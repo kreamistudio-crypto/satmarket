@@ -14716,3 +14716,158 @@ cert TLS di LND (22 ott 2027: ricopiare `tls.cert` sul VPS); il foglio
 del panico, la cui riga «LNbits gira su Spark» e' gia' falsa a meta';
 `ufw`. La strada scartata da non riproporre senza un motivo nuovo: il
 lease come base della liquidita'.
+
+## Entra anche con Nostr: la firma vera al posto della nota pubblica (15 set 2026)
+
+**IL PROBLEMA, trovato da Andrea**: collegare Nostr a un account
+Telegram erano due gesti separati, ed entrambi senza mai firmare
+niente. Si salvava la npub e la si "verificava" pubblicando una nota
+da un client Nostr ESTERNO (Damus, Amethyst...) — prova il possesso
+ma non lascia mai in mano al browser una firma vera. Poi un bottone a
+parte, "Abilita l'accesso con Nostr", spostava solo un interruttore
+sul server (`abilita_accesso_nostr`, nessuna firma nemmeno li). Il
+risultato: `chiave_nostr_provata()` diventava vera (npub_verificata o
+npub_accesso), ma il browser non aveva MAI in mano un firmatario —
+quindi la coda `firme_nostr` (IL TRASLOCO degli annunci sul nome
+dell'utente, la dichiarazione di fiducia NIP-85) restava silenziosa.
+L'unico rimedio era `sollecita_firme_nostr`, un promemoria settimanale
+OPT-IN e SPENTO di default: nella pratica un utente poteva collegare
+Nostr e non vedere MAI i suoi annunci passare a nome suo.
+
+**LA CURA**: `POST /api/me/npub/collega-firma` (subito dopo
+`disabilita_accesso_nostr` in server.py), che fa in un gesto solo
+quel che prima erano tre passi. Riusa la STESSA sfida del login vero
+(`GET /api/login/nostr/sfida`, `verifica_evento_login`) — zero
+crittografia reinventata — ma la applica all'account Telegram GIA'
+aperto invece di aprirne uno nuovo: una sola `UPDATE utenti SET
+npub=?, npub_verificata=1, npub_accesso=?` con la STESSA guardia a
+indice unico di `abilita_accesso_nostr` (stesso messaggio 409, stesso
+400 "gia' attivo" — copiati a mano, cosi' i due guardiani non possono
+un giorno dire due cose diverse per lo stesso errore). Il client
+(`collegaNostrFirmato`/`eseguiCollegamentoFirmato`, vicino a
+`dichiaraNip85` in miniapp.html) ricalca `entraConNostr` ma non apre
+una sessione: firma la sfida col firmatario che ha (bunker salvato,
+estensione, o il foglio `apriNostrSheet`), la consegna al server, e
+RIUSA SUBITO quella stessa firma per svuotare la coda
+(`svuotaFirmeNostr(f)`, che ora accetta un firmatario gia' in mano
+invece di doverlo ritrovare da sola) — i due gesti (collegare, e
+smaltire la coda) usano la stessa firma, invece di aspettare il
+prossimo giro opportunistico o il promemoria.
+
+**IL TRASLOCO SUBITO, per un utente solo**: `trasloca_annunci_nostr`
+gira ogni 10 minuti su TUTTI gli utenti e nella sua seconda meta'
+chiama i relay — non e' pensato per girare dentro una richiesta HTTP
+che aspetta. `_accoda_trasloco_di(con, tg_id)` e' la meta' piccola
+(solo la SELECT che mette in coda, niente relay, niente attesa): gli
+annunci vecchi del venditore finiscono SUBITO pronti per la sua firma,
+la lapide sul vecchio evento di Barattolo resta all'orologio come
+sempre. E' una duplicazione DICHIARATA delle tre condizioni della
+WHERE di `trasloca_annunci_nostr` (estrarle avrebbe voluto dire
+toccare quella funzione, fuori dal perimetro di qui): `prove_
+collega_npub_firma` confronta le due WHERE byte a byte, cosi' se
+divergono la prova si accorge invece di scollegarsi in silenzio.
+
+**IL SECONDO GIRO, LO STESSO GIORNO — Andrea ha tagliato anche i
+ripieghi**: la prima stesura di questo cantiere teneva la nota
+pubblica e "Abilita l'accesso senza firmare" come bottoni secondari,
+per rispetto del gradino gia' approvato della scala Nostr. Andrea li
+ha bocciati appena visti: «il verifica accesso ha poco senso... uno
+verifica l'identita' e pensa che sia a posto cosi'» — anche un bottone
+DEMOTO, se esiste, e' un modo di finire senza aver firmato niente.
+**TOLTI DEL TUTTO, non solo demoti**: `verifica_npub_avvia`,
+`verifica_npub_controlla`, `cerca_nota_verifica`, `abilita_accesso_nostr`
+lato server; `saveNpub`, `npubAvvia`, `npubControlla`, `copiaCodice`,
+`abilitaAccessoNostr` lato client; il campo a mano «Il tuo profilo
+Nostr (facoltativo)» + bottone «Salva la npub» nel markup. La colonna
+`nip85_pubkey`/il rito NIP-85 e' rimasto una funzione (`firmaEConsegnaNip85`)
+ma non piu' un gesto SUO: vedi sotto. `/api/me/npub` (`salva_npub`)
+sopravvive perche' `rimuoviNpub()` lo riusa per il solo ramo che
+CANCELLA la npub — non ne resta nessun ramo che ne SALVI una non
+vuota. `renderIdentita` mostra un bottone solo, «🔑 Entra anche con
+Nostr», in ogni stato "non ancora collegato del tutto"; `disabilita_
+accesso_nostr` resta (spegne solo l'accesso, non e' un ripiego — e'
+il contrario di collegarsi, non un modo piu' debole di farlo).
+
+**E ANCHE LA FIDUCIA NIP-85 NON SI MOSTRA PIU'**, stesso messaggio di
+Andrea, un minuto dopo: «sti tecnicismi tipo verifica nip 85... non
+metterli. Metti solo entra anche con nostr, e li firma gia' nip 85».
+Il bottone «🔗 Firma la fiducia NIP-85» e la sua spiegazione (kind
+30382, kind 10040...) sono spariti dal cassetto Identita' insieme al
+resto: `firmaEConsegnaNip85(f, silenzioso)` viene chiamata DENTRO
+`eseguiCollegamentoFirmato`, con la STESSA firma appena usata per
+collegarsi, e con `silenzioso=true` sostituisce ogni suo toast con un
+log `console` — un dettaglio tecnico per chi legge la console, non un
+passo che l'utente deve vedere o seguire. Chi non ha ancora una npub
+verificata, chi non ha `myNip85Pubkey` (Nostr spento sul server) o chi
+ha gia' dichiarato la fiducia: il ramo esce subito, senza dire niente
+a nessuno — coerente col resto (fail-open, mai un errore per un gesto
+in piu' che non e' la promessa principale del bottone). `dichiaraNip85`
+(il vecchio innesco manuale) e' sparito: non ha piu' nessun chiamante.
+
+**IL RISULTATO**: un bottone solo — «🔑 Entra anche con Nostr» —
+firma la sfida del login, e quella STESSA firma fa il resto in
+sequenza, nello stesso gesto e senza altri passi visibili: badge +
+accesso (server, atomico), fiducia NIP-85 (silenziosa), coda
+`firme_nostr` svuotata (i vecchi annunci ripubblicati a nome
+dell'utente). Un solo toast di successo, uno all'inizio se serve la
+firma, e basta.
+
+**LE PROVE**: `prove_collega_npub_firma` (vicino a
+`prove_trasloco_nostr` in prove.py), girata per davvero: riusa
+`verifica_evento_login` (mai una seconda verifica della firma scritta
+a mano), la guardia si ripete nella WHERE, la scrittura e' atomica
+(un solo UPDATE, i tre campi insieme), il 400 e il 409 sono nominati
+dentro `collega_npub_firma` stessa (non piu' confrontati con un
+gemello — quel gemello, `abilita_accesso_nostr`, e' sparito nel
+secondo giro, e la prova e' stata aggiornata con lui), e una prova
+regina gira su sqlite vero con l'indice unico vero: il caso normale
+(npub mai vista, un annuncio vecchio che finisce in coda, i due premi
+che partono), il richiamo sullo stesso utente (400), la stessa chiave
+da un altro utente (409, e la riga di quell'utente resta intatta —
+niente scrittura parziale dietro un rifiuto). `prove_reputazione_nostr`
+aveva un gancio su `verifica_npub_controlla`: spostato su
+`collega_npub_firma`, che ha ereditato lo stesso compito (ripubblicare
+subito la reputazione di chi aveva gia' un livello). Il censimento di
+`location.origin` nel client (`prove_onion`) e' salito da 4 a 5 posti
+noti (il tag `['relay', location.origin]` di
+`eseguiCollegamentoFirmato`), e quello delle copie letterali
+dell'icona Nostr (stessa prova) e' SCESO da 2 a 1 — il bottone «Salva
+la npub», una delle tre copie storiche, e' andato via col campo a
+mano. **10067 verdi**, entrambi i giri.
+
+**PROVATO DAL VIVO** (15 set 2026, MODALITA_COLLAUDO, due account):
+primo giro (Venditore/222, prima del secondo taglio) — una npub Nostr
+vera generata al volo, firmata e collegata dal Profilo, badge e
+accesso accesi insieme, distintivo "Doppia cittadinanza" scattato,
+`annunci_in_coda` tornato nella risposta; provati anche i due rifiuti
+(400 sul richiamo allo stesso utente, 409 sulla chiave gia' presa,
+riga del terzo utente intatta). Secondo giro (Compratore/111, DOPO il
+taglio dei ripieghi e del bottone NIP-85): il cassetto Identita' non
+mostra piu' ne' il campo a mano ne' `#npubVerifica` (verificato
+`document.getElementById` su entrambi: `null`); collegamento firmato
+con nsec generata al volo — un TOAST SOLO, "🔑 Fatto! Badge verificato,
+accesso abilitato", niente toast NIP-85 di mezzo; scattati insieme i
+distintivi "🟣 Nostrano" e "🔗 Doppia cittadinanza". In questa macchina
+di sviluppo `_NOSTR` (la chiave della piattaforma) non e' configurata,
+quindi `premia_reputazione_nostr` fallisce in modo APERTO (il suo
+`try/except` di sempre) e `firmaEConsegnaNip85` esce subito per
+`myNip85Pubkey` vuoto (nessun log, per costruzione) — non sono difetti
+di questo cantiere, sono la stessa rete di sicurezza gia' scritta
+ovunque nel codice Nostr, solo mai esercitata prima su questa porta.
+
+**COSA RESTA**: non provato in produzione vera un collegamento via
+bunker o telefono (nostrconnect) end-to-end, ne' la firma NIP-85
+silenziosa con `_NOSTR` VERO configurato — solo la nsec incollata in
+pagina e un server senza chiave Nostr, le strade piu' semplici da
+riprodurre in collaudo. Per chi firma con la nsec (mai salvata, per
+scelta: regola ferrea 2) i prossimi annunci pubblicati finiranno
+comunque in coda come sempre, e senza un bunker/un'estensione
+collegati la coda tornera' silenziosa — resta valido solo
+`sollecita_firme_nostr`, che e' ancora spento di default. Nessuna leva
+nuova e' nata per questo cantiere: l'unico modo di spegnere la firma
+sarebbe togliere il bottone dal client, mai fatto finora. La rotta
+Nostr→Telegram (`collegaTelegram`, «✈️ Collega Telegram») non e' stata
+toccata: fa gia' tutto per costruzione (un account nativo ha sempre
+`npub_accesso`, quindi una chiave provata, fin dalla nascita) — resta
+aperto solo se rinominarla per simmetria col nuovo bottone (Andrea
+l'ha descritta ma non ha chiesto esplicitamente il rinomino).

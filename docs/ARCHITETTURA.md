@@ -6041,23 +6041,30 @@
   POST — il ridimensionamento a 1200px è il livellatore. Il 413 ha
   comunque il suo messaggio, che è l'unico errore che l'utente ripara
   da solo togliendo una foto.
-  Badge Nostr: colonna `utenti.npub` auto-dichiarata via `/api/me/npub`
-  (formato bech32, rifiuta le nsec) + verifica con NOTA PUBBLICA:
-  `/api/me/npub/verifica-avvia` genera un codice (vale 1h), l'utente lo
-  pubblica in una nota kind-1 dal SUO client, `verifica-controlla`
-  interroga 4 relay (websocket-client è sincrono: gira dentro
-  `asyncio.to_thread`, relay in parallelo) → `utenti.npub_verificata`,
-  badge 🟣. Dal lug 2026 il badge pubblico (card, dettaglio, negozio)
-  esiste SOLO con la npub verificata, come 🟣 semplice senza ✓ (il
-  non-verificato non compare in pubblico, quindi la spunta non
-  distingue più nulla); la npub dichiarata ma non verificata la vede
-  solo il proprietario nel suo Profilo, con l'invito a verificarla.
-  Cambiare o rimuovere la npub azzera la verifica.
+  Badge Nostr: colonna `utenti.npub` (formato bech32, rifiuta le nsec),
+  verificata e con accesso insieme via `/api/me/npub/collega-firma`
+  (una firma vera, vedi «Doppia cittadinanza» e «L'accesso Nostr
+  firmato» più sopra) → `utenti.npub_verificata`, badge 🟣. ⚠️ Dal lug
+  2026 al set 2026 esisteva anche un secondo modo, PIÙ LENTO e senza
+  mai firmare: `/api/me/npub/verifica-avvia` generava un codice,
+  l'utente lo pubblicava in una nota kind-1 dal SUO client esterno,
+  `verifica-controlla` interrogava 4 relay (websocket-client è
+  sincrono: girava dentro `asyncio.to_thread`) → stesso `npub_verificata`
+  ma NESSUNA firma in mano al browser, quindi niente accesso e niente
+  coda `firme_nostr` risolta. RIMOSSO set 2026 (decisione di Andrea:
+  dava un badge e lasciava pensare che bastasse) insieme al campo npub
+  a mano e ad `/api/me/npub/abilita-accesso` — vedi CANTIERI, "Entra
+  anche con Nostr". Dal lug 2026 il badge pubblico (card, dettaglio,
+  negozio) esiste SOLO con la npub verificata, come 🟣 semplice senza ✓
+  (il non-verificato non compare in pubblico, quindi la spunta non
+  distingue più nulla). Cambiare o rimuovere la npub azzera la verifica.
   Rimozione della npub (lug 2026): `salva_npub` con stringa vuota è
-  l'unica strada; nel cassetto Identità c'è il bottone esplicito
+  l'unica strada, oggi l'UNICO ramo ancora raggiunto di quella rotta
+  (il ramo che SALVA una npub non vuota è servito solo da
+  `collega-firma`); nel cassetto Identità c'è il bottone esplicito
   «🗑 Rimuovi la npub dal profilo» (confirm SEMPRE, con l'avviso in
-  più se la chiave era anche npub_accesso; il campo svuotato + Salva
-  delega lì). La rimozione toglie npub, verifica e — se coincideva —
+  più se la chiave era anche npub_accesso). La rimozione toglie npub,
+  verifica e — se coincideva —
   npub_accesso (solo tg_id>0, com'era già); il NATIVO Nostr (tg_id<0)
   con badge ≡ npub_accesso è BLOCCATO con 400 «è il tuo unico modo di
   entrare: collega prima Telegram» (guardia doppia frontend+server);
@@ -7951,15 +7958,16 @@
   commenti — quindi il giro «dal vivo» stava entrando con l'identità
   finta del collaudo e diceva `WEB: false` per la ragione sbagliata.
   Una verifica che fallisce si guarda prima di crederle.
-  Doppia cittadinanza (lug 2026): le due direzioni del collegamento.
-  Telegram→Nostr: `POST /api/me/npub/abilita-accesso` promuove il
-  badge VERIFICATO a `npub_accesso` (indice unico = giudice: 409 se
-  la chiave apre già un altro account, e il messaggio indirizza alla
-  fusione); `disabilita-accesso` è il contrario ma RIFIUTA i tg_id
-  negativi (un nativo si chiuderebbe fuori); `salva_npub` che cambia
-  o rimuove il badge azzera anche `npub_accesso` se coincideva (solo
-  su tg_id>0, stessa ragione). Nostr→Telegram: il bot per la prima
-  volta ASCOLTA — webhook `POST /api/telegram/aggiornamenti`
+  Doppia cittadinanza (lug 2026, poi set 2026): le due direzioni del
+  collegamento. Telegram→Nostr: `POST /api/me/npub/collega-firma`
+  (vedi «L'accesso Nostr firmato», qui sotto) è l'UNICA porta —
+  indice unico = giudice: 409 se la chiave apre già un altro account,
+  e il messaggio indirizza alla fusione; `disabilita-accesso` è il
+  contrario ma RIFIUTA i tg_id negativi (un nativo si chiuderebbe
+  fuori); `salva_npub` (oggi richiamato solo per RIMUOVERE la npub,
+  da «🗑 Rimuovi la npub dal profilo») azzera anche `npub_accesso` se
+  coincideva (solo su tg_id>0, stessa ragione). Nostr→Telegram: il
+  bot per la prima volta ASCOLTA — webhook `POST /api/telegram/aggiornamenti`
   (`TELEGRAM_WEBHOOK_SEGRETO` in config, segnaposto = spento;
   confronto `hmac.compare_digest` sull'header
   X-Telegram-Bot-Api-Secret-Token; si registra da solo all'avvio con
@@ -7984,6 +7992,34 @@
   `gestisci_update` fa `upsert_utente` sul mittente (che può non
   aver mai aperto la Mini App) e risponde con garbo a /start nudo
   e ai messaggi qualsiasi.
+  L'accesso Nostr firmato (set 2026, vedi CANTIERI, voce omonima):
+  `POST /api/me/npub/collega-firma` è oggi l'UNICA porta per collegare
+  Nostr da un account Telegram, e fa in UN gesto quel che prima erano
+  tre passi separati — salva_npub, la verifica con nota pubblica
+  esterna, abilita-accesso — riusando la STESSA sfida del login vero
+  (`GET /api/login/nostr/sfida`, `verifica_evento_login`) invece di
+  chiedere una nota pubblicata a mano. La ragione: la nota pubblica
+  prova il possesso ma non lascia mai in mano al browser una firma
+  vera, quindi `chiave_nostr_provata()` diventava sì vera ma
+  `firmatarioAutomatico()` restava a mani vuote — la coda
+  `firme_nostr` (IL TRASLOCO, la reputazione NIP-85) restava silenziosa
+  fino al promemoria settimanale spento di default, e chi verificava o
+  abilitava l'accesso pensava di aver finito (decisione di Andrea: «se
+  non può firmare, i prodotti non sono suoi»). Qui la firma che arriva
+  è già quella buona, e viene RIUSATA per tutto il resto nello stesso
+  gesto, in silenzio — mai un secondo bottone tecnico da mostrare:
+  svuota la coda (`svuotaFirmeNostr(f)`), firma la dichiarazione di
+  fiducia NIP-85 (`firmaEConsegnaNip85(f, true)`, la modalità muta —
+  toast sostituiti da un log — perché è un dettaglio e non un passo da
+  seguire), e il server accoda SUBITO gli annunci vecchi con
+  `_accoda_trasloco_di` (solo la metà che mette in coda, niente relay:
+  quella resta all'orologio dei 10 minuti). `verifica-avvia`,
+  `verifica-controlla`, `abilita-accesso` e le loro controparti client
+  (`saveNpub`, `npubAvvia`, `npubControlla`, `dichiaraNip85`, il campo
+  npub a mano) sono stati RIMOSSI, non solo demoti a ripiego: davano
+  un badge o un accesso senza mai firmare, e lasciavano pensare che
+  bastasse. `salva_npub` sopravvive solo per il ramo che RIMUOVE la
+  npub (`{"npub": ""}`, da «🗑 Rimuovi la npub dal profilo»).
   Notifiche multi-canale (lug 2026): `notifica()` legge
   `utenti.canale_notifiche` ('' = automatico: Telegram se tg_id>0,
   DM Nostr per i nativi; oppure telegram | nostr | entrambi, scelta
@@ -8576,9 +8612,10 @@
   criteri dai dati veri (stile `_ricalcola_rating`) e assegna con
   INSERT OR IGNORE; `premia_distintivi(tg_id)` (connessione propria,
   fail-open, notifica «🏅» DOPO il commit) è il gancio dal vivo in:
-  `_sblocca_sats` (entrambe le parti), `verifica_npub_controlla`,
-  `abilita_accesso_nostr`, `login_nostr` (nativo nuovo),
-  `login_nostr_collega`, `pubblica`, `lascia_feedback` (entrambe).
+  `_sblocca_sats` (entrambe le parti), `collega_npub_firma` (set 2026,
+  erede di `verifica_npub_controlla`+`abilita_accesso_nostr`, rimossi),
+  `login_nostr` (nativo nuovo), `login_nostr_collega`, `pubblica`,
+  `lascia_feedback` (entrambe).
   Passata retroattiva SILENZIOSA su tutti gli utenti a ogni avvio in
   `init_db` + catch-all silenzioso in `/api/me` (scrittura su GET ma
   idempotente: è ciò che rende il sistema auto-riparante). I criteri
@@ -24532,12 +24569,21 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Qui ci sono i gradini col PERCHÉ di ognuno, che è la parte che serve
   quando qualcuno propone un gradino nuovo: si guarda se somiglia a uno
   già approvato o a quello che è stato RESPINTO.
-   Decisione permanente. La scala approvata: badge npub auto-dichiarato →
-   verifica con nota pubblica (fatta, lug 2026) → login Nostr con firma
-   di sfida (fatto, lug 2026: la nsec incollata nel login web firma
-   SOLO nella pagina, mai trasmessa né salvata, e la UI la sconsiglia
-   a favore di estensione/bunker — è l'estensione approvata della
-   scala, NON un'eccezione) → wallet NWC solo-nel-browser (lug 2026:
+   Decisione permanente. La scala approvata: badge npub auto-dichiarato
+   → verifica con nota pubblica (fatta lug 2026, RITIRATA set 2026: dava
+   un badge senza mai firmare, e lasciava pensare che bastasse — vedi
+   CANTIERI, "Entra anche con Nostr". Il gradino resta scritto qui per
+   la storia della decisione, non perché sia ancora offerto) → login
+   Nostr con firma di sfida (fatto, lug 2026: la nsec incollata nel
+   login web firma SOLO nella pagina, mai trasmessa né salvata, e la UI
+   la sconsiglia a favore di estensione/bunker — è l'estensione
+   approvata della scala, NON un'eccezione) → collegamento Nostr con la
+   STESSA firma di sfida, ma sull'account Telegram già aperto (fatto,
+   set 2026, `POST /api/me/npub/collega-firma`: nessuna chiave nuova
+   rispetto al gradino sopra, solo un secondo uso — collegare invece di
+   entrare — della stessa sfida e dello stesso `verifica_evento_login`;
+   da set 2026 è l'UNICA porta per collegare Nostr da Telegram) →
+   wallet NWC solo-nel-browser (lug 2026:
    la stringa nostr+walletconnect:// è una credenziale di SPESA e
    vive solo in localStorage del dispositivo, mai sul server — un
    suo salvataggio server-side, anche cifrato, farebbe della

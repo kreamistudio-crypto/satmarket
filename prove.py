@@ -12406,6 +12406,183 @@ def prove_trasloco_nostr():
           "SET nostr_event_vecchio=?" in fatta)
 
 
+def prove_collega_npub_firma():
+    """"Entra anche con Nostr" (set 2026): l'UNICA porta per collegare
+    Nostr da un account Telegram, con una firma vera — niente piu'
+    salva-npub, nota pubblica esterna o switch senza firma (tutti
+    rimossi con questo cantiere, vedi CANTIERI). Una scrittura atomica
+    che riusa il giudice unico del login vero (verifica_evento_login)
+    invece di reinventare un controllo di firma."""
+    import asyncio
+    import sqlite3
+    import time
+    print("\n[entra anche con Nostr: collegamento firmato]")
+
+    corpo = pezzo("collega_npub_firma")
+    trasl = pezzo("_accoda_trasloco_di")
+    corpo_trasloco = pezzo("trasloca_annunci_nostr")
+
+    # 1. Non reinventa la crittografia: la firma passa dal giudice unico
+    #    del login vero, lo stesso di /api/login/nostr.
+    prova("la firma passa dal giudice unico del login", True,
+          "verifica_evento_login" in corpo)
+    prova("...e non ricontrolla la firma un'altra volta a mano", False,
+          "ChiavePubblicaNostr(" in corpo)
+
+    # 2. I due rifiuti dicono chi e perche', non solo "errore".
+    prova("il 400 nomina l'accesso gia' attivo", True,
+          "L'accesso con Nostr e' gia' attivo" in corpo)
+    prova("il 409 nomina la chiave gia' presa e indirizza alla fusione",
+          True, "Questa chiave apre gia' un altro account" in corpo
+          and "Collega Telegram" in corpo)
+
+    # 3. La guardia si ripete nella WHERE: l'indice unico e' il giudice
+    #    vero (una IntegrityError sui generis), non solo il controllo
+    #    prima — un controllo-solo-prima avrebbe una finestra di corsa.
+    prova("la WHERE ripete la guardia", True,
+          "WHERE tg_id=? AND npub_accesso=''" in corpo)
+
+    # 4. Scrittura atomica: i tre campi insieme, in UNA UPDATE sola, non
+    #    tre passi separati che potrebbero fermarsi a meta'.
+    for campo in ("npub=?", "npub_verificata=1", "npub_accesso=?"):
+        prova(f"la scrittura atomica include {campo}", True, campo in corpo)
+    prova("una scrittura sola (un solo UPDATE utenti)", 1,
+          corpo.count("UPDATE utenti"))
+
+    # 5. Il trasloco per l'utente solo non tocca i relay e non aspetta
+    #    niente: non deve far aspettare la richiesta di chi ha appena
+    #    collegato la chiave. La lapide resta all'orologio.
+    prova("_accoda_trasloco_di non chiama i relay", False,
+          "_spedisci_ai_relay" in trasl)
+    prova("...e non aspetta niente", False, "await" in trasl)
+
+    # 6. ANTI-DERIVA: le condizioni della WHERE di _accoda_trasloco_di
+    #    sono le STESSE di trasloca_annunci_nostr, ripetute a mano apposta
+    #    (vedi la sua docstring) — se una cambia senza l'altra, questa
+    #    prova diventa rossa invece di scollegarsi in silenzio.
+    for pezzetto in ("a.nostr_event_id<>''", "a.nostr_autore=''",
+                     "a.contatto_nostr=''", "f.annuncio_id IS NULL"):
+        prova(f"stessa condizione del trasloco periodico: {pezzetto}", True,
+              pezzetto in trasl and pezzetto in corpo_trasloco)
+
+    # ---- La prova regina, ESEGUIBILE: indice unico vero compreso -----
+    class _HTTP(Exception):
+        def __init__(self, codice, detail=""):
+            self.status_code, self.detail = codice, detail
+
+    class _ReqFinta:
+        headers = {"host": "barattolo.store"}
+
+    amb = {"Header": lambda d="": d, "Cookie": lambda d="": d,
+           "Request": object, "HTTPException": _HTTP,
+           "ChiavePubblicaNostr": object, "time": time, "sqlite3": sqlite3}
+    # bech32 vero, lo stesso importato da prove_trasloco_nostr: una npub
+    # finta a mano avrebbe potuto nascondere un bug nella codifica.
+    i = _SORGENTE.index("CHARSET_BECH32 = ")
+    exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+    exec(pezzo("_bech32_polymod"), amb)
+    exec(pezzo("npub_to_hex"), amb)
+    exec(pezzo("hex_to_npub"), amb)
+    exec(pezzo("accoda_firma"), amb)
+    exec(pezzo("_accoda_trasloco_di"), amb)
+    exec("async " + pezzo("collega_npub_firma"), amb)
+
+    esito_verifica = {"pubkey": ""}
+    amb["verifica_evento_login"] = lambda evento, host: esito_verifica["pubkey"]
+    utente_attivo = {"id": 0}
+    amb["verifica_utente"] = lambda *a: utente_attivo
+    premiati = []
+
+    async def premia_distintivi_finta(tg_id):
+        premiati.append(("distintivi", tg_id))
+
+    async def premia_reputazione_nostr_finta(tg_id):
+        premiati.append(("reputazione", tg_id))
+    amb["premia_distintivi"] = premia_distintivi_finta
+    amb["premia_reputazione_nostr"] = premia_reputazione_nostr_finta
+
+    async def json_finto(req):
+        return {"evento": {}}
+    amb["leggi_json"] = json_finto
+
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript("""
+        CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, npub TEXT DEFAULT '',
+            npub_verificata INTEGER DEFAULT 0, npub_accesso TEXT DEFAULT '',
+            verifica_codice TEXT DEFAULT '', verifica_scade INTEGER DEFAULT 0);
+        CREATE UNIQUE INDEX idx_utenti_npub_accesso
+            ON utenti(npub_accesso) WHERE npub_accesso != '';
+        CREATE TABLE annunci(id INTEGER PRIMARY KEY, venditore_id INTEGER,
+            nostr_event_id TEXT DEFAULT '', nostr_autore TEXT DEFAULT '',
+            contatto_nostr TEXT DEFAULT '');
+        CREATE TABLE firme_nostr(annuncio_id INTEGER PRIMARY KEY,
+            tg_id INTEGER, azione TEXT, creato INTEGER);
+    """)
+    con.executemany("INSERT INTO utenti(tg_id) VALUES(?)", [(1,), (3,)])
+    con.execute("INSERT INTO annunci(id, venditore_id, nostr_event_id) "
+                "VALUES(20, 1, 'ev20')")
+    con.commit()
+
+    class Finta:
+        """Delega tutto alla connessione vera tranne close(): la prova
+        deve poter guardare il database DOPO che il pezzo l'ha chiuso."""
+        def __getattr__(self, n):
+            return getattr(con, n)
+
+        def close(self):
+            pass
+    amb["db"] = lambda: Finta()
+
+    # --- A) il caso normale: user 1 firma con una chiave mai vista -----
+    utente_attivo["id"] = 1
+    esito_verifica["pubkey"] = "c" * 64
+    npub_c = amb["hex_to_npub"]("c" * 64)
+    ris = asyncio.run(amb["collega_npub_firma"](_ReqFinta()))
+    prova("risponde ok con la npub firmata", npub_c, ris["npub"])
+    prova("...verificata e con accesso insieme", (True, True),
+          (ris["npub_verificata"], ris["npub_accesso"]))
+    prova("...e conta l'annuncio appena accodato", 1, ris["annunci_in_coda"])
+    riga1 = con.execute("SELECT * FROM utenti WHERE tg_id=1").fetchone()
+    prova("la riga vera ha i tre campi scritti insieme", (npub_c, 1, npub_c),
+          (riga1["npub"], riga1["npub_verificata"], riga1["npub_accesso"]))
+    coda = con.execute("SELECT azione FROM firme_nostr "
+                       "WHERE annuncio_id=20").fetchone()
+    prova("l'annuncio vecchio e' davvero in coda per la firma sua",
+          "pubblica", coda["azione"] if coda else None)
+    prova("i due premi sono partiti per l'utente giusto",
+          [("distintivi", 1), ("reputazione", 1)], premiati)
+
+    # --- B) richiamarlo sullo stesso utente: 400, gia' attivo ----------
+    try:
+        asyncio.run(amb["collega_npub_firma"](_ReqFinta()))
+        esito_b = None
+    except _HTTP as e:
+        esito_b = (e.status_code, e.detail)
+    prova("il secondo giro sullo stesso utente e' un 400, non uno strappo",
+          (400, "L'accesso con Nostr e' gia' attivo"), esito_b)
+
+    # --- C) un altro utente firma con la STESSA chiave: 409 ------------
+    utente_attivo["id"] = 3   # gia' in tabella, npub_accesso ancora vuota
+    try:
+        asyncio.run(amb["collega_npub_firma"](_ReqFinta()))
+        esito_c = None
+    except _HTTP as e:
+        esito_c = (e.status_code, e.detail)
+    prova("la chiave gia' presa altrove e' un 409, non uno strappo silenzioso",
+          409, esito_c[0] if esito_c else None)
+    prova("...e indirizza alla fusione con la frase intera",
+          "Questa chiave apre gia' un altro account: se e' il tuo "
+          "account Nostr, entra dal web con Nostr e usa «Collega Telegram»",
+          esito_c[1] if esito_c else None)
+    riga3 = con.execute("SELECT npub, npub_accesso FROM utenti "
+                        "WHERE tg_id=3").fetchone()
+    prova("...e la riga del terzo utente resta intatta: niente scrittura "
+          "parziale dietro il 409", ("", ""),
+          (riga3["npub"], riga3["npub_accesso"]))
+    con.close()
+
+
 def prove_bip353():
     """Perche' un Lightning address non ha risposto (ago 2026, dal
     caso vero di Phoenix). Un indirizzo BIP-353 e' scritto benissimo:
@@ -24026,15 +24203,22 @@ def prove_onion():
           "const base = baseCondivisione();" in mini)
 
     # --- 3) IL ROVESCIO: i tre che non si toccano ------------------
-    prova("il tag relay del login Nostr resta location.origin", True,
-          "['relay', location.origin]" in mini)
+    prova("il tag relay del login Nostr resta location.origin", 2,
+          mini.count("['relay', location.origin]"))
+    # (set 2026) IL SECONDO E' "entra anche con Nostr": stessa sfida del
+    # login vero, sull'account Telegram gia' aperto — vedi
+    # eseguiCollegamentoFirmato, che ricalca apposta entraConNostr.
+    _ecf = pezzo_js(mini, "async function eseguiCollegamentoFirmato(",
+                    "\n}\n")
+    prova("...e il secondo e' proprio nel collegamento firmato", True,
+          "['relay', location.origin]" in _ecf)
     prova("...e i due URL di export/modello anche", 2,
           mini.count("${location.origin}${API_BASE}"))
     # E IL CENSIMENTO: nel CODICE del client `location.origin` resta
-    # in QUATTRO posti — il ripiego del giudice piu' i tre qui sopra —
-    # e da nessun'altra parte. Cosi' la condivisione nuova di domani
-    # non puo' nascere col dominio sbagliato senza che questa riga lo
-    # dica.
+    # in CINQUE posti — il ripiego del giudice, i due tag relay del
+    # login/collegamento Nostr, i due URL qui sopra — e da nessun'altra
+    # parte. Cosi' la condivisione nuova di domani non puo' nascere col
+    # dominio sbagliato senza che questa riga lo dica.
     #
     # ⚠️ SI GUARDA IL CODICE E NON LA PROSA, ed e' la trappola gia'
     # pagata altrove: nel client i commenti sono a BLOCCO e le righe di
@@ -24068,7 +24252,7 @@ def prove_onion():
                 _i = _j + len(_a)
         if "location.origin" in _pulita.split("//")[0]:
             _vive.append(_r.strip())
-    prova("...e nel codice non ne restano altri in giro", 4, len(_vive))
+    prova("...e nel codice non ne restano altri in giro", 5, len(_vive))
 
     # --- 4) il login Telegram non si offre su onion ----------------
     # Il Login Widget funziona SOLO sul dominio registrato con
@@ -24626,16 +24810,18 @@ def prove_onion():
     _mk = mini.split(" Ti conosciamo")[0].split("<h3>")[-1]
     prova("il disegno del markup e quello del giudice combaciano",
           True, _js == _mk and "<circle" in _js)
-    # ...E VALE PER OGNI COPIA, non solo per quella. Le copie
-    # letterali sono TRE — il giudice, il foglio del collegamento e
-    # il bottone «Salva la npub», che nessuno riscrive — e si
-    # confrontano col giudice UNA PER UNA: contarle direbbe «tre»
-    # anche su tre disegni diversi.
+    # ...E VALE PER OGNI COPIA, non solo per quella. Le copie letterali
+    # sono DUE — il giudice e il foglio del collegamento, che nessuno
+    # riscrive — e si confrontano col giudice UNA PER UNA: contarle
+    # direbbe «due» anche su due disegni diversi.
+    # (set 2026: il bottone «Salva la npub» — la terza copia di ieri —
+    # e' sparito insieme al campo a mano: vedi CANTIERI, "Entra anche
+    # con Nostr".)
     _tutte = _re.findall(
         r'<svg class="ico-nostr" viewBox[^\n]*?</svg>', mini)
     _letterali = [c for c in _tutte if "' " not in c and "+ '" not in c]
     prova("ogni copia letterale del disegno combacia col giudice",
-          (2, True), (len(_letterali),
+          (1, True), (len(_letterali),
                       all(c == _js for c in _letterali)))
     prova("...e le porte riscritte dal JS portano il solo testo",
           (True, True),
@@ -58640,8 +58826,11 @@ def prove_reputazione_nostr():
     vero.close()
 
     # --- 3) i due ganci nei punti giusti -------------------------------
-    corpo_npub = pezzo("verifica_npub_controlla")
-    prova("dopo la verifica della npub si (ri)pubblica subito: chi "
+    # (set 2026: il gancio era in verifica_npub_controlla, sparita col
+    # cantiere "Entra anche con Nostr" — ora e' collega_npub_firma, la
+    # sola porta rimasta che rende una chiave provata.)
+    corpo_npub = pezzo("collega_npub_firma")
+    prova("dopo il collegamento firmato si (ri)pubblica subito: chi "
           "aveva gia' un livello non aspetta il primo affare nuovo",
           True, 'await premia_reputazione_nostr(user["id"])' in corpo_npub)
 
@@ -59069,7 +59258,8 @@ def main():
               prove_notifica_fail_open,
               prove_messaggio_admin, prove_avviso_contatto,
               prove_forma_tracking, prove_bip353, prove_firme_nostr,
-              prove_trasloco_nostr, prove_conta_feedback,
+              prove_trasloco_nostr, prove_collega_npub_firma,
+              prove_conta_feedback,
               prove_classifica,
               prove_ferie, prove_stock_raccontato, prove_pausa,
               prove_xp, prove_coorti_titoli, prove_conto_acquisto,

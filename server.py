@@ -33156,157 +33156,20 @@ def decodifica_naddr(naddr: str) -> dict:
             "kind": kind, "relays": relays}
 
 
-def cerca_nota_verifica(relay: str, hexkey: str, codice: str, da: int) -> bool:
-    """Chiede a UN relay le note recenti della npub e guarda se una
-    contiene il codice. E' SINCRONA (websocket-client): il server e'
-    async, quindi va chiamata dentro asyncio.to_thread."""
-    try:
-        ws = create_connection(relay, timeout=5,
-                               sslopt={"cert_reqs": ssl.CERT_NONE})
-        ws.send(json.dumps(["REQ", "verifica", {
-            "kinds": [1], "authors": [hexkey], "since": da, "limit": 50}]))
-        inizio = time.time()
-        while time.time() - inizio < 6:
-            msg = json.loads(ws.recv())
-            if msg[0] == "EVENT" and msg[1] == "verifica":
-                if codice in msg[2].get("content", ""):
-                    ws.close()
-                    return True
-            elif msg[0] == "EOSE":
-                break
-        ws.close()
-    except Exception:
-        pass                  # relay muto o irraggiungibile: pazienza
-    return False
-
-
-@app.post("/api/me/npub/verifica-avvia")
-async def verifica_npub_avvia(x_tg_init_data: str = Header(""),
-                              barattolo_sessione: str = Cookie("")):
-    """Primo passo: generiamo il codice univoco da pubblicare in una
-    nota Nostr. Vale 1 ora."""
-    user = verifica_utente(x_tg_init_data, barattolo_sessione)
-    con = db()
-    u = con.execute("SELECT npub, npub_verificata FROM utenti WHERE tg_id=?",
-                    (user["id"],)).fetchone()
-    if not u or not u["npub"]:
-        con.close()
-        raise HTTPException(400, "Prima salva la tua npub nel profilo")
-    if u["npub_verificata"]:
-        con.close()
-        return {"ok": True, "gia_verificata": True}
-    codice = f"barattolo-verify-{secrets.token_hex(3)}"
-    con.execute("UPDATE utenti SET verifica_codice=?, verifica_scade=? "
-                "WHERE tg_id=?", (codice, int(time.time()) + 3600, user["id"]))
-    con.commit()
-    con.close()
-    return {"ok": True, "codice": codice,
-            "istruzioni": ("Pubblica dal tuo client Nostr (Damus, Amethyst, "
-                           "Primal…) una nota con questo codice, poi torna "
-                           "qui e premi «Ho pubblicato, controlla». Dopo la "
-                           "verifica puoi cancellare la nota.")}
-
-
-@app.post("/api/me/npub/verifica-controlla")
-async def verifica_npub_controlla(x_tg_init_data: str = Header(""),
-                                  barattolo_sessione: str = Cookie("")):
-    """Secondo passo: cerchiamo sui relay una nota recente della npub
-    che contenga il codice. Trovata = la npub e' davvero sua."""
-    user = verifica_utente(x_tg_init_data, barattolo_sessione)
-    if create_connection is None:
-        raise HTTPException(503, "Verifica non disponibile: sul server "
-                                 "manca il pacchetto websocket-client")
-    con = db()
-    u = con.execute(
-        "SELECT npub, npub_verificata, verifica_codice, verifica_scade "
-        "FROM utenti WHERE tg_id=?", (user["id"],)).fetchone()
-    con.close()
-    if not u or not u["npub"]:
-        raise HTTPException(400, "Prima salva la tua npub nel profilo")
-    if u["npub_verificata"]:
-        return {"ok": True, "verificata": True}
-    if not u["verifica_codice"]:
-        raise HTTPException(400, "Prima avvia la verifica per avere il codice")
-    if time.time() > u["verifica_scade"]:
-        raise HTTPException(400,
-            "Il codice e' scaduto (vale 1 ora): avvia una nuova verifica")
-    try:
-        hexkey = npub_to_hex(u["npub"])
-    except ValueError:
-        raise HTTPException(400, "La npub salvata non e' valida: reinseriscila")
-    # Tutti i relay in parallelo (ognuno nel suo thread): basta un si'.
-    # "da" = poco prima dell'avvio della verifica, per note recenti.
-    da = u["verifica_scade"] - 3600 - 600
-    esiti = await asyncio.gather(*[
-        asyncio.to_thread(cerca_nota_verifica, r, hexkey,
-                          u["verifica_codice"], da)
-        for r in RELAYS_VERIFICA])
-    if not any(esiti):
-        return {"ok": True, "verificata": False,
-                "msg": ("Nota non ancora trovata: i relay a volte tardano "
-                        "qualche minuto. Riprova tra poco!")}
-    con = db()
-    con.execute("UPDATE utenti SET npub_verificata=1, verifica_codice='', "
-                "verifica_scade=0 WHERE tg_id=?", (user["id"],))
-    con.commit()
-    con.close()
-    await notifica(user["id"],
-                   "🟣 <b>npub verificata!</b> Da adesso i tuoi annunci "
-                   "portano il badge dei venditori verificati su Nostr. 🎉 "
-                   "(La nota col codice ora puoi anche cancellarla.)")
-    await premia_distintivi(user["id"])
-    # Prima volta che c'e' un soggetto a cui indirizzare il kind 30382:
-    # se aveva gia' un livello da prima di verificare, esce subito,
-    # senza aspettare il prossimo affare concluso.
-    await premia_reputazione_nostr(user["id"])
-    return {"ok": True, "verificata": True}
-
-
-# --- Doppia cittadinanza: il badge diventa chiave d'ingresso ---------
-# Un utente Telegram con la npub VERIFICATA puo' promuoverla a chiave
-# d'accesso (npub_accesso): da quel momento entra nello STESSO account
-# anche dal web col login Nostr. Il badge non verificato non basta mai:
-# potrebbe essere la dichiarazione (falsa) di una chiave altrui.
-
-@app.post("/api/me/npub/abilita-accesso")
-async def abilita_accesso_nostr(x_tg_init_data: str = Header(""),
-                                barattolo_sessione: str = Cookie("")):
-    user = verifica_utente(x_tg_init_data, barattolo_sessione)
-    con = db()
-    u = con.execute(
-        "SELECT npub, npub_verificata, npub_accesso FROM utenti "
-        "WHERE tg_id=?", (user["id"],)).fetchone()
-    if not u or not u["npub"] or not u["npub_verificata"]:
-        con.close()
-        raise HTTPException(400, "Prima verifica la tua npub (badge 🟣): "
-                                 "solo un badge verificato puo' aprire l'account")
-    if u["npub_accesso"]:
-        con.close()
-        raise HTTPException(400, "L'accesso con Nostr e' gia' attivo")
-    try:
-        # Le condizioni si ripetono nella WHERE: tra la lettura sopra e
-        # questa scrittura non deve essere cambiato nulla.
-        con.execute("UPDATE utenti SET npub_accesso=npub WHERE tg_id=? "
-                    "AND npub_accesso='' AND npub_verificata=1",
-                    (user["id"],))
-        con.commit()
-    except sqlite3.IntegrityError:
-        # L'indice unico fa da giudice: quella chiave apre gia' un altro
-        # account (probabilmente il suo account nativo Nostr) e la
-        # strada giusta e' la fusione, non un doppione.
-        con.close()
-        raise HTTPException(409,
-            "Questa chiave apre gia' un altro account: se e' il tuo "
-            "account Nostr, entra dal web con Nostr e usa «Collega Telegram»")
-    con.close()
-    await premia_distintivi(user["id"])
-    return {"ok": True, "npub_accesso": True}
-
+# --- Doppia cittadinanza: la firma e' la chiave d'ingresso -----------
+# (set 2026: non piu' badge dichiarato + nota pubblica esterna + questo
+# switch — tre gesti senza mai firmare niente, sostituiti da UNA firma
+# vera. Vedi collega_npub_firma, piu' sotto, e CANTIERI, "Entra anche
+# con Nostr". cerca_nota_verifica/verifica_npub_avvia/
+# verifica_npub_controlla/abilita_accesso_nostr sono andati via con
+# quel giro: davano un badge o un accesso senza mai una firma, e
+# lasciavano pensare che bastasse.)
 
 @app.post("/api/me/npub/disabilita-accesso")
 def disabilita_accesso_nostr(x_tg_init_data: str = Header(""),
                              barattolo_sessione: str = Cookie("")):
-    """Il gesto contrario: l'account torna apribile solo da Telegram."""
+    """Il gesto contrario a collega_npub_firma: l'account torna
+    apribile solo da Telegram."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if user["id"] < 0:
         # Doppia cintura col tg_id>0 nella WHERE qui sotto: un nativo
@@ -33320,6 +33183,76 @@ def disabilita_accesso_nostr(x_tg_init_data: str = Header(""),
     con.commit()
     con.close()
     return {"ok": True, "npub_accesso": False}
+
+
+def _accoda_trasloco_di(con, tg_id: int) -> int:
+    """Il trasloco (vedi trasloca_annunci_nostr) per UN utente solo,
+    SUBITO dopo che la sua chiave e' appena diventata provata qui — non
+    nel giro periodico. Solo la meta' che accoda (niente relay, niente
+    attesa): la lapide sul vecchio evento nostro resta all'orologio, che
+    tocca i relay e non deve far aspettare la richiesta di nessuno.
+    Le tre condizioni della WHERE sono quelle di trasloca_annunci_nostr,
+    ripetute a mano apposta (estrarle vorrebbe dire toccare quella
+    funzione, fuori da questo cantiere): prove_collega_npub_firma
+    confronta le due stringhe, cosi' se divergono la prova si accorge."""
+    righe = con.execute(
+        "SELECT a.id FROM annunci a "
+        "LEFT JOIN firme_nostr f ON f.annuncio_id=a.id "
+        "WHERE a.venditore_id=? AND a.nostr_event_id<>'' "
+        "  AND a.nostr_autore='' AND a.contatto_nostr='' "
+        "  AND f.annuncio_id IS NULL", (tg_id,)).fetchall()
+    for r in righe:
+        accoda_firma(con, r["id"], tg_id, "pubblica")
+    return len(righe)
+
+
+@app.post("/api/me/npub/collega-firma")
+async def collega_npub_firma(req: Request, x_tg_init_data: str = Header(""),
+                             barattolo_sessione: str = Cookie("")):
+    """Collega+verifica+abilita in un solo gesto: l'utente firma la
+    stessa sfida del login vero (GET /api/login/nostr/sfida) col suo
+    firmatario (nsec in pagina, bunker, telefono), e quella firma stessa
+    e' la prova — l'UNICA porta, da set 2026 (vedi CANTIERI, "Entra
+    anche con Nostr"): niente piu' salva-npub, nota pubblica esterna o
+    switch senza firma. Una sola scrittura atomica, indice unico come
+    giudice sulla WHERE (ripetuta apposta, vedi sotto)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if ChiavePubblicaNostr is None:
+        raise HTTPException(503, "Login Nostr non disponibile: sul "
+                                 "server manca il pacchetto coincurve")
+    d = await leggi_json(req)
+    pubkey = verifica_evento_login(d.get("evento"),
+                                   req.headers.get("host", ""))
+    npub = hex_to_npub(pubkey)
+    con = db()
+    u = con.execute("SELECT npub_accesso FROM utenti WHERE tg_id=?",
+                    (user["id"],)).fetchone()
+    if not u:
+        con.close()
+        raise HTTPException(404, "Profilo non trovato")
+    if u["npub_accesso"]:
+        con.close()
+        raise HTTPException(400, "L'accesso con Nostr e' gia' attivo")
+    try:
+        # La condizione si ripete nella WHERE: tra la lettura sopra e
+        # questa scrittura non deve essere cambiato nulla.
+        con.execute(
+            "UPDATE utenti SET npub=?, npub_verificata=1, npub_accesso=?, "
+            "verifica_codice='', verifica_scade=0 "
+            "WHERE tg_id=? AND npub_accesso=''",
+            (npub, npub, user["id"]))
+    except sqlite3.IntegrityError:
+        con.close()
+        raise HTTPException(409,
+            "Questa chiave apre gia' un altro account: se e' il tuo "
+            "account Nostr, entra dal web con Nostr e usa «Collega Telegram»")
+    accodati = _accoda_trasloco_di(con, user["id"])
+    con.commit()
+    con.close()
+    await premia_distintivi(user["id"])
+    await premia_reputazione_nostr(user["id"])
+    return {"ok": True, "npub": npub, "npub_verificata": True,
+            "npub_accesso": True, "annunci_in_coda": accodati}
 
 
 # --- Barattolo su Nostr: gli annunci in piazza -----------------------

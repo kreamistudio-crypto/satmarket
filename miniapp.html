@@ -8310,14 +8310,13 @@ document.getElementById('cartello')?.remove();</script>
       <div class="acc" id="accIdentita">
         <button class="acc-h" onclick="toggleAcc('accIdentita')"><span class="em">🆔</span>Identità<span class="fr">▾</span></button>
         <div class="acc-b">
+          <!-- Niente piu' campo a mano, verifica con nota pubblica, ne'
+               invito NIP-85 separato (set 2026, decisione di Andrea):
+               davano un badge/una fiducia dichiarata senza mai firmare
+               davvero, e lasciavano pensare che bastasse. "Entra anche
+               con Nostr" qui sotto e' l'UNICA porta, e firma tutto -
+               badge, accesso, fiducia NIP-85 - nello stesso gesto. -->
           <div id="identitaBlocco"></div>
-          <div class="field" style="margin-top:10px"><label>Il tuo profilo Nostr (facoltativo)</label>
-            <input id="npubInput" placeholder="npub1… (la tua chiave PUBBLICA)"></div>
-          <button class="btn ghost" style="margin-top:0" onclick="saveNpub()"><svg class="ico-nostr" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7"/><circle class="lux" cx="5.5" cy="5.3" r="2.3"/></svg> Salva la npub nel profilo</button>
-          <!-- La nota sotto il bottone e' DINAMICA (renderNpubVerifica):
-               ogni stato mostra solo cio' che gli serve, il resto lo
-               dicono confirm e toast al momento giusto. -->
-          <div id="npubVerifica"></div>
         </div>
       </div>
 
@@ -23857,10 +23856,9 @@ async function rimuoviLnAddress(){
     }});
 }
 
-/* ---- badge Nostr del profilo: npub auto-dichiarata + verifica con
-   nota pubblica (l'utente pubblica un codice dal SUO client: nessuna
-   nsec, nessuna firma da consegnare, mai) ---- */
-let myNpub = '', myNpubVerified = false, npubCodice = '';
+/* ---- badge Nostr del profilo: npub, verificata e accesso arrivano
+   insieme da "Entra anche con Nostr" (collegaNostrFirmato) ---- */
+let myNpub = '', myNpubVerified = false;
 /* NIP-85 (set 2026): il kind 10040 con cui l'utente dichiara, di SUA
    chiave, che si fida di Barattolo come fonte del suo livello (kind
    30382). La pubkey di servizio e i relay arrivano da /api/me — mai
@@ -24656,17 +24654,25 @@ function renderIdentita(){
   const btnRimuovi =
     `<button class="btn danger-ghost" style="margin:0 0 2px" onclick="rimuoviNpub()">🗑 Rimuovi la npub dal profilo</button>` +
     sub(`Toglie npub, badge e verifica ovunque.`);
+  /* IL BOTTONE FIRMATO E' L'AZIONE PRINCIPALE in tutti e tre gli stati
+     "non ancora collegato del tutto" (set 2026): a differenza della
+     nota pubblica e di "Abilita l'accesso", qui la firma stessa prova
+     la chiave E mette in mano al browser cio' che serve per svuotare
+     subito la coda firme_nostr — i tuoi annunci passano a nome tuo
+     senza aspettare il promemoria settimanale. Vedi collegaNostrFirmato. */
+  const btnFirma =
+    `<button class="btn ghost" style="margin:0 0 8px" onclick="collegaNostrFirmato()">🔑 Entra anche con Nostr</button>` +
+    sub(`Firmi con bunker, estensione o nsec (mai inviata, mai salvata): badge, verifica e accesso arrivano insieme, e i tuoi annunci passano a nome tuo.`);
   let nsRiga;
   if (!myNpub) {
-    nsRiga = riga('🟣','Nostr','Nessuna npub nel profilo: puoi dichiararla qui sotto.');
+    nsRiga = riga('🟣','Nostr','Nessuna npub nel profilo.', btnFirma);
   } else if (!myNpubVerified) {
     nsRiga = riga('🟣','Nostr',
-      `${npubBreve} — salvata, da verificare qui sotto.`,
-      btnRimuovi);
+      `${npubBreve} — salvata, ma non firmata.`,
+      btnFirma + btnRimuovi);
   } else if (!myNpubAccesso) {
-    nsRiga = riga('🟣','Nostr',`${npubBreve} — verificata, badge 🟣 attivo.`,
-      `<button class="btn ghost" style="margin:0 0 8px" onclick="abilitaAccessoNostr()">🔑 Abilita l'accesso con Nostr</button>
-       ${sub(`Per entrare in questo account anche dal browser, con la tua firma Nostr.`)}${btnRimuovi}`);
+    nsRiga = riga('🟣','Nostr',`${npubBreve} — badge 🟣 attivo, ma non firmata.`,
+      btnFirma + btnRimuovi);
   } else {
     nsRiga = riga('🟣','Nostr',`${npubBreve} — verificata 🔑 puoi entrare dal web con Nostr.`,
       (myTgId > 0
@@ -27349,18 +27355,6 @@ function avvisamiDaRicerca(){
   apriCassettoProfilo('accRicerche');
 }
 
-async function abilitaAccessoNostr(){
-  haptic();
-  if (DEMO) { toast('In demo non c\'è un account vero da aprire 🙂'); return; }
-  const r = await fetch(`${API_BASE}/me/npub/abilita-accesso`,
-    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
-  const d = await r.json().catch(()=>({}));
-  if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
-  myNpubAccesso = myNpub;
-  renderIdentita();
-  toast('🔑 Fatto! Ora puoi entrare anche dal web con Nostr');
-}
-
 async function disabilitaAccessoNostr(){
   haptic();
   const r = await fetch(`${API_BASE}/me/npub/disabilita-accesso`,
@@ -27387,89 +27381,9 @@ async function collegaTelegram(){
   window.open(`https://t.me/ilbarattolobot?start=${d.codice}`, '_blank', 'noopener');
 }
 
-function renderNpubVerifica(){
-  const box = el('npubVerifica');
-  if (!box) return;
-  if (!myNpub) {
-    /* campo vuoto: l'unica nota che serve PRIMA di salvare */
-    box.innerHTML = `<div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
-      Con la npub <b>verificata</b> i tuoi annunci portano il badge 🟣.
-      Mai la nsec: è la tua chiave privata.</div>`;
-    return;
-  }
-  if (myNpubVerified) {
-    /* niente doppione sul badge: lo dice gia' la riga Nostr qui sopra.
-       Resta solo, se manca, l'invito a dichiarare la fiducia NIP-85 —
-       un gesto in piu' e non automatico, perche' questo lo firma la
-       TUA chiave e non quella della piattaforma (regola ferrea 2). */
-    box.innerHTML = (myNip85Dichiarato || !myNip85Pubkey) ? '' : `
-      <div style="margin-top:12px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
-        🔗 Un client Nostr può leggere il tuo livello (kind 30382), ma
-        per sapere che è <b>Barattolo</b> a dirlo deve saperlo da te:
-        firma una volta la fiducia (NIP-85), poi non serve più.</div>
-      <button class="btn ghost" style="margin-top:8px" onclick="dichiaraNip85()">🔗 Firma la fiducia NIP-85</button>`;
-    return;
-  }
-  if (npubCodice) {
-    box.innerHTML = `
-      <div style="margin-top:12px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
-        Pubblica dal tuo client Nostr (Damus, Amethyst, Primal…) una nota
-        con questo codice, poi torna qui. Dopo la verifica potrai anche
-        cancellarla.</div>
-      <div class="mono" onclick="copiaCodice()" title="Tocca per copiare"
-        style="margin:8px 0;padding:10px;border:1.5px dashed var(--muted);border-radius:10px;text-align:center;font-size:14px;cursor:pointer">${npubCodice}</div>
-      <button class="btn orange" style="margin-top:0" onclick="npubControlla()">✅ Ho pubblicato, controlla</button>`;
-    return;
-  }
-  box.innerHTML = `
-    <div style="margin-top:10px;font-size:13px;font-weight:800">🟣 npub non verificata: il badge sugli annunci arriva con la verifica</div>
-    <button class="btn ghost" style="margin-top:8px" onclick="npubAvvia()">✓ Verifica ora</button>`;
-}
-
-function copiaCodice(){
-  navigator.clipboard?.writeText(npubCodice);
-  toast('📋 Codice copiato');
-}
-
-async function npubAvvia(){
-  haptic();
-  if (DEMO) { npubCodice = 'barattolo-verify-demo42'; renderNpubVerifica(); return; }
-  const r = await fetch(`${API_BASE}/me/npub/verifica-avvia`,
-    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
-  const d = await r.json().catch(()=>({}));
-  if (!r.ok) { toast(d.detail || 'Non riesco ad avviare la verifica'); return; }
-  if (d.gia_verificata) { myNpubVerified = true; renderNpubVerifica(); return; }
-  npubCodice = d.codice;
-  renderNpubVerifica();
-}
-
-async function npubControlla(){
-  haptic();
-  if (DEMO) { toast('In demo non ci sono relay: col backend vero qui parte il controllo 🟣'); return; }
-  toast('🔎 Controllo i relay Nostr… qualche secondo', 8000);
-  const r = await fetch(`${API_BASE}/me/npub/verifica-controlla`,
-    {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
-  const d = await r.json().catch(()=>({}));
-  if (!r.ok) {
-    if (r.status===400) npubCodice = '';   // codice scaduto o mancante: si riparte
-    toast(d.detail || 'Controllo non riuscito, riprova');
-    renderNpubVerifica(); return;
-  }
-  if (d.verificata) {
-    myNpubVerified = true; npubCodice = '';
-    toast('🎉 npub verificata! Badge 🟣 attivo sui tuoi annunci');
-    renderNpubVerifica();
-    renderIdentita();
-    await loadListings(); renderGrid();
-  } else {
-    toast(d.msg || 'Nota non ancora trovata: riprova tra poco', 4000);
-  }
-}
-
-/* Rimozione della npub: l'unica strada, sempre con conferma. Il campo
-   svuotato + Salva delega qui. Per il nativo Nostr (la npub È il suo
-   ingresso) si ferma con un messaggio onesto — e il server fa comunque
-   da guardia con lo stesso 400. */
+/* Rimozione della npub: l'unica strada, sempre con conferma. Per il
+   nativo Nostr (la npub È il suo ingresso) si ferma con un messaggio
+   onesto — e il server fa comunque da guardia con lo stesso 400. */
 async function rimuoviNpub(){
   haptic();
   if (!myNpub) return;
@@ -27478,7 +27392,8 @@ async function rimuoviNpub(){
     return;
   }
   let msg = 'Perderai il badge 🟣 e gli altri utenti non potranno più ' +
-    'contattarti su Nostr. Se la reinserirai, dovrai verificarla di nuovo.';
+    'contattarti su Nostr. Se vorrai ricollegarla, basterà firmare di ' +
+    'nuovo con «Entra anche con Nostr».';
   if (myNpubAccesso && myNpubAccesso === myNpub)
     msg += '\n\n⚠️ Questa chiave apre anche l\'account dal web: perderai pure l\'accesso con Nostr.';
   chiediConferma({
@@ -27487,9 +27402,8 @@ async function rimuoviNpub(){
     etichetta: '🗑 Rimuovi',
     poi: async () => {
   if (DEMO) {
-    myNpub = ''; myNpubVerified = false; npubCodice = '';
-    if (el('npubInput')) el('npubInput').value = '';
-    renderNpubVerifica(); renderIdentita();
+    myNpub = ''; myNpubVerified = false;
+    renderIdentita();
     toast('npub rimossa dal profilo'); return;
   }
   const r = await fetch(`${API_BASE}/me/npub`, {
@@ -27498,54 +27412,15 @@ async function rimuoviNpub(){
     body: JSON.stringify({npub:''})});
   const d = await r.json().catch(()=>({}));
   if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 7000); return; }
-  myNpub = ''; myNpubVerified = false; npubCodice = '';
+  myNpub = ''; myNpubVerified = false;
   if (d.accesso_revocato) myNpubAccesso = '';
   if (d.canale_azzerato) myCanaleNotifiche = '';
-  if (el('npubInput')) el('npubInput').value = '';
-  renderNpubVerifica();
   renderIdentita();
   toast(d.accesso_revocato
     ? 'npub rimossa: badge e accesso con Nostr spenti'
     : 'npub rimossa dal profilo');
   await loadListings(); renderGrid();
     }});
-}
-
-async function saveNpub(){
-  haptic();
-  const npub = el('npubInput').value.trim().toLowerCase().replace(/^nostr:/,'');
-  if (!npub && myNpub) return rimuoviNpub();
-  if (npub.startsWith('nsec')) {
-    toast('⚠️ Quella è la chiave PRIVATA (nsec): non incollarla mai! Qui va la npub'); return;
-  }
-  if (npub && !/^npub1[023456789acdefghjklmnpqrstuvwxyz]{58}$/.test(npub)) {
-    toast('Formato non valido: la npub inizia con npub1 ed è lunga 63 caratteri'); return;
-  }
-  if (DEMO) {
-    if (npub !== myNpub) { myNpubVerified = false; npubCodice = ''; }
-    myNpub = npub; renderNpubVerifica();
-    toast(npub?'🟣 npub salvata: verificala per il badge sugli annunci':'npub rimossa'); return;
-  }
-  const r = await fetch(`${API_BASE}/me/npub`, {
-    method:'POST',
-    headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-    body: JSON.stringify({npub})});
-  const d = await r.json().catch(()=>({}));
-  if (!r.ok) { toast(d.detail || 'npub non accettata, ricontrolla'); return; }
-  myNpub = d.npub; myNpubVerified = !!d.npub_verificata;
-  if (!myNpubVerified) npubCodice = '';   // npub cambiata: verifica da rifare
-  if (d.accesso_revocato) {
-    myNpubAccesso = '';
-    toast('🔑 Accesso con Nostr spento: la chiave era legata alla vecchia npub', 6000);
-  }
-  if (d.canale_azzerato) myCanaleNotifiche = '';
-  renderNpubVerifica();
-  renderIdentita();
-  toast(myNpub
-    ? (myNpubVerified ? '🟣 npub salvata: badge attivo sui tuoi annunci'
-                      : '🟣 npub salvata: verificala qui sotto per il badge sugli annunci')
-    : 'npub rimossa dal profilo');
-  await loadListings(); renderGrid();
 }
 
 /* ---- pannello rimborso dell'acquirente (disputa vinta) ---- */
@@ -34000,7 +33875,10 @@ async function firmatarioAutomatico(){
   return null;
 }
 
-async function svuotaFirmeNostr(){
+async function svuotaFirmeNostr(fPronto){
+  /* fPronto: un firmatario gia' in mano (appena usato per collegare la
+     chiave), cosi' non deve ritrovarlo da solo e la coda si svuota nello
+     STESSO gesto invece di aspettare il prossimo giro opportunistico. */
   if (DEMO || VETRINA || !(myNpubAccesso || myNpubVerified)) return;
   let d;
   try {
@@ -34010,7 +33888,7 @@ async function svuotaFirmeNostr(){
     d = await r.json();
   } catch(e){ return; }
   if (!d.firme || !d.firme.length) return;
-  const auto = await firmatarioAutomatico();
+  const auto = fPronto ? {f: fPronto, chiudi: false} : await firmatarioAutomatico();
   if (!auto) {
     console.log(`🟪 [coda] ${d.firme.length} firme in attesa, nessuna `
       + `strada automatica: restano in coda`);
@@ -34078,32 +33956,31 @@ async function pubblicaEventoSuRelay(relays, evento){
   return esiti.filter(e=>e.status==='fulfilled').length;
 }
 
-/* ---- La dichiarazione di fiducia NIP-85 (set 2026) ----------------
-   Barattolo pubblica DA SOLO il livello di ognuno come kind 30382
-   (server, npub verificata, vedi premia_reputazione_nostr). Ma perche'
-   un client Nostr qualunque lo raccolga come fonte affidabile, deve
-   saperlo dalla chiave del diretto interessato: il kind 10040 che dice
-   "mi fido di Barattolo per 30382:rank". Quello lo firma SOLO il
-   browser dell'utente — stessa cintura della modifica firmata qui
-   sopra: firmatario automatico se c'e' (bunker/estensione), altrimenti
-   il foglio; l'id si ricontrolla PRIMA di fidarsi della firma. */
-async function dichiaraNip85(){
+/* ---- "Entra anche con Nostr": collega+verifica+abilita con una firma
+   vera (set 2026), al posto della sola nota pubblica esterna. Stessa
+   sfida del login vero (entraConNostr), ma sull'account Telegram GIA'
+   aperto — e la firma appena ottenuta si riusa subito per svuotare la
+   coda firme_nostr, invece di aspettare il prossimo giro opportunistico
+   o il promemoria settimanale. ---- */
+async function collegaNostrFirmato(){
   haptic();
-  if (DEMO) { toast('In demo non ci sono relay: col backend vero qui parte la firma 🔗'); return; }
-  if (!myNip85Pubkey) { toast('Nostr è spento sul server: niente da dichiarare', 5000); return; }
+  if (DEMO) { toast('In demo non c\'è un account vero da collegare 🙂'); return; }
   const auto = await firmatarioAutomatico();
   if (auto) {
-    try { await firmaEConsegnaNip85(auto.f); }
+    try { await eseguiCollegamentoFirmato(auto.f); }
     finally { if (auto.chiudi) { try { auto.f.chiudi(); } catch(e){} } }
     return;
   }
   toast('🟣 Ora serve la tua firma…', 4000);
-  apriNostrSheet((f) => firmaEConsegnaNip85(f));
+  apriNostrSheet((f) => eseguiCollegamentoFirmato(f));
 }
 
-async function firmaEConsegnaNip85(f){
+async function eseguiCollegamentoFirmato(f){
   if (el('nostrSheet')) el('nostrSheet').classList.remove('open');
   if (el('sheetBg')) el('sheetBg').classList.remove('open');
+  const rs = await fetch(`${API_BASE}/login/nostr/sfida`);
+  const ds = await rs.json().catch(()=>({}));
+  if (!rs.ok) { toast(ds.detail || 'Login Nostr non disponibile', 6000); return; }
   await caricaNostrTools();
   const NT = window.NostrTools;
   let pub;
@@ -34111,12 +33988,60 @@ async function firmaEConsegnaNip85(f){
   catch(e){
     toast(`Il firmatario non risponde: ${e.message||'riprova'}`, 7000); return;
   }
+  const bozza = {pubkey: pub, kind: 22242, created_at: Math.floor(Date.now()/1000),
+    content: '', tags: [['relay', location.origin], ['challenge', ds.sfida]]};
+  let firmato;
+  try { firmato = await f.firma(bozza); }
+  catch(e){
+    toast(`Firma non riuscita: ${e.message||'rifiutata'}`, 7000); return;
+  }
+  if (!firmato || firmato.id !== NT.getEventHash({...bozza, pubkey: pub})) {
+    toast('Il firmatario ha cambiato l\'evento: mi fermo', 8000); return;
+  }
+  const r = await fetch(`${API_BASE}/me/npub/collega-firma`, {
+    method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({evento: firmato})});
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+  myNpub = d.npub; myNpubVerified = true; myNpubAccesso = d.npub;
+  renderIdentita();
+  toast('🔑 Fatto! Badge verificato, accesso abilitato', 6000);
+  /* La stessa firma finisce il resto in silenzio, nello stesso gesto:
+     nessun bottone/passo in piu' da mostrare (set 2026, decisione di
+     Andrea — «non metterli, li firma gia'»). */
+  await firmaEConsegnaNip85(f, true);
+  await svuotaFirmeNostr(f);   // stessa firma, subito: non aspetta l'orologio
+  await loadListings(); renderGrid();
+}
+
+/* ---- La dichiarazione di fiducia NIP-85 (set 2026), SEMPRE dentro
+   collegaNostrFirmato e mai come gesto suo: Barattolo pubblica DA SOLO
+   il livello di ognuno come kind 30382 (server, npub verificata, vedi
+   premia_reputazione_nostr), ma perche' un client Nostr qualunque lo
+   raccolga come fonte affidabile deve saperlo dalla chiave del diretto
+   interessato — il kind 10040 che dice "mi fido di Barattolo per
+   30382:rank". Quello lo firma SOLO il browser dell'utente, e qui lo
+   fa con la STESSA firma appena usata per collegarsi: silenzioso=true
+   sostituisce ogni toast con un log, perche' e' un dettaglio tecnico
+   e non un passo che l'utente deve seguire. */
+async function firmaEConsegnaNip85(f, silenzioso){
+  const avvisa = silenzioso ? (m) => console.log(`🟪 [nip85] ${m}`) : toast;
+  if (!myNip85Pubkey) return;   // Nostr spento sul server: niente da dichiarare
+  if (el('nostrSheet')) el('nostrSheet').classList.remove('open');
+  if (el('sheetBg')) el('sheetBg').classList.remove('open');
+  await caricaNostrTools();
+  const NT = window.NostrTools;
+  let pub;
+  try { pub = String(await f.pubkey() || '').toLowerCase(); }
+  catch(e){
+    avvisa(`Il firmatario non risponde: ${e.message||'riprova'}`, 7000); return;
+  }
   /* Deve essere la STESSA chiave della npub verificata: e' lei che
      ha il badge 🟣, ed e' lei che deve dire di chi si fida. */
   const attesa = myNpub.startsWith('npub1')
     ? NT.nip19.decode(myNpub).data : myNpub.toLowerCase();
   if (pub !== attesa) {
-    toast('Questa non è la chiave della tua npub verificata', 8000);
+    avvisa('Questa non è la chiave della tua npub verificata', 8000);
     return;
   }
   const bozza = {pubkey: pub, created_at: Math.floor(Date.now()/1000),
@@ -34124,30 +34049,29 @@ async function firmaEConsegnaNip85(f){
     content: ''};
   let firmato;
   try { firmato = await f.firma(bozza); }
-  catch(e){ toast(`Firma non riuscita: ${e.message||'rifiutata'}`, 7000); return; }
+  catch(e){ avvisa(`Firma non riuscita: ${e.message||'rifiutata'}`, 7000); return; }
   if (!firmato || firmato.id !== NT.getEventHash({...bozza, pubkey: pub})) {
-    toast('Evento alterato dal firmatario: mi fermo', 6000); return;
+    avvisa('Evento alterato dal firmatario: mi fermo', 6000); return;
   }
   /* In collaudo il browser non bussa a relay VERI (stesso patto di
      salvaModificaFirmata/svuotaFirmeNostr): la firma si fa lo stesso,
      sui relay non ci si prova nemmeno. */
   const ok = myNip85Collaudo ? 1
     : await pubblicaEventoSuRelay(myNip85Relays, firmato);
-  if (!ok) { toast('Nessun relay ha accettato: riprova', 6000); return; }
+  if (!ok) { avvisa('Nessun relay ha accettato: riprova', 6000); return; }
   try {
     const r = await fetch(`${API_BASE}/me/nip85-dichiarazione`, {
       method:'POST', headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
       body: JSON.stringify({evento: firmato})});
     if (r.ok) {
       myNip85Dichiarato = true;
-      renderNpubVerifica();
-      toast('🔗 Fiducia dichiarata: la tua reputazione è collegabile', 5000);
+      avvisa('🔗 Fiducia dichiarata: la tua reputazione è collegabile', 5000);
     } else {
       const d = await r.json().catch(()=>({}));
-      toast(d.detail || 'Pubblicato sui relay, ma il server non conferma', 6000);
+      avvisa(d.detail || 'Pubblicato sui relay, ma il server non conferma', 6000);
     }
   } catch(e){
-    toast('Pubblicato sui relay: riprova più tardi a confermare', 5000);
+    avvisa('Pubblicato sui relay: riprova più tardi a confermare', 5000);
   }
 }
 
@@ -43974,9 +43898,7 @@ async function avvia(){
     myBarattoloCond = me.barattolo_condiviso || null;
     servizioLeve = me.servizio_leve || null;
     aggiornaServizioVisibilita();
-    npubCodice = ''; lnAddrModifica = false;
-    if (el('npubInput')) el('npubInput').value = myNpub;
-    renderNpubVerifica();
+    lnAddrModifica = false;
     renderIdentita();
     DEMO = false;
     renderAvatar();
