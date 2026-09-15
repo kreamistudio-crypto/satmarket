@@ -39376,11 +39376,24 @@ const MOTIVI_CANTDO = {
   'is-not-your-order': 'questo ordine non è tuo',
   'not-allowed-by-status': 'non si può fare in questo momento dello scambio',
   'pending-order-exists': 'hai già un ordine in corso',
-  'cant-create-user': 'non è stato possibile creare il profilo di scambio'
+  'cant-create-user': 'non è stato possibile creare il profilo di scambio',
+  /* il prezzo di mercato che manca (15 set 2026, dal campo con Alan):
+     cache vuota dopo un riavvio, o piu' vecchia della finestra — per
+     chi scambia e' la stessa cosa, e la via d'uscita e' il prezzo fisso */
+  'price-too-stale': 'il prezzo di mercato non è disponibile in questo momento: riprova fra poco, o pubblica a prezzo fisso'
 };
+/* ⚠️ IL FILO PARLA snake_case, LA MAPPA kebab-case (15 set 2026):
+   mostro-core 0.14.6 serializza `CantDoReason` con
+   `rename_all = "snake_case"` — `{"cant_do": "invalid_trade_index"}`,
+   letto su error.rs e message.rs del tag — mentre le AZIONI sono
+   kebab-case (`cant-do`, `new-order`), ed e' da li' che la mappa aveva
+   preso la forma. Fino a oggi nessuna chiave combaciava e a schermo
+   usciva il nome grezzo. La chiave si NORMALIZZA qui, una volta, e la
+   mappa accetta tutt'e due le forme: chi la legge non deve sapere quale
+   delle due parla il coordinatore. */
 function motivoCantDo(payload){
   const r = payload && (payload.cant_do || payload['cant-do'] || payload.reason);
-  const k = String(r || '').trim();
+  const k = String(r || '').trim().toLowerCase().replace(/_/g, '-');
   if (!k) return 'La richiesta è stata rifiutata';
   return 'La richiesta è stata rifiutata: ' + (MOTIVI_CANTDO[k] || k);
 }

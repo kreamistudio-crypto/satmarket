@@ -15323,3 +15323,20 @@ giorno e dichiarati: la deriva di `mostro` nel compose (il prossimo
 `up -d` che lo tocchi lo ricrea) e i cant-do del client in kebab-case
 contro lo snake_case del filo, con `price_too_stale` da aggiungere e la
 patch 0004 del fork.
+
+**I CANT-DO, CHIUSI LA SERA STESSA** (con la patch 0004 del fork, che
+Andrea applica sul nodo). `motivoCantDo` normalizza la chiave una volta
+(`trim`, minuscole, `_` → `-`) e la mappa resta kebab: cosi' accetta
+tutt'e due le forme senza sapere quale parla il coordinatore. Nuova
+voce `price-too-stale` («il prezzo di mercato non è disponibile in
+questo momento: riprova fra poco, o pubblica a prezzo fisso»). Quattro
+prove nuove nel banco node: snake e kebab danno la stessa frase, la
+maiuscola e gli spazi non contano, il prezzo ha la sua frase, e la
+normalizzazione sta in un posto solo. La patch 0004 (tre confini:
+`order.rs`, `take_buy.rs`, `take_sell.rs`) fa rispondere
+`PriceTooStale` anche al prezzo MAI visto, che prima era un errore
+interno muto; nasce da un patcher python ad ancore uniche, provato a
+secco sul sorgente del tag v0.18.7, e il `.patch` esportato dal nodo
+arriva in `deploy/mostro/` col prossimo giro. La deriva di `mostro`
+nel compose si assorbe nello stesso `up -d --no-deps mostro` che porta
+l'immagine `-bar2` e la sezione `[price]`: un riavvio solo per tre cose.

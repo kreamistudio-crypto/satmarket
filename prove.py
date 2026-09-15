@@ -44311,6 +44311,12 @@ out.noStato = no.stato;
 out.noMotivo = no.cantDo;
 out.noIgnoto = avanzaOrdineP2P(attivo, 'cant-do', {cant_do: 'roba-nuova'}).cantDo;
 out.noVuoto = avanzaOrdineP2P(attivo, 'cant-do', {}).cantDo;
+// 4-bis) IL FILO PARLA snake_case (15 set 2026): la stessa ragione nelle
+// due forme deve dare la stessa frase, e il prezzo che manca ha la sua
+out.noSnake = avanzaOrdineP2P(attivo, 'cant-do', {cant_do: 'invalid_trade_index'}).cantDo;
+out.noMaiuscolo = avanzaOrdineP2P(attivo, 'cant-do', {cant_do: ' Invalid_Trade_Index '}).cantDo;
+out.noPrezzo = avanzaOrdineP2P(attivo, 'cant-do', {cant_do: 'price_too_stale'}).cantDo;
+out.noPrezzoKebab = avanzaOrdineP2P(attivo, 'cant-do', {cant_do: 'price-too-stale'}).cantDo;
 /* e il messaggio dopo lo cancella: un avviso vecchio non resta a
    schermo su uno scambio che nel frattempo si e' mosso */
 out.noSiPulisce = avanzaOrdineP2P(no, 'fiat-sent-ok', null).cantDo;
@@ -44475,6 +44481,19 @@ process.stdout.write(JSON.stringify(out));
           "La richiesta è stata rifiutata: roba-nuova", out["noIgnoto"])
     prova("...e senza motivo si dice almeno che ha rifiutato",
           "La richiesta è stata rifiutata", out["noVuoto"])
+    # ⚠️ IL FILO PARLA snake_case (15 set 2026): mostro-core 0.14.6 scrive
+    # `{"cant_do": "invalid_trade_index"}` (rename_all = "snake_case" su
+    # CantDoReason, letto sul tag), e la mappa era nata kebab come le
+    # azioni: nessuna chiave combaciava, a schermo usciva il nome grezzo.
+    # La chiave si normalizza una volta, in motivoCantDo.
+    prova("la stessa ragione in snake_case da' la stessa frase", True,
+          out["noSnake"] == out["noMotivo"] and out["noMaiuscolo"] == out["noMotivo"])
+    prova("il prezzo che manca ha la sua frase, e indica il prezzo fisso", True,
+          "il prezzo di mercato non è disponibile in questo momento" in out["noPrezzo"]
+          and "pubblica a prezzo fisso" in out["noPrezzo"]
+          and out["noPrezzoKebab"] == out["noPrezzo"])
+    prova("...e la normalizzazione sta in motivoCantDo, una volta", True,
+          ".trim().toLowerCase().replace(/_/g, '-')" in fn("function motivoCantDo(payload){"))
     prova("il messaggio dopo cancella l'avviso vecchio", "", out["noSiPulisce"])
     prova("un'azione sconosciuta non muove niente", True, out["ignotoFermo"])
     prova("il voto si accende senza muovere lo stato", True, out["rate"])

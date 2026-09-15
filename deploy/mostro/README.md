@@ -63,6 +63,21 @@ toccati: il guasto osservato era `NoAPIResponse` in risoluzione, e
 allargare cose che non c'entrano è il modo di rendere una patch
 irricevibile a monte.
 
+**0004 — `src/app/order.rs`, `take_buy.rs`, `take_sell.rs`: un prezzo
+MAI visto risponde `PriceTooStale` invece di tacere.** Dalla 0.18.7 il
+prezzo vive in una cache solo in RAM riempita dallo scheduler; finché
+nessun prezzo è mai entrato (riavvio + provider giù, il 15 set 2026 per
+tre ore) `get_bitcoin_price` torna `NoAPIResponse`, che ai tre confini
+dell'ordine è un errore INTERNO: un WARN e nessuna risposta all'utente.
+Un prezzo VECCHIO invece rispondeva già `PriceTooStale` come cant-do.
+Per chi scambia i due casi sono uguali, quindi la risposta è la stessa;
+il PriceManager e i suoi log non si toccano. Un test di `order.rs` che
+fissava il vecchio comportamento è rinominato e ribaltato. Nasce da
+`patch-0004-prezzo-mai-visto.py` (sostituzioni mirate, ancore uniche,
+provate a secco sul sorgente del tag) e vive qui come `.patch` esportato
+dal nodo; il client Barattolo dalla stessa sera legge `price_too_stale`
+e dice «riprova fra poco, o pubblica a prezzo fisso».
+
 ## COSA CURA, E COSA NO
 
 Il difetto ha due facce, e le patch le trattano in modo diverso.
