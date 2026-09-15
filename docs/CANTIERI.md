@@ -14871,3 +14871,127 @@ toccata: fa gia' tutto per costruzione (un account nativo ha sempre
 `npub_accesso`, quindi una chiave provata, fin dalla nascita) — resta
 aperto solo se rinominarla per simmetria col nuovo bottone (Andrea
 l'ha descritta ma non ha chiesto esplicitamente il rinomino).
+
+
+## Il verso di chi pubblica, e il giudice sullo slider (15 set 2026)
+
+**DAL CAMPO, CON ALAN.** Due cose in un giro solo. La prima: Alan
+pubblica un ordine da 50 € (Ricevi ≈ 77.057 sats) e la risposta non
+arriva. La pagina che gli si apre dice «Ordine preso — Di' dove
+ricevere i sats» come primo passo, «Nessuna risposta — Puoi riprovare:
+se l'ordine è ancora libero, viene riservato a te» come stato,
+l'avviso arancio «Questo ordine non risulta ancora registrato» e un
+«↻ Riprova». **Nessuna di quelle frasi era per lui**: sono le parole
+di chi PRENDE, e lui stava pubblicando. La seconda: lo slider del
+premio nel foglio «Pubblica» colorava verde a destra e rosso a
+sinistra SEMPRE, e su un ordine di ACQUISTO un premio positivo fa
+ricevere MENO sats a chi pubblica — il verde diceva il contrario del
+vero.
+
+**LA PAGINA ERA UNA SOLA PER DUE VERSI, ed è il difetto di fondo.**
+`renderOrdineP2P`, `STATI_P2P` e il bottone «Riprova» erano nati con
+la presa (tappe 2-4) e la pubblicazione (tappa 5) ci si era appoggiata
+sopra senza portare le sue parole: la riga locale sapeva di essere
+«mia» (`mio: true`, scritto da `inviaNuovoOrdineP2P` e da
+`adottaOrdiniAltroveP2P`) ma nessuno dei tre la interrogava.
+**E IL «RIPROVA» FACEVA UNA COSA SBAGLIATA, non solo diceva una cosa
+sbagliata**: `riprovaPresaP2P` manda una `take-buy`/`take-sell`, cioè
+Alan stava provando a PRENDERE il proprio ordine — e siccome un ordine
+mai registrato un id vero non ce l'ha, il gesto si fermava sul
+cancello di `chiamataOrdineP2P` («non risulta ancora registrato:
+aspetta un momento la risposta»). Quell'avviso arancio non era un
+secondo guasto: era l'eco del primo, e per giunta **sovrascriveva
+`o.errore`** — la ragione del PRIMO silenzio (il testo del timeout, o
+un errore del relay) è andata persa prima che qualcuno la leggesse.
+
+**LE TRE CURE DEL VERSO**, tutte sulla riga con `mio`.
+1) `STATI_P2P` ha due voci nuove per riga, `t_mio` e `d_mio`, e
+`statoTestoP2P` le sceglie PRIMA del lato: «senza risposta» a chi
+pubblica dice che l'ordine potrebbe non essere nel libro e che si può
+riprovare a pubblicarlo con la stessa chiave («se era già stato
+registrato, te lo dice»); «rifiutato» diventa «Ordine non pubblicato».
+Gli altri stati non dichiarano `d_mio` e non cambiano — c'è una prova
+che lo chiede (`attivoMio == attivoCompro`).
+2) Il PRIMO passo dello stepper per chi pubblica è «Ordine pubblicato
+— Aspetta chi ti vende / ti compra i sats»: i tre dopo sono gli
+stessi di chiunque, perché da quando qualcuno lo prende lo scambio è
+lo scambio.
+3) Il «Riprova» ha due versi: `riprovaPubblicazioneP2P`, gemello di
+`riprovaPresaP2P` con la STESSA regola — la richiesta si rimanda con
+la stessa chiave e lo stesso indice. Se il coordinatore l'aveva già
+registrata risponde `invalid-trade-index` («prova a riaprire l'app»:
+alla riapertura la restore la trova e la adotta); se non l'aveva mai
+vista la registra adesso e la riga prende il nome vero come alla
+prima. **Un indice nuovo brucerebbe una chiave per niente e, nel caso
+peggiore, metterebbe nel libro due copie dello stesso ordine** — è la
+ragione per cui non si è ripartiti da `inviaNuovoOrdineP2P`. Non
+passa da `chiamataOrdineP2P`: quel cancello vuole un id vero, e qui
+l'id vero è esattamente la cosa che manca. La cintura del mazzo c'è
+lo stesso (`tk.pub !== o.pubTrade` → errore che si legge).
+L'ORDINE SI RILEGGE DALLA RIGA con `ordineDaRigaP2P`, che passa dallo
+STESSO costruttore del foglio (`ordineDaCampiP2P`): i campi della
+riga sono nati dal payload, quindi il giro torna sui byte, e c'è una
+prova che lo chiede a mercato, a intervallo e a prezzo fisso.
+⚠️ **CHI AGGIUNGE UN CAMPO AL PAYLOAD DEL FOGLIO LO PORTA ANCHE LÌ**:
+il cantiere del tabacchino, in un'altra sessione, mette `expires_at`
+nell'ordine — se non passa anche da `ordineDaRigaP2P`, il «Riprova a
+pubblicare» ripubblica senza scadenza, in silenzio.
+E la riga dei giorni («Resta qui ancora N giorni…») dice la ragione
+del suo verso: per chi pubblica la chiave serve «a riconoscerlo e a
+ritirarlo», non «a riprenderlo».
+
+**IL GIUDICE SULLO SLIDER È QUELLO DELLE CARD.** `fasciaPremioP2P`
+prende ora il lato, e la TINTA (e la classe della pillola, e i due
+capi «−20% / +20%» sotto la barra) esce da `affareP2P` passando per
+`comeLibroP2P`, esattamente come il conto del dettaglio: «chi guarda»
+qui è chi pubblica. La GEOMETRIA invece resta del segno — il pallino
+sta dove sta il numero — e a zero non c'è nessun giudizio. Le classi
+CSS della pillola sono diventate `affare`/`avviso` (erano `su`/`giu`,
+che dicevano il segno nel nome): un giudice solo, mai il segno, e una
+prova che cerca `.segno` in `cambiaPremioP2P` e vuole non trovarlo.
+Sul lato VENDO niente cambia a vista (lì tinta e segno combaciavano,
+ed era l'unico verso provato); sul lato COMPRO si rovescia: −20% verde
+a sinistra, +20% rosso a destra. Gli altri posti dove il premio si
+colora — badge del libro, badge «per te» della lista, riga del conto,
+cartellino dell'affare — passavano già da `affareP2P` e non si sono
+toccati; il filtro «Sconto / Premio» del libro è un intervallo in
+tinta neutra (`--sats`), e non dà giudizi.
+
+**IL SILENZIO DEL COORDINATORE NON È ANCORA SPIEGATO, e va guardato
+sul nodo** (comandi in sola lettura in PRODUZIONE, «COME SI LEGGE COSA
+HA FATTO IL COORDINATOR DI UNA RICHIESTA»). Le ipotesi in ordine di
+peso, da smentire una alla volta:
+• **`get_market_quote` fallita in silenzio.** Su un ordine a prezzo
+di mercato mostrod chiede il cambio a `api.yadio.io` PRIMA di
+registrare (`order_action` in `src/app/order.rs`: serve a controllare
+`max_order_amount`), e se la chiamata fallisce logga e **torna senza
+rispondere niente** — la stessa forma del difetto della dev fee
+(circuito Tor freddo, tre budget compilati; vedi CLAUDE.md, «LA DEV
+FEE SI IMPIANTA SUL CIRCUITO FREDDO»), con in più il caso che yadio
+rifiuti l'exit Tor del momento, come WoS e Boltz coi nostri. Il 6 e il
+7 set ha risposto perché il circuito era caldo (o l'exit gradito).
+• **Il riavvio del 15 set** (`hold_invoice_cltv_delta` a 576): se il
+tentativo di Alan è caduto nella finestra in cui mostrod non aveva
+ancora ripreso i relay via Tor, l'evento è arrivato al relay e nessuno
+l'ha letto — la sottoscrizione di mostrod riparte da «adesso».
+• **La busta scartata prima di ogni handler** (firma della prova
+d'identità, indice, spam gate): un `warn` nel log e nessuna risposta.
+Fino a ieri l'indice fuori posto rispondeva `invalid-trade-index`, e
+Alan avrebbe letto «Ordine non preso», non «Nessuna risposta»: pesa
+poco, ma si guarda.
+• **L'evento non è mai arrivato al relay**: si vede dal relay stesso
+(`strfry scan` sui kind 14 del pomeriggio), e allora il guasto è dal
+lato del client — publish caduta, «timed out» letto come partito.
+Quel che il grezzo dirà va scritto qui sotto, con la data.
+
+**PROVATO**: `prove.py` intero in un worktree su `origin/main`
+(`PYTHONUTF8=1 PROVE_SEVERE=1`), con le prove nuove: il giudizio della
+fascia sui due lati (geometria uguale, tinta rovesciata su compro,
+nessun giudizio a zero), il giro riga→payload sui tre tipi d'ordine,
+le parole dei due versi in `statoTestoP2P` (e che gli altri stati non
+cambino), il primo passo di chi pubblica, il bottone che ripubblica
+invece di prendere, e il ripubblica che rimanda `new-order` con la
+stessa chiave e lo stesso indice senza mai passare da una take.
+**DA GUARDARE**: la conferma sul campo — Alan riapre l'ordine fermo,
+legge le parole nuove, preme «Riprova a pubblicare» e si legge cosa
+risponde il coordinatore (o cosa dice il suo log, se tace ancora).

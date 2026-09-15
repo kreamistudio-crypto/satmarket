@@ -42903,6 +42903,38 @@ def prove_p2p_motore():
           in _ren
           and "{t: 'Scambio concluso', d: 'I sats sono arrivati a te'}"
           in _ren)
+    # ⚠️ E IL PRIMO PASSO DI CHI PUBBLICA NON E' «ORDINE PRESO» (15 set
+    # 2026, dal campo con Alan): il suo ordine e' nel libro e aspetta,
+    # e i tre passi dopo sono gli stessi di chiunque.
+    prova("...e chi PUBBLICA ha per primo passo «Ordine pubblicato»", True,
+          "if (o.mio) passi[0] = {t: 'Ordine pubblicato'," in _ren
+          and "'Aspetta chi ti vende i sats' : 'Aspetta chi ti compra i sats'"
+          in _ren)
+    # e il «Riprova» di chi pubblica RIPUBBLICA: la take del proprio
+    # ordine si fermava sul cancello dell'id vero, con un avviso che
+    # parlava d'altro
+    prova("...e il suo «Riprova» ripubblica, invece di prendere il proprio ordine",
+          True,
+          "onclick=\"riprovaPubblicazioneP2P()\">↻ Riprova a pubblicare" in _ren
+          and "? (o.mio\n" in _ren
+          and "onclick=\"riprovaPresaP2P()\">↻ Riprova</button>'" in _ren)
+    _rp = pezzo_js(mini, "async function riprovaPubblicazioneP2P(){", "\n}\n")
+    prova("il ripubblica rimanda new-order con la STESSA chiave e lo stesso indice",
+          True,
+          "messaggioMostro('new-order'" in _rp
+          and "chiaveScambio(mz.sk, o.indice)" in _rp
+          and "indice: reput ? o.indice : null" in _rp
+          and "ordineDaRigaP2P(o)" in _rp
+          and "take-" not in _rp
+          and "chiamataOrdineP2P" not in _rp)
+    prova("...si ferma se la riga non e' del mazzo vivo, o ha gia' un nome vero",
+          True,
+          "if (tk.pub !== o.pubTrade) throw" in _rp
+          and "if (idMostroVero(o.id))" in _rp
+          and "if (!o || !o.mio) return;" in _rp)
+    prova("...e la riga dei giorni dice la ragione del suo verso", True,
+          "serve a riconoscerlo e a ritirarlo." in _ren
+          and "serve a riprenderlo." in _ren)
     # ⚠️ E LA PRIMA PARENTESI DI OGNI LISTA E' IL GESTO DEL BOTTONE:
     # `azioniDisponibili` da' «fattura» a chi compra e «hold» a chi
     # vende, e le due frasi dicono la stessa cosa nello stesso ordine.
@@ -44141,6 +44173,14 @@ out.euroVendo = statoTestoP2P({lato: 'vendo', stato: 'euro_inviati'}).d;
 out.titoloUguale = statoTestoP2P({lato: 'compro', stato: 'attivo'}).t
                 === statoTestoP2P({lato: 'vendo', stato: 'attivo'}).t;
 out.statoIgnoto = statoTestoP2P({lato: 'compro', stato: 'boh'});
+// 9-bis) e col VERSO di chi ha pubblicato (15 set 2026, dal campo con
+// Alan): la stessa riga, letta da chi prende e da chi pubblica
+out.srPresa = statoTestoP2P({lato: 'compro', stato: 'senza_risposta'});
+out.srMio = statoTestoP2P({lato: 'compro', stato: 'senza_risposta', mio: true});
+out.rifPresa = statoTestoP2P({lato: 'vendo', stato: 'rifiutato'}).t;
+out.rifMio = statoTestoP2P({lato: 'vendo', stato: 'rifiutato', mio: true}).t;
+// il verso di chi pubblica NON tocca gli stati che non lo dichiarano
+out.attivoMio = statoTestoP2P({lato: 'compro', stato: 'attivo', mio: true}).d;
 
 /* ---- tappa 5: chi PUBBLICA un ordine ---- */
 // 10) il giro di chi pubblica e poi aspetta che qualcuno risponda
@@ -44276,6 +44316,20 @@ process.stdout.write(JSON.stringify(out));
           out["titoloUguale"])
     prova("uno stato che non conosciamo non lascia la pagina muta",
           {"t": "Scambio in corso", "d": ""}, out["statoIgnoto"])
+    # ⚠️ CHI PUBBLICA NON LEGGE LE PAROLE DI CHI PRENDE (15 set 2026,
+    # dal campo con Alan): «se l'ordine è ancora libero, viene
+    # riservato a te» sotto il PROPRIO ordine senza risposta.
+    prova("senza risposta, chi PRENDE legge della riserva", True,
+          "riservato a te" in out["srPresa"]["d"])
+    prova("...e chi PUBBLICA legge di ripubblicare, mai della riserva", True,
+          "riprovare a pubblicarlo" in out["srMio"]["d"]
+          and "riservato" not in out["srMio"]["d"]
+          and out["srMio"]["t"] == out["srPresa"]["t"])
+    prova("un rifiuto e' «non preso» per chi prende e «non pubblicato» per chi pubblica",
+          ["Ordine non preso", "Ordine non pubblicato"],
+          [out["rifPresa"], out["rifMio"]])
+    prova("...e il verso di chi pubblica non tocca gli altri stati", True,
+          out["attivoMio"] == out["attivoCompro"])
 
     # --- 4) TAPPA 5: chi pubblica, chi ritira, chi vota --------------
     prova("chi PUBBLICA aspetta, poi blocca i sats come chiunque venda",
@@ -45224,7 +45278,12 @@ def prove_p2p_pubblica():
         + "\nconst P2P_PREMIO_MAX = %d;\n" % P2P_PREMIO_MAX_da(mini)
         + re.search(r"const P2P_POLLICE = \d+;", mini).group(0) + "\n"
         + _intera("function bordoPremioP2P(frazione){")
-        + "\n" + _intera("function fasciaPremioP2P(premio){")
+        # il giudice delle card e la traduzione del lato: dal 15 set
+        # 2026 la tinta della fascia esce da loro, non dal segno
+        + "\n" + _intera("function affareP2P(o){")
+        + "\n" + _intera("function comeLibroP2P(o){")
+        + "\n" + _intera("function fasciaPremioP2P(premio, lato){")
+        + "\n" + _intera("function ordineDaRigaP2P(o){")
         + "\n" + _forme
         + "\n" + _intera("function formaRecapito(metodo){")
         + "\nconst METODI = ['SEPA', 'SEPA Instant', 'Revolut',"
@@ -45280,12 +45339,35 @@ def prove_p2p_pubblica():
         # sono diventati due punti qualunque — cinque rosse che non
         # dicevano niente sul codice. Chiesti alla costante, gli
         # attesi restano gli stessi qualunque fascia si scelga domani.
-        "  fascia: [fasciaPremioP2P(-P2P_PREMIO_MAX), fasciaPremioP2P(0),\n"
-        "           fasciaPremioP2P(P2P_PREMIO_MAX),\n"
+        # SUL LATO VENDO: un premio positivo fa consegnare meno sats a
+        # chi vende, quindi a destra e' verde — il verso in cui la
+        # tinta e il segno combaciano, e il solo che c'era prima
+        "  fascia: [fasciaPremioP2P(-P2P_PREMIO_MAX, 'vendo'), fasciaPremioP2P(0, 'vendo'),\n"
+        "           fasciaPremioP2P(P2P_PREMIO_MAX, 'vendo'),\n"
         # «mezza strada» e' meta' fascia, e i due fuori-fascia si
         # tosano ai capi qualunque sia la fascia
-        "           fasciaPremioP2P(-P2P_PREMIO_MAX / 2),\n"
-        "           fasciaPremioP2P(-999), fasciaPremioP2P(999)],\n"
+        "           fasciaPremioP2P(-P2P_PREMIO_MAX / 2, 'vendo'),\n"
+        "           fasciaPremioP2P(-999, 'vendo'), fasciaPremioP2P(999, 'vendo')],\n"
+        # SUL LATO COMPRO LA TINTA SI ROVESCIA E LA GEOMETRIA NO (15 set
+        # 2026, dal campo con Alan): +20% fa ricevere MENO sats a chi
+        # pubblica, ed e' rosso; -20% di piu', ed e' verde
+        "  fasciaCompro: [fasciaPremioP2P(-P2P_PREMIO_MAX, 'compro'),\n"
+        "                 fasciaPremioP2P(P2P_PREMIO_MAX, 'compro'),\n"
+        "                 fasciaPremioP2P(0, 'compro')],\n"
+        # IL GIRO DI ANDATA E RITORNO della riga (il «Riprova a
+        # pubblicare»): dal payload nasce la riga, dalla riga il
+        # payload, e i due devono combaciare sui byte — a mercato, a
+        # intervallo e a prezzo fisso
+        "  rigaGiro: [\n"
+        "    ['compro', {euro: '50', euroMax: '', sats: '', fisso: false, metodi: ['SEPA', 'Revolut'], premio: 3}],\n"
+        "    ['vendo', {euro: '20', euroMax: '100', sats: '', fisso: false, metodi: ['SEPA'], premio: -2}],\n"
+        "    ['vendo', {euro: '25', euroMax: '', sats: '50000', fisso: true, metodi: ['Satispay'], premio: 0}]\n"
+        "  ].map(([lato, v]) => {\n"
+        "    const ordine = ordineDaCampiP2P(v, lato);\n"
+        "    const riga = {lato: lato, euro: ordine.max_amount ? ordine.min_amount : ordine.fiat_amount,\n"
+        "                  euroMax: ordine.max_amount || 0, sats: ordine.amount,\n"
+        "                  metodi: v.metodi, premium: ordine.premium};\n"
+        "    return JSON.stringify(ordineDaRigaP2P(riga)) === JSON.stringify(ordine); }),\n"
         "  forme: METODI.map(m => formaRecapito(m).forma),\n"
         "  interi: [interoP2P('5'), interoP2P('5.5'),\n"
         "           interoP2P(','), interoP2P(''),\n"
@@ -45476,23 +45558,38 @@ def prove_p2p_pubblica():
     # e a destra verde. La correzione del pollice c'e' in ogni bordo —
     # senza, il colore e il pallino si scollano proprio agli estremi.
     _C = "calc(0.5 * (100% - 20px) + 10px)"     # il centro
-    prova("a zero la fascia e' larga zero, e nessuno dei due segni",
-          {"da": _C, "a": _C, "tinta": "var(--muted)", "segno": ""},
+    prova("a zero la fascia e' larga zero, e nessun giudizio",
+          {"da": _C, "a": _C, "tinta": "var(--muted)", "giudizio": ""},
           out["fascia"][1])
-    prova("...a sinistra e' rossa e va dal capo al centro",
+    prova("...a sinistra (vendo) e' rossa e va dal capo al centro",
           {"da": "calc(0 * (100% - 20px) + 10px)", "a": _C,
-           "tinta": "var(--danger)", "segno": "giu"}, out["fascia"][0])
-    prova("...a destra e' verde e va dal centro al capo",
+           "tinta": "var(--danger)", "giudizio": "avviso"}, out["fascia"][0])
+    prova("...a destra (vendo) e' verde e va dal centro al capo",
           {"da": _C, "a": "calc(1 * (100% - 20px) + 10px)",
-           "tinta": "var(--trust)", "segno": "su"}, out["fascia"][2])
+           "tinta": "var(--trust)", "giudizio": "affare"}, out["fascia"][2])
     # a meta' strada verso sinistra: il bordo mobile e' quello di
     # SINISTRA e il centro resta l'altro capo — la fascia non scavalca
     prova("...e a meta' strada il centro resta un capo",
           {"da": "calc(0.25 * (100% - 20px) + 10px)", "a": _C,
-           "tinta": "var(--danger)", "segno": "giu"}, out["fascia"][3])
+           "tinta": "var(--danger)", "giudizio": "avviso"}, out["fascia"][3])
     prova("...e i numeri fuori fascia si tosano ai due capi",
           [out["fascia"][0], out["fascia"][2]],
           [out["fascia"][4], out["fascia"][5]])
+    # ⚠️ SUL LATO COMPRO IL GIUDIZIO SI ROVESCIA E LA GEOMETRIA NO (15
+    # set 2026, dal campo con Alan): un +20% fa ricevere MENO sats a
+    # chi pubblica un acquisto, e il verde diceva il contrario del
+    # vero. Il giudice e' `affareP2P`, lo stesso delle card — mai il
+    # segno.
+    prova("sul lato COMPRO il capo sinistro e' verde: piu' sats a chi compra",
+          {"da": "calc(0 * (100% - 20px) + 10px)", "a": _C,
+           "tinta": "var(--trust)", "giudizio": "affare"}, out["fasciaCompro"][0])
+    prova("...e il capo destro e' rosso: meno sats a chi compra",
+          {"da": _C, "a": "calc(1 * (100% - 20px) + 10px)",
+           "tinta": "var(--danger)", "giudizio": "avviso"}, out["fasciaCompro"][1])
+    prova("...e a zero non c'e' giudizio nemmeno di la'",
+          out["fascia"][1], out["fasciaCompro"][2])
+    prova("la riga torna payload sui byte: mercato, intervallo, prezzo fisso",
+          [True, True, True], out["rigaGiro"])
     # ⚠️ LA PROVA CHE REGGE IL ROVESCIAMENTO: il vocabolario e' chiuso
     # PERCHE' ogni voce ha il suo form di recapito. Se un giorno se ne
     # aggiunge una senza forma, chi deve ricevere gli euro si trova la
@@ -45762,7 +45859,7 @@ def prove_p2p_pubblica():
     # ogni movimento — non solo al render, o trascinando resterebbe
     # fermo dov'era.
     prova("la fascia parte gia' scritta", True,
-          "'style=\"' + stilePremioP2P(p2pNuovoPremio) + '\" '" in nuovo)
+          "'style=\"' + stilePremioP2P(p2pNuovoPremio, p2pLato) + '\" '" in nuovo)
     _cp = pezzo_js(mini, "function cambiaPremioP2P(v){", "\n}\n")
     prova("...e si riscrive a ogni movimento, tutt'e tre le variabili",
           True, all(("cur.style.setProperty('--%s', f.%s);" % (k, k)) in _cp
@@ -45771,9 +45868,18 @@ def prove_p2p_pubblica():
     # PILLOLA, non sul numero: riscrivere la cifra dentro un figlio
     # lascia dov'e' la matita agganciata all'angolo. Fossero lo stesso
     # nodo, ogni movimento del cursore la porterebbe via.
-    prova("...e il numero cambia colore col segno", True,
-          "pil.classList.toggle('su', s === 'su');" in _cp
-          and "pil.classList.toggle('giu', s === 'giu');" in _cp)
+    prova("...e il numero cambia colore col GIUDIZIO, mai col segno", True,
+          "pil.classList.toggle('affare', s === 'affare');" in _cp
+          and "pil.classList.toggle('avviso', s === 'avviso');" in _cp
+          and "fasciaPremioP2P(p2pNuovoPremio, p2pLato).giudizio" in _cp
+          and ".segno" not in _cp)
+    # i due capi sotto la barra: dallo stesso giudice, ai due estremi —
+    # un `var(--danger)` scritto a mano a sinistra tornerebbe a mentire
+    # sull'acquisto
+    prova("...e i due capi sotto la barra escono dal giudice", True,
+          "fasciaPremioP2P(-P2P_PREMIO_MAX, p2pLato).tinta" in nuovo
+          and "fasciaPremioP2P(P2P_PREMIO_MAX, p2pLato).tinta" in nuovo
+          and "p2p-premio-capi\"><span style=\"color:var(--danger)\">" not in nuovo)
     prova("...con la cifra in un figlio, che la matita resti", True,
           "'<span id=\"p2pNuovoPremioVal\">' + esc(premioTestoP2P(p2pNuovoPremio))"
           in pezzo_js(mini, "function premioValP2P(){", "\n}\n"))
@@ -45788,8 +45894,9 @@ def prove_p2p_pubblica():
     prova("...col fondo NEUTRO, che il colore ce l'ha il numero", True,
           "padding:7px 12px;border:0;border-radius:999px;background:var(--card);"
           in stile
-          and ".p2p-premio-cifra.su{color:var(--trust)}" in stile
-          and ".p2p-premio-cifra.giu{color:var(--danger)}" in stile)
+          and ".p2p-premio-cifra.affare{color:var(--trust)}" in stile
+          and ".p2p-premio-cifra.avviso{color:var(--danger)}" in stile
+          and ".p2p-premio-cifra.su{" not in stile)
     # ⚠️ IL BLOCCO SI RITAGLIA, e la tortura ha spiegato perche': la
     # riga `border-radius:999px;background:#fff;` sta ANCHE nel pomello
     # della leva del tipo di prezzo, dieci righe piu' su. Cercata in

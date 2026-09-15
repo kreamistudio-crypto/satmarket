@@ -37,6 +37,41 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   del client (`📖 [p2p] libro: ...=N`): e' li' che si vede uno
   specchio che ha smesso di aggiornarsi, perche' non fallisce — torna
   zero, e zero si legge come «oggi non c'e' nessun ordine».
+- COME SI LEGGE COSA HA FATTO IL COORDINATOR DI UNA RICHIESTA (15 set
+  2026, dal silenzio sull'ordine di Alan). Tutto in sola lettura, e in
+  ORDINE: prima si cerca la richiesta, poi la risposta, poi il perché.
+  1) Sulla macchina del relay (`/opt/relay`): l'evento del client è un
+  kind 14 con tag `p` verso il coordinator, e la risposta è un kind 14
+  FIRMATO dal coordinator. Con l'ora del tentativo in `since` (epoch),
+  senza bisogno di sapere la hex:
+  `docker compose -f /opt/relay/compose.yml exec relay strfry scan
+  '{"kinds":[14],"since":EPOCH}' | jq -r '[.created_at, .pubkey[0:8],
+  (.tags[]|select(.[0]=="p")|.[1][0:8])] | @tsv'` — la `p` più
+  frequente è il coordinator; una riga con QUELLA come `pubkey` è una
+  risposta. Richiesta senza risposta = il guasto è sul nodo; nessuna
+  richiesta = il guasto è sul client (o sulla publish).
+  2) Sul nodo (`~/nodo`, servizio `mostro`), la finestra del
+  tentativo, tolto il rumore della dev fee:
+  `cd ~/nodo && docker compose logs --timestamps --since
+  2026-09-15T00:00:00 mostro | grep -v "unpaid dev fees\|NoAPIResponse"
+  | grep -iE "order|warn|error|invalid|rate|spam|quote|yadio|signature|
+  relay|connect" | tail -n 200`. Le righe che contano: «Invalid
+  signature»/«verification» (busta scartata, nessuna risposta per
+  scelta), «Invalid trade index» (ma quella risponde `cant-do`),
+  «quote»/«yadio» con un errore (il cambio non è arrivato: su un ordine
+  a prezzo di mercato mostrod NON registra e NON risponde), e le
+  «Connected to relay» dopo un riavvio (se il tentativo è caduto
+  prima, l'evento è passato e nessuno l'ha letto).
+  3) Il cambio DAL NAMESPACE DI RETE DEL CONTAINER, cioè dalla stessa
+  strada Tor che fa mostrod:
+  `docker run --rm --network container:nodo-mostro-1 curlimages/curl
+  -s -m 30 -o /dev/null -w '%{http_code} %{time_appconnect}s\n'
+  https://api.yadio.io/exrates/EUR` — 200 sotto i 4 s è la finestra
+  in cui mostrod ce la fa; 403/000 o oltre i 4 s è la stessa forma del
+  difetto della dev fee (vedi CLAUDE.md), e la cura è la stessa
+  conversazione upstream. ⚠️ `time_connect` MENTE sotto il proxy
+  trasparente: si guarda `time_appconnect`. Dopo un giro il circuito è
+  CALDO, quindi la seconda misura non dice niente sul primo tentativo.
 - LO SPECCHIO GIRA SULLA MACCHINA DEL RELAY, non su questo VPS: e' il
   servizio `specchio` del `compose.yml` di `/opt/relay` (uno `strfry
   router` con `router.conf`), e si accende con `docker compose up -d

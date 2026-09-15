@@ -3024,8 +3024,11 @@
   .p2p-premio{display:flex;align-items:center;gap:12px}
   .p2p-premio-val{flex:0 0 auto;min-width:56px;text-align:center}
   /* LA PILLOLA E' UN BOTTONE col fondo NEUTRO (ritocco di Andrea): il
-     colore ce l'ha il NUMERO, e dice il SEGNO — verde sopra il
-     mercato, rosso sotto, neutro a zero, in pari con la barra. Un
+     colore ce l'ha il NUMERO, e dice il GIUDIZIO — verde dove il
+     premio pende dalla parte di chi pubblica, rosso dove pende
+     contro, neutro a zero, in pari con la barra (15 set 2026: prima
+     diceva il SEGNO, e su un ordine di acquisto un +5% verde diceva
+     il contrario del vero — vedi `fasciaPremioP2P`). Un
      fondo pieno faceva della pillola la cosa piu' accesa della
      sezione, davanti alla barra che e' quella da guardare; e non
      avrebbe potuto dire il segno, che il testo bianco sopra deve
@@ -3036,8 +3039,8 @@
   .p2p-premio-cifra{position:relative;display:block;min-width:56px;
     padding:7px 12px;border:0;border-radius:999px;background:var(--card);
     font:inherit;font-weight:800;font-size:15px;color:var(--ink);cursor:pointer}
-  .p2p-premio-cifra.su{color:var(--trust)}
-  .p2p-premio-cifra.giu{color:var(--danger)}
+  .p2p-premio-cifra.affare{color:var(--trust)}
+  .p2p-premio-cifra.avviso{color:var(--danger)}
   /* IL TONDINO E' BIANCO NEI DUE TEMI (scelta di Andrea) e la matita
      scura: un tondino che seguisse il tema sparirebbe dentro la
      pillola di giorno, che e' bianca anche lei. A staccarlo dal fondo
@@ -39468,8 +39471,15 @@ const STATI_P2P = {
   pubblico: {t: 'Sto pubblicando l\'ordine…', d: 'Lo metto nel libro degli ordini.'},
   pubblicato: {t: 'Ordine pubblicato', d_compro: 'È nel libro: aspetta che qualcuno ti venda i sats. Puoi ritirarlo quando vuoi, finché nessuno lo prende.',
                d_vendo: 'È nel libro: aspetta che qualcuno ti compri i sats. Puoi ritirarlo quando vuoi, finché nessuno lo prende.'},
-  senza_risposta: {t: 'Nessuna risposta', d: 'La risposta non è arrivata. Puoi riprovare: se l\'ordine è ancora libero, viene riservato a te.'},
-  rifiutato: {t: 'Ordine non preso', d: 'La richiesta non è stata accettata.'},
+  /* LE DUE VOCI HANNO UN VERSO IN PIU' (15 set 2026, dal campo con
+     Alan): la stessa riga la legge chi PRENDE e chi PUBBLICA, e a chi
+     pubblica «se l'ordine è ancora libero, viene riservato a te» non
+     c'entra niente. `t_mio`/`d_mio` valgono per la riga con `mio`,
+     e li sceglie statoTestoP2P prima del lato. */
+  senza_risposta: {t: 'Nessuna risposta', d: 'La risposta non è arrivata. Puoi riprovare: se l\'ordine è ancora libero, viene riservato a te.',
+                   d_mio: 'La risposta non è arrivata: l\'ordine potrebbe non essere nel libro. Puoi riprovare a pubblicarlo con la stessa chiave: se era già stato registrato, te lo dice.'},
+  rifiutato: {t: 'Ordine non preso', d: 'La richiesta non è stata accettata.',
+              t_mio: 'Ordine non pubblicato', d_mio: 'La pubblicazione non è stata accettata.'},
   attesa_mia_fattura: {t: 'Dove vuoi i sats?', d: 'Indica il tuo indirizzo Lightning: è lì che arriveranno alla fine dello scambio.'},
   attesa_hold_venditore: {t: 'Chi vende sta bloccando i sats', d: 'Appena sono al sicuro in garanzia te lo diciamo: da lì potrai pagare in euro.'},
   attesa_fattura_compratore: {t: 'Chi compra sta indicando dove ricevere', d: 'Appena lo fa ti chiederemo di bloccare i sats.'},
@@ -39535,10 +39545,14 @@ function tintaStatoP2P(o){
 }
 function statoTestoP2P(o){
   const s = STATI_P2P[o && o.stato] || {t: 'Scambio in corso', d: ''};
-  const d = (o && o.lato === 'compro' && s.d_compro) ? s.d_compro
+  /* il verso di chi ha PUBBLICATO vince sul lato: e' la stessa riga
+     letta da un'altra parte del banco, e la sua frase e' un'altra */
+  const mio = !!(o && o.mio);
+  const d = (mio && s.d_mio) ? s.d_mio
+          : (o && o.lato === 'compro' && s.d_compro) ? s.d_compro
           : (o && o.lato === 'vendo' && s.d_vendo) ? s.d_vendo
           : (s.d || '');
-  return {t: s.t, d};
+  return {t: (mio && s.t_mio) || s.t, d};
 }
 
 /* ---- quanto chiede una richiesta di pagamento ----
@@ -40577,6 +40591,57 @@ async function riprovaPresaP2P(){
   }
   if (p2pOrdineAperto === id) renderOrdineP2P();
 }
+/* IL «RIPROVA» DI CHI PUBBLICA (15 set 2026, dal campo con Alan):
+   gemello di riprovaPresaP2P, e con la stessa regola — la richiesta si
+   rimanda con la STESSA chiave e lo STESSO indice. Se il coordinatore
+   l'aveva gia' registrata risponde che quell'indice l'ha gia' visto
+   (`invalid-trade-index`, «prova a riaprire l'app»: alla riapertura
+   la restore lo trova e lo adotta); se non l'aveva mai vista la
+   registra adesso, e l'ordine locale prende il suo nome vero come
+   alla prima. Un indice nuovo brucerebbe una chiave per niente e, nel
+   caso peggiore, metterebbe nel libro due copie dello stesso ordine.
+   L'ORDINE SI RILEGGE DALLA RIGA (`ordineDaRigaP2P`), cioe' da quel
+   che la pagina mostra: quel che parte e quel che si vede non possono
+   raccontare due cose diverse, che e' la regola di inviaNuovoOrdineP2P.
+   ⚠️ NON passa da chiamataOrdineP2P: quel cancello vuole un id vero, e
+   qui l'id vero e' esattamente la cosa che manca. */
+async function riprovaPubblicazioneP2P(){
+  const id = p2pOrdineAperto;
+  const o = ordiniP2P()[id];
+  if (!o || !o.mio) return;
+  /* con un nome vero l'ordine e' gia' nel libro: niente da ripubblicare */
+  if (idMostroVero(o.id)) { toast('Questo ordine è già nel libro'); return; }
+  o.stato = 'pubblico'; o.errore = ''; o.cantDo = '';
+  scriviOrdineP2P(o);
+  renderOrdineP2P();
+  try {
+    const mz = mazzoMostro();
+    if (!mz) throw new Error('Il profilo di scambio non si trova');
+    const tk = chiaveScambio(mz.sk, o.indice);
+    /* la cintura del mazzo, la stessa del cancello dei gesti: una
+       riga dell'altra identita' partirebbe firmata da una chiave che
+       l'ordine non ha mai visto, e morirebbe in silenzio */
+    if (tk.pub !== o.pubTrade) throw new Error('Questo ordine è di un altro profilo di scambio: riapri l\'app dal dispositivo da cui l\'hai pubblicato');
+    await mostroRiascolta();
+    const NT = window.NostrTools;
+    const reput = !!(NT && NT.schnorr) && (o.indice | 0) > 0;
+    const msg = messaggioMostro('new-order', {
+      requestId: nuovaRichiestaP2P(), indice: reput ? o.indice : null,
+      payload: {order: ordineDaRigaP2P(o)}
+    });
+    await mostroChiama(tk.sk, msg, {mazzoSk: reput ? mz.sk : null, primoContatto: true});
+    /* la chiave VIVA: alla risposta la riga ha gia' il nome definitivo */
+    const agg = ordiniP2P()[p2pOrdineAperto] || o;
+    agg.contattato = true;
+    scriviOrdineP2P(agg);
+  } catch(e) {
+    const agg = ordiniP2P()[p2pOrdineAperto] || o;
+    agg.stato = (e && e.cantDo) ? 'rifiutato' : 'senza_risposta';
+    agg.errore = String(e && e.message || e);
+    scriviOrdineP2P(agg);
+  }
+  renderOrdineP2P();
+}
 /* la chiamata di uno scambio gia' preso: la chiave si deriva al volo
    dal profilo, l'indice si manda solo dove il coordinatore lo valida
    (prendere e creare un ordine) */
@@ -40711,6 +40776,14 @@ function renderOrdineP2P(){
     {t: 'Euro inviati', d: 'Al recapito che hai indicato'},
     {t: 'Scambio concluso', d: 'I sats sono arrivati al compratore'}
   ];
+  /* IL PRIMO PASSO E' DEL VERSO (15 set 2026, dal campo con Alan): chi
+     PUBBLICA leggeva «Ordine preso — Di' dove ricevere i sats», che e'
+     il passo di chi prende. Il suo primo passo e' un altro — l'ordine
+     e' nel libro e si aspetta — e i tre dopo sono gli stessi per
+     tutt'e due, perche' da quando qualcuno lo prende lo scambio e' lo
+     scambio. */
+  if (o.mio) passi[0] = {t: 'Ordine pubblicato',
+    d: o.lato === 'compro' ? 'Aspetta chi ti vende i sats' : 'Aspetta chi ti compra i sats'};
   const prog = P2P_PROGRESSO[o.stato] === undefined ? 0 : P2P_PROGRESSO[o.stato];
   const tog = p2pTogliibile(o);
   /* IL CONTO E' QUELLO DEL LIBRO, tradotto al verso di chi l'ordine
@@ -40762,16 +40835,28 @@ function renderOrdineP2P(){
     '<div class="trust-note nota-scambio"><span><b>' + esc(st.t) + '</b><br>' + esc(st.d) + '</span></div>' +
     (avviso ? '<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⚠️ <span>' + esc(avviso) + '</span></div>' : '') +
     (bottoni[azione] || '') +
+    /* IL «RIPROVA» HA DUE VERSI (15 set 2026, dal campo con Alan): su
+       un ordine PUBBLICATO senza risposta il bottone mandava una
+       take-buy del proprio ordine, e siccome quello un nome vero non
+       ce l'ha si fermava sul cancello di chiamataOrdineP2P — l'avviso
+       arancio «non risulta ancora registrato» che Alan ha letto. Chi
+       pubblica ripubblica. */
     (o.stato === 'senza_risposta'
-      ? '<button class="btn ghost" onclick="riprovaPresaP2P()">↻ Riprova</button>' : '') +
+      ? (o.mio
+         ? '<button class="btn ghost" onclick="riprovaPubblicazioneP2P()">↻ Riprova a pubblicare</button>'
+         : '<button class="btn ghost" onclick="riprovaPresaP2P()">↻ Riprova</button>') : '') +
     /* la riga che spiega perche' lo scambio RESTA: senza, un ordine
        senza risposta e' una riga che non se ne va e non dice perche'.
        Dice la RAGIONE (la chiave serve a riprenderlo) e non il solo
-       fatto, e cade da sola quando smette di essere vera. */
+       fatto, e cade da sola quando smette di essere vera. Per chi ha
+       pubblicato la ragione e' un'altra: l'ordine puo' essere finito
+       nel libro lo stesso, e la chiave e' l'unica che lo governa. */
     (tog.giorni
       ? '<div class="hint">Resta qui ancora ' + tog.giorni +
         (tog.giorni === 1 ? ' giorno' : ' giorni') + ': fino ad allora l\'ordine può essere ' +
-        'ancora vivo nel libro, e la sua chiave serve a riprenderlo. Poi lo potrai togliere.</div>'
+        (o.mio ? 'comunque finito nel libro, e la sua chiave serve a riconoscerlo e a ritirarlo.'
+               : 'ancora vivo nel libro, e la sua chiave serve a riprenderlo.') +
+        ' Poi lo potrai togliere.</div>'
       : '') +
     /* i recapiti stanno FRA il passo da fare e le uscite (fase 6, al
        posto della chat): quel che e' arrivato si mostra, quel che
@@ -41468,6 +41553,22 @@ function ordineDaCampiP2P(v, lato){
     created_at: 0
   };
 }
+/* PURA: l'ordine da (ri)mandare, letto dalla RIGA locale con lo STESSO
+   costruttore del foglio — i campi della riga sono nati dal payload
+   (`euro` da fiat/min, `euroMax` da max, `sats` da amount, `premium`),
+   quindi il giro torna sui byte. ⚠️ Chi aggiunge un campo al payload
+   del foglio lo porta anche qui, o il «Riprova a pubblicare» lo perde
+   in silenzio: c'e' una prova che chiede il giro di andata e ritorno. */
+function ordineDaRigaP2P(o){
+  return ordineDaCampiP2P({
+    euro: String(o.euro || 0),
+    euroMax: o.euroMax ? String(o.euroMax) : '',
+    sats: o.sats ? String(o.sats) : '',
+    fisso: (Number(o.sats) || 0) > 0,
+    metodi: o.metodi || [],
+    premio: o.premium || 0
+  }, o.lato);
+}
 function renderNuovoOrdineP2P(){
   const box = el('p2pNuovoCorpo');
   if (!box) return;
@@ -41587,13 +41688,18 @@ function renderNuovoOrdineP2P(){
       '<div class="p2p-premio-val">' + premioValP2P() + '</div>' +
       '<input type="range" id="p2pNuovoPremioCursore" min="-' + P2P_PREMIO_MAX + '" ' +
         'max="' + P2P_PREMIO_MAX + '" step="1" value="' + p2pNuovoPremio + '" ' +
-        'style="' + stilePremioP2P(p2pNuovoPremio) + '" ' +
+        'style="' + stilePremioP2P(p2pNuovoPremio, p2pLato) + '" ' +
         'oninput="cambiaPremioP2P(this.value)" aria-label="Premio in percento">' +
       '</div>' +
-      /* sotto la pillola il suo bottone, sotto la barra i suoi capi */
+      /* sotto la pillola il suo bottone, sotto la barra i suoi capi —
+         IN TINTA DALLO STESSO GIUDICE della fascia, ai due estremi:
+         su un ordine di acquisto e' il capo di SINISTRA a essere
+         verde, perche' e' li' che chi pubblica riceve piu' sats */
       '<div class="p2p-premio-pie">' + premioModP2P() +
-      '<span class="p2p-premio-capi"><span style="color:var(--danger)">−' + P2P_PREMIO_MAX +
-      '%</span><span style="color:var(--trust)">+' + P2P_PREMIO_MAX + '%</span></span></div>' +
+      '<span class="p2p-premio-capi"><span style="color:' +
+      fasciaPremioP2P(-P2P_PREMIO_MAX, p2pLato).tinta + '">−' + P2P_PREMIO_MAX +
+      '%</span><span style="color:' + fasciaPremioP2P(P2P_PREMIO_MAX, p2pLato).tinta +
+      '">+' + P2P_PREMIO_MAX + '%</span></span></div>' +
       '<div class="hint" id="p2pNuovoPremioNota">' + premioNotaP2P(compro, p2pNuovoPremio) + '</div>'
   });
 
@@ -41728,15 +41834,18 @@ function cambiaTipoPrezzoP2P(){
 }
 /* IL PREMIO SI MISURA DAL CENTRO, non dal capo (ritocco di Andrea che
    EMENDA il giro prima): a zero la barra e' tutta spenta, e da li' si
-   accende SOLO il tratto fra il centro e il pallino — verde a destra,
-   dove il premio e' un sovrapprezzo, rosso a sinistra, dove e' uno
-   sconto. Cosi' la barra dice due cose insieme: quanto ci si e'
-   spostati e DA CHE PARTE. Riempita dal capo sinistro diceva solo la
-   prima, e a zero sembrava gia' mezza scelta.
-   PURA, e un giudice solo per tutt'e tre le cose che dipendono dal
-   segno: i due bordi della fascia, la sua tinta, e la classe che
-   colora il numero nella pillola. Due giudici avrebbero potuto
-   raccontare due segni diversi sulla stessa cifra.
+   accende SOLO il tratto fra il centro e il pallino, nella tinta del
+   GIUDIZIO: verde dove il premio conviene a chi pubblica, rosso dove
+   gli costa (dal 15 set 2026 — prima era verde a destra e rosso a
+   sinistra per tutti, e sull'acquisto mentiva). Cosi' la barra dice
+   due cose insieme: quanto ci si e' spostati e SE CONVIENE. Riempita
+   dal capo sinistro diceva solo la prima, e a zero sembrava gia'
+   mezza scelta.
+   PURA, e un giudice solo per tutt'e quattro le cose che ne
+   dipendono: i due bordi della fascia (dal segno), la sua tinta e la
+   classe che colora il numero nella pillola (dal giudizio), e i due
+   capi sotto la barra. Due giudici avrebbero potuto raccontare due
+   verdetti diversi sulla stessa cifra.
    ⚠️ I BORDI NON SONO PERCENTUALI NUDE: il pallino e' largo
    `P2P_POLLICE` e il suo centro corre dentro `larghezza - pollice`,
    quindi senza la correzione il colore e il pallino si scollano ai due
@@ -41746,23 +41855,33 @@ function bordoPremioP2P(frazione){
   return 'calc(' + frazione + ' * (100% - ' + P2P_POLLICE + 'px) + '
     + (P2P_POLLICE / 2) + 'px)';
 }
-function fasciaPremioP2P(premio){
+function fasciaPremioP2P(premio, lato){
   const p = Math.max(-P2P_PREMIO_MAX,
     Math.min(P2P_PREMIO_MAX, Math.round(Number(premio) || 0)));
   const dove = (p + P2P_PREMIO_MAX) / (2 * P2P_PREMIO_MAX);
+  /* ⚠️ LA TINTA NON E' IL SEGNO (15 set 2026, dal campo con Alan):
+     fin qui verde a destra e rosso a sinistra SEMPRE, e su un ordine
+     di ACQUISTO un premio positivo fa ricevere MENO sats a chi
+     pubblica — il verde diceva il contrario del vero. Il giudice e'
+     quello delle card, `affareP2P`, che valuta PER CHI GUARDA: qui
+     chi guarda e' chi pubblica, e la traduzione del lato la fa
+     `comeLibroP2P` come nel conto del dettaglio. La GEOMETRIA invece
+     resta del segno — il pallino sta dove sta il numero — e a zero
+     non c'e' nessun giudizio da dare. */
+  const affare = p ? affareP2P(comeLibroP2P({lato: lato, premium: p})) : null;
   return {
     da: bordoPremioP2P(Math.min(0.5, dove)),
     a: bordoPremioP2P(Math.max(0.5, dove)),
     /* a zero la fascia e' larga zero, quindi la tinta non si vede: si
        tiene lo spento, che e' anche il colore del pallino fermo */
-    tinta: p > 0 ? 'var(--trust)' : p < 0 ? 'var(--danger)' : 'var(--muted)',
-    segno: p > 0 ? 'su' : p < 0 ? 'giu' : ''
+    tinta: affare === null ? 'var(--muted)' : affare ? 'var(--trust)' : 'var(--danger)',
+    giudizio: affare === null ? '' : affare ? 'affare' : 'avviso'
   };
 }
 /* le tre variabili che il CSS legge, in una stringa sola: chi le
    scrive (il render e ogni movimento) non deve ricordarsene i nomi */
-function stilePremioP2P(premio){
-  const f = fasciaPremioP2P(premio);
+function stilePremioP2P(premio, lato){
+  const f = fasciaPremioP2P(premio, lato);
   return '--da:' + f.da + ';--a:' + f.a + ';--tinta:' + f.tinta;
 }
 function cambiaPremioP2P(v){
@@ -41773,19 +41892,19 @@ function cambiaPremioP2P(v){
   const cur = el('p2pNuovoPremioCursore');
   if (cur && String(cur.value) !== String(p2pNuovoPremio)) cur.value = String(p2pNuovoPremio);
   if (cur) {
-    const f = fasciaPremioP2P(p2pNuovoPremio);
+    const f = fasciaPremioP2P(p2pNuovoPremio, p2pLato);
     cur.style.setProperty('--da', f.da);
     cur.style.setProperty('--a', f.a);
     cur.style.setProperty('--tinta', f.tinta);
   }
-  /* IL NUMERO CAMBIA COLORE COL SEGNO, in pari con la barra: la classe
-     sta sulla PILLOLA e il numero in un figlio suo, cosi' riscrivere la
-     cifra non porta via la matita agganciata all'angolo. */
+  /* IL NUMERO CAMBIA COLORE COL GIUDIZIO, in pari con la barra: la
+     classe sta sulla PILLOLA e il numero in un figlio suo, cosi'
+     riscrivere la cifra non porta via la matita agganciata all'angolo. */
   const pil = el('p2pNuovoPremioPil');
   if (pil) {
-    const s = fasciaPremioP2P(p2pNuovoPremio).segno;
-    pil.classList.toggle('su', s === 'su');
-    pil.classList.toggle('giu', s === 'giu');
+    const s = fasciaPremioP2P(p2pNuovoPremio, p2pLato).giudizio;
+    pil.classList.toggle('affare', s === 'affare');
+    pil.classList.toggle('avviso', s === 'avviso');
   }
   const nota = el('p2pNuovoPremioNota');
   if (nota) nota.innerHTML = premioNotaP2P(p2pLato === 'compro', p2pNuovoPremio);
@@ -41883,8 +42002,8 @@ function premioValP2P(){
       'min="-' + P2P_PREMIO_MAX + '" max="' + P2P_PREMIO_MAX + '" value="' + p2pNuovoPremio +
       '" style="width:56px;text-align:center" oninput="cambiaPremioP2P(this.value)" ' +
       'aria-label="Premio in percento">';
-  const segno = fasciaPremioP2P(p2pNuovoPremio).segno;
-  return '<button type="button" class="p2p-premio-cifra' + (segno ? ' ' + segno : '') +
+  const giudizio = fasciaPremioP2P(p2pNuovoPremio, p2pLato).giudizio;
+  return '<button type="button" class="p2p-premio-cifra' + (giudizio ? ' ' + giudizio : '') +
     '" id="p2pNuovoPremioPil" onclick="scriviPremioP2P()" ' +
     'aria-label="Scrivi il premio a mano">' +
     '<span id="p2pNuovoPremioVal">' + esc(premioTestoP2P(p2pNuovoPremio)) + '</span>' +
