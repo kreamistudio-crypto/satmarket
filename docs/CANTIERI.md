@@ -15351,3 +15351,12 @@ primo tick, 161 valute pubblicate su Nostr —, la deriva del compose
 assorbita, e l'immagine nuova; mostro è ripartito **senza fermare LND**.
 Da oggi un yadio giù non ferma più il P2P, e un prezzo che manca lo dice
 a chi scambia invece di tacere.
+
+**UNO SCIVOLONE SULLA REGOLA 8, a verbale.** In `b3ac6e6` il paragrafo
+«I CANT-DO, CHIUSI LA SERA STESSA» qui sopra e' finito nello STESSO
+commit del codice (`miniapp.html`, `prove.py`, il patcher e il README
+del fork), mentre la regola vuole il verbale in un commit separato. Non
+si riscrive la storia: quel commit e' gia' su main e deployato, e un
+`rebase` su main pubblico costa piu' di quel che ripara. Visto il 15 set
+2026 controllando i tre commit della sera (questo, `3fd234b` e il
+`2b71308` del fork, che sono puliti).
