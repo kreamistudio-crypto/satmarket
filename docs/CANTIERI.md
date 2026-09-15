@@ -15316,3 +15316,10 @@ scambi fermi. La ronda legge ora il DROP con l'iptables di tor via
 `docker exec` — che da stasera dice il vero, perché il namespace è di
 tor e di nessun altro. Copie in `deploy/nodo/`: `tor-entrypoint.sh`,
 `Dockerfile.tor`, `ronda-tor.sh`, le due unit, `settings-price.toml`.
+**LA RONDA E' INSTALLATA** la sera stessa (firme a confronto, timer
+attivo per le 09:20 UTC): «PROVA tor: esce da Tor (96.44.159.148); DROP
+del FORWARD al suo posto». CANTIERE CHIUSO. Restano, per un altro
+giorno e dichiarati: la deriva di `mostro` nel compose (il prossimo
+`up -d` che lo tocchi lo ricrea) e i cant-do del client in kebab-case
+contro lo snake_case del filo, con `price_too_stale` da aggiungere e la
+patch 0004 del fork.
