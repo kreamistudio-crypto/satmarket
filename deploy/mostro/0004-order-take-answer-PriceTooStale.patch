@@ -1,0 +1,86 @@
+From 2b713087f598dad232ec37f9fd77d3bbfd056914 Mon Sep 17 00:00:00 2001
+From: kreamistudio-crypto <kreamistudio-crypto@users.noreply.github.com>
+Date: Tue, 15 Sep 2026 19:52:49 +0000
+Subject: [PATCH] order/take: answer PriceTooStale when no price is cached yet,
+ instead of a silent internal error
+
+With the in-memory price store, a market-priced order or take issued before the first successful provider tick (cold cache after a restart, all providers down) hit NoAPIResponse / WrongAmountError at the order boundary: an internal error that is logged and never answered. For the user this is the same situation as a stale price, so answer the same CantDoReason::PriceTooStale. The PriceManager keeps its internal distinction and logs.
+---
+ src/app/order.rs     | 16 +++++++++-------
+ src/app/take_buy.rs  |  4 +++-
+ src/app/take_sell.rs |  4 +++-
+ 3 files changed, 15 insertions(+), 9 deletions(-)
+
+diff --git a/src/app/order.rs b/src/app/order.rs
+index 9ef327b..8faa255 100644
+--- a/src/app/order.rs
++++ b/src/app/order.rs
+@@ -23,8 +23,12 @@ async fn calculate_and_check_quote(
+             Err(MostroInternalErr(ServiceError::PriceTooStale)) => {
+                 return Err(MostroCantDo(CantDoReason::PriceTooStale));
+             }
++            // No price at all yet (cold cache after a restart, every
++            // provider down): for the user this is the same as a stale
++            // one — "no usable price right now" — so answer the same
++            // cant-do instead of a silent internal error.
+             Err(_) => {
+-                return Err(MostroInternalErr(ServiceError::NoAPIResponse));
++                return Err(MostroCantDo(CantDoReason::PriceTooStale));
+             }
+         },
+         _ => order.amount,
+@@ -454,17 +458,15 @@ mod tests {
+         }
+ 
+         #[tokio::test]
+-        async fn market_priced_order_without_price_data_fails() {
++        async fn market_priced_order_without_price_data_is_a_cant_do() {
+             let ctx = create_ctx().await;
+-            // No override and no global PriceManager → NoAPIResponse.
++            // No override and no global PriceManager → the user gets a
++            // PriceTooStale cant-do, never a silent internal error.
+             let order = order_with(0, "QUOTE2");
+             let err = calculate_and_check_quote(&ctx, &order, &100)
+                 .await
+                 .unwrap_err();
+-            assert!(matches!(
+-                err,
+-                MostroInternalErr(ServiceError::NoAPIResponse)
+-            ));
++            assert!(matches!(err, MostroCantDo(CantDoReason::PriceTooStale)));
+         }
+ 
+         #[tokio::test]
+diff --git a/src/app/take_buy.rs b/src/app/take_buy.rs
+index 4a5e25d..5fc2424 100644
+--- a/src/app/take_buy.rs
++++ b/src/app/take_buy.rs
+@@ -141,7 +141,9 @@ pub async fn take_buy_action(
+             Err(MostroInternalErr(ServiceError::PriceTooStale)) => {
+                 return Err(MostroCantDo(CantDoReason::PriceTooStale))
+             }
+-            Err(_) => return Err(MostroInternalErr(ServiceError::WrongAmountError)),
++            // No price at all yet (cold cache): same answer as stale,
++            // so the taker is told instead of left waiting.
++            Err(_) => return Err(MostroCantDo(CantDoReason::PriceTooStale)),
+         };
+     } else {
+         // Calculate dev_fee for fixed price orders
+diff --git a/src/app/take_sell.rs b/src/app/take_sell.rs
+index aa16fe7..8ebfdd1 100644
+--- a/src/app/take_sell.rs
++++ b/src/app/take_sell.rs
+@@ -185,7 +185,9 @@ pub async fn take_sell_action(
+             Err(MostroInternalErr(ServiceError::PriceTooStale)) => {
+                 return Err(MostroCantDo(CantDoReason::PriceTooStale))
+             }
+-            Err(_) => return Err(MostroInternalErr(ServiceError::WrongAmountError)),
++            // No price at all yet (cold cache): same answer as stale,
++            // so the taker is told instead of left waiting.
++            Err(_) => return Err(MostroCantDo(CantDoReason::PriceTooStale)),
+         };
+     } else {
+         // Fixed price: only calculate dev_fee (amount/fee already set at creation)
+-- 
+2.47.3
+

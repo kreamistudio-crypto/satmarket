@@ -15340,3 +15340,14 @@ secco sul sorgente del tag v0.18.7, e il `.patch` esportato dal nodo
 arriva in `deploy/mostro/` col prossimo giro. La deriva di `mostro`
 nel compose si assorbe nello stesso `up -d --no-deps mostro` che porta
 l'immagine `-bar2` e la sezione `[price]`: un riavvio solo per tre cose.
+
+**CHIUSO DAVVERO, la sera del 15 set 2026.** La patch 0004 è sul nodo
+(commit `2b71308` sul ramo `barattolo/v0.18.7`, esportata in
+`deploy/mostro/0004-order-take-answer-PriceTooStale.patch`), l'immagine
+`mostro:v0.18.7-bar2` è in servizio e il coordinatore la annuncia sul
+relay. Un riavvio solo ha fatto tre cose: la sezione `[price]` — quattro
+provider attivi (yadio, blockchain, currency_api, coingecko), tutti ok al
+primo tick, 161 valute pubblicate su Nostr —, la deriva del compose
+assorbita, e l'immagine nuova; mostro è ripartito **senza fermare LND**.
+Da oggi un yadio giù non ferma più il P2P, e un prezzo che manca lo dice
+a chi scambia invece di tacere.

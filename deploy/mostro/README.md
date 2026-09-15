@@ -1,6 +1,6 @@
-# IL FORK DI MOSTRO — tre patch sopra il tag v0.18.7
+# IL FORK DI MOSTRO — quattro patch sopra il tag v0.18.7
 
-Qui dentro non c'è codice: ci sono le tre patch che il nodo Mostro di
+Qui dentro non c'è codice: ci sono le quattro patch che il nodo Mostro di
 Dublino applica sopra il sorgente upstream, prodotte con
 `git format-patch`. Il codice vero vive sul nodo, nel branch
 `barattolo/v0.18.7` di `~/nodo/mostro-src`, e queste sono la sua copia
@@ -15,7 +15,7 @@ esattamente il lavoro che non vogliamo.
 
 Fatto l'8 settembre 2026. Upstream: `v0.18.7`, commit `afc39a2`.
 
-## LE TRE PATCH, cosa fanno e perché
+## LE QUATTRO PATCH, cosa fanno e perché
 
 **0001 — `src/lnurl.rs`, i tre budget da 4s/2s/2s a 30s/15s/10s.**
 Un coordinator che esce solo da Tor misura **10,6 secondi** per la
@@ -94,8 +94,9 @@ Il difetto ha due facce, e le patch le trattano in modo diverso.
 
 ## IN SERVIZIO
 
-Immagine `mostro:v0.18.7-bar1`, costruita sul nodo con
-`docker build -f docker/Dockerfile -t mostro:v0.18.7-bar1 .` dentro
+Immagine `mostro:v0.18.7-bar2` dal 15 set 2026 sera (la `-bar1` con le
+prime tre patch è restata sulla macchina, come tag di rollback), costruita
+sul nodo con `docker build -f docker/Dockerfile -t mostro:v0.18.7-bar2 .` dentro
 `~/nodo/mostro-src`. Il `Dockerfile` fa `COPY . .`, cioè copia il
 sorgente LOCALE e non lo riscarica: è la ragione per cui le patch
 finiscono davvero nel binario, ed è la cosa da riverificare se un
@@ -149,7 +150,10 @@ tornerebbe identico.
   il minimo non si è aperto né il fondo né il tetto.
   ⚠️ Il `cargo build --release` del Dockerfile **non compila i test**:
   una build verde non dice niente su di loro, vanno lanciati a parte.
-- In servizio: `inspect` dice `mostro:v0.18.7-bar1`, log con
+- La 0004: `market_priced_order_without_price_data_is_a_cant_do` verde
+  nei test di `app::order`, `app::take_buy`, `app::take_sell` sul nodo.
+- In servizio: `inspect` dice `mostro:v0.18.7-bar2` (era `-bar1` fino al
+  15 set 2026), log con
   «Settings correctly loaded!», prezzi pubblicati su Nostr.
 
 **Quello che NON è provato**, ed è la parte onesta: che la dev fee ora
@@ -164,10 +168,10 @@ non lo era.
 cd ~/nodo/mostro-src
 git fetch --tags
 git switch -c barattolo/vX.Y.Z vX.Y.Z
-git cherry-pick a9d387b 1d6652c 1d5f634
+git cherry-pick a9d387b 1d6652c 1d5f634 2b71308
 docker build -f docker/Dockerfile -t mostro:vX.Y.Z-bar1 .
 docker build -f docker/Dockerfile --target builder -t mostro-test:bar1 .
-docker run --rm mostro-test:bar1 sh -c "cargo test --release lnurl && cargo test --release config::util && cargo test --release dev_fee"
+docker run --rm mostro-test:bar1 sh -c "cargo test --release lnurl && cargo test --release config::util && cargo test --release dev_fee && cargo test --release app::order && cargo test --release app::take_buy && cargo test --release app::take_sell"
 ```
 
 poi la riga dell'immagine nel compose e `docker compose up -d mostro`.
