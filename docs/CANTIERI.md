@@ -14645,8 +14645,14 @@ Nata qui la ronda GIORNALIERA della liquidita' sul nodo
 nuovo rispetto a una baseline imparata, inbound dei soli canali attivi
 sotto 500k, scadenza dei lease da `lease.txt`. La ronda settimanale
 ha ceduto il giudizio sul canale (l'«atteso 1» avrebbe suonato per
-sempre). A verbale, non curato: in `ronda.sh` i due sotto-giudici e il
-marcatore stanno solo nel ramo senza allarmi.
+sempre). E il difetto di `ronda.sh` — i due sotto-giudici e il
+marcatore stavano solo nel ramo senza allarmi, quindi una settimana
+col disco oltre soglia saltava pagamenti, HTLC, backup e superficie
+con un messaggio arrivato che faceva sembrare il giro completo — e'
+CURATO il 16 set con una patch mirata: i sotto-giudici girano sempre,
+prima del bivio, e `--- fine ronda` chiude tutt'e due i rami e il
+testo Telegram. Il primo drill ha alzato 27 «pagamenti sconosciuti»,
+tutti veri (la spinta, la sonda, i due ordini di prova): `--impara`.
 
 **FASE 0, IL PONTE.** Macaroon DEDICATO cotto con `root_key_id` suo
 (invoices r/w, offchain r/w, info r: la stessa forma del ristretto di
@@ -14666,7 +14672,9 @@ SOCKS4A del tor del VPS → onion:8080); TLS end-to-end verificato col
 PRIMO AVVIO: l'immagine legge `LNBITS_HOST`/`LNBITS_PORT`, non
 `HOST`/`PORT` — il primo `up` e' finito su **0.0.0.0:5000, esposto a
 internet** (ufw inattivo); spento e curato con un `command:` esplicito
-coi numeri SCRITTI, e `ufw` proposto (rimandato da Andrea). Versione
+coi numeri SCRITTI, e `ufw` ACCESO il 16 set (deny incoming; 22, 80,
+443 tcp e 443 udp per HTTP/3; con la porta SSH letta dal sistema e una
+seconda sessione aperta prima dell'`enable`). Versione
 pinnata `v1.6.1` (l'immagine dice «1.6.1-rc2»: cosmetico, verificato
 sugli sha di due file contro il tag). La sonda dei cinque tubi e'
 verde, e i nomi dei campi sono gli STESSI del SaaS (`payment_hash`,
@@ -14709,13 +14717,26 @@ rosso IDENTICO su origin/main pulito — debito del cantiere del banner,
 non di questo. Il banco dal vivo ha preso quel che l'estrazione non
 vede: un `?` in meno nell'INSERT del set (31 valori per 32 colonne).
 
-**COSA RESTA**: fase 3 (leva True + chiavi nel config del VPS, un
-ordine vero marcato `prova`, con Alan), 4 e 5; `user:` non root nel
-compose di LNbits; il secondo milione di inbound; la scadenza del
-cert TLS di LND (22 ott 2027: ricopiare `tls.cert` sul VPS); il foglio
-del panico, la cui riga «LNbits gira su Spark» e' gia' falsa a meta';
-`ufw`. La strada scartata da non riproporre senza un motivo nuovo: il
-lease come base della liquidita'.
+**FASE 3, ACCESA E PROVATA (16 set 2026).** Le quattro righe nel
+config del VPS, riavvio, journal «🔒 Cassaforte del denaro nuovo:
+nodo». Ordine #156 (75.605 sats, fra due account di Andrea): nato
+`locked` su una fattura coniata dalla nostra LNbits, spedito,
+ricevuto, `released` con `payout_stato='uscito'` e l'hash in riga —
+il diario dei payout del 14 set scrive anche qui. Ordine #157: disputa
+decisa per il compratore, `refunded` dal nodo, hash in riga. Le due
+strade del denaro sono provate. `payout_verso` vuoto sugli `uscito`
+NON e' un difetto: lo scrivono solo i tre timbri del non-riuscito, dove
+serve a sapere a chi ritentare; sul riuscito il verso lo dice lo stato.
+Da qui e' FASE 4, il regime doppio: nessun gesto, si guarda il polso 24.
+
+**COSA RESTA**: fase 5 (a zero righe aperte 'saas' sul polso 24: lo
+sweep del saldo, il backfill della colonna sulle righe chiuse, un mese
+di SaaS come rete, la disdetta, e il foglio del panico riscritto — la
+riga «LNbits gira su Spark» e' gia' falsa); `user:` non root nel
+compose di LNbits; il secondo milione di inbound verso un peer con
+onion; la scadenza del cert TLS di LND (22 ott 2027: ricopiare
+`tls.cert` sul VPS). La strada scartata da non riproporre senza un
+motivo nuovo: il lease come base della liquidita'.
 
 ## Entra anche con Nostr: la firma vera al posto della nota pubblica (15 set 2026)
 

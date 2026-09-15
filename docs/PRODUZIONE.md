@@ -220,3 +220,14 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   BACKUP: `/opt/lnbits` (db con backup atomico, `.env`, compose, cert,
   superuser, unit del ponte) e `onion_auth` viaggiano nell'archivio
   age; la riserva fee di LNbits e' `max(1%, 2000 sats)` per payout.
+- IL FIREWALL (`ufw`, acceso il 16 set 2026): `deny incoming`, `allow
+  outgoing`, e in entrata SOLO la porta SSH (letta dal sistema con
+  `ss -tlnp | grep sshd`, non ricordata), 80/tcp, 443/tcp e 443/udp
+  (HTTP/3 di Caddy). Tor, i backup, il pull del deploy e il ponte verso
+  il nodo sono uscite e non lo vedono. Per una porta nuova: `ufw allow
+  N/tcp` PRIMA di metterci qualcosa in ascolto, e comunque un servizio
+  nuovo ascolta su 127.0.0.1 salvo motivo scritto. Se un giorno SSH
+  non entra piu': dalla console Hetzner, `ufw disable` e si riguarda.
+  Prima di ogni `ufw enable` futuro: la porta SSH ammessa per prima e
+  una seconda sessione gia' aperta, che le connessioni vive non
+  vengono tagliate.
