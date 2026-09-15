@@ -9106,7 +9106,14 @@ def prove_foto_spenta():
     # ieri, cioe' un file che il rinfresco ha appena cancellato
     prova("...riletto DOPO il rinfresco", True,
           _end.index("await aggiorna_profilo_social(")
-          < _end.index("SELECT avatar FROM utenti"))
+          < _end.index("SELECT avatar, nome FROM utenti"))
+    # IL NOME VERO, non solo quello del francobollo (set 2026): senza
+    # questa chiave nella risposta, chi passa a 'nostr' vedeva la foto
+    # cambiare subito e il nome restare quello di ieri finche' non
+    # ricaricava tutta la Mini App — lo stesso difetto di sopra,
+    # applicato al nome invece che alla foto.
+    prova("la risposta porta anche il nome vero", True,
+          '"nome": r["nome"]' in _end)
 
     # --- IL CLIENT --------------------------------------------------
     _set = pezzo_js(mini, "async function setFotoScelta(scelta){")
@@ -9115,6 +9122,8 @@ def prove_foto_spenta():
     # chiave assente = server di ieri: si tiene quel che c'e'
     prova("...e un server vecchio non gli svuota la faccia", True,
           "'avatar' in d" in _set)
+    prova("...e rimette anche il NOME che torna", True,
+          "if (d.nome) myNome = d.nome;" in _set)
     prova("ridisegna anche la testata e il tappo, non solo il cassetto",
           (True, True),
           ("renderProfilo()" in _set, "renderAvatar()" in _set))
@@ -9154,17 +9163,17 @@ def prove_foto_spenta():
     vero.row_factory = sqlite3.Row
     vero.executescript("""
       CREATE TABLE utenti(
-        tg_id INT PRIMARY KEY, negozio TEXT DEFAULT '',
+        tg_id INT PRIMARY KEY, negozio TEXT DEFAULT '', nome TEXT DEFAULT '',
         avatar TEXT DEFAULT '', avatar_scelta TEXT DEFAULT '',
         npub TEXT DEFAULT '', npub_verificata INT DEFAULT 0,
         npub_accesso TEXT DEFAULT '');
-      INSERT INTO utenti(tg_id,negozio,avatar,npub,npub_verificata)
-        VALUES(111,'ab12cd34','av_ab12cd34_100.jpg','npub1zz',1);
+      INSERT INTO utenti(tg_id,negozio,nome,avatar,npub,npub_verificata)
+        VALUES(111,'ab12cd34','Ada','av_ab12cd34_100.jpg','npub1zz',1);
       -- chi una npub non l'ha: la gamba Nostr non gli si offre
-      INSERT INTO utenti(tg_id,negozio) VALUES(222,'cd34ab12');
+      INSERT INTO utenti(tg_id,negozio,nome) VALUES(222,'cd34ab12','Bruno');
       -- il nativo Nostr: una chat Telegram non ce l'ha
-      INSERT INTO utenti(tg_id,negozio,npub_accesso)
-        VALUES(-5,'ef56ab78','npub1qq');
+      INSERT INTO utenti(tg_id,negozio,nome,npub_accesso)
+        VALUES(-5,'ef56ab78','Nativo','npub1qq');
     """)
     vero.commit()
 
@@ -9218,7 +9227,7 @@ def prove_foto_spenta():
     social.clear()
     r = scegli("nessuna")
     prova("spegnere: la risposta non porta nessuna foto",
-          {"ok": True, "scelta": "nessuna", "avatar": ""}, r)
+          {"ok": True, "scelta": "nessuna", "avatar": "", "nome": "Ada"}, r)
     prova("...e non si e' chiesto niente al social", [], social)
     prova("...ma il file resta in dispensa: riaccendendo torna",
           "av_ab12cd34_100.jpg", riga()["avatar"])
@@ -9229,7 +9238,7 @@ def prove_foto_spenta():
     # LA PROVA REGINA: e' il nome NUOVO, non quello di ieri
     prova("...e la risposta porta la foto NUOVA",
           {"ok": True, "scelta": "telegram",
-           "avatar": "av_ab12cd34_200.jpg"}, r)
+           "avatar": "av_ab12cd34_200.jpg", "nome": "Ada"}, r)
     prova("...che e' anche quella in colonna", "av_ab12cd34_200.jpg",
           riga()["avatar"])
 

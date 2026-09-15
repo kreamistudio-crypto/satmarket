@@ -19275,7 +19275,16 @@ async function startBuySet(){
    motivo per cui il ⚡ della cassa resta gated su d.tipo==='mono'.) */
 
 function openDetail(id){
-  currentListing = listings.find(l=>l.id===id) || myListings.find(l=>l.id===id);
+  /* myListings PRIMA (set 2026): e' l'unica copia che porta le
+     visualizzazioni (e venditore_id) di un proprio annuncio — la
+     vetrina generale non le manda mai, nemmeno al proprietario (vedi
+     CAMPI_VETRINA in server.py). Con l'ordine scambiato, un annuncio
+     proprio gia' visto anche nella vetrina pubblica (basta un giro su
+     Esplora) restava agganciato a quella copia monca e le viste non
+     comparivano mai — "i dati freschi vincono sui vecchi" di
+     inCatalogo qui si applica allo stesso modo, a favore della copia
+     piu' completa. */
+  currentListing = myListings.find(l=>l.id===id) || listings.find(l=>l.id===id);
   if (!currentListing) { toast('Annuncio non trovato'); return; }
   const l = currentListing;
   const mio = !DEMO && myTgId && l.sellerId===myTgId;
@@ -24767,6 +24776,14 @@ async function setFotoScelta(scelta){
        file vecchio (i nomi sono versionati). Chiave assente = server
        di ieri: si tiene quel che c'e' invece di svuotare. */
     if ('avatar' in d) myAvatar = d.avatar || '';
+    /* IL NOME segue la stessa regola (set 2026): 'nostr' puo' averlo
+       appena riscritto (aggiorna_profilo_social, lato server), e senza
+       questa riga la testata restava ferma al nome di prima finche' non
+       si ricaricava tutta la Mini App — "cambio la foto, il nome resta
+       quello di ieri" e' esattamente il difetto che questa riga toglie
+       alla foto due righe sopra, applicato al nome. Chiave assente o
+       vuota = server di ieri o niente da dire: si tiene quel che c'e'. */
+    if (d.nome) myNome = d.nome;
     /* E SI RIDISEGNA ANCHE FUORI DAL CASSETTO: i lettori di myAvatar
        sono la testata del Profilo e il tappo in testata, e senza
        questi due la faccia resterebbe li' fino al prossimo /api/me —

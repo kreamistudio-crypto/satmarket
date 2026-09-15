@@ -30793,13 +30793,19 @@ async def scegli_avatar(req: Request,
     # client di rimettere la faccia SUBITO, senza ricaricare. Si
     # rilegge DOPO il rinfresco, o si direbbe il nome di ieri — e passa
     # dal giudice, che con 'nessuna' risponde ''.
+    # IL NOME VERO torna qui accanto (set 2026): 'nostr' puo' averlo
+    # appena riscritto (aggiorna_profilo_social, qui sopra), e senza
+    # questa chiave il client restava fermo al nome di prima finche' non
+    # si ricaricava tutta la Mini App — la stessa attesa che questo giro
+    # esiste per togliere alla foto.
     con = db()
-    r = con.execute("SELECT avatar FROM utenti WHERE tg_id=?",
+    r = con.execute("SELECT avatar, nome FROM utenti WHERE tg_id=?",
                     (user["id"],)).fetchone()
     con.close()
     return {"ok": True, "scelta": scelta,
             "avatar": avatar_da_mostrare(r["avatar"] if r else "",
-                                         scelta)}
+                                         scelta),
+            "nome": r["nome"] if r else ""}
 
 
 # --- Avvisi di ricerca: «dimmi quando esce quello che cerco» ---------
