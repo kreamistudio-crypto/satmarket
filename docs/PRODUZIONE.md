@@ -143,3 +143,45 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `pip install pillow pillow-heif` nell'ambiente del servizio
   (entrambe hanno wheel, niente compilazioni). Se mancano, i JPEG
   vivono come sempre e solo le HEIC non convertibili si saltano.
+- LA CASSAFORTE SUL NODO (set 2026): LNbits self-hosted in
+  `/opt/lnbits` (Docker `docker.io` + `docker-compose-v2` di Ubuntu,
+  immagine `lnbits/lnbits:v1.6.1` PINNATA nel compose — mai `latest`;
+  si aggiorna cambiando il tag e `docker compose pull && up -d`, a
+  ordini fermi). Ascolta SOLO su `127.0.0.1:5001`, coi numeri SCRITTI
+  nel `command:` del compose: le env `HOST`/`PORT` del `.env` NON
+  contano (i nomi veri sono `LNBITS_HOST`/`LNBITS_PORT`) e il primo
+  avvio e' finito su 0.0.0.0:5000. Ogni futura `ports:` in bridge si
+  scrive `127.0.0.1:…`, mai nuda: Docker aggira `ufw`. Il pannello si
+  apre dal PC con `ssh -N -L 5001:127.0.0.1:5001 root@VPS` e poi
+  `http://127.0.0.1:5001` (login «LNbits nodo» in KeePass); creazione
+  di nuovi utenti spenta, solo username/password.
+  IL PONTE VERSO LND: `lnd-ponte.service` (socat) ascolta su
+  `127.0.0.1:18080` e infila tutto nel tor del VPS verso l'hidden
+  service della REST di LND sul nodo, che ha il client-auth v3: la
+  chiave privata sta in `/var/lib/tor/onion_auth/lnbits.auth_private`
+  (`ClientOnionAuthDir` nel torrc), la pubblica in
+  `~/nodo/tor/data/lnbits/authorized_clients/vps.auth` sul nodo. Senza
+  la chiave la porta non esiste. Il TLS e' end-to-end col `tls.cert`
+  di LND copiato in `/opt/lnbits/data/tls.cert` (SAN `127.0.0.1`):
+  SCADE IL 22 OTT 2027 — quel giorno LND lo rigenera e la copia sul
+  VPS va rifatta, o LNbits smette di fidarsi del ponte con un errore
+  che sa di rete. Il macaroon (`LND_REST_MACAROON` nel `.env`, 600) e'
+  dedicato, `root_key_id 1`: si revoca da solo con
+  `lncli deletemacaroonid 1` sul nodo. Diagnosi in tre `curl` dal VPS:
+  `-k` su `https://127.0.0.1:18080/v1/getinfo` (il ponte arriva?),
+  `--cacert /opt/lnbits/data/tls.cert` (il cert combacia?), con
+  l'header `Grpc-Metadata-macaroon` letto da file (il macaroon
+  apre?); ognuno risponde a una domanda diversa.
+  LE LEVE DEL DOPPIO WALLET si AGGIUNGONO al config del VPS, come
+  quelle del P2P: `LNBITS_NODO_URL = "http://127.0.0.1:5001"`,
+  `LNBITS_NODO_INVOICE_KEY`, `LNBITS_NODO_ADMIN_KEY` (dal wallet
+  «Cassaforte Barattolo», in KeePass) e `CASSAFORTE_NUOVA = True`,
+  poi riavvio. All'avvio il journal dice «🔒 Cassaforte del denaro
+  nuovo: nodo» — se dice `saas` con la leva True, mancano le chiavi e
+  la riga sopra lo spiega. `False` e riavvio rimanda il nuovo sul
+  SaaS; le righe gia' nate sul nodo continuano a chiudersi la'. Il
+  SaaS si svuota e si disdice SOLO quando il polso 24 del libro mastro
+  (`query_libro_mastro.sql`) da' zero righe aperte 'saas'.
+  BACKUP: `/opt/lnbits` (db con backup atomico, `.env`, compose, cert,
+  superuser, unit del ponte) e `onion_auth` viaggiano nell'archivio
+  age; la riserva fee di LNbits e' `max(1%, 2000 sats)` per payout.

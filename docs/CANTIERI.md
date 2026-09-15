@@ -14603,3 +14603,116 @@ preferiscono ancora lo slug quando c'e': oggi condividono comunque
 username o codice, e preferire lo slug li' sarebbe la mossa naturale
 di un prossimo giro, non fatta qui per tenere il cantiere fermo sul
 suo perimetro.
+
+## Il doppio wallet: l'escrow trasloca sul nodo senza fermarsi (set 2026, in corso)
+
+**LA DECISIONE** (12 set 2026, piano a sei fasi approvato il 15):
+l'escrow lascia il LNbits ospitato (SaaS, backend Spark) per un
+LNbits NOSTRO sul VPS col nodo Lightning di Barattolo come funding
+source — nessuna dipendenza da Spark ne' dal SaaS, sats sul nostro
+nodo — e **Barattolo non si ferma mai**. La migrazione e' a caldo, col
+DOPPIO WALLET: ogni riga di denaro (`ordini`, `rilanci`, `pagamenti`,
+`rimborsi_asta`) porta in colonna la cassaforte in cui vivono i suoi
+sats (`cassaforte`: 'saas' | 'nodo'); i vecchi ordini chiudono sul
+SaaS fino a chiusura naturale, i nuovi nascono dove dice la leva
+`CASSAFORTE_NUOVA`; quando l'ultimo 'saas' e' chiuso si sposta il
+saldo residuo via Lightning e si disdice il SaaS (tenuto un mese come
+rete). Le fasi: 0 sonda (liquidita', macaroon, hidden service, ponte,
+curl) — 1 LNbits in piedi, Barattolo ignaro — 2 doppio wallet nel
+codice, deploy INERTE — 3 accensione e ordine di prova — 4 regime
+doppio — 5 svuotamento e disdetta. Al 15 set sono chiuse 0, 1 e 2.
+
+**FASE 0, LA LIQUIDITA', e la lezione comprata a $4,92.** Un canale
+aperto da noi nasce tutto outbound, e l'escrow e' denaro in ENTRATA:
+con 194k di inbound contro un picco di 1,14M in cassaforte (13 ordini
+aperti, letto dal database vero) il checkout sarebbe morto muto. La
+prima strada — un lease Magma da 1,53M, «1 month» — e' **scartata con
+prova**: il venditore ha chiuso il canale (COOPERATIVE_CLOSE) poche
+ore dopo l'apertura, reclamo aperto. La strada scelta sono i canali
+NOSTRI: un secondo canale da 1M con ACINQ (l'unico peer che accetta
+le nostre connessioni da exit Tor — Wallet of Satoshi apre il TCP e
+chiude sull'Init, Boltz e' irraggiungibile dagli exit e non annuncia
+onion) e la SPINTA di ~950k verso un wallet di Alan, che il milione lo
+aveva prestato: il capitale torna a lui, nel nodo restano ~50k di
+cuscinetto (suoi, prestati). LND 0.19 NON ha lo splicing: pochi canali
+larghi da subito. Verso Blixt il tetto per-HTLC e' 50k e la mission
+control dopo due timeout non riprova nemmeno (`lncli resetmc`); un
+wallet mobile non custodial non e' la destinazione per spingere
+centinaia di k. Inbound al 19 set: 1,145M — copre il picco al filo;
+il secondo milione verso un peer con onion (LNBIG) resta segnato.
+Nata qui la ronda GIORNALIERA della liquidita' sul nodo
+(`nodo-liquidita.timer`, copia in `deploy/nodo/`): canale sparito o
+nuovo rispetto a una baseline imparata, inbound dei soli canali attivi
+sotto 500k, scadenza dei lease da `lease.txt`. La ronda settimanale
+ha ceduto il giudizio sul canale (l'«atteso 1» avrebbe suonato per
+sempre). A verbale, non curato: in `ronda.sh` i due sotto-giudici e il
+marcatore stanno solo nel ramo senza allarmi.
+
+**FASE 0, IL PONTE.** Macaroon DEDICATO cotto con `root_key_id` suo
+(invoices r/w, offchain r/w, info r: la stessa forma del ristretto di
+mostrod, revocabile da solo). Un hidden service NUOVO nel tor del
+compose del nodo verso la REST di LND, **con client-auth v3**: senza la
+chiave del VPS la porta non esiste (provato: `exit=97` senza chiave,
+«expected 1 macaroon» con). Uno suo e non uno dei due di Zeus, per
+poterlo revocare da solo. Cade una delle sette cose aperte del nodo —
+«il macaroon non esce dalla macchina»: ora una copia vive sul VPS, e
+l'IP lock via Tor non esiste.
+
+**FASE 1, LNBITS SUL VPS.** In Docker (`docker.io` di Ubuntu, non il
+repo di Docker Inc.), `network_mode: host`, ascolto SOLO su
+`127.0.0.1:5001`; ponte `lnd-ponte.service` (socat, 127.0.0.1:18080 →
+SOCKS4A del tor del VPS → onion:8080); TLS end-to-end verificato col
+`tls.cert` di LND, che porta `127.0.0.1` fra i nomi. LA TRAPPOLA DEL
+PRIMO AVVIO: l'immagine legge `LNBITS_HOST`/`LNBITS_PORT`, non
+`HOST`/`PORT` — il primo `up` e' finito su **0.0.0.0:5000, esposto a
+internet** (ufw inattivo); spento e curato con un `command:` esplicito
+coi numeri SCRITTI, e `ufw` proposto (rimandato da Andrea). Versione
+pinnata `v1.6.1` (l'immagine dice «1.6.1-rc2»: cosmetico, verificato
+sugli sha di due file contro il tag). La sonda dei cinque tubi e'
+verde, e i nomi dei campi sono gli STESSI del SaaS (`payment_hash`,
+`payment_request` e `bolt11` insieme, `paid`, `amount_msat`); il
+«pagato» regge a ponte riavviato, cioe' il poll non dipende dallo
+stream. Riserva fee di LNbits `max(1%, 2000)`: un wallet sotto 2000
+sats non paga. `/opt/lnbits` e la chiave client-auth entrano nel
+backup age.
+
+**FASE 2, IL CODICE** (questo commit, deploy inerte: la leva nasce
+False). Le tre righe `LNBITS_*` restano il SaaS; si AGGIUNGONO
+`LNBITS_NODO_URL/_INVOICE_KEY/_ADMIN_KEY` e `CASSAFORTE_NUOVA`. Un
+risolutore (`_chiavi_cassaforte`) con DUE nomi letterali e un terzo
+che ALZA; le chiavi tengono i loro nomi dentro l'oggetto
+(`cf.LNBITS_ADMIN_KEY`) perche' le sentinelle dell'ordine leggono quei
+letterali nel sorgente. I tubi che LEGGONO o PAGANO (`invoice_pagata`,
+`_stato_pagamento`, `paga_venditore`) pretendono la cassaforte SENZA
+default — `paga_venditore` solo per nome — cosi' chi la dimentica lo
+sente da Python invece di chiedere «pagato?» al wallet sbagliato, che
+e' la risposta con cui gli scandagli annullano. Chi CONIA la scrive
+sempre (sentinella sui cinque `crea_invoice_escrow`). Le aste: una
+puntata vive in una cassaforte sola — il secondo versamento eredita
+quella del primo saldato (`_cassaforte_puntata`), anche a leva girata
+a meta' asta — e i rimborsi d'asta la compilano dalla puntata la
+prima volta che si pagano (`_cassaforte_riga`, l'unico che scrive
+quella colonna: sette INSERT diversi non si tengono in pari). Il
+congelamento nomina la cassaforte nell'avviso ai moderatori. Il
+pannello legge la leva VIVA e suona se e' True senza le chiavi.
+Il libro mastro ha il polso 24: righe aperte per cassaforte, il
+numero della fase 4.
+
+**LE PROVE**: `prove_doppio_wallet`, 38 nuove (forma dei tubi, ogni
+strada che conia e che paga, il risolutore coi due nomi e il terzo che
+alza, la leva col segnaposto che vale spenta, la cassaforte della riga
+su un db vero, pannello e config gemelli). Le tabelle usa-e-getta di
+sei banchi hanno imparato la colonna e gli ambienti finti i tre nomi
+nuovi. **10085 verdi.** I collaudi in-process: 13 su 14 verdi, e il
+quattordicesimo (`collaudo_sblocco_banner`, `KeyError: 'motivo'`) e'
+rosso IDENTICO su origin/main pulito — debito del cantiere del banner,
+non di questo. Il banco dal vivo ha preso quel che l'estrazione non
+vede: un `?` in meno nell'INSERT del set (31 valori per 32 colonne).
+
+**COSA RESTA**: fase 3 (leva True + chiavi nel config del VPS, un
+ordine vero marcato `prova`, con Alan), 4 e 5; `user:` non root nel
+compose di LNbits; il secondo milione di inbound; la scadenza del
+cert TLS di LND (22 ott 2027: ricopiare `tls.cert` sul VPS); il foglio
+del panico, la cui riga «LNbits gira su Spark» e' gia' falsa a meta';
+`ufw`. La strada scartata da non riproporre senza un motivo nuovo: il
+lease come base della liquidita'.

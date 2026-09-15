@@ -153,7 +153,10 @@ cosa che non si sarebbe potuta disfare.
 
 **LE SETTE COSE APERTE**, dichiarate e non dimenticate: `/config`
 scrivibile da mostrod (prima serve sapere dove vive il db); macaroon
-senza IP lock (oggi il file non esce dalla macchina); LLMNR sulla 5355
+senza IP lock (quello di mostrod non esce dalla macchina; dal set 2026
+ne esiste un SECONDO, dedicato a LNbits e revocabile da solo —
+`root_key_id 1` — che vive sul VPS di Barattolo dietro un hidden
+service con client-auth: vedi Cantieri, «Il doppio wallet»); LLMNR sulla 5355
 (superficie che non paga affitto); il pull non è sorvegliato (il
 server sa che l'archivio esiste, non che il PC l'abbia preso); il DROP
 del FORWARD è solo in `iptables` e **non in `ip6tables`**, e va messo

@@ -1,7 +1,14 @@
 ## Architettura
 
 - `server.py` — backend FastAPI + SQLite (`satmarket.db`), un solo file.
-  Escrow LNbits (invoice key incassa, admin key paga), commissione
+  Escrow LNbits (invoice key incassa, admin key paga) — dal set 2026
+  su DUE cassaforti: ogni riga di denaro porta in colonna la sua
+  (`cassaforte`: 'saas' = il LNbits ospitato di ieri, 'nodo' = il
+  LNbits nostro sul VPS col nodo dietro), i tubi che leggono o pagano
+  la pretendono senza default, chi conia la scrive, e la leva
+  `CASSAFORTE_NUOVA` decide solo dove nasce il denaro NUOVO (vedi
+  «LE DUE CASSAFORTI» in server.py e Cantieri, «Il doppio wallet»);
+  commissione
   SOSPESA (COMMISSIONE_PERCENTO=0 nel config, cifra da decidere:
   quando si accenderà vanno rimessi i testi con la cifra — l'elenco
   dei punti è nel commit del lug 2026 che l'ha azzerata — E va
