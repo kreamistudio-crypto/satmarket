@@ -72,6 +72,21 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   conversazione upstream. ⚠️ `time_connect` MENTE sotto il proxy
   trasparente: si guarda `time_appconnect`. Dopo un giro il circuito è
   CALDO, quindi la seconda misura non dice niente sul primo tentativo.
+- LA FINESTRA DELLA GARANZIA SUL NODO (15 set 2026, col tabacchino):
+  `hold_invoice_cltv_delta = 576` in
+  `/home/debian/nodo/mostro/settings.toml` (era 432; la copia
+  `.prima-576` sta accanto). Si gira a scambi fermi, e il riavvio è
+  dal compose — `cd ~/nodo && docker compose restart mostro` — poi
+  «Settings correctly loaded» nei log del servizio. La verifica vale
+  dal lato di chi legge, sulla macchina del RELAY:
+  `docker compose -f /opt/relay/compose.yml exec relay strfry scan
+  '{"kinds":[38385]}' | grep -o '"hold_invoice_cltv_delta","[0-9]*"'`.
+  Se dice ancora il vecchio numero, il coordinatore non ha ancora
+  ripubblicato il suo evento: si aspetta, prima di sospettare del
+  riavvio. Il client legge questo numero dal 38385 (`holdBlocchi`) e
+  ne ricava la finestra utile togliendo 24 blocchi di margine nostro:
+  cambiarlo sul nodo cambia il cap del foglio «Pubblica» senza toccare
+  niente nel codice.
 - LO SPECCHIO GIRA SULLA MACCHINA DEL RELAY, non su questo VPS: e' il
   servizio `specchio` del `compose.yml` di `/opt/relay` (uno `strfry
   router` con `router.conf`), e si accende con `docker compose up -d

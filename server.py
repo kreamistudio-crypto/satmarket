@@ -3619,6 +3619,23 @@ def init_db():
         aggiornato INTEGER
     );
     CREATE INDEX IF NOT EXISTS idx_p2p_indice_tg ON p2p_indice(tg_id);
+    CREATE TABLE IF NOT EXISTS p2p_sveglie(
+        -- LA SVEGLIA DEL TABACCHINO (set 2026, emenda alla fase 6): il
+        -- server impara UNA cosa sola — «questo account ha una
+        -- scadenza a quest'ora» — e niente altro: ne' l'ordine, ne'
+        -- l'importo, ne' il lato. Le colonne sono queste quattro e
+        -- non ne entra una quinta senza riaprire il verbale. Il costo
+        -- in privacy e' dichiarato la': la scadenza combacia con
+        -- l'expires_at pubblico del libro, e con pochi ordini nella
+        -- stessa ora chi legge questa tabella sa collegare account e
+        -- ordine. Lo sa solo Barattolo, che gia' «sa ricavare» il
+        -- profilo dal seme. La riga muore alla scadenza.
+        tg_id INTEGER NOT NULL,
+        quando INTEGER NOT NULL,
+        creata INTEGER NOT NULL,
+        avvisata INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (tg_id, quando)
+    );
     CREATE TABLE IF NOT EXISTS p2p_semi(
         -- IL SALE DEL PROFILO DI SCAMBIO (set 2026): la chiave
         -- d'identita' Mostro di chi entra da Telegram si ricava con
@@ -9144,6 +9161,12 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE OR IGNORE p2p_semi SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         con.execute("DELETE FROM p2p_semi WHERE tg_id=?", (id_nostr,))
+        # ...e le sveglie del tabacchino (set 2026) seguono l'utente: la
+        # PK e' (tg_id, quando), quindi la STESSA scadenza sulle due
+        # meta' collide — vince quella che resta, la copia si butta.
+        con.execute("UPDATE OR IGNORE p2p_sveglie SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        con.execute("DELETE FROM p2p_sveglie WHERE tg_id=?", (id_nostr,))
         # I punti di ritiro salvati seguono l'utente, stessa forma.
         # SULLA STESSA RETE VINCE LA META' TELEGRAM, e va DICHIARATO
         # perche' qui la scelta non e' neutra come per i preferiti: la'
@@ -32703,6 +32726,144 @@ def seme_profilo_p2p(x_tg_init_data: str = Header(""),
         raise HTTPException(409, "Il profilo legato all'account non e' attivo")
     return JSONResponse({"ok": True, "seme": seme, "versione": versione},
                         headers={"Cache-Control": "no-store, private"})
+
+
+# ==================== LA SVEGLIA DEL TABACCHINO (set 2026) ==============
+# Emenda alla fase 6 (decisione di Andrea): gli avvisi di scadenza
+# dello scambio in contanti al tabacchino arrivano anche ad app chiusa,
+# su Telegram o Nostr secondo le impostazioni — passano da `notifica`,
+# che gia' sceglie il canale. Il server impara SOLO «questo account ha
+# una scadenza a quest'ora»: la rotta legge una chiave sola dal corpo
+# e la tabella ha quattro colonne. I due momenti li ricava il server
+# (sei ore prima, un'ora prima), cosi' la regola vive in un posto; il
+# testo non porta numeri, id ne' importi, e dice «se e' gia' chiuso,
+# ignora» perche' chi chiude da un altro dispositivo non toglie la
+# sveglia. La riga muore alla scadenza.
+MAX_SVEGLIE_P2P = 20          # per persona: piu' di cosi' non e' un uso
+SVEGLIA_P2P_ORIZZONTE_S = 15 * 86400   # `max_expiration_days` del coordinatore
+SVEGLIA_P2P_TESTI = {
+    1: "⏳ Un tuo scambio in contanti al tabacchino scade fra circa sei "
+       "ore. Se l'ordine Amazon non è ancora pagato, è il momento di "
+       "andare. Se lo scambio è già chiuso, ignora questo avviso.",
+    2: "⏰ Un tuo scambio in contanti al tabacchino scade fra meno di "
+       "un'ora. Se non è ancora pagato, è adesso: dopo resta solo "
+       "annullare d'accordo. Se lo scambio è già chiuso, ignora questo "
+       "avviso.",
+}
+
+
+def _sveglie_p2p_da_mandare(righe, adesso):
+    """PURA: quali avvisi partono adesso e quali righe sono morte.
+    Torna (da_mandare, morte): il primo e' una lista di (tg_id,
+    quando, livello) col livello 1 = sei ore, 2 = un'ora; il secondo
+    e' la lista delle (tg_id, quando) gia' scadute, da cancellare.
+    UN AVVISO SOLO PER GIRO E PER RIGA, il piu' alto: una sveglia
+    messa a mezz'ora dalla fine prende l'avviso dell'ora e salta
+    quello delle sei, che sarebbe gia' falso."""
+    da_mandare, morte = [], []
+    for r in righe:
+        quando = int(r["quando"])
+        manca = quando - adesso
+        if manca <= 0:
+            morte.append((r["tg_id"], quando))
+            continue
+        livello = 2 if manca <= 3600 else (1 if manca <= 6 * 3600 else 0)
+        if livello > int(r["avvisata"] or 0):
+            da_mandare.append((r["tg_id"], quando, livello))
+    return da_mandare, morte
+
+
+async def _giro_sveglie_p2p():
+    adesso = int(time.time())
+    con = db()
+    righe = [dict(r) for r in con.execute(
+        "SELECT tg_id, quando, avvisata FROM p2p_sveglie").fetchall()]
+    da_mandare, morte = _sveglie_p2p_da_mandare(righe, adesso)
+    for tg_id, quando in morte:
+        con.execute("DELETE FROM p2p_sveglie WHERE tg_id=? AND quando=?",
+                    (tg_id, quando))
+    # IL TIMBRO PRIMA DELL'INVIO: `notifica` non alza mai, ma un giro
+    # che muore a meta' non deve ripetere lo stesso avviso al giro dopo
+    for tg_id, quando, livello in da_mandare:
+        con.execute("UPDATE p2p_sveglie SET avvisata=? WHERE tg_id=? AND quando=?",
+                    (livello, tg_id, quando))
+    con.commit()
+    con.close()
+    for tg_id, quando, livello in da_mandare:
+        await notifica(tg_id, SVEGLIA_P2P_TESTI[livello])
+
+
+async def orologio_sveglie_p2p():
+    """Un giro al minuto, fail-open come gli altri orologi: un giro
+    che muore lo dice nel journal e il prossimo riparte."""
+    while True:
+        await asyncio.sleep(60)
+        try:
+            await _giro_sveglie_p2p()
+        except Exception as e:
+            print(f"⚠️ Giro delle sveglie P2P saltato: {e}", flush=True)
+
+
+_TASK_SVEGLIE_P2P = None
+
+
+@app.on_event("startup")
+async def avvia_sveglie_p2p():
+    global _TASK_SVEGLIE_P2P
+    _TASK_SVEGLIE_P2P = asyncio.create_task(orologio_sveglie_p2p())
+
+
+async def _quando_sveglia_p2p(req, x_tg_init_data, barattolo_sessione):
+    """Il pezzo comune delle due rotte: chi sei, se il P2P e' tuo, e
+    l'UNICA chiave che si legge dal corpo. Torna (tg_id, quando)."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not _p2p_per(user["id"])["attivo"]:
+        raise HTTPException(409, "Lo scambio P2P non e' attivo")
+    try:
+        d = await req.json()
+        quando = int(d.get("quando") or 0)
+    except Exception:
+        raise HTTPException(400, "Corpo non valido")
+    if quando <= 0:
+        raise HTTPException(400, "Manca la scadenza")
+    return user["id"], quando
+
+
+@app.post("/api/p2p/sveglia")
+async def metti_sveglia_p2p(req: Request, x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """«Avvisami quando questa scadenza si avvicina». Solo `quando`,
+    nel futuro e dentro l'orizzonte del coordinatore; un tetto per
+    persona, e la stessa scadenza messa due volte e' una sola riga."""
+    tg_id, quando = await _quando_sveglia_p2p(req, x_tg_init_data, barattolo_sessione)
+    adesso = int(time.time())
+    if not (adesso < quando <= adesso + SVEGLIA_P2P_ORIZZONTE_S):
+        raise HTTPException(400, "Scadenza fuori misura")
+    con = db()
+    quante = con.execute("SELECT COUNT(*) FROM p2p_sveglie WHERE tg_id=?",
+                         (tg_id,)).fetchone()[0]
+    gia = con.execute("SELECT 1 FROM p2p_sveglie WHERE tg_id=? AND quando=?",
+                      (tg_id, quando)).fetchone()
+    if quante >= MAX_SVEGLIE_P2P and not gia:
+        con.close()
+        raise HTTPException(429, "Troppe sveglie")
+    con.execute("INSERT OR IGNORE INTO p2p_sveglie(tg_id, quando, creata, avvisata) "
+                "VALUES (?, ?, ?, 0)", (tg_id, quando, adesso))
+    con.commit()
+    con.close()
+    return JSONResponse({"ok": True}, headers={"Cache-Control": "no-store, private"})
+
+
+@app.post("/api/p2p/sveglia/togli")
+async def togli_sveglia_p2p(req: Request, x_tg_init_data: str = Header(""),
+                            barattolo_sessione: str = Cookie("")):
+    """Lo scambio e' finito: la sveglia non serve piu'. Idempotente."""
+    tg_id, quando = await _quando_sveglia_p2p(req, x_tg_init_data, barattolo_sessione)
+    con = db()
+    con.execute("DELETE FROM p2p_sveglie WHERE tg_id=? AND quando=?", (tg_id, quando))
+    con.commit()
+    con.close()
+    return JSONResponse({"ok": True}, headers={"Cache-Control": "no-store, private"})
 
 
 MAX_EURO_P2P_CANALE = 100_000   # lo stesso tetto di mostrod (max_order_amount)

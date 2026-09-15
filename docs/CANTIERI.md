@@ -15016,3 +15016,178 @@ stessa chiave e lo stesso indice senza mai passare da una take.
 **DA GUARDARE**: la conferma sul campo — Alan riapre l'ordine fermo,
 legge le parole nuove, preme «Riprova a pubblicare» e si legge cosa
 risponde il coordinatore (o cosa dice il suo log, se tace ancora).
+
+## Contanti al tabacchino: il settimo metodo, e la sveglia (15 set 2026)
+
+**IL METODO.** Chi VENDE sats genera un ordine Amazon pagabile in
+contanti (Mooney, in tabaccheria) per l'importo dello scambio, e passa
+a chi compra tre dati: numero dell'ordine, importo e scadenza (72 ore
+da quando l'ha generato). Chi compra va al tabacchino, paga in contanti
+e tiene lo scontrino; chi vende vede l'ordine pagato e libera i sats.
+Se non libera, resta la disputa, e lo scontrino è la prova. È il primo
+metodo per chi non vuole passare da una banca o da un'app.
+
+**LE SEI DECISIONI DI ANDREA**, prese prima di scrivere una riga, con
+la ragione accanto. 1) **Esclusività**: col tabacchino nessun altro
+metodo nello stesso ordine, e il foglio lo dice — se chi compra
+scegliesse SEPA, l'ordine Amazon resterebbe appeso. 2) **Il margine dei
+24 blocchi si sottrae comunque**, come prudenza nostra dichiarata: il
+coordinatore pubblica nel 38385 il `hold_invoice_cltv_delta` ma NON
+`escrow_deadline_margin_blocks`, e un cap sul cltv intero prometterebbe
+più del vero. 3) **Gli avvisi arrivano anche ad app chiusa**, su
+Telegram o Nostr secondo le impostazioni — è l'EMENDA ALLA FASE 6, che
+diceva «niente del P2P al server»: la ragione è che gli ordini sono GIÀ
+pubblici sui relay, e il P2P è ormai legato all'account. 4) **La
+scadenza la scrive l'utente**, campo vuoto con la regola accanto: la
+sa la ricevuta Amazon, e proporne una sarebbe una cifra plausibile al
+posto di quella vera. 5) **Avviso alla presa sotto le sei ore**, mai
+bloccante. 6) **La stringa è «Contanti al tabacchino»**, e viaggia in
+chiaro nel tag `pm` del libro pubblico: cambiarla cambia quel che
+leggono i client altrui.
+
+**LE DECISIONI DEL GIRO PRIMA**, rispettate e non riaperte: l'ordine
+Amazon si genera PRIMA di pubblicare e i tre dati entrano nel foglio
+«Pubblica»; la scadenza diventa l'`expires_at` dell'ordine, così il
+coordinatore lo uccide da solo finché è nel libro; i tre campi sono
+obbligatori e l'importo che diverge AVVISA senza fermare; la voce
+compare solo lato vendo e nel filtro del libro resta per tutti;
+l'importo è fisso, niente intervallo; la finestra della garanzia sale
+da 432 a 576 blocchi SUL NODO e il form cappa sulla finestra letta VIVA;
+allo scadere coi sats in garanzia avvisi prima, poi «è scaduto» con
+l'annullo d'accordo in evidenza, nessun gesto automatico; il conto alla
+rovescia di chi compra si ricava rileggendo la data dal testo cifrato.
+
+**FASE 0, LA FINESTRA.** `infoDaEvento` legge `hold_invoice_cltv_delta`
+(`holdBlocchi`) e il giudice puro `finestraGaranziaP2P` torna (cltv −
+24) × 600 secondi, o 0 quando non si sa — e lo zero si legge «non lo
+so», mai «zero ore». Sul nodo: riga 12 di
+`/home/debian/nodo/mostro/settings.toml` a 576, copia `.prima-576`,
+riavvio dal compose, «Settings correctly loaded», e il 38385 letto
+dallo specchio del relay che annuncia 576. **La garanzia allo scadere,
+letta sul sorgente della 0.18.7** invece che a memoria:
+`enforce_escrow_deadline_pass` in `src/scheduler.rs` — in `active`
+cancella la hold (sats a chi vende) e chiude l'ordine, in `fiat-sent`
+apre la disputa da sola e la hold la LASCIA, che è l'unica leva del
+moderatore. Il commento del sorgente lo dice: gli euro potrebbero
+essere già arrivati, e solo un umano può decidere.
+
+**FASE 1, IL VOCABOLARIO.** Settima voce in `P2P_METODI`. La forma
+`tabacchino` sta PRIMA di `contanti` in `P2P_FORME_RECAPITO`, e non è
+ordine di comparsa: la regex dei contanti (`/contant|…/`) cattura anche
+«Contanti al tabacchino» e `formaRecapito` tiene la PRIMA che
+riconosce — c'è una prova che lo dice. `ricorda: false`, perché ogni
+ordine Amazon è nuovo e un numero d'ordine ricordato è un numero già
+speso. La scadenza è una riga a formato fisso, «Scade: 17/09/2026 alle
+14:30», scritta e letta da due GEMELLE (`dataTabacchinoP2P` e
+`leggiDataTabacchinoP2P`) con la prova di andata e ritorno; la lettura
+tace con zero su riga mancante, mese 13 e 30 febbraio (che JS
+«correggerebbe» al 2 marzo: si rilegge e si confronta). ORA LOCALE di
+chi scrive letta come ora locale di chi legge: giusto finché siamo
+tutti nello stesso fuso, e dichiarato invece che nascosto. Sul filo
+viaggia testo composto e mai una struttura, la regola di sempre: chi
+compra parsa la sola riga «Scade:», mai una data qualunque nel resto.
+
+**FASE 2, IL FOGLIO «PUBBLICA».** `metodiPubblicabiliP2P(lato)` offre
+il tabacchino solo a chi vende; il giudice puro rifiuta comunque un
+tabacchino lato compro. Sceglierlo toglie gli altri e svuota
+l'intervallo; scegliere un altro toglie lui. Una sezione nuova con
+l'icona dello scontrino: numero, importo, e la scadenza in un
+`<input type="datetime-local">` — la strada corta, un selettore che sa
+già i giorni e le ore — con `min` e `max` dalla finestra viva
+(`campoDaScadeP2P`/`scadeDaCampoP2P`, altre due gemelle; a mano vale la
+forma delle prime). I tre dati sono obbligatori, ognuno col suo «manca»
+e il suo campo; scadenza passata: no; oltre la finestra: no, e la frase
+dice le ore (92 col nodo a 576); **senza 38385 il tabacchino non si
+pubblica** («aspetta un attimo»), perché è l'unico metodo in cui un
+numero ignoto può costare i sats — gli altri restano com'erano. Gli
+importi che divergono: nota viva sotto i campi mentre si digita, e alla
+pubblicazione la CINQUANTOTTESIMA domanda di `chiediConferma`. `expires_at`
+entra nel payload SOLO col tabacchino, al secondo; per gli altri la
+chiave non c'è proprio e una prova tiene il payload di ieri byte per
+byte. I tre dati vanno sulla RIGA già composti nel testo del recapito,
+con `scade` (così l'anello parte subito); `recapitoDaAutoInvio` li
+legge dalla riga PRIMA del ricordo, col suo toast; il form del recapito
+si precompila dalla riga e una correzione da lì la aggiorna.
+GIRO VISIVO nel Browser pane a larghezza telefono, forzando lo stato JS:
+lo scontrino galleggiava a metà delle tre note — spostate nel «sotto»
+della sezione, la stessa cura della tendina dei metodi.
+
+**FASE 3, IL TEMPO DEI DUE LATI.** `scadenzaTabacchinoOrdineP2P` è il
+giudice unico: chi vende legge dalla riga, chi compra rilegge il testo
+cifrato, con un ripiego sul proprio recapito inviato per chi vende da
+un altro dispositivo. Le fasce (`fasciaTabacchinoP2P`): sotto sei ore,
+sotto un'ora, scaduta. `statoTabacchinoP2P` prevale sul passo SOLO con i
+sats in garanzia, con tre frasi diverse per lato; «scaduto» non è uno
+stato del coordinatore né una voce nuova di `STATI_P2P`, è un giudizio
+locale. L'anello grande entra nella pagina dello scambio, e il battito
+cura l'anello della VISTA APERTA (`.view.active .p2p-anellone`): prima
+il `querySelector` avrebbe preso quello del dettaglio rimasto nel DOM.
+A ordine scaduto in garanzia il «Chiedi di annullare d'accordo» si veste
+d'arancio sotto il bottone del passo, che resta: chi compra può aver
+pagato in tempo. L'avviso alla presa vive nel dettaglio sopra il
+bottone. Gli avvisi in-app battono nell'unico interval dell'app, ogni
+trenta secondi, una volta per fascia col timbro sulla riga.
+**LA SVEGLIA DEL SERVER.** Tabella `p2p_sveglie` con QUATTRO colonne
+(tg_id, quando, creata, avvisata; PK tg_id+quando) e una prova che le
+conta; la fusione dei conti la nomina, come pretende la sua sentinella.
+Due rotte, `/api/p2p/sveglia` e `/api/p2p/sveglia/togli`, che passano
+da `verifica_utente` e dal gate `_p2p_per`, leggono UNA chiave dal
+corpo, pretendono una scadenza nel futuro entro 15 giorni
+(`max_expiration_days`) e un tetto di 20 per persona. L'orologio al
+minuto col giudice puro `_sveglie_p2p_da_mandare`: sei ore prima il
+primo avviso, un'ora prima il secondo, mai due volte, e una sveglia
+messa a mezz'ora dalla fine salta il primo. Il timbro si scrive PRIMA di
+mandare. I testi passano da `notifica`, non portano numeri né id, e
+dicono «se è già chiuso, ignora»: chi chiude da un altro dispositivo
+non toglie la sveglia. Il client la mette quando la riga sa la data, la
+toglie a scambio finito, non la mette per una scadenza già passata (il
+server la rifiuterebbe), mai dalla vetrina o dal demo, e ritenta dopo
+cinque minuti in silenzio.
+**IL COSTO IN PRIVACY, DETTO ONESTO:** la scadenza combacia con
+l'`expires_at` pubblico nel libro. Con pochi ordini nella stessa ora,
+chi legge il database del server sa collegare l'account all'ordine,
+cioè il legame che le chiavi usa-e-getta nascondono. Lo sa solo
+Barattolo, che già oggi «sa ricavare» il profilo dal seme, come dice la
+pagina. Arrotondare l'ora non comprerebbe quasi niente, e non si è
+fatto. È scritto nella tabella, nella rotta e nel commento del client.
+**DOVE VIVE, ed è costato due giri:** la sveglia fa `fetch`, e i due
+perimetri del P2P hanno ciascuno un censimento — il motore pretende
+ZERO fetch, il blocco del mazzo ne pretende QUATTRO e un solo `body:`.
+Messa prima nel motore e poi accanto a `registraChiaviP2P`, è finita
+accanto ad `annunciaCanaleP2P`, l'altra cosa fuori dai due perimetri che
+parla col server. Il commento in testa lo dice.
+
+**FASE 4, LE PAROLE.** «Info P2P» ha la sezione «Contanti al
+tabacchino, passo per passo» (cinque passi, «se scade», e la nota sulla
+presa), prima de «I tempi»; il dettaglio dice cos'è il metodo e rimanda
+lì con un bottone (`apriInfoTabacchinoP2P`, che chiude il foglio e
+scorre all'ancora). ARCHITETTURA ha la voce sotto i metodi; PRODUZIONE
+la procedura della leva sul nodo; CLAUDE.md i soli numeri che
+diventavano falsi (432→576, 68→92 ore), come commit separato.
+
+**LE STRADE SCARTATE.** Avvisi solo in-app (proposta mia, rovesciata da
+Andrea con la ragione sopra). Un tipo nuovo nel tag `t` dei recapiti
+(vietato dalla regola dell'identità di pagamento: il tipo resta
+`euro`). Proporre la scadenza a +72 ore. Un campo di testo per la data
+(il selettore del sistema sbaglia meno). Cappare sul cltv intero.
+Arrotondare l'ora della sveglia. Un gesto automatico allo scadere.
+
+**PROVATO.** Le prove sono passate da 9976 a **10040 verdi, 0 rosse**:
++5 (fase 0), +10 (fase 1), +21 (fase 2), +26 (fase 3), più le sentinelle
+della fase 4. Dal vivo nel Browser pane: il foglio «Pubblica» lato vendo
+col tabacchino (finestra 331200 s, min/max sul campo data, nota sugli
+importi, niente secondo importo); la pagina dello scambio lato compro a
+ordine scaduto (riquadro, anello a zero, annullo in arancio, nessun
+errore JS); le due rotte rispondono sul server riavviato, ma in locale
+il P2P è spento e il gate le ferma a 409 prima dell'INSERT.
+
+**QUEL CHE RESTA, dichiarato.** 1) Il percorso che SCRIVE la riga della
+sveglia lo coprono il giudice puro e le sentinelle sul testo: si vede
+sul campo. 2) Su un altro dispositivo la riga adottata non ha i tre
+dati: il form nasce vuoto e si riscrivono dalla ricevuta. 3) Una
+scadenza corretta dopo la pubblicazione non cambia l'`expires_at` del
+coordinatore. 4) L'ora è locale: il giorno di un fuso, la riga cambia
+forma e le gemelle con lei. 5) La prova sul campo a due identità con un
+ordine Amazon vero — fase 5, agganciata alla tappa 8 — e con lei i
+timer mai scaduti: la scadenza di `expiration_seconds`, la riconsegna
+al libro, e i 576 blocchi del cltv.

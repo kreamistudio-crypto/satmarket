@@ -29579,8 +29579,13 @@ def prove_fogli_di_casa():
     # CINQUANTOTTO (set 2026, il link del negozio a scelta): si paga a
     # ogni cambio, e non e' un abbonamento — la stessa ragione per cui
     # lo sblocco del banner chiede prima di pagare.
-    prova("i gesti che passano dalla domanda unica sono cinquantotto",
-          58, solo_codice(mini).count("chiediConferma({"))
+    # CINQUANTANOVE (15 set 2026, il tabacchino nel foglio «Pubblica»):
+    # «gli importi non combaciano» — l'ordine Amazon e lo scambio
+    # dicono due cifre diverse. Avvisa e non ferma (decisione di
+    # Andrea): quasi sempre e' un errore di battitura, qualche volta
+    # e' voluto, e la differenza la sa solo chi pubblica.
+    prova("i gesti che passano dalla domanda unica sono cinquantanove",
+          59, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -38779,6 +38784,8 @@ def prove_p2p_libro():
         "function icoPersonaP2P(){",
         "function stellineP2P(f){",
         "function infoDaEvento(ev){",
+        # la finestra della garanzia (set 2026, col tabacchino)
+        "function finestraGaranziaP2P(info){",
         "function scadeTestoP2P(scade){",
         # l'anello della scadenza (set 2026) e il suo giudice puro
         "function frazioneVitaP2P(o, adesso){",
@@ -38841,7 +38848,11 @@ def prove_p2p_libro():
     # anelloScadenzaP2P usa per il dasharray
     for riga in ("const P2P_ANELLO_R = ", "const P2P_ANELLO_GIRO = ",
                  "const P2P_ULTIMO_GIORNO_S = ",
-                 "const P2P_ANELLO_VICINA_S = "):
+                 "const P2P_ANELLO_VICINA_S = ",
+                 # la finestra della garanzia (set 2026): il margine
+                 # e' nostro e dichiarato, e vive nel client
+                 "const P2P_MARGINE_HOLD_BLOCCHI = ",
+                 "const P2P_SEC_PER_BLOCCO = "):
         i_a = mini.index(riga)
         pezzi.append(mini[i_a:mini.index("\n", i_a)])
     banco = "\n".join(pezzi) + r"""
@@ -38896,8 +38907,13 @@ out.senzaD = ordineDaEvento(ev(38383, [['k','sell'],['f','EUR'],['fa','5']]), or
 out.latoStorto = ordineDaEvento(ev(38383, [['d','x'],['k','swap'],['fa','5']]), ora);
 out.kindStorto = ordineDaEvento(ev(38385, [['d','ord-1'],['k','sell'],['fa','5']]), ora);
 out.stato = ordineDaEvento(ev(38383, [['d','ord-5'],['k','sell'],['f','EUR'],['s','in-progress'],['amt','10'],['fa','5']]), ora);
-out.info = infoDaEvento(ev(38385, [['d','mostro-pk'],['fee','0.01'],['pow','0'],['max_order_amount','100000'],['min_order_amount','100'],['fiat_currencies_accepted','EUR, usd'],['mostro_version','0.18.2']], 5));
+out.info = infoDaEvento(ev(38385, [['d','mostro-pk'],['fee','0.01'],['pow','0'],['max_order_amount','100000'],['min_order_amount','100'],['fiat_currencies_accepted','EUR, usd'],['mostro_version','0.18.2'],['hold_invoice_cltv_delta','432']], 5));
 out.infoStorta = infoDaEvento(ev(38383, [['fee','0.5']]));
+/* la finestra della garanzia (set 2026): dal cltv letto, col margine
+   dichiarato; e «non lo so» e' uno zero, mai un negativo */
+out.finestra = finestraGaranziaP2P(out.info);
+out.finestraIgnota = finestraGaranziaP2P(null);
+out.finestraCorta = finestraGaranziaP2P({holdBlocchi: 24});
 out.rigaVeleno = rigaOrdineP2P(ordineDaEvento(ev(38383, [['d','ord-6"'],['k','sell'],['f','EUR'],['s','pending'],['amt','1000'],['fa','5'],['pm','<script>alert(1)</script>'],['expires_at', String(ora+7200)]]), ora));
 out.rigaMercato = rigaOrdineP2P(out.mercato);
 /* SENZA premio: e' l'unico caso in cui il ramo del ripiego della meta
@@ -39233,6 +39249,15 @@ console.log(JSON.stringify(out));
           and inf["minSats"] == 100 and inf["valute"] == ["EUR", "USD"]
           and inf["versione"] == "0.18.2" and inf["quando"] == 5)
     prova("...e il pow del primo contatto ricade su pow", 0, inf["powPrimo"])
+    # la finestra della garanzia (set 2026, col tabacchino): il cltv
+    # si LEGGE dal 38385 e il margine dei 24 blocchi e' prudenza
+    # nostra, dichiarata — e «non lo so» resta uno zero
+    prova("...e i blocchi della hold (set 2026)", 432, inf["holdBlocchi"])
+    prova("la finestra della garanzia e' (cltv - 24) x 600 secondi", 244800,
+          out["finestra"])
+    prova("...senza 38385 non si sa, e non si sa e' zero", 0, out["finestraIgnota"])
+    prova("...e un cltv che non supera il margine vale zero, non un negativo",
+          0, out["finestraCorta"])
     prova("un 38383 non e' un'impostazione", None, out["infoStorta"])
     rv = out["rigaVeleno"]
     prova("il metodo avvelenato esce scappato", True,
@@ -39997,6 +40022,11 @@ def prove_p2p_dettaglio():
         "function contoRimastoP2P(sec){",
         "function taccheAnelloneP2P(resta){",
         "function anelloneP2P(o, adesso){",
+        # l'avviso alla presa col tabacchino (set 2026) e i suoi due giudici
+        "function tabacchinoP2P(metodi){",
+        "function fasciaTabacchinoP2P(scade, adesso){",
+        "function avvisoPresaTabacchinoP2P(o, adesso){",
+        "function notaTabacchinoDettP2P(o){",
         "function repRiquadroP2P(f){",
         "function monetaP2P(o){",
         "function segnoMonetaP2P(o){",
@@ -40038,6 +40068,8 @@ def prove_p2p_dettaglio():
     for riga in ("const P2P_VALUTA = ", "const P2P_VALUTE = ",
                  "const P2P_GLIFI = ", "const P2P_ULTIMO_GIORNO_S = ",
                  "const P2P_ANELLO_VICINA_S = ", "const P2P_ANELLONE_TACCHE = ",
+                 "const P2P_TABACCHINO = ", "const P2P_TAB_AVVISO_S = ",
+                 "const P2P_TAB_ULTIMA_S = ",
                  "const p2pCoord = ",
                  "let p2pDettOrdine = ", "let p2pDettMetodo = "):
         i_a = mini.index(riga)
@@ -41238,6 +41270,11 @@ def prove_nav_p2p():
     # che il lettore del 38385 buttava via, e la pagina la dice.
     prova("infoDaEvento legge anche la vita nel libro", True,
           "oreVita: Math.floor(num('expiration_hours'))" in mini)
+    # ...e la finestra della garanzia (set 2026, col tabacchino): il
+    # cltv dal 38385, il margine dichiarato in UN posto e mai nel form
+    prova("...e i blocchi della garanzia, col margine dichiarato", True,
+          "holdBlocchi: Math.floor(num('hold_invoice_cltv_delta'))" in mini
+          and "const P2P_MARGINE_HOLD_BLOCCHI = 24;" in mini)
 
     # --- 5) IL CSS MUOVE SOLO TRANSFORM/OPACITY, E SA FERMARSI --------
     css = mini[mini.index("nav .nav-cella{"):
@@ -45164,9 +45201,9 @@ def prove_p2p_pubblica():
     # IL VOCABOLARIO E' CHIUSO (set 2026, decisione di Andrea che
     # ROVESCIA il campo libero di ieri): il perche' e' che ogni voce
     # deve avere il SUO form di recapito, e lo prova il blocco 9.
-    prova("...e il vocabolario e' chiuso, sei voci", True,
+    prova("...e il vocabolario e' chiuso, sette voci", True,
           "const P2P_METODI = ['SEPA', 'SEPA Instant', 'Revolut', "
-          "'Satispay', 'PayPal', 'Contanti'];" in mini)
+          "'Satispay', 'PayPal', 'Contanti', 'Contanti al tabacchino'];" in mini)
     prova("...e del campo libero di ieri non resta niente", False,
           "Oppure scrivilo tu" in mini or "p2pNuovoMetodo =" in mini)
     # ⚠️ LE TRE PAROLE CHE LA RIGA DEL CANALE CHIEDE, e non e' pedanteria:
@@ -45286,8 +45323,30 @@ def prove_p2p_pubblica():
         + "\n" + _intera("function ordineDaRigaP2P(o){")
         + "\n" + _forme
         + "\n" + _intera("function formaRecapito(metodo){")
+        + "\n" + _intera("function dataTabacchinoP2P(epoch){")
+        + "\n" + _intera("function leggiDataTabacchinoP2P(testo){")
+        + "\n" + _intera("function scadenzaTabacchinoP2P(testo){")
+        # il foglio «Pubblica» col tabacchino (set 2026): il campo
+        # data, la voce, i metodi per lato — e le due costanti dal
+        # client, mai ribattute
+        + "\n" + _intera("function scadeDaCampoP2P(s){")
+        + "\n" + _intera("function campoDaScadeP2P(epoch){")
+        + "\n" + _intera("function tabacchinoP2P(metodi){")
+        + "\n" + _intera("function metodiPubblicabiliP2P(lato){")
+        # il tempo dei due lati (set 2026): il giudice unico della
+        # scadenza, le fasce, il riquadro, l'avviso alla presa
+        + "\n" + _intera("function scadenzaTabacchinoOrdineP2P(o){")
+        + "\n" + _intera("function fasciaTabacchinoP2P(scade, adesso){")
+        + "\n" + _intera("function statoTabacchinoP2P(o, adesso){")
+        + "\n" + _intera("function avvisoPresaTabacchinoP2P(o, adesso){")
+        + "\n" + re.search(r"const P2P_TAB_AVVISO_S = [^\n]*;", mini).group(0)
+        + "\n" + re.search(r"const P2P_TAB_ULTIMA_S = [^\n]*;", mini).group(0)
+        + "\n" + mini[mini.index("const P2P_TAB_IN_GARANZIA = "):
+                       mini.index("];", mini.index("const P2P_TAB_IN_GARANZIA = ")) + 2]
+        + "\n" + re.search(r"const P2P_METODI = \[[^\n]*\];", mini).group(0)
+        + "\n" + re.search(r"const P2P_TABACCHINO = [^\n]*;", mini).group(0)
         + "\nconst METODI = ['SEPA', 'SEPA Instant', 'Revolut',"
-          " 'Satispay', 'PayPal', 'Contanti'];\n"
+          " 'Satispay', 'PayPal', 'Contanti', 'Contanti al tabacchino'];\n"
         "const base = {metodi: ['SEPA', 'Revolut'], maxSats: 100000, minSats: 100};\n"
         "console.log(JSON.stringify({\n"
         # a mercato, importo singolo: i sats a zero, il premio vivo
@@ -45368,7 +45427,96 @@ def prove_p2p_pubblica():
         "                  euroMax: ordine.max_amount || 0, sats: ordine.amount,\n"
         "                  metodi: v.metodi, premium: ordine.premium};\n"
         "    return JSON.stringify(ordineDaRigaP2P(riga)) === JSON.stringify(ordine); }),\n"
+        # IL TABACCHINO NEL FOGLIO (set 2026): il giudice puro con un
+        # orologio fermo e una finestra data — i tre dati obbligatori,
+        # il lato, l'esclusivita', la scadenza dentro la finestra viva,
+        # il payload con `expires_at` solo qui, il campo data che va
+        # e torna
+        "  tabVale: (() => {\n"
+        "    const ora = 1800000000, fin = (576 - 24) * 600;\n"
+        "    const ok = {euro: '100', euroMax: '', sats: '', fisso: false, metodi: [P2P_TABACCHINO],\n"
+        "      maxSats: 100000, minSats: 100, lato: 'vendo', finestra: fin, adesso: ora,\n"
+        "      tab: {ordine: '123-4567890-1234567', importo: '100', scade: campoDaScadeP2P(ora + 48 * 3600)}};\n"
+        "    const con = (agg) => valeNuovoOrdineP2P(Object.assign({}, ok, agg));\n"
+        "    const tab = (agg) => Object.assign({}, ok.tab, agg);\n"
+        "    return {\n"
+        "      buono: con({}),\n"
+        "      compro: con({lato: 'compro'}).manca,\n"
+        "      due: con({metodi: ['SEPA', P2P_TABACCHINO]}).manca,\n"
+        "      massimo: con({euroMax: '200'}).manca,\n"
+        "      ordine: con({tab: tab({ordine: ' '})}).manca,\n"
+        "      importo: con({tab: tab({importo: ''})}).manca,\n"
+        "      scade: con({tab: tab({scade: ''})}).manca,\n"
+        "      passata: con({tab: tab({scade: campoDaScadeP2P(ora - 60)})}).manca,\n"
+        "      senzaInfo: con({finestra: 0}).manca,\n"
+        "      lontana: con({tab: tab({scade: campoDaScadeP2P(ora + fin + 3600)})}).manca,\n"
+        "      alBordo: con({tab: tab({scade: campoDaScadeP2P(ora + fin - 60)})}).ok,\n"
+        "      campi: [con({lato: 'compro'}).campo, con({tab: tab({ordine: ''})}).campo,\n"
+        "              con({tab: tab({importo: ''})}).campo, con({tab: tab({scade: ''})}).campo],\n"
+        "      payload: ordineDaCampiP2P({euro: '100', euroMax: '', sats: '', fisso: false,\n"
+        "        metodi: [P2P_TABACCHINO], premio: 2, scade: ora + 48 * 3600}, 'vendo'),\n"
+        "      senzaChiave: 'expires_at' in ordineDaCampiP2P({euro: '25', euroMax: '', sats: '',\n"
+        "        fisso: false, metodi: ['SEPA'], premio: 0, scade: 0}, 'compro'),\n"
+        "      giro: scadeDaCampoP2P(campoDaScadeP2P(ora + 48 * 3600)) === ora + 48 * 3600,\n"
+        "      aMano: scadeDaCampoP2P('17/09/2026 alle 14:30') === Math.floor(new Date(2026, 8, 17, 14, 30).getTime() / 1000),\n"
+        "      storta: [scadeDaCampoP2P(''), scadeDaCampoP2P('2026-13-01T10:00'),\n"
+        "               scadeDaCampoP2P('2026-02-30T10:00'), campoDaScadeP2P(0)],\n"
+        "      offerti: [metodiPubblicabiliP2P('compro').indexOf(P2P_TABACCHINO),\n"
+        "                metodiPubblicabiliP2P('vendo').indexOf(P2P_TABACCHINO),\n"
+        "                metodiPubblicabiliP2P('vendo').length]\n"
+        "    };\n"
+        "  })(),\n"
+        # IL TEMPO DEI DUE LATI (set 2026): la scadenza si legge dalla
+        # riga o dal testo cifrato, le fasce, il riquadro che prevale
+        # solo in garanzia, l'avviso alla presa sotto le sei ore
+        "  tabTempo: (() => {\n"
+        "    const ora = 1800000000;\n"
+        "    const testo = 'Contanti al tabacchino\\nNumero ordine: 1\\nImporto: 100 €\\nScade: '\n"
+        "      + dataTabacchinoP2P(ora + 7200);\n"
+        "    const T = P2P_TABACCHINO;\n"
+        "    return {\n"
+        "      giudice: [scadenzaTabacchinoOrdineP2P({metodi: [T], lato: 'vendo', tabacchino: {scade: ora + 99}}) - ora,\n"
+        "                scadenzaTabacchinoOrdineP2P({metodi: [T], lato: 'compro', campiLoro: {euro: {testo: testo}}}) - ora,\n"
+        "                scadenzaTabacchinoOrdineP2P({metodi: [T], lato: 'vendo', campiMiei: {euro: {testo: testo}}}) - ora,\n"
+        "                scadenzaTabacchinoOrdineP2P({metodi: ['SEPA'], lato: 'compro', campiLoro: {euro: {testo: testo}}}),\n"
+        "                scadenzaTabacchinoOrdineP2P({metodi: [T], lato: 'compro', campiLoro: {euro: {testo: 'Contanti al tabacchino\\nNumero ordine: 1'}}}),\n"
+        "                scadenzaTabacchinoOrdineP2P(null)],\n"
+        "      fasce: [fasciaTabacchinoP2P(0, ora), fasciaTabacchinoP2P(ora + 7 * 3600, ora),\n"
+        "              fasciaTabacchinoP2P(ora + 6 * 3600, ora), fasciaTabacchinoP2P(ora + 3600, ora),\n"
+        "              fasciaTabacchinoP2P(ora, ora)],\n"
+        "      stato: [statoTabacchinoP2P({stato: 'attivo', lato: 'compro', metodi: [T], tabacchino: {scade: ora - 1}}, ora).t,\n"
+        "              statoTabacchinoP2P({stato: 'euro_inviati', lato: 'vendo', metodi: [T], tabacchino: {scade: ora + 1800}}, ora).t,\n"
+        "              statoTabacchinoP2P({stato: 'attivo', lato: 'vendo', metodi: [T], tabacchino: {scade: ora + 4 * 3600}}, ora).t,\n"
+        "              statoTabacchinoP2P({stato: 'attivo', lato: 'vendo', metodi: [T], tabacchino: {scade: ora + 48 * 3600}}, ora),\n"
+        "              statoTabacchinoP2P({stato: 'pubblicato', lato: 'vendo', metodi: [T], tabacchino: {scade: ora - 1}}, ora),\n"
+        "              statoTabacchinoP2P({stato: 'attivo', lato: 'vendo', metodi: ['SEPA'], tabacchino: {scade: ora - 1}}, ora)],\n"
+        "      presa: [avvisoPresaTabacchinoP2P({metodi: [T], scade: ora + 5 * 3600}, ora).indexOf('sei ore') > 0,\n"
+        "              avvisoPresaTabacchinoP2P({metodi: [T], scade: ora + 1800}, ora).indexOf('meno di un') > 0,\n"
+        "              avvisoPresaTabacchinoP2P({metodi: [T], scade: ora + 7 * 3600}, ora),\n"
+        "              avvisoPresaTabacchinoP2P({metodi: ['SEPA'], scade: ora + 1800}, ora),\n"
+        "              avvisoPresaTabacchinoP2P({metodi: [T], scade: ora - 1}, ora).indexOf('scaduto') > 0]\n"
+        "    };\n"
+        "  })(),\n"
         "  forme: METODI.map(m => formaRecapito(m).forma),\n"
+        # IL TABACCHINO (set 2026): la forma sua e non quella dei
+        # contanti, il testo composto a righe fisse, le due gemelle
+        # della data in andata e ritorno, e i silenzi del lettore
+        "  tab: (() => {\n"
+        "    const f = formaRecapito('Contanti al tabacchino');\n"
+        "    const t = f.componi({ordine: '123-4567890-1234567', importo: '100',\n"
+        "                         scade: '17/09/2026 alle 14:30'});\n"
+        "    const atteso = Math.floor(new Date(2026, 8, 17, 14, 30).getTime() / 1000);\n"
+        "    return {forma: f.forma, ricorda: f.ricorda, testo: t,\n"
+        "      contanti: formaRecapito('Contanti').forma,\n"
+        "      ritorno: scadenzaTabacchinoP2P(t) === atteso,\n"
+        "      andata: dataTabacchinoP2P(atteso),\n"
+        "      punto: leggiDataTabacchinoP2P('17/9/2026 14.30') === atteso,\n"
+        "      senzaRiga: scadenzaTabacchinoP2P('Contanti al tabacchino\\nNumero ordine: 17/09/2026 alle 14:30'),\n"
+        "      trenta: scadenzaTabacchinoP2P('Scade: 30/02/2026 alle 10:00'),\n"
+        "      tredici: scadenzaTabacchinoP2P('Scade: 01/13/2026 alle 10:00'),\n"
+        "      nulla: [scadenzaTabacchinoP2P(null), scadenzaTabacchinoP2P(''),\n"
+        "              dataTabacchinoP2P(0), dataTabacchinoP2P('x')]};\n"
+        "  })(),\n"
         "  interi: [interoP2P('5'), interoP2P('5.5'),\n"
         "           interoP2P(','), interoP2P(''),\n"
         "           interoP2P('  7  '), interoP2P('5e3'),\n"
@@ -45540,6 +45688,122 @@ def prove_p2p_pubblica():
           out["campi"])
     prova("...e i campi nominati esistono davvero nel foglio", True,
           all(('id="%s"' % c) in mini for c in set(out["campi"]) if c))
+    # --- IL TABACCHINO NEL FOGLIO (set 2026) --------------------------
+    tv = out["tabVale"]
+    prova("col tabacchino, tre dati buoni e scadenza nella finestra: si pubblica",
+          True, tv["buono"]["ok"])
+    prova("...ma solo lato vendo",
+          "«Contanti al tabacchino» vale solo per chi vende sats", tv["compro"])
+    prova("...da solo nell'ordine",
+          "Col tabacchino nessun altro metodo nello stesso ordine", tv["due"])
+    prova("...e senza intervallo",
+          "Col tabacchino l'importo è uno solo, senza massimo", tv["massimo"])
+    prova("i tre dati sono obbligatori, ognuno col suo nome",
+          ["Scrivi il numero dell'ordine Amazon", "Scrivi l'importo dell'ordine Amazon",
+           "Scrivi quando scade l'ordine Amazon"],
+          [tv["ordine"], tv["importo"], tv["scade"]])
+    prova("una scadenza passata non si pubblica",
+          "La scadenza è già passata: serve un ordine Amazon nuovo", tv["passata"])
+    # SENZA 38385 NON SI SA quanto copre la garanzia, e il tabacchino
+    # e' l'unico metodo in cui un numero ignoto puo' costare i sats:
+    # aspetta, invece di cappare su un numero cablato
+    prova("senza 38385 il tabacchino aspetta: la finestra non si inventa",
+          "Aspetta un attimo: sto leggendo quanto dura la garanzia", tv["senzaInfo"])
+    prova("oltre la finestra letta viva non si pubblica, e la frase dice le ore",
+          "Troppo lontana: la garanzia copre al massimo 92 ore da adesso", tv["lontana"])
+    prova("...e un minuto sotto il bordo passa", True, tv["alBordo"])
+    prova("ogni «manca» del tabacchino si porta il suo campo",
+          ["p2pNuovoMetodiBtn", "p2pNuovoTabOrdine", "p2pNuovoTabImporto", "p2pNuovoTabScade"],
+          tv["campi"])
+    prova("...e i campi del tabacchino esistono davvero nel foglio", True,
+          all(('id="%s"' % c) in mini for c in tv["campi"]))
+    prova("expires_at viaggia col tabacchino, ed e' la scadenza al secondo",
+          {"kind": "sell", "status": "pending", "amount": 0, "fiat_code": "EUR",
+           "min_amount": None, "max_amount": None, "fiat_amount": 100,
+           "payment_method": "Contanti al tabacchino", "premium": 2,
+           "created_at": 0, "expires_at": 1800000000 + 48 * 3600},
+          tv["payload"])
+    prova("...e per gli altri metodi la chiave non c'e' proprio: il payload di ieri",
+          False, tv["senzaChiave"])
+    prova("il campo data va e torna, e a mano vale la forma delle gemelle",
+          [True, True], [tv["giro"], tv["aMano"]])
+    prova("...e sulle date storte tace", [0, 0, 0, ""], tv["storta"])
+    prova("il foglio offre il tabacchino solo a chi vende: sette voci di la', sei di qua",
+          [-1, 6, 7], tv["offerti"])
+    # le righe del foglio che il banco puro non vede
+    _sc = pezzo_js(mini, "function scegliMetodoP2P(m){", "\n}\n")
+    prova("scegliere il tabacchino toglie gli altri, e viceversa", True,
+          "p2pNuovoMetodi = [P2P_TABACCHINO];" in _sc
+          and "x !== P2P_TABACCHINO &&" in _sc)
+    _rn = pezzo_js(mini, "function renderNuovoOrdineP2P(){", "\n}\n")
+    prova("la tendina del foglio chiede i metodi per lato, mai la lista intera", True,
+          "metodiPubblicabiliP2P(" in _rn and "P2P_METODI.map(" not in _rn)
+    prova("...e col tabacchino il secondo importo non si rivela", True,
+          "tabacchinoP2P(p2pNuovoMetodi)) return;"
+          in pezzo_js(mini, "function svelaSecondoImportoP2P(){", "\n}\n"))
+    _ra = pezzo_js(mini, "function recapitoDaAutoInvio(o){", "\n}\n")
+    prova("l'invio automatico legge il tabacchino dalla riga, prima del ricordo", True,
+          "o.tabacchino.testo" in _ra
+          and _ra.index("o.tabacchino") < _ra.index("recapitiMiei()"))
+    prova("e la riga del nuovo ordine porta i tre dati e la scadenza", True,
+          "ord.tabacchino = t;" in invia and "ord.scade = campi.scade;" in invia)
+    # --- IL TEMPO DEI DUE LATI (set 2026) ------------------------------
+    tt = out["tabTempo"]
+    prova("la scadenza si legge dalla riga di chi vende e dal testo cifrato di chi compra",
+          [99, 7200, 7200, 0, 0, 0], tt["giudice"])
+    prova("le fasce: niente, vicina a sei ore, ultima a una, scaduta a zero",
+          ["", "", "vicina", "ultima", "scaduta"], tt["fasce"])
+    prova("il riquadro prevale solo in garanzia, con le tre frasi del tempo",
+          ["L'ordine Amazon è scaduto", "L'ordine Amazon scade fra meno di un'ora",
+           "L'ordine Amazon scade fra meno di sei ore", None, None, None], tt["stato"])
+    prova("l'avviso alla presa: sotto le sei ore, sotto l'ora, e a ordine scaduto — mai altrove",
+          [True, True, "", "", True], tt["presa"])
+    # le cuciture che il banco puro non vede
+    _ro = pezzo_js(mini, "function renderOrdineP2P(){", "\n}\n")
+    prova("nella pagina dello scambio il tempo prevale sul passo, con l'anello", True,
+          "statoTabacchinoP2P(o) || statoTestoP2P(o)" in _ro
+          and "anelloneTabacchinoP2P(o) +" in _ro
+          and "SECONDARI_EVIDENZA_P2P[a]" in _ro)
+    prova("...e l'annullo in evidenza e' lo stesso gesto, vestito d'arancio", True,
+          "onclick=\"annullaScambioP2P()\"" in pezzo_js(mini, "const SECONDARI_EVIDENZA_P2P = {", "\n};")
+          and "btn orange" in pezzo_js(mini, "const SECONDARI_EVIDENZA_P2P = {", "\n};"))
+    prova("il dettaglio avvisa alla presa, sopra il bottone", True,
+          "avvisoPresaTabacchinoP2P(o) +" in pezzo_js(mini, "function renderDettaglioP2P(){", "\n}\n"))
+    # LE PAROLE (fase 4): il dettaglio dice cos'e' e rimanda, e «Info
+    # P2P» ha il passo per passo con i due momenti degli avvisi
+    prova("...e dice cos'e' il tabacchino, col rimando a Info P2P", True,
+          "notaTabacchinoDettP2P(o) +" in pezzo_js(mini, "function renderDettaglioP2P(){", "\n}\n")
+          and "onclick=\"apriInfoTabacchinoP2P()\"" in mini)
+    _inf = mini[mini.index('id="view-p2pinfo"'):]
+    _inf = _inf[:_inf.index('id="p2pinfo-storto"')]
+    prova("«Info P2P» spiega il tabacchino passo per passo, prima dei tempi", True,
+          'id="p2pinfo-tabacchino"' in _inf
+          and _inf.index('id="p2pinfo-tabacchino"') < _inf.index("<h3>I tempi</h3>")
+          and "tiene lo scontrino" in _inf
+          and "sei ore prima e un'ora prima" in _inf)
+    # IL BATTITO sta nell'UNICO interval, e l'anello batte su quello
+    # della vista aperta: adesso ce ne sono due nel DOM
+    _iv = mini[mini.index("setInterval(() => {\n  const adesso = Date.now();"):]
+    _iv = _iv[:_iv.index("}, 1000)") if "}, 1000)" in _iv else 4000]
+    prova("il battito del tabacchino sta nell'unico interval dell'app", True,
+          "battitoTabacchinoP2P();" in _iv)
+    prova("...e l'anello grande batte su quello della VISTA APERTA", True,
+          "document.querySelector('.view.active .p2p-anellone')"
+          in pezzo_js(mini, "function battitoAnelloneP2P(){", "\n}\n"))
+    _bt = pezzo_js(mini, "function battitoTabacchinoP2P(){", "\n}\n")
+    prova("gli avvisi in-app: una volta per fascia, col timbro sulla riga", True,
+          "if (f && !gia[f]) {" in _bt and "o.tabAvvisi = gia; scriviOrdineP2P(o);" in _bt)
+    # LA SVEGLIA: sul filo va SOLO `quando`, e mai dalla vetrina
+    _sv2 = pezzo_js(mini, "function sincronizzaSvegliaP2P(o, scade, finale, adesso){", "\n}\n")
+    prova("la sveglia manda al server la sola scadenza: niente id, importo o lato", True,
+          "body: JSON.stringify({quando: quando})" in _sv2
+          and "o.id" not in _sv2.replace("o.id + ':'", "").replace("ordiniP2P()[o.id]", "")
+          and "euro" not in _sv2 and "importo" not in _sv2)
+    prova("...e non parte dalla vetrina, dal demo o senza identita'", True,
+          "VETRINA) return;" in _sv2 and "DEMO) return;" in _sv2 and "if (!myTgId) return;" in _sv2)
+    prova("...e si toglie quando lo scambio finisce", True,
+          "const vuole = (finale || scade <= adesso) ? 0 : scade;" in _sv2
+          and "'sveglia/togli'" in _sv2)
     # LA FASCIA DELL'INTERVALLO si guarda PRIMA del giro di rete: il
     # coordinatore risponde `OutOfRangeSatsAmount`, ma quel no arriva
     # dopo una chiave bruciata.
@@ -45594,9 +45858,36 @@ def prove_p2p_pubblica():
     # PERCHE' ogni voce ha il suo form di recapito. Se un giorno se ne
     # aggiunge una senza forma, chi deve ricevere gli euro si trova la
     # casella generica — e questa riga diventa rossa prima.
-    prova("ognuna delle sei voci ha il suo form di recapito",
-          ["sepa", "sepa", "revolut", "satispay", "paypal", "contanti"],
+    prova("ognuna delle sette voci ha il suo form di recapito",
+          ["sepa", "sepa", "revolut", "satispay", "paypal", "contanti",
+           "tabacchino"],
           out["forme"])
+    # --- IL TABACCHINO (set 2026) ---------------------------------
+    tab = out["tab"]
+    # la regex dei contanti prende anche «Contanti al tabacchino»:
+    # la forma sua vince perche' sta PRIMA nella lista, e i contanti
+    # restano i contanti
+    prova("«Contanti al tabacchino» ha la forma sua, non quella dei contanti",
+          ["tabacchino", "contanti"], [tab["forma"], tab["contanti"]])
+    prova("...e sta PRIMA dei contanti nella lista, o perderebbe", True,
+          mini.index("{forma: 'tabacchino',") < mini.index("{forma: 'contanti',"))
+    prova("...e non si ricorda: ogni ordine Amazon e' nuovo", False, tab["ricorda"])
+    prova("il testo composto ha le quattro righe fisse",
+          "Contanti al tabacchino\nNumero ordine: 123-4567890-1234567\n"
+          "Importo: 100 \u20ac\nScade: 17/09/2026 alle 14:30", tab["testo"])
+    prova("la data va e torna: quel che la gemella scrive l'altra legge",
+          [True, "17/09/2026 alle 14:30"], [tab["ritorno"], tab["andata"]])
+    prova("...e a mano si accetta anche senza «alle» e col punto", True, tab["punto"])
+    prova("una data fuori dalla riga «Scade:» non e' una scadenza", 0, tab["senzaRiga"])
+    prova("il 30 febbraio e il mese 13 tacciono, non slittano", [0, 0],
+          [tab["trenta"], tab["tredici"]])
+    prova("...e sul nulla le gemelle tacciono tutt'e due", [0, 0, "", ""], tab["nulla"])
+    # il form: la scadenza si normalizza prima di partire, e il
+    # ricordo salta la forma che non si ricorda
+    _inv = pezzo_js(mini, "async function inviaCampoP2P(tipo, btn){", "\n}\n")
+    prova("il form normalizza la scadenza e non ricorda il tabacchino", True,
+          "campi.scade = dataTabacchinoP2P(quando);" in _inv
+          and "daRicordare = fr.ricorda === false ? null" in _inv)
     # FINCHE' LA VALUTA E' UNA SOLA il codice puo' restare cablato in
     # `ordineDaCampiP2P` (`fiat_code: 'EUR'`). Il giorno che il
     # catalogo cresce questa riga diventa rossa e dice dove andare:
@@ -45651,8 +45942,10 @@ def prove_p2p_pubblica():
           'onfocus="svelaSecondoImportoP2P()"' in nuovo)
     prova("...svelando, non ridisegnando", True,
           "n.style.display = '';" in _sv and "renderNuovoOrdineP2P" not in _sv)
-    prova("...una volta sola, e mai a prezzo fisso", True,
-          "if (p2pNuovoDue || p2pNuovoFisso) return;" in _sv)
+    # ...e mai col tabacchino (set 2026): l'ordine Amazon e' una cifra
+    # sola, e un intervallo che si svela li' sarebbe una bugia
+    prova("...una volta sola, mai a prezzo fisso, e mai col tabacchino", True,
+          "if (p2pNuovoDue || p2pNuovoFisso || tabacchinoP2P(p2pNuovoMetodi)) return;" in _sv)
     prova("la nota dice quando serve il secondo campo, alla lettera",
           True, "Tocca il secondo campo solo se vuoi creare un ordine "
           "a intervallo" in nuovo)
@@ -48355,6 +48648,63 @@ def prove_p2p_server():
     prova("...e il sale si committa PRIMA della close", True,
           "con.commit()" in seme_r
           and seme_r.index("con.commit()") < seme_r.index("con.close()"))
+
+    # --- 11 bis) LA SVEGLIA DEL TABACCHINO (set 2026, emenda alla fase 6)
+    # Il server impara SOLO «questo account ha una scadenza a quest'ora»:
+    # la tabella ha quattro colonne, la rotta legge una chiave, il testo
+    # non porta numeri ne' id. I due momenti li ricava il server.
+    amb_sv = {}
+    exec(pezzo("_sveglie_p2p_da_mandare"), amb_sv)
+    _dm = amb_sv["_sveglie_p2p_da_mandare"]
+    _ora = 1800000000
+    _righe = [{"tg_id": 1, "quando": _ora + 48 * 3600, "avvisata": 0},
+              {"tg_id": 2, "quando": _ora + 5 * 3600, "avvisata": 0},
+              {"tg_id": 3, "quando": _ora + 5 * 3600, "avvisata": 1},
+              {"tg_id": 4, "quando": _ora + 1800, "avvisata": 0},
+              {"tg_id": 5, "quando": _ora + 1800, "avvisata": 1},
+              {"tg_id": 6, "quando": _ora + 1800, "avvisata": 2},
+              {"tg_id": 7, "quando": _ora, "avvisata": 1}]
+    _manda, _morte = _dm(_righe, _ora)
+    prova("la sveglia: sei ore prima il primo avviso, un'ora prima il secondo, mai due volte",
+          [(2, _ora + 5 * 3600, 1), (4, _ora + 1800, 2), (5, _ora + 1800, 2)], _manda)
+    prova("...una messa a mezz'ora dalla fine salta le sei ore e prende l'ora", True,
+          (4, _ora + 1800, 2) in _manda and not any(m[0] == 4 and m[2] == 1 for m in _manda))
+    prova("...e alla scadenza la riga muore", [(7, _ora)], _morte)
+    prova("...e senza righe non succede niente", ([], []), _dm([], _ora))
+    _tab = src[src.index("CREATE TABLE IF NOT EXISTS p2p_sveglie("):]
+    _tab = _tab[:_tab.index(");")]
+    _col = [l.strip().split()[0] for l in _tab.split("\n")[1:]
+            if l.strip() and not l.strip().startswith("--")]
+    prova("la tabella della sveglia ha quattro colonne e nessun ordine dentro",
+          ["tg_id", "quando", "creata", "avvisata", "PRIMARY"], _col)
+    _rs = src[src.index('@app.post("/api/p2p/sveglia")'):]
+    _rs = _rs[:_rs.index('@app.post("/api/p2p/sveglia/togli")')]
+    _rc = pezzo("_quando_sveglia_p2p")
+    prova("la rotta della sveglia passa da chi sei e dal gate della persona", True,
+          "verifica_utente(x_tg_init_data, barattolo_sessione)" in _rc
+          and 'if not _p2p_per(user["id"])["attivo"]:' in _rc)
+    prova("...e dal corpo legge UNA chiave sola", 1, _rc.count("d.get("))
+    prova("...nel futuro, dentro l'orizzonte del coordinatore, e con un tetto per persona", True,
+          "adesso < quando <= adesso + SVEGLIA_P2P_ORIZZONTE_S" in _rs
+          and "quante >= MAX_SVEGLIE_P2P and not gia" in _rs
+          and "INSERT OR IGNORE INTO p2p_sveglie(tg_id, quando, creata, avvisata)" in _rs)
+    prova("...e non si mette in cache", True, '"Cache-Control": "no-store, private"' in _rs)
+    prova("il togli e' una DELETE per (tg_id, quando)", True,
+          "DELETE FROM p2p_sveglie WHERE tg_id=? AND quando=?"
+          in pezzo("togli_sveglia_p2p"))
+    _giro = pezzo("_giro_sveglie_p2p")
+    prova("il giro timbra PRIMA di mandare, e manda con `notifica`", True,
+          _giro.index("UPDATE p2p_sveglie SET avvisata=?") < _giro.index("await notifica(")
+          and "SVEGLIA_P2P_TESTI[livello]" in _giro)
+    prova("l'orologio delle sveglie parte all'avvio", True,
+          "_TASK_SVEGLIE_P2P = asyncio.create_task(orologio_sveglie_p2p())" in src)
+    _testi = src[src.index("SVEGLIA_P2P_TESTI = {"):]
+    _testi = _testi[:_testi.index("\n}")]
+    _testi = _testi[_testi.index("\n") + 1:]   # via il nome: «P2P» porta un 2
+    prova("i due testi non portano numeri, cifre ne' id: solo «un tuo scambio»", True,
+          not re.search(r"\d", _testi.replace("1:", "").replace("2:", ""))
+          and "€" not in _testi and "sats" not in _testi
+          and _testi.count("ignora questo") == 2)
 
     # --- 12) LA GUARDIA DEGLI SCAMBI APERTI (fase 6: nel «dimentica»)
     # ⚠️ EMENDATA: le sostituzioni del mazzo sono uscite con la fase 6

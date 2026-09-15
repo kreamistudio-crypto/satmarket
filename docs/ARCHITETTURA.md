@@ -23801,6 +23801,48 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   suo form di recapito (`P2P_FORME_RECAPITO`): un metodo scritto a mano
   cadrebbe nella forma generica, dove chi deve ricevere gli euro trova
   una casella vuota invece dei suoi campi.
+  LA SETTIMA VOCE È «Contanti al tabacchino» (15 set 2026): chi VENDE
+  sats genera un ordine Amazon pagabile in contanti (Mooney) e passa a
+  chi compra numero, importo e scadenza; chi compra paga alla cassa,
+  tiene lo scontrino, chi vende vede l'ordine pagato e libera. Le sue
+  regole vivono in giudici puri: la forma `tabacchino` sta PRIMA di
+  `contanti` in `P2P_FORME_RECAPITO` perché la regex dei contanti la
+  catturerebbe; il form non si ricorda (`ricorda: false`) perché ogni
+  ordine Amazon è nuovo; la scadenza è una riga a formato fisso
+  («Scade: 17/09/2026 alle 14:30») scritta e letta da due gemelle
+  (`dataTabacchinoP2P` / `leggiDataTabacchinoP2P`), ora locale
+  dichiarata; nel foglio «Pubblica» è offerta solo lato vendo
+  (`metodiPubblicabiliP2P`), esclusiva, a importo unico, coi tre dati
+  obbligatori e la scadenza cappata sulla FINESTRA DELLA GARANZIA
+  letta viva dal 38385 — `finestraGaranziaP2P` = (hold_invoice_cltv_delta
+  − 24) × 600, dove i 24 blocchi sono prudenza nostra dichiarata: il
+  margine del coordinatore non è pubblicato — e senza 38385 non si
+  pubblica. `expires_at` viaggia SOLO con questo metodo; per gli altri
+  la chiave non c'è, e il payload resta quello di ieri byte per byte.
+  I tre dati stanno sulla RIGA e partono da soli alla presa; chi compra
+  rilegge la data dal testo cifrato (`scadenzaTabacchinoOrdineP2P`, il
+  giudice unico dei due lati). Con i sats in garanzia il riquadro di
+  stato prevale sul passo a scadenza vicina o passata («scaduto» è un
+  giudizio locale, mai uno stato nuovo) e l'annullo d'accordo si veste
+  d'arancio: nessun gesto automatico. Allo scadere della garanzia vera
+  (92 ore col nodo a 576, erano 68 a 432) è il coordinatore a muoversi:
+  in `active` cancella la hold, in `fiat-sent` apre la disputa
+  (`enforce_escrow_deadline_pass`, letto sulla v0.18.7).
+  LA SVEGLIA DEL TABACCHINO è l'emenda alla fase 6 (decisione di
+  Andrea): il server impara UNA cosa — «questo account ha una scadenza
+  a quest'ora» — nella tabella `p2p_sveglie` (quattro colonne, PK
+  tg_id+quando, e la fusione dei conti la nomina), dalle rotte
+  `/api/p2p/sveglia` e `/api/p2p/sveglia/togli` che leggono una chiave
+  sola dal corpo; l'orologio al minuto ricava i due momenti (sei ore,
+  un'ora) col giudice puro `_sveglie_p2p_da_mandare` e manda con
+  `notifica`, quindi Telegram o Nostr secondo le impostazioni, con
+  testi senza numeri né id. Il costo in privacy è dichiarato: la
+  scadenza combacia con l'`expires_at` pubblico, e con pochi ordini
+  nella stessa ora chi legge il database sa collegare account e
+  ordine — lo sa solo Barattolo, che già sa ricavare il profilo dal
+  seme. Nel client la sveglia vive fuori dal motore e fuori dal mazzo
+  (i due perimetri con un censimento delle `fetch`), accanto al
+  canale. Il verbale: CANTIERI, «Contanti al tabacchino».
   LA CIFRA DI CHI PRENDE UN INTERVALLO viaggia come `Payload::Amount`
   (`{"amount": N}`), che mostrod legge SOLO su `take-sell` e `take-buy`
   (`get_amount` in `message.rs`) e confronta con min/max
