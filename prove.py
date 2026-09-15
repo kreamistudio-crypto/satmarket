@@ -51838,6 +51838,16 @@ def prove_banner_negozio():
           < codice(pezzo("decidi_banner_admin")).index("leggi_json"))
     prova("la tastiera non tiene token in memoria", True,
           'f"ban:ok:{tg_id}"' in pezzo("avvisa_banner"))
+    # LE DUE PORTE NELL'AVVISO (set 2026): non che la variabile esista
+    # ma che finisca NEL TESTO, e che il numero venga dal pagamento
+    # RIUSCITO — una lapide 'annullato' e' la riga piu' facile da
+    # pescare per sbaglio, e manderebbe il moderatore a rimborsare un
+    # pagamento che non e' mai entrato.
+    prova("l'avviso dice da quale delle due porte e' entrato", True,
+          'f"Porta aperta {porta}"' in pezzo("avvisa_banner"))
+    prova("...e il numero e' quello del pagamento RIUSCITO", True,
+          "AND stato='pagato' ORDER BY id LIMIT 1"
+          in pezzo("avvisa_banner"))
     prova("...e il tocco lo autorizza e_admin", True,
           "e_admin(" in pezzo("callback_banner"))
     prova("lo smistamento della tastiera esiste", True,

@@ -30223,17 +30223,49 @@ async def avvisa_banner(tg_id: int):
     autorizzare e' `e_admin` sul mittente del tocco."""
     con = db()
     u = con.execute("SELECT tg_id, nome, negozio, banner_foto_att, "
-                    "banner_link_att FROM utenti WHERE tg_id=?",
+                    "banner_link_att, banner_sbloccato_il "
+                    "FROM utenti WHERE tg_id=?",
                     (tg_id,)).fetchone()
-    con.close()
     if not u or not u["banner_foto_att"]:
+        con.close()
         return
+    # DA QUALE DELLE DUE PORTE E' ENTRATO (set 2026). Le chiavi sono
+    # due — il livello guadagnato commerciando e lo sblocco pagato —
+    # e la notifica non diceva quale: chi modera finiva a chiederlo al
+    # database, che e' esattamente il giro che questo messaggio esiste
+    # per risparmiargli.
+    # IL NUMERO DEL PAGAMENTO E' L'AGGANCIO e non un ornamento: il
+    # rimborso dello sblocco si chiede per `id`, quindi chi decide ce
+    # l'ha gia' sotto gli occhi mentre decide.
+    sbloccato = u["banner_sbloccato_il"] or 0
+    pag = None
+    if sbloccato:
+        pag = con.execute(
+            "SELECT id FROM pagamenti WHERE tg_id=? AND motivo='banner' "
+            "AND stato='pagato' ORDER BY id LIMIT 1",
+            (tg_id,)).fetchone()
+    con.close()
+    # LA PORTA SI DICE ANCHE SENZA IL NUMERO: sblocco senza riga e' uno
+    # stato anomalo, e a gridarlo c'e' gia' la ronda del libro mastro
+    # («porta del banner aperta senza pagamento»). Questa riga non deve
+    # aggiungere il proprio silenzio a quell'allarme.
+    if not sbloccato:
+        porta = "dal livello"
+    elif pag:
+        porta = f"dallo sblocco pagato #{pag['id']}"
+    else:
+        porta = "dallo sblocco pagato"
     dom = dominio_link(u["banner_link_att"])
+    # «Porta APERTA» e non «Porta», che due righe su tre qui sopra
+    # comincerebbero con la stessa parola dicendo cose diverse: «porta
+    # su» e' dove manda il banner, «porta aperta» e' come e' entrato
+    # chi lo chiede. Sta in fondo per la stessa ragione.
     testo = (f"🖼 <b>Banner da approvare</b>\n"
              f"Negozio: {html.escape(u['nome'] or '')} "
              f"({URL_PUBBLICO}/negozio/{u['negozio']})\n"
              f"Porta su: <b>{html.escape(dom)}</b>\n"
-             f"<code>{html.escape(u['banner_link_att'])}</code>")
+             f"<code>{html.escape(u['banner_link_att'])}</code>\n"
+             f"Porta aperta {porta}")
     tastiera = {"inline_keyboard": [[
         {"text": "✅ Pubblica", "callback_data": f"ban:ok:{tg_id}"},
         {"text": "❌ Rifiuta", "callback_data": f"ban:no:{tg_id}"},
