@@ -1193,16 +1193,24 @@ try:
     from config import BANNER_NEGOZIO_ATTIVO
 except ImportError:
     BANNER_NEGOZIO_ATTIVO = False  # spento di serie: si accende dal VPS
-# Il gradino che apre la porta. «avviato» = 150 XP e UN affare
-# concluso (decisione di Andrea): con «pratico» — 600 XP e 5 affari —
-# oggi non ce l'avrebbe quasi nessuno, la porta non si aprirebbe mai e
-# la funzione nascerebbe morta. E' un filtro alla CODA, non un premio:
-# a commissione spenta il livello si compra con due account e un
-# ordine finto, quindi il freno VERO resta la revisione umana.
+# LO SCONTO FEDELTA' PER LIVELLO (set 2026, decisione di Andrea che
+# ROVESCIA quella di ago 2026 qui sopra): il banner PRIMA si apriva
+# gratis raggiungendo il livello «avviato» — due strade per la stessa
+# porta, bastava una. Si e' scoperto che regala la porta per davvero
+# (un venditore l'aveva presa cosi', zero sats mai visti), quindi ora
+# la porta si paga SEMPRE e il livello sconta il prezzo, mai lo azzera
+# — vedi `_sconto_banner_livello`, che chiude a 99 anche una leva
+# scritta storta: nessun livello deve poter arrivare al 100%.
+# Chiave = l'id del livello (LIVELLI), valore = sconto in percento
+# (0-99) su BANNER_PREZZO_SATS. Tutti a zero = lo sconto fedelta' e'
+# spento e chiunque paga lo stesso prezzo, indipendentemente dal
+# livello — la porta resta comunque a pagamento, che quella non ha
+# piu' un interruttore separato.
 try:
-    from config import BANNER_LIVELLO
+    from config import BANNER_SCONTI_LIVELLO
 except ImportError:
-    BANNER_LIVELLO = "avviato"
+    BANNER_SCONTI_LIVELLO = {"nuovo": 0, "avviato": 10, "pratico": 20,
+                             "esperto": 35, "maestro": 50}
 # IL PREZZO DELLA PORTA (ago 2026, tappa 2): chi non ha il livello la
 # apre pagando. E' il PRIMO incasso che Barattolo fa per se' — finora
 # ogni invoice in entrata era escrow per conto di terzi — e per questo
@@ -2647,33 +2655,62 @@ def _gradino_livello(id_livello: str) -> int:
     return len(LIVELLI) + 1
 
 
-def banner_porta_aperta(xp: int, affari: int, livello_minimo: str,
-                        sbloccato_il: int) -> bool:
-    """Chi puo' CHIEDERE un banner. DUE STRADE per la stessa porta, e
-    basta una: il LIVELLO, che si guadagna commerciando, oppure lo
-    SBLOCCO PAGATO (tappa 2, ago 2026) — chi ha fretta anticipa.
-    Il livello resta un filtro alla CODA e non un premio: a
-    commissione spenta si compra con due account e un ordine finto,
-    quindi il freno vero e' e resta la revisione umana. Il pagamento
-    non lo indebolisce: e' l'altra porta, non una scorciatoia alla
-    moderazione — quel che si compra e' il DIRITTO DI CHIEDERE.
-    ERA LA RIGA GIA' DICHIARATA: «il giorno che la porta si potra'
-    anticipare pagando, ad allargarsi e' QUESTA riga e nessun'altra».
-    Ed e' andata cosi': i due chiamanti passano un campo in piu'.
-    IL PAGAMENTO VINCE SUL FAIL-CLOSED del gradino ignoto, ed e' la
-    riga da non ammorbidire: chi ha pagato ha pagato, anche se
-    `BANNER_LIVELLO` nel config e' scritto storto — quel fail-closed
-    difende la porta da una leva sbagliata, mai da una ricevuta.
-    `sbloccato_il` e' la DATA dello sblocco e non un booleano
-    (decisione di Andrea): oggi si paga una volta e vale per sempre,
-    e il giorno dell'abbonamento la scadenza si aggiunge qui senza
-    migrare una riga.
-    I DUE argomenti in coda sono obbligatori e SENZA DEFAULT apposta
-    (la lezione di `atteso_sats`): chi li dimentica lo sente da
-    Python, invece di chiudere in silenzio la porta a chi ha pagato
-    o di ereditare una soglia che non ha scelto."""
-    return bool(sbloccato_il) or livello_utente(
-        xp, affari)["numero"] >= _gradino_livello(livello_minimo)
+def banner_porta_aperta(sbloccato_il: int) -> bool:
+    """Chi puo' CHIEDERE un banner: chi ha PAGATO, punto (set 2026).
+
+    C'ERANO DUE STRADE per la stessa porta — il livello, gratis, o lo
+    sblocco pagato per chi aveva fretta — e la gratis si e' rivelata un
+    regalo vero: un venditore l'ha presa senza mai vedere una fattura.
+    Ora la porta ha UNA chiave sola, ed e' quella. Il livello non e'
+    sparito: sconta il prezzo (`_sconto_banner_livello`, mai fino al
+    100%), non apre piu' niente da solo.
+    `sbloccato_il` resta una DATA e non un booleano (decisione di
+    Andrea, invariata): oggi si paga una volta e vale per sempre, e il
+    giorno dell'abbonamento la scadenza si aggiunge qui senza migrare
+    una riga."""
+    return bool(sbloccato_il)
+
+
+def _sconto_banner_livello(xp: int, affari: int) -> int:
+    """Lo sconto fedelta' (0-99) sul prezzo del banner per il livello
+    di QUESTO venditore — mai il 100%: e' la riga che rende onesta la
+    decisione «si paga sempre», anche se `BANNER_SCONTI_LIVELLO` nel
+    config viene scritto storto un domani. Fail-closed come
+    `_gradino_livello`: un livello sconosciuto o un numero fuori scala
+    vale ZERO sconto — mai un regalo per un errore di configurazione,
+    mai un debito per chi legge il prezzo."""
+    liv = livello_utente(xp, affari)["id"]
+    try:
+        sconto = int(BANNER_SCONTI_LIVELLO.get(liv, 0))
+    except Exception:
+        sconto = 0
+    return max(0, min(99, sconto))
+
+
+def _prezzo_banner_utente(xp: int, affari: int) -> tuple:
+    """`_prezzo_banner`, ma per QUESTO venditore: lo sconto di livello
+    si applica al prezzo di OGGI (`BANNER_PREZZO_SATS`) e il confronto
+    per il barrato e' contro il PIU' ALTO fra il pieno vero
+    (`BANNER_PREZZO_PIENO_SATS`) e il listino stesso — MAI contro il
+    solo pieno: senza il listino come pavimento, uno sconto di
+    fedelta' da solo (nessuna offerta di lancio attiva, pieno spento o
+    non piu' alto del listino) non barrerebbe NIENTE, e chi ha il
+    livello pagherebbe meno senza vederselo dire. Cosi' invece i due
+    sconti si SOMMANO quando ci sono entrambi (un «nuovo» vede la sola
+    offerta di lancio, un «maestro» la vede piu' grande) e la fedelta'
+    barra DA SOLA quando la lancio non c'e' o e' spenta.
+    ALMENO UN SAT quando il listino non e' zero (`max(1, ...)`): difesa
+    in piu' e non l'unica — lo sconto arriva gia' chiuso a 99 da
+    `_sconto_banner_livello` — ma se un domani quella cintura si
+    allentasse, un listino piccolo non deve poter arrotondare a zero e
+    regalare la porta per un caso di interi."""
+    listino = max(0, int(BANNER_PREZZO_SATS or 0))
+    if listino <= 0:
+        return _prezzo_banner(0, int(BANNER_PREZZO_PIENO_SATS or 0))
+    pieno = max(listino, int(BANNER_PREZZO_PIENO_SATS or 0))
+    sconto = _sconto_banner_livello(xp, affari)
+    tuo = max(1, listino - listino * sconto // 100)
+    return _prezzo_banner(tuo, pieno)
 
 
 def _prezzo_banner(prezzo: int, pieno: int) -> tuple:
@@ -2712,60 +2749,6 @@ def _prezzo_banner(prezzo: int, pieno: int) -> tuple:
     barrato = barrato if paga > 0 and barrato > paga else 0
     tonda = barrato and paga * 100 % barrato == 0
     return paga, barrato, (100 - paga * 100 // barrato) if tonda else 0
-
-
-# LA PORTA HA DUE CHIAVI, E IL RIFIUTO LE DICE TUTT'E DUE (ago 2026,
-# dal campo): il messaggio nominava il solo affare concluso, quindi chi
-# ne aveva tredici e 104 XP si sentiva chiedere una cosa che aveva gia'
-# — e andava a cercare dalla parte sbagliata. Il livello lo decidono
-# ENTRAMBE le soglie (lo dice `livello_utente`), e il rifiuto ora dice
-# QUALE manca, col numero, e SOLO quella.
-
-
-def banner_cosa_manca(xp: int, affari: int, livello_minimo: str) -> dict:
-    """Che cosa manca alla porta, coi numeri: quanti XP ha e quanti ne
-    servono, quanti affari conclusi ha e quanti ne servono — e `0`
-    sulla meta' che non manca, che e' quel che permette di dire solo
-    l'altra.
-    Le soglie sono quelle del gradino chiesto e non del prossimo: i
-    due assi di LIVELLI crescono insieme, quindi «essere al gradino N»
-    e' esattamente «xp >= soglia_N e affari >= soglia_N» — la stessa
-    domanda di `banner_porta_aperta`, detta coi numeri.
-    Un gradino sconosciuto non manca di NIENTE (tutti zero): li' la
-    porta resta chiusa dal fail-closed di `banner_porta_aperta`, e un
-    numero inventato sarebbe peggio del silenzio."""
-    liv = next((l for l in LIVELLI if l[2] == livello_minimo), None)
-    if liv is None:
-        return {"xp": 0, "xp_ora": xp, "xp_serve": 0,
-                "affari": 0, "affari_ora": affari, "affari_serve": 0}
-    return {"xp": max(0, liv[0] - xp), "xp_ora": xp, "xp_serve": liv[0],
-            "affari": max(0, liv[1] - affari), "affari_ora": affari,
-            "affari_serve": liv[1]}
-
-
-def msg_banner_chiuso(xp: int, affari: int, livello_minimo: str) -> str:
-    """Il rifiuto della porta, scritto UNA volta sola: lo dicono il 400
-    dell'endpoint e il cassetto del Profilo, che se lo riceve gia'
-    scritto in `banner_leve` invece di ricomporlo — due prose sulla
-    stessa porta sono due prose che un giorno dicono due cose diverse
-    (il patto di `messaggio_zona_storta`).
-    Il gradino ignoto ricade sulla frase corta: la porta e' chiusa e
-    non c'e' un numero onesto da dire."""
-    nome = next((l[3] for l in LIVELLI if l[2] == livello_minimo),
-                livello_minimo)
-    m = banner_cosa_manca(xp, affari, livello_minimo)
-    pezzi = []
-    if m["xp"]:
-        pezzi.append(f"{m['xp_ora']} XP su {m['xp_serve']}")
-    if m["affari"]:
-        voce = "affare concluso" if m["affari_ora"] == 1 else "affari conclusi"
-        pezzi.append(f"{m['affari_ora']} {voce} su {m['affari_serve']}")
-    if not pezzi:
-        return f"Il banner si sblocca col livello «{nome}»."
-    # il «hai» sta DAVANTI e una volta sola: ripetuto in ogni pezzo,
-    # con tutt'e due le meta' mancanti si leggerebbe «hai ... e hai ...»
-    return (f"Il banner si sblocca col livello «{nome}»: hai "
-            + " e ".join(pezzi) + ".")
 
 
 def dominio_link(url: str) -> str:
@@ -4562,6 +4545,27 @@ def init_db():
                 "SELECT tg_id FROM utenti WHERE coorte='' "
                 "ORDER BY registrato, tg_id").fetchall():
             assegna_coorte(con, r["tg_id"])
+    except sqlite3.OperationalError:
+        pass
+    # IL GRANDFATHERING DELLA PORTA GRATIS (set 2026): il banner PRIMA
+    # si apriva anche solo col livello, senza pagare — decisione poi
+    # rovesciata (`banner_porta_aperta`): ora si paga sempre, il
+    # livello sconta. Chi l'aveva gia' presa cosi' non se la vede
+    # togliere a sorpresa: non e' un errore suo, era la regola di
+    # allora. RICONOSCIBILE PERCHE' E' L'UNICA COMBINAZIONE POSSIBILE
+    # sotto la regola vecchia: un banner mai stato '' (lo si e' chiesto
+    # almeno una volta) con lo sblocco pagato ancora a zero — chi ha
+    # invece pagato ha gia' `banner_sbloccato_il` scritto da
+    # `_incassa_sblocco`, e questa riga non lo tocca. IDEMPOTENTE: dopo
+    # il primo giro non resta piu' nessuna riga con questa combinazione,
+    # quindi i prossimi avvii non toccano niente. La data e' quella
+    # della prima richiesta se c'e' (`banner_chiesto_il`), o adesso.
+    try:
+        con.execute(
+            "UPDATE utenti SET banner_sbloccato_il=COALESCE("
+            "NULLIF(banner_chiesto_il,0), ?) "
+            "WHERE banner_stato!='' AND banner_sbloccato_il=0",
+            (int(time.time()),))
     except sqlite3.OperationalError:
         pass
     # n_recensori per chi aveva gia' dei feedback: idempotente, tocca
@@ -17805,12 +17809,14 @@ def _leve_stato():
                          "un LINK FUORI da Barattolo: ogni banner passa "
                          "da un moderatore",
                   allarme=bool(BANNER_NEGOZIO_ATTIVO)),
-            _leva("Banner: livello che apre la porta", "BANNER_LIVELLO",
-                  BANNER_LIVELLO),
-            _leva("Banner: prezzo per anticipare la porta (sats)",
+            _leva("Banner: sconto fedeltà per livello (mai il 100%)",
+                  "BANNER_SCONTI_LIVELLO",
+                  " · ".join(f"{l[3]} {max(0, min(99, int(BANNER_SCONTI_LIVELLO.get(l[2], 0))))}%"
+                             for l in LIVELLI)),
+            _leva("Banner: prezzo della porta (sats, prima dello sconto)",
                   "BANNER_PREZZO_SATS", int(BANNER_PREZZO_SATS or 0),
-                  spento="si apre solo col livello: nessuno puo' "
-                         "anticiparla pagando"),
+                  spento="il banner e' spento del tutto: nessuno puo' "
+                         "sbloccare la porta, a nessun livello"),
             # IL VALORE E' QUELLO EFFETTIVO, dal giudice e non dalla
             # costante: e' alla lettera la trappola che questa pagina
             # esiste per non far ricadere. Un pieno che non morde
@@ -28727,30 +28733,30 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # Il banner del negozio, per il cassetto «🖼». Le sue colonne
     # escono gia' dal SELECT * — e' il SUO profilo, quindi vede anche
     # cio' che aspetta una decisione e il motivo di un rifiuto — e qui
-    # si aggiungono le tre cose che il client non deve calcolarsi da
-    # se': se la porta e' aperta, il PERCHE' quando e' chiusa, e i
-    # DOMINI in chiaro (un secondo parser di la' sarebbe il posto da
-    # cui un giorno la riga sotto il banner e il link che si apre
-    # direbbero due cose diverse).
+    # si aggiungono le due cose che il client non deve calcolarsi da
+    # se': se la porta e' aperta, e i DOMINI in chiaro (un secondo
+    # parser di la' sarebbe il posto da cui un giorno la riga sotto il
+    # banner e il link che si apre direbbero due cose diverse).
+    # NIENTE PIU' «MOTIVO» ne' «LIVELLO» (set 2026): la porta non ha
+    # piu' una soglia da spiegare quando e' chiusa — si paga sempre —
+    # quindi non c'e' piu' niente da dire oltre al prezzo, che gia'
+    # arriva scontato dal livello qui sotto.
     _xp_ban = (u["xp"] or 0) if u else 0
     _aff_ban = ((u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)) if u else 0
     _sbl_ban = (u["banner_sbloccato_il"] or 0) if u else 0
-    _porta_ban = bool(u) and banner_porta_aperta(
-        _xp_ban, _aff_ban, BANNER_LIVELLO, _sbl_ban)
-    _pz_ban = _prezzo_banner(BANNER_PREZZO_SATS,
-                             BANNER_PREZZO_PIENO_SATS)
+    _porta_ban = bool(u) and banner_porta_aperta(_sbl_ban)
+    _pz_ban = _prezzo_banner_utente(_xp_ban, _aff_ban)
     profilo["banner_leve"] = {
         "attivo": bool(BANNER_NEGOZIO_ATTIVO),
-        "livello": BANNER_LIVELLO,
-        "livello_nome": next(
-            (l[3] for l in LIVELLI if l[2] == BANNER_LIVELLO), ""),
         "porta_aperta": _porta_ban,
         # IL PREZZO ARRIVA DAL SERVER e il client non lo scrive mai a
         # mano (il patto di `max_barattolo`): a 0 lo sblocco a
-        # pagamento e' spento e il bottone non nasce affatto.
+        # pagamento e' spento e il bottone non nasce affatto. E'
+        # GIA' lo sconto di QUESTO venditore, non il listino grezzo.
         "prezzo_sats": _pz_ban[0],
         # E IL PIENO BARRATO accanto, GIA' GIUDICATO: esce >0 SOLO
-        # quando c'e' una promozione vera — la regola d'oro di
+        # quando c'e' uno sconto vero (offerta di lancio, fedelta' di
+        # livello, o entrambe insieme) — la regola d'oro di
         # `_sconto_pubblico`, cosi' il client legge e non giudica.
         # Un client rimasto in cache non conosce la chiave e non
         # disegna niente: un'omissione, mai una bugia.
@@ -28762,16 +28768,8 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         # lei: a percentuale muta resta la sola cifra sbarrata.
         "prezzo_percento": _pz_ban[2],
         # QUANDO l'ha pagata: serve al cassetto per dire «l'hai
-        # sbloccata» invece di ripetere la strada del livello a chi
-        # l'ha gia' percorsa in un altro modo.
-        "sbloccato_il": _sbl_ban,
-        # A porta chiusa il MOTIVO viaggia gia' scritto, ed e' lo
-        # STESSO testo del 400: il cassetto non lo ricompone (due
-        # prose sulla stessa porta divergono al primo ritocco) e
-        # soprattutto non si ricalcola quale meta' manca, che e' il
-        # numero dove vive un off-by-one — il patto di `mancano_pezzi`.
-        "motivo": "" if _porta_ban else msg_banner_chiuso(
-            _xp_ban, _aff_ban, BANNER_LIVELLO)}
+        # sbloccata» — l'UNICA strada, da set 2026.
+        "sbloccato_il": _sbl_ban}
     profilo["banner_dominio"] = dominio_link(profilo.get("banner_link") or "")
     profilo["banner_dominio_att"] = dominio_link(
         profilo.get("banner_link_att") or "")
@@ -29739,6 +29737,10 @@ async def imposta_ferie(req: Request,
 # puo' vedere. A guardare e' un umano, sempre.
 
 MSG_BANNER_SPENTO = "Il banner del negozio non è attivo su Barattolo"
+# LA PORTA HA UNA CHIAVE SOLA da set 2026 (era il livello o il
+# pagamento): senza uno sblocco pagato non si puo' nemmeno chiedere.
+MSG_BANNER_NON_SBLOCCATO = ("Devi prima sbloccare la porta: paga dal "
+                            "Profilo, in «🖼 Banner del negozio»")
 
 
 def _casa_barattolo() -> str:
@@ -29801,20 +29803,15 @@ async def salva_banner_negozio(req: Request,
         raise HTTPException(400, MSG_BANNER_SPENTO)
     d = await leggi_json(req)
     con = db()
-    u = con.execute("SELECT negozio, xp, vendite_ok, acquisti_ok, "
-                    "banner_foto_att, banner_sbloccato_il "
+    u = con.execute("SELECT negozio, banner_foto_att, banner_sbloccato_il "
                     "FROM utenti WHERE tg_id=?",
                     (user["id"],)).fetchone()
     if not u or not u["negozio"]:
         con.close()
         raise HTTPException(400, "Il tuo negozio non è ancora pronto")
-    _xp = u["xp"] or 0
-    _affari = (u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)
-    if not banner_porta_aperta(_xp, _affari, BANNER_LIVELLO,
-                               u["banner_sbloccato_il"] or 0):
+    if not banner_porta_aperta(u["banner_sbloccato_il"] or 0):
         con.close()
-        raise HTTPException(400, msg_banner_chiuso(_xp, _affari,
-                                                   BANNER_LIVELLO))
+        raise HTTPException(400, MSG_BANNER_NON_SBLOCCATO)
     link, motivo = link_banner_ammesso(d.get("link"), BANNER_LINK_VIETATI,
                                        _casa_barattolo())
     if not link:
@@ -29882,8 +29879,7 @@ async def togli_banner_negozio(x_tg_init_data: str = Header(""),
 # altro), quindi l'unica corsa possibile e' il doppio tocco, e quella
 # la chiude la RIPRESA qui sotto. Nessun ricontrollo dopo la fattura,
 # e nessun await fra la fattura e l'INSERT.
-MSG_SBLOCCO_SPENTO = ("Lo sblocco a pagamento non è attivo: il banner "
-                      "si prende col livello")
+MSG_SBLOCCO_SPENTO = "Lo sblocco del banner non è attivo al momento"
 MSG_SBLOCCO_GIA = "La porta è già aperta: il banner puoi chiederlo adesso"
 
 
@@ -29891,24 +29887,22 @@ MSG_SBLOCCO_GIA = "La porta è già aperta: il banner puoi chiederlo adesso"
 async def sblocca_banner(req: Request,
                          x_tg_init_data: str = Header(""),
                          barattolo_sessione: str = Cookie("")):
-    """La fattura che apre la porta del banner.
+    """La fattura che apre la porta del banner — l'UNICA strada da set
+    2026 (era anche il livello, che ora sconta e basta).
 
     LA RIPRESA, e non un rifiuto: chi ha gia' una fattura viva si
     rivede LA SUA (`pagamenti.invoice` esiste per questo, come
     `ordini.invoice`). Il 400 «hai gia' una fattura in corso» di
     `fai_puntata` qui sarebbe piu' povero — la' la cifra puo' essere
-    cambiata perche' la gara e' andata avanti, qui il prezzo e' lo
-    stesso e la fattura di prima e' ancora buona.
+    cambiata perche' la gara e' andata avanti, qui il prezzo e' quello
+    fotografato allora e la fattura di prima e' ancora buona.
 
     CHI HA GIA' LA PORTA NON PUO' PAGARE, ed e' la guardia che
-    protegge l'utente da noi: nessuno deve poter comprare una cosa
-    che ha gia' — ne' chi ha il livello, ne' chi ha gia' pagato."""
+    protegge l'utente da noi: nessuno deve poter comprare due volte
+    la stessa porta."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not BANNER_NEGOZIO_ATTIVO:
         raise HTTPException(400, MSG_BANNER_SPENTO)
-    prezzo = int(BANNER_PREZZO_SATS or 0)
-    if prezzo <= 0:
-        raise HTTPException(400, MSG_SBLOCCO_SPENTO)
     con = db()
     u = con.execute("SELECT negozio, xp, vendite_ok, acquisti_ok, "
                     "banner_sbloccato_il FROM utenti WHERE tg_id=?",
@@ -29916,12 +29910,15 @@ async def sblocca_banner(req: Request,
     if not u or not u["negozio"]:
         con.close()
         raise HTTPException(400, "Il tuo negozio non è ancora pronto")
-    _xp = u["xp"] or 0
-    _affari = (u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)
-    if banner_porta_aperta(_xp, _affari, BANNER_LIVELLO,
-                           u["banner_sbloccato_il"] or 0):
+    if banner_porta_aperta(u["banner_sbloccato_il"] or 0):
         con.close()
         raise HTTPException(400, MSG_SBLOCCO_GIA)
+    _xp = u["xp"] or 0
+    _affari = (u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0)
+    prezzo = _prezzo_banner_utente(_xp, _affari)[0]
+    if prezzo <= 0:
+        con.close()
+        raise HTTPException(400, MSG_SBLOCCO_SPENTO)
     adesso = int(time.time())
     # LA RIPRESA: la finestra e' quella fisica del pagamento (30
     # minuti), la stessa di `_riservati` — copre la vita della

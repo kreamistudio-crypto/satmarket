@@ -20694,6 +20694,25 @@ def _censimento(acceso):
     # il contrario di quel che il pannello fa. Con 70 contro 7 il
     # barrato esce; a leve spente `acceso and` lo azzera da solo.
     amb["BANNER_PREZZO_PIENO_SATS"] = acceso and 70
+    # LIVELLI e' una costante vera (non viene dal config), ma
+    # `_leve_stato` la ITERA per lo sconto fedelta' del banner: senza
+    # uno stub qui, `__missing__` la risolve a 7 e la prova ESPLODE con
+    # «int object is not iterable» — la stessa trappola delle leve-LISTA,
+    # con LIVELLI al posto di una lista di config. I cinque gradini
+    # veri, non [1,2,3]: qui il pannello ci legge anche il NOME.
+    amb["LIVELLI"] = (
+        (0, 0, "nuovo", "Nuovo arrivato"),
+        (50, 1, "avviato", "Bottega avviata"),
+        (200, 5, "pratico", "Mercante pratico"),
+        (800, 15, "esperto", "Mercante esperto"),
+        (3000, 40, "maestro", "Maestro del banco"))
+    # E LO SCONTO FEDELTA' E' UN DIZIONARIO, non una lista: il config
+    # finto darebbe 7 e `_leve_stato` gli chiede `.get(...)`, quindi
+    # senza stub la prova esploderebbe con «int object has no
+    # attribute 'get'» invece di diventare rossa.
+    amb["BANNER_SCONTI_LIVELLO"] = {"nuovo": 0, "avviato": 10,
+                                    "pratico": 20, "esperto": 35,
+                                    "maestro": 50}
     # Il canale non si legge piu' dalla costante: dall'ago 2026 lo
     # decide il bot e il giudice e' `canale_id()`, che va a leggere il
     # database. Qui si stuba — al pannello interessa il FATTO, e
@@ -51428,10 +51447,14 @@ def prove_banner_negozio():
     i = src.index("    BANNER_NEGOZIO_ATTIVO = ")
     prova("la leva del banner nasce spenta",
           "    BANNER_NEGOZIO_ATTIVO = False", src[i:src.index("#", i)].rstrip())
-    prova("il gradino che apre la porta e' una leva", True,
-          'BANNER_LIVELLO = "avviato"' in src)
+    # LO SCONTO FEDELTA' (set 2026) ha preso il posto del gradino
+    # gratis: mai il 100%, e la scala e' una leva col suo default.
+    prova("lo sconto fedelta' per livello e' una leva", True,
+          'BANNER_SCONTI_LIVELLO = {"nuovo": 0, "avviato": 10, '
+          '"pratico": 20,' in src)
     prova("...e lo stesso nel config d'esempio", True,
-          'BANNER_LIVELLO = "avviato"'
+          'BANNER_SCONTI_LIVELLO = {"nuovo": 0, "avviato": 10, '
+          '"pratico": 20,'
           in open("config_esempio.py", encoding="utf-8").read())
     for c in ("banner_foto", "banner_link", "banner_foto_att",
               "banner_link_att", "banner_stato", "banner_motivo",
@@ -51463,6 +51486,51 @@ def prove_banner_negozio():
     prova("...anche nel config d'esempio", True,
           "BANNER_PREZZO_PIENO_SATS = 40_000"
           in open("config_esempio.py", encoding="utf-8").read())
+
+    # IL GRANDFATHERING DELLA PORTA GRATIS (set 2026), girato per
+    # davvero: chi l'aveva presa gratis col vecchio livello non se la
+    # vede togliere quando il codice cambia — la riga di `init_db` lo
+    # riconosce dalla combinazione impossibile sotto la regola nuova
+    # (un banner mai stato '' con lo sblocco ancora a zero) e lo
+    # marca come gia' pagato, una volta sola.
+    _i = src.index("IL GRANDFATHERING DELLA PORTA GRATIS")
+    _inizio = src.rfind("\n", 0, src.index("try:", _i)) + 1
+    _mig = "if True:\n" + src[_inizio:src.index("pass", _i) + 4]
+    con_g = _sq.connect(":memory:")
+    con_g.row_factory = _sq.Row
+    con_g.executescript("""
+      CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY,
+        banner_stato TEXT DEFAULT '', banner_sbloccato_il INT DEFAULT 0,
+        banner_chiesto_il INT DEFAULT 0);
+      INSERT INTO utenti VALUES
+        (1, 'attivo', 0, 1690000000),  -- gratis col livello: da migrare
+        (2, 'attivo', 1680000000, 1690000000),  -- ha gia' pagato: intatto
+        (3, '', 0, 0),                 -- mai chiesto: non e' banner
+        (4, 'attivo', 0, 0);           -- gratis, mai una data: oggi
+    """)
+    con_g.commit()
+    exec(_mig, {"con": con_g, "time": __import__("time"),
+               "sqlite3": _sq})
+    righe_g = {r["tg_id"]: r["banner_sbloccato_il"]
+              for r in con_g.execute("SELECT * FROM utenti")}
+    prova("chi l'aveva gratis col livello viene migrato alla sua data",
+          1690000000, righe_g[1])
+    prova("...e chi aveva gia' pagato resta com'era", 1680000000,
+          righe_g[2])
+    prova("...chi non l'ha mai chiesto non diventa un banner pagato",
+          0, righe_g[3])
+    prova("...e senza una data di richiesta si marca ADESSO", True,
+          righe_g[4] > 1690000000)
+    # IDEMPOTENTE: un secondo giro (il prossimo avvio) non deve
+    # rimuovere ne' spostare niente — la combinazione che l'ha fatto
+    # scattare non esiste piu' per nessuno di questi quattro.
+    _prima = dict(righe_g)
+    exec(_mig, {"con": con_g, "time": __import__("time"), "sqlite3": _sq})
+    righe_g2 = {r["tg_id"]: r["banner_sbloccato_il"]
+               for r in con_g.execute("SELECT * FROM utenti")}
+    prova("il secondo giro non cambia niente", _prima, righe_g2)
+    con_g.close()
+
     # LA RIGA DA NON AMMORBIDIRE: il pieno e' un ORNAMENTO, e
     # l'endpoint che stacca la fattura non lo nomina AFFATTO — non
     # nella invoice, non nell'INSERT, non nella risposta. Chi lo fa
@@ -51485,11 +51553,17 @@ def prove_banner_negozio():
     # la tortura, non la rilettura.
     prova("...e la percentuale, dallo stesso giudice", True,
           '"prezzo_percento": _pz_ban[2]' in _mp)
-    # ...e la leva grezza la nomina UNA volta sola: dentro la
-    # chiamata al giudice. Un secondo uso li' dentro sarebbe la
-    # strada da cui la costante rientra.
-    prova("...e la leva la nomina solo per darla al giudice", 1,
+    # LA LEVA GREZZA NON SI NOMINA PIU' AFFATTO QUI (set 2026): il
+    # profilo chiede a `_prezzo_banner_utente` — che sa gia' del
+    # pieno E dello sconto di livello — invece di comporre lui stesso
+    # `_prezzo_banner(BANNER_PREZZO_SATS, BANNER_PREZZO_PIENO_SATS)`.
+    # E' un'incapsulazione IN PIU', non meno: prima la leva rientrava
+    # una volta per darla al giudice, ora il profilo non sa nemmeno
+    # che esiste.
+    prova("...e la leva grezza non si nomina piu' qui dentro", 0,
           _mp.count("BANNER_PREZZO_PIENO_SATS"))
+    prova("...il profilo chiede al giudice PER UTENTE", True,
+          "_prezzo_banner_utente(" in _mp)
     # ...e nemmeno nelle due strade del denaro a valle, che leggono
     # SOLO l'importo fotografato in colonna.
     for _f in ("_incassa_sblocco", "_rimborsa_sblocco"):
@@ -51553,7 +51627,12 @@ def prove_banner_negozio():
           dom("https://www.lamiabottega.it/x"))
     prova("...e su una stringa storta non esplode", "", dom("non un url"))
 
-    # ---- 3. LA PORTA: il livello, e il fail-CLOSED ----------------
+    # ---- 3. LA PORTA: UNA CHIAVE SOLA (set 2026) -------------------
+    # C'ERANO DUE STRADE — il livello, gratis, o lo sblocco pagato per
+    # chi aveva fretta — e la gratis si e' rivelata un regalo vero: un
+    # venditore l'ha presa senza mai vedere una fattura. Ora la porta
+    # si apre SOLO pagando; il livello resta (sconta il prezzo, vedi
+    # sotto), ma da solo non apre piu' niente.
     amb2 = {"LIVELLI": (
         (0, 0, "nuovo", "Nuovo arrivato"),
         (150, 1, "avviato", "Bottega avviata"),
@@ -51564,53 +51643,29 @@ def prove_banner_negozio():
     exec(pezzo("_gradino_livello"), amb2)
     exec(pezzo("banner_porta_aperta"), amb2)
     porta, grad = amb2["banner_porta_aperta"], amb2["_gradino_livello"]
-    prova("chi non ha concluso niente resta fuori", False,
-          porta(0, 0, "avviato", 0))
-    prova("...e nemmeno con gli XP ma zero affari", False,
-          porta(5000, 0, "avviato", 0))
-    prova("un affare concluso e 150 XP: passa", True,
-          porta(150, 1, "avviato", 0))
-    prova("chi e' piu' avanti passa comunque (la scala)", True,
-          porta(9000, 40, "avviato", 0))
-    prova("col gradino alto, chi e' avviato non passa", False,
-          porta(150, 1, "pratico", 0))
-    # FAIL-CLOSED: una leva scritta a mano e storta deve CHIUDERE la
-    # porta, mai spalancarla a tutti. E' la ragione per cui il gradino
-    # sconosciuto vale piu' dell'ultimo e non zero.
-    prova("un livello inventato chiude la porta a chiunque", False,
-          porta(999999, 999, "livello-che-non-esiste", 0))
-    prova("...perche' il gradino ignoto vale piu' dell'ultimo", True,
-          grad("boh") > grad("maestro"))
-
-    # LA SECONDA CHIAVE: LO SBLOCCO PAGATO (ago 2026, la tappa 2).
-    # Due strade per la stessa porta, e basta una — quindi le prove
-    # qui sopra provano ANCHE che il pagamento non e' diventato
-    # obbligatorio: passano tutte con `sbloccato_il` a zero.
-    prova("chi ha pagato entra senza il livello", True,
-          porta(0, 0, "avviato", 1_700_000_000))
-    prova("...e chi non ha ne' l'uno ne' l'altro resta fuori", False,
-          porta(0, 0, "avviato", 0))
-    prova("chi ha il livello entra senza pagare", True,
-          porta(150, 1, "avviato", 0))
-    # IL PAGAMENTO VINCE SUL FAIL-CLOSED, ed e' la riga da non
-    # ammorbidire: quel fail-closed difende la porta da una LEVA
-    # scritta storta, mai da una ricevuta. Chi ha pagato ha pagato.
-    prova("chi ha pagato entra anche col gradino scritto storto", True,
-          porta(0, 0, "livello-che-non-esiste", 1_700_000_000))
+    prova("chi non ha pagato resta fuori, qualunque sia il livello",
+          (False, False), (porta(0), porta(0)))
+    prova("chi ha pagato entra", True, porta(1_700_000_000))
     # La data e' una DATA e non un flag: un timestamp qualunque apre,
-    # e il giorno dell'abbonamento la scadenza si aggiunge qui.
-    prova("una data vecchia apre come una nuova", True,
-          porta(0, 0, "avviato", 1))
-    # I due argomenti in coda sono OBBLIGATORI (la lezione di
-    # `atteso_sats`): chi li dimentica lo sente da Python, invece di
-    # chiudere in silenzio la porta a chi ha pagato.
+    # e il giorno dell'abbonamento la scadenza si aggiunge qui senza
+    # migrare una riga (decisione di Andrea, invariata).
+    prova("una data vecchia apre come una nuova", True, porta(1))
+    # L'ARGOMENTO E' OBBLIGATORIO (la lezione di `atteso_sats`): chi lo
+    # dimentica lo sente da Python, invece di chiudere in silenzio la
+    # porta a chi ha pagato.
     try:
-        porta(0, 0, "avviato")
+        porta()
         _obbl = False
     except TypeError:
         _obbl = True
     prova("lo sblocco e' un argomento obbligatorio, senza default",
           True, _obbl)
+    # `_gradino_livello` non e' piu' di casa del banner (serve ancora
+    # ai titoli, in `titoli_disponibili`), ma il suo fail-closed resta
+    # una proprieta' da sorvegliare: un gradino sconosciuto deve
+    # valere PIU' dell'ultimo, mai chiudere a caso su uno intermedio.
+    prova("il gradino ignoto vale piu' dell'ultimo (fail-closed)", True,
+          grad("boh") > grad("maestro"))
 
     # ---- 3-bis. IL PREZZO E IL SUO BARRATO (ago 2026) -------------
     # Il pieno e' un ORNAMENTO e non entra mai nel conto: qui si
@@ -51678,52 +51733,66 @@ def prove_banner_negozio():
               (pz(a, d) for a in (0, 1, 3, 20_000)
                for d in (0, 1, 2, 7, 25_000, 40_000, 2_000_000))))
 
-    # LA PORTA HA DUE CHIAVI, E IL RIFIUTO LE DICE TUTT'E DUE (ago
-    # 2026, dal campo): il messaggio nominava il solo affare concluso,
-    # e chi ne aveva tredici con 104 XP andava a cercare dalla parte
-    # sbagliata. Qui si prova il caso VERO che ha aperto il cantiere.
-    exec(pezzo("banner_cosa_manca"), amb2)
-    exec(pezzo("msg_banner_chiuso"), amb2)
-    manca, msg = amb2["banner_cosa_manca"], amb2["msg_banner_chiuso"]
-    m = manca(104, 13, "avviato")
-    prova("104 XP su 150: ne mancano 46", (46, 104, 150),
-          (m["xp"], m["xp_ora"], m["xp_serve"]))
-    prova("...e con tredici affari non ne manca nessuno", 0, m["affari"])
-    testo = msg(104, 13, "avviato")
-    prova("il rifiuto dice gli XP che ha e quelli che servono", True,
-          "104 XP su 150" in testo)
-    prova("...e NON chiede un affare che ha gia'", True,
-          "affar" not in testo)
-    prova("...e nomina il livello che apre la porta", True,
-          "Bottega avviata" in testo)
-    # Il rovescio: chi ha gli XP e nessun affare si sente dire QUELLO,
-    # e al singolare/plurale giusto.
-    zero = msg(900, 0, "avviato")
-    prova("chi non ha concluso niente se lo sente dire", True,
-          "0 affari conclusi su 1" in zero)
-    prova("...senza che gli si chiedano XP che ha", True, "XP" not in zero)
-    prova("un affare solo si scrive al singolare", True,
-          "1 affare concluso su 5" in msg(600, 1, "pratico"))
-    # Mancano tutt'e due: si dicono INSIEME, una volta sola ciascuna.
-    due = msg(0, 0, "avviato")
-    prova("mancano tutt'e due: si dicono insieme", True,
-          "0 XP su 150 e 0 affari conclusi su 1" in due)
-    # FAIL-CLOSED anche nella prosa: sul gradino ignoto la porta resta
-    # chiusa (sopra) e qui non si inventa nessun numero.
-    prova("il gradino ignoto non inventa numeri", True,
-          "su" not in msg(50, 2, "boh").split("«")[1])
-    prova("...e il giudice non manca di niente", (0, 0),
-          (manca(50, 2, "boh")["xp"], manca(50, 2, "boh")["affari"]))
-    # IL COMPOSER E' UNO: la frase vive dentro `msg_banner_chiuso` e in
-    # nessun altro posto — ne' nel 400, ne' nel client, che la riceve
-    # gia' scritta. Due prose sulla stessa porta divergono al primo
-    # ritocco (il patto di `messaggio_zona_storta`).
-    prova("la frase si scrive in un posto solo", 2,
-          src.count("Il banner si sblocca"))
-    prova("...dentro il composer", 2,
-          pezzo("msg_banner_chiuso").count("Il banner si sblocca"))
-    prova("il 400 e il cassetto chiamano lo stesso composer", 2,
-          src.count("msg_banner_chiuso(") - 1)
+    # ---- 3-ter. LO SCONTO FEDELTA', E IL PREZZO PER UTENTE (set 2026) --
+    # Ha preso il posto della porta gratis: il livello non apre piu'
+    # niente da solo, SCONTA il prezzo di chi ha gia' scelto di
+    # pagare — mai fino al 100%, che sarebbe la stessa porta gratis
+    # vestita diversa.
+    amb2["BANNER_SCONTI_LIVELLO"] = {"nuovo": 0, "avviato": 10,
+                                     "pratico": 20, "esperto": 35,
+                                     "maestro": 999}
+    exec(pezzo("_sconto_banner_livello"), amb2)
+    sconto = amb2["_sconto_banner_livello"]
+    prova("nuovo arrivato: nessuno sconto", 0, sconto(0, 0))
+    prova("avviato: 10%", 10, sconto(150, 1))
+    prova("pratico: 20%", 20, sconto(600, 5))
+    prova("esperto: 35%", 35, sconto(2500, 15))
+    # IL CLAMP A 99, e non e' pignoleria: e' la riga che rende vera la
+    # decisione «mai gratis» anche se in config qualcuno scrivesse un
+    # numero piu' alto per sbaglio.
+    prova("maestro: un 999% scritto storto si ferma a 99", 99,
+          sconto(9000, 40))
+    # FAIL-CLOSED come `_gradino_livello`: un livello senza voce nella
+    # leva vale ZERO sconto, mai un regalo per una leva incompleta.
+    amb2["BANNER_SCONTI_LIVELLO"] = {"nuovo": 0}
+    prova("un livello senza voce nella leva non sconta niente", 0,
+          sconto(9000, 40))
+
+    # `_prezzo_banner_utente`: il confronto per il barrato e' contro
+    # il PIU' ALTO fra il pieno vero e il listino stesso — mai contro
+    # il solo pieno, o senza un'offerta di lancio attiva lo sconto
+    # fedelta' non barrerebbe NIENTE.
+    amb2["BANNER_SCONTI_LIVELLO"] = {"nuovo": 0, "avviato": 10,
+                                     "pratico": 20, "esperto": 35,
+                                     "maestro": 50}
+    amb2["BANNER_PREZZO_SATS"] = 20_000
+    amb2["BANNER_PREZZO_PIENO_SATS"] = 40_000
+    exec(pezzo("_prezzo_banner_utente"), amb2)
+    pzu = amb2["_prezzo_banner_utente"]
+    prova("un 'nuovo' vede la sola offerta di lancio", (20_000, 40_000, 50),
+          pzu(0, 0))
+    prova("un 'pratico' vede lancio e fedelta' SOMMATI",
+          (16_000, 40_000, 60), pzu(600, 5))
+    prova("un 'maestro' arriva al massimo (mai il 100%)",
+          (10_000, 40_000, 75), pzu(9000, 40))
+    # SENZA offerta di lancio (pieno spento), lo sconto di livello
+    # barra DA SOLO contro il listino: e' la riga che rende vero «si
+    # paga sempre, ma il livello sconta comunque qualcosa».
+    amb2["BANNER_PREZZO_PIENO_SATS"] = 0
+    prova("senza offerta di lancio, la fedelta' barra comunque",
+          (16_000, 20_000, 20), pzu(600, 5))
+    prova("...e un 'nuovo' senza sconti non vede nessun barrato",
+          (20_000, 0, 0), pzu(0, 0))
+    # UN LISTINO PICCOLO scontato al massimo non deve mai arrivare a
+    # zero: la porta costa sempre almeno un sat.
+    amb2["BANNER_PREZZO_SATS"] = 3
+    prova("un listino piccolo scontato al massimo non scende sotto 1",
+          True, pzu(9000, 40)[0] >= 1)
+    # A LISTINO SPENTO il banner e' spento del tutto, per chiunque:
+    # nessun livello puo' regalarlo se `BANNER_PREZZO_SATS` e' 0.
+    amb2["BANNER_PREZZO_SATS"] = 0
+    prova("a listino spento, zero per tutti (anche per un maestro)",
+          (0, 0, 0), pzu(9000, 40))
 
     # ---- 4. QUANDO SI VEDE ----------------------------------------
     amb3 = {"BANNER_NEGOZIO_ATTIVO": True, "dominio_link": dom}
@@ -51964,19 +52033,20 @@ def prove_banner_negozio():
     prova("il cassetto sparisce in DEMO e in vetrina", True,
           "DEMO || VETRINA" in rb)
     prova("...e a leva spenta", True, "bannerLeve.attivo" in rb)
-    # LA PORTA CHIUSA SI DICE: chi non ha il livello deve sapere che il
-    # banner esiste e come si apre, o non scoprirebbe mai la funzione.
+    # LA PORTA CHIUSA SI DICE: chi non ha ancora pagato deve sapere che
+    # il banner esiste e come si apre, o non scoprirebbe mai la
+    # funzione.
     prova("la porta chiusa si racconta, non si nasconde", True,
-          "porta_aperta" in rb and "bannerLeve.motivo" in rb)
-    # HA CAMBIATO LATO (ago 2026): chiedeva che la frase «si sblocca»
-    # fosse SCRITTA QUI, e quella frase nominava una sola delle due
-    # chiavi della porta. Adesso il perche' arriva dal server, che ha i
-    # numeri: di qua non si ricompone e non si ricalcola quale meta'
-    # manca — e chiave assente vuol dire un'assenza, mai una bugia.
-    prova("il perche' non si riscrive nel client", True,
-          "si sblocca" not in rb and "affare concluso" not in rb)
-    prova("...e un server di ieri non lascia una frase falsa", True,
-          "bannerLeve.motivo ?" in rb)
+          "porta_aperta" in rb)
+    # NIENTE PIU' UN «PERCHE'» DA RICOMPORRE (set 2026): la porta non
+    # ha piu' una soglia da spiegare — si paga sempre — quindi non c'e'
+    # piu' un `bannerLeve.motivo` da leggere ne' una frase sul livello
+    # da scrivere qui: il prezzo (gia' scontato) e' l'unica cosa che
+    # conta, e quello lo dice il barrato piu' sotto.
+    prova("nessun livello si nomina nel client", True,
+          "si sblocca" not in rb and "affare concluso" not in rb
+          and "bannerLeve.livello" not in rb
+          and "bannerLeve.motivo" not in rb)
     # LA PORTA CHIUSA NON E' UNA TRUST-NOTE (ago 2026, decisione di
     # Andrea): il verde e' il registro della fiducia — l'escrow — e
     # qui si dice soltanto come si apre una porta. Prosa normale,
@@ -52023,11 +52093,11 @@ def prove_banner_negozio():
     prova("...e il chip della percentuale con lui", True,
           "pz-chip" in _btn)
     # LA PAROLA RESTA NELLA PROSA, che il chip non la dice: «−50%»
-    # e' un fatto, «offerta di lancio» e' il PERCHE' — e senza si
-    # perderebbe la risposta a «e quando finisce?».
+    # e' un fatto, «scontato per te» e' il PERCHE' — senza sapere che
+    # c'e' uno sconto, il barrato si leggerebbe come un refuso.
     prova("...e la parola resta sopra, fuori dal bottone", True,
-          "offerta di lancio" in chiusa
-          and "offerta di lancio" not in _btn)
+          "scontato per te" in chiusa
+          and "scontato per te" not in _btn)
     # LE DUE META' VANNO A CAPO INTERE: sono due span e non due
     # parole, quindi il verbo sopra e il confronto sotto — mai un
     # a-capo dove capita. MISURATO a 320px, dove il cassetto
@@ -52169,12 +52239,15 @@ def prove_banner_negozio():
     prova("...e si scrive anche lui prima di mostraQr", True,
           _sb.index("sbloccoPct =") < _sb.index("mostraQr("))
     # LA PAROLA sta nei tre posti e in nessun altro: e' l'unica cosa
-    # che dice che il prezzo e' temporaneo, e non promette una data.
+    # che dice che il barrato non e' un refuso — DA SET 2026 non
+    # promette piu' che sia un'offerta A TEMPO (poteva venire dal solo
+    # sconto di livello, che non scade), quindi la parola e' diventata
+    # «scontato per te» e non piu' «offerta di lancio».
     _conf = pezzo_js(mini, "function chiediSblocco(){", "\n}")
     for _dove, _p in (("il cassetto", chiusa), ("il foglio", _sb),
                       ("la conferma", _conf)):
-        prova(f"«offerta di lancio» in {_dove}", True,
-              "offerta di lancio" in _p.lower())
+        prova(f"«scontato per te» in {_dove}", True,
+              "scontato per te" in _p.lower())
     # IL BARRATO DELLA CONFERMA VA NELLA TESTATA: `confCorpo` si
     # scrive col textContent — il patto dei testi NUDI — quindi un
     # <s> nel corpo uscirebbe a lettere.
@@ -52273,10 +52346,11 @@ def prove_banner_negozio():
         importo_sats INT, payment_hash TEXT DEFAULT '',
         invoice TEXT DEFAULT '', stato TEXT DEFAULT 'creato',
         creato INT, pagato_il INT DEFAULT 0, aggiornato INT);
-      INSERT INTO utenti(tg_id,negozio,xp,vendite_ok,acquisti_ok)
-        VALUES(1,'ab12',0,0,0),      -- nudo: la porta e' chiusa
-             (2,'cd34',5000,9,9),   -- ce l'ha col LIVELLO
-             (3,'ef56',0,0,0);      -- paghera'
+      INSERT INTO utenti(tg_id,negozio,xp,vendite_ok,acquisti_ok,
+                         banner_sbloccato_il)
+        VALUES(1,'ab12',0,0,0,1700000000),  -- ha gia' pagato
+             (2,'cd34',5000,9,9,0),        -- 'esperto': paghera' scontato
+             (3,'ef56',0,0,0,0);           -- 'nuovo': paghera' il pieno
     """)
     con2.commit()
 
@@ -52314,7 +52388,10 @@ def prove_banner_negozio():
             "Cookie": lambda d="": d,
             "crea_invoice_escrow": _finta_invoice,
             "INVOICE_EXPIRY": 900, "BANNER_NEGOZIO_ATTIVO": True,
-            "BANNER_PREZZO_SATS": 10_000, "BANNER_LIVELLO": "avviato",
+            "BANNER_PREZZO_SATS": 10_000, "BANNER_PREZZO_PIENO_SATS": 0,
+            "BANNER_SCONTI_LIVELLO": {"nuovo": 0, "avviato": 10,
+                                      "pratico": 20, "esperto": 35,
+                                      "maestro": 50},
             "MSG_BANNER_SPENTO": "spento",
             "MSG_SBLOCCO_SPENTO": "sblocco spento",
             "MSG_SBLOCCO_GIA": "La porta è già aperta",
@@ -52326,6 +52403,9 @@ def prove_banner_negozio():
     exec(pezzo("livello_utente"), amb5)
     exec(pezzo("_gradino_livello"), amb5)
     exec(pezzo("banner_porta_aperta"), amb5)
+    exec(pezzo("_sconto_banner_livello"), amb5)
+    exec(pezzo("_prezzo_banner"), amb5)
+    exec(pezzo("_prezzo_banner_utente"), amb5)
     exec("async " + pezzo("_incassa_sblocco"), amb5)
     exec("async " + pezzo("sblocca_banner"), amb5)
     sblocca = amb5["sblocca_banner"]
@@ -52334,24 +52414,40 @@ def prove_banner_negozio():
     def chi(n):
         amb5["verifica_utente"] = lambda h, s: {"id": n}
 
-    # CHI HA GIA' LA PORTA NON PUO' PAGARE: e' la guardia che
+    # CHI HA GIA' PAGATO NON PUO' PAGARE DUE VOLTE: e' la guardia che
     # protegge l'utente da noi — nessuno deve comprare cio' che ha.
-    chi(2)
+    # DA SET 2026 non c'e' piu' una scorciatoia col livello: questo
+    # utente ha la porta aperta perche' `banner_sbloccato_il` e'
+    # gia' scritto, punto.
+    chi(1)
     try:
         _aio.run(sblocca(None))
         _gia = False
     except Exception as e:
         _gia = "già aperta" in str(e)
-    prova("chi ha la porta col livello non puo' pagare", True, _gia)
+    prova("chi ha gia' pagato non puo' pagare due volte", True, _gia)
     prova("...e nessuna fattura e' stata coniata", 0, len(fatture))
 
-    # il giro vero: si conia UNA fattura e nasce UNA riga
+    # IL LIVELLO SCONTA, NON APRE: un 'esperto' (5000 XP, 18 affari)
+    # non ha la porta gratis — deve pagare come tutti — ma la sua
+    # fattura e' gia' scontata del 35% (la leva di amb5).
+    chi(2)
+    r0 = _aio.run(sblocca(None))
+    prova("l'esperto paga, ma scontato", (1, 6_500),
+          (len(fatture), fatture[0][0]))
+    prova("...ed e' lo stesso importo nella riga e nella risposta",
+          (6_500, 6_500), (r0["importo_sats"],
+          con2.execute("SELECT importo_sats FROM pagamenti WHERE id=?",
+                      (r0["pagamento_id"],)).fetchone()[0]))
+
+    # IL GIRO VERO: un 'nuovo' (0 XP, 0 affari) paga il pieno — nessuno
+    # sconto per chi non ha ancora livello.
     chi(3)
     r1 = _aio.run(sblocca(None))
-    prova("la fattura si conia per il prezzo della leva", (1, 10_000),
-          (len(fatture), fatture[0][0]))
+    prova("il nuovo arrivato paga il listino intero", (2, 10_000),
+          (len(fatture), fatture[1][0]))
     prova("...col memo che si riconosce nel registro LNbits", True,
-          "sblocco banner" in fatture[0][1])
+          "sblocco banner" in fatture[1][1])
     prova("...e la riga nasce 'creato'", ("creato", 10_000),
           tuple(con2.execute("SELECT stato, importo_sats FROM pagamenti "
                              "WHERE id=?", (r1["pagamento_id"],)).fetchone()))
@@ -52363,9 +52459,9 @@ def prove_banner_negozio():
     prova("il secondo tocco ripresenta la stessa fattura",
           (r1["pagamento_id"], True),
           (r2["pagamento_id"], bool(r2.get("ripresa"))))
-    prova("...e non ne conia una seconda", 1, len(fatture))
-    prova("...e la riga resta UNA", 1,
-          con2.execute("SELECT COUNT(*) FROM pagamenti").fetchone()[0])
+    prova("...e non ne conia una terza", 2, len(fatture))
+    prova("...e le righe restano DUE (una per chi ha gia' pagato sopra)",
+          2, con2.execute("SELECT COUNT(*) FROM pagamenti").fetchone()[0])
 
     # L'INCASSO: la porta si apre NELLA STESSA transazione, ed e' cio'
     # che rende impossibile lo stato «ha pagato e la porta e' chiusa»
@@ -52395,7 +52491,7 @@ def prove_banner_negozio():
     except Exception as e:
         _due = "già aperta" in str(e)
     prova("chi ha pagato non puo' pagare due volte", True, _due)
-    prova("...e la fattura resta una sola", 1, len(fatture))
+    prova("...e non se ne conia una terza", 2, len(fatture))
     con2.close()
 
 

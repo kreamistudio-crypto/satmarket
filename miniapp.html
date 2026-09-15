@@ -24176,8 +24176,8 @@ function fraseXp(r){
    aveva gia', ed e' alla lettera il difetto che il rifiuto del banner
    ha gia' pagato una volta («il messaggio nominava il solo affare
    concluso... e andava a cercare dalla parte sbagliata»).
-   2) IL SINGOLARE: «1 affari conclusi». La stessa distinzione il
-   server la fa gia' in `msg_banner_chiuso`; qui mancava.
+   2) IL SINGOLARE: «1 affari conclusi». La stessa distinzione va
+   fatta anche qui, o si legge storto.
    3) IL VERBO, che segue quel che resta: «manca 1 affare concluso»,
    «mancano 120 XP», e il PLURALE davanti a due pezzi qualunque siano
    i numeri — due soggetti uniti da «e» vogliono il verbo plurale.
@@ -26534,17 +26534,12 @@ function renderBanner(){
   if (sez) sez.style.display = '';
   const b = myBanner || {};
   el('bannerConta').textContent = BANNER_STATI[b.stato] || '';
-  /* LA PORTA CHIUSA SI DICE, non si nasconde: chi non ha ancora il
-     livello deve sapere che il banner esiste e come si apre, o non
-     scoprirebbe mai la funzione. */
+  /* LA PORTA CHIUSA SI DICE, non si nasconde: chi non ha ancora
+     pagato deve sapere che il banner esiste e come si apre, o non
+     scoprirebbe mai la funzione. NIENTE PIU' «MOTIVO» (set 2026): il
+     banner si paga sempre, non c'e' piu' un livello da spiegare — e
+     se il livello sconta il prezzo, lo dice gia' il barrato qui sotto. */
   if (!bannerLeve.porta_aperta){
-    /* IL PERCHE' ARRIVA GIA' SCRITTO dal server (`motivo`), ed e' lo
-       stesso testo del 400: la porta ha DUE chiavi — gli XP e gli
-       affari conclusi — e quale delle due manca, col numero, lo dice
-       chi ha i dati in mano. Chiave assente (un server di ieri) =
-       resta la sola spiegazione di cosa sia il banner: un'assenza,
-       mai una bugia. */
-    const perche = bannerLeve.motivo ? esc(bannerLeve.motivo) + ' ' : '';
     /* SCRITTA NORMALE, senza riquadro (ago 2026, decisione di Andrea):
        il riquadro verde e' il registro della FIDUCIA — il deposito di
        garanzia — e qui non si rassicura nessuno: si dice come si apre
@@ -26552,12 +26547,12 @@ function renderBanner(){
        poche righe piu' giu' a porta aperta: un cassetto, una voce.
        (Il nome di quella classe non si scrive nemmeno qui: la
        sentinella legge anche i commenti.) */
-    /* LA SECONDA STRADA (ago 2026): chi ha fretta anticipa la porta
-       pagando. Il bottone nasce solo se il server manda un prezzo — a
-       leva spenta `prezzo_sats` e' 0 e qui non compare niente, che un
-       bottone verso un muro e' peggio di nessun bottone. La cifra
-       arriva da la' e non si scrive mai a mano (il patto di
-       `max_barattolo`). */
+    /* SI PAGA SEMPRE (ago 2026, poi set 2026: prima anche il livello
+       apriva la porta da solo). Il bottone nasce solo se il server
+       manda un prezzo — a leva spenta `prezzo_sats` e' 0 e qui non
+       compare niente, che un bottone verso un muro e' peggio di
+       nessun bottone. La cifra arriva da la' e non si scrive mai a
+       mano (il patto di `max_barattolo`). */
     const prezzo = (bannerLeve.prezzo_sats || 0);
     /* IL LISTINO STA NEL BOTTONE (ago 2026, decisione di Andrea,
        e ROVESCIA la riga di ieri: «sta nella prosa, che dentro un
@@ -26567,7 +26562,11 @@ function renderBanner(){
        («il bottone porta UNA cifra sola») cade perche' e' proprio
        il CONFRONTO la cosa da mettere sotto il dito: nella prosa
        si vedeva troppo piccolo. Qui sopra resta la PAROLA, che il
-       chip non dice; i numeri stanno tutti in un posto solo. */
+       chip non dice; i numeri stanno tutti in un posto solo.
+       DA SET 2026 il barrato puo' venire dall'offerta di lancio, dallo
+       sconto di livello, o da tutt'e due insieme — il server li somma
+       gia' in un solo confronto (`_prezzo_banner_utente`), qui si
+       legge un numero solo e non si distinguono le due ragioni. */
     const pieno = (bannerLeve.prezzo_pieno_sats || 0) > prezzo
       ? bannerLeve.prezzo_pieno_sats : 0;
     /* LA PERCENTUALE ARRIVA GIUDICATA dal server e non si
@@ -26577,12 +26576,12 @@ function renderBanner(){
     const pct = pieno ? (bannerLeve.prezzo_percento || 0) : 0;
     box.innerHTML = `
       <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
-        🔒 <b style="color:var(--ink)">${perche}</b>È l'insegna che puoi
+        🔒 È l'insegna che puoi
         appendere sopra il tuo catalogo — una foto e il link al tuo
         sito.</div>`
       + (prezzo && pieno ? `
       <div style="font-size:12.5px;color:var(--muted);font-weight:600;margin-top:10px">
-        Adesso è in <b style="color:var(--ink)">offerta di lancio</b>.</div>` : '')
+        Il prezzo qui sotto è già <b style="color:var(--ink)">scontato per te</b>.</div>` : '')
       + (prezzo ? `
       <button class="btn orange sblocca-cta" style="margin-top:12px"
               onclick="chiediSblocco()"><span>⚡ Sbloccalo subito</span>
@@ -26775,7 +26774,7 @@ function chiediSblocco(){
   chiediConferma({
     titolo: 'Sbloccare il banner?',
     testata: pieno
-      ? `<s class="acq-barrato">${fmt(pieno)} <span class="unit">sats</span></s><b>offerta di lancio</b>` : '',
+      ? `<s class="acq-barrato">${fmt(pieno)} <span class="unit">sats</span></s><b>scontato per te</b>` : '',
     corpo: `Paghi ${fmt(prezzo)} sats e la porta si apre subito. `
          + 'Si paga una volta sola, non è un abbonamento.\n\n'
          + 'Quello che compri è la porta, non il banner: l\'insegna '
@@ -26829,7 +26828,7 @@ async function sbloccaBanner(){
   nota.style.display = '';
   /* la parola sta nella nota e non nel titolo: li' il barrato dice
      gia' il fatto, e la riga sotto dice che e' a tempo */
-  const _lancio = sbloccoPieno ? 'Offerta di lancio. ' : '';
+  const _lancio = sbloccoPieno ? 'Scontato per te. ' : '';
   nota.textContent = _lancio + (d.ripresa
     ? 'È la fattura che avevi già chiesto: vale ancora.'
     : 'La fattura vale 15 minuti.');
@@ -26860,7 +26859,6 @@ async function verificaSblocco(pid){
       if (bannerLeve){
         bannerLeve.porta_aperta = true;
         bannerLeve.sbloccato_il = Math.floor(Date.now() / 1000);
-        bannerLeve.motivo = '';
       }
       renderBanner();
       apriCassettoProfilo('accBanner');

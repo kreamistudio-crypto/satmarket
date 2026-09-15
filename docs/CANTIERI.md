@@ -14439,3 +14439,78 @@ deploy: nessuna colonna nuova, nessuna migrazione. La leva
 `LINK_DESCRIZIONE_AMMESSI` e' dichiarata in `config_esempio.py` e non
 serve toccarla — il default nel codice e' quello giusto; **svuotarla
 spegne tutto**, ed e' l'interruttore d'emergenza.
+
+## Il banner si paga sempre: il livello sconta, non regala più la porta (15 set 2026)
+
+**IL FATTO CHE HA APERTO IL CANTIERE**: un negozio vero — «Un tempo per
+te» — aveva il banner acceso senza aver mai pagato un sat. Non era un
+bug: `banner_porta_aperta` (ago 2026, tappa 2) aveva **due porte per
+la stessa stanza**, il livello (gratis, raggiunto commerciando) o lo
+sblocco pagato (per chi aveva fretta), e bastava una delle due.
+Rivedendola dal vivo, Andrea ha deciso che una porta regalata è
+proprio quello che non doveva succedere: **il banner si paga sempre**,
+e il livello — che restava comunque un modo onesto di premiare chi usa
+il mercatino — deve **scontare** il prezzo, mai azzerarlo.
+
+**LA CURA**: `banner_porta_aperta` perde tre argomenti su quattro — non
+chiede più `xp`, `affari`, `livello_minimo`, solo `sbloccato_il`, ed è
+`bool(sbloccato_il)` e basta. Al suo posto nascono due funzioni pure:
+`_sconto_banner_livello(xp, affari)` legge la nuova leva
+`BANNER_SCONTI_LIVELLO` (un dizionario livello→percento, di serie
+0/10/20/35/50 su nuovo/avviato/pratico/esperto/maestro) e **chiude a
+99**, mai a 100 — fail-closed come `_gradino_livello`, che resta in
+vita per i titoli ma non serve più qui. `_prezzo_banner_utente(xp,
+affari)` applica lo sconto a `BANNER_PREZZO_SATS` e chiama
+`_prezzo_banner` (invariata) per il barrato.
+
+**LA TRAPPOLA DEL BARRATO, trovata scrivendo le prove e non
+rileggendo**: la prima stesura confrontava il prezzo scontato sempre
+contro `BANNER_PREZZO_PIENO_SATS` — corretto quando l'offerta di
+lancio è viva, ma **senza promozione attiva (pieno spento o non più
+alto del listino) uno sconto di sola fedeltà non barrava NIENTE**: un
+«pratico» avrebbe pagato meno senza vederselo dire da nessuna parte.
+La cura è confrontare contro il **più alto fra il pieno vero e il
+listino stesso** (`pieno = max(listino, BANNER_PREZZO_PIENO_SATS)`):
+così un'offerta di lancio e uno sconto di livello **si sommano** in un
+solo confronto quando ci sono entrambi, e la fedeltà barra da sola
+quando la lancio non c'è.
+
+**IL GRANDFATHERING**: chi aveva già la porta gratis col vecchio
+livello non se la vede togliere — decisione di Andrea, «vale solo da
+ora in poi». `init_db` porta una migrazione additiva e idempotente che
+riconosce la combinazione impossibile sotto la regola nuova (un
+banner mai stato `''` con `banner_sbloccato_il` ancora a zero: chi ha
+invece pagato ce l'ha già scritto da `_incassa_sblocco`) e lo marca
+come sbloccato alla data della sua prima richiesta
+(`banner_chiesto_il`), o ad adesso se quella data non c'è. Gira a ogni
+avvio, senza far niente dal secondo giro in poi.
+
+**IL CLIENT**: `renderBanner`, `chiediSblocco` e `sbloccaBanner` non
+nominano più un livello che apre la porta (`bannerLeve.motivo`,
+`bannerLeve.livello` sono spariti) — non c'è più niente da spiegare
+quando la porta è chiusa, solo un prezzo da pagare che arriva già
+scontato. La parola sopra il barrato non è più «offerta di lancio»
+(sarebbe stata falsa per uno sconto di sola fedeltà, che non scade):
+è diventata **«scontato per te»**, identica nei tre posti dove compare
+— cassetto, foglio di pagamento, conferma prima di pagare — come
+prima.
+
+**LE PROVE**: `prove_banner_negozio` è stata riscritta a fondo. La
+porta ora si prova con una chiave sola; `_sconto_banner_livello` e
+`_prezzo_banner_utente` hanno le loro prove nuove (compreso il clamp a
+99 e il fail-closed su un livello senza voce nella leva); il giro
+funzionale su `sblocca_banner` ha tre utenti — uno che ha già pagato
+(non può ripagare), un «esperto» che paga scontato, un «nuovo» che
+paga il pieno — invece dei vecchi due; la migrazione del
+grandfathering ha una prova sua, girata per davvero su un database in
+memoria con quattro casi (da migrare, già pagato, mai chiesto, senza
+data) e verificata idempotente. Il censimento delle leve (`prove_leve`)
+aveva bisogno di due stub nuovi — `LIVELLI` (che `_leve_stato` ora
+itera) e `BANNER_SCONTI_LIVELLO` (un dizionario, non un `7` implicito)
+— la stessa trappola già pagata dalla fee dinamica. **9729 verdi.**
+
+**COSA RESTA**: la scala degli sconti è una leva, non un'idea fissa —
+si guarda e si cambia da `config.py` senza toccare il codice. Nessun
+rimborso cambia: chi paga il banner e non viene approvato resta con lo
+stesso percorso di sempre (`_rimborsa_sblocco`, manuale, mai
+automatico).

@@ -259,17 +259,20 @@ FERIE_PREAVVISO_ORE = 24     # «domani riapri» (0 = nessun promemoria)
 # l'AI di casa legge testo e un banner e' un'immagine, quindi li' non
 # ci sarebbe niente da leggere.
 BANNER_NEGOZIO_ATTIVO = False   # interruttore generale (False = spento)
-# Il gradino che apre la porta: «avviato» = 150 XP e un affare
-# concluso. Con «pratico» (600 XP e 5 affari) oggi non ce l'avrebbe
-# quasi nessuno e la funzione nascerebbe morta.
+# LO SCONTO FEDELTA' PER LIVELLO (set 2026): il banner si paga SEMPRE
+# — non c'e' piu' un livello che lo regala — e il livello sconta
+# soltanto il prezzo qui sotto. MAI il 100%: il codice chiude a 99
+# anche se qui si scrivesse per sbaglio un numero piu' alto.
 # I gradini sono: nuovo · avviato · pratico · esperto · maestro.
-BANNER_LIVELLO = "avviato"
-# Il PREZZO per anticipare la porta senza aspettare il livello (tappa
-# 2): chi ha fretta paga e la apre subito. Si paga UNA VOLTA e vale
-# per sempre. E' il primo incasso che Barattolo fa per se', quindi
-# ogni sblocco lascia una riga nella tabella `pagamenti`: senza,
-# sembrerebbe un orfano al giro di riconciliazione con LNbits.
-# 0 = sblocco a pagamento spento, resta solo la strada del livello.
+# Tutti a zero = lo sconto fedelta' e' spento, si paga sempre lo
+# stesso prezzo — il banner resta comunque a pagamento in ogni caso.
+BANNER_SCONTI_LIVELLO = {"nuovo": 0, "avviato": 10, "pratico": 20,
+                         "esperto": 35, "maestro": 50}
+# Il PREZZO della porta (tappa 2): si paga UNA VOLTA e vale per
+# sempre. E' il primo incasso che Barattolo fa per se', quindi ogni
+# sblocco lascia una riga nella tabella `pagamenti`: senza, sembrerebbe
+# un orfano al giro di riconciliazione con LNbits.
+# 0 = il banner e' spento del tutto: nessuno puo' sbloccare la porta.
 BANNER_PREZZO_SATS = 20_000
 # Il prezzo PIENO, quello BARRATO accanto: dice che i 20.000 qui
 # sopra sono un'offerta di lancio e non il listino. NON ENTRA MAI NEL
