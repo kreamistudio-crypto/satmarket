@@ -181,7 +181,7 @@ restano quelle fatte al 0.18.6): è in BLOCCHI, 144 ≈ 24h — il numero che ha
 giorni fanno 432. Il margine `escrow_deadline_margin_blocks` (24)
 resta com'è, quindi la finestra UTILE è sempre ~4 ore più corta
 dell'orizzonte: mostrod molla la presa PRIMA che LND sia costretto a
-chiudere il canale per salvare l'HTLC. GIRATA A 432 il 6 set 2026, a
+chiudere il canale per salvare l'HTLC. GIRATA A 432 il 6 set 2026 e a 576 il 15 set 2026 (tabacchino, vedi PRODUZIONE), a
 scambi fermi: riavvio pulito («Settings correctly loaded», transport
 nip44). ⚠️ IL RIAVVIO SI FA DAL COMPOSE: `docker compose restart
 mostro` dalla cartella `~/nodo`. «mostro» è il nome del SERVIZIO,
@@ -264,7 +264,7 @@ termometro degli eventi salta di un ordine di grandezza.
 **Q8 — UNA RISPOSTA SOLA PER OGNI RICHIESTA**, ed e' la meta' che rende
 praticabile l'aggancio per chiave: non c'e' nessuna raffica da sceverare.
 I PARAMETRI DEL 38385 VALGONO PIU' DI UNA CONFERMA: `expiration_hours`
-168, `expiration_seconds` 900, `hold_invoice_cltv_delta` 432 — le tre
+168, `expiration_seconds` 900, `hold_invoice_cltv_delta` 576 (432 fino al 15 set 2026) — le tre
 leve girate il 6 set 2026 si leggono **DAL LIBRO PUBBLICO** e non piu'
 dal solo `settings.toml`, cioe' sono verificate dal lato di chi legge e
 non da quello di chi le ha scritte. Piu' `bond_enabled` false (coerente
@@ -332,11 +332,11 @@ dal wizard, presente in una fixture di test, e in nessun altro posto
 — censite tutte e 25 le `.rs` che potrebbero nominarla. Toccarla non
 fa niente, e il suo commento nel template descrive il mestiere di
 `expiration_seconds`.
-• `hold_invoice_cltv_delta` (432) alimenta SOLO il `cltv_expiry` della
+• `hold_invoice_cltv_delta` (576 dal 15 set 2026, prima 432) alimenta SOLO il `cltv_expiry` della
 hold invoice (`create_hold_invoice` in `src/lightning/mod.rs`, che
 l'`expiry` della fattura non lo tocca proprio): è quanto l'HTLC resta
 appeso DOPO il pagamento, e la finestra utile la dà
-`escrow_guard_window_secs` — `(432−24)×600 = 68 ore`.
+`escrow_guard_window_secs` — `(576−24)×600 = 92 ore` (68 a 432); il client la legge dal 38385 (`finestraGaranziaP2P`).
 • LA VITA NEL LIBRO È UN'ALTRA LEVA, `expiration_hours`:
 `get_expiration_date` in `src/util.rs` scrive `orders.expires_at` a
 `now + expiration_hours` quando il client non ne manda una sua, e la
@@ -384,7 +384,7 @@ toccato una hold invoice» — e con lei il dubbio sul macaroon ristretto.
 distinzione da non perdere: il cronometro di `expiration_seconds` è
 partito davvero (`taken_at` scritto) e si è chiuso col GESTO, mai
 scadendo — quindi restano NON provati la SCADENZA di quella finestra,
-la riconsegna al libro di `job_cancel_orders` e i 432 blocchi del
+la riconsegna al libro di `job_cancel_orders` e i 576 blocchi del
 `cltv_delta`, che l'HTLC non è mai andato vicino a spirare. Si provano
 solo lasciando scadere un ordine APPOSTA, e si agganciano alla tappa 8
 del cantiere client P2P.
