@@ -23913,16 +23913,22 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (i due perimetri con un censimento delle `fetch`), accanto al
   canale. Il verbale: CANTIERI, «Contanti al tabacchino».
   IL VESTITO BARATTOZON (16 set 2026, decisione di Andrea): nella UI il
-  tabacchino si presenta col marchio Barattozon — grande (30px) al
-  posto del testo nella scatola 💳 della card del libro, piccolo (14px)
-  nella pillola del filtro e accanto alla voce nel foglio «Pubblica» —
+  tabacchino si presenta col marchio Barattozon — grande (40px) al
+  posto del testo nella scatola dei metodi della card del libro, che lì
+  diventa un'INSEGNA navy piena (#131A26, quello della testata di
+  Amazon) e perde il 💳, perché un marchio si intesta da sé; piccolo
+  (14px) nella pillola del filtro e accanto alla voce nel foglio
+  «Pubblica» —
   e la card del libro veste un gradiente ambra/arancio scuro. IL TAG
   `pm` NON CAMBIA: nel 38383 viaggia sempre «Contanti al tabacchino»,
   e i giudici (`tabacchinoP2P`, le forme di recapito, il filtro)
   cercano la stringa. Il vestito sta in UN catalogo, `P2P_VESTE_METODI`
-  (nome, logo, classe della card), letto da `marchioMetodoP2P` e
-  `classeVesteP2P`: i tre posti non sanno nulla del tabacchino, e una
-  voce nuova con un marchio suo si aggiunge lì e basta. La card scura
+  (nome, logo, classe della card, `soloMarchio`), letto da
+  `marchioMetodoP2P`, `classeVesteP2P` e `iconaMetodiP2P`: i tre posti
+  non sanno nulla del tabacchino, e una voce nuova con un marchio suo
+  si aggiunge lì e basta — anche l'emoji la decide il catalogo, e con
+  un metodo vestito e uno scritto RESTA, che lì c'è ancora del testo da
+  intestare. La card scura
   RISCRIVE I TOKEN (`--ink`, `--muted`, `--trust`, `--danger`,
   `--sats-text`, `--chip-bg`, `--line`) invece delle regole delle
   figlie: badge, anello, stelline e scatole vestono da soli. Esiste una

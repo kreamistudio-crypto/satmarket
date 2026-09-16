@@ -16099,3 +16099,40 @@ da …» e «🔁 non risponde: …» relay per relay; i 12 secondi di
 per url con l'attesa che cresce, mai esercitata dal vivo; e la
 domanda del punto 4 di Andrea, che si chiude sul nodo e non qui: se
 `settings.toml` di mostrod ascolta già lo specchio.
+
+**IL SECONDO GIRO, GUARDANDO LO SCHERMO (16 set 2026, tre ritocchi di
+Andrea).** 1) **Via il 💳 dove c'è solo il marchio**: quell'emoji
+intesta dei NOMI, e sopra un marchio che si intesta da sé diventava
+una seconda etichetta della stessa cosa. A deciderlo è il CATALOGO
+(`soloMarchio`) via `iconaMetodiP2P`, non un'eccezione scritta nella
+card — e con un metodo vestito e uno scritto l'icona RESTA, perché lì
+dentro un testo da intestare c'è ancora. È il caso a decidere, non la
+regola dell'esclusività, che vive altrove e può cambiare senza passare
+di qua. 2) **La tessera è diventata la SCATOLA**: il chip
+semitrasparente di casa (`--chip-bg`, bianco al 12%) sbiadiva sul
+gradiente, e al suo posto c'è un rettangolo pieno di **navy #131A26**
+— quello della testata di Amazon — con gli angoli delle sorelle e un
+filo chiaro che è un'ombra INTERNA e non un bordo, o la scatola
+crescerebbe di due pixel e le misure qui sotto sarebbero altre. Il
+marchio ci sta dentro NUDO, in tutt'e due le varianti: la sua tessera
+ambra vale solo FUORI dalla card, dove un fondo scuro non glielo dà
+nessuno (pillola del filtro e voce del foglio). 3) **Il marchio da 30 a
+40px**, che è quanto la scatola concede senza toccare nient'altro.
+**E LA VARIANTE CHIARA TIENE LA STESSA INSEGNA**, che è la decisione
+meno ovvia del giro: il navy non cambia col gradiente della card,
+perché due insegne diverse per lo stesso metodo sono due marchi, e
+quello che deve restare riconoscibile è uno.
+
+**I NUMERI DEL SECONDO GIRO (375px, e ricontrollati a 320).** Marchio
+127x40; scatola 313x56 (era 46), navy `rgb(19,26,38)` verificato dal
+computed style; card 162px contro i 140 di una normale, e premio,
+scadenza e anello restano dov'erano (il badge del premio è la riga da
+19px sopra la scatola, l'anello in alto a destra a 22x22). La scatola
+finisce 15px dentro il bordo della card, `scrollWidth` 375 a 375 e 320
+a 320: niente sfonda e la pagina non scorre di lato. A 320 il marchio
+non si stringe — 127 in una scatola da 258 — perché è alto, non largo.
+**Le prove del giro** (`prove_p2p_barattozon`, 30 verdi): il catalogo
+dice `soloMarchio`, la card non scrive più nessun 💳 a mano, l'icona
+sparisce col solo marchio e resta in tutti gli altri quattro casi
+(misto compreso), il navy è pieno e il filo è un'ombra interna, il
+marchio è a 40px e nudo dentro la card in tutt'e due le varianti.
