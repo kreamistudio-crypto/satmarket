@@ -2447,43 +2447,37 @@
      gradiente, il rettangolo pieno che l'aveva sostituito era una
      toppa larga tutta la riga, e quel che ci vuole e' un marchio
      APPOGGIATO sulla card, con i bordi che ci si sciolgono dentro.
-     COM'E' FATTO, e perche' cosi': un `radial-gradient` ellittico
-     `closest-side` sul marchio stesso — navy pieno sotto il logo, poi
-     la dissolvenza, e ZERO esatto sui quattro lati del riquadro.
-     `closest-side` non e' un dettaglio: col `farthest-corner` di
-     default il gradiente arriva a zero negli ANGOLI, quindi a meta'
-     dei lati resterebbe del colore e il riquadro tornerebbe a
-     vedersi — cioe' la toppa, con un contorno piu' morbido. Cosi'
-     invece l'alone finisce PRIMA di toccare il bordo, e un bordo che
-     non tocca niente non si vede.
-     E NIENTE OMBRE NE' SFOCATURE, che sarebbe la strada istintiva
-     (`filter:blur` o un `box-shadow` dello stesso colore): quelle
-     escono dal riquadro, e `.p2p-paga` TAGLIA — e' la riga che le
-     impedisce di allargare la pagina. Un alone tagliato di netto a
-     meta' dissolvenza e' esattamente la toppa che si voleva togliere.
-     Tutto dentro il riquadro, e la regola del taglio resta dov'e'.
-     E' CORTO, non largo la riga: il marchio piu' il respiro che serve
-     alla dissolvenza (191x68), centrato — col tabacchino esclusivo il
-     metodo e' uno solo, e una fascia lunga 313 sarebbe vuota per due
-     terzi. Centrato e non a sinistra perche' un alone non ha un bordo
-     con cui allinearsi: appoggiato a sinistra sembrerebbe scivolato,
-     e il suo centro e' l'unico punto che si veda davvero.
+     COM'E' FATTO: un rettangolo arrotondato di navy pieno, corto
+     quanto il marchio piu' un respiro (159x52), con attorno un
+     BAGLIORE dello stesso colore — un `box-shadow` senza scostamento,
+     sfocato e allargato — che lo scioglie nel gradiente. Scelto da
+     Andrea guardando cinque rese una sotto l'altra, contro l'alone
+     ellittico che c'era qui prima (vedi CANTIERI, «La scelta
+     rovesciata»): il bordo del rettangolo resta leggibile per un
+     soffio, ed e' quello che gli da' l'aria di un'insegna appoggiata.
+     ⚠️ E IL BAGLIORE STA DENTRO IL TAGLIO, che e' la riga da non
+     ammorbidire: `.p2p-paga` TAGLIA quel che esce, ed e' cosi' che un
+     elenco di metodi lungo — testo di SCONOSCIUTI — non allarga la
+     pagina. Il bagliore e' inchiostro che esce dal riquadro del
+     marchio, quindi o gli si fa posto DENTRO la riga o lo si vede
+     segato di netto, che e' peggio della toppa: un lato dritto in
+     mezzo alla sfumatura. Il posto glielo fa il respiro verticale
+     della scatola, 19px, contro i 18 che il bagliore arriva a
+     toccare (9 di allargamento piu' meta' dei 18 di sfocatura) — e
+     una prova rifa' questo conto a ogni giro, perche' chi tocca una
+     delle due misure deve sapere dell'altra.
+     ORIZZONTALMENTE non serve niente: il marchio e' centrato in una
+     riga da 313 e il bagliore arriva a 98 dal centro, cioe' resta a
+     meta' strada dal bordo. Centrato e non a sinistra perche'
+     appoggiato a sinistra sembra scivolato in un vuoto lungo due
+     terzi di riga — col tabacchino esclusivo il metodo e' uno solo.
      IL MARCHIO STA A 40px in tutt'e due le varianti, e la sua tessera
      ambra vale fuori di qui (pillola del filtro e voce del foglio),
-     dove un fondo scuro non ce l'ha nessuno. La riga passa da 56 a 68
-     e la card da 162 a 174, senza toccare premio e scadenza, che
-     stanno su righe loro.
-     LA TARATURA E' STATA SCELTA GUARDANDO, cinque rese una sotto
-     l'altra: il pieno arriva al 66% invece che al 54-60 perche' il
-     marchio e' LARGO E BASSO (127x40) e un'ellisse che lo contiene
-     comoda non ci sta in una riga da 313 — con la dissolvenza piu'
-     generosa le due punte, che sono arancio, finivano sul navy gia'
-     smagrito e perdevano il fondo proprio dove serve. Scartate:
-     l'alone appoggiato a SINISTRA, che senza un bordo con cui
-     allinearsi sembra scivolato in un vuoto lungo due terzi di riga,
-     e il rettangolo arrotondato col bagliore dello stesso colore, che
-     resta una toppa con un contorno morbido — si vede ancora la
-     forma, ed e' la forma il difetto. */
+     dove un fondo scuro non ce l'ha nessuno. La riga passa da 56 a 90
+     e la card da 162 a 196, senza toccare premio e scadenza, che
+     stanno su righe loro: quel che cresce e' l'aria attorno al
+     marchio, ed e' la stessa aria che tiene il bagliore dentro il
+     taglio. */
   .p2p-marca{display:inline-flex;align-items:center;vertical-align:middle;
     padding:3px 8px;border-radius:8px;
     background:linear-gradient(135deg,#8A4407,#C4620C 55%,#9A4C08)}
@@ -2497,16 +2491,18 @@
     background:linear-gradient(135deg,#6B3204 0%,#A24F0A 58%,#7D3D06 100%);
     border-color:rgba(255,170,80,.55);
     box-shadow:0 0 0 1px rgba(255,138,0,.14),0 4px 14px rgba(110,55,5,.22)}
-  /* L'ALONE: il fondo del marchio, e il raggio va a zero perche' la
-     forma adesso la fa il gradiente e non piu' un ritaglio. */
-  .p2p-ord.p2p-barattozon .p2p-marca{border-radius:0;padding:14px 32px;
-    background:radial-gradient(ellipse closest-side at 50% 50%,
-      #131A26 0%,#131A26 66%,rgba(19,26,38,.6) 88%,rgba(19,26,38,0) 100%)}
-  /* la scatola non e' piu' una scatola: nessun fondo, nessun filo, e
-     il respiro verticale che l'alone si porta da se'. Resta un BLOCCO
-     col suo taglio — la riga che le impedisce di allargare la pagina. */
+  /* L'INSEGNA: navy pieno, angoli tondi, e il bagliore dello stesso
+     colore che la scioglie nella card. Nessuno scostamento: il
+     bagliore sta attorno, non sotto. */
+  .p2p-ord.p2p-barattozon .p2p-marca{border-radius:14px;padding:6px 16px;
+    background:#131A26;box-shadow:0 0 18px 9px #131A26}
+  /* la scatola non e' piu' una scatola: nessun fondo, nessun filo. Il
+     respiro verticale NON e' cosmetico — e' il posto che il bagliore
+     ha per finire prima del taglio (19 contro 18, vedi il commento).
+     E il taglio resta dov'e': e' la riga che le impedisce di allargare
+     la pagina. */
   .p2p-ord.p2p-barattozon .p2p-paga{background:none;box-shadow:none;
-    padding:0;text-align:center}
+    padding:19px 0;text-align:center}
   /* LA VARIANTE CHIARA, da decidere sullo schermo (16 set 2026): stessa
      famiglia, gradiente crema/ambra coi token di casa — e la scatola
      navy sotto il marchio, uguale alla sorella: e' il fondo che il

@@ -47771,31 +47771,39 @@ def prove_p2p_barattozon():
     prova("il marchio: 40px nella card, 14px nella pillola e nella voce", True,
           ".p2p-marca img{display:block;height:40px;width:auto}" in css
           and ".p2p-marca.mini img{height:14px}" in css)
-    # L'ALONE AL POSTO DELLA TOPPA (16 set 2026, terzo giro): il fondo
-    # scuro del marchio non e' piu' una scatola — e' un gradiente sul
-    # marchio stesso, corto quanto lui piu' il respiro, che finisce a
-    # ZERO sui quattro lati. La tessera ambra resta la pelle di
-    # `.p2p-marca`, cioe' vale FUORI dalla card.
+    # L'INSEGNA COL BAGLIORE (16 set 2026, quarto giro: Andrea sceglie
+    # la resa E guardando le cinque). Rettangolo arrotondato di navy
+    # pieno, corto quanto il marchio piu' un respiro, e un `box-shadow`
+    # dello stesso colore che lo scioglie nella card. La tessera ambra
+    # resta la pelle di `.p2p-marca`, cioe' vale FUORI dalla card.
     _alone = pezzo_js(css, ".p2p-ord.p2p-barattozon .p2p-marca{", "}")
-    prova("il fondo del marchio e' un alone ellittico, non un rettangolo",
-          True,
-          "radial-gradient(ellipse closest-side" in _alone
-          and "#131A26" in _alone)
-    # ⚠️ `closest-side` E' LA RIGA CHE FA LA DISSOLVENZA: col
-    # `farthest-corner` di default il gradiente arriva a zero negli
-    # ANGOLI, quindi a meta' dei lati resta del colore e il riquadro
-    # torna a vedersi — la toppa, con un contorno piu' morbido.
-    prova("...e arriva a ZERO esatto, o il riquadro tornerebbe a vedersi",
-          True, "rgba(19,26,38,0) 100%" in _alone)
-    # ⚠️ NIENTE OMBRE NE' SFOCATURE: escono dal riquadro, e `.p2p-paga`
-    # TAGLIA — un alone tagliato di netto e' la toppa di nuovo. E il
-    # taglio non si tocca: e' la riga che impedisce alla scatola di
-    # allargare la pagina.
     _scat = pezzo_js(css, ".p2p-ord.p2p-barattozon .p2p-paga{", "}")
-    prova("...e non esce dal riquadro: nessuna sfocatura, nessuna ombra",
-          [False, False, False],
-          ["filter:" in _alone, "box-shadow:0" in _alone, "overflow" in _scat])
-    prova("l'alone e' CORTO e centrato: la scatola non e' piu' una scatola",
+    prova("l'insegna e' navy pieno con gli angoli tondi", True,
+          "background:#131A26" in _alone and "border-radius:14px" in _alone)
+    prova("...e il bagliore e' dello stesso colore e senza scostamento",
+          True, "box-shadow:0 0 18px 9px #131A26" in _alone)
+    # ⚠️ IL CONTO CHE TIENE IL BAGLIORE DENTRO IL TAGLIO, e si rifa' qui
+    # a ogni giro invece di fidarsi di due numeri scritti in due posti:
+    # `.p2p-paga` TAGLIA quel che esce — la riga che impedisce a un
+    # elenco di metodi di uno sconosciuto di allargare la pagina — e un
+    # bagliore che arriva piu' in la' del respiro si vede SEGATO DI
+    # NETTO, che e' peggio della toppa. Il bagliore tocca
+    # `allargamento + sfocatura/2`; il respiro deve battere quel numero.
+    import re as _re_b
+    _sh = _re_b.search(r"box-shadow:0 0 (\d+)px (\d+)px", _alone)
+    _pd = _re_b.search(r"padding:(\d+)px 0", _scat)
+    if not _sh or not _pd:
+        prova("il bagliore e il respiro si leggono dal CSS", True, False)
+    else:
+        _tocca = int(_sh.group(2)) + int(_sh.group(1)) / 2
+        _respiro = int(_pd.group(1))
+        prova("il respiro della riga contiene il bagliore (o si vedrebbe segato)",
+              True, _respiro >= _tocca)
+        prova("...e non ne avanza piu' di un dito, o sarebbe aria sprecata",
+              True, _respiro - _tocca <= 6)
+    # e il taglio non si tocca: la regola della card non nomina overflow
+    prova("il taglio della scatola resta dov'e'", False, "overflow" in _scat)
+    prova("l'insegna e' CORTA e centrata: la scatola non e' piu' una scatola",
           True,
           "text-align:center" in _scat and "background:none" in _scat
           and "box-shadow:none" in _scat and "width" not in _alone)
