@@ -2428,6 +2428,52 @@
      della cifra. */
   .p2p-mio{border-color:var(--orange);opacity:.85}
   .p2p-tuo{background:rgba(255,138,0,.10);color:var(--orange);font-weight:700}
+  /* ══ IL VESTITO BARATTOZON (16 set 2026, decisione di Andrea) ══
+     Gli ordini col tabacchino hanno una card SUA: gradiente caldo
+     ambra/arancio scuro che stacca dalle card normali senza fare il
+     banner — bordo e bagliore leggeri — e nella scatola 💳 il marchio
+     al posto del testo, GRANDE (30px), perche' e' la cosa che deve
+     saltare all'occhio; premio e scadenza restano dove stanno.
+     I TOKEN SI RISCRIVONO SULLA CARD, ed e' il modo in cui resta della
+     stessa famiglia: dentro e' un'isola scura anche col tema chiaro,
+     quindi inchiostro, grigio, verde e rosso prendono i valori gia'
+     tarati per il fondo bruno di sera, e badge, anello, stelline e
+     scatole vestono da soli — nessuna regola per ciascuno, e una riga
+     nuova nella card domani si veste senza saperlo.
+     IL MARCHIO E' BIANCO SU TRASPARENTE: sulla card scura sta nudo;
+     dappertutto altrove (pillola del filtro, voce del foglio, variante
+     chiara) porta la sua TESSERA ambra, che e' quel che lo rende
+     leggibile su un fondo chiaro. Dentro `.p2p-paga` — che cede coi
+     puntini — e' un inline largo ~95px: non rompe la riga, e col
+     tabacchino e' solo nella scatola per costruzione. */
+  .p2p-marca{display:inline-flex;align-items:center;vertical-align:middle;
+    padding:3px 8px;border-radius:8px;
+    background:linear-gradient(135deg,#8A4407,#C4620C 55%,#9A4C08)}
+  .p2p-marca img{display:block;height:30px;width:auto}
+  .p2p-marca.mini{padding:2px 6px;border-radius:6px;margin-top:-1px}
+  .p2p-marca.mini img{height:14px}
+  .p2p-ord.p2p-barattozon{
+    --ink:#FFF4E4;--muted:#EED5B4;--ink-soft:#F1DDC2;--line:rgba(255,255,255,.28);
+    --chip-bg:rgba(255,255,255,.12);
+    --trust:#3FCB8A;--danger:#FFA07A;--sats:#FFB25C;--sats-text:#FFC98A;
+    background:linear-gradient(135deg,#6B3204 0%,#A24F0A 58%,#7D3D06 100%);
+    border-color:rgba(255,170,80,.55);
+    box-shadow:0 0 0 1px rgba(255,138,0,.14),0 4px 14px rgba(110,55,5,.22)}
+  .p2p-ord.p2p-barattozon .p2p-marca{background:none;padding:0}
+  /* LA VARIANTE CHIARA, da decidere sullo schermo (16 set 2026): stessa
+     famiglia, gradiente crema/ambra coi token di casa, e il marchio
+     tiene la tessera. La accende P2P_BARATTOZON_CHIARA, e SOLO col tema
+     chiaro: di sera una card crema sarebbe un faro, e la scura e'
+     l'unica che non lo e'. */
+  html:not([data-tema="scuro"]) .p2p-ord.p2p-barattozon.chiara{
+    --ink:#23282C;--muted:#8A6A3F;--ink-soft:#5C4A2E;--line:#F0C68A;
+    --chip-bg:rgba(255,255,255,.62);
+    --trust:#1B8B54;--danger:#C2410C;--sats:#F7931A;--sats-text:#B45309;
+    background:linear-gradient(135deg,#FFF6E8 0%,#FFE4BF 60%,#FFD8A6 100%);
+    border-color:rgba(230,130,20,.45);
+    box-shadow:0 0 0 1px rgba(255,138,0,.10),0 4px 14px rgba(200,120,30,.16)}
+  html:not([data-tema="scuro"]) .p2p-ord.p2p-barattozon.chiara .p2p-marca{
+    background:linear-gradient(135deg,#8A4407,#C4620C 55%,#9A4C08);padding:3px 8px}
   /* la reputazione e' UNA FRASE (set 2026, il ridisegno): niente piu'
      due pezzi ai bordi — si legge come si dice */
   .p2p-rep{font-size:12px}
@@ -36689,9 +36735,12 @@ function rigaOrdineP2P(o){
     : pr > P2P_AFFARE_SUPER
       ? '<span class="p2p-affarone super">⚡⚡ Super affare</span>'
       : '<span class="p2p-affarone">⚡ Ottimo affare</span>';
+  /* il metodo VESTITO (16 set 2026): il marchio per chi ce l'ha nel
+     catalogo, il testo per tutti gli altri — vedi P2P_VESTE_METODI. Il
+     `title` resta il testo, che e' quel che viaggia nel tag `pm`. */
   const paga = o.metodi.length
     ? `<div class="p2p-box p2p-paga" title="${esc(o.metodi.join(', '))}">💳 `
-      + esc(o.metodi.join(', ')) + '</div>' : '';
+      + o.metodi.map(m => marchioMetodoP2P(m, 'grande')).join(', ') + '</div>' : '';
   /* LE STELLINE SONO QUELLE DEL MERCATINO (set 2026, decisione di
      Andrea): sotto il metodo, la media che quella persona ha gia'
      ricevuto QUI — e non piu' quella del coordinatore, che parlava di
@@ -36714,7 +36763,7 @@ function rigaOrdineP2P(o){
   const mio = ordineMioP2P(o.id);
   /* l'id viaggia nel dataset e non dentro la stringa dell'onclick:
      e' testo di sconosciuti — il patto del filtro-alfabeto */
-  return `<div class="p2p-ord${mio ? ' p2p-mio' : ''}${p2pFacce[o.id] ? ' con-faccia' : ''}" data-id="${esc(o.id)}" role="button" tabindex="0"
+  return `<div class="p2p-ord${mio ? ' p2p-mio' : ''}${p2pFacce[o.id] ? ' con-faccia' : ''}${classeVesteP2P(o.metodi)}" data-id="${esc(o.id)}" role="button" tabindex="0"
     onclick="prendiOrdineP2P(this.dataset.id)">
     <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${anelloScadenzaP2P(o)}</div>
     ${paghiEuro ? rigaSats : rigaEuro}
@@ -37176,10 +37225,13 @@ function renderFiltroP2P(){
   const box = el('p2pFiltroCorpo');
   const b = p2pFiltroBozza;
   if (!box || !b) return;
-  const pill = (testo, scelto, gesto) =>
+  /* `dentro` e' quel che si vede nella pillola quando non e' il testo:
+     il marchio del metodo vestito (16 set 2026). Il `data-v` resta il
+     testo, che e' la chiave che il filtro confronta col tag `pm`. */
+  const pill = (testo, scelto, gesto, dentro) =>
     '<button type="button" class="tema-pill' + (scelto ? ' active' : '') +
     '" data-v="' + esc(testo) + '" onclick="' + gesto + '(this.dataset.v)">' +
-    esc(testo) + '</button>';
+    (dentro || esc(testo)) + '</button>';
   box.innerHTML =
     '<div class="section-label">Valute</div>' +
     '<div class="p2p-metodi">' + P2P_VALUTE.map(v =>
@@ -37187,7 +37239,8 @@ function renderFiltroP2P(){
     '</div>' +
     '<div class="section-label">Metodi di pagamento</div>' +
     '<div class="p2p-metodi">' + P2P_METODI.map(m =>
-      pill(m, b.metodi.indexOf(m) >= 0, 'scegliMetodoFiltroP2P')).join('') +
+      pill(m, b.metodi.indexOf(m) >= 0, 'scegliMetodoFiltroP2P',
+           marchioMetodoP2P(m, 'mini'))).join('') +
     '</div>' +
     /* SCONTO A SINISTRA, come lo slider (set 2026, ritocco di
        Andrea): il titolo diceva l'ordine opposto ai due capi qui
@@ -41416,6 +41469,50 @@ const P2P_TABACCHINO = 'Contanti al tabacchino';
 function tabacchinoP2P(metodi){
   return (metodi || []).indexOf(P2P_TABACCHINO) >= 0;
 }
+/* IL VESTITO DEI METODI (16 set 2026, decisione di Andrea): «Contanti
+   al tabacchino» si presenta come BARATTOZON — il marchio al posto del
+   testo nella card del libro, piccolo nella pillola del filtro e
+   accanto alla voce nel foglio «Pubblica».
+   ⚠️ IL TAG `pm` NON SI TOCCA: nel libro pubblico viaggia sempre la
+   stringa di P2P_TABACCHINO, e i client altrui leggono quella. Cambia
+   il vestito, non la parola — e i giudici (tabacchinoP2P, le forme di
+   recapito, il filtro) continuano a cercare la stringa.
+   UN CATALOGO e non tre eccezioni scritte a mano nei tre posti: una
+   voce che un domani volesse un marchio suo si aggiunge QUI e i tre
+   posti la vestono da soli. `classe` e' la pelle della card
+   (`.p2p-ord.<classe>`), `nome` e' l'alt del marchio. */
+const P2P_VESTE_METODI = {
+  'Contanti al tabacchino': {nome: 'Barattozon', logo: '/assets/barattozon.webp',
+                             classe: 'p2p-barattozon'}
+};
+/* LA VARIANTE CHIARA della card (16 set 2026): due gradienti, uno
+   scuro ambra/arancio e uno crema, da decidere sullo schermo. Finche'
+   la scelta non e' presa vive qui, in un interruttore: `true` veste la
+   card chiara (solo col tema chiaro, vedi il CSS). */
+const P2P_BARATTOZON_CHIARA = false;
+function vesteMetodoP2P(m){
+  return P2P_VESTE_METODI[m] || null;
+}
+/* il metodo come si MOSTRA: il marchio per chi ce l'ha, il testo per
+   gli altri. `taglia` e' 'grande' (la card) o 'mini' (pillola e
+   voce); con `conTesto` il marchio AFFIANCA la parola invece di
+   sostituirla — il foglio «Pubblica», dove la voce resta leggibile
+   per nome. Se il file non arriva, l'img si toglie e resta il nome nel
+   `title` del contenitore: mai una scatola vuota al posto del metodo.
+   Metodi di sconosciuti: esc() come sempre. */
+function marchioMetodoP2P(m, taglia, conTesto){
+  const v = vesteMetodoP2P(m);
+  if (!v) return esc(m);
+  const img = '<span class="p2p-marca' + (taglia === 'mini' ? ' mini' : '')
+    + '" title="' + esc(m) + '"><img src="' + v.logo + '" alt="' + esc(v.nome)
+    + '" onerror="this.parentNode.replaceWith(this.parentNode.title)"></span>';
+  return conTesto ? esc(m) + ' ' + img : img;
+}
+/* la pelle della card: la classe del primo metodo vestito, o niente */
+function classeVesteP2P(metodi){
+  const v = (metodi || []).map(vesteMetodoP2P).find(Boolean);
+  return v ? ' ' + v.classe + (P2P_BARATTOZON_CHIARA ? ' chiara' : '') : '';
+}
 /* i metodi che il foglio OFFRE dipendono dal lato (set 2026): il
    tabacchino lo puo' scegliere solo chi vende sats, perche' l'ordine
    Amazon lo genera lui. Nel filtro del libro resta per tutti. */
@@ -42042,7 +42139,9 @@ function renderNuovoOrdineP2P(){
           '<button type="button" class="p2p-voce" data-m="' + esc(m) + '" ' +
           'aria-pressed="' + (p2pNuovoMetodi.indexOf(m) >= 0 ? 'true' : 'false') + '" ' +
           'onclick="scegliMetodoP2P(this.dataset.m)"><b aria-hidden="true">' +
-          (p2pNuovoMetodi.indexOf(m) >= 0 ? '✓' : '') + '</b>' + esc(m) + '</button>').join('') +
+          (p2pNuovoMetodi.indexOf(m) >= 0 ? '✓' : '') + '</b>'
+          /* il marchio accanto al nome, per chi ce l'ha (16 set 2026) */
+          + marchioMetodoP2P(m, 'mini', true) + '</button>').join('') +
         '</div>'
       : ''
   });

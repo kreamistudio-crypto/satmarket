@@ -47312,6 +47312,24 @@ def asset_p2p_logo_completo():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
+@app.get("/assets/barattozon.webp")
+def asset_barattozon():
+    """Il marchio Barattozon (16 set 2026): il VESTITO del metodo
+    «Contanti al tabacchino» nel libro P2P. La stringa del tag `pm`
+    non cambia — nel libro pubblico viaggia sempre quella, ed e' quel
+    che leggono i client altrui — cambia solo come si mostra qui
+    (`P2P_VESTE_METODI` nel client). WebP con trasparenza, ritagliato
+    sull'alpha e ridotto a 305x96 dal PNG di Andrea (15,7 KB, qualita'
+    92): la stessa cura del peso delle illustrazioni di Sfoglia, ma in
+    cartella SUA e mai assets/categorie/, che ritaglia_categorie.py la
+    percorre col glob e un marchio orizzontale entrerebbe nella
+    mediana del pareggio spostando le sorelle. Rotta esplicita come le
+    tre del logo P2P: mai un mount (regola 3). Il timbro ?v= lo mette
+    _timbra_asset_pagina, quindi il max-age e' innocuo."""
+    return FileResponse("assets/barattozon.webp", media_type="image/webp",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/assets/tappo.jpeg")
 def asset_tappo():
     """Il tappo del barattolo (128px, ritagliato sul diametro): e' il

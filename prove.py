@@ -39279,6 +39279,17 @@ def prove_p2p_libro():
     j_lap = mini.index("const MOSTRO_LAPIDI_CHIAVE = ")
     pezzi.append(mini[j_lap:mini.index(";", j_lap) + 1])
     pezzi.append("const P2P_LIBRO_FINESTRA_S = 16 * 86400;")
+    # IL VESTITO DEI METODI (16 set 2026): rigaOrdineP2P veste il metodo
+    # col catalogo, quindi il banco porta il catalogo, l'interruttore e
+    # le tre funzioni (col terminatore "\n}\n" e la graffa rimessa:
+    # fra loro non c'e' nessuna riga vuota)
+    i_v = mini.index("const P2P_VESTE_METODI = {")
+    pezzi.append(mini[i_v:mini.index("\n};", i_v) + 3])
+    pezzi.append("const P2P_BARATTOZON_CHIARA = false;")
+    for f in ("function vesteMetodoP2P(m){",
+              "function marchioMetodoP2P(m, taglia, conTesto){",
+              "function classeVesteP2P(metodi){"):
+        pezzi.append(pezzo_js(mini, f, "\n}\n") + "\n}")
     # le chiavi del dispositivo portano il conto nel nome (set 2026):
     # qui non c'e' identita', e senza vale il nome di ieri
     pezzi.append("let myTgId = null;")
@@ -47187,6 +47198,151 @@ def prove_p2p_pubblica():
           pezzo_js(mini, "function celaVeriP2P(cela){", "\n}\n")
           and "meta.style.visibility = cela ? 'hidden' : '';" in
           pezzo_js(mini, "function celaVeriP2P(cela){", "\n}\n"))
+
+
+def prove_p2p_barattozon():
+    """IL VESTITO BARATTOZON (16 set 2026): «Contanti al tabacchino» si
+    mostra col marchio, e il tag `pm` NON cambia. Il catalogo e' uno
+    (`P2P_VESTE_METODI`) e i tre posti — la card del libro, la pillola
+    del filtro, la voce del foglio «Pubblica» — lo leggono da li': una
+    voce nuova che volesse un marchio suo si aggiunge nel catalogo e
+    basta, mai un'eccezione scritta a mano in uno dei tre."""
+    print("\n--- IL VESTITO BARATTOZON ---")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    css = mini[mini.index("<style>"):mini.index("</style>")]
+
+    # --- 1) IL FILE E LA ROTTA: la cura del peso delle illustrazioni,
+    # in cartella sua (assets/categorie/ e' il glob del pareggio) e con
+    # la rotta esplicita delle tre del logo P2P — mai un mount.
+    with open("assets/barattozon.webp", "rb") as _f:
+        _testa = _f.read(16)
+    prova("il marchio e' un WebP", (b"RIFF", b"WEBP"), (_testa[:4], _testa[8:12]))
+    prova("...e pesa quanto un'illustrazione, sotto i 20 KB", True,
+          os.path.getsize("assets/barattozon.webp") < 20000)
+    try:
+        from PIL import Image as _Im
+        with _Im.open("assets/barattozon.webp") as _im:
+            _taglia, _modo = _im.size, _im.mode
+        prova("...ritagliato sull'alpha e ridotto: 305x96 con trasparenza",
+              ((305, 96), "RGBA"), (_taglia, _modo))
+    except ImportError:
+        salta("la taglia del marchio", "serve Pillow")
+    prova("la rotta e' esplicita, mai un mount", True,
+          '@app.get("/assets/barattozon.webp")' in _SORGENTE
+          and 'FileResponse("assets/barattozon.webp", media_type="image/webp"'
+          in _SORGENTE)
+    prova("...e il file NON sta in assets/categorie/", False,
+          os.path.exists(os.path.join("assets", "categorie", "barattozon.webp")))
+
+    # --- 2) IL TAG `pm` NON SI TOCCA: la stringa del protocollo e' quella
+    # di ieri, e il catalogo e' un vestito sopra — una voce sola.
+    prova("la stringa del protocollo non cambia", True,
+          "const P2P_TABACCHINO = 'Contanti al tabacchino';" in mini
+          and "'Contanti', 'Contanti al tabacchino'];" in mini)
+    _cat = mini[mini.index("const P2P_VESTE_METODI = {"):]
+    _cat = _cat[:_cat.index("\n};")]
+    prova("il catalogo ha UNA voce: nome, logo e pelle della card", (1, True),
+          (_cat.count("nome:"),
+           "'Contanti al tabacchino': {nome: 'Barattozon', "
+           "logo: '/assets/barattozon.webp'," in _cat
+           and "classe: 'p2p-barattozon'" in _cat))
+    prova("...e non chiama nessuna classe «p2p-logo» (la sentinella della testata)",
+          False, "p2p-logo" in _cat)
+    prova("l'interruttore della variante chiara esiste ed e' un booleano", True,
+          "const P2P_BARATTOZON_CHIARA = false;" in mini
+          or "const P2P_BARATTOZON_CHIARA = true;" in mini)
+
+    # --- 3) I TRE POSTI LEGGONO DAL CATALOGO, nessuno ribatte il nome
+    riga = pezzo_js(mini, "function rigaOrdineP2P(o){", "\n}\n")
+    prova("la card: il marchio al posto del testo nella scatola 💳", True,
+          "o.metodi.map(m => marchioMetodoP2P(m, 'grande')).join(', ')" in riga
+          and "${classeVesteP2P(o.metodi)}" in riga)
+    prova("...e il title della scatola resta il testo del tag", True,
+          "title=\"${esc(o.metodi.join(', '))}\">💳 " in riga)
+    filtro = pezzo_js(mini, "function renderFiltroP2P(){", "\n}\n")
+    prova("il filtro: la pillola col marchio piccolo, la chiave resta il testo", True,
+          "marchioMetodoP2P(m, 'mini'))" in filtro
+          and "data-v=\"' + esc(testo)" in filtro)
+    nuovo = pezzo_js(mini, "function renderNuovoOrdineP2P(){", "\n}\n")
+    prova("il foglio Pubblica: il marchio ACCANTO al nome, non al suo posto", True,
+          "marchioMetodoP2P(m, 'mini', true)" in nuovo)
+    prova("nessun posto scrive «Barattozon» a mano fuori dal catalogo", 1,
+          mini.count("'Barattozon'"))
+
+    # --- 4) LE TRE FUNZIONI GIRANO: il testo per chi non e' vestito (e
+    # passa da esc), il marchio per il tabacchino, la pelle solo a lui.
+    import json as _js, shutil as _sh, subprocess as _sp, tempfile as _tf
+    _node = _sh.which("node")
+    if not _node:
+        salta("il vestito dei metodi gira", "serve node")
+    else:
+        def _intera(firma):
+            return pezzo_js(mini, firma, "\n}\n") + "\n}\n"
+        _prog = (
+            "const esc = s => String(s).replace(/[&<>\"']/g, c => ({'&': '&amp;',"
+            " '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;'}[c]));\n"
+            + _cat + "\n};\n"
+            + "const P2P_BARATTOZON_CHIARA = false;\n"
+            + _intera("function vesteMetodoP2P(m){")
+            + _intera("function marchioMetodoP2P(m, taglia, conTesto){")
+            + _intera("function classeVesteP2P(metodi){")
+            + "const T = 'Contanti al tabacchino';\n"
+            "console.log(JSON.stringify({\n"
+            "  sepa: marchioMetodoP2P('SEPA', 'grande'),\n"
+            "  strano: marchioMetodoP2P('<b>', 'grande'),\n"
+            "  tab: marchioMetodoP2P(T, 'grande'),\n"
+            "  mini: marchioMetodoP2P(T, 'mini', true),\n"
+            "  classi: [classeVesteP2P(['SEPA']), classeVesteP2P([T]),\n"
+            "           classeVesteP2P(['SEPA', T]), classeVesteP2P([]), classeVesteP2P(null)]\n"
+            "}));\n")
+        _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                    encoding="utf-8")
+        _f.write(_prog)
+        _f.close()
+        _r = _sp.run([_node, _f.name], capture_output=True, text=True,
+                     timeout=60, encoding="utf-8")
+        os.unlink(_f.name)
+        if _r.returncode != 0:
+            prova("il vestito dei metodi gira", "", _r.stderr[:300])
+        else:
+            out = _js.loads(_r.stdout.strip())
+            prova("chi non e' vestito resta testo, e passa da esc",
+                  ["SEPA", "&lt;b&gt;"], [out["sepa"], out["strano"]])
+            prova("il tabacchino grande: scatola, marchio con alt, title il testo",
+                  True, out["tab"].startswith(
+                      '<span class="p2p-marca" title="Contanti al tabacchino">'
+                      '<img src="/assets/barattozon.webp" alt="Barattozon"'))
+            prova("...e se il file non arriva resta il nome, non un buco", True,
+                  'onerror="this.parentNode.replaceWith(this.parentNode.title)"'
+                  in out["tab"])
+            prova("mini e con testo: prima il nome, poi il marchio piccolo", True,
+                  out["mini"].startswith(
+                      'Contanti al tabacchino <span class="p2p-marca mini"'))
+            prova("la pelle della card va solo a chi e' vestito",
+                  ["", " p2p-barattozon", " p2p-barattozon", "", ""], out["classi"])
+
+    # --- 5) IL CSS: la card riscrive i TOKEN (cosi' badge, anello e
+    # stelline vestono da soli), il marchio e' grande dentro e piccolo
+    # fuori, la variante chiara esiste e vale solo col tema chiaro, e
+    # la scatola dei metodi cede coi puntini come prima.
+    _card = pezzo_js(css, ".p2p-ord.p2p-barattozon{", "}")
+    prova("la card vestita riscrive i token, non le regole delle figlie", True,
+          all(t in _card for t in ("--ink:", "--muted:", "--trust:", "--danger:",
+                                   "--sats-text:", "--chip-bg:", "--line:"))
+          and "linear-gradient(" in _card
+          and css.count(".p2p-ord.p2p-barattozon .p2p-sats") == 0)
+    prova("il marchio: 30px nella card, 14px nella pillola e nella voce", True,
+          ".p2p-marca img{display:block;height:30px;width:auto}" in css
+          and ".p2p-marca.mini img{height:14px}" in css)
+    prova("...nudo sulla card scura, con la tessera ambra altrove", True,
+          ".p2p-ord.p2p-barattozon .p2p-marca{background:none;padding:0}" in css
+          and "linear-gradient(" in pezzo_js(css, ".p2p-marca{", "}"))
+    prova("la variante chiara esiste e vale solo col tema chiaro", True,
+          'html:not([data-tema="scuro"]) .p2p-ord.p2p-barattozon.chiara{' in css
+          and 'html:not([data-tema="scuro"]) .p2p-ord.p2p-barattozon.chiara '
+              '.p2p-marca{' in css)
+    prova("la scatola dei metodi cede coi puntini come prima", True,
+          ".p2p-paga{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" in css)
 
 
 def prove_p2p_canale():
@@ -60703,6 +60859,7 @@ def main():
     prove_p2p_stati,
     prove_p2p_chat,
     prove_p2p_pubblica,
+    prove_p2p_barattozon,
     prove_p2p_canale,
     prove_p2p_canonico,
     prove_p2p_bundle,
