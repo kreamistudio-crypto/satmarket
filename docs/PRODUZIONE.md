@@ -37,6 +37,21 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   del client (`📖 [p2p] libro: ...=N`): e' li' che si vede uno
   specchio che ha smesso di aggiornarsi, perche' non fallisce — torna
   zero, e zero si legge come «oggi non c'e' nessun ordine».
+- LE NOTIFICHE PRECISE DEL P2P (16 set 2026) non hanno una leva loro:
+  girano con `P2P_ATTIVO`, dentro lo stesso orologio del campanello,
+  e leggono il libro dai relay del coordinator e poi dallo specchio.
+  Nel journal: `📖 Libro P2P: avvisati N [...]` quando parte una frase,
+  `⚠️ Libro P2P: battito saltato (...)` se un giro muore (il prossimo
+  riparte da solo), e `📖 Libro P2P: stato mai visto «...»` il giorno
+  che il coordinator ripubblica uno stato che non abbiamo ancora visto
+  (`expired`, `dispute`, gli esiti dell'admin): quella riga e' la
+  richiesta di riguardare `_passaggio_libro_p2p` con lo stato vero
+  davanti. Al primo riavvio dopo il deploy il server aggiunge da solo
+  le quattro colonne a `p2p_ordini` e `avvisi_p2p` a `utenti`
+  (ALTER TABLE, come tutte le colonne nuove): niente da fare a mano.
+  Le righe gia' in tabella prendono lo stato alla PRIMA ripubblicazione
+  del loro ordine, senza frase: l'orologio non ha visto il passaggio
+  e non lo inventa.
 - COME SI LEGGE COSA HA FATTO IL COORDINATOR DI UNA RICHIESTA (15 set
   2026, dal silenzio sull'ordine di Alan). Tutto in sola lettura, e in
   ORDINE: prima si cerca la richiesta, poi la risposta, poi il perché.

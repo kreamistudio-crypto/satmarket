@@ -15577,3 +15577,173 @@ Andrea ha segnato per un cantiere suo; il caso reale con un wallet che
 faccia fatture lunghe (Phoenix, Wallet of Satoshi) sul nodo vero, che
 chiude la tappa 8; e le righe di prima del 16 set sui due telefoni, da
 lasciar morire con gli scambi che portano.
+
+## Il libro che avvisa: le notifiche precise del P2P, e l'interruttore (16 set 2026)
+
+Decisione presa con Alan: le notifiche del P2P diventano precise, per
+chiunque le abbia attive, da qualunque ingresso (Telegram o Nostr), e
+chi non le vuole le spegne e non riceve niente. Questo cantiere è il
+PRIMO PASSO, e il perimetro era scritto nella richiesta: senza toccare
+mostro né la cifratura, il server legge il libro 38383 dai relay — i
+soli ordini con un id nella sua tabella — e racconta i passaggi
+pubblici con frasi precise. I tre momenti interni (garanzia
+depositata, fiat inviato, disputa aperta) restano alla generica di
+oggi, compresa la riga sulla cifratura.
+
+**LE DUE DOMANDE DEL PERIMETRO, prima del codice.** 1) Chi entra da
+Nostr era GIÀ coperto: il campanello passa da `notifica()`, che per
+`tg_id < 0` (o per chi ha scelto «nostr»/«entrambi») manda un DM
+NIP-17 alla npub di cui l'utente ha dimostrato il possesso, con
+ripiego Telegram se c'è una chat collegata. Non serviva un pezzo in
+più: le frasi nuove escono dallo stesso `notifica()`, quindi arrivano
+sul canale che ognuno ha scelto. 2) L'interruttore NON esisteva: la
+preferenza del mercatino (`canale_notifiche`) dice DOVE arrivano gli
+avvisi, non SE, e il server accettava solo `telegram|nostr|entrambi|''`
+— la pagina Info prometteva «o spegnerli» su una cosa che non c'era.
+Ne è nata una accanto: `utenti.avvisi_p2p` (1 di serie), rotta
+`/api/me/avvisi-p2p`, riga «⚡ Avvisi sugli scambi P2P» nel cassetto
+Avvisi del profilo — solo a leva accesa, perché a leva spenta non c'è
+niente da spegnere. Il giudice `_avvisi_p2p_accesi` lo consultano SIA
+le frasi del libro SIA `_nudge_p2p`, e in `_nudge_p2p` sta PRIMA del
+gate dei dieci minuti: un no non brucia il turno, o alla riaccensione
+si tacerebbe per dieci minuti. La sveglia del tabacchino resta fuori
+dall'interruttore, dichiarato: quella la chiede l'utente con un gesto
+suo, non è un avviso che riceve.
+
+**COME SI LEGGE IL LIBRO, e quanto costa.** Polling, dentro lo stesso
+orologio del campanello (`orologio_p2p`, un giro al minuto), e non un
+ascolto persistente: la latenza di un minuto è la stessa del
+campanello, e un websocket sempre aperto verso relay altrui è una
+cosa in più da sorvegliare. Una REQ per giro — kinds 38383, `authors`
+il coordinatore, `#d` gli id in tabella a blocchi di 100, `since` il
+segnalibro `p2p_libro_visto` nei timbri — e la risposta sono i soli
+38383 ripubblicati da allora: a scambi fermi, zero byte. Le righe MAI
+VISTE (appena registrate) si chiedono senza segnalibro, perché il loro
+evento può essere vecchio quanto l'ordine, e per due ore al più: un id
+che il libro non mostra mai smette di farsi cercare senza segnalibro e
+passa con gli altri. E TUTTE LE ALTRE, viste o no, vanno col
+segnalibro — comprese le righe di ieri, registrate prima che il libro
+si leggesse: la prima stesura le lasciava fuori da tutt'e due le liste
+(né fresche né viste), cioè non avrebbero mai preso uno stato; l'ha
+detto la copia di cartone, dove la riga vecchia di 111 restava vuota
+mentre le due fresche si riempivano dal libro vero. I relay sono
+quelli del coordinatore e POI lo specchio, il primo che risponde: dove
+mostrod scrive è la fonte, lo specchio è la copia. Il 38385 (fee,
+`expiration_hours`) si rilegge una volta l'ora, da `info_libro_da_relay`.
+Il filtro porta `authors`, e qui vale ancora più che nel campanello:
+senza, chiunque potrebbe pubblicare un 38383 col `d` di un nostro
+ordine e far partire «scambio concluso» a chi vuole.
+
+**GLI STATI SI SCRIVONO QUANDO SI VEDONO, e li ho guardati.** Prima di
+scrivere il giudice ho letto il libro vero dallo specchio
+(`relay.barattolo.store`, 65 ordini del nostro coordinatore): gli stati
+sono `pending` (16), `canceled` (47), `in-progress` (1) e `success`
+(1, lo scambio con Alan del 7 set). L'`in-progress` porta GIÀ `amt` coi
+sats lordi (7402 su un ordine da 5 €), quindi la frase del «preso» ha i
+numeri. `expired` e `dispute` sono nel vocabolario di mostro-core, i
+rami ci sono, ma non li abbiamo mai visti ripubblicati — tutti i
+pending del libro hanno meno di 168 ore, quindi non si può nemmeno
+dire se il coordinatore ripubblichi `expired` o lasci morire l'evento.
+Uno stato sconosciuto NON produce una frase: lascia una riga nel
+journal (`📖 Libro P2P: stato mai visto`), che è la richiesta di
+riguardare il giudice con lo stato vero davanti. Da qui la tabella dei
+passaggi, in `_passaggio_libro_p2p`: `pending→in-progress` PRESO;
+`in-progress→pending` TORNATO in vetrina (il timeout dei 900 s O il
+ritiro del taker prima di pagare: per chi ha pubblicato è la stessa
+notizia, «non ha proseguito»); `in-progress→success` CONCLUSO;
+`in-progress→canceled` ANNULLATO; `pending→expired` SCADUTO;
+`dispute→success|canceled` DISPUTA CHIUSA. `pending→canceled` è il
+RITIRO di chi ha pubblicato: l'ha fatto lui e non c'era garanzia,
+niente. `in-progress→dispute` è interno e resta al campanello.
+E `relay.mostro.network` dal mio PC è andato in timeout mentre lo
+specchio rispondeva: non dice niente del VPS, ma dice perché la lista
+dei relay si scorre e non ci si ferma al primo muto.
+
+**IL MAKER NON SI INVENTA, E CHI PRENDE NON SI REGISTRA.** `p2p_ordini`
+sa «questo ordine è di Tizio» ma non se Tizio l'ha PUBBLICATO o PRESO:
+la restore intesta tutti gli id che il coordinatore restituisce, anche
+quelli presi (per un ordine nato su un altro client, il taker è il
+primo a registrarlo). La frase del «preso» a un taker sarebbe falsa, e
+«hai venduto» a chi ha comprato pure. Due modi per saperlo, nessuno a
+memoria: il client dichiara `pubblicati: true` quando gli id vengono
+dalla RISPOSTA a una pubblicazione (l'unico chiamante che ha in mano
+quella risposta; dalla restore resta falso) e il server accende
+`maker` solo sulle righe di quell'account — dichiararsi maker
+dell'ordine di un altro non sposta niente; oppure lo scopre il libro:
+una riga il cui PRIMO stato è `pending` è del maker per forza, perché
+chi prende ritrova l'ordine nella restore solo DOPO averlo preso, e al
+timeout il coordinatore lo scollega. Una riga vista per la prima volta
+già `in-progress` e senza dichiarazione resta a ruolo ignoto: serve ai
+volti, non alle frasi. E il taker NON si registra apposta, anche se i
+testi della richiesta lo nominavano («a entrambi»): sarebbe scrivere
+sul nostro server «Tizio e Caio scambiano insieme», la stessa
+correlazione che il campanello ha rifiutato per la chat. A chi prende
+arriva il campanello generico — mostrod gli manda un kind 14 a ogni
+passaggio — e per lui basta: è già nell'app, e le frasi «concluso» e
+«annullato» le legge lì. È la riga da tenere presente quando si
+rileggerà la richiesta: «a entrambi» vale per il maker su tutti i
+momenti, e per il taker vale la generica.
+
+**UN MOMENTO, UNA NOTIFICA SOLA.** Mostrod ripubblica il 38383 e manda
+il kind 14 nello stesso istante, quindi senza una cura il maker
+riceverebbe la frase precisa E «c'è una novità». La cura è in due
+mosse: il giro del libro passa PRIMA di quello dei kind 14 dentro lo
+stesso battito, e chi riceve la frase precisa vede timbrato
+`ultimo_nudge` su tutte le sue chiavi — così il kind 14 dello stesso
+momento cade nel gate dei dieci minuti. Resta il caso raro del kind 14
+arrivato al giro PRIMA del 38383 (propagazione diversa fra relay): due
+frasi per un momento, dichiarato. E c'è un rovescio voluto: per chi
+VENDE, il «tocca a te bloccare la garanzia» vero arriva quando chi
+compra ha dato la fattura, che nel nostro client è DOPO la presa (il
+take non porta la fattura); se arriva entro dieci minuti dalla frase
+del preso, la generica tace — ma la frase del preso ha già detto «apri
+Barattolo», e l'app aperta mostra la hold quando arriva. Il testo lo
+dice com'è: «appena chi compra indica dove ricevere i sats, tocca a te
+bloccare la garanzia», e per chi compra il rovescio: «appena chi vende
+blocca la garanzia, tocca a te indicare dove ricevere i sats». Non ho
+copiato «tocca a te bloccare la garanzia» secco perché al momento della
+presa NON è ancora vero, e una frase che manda ad aprire l'app su un
+passo che non c'è insegna a non fidarsi delle frasi.
+
+**IL NETTO È IL CONTO DEL CLIENT.** Il cantiere gemello (la fattura da
+7468, atterrato prima di questo) ha lasciato buono `nettoLatoP2P`:
+`round(sats × fee / 2)` tolto a chi compra, con la fee viva del 38385.
+Il server fa lo stesso conto — `sats − int(sats × fee / 2 + 0.5)` — e
+la prova lo verifica sul primo scambio vero: 7301 sats con la fee
+dell'1% di allora fanno 7264, il numero del verbale del 7 set. Senza
+38385 (fee ignota) il numero NON si inventa: «I sats sono in arrivo al
+tuo recapito», senza cifra. Chi vende legge il lordo e gli euro, che
+sono quel che ha venduto.
+
+**LE COLONNE E IL PATTO DEL TIMBRO.** `p2p_ordini` guadagna `stato`,
+`lato`, `maker`, `visto` (CREATE per i database nuovi, ALTER al
+riavvio per quelli di ieri): il server sapeva già di chi è l'ordine,
+qui impara a che punto è, che è pubblico. Lo stato si scrive PRIMA di
+mandare (il patto delle sveglie): un giro che muore a metà perde una
+frase, mai la raddoppia. Un evento più vecchio del `visto` — una copia
+in ritardo da un altro relay — non riporta indietro nessuno stato. E
+chi ha spento l'interruttore vede lo stato camminare lo stesso: alla
+riaccensione non riceve un passaggio vecchio di giorni.
+
+**COSA È STATO PROVATO** (`prove_p2p_avvisi_libro`, più due casi nel
+banco del campanello): il lettore chiede i soli 38383 del coordinatore
+per `d` e non legge il content; l'orologio passa dal libro prima dei
+kind 14, con due `try` separati; le righe mai viste senza segnalibro e
+per due ore; lo stato scritto prima dell'invio; il banco sqlite fa
+girare il giudice su sette ordini — preso (lato, sats, euro, metodo,
+gate timbrato), riletto uguale, copia vecchia, tornato in vetrina,
+concluso da chi vende e da chi compra (49.500 su 50.000 al 2%, e 7264
+su 7301 all'1%), senza fee, ruolo ignoto, ritiro proprio, annullato in
+corso, scaduto con e senza ore, interruttore spento (stato cammina,
+gate intatto), la dichiarazione che non ruba; e nel campanello: spento
+non suona, riacceso suona subito. Più le sentinelle sul client: la
+dichiarazione solo dal chiamante della pubblicazione, la riga nel
+cassetto solo a leva accesa, un server di ieri vale «accesi».
+
+**RESTA DA GUARDARE:** `expired` e `dispute` sul libro vero (la riga
+del journal dirà quando); la prima ripubblicazione delle righe già in
+tabella sul VPS, che prendono lo stato senza frase; il taker, che ha
+solo la generica — se un giorno si vorrà la frase anche per lui, il
+prezzo è la correlazione scritta qui sopra e va deciso a occhi aperti;
+e l'ordine in-progress fermo dal 9 set sullo specchio (`5eca1bc6`), che
+non è di questo cantiere ma è lì.

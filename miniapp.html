@@ -23929,6 +23929,7 @@ let mySpedGratis = null, spedGratisLeve = null, spedGratisBozza = null;
    lui») e il RITMO in giorni, che e' del config e non si hardcoda —
    0 o assente = server di ieri, e la riga non lo nomina. */
 let mySuggerimenti = false, suggerimentiOgni = 0;
+let myAvvisiP2P = true;   // «⚡ Avvisi sugli scambi P2P»: accesi di serie
 let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNFeedback = 0, myNRecensori = 0, myNegozio = '';
 /* il francobollo della propria foto profilo e il suo selettore
    ('' = automatico, la catena Telegram → Nostr → iniziale; oppure
@@ -24881,7 +24882,7 @@ function renderAvvisi(){
      solo lo stato e le scelte */
   box.innerHTML = `
     <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.4">${stato}</div>${dentro}
-    ${rigaSuggerimenti()}`;
+    ${rigaSuggerimenti()}${rigaAvvisiP2P()}`;
 }
 
 /* «💡 Suggerimenti sui miei annunci»: l'interruttore dei consigli che
@@ -24925,6 +24926,42 @@ async function setSuggerimenti(attivi){
     ? (suggerimentiOgni ? `💡 Suggerimenti attivi: al massimo uno ogni ${suggerimentiOgni} giorni`
                         : '💡 Suggerimenti attivi')
     : 'Suggerimenti spenti: non ti scriviamo più');
+}
+
+/* «⚡ Avvisi sugli scambi P2P» (16 set 2026, decisione di Andrea con
+   Alan): le notifiche dello scambio — quelle precise del libro e la
+   generica «c'e' una novita'» — si spengono qui, e spente vuol dire
+   NIENTE, nemmeno la generica. Compare solo a chi il P2P ce l'ha: a
+   leva spenta non c'e' niente da spegnere. Stesso calco della riga dei
+   suggerimenti, stessa regola: lo stato viene dal server. */
+const rigaAvvisiP2P = () => (!p2pLeve || !p2pLeve.attivo) ? '' : `
+  <div style="display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+    <div style="min-width:0;flex:1">
+      <div style="font-size:13.5px;font-weight:800">⚡ Avvisi sugli scambi P2P</div>
+      <div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">
+        Quando il tuo ordine viene preso, quando lo scambio si chiude
+        e quando tocca a te. Spenti, non ti scriviamo nulla dello scambio.</div>
+    </div>
+    <button onclick="setAvvisiP2P(${myAvvisiP2P ? 'false' : 'true'})"
+      aria-pressed="${myAvvisiP2P ? 'true' : 'false'}"
+      style="flex:none;font:inherit;font-size:12.5px;font-weight:800;border:1px solid ${myAvvisiP2P?'var(--sats)':'var(--line)'};background:${myAvvisiP2P?'var(--sats)':'transparent'};color:${myAvvisiP2P?'#fff':'var(--muted)'};border-radius:99px;padding:6px 14px;cursor:pointer">
+      ${myAvvisiP2P ? 'Attivi' : 'Spenti'}</button>
+  </div>`;
+
+async function setAvvisiP2P(attivi){
+  haptic();
+  if (DEMO) { toast('In demo non ci sono avvisi veri 🙂'); return; }
+  try {
+    const r = await fetch(`${API_BASE}/me/avvisi-p2p`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({attivi})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+    myAvvisiP2P = !!d.attivi;
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  renderAvvisi();
+  toast(myAvvisiP2P ? '⚡ Avvisi sugli scambi attivi'
+                    : 'Avvisi sugli scambi spenti: non ti scriviamo più');
 }
 
 async function setCanale(canale){
@@ -39735,7 +39772,7 @@ function applicaMessaggioP2P(ord, dentro){
     /* e col nome vero l'ordine si intesta SUBITO, volto compreso: la
        restore della sessione dopo era una faccia in ritardo di tre
        aperture (vedi `intestaOrdiniP2P`) */
-    intestaOrdiniP2P([nuovo.id]).catch(() => {});
+    intestaOrdiniP2P([nuovo.id], true).catch(() => {});
   } else scriviOrdineP2P(nuovo);
   /* IL RITIRATO NON SI VEDE PIU' (set 2026, decisione di Andrea):
      ritirato = sparito, subito e ovunque — niente card «annullato»
@@ -43965,7 +44002,7 @@ let p2pOrdiniRegistrati = new Set();   // gia' detti al server, in questa sessio
 let p2pFacce = {};                     // ordine -> {nome, avatar, media, voti}
 let p2pFacceChieste = new Set();       // gia' chiesti: mai due volte
 let p2pFacceGiro = null;               // la domanda in volo
-async function registraOrdiniP2P(ids){
+async function registraOrdiniP2P(ids, pubblicati){
   if (DEMO || VETRINA || !myTgId) return false;
   /* SOLO GLI ID VERI del coordinatore: i provvisori del client
      cambiano nome quando lui risponde, e una riga col nome vecchio non
@@ -43977,7 +44014,12 @@ async function registraOrdiniP2P(ids){
   try {
     const r = await fetch(`${API_BASE}/p2p/ordini`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
-      body: JSON.stringify({ordini: lista})});
+      /* `pubblicati` (16 set 2026, le notifiche del libro): vero SOLO
+         dal chiamante che ha in mano la risposta del coordinatore a una
+         pubblicazione — quello e' il maker per costruzione, e il server
+         accende subito la colonna. Dalla restore resta falso: li' gli
+         id sono anche di ordini PRESI, e il ruolo lo scopre il libro. */
+      body: JSON.stringify({ordini: lista, pubblicati: !!pubblicati})});
     return r.ok;
   } catch(e){ return false; }
 }
@@ -44018,10 +44060,10 @@ async function chiediFacceP2P(ids){
    ok si richiede il volto di quegli id (dimenticando il «gia' chiesto»)
    e la card si ridisegna. Due chiamanti: la risposta del coordinatore
    che assegna l'id vero a un ordine appena pubblicato, e la restore. */
-async function intestaOrdiniP2P(ids){
+async function intestaOrdiniP2P(ids, pubblicati){
   const lista = (ids || []).filter(id => id && !provvisorioP2P(id));
   if (!lista.length) return false;
-  if (!(await registraOrdiniP2P(lista))) return false;
+  if (!(await registraOrdiniP2P(lista, pubblicati))) return false;
   /* una domanda in volo si aspetta: `chiediFacceP2P` a giro occupato
      rifiuta, e il volto resterebbe di nuovo indietro */
   try { await p2pFacceGiro; } catch(e){}
@@ -44652,6 +44694,8 @@ async function avvia(){
     myNpubAccesso = me.npub_accesso || '';
     myCanaleNotifiche = me.canale_notifiche || '';
     mySuggerimenti = !!me.suggerimenti_annunci;
+    /* un server di ieri non manda la chiave: vale «accesi», il default */
+    myAvvisiP2P = me.avvisi_p2p === undefined ? true : !!me.avvisi_p2p;
     suggerimentiOgni = me.suggerimenti_ogni_giorni || 0;
     adottaFont(me);   // la misura scelta sull'altro telefono
     mySpedizioniere = me.spedizioniere || '';

@@ -23858,6 +23858,56 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   seme. Nel client la sveglia vive fuori dal motore e fuori dal mazzo
   (i due perimetri con un censimento delle `fetch`), accanto al
   canale. Il verbale: CANTIERI, «Contanti al tabacchino».
+  IL LIBRO CHE AVVISA (16 set 2026, decisione di Andrea con Alan): le
+  notifiche del P2P diventano PRECISE sui passaggi pubblici, senza
+  toccare mostro né la cifratura. Il server legge il 38383 dei SOLI
+  ordini in `p2p_ordini` (i volti sul libro) e a chi li ha PUBBLICATO
+  dice cosa è successo, coi numeri e di chi è il prossimo passo:
+  preso (`pending→in-progress`, lato e importi dal libro), tornato in
+  vetrina (`in-progress→pending`: chi aveva preso non ha proseguito),
+  concluso (`→success`: chi vende legge quanto per quanto, chi compra
+  il NETTO, `sats − round(sats × fee/2)` con la `fee` viva del 38385 —
+  il conto del client, cantiere della fattura da 7468), annullato
+  (`in-progress→canceled`), scaduto (`pending→expired`, i giorni da
+  `expiration_hours`), disputa chiusa (`dispute→success|canceled`).
+  Il ritiro del proprio ordine (`pending→canceled`) e i tre momenti
+  interni — garanzia depositata, fiat inviato, disputa aperta — non
+  hanno una frase: il libro li mostra tutti come `in-progress`, e
+  restano al campanello generico, cifratura compresa.
+  COM'È FATTO: `_giro_libro_p2p` gira nell'`orologio_p2p` PRIMA del
+  giro dei kind 14, una REQ al minuto (`eventi_libro_da_relay`: kinds
+  38383, `authors` il coordinatore, `#d` gli id in tabella a blocchi di
+  100, `since` il segnalibro `p2p_libro_visto` nei timbri) sui relay
+  del coordinatore e poi sullo specchio, il primo che risponde; le
+  righe MAI VISTE si chiedono senza segnalibro e per due ore al più.
+  Il 38385 (`info_libro_da_relay`: fee, expiration_hours) si rilegge
+  una volta l'ora. Il giudice puro `_avvisi_libro_p2p` scrive su
+  `p2p_ordini` le quattro colonne nuove — `stato`, `lato`, `maker`,
+  `visto` — PRIMA che si mandi (il patto delle sveglie), e ricava il
+  momento con `_passaggio_libro_p2p`; le frasi le fa `_testo_libro_p2p`
+  e partono con `notifica`, quindi Telegram o DM Nostr come tutto il
+  resto. IL MAKER NON SI INVENTA: lo dichiara il client quando gli id
+  vengono dalla risposta a una pubblicazione (`pubblicati: true` su
+  `/api/p2p/ordini`, e solo sulle righe di quell'account) oppure lo
+  scopre il libro (un primo stato `pending` è del maker per forza); una
+  riga vista per la prima volta già in corso resta a ruolo ignoto e
+  serve ai volti, non alle frasi. CHI PRENDE NON SI REGISTRA, apposta:
+  sarebbe scrivere sul nostro server «Tizio e Caio scambiano insieme»
+  (la stessa correlazione rifiutata per la chat), quindi a chi prende
+  arriva il campanello generico — che per lui basta, è già nell'app.
+  UN MOMENTO, UNA NOTIFICA: chi riceve la frase precisa vede timbrato
+  `ultimo_nudge` su tutte le sue chiavi, e il kind 14 dello stesso
+  istante non fa suonare anche la generica. L'INTERRUTTORE è
+  `utenti.avvisi_p2p` (1 di serie, rotta `/api/me/avvisi-p2p`, riga
+  «⚡ Avvisi sugli scambi P2P» nel cassetto Avvisi, solo a leva
+  accesa): il giudice `_avvisi_p2p_accesi` lo guarda sia il libro sia
+  `_nudge_p2p`, quindi spento vuol dire NIENTE — la sveglia del
+  tabacchino no, che la chiede l'utente con un gesto suo. Gli stati
+  sul libro si scrivono quando si VEDONO: `pending`, `in-progress`,
+  `canceled`, `success` letti dallo specchio il 16 set 2026; `expired`
+  e `dispute` hanno il ramo ma non sono mai stati visti ripubblicati,
+  e uno stato sconosciuto lascia una riga nel journal invece di una
+  frase. Il verbale: CANTIERI, «Il libro che avvisa».
   LA CIFRA DI CHI PRENDE UN INTERVALLO viaggia come `Payload::Amount`
   (`{"amount": N}`), che mostrod legge SOLO su `take-sell` e `take-buy`
   (`get_amount` in `message.rs`) e confronta con min/max
