@@ -39291,10 +39291,8 @@ def prove_p2p_libro():
     i_v = mini.index("const P2P_VESTE_METODI = {")
     pezzi.append(mini[i_v:mini.index("\n};", i_v) + 3])
     for f in ("function vesteMetodoP2P(m){",
-              "function marchioMetodoP2P(m, taglia, conTesto){",
-              "function classeVesteP2P(metodi){",
-              "function iconaMetodiP2P(metodi){",
-              "function marchioInTestaP2P(metodi){"):
+              "function marchioMetodoP2P(m, conTesto){",
+              "function iconaMetodiP2P(metodi){"):
         pezzi.append(pezzo_js(mini, f, "\n}\n") + "\n}")
     # le chiavi del dispositivo portano il conto nel nome (set 2026):
     # qui non c'e' identita', e senza vale il nome di ieri
@@ -47627,19 +47625,23 @@ def prove_p2p_pubblica():
 
 
 def prove_p2p_barattozon():
-    """IL VESTITO BARATTOZON (16 set 2026): «Contanti al tabacchino» si
-    mostra col marchio, e il tag `pm` NON cambia. Il catalogo e' uno
-    (`P2P_VESTE_METODI`) e i tre posti — la card del libro, la pillola
-    del filtro, la voce del foglio «Pubblica» — lo leggono da li': una
-    voce nuova che volesse un marchio suo si aggiunge nel catalogo e
-    basta, mai un'eccezione scritta a mano in uno dei tre."""
-    print("\n--- IL VESTITO BARATTOZON ---")
+    """IL MARCHIO BARATTOZON (16 set 2026): «Contanti al tabacchino» si
+    mostra col suo marchio invece che col nome, e il tag `pm` NON
+    cambia. Il catalogo e' uno (`P2P_VESTE_METODI`) e i tre posti — la
+    scatola dei metodi della card, la pillola del filtro, la voce del
+    foglio «Pubblica» — lo leggono da li'.
+
+    ⚠️ E LA CARD E' IDENTICA ALLE SORELLE, che e' la decisione finale
+    dopo sei versioni vestite (capo navy, gradienti, tessere, aloni,
+    bagliori, bordi): quelle vivono nei commit, con gli hash in
+    CANTIERI, «La card semplice, e dove vivono i vestiti». Qui si
+    sorveglia che NON tornino per sbaglio — una pelle di card che
+    nessuno emette e' peggio di nessuna pelle."""
+    print("\n--- IL MARCHIO BARATTOZON ---")
     mini = open("miniapp.html", encoding="utf-8").read()
     css = mini[mini.index("<style>"):mini.index("</style>")]
 
-    # --- 1) IL FILE E LA ROTTA: la cura del peso delle illustrazioni,
-    # in cartella sua (assets/categorie/ e' il glob del pareggio) e con
-    # la rotta esplicita delle tre del logo P2P — mai un mount.
+    # --- 1) IL FILE E LA ROTTA -------------------------------------
     with open("assets/barattozon.webp", "rb") as _f:
         _testa = _f.read(16)
     prova("il marchio e' un WebP", (b"RIFF", b"WEBP"), (_testa[:4], _testa[8:12]))
@@ -47660,64 +47662,63 @@ def prove_p2p_barattozon():
     prova("...e il file NON sta in assets/categorie/", False,
           os.path.exists(os.path.join("assets", "categorie", "barattozon.webp")))
 
-    # --- 2) IL TAG `pm` NON SI TOCCA: la stringa del protocollo e' quella
-    # di ieri, e il catalogo e' un vestito sopra — una voce sola.
+    # --- 2) IL TAG `pm` NON SI TOCCA -------------------------------
     prova("la stringa del protocollo non cambia", True,
           "const P2P_TABACCHINO = 'Contanti al tabacchino';" in mini
           and "'Contanti', 'Contanti al tabacchino'];" in mini)
     _cat = mini[mini.index("const P2P_VESTE_METODI = {"):]
     _cat = _cat[:_cat.index("\n};")]
-    prova("il catalogo ha UNA voce: nome, logo e pelle della card", (1, True),
+    prova("il catalogo ha UNA voce: nome, logo e il fatto che basti da solo",
+          (1, True),
           (_cat.count("nome:"),
            "'Contanti al tabacchino': {nome: 'Barattozon', "
            "logo: '/assets/barattozon.webp'," in _cat
-           and "classe: 'p2p-barattozon'" in _cat))
-    prova("...e dice che nella scatola il marchio BASTA", True,
-          "soloMarchio: true" in _cat)
+           and "soloMarchio: true" in _cat))
+    # ⚠️ IL CATALOGO E' DI TRE CAMPI: `classe` e `inTesta` erano della
+    # card vestita, e con lei se ne sono andati. Se ricompaiono senza
+    # che qualcuno li legga, sono peso morto che sembra una funzione.
+    prova("...e non porta piu' i campi della card vestita", [False, False],
+          ["classe:" in _cat, "inTesta:" in _cat])
     prova("...e non chiama nessuna classe «p2p-logo» (la sentinella della testata)",
           False, "p2p-logo" in _cat)
-    prova("...e che il marchio va in CIMA alla card", True,
-          "inTesta: true" in _cat)
-    # ⚠️ LA VARIANTE CHIARA E' MORTA con la direzione definitiva (il
-    # marchio si appoggia alla card, e una card crema gli mangerebbe la
-    # parola bianca): del suo interruttore non deve restare niente, o
-    # sarebbe una leva che non accende piu' nulla.
-    prova("della variante chiara non resta niente", [False, False],
-          ["P2P_BARATTOZON_CHIARA" in mini, "p2p-barattozon.chiara" in mini])
-
-    # --- 3) I TRE POSTI LEGGONO DAL CATALOGO, nessuno ribatte il nome
-    riga = pezzo_js(mini, "function rigaOrdineP2P(o){", "\n}\n")
-    prova("la card: il marchio al posto del testo nella scatola", True,
-          "o.metodi.map(m => marchioMetodoP2P(m, 'grande')).join(', ')" in riga
-          and "${classeVesteP2P(o.metodi)}" in riga)
-    prova("...e il title della scatola resta il testo del tag", True,
-          "title=\"${esc(o.metodi.join(', '))}\">`" in riga)
-    # ⚠️ L'EMOJI NON SI SCRIVE PIU' A MANO NELLA CARD (16 set 2026): la
-    # chiede al catalogo, o il giorno che una voce nuova volesse il solo
-    # marchio bisognerebbe tornare qui — che e' la cosa che il catalogo
-    # doveva evitare.
-    prova("...e l'icona la decide il catalogo, non la card", [True, 0],
-          ["+ iconaMetodiP2P(o.metodi)" in riga, riga.count(chr(0x1F4B3))])
-    # ⚠️ IL MARCHIO IN CIMA CAMBIA IL MARKUP, non un `order` del flex:
-    # con l'ordine visivo staccato da quello del documento, la card si
-    # leggerebbe in due modi diversi. E la scatola resta UNA: scritta
-    # nei due rami dello stesso ternario, mai due volte nella pagina.
-    prova("col marchio in cima la scatola apre la card", True,
-          "${inTesta ? paga : ''}" in riga
-          and "${inTesta ? '' : paga}" in riga
-          and "const inTesta = marchioInTestaP2P(o.metodi);" in riga)
-    filtro = pezzo_js(mini, "function renderFiltroP2P(){", "\n}\n")
-    prova("il filtro: la pillola col marchio piccolo, la chiave resta il testo", True,
-          "marchioMetodoP2P(m, 'mini'))" in filtro
-          and "data-v=\"' + esc(testo)" in filtro)
-    nuovo = pezzo_js(mini, "function renderNuovoOrdineP2P(){", "\n}\n")
-    prova("il foglio Pubblica: il marchio ACCANTO al nome, non al suo posto", True,
-          "marchioMetodoP2P(m, 'mini', true)" in nuovo)
     prova("nessun posto scrive «Barattozon» a mano fuori dal catalogo", 1,
           mini.count("'Barattozon'"))
 
-    # --- 4) LE TRE FUNZIONI GIRANO: il testo per chi non e' vestito (e
-    # passa da esc), il marchio per il tabacchino, la pelle solo a lui.
+    # --- 3) I TRE POSTI LEGGONO DAL CATALOGO ------------------------
+    riga = pezzo_js(mini, "function rigaOrdineP2P(o){", "\n}\n")
+    prova("la card: il marchio al posto del testo nella scatola", True,
+          "o.metodi.map(m => marchioMetodoP2P(m)).join(', ')" in riga)
+    prova("...e il title della scatola resta il testo del tag", True,
+          "title=\"${esc(o.metodi.join(', '))}\">`" in riga)
+    # ⚠️ L'EMOJI NON SI SCRIVE PIU' A MANO NELLA CARD: la chiede al
+    # catalogo, o il giorno che una voce nuova volesse il solo marchio
+    # bisognerebbe tornare qui — che e' quel che il catalogo evita.
+    prova("...e l'icona la decide il catalogo, non la card", [True, 0],
+          ["iconaMetodiP2P(o.metodi)" in riga, riga.count(chr(0x1F4B3))])
+    # ⚠️ L'INSEGNA E L'ICONA HANNO LO STESSO GIUDICE, chiesto UNA volta:
+    # «qui dentro non resta nessun nome». Due giudici sulla stessa
+    # domanda divergono al primo ritocco — e divergerebbero in
+    # silenzio, con una scatola navy che porta del testo o un'icona su
+    # un'insegna.
+    prova("la scatola diventa un'insegna con lo stesso giudice dell'icona",
+          True,
+          "const senzaIcona = iconaMetodiP2P(o.metodi) === '';" in riga
+          and "${senzaIcona ? ' p2p-paga-marchio' : ''}" in riga
+          and "(senzaIcona ? '' : iconaMetodiP2P(o.metodi))" in riga)
+    # ⚠️ E LA CARD NON HA NIENTE DI SUO: nessuna pelle, nessun ordine
+    # ribaltato. E' una card come le altre con un marchio nella scatola.
+    prova("la card non porta nessuna pelle e non ribalta le sue righe",
+          [False, False, False],
+          ["classeVesteP2P" in riga, "inTesta" in riga,
+           "p2p-barattozon" in riga])
+    filtro = pezzo_js(mini, "function renderFiltroP2P(){", "\n}\n")
+    prova("il filtro: la pillola col marchio, la chiave resta il testo", True,
+          "marchioMetodoP2P(m))" in filtro and "data-v=\"' + esc(testo)" in filtro)
+    nuovo = pezzo_js(mini, "function renderNuovoOrdineP2P(){", "\n}\n")
+    prova("il foglio Pubblica: il marchio ACCANTO al nome, non al suo posto", True,
+          "marchioMetodoP2P(m, true)" in nuovo)
+
+    # --- 4) LE TRE FUNZIONI GIRANO ---------------------------------
     import json as _js, shutil as _sh, subprocess as _sp, tempfile as _tf
     _node = _sh.which("node")
     if not _node:
@@ -47730,23 +47731,16 @@ def prove_p2p_barattozon():
             " '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;'}[c]));\n"
             + _cat + "\n};\n"
             + _intera("function vesteMetodoP2P(m){")
-            + _intera("function marchioMetodoP2P(m, taglia, conTesto){")
-            + _intera("function classeVesteP2P(metodi){")
+            + _intera("function marchioMetodoP2P(m, conTesto){")
             + _intera("function iconaMetodiP2P(metodi){")
-            + _intera("function marchioInTestaP2P(metodi){")
             + "const T = 'Contanti al tabacchino';\n"
             "console.log(JSON.stringify({\n"
-            "  sepa: marchioMetodoP2P('SEPA', 'grande'),\n"
-            "  strano: marchioMetodoP2P('<b>', 'grande'),\n"
-            "  tab: marchioMetodoP2P(T, 'grande'),\n"
-            "  mini: marchioMetodoP2P(T, 'mini', true),\n"
-            "  classi: [classeVesteP2P(['SEPA']), classeVesteP2P([T]),\n"
-            "           classeVesteP2P(['SEPA', T]), classeVesteP2P([]), classeVesteP2P(null)],\n"
+            "  sepa: marchioMetodoP2P('SEPA'),\n"
+            "  strano: marchioMetodoP2P('<b>'),\n"
+            "  tab: marchioMetodoP2P(T),\n"
+            "  conTesto: marchioMetodoP2P(T, true),\n"
             "  icone: [iconaMetodiP2P([T]), iconaMetodiP2P(['SEPA']),\n"
-            "          iconaMetodiP2P(['SEPA', T]), iconaMetodiP2P([]), iconaMetodiP2P(null)],\n"
-            "  teste: [marchioInTestaP2P([T]), marchioInTestaP2P(['SEPA']),\n"
-            "          marchioInTestaP2P(['SEPA', T]), marchioInTestaP2P([]),\n"
-            "          marchioInTestaP2P(null)]\n"
+            "          iconaMetodiP2P(['SEPA', T]), iconaMetodiP2P([]), iconaMetodiP2P(null)]\n"
             "}));\n")
         _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
                                     encoding="utf-8")
@@ -47761,135 +47755,97 @@ def prove_p2p_barattozon():
             out = _js.loads(_r.stdout.strip())
             prova("chi non e' vestito resta testo, e passa da esc",
                   ["SEPA", "&lt;b&gt;"], [out["sepa"], out["strano"]])
-            prova("il tabacchino grande: scatola, marchio con alt, title il testo",
+            prova("il tabacchino: la tessera, il marchio con alt, il title col testo",
                   True, out["tab"].startswith(
                       '<span class="p2p-marca" title="Contanti al tabacchino">'
                       '<img src="/assets/barattozon.webp" alt="Barattozon"'))
             prova("...e se il file non arriva resta il nome, non un buco", True,
                   'onerror="this.parentNode.replaceWith(this.parentNode.title)"'
                   in out["tab"])
-            prova("mini e con testo: prima il nome, poi il marchio piccolo", True,
-                  out["mini"].startswith(
-                      'Contanti al tabacchino <span class="p2p-marca mini"'))
-            prova("la pelle della card va solo a chi e' vestito",
-                  ["", " p2p-barattozon", " p2p-barattozon", "", ""], out["classi"])
+            prova("...e una misura sola: nessuna taglia da scegliere", False,
+                  "mini" in out["tab"])
+            prova("col testo: prima il nome, poi il marchio", True,
+                  out["conTesto"].startswith(
+                      'Contanti al tabacchino <span class="p2p-marca"'))
             # l'icona se ne va SOLO quando dentro non resta nessun nome:
             # col misto c'e' ancora del testo da intestare
             _c = chr(0x1F4B3) + " "
             prova("l'icona sparisce col solo marchio, e resta in tutti gli altri casi",
                   ["", _c, _c, _c, _c], out["icone"])
-            # il posto in cima lo chiede il catalogo, e vale anche col
-            # metodo misto: li' il marchio c'e' lo stesso
-            prova("il marchio va in cima solo dove il catalogo lo chiede",
-                  [True, False, True, False, False], out["teste"])
 
-    # --- 5) IL CSS: la card riscrive i TOKEN (cosi' badge, anello e
-    # il marchio e' grande dentro e piccolo fuori, la scatola dei metodi
-    # cede coi puntini come prima, e la card e' una SORELLA col cappello.
-    _card = pezzo_js(css, ".p2p-ord.p2p-barattozon{", "}")
-    # ⚠️ LA CARD NON RISCRIVE PIU' NESSUN TOKEN DI TESTO, ed e' una
-    # regola e non un'economia: il fondo e' tornato quello delle
-    # sorelle, quindi un `--ink` schiarito qui — che serviva al fondo
-    # scuro — scriverebbe in chiaro sul bianco. L'unico token che resta
-    # e' quello del capo, che e' una tinta sua e non un'eredita'.
-    prova("la card non riscrive nessun token di testo: e' una sorella col cappello",
-          [False, True],
-          [any(t in _card for t in ("--ink:", "--muted:", "--ink-soft:", "--trust:",
-                                    "--danger:", "--sats:", "--sats-text:",
-                                    "--chip-bg:", "--line:")),
-           "--barattozon-testa:" in _card])
-    prova("...e non tocca nemmeno le regole delle figlie", 0,
-          css.count(".p2p-ord.p2p-barattozon .p2p-sats"))
-    prova("il marchio: 40px nella card, 14px nella pillola e nella voce", True,
-          ".p2p-marca img{display:block;height:40px;width:auto}" in css
-          and ".p2p-marca.mini img{height:14px}" in css)
-    # L'INSEGNA COL BAGLIORE (16 set 2026, quarto giro: Andrea sceglie
-    # la resa E guardando le cinque). Rettangolo arrotondato di navy
-    # pieno, corto quanto il marchio piu' un respiro, e un `box-shadow`
-    # dello stesso colore che lo scioglie nella card. La tessera ambra
-    # resta la pelle di `.p2p-marca`, cioe' vale FUORI dalla card.
-    _alone = pezzo_js(css, ".p2p-ord.p2p-barattozon .p2p-marca{", "}")
-    _scat = pezzo_js(css, ".p2p-ord.p2p-barattozon .p2p-paga{", "}")
-    # IL COLORE E' UNA DECISIONE, quindi sta in una variabile sua e la
-    # prova non lo ribatte: guarda che ci SIA e che a leggerlo sia il
-    # GRADIENTE DELLA CARD, perche' il fondo del marchio adesso e' la
-    # card e non piu' una tessera.
+    # --- 5) IL CSS: l'insegna, la tessera, e i due conti delle misure
+    _marca = pezzo_js(css, ".p2p-marca{", "}")
+    _img = pezzo_js(css, ".p2p-marca img{", "}")
+    _ins = pezzo_js(css, ".p2p-paga-marchio{", "}")
+    _insm = pezzo_js(css, ".p2p-paga-marchio .p2p-marca{", "}")
+    _insi = pezzo_js(css, ".p2p-paga-marchio .p2p-marca img{", "}")
+    prova("la scatola-insegna e' navy, e cambia il SOLO fondo", True,
+          "background:#131A26" in _ins
+          and not any(x in _ins for x in ("border", "padding", "radius")))
+    # dentro un'insegna navy la tessera sarebbe una toppa dello stesso
+    # colore: il marchio ci sta nudo
+    prova("...e dentro il marchio sta nudo, senza la sua tessera", True,
+          "background:none" in _insm and "padding:0" in _insm)
+    # la tessera e' NAVY e non piu' l'ambra di casa (16 set 2026): e'
+    # l'unica cosa rimasta in piedi del giro dei sedici colori, e su di
+    # lei il marchio legge 16,6:1 col bianco e 7,0:1 con l'arancio.
+    prova("il marchio porta la sua tessera navy dovunque vada", True,
+          "background:#131A26}" in _marca.replace(" ", "")
+             or "background:#131A26" in _marca
+          and "inline-flex" in _marca)
+    # ⚠️ IL CONTO CHE TIENE LA SCATOLA ALLA SUA ALTEZZA, e si rifa' qui
+    # a ogni giro: la riga della scatola dei metodi e' alta 17 (12,5px
+    # di testo a interlinea normale, MISURATO sul vivo), quindi la
+    # tessera intera — marchio piu' i due respiri — non puo' passarli, o
+    # la scatola si alza e con lei la card. E' la regola che decide la
+    # misura del marchio, e non il gusto.
     import re as _re_b
-    _cardcss = pezzo_js(css, ".p2p-ord.p2p-barattozon{", "}")
-    _tinta = _re_b.search(r"--barattozon-testa:(#[0-9A-Fa-f]{3,8})", _cardcss)
-    prova("il colore della testa della card vive in una variabile sua", True,
-          bool(_tinta))
-    prova("...e a leggerlo e' il gradiente della card, non una tessera", True,
-          "linear-gradient(180deg,var(--barattozon-testa) 0," in _cardcss)
-    # ⚠️ E IL GRADIENTE FINISCE SU `var(--card)`, non su una tinta
-    # scritta a mano: e' la riga che tiene la card in famiglia in
-    # tutt'e due i temi — di giorno la carta e' bianca, di sera bruna —
-    # senza che nessuno debba ricordarsi di aggiornarla.
-    prova("...e finisce sulla carta di casa, non su una tinta a mano", True,
-          "var(--card) " in _cardcss and "#A24F0A" not in _cardcss)
-    prova("del marchio non resta nessuna tessera, in nessuna forma",
-          [False, False, False, False],
-          ["gradient(" in _alone, "box-shadow" in _alone, "filter:" in _alone,
-           "background:none" not in _alone])
-    # ⚠️ LE FERMATE DEL GRADIENTE SONO IN PIXEL, e il conto fra le tre
-    # misure si rifa' QUI a ogni giro: la card e' alta quanto il suo
-    # contenuto, quindi una fermata in percento farebbe salire e
-    # scendere la fascia navy sotto al marchio a seconda di quel che
-    # c'e' sotto. Le tre che devono stare in pari: il marchio finisce a
-    # 12+40, il navy tiene pieno fino a `pieno`, e la dissolvenza
-    # finisce dove comincia la riga dell'importo (il suo margine).
-    _grad = _cardcss[_cardcss.index("linear-gradient(180deg"):]
-    _grad = _grad[:_grad.index(";")]
-    _ferm = [int(x) for x in _re_b.findall(r"(\d+)px", _grad)]
-    _mg = _re_b.search(r"margin-top:(\d+)px",
-                       pezzo_js(css, ".p2p-ord.p2p-barattozon .p2p-testa{", "}"))
-    if len(_ferm) < 2 or not _mg:
-        prova("le fermate del gradiente si leggono dal CSS", True, False)
+    _h = _re_b.search(r"height:(\d+)px", _img)
+    _p = _re_b.search(r"padding:(\d+)px", _marca)
+    _hi = _re_b.search(r"height:(\d+)px", _insi)
+    if not _h or not _p or not _hi:
+        prova("le misure del marchio si leggono dal CSS", True, False)
     else:
-        _pieno, _fine = _ferm[0], _ferm[-1]
-        _riga = 12 + 40 + int(_mg.group(1))
-        prova("il navy tiene pieno sotto tutto il marchio", True, _pieno >= 52)
-        prova("...e non ne avanza piu' di un dito", True, _pieno - 52 <= 8)
-        prova("...e non si mangia la riga dell'importo", True, _pieno < _riga)
-        # ⚠️ LA CARTA DEVE ARRIVARE PRIMA CHE FINISCA LA CARD PIU' CORTA:
-        # un ordine a prezzo fisso non porta il badge e sta in 146px,
-        # quindi una dissolvenza che finisse piu' in la' farebbe card
-        # che il loro colore non lo vedono mai — e il difetto si
-        # vedrebbe solo su ALCUNE card, che e' il modo peggiore.
-        prova("...e la carta arriva prima che la card piu' corta finisca",
-              True, _fine <= 130)
-        # ⚠️ IL SECONDO PADRONE DELLA SFUMATURA E' IL TESTO, e non c'era
-        # finche' il fondo era scuro: la riga dell'importo comincia
-        # DENTRO la dissolvenza e di giorno l'inchiostro e' scuro,
-        # quindi piu' la sfumatura si allunga piu' quella riga si trova
-        # su un grigio medio. Il conto che la tiene leggibile: quando il
-        # testo comincia, la carta dev'essere almeno a meta' strada.
-        prova("quando comincia l'importo la carta e' almeno a meta' strada",
-              True, (_riga - _pieno) / max(1, _fine - _pieno) >= .5)
-    # e l'anello scende con lei: a 12 starebbe sulla fascia del marchio
-    _an = _re_b.search(r"top:(\d+)px",
-                       pezzo_js(css, ".p2p-ord.p2p-barattozon .p2p-anello{", "}"))
-    prova("l'anello scende sotto la fascia del marchio", True,
-          bool(_an) and int(_an.group(1)) >= 82)
-    # ⚠️ IL TAGLIO DELLA SCATOLA RESTA DOV'E': e' la riga che impedisce a
-    # un elenco di metodi di uno sconosciuto di allargare la pagina, e
-    # vale ancora — col tabacchino il libro puo' portare anche i metodi
-    # di un altro client.
-    prova("il taglio della scatola resta dov'e'", False, "overflow" in _scat)
-    # ⚠️ A SINISTRA, e la riga si pretende SCRITTA anche se «left» e'
-    # quel che si eredita: qui c'e' stato `center`, e una riga esplicita
-    # e' l'unica cosa che impedisce di rimetterlo per sbaglio.
-    prova("la scatola e' trasparente sulla card, a sinistra e senza stacco",
-          True,
-          "text-align:left" in _scat and "text-align:center" not in _scat
-          and "background:none" in _scat and "padding:0" in _scat
-          and "margin-top:0" in _scat and "width" not in _alone)
-    prova("il marchio tiene la sua tessera ambra solo fuori dalla card", True,
-          "linear-gradient(" in pezzo_js(css, ".p2p-marca{", "}"))
-    prova("...e nel CSS la variante chiara non ha lasciato regole orfane",
-          0, css.count(".p2p-barattozon.chiara"))
-    prova("la scatola dei metodi cede coi puntini come prima", True,
+        # FUORI dalla card il marchio porta la tessera, e la tessera sta
+        # in fila con le pillole sorelle: 13 piu' 2+2 fa 17, cioe' la
+        # riga esatta. Un pixel di piu' e quella pillola e' piu' alta
+        # delle altre.
+        _alta = int(_h.group(1)) + 2 * int(_p.group(1))
+        prova("la tessera sta nella riga, come le pillole sorelle",
+              True, _alta <= 17)
+        prova("...e la riempie: piu' piccola sarebbe marchio sprecato",
+              True, _alta >= 15)
+        # DENTRO l'insegna il marchio e' nudo e puo' crescere: fino a 17
+        # e' gratis (17 e' gia' l'altezza della riga), oltre alza la
+        # scatola e con lei la card. A 22 costa 5 di scatola e 3 di
+        # card, ed e' la misura scelta guardando tre rese affiancate.
+        _dentro = int(_hi.group(1))
+        prova("dentro l'insegna il marchio e' piu' grande di quello con la tessera",
+              True, _dentro > _alta - 4)
+        prova("...e quel che costa alla scatola resta un dito", True,
+              max(0, _dentro - 17) <= 8)
+    prova("la scatola dei metodi cede coi puntini come sempre", True,
           ".p2p-paga{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" in css)
+
+    # --- 6) DELLA CARD VESTITA NON RESTA NIENTE ---------------------
+    # ⚠️ Sei versioni provate e tolte: una pelle che nessuno emette, una
+    # funzione che nessuno chiama o un interruttore che non accende
+    # niente sono peso morto che SEMBRA una funzione. Vivono nei commit
+    # (CANTIERI, «La card semplice, e dove vivono i vestiti»), non qui.
+    prova("nel CSS non resta nessuna regola della card vestita", 0,
+          css.count(".p2p-barattozon"))
+    # ⚠️ SI CONTANO LE CHIAMATE, NON I NOMI — nome piu' parentesi: il
+    # commento del catalogo NOMINA queste funzioni apposta, per dire
+    # dove sono finite, e una sentinella che cercasse il solo nome
+    # sarebbe rossa per il commento che spiega perche' e' verde. E'
+    # la trappola gia' pagata tre volte (vedi «prove che rispondono
+    # per il vicino»): un commento non chiama niente.
+    prova("...e nel client nessuna delle sue funzioni o leve",
+          [0, 0, 0, 0],
+          [mini.count("classeVesteP2P("), mini.count("marchioInTestaP2P("),
+           mini.count("P2P_BARATTOZON_CHIARA "), mini.count("--barattozon-testa:")])
+    prova("...e nemmeno la seconda taglia del marchio", 0,
+          css.count(".p2p-marca.mini"))
 
 
 def prove_p2p_canale():
@@ -50960,9 +50916,14 @@ def prove_p2p_card_scambio():
     # IL METODO E' LA SCATOLA DEL LIBRO, la stessa riga e lo stesso
     # vestito: `.p2p-paga` cede coi puntini, e da qui non nasce nessuna
     # classe nuova.
+    # ⚠️ NEL LIBRO LA CLASSE HA UN MODIFICATORE (16 set 2026, l'insegna
+    # del marchio): la card scrive `p2p-box p2p-paga` e poi, se dentro
+    # non resta nessun nome, aggiunge `p2p-paga-marchio`. Le DUE classi
+    # di base restano le stesse, ed e' quello che questa riga
+    # sorveglia — la card dello scambio non deve inventarsene di sue.
     prova("il metodo veste la scatola delle card del libro", True,
           'class="p2p-box p2p-paga"' in rs
-          and 'class="p2p-box p2p-paga"' in riga)
+          and 'class="p2p-box p2p-paga${' in riga)
 
     # --- 4) IL BANCO: le funzioni vere ------------------------------
     node = _sh.which("node")

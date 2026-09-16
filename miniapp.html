@@ -2428,125 +2428,46 @@
      della cifra. */
   .p2p-mio{border-color:var(--orange);opacity:.85}
   .p2p-tuo{background:rgba(255,138,0,.10);color:var(--orange);font-weight:700}
-  /* ══ IL VESTITO BARATTOZON (16 set 2026, decisione di Andrea) ══
-     Gli ordini col tabacchino hanno una card SUA: gradiente caldo
-     ambra/arancio scuro che stacca dalle card normali senza fare il
-     banner — bordo e bagliore leggeri — e nella scatola 💳 il marchio
-     al posto del testo, GRANDE (30px), perche' e' la cosa che deve
-     saltare all'occhio; premio e scadenza restano dove stanno.
-     I TOKEN SI RISCRIVONO SULLA CARD, ed e' il modo in cui resta della
-     stessa famiglia: dentro e' un'isola scura anche col tema chiaro,
-     quindi inchiostro, grigio, verde e rosso prendono i valori gia'
-     tarati per il fondo bruno di sera, e badge, anello, stelline e
-     scatole vestono da soli — nessuna regola per ciascuno, e una riga
-     nuova nella card domani si veste senza saperlo.
-     IL MARCHIO E' BIANCO SU TRASPARENTE, quindi gli serve sempre un
-     fondo scuro sotto. Nella card glielo da' un ALONE navy — quello
-     della testata di Amazon — e non piu' una scatola (16 set 2026,
-     terzo giro, decisione di Andrea): il chip di casa sbiadiva sul
-     gradiente, il rettangolo pieno che l'aveva sostituito era una
-     toppa larga tutta la riga, e quel che ci vuole e' un marchio
-     APPOGGIATO sulla card, con i bordi che ci si sciolgono dentro.
-     COM'E' FATTO: LA CARD E' QUELLA DELLE SORELLE, e di suo ha solo
-     il CAPO. Non c'e' nessuna tessera — ne' rettangolo, ne' alone, ne'
-     bagliore — e non c'e' piu' nemmeno l'ambra: ci sono passate tutte,
-     e la storia sta in CANTIERI («La scelta rovesciata», «Il colore
-     che stacca», «Il navy diventa la card», «Solo il capo»). Il
-     gradiente parte dal navy in CIMA, dove siede il marchio, e scende
-     sciogliendosi nel colore normale della card.
-     ⚠️ E LA CARD NON RISCRIVE PIU' NESSUN TOKEN, che e' la parte che
-     cambia di piu' sotto il cofano: finche' il fondo era scuro,
-     inchiostro, grigio, verde e rosso dovevano schiarirsi tutti. Adesso
-     il fondo e' la carta di casa, quindi i token di casa sono gia'
-     quelli giusti — e riscriverne uno vorrebbe dire scrivere testo
-     chiaro sul bianco. Questa card e' una sorella con un cappello, e
-     una prova pretende che resti tale.
-     ⚠️ LE FERMATE DEL GRADIENTE SONO IN PIXEL, NON IN PERCENTO, ed e'
-     la riga da non ammorbidire: la card e' alta quanto il suo
-     contenuto — con o senza badge, con o senza stelline, e in due
-     lingue diverse — quindi una fermata in percento farebbe salire e
-     scendere la fascia navy sotto al marchio a seconda di quel che
-     c'e' SOTTO. In pixel la fascia e' quella e basta, e il marchio ci
-     siede pieno in ogni card.
-     LE MISURE CHE DEVONO STARE IN PARI, e una prova le rilegge dal
-     CSS a ogni giro: il marchio va da 12 a 52 (il respiro della card
-     piu' i suoi 40) e il navy tiene PIENO fino a 56 — sei pixel di
-     margine sotto il marchio, e mai tanti da mangiarsi la riga
-     dell'importo, che comincia a 82. Poi la dissolvenza, che deve
-     finire PRIMA che finisca la card piu' corta che esista: quella di
-     un ordine a prezzo fisso, senza badge, e' alta 146.
-     ⚠️ E QUI LA DISSOLVENZA HA UN SECONDO PADRONE, che con l'ambra non
-     c'era: il TESTO. La riga dell'importo comincia a 82, cioe' DENTRO
-     la sfumatura, e di giorno l'inchiostro e' scuro — quindi piu' la
-     sfumatura si allunga, piu' quella riga si trova su un grigio medio
-     e meno si legge. A 104 la carta e' arrivata all'87% quando il
-     testo comincia, e il contrasto misurato resta sopra il minimo per
-     il testo normale. Chi volesse allungarla ancora deve misurare
-     quello, non guardare la card: e' il numero che decide.
-     E LE FERMATE CALDE DI IERI SONO CADUTE con l'ambra: servivano a
-     scansare il fango fra navy e arancio, due colori su lati opposti
-     della ruota. Verso la carta la strada e' dritta e pulita.
-     ⚠️ IL TAGLIO DELLA SCATOLA RESTA DOV'E', ed e' la riga da non
-     ammorbidire: `.p2p-paga` TAGLIA quel che esce, ed e' cosi' che un
-     elenco di metodi lungo — testo di SCONOSCIUTI, che col tabacchino
-     puo' arrivare dal client di un altro — non allarga la pagina.
-     Netta, la tessera non esce dal suo riquadro e il taglio non ha
-     niente da tagliare: e' la ragione per cui questa forma non ha
-     bisogno di nessuna taratura che la contenga.
-     ORIZZONTALMENTE il marchio parte da 31, cioe' dalla colonna
-     dell'importo, del badge e delle scatole delle card sorelle: senza
-     tessera non c'e' piu' un riquadro da allineare, e ad allinearsi e'
-     l'inchiostro.
-     IL MARCHIO STA A 40px, e la sua tessera ambra vale FUORI di qui
-     (pillola del filtro e voce del foglio), dove un fondo scuro non ce
-     l'ha nessuno. L'ANELLO SCENDE con tutto il resto: a 12 sarebbe
-     finito sul navy, e li' sopra il tempo che resta si legge ma non
-     sta — quella fascia e' del marchio. */
+  /* ══ IL MARCHIO DEL METODO (16 set 2026) ══
+     Il marchio sta al posto del NOME, in tre posti: la scatola dei
+     metodi della card, la pillola del filtro e la voce del foglio
+     «Pubblica». E' bianco e arancio su trasparente, quindi gli serve
+     sempre un fondo scuro sotto, o la sua parola bianca sparisce sulla
+     carta chiara. Glielo danno due cose diverse: nella CARD la scatola
+     dei metodi, che diventa un'insegna navy tutta intera; fuori — la
+     pillola del filtro e la voce del foglio — una TESSERA sua, dello
+     stesso navy, perche' li' una scatola non c'e'.
+     IL NAVY E' #131A26, quello della testata di Amazon: la tinta
+     scelta dopo sedici rese (CANTIERI, «Il colore che stacca»), e
+     l'unica cosa di quel giro rimasta in piedi — su di lei il bianco
+     del marchio legge 16,6:1 e l'arancio 7,0:1.
+     ⚠️ LE DUE MISURE SONO DUE CONTI, non due gusti. La riga della
+     scatola e' alta 17 (12,5px di testo a interlinea normale), e tutto
+     quel che la passa ALZA la scatola e con lei la card. DENTRO
+     l'insegna il marchio e' nudo e sta a 22 — scelto da Andrea
+     guardando tre misure affiancate: costa cinque pixel di scatola e
+     tre di card, ed e' il prezzo della leggibilita'. FUORI, dove porta
+     la tessera che gli aggiunge 2+2 di respiro, resta a 13: li' la
+     pillola del filtro e le voci del foglio stanno in fila con le loro
+     sorelle, e una piu' alta delle altre si vedrebbe. Le prove rifanno
+     tutt'e due i conti leggendo i numeri dal CSS.
+     LA CARD VESTITA, quella con la sua pelle e il capo navy, e' stata
+     provata in sei versioni e poi tolta: vive nei commit, e gli hash
+     stanno in CANTIERI («La card semplice, e dove vivono i vestiti»).
+     Si recupera il giorno delle card in evidenza a pagamento. */
   .p2p-marca{display:inline-flex;align-items:center;vertical-align:middle;
-    padding:3px 8px;border-radius:8px;
-    background:linear-gradient(135deg,#8A4407,#C4620C 55%,#9A4C08)}
-  .p2p-marca img{display:block;height:40px;width:auto}
-  .p2p-marca.mini{padding:2px 6px;border-radius:6px;margin-top:-1px}
-  .p2p-marca.mini img{height:14px}
-  .p2p-ord.p2p-barattozon{
-    /* la tinta del CAPO, l'unica cosa che questa card ha di suo: una
-       DECISIONE, non un dettaglio — e' il navy della seconda versione,
-       ripescato da Andrea dopo sedici rese (CANTIERI, «Il colore che
-       stacca» e «Solo il capo»), e chi volesse rivederla cambia qui. */
-    --barattozon-testa:#131A26;
-    /* IL GRADIENTE, e le sue fermate in PIXEL: vedi il commento qui
-       sopra. Finisce su `var(--card)` e non su una tinta scritta a
-       mano, ed e' la riga che tiene la card in famiglia: di giorno la
-       carta e' bianca, di sera e' bruna, e il capo ci si scioglie
-       dentro tutt'e due le volte senza che nessuno debba ricordarsene. */
-    background:linear-gradient(180deg,var(--barattozon-testa) 0,
-      var(--barattozon-testa) 56px,var(--card) 104px);
-    border-color:rgba(255,170,80,.55);
-    box-shadow:0 0 0 1px rgba(255,138,0,.14),0 4px 14px rgba(110,55,5,.22)}
-  /* IL MARCHIO E' NUDO: il fondo scuro glielo da' la card. */
-  .p2p-ord.p2p-barattozon .p2p-marca{border-radius:0;padding:0;background:none}
-  /* l'importo comincia a 82 (12 + 40 del marchio + questi 30): sotto
-     la fascia navy, e dentro la dissolvenza — vedi il commento sul
-     secondo padrone della sfumatura, che e' il contrasto del testo. */
-  .p2p-ord.p2p-barattozon .p2p-testa{margin-top:30px}
-  /* e l'anello scende con lei, o starebbe sulla fascia del marchio */
-  .p2p-ord.p2p-barattozon .p2p-anello{top:84px}
-  /* la scatola non e' piu' una scatola: nessun fondo e nessun respiro
-     suo — a fare da riquadro e' la tessera. Il taglio resta dov'e': e'
-     la riga che le impedisce di allargare la pagina.
-     A SINISTRA e non centrata (16 set 2026, decisione di Andrea): la
-     tessera e' un riquadro, e un riquadro ha un bordo con cui
-     allinearsi — il suo lato sinistro cade a 31, sulla stessa colonna
-     dell'importo, del badge e delle scatole delle card sorelle.
-     Centrata galleggiava. La riga e' scritta ANCHE SE il valore e'
-     quello che si eredita: qui c'era `center`, e una riga che dice
-     «sinistra» e' l'unica cosa che impedisce di rimetterlo per sbaglio. */
-  .p2p-ord.p2p-barattozon .p2p-paga{background:none;box-shadow:none;
-    padding:0;margin-top:0;text-align:left}
-  /* ⚠️ LA VARIANTE CHIARA E' MORTA con la direzione definitiva: il
-     marchio si appoggia alla card, e su una card crema perderebbe la
-     sua parola bianca. Il perche' per esteso sta accanto al catalogo,
-     in `P2P_VESTE_METODI`. */
+    padding:2px 6px;border-radius:6px;margin-top:-1px;
+    background:#131A26}
+  .p2p-marca img{display:block;height:13px;width:auto}
+  /* L'INSEGNA: la scatola dei metodi quando dentro non resta nessun
+     nome. Prende il navy al posto della carta di casa, e il marchio ci
+     sta NUDO — la tessera qui sarebbe una toppa dentro un'insegna
+     dello stesso colore. Il raggio e il respiro restano quelli delle
+     scatole sorelle: a cambiare e' il solo fondo. */
+  .p2p-paga-marchio{background:#131A26}
+  .p2p-paga-marchio .p2p-marca{background:none;padding:0;border-radius:0;
+    margin-top:0}
+  .p2p-paga-marchio .p2p-marca img{height:22px}
   /* la reputazione e' UNA FRASE (set 2026, il ridisegno): niente piu'
      due pezzi ai bordi — si legge come si dice */
   .p2p-rep{font-size:12px}
@@ -36867,10 +36788,16 @@ function rigaOrdineP2P(o){
   /* il metodo VESTITO (16 set 2026): il marchio per chi ce l'ha nel
      catalogo, il testo per tutti gli altri — vedi P2P_VESTE_METODI. Il
      `title` resta il testo, che e' quel che viaggia nel tag `pm`. */
+  /* LA SCATOLA DIVENTA UN'INSEGNA quando dentro non resta nessun nome
+     (16 set 2026): fondo navy e il marchio nudo, vedi il CSS di
+     `.p2p-paga-marchio`. Il giudice e' lo STESSO dell'icona — «qui
+     dentro c'e' solo un marchio» — e si chiede una volta sola, perche'
+     due giudici sulla stessa domanda divergono al primo ritocco. */
+  const senzaIcona = iconaMetodiP2P(o.metodi) === '';
   const paga = o.metodi.length
-    ? `<div class="p2p-box p2p-paga" title="${esc(o.metodi.join(', '))}">`
-      + iconaMetodiP2P(o.metodi)
-      + o.metodi.map(m => marchioMetodoP2P(m, 'grande')).join(', ') + '</div>' : '';
+    ? `<div class="p2p-box p2p-paga${senzaIcona ? ' p2p-paga-marchio' : ''}" title="${esc(o.metodi.join(', '))}">`
+      + (senzaIcona ? '' : iconaMetodiP2P(o.metodi))
+      + o.metodi.map(m => marchioMetodoP2P(m)).join(', ') + '</div>' : '';
   /* LE STELLINE SONO QUELLE DEL MERCATINO (set 2026, decisione di
      Andrea): sotto il metodo, la media che quella persona ha gia'
      ricevuto QUI — e non piu' quella del coordinatore, che parlava di
@@ -36891,18 +36818,14 @@ function rigaOrdineP2P(o){
      ordine resta indistinguibile: e' il limite dichiarato di questo
      mattone, e lo chiude la marcatura via coordinatore. */
   const mio = ordineMioP2P(o.id);
-  /* col marchio in cima la scatola dei metodi apre la card: vedi
-     `marchioInTestaP2P` e, nel CSS, «il navy e' la card» */
-  const inTesta = marchioInTestaP2P(o.metodi);
   /* l'id viaggia nel dataset e non dentro la stringa dell'onclick:
      e' testo di sconosciuti — il patto del filtro-alfabeto */
-  return `<div class="p2p-ord${mio ? ' p2p-mio' : ''}${p2pFacce[o.id] ? ' con-faccia' : ''}${classeVesteP2P(o.metodi)}" data-id="${esc(o.id)}" role="button" tabindex="0"
+  return `<div class="p2p-ord${mio ? ' p2p-mio' : ''}${p2pFacce[o.id] ? ' con-faccia' : ''}" data-id="${esc(o.id)}" role="button" tabindex="0"
     onclick="prendiOrdineP2P(this.dataset.id)">
-    ${inTesta ? paga : ''}
     <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${anelloScadenzaP2P(o)}</div>
     ${paghiEuro ? rigaSats : rigaEuro}
     ${badge ? `<div class="p2p-badge-riga">${badge}${affarone}</div>` : ''}
-    ${inTesta ? '' : paga}
+    ${paga}
     ${rep ? '<div class="p2p-box p2p-rep">' + rep + '</div>' : ''}
     ${mio ? '<div class="p2p-box p2p-tuo">È il tuo ordine — tocca per aprirlo</div>' : ''}
   </div>`;
@@ -37374,7 +37297,7 @@ function renderFiltroP2P(){
     '<div class="section-label">Metodi di pagamento</div>' +
     '<div class="p2p-metodi">' + P2P_METODI.map(m =>
       pill(m, b.metodi.indexOf(m) >= 0, 'scegliMetodoFiltroP2P',
-           marchioMetodoP2P(m, 'mini'))).join('') +
+           marchioMetodoP2P(m))).join('') +
     '</div>' +
     /* SCONTO A SINISTRA, come lo slider (set 2026, ritocco di
        Andrea): il titolo diceva l'ordine opposto ai due capi qui
@@ -41873,16 +41796,22 @@ function tabacchinoP2P(metodi){
    recapito, il filtro) continuano a cercare la stringa.
    UN CATALOGO e non tre eccezioni scritte a mano nei tre posti: una
    voce che un domani volesse un marchio suo si aggiunge QUI e i tre
-   posti la vestono da soli. `classe` e' la pelle della card
-   (`.p2p-ord.<classe>`), `nome` e' l'alt del marchio, `soloMarchio`
-   dice che nella scatola dei metodi il marchio BASTA — vedi
-   `iconaMetodiP2P` — e `inTesta` che nella card va IN CIMA, appoggiato
-   alla zona scura del suo gradiente (vedi il CSS, «il navy e' la
-   card»). */
+   posti la vestono da soli. `nome` e' l'alt del marchio, `soloMarchio`
+   dice che nella scatola dei metodi il marchio BASTA, cioe' che li'
+   dentro l'emoji se ne va (vedi `iconaMetodiP2P`).
+   ⚠️ E IL CATALOGO E' RIMASTO DI TRE CAMPI, dopo un pomeriggio in cui
+   ne ha avuti il doppio (16 set 2026): la card VESTITA — capo navy,
+   gradienti, tessere, bordi, la pelle `p2p-barattozon` con la sua
+   `classeVesteP2P` e il marchio in cima con `marchioInTestaP2P` — e'
+   stata provata in sei versioni e poi TOLTA tutta, perche' la card
+   giusta e' quella uguale alle sorelle. Quel lavoro non e' perso e non
+   sta qui a fare peso: vive nei commit, e i loro hash stanno in
+   CANTIERI, «La card semplice, e dove vivono i vestiti». Si recupera
+   il giorno delle card in evidenza a pagamento, che e' il posto dove
+   quel vestito avra' un senso. */
 const P2P_VESTE_METODI = {
   'Contanti al tabacchino': {nome: 'Barattozon', logo: '/assets/barattozon.webp',
-                             classe: 'p2p-barattozon', soloMarchio: true,
-                             inTesta: true}
+                             soloMarchio: true}
 };
 /* ⚠️ LA VARIANTE CHIARA E' MORTA (16 set 2026, con la direzione
    definitiva): serviva a scegliere fra una card scura e una crema, e
@@ -41895,37 +41824,22 @@ function vesteMetodoP2P(m){
   return P2P_VESTE_METODI[m] || null;
 }
 /* il metodo come si MOSTRA: il marchio per chi ce l'ha, il testo per
-   gli altri. `taglia` e' 'grande' (la card) o 'mini' (pillola e
-   voce); con `conTesto` il marchio AFFIANCA la parola invece di
-   sostituirla — il foglio «Pubblica», dove la voce resta leggibile
-   per nome. Se il file non arriva, l'img si toglie e resta il nome nel
+   gli altri. Con `conTesto` il marchio AFFIANCA la parola invece di
+   sostituirla — il foglio «Pubblica», dove la voce resta leggibile per
+   nome. Se il file non arriva, l'img si toglie e resta il nome nel
    `title` del contenitore: mai una scatola vuota al posto del metodo.
-   Metodi di sconosciuti: esc() come sempre. */
-function marchioMetodoP2P(m, taglia, conTesto){
+   Metodi di sconosciuti: esc() come sempre.
+   ⚠️ LA MISURA E' UNA SOLA, in tutt'e tre i posti (16 set 2026): c'era
+   anche una taglia «grande» per la card, e se n'e' andata con la card
+   vestita. Nella scatola dei metodi il marchio deve stare nella riga
+   che c'e' — vedi il CSS di `.p2p-marca`, dove il conto e' scritto. */
+function marchioMetodoP2P(m, conTesto){
   const v = vesteMetodoP2P(m);
   if (!v) return esc(m);
-  const img = '<span class="p2p-marca' + (taglia === 'mini' ? ' mini' : '')
-    + '" title="' + esc(m) + '"><img src="' + v.logo + '" alt="' + esc(v.nome)
+  const img = '<span class="p2p-marca" title="' + esc(m) + '"><img src="'
+    + v.logo + '" alt="' + esc(v.nome)
     + '" onerror="this.parentNode.replaceWith(this.parentNode.title)"></span>';
   return conTesto ? esc(m) + ' ' + img : img;
-}
-/* la pelle della card: la classe del primo metodo vestito, o niente */
-function classeVesteP2P(metodi){
-  const v = (metodi || []).map(vesteMetodoP2P).find(Boolean);
-  return v ? ' ' + v.classe : '';
-}
-/* IL MARCHIO IN CIMA (16 set 2026): la card vestita mette la scatola
-   dei metodi PRIMA di tutto il resto, perche' il marchio si appoggia
-   alla zona scura del gradiente, che sta in alto. Lo dice il catalogo
-   (`inTesta`) e non la card: il giorno che una voce nuova volesse il
-   marchio dov'e' sempre stato, gli basta non chiederlo.
-   ⚠️ E CAMBIA L'ORDINE DEL MARKUP, non solo quello a vedersi: con un
-   `order` del flex il lettore di schermo direbbe ancora l'importo per
-   primo mentre l'occhio vede il marchio, e le due letture della stessa
-   card divergerebbero. Qui la card e' un solo bottone e si legge
-   tutta: l'ordine vero e' l'unico che c'e'. */
-function marchioInTestaP2P(metodi){
-  return (metodi || []).some(m => (vesteMetodoP2P(m) || {}).inTesta);
 }
 /* L'ICONA DELLA SCATOLA DEI METODI (16 set 2026, ritocco di Andrea).
    Il 💳 intesta dei NOMI: dice «quel che leggi qui sono i modi di
@@ -42571,7 +42485,7 @@ function renderNuovoOrdineP2P(){
           'onclick="scegliMetodoP2P(this.dataset.m)"><b aria-hidden="true">' +
           (p2pNuovoMetodi.indexOf(m) >= 0 ? '✓' : '') + '</b>'
           /* il marchio accanto al nome, per chi ce l'ha (16 set 2026) */
-          + marchioMetodoP2P(m, 'mini', true) + '</button>').join('') +
+          + marchioMetodoP2P(m, true) + '</button>').join('') +
         '</div>'
       : ''
   });
