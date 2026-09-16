@@ -23915,11 +23915,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   IL VESTITO BARATTOZON (16 set 2026, decisione di Andrea): nella UI il
   tabacchino si presenta col marchio Barattozon — grande (40px) al
   posto del testo nella scatola dei metodi della card del libro, che lì
-  porta il marchio al posto del nome, e quando dentro non resta nessun
-  nome la SCATOLA DEI METODI diventa un'insegna navy (#131A26) col
-  marchio dentro, nudo, a 22px. **La card è IDENTICA alle sorelle**:
-  nessuna pelle, nessun gradiente, nessun bordo suo — a vestirsi è la
-  scatola, non la card. Il 💳 se ne va
+  porta il marchio al posto del nome, dentro la sua tessera navy
+  (#131A26): 30px nella card, 13px nella pillola del filtro e nelle
+  voci del foglio, dove le pillole stanno in fila. **La card è IDENTICA
+  alle sorelle** e anche la scatola dei metodi lo è — fondo, bordo e
+  raggio di casa — tranne il respiro verticale, che scende da 8 a 3 per
+  far posto al marchio grande senza far scappare la scatola più di sei
+  punti. Il 💳 se ne va
   perché un marchio si intesta da sé; piccolo
   (14px) nella pillola del filtro e accanto alla voce nel foglio
   «Pubblica» —

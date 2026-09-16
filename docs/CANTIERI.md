@@ -16460,13 +16460,21 @@ resto del libro è che nella scatola dei metodi, al posto del testo
 tessera navy. Tutto il resto — sei versioni vestite provate in un
 pomeriggio — è uscito dal codice.
 
-**E IL RETTANGOLO NAVY È LA SCATOLA INTERA**, non una tessera dietro al
-marchio (chiarimento di Andrea, dopo un primo giro in cui avevo vestito
-il solo logo): quando dentro la scatola dei metodi non resta nessun
-nome, la scatola prende il navy al posto della carta di casa e il
-marchio ci sta **nudo** — una tessera dentro un'insegna dello stesso
-colore sarebbe una toppa. A cambiare è il SOLO fondo: raggio, respiro e
-margini restano quelli delle scatole sorelle.
+**IL RETTANGOLO NAVY È LA TESSERA DEL MARCHIO**, e la scatola non ha
+niente di suo. Ci sono voluti due giri per arrivarci: prima il navy era
+la TESSERA dietro al solo logo, poi — su chiarimento di Andrea — è
+diventato la SCATOLA intera col marchio nudo dentro, e mezz'ora dopo la
+scatola è tornata quella delle sorelle. **Il difetto della scatola navy
+non era estetico**: quel rettangolo pieno largo tutta la riga rifaceva,
+dentro una card bianca, la stessa toppa che avevamo passato il
+pomeriggio a togliere dalla card. Adesso il fondo scuro se lo porta il
+marchio addosso, come già fa fuori dalla card — ed è obbligatorio, non
+una scelta: senza, la sua parola bianca sparisce sulla carta chiara.
+⚠️ **E LA SCATOLA CEDE SOLO IL RESPIRO**: `padding` verticale da 8 a 3,
+e nient'altro. Non è cosmesi — è quello che permette a un marchio da 30
+di costare **sei** pixel invece di quattordici. Una prova rifà il conto
+(marchio più tessera più respiro, meno l'altezza di una scatola
+normale) e pretende che resti sotto gli otto.
 ⚠️ **E L'INSEGNA HA LO STESSO GIUDICE DELL'ICONA**, chiesto una volta
 sola: «qui dentro non resta nessun nome». Due giudici sulla stessa
 domanda divergono al primo ritocco, e divergerebbero in silenzio — una
@@ -16482,13 +16490,15 @@ c'è e il marchio si porta dietro una **tessera** dello stesso navy.
 alta 17 (12,5px di testo a interlinea normale). FUORI, con la tessera
 che aggiunge 2+2 di respiro, il marchio resta a **13**: lì le pillole
 stanno in fila con le sorelle, e una più alta delle altre si vedrebbe.
-DENTRO l'insegna il marchio è nudo e sta a **22** — scelto da Andrea
-guardando tre misure affiancate — e costa 4 pixel di scatola e 4 di
-card. Misurato sul vivo: card **144** contro i 140 della sorella,
-scatola **313x38** contro 313x34, marchio **70x22**, fondo
-`rgb(19,26,38)` dal computed style; a 320 e col tema di sera i numeri
-sono gli stessi, e la card più corta (prezzo fisso, senza badge) sta in
-122. Le prove rifanno tutt'e due i conti leggendo i numeri dal CSS.
+DENTRO la card non c'è nessuna fila e il marchio sale a **30** —
+scelto da Andrea — e col respiro della scatola sceso a 3 costa **sei**
+pixel di scatola e sei di card. Misurato sul vivo: card **146** contro
+i 140 della sorella, scatola **313x40** contro 313x34, marchio
+**95x30**; il fondo della scatola è `rgb(243,236,218)` di giorno e
+`rgb(55,48,31)` di sera, cioè `--chip-bg` nei due temi, letto dal
+computed style — la prova che non ha più niente di suo. A 320 i numeri
+sono gli stessi e la card più corta (prezzo fisso, senza badge) sta in
+124. Le prove rifanno tutt'e due i conti leggendo i numeri dal CSS.
 
 **DOVE VIVONO I VESTITI, e perché non nel codice.** Andrea ha chiesto
 di non buttare il lavoro delle versioni provate, lasciando la scelta
