@@ -16136,3 +16136,53 @@ dice `soloMarchio`, la card non scrive più nessun 💳 a mano, l'icona
 sparisce col solo marchio e resta in tutti gli altri quattro casi
 (misto compreso), il navy è pieno e il filo è un'ombra interna, il
 marchio è a 40px e nudo dentro la card in tutt'e due le varianti.
+
+**IL TERZO GIRO: L'ALONE AL POSTO DELLA TOPPA (16 set 2026).** Il
+rettangolo navy del giro prima era pieno, netto e largo tutta la riga,
+e Andrea l'ha chiamato col suo nome: una toppa. Adesso il marchio si
+appoggia su un **alone** — stesso navy, ma corto quanto lui più il
+respiro (191x68 invece di 313x56) e coi bordi che si sciolgono nel
+gradiente ambra.
+
+**COM'È FATTO, E PERCHÉ NON ALTRIMENTI.** Un `radial-gradient` ellittico
+**`closest-side`** sul marchio stesso: pieno sotto il logo, poi la
+dissolvenza, e **zero esatto sui quattro lati** del riquadro. Il
+`closest-side` non è un dettaglio di stile: col `farthest-corner` di
+default il gradiente arriva a zero negli ANGOLI, quindi a metà dei lati
+resterebbe del colore e il riquadro tornerebbe a vedersi — cioè la
+toppa, con un contorno più morbido. Un bordo che non tocca niente non
+si vede.
+⚠️ **NIENTE `filter:blur` NÉ `box-shadow`**, che sono le due strade
+istintive per «sfumare»: escono dal riquadro, e `.p2p-paga` TAGLIA —
+quel taglio è la riga che le impedisce di allargare la pagina, e non si
+tocca. Un alone tagliato di netto a metà dissolvenza è la toppa di
+nuovo, con un lato dritto. Tutto dentro il riquadro, e la regola resta
+dov'è.
+
+**LE CINQUE RESE, GUARDATE UNA SOTTO L'ALTRA** (è una decisione di
+disegno: si guarda, non si legge). Tenuta la taratura stretta —
+padding 14/32, pieno fino al 66%, dissolvenza fino all'88% e zero al
+100% — perché **il marchio è largo e basso** (127x40) e un'ellisse che
+lo contenga comoda non sta in una riga da 313: con la dissolvenza più
+generosa (stop al 54-60%) le due punte, che sono arancio, finivano sul
+navy già smagrito e perdevano il fondo proprio dove serve.
+**Scartate due strade**: l'alone appoggiato a SINISTRA, che senza un
+bordo con cui allinearsi sembra scivolato in un vuoto lungo due terzi
+di riga (l'alone è centrato: il suo centro è l'unico punto che si veda
+davvero); e il rettangolo arrotondato col bagliore dello stesso colore,
+che resta una toppa con un contorno morbido — si vede ancora la forma,
+ed è la forma il difetto.
+
+**I NUMERI (375px, ricontrollati a 320).** Alone 191x68, marchio 127x40
+dentro; la riga passa da 56 a 68 e la card da 182 a **174** (contro i
+140 di una card normale); la scatola non ha più fondo
+(`rgba(0,0,0,0)` dal computed style) e finisce 15px dentro il bordo
+della card; premio, scadenza e anello dove stavano; `scrollWidth` 375 a
+375 e 320 a 320. A 320 l'alone non si stringe: è largo 191 in una riga
+da 258.
+
+**COSA È STATO PROVATO** (`prove_p2p_barattozon`, 31 verdi): il fondo è
+un `radial-gradient(ellipse closest-side`, arriva a `rgba(19,26,38,0)
+100%`, non ha `filter:` né `box-shadow:0` e non tocca l'`overflow`
+della scatola; la scatola non ha più fondo né ombra ed è centrata;
+l'alone non ha `width`, cioè resta corto quanto il suo contenuto.

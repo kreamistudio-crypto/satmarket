@@ -23915,8 +23915,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   IL VESTITO BARATTOZON (16 set 2026, decisione di Andrea): nella UI il
   tabacchino si presenta col marchio Barattozon — grande (40px) al
   posto del testo nella scatola dei metodi della card del libro, che lì
-  diventa un'INSEGNA navy piena (#131A26, quello della testata di
-  Amazon) e perde il 💳, perché un marchio si intesta da sé; piccolo
+  non è più una scatola: il marchio si appoggia su un ALONE navy
+  (#131A26, quello della testata di Amazon) corto quanto lui più il
+  respiro, coi bordi che si sciolgono nel gradiente, e il 💳 se ne va
+  perché un marchio si intesta da sé; piccolo
   (14px) nella pillola del filtro e accanto alla voce nel foglio
   «Pubblica» —
   e la card del libro veste un gradiente ambra/arancio scuro. IL TAG
