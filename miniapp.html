@@ -2453,9 +2453,12 @@
      c'e', mai un pixel di piu'. I numeri da cui partono sono MISURATI
      sul vivo, non dedotti dal foglio di stile.
      NELLA VOCE DEL FOGLIO «Pubblica» il marchio sta accanto al nome e
-     tiene la sua tessera: la riga della voce e' alta 20 (14px di testo,
-     interlinea normale), la tessera aggiunge 2+2, quindi il marchio sta
-     a 16 e la voce resta alta 38 come le sorelle.
+     tiene la sua tessera, perche' li' la parola serve a scegliere e un
+     fondo su tutta la riga la coprirebbe. La voce e' alta 38 e non
+     deve crescere, ma il suo respiro puo' stringersi: sceso da 9 a 4,
+     dentro restano 30, meno il 2+2 della tessera fa 26 di marchio —
+     dieci in piu' del primo giro, a parita' di riga. La parola accanto
+     si stringe un po', ed e' il prezzo che Andrea ha scelto di pagare.
      NELLA PILLOLA DEL FILTRO il marchio e' nudo, perche' li' il fondo
      scuro ce l'ha la pillola: dentro i suoi 30 stanno 5+5 di respiro,
      1+1 di bordo e 18 di spazio — che sono il marchio, esatti.
@@ -3070,6 +3073,14 @@
     color:var(--ink);padding:9px 8px;border-radius:10px;cursor:pointer}
   .p2p-voce:hover{background:var(--card)}
   .p2p-voce b{flex:0 0 auto;width:16px;text-align:center;color:var(--trust)}
+  /* LA VOCE COL MARCHIO: il respiro si stringe e il marchio si prende
+     quel che resta, senza che la voce cresca — 38 come le sorelle.
+     ⚠️ E STA QUI, DOPO `.p2p-voce`, non lassu' col marchio: hanno la
+     stessa specificita' e a decidere e' l'ordine. Scritta accanto al
+     marchio perdeva, e la voce cresceva a 47 invece di restare a 38
+     (misurato, non immaginato). */
+  .p2p-voce-marchio{padding-top:4px;padding-bottom:4px}
+  .p2p-voce-marchio .p2p-marca img{height:26px}
   /* la leva del tipo di prezzo */
   .p2p-leva{flex:0 0 auto;display:inline-flex;align-items:center;gap:8px;border:0;
     background:none;font:inherit;font-weight:700;font-size:12.5px;color:var(--muted);
@@ -5467,8 +5478,19 @@
      tonde: quelle non sono bottoni-oggetto, sono etichette. */
   .btn:disabled{opacity:.55;pointer-events:none}
   /* overlay di attesa: blocca tutto mentre i sats viaggiano */
+  /* ⚠️ NIENTE `backdrop-filter` (16 set 2026, dal campo: «lo sfondo e'
+     sgranato, il gradiente si vede a bande»). La sfocatura di un
+     fondo con un gradiente sotto si calcola a otto bit per canale e su
+     molte schede esce a SCALINI — bande larghe che sembrano un
+     difetto della pagina. Al suo posto una velatura piu' fitta e
+     PIATTA, che non ha niente da interpolare. E' la stessa strada gia'
+     presa dall'header ad agosto — per un'altra ragione, il fondo
+     diventato opaco — ma NON e' vera per tutta la casa: le quattro
+     barre (nav, testate) la sfocatura ce l'hanno ancora, e li' sta su
+     una striscia sottile dove le bande non si vedono. Il difetto e' di
+     un velo GRANDE sopra un gradiente, non del filtro in se'. */
   #attesaOverlay{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;
-    background:rgba(20,20,22,.45);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+    background:rgba(20,20,22,.62)}
   #attesaOverlay.on{display:flex}
   .attesa-card{background:var(--bg);border-radius:16px;padding:20px 26px;font-weight:800;font-size:15.5px;
     display:flex;align-items:center;gap:10px;box-shadow:0 10px 40px rgba(0,0,0,.25)}
@@ -5478,6 +5500,23 @@
   .attesa-jar{width:34px;height:34px;border-radius:10px;flex:none;
     animation:scuoti 1.1s ease-in-out infinite}
   .attesa-jar + .attesa-clessidra{display:none}
+  /* ══ L'ANELLO SOTTILE (16 set 2026, richiesta di Andrea) ══
+     Il barattolino e' il segno di casa e resta dov'e': qui serviva un
+     giro PIU' FINE, e in casa un anello non c'era — questo e' il
+     primo. Due pixel di filo, il quarto acceso in arancio, e gira col
+     `gira` che c'e' gia' (quello della clessidra): un keyframe nuovo
+     per la stessa cosa sarebbe il secondo da tenere in pari.
+     Lo accende chi chiama l'attesa, una classe sull'overlay: cosi' il
+     velo resta UNO e non nasce un secondo velo che gli somiglia. */
+  #attesaOverlay.anello .attesa-jar,
+  #attesaOverlay.anello .attesa-clessidra{display:none}
+  .attesa-anello{display:none;width:24px;height:24px;flex:none;
+    border-radius:50%;border:2px solid var(--line);
+    border-top-color:var(--sats);animation:gira .8s linear infinite}
+  #attesaOverlay.anello .attesa-anello{display:block}
+  @media (prefers-reduced-motion:reduce){
+    .attesa-anello{animation:none}
+  }
   .attesa-clessidra{font-size:22px;animation:gira 1.6s linear infinite}
   @keyframes gira{to{transform:rotate(360deg)}}
   @keyframes scuoti{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
@@ -9466,7 +9505,7 @@ document.getElementById('cartello')?.remove();</script>
   <!-- La pastiglia del gesto «tira giù per aggiornare» -->
   <div class="ptr" id="ptr" aria-hidden="true"><span>↻</span></div>
   <div class="toast" id="toast"></div>
-  <div id="attesaOverlay"><div class="attesa-card"><img class="attesa-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()"><span class="attesa-clessidra">⏳</span> <span id="attesaTesto">Invio sats in corso…</span></div></div>
+  <div id="attesaOverlay"><div class="attesa-card"><img class="attesa-jar" src="/assets/barattolo.jpeg" alt="" onerror="this.remove()"><span class="attesa-clessidra">⏳</span><span class="attesa-anello"></span> <span id="attesaTesto">Invio sats in corso…</span></div></div>
 </div>
 
 <script>
@@ -27653,11 +27692,14 @@ function bottoneInAttesa(btn, testo){
    quella lettura E' la ricevuta, e non torna indietro — quindi resta
    col velo immediato, che li' e' proprio la guardia. */
 const RITARDO_ATTESA = 180;
-function attesaRitardata(btn, testo){
+/* `anello` scambia il barattolino con l'anello sottile, per chi vuole
+   un giro piu' discreto (il P2P). Il velo resta lo stesso. */
+function attesaRitardata(btn, testo, anello){
   let acceso = false, prima = '';
   const t = setTimeout(()=>{
     acceso = true;
     el('attesaTesto').textContent = testo || 'Un attimo…';
+    el('attesaOverlay').classList.toggle('anello', !!anello);
     el('attesaOverlay').classList.add('on');
     if (btn) { prima = btn.innerHTML; btn.disabled = true; btn.innerHTML = '⏳ ' + (testo || 'Un attimo…'); }
   }, RITARDO_ATTESA);
@@ -37057,7 +37099,7 @@ function renderP2P(){
         + '<button class="btn ghost" onclick="ricaricaP2P()">↻ Riprova</button></div>'
       : '';
     if (p2pErrore) chiudiAttesaP2P();
-    else if (!p2pAttesa) p2pAttesa = attesaRitardata(null, 'Aspetta…');
+    else if (!p2pAttesa) p2pAttesa = attesaRitardata(null, 'Aspetta…', true);
     box.innerHTML = attesa;
     if (mieiBox) mieiBox.innerHTML = attesa;
     /* niente pillola finche' non c'e' un libro da filtrare: un
@@ -37368,11 +37410,14 @@ function renderFiltroP2P(){
   /* `dentro` e' quel che si vede nella pillola quando non e' il testo:
      il marchio del metodo vestito (16 set 2026). Il `data-v` resta il
      testo, che e' la chiave che il filtro confronta col tag `pm`. */
-  const pill = (testo, scelto, gesto, dentro) =>
+  /* ⚠️ `vestita` E' UN ARGOMENTO SUO, e non si deduce da `dentro`: quel
+     parametro e' PIENO SEMPRE — per i metodi senza marchio contiene il
+     loro nome — e dedurne il navy ha tinto di blu tutte le pillole dei
+     metodi (16 set 2026, visto da Andrea). Il navy lo decide il
+     CATALOGO, che e' l'unico che sa chi ha un marchio. */
+  const pill = (testo, scelto, gesto, dentro, vestita) =>
     '<button type="button" class="tema-pill' + (scelto ? ' active' : '') +
-    /* la pillola col marchio si riempie di navy, come la scatola della
-       card: il giudice e' lo stesso che decide cosa ci va dentro */
-    (dentro ? ' p2p-pill-marchio' : '') +
+    (vestita ? ' p2p-pill-marchio' : '') +
     '" data-v="' + esc(testo) + '" onclick="' + gesto + '(this.dataset.v)">' +
     (dentro || esc(testo)) + '</button>';
   box.innerHTML =
@@ -37383,7 +37428,7 @@ function renderFiltroP2P(){
     '<div class="section-label">Metodi di pagamento</div>' +
     '<div class="p2p-metodi">' + P2P_METODI.map(m =>
       pill(m, b.metodi.indexOf(m) >= 0, 'scegliMetodoFiltroP2P',
-           marchioMetodoP2P(m))).join('') +
+           marchioMetodoP2P(m), !!vesteMetodoP2P(m))).join('') +
     '</div>' +
     /* SCONTO A SINISTRA, come lo slider (set 2026, ritocco di
        Andrea): il titolo diceva l'ordine opposto ai due capi qui
@@ -42566,7 +42611,11 @@ function renderNuovoOrdineP2P(){
       '<span>' + esc(scelti) + '</span><i aria-hidden="true">▾</i></button>',
     sotto: p2pNuovoAperta
       ? '<div class="p2p-voci">' + metodiPubblicabiliP2P(compro ? 'compro' : 'vendo').map(m =>
-          '<button type="button" class="p2p-voce" data-m="' + esc(m) + '" ' +
+          /* la voce col marchio stringe il respiro per farlo grande:
+             la classe la chiede il CATALOGO, come la pillola */
+          '<button type="button" class="p2p-voce' +
+          (vesteMetodoP2P(m) ? ' p2p-voce-marchio' : '') +
+          '" data-m="' + esc(m) + '" ' +
           'aria-pressed="' + (p2pNuovoMetodi.indexOf(m) >= 0 ? 'true' : 'false') + '" ' +
           'onclick="scegliMetodoP2P(this.dataset.m)"><b aria-hidden="true">' +
           (p2pNuovoMetodi.indexOf(m) >= 0 ? '✓' : '') + '</b>'

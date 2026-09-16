@@ -4997,7 +4997,12 @@ def prove_busta_ritiro():
     # Paga. Sotto la soglia non compare mai, oltre compare una volta.
     prova("la lettura non alza piu' il velo immediato", False,
           "bottoneInAttesa" in mb)
-    _ar = pezzo_js(mini, "function attesaRitardata(btn, testo){")
+    # ⚠️ LA FIRMA HA UN TERZO ARGOMENTO dal 16 set 2026 (l'anello
+    # sottile del P2P): questa ancora e' la sola cosa che tiene il
+    # censimento del velo agganciato alla funzione vera, e quando la
+    # firma e' cambiata la prova e' ESPLOSA invece di diventare rossa.
+    # A dirlo e' stata la suite intera.
+    _ar = pezzo_js(mini, "function attesaRitardata(btn, testo, anello){")
     prova("l'attesa ritardata arma un timer e non tocca subito il DOM",
           True, "setTimeout(" in _ar
           and _ar.index("setTimeout(") < _ar.index("classList.add('on')"))
@@ -5088,6 +5093,11 @@ def prove_busta_ritiro():
                   "const finti = {attesaTesto:{textContent:''},"
                   " attesaOverlay:{classList:{"
                   "  add:()=>registro.push('acceso'),"
+                  # ⚠️ il velo sa anche SCAMBIARE il barattolino con
+                  # l'anello (16 set 2026): il cartone deve saperlo fare,
+                  # o la funzione VERA muore qui dentro per colpa del
+                  # banco — ed e' il banco a mancare, non il codice.
+                  "  toggle:(c,v)=>registro.push((v?'con ':'senza ')+c),"
                   "  remove:()=>registro.push('spento')}}};\n"
                   "const el = id => finti[id];\n")
         _prog4 = (_banco + _ar_js + "\n"
@@ -5117,7 +5127,14 @@ def prove_busta_ritiro():
               "volta sola se e' lenta, e il bottone torna com'era",
               [{"velo": "", "etichetta": "👁 Mostra il codice",
                 "spento": False},
-               {"velo": "acceso+spento", "etichetta": "👁 Mostra il codice",
+               # ⚠️ IL REGISTRO DICE ANCHE QUALE GIRO (16 set 2026): la
+               # ritardata sceglie fra il barattolino di casa e l'anello
+               # sottile, e questa lettura — che non chiede l'anello —
+               # deve prendere il barattolino. «senza anello» e' quella
+               # scelta, e sta PRIMA dell'accensione perche' il velo si
+               # veste prima di farsi vedere.
+               {"velo": "senza anello+acceso+spento",
+                "etichetta": "👁 Mostra il codice",
                 "spento": False}],
               _js4.loads(_r4.stdout.strip()) if _r4.returncode == 0
               else f"ERRORE: {_r4.stderr[:160]}")
@@ -47735,7 +47752,8 @@ def prove_p2p_barattozon():
            "p2p-barattozon" in riga])
     filtro = pezzo_js(mini, "function renderFiltroP2P(){", "\n}\n")
     prova("il filtro: la pillola col marchio, la chiave resta il testo", True,
-          "marchioMetodoP2P(m))" in filtro and "data-v=\"' + esc(testo)" in filtro)
+          "marchioMetodoP2P(m), !!vesteMetodoP2P(m))" in filtro
+          and "data-v=\"' + esc(testo)" in filtro)
     nuovo = pezzo_js(mini, "function renderNuovoOrdineP2P(){", "\n}\n")
     prova("il foglio Pubblica: il marchio ACCANTO al nome, non al suo posto", True,
           "marchioMetodoP2P(m, true)" in nuovo)
@@ -47917,6 +47935,18 @@ def prove_p2p_barattozon():
     _pilmi = pezzo_js(css, ".p2p-pill-marchio .p2p-marca img{", "}")
     prova("la pillola col marchio si riempie di navy", True,
           "background:#131A26" in _pilm)
+    # ⚠️ E IL NAVY LO DECIDE IL CATALOGO, non la presenza del testo
+    # dentro la pillola: quel parametro e' pieno SEMPRE — per i metodi
+    # senza marchio contiene il loro nome — e dedurne il navy aveva
+    # tinto di blu TUTTE le pillole dei metodi (16 set 2026, visto da
+    # Andrea). Una prova che guardasse solo il CSS non l'avrebbe mai
+    # detto: la regola era giusta, era chi la indossava a essere
+    # sbagliato.
+    prova("...e il navy lo decide il catalogo, non il testo della pillola",
+          True,
+          "const pill = (testo, scelto, gesto, dentro, vestita) =>" in filtro
+          and "(vestita ? ' p2p-pill-marchio' : '')" in filtro
+          and "marchioMetodoP2P(m), !!vesteMetodoP2P(m))" in filtro)
     # la coppia vale anche qui: fondo scuro sulla pillola, marchio nudo
     prova("...e il marchio ci sta nudo, come nella scatola della card",
           True, "background:none" in _pilmm)
@@ -47948,9 +47978,31 @@ def prove_p2p_barattozon():
     if not _vp or not _mi or not _mp:
         prova("le misure della voce si leggono dal CSS", True, False)
     else:
-        # 20 e' la riga MISURATA della voce (14px, interlinea normale)
-        prova("nella voce la tessera riempie la riga senza alzarla",
-              20, int(_mi.group(1)) + 2 * int(_mp.group(1)))
+        # ⚠️ LA VOCE COL MARCHIO STRINGE IL RESPIRO per farlo grande:
+        # 38 e' l'altezza MISURATA della voce sorella, e il marchio si
+        # prende quel che resta tolto il respiro suo e la tessera. Non
+        # deve CRESCERE: se il conto passa i 38 la voce si alza, e in
+        # una lista di voci una piu' alta si vede.
+        _vm = pezzo_js(css, ".p2p-voce-marchio{", "}")
+        _vmi = pezzo_js(css, ".p2p-voce-marchio .p2p-marca img{", "}")
+        _vmp = _re_p.search(r"padding-top:(\d+)px", _vm)
+        _vmh = _re_p.search(r"height:(\d+)px", _vmi)
+        if not _vmp or not _vmh:
+            prova("le misure della voce col marchio si leggono dal CSS",
+                  True, False)
+        else:
+            _alta = int(_vmh.group(1)) + 2 * int(_mp.group(1)) + 2 * int(_vmp.group(1))
+            prova("la voce col marchio non cresce oltre le sorelle",
+                  True, _alta <= 38)
+            prova("...e il marchio si prende quel che resta, a un pixel",
+                  True, 38 - _alta <= 1)
+            prova("...ed e' piu' grande di quello che sta nelle pillole",
+                  True, int(_vmh.group(1)) > int(_mi.group(1)))
+        # ⚠️ E LA REGOLA STA DOPO `.p2p-voce`, o perde: stessa
+        # specificita', decide l'ordine — scritta accanto al marchio la
+        # voce cresceva a 47 invece di restare a 38 (misurato).
+        prova("...e la regola vince su `.p2p-voce`, che ha la stessa specificita'",
+              True, css.index(".p2p-voce-marchio{") > css.index("  .p2p-voce{"))
 
     # --- 8) IL CARICAMENTO E' QUELLO DI CASA ------------------------
     # ⚠️ NIENTE PAROLE DEL PROTOCOLLO a chi apre la sezione: il libro,
@@ -47958,7 +48010,7 @@ def prove_p2p_barattozon():
     # velo di casa, lo stesso di tutta l'app.
     _rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
     prova("il caricamento del P2P e' il velo di casa, con la parola di casa",
-          True, "attesaRitardata(null, 'Aspetta…')" in _rp)
+          True, "attesaRitardata(null, 'Aspetta…', true)" in _rp)
     prova("...e della scritta di prima non resta niente", 0,
           mini.count("Leggo il libro"))
     # ⚠️ UN VELO A TUTTO SCHERMO CHE RESTA APERTO E' L'APP BLOCCATA, e
@@ -47975,6 +48027,34 @@ def prove_p2p_barattozon():
     prova("...ed e' uno solo, non uno per render", True,
           "if (!p2pAttesa) p2pAttesa = attesaRitardata" in _rp
           and "let p2pAttesa = null;" in mini)
+    # ⚠️ L'ANELLO E' UN'OPZIONE DEL VELO DI CASA, non un secondo velo:
+    # il barattolino resta il segno dell'app e vive dov'e' sempre
+    # stato; qui serviva un giro piu' fine, e lo accende chi chiama.
+    _an = pezzo_js(css, ".attesa-anello{", "}")
+    prova("l'anello e' sottile e gira col keyframe che c'e' gia'", True,
+          "border:2px solid" in _an and "animation:gira" in _an)
+    prova("...e lo accende chi chiama l'attesa, sul velo di casa", True,
+          "function attesaRitardata(btn, testo, anello){" in mini
+          and "classList.toggle('anello', !!anello)" in mini
+          and "attesaRitardata(null, 'Aspetta…', true)" in _rp)
+    prova("...e col moto ridotto sta fermo, come il resto", True,
+          ".attesa-anello{animation:none}" in css.replace("\r\n", "").replace("  ", ""))
+    # ⚠️ IL VELO NON HA PIU' LA SFOCATURA (dal campo: «lo sfondo e'
+    # sgranato, il gradiente si vede a bande»): la sfocatura di un fondo
+    # con un gradiente sotto esce a scalini su molte schede. E' la
+    # stessa strada gia' presa dall'header, che il `backdrop-filter`
+    # l'aveva tolto ad agosto — in casa non vive piu' da nessuna parte.
+    _ov = pezzo_js(css, "#attesaOverlay{", "}")
+    prova("il velo e' una velatura piatta, senza sfocatura", True,
+          "backdrop-filter" not in _ov and "rgba(20,20,22,.62)" in _ov)
+    # ⚠️ E LA CASA NON C'ENTRA: le quattro barre la sfocatura ce l'hanno
+    # ancora, e li' va bene — stanno su strisce sottili, dove le bande
+    # non si vedono. Il difetto e' di un velo GRANDE sopra un
+    # gradiente. Una prima stesura di questa riga pretendeva zero
+    # `backdrop-filter` in tutto il file ed e' uscita rossa: il
+    # commento accanto diceva il falso, e a dirlo e' stata la prova.
+    prova("...e le barre la tengono, che li' non fa bande", True,
+          css.count("backdrop-filter") >= 4)
 
 
 def prove_p2p_canale():
