@@ -38711,14 +38711,32 @@ const P2P_FINALI = ['concluso', 'annullato', 'rifiutato'];
    guardare il ramo del timeout senza aspettare mezzo minuto */
 let P2P_ATTESA_MS = 30000;
 const P2P_SCADENZA_MSG = 3600;   // quanto vive un nostro kind 14 (NIP-40)
-let p2pRelayVivo = null;         // la connessione viva: UNA, e resta aperta
-let p2pConnessa = null;          // la promessa in volo (due gesti non fanno due connessioni)
+/* LA CONNESSIONE VIVA E' UN CORO (16 set 2026, dal campo: «nessuna
+   risposta» a intermittenza, e i log del nodo dicevano che quando il
+   messaggio ARRIVA mostro risponde sempre — nei giri falliti non gli
+   arrivava proprio, e relay.mostro.network andava in timeout anche sui
+   publish del coordinatore stesso). Prima si parlava con UN relay, il
+   primo che apriva la websocket: un relay che apre e poi tace si
+   sceglieva uguale, e quel che partiva da li' moriva senza che niente
+   fallisse. Il disegno sta sopra `mostroConnetti`. */
+let p2pRelayVivi = {};           // url -> Relay connesso: il coro, e resta aperto
+let p2pConnessioni = {};         // url -> la promessa di connessione in volo
+let p2pConnessa = null;          // la promessa del primo giro (due gesti non fanno due giri)
+let p2pAscolti = [];             // gli ascolti aperti sul coro: si riapplicano a chi si riconnette
 let p2pSub = null;
 let p2pSubChiavi = '';           // la firma delle pubkey ascoltate: uguale = non si rifa'
 let p2pAttese = {};              // request_id -> {ok, no, t}
-let p2pVisti = [];               // gli id gia' letti: il relay puo' ripetere
+let p2pVisti = [];               // gli id gia' letti: il relay puo' ripetere, e il coro lo fa apposta
 let p2pRichiesta = Math.floor(Date.now() / 1000);
-let p2pRiconnetti = 0;
+let p2pRiconnetti = {};          // url -> quante cadute di fila (l'attesa cresce)
+/* quanto si aspetta che ALMENO UN relay confermi un invio: oltre, il
+   messaggio non e' partito e si dice. `let` per il banco. Copre una
+   websocket da aprire (P2P_LIBRO_MS) piu' l'OK del bundle (4,4 s). */
+let P2P_ACK_MS = 12000;
+/* la parola a chi legge: mai «relay» (la regola delle parole di casa,
+   che il banco fa rispettare) — il fatto e' che il messaggio non e'
+   partito, e si dice cosi' */
+const P2P_NON_PARTITO = 'Il messaggio non è partito';
 let p2pOrdineAperto = '';
 let p2pHoldOrdine = '';
 let p2pIncassoOrdine = '';
@@ -39079,46 +39097,203 @@ function bustaMostro(skTrade, skIdentita, msg){
          JSON.stringify(prova || null) + ']';
 }
 
-/* ---- la connessione viva ----
+/* ---- la connessione viva: un CORO di relay ----
    Il libro ordini si legge e si chiude (leggiLibroMostro); qui invece
    la connessione RESTA aperta, perche' le risposte del coordinatore
    arrivano quando arrivano — dopo un'ora, dopo il gesto di un altro —
-   e chi non ascolta non le vede mai. */
-function mostroConnetti(){
-  if (p2pRelayVivo && p2pRelayVivo.connected) return Promise.resolve(p2pRelayVivo);
-  if (p2pConnessa) return p2pConnessa;
-  p2pConnessa = (async () => {
-    const c = p2pCoord();
-    if (!c || !c.mostro || !Array.isArray(c.relay) || !c.relay.length)
-      throw new Error('Gli scambi P2P non sono disponibili');
+   e chi non ascolta non le vede mai.
+   ⚠️ ED E' UN CORO, NON UN RELAY SOLO (16 set 2026, dal campo). Fin
+   qui `mostroConnetti` scorreva la lista e teneva il PRIMO relay che
+   apriva la websocket; tutto — invio e ascolto — passava da quello.
+   Un relay che apre e poi tace (relay.mostro.network, in testa alla
+   lista, in timeout anche sui publish del coordinatore) si sceglieva
+   come uno sano, e il messaggio scritto solo li' moriva: «publish timed
+   out» valeva «partito senza OK», si aspettavano trenta secondi una
+   risposta a una domanda mai arrivata, e a schermo «nessuna risposta».
+   ADESSO: ci si connette a TUTTI i relay del coordinatore insieme
+   (`mostroConnetti` torna appena UNO risponde, gli altri arrivano in
+   sottofondo e chi manca si riprova al gesto dopo); un evento parte
+   verso tutti ed e' inviato con la PRIMA conferma
+   (`pubblicaSuTuttiP2P`), gli altri seguono da soli; gli ascolti
+   stanno su tutti e si riapplicano a chi si riconnette (`ascoltaP2P`);
+   la dedup di `p2pVisti` fa il resto, perche' la stessa risposta da
+   due relay e' lo STESSO evento, con lo stesso id.
+   CHI CHIAMA NON SE NE ACCORGE: `mostroConnetti` torna una voce con
+   `publish`, `subscribe` e `connected` come il Relay di prima, e
+   `mostroChiama`, la restore, i recapiti e la via di riserva parlano
+   con quella. La differenza che SI VEDE e' una sola: quando NESSUN
+   relay conferma entro P2P_ACK_MS l'errore lo dice (`relayMuti`), e
+   il foglio scrive «il messaggio non è partito» invece di un
+   generico silenzio dopo trenta secondi — senza la parola «relay»,
+   che a chi entra da Telegram non dice niente (le parole di casa).
+   ⚠️ GLI SPECCHI RESTANO FUORI DAL CORO, e non e' una dimenticanza: un
+   OK da un relay dove mostrod non ascolta sarebbe un «inviato» falso —
+   esattamente il guasto muto che questa voce cura. Lo specchio entra
+   nel coro il giorno che il coordinatore lo ascolta, e quel giorno
+   entra in MOSTRO_RELAY dal config, senza toccare una riga qui. */
+function urlViviP2P(){
+  const c = p2pCoord();
+  return (c && c.mostro && Array.isArray(c.relay)) ? c.relay.filter(Boolean) : [];
+}
+function erroreRelayMutiP2P(esiti){
+  const e = new Error(P2P_NON_PARTITO + ': nessuno ha confermato in '
+                      + Math.round(P2P_ACK_MS / 1000) + ' s. Riprova fra un momento');
+  e.relayMuti = true;
+  e.esiti = esiti || [];
+  return e;
+}
+/* UNA CONNESSIONE PER RELAY, e una sola in volo per url: due gesti
+   nello stesso respiro non aprono due websocket verso lo stesso posto */
+function connettiUnoP2P(url){
+  const gia = p2pRelayVivi[url];
+  if (gia && gia.connected) return Promise.resolve(gia);
+  if (p2pConnessioni[url]) return p2pConnessioni[url];
+  const giro = (async () => {
     await caricaNostrTools();
     const NT = window.NostrTools;
-    for (const url of c.relay) {
-      try {
-        const relay = new NT.Relay(url);
-        await relay.connect({timeout: P2P_LIBRO_MS});
-        relay.onclose = () => {
-          if (p2pRelayVivo !== relay) return;
-          p2pRelayVivo = null; p2pConnessa = null; p2pSub = null; p2pSubChiavi = '';
-          /* si riprova solo se c'e' ancora uno scambio da seguire, e
-             con l'attesa che cresce: un coordinatore giu' non deve
-             diventare un martello */
-          if (!Object.keys(ordiniAscoltoP2P()).length) return;
-          const fra = 5000 * Math.min(6, ++p2pRiconnetti);
-          console.log('🔁 [p2p] connessione caduta, riprovo fra ' + Math.round(fra / 1000) + ' s');
-          setTimeout(() => { mostroRiascolta().catch(() => {}); }, fra);
-        };
-        p2pRelayVivo = relay; p2pRiconnetti = 0;
-        return relay;
-      } catch(e) {
-        console.log('🔁 [p2p] non risponde: ' + url + ' (' + (e && e.message || e) + ')');
-      }
-    }
-    throw new Error('Nessuna risposta: riprova fra un momento');
+    const relay = new NT.Relay(url);
+    await relay.connect({timeout: P2P_LIBRO_MS});
+    relay.onclose = () => {
+      if (p2pRelayVivi[url] !== relay) return;
+      delete p2pRelayVivi[url];
+      for (const a of p2pAscolti) { delete a.per[url]; delete a.eose[url]; }
+      /* si riprova solo se c'e' ancora qualcosa da ascoltare, e con
+         l'attesa che cresce: un relay giu' non deve diventare un
+         martello. Alla riconnessione gli ascolti aperti si riapplicano
+         da soli, e mostroRiascolta rimette quello degli scambi se nel
+         frattempo e' caduto con l'ultimo relay. */
+      if (!p2pAscolti.length && !Object.keys(ordiniAscoltoP2P()).length) return;
+      const n = (p2pRiconnetti[url] = (p2pRiconnetti[url] || 0) + 1);
+      const fra = 5000 * Math.min(6, n);
+      console.log('🔁 [p2p] connessione caduta: ' + url + ', riprovo fra ' + Math.round(fra / 1000) + ' s');
+      setTimeout(() => {
+        connettiUnoP2P(url).then(() => mostroRiascolta()).catch(() => {});
+      }, fra);
+    };
+    p2pRelayVivi[url] = relay;
+    p2pRiconnetti[url] = 0;
+    for (const a of p2pAscolti) ascoltaSuP2P(a, url, relay);
+    return relay;
   })();
+  p2pConnessioni[url] = giro;
+  const via = () => { if (p2pConnessioni[url] === giro) delete p2pConnessioni[url]; };
+  giro.then(via, via);
+  return giro;
+}
+/* la prima promessa che RIESCE; se cadono tutte, l'ultimo motivo */
+function unoDeiTantiP2P(promesse){
+  return new Promise((ok, no) => {
+    let restano = promesse.length;
+    let ultimo = null;
+    if (!restano) { no(new Error('niente da provare')); return; }
+    promesse.forEach(p => p.then(ok, e => { ultimo = e; if (--restano === 0) no(ultimo); }));
+  });
+}
+function mostroConnetti(){
+  const urls = urlViviP2P();
+  if (!urls.length) return Promise.reject(new Error('Gli scambi P2P non sono disponibili'));
+  /* TUTTI insieme, e chi manca si riprova qui: e' il «ritentare sugli
+     altri in sottofondo». Un giro che cade lo dice nel log, con l'url
+     — che a chi legge lo schermo invece non si nomina. */
+  const giri = urls.map(u => connettiUnoP2P(u).catch(e => {
+    console.log('🔁 [p2p] non risponde: ' + u + ' (' + (e && e.message || e) + ')');
+    throw e;
+  }));
+  giri.forEach(p => p.catch(() => {}));
+  if (urls.some(u => p2pRelayVivi[u] && p2pRelayVivi[u].connected))
+    return Promise.resolve(coroP2P());
+  if (p2pConnessa) return p2pConnessa;
+  p2pConnessa = unoDeiTantiP2P(giri).then(() => coroP2P(), () => {
+    const e = new Error(P2P_NON_PARTITO + ': nessuno risponde, riprova fra un momento');
+    e.relayMuti = true;
+    throw e;
+  });
   /* un fallimento non si ricorda: il gesto dopo riprova da capo */
-  p2pConnessa.catch(() => { p2pConnessa = null; });
+  const via = () => { p2pConnessa = null; };
+  p2pConnessa.then(via, via);
   return p2pConnessa;
+}
+/* la voce del coro: quel che chi chiama vede al posto del Relay */
+function coroP2P(){
+  return {
+    get connected(){
+      return urlViviP2P().some(u => p2pRelayVivi[u] && p2pRelayVivi[u].connected);
+    },
+    publish(ev){ return pubblicaSuTuttiP2P(ev); },
+    subscribe(filtri, opz){ return ascoltaP2P(filtri, opz); }
+  };
+}
+/* L'EVENTO PARTE VERSO TUTTI, ed e' inviato con la PRIMA conferma: gli
+   altri seguono in sottofondo, e un relay che non era connesso si
+   connette qui. Se entro P2P_ACK_MS nessuno ha detto OK — rifiuti,
+   timeout, websocket che non aprono — il messaggio NON e' partito, e si
+   alza `relayMuti` con gli esiti uno per uno nel log. Un «publish timed
+   out» su un relay solo non e' piu' «partito senza OK»: conta zero,
+   e a parlare sono gli altri. */
+function pubblicaSuTuttiP2P(ev){
+  const urls = urlViviP2P();
+  return new Promise((ok, no) => {
+    const esiti = [];
+    let chiuso = false;
+    let restano = urls.length;
+    const fine = (f) => { if (chiuso) return; chiuso = true; clearTimeout(t); f(); };
+    const muti = () => {
+      console.log('🔁 [p2p] nessuna conferma: ' + (esiti.join('  ') || 'niente su cui provare'));
+      no(erroreRelayMutiP2P(esiti));
+    };
+    const t = setTimeout(() => fine(muti), P2P_ACK_MS);
+    if (!restano) { fine(muti); return; }
+    urls.forEach(u => {
+      connettiUnoP2P(u).then(r => r.publish(ev)).then(() => {
+        esiti.push(u + '=ok');
+        fine(() => { console.log('📨 [p2p] confermato da ' + u); ok(u); });
+      }, e => {
+        esiti.push(u + '=' + String(e && e.message || e));
+        if (--restano === 0) fine(muti);
+      });
+    });
+  });
+}
+/* L'ASCOLTO STA SU TUTTI I RELAY DEL CORO, e si riapplica da solo a chi
+   si (ri)connette dopo: `close()` lo toglie dal registro e chiude
+   ovunque. `oneose` si dice UNA volta, quando hanno finito tutti quelli
+   connessi; `onclose` solo quando non e' rimasto nessuno. */
+function ascoltaP2P(filtri, opz){
+  const a = {filtri: filtri, opz: opz || {}, per: {}, eose: {},
+             chiuso: false, eoseDetto: false};
+  a.sub = {
+    close(){
+      a.chiuso = true;
+      const i = p2pAscolti.indexOf(a);
+      if (i >= 0) p2pAscolti.splice(i, 1);
+      for (const u in a.per) { try { a.per[u].close(); } catch(e){} }
+      a.per = {}; a.eose = {};
+    }
+  };
+  p2pAscolti.push(a);
+  for (const u in p2pRelayVivi)
+    if (p2pRelayVivi[u].connected) ascoltaSuP2P(a, u, p2pRelayVivi[u]);
+  return a.sub;
+}
+function ascoltaSuP2P(a, url, relay){
+  if (a.chiuso || a.per[url]) return;
+  try {
+    a.per[url] = relay.subscribe(a.filtri, {
+      onevent(ev){ if (a.opz.onevent) a.opz.onevent(ev); },
+      oneose(){
+        a.eose[url] = true;
+        if (a.eoseDetto || !a.opz.oneose) return;
+        if (Object.keys(a.per).every(u => a.eose[u])) { a.eoseDetto = true; a.opz.oneose(); }
+      },
+      onclose(){
+        if (a.chiuso) return;
+        delete a.per[url]; delete a.eose[url];
+        if (a.opz.onclose && !Object.keys(a.per).length) a.opz.onclose();
+      }
+    });
+  } catch(e) {
+    console.log('🔁 [p2p] ascolto non aperto su ' + url + ' (' + (e && e.message || e) + ')');
+  }
 }
 
 /* le trade key da ascoltare: quelle degli scambi non ancora finiti */
@@ -39296,11 +39471,10 @@ async function unaRestoreP2P(relay, mostro, info, identitaSk, dentro){
       const bits = Math.max(info.pow || 0, info.powPrimo || 0);
       if (bits > 0) NT.nip13.minePow(ev, bits);
       const firmato = NT.finalizeEvent(ev, NT.utils.hexToBytes(tk.sk));
-      relay.publish(firmato).catch((e) => {
-        /* «publish timed out» vuol dire partito senza OK: si resta
-           in ascolto — la lezione del bunker. Il resto chiude. */
-        if (!/timed out/i.test(String(e && e.message || e))) male(e);
-      });
+      /* il coro alza solo se NESSUN relay ha confermato: allora la
+         domanda non e' partita, e si chiude — la lista resta quella
+         di prima (il fail-open di chiediMieiOrdiniP2P) */
+      relay.publish(firmato).catch(male);
       setTimeout(basta, P2P_ATTESA_MS);
     });
   } finally {
@@ -39403,7 +39577,14 @@ async function mostroRiascolta(){
                                 since: ultimoVistoP2P() - 600});
   p2pSub = relay.subscribe(filtri, {
     onevent(ev){ mostroArriva(ev).catch(e => console.log('🔁 [p2p] messaggio illeggibile: ' + (e && e.message || e))); },
-    onclose(){ if (p2pSubChiavi === firma) { p2pSub = null; p2pSubChiavi = ''; } }
+    onclose(){
+      /* il coro lo dice solo quando NON E' RIMASTO NESSUN relay: si
+         chiude anche nel registro, e la riconnessione lo rimette
+         (connettiUnoP2P richiama mostroRiascolta) */
+      if (p2pSubChiavi !== firma) return;
+      const s = p2pSub; p2pSub = null; p2pSubChiavi = '';
+      try { if (s) s.close(); } catch(e){}
+    }
   });
 }
 
@@ -39484,15 +39665,17 @@ async function mostroChiama(skTrade, msg, opz){
   try {
     await relay.publish(firmato);
   } catch(e) {
-    const testo = String(e && e.message || e);
-    /* «publish timed out» vuol dire che l'evento e' PARTITO e manca
-       solo l'OK: si resta in ascolto — la lezione del bunker */
-    if (!/timed out/i.test(testo)) {
-      const att = p2pAttese[rid];
-      if (att) { clearTimeout(att.t); delete p2pAttese[rid]; }
-      throw e;
-    }
-    console.log('🔁 [p2p] inviato senza conferma: ' + testo);
+    /* IL CORO ALZA SOLO SE NESSUNO HA CONFERMATO (16 set 2026). Con un
+       relay solo «publish timed out» valeva «partito senza OK, si resta
+       in ascolto» — la lezione del bunker — e con relay.mostro.network
+       in timeout era proprio il modo in cui un messaggio morto si
+       aspettava per trenta secondi. Adesso un timeout su UN relay conta
+       zero e parlano gli altri; se tacciono tutti entro P2P_ACK_MS il
+       messaggio non e' partito, si smette di aspettare la risposta e
+       chi legge lo sente subito, con la ragione vera. */
+    const att = p2pAttese[rid];
+    if (att) { clearTimeout(att.t); delete p2pAttese[rid]; }
+    throw e;
   }
   return attesa;
 }
@@ -39660,6 +39843,7 @@ function avanzaOrdineP2P(ordine, azione, payload){
     o.aggiornato = Math.floor(Date.now() / 1000);
     o.cantDo = '';
     o.errore = '';
+    o.nonPartito = false;
   }
   return o;
 }
@@ -39719,7 +39903,16 @@ const STATI_P2P = {
      c'entra niente. `t_mio`/`d_mio` valgono per la riga con `mio`,
      e li sceglie statoTestoP2P prima del lato. */
   senza_risposta: {t: 'Nessuna risposta', d: 'La risposta non è arrivata. Puoi riprovare: se l\'ordine è ancora libero, viene riservato a te.',
-                   d_mio: 'La risposta non è arrivata: l\'ordine potrebbe non essere nel libro. Puoi riprovare a pubblicarlo con la stessa chiave: se era già stato registrato, te lo dice.'},
+                   d_mio: 'La risposta non è arrivata: l\'ordine potrebbe non essere nel libro. Puoi riprovare a pubblicarlo con la stessa chiave: se era già stato registrato, te lo dice.',
+                   /* IL MESSAGGIO NON E' PARTITO (16 set 2026): non e' il
+                      coordinatore che tace, e' la rete che non ha preso
+                      in consegna — nessun relay ha confermato. La cura e'
+                      un'altra (riprovare fra poco, con la stessa chiave),
+                      quindi la frase e' un'altra. Vale per chi prende e
+                      per chi pubblica: il messaggio non e' arrivato a
+                      NESSUNO, e non c'e' un libro da controllare. */
+                   t_muto: 'Il messaggio non è partito',
+                   d_muto: 'Nessuno ha preso in consegna la richiesta: la rete non ha confermato di averla ricevuta. Riprova fra un momento, con la stessa chiave.'},
   rifiutato: {t: 'Ordine non preso', d: 'La richiesta non è stata accettata.',
               t_mio: 'Ordine non pubblicato', d_mio: 'La pubblicazione non è stata accettata.'},
   attesa_mia_fattura: {t: 'Dove vuoi i sats?', d: 'Indica il tuo indirizzo Lightning: è lì che arriveranno alla fine dello scambio.'},
@@ -39787,6 +39980,9 @@ function tintaStatoP2P(o){
 }
 function statoTestoP2P(o){
   const s = STATI_P2P[o && o.stato] || {t: 'Scambio in corso', d: ''};
+  /* il messaggio che non e' partito vince sul lato e sul verso: la
+     frase e' la stessa per tutti, perche' il fatto e' lo stesso */
+  if (o && o.nonPartito && s.t_muto) return {t: s.t_muto, d: s.d_muto};
   /* il verso di chi ha PUBBLICATO vince sul lato: e' la stessa riga
      letta da un'altra parte del banco, e la sua frase e' un'altra */
   const mio = !!(o && o.mio);
@@ -40882,6 +41078,7 @@ async function eseguiPresaP2P(id, scelto, metodo){
     ord = ordiniP2P()[id] || ord;
     ord.stato = (e && e.cantDo) ? 'rifiutato' : 'senza_risposta';
     ord.errore = String(e && e.message || e);
+    ord.nonPartito = !!(e && e.relayMuti);
     scriviOrdineP2P(ord);
   }
   if (p2pOrdineAperto === id) renderOrdineP2P(); else apriOrdineP2P(id);
@@ -40892,7 +41089,7 @@ async function riprovaPresaP2P(){
   const id = p2pOrdineAperto;
   const o = ordiniP2P()[id];
   if (!o) return;
-  o.stato = 'prendo'; o.errore = ''; o.cantDo = '';
+  o.stato = 'prendo'; o.errore = ''; o.cantDo = ''; o.nonPartito = false;
   scriviOrdineP2P(o);
   renderOrdineP2P();
   try {
@@ -40907,6 +41104,7 @@ async function riprovaPresaP2P(){
     const agg = ordiniP2P()[id] || o;
     agg.stato = (e && e.cantDo) ? 'rifiutato' : 'senza_risposta';
     agg.errore = String(e && e.message || e);
+    agg.nonPartito = !!(e && e.relayMuti);
     scriviOrdineP2P(agg);
   }
   if (p2pOrdineAperto === id) renderOrdineP2P();
@@ -40931,7 +41129,7 @@ async function riprovaPubblicazioneP2P(){
   if (!o || !o.mio) return;
   /* con un nome vero l'ordine e' gia' nel libro: niente da ripubblicare */
   if (idMostroVero(o.id)) { toast('Questo ordine è già nel libro'); return; }
-  o.stato = 'pubblico'; o.errore = ''; o.cantDo = '';
+  o.stato = 'pubblico'; o.errore = ''; o.cantDo = ''; o.nonPartito = false;
   scriviOrdineP2P(o);
   renderOrdineP2P();
   try {
@@ -40958,6 +41156,7 @@ async function riprovaPubblicazioneP2P(){
     const agg = ordiniP2P()[p2pOrdineAperto] || o;
     agg.stato = (e && e.cantDo) ? 'rifiutato' : 'senza_risposta';
     agg.errore = String(e && e.message || e);
+    agg.nonPartito = !!(e && e.relayMuti);
     scriviOrdineP2P(agg);
   }
   renderOrdineP2P();
@@ -42830,6 +43029,7 @@ async function inviaNuovoOrdineP2P(){
     const agg = ordiniP2P()[p2pOrdineAperto] || ordiniP2P()[ord.id] || ord;
     agg.stato = (e && e.cantDo) ? 'rifiutato' : 'senza_risposta';
     agg.errore = String(e && e.message || e);
+    agg.nonPartito = !!(e && e.relayMuti);
     /* un ordine che non ha ancora un nome NON SI SCRIVE: sarebbe una riga
        che nessuna vista puo' mostrare — e' quel che e' successo col
        bundle vecchio, dove in memoria e' restata una riga con l'id vuoto */

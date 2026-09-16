@@ -43414,8 +43414,52 @@ def prove_p2p_motore():
           "nip44.encrypt(bustaMostro(skTrade, o.mazzoSk, msg), conv)" in ch)
     prova("il timeout non nomina il relay a chi legge", False,
           "relay" in ch[ch.index("no(new Error("):ch.index("}, o.timeoutMs")].lower())
-    prova("un publish andato in timeout resta in ascolto", True,
-          "if (!/timed out/i.test(testo)) {" in ch)
+    # ══ IL CORO DEI RELAY (16 set 2026, dal campo) ══ «nessuna
+    # risposta» a intermittenza: quando il messaggio ARRIVA mostro
+    # risponde sempre, nei giri falliti non gli arrivava — il client
+    # parlava col PRIMO relay che apriva la websocket, e
+    # relay.mostro.network apre e poi tace. Un «publish timed out» su
+    # quel relay valeva «partito senza OK» e si aspettavano trenta
+    # secondi una risposta a una domanda mai consegnata. Adesso la
+    # connessione viva e' un coro: si scrive su TUTTI, vale la PRIMA
+    # conferma, e senza nessuna conferma lo si dice — con la sua frase.
+    prova("un invio senza NESSUNA conferma smette di aspettare la risposta", True,
+          "if (att) { clearTimeout(att.t); delete p2pAttese[rid]; }" in ch
+          and "throw e;" in ch and "/timed out/" not in ch)
+    _pt = pezzo_js(mini, "function pubblicaSuTuttiP2P(ev){", "\n}\n")
+    prova("l'evento parte verso TUTTI i relay del coordinatore", True,
+          "urls.forEach(u => {" in _pt
+          and "connettiUnoP2P(u).then(r => r.publish(ev))" in _pt)
+    prova("...ed e' inviato con la PRIMA conferma", True,
+          "fine(() => { console.log('📨 [p2p] confermato da ' + u); ok(u); });" in _pt)
+    prova("...e senza NESSUNA conferma entro P2P_ACK_MS alza relayMuti", True,
+          "const t = setTimeout(() => fine(muti), P2P_ACK_MS);" in _pt
+          and "e.relayMuti = true;"
+          in pezzo_js(mini, "function erroreRelayMutiP2P(esiti){", "\n}\n"))
+    prova("...con dodici secondi di tetto, e `let` per il banco", True,
+          "let P2P_ACK_MS = 12000;" in mini)
+    _mc = pezzo_js(mini, "function mostroConnetti(){", "\n}\n")
+    prova("la connessione torna col PRIMO relay che risponde, gli altri in sottofondo", True,
+          "unoDeiTantiP2P(giri)" in _mc
+          and "giri.forEach(p => p.catch(() => {}));" in _mc)
+    prova("...e chi manca si riprova a ogni gesto", True,
+          "const giri = urls.map(u => connettiUnoP2P(u)" in _mc)
+    prova("l'ascolto sta su tutti i relay del coro e si riapplica a chi si riconnette", True,
+          "p2pAscolti.push(a);"
+          in pezzo_js(mini, "function ascoltaP2P(filtri, opz){", "\n}\n")
+          and "for (const a of p2pAscolti) ascoltaSuP2P(a, url, relay);"
+          in pezzo_js(mini, "function connettiUnoP2P(url){", "\n}\n"))
+    prova("la restore non tiene piu' l'eccezione del timeout: alza col coro", True,
+          "relay.publish(firmato).catch(male);"
+          in pezzo_js(mini, "async function unaRestoreP2P(", "\n}\n"))
+    prova("i quattro posti che scrivono «senza_risposta» dicono se il messaggio e' partito", 4,
+          mini.count("nonPartito = !!(e && e.relayMuti);"))
+    prova("...e il foglio ha la sua frase per il messaggio che non e' partito", True,
+          "t_muto: 'Il messaggio non è partito'," in mini
+          and "if (o && o.nonPartito && s.t_muto) return {t: s.t_muto, d: s.d_muto};"
+          in pezzo_js(mini, "function statoTestoP2P(o){", "\n}\n"))
+    prova("...che il «riprova» azzera", 2,
+          mini.count("o.errore = ''; o.cantDo = ''; o.nonPartito = false;"))
 
     # --- 4) IL REGISTRO: il sigillo dell'escrow non si presta --------
     # `vault` e' il recinto tratteggiato del deposito di garanzia di
@@ -43730,6 +43774,15 @@ const {bytesToHex, hexToBytes, utf8Encoder} = NT0.utils;
 const MOSTRO_SK = NT0.generateSecretKey();
 const MOSTRO_PUB = NT0.getPublicKey(MOSTRO_SK);
 let ricevuti = [], subs = [], chiuse = 0, rispondi = null;
+/* da quale relay il coordinatore di cartone RISPONDE (null = da tutti):
+   serve a provare che la risposta puo' tornare da un relay diverso da
+   quello che ha confermato l'invio */
+let rispondiVia = null;
+/* gli id gia' serviti: lo stesso evento arrivato da due relay e' UNA
+   richiesta, e mostrod risponde una volta — come qui */
+let rispostiPer = new Set();
+/* quante volte lo «zoppo» e' caduto: cade alla prima e si riprende */
+let zoppoCadute = 0;
 /* la STORIA del relay: quel che fu mandato a una chiave torna a chi
    la ascolta, subito — e' il rigioco che la restore deve scansare */
 let storia = [];
@@ -43770,14 +43823,17 @@ function esamina(ev){
   r.ok = true;
   return r;
 }
-function manda(msg, versoPub){
+function manda(msg, versoPub, soloUrl){
   const conv = NT0.nip44.getConversationKey(MOSTRO_SK, versoPub);
   const ev = NT0.finalizeEvent({
     kind: 14, created_at: Math.floor(Date.now() / 1000),
     tags: [['p', versoPub]],
     content: NT0.nip44.encrypt(JSON.stringify([msg, null, null]), conv)
   }, MOSTRO_SK);
+  /* LO STESSO evento a ogni relay che ascolta, con lo stesso id: e'
+     quel che fa un coordinatore vero, ed e' il caso della dedup */
   for (const s of subs) {
+    if (soloUrl && s.url !== soloUrl) continue;
     const f = s.filtri[0] || {};
     if (f['#p'] && f['#p'].indexOf(versoPub) >= 0) setTimeout(() => s.h.onevent(ev), 0);
   }
@@ -43822,6 +43878,12 @@ class FintoWallet {
   }
   close(){}
 }
+/* I CARATTERI DEL RELAY DI CARTONE, dall'url (16 set 2026, il coro):
+   `rotto` non apre mai la websocket; `zoppo` cade alla prima e si
+   riprende alla seconda; `lento` apre dopo 300 ms; `muto` apre, si
+   lascia scrivere e NON conferma mai (relay.mostro.network dal campo);
+   `rifiuta` risponde con un errore al publish. Tutti gli altri sono
+   sani e rispondono come Mostro. */
 class FintoRelay {
   /* la factory `Relay.connect(url)` che usano il client NWC e il
      bunker: sul relay del wallet finto apre il wallet di cartone */
@@ -43832,10 +43894,12 @@ class FintoRelay {
   constructor(url){ this.url = url; this.connected = false; }
   async connect(){
     if (/rotto/.test(this.url)) throw new Error('non risponde');
+    if (/zoppo/.test(this.url) && zoppoCadute++ < 1) throw new Error('non risponde');
+    if (/lento/.test(this.url)) await new Promise(r => setTimeout(r, 300));
     this.connected = true;
   }
   subscribe(filtri, h){
-    const s = {filtri: filtri, h: h, close(){ chiuse++; }};
+    const s = {filtri: filtri, h: h, url: this.url, close(){ chiuse++; }};
     subs.push(s);
     /* come il relay vero: prima gli eventi GIA' scritti che il filtro
        pesca, poi il vivo — senza `since`, la storia arriva per prima */
@@ -43848,9 +43912,17 @@ class FintoRelay {
   }
   async publish(ev){
     const r = esamina(ev);
+    r.via = this.url;
     ricevuti.push(r);
+    if (/rifiuta/.test(this.url)) throw new Error('restricted: non qui');
+    /* il muto prende in consegna e non dice mai OK: come un relay che
+       apre la websocket e poi va in timeout */
+    if (/muto/.test(this.url)) return new Promise(() => {});
     if (!r.ok) return 'scartato';
-    if (rispondi) for (const m of (rispondi(r) || [])) manda(m, r.tradePub);
+    if (rispondi && !rispostiPer.has(ev.id)) {
+      rispostiPer.add(ev.id);
+      for (const m of (rispondi(r) || [])) manda(m, r.tradePub, rispondiVia);
+    }
     return 'ok';
   }
 }
@@ -43950,15 +44022,17 @@ function reset(){
   aperti = []; chiusi = []; conferme = []; inviti = []; viste = []; qr = [];
   copiato = ''; renderP2Pn = 0; ricevuti = []; subs = []; chiuse = 0;
   rispondi = null; storia = []; DEMO = false; VETRINA = false; myTgId = 111;
-  p2pRelayVivo = null; p2pConnessa = null; p2pSub = null; p2pSubChiavi = '';
+  p2pRelayVivi = {}; p2pConnessioni = {}; p2pConnessa = null; p2pAscolti = [];
+  p2pSub = null; p2pSubChiavi = ''; rispondiVia = null; zoppoCadute = 0;
+  rispostiPer = new Set();
   p2pAttese = {}; p2pVisti = []; p2pOrdineAperto = ''; p2pHoldOrdine = '';
   /* il memo del seme e il giudizio del profilo di dispositivo sono di
      QUELLA sessione: senza queste tre righe il seme caduto di un caso
      resterebbe in tasca al successivo, e il giudizio gia' dato
      chiuderebbe la porta a chi viene dopo */
   p2pSemeGiro = null; p2pMazzoEsito = ''; p2pGiudizio = null;
-  p2pIncassoOrdine = ''; p2pStatoChiesto = false; p2pRiconnetti = 0;
-  P2P_ATTESA_MS = 30000;
+  p2pIncassoOrdine = ''; p2pStatoChiesto = false; p2pRiconnetti = {};
+  P2P_ATTESA_MS = 30000; P2P_ACK_MS = 12000;
   P2P_NWC_ATTESA_MS = 300; walletModo = 'buona'; walletRichieste = [];
   /* la fee e la finestra sono quelle del NOSTRO nodo (16 set 2026):
      2% spartito meta' a testa, 3600 s di vita minima per la fattura,
@@ -44410,6 +44484,10 @@ function reset(){
   out.senzaRisposta = mu.stato;
   out.diceISecondi = String(mu.errore).indexOf('Nessuna risposta') >= 0;
   out.offreRiprova = (nodi.p2pOrdineCorpo.innerHTML || '').indexOf('Riprova') >= 0;
+  /* il relay ha CONFERMATO e il coordinatore tace: non e' il caso dei
+     relay muti, e la frase resta quella del silenzio */
+  out.silenzioNonEMuto = mu.nonPartito !== true
+    && (nodi.p2pOrdineCorpo.innerHTML || '').indexOf('Il messaggio non è partito') < 0;
 
   /* ---- 7) SENZA FIRMA GREZZA non si mente: anonimo ------------ */
   reset();
@@ -44431,7 +44509,7 @@ function reset(){
   p2pCoord = () => ({mostro: MOSTRO_PUB, relay: ['wss://rotto']});
   let esploso = '';
   try { await mostroConnetti(); } catch(e) { esploso = String(e.message || e); }
-  out.giuLoDice = esploso.indexOf('Nessuna risposta') >= 0;
+  out.giuLoDice = esploso.indexOf('non è partito') >= 0;
   out.giuNonNominaIlRelay = esploso.toLowerCase().indexOf('wss://') < 0;
 
   /* ---- 9) LA RESTORE NON BEVE LA STORIA DEL RELAY --------------
@@ -44581,6 +44659,119 @@ function reset(){
     && !((p2pLibro && p2pLibro.ordini) || []).some(x => x.id === idA);
   out.ritiroRiportaAlLibro = viste.indexOf('p2pmiei') >= 0;
   out.ritiroDetto = toasts.some(t => String(t).indexOf('ritirato') >= 0);
+
+  /* ---- 11) IL CORO: un relay rotto, uno muto, uno buono ----------
+     Il caso dal campo (16 set 2026): relay.mostro.network apre la
+     websocket e poi tace — con un relay solo, se stava in testa alla
+     lista, era «inviato senza conferma», trenta secondi di attesa e
+     «nessuna risposta». Nel coro il muto conta zero e a parlare e' il
+     buono; il rotto si dice nel log e basta. */
+  const ID2 = '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002';
+  const addInvoice = r => (r.dentro && r.dentro.action === 'take-sell')
+    ? [ordine('add-invoice', r.dentro.request_id, r.dentro.id,
+              {order: {id: r.dentro.id, amount: 7543, fiat_amount: 50}})]
+    : [];
+  const viePrese = () => ricevuti
+    .filter(r => r.dentro && r.dentro.action === 'take-sell').map(r => r.via).sort();
+  reset();
+  p2pCoord = () => ({mostro: MOSTRO_PUB, relay: ['wss://rotto', 'wss://muto', 'wss://finto']});
+  rispondi = addInvoice;
+  await prendiOrdineP2P(ID2);
+  await finoA(() => oltrePrendo(ID2));
+  await pausa(30);
+  {
+    const o = ordiniP2P()[ID2];
+    out.coroPassa = o.stato === 'attesa_mia_fattura';
+    out.coroVentaglio = JSON.stringify(viePrese()) === JSON.stringify(['wss://finto', 'wss://muto']);
+    out.coroAscoltaDaTutti = subs.some(s => s.url === 'wss://finto')
+      && subs.some(s => s.url === 'wss://muto') && !subs.some(s => s.url === 'wss://rotto');
+    out.coroNonDiceMuto = !o.nonPartito && !o.errore;
+  }
+
+  /* ---- 12) TUTTI MUTI: si dice, subito, e con la sua frase -------
+     Nessun OK entro P2P_ACK_MS: il messaggio NON e' partito. Non si
+     aspettano i trenta secondi della risposta (P2P_ATTESA_MS qui e'
+     lungo apposta: se fosse lui a chiudere, la prova resterebbe su
+     «prendo» oltre il tetto di finoA), e il foglio dice «il messaggio non è
+     partito» invece del generico silenzio. Poi il «riprova» con i
+     relay tornati sani riparte dalla STESSA chiave. */
+  reset();
+  p2pCoord = () => ({mostro: MOSTRO_PUB, relay: ['wss://muto', 'wss://muto-b', 'wss://rotto']});
+  P2P_ACK_MS = 150; P2P_ATTESA_MS = 8000;
+  rispondi = addInvoice;
+  await prendiOrdineP2P(ID2);
+  await finoA(() => oltrePrendo(ID2));
+  await pausa(30);
+  {
+    const o = ordiniP2P()[ID2];
+    const h = nodi.p2pOrdineCorpo.innerHTML || '';
+    out.mutiStato = o.stato;
+    out.mutiNonPartito = o.nonPartito === true;
+    out.mutiLoDice = String(o.errore).indexOf('non è partito') >= 0
+      && String(o.errore).indexOf('confermato') >= 0;
+    out.mutiSenzaUrl = String(o.errore).indexOf('wss://') < 0;
+    out.mutiAtteseVuote = Object.keys(p2pAttese).length === 0;
+    out.mutiFoglio = h.indexOf('Il messaggio non è partito') >= 0
+      && h.indexOf('preso in consegna') >= 0;
+    out.mutiOffreRiprova = h.indexOf('riprovaPresaP2P()') >= 0;
+    out.mutiVentaglio = JSON.stringify(viePrese()) === JSON.stringify(['wss://muto', 'wss://muto-b']);
+  }
+  p2pCoord = () => ({mostro: MOSTRO_PUB, relay: ['wss://finto']});
+  P2P_ACK_MS = 12000;
+  p2pOrdineAperto = ID2;
+  await riprovaPresaP2P();
+  await finoA(() => (ordiniP2P()[ID2] || {}).stato === 'attesa_mia_fattura');
+  await pausa(30);
+  {
+    const o = ordiniP2P()[ID2];
+    out.mutiPoiRiprova = o.stato === 'attesa_mia_fattura' && !o.nonPartito && !o.errore;
+  }
+
+  /* ---- 13) LA RISPOSTA PUO' TORNARE DA UN ALTRO RELAY, e da due e' una ---
+     L'invio lo conferma il primo che risponde; il coordinatore di
+     cartone risponde SOLO dal secondo. Poi un messaggio spontaneo da
+     tutt'e due: lo stesso evento, lo stesso id, lo scambio si muove
+     una volta. */
+  reset();
+  p2pCoord = () => ({mostro: MOSTRO_PUB, relay: ['wss://finto', 'wss://finto-b']});
+  rispondi = addInvoice;
+  rispondiVia = 'wss://finto-b';
+  await prendiOrdineP2P(ID2);
+  await finoA(() => oltrePrendo(ID2));
+  await pausa(30);
+  {
+    const o = ordiniP2P()[ID2];
+    out.coroRispostaDaAltrove = o.stato === 'attesa_mia_fattura'
+      && viePrese().length === 2 && p2pVisti.length === 1;
+    rispondiVia = null;
+    manda(ordine('waiting-seller-to-pay', null, ID2), o.pubTrade);
+    await pausa(60);
+    const dopo = ordiniP2P()[ID2];
+    out.coroDedup = dopo.stato === 'attesa_hold_venditore' && p2pVisti.length === 2
+      && subs.filter(s => s.url === 'wss://finto').length === subs.filter(s => s.url === 'wss://finto-b').length;
+  }
+
+  /* ---- 14) LO ZOPPO SI RIPRENDE IN SOTTOFONDO ---------------------
+     Cade alla prima connessione, e al gesto dopo il coro lo riprova:
+     riceve l'evento e si prende l'ascolto degli scambi, senza che
+     nessuno l'abbia chiesto. */
+  reset();
+  p2pCoord = () => ({mostro: MOSTRO_PUB, relay: ['wss://zoppo', 'wss://finto']});
+  rispondi = addInvoice;
+  await prendiOrdineP2P(ID2);
+  await finoA(() => oltrePrendo(ID2));
+  await pausa(30);
+  out.zoppoCaduto = zoppoCadute >= 2;
+  out.zoppoRiprovato = JSON.stringify(viePrese()) === JSON.stringify(['wss://finto', 'wss://zoppo']);
+  out.zoppoAscoltato = subs.some(s => s.url === 'wss://zoppo');
+
+  /* ---- 15) IL LENTO NON SI ASPETTA: arriva da solo ---------------- */
+  reset();
+  p2pCoord = () => ({mostro: MOSTRO_PUB, relay: ['wss://lento', 'wss://finto']});
+  await mostroConnetti();
+  out.lentoNonAspettato = !p2pRelayVivi['wss://lento'] && !!p2pRelayVivi['wss://finto'];
+  await finoA(() => !!p2pRelayVivi['wss://lento'], 3000);
+  out.lentoPoiArriva = !!p2pRelayVivi['wss://lento'];
 
   /* ---- LA GAMBA DELL'APP (set 2026, dal campo): il profilo del
      conto rinasce all'ingresso su un dispositivo svuotato — fuori da
@@ -44740,6 +44931,28 @@ function reset(){
         "indiceNonBruciato": "...e senza bruciarne uno",
         "giuLoDice": "un coordinatore giu' si dice",
         "giuNonNominaIlRelay": "...senza nominare il relay",
+        # IL CORO DEI RELAY (16 set 2026, dal campo)
+        "silenzioNonEMuto": "...e il silenzio del coordinatore NON si veste da relay muti",
+        "coroPassa": "col coro un relay rotto e uno muto non fermano lo scambio",
+        "coroVentaglio": "...l'evento e' arrivato a tutti quelli che aprono, muto compreso",
+        "coroAscoltaDaTutti": "...e l'ascolto sta su tutti quelli aperti",
+        "coroNonDiceMuto": "...senza nessun avviso a chi legge",
+        "mutiStato": ("tutti muti: lo scambio finisce senza risposta", "senza_risposta"),
+        "mutiNonPartito": "...e sa che il messaggio NON e' partito",
+        "mutiLoDice": "...la ragione dice che nessun relay ha confermato",
+        "mutiSenzaUrl": "...senza nominare un url",
+        "mutiAtteseVuote": "...e i trenta secondi della risposta non si aspettano",
+        "mutiFoglio": "...il foglio scrive «Il messaggio non è partito», e perche'",
+        "mutiOffreRiprova": "...e offre di riprovare",
+        "mutiVentaglio": "...dopo aver provato davvero su tutti",
+        "mutiPoiRiprova": "...e coi relay tornati sani il riprova passa, con la stessa chiave",
+        "coroRispostaDaAltrove": "la risposta torna anche dal relay che NON ha confermato",
+        "coroDedup": "...e lo stesso evento da due relay muove lo scambio una volta",
+        "zoppoCaduto": "un relay che cade alla prima si riprova",
+        "zoppoRiprovato": "...e al gesto dopo riceve l'evento come gli altri",
+        "zoppoAscoltato": "...con l'ascolto degli scambi riapplicato da solo",
+        "lentoNonAspettato": "la connessione torna col primo che risponde, senza aspettare il lento",
+        "lentoPoiArriva": "...che arriva da solo, in sottofondo",
         "restoreFresca": "la restore legge la risposta di OGGI, non la storia",
         "restoreCompleta": "...e la lista fresca arriva intera",
         # LE MIE IDENTITA' POSSONO ESSERE DUE (13 set 2026, il PC di
@@ -49250,11 +49463,19 @@ def prove_p2p_server():
         return "\n".join(r for r in js.split("\n")
                           if not r.strip().startswith("//"))
 
+    # ...e dal 16 set 2026 la connessione viva e' un CORO: le voci che
+    # scelgono gli url sono tre in piu', e l'invariante vale per tutte
     for nome, apertura in (("mostroConnetti", "function mostroConnetti(){"),
                            ("mostroChiama",
-                            "async function mostroChiama(skTrade, msg, opz){")):
+                            "async function mostroChiama(skTrade, msg, opz){"),
+                           ("urlViviP2P", "function urlViviP2P(){"),
+                           ("connettiUnoP2P", "function connettiUnoP2P(url){"),
+                           ("pubblicaSuTuttiP2P",
+                            "function pubblicaSuTuttiP2P(ev){")):
         prova(f"`{nome}` non pesca MAI dagli specchi", False,
               "specchio" in solo_codice(corpo(apertura)))
+    prova("...e gli url del coro vengono dalla leva dei relay del coordinator", True,
+          "c.relay.filter(Boolean)" in corpo("function urlViviP2P(){"))
     # IL VERSO OPPOSTO, e si guarda la RIGA che legge la leva: se il
     # lettore smettesse di usarla, la leva sarebbe morta e il libro
     # continuerebbe ad arrivare dai soli relay del coordinator — cioe'
