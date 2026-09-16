@@ -14742,7 +14742,30 @@ in `timbri` si riarma se un dovere ricompare, e un conteggio che
 esplode non dichiara zero. `prove_saas_senza_doveri`, 23 prove su un
 database usa-e-getta, transizioni comprese. **10148 verdi.**
 
-**COSA RESTA**: fase 5 (quando arriva il 🏁: lo sweep del saldo, il
+**GLI INCASSI SENZA RIGA, SULLE DUE CASSEFORTI** (16 set 2026, commit
+dc794b3). Sul VPS viveva un `orfani.py` non tracciato del 10 ago —
+il metodo di Architettura, «incrociare gli incassi di LNbits coi
+payment_hash noti» — con una cassaforte sola e due tabelle. Nessun
+polso del libro mastro lo copre e nessuno puo': le sue query vivono
+in SQL, e una riga cancellata non esiste piu'. Adesso e' nel repo,
+aggiornato in tre punti: legge ogni cassaforte configurata con la
+sua invoice key risolta per NOME (il calco di `_chiavi_cassaforte`:
+due letterali, il terzo alza, mai la chiave che paga — la sentinella
+lo pretende, e ha fatto rosso al primo giro perche' la parola stava
+nella docstring che ne spiegava l'assenza); conosce `pagamenti`, la
+terza tabella in entrata nata col banner, che il vecchio avrebbe
+elencato come orfani; e aggiunge i FUORI POSTO — l'incasso la cui
+riga dice un'altra cassaforte, cioe' l'errore del doppio wallet
+visto dal lato dell'entrata. `prove_orfani`, 22 prove; banco dal
+vivo su due LNbits di cartone (paginazione a 130 movimenti, i tre
+elenchi, il SaaS disdetto con l'avviso sulle righe che non si
+possono verificare). Il banco ha anche insegnato che lo script
+importa `config` dalla SUA cartella e non dalla cwd — sul VPS
+coincidono. **10237 verdi.**
+
+**COSA RESTA**: il primo giro di `orfani.py` sul VPS con le due
+casseforti vive, che e' la riconciliazione che il vecchio script non
+poteva fare; fase 5 (quando arriva il 🏁: lo sweep del saldo, il
 backfill della colonna sulle righe chiuse, un mese di SaaS come rete,
 la disdetta, e il foglio del panico riscritto — la riga «LNbits gira
 su Spark» e' gia' falsa); `user:` non root nel

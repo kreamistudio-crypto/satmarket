@@ -942,6 +942,11 @@
   quale annuncio (`Barattolo escrow #{id}`), mai chi ha pagato. Fatto
   ad ago 2026: zero orfani, i soli col nostro memo erano sei collaudi
   di luglio.
+  DAL SET 2026 IL METODO E' UNO STRUMENTO, `orfani.py` nel repo: legge
+  le DUE casseforti per nome con la sola invoice key, conosce anche
+  `pagamenti` (la terza tabella in entrata, nata col banner) e segnala
+  pure l'incasso la cui riga dice un'altra cassaforte. Procedura in
+  PRODUZIONE, «IL CONTROLLO DEGLI ORFANI».
   IL REAPER NON POTEVA GUARDARE DA SÉ, ed è ciò che ha deciso la
   forma: è SINCRONO e vive dentro `GET /api/orders` (unico chiamante,
   il «reaper pigro»), quindi a LNbits non ci può parlare. Ora lui i

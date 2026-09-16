@@ -313,6 +313,17 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   discesa a zero (timbro `saas_senza_doveri` in `timbri`: si riarma da
   solo se un dovere ricompare, e nel dubbio — un conteggio che esplode
   — non dichiara zero). Parla solo col denaro nuovo sul nodo.
+  IL CONTROLLO DEGLI ORFANI, sulle due casseforti (set 2026):
+  `cd ~/satmarket && python3 orfani.py` — sola lettura, legge il
+  registro di ogni cassaforte configurata con la sua invoice key e
+  lo incrocia coi `payment_hash` di ordini, rilanci e pagamenti.
+  Tre elenchi: ORFANI (nostro memo, nessuna riga: devono essere
+  zero), FUORI POSTO (la riga dice un'altra cassaforte: zero anche
+  loro) e NON NOSTRI (capitale o altro: li guarda una persona).
+  Esce con 1 se c'e' da guardare, quindi puo' stare in un cron che
+  tace. Ha sostituito l'`orfani.py` non tracciato del 10 ago 2026,
+  che leggeva una cassaforte sola e non conosceva `pagamenti`:
+  quello si cancella.
   BACKUP: `/opt/lnbits` (db con backup atomico, `.env`, compose, cert,
   superuser, unit del ponte) e `onion_auth` viaggiano nell'archivio
   age; la riserva fee di LNbits e' `max(1%, 2000 sats)` per payout.
