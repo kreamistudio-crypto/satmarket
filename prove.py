@@ -47849,12 +47849,16 @@ def prove_p2p_barattozon():
               True, _alta <= 17)
         prova("...e la riempie: piu' piccola sarebbe marchio sprecato",
               True, _alta >= 15)
-        # ⚠️ DENTRO LA CARD il marchio e' piu' grande — li' non c'e'
-        # nessuna fila da rispettare — ma la scatola non deve SCAPPARE
-        # dalle sorelle: il conto e' (marchio + tessera + respiro) meno
-        # l'altezza di una scatola normale, e deve restare qualche
-        # punto. Il respiro suo scende apposta, o un marchio da 30
-        # costerebbe quattordici pixel invece di sei.
+        # ⚠️ DENTRO LA CARD la scatola dev'essere IDENTICA a quelle
+        # sorelle — nessun punto in piu' — e il marchio si prende quel
+        # che resta. Quindi qui non si guarda una soglia ma
+        # un'UGUAGLIANZA: (marchio + respiro nostro) deve venire
+        # esattamente come (riga di testo + respiro loro). La misura
+        # del marchio non e' scelta, e' la sottrazione che resta.
+        # ⚠️ IL 18 E' MISURATO, non dedotto: e' l'altezza della riga di
+        # una scatola normale col testo dentro (12,5px, interlinea
+        # normale), letta dal vivo a 375 e a 320 — la scatola sorella
+        # viene 34, che e' 18 piu' 8+8.
         _dentro = int(_hi.group(1))
         _resp = _re_b.search(r"padding-top:(\d+)px", _ins)
         _bxp = _re_b.search(r"padding:(\d+)px", pezzo_js(css, ".p2p-box{", "}"))
@@ -47872,11 +47876,11 @@ def prove_p2p_barattozon():
             _pin = _re_b.search(r"padding:(\d+)(?:px)?", _insm)
             _dpad = int(_pin.group(1)) if _pin else int(_p.group(1))
             _nostra = _dentro + 2 * _dpad + 2 * int(_resp.group(1))
-            _sorella = 17 + 2 * int(_bxp.group(1))
+            _sorella = 18 + 2 * int(_bxp.group(1))
             prova("dentro la card il marchio e' piu' grande che nelle pillole",
                   True, _dentro > int(_h.group(1)))
-            prova("...e la scatola non scappa dalle sorelle piu' di qualche punto",
-                  True, 0 < _nostra - _sorella <= 8)
+            prova("...e la scatola viene ESATTA come quella delle sorelle",
+                  _sorella, _nostra)
     prova("la scatola dei metodi cede coi puntini come sempre", True,
           ".p2p-paga{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" in css)
 
