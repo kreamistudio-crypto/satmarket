@@ -38232,6 +38232,191 @@ process.stdout.write(JSON.stringify(out));
     prova("bundle: hkdf.expand da' la lunghezza chiesta", 76, o["hkdfLen"])
 
 
+def prove_tour_p2p():
+    """IL TOUR DI BENVENUTO DEL P2P (set 2026): sei card, una scorsa,
+    e poi il libro.
+
+    Le cose che qui possono rompersi in silenzio sono quattro, e tre
+    le ha gia' fatte il primo giro dal vivo.
+    1) IL TIMBRO. Se smettesse di portare il conto, due account sullo
+       stesso telefono si passerebbero il «gia' visto» — il difetto de
+       «IL CONTO SUL DISPOSITIVO», che li' e' costato uno scambio
+       attribuito alla persona sbagliata e qui costerebbe solo un tour
+       mancato, ma e' lo stesso difetto e si sorveglia uguale. E se
+       `localStorage` tace il ripiego dev'essere «VISTO», o il tour
+       tornerebbe a ogni ingresso proprio a chi non puo' spegnerlo.
+    2) L'INNESCO. Deve stare DOPO `chiudiAttesaP2P`, dentro il ramo
+       «il libro c'e'»: nel ramo dell'attesa il tour comparirebbe
+       sopra l'anello del caricamento, e chiudendolo si troverebbe lo
+       spinner — che e' esattamente quel che Andrea ha chiesto di non
+       fare.
+    3) LO STRATO. Il tour e' un livello del motore di navigazione: se
+       `navPila` smettesse di nominarlo, l'indietro di Telegram
+       passerebbe OLTRE il tour lasciandolo aperto sopra un'altra
+       pagina.
+    4) I DUE DIFETTI VISTI DAL VIVO, che sono qui perche' nessuna
+       sentinella di forma li avrebbe presi da sola:
+       l'ascoltatore dello scroll che passava l'EVENTO come indice
+       (pallini tutti spenti), e il marchio Barattozon che senza
+       specificita' doppia si prendeva il `width:100%` della figura e
+       riempiva la card."""
+    print("\n[il tour di benvenuto del P2P]")
+    import os as _os
+    mini = open("miniapp.html", encoding="utf-8").read()
+    srv = open("server.py", encoding="utf-8").read()
+
+    # --- 1) LE SEI ILLUSTRAZIONI, E LA ROTTA CHE LE SERVE ------------
+    # La whitelist e' una TUPLA scritta a mano (il patto di
+    # FILE_SCOPRIRE): sei file, si contano, e un nome che arriva dal
+    # client non diventa mai un percorso.
+    _t = re.search(r"FILE_TOUR_P2P = \(([^)]*)\)", srv, re.S)
+    prova("la whitelist del tour e' una tupla", True, bool(_t))
+    nomi = re.findall(r'"([^"]+)"', _t.group(1) if _t else "")
+    ATTESI = ["scambio.webp", "garanzia.webp", "metodi.webp",
+              "recapiti.webp", "reputazione.webp", "tabacchino.webp"]
+    prova("...e ci sono tutte e sei, in ordine", ATTESI, nomi)
+    _r = pezzo("asset_tour_p2p")
+    prova("...e la rotta la interroga", True,
+          "if nome not in FILE_TOUR_P2P:" in _r)
+    prova("la rotta serve col 304 e la revalidazione", True,
+          "_file_con_etag" in _r and '"public, no-cache"' in _r)
+    # MAI un mount: la regola ferrea 3 vale anche per una cartella
+    # nuova, e il modo di romperla e' proprio aggiungerne una.
+    prova("...e la cartella non e' montata", False,
+          'StaticFiles(directory="assets/tour-p2p"' in srv)
+    # I SEI FILE CI SONO DAVVERO. La prova nasce COL loro commit (il
+    # precedente di tutto.webp): un asset che manca fa 404 e la card
+    # resta navy vuota, senza che niente protesti.
+    manca = [n for n in ATTESI
+             if not _os.path.exists(_os.path.join("assets", "tour-p2p", n))]
+    prova("i sei file esistono", [], manca)
+    # IL TETTO DEL PESO, e non e' cosmesi: sono SEI immagini che si
+    # scaricano tutte insieme all'apertura del tour, su una rete che
+    # puo' essere quella del telefono in giro. 110 KB oggi; il tetto
+    # lascia respiro a una che si ridisegna e ferma chi ci ributta
+    # dentro un PNG.
+    peso = sum(_os.path.getsize(_os.path.join("assets", "tour-p2p", n))
+               for n in ATTESI if _os.path.exists(
+                   _os.path.join("assets", "tour-p2p", n))) / 1024
+    prova(f"...e insieme pesano meno di 200 KB (ora {peso:.0f})",
+          True, peso < 200)
+
+    # --- 2) IL CATALOGO DEL CLIENT COMBACIA COLLA WHITELIST ----------
+    # Gli URL sono LETTERALI apposta — cosi' `_timbra_asset_pagina` li
+    # timbra col ?v= del contenuto — quindi qui si possono leggere e
+    # confrontare con quel che il server accetta di servire. Un nome
+    # che diverge e' un 404 muto.
+    _cat = pezzo_js(mini, "const TAPPE_TOUR_P2P = [", "];")
+    usati = re.findall(r"/assets/tour-p2p/([a-z0-9-]+\.webp)", _cat)
+    prova("il client chiede le sei della whitelist, in quell'ordine",
+          ATTESI, usati)
+    prova("...e sono URL letterali, non costruiti", False,
+          "${" in _cat)
+    # I SEI TESTI: si guarda la CODA di ognuno, che e' quel che una
+    # riscrittura distratta tronca per prima.
+    for coda in ("come e a che prezzo.", "solo a scambio concluso.",
+                 "pagando dal tabaccaio.", "non una promessa.",
+                 "prima di scambiare.", "fino alla consegna."):
+        prova(f"...e il testo che finisce «{coda}» c'e'", True, coda in _cat)
+    # IL MARCHIO STA SULLA SESTA E SOLO SU QUELLA
+    prova("il marchio Barattozon e' su una card sola", 1,
+          _cat.count("marchio: true"))
+    prova("...ed e' la sesta", True,
+          _cat.rindex("marchio: true") > _cat.rindex("reputazione.webp"))
+
+    # --- 3) IL TIMBRO PORTA IL CONTO --------------------------------
+    prova("il timbro passa da chiaveP2P, come le chiavi dello scambio",
+          True, "return chiaveP2P(TOUR_P2P_CHIAVE);" in mini)
+    # mai letto nudo: una lettura senza conto e' un «gia' visto» che
+    # due account si passano
+    nude = re.findall(r"localStorage\.(?:getItem|setItem)\("
+                      r"TOUR_P2P_CHIAVE\)", mini)
+    prova("...e non si legge mai nudo", [], nude)
+    # IL RIPIEGO E' «VISTO», ed e' il verso scomodo: col verso opposto
+    # una memoria muta (finestra privata, dispensa piena) farebbe
+    # tornare il tour a OGNI ingresso.
+    _v = pezzo_js(mini, "function tourP2PVisto(){", "\n}\n")
+    prova("memoria muta = «gia' visto»", True, "catch(e) { return true; }" in _v)
+    # ...e lo scordare tocca TUTT'E DUE i nomi: quello del conto e
+    # quello nudo di chi non aveva ancora un'identita'
+    _s = pezzo_js(mini, "function scordaTourP2P(){", "\n}\n")
+    prova("scordare toglie il nome del conto E quello nudo", True,
+          "removeItem(chiaveTourP2P())" in _s
+          and "removeItem(TOUR_P2P_CHIAVE)" in _s)
+    # «TRATTAMI DA NUOVO» LO RIARMA: il timbro non sta in
+    # `barattolo_hint`, quindi la riga che azzera quello non lo sfiora
+    # — ed e' proprio la prima cosa che un utente nuovo vede nel P2P.
+    _t2 = pezzo_js(mini, "function trattamiDaNuovo(){", "\n}\n")
+    prova("«Trattami da nuovo» riarma anche il tour del P2P", True,
+          "scordaTourP2P();" in _t2)
+
+    # --- 4) L'INNESCO ASPETTA IL LIBRO ------------------------------
+    _rp = pezzo_js(mini, "function renderP2P(){")
+    prova("l'innesco sta dopo che il velo si e' chiuso", True,
+          0 < _rp.find("chiudiAttesaP2P();")
+          < _rp.find("apriTourP2PSePrimaVolta();"))
+    # ...e sta nel ramo «il libro c'e'», cioe' DOPO il `return`
+    # dell'attesa: nel ramo di sopra comparirebbe sull'anello
+    prova("...e dopo il return del ramo dell'attesa", True,
+          0 < _rp.find(".finally(chiudiAttesaP2P);")
+          < _rp.find("apriTourP2PSePrimaVolta();"))
+    _a = pezzo_js(mini, "function apriTourP2PSePrimaVolta(){", "\n}\n")
+    prova("il tour non si apre sopra un altro strato", True,
+          "if (tourP2PInCorso || tourInCorso || testModaleInCorso) return;" in _a)
+    # LA SEZIONE E' IL LIBRO: renderP2P dipinge anche «I miei scambi»,
+    # e di la' il tour si aprirebbe sulla pagina sbagliata
+    prova("...e solo sul libro, non su «I miei scambi»", True,
+          "?.id !== 'view-p2p') return;" in _a)
+    prova("...e si consuma alla comparsa, non alla fine", True,
+          "localStorage.setItem(chiaveTourP2P(), Date.now());"
+          in pezzo_js(mini, "function apriTourP2P(){", "\n}\n"))
+
+    # --- 5) IL TOUR E' UNO STRATO DEL MOTORE ------------------------
+    prova("navPila conosce il tour del P2P", True,
+          "if (tourP2PInCorso)    p.push({t:'tourp2p', k:''});" in mini)
+    prova("...e navChiudiStrato sa smontarlo", True,
+          "if (s.t==='tourp2p') return chiudiTourP2P();" in mini)
+    prova("...e l'osservatore guarda la sua classe", True,
+          "el('tour'), el('tourP2P'), el('testModale')" in mini)
+    # la bandierina si abbassa PRIMA della classe: l'osservatore
+    # scatta sul cambio di classe e chiede la pila a navPila, che
+    # questa variabile la legge
+    _c = pezzo_js(mini, "function chiudiTourP2P(){", "\n}\n")
+    prova("la bandierina cade prima della classe", True,
+          0 < _c.find("tourP2PInCorso = false;")
+          < _c.find("classList.remove('open')"))
+
+    # --- 6) I DUE DIFETTI VISTI DAL VIVO ----------------------------
+    # L'ASCOLTATORE NON PASSA L'EVENTO: `scroll` chiama con l'Event,
+    # che non e' `undefined` e finiva dritto nel parametro `i` —
+    # nessun `j === i` piu' vero, pallini tutti spenti e il bottone
+    # che sull'ultima card diceva ancora «Avanti».
+    prova("l'ascoltatore dello scroll non passa l'evento come indice",
+          True, "addEventListener('scroll', scorriTourP2P" in mini
+          and "function scorriTourP2P(){ aggiornaTourP2P(); }" in mini)
+    prova("...e si stacca per lo stesso nome", True,
+          "removeEventListener('scroll', scorriTourP2P)" in mini)
+    # IL MARCHIO HA LA SPECIFICITA' DOPPIA: `.giro-fig img` vale
+    # (0,1,1) e vincerebbe su `.giro-marchio` (0,1,0) QUALUNQUE fosse
+    # l'ordine nel foglio — il marchio riempiva la figura intera.
+    prova("il marchio batte il `width:100%` della figura", True,
+          ".giro-fig img.giro-marchio{" in mini)
+    # IL PREFISSO NON E' `p2p-`, e non e' un gusto: `tp2p-marchio`
+    # CONTIENE `p2p-marchio`, e una sentinella di casa cerca proprio
+    # quella stringa nel file intero. Vale per tutta la famiglia.
+    prova("le classi del tour non fingono di essere della famiglia p2p-",
+          False, "tp2p-" in mini)
+
+    # --- 7) LA PORTA PER RIVEDERLO ----------------------------------
+    prova("«Come funziona» vive in fondo al libro", True,
+          'onclick="rivediTourP2P()">Come funziona<' in mini)
+    prova("...e il libro la appende anche quando e' vuoto", True,
+          "+ comeFunziona;" in _rp)
+    _riv = pezzo_js(mini, "function rivediTourP2P(){", "\n")
+    prova("...e riaprire non rimette in gioco nessun timbro", False,
+          "removeItem" in _riv)
+
+
 def prove_p2p_libro():
     """LO SCAMBIO P2P, LATO CLIENT (set 2026, tappa 2): la leva a due
     fonti, il tab che passa dal giudice, la vista col libro ordini del
@@ -48355,8 +48540,20 @@ def prove_p2p_conto_dispositivo():
     nomi = re.findall(r"'([^']+)'", lista.group(1)) if lista else []
     costanti = [re.search(r"const %s = '([^']+)';" % c, mini) for c in
                 ("MOSTRO_CHIAVE", "MOSTRO_ORDINI_CHIAVE", "MOSTRO_LAPIDI_CHIAVE", "RECAPITI_CHIAVE")]
+    # ⚠️ LA LISTA HA UN OSPITE CHE NON E' UNA CHIAVE DI SCAMBIO (set
+    # 2026, col tour del P2P): `barattolo_tour_p2p` e' il timbro del
+    # giro di benvenuto, e sta li' perche' vuole ESATTAMENTE il
+    # trasloco che questa lista descrive — dal nome nudo al nome col
+    # conto, appena il conto arriva — cosi' chi ha visto il tour da
+    # anonimo non se lo ribecca al primo ingresso da autenticato.
+    # Scriverne uno suo accanto sarebbe la seconda copia della
+    # stessa regola. Il confronto resta ESATTO — le quattro piu'
+    # l'ospite, nessun altro — quindi una chiave nuova dimenticata
+    # e' rossa come prima, e un ospite non dichiarato pure.
+    OSPITI_LISTA = ['barattolo_tour_p2p']
     prova("la lista delle chiavi del dispositivo e' in pari con le costanti",
-          [c.group(1) for c in costanti if c], nomi)
+          sorted([c.group(1) for c in costanti if c] + OSPITI_LISTA),
+          sorted(nomi))
     prova("chiaveP2P mette il conto nel nome, e senza conto vale il nome di ieri",
           True, "return myTgId ? base + '@' + myTgId : base;" in blocco)
 
@@ -61684,6 +61881,7 @@ def main():
               prove_relay_chiavi,
               prove_p2p_server,
         prove_p2p_libro,
+        prove_tour_p2p,
     prove_p2p_dettaglio,
     prove_nav_p2p,
     prove_timbro_asset,

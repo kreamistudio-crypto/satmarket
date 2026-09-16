@@ -47584,6 +47584,48 @@ def asset_scoprire(nome: str, if_none_match: str = Header("")):
                           if_none_match)
 
 
+# Le sei illustrazioni del tour di benvenuto del P2P (set 2026): si
+# vedono una volta sola per conto, al primo ingresso nel libro, e
+# poi solo a richiesta dalla voce «Come funziona».
+# LA TECNICA E' QUELLA DELLE CATEGORIE E DEL MARCHIO BARATTOZON —
+# ritaglio, WebP, compressione seria — con la differenza che il
+# fondo impone: le illustrazioni delle categorie sono scontornate su
+# TRASPARENZA e si ritagliano sull'alpha, queste nascono su un navy
+# opaco con un alone caldo attorno al soggetto, quindi il disegno si
+# trova per DISTANZA dal fondo. Le soglie sono DUE e non una, ed e'
+# la cosa che il primo giro ha sbagliato: quella ALTA misura il
+# disegno e da' la scala (il pareggio, che qui serve piu' che
+# altrove — la striscia del tabaccaio e' 2,4:1 e il barattolo
+# 0,8:1, e a tela piena uno sembrerebbe il triplo dell'altro),
+# quella BASSA dice cosa portarsi dietro, perche' tagliare l'alone
+# lascia un rettangolo visibile sul navy della card. Da 2048x2048
+# JPEG a 768x576 WebP qualita' 85: 110 KB tutt'e sei.
+# Cartella SUA e MAI assets/categorie/, per la ragione di
+# assets/scoprire/ e di assets/og/: ritaglia_categorie.py fa il glob
+# di quella cartella e sei file a fondo pieno le inquinerebbero la
+# mediana del pareggio dell'inchiostro, spostando le sorelle.
+# Il nome ARRIVA dal client, quindi whitelist a tupla (il patto di
+# FILE_SCOPRIRE); i nomi sono quelli delle voci del tour nel client
+# (TAPPE_TOUR_P2P) e restano quelli.
+FILE_TOUR_P2P = ("scambio.webp", "garanzia.webp", "metodi.webp",
+                 "recapiti.webp", "reputazione.webp", "tabacchino.webp")
+
+
+@app.get("/assets/tour-p2p/{nome}")
+def asset_tour_p2p(nome: str, if_none_match: str = Header("")):
+    if nome not in FILE_TOUR_P2P:
+        raise HTTPException(404, "immagine non trovata")
+    percorso = os.path.join("assets", "tour-p2p", nome)
+    if not os.path.exists(percorso):
+        raise HTTPException(404, "immagine non trovata")
+    # Revalidazione come le sorelle: i nomi non sono versionati e
+    # un'illustrazione si ridisegna senza rinominare niente. Il
+    # timbro ?v= glielo mette _timbra_asset_pagina, che nel client
+    # questi sei URL li trova SCRITTI PER ESTESO apposta.
+    return _file_con_etag(percorso, "image/webp", "public, no-cache",
+                          if_none_match)
+
+
 # Le foto degli annunci e i francobolli degli avatar (ago 2026: qui
 # c'era uno StaticFiles montato su /foto, l'unica directory servita in
 # blocco di tutto il progetto — contro la regola ferrea 3, che le

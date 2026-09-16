@@ -2561,6 +2561,10 @@
      niente. */
   .p2p-x{margin-left:auto}
   #view-p2p .btn{margin-top:14px}
+  /* la voce che riapre il tour: discreta, centrata, con l'aria di
+     una nota a pie' di pagina — che e' quel che e' */
+  .giro-porta{margin:18px 0 6px;text-align:center;
+    font-size:12.5px;font-weight:700;color:var(--muted)}
   .p2p-metodi{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
   /* L'ARIA SOTTO I TITOLI del foglio filtro (set 2026, ritocco di
      Andrea): l'etichetta di sezione di casa non ha respiro sotto —
@@ -6082,6 +6086,92 @@
     #tourFumetto{transition:top .3s ease,left .3s ease}
   }
 
+  /* ---------- tour del P2P: sei card, una scorsa (set 2026) ----------
+     E' il GEMELLO del tour qui sopra e non la stessa macchina, e la
+     differenza e' il mestiere: quello illumina pezzi di pagina viva —
+     riflettore, fumetto, bersagli che possono mancare — e serve a
+     dire «questa cosa che vedi fa questo»; questo racconta una
+     sezione a chi non l'ha mai aperta, dove non c'e' ancora niente da
+     illuminare. Percio' non riusa `#tour`: fra le due non c'e' un
+     pezzo in comune se non il velo, e forzarle nella stessa funzione
+     avrebbe voluto dire due rami per ogni riga.
+     IL NASTRO E' UNO SCORRIMENTO VERO (`scroll-snap`), la stessa
+     tecnica della galleria del dettaglio: il dito la conosce, il
+     compositor la porta da solo e l'indice si LEGGE dallo scorrimento
+     (`scrollLeft / clientWidth`) invece di tenerlo a mano. Un
+     IntersectionObserver qui sarebbe una seconda verita' accanto a
+     quella dello scroll — e per giunta non si potrebbe provare, che
+     nel Browser pane il documento e' `hidden` e gli osservatori non
+     emettono.
+     IL FONDO DELLA FIGURA E' IL NAVY DI CASA (#131A26, quello del
+     marchio): le sei illustrazioni nascono su quel navy, quindi
+     l'immagine copre la sua scatola e sotto non resta il bordo di
+     un'altra tinta. E se una non arrivasse, quel che resta e' navy e
+     non un buco bianco in mezzo alla card. */
+  #tourP2P{position:fixed;inset:0;z-index:84;display:none;
+    align-items:center;justify-content:center;padding:16px;
+    background:rgba(15,12,6,.62)}
+  #tourP2P.open{display:flex}
+  .giro-box{position:relative;width:100%;max-width:380px;
+    max-height:calc(100dvh / var(--fs-zoom,1) - 32px);
+    background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius);box-shadow:var(--shadow-hover);
+    overflow:hidden;display:flex;flex-direction:column}
+  /* «Salta» vive SULLA figura, che e' navy in tutt'e due i temi:
+     percio' e' bianco e non `--muted`, che sul navy sparirebbe. */
+  .giro-salta{position:absolute;top:8px;right:8px;z-index:2;
+    border:0;border-radius:999px;padding:6px 12px;font:inherit;
+    font-weight:800;font-size:12.5px;cursor:pointer;
+    background:rgba(255,255,255,.16);color:#fff}
+  .giro-salta:active{transform:translateY(1px)}
+  .giro-nastro{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;
+    scrollbar-width:none;overscroll-behavior-x:contain}
+  .giro-nastro::-webkit-scrollbar{display:none}
+  .giro-card{flex:0 0 100%;min-width:0;scroll-snap-align:center;
+    scroll-snap-stop:always;display:flex;flex-direction:column}
+  .giro-fig{position:relative;width:100%;aspect-ratio:4/3;
+    background:#131A26;flex:none}
+  .giro-fig img{display:block;width:100%;height:100%;object-fit:cover}
+  /* Il marchio Barattozon sulla sesta figura: NUDO, senza la tessera
+     che porta altrove — il fondo scuro glielo da' gia' la figura, ed
+     e' la stessa coppia «fondo navy + marchio nudo» della scatola dei
+     metodi nel libro. */
+  /* ⚠️ LA SPECIFICITA' E' DOPPIA APPOSTA, e non e' pignoleria: visto
+     dal vivo, il marchio riempiva la figura intera. `.giro-fig img`
+     qui sopra vale (0,1,1) e questa regola da sola (0,1,0), quindi
+     il `width:100%;height:100%` della figura vinceva sul marchio
+     QUALUNQUE fosse l'ordine nel foglio — non c'era niente da
+     spostare, andava alzata la specificita'. */
+  .giro-fig img.giro-marchio{position:absolute;left:14px;bottom:12px;
+    height:20px;width:auto;object-fit:contain;display:block}
+  .giro-testo{padding:15px 18px 6px;font-size:14px;font-weight:600;
+    line-height:1.5;color:var(--ink)}
+  .giro-piede{display:flex;align-items:center;gap:12px;
+    padding:12px 16px 14px;border-top:1px solid var(--line)}
+  .giro-punti{display:flex;gap:6px}
+  /* Il bersaglio vero e' l'`::after`, come i pallini della galleria:
+     7px non si mirano col dito. Qui pero' il tocco NON attraversa —
+     sotto non c'e' una foto da aprire, e il pallino e' il timone. */
+  .giro-punto{width:7px;height:7px;padding:0;border:0;border-radius:50%;
+    position:relative;background:var(--line);cursor:pointer}
+  .giro-punto::after{content:'';position:absolute;inset:-9px}
+  .giro-punto.on{width:18px;border-radius:999px;background:var(--sats)}
+  /* `.btn` nasce largo quanto la riga: qui e' un bottone in fila coi
+     pallini, e la deroga si dice con la specificita' doppia invece
+     che sperando nell'ordine del foglio. */
+  .giro-piede .btn{width:auto;flex:none;margin:0;margin-left:auto;
+    padding:11px 22px;font-size:14px}
+  /* ⚠️ NIENTE `scroll-behavior:smooth` sul nastro, ed e' una regola
+     di casa che vale per tutto il foglio: con lo scorrimento morbido
+     la compensazione di `riapriOrdineFermo` diventerebbe
+     un'animazione, cioe' il salto che quella nasconde tornerebbe
+     visibile al rallentatore. La scorsa morbida qui la chiede
+     `vaiTappaTourP2P` con `scrollTo({behavior:'smooth'})` — che e'
+     anche l'unico posto da cui si puo' guardare `tourRidotto()`. */
+  @media (prefers-reduced-motion: no-preference){
+    .giro-punto{transition:width .2s ease,background .2s ease}
+  }
+
   /* ---------- fascia «fase di test»: la porta fissa al canale ----------
      Il cartello passa una volta al giorno, questa resta. Volutamente
      NON un CTA pieno: l'arancione pieno e' del «+ Vendi» e dei bottoni
@@ -8620,6 +8710,23 @@ document.getElementById('cartello')?.remove();</script>
   <div id="tour" role="dialog" aria-label="Tour di benvenuto">
     <div id="tourLuce"></div>
     <div id="tourFumetto" aria-live="polite"></div>
+  </div>
+
+  <!-- ============ TOUR DEL P2P: sei card, una scorsa (set 2026) ============
+       Markup FISSO come le viste, e per la stessa ragione: dentro
+       #tourP2PNastro e #tourP2PPunti scrive `apriTourP2P`, e le sei
+       voci — figura e testo — stanno tutte in `TAPPE_TOUR_P2P`, che e'
+       il loro unico catalogo. -->
+  <div id="tourP2P" role="dialog" aria-modal="true"
+       aria-label="Come funziona lo scambio">
+    <div class="giro-box">
+      <button class="giro-salta" id="tourP2PSalta" onclick="chiudiTourP2P()">Salta</button>
+      <div class="giro-nastro" id="tourP2PNastro" aria-live="polite"></div>
+      <div class="giro-piede">
+        <div class="giro-punti" id="tourP2PPunti"></div>
+        <button class="btn orange" id="tourP2PVia" onclick="avantiTourP2P()">Avanti</button>
+      </div>
+    </div>
   </div>
 
   <!-- ============ CARTELLO «FASE DI TEST» (testo e link dal config) ============ -->
@@ -11213,6 +11320,7 @@ function navVista(){
 const chiaveVetrina = () => ramoVetrina + '|' + activeCat;
 /* La pila: la vista in fondo, sopra gli strati nell'ordine in cui si
    coprono (che e' quello degli z-index: fogli 41, lightbox 70, tour 80,
+   tour del P2P 84,
    cartello 90). Il picker va per ultimo fra i fogli — e' l'unico che si
    apre SOPRA un altro, e nel markup non sta in coda. */
 function navPila(){
@@ -11222,6 +11330,7 @@ function navPila(){
     .forEach(id => p.push({t:'f', k:id}));
   if (el('lightbox')?.classList.contains('open')) p.push({t:'lb', k:''});
   if (tourInCorso)       p.push({t:'tour', k:''});
+  if (tourP2PInCorso)    p.push({t:'tourp2p', k:''});
   if (testModaleInCorso) p.push({t:'test', k:''});
   return p;
 }
@@ -11235,6 +11344,7 @@ const navUguali = (a,b) => !!a && !!b && a.length===b.length
 function navChiudiStrato(s){
   if (s.t==='lb')   return chiudiLightbox();
   if (s.t==='tour') return chiudiTour();
+  if (s.t==='tourp2p') return chiudiTourP2P();
   if (s.t==='test') return chiudiModaleTest();
   if (s.k==='pickerSheet') return chiudiPicker();
   el(s.k)?.classList.remove('open');
@@ -11505,7 +11615,7 @@ function navMotore(){
      risulta a saldo zero da solo, senza scriverlo da nessuna parte. */
   const occhio = new MutationObserver(() => navRiflette());
   [...document.querySelectorAll('.view, .sheet'),
-   el('lightbox'), el('tour'), el('testModale')].forEach(n =>
+   el('lightbox'), el('tour'), el('tourP2P'), el('testModale')].forEach(n =>
     n && occhio.observe(n, {attributes:true, attributeFilter:['class']}));
   addEventListener('popstate', e => navApplica(e.state));
   /* Dentro Telegram il gesto lo intercetta il CLIENT, non la WebView:
@@ -32582,6 +32692,13 @@ function aggiornaAdmDot(n){
 function trattamiDaNuovo(){
   if (!isAdmin) return;
   try { localStorage.removeItem(HINT_CHIAVE); localStorage.removeItem(TEST_CHIAVE); } catch(e){}
+  /* IL TIMBRO DEL TOUR P2P NON STA IN `barattolo_hint`, e va tolto a
+     parte: vive sotto un nome SUO col conto attaccato
+     (`barattolo_tour_p2p@<tg_id>`), quindi la riga qui sopra non lo
+     sfiora. Senza questa, «trattami da nuovo utente» avrebbe
+     riarmato tutto tranne la cosa che un utente nuovo vede per
+     prima entrando nel P2P. */
+  scordaTourP2P();
   go('esplora');                   // il tour vive in vetrina: ci si va
   modaleTest(tourBenvenuto);       // il cartello del rodaggio, poi il tour
   checklistPrimoSguardo = true;    // e la checklist si riapre da sola
@@ -37116,6 +37233,9 @@ function renderP2P(){
   }
   /* il libro c'e': il velo se ne va, qualunque strada l'abbia acceso */
   chiudiAttesaP2P();
+  /* ...e solo adesso il tour di benvenuto puo' aprirsi: mai sopra
+     l'anello dell'attesa (vedi `apriTourP2PSePrimaVolta`) */
+  apriTourP2PSePrimaVolta();
   /* IL LIBRO SI AGGIORNA DA SOLO (set 2026, fase 6): il bottone
      «Aggiorna il libro» non c'e' piu' — al posto del gesto, un libro
      piu' vecchio di P2P_LIBRO_FRESCO_MS si rilegge in sottofondo al
@@ -37228,6 +37348,16 @@ function renderP2P(){
     + '<button type="button" class="tema-btn" onclick="alternaTema()">'
     + '<span class="tema-ico" aria-hidden="true">'
     + (temaEffettivo() === 'scuro' ? '☀️' : '🌙') + '</span></button></div>';
+  /* LA PORTA PER RIVEDERE IL TOUR sta IN FONDO al libro (set 2026,
+     scelta di Andrea fra il filtro e il fondo): e' una voce da
+     leggere, non un comando da usare — in testa avrebbe rubato una
+     riga alle offerte per sempre, che e' il prezzo che la pillola
+     «Ordina» paga perche' serve a ogni giro e questa no. E c'e'
+     anche quando il libro e' vuoto: e' proprio li' che uno si
+     chiede cosa sia questo posto. */
+  const comeFunziona = '<div class="giro-porta">'
+    + '<button type="button" class="scopri-link" '
+    + 'onclick="rivediTourP2P()">Come funziona</button></div>';
   box.innerHTML = avvisi
     + (mostrati.length ? mostrati.map(rigaOrdineP2P).join('')
        : `<div class="empty"><img class="p2p-simbolo" src="/assets/p2p-logo-completo.png" alt="" onerror="this.remove()"><span class="empty-title">${
@@ -37237,7 +37367,8 @@ function renderP2P(){
                + '<button type="button" class="scopri-link" onclick="azzeraFiltroP2P()">Togli il filtro</button>'
              : p2pLato === 'compro'
                ? 'In questo momento nessuno sta vendendo sats in euro.'
-               : 'In questo momento nessuno sta comprando sats in euro.'}</div>`);
+               : 'In questo momento nessuno sta comprando sats in euro.'}</div>`)
+    + comeFunziona;
   /* ...E LA STESSA RIGA DI STRUMENTI ANCHE DI LA' (set 2026, ridisegno
      di Andrea): «Ordina» a sinistra, «Filtro» in mezzo, la levetta del
      tema a destra. Le classi sono LE STESSE del libro — `.p2p-filtro`,
@@ -37648,8 +37779,14 @@ let p2pChiaviGiro = null;
    costanti, che vivono tre blocchi piu' in la': una prova le tiene
    in pari, e un nome nuovo che non entri in questa lista resta di
    un conto solo per tutti. */
+/* ⚠️ `barattolo_tour_p2p` NON E' UNA CHIAVE DI SCAMBIO ed e' qui
+   lo stesso: il trasloco che questa lista descrive — dal nome nudo
+   al nome col conto, appena il conto arriva — e' esattamente quel
+   che serve al timbro del tour, e scriverne uno suo accanto
+   sarebbe la seconda copia della stessa regola. */
 const P2P_CHIAVI_DISPOSITIVO = ['barattolo_mostro', 'barattolo_mostro_ordini',
-                                'barattolo_mostro_lapidi', 'barattolo_p2p_recapiti'];
+                                'barattolo_mostro_lapidi', 'barattolo_p2p_recapiti',
+                                'barattolo_tour_p2p'];
 let p2pContoAllineato = null;   /* il tg_id per cui questa sessione e' allineata */
 function chiaveP2P(base){
   /* senza identita' vale il nome di ieri: e' il posto che
@@ -38805,6 +38942,185 @@ async function esportaDati(tutti){
       document.body.appendChild(a); a.click(); a.remove();
     }
   } catch(e){ toast('❌ Export non riuscito, riprova'); }
+}
+
+/* ---------------- il tour del P2P (set 2026) ----------------
+   Sei card quadrate, una scorsa, e poi il libro. Chi entra nel P2P la
+   prima volta non sa niente di quel che sta guardando: il libro e' una
+   lista di offerte, e nessuna riga li' dentro puo' spiegare la
+   garanzia, i recapiti cifrati o il tabaccaio senza diventare un
+   muro di testo sopra le offerte. Il tour lo dice una volta e se ne va.
+
+   IL TIMBRO E' UNO SOLO E PORTA IL CONTO, la convenzione di
+   `chiaveP2P` e del wallet NWC: `barattolo_tour_p2p@<tg_id>`. Non e'
+   pignoleria — su un telefono con due account Telegram il secondo
+   conto e' un utente NUOVO, e il tour deve vederlo. Il nome nudo (di
+   chi non ha ancora un'identita') se lo assorbe `allineaContoP2P`
+   quando il conto arriva, perche' la chiave sta in
+   `P2P_CHIAVI_DISPOSITIVO`: chi l'ha visto da anonimo non se lo
+   ribecca appena entra.
+
+   SI CONSUMA APPENA PARTE, il patto del tour di benvenuto: anche chi
+   tocca «Salta» al primo sguardo non lo rivede. Un cartello che torna
+   finche' non lo si finisce e' un tormentone, e la strada per
+   rivederlo c'e' ed e' un gesto («Come funziona», in fondo al libro).
+
+   ⚠️ E SE `localStorage` NON RISPONDE VALE «GIA' VISTO», che e' il
+   verso scomodo e quello giusto: col verso opposto una memoria muta
+   (finestra privata, dispensa piena) farebbe ricomparire il tour a
+   OGNI ingresso, cioe' il tormentone garantito proprio a chi non puo'
+   spegnerlo. */
+const TOUR_P2P_CHIAVE = 'barattolo_tour_p2p';
+/* Le sei voci, in ordine. Gli URL sono LETTERALI e non costruiti da
+   uno slug: cosi' `_timbra_asset_pagina` li vede e li timbra col ?v=
+   del contenuto — il giorno che un'illustrazione si ridisegna sotto
+   lo stesso nome, ogni cache di ogni client cade da sola. Un
+   `/assets/tour-p2p/${slug}.webp` sarebbe invisibile a quella regex,
+   e resterebbe la sola revalidazione della rotta. */
+const TAPPE_TOUR_P2P = [
+  {fig: '/assets/tour-p2p/scambio.webp',
+   testo: 'Qui scambi bitcoin ed euro direttamente con altre persone. '
+        + 'Tu scegli quanto, come e a che prezzo.'},
+  {fig: '/assets/tour-p2p/garanzia.webp',
+   testo: 'Chi vende blocca i sats prima che tu paghi. Nessuno può '
+        + 'scappare con i soldi: si sbloccano solo a scambio concluso.'},
+  {fig: '/assets/tour-p2p/metodi.webp',
+   testo: 'SEPA, Revolut, Satispay, contanti — e con Barattozon compri '
+        + 'su Amazon pagando dal tabaccaio.'},
+  {fig: '/assets/tour-p2p/recapiti.webp',
+   testo: 'I recapiti ve li scambiate voi due, cifrati. Barattolo non '
+        + 'li legge: lo dice la matematica, non una promessa.'},
+  {fig: '/assets/tour-p2p/reputazione.webp',
+   testo: 'Chi è onesto nel mercatino è onesto anche qui: la '
+        + 'reputazione è una sola. Guarda le stelle prima di scambiare.'},
+  /* la sesta porta il marchio SULLA figura: il fondo navy ce l'ha gia'
+     lei, quindi il marchio ci sta nudo (vedi il CSS di `.giro-marchio`) */
+  {fig: '/assets/tour-p2p/tabacchino.webp', marchio: true,
+   testo: 'Scegli un ordine Barattozon: paghi in contanti dal '
+        + 'tabaccaio, chi vende ti fa l\'ordine su Amazon, e i sats in '
+        + 'garanzia proteggono lo scambio fino alla consegna.'},
+];
+let tourP2PInCorso = false;
+function chiaveTourP2P(){ return chiaveP2P(TOUR_P2P_CHIAVE); }
+function tourP2PVisto(){
+  try { return localStorage.getItem(chiaveTourP2P()) !== null; }
+  catch(e) { return true; }      /* memoria muta = «visto»: vedi sopra */
+}
+function scordaTourP2P(){
+  /* tutt'e due i nomi: quello del conto e quello nudo di chi non aveva
+     ancora un'identita', che `allineaContoP2P` potrebbe non aver
+     ancora traslocato */
+  try {
+    localStorage.removeItem(chiaveTourP2P());
+    localStorage.removeItem(TOUR_P2P_CHIAVE);
+  } catch(e){}
+}
+/* L'ingresso automatico: UNA volta, e solo col libro gia' in mano.
+   Sta in `renderP2P` dopo `chiudiAttesaP2P` e non in `vaiP2P`, per due
+   ragioni diverse. La prima e' il velo: sopra l'anello del
+   caricamento il tour sarebbe un cartello davanti a una pagina che non
+   c'e' ancora, e chiudendolo si troverebbe l'attesa. La seconda e' la
+   lezione di `renderInteresse`, gia' scritta due volte qui accanto:
+   `vaiP2P` e' il solo ingresso dal TAB, mentre alla vista ci si torna
+   col gesto indietro e dalla cronologia — che da li' non passano mai. */
+function apriTourP2PSePrimaVolta(){
+  if (tourP2PInCorso || tourInCorso || testModaleInCorso) return;
+  /* LA SEZIONE E' IL LIBRO: `renderP2P` dipinge anche «I miei
+     scambi», e di la' il tour si aprirebbe sopra la pagina sbagliata —
+     per giunta a chi il libro l'ha gia' attraversato. */
+  if (document.querySelector('.view.active')?.id !== 'view-p2p') return;
+  if (tourP2PVisto()) return;
+  apriTourP2P();
+}
+/* «Come funziona»: lo stesso tour a richiesta, per tutti. Non rimette
+   in gioco nessun timbro — riapre e basta, e alla chiusura il timbro
+   resta quello che era (riscritto uguale da `apriTourP2P`). */
+function rivediTourP2P(){ haptic(); apriTourP2P(); }
+function apriTourP2P(){
+  if (tourP2PInCorso) return;
+  /* consumato alla COMPARSA, non alla fine: vedi il patto qui sopra */
+  try { localStorage.setItem(chiaveTourP2P(), Date.now()); } catch(e){}
+  tourP2PInCorso = true;
+  const nastro = el('tourP2PNastro'), punti = el('tourP2PPunti');
+  nastro.innerHTML = TAPPE_TOUR_P2P.map(t =>
+    `<div class="giro-card"><div class="giro-fig">`
+    + `<img src="${t.fig}" alt="" onerror="this.remove()">`
+    + (t.marchio ? `<img class="giro-marchio" src="/assets/barattozon.webp"`
+                 + ` alt="Barattozon" onerror="this.remove()">` : '')
+    + `</div><div class="giro-testo">${esc(t.testo)}</div></div>`).join('');
+  punti.innerHTML = TAPPE_TOUR_P2P.map((_, i) =>
+    `<button type="button" class="giro-punto${i ? '' : ' on'}"`
+    + ` onclick="vaiTappaTourP2P(${i})"`
+    + ` aria-label="Vai al passo ${i + 1}"></button>`).join('');
+  el('tourP2P').classList.add('open');
+  nastro.scrollLeft = 0;              /* riaperto, si riparte dalla prima */
+  nastro.addEventListener('scroll', scorriTourP2P, {passive: true});
+  document.addEventListener('keydown', tastoTourP2P);
+  aggiornaTourP2P();
+}
+/* ⚠️ L'ASCOLTATORE PASSA UN ARGOMENTO, e va scartato (visto dal vivo:
+   alla prima scorsa i pallini si spegnevano tutti e sei). `scroll`
+   chiama con l'EVENTO, che non e' `undefined`, quindi finiva dritto
+   nel parametro `i` di `aggiornaTourP2P` e nessun `j === i` era piu'
+   vero. La cura non e' allargare la guardia — un `typeof i` che
+   accetta di tutto nasconderebbe il prossimo chiamante distratto —
+   e' una funzione NOMINATA che l'argomento lo taglia: serve
+   comunque, che `removeEventListener` vuole lo stesso riferimento. */
+function scorriTourP2P(){ aggiornaTourP2P(); }
+/* L'indice e' la pagina di scroll-snap, come nella galleria del
+   dettaglio: ogni card e' larga quanto il nastro. Una sola verita' —
+   quella dello scorrimento — e nessun contatore da tenere in pari. */
+function tappaTourP2P(){
+  const n = el('tourP2PNastro');
+  return Math.max(0, Math.min(TAPPE_TOUR_P2P.length - 1,
+    Math.round(n.scrollLeft / (n.clientWidth || 1))));
+}
+function aggiornaTourP2P(i){
+  if (!tourP2PInCorso) return;
+  if (i === undefined) i = tappaTourP2P();
+  const punti = el('tourP2PPunti');
+  [...punti.children].forEach((p, j) => p.classList.toggle('on', j === i));
+  const ultima = i === TAPPE_TOUR_P2P.length - 1;
+  el('tourP2PVia').textContent = ultima ? 'Inizia' : 'Avanti';
+  /* sull'ultima «Salta» e «Inizia» farebbero la stessa cosa, e due
+     bottoni per un gesto solo sono una domanda inutile */
+  el('tourP2PSalta').style.visibility = ultima ? 'hidden' : '';
+}
+function vaiTappaTourP2P(i){
+  haptic();
+  const n = el('tourP2PNastro');
+  i = Math.max(0, Math.min(TAPPE_TOUR_P2P.length - 1, i));
+  /* Lo `scroll-snap-stop:always` vale anche per le scorse che facciamo
+     noi: un salto lungo (dal pallino 1 al 5) si fermerebbe per strada.
+     Il passo corto resta morbido, il salto e' netto — la stessa regola
+     della galleria del dettaglio. */
+  const corto = Math.abs(i - tappaTourP2P()) <= 1 && !tourRidotto();
+  n.scrollTo({left: i * n.clientWidth, behavior: corto ? 'smooth' : 'auto'});
+  aggiornaTourP2P(i);
+}
+function avantiTourP2P(){
+  const i = tappaTourP2P();
+  if (i < TAPPE_TOUR_P2P.length - 1) { vaiTappaTourP2P(i + 1); return; }
+  haptic();
+  chiudiTourP2P();
+  /* «Inizia» PORTA AL LIBRO, e quasi sempre ci si e' gia': il ramo
+     serve al giorno che il tour si aprira' da un'altra pagina. */
+  if (document.querySelector('.view.active')?.id !== 'view-p2p') go('p2p');
+}
+function tastoTourP2P(e){
+  if (e.key === 'Escape') { navIndietro(); return; }
+  if (e.key === 'ArrowRight') vaiTappaTourP2P(tappaTourP2P() + 1);
+  if (e.key === 'ArrowLeft')  vaiTappaTourP2P(tappaTourP2P() - 1);
+}
+function chiudiTourP2P(){
+  if (!tourP2PInCorso) return;
+  /* la bandierina si abbassa PRIMA della classe: l'osservatore del
+     motore di navigazione scatta sul cambio di classe e chiede la pila
+     a `navPila`, che questa variabile la legge */
+  tourP2PInCorso = false;
+  el('tourP2P').classList.remove('open');
+  el('tourP2PNastro').removeEventListener('scroll', scorriTourP2P);
+  document.removeEventListener('keydown', tastoTourP2P);
 }
 
 /* ============ IL MOTORE DELLO SCAMBIO (set 2026, tappa 4) ============
