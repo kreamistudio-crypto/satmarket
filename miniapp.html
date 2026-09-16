@@ -7812,6 +7812,7 @@ document.getElementById('cartello')?.remove();</script>
       <p><b>Se entri con una chiave Nostr che è tua</b> e in passato l'hai resa il tuo profilo di scambio, resta così: <b>non lo può ricavare nessuno tranne te</b>, noi compresi, ed è lo stesso ovunque perché ce l'hai tu. Questa strada resta nel patto anche se oggi non ha più un gesto dentro l'app.</p>
       <p><b>Negli altri casi</b> — un profilo nato nel browser prima che arrivasse quello del conto — il profilo <b>vive sul dispositivo</b> e non lo può ricavare nessuno. Dentro Telegram ne salviamo una copia nel <b>cloud del tuo account Telegram</b>, così sopravvive alla cache svuotata e ti segue fra telefono e computer: <b>chi ha il tuo account Telegram ce l'ha anche lui</b> — è già così per tutto Barattolo — e Telegram potrebbe leggerlo, che è il prezzo. Il <b>codice segreto</b> serve a portare il profilo <b>fuori da Barattolo</b>, in un altro programma che parla con lo stesso coordinatore.</p>
       <p>In tutti e tre i casi il server conosce la <b>parte pubblica</b> del profilo e le <b>chiavi usa-e-getta</b> di ogni scambio, per poterti avvisare quando c'è una novità, e da settembre 2026 anche <b>a che numero di scambio sei arrivato</b>: serve a non riusare due volte la stessa chiave usa-e-getta quando apri Barattolo da un dispositivo nuovo, ed è un dato che dai conti che teneva già si sarebbe comunque ricavato. Dal foglio qui sotto il <b>codice segreto</b> lo vedi e lo copi, e il profilo lo <b>dimentichi</b>; dimenticandolo si cancella anche la parte pubblica che il server teneva.</p>
+      <p>Dal 16 settembre 2026 il server annota anche <b>quali ordini pubblichi e quali prendi</b>, per avvisarti con i numeri quando lo scambio si muove (preso, concluso, annullato, tornato in vetrina): sono i passaggi <b>pubblici</b> del libro, e la cifratura dei messaggi non si tocca. Chi entra <b>da Nostr</b> non viene annotato quando prende un ordine — sulle prese riceve l'avviso generico — perché quell'ingresso esiste per chi non vuole lasciare tracce. Gli avvisi si spengono tutti dal cassetto «🔔 Avvisi» del profilo.</p>
       <button class="btn ghost" onclick="apriProfiloP2P()">👤 Il tuo profilo di scambio</button>
       <p>Gli <b>ordini di scambio</b> sono pubblici per come è fatto il coordinatore: vivono sui relay e li legge chiunque, e da settembre 2026 <b>una copia sta anche sul nostro relay</b> — serve a far vedere il libro degli scambi anche quando i relay del coordinatore non rispondono. Non c'è scritto chi sei: un ordine porta l'importo, il metodo di pagamento e una <b>chiave usa-e-getta</b>, diversa a ogni scambio. Le vostre <b>conversazioni</b> non passano di lì: sono cifrate e viaggiano sui relay del coordinatore, e sul nostro non ne teniamo copia.</p>
 
@@ -24990,7 +24991,8 @@ const rigaAvvisiP2P = () => (!p2pLeve || !p2pLeve.attivo) ? '' : `
       <div style="font-size:13.5px;font-weight:800">⚡ Avvisi sugli scambi P2P</div>
       <div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">
         Quando il tuo ordine viene preso, quando lo scambio si chiude
-        e quando tocca a te. Spenti, non ti scriviamo nulla dello scambio.</div>
+        e quando tocca a te. Spenti, non ti scriviamo nulla dello scambio.${
+          myTgId < 0 ? " Entrando da Nostr, sulle prese ricevi l'avviso generico: non annotiamo quali ordini prendi." : ""}</div>
     </div>
     <button onclick="setAvvisiP2P(${myAvvisiP2P ? 'false' : 'true'})"
       aria-pressed="${myAvvisiP2P ? 'true' : 'false'}"
@@ -40873,6 +40875,9 @@ async function eseguiPresaP2P(id, scelto, metodo){
     ord = ordiniP2P()[id] || ord;
     ord.contattato = true;
     scriviOrdineP2P(ord);
+    /* la presa accettata si dichiara al server (16 set 2026): da qui
+       arrivano anche a me le frasi precise del libro, dal mio lato */
+    registraOrdiniP2P([id], false, true).catch(() => {});
   } catch(e) {
     ord = ordiniP2P()[id] || ord;
     ord.stato = (e && e.cantDo) ? 'rifiutato' : 'senza_risposta';
@@ -40897,6 +40902,7 @@ async function riprovaPresaP2P(){
     const agg = ordiniP2P()[id] || o;
     agg.contattato = true;
     scriviOrdineP2P(agg);
+    registraOrdiniP2P([id], false, true).catch(() => {});
   } catch(e) {
     const agg = ordiniP2P()[id] || o;
     agg.stato = (e && e.cantDo) ? 'rifiutato' : 'senza_risposta';
@@ -44212,13 +44218,16 @@ let p2pOrdiniRegistrati = new Set();   // gia' detti al server, in questa sessio
 let p2pFacce = {};                     // ordine -> {nome, avatar, media, voti}
 let p2pFacceChieste = new Set();       // gia' chiesti: mai due volte
 let p2pFacceGiro = null;               // la domanda in volo
-async function registraOrdiniP2P(ids, pubblicati){
+async function registraOrdiniP2P(ids, pubblicati, presi){
   if (DEMO || VETRINA || !myTgId) return false;
   /* SOLO GLI ID VERI del coordinatore: i provvisori del client
      cambiano nome quando lui risponde, e una riga col nome vecchio non
      servirebbe a nessuno (e occuperebbe una PK per sempre). */
+  /* «l'ho preso io» passa anche su un id gia' detto: la restore puo'
+     averlo intestato prima (come ordine altrui), e la presa e' un'altra
+     dichiarazione */
   const lista = (ids || []).filter(id =>
-    id && !provvisorioP2P(id) && !p2pOrdiniRegistrati.has(id));
+    id && !provvisorioP2P(id) && (presi || !p2pOrdiniRegistrati.has(id)));
   if (!lista.length) return false;
   lista.forEach(id => p2pOrdiniRegistrati.add(id));
   try {
@@ -44229,7 +44238,12 @@ async function registraOrdiniP2P(ids, pubblicati){
          pubblicazione — quello e' il maker per costruzione, e il server
          accende subito la colonna. Dalla restore resta falso: li' gli
          id sono anche di ordini PRESI, e il ruolo lo scopre il libro. */
-      body: JSON.stringify({ordini: lista, pubblicati: !!pubblicati})});
+      body: JSON.stringify({ordini: lista, pubblicati: !!pubblicati,
+                            /* `presi` (16 set 2026, l'emenda): «l'ho preso
+                               io», dalla presa ACCETTATA dal coordinatore.
+                               Il server lo annota solo a chi entra da
+                               Telegram; per chi entra da Nostr lo ignora. */
+                            presi: !!presi})});
     return r.ok;
   } catch(e){ return false; }
 }

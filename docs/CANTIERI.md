@@ -15684,6 +15684,68 @@ passaggio — e per lui basta: è già nell'app, e le frasi «concluso» e
 rileggerà la richiesta: «a entrambi» vale per il maker su tutti i
 momenti, e per il taker vale la generica.
 
+**⚠️ EMENDATO LA SERA STESSA, 16 SET 2026 (decisione con Alan): IL
+TAKER SI REGISTRA, E RICEVE ANCHE LUI LE FRASI PRECISE.** Gli
+argomenti che hanno rovesciato la riga qui sopra: le card mostrano già
+chi pubblica, e le due parti si conoscono comunque per il pagamento
+fiat — la correlazione che il server impara è una che le persone
+coinvolte hanno già in mano. Il costo resta dichiarato (il server sa
+«Tizio ha preso l'ordine di Caio»), ma non aggiunge nulla a quel che
+le card e il bonifico dicono già. COM'È FATTO: il client dichiara la
+presa ACCETTATA dal coordinatore (`presi: true` su `/api/p2p/ordini`,
+nei due cammini della presa, anche su un id che la restore aveva già
+detto), il server la scrive in `p2p_ordini.preso_da` accanto a chi ha
+pubblicato — la riga resta sua, o nasce a intestatario ignoto (tg_id
+0) se chi ha pubblicato non è di Barattolo, e si intesta quando lui si
+presenta, mai a chi l'ha presa. Una riga che la restore aveva
+intestato al futuro taker (l'ordine altrui preso da un nostro utente,
+il difetto delle facce di prima) si corregge alla presa: intestatario
+ignoto, presa scritta dove va. Il proprio ordine non si «prende»: una
+riga con `maker` resta com'è. Il giudice del libro ha DUE destinatari
+per riga, ognuno con la frase del suo lato — «Hai preso l'ordine!
+Compri… tocca a te indicare dove ricevere i sats» / «Vendi… tocca a
+te bloccare la garanzia», il netto per chi compra, annullato, disputa
+— e al timeout chi aveva preso legge «Non hai proseguito in tempo:
+l'ordine è tornato in vetrina, se ti interessa ancora puoi
+riprenderlo» e viene SCOLLEGATO dalla riga: la presa dopo è di un
+altro. Lo scaduto resta di chi ha pubblicato. L'interruttore vale
+anche per lui, e «dimentica il profilo» e la fusione dei conti portano
+`preso_da` con sé. IL PERIMETRO ONESTO, la domanda di Andrea: chi
+entra da Nostr per l'anonimato non va annotato come taker senza
+saperlo. La forma scelta è la più semplice: il giudice è `tg_id < 0`,
+l'account nato da Nostr — lo stesso che `notifica()` usa per scegliere
+il DM — e per lui la rotta IGNORA `presi` senza che il client debba
+distinguere niente: resta sulla generica del campanello, e la cosa è
+DETTA in due posti, la pagina Info del P2P («chi entra da Nostr non
+viene annotato quando prende un ordine») e la riga dell'interruttore
+nel cassetto Avvisi, che a lui mostra la frase in più. Scartato il
+foglio di consenso alla prima presa: una domanda in più nel momento in
+cui uno sta prendendo un ordine, per un ingresso che esiste apposta
+per non lasciare tracce. Se un giorno un nativo Nostr vorrà le frasi
+precise, la strada è collegare la chat Telegram (la fusione porta
+tutto). Provato nel banco: due frasi per passaggio dai due lati, il
+gate timbrato a tutt'e due, lo scollegamento al timeout e la presa
+nuova di un altro, la riga nata dalla presa di un ordine altrui e
+intestata dopo, la correzione della vecchia intestazione, il proprio
+ordine che non si prende, l'interruttore del taker; più le sentinelle
+sulla rotta (`presi` solo con `tg_id > 0`), sui due cammini del
+client, su «dimentica» e sulla fusione. Il rovescio da tenere a mente:
+se il giro del libro vede l'`in-progress` PRIMA che la dichiarazione
+del client sia atterrata (la presa e il 38383 nascono nello stesso
+istante, la dichiarazione parte subito dopo), chi ha preso perde la
+sola frase di conferma — l'app è aperta davanti a lui — e legge tutte
+le successive.
+
+**E LA GENERICA CAMBIA TESTO, LA PATCH 0005 NON SI FARÀ** (stessa sera,
+stessa decisione con Alan). Il campanello dei kind 14 dice ora «⚡
+Novità in un tuo scambio P2P: apri Barattolo → P2P → I miei scambi. Se
+tocca a te, il prossimo passo è lì.», con la riga sulla cifratura che
+resta com'era. I tre momenti interni — garanzia depositata, fiat
+inviato, disputa aperta — restano generici PER SCELTA: la patch 0005 a
+mostro, che li avrebbe resi leggibili dal libro, non si fa. Il libro
+mostra tutti e tre come `in-progress`, e va bene così: quel che è
+cifrato resta cifrato, e a chi tocca lo sa aprendo l'app.
+
 **UN MOMENTO, UNA NOTIFICA SOLA.** Mostrod ripubblica il 38383 e manda
 il kind 14 nello stesso istante, quindi senza una cura il maker
 riceverebbe la frase precisa E «c'è una novità». La cura è in due
@@ -15742,9 +15804,9 @@ cassetto solo a leva accesa, un server di ieri vale «accesi».
 
 **RESTA DA GUARDARE:** `expired` e `dispute` sul libro vero (la riga
 del journal dirà quando); la prima ripubblicazione delle righe già in
-tabella sul VPS, che prendono lo stato senza frase; il taker, che ha
-solo la generica — se un giorno si vorrà la frase anche per lui, il
-prezzo è la correlazione scritta qui sopra e va deciso a occhi aperti;
+tabella sul VPS, che prendono lo stato senza frase; chi entra da
+Nostr e prende un ordine, che resta sulla generica per scelta (vedi
+l'emenda) — se un giorno la si vorrà rivedere, il posto è la rotta;
 e l'ordine in-progress fermo dal 9 set sullo specchio (`5eca1bc6`), che
 non è di questo cantiere ma è lì.
 

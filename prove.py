@@ -41924,8 +41924,11 @@ def prove_volti_libro():
     con = sqlite3.connect(":memory:")
     con.row_factory = sqlite3.Row
     con.executescript(
+        # ...con le colonne del libro (16 set 2026): la registrazione
+        # le tocca anche quando qui non servono
         "CREATE TABLE p2p_ordini(ordine TEXT PRIMARY KEY, tg_id INTEGER,"
-        " creato INTEGER);"
+        " creato INTEGER, stato TEXT DEFAULT '', maker INTEGER DEFAULT 0,"
+        " preso_da INTEGER DEFAULT 0);"
         "CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT,"
         " avatar TEXT, rating REAL, n_feedback INTEGER,"
         " avatar_scelta TEXT DEFAULT '', username TEXT DEFAULT '',"
@@ -43872,6 +43875,10 @@ let fetches = [];
 async function fetch(url, opt){ fetches.push({url: url, opt: opt}); return {ok: true}; }
 let toasts = []; function toast(m){ toasts.push(String(m)); }
 function haptic(){}
+/* la dichiarazione della presa (16 set 2026) vive nel blocco dei volti,
+   fuori dal motore: qui e' un si' che non chiama nessuno */
+let PRESI_DETTI = [];
+async function registraOrdiniP2P(ids, pubblicati, presi){ PRESI_DETTI.push([ids, !!presi]); return true; }
 let nodi = {}, aperti = [], chiusi = [];
 function el(id){
   if (!nodi[id]) nodi[id] = {id: id, value: '', innerHTML: '', textContent: '',
@@ -51572,6 +51579,9 @@ def prove_p2p_campanello():
               spia in msg.lower())
     prova("...e dice che il contenuto non lo leggiamo", True,
           "Barattolo non li legge" in msg)
+    prova("...e dal 16 set 2026 dice dove guardare e che il passo, se e' tuo, e' li'",
+          True, "Novità in un tuo scambio P2P" in msg
+          and "Se tocca a te, il prossimo passo è lì" in msg)
     for spia in ("nostr", "relay", "chiave", "npub"):
         prova(f"la campagna non dice «{spia}»", False,
               spia in _senza_prosa(campagna).lower())
@@ -51795,6 +51805,28 @@ def prove_p2p_avvisi_libro():
     prova("...e la rotta passa la dichiarazione", True,
           'bool((d or {}).get("pubblicati"))' in pezzo("registra_ordini_p2p"))
     _mini = open("miniapp.html", encoding="utf-8").read()
+    # L'EMENDA DEL 16 SET 2026: il taker si registra, ma solo chi entra
+    # da Telegram — chi entra da Nostr (tg_id < 0) resta sulla generica
+    # senza dover fare niente, e la pagina Info lo dice.
+    prova("la presa si annota solo a chi entra da Telegram (tg_id > 0)", True,
+          'bool((d or {}).get("presi"))\n'
+          '                                     and user["id"] > 0)'
+          in pezzo("registra_ordini_p2p"))
+    prova("il client dichiara la presa dopo l'accettazione, nei due cammini",
+          2, _mini.count("registraOrdiniP2P([id], false, true).catch(() => {});"))
+    prova("...e la presa passa anche su un id gia' detto dalla restore", True,
+          "(presi || !p2pOrdiniRegistrati.has(id))" in _mini
+          and "presi: !!presi" in _mini)
+    prova("la pagina Info dichiara che chi entra da Nostr resta sulla generica",
+          True, "Chi entra <b>da Nostr</b> non viene annotato quando prende un ordine"
+          in _mini and "sulle prese ricevi l'avviso generico" in _mini)
+    prova("«dimentica il profilo» scollega anche le prese", True,
+          "UPDATE p2p_ordini SET preso_da=0 WHERE preso_da=?"
+          in pezzo("dimentica_chiavi_p2p"))
+    prova("...e la fusione dei conti le porta con se'", True,
+          "UPDATE p2p_ordini SET preso_da=? WHERE preso_da=?"
+          in pezzo("esegui_fusione"))
+    _mini = open("miniapp.html", encoding="utf-8").read()
     prova("il client dichiara «pubblicati» quando l'id viene dalla risposta a una pubblicazione",
           True, "intestaOrdiniP2P([nuovo.id], true)" in _mini)
     prova("...e NON dalla restore, dove gli id sono anche di ordini presi",
@@ -51841,7 +51873,7 @@ def prove_p2p_avvisi_libro():
         exec(_senza_prosa(pezzo(f)), amb)
     giud, reg = amb["_avvisi_libro_p2p"], amb["_registra_ordini_p2p"]
     passaggio, euro = amb["_passaggio_libro_p2p"], amb["_euro_libro"]
-    for chi, acceso in ((111, 1), (222, 1), (333, 0)):
+    for chi, acceso in ((111, 1), (222, 1), (333, 0), (444, 1), (555, 1)):
         con.execute("INSERT INTO utenti VALUES(?,?)", (chi, acceso))
         con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)",
                     (chr(96 + chi // 111) * 64, chi))
@@ -51968,6 +52000,83 @@ def prove_p2p_avvisi_libro():
     prova("dichiararsi maker di un ordine altrui non sposta niente", 111,
           con.execute("SELECT tg_id FROM p2p_ordini WHERE ordine=?",
                       (A,)).fetchone()[0])
+
+    # --- 6) IL TAKER (l'emenda del 16 set 2026) --------------------
+    def riga(oid):
+        r = con.execute("SELECT tg_id, preso_da, maker, stato FROM p2p_ordini "
+                        "WHERE ordine=?", (oid,)).fetchone()
+        return (r["tg_id"], r["preso_da"], r["maker"], r["stato"])
+
+    H, I, J, K, L = ("ordine-%s" % x for x in "hijkl")
+    # H: 111 pubblica, 222 prende — due frasi per passaggio, ognuno dal suo lato
+    reg(con, 111, [H], 10000, True)
+    giud(con, [ev(H, "pending", 10000)], 10000, 0.02, 168)
+    reg(con, 222, [H], 10050, False, True)
+    prova("la presa si scrive accanto a chi ha pubblicato, senza toccarlo",
+          (111, 222, 1, "pending"), riga(H))
+    fuori = giud(con, [ev(H, "in-progress", 10100, sats=50000)], 10100, 0.02, 168)
+    prova("preso: due frasi, a chi ha pubblicato e a chi ha preso",
+          [111, 222], sorted(t for t, _ in fuori))
+    testi = dict(fuori)
+    prova("...chi ha pubblicato (vende) legge la sua", True,
+          "Il tuo ordine è stato preso!</b> Vendi 50.000 sats" in testi[111])
+    prova("...chi ha preso legge la conferma dal SUO lato: compra, e tocca a lui",
+          True, "Hai preso l'ordine!</b> Compri 50.000 sats per 32,50 € via SEPA Instant"
+          in testi[222] and "tocca a te indicare dove ricevere i sats" in testi[222])
+    prova("...e il gate del campanello e' timbrato a tutt'e due",
+          (10100, 10100), (nudge_di(111), nudge_di(222)))
+    fuori = giud(con, [ev(H, "pending", 10900, sats=0)], 10900, 0.02, 168)
+    testi = dict(fuori)
+    prova("tornato in vetrina: a chi ha pubblicato «non ha proseguito», a chi ha preso «non hai proseguito»",
+          True, "Chi aveva preso il tuo ordine non ha proseguito" in testi.get(111, "")
+          and "Non hai proseguito in tempo" in testi.get(222, "")
+          and "puoi riprenderlo" in testi.get(222, ""))
+    prova("...e chi aveva preso viene scollegato dalla riga", (111, 0, 1, "pending"), riga(H))
+    reg(con, 444, [H], 11000, False, True)
+    fuori = giud(con, [ev(H, "in-progress", 11100, sats=50000)], 11100, 0.02, 168)
+    prova("la presa nuova e' di un altro: la frase va a lui, non al primo",
+          [111, 444], sorted(t for t, _ in fuori))
+    fuori = giud(con, [ev(H, "success", 12000, sats=50000)], 12000, 0.02, 168)
+    testi = dict(fuori)
+    prova("concluso: chi vende legge quanto per quanto, chi compra il suo netto",
+          True, "Hai venduto 50.000 sats per 32,50 €" in testi.get(111, "")
+          and "49.500 sats sono in arrivo al tuo recapito" in testi.get(444, ""))
+
+    # I: chi ha pubblicato non e' di Barattolo — la riga nasce dalla presa
+    reg(con, 222, [I], 20000, False, True)
+    prova("la presa di un ordine altrui fa nascere la riga a intestatario ignoto",
+          (0, 222, 0, ""), riga(I))
+    fuori = giud(con, [ev(I, "in-progress", 20100, lato="buy", sats=9000)], 20100, 0.02, 168)
+    prova("...e chi ha preso legge la sua (vende, blocca la garanzia): nessun altro",
+          True, [t for t, _ in fuori] == [222]
+          and "Hai preso l'ordine!</b> Vendi 9.000 sats" in fuori[0][1]
+          and "tocca a te bloccare la garanzia" in fuori[0][1])
+    fuori = giud(con, [ev(I, "canceled", 20200, lato="buy", sats=9000)], 20200, 0.02, 168)
+    prova("annullato: la frase arriva anche a chi ha preso", True,
+          [t for t, _ in fuori] == [222] and "annullato" in fuori[0][1])
+    reg(con, 555, [I], 20300)
+    prova("chi ha pubblicato che si presenta dopo intesta la riga", (555, 222), riga(I)[:2])
+    reg(con, 222, [I], 20400)
+    prova("...ma chi l'ha presa no, mai", (555, 222), riga(I)[:2])
+
+    # J: la vecchia intestazione dalla restore di un ordine altrui si corregge
+    reg(con, 222, [J], 30000)
+    prova("(prima) la restore intesta l'ordine altrui a chi lo prendera'", (222, 0), riga(J)[:2])
+    reg(con, 222, [J], 30100, False, True)
+    prova("la presa corregge: intestatario ignoto, presa scritta dove va", (0, 222, 0), riga(J)[:3])
+
+    # K: il proprio ordine non si «prende»
+    reg(con, 222, [K], 40000, True)
+    reg(con, 222, [K], 40100, False, True)
+    prova("dichiararsi taker del proprio ordine non sposta niente", (222, 0, 1), riga(K)[:3])
+
+    # L: chi ha preso e ha spento gli avvisi non legge niente
+    reg(con, 111, [L], 50000, True)
+    giud(con, [ev(L, "pending", 50000)], 50000, 0.02, 168)
+    reg(con, 333, [L], 50050, False, True)
+    fuori = giud(con, [ev(L, "in-progress", 50100, sats=100)], 50100, 0.02, 168)
+    prova("l'interruttore vale anche per chi ha preso", [111], [t for t, _ in fuori])
+    prova("...e la sua presa resta scritta", (111, 333), riga(L)[:2])
     con.close()
 
 

@@ -3602,12 +3602,22 @@ def init_db():
         -- PUBBLICATO — dichiarato dal client alla pubblicazione, o
         -- scoperto dal libro (un primo stato `pending` e' del maker per
         -- forza). Il server sa gia' «questo ordine e' di Tizio»: qui
-        -- impara solo a che punto e' l'ordine, che e' pubblico. Chi
-        -- l'ha PRESO non si scrive, apposta (vedi _passaggio_libro_p2p).
+        -- impara solo a che punto e' l'ordine, che e' pubblico.
+        -- E CHI L'HA PRESO (`preso_da`, 16 set 2026, seconda decisione
+        -- con Alan): la prima stesura non lo scriveva per non mettere
+        -- in relazione due account; la decisione l'ha rovesciata con
+        -- gli argomenti scritti in CANTIERI («Il libro che avvisa»,
+        -- l'emenda) — le card mostrano gia' chi pubblica e le due parti
+        -- si conoscono comunque per il pagamento fiat. Lo dichiara il
+        -- client alla presa accettata, SOLO per chi entra da Telegram
+        -- (tg_id > 0): chi entra da Nostr non viene annotato e resta
+        -- sulla generica. Una riga nata dalla presa di un ordine altrui
+        -- ha tg_id 0 finche' chi l'ha pubblicato non si presenta.
         stato TEXT DEFAULT '',
         lato TEXT DEFAULT '',
         maker INTEGER DEFAULT 0,
-        visto INTEGER DEFAULT 0
+        visto INTEGER DEFAULT 0,
+        preso_da INTEGER DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_p2p_ordini_tg ON p2p_ordini(tg_id);
     CREATE TABLE IF NOT EXISTS p2p_indice(
@@ -4646,7 +4656,8 @@ def init_db():
     # per i database nuovi, questo giro le da' a quelli che la tabella
     # ce l'avevano gia' (il calco del giro di `pagamenti` qui sotto).
     for colonna in ("stato TEXT DEFAULT ''", "lato TEXT DEFAULT ''",
-                    "maker INTEGER DEFAULT 0", "visto INTEGER DEFAULT 0"):
+                    "maker INTEGER DEFAULT 0", "visto INTEGER DEFAULT 0",
+                    "preso_da INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE p2p_ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -9180,6 +9191,8 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # che muore resterebbero intestate a un account che non c'e'
         # piu', cioe' senza faccia.
         con.execute("UPDATE p2p_ordini SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        con.execute("UPDATE p2p_ordini SET preso_da=? WHERE preso_da=?",
                     (id_telegram, id_nostr))
         # Il sale del profilo di scambio segue l'utente. Qui la PK E'
         # il tg_id, quindi le due meta' POSSONO collidere — e allora
@@ -32448,7 +32461,8 @@ def _ordini_puliti_p2p(ordini) -> list:
 
 
 def _registra_ordini_p2p(con, tg_id: int, ordini, adesso: int,
-                         pubblicati: bool = False) -> dict:
+                         pubblicati: bool = False,
+                         presi: bool = False) -> dict:
     """Scrive «questo ordine e' di questo account». Idempotente (PK
     sull'id + INSERT OR IGNORE): il client li rimanda a ogni sessione.
     UN ORDINE GIA' DI UN ALTRO NON SI RUBA — l'OR IGNORE lo lascia a
@@ -32464,13 +32478,34 @@ def _registra_ordini_p2p(con, tg_id: int, ordini, adesso: int,
     del primo giro del libro. Solo sulle righe di questo stesso
     account: dichiararsi maker di un ordine altrui non sposta niente.
     Dalla restore il client non lo dice, e il ruolo lo scopre il
-    libro (un primo stato `pending`)."""
+    libro (un primo stato `pending`).
+    `presi` (16 set 2026, l'emenda): «questi li ho PRESI io». La riga
+    resta di chi ha pubblicato — o nasce con tg_id 0 se lui non e' di
+    Barattolo — e `preso_da` diventa questo account. Un ordine non si
+    prende da soli (mostrod lo rifiuta), quindi una riga che porta
+    gia' questo tg_id come intestatario SENZA `maker` e' la vecchia
+    intestazione dalla restore di un ordine altrui: si corregge,
+    l'intestatario torna ignoto e la presa si scrive dove va. Chi arriva
+    dalla restore su una riga a tg_id 0 la intesta (e' chi ha
+    pubblicato che si presenta), mai chi l'ha presa."""
     pulite = _ordini_puliti_p2p(ordini)
     scritti = 0
     for o in pulite:
+        if presi:
+            scritti += con.execute(
+                "INSERT OR IGNORE INTO p2p_ordini(ordine, tg_id, creato, "
+                "preso_da) VALUES(?,0,?,?)", (o, adesso, tg_id)).rowcount
+            con.execute("UPDATE p2p_ordini SET tg_id=0, maker=0 "
+                        "WHERE ordine=? AND tg_id=? AND maker=0", (o, tg_id))
+            con.execute("UPDATE p2p_ordini SET preso_da=? "
+                        "WHERE ordine=? AND tg_id<>?", (tg_id, o, tg_id))
+            continue
         scritti += con.execute(
             "INSERT OR IGNORE INTO p2p_ordini(ordine, tg_id, creato) "
             "VALUES(?,?,?)", (o, tg_id, adesso)).rowcount
+        con.execute("UPDATE p2p_ordini SET tg_id=? "
+                    "WHERE ordine=? AND tg_id=0 AND preso_da<>?",
+                    (tg_id, o, tg_id))
         if pubblicati:
             con.execute("UPDATE p2p_ordini SET maker=1 "
                         "WHERE ordine=? AND tg_id=?", (o, tg_id))
@@ -32550,9 +32585,16 @@ async def registra_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(400, "Richiesta illeggibile")
     con = db()
     try:
+        # LA PRESA SI ANNOTA SOLO A CHI ENTRA DA TELEGRAM (16 set 2026):
+        # `tg_id < 0` e' l'account nato da Nostr — lo stesso giudice di
+        # notifica() — e per lui non si scrive «l'ha preso», senza che
+        # debba fare niente: resta sulla frase generica del campanello.
+        # E' scritto nella pagina Info del P2P e nel cassetto Avvisi.
         esito = _registra_ordini_p2p(con, user["id"],
                                      (d or {}).get("ordini"), int(time.time()),
-                                     bool((d or {}).get("pubblicati")))
+                                     bool((d or {}).get("pubblicati")),
+                                     bool((d or {}).get("presi"))
+                                     and user["id"] > 0)
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
@@ -32658,6 +32700,10 @@ def dimentica_chiavi_p2p(x_tg_init_data: str = Header(""),
                         (user["id"],)).rowcount
     volti = con.execute("DELETE FROM p2p_ordini WHERE tg_id=?",
                         (user["id"],)).rowcount
+    # ...e le prese: la riga resta a chi ha pubblicato, ma di me non
+    # deve restare nemmeno «l'ha preso lui»
+    con.execute("UPDATE p2p_ordini SET preso_da=0 WHERE preso_da=?",
+                (user["id"],))
     con.commit()
     con.close()
     return {"ok": True, "tolte": tolte, "volti": volti}
@@ -33052,10 +33098,16 @@ P2P_BLOCCO = 100         # quante pubkey in un filtro (i relay hanno tetti)
 P2P_PRIMO_SGUARDO = 600  # al primo avvio si guarda indietro dieci minuti
 _P2P_VISTI = set()       # gli id gia' contati, dentro questo processo
 
+# IL TESTO DEL 16 SET 2026 (decisione di Andrea con Alan, insieme alle
+# frasi precise del libro): dice DOVE guardare e che il prossimo passo,
+# se e' tuo, sta la'. La riga sulla cifratura resta: i tre momenti
+# interni — garanzia depositata, fiat inviato, disputa aperta — restano
+# generici PER SCELTA, e la patch 0005 a mostro che li avrebbe resi
+# leggibili dal libro non si fara' (vedi CANTIERI, «Il libro che
+# avvisa», l'emenda).
 MSG_NUDGE_P2P = (
-    "🔄 <b>C'è una novità nel tuo scambio.</b>\n\n"
-    "Apri Barattolo e vai su <b>P2P → I miei scambi</b>: "
-    "potrebbe toccare a te.\n\n"
+    "⚡ <b>Novità in un tuo scambio P2P:</b> apri Barattolo → P2P → "
+    "I miei scambi. Se tocca a te, il prossimo passo è lì.\n\n"
     "<i>Cosa sia successo lo sa solo il tuo telefono: i messaggi dello "
     "scambio sono cifrati e Barattolo non li legge.</i>")
 
@@ -33258,7 +33310,8 @@ async def orologio_p2p():
 # 38383 e' in chiaro per mestiere — e di quelli si puo' dire tutto: cosa
 # e' successo, i numeri, di chi e' il prossimo passo. Qui il server
 # legge il libro dei SOLI ordini che ha in tabella (`p2p_ordini`, i
-# volti sul libro) e a chi li ha pubblicati manda la frase precisa.
+# volti sul libro) e a chi li ha pubblicati — e, dal 16 set 2026 sera,
+# a chi li ha presi — manda la frase precisa, adattata al lato.
 # NON TOCCA MOSTRO, NON TOCCA LA CIFRATURA: legge quel che chiunque puo'
 # leggere, e lo dice a chi ne ha titolo.
 # I TRE MOMENTI INTERNI — garanzia depositata, fiat inviato, disputa
@@ -33393,10 +33446,11 @@ def _avvisi_p2p_accesi(con, tg_id: int) -> bool:
 
 def _passaggio_libro_p2p(prima: str, dopo: str, maker: int) -> str:
     """PURA: da due stati del libro al MOMENTO da raccontare, o '' se
-    non c'e' niente da dire. Solo per chi ha PUBBLICATO l'ordine
-    (`maker`): il server non sa chi l'ha preso — e non lo registra
-    apposta, che sarebbe scrivere «Tizio e Caio scambiano insieme» —
-    quindi chi prende ha il campanello generico e l'app aperta.
+    non c'e' niente da dire. `maker` dice se di questa persona si SA
+    il ruolo: chi ha pubblicato (dichiarato o scoperto dal libro) e,
+    dall'emenda del 16 set 2026, chi ha preso (`preso_da`, che il
+    chiamante passa come 1: di lui il ruolo e' certo). A ruolo ignoto
+    non si racconta niente.
 
     I passaggi: pending→in-progress e' PRESO (anche da mai visto, se
     l'ordine e' stato dichiarato pubblicato: preso prima del primo
@@ -33443,23 +33497,37 @@ def _euro_libro(valori) -> str:
     return f"{it(nums[0])} €"
 
 
-def _testo_libro_p2p(passaggio: str, ev: dict, fee, ore: int) -> str:
+def _testo_libro_p2p(passaggio: str, ev: dict, fee, ore: int,
+                     ruolo: str = "maker") -> str:
     """PURA: la frase per quel momento, coi numeri del libro. Lo stile
     e' uno solo — cosa e' successo, i numeri, di chi e' il prossimo
     passo — e non nomina mai il protocollo: chi legge entra da
     Telegram o da Nostr e non deve sapere cos'e' un relay.
-    `lato` e' quello del libro (`k`): `sell` = chi ha pubblicato VENDE.
+    `lato` e' quello del libro (`k`): `sell` = chi ha pubblicato VENDE,
+    e chi l'ha preso (`ruolo` taker) fa il contrario. Le frasi di chi
+    prende dicono la stessa cosa dal suo lato: la presa e' una
+    CONFERMA coi numeri e con quel che tocca a lui subito — chi compra
+    indica dove ricevere i sats, chi vende blocca la garanzia (mostrod
+    gli manda la hold nello stesso istante) — e il timeout e' «non hai
+    proseguito», che per lui e' la notizia vera.
     IL NETTO di chi compra e' il conto del client, lasciato buono dal
     cantiere della fattura da 7468: la meta' della fee del 38385,
     arrotondata — `sats − round(sats × fee / 2)`. Senza fee (38385 mai
     letto) il numero NON si inventa: la frase resta senza cifra.
     I METODI sono testo di sconosciuti e passano da html.escape."""
-    vende = ev.get("lato") == "sell"
+    taker = ruolo == "taker"
+    vende = (ev.get("lato") == "sell") != taker
     sats = int(ev.get("sats") or 0)
     euro = _euro_libro(ev.get("euro"))
     metodi = ", ".join(html.escape(str(m)) for m in (ev.get("metodi") or []))
     quanto = (f"{_fmt_sats(sats)} sats" if sats > 0 else "bitcoin") + \
         (f" per {euro}" if euro else "") + (f" via {metodi}" if metodi else "")
+    if passaggio == "preso" and taker:
+        if vende:
+            return (f"⚡ <b>Hai preso l'ordine!</b> Vendi {quanto}.\n\n"
+                    "Apri Barattolo: tocca a te bloccare la garanzia.")
+        return (f"⚡ <b>Hai preso l'ordine!</b> Compri {quanto}.\n\n"
+                "Apri Barattolo: tocca a te indicare dove ricevere i sats.")
     if passaggio == "preso":
         if vende:
             return (f"⚡ <b>Il tuo ordine è stato preso!</b> Vendi {quanto}.\n\n"
@@ -33468,6 +33536,9 @@ def _testo_libro_p2p(passaggio: str, ev: dict, fee, ore: int) -> str:
         return (f"⚡ <b>Il tuo ordine è stato preso!</b> Compri {quanto}.\n\n"
                 "Apri Barattolo: appena chi vende blocca la garanzia, tocca "
                 "a te indicare dove ricevere i sats.")
+    if passaggio == "tornato" and taker:
+        return ("🔄 <b>Non hai proseguito in tempo:</b> l'ordine è tornato "
+                "in vetrina. Se ti interessa ancora, puoi riprenderlo.")
     if passaggio == "tornato":
         return ("🔄 <b>Chi aveva preso il tuo ordine non ha proseguito.</b> "
                 "È tornato in vetrina: non devi fare niente.")
@@ -33524,12 +33595,18 @@ def _avvisi_libro_p2p(con, eventi: list, adesso: int, fee, ore: int) -> list:
     riceverebbe un passaggio vecchio di giorni.
     E CHI RICEVE LA FRASE PRECISA VEDE TIMBRATO IL GATE DEL CAMPANELLO,
     su tutte le sue chiavi: e' l'anti-doppione, un momento una
-    notifica sola."""
+    notifica sola.
+    DUE DESTINATARI PER RIGA (16 set 2026, l'emenda): chi ha pubblicato
+    (`tg_id`, se il ruolo e' noto) e chi ha preso (`preso_da`), ognuno
+    con la frase del suo lato. Al ritorno in vetrina chi aveva preso
+    viene SCOLLEGATO dalla riga dopo la sua frase: la prossima presa e'
+    di un altro, e non deve leggere «hai preso» per lui. Lo scaduto e'
+    solo di chi ha pubblicato: un ordine preso non scade."""
     fuori, avvisati = [], set()
     for ev in eventi:
         r = con.execute(
-            "SELECT tg_id, stato, maker, visto FROM p2p_ordini WHERE ordine=?",
-            (ev["id"],)).fetchone()
+            "SELECT tg_id, stato, maker, visto, preso_da FROM p2p_ordini "
+            "WHERE ordine=?", (ev["id"],)).fetchone()
         if not r:
             continue
         if int(ev.get("quando") or 0) < int(r["visto"] or 0):
@@ -33539,22 +33616,34 @@ def _avvisi_libro_p2p(con, eventi: list, adesso: int, fee, ore: int) -> list:
         if not prima and dopo == "pending":
             maker = 1
         passaggio = _passaggio_libro_p2p(prima, dopo, maker)
+        preso_da = int(r["preso_da"] or 0)
+        # chi ha preso: il ruolo e' certo (1), e lo scaduto non e' suo
+        passaggio_taker = _passaggio_libro_p2p(prima, dopo, 1) \
+            if preso_da > 0 else ""
+        if passaggio_taker == "scaduto":
+            passaggio_taker = ""
         con.execute(
-            "UPDATE p2p_ordini SET stato=?, lato=?, maker=?, visto=? "
-            "WHERE ordine=?",
+            "UPDATE p2p_ordini SET stato=?, lato=?, maker=?, visto=?, "
+            "preso_da=? WHERE ordine=?",
             (dopo, ev.get("lato") or "", maker, int(ev.get("quando") or 0),
-             ev["id"]))
+             # un ordine in vetrina non ha un taker per definizione: la
+             # presa si scollega a OGNI pending visto, anche se il giro
+             # si fosse perso l'in-progress in mezzo — o la prossima
+             # presa di un altro direbbe «hai preso» a chi non c'e' piu'
+             0 if dopo == "pending" else preso_da, ev["id"]))
         if prima and dopo != prima and dopo not in (
                 "pending", "in-progress", "success", "canceled",
                 "expired", "dispute"):
             print(f"📖 Libro P2P: stato mai visto «{dopo}» "
                   f"(da «{prima}») sull'ordine {ev['id'][:8]}")
-        if not passaggio or not _avvisi_p2p_accesi(con, r["tg_id"]):
-            continue
-        testo = _testo_libro_p2p(passaggio, ev, fee, ore)
-        if testo:
-            fuori.append((r["tg_id"], testo))
-            avvisati.add(r["tg_id"])
+        for chi, pas, ruolo in ((int(r["tg_id"] or 0), passaggio, "maker"),
+                                (preso_da, passaggio_taker, "taker")):
+            if chi <= 0 or not pas or not _avvisi_p2p_accesi(con, chi):
+                continue
+            testo = _testo_libro_p2p(pas, ev, fee, ore, ruolo)
+            if testo:
+                fuori.append((chi, testo))
+                avvisati.add(chi)
     for tg_id in avvisati:
         con.execute("UPDATE chiavi_p2p SET ultimo_nudge=? WHERE tg_id=?",
                     (adesso, tg_id))

@@ -23932,10 +23932,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `/api/p2p/ordini`, e solo sulle righe di quell'account) oppure lo
   scopre il libro (un primo stato `pending` è del maker per forza); una
   riga vista per la prima volta già in corso resta a ruolo ignoto e
-  serve ai volti, non alle frasi. CHI PRENDE NON SI REGISTRA, apposta:
-  sarebbe scrivere sul nostro server «Tizio e Caio scambiano insieme»
-  (la stessa correlazione rifiutata per la chat), quindi a chi prende
-  arriva il campanello generico — che per lui basta, è già nell'app.
+  serve ai volti, non alle frasi. CHI PRENDE SI REGISTRA (emenda della
+  sera del 16 set 2026, decisione con Alan; la prima stesura non lo
+  faceva per non correlare due account, ma le card mostrano già chi
+  pubblica e le parti si conoscono per il pagamento fiat): il client
+  dichiara la presa accettata (`presi: true`) e il server la scrive in
+  `p2p_ordini.preso_da`, accanto a chi ha pubblicato — la riga resta
+  sua, o nasce a tg_id 0 se lui non è di Barattolo. Il giudice del
+  libro ha due destinatari per riga, ognuno con la frase del suo lato;
+  al ritorno in vetrina chi aveva preso legge «non hai proseguito» e
+  viene scollegato dalla riga. SOLO PER CHI ENTRA DA TELEGRAM: a
+  `tg_id < 0` (account nato da Nostr) la rotta ignora `presi`, e lui
+  resta sulla generica — dichiarato nella pagina Info del P2P e nella
+  riga dell'interruttore. `Dimentica il profilo` e la fusione dei conti
+  portano `preso_da` con sé.
   UN MOMENTO, UNA NOTIFICA: chi riceve la frase precisa vede timbrato
   `ultimo_nudge` su tutte le sue chiavi, e il kind 14 dello stesso
   istante non fa suonare anche la generica. L'INTERRUTTORE è
