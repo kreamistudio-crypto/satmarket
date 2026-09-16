@@ -194,13 +194,22 @@ def main():
     # 20.000 e' meta' esatta, quindi si dice.
     prova("...e la percentuale, tonda", 50,
           d["banner_leve"]["prezzo_percento"])
-    prova("...col motivo gia' scritto", True,
-          "si sblocca col livello" in d["banner_leve"]["motivo"])
     come(2)
     d2 = asyncio.run(server.mio_profilo("", ""))
-    prova("chi ha il livello ce l'ha aperta, e senza pagare", (True, 0),
-          (d2["banner_leve"]["porta_aperta"],
-           d2["banner_leve"]["sbloccato_il"]))
+    # IL BANNER SI PAGA SEMPRE (set 2026): il livello non regala piu'
+    # la porta, la sconta soltanto. Utente 2 (xp 5000, 9 affari) e'
+    # "pratico" — 20% di sconto su BANNER_SCONTI_LIVELLO — quindi paga
+    # 16.000 invece di 20.000, col pieno che resta 40.000 e la
+    # percentuale che torna tonda (60%).
+    prova("...ma la porta resta chiusa anche col livello", False,
+          d2["banner_leve"]["porta_aperta"])
+    prova("...e non e' mai stata sbloccata a pagamento", 0,
+          d2["banner_leve"]["sbloccato_il"])
+    prova("...e il prezzo e' scontato dal livello (pratico, 20%)",
+          (16000, 40000, 60),
+          (d2["banner_leve"]["prezzo_sats"],
+           d2["banner_leve"]["prezzo_pieno_sats"],
+           d2["banner_leve"]["prezzo_percento"]))
 
     print("\n[chiedere il banner a porta chiusa]")
     come(1)
@@ -209,8 +218,8 @@ def main():
         esito = "passato"
     except server.HTTPException as e:
         esito = str(e.detail)
-    prova("il banner non si chiede: il 400 dice quale chiave manca",
-          True, "si sblocca col livello" in esito)
+    prova("il banner non si chiede: il 400 dice di pagare la porta",
+          True, "sbloccare la porta" in esito)
 
     print("\n[la fattura]")
     r = asyncio.run(server.sblocca_banner(None, "", ""))
@@ -254,8 +263,6 @@ def main():
     print("\n[e adesso il banner si chiede]")
     d6 = asyncio.run(server.mio_profilo("", ""))
     prova("la porta risulta aperta", True, d6["banner_leve"]["porta_aperta"])
-    prova("...e il cassetto non ha piu' un motivo da dire", "",
-          d6["banner_leve"]["motivo"])
     try:
         asyncio.run(server.sblocca_banner(None, "", ""))
         due = "passato"
@@ -436,14 +443,12 @@ def main():
     asyncio.run(server.annulla_pagamento_sblocco(r8["pagamento_id"],
                                                  "", ""))
 
-    # --- chi ha ANCHE il livello tiene la porta ------------------
-    # il rimborso disfa il PAGAMENTO, non i diritti guadagnati: a
-    # dirlo e' il giudice, che e' un OR e non sa niente del
-    # rimborso.
-    prova("chi ha il livello tiene la porta anche da rimborsato",
-          True,
-          server.banner_porta_aperta(9000, 40, server.BANNER_LIVELLO,
-                                     0))
+    # IL LIVELLO NON TIENE PIU' LA PORTA (set 2026): banner_porta_aperta
+    # ora prende SOLO sbloccato_il, giudice unico senza OR col livello
+    # — vedi "il banner si paga sempre" in CANTIERI. Il giudice puro:
+    prova("banner_porta_aperta e' ora un giudice a un parametro solo",
+          True, server.banner_porta_aperta(0) is False
+          and server.banner_porta_aperta(123) is True)
 
     rotti3 = []
     for nome, perche, sql in server.CONTROLLI_LIBRO_MASTRO:
