@@ -14148,6 +14148,25 @@ Lightning address, e il censimento che giudica *la fattura in colonna* e
 non *l'ordine* — quando le due cose divergono va letto con la storia
 accanto.
 
+**IL CAPITALE SULLE DUE CASSEFORTI** (16 set 2026, commit 2b65bbe). Dal
+16 set il capitale può stare anche sul nodo, e `capitale_cassa.py`
+leggeva solo il SaaS: un numero parziale. Ora legge i due registri
+con le chiavi per nome di `orfani.py` — sola invoice key, il
+risolutore in un posto solo, e i quattro memo nostri pure — un totale
+per cassaforte e uno complessivo, e tiene fuori le fatture in entrata
+mai pagate: la terza cosa che dichiarava di non sapere, chiusa
+dall'esito letto come fa il server. Il polso 23 lo segue: una riga
+per cassaforte con le stesse voci, i rimborsi d'asta con la colonna
+vuota ereditata dalla puntata come nei doveri del SaaS, e una chiave
+di `impostazioni` per cassaforte (`capitale_saas_sats`,
+`capitale_nodo_sats`); `capitale_nostro_sats` resta come ripiego del
+solo SaaS, così il numero dichiarato il 15 set non si perde per un
+nome nuovo. `prove_capitale_cassa`, 25 prove, col polso 23 eseguito
+DAVVERO su un database gemello — un file .sql sbagliato non fallisce,
+tace — e la prova ha preso l'ordine del cartone (a pari ora la lista
+si ordina per sats). Banco dal vivo sui due LNbits di cartone. Da
+rifare sul VPS la dichiarazione, con le due chiavi nuove.
+
 ## Il foglio che non si zoomava, e 81px di cappello sopra la nav (14 set 2026)
 
 Segnalazione di Andrea: **Aspetto → «Quanto grande si legge Barattolo»

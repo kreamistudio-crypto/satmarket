@@ -324,6 +324,12 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   tace. Ha sostituito l'`orfani.py` non tracciato del 10 ago 2026,
   che leggeva una cassaforte sola e non conosceva `pagamenti`:
   quello si cancella.
+  IL CAPITALE, per dichiararlo al polso 23: `cd ~/satmarket && python3
+  capitale_cassa.py` — legge i due registri e stampa un totale per
+  cassaforte, il complessivo e le due righe `INSERT OR REPLACE` con le
+  chiavi `capitale_saas_sats` e `capitale_nodo_sats`. Dal set 2026 il
+  polso 23 e' per cassaforte e legge quelle due (la vecchia
+  `capitale_nostro_sats` vale da ripiego per il solo SaaS).
   BACKUP: `/opt/lnbits` (db con backup atomico, `.env`, compose, cert,
   superuser, unit del ponte) e `onion_auth` viaggiano nell'archivio
   age; la riserva fee di LNbits e' `max(1%, 2000 sats)` per payout.

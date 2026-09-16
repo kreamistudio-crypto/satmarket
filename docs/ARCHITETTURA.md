@@ -172,7 +172,10 @@
   controllo aveva un falso positivo garantito (emendato il giorno stesso
   in cui è nato): il wallet non era nato vuoto, e dei sats nostri già in
   cassa si leggevano come lo scarto da allarme. Si dichiara in
-  `impostazioni` alla chiave `capitale_nostro_sats` — nel database e non
+  `impostazioni`, dal set 2026 UNA CHIAVE PER CASSAFORTE —
+  `capitale_saas_sats` e `capitale_nodo_sats`; la vecchia
+  `capitale_nostro_sats` vale da ripiego per il solo SaaS, che era
+  l'unico wallet — nel database e non
   nel file .sql perché il deploy TIRA, e un numero scritto a mano nel
   repo sparirebbe al primo giro; si chiama «nostro» e non «iniziale»
   perché al secondo versamento quel nome sarebbe una bugia. Se manca,
@@ -187,6 +190,13 @@
   commissione non fotografata sull'ordine, gli ordini nati da un'asta (i
   cui sats erano già in cassa dai `rilanci`), e le fatture create e mai
   pagate.
+  DAL SET 2026 TUTTO QUESTO È PER CASSAFORTE: il polso 23 stampa una
+  riga per 'saas' e una per 'nodo' (i rimborsi d'asta con la colonna
+  vuota la ereditano dalla puntata, come nei doveri del SaaS), e
+  `capitale_cassa.py` legge i due registri con le chiavi risolte per
+  nome da `orfani.py` — un totale per cassaforte e uno complessivo —
+  e tiene fuori le fatture mai pagate, che era la terza delle cose
+  che dichiarava di non sapere.
   ⚠️⚠️ E DAL 15 SET 2026 NON È UN ALLARME MA UN POLSO (decisione di
   Andrea), col vocabolario che il file già aveva: i controlli numerati
   devono stampare «(nessuna riga)», quelli etichettati `polso` no. La
