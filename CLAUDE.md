@@ -124,9 +124,8 @@ ANCORA QUELLI VECCHI — `invoice_expiration_window` e
 `hold_invoice_expiration_window`. Quindi non morde. Dal 16 set 2026 il
 client LEGGE `invoice_expiration_window` (`fattFinestra`, via
 `finestraFatturaP2P`) per fermare PRIMA una fattura troppo corta: il
-nome usato e' quello che il 38385 emette davvero, verificato; se il tag
-sparisse, il client ripiega sui 3600 s del template. La sorella della
-hold resta parcheggiata e morta.
+nome e' quello che il 38385 emette davvero; se il tag sparisse, il
+client ripiega sui 3600 s del template. La sorella della hold resta morta.
 
 **LA RONDA DICE CINQUE COSE E LA QUINTA VALIDA LE ALTRE:** finestra
 blocchi/disco/ram, canale e HTLC, backup (allarme oltre 48h o sotto
