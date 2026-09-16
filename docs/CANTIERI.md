@@ -15971,3 +15971,131 @@ serve la fattura a mano); le righe di ieri senza metodi, che nel P2P
 chiedono di ricollegare; e il recapito a fine scambio del cantiere
 precedente, con cui questo si compone bene — una fattura chiesta al
 rilascio è fresca per costruzione.
+
+## Il coro dei relay: il P2P che «non pubblica» (16 set 2026)
+
+Aperto da Andrea con la diagnosi già fatta sui log del nodo: quando il
+messaggio ARRIVA, mostro risponde sempre — un `new-order` servito
+subito alle 16:39 — e nei tentativi falliti il messaggio non gli
+arriva proprio; `relay.mostro.network` risulta in timeout perfino sui
+publish del prezzo di mostro. Quindi un messaggio scritto solo lì
+muore, e a schermo esce «nessuna risposta».
+
+**COM'ERA, e perché il difetto si nascondeva.** `mostroConnetti`
+scorreva `MOSTRO_RELAY` in ordine e teneva il PRIMO relay che apriva
+la websocket (8 s a testa, `P2P_LIBRO_MS`); da lì passava TUTTO — la
+sub delle risposte, `mostroChiama`, la restore, i recapiti cifrati, la
+via di riserva. `relay.mostro.network` è il primo della lista e la
+websocket la APRE: quindi lo si sceglieva sempre come uno sano, e
+quando poi taceva il publish di nostr-tools cadeva in «publish timed
+out» dopo 4,4 s — che il client leggeva come «partito senza OK, si
+resta in ascolto». Era la lezione del bunker, giusta con un relay solo
+e sbagliata con un relay che non consegna: trenta secondi di attesa
+(`P2P_ATTESA_MS`) e «Nessuna risposta (30 s)», la stessa frase del
+coordinatore che tace, per un messaggio che non aveva mai lasciato il
+telefono. Il LIBRO invece si leggeva già a ventaglio dal cantiere
+dello specchio: era la gamba VIVA a essere rimasta su un relay solo,
+e il suo modo di rompersi non alzava niente.
+
+**LA CURA È UN CORO, e chi chiama non se ne accorge.** Quattro voci
+nel blocco del motore, al posto di `p2pRelayVivo`:
+`connettiUnoP2P(url)` tiene una websocket per relay, una sola in volo
+per url (`p2pConnessioni`), e alla caduta riprova con l'attesa che
+cresce (5 s × cadute, tetto 30) SOLO se c'è qualcosa da ascoltare;
+`mostroConnetti` le apre tutte insieme e torna appena UNA risponde
+(`unoDeiTantiP2P`), gli altri arrivano in sottofondo e chi manca si
+riprova a ogni gesto; `pubblicaSuTuttiP2P(ev)` manda a tutti e
+considera INVIATO alla PRIMA conferma, gli altri seguono da soli, e se
+NESSUNO conferma entro `P2P_ACK_MS` — 12 s, cioè gli 8 della websocket
+più i 4,4 dell'OK del bundle — alza un errore con `relayMuti` e gli
+esiti uno per uno nel log; `ascoltaP2P(filtri, opz)` tiene un
+registro degli ascolti aperti (`p2pAscolti`) e li riapplica a ogni
+relay che si (ri)connette, dice `oneose` UNA volta quando hanno finito
+tutti i connessi e `onclose` solo quando non è rimasto nessuno. La
+voce del coro (`coroP2P`) ha `publish`, `subscribe` e `connected` come
+il Relay di prima: `mostroChiama`, `unaRestoreP2P`, `campoInvia` e
+`statoPubblicoOrdini` non sono cambiati di una riga nel loro corpo. La
+dedup di `p2pVisti` fa il resto, perché la stessa risposta da due
+relay è lo STESSO evento con lo stesso id — e il caso 13 del banco lo
+prova. Un «publish timed out» su UN relay non è più «partito senza
+OK»: conta zero, e parlano gli altri.
+
+**IL TIMEOUT SI DICE PER QUELLO CHE È.** Il `catch` di `mostroChiama`
+non tiene più l'eccezione del timeout: il coro alza solo se nessuno ha
+confermato, e allora la risposta non si aspetta (l'attesa in
+`p2pAttese` si cancella subito) e chi legge lo sente in 12 secondi
+invece che in 30. I quattro posti che scrivono `senza_risposta`
+(presa, riprova della presa, riprova della pubblicazione, nuovo
+ordine) timbrano `nonPartito` dal `relayMuti` dell'errore, e
+`statoTestoP2P` sceglie `t_muto`/`d_muto`: «Il messaggio non è
+partito — Nessuno ha preso in consegna la richiesta: la rete non ha
+confermato di averla ricevuta. Riprova fra un momento, con la stessa
+chiave.» Il «Nessuna risposta» di prima RESTA, per il coordinatore che
+tace davvero, cioè quando un relay ha confermato. Il «riprova» azzera
+`nonPartito` e riparte dalla stessa chiave, come sempre.
+ANDREA AVEVA CHIESTO «i relay non rispondono», e la prima stesura lo
+diceva: l'ha fermata la sentinella delle parole di casa («a schermo
+nessuna parola di protocollo»), che vieta `relay` nelle stringhe del
+motore perché a chi entra da Telegram non dice niente. La frase dice
+il FATTO invece della causa, e il perché sta accanto a
+`P2P_NON_PARTITO`. Si cambia in un minuto se Andrea vuole la parola.
+
+**LO SPECCHIO RESTA FUORI DAL CORO, ed è una decisione e non una
+dimenticanza.** Un OK da un relay dove mostrod non ascolta sarebbe un
+«inviato» falso — esattamente il guasto muto che il cantiere dello
+specchio aveva messo a verbale. E OGGI non potrebbe nemmeno
+prenderlo: `chi-scrive.py` rifiuta ogni pubkey fuori dalla whitelist,
+e una trade key nasce fresca a ogni scambio; il `router.conf` copia
+in discesa i soli 38383 e 38385, quindi nemmeno le risposte kind 14
+di mostro arrivano allo specchio. Perché entri nel coro servono TRE
+mosse su tre macchine, in quest'ordine: 1) la policy del relay deve
+ammettere i kind 14 con tag `p` = `MOSTRO_HEX` da chiunque e ogni
+evento firmato da `MOSTRO_HEX` (è una porta per lo spam di kind 14
+verso il solo coordinator, limitata dai tetti di strfry); 2) la lista
+`relays` del `settings.toml` di mostrod sul nodo deve portare
+`wss://relay.barattolo.store` (oggi non si sa se ce l'ha: il file non
+è nel repo, si guarda in sola lettura sul nodo); 3) SOLO ALLORA
+`wss://relay.barattolo.store` passa da `MOSTRO_RELAY_SPECCHIO` a
+`MOSTRO_RELAY` nel config del VPS, e il coro lo prende come gli altri
+senza toccare una riga. Le sentinelle dell'invariante dello specchio
+si sono allargate alle voci nuove (`urlViviP2P`, `connettiUnoP2P`,
+`pubblicaSuTuttiP2P`): nessuna nomina gli specchi.
+
+**IL BANCO: il relay di cartone ha imparato i caratteri.** Dall'url:
+`rotto` non apre mai; `zoppo` cade alla prima e si riprende alla
+seconda (`zoppoCadute`); `lento` apre dopo 300 ms; `muto` apre, si
+lascia scrivere e non conferma MAI (è relay.mostro.network dal
+campo); `rifiuta` risponde con un errore. `manda` accetta un
+`soloUrl`, e `rispostiPer` fa rispondere il coordinatore di cartone
+UNA volta per id di evento, come mostrod. Cinque casi nuovi, tutti sul
+motore VERO col bundle VERO: 11) rotto + muto + buono, lo scambio
+passa, l'evento è arrivato a due, l'ascolto sta su due, nessun avviso;
+12) tutti muti con `P2P_ACK_MS` a 150 ms e `P2P_ATTESA_MS` a 8 s — se
+fosse l'attesa lunga a chiudere, la prova resterebbe su «prendo» oltre
+il tetto di `finoA` — `senza_risposta` + `nonPartito`, la ragione
+senza url, `p2pAttese` vuoto, il foglio con la frase nuova e il
+riprova; poi i relay tornano sani e il riprova passa con la stessa
+chiave; 13) la risposta torna dal relay che NON ha confermato, e lo
+stesso evento da due relay muove lo scambio una volta; 14) lo zoppo si
+riprova al gesto dopo, riceve l'evento e si prende l'ascolto da solo;
+15) il lento non si aspetta e arriva in sottofondo. Più tredici
+sentinelle statiche sul coro e la frase. Il caso 8 («coordinatore
+giù») ha cambiato frase con il resto.
+LA LEZIONE DEL GIRO: il caso 13 è uscito rosso al primo colpo perché
+il coordinatore di cartone rispondeva a OGNI publish — due relay, due
+risposte con due id diversi — cioè il banco modellava un coordinatore
+che non esiste. Un banco che mente nel verso severo è meglio di uno
+che mente nel verso largo, ma mente lo stesso: la cura è stata nel
+cartone (`rispostiPer`), non nel motore.
+
+**I NUMERI:** i due banchi del motore e del server 490 → 493, zero
+rosse; la corsa intera di `prove.py` con `PROVE_SEVERE=1` — il conto
+sta nel messaggio del commit.
+
+**RESTA DA GUARDARE:** il campo — la prossima pubblicazione con
+`relay.mostro.network` in timeout, dove la console dice «📨 confermato
+da …» e «🔁 non risponde: …» relay per relay; i 12 secondi di
+`P2P_ACK_MS`, che sono un conto e non una misura; la riconnessione
+per url con l'attesa che cresce, mai esercitata dal vivo; e la
+domanda del punto 4 di Andrea, che si chiude sul nodo e non qui: se
+`settings.toml` di mostrod ascolta già lo specchio.

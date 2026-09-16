@@ -6269,8 +6269,10 @@
   chiave release fredda. Nessuno dei due è il canale di Barattolo.
   LE DUE LISTE DEL P2P NON SONO UNA LISTA PIU' LUNGA (set 2026, lo
   specchio del libro): `MOSTRO_RELAY` sono i relay dove il coordinator
-  Mostro ASCOLTA, e il client li scorre sia per leggere il libro sia
-  per PUBBLICARE le sue richieste di scambio (kind 14);
+  Mostro ASCOLTA, e il client ci sta sopra a CORO — legge il libro a
+  ventaglio e, dal 16 set 2026, ci PUBBLICA le sue richieste di
+  scambio (kind 14) e ci ascolta le risposte da tutti insieme (vedi
+  «IL CORO DEI RELAY», qui sotto);
   `MOSTRO_RELAY_SPECCHIO` sono relay che tengono una COPIA del libro e
   da cui si legge soltanto — oggi `relay.barattolo.store`. Viaggiano
   al client come due chiavi distinte di `_p2p_leve`, e `attivo` non
@@ -6279,10 +6281,11 @@
   ⚠️ FONDERLE E' IL MODO IN CUI QUESTO SI ROMPE, ed e' un guasto MUTO:
   una richiesta di scambio mandata a uno specchio finisce dove mostrod
   non ascolta — nessun errore, nessuna riga, solo un coordinatore che
-  «non risponde mai». Per questo l'invariante ha tre sentinelle in
-  `prove.py` invece di un commento: `mostroConnetti` e `mostroChiama`
+  «non risponde mai». Per questo l'invariante ha delle sentinelle in
+  `prove.py` invece di un commento: `mostroConnetti`, `mostroChiama` e
+  — dal coro — `urlViviP2P`, `connettiUnoP2P` e `pubblicaSuTuttiP2P`
   non devono nominare gli specchi, e `leggiLibroMostro` deve LEGGERLI
-  dalla leva — il terzo verso vale quanto gli altri due, perche' un
+  dalla leva — il verso opposto vale quanto gli altri, perche' un
   lettore che smettesse di usarla lascerebbe la leva morta senza che
   niente diventi rosso.
   E IL LIBRO SI LEGGE A VENTAGLIO, non dal primo che risponde: un EOSE
@@ -6294,6 +6297,33 @@
   scrive «elenco parziale»: un ordine gia' preso e' una SOSTITUZIONE e
   non una cancellazione, quindi uno specchio indietro lo mostrerebbe
   ancora libero.
+  IL CORO DEI RELAY (16 set 2026, la gamba VIVA del P2P): la
+  connessione con cui il client parla col coordinator — richieste,
+  risposte, restore, recapiti, via di riserva — non e' piu' UN relay
+  ma tutti quelli di `MOSTRO_RELAY` insieme. `connettiUnoP2P` tiene
+  una websocket per url (una sola in volo per url, `p2pConnessioni`);
+  `mostroConnetti` le apre tutte e torna appena UNA risponde
+  (`unoDeiTantiP2P`), gli altri arrivano in sottofondo e chi manca si
+  riprova a ogni gesto; `pubblicaSuTuttiP2P` manda l'evento a tutti e
+  lo considera INVIATO alla PRIMA conferma, gli altri seguono da soli,
+  e senza NESSUNA conferma entro `P2P_ACK_MS` (12 s: 8 di websocket
+  piu' i 4,4 dell'OK del bundle) alza un errore con `relayMuti`;
+  `ascoltaP2P` tiene un registro degli ascolti aperti e li riapplica a
+  ogni relay che si (ri)connette, dice `oneose` una volta sola quando
+  hanno finito tutti e `onclose` solo quando non e' rimasto nessuno.
+  La dedup di `p2pVisti` fa il resto: la stessa risposta da due relay
+  e' lo STESSO evento, con lo stesso id. Chi chiama vede una voce con
+  `publish`, `subscribe` e `connected`, come il Relay di prima.
+  IL TIMEOUT SI DICE PER QUELLO CHE E': un messaggio senza nessuna
+  conferma marca lo scambio `senza_risposta` con `nonPartito`, e il
+  foglio scrive «Il messaggio non è partito» (le parole di casa: la
+  parola «relay» a schermo la ferma una sentinella) invece del
+  generico «Nessuna risposta» — che resta per il coordinatore che
+  tace davvero, cioe' quando un relay HA confermato.
+  GLI SPECCHI RESTANO FUORI DAL CORO: un OK da un relay dove mostrod
+  non ascolta sarebbe un «inviato» falso. Lo specchio entra il giorno
+  che il coordinator lo ascolta, e quel giorno entra in `MOSTRO_RELAY`
+  dal config del VPS, senza toccare il client.
   Presenza Nostr della piattaforma: `NOSTR_NSEC_PIATTAFORMA` in config
   (segnaposto = funzione spenta, fail-open). Alla pubblicazione il
   server firma un evento NIP-99 (kind 30402, tag `d` stabile
