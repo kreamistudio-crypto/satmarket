@@ -14604,7 +14604,7 @@ username o codice, e preferire lo slug li' sarebbe la mossa naturale
 di un prossimo giro, non fatta qui per tenere il cantiere fermo sul
 suo perimetro.
 
-## Il doppio wallet: l'escrow trasloca sul nodo senza fermarsi (set 2026, in corso)
+## Il doppio wallet: l'escrow trasloca sul nodo senza fermarsi (set 2026, fase 4 in produzione)
 
 **LA DECISIONE** (12 set 2026, piano a sei fasi approvato il 15):
 l'escrow lascia il LNbits ospitato (SaaS, backend Spark) per un
@@ -14620,7 +14620,9 @@ saldo residuo via Lightning e si disdice il SaaS (tenuto un mese come
 rete). Le fasi: 0 sonda (liquidita', macaroon, hidden service, ponte,
 curl) — 1 LNbits in piedi, Barattolo ignaro — 2 doppio wallet nel
 codice, deploy INERTE — 3 accensione e ordine di prova — 4 regime
-doppio — 5 svuotamento e disdetta. Al 15 set sono chiuse 0, 1 e 2.
+doppio — 5 svuotamento e disdetta. Dal 16 set 2026 e' in
+produzione la FASE 4: leva accesa sul VPS, il denaro nuovo nasce sul
+nodo, i 12 ordini vecchi chiudono sul SaaS (le fasi 3 e 5, sotto).
 
 **FASE 0, LA LIQUIDITA', e la lezione comprata a $4,92.** Un canale
 aperto da noi nasce tutto outbound, e l'escrow e' denaro in ENTRATA:
