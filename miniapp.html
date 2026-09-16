@@ -2448,13 +2448,17 @@
      scelta dopo sedici rese (CANTIERI, «Il colore che stacca»), e
      l'unica cosa di quel giro rimasta in piedi — su di lei il bianco
      del marchio legge 16,6:1 e l'arancio 7,0:1.
-     ⚠️ LE DUE MISURE SONO DUE CONTI, non due gusti, e tutt'e due
+     ⚠️ LE TRE MISURE SONO TRE CONTI, non tre gusti, e tutt'e tre
      nascono dalla stessa regola: il marchio prende tutto lo spazio che
-     c'e', mai un pixel di piu'.
-     FUORI dalla card — pillola del filtro e voci del foglio — le
-     pillole stanno IN FILA con le sorelle e una piu' alta delle altre
-     si vedrebbe: la loro riga e' alta 17, la tessera gli aggiunge 2+2,
-     quindi il marchio sta a 13.
+     c'e', mai un pixel di piu'. I numeri da cui partono sono MISURATI
+     sul vivo, non dedotti dal foglio di stile.
+     NELLA VOCE DEL FOGLIO «Pubblica» il marchio sta accanto al nome e
+     tiene la sua tessera: la riga della voce e' alta 20 (14px di testo,
+     interlinea normale), la tessera aggiunge 2+2, quindi il marchio sta
+     a 16 e la voce resta alta 38 come le sorelle.
+     NELLA PILLOLA DEL FILTRO il marchio e' nudo, perche' li' il fondo
+     scuro ce l'ha la pillola: dentro i suoi 30 stanno 5+5 di respiro,
+     1+1 di bordo e 18 di spazio — che sono il marchio, esatti.
      DENTRO la card la scatola dev'essere IDENTICA a quelle sorelle —
      34, nessun punto in piu' (16 set 2026, ultimo aggiustamento di
      Andrea) — e il marchio si prende quel che resta: col respiro di 5
@@ -2468,7 +2472,7 @@
   .p2p-marca{display:inline-flex;align-items:center;vertical-align:middle;
     padding:2px 6px;border-radius:6px;margin-top:-1px;
     background:#131A26}
-  .p2p-marca img{display:block;height:13px;width:auto}
+  .p2p-marca img{display:block;height:16px;width:auto}
   /* LA SCATOLA COL SOLO MARCHIO: fondo, raggio e colonna restano
      quelli delle sorelle — non ha NIENTE di suo tranne il respiro
      verticale, che scende a 5 per far posto a un marchio grande senza
@@ -3438,6 +3442,31 @@
   .tema-pill{font:inherit;font-size:12.5px;font-weight:700;border:1px solid var(--line);
     background:transparent;color:var(--muted);border-radius:99px;padding:5px 12px;cursor:pointer}
   .tema-pill.active{border-color:var(--sats);background:var(--sats);color:#fff}
+  /* ══ LA PILLOLA COL MARCHIO (16 set 2026) ══
+     Stesso trattamento della scatola dei metodi nella card: la pillola
+     si riempie di navy e il marchio ci sta NUDO — il fondo scuro glielo
+     da' lei, quindi la tessera sarebbe una toppa dentro un fondo che
+     gia' fa il lavoro.
+     ⚠️ E STA DOPO `.active` APPOSTA: hanno la stessa specificita', e
+     l'ordine e' l'unica cosa che decide. Se il navy perdesse, una
+     pillola scelta tornerebbe arancione e si mangerebbe il marchio.
+     LA SCELTA ALLORA LA DICE IL BORDO, non il fondo: la pillola col
+     marchio resta navy e si accende di un filo arancio. E' l'unica
+     delle pillole a cui il fondo serve per un'altra ragione.
+     LA MISURA E' UNA SOTTRAZIONE: la pillola e' alta 30 come le
+     sorelle — 5+5 di respiro, 1+1 di bordo — e quel che resta, 18, e'
+     il marchio. Misurato sul vivo, e una prova rifa' il conto. */
+  /* ⚠️ FLEX, e non e' cosmesi: da inline il marchio si allinea alla
+     LINEA DI BASE, e un'immagine alta 18 dentro una riga da 18,125
+     spingeva la pillola a 31 — un pixel piu' delle sorelle, misurato.
+     Da flex l'altezza la decide il contenuto e il conto torna esatto. */
+  .tema-pill.p2p-pill-marchio{background:#131A26;border-color:#131A26;
+    display:flex;align-items:center}
+  .tema-pill.p2p-pill-marchio.active{border-color:var(--sats);
+    box-shadow:inset 0 0 0 1px var(--sats)}
+  .p2p-pill-marchio .p2p-marca{background:none;padding:0;border-radius:0;
+    margin-top:0}
+  .p2p-pill-marchio .p2p-marca img{height:18px}
   /* Il grado e la sua progressione (ago 2026). La barra e' l'unico
      pezzo di questa app che misura una cosa che sale: si fa piena
      come il barattolo, con lo stesso arancio. */
@@ -35763,6 +35792,17 @@ const P2P_LIBRO_FRESCO_MS = 60000; // oltre, il libro si rilegge da solo al pros
    motore: la usano tutt'e due, e il banco del motore la deve avere */
 let p2pLato = 'compro';            // 'compro' = k:sell (chi vende sats a me) | 'vendo' = k:buy
 let p2pLibro = null;               // {ordini:[...], quando} — null = mai letto
+/* IL VELO DELL'ATTESA, uno solo (16 set 2026): `attesaRitardata` torna
+   la sua chiusura, e finche' quella e' in mano il velo e' acceso. Una
+   sola variabile perche' renderP2P passa di qui a ogni giro: senza,
+   ogni render ne accenderebbe uno nuovo e la chiusura del primo non
+   spegnerebbe gli altri. */
+let p2pAttesa = null;
+function chiudiAttesaP2P(){
+  if (!p2pAttesa) return;
+  p2pAttesa();
+  p2pAttesa = null;
+}
 let p2pRiletto = 0;                // l'ultimo tentativo di rilettura: un giro caduto non martella
 let p2pInfo = null;                // le impostazioni del coordinator, dal 38385
 let p2pErrore = '';                // l'ultimo relay che non ha risposto, per dirlo
@@ -36993,14 +37033,31 @@ function renderP2P(){
   el('p2pLatoCompro')?.classList.toggle('attiva', p2pLato === 'compro');
   el('p2pLatoVendo')?.classList.toggle('attiva', p2pLato === 'vendo');
   if (p2pLibro === null) {
-    /* la stessa attesa in tutt'e due: anche la striscia vuole il
-       libro in mano (l'adozione ricostruisce solo cio' che il libro
-       sa descrivere), quindi prima del libro non c'e' niente di
-       onesto da mostrare nemmeno li' */
-    const attesa = '<div class="hint">' + (p2pErrore
-      ? 'Il libro degli ordini non risponde (' + esc(p2pErrore) + ').'
-        + '<button class="btn ghost" onclick="ricaricaP2P()">↻ Riprova</button>'
-      : 'Leggo il libro degli ordini…') + '</div>';
+    /* IL CARICAMENTO E' QUELLO DI CASA (16 set 2026, richiesta di
+       Andrea): il barattolino che ondeggia con «Aspetta…», lo stesso
+       di tutto il resto dell'app. La riga di prima NOMINAVA il
+       protocollo a chi non deve conoscerlo — il libro, gli ordini, il
+       coordinatore sono parole nostre, e chi apre la sezione vuole
+       solo sapere che sta arrivando.
+       ⚠️ E QUI NON SI RIPETE QUEL CHE E' STATO TOLTO, nemmeno per
+       spiegarlo: una sentinella che conta la vecchia scritta la
+       troverebbe in questo commento e sarebbe rossa per la riga che
+       spiega perche' e' verde. E' la trappola gia' pagata tre volte.
+       ⚠️ E L'ATTESA SI CHIUDE SEMPRE, su tutt'e tre le uscite: col
+       libro arrivato (la riga dopo il blocco), con l'errore (qui
+       sotto) e comunque alla fine della lettura (`finally`). Un velo a
+       tutto schermo che resta aperto e' l'app bloccata, e non c'e'
+       niente che lo tolga da fuori.
+       La stessa attesa vale in tutt'e due i posti: anche la striscia
+       vuole il libro in mano (l'adozione ricostruisce solo cio' che il
+       libro sa descrivere), quindi prima del libro non c'e' niente di
+       onesto da mostrare nemmeno li'. */
+    const attesa = p2pErrore
+      ? '<div class="hint">Il libro degli ordini non risponde (' + esc(p2pErrore) + ').'
+        + '<button class="btn ghost" onclick="ricaricaP2P()">↻ Riprova</button></div>'
+      : '';
+    if (p2pErrore) chiudiAttesaP2P();
+    else if (!p2pAttesa) p2pAttesa = attesaRitardata(null, 'Aspetta…');
     box.innerHTML = attesa;
     if (mieiBox) mieiBox.innerHTML = attesa;
     /* niente pillola finche' non c'e' un libro da filtrare: un
@@ -37011,14 +37068,17 @@ function renderP2P(){
        l'adozione a volerlo), quindi un conteggio adesso direbbe un
        numero vero di una lista non ancora completa */
     if (mieiTesta) mieiTesta.innerHTML = '';
-    if (!p2pErrore) caricaLibroP2P().then(renderP2P, renderP2P);
+    if (!p2pErrore) caricaLibroP2P().then(renderP2P, renderP2P)
+      .finally(chiudiAttesaP2P);
     return;
   }
+  /* il libro c'e': il velo se ne va, qualunque strada l'abbia acceso */
+  chiudiAttesaP2P();
   /* IL LIBRO SI AGGIORNA DA SOLO (set 2026, fase 6): il bottone
      «Aggiorna il libro» non c'e' piu' — al posto del gesto, un libro
      piu' vecchio di P2P_LIBRO_FRESCO_MS si rilegge in sottofondo al
-     primo render che lo attraversa, TENENDO quel che si vede (mai il
-     lampo di «Leggo il libro…» sotto le dita). `p2pRiletto` e' il
+     primo render che lo attraversa, TENENDO quel che si vede (mai un
+     lampo di caricamento sotto le dita). `p2pRiletto` e' il
      freno: un giro caduto non riparte a ogni render ma al giro dopo,
      e la lettura in volo fa gia' da guardia ai doppi.
      LA MARCATURA «e' mio» NON SI RIARMA QUI, ed e' voluto: e' una
@@ -37310,6 +37370,9 @@ function renderFiltroP2P(){
      testo, che e' la chiave che il filtro confronta col tag `pm`. */
   const pill = (testo, scelto, gesto, dentro) =>
     '<button type="button" class="tema-pill' + (scelto ? ' active' : '') +
+    /* la pillola col marchio si riempie di navy, come la scatola della
+       card: il giudice e' lo stesso che decide cosa ci va dentro */
+    (dentro ? ' p2p-pill-marchio' : '') +
     '" data-v="' + esc(testo) + '" onclick="' + gesto + '(this.dataset.v)">' +
     (dentro || esc(testo)) + '</button>';
   box.innerHTML =

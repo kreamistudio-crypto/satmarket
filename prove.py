@@ -47840,15 +47840,15 @@ def prove_p2p_barattozon():
     if not _h or not _p or not _hi:
         prova("le misure del marchio si leggono dal CSS", True, False)
     else:
-        # FUORI dalla card il marchio porta la tessera, e la tessera sta
-        # in fila con le pillole sorelle: 13 piu' 2+2 fa 17, cioe' la
-        # riga esatta. Un pixel di piu' e quella pillola e' piu' alta
-        # delle altre.
+        # ⚠️ LA TESSERA NON VIVE PIU' NELLA PILLOLA (16 set 2026): li' il
+        # fondo scuro ce l'ha la pillola e il marchio va nudo. La
+        # tessera e' rimasta nella VOCE del foglio «Pubblica», dove il
+        # marchio sta accanto a un nome, e la sua misura si controlla
+        # piu' sotto — col numero della riga di QUELLA riga, che e' un
+        # altro. Questa coppia di prove e' stata tolta invece che
+        # aggiustata: diceva «la tessera sta nella pillola», e nella
+        # pillola non c'e' piu'.
         _alta = int(_h.group(1)) + 2 * int(_p.group(1))
-        prova("la tessera sta nella riga, come le pillole sorelle",
-              True, _alta <= 17)
-        prova("...e la riempie: piu' piccola sarebbe marchio sprecato",
-              True, _alta >= 15)
         # ⚠️ DENTRO LA CARD la scatola dev'essere IDENTICA a quelle
         # sorelle — nessun punto in piu' — e il marchio si prende quel
         # che resta. Quindi qui non si guarda una soglia ma
@@ -47903,6 +47903,78 @@ def prove_p2p_barattozon():
            mini.count("P2P_BARATTOZON_CHIARA "), mini.count("--barattozon-testa:")])
     prova("...e nemmeno la seconda taglia del marchio", 0,
           css.count(".p2p-marca.mini"))
+
+    # --- 7) GLI ALTRI DUE POSTI DEL MARCHIO (16 set 2026) -----------
+    # ⚠️ STESSA REGOLA DELLA SCATOLA, TRE VOLTE: il marchio prende tutto
+    # lo spazio che c'e' e mai un pixel di piu', e la misura e' una
+    # SOTTRAZIONE dall'altezza che c'e' gia'. I numeri di partenza sono
+    # MISURATI sul vivo e scritti qui: la pillola del filtro e' alta 30
+    # (5+5 di respiro, 1+1 di bordo, 18 di riga) e la voce del foglio
+    # «Pubblica» 38 (9+9 di respiro, 20 di riga).
+    _pil = pezzo_js(css, ".tema-pill{", "}")
+    _pilm = pezzo_js(css, ".tema-pill.p2p-pill-marchio{", "}")
+    _pilmm = pezzo_js(css, ".p2p-pill-marchio .p2p-marca{", "}")
+    _pilmi = pezzo_js(css, ".p2p-pill-marchio .p2p-marca img{", "}")
+    prova("la pillola col marchio si riempie di navy", True,
+          "background:#131A26" in _pilm)
+    # la coppia vale anche qui: fondo scuro sulla pillola, marchio nudo
+    prova("...e il marchio ci sta nudo, come nella scatola della card",
+          True, "background:none" in _pilmm)
+    # ⚠️ E LA REGOLA STA DOPO `.active`, o una pillola scelta tornerebbe
+    # arancione e si mangerebbe il marchio: hanno la stessa
+    # specificita', e a decidere e' solo l'ordine.
+    prova("...e vince su `.active`, che ha la stessa specificita'", True,
+          css.index(".tema-pill.p2p-pill-marchio{") > css.index(".tema-pill.active{"))
+    prova("...e la scelta la dice il bordo, visto che il fondo serve al marchio",
+          True, "var(--sats)" in pezzo_js(css, ".tema-pill.p2p-pill-marchio.active{", "}"))
+    import re as _re_p
+    _pp = _re_p.search(r"padding:(\d+)px", _pil)
+    _pb = _re_p.search(r"border:(\d+)px", _pil)
+    _pi = _re_p.search(r"height:(\d+)px", _pilmi)
+    if not _pp or not _pb or not _pi:
+        prova("le misure della pillola si leggono dal CSS", True, False)
+    else:
+        # 30 e' l'altezza MISURATA della pillola sorella
+        _dentro = 30 - 2 * int(_pp.group(1)) - 2 * int(_pb.group(1))
+        prova("il marchio riempie la pillola senza alzarla", _dentro,
+              int(_pi.group(1)))
+    # LA VOCE DEL FOGLIO: li' il marchio sta ACCANTO al nome, quindi
+    # tiene la sua tessera — un fondo navy sull'intera riga
+    # coprirebbe anche la parola, che li' serve a scegliere.
+    _voce = pezzo_js(css, ".p2p-voce{", "}")
+    _vp = _re_p.search(r"padding:(\d+)px", _voce)
+    _mi = _re_p.search(r"height:(\d+)px", _img)
+    _mp = _re_p.search(r"padding:(\d+)px", _marca)
+    if not _vp or not _mi or not _mp:
+        prova("le misure della voce si leggono dal CSS", True, False)
+    else:
+        # 20 e' la riga MISURATA della voce (14px, interlinea normale)
+        prova("nella voce la tessera riempie la riga senza alzarla",
+              20, int(_mi.group(1)) + 2 * int(_mp.group(1)))
+
+    # --- 8) IL CARICAMENTO E' QUELLO DI CASA ------------------------
+    # ⚠️ NIENTE PAROLE DEL PROTOCOLLO a chi apre la sezione: il libro,
+    # gli ordini e il coordinatore sono nomi nostri. Al loro posto il
+    # velo di casa, lo stesso di tutta l'app.
+    _rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
+    prova("il caricamento del P2P e' il velo di casa, con la parola di casa",
+          True, "attesaRitardata(null, 'Aspetta…')" in _rp)
+    prova("...e della scritta di prima non resta niente", 0,
+          mini.count("Leggo il libro"))
+    # ⚠️ UN VELO A TUTTO SCHERMO CHE RESTA APERTO E' L'APP BLOCCATA, e
+    # da fuori non c'e' niente che lo tolga: si chiude sul libro
+    # arrivato, sull'errore, e comunque alla fine della lettura.
+    # le tre uscite sono DUE chiamate (l'errore e il libro arrivato) piu'
+    # il `finally`, che non e' una chiamata col nome ma la chiusura di
+    # ogni lettura, riuscita o no
+    prova("il velo si chiude su tutt'e tre le uscite", True,
+          _rp.count("chiudiAttesaP2P()") == 2
+          and ".finally(chiudiAttesaP2P)" in _rp)
+    # e il velo e' UNO: renderP2P passa di qui a ogni giro, e senza una
+    # variabile sola ne accenderebbe uno nuovo ogni volta
+    prova("...ed e' uno solo, non uno per render", True,
+          "if (!p2pAttesa) p2pAttesa = attesaRitardata" in _rp
+          and "let p2pAttesa = null;" in mini)
 
 
 def prove_p2p_canale():
