@@ -2433,24 +2433,27 @@
      metodi della card, la pillola del filtro e la voce del foglio
      «Pubblica». E' bianco e arancio su trasparente, quindi gli serve
      sempre un fondo scuro sotto, o la sua parola bianca sparisce sulla
-     carta chiara. Glielo danno due cose diverse: nella CARD la scatola
-     dei metodi, che diventa un'insegna navy tutta intera; fuori — la
-     pillola del filtro e la voce del foglio — una TESSERA sua, dello
-     stesso navy, perche' li' una scatola non c'e'.
+     carta chiara. Glielo da' sempre la SUA TESSERA, in tutt'e tre i
+     posti: navy, angoli tondi, e il marchio dentro. La scatola dei
+     metodi non ci mette niente di suo — e' quella delle sorelle, col
+     fondo di casa — perche' a distinguere questa card basta il marchio
+     (16 set 2026, ritocco di Andrea che rovescia l'insegna navy di
+     mezz'ora prima: il rettangolo navy resta, ma e' la TESSERA e non
+     la scatola).
      IL NAVY E' #131A26, quello della testata di Amazon: la tinta
      scelta dopo sedici rese (CANTIERI, «Il colore che stacca»), e
      l'unica cosa di quel giro rimasta in piedi — su di lei il bianco
      del marchio legge 16,6:1 e l'arancio 7,0:1.
-     ⚠️ LE DUE MISURE SONO DUE CONTI, non due gusti. La riga della
-     scatola e' alta 17 (12,5px di testo a interlinea normale), e tutto
-     quel che la passa ALZA la scatola e con lei la card. DENTRO
-     l'insegna il marchio e' nudo e sta a 22 — scelto da Andrea
-     guardando tre misure affiancate: costa cinque pixel di scatola e
-     tre di card, ed e' il prezzo della leggibilita'. FUORI, dove porta
-     la tessera che gli aggiunge 2+2 di respiro, resta a 13: li' la
-     pillola del filtro e le voci del foglio stanno in fila con le loro
-     sorelle, e una piu' alta delle altre si vedrebbe. Le prove rifanno
-     tutt'e due i conti leggendo i numeri dal CSS.
+     ⚠️ LE DUE MISURE SONO DUE CONTI, non due gusti. FUORI dalla card —
+     pillola del filtro e voci del foglio — il marchio sta a 13, perche'
+     li' le pillole stanno IN FILA con le sorelle e una piu' alta delle
+     altre si vedrebbe: 13 piu' 2+2 di tessera fa 17, che e' l'altezza
+     esatta della loro riga. DENTRO la card non c'e' nessuna fila e il
+     marchio sale a 30 — scelto da Andrea — ma la scatola non deve
+     scappare dalle sorelle: il suo respiro verticale scende da 8 a 3,
+     cosi' la tessera da 34 la lascia a 40 contro le 34 delle altre.
+     Sei pixel, non quattordici. Le prove rifanno tutt'e due i conti
+     leggendo i numeri dal CSS.
      LA CARD VESTITA, quella con la sua pelle e il capo navy, e' stata
      provata in sei versioni e poi tolta: vive nei commit, e gli hash
      stanno in CANTIERI («La card semplice, e dove vivono i vestiti»).
@@ -2459,15 +2462,13 @@
     padding:2px 6px;border-radius:6px;margin-top:-1px;
     background:#131A26}
   .p2p-marca img{display:block;height:13px;width:auto}
-  /* L'INSEGNA: la scatola dei metodi quando dentro non resta nessun
-     nome. Prende il navy al posto della carta di casa, e il marchio ci
-     sta NUDO — la tessera qui sarebbe una toppa dentro un'insegna
-     dello stesso colore. Il raggio e il respiro restano quelli delle
-     scatole sorelle: a cambiare e' il solo fondo. */
-  .p2p-paga-marchio{background:#131A26}
-  .p2p-paga-marchio .p2p-marca{background:none;padding:0;border-radius:0;
-    margin-top:0}
-  .p2p-paga-marchio .p2p-marca img{height:22px}
+  /* LA SCATOLA COL SOLO MARCHIO: fondo, raggio e colonna restano
+     quelli delle sorelle — non ha NIENTE di suo tranne il respiro
+     verticale, che scende a 3 per far posto a un marchio grande senza
+     scappare dalla fila. Il conto sta nel commento qui sopra. */
+  .p2p-paga-marchio{padding-top:3px;padding-bottom:3px}
+  .p2p-paga-marchio .p2p-marca{margin-top:0}
+  .p2p-paga-marchio .p2p-marca img{height:30px}
   /* la reputazione e' UNA FRASE (set 2026, il ridisegno): niente piu'
      due pezzi ai bordi — si legge come si dice */
   .p2p-rep{font-size:12px}

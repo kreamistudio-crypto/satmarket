@@ -47779,13 +47779,19 @@ def prove_p2p_barattozon():
     _ins = pezzo_js(css, ".p2p-paga-marchio{", "}")
     _insm = pezzo_js(css, ".p2p-paga-marchio .p2p-marca{", "}")
     _insi = pezzo_js(css, ".p2p-paga-marchio .p2p-marca img{", "}")
-    prova("la scatola-insegna e' navy, e cambia il SOLO fondo", True,
-          "background:#131A26" in _ins
-          and not any(x in _ins for x in ("border", "padding", "radius")))
-    # dentro un'insegna navy la tessera sarebbe una toppa dello stesso
-    # colore: il marchio ci sta nudo
-    prova("...e dentro il marchio sta nudo, senza la sua tessera", True,
-          "background:none" in _insm and "padding:0" in _insm)
+    # ⚠️ LA SCATOLA NON HA PIU' NIENTE DI SUO (16 set 2026, ritocco di
+    # Andrea che rovescia l'insegna navy di mezz'ora prima): ne' fondo,
+    # ne' bordo, ne' raggio — solo il respiro verticale, che scende per
+    # far posto a un marchio grande. A distinguere la card basta il
+    # marchio, e il rettangolo navy e' la TESSERA, non la scatola.
+    prova("la scatola non ha niente di suo, solo il respiro", True,
+          "padding-top:" in _ins
+          and not any(x in _ins for x in ("background", "border", "radius")))
+    # e dentro il marchio TIENE la sua tessera: senza un fondo scuro
+    # addosso, sulla carta chiara la sua parola bianca sparirebbe — e'
+    # la stessa ragione che aveva bocciato la resa crema fra i colori
+    prova("...e dentro il marchio tiene la sua tessera, o sparirebbe sul chiaro",
+          False, "background:none" in _insm)
     # la tessera e' NAVY e non piu' l'ambra di casa (16 set 2026): e'
     # l'unica cosa rimasta in piedi del giro dei sedici colori, e su di
     # lei il marchio legge 16,6:1 col bianco e 7,0:1 con l'arancio.
@@ -47815,15 +47821,24 @@ def prove_p2p_barattozon():
               True, _alta <= 17)
         prova("...e la riempie: piu' piccola sarebbe marchio sprecato",
               True, _alta >= 15)
-        # DENTRO l'insegna il marchio e' nudo e puo' crescere: fino a 17
-        # e' gratis (17 e' gia' l'altezza della riga), oltre alza la
-        # scatola e con lei la card. A 22 costa 5 di scatola e 3 di
-        # card, ed e' la misura scelta guardando tre rese affiancate.
+        # ⚠️ DENTRO LA CARD il marchio e' piu' grande — li' non c'e'
+        # nessuna fila da rispettare — ma la scatola non deve SCAPPARE
+        # dalle sorelle: il conto e' (marchio + tessera + respiro) meno
+        # l'altezza di una scatola normale, e deve restare qualche
+        # punto. Il respiro suo scende apposta, o un marchio da 30
+        # costerebbe quattordici pixel invece di sei.
         _dentro = int(_hi.group(1))
-        prova("dentro l'insegna il marchio e' piu' grande di quello con la tessera",
-              True, _dentro > _alta - 4)
-        prova("...e quel che costa alla scatola resta un dito", True,
-              max(0, _dentro - 17) <= 8)
+        _resp = _re_b.search(r"padding-top:(\d+)px", _ins)
+        _bxp = _re_b.search(r"padding:(\d+)px", pezzo_js(css, ".p2p-box{", "}"))
+        if not _resp or not _bxp:
+            prova("il respiro della scatola si legge dal CSS", True, False)
+        else:
+            _nostra = _dentro + 2 * int(_p.group(1)) + 2 * int(_resp.group(1))
+            _sorella = 17 + 2 * int(_bxp.group(1))
+            prova("dentro la card il marchio e' piu' grande che nelle pillole",
+                  True, _dentro > int(_h.group(1)))
+            prova("...e la scatola non scappa dalle sorelle piu' di qualche punto",
+                  True, 0 < _nostra - _sorella <= 8)
     prova("la scatola dei metodi cede coi puntini come sempre", True,
           ".p2p-paga{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" in css)
 
