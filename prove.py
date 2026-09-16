@@ -47778,35 +47778,36 @@ def prove_p2p_barattozon():
     # resta la pelle di `.p2p-marca`, cioe' vale FUORI dalla card.
     _alone = pezzo_js(css, ".p2p-ord.p2p-barattozon .p2p-marca{", "}")
     _scat = pezzo_js(css, ".p2p-ord.p2p-barattozon .p2p-paga{", "}")
-    prova("l'insegna e' navy pieno con gli angoli tondi", True,
-          "background:#131A26" in _alone and "border-radius:14px" in _alone)
-    prova("...e il bagliore e' dello stesso colore e senza scostamento",
-          True, "box-shadow:0 0 18px 9px #131A26" in _alone)
-    # ⚠️ IL CONTO CHE TIENE IL BAGLIORE DENTRO IL TAGLIO, e si rifa' qui
-    # a ogni giro invece di fidarsi di due numeri scritti in due posti:
-    # `.p2p-paga` TAGLIA quel che esce — la riga che impedisce a un
-    # elenco di metodi di uno sconosciuto di allargare la pagina — e un
-    # bagliore che arriva piu' in la' del respiro si vede SEGATO DI
-    # NETTO, che e' peggio della toppa. Il bagliore tocca
-    # `allargamento + sfocatura/2`; il respiro deve battere quel numero.
+    # IL COLORE E' UNA DECISIONE, quindi sta in una variabile sua e la
+    # prova non lo ribatte: guarda che ci SIA e che sia una tinta
+    # piena, perche' e' la pienezza il punto di questa forma.
     import re as _re_b
-    _sh = _re_b.search(r"box-shadow:0 0 (\d+)px (\d+)px", _alone)
-    _pd = _re_b.search(r"padding:(\d+)px 0", _scat)
-    if not _sh or not _pd:
-        prova("il bagliore e il respiro si leggono dal CSS", True, False)
-    else:
-        _tocca = int(_sh.group(2)) + int(_sh.group(1)) / 2
-        _respiro = int(_pd.group(1))
-        prova("il respiro della riga contiene il bagliore (o si vedrebbe segato)",
-              True, _respiro >= _tocca)
-        prova("...e non ne avanza piu' di un dito, o sarebbe aria sprecata",
-              True, _respiro - _tocca <= 6)
-    # e il taglio non si tocca: la regola della card non nomina overflow
+    _tinta = _re_b.search(r"--barattozon-tessera:(#[0-9A-Fa-f]{3,8})",
+                          pezzo_js(css, ".p2p-ord.p2p-barattozon{", "}"))
+    prova("il colore della tessera vive in una variabile sua", True,
+          bool(_tinta))
+    prova("...e il marchio la legge da li', invece di ribatterla", True,
+          "background:var(--barattozon-tessera)" in _alone)
+    prova("la tessera e' PIENA e netta: nessuna sfumatura, nessun bagliore",
+          [False, False, False],
+          ["gradient(" in _alone, "box-shadow" in _alone, "filter:" in _alone])
+    prova("...con gli angoli delle sorelle", True,
+          "border-radius:10px" in _alone
+          and "border-radius:10px" in pezzo_js(css, ".p2p-box{", "}"))
+    # ⚠️ NETTA VUOL DIRE CHE NON ESCE, e il taglio di `.p2p-paga` non ha
+    # niente da tagliare: e' la ragione per cui questa forma non chiede
+    # nessuna taratura che la contenga. Il taglio pero' resta dov'e' —
+    # e' la riga che impedisce a un elenco di metodi di uno sconosciuto
+    # di allargare la pagina.
     prova("il taglio della scatola resta dov'e'", False, "overflow" in _scat)
-    prova("l'insegna e' CORTA e centrata: la scatola non e' piu' una scatola",
+    # ⚠️ A SINISTRA, e la riga si pretende SCRITTA anche se «left» e'
+    # quel che si eredita: qui c'e' stato `center`, e una riga esplicita
+    # e' l'unica cosa che impedisce di rimetterlo per sbaglio.
+    prova("la tessera e' CORTA e sta a sinistra, e la scatola non fa piu' da riquadro",
           True,
-          "text-align:center" in _scat and "background:none" in _scat
-          and "box-shadow:none" in _scat and "width" not in _alone)
+          "text-align:left" in _scat and "text-align:center" not in _scat
+          and "background:none" in _scat
+          and "padding:0" in _scat and "width" not in _alone)
     prova("il marchio tiene la sua tessera ambra solo fuori dalla card", True,
           "linear-gradient(" in pezzo_js(css, ".p2p-marca{", "}")
           and ".p2p-barattozon.chiara .p2p-marca{" not in css)
