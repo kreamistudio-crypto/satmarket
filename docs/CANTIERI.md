@@ -15404,3 +15404,176 @@ si riscrive la storia: quel commit e' gia' su main e deployato, e un
 `rebase` su main pubblico costa piu' di quel che ripara. Visto il 15 set
 2026 controllando i tre commit della sera (questo, `3fd234b` e il
 `2b71308` del fork, che sono puliti).
+
+## Il coordinatore manda già il mio lato: la fattura da 7468 che ne voleva 7543 (16 set 2026)
+
+Aperto da Andrea sul campo: prendendo un ordine da 5 € il foglio «Dove
+ricevere i sats» ha suggerito 7468 sats, il wallet ha fatto la bolt11,
+e il coordinatore l'ha rifiutata con «la richiesta di pagamento non è
+valida». La domanda era: quali controlli fa mostro sulla fattura di
+chi compra, e cosa dicono i suoi log. La risposta ha rovesciato una
+lettura del 14 set, ed è la lezione da tenere.
+
+**LA FATTURA, DECODIFICATA** (bech32 a mano, è pubblica): 7468 sats,
+nata il 16 set alle 14:28:38 UTC, `x` = **3600 s esatti**, `c` = 80
+(un wallet su LND). Due trappole insieme, e la seconda avrebbe morso
+anche con la cifra giusta.
+
+**I CONTROLLI DI MOSTRO** (`src/lightning/invoice.rs` al tag v0.18.7,
+che il nodo gira; nessuna delle quattro patch del fork lo tocca):
+1. importo **esatto**, `amount_sat == order.amount − order.fee`,
+   oppure fattura senza importo (0); zero tolleranza, e `order.fee`
+   è già la metà di un lato;
+2. **nessun ricalcolo al prezzo corrente**: l'importo si fissa al take
+   (`get_market_amount_and_fee`), si salva, e `add_invoice_action` lo
+   rilegge dal database;
+3. minimo `min_payment_amount` (100 sul nodo);
+4. la fattura deve scadere **non prima di `adesso +
+   invoice_expiration_window`** (3600 s sul nodo): una fattura da
+   un'ora esatta — il default di LND, Zeus, Blixt — è rifiutata SEMPRE,
+   perché quando arriva ha già perso qualche secondo;
+5. catena giusta, `min_final_cltv_expiry_delta ≤
+   max_final_cltv_expiry_delta` (432 sul nodo), non già scaduta;
+6. indirizzo Lightning o LNURL: solo `ln_exists`, nessun controllo
+   sull'importo.
+Ogni bocciatura è lo stesso `InvoiceInvalidError`, che `validate_invoice`
+traduce nel cant-do `invalid-invoice`.
+
+**I LOG NON DICONO IL PERCHÉ, e non possono:** `manage_errors` in
+`app.rs` su un cant-do accoda solo la risposta al client, senza una
+riga di tracing. Nel journal resta «Received message with action
+AddInvoice» e basta. Non è un difetto nostro e non si cura da qui.
+
+**LA CAUSA VERA: LA METÀ TOLTA DUE VOLTE.** Il cantiere del 14 set
+(«`satsNetti` è il lordo: la fattura che il nostro client rifiutava»)
+aveva verificato il CONTROLLO di mostro (accetta `amount − fee`) ma
+non quel che mostro MANDA. Verificato oggi, sui byte, tutti i mittenti
+di un payload `order` dopo il take:
+
+| azione verso di me | `order.amount` nel payload |
+|---|---|
+| `new-order` (eco a chi pubblica) | lordo (0 a prezzo di mercato) |
+| `add-invoice` → chi compra (`set_waiting_invoice_status`, `flow.rs`, `release.rs`) | lordo − fee |
+| `hold-invoice-payment-accepted` → chi compra | lordo − fee |
+| `buyer-took-order` → chi vende (`add_invoice.rs`, `flow.rs`) | lordo + fee |
+| `pay-invoice` → chi vende: la hold stessa | lordo + fee |
+| `waiting-seller-to-pay` → chi compra | nessun payload |
+
+Cioè **dopo il take ogni payload porta già l'importo del lato di chi
+legge**, e il lordo arriva solo nell'eco del `new-order` e nel libro.
+Il client scriveva `order.amount` in `satsNetti` credendolo lordo, e
+`satsDaRicevereP2P` gli toglieva la metà un'altra volta. I numeri, al
+2% spartito:
+
+| | sats |
+|---|---|
+| ordine (lordo) | 7619 |
+| fee di un lato | 76 |
+| nell'`add-invoice`, cioè quel che mostro pretende | 7543 |
+| suggerito dal foglio | 7468 |
+
+7543 è l'unico numero che dà 7468, quindi il conto torna. E il
+difetto aveva **due lame**: la NOSTRA guardia avrebbe fermato la
+fattura giusta da 7543 («ne devi ricevere 7468»). Lo stesso errore
+gonfiava la card di chi vende (`buyer-took-order` porta già lordo +
+fee, e la card aggiungeva la metà ancora).
+
+**LA CURA: DUE CAMPI PER DUE VERITÀ.** `satsMiei` è l'importo del mio
+lato come l'ha detto il coordinatore, e arriva SOLO dalle azioni di
+`P2P_IMPORTO_MIO` (`add-invoice`, `hold-invoice-payment-accepted`,
+`buyer-took-order`) più la hold del `pay-invoice`; `satsNetti` resta il
+lordo (il nome mente e resta: vive in `localStorage`), dall'eco del
+`new-order` così com'è, dalle altre azioni **ricavato all'indietro** con
+`lordoDaMieiP2P`, che rifà il conto di `get_fee` al contrario e vince
+il candidato più piccolo che riproduce la cifra con la stessa formula
+di `nettoLatoP2P`. I giudici: `satsDaRicevereP2P` ripete `satsMiei`
+(un fatto, non un conto), `satsScambioP2P` lo scrive secco senza ≈, e
+il conto della pagina riparte dal lordo ricavato — così «Ricevi»
+torna al satoshi sulla cifra detta.
+⚠️ **L'ARROTONDAMENTO PUÒ DARE DUE LORDI PER LO STESSO NETTO** (7549 e
+7550 fanno tutt'e due 7474 all'1%): il Subtotale può sbagliare di UN
+sat, il mio lato mai. Dichiarato nel codice.
+⚠️ **E A COMMISSIONE IGNOTA IL LORDO NON SI INVENTA:** senza 38385
+`satsMiei` si tiene (è un fatto) e `satsNetti` non si scrive. Le righe
+scritte PRIMA del 16 set, col solo lordo, hanno il ripiego di ieri
+(la metà si toglie): vale per gli scambi aperti sui dispositivi di
+Andrea e Alan, e non c'è altro modo di leggerle.
+
+**IL FOGLIO DI CHI COMPRA** (punti 2 e 4 di Andrea): la cifra da
+ricevere con un bottone che la copia (si ribatte a mano nel wallet);
+l'indirizzo Lightning detto come la via più semplice, e **già scritto
+dagli incassi automatici** quando ci sono, modificabile solo per quello
+scambio (`apriIncassoP2P` lo faceva già, adesso il foglio lo dice); la
+fattura **senza importo** consigliata come via robusta sulla cifra; e
+l'avviso PRIMA sulla scadenza, coi minuti che il nodo pretende
+(`finestraFatturaP2P`: `fattFinestra` del 38385, o 3600 senza).
+`leggiBolt11` decodifica la bolt11 a mano — bech32 col checksum, i
+campi taggati `x` e `c`, la firma non si guarda — e la guardia ferma
+con parole nostre una fattura che scada troppo presto, senza-importo
+compresa: la regola è sulla bolt11, non sulla cifra. Il «no» del
+coordinatore, quando arriva lo stesso, dice adesso le due ragioni
+possibili invece di «non valida». Il custode non si nomina a schermo
+(la sentinella del 6 ha morso al primo giro: «vengono rifiutate», non
+«il coordinatore le rifiuta»).
+
+**NUMERI E PROVE, fee 2% su tutt'e due i lati.** Il banco del motore
+gira sui numeri veri (7543 nell'`add-invoice` → 7619 lordo, conto con
+`7619 sats` e `7543 sats` e mai 7468; la hold di chi vende 40000 →
+39604 + 396) e su **sei fatture**: quella VERA del 16 set come fixture
+(fermata sulla cifra, e la ragione dice 7543), e cinque coniate da
+`bolt11_finta` — bech32 vero, firma di zeri, timestamp di dieci
+secondi fa — per i casi 7468 con un giorno di vita (fermata: era la
+metà due volte), 7543 da un'ora esatta (fermata coi minuti), la
+senza-importo da un'ora (fermata: la regola è sulla scadenza), 7543 e
+la senza-importo con un giorno (passano), e una col checksum rotto
+(«non si legge»). Le sequenze provano la tabella qui sopra azione per
+azione, `lordoDaMieiP2P` da tutt'e due i lati compreso il caso
+ambiguo, e `leggiBolt11` sulla fattura vera: `[7468, 1789568918,
+3600, 1789572518, 80]`. La card: il mio lato detto si ripete secco.
+
+**PUNTO 1 — IL RECAPITO A FINE SCAMBIO: NON SI PUÒ SENZA PATCH**, e
+ci si è fermati come chiesto. Letto sul tag v0.18.7: `fiat_sent`
+pretende `Active`, e `Active` si raggiunge SOLO passando dalla fattura
+di chi compra (`add_invoice_action`, o il take con la fattura dentro);
+senza fattura il take parcheggia in `waiting-buyer-invoice` e
+`job_cancel_orders` la chiude a 900 s. La macchina «fattura dopo il
+rilascio» ESISTE ma solo per il caso del pagamento fallito
+(`check_failure_retries` → `AddInvoice`, `pay_new_invoice` in
+`settled-hold-invoice`). Cosa andrebbe toccato, per deciderlo a parte:
+- `take_sell.rs`: senza `payment_request` andare dritti a
+  `show_hold_invoice` invece che in `waiting-buyer-invoice`;
+- `flow.rs` (hold pagata, ordine buy): senza `buyer_invoice` passare
+  ad `Active` con `HoldInvoicePaymentAccepted` invece di chiedere la
+  fattura;
+- `release.rs`: `do_payment` con `buyer_invoice` None oggi torna
+  `InvoiceInvalidError` SENZA passare da `check_failure_retries`, quindi
+  `failed_payment` resta false e `job_retry_failed_payments` non lo
+  vede mai — servirebbe accodare subito `AddInvoice` (col netto) e
+  lasciare l'ordine in `settled-hold-invoice`;
+- `add_invoice.rs` / `pay_new_invoice`: dopo aver salvato la fattura
+  deve far partire il payout (oggi azzera solo `payment_attempts` e
+  conta sul `failed_payment` già vero del giro dei retry);
+- una politica per chi NON dà mai la fattura dopo il rilascio: i sats
+  restano nel wallet di mostro senza timeout, e oggi non c'è un
+  promemoria né un gesto admin.
+Il client non cambierebbe: `add-invoice` in `rilasciato` è già
+`attesa_mia_fattura`. E c'è un argomento in più per quella strada, che
+è uscito da qui: la finestra del punto 4 protegge solo l'ARRIVO della
+fattura, non il payout — una bolt11 da un giorno su uno scambio che si
+chiude in tre è scaduta al rilascio lo stesso, e finisce nel giro dei
+retry. Una fattura chiesta ALLA FINE, o un indirizzo (che si risolve
+al payout), è l'unico modo perché la scadenza non morda mai.
+
+**PUNTO 5 — IL PARERE SU `invoice_expiration_window`: NON SI TOCCA.**
+Abbassarla (per esempio a 900) farebbe passare le fatture da un'ora al
+momento dell'arrivo, ma non le farebbe pagabili al rilascio: scadute
+dopo un'ora, cadrebbero nei retry e nel secondo `AddInvoice`, che è
+peggio di un no detto subito. La cura è quella del foglio (avviso
+prima, senza-importo, indirizzo) e, davvero, il recapito a fine
+scambio. Il default di mostro è lo stesso 3600 del nodo.
+
+**RESTA DA GUARDARE:** la decisione sulla patch del punto 1; NWC, che
+Andrea ha segnato per un cantiere suo; il caso reale con un wallet che
+faccia fatture lunghe (Phoenix, Wallet of Satoshi) sul nodo vero, che
+chiude la tappa 8; e le righe di prima del 16 set sui due telefoni, da
+lasciar morire con gli scambi che portano.

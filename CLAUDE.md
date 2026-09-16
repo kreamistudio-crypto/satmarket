@@ -121,11 +121,12 @@ nostro client ricalca non si e' mossa.
 dedotto: `c6efb2d` (#952) rinominava il campo con cui l'`info`
 annuncia la finestra della hold invoice, e nel 38385 vero i nomi sono
 ANCORA QUELLI VECCHI — `invoice_expiration_window` e
-`hold_invoice_expiration_window`. Quindi non morde, e non mordeva
-nemmeno di nascosto: il client quel campo lo parcheggia in
-`fattFinestra` e non lo usa da nessuna parte (un `grep` in
-`miniapp.html` lo trova una volta sola, dove nasce). Se un giorno
-qualcuno vorra' usarlo, si riguarda il nome prima di fidarsi.
+`hold_invoice_expiration_window`. Quindi non morde. Dal 16 set 2026 il
+client LEGGE `invoice_expiration_window` (`fattFinestra`, via
+`finestraFatturaP2P`) per fermare PRIMA una fattura troppo corta: il
+nome usato e' quello che il 38385 emette davvero, verificato; se il tag
+sparisse, il client ripiega sui 3600 s del template. La sorella della
+hold resta parcheggiata e morta.
 
 **LA RONDA DICE CINQUE COSE E LA QUINTA VALIDA LE ALTRE:** finestra
 blocchi/disco/ram, canale e HTLC, backup (allarme oltre 48h o sotto
