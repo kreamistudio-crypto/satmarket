@@ -47771,18 +47771,36 @@ def prove_p2p_barattozon():
     prova("il marchio: 40px nella card, 14px nella pillola e nella voce", True,
           ".p2p-marca img{display:block;height:40px;width:auto}" in css
           and ".p2p-marca.mini img{height:14px}" in css)
-    # LA TESSERA E' LA SCATOLA (16 set 2026): navy pieno dentro la card,
-    # in tutt'e due le varianti, e il marchio nudo; la tessera ambra
-    # resta la pelle di `.p2p-marca`, cioe' vale FUORI dalla card.
-    _navy = pezzo_js(css, ".p2p-ord.p2p-barattozon .p2p-paga{", "}")
-    prova("la scatola dei metodi e' navy pieno, non il chip di casa", True,
-          "background:#131A26" in _navy and "var(--chip-bg)" not in _navy)
-    prova("...e il filo chiaro e' un'ombra interna, che non alza la scatola",
-          [True, False],
-          ["box-shadow:inset 0 0 0 1px" in _navy, "border:" in _navy])
-    prova("il marchio sta nudo dentro la card, tessera ambra solo fuori", True,
-          ".p2p-ord.p2p-barattozon .p2p-marca{background:none;padding:0}" in css
-          and "linear-gradient(" in pezzo_js(css, ".p2p-marca{", "}")
+    # L'ALONE AL POSTO DELLA TOPPA (16 set 2026, terzo giro): il fondo
+    # scuro del marchio non e' piu' una scatola — e' un gradiente sul
+    # marchio stesso, corto quanto lui piu' il respiro, che finisce a
+    # ZERO sui quattro lati. La tessera ambra resta la pelle di
+    # `.p2p-marca`, cioe' vale FUORI dalla card.
+    _alone = pezzo_js(css, ".p2p-ord.p2p-barattozon .p2p-marca{", "}")
+    prova("il fondo del marchio e' un alone ellittico, non un rettangolo",
+          True,
+          "radial-gradient(ellipse closest-side" in _alone
+          and "#131A26" in _alone)
+    # ⚠️ `closest-side` E' LA RIGA CHE FA LA DISSOLVENZA: col
+    # `farthest-corner` di default il gradiente arriva a zero negli
+    # ANGOLI, quindi a meta' dei lati resta del colore e il riquadro
+    # torna a vedersi — la toppa, con un contorno piu' morbido.
+    prova("...e arriva a ZERO esatto, o il riquadro tornerebbe a vedersi",
+          True, "rgba(19,26,38,0) 100%" in _alone)
+    # ⚠️ NIENTE OMBRE NE' SFOCATURE: escono dal riquadro, e `.p2p-paga`
+    # TAGLIA — un alone tagliato di netto e' la toppa di nuovo. E il
+    # taglio non si tocca: e' la riga che impedisce alla scatola di
+    # allargare la pagina.
+    _scat = pezzo_js(css, ".p2p-ord.p2p-barattozon .p2p-paga{", "}")
+    prova("...e non esce dal riquadro: nessuna sfocatura, nessuna ombra",
+          [False, False, False],
+          ["filter:" in _alone, "box-shadow:0" in _alone, "overflow" in _scat])
+    prova("l'alone e' CORTO e centrato: la scatola non e' piu' una scatola",
+          True,
+          "text-align:center" in _scat and "background:none" in _scat
+          and "box-shadow:none" in _scat and "width" not in _alone)
+    prova("il marchio tiene la sua tessera ambra solo fuori dalla card", True,
+          "linear-gradient(" in pezzo_js(css, ".p2p-marca{", "}")
           and ".p2p-barattozon.chiara .p2p-marca{" not in css)
     prova("la variante chiara esiste e vale solo col tema chiaro", True,
           'html:not([data-tema="scuro"]) .p2p-ord.p2p-barattozon.chiara{' in css

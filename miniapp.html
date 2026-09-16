@@ -2441,19 +2441,49 @@
      scatole vestono da soli — nessuna regola per ciascuno, e una riga
      nuova nella card domani si veste senza saperlo.
      IL MARCHIO E' BIANCO SU TRASPARENTE, quindi gli serve sempre un
-     fondo scuro sotto. Nella card ce lo mette la SCATOLA, che qui non
-     e' piu' il chip semitrasparente delle altre (16 set 2026, ritocco
-     di Andrea): e' un rettangolo PIENO di navy — quello della testata
-     di Amazon — con gli angoli delle sorelle, e sul gradiente ambra
-     stacca come un'insegna. Il marchio ci sta dentro NUDO, in tutt'e
-     due le varianti: la sua tessera ambra vale fuori di qui (pillola
-     del filtro e voce del foglio), dove un fondo scuro non ce l'ha
-     nessuno.
-     E COSI' LA SCATOLA PUO' CRESCERE: 40px di marchio invece di 30,
-     cioe' 127x40 dentro una riga da 313 — la scatola passa da 46 a 56
-     e la card da 152 a 162, senza toccare premio e scadenza, che
-     stanno su righe loro. Cede coi puntini come sempre, e col
-     tabacchino e' sola nella scatola per costruzione. */
+     fondo scuro sotto. Nella card glielo da' un ALONE navy — quello
+     della testata di Amazon — e non piu' una scatola (16 set 2026,
+     terzo giro, decisione di Andrea): il chip di casa sbiadiva sul
+     gradiente, il rettangolo pieno che l'aveva sostituito era una
+     toppa larga tutta la riga, e quel che ci vuole e' un marchio
+     APPOGGIATO sulla card, con i bordi che ci si sciolgono dentro.
+     COM'E' FATTO, e perche' cosi': un `radial-gradient` ellittico
+     `closest-side` sul marchio stesso — navy pieno sotto il logo, poi
+     la dissolvenza, e ZERO esatto sui quattro lati del riquadro.
+     `closest-side` non e' un dettaglio: col `farthest-corner` di
+     default il gradiente arriva a zero negli ANGOLI, quindi a meta'
+     dei lati resterebbe del colore e il riquadro tornerebbe a
+     vedersi — cioe' la toppa, con un contorno piu' morbido. Cosi'
+     invece l'alone finisce PRIMA di toccare il bordo, e un bordo che
+     non tocca niente non si vede.
+     E NIENTE OMBRE NE' SFOCATURE, che sarebbe la strada istintiva
+     (`filter:blur` o un `box-shadow` dello stesso colore): quelle
+     escono dal riquadro, e `.p2p-paga` TAGLIA — e' la riga che le
+     impedisce di allargare la pagina. Un alone tagliato di netto a
+     meta' dissolvenza e' esattamente la toppa che si voleva togliere.
+     Tutto dentro il riquadro, e la regola del taglio resta dov'e'.
+     E' CORTO, non largo la riga: il marchio piu' il respiro che serve
+     alla dissolvenza (191x68), centrato — col tabacchino esclusivo il
+     metodo e' uno solo, e una fascia lunga 313 sarebbe vuota per due
+     terzi. Centrato e non a sinistra perche' un alone non ha un bordo
+     con cui allinearsi: appoggiato a sinistra sembrerebbe scivolato,
+     e il suo centro e' l'unico punto che si veda davvero.
+     IL MARCHIO STA A 40px in tutt'e due le varianti, e la sua tessera
+     ambra vale fuori di qui (pillola del filtro e voce del foglio),
+     dove un fondo scuro non ce l'ha nessuno. La riga passa da 56 a 68
+     e la card da 162 a 174, senza toccare premio e scadenza, che
+     stanno su righe loro.
+     LA TARATURA E' STATA SCELTA GUARDANDO, cinque rese una sotto
+     l'altra: il pieno arriva al 66% invece che al 54-60 perche' il
+     marchio e' LARGO E BASSO (127x40) e un'ellisse che lo contiene
+     comoda non ci sta in una riga da 313 — con la dissolvenza piu'
+     generosa le due punte, che sono arancio, finivano sul navy gia'
+     smagrito e perdevano il fondo proprio dove serve. Scartate:
+     l'alone appoggiato a SINISTRA, che senza un bordo con cui
+     allinearsi sembra scivolato in un vuoto lungo due terzi di riga,
+     e il rettangolo arrotondato col bagliore dello stesso colore, che
+     resta una toppa con un contorno morbido — si vede ancora la
+     forma, ed e' la forma il difetto. */
   .p2p-marca{display:inline-flex;align-items:center;vertical-align:middle;
     padding:3px 8px;border-radius:8px;
     background:linear-gradient(135deg,#8A4407,#C4620C 55%,#9A4C08)}
@@ -2467,12 +2497,16 @@
     background:linear-gradient(135deg,#6B3204 0%,#A24F0A 58%,#7D3D06 100%);
     border-color:rgba(255,170,80,.55);
     box-shadow:0 0 0 1px rgba(255,138,0,.14),0 4px 14px rgba(110,55,5,.22)}
-  .p2p-ord.p2p-barattozon .p2p-marca{background:none;padding:0}
-  /* LA TESSERA E' LA SCATOLA: navy pieno, non il chip di casa. Il filo
-     chiaro e' un'ombra INTERNA e non un bordo, o la scatola crescerebbe
-     di due pixel e la misura qui sopra sarebbe un'altra. */
-  .p2p-ord.p2p-barattozon .p2p-paga{background:#131A26;
-    box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+  /* L'ALONE: il fondo del marchio, e il raggio va a zero perche' la
+     forma adesso la fa il gradiente e non piu' un ritaglio. */
+  .p2p-ord.p2p-barattozon .p2p-marca{border-radius:0;padding:14px 32px;
+    background:radial-gradient(ellipse closest-side at 50% 50%,
+      #131A26 0%,#131A26 66%,rgba(19,26,38,.6) 88%,rgba(19,26,38,0) 100%)}
+  /* la scatola non e' piu' una scatola: nessun fondo, nessun filo, e
+     il respiro verticale che l'alone si porta da se'. Resta un BLOCCO
+     col suo taglio — la riga che le impedisce di allargare la pagina. */
+  .p2p-ord.p2p-barattozon .p2p-paga{background:none;box-shadow:none;
+    padding:0;text-align:center}
   /* LA VARIANTE CHIARA, da decidere sullo schermo (16 set 2026): stessa
      famiglia, gradiente crema/ambra coi token di casa — e la scatola
      navy sotto il marchio, uguale alla sorella: e' il fondo che il
