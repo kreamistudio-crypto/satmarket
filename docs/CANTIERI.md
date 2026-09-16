@@ -16786,3 +16786,158 @@ specificità da sola non basta mai, conta dove scrivi la riga.**
 37 contro 38, marchio 83x26 dentro una tessera 95x30. Velo:
 `rgba(20,20,22,.62)` piatto, `backdrop-filter: none`, anello 24px con 2
 di filo.
+
+
+## Il tour di benvenuto del P2P (17 set 2026)
+
+Chi apre il P2P per la prima volta si trova una lista di offerte e
+nessuna riga che gli dica cos'è. Il libro non può spiegarlo: un
+cartello sulla garanzia, uno sui recapiti cifrati e uno sul tabaccaio
+sarebbero tre muri di testo sopra le offerte, per sempre, anche a chi
+li ha già letti. Da qui il tour: **sei card quadrate, una scorsa, e poi
+il libro** — si vede una volta e se ne va.
+
+**LE SEI CARD, nell'ordine:** lo scambio (₿ ⇄ €), la garanzia (il
+barattolo col lucchetto), i metodi di pagamento, i recapiti cifrati, la
+reputazione unica, e il Barattozon col marchio sulla figura. I testi
+sono di Andrea, parola per parola.
+
+**È IL GEMELLO DEL TOUR DI VETRINA, NON LA STESSA MACCHINA**, e la
+differenza è il mestiere. Quello illumina pezzi di pagina viva —
+riflettore, fumetto, bersagli che possono mancare — e dice «questa cosa
+che vedi fa questo». Questo racconta una sezione a chi non l'ha mai
+aperta, dove non c'è ancora niente da illuminare. Forzarle nella stessa
+funzione avrebbe voluto dire due rami per ogni riga: `#tourP2P` è suo,
+e con `#tour` non condivide nulla se non il velo.
+
+**IL NASTRO È UNO SCORRIMENTO VERO** (`scroll-snap`), la stessa tecnica
+della galleria del dettaglio: il dito la conosce, il compositor la
+porta da solo, e l'indice si **legge** dallo scorrimento
+(`scrollLeft / clientWidth`) invece di tenerlo a mano. Un
+IntersectionObserver sarebbe stato una seconda verità accanto a quella
+dello scroll — e per giunta non si sarebbe potuto provare, che nel
+Browser pane il documento è `hidden` e gli osservatori non emettono.
+**Il bottone «Avanti» è un'aggiunta al disegno chiesto** (che diceva
+puntini, «Salta» e «Inizia» sull'ultima): senza, il tour si comanderebbe
+col solo dito, e chi tocca invece di scorrere resterebbe fermo. Sull'ultima
+diventa «Inizia» e «Salta» sparisce — due bottoni per un gesto solo sono
+una domanda inutile.
+
+**IL VELO SI RISPETTA: il tour si apre DOPO che il libro è arrivato.**
+L'innesco sta in `renderP2P` dopo `chiudiAttesaP2P()`, nel ramo «il
+libro c'è» — non in `vaiP2P`, e per due ragioni diverse. La prima è
+l'anello: sopra il velo del caricamento il tour sarebbe un cartello
+davanti a una pagina che non c'è ancora, e chiudendolo si troverebbe
+l'attesa. La seconda è **la lezione di `renderInteresse`**, già scritta
+due volte lì accanto: `vaiP2P` è il solo ingresso dal tab, mentre alla
+vista ci si torna col gesto indietro e dalla cronologia, che da lì non
+passano mai. Conseguenza voluta: **se il libro non risponde, il tour
+non si apre e il timbro non si consuma** — al giro buono si vedrà.
+
+**IL TIMBRO PORTA IL CONTO**, ed è la lezione de «Il conto sul
+dispositivo» applicata prima che costi: `barattolo_tour_p2p@<tg_id>`,
+via `chiaveP2P`, come le chiavi dello scambio e il wallet NWC. Su un
+telefono con due account Telegram il secondo conto è un utente nuovo e
+il tour deve vederlo — verificato dal vivo: Compratore (111) e Admin
+(999) hanno due timbri separati. Il nome nudo di chi non ha ancora
+un'identità se lo assorbe `allineaContoP2P`, perché la chiave sta in
+`P2P_CHIAVI_DISPOSITIVO`. ⚠️ **Quella lista ha così un ospite che non è
+una chiave di scambio**, ed è dichiarato: la sua prova non chiede più
+«uguali alle quattro costanti» ma «le quattro più l'ospite, nessun
+altro», quindi una chiave nuova dimenticata resta rossa come prima.
+
+**SI CONSUMA APPENA PARTE**, il patto del tour di vetrina: anche chi
+tocca «Salta» al primo sguardo non lo rivede. ⚠️ **E se `localStorage`
+non risponde vale «già visto»**, che è il verso scomodo e quello
+giusto: col verso opposto una memoria muta (finestra privata, dispensa
+piena) farebbe ricomparire il tour a **ogni** ingresso, cioè il
+tormentone garantito proprio a chi non può spegnerlo.
+
+**RIVEDERLO È UN GESTO, IN FONDO AL LIBRO.** «Come funziona», discreta,
+centrata, con l'aria di una nota a piè di pagina. In fondo e non in
+testa (scelta di Andrea fra il filtro e il fondo): è una voce da
+leggere, non un comando da usare, e in testa avrebbe rubato una riga
+alle offerte per sempre — il prezzo che la pillola «Ordina» paga perché
+serve a ogni giro e questa no. C'è anche col libro vuoto: è proprio lì
+che uno si chiede cosa sia questo posto. **E «Trattami da nuovo» lo
+riarma**: il timbro non sta in `barattolo_hint`, quindi la riga che
+azzera quello non lo sfiorava — senza, il gesto avrebbe riarmato tutto
+tranne la prima cosa che un utente nuovo vede entrando nel P2P.
+
+**LE IMMAGINI: la tecnica delle categorie, con una differenza che il
+fondo impone.** Lì i disegni sono scontornati su trasparenza e il
+ritaglio si fa sull'alpha; qui nascono su un navy opaco con un alone
+caldo, e il disegno si trova per **distanza** dal fondo. ⚠️ **Le soglie
+sono DUE, ed è la cosa che il primo giro ha sbagliato**: con una sola
+soglia bassa (che tiene l'alone) il pareggio misurava l'**alone** invece
+del disegno — «metodi» e «reputazione» hanno un alone largo fino ai
+bordi, quindi entravano nella scatola sicura col loro alone e il
+disegno vero usciva piccolo. Adesso la soglia ALTA (40) dice quanto è
+grande il soggetto e da lì esce la scala, quella BASSA (4) dice cosa
+portarsi dietro. Quel che sborda è alone, e sbordare è giusto: sulla
+card sfuma oltre il bordo come nell'originale.
+**Il pareggio qui serve più che altrove**: la striscia del tabaccaio è
+2,4:1 e il barattolo 0,8:1, e a tela piena uno sembrerebbe il triplo
+dell'altro. Da 2048×2048 JPEG a **768×576 WebP qualità 85: 110 KB
+tutt'e sei** (512px sarebbero stati 64 KB, ma su un telefono a 3× la
+card è ~1000 px di schermo e 512 si vedono morbidi; 39 KB non valgono
+quella resa). **Non sono incorporate in `miniapp.html`**, ed è
+deliberato: lì peserebbero il 33% in più in base64 su una pagina che
+si scarica a **ogni** apertura, per un tour che si guarda una volta.
+Come file si scaricano solo quando il tour si apre. Cartella sua e mai
+`assets/categorie/`, per la ragione di `assets/scoprire/`: il glob del
+pareggio le inquinerebbe la mediana. Rotta esplicita con whitelist a
+tupla e revalidazione col 304, mai un mount (regola ferrea 3). Gli URL
+nel client sono **letterali** apposta, così `_timbra_asset_pagina` li
+timbra col `?v=` del contenuto — verificato dal vivo.
+
+**IL PREFISSO DELLE CLASSI NON È `p2p-`, E NON È UN GUSTO.** La prima
+stesura le chiamava `tp2p-*`, e `tp2p-marchio` **contiene**
+`p2p-marchio`: una sentinella di casa cerca proprio quella stringa nel
+file intero, per pretendere che il vecchio marchio della vista scambio
+non risorga, e la faceva rossa una classe che con quello non c'entra
+niente. Valeva per tutta la famiglia (`tp2p-card` contiene `p2p-card`,
+`tp2p-testo` contiene `p2p-testo`...), quindi non si è curato il
+singolo nome: si è cambiato il prefisso, a `giro-`. **È l'ennesima
+faccia di «una sentinella che cerca in un contenitore troppo grande»**,
+e la cura che costa meno non è allargare la prova altrui — è non
+passarle davanti.
+
+**I DUE DIFETTI CHE SOLO IL GIRO DAL VIVO HA PRESO**, ed è la ragione
+per cui il giro si fa:
+1) **I pallini si spegnevano tutti alla prima scorsa.** `addEventListener('scroll', aggiornaTourP2P)` chiama con
+   l'**evento**, che non è `undefined`: finiva dritto nel parametro `i`,
+   e nessun `j === i` era più vero. Sull'ultima card il bottone avrebbe
+   detto ancora «Avanti». La cura non è allargare la guardia — un
+   `typeof i` che accetta di tutto nasconderebbe il prossimo chiamante
+   distratto — è una funzione **nominata** che l'argomento lo taglia, e
+   serve comunque a `removeEventListener`.
+2) **Il marchio Barattozon riempiva la figura intera.** `.giro-fig img`
+   vale (0,1,1) e `.giro-marchio` (0,1,0): il `width:100%;height:100%`
+   della figura vinceva **qualunque** fosse l'ordine nel foglio. Non
+   c'era niente da spostare, andava alzata la specificità. È il gemello
+   dell'inciampo del marchio nella voce del foglio, due giorni prima,
+   visto dall'altro lato: **lì contava dove scrivi la riga, qui non
+   bastava scriverla nel posto giusto.**
+
+**COSA È STATO PROVATO.** 38 sentinelle nuove, e **torturate**: dieci
+mutazioni una alla volta su una copia (l'innesco tolto, il marchio
+senza specificità, l'ascoltatore che ripassa l'evento, il ripiego
+rovesciato, il timbro senza conto, «Trattami da nuovo» che non riarma,
+lo strato fuori da `navPila`, il tour aperto anche su «I miei scambi»,
+un nome della whitelist che diverge, la porta rinominata) — **dieci su
+dieci uccise**. Suite intera: 10567 verdi, zero rosse, `PROVE_SEVERE=1`.
+Dal vivo, col libro vero del coordinator (9 offerte): apertura dopo il
+velo, le sei card, scorsa e pallini, «Salta» e «Inizia», le due
+identità con due timbri, il non-ritorno al secondo ingresso, «Come
+funziona», Escape che chiude passando dal motore di navigazione, tema
+scuro e schermo da 320 (la card sta in 288×412 su 640, e la card più
+lunga non sborda).
+
+**COSA RESTA DA GUARDARE.** Il tour non si è mai visto su un telefono
+VERO dentro Telegram: `scroll-snap` col dito è la cosa che il Browser
+pane imita peggio, e lì il pane emula anche `prefers-reduced-motion`,
+quindi la scorsa morbida di `vaiTappaTourP2P` non l'ha mai eseguita
+nessuno — ha sempre preso il ramo netto. E `scrollWidth` torna 2060
+dove sei card da 341 fanno 2046: quattordici pixel di sbordo oltre
+l'ultima card, che lo snap mandatorio riassorbe. Misurato, non curato.

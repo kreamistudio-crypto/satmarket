@@ -24759,6 +24759,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    `/assets/barattozon.webp` (il marchio del metodo «Contanti al
    tabacchino», 16 set 2026: WebP con trasparenza, 305x96, cartella
    sua e mai assets/categorie/ — vedi «IL VESTITO BARATTOZON»),
+   `/assets/tour-p2p/{nome}` (le sei illustrazioni del tour di
+   benvenuto del P2P, 17 set 2026: whitelist a tupla
+   `FILE_TOUR_P2P`, 768x576 WebP, 110 KB tutt'e sei — cartella sua
+   e mai assets/categorie/, per la ragione di assets/scoprire/;
+   vedi CANTIERI, «Il tour di benvenuto del P2P»),
    `/assets/tappo.jpeg`, le rotte PWA (`/manifest.json`, `/sw.js`,
    `/offline.html`, `/assets/icona-192.png`, `/assets/icona-512.png`,
    `/assets/icona-192-maskable.png`, `/assets/icona-512-maskable.png`,
