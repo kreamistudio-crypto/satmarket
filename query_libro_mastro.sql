@@ -481,10 +481,14 @@ SELECT '23) IL CONTO DI CASSA — UN POLSO, NON UN ALLARME (set 2026)' AS polso;
 -- cui non conoscevamo nemmeno l'ordine. Questo e' quel numero.
 --
 -- COME SI USA, in due gesti:
---   1. qui si legge `saldo_atteso_sats`;
---   2. si chiede a LNbits il saldo vero
+--   1. qui si legge `saldo_atteso_sats`, UNA RIGA PER CASSAFORTE;
+--   2. si chiede a OGNI LNbits il suo saldo vero
 --      (GET /api/v1/wallet -> `balance`, in MILLIsatoshi: si divide per 1000)
--- e si confrontano.
+-- e si confrontano riga per riga. Dal doppio wallet (set 2026) il conto
+-- e'' per cassaforte perche'' un numero solo non combacerebbe con NESSUN
+-- wallet: ogni tabella porta la colonna `cassaforte`, e i rimborsi
+-- d''asta con la colonna vuota la ereditano dalla puntata, come fa
+-- `_cassaforte_riga` nel server.
 --
 -- ⚠️ IL WALLET NON E'' NATO VUOTO, ed e'' la voce senza la quale questo
 -- controllo dava un FALSO POSITIVO GARANTITO (trovata da Andrea il 14
@@ -492,10 +496,18 @@ SELECT '23) IL CONTO DI CASSA — UN POLSO, NON UN ALLARME (set 2026)' AS polso;
 -- gia'' li'' prima del primo ordine, e senza contarli lo scarto si
 -- legge come «sats dati per pagati e ancora in cassa» — cioe''
 -- esattamente l''allarme che deve restare raro. Il capitale si
--- DICHIARA, in `impostazioni`, con la chiave `capitale_nostro_sats`:
+-- DICHIARA, in `impostazioni`, UNA CHIAVE PER CASSAFORTE —
+-- `capitale_saas_sats` e `capitale_nodo_sats` — e i numeri li da''
+-- `capitale_cassa.py`, che legge i due registri:
 --
 --   INSERT OR REPLACE INTO impostazioni(chiave, valore)
---        VALUES('capitale_nostro_sats', '123456');
+--        VALUES('capitale_saas_sats', '123456');
+--   INSERT OR REPLACE INTO impostazioni(chiave, valore)
+--        VALUES('capitale_nodo_sats', '0');
+--
+-- (`capitale_nostro_sats`, la chiave di prima del doppio wallet, vale
+-- ancora come RIPIEGO per il solo SaaS: era l''unico wallet che c''era,
+-- e un numero gia'' dichiarato non si perde per un nome nuovo.)
 --
 -- E'' il NETTO di quel che ci abbiamo messo NOI — il capitale iniziale
 -- piu'' i versamenti successivi, meno i prelievi per noi — e si aggiorna
@@ -559,76 +571,106 @@ SELECT '23) IL CONTO DI CASSA — UN POLSO, NON UN ALLARME (set 2026)' AS polso;
 --   c) LE FATTURE IN ENTRATA CREATE E NON PAGATE non c'entrano: non e''
 --      mai arrivato niente. Gli stati 'creato' e 'annullato' sono fuori.
 WITH
-  -- IL CAPITALE NOSTRO, dichiarato. Il CAST che torna su se stesso non
-  -- e'' pignoleria: `CAST('' AS INTEGER)` fa ZERO, quindi una riga
-  -- scritta male — vuota, con uno spazio, con «123 sats» dentro —
-  -- passerebbe per un capitale nullo e il controllo tornerebbe a
-  -- mentire in silenzio. Se il valore non e'' un intero pulito, qui
-  -- resta NULL e il saldo atteso resta vuoto.
+  casseforti(nome) AS (SELECT 'saas' UNION ALL SELECT 'nodo'),
+  -- IL CAPITALE NOSTRO, dichiarato, uno per cassaforte. Il CAST che
+  -- torna su se stesso non e'' pignoleria: `CAST('' AS INTEGER)` fa
+  -- ZERO, quindi una riga scritta male — vuota, con uno spazio, con
+  -- «123 sats» dentro — passerebbe per un capitale nullo e il conto
+  -- tornerebbe a mentire in silenzio. Se il valore non e'' un intero
+  -- pulito, qui resta NULL e il saldo atteso resta vuoto.
+  dichiarato AS (
+    SELECT 'saas' AS cf, COALESCE(
+        (SELECT valore FROM impostazioni WHERE chiave = 'capitale_saas_sats'),
+        (SELECT valore FROM impostazioni WHERE chiave = 'capitale_nostro_sats'))
+        AS valore
+    UNION ALL
+    SELECT 'nodo', (SELECT valore FROM impostazioni
+                     WHERE chiave = 'capitale_nodo_sats')),
   capitale AS (
-    SELECT CASE WHEN CAST(CAST(TRIM(valore) AS INTEGER) AS TEXT)
-                     = TRIM(valore)
-                THEN CAST(TRIM(valore) AS INTEGER) END AS sats
-      FROM impostazioni WHERE chiave = 'capitale_nostro_sats'),
+    SELECT cf, CASE WHEN CAST(CAST(TRIM(valore) AS INTEGER) AS TEXT)
+                         = TRIM(valore)
+                    THEN CAST(TRIM(valore) AS INTEGER) END AS sats
+      FROM dichiarato),
   -- ENTRATE: gli escrow degli ordini NON nati da un'asta
   dentro_ordini AS (
-    SELECT COALESCE(SUM(o.prezzo_sats), 0) AS sats
+    SELECT o.cassaforte AS cf, SUM(o.prezzo_sats) AS sats
       FROM ordini o LEFT JOIN annunci a ON a.id = o.annuncio_id
      WHERE o.stato NOT IN ('creato', 'annullato')
-       AND COALESCE(a.asta_base_sats, 0) = 0),
+       AND COALESCE(a.asta_base_sats, 0) = 0
+     GROUP BY o.cassaforte),
   -- ENTRATE: i versamenti d'asta saldati (anche i tardivi: quei sats
   -- sono in cassa, e ne escono come rimborso)
   dentro_aste AS (
-    SELECT COALESCE(SUM(delta_sats), 0) AS sats
-      FROM rilanci WHERE stato IN ('saldato', 'tardivo')),
+    SELECT cassaforte AS cf, SUM(delta_sats) AS sats
+      FROM rilanci WHERE stato IN ('saldato', 'tardivo')
+     GROUP BY cassaforte),
   -- ENTRATE: i nostri incassi (lo sblocco del banner)
   dentro_nostri AS (
-    SELECT COALESCE(SUM(importo_sats), 0) AS sats
-      FROM pagamenti WHERE stato IN ('pagato', 'rimborsato')),
+    SELECT cassaforte AS cf, SUM(importo_sats) AS sats
+      FROM pagamenti WHERE stato IN ('pagato', 'rimborsato')
+     GROUP BY cassaforte),
   -- USCITE: il netto ai venditori sugli ordini chiusi
   fuori_venditori AS (
-    SELECT COALESCE(SUM(prezzo_sats - protezione_sats), 0) AS sats
-      FROM ordini WHERE stato = 'released'),
+    SELECT cassaforte AS cf, SUM(prezzo_sats - protezione_sats) AS sats
+      FROM ordini WHERE stato = 'released' GROUP BY cassaforte),
   -- USCITE: i rimborsi integrali ai compratori
   fuori_compratori AS (
-    SELECT COALESCE(SUM(prezzo_sats), 0) AS sats
-      FROM ordini WHERE stato = 'refunded'),
-  -- USCITE: i rimborsi d'asta riscossi
+    SELECT cassaforte AS cf, SUM(prezzo_sats) AS sats
+      FROM ordini WHERE stato = 'refunded' GROUP BY cassaforte),
+  -- USCITE: i rimborsi d'asta riscossi (la cassaforte vuota si
+  -- eredita dalla puntata, e nel dubbio e'' il SaaS: la colonna e''
+  -- nata col doppio wallet, e quel che c''era prima stava tutto la'')
   fuori_aste AS (
-    SELECT COALESCE(SUM(importo_sats), 0) AS sats
-      FROM rimborsi_asta WHERE stato = 'riscosso'),
+    SELECT COALESCE(NULLIF(r.cassaforte, ''),
+                    (SELECT cassaforte FROM rilanci
+                      WHERE puntata_id = r.puntata_id
+                        AND stato IN ('saldato', 'tardivo')
+                      ORDER BY id LIMIT 1),
+                    'saas') AS cf,
+           SUM(r.importo_sats) AS sats
+      FROM rimborsi_asta r WHERE r.stato = 'riscosso' GROUP BY 1),
   -- USCITE: gli sblocchi restituiti da un moderatore
   fuori_nostri AS (
-    SELECT COALESCE(SUM(importo_sats), 0) AS sats
-      FROM pagamenti WHERE stato = 'rimborsato')
+    SELECT cassaforte AS cf, SUM(importo_sats) AS sats
+      FROM pagamenti WHERE stato = 'rimborsato' GROUP BY cassaforte),
+  conto AS (
+    SELECT c.nome AS cassaforte,
+      (SELECT sats FROM capitale WHERE cf = c.nome)         AS capitale_nostro,
+      COALESCE((SELECT sats FROM dentro_ordini    WHERE cf = c.nome), 0)
+                                                            AS in_escrow_ordini,
+      COALESCE((SELECT sats FROM dentro_aste      WHERE cf = c.nome), 0)
+                                                            AS in_versamenti_asta,
+      COALESCE((SELECT sats FROM dentro_nostri    WHERE cf = c.nome), 0)
+                                                            AS in_incassi_nostri,
+      COALESCE((SELECT sats FROM fuori_venditori  WHERE cf = c.nome), 0)
+                                                            AS out_ai_venditori,
+      COALESCE((SELECT sats FROM fuori_compratori WHERE cf = c.nome), 0)
+                                                            AS out_ai_compratori,
+      COALESCE((SELECT sats FROM fuori_aste       WHERE cf = c.nome), 0)
+                                                            AS out_rimborsi_asta,
+      COALESCE((SELECT sats FROM fuori_nostri     WHERE cf = c.nome), 0)
+                                                            AS out_sblocchi_resi
+      FROM casseforti c)
 SELECT
-  CASE WHEN (SELECT sats FROM capitale) IS NULL
+  cassaforte,
+  CASE WHEN capitale_nostro IS NULL
        THEN 'NO — dichiaralo, o il confronto non si puo'' fare'
        ELSE 'si' END                  AS capitale_dichiarato,
-  (SELECT sats FROM capitale)         AS capitale_nostro,
-  (SELECT sats FROM dentro_ordini)    AS in_escrow_ordini,
-  (SELECT sats FROM dentro_aste)      AS in_versamenti_asta,
-  (SELECT sats FROM dentro_nostri)    AS in_incassi_nostri,
-  (SELECT sats FROM fuori_venditori)  AS out_ai_venditori,
-  (SELECT sats FROM fuori_compratori) AS out_ai_compratori,
-  (SELECT sats FROM fuori_aste)       AS out_rimborsi_asta,
-  (SELECT sats FROM fuori_nostri)     AS out_sblocchi_resi,
+  capitale_nostro, in_escrow_ordini, in_versamenti_asta, in_incassi_nostri,
+  out_ai_venditori, out_ai_compratori, out_rimborsi_asta, out_sblocchi_resi,
   -- il movimento del solo mercatino, che vale anche senza il capitale:
   -- se questo numero e'' negativo sono usciti piu'' sats di quanti ne
   -- siano entrati dagli utenti, e li'' non serve nessun confronto
-  (SELECT sats FROM dentro_ordini) + (SELECT sats FROM dentro_aste)
-    + (SELECT sats FROM dentro_nostri)
-    - (SELECT sats FROM fuori_venditori) - (SELECT sats FROM fuori_compratori)
-    - (SELECT sats FROM fuori_aste) - (SELECT sats FROM fuori_nostri)
-                                      AS movimento_mercatino,
+  in_escrow_ordini + in_versamenti_asta + in_incassi_nostri
+    - out_ai_venditori - out_ai_compratori - out_rimborsi_asta
+    - out_sblocchi_resi                 AS movimento_mercatino,
   -- e l''atteso vero, che senza il capitale resta VUOTO invece che
   -- sbagliato (NULL si propaga da solo in tutta la somma)
-  (SELECT sats FROM capitale)
-    + (SELECT sats FROM dentro_ordini) + (SELECT sats FROM dentro_aste)
-    + (SELECT sats FROM dentro_nostri)
-    - (SELECT sats FROM fuori_venditori) - (SELECT sats FROM fuori_compratori)
-    - (SELECT sats FROM fuori_aste) - (SELECT sats FROM fuori_nostri)
-                                      AS saldo_atteso_sats;
+  capitale_nostro
+    + in_escrow_ordini + in_versamenti_asta + in_incassi_nostri
+    - out_ai_venditori - out_ai_compratori - out_rimborsi_asta
+    - out_sblocchi_resi                 AS saldo_atteso_sats
+  FROM conto;
 
 SELECT '23b) DI CHE COSA E'' FATTO L''ATTESO (le voci che restano a noi)' AS polso;
 -- Le due leve che NON escono mai dalla cassaforte: servono a capire

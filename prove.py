@@ -2818,6 +2818,122 @@ def prove_orfani():
     con.close()
 
 
+# ====================================================================
+def prove_capitale_cassa():
+    """IL CAPITALE NOSTRO SULLE DUE CASSEFORTI (set 2026): lo strumento
+    che legge i due registri e il polso 23 del libro mastro, che da
+    allora e' PER CASSAFORTE. Le sentinelle sulla forma — il database
+    non si apre, la chiave che paga non si legge, il risolutore e' quello
+    di orfani.py — il cuore su un registro di cartone, e il polso 23
+    eseguito DAVVERO su un database gemello: una query sbagliata in un
+    file .sql non fallisce, TACE."""
+    print("\n[il capitale nostro, per cassaforte, e il polso 23]")
+    import sqlite3 as sq
+    import capitale_cassa as cc
+
+    src = open("capitale_cassa.py", encoding="utf-8").read()
+    # («import sqlite3» e non «sqlite3»: la parola sta anche nel comando
+    # che lo script STAMPA per chi dichiara — vedi prove-che-rispondono)
+    prova("capitale_cassa non apre il database", False,
+          "import sqlite3" in src)
+    prova("...e non legge mai la chiave che paga", False, "ADMIN_KEY" in src)
+    prova("...e non paga: nessuna richiesta in uscita", False,
+          '"out": True' in src)
+    prova("le casseforti vengono da orfani.py, un posto solo", True,
+          "from orfani import" in src and "def casseforti_leggibili" not in src)
+    prova("una chiave di impostazioni per cassaforte",
+          {"saas": "capitale_saas_sats", "nodo": "capitale_nodo_sats"},
+          cc.CHIAVE)
+
+    def mov(sats, memo, **stato):
+        return {"amount": sats * 1000, "memo": memo, "time": 1700000000,
+                **(stato or {"status": "success"})}
+    c = cc.conta([mov(5000, "capitale di Andrea"),
+                  mov(300, "Barattolo escrow #7: cosa"),
+                  mov(900, "fattura mai pagata", status="pending"),
+                  mov(-1200, "payout"),
+                  mov(70, "")])
+    prova("capitale = entrate riuscite senza memo nostro", [70, 5000],
+          [s for _, s, _ in c["capitale"]])   # stessa ora: ordina per sats
+    prova("...sommate", 5070, c["totale"])
+    prova("il memo nostro e' mercatino, non capitale", 300, c["mercatino"])
+    prova("la fattura mai pagata non conta", False,
+          any(m == "fattura mai pagata" for _, _, m in c["capitale"]))
+    prova("le uscite si elencano tutte", [-1200],
+          [s for _, s, _ in c["uscite"]])
+
+    # --- il polso 23, eseguito su un database gemello ----------------
+    sql = open("query_libro_mastro.sql", encoding="utf-8").read()
+    blocco = sql[sql.index("SELECT '23)"):sql.index("SELECT '23b)")]
+    for vietato in ("INSERT INTO", "UPDATE ", "DELETE ", "DROP ", "CREATE "):
+        prova(f"polso 23: nessun {vietato.strip()} fuori dai commenti", False,
+              vietato in "\n".join(r for r in blocco.splitlines()
+                                   if not r.lstrip().startswith("--")))
+    q = blocco[blocco.index("WITH"):blocco.index("FROM conto;") + len("FROM conto;")]
+
+    def gemello():
+        con = sq.connect(":memory:")
+        con.row_factory = sq.Row
+        con.executescript("""
+          CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
+            prezzo_sats INT, protezione_sats INT DEFAULT 0, stato TEXT,
+            cassaforte TEXT DEFAULT 'saas');
+          CREATE TABLE annunci(id INTEGER PRIMARY KEY,
+            asta_base_sats INT DEFAULT 0);
+          CREATE TABLE rilanci(id INTEGER PRIMARY KEY, puntata_id INT,
+            delta_sats INT, stato TEXT, cassaforte TEXT DEFAULT 'saas');
+          CREATE TABLE pagamenti(id INTEGER PRIMARY KEY, importo_sats INT,
+            stato TEXT, cassaforte TEXT DEFAULT 'saas');
+          CREATE TABLE rimborsi_asta(id INTEGER PRIMARY KEY, puntata_id INT,
+            importo_sats INT, stato TEXT, cassaforte TEXT DEFAULT '');
+          CREATE TABLE impostazioni(chiave TEXT PRIMARY KEY, valore TEXT);
+          INSERT INTO annunci VALUES (1, 0), (2, 5000);
+          -- saas: un released (1000, protezione 100), un rilancio saldato
+          -- 200, un rimborso d'asta riscosso 50 con la colonna VUOTA che
+          -- eredita dalla puntata; nodo: un locked 500, un banner 30
+          INSERT INTO ordini VALUES (1, 1, 1000, 100, 'released', 'saas');
+          INSERT INTO ordini VALUES (2, 1, 500, 0, 'locked', 'nodo');
+          INSERT INTO ordini VALUES (3, 2, 9999, 0, 'locked', 'saas');
+          INSERT INTO ordini VALUES (4, 1, 777, 0, 'creato', 'nodo');
+          INSERT INTO rilanci VALUES (1, 11, 200, 'saldato', 'saas');
+          INSERT INTO rimborsi_asta VALUES (1, 11, 50, 'riscosso', '');
+          INSERT INTO pagamenti VALUES (1, 30, 'pagato', 'nodo');
+        """)
+        return con
+
+    con = gemello()
+    righe = [dict(r) for r in con.execute(q)]
+    prova("una riga per cassaforte, saas prima", ["saas", "nodo"],
+          [r["cassaforte"] for r in righe])
+    s, n = righe
+    prova("saas: l'ordine nato da un'asta non conta fra le entrate", 1000,
+          s["in_escrow_ordini"])
+    prova("saas: movimento = 1000 + 200 - 900 - 50", 250,
+          s["movimento_mercatino"])
+    prova("nodo: movimento = 500 + 30, il 'creato' fuori", 530,
+          n["movimento_mercatino"])
+    prova("senza capitale l'atteso e' VUOTO, non sbagliato", [None, None],
+          [s["saldo_atteso_sats"], n["saldo_atteso_sats"]])
+    prova("...e lo dice", True,
+          s["capitale_dichiarato"].startswith("NO"))
+    con.execute("INSERT INTO impostazioni VALUES ('capitale_nostro_sats', '100')")
+    con.execute("INSERT INTO impostazioni VALUES ('capitale_nodo_sats', ' 7 ')")
+    s, n = [dict(r) for r in con.execute(q)]
+    prova("la chiave di ieri vale come ripiego del SaaS", 350,
+          s["saldo_atteso_sats"])
+    prova("il nodo legge la sua, ripulita dagli spazi", 537,
+          n["saldo_atteso_sats"])
+    con.execute("INSERT INTO impostazioni VALUES ('capitale_saas_sats', '150')")
+    con.execute("UPDATE impostazioni SET valore='7 sats' "
+                "WHERE chiave='capitale_nodo_sats'")
+    s, n = [dict(r) for r in con.execute(q)]
+    prova("la chiave nuova del SaaS vince sul ripiego", 400,
+          s["saldo_atteso_sats"])
+    prova("un valore sporco non fa zero: fa VUOTO", None,
+          n["saldo_atteso_sats"])
+    con.close()
+
+
 def prove_doppio_wallet():
     """IL DOPPIO WALLET (set 2026): ogni riga di denaro porta la sua
     cassaforte, i tubi che leggono o pagano la pretendono, chi conia
@@ -59981,7 +60097,7 @@ def main():
               prove_foto_spenta, prove_foto_telegram_fallita,
               prove_nome_da_nostr,
               prove_pagamento_incerto, prove_esito_pagamento,
-              prove_doppio_wallet, prove_saas_senza_doveri, prove_orfani,
+              prove_doppio_wallet, prove_saas_senza_doveri, prove_orfani, prove_capitale_cassa,
               prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,
               prove_busta_ritiro, prove_contenuto_digitale_forma,

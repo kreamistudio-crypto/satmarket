@@ -53,9 +53,10 @@ from typing import NamedTuple
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-# I memo che scriviamo NOI sulle fatture in entrata (gli stessi di
-# capitale_cassa.py: se ne nasce un quinto va aggiunto in tutt'e due,
-# o qui un incasso nostro finirebbe fra i «non nostri» in silenzio).
+# I memo che scriviamo NOI sulle fatture in entrata. Vivono QUI e in
+# nessun altro posto: capitale_cassa.py li importa da qui. Se ne nasce
+# un quinto va aggiunto, o un incasso nostro finirebbe fra i «non
+# nostri» di la' e fra il capitale di la' — in silenzio tutt'e due.
 NOSTRI = ("Barattolo escrow #", "Barattolo escrow set:",
           "Barattolo asta #", "Barattolo sblocco banner #")
 
