@@ -2447,15 +2447,35 @@
      gradiente, il rettangolo pieno che l'aveva sostituito era una
      toppa larga tutta la riga, e quel che ci vuole e' un marchio
      APPOGGIATO sulla card, con i bordi che ci si sciolgono dentro.
-     COM'E' FATTO: una tessera PIENA E NETTA, corta quanto il marchio
-     piu' un respiro (159x52), con gli angoli delle sorelle (10px) e
-     il marchio dentro. Niente bagliori, niente dissolvenze: ci sono
-     passate tutt'e due — l'alone ellittico e il rettangolo sfumato —
-     e la storia sta in CANTIERI («La scelta rovesciata» e «Il colore
-     che stacca»). Quel che il marchio chiede e' un fondo che lo
-     STACCHI, non uno che lo sciolga: il navy dell'inizio somigliava
-     troppo al bruno della card, e a perderci era proprio la parte
-     arancio del marchio.
+     COM'E' FATTO: IL NAVY E' LA CARD. Non c'e' nessuna tessera —
+     ne' rettangolo, ne' alone, ne' bagliore: ci sono passate tutt'e
+     tre, e la storia sta in CANTIERI («La scelta rovesciata», «Il
+     colore che stacca», «Il navy diventa la card»). Il gradiente
+     della card parte dal navy in CIMA e scende sfumando nell'ambra,
+     e il marchio si appoggia li' sopra, primo di tutti.
+     ⚠️ LE FERMATE DEL GRADIENTE SONO IN PIXEL, NON IN PERCENTO, ed e'
+     la riga da non ammorbidire: la card e' alta quanto il suo
+     contenuto — con o senza badge, con o senza stelline, e in due
+     lingue diverse — quindi una fermata in percento farebbe salire e
+     scendere la fascia navy sotto al marchio a seconda di quel che
+     c'e' SOTTO. In pixel la fascia e' quella e basta, e il marchio ci
+     siede pieno in ogni card.
+     LE MISURE CHE DEVONO STARE IN PARI, e una prova le rilegge dal
+     CSS a ogni giro: il marchio va da 12 a 52 (il respiro della card
+     piu' i suoi 40) e il navy tiene PIENO fino a 56 — sei pixel di
+     margine sotto il marchio, e mai tanti da mangiarsi la riga
+     dell'importo, che comincia a 82. Poi la dissolvenza, e deve
+     finire PRIMA che finisca la card piu' corta che esista: quella di
+     un ordine a prezzo fisso, senza badge, e' alta 146, quindi l'ambra
+     va raggiunta entro ~130 o esisterebbero card che l'ambra non la
+     vedono mai.
+     ⚠️ E LA DISSOLVENZA PASSA DA DUE FERMATE CALDE (16 set 2026,
+     richiesta di Andrea: «piu' sfumato»). Allungarla e basta non
+     bastava: fra il navy e l'ambra la strada dritta passa da un
+     grigio-bruno spento — il fango — perche' i due colori stanno su
+     lati opposti della ruota. Le due fermate di mezzo la portano
+     dentro la famiglia calda, e la card si legge come un colore che
+     scende invece che come due colori che si incontrano.
      ⚠️ IL TAGLIO DELLA SCATOLA RESTA DOV'E', ed e' la riga da non
      ammorbidire: `.p2p-paga` TAGLIA quel che esce, ed e' cosi' che un
      elenco di metodi lungo — testo di SCONOSCIUTI, che col tabacchino
@@ -2463,15 +2483,15 @@
      Netta, la tessera non esce dal suo riquadro e il taglio non ha
      niente da tagliare: e' la ragione per cui questa forma non ha
      bisogno di nessuna taratura che la contenga.
-     ORIZZONTALMENTE e' corta e sta a SINISTRA: 159 in una riga da
-     313, col lato sinistro sulla colonna di tutto il resto della card.
-     Centrata era la scelta dell'alone — che un bordo non ce l'aveva —
-     e con un riquadro vero non regge piu': un riquadro si allinea.
-     IL MARCHIO STA A 40px in tutt'e due le varianti, e la sua tessera
-     ambra vale fuori di qui (pillola del filtro e voce del foglio),
-     dove un fondo scuro non ce l'ha nessuno. La riga e' alta quanto la
-     tessera (52) e la card sta a 158, senza toccare premio e
-     scadenza, che stanno su righe loro. */
+     ORIZZONTALMENTE il marchio parte da 31, cioe' dalla colonna
+     dell'importo, del badge e delle scatole delle card sorelle: senza
+     tessera non c'e' piu' un riquadro da allineare, e ad allinearsi e'
+     l'inchiostro.
+     IL MARCHIO STA A 40px, e la sua tessera ambra vale FUORI di qui
+     (pillola del filtro e voce del foglio), dove un fondo scuro non ce
+     l'ha nessuno. L'ANELLO SCENDE con tutto il resto: a 12 sarebbe
+     finito sul navy, e li' sopra il tempo che resta si legge ma non
+     sta — quella fascia e' del marchio. */
   .p2p-marca{display:inline-flex;align-items:center;vertical-align:middle;
     padding:3px 8px;border-radius:8px;
     background:linear-gradient(135deg,#8A4407,#C4620C 55%,#9A4C08)}
@@ -2481,20 +2501,27 @@
   .p2p-ord.p2p-barattozon{
     --ink:#FFF4E4;--muted:#EED5B4;--ink-soft:#F1DDC2;--line:rgba(255,255,255,.28);
     --chip-bg:rgba(255,255,255,.12);
-    /* la tinta della tessera del marchio: una DECISIONE, non un
-       dettaglio — scelta da Andrea guardando SEDICI rese affiancate
-       sulla card vera (CANTIERI, «Il colore che stacca»), e chi
-       volesse rivederla cambia qui. E' l'espresso della card: la SUA
-       stessa tinta portata molto piu' giu', cioe' tono su tono. */
-    --barattozon-tessera:#2E1602;
+    /* la tinta della TESTA della card, quella su cui siede il
+       marchio: una DECISIONE, non un dettaglio — e' il navy della
+       seconda versione, ripescato da Andrea dopo sedici rese
+       (CANTIERI, «Il colore che stacca» e «Il navy diventa la card»),
+       e chi volesse rivederla cambia qui. */
+    --barattozon-testa:#131A26;
     --trust:#3FCB8A;--danger:#FFA07A;--sats:#FFB25C;--sats-text:#FFC98A;
-    background:linear-gradient(135deg,#6B3204 0%,#A24F0A 58%,#7D3D06 100%);
+    /* IL GRADIENTE DELLA CARD, e le sue fermate in PIXEL: vedi il
+       commento qui sopra, «le tre misure che devono stare in pari». */
+    background:linear-gradient(180deg,var(--barattozon-testa) 0,
+      var(--barattozon-testa) 56px,#3E2A1A 78px,#7A3B08 96px,
+      #A24F0A 118px,#7D3D06 100%);
     border-color:rgba(255,170,80,.55);
     box-shadow:0 0 0 1px rgba(255,138,0,.14),0 4px 14px rgba(110,55,5,.22)}
-  /* LA TESSERA: piena, netta, con gli angoli delle sorelle. La tinta
-     la prende dai token della card, coi suoi fratelli. */
-  .p2p-ord.p2p-barattozon .p2p-marca{border-radius:10px;padding:6px 16px;
-    background:var(--barattozon-tessera)}
+  /* IL MARCHIO E' NUDO: il fondo scuro glielo da' la card. */
+  .p2p-ord.p2p-barattozon .p2p-marca{border-radius:0;padding:0;background:none}
+  /* l'importo comincia a 82 (12 + 40 del marchio + questi 30): sotto
+     la fascia navy, e dentro la dissolvenza, che da li' continua. */
+  .p2p-ord.p2p-barattozon .p2p-testa{margin-top:30px}
+  /* e l'anello scende con lei, o starebbe sulla fascia del marchio */
+  .p2p-ord.p2p-barattozon .p2p-anello{top:84px}
   /* la scatola non e' piu' una scatola: nessun fondo e nessun respiro
      suo — a fare da riquadro e' la tessera. Il taglio resta dov'e': e'
      la riga che le impedisce di allargare la pagina.
@@ -2506,21 +2533,11 @@
      quello che si eredita: qui c'era `center`, e una riga che dice
      «sinistra» e' l'unica cosa che impedisce di rimetterlo per sbaglio. */
   .p2p-ord.p2p-barattozon .p2p-paga{background:none;box-shadow:none;
-    padding:0;text-align:left}
-  /* LA VARIANTE CHIARA, da decidere sullo schermo (16 set 2026): stessa
-     famiglia, gradiente crema/ambra coi token di casa — e la scatola
-     navy sotto il marchio, uguale alla sorella: e' il fondo che il
-     marchio bianco pretende, e cambiarlo con la variante vorrebbe dire
-     due insegne diverse per lo stesso metodo. La accende
-     P2P_BARATTOZON_CHIARA, e SOLO col tema chiaro: di sera una card
-     crema sarebbe un faro, e la scura e' l'unica che non lo e'. */
-  html:not([data-tema="scuro"]) .p2p-ord.p2p-barattozon.chiara{
-    --ink:#23282C;--muted:#8A6A3F;--ink-soft:#5C4A2E;--line:#F0C68A;
-    --chip-bg:rgba(255,255,255,.62);
-    --trust:#1B8B54;--danger:#C2410C;--sats:#F7931A;--sats-text:#B45309;
-    background:linear-gradient(135deg,#FFF6E8 0%,#FFE4BF 60%,#FFD8A6 100%);
-    border-color:rgba(230,130,20,.45);
-    box-shadow:0 0 0 1px rgba(255,138,0,.10),0 4px 14px rgba(200,120,30,.16)}
+    padding:0;margin-top:0;text-align:left}
+  /* ⚠️ LA VARIANTE CHIARA E' MORTA con la direzione definitiva: il
+     marchio si appoggia alla card, e su una card crema perderebbe la
+     sua parola bianca. Il perche' per esteso sta accanto al catalogo,
+     in `P2P_VESTE_METODI`. */
   /* la reputazione e' UNA FRASE (set 2026, il ridisegno): niente piu'
      due pezzi ai bordi — si legge come si dice */
   .p2p-rep{font-size:12px}
@@ -36865,14 +36882,18 @@ function rigaOrdineP2P(o){
      ordine resta indistinguibile: e' il limite dichiarato di questo
      mattone, e lo chiude la marcatura via coordinatore. */
   const mio = ordineMioP2P(o.id);
+  /* col marchio in cima la scatola dei metodi apre la card: vedi
+     `marchioInTestaP2P` e, nel CSS, «il navy e' la card» */
+  const inTesta = marchioInTestaP2P(o.metodi);
   /* l'id viaggia nel dataset e non dentro la stringa dell'onclick:
      e' testo di sconosciuti — il patto del filtro-alfabeto */
   return `<div class="p2p-ord${mio ? ' p2p-mio' : ''}${p2pFacce[o.id] ? ' con-faccia' : ''}${classeVesteP2P(o.metodi)}" data-id="${esc(o.id)}" role="button" tabindex="0"
     onclick="prendiOrdineP2P(this.dataset.id)">
+    ${inTesta ? paga : ''}
     <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${anelloScadenzaP2P(o)}</div>
     ${paghiEuro ? rigaSats : rigaEuro}
     ${badge ? `<div class="p2p-badge-riga">${badge}${affarone}</div>` : ''}
-    ${paga}
+    ${inTesta ? '' : paga}
     ${rep ? '<div class="p2p-box p2p-rep">' + rep + '</div>' : ''}
     ${mio ? '<div class="p2p-box p2p-tuo">È il tuo ordine — tocca per aprirlo</div>' : ''}
   </div>`;
@@ -41846,16 +41867,21 @@ function tabacchinoP2P(metodi){
    posti la vestono da soli. `classe` e' la pelle della card
    (`.p2p-ord.<classe>`), `nome` e' l'alt del marchio, `soloMarchio`
    dice che nella scatola dei metodi il marchio BASTA — vedi
-   `iconaMetodiP2P`. */
+   `iconaMetodiP2P` — e `inTesta` che nella card va IN CIMA, appoggiato
+   alla zona scura del suo gradiente (vedi il CSS, «il navy e' la
+   card»). */
 const P2P_VESTE_METODI = {
   'Contanti al tabacchino': {nome: 'Barattozon', logo: '/assets/barattozon.webp',
-                             classe: 'p2p-barattozon', soloMarchio: true}
+                             classe: 'p2p-barattozon', soloMarchio: true,
+                             inTesta: true}
 };
-/* LA VARIANTE CHIARA della card (16 set 2026): due gradienti, uno
-   scuro ambra/arancio e uno crema, da decidere sullo schermo. Finche'
-   la scelta non e' presa vive qui, in un interruttore: `true` veste la
-   card chiara (solo col tema chiaro, vedi il CSS). */
-const P2P_BARATTOZON_CHIARA = false;
+/* ⚠️ LA VARIANTE CHIARA E' MORTA (16 set 2026, con la direzione
+   definitiva): serviva a scegliere fra una card scura e una crema, e
+   la scelta e' caduta su una card che in cima E' SCURA per mestiere —
+   il marchio ci si appoggia sopra. Su una card crema il marchio, che
+   e' bianco e arancio, perderebbe la parola «aratto»: e' la stessa
+   ragione che aveva bocciato la resa crema fra i sedici colori. Non
+   si riapre senza una seconda versione del file col lettering scuro. */
 function vesteMetodoP2P(m){
   return P2P_VESTE_METODI[m] || null;
 }
@@ -41877,7 +41903,20 @@ function marchioMetodoP2P(m, taglia, conTesto){
 /* la pelle della card: la classe del primo metodo vestito, o niente */
 function classeVesteP2P(metodi){
   const v = (metodi || []).map(vesteMetodoP2P).find(Boolean);
-  return v ? ' ' + v.classe + (P2P_BARATTOZON_CHIARA ? ' chiara' : '') : '';
+  return v ? ' ' + v.classe : '';
+}
+/* IL MARCHIO IN CIMA (16 set 2026): la card vestita mette la scatola
+   dei metodi PRIMA di tutto il resto, perche' il marchio si appoggia
+   alla zona scura del gradiente, che sta in alto. Lo dice il catalogo
+   (`inTesta`) e non la card: il giorno che una voce nuova volesse il
+   marchio dov'e' sempre stato, gli basta non chiederlo.
+   ⚠️ E CAMBIA L'ORDINE DEL MARKUP, non solo quello a vedersi: con un
+   `order` del flex il lettore di schermo direbbe ancora l'importo per
+   primo mentre l'occhio vede il marchio, e le due letture della stessa
+   card divergerebbero. Qui la card e' un solo bottone e si legge
+   tutta: l'ordine vero e' l'unico che c'e'. */
+function marchioInTestaP2P(metodi){
+  return (metodi || []).some(m => (vesteMetodoP2P(m) || {}).inTesta);
 }
 /* L'ICONA DELLA SCATOLA DEI METODI (16 set 2026, ritocco di Andrea).
    Il 💳 intesta dei NOMI: dice «quel che leggi qui sono i modi di
