@@ -16378,3 +16378,56 @@ ternario; il gradiente è verticale, legge il token e ha le fermate in
 pixel; il conto fra le tre misure; l'anello sceso; la scatola
 trasparente e senza margine; il taglio al suo posto; e della variante
 chiara non resta niente, né nel client né nel CSS.
+
+## Solo il capo: la card torna quella delle sorelle (16 set 2026)
+
+**L'ULTIMA SEMPLIFICAZIONE, e la più grande.** Il fondo della card
+torna **quello delle altre** — `var(--card)`, bianco di giorno e bruno
+di sera — e di suo questa card tiene soltanto il **capo navy** sotto al
+marchio, che da lì si scioglie nel colore normale. Via l'ambra, via il
+gradiente caldo, via le fermate intermedie che servivano a scansare il
+fango fra navy e arancio: verso la carta la strada è dritta e pulita.
+
+⚠️ **E CADONO TUTTI I TOKEN RISCRITTI, che è la parte che cambia di più
+sotto il cofano.** Finché il fondo era scuro, la card doveva schiarirsi
+inchiostro, grigio, verde, rosso e arancio — nove token — perché il
+testo di casa, pensato per la carta chiara, lì dentro sarebbe sparito.
+Adesso il fondo È la carta di casa, quindi i token di casa sono già
+quelli giusti, e **riscriverne uno vorrebbe dire scrivere chiaro sul
+bianco**. Questa card è una sorella con un cappello, e una prova
+pretende che resti tale: nessun token di testo nella sua regola, e solo
+quello del capo, che è una tinta sua e non un'eredità.
+
+⚠️ **LA SFUMATURA HA UN SECONDO PADRONE, che con l'ambra non c'era: il
+TESTO.** La riga dell'importo comincia a 82, cioè DENTRO la
+dissolvenza, e di giorno l'inchiostro è scuro — quindi più la sfumatura
+si allunga, più quella riga si trova su un grigio medio e meno si
+legge. Con la carta raggiunta a 104 il ramo è al 54% quando il testo
+comincia e all'80% dove passano le lettere, e il contrasto misurato sta
+sopra il minimo. **Chi volesse allungarla ancora deve misurare quello,
+non guardare la card**: è il numero che decide, e una prova rifà il
+conto (quando l'importo comincia, la carta dev'essere almeno a metà
+strada).
+
+**IL GRADIENTE FINISCE SU `var(--card)`, non su una tinta scritta a
+mano**, ed è la riga che tiene la card in famiglia nei due temi: di
+giorno la carta è bianca, di sera bruna, e il capo ci si scioglie
+dentro tutt'e due le volte senza che nessuno debba ricordarsene. Letto
+dai pixel: di giorno la riga dell'importo cade su `rgb(207,208,210)` e
+il fondo card è `rgb(255,255,255)`; di sera la stessa riga è
+`rgb(39,34,26)` e il fondo `rgb(44,37,23)`, cioè esattamente
+`--card` del tema scuro.
+
+**I NUMERI (375px, ricontrollati a 320).** Card 168 col badge e 146 a
+prezzo fisso, contro i 140 di una normale; capo navy pieno fino a 56,
+carta piena a 104; marchio 127x40 a x=31; anello a 84; scatola 313x40
+trasparente; `scrollWidth` 375 a 375 e 320 a 320. Sopra, a metà e
+appena sotto il marchio i pixel danno `rgb(18,25,37)`–`rgb(19,26,38)`:
+il navy pieno, in tutt'e quattro i casi provati.
+
+**RESTA DA DECIDERE IL BORDO.** La card porta ancora il bordo e il
+bagliore ambra chiesti due giri fa, che ora sono l'ultimo colore caldo
+rimasto. Rese tre possibilità affiancate: l'ambra di adesso, il bordo
+delle sorelle (nessun segno oltre al capo) e un bordo navy in tinta col
+capo. Finché non si decide resta l'ambra, perché è l'unica delle tre
+che qualcuno ha chiesto esplicitamente.
