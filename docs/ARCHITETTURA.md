@@ -23858,6 +23858,23 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   seme. Nel client la sveglia vive fuori dal motore e fuori dal mazzo
   (i due perimetri con un censimento delle `fetch`), accanto al
   canale. Il verbale: CANTIERI, «Contanti al tabacchino».
+  IL VESTITO BARATTOZON (16 set 2026, decisione di Andrea): nella UI il
+  tabacchino si presenta col marchio Barattozon — grande (30px) al
+  posto del testo nella scatola 💳 della card del libro, piccolo (14px)
+  nella pillola del filtro e accanto alla voce nel foglio «Pubblica» —
+  e la card del libro veste un gradiente ambra/arancio scuro. IL TAG
+  `pm` NON CAMBIA: nel 38383 viaggia sempre «Contanti al tabacchino»,
+  e i giudici (`tabacchinoP2P`, le forme di recapito, il filtro)
+  cercano la stringa. Il vestito sta in UN catalogo, `P2P_VESTE_METODI`
+  (nome, logo, classe della card), letto da `marchioMetodoP2P` e
+  `classeVesteP2P`: i tre posti non sanno nulla del tabacchino, e una
+  voce nuova con un marchio suo si aggiunge lì e basta. La card scura
+  RISCRIVE I TOKEN (`--ink`, `--muted`, `--trust`, `--danger`,
+  `--sats-text`, `--chip-bg`, `--line`) invece delle regole delle
+  figlie: badge, anello, stelline e scatole vestono da soli. Esiste una
+  variante chiara (`P2P_BARATTOZON_CHIARA`, solo col tema chiaro), da
+  decidere sullo schermo. Il verbale: CANTIERI, «Il vestito
+  Barattozon».
   IL LIBRO CHE AVVISA (16 set 2026, decisione di Andrea con Alan): le
   notifiche del P2P diventano PRECISE sui passaggi pubblici, senza
   toccare mostro né la cifratura. Il server legge il 38383 dei SOLI
@@ -24651,6 +24668,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    della sezione «Da scoprire», whitelist a tupla `FILE_SCOPRIRE`,
    ago 2026), `/assets/mascotte.jpeg`,
    `/assets/barattolo.jpeg`, `/assets/barattolo-hero.png`,
+   `/assets/p2p-logo-compra.png`, `/assets/p2p-logo-vendi.png`,
+   `/assets/p2p-logo-completo.png` (i tre del logo P2P, set 2026),
+   `/assets/barattozon.webp` (il marchio del metodo «Contanti al
+   tabacchino», 16 set 2026: WebP con trasparenza, 305x96, cartella
+   sua e mai assets/categorie/ — vedi «IL VESTITO BARATTOZON»),
    `/assets/tappo.jpeg`, le rotte PWA (`/manifest.json`, `/sw.js`,
    `/offline.html`, `/assets/icona-192.png`, `/assets/icona-512.png`,
    `/assets/icona-192-maskable.png`, `/assets/icona-512-maskable.png`,

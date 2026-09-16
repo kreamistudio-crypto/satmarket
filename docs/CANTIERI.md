@@ -15747,3 +15747,84 @@ solo la generica — se un giorno si vorrà la frase anche per lui, il
 prezzo è la correlazione scritta qui sopra e va deciso a occhi aperti;
 e l'ordine in-progress fermo dal 9 set sullo specchio (`5eca1bc6`), che
 non è di questo cantiere ma è lì.
+
+## Il vestito Barattozon: il tabacchino col marchio (16 set 2026)
+
+**COSA SI È DECISO.** «Contanti al tabacchino» nella UI diventa
+BARATTOZON: nella card del libro P2P il marchio (il PNG di Andrea,
+non ridisegnato e coi suoi colori) prende il posto del testo nella
+scatola 💳, GRANDE — 30px di altezza, ~95px di larghezza, l'elemento
+che salta all'occhio — e la card veste un gradiente caldo
+ambra/arancio scuro con bordo e bagliore leggeri; nel foglio del
+filtro la pillola del tabacchino porta il marchio piccolo (14px) al
+posto del nome; nel foglio «Pubblica» il marchio piccolo sta ACCANTO a
+«Contanti al tabacchino», che resta leggibile per nome perché lì si
+sceglie. **IL TAG `pm` NON SI TOCCA:** nel 38383 viaggia sempre la
+stringa di ieri, i client altrui leggono quella, e tutti i giudici
+(`tabacchinoP2P`, `P2P_FORME_RECAPITO`, il filtro che confronta
+`data-v` col tag) continuano a cercare la stringa. Cambia il vestito,
+non la parola.
+
+**LA STRADA: UN CATALOGO, NON TRE ECCEZIONI.** `P2P_VESTE_METODI`
+(nome, logo, classe della card) è l'unico posto che sa che il
+tabacchino ha un marchio; `marchioMetodoP2P(m, taglia, conTesto)`
+rende il marchio a chi ce l'ha e `esc(m)` a tutti gli altri, e
+`classeVesteP2P(metodi)` dà la pelle alla card. I tre posti chiamano
+quelle due e non nominano mai «Barattozon» (una prova conta la
+stringa: una sola, nel catalogo). Se il file non arriva, l'`onerror`
+rimette il nome al posto del marchio: mai una scatola vuota.
+
+**IL FILE.** Dal PNG 1280x714 di Andrea: ritaglio sull'alpha (soglia 8,
+la stessa di `ritaglia_categorie.py`), ridotto a 305x96, WebP qualità
+92 con trasparenza — 15,7 KB, la cura delle illustrazioni di Sfoglia.
+In `assets/` e MAI in `assets/categorie/`, perché il glob del pareggio
+lo conterebbe nella mediana dell'inchiostro. Rotta esplicita
+`/assets/barattozon.webp` come le tre del logo P2P (regola 3), e il
+timbro `?v=` lo mette già `_timbra_asset_pagina` anche dentro la
+stringa JS del catalogo (verificato: `?v=1370694b18`).
+
+**LA CARD SCURA RISCRIVE I TOKEN, NON LE REGOLE.** Il marchio è bianco
+su trasparente, quindi dentro la card serve un fondo scuro anche col
+tema chiaro: `.p2p-ord.p2p-barattozon` ridefinisce `--ink`, `--muted`,
+`--ink-soft`, `--line`, `--chip-bg`, `--trust`, `--danger`, `--sats`,
+`--sats-text` coi valori già tarati per il bruno di sera, e la riga
+grande, i sats, il badge del premio, l'anello, le stelline e la scatola
+si vestono da soli — nessuna regola per figlia, e una riga nuova nella
+card domani si veste senza saperlo. Sulla card scura il marchio sta
+nudo; dappertutto altrove (pillola, voce, variante chiara) porta una
+TESSERA ambra (`.p2p-marca`), che è quel che lo rende leggibile su
+un fondo chiaro. La scatola `.p2p-paga` non cambia: cede coi puntini
+come prima, e il marchio è un inline di ~95px che non la rompe — col
+tabacchino esclusivo è solo, per costruzione.
+
+**LA VARIANTE CHIARA, DA DECIDERE SULLO SCHERMO.** Gradiente
+crema/ambra coi token di casa e il marchio con la tessera; si accende
+con `P2P_BARATTOZON_CHIARA = true`, e SOLO col tema chiaro
+(`html:not([data-tema="scuro"])`): di sera una card crema sarebbe un
+faro, e la scura è l'unica che non lo è. Le due si confrontano negli
+scatti del cantiere; finché Andrea non decide vale la scura.
+
+**I NUMERI (375px, tema chiaro).** Card tabacchino 152px di altezza
+contro 140 di una card normale (+12: la scatola 💳 passa da 33 a 46);
+marchio nella card 95x30; nella pillola del filtro e nella voce del
+foglio 56x18 tessera compresa; `scrollWidth` 375, nessun overflow;
+richiesta del marchio 200 con `?v=` e 304 alla seconda.
+
+**COSA È STATO PROVATO** (`prove_p2p_barattozon`, 24 verdi): il file è
+un WebP RGBA 305x96 sotto i 20 KB, fuori da `assets/categorie/`, con
+la rotta esplicita; la stringa del protocollo non cambia; il catalogo
+ha una voce e nessun posto ribatte «Barattozon»; i tre posti leggono
+da `marchioMetodoP2P`/`classeVesteP2P` (la card col `title` del tag, il
+filtro con `data-v` testo, il foglio col marchio accanto al nome); le
+tre funzioni girano in node (testo e `esc` per chi non è vestito,
+scatola+alt+`onerror` per il tabacchino, pelle solo a lui, anche in
+mezzo ad altri metodi); il CSS riscrive i token e non tocca
+`.p2p-ord.p2p-barattozon .p2p-sats`, 30/14px, la variante chiara
+solo col tema chiaro, `.p2p-paga` intatta. Dal vivo: card, filtro e
+foglio nel Browser pane a 375, e i tre scatti via CDP.
+
+**RESTA DA GUARDARE:** la scelta fra scura e chiara; il dettaglio dello
+scambio e la card dei propri scambi mostrano ancora il metodo come
+testo (`p2p-dett-uno`, `💳` in `rigaScambioP2P`) — non era chiesto, e
+si veste con una riga dallo stesso catalogo il giorno che si vuole; la
+tendina chiusa del foglio «Pubblica» scrive i nomi scelti come testo.
