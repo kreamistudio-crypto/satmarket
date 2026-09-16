@@ -16547,3 +16547,73 @@ tre posti che leggono da lì; la card che non porta nessuna pelle e non
 ribalta le sue righe; le tre funzioni in node, con una misura sola; il
 conto che tiene la tessera nella riga della scatola; e che della card
 vestita non resti niente — né regole CSS, né funzioni, né leve.
+
+## L'uscita e' una: la sentinella che conta chi paga (16 set 2026)
+
+**IL CANTIERE NASCE DA UNA VERIFICA IN SOLA LETTURA**, chiesta da
+Andrea: la cintura di `importo_invoice` dentro `paga_venditore` — la
+riga che rifiuta una bolt11 che chiede una cifra diversa dal dovuto —
+vale ancora su TUTTI i tubi in uscita? La risposta era sì, e si è
+letta tubo per tubo: il payout del venditore (`_sblocca_sats`), il
+rimborso del compratore (`_rimborsa_compratore`), il rimborso d'asta
+(`_paga_rimborso`) e il rimborso degli sblocchi, banner compresi
+(`_rimborsa_sblocco`), passano tutt'e quattro da `paga_venditore` con
+l'importo letto dalla RIGA in database e mai dal client; le due
+casseforti non hanno tubi separati, perché `_chiavi_cassaforte` sceglie
+URL e chiavi e il decode e il pagamento usano lo stesso `cf`; il
+Lightning address ha una cintura doppia (la fattura del callback si
+rilegge in `invoice_da_ln_address`, e poi passa comunque dal giudice).
+Sui banner non esiste nessun payout verso terzi: l'unica uscita è il
+rimborso, che è il quarto tubo.
+
+**MA LA COSA CHE NESSUNA PROVA DICEVA ERA CHE L'USCITA È UNA.** Le
+cinque sentinelle di `prove_importo_uscita` sorvegliano i CHIAMANTI di
+`paga_venditore`: nessuna chiamata a un argomento solo, nessuna senza
+`cassaforte=`, il rifiuto prima della chiave admin, l'aritmetica dei
+msat in un posto. Nessuna guardava chi la AGGIRA — un tubo nuovo che
+bussasse a LNbits da solo, con la chiave admin in mano, avrebbe pagato
+senza cintura e con la suite tutta verde. Era vero per ispezione (la
+richiesta che paga e l'header con la chiave admin stanno in una riga
+sola di tutto `server.py`, dentro `paga_venditore`), e «vero per
+ispezione» è esattamente la cosa che un refactor distratto disfa.
+
+**LA CURA SONO TRE SENTINELLE CHE CONTANO**, aggiunte accanto alle
+sorelle (le numero 6 e 7 del blocco): la richiesta che paga è UNA nel
+sorgente intero; l'header con una chiave admin è UNO; e tutt'e due
+stanno dentro `paga_venditore`, SOTTO la riga della cintura. Tre
+scelte da tenere a mente:
+- **si conta nel sorgente INTERO, prosa compresa**, come già fa la
+  sentinella del NON_CHIESTO. Il prezzo è che la richiesta che paga e
+  l'header con la chiave admin non si scrivono nei commenti di
+  `server.py` nemmeno per spiegarli — lo stesso patto che
+  `paga_venditore` ha già col nome della chiave del diario;
+- **la regex è larga apposta**: lo spazio dopo i due punti è
+  facoltativo, e nell'header vale QUALUNQUE nome che finisca in
+  `ADMIN_KEY` — `cf.`, nudo, o `LNBITS_NODO_ADMIN_KEY` in chiaro. Una
+  sentinella che cercasse la sola grafia di oggi si aggirerebbe
+  scrivendola in un altro modo;
+- **la terza prova non conta soltanto: guarda l'ORDINE.** Che il POST
+  stia dentro `paga_venditore` non basta se qualcuno lo sposta sopra
+  la cintura; la prova pretende che il confronto con l'importo dovuto
+  venga PRIMA della richiesta.
+
+**LA STRADA SCARTATA**: contare le occorrenze nude di `ADMIN_KEY` nel
+file. Ce ne sono una dozzina legittime — l'import, la struct della
+cassaforte, il controllo che le chiavi del nodo non siano il segnaposto
+— e un numero inchiodato a «dodici» invecchia al primo ritocco
+innocuo. Si è ancorata invece la FORMA che paga (l'header `X-Api-Key`
+con una chiave admin dentro), che è l'unica che conta.
+
+**COSA È STATO PROVATO.** Sul codice intatto le tre sono verdi. Poi la
+tortura, su una COPIA nello scratchpad e mai sui file veri: in fondo a
+`server.py` un tubo finto che chiama LNbits da solo, scritto apposta
+nella grafia diversa (niente spazio dopo i due punti, chiave del nodo
+nuda) — le prime due sono diventate ROSSE e la terza è restata verde,
+che è il verdetto giusto (`paga_venditore` non era stata toccata).
+Quindi la sentinella morde, e morde anche chi scrive in un altro modo.
+
+**COSA RESTA DA GUARDARE.** Niente di aperto sul tubo. La regola che ne
+esce, per chi un giorno dovesse davvero aggiungere una strada d'uscita:
+non si scrive un secondo POST, si chiama `paga_venditore` con l'importo
+letto dalla riga e la sua cassaforte — e se la sentinella diventa rossa
+non si alza il conto a due, si torna a leggere questa voce.
