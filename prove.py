@@ -18294,8 +18294,8 @@ def prove_pagina_acquisto():
     #    confermaSetSubito e' morto col foglio del riepilogo). La
     #    regola viveva nel codice senza nessuna sentinella, e dopo la
     #    fusione e' una riga che si puo' rompere senza accorgersene.
-    prova("il ⚡ Compra subito resta del solo singolo", True,
-          "d.tipo==='mono' && !DEMO && !VETRINA && walletNwc()" in _rac)
+    prova("il ⚡ Compra subito resta del solo singolo (e guarda pay_invoice, 16 set 2026)", True,
+          "d.tipo==='mono' && !DEMO && !VETRINA && walletNwcPaga()" in _rac)
     #    IL CARRELLO POTATO RIFA' IL CONTO (ago 2026): rileggiVenditore
     #    MUTA setScelte, e renderAcquisto disegna dalla CACHE — senza
     #    questa riga si vedrebbero due articoli a schermo e tre nel
@@ -43336,6 +43336,44 @@ def prove_p2p_motore():
     _ff = pezzo_js(mini, "function finestraFatturaP2P(){", "\n}\n")
     prova("...con la finestra del 38385, e senza 38385 i 3600 s del nodo", True,
           "p2pInfo.fattFinestra" in _ff and "return f > 0 ? f : 3600;" in _ff)
+    # ══ NWC PER IL P2P (16 set 2026) ══ il wallet fa la fattura da
+    # solo; ogni superficie guarda il suo metodo; la chiave porta il conto
+    _fw = pezzo_js(mini, "async function fatturaDalWalletP2P(id){", "\n}\n")
+    prova("la fattura del wallet passa dalla STESSA guardia della fattura incollata", True,
+          "leggiBolt11(bolt)" in _fw and "b.sats !== deve" in _fw
+          and "finestraFatturaP2P()" in _fw)
+    prova("...con l'importo di satsDaRicevereP2P e la vita dell'ordine", True,
+          "satsDaRicevereP2P(o)" in _fw and "scadenzaFatturaP2P()" in _fw)
+    prova("...e il wallet ha 15 secondi, non i 30 del mercatino", True,
+          "let P2P_NWC_ATTESA_MS = 15000;" in mini
+          and "Promise.race([lavoro, scaduto])" in _fw)
+    prova("...e chiede al wallet SOLO col metodo giusto", True,
+          "if (walletNwcFattura()) fatturaDalWalletP2P(id);"
+          in pezzo_js(mini, "function apriIncassoP2P(){", "\n}\n"))
+    _sf = pezzo_js(mini, "function scadenzaFatturaP2P(){", "\n}\n")
+    prova("...la vita dell'ordine e' expiration_hours, o sette giorni senza 38385", True,
+          "p2pInfo.oreVita" in _sf and "7 * 86400" in _sf)
+    # il mercatino guarda pay_invoice, e nessuno legge piu' walletNwc()
+    # a crudo fuori dalla custodia (il checklist del profilo dice solo
+    # «collegato», ed e' l'unica lettura nuda ammessa)
+    _i0 = mini.index("const NWC_CHIAVE = ")
+    _i1 = mini.index("async function collegaWallet(){")
+    _fuori = mini[:_i0] + mini[_i1:]
+    prova("fuori dalla custodia walletNwc() nudo resta solo dove si dice «collegato» (checklist e renderWallet)", 2,
+          _fuori.count("walletNwc()"))
+    prova("...e il mercatino paga solo con pay_invoice", True,
+          "clientNwc(walletNwcPaga())" in mini and "if (!walletNwcPaga()) { startBuy(); return; }" in mini)
+    prova("la chiave NWC porta il conto come le chiavi P2P", True,
+          "return myTgId ? NWC_CHIAVE + '@' + myTgId : NWC_CHIAVE;"
+          in pezzo_js(mini, "function chiaveNwcConto(){", "\n}\n"))
+    prova("...e collega/scollega scrivono e cancellano LI'", True,
+          "localStorage.setItem(chiaveNwcConto(), JSON.stringify({" in mini
+          and "localStorage.removeItem(chiaveNwcConto());" in mini
+          and "localStorage.setItem(NWC_CHIAVE, " not in mini)
+    prova("il profilo dice di creare la stringa col solo permesso di ricevere", True,
+          "solo permesso di ricevere</b> (make_invoice)" in mini)
+    prova("...e avvisa quando la connessione sa anche pagare", True,
+          "Questa connessione sa <b>pagare</b>" in pezzo_js(mini, "function renderWallet(){", "\n}\n"))
     prova("...e il perche' cita i byte che l'hanno deciso", True,
           "validate_bolt11_invoice" in mini and "split_fee" in mini
           and "SmallOrder" in mini)
@@ -43637,8 +43675,20 @@ def prove_p2p_motore():
         "f7468_1g": bolt11_finta(7468, 86400, _adesso),
         "f7543_1h": bolt11_finta(7543, 3600, _adesso),
         "f7543_1g": bolt11_finta(7543, 86400, _adesso),
+        "f7543_7g": bolt11_finta(7543, 7 * 86400, _adesso),
         "libera_1h": bolt11_finta(0, 3600, _adesso),
         "libera_1g": bolt11_finta(0, 86400, _adesso)}) + ";\n")
+    # IL WALLET NWC (16 set 2026): le pure della custodia e il client
+    # NIP-47 vivono nel blocco del profilo, fuori dal motore — la
+    # fattura del P2P la chiede a LORO, e qui entrano quelli veri
+    js_nwc = ("\nconst NWC_CHIAVE = 'barattolo_nwc';\n" + "\n".join(
+        pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
+            "function chiaveNwcConto(){",
+            "function walletNwc(){",
+            "function walletNwcPaga(){",
+            "function walletNwcFattura(){",
+            "function chiaveNwc(con){",
+            "async function clientNwc(dati){")) + "\n")
     # LE PURE DELLA CARD DI UNO SCAMBIO vivono nel blocco del libro,
     # cioe' FUORI dalla fetta del motore — e la card le chiama da
     # quando ha quattro righe (set 2026). Si portano dentro QUELLE
@@ -43736,7 +43786,46 @@ function ordine(azione, rid, id, payload){
   m.payload = payload === undefined ? null : payload;
   return azione === 'cant-do' ? {'cant-do': m} : {order: m};
 }
+/* IL WALLET DI CARTONE (16 set 2026): risponde alle richieste NIP-47
+   del client — decifra nip04 con la SUA chiave, guarda il metodo, e
+   risponde secondo `walletModo`: 'buona' (una fattura di 7543 con
+   sette giorni), 'storta' (7468), 'corta' (7543 da un'ora), 'rifiuta'
+   (un errore NIP-47), 'muto' (niente). Le chiavi si GENERANO: mai 64
+   esadecimali scritti per esteso (lo scanner dei segreti). */
+const WALLET_SK = NT0.generateSecretKey();
+const WALLET_PUB = NT0.getPublicKey(WALLET_SK);
+const NWC_CLI_SK = NT0.generateSecretKey();
+let walletModo = 'buona', walletRichieste = [];
+function stringaNwcFinta(){
+  return 'nostr+walletconnect://' + WALLET_PUB + '?relay=wss://wallet-finto&secret=' + bytesToHex(NWC_CLI_SK);
+}
+function collegaWalletFinto(metodi){
+  localStorage.setItem('barattolo_nwc@' + myTgId, JSON.stringify({
+    stringa: stringaNwcFinta(), pubkey: WALLET_PUB, relays: ['wss://wallet-finto'],
+    cifratura: 'nip04', metodi: metodi, collegato: 1}));
+}
+class FintoWallet {
+  subscribe(filtri, h){ this.h = h; return {close(){}}; }
+  async publish(ev){
+    let msg = null;
+    try { msg = JSON.parse(NT0.nip04.decrypt(WALLET_SK, ev.pubkey, ev.content)); } catch(e){ msg = {rotto: String(e)}; }
+    walletRichieste.push(msg);
+    if (walletModo === 'muto') return;
+    const risposta = walletModo === 'rifiuta'
+      ? {error: {code: 'RESTRICTED', message: 'permesso negato'}}
+      : {result: {invoice: {buona: FATT.f7543_7g, storta: FATT.f7468_1g, corta: FATT.f7543_1h}[walletModo]}};
+    const content = NT0.nip04.encrypt(WALLET_SK, ev.pubkey, JSON.stringify(risposta));
+    setTimeout(() => this.h.onevent({kind: 23195, pubkey: WALLET_PUB, tags: [['e', ev.id]], content: content}), 0);
+  }
+  close(){}
+}
 class FintoRelay {
+  /* la factory `Relay.connect(url)` che usano il client NWC e il
+     bunker: sul relay del wallet finto apre il wallet di cartone */
+  static async connect(url){
+    if (url === 'wss://wallet-finto') return new FintoWallet();
+    const r = new FintoRelay(url); await r.connect(); return r;
+  }
   constructor(url){ this.url = url; this.connected = false; }
   async connect(){
     if (/rotto/.test(this.url)) throw new Error('non risponde');
@@ -43822,7 +43911,7 @@ function tagValore(ev, n){
   const t = (ev.tags || []).filter(x => x[0] === n)[0];
   return t ? t[1] : '';
 }
-""" + js_pure + js_mazzo + js_motore + fatture_js + r"""
+""" + js_pure + js_mazzo + js_motore + fatture_js + js_nwc + r"""
 /* ---- il banco ---- */
 /* IL DETTAGLIO-PAGINA vive nel blocco del libro, fuori dal motore: qui
    si presta, e i suoi casi veri girano in prove_p2p_dettaglio. Lo stub
@@ -43863,10 +43952,12 @@ function reset(){
   p2pSemeGiro = null; p2pMazzoEsito = ''; p2pGiudizio = null;
   p2pIncassoOrdine = ''; p2pStatoChiesto = false; p2pRiconnetti = 0;
   P2P_ATTESA_MS = 30000;
+  P2P_NWC_ATTESA_MS = 300; walletModo = 'buona'; walletRichieste = [];
   /* la fee e la finestra sono quelle del NOSTRO nodo (16 set 2026):
-     2% spartito meta' a testa, 3600 s di vita minima per la fattura */
+     2% spartito meta' a testa, 3600 s di vita minima per la fattura,
+     168 ore di vita dell'ordine */
   p2pInfo = {fee: 0.02, pow: 8, powPrimo: 10, maxSats: 100000, minSats: 100,
-             valute: ['EUR'], versione: '2', quando: 0,
+             valute: ['EUR'], versione: '2', quando: 0, oreVita: 168,
              scadenzaSec: 86400, holdFinestra: 300, fattFinestra: 3600};
   p2pLibro = {ordini: [
     {id: '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002', lato: 'sell', euro: 50, sats: 100000, metodi: ['SEPA'], premium: 0},
@@ -44148,6 +44239,91 @@ function reset(){
   out.liberaPassa = ricevuti.length === 3
     && ricevuti[2].dentro.action === 'add-invoice'
     && ricevuti[2].dentro.payload.payment_request[1] === FATT.libera_1g;
+
+  /* ---- 4-bis) LA FATTURA LA FA IL WALLET (NWC, 16 set 2026) -------
+     Col wallet collegato e `make_invoice` fra i metodi, il foglio
+     chiede la fattura al wallet appena si apre — importo esatto in
+     millisat, scadenza lunga quanto la vita dell'ordine — e la manda
+     da solo. Ogni fallimento torna al foglio a mano con la ragione. */
+  const presaConWallet = async (modo, metodi) => {
+    reset();
+    walletModo = modo;
+    collegaWalletFinto(metodi || ['make_invoice', 'get_info']);
+    rispondi = r => {
+      const d = r.dentro;
+      if (d.action === 'take-sell')
+        return [ordine('add-invoice', d.request_id, d.id,
+                       {order: {id: d.id, amount: 7543}})];
+      /* il coordinatore risponde alla fattura, o il foglio aspetterebbe
+         la sua risposta per P2P_ATTESA_MS prima di chiudersi */
+      if (d.action === 'add-invoice')
+        return [ordine('waiting-seller-to-pay', d.request_id, d.id)];
+      return [];
+    };
+    await prendiOrdineP2P('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002');
+    await finoA(() => oltrePrendo('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'));
+    await pausa(30);
+    apriIncassoP2P();
+    await finoA(() => ricevuti.length >= 2 || (el('p2pIncassoAvviso').textContent || '').indexOf('non ha dato') >= 0, 3000);
+    await pausa(60);
+  };
+  await presaConWallet('buona');
+  {
+    const q = walletRichieste[0] || {};
+    out.walletChiesto = q.method === 'make_invoice';
+    out.walletImportoEsatto = q.params && q.params.amount === 7543000;
+    out.walletScadenzaLunga = q.params && q.params.expiry === 168 * 3600;
+    out.walletDescrizione = q.params && String(q.params.description || '').indexOf('0199b7c1') >= 0;
+    out.walletFatturaInviata = ricevuti.length === 2
+      && ricevuti[1].dentro.action === 'add-invoice'
+      && ricevuti[1].dentro.payload.payment_request[1] === FATT.f7543_7g;
+    out.walletFoglioChiuso = chiusi.indexOf('p2pIncassoSheet') >= 0;
+    out.walletLoDice = toasts.some(t => t.indexOf('wallet') >= 0 && t.indexOf('✅') >= 0);
+    out.walletDopo = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'].stato;
+  }
+  /* il silenzio: dopo l'attesa il foglio a mano e' li', con la ragione,
+     e lo scambio non si e' mosso */
+  await presaConWallet('muto');
+  out.mutoNonManda = ricevuti.length === 1 && walletRichieste.length === 1;
+  out.mutoLoDice = (el('p2pIncassoAvviso').textContent || '').indexOf('non risponde') >= 0
+    && (el('p2pIncassoAvviso').textContent || '').indexOf('incollarne una') >= 0;
+  out.mutoFoglioAperto = chiusi.indexOf('p2pIncassoSheet') < 0;
+  out.mutoScambioFermo = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'].stato === 'attesa_mia_fattura';
+  /* ...e da li' la mano funziona come sempre */
+  el('p2pIncassoInp').value = FATT.f7543_1g;
+  await inviaIncassoP2P();
+  await pausa(60);
+  out.mutoPoiAMano = ricevuti.length === 2 && ricevuti[1].dentro.action === 'add-invoice';
+  /* il rifiuto: il messaggio del wallet arriva a chi legge */
+  await presaConWallet('rifiuta');
+  out.rifiutoNonManda = ricevuti.length === 1;
+  out.rifiutoLoDice = (el('p2pIncassoAvviso').textContent || '').indexOf('permesso negato') >= 0;
+  /* la fattura storta: la STESSA guardia della fattura incollata */
+  await presaConWallet('storta');
+  out.stortaNonManda = ricevuti.length === 1;
+  out.stortaLoDice = (el('p2pIncassoAvviso').textContent || '').indexOf('7468') >= 0
+    && (el('p2pIncassoAvviso').textContent || '').indexOf('7543') >= 0;
+  await presaConWallet('corta');
+  out.cortaNonManda = ricevuti.length === 1;
+  out.cortaLoDice = (el('p2pIncassoAvviso').textContent || '').indexOf('scade troppo presto') >= 0;
+  /* senza make_invoice fra i metodi il wallet non si disturba: il
+     foglio e' quello a mano di sempre */
+  await presaConWallet('buona', ['pay_invoice', 'get_info']);
+  out.senzaMetodoNonChiede = walletRichieste.length === 0 && ricevuti.length === 1
+    && (el('p2pIncassoAvviso').textContent || '') === '';
+  /* LA CUSTODIA PER CONTO, e la migrazione della riga di ieri */
+  reset();
+  localStorage.setItem('barattolo_nwc', JSON.stringify({stringa: 'x', pubkey: 'ab', relays: [], cifratura: 'nip04'}));
+  {
+    const w = walletNwc();
+    out.migraAlConto = !!w && localStorage.getItem('barattolo_nwc@111') !== null
+      && localStorage.getItem('barattolo_nwc') === null;
+    out.vecchiaPagaAncora = !!walletNwcPaga();
+    out.vecchiaNonFattura = walletNwcFattura() === null;
+    myTgId = 222;
+    out.altroContoNonLoVede = walletNwc() === null;
+    myTgId = 111;
+  }
   /* ⚠️ E LA RIGA DI IERI — solo il lordo, senza `satsMiei` — ha il suo
      ripiego: la meta' si toglie come prima (99000 → 98010 al 2%), che e'
      l'unico numero che si puo' dire da li'. Vale per gli scambi aperti
@@ -44517,6 +44693,30 @@ function reset(){
         "testoStortoFermato": "...e nemmeno un testo che non e' ne' l'uno ne' l'altra",
         "importoGiustoPassa": "...ma 7543 con un giorno di vita PARTE (il difetto che fermava uno scambio)",
         "liberaPassa": "...e la senza-importo con un giorno di vita pure",
+        "walletChiesto": "col wallet NWC collegato il foglio chiede make_invoice da solo",
+        "walletImportoEsatto": "...con l'importo ESATTO detto dal coordinatore, in millisat",
+        "walletScadenzaLunga": "...e la scadenza lunga quanto la vita dell'ordine (168 ore)",
+        "walletDescrizione": "...con lo scambio nella descrizione",
+        "walletFatturaInviata": "...e la fattura del wallet parte verso mostro da sola",
+        "walletFoglioChiuso": "...il foglio si chiude",
+        "walletLoDice": "...e lo dice",
+        "walletDopo": ("...e si aspetta chi vende", "attesa_hold_venditore"),
+        "mutoNonManda": "un wallet MUTO non manda niente",
+        "mutoLoDice": "...e dopo l'attesa il foglio dice che non risponde e che si puo' incollare",
+        "mutoFoglioAperto": "...col foglio a mano ancora aperto",
+        "mutoScambioFermo": "...e lo scambio fermo dov'era",
+        "mutoPoiAMano": "...e da li' la fattura incollata parte come sempre",
+        "rifiutoNonManda": "un wallet che RIFIUTA non manda niente",
+        "rifiutoLoDice": "...e la sua ragione arriva a chi legge",
+        "stortaNonManda": "una fattura STORTA del wallet non parte",
+        "stortaLoDice": "...e la ragione dice le due cifre (la stessa guardia della fattura incollata)",
+        "cortaNonManda": "una fattura del wallet da un'ora non parte",
+        "cortaLoDice": "...e la ragione dice che scade troppo presto",
+        "senzaMetodoNonChiede": "senza make_invoice fra i metodi il wallet non si disturba",
+        "migraAlConto": "la riga NWC di ieri migra alla chiave del conto",
+        "vecchiaPagaAncora": "...e per il mercatino vale ancora (era stata collegata con pay_invoice)",
+        "vecchiaNonFattura": "...ma per il P2P no: senza metodi scritti non si chiede",
+        "altroContoNonLoVede": "...e un altro conto sullo stesso telefono non la vede",
         "rigaDiIeriRipiega": "una riga di ieri, col solo lordo, ripiega sulla meta' come prima",
         "senzaFeeIlFattoResta": "senza il 38385 il mio lato si tiene e il lordo non si inventa",
         "senzaFeeDiceIlFatto": "...e il foglio dice la cifra detta, che non e' un conto",
@@ -51802,6 +52002,7 @@ def prove_nwc_cifratura():
     mini = open("miniapp.html", encoding="utf-8").read()
     pezzi = "\n\n".join(pezzo_js(mini, f) for f in (
         "function chiaveNwc(con){",
+        "function metodiNwc(info){",
         "async function leggiEventoInfo(NT, relays, walletPub){",
         "async function infoNwc(stringa){",
         "async function clientNwc(dati){"))
@@ -51830,7 +52031,9 @@ const relay = {
     ultimo = ev;
     const tag44 = (ev.tags || []).some(t => t[0] === 'encryption' && /nip44/.test(t[1] || ''));
     const giusta = (PARLA === 'nip44') === tag44;
-    const msg = giusta ? {result: {methods: ['pay_invoice']}}
+    /* SOLO make_invoice (16 set 2026): la stringa col solo permesso di
+       ricevere e' quella del P2P, e fino a ieri infoNwc la rifiutava */
+    const msg = giusta ? {result: {methods: ['make_invoice', 'get_info']}}
                        : {error: {code: 'UNSUPPORTED_ENCRYPTION', message: 'no'}};
     setTimeout(()=>relay.onev({tags: [['e', ev.id]], content: JSON.stringify(msg)}), 0);
     return Promise.resolve();
@@ -51866,6 +52069,7 @@ function chiavi(){
     try {
       const r = await infoNwc('nostr+walletconnect://' + PK + '?relay=wss://finto&secret=' + SEC);
       out['esito_' + modo] = r.cifratura;
+      out['metodi_' + modo] = r.metodi;
     } catch(e){ out['esito_' + modo] = 'ESPLODE: ' + e.message; }
     out['tag_' + modo] = (ultimo.tags || []).some(t => t[0] === 'encryption' && t[1] === 'nip44_v2');
   }
@@ -51896,6 +52100,13 @@ function chiavi(){
           "nip44", o["esito_nip44"])
     prova("il wallet nip04 resta identico a ieri",
           "nip04", o["esito_nip04"])
+    # OGNI SUPERFICIE GUARDA IL SUO (16 set 2026): la stretta di mano
+    # REGISTRA i metodi e non pretende piu' pay_invoice — la stringa col
+    # solo permesso di ricevere e' proprio quella del P2P
+    prova("una stringa col solo make_invoice si collega, e i metodi restano scritti",
+          ["make_invoice", "get_info"], o["metodi_nip44"])
+    prova("...e infoNwc non pretende piu' pay_invoice", False,
+          "non permette pay_invoice" in pezzo_js(mini, "async function infoNwc(stringa){"))
 
     # 3) le due guardie sulla chiave
     prova("la chiave esadecimale passa", "b8" * 32,

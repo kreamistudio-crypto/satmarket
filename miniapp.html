@@ -7577,7 +7577,7 @@ document.getElementById('cartello')?.remove();</script>
 
       <h3>Il pagamento, in pratica</h3>
       <p>Su Barattolo si paga <b>solo in bitcoin</b>, sulla rete <b>Lightning</b>: trasferimenti immediati e con commissioni di rete quasi nulle, anche per pochi euro di valore. Il prezzo lo puoi leggere in sats o in euro con l'interruttore <b>€ / ₿</b> — quello che viaggia sono sempre sats.</p>
-      <p>Ti serve un wallet Lightning: ne esistono tanti, gratuiti, e ne basta uno. Al pagamento Barattolo ti mostra una <b>invoice</b>: la copi, o inquadri il codice, e il wallet fa il resto. Se colleghi il wallet con <b>NWC</b> (Nostr Wallet Connect) dal tuo Profilo, il bottone «⚡ Compra subito» paga senza passaggi — la connessione resta <b>solo sul tuo dispositivo</b>, non arriva mai ai nostri server, e nel wallet puoi darle un tetto di spesa.</p>
+      <p>Ti serve un wallet Lightning: ne esistono tanti, gratuiti, e ne basta uno. Al pagamento Barattolo ti mostra una <b>invoice</b>: la copi, o inquadri il codice, e il wallet fa il resto. Se colleghi il wallet con <b>NWC</b> (Nostr Wallet Connect) dal tuo Profilo, il bottone «⚡ Compra subito» paga senza passaggi, e nel P2P la fattura per ricevere i sats la fa il wallet da solo — la connessione resta <b>solo sul tuo dispositivo</b>, non arriva mai ai nostri server, e nel wallet puoi darle un tetto di spesa (o, per il solo P2P, il solo permesso di ricevere).</p>
 
       <!-- L'INDIRIZZO DI CASA (ago 2026). Fino a ieri questa pagina non
            nominava mai indirizzi, recapiti o dati personali — e non
@@ -8430,9 +8430,13 @@ document.getElementById('cartello')?.remove();</script>
             <button class="btn ghost" style="margin-top:0" id="nwcBottone" onclick="collegaWallet()">⚡ Collega il wallet (NWC)</button>
             <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
               Col wallet collegato paghi in un tocco («⚡ Compra
-              subito»). La stringa resta <b>solo nel tuo browser</b>:
-              Barattolo non la vede mai. Nella app del wallet imposta un
-              <b>limite di spesa</b> per questa connessione.</div>
+              subito»), e nel P2P la fattura per ricevere i sats la fa
+              il wallet da solo. La stringa resta <b>solo nel tuo
+              browser</b>: Barattolo non la vede mai. Nella app del
+              wallet imposta un <b>limite di spesa</b> per questa
+              connessione — e se ti serve solo per il P2P, creala col
+              <b>solo permesso di ricevere</b> (make_invoice): così chi
+              la rubasse non potrebbe spendere niente.</div>
             <div id="nwcStato"></div>
           </div>
           <button class="btn ghost" style="margin-top:16px" onclick="esportaDati()">📄 Esporta i tuoi dati</button>
@@ -15751,7 +15755,7 @@ function chiudiModaleTest(){
 /* Riga nel foglio di pagamento: solo senza wallet NWC collegato */
 function aggiornaPayHint(){
   const box = el('payHint'); if (!box) return;
-  box.innerHTML = (hintAttivi() && !walletNwc() && !hintDismesso('nwc'))
+  box.innerHTML = (hintAttivi() && !walletNwcPaga() && !hintDismesso('nwc'))
     ? hintHTML('nwc',
         'Con un wallet collegato paghi in un tocco, senza copiare la invoice.',
         'Collega', "apriCassettoProfilo('walletBlocco')", 'Non ora')
@@ -17865,7 +17869,7 @@ function renderAcquisto(){
   /* --- il fondo: ⚡ NWC (solo mono, col wallet), Paga, e i due
      secondari del carrello (sul singolo non ci sono: l'offerta ce
      l'ha la scheda, col suo bottone in barra) --- */
-  const nwc = (d.tipo==='mono' && !DEMO && !VETRINA && walletNwc())
+  const nwc = (d.tipo==='mono' && !DEMO && !VETRINA && walletNwcPaga())
     ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${circa}${fmt(tot)} sats</span></button>
        <div class="escrow-note" style="margin:0">In un tocco, col wallet collegato</div>` : '';
   const secondari = d.tipo==='set'
@@ -20564,7 +20568,7 @@ function compraSubito(){
     return;
   }
   if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
-  if (!walletNwc()) { startBuy(); return; }
+  if (!walletNwcPaga()) { startBuy(); return; }
   /* Il ⚡ vive nella pagina d'acquisto (ago 2026): le cifre sono
      quelle del preventivo — per i listini EUR restano una stima, i
      sats veri li fissa il server con la invoice. Senza preventivo
@@ -20652,7 +20656,7 @@ async function confermaCompraSubito(btn){
     if (pollTimer) clearInterval(pollTimer);
     pollTimer = setInterval(()=>verificaOrdine(currentOrderId), 4000);
     /* 3) la telefonata al wallet: paga la invoice via NIP-47 */
-    cliente = await clientNwc(walletNwc());
+    cliente = await clientNwc(walletNwcPaga());
     await cliente.paga(invoice);
     /* Il wallet dice "pagato": l'overlay resta finché il poll non
        vede il locked. Cintura: dopo 60s si libera lo schermo e il
@@ -35441,9 +35445,48 @@ function bottoneLoginNostr(){
    richieste cifrate su un relay, risposte cifrate indietro. */
 const NWC_CHIAVE = 'barattolo_nwc';
 
+/* LA CHIAVE PORTA IL CONTO (16 set 2026, cantiere NWC per il P2P):
+   stessa convenzione di `chiaveP2P` — `barattolo_nwc@<tg_id>` — perche'
+   su un telefono con due account Telegram il wallet si mischiava come
+   si mischiavano le chiavi P2P a settembre. Senza identita' vale il
+   nome di ieri. */
+function chiaveNwcConto(){
+  return myTgId ? NWC_CHIAVE + '@' + myTgId : NWC_CHIAVE;
+}
 function walletNwc(){
-  try { return JSON.parse(localStorage.getItem(NWC_CHIAVE)) || null; }
-  catch(e){ return null; }          // dato corrotto = nessun wallet
+  try {
+    const k = chiaveNwcConto();
+    let v = localStorage.getItem(k);
+    if (v === null && k !== NWC_CHIAVE) {
+      /* LA MIGRAZIONE: la riga di ieri, senza conto, passa al PRIMO
+         conto che entra dopo l'aggiornamento e sparisce dal nome
+         vecchio — chi ha gia' NWC non lo perde, e l'altro account
+         dello stesso telefono, se c'e', lo ricollega. */
+      v = localStorage.getItem(NWC_CHIAVE);
+      if (v !== null) { localStorage.setItem(k, v); localStorage.removeItem(NWC_CHIAVE); }
+    }
+    return JSON.parse(v) || null;
+  } catch(e){ return null; }        // dato corrotto = nessun wallet
+}
+/* OGNI SUPERFICIE GUARDA IL SUO METODO (16 set 2026). La stretta di
+   mano registra i `methods` che il wallet dichiara in `get_info`, e
+   la stringa vale quel che le e' stato concesso quando e' nata: il
+   mercatino chiede `pay_invoice`, il P2P `make_invoice`. Una riga
+   di prima del cantiere non ha `metodi`: per il mercatino vale come
+   ieri (era stata collegata pretendendo pay_invoice), per il P2P no —
+   il profilo dice di ricollegare. */
+function walletNwcPaga(){
+  const w = walletNwc();
+  if (!w) return null;
+  const m = Array.isArray(w.metodi) ? w.metodi : [];
+  return (!m.length || m.indexOf('pay_invoice') >= 0) ? w : null;
+}
+function walletNwcFattura(){
+  const w = walletNwc();
+  return (w && Array.isArray(w.metodi) && w.metodi.indexOf('make_invoice') >= 0) ? w : null;
+}
+function metodiNwc(info){
+  return (info && Array.isArray(info.methods)) ? info.methods.map(String) : [];
 }
 
 /* Il "biglietto da visita" del wallet (evento kind-13194), SE esiste:
@@ -35520,9 +35563,10 @@ async function infoNwc(stringa){
       cliente = await clientNwc({stringa, cifratura});
       const info = await cliente.info(12000);
       console.log('🟪 [nwc] il wallet risponde in ' + cifratura + ':', info);
-      if (Array.isArray(info.methods) && info.methods.length && !info.methods.includes('pay_invoice'))
-        throw Object.assign(new Error('questa connessione non permette pay_invoice'), {definitivo: true});
-      return {pubkey: walletPub, relays: con.relays, cifratura};
+      /* niente piu' «serve pay_invoice» (16 set 2026): i metodi si
+         REGISTRANO e ogni superficie guarda il suo — una stringa col
+         solo permesso di ricevere e' proprio quella che il P2P vuole */
+      return {pubkey: walletPub, relays: con.relays, cifratura, metodi: metodiNwc(info)};
     } catch(e){
       if (e.definitivo) throw e;
       const codice = String(e.code || '').toUpperCase();
@@ -35539,7 +35583,7 @@ async function infoNwc(stringa){
            relay, secret e cifratura funzionano — per il collegamento
            basta e avanza */
         console.log('🟪 [nwc] il wallet risponde in ' + cifratura + ' (errore ' + e.code + '): connessione viva');
-        return {pubkey: walletPub, relays: con.relays, cifratura};
+        return {pubkey: walletPub, relays: con.relays, cifratura, metodi: []};
       } else {
         console.log('🟪 [nwc] con ' + cifratura + ' non risponde: ' + (e.message || e));
         ultimo = e;
@@ -35614,6 +35658,10 @@ async function clientNwc(dati){
   return {
     paga:   (bolt11) => chiama('pay_invoice', {invoice: bolt11}),
     info:   (timeoutMs) => chiama('get_info', {}, timeoutMs),
+    /* NIP-47 make_invoice: l'importo in MILLISAT, la scadenza in
+       secondi. Torna {invoice, payment_hash, expires_at, ...}. */
+    fattura: (sats, descrizione, scadenzaSec, timeoutMs) =>
+      chiama('make_invoice', {amount: sats * 1000, description: descrizione, expiry: scadenzaSec}, timeoutMs),
     chiudi: () => { try { relay.close(); } catch(e){} },
   };
 }
@@ -35629,12 +35677,18 @@ async function collegaWallet(){
   toast('⚡ Busso al wallet… qualche secondo', 6000);
   try {
     const info = await infoNwc(stringa);
-    localStorage.setItem(NWC_CHIAVE, JSON.stringify({
+    localStorage.setItem(chiaveNwcConto(), JSON.stringify({
       stringa, pubkey: info.pubkey, relays: info.relays,
-      cifratura: info.cifratura, collegato: Date.now()}));
+      cifratura: info.cifratura, metodi: info.metodi || [], collegato: Date.now()}));
     el('nwcInput').value = '';        // via dal campo: ora vive in localStorage
     renderWallet();
-    toast('⚡ Wallet collegato! Sugli annunci ora trovi «Compra subito»', 5000);
+    /* si dice cosa SBLOCCA, e se sa anche pagare lo si avvisa: per il
+       solo P2P la stringa giusta e' quella col solo permesso di ricevere */
+    const paga = !!walletNwcPaga(), fatt = !!walletNwcFattura();
+    toast(fatt && paga ? '⚡ Wallet collegato: «Compra subito» e la fattura del P2P la fa lui. Sa anche pagare: se ti serve solo per il P2P, ricreala nel wallet col solo permesso di ricevere'
+        : fatt ? '⚡ Wallet collegato: nel P2P la fattura la fa lui, senza incollare niente'
+        : paga ? '⚡ Wallet collegato! Sugli annunci ora trovi «Compra subito»'
+        : '⚡ Wallet collegato, ma senza pay_invoice ne\' make_invoice: nel wallet dai alla connessione il permesso che ti serve', 7000);
   } catch(e){
     toast(`Collegamento non riuscito: ${e.message || 'riprova'}`, 6000);
   }
@@ -35642,7 +35696,7 @@ async function collegaWallet(){
 
 function scollegaWallet(){
   haptic();
-  localStorage.removeItem(NWC_CHIAVE);
+  localStorage.removeItem(chiaveNwcConto());
   renderWallet();
   toast('Wallet scollegato. Per pulizia completa revoca la connessione anche nella app del wallet', 5000);
 }
@@ -41217,6 +41271,63 @@ function apriIncassoP2P(){
   el('p2pIncassoSheet').classList.add('open');
   const c = el('p2pIncassoInp');
   if (c) { c.value = myLnAddress || ''; setTimeout(() => { try { c.focus({preventScroll: true}); } catch(e){} }, 60); }
+  /* col wallet collegato la fattura la fa lui (16 set 2026): si chiede
+     subito, e se non arriva il foglio a mano e' gia' sotto, con la
+     ragione scritta */
+  if (walletNwcFattura()) fatturaDalWalletP2P(id);
+}
+/* quanto deve VIVERE la fattura chiesta al wallet: la vita dell'ordine
+   nel libro (`expiration_hours` del 38385, 168 ore sul nodo), cosi' la
+   scadenza non morde nemmeno al payout, che arriva al rilascio e non
+   all'arrivo. Senza 38385, sette giorni. */
+function scadenzaFatturaP2P(){
+  const ore = p2pInfo ? Math.floor(Number(p2pInfo.oreVita) || 0) : 0;
+  return ore > 0 ? ore * 3600 : 7 * 86400;
+}
+let P2P_NWC_ATTESA_MS = 15000;   /* il wallet ha 15 s, non i 30 del mercatino: qui dietro c'e' un foglio a mano */
+/* LA FATTURA LA FA IL WALLET (16 set 2026, cantiere NWC per il P2P):
+   `make_invoice` via NIP-47 con l'importo ESATTO detto dal
+   coordinatore (`satsDaRicevereP2P`, in millisat) e la scadenza lunga
+   quanto la vita dell'ordine. La risposta passa dalla STESSA guardia
+   di una fattura incollata (`leggiBolt11`: cifra e scadenza), perche'
+   un wallet puo' ignorare l'expiry chiesto o arrotondare — e a mostro
+   parte solo una fattura che lui accetterebbe. Ogni fallimento —
+   silenzio, rifiuto, fattura storta — torna al foglio a mano con la
+   ragione scritta, e lo scambio non si muove. Tor non c'entra: il
+   telefono parla col relay del wallet, e mostro valida senza rete. */
+async function fatturaDalWalletP2P(id){
+  const o = ordiniP2P()[id];
+  const w = walletNwcFattura();
+  const deve = satsDaRicevereP2P(o);
+  const av = el('p2pIncassoAvviso');
+  const dillo = m => { if (av) { av.textContent = m; av.style.display = ''; } };
+  if (!o || !w) return false;
+  if (!(deve > 0)) { dillo('La cifra da ricevere non si sa ancora: la fattura al wallet non si chiede. Puoi incollarne una senza importo, o dare l\'indirizzo.'); return false; }
+  dillo('⚡ Chiedo la fattura al wallet…');
+  let cliente = null;
+  try {
+    const scaduto = new Promise((ok, no) => setTimeout(() => no(new Error('il wallet non risponde')), P2P_NWC_ATTESA_MS));
+    const lavoro = (async () => {
+      cliente = await clientNwc(w);
+      return cliente.fattura(deve, 'Barattolo P2P ' + String(o.id).slice(0, 8), scadenzaFatturaP2P(), P2P_NWC_ATTESA_MS);
+    })();
+    const r = await Promise.race([lavoro, scaduto]);
+    const bolt = String((r && r.invoice) || '').trim();
+    const b = leggiBolt11(bolt);
+    if (!b) throw new Error('ha risposto con una fattura che non si legge');
+    if (b.sats !== deve) throw new Error('ha fatto una fattura di ' + fmt(b.sats) + ' sats invece di ' + fmt(deve));
+    if (b.scade < Math.floor(Date.now() / 1000) + finestraFatturaP2P())
+      throw new Error('ha fatto una fattura che scade troppo presto');
+    if (p2pIncassoOrdine !== id) return false;   /* il foglio e' gia' passato ad altro */
+    await chiamataOrdineP2P(o, 'add-invoice', {payment_request: [null, bolt, null]});
+    chiudiFoglioP2P('p2pIncassoSheet');
+    p2pIncassoOrdine = '';
+    toast('⚡ Fattura fatta dal wallet e inviata ✅');
+    return true;
+  } catch(e){
+    dillo('Il wallet non ha dato la fattura (' + ((e && e.message) || 'errore') + '). Puoi incollarne una qui, o dare il tuo indirizzo Lightning.');
+    return false;
+  } finally { if (cliente) cliente.chiudi(); }
 }
 /* ---- QUANTI SATS ARRIVANO DAVVERO A CHI COMPRA ----
    PURA, ed e' l'importo che la sua fattura DEVE portare.
@@ -44409,10 +44520,22 @@ function renderWallet(){
   const w = walletNwc();
   el('nwcCampo').style.display = w ? 'none' : '';
   el('nwcBottone').style.display = w ? 'none' : '';
+  /* cosa sblocca questa connessione, metodo per metodo (16 set 2026):
+     una riga di prima del cantiere non ha `metodi`, e per il P2P va
+     ricollegata — lo si dice invece di tacere */
+  const paga = !!walletNwcPaga(), fatt = !!walletNwcFattura();
+  const vecchia = w && !(Array.isArray(w.metodi) && w.metodi.length);
+  const righe = !w ? '' : [
+    paga ? '✅ «Compra subito» sugli annunci' : '',
+    fatt ? '✅ Nel P2P la fattura per ricevere i sats la fa il wallet da solo' : '',
+    vecchia ? '↻ Per usarlo anche nel P2P, scollega e ricollega: serve sapere cosa permette' : '',
+    (paga && !fatt && !vecchia) ? '– Nel P2P no: la connessione non permette make_invoice' : '',
+    paga ? '⚠️ Questa connessione sa <b>pagare</b>: tienile un limite di spesa nel wallet, e se ti serve solo per il P2P ricreala col solo permesso di ricevere' : ''
+  ].filter(Boolean).map(r => '<div style="margin-top:6px;font-size:12.5px;font-weight:600;color:var(--muted);line-height:1.4">' + r + '</div>').join('');
   el('nwcStato').innerHTML = w ? `
     <div style="margin-top:24px;font-size:13px;font-weight:800;color:var(--trust)">
       ⚡ Wallet collegato <span class="mono">${esc((w.pubkey||'').slice(0,8))}…</span>
-      · solo su questo dispositivo</div>
+      · solo su questo dispositivo</div>${righe}
     <button class="btn ghost" style="margin-top:8px" onclick="scollegaWallet()">Scollega il wallet</button>` : '';
 }
 
