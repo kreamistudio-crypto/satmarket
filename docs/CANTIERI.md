@@ -16228,3 +16228,69 @@ Orizzontalmente non serve niente: il marchio è centrato in una riga da
 a 320 la riga è 258 e il conto regge uguale. Scatola senza fondo
 (`rgba(0,0,0,0)`), 15px dentro il bordo della card, premio scadenza e
 anello dove stavano, `scrollWidth` 375 a 375 e 320 a 320.
+
+## Il colore che stacca, e la tessera che si allinea (16 set 2026)
+
+**VIA TUTT'E DUE LE MORBIDEZZE.** Dopo l'alone e il bagliore Andrea ha
+cambiato rotta: tessera **piena e netta**, angoli da 10 come le scatole
+sorelle, marchio 40px dentro, corta (159x52) e col taglio della scatola
+intatto. È la forma del secondo giro, ma corta invece che larga tutta
+la riga. ⚠️ **E netta vuol dire che non esce**: `.p2p-paga` taglia, e
+una forma che sta dentro il suo riquadro non chiede nessuna taratura
+che la contenga — è la ragione per cui questa versione non ha il conto
+fra sfocatura e respiro che serviva al bagliore.
+
+**IL COLORE È STATO SCELTO SU SEDICI RESE**, tutte sulla card vera e
+tutte con la stessa forma e la stessa misura, in tre giri: le quattro
+chieste (navy attuale, blu notte carico, nero pieno, crema), poi sei
+tinte **di casa prese dai token veri** — la barra del P2P di sera, il
+bruno e la carta di sera, l'inchiostro, il verde della protezione, il
+petrolio dell'asta — poi altre sei (nero bruno, l'espresso della card,
+i due viola di Nostr, il verde e il petrolio cupi).
+**Ha vinto l'espresso, `#2E1602`**: la tinta della card stessa portata
+molto più giù, cioè tono su tono.
+
+⚠️ **E LA MISURA DICE COSA È CAMBIATO DAVVERO, che non è il contrasto.**
+Il giro era nato per «un colore che faccia risaltare il logo più del
+navy, che era troppo vicino al fondo» — ma i numeri dicono che i due
+sono la stessa cosa: contro i tre capi del gradiente della card
+l'espresso misura 1,69 / 2,97 / 2,06 e il navy 1,73 / 3,04 / 2,11, e
+sul marchio il bianco legge 16,6:1 contro 17,0 e l'arancio 7,0:1 contro
+7,1 (calcolati sui colori VERI del file, non a memoria: il bianco è
+251,252,252 su 3.090 pixel e l'arancio 248,137,10 su 4.812). Quindi la
+scelta è di FAMIGLIA, non di stacco: l'espresso si legge come un'ombra
+profonda della card invece che come un colore estraneo, ed è una
+ragione buona — ma chi un giorno volesse davvero più separazione sappia
+che la leva è **scendere di luce**, non cambiare tinta.
+
+⚠️ **LA CREMA È IMPOSSIBILE, e non per gusto:** il marchio è bianco e
+arancio su trasparente, quindi su un fondo chiaro la parola «aratto»
+sparisce e resta il simbolo con «zon» e un vuoto in mezzo. Un fondo
+chiaro chiederebbe una SECONDA versione del file col lettering scuro.
+Scartati anche il petrolio e i due viola: sono i colori dell'asta e di
+Nostr, e usarli qui vorrebbe dire che non significano più quelli.
+
+**E LA TESSERA STA A SINISTRA** (decisione dello stesso giro): il suo
+lato cade a 31, sulla colonna dell'importo, del badge e delle scatole
+delle card sorelle. Centrata era la scelta dell'**alone**, che un bordo
+con cui allinearsi non ce l'aveva; un riquadro vero invece si allinea,
+e centrato galleggiava. La riga `text-align:left` è scritta anche se è
+il valore che si eredita — lì c'era `center`, e una riga esplicita è
+l'unica cosa che impedisce di rimetterlo per sbaglio: una prova
+pretende che ci sia.
+
+**I NUMERI (375px, ricontrollati a 320).** Tessera 159x52 col marchio
+127x40 dentro, lato sinistro a 31 e marchio a 47; riga 313x52, card
+**158** contro i 140 di una normale — la più bassa da quando il marchio
+è a 40px (erano 196 col bagliore, 174 con l'alone, 162 con la fascia
+larga). Scatola senza fondo, `scrollWidth` 375 a 375 e 320 a 320.
+Provate anche le misure più piccole: marchio 34 (tessera 136x44, card
+150) e marchio 30, la taglia dei primi giri (121x40, card 146) —
+tenuto il 40.
+
+**COSA È STATO PROVATO** (`prove_p2p_barattozon`, 33 verdi): il colore
+vive in un token suo coi fratelli della card e il marchio lo legge da
+lì invece di ribatterlo; la tessera è piena (nessun gradiente, nessuna
+ombra, nessuna sfocatura) e ha gli angoli delle sorelle, **letti dalla
+regola di `.p2p-box` invece che ribattuti**; sta a sinistra e non è
+centrata; il taglio della scatola è al suo posto.
