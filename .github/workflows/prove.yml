@@ -167,7 +167,13 @@ jobs:
       # gia' successo alle FORME. E si esclude il VALORE e mai il
       # file: un collaudo che un domani portasse una chiave vera
       # resterebbe preso.
-      SEGNAPOSTI: INCOLLA_QUI|collaudo-usa-e-getta
+      # IL TERZO E' UNA LETTERA E UNA CIFRA (set 2026), e serve alla
+      # CRONOLOGIA: dc794b3 ha spinto quattro righe di cartone nella
+      # forma `KEY="i1"` prima che il banco passasse al dizionario,
+      # e la storia non si riscrive. Nessuna chiave vera ha quella
+      # forma, quindi l'eccezione non copre nessun segreto. L'albero
+      # e' pulito anche SENZA di lui (provato in locale sui due passi).
+      SEGNAPOSTI: INCOLLA_QUI|collaudo-usa-e-getta|KEY *= *"[a-z][0-9]"
       FORMA_HEX: '\b[0-9a-f]{64}\b'
     steps:
       - uses: actions/checkout@v5

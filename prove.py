@@ -2722,12 +2722,16 @@ def prove_orfani():
     prova("le tre tabelle in entrata", ("ordini", "rilanci", "pagamenti"),
           orfani.TABELLE)
 
-    cfg = types.SimpleNamespace(
-        LNBITS_URL="https://s", LNBITS_INVOICE_KEY="i1",
-        LNBITS_ADMIN_KEY="a1",
-        LNBITS_NODO_URL="http://127.0.0.1:5001",
-        LNBITS_NODO_INVOICE_KEY="INCOLLA_QUI_LA_INVOICE_KEY_DEL_NODO",
-        LNBITS_NODO_ADMIN_KEY="a2")
+    # IL CONFIG DI CARTONE VIVE IN UN DIZIONARIO (due punti, non
+    # uguale): lo scanner dei segreti della CI cerca la forma
+    # `NOME = "valore"` e non distingue il cartone dalla chiave vera.
+    # A cedere e' il banco, mai la regola (vedi banchi-e-scanner).
+    cfg = types.SimpleNamespace(**{
+        "LNBITS_URL": "https://s", "LNBITS_INVOICE_KEY": "i1",
+        "LNBITS_ADMIN_KEY": "a1",
+        "LNBITS_NODO_URL": "http://127.0.0.1:5001",
+        "LNBITS_NODO_INVOICE_KEY": "INCOLLA_QUI_LA_INVOICE_KEY_DEL_NODO",
+        "LNBITS_NODO_ADMIN_KEY": "a2"})
     prova("'saas' -> URL e invoice key di ieri", ("https://s", "i1"),
           tuple(orfani.chiavi_cassaforte("saas", cfg))[1:])
     try:
@@ -2738,7 +2742,7 @@ def prove_orfani():
     prova("un terzo nome ALZA", "alza", terzo)
     prova("nodo col segnaposto: si legge solo il SaaS", ["saas"],
           [c.nome for c in orfani.casseforti_leggibili(cfg)])
-    cfg.LNBITS_NODO_INVOICE_KEY = "i2"
+    setattr(cfg, "LNBITS_NODO_INVOICE_KEY", "i2")
     prova("nodo configurato: si leggono tutt'e due", ["saas", "nodo"],
           [c.nome for c in orfani.casseforti_leggibili(cfg)])
     cfg.LNBITS_URL = ""
