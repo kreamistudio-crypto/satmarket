@@ -16739,3 +16739,50 @@ due è cresciuta di un pixel.
 regola contro `.active`, i due conti delle sottrazioni letti dal CSS, e
 che la vecchia scritta del caricamento non esista più da nessuna parte
 — nemmeno nei commenti, che è la trappola già pagata tre volte oggi.
+
+## I quattro ritocchi del velo e delle pillole (16 set 2026)
+
+**1) IL NAVY ERA FINITO SU TUTTE LE PILLOLE**, e lo ha visto Andrea.
+La pillola prendeva il fondo scuro quando il parametro col suo
+contenuto era pieno — ma quel parametro è pieno SEMPRE: per i metodi
+senza marchio contiene il loro nome. ⚠️ **La regola CSS era giusta: a
+essere sbagliato era chi la indossava**, e nessuna prova sul foglio di
+stile poteva dirlo. Adesso il navy lo chiede il CATALOGO
+(`vesteMetodoP2P`), che è l'unico che sa chi ha un marchio, e una prova
+guarda proprio quel passaggio. Verificato dal vivo: una pillola navy su
+otto, e tutte alte 30.
+
+**2) L'ANELLO SOTTILE.** Il barattolino che ondeggia è il segno di casa
+e resta dov'è: qui serviva un giro più fine, e in casa un anello non
+c'era — questo è il primo. Due pixel di filo, il quarto acceso in
+arancio, e gira col keyframe che c'è già (quello della clessidra): un
+keyframe nuovo per la stessa cosa sarebbe il secondo da tenere in pari.
+Lo accende **chi chiama l'attesa**, con una classe sul velo: così il
+velo resta UNO e non nasce un secondo velo che gli somiglia.
+
+**3) IL VELO NON SFOCA PIÙ.** Dal campo: «lo sfondo è sgranato, il
+gradiente si vede a bande». La sfocatura di un fondo con un gradiente
+sotto si calcola a otto bit per canale e su molte schede esce a
+SCALINI. Al suo posto una velatura più fitta e **piatta**, che non ha
+niente da interpolare. ⚠️ **E il filtro NON è stato tolto da tutta la
+casa**: le quattro barre ce l'hanno ancora, e lì sta su strisce
+sottili dove le bande non si vedono — il difetto è di un velo GRANDE
+sopra un gradiente, non del filtro in sé. Una prima stesura del
+commento diceva «in casa non vive più da nessuna parte», e **a
+smentirlo è stata la prova**, che contava dieci occorrenze.
+
+**4) IL MARCHIO NELLA VOCE DEL FOGLIO, AL MASSIMO.** Era a 16 perché il
+respiro della voce era quello delle sorelle; adesso il respiro scende
+da 9 a 4 e il marchio sale a **26** — dieci in più, a parità di riga.
+La voce resta a 37 contro i 38 della sorella: non cresce, che era la
+condizione. ⚠️ **E la regola sta DOPO `.p2p-voce`**, non accanto al
+marchio: hanno la stessa specificità e a decidere è l'ordine. Scritta
+lassù perdeva, e la voce cresceva a **47** invece di restare a 38 —
+misurato, non immaginato. È lo stesso inciampo della pillola contro
+`.active`, nello stesso pomeriggio: **in questo foglio di stile la
+specificità da sola non basta mai, conta dove scrivi la riga.**
+
+**I NUMERI.** Pillole: una navy su otto, tutte a 30. Voce col marchio:
+37 contro 38, marchio 83x26 dentro una tessera 95x30. Velo:
+`rgba(20,20,22,.62)` piatto, `backdrop-filter: none`, anello 24px con 2
+di filo.

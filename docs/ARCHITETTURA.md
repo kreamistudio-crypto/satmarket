@@ -23921,7 +23921,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   marchio ci sta nudo a 24px; nella pillola del filtro è la pillola a
   riempirsi, e il marchio è nudo a 18px; nella voce del foglio
   «Pubblica», dove il marchio sta accanto al nome, il fondo è una
-  tessera piccola dietro di lui e il marchio è alto 16px. **Le tre
+  tessera piccola dietro di lui e il marchio è alto 26px (la voce
+  stringe il respiro da 9 a 4 per fargli posto senza crescere). **Le tre
   misure sono tre sottrazioni**, non tre scelte: ogni posto ha
   un'altezza che non deve cambiare (34, 30, 38 — le stesse delle
   sorelle), e il marchio prende quel che resta. Fondo scuro e marchio
