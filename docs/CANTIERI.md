@@ -16663,14 +16663,23 @@ la parola bianca sul chip chiaro del tema giorno — difetto **visto**
 sullo schermo, non dedotto, e che nessun'altra sentinella saprebbe
 vedere.
 
-**DELLA SCATOLA CAMBIA IL SOLO FONDO**: angoli, colonna e margini
-restano quelli delle sorelle, e l'unica altra cosa sua è il respiro
-verticale, sceso da 8 a **5** per tenere un marchio da 30 dentro sei
-pixel di crescita invece di quattordici. Il respiro è rimasto quello
-dei giri precedenti e non gli 8 di `99abe67`, dove il marchio era 22.
+**DELLA SCATOLA CAMBIA IL SOLO FONDO**: angoli, colonna, margini e
+**altezza** restano quelli delle sorelle — nessun punto in più (ultimo
+aggiustamento di Andrea, stessa sera). L'unica altra cosa sua è il
+respiro verticale, 5 invece di 8, e non serve a fare spazio: è il navy
+che si vede attorno al marchio.
 
-**I NUMERI (375px, ricontrollati a 320).** Card **146** contro i 140
-della sorella, scatola **313x40** contro 313x34, marchio **95x30**,
-fondo `rgb(19,26,38)` dal computed style — lo stesso nei due temi,
-perché il navy non dipende dalla carta. La card più corta (prezzo
-fisso, senza badge) sta in 124, `scrollWidth` 375 a 375 e 320 a 320.
+⚠️ **E COSÌ LA MISURA DEL MARCHIO NON È PIÙ UNA SCELTA, È UNA
+SOTTRAZIONE**: la scatola è alta 34 come le sorelle, il respiro ne
+prende 5+5, e quel che resta — **24** — è il marchio. La prova non
+guarda più una soglia ma un'**uguaglianza**: la nostra scatola e quella
+delle sorelle devono venire allo stesso numero. Il 18 con cui il conto
+parte (l'altezza della riga di testo di una scatola normale) è
+**misurato**, non dedotto: la sorella viene 34, che è 18 più 8+8.
+
+**I NUMERI (375px, ricontrollati a 320).** Card **140** e scatola
+**313x34**: gli stessi identici numeri della sorella accanto, a
+entrambe le larghezze. Marchio **76x24**, fondo `rgb(19,26,38)` dal
+computed style — lo stesso nei due temi, perché il navy non dipende
+dalla carta. La card più corta (prezzo fisso, senza badge) sta in 118,
+`scrollWidth` 375 a 375 e 320 a 320.

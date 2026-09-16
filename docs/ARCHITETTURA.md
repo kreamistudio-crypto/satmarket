@@ -23916,7 +23916,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   tabacchino si presenta col marchio Barattozon — grande (40px) al
   posto del testo nella scatola dei metodi della card del libro, che lì
   porta il marchio al posto del nome: nella card la SCATOLA dei metodi
-  si riempie di navy (#131A26) e il marchio ci sta nudo, alto 30px;
+  si riempie di navy (#131A26) e il marchio ci sta nudo, alto 24px —
+  quanto resta di una scatola alta come quelle sorelle, tolto il respiro
+  di 5 che gli fa da cornice navy;
   fuori dalla card (pillola del filtro e voci del foglio) porta una
   tessera dello stesso navy ed è alto 13px, perché lì le pillole stanno
   in fila. Fondo scuro e marchio nudo sono una COPPIA: il marchio è
