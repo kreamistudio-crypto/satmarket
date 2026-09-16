@@ -47801,24 +47801,25 @@ def prove_p2p_barattozon():
     _ins = pezzo_js(css, ".p2p-paga-marchio{", "}")
     _insm = pezzo_js(css, ".p2p-paga-marchio .p2p-marca{", "}")
     _insi = pezzo_js(css, ".p2p-paga-marchio .p2p-marca img{", "}")
-    # ⚠️ LA SCATOLA NON HA PIU' NIENTE DI SUO (16 set 2026, ritocco di
-    # Andrea che rovescia l'insegna navy di mezz'ora prima): ne' fondo,
-    # ne' bordo, ne' raggio — solo il respiro verticale, che scende per
-    # far posto a un marchio grande. A distinguere la card basta il
-    # marchio, e il rettangolo navy e' la TESSERA, non la scatola.
-    prova("la scatola non ha niente di suo, solo il respiro", True,
-          "padding-top:" in _ins
-          and not any(x in _ins for x in ("background", "border", "radius")))
-    # ⚠️ DENTRO LA SCATOLA IL MARCHIO E' NUDO, MA MAI NUDO E BASTA: e'
-    # bianco e arancio su trasparente, e sul chip chiaro del tema
-    # giorno la parola bianca sparisce (verificato sullo schermo). Al
-    # posto della tessera ha un ALONE — due drop-shadow strette dello
-    # stesso navy — che gli disegna il contorno senza mettergli niente
-    # dietro. Le due cose stanno INSIEME o non stanno: chi togliesse
-    # l'alone lasciando il fondo trasparente si ricompra un marchio
-    # mezzo invisibile, e nessun'altra prova se ne accorgerebbe.
-    prova("dentro la scatola il marchio e' nudo, ma mai nudo e basta", True,
-          "background:none" in _insm and "drop-shadow" in _insi)
+    # ⚠️ DELLA SCATOLA CAMBIA IL SOLO FONDO: angoli, colonna e margini
+    # restano quelli delle sorelle, e l'unica altra cosa sua e' il
+    # respiro verticale, che scende per far posto a un marchio grande.
+    prova("la scatola col marchio ha il fondo navy, e cambia solo quello",
+          True,
+          "background:#131A26" in _ins and "padding-top:" in _ins
+          and not any(x in _ins for x in ("border", "radius")))
+    # ⚠️ LA COPPIA E' FONDO NAVY + MARCHIO NUDO, e le due cose stanno
+    # INSIEME o non stanno. Da un lato: col fondo scuro della scatola,
+    # una tessera o un alone addosso al marchio sarebbero una toppa e
+    # un contorno inutili. Dall'altro: chi togliesse il navy lasciando
+    # il marchio nudo si ricompra la parola bianca che sparisce sul
+    # chip chiaro del tema giorno — difetto VISTO sullo schermo, e che
+    # nessun'altra prova saprebbe vedere.
+    prova("la coppia sta in piedi: fondo navy e marchio nudo", True,
+          "background:#131A26" in _ins and "background:none" in _insm)
+    prova("...e il marchio non porta ne' alone ne' ombre, che li' non servono",
+          [False, False],
+          ["filter" in _insi, "shadow" in _insm])
     # la tessera e' NAVY e non piu' l'ambra di casa (16 set 2026): e'
     # l'unica cosa rimasta in piedi del giro dei sedici colori, e su di
     # lei il marchio legge 16,6:1 col bianco e 7,0:1 con l'arancio.
