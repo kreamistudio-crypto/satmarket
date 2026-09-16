@@ -2698,6 +2698,28 @@ def prove_importo_uscita():
     prova("sentinella: la fattura del wallet si rilegge sempre", True,
           "importo_invoice" in lna
           and 'return r.json().get("pr")' not in lna)
+    # 6: L'USCITA E' UNA (16 set 2026). Le sentinelle qui sopra guardano
+    #    i CHIAMANTI di paga_venditore: un tubo nuovo che bussasse a
+    #    LNbits da solo, con la chiave admin in mano, aggirerebbe la
+    #    cintura senza far rossa nessuna di loro. Si contano nel
+    #    sorgente INTERO, prosa compresa — quindi la richiesta che paga
+    #    e l'header con la chiave admin non si scrivono nei commenti di
+    #    server.py nemmeno per spiegarli — e devono stare tutt'e due
+    #    dentro il pezzo che ha la cintura. La regex e' larga apposta:
+    #    `"out":True` senza spazio o `LNBITS_NODO_ADMIN_KEY` nudo
+    #    nell'header contano uguale.
+    _paga = re.findall(r'"out"\s*:\s*True', _SORGENTE)
+    _admin = re.findall(r'X-Api-Key"\s*:\s*[\w.]*ADMIN_KEY', _SORGENTE)
+    prova("sentinella: la richiesta che paga e' UNA in tutto il server", 1,
+          len(_paga))
+    prova("sentinella: la chiave admin sta in UN header solo", 1,
+          len(_admin))
+    prova("...e tutt'e due stanno dentro paga_venditore, sotto la cintura",
+          (1, 1, True),
+          (len(re.findall(r'"out"\s*:\s*True', pv)),
+           len(re.findall(r'X-Api-Key"\s*:\s*[\w.]*ADMIN_KEY', pv)),
+           pv.index("chiesto != atteso_sats") < pv.index('"out"')))
+
 
 
 # ====================================================================
