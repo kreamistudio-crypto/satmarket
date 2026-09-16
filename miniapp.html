@@ -2447,12 +2447,20 @@
      gradiente, il rettangolo pieno che l'aveva sostituito era una
      toppa larga tutta la riga, e quel che ci vuole e' un marchio
      APPOGGIATO sulla card, con i bordi che ci si sciolgono dentro.
-     COM'E' FATTO: IL NAVY E' LA CARD. Non c'e' nessuna tessera —
-     ne' rettangolo, ne' alone, ne' bagliore: ci sono passate tutt'e
-     tre, e la storia sta in CANTIERI («La scelta rovesciata», «Il
-     colore che stacca», «Il navy diventa la card»). Il gradiente
-     della card parte dal navy in CIMA e scende sfumando nell'ambra,
-     e il marchio si appoggia li' sopra, primo di tutti.
+     COM'E' FATTO: LA CARD E' QUELLA DELLE SORELLE, e di suo ha solo
+     il CAPO. Non c'e' nessuna tessera — ne' rettangolo, ne' alone, ne'
+     bagliore — e non c'e' piu' nemmeno l'ambra: ci sono passate tutte,
+     e la storia sta in CANTIERI («La scelta rovesciata», «Il colore
+     che stacca», «Il navy diventa la card», «Solo il capo»). Il
+     gradiente parte dal navy in CIMA, dove siede il marchio, e scende
+     sciogliendosi nel colore normale della card.
+     ⚠️ E LA CARD NON RISCRIVE PIU' NESSUN TOKEN, che e' la parte che
+     cambia di piu' sotto il cofano: finche' il fondo era scuro,
+     inchiostro, grigio, verde e rosso dovevano schiarirsi tutti. Adesso
+     il fondo e' la carta di casa, quindi i token di casa sono gia'
+     quelli giusti — e riscriverne uno vorrebbe dire scrivere testo
+     chiaro sul bianco. Questa card e' una sorella con un cappello, e
+     una prova pretende che resti tale.
      ⚠️ LE FERMATE DEL GRADIENTE SONO IN PIXEL, NON IN PERCENTO, ed e'
      la riga da non ammorbidire: la card e' alta quanto il suo
      contenuto — con o senza badge, con o senza stelline, e in due
@@ -2464,18 +2472,20 @@
      CSS a ogni giro: il marchio va da 12 a 52 (il respiro della card
      piu' i suoi 40) e il navy tiene PIENO fino a 56 — sei pixel di
      margine sotto il marchio, e mai tanti da mangiarsi la riga
-     dell'importo, che comincia a 82. Poi la dissolvenza, e deve
+     dell'importo, che comincia a 82. Poi la dissolvenza, che deve
      finire PRIMA che finisca la card piu' corta che esista: quella di
-     un ordine a prezzo fisso, senza badge, e' alta 146, quindi l'ambra
-     va raggiunta entro ~130 o esisterebbero card che l'ambra non la
-     vedono mai.
-     ⚠️ E LA DISSOLVENZA PASSA DA DUE FERMATE CALDE (16 set 2026,
-     richiesta di Andrea: «piu' sfumato»). Allungarla e basta non
-     bastava: fra il navy e l'ambra la strada dritta passa da un
-     grigio-bruno spento — il fango — perche' i due colori stanno su
-     lati opposti della ruota. Le due fermate di mezzo la portano
-     dentro la famiglia calda, e la card si legge come un colore che
-     scende invece che come due colori che si incontrano.
+     un ordine a prezzo fisso, senza badge, e' alta 146.
+     ⚠️ E QUI LA DISSOLVENZA HA UN SECONDO PADRONE, che con l'ambra non
+     c'era: il TESTO. La riga dell'importo comincia a 82, cioe' DENTRO
+     la sfumatura, e di giorno l'inchiostro e' scuro — quindi piu' la
+     sfumatura si allunga, piu' quella riga si trova su un grigio medio
+     e meno si legge. A 104 la carta e' arrivata all'87% quando il
+     testo comincia, e il contrasto misurato resta sopra il minimo per
+     il testo normale. Chi volesse allungarla ancora deve misurare
+     quello, non guardare la card: e' il numero che decide.
+     E LE FERMATE CALDE DI IERI SONO CADUTE con l'ambra: servivano a
+     scansare il fango fra navy e arancio, due colori su lati opposti
+     della ruota. Verso la carta la strada e' dritta e pulita.
      ⚠️ IL TAGLIO DELLA SCATOLA RESTA DOV'E', ed e' la riga da non
      ammorbidire: `.p2p-paga` TAGLIA quel che esce, ed e' cosi' che un
      elenco di metodi lungo — testo di SCONOSCIUTI, che col tabacchino
@@ -2499,26 +2509,25 @@
   .p2p-marca.mini{padding:2px 6px;border-radius:6px;margin-top:-1px}
   .p2p-marca.mini img{height:14px}
   .p2p-ord.p2p-barattozon{
-    --ink:#FFF4E4;--muted:#EED5B4;--ink-soft:#F1DDC2;--line:rgba(255,255,255,.28);
-    --chip-bg:rgba(255,255,255,.12);
-    /* la tinta della TESTA della card, quella su cui siede il
-       marchio: una DECISIONE, non un dettaglio — e' il navy della
-       seconda versione, ripescato da Andrea dopo sedici rese
-       (CANTIERI, «Il colore che stacca» e «Il navy diventa la card»),
-       e chi volesse rivederla cambia qui. */
+    /* la tinta del CAPO, l'unica cosa che questa card ha di suo: una
+       DECISIONE, non un dettaglio — e' il navy della seconda versione,
+       ripescato da Andrea dopo sedici rese (CANTIERI, «Il colore che
+       stacca» e «Solo il capo»), e chi volesse rivederla cambia qui. */
     --barattozon-testa:#131A26;
-    --trust:#3FCB8A;--danger:#FFA07A;--sats:#FFB25C;--sats-text:#FFC98A;
-    /* IL GRADIENTE DELLA CARD, e le sue fermate in PIXEL: vedi il
-       commento qui sopra, «le tre misure che devono stare in pari». */
+    /* IL GRADIENTE, e le sue fermate in PIXEL: vedi il commento qui
+       sopra. Finisce su `var(--card)` e non su una tinta scritta a
+       mano, ed e' la riga che tiene la card in famiglia: di giorno la
+       carta e' bianca, di sera e' bruna, e il capo ci si scioglie
+       dentro tutt'e due le volte senza che nessuno debba ricordarsene. */
     background:linear-gradient(180deg,var(--barattozon-testa) 0,
-      var(--barattozon-testa) 56px,#3E2A1A 78px,#7A3B08 96px,
-      #A24F0A 118px,#7D3D06 100%);
+      var(--barattozon-testa) 56px,var(--card) 104px);
     border-color:rgba(255,170,80,.55);
     box-shadow:0 0 0 1px rgba(255,138,0,.14),0 4px 14px rgba(110,55,5,.22)}
   /* IL MARCHIO E' NUDO: il fondo scuro glielo da' la card. */
   .p2p-ord.p2p-barattozon .p2p-marca{border-radius:0;padding:0;background:none}
   /* l'importo comincia a 82 (12 + 40 del marchio + questi 30): sotto
-     la fascia navy, e dentro la dissolvenza, che da li' continua. */
+     la fascia navy, e dentro la dissolvenza — vedi il commento sul
+     secondo padrone della sfumatura, che e' il contrasto del testo. */
   .p2p-ord.p2p-barattozon .p2p-testa{margin-top:30px}
   /* e l'anello scende con lei, o starebbe sulla fascia del marchio */
   .p2p-ord.p2p-barattozon .p2p-anello{top:84px}

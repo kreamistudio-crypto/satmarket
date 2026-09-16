@@ -47784,15 +47784,22 @@ def prove_p2p_barattozon():
                   [True, False, True, False, False], out["teste"])
 
     # --- 5) IL CSS: la card riscrive i TOKEN (cosi' badge, anello e
-    # stelline vestono da soli), il marchio e' grande dentro e piccolo
-    # fuori, la variante chiara esiste e vale solo col tema chiaro, e
-    # la scatola dei metodi cede coi puntini come prima.
+    # il marchio e' grande dentro e piccolo fuori, la scatola dei metodi
+    # cede coi puntini come prima, e la card e' una SORELLA col cappello.
     _card = pezzo_js(css, ".p2p-ord.p2p-barattozon{", "}")
-    prova("la card vestita riscrive i token, non le regole delle figlie", True,
-          all(t in _card for t in ("--ink:", "--muted:", "--trust:", "--danger:",
-                                   "--sats-text:", "--chip-bg:", "--line:"))
-          and "linear-gradient(" in _card
-          and css.count(".p2p-ord.p2p-barattozon .p2p-sats") == 0)
+    # ⚠️ LA CARD NON RISCRIVE PIU' NESSUN TOKEN DI TESTO, ed e' una
+    # regola e non un'economia: il fondo e' tornato quello delle
+    # sorelle, quindi un `--ink` schiarito qui — che serviva al fondo
+    # scuro — scriverebbe in chiaro sul bianco. L'unico token che resta
+    # e' quello del capo, che e' una tinta sua e non un'eredita'.
+    prova("la card non riscrive nessun token di testo: e' una sorella col cappello",
+          [False, True],
+          [any(t in _card for t in ("--ink:", "--muted:", "--ink-soft:", "--trust:",
+                                    "--danger:", "--sats:", "--sats-text:",
+                                    "--chip-bg:", "--line:")),
+           "--barattozon-testa:" in _card])
+    prova("...e non tocca nemmeno le regole delle figlie", 0,
+          css.count(".p2p-ord.p2p-barattozon .p2p-sats"))
     prova("il marchio: 40px nella card, 14px nella pillola e nella voce", True,
           ".p2p-marca img{display:block;height:40px;width:auto}" in css
           and ".p2p-marca.mini img{height:14px}" in css)
@@ -47814,6 +47821,12 @@ def prove_p2p_barattozon():
           bool(_tinta))
     prova("...e a leggerlo e' il gradiente della card, non una tessera", True,
           "linear-gradient(180deg,var(--barattozon-testa) 0," in _cardcss)
+    # ⚠️ E IL GRADIENTE FINISCE SU `var(--card)`, non su una tinta
+    # scritta a mano: e' la riga che tiene la card in famiglia in
+    # tutt'e due i temi — di giorno la carta e' bianca, di sera bruna —
+    # senza che nessuno debba ricordarsi di aggiornarla.
+    prova("...e finisce sulla carta di casa, non su una tinta a mano", True,
+          "var(--card) " in _cardcss and "#A24F0A" not in _cardcss)
     prova("del marchio non resta nessuna tessera, in nessuna forma",
           [False, False, False, False],
           ["gradient(" in _alone, "box-shadow" in _alone, "filter:" in _alone,
@@ -47833,22 +47846,26 @@ def prove_p2p_barattozon():
     if len(_ferm) < 2 or not _mg:
         prova("le fermate del gradiente si leggono dal CSS", True, False)
     else:
-        _pieno, _ambra = _ferm[0], _ferm[-1]
+        _pieno, _fine = _ferm[0], _ferm[-1]
         _riga = 12 + 40 + int(_mg.group(1))
         prova("il navy tiene pieno sotto tutto il marchio", True, _pieno >= 52)
         prova("...e non ne avanza piu' di un dito", True, _pieno - 52 <= 8)
         prova("...e non si mangia la riga dell'importo", True, _pieno < _riga)
-        # ⚠️ L'AMBRA DEVE ARRIVARE PRIMA CHE FINISCA LA CARD PIU' CORTA:
+        # ⚠️ LA CARTA DEVE ARRIVARE PRIMA CHE FINISCA LA CARD PIU' CORTA:
         # un ordine a prezzo fisso non porta il badge e sta in 146px,
         # quindi una dissolvenza che finisse piu' in la' farebbe card
-        # che l'ambra non la vedono mai — e il difetto si vedrebbe solo
-        # su ALCUNE card, che e' il modo peggiore in cui si vede.
-        prova("...e l'ambra arriva prima che la card piu' corta finisca",
-              True, _ambra <= 130)
-        # la dissolvenza non va dritta dal navy all'ambra: in mezzo c'e'
-        # il fango, e le fermate calde la portano dentro la famiglia
-        prova("la dissolvenza passa da fermate calde, non dritta nel fango",
-              True, len(_ferm) >= 4)
+        # che il loro colore non lo vedono mai — e il difetto si
+        # vedrebbe solo su ALCUNE card, che e' il modo peggiore.
+        prova("...e la carta arriva prima che la card piu' corta finisca",
+              True, _fine <= 130)
+        # ⚠️ IL SECONDO PADRONE DELLA SFUMATURA E' IL TESTO, e non c'era
+        # finche' il fondo era scuro: la riga dell'importo comincia
+        # DENTRO la dissolvenza e di giorno l'inchiostro e' scuro,
+        # quindi piu' la sfumatura si allunga piu' quella riga si trova
+        # su un grigio medio. Il conto che la tiene leggibile: quando il
+        # testo comincia, la carta dev'essere almeno a meta' strada.
+        prova("quando comincia l'importo la carta e' almeno a meta' strada",
+              True, (_riga - _pieno) / max(1, _fine - _pieno) >= .5)
     # e l'anello scende con lei: a 12 starebbe sulla fascia del marchio
     _an = _re_b.search(r"top:(\d+)px",
                        pezzo_js(css, ".p2p-ord.p2p-barattozon .p2p-anello{", "}"))
