@@ -16294,3 +16294,87 @@ lì invece di ribatterlo; la tessera è piena (nessun gradiente, nessuna
 ombra, nessuna sfocatura) e ha gli angoli delle sorelle, **letti dalla
 regola di `.p2p-box` invece che ribattuti**; sta a sinistra e non è
 centrata; il taglio della scatola è al suo posto.
+
+## Il navy diventa la card: la direzione definitiva (16 set 2026)
+
+**VIA LA TESSERA IN OGNI SUA FORMA.** Rettangolo, alone, bagliore,
+insegna corta: tutte strade di un pomeriggio solo, e tutte finite.
+Adesso **il fondo scuro del marchio è la CARD**: il suo gradiente parte
+dal navy `#131A26` — quello della seconda versione, ripescato — e
+scende sfumando nell'ambra di sempre. Il marchio sale in CIMA, primo
+elemento della card, e ci si appoggia sopra nudo, a 40px, con
+l'inchiostro che comincia a 31, cioè sulla colonna dell'importo, del
+badge e delle scatole delle card sorelle. Sotto, dall'importo in giù,
+la card è quella di prima.
+
+⚠️ **LE FERMATE DEL GRADIENTE SONO IN PIXEL, E NON È UN DETTAGLIO.** La
+card è alta quanto il suo contenuto: col badge del premio o senza, con
+le stelline o senza, con un importo lungo che va a capo. Una fermata in
+**percento** farebbe salire e scendere la fascia navy sotto al marchio
+a seconda di quello che c'è SOTTO — cioè il marchio finirebbe a metà
+sull'ambra in certe card e non in altre, e il difetto si vedrebbe solo
+su alcune. In pixel la fascia è quella e basta. **Provato sul caso che
+lo smaschera**: un ordine a prezzo fisso, che non porta il badge, fa
+una card di 146px invece di 168 — e il campione di pixel sotto al
+marchio è identico nelle due.
+
+**LE MISURE CHE DEVONO STARE IN PARI**, e una prova le rilegge dal CSS
+a ogni giro: il marchio va da 12 a 52 (il respiro della card più i suoi
+40px); il navy tiene **pieno fino a 56**, sei pixel di margine sotto il
+marchio e mai tanti da mangiarsi la riga dell'importo, che comincia a
+82; e l'ambra dev'essere raggiunta **entro ~130**, perché la card più
+corta che esista — un ordine a prezzo fisso, senza badge — è alta 146:
+una dissolvenza più lunga farebbe card che l'ambra non la vedono mai.
+**L'anello scende con loro** (`top:84px`): a 12 sarebbe finito sulla
+fascia del marchio, e quella fascia è sua.
+
+⚠️ **E LA DISSOLVENZA PASSA DA DUE FERMATE CALDE** (richiesta di Andrea
+a giro quasi chiuso: «più sfumato»). Allungarla e basta non bastava:
+fra il navy e l'ambra la strada dritta passa da un grigio-bruno spento
+— il fango — perché i due colori stanno su lati opposti della ruota.
+Con `#3E2A1A` a 78 e `#7A3B08` a 96 la discesa resta dentro la famiglia
+calda, l'ambra piena arriva a 118, e la card si legge come UN colore
+che scende invece che come due colori che si incontrano. Guardate
+quattro lunghezze affiancate: 26 pixel (troppo netta), 54, 84 (l'ambra
+quasi sparisce) e questa.
+
+**E IL MARCHIO IN CIMA CAMBIA IL MARKUP, non un `order` del flex.** Con
+l'ordine visivo staccato da quello del documento, la stessa card si
+leggerebbe in due modi diversi — l'occhio il marchio per primo, il
+lettore di schermo l'importo. La card è un solo bottone e si legge
+tutta: l'ordine vero è l'unico che c'è. A chiederlo è il CATALOGO
+(`inTesta`), non la card, e la scatola resta UNA — scritta nei due rami
+dello stesso ternario, mai due volte nella pagina.
+
+⚠️ **LA VARIANTE CHIARA È MORTA, ed è una conseguenza e non un taglio.**
+Serviva a scegliere fra una card scura e una crema; la scelta è caduta
+su una card che in cima **è scura per mestiere**, perché il marchio ci
+si appoggia. Su una card crema il marchio — bianco e arancio — perde la
+parola «aratto»: la stessa ragione che aveva bocciato la resa crema fra
+i sedici colori. Non si riapre senza una seconda versione del file col
+lettering scuro. Via l'interruttore, via le regole, e una prova
+pretende che non ne resti niente: una leva che non accende più nulla è
+peggio di nessuna leva.
+
+**LA SCATOLA DEI METODI RESTA, trasparente.** Nessun fondo, nessun
+margine, allineata a sinistra — ma **il suo taglio non si tocca**: col
+tabacchino il libro può portare l'ordine di un altro client con più
+metodi, e quel taglio è la riga che impedisce a un elenco lungo di
+allargare la pagina.
+
+**I NUMERI (375px, ricontrollati a 320).** Card **168**px col badge e
+**146** a prezzo fisso, contro i 140 di una normale; marchio 127x40 a
+x=31; scatola 313x40 col fondo `rgba(0,0,0,0)`; anello a 84;
+`scrollWidth` 375 a 375 e 320 a 320. **E il colore lo dicono i PIXEL,
+non la geometria**: sopra, a metà e appena sotto il marchio si legge
+`rgb(18,25,37)`–`rgb(19,26,38)`, cioè il navy pieno; sulla riga
+dell'importo `rgb(116,57,9)`, sul badge `rgb(142,69,8)`, in fondo alla
+card `rgb(128,62,6)` — tutti bruni caldi, nessun grigio. Uguali a 375,
+a 320, col tema di sera e sulla card corta.
+
+**COSA È STATO PROVATO** (`prove_p2p_barattozon`, 41 verdi): il
+catalogo chiede `inTesta`; la card apre col marchio nei due rami del
+ternario; il gradiente è verticale, legge il token e ha le fermate in
+pixel; il conto fra le tre misure; l'anello sceso; la scatola
+trasparente e senza margine; il taglio al suo posto; e della variante
+chiara non resta niente, né nel client né nel CSS.

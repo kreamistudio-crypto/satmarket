@@ -23915,11 +23915,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   IL VESTITO BARATTOZON (16 set 2026, decisione di Andrea): nella UI il
   tabacchino si presenta col marchio Barattozon — grande (40px) al
   posto del testo nella scatola dei metodi della card del libro, che lì
-  non è più una scatola: il marchio sta su una TESSERA piena e netta
-  (#2E1602, l'espresso della card: la sua stessa tinta portata molto
-  più giù), corta quanto lui più un respiro — 159x52, angoli da 10 come
-  le scatole sorelle, allineata a sinistra sulla colonna della card — e
-  il 💳 se ne va
+  non è più una scatola e il marchio non ha più nessuna tessera: SALE
+  IN CIMA alla card e si appoggia al gradiente di lei, che parte dal
+  navy #131A26 in testa e scende sfumando nell'ambra (fermate in
+  PIXEL, non in percento, o la fascia si muoverebbe con l'altezza
+  della card). Il 💳 se ne va
   perché un marchio si intesta da sé; piccolo
   (14px) nella pillola del filtro e accanto alla voce nel foglio
   «Pubblica» —
