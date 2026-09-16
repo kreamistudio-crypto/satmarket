@@ -16460,16 +16460,34 @@ resto del libro è che nella scatola dei metodi, al posto del testo
 tessera navy. Tutto il resto — sei versioni vestite provate in un
 pomeriggio — è uscito dal codice.
 
-**IL RETTANGOLO NAVY È LA TESSERA DEL MARCHIO**, e la scatola non ha
-niente di suo. Ci sono voluti due giri per arrivarci: prima il navy era
-la TESSERA dietro al solo logo, poi — su chiarimento di Andrea — è
-diventato la SCATOLA intera col marchio nudo dentro, e mezz'ora dopo la
-scatola è tornata quella delle sorelle. **Il difetto della scatola navy
-non era estetico**: quel rettangolo pieno largo tutta la riga rifaceva,
+**DENTRO LA CARD NON C'È NESSUN RETTANGOLO, E IL MARCHIO SI LEGGE LO
+STESSO.** Ci sono voluti tre giri: il navy era la TESSERA dietro al
+logo, poi — su chiarimento di Andrea — la SCATOLA intera col marchio
+nudo dentro, poi di nuovo la tessera, e infine **niente**: il logo
+direttamente nella scatola di casa. **Il difetto della scatola navy non
+era estetico**: quel rettangolo pieno largo tutta la riga rifaceva,
 dentro una card bianca, la stessa toppa che avevamo passato il
-pomeriggio a togliere dalla card. Adesso il fondo scuro se lo porta il
-marchio addosso, come già fa fuori dalla card — ed è obbligatorio, non
-una scelta: senza, la sua parola bianca sparisce sulla carta chiara.
+pomeriggio a togliere dalla card.
+⚠️ **MA NUDO E BASTA NON SI POTEVA**, ed è stato verificato sullo
+schermo prima di spingerlo: il marchio è bianco e arancio su
+trasparente, e sul chip chiaro del tema giorno la parola bianca
+sparisce — si legge il simbolo, un vuoto, poi «zon». Di sera, dove il
+chip è bruno scuro, il difetto non esiste: è il genere di guasto che si
+vede solo su metà delle installazioni. Al posto della tessera il
+marchio ha un **ALONE**: due `drop-shadow` strette dello stesso navy,
+che gli disegnano il contorno senza mettergli niente dietro. Scelto da
+Andrea fra quattro rese (nudo, alone sottile, alone marcato, tessera).
+**Le due cose stanno insieme o non stanno** — fondo trasparente E alone
+— e una prova pretende che quando c'è l'uno ci sia l'altro: chi
+togliesse l'alone si ricomprerebbe un marchio mezzo invisibile, e
+nessun'altra sentinella se ne accorgerebbe.
+⚠️ **E IL CONTO DELLA SCATOLA SI LEGGE DA DENTRO LA SCATOLA**: il
+respiro del marchio è 0 lì dentro (è nudo) e 2 fuori (ha la tessera), e
+la prova che prendeva il numero di fuori gonfiava il conto di quattro
+pixel inesistenti, diventando rossa su una card sana. Nello stesso
+punto, `padding:0` **non ha unità**: una regex che pretendeva i `px`
+non lo trovava e cadeva sul ripiego — due modi diversi di leggere il
+numero sbagliato, nella stessa riga, in cinque minuti.
 ⚠️ **E LA SCATOLA CEDE SOLO IL RESPIRO**: `padding` verticale da 8 a 3,
 e nient'altro. Non è cosmesi — è quello che permette a un marchio da 30
 di costare **sei** pixel invece di quattordici. Una prova rifà il conto
@@ -16491,8 +16509,8 @@ alta 17 (12,5px di testo a interlinea normale). FUORI, con la tessera
 che aggiunge 2+2 di respiro, il marchio resta a **13**: lì le pillole
 stanno in fila con le sorelle, e una più alta delle altre si vedrebbe.
 DENTRO la card non c'è nessuna fila e il marchio sale a **30** —
-scelto da Andrea — e col respiro della scatola sceso a 3 costa **sei**
-pixel di scatola e sei di card. Misurato sul vivo: card **146** contro
+scelto da Andrea — e, nudo com'è, col respiro della scatola a 5 costa
+**sei** pixel di scatola e sei di card. Misurato sul vivo: card **146** contro
 i 140 della sorella, scatola **313x40** contro 313x34, marchio
 **95x30**; il fondo della scatola è `rgb(243,236,218)` di giorno e
 `rgb(55,48,31)` di sera, cioè `--chip-bg` nei due temi, letto dal

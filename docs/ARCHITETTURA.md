@@ -23915,9 +23915,12 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   IL VESTITO BARATTOZON (16 set 2026, decisione di Andrea): nella UI il
   tabacchino si presenta col marchio Barattozon — grande (40px) al
   posto del testo nella scatola dei metodi della card del libro, che lì
-  porta il marchio al posto del nome, dentro la sua tessera navy
-  (#131A26): 30px nella card, 13px nella pillola del filtro e nelle
-  voci del foglio, dove le pillole stanno in fila. **La card è IDENTICA
+  porta il marchio al posto del nome: nella card è NUDO e alto 30px,
+  con un alone navy (#131A26) di due `drop-shadow` strette che gli
+  disegnano il contorno — senza, sul chip chiaro del tema giorno la sua
+  parola bianca sparisce; fuori dalla card (pillola del filtro e voci
+  del foglio) porta una tessera dello stesso navy ed è alto 13px,
+  perché lì le pillole stanno in fila. **La card è IDENTICA
   alle sorelle** e anche la scatola dei metodi lo è — fondo, bordo e
   raggio di casa — tranne il respiro verticale, che scende da 8 a 3 per
   far posto al marchio grande senza far scappare la scatola più di sei
