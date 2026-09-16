@@ -16171,7 +16171,9 @@ bordo con cui allinearsi sembra scivolato in un vuoto lungo due terzi
 di riga (l'alone è centrato: il suo centro è l'unico punto che si veda
 davvero); e il rettangolo arrotondato col bagliore dello stesso colore,
 che resta una toppa con un contorno morbido — si vede ancora la forma,
-ed è la forma il difetto.
+ed è la forma il difetto. ⚠️ **QUESTO SECONDO SCARTO È STATO ROVESCIATO
+DA ANDREA LO STESSO GIORNO**, ed è la voce qui sotto: la forma che
+restava leggibile non era il difetto, era quello che voleva.
 
 **I NUMERI (375px, ricontrollati a 320).** Alone 191x68, marchio 127x40
 dentro; la riga passa da 56 a 68 e la card da 182 a **174** (contro i
@@ -16186,3 +16188,43 @@ un `radial-gradient(ellipse closest-side`, arriva a `rgba(19,26,38,0)
 100%`, non ha `filter:` né `box-shadow:0` e non tocca l'`overflow`
 della scatola; la scatola non ha più fondo né ombra ed è centrata;
 l'alone non ha `width`, cioè resta corto quanto il suo contenuto.
+
+**LA SCELTA ROVESCIATA: vince l'insegna col bagliore (16 set 2026).**
+Guardando le cinque rese Andrea ha scelto la **E** — il rettangolo
+arrotondato col bagliore dello stesso colore — cioè proprio quella che
+la voce qui sopra aveva scartato. **E il perché dello scarto era
+sbagliato, non il gusto**: «si vede ancora la forma» era descritto come
+un difetto, mentre è esattamente ciò che rende il marchio un'insegna
+APPOGGIATA sulla card invece di una macchia. L'alone ellittico
+dissolveva talmente da non avere più un oggetto: bello, e senza corpo.
+La regola che ne esce, e vale oltre questo cantiere: **quando la
+richiesta è «sfuma i bordi», chi disegna deve chiedersi fin dove — e la
+risposta non sta nel codice, sta sullo schermo.** Le rese si guardano
+tutte insieme, e chi decide è chi guarda.
+
+⚠️ **IL PREZZO TECNICO DEL BAGLIORE, e come è stato pagato.** La resa E
+girava con `overflow:visible` sulla scatola dei metodi, cioè col TAGLIO
+TOLTO — e quel taglio è la riga che impedisce a un elenco di metodi
+lungo di allargare la pagina. Non è teoria: il `pm` del 38383 è testo
+di SCONOSCIUTI, e un altro client può pubblicare un ordine col
+tabacchino PIÙ altri metodi, che prende la pelle Barattozon e finisce
+in quella scatola. Quindi il taglio resta dov'è, e al bagliore si fa
+posto DENTRO la riga: il respiro verticale della scatola (19px) contro
+i 18 che il bagliore arriva a toccare (9 di allargamento più metà dei
+18 di sfocatura). Un pixel di margine, e **una prova che rifà il conto
+leggendo i due numeri dal CSS** invece di fidarsi che restino in pari:
+chi tocca la sfocatura senza toccare il respiro vede una prova rossa,
+non un lato dritto in mezzo alla sfumatura in produzione. Provate anche
+le due rese intermedie (respiro 17 col bagliore 16/8, respiro 22 col
+bagliore 22/10 identico alla E): tenuta la via di mezzo, che è la E a
+meno di un pixel.
+
+**I NUMERI (375px, ricontrollati a 320).** Insegna 159x52 col marchio
+127x40 dentro; la riga passa da 68 a 90 e la card da 174 a **196**
+(contro i 140 di una normale) — quel che cresce è l'aria attorno al
+marchio, ed è la stessa aria che tiene il bagliore dentro il taglio.
+Orizzontalmente non serve niente: il marchio è centrato in una riga da
+313 e il bagliore arriva a 98 dal centro, cioè a metà strada dal bordo;
+a 320 la riga è 258 e il conto regge uguale. Scatola senza fondo
+(`rgba(0,0,0,0)`), 15px dentro il bordo della card, premio scadenza e
+anello dove stavano, `scrollWidth` 375 a 375 e 320 a 320.
