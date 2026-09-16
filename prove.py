@@ -2698,6 +2698,122 @@ def prove_importo_uscita():
           and 'return r.json().get("pr")' not in lna)
 
 
+# ====================================================================
+def prove_orfani():
+    """GLI INCASSI SENZA RIGA (set 2026): lo strumento che incrocia il
+    registro di LNbits col database sulle due casseforti. Le sentinelle
+    sulla FORMA — mai la chiave che paga, i due nomi letterali e il
+    terzo che alza — e il cuore su dati di cartone: un incasso col
+    nostro memo e senza riga e' un orfano, uno senza memo no, uno la
+    cui riga dice un'altra cassaforte e' fuori posto, e le entrate
+    non riuscite o le uscite non contano."""
+    print("\n[gli incassi senza riga: orfani.py]")
+    import sqlite3 as sq
+    import types
+    import orfani
+
+    src = open("orfani.py", encoding="utf-8").read()
+    prova("orfani.py non legge mai la chiave che paga", False,
+          "ADMIN_KEY" in src)
+    prova("orfani.py non scrive: nessun INSERT/UPDATE/DELETE", [],
+          [v for v in ("INSERT", "UPDATE", "DELETE") if v in src])
+    prova("i due nomi sono i letterali del server", ("saas", "nodo"),
+          orfani.CASSAFORTI)
+    prova("le tre tabelle in entrata", ("ordini", "rilanci", "pagamenti"),
+          orfani.TABELLE)
+
+    cfg = types.SimpleNamespace(
+        LNBITS_URL="https://s", LNBITS_INVOICE_KEY="i1",
+        LNBITS_ADMIN_KEY="a1",
+        LNBITS_NODO_URL="http://127.0.0.1:5001",
+        LNBITS_NODO_INVOICE_KEY="INCOLLA_QUI_LA_INVOICE_KEY_DEL_NODO",
+        LNBITS_NODO_ADMIN_KEY="a2")
+    prova("'saas' -> URL e invoice key di ieri", ("https://s", "i1"),
+          tuple(orfani.chiavi_cassaforte("saas", cfg))[1:])
+    try:
+        orfani.chiavi_cassaforte("spark", cfg)
+        terzo = "ripiega"
+    except ValueError:
+        terzo = "alza"
+    prova("un terzo nome ALZA", "alza", terzo)
+    prova("nodo col segnaposto: si legge solo il SaaS", ["saas"],
+          [c.nome for c in orfani.casseforti_leggibili(cfg)])
+    cfg.LNBITS_NODO_INVOICE_KEY = "i2"
+    prova("nodo configurato: si leggono tutt'e due", ["saas", "nodo"],
+          [c.nome for c in orfani.casseforti_leggibili(cfg)])
+    cfg.LNBITS_URL = ""
+    prova("SaaS disdetto: resta il nodo", ["nodo"],
+          [c.nome for c in orfani.casseforti_leggibili(cfg)])
+
+    prova("esito: paid True", "success", orfani.esito({"paid": True}))
+    prova("esito: status failed", "failed",
+          orfani.esito({"status": "failed"}))
+    prova("esito: la vecchia col solo pending False", "success",
+          orfani.esito({"pending": False}))
+    prova("esito: nel dubbio pending", "pending", orfani.esito({}))
+
+    h = [f"{i:064x}" for i in range(1, 7)]
+    def inc(hh, memo, sats=1000, **stato):
+        return {"payment_hash": hh, "memo": memo, "amount": sats * 1000,
+                "time": 1700000000, **(stato or {"status": "success"})}
+    incassi = {
+        "saas": [inc(h[0], "Barattolo escrow #1: cosa"),
+                 inc(h[1], "Barattolo asta #2: puntata 5 sats"),
+                 inc(h[2], "regalo di Andrea"),
+                 inc(h[3], "Barattolo escrow #3: mai pagato",
+                     status="pending"),
+                 inc(h[4], "payout", sats=-5000)],
+        "nodo": [inc(h[5], "Barattolo sblocco banner #9")],
+    }
+    righe = [("ordini", 1, h[0], "saas"), ("pagamenti", 9, h[5], "saas")]
+    r = orfani.incrocia(incassi, righe)
+    s, n = r["saas"], r["nodo"]
+    prova("saas: 5 movimenti, 3 incassi riusciti", (5, 3),
+          (s["movimenti"], s["incassi"]))
+    prova("saas: uno riconosciuto", 1, s["riconosciuti"])
+    prova("saas: l'orfano e' quello col nostro memo senza riga", [h[1]],
+          [p["payment_hash"] for p in s["orfani"]])
+    prova("saas: senza il nostro memo non e' un orfano", [h[2]],
+          [p["payment_hash"] for p in s["non_nostri"]])
+    prova("saas: l'entrata pending e l'uscita non contano", [],
+          [p for p in s["orfani"] + s["non_nostri"]
+           if p["payment_hash"] in (h[3], h[4])])
+    prova("nodo: la riga che dice 'saas' e' FUORI POSTO",
+          [(h[5], [("pagamenti", 9, "saas")])],
+          [(p["payment_hash"], dv) for p, dv in n["fuori_posto"]])
+    prova("nodo: niente riconosciuto, niente orfano", (0, []),
+          (n["riconosciuti"], n["orfani"]))
+
+    con = sq.connect(":memory:")
+    con.executescript("""
+      CREATE TABLE ordini(id INTEGER PRIMARY KEY, payment_hash TEXT,
+        cassaforte TEXT DEFAULT 'saas');
+      CREATE TABLE rilanci(id INTEGER PRIMARY KEY,
+        payment_hash TEXT DEFAULT '', cassaforte TEXT DEFAULT 'saas');
+      CREATE TABLE pagamenti(id INTEGER PRIMARY KEY,
+        payment_hash TEXT DEFAULT '', cassaforte TEXT DEFAULT 'saas');
+      INSERT INTO ordini VALUES (1, 'aa', 'nodo'), (2, NULL, 'saas');
+      INSERT INTO rilanci VALUES (3, '', 'saas'), (4, 'bb', 'saas');
+      INSERT INTO pagamenti VALUES (5, 'cc', NULL);
+    """)
+    prova("righe_db: solo le righe con un hash, cassaforte NULL = ''",
+          [("ordini", 1, "aa", "nodo"), ("rilanci", 4, "bb", "saas"),
+           ("pagamenti", 5, "cc", "")],
+          orfani.righe_db(con))
+    con.close()
+    con = sq.connect(":memory:")
+    con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, "
+                "payment_hash TEXT)")
+    try:
+        orfani.righe_db(con)
+        vecchio = "indovina"
+    except SystemExit:
+        vecchio = "si ferma"
+    prova("un database senza la colonna cassaforte ferma lo strumento",
+          "si ferma", vecchio)
+    con.close()
+
+
 def prove_doppio_wallet():
     """IL DOPPIO WALLET (set 2026): ogni riga di denaro porta la sua
     cassaforte, i tubi che leggono o pagano la pretendono, chi conia
@@ -59861,7 +59977,7 @@ def main():
               prove_foto_spenta, prove_foto_telegram_fallita,
               prove_nome_da_nostr,
               prove_pagamento_incerto, prove_esito_pagamento,
-              prove_doppio_wallet, prove_saas_senza_doveri,
+              prove_doppio_wallet, prove_saas_senza_doveri, prove_orfani,
               prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,
               prove_busta_ritiro, prove_contenuto_digitale_forma,
