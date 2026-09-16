@@ -16425,9 +16425,115 @@ trasparente; `scrollWidth` 375 a 375 e 320 a 320. Sopra, a metà e
 appena sotto il marchio i pixel danno `rgb(18,25,37)`–`rgb(19,26,38)`:
 il navy pieno, in tutt'e quattro i casi provati.
 
-**RESTA DA DECIDERE IL BORDO.** La card porta ancora il bordo e il
-bagliore ambra chiesti due giri fa, che ora sono l'ultimo colore caldo
-rimasto. Rese tre possibilità affiancate: l'ambra di adesso, il bordo
-delle sorelle (nessun segno oltre al capo) e un bordo navy in tinta col
-capo. Finché non si decide resta l'ambra, perché è l'unica delle tre
-che qualcuno ha chiesto esplicitamente.
+**E ANCHE IL BORDO È DELLE SORELLE** (scelto da Andrea fra tre rese
+affiancate: l'ambra di due giri prima, il bordo di casa e un bordo navy
+in tinta col capo). Cade così l'ultimo colore caldo, e a dire che
+questa card è diversa basta il capo. ⚠️ **Il bordo delle sorelle non si
+RIPETE qui, si eredita**: una riga che lo ribattesse sarebbe la seconda
+da tenere in pari il giorno che il bordo di casa cambia. Quindi la
+regola della card non nomina né `border` né `box-shadow`, e una prova
+pretende che resti così — la card non ha più NIENTE di suo oltre alla
+tinta del capo e al gradiente che ci scende.
+
+⚠️ **E TOGLIENDO QUELLE DUE RIGHE UNA PROVA È MORTA INVECE DI DIVENTARE
+ROSSA**, che è il modo peggiore in cui può rompersi. Il lettore del
+gradiente tagliava la dichiarazione al `;`, e il `;` finale è sparito
+quando il fondo è diventato l'ULTIMA dichiarazione della regola: un
+`index` che non trova solleva, e l'eccezione si è portata via tutte le
+sentinelle che venivano dopo — dieci righe che non hanno neanche
+provato a girare. A dirlo è stato il codice d'uscita, non l'assenza di
+✗. Adesso il taglio è uno `split`, che su una regola accorciata dà
+semplicemente la stringa intera.
+
+**COSA È STATO PROVATO** (`prove_p2p_barattozon`, 44 verdi): la card
+non riscrive nessun token di testo, né il bordo, né l'ombra; il gradiente
+finisce su `var(--card)`; il capo tiene pieno sotto tutto il marchio senza
+mangiarsi la riga dell'importo; quando l'importo comincia la carta è almeno
+a metà strada; e la carta piena arriva prima che la card più corta finisca.
+
+## La card semplice, e dove vivono i vestiti (16 set 2026)
+
+**LA FINE DEL GIRO: LA CARD È IDENTICA ALLE SORELLE.** Niente pelle,
+niente gradiente, niente capo, niente bordo suo. L'unica differenza col
+resto del libro è che nella scatola dei metodi, al posto del testo
+«Contanti al tabacchino», c'è il **marchio Barattozon** dentro la sua
+tessera navy. Tutto il resto — sei versioni vestite provate in un
+pomeriggio — è uscito dal codice.
+
+**E IL RETTANGOLO NAVY È LA SCATOLA INTERA**, non una tessera dietro al
+marchio (chiarimento di Andrea, dopo un primo giro in cui avevo vestito
+il solo logo): quando dentro la scatola dei metodi non resta nessun
+nome, la scatola prende il navy al posto della carta di casa e il
+marchio ci sta **nudo** — una tessera dentro un'insegna dello stesso
+colore sarebbe una toppa. A cambiare è il SOLO fondo: raggio, respiro e
+margini restano quelli delle scatole sorelle.
+⚠️ **E L'INSEGNA HA LO STESSO GIUDICE DELL'ICONA**, chiesto una volta
+sola: «qui dentro non resta nessun nome». Due giudici sulla stessa
+domanda divergono al primo ritocco, e divergerebbero in silenzio — una
+scatola navy che porta del testo, o un 💳 su un'insegna.
+
+**IL NAVY È `#131A26`** (quello della testata di Amazon): l'unica cosa
+rimasta in piedi del giro dei sedici colori, e su di lui il marchio
+legge 16,6:1 col bianco e 7,0:1 con l'arancio. Vale anche FUORI dalla
+card — pillola del filtro e voce del foglio — dove però una scatola non
+c'è e il marchio si porta dietro una **tessera** dello stesso navy.
+
+**LE DUE MISURE SONO DUE CONTI, non due gusti.** La riga della scatola è
+alta 17 (12,5px di testo a interlinea normale). FUORI, con la tessera
+che aggiunge 2+2 di respiro, il marchio resta a **13**: lì le pillole
+stanno in fila con le sorelle, e una più alta delle altre si vedrebbe.
+DENTRO l'insegna il marchio è nudo e sta a **22** — scelto da Andrea
+guardando tre misure affiancate — e costa 4 pixel di scatola e 4 di
+card. Misurato sul vivo: card **144** contro i 140 della sorella,
+scatola **313x38** contro 313x34, marchio **70x22**, fondo
+`rgb(19,26,38)` dal computed style; a 320 e col tema di sera i numeri
+sono gli stessi, e la card più corta (prezzo fisso, senza badge) sta in
+122. Le prove rifanno tutt'e due i conti leggendo i numeri dal CSS.
+
+**DOVE VIVONO I VESTITI, e perché non nel codice.** Andrea ha chiesto
+di non buttare il lavoro delle versioni provate, lasciando la scelta
+fra tenerle spente nel codice come veste generica «in evidenza» o
+metterle a verbale con gli hash. **Scelto il verbale**, per una ragione
+che questo cantiere ha già pagato due volte: una pelle di card che
+nessuno emette, una funzione che nessuno chiama e un interruttore che
+non accende niente sono **peso morto che SEMBRA una funzione** — è
+l'argomento con cui abbiamo tolto la variante chiara poche ore prima, e
+varrebbe uguale qui. In più andrebbero sorvegliate da prove che non
+possono provare nulla (nessuna card le indossa), e ogni ritocco futuro
+alla card dovrebbe tenerle in pari. Git le conserva meglio, complete e
+funzionanti, e qui restano gli indirizzi:
+
+- **`cc8e9a1`** — la prima tessera: gradiente ambra, marchio 30px, e la
+  nascita del catalogo `P2P_VESTE_METODI` con `classeVesteP2P`.
+- **`206ccbc`** — l'insegna navy piena larga tutta la riga, marchio a
+  40px, via il 💳 (`iconaMetodiP2P`).
+- **`9bde814`** — l'alone ellittico `closest-side`, che finisce a zero
+  sui quattro lati del riquadro.
+- **`903120d`** — il rettangolo arrotondato col bagliore dello stesso
+  colore, tenuto dentro il taglio dal respiro della riga.
+- **`8cc23c8`** — la tessera netta color espresso, corta e a sinistra.
+- **`0d61a19`** — il capo navy: il marchio in cima alla card e il
+  gradiente della card con le fermate in PIXEL.
+- **`f201abe`** — solo il capo: la card del colore delle sorelle, il
+  gradiente che finisce su `var(--card)`, e i nove token che cadono.
+
+**Il posto dove quel vestito avrà un senso**, ed è la ragione per cui
+si conserva: le **card in evidenza a pagamento** del P2P, i gemelli dei
+banner del mercatino. Lì una card con la sua pelle non è un'eccezione
+scritta a mano: è il prodotto.
+
+⚠️ **E LA SENTINELLA DEI MORTI CONTA LE CHIAMATE, NON I NOMI.** La
+prova che pretende che `classeVesteP2P` e `marchioInTestaP2P` non
+esistano più cercava il nome, e lo trovava nel COMMENTO che spiega dove
+sono finite: rossa per la riga che spiega perché è verde. Si contano
+`nome(` con la parentesi, che un commento non ha. È la stessa trappola
+già pagata tre volte (vedi «prove che rispondono per il vicino»), e
+questa volta è costata un minuto perché la suite l'ha detto subito.
+
+**COSA È STATO PROVATO** (`prove_p2p_barattozon`, riscritta da capo
+perché la superficie è un'altra): il file e la rotta; il tag `pm`
+intatto; il catalogo di tre campi, senza più `classe` né `inTesta`; i
+tre posti che leggono da lì; la card che non porta nessuna pelle e non
+ribalta le sue righe; le tre funzioni in node, con una misura sola; il
+conto che tiene la tessera nella riga della scatola; e che della card
+vestita non resti niente — né regole CSS, né funzioni, né leve.
