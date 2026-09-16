@@ -47809,11 +47809,16 @@ def prove_p2p_barattozon():
     prova("la scatola non ha niente di suo, solo il respiro", True,
           "padding-top:" in _ins
           and not any(x in _ins for x in ("background", "border", "radius")))
-    # e dentro il marchio TIENE la sua tessera: senza un fondo scuro
-    # addosso, sulla carta chiara la sua parola bianca sparirebbe — e'
-    # la stessa ragione che aveva bocciato la resa crema fra i colori
-    prova("...e dentro il marchio tiene la sua tessera, o sparirebbe sul chiaro",
-          False, "background:none" in _insm)
+    # ⚠️ DENTRO LA SCATOLA IL MARCHIO E' NUDO, MA MAI NUDO E BASTA: e'
+    # bianco e arancio su trasparente, e sul chip chiaro del tema
+    # giorno la parola bianca sparisce (verificato sullo schermo). Al
+    # posto della tessera ha un ALONE — due drop-shadow strette dello
+    # stesso navy — che gli disegna il contorno senza mettergli niente
+    # dietro. Le due cose stanno INSIEME o non stanno: chi togliesse
+    # l'alone lasciando il fondo trasparente si ricompra un marchio
+    # mezzo invisibile, e nessun'altra prova se ne accorgerebbe.
+    prova("dentro la scatola il marchio e' nudo, ma mai nudo e basta", True,
+          "background:none" in _insm and "drop-shadow" in _insi)
     # la tessera e' NAVY e non piu' l'ambra di casa (16 set 2026): e'
     # l'unica cosa rimasta in piedi del giro dei sedici colori, e su di
     # lei il marchio legge 16,6:1 col bianco e 7,0:1 con l'arancio.
@@ -47855,7 +47860,17 @@ def prove_p2p_barattozon():
         if not _resp or not _bxp:
             prova("il respiro della scatola si legge dal CSS", True, False)
         else:
-            _nostra = _dentro + 2 * int(_p.group(1)) + 2 * int(_resp.group(1))
+            # ⚠️ IL RESPIRO DEL MARCHIO SI LEGGE DA DENTRO LA SCATOLA,
+            # non dalla regola di fuori: li' dentro e' nudo (padding 0)
+            # e fuori porta la tessera (2), e prendere il numero
+            # sbagliato gonfia il conto di quattro pixel che non
+            # esistono — la prova diventa rossa su una card sana.
+            # ⚠ `padding:0` NON HA UNITA', e una regex che pretende
+            # i `px` non lo trova: cadrebbe sul ripiego e conterebbe i
+            # due pixel della tessera di FUORI, che li' dentro non c'e'.
+            _pin = _re_b.search(r"padding:(\d+)(?:px)?", _insm)
+            _dpad = int(_pin.group(1)) if _pin else int(_p.group(1))
+            _nostra = _dentro + 2 * _dpad + 2 * int(_resp.group(1))
             _sorella = 17 + 2 * int(_bxp.group(1))
             prova("dentro la card il marchio e' piu' grande che nelle pillole",
                   True, _dentro > int(_h.group(1)))

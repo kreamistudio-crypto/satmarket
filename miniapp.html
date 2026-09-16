@@ -2464,11 +2464,30 @@
   .p2p-marca img{display:block;height:13px;width:auto}
   /* LA SCATOLA COL SOLO MARCHIO: fondo, raggio e colonna restano
      quelli delle sorelle — non ha NIENTE di suo tranne il respiro
-     verticale, che scende a 3 per far posto a un marchio grande senza
-     scappare dalla fila. Il conto sta nel commento qui sopra. */
-  .p2p-paga-marchio{padding-top:3px;padding-bottom:3px}
-  .p2p-paga-marchio .p2p-marca{margin-top:0}
-  .p2p-paga-marchio .p2p-marca img{height:30px}
+     verticale, che scende a 5 per far posto a un marchio grande senza
+     scappare dalla fila. Il conto sta nel commento qui sopra.
+     ⚠️ E QUI DENTRO IL MARCHIO E' NUDO (16 set 2026, richiesta di
+     Andrea): niente tessera, il logo direttamente nella scatola. LA
+     TESSERA RESTA FUORI — pillola del filtro e voci del foglio — dove
+     il marchio sta su fondi che non controlliamo.
+     ⚠️ MA NUDO E BASTA NON SI PUO': il marchio e' bianco e arancio su
+     trasparente, e sul chip CHIARO del tema giorno la parola bianca
+     sparisce — si legge il simbolo, un vuoto, poi «zon». Verificato
+     sullo schermo, non dedotto. Al posto della tessera gli si da' un
+     ALONE: due `drop-shadow` dello stesso navy, stretti, che gli
+     disegnano il contorno senza mettergli niente dietro. Scelto da
+     Andrea fra quattro rese, ed e' il compromesso fra «nessun
+     rettangolo» e «il nome si legge».
+     LE DUE COSE STANNO INSIEME O NON STANNO: senza fondo E senza alone
+     il marchio e' mezzo invisibile, e una prova pretende che quando
+     c'e' l'uno ci sia l'altro. Di sera l'alone non si vede — il chip
+     e' gia' scuro — e non da' fastidio: e' un contorno, non un'ombra
+     portata. */
+  .p2p-paga-marchio{padding-top:5px;padding-bottom:5px}
+  .p2p-paga-marchio .p2p-marca{background:none;padding:0;border-radius:0;
+    margin-top:0}
+  .p2p-paga-marchio .p2p-marca img{height:30px;
+    filter:drop-shadow(0 0 1px rgba(19,26,38,.95)) drop-shadow(0 0 2px rgba(19,26,38,.6))}
   /* la reputazione e' UNA FRASE (set 2026, il ridisegno): niente piu'
      due pezzi ai bordi — si legge come si dice */
   .p2p-rep{font-size:12px}
