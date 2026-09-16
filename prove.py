@@ -13,8 +13,10 @@ USO:  python prove.py          (esce 1 se qualcosa e' rotto)
 
 import ast
 import os
+import json
 import re
 import sys
+import time
 import textwrap
 
 QUI = os.path.dirname(os.path.abspath(__file__))
@@ -8573,6 +8575,63 @@ def pezzo_js(mini, firma, fine="\n\n"):
     per testo, dalla firma alla prima riga vuota."""
     i = mini.index(firma)
     return mini[i:mini.index(fine, i)]
+
+
+# LA BOLT11 VERA del 16 set 2026: 7468 sats, scadenza 3600 s, cltv 80,
+# nata alle 14:28:38 UTC — quella che il foglio ha suggerito e il
+# coordinatore ha rifiutato. E' pubblica (una fattura non porta segreti)
+# e vale come fixture perche' e' il caso vissuto: importo sbagliato
+# (ne voleva 7543) E scadenza da un'ora esatta, tutt'e due insieme.
+BOLT11_VERA_7468 = (
+    "lnbc74680n1p424fukpp59hgjkkeervlh9420ekttlnjnvtwt8e5sc2ymk9qm69flw05450qqdqqcqzzsxqrrssrzjqgc2t099trn8g9rqcy7axnnrdk3gu540myw0j0dc0mgmqwf2w3nwhapyqqqqqqqjqvqqqqqqqqqq86qq2qsp5ua8gfecmkqufz5vmzudqwwaucupxhu8p24f7fp045ytsv9w2s7fs9qxpqysgqf98q726nmlrfld7wh39r8rauly63hadqn8mm330qtdxrn773r5nzfxc23j6j8rhnzew9nd8se623rmj9cznpp4spntx50zdd88elzxqq0vemvd")
+
+
+def bolt11_finta(sats, scadenza, quando):
+    """Una bolt11 SINTATTICAMENTE vera — bech32 col suo checksum, i
+    campi taggati al posto giusto, la firma di zeri — per provare il
+    lettore del client senza una chiave: `leggiBolt11` verifica il
+    checksum e non la firma (quella la guarda LND). sats=0 e' la
+    fattura senza importo. Il conio e' BOLT-11 a mano: hrp `lnbc` +
+    importo in nBTC (1 n = 0,1 sat), timestamp su 35 bit, poi
+    [tipo, lunghezza (10 bit), dati], poi 520 bit di firma."""
+    ALF = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+    hrp = "lnbc" + (f"{sats * 10}n" if sats else "")
+
+    def bits(n, larghezza):
+        return [(n >> (5 * k)) & 31 for k in range(larghezza - 1, -1, -1)]
+
+    def tag(tipo, dati):
+        return [tipo] + bits(len(dati), 2) + dati
+
+    def minimo(n):
+        g = 1
+        while n >> (5 * g):
+            g += 1
+        return bits(n, g)
+
+    dati = bits(quando, 7)
+    dati += tag(1, [0] * 52)             # p: payment hash di zeri (256 bit)
+    dati += tag(13, [])                  # d: descrizione vuota
+    dati += tag(6, minimo(scadenza))     # x: la scadenza
+    dati += tag(24, minimo(80))          # c: cltv finale, come LND
+    dati += tag(16, [0] * 52)            # s: payment secret di zeri
+    dati += [0] * 104                    # la firma: 65 byte di zeri
+
+    def polymod(v):
+        GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3]
+        chk = 1
+        for x in v:
+            b = chk >> 25
+            chk = ((chk & 0x1ffffff) << 5) ^ x
+            for i in range(5):
+                if (b >> i) & 1:
+                    chk ^= GEN[i]
+        return chk
+
+    esp = [ord(c) >> 5 for c in hrp] + [0] + [ord(c) & 31 for c in hrp]
+    pm = polymod(esp + dati + [0] * 6) ^ 1
+    chk = [(pm >> (5 * (5 - i))) & 31 for i in range(6)]
+    return hrp + "1" + "".join(ALF[x] for x in dati + chk)
 
 
 def prove_ssrf_redirect():
@@ -43234,17 +43293,38 @@ def prove_p2p_motore():
     # meta' del tempo vero, su un gesto che chiede di pagare. La
     # sentinella e' in due tempi perche' il difetto ha due facce —
     # usare la voce morta, e cablare il numero invece di leggerlo.
-    # ══ `satsNetti` E' IL LORDO, e la fattura porta il NETTO (set
-    # 2026) ══ Verificato sui byte di mostro v0.18.6:
-    # `validate_bolt11_invoice` accetta solo `amount − order.fee`, e
-    # `get_fee` la meta' la fa gia' lui. La cifra non arriva dal
-    # coordinatore (`SmallOrder` non ha un campo `fee`), quindi si
-    # ricalcola — e dove non si sa, non si pretende.
+    # ══ IL COORDINATORE MANDA GIA' IL MIO LATO (16 set 2026) ══ La
+    # lettura del 14 set («`satsNetti` e' il lordo, la fattura porta il
+    # netto») verificava il CONTROLLO di mostro e non quel che mostro
+    # MANDA: nell'`add-invoice` c'e' gia' `amount − fee`, e il client gli
+    # toglieva la meta' un'altra volta — chiedeva 7468 dove ne voleva
+    # 7543, e la SUA guardia avrebbe fermato la fattura giusta. Adesso
+    # la cifra detta si ripete (`satsMiei`), il lordo si ricava, e dove
+    # non si sa, non si pretende.
     _sd = pezzo_js(mini, "function satsDaRicevereP2P(o){", "\n}\n")
-    prova("la fattura di chi compra ha il suo giudice", True,
-          "return nettoLatoP2P({lato: 'sell'}, lordo);" in _sd)
-    prova("...che a commissione ignota non inventa una cifra", True,
+    prova("la fattura di chi compra ripete la cifra detta dal coordinatore", True,
+          "if (o && o.satsMiei > 0) return o.satsMiei;" in _sd)
+    prova("...e sul ripiego del lordo non inventa una cifra a commissione ignota", True,
           "commissioneVivaP2P() === null) return 0;" in _sd)
+    _av = pezzo_js(mini, "function avanzaOrdineP2P(ordine, azione, payload){", "\n}\n")
+    prova("...e il mio lato non finisce MAI scritto dentro il lordo", True,
+          "if (amt > 0 && P2P_IMPORTO_MIO.indexOf(azione) >= 0) {" in _av
+          and "o.satsMiei = amt;" in _av
+          and "const lordo = lordoDaMieiP2P(o, amt);" in _av
+          and "o.satsNetti = Math.floor(Number(ord.amount))" not in _av)
+    prova("...le azioni che portano il mio lato sono le tre verificate sui byte",
+          "const P2P_IMPORTO_MIO = ['add-invoice', 'hold-invoice-payment-accepted', 'buyer-took-order'];",
+          [r for r in mini.split("\n") if r.startswith("const P2P_IMPORTO_MIO = ")][0])
+    prova("...e la hold di chi vende e' il suo importo", True,
+          "o.satsMiei = o.hold.sats;" in _av)
+    _ii = pezzo_js(mini, "async function inviaIncassoP2P(){", "\n}\n")
+    prova("la guardia legge la scadenza PRIMA di mandare", True,
+          "const b = leggiBolt11(testo);" in _ii
+          and "if (b.scade < adesso + finestra) {" in _ii
+          and "finestraFatturaP2P()" in _ii)
+    _ff = pezzo_js(mini, "function finestraFatturaP2P(){", "\n}\n")
+    prova("...con la finestra del 38385, e senza 38385 i 3600 s del nodo", True,
+          "p2pInfo.fattFinestra" in _ff and "return f > 0 ? f : 3600;" in _ff)
     prova("...e il perche' cita i byte che l'hanno deciso", True,
           "validate_bolt11_invoice" in mini and "split_fee" in mini
           and "SmallOrder" in mini)
@@ -43255,9 +43335,10 @@ def prove_p2p_motore():
           and "o.satsNetti" not in _ri and "o.satsNetti" not in _ii)
     # ...e la card della lista dice lo stesso numero della pagina: due
     # cifre per la stessa cosa sono la bugia piu' difficile da notare
-    prova("...e la card della lista passa dallo stesso giudice", True,
-          "const n = nettoLatoP2P(l, o.satsNetti);"
-          in pezzo_js(mini, "function satsScambioP2P(o){", "\n}\n"))
+    _ss = pezzo_js(mini, "function satsScambioP2P(o){", "\n}\n")
+    prova("...e la card della lista ripete il mio lato quando e' detto", True,
+          "if (o.satsMiei > 0) return fmt(o.satsMiei) + ' sats';" in _ss
+          and "const n = nettoLatoP2P(l, o.satsNetti);" in _ss)
     _rh = pezzo_js(mini, "function renderHoldP2P(){", "\n}\n")
     prova("il foglio della hold conta i minuti da expiration_seconds",
           True, "p2pInfo.scadenzaSec" in _rh)
@@ -43535,6 +43616,18 @@ def prove_p2p_motore():
     js_mazzo = mini[mini.index("const MOSTRO_CHIAVE = "):
                     mini.index("/* ---- export CSV degli affari conclusi")]
     js_motore = mini[i_cod:i_fine]
+    # LE FATTURE DEL BANCO: quella vera del 16 set (7468, un'ora esatta,
+    # gia' scaduta da un pezzo) e quattro coniate ADESSO — dieci secondi
+    # fa, cosi' «un'ora esatta» ha gia' perso qualcosa anche sul runner
+    # piu' veloce, che e' esattamente il caso del wallet.
+    _adesso = int(time.time()) - 10
+    fatture_js = ("\nconst FATT = " + json.dumps({
+        "vera7468": BOLT11_VERA_7468,
+        "f7468_1g": bolt11_finta(7468, 86400, _adesso),
+        "f7543_1h": bolt11_finta(7543, 3600, _adesso),
+        "f7543_1g": bolt11_finta(7543, 86400, _adesso),
+        "libera_1h": bolt11_finta(0, 3600, _adesso),
+        "libera_1g": bolt11_finta(0, 86400, _adesso)}) + ";\n")
     # LE PURE DELLA CARD DI UNO SCAMBIO vivono nel blocco del libro,
     # cioe' FUORI dalla fetta del motore — e la card le chiama da
     # quando ha quattro righe (set 2026). Si portano dentro QUELLE
@@ -43718,7 +43811,7 @@ function tagValore(ev, n){
   const t = (ev.tags || []).filter(x => x[0] === n)[0];
   return t ? t[1] : '';
 }
-""" + js_pure + js_mazzo + js_motore + r"""
+""" + js_pure + js_mazzo + js_motore + fatture_js + r"""
 /* ---- il banco ---- */
 /* IL DETTAGLIO-PAGINA vive nel blocco del libro, fuori dal motore: qui
    si presta, e i suoi casi veri girano in prove_p2p_dettaglio. Lo stub
@@ -43759,9 +43852,11 @@ function reset(){
   p2pSemeGiro = null; p2pMazzoEsito = ''; p2pGiudizio = null;
   p2pIncassoOrdine = ''; p2pStatoChiesto = false; p2pRiconnetti = 0;
   P2P_ATTESA_MS = 30000;
-  p2pInfo = {fee: 0.01, pow: 8, powPrimo: 10, maxSats: 100000, minSats: 100,
+  /* la fee e la finestra sono quelle del NOSTRO nodo (16 set 2026):
+     2% spartito meta' a testa, 3600 s di vita minima per la fattura */
+  p2pInfo = {fee: 0.02, pow: 8, powPrimo: 10, maxSats: 100000, minSats: 100,
              valute: ['EUR'], versione: '2', quando: 0,
-             scadenzaSec: 86400, holdFinestra: 300, fattFinestra: 900};
+             scadenzaSec: 86400, holdFinestra: 300, fattFinestra: 3600};
   p2pLibro = {ordini: [
     {id: '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002', lato: 'sell', euro: 50, sats: 100000, metodi: ['SEPA'], premium: 0},
     {id: '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60001', lato: 'buy', euro: 20, sats: 40000, metodi: ['Satispay'], premium: 0}
@@ -43772,9 +43867,11 @@ function reset(){
   reset();
   rispondi = r => {
     const d = r.dentro;
+    /* I NUMERI DEL 16 SET 2026: ordine da 7619 sats, fee di un lato
+       76, e l'`add-invoice` porta 7543 — il mio lato, gia' al netto */
     if (d.action === 'take-sell')
       return [ordine('add-invoice', d.request_id, d.id,
-                     {order: {id: d.id, amount: 99000, fiat_amount: 50}})];
+                     {order: {id: d.id, amount: 7543, fiat_amount: 50}})];
     return [];
   };
   await prendiOrdineP2P('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002');
@@ -43801,6 +43898,7 @@ function reset(){
   let o = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'];
   out.dopoPresa = o.stato;
   out.satsNetti = o.satsNetti;
+  out.satsMiei = o.satsMiei;
   /* i non sollecitati muovono la macchina uguale */
   const tp = o.pubTrade;
   manda(ordine('waiting-seller-to-pay', null, '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'), tp); await pausa();
@@ -43829,14 +43927,15 @@ function reset(){
      COORDINATORE ha detto (99000 nel giro qui sopra) — non una stima,
      che qui il cambio e' spento apposta. E' la prova che il ramo
      `satsDetti` regge dove serve: nella pagina di uno scambio preso,
-     dove senza di lui ci sarebbero solo trattini. La fee viva e'
-     l'1%, la meta' di chi legge e' lo 0,5% — 495 sats — e resta
-     98505. */
+     dove senza di lui ci sarebbero solo trattini. Dal 16 set 2026 la
+     base e' il LORDO RICAVATO dal mio lato (7543 → 7619, fee 2%
+     spartita: 76), e la riga «Ricevi» torna al satoshi sulla cifra
+     detta — mai 7468, che era la meta' tolta due volte. */
   {
     const h = nodi.p2pOrdineCorpo.innerHTML || '';
     out.contoInCard = h.indexOf('<div class="p2p-ord"><div class="ctrl-conto conto-p2p">') >= 0;
-    out.contoSullaCifraVera = h.indexOf('99000 sats') >= 0
-      && h.indexOf('98505 sats') >= 0;
+    out.contoSullaCifraVera = h.indexOf('7619 sats') >= 0
+      && h.indexOf('7543 sats') >= 0 && h.indexOf('7468') < 0;
     /* ...e la testa a due colonne non c'e' piu': quel che diceva —
        l'euro e i sats — lo dicono le righe del conto, ognuna col suo
        nome */
@@ -43896,6 +43995,9 @@ function reset(){
   out.venditoreAspetta = ov.stato;
   out.holdArrivata = !!(ov.hold && ov.hold.bolt11 === BOLT);
   out.holdConImporto = ov.hold && ov.hold.sats === 40000;
+  /* la hold E' il mio lato (lordo + la mia meta'): 40000 = 39604 + 396 */
+  out.venditoreMiei = ov.satsMiei;
+  out.venditoreLordo = ov.satsNetti;
   await apriHoldP2P();
   out.qrDellaHold = qr.length === 1 && qr[0] === ('lightning:' + BOLT).toUpperCase();
   out.holdApertoConVelo = aperti.indexOf('p2pHoldSheet') >= 0
@@ -43947,60 +44049,115 @@ function reset(){
   out.nessunaFetchAllIndirizzo = fetches.every(f => String(f.url).indexOf('/api/') === 0);
   out.incassoChiuso = chiusi.indexOf('p2pIncassoSheet') >= 0;
   out.dopoLIndirizzo = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'].stato;
-  /* ⚠️ LA FATTURA PORTA IL NETTO, non l'importo dell'ordine (set
-     2026, verificato sui byte di mostro v0.18.6): `satsNetti` e'
-     `order.amount`, e il coordinatore accetta `amount − order.fee`.
-     Qui la fee viva e' l'1%, la meta' di chi legge lo 0,5%: su 99000
-     fa 495, e la cifra da chiedere e' 98505. Prima il foglio
-     prometteva 99000 e la guardia pretendeva 99000 — cioe' rifiutava
-     la fattura GIUSTA e lasciava passare quella che il coordinatore
-     avrebbe scartato. */
+  /* ⚠️ IL COORDINATORE MANDA GIA' IL MIO LATO (16 set 2026, il caso
+     vissuto): l'`add-invoice` porta `amount − fee` = 7543, e la fattura
+     deve essere di 7543 — non di 7468 (la meta' tolta due volte, quel
+     che il foglio suggeriva fino a ieri) e non di 7619 (il lordo). */
   reset();
   rispondi = r => [];
   scriviOrdineP2P({id: 'x2', lato: 'compro', indice: 0, pubTrade: '',
-                   stato: 'attesa_mia_fattura', euro: 10, sats: 20000,
-                   satsNetti: 99000, metodi: [], creato: 1});
+                   stato: 'attesa_mia_fattura', euro: 5, sats: 0,
+                   satsNetti: 7619, satsMiei: 7543, metodi: [], creato: 1});
   p2pOrdineAperto = 'x2';
   await assicuraMazzo();
   apriIncassoP2P();
-  out.foglioDiceIlNetto =
-    (nodi.p2pIncassoCorpo.innerHTML || '').indexOf('98505') >= 0
-    && (nodi.p2pIncassoCorpo.innerHTML || '').indexOf('99000') < 0;
-  el('p2pIncassoInp').value = 'lnbc1u1pxxx';       /* 100 sats, non 98505 */
+  {
+    const h = nodi.p2pIncassoCorpo.innerHTML || '';
+    out.foglioDiceIlMioLato = h.indexOf('Riceverai <b>7543 sats</b>') >= 0
+      && h.indexOf('7468') < 0 && h.indexOf('7619') < 0;
+    /* la cifra si copia (si ribatte a mano nel wallet), la senza-importo
+       si consiglia, e la scadenza si dice PRIMA coi minuti del nodo */
+    out.foglioCopiaLaCifra = h.indexOf("copiaLink('7543'") >= 0;
+    out.foglioConsigliaLaLibera = h.indexOf('<b>senza importo</b>') >= 0;
+    out.foglioAvvisaSullaScadenza = h.indexOf('più di 60 minuti') >= 0;
+    out.foglioDiceDellAutoincasso = h.indexOf('incassi automatici') >= 0
+      && nodi.p2pIncassoInp.value === 'io@wallet.com';
+  }
+  /* LA FATTURA VERA DEL 16 SET: 7468 sats — fermata sulla cifra, e la
+     ragione dice quella giusta (7543), mai il lordo */
+  el('p2pIncassoInp').value = FATT.vera7468;
   await inviaIncassoP2P();
   out.importoStortoFermato = ricevuti.length === 0
-    && String(nodi.p2pIncassoAvviso.textContent).indexOf('98505') >= 0;
+    && String(nodi.p2pIncassoAvviso.textContent).indexOf('7543') >= 0;
   out.nonChiedeIlLordo =
-    String(nodi.p2pIncassoAvviso.textContent).indexOf('99000') < 0;
+    String(nodi.p2pIncassoAvviso.textContent).indexOf('7619') < 0;
+  /* ...e di 7468 (quel che il foglio suggeriva ieri) NON si accontenta */
+  el('p2pIncassoInp').value = FATT.f7468_1g;
+  await inviaIncassoP2P();
+  out.laMetaDueVolteFermata = ricevuti.length === 0
+    && String(nodi.p2pIncassoAvviso.textContent).indexOf('7543') >= 0;
+  /* la cifra giusta ma da un'ora ESATTA: e' la seconda trappola, e si
+     dice coi minuti che restano, non con un «non valida» */
+  el('p2pIncassoInp').value = FATT.f7543_1h;
+  await inviaIncassoP2P();
+  out.scadenzaCortaFermata = ricevuti.length === 0
+    && /scade fra \d+ minuti/.test(String(nodi.p2pIncassoAvviso.textContent))
+    && String(nodi.p2pIncassoAvviso.textContent).indexOf('60 minuti') >= 0;
+  /* la senza-importo non scavalca la scadenza: la regola e' sulla bolt11 */
+  el('p2pIncassoInp').value = FATT.libera_1h;
+  await inviaIncassoP2P();
+  out.liberaCortaFermata = ricevuti.length === 0
+    && String(nodi.p2pIncassoAvviso.textContent).indexOf('minuti') >= 0;
+  /* una bolt11 col checksum rotto non si legge, e lo dice */
+  el('p2pIncassoInp').value = 'lnbc75430n1pxxx';
+  await inviaIncassoP2P();
+  out.rottaNonSiLegge = ricevuti.length === 0
+    && String(nodi.p2pIncassoAvviso.textContent).indexOf('non si legge') >= 0;
   el('p2pIncassoInp').value = 'non e un indirizzo';
   await inviaIncassoP2P();
   out.testoStortoFermato = ricevuti.length === 0;
   /* ...E QUELLA GIUSTA PASSA, che e' il caso capace di fermare uno
-     scambio vero: `985050n` = 98505 sats, e fino a ieri la nostra
-     guardia la rimandava indietro. Si rifa' la strada intera — presa,
-     `add-invoice` del coordinatore con `amount` 99000, foglio — o la
-     riga non ha la chiave dello scambio e non partirebbe comunque. */
+     scambio vero: 7543 sats con un giorno di vita. Si rifa' la strada
+     intera — presa, `add-invoice` del coordinatore con `amount` 7543,
+     foglio — o la riga non ha la chiave dello scambio e non
+     partirebbe comunque. Poi, sullo stesso scambio, la SENZA IMPORTO
+     con un giorno di vita: passa anche lei. */
   reset();
   rispondi = r => {
     const d = r.dentro;
     if (d.action === 'take-sell')
       return [ordine('add-invoice', d.request_id, d.id,
-                     {order: {id: d.id, amount: 99000}})];
+                     {order: {id: d.id, amount: 7543}})];
     return [];
   };
   await prendiOrdineP2P('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002');
   await finoA(() => oltrePrendo('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'));
   await pausa(30);
   apriIncassoP2P();
-  el('p2pIncassoInp').value = 'lnbc985050n1xxx';
+  el('p2pIncassoInp').value = FATT.f7543_1g;
   await inviaIncassoP2P();
   await pausa(60);
   out.importoGiustoPassa = ricevuti.length === 2
-    && ricevuti[1].dentro.action === 'add-invoice';
-  /* ⚠️ E A COMMISSIONE IGNOTA NON SI SBARRA LA STRADA: senza il 38385
-     la meta' non si sa, e un rifiuto nostro su un numero inventato
-     sarebbe peggio del «no» del coordinatore, che almeno porta la sua
-     ragione. Il foglio, allo stesso modo, non promette nessuna cifra.
+    && ricevuti[1].dentro.action === 'add-invoice'
+    && ricevuti[1].dentro.payload.payment_request[1] === FATT.f7543_1g;
+  apriIncassoP2P();
+  el('p2pIncassoInp').value = FATT.libera_1g;
+  await inviaIncassoP2P();
+  await pausa(60);
+  out.liberaPassa = ricevuti.length === 3
+    && ricevuti[2].dentro.action === 'add-invoice'
+    && ricevuti[2].dentro.payload.payment_request[1] === FATT.libera_1g;
+  /* ⚠️ E LA RIGA DI IERI — solo il lordo, senza `satsMiei` — ha il suo
+     ripiego: la meta' si toglie come prima (99000 → 98010 al 2%), che e'
+     l'unico numero che si puo' dire da li'. Vale per gli scambi aperti
+     sui dispositivi prima del 16 set. */
+  reset();
+  rispondi = r => [];
+  scriviOrdineP2P({id: 'x3', lato: 'compro', indice: 0, pubTrade: '',
+                   stato: 'attesa_mia_fattura', euro: 10, sats: 20000,
+                   satsNetti: 99000, metodi: [], creato: 1});
+  p2pOrdineAperto = 'x3';
+  await assicuraMazzo();
+  apriIncassoP2P();
+  out.rigaDiIeriRipiega =
+    (nodi.p2pIncassoCorpo.innerHTML || '').indexOf('98010') >= 0
+    && (nodi.p2pIncassoCorpo.innerHTML || '').indexOf('99000') < 0;
+  /* ⚠️ E A COMMISSIONE IGNOTA NON SI SBARRA LA STRADA SULLA CIFRA:
+     senza il 38385 la meta' non si sa, e un rifiuto nostro su un
+     numero inventato sarebbe peggio del «no» del coordinatore, che
+     almeno porta la sua ragione. Il foglio, allo stesso modo, non
+     promette nessuna cifra — ma il mio lato DETTO dal coordinatore si
+     ripete anche senza 38385, perche' non e' un conto: e' un fatto.
      ⚠️ E `p2pInfo = null` NON rompe il motore: `mostroInfoP2P` ripiega
      su un oggetto suo senza ASSEGNARLO, quindi al momento della
      guardia la commissione e' ancora «non si sa». */
@@ -44010,18 +44167,27 @@ function reset(){
     const d = r.dentro;
     if (d.action === 'take-sell')
       return [ordine('add-invoice', d.request_id, d.id,
-                     {order: {id: d.id, amount: 99000}})];
+                     {order: {id: d.id, amount: 7543}})];
     return [];
   };
   await prendiOrdineP2P('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002');
   await finoA(() => oltrePrendo('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'));
   await pausa(30);
+  {
+    const o3 = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'];
+    /* il fatto si tiene, il lordo non si inventa */
+    out.senzaFeeIlFattoResta = o3.satsMiei === 7543 && !(o3.satsNetti > 0);
+  }
   apriIncassoP2P();
-  out.senzaFeeNientePromessa =
-    (nodi.p2pIncassoCorpo.innerHTML || '').indexOf('Riceverai') < 0;
-  /* 100 sats: sbagliati per chiunque, e passano lo stesso — perche'
-     la cifra giusta noi non la sappiamo */
-  el('p2pIncassoInp').value = 'lnbc1u1pxxx';
+  out.senzaFeeDiceIlFatto =
+    (nodi.p2pIncassoCorpo.innerHTML || '').indexOf('Riceverai <b>7543 sats</b>') >= 0;
+  /* la fattura da 7543 passa; e la finestra, senza 38385, e' quella del
+     nodo: la stessa da un'ora esatta si ferma lo stesso */
+  el('p2pIncassoInp').value = FATT.f7543_1h;
+  await inviaIncassoP2P();
+  out.senzaFeeLaScadenzaSiGuarda = ricevuti.length === 1
+    && String(nodi.p2pIncassoAvviso.textContent).indexOf('60 minuti') >= 0;
+  el('p2pIncassoInp').value = FATT.f7543_1g;
   await inviaIncassoP2P();
   await pausa(60);
   out.senzaFeeNonSbarra = ricevuti.length === 2
@@ -44292,7 +44458,8 @@ function reset(){
         "skMaiInRete": "il segreto del profilo non esce mai",
         "pubRegistrata": "...e al server va la sola meta' pubblica",
         "dopoPresa": ("il coordinatore chiede dove ricevere", "attesa_mia_fattura"),
-        "satsNetti": ("...e dice quanti sats arrivano netti", 99000),
+        "satsMiei": ("...e dice quanti sats arrivano a me: e' la cifra detta, un fatto", 7543),
+        "satsNetti": ("...e l'importo dell'ordine si ricava dal mio lato (fee 2%, meta' 76)", 7619),
         "aspettaVenditore": ("«sta pagando» si legge", "attesa_hold_venditore"),
         "attivo": ("i sats bloccati fanno partire lo scambio", "attivo"),
         "euroInviati": ("gli euro inviati si registrano", "euro_inviati"),
@@ -44310,6 +44477,8 @@ function reset(){
         "venditoreAspetta": ("chi vende deve bloccare i sats", "attesa_mia_hold"),
         "holdArrivata": "...e la richiesta di pagamento arriva",
         "holdConImporto": "...col suo importo",
+        "venditoreMiei": ("...che E' il mio lato di chi vende", 40000),
+        "venditoreLordo": ("...e l'ordine si ricava: 39604 + 396", 39604),
         "qrDellaHold": "il QR e' quello della richiesta, in maiuscolo",
         "holdApertoConVelo": "...e il foglio si apre col velo",
         "invoiceColTextContent": "la fattura si scrive col testo, mai nel markup",
@@ -44323,13 +44492,25 @@ function reset(){
         "nessunaFetchAllIndirizzo": "...senza chiedere niente a un wallet di terzi",
         "incassoChiuso": "...e il foglio si chiude",
         "dopoLIndirizzo": ("...e si aspetta chi vende", "attesa_hold_venditore"),
-        "foglioDiceIlNetto": "il foglio promette il NETTO, non l'importo dell'ordine",
-        "importoStortoFermato": "una fattura dell'importo sbagliato non parte",
-        "nonChiedeIlLordo": "...e la ragione non chiede piu' il lordo",
+        "foglioDiceIlMioLato": "il foglio promette la cifra DETTA dal coordinatore: 7543, non 7468 ne' 7619",
+        "foglioCopiaLaCifra": "...con la cifra da copiare",
+        "foglioConsigliaLaLibera": "...consiglia la fattura senza importo",
+        "foglioAvvisaSullaScadenza": "...e avvisa PRIMA sui minuti di vita che il nodo pretende",
+        "foglioDiceDellAutoincasso": "...e l'indirizzo degli incassi automatici e' gia' scritto, e si puo' cambiare",
+        "importoStortoFermato": "la fattura vera del 16 set (7468) si ferma, e la ragione dice 7543",
+        "nonChiedeIlLordo": "...mai il lordo",
+        "laMetaDueVolteFermata": "...e 7468 con un giorno di vita si ferma lo stesso: era la meta' tolta due volte",
+        "scadenzaCortaFermata": "la cifra giusta da un'ora ESATTA si ferma, coi minuti che restano",
+        "liberaCortaFermata": "...e la senza-importo da un'ora pure: la regola e' sulla scadenza",
+        "rottaNonSiLegge": "una bolt11 col checksum rotto non si legge, e lo dice",
         "testoStortoFermato": "...e nemmeno un testo che non e' ne' l'uno ne' l'altra",
-        "importoGiustoPassa": "...ma la fattura GIUSTA parte (il difetto che fermava uno scambio)",
-        "senzaFeeNientePromessa": "senza il 38385 il foglio non promette nessuna cifra",
-        "senzaFeeNonSbarra": "...e la guardia non sbarra la strada",
+        "importoGiustoPassa": "...ma 7543 con un giorno di vita PARTE (il difetto che fermava uno scambio)",
+        "liberaPassa": "...e la senza-importo con un giorno di vita pure",
+        "rigaDiIeriRipiega": "una riga di ieri, col solo lordo, ripiega sulla meta' come prima",
+        "senzaFeeIlFattoResta": "senza il 38385 il mio lato si tiene e il lordo non si inventa",
+        "senzaFeeDiceIlFatto": "...e il foglio dice la cifra detta, che non e' un conto",
+        "senzaFeeLaScadenzaSiGuarda": "...la scadenza si guarda lo stesso, coi 3600 s del nodo",
+        "senzaFeeNonSbarra": "...e la fattura buona passa",
         "rifiutato": ("un «no» del coordinatore si legge", "rifiutato"),
         "motivoInItaliano": "...e il motivo e' in italiano",
         "cantDoScritto": "...e resta scritto nello scambio",
@@ -44486,13 +44667,20 @@ def prove_p2p_stati():
         tab, stati, prog, motivi, liste, secondarie, provv,
         fn("function motivoCantDo(payload){"),
         fn("function importoBolt11(pr){"),
+        fn("function leggiBolt11(pr){"),
+        # dal 16 set 2026 la macchina a stati RICAVA il lordo dal mio
+        # lato: le servono il giudice della meta' e la fee viva
+        "let p2pInfo = {fee: 0.02};",
+        fn("function commissioneVivaP2P(){"),
+        fn("function nettoLatoP2P(o, sats){"),
+        fn("function lordoDaMieiP2P(o, miei){"),
         fn("function statoTestoP2P(o){"),
         # la cifra in euro di uno scambio: il giudice unico delle due
         # viste, e l'unico che sa dire un INTERVALLO
         "const fmtEur = e => e.toLocaleString('it-IT', "
         "{minimumFractionDigits: 2, maximumFractionDigits: 2});",
         fn("function euroTestoP2P(o){"),
-        avanza, azioni]) + r"""
+        avanza, azioni, "const FATT_VERA = " + json.dumps(BOLT11_VERA_7468) + ";"]) + r"""
 const out = {};
 /* uno scambio si «cammina»: si parte da com'e' nato e gli si danno i
    messaggi nell'ordine in cui il coordinatore li manda, guardando a
@@ -44521,6 +44709,7 @@ const gc = cammina(compro, [
 ]);
 out.giroCompro = gc.tappe;
 out.comproNetti = gc.ord.satsNetti;
+out.comproMiei = gc.ord.satsMiei;
 out.comproMetodi = gc.ord.metodi;
 out.comproPeer = gc.ord.peer;
 
@@ -44533,6 +44722,32 @@ const gv = cammina(vendo, [
 ]);
 out.giroVendo = gv.tappe;
 out.holdLetta = gv.ord.hold && gv.ord.hold.bolt11 === 'lnbc800u1qqqq' && gv.ord.hold.sats;
+out.vendoMiei = gv.ord.satsMiei;
+out.vendoLordo = gv.ord.satsNetti;
+
+// 2-bis) DA CHE AZIONE VIENE L'IMPORTO decide cos'e' (16 set 2026):
+// l'eco del new-order e' il lordo; add-invoice, buyer-took-order e
+// hold-invoice-payment-accepted sono il mio lato; e senza la fee viva
+// il mio lato si tiene e il lordo non si inventa
+out.ecoLordo = (() => { const o = avanzaOrdineP2P(compro, 'new-order', {order: {amount: 7619}});
+                        return [o.satsNetti, o.satsMiei]; })();
+out.vendoPreso = (() => { const o = avanzaOrdineP2P(vendo, 'buyer-took-order', {order: {amount: 7695}});
+                          return [o.satsNetti, o.satsMiei]; })();
+out.comproAccettato = (() => { const o = avanzaOrdineP2P(compro, 'hold-invoice-payment-accepted', {order: {amount: 7543}});
+                               return [o.satsNetti, o.satsMiei]; })();
+out.lordi = [lordoDaMieiP2P({lato: 'compro'}, 7543), lordoDaMieiP2P({lato: 'vendo'}, 7695),
+             lordoDaMieiP2P({lato: 'compro'}, 79200), lordoDaMieiP2P({lato: 'vendo'}, 80000),
+             /* due lordi per lo stesso netto (7549 e 7550 → 7474): vince il piu' piccolo */
+             lordoDaMieiP2P({lato: 'compro'}, 7474)];
+p2pInfo = {fee: 0};
+out.lordoAFeeZero = lordoDaMieiP2P({lato: 'compro'}, 7543);
+p2pInfo = null;
+out.senzaFee = (() => { const o = avanzaOrdineP2P(compro, 'add-invoice', {order: {amount: 7543}});
+                        return [o.satsNetti, o.satsMiei, lordoDaMieiP2P({lato: 'compro'}, 7543)]; })();
+p2pInfo = {fee: 0.02};
+// 2-ter) la bolt11 vera del 16 set, letta oltre la cifra
+out.lettaVera = (() => { const b = leggiBolt11(FATT_VERA); return [b.sats, b.quando, b.scadenza, b.scade, b.cltv]; })();
+out.lettaRotta = [leggiBolt11('lnbc74680n1pxxx'), leggiBolt11('ciao'), leggiBolt11('')];
 
 // 3) un messaggio vecchio non riapre uno scambio finito
 out.finitoResta = avanzaOrdineP2P(gc.ord, 'buyer-took-order', null).stato;
@@ -44692,7 +44907,8 @@ process.stdout.write(JSON.stringify(out));
            ["euro_inviati", ""],
            ["rilasciato", ""],
            ["concluso", ""]], out["giroCompro"])
-    prova("...e i sats NETTI arrivano dal coordinatore", 79200, out["comproNetti"])
+    prova("...e il mio lato arriva dal coordinatore cosi' com'e'", 79200, out["comproMiei"])
+    prova("...e l'importo dell'ordine si ricava (fee 2%: 80000 − 800 = 79200)", 80000, out["comproNetti"])
     prova("...coi metodi letti dalla stringa a virgole",
           ["Revolut", "Satispay"], out["comproMetodi"])
     prova("...e la trade key dell'altra persona si tiene", "cc" * 32,
@@ -44704,6 +44920,22 @@ process.stdout.write(JSON.stringify(out));
            ["concluso", ""]], out["giroVendo"])
     prova("la richiesta da bloccare si legge, importo compreso", 80000,
           out["holdLetta"])
+    prova("...e la hold E' il mio lato di chi vende", 80000, out["vendoMiei"])
+    prova("...da cui l'ordine si ricava (79208 + 792 = 80000)", 79208, out["vendoLordo"])
+    prova("l'eco del new-order e' il lordo, e il mio lato non c'e'",
+          [7619, None], out["ecoLordo"])
+    prova("chi vende, preso: 7695 e' il mio lato, 7619 l'ordine",
+          [7619, 7695], out["vendoPreso"])
+    prova("chi compra, a sats bloccati: 7543 e' il mio lato, 7619 l'ordine",
+          [7619, 7543], out["comproAccettato"])
+    prova("il lordo ricavato riproduce la cifra detta, da tutt'e due i lati",
+          [7619, 7619, 80000, 79208, 7549], out["lordi"])
+    prova("...a fee zero e' la cifra stessa", 7543, out["lordoAFeeZero"])
+    prova("...e senza la fee viva il mio lato si tiene e il lordo non si inventa",
+          [0, 7543, 0], out["senzaFee"])
+    prova("la bolt11 vera del 16 set: 7468 sats, un'ora esatta, cltv 80",
+          [7468, 1789568918, 3600, 1789572518, 80], out["lettaVera"])
+    prova("...e una rotta non si legge", [None, None, None], out["lettaRotta"])
     prova("un messaggio vecchio non riapre uno scambio concluso",
           "concluso", out["finitoResta"])
     prova("...ne' uno annullato", "annullato", out["annullatoResta"])
@@ -50100,6 +50332,8 @@ out.nudo = out.compro.indexOf('p2p-meta') < 0;
 out.satsStima = satsScambioP2P(riga({}));
 out.satsFisso = satsScambioP2P(riga({sats: 12000}));
 out.satsDetto = satsScambioP2P(riga({sats: 12000, satsNetti: 9999}));
+/* il mio lato DETTO (16 set 2026): si ripete secco, niente ≈ */
+out.satsMiei = satsScambioP2P(riga({sats: 12000, satsNetti: 7619, satsMiei: 7543}));
 out.satsRange = satsScambioP2P(riga({euro: 50, euroMax: 100}));
 cambioVivo = false;
 out.satsMuti = satsScambioP2P(riga({}));
@@ -50374,6 +50608,10 @@ console.log(JSON.stringify(out));
     # la stessa riga.
     prova("...e quel che ha detto il coordinatore vince, al netto della meta'",
           "≈ 9899 sats", o["satsDetto"])
+    # ...ma quando il coordinatore ha detto il MIO lato (dal 16 set 2026:
+    # `add-invoice`, `buyer-took-order`, la hold), quello si ripete secco
+    prova("...e il mio lato detto dal coordinatore si ripete senza conti ne' ≈",
+          "7543 sats", o["satsMiei"])
     prova("l'intervallo porta i due capi anche in sats", True,
           o["satsRange"].count("–") == 1)
     # ⚠️ A CAMBIO MUTO NESSUN NUMERO, mai uno inventato — e la card

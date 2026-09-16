@@ -35842,11 +35842,12 @@ function infoDaEvento(ev){
        di `adesso + invoice_expiration_window` — una fattura troppo
        corta viene rifiutata con lo stesso `InvoiceInvalidError`
        dell'importo sbagliato, cioe' con un «no» che non dice quale
-       delle due cose non andava. Resta PARCHEGGIATA per ora: il
-       foglio non promette tempi e non sbarra la strada, e il giorno
-       che la si volesse usare va riguardato prima il NOME — il commit
-       `c6efb2d` (#952) lo rinomina upstream, e nel 38385 del nostro
-       nodo i nomi sono ancora questi (vedi CLAUDE.md). */
+       delle due cose non andava. Dal 16 set 2026 la legge
+       `finestraFatturaP2P`, e il foglio di chi compra ferma PRIMA una
+       fattura troppo corta dicendo perche'. Il NOME e' quello che il
+       38385 del nostro nodo emette DAVVERO (verificato): il commit
+       `c6efb2d` (#952) lo rinomina upstream, e il giorno che il tag
+       sparisse la finestra tornerebbe al default di 3600 s. */
     holdFinestra: Math.floor(num('hold_invoice_expiration_window')),
     fattFinestra: Math.floor(num('invoice_expiration_window')),
     valute: String(tagValore(ev, 'fiat_currencies_accepted') || '')
@@ -39366,7 +39367,7 @@ const MOTIVI_CANTDO = {
   'invalid-signature': 'la firma non è stata riconosciuta',
   'invalid-trade-index': 'il profilo di scambio non è allineato: prova a riaprire l\'app',
   'invalid-amount': 'l\'importo non va bene',
-  'invalid-invoice': 'la richiesta di pagamento non è valida',
+  'invalid-invoice': 'la richiesta di pagamento è stata rifiutata: o l\'importo non è quello dovuto, o scade troppo presto',
   'invalid-order-kind': 'questo ordine non si può prendere',
   'invalid-order-status': 'l\'ordine non è più disponibile',
   'invalid-pubkey': 'il profilo di scambio non è stato riconosciuto',
@@ -39427,6 +39428,18 @@ const AVANZA_P2P = {
   'admin-took-dispute': 'in_disputa',
   'payment-failed': 'pagamento_ritentato'
 };
+/* ⚠️ DOPO IL TAKE, OGNI PAYLOAD PORTA GIA' L'IMPORTO DEL LATO DI CHI
+   LEGGE (16 set 2026, verificato sui byte di mostro v0.18.7, il tag
+   che il nodo gira): `set_waiting_invoice_status` e `flow.rs` scrivono
+   `amount − fee` nell'`add-invoice` verso chi compra, `add_invoice.rs`
+   e `flow.rs` `amount + fee` nel `buyer-took-order` verso chi vende e
+   `amount − fee` nell'`hold-invoice-payment-accepted` verso chi compra,
+   e la hold del `pay-invoice` E' `amount + fee`. Il LORDO arriva solo
+   nell'eco del `new-order` (e nel libro 38383). Su queste azioni
+   l'importo NON si tocca: e' gia' quello che il coordinatore pretende
+   nella fattura o mette nella hold — e sottrargli di nuovo la meta'
+   (la lettura del 14 set) faceva chiedere 7468 dove ne voleva 7543. */
+const P2P_IMPORTO_MIO = ['add-invoice', 'hold-invoice-payment-accepted', 'buyer-took-order'];
 /* PURA: copia, non muta. Cosi' si prova senza un browser e senza un
    coordinatore, ed e' l'unica cosa che decide cosa si vede. */
 function avanzaOrdineP2P(ordine, azione, payload){
@@ -39435,18 +39448,26 @@ function avanzaOrdineP2P(ordine, azione, payload){
   const finito = P2P_FINALI.indexOf(o.stato) >= 0;
   const ord = p && p.order;
   if (ord) {
-    /* ⚠️ E' IL LORDO, E IL NOME MENTE (set 2026): `order.amount` e'
-       l'importo dell'ORDINE, non quel che passa di mano — chi compra
-       ne riceve la meta' della commissione IN MENO, chi vende
-       altrettanto in piu'. Il nome resta perche' la riga vive in
-       localStorage sui dispositivi di chi ha gia' scambiato, e
-       ribattezzare il campo perderebbe la cifra a chi aggiorna: la
-       cura e' non leggerlo MAI a crudo. I tre giudici sono
-       `satsDaRicevereP2P` (la fattura di chi compra),
-       `satsScambioP2P` (la card della lista) e il `satsDetti` del
-       conto, che e' l'unico posto dove il lordo E' la cosa giusta —
-       li' fa il Subtotale. */
-    if (Number(ord.amount) > 0) o.satsNetti = Math.floor(Number(ord.amount));
+    /* ⚠️ DUE CAMPI PER DUE VERITA' (16 set 2026). `satsMiei` e'
+       l'importo del MIO lato come l'ha detto il coordinatore — quel
+       che pretende nella fattura di chi compra, quel che mette nella
+       hold di chi vende — e arriva sulle azioni di `P2P_IMPORTO_MIO`.
+       `satsNetti` e' l'importo dell'ORDINE (il lordo, e il nome mente:
+       resta perche' la riga vive in localStorage sui dispositivi di
+       chi ha gia' scambiato): dall'eco del `new-order` arriva cosi'
+       com'e', dalle altre azioni si RICAVA all'indietro con
+       `lordoDaMieiP2P`, rifacendo il conto del coordinatore al
+       contrario. Mai scrivere il mio lato dentro il lordo: era il
+       difetto del 14 set, e il foglio chiedeva una fattura che il
+       coordinatore rifiutava. I giudici: `satsDaRicevereP2P` (la
+       fattura), `satsScambioP2P` (la card), `satsDetti` del conto
+       (l'unico posto dove il lordo E' la cosa giusta: fa il Subtotale). */
+    const amt = Math.floor(Number(ord.amount) || 0);
+    if (amt > 0 && P2P_IMPORTO_MIO.indexOf(azione) >= 0) {
+      o.satsMiei = amt;
+      const lordo = lordoDaMieiP2P(o, amt);
+      if (lordo > 0) o.satsNetti = lordo;
+    } else if (amt > 0) o.satsNetti = amt;
     /* L'INTERVALLO COLLASSA QUI, ed e' l'unico posto che puo' farlo:
        un ordine a range non ha una cifra finche' qualcuno non la
        sceglie, e quella la dice il coordinatore col `fiat_amount`
@@ -39469,8 +39490,17 @@ function avanzaOrdineP2P(ordine, azione, payload){
      [ordine, fattura, importo] — sempre tre elementi, anche vuoti */
   if (azione === 'pay-invoice' && p && Array.isArray(p.payment_request)) {
     const bolt = typeof p.payment_request[1] === 'string' ? p.payment_request[1] : '';
-    if (bolt) o.hold = {bolt11: bolt, sats: importoBolt11(bolt) || 0,
-                        quando: Math.floor(Date.now() / 1000)};
+    if (bolt) {
+      o.hold = {bolt11: bolt, sats: importoBolt11(bolt) || 0,
+                quando: Math.floor(Date.now() / 1000)};
+      /* la hold e' `amount + fee` (`show_hold_invoice`): e' l'importo
+         del MIO lato, detto dalla fattura stessa, e il lordo si ricava */
+      if (o.hold.sats > 0) {
+        o.satsMiei = o.hold.sats;
+        const lordo = lordoDaMieiP2P(o, o.hold.sats);
+        if (lordo > 0) o.satsNetti = lordo;
+      }
+    }
   }
   if (p && p.peer && p.peer.pubkey) o.peer = String(p.peer.pubkey);
   /* un no non muove lo stato: dice perche', e lo scambio resta dov'e' */
@@ -39638,6 +39668,56 @@ function importoBolt11(pr){
   const msat = n * molt[k];
   if (msat % 1000) return null;   // una frazione di sat non si sa dire
   return Math.round(msat / 1000);
+}
+
+/* ---- quel che DICE una richiesta di pagamento, oltre la cifra ----
+   (16 set 2026) Il coordinatore rifiuta una bolt11 che scada prima di
+   `adesso + invoice_expiration_window` — 3600 s sul nostro nodo — e i
+   wallet comuni fanno fatture da UN'ORA ESATTA, che quando arrivano
+   hanno gia' perso qualche secondo: rifiutate tutte, con lo stesso
+   «no» dell'importo sbagliato. Qui la scadenza si legge PRIMA di
+   mandare, per dirlo con parole nostre. Bech32 a mano (BOLT-11): il
+   checksum si verifica, la firma no — quella la guarda LND. I campi:
+   timestamp (35 bit), poi i taggati [tipo, lunghezza, dati], e in coda
+   la firma (65 byte = 104 gruppi). `x` (6) e' la scadenza in secondi,
+   default 3600; `c` (24) il cltv finale, default 18.
+   null = non si legge (e allora non si afferma niente). */
+function leggiBolt11(pr){
+  const s = String(pr || '').trim().toLowerCase();
+  const sats = importoBolt11(s);
+  if (sats === null) return null;
+  const sep = s.lastIndexOf('1');
+  if (sep < 1) return null;
+  const hrp = s.slice(0, sep), corpo = s.slice(sep + 1);
+  const ALF = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+  const v = [];
+  for (const c of corpo) { const k = ALF.indexOf(c); if (k < 0) return null; v.push(k); }
+  const GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+  const esp = [];
+  for (const c of hrp) esp.push(c.charCodeAt(0) >> 5);
+  esp.push(0);
+  for (const c of hrp) esp.push(c.charCodeAt(0) & 31);
+  let chk = 1;
+  for (const x of esp.concat(v)) {
+    const b = chk >>> 25;
+    chk = ((chk & 0x1ffffff) << 5) ^ x;
+    for (let i = 0; i < 5; i++) if ((b >> i) & 1) chk ^= GEN[i];
+  }
+  if (chk !== 1) return null;
+  const d = v.slice(0, -6);            /* via il checksum */
+  if (d.length < 7 + 104) return null; /* timestamp + firma */
+  const num = a => a.reduce((n, x) => n * 32 + x, 0);
+  const quando = num(d.slice(0, 7));
+  let scadenza = 3600, cltv = 18;      /* i default di BOLT-11 */
+  const fine = d.length - 104;
+  for (let i = 7; i + 3 <= fine;) {
+    const t = d[i], l = d[i + 1] * 32 + d[i + 2];
+    if (i + 3 + l > fine) break;
+    if (t === 6) scadenza = num(d.slice(i + 3, i + 3 + l));
+    if (t === 24) cltv = num(d.slice(i + 3, i + 3 + l));
+    i += 3 + l;
+  }
+  return {sats: sats, quando: quando, scadenza: scadenza, scade: quando + scadenza, cltv: cltv};
 }
 
 /* ---- quel che succede quando un messaggio si applica ---- */
@@ -41074,9 +41154,45 @@ function apriIncassoP2P(){
    cifra non la lasciano scegliere, ed e' quella che il foglio
    suggerisce da sempre. */
 function satsDaRicevereP2P(o){
+  /* la cifra che il coordinatore ha DETTO nell'`add-invoice` e' quella
+     che pretende nella fattura (`amount − order.fee`, gia' fatta da
+     lui): si ripete, non si ricalcola. Il ramo sotto e' il ripiego
+     per una riga scritta prima del 16 set 2026, dove c'e' solo il lordo. */
+  if (o && o.satsMiei > 0) return o.satsMiei;
   const lordo = (o && o.satsNetti > 0) ? o.satsNetti : 0;
   if (!(lordo > 0) || commissioneVivaP2P() === null) return 0;
   return nettoLatoP2P({lato: 'sell'}, lordo);
+}
+/* PURA: dall'importo del MIO lato all'importo dell'ORDINE, rifacendo
+   al contrario il conto del coordinatore (`get_fee`: la meta' della
+   fee sul lordo, arrotondata). Si prova il candidato piu' vicino e i
+   suoi vicini, e vince il piu' piccolo che RIPRODUCE la cifra detta
+   con la stessa formula di `nettoLatoP2P` — cosi' il conto della
+   pagina, che riparte dal lordo, torna al satoshi sul mio lato.
+   ⚠️ L'ARROTONDAMENTO PUO' DARE DUE LORDI PER LO STESSO NETTO (7549 e
+   7550 fanno tutt'e due 7474 all'1%): il Subtotale puo' sbagliare di
+   UN sat, il mio lato mai. A commissione ignota torna 0: il lordo non
+   si inventa. */
+function lordoDaMieiP2P(o, miei){
+  const fee = commissioneVivaP2P();
+  if (!(miei > 0) || fee === null) return 0;
+  if (!(fee > 0)) return miei;
+  const verso = {lato: (o && o.lato === 'compro') ? 'sell' : 'buy'};
+  const base = Math.round(miei / (verso.lato === 'sell' ? 1 - fee / 2 : 1 + fee / 2));
+  for (let d = -2; d <= 2; d++) {
+    const c = base + d;
+    if (c > 0 && nettoLatoP2P(verso, c) === miei) return c;
+  }
+  return 0;
+}
+/* quanto deve ancora valere una fattura quando arriva al coordinatore
+   (`invoice_expiration_window`, letta dal 38385 in `fattFinestra`).
+   Senza il 38385 vale il default del template di mostro, 3600 s, che
+   e' anche quello del nostro nodo: meglio fermare una fattura da
+   un'ora esatta che lasciarla andare a farsi dire di no. */
+function finestraFatturaP2P(){
+  const f = p2pInfo ? Math.floor(Number(p2pInfo.fattFinestra) || 0) : 0;
+  return f > 0 ? f : 3600;
 }
 function renderIncassoP2P(){
   const box = el('p2pIncassoCorpo');
@@ -41084,11 +41200,26 @@ function renderIncassoP2P(){
   if (!box || !o) return;
   const netto = satsDaRicevereP2P(o);
   const quanti = netto > 0 ? fmt(netto) + ' sats' : '';
+  const minuti = Math.ceil(finestraFatturaP2P() / 60);
+  /* tre cose, nell'ordine in cui servono: la cifra (con la copia,
+     perche' si ribatte a mano nel wallet), la via piu' semplice —
+     l'indirizzo — e le due regole del coordinatore sulla bolt11, dette
+     PRIMA: la senza-importo e' la via robusta sulla cifra, e una
+     fattura da un'ora esatta non passa (vedi `leggiBolt11`) */
   box.innerHTML =
     '<div class="hint">' + (quanti ? 'Riceverai <b>' + esc(quanti) + '</b>. ' : '') +
-      'Scrivi il tuo indirizzo Lightning (quello che finisce per @qualcosa) oppure incolla una richiesta di pagamento del tuo wallet.</div>' +
+      'Scrivi il tuo indirizzo Lightning (quello che finisce per @qualcosa): è la via più semplice. ' +
+      'Oppure incolla una richiesta di pagamento del tuo wallet: falla <b>senza importo</b>' +
+      (quanti ? ', o di ' + esc(quanti) + ' esatti' : '') +
+      ', e che valga ancora più di ' + minuti + ' minuti quando arriva — quelle da un\'ora esatta vengono rifiutate.</div>' +
+    (netto > 0
+      ? '<button class="btn ghost" type="button" onclick="copiaLink(\'' + netto + '\', \'📋 Cifra copiata\')">📋 Copia la cifra: ' + esc(fmt(netto)) + '</button>'
+      : '') +
     '<div class="field"><label>Dove vuoi ricevere i sats</label>' +
       '<input type="text" id="p2pIncassoInp" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="tuonome@wallet.com"></div>' +
+    (myLnAddress
+      ? '<div class="hint">È l\'indirizzo dei tuoi incassi automatici: puoi cambiarlo solo per questo scambio.</div>'
+      : '') +
     '<div class="hint" id="p2pIncassoAvviso" style="display:none"></div>' +
     '<button class="btn orange" id="p2pIncassoBtn" onclick="inviaIncassoP2P()">Invia</button>';
 }
@@ -41102,8 +41233,9 @@ async function inviaIncassoP2P(){
   if (!testo) { dillo('Serve un indirizzo o una richiesta di pagamento.'); return; }
   const bolt = /^ln[a-z0-9]+$/i.test(testo);
   if (bolt) {
-    const q = importoBolt11(testo);
-    if (q === null) { dillo('Questa richiesta di pagamento non si legge: controlla di averla copiata tutta.'); return; }
+    const b = leggiBolt11(testo);
+    if (!b) { dillo('Questa richiesta di pagamento non si legge: controlla di averla copiata tutta.'); return; }
+    const q = b.sats;
     /* la cifra che il coordinatore pretende, non quella dell'ordine:
        vedi l'avviso su `satsDaRicevereP2P`. A cifra ignota non si
        sbarra la strada — meglio un «no» del coordinatore con la sua
@@ -41111,6 +41243,19 @@ async function inviaIncassoP2P(){
     const deve = satsDaRicevereP2P(o);
     if (q > 0 && deve > 0 && q !== deve) {
       dillo('La richiesta è di ' + fmt(q) + ' sats, ma ne devi ricevere ' + fmt(deve) + '. Rifalla dell\'importo esatto, oppure lascia l\'importo libero.');
+      return;
+    }
+    /* la SCADENZA invece si sbarra sempre: la regola e' del
+       coordinatore (`validate_bolt11_invoice`: scade < adesso +
+       finestra = no) e il suo «no» non direbbe quale delle due cose
+       non andava */
+    const finestra = finestraFatturaP2P();
+    const adesso = Math.floor(Date.now() / 1000);
+    if (b.scade < adesso + finestra) {
+      const resta = Math.floor((b.scade - adesso) / 60);
+      dillo((resta > 0 ? 'Questa richiesta scade fra ' + resta + ' minuti' : 'Questa richiesta è già scaduta')
+        + ', e viene accettata solo se vale ancora più di ' + Math.ceil(finestra / 60)
+        + ' minuti quando arriva: quelle da un\'ora esatta non bastano. Rifalla con una scadenza più lunga, oppure usa il tuo indirizzo Lightning.');
       return;
     }
   } else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(testo)) {
@@ -43447,6 +43592,9 @@ function satsScambioP2P(o){
      meno, chi vende blocca di piu'. Il `≈` c'e' quando la meta' e'
      stata applicata, che l'arrotondamento buono ce l'ha il
      coordinatore. */
+  /* il mio lato DETTO dal coordinatore e' un fatto: niente ≈ e
+     niente conto (16 set 2026, vedi `P2P_IMPORTO_MIO`) */
+  if (o.satsMiei > 0) return fmt(o.satsMiei) + ' sats';
   if (o.satsNetti > 0) {
     const n = nettoLatoP2P(l, o.satsNetti);
     return (n === o.satsNetti ? '' : '≈ ') + fmt(n) + ' sats';
