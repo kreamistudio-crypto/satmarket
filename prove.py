@@ -39288,7 +39288,8 @@ def prove_p2p_libro():
     pezzi.append("const P2P_BARATTOZON_CHIARA = false;")
     for f in ("function vesteMetodoP2P(m){",
               "function marchioMetodoP2P(m, taglia, conTesto){",
-              "function classeVesteP2P(metodi){"):
+              "function classeVesteP2P(metodi){",
+              "function iconaMetodiP2P(metodi){"):
         pezzi.append(pezzo_js(mini, f, "\n}\n") + "\n}")
     # le chiavi del dispositivo portano il conto nel nome (set 2026):
     # qui non c'e' identita', e senza vale il nome di ieri
@@ -47666,6 +47667,8 @@ def prove_p2p_barattozon():
            "'Contanti al tabacchino': {nome: 'Barattozon', "
            "logo: '/assets/barattozon.webp'," in _cat
            and "classe: 'p2p-barattozon'" in _cat))
+    prova("...e dice che nella scatola il marchio BASTA", True,
+          "soloMarchio: true" in _cat)
     prova("...e non chiama nessuna classe «p2p-logo» (la sentinella della testata)",
           False, "p2p-logo" in _cat)
     prova("l'interruttore della variante chiara esiste ed e' un booleano", True,
@@ -47674,11 +47677,17 @@ def prove_p2p_barattozon():
 
     # --- 3) I TRE POSTI LEGGONO DAL CATALOGO, nessuno ribatte il nome
     riga = pezzo_js(mini, "function rigaOrdineP2P(o){", "\n}\n")
-    prova("la card: il marchio al posto del testo nella scatola 💳", True,
+    prova("la card: il marchio al posto del testo nella scatola", True,
           "o.metodi.map(m => marchioMetodoP2P(m, 'grande')).join(', ')" in riga
           and "${classeVesteP2P(o.metodi)}" in riga)
     prova("...e il title della scatola resta il testo del tag", True,
-          "title=\"${esc(o.metodi.join(', '))}\">💳 " in riga)
+          "title=\"${esc(o.metodi.join(', '))}\">`" in riga)
+    # ⚠️ L'EMOJI NON SI SCRIVE PIU' A MANO NELLA CARD (16 set 2026): la
+    # chiede al catalogo, o il giorno che una voce nuova volesse il solo
+    # marchio bisognerebbe tornare qui — che e' la cosa che il catalogo
+    # doveva evitare.
+    prova("...e l'icona la decide il catalogo, non la card", [True, 0],
+          ["+ iconaMetodiP2P(o.metodi)" in riga, riga.count(chr(0x1F4B3))])
     filtro = pezzo_js(mini, "function renderFiltroP2P(){", "\n}\n")
     prova("il filtro: la pillola col marchio piccolo, la chiave resta il testo", True,
           "marchioMetodoP2P(m, 'mini'))" in filtro
@@ -47706,6 +47715,7 @@ def prove_p2p_barattozon():
             + _intera("function vesteMetodoP2P(m){")
             + _intera("function marchioMetodoP2P(m, taglia, conTesto){")
             + _intera("function classeVesteP2P(metodi){")
+            + _intera("function iconaMetodiP2P(metodi){")
             + "const T = 'Contanti al tabacchino';\n"
             "console.log(JSON.stringify({\n"
             "  sepa: marchioMetodoP2P('SEPA', 'grande'),\n"
@@ -47713,7 +47723,9 @@ def prove_p2p_barattozon():
             "  tab: marchioMetodoP2P(T, 'grande'),\n"
             "  mini: marchioMetodoP2P(T, 'mini', true),\n"
             "  classi: [classeVesteP2P(['SEPA']), classeVesteP2P([T]),\n"
-            "           classeVesteP2P(['SEPA', T]), classeVesteP2P([]), classeVesteP2P(null)]\n"
+            "           classeVesteP2P(['SEPA', T]), classeVesteP2P([]), classeVesteP2P(null)],\n"
+            "  icone: [iconaMetodiP2P([T]), iconaMetodiP2P(['SEPA']),\n"
+            "          iconaMetodiP2P(['SEPA', T]), iconaMetodiP2P([]), iconaMetodiP2P(null)]\n"
             "}));\n")
         _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
                                     encoding="utf-8")
@@ -47740,6 +47752,11 @@ def prove_p2p_barattozon():
                       'Contanti al tabacchino <span class="p2p-marca mini"'))
             prova("la pelle della card va solo a chi e' vestito",
                   ["", " p2p-barattozon", " p2p-barattozon", "", ""], out["classi"])
+            # l'icona se ne va SOLO quando dentro non resta nessun nome:
+            # col misto c'e' ancora del testo da intestare
+            _c = chr(0x1F4B3) + " "
+            prova("l'icona sparisce col solo marchio, e resta in tutti gli altri casi",
+                  ["", _c, _c, _c, _c], out["icone"])
 
     # --- 5) IL CSS: la card riscrive i TOKEN (cosi' badge, anello e
     # stelline vestono da soli), il marchio e' grande dentro e piccolo
@@ -47751,16 +47768,25 @@ def prove_p2p_barattozon():
                                    "--sats-text:", "--chip-bg:", "--line:"))
           and "linear-gradient(" in _card
           and css.count(".p2p-ord.p2p-barattozon .p2p-sats") == 0)
-    prova("il marchio: 30px nella card, 14px nella pillola e nella voce", True,
-          ".p2p-marca img{display:block;height:30px;width:auto}" in css
+    prova("il marchio: 40px nella card, 14px nella pillola e nella voce", True,
+          ".p2p-marca img{display:block;height:40px;width:auto}" in css
           and ".p2p-marca.mini img{height:14px}" in css)
-    prova("...nudo sulla card scura, con la tessera ambra altrove", True,
+    # LA TESSERA E' LA SCATOLA (16 set 2026): navy pieno dentro la card,
+    # in tutt'e due le varianti, e il marchio nudo; la tessera ambra
+    # resta la pelle di `.p2p-marca`, cioe' vale FUORI dalla card.
+    _navy = pezzo_js(css, ".p2p-ord.p2p-barattozon .p2p-paga{", "}")
+    prova("la scatola dei metodi e' navy pieno, non il chip di casa", True,
+          "background:#131A26" in _navy and "var(--chip-bg)" not in _navy)
+    prova("...e il filo chiaro e' un'ombra interna, che non alza la scatola",
+          [True, False],
+          ["box-shadow:inset 0 0 0 1px" in _navy, "border:" in _navy])
+    prova("il marchio sta nudo dentro la card, tessera ambra solo fuori", True,
           ".p2p-ord.p2p-barattozon .p2p-marca{background:none;padding:0}" in css
-          and "linear-gradient(" in pezzo_js(css, ".p2p-marca{", "}"))
+          and "linear-gradient(" in pezzo_js(css, ".p2p-marca{", "}")
+          and ".p2p-barattozon.chiara .p2p-marca{" not in css)
     prova("la variante chiara esiste e vale solo col tema chiaro", True,
           'html:not([data-tema="scuro"]) .p2p-ord.p2p-barattozon.chiara{' in css
-          and 'html:not([data-tema="scuro"]) .p2p-ord.p2p-barattozon.chiara '
-              '.p2p-marca{' in css)
+          and css.count(".p2p-ord.p2p-barattozon.chiara") >= 1)
     prova("la scatola dei metodi cede coi puntini come prima", True,
           ".p2p-paga{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" in css)
 

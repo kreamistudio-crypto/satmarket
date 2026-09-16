@@ -2440,16 +2440,24 @@
      tarati per il fondo bruno di sera, e badge, anello, stelline e
      scatole vestono da soli — nessuna regola per ciascuno, e una riga
      nuova nella card domani si veste senza saperlo.
-     IL MARCHIO E' BIANCO SU TRASPARENTE: sulla card scura sta nudo;
-     dappertutto altrove (pillola del filtro, voce del foglio, variante
-     chiara) porta la sua TESSERA ambra, che e' quel che lo rende
-     leggibile su un fondo chiaro. Dentro `.p2p-paga` — che cede coi
-     puntini — e' un inline largo ~95px: non rompe la riga, e col
-     tabacchino e' solo nella scatola per costruzione. */
+     IL MARCHIO E' BIANCO SU TRASPARENTE, quindi gli serve sempre un
+     fondo scuro sotto. Nella card ce lo mette la SCATOLA, che qui non
+     e' piu' il chip semitrasparente delle altre (16 set 2026, ritocco
+     di Andrea): e' un rettangolo PIENO di navy — quello della testata
+     di Amazon — con gli angoli delle sorelle, e sul gradiente ambra
+     stacca come un'insegna. Il marchio ci sta dentro NUDO, in tutt'e
+     due le varianti: la sua tessera ambra vale fuori di qui (pillola
+     del filtro e voce del foglio), dove un fondo scuro non ce l'ha
+     nessuno.
+     E COSI' LA SCATOLA PUO' CRESCERE: 40px di marchio invece di 30,
+     cioe' 127x40 dentro una riga da 313 — la scatola passa da 46 a 56
+     e la card da 152 a 162, senza toccare premio e scadenza, che
+     stanno su righe loro. Cede coi puntini come sempre, e col
+     tabacchino e' sola nella scatola per costruzione. */
   .p2p-marca{display:inline-flex;align-items:center;vertical-align:middle;
     padding:3px 8px;border-radius:8px;
     background:linear-gradient(135deg,#8A4407,#C4620C 55%,#9A4C08)}
-  .p2p-marca img{display:block;height:30px;width:auto}
+  .p2p-marca img{display:block;height:40px;width:auto}
   .p2p-marca.mini{padding:2px 6px;border-radius:6px;margin-top:-1px}
   .p2p-marca.mini img{height:14px}
   .p2p-ord.p2p-barattozon{
@@ -2460,11 +2468,18 @@
     border-color:rgba(255,170,80,.55);
     box-shadow:0 0 0 1px rgba(255,138,0,.14),0 4px 14px rgba(110,55,5,.22)}
   .p2p-ord.p2p-barattozon .p2p-marca{background:none;padding:0}
+  /* LA TESSERA E' LA SCATOLA: navy pieno, non il chip di casa. Il filo
+     chiaro e' un'ombra INTERNA e non un bordo, o la scatola crescerebbe
+     di due pixel e la misura qui sopra sarebbe un'altra. */
+  .p2p-ord.p2p-barattozon .p2p-paga{background:#131A26;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
   /* LA VARIANTE CHIARA, da decidere sullo schermo (16 set 2026): stessa
-     famiglia, gradiente crema/ambra coi token di casa, e il marchio
-     tiene la tessera. La accende P2P_BARATTOZON_CHIARA, e SOLO col tema
-     chiaro: di sera una card crema sarebbe un faro, e la scura e'
-     l'unica che non lo e'. */
+     famiglia, gradiente crema/ambra coi token di casa — e la scatola
+     navy sotto il marchio, uguale alla sorella: e' il fondo che il
+     marchio bianco pretende, e cambiarlo con la variante vorrebbe dire
+     due insegne diverse per lo stesso metodo. La accende
+     P2P_BARATTOZON_CHIARA, e SOLO col tema chiaro: di sera una card
+     crema sarebbe un faro, e la scura e' l'unica che non lo e'. */
   html:not([data-tema="scuro"]) .p2p-ord.p2p-barattozon.chiara{
     --ink:#23282C;--muted:#8A6A3F;--ink-soft:#5C4A2E;--line:#F0C68A;
     --chip-bg:rgba(255,255,255,.62);
@@ -2472,8 +2487,6 @@
     background:linear-gradient(135deg,#FFF6E8 0%,#FFE4BF 60%,#FFD8A6 100%);
     border-color:rgba(230,130,20,.45);
     box-shadow:0 0 0 1px rgba(255,138,0,.10),0 4px 14px rgba(200,120,30,.16)}
-  html:not([data-tema="scuro"]) .p2p-ord.p2p-barattozon.chiara .p2p-marca{
-    background:linear-gradient(135deg,#8A4407,#C4620C 55%,#9A4C08);padding:3px 8px}
   /* la reputazione e' UNA FRASE (set 2026, il ridisegno): niente piu'
      due pezzi ai bordi — si legge come si dice */
   .p2p-rep{font-size:12px}
@@ -36795,7 +36808,8 @@ function rigaOrdineP2P(o){
      catalogo, il testo per tutti gli altri — vedi P2P_VESTE_METODI. Il
      `title` resta il testo, che e' quel che viaggia nel tag `pm`. */
   const paga = o.metodi.length
-    ? `<div class="p2p-box p2p-paga" title="${esc(o.metodi.join(', '))}">💳 `
+    ? `<div class="p2p-box p2p-paga" title="${esc(o.metodi.join(', '))}">`
+      + iconaMetodiP2P(o.metodi)
       + o.metodi.map(m => marchioMetodoP2P(m, 'grande')).join(', ') + '</div>' : '';
   /* LE STELLINE SONO QUELLE DEL MERCATINO (set 2026, decisione di
      Andrea): sotto il metodo, la media che quella persona ha gia'
@@ -41796,10 +41810,12 @@ function tabacchinoP2P(metodi){
    UN CATALOGO e non tre eccezioni scritte a mano nei tre posti: una
    voce che un domani volesse un marchio suo si aggiunge QUI e i tre
    posti la vestono da soli. `classe` e' la pelle della card
-   (`.p2p-ord.<classe>`), `nome` e' l'alt del marchio. */
+   (`.p2p-ord.<classe>`), `nome` e' l'alt del marchio, `soloMarchio`
+   dice che nella scatola dei metodi il marchio BASTA — vedi
+   `iconaMetodiP2P`. */
 const P2P_VESTE_METODI = {
   'Contanti al tabacchino': {nome: 'Barattozon', logo: '/assets/barattozon.webp',
-                             classe: 'p2p-barattozon'}
+                             classe: 'p2p-barattozon', soloMarchio: true}
 };
 /* LA VARIANTE CHIARA della card (16 set 2026): due gradienti, uno
    scuro ambra/arancio e uno crema, da decidere sullo schermo. Finche'
@@ -41828,6 +41844,22 @@ function marchioMetodoP2P(m, taglia, conTesto){
 function classeVesteP2P(metodi){
   const v = (metodi || []).map(vesteMetodoP2P).find(Boolean);
   return v ? ' ' + v.classe + (P2P_BARATTOZON_CHIARA ? ' chiara' : '') : '';
+}
+/* L'ICONA DELLA SCATOLA DEI METODI (16 set 2026, ritocco di Andrea).
+   Il 💳 intesta dei NOMI: dice «quel che leggi qui sono i modi di
+   pagare». Quando dentro non c'e' nessun nome ma solo un marchio, che
+   si intesta da se', l'emoji diventa una seconda etichetta della
+   stessa cosa e se ne va — e a dirlo e' il CATALOGO (`soloMarchio`),
+   non un'eccezione scritta nella card.
+   ⚠️ CON UN METODO VESTITO E UNO SCRITTO L'ICONA RESTA, ed e' la riga
+   da non ammorbidire: li' dentro c'e' ancora del testo da intestare.
+   Oggi non succede — il tabacchino e' esclusivo nell'ordine — ma la
+   funzione risponde al caso, non alla regola di adesso, che e' scritta
+   altrove e potrebbe cambiare senza passare di qua. */
+function iconaMetodiP2P(metodi){
+  const m = metodi || [];
+  return m.length && m.every(x => (vesteMetodoP2P(x) || {}).soloMarchio)
+    ? '' : '💳 ';
 }
 /* i metodi che il foglio OFFRE dipendono dal lato (set 2026): il
    tabacchino lo puo' scegliere solo chi vende sats, perche' l'ordine
