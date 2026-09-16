@@ -16635,3 +16635,42 @@ esce, per chi un giorno dovesse davvero aggiungere una strada d'uscita:
 non si scrive un secondo POST, si chiama `paga_venditore` con l'importo
 letto dalla riga e la sua cassaforte — e se la sentinella diventa rossa
 non si alza il conto a due, si torna a leggere questa voce.
+
+## Il ritorno del fondo navy (16 set 2026)
+
+**LA FORMA FINALE, dopo quattro giri sullo stesso rettangolo.** La
+scatola dei metodi della card Barattozon si riempie di **navy
+`#131A26`** e il marchio ci sta dentro **nudo**, alto 30px. È la
+versione di `99abe67` — scatola navy, angoli e colonna delle sorelle —
+ripresa da Andrea con la misura del marchio di adesso invece dei 22 di
+allora, e senza l'alone, che su un fondo navy non ha niente da fare.
+
+**I QUATTRO GIRI, per chi un giorno ci ripassasse**: tessera navy
+dietro al solo logo; scatola navy col marchio nudo; di nuovo la
+tessera, con la scatola tornata di casa; logo nudo con un alone di due
+`drop-shadow`; e infine di nuovo la scatola navy. Non è indecisione da
+verbalizzare con imbarazzo: ogni giro ha **visto** una cosa che dal
+codice non si vedeva, e la riga che li mette tutti in fila è una sola —
+il marchio è bianco e arancio su trasparente, e da qualche parte il
+fondo scuro se lo deve prendere.
+
+⚠️ **E LA PROVA CHE LEGAVA FONDO E ALONE ADESSO LEGA FONDO E NUDITÀ.**
+La coppia è: fondo navy sulla scatola **e** marchio senza tessera né
+ombre. Le due cose stanno insieme o non stanno, in tutt'e due i versi:
+con il fondo scuro, una tessera o un alone addosso al marchio sarebbero
+una toppa e un contorno inutili; senza il fondo, il marchio nudo perde
+la parola bianca sul chip chiaro del tema giorno — difetto **visto**
+sullo schermo, non dedotto, e che nessun'altra sentinella saprebbe
+vedere.
+
+**DELLA SCATOLA CAMBIA IL SOLO FONDO**: angoli, colonna e margini
+restano quelli delle sorelle, e l'unica altra cosa sua è il respiro
+verticale, sceso da 8 a **5** per tenere un marchio da 30 dentro sei
+pixel di crescita invece di quattordici. Il respiro è rimasto quello
+dei giri precedenti e non gli 8 di `99abe67`, dove il marchio era 22.
+
+**I NUMERI (375px, ricontrollati a 320).** Card **146** contro i 140
+della sorella, scatola **313x40** contro 313x34, marchio **95x30**,
+fondo `rgb(19,26,38)` dal computed style — lo stesso nei due temi,
+perché il navy non dipende dalla carta. La card più corta (prezzo
+fisso, senza badge) sta in 124, `scrollWidth` 375 a 375 e 320 a 320.
