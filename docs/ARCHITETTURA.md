@@ -16112,6 +16112,30 @@
   è una LISTA («nip04 nip44_v2»), non un valore: nip44 si cerca DENTRO
   il valore invece di confrontarlo, e chi lo pubblica spesso parla
   tutt'e due (la nota è di Alan, PR #10).
+  OGNI SUPERFICIE GUARDA IL SUO METODO (16 set 2026, cantiere NWC per
+  il P2P). La stretta di mano REGISTRA i `methods` che il wallet
+  dichiara in `get_info` (`metodi` nella riga salvata) e non pretende
+  più `pay_invoice`: il mercatino chiede `walletNwcPaga()`
+  (pay_invoice, o una riga di prima del cantiere senza metodi, che era
+  stata collegata pretendendolo), il P2P `walletNwcFattura()`
+  (make_invoice, e SOLO se i metodi sono scritti). La stringa vale
+  quel che le è stato concesso quando è nata: i permessi li impone il
+  wallet, noi diciamo di crearla col solo permesso di ricevere per il
+  solo P2P e avvisiamo quando sa anche pagare. LA CHIAVE PORTA IL
+  CONTO, `barattolo_nwc@<tg_id>` (`chiaveNwcConto`, la convenzione di
+  `chiaveP2P`): la riga di ieri senza conto migra al primo conto che
+  entra e sparisce dal nome vecchio. IL P2P CHIEDE LA FATTURA AL
+  WALLET (`fatturaDalWalletP2P`, dal foglio «Dove ricevere i sats»
+  appena si apre): `make_invoice` con l'importo ESATTO detto dal
+  coordinatore in millisat e `expiry` lungo quanto la vita dell'ordine
+  (`expiration_hours` del 38385, 168 ore), 15 secondi di attesa
+  (`P2P_NWC_ATTESA_MS`), e la risposta passa dalla STESSA guardia di
+  una fattura incollata (`leggiBolt11`: cifra e scadenza) prima di
+  partire verso mostro; ogni fallimento torna al foglio a mano con la
+  ragione scritta e lo scambio fermo. Il mercatino resta fuori: lì il
+  payout lo fa il server al rilascio, e la fattura la dovrebbe
+  chiedere lui — cioè il secret finirebbe da lui, che è la strada
+  respinta della scala Nostr.
   LA CIFRATURA SI DICHIARA (ago 2026, dal campo: «Primal non si
   collega»). NIP-47 dice che il client mette un tag `encryption` nella
   richiesta e che **l'assenza del tag indica nip04**: noi il tag non lo

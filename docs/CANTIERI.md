@@ -15828,3 +15828,84 @@ scambio e la card dei propri scambi mostrano ancora il metodo come
 testo (`p2p-dett-uno`, `💳` in `rigaScambioP2P`) — non era chiesto, e
 si veste con una riga dallo stesso catalogo il giorno che si vuole; la
 tendina chiusa del foglio «Pubblica» scrive i nomi scelti come testo.
+
+## Il wallet fa la fattura: NWC per il P2P (16 set 2026)
+
+Aperto da Andrea la sera della fattura da 7468: «il compratore
+collega il suo wallet una volta, e quando serve il recapito la fattura
+la emette il wallet da solo — niente incolla, niente scadenze, niente
+cifre da copiare». Prima l'analisi in quattro punti (protocollo,
+flusso, dove si configura, rischi), approvata, poi il cantiere.
+
+**IL PEZZO GROSSO C'ERA GIÀ:** Barattolo parla NIP-47 dal luglio 2026
+per «Compra subito», tutto nel browser — `clientNwc` apre il relay del
+wallet, cifra nip04 o nip44, firma le 23194 e attende le 23195. Il
+cantiere ha aggiunto un metodo a quel client (`fattura`: `make_invoice`
+con `amount` in millisat, `description`, `expiry`) e un ramo al foglio
+di chi compra. Zero righe sul server, ed è la cosa da tenere: la stringa
+`nostr+walletconnect://` porta il secret, vive in `localStorage` e non
+viaggia mai — nemmeno un flag «ha NWC».
+
+**LE SEI COSE FATTE.** 1) `chiaveNwcConto`: la chiave di storage porta
+il conto come le chiavi P2P, e la riga di ieri migra al primo conto che
+entra senza perdere chi ha già NWC (l'altro account dello stesso
+telefono la ricollega). 2) `infoNwc` REGISTRA i `methods` e smette di
+pretendere `pay_invoice`: la stringa col solo permesso di ricevere,
+che fino a ieri rifiutava, è proprio quella del P2P. 3) I due giudici,
+`walletNwcPaga` (mercatino) e `walletNwcFattura` (P2P): ogni superficie
+guarda il suo; una riga di prima del cantiere vale per il mercatino e
+non per il P2P, e il profilo dice di ricollegare. 4) `fatturaDalWalletP2P`:
+il foglio, appena si apre, chiede la fattura al wallet con
+`satsDaRicevereP2P` esatto e `expiry` = vita dell'ordine
+(`oreVita` × 3600, sette giorni senza 38385), 15 secondi e non i 30
+del mercatino perché dietro c'è un foglio a mano; la risposta passa
+dalla STESSA guardia di una fattura incollata — cifra e scadenza —
+perché un wallet può ignorare l'expiry chiesto; ogni fallimento
+(silenzio, rifiuto, fattura storta) torna al foglio a mano con la
+ragione scritta, e lo scambio non si muove. 5) Il profilo: cosa
+sblocca la connessione metodo per metodo, la guida che dice di crearla
+col solo permesso di ricevere, l'avviso quando sa anche pagare.
+6) Solo P2P: il mercatino resta sull'indirizzo Lightning, perché lì il
+payout lo fa il server al rilascio e la fattura la dovrebbe chiedere
+lui — il secret finirebbe da lui, che è la strada respinta.
+
+**TOR NON C'ENTRA, ed è la parte che nell'analisi si era temuta:** il
+telefono parla col relay del wallet direttamente, e mostro valida la
+bolt11 senza rete. Il circuito freddo morde solo l'indirizzo Lightning,
+che è l'altra strada.
+
+**IL WALLET DI CARTONE.** Nel banco del motore `FintoRelay` ha
+imparato la factory `Relay.connect(url)` che usano il client NWC e il
+bunker, e sul relay del wallet finto apre `FintoWallet`: decifra nip04
+con la SUA chiave — chiavi GENERATE, mai 64 esadecimali scritti, per lo
+scanner dei segreti — guarda il metodo e risponde secondo `walletModo`:
+`buona` (7543 con sette giorni, coniata da `bolt11_finta`), `storta`
+(7468), `corta` (7543 da un'ora), `rifiuta` (errore NIP-47), `muto`.
+Il banco prova che la richiesta è `make_invoice` con 7543000 millisat,
+expiry 604800 e lo scambio nella descrizione; che la fattura buona parte
+verso mostro da sola e il foglio si chiude; che il muto, il rifiuto, la
+storta e la corta NON mandano niente, dicono perché, e da lì la mano
+funziona come sempre; che senza `make_invoice` fra i metodi il wallet
+non si disturba; e la migrazione della riga di ieri con i due giudici
+sopra. Nel banco della cifratura la stringa col solo `make_invoice` si
+collega e i metodi restano scritti. `P2P_NWC_ATTESA_MS` è un `let`
+apposta: il banco lo abbassa a 300 ms, o il muto costerebbe 15 secondi
+a giro.
+
+⚠️ **UN'ALTRA SESSIONE LAVORAVA NELLA STESSA CARTELLA** (il vestito
+Barattozon), con un'edit rotta in `prove.py` a metà strada. I miei hunk
+si sono separati dai suoi per MARCATORE in byte — e il marcatore
+«metodi» prendeva anche un hunk loro: ristretto a `metodi_` e
+`r.metodi` — e il delta si è provato in un ALBERO ISOLATO, HEAD più i
+soli miei hunk, che è com'è la CI. Il verbale è scritto in tutt'e due
+gli alberi, così dopo l'`update-ref` il loro diff resta il loro (vedi
+la memoria «sessioni parallele, stessa cartella»).
+
+**RESTA DA GUARDARE:** la prova sul campo con due wallet veri, che
+fanno Andrea e Alan — è l'unica cosa che le fonti non dicono, i
+`methods` wallet per wallet (Alby Hub, Coinos, Primal, Zeus); un wallet
+che cappi l'expiry sotto la finestra (la guardia lo ferma, ma allora
+serve la fattura a mano); le righe di ieri senza metodi, che nel P2P
+chiedono di ricollegare; e il recapito a fine scambio del cantiere
+precedente, con cui questo si compone bene — una fattura chiesta al
+rilascio è fresca per costruzione.
