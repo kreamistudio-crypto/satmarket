@@ -23915,15 +23915,18 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   IL VESTITO BARATTOZON (16 set 2026, decisione di Andrea): nella UI il
   tabacchino si presenta col marchio Barattozon — grande (40px) al
   posto del testo nella scatola dei metodi della card del libro, che lì
-  porta il marchio al posto del nome: nella card la SCATOLA dei metodi
-  si riempie di navy (#131A26) e il marchio ci sta nudo, alto 24px —
-  quanto resta di una scatola alta come quelle sorelle, tolto il respiro
-  di 5 che gli fa da cornice navy;
-  fuori dalla card (pillola del filtro e voci del foglio) porta una
-  tessera dello stesso navy ed è alto 13px, perché lì le pillole stanno
-  in fila. Fondo scuro e marchio nudo sono una COPPIA: il marchio è
-  bianco e arancio su trasparente, e senza un fondo scuro la sua parola
-  bianca sparisce. **La card è IDENTICA
+  porta il marchio al posto del nome, e il navy #131A26 lo accompagna
+  in tutt'e tre i posti — sempre come FONDO, mai come colore del
+  marchio. Nella card la scatola dei metodi si riempie di navy e il
+  marchio ci sta nudo a 24px; nella pillola del filtro è la pillola a
+  riempirsi, e il marchio è nudo a 18px; nella voce del foglio
+  «Pubblica», dove il marchio sta accanto al nome, il fondo è una
+  tessera piccola dietro di lui e il marchio è alto 16px. **Le tre
+  misure sono tre sottrazioni**, non tre scelte: ogni posto ha
+  un'altezza che non deve cambiare (34, 30, 38 — le stesse delle
+  sorelle), e il marchio prende quel che resta. Fondo scuro e marchio
+  sono una COPPIA: il marchio è bianco e arancio su trasparente, e
+  senza un fondo scuro la sua parola bianca sparisce. **La card è IDENTICA
   alle sorelle** e anche la scatola dei metodi lo è — fondo, bordo e
   raggio di casa — tranne il respiro verticale, che scende da 8 a 3 per
   far posto al marchio grande senza far scappare la scatola più di sei

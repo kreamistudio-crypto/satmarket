@@ -16683,3 +16683,59 @@ entrambe le larghezze. Marchio **76x24**, fondo `rgb(19,26,38)` dal
 computed style — lo stesso nei due temi, perché il navy non dipende
 dalla carta. La card più corta (prezzo fisso, senza badge) sta in 118,
 `scrollWidth` 375 a 375 e 320 a 320.
+
+## Il navy negli altri due posti, e il caricamento di casa (16 set 2026)
+
+**IL MARCHIO HA LO STESSO TRATTAMENTO DOVUNQUE VADA.** Dopo la card,
+Andrea l'ha chiesto anche per la pillola del filtro e per la voce del
+foglio «Pubblica»: fondo navy `#131A26` e marchio il più grande che
+l'altezza esistente concede.
+
+**LE TRE MISURE SONO TRE SOTTRAZIONI**, e i numeri da cui partono sono
+**misurati sul vivo**, non dedotti dal foglio di stile:
+
+- **card**, scatola alta 34 (18 di riga + 8+8 di respiro): meno il
+  respiro suo di 5+5, restano **24** di marchio, nudo.
+- **pillola del filtro**, alta 30 (18 di riga + 5+5 di respiro + 1+1 di
+  bordo): dentro ci stanno **18** di marchio, nudo.
+- **voce del foglio**, alta 38 (20 di riga + 9+9 di respiro): la
+  tessera ne può prendere 20, e tolto il suo 2+2 restano **16** di
+  marchio.
+
+**PERCHÉ LA VOCE TIENE LA TESSERA E GLI ALTRI DUE NO:** lì il marchio
+sta ACCANTO al nome — la voce si sceglie leggendola — quindi un fondo
+navy su tutta la riga coprirebbe anche la parola. Negli altri due posti
+il marchio è solo, e il fondo può essere tutto il contenitore.
+
+⚠️ **LA PILLOLA È FLEX, E NON È COSMESI.** Da inline il marchio si
+allinea alla LINEA DI BASE, e un'immagine alta 18 dentro una riga da
+18,125 spingeva la pillola a **31** — un pixel più delle sorelle,
+misurato e non immaginato. Da flex l'altezza la decide il contenuto e
+il conto torna esatto: 30, come le altre.
+⚠️ **E LA REGOLA DEL NAVY STA DOPO `.active`**: hanno la stessa
+specificità, e a decidere è solo l'ordine. Se il navy perdesse, una
+pillola SCELTA tornerebbe arancione e si mangerebbe il marchio. Quindi
+la pillola col marchio resta navy anche da scelta, e la scelta la dice
+il bordo — è l'unica pillola a cui il fondo serve per un'altra ragione.
+
+**IL CARICAMENTO DELLA SEZIONE È QUELLO DI CASA** (stessa richiesta): il
+barattolino che ondeggia con «Aspetta…», lo stesso di tutta l'app. La
+riga di prima nominava il protocollo — libro, ordini — a chi non deve
+conoscerlo: chi apre la sezione vuole solo sapere che sta arrivando.
+⚠️ **E IL VELO SI CHIUDE SU TUTT'E TRE LE USCITE**: col libro arrivato,
+con l'errore, e comunque alla fine della lettura (`finally`). Un velo a
+tutto schermo che resta aperto è l'app bloccata, e da fuori non c'è
+niente che lo tolga. Il velo è anche UNO SOLO, tenuto da una variabile:
+`renderP2P` passa di lì a ogni giro, e senza quella ogni render ne
+accenderebbe uno nuovo, con la chiusura del primo che non spegne gli
+altri.
+
+**I NUMERI, misurati dopo.** Pillola col marchio **30** come la sorella
+(marchio 57x18, fondo `rgb(19,26,38)`); voce **38** come la sorella
+(marchio 51x16 dentro una tessera 63x20, stesso fondo). Nessuna delle
+due è cresciuta di un pixel.
+
+**COSA È STATO PROVATO**: le due coppie fondo+marchio, l'ordine della
+regola contro `.active`, i due conti delle sottrazioni letti dal CSS, e
+che la vecchia scritta del caricamento non esista più da nessuna parte
+— nemmeno nei commenti, che è la trappola già pagata tre volte oggi.
