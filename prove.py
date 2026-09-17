@@ -48086,7 +48086,8 @@ def prove_p2p_pubblica():
         # foglio quanto le sezioni: fuori di qui una parola vietata
         # uscirebbe a schermo con la sentinella verde
         "function rigaTettoFeeP2P(){",
-        "function articoloPercentoP2P(testo){"))
+        "function articoloPercentoP2P(testo){",
+        "function riquadroPrimaP2P(){"))
     # --- 8b) LA RIGA SOTTO L'IMPORTO (17 set 2026, ritocco di Andrea)
     # Le due righe lunghe in fondo al foglio — «Si accettano ordini
     # fino a…» e «La commissione è…» — dicevano due numeri che servono
@@ -48095,8 +48096,24 @@ def prove_p2p_pubblica():
     # riguarda. E LA PERCENTUALE E' LA META', che prima non lo era: la
     # riga vecchia diceva la fee INTERA del coordinatore, cioe' il
     # DOPPIO di quel che paga chi legge.
-    prova("la riga sta sotto il riquadro dell'importo", True,
-          "valuta + importo + rigaTettoFeeP2P() + metodi" in mini)
+    # EMENDATA la sera del 17 set 2026 (ritocco di Andrea): la riga
+    # non e' piu' nuda fra le scatole, sta dentro una SCATOLA sua —
+    # stessa forma delle altre — e al montaggio arriva da li'.
+    prova("il riquadro sta sotto quello dell'importo", True,
+          "valuta + importo + riquadroPrimaP2P() + metodi" in mini)
+    _riq = pezzo_js(mini, "function riquadroPrimaP2P(){", "\n}\n")
+    prova("...ed e' la scatola delle altre, senza icona", True,
+          "return sezioneNuovoP2P({" in _riq and "ico: ''," in _riq
+          and "titolo: 'Prima di pubblicare'," in _riq)
+    prova("...e porta dentro la riga dei due numeri", True,
+          "corpo: rigaTettoFeeP2P()" in _riq)
+    # ⚠️ L'AVVISO CHE LE PARTI SI VEDONO NON SI E' PERSO (17 set 2026):
+    # stava in fondo al foglio, sotto tutto, e il fondo adesso e'
+    # pulito. E' salito nel riquadro, che e' dove si sanno le cose
+    # PRIMA del gesto — l'unico requisito vero, che dirlo dopo sarebbe
+    # dirlo a cose fatte (vedi CANTIERI, «Le parti si vedono»).
+    prova("l'avviso che le due parti si vedono non si e' perso", True,
+          "Appena qualcuno lo prende <b>vi vedete</b>" in _riq)
     # ⚠️ SI GUARDA IL FOGLIO SENZA I COMMENTI, che qui sopra le due
     # righe vecchie sono NOMINATE per spiegare cosa se n'e' andato —
     # e una sentinella che legge la spiegazione risponde per il
@@ -48107,6 +48124,21 @@ def prove_p2p_pubblica():
     prova("...e le due righe lunghe in fondo non ci sono piu'", False,
           "Si accettano ordini fino a" in _foglio
           or "La commissione è" in _foglio)
+    # IL FONDO DEL FOGLIO E' PULITO (17 set 2026, decisione di Andrea):
+    # sotto le scatole solo il bottone che pubblica. Qui stavano due
+    # righe sciolte — la rassicurazione sul ritiro (che si fa dalla
+    # pagina dello scambio, e lo dice li') e l'avviso delle parti che
+    # si vedono (salito nel riquadro). Una riga grigia sopra un
+    # bottone arancione e' quel che si legge per ultimo e si ricorda
+    # per primo, e nessuna delle due meritava quel posto.
+    prova("la riga sul ritiro in fondo non c'e' piu'", False,
+          "Finché nessuno lo prende" in _foglio
+          or "Gli euro viaggiano fra voi due" in _foglio)
+    prova("...e nemmeno l'avviso, che e' salito nel riquadro", False,
+          "Appena qualcuno lo prende" in _foglio)
+    prova("...e sotto le scatole c'e' SOLO il bottone", True,
+          "+ quanti + premio + '<div class=\"foglio-piede sola\">'"
+          in re.sub(r"\s+", " ", _foglio))
     prova("la quota di chi legge ha un giudice solo", 1,
           mini.count("(n * 50).toLocaleString("))
     prova("...e il conto lo chiama invece di ribattere la formula",
@@ -49413,6 +49445,10 @@ def prove_p2p_pubblica():
         + "\n" + _intera("function mezzaCommissioneP2P(fee){")
         + "\n" + _intera("function articoloPercentoP2P(testo){")
         + "\n" + _intera("function rigaTettoFeeP2P(){")
+        # ...e la scatola che la contiene (17 set 2026): `esc` non
+        # serve, che `porta` qui non c'e' e `ico` e' vuoto
+        + "\n" + _intera("function sezioneNuovoP2P(o){")
+        + "\n" + _intera("function riquadroPrimaP2P(){")
         + "\nconst out = {};\n"
         # il caso di oggi sul nodo: tetto 500 000, fee 2% -> 1% a testa
         "p2pInfo = {maxSats: 500000, fee: 0.02};\n"
@@ -49437,6 +49473,13 @@ def prove_p2p_pubblica():
         "out.muto = rigaTettoFeeP2P();\n"
         "out.articoli = ['0,5', '1', '1,5', '2', '3', '8', '11', '80']"
         ".map(articoloPercentoP2P);\n"
+        # LA SCATOLA C'E' SEMPRE, anche senza il 38385: la riga dei
+        # numeri cade da sola e resta l'avviso, che e' vero comunque —
+        # un riquadro che sparisce porterebbe via anche quello.
+        "p2pInfo = {maxSats: 500000, fee: 0.02};\n"
+        "out.scatola = riquadroPrimaP2P();\n"
+        "p2pInfo = null;\n"
+        "out.scatolaMuta = riquadroPrimaP2P();\n"
         "console.log(JSON.stringify(out));\n")
     f8 = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
                                 encoding="utf-8")
@@ -49468,6 +49511,18 @@ def prove_p2p_pubblica():
     prova("gli articoli, uno per uno",
           ["dello ", "dell'", "dell'", "del ", "del ", "dell'",
            "dell'", "dell'"], o8["articoli"])
+    prova("la scatola ha il vestito delle altre e il suo titolo", True,
+          o8["scatola"].startswith('<div class="p2p-sez">')
+          and "<div class=\"p2p-sez-tit\"><span>Prima di pubblicare</span>"
+          in o8["scatola"])
+    prova("...e dentro ci stanno i due numeri e l'avviso", [True, True],
+          ["fino a 500\u202f000 sats" in o8["scatola"],
+           "vi vedete" in o8["scatola"]])
+    prova("...e senza impostazioni la scatola RESTA, con l'avviso",
+          [True, True, True],
+          [o8["scatolaMuta"].startswith('<div class="p2p-sez">'),
+           "vi vedete" in o8["scatolaMuta"],
+           "ordini fino a" not in o8["scatolaMuta"]])
 
     # I) LA NOTA DEL PREMIO COMINCIA DAL GESTO (17 set 2026, richiesta
     #    di Andrea). Cominciava con «Sopra il mercato:», cioe' dalla

@@ -43945,6 +43945,38 @@ function articoloPercentoP2P(testo){
       || (intero >= 80 && intero <= 89)) return 'dell\'';
   return 'del ';
 }
+/* ---- IL RIQUADRO «PRIMA DI PUBBLICARE» (17 set 2026, ritocco di
+   Andrea) ----
+   Le due cose che si sanno PRIMA del gesto, e che non sono un campo da
+   riempire: quanto si puo' chiedere e quanto costa, e che appena
+   qualcuno prende l'ordine le due parti si vedono.
+   ⚠️ E' UN RIQUADRO E NON PIU' DUE RIGHE NUDE: la stessa scatola delle
+   altre — `sezioneNuovoP2P`, cioe' lo stesso fondo, gli stessi angoli,
+   lo stesso respiro — perche' una riga sciolta in mezzo a cinque
+   scatole si legge come uno scarto del montaggio invece che come una
+   cosa che qualcuno ha voluto dire. SENZA ICONA, come il Premio: un
+   cerchio tondo qui vorrebbe un glifo nuovo e una tinta nuova per
+   dire quel che il titolo dice gia'.
+   ⚠️ E L'AVVISO CHE LE PARTI SI VEDONO E' FINITO QUI DENTRO, che e' la
+   parte da non perdere: stava in fondo al foglio, sotto tutto, e il
+   fondo adesso e' pulito per decisione di Andrea — sotto le scatole
+   solo il bottone. Accanto al bottone sarebbe tornata una riga
+   sciolta, cioe' proprio la cosa che questo ritocco toglie; qui dentro
+   sta col suo simile — l'altra cosa che si sa prima del gesto — e
+   soprattutto sta PRIMA, che e' l'unico requisito vero (vedi CANTIERI,
+   «Le parti si vedono»: dirlo dopo sarebbe dirlo a cose fatte).
+   LA SCATOLA C'E' SEMPRE, anche senza il 38385: la riga dei numeri
+   cade da sola e resta l'avviso, che e' vero comunque. */
+function riquadroPrimaP2P(){
+  return sezioneNuovoP2P({
+    ico: '', titolo: 'Prima di pubblicare',
+    corpo: rigaTettoFeeP2P()
+      + '<div class="hint">👤 Appena qualcuno lo prende <b>vi vedete</b>: '
+      + 'tu e chi lo prende vedrete il profilo l\'uno dell\'altra — nome, '
+      + 'foto, stelline e livello, gli stessi del mercatino — e i bottoni '
+      + 'per scrivervi.</div>'
+  });
+}
 function renderNuovoOrdineP2P(){
   const box = el('p2pNuovoCorpo');
   if (!box) return;
@@ -44140,28 +44172,31 @@ function renderNuovoOrdineP2P(){
        lunghe in fondo al foglio — «Si accettano ordini fino a…» e «La
        commissione è…» — cioe' due numeri che servono mentre si SCRIVE
        la cifra, messi dopo il punto in cui la cifra e' gia' scritta.
-       Adesso sono una riga sola sotto il riquadro che li riguarda.
+       Adesso sono una riga sola sotto il riquadro che li riguarda —
+       e dal ritocco della sera, dentro una SCATOLA sua invece che
+       sciolta fra le altre (vedi `riquadroPrimaP2P`).
        E LA PERCENTUALE E' LA META', che prima non lo era: la riga
        vecchia diceva la fee INTERA del coordinatore, cioe' il doppio
        di quel che paga chi legge — «per parte» non e' una precisazione
        ma la correzione di un numero che diceva il doppio. */
-    valuta + importo + rigaTettoFeeP2P() + metodi + scontrino + tipo
+    valuta + importo + riquadroPrimaP2P() + metodi + scontrino + tipo
     + quanti + premio +
-    /* LA RIGA ROSSA NON C'E' PIU' (set 2026, col bottone sempre
-       acceso), e cade insieme alla ragione per cui era nata: serviva a
-       dire PERCHE' il bottone fosse spento, cioe' a curare un vicolo
-       cieco muto. Col bottone vivo quel vicolo non esiste, e una riga
-       rossa accesa su un modulo che non si e' ancora cominciato a
-       riempire e' un rimprovero per una cosa che nessuno ha ancora
-       sbagliato. Adesso l'avviso arriva AL TOCCO, come nel foglio del
-       mercatino. */
-    '<div class="hint">Finché nessuno lo prende puoi ritirarlo quando vuoi. Gli euro viaggiano fra voi due, fuori da qui.</div>' +
-    /* ⚠️ E CHI PUBBLICA LO SA PRIMA DI PUBBLICARE (17 set 2026,
-       decisione di Andrea con Alan): appena qualcuno lo prende le due
-       parti si vedono. Vale per tutti, anche per chi e' entrato senza
-       un nome — pubblicare e' l'unico dei due gesti che si fa vedere
-       comunque, e il profilo che si mostra e' quello che ha qui. */
-    '<div class="hint">👤 Appena qualcuno lo prende vi vedete: tu e chi lo prende vedrete il profilo l\'uno dell\'altra — nome, foto, stelline e livello, gli stessi del mercatino — e i bottoni per scrivervi.</div>' +
+    /* ⚠️ SOTTO LE SCATOLE NON C'E' PIU' NIENTE (17 set 2026,
+       decisione di Andrea): qui stavano due righe sciolte — «Finche'
+       nessuno lo prende puoi ritirarlo quando vuoi…» e l'avviso che le
+       due parti si vedono. La prima era una rassicurazione su una cosa
+       che il foglio non sta chiedendo (si ritira DALLA pagina dello
+       scambio, e lo dice li'); la seconda e' salita nel riquadro
+       «Prima di pubblicare», che e' dove si sanno le cose prima del
+       gesto invece che dopo aver scorso tutto il modulo.
+       IL FONDO PULITO E' LA DECISIONE: sotto le scatole solo il
+       bottone che pubblica. Una riga grigia sopra un bottone arancione
+       e' quel che si legge per ultimo e si ricorda per primo, e
+       nessuna delle due meritava quel posto.
+       LA RIGA ROSSA se n'era gia' andata (set 2026, col bottone sempre
+       acceso): diceva PERCHE' il bottone fosse spento, e col bottone
+       vivo quel vicolo non esiste — l'avviso arriva AL TOCCO, come nel
+       foglio del mercatino. */
     /* IL PIEDE HA UNA SOLA USCITA (set 2026, decisione di Andrea):
        «Annulla» se n'e' andato. Da una pagina a pieno schermo si
        torna con la freccia in alto, che e' la stessa via del gesto
