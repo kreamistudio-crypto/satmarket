@@ -45483,10 +45483,12 @@ function esamina(ev){
   r.ok = true;
   return r;
 }
-function manda(msg, versoPub, soloUrl){
+/* l'ora delle RISPOSTE del coordinatore di cartone: 0 = adesso */
+let rispondiQuando = 0;
+function manda(msg, versoPub, soloUrl, quando){
   const conv = NT0.nip44.getConversationKey(MOSTRO_SK, versoPub);
   const ev = NT0.finalizeEvent({
-    kind: 14, created_at: Math.floor(Date.now() / 1000),
+    kind: 14, created_at: quando || Math.floor(Date.now() / 1000),
     tags: [['p', versoPub]],
     content: NT0.nip44.encrypt(JSON.stringify([msg, null, null]), conv)
   }, MOSTRO_SK);
@@ -45581,7 +45583,7 @@ class FintoRelay {
     if (!r.ok) return 'scartato';
     if (rispondi && !rispostiPer.has(ev.id)) {
       rispostiPer.add(ev.id);
-      for (const m of (rispondi(r) || [])) manda(m, r.tradePub, rispondiVia);
+      for (const m of (rispondi(r) || [])) manda(m, r.tradePub, rispondiVia, rispondiQuando);
     }
     return 'ok';
   }
@@ -45690,7 +45692,7 @@ function reset(){
   store = new Map(); cloud = new Map(); fetches = []; toasts = []; nodi = {};
   aperti = []; chiusi = []; conferme = []; inviti = []; viste = []; qr = [];
   copiato = ''; renderP2Pn = 0; ricevuti = []; subs = []; chiuse = 0;
-  rispondi = null; storia = []; DEMO = false; VETRINA = false; myTgId = 111;
+  rispondi = null; rispondiQuando = 0; storia = []; DEMO = false; VETRINA = false; myTgId = 111;
   p2pRelayVivi = {}; p2pConnessioni = {}; p2pConnessa = null; p2pAscolti = [];
   p2pSub = null; p2pSubChiavi = ''; rispondiVia = null; zoppoCadute = 0;
   rispostiPer = new Set();
@@ -45934,7 +45936,7 @@ function reset(){
       && h.indexOf('non rispondono alla verifica dell\'indirizzo') >= 0
       && h.toLowerCase().indexOf('coordinatore') < 0
       && h.indexOf('se il tuo indirizzo viene rifiutato, usa la fattura') >= 0
-      && h.indexOf('id="p2pIncassoInp"') < h.indexOf('Wallet of Satoshi');
+      && h.indexOf('id="p2pIncassoInp"') < h.indexOf('non rispondono alla verifica dell\'indirizzo');
     out.foglioNonDicePiuSemplice = h.indexOf('via più semplice') < 0;
     /* IL CAMPO NASCE VUOTO (17 set 2026): l'indirizzo degli incassi non
        si precompila piu' — sta a un tocco, SOTTO l'avviso sui provider,
@@ -46612,6 +46614,119 @@ function reset(){
   await finoA(() => !!p2pRelayVivi['wss://lento'], 3000);
   out.lentoPoiArriva = !!p2pRelayVivi['wss://lento'];
 
+  /* ---- IL PAGAMENTO FALLITO DOPO IL RILASCIO (17 set 2026, lo
+     scambio 3fcdb207: 14.837 sats fermi nel nodo). La sequenza VERA
+     dei messaggi verso chi compra, cifrati e con la loro ora: fattura,
+     garanzia, euro, rilascio, il primo fallimento, e l'`add-invoice`
+     dell'ultimo tentativo — che porta l'ordine a `settled-hold-invoice`
+     con la fattura vecchia come promemoria. */
+  reset();
+  const FN = '0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002';
+  rispondi = r => {
+    const d = r.dentro;
+    if (d.action === 'take-sell')
+      return [ordine('add-invoice', d.request_id, d.id,
+                     {order: {id: d.id, amount: 14837, status: 'waiting-buyer-invoice'}})];
+    if (d.action === 'add-invoice')
+      return [ordine('invoice-updated', d.request_id, d.id)];
+    return [];
+  };
+  await prendiOrdineP2P(FN);
+  await finoA(() => oltrePrendo(FN));
+  await pausa(30);
+  const fnPub = ordiniP2P()[FN].pubTrade;
+  /* le ore corrono in avanti da adesso, come in uno scambio vero — e
+     la risposta alla fattura nuova porta la SUA (`rispondiQuando`), o
+     nascerebbe «adesso» e passerebbe per passato */
+  const T9 = Math.floor(Date.now() / 1000) + 100;
+  const FALLITO = {order: {id: FN, amount: 14837, status: 'settled-hold-invoice',
+                           buyer_invoice: 'lnbc148370n1vecchia'}};
+  const SEQ = [
+    ['hold-invoice-payment-accepted', {order: {id: FN, amount: 14837}}, T9],
+    ['fiat-sent-ok', null, T9 + 100],
+    ['released', null, T9 + 4000],
+    ['payment-failed', {payment_failed: {payment_attempts: 2, payment_retries_interval: 60}}, T9 + 4010],
+    ['add-invoice', FALLITO, T9 + 4200]
+  ];
+  const spedisci = async m => { manda(ordine(m[0], null, FN, m[1]), fnPub, null, m[2]); await pausa(); };
+  const statiVisti = [];
+  p2pOrdineAperto = '';
+  for (const m of SEQ) { await spedisci(m); statiVisti.push(ordiniP2P()[FN].stato); }
+  out.fnCammino = statiVisti.join('>');
+  out.fnCifra = ordiniP2P()[FN].satsMiei;
+  out.fnBottone = azioniDisponibili(ordiniP2P()[FN]);
+  out.fnSuona = toasts.filter(t => t === P2P_TOAST_FATTURA_NUOVA).length;
+  out.fnTesto = statoTestoP2P(ordiniP2P()[FN]).t;
+  out.fnNonPromette = ['rilasciato', 'fattura_nuova', 'pagamento_ritentato']
+    .every(st => statoTestoP2P({lato: 'compro', stato: st}).d.toLowerCase().indexOf('stanno arrivando') < 0);
+  /* IL DIFETTO DI OGGI: alla riapertura la restore dice
+     `settled-hold-invoice`, e scavalcava il campo con «Sats liberati» */
+  out.fnRestoreFerma = ['fattura_nuova', 'pagamento_ritentato']
+    .map(st => riprendiDaRestoreP2P({lato: 'compro', stato: st}, 'settled-hold-invoice'));
+  out.fnRestoreAvanti = riprendiDaRestoreP2P({lato: 'compro', stato: 'euro_inviati'}, 'settled-hold-invoice').stato;
+  /* la riapertura: il relay ripete tutto alla rinfusa, e niente si muove */
+  toasts = [];
+  for (const k of [2, 4, 0, 3, 1, 4]) await spedisci(SEQ[k]);
+  out.fnReplay = [ordiniP2P()[FN].stato, toasts.length];
+  /* IL FOGLIO: la cifra, la copia, il perche' — e l'avviso sulle
+     fatture che scadono, che vale anche la prima volta */
+  p2pOrdineAperto = FN;
+  apriIncassoP2P();
+  {
+    const h = nodi.p2pIncassoCorpo.innerHTML || '';
+    out.fnFoglio = h.indexOf('Il pagamento dei tuoi sats non è riuscito') >= 0
+      && h.indexOf('Riceverai <b>14837 sats</b>') >= 0
+      && h.indexOf("copiaLink('14837'") >= 0
+      && h.indexOf('non ha trovato una strada') >= 0
+      && h.toLowerCase().indexOf('stanno arrivando') < 0;
+    out.fnFoglioWos = h.indexOf('Usi Wallet of Satoshi?') >= 0
+      && h.indexOf('scadono presto') >= 0 && h.indexOf('<b>scadenza lunga</b>') >= 0
+      && h.indexOf('Usi Wallet of Satoshi?') < h.indexOf('id="p2pIncassoInp"');
+    out.fnTitolo = nodi.p2pIncassoTit ? nodi.p2pIncassoTit.textContent : '(nessun titolo)';
+  }
+  /* la fattura nuova parte, e la risposta e' `invoice-updated`: torna
+     «in pagamento», MAI «manda gli euro» */
+  const prima9 = ricevuti.length;
+  rispondiQuando = T9 + 4300;
+  el('p2pIncassoInp').value = 'io@wallet.com';
+  await inviaIncassoP2P();
+  await pausa(60);
+  /* a questo punto del banco i relay in ascolto sono due, e `ricevuti`
+     conta una copia per relay: si guarda COSA e' partito, non quante copie */
+  out.fnMandata = ricevuti.length > prima9
+    && ricevuti.slice(prima9).every(r => r.dentro.action === 'add-invoice'
+         && r.dentro.id === FN
+         && r.dentro.payload.payment_request[1] === 'io@wallet.com');
+  out.fnDopoInvio = ordiniP2P()[FN].stato;
+  out.fnRiserva = azioniSecondarieP2P(ordiniP2P()[FN]).indexOf('non-arrivano') >= 0
+    && azioniSecondarieP2P({lato: 'vendo', stato: 'rilasciato'}).indexOf('non-arrivano') < 0;
+  /* ...e se fallisce ANCORA il giro riparte e risuona */
+  toasts = [];
+  await spedisci(['payment-failed', {payment_failed: {payment_attempts: 2, payment_retries_interval: 60}}, T9 + 9000]);
+  await spedisci(['add-invoice', FALLITO, T9 + 9200]);
+  out.fnSecondoGiro = [ordiniP2P()[FN].stato, toasts.filter(t => t === P2P_TOAST_FATTURA_NUOVA).length];
+  await spedisci(['purchase-completed', null, T9 + 9900]);
+  out.fnConcluso = ordiniP2P()[FN].stato;
+  /* SUL DISPOSITIVO CHE RIAPRE: la riga e' ferma a «rilasciato» (la
+     restore di oggi) e i messaggi arrivano dal piu' RECENTE — il primo
+     e' proprio la richiesta della fattura nuova, e dietro c'e' il
+     passato. Con lo scambio aperto davanti, il foglio si apre da solo. */
+  const riga9 = Object.assign({}, ordiniP2P()[FN], {stato: 'rilasciato', ultimaMossa: 0});
+  scriviOrdineP2P(riga9);
+  aperti = []; toasts = [];
+  await spedisci(['add-invoice', FALLITO, T9 + 4200]);
+  await spedisci(SEQ[2]); await spedisci(SEQ[0]);
+  out.fnRiapre = [ordiniP2P()[FN].stato, aperti.indexOf('p2pIncassoSheet') >= 0, toasts.length];
+  /* il ripiego DICHIARATO: senza `status` nel messaggio decide la riga */
+  out.fnRipiego = [
+    avanzaOrdineP2P({lato: 'compro', stato: 'rilasciato'}, 'add-invoice', {order: {amount: 14837}}).stato,
+    avanzaOrdineP2P({lato: 'compro', stato: 'prendo'}, 'add-invoice', {order: {amount: 14837}}).stato,
+    avanzaOrdineP2P({lato: 'compro', stato: 'attivo'}, 'invoice-updated', null).stato];
+  /* ...e il criterio PRIMO, da solo: il dispositivo che il rilascio non
+     l'ha mai visto (fermo a «euro inviati») lo capisce dallo `status` */
+  out.fnDalloStatus = avanzaOrdineP2P({lato: 'compro', stato: 'euro_inviati'}, 'add-invoice', FALLITO).stato;
+  p2pOrdineAperto = ''; rispondiQuando = 0;
+
   /* ---- LA GAMBA DELL'APP (set 2026, dal campo): il profilo del
      conto rinasce all'ingresso su un dispositivo svuotato — fuori da
      Telegram il cloud non c'e', e prima di questa gamba i propri
@@ -46660,6 +46775,31 @@ function reset(){
         _sh.rmtree(d, ignore_errors=True)
 
     attesi = {
+        "fnCammino": ("IL PAGAMENTO FALLITO, la sequenza vera: garanzia, euro, rilascio, primo fallimento, e la richiesta della fattura nuova",
+                      "attivo>euro_inviati>rilasciato>pagamento_ritentato>fattura_nuova"),
+        "fnCifra": ("...con la cifra detta dal coordinatore: 14.837", 14837),
+        "fnBottone": ("...il bottone pieno e' «Dai una fattura nuova»", "fattura-nuova"),
+        "fnSuona": ("...e SUONA, una volta", 1),
+        "fnTesto": ("...e la pagina dice «Serve una fattura nuova»", "Serve una fattura nuova"),
+        "fnNonPromette": "...e da nessuno dei tre stati del dopo-rilascio si promette piu' che «stanno arrivando»",
+        "fnRestoreFerma": ("IL DIFETTO DI OGGI: la restore `settled-hold-invoice` non scavalca piu' ne' la fattura nuova ne' il ritentato",
+                           [None, None]),
+        "fnRestoreAvanti": ("...ma da «euro inviati» porta ancora avanti, a «in pagamento»", "rilasciato"),
+        "fnReplay": ("la riapertura: i messaggi ripetuti alla rinfusa non muovono niente e non risuonano",
+                     ["fattura_nuova", 0]),
+        "fnFoglio": "IL FOGLIO dice che il pagamento non e' riuscito, il perche', la cifra 14.837 e la sua copia",
+        "fnFoglioWos": "...e avvisa chi usa Wallet of Satoshi, PRIMA del campo: senza importo, o scadenza lunga",
+        "fnTitolo": ("...col titolo suo", "⚡ Una fattura nuova"),
+        "fnMandata": "la fattura nuova parte come `add-invoice` su quello scambio",
+        "fnDopoInvio": ("...e l'`invoice-updated` di risposta riporta a «in pagamento», mai a «manda gli euro»", "rilasciato"),
+        "fnRiserva": "...dove a chi compra (e solo a lui) resta la porta di riserva «i sats non arrivano?»",
+        "fnSecondoGiro": ("se il pagamento fallisce ANCORA, il giro riparte e risuona", ["fattura_nuova", 1]),
+        "fnConcluso": ("...e il `purchase-completed` chiude", "concluso"),
+        "fnRiapre": ("SUL DISPOSITIVO CHE RIAPRE fermo a «rilasciato»: il messaggio piu' recente porta alla fattura nuova, il passato non la smuove, e con lo scambio davanti il foglio si apre da solo",
+                     ["fattura_nuova", True, 1]),
+        "fnRipiego": ("il ripiego dichiarato: senza `status` decide la riga — e la PRIMA fattura e l'`invoice-updated` a scambio attivo restano quelli di sempre",
+                      ["fattura_nuova", "attesa_mia_fattura", "attivo"]),
+        "fnDalloStatus": ("...e lo `status` dell'ordine basta da solo, su un dispositivo che il rilascio non l'ha mai visto", "fattura_nuova"),
         "chiestoUnaVolta": "prendere un ordine manda UNA richiesta",
         "contoNato": "il profilo del conto rinasce dal seme, all'ingresso",
         "contoPavimento": "...e si registra subito, chiedendo il pavimento",
@@ -46887,7 +47027,8 @@ def prove_p2p_stati():
 
     i_fin = mini.index("const P2P_FINALI = [")
     riga_finali = mini[i_fin:mini.index("\n", i_fin)]
-    avanza = fn("function avanzaOrdineP2P(ordine, azione, payload){")
+    avanza = (fn("function mossaDopoRilascioP2P(o, azione, ord){") + "\n"
+              + fn("function avanzaOrdineP2P(ordine, azione, payload){"))
     azioni = fn("function azioniDisponibili(o){")
     # le due funzioni della tappa 5 stanno su UNA riga: `fn` si ferma
     # alla graffa a colonna zero e qui non c'e'
@@ -47088,7 +47229,8 @@ out.rate = vot.votabile === true && vot.stato === attivo.stato;
 out.mai2 = ['prendo','attesa_mia_fattura','attesa_hold_venditore',
   'attesa_fattura_compratore','attesa_mia_hold','attivo','euro_inviati',
   'rilasciato','concluso','annullato','in_disputa','annullo_chiesto',
-  'annullo_proposto','senza_risposta','rifiutato','pagamento_ritentato']
+  'annullo_proposto','senza_risposta','rifiutato','pagamento_ritentato',
+  'fattura_nuova']
   .map(s => [azioniDisponibili({lato:'compro', stato:s}),
              azioniDisponibili({lato:'vendo', stato:s})])
   .every(([a, b]) => !(a && b));
@@ -54359,8 +54501,11 @@ console.log(JSON.stringify(out));
     # stessi che accendono il 👉. Due liste della stessa cosa si
     # scollano, e il giorno che si scollassero la pillola direbbe un
     # numero e le card un altro.
-    prova("«tocca a te» sono i quattro casi del 👉, e nessun altro",
+    # CINQUE dal 17 set 2026: la fattura nuova dopo un pagamento
+    # fallito e' un gesto che tocca a chi compra, e a nessun altro
+    prova("«tocca a te» sono i cinque casi del 👉, e nessun altro",
           ["compro:attesa_mia_fattura", "compro:attivo",
+           "compro:fattura_nuova",
            "vendo:attesa_mia_hold", "vendo:euro_inviati"],
           o["fare"])
     prova("...e il gruppo lo decide chiamandolo, non ricopiandolo", True,
@@ -56461,6 +56606,7 @@ def prove_p2p_silenzi():
         fn("function lordoDaMieiP2P(o, miei){"),
         fn("function statoTestoP2P(o){"),
         fn("function holdVivaP2P(o){"),
+        fn("function mossaDopoRilascioP2P(o, azione, ord){"),
         fn("function avanzaOrdineP2P(ordine, azione, payload){"),
         fn("function azioniDisponibili(o){"),
         "const FRESCA = " + _json.dumps(bolt11_finta(8302, 900, adesso - 30)) + ";",
@@ -56568,7 +56714,13 @@ process.stdout.write(JSON.stringify(out));
         fn("function lordoDaMieiP2P(o, miei){"),
         fn("function statoTestoP2P(o){"),
         fn("function holdVivaP2P(o){"),
+        fn("function mossaDopoRilascioP2P(o, azione, ord){"),
         fn("function avanzaOrdineP2P(ordine, azione, payload){"),
+        # il pagamento fallito suona e apre il foglio: qui di cartone,
+        # il suo banco vero e' quello del motore
+        "const P2P_TOAST_FATTURA_NUOVA = 'FATTURA';",
+        "function altroFoglioAperto(){ return false; }",
+        "function apriIncassoP2P(){}",
         fn("function applicaMessaggioP2P(ord, dentro){"),
         "let p2pDiario = [];", fn("function diarioP2P(riga){"),
         # la guardia del bundle non entra nel banco, la sua memoria si':

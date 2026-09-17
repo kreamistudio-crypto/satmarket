@@ -40983,6 +40983,38 @@ const AVANZA_P2P = {
    nella fattura o mette nella hold — e sottrargli di nuovo la meta'
    (la lettura del 14 set) faceva chiedere 7468 dove ne voleva 7543. */
 const P2P_IMPORTO_MIO = ['add-invoice', 'hold-invoice-payment-accepted', 'buyer-took-order'];
+/* ═══ DOPO IL RILASCIO LE STESSE AZIONI VOGLIONO DIRE UN'ALTRA COSA
+   (17 set 2026, lo scambio 3fcdb207: 14.837 sats fermi nel nodo) ═════
+   Chi vende libera, il coordinatore incassa la garanzia
+   (`settled-hold-invoice`) e paga la fattura di chi compra. Se quel
+   pagamento fallisce — letto sui byte di mostro v0.18.7,
+   `check_failure_retries` in `src/app/release.rs` — al PRIMO
+   fallimento parte un `payment-failed` (e riprova da solo), e
+   all'ULTIMO tentativo parte un `add-invoice`: la STESSA azione
+   dell'inizio dello scambio, con dentro l'ordine a stato
+   `settled-hold-invoice`, l'importo `amount − fee` e la fattura
+   vecchia come promemoria. Vuol dire «dammi una fattura nuova», e la
+   tabella lo leggeva come «Dove vuoi i sats?» — il passo UNO, che alla
+   riapertura la restore scavalcava con «Sats liberati, stanno
+   arrivando» (passo 4 > passo 1): chi comprava restava senza campo,
+   coi sats fermi.
+   E LA RISPOSTA ALLA FATTURA NUOVA E' `invoice-updated`
+   (`pay_new_invoice` in `src/app/add_invoice.rs`), che la tabella
+   porta ad `attivo`: dopo il rilascio riporterebbe chi compra a
+   «manda gli euro». Qui torna a «in pagamento».
+   DUE CRITERI, e il secondo e' il ripiego DICHIARATO (la lezione della
+   sonda: si rende robusto il lettore): lo stato che il coordinatore
+   scrive nell'ordine, che vale anche su un dispositivo che non ha
+   visto il resto, e lo stato della riga, che vale se quel campo un
+   giorno mancasse. PURA: lo stato nuovo, o '' se vale la tabella. */
+const P2P_DOPO_RILASCIO = ['rilasciato', 'pagamento_ritentato', 'fattura_nuova'];
+function mossaDopoRilascioP2P(o, azione, ord){
+  const dopo = P2P_DOPO_RILASCIO.indexOf(o && o.stato) >= 0;
+  const detto = !!ord && String(ord.status || '').trim().toLowerCase() === 'settled-hold-invoice';
+  if (azione === 'add-invoice' && (dopo || detto)) return 'fattura_nuova';
+  if (azione === 'invoice-updated' && (dopo || detto)) return 'rilasciato';
+  return '';
+}
 /* PURA: copia, non muta. Cosi' si prova senza un browser e senza un
    coordinatore, ed e' l'unica cosa che decide cosa si vede. */
 function avanzaOrdineP2P(ordine, azione, payload){
@@ -41055,7 +41087,7 @@ function avanzaOrdineP2P(ordine, azione, payload){
   if (azione === 'rate') { o.votabile = true; return o; }
   /* il voto e' andato: il gesto sparisce, lo scambio resta dov'e' */
   if (azione === 'rate-received') { o.votato = true; return o; }
-  const nuovo = AVANZA_P2P[azione];
+  const nuovo = mossaDopoRilascioP2P(o, azione, ord) || AVANZA_P2P[azione];
   if (nuovo && !finito) {
     /* IL GIRO MORTO SI SCRIVE (17 set 2026): vedi P2P_GIRO_APERTO */
     if (P2P_GIRO_APERTO.indexOf(o.stato) >= 0
@@ -41111,6 +41143,7 @@ function holdVivaP2P(o){
   return Math.floor(Date.now() / 1000) < b.quando + finestra;
 }
 const P2P_TOAST_HOLD = '⚡ Tocca a te: blocca i sats in garanzia';
+const P2P_TOAST_FATTURA_NUOVA = '⚠️ Il pagamento dei tuoi sats non è riuscito: serve una fattura nuova';
 const P2P_TOAST_GIRO_MORTO = {
   pubblicato: 'Il giro si è chiuso senza garanzia: l\'ordine è tornato nel libro',
   annullato: 'Scambio annullato prima della garanzia: nessun sat si è mosso'
@@ -41122,6 +41155,8 @@ const P2P_TOAST_GIRO_MORTO = {
 function azioniDisponibili(o){
   if (!o) return '';
   if (o.lato === 'compro' && o.stato === 'attesa_mia_fattura') return 'fattura';
+  /* il pagamento dei sats e' fallito: l'unico gesto e' la fattura nuova */
+  if (o.lato === 'compro' && o.stato === 'fattura_nuova')      return 'fattura-nuova';
   if (o.lato === 'vendo'  && o.stato === 'attesa_mia_hold')    return 'hold';
   if (o.lato === 'compro' && o.stato === 'attivo')             return 'euro-inviati';
   if (o.lato === 'vendo'  && o.stato === 'euro_inviati')       return 'rilascia';
@@ -41147,6 +41182,16 @@ function azioniSecondarieP2P(o, rec){
   if (P2P_ANNULLA_SUBITO.indexOf(o.stato) >= 0) fuori.push('ritira');
   else if (P2P_ANNULLA_INSIEME.indexOf(o.stato) >= 0) fuori.push('annulla');
   if (o.stato === 'annullo_proposto') fuori.push('accetta-annullo');
+  /* LA PORTA DI RISERVA (17 set 2026): se il messaggio che chiede la
+     fattura nuova non arriva su questo dispositivo — un relay fermo,
+     una riga ripresa dalla sola restore, che dice `settled-hold-invoice`
+     e non se il pagamento e' fallito — chi compra non deve restare
+     senza campo. Il coordinatore la fattura nuova la accetta in quello
+     stato SOLO se non c'e' un pagamento in volo (`payout_payment_hash
+     IS NULL`), e altrimenti risponde di no senza muovere niente:
+     quindi offrirla non puo' fare danni. */
+  if (o.lato === 'compro' && (o.stato === 'rilasciato' || o.stato === 'pagamento_ritentato'))
+    fuori.push('non-arrivano');
   const gesto = gestoRecensioneP2P(o, rec);
   if (gesto) fuori.push(gesto);
   if (P2P_DISPUTABILI.indexOf(o.stato) >= 0) fuori.push('disputa');
@@ -41177,8 +41222,9 @@ const P2P_PROGRESSO = {
   prendo: 0, senza_risposta: 0, rifiutato: 0, pubblico: 0, pubblicato: 0,
   attesa_mia_fattura: 1, attesa_hold_venditore: 1,
   attesa_fattura_compratore: 1, attesa_mia_hold: 1,
-  attivo: 2, pagamento_ritentato: 2,
-  euro_inviati: 3, rilasciato: 3,
+  attivo: 2,
+  /* il pagamento che fallisce viene DOPO il rilascio: stessa tacca */
+  euro_inviati: 3, rilasciato: 3, pagamento_ritentato: 3, fattura_nuova: 3,
   concluso: 4,
   annullo_chiesto: 2, annullo_proposto: 2, in_disputa: 3, annullato: 0
 };
@@ -41213,7 +41259,15 @@ const STATI_P2P = {
            d_vendo: 'I tuoi sats sono bloccati. Aspetta che chi compra mandi gli euro.'},
   euro_inviati: {t: 'Euro inviati', d_compro: 'Hai detto di aver mandato gli euro: appena chi vende li vede, libera i sats.',
                  d_vendo: 'Chi compra dice di aver mandato gli euro. Controlla di averli ricevuti: poi libera i sats.'},
-  rilasciato: {t: 'Sats liberati', d: 'Stanno arrivando all\'indirizzo che hai indicato.'},
+  /* «STANNO ARRIVANDO» NON SI DICE PIU' (17 set 2026): era una
+     promessa su un pagamento che puo' fallire, e a chi aveva i sats
+     fermi la ripeteva a ogni apertura. Si dice quel che e' vero: sono
+     IN PAGAMENTO, e se non riesce c'e' una strada. */
+  rilasciato: {t: 'Sats liberati: in pagamento', d_compro: 'Chi vende ha liberato i sats e il pagamento verso il tuo wallet è in corso. Se non riesce te lo diciamo qui, e potrai dare una fattura nuova.',
+               d_vendo: 'Hai liberato i sats: sono in pagamento verso chi compra.',
+               d: 'I sats sono stati liberati e sono in pagamento verso chi compra.'},
+  fattura_nuova: {t: 'Serve una fattura nuova', d_compro: 'Il pagamento dei tuoi sats non è riuscito: la richiesta che avevi dato può essere scaduta, o il pagamento non ha trovato una strada fino al tuo wallet. I sats non sono persi: sono fermi al sicuro e restano tuoi. Dai una fattura nuova e ripartono.',
+                  d: 'Il pagamento dei sats a chi compra non è riuscito: si aspetta la sua fattura nuova. Tu non devi fare niente.'},
   concluso: {t: 'Scambio concluso', d: 'È andato tutto a buon fine.'},
   annullo_chiesto: {t: 'Hai chiesto di annullare', d: 'Serve anche il sì dell\'altra persona.'},
   annullo_proposto: {t: 'L\'altra persona vuole annullare', d: 'Se sei d\'accordo, i sats tornano a chi li ha bloccati.'},
@@ -41251,7 +41305,7 @@ const STATI_P2P = {
 const P2P_TINTA_STATO = {
   prendo: '', pubblico: '', pubblicato: '',
   attesa_mia_fattura: 'locked', attesa_mia_hold: 'locked',
-  attivo: 'locked', pagamento_ritentato: 'locked',
+  attivo: 'locked', pagamento_ritentato: 'locked', fattura_nuova: 'locked',
   attesa_hold_venditore: 'confirmed', attesa_fattura_compratore: 'confirmed',
   euro_inviati: 'confirmed', annullo_chiesto: 'confirmed',
   annullo_proposto: 'confirmed',
@@ -41549,6 +41603,19 @@ function applicaMessaggioP2P(ord, dentro){
       && holdVivaP2P(nuovo)) {
     haptic();
     toast(P2P_TOAST_HOLD, 6000);
+  }
+  /* IL PAGAMENTO FALLITO CHIEDE UN GESTO, E SUONA (17 set 2026): i
+     sats restano fermi finche' chi compra non da' una fattura nuova, e
+     nessun altro puo' farlo per lui. Toast ovunque sia, e se sta
+     guardando proprio questo scambio il foglio si apre da solo — col
+     wallet collegato la fattura la chiede lui (vedi apriIncassoP2P).
+     A spingere chi ha l'app CHIUSA resta il campanello del server, che
+     i messaggi non li legge e dice solo «guarda». */
+  if (nuovo.stato === 'fattura_nuova' && prima !== 'fattura_nuova'
+      && nuovo.lato === 'compro') {
+    haptic();
+    toast(P2P_TOAST_FATTURA_NUOVA, 8000);
+    if (p2pOrdineAperto === nuovo.id && !altroFoglioAperto()) apriIncassoP2P();
   }
   /* ...e il giro che muore lo dice, invece di tornare a «pubblicato»
      in silenzio (la riga lo tiene scritto: statoTestoP2P) */
@@ -42685,6 +42752,7 @@ const SECONDARI_P2P = {
   ritira: '<button class="btn ghost" onclick="annullaScambioP2P()">✕ Annulla l\'ordine</button>',
   annulla: '<button class="btn ghost" onclick="annullaScambioP2P()">✕ Chiedi di annullare</button>',
   'accetta-annullo': '<button class="btn ghost" onclick="accettaAnnulloP2P()">🤝 Accetta di annullare</button>',
+  'non-arrivano': '<button class="btn ghost" onclick="apriIncassoP2P()">⚡ I sats non arrivano? Dai una fattura nuova</button>',
   /* A SCAMBIO CONCLUSO I GESTI SONO DUE E SI ESCLUDONO (set 2026, le
      recensioni degli scambi): `recensisci` e' la recensione di casa —
      stelle E commento, sul profilo Barattolo dell'altra persona, nella
@@ -42825,6 +42893,7 @@ function renderOrdineP2P(){
   const azione = azioniDisponibili(o);
   const bottoni = {
     fattura: '<button class="btn orange" onclick="apriIncassoP2P()">💸 Dove ricevere i sats</button>',
+    'fattura-nuova': '<button class="btn orange" onclick="apriIncassoP2P()">⚡ Dai una fattura nuova</button>',
     hold: '<button class="btn orange" onclick="apriHoldP2P()">🔒 Blocca i sats</button>',
     'euro-inviati': '<button class="btn orange" onclick="euroInviatiP2P()">✅ Ho inviato gli euro</button>',
     rilascia: '<button class="btn orange" onclick="rilasciaP2P()">🔓 Libera i sats</button>'
@@ -43179,7 +43248,31 @@ function renderIncassoP2P(){
      (si ribatte a mano nel wallet), le due regole della bolt11 dette
      PRIMA — senza importo o esatta, e piu' lunga della finestra (vedi
      `leggiBolt11`) — e l'indirizzo per ultimo, col suo avviso. */
+  /* IL FOGLIO DEL PAGAMENTO FALLITO (17 set 2026): stesso foglio,
+     stessa cifra, stesso campo — cambia la prima cosa che dice, che
+     qui e' il PERCHE'. Dalla porta di riserva («i sats non arrivano?»)
+     il fallimento non e' un fatto, e la frase non lo afferma. */
+  const fallito = o.stato === 'fattura_nuova';
+  const riserva = o.stato === 'rilasciato' || o.stato === 'pagamento_ritentato';
+  const tit = el('p2pIncassoTit');
+  if (tit) tit.textContent = (fallito || riserva) ? '⚡ Una fattura nuova' : '💸 Dove ricevere i sats';
   box.innerHTML =
+    (fallito
+      ? '<div class="hint" style="color:var(--danger);font-weight:800">⚠️ Il pagamento dei tuoi sats non è riuscito.</div>'
+        /* IL PERCHE' NON SI AFFERMA (17 set 2026, corretto da Andrea
+           nello stesso giorno): la prima stesura diceva «quasi sempre
+           scaduta», e lo scambio che ha aperto il cantiere era durato
+           CINQUE minuti — la fattura era viva. Il coordinatore non dice
+           il motivo (mostrod butta via il `failure_reason` di LND), quindi
+           qui si elencano le due cause e non se ne sceglie una. */
+        + '<div class="hint">Chi vende li ha liberati, ma il pagamento verso la richiesta che avevi dato non è andato a buon fine: '
+        + 'può essere scaduta, oppure il pagamento non ha trovato una strada fino al tuo wallet. '
+        + 'I sats non sono persi — sono fermi al sicuro e restano tuoi: dai qui una richiesta nuova e ripartono. '
+        + 'Se con lo stesso wallet fallisce ancora, prova con un altro.</div>'
+      : riserva
+      ? '<div class="hint">Se i sats non ti sono arrivati, qui puoi dare una richiesta di pagamento nuova. '
+        + 'Se il pagamento è ancora in corso ti viene risposto di no, e non cambia niente.</div>'
+      : '') +
     '<div class="hint">' + (quanti ? 'Riceverai <b>' + esc(quanti) + '</b>. ' : '') +
       'Incolla una richiesta di pagamento del tuo wallet: <b>senza importo</b>' +
       (quanti ? ', o di ' + esc(quanti) + ' esatti' : '') +
@@ -43197,6 +43290,13 @@ function renderIncassoP2P(){
     (netto > 0
       ? '<button class="btn primary" type="button" onclick="copiaLink(\'' + netto + '\', \'📋 Cifra copiata\')">📋 Copia la cifra: ' + esc(fmt(netto)) + '</button>'
       : '') +
+    /* LE FATTURE CHE MUOIONO PRIMA DEL RILASCIO (17 set 2026, lo
+       scambio 3fcdb207): la fattura si da' ALL'INIZIO e si paga alla
+       FINE, quando chi vende libera — ore dopo, a volte giorni. La
+       guardia qui sotto pretende solo la finestra del coordinatore
+       (un'ora), e una fattura da poche ore la passa e muore lo stesso. */
+    '<div class="hint">⏳ <b>Usi Wallet of Satoshi?</b> Le sue richieste scadono presto, e in uno scambio lungo muoiono prima che i sats vengano liberati: il pagamento fallisce e va rifatto. '
+      + 'Meglio una richiesta <b>senza importo</b>, o un wallet che lasci scegliere una <b>scadenza lunga</b> (un giorno o più).</div>' +
     '<div class="field"><label>Dove vuoi ricevere i sats</label>' +
       '<input type="text" id="p2pIncassoInp" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="lnbc… oppure tuonome@wallet.com"></div>' +
     '<div class="hint">In alternativa puoi scrivere il tuo indirizzo Lightning (quello che finisce per @qualcosa). ' +
@@ -46240,8 +46340,14 @@ const P2P_RIPRESA_PASSO = {
   prendo: 0, pubblico: 0, pubblicato: 0, senza_risposta: 0,
   attesa_mia_fattura: 1, attesa_hold_venditore: 1,
   attesa_fattura_compratore: 1, attesa_mia_hold: 1,
-  attivo: 2, pagamento_ritentato: 2, annullo_chiesto: 2, annullo_proposto: 2,
-  euro_inviati: 3, rilasciato: 4, in_disputa: 5,
+  attivo: 2, annullo_chiesto: 2, annullo_proposto: 2,
+  /* ⚠️ I TRE DEL DOPO-RILASCIO STANNO ALLA PARI (17 set 2026): la
+     restore dice `settled-hold-invoice` in tutt'e tre i casi — in
+     pagamento, ritentato, fattura nuova da dare — e non sa quale. A
+     passo 2 e 1 la fotografia li scavalcava con «rilasciato», cioe'
+     toglieva il campo della fattura a chi doveva usarlo. Alla pari
+     non si muovono, e a dire quale dei tre e' restano i messaggi. */
+  euro_inviati: 3, rilasciato: 4, pagamento_ritentato: 4, fattura_nuova: 4, in_disputa: 5,
   concluso: 6, annullato: 6, rifiutato: 6
 };
 function statoDaRestoreP2P(o, statoMostro){
