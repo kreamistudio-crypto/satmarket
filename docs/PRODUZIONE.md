@@ -198,8 +198,10 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   guasti, e non questo.
   Poi si riaccende il router: `docker compose up -d specchio` — COL
   NOME DEL SERVIZIO, che un `up -d` nudo ricrea anche il relay vivo.
-  I minuti col router fermo non si perdono: alla riconnessione rifa'
-  la REQ e si riprende il libro.
+  I minuti col router fermo non dovrebbero perdersi: alla riconnessione
+  rifa' la REQ, che non porta nessun `since` — ma e' ricavato dal
+  filtro, non misurato (vedi CANTIERI, punto 5 del «resta da
+  guardare»), e in questa finestra la scrittura diretta copre comunque.
   **7) E DAL LATO DI CHI LEGGE**, nel journal del VPS: spariscono i
   «⚠️ Ascolto P2P: … NON l'ascolto» (erano il segno che lo specchio
   arrivava dopo i relay pubblici) e i lampi restano con `buste

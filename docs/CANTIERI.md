@@ -18072,8 +18072,10 @@ righe doppie nel db e nessuno squillo doppio.**
 falliscono in modi diversi, ed è questo che le rende due:
 la scrittura diretta è fire-and-forget — quel che mostrod manda mentre
 il nostro relay è giù (riavvio, deploy, Caddy che rinnova) **è perso**,
-perché nessuno lo ripubblica; il router alla riconnessione rifà la REQ
-e **si riprende il libro**. E ancora: al ripristino della macchina
+perché nessuno lo ripubblica; il router alla riconnessione rifà la REQ,
+che nel filtro non porta nessun `since`, quindi **il relay gli serve
+quel che ha in magazzino** (ricavato dal filtro, non misurato: punto 5
+qui sotto). E ancora: al ripristino della macchina
 `chiavi.txt` non c'è (è un segreto, non sta nel repo), quindi per i due
 minuti prima del primo `aggiorna-chiavi.sh` il plugin ammette la sola
 piattaforma — e in quella finestra il libro arriva lo stesso, dal
@@ -18124,3 +18126,12 @@ sulla macchina.
 cadere? Non è scritto da nessuna parte che abbiamo letto, e decide
 quanto vale davvero la rete di sicurezza del router. Si scopre alla
 prima disconnessione vera.
+5) Che il router RECUPERI la finestra in cui è stato giù è **ricavato,
+non misurato**: la REQ di `router.conf` non porta un `since`, quindi
+alla riconnessione il relay remoto serve quel che ha in magazzino e poi
+passa al vivo. È l'argomento più forte per tenerlo, quindi merita una
+misura vera — e non la dà il passo 6 della procedura, che spegne il
+router mentre la scrittura diretta copre lo stesso buco. Serve un giro
+apposta: specchio fermo con la diretta ancora non accesa, un evento
+nuovo sui relay pubblici, e poi guardare se dopo `up -d specchio`
+compare.
