@@ -37688,6 +37688,9 @@ function renderP2P(){
          per una faccia e' un'attesa che non fa male a nessuno. */
       intestaOrdiniP2P(Object.keys(miei || {})).catch(() => {});
       renderP2P();
+      /* la ripresa puo' aver mosso proprio lo scambio che si sta
+         guardando (17 set 2026): la sua pagina si ridisegna anche lei */
+      if (p2pOrdineAperto) renderOrdineP2P();
     }).catch(() => {});
   }
   /* DUE CORPI, UN RENDERER (set 2026, la nav trasformata): il libro
@@ -40610,6 +40613,10 @@ async function mostroArriva(ev){
       att.no(Object.assign(new Error(motivoCantDo(dentro.payload)), {cantDo: true}));
     else att.ok(dentro);
   }
+  /* L'ORA E' QUELLA DELL'EVENTO (17 set 2026): la scrive il
+     coordinatore, e serve a non riapplicare il passato — vedi
+     applicaMessaggioP2P */
+  dentro.quando = Number(ev.created_at) || 0;
   /* SEMPRE, anche quando una chiamata l'aspettava: la macchina a stati
      e' una sola, e un messaggio non sollecitato la muove uguale */
   applicaMessaggioP2P(ord, dentro);
@@ -40836,6 +40843,8 @@ function avanzaOrdineP2P(ordine, azione, payload){
          che tiene la riga (vedi p2pRitirato) e nessun bottone la apre. */
       if (nuovo === 'pubblicato') delete o.hold;
     } else if (nuovo !== 'pubblicato' && nuovo !== 'annullato') delete o.giroMorto;
+    /* una mossa vera del coordinatore chiude anche lo stato grezzo */
+    delete o.statoGrezzo;
     o.stato = nuovo;
     o.aggiornato = Math.floor(Date.now() / 1000);
     o.cantDo = '';
@@ -41024,6 +41033,10 @@ function statoTestoP2P(o){
      sarebbe vera e muta — la notizia e' che era stato preso */
   const gm = o && o.giroMorto && P2P_GIRO_MORTO[o.stato];
   if (gm) return {t: gm.t, d: gm[o.giroMorto] || gm.prima};
+  /* lo stato che non conosciamo: la parola del coordinatore, grezza */
+  if (o && o.statoGrezzo)
+    return {t: 'Stato: «' + o.statoGrezzo + '»',
+            d: 'Il coordinatore riporta uno stato che questa versione di Barattolo non conosce, e non lo interpretiamo. L\'ultimo passo noto qui era «' + s.t + '».'};
   /* il verso di chi ha PUBBLICATO vince sul lato: e' la stessa riga
      letta da un'altra parte del banco, e la sua frase e' un'altra */
   const mio = !!(o && o.mio);
@@ -41108,7 +41121,44 @@ function applicaMessaggioP2P(ord, dentro){
   const azione = dentro && dentro.action;
   if (!azione) return;
   const prima = ord.stato;
+  /* ═══ IL PASSATO NON SI RIAPPLICA (17 set 2026, l'ordine 8263bce5) ══
+     A ogni riapertura il relay ripete i messaggi dello scambio — il
+     riascolto parte dallo scambio aperto piu' vecchio, e `p2pVisti`
+     vive solo in memoria — e li serve nell'ordine che vuole lui (col
+     coro, di piu' relay). La macchina a stati li riapplicava TUTTI, e
+     vinceva l'ultimo ARRIVATO invece dell'ultimo SUCCESSO: l'eco della
+     pubblicazione riportava a «pubblicato» uno scambio con la garanzia
+     pagata, e l'`add-invoice` di ieri riportava chi compra a «Dove
+     vuoi i sats?». Col cantiere dei silenzi quell'eco vecchia faceva
+     anche scattare «Di nuovo nel libro», cioe' una storia inventata.
+     La riga tiene l'ora dell'ultimo messaggio APPLICATO (`ultimoMsg`,
+     che vive col resto della riga): uno piu' vecchio non muove niente
+     e non fa parlare nessuno. Gli si prende solo QUEL CHE MANCA — la
+     controparte, la richiesta da pagare se e' quella che si aspetta —
+     perche' su un dispositivo nuovo i messaggi arrivano dal piu'
+     recente, e quelli dietro portano i dati.
+     Alla pari (stesso secondo) si applica: meglio due volte che mai.
+     Una riga di prima della cura non ha l'ora: converge da sola, in
+     qualunque ordine arrivino, perche' dopo il piu' recente gli altri
+     sono passato. */
+  const quando = Number(dentro.quando) || 0;
+  if (quando > 0 && (Number(ord.ultimoMsg) || 0) > quando) {
+    const eco = avanzaOrdineP2P(ord, azione, dentro.payload || null);
+    let preso = false;
+    const peerNuovo = !ord.peer && !!eco.peer;
+    if (peerNuovo) { ord.peer = eco.peer; preso = true; }
+    if (!ord.hold && eco.hold && ord.stato === 'attesa_mia_hold') {
+      ord.hold = eco.hold; preso = true;
+    }
+    if (preso) {
+      scriviOrdineP2P(ord);
+      if (peerNuovo) { pianificaMetodoP2P(ord.id); pianificaAutoRecapito(ord.id); }
+      if (p2pOrdineAperto === ord.id) renderOrdineP2P();
+    }
+    return;
+  }
   const nuovo = avanzaOrdineP2P(ord, azione, dentro.payload || null);
+  if (quando > 0) nuovo.ultimoMsg = quando;
   /* IL RINOME STA QUI e non in chi ha creato l'ordine: la risposta
      puo' arrivare anche quando nessuno la sta aspettando (app riaperta,
      relay che ripete), e da li' in poi lo scambio deve avere il nome
@@ -45390,6 +45440,74 @@ async function statoPubblicoOrdini(ids){
   return mossi;
 }
 
+/* ═══ LA RIPRESA DALLA RESTORE (17 set 2026, dal collaudo vero) ═════
+   L'ordine 8263bce5: garanzia PAGATA, il coordinatore risponde `active`
+   alla restore di tutt'e due le parti, e il client mostrava «Ordine
+   pubblicato» a chi vendeva e «Dove vuoi i sats?» a chi comprava. I
+   messaggi che avrebbero mosso la macchina a stati non erano arrivati,
+   e lo stato della restore — che stava gia' in `p2pMieiOrdini` — non lo
+   leggeva NESSUNO sulle righe gia' locali: serviva solo a far nascere
+   righe «pubblicato». Qui lo stato del coordinatore diventa il nostro.
+   IL VOCABOLARIO E' QUELLO DI mostro-core (`Status`, kebab-case) per
+   intero, e va detto cosa e' VISTO e cosa no (la lezione di Q4):
+   `pending` e `active` visti dalla restore vera, `waiting-buyer-invoice`
+   e `waiting-payment` visti sul libro; gli altri vengono dall'elenco
+   del protocollo. Uno stato che qui non c'e' NON muove niente e lascia
+   una riga in console — mai un default, men che meno «pubblicato».
+   `pending` e `in-progress` non muovono: il primo e' la vetrina (da
+   li' non si va da nessuna parte), il secondo e' parola del libro e
+   non dice a chi tocca.
+   DUE STATI DIPENDONO DAL LATO: chi deve la fattura e chi la garanzia.
+   SOLO IN AVANTI, ed e' la riga che tiene tutto: la restore e' una
+   fotografia d'inizio sessione, i messaggi arrivano dopo — un gesto
+   appena fatto qui (euro inviati) non deve tornare indietro perche' la
+   fotografia diceva `active`. I passi stanno in P2P_RIPRESA_PASSO; la
+   disputa e i finali stanno in cima, cosi' vincono su tutto tranne che
+   su un finale gia' scritto. PURA: torna la riga nuova, o null. */
+const P2P_DA_RESTORE = {
+  'waiting-buyer-invoice': {compro: 'attesa_mia_fattura', vendo: 'attesa_fattura_compratore'},
+  'waiting-payment': {compro: 'attesa_hold_venditore', vendo: 'attesa_mia_hold'},
+  'active': 'attivo',
+  'fiat-sent': 'euro_inviati',
+  'settled-hold-invoice': 'rilasciato',
+  'success': 'concluso',
+  'completed-by-admin': 'concluso',
+  'settled-by-admin': 'concluso',
+  'canceled': 'annullato',
+  'canceled-by-admin': 'annullato',
+  'cooperatively-canceled': 'annullato',
+  'expired': 'annullato',
+  'dispute': 'in_disputa'
+};
+const P2P_RESTORE_FERMI = ['pending', 'in-progress'];
+const P2P_RIPRESA_PASSO = {
+  prendo: 0, pubblico: 0, pubblicato: 0, senza_risposta: 0,
+  attesa_mia_fattura: 1, attesa_hold_venditore: 1,
+  attesa_fattura_compratore: 1, attesa_mia_hold: 1,
+  attivo: 2, pagamento_ritentato: 2, annullo_chiesto: 2, annullo_proposto: 2,
+  euro_inviati: 3, rilasciato: 4, in_disputa: 5,
+  concluso: 6, annullato: 6, rifiutato: 6
+};
+function statoDaRestoreP2P(o, statoMostro){
+  const s = String(statoMostro || '').trim().toLowerCase();
+  const v = P2P_DA_RESTORE[s];
+  if (!v) return '';
+  return typeof v === 'string' ? v : (v[o && o.lato] || '');
+}
+function riprendiDaRestoreP2P(o, statoMostro){
+  if (!o) return null;
+  const nuovo = statoDaRestoreP2P(o, statoMostro);
+  if (!nuovo) return null;
+  const da = P2P_RIPRESA_PASSO[o.stato], a = P2P_RIPRESA_PASSO[nuovo];
+  if (!(a > da)) return null;
+  const r = Object.assign({}, o, {stato: nuovo,
+    aggiornato: Math.floor(Date.now() / 1000),
+    cantDo: '', errore: '', nonPartito: false});
+  delete r.giroMorto;
+  delete r.statoGrezzo;
+  return r;
+}
+
 /* ---- gli scambi riconosciuti dal coordinatore, senza riga locale --
    LA RIGA SI ADOTTA (set 2026, dal campo: «non posso piu' annullare»).
    Per un ordine PENDING la restore e il libro insieme dicono tutto
@@ -45439,6 +45557,37 @@ function adottaOrdiniAltroveP2P(locali){
     try { tk = chiaveScambio(mz.sk, indice); } catch(e) { continue; }
     const gia = locali[id];
     if (gia) {
+      /* LA RIPRESA: lo stato del coordinatore muove la riga locale, UNA
+         volta per fotografia (`ripresa` sulla voce, che vive in memoria
+         e rinasce a ogni restore) — la lista resta la stessa per tutta
+         la sessione, e riapplicarla a ogni render riporterebbe avanti
+         un giro che nel frattempo e' morto. */
+      if (!voce.ripresa) {
+        voce.ripresa = true;
+        const st = String(voce.stato || '').trim().toLowerCase();
+        const ripreso = riprendiDaRestoreP2P(gia, st);
+        if (ripreso) {
+          console.log('🔁 [p2p] ripresa: ' + id.slice(0, 8) + ' da «' + gia.stato
+                      + '» a «' + ripreso.stato + '» (il coordinatore dice ' + st + ')');
+          Object.assign(gia, ripreso);
+          delete gia.giroMorto;
+          delete gia.statoGrezzo;
+          scriviOrdineP2P(gia);
+          nati++;
+        } else if (st && !P2P_DA_RESTORE[st] && P2P_RESTORE_FERMI.indexOf(st) < 0) {
+          /* LO STATO CHE NON SI CONOSCE SI MOSTRA GREZZO E SI LOGGA
+             (Andrea, 17 set 2026): mai una storia inventata. La riga
+             resta dov'e', e dice la parola del coordinatore cosi' com'e'
+             — ripulita a lettere, cifre e trattini, che e' testo altrui. */
+          console.log('🔁 [p2p] ripresa: stato mai visto «' + st + '» su ' + id.slice(0, 8));
+          const grezzo = st.replace(/[^a-z0-9-]/g, '').slice(0, 40);
+          if (grezzo && gia.statoGrezzo !== grezzo && P2P_FINALI.indexOf(gia.stato) < 0) {
+            gia.statoGrezzo = grezzo;
+            scriviOrdineP2P(gia);
+            nati++;
+          }
+        }
+      }
       /* LA RIPARAZIONE, per le righe scritte col mazzo sbagliato prima
          di questa cura: l'identita' e' la mia, quindi la trade key
          GIUSTA e' quella che si deriva adesso — non e' un'ipotesi, e'

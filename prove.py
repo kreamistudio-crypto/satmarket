@@ -51701,7 +51701,18 @@ console.log(JSON.stringify(out));
     else:
         k5 = mini.index("const esc = s =>")
         esc5 = mini[k5:mini.index(";\n", k5) + 1]
+        # LA RIPRESA DALLA RESTORE (17 set 2026) entra col suo codice
+        # VERO: le tre tabelle e i due giudici, non uno stub
+        def _cost5(nome):
+            i = mini.index("const " + nome + " = ")
+            return mini[i:mini.index(";\n", i) + 1]
         banco5 = esc5 + "\n" + "\n".join(
+            _cost5(n) for n in ("P2P_DA_RESTORE", "P2P_RESTORE_FERMI",
+                                "P2P_RIPRESA_PASSO")) + "\n" + "\n".join(
+            pezzo_js(mini, f, "\n}\n") + "\n}"
+            for f in ("function statoDaRestoreP2P(o, statoMostro){",
+                      "function riprendiDaRestoreP2P(o, statoMostro){")
+        ) + "\n" + "\n".join(
             pezzo_js(mini, f, "\n}\n") + "\n}"
             for f in ("async function chiediMieiOrdiniP2P(",
                       "async function identitaMieP2P(mz){",
@@ -51853,6 +51864,68 @@ out.strisciaSubito = s1.includes('<loc ord-a>');
   scambiP2P();
   out.chiaveStortaRiparata = ordiniFinti['ord-storto'].pubTrade === 'pub:4';
   out.finitaNonSiTocca = ordiniFinti['ord-finito'].pubTrade === 'pub:SBAGLIATA';
+  // l) IL COLLAUDO DEL 17 SET 2026, l'ordine 8263bce5: garanzia pagata,
+  //    la restore dice `active` a TUTT'E DUE, e le righe locali erano
+  //    rimaste indietro — «pubblicato» chi vendeva (indice 54), «dove
+  //    vuoi i sats?» chi comprava (indice 15)
+  const log0 = console.log; console.log = () => {};
+  ordiniFinti = {'8263bce5-mk': {id: '8263bce5-mk', lato: 'vendo', mio: true,
+                                 stato: 'pubblicato', indice: 54, pubTrade: 'pub:54',
+                                 giroMorto: 'hold', cantDo: 'vecchio no', creato: 10},
+                 '8263bce5-tk': {id: '8263bce5-tk', lato: 'compro', stato: 'attesa_mia_fattura',
+                                 indice: 15, pubTrade: 'pub:15', creato: 10}};
+  p2pMieiOrdini = {'8263bce5-mk': {indice: 54, stato: 'active', identita: 'P'},
+                   '8263bce5-tk': {indice: 15, stato: 'active', identita: 'P'}};
+  p2pLibro = {ordini: []};
+  scambiP2P();
+  out.ripresaActive = [ordiniFinti['8263bce5-mk'].stato, ordiniFinti['8263bce5-tk'].stato];
+  out.ripresaPulisce = ['giroMorto' in ordiniFinti['8263bce5-mk'],
+                        ordiniFinti['8263bce5-mk'].cantDo];
+  // ...UNA VOLTA per fotografia: il giro che poi muore non torna avanti
+  ordiniFinti['8263bce5-mk'].stato = 'pubblicato';
+  scambiP2P();
+  out.ripresaUnaVolta = ordiniFinti['8263bce5-mk'].stato;
+  // ...e una restore NUOVA riprende di nuovo
+  p2pMieiOrdini = {'8263bce5-mk': {indice: 54, stato: 'fiat-sent', identita: 'P'}};
+  scambiP2P();
+  out.ripresaNuovaFoto = ordiniFinti['8263bce5-mk'].stato;
+  // ...SOLO IN AVANTI: il gesto appena fatto non torna indietro
+  ordiniFinti = {'ord-av': {id: 'ord-av', lato: 'compro', stato: 'euro_inviati',
+                            indice: 7, pubTrade: 'pub:7', creato: 10}};
+  p2pMieiOrdini = {'ord-av': {indice: 7, stato: 'active', identita: 'P'}};
+  scambiP2P();
+  out.ripresaSoloAvanti = ordiniFinti['ord-av'].stato;
+  // ...e uno stato mai visto non muove NIENTE (men che meno a «pubblicato»)
+  ordiniFinti = {'ord-ig': {id: 'ord-ig', lato: 'vendo', stato: 'attivo',
+                            indice: 8, pubTrade: 'pub:8', creato: 10}};
+  p2pMieiOrdini = {'ord-ig': {indice: 8, stato: 'roba-nuova', identita: 'P'}};
+  scambiP2P();
+  out.ripresaIgnoto = ordiniFinti['ord-ig'].stato;
+  out.ripresaGrezzo = ordiniFinti['ord-ig'].statoGrezzo;
+  // ...e una restore che poi lo capisce porta via anche il grezzo
+  p2pMieiOrdini = {'ord-ig': {indice: 8, stato: 'fiat-sent', identita: 'P'}};
+  scambiP2P();
+  out.ripresaGrezzoVia = [ordiniFinti['ord-ig'].stato, 'statoGrezzo' in ordiniFinti['ord-ig']];
+  console.log = log0;
+  // m) LA TABELLA PER INTERO: ogni stato del coordinatore, sui due lati,
+  //    partendo dalla riga piu' indietro che c'e'
+  const VOCI = ['pending', 'waiting-buyer-invoice', 'waiting-payment', 'active',
+    'fiat-sent', 'settled-hold-invoice', 'success', 'canceled', 'canceled-by-admin',
+    'settled-by-admin', 'completed-by-admin', 'dispute', 'expired',
+    'cooperatively-canceled', 'in-progress'];
+  out.tabella = {};
+  for (const lato of ['compro', 'vendo'])
+    for (const v of VOCI) {
+      const r = riprendiDaRestoreP2P({id: 'x', lato: lato, stato: 'pubblicato'}, v);
+      out.tabella[lato + ':' + v] = r ? r.stato : '';
+    }
+  out.tabellaMaiuscole = statoDaRestoreP2P({lato: 'vendo'}, ' Active ');
+  // il giudice PURO pulisce da se', senza contare su chi lo chiama
+  // (la tortura: l'adozione ripuliva per lui, e la riga non la provava nessuno)
+  const vecchia = {lato: 'vendo', stato: 'pubblicato', giroMorto: 'hold'};
+  out.ripresaPura = ['giroMorto' in riprendiDaRestoreP2P(vecchia, 'active'),
+                     vecchia.stato, vecchia.giroMorto];
+  out.passiTutti = Object.keys(P2P_RIPRESA_PASSO).sort();
   // j) LE MIE IDENTITA': un mazzo 'conto' E' gia' il seme, e la
   //    seconda domanda non parte nemmeno — nemmeno la POST
   const SK_SEME = 'cd'.repeat(32);
@@ -51930,6 +52003,58 @@ out.strisciaSubito = s1.includes('<loc ord-a>');
                   True, out5["chiaveStortaRiparata"])
             prova("...e una riga gia' finita non si tocca", True,
                   out5["finitaNonSiTocca"])
+            # LA RIPRESA DALLA RESTORE (17 set 2026, l'ordine 8263bce5)
+            prova("la restore dice `active`: chi vende esce da «pubblicato» e chi compra da «dove vuoi i sats?»",
+                  ["attivo", "attivo"], out5["ripresaActive"])
+            prova("...e la ripresa porta via il giro morto e il vecchio «no»",
+                  [False, ""], out5["ripresaPulisce"])
+            prova("...una volta per fotografia: un giro morto DOPO non torna avanti",
+                  "pubblicato", out5["ripresaUnaVolta"])
+            prova("...mentre una restore nuova riprende di nuovo", "euro_inviati",
+                  out5["ripresaNuovaFoto"])
+            prova("...solo in avanti: «euro inviati» non torna «attivo»",
+                  "euro_inviati", out5["ripresaSoloAvanti"])
+            prova("...e uno stato mai visto non muove niente", "attivo",
+                  out5["ripresaIgnoto"])
+            prova("...ma resta scritto GREZZO sulla riga, da mostrare", "roba-nuova",
+                  out5["ripresaGrezzo"])
+            prova("...finche' una restore che si capisce non lo porta via",
+                  ["euro_inviati", False], out5["ripresaGrezzoVia"])
+            _att = {"pending": ("", ""), "in-progress": ("", ""),
+                    "waiting-buyer-invoice": ("attesa_mia_fattura",
+                                              "attesa_fattura_compratore"),
+                    "waiting-payment": ("attesa_hold_venditore", "attesa_mia_hold"),
+                    "active": ("attivo",) * 2, "fiat-sent": ("euro_inviati",) * 2,
+                    "settled-hold-invoice": ("rilasciato",) * 2,
+                    "success": ("concluso",) * 2,
+                    "settled-by-admin": ("concluso",) * 2,
+                    "completed-by-admin": ("concluso",) * 2,
+                    "canceled": ("annullato",) * 2,
+                    "canceled-by-admin": ("annullato",) * 2,
+                    "cooperatively-canceled": ("annullato",) * 2,
+                    "expired": ("annullato",) * 2,
+                    "dispute": ("in_disputa",) * 2}
+            for voce, (c, v) in sorted(_att.items()):
+                prova(f"restore `{voce}`: chi compra → «{c or 'fermo'}», chi vende → «{v or 'fermo'}»",
+                      [c, v], [out5["tabella"]["compro:" + voce],
+                               out5["tabella"]["vendo:" + voce]])
+            prova("la tabella copre TUTTO il vocabolario di mostro-core (quindici stati)",
+                  15, len(out5["tabella"]) // 2)
+            prova("...e NESSUNO stato del coordinatore porta a «pubblicato»", [],
+                  [k for k, s in out5["tabella"].items() if s == "pubblicato"])
+            prova("il giudice puro toglie il giro morto da se', e non muta la riga che riceve",
+                  [False, "pubblicato", "hold"], out5["ripresaPura"])
+            prova("...e lo stato si legge senza badare a spazi e maiuscole",
+                  "attivo", out5["tabellaMaiuscole"])
+            _stati = sorted(set(re.findall(
+                r"^  (\w+): \{", mini[mini.index("const STATI_P2P = {"):
+                                      mini.index("\n};", mini.index("const STATI_P2P = {"))],
+                re.M)))
+            prova("ogni stato che il client sa raccontare ha il suo passo nella ripresa",
+                  _stati, out5["passiTutti"])
+            _arr = sorted({s for v in out5["tabella"].values() for s in [v] if s})
+            prova("...e ogni stato d'arrivo della ripresa e' uno che si sa raccontare",
+                  [], [s for s in _arr if s not in _stati])
             # LE MIE IDENTITA' (13 set 2026, il PC di Andrea): il
             # giudice gira davvero, coi sei rami che contano.
             prova("a un mazzo 'conto' il seme non si chiede: E' lui",
@@ -53982,6 +54107,155 @@ process.stdout.write(JSON.stringify(out));
     prova("la richiesta fresca e' viva, quella di venti minuti fa no, e una che non si legge vale viva",
           [True, False, True, True], out["viva"])
     prova("...e senza il 38385 la finestra e' di 900 secondi", True, out["vivaSenzaInfo"])
+    # --- 3) IL PASSATO NON SI RIAPPLICA (17 set 2026, l'ordine 8263bce5) --
+    # Il relay alla riapertura ripete i messaggi dello scambio in ordine
+    # sparso, e la macchina a stati li riapplicava tutti: vinceva
+    # l'ultimo ARRIVATO. Qui gira `applicaMessaggioP2P` VERA, con l'ora
+    # dell'evento, sui messaggi dello scambio ripetuti alla rinfusa.
+    prova("il messaggio porta l'ora dell'evento, scritta dal coordinatore", True,
+          "dentro.quando = Number(ev.created_at) || 0;"
+          in fn("async function mostroArriva(ev){"))
+    banco2 = "\n".join([
+        blocco("AVANZA_P2P"), blocco("STATI_P2P"), blocco("MOTIVI_CANTDO"),
+        blocco("P2P_GIRO_MORTO"), blocco("P2P_TOAST_GIRO_MORTO"), liste,
+        "const P2P_TOAST_HOLD = 'TOCCA';",
+        fn("function motivoCantDo(payload){"),
+        fn("function importoBolt11(pr){"), fn("function leggiBolt11(pr){"),
+        "let p2pInfo = {fee: 0.02, scadenzaSec: 900};",
+        fn("function commissioneVivaP2P(){"),
+        fn("function nettoLatoP2P(o, sats){"),
+        fn("function lordoDaMieiP2P(o, miei){"),
+        fn("function statoTestoP2P(o){"),
+        fn("function holdVivaP2P(o){"),
+        fn("function avanzaOrdineP2P(ordine, azione, payload){"),
+        fn("function applicaMessaggioP2P(ord, dentro){"),
+        "const FRESCA = " + _json.dumps(bolt11_finta(16673, 900, adesso - 30)) + ";",
+    ]) + r"""
+let righe = {}, toasts = [], pianificati = [];
+function scriviOrdineP2P(o){ righe[o.id] = o; return o; }
+function provvisorioP2P(id){ return false; }
+function rinominaOrdineP2P(){}
+function intestaOrdiniP2P(){ return Promise.resolve(true); }
+function p2pRitirato(o){ return false; }
+function togliRitiratoP2P(){ return false; }
+function toast(m){ toasts.push(String(m)); }
+function haptic(){}
+function go(){}
+function renderP2P(){}
+function renderOrdineP2P(){}
+function chiudiFoglioP2P(){}
+async function mostroRiascolta(){}
+function pianificaMetodoP2P(id){ pianificati.push('m:' + id); }
+function pianificaAutoRecapito(id){ pianificati.push('r:' + id); }
+let p2pOrdineAperto = '', p2pHoldOrdine = '';
+const document = {querySelector: s => null};
+const MIA = 'aa'.repeat(32), SUA = 'bb'.repeat(32);
+const T = 1758100000;
+/* i quattro messaggi che chi VENDE riceve in uno scambio vero */
+const MSG = {
+  eco:    ['new-order', {order: {amount: 16345}}, T],
+  attesa: ['waiting-buyer-invoice', {order: {amount: 16345, buyer_trade_pubkey: SUA, seller_trade_pubkey: MIA}}, T + 60],
+  paga:   ['pay-invoice', {order: {amount: 16673}, payment_request: [null, FRESCA, 16673]}, T + 120],
+  preso:  ['buyer-took-order', {order: {amount: 16673}}, T + 180]
+};
+function arriva(id, nome){
+  const [azione, payload, quando] = MSG[nome] || nome;
+  applicaMessaggioP2P(righe[id], {action: azione, payload: payload, quando: quando});
+}
+function nuova(extra){
+  righe = {}; toasts = []; pianificati = [];
+  righe.v = Object.assign({id: 'v', lato: 'vendo', mio: true, stato: 'pubblico',
+    pubTrade: MIA, euro: 10, satsNetti: 0, metodi: [], cantDo: '', errore: ''}, extra || {});
+}
+const out = {};
+// a) lo scambio vero, in ordine: fino a «Sats in garanzia»
+nuova();
+for (const n of ['eco', 'attesa', 'paga', 'preso']) arriva('v', n);
+out.inOrdine = [righe.v.stato, righe.v.ultimoMsg === T + 180, righe.v.peer === SUA,
+                toasts.filter(t => t === 'TOCCA').length];
+// b) LA RIAPERTURA: il relay ripete tutto alla rinfusa. Niente si muove,
+//    nessuna storia inventata, nessun toast
+toasts = [];
+for (const n of ['eco', 'paga', 'attesa', 'preso', 'eco', 'attesa']) arriva('v', n);
+out.replay = [righe.v.stato, righe.v.giroMorto || '', toasts.length, statoTestoP2P(righe.v).t];
+// c) LA RIGA DI PRIMA DELLA CURA, quella di oggi: ferma a «pubblicato»
+//    con la storia falsa scritta sopra, senza l'ora. In QUALUNQUE ordine
+//    arrivino i ripetuti, finisce ad attivo e la storia sparisce
+out.legacy = [];
+for (const giro of [['preso', 'paga', 'attesa', 'eco'], ['attesa', 'eco', 'preso', 'paga'],
+                    ['eco', 'attesa', 'paga', 'preso'], ['paga', 'preso', 'eco', 'attesa']]) {
+  nuova({stato: 'pubblicato', giroMorto: 'prima'});
+  for (const n of giro) arriva('v', n);
+  out.legacy.push([righe.v.stato, righe.v.giroMorto || '', righe.v.peer === SUA]);
+}
+// d) dal piu' recente: quel che MANCA si prende dai messaggi dietro,
+//    senza muovere lo stato — e il recapito si pianifica una volta
+nuova({stato: 'pubblicato'});
+arriva('v', 'preso'); arriva('v', 'attesa'); arriva('v', 'attesa'); arriva('v', 'paga');
+out.raccolto = [righe.v.stato, righe.v.peer === SUA, pianificati.join(',')];
+// ...ma la richiesta vecchia NON si prende se non e' quella che si aspetta
+out.holdNonPresa = !righe.v.hold;
+// e) IL RITORNO VERO nel libro: un new-order PIU' RECENTE, da un giro aperto
+nuova();
+arriva('v', 'eco'); arriva('v', 'attesa'); arriva('v', 'paga');
+toasts = [];
+arriva('v', ['new-order', {order: {amount: 16345}}, T + 400]);
+out.ritornoVero = [righe.v.stato, righe.v.giroMorto, 'hold' in righe.v, toasts.length];
+// f) chi COMPRA: l'add-invoice di ieri non lo riporta a «Dove vuoi i sats?»
+righe = {c: {id: 'c', lato: 'compro', stato: 'prendo', pubTrade: MIA, euro: 10,
+             satsNetti: 0, metodi: [], cantDo: '', errore: ''}};
+const C = [['add-invoice', {order: {amount: 16182}}, T + 10],
+           ['waiting-seller-to-pay', null, T + 70],
+           ['hold-invoice-payment-accepted', {order: {amount: 16182}}, T + 180]];
+for (const m of C) arriva('c', m);
+for (const m of [C[2], C[0], C[1], C[0]]) arriva('c', m);
+out.compratore = righe.c.stato;
+// g) alla pari si applica, e senza ora (un messaggio atteso da una
+//    chiamata di ieri) pure: meglio due volte che mai
+nuova();
+arriva('v', 'eco');
+arriva('v', ['waiting-buyer-invoice', null, T]);
+out.allaPari = righe.v.stato;
+arriva('v', ['pay-invoice', {payment_request: [null, FRESCA, 16673]}, 0]);
+out.senzaOra = [righe.v.stato, righe.v.ultimoMsg === T];
+process.stdout.write(JSON.stringify(out));
+"""
+    d = _tf.mkdtemp()
+    try:
+        p = os.path.join(d, "banco2.js")
+        open(p, "w", encoding="utf-8").write(banco2)
+        r = _sp.run([node, p], capture_output=True, encoding="utf-8", timeout=60)
+        if r.returncode != 0:
+            prova("il banco node dei messaggi ripetuti gira", "", r.stderr[-700:])
+            return
+        o2 = _json.loads(r.stdout.strip().splitlines()[-1])
+    finally:
+        _sh.rmtree(d, ignore_errors=True)
+    prova("lo scambio vero, in ordine: «Sats in garanzia», con l'ora, la controparte e UN «tocca a te»",
+          ["attivo", True, True, 1], o2["inOrdine"])
+    prova("LA RIAPERTURA: i messaggi ripetuti alla rinfusa non muovono niente, non inventano storie, non parlano",
+          ["attivo", "", 0, "Sats in garanzia"], o2["replay"])
+    prova("la riga di oggi (ferma a «pubblicato» con la storia falsa, senza l'ora) guarisce in QUALUNQUE ordine",
+          [["attivo", "", True]] * 4, o2["legacy"])
+    prova("dal piu' recente: la controparte si raccoglie dai messaggi dietro, senza muovere lo stato, e il recapito si pianifica una volta",
+          ["attivo", True, "m:v,r:v"], o2["raccolto"])
+    prova("...e una richiesta vecchia non si raccoglie se non e' quella che si aspetta",
+          True, o2["holdNonPresa"])
+    prova("il ritorno VERO nel libro (un new-order piu' recente) scatta ancora: storia, hold buttata, toast",
+          ["pubblicato", "hold", False, 1], o2["ritornoVero"])
+    prova("chi COMPRA: l'add-invoice di ieri non lo riporta a «Dove vuoi i sats?»",
+          "attivo", o2["compratore"])
+    prova("alla pari (stesso secondo) si applica", "attesa_fattura_compratore",
+          o2["allaPari"])
+    prova("...e un messaggio senza ora pure, senza toccare l'ora della riga",
+          ["attesa_mia_hold", True], o2["senzaOra"])
+    # lo stato che non si conosce: grezzo, mai interpretato
+    prova("lo stato grezzo chiude a una mossa vera e alla ripresa", True,
+          "delete o.statoGrezzo;" in fn("function avanzaOrdineP2P(ordine, azione, payload){")
+          and "delete r.statoGrezzo;" in fn("function riprendiDaRestoreP2P(o, statoMostro){"))
+    prova("...e la frase lo mostra cosi' com'e', senza interpretarlo", True,
+          "return {t: 'Stato: «' + o.statoGrezzo + '»'," in fn("function statoTestoP2P(o){")
+          and "non lo interpretiamo" in fn("function statoTestoP2P(o){"))
 
 
 def prove_nwc_cifratura():
