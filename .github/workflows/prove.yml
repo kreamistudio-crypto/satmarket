@@ -174,7 +174,17 @@ jobs:
       # e la storia non si riscrive. Nessuna chiave vera ha quella
       # forma, quindi l'eccezione non copre nessun segreto. L'albero
       # e' pulito anche SENZA di lui (provato in locale sui due passi).
-      SEGNAPOSTI: INCOLLA_QUI|collaudo-usa-e-getta|KEY *= *"[a-z][0-9]"
+      # Il quarto (17 set 2026): `SEGRETO = "..."`, tre puntini veri —
+      # la riga d'esempio di PRODUZIONE finita nella cronologia il
+      # giorno stesso in cui P2P_SCONTO_SEGRETO e' entrato fra le
+      # FORME. Tre punti non sono la forma di nessuna chiave.
+      SEGNAPOSTI: INCOLLA_QUI|collaudo-usa-e-getta|KEY *= *"[a-z][0-9]"|SEGRETO *= *"\.\.\."
+      # LE CHIAVI DI CARTONE IN ESADECIMALE: 64 volte LO STESSO
+      # carattere (i test Rust della patch 0005 ne avevano due, e sono
+      # nella cronologia). Si TOGLIE IL VALORE dalla riga prima di
+      # guardarla, non la riga: una chiave vera accanto a una di
+      # cartone resta li' e fa scattare la regola.
+      CARTONE_HEX: 's/\b([0-9a-f])\1{63}\b//g'
       FORMA_HEX: '\b[0-9a-f]{64}\b'
     steps:
       - uses: actions/checkout@v5
@@ -310,7 +320,8 @@ jobs:
                ':!deploy/relay/strfry.conf' \
                ':!deploy/relay/policy/chi-scrive.py' \
                ':!deploy/relay/router.conf' \
-               | grep -a '^+' | grep -aE "$FORMA_HEX" ; then
+               | grep -a '^+' | sed -E "$CARTONE_HEX" \
+               | grep -aE "$FORMA_HEX" ; then
             echo "::error::Una chiave esadecimale nuda e' passata dalla repo: va RUOTATA"
             exit 1
           fi

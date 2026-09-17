@@ -525,7 +525,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   stessa cifra in ogni momento del giro.
   1) IL SEGRETO, generato sul PC: `python -c "import secrets;
   print(secrets.token_urlsafe(32))"`. Va in DUE posti e in nessun
-  altro: `P2P_SCONTO_SEGRETO = "..."` nel `config.py` del VPS, e
+  altro: la riga `P2P_SCONTO_SEGRETO` nel `config.py` del VPS, e
   `BARATTOLO_SCONTO_SEGRETO` nel compose del nodo. Mai nel canale
   Telegram del nodo.
   2) SUL NODO, il fork: `cd ~/nodo/mostro-src`, branch
