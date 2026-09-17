@@ -40076,9 +40076,17 @@ def prove_p2p_libro():
     # `rigaTettoFeeP2P` — che senza nessuno dei due numeri non nasce
     # affatto. La domanda e' la stessa: il foglio tace su quel che il
     # coordinator non ha detto.
+    # EMENDATA ANCORA (17 set 2026, il tetto sotto il campo): la
+    # lettura di `maxSats` e' uscita in un giudice suo — la dice anche
+    # la scritta piccola sotto l'importo — quindi la guardia del tetto
+    # sta LI', e la riga la chiama. Le tre domande restano le stesse:
+    # senza tetto niente tetto, senza fee niente fee, e senza nessuno
+    # dei due niente riga.
     _rtf = pezzo_js(mini, "function rigaTettoFeeP2P(){", "\n}\n")
+    _max = pezzo_js(mini, "function maxSatsTestoP2P(){", "\n}\n")
     prova("...e il foglio del nuovo ordine tace su quel che non sa", True,
-          "if (max > 0)" in _rtf and "if (fee > 0) {" in _rtf
+          "max > 0 ?" in _max and "const tetto = maxSatsTestoP2P();" in _rtf
+          and "if (tetto)" in _rtf and "if (fee > 0) {" in _rtf
           and "if (!pezzi.length) return '';" in _rtf)
 
     # --- 7) IL BANCO NODE: il parser GIRA ------------------------------
@@ -48087,7 +48095,8 @@ def prove_p2p_pubblica():
         # uscirebbe a schermo con la sentinella verde
         "function rigaTettoFeeP2P(){",
         "function articoloPercentoP2P(testo){",
-        "function riquadroPrimaP2P(){"))
+        "function maxSatsTestoP2P(){",
+        "function riquadroLimitiP2P(){"))
     # --- 8b) LA RIGA SOTTO L'IMPORTO (17 set 2026, ritocco di Andrea)
     # Le due righe lunghe in fondo al foglio — «Si accettano ordini
     # fino a…» e «La commissione è…» — dicevano due numeri che servono
@@ -48096,49 +48105,67 @@ def prove_p2p_pubblica():
     # riguarda. E LA PERCENTUALE E' LA META', che prima non lo era: la
     # riga vecchia diceva la fee INTERA del coordinatore, cioe' il
     # DOPPIO di quel che paga chi legge.
-    # EMENDATA la sera del 17 set 2026 (ritocco di Andrea): la riga
-    # non e' piu' nuda fra le scatole, sta dentro una SCATOLA sua —
-    # stessa forma delle altre — e al montaggio arriva da li'.
-    prova("il riquadro sta sotto quello dell'importo", True,
-          "valuta + importo + riquadroPrimaP2P() + metodi" in mini)
-    _riq = pezzo_js(mini, "function riquadroPrimaP2P(){", "\n}\n")
-    prova("...ed e' la scatola delle altre, senza icona", True,
-          "return sezioneNuovoP2P({" in _riq and "ico: ''," in _riq
-          and "titolo: 'Prima di pubblicare'," in _riq)
-    prova("...e porta dentro la riga dei due numeri", True,
-          "corpo: rigaTettoFeeP2P()" in _riq)
-    # ⚠️ L'AVVISO CHE LE PARTI SI VEDONO NON SI E' PERSO (17 set 2026):
-    # stava in fondo al foglio, sotto tutto, e il fondo adesso e'
-    # pulito. E' salito nel riquadro, che e' dove si sanno le cose
-    # PRIMA del gesto — l'unico requisito vero, che dirlo dopo sarebbe
-    # dirlo a cose fatte (vedi CANTIERI, «Le parti si vedono»).
-    prova("l'avviso che le due parti si vedono non si e' perso", True,
-          "Appena qualcuno lo prende <b>vi vedete</b>" in _riq)
-    # ⚠️ SI GUARDA IL FOGLIO SENZA I COMMENTI, che qui sopra le due
-    # righe vecchie sono NOMINATE per spiegare cosa se n'e' andato —
-    # e una sentinella che legge la spiegazione risponde per il
-    # vicino (la trappola gia' pagata tre volte in due giorni).
+    # EMENDATA DUE VOLTE IL 17 set 2026 (ritocchi di Andrea): prima la
+    # riga e' diventata una SCATOLA — stessa forma delle altre — poi la
+    # scatola e' scesa all'ULTIMO posto, sotto il Premio, e il TETTO e'
+    # salito sotto il campo dell'importo, dove serve mentre si scrive.
+    # ⚠️ SI GUARDA IL FOGLIO SENZA I COMMENTI, che qui dentro i posti
+    # vecchi sono NOMINATI per raccontare il giro — e una sentinella
+    # che legge la spiegazione risponde per il vicino (la trappola
+    # gia' pagata tre volte in due giorni).
     _foglio = re.sub(r"/\*[\s\S]*?\*/", "",
                      pezzo_js(mini, "function renderNuovoOrdineP2P(){",
                               "\n}\n"))
-    prova("...e le due righe lunghe in fondo non ci sono piu'", False,
+    # L'ORDINE DELLE SCATOLE STA IN UNA SENTINELLA SOLA, e dice tre
+    # cose insieme: quali sono, in che ordine, e che sotto l'ultima
+    # c'e' soltanto il bottone.
+    prova("l'ordine delle scatole, e il bottone sotto l'ultima", True,
+          "valuta + importo + metodi + scontrino + tipo + quanti + premio"
+          " + riquadroLimitiP2P() + '<div class=\"foglio-piede sola\">'"
+          in re.sub(r"\s+", " ", _foglio))
+    _riq = pezzo_js(mini, "function riquadroLimitiP2P(){", "\n}\n")
+    prova("la scatola e' quella delle altre, senza icona", True,
+          "sezioneNuovoP2P({" in _riq and "ico: ''," in _riq)
+    # IL TITOLO E' CAMBIATO COL CONTENUTO: era «Prima di pubblicare»,
+    # che prometteva un elenco di cose da sapere, e con una riga sola
+    # dentro consegnerebbe un tetto e un prezzo. Il titolo dice quel
+    # che c'e'.
+    prova("...col titolo che dice quel che c'e' dentro", True,
+          "titolo: 'Quanto si può, e quanto costa'," in _riq)
+    prova("...e dentro c'e' la SOLA riga dei due numeri", True,
+          "const riga = rigaTettoFeeP2P();" in _riq
+          and "corpo: riga}) : '';" in _riq)
+    # SENZA LA RIGA NON NASCE: una scatola vuota col solo titolo
+    # direbbe che qualcosa manca.
+    prova("...e senza la riga la scatola non nasce affatto", True,
+          "return riga ? sezioneNuovoP2P({" in _riq)
+    prova("le due righe lunghe di ieri non ci sono piu'", False,
           "Si accettano ordini fino a" in _foglio
           or "La commissione è" in _foglio)
-    # IL FONDO DEL FOGLIO E' PULITO (17 set 2026, decisione di Andrea):
-    # sotto le scatole solo il bottone che pubblica. Qui stavano due
-    # righe sciolte — la rassicurazione sul ritiro (che si fa dalla
-    # pagina dello scambio, e lo dice li') e l'avviso delle parti che
-    # si vedono (salito nel riquadro). Una riga grigia sopra un
-    # bottone arancione e' quel che si legge per ultimo e si ricorda
-    # per primo, e nessuna delle due meritava quel posto.
-    prova("la riga sul ritiro in fondo non c'e' piu'", False,
+    prova("...e nemmeno la riga sul ritiro in fondo", False,
           "Finché nessuno lo prende" in _foglio
           or "Gli euro viaggiano fra voi due" in _foglio)
-    prova("...e nemmeno l'avviso, che e' salito nel riquadro", False,
-          "Appena qualcuno lo prende" in _foglio)
-    prova("...e sotto le scatole c'e' SOLO il bottone", True,
-          "+ quanti + premio + '<div class=\"foglio-piede sola\">'"
-          in re.sub(r"\s+", " ", _foglio))
+    # ⚠️ E «VI VEDETE» NON STA PIU' IN QUESTO FOGLIO, da nessuna parte
+    # — decisione di Andrea, e la sentinella esiste perche' non torni
+    # per sbaglio: quell'informazione vive nella pagina «I tuoi dati»
+    # e nel foglio di chi PRENDE un ordine, che sono i due posti dove
+    # resta. Qui era la terza copia, sul gesto in cui pesava di meno.
+    # Si guarda TUTTO il foglio — le sezioni, la riga, la scatola — e
+    # non il solo montaggio.
+    prova("«vi vedete» non compare in NESSUN pezzo del foglio", False,
+          "vi vedete" in re.sub(r"/\*[\s\S]*?\*/", "", nuovo).lower()
+          or "vi vedete" in _foglio.lower())
+    # IL TETTO SOTTO IL CAMPO (17 set 2026): la scritta piccola dove si
+    # sta scrivendo la cifra. Le due letture — questa e il riepilogo
+    # della scatola — vengono dallo STESSO giudice, o un giorno
+    # direbbero due cifre nello stesso foglio.
+    prova("sotto il campo dell'importo c'e' il tetto", True,
+          '\'<div class="hint">max \' + maxSatsTestoP2P()' in _foglio)
+    prova("...e il tetto ha un giudice solo, per i due posti", 1,
+          mini.count("Number(p2pInfo.maxSats) || 0"))
+    prova("...che la riga della scatola CHIAMA invece di rileggere",
+          True, "const tetto = maxSatsTestoP2P();"
+          in pezzo_js(mini, "function rigaTettoFeeP2P(){", "\n}\n"))
     prova("la quota di chi legge ha un giudice solo", 1,
           mini.count("(n * 50).toLocaleString("))
     prova("...e il conto lo chiama invece di ribattere la formula",
@@ -49448,7 +49475,8 @@ def prove_p2p_pubblica():
         # ...e la scatola che la contiene (17 set 2026): `esc` non
         # serve, che `porta` qui non c'e' e `ico` e' vuoto
         + "\n" + _intera("function sezioneNuovoP2P(o){")
-        + "\n" + _intera("function riquadroPrimaP2P(){")
+        + "\n" + _intera("function maxSatsTestoP2P(){")
+        + "\n" + _intera("function riquadroLimitiP2P(){")
         + "\nconst out = {};\n"
         # il caso di oggi sul nodo: tetto 500 000, fee 2% -> 1% a testa
         "p2pInfo = {maxSats: 500000, fee: 0.02};\n"
@@ -49477,9 +49505,15 @@ def prove_p2p_pubblica():
         # numeri cade da sola e resta l'avviso, che e' vero comunque —
         # un riquadro che sparisce porterebbe via anche quello.
         "p2pInfo = {maxSats: 500000, fee: 0.02};\n"
-        "out.scatola = riquadroPrimaP2P();\n"
+        "out.scatola = riquadroLimitiP2P();\n"
+        "out.max = maxSatsTestoP2P();\n"
+        # SENZA TETTO la scritta sotto il campo non c'e', e la scatola
+        # resta col solo prezzo: i due pezzi cadono uno per uno
+        "p2pInfo = {maxSats: 0, fee: 0.02};\n"
+        "out.maxMuto = maxSatsTestoP2P();\n"
+        "out.scatolaSenzaTetto = riquadroLimitiP2P();\n"
         "p2pInfo = null;\n"
-        "out.scatolaMuta = riquadroPrimaP2P();\n"
+        "out.scatolaMuta = riquadroLimitiP2P();\n"
         "console.log(JSON.stringify(out));\n")
     f8 = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
                                 encoding="utf-8")
@@ -49513,16 +49547,21 @@ def prove_p2p_pubblica():
            "dell'", "dell'"], o8["articoli"])
     prova("la scatola ha il vestito delle altre e il suo titolo", True,
           o8["scatola"].startswith('<div class="p2p-sez">')
-          and "<div class=\"p2p-sez-tit\"><span>Prima di pubblicare</span>"
-          in o8["scatola"])
-    prova("...e dentro ci stanno i due numeri e l'avviso", [True, True],
+          and "<div class=\"p2p-sez-tit\"><span>Quanto si pu\u00f2, e "
+              "quanto costa</span>" in o8["scatola"])
+    prova("...e dentro c'e' la sola riga dei due numeri", [True, False],
           ["fino a 500\u202f000 sats" in o8["scatola"],
            "vi vedete" in o8["scatola"]])
-    prova("...e senza impostazioni la scatola RESTA, con l'avviso",
-          [True, True, True],
-          [o8["scatolaMuta"].startswith('<div class="p2p-sez">'),
-           "vi vedete" in o8["scatolaMuta"],
-           "ordini fino a" not in o8["scatolaMuta"]])
+    prova("il tetto sotto il campo e' il numero vivo",
+          "500\u202f000 sats", o8["max"])
+    prova("...e senza tetto non c'e' scritta, e la scatola resta col prezzo",
+          ["", True, True],
+          [o8["maxMuto"],
+           o8["scatolaSenzaTetto"].startswith('<div class="p2p-sez">'),
+           "commissione" in o8["scatolaSenzaTetto"]
+           and "ordini fino a" not in o8["scatolaSenzaTetto"]])
+    prova("...e senza impostazioni la scatola non nasce affatto",
+          "", o8["scatolaMuta"])
 
     # I) LA NOTA DEL PREMIO COMINCIA DAL GESTO (17 set 2026, richiesta
     #    di Andrea). Cominciava con «Sopra il mercato:», cioe' dalla

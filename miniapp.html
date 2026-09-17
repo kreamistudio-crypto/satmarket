@@ -43892,6 +43892,20 @@ function ordineDaRigaP2P(o){
     premio: o.premium || 0
   }, o.lato);
 }
+/* IL TETTO SOTTO IL CAMPO (17 set 2026, ritocco di Andrea): la
+   scritta piccola «max 500 000 sats» sotto l'importo, dove si sta
+   scrivendo la cifra. Numero VIVO dal 38385 come ovunque, e senza
+   38385 non c'e' scritta — mai un tetto inventato.
+   ⚠️ E IL NUMERO E' IN SATS MENTRE IL CAMPO E' IN EURO, che e' una
+   stranezza VERA e non un refuso: il tetto lo mette il coordinatore
+   sull'importo in sats (`max_order_amount` del 38385), e a euro non
+   si traduce — dipende dal cambio del momento in cui qualcuno prende.
+   Dire «max 500 000 sats» e' quel che si sa; convertirlo sarebbe
+   inventare una soglia in euro che il coordinatore non applica. */
+function maxSatsTestoP2P(){
+  const max = p2pInfo ? (Number(p2pInfo.maxSats) || 0) : 0;
+  return max > 0 ? fmt(max) + ' sats' : '';
+}
 /* ---- LA RIGA DEL TETTO E DELLA COMMISSIONE (17 set 2026, ritocco
    di Andrea) ----
    Stava in fondo al foglio, in due righe lunghe, e i numeri servono
@@ -43909,9 +43923,12 @@ function ordineDaRigaP2P(o){
    «gratis». */
 function rigaTettoFeeP2P(){
   const pezzi = [];
-  const max = p2pInfo ? (Number(p2pInfo.maxSats) || 0) : 0;
-  if (max > 0)
-    pezzi.push('al momento si accettano ordini fino a ' + fmt(max) + ' sats');
+  /* il tetto lo legge il giudice di sopra, che lo dice anche sotto il
+     campo: due letture dello stesso numero si scollano, e a scoprirlo
+     sarebbe chi legge due cifre diverse nello stesso foglio */
+  const tetto = maxSatsTestoP2P();
+  if (tetto)
+    pezzi.push('al momento si accettano ordini fino a ' + tetto);
   const fee = commissioneVivaP2P();
   if (fee > 0) {
     const q = mezzaCommissioneP2P(fee);
@@ -43945,37 +43962,34 @@ function articoloPercentoP2P(testo){
       || (intero >= 80 && intero <= 89)) return 'dell\'';
   return 'del ';
 }
-/* ---- IL RIQUADRO «PRIMA DI PUBBLICARE» (17 set 2026, ritocco di
-   Andrea) ----
-   Le due cose che si sanno PRIMA del gesto, e che non sono un campo da
-   riempire: quanto si puo' chiedere e quanto costa, e che appena
-   qualcuno prende l'ordine le due parti si vedono.
-   ⚠️ E' UN RIQUADRO E NON PIU' DUE RIGHE NUDE: la stessa scatola delle
-   altre — `sezioneNuovoP2P`, cioe' lo stesso fondo, gli stessi angoli,
-   lo stesso respiro — perche' una riga sciolta in mezzo a cinque
-   scatole si legge come uno scarto del montaggio invece che come una
-   cosa che qualcuno ha voluto dire. SENZA ICONA, come il Premio: un
-   cerchio tondo qui vorrebbe un glifo nuovo e una tinta nuova per
-   dire quel che il titolo dice gia'.
-   ⚠️ E L'AVVISO CHE LE PARTI SI VEDONO E' FINITO QUI DENTRO, che e' la
-   parte da non perdere: stava in fondo al foglio, sotto tutto, e il
-   fondo adesso e' pulito per decisione di Andrea — sotto le scatole
-   solo il bottone. Accanto al bottone sarebbe tornata una riga
-   sciolta, cioe' proprio la cosa che questo ritocco toglie; qui dentro
-   sta col suo simile — l'altra cosa che si sa prima del gesto — e
-   soprattutto sta PRIMA, che e' l'unico requisito vero (vedi CANTIERI,
-   «Le parti si vedono»: dirlo dopo sarebbe dirlo a cose fatte).
-   LA SCATOLA C'E' SEMPRE, anche senza il 38385: la riga dei numeri
-   cade da sola e resta l'avviso, che e' vero comunque. */
-function riquadroPrimaP2P(){
-  return sezioneNuovoP2P({
-    ico: '', titolo: 'Prima di pubblicare',
-    corpo: rigaTettoFeeP2P()
-      + '<div class="hint">👤 Appena qualcuno lo prende <b>vi vedete</b>: '
-      + 'tu e chi lo prende vedrete il profilo l\'uno dell\'altra — nome, '
-      + 'foto, stelline e livello, gli stessi del mercatino — e i bottoni '
-      + 'per scrivervi.</div>'
-  });
+/* ---- IL RIQUADRO «QUANTO SI PUO', E QUANTO COSTA» (17 set 2026,
+   ritocco di Andrea) ----
+   Le due cose che non sono un campo da riempire: quanto si puo'
+   chiedere, e quanto costa. La stessa scatola delle altre —
+   `sezioneNuovoP2P`, cioe' lo stesso fondo, gli stessi angoli, lo
+   stesso respiro — perche' una riga sciolta in mezzo a cinque scatole
+   si legge come uno scarto del montaggio invece che come una cosa che
+   qualcuno ha voluto dire. SENZA ICONA, come il Premio: un cerchio
+   tondo qui vorrebbe un glifo nuovo e una tinta nuova per dire quel
+   che il titolo dice gia'.
+   ⚠️ IL TITOLO E' CAMBIATO COL CONTENUTO, e non e' cosmesi: era
+   «Prima di pubblicare», che prometteva un elenco di cose da sapere e
+   adesso consegnerebbe una riga di numeri. Il titolo dice quel che
+   c'e' dentro, e con una riga sola quel che c'e' dentro e' un tetto e
+   un prezzo.
+   ⚠️ E L'AVVISO CHE LE PARTI SI VEDONO NON C'E' PIU', NE' QUI NE'
+   ALTROVE IN QUESTO FOGLIO — decisione di Andrea, e sta scritta
+   perche' non torni per sbaglio: quell'informazione vive nella pagina
+   «I tuoi dati» e nel foglio di chi PRENDE un ordine, che sono i due
+   posti dove resta. Qui era la terza copia, sul gesto in cui pesava
+   di meno. C'e' una sentinella che la tiene fuori dall'intero foglio.
+   LA SCATOLA CADE COL SILENZIO DEL COORDINATORE: senza il 38385 la
+   riga dei numeri non nasce, e una scatola vuota col solo titolo
+   direbbe che qualcosa manca. Niente riga, niente scatola. */
+function riquadroLimitiP2P(){
+  const riga = rigaTettoFeeP2P();
+  return riga ? sezioneNuovoP2P({
+    ico: '', titolo: 'Quanto si può, e quanto costa', corpo: riga}) : '';
 }
 function renderNuovoOrdineP2P(){
   const box = el('p2pNuovoCorpo');
@@ -44031,6 +44045,14 @@ function renderNuovoOrdineP2P(){
         'onbeforeinput="soloCifreP2P(event)" ' +
         'oninput="cambiaCampoNuovoP2P()" aria-label="Importo massimo">') +
       '</div>' +
+      /* IL TETTO SOTTO IL CAMPO (17 set 2026, ritocco di Andrea): la
+         scritta piccola sta qui e non nel riquadro in fondo, perche'
+         serve MENTRE si scrive la cifra. Il riquadro in fondo lo
+         ripete per esteso insieme alla commissione, ed e' un
+         riepilogo: le due letture vengono dallo STESSO giudice
+         (`maxSatsTestoP2P`), o un giorno direbbero due cifre. */
+      (maxSatsTestoP2P()
+        ? '<div class="hint">max ' + maxSatsTestoP2P() + '</div>' : '') +
       (tab
         ? '<div class="hint">Col tabacchino l\'importo è uno solo, quello dell\'ordine Amazon: niente intervallo.</div>'
         : p2pNuovoFisso
@@ -44172,15 +44194,23 @@ function renderNuovoOrdineP2P(){
        lunghe in fondo al foglio — «Si accettano ordini fino a…» e «La
        commissione è…» — cioe' due numeri che servono mentre si SCRIVE
        la cifra, messi dopo il punto in cui la cifra e' gia' scritta.
-       Adesso sono una riga sola sotto il riquadro che li riguarda —
-       e dal ritocco della sera, dentro una SCATOLA sua invece che
-       sciolta fra le altre (vedi `riquadroPrimaP2P`).
+       Adesso e' una riga sola dentro una SCATOLA sua
+       (`riquadroLimitiP2P`), e la scatola sta per ULTIMA — sotto il
+       Premio, appena sopra il bottone.
+       ⚠️ E' IL TERZO POSTO IN UN GIORNO, e il giro ha un senso: in
+       fondo al foglio (due righe sciolte, che nessuno leggeva), sotto
+       l'importo (dove i numeri servono mentre si scrive), e infine in
+       fondo di nuovo — ma stavolta come SCATOLA e non come riga, con
+       il tetto salito sotto il campo dell'importo (vedi
+       `maxSatsTestoP2P`). Cioe': il numero che serve MENTRE si scrive
+       sta accanto al campo, e il riepilogo di tetto e prezzo sta
+       dov'e' naturale rileggerlo — subito prima di premere.
        E LA PERCENTUALE E' LA META', che prima non lo era: la riga
        vecchia diceva la fee INTERA del coordinatore, cioe' il doppio
        di quel che paga chi legge — «per parte» non e' una precisazione
        ma la correzione di un numero che diceva il doppio. */
-    valuta + importo + riquadroPrimaP2P() + metodi + scontrino + tipo
-    + quanti + premio +
+    valuta + importo + metodi + scontrino + tipo
+    + quanti + premio + riquadroLimitiP2P() +
     /* ⚠️ SOTTO LE SCATOLE NON C'E' PIU' NIENTE (17 set 2026,
        decisione di Andrea): qui stavano due righe sciolte — «Finche'
        nessuno lo prende puoi ritirarlo quando vuoi…» e l'avviso che le
