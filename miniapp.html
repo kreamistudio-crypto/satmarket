@@ -43290,13 +43290,6 @@ function renderIncassoP2P(){
     (netto > 0
       ? '<button class="btn primary" type="button" onclick="copiaLink(\'' + netto + '\', \'📋 Cifra copiata\')">📋 Copia la cifra: ' + esc(fmt(netto)) + '</button>'
       : '') +
-    /* LE FATTURE CHE MUOIONO PRIMA DEL RILASCIO (17 set 2026, lo
-       scambio 3fcdb207): la fattura si da' ALL'INIZIO e si paga alla
-       FINE, quando chi vende libera — ore dopo, a volte giorni. La
-       guardia qui sotto pretende solo la finestra del coordinatore
-       (un'ora), e una fattura da poche ore la passa e muore lo stesso. */
-    '<div class="hint">⏳ <b>Usi Wallet of Satoshi?</b> Le sue richieste scadono presto, e in uno scambio lungo muoiono prima che i sats vengano liberati: il pagamento fallisce e va rifatto. '
-      + 'Meglio una richiesta <b>senza importo</b>, o un wallet che lasci scegliere una <b>scadenza lunga</b> (un giorno o più).</div>' +
     '<div class="field"><label>Dove vuoi ricevere i sats</label>' +
       '<input type="text" id="p2pIncassoInp" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="lnbc… oppure tuonome@wallet.com"></div>' +
     '<div class="hint">In alternativa puoi scrivere il tuo indirizzo Lightning (quello che finisce per @qualcosa). ' +

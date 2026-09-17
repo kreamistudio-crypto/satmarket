@@ -46668,8 +46668,7 @@ function reset(){
   toasts = [];
   for (const k of [2, 4, 0, 3, 1, 4]) await spedisci(SEQ[k]);
   out.fnReplay = [ordiniP2P()[FN].stato, toasts.length];
-  /* IL FOGLIO: la cifra, la copia, il perche' — e l'avviso sulle
-     fatture che scadono, che vale anche la prima volta */
+  /* IL FOGLIO: la cifra, la copia, il perche' */
   p2pOrdineAperto = FN;
   apriIncassoP2P();
   {
@@ -46679,9 +46678,6 @@ function reset(){
       && h.indexOf("copiaLink('14837'") >= 0
       && h.indexOf('non ha trovato una strada') >= 0
       && h.toLowerCase().indexOf('stanno arrivando') < 0;
-    out.fnFoglioWos = h.indexOf('Usi Wallet of Satoshi?') >= 0
-      && h.indexOf('scadono presto') >= 0 && h.indexOf('<b>scadenza lunga</b>') >= 0
-      && h.indexOf('Usi Wallet of Satoshi?') < h.indexOf('id="p2pIncassoInp"');
     out.fnTitolo = nodi.p2pIncassoTit ? nodi.p2pIncassoTit.textContent : '(nessun titolo)';
   }
   /* la fattura nuova parte, e la risposta e' `invoice-updated`: torna
@@ -46788,7 +46784,6 @@ function reset(){
         "fnReplay": ("la riapertura: i messaggi ripetuti alla rinfusa non muovono niente e non risuonano",
                      ["fattura_nuova", 0]),
         "fnFoglio": "IL FOGLIO dice che il pagamento non e' riuscito, il perche', la cifra 14.837 e la sua copia",
-        "fnFoglioWos": "...e avvisa chi usa Wallet of Satoshi, PRIMA del campo: senza importo, o scadenza lunga",
         "fnTitolo": ("...col titolo suo", "⚡ Una fattura nuova"),
         "fnMandata": "la fattura nuova parte come `add-invoice` su quello scambio",
         "fnDopoInvio": ("...e l'`invoice-updated` di risposta riporta a «in pagamento», mai a «manda gli euro»", "rilasciato"),
