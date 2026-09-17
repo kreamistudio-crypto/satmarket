@@ -18608,3 +18608,84 @@ nostro. Se «copia incompleta», c'era una copia stantia appesa al timbro
 P2P resta dietro `P2P_PROVA_IDS`: chi scarica l'app oggi non arriva a
 quel muro, ma la STESSA libreria serve il **login Nostr** e la modifica
 firmata degli annunci importati, che sono pubblici.
+
+## Due ritocchi al foglio «Pubblica»: i numeri dove servono, e la frase che dice il gesto (17 set 2026)
+
+**LA RIGA DEL TETTO E DELLA COMMISSIONE SCENDE SOTTO L'IMPORTO.** In
+fondo al foglio c'erano due righe lunghe — «Si accettano ordini fino a
+… sats.» e «La commissione è …%.» — cioè due numeri che servono *mentre
+si scrive la cifra*, messi dopo il punto in cui la cifra è già scritta.
+Diventano una riga sola, discreta, sotto il riquadro dell'importo:
+«Al momento si accettano ordini fino a 500 000 sats — la commissione di
+Barattolo è dell'1% per parte».
+
+⚠️ **E LA PERCENTUALE È LA METÀ, che prima non lo era.** La riga
+vecchia diceva la fee INTERA del coordinatore (2%), cioè **il doppio di
+quel che paga chi legge**: la fee si spartisce metà a testa — chi compra
+riceve `amount − metà`, chi vende blocca `amount + metà`, letto sui
+numeri del primo scambio vero. «Per parte» non è una precisazione
+aggiunta: è la correzione di un numero che diceva il doppio.
+
+**UN GIUDICE SOLO, `mezzaCommissioneP2P`.** La quota di chi legge la
+dicono ora due posti — la riga «Fee Barattolo» del conto e questa — e
+due formule sullo stesso numero si scollano senza rompere niente: un
+verde su un numero sbagliato non fa fallire nessuna prova, lo legge
+solo chi sta per pubblicare. Il conto lo CHIAMA invece di ribattere
+`fee * 50`. Nessuno dei due numeri è battuto a mano: il tetto è
+`maxSats` del 38385 e la percentuale è la metà della `fee` viva, quindi
+il giorno che la fee cambia sul nodo la riga cambia da sola. E ogni
+pezzo cade da solo: senza 38385 la riga non nasce affatto — mai uno
+zero, che direbbe «gratis», mai un tetto inventato.
+
+⚠️ **E L'ARTICOLO CAMBIA COL NUMERO,** che è la parte che si sarebbe
+scoperta solo il giorno della fee nuova: «dell'1%» ma «del 2%», perché
+«uno» comincia per vocale e «due» no — e «dello 0,5%». Scritto fisso, il
+foglio avrebbe detto «dell'2%»: il numero vivo dentro una prosa morta.
+Il giudice è `articoloPercentoP2P`, che legge il numero come si
+PRONUNCIA (`parseInt` si ferma alla virgola, quindi «1,5» legge uno e
+«0,5» legge zero) e copre quel che può capitare a una commissione — lo
+zero virgola, l'uno, l'otto, l'undici, gli ottanta. Sopra il centinaio
+una commissione non esiste, e lì non si finge di sapere.
+
+**LA NOTA DEL PREMIO COMINCIA DAL GESTO E NON DALLA CONSEGUENZA.**
+Cominciava con «Sopra il mercato:», cioè da quel che *succede*, e chi
+legge doveva ricavarsi da solo di quale gesto si parlasse — proprio
+mentre muoveva il cursore. Adesso comincia da quel che sta facendo:
+**il verbo segue il LATO** (comprare/vendere), **la direzione segue il
+SEGNO** (sopra/sotto), e la coda è la frase di prima, parola per parola.
+La vecchia testa non si è persa e non si è sdoppiata: è *salita*
+nell'apertura, che la dice meglio — «sotto al prezzo di mercato»
+attaccato al gesto invece che sospeso. A premio zero l'apertura si
+adatta invece di sparire («al prezzo di mercato: quello del momento in
+cui qualcuno prende l'offerta»), perché anche restare a mercato è una
+scelta e va detta dal verso di chi la sta facendo.
+
+Le cinque frasi, per intero:
+- **vendi−** «Vuoi vendere Bitcoin sotto al prezzo di mercato: consegni
+  **più** sats per gli stessi euro. Un ordine più appetibile per chi
+  compra.»
+- **vendi+** «Vuoi vendere Bitcoin sopra al prezzo di mercato: consegni
+  **meno** sats per gli stessi euro. Conviene a te, meno a chi compra.»
+- **compra−** «Vuoi comprare Bitcoin sotto al prezzo di mercato: chi
+  vende consegna **più** sats per i tuoi euro. Conviene a te, meno a chi
+  vende.»
+- **compra+** «Vuoi comprare Bitcoin sopra al prezzo di mercato: chi
+  vende riceve i tuoi euro e consegna **meno** sats. Un ordine più
+  appetibile per chi vende.»
+- **zero** «Vuoi vendere/comprare Bitcoin al prezzo di mercato: quello
+  del momento in cui qualcuno prende l'offerta.»
+
+**LE PROVE** girano i due pezzi invece di guardarli: la riga con le
+impostazioni del coordinator che cambiano sotto (2% → «dell'1%», 4% →
+«del 2%», 3% → «dell'1,5%», 1% → «dello 0,5%», un pezzo solo, nessun
+pezzo), gli otto articoli uno per uno, e le cinque note col **giro
+incrociato** — verbo dal lato e direzione dal segno, che è l'unico modo
+di vedere che non si sono scambiati. Più tre sentinelle: la riga sta
+sotto l'importo, le due righe lunghe non ci sono più (**guardando il
+foglio senza i commenti**, che qui sopra le nominano per spiegare cosa
+se n'è andato), e la quota di chi legge ha un giudice solo.
+
+⚠️ **E IL GIUDICE NUOVO VA IN DUE BANCHI, non in uno**: `contoDettP2P`
+lo gira sia il banco del dettaglio sia quello del motore, e il secondo
+è esploso su `mezzaCommissioneP2P is not defined` — la trappola dei DUE
+RITAGLI, trovata dal giro intero e non dalle prove del cantiere.

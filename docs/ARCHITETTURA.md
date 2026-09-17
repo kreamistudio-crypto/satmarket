@@ -25051,6 +25051,27 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `campoArriva` accetta un `contatto` da un'app di ieri; a cambiare è
   `inviaCampoP2P`, che scrive il solo `euro`. Il verbale: CANTIERI,
   «Le parti si vedono».
+- LA QUOTA DI CHI LEGGE HA UN GIUDICE SOLO (17 set 2026):
+  `mezzaCommissioneP2P(fee)` — la fee del coordinatore si spartisce
+  metà a testa, quindi la percentuale da mostrare a una persona è la
+  METÀ della `fee` viva, mai il totale. La chiamano la riga «Fee
+  Barattolo» del conto (`contoDettP2P`) e la riga sotto l'importo del
+  foglio «Pubblica»; esce testo già all'italiana e senza il segno di
+  percento, che in un posto sta dentro un `<b>` e nell'altro no.
+  LA RIGA SOTTO L'IMPORTO è `rigaTettoFeeP2P()`, e sta fra il riquadro
+  dell'importo e quello dei metodi: «Al momento si accettano ordini
+  fino a N sats — la commissione di Barattolo è dell'1% per parte».
+  Prima erano due righe lunghe in fondo al foglio, e la percentuale
+  era quella INTERA — cioè il doppio di quel che paga chi legge. Tetto
+  da `maxSats` del 38385, percentuale dalla metà della fee viva: senza
+  38385 la riga non nasce, con uno solo dei due dice quello.
+  ⚠️ L'ARTICOLO LO DECIDE `articoloPercentoP2P`, dal numero come si
+  PRONUNCIA: «dell'1%», «del 2%», «dello 0,5%». Fisso, il giorno della
+  fee nuova il foglio direbbe «dell'2%».
+  LA NOTA DEL PREMIO (`premioNotaP2P`) comincia dal GESTO: verbo dal
+  lato, direzione dal segno, e la coda è la frase di sempre — «Vuoi
+  vendere Bitcoin sotto al prezzo di mercato: consegni più sats…». Il
+  verbale: CANTIERI, «Due ritocchi al foglio Pubblica».
 - LE ROTTE PUBBLICHE, l'elenco per intero (la regola ferrea 3 in
   CLAUDE.md tiene il divieto — mai StaticFiles su una directory — e le
   due sentinelle; l'elenco sta qui perché cresce a ogni cantiere, e a
