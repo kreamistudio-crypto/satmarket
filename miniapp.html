@@ -42666,7 +42666,14 @@ function apriIncassoP2P(){
   el('sheetBg').classList.add('open');
   el('p2pIncassoSheet').classList.add('open');
   const c = el('p2pIncassoInp');
-  if (c) { c.value = myLnAddress || ''; setTimeout(() => { try { c.focus({preventScroll: true}); } catch(e){} }, 60); }
+  /* IL CAMPO NASCE VUOTO (17 set 2026): fino a ieri si precompilava con
+     l'indirizzo degli incassi automatici, cioe' con la via che adesso
+     e' la seconda — e chi ha salvato un Wallet of Satoshi se lo trovava
+     pronto da inviare verso un rifiuto certo. `myLnAddress` e' SEMPRE
+     un indirizzo (una fattura negli incassi non esiste), quindi non c'e'
+     niente da precompilare: l'indirizzo resta a un tocco, sotto il suo
+     avviso — vedi `usaIndirizzoSalvatoP2P`. */
+  if (c) { c.value = ''; setTimeout(() => { try { c.focus({preventScroll: true}); } catch(e){} }, 60); }
   /* col wallet collegato la fattura la fa lui (16 set 2026): si chiede
      subito, e se non arriva il foglio a mano e' gia' sotto, con la
      ragione scritta */
@@ -42822,11 +42829,23 @@ function renderIncassoP2P(){
     '<div class="hint">In alternativa puoi scrivere il tuo indirizzo Lightning (quello che finisce per @qualcosa). ' +
       'Alcuni provider (per esempio Wallet of Satoshi) non rispondono alla verifica dell\'indirizzo: ' +
       'se il tuo indirizzo viene rifiutato, usa la fattura.</div>' +
+    /* la scorciatoia sta SOTTO l'avviso, che cosi' vale anche per lei;
+       l'indirizzo e' testo dell'utente: a schermo passa da esc(), e
+       nell'onclick non ci entra — lo rilegge la funzione */
     (myLnAddress
-      ? '<div class="hint">È l\'indirizzo dei tuoi incassi automatici: puoi cambiarlo solo per questo scambio.</div>'
+      ? '<button class="btn ghost" type="button" onclick="usaIndirizzoSalvatoP2P()">⚡ Usa l\'indirizzo dei tuoi incassi: '
+        + esc(myLnAddress) + '</button>'
       : '') +
     '<div class="hint" id="p2pIncassoAvviso" style="display:none"></div>' +
     '<button class="btn orange" id="p2pIncassoBtn" onclick="inviaIncassoP2P()">Invia</button>';
+}
+/* la scorciatoia SCRIVE nel campo e basta: a mandare resta «Invia»,
+   cosi' l'indirizzo si puo' ancora correggere per questo solo scambio */
+function usaIndirizzoSalvatoP2P(){
+  const c = el('p2pIncassoInp');
+  if (!c || !myLnAddress) return;
+  haptic();
+  c.value = myLnAddress;
 }
 /* IL «NO» SU UN INDIRIZZO NON E' IL «NO» SU UNA FATTURA (17 set 2026).
    PURA. Il coordinatore risponde `invalid-invoice` a tutt'e due —
@@ -42877,7 +42896,7 @@ async function inviaIncassoP2P(){
       const resta = Math.floor((b.scade - adesso) / 60);
       dillo((resta > 0 ? 'Questa richiesta scade fra ' + resta + ' minuti' : 'Questa richiesta è già scaduta')
         + ', e viene accettata solo se vale ancora più di ' + Math.ceil(finestra / 60)
-        + ' minuti quando arriva: quelle da un\'ora esatta non bastano. Rifalla con una scadenza più lunga, oppure usa il tuo indirizzo Lightning.');
+        + ' minuti quando arriva: quelle da un\'ora esatta non bastano. Rifalla con una scadenza più lunga, un giorno va benissimo: molti wallet la fanno scegliere nelle opzioni della richiesta, alla voce «Scadenza» (o «Expiry»).');
       return;
     }
   } else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(testo)) {

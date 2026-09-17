@@ -45422,8 +45422,26 @@ function reset(){
       && h.indexOf('se il tuo indirizzo viene rifiutato, usa la fattura') >= 0
       && h.indexOf('id="p2pIncassoInp"') < h.indexOf('Wallet of Satoshi');
     out.foglioNonDicePiuSemplice = h.indexOf('via più semplice') < 0;
-    out.foglioDiceDellAutoincasso = h.indexOf('incassi automatici') >= 0
-      && nodi.p2pIncassoInp.value === 'io@wallet.com';
+    /* IL CAMPO NASCE VUOTO (17 set 2026): l'indirizzo degli incassi non
+       si precompila piu' — sta a un tocco, SOTTO l'avviso sui provider,
+       e il tocco scrive nel campo senza mandare niente */
+    out.foglioCampoVuoto = nodi.p2pIncassoInp.value === '';
+    out.foglioScorciatoiaSottoLAvviso =
+      h.indexOf('onclick="usaIndirizzoSalvatoP2P()">⚡ Usa l\'indirizzo dei tuoi incassi: io@wallet.com</button>') >= 0
+      && h.indexOf('usa la fattura') < h.indexOf('usaIndirizzoSalvatoP2P()')
+      && h.indexOf("usaIndirizzoSalvatoP2P('") < 0;
+    usaIndirizzoSalvatoP2P();
+    out.foglioScorciatoiaScrive = nodi.p2pIncassoInp.value === 'io@wallet.com'
+      && ricevuti.length === 0;
+    {
+      const salvato = myLnAddress;
+      myLnAddress = '';
+      renderIncassoP2P();
+      out.foglioSenzaSalvatoNienteScorciatoia =
+        (nodi.p2pIncassoCorpo.innerHTML || '').indexOf('usaIndirizzoSalvatoP2P') < 0;
+      myLnAddress = salvato;
+      renderIncassoP2P();
+    }
   }
   /* LA FATTURA VERA DEL 16 SET: 7468 sats — fermata sulla cifra, e la
      ragione dice quella giusta (7543), mai il lordo */
@@ -45445,6 +45463,12 @@ function reset(){
   out.scadenzaCortaFermata = ricevuti.length === 0
     && /scade fra \d+ minuti/.test(String(nodi.p2pIncassoAvviso.textContent))
     && String(nodi.p2pIncassoAvviso.textContent).indexOf('60 minuti') >= 0;
+  /* ...e la cura che si dice e' RIFARE LA FATTURA, e come — mai piu'
+     l'indirizzo, che adesso e' la via che si rompe (17 set 2026) */
+  out.scadenzaCortaDiceCome =
+    String(nodi.p2pIncassoAvviso.textContent).indexOf('Rifalla con una scadenza più lunga') >= 0
+    && String(nodi.p2pIncassoAvviso.textContent).indexOf('«Scadenza»') >= 0
+    && String(nodi.p2pIncassoAvviso.textContent).toLowerCase().indexOf('indirizzo') < 0;
   /* la senza-importo non scavalca la scadenza: la regola e' sulla bolt11 */
   el('p2pIncassoInp').value = FATT.libera_1h;
   await inviaIncassoP2P();
@@ -46114,11 +46138,15 @@ function reset(){
         "foglioCopiaInEvidenza": "...con «Copia la cifra» in evidenza, e prima del campo",
         "foglioAvvisaSuiProvider": "...e l'indirizzo resta in alternativa, sotto il campo, con l'avviso sui provider",
         "foglioNonDicePiuSemplice": "...e nessuno dice piu' che l'indirizzo e' la via piu' semplice",
-        "foglioDiceDellAutoincasso": "...e l'indirizzo degli incassi automatici e' gia' scritto, e si puo' cambiare",
+        "foglioCampoVuoto": "...e il campo nasce VUOTO: l'indirizzo degli incassi non si precompila piu'",
+        "foglioScorciatoiaSottoLAvviso": "...resta a un tocco, sotto l'avviso sui provider, e mai dentro un onclick",
+        "foglioScorciatoiaScrive": "...e il tocco scrive nel campo senza mandare niente",
+        "foglioSenzaSalvatoNienteScorciatoia": "...e senza un indirizzo salvato la scorciatoia non c'e'",
         "importoStortoFermato": "la fattura vera del 16 set (7468) si ferma, e la ragione dice 7543",
         "nonChiedeIlLordo": "...mai il lordo",
         "laMetaDueVolteFermata": "...e 7468 con un giorno di vita si ferma lo stesso: era la meta' tolta due volte",
         "scadenzaCortaFermata": "la cifra giusta da un'ora ESATTA si ferma, coi minuti che restano",
+        "scadenzaCortaDiceCome": "...e la cura e' rifare la fattura piu' lunga, detto come — mai l'indirizzo",
         "liberaCortaFermata": "...e la senza-importo da un'ora pure: la regola e' sulla scadenza",
         "rottaNonSiLegge": "una bolt11 col checksum rotto non si legge, e lo dice",
         "testoStortoFermato": "...e nemmeno un testo che non e' ne' l'uno ne' l'altra",
