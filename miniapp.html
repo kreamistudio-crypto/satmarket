@@ -44004,6 +44004,19 @@ function valeNuovoOrdineP2P(v){
   if (!x.vuoto && !(max > euro))
     return {ok: false, manca: 'L\'importo massimo deve superare il primo',
             campo: 'p2pNuovoEuroMax'};
+  /* IL TETTO IN EURO DI BARATTOLO (set 2026): la leva P2P_MAX_EURO
+     del config, in busta con le leve — zero o assente = spento. Si
+     giudica QUI, sugli euro scritti, per TUTTI gli ordini: a prezzo
+     di mercato e' l'unico numero che c'e', e a prezzo fisso il tetto
+     in sats del coordinatore resta valido SOTTO — chi passa questo
+     ma sfora i sats si ferma comunque al controllo dei sats. */
+  const tettoEuro = Math.floor(Number(v.maxEuro)) || 0;
+  if (tettoEuro > 0 && euro > tettoEuro)
+    return {ok: false, manca: 'Troppi: il massimo è ' + fmt(tettoEuro) + ' €',
+            campo: 'p2pNuovoEuro'};
+  if (tettoEuro > 0 && max > tettoEuro)
+    return {ok: false, manca: 'Troppi: il massimo è ' + fmt(tettoEuro) + ' €',
+            campo: 'p2pNuovoEuroMax'};
   if (!(v.metodi || []).length)
     return {ok: false, manca: 'Scegli almeno un metodo di pagamento',
             campo: 'p2pNuovoMetodiBtn'};
@@ -44072,6 +44085,8 @@ function campiNuovoP2P(){
     metodi: p2pNuovoMetodi,
     maxSats: (p2pInfo && p2pInfo.maxSats) || 0,
     minSats: (p2pInfo && p2pInfo.minSats) || 0,
+    /* il tetto in euro di Barattolo, dalla busta delle leve: 0 = spento */
+    maxEuro: maxEuroP2P(),
     /* il tabacchino (set 2026): il lato, i tre dati, la finestra
        della garanzia letta viva (0 = non lo so) e l'ora, cosi' il
        giudice resta puro e il banco gli da' un orologio fermo */
@@ -44160,6 +44175,31 @@ function maxSatsTestoP2P(){
   const max = p2pInfo ? (Number(p2pInfo.maxSats) || 0) : 0;
   return max > 0 ? fmt(max) + ' sats' : '';
 }
+/* ---- IL TETTO IN EURO DI BARATTOLO (set 2026) ----
+   Un secondo tetto, NOSTRO, sopra quello in sats del coordinatore:
+   la leva P2P_MAX_EURO del config del VPS, in busta con le leve P2P
+   come il listino della commissione. A differenza dell'altro e' in
+   EURO, cioe' nella valuta in cui si scrive la cifra: si giudica
+   mentre si scrive, senza cambio di mezzo. Zero o assente = spento,
+   il mondo di ieri. E IL TETTO IN SATS RESTA VALIDO SOTTO, SEMPRE:
+   chi passa il tetto in euro ma sfora i sats viene fermato lo
+   stesso dal giudice del foglio. */
+function maxEuroP2P(){
+  const c = p2pCoord();
+  const n = c ? Math.floor(Number(c.maxEuro)) : 0;
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+/* IL TESTO SOTTO IL CAMPO, con due tetti possibili: quando la leva
+   in euro e' accesa la scritta dice GLI EURO — la valuta del campo,
+   il numero piu' stretto per chi scrive — e quando e' spenta
+   restano i sats del coordinatore, che sono l'unico tetto che c'e'.
+   Il riepilogo in fondo (rigaTettoFeeP2P) li dice invece TUTT'E DUE
+   quando ci sono tutt'e due: la' c'e' lo spazio per la frase intera. */
+function maxTestoP2P(){
+  const eur = maxEuroP2P();
+  if (eur > 0) return fmt(eur) + ' €';
+  return maxSatsTestoP2P();
+}
 /* ---- LA RIGA DEL TETTO E DELLA COMMISSIONE (17 set 2026, ritocco
    di Andrea) ----
    Stava in fondo al foglio, in due righe lunghe, e i numeri servono
@@ -44181,7 +44221,16 @@ function rigaTettoFeeP2P(){
      campo: due letture dello stesso numero si scollano, e a scoprirlo
      sarebbe chi legge due cifre diverse nello stesso foglio */
   const tetto = maxSatsTestoP2P();
-  if (tetto)
+  const tettoEur = maxEuroP2P();
+  /* con TUTT'E DUE i tetti si dicono tutt'e due: quello in euro e'
+     la regola di Barattolo, quello in sats resta valido sotto —
+     tacerne uno lo farebbe scoprire al momento del rifiuto */
+  if (tettoEur > 0 && tetto)
+    pezzi.push('al momento si accettano ordini fino a ' + fmt(tettoEur)
+               + ' € (e mai oltre ' + tetto + ')');
+  else if (tettoEur > 0)
+    pezzi.push('al momento si accettano ordini fino a ' + fmt(tettoEur) + ' €');
+  else if (tetto)
     pezzi.push('al momento si accettano ordini fino a ' + tetto);
   const fee = feeMiaP2P(null);
   if (fee > 0) {
@@ -44309,10 +44358,11 @@ function renderNuovoOrdineP2P(){
          scritta piccola sta qui e non nel riquadro in fondo, perche'
          serve MENTRE si scrive la cifra. Il riquadro in fondo lo
          ripete per esteso insieme alla commissione, ed e' un
-         riepilogo: le due letture vengono dallo STESSO giudice
-         (`maxSatsTestoP2P`), o un giorno direbbero due cifre. */
-      (maxSatsTestoP2P()
-        ? '<div class="hint">max ' + maxSatsTestoP2P() + '</div>' : '') +
+         riepilogo: le due letture vengono dagli STESSI giudici
+         (`maxTestoP2P`, che sotto ha `maxEuroP2P` e
+         `maxSatsTestoP2P`), o un giorno direbbero due cifre. */
+      (maxTestoP2P()
+        ? '<div class="hint">max ' + maxTestoP2P() + '</div>' : '') +
       (tab
         ? '<div class="hint">Col tabacchino l\'importo è uno solo, quello dell\'ordine Amazon: niente intervallo.</div>'
         : p2pNuovoFisso
@@ -44462,7 +44512,7 @@ function renderNuovoOrdineP2P(){
        l'importo (dove i numeri servono mentre si scrive), e infine in
        fondo di nuovo — ma stavolta come SCATOLA e non come riga, con
        il tetto salito sotto il campo dell'importo (vedi
-       `maxSatsTestoP2P`). Cioe': il numero che serve MENTRE si scrive
+       `maxTestoP2P`). Cioe': il numero che serve MENTRE si scrive
        sta accanto al campo, e il riepilogo di tetto e prezzo sta
        dov'e' naturale rileggerlo — subito prima di premere.
        E LA PERCENTUALE E' LA META', che prima non lo era: la riga

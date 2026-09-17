@@ -652,6 +652,13 @@ MOSTRO_RELAY_SPECCHIO = []
 # listino = il conto del P2P mostra la pillola «beta».
 # Sul VPS il listino e' 4 (set 2026); in beta il nodo tiene `fee = 0.03`.
 P2P_COMMISSIONE_PERCENTO = 2
+# IL TETTO IN EURO DEGLI ORDINI P2P (set 2026): il massimo che il
+# foglio Pubblica accetta come importo, NOSTRO e sopra quello in
+# sats del coordinatore (`max_order_amount` del 38385), che resta
+# valido sotto, sempre. Lo giudica il CLIENT mentre si scrive la
+# cifra: il coordinatore non lo conosce e non lo applica. 0 =
+# spento, nessun tetto in euro.
+P2P_MAX_EURO = 0
 # LO SCONTO FEDELTA' SUL P2P (set 2026): punti percentuali IN MENO
 # sulla propria meta' per chi e' pioniere OPPURE ha il livello 5 (uno
 # sconto solo, non si sommano). ⚠️ Lo sconto vero lo applica il

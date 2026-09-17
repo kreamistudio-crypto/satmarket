@@ -48396,6 +48396,7 @@ def prove_p2p_pubblica():
         "function rigaTettoFeeP2P(){",
         "function articoloPercentoP2P(testo){",
         "function maxSatsTestoP2P(){",
+        "function maxTestoP2P(){",
         "function riquadroLimitiP2P(){"))
     # --- 8b) LA RIGA SOTTO L'IMPORTO (17 set 2026, ritocco di Andrea)
     # Le due righe lunghe in fondo al foglio — «Si accettano ordini
@@ -48458,7 +48459,15 @@ def prove_p2p_pubblica():
     # della scatola — vengono dallo STESSO giudice, o un giorno
     # direbbero due cifre nello stesso foglio.
     prova("sotto il campo dell'importo c'e' il tetto", True,
-          '\'<div class="hint">max \' + maxSatsTestoP2P()' in _foglio)
+          '\'<div class="hint">max \' + maxTestoP2P()' in _foglio)
+    # IL TETTO IN EURO (set 2026): quando la leva P2P_MAX_EURO e'
+    # accesa la scritta sotto il campo dice GLI EURO — la valuta del
+    # campo — e quando e' spenta restano i sats del coordinatore. Il
+    # giudizio VIVO dei due tetti sta nel banco node, piu' sotto.
+    _maxT = pezzo_js(mini, "function maxTestoP2P(){", "\n}\n")
+    prova("...gli euro quando la leva e' accesa, se no i sats", True,
+          "if (eur > 0) return fmt(eur) + ' €';" in _maxT
+          and "return maxSatsTestoP2P();" in _maxT)
     prova("...e il tetto ha un giudice solo, per i due posti", 1,
           mini.count("Number(p2pInfo.maxSats) || 0"))
     prova("...che la riga della scatola CHIAMA invece di rileggere",
@@ -48518,6 +48527,15 @@ def prove_p2p_pubblica():
         + "\n" + _intera("function comeLibroP2P(o){")
         + "\n" + _intera("function fasciaPremioP2P(premio, lato){")
         + "\n" + _intera("function ordineDaRigaP2P(o){")
+        # i due tetti nel foglio (set 2026): il giudice in euro dalla
+        # busta delle leve, il testo sotto il campo e la riga della
+        # scatola — la busta e' di cartone, come il 38385
+        + "\nlet p2pLeve = null, p2pLevaPubblica = null;\n"
+        + re.search(r"const p2pCoord = [^\n]*;", mini).group(0)
+        + "\n" + _intera("function maxEuroP2P(){")
+        + "\n" + _intera("function maxSatsTestoP2P(){")
+        + "\n" + _intera("function maxTestoP2P(){")
+        + "\n" + _intera("function rigaTettoFeeP2P(){")
         + "\n" + _forme
         + "\n" + _intera("function formaRecapito(metodo){")
         + "\n" + _intera("function dataTabacchinoP2P(epoch){")
@@ -48578,6 +48596,32 @@ def prove_p2p_pubblica():
         "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: '30', fisso: true, sats: '100001'})).campo,\n"
         "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: '30', fisso: true, sats: '99'})).campo,\n"
         "    valeNuovoOrdineP2P(Object.assign({}, base, {euro: '30', euroMax: '90'})).campo],\n"
+        # IL TETTO IN EURO DI BARATTOLO (set 2026): oltre il tetto si
+        # rifiuta col campo e la frase giusti, al bordo si passa, il
+        # tetto in sats resta valido SOTTO, e a leva spenta gli euro
+        # alti passano come ieri.
+        "  tettoEuro: {\n"
+        "    campo: valeNuovoOrdineP2P(Object.assign({}, base, {euro: '600', maxEuro: 500})).campo,\n"
+        "    frase: valeNuovoOrdineP2P(Object.assign({}, base, {euro: '600', maxEuro: 500})).manca,\n"
+        "    capoAlto: valeNuovoOrdineP2P(Object.assign({}, base, {euro: '30', euroMax: '600', maxEuro: 500})).campo,\n"
+        "    alBordo: valeNuovoOrdineP2P(Object.assign({}, base, {euro: '500', maxEuro: 500})).ok,\n"
+        "    satsSotto: valeNuovoOrdineP2P(Object.assign({}, base, {euro: '400', maxEuro: 500, fisso: true, sats: '100001'})).manca,\n"
+        "    spento: valeNuovoOrdineP2P(Object.assign({}, base, {euro: '600'})).ok},\n"
+        # ...e i TESTI dei due tetti: sotto il campo uno solo (gli
+        # euro se la leva e' accesa, se no i sats), nella scatola
+        # tutt'e due quando ci sono tutt'e due. La busta e il 38385
+        # di cartone si rimettono a posto in coda, che i casi dopo
+        # non li vedano.
+        "  tetti: (() => {\n"
+        "    const con = (leva, info) => { p2pLevaPubblica = leva; p2pInfo = info;\n"
+        "      return [maxTestoP2P(), rigaTettoFeeP2P()]; };\n"
+        "    const r = {due: con({maxEuro: 500}, {maxSats: 500000}),\n"
+        "               soloEuro: con({maxEuro: 500}, null),\n"
+        "               soloSats: con(null, {maxSats: 500000}),\n"
+        "               niente: con(null, null)};\n"
+        "    p2pLevaPubblica = null; p2pInfo = null;\n"
+        "    return r;\n"
+        "  })(),\n"
         "  quanto: [\n"
         "    quantoValeP2P({euro: 20, euroMax: 100, premium: 0, lato: 'sell'}, '19').ok,\n"
         "    quantoValeP2P({euro: 20, euroMax: 100, premium: 0, lato: 'sell'}, '101').ok,\n"
@@ -48826,6 +48870,38 @@ def prove_p2p_pubblica():
     # un intero anche loro, e passano dallo stesso giudice.
     prova("i sats passano dallo stesso giudice, filo compreso",
           [0, 50000, "Scrivi quanti sats"], out["satsStorti"])
+    # --- IL TETTO IN EURO DI BARATTOLO (set 2026) --------------------
+    # La leva P2P_MAX_EURO, giudicata dal CLIENT sugli euro scritti:
+    # oltre il tetto ci si ferma sul campo giusto con la frase giusta,
+    # al bordo si passa, e il tetto in sats del coordinatore resta
+    # valido SOTTO, sempre — chi passa gli euro ma sfora i sats si
+    # ferma lo stesso. A leva spenta (0 o assente) gli euro alti
+    # passano come ieri.
+    prova("oltre il tetto in euro: fermato sul campo dell'importo",
+          ["p2pNuovoEuro", "Troppi: il massimo è 500 €"],
+          [out["tettoEuro"]["campo"], out["tettoEuro"]["frase"]])
+    prova("...e il capo alto dell'intervallo sul campo suo",
+          "p2pNuovoEuroMax", out["tettoEuro"]["capoAlto"])
+    prova("...al bordo esatto si passa", True, out["tettoEuro"]["alBordo"])
+    prova("...e chi passa gli euro ma sfora i sats si ferma lo stesso",
+          "Troppi: il massimo è 100000 sats", out["tettoEuro"]["satsSotto"])
+    prova("...a leva spenta gli euro alti passano", True,
+          out["tettoEuro"]["spento"])
+    # I TESTI: sotto il campo un tetto solo — gli euro quando la leva
+    # e' accesa, i sats del coordinatore quando e' spenta — e nella
+    # scatola in fondo tutt'e due quando ci sono tutt'e due.
+    prova("sotto il campo: gli euro quando la leva e' accesa",
+          "500 €", out["tetti"]["due"][0])
+    prova("...e la scatola dice tutt'e due i tetti", True,
+          "fino a 500 € (e mai oltre 500000 sats)" in out["tetti"]["due"][1])
+    prova("col solo tetto in euro si dice quello", True,
+          out["tetti"]["soloEuro"][0] == "500 €"
+          and "fino a 500 €<" in out["tetti"]["soloEuro"][1])
+    prova("a leva spenta restano i sats del coordinatore", True,
+          out["tetti"]["soloSats"][0] == "500000 sats"
+          and "fino a 500000 sats" in out["tetti"]["soloSats"][1])
+    prova("senza nessun tetto, niente scritta e niente riga",
+          ["", ""], out["tetti"]["niente"])
     # I QUATTRO CAMPI: testo filtrato, tastiera numerica, e il filtro
     # attaccato. ⚠️ `type="number"` NON PUO' ESSERCI: con dentro «5,5»
     # risponde value vuoto (badInput), quindi il testo vero non arriva a
@@ -49767,7 +49843,13 @@ def prove_p2p_pubblica():
     banco8 = (
         "let p2pInfo = null;\n"
         + re.search(r"const fmt = [^\n]*;", mini).group(0) + "\n"
-        + _intera("function commissioneVivaP2P(){")
+        # il tetto in euro (set 2026): la busta resta di cartone e
+        # VUOTA, cosi' la riga dice i sats come ieri; i casi con la
+        # leva accesa stanno nel banco del foglio
+        + "let p2pLeve = null, p2pLevaPubblica = null;\n"
+        + re.search(r"const p2pCoord = [^\n]*;", mini).group(0) + "\n"
+        + _intera("function maxEuroP2P(){")
+        + "\n" + _intera("function commissioneVivaP2P(){")
         + "\n" + _intera("function feeMiaP2P(o){")
         + "\n" + _intera("function mezzaCommissioneP2P(fee){")
         + "\n" + _intera("function articoloPercentoP2P(testo){")
@@ -51867,6 +51949,37 @@ def prove_p2p_server():
           "except ImportError:\n    MOSTRO_RELAY_SPECCHIO = []" in cod)
     prova("...e si legge dal config come le altre", True,
           "from config import MOSTRO_RELAY_SPECCHIO" in cod)
+    # IL TETTO IN EURO (set 2026): nasce a zero — nessun tetto — e si
+    # legge dal config col pattern di casa. La leva storta SPEGNE e
+    # non inventa: il blocco si fa GIRARE con un config finto, come
+    # per lo sconto fedelta'.
+    prova("P2P_MAX_EURO nasce a zero: nessun tetto in euro", True,
+          "except ImportError:\n    P2P_MAX_EURO = 0" in cod)
+    i_t = src.index("try:\n    from config import P2P_MAX_EURO")
+    blocco_t = src[i_t:src.index("# LO SCONTO FEDELTA' SUL P2P", i_t)]
+
+    def tetto_con(valore):
+        amb_t = {"print": lambda *x, **k: None}
+        finto = type("C", (), {})()
+        if valore is not None:
+            finto.P2P_MAX_EURO = valore
+        vecchio = sys.modules.get("config")
+        sys.modules["config"] = finto
+        try:
+            exec(blocco_t, amb_t)
+        finally:
+            if vecchio is None:
+                sys.modules.pop("config", None)
+            else:
+                sys.modules["config"] = vecchio
+        return amb_t["P2P_MAX_EURO"]
+
+    prova("...la leva legge la cifra", 500, tetto_con(500))
+    prova("...non dichiarata: spento (il mondo di ieri)", 0,
+          tetto_con(None))
+    prova("...una parola spegne, mai un tetto inventato", 0,
+          tetto_con("cinquecento"))
+    prova("...un negativo spegne", 0, tetto_con(-5))
 
     # --- 2) IL GIUDICE DELLA NPUB E' FAIL-CLOSED --------------------
     amb = {"__builtins__": __builtins__,
@@ -51894,11 +52007,12 @@ def prove_p2p_server():
     prova("un carattere fuori alfabeto vale ''", "", mh(npub[:-1] + "b"))
 
     # --- 3) `_p2p_leve` GIRA nei quattro casi -------------------------
-    def leve(attivo, hexv, relay, specchio=()):
+    def leve(attivo, hexv, relay, specchio=(), max_euro=0):
         a = {"__builtins__": __builtins__, "P2P_ATTIVO": attivo,
              "MOSTRO_HEX": hexv, "MOSTRO_RELAY": relay,
              "MOSTRO_RELAY_SPECCHIO": list(specchio),
-             "P2P_COMMISSIONE_PERCENTO": 2}
+             "P2P_COMMISSIONE_PERCENTO": 2,
+             "P2P_MAX_EURO": max_euro}
         exec(pezzo("_p2p_leve"), a)
         return a["_p2p_leve"]()
     relay = ["wss://relay.mostro.network", "wss://nos.lol"]
@@ -51914,13 +52028,21 @@ def prove_p2p_server():
           leve(True, "", relay)["attivo"])
     prova("accesa ma senza relay: attivo False (fail-closed)", False,
           leve(True, hexv, [])["attivo"])
-    prova("le chiavi sono cinque e sono sempre quelle",
-          ["attivo", "commissione", "mostro", "relay", "specchio"],
+    prova("le chiavi sono sei e sono sempre quelle",
+          ["attivo", "commissione", "maxEuro", "mostro", "relay",
+           "specchio"],
           sorted(piena.keys()))
     # IL LISTINO VIAGGIA SEMPRE, come npub e relay: e' pubblico, e il
     # client lo usa solo per dire quando la fee viva e' una promo.
     prova("...e il listino della commissione e' un numero, il 2",
           2.0, piena["commissione"])
+    # IL TETTO IN EURO VIAGGIA SEMPRE, anche a zero: a non giudicare
+    # niente quando e' spento e' il client — un'assenza direbbe
+    # «server di ieri» e il foglio non saprebbe la differenza.
+    prova("...e il tetto in euro spento viaggia come 0", 0,
+          piena["maxEuro"])
+    prova("...e acceso porta la cifra intera", 500,
+          leve(True, hexv, relay, max_euro=500)["maxEuro"])
     # LO SPECCHIO E' UNA CHIAVE IN PIU', NON UNA LISTA PIU' LUNGA: e' la
     # riga che regge tutto il cantiere del relay nostro. Fondere le due
     # liste manderebbe una richiesta di scambio a un relay dove mostrod

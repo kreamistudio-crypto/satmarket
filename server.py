@@ -19008,6 +19008,15 @@ def _leve_stato():
                          "client leggono viva dal suo 38385",
                   spento="nessuna promessa: il conto dei client dice "
                          "la sola fee viva del coordinator"),
+            # IL TETTO IN EURO DEGLI ORDINI (set 2026): la regola di
+            # Barattolo, sopra il tetto in sats del coordinatore che
+            # resta valido sotto. A giudicare e' il client, nel foglio.
+            _leva("Tetto ordini P2P (€)", "P2P_MAX_EURO", P2P_MAX_EURO,
+                  acceso="il foglio Pubblica rifiuta gli importi sopra "
+                         "questa cifra; il tetto in sats del "
+                         "coordinatore resta valido sotto",
+                  spento="nessun tetto in euro: vale solo il tetto in "
+                         "sats del coordinatore (38385)"),
             # LO SCONTO FEDELTA': la leva dice la cifra che il CLIENT
             # mostra; a scontare davvero e' il coordinatore (patch
             # 0005), che chiede a /api/p2p/sconto. Due righe perche'
@@ -33187,6 +33196,29 @@ try:
     from config import P2P_COMMISSIONE_PERCENTO
 except ImportError:
     P2P_COMMISSIONE_PERCENTO = 2
+# IL TETTO IN EURO DEGLI ORDINI P2P (set 2026): un tetto NOSTRO,
+# sopra quello in sats del coordinatore (`max_order_amount` del
+# 38385), che resta valido sotto, SEMPRE: chi passa il tetto in
+# euro ma sfora i sats viene fermato lo stesso. Questo e' in EURO
+# perche' e' la valuta in cui si scrive la cifra nel foglio: il
+# client la giudica mentre si scrive, senza un cambio di mezzo —
+# tradurre il tetto in sats in euro sarebbe inventare una soglia
+# che dipende dal cambio del momento. La leva viaggia nella busta
+# delle leve P2P e a giudicare e' il client, come tutto il foglio:
+# il coordinatore non la conosce e non la applica. Zero o non
+# dichiarata = spento, il mondo di ieri; storta SPEGNE e lo dice,
+# mai un tetto inventato da un refuso.
+try:
+    from config import P2P_MAX_EURO
+    P2P_MAX_EURO = int(P2P_MAX_EURO)
+    if P2P_MAX_EURO < 0:
+        raise ValueError("un tetto negativo non e' un tetto")
+except ImportError:
+    P2P_MAX_EURO = 0
+except (TypeError, ValueError):
+    P2P_MAX_EURO = 0
+    print("[p2p] P2P_MAX_EURO non e' un numero intero: il tetto in "
+          "euro resta SPENTO")
 # LO SCONTO FEDELTA' SUL P2P (set 2026, deciso con Alan): chi e'
 # PIONIERE oppure ha raggiunto il livello 5 paga mezzo punto in meno
 # sulla SUA meta' della commissione — 1% invece dell'1,5% della beta.
@@ -33376,7 +33408,11 @@ def _p2p_leve() -> dict:
             # il LISTINO della commissione (set 2026): la percentuale
             # viva il client la legge dal 38385 del coordinatore, e
             # questa serve solo a dire quand'e' che quella e' una promo
-            "commissione": float(P2P_COMMISSIONE_PERCENTO)}
+            "commissione": float(P2P_COMMISSIONE_PERCENTO),
+            # il tetto in euro di Barattolo (set 2026): lo giudica il
+            # CLIENT nel foglio Pubblica, 0 = spento. Viaggia sempre,
+            # anche a zero: un'assenza direbbe «server di ieri»
+            "maxEuro": int(P2P_MAX_EURO)}
 
 
 def _p2p_per(tg_id) -> dict:
