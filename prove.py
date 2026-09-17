@@ -38301,6 +38301,44 @@ def prove_tour_p2p():
     prova(f"...e insieme pesano meno di 200 KB (ora {peso:.0f})",
           True, peso < 200)
 
+    # LA TELA E LA SCATOLA HANNO LA STESSA FORMA, e sono due numeri in
+    # DUE FILE diversi — il `aspect-ratio` nel CSS e i pixel dei sei
+    # WebP —, cioe' il posto classico dove uno resta indietro e nessuno
+    # se ne accorge. Se divergessero non fallirebbe niente: la figura
+    # ritaglierebbe a `cover` (barattolo decapitato) o lascerebbe due
+    # bande di navy ai lati, e il navy delle sei non e' identico
+    # (#131925..#17202F), quindi le bande si vedrebbero.
+    # ⚠️ 21:10 E' UNA MISURA DECISA, non un gusto (17 set 2026, ritocco
+    # di Andrea): a 4/3 la figura si mangiava la card — 256 px su un
+    # telefono da 375 — e il testo restava schiacciato in fondo. A
+    # 21:10 scende a 162, il 63% di ieri.
+    _fig = pezzo_js(mini, "  .giro-fig{", "}")
+    prova("la figura e' la striscia 21:10, non il quadro 4/3", True,
+          "aspect-ratio:21/10" in _fig)
+    try:
+        from PIL import Image as _Img
+    except ImportError:
+        salta("le sei tele hanno la forma della scatola",
+              "Pillow non e' installata")
+    else:
+        _storte = []
+        for _n in ATTESI:
+            _p = _os.path.join("assets", "tour-p2p", _n)
+            if not _os.path.exists(_p):
+                continue
+            _w, _h = _Img.open(_p).size
+            # un pixel di tolleranza: 21:10 esatti su una tela intera
+            if abs(_w / _h - 2.1) > 0.01:
+                _storte.append(f"{_n} {_w}x{_h}")
+        prova("le sei tele hanno la forma della scatola (21:10)",
+              [], _storte)
+    # IL TESTO STA IN MEZZO AL SUO SPAZIO: le card prendono tutte
+    # l'altezza della piu' alta, e appoggiato in alto un testo di tre
+    # righe lasciava un buco bianco sopra il piede.
+    _tst = pezzo_js(mini, "  .giro-testo{", "}")
+    prova("il testo e' centrato nello spazio che avanza", True,
+          "flex:1" in _tst and "align-items:center" in _tst)
+
     # --- 2) IL CATALOGO DEL CLIENT COMBACIA COLLA WHITELIST ----------
     # Gli URL sono LETTERALI apposta — cosi' `_timbra_asset_pagina` li
     # timbra col ?v= del contenuto — quindi qui si possono leggere e
@@ -38314,10 +38352,32 @@ def prove_tour_p2p():
           "${" in _cat)
     # I SEI TESTI: si guarda la CODA di ognuno, che e' quel che una
     # riscrittura distratta tronca per prima.
+    # ⚠️ PRIMA SI RICUCIONO I PEZZI, e non e' un vezzo: i testi stanno
+    # su piu' righe unite da `' + '`, quindi una frase puo' spezzarsi
+    # NEL MEZZO («...i sats in garanzia si ' + 'sbloccano verso di
+    # te.») e la coda non si trova piu' — rosso per come il testo e'
+    # ANDATO A CAPO, non per quel che dice. Successo al primo ritocco.
+    # Cucite, le sentinelle guardano la frase e non l'impaginazione.
+    _frasi = re.sub(r"'\s*\+\s*'", "", _cat)
+    # ⚠️ LE DUE CODE DEL BARATTOZON SONO CAMBIATE (17 set 2026): le
+    # righe di ieri davano il gesto al soggetto sbagliato — chi paga in
+    # contanti dal tabaccaio e' chi COMPRA sats, e a preparare
+    # l'ordine Amazon e' chi VENDE. Le code seguono i testi.
     for coda in ("come e a che prezzo.", "solo a scambio concluso.",
-                 "pagando dal tabaccaio.", "non una promessa.",
-                 "prima di scambiare.", "fino alla consegna."):
-        prova(f"...e il testo che finisce «{coda}» c'e'", True, coda in _cat)
+                 "dal tabaccaio diventano sats.", "non una promessa.",
+                 "prima di scambiare.", "si sbloccano verso di te."):
+        prova(f"...e il testo che finisce «{coda}» c'e'", True,
+              coda in _frasi)
+    # ⚠️ E IL SOGGETTO DEV'ESSERE QUELLO GIUSTO, che una coda da sola
+    # non direbbe: nel Barattozon chi PAGA in contanti dal tabaccaio e'
+    # chi compra sats (cioe' chi legge), e a preparare l'ordine Amazon
+    # e' chi VENDE. La prima stesura scriveva «compri su Amazon pagando
+    # dal tabaccaio», cioe' il flusso al rovescio, e nessuna sentinella
+    # poteva accorgersene — questa e' quella che mancava.
+    prova("il Barattozon non si racconta al rovescio", [False, False],
+          ["compri su Amazon" in _frasi, "ti fa l'ordine" in _frasi])
+    prova("...e a preparare l'ordine Amazon e' chi VENDE sats", True,
+          "chi vende sats prepara il suo ordine Amazon" in _frasi)
     # IL MARCHIO STA SULLA SESTA E SOLO SU QUELLA
     prova("il marchio Barattozon e' su una card sola", 1,
           _cat.count("marchio: true"))
