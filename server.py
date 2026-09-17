@@ -33956,7 +33956,14 @@ async def togli_sveglia_p2p(req: Request, x_tg_init_data: str = Header(""),
     return JSONResponse({"ok": True}, headers={"Cache-Control": "no-store, private"})
 
 
-MAX_EURO_P2P_CANALE = 100_000   # lo stesso tetto di mostrod (max_order_amount)
+# ⚠️ E' IN EURO, e non ricalca `max_order_amount` del coordinatore, che
+# e' in SATS: qui stava scritto «lo stesso tetto di mostrod» ed era vero
+# solo per la cifra (100.000), mai per l'unita'. Il tetto vero degli
+# ordini lo legge il client VIVO dal 38385 — dal 17 set 2026 sono
+# 500.000 sats, qualche centinaio di euro — e qui resta solo l'argine
+# contro un numero assurdo nel post del canale: non si tiene a mano e
+# non va inseguito quando il coordinatore cambia il suo.
+MAX_EURO_P2P_CANALE = 100_000   # un argine, non il tetto degli ordini
 MAX_METODO_P2P_CANALE = 60      # il maxlength del campo nel foglio
 
 

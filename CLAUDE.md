@@ -275,7 +275,7 @@ leve girate il 6 set 2026 si leggono **DAL LIBRO PUBBLICO** e non piu'
 dal solo `settings.toml`, cioe' sono verificate dal lato di chi legge e
 non da quello di chi le ha scritte. Piu' `bond_enabled` false (coerente
 con `[anti_abuse_bond]` commentata), `maintenance_mode` false,
-`max_order_amount` 100000 e **`fee` 0.02** — la commissione di
+`max_order_amount` 500000 (dal 17 set) e **`fee` 0.02** — la commissione di
 Barattolo, girata da 0.01 il 10 set 2026 col cantiere del conto
 scorporato e verificata dallo specchio: il client la legge viva dal
 38385 e la mostra a chi scambia, meta' a testa (vedi CANTIERI, «Il

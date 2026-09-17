@@ -40467,6 +40467,19 @@ out.intervalloMuore = libroDaEventi([intVivo, intMorto], ora).ordini.length === 
   && libroDaEventi([intVivo], ora).ordini.length === 1;
 /* e il 38385 esce dal lettore puro, per il chiamante */
 out.lettoreDaInfo = (libroDaEventi([ev(38385, [['fee','0.01'],['max_order_amount','1']], 5)], ora).info || {}).fee === 0.01;
+/* IL TETTO E' QUELLO DEL 38385 PIU' FRESCO, in qualunque ordine arrivino
+   (17 set 2026, il caso VERO: il tetto sale da 100.000 a 500.000 sul
+   nodo, damus e nos.lol annunciano il nuovo, e relay.mostro.network
+   serve ancora il 38385 del giorno prima). Il relay fermo non deve
+   poter riportare indietro il tetto solo perche' risponde per ultimo. */
+{
+  const vecchio = ev(38385, [['fee','0.02'],['max_order_amount','100000']], 100);
+  const fresco = ev(38385, [['fee','0.02'],['max_order_amount','500000']], 200);
+  out.tettoPiuFresco = [
+    (libroDaEventi([vecchio, fresco], ora).info || {}).maxSats,
+    (libroDaEventi([fresco, vecchio], ora).info || {}).maxSats,
+    (libroDaEventi([vecchio, fresco, vecchio], ora).info || {}).maxSats];
+}
 /* --- LE LAPIDI: orologio VERO, che dentro c'e' Date.now() --- */
 const veroAdesso = Math.floor(Date.now() / 1000);
 lapideP2P({id: 'lap-viva', scade: veroAdesso + 3600, creato: veroAdesso});
@@ -41092,6 +41105,9 @@ console.log(JSON.stringify(out));
           out["intervalloMuore"])
     prova("il lettore puro consegna anche il 38385", True,
           out["lettoreDaInfo"])
+    prova("...e il tetto e' quello del 38385 piu' FRESCO: un relay fermo "
+          "a ieri non lo riporta a 100.000, in qualunque ordine risponda",
+          [500000, 500000, 500000], out["tettoPiuFresco"])
     prova("la lapide copre il proprio ritirato", True, out["lapideCopre"])
     prova("...e non inventa lapidi mai scritte", True,
           out["lapideNonInventa"])
@@ -49363,8 +49379,9 @@ def prove_p2p_canale():
           "0 < euro <= MAX_EURO_P2P_CANALE" in rotta)
     prova("il metodo non e' vuoto e ha un tetto", True,
           "not metodo or len(metodo) > MAX_METODO_P2P_CANALE" in rotta)
-    prova("...e il tetto euro e' quello di mostrod (max_order_amount)",
-          True, "MAX_EURO_P2P_CANALE = 100_000" in _SORGENTE)
+    prova("...e il tetto euro e' un argine in EURO, largo apposta: non "
+          "ricalca il tetto in sats del coordinatore",
+          True, "MAX_EURO_P2P_CANALE = 100_000   # un argine" in _SORGENTE)
     prova("il venditore si legge da utenti per tg_id", True,
           "FROM utenti WHERE tg_id=?" in rotta
           and '(user["id"],)' in rotta)
