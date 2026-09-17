@@ -8509,6 +8509,12 @@
   Feedback e stelle (lug 2026): tabella `feedback(ordine_id, da_tg_id,
   per_tg_id, voto 1-5, commento ≤200, creato)` con
   `UNIQUE(ordine_id, da_tg_id)` come giudice dei doppioni.
+  ⚠️ DAL SET 2026 IN QUESTA TABELLA VIVONO ANCHE LE RECENSIONI DEGLI
+  SCAMBI P2P, con una colonna che dice da dove viene il voto
+  (`scambio`) e un secondo giudice dei doppioni per loro: è «una
+  reputazione sola», e la media è la stessa. Tutto quel che segue vale
+  per gli affari del mercatino; per gli scambi vedi «LE RECENSIONI
+  DEGLI SCAMBI».
   `POST /api/orders/{id}/feedback`: solo le due parti, solo su
   `STATI_FEEDBACK = (released, refunded)` — anche gli affari finiti
   male sono affari veri, escluderli gonfierebbe i profili —
@@ -24289,6 +24295,100 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   passanti non si chiedono volti. Chi non ha un account Barattolo non
   ha stelle e passa solo col minimo a zero, come chi non ha ancora
   voti. Il verbale in CANTIERI, «Una reputazione sola».
+
+- LE RECENSIONI DEGLI SCAMBI (set 2026, richiesta di Andrea): a
+  scambio P2P concluso le due parti si recensiscono come nel
+  mercatino — stelle e commento — e quel voto finisce nella STESSA
+  tabella e nella STESSA media. È «UNA REPUTAZIONE SOLA» portata fino
+  in fondo: prima valeva per quel che si LEGGE (il tag `rating` del
+  coordinatore non lo apriva più nessuno), adesso anche per quel che
+  si SCRIVE. Il verbale in CANTIERI, «Le recensioni degli scambi».
+  LA COLONNA È UNA, `feedback.scambio`: '' = un affare del mercatino
+  (e l'affare è `ordine_id`), altrimenti è l'id dello scambio sul
+  coordinatore. `_ricalcola_rating` non la guarda e non deve: media,
+  `n_feedback` e `n_recensori` escono dalla tabella intera.
+  I DUE GIUDICI DEI DOPPIONI DICONO LA STESSA COSA: la UNIQUE di
+  sempre `(ordine_id, da_tg_id)` e l'indice parziale nuovo
+  `idx_feedback_scambio` su `(scambio, da_tg_id) WHERE scambio<>''`.
+  Perché siano d'accordo, `ordine_id` di una riga di scambio porta la
+  FIRMA dello scambio — 60 bit di SHA-256 del suo id, col segno MENO
+  (`_numero_scambio_p2p`). Negativo perché gli affari del mercatino
+  sono positivi: i due mondi non si incrociano mai, le subselect
+  `WHERE ordine_id=o.id` non pescano una riga P2P nemmeno per sbaglio,
+  e una riga di scambio si riconosce a occhio in qualunque query.
+  ⚠️ CON UNO ZERO AL POSTO DELL'ORDINE ogni persona avrebbe potuto
+  recensire UN SOLO scambio in tutta la vita (la UNIQUE scatta al
+  secondo), e nessuna sentinella sulla forma l'avrebbe visto: c'è la
+  PROVA REGINA che gira i due giudici su un database di cartone.
+  IL GIUDICE DELLE PARTI È `_parti_recensione_p2p(maker, preso_da,
+  chi)`, PURO (prende i campi, non la riga): torna chi riceve, o il
+  MOTIVO — `estraneo` (non è uno dei due posti), `ignota` (l'altra
+  parte il server non sa chi sia), `se_stesso` (le due metà di un
+  account fuso ai due capi dello stesso scambio). Lo stato lo ammette
+  `_ammette_recensione_p2p`: **solo `success`**, l'unico finale in
+  porto che il libro pubblichi. ⚠️ E LA DISPUTA CHIUSA IN PORTO CI STA
+  DENTRO, a differenza del mercatino — là un `confirmed` disputato
+  resta ridecidibile da un moderatore e il voto è chiuso, qui decide
+  il coordinatore e non c'è appello.
+  DUE ROTTE, E L'ID STA NEL CORPO (la regola dei volti: una GET lo
+  metterebbe nei log del web server). `POST /api/p2p/recensibile`
+  risponde alla domanda che il foglio fa PRIMA di aprirsi — «c'è un
+  posto, e l'ho già lasciata?» — e la seconda metà vive sul server
+  apposta: la riga dello scambio sta in localStorage, quindi da un
+  altro dispositivo l'invito ricomparirebbe e uno riscriverebbe una
+  recensione per sentirsi dire che c'è già. `POST /api/p2p/recensione`
+  scrive, dentro `BEGIN IMMEDIATE`, e il doppione lo dice
+  l'IntegrityError e non una SELECT fatta prima.
+  NESSUN GATE SULLA LEVA su nessuna delle due, dichiarato: la
+  recensione è del MERCATINO e lo scambio è già successo — spegnere il
+  P2P non deve togliere a nessuno il voto che si è guadagnato.
+  IL POSTO DI CHI HA PRESO SI È IRRIGIDITO, e non era cosmesi: da
+  `p2p_ordini.preso_da` passa ora il DESTINATARIO di una recensione, e
+  quel posto si sovrascriveva all'ultima parola — cioè chiunque legge
+  il libro (gli id sono pubblici) poteva intestarsi lo scambio di un
+  altro a cose fatte, prendersi la sua recensione e lasciarne una a
+  chi ha pubblicato, senza aver scambiato niente. Adesso la PRIMA
+  dichiarazione vince e a scambio chiuso quel posto non si prende più
+  (`preso_da=0 OR preso_da=?` + `stato NOT IN
+  ('success','canceled','expired')`); è la stessa prudenza del posto
+  di chi pubblica, e favorisce chi è onesto — la presa vera la
+  dichiara il coordinatore in privato, cioè PRIMA che il libro dica
+  «in-progress».
+  L'INVITO NELLA NOTIFICA HA UNA CONDIZIONE: «Lascia una recensione:
+  la trovi nella pagina dello scambio» si scrive solo dove il posto
+  c'è (`_testo_libro_p2p(..., recensibile)`, e il giudice è quello
+  della rotta). Prima quella frase stava lì sempre — scritta col
+  cantiere delle notifiche — e prometteva un gesto che non esisteva.
+  NEL CLIENT UN FOGLIO SOLO E TRE FORME (`p2pVotoSheet`): la
+  RECENSIONE (stelle + commento, «vanno sul suo profilo di Barattolo,
+  nella stessa media del mercatino», definitiva e col `chiediConferma`
+  del mercatino), il VOTO DEL SOLO CIRCUITO quando un posto non c'è, e
+  la riga «Recensione lasciata» quando è fatta. A decidere è
+  `gestoRecensioneP2P(o, rec)`, PURA — mai il chiamante — e finché la
+  risposta del server non arriva NON SI OFFRE NIENTE: il bottone
+  cambierebbe sotto il dito.
+  DUE DESTINAZIONI, UN GESTO SOLO: le stelle — non il commento, che il
+  protocollo non porta — partono ANCHE verso il coordinatore
+  (`rate-user`, un posto solo: `stelleCircuitoP2P`) quando è stato lui
+  a invitare al voto. Non è una seconda reputazione da leggere: è
+  quella che l'altra persona si porta dietro FUORI da Barattolo.
+  LA SCOPA GUARDA LA RECENSIONE e non più il voto del coordinatore
+  (`recensioneInSospesoP2P`): finché c'è una recensione da lasciare la
+  riga non si tocca — la sua chiave è l'unica cosa che permette di
+  lasciarla — e a farla invecchiare è il timbro `o.recensione`
+  ('fatta', o 'senza' quando il server ha detto che un posto non c'è).
+  NEL NEGOZIO la provenienza si vede e il conteggio no: il `ruolo`
+  della riga vale `scambio` («da uno scambio P2P») e il ramo sta PER
+  PRIMO nel CASE, perché una riga di scambio ha `ordine_id` negativo e
+  il LEFT JOIN la chiamerebbe «utente».
+  LA FUSIONE cancella le recensioni degli scambi fra le due metà, per
+  le stesse due ragioni dei gemelli del mercatino: sarebbero auto-voti,
+  e due righe sullo stesso scambio collidono sull'indice parziale
+  PROPRIO durante la migrazione — cioè farebbero fallire la fusione.
+  IL COLLAUDO ESEGUIBILE è `collaudo_recensione_p2p.py` (41 verdi): il
+  giro vero sui dieci casi, dalla coppia di recensioni alla media
+  unica, dal doppione allo scambio aperto, dall'altra parte senza
+  profilo alla fusione.
 
 - LA TESTATA DEL LIBRO RESTA IN ALTO (set 2026): tab, logo e pillola
   del filtro stanno in `.p2p-sticky`, un blocco `position:sticky`

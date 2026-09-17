@@ -18286,3 +18286,219 @@ fino al ricaricamento — non si vede, perché a quel punto `o.peer` è
 quello di prima e la pagina dice un'altra cosa, ma è la prima cosa da
 guardare il giorno che una faccia restasse attaccata a uno scambio che
 non è più suo.
+
+LE RECENSIONI DEGLI SCAMBI (17 set 2026, richiesta di Andrea: «a fine
+scambio P2P si deve poter lasciare una recensione, e deve confluire
+nella media unica dell'utente, la stessa del mercatino — "una sola
+reputazione" è la regola di casa»).
+A scambio concluso (`success` sul libro) a entrambe le parti compare
+l'invito, e il gesto è quello del mercatino: cinque stelle e un
+commento da 200 caratteri, una per parte per scambio, nella STESSA
+tabella `feedback` e nella STESSA media. La regola «una reputazione
+sola» del 10 set valeva per quel che si LEGGE — il tag `rating` del
+coordinatore non lo apriva più nessuno; adesso vale anche per quel che
+si SCRIVE, e il cerchio si chiude.
+**NON SI MODIFICA, E LA DOMANDA ERA GIUSTA**: la richiesta diceva
+«modificabile per un po' se il mercatino lo permette già». Non lo
+permette, per una ragione scritta a luglio — «niente modifica: chiude
+il ricatto *cambia il feedback o…*» — e la valvola resta la rimozione
+di un moderatore. Quindi definitiva anche qui, e il foglio lo dice
+prima con la domanda unica (che diventa la sessantesima).
+
+**LA COLONNA È UNA E LA MEDIA NON SA DA DOVE VENGA IL VOTO.**
+`feedback.scambio` vale '' per un affare del mercatino e l'id dello
+scambio per una recensione P2P; `_ricalcola_rating` non la guarda, e
+media, `n_feedback` e `n_recensori` escono dalla tabella intera. Nel
+negozio la provenienza si vede («da uno scambio P2P») e nel conteggio
+no: una media sola, come chiesto.
+**IL PEZZO DIFFICILE ERA LA UNIQUE DI SEMPRE**, `(ordine_id,
+da_tg_id)`, e la trappola è quella che si sarebbe presa con la strada
+ovvia: mettendo ZERO al posto dell'ordine, ogni persona avrebbe potuto
+recensire **un solo scambio in tutta la vita** — al secondo il
+database dice «hai già recensito», e nessuna sentinella sulla forma
+l'avrebbe visto. Le strade erano tre e due sono state scartate:
+rifare la tabella per togliere la UNIQUE (la PRIMA ricostruzione di
+tabella di questo repo, sulla tabella della reputazione di tutti,
+dove le migrazioni sono sempre state additive) e un contatore locale
+per scambio (uno stato in più da tenere, e con un numero nuovo a ogni
+giro la UNIQUE lascerebbe passare il doppione, che resterebbe in mano
+al solo indice parziale: due giudici che dicono cose diverse sullo
+stesso fatto). Quella scelta è la FIRMA dello scambio — 60 bit di
+SHA-256 del suo id, col segno MENO — più un indice parziale gemello
+su `(scambio, da_tg_id)`: i due giudici dicono la stessa cosa, e il
+segno negativo tiene i due mondi separati per costruzione (gli affari
+del mercatino sono positivi, quindi nessuna subselect `WHERE
+ordine_id=o.id` pesca una riga P2P nemmeno per sbaglio).
+⚠️ **IL PREZZO È DICHIARATO**: 60 bit di un id che ne ha 122. Perché
+una recensione venisse rifiutata per sbaglio servirebbe che la STESSA
+persona avesse due scambi che collidono su quei bit — un caso su
+10^18 a coppia — e sbaglia RIFIUTANDO, mai attribuendo: a dire di
+quale scambio si parla è `scambio`, che porta l'id per intero.
+LA PROVA REGINA di questo cantiere estrae la tabella E l'indice da
+`server.py` e li fa GIRARE su un database di cartone: la prima
+recensione passa, quella dell'altra parte passa, la seconda della
+stessa parte è un doppione, e **un ALTRO scambio della stessa persona
+passa** — che è la riga che avrebbe smascherato lo zero.
+
+**SU COSA POGGIA IL GIUDIZIO, detto chiaro**: dello scambio il server
+non ha visto niente — i sats li ha tenuti il coordinatore, gli euro
+sono passati fuori. Quel che sa è `p2p_ordini`: chi ha pubblicato, chi
+ha preso (se l'ha dichiarato) e l'ultimo stato del libro PUBBLICO. Lo
+stato ammesso è **solo `success`**, l'unico finale in porto che il
+38383 pubblichi (la lezione di Q4: gli stati si scrivono quando si
+vedono). ⚠️ E LA DISPUTA CHIUSA IN PORTO CI STA DENTRO, a differenza
+del mercatino: là un `confirmed` disputato resta ridecidibile da un
+moderatore e il voto è chiuso, qui decide il coordinatore e non c'è
+appello — ed è proprio dopo una lite che una recensione dice la cosa
+più utile.
+
+**L'INVITO PROMETTEVA UN GESTO CHE NON ESISTEVA** (punto 3 della
+richiesta: «verifica che l'invito porti al posto giusto»). Non ci
+portava: la frase «Lascia una recensione su Barattolo» sta nella
+notifica di chiusura dal 16 set, col cantiere delle notifiche
+precise, e fino a oggi di là non c'era nessuna recensione da lasciare
+— l'unico gesto era il voto del coordinatore, che il foglio stesso
+dichiarava «un'altra cosa dalle stelle di Barattolo». Adesso porta
+alla pagina dello scambio e lo DICE («la trovi nella pagina dello
+scambio»), e soprattutto **si scrive solo dove il posto c'è**: il
+giudice è lo stesso della rotta, che due elenchi da tenere in pari
+sono il posto dove un giorno la frase dice una cosa e il codice
+un'altra.
+
+⚠️ **E IL POSTO DI CHI HA PRESO SI RUBAVA.** È il difetto vero che
+questo cantiere ha trovato, e non era suo: `preso_da` si
+sovrascriveva all'ULTIMA parola, quindi con una sessione Barattolo e
+un id letto dal libro pubblico — che è pubblico — si poteva
+intestarsi lo scambio di un altro **a cose fatte**. Finché quel posto
+serviva solo alle notifiche era fastidio (frasi su fatti già
+pubblici); da oggi ci passa il DESTINATARIO di una recensione, cioè
+si sarebbe potuta prendere la recensione di un altro e lasciarne una
+a chi ha pubblicato, senza aver scambiato niente. Curato con due
+condizioni: la PRIMA dichiarazione vince, e a scambio chiuso quel
+posto non si prende più. Favorisce chi è onesto per come sta il
+mondo, non per fortuna: la presa vera la dichiara il coordinatore in
+PRIVATO, cioè prima che il libro pubblico dica «in-progress».
+
+**PUNTO 4 — IL RATING DI MOSTRO (38384), A VERBALE.** La domanda era
+se pubblicarlo in parallelo o lasciarlo stare, e la prima cosa da
+dire è un fatto: **quell'evento non lo possiamo pubblicare noi**. Il
+38384 lo firma il coordinatore, che aggrega i voti per chiave
+d'identità; l'unico modo per far crescere la reputazione di qualcuno
+in quel circuito è mandargli un `rate-user`. E quello **lo facciamo
+già**: c'è dal giorno del motore, ed è il vecchio bottone «⭐ Vota chi
+ha scambiato con te».
+LA DECISIONE: **si continua a mandarlo, e non si legge**. Le stelle —
+non il commento, che il protocollo non porta — partono anche verso il
+coordinatore nello STESSO gesto della recensione, quando è stato lui a
+invitare al voto. Il perché è che leggere due reputazioni mette due
+numeri davanti alla stessa persona (ed è quel che «una reputazione
+sola» ha chiuso), mentre SCRIVERE dove l'altra persona ce l'ha è un
+costo di un messaggio: chi scambia con noi si porta quella
+reputazione fuori da Barattolo, dove i nostri voti non si vedono, e
+non mandarla sarebbe scroccare il circuito degli altri. Il foglio lo
+dice in una riga, che una cosa che parte in silenzio è una bugia
+silenziosa.
+⚠️ QUEL CHE RESTA IGNOTO: che mostrod ACCETTI il nostro `rate-user`
+non è mai stato verificato sul nodo vero — il messaggio ha la forma
+provata, lo scambio del 7 set non è stato votato, e un rifiuto del
+coordinatore non fa rumore da nessuna parte. Vale come i tre timer
+mai scaduti: si chiude alla tappa 8, guardando il journal del nodo
+mentre si vota.
+
+**PUNTO 5 — CHI ENTRA DA NOSTR: DOVE FINISCE LA SUA RECENSIONE.** La
+domanda dava per scontato che non abbia un profilo nel mercatino, e la
+prima risposta è che **ce l'ha**: un login Nostr è un account con
+`tg_id` negativo, il suo negozio, le sue stelle e la sua media. Quindi
+la sua recensione finisce dove finiscono tutte — nella stessa tabella,
+nella stessa media — e il giudice delle parti lo accetta come
+destinatario (c'è la prova: `_parti_recensione_p2p(-77, 222, 222)`).
+CHI NON HA UN PROFILO È UN ALTRO: chi scambia da un **altro client
+Mostro**, che su Barattolo non è mai passato. Lì una recensione non ha
+un posto dove vivere, e non si scrive altrove in attesa di un giorno —
+sarebbe un giudizio in deposito su una persona che non l'ha chiesto, e
+nessuno potrebbe mai provare di esserne il proprietario. Si dice
+(«questa persona non ha un profilo su Barattolo») e le stelle vanno
+dove possono: sul circuito degli scambi, che per lei è l'unica
+reputazione che ha. È il caso in cui il punto 4 non è un di più ma
+l'unica strada.
+⚠️ **E C'È UN'ASIMMETRIA GIÀ SCRITTA CHE MORDE QUI**: pubblicare un
+ordine viene annotato per tutti, PRENDERLO solo per chi entra da
+Telegram — «quell'ingresso esiste per chi non vuole lasciare tracce»,
+decisione del 16 set. Quindi un login Nostr che PRENDE resta invisibile
+al server, e su quello scambio non si recensisce **in nessuno dei due
+versi**: il foglio lo dice, e il timbro `senza` fa invecchiare la riga
+come le altre.
+LA PROPOSTA, non fatta qui: un interruttore nel cassetto «🔔 Avvisi» —
+«fatti riconoscere negli scambi» — che accenda l'annotazione della
+presa anche per chi entra da Nostr, su richiesta SUA. È una riga di
+client e una condizione in meno sul server, ma rovescia una decisione
+di privacy scritta, e rovesciarla deve essere una scelta di Andrea e
+non l'effetto collaterale di un cantiere sulle recensioni.
+⚠️ **UNA STRADA SCARTATA, e non si riproponga senza un motivo nuovo**:
+ricavare la controparte dalla sua trade key (il coordinatore la manda
+a ognuna delle due parti, e `chiavi_p2p` sa a chi appartiene). Sembra
+la cura del caso Nostr e invece apre un buco: la chiave la dichiara
+chi recensisce, quindi chi è dentro un solo scambio vero potrebbe
+scaricare una stella a un estraneo qualunque — e le trade key
+girano in chiaro nei tag `p` delle buste, cioè si raccolgono a
+palate. La destinazione di una recensione deve poggiare su quel che il
+server SAPEVA PRIMA, non su quel che una parte gli dice dopo.
+
+**NEL CLIENT UN FOGLIO SOLO, TRE FORME**, e una riga che vale più
+delle altre: **finché la risposta del server non arriva non si offre
+NIENTE**. Con un bottone ottimista, «Lascia una recensione» sarebbe
+diventato «Vota chi ha scambiato con te» un istante dopo, sotto il
+dito di chi lo stava premendo — e la card che nasce senza faccia e se
+la mette quando la risposta arriva è il patto già scritto per i volti.
+La domanda è una rotta sua (`/api/p2p/recensibile`) e non un tentativo
+seguito da un rifiuto: «un bottone che porta a un muro è peggio di un
+bottone che non c'è». Porta anche il `gia`, e quella metà vive sul
+server apposta — la riga dello scambio sta in localStorage, quindi da
+un altro telefono l'invito ricomparirebbe e uno riscriverebbe una
+recensione per sentirsi dire che c'è già.
+E LE DUE CHE PARLANO COL NOSTRO SERVER STANNO FUORI DAL MOTORE, nel
+blocco dei volti: il motore dello scambio non ha dentro NESSUNA
+`fetch`, e una sentinella lo fa rispettare. L'ha detta lei, non un
+ripensamento.
+**LA SCOPA GUARDA LA RECENSIONE** e non più il voto del coordinatore:
+finché c'è una recensione da lasciare la riga non si tocca (la sua
+chiave è l'unica cosa che permette di lasciarla), e a farla invecchiare
+è il timbro — 'fatta', o 'senza' quando un posto non c'è. È la regola
+di prima su un gesto che non dipende più dall'invito di un terzo, e
+allarga di poco quel che resta in lista: i due casi che prima
+sparivano (concluso senza invito, e voto già dato) ora restano finché
+non si apre quello scambio. Le loro righe nel banco della scopa sono
+state emendate con scritto perché.
+
+**I NUMERI.** `prove.py` fa **11.091 passate, 0 fallite** su un
+albero isolato — questo cantiere e nient'altro sopra `main` — e
+**11.146** col cantiere gemello dei profili delle parti sotto, su cui
+questo si e' rebasato al push. +101
+righe nuove sono di `prove_recensione_p2p`; più dieci sentinelle
+emendate, ognuna con scritto perché:
+la domanda unica a sessanta, i `p2p-stella` che diventano due
+famiglie con lo stesso mestiere, le quattro `fetch` e le quattro POST
+del blocco dei volti, l'invito del libro, la scopa, la firma di
+`azioniSecondarieP2P`, i due banchi node e i quattro ambienti finti
+che ora montano il giudice delle parti. Il giro vero è
+`collaudo_recensione_p2p.py`: **42 verdi** sui dieci casi — la coppia
+di recensioni con le due medie che si muovono, la media unica fra
+mercatino e scambio (5 e 1 e 5 fanno 3,7 su UN profilo), il doppione,
+lo scambio non concluso, l'altra parte senza profilo, l'estraneo col
+403, la provenienza nel negozio, il posto di chi ha preso che non si
+sposta più, l'invito che compare solo dove porta, e la fusione che non
+esplode.
+
+**COSA RESTA DA GUARDARE.** 1) I DUE OROLOGI: il client sa «concluso»
+dai messaggi privati del coordinatore, il server dal libro pubblico —
+se il 38383 di chiusura non è ancora passato dal giro, la rotta
+risponde `non_conclusa` su uno scambio che a schermo è finito. Si
+sistema da sé (quel motivo NON si timbra sulla riga, quindi la
+domanda si rifà alla sessione dopo), ma è la prima cosa da guardare
+se qualcuno segnala «mi dice che non è concluso». 2) La riga di uno
+scambio concluso che non si apre MAI resta in lista per sempre: era
+già così col voto del coordinatore, ed è il verso giusto in cui
+sbagliare. 3) Il `rate-user` mai confermato dal nodo (sopra). 4) E
+`n_recensori` conta le PERSONE: due voti dalla stessa persona — uno
+per un oggetto e uno per uno scambio — restano «1 persona», che è
+giusto e va saputo prima di leggere il numero.
