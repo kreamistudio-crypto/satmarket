@@ -49,6 +49,22 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   davanti. Al primo riavvio dopo il deploy il server aggiunge da solo
   le quattro colonne a `p2p_ordini` e `avvisi_p2p` a `utenti`
   (ALTER TABLE, come tutte le colonne nuove): niente da fare a mano.
+- L'OROLOGIO P2P NEL JOURNAL (17 set 2026): «non gira» e «gira a
+  vuoto» adesso si distinguono, e si guarda cosi':
+  `journalctl -u barattolo --since "10 min ago" | grep -E "P2P|Libro|Campanello"`.
+  Le righe: `▶️ Orologio P2P partito: …` a ogni avvio, coi relay;
+  `· P2P passata N: libro — … ; campanello — … (1.2s)` UNA AL MINUTO
+  anche a vuoto (si spegne con `P2P_LOG_PASSATE = False` nel config);
+  `🔇 P2P: il relay … non risponde (…)` e `🔊 … e' tornato a
+  rispondere`, al CAMBIO e non a ogni giro; `⚠️ … passata oltre 240s,
+  abbandonata` e `⚠️ … battito saltato (Tipo: …)` quando una passata
+  si appende o esplode — la successiva riparte dal segnalibro; e le
+  due del guardiano, `💥 Orologio P2P MORTO (…): riparte adesso` e
+  `⚠️ Orologio P2P FERMO da Ns: lo annullo`. ⚠️ SE PER PIU' DI DUE
+  MINUTI NON C'E' NESSUNA «· P2P passata», l'orologio non gira: e' la
+  domanda da fare per prima, e se capita con questo codice la riga del
+  guardiano deve comparire entro dieci minuti — se non compare nemmeno
+  quella, e' fermo l'intero processo e non il P2P.
   Le righe gia' in tabella prendono lo stato alla PRIMA ripubblicazione
   del loro ordine, senza frase: l'orologio non ha visto il passaggio
   e non lo inventa.

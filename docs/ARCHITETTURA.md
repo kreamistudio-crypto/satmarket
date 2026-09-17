@@ -24108,6 +24108,18 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   set: alla riapertura il relay ripete i kind 14 dello scambio in
   ordine sparso, e vinceva l'ultimo ARRIVATO invece dell'ultimo
   SUCCESSO. Il verbale: CANTIERI, «La restore che diceva active».
+  L'OROLOGIO P2P HA TRE CINTURE (17 set 2026): ogni domanda a un
+  relay passa da `_chiedi_relay_p2p` — tetto `P2P_RELAY_MAX_S` (20 s)
+  sull'attesa INTERA, thread compreso, e un pool di thread del solo
+  P2P, così un relay lento non affama il pool comune e viceversa;
+  ogni passata (libro, poi campanello) ha `P2P_PASSATA_MAX_S` (240 s)
+  e un'eccezione o un tetto scaduto non tolgono il turno alla
+  successiva; e `guardiano_p2p` — che parte al posto dell'orologio,
+  lo avvia e ne TIENE il riferimento — lo fa ripartire se il task è
+  finito o se il battito (`_P2P_BATTITO`) tace da più di `P2P_FERMO_S`
+  (600 s). Il segnalibro si sposta solo a eventi LETTI, quindi una
+  passata abbandonata non perde niente. Il journal: PRODUZIONE,
+  «L'OROLOGIO P2P NEL JOURNAL».
   IL DIARIO E LA DIAGNOSI: `diarioP2P` tiene in MEMORIA (mai disco,
   mai server) le ultime 150 righe di quel che il P2P ha fatto nella
   sessione — messaggi con ora ed esito, restore, ripresa, e il perché

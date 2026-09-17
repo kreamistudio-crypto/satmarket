@@ -17573,3 +17573,84 @@ saltata per identità ora lo DICE.
 I NUMERI DELLA SERA: da 10808 a 10822 (14 prove nuove), quattro
 mutazioni uccise; il caso del taker fermo era ROSSO col codice del
 pomeriggio, in tre ordini su quattro.
+
+## L'orologio P2P che non si appende (17 set 2026)
+
+Aperto da Andrea col journal del VPS davanti: alle 09:53 il libro
+avvisa («📖 Libro P2P: avvisati 2»); alle 10:03 il servizio riparte per
+il deploy e da lì il journal non ha più UNA riga del libro; alle 10:09
+Alan prende un ordine e per un quarto d'ora non arriva niente a
+nessuno; un `systemctl restart` a mano, e subito partono la presa
+giusta e lo «scambio concluso» di un giro prima, rimasto in coda.
+Quindi segnalibro e recupero funzionavano: era il GIRO a non girare.
+
+**LA CAUSA NON È PROVATA, E LO SCRIVO.** Dal journal di quel giorno non
+si poteva distinguere «non gira» da «gira a vuoto»: il giro parlava
+solo quando avvisava qualcuno. Dal codice, DUE cose potevano fermarlo
+senza lasciare una riga, e le ho curate tutt'e due invece di
+scommettere:
+1) le domande ai relay giravano in `asyncio.to_thread` SENZA UN TETTO.
+I timeout dei socket (5 s alla connessione, 8 alla lettura) c'erano
+tutti — li ho ricontati, nessuna `create_connection` ne è priva — ma
+non coprono la risoluzione DNS né un thread che non PARTE perché il
+pool comune è pieno (è piccolo — i core più quattro — e lo usano
+le miniature, Nostr, l'import). Un `await` che non torna ferma tutte le
+passate dopo, per sempre, in silenzio.
+2) l'orologio nasceva con un `asyncio.create_task(orologio_p2p())` di
+cui NESSUNO teneva il riferimento — gli altri orologi hanno il loro
+`_TASK_…`, questo no — e niente lo sorvegliava: morto o appeso, restava
+così fino al deploy dopo.
+
+**LE TRE CINTURE, dalla più stretta alla più larga.** `_chiedi_relay_p2p`:
+ogni domanda a un relay ha il suo tetto (20 s) sull'attesa INTERA e un
+pool di thread SUO, quattro posti; allo scadere vale «relay muto» e si
+passa al successivo, e il thread rimasto indietro muore da solo coi
+suoi timeout senza affamare nessuno. Ogni PASSATA ha il suo tetto
+(240 s): una che non finisce si abbandona e si dice, e né quella né
+un'eccezione tolgono il turno alla successiva — né al campanello nello
+stesso battito. E IL GUARDIANO: parte lui al posto dell'orologio, lo
+avvia, ne tiene il riferimento, e ogni trenta secondi guarda se il task
+è FINITO (lo dice col perché, e riparte) o FERMO — vivo ma senza
+battito da dieci minuti (lo annulla, e riparte). Il guardiano ha il suo
+try a ogni sguardo e il suo riferimento.
+⚠️ LA STRADA NON PRESA: un timeout unico e basta. Il tetto sul relay
+cura il caso che si capisce; il guardiano cura quello che non si è
+capito — e siccome la causa di oggi non è provata, è lui la cintura che
+conta.
+
+**IL JOURNAL CHE RISPONDE ALLA DOMANDA.** Una riga alla partenza (coi
+relay), una A OGNI PASSATA anche a vuoto — «· P2P passata N: libro — 3
+ordini guardati (0 mai visti), 0 eventi; campanello — 12 chiavi, 0
+messaggi dal segnalibro (1.2s)» — che si spegne con `P2P_LOG_PASSATE`
+nel config; il relay che smette di rispondere e quello che torna, AL
+CAMBIO e non a ogni giro (un relay giù per un'ora sarebbero sessanta
+righe uguali, e la riga che conta ci annegherebbe); la passata saltata
+o abbandonata, col TIPO dell'errore; le due del guardiano. Tutte con
+`flush=True`: sotto systemd lo stdout può restare nel buffer, e una
+riga che arriva dieci minuti dopo è un'altra bugia sul «quando». E
+`info_libro_da_relay` torna `{}` e non None quando il relay risponde ma
+il 38385 non ce l'ha: None è «muto», e sarebbe finito nel journal come
+tale.
+
+**PROVATO, con le funzioni VERE contro relay di cartone** (28 prove
+nuove, da 10822 a 10850, zero fallite): il relay che non risponde MAI
+durante la passata — la passata finisce in meno di due secondi, passa
+al relay dopo, il journal dice quale tace e non lo ridice al giro
+dopo; IL SERVIZIO RIAVVIATO CON UN EVENTO NEL MEZZO — memoria vergine,
+stesso disco: la prima passata chiede dal segnalibro rimasto (si guarda
+il `since` arrivato al relay, non solo l'esito), la presa caduta nel
+fermo si notifica, il segnalibro avanza, la passata dopo non la ridice,
+e una coda di tre eventi racconta il solo momento nuovo; l'orologio col
+giro che esplode e quello che si appende — tutt'e due detti, nessuno
+ferma le passate dopo; il guardiano con l'orologio che muore e quello
+che si ferma. Tre giri di fila identici (le prove hanno tempi stretti:
+non ballano), e sette mutazioni uccise su sette — tolto il tetto della
+passata ne cadono cinque, col segnalibro spostato all'orologio invece
+che all'ultimo evento letto ne cadono sette.
+
+**RESTA DA GUARDARE:** il journal dopo il deploy — entro un minuto
+«▶️ Orologio P2P partito» e poi una «· P2P passata» al minuto; e il
+giorno che ricapita, QUALE riga compare: «🔇 relay» o «passata
+abbandonata» dicono che era la rete, «💥 MORTO» o «⚠️ FERMO» che era
+il task — è così che la causa di oggi si chiude, a posteriori. La riga
+al minuto sono 1.440 righe al giorno nel journal: se pesa, si spegne.
