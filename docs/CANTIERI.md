@@ -17360,3 +17360,91 @@ anticipa. Il giorno che un venditore vero esporterà sul serio, quella
 riga non basterà — e la domanda («chi paga il dazio se il pacco torna
 indietro?») è la stessa famiglia del parere legale MiCA già nel
 backlog.
+
+## I silenzi del P2P: la presa che non ha suonato (17 set 2026)
+
+Aperto da Andrea dal collaudo vero: pubblica una vendita, Alan la
+prende, e non arriva NIENTE — né la frase precisa, né la generica, né
+un segno in app. Il giro è morto in tre minuti ed è tornato in vetrina
+senza che chi vendeva sapesse di aver avuto una garanzia da bloccare.
+Tre cause, lette la mattina, e nessuna era un guasto: erano tre
+decisioni giuste prese ognuna senza vedere le altre.
+
+**1) IL LIBRO DICE TRE STATI DOVE NE CONOSCEVAMO UNO.** Il 16 set dallo
+specchio si era visto `in-progress`, e quello era «preso». Ma un ordine
+preso SENZA fattura sta in `waiting-buyer-invoice`, e poi in
+`waiting-payment`: il lettore li trattava da «mai visti» — una riga nel
+journal, nessuna frase. È la regola di Q4 («gli stati si scrivono
+quando si vedono») che ha fatto il suo mestiere: non ha inventato una
+notifica, ha lasciato la riga che stamattina ha detto cosa mancava.
+Ora `STATI_LIBRO_PRESO` sono tre e il giudice dei passaggi li legge
+come uno: il primo che si vede è «preso», da ognuno si torna, si
+conclude o si annulla, e il passo DENTRO la presa non racconta niente.
+In tabella resta lo stato VERO, e la frase lo usa: `waiting-payment` =
+«tocca a te bloccare la garanzia» a chi vende, `waiting-buyer-invoice`
+= «tocca a te indicare dove ricevere i sats» a chi compra; l'altro lato
+riceve la frase di chi aspetta. Con `in-progress`, che non dice a chi
+tocca, restano le frasi di sempre.
+
+**2) IL GATE ERA LUNGO QUANTO IL GESTO.** Dieci minuti a persona,
+contro una finestra di quindici per bloccare la garanzia: la
+pubblicazione timbrava, la presa arrivava tre minuti dopo, e il
+campanello taceva proprio sul messaggio che scadeva. Andrea aveva
+proposto due strade. IL GATE PER ORDINE È SCARTATO, e con un motivo:
+l'eco della pubblicazione e la richiesta di pagamento viaggiano sulla
+STESSA trade key, quindi per ordine il caso di oggi sarebbe rimasto
+muto identico. IL BYPASS «PER I MESSAGGI CHE CHIEDONO UN GESTO» non si
+può fare alla lettera — il server i kind 14 non li legge, ed è la
+regola — ma si può fare dal lato che il server VEDE: il libro. Chi ha
+un ordine PRESO (pubblicato da lui o preso da lui, nei tre stati o in
+disputa) ha la pausa corta, `P2P_NUDGE_VIVO_S` = 90 secondi; con soli
+ordini in vetrina restano i dieci minuti. Novanta sta fra uno e due
+battiti apposta: il kind 14 dello stesso momento della frase precisa —
+anche visto al giro dopo — non raddoppia (un momento, una notifica), e
+il gesto chiesto due minuti dopo suona.
+⚠️ QUEL CHE RESTA, dichiarato: chi entra da Nostr e PRENDE non è
+annotato in `preso_da`, quindi per lui vale il gate lungo (come già
+vale la sola generica); e se il kind 14 arriva un battito PRIMA del
+38383, quel giro lo giudica ancora «in vetrina» — al minuto dopo parte
+comunque la frase precisa.
+
+**3) IN APP, TRE COSE.** Il «⚡ Tocca a te: blocca i sats in garanzia»
+scatta all'ingresso in `attesa_mia_hold` ovunque si sia nell'app, ma
+solo su una richiesta ancora pagabile (`holdVivaP2P`): alla riapertura
+il relay ripete gli ultimi dieci minuti, e un `pay-invoice` di un giro
+già chiuso avrebbe detto di pagare una fattura annullata. La data la
+dice la bolt11, la finestra il 38385. IL GIRO MORTO SI SCRIVE: da uno
+stato preso-senza-garanzia (`P2P_GIRO_APERTO`) un ritorno a
+«pubblicato» o un annullo lascia `giroMorto` sulla riga, che smette di
+dire «Ordine pubblicato» e dice che cosa è successo e che nessun sat si
+è mosso; al ritorno nel libro la richiesta vecchia si butta, sull'
+annullato RESTA perché è la ricevuta che tiene la riga (`p2pRitirato`).
+E UN DIFETTO TROVATO LEGGENDO: uscendo da `attesa_mia_hold` il foglio
+diceva «Sats bloccati ✅» SEMPRE — anche col giro morto. Ora solo se lo
+scambio è `attivo`.
+
+**LA DOMANDA DEL MATTINO, a verbale perché torna:** nel client NON
+esiste un pagamento automatico della garanzia. `pay_invoice` via NWC si
+chiama in un posto solo, il «⚡ Compra subito» del mercatino; nel P2P
+NWC fa solo `make_invoice`, per chi compra. La hold la paga chi vende, a
+mano, dal foglio col QR. E un `no_route` lo vede solo il nodo che PAGA:
+se il nodo ne ha quattro a verbale, il pagatore stava su quel nodo.
+
+**PROVATO:** 53 prove nuove (da 10714 a 10767, zero fallite) — il gate
+sul banco sqlite col caso di oggi (tre minuti dopo: tace in vetrina,
+suona nei tre stati presi, 89/90 secondi, disputa, concluso, chi ha
+preso), il giudice del libro sul collaudo per intero (preso senza
+fattura → frase; passo interno → niente; ritorno → frase), le frasi per
+stato e per lato, e il client su node: il giro morto, la hold che
+sparisce, la ripresa che cancella la notizia, l'eco che non è un giro
+morto, l'annullo prima e dopo la garanzia, la richiesta viva e quella
+di venti minuti fa. Tortura: nove mutazioni, nove uccise.
+
+**RESTA DA GUARDARE:** la conferma sul campo — il prossimo scambio con
+Alan deve suonare due volte, alla presa e alla richiesta; l'ORDINE dei
+messaggi ripetuti alla riapertura (il relay può servire prima il
+ritorno e poi la richiesta: la macchina a stati non guarda il
+`created_at`, e il toast è protetto ma lo stato no); il gemello
+`add-invoice` di chi compra, che in app oggi è muto come lo era la
+hold; e l'eco della PROPRIA pubblicazione, che fa suonare la generica
+per un gesto appena fatto — è lei che timbrava il gate.

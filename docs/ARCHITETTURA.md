@@ -24059,6 +24059,29 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   e `dispute` hanno il ramo ma non sono mai stati visti ripubblicati,
   e uno stato sconosciuto lascia una riga nel journal invece di una
   frase. Il verbale: CANTIERI, «Il libro che avvisa».
+  LA PRESA SONO TRE STATI, E IL GATE HA DUE PAUSE (17 set 2026, dal
+  collaudo vero): il libro dice anche `waiting-buyer-invoice` e
+  `waiting-payment` prima di `in-progress` — `STATI_LIBRO_PRESO`, che
+  `_passaggio_libro_p2p` legge come uno stato solo (il primo dei tre
+  che si vede è «preso», il passo DENTRO la presa non racconta niente)
+  mentre in tabella resta scritto quello vero, e la frase lo segue:
+  con `waiting-payment` tocca a chi vende ADESSO, con
+  `waiting-buyer-invoice` a chi compra. E `_nudge_p2p` sceglie la
+  pausa da `_scambio_vivo_p2p`: chi ha un ordine PRESO (da `tg_id` o
+  da `preso_da`, nei tre stati o in `dispute`) ha `P2P_NUDGE_VIVO_S`
+  = 90 s, tutti gli altri i 600 di sempre. Novanta perché sta fra uno
+  e due battiti: il kind 14 dello stesso momento della frase precisa
+  non raddoppia, il gesto chiesto due minuti dopo suona.
+  NEL CLIENT il giro che muore prima della garanzia si SCRIVE
+  (`giroMorto` sulla riga, `P2P_GIRO_APERTO` gli stati da cui un
+  ritorno è una notizia, `P2P_GIRO_MORTO` le frasi che statoTestoP2P
+  mette al posto di «Ordine pubblicato»), la richiesta vecchia si
+  butta al ritorno nel libro — sull'annullato RESTA, è la ricevuta di
+  `p2pRitirato` — e il «⚡ Tocca a te: blocca i sats in garanzia»
+  scatta in `applicaMessaggioP2P` all'ingresso in `attesa_mia_hold`,
+  senza guardare la vista, solo su una richiesta ancora pagabile
+  (`holdVivaP2P`: la data della bolt11 più `expiration_seconds`).
+  Il verbale: CANTIERI, «I silenzi del P2P».
   LA CIFRA DI CHI PRENDE UN INTERVALLO viaggia come `Payload::Amount`
   (`{"amount": N}`), che mostrod legge SOLO su `take-sell` e `take-buy`
   (`get_amount` in `message.rs`) e confronta con min/max
