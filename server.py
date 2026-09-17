@@ -47419,6 +47419,21 @@ def asset_barattozon():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
+@app.get("/assets/barattozon-scuro.webp")
+def asset_barattozon_scuro():
+    """IL MARCHIO SCURO (17 set 2026, col marchio nel testo del tour):
+    la stessa immagine della sorella con la sola meta' BIANCA portata
+    nell'inchiostro di casa (#23282C), e l'arancio lasciato dov'era.
+    Serve perche' il marchio, tolto dalla sua tessera navy, finisce in
+    una frase — e su carta chiara la sua parola bianca sparirebbe. I
+    due si scambiano nel client con `html[data-tema="scuro"]`: il
+    bianco alla carta scura, questo a quella chiara.
+    Rotta esplicita come la sorella: mai un mount (regola 3)."""
+    return FileResponse("assets/barattozon-scuro.webp",
+                        media_type="image/webp",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/assets/tappo.jpeg")
 def asset_tappo():
     """Il tappo del barattolo (128px, ritagliato sul diametro): e' il

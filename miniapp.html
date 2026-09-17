@@ -6144,18 +6144,41 @@
   .giro-fig{position:relative;width:100%;aspect-ratio:21/10;
     background:#131A26;flex:none}
   .giro-fig img{display:block;width:100%;height:100%;object-fit:cover}
-  /* Il marchio Barattozon sulla sesta figura: NUDO, senza la tessera
-     che porta altrove — il fondo scuro glielo da' gia' la figura, ed
-     e' la stessa coppia «fondo navy + marchio nudo» della scatola dei
-     metodi nel libro. */
-  /* ⚠️ LA SPECIFICITA' E' DOPPIA APPOSTA, e non e' pignoleria: visto
-     dal vivo, il marchio riempiva la figura intera. `.giro-fig img`
-     qui sopra vale (0,1,1) e questa regola da sola (0,1,0), quindi
-     il `width:100%;height:100%` della figura vinceva sul marchio
-     QUALUNQUE fosse l'ordine nel foglio — non c'era niente da
-     spostare, andava alzata la specificita'. */
-  .giro-fig img.giro-marchio{position:absolute;left:14px;bottom:12px;
-    height:20px;width:auto;object-fit:contain;display:block}
+  /* ══ IL MARCHIO BARATTOZON STA NEL TESTO (17 set 2026, ritocco di
+     Andrea) ══
+     Prima era appoggiato sulla FIGURA, in basso a sinistra: un
+     ornamento, e per giunta stretto contro il carrello da quando la
+     striscia si e' abbassata. Adesso prende il posto della PAROLA
+     «Barattozon» nella frase — dove il nome serve a leggere, non a
+     decorare — e ci sta NUDO, senza la tessera navy che porta nel
+     libro e nel foglio «Pubblica».
+     ⚠️ E SENZA TESSERA SERVONO DUE MARCHI, che e' il prezzo di
+     toglierla: la parola del marchio e' BIANCA, e in una frase su
+     carta chiara sparirebbe — e' la riga scritta nel CSS della
+     tessera, vista dall'altro lato. Il fondo scuro glielo dava la
+     tessera; senza, glielo deve dare il TEMA. Quindi due file: il
+     marchio di sempre per la carta scura, e `barattozon-scuro.webp`
+     — la stessa immagine con la sola meta' bianca portata
+     nell'inchiostro di casa — per quella chiara. Si scambiano con
+     `html[data-tema="scuro"]`, che e' il giudice unico del tema (lo
+     scrive `applicaTema`, e vale anche per l'automatico).
+     LA MISURA E' IN `em` E NON IN PIXEL: il marchio sta dentro una
+     frase, quindi deve crescere con lei — e la frase cresce davvero,
+     che l'app ha la scala del testo. L'allineamento e' sulla base
+     della riga, non al centro: una parola in mezzo a una frase. */
+  .giro-marchio{display:inline-block;height:1.45em;vertical-align:-.42em;
+    margin:0 .1em}
+  .giro-marchio img{display:block;height:100%;width:auto}
+  /* ⚠️ LE TRE REGOLE NOMINANO L'ELEMENTO, e non e' pignoleria: senza
+     `img` davanti valgono (0,1,0) e la riga qui sopra — che e'
+     (0,1,1) — le batte QUALUNQUE sia l'ordine nel foglio. Visto dal
+     vivo: i due vestiti restavano tutt'e due `display:block`,
+     impilati in un riquadro alto 15 px, e il marchio si leggeva
+     sdoppiato in mezzo alla frase. E' lo STESSO inciampo del marchio
+     sulla figura, preso due volte nello stesso giorno. */
+  .giro-marchio img.giro-m-scuro{display:none}
+  html[data-tema="scuro"] .giro-marchio img.giro-m-chiaro{display:none}
+  html[data-tema="scuro"] .giro-marchio img.giro-m-scuro{display:block}
   /* IL TESTO STA IN MEZZO AL SUO SPAZIO, e non e' cosmesi: le sei card
      vivono in una fila flex, quindi prendono tutte l'altezza della piu'
      alta (il Barattozon, che ha quattro righe). Appoggiato in alto, un
@@ -6164,8 +6187,14 @@
      piede resta fermo dove sta — che e' quel che serve a chi scorre,
      perche' «Avanti» non balla sotto il dito — e il respiro si
      distribuisce sopra e sotto. */
+  /* ⚠️ IL FLEX CENTRA UN FIGLIO SOLO, e la frase deve essere quello:
+     in un contenitore flex OGNI figlio diventa un elemento a se', e il
+     marchio in mezzo alla frase e' un figlio — senza involucro la
+     frase si spezzava in tre pezzi affiancati («Con», il marchio, il
+     resto) con le righe a capo dove capitava. Visto dal vivo. */
   .giro-testo{flex:1;display:flex;align-items:center;
-    padding:14px 18px;font-size:14px;font-weight:600;
+    padding:14px 18px}
+  .giro-frase{margin:0;font-size:14px;font-weight:600;
     line-height:1.5;color:var(--ink)}
   .giro-piede{display:flex;align-items:center;gap:12px;
     padding:12px 16px 14px;border-top:1px solid var(--line)}
@@ -27788,6 +27817,16 @@ function refundPanel(o){
    sfocato, e li' non lo legge nessuno. */
 function bottoneInAttesa(btn, testo){
   el('attesaTesto').textContent = testo || 'Invio sats in corso…';
+  /* IL VELO SI VESTE SEMPRE, e non si limita ad accendersi (17 set
+     2026): `attesaRitardata` sceglie fra barattolino e anello con una
+     classe, ma alla chiusura non la toglie — quindi bastava una
+     lettura del libro P2P (che l'anello lo chiede) perche' da li' in
+     poi OGNI velo dell'app girasse con l'anello al posto del
+     barattolino. Non si legge come un guasto, si legge come «il
+     barattolino ogni tanto non c'e'», ed e' il modo in cui una cosa
+     del genere resta in piedi per mesi. Qui il barattolino si
+     RIVENDICA: chi vuole l'anello passa da `attesaP2P`. */
+  el('attesaOverlay').classList.remove('anello');
   el('attesaOverlay').classList.add('on');    /* blocca tutto: i sats viaggiano */
   const prima = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = '⏳ ' + (testo || 'Invio in corso…'); }
@@ -27795,6 +27834,39 @@ function bottoneInAttesa(btn, testo){
     el('attesaOverlay').classList.remove('on');
     if (btn) { btn.disabled = false; btn.innerHTML = prima; }
   };
+}
+
+/* ══ IL VELO DEI GESTI CHE PARLANO COL COORDINATORE (17 set 2026,
+   richiesta di Andrea) ══
+   Non e' un terzo velo: e' il velo immediato di casa vestito
+   dell'anello sottile, che nel P2P e' il giro di casa (lo porta gia'
+   l'attesa del libro). Immediato e NON ritardato, ed e' la regola
+   scritta in `attesaRitardata`: qui si MUOVONO i sats — si ritira un
+   ordine, si dice «ho pagato», si liberano i sats — quindi il velo
+   non e' cortesia ma la guardia contro il secondo tocco su una cosa
+   che non torna indietro, e ritardarlo aprirebbe 180 ms in cui il
+   gesto parte due volte.
+   ⚠️ E SI CHIUDE SEMPRE, su tutt'e tre le uscite — risposta, rifiuto,
+   messaggio mai partito —: e' la stessa regola dell'attesa del libro,
+   e il modo di rispettarla e' il `finally`, non tre `rip()` sparsi
+   che il quarto ramo di domani dimentica. Un velo che resta aperto
+   e' l'app bloccata, e non c'e' niente che lo tolga da fuori. */
+function attesaP2P(testo, btn){
+  const rip = bottoneInAttesa(btn, testo);
+  el('attesaOverlay').classList.add('anello');
+  return () => { rip(); el('attesaOverlay').classList.remove('anello'); };
+}
+/* LA RAGIONE, quando il gesto non e' riuscito. I casi sono due e la
+   cura e' DIVERSA, quindi la frase dev'essere diversa: il
+   coordinatore che risponde di no (o che non risponde) lascia la sua
+   ragione, gia' tradotta da `motivoCantDo`; la richiesta che non e'
+   nemmeno PARTITA — nessuno l'ha presa in consegna entro
+   P2P_ACK_MS — non ha niente da controllare da nessuna parte, e si
+   riprova. La parola «relay» non compare, che e' la regola delle
+   parole di casa: il fatto e' che il messaggio non e' partito. */
+function ragioneGestoP2P(e){
+  if (e && e.relayMuti) return P2P_NON_PARTITO + ': riprova fra un momento';
+  return String((e && e.message) || e || 'non è riuscito');
 }
 
 /* L'ATTESA RITARDATA, per i gesti che LEGGONO (ago 2026, dal campo:
@@ -39023,6 +39095,31 @@ const TAPPE_TOUR_P2P = [
         + 'sbloccano verso di te.'},
 ];
 let tourP2PInCorso = false;
+/* IL NOME DIVENTA IL MARCHIO, in UNA card sola. Si sostituisce DOPO
+   `esc`, ed e' l'ordine che conta: prima si mette al sicuro il testo,
+   poi si infila l'unico pezzo di markup che qui ci vuole stare.
+   ⚠️ E SI SOSTITUISCE LA PRIMA SOLA, che e' voluto: il nome torna
+   una volta nella frase, e il giorno che tornasse due volte un
+   marchio ripetuto in mezzo a una riga si leggerebbe come un errore
+   di stampa. `replace` con una stringa fa esattamente questo.
+   IL RIPIEGO E' LA PAROLA: i due `<img>` portano `onerror` che rimette
+   il testo — un marchio che non arriva lascerebbe la frase con un
+   buco al posto del soggetto. */
+const MARCHIO_P2P_INLINE =
+  '<span class="giro-marchio" role="img" aria-label="Barattozon">'
+  + '<img class="giro-m-chiaro" src="/assets/barattozon-scuro.webp" alt=""'
+  + ' onerror="this.replaceWith(&quot;Barattozon&quot;)">'
+  + '<img class="giro-m-scuro" src="/assets/barattozon.webp" alt=""'
+  + ' onerror="this.remove()"></span>';
+function marchioNelTestoP2P(testo, conMarchio){
+  /* IL NOME VIENE DAL CATALOGO e non da una seconda stringa: e' la
+     regola di casa (il marchio ha UN nome, in `P2P_VESTE_METODI`) e
+     c'e' una sentinella che conta quante volte e' scritto a mano.
+     Senza catalogo — o senza nome — il testo resta il testo: la
+     frase e' gia' giusta da sola, il marchio e' un di piu'. */
+  const nome = (P2P_VESTE_METODI[P2P_TABACCHINO] || {}).nome || '';
+  return (conMarchio && nome) ? testo.replace(nome, MARCHIO_P2P_INLINE) : testo;
+}
 function chiaveTourP2P(){ return chiaveP2P(TOUR_P2P_CHIAVE); }
 function tourP2PVisto(){
   try { return localStorage.getItem(chiaveTourP2P()) !== null; }
@@ -39067,9 +39164,9 @@ function apriTourP2P(){
   nastro.innerHTML = TAPPE_TOUR_P2P.map(t =>
     `<div class="giro-card"><div class="giro-fig">`
     + `<img src="${t.fig}" alt="" onerror="this.remove()">`
-    + (t.marchio ? `<img class="giro-marchio" src="/assets/barattozon.webp"`
-                 + ` alt="Barattozon" onerror="this.remove()">` : '')
-    + `</div><div class="giro-testo">${esc(t.testo)}</div></div>`).join('');
+    + `</div><div class="giro-testo"><p class="giro-frase">`
+    + marchioNelTestoP2P(esc(t.testo), t.marchio)
+    + `</p></div></div>`).join('');
   punti.innerHTML = TAPPE_TOUR_P2P.map((_, i) =>
     `<button type="button" class="giro-punto${i ? '' : ' on'}"`
     + ` onclick="vaiTappaTourP2P(${i})"`
@@ -42138,7 +42235,9 @@ async function inviaIncassoP2P(){
     dillo('Non sembra un indirizzo Lightning né una richiesta di pagamento.');
     return;
   }
-  const rip = bottoneInAttesa(el('p2pIncassoBtn'), 'Invio…');
+  /* qui il bottone c'e' e resta suo: il velo lo veste dell'anello e
+     l'etichetta la mette `bottoneInAttesa` dentro `attesaP2P` */
+  const rip = attesaP2P('Mando dove ricevere i sats…', el('p2pIncassoBtn'));
   try {
     /* l'indirizzo Lightning si manda COSI' COM'E': lo risolve il
        coordinatore, che quel giro di rete lo sa gia' fare — e cosi'
@@ -42148,7 +42247,7 @@ async function inviaIncassoP2P(){
     p2pIncassoOrdine = '';
     toast('Inviato ✅');
   } catch(e) {
-    dillo(String(e && e.message || e));
+    dillo(ragioneGestoP2P(e));
   } finally {
     if (rip) rip();
   }
@@ -42162,7 +42261,8 @@ function euroInviatiP2P(){
     titolo: 'Hai inviato gli euro?',
     corpo: 'Dillo solo dopo aver davvero mandato ' + fmtEur(o.euro) + ' € con il metodo concordato. Chi vende lo vedrà e libererà i sats.',
     etichetta: 'Sì, li ho inviati',
-    poi: () => { mossaOrdineP2P(o.id, 'fiat-sent', 'Fatto ✅'); }
+    poi: () => { mossaOrdineP2P(o.id, 'fiat-sent', 'Fatto ✅',
+                                'Sto avvisando che hai pagato…'); }
   });
 }
 function rilasciaP2P(){
@@ -42172,21 +42272,30 @@ function rilasciaP2P(){
     titolo: 'Liberi i sats?',
     corpo: 'Fallo solo se hai ricevuto ' + fmtEur(o.euro) + ' € davvero. I sats partono verso chi compra e non tornano indietro.',
     etichetta: 'Sì, libero i sats',
-    poi: () => { mossaOrdineP2P(o.id, 'release', 'Sats liberati ✅'); }
+    poi: () => { mossaOrdineP2P(o.id, 'release', 'Sats liberati ✅',
+                                'Sto liberando i sats…'); }
   });
 }
-async function mossaOrdineP2P(id, azione, fatto){
+/* `sto` E' IL VERBO DEL VELO, e si passa sempre (17 set 2026, dal
+   campo): questi due gesti non alzavano NIENTE — si toccava «Ho
+   inviato gli euro» e la pagina restava ferma finche' il
+   coordinatore non rispondeva, cioe' indistinguibile da un tocco
+   che non era stato registrato. E il verbo dice quale dei due sta
+   partendo: un velo che dicesse «Un attimo…» su un gesto che libera
+   i sats sarebbe muto quanto prima. */
+async function mossaOrdineP2P(id, azione, fatto, sto){
   const o = ordiniP2P()[id];
   if (!o) return;
+  const rip = attesaP2P(sto);
   try {
     await chiamataOrdineP2P(o, azione);
     toast(fatto);
   } catch(e) {
     const agg = ordiniP2P()[id] || o;
-    agg.errore = String(e && e.message || e);
+    agg.errore = ragioneGestoP2P(e);
     scriviOrdineP2P(agg);
     toast(agg.errore);
-  }
+  } finally { rip(); }
   if (p2pOrdineAperto === id) renderOrdineP2P();
 }
 
@@ -43560,7 +43669,7 @@ function annullaScambioP2P(){
       ? 'L\'ordine esce dal libro. Nessuno ha ancora scambiato niente con te.'
       : 'Lo scambio si annulla solo se anche l\'altra persona è d\'accordo. Se lo è, i sats tornano a chi li ha bloccati.',
     etichetta: subito ? 'Sì, ritira' : 'Sì, chiedilo',
-    poi: () => { inviaAnnulloP2P(); }
+    poi: () => { inviaAnnulloP2P(subito ? 'ritira' : 'chiedi'); }
   });
 }
 function accettaAnnulloP2P(){
@@ -43571,26 +43680,43 @@ function accettaAnnulloP2P(){
     titolo: 'Accetti di annullare?',
     corpo: 'Lo scambio si chiude e i sats tornano a chi li aveva bloccati. Nessuno perde niente.',
     etichetta: 'Sì, annulliamo',
-    poi: () => { inviaAnnulloP2P(); }
+    poi: () => { inviaAnnulloP2P('accetta'); }
   });
 }
-async function inviaAnnulloP2P(){
+/* ⚠️ IL VERBO E' QUELLO DEL GESTO, e i gesti sono TRE mentre il
+   messaggio al coordinatore e' uno solo (`cancel`): ritirare un
+   ordine che nessuno ha ancora preso, CHIEDERE di annullare uno
+   scambio in corso, e ACCETTARE la richiesta dell'altra persona.
+   Fin qui il velo diceva «Chiedo di annullare…» a tutt'e tre — e su
+   «Sì, ritira» era una frase che parlava di un'altra cosa, cioe'
+   peggio che nessuna frase. La tabella sta QUI e non nei tre
+   chiamanti: il verbo del velo e quello del toast devono
+   raccontare la stessa cosa, e due posti da tenere in pari sono il
+   posto dove un giorno divergono. */
+const ANNULLI_P2P = {
+  ritira:  {sto: 'Sto ritirando l\'ordine…',    fatto: 'Ordine ritirato'},
+  chiedi:  {sto: 'Chiedo di annullare…',        fatto: 'Richiesta di annullo inviata'},
+  accetta: {sto: 'Accetto di annullare…',       fatto: 'Annullo accettato'}
+};
+async function inviaAnnulloP2P(modo){
   const id = p2pOrdineAperto;
   const o = ordiniP2P()[id];
   if (!o) return;
   if (provvisorioP2P(id)) { toast('Aspetta: la risposta non è ancora arrivata'); return; }
-  /* il velo e globale e il gesto arriva dal foglio della conferma, che
-     il bottone se l e portato via: si passa null e a parlare e il velo */
-  const rip = bottoneInAttesa(null, 'Chiedo di annullare…');
+  const voce = ANNULLI_P2P[modo] || ANNULLI_P2P.chiedi;
+  /* il velo e' globale e il gesto arriva dal foglio della conferma,
+     che il bottone se l'e' portato via: si passa null e a parlare e'
+     il velo */
+  const rip = attesaP2P(voce.sto);
   try {
     await chiamataOrdineP2P(o, 'cancel');
+    toast(voce.fatto);
   } catch(e) {
     const agg = ordiniP2P()[id] || o;
-    agg.errore = String(e && e.message || e);
+    agg.errore = ragioneGestoP2P(e);
     scriviOrdineP2P(agg);
-    toast('Non è riuscito: ' + String(e && e.message || e));
-  }
-  rip();
+    toast('Non è riuscito: ' + agg.errore);
+  } finally { rip(); }
   if (p2pOrdineAperto === id) renderOrdineP2P();
 }
 
@@ -43622,7 +43748,7 @@ async function votaP2P(n){
   const o = ordiniP2P()[id];
   if (!o || !(n >= 1 && n <= 5)) return;
   chiudiFoglioP2P('p2pVotoSheet');
-  const rip = bottoneInAttesa(null, 'Mando il voto…');
+  const rip = attesaP2P('Mando il voto…');
   try {
     await chiamataOrdineP2P(o, 'rate-user', {rating_user: n});
     const agg = ordiniP2P()[id] || o;
@@ -43630,9 +43756,8 @@ async function votaP2P(n){
     scriviOrdineP2P(agg);
     toast('Grazie ⭐');
   } catch(e) {
-    toast('Il voto non è partito: ' + String(e && e.message || e));
-  }
-  rip();
+    toast('Il voto non è partito: ' + ragioneGestoP2P(e));
+  } finally { rip(); }
   if (p2pOrdineAperto === id) renderOrdineP2P();
 }
 
@@ -44384,16 +44509,16 @@ async function inviaDisputaP2P(){
   const id = p2pOrdineAperto;
   const o = ordiniP2P()[id];
   if (!o) return;
-  const rip = bottoneInAttesa(null, 'Apro la disputa…');
+  const rip = attesaP2P('Apro la disputa…');
   try {
     await chiamataOrdineP2P(o, 'dispute');
+    toast('Disputa aperta');
   } catch(e) {
     const agg = ordiniP2P()[id] || o;
-    agg.errore = String(e && e.message || e);
+    agg.errore = ragioneGestoP2P(e);
     scriviOrdineP2P(agg);
-    toast('Non è riuscita: ' + String(e && e.message || e));
-  }
-  rip();
+    toast('Non è riuscita: ' + agg.errore);
+  } finally { rip(); }
   if (p2pOrdineAperto === id) renderOrdineP2P();
 }
 

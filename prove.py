@@ -38338,6 +38338,14 @@ def prove_tour_p2p():
     _tst = pezzo_js(mini, "  .giro-testo{", "}")
     prova("il testo e' centrato nello spazio che avanza", True,
           "flex:1" in _tst and "align-items:center" in _tst)
+    # ⚠️ ...E LA FRASE HA UN INVOLUCRO SUO: in un contenitore flex ogni
+    # figlio e' un elemento a se', e il marchio in mezzo alla frase e'
+    # un figlio — senza involucro la frase si spezza in tre pezzi
+    # affiancati. Non fallisce niente: si spezza e basta, e una prova
+    # sul solo CSS non lo vedrebbe.
+    prova("...e la frase sta in un involucro solo, o il marchio la spezza",
+          True,
+          '<div class="giro-testo"><p class="giro-frase">' in mini)
 
     # --- 2) IL CATALOGO DEL CLIENT COMBACIA COLLA WHITELIST ----------
     # Gli URL sono LETTERALI apposta — cosi' `_timbra_asset_pagina` li
@@ -38456,11 +38464,43 @@ def prove_tour_p2p():
           and "function scorriTourP2P(){ aggiornaTourP2P(); }" in mini)
     prova("...e si stacca per lo stesso nome", True,
           "removeEventListener('scroll', scorriTourP2P)" in mini)
-    # IL MARCHIO HA LA SPECIFICITA' DOPPIA: `.giro-fig img` vale
-    # (0,1,1) e vincerebbe su `.giro-marchio` (0,1,0) QUALUNQUE fosse
-    # l'ordine nel foglio — il marchio riempiva la figura intera.
-    prova("il marchio batte il `width:100%` della figura", True,
+    # ⚠️ IL MARCHIO NON STA PIU' SULLA FIGURA (17 set 2026, ritocco di
+    # Andrea): era un ornamento in basso a sinistra, ed e' passato nel
+    # TESTO, al posto della parola. Con lui se n'e' andata la regola
+    # dalla specificita' doppia — non deve restare un vestito orfano.
+    prova("il marchio non e' piu' appeso alla figura", False,
           ".giro-fig img.giro-marchio{" in mini)
+    # ⚠️ E SENZA TESSERA SERVONO DUE MARCHI: la parola del marchio e'
+    # BIANCA, e in una frase su carta chiara sparirebbe — e' la riga
+    # scritta nel CSS della tessera, vista dall'altro lato. I due si
+    # scambiano col tema, che e' il giudice unico (`applicaTema`).
+    # ⚠️ E LE TRE REGOLE DEVONO NOMINARE `img`: senza, valgono (0,1,0)
+    # e `.giro-marchio img{display:block}` le batte qualunque sia
+    # l'ordine nel foglio — i due vestiti restano tutt'e due visibili e
+    # il marchio si legge SDOPPIATO in mezzo alla frase. Visto dal
+    # vivo, ed e' lo stesso inciampo del marchio sulla figura preso due
+    # volte nello stesso giorno: qui la prova lo inchioda.
+    prova("il marchio in riga ha i due vestiti del tema", True,
+          'html[data-tema="scuro"] .giro-marchio img.giro-m-chiaro{display:none}'
+          in mini
+          and 'html[data-tema="scuro"] .giro-marchio img.giro-m-scuro{display:block}'
+          in mini)
+    prova("...e battono il `display:block` dell'immagine", True,
+          '.giro-marchio img.giro-m-scuro{display:none}' in mini)
+    prova("...e il chiaro porta il marchio SCURO, non quello bianco",
+          True,
+          'class="giro-m-chiaro" src="/assets/barattozon-scuro.webp"' in mini
+          and 'class="giro-m-scuro" src="/assets/barattozon.webp"' in mini)
+    # il nome da sostituire viene dal CATALOGO: un secondo letterale
+    # sarebbe il primo passo verso due nomi che divergono
+    prova("...e il nome da sostituire lo dice il catalogo", True,
+          "(P2P_VESTE_METODI[P2P_TABACCHINO] || {}).nome" in mini)
+    # la misura e' in `em`: il marchio sta in una frase, e la frase
+    # cresce davvero (l'app ha la scala del testo)
+    _mrc = pezzo_js(mini, "  .giro-marchio{", "}")
+    prova("...e cresce col testo, che e' in em e non in pixel", True,
+          bool(re.search(r"height:[\d.]+em", _mrc))
+          and not re.search(r"height:[\d.]+px", _mrc))
     # IL PREFISSO NON E' `p2p-`, e non e' un gusto: `tp2p-marchio`
     # CONTIENE `p2p-marchio`, e una sentinella di casa cerca proprio
     # quella stringa nel file intero. Vale per tutta la famiglia.
@@ -43530,6 +43570,205 @@ const corpo = f => JSON.parse(f.opt.body);
         prova(nome, True, out.get(k))
 
 
+def prove_velo_p2p():
+    """IL VELO DEI GESTI CHE PARLANO COL COORDINATORE (17 set 2026).
+
+    Dal campo: si toccava «Annulla l'ordine» (o «Ho inviato gli euro»,
+    o «Libero i sats») e la pagina restava ferma finche' il
+    coordinatore non rispondeva — indistinguibile da un tocco che non
+    era stato registrato.
+
+    Le cose che qui possono rompersi in silenzio sono tre, e sono
+    tutte e tre della stessa famiglia: un velo che non si alza lascia
+    l'app muta, un velo che non si abbassa la lascia BLOCCATA — e non
+    c'e' niente che lo tolga da fuori —, e un velo che si alza con la
+    frase sbagliata e' peggio di nessuna frase (diceva «Chiedo di
+    annullare…» a chi aveva appena toccato «Sì, ritira»).
+    Percio' le sentinelle non si fermano alla forma: un banco node fa
+    GIRARE i gesti VERI sulle TRE uscite — il coordinatore che
+    risponde, quello che dice di no, e il messaggio che non parte —, e
+    guarda che il velo si chiuda in tutte e tre."""
+    print("\n[il velo dei gesti P2P]")
+    import json as _js
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) LA FORMA: il velo c'e', e si chiude nel `finally` --------
+    # ⚠️ IL `finally` NON E' PIGNOLERIA: le uscite sono tre e domani
+    # saranno quattro, e un `rip()` scritto a mano in fondo lo
+    # dimentica il ramo nuovo. E' la stessa regola dell'attesa del
+    # libro, che ce l'ha scritta sopra.
+    GESTI = {
+        "mossaOrdineP2P": "async function mossaOrdineP2P(id, azione, fatto, sto){",
+        "inviaAnnulloP2P": "async function inviaAnnulloP2P(modo){",
+        "inviaDisputaP2P": "async function inviaDisputaP2P(){",
+        "votaP2P": "async function votaP2P(n){",
+    }
+    for nome, firma in GESTI.items():
+        corpo = pezzo_js(mini, firma, "\n}\n")
+        prova(f"{nome} alza il velo dei gesti P2P", True,
+              "attesaP2P(" in corpo)
+        prova(f"...e {nome} lo chiude nel finally", True,
+              "} finally { rip(); }" in corpo)
+    # l'incasso ha un bottone suo, quindi il velo se lo porta insieme:
+    # stessa funzione, stesso anello, e il `finally` ce l'aveva gia'
+    _ii = pezzo_js(mini, "async function inviaIncassoP2P(){", "\n}\n")
+    prova("anche l'incasso passa dal velo dei gesti P2P", True,
+          "attesaP2P('Mando dove ricevere i sats…', el('p2pIncassoBtn'))" in _ii)
+
+    # --- 2) IL VERBO E' QUELLO DEL GESTO ----------------------------
+    # I gesti sono TRE e il messaggio al coordinatore uno solo
+    # (`cancel`): la tabella tiene insieme il verbo del velo e quello
+    # del toast, che sono le due cose che chi guarda confronta.
+    _tab = pezzo_js(mini, "const ANNULLI_P2P = {", "\n};")
+    # ⚠️ NEL SORGENTE L'APOSTROFO E' SCAPPATO (`l\\'ordine`): cercare
+    # la frase come si LEGGE la farebbe rossa per come e' scritta e
+    # non per quel che dice. E' l'inciampo delle code dei testi del
+    # tour, preso lo stesso giorno da un'altra parte.
+    _tabl = _tab.replace("\\'", "'")
+    for chiave, verbo, fatto in (
+            ("ritira", "Sto ritirando l'ordine…", "Ordine ritirato"),
+            ("chiedi", "Chiedo di annullare…", "Richiesta di annullo inviata"),
+            ("accetta", "Accetto di annullare…", "Annullo accettato")):
+        prova(f"l'annullo «{chiave}» ha il suo verbo e il suo fatto", True,
+              verbo in _tabl and fatto in _tabl)
+    # ...e i tre chiamanti passano il modo giusto: senza, la tabella
+    # sarebbe un catalogo che nessuno interroga
+    _ann = pezzo_js(mini, "function annullaScambioP2P(){", "\n}\n")
+    prova("chi ritira dice «ritira», chi chiede dice «chiedi»", True,
+          "inviaAnnulloP2P(subito ? 'ritira' : 'chiedi')" in _ann)
+    _acc = pezzo_js(mini, "function accettaAnnulloP2P(){", "\n}\n")
+    prova("...e chi accetta dice «accetta»", True,
+          "inviaAnnulloP2P('accetta')" in _acc)
+    # i due gesti che muovono lo scambio portano il verbo dal chiamante
+    prova("«ho inviato gli euro» e «libero i sats» dicono cosa sta partendo",
+          True,
+          "'Sto avvisando che hai pagato…'" in mini
+          and "'Sto liberando i sats…'" in mini)
+
+    # --- 3) IL BARATTOLINO TORNA IL BARATTOLINO ---------------------
+    # `attesaRitardata` VESTE il velo con una classe e alla chiusura
+    # non la toglie: bastava una lettura del libro P2P perche' da li'
+    # in poi OGNI velo dell'app girasse con l'anello. Non si legge
+    # come un guasto — si legge come «il barattolino ogni tanto non
+    # c'e'» — ed e' il modo in cui una cosa del genere resta in piedi.
+    _bia = pezzo_js(mini, "function bottoneInAttesa(btn, testo){", "\n}\n")
+    prova("il velo immediato si rivendica il barattolino", True,
+          "el('attesaOverlay').classList.remove('anello');" in _bia)
+    _ap = pezzo_js(mini, "function attesaP2P(testo, btn){", "\n}\n")
+    prova("...e il velo dei gesti P2P si veste dell'anello", True,
+          "classList.add('anello')" in _ap)
+    prova("...e se lo toglie chiudendo", True,
+          "rip(); el('attesaOverlay').classList.remove('anello');" in _ap)
+
+    # --- 4) E SI FA GIRARE, SULLE TRE USCITE ------------------------
+    # Le sentinelle qui sopra dicono che il velo ESISTE, mai che si
+    # chiuda quando il coordinatore dice di no o quando il messaggio
+    # non parte — ed e' precisamente li' che un velo dimenticato
+    # blocca l'app per sempre.
+    _node = _sh.which("node")
+    if not _node:
+        salta("il velo risponde giusto sulle tre uscite",
+              "node non installato")
+        return
+    _pezzi = "\n".join(
+        pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
+            "function bottoneInAttesa(btn, testo){",
+            "function attesaP2P(testo, btn){",
+            "function ragioneGestoP2P(e){",
+            "async function mossaOrdineP2P(id, azione, fatto, sto){",
+            "async function inviaAnnulloP2P(modo){"))
+    _npart = re.search(r"const P2P_NON_PARTITO = '[^']*';", mini).group(0)
+    # `pezzo_js` porta gia' la riga di APERTURA nel pezzo: rimetterla
+    # davanti la scrive due volte, e il banco muore al parse
+    _tabella = _tab + "\n};"
+    _banco = (
+        "const reg = [], toasts = [];\n"
+        "const finti = {attesaTesto: {textContent: ''},\n"
+        "  attesaOverlay: {classList: {\n"
+        "    add: c => reg.push('+' + c),\n"
+        "    remove: c => reg.push('-' + c)}}};\n"
+        "const el = id => finti[id];\n"
+        "function toast(t){ toasts.push(String(t)); }\n"
+        "let p2pOrdineAperto = 'ord1';\n"
+        "let riga = {id: 'ord1', errore: ''};\n"
+        "function ordiniP2P(){ return {ord1: riga}; }\n"
+        "function scriviOrdineP2P(o){ riga = o; }\n"
+        "let render = 0; function renderOrdineP2P(){ render++; }\n"
+        "function provvisorioP2P(){ return false; }\n"
+        "let risposta = null;\n"
+        "async function chiamataOrdineP2P(){ if (risposta) throw risposta;\n"
+        "  return {ok: true}; }\n"
+        + _npart + "\n" + _tabella + "\n" + _pezzi + "\n")
+    _prog = (_banco + "(async () => {\n"
+             "  const esito = {};\n"
+             "  const casi = [\n"
+             "    ['risposta', null],\n"
+             "    ['rifiuto', Object.assign(new Error("
+             "'l\\'ordine non e\\' piu\\' disponibile'), {cantDo: true})],\n"
+             "    ['mai partito', Object.assign(new Error("
+             "'publish timed out'), {relayMuti: true})]\n"
+             "  ];\n"
+             "  for (const [nome, err] of casi) {\n"
+             "    for (const gesto of ['ritira', 'release']) {\n"
+             "      reg.length = 0; toasts.length = 0;\n"
+             "      riga = {id: 'ord1', errore: ''};\n"
+             "      risposta = err;\n"
+             "      if (gesto === 'ritira') await inviaAnnulloP2P('ritira');\n"
+             "      else await mossaOrdineP2P('ord1', 'release',"
+             " 'Sats liberati', 'Sto liberando i sats…');\n"
+             "      esito[nome + '/' + gesto] = {velo: reg.join(' '),\n"
+             "        detto: finti.attesaTesto.textContent,\n"
+             "        toast: toasts.join('|')};\n"
+             "    }\n"
+             "  }\n"
+             "  console.log(JSON.stringify(esito));\n"
+             "})();")
+    _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8")
+    _f.write(_prog)
+    _f.close()
+    _r = _sp.run([_node, _f.name], capture_output=True, text=True,
+                 timeout=60, encoding="utf-8")
+    os.unlink(_f.name)
+    _out = (_js.loads(_r.stdout.strip()) if _r.returncode == 0
+            else {"ERRORE": {"velo": _r.stderr[:300]}})
+    # IL VELO SI ALZA E SI CHIUDE IN TUTTI E SEI I GIRI, ed e' la
+    # riga che regge tutto: `-anello +on` e' il velo immediato che si
+    # rivendica il barattolino e si accende, `+anello` e' l'anello che
+    # i gesti P2P gli mettono addosso, `-on -anello` e' la chiusura
+    # che rimette il velo com'era per il resto dell'app.
+    VELO = "-anello +on +anello -on -anello"
+    prova("il velo si alza e si richiude su tutte e tre le uscite",
+          {k: VELO for k in _out},
+          {k: v.get("velo") for k, v in _out.items()})
+    # IL VERBO E' QUELLO DEL GESTO, in tutte e tre le uscite
+    prova("...e il verbo e' quello del gesto, sempre",
+          {k: ("Sto ritirando l'ordine…" if k.endswith("ritira")
+               else "Sto liberando i sats…") for k in _out},
+          {k: v.get("detto") for k, v in _out.items()})
+    # LE TRE USCITE DICONO TRE COSE DIVERSE: la conferma, la ragione
+    # del no, e — quando il messaggio non e' nemmeno partito — la
+    # frase onesta di casa, che ha una cura diversa (si riprova).
+    prova("la risposta buona conferma col fatto",
+          ["Ordine ritirato", "Sats liberati"],
+          [_out.get("risposta/ritira", {}).get("toast"),
+           _out.get("risposta/release", {}).get("toast")])
+    prova("il rifiuto scrive la ragione, non un errore qualunque",
+          [True, True],
+          [("disponibile" in _out.get("rifiuto/ritira", {}).get("toast", "")),
+           ("disponibile" in _out.get("rifiuto/release", {}).get("toast", ""))])
+    prova("il messaggio mai partito ha la sua frase, e non nomina la rete",
+          [True, True, False],
+          ["Il messaggio non è partito"
+           in _out.get("mai partito/ritira", {}).get("toast", ""),
+           "Il messaggio non è partito"
+           in _out.get("mai partito/release", {}).get("toast", ""),
+           "relay" in _out.get("mai partito/release", {}).get("toast", "")])
+
+
 def prove_p2p_motore():
     """IL MOTORE DELLO SCAMBIO (set 2026, tappa 4): il kind 14 che parla
     col coordinator, e la sola cosa che possa fallire in silenzio.
@@ -44035,9 +44274,18 @@ def prove_p2p_motore():
     # ...e dal set 2026 la pagina dello scambio porta il CONTO, che ne
     # chiama altre due di la' dal confine: il listino (la promo) e la
     # sigla della valuta. Vengono dentro vere come le altre.
+    # ⚠️ `ragioneGestoP2P` E' PURA E VA NEL BANCO VERA, non
+    # doppiata (17 set 2026): dice la ragione delle tre uscite di un
+    # gesto verso il coordinatore — ha risposto di no, non ha risposto,
+    # oppure il messaggio non e' nemmeno partito — e il terzo caso ha
+    # una cura DIVERSA, quindi una frase diversa. Doppiarla vorrebbe
+    # dire provare il cartone invece della frase che si legge davvero.
     js_pure = ("let cambioVivo = false, eurPerSat = 0;\n"
+               # la costante la porta gia' `js_motore`: ridichiararla
+               # fa esplodere il banco con «already been declared»
                + riga("const P2P_VALUTA = ") + "\n") + "\n".join(
         pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
+            "function ragioneGestoP2P(e){",
             "function commissioneVivaP2P(){",
             "function commissioneListinoP2P(){",
             "function satsMercatoP2P(o){",
@@ -44262,6 +44510,10 @@ let viste = []; function go(v){ viste.push(v); }
 const document = {querySelector: s => ({id: 'view-p2pordine'})};
 let qr = []; async function disegnaQr(box, testo, modo){ qr.push(testo); }
 function bottoneInAttesa(b, t){ return () => {}; }
+/* il velo dei gesti P2P: il banco REGISTRA, cosi' i suoi casi
+   possono guardare che si sia alzato col verbo giusto */
+let veli = []; function attesaP2P(t, b){ veli.push('su:' + t);
+  return () => veli.push('giu'); }
 let renderP2Pn = 0; function renderP2P(){ renderP2Pn++; }
 /* l'intestazione vive nel blocco dei volti, fuori dal motore: si stubba */
 let intestati = []; function intestaOrdiniP2P(ids){ intestati.push(...(ids || [])); return Promise.resolve(true); }
@@ -46578,7 +46830,13 @@ def prove_p2p_pubblica():
           "fetch(" in invia)
 
     # --- 4) I GESTI CHE NON SI POSSONO FARE --------------------------
-    annullo = pezzo_js(mini, "async function inviaAnnulloP2P(){", "\n}\n")
+    # ⚠️ LA FIRMA HA GUADAGNATO UN ARGOMENTO (17 set 2026, col velo dei
+    # gesti): `inviaAnnulloP2P(modo)` — i gesti sono tre (ritira,
+    # chiedi, accetta) e il verbo del velo e' quello del gesto. E
+    # l'ancora va tenuta in pari: un argomento nuovo non fa una prova
+    # rossa, fa ESPLODERE la fetta — e il crash si porta via tutte le
+    # sorelle dopo di lui (e' successo qui, lo stesso giorno).
+    annullo = pezzo_js(mini, "async function inviaAnnulloP2P(modo){", "\n}\n")
     prova("un ordine senza nome non si puo' annullare", True,
           "if (provvisorioP2P(id)) {" in annullo)
     # il coordinatore lo chiama per id: finche' non risponde, non c'e'
@@ -46587,14 +46845,21 @@ def prove_p2p_pubblica():
           "toast('Aspetta: la risposta non è ancora arrivata');" in annullo)
 
     # --- 5) IL VELO SI SPEGNE ----------------------------------------
-    # `bottoneInAttesa` RITORNA il ripristino: chiamarla una seconda
-    # volta lo rialza, e l'app resta sotto l'overlay per sempre
+    # Il velo RITORNA il suo ripristino, e chi lo alza deve rimetterlo
+    # giu': un velo che resta aperto e' l'app bloccata, e non c'e'
+    # niente che lo tolga da fuori.
+    # ⚠️ E DAL 17 set 2026 SI CHIUDE NEL `finally`, non con un `rip()`
+    # in fondo: le uscite sono TRE — risposta, rifiuto, messaggio mai
+    # partito — e domani saranno quattro, e un `rip()` scritto a mano
+    # lo dimentica il ramo nuovo. Le tre uscite le fa GIRARE il banco
+    # di `prove_velo_p2p`, che qui sarebbe fuori posto.
     voto = pezzo_js(mini, "async function votaP2P(n){", "\n}\n")
     for nome, corpo in (("l'annullo", annullo), ("il voto", voto)):
         prova("%s alza il velo e lo rimette giu'" % nome, True,
-              "const rip = bottoneInAttesa(" in corpo and "\n  rip();" in corpo)
+              "const rip = attesaP2P(" in corpo
+              and "} finally { rip(); }" in corpo)
         prova("...e mai col booleano, che lo riaccenderebbe" , False,
-              "bottoneInAttesa(true" in corpo or "bottoneInAttesa(false" in corpo)
+              "attesaP2P(true" in corpo or "attesaP2P(false" in corpo)
 
     # --- 6) I DUE FOGLI NUOVI SI CHIUDONO COI FRATELLI ---------------
     chiudi = pezzo_js(mini, "function closeSheet(){", "\n}\n")
@@ -61942,6 +62207,7 @@ def main():
               prove_p2p_server,
         prove_p2p_libro,
         prove_tour_p2p,
+        prove_velo_p2p,
     prove_p2p_dettaglio,
     prove_nav_p2p,
     prove_timbro_asset,
