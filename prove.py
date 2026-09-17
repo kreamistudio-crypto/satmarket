@@ -41008,23 +41008,37 @@ console.log(JSON.stringify(out));
           and out["stelUno"].endswith(" 1"))
     prova("senza voti la riga non si scrive proprio", ["", ""],
           [out["stelZero"], out["stelNiente"]])
-    # IL VOLTO ENTRA NELL'ANELLO, e senza volto la card resta quella
-    # di ieri: l'anello c'e' lo stesso e le stelline no.
+    # IL VOLTO ENTRA NELL'ANELLO — e il buco non e' MAI vuoto (17 set
+    # 2026, dal campo di Andrea): mentre i volti sono in viaggio, o il
+    # server e' in riavvio e le facce tacciono, dentro l'anello sta il
+    # tappo del mercatino col «?». Le stelline invece restano dei soli
+    # volti coi voti.
     prova("col volto la faccia sta dentro l'anello", True,
           "p2p-faccia" in out["rigaConFaccia"]
-          and "con-faccia" in out["rigaConFaccia"]
           and "av_x.jpg" in out["rigaConFaccia"])
     prova("...e la card porta le stelline IN CODA", True,
           "p2p-rep" in out["rigaConFaccia"]
           and out["rigaConFaccia"].index("p2p-euro")
               < out["rigaConFaccia"].index("p2p-rep"))
-    prova("senza volto niente faccia e niente stelline", True,
-          "p2p-faccia" not in out["rigaSenzaRep"]
+    prova("senza volto il tappo col «?»: mai un anello vuoto", True,
+          'class="p2p-faccia">?</span>' in out["rigaSenzaRep"]
+          and "av-foto" not in out["rigaSenzaRep"]
           and "p2p-rep" not in out["rigaSenzaRep"]
           and "p2p-anello" in out["rigaSenzaRep"])
     prova("...e un volto senza voti porta la faccia, non la riga", True,
           "p2p-faccia" in out["rigaFacciaSenzaVoti"]
           and "p2p-rep" not in out["rigaFacciaSenzaVoti"])
+    # CHI NON HA LA FOTO SU TELEGRAM ha il tappo del mercatino: niente
+    # <img>, l'iniziale del nome sul tondo scuro — la stessa scala di
+    # ripieghi delle card degli annunci.
+    prova("...e senza foto l'iniziale sul tondo, senza <img>", True,
+          'class="p2p-faccia">B</span>' in out["rigaFacciaSenzaVoti"]
+          and "av-foto" not in out["rigaFacciaSenzaVoti"])
+    # ...e la variante piccola dell'anello e' USCITA col suo nome:
+    # l'anello e' sempre la cornice del volto, pure quando il volto
+    # non e' ancora arrivato (17 set 2026, mai un anello vuoto).
+    prova("la classe della variante piccola non esiste piu'", 0,
+          mini.count("con-faccia"))
     # IL VOLTO E' UNA PORTA (set 2026, richiesta di Andrea): col
     # negozio il tocco apre la pagina del mercatino — e SOLO col
     # negozio, o un volto senza porta prometterebbe col cursore una

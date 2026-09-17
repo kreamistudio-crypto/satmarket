@@ -2137,20 +2137,18 @@
      e lo faceva scendere a meta' card — visto dal vivo. In assoluto
      sta sempre in alto a destra e non entra nel giro del wrap, e la
      riga grande gli lascia il posto col suo padding. */
-  .p2p-anello{position:absolute;top:12px;right:14px;line-height:0}
-  .p2p-ord .p2p-testa{padding-right:28px}
-  /* COL VOLTO DENTRO l'anello cresce e diventa la sua cornice (set
-     2026, i volti sul libro): 44px, la faccia tonda al centro e il
-     colore del tempo tutt'intorno. Un segno solo per due cose, nello
-     spazio che l'angolo aveva gia'. Senza volto resta il piccolo di
-     ieri, e la riga grande gli lascia il posto che gli serve. */
-  .p2p-anello.con-faccia{width:44px;height:44px}
-  .p2p-anello.con-faccia svg{width:44px;height:44px}
-  /* il posto che l'anello grande si prende lo dichiara la CARD, con
-     una classe sua: `:has()` avrebbe fatto lo stesso su un browser
-     recente e niente su uno vecchio, e qui il dato lo conosce gia'
-     chi scrive il markup */
-  .p2p-ord.con-faccia .p2p-testa{padding-right:52px}
+  .p2p-anello{position:absolute;top:12px;right:14px;line-height:0;
+    width:44px;height:44px}
+  /* L'ANELLO E' SEMPRE LA CORNICE DEL VOLTO (17 set 2026, dal campo
+     di Andrea): 44px e la faccia tonda al centro, anche quando la
+     faccia ancora NON C'E'. La variante piccola «senza volto» del
+     primo giro se n'e' andata: mentre i volti sono in viaggio — o il
+     server e' in riavvio e le facce tacciono per qualche secondo —
+     le card restavano con l'anello vuoto in mezzo, e un buco che si
+     riempie «di solito» si legge come un difetto. Dentro c'e' sempre
+     il tappo del mercatino (il giudice sta in anelloScadenzaP2P), e
+     la testa lascia il posto alla cornice su ogni card. */
+  .p2p-ord .p2p-testa{padding-right:52px}
   /* la faccia: il cerchio dell'avatar di casa, rimpicciolito e
      infilato nel buco dell'anello (l'inset lo tiene dentro il tratto).
      L'iniziale sotto la foto e' la rete di sempre — se l'immagine non
@@ -2169,7 +2167,7 @@
     object-fit:cover}
   /* il volto che porta a un negozio lo dice anche al mouse */
   .p2p-faccia[role="button"]{cursor:pointer}
-  .p2p-anello svg{width:22px;height:22px;display:block;
+  .p2p-anello svg{width:44px;height:44px;display:block;
     transform:rotate(-90deg)}
   .p2p-anello circle{fill:none;stroke-width:3;stroke-linecap:round}
   .p2p-anello .pista{stroke:var(--line)}
@@ -37219,23 +37217,29 @@ function anelloScadenzaP2P(o, adesso){
   /* DENTRO L'ANELLO CI STA LA FACCIA (set 2026, i volti sul libro):
      l'anello diventa la cornice del volto di chi ha pubblicato, e il
      suo colore dice il tempo — un solo segno per due cose, nell'angolo
-     che gia' era suo. Senza volto (vetrina anonima, o un ordine di chi
-     Barattolo non ce l'ha) resta l'anello vuoto di ieri: il tempo si
-     legge lo stesso. */
-  const f = p2pFacce[o.id];
+     che gia' era suo.
+     ⚠️ E IL BUCO NON E' MAI VUOTO (17 set 2026, dal campo di Andrea):
+     mentre i volti sono in viaggio — o il server e' in riavvio e le
+     facce tacciono per qualche secondo — le card restavano con
+     l'anello vuoto in mezzo, come per la vetrina anonima e per gli
+     ordini di chi Barattolo non ce l'ha. Il ripiego e' il tappo del
+     mercatino, la stessa scala delle card degli annunci: foto se
+     c'e', iniziale se si sa il nome, «?» finche' non si sa niente.
+     Il vuoto-oggetto tiene vive le stesse letture di sempre (avatar,
+     nome, negozio) senza aprire un ramo per caso. */
+  const f = p2pFacce[o.id] || {};
   /* IL VOLTO E' UNA PORTA (set 2026, richiesta di Andrea): toccarlo
      apre il NEGOZIO di chi ha pubblicato — la stessa pagina del
      mercatino — mentre il resto della card resta l'ordine. Lo
      stopPropagation vive in apriNegozioP2P: senza, il tocco cadrebbe
      anche su prendiOrdineP2P. Senza un negozio da aprire il volto
      resta un volto: nessun onclick, il tocco scivola sulla card. */
-  const dentro = !f ? ''
-    : '<span class="p2p-faccia"' + (f.negozio
-        ? ' role="button" tabindex="0" data-negozio="' + esc(f.negozio)
-          + '" onclick="apriNegozioP2P(event, this.dataset.negozio)"'
-        : '') + '>' + avatarImg(f.avatar)
-      + esc((f.nome || '?')[0]) + '</span>';
-  return '<span class="p2p-anello' + stato + (f ? ' con-faccia' : '')
+  const dentro = '<span class="p2p-faccia"' + (f.negozio
+      ? ' role="button" tabindex="0" data-negozio="' + esc(f.negozio)
+        + '" onclick="apriNegozioP2P(event, this.dataset.negozio)"'
+      : '') + '>' + avatarImg(f.avatar)
+    + esc((f.nome || '?')[0]) + '</span>';
+  return '<span class="p2p-anello' + stato
     + '" role="img" title="' + esc(aria) + '" aria-label="' + esc(aria) + '">'
     + '<svg viewBox="0 0 24 24" aria-hidden="true">'
     + '<circle class="pista" cx="12" cy="12" r="' + P2P_ANELLO_R + '"/>'
@@ -37744,7 +37748,7 @@ function rigaOrdineP2P(o){
   const mio = ordineMioP2P(o.id);
   /* l'id viaggia nel dataset e non dentro la stringa dell'onclick:
      e' testo di sconosciuti — il patto del filtro-alfabeto */
-  return `<div class="p2p-ord${mio ? ' p2p-mio' : ''}${p2pFacce[o.id] ? ' con-faccia' : ''}" data-id="${esc(o.id)}" role="button" tabindex="0"
+  return `<div class="p2p-ord${mio ? ' p2p-mio' : ''}" data-id="${esc(o.id)}" role="button" tabindex="0"
     onclick="prendiOrdineP2P(this.dataset.id)">
     <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${anelloScadenzaP2P(o)}</div>
     ${paghiEuro ? rigaSats : rigaEuro}

@@ -34003,8 +34003,9 @@ async def facce_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
     libro sui relay lo legge chiunque, ma il collegamento coi nostri
     account no — dentro Barattolo i volti si vedono, un raccoglitore
     anonimo che incrocia il libro pubblico non incrocia niente. La
-    vetrina anonima vede le card senza volto, e le card funzionano
-    lo stesso: l'anello resta, la riga delle stelline sparisce.
+    vetrina anonima vede le card senza volto — dal 17 set 2026 il
+    client ci disegna il tappo col «?» — e le card funzionano lo
+    stesso: l'anello resta, la riga delle stelline sparisce.
     NIENTE ID NELL'URL: sono in un POST apposta — una GET metterebbe
     gli id degli ordini nei log del web server, e un log e' un posto
     dove le cose restano.
