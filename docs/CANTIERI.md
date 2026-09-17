@@ -16878,10 +16878,12 @@ portarsi dietro. Quel che sborda è alone, e sbordare è giusto: sulla
 card sfuma oltre il bordo come nell'originale.
 **Il pareggio qui serve più che altrove**: la striscia del tabaccaio è
 2,4:1 e il barattolo 0,8:1, e a tela piena uno sembrerebbe il triplo
-dell'altro. Da 2048×2048 JPEG a **768×576 WebP qualità 85: 110 KB
-tutt'e sei** (512px sarebbero stati 64 KB, ma su un telefono a 3× la
-card è ~1000 px di schermo e 512 si vedono morbidi; 39 KB non valgono
-quella resa). **Non sono incorporate in `miniapp.html`**, ed è
+dell'altro. Da 2048×2048 JPEG a WebP qualità 85 — **756×360, 80 KB
+tutt'e sei** dopo il ritocco del 17 set (nate 768×576 e 110 KB, vedi
+«I due ritocchi» in fondo); una tela più piccola sarebbe più leggera
+ma su un telefono a 3× la card è ~1000 px di schermo, e qualche
+decina di KB non vale quella resa. **Non sono incorporate in
+`miniapp.html`**, ed è
 deliberato: lì peserebbero il 33% in più in base64 su una pagina che
 si scarica a **ogni** apertura, per un tour che si guarda una volta.
 Come file si scaricano solo quando il tour si apre. Cartella sua e mai
@@ -16931,8 +16933,8 @@ Dal vivo, col libro vero del coordinator (9 offerte): apertura dopo il
 velo, le sei card, scorsa e pallini, «Salta» e «Inizia», le due
 identità con due timbri, il non-ritorno al secondo ingresso, «Come
 funziona», Escape che chiude passando dal motore di navigazione, tema
-scuro e schermo da 320 (la card sta in 288×412 su 640, e la card più
-lunga non sborda).
+scuro e schermo da 320 (la card stava in 288×412 su 640 — dal 17 set
+è 288×361 —, e la card più lunga non sborda).
 
 **COSA RESTA DA GUARDARE.** Il tour non si è mai visto su un telefono
 VERO dentro Telegram: `scroll-snap` col dito è la cosa che il Browser
@@ -16941,3 +16943,71 @@ quindi la scorsa morbida di `vaiTappaTourP2P` non l'ha mai eseguita
 nessuno — ha sempre preso il ramo netto. E `scrollWidth` torna 2060
 dove sei card da 341 fanno 2046: quattordici pixel di sbordo oltre
 l'ultima card, che lo snap mandatorio riassorbe. Misurato, non curato.
+
+### I due ritocchi (17 set 2026)
+
+**IL BARATTOZON ERA RACCONTATO AL ROVESCIO**, e lo ha visto Andrea. Le
+due card che lo nominano davano il gesto al soggetto sbagliato: «compri
+su Amazon pagando dal tabaccaio» e «chi vende ti fa l'ordine su
+Amazon». Il flusso vero è l'opposto — **chi VENDE sats prepara il suo
+ordine Amazon** da pagare in contanti alla cassa e ne indica il codice,
+**chi COMPRA** (cioè chi legge) paga quel codice dal tabaccaio. Le due
+righe nuove:
+- card 3: «SEPA, Revolut, Satispay, contanti — e con Barattozon i tuoi
+  contanti dal tabaccaio diventano sats.»
+- card 6: «Con Barattozon chi vende sats prepara il suo ordine Amazon da
+  pagare in contanti alla cassa e ne indica il codice. Tu paghi quel
+  codice dal tabaccaio, e i sats in garanzia si sbloccano verso di te.»
+
+⚠️ **E NESSUNA SENTINELLA POTEVA ACCORGERSENE**: le sei guardavano la
+CODA di ogni testo, cioè che la frase non fosse stata troncata — una
+frase intera e sbagliata le passava davanti tutte. Adesso due prove
+guardano il SOGGETTO: che «compri su Amazon» e «ti fa l'ordine» non
+tornino, e che a preparare l'ordine sia chi vende. **Una prova sulla
+forma non può dire se il contenuto è vero; solo una che nomina il fatto
+lo può.**
+
+⚠️ **E LE CODE SI SPEZZAVANO A META' FRASE.** I testi stanno su più
+righe unite da `' + '`, e la coda nuova cadeva nel mezzo («...i sats in
+garanzia si ' + 'sbloccano verso di te.»): rosso per **come il testo è
+andato a capo**, non per quel che dice. Le sentinelle adesso ricuciono
+i pezzi prima di guardare (`re.sub(r"'\s*\+\s*'", "", _cat)`), così
+leggono la frase e non l'impaginazione.
+
+**LA FIGURA SI MANGIAVA LA CARD** (sempre Andrea). A 4/3 erano 256 px
+su un telefono da 375, e il testo restava schiacciato in fondo.
+Adesso è una **striscia 21:10**: 162 px, cioè il **63%** di ieri, e la
+card scende da 412 a 367. A 320 la figura è 136 e la card 361 dentro
+640 — 139 px di aria sopra e altrettanti sotto, e la card più lunga
+(il Barattozon, che ora ha quattro righe di testo) non sborda.
+
+⚠️ **E LE SEI IMMAGINI SONO RIFATTE A QUELLA FORMA, non ritagliate dal
+CSS**, che è la decisione da non rovesciare. Le tre strade:
+- `cover` su un 4/3 dentro una striscia avrebbe **decapitato** il
+  barattolo e le stelle;
+- `contain` avrebbe messo due bande di navy ai lati, e il navy delle
+  sei **non è identico** (#131925..#17202F): le bande si vedrebbero;
+- tela e scatola alla stessa forma = nessun bordo, mai.
+Tela nuova **756×360** (21:10 esatti) e pareggio rifatto per la forma
+nuova: adesso cinque disegni su sei sono limitati dall'ALTEZZA e solo
+il tabaccaio dalla larghezza. **80 KB tutt'e sei**, 30 in meno di ieri.
+⚠️ E ora sono **due numeri in due file diversi** — l'`aspect-ratio` nel
+CSS e i pixel dei WebP —, cioè il posto classico dove uno resta
+indietro: una prova misura i sei file con Pillow e pretende che
+combacino con la scatola.
+
+**IL TESTO STA IN MEZZO AL SUO SPAZIO**, ed è la conseguenza della
+figura più bassa: le sei card vivono in una fila flex e prendono tutte
+l'altezza della più alta, quindi appoggiato in alto un testo di tre
+righe lasciava un buco bianco sopra il piede — la card sembrava mezza
+vuota mentre la vicina era piena. Centrato, il piede resta fermo dove
+sta (che è quel che serve a chi scorre: «Avanti» non balla sotto il
+dito) e il respiro si distribuisce sopra e sotto.
+
+**PROVATO:** quattro sentinelle nuove (la striscia, le sei tele col
+Pillow, il testo centrato, il soggetto del Barattozon), quattordici
+mutazioni tutte uccise, 10572 verdi con `PROVE_SEVERE`. Scatti a 375 e
+a 320 **con Chrome headless via CDP**: il Browser pane oggi rispondeva
+col mosaico 2×2 — il modo di fallire che non sembra un guasto — e le
+misure via JS erano l'unica cosa di cui fidarsi finché il CDP non ha
+dato scatti veri.

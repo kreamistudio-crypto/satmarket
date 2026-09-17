@@ -24761,7 +24761,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    sua e mai assets/categorie/ — vedi «IL VESTITO BARATTOZON»),
    `/assets/tour-p2p/{nome}` (le sei illustrazioni del tour di
    benvenuto del P2P, 17 set 2026: whitelist a tupla
-   `FILE_TOUR_P2P`, 768x576 WebP, 110 KB tutt'e sei — cartella sua
+   `FILE_TOUR_P2P`, 756x360 WebP (21:10, la forma della scatola nel
+   client), 80 KB tutt'e sei — cartella sua
    e mai assets/categorie/, per la ragione di assets/scoprire/;
    vedi CANTIERI, «Il tour di benvenuto del P2P»),
    `/assets/tappo.jpeg`, le rotte PWA (`/manifest.json`, `/sw.js`,
