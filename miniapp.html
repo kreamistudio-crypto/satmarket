@@ -40617,7 +40617,8 @@ async function mostroArriva(ev){
     delete p2pAttese[rid];
     clearTimeout(att.t);
     if (dentro.action === 'cant-do')
-      att.no(Object.assign(new Error(motivoCantDo(dentro.payload)), {cantDo: true}));
+      att.no(Object.assign(new Error(motivoCantDo(dentro.payload)),
+                           {cantDo: true, motivo: chiaveCantDo(dentro.payload)}));
     else att.ok(dentro);
   }
   /* L'ORA E' QUELLA DELL'EVENTO (17 set 2026): la scrive il
@@ -40723,9 +40724,16 @@ const MOTIVI_CANTDO = {
    usciva il nome grezzo. La chiave si NORMALIZZA qui, una volta, e la
    mappa accetta tutt'e due le forme: chi la legge non deve sapere quale
    delle due parla il coordinatore. */
-function motivoCantDo(payload){
+/* PURA: la chiave del «no», gia' normalizzata. Sta a parte perche'
+   chi ha fatto il gesto a volte deve sapere QUALE no e' arrivato, e
+   non solo la sua frase (17 set 2026: il foglio dell'incasso, che a un
+   `invalid-invoice` su un INDIRIZZO risponde un'altra cosa). */
+function chiaveCantDo(payload){
   const r = payload && (payload.cant_do || payload['cant-do'] || payload.reason);
-  const k = String(r || '').trim().toLowerCase().replace(/_/g, '-');
+  return String(r || '').trim().toLowerCase().replace(/_/g, '-');
+}
+function motivoCantDo(payload){
+  const k = chiaveCantDo(payload);
   if (!k) return 'La richiesta è stata rifiutata';
   return 'La richiesta è stata rifiutata: ' + (MOTIVI_CANTDO[k] || k);
 }
@@ -42790,27 +42798,52 @@ function renderIncassoP2P(){
   const netto = satsDaRicevereP2P(o);
   const quanti = netto > 0 ? fmt(netto) + ' sats' : '';
   const minuti = Math.ceil(finestraFatturaP2P() / 60);
-  /* tre cose, nell'ordine in cui servono: la cifra (con la copia,
-     perche' si ribatte a mano nel wallet), la via piu' semplice —
-     l'indirizzo — e le due regole del coordinatore sulla bolt11, dette
-     PRIMA: la senza-importo e' la via robusta sulla cifra, e una
-     fattura da un'ora esatta non passa (vedi `leggiBolt11`) */
+  const vale = minuti === 60 ? 'un\'ora' : minuti + ' minuti';
+  /* LA VIA PRINCIPALE E' LA FATTURA (17 set 2026, dal campo): fino a
+     ieri qui c'era scritto che l'indirizzo «è la via più semplice», ed
+     era la via che si rompeva — il coordinatore l'indirizzo lo VERIFICA
+     da dietro Tor con tre timeout stretti, e certi provider (Wallet of
+     Satoshi) a quel giro non rispondono: `invalid-invoice`, senza un
+     perche'. La fattura invece mostro la valida senza rete. Quindi,
+     nell'ordine in cui servono: la cifra con la sua copia IN EVIDENZA
+     (si ribatte a mano nel wallet), le due regole della bolt11 dette
+     PRIMA — senza importo o esatta, e piu' lunga della finestra (vedi
+     `leggiBolt11`) — e l'indirizzo per ultimo, col suo avviso. */
   box.innerHTML =
     '<div class="hint">' + (quanti ? 'Riceverai <b>' + esc(quanti) + '</b>. ' : '') +
-      'Scrivi il tuo indirizzo Lightning (quello che finisce per @qualcosa): è la via più semplice. ' +
-      'Oppure incolla una richiesta di pagamento del tuo wallet: falla <b>senza importo</b>' +
+      'Incolla una richiesta di pagamento del tuo wallet: <b>senza importo</b>' +
       (quanti ? ', o di ' + esc(quanti) + ' esatti' : '') +
-      ', e che valga ancora più di ' + minuti + ' minuti quando arriva — quelle da un\'ora esatta vengono rifiutate.</div>' +
+      ', valida più di ' + vale + '.</div>' +
     (netto > 0
-      ? '<button class="btn ghost" type="button" onclick="copiaLink(\'' + netto + '\', \'📋 Cifra copiata\')">📋 Copia la cifra: ' + esc(fmt(netto)) + '</button>'
+      ? '<button class="btn primary" type="button" onclick="copiaLink(\'' + netto + '\', \'📋 Cifra copiata\')">📋 Copia la cifra: ' + esc(fmt(netto)) + '</button>'
       : '') +
     '<div class="field"><label>Dove vuoi ricevere i sats</label>' +
-      '<input type="text" id="p2pIncassoInp" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="tuonome@wallet.com"></div>' +
+      '<input type="text" id="p2pIncassoInp" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="lnbc… oppure tuonome@wallet.com"></div>' +
+    '<div class="hint">In alternativa puoi scrivere il tuo indirizzo Lightning (quello che finisce per @qualcosa). ' +
+      'Alcuni provider (per esempio Wallet of Satoshi) non rispondono alla verifica dell\'indirizzo: ' +
+      'se il tuo indirizzo viene rifiutato, usa la fattura.</div>' +
     (myLnAddress
       ? '<div class="hint">È l\'indirizzo dei tuoi incassi automatici: puoi cambiarlo solo per questo scambio.</div>'
       : '') +
     '<div class="hint" id="p2pIncassoAvviso" style="display:none"></div>' +
     '<button class="btn orange" id="p2pIncassoBtn" onclick="inviaIncassoP2P()">Invia</button>';
+}
+/* IL «NO» SU UN INDIRIZZO NON E' IL «NO» SU UNA FATTURA (17 set 2026).
+   PURA. Il coordinatore risponde `invalid-invoice` a tutt'e due —
+   letto su `src/util.rs` di v0.18.6: `is_valid_invoice` che fallisce
+   esce sempre come `CantDoReason::InvalidInvoice` — ma su un indirizzo
+   importo e scadenza non c'entrano: e' la VERIFICA che non e' riuscita
+   (il provider non ha risposto in tempo al coordinatore), e la frase
+   generica manderebbe a controllare due cose che non esistono. La via
+   d'uscita e' una sola e si dice: la fattura.
+   ⚠️ SOLO su `invalid-invoice`: un indirizzo mandato nel momento
+   sbagliato (`not-allowed-by-status`) tiene la sua ragione vera, e il
+   messaggio mai partito pure. */
+const P2P_INDIRIZZO_RIFIUTATO = 'Non sono riuscito a verificare questo indirizzo: usa una fattura del tuo wallet.';
+function ragioneIncassoP2P(e, testo){
+  if (e && e.cantDo && e.motivo === 'invalid-invoice' && String(testo || '').indexOf('@') >= 0)
+    return P2P_INDIRIZZO_RIFIUTATO;
+  return ragioneGestoP2P(e);
 }
 async function inviaIncassoP2P(){
   const o = ordiniP2P()[p2pIncassoOrdine];
@@ -42863,7 +42896,20 @@ async function inviaIncassoP2P(){
     p2pIncassoOrdine = '';
     toast('Inviato ✅');
   } catch(e) {
-    dillo(ragioneGestoP2P(e));
+    const perche = ragioneIncassoP2P(e, testo);
+    dillo(perche);
+    /* la pagina sotto ripete l'ultimo «no» (`o.cantDo`), e quello
+       l'ha scritto `applicaMessaggioP2P` con la frase generica — che
+       parla di importo e scadenza: sull'indirizzo si riscrive, o foglio
+       e pagina direbbero due cose diverse dello stesso rifiuto */
+    if (perche === P2P_INDIRIZZO_RIFIUTATO) {
+      const agg = ordiniP2P()[o.id];
+      if (agg) {
+        agg.cantDo = perche;
+        scriviOrdineP2P(agg);
+        if (p2pOrdineAperto === o.id) renderOrdineP2P();
+      }
+    }
   } finally {
     if (rip) rip();
   }

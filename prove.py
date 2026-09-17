@@ -45407,7 +45407,21 @@ function reset(){
        si consiglia, e la scadenza si dice PRIMA coi minuti del nodo */
     out.foglioCopiaLaCifra = h.indexOf("copiaLink('7543'") >= 0;
     out.foglioConsigliaLaLibera = h.indexOf('<b>senza importo</b>') >= 0;
-    out.foglioAvvisaSullaScadenza = h.indexOf('più di 60 minuti') >= 0;
+    out.foglioAvvisaSullaScadenza = h.indexOf('valida più di un\'ora') >= 0;
+    /* LA PRIORITA' (17 set 2026): la fattura PRIMA dell'indirizzo, la
+       copia della cifra in evidenza e prima del campo, e l'indirizzo
+       col suo avviso — mai piu' «la via più semplice» */
+    out.foglioFatturaPrima = h.indexOf('Incolla una richiesta di pagamento del tuo wallet') >= 0
+      && h.indexOf('Incolla una richiesta') < h.indexOf('indirizzo Lightning');
+    out.foglioCifraEsatta = h.indexOf(', o di 7543 sats esatti, valida') >= 0;
+    out.foglioCopiaInEvidenza = h.indexOf('<button class="btn primary" type="button" onclick="copiaLink(') >= 0
+      && h.indexOf('copiaLink(') < h.indexOf('id="p2pIncassoInp"');
+    out.foglioAvvisaSuiProvider = h.indexOf('Wallet of Satoshi') >= 0
+      && h.indexOf('non rispondono alla verifica dell\'indirizzo') >= 0
+      && h.toLowerCase().indexOf('coordinatore') < 0
+      && h.indexOf('se il tuo indirizzo viene rifiutato, usa la fattura') >= 0
+      && h.indexOf('id="p2pIncassoInp"') < h.indexOf('Wallet of Satoshi');
+    out.foglioNonDicePiuSemplice = h.indexOf('via più semplice') < 0;
     out.foglioDiceDellAutoincasso = h.indexOf('incassi automatici') >= 0
       && nodi.p2pIncassoInp.value === 'io@wallet.com';
   }
@@ -45615,6 +45629,65 @@ function reset(){
   await pausa(60);
   out.senzaFeeNonSbarra = ricevuti.length === 2
     && ricevuti[1].dentro.action === 'add-invoice';
+
+  /* ---- 4-ter) IL «NO» SU UN INDIRIZZO NON E' IL «NO» SU UNA FATTURA
+     (17 set 2026). Il coordinatore dice `invalid_invoice` a tutt'e due
+     (snake_case, com'e' sul filo): sull'indirizzo il foglio manda alla
+     fattura e NON parla di importo e scadenza; sulla fattura resta la
+     frase di sempre; e un «no» d'altro tipo su un indirizzo tiene la
+     sua ragione vera. Il foglio resta aperto e lo scambio fermo. */
+  const presaCheRifiuta = async motivo => {
+    reset();
+    rispondi = r => {
+      const d = r.dentro;
+      if (d.action === 'take-sell')
+        return [ordine('add-invoice', d.request_id, d.id,
+                       {order: {id: d.id, amount: 7543}})];
+      if (d.action === 'add-invoice')
+        return [ordine('cant-do', d.request_id, d.id, {cant_do: motivo})];
+      return [];
+    };
+    await prendiOrdineP2P('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002');
+    await finoA(() => oltrePrendo('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'));
+    await pausa(30);
+    apriIncassoP2P();
+  };
+  await presaCheRifiuta('invalid_invoice');
+  el('p2pIncassoInp').value = 'io@walletofsatoshi.com';
+  await inviaIncassoP2P();
+  await pausa(60);
+  {
+    const t = String(nodi.p2pIncassoAvviso.textContent || '');
+    const oi = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'];
+    out.indirizzoRifiutatoPartito = ricevuti.length === 2
+      && ricevuti[1].dentro.payload.payment_request[1] === 'io@walletofsatoshi.com';
+    out.indirizzoRifiutatoLoDice =
+      t === 'Non sono riuscito a verificare questo indirizzo: usa una fattura del tuo wallet.';
+    out.indirizzoRifiutatoSenzaImporto = t.indexOf('importo') < 0 && t.indexOf('scade') < 0;
+    out.indirizzoRifiutatoFoglioAperto = chiusi.indexOf('p2pIncassoSheet') < 0;
+    out.indirizzoRifiutatoFermo = oi.stato;
+    out.indirizzoRifiutatoInPagina = oi.cantDo === t;
+    /* ...e da li' la fattura parte, sullo stesso foglio */
+    el('p2pIncassoInp').value = FATT.f7543_1g;
+    await inviaIncassoP2P();
+    await pausa(60);
+    out.fatturaRifiutataDiceLaSua = ricevuti.length === 3
+      && String(nodi.p2pIncassoAvviso.textContent).indexOf('importo') >= 0
+      && String(nodi.p2pIncassoAvviso.textContent).indexOf('verificare questo indirizzo') < 0;
+  }
+  await presaCheRifiuta('not_allowed_by_status');
+  el('p2pIncassoInp').value = 'io@wallet.com';
+  await inviaIncassoP2P();
+  await pausa(60);
+  out.altroNoTieneLaSuaRagione =
+    String(nodi.p2pIncassoAvviso.textContent).indexOf('in questo momento dello scambio') >= 0
+    && String(nodi.p2pIncassoAvviso.textContent).indexOf('verificare questo indirizzo') < 0;
+  /* PURA: il messaggio mai partito e il silenzio restano i loro */
+  out.ragioneIncassoPura =
+    ragioneIncassoP2P({cantDo: true, motivo: 'invalid-invoice', message: 'x'}, 'a@b.it') === P2P_INDIRIZZO_RIFIUTATO
+    && ragioneIncassoP2P({cantDo: true, motivo: 'invalid-invoice', message: 'x'}, 'lnbc1xyz') === 'x'
+    && ragioneIncassoP2P({relayMuti: true, message: 'x'}, 'a@b.it').indexOf('riprova') >= 0
+    && ragioneIncassoP2P(new Error('nessuna risposta'), 'a@b.it') === 'nessuna risposta';
 
   /* ---- 5) IL «NO» DEL COORDINATORE, in italiano ---------------- */
   reset();
@@ -46035,7 +46108,12 @@ function reset(){
         "foglioDiceIlMioLato": "il foglio promette la cifra DETTA dal coordinatore: 7543, non 7468 ne' 7619",
         "foglioCopiaLaCifra": "...con la cifra da copiare",
         "foglioConsigliaLaLibera": "...consiglia la fattura senza importo",
-        "foglioAvvisaSullaScadenza": "...e avvisa PRIMA sui minuti di vita che il nodo pretende",
+        "foglioAvvisaSullaScadenza": "...e avvisa PRIMA sulla vita che il nodo pretende: piu' di un'ora",
+        "foglioFatturaPrima": "la via principale del foglio e' la FATTURA, detta prima dell'indirizzo",
+        "foglioCifraEsatta": "...senza importo, o della cifra esatta",
+        "foglioCopiaInEvidenza": "...con «Copia la cifra» in evidenza, e prima del campo",
+        "foglioAvvisaSuiProvider": "...e l'indirizzo resta in alternativa, sotto il campo, con l'avviso sui provider",
+        "foglioNonDicePiuSemplice": "...e nessuno dice piu' che l'indirizzo e' la via piu' semplice",
         "foglioDiceDellAutoincasso": "...e l'indirizzo degli incassi automatici e' gia' scritto, e si puo' cambiare",
         "importoStortoFermato": "la fattura vera del 16 set (7468) si ferma, e la ragione dice 7543",
         "nonChiedeIlLordo": "...mai il lordo",
@@ -46075,6 +46153,15 @@ function reset(){
         "senzaFeeDiceIlFatto": "...e il foglio dice la cifra detta, che non e' un conto",
         "senzaFeeLaScadenzaSiGuarda": "...la scadenza si guarda lo stesso, coi 3600 s del nodo",
         "senzaFeeNonSbarra": "...e la fattura buona passa",
+        "indirizzoRifiutatoPartito": "un indirizzo parte com'e' anche quando il coordinatore lo rifiutera'",
+        "indirizzoRifiutatoLoDice": "...e al suo invalid_invoice il foglio dice: non verificato, usa una fattura",
+        "indirizzoRifiutatoSenzaImporto": "...senza parlare di importo ne' di scadenza",
+        "indirizzoRifiutatoFoglioAperto": "...col foglio ancora aperto",
+        "indirizzoRifiutatoFermo": ("...e lo scambio fermo dov'era", "attesa_mia_fattura"),
+        "indirizzoRifiutatoInPagina": "...e la pagina sotto ripete la STESSA frase, non quella generica",
+        "fatturaRifiutataDiceLaSua": "una FATTURA rifiutata tiene la frase di sempre, su importo e scadenza",
+        "altroNoTieneLaSuaRagione": "un «no» d'altro tipo su un indirizzo tiene la sua ragione vera",
+        "ragioneIncassoPura": "ragioneIncassoP2P e' pura: non partito e silenzio restano i loro",
         "rifiutato": ("un «no» del coordinatore si legge", "rifiutato"),
         "motivoInItaliano": "...e il motivo e' in italiano",
         "cantDoScritto": "...e resta scritto nello scambio",
@@ -46251,7 +46338,7 @@ def prove_p2p_stati():
         return
     banco = "\n".join([
         tab, stati, prog, motivi, liste, secondarie, provv,
-        fn("function motivoCantDo(payload){"),
+        fn("function chiaveCantDo(payload){"), fn("function motivoCantDo(payload){"),
         fn("function importoBolt11(pr){"),
         fn("function leggiBolt11(pr){"),
         # dal 16 set 2026 la macchina a stati RICAVA il lordo dal mio
@@ -46546,8 +46633,10 @@ process.stdout.write(JSON.stringify(out));
           "il prezzo di mercato non è disponibile in questo momento" in out["noPrezzo"]
           and "pubblica a prezzo fisso" in out["noPrezzo"]
           and out["noPrezzoKebab"] == out["noPrezzo"])
-    prova("...e la normalizzazione sta in motivoCantDo, una volta", True,
-          ".trim().toLowerCase().replace(/_/g, '-')" in fn("function motivoCantDo(payload){"))
+    prova("...e la normalizzazione sta in chiaveCantDo, una volta", True,
+          ".trim().toLowerCase().replace(/_/g, '-')" in fn("function chiaveCantDo(payload){")
+          and "const k = chiaveCantDo(payload);" in fn("function motivoCantDo(payload){")
+          and mini.count(".toLowerCase().replace(/_/g, '-')") == 1)
     prova("il messaggio dopo cancella l'avviso vecchio", "", out["noSiPulisce"])
     prova("un'azione sconosciuta non muove niente", True, out["ignotoFermo"])
     prova("il voto si accende senza muovere lo stato", True, out["rate"])
@@ -55279,7 +55368,7 @@ def prove_p2p_silenzi():
     banco = "\n".join([
         blocco("AVANZA_P2P"), blocco("STATI_P2P"), blocco("MOTIVI_CANTDO"),
         blocco("P2P_GIRO_MORTO"), liste,
-        fn("function motivoCantDo(payload){"),
+        fn("function chiaveCantDo(payload){"), fn("function motivoCantDo(payload){"),
         fn("function importoBolt11(pr){"), fn("function leggiBolt11(pr){"),
         "let p2pInfo = {fee: 0.02, scadenzaSec: 900};",
         fn("function commissioneVivaP2P(){"),
@@ -55384,7 +55473,7 @@ process.stdout.write(JSON.stringify(out));
         blocco("AVANZA_P2P"), blocco("STATI_P2P"), blocco("MOTIVI_CANTDO"),
         blocco("P2P_GIRO_MORTO"), blocco("P2P_TOAST_GIRO_MORTO"), liste,
         "const P2P_TOAST_HOLD = 'TOCCA';",
-        fn("function motivoCantDo(payload){"),
+        fn("function chiaveCantDo(payload){"), fn("function motivoCantDo(payload){"),
         fn("function importoBolt11(pr){"), fn("function leggiBolt11(pr){"),
         "let p2pInfo = {fee: 0.02, scadenzaSec: 900};",
         fn("function commissioneVivaP2P(){"),
