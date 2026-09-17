@@ -70,6 +70,7 @@ jobs:
              stima_coda_moderazione.py collaudo_altri_oggetti.py
              collaudo_reti.py collaudo_nota.py collaudo_porta_timer.py
              collaudo_feedback_confermato.py ripubblica_tag_client.py
+             collaudo_recensione_p2p.py
              collaudo_pausa.py collaudo_due_teste.py
              collaudo_consegna_firmata.py collaudo_ricategorizza.py
              collaudo_ricerca.py collaudo_sblocco_banner.py collaudo_servizio_dove.py

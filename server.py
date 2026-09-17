@@ -3516,6 +3516,14 @@ def init_db():
         voto INTEGER NOT NULL CHECK(voto BETWEEN 1 AND 5),
         commento TEXT DEFAULT '',
         creato INTEGER,
+        -- DA DOVE VIENE (set 2026, le recensioni degli scambi P2P):
+        -- '' = un affare del mercatino, e allora l'affare e'
+        -- `ordine_id`; altrimenti e' l'id dello scambio sul
+        -- coordinatore, e la recensione si mostra «da scambio P2P».
+        -- UNA TABELLA SOLA E UNA MEDIA SOLA, che e' la regola di casa
+        -- («chi e' onesto con gli oggetti e' onesto anche sul P2P»):
+        -- `_ricalcola_rating` non guarda questa colonna, e non deve.
+        scambio TEXT DEFAULT '',
         UNIQUE(ordine_id, da_tg_id)  -- uno per ordine per parte
     );
     CREATE INDEX IF NOT EXISTS idx_feedback_per
@@ -5434,6 +5442,21 @@ def init_db():
     # Migrazione per i rimborsi delle dispute
     try:
         con.execute("ALTER TABLE ordini ADD COLUMN invoice_rimborso TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+    # LE RECENSIONI DEGLI SCAMBI P2P (set 2026): la colonna dice da
+    # dove viene il voto, e l'indice parziale e' il GEMELLO della
+    # UNIQUE della tabella — «uno per scambio per parte» accanto a
+    # «uno per ordine per parte». Additiva, col default che E' la
+    # migrazione: le righe di ieri restano del mercatino ('') e
+    # continuano a pesare identiche nella media.
+    try:
+        con.execute("ALTER TABLE feedback ADD COLUMN scambio TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        con.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_feedback_scambio "
+                    "ON feedback(scambio, da_tg_id) WHERE scambio<>''")
     except sqlite3.OperationalError:
         pass
     # Migrazione per il tie-break dei saldi d'asta (nata col cantiere:
@@ -9605,6 +9628,19 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("DELETE FROM feedback WHERE ordine_id IN "
                     "(SELECT id FROM ordini WHERE compratore_id=? "
                     " AND venditore_id=?)", (id_telegram, id_telegram))
+        # ...e le recensioni degli SCAMBI P2P fra le due meta' (set
+        # 2026), per le stesse due ragioni: dopo la migrazione sarebbero
+        # auto-voti, e due righe sullo stesso scambio — una per meta' —
+        # collidono sull'indice parziale PROPRIO durante l'UPDATE qui
+        # sotto, cioe' farebbero fallire la fusione intera.
+        # PRIMA che `p2p_ordini` si riscriva (piu' in basso): da li' in
+        # poi i due posti portano lo stesso id e questa query non
+        # riconoscerebbe piu' la coppia.
+        con.execute("DELETE FROM feedback WHERE scambio<>'' AND scambio IN "
+                    "(SELECT ordine FROM p2p_ordini "
+                    " WHERE (tg_id=? AND preso_da=?) "
+                    "    OR (tg_id=? AND preso_da=?))",
+                    (id_telegram, id_nostr, id_nostr, id_telegram))
         con.execute("UPDATE feedback SET da_tg_id=? WHERE da_tg_id=?",
                     (id_telegram, id_nostr))
         con.execute("UPDATE feedback SET per_tg_id=? WHERE per_tg_id=?",
@@ -16313,7 +16349,17 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     # f.id e' un numero opaco: serve solo al bottone rimuovi dell'admin.
     feedback = [] if cursore else [dict(r) for r in con.execute(
         "SELECT f.id, f.voto, f.commento, f.creato, "
-        "CASE WHEN o.id IS NULL THEN 'utente' "
+        # LA PROVENIENZA SI VEDE, IL CONTEGGIO NO (set 2026, le
+        # recensioni degli scambi P2P): una recensione nata da uno
+        # scambio di sats lo dice nella sua riga — «una reputazione
+        # sola» vuol dire una MEDIA sola, non una provenienza sola.
+        # ⚠️ IL RAMO STA PER PRIMO, e non e' gusto: una riga di scambio
+        # ha `ordine_id` negativo (la firma dello scambio), quindi il
+        # LEFT JOIN non trova niente e `o.id IS NULL` la chiamerebbe
+        # «utente» — cioe' la parola che qui dentro vuol dire «di
+        # questo voto non sappiamo l'affare».
+        "CASE WHEN f.scambio<>'' THEN 'scambio' "
+        "WHEN o.id IS NULL THEN 'utente' "
         "WHEN f.da_tg_id=o.compratore_id THEN 'acquirente' "
         "ELSE 'venditore' END AS ruolo, "
         "au.nome AS da_nome, au.negozio AS da_negozio, "
@@ -33496,8 +33542,27 @@ def _registra_ordini_p2p(con, tg_id: int, ordini, adesso: int,
                 "preso_da) VALUES(?,0,?,?)", (o, adesso, tg_id)).rowcount
             con.execute("UPDATE p2p_ordini SET tg_id=0, maker=0 "
                         "WHERE ordine=? AND tg_id=? AND maker=0", (o, tg_id))
+            # ⚠️ LA PRIMA DICHIARAZIONE VINCE, E A COSE FATTE QUEL
+            # POSTO NON SI PRENDE PIU' (set 2026, con le recensioni):
+            # da qui passa ora anche il DESTINATARIO di una recensione,
+            # e un posto che si sovrascrive sarebbe una reputazione che
+            # si dirotta — gli id del libro li legge chiunque, e con
+            # l'ULTIMA parola bastava intestarsi lo scambio di un altro
+            # a scambio finito per prendersi la sua recensione e
+            # lasciarne una a chi ha pubblicato, senza aver scambiato
+            # niente. E' la stessa prudenza del posto di chi pubblica
+            # («un ordine gia' di un altro non si ruba»), e favorisce
+            # chi e' onesto: la presa vera la dichiara il coordinatore
+            # in privato, cioe' PRIMA che il libro dica «in-progress».
+            # IDEMPOTENTE (`preso_da=?` fra le condizioni): il client
+            # la rimanda, e una seconda dichiarazione uguale non e' un
+            # doppione. E il ritorno in vetrina rimette il posto a zero
+            # (`_avvisi_libro_p2p`), quindi la prossima presa entra.
             con.execute("UPDATE p2p_ordini SET preso_da=? "
-                        "WHERE ordine=? AND tg_id<>?", (tg_id, o, tg_id))
+                        "WHERE ordine=? AND tg_id<>? "
+                        "AND (preso_da=0 OR preso_da=?) "
+                        "AND stato NOT IN ('success','canceled','expired')",
+                        (tg_id, o, tg_id, tg_id))
             continue
         scritti += con.execute(
             "INSERT OR IGNORE INTO p2p_ordini(ordine, tg_id, creato) "
@@ -33767,6 +33832,261 @@ async def controparte_p2p(req: Request, x_tg_init_data: str = Header(""),
     finally:
         con.close()
     return {"controparti": chi}
+
+
+# ═══ LE RECENSIONI DEGLI SCAMBI P2P (set 2026) ══════════════════════
+# UNA REPUTAZIONE SOLA, e qui la regola di casa diventa una riga di
+# SQL: la recensione di uno scambio finisce nella TABELLA dei feedback
+# del mercatino e nella STESSA media (`_ricalcola_rating`, che di
+# questa colonna non sa niente). Si distingue da dove viene
+# (`feedback.scambio`), mai nel conteggio.
+# COSA SA IL SERVER, e non e' un dettaglio: dello scambio non ha visto
+# niente — i sats li ha tenuti il coordinatore, gli euro sono passati
+# fuori. Quel che sa e' `p2p_ordini`: chi ha pubblicato, chi ha preso
+# (se l'ha dichiarato) e l'ultimo stato del libro PUBBLICO. Il giudizio
+# poggia su quella riga, e su niente altro.
+STATI_RECENSIONE_P2P = ("success",)
+
+
+def _ammette_recensione_p2p(stato) -> bool:
+    """PURA: da questo stato del libro si recensisce?
+    UNO SOLO, ed e' quello VISTO (la lezione di Q4: gli stati si
+    scrivono quando si vedono): `success` e' l'unico finale in porto
+    che il 38383 pubblichi — `_giro_libro_p2p` tratta come chiusi
+    success/canceled/expired, e gli altri finali del protocollo il
+    libro non li ha mai detti.
+    ⚠️ E LA DISPUTA CHIUSA IN PORTO CI STA DENTRO, a differenza del
+    mercatino: la' un `confirmed` disputato resta ridecidibile da un
+    moderatore e il voto e' chiuso (vedi `_ammette_feedback`), qui
+    decide il coordinatore e non c'e' appello — lo stato e' assorbente
+    davvero. Ed e' proprio dopo una lite che una recensione dice la
+    cosa piu' utile."""
+    return str(stato or "") in STATI_RECENSIONE_P2P
+
+
+def _parti_recensione_p2p(maker_id, preso_da, chi) -> tuple:
+    """PURA: (chi riceve la recensione, motivo per cui non si puo').
+    Prende i CAMPI e non la riga, il patto di `in_ferie`: cosi' si fa
+    girare senza database.
+    I MOTIVI sono codici e non frasi — le frasi le scrive chi le mostra
+    (il client ne ha la tabella, e il refiuto della rotta la sua).
+    `estraneo`: non e' uno dei due posti di quello scambio.
+    `ignota`: l'altra parte il server non sa chi sia — chi ha preso
+    entrando da Nostr (per scelta: la presa non si annota), o chi
+    scambia da un altro client Mostro, che su Barattolo non ha nemmeno
+    un profilo. Una recensione senza destinatario non si scrive
+    ALTROVE in attesa di un giorno: sarebbe un giudizio in deposito su
+    una persona che non l'ha chiesto, e nessuno potrebbe mai provare
+    di esserne il proprietario.
+    `se_stesso`: le due meta' di un account fuso si sono ritrovate ai
+    due capi dello stesso scambio (il patto dell'auto-ordine)."""
+    maker_id, preso_da, chi = int(maker_id or 0), int(preso_da or 0), int(chi or 0)
+    if chi and chi == maker_id:
+        altro = preso_da
+    elif chi and chi == preso_da:
+        altro = maker_id
+    else:
+        return 0, "estraneo"
+    if not altro:
+        return 0, "ignota"
+    if altro == chi:
+        return 0, "se_stesso"
+    return altro, ""
+
+
+def _numero_scambio_p2p(ordine: str) -> int:
+    """PURA: il posto dell'ORDINE per la recensione di uno scambio.
+    `feedback.ordine_id` e' NOT NULL e la UNIQUE di sempre e'
+    (ordine_id, da_tg_id): con uno zero per tutte le righe P2P, al
+    SECONDO scambio di ogni persona il database direbbe «hai gia'
+    recensito». Qui ci va la FIRMA dello scambio: 60 bit di
+    SHA-256 del suo id, col segno MENO.
+    NEGATIVO perche' gli affari del mercatino sono positivi
+    (AUTOINCREMENT): i due mondi non si incrociano mai — le subselect
+    `WHERE ordine_id=o.id` non pescano una riga P2P nemmeno per
+    sbaglio — e una riga di scambio si riconosce a occhio in
+    qualunque query.
+    DERIVATO E NON CONTATO, ed e' la meta' che conta: con un numero
+    nuovo a ogni giro la UNIQUE di sempre lascerebbe passare il
+    doppione (numero diverso, stessa persona) e a fermarlo resterebbe
+    solo l'indice parziale — due giudici che dicono cose diverse sullo
+    stesso fatto. Cosi' dicono la stessa cosa, e il secondo e' una
+    cintura.
+    ⚠️ IL PREZZO, dichiarato: 60 bit. Perche' una recensione venisse
+    rifiutata per sbaglio servirebbe che la STESSA persona abbia due
+    scambi che collidono su quei 60 bit — un caso su 10^18 a coppia.
+    E sbaglia RIFIUTANDO, mai attribuendo: a dire di quale scambio si
+    parla e' `scambio`, che porta l'id per intero."""
+    firma = int.from_bytes(hashlib.sha256(
+        str(ordine).encode("utf-8")).digest()[:8], "big") >> 4
+    return -(firma or 1)
+
+
+def _mia_recensione_p2p(con, ordine: str, chi: int):
+    """La recensione che quella persona ha gia' lasciato su quello
+    scambio, o None. Sta sul SERVER e non nel browser apposta: la riga
+    dello scambio vive in localStorage, quindi da un altro dispositivo
+    l'invito ricomparirebbe — e uno si troverebbe a riscrivere una
+    recensione per poi sentirsi dire che c'e' gia'."""
+    return con.execute("SELECT voto, commento FROM feedback "
+                       "WHERE scambio=? AND da_tg_id=?",
+                       (ordine, chi)).fetchone()
+
+
+@app.post("/api/p2p/recensibile")
+async def recensibile_p2p(req: Request, x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """«Su questo scambio posso lasciare una recensione, e l'ho gia'
+    lasciata?» — la domanda che il foglio fa PRIMA di aprirsi.
+    ESISTE PER NON MOSTRARE UN MURO: senza, il foglio chiederebbe
+    stelle e commento e poi il server risponderebbe «l'altra persona
+    non e' su Barattolo» a chi ha gia' scritto — «un bottone che porta
+    a un muro e' peggio di un bottone che non c'e'».
+    NIENTE ID NELL'URL, come per i volti: un log e' un posto dove le
+    cose restano.
+    NESSUN GATE SULLA LEVA, per la ragione delle sorelle rovesciata:
+    qui non si scrive niente, e un 409 colpirebbe solo chi ha appena
+    concluso uno scambio il giorno che la leva si spegne."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    # `leggi_json` e non un try a mano, come la gemella che scrive: un
+    # body che non e' nemmeno un oggetto prende 400 e non 500.
+    d = await leggi_json(req)
+    ordine = str(d.get("ordine") or "").strip()
+    if not FORMA_ORDINE_P2P.fullmatch(ordine):
+        raise HTTPException(400, "Ordine in una forma sconosciuta")
+    con = db()
+    try:
+        r = con.execute("SELECT tg_id, preso_da, stato FROM p2p_ordini "
+                        "WHERE ordine=?", (ordine,)).fetchone()
+        mia = _mia_recensione_p2p(con, ordine, user["id"])
+    finally:
+        con.close()
+    # UNA RIGA CHE NON C'E' NON E' UN ERRORE: e' lo scambio di un altro
+    # client, o uno che questo server non ha mai visto passare.
+    if not r:
+        return {"si": False, "motivo": "ignota", "gia": False}
+    per, motivo = _parti_recensione_p2p(r["tg_id"], r["preso_da"], user["id"])
+    # ⚠️ E A CHI NON E' DELLA PARTITA SI RISPONDE COME A UN ID CHE NON
+    # ESISTE (la lezione di Q3: «non ti riconosco» si serve COME una
+    # lista vuota). Distinguere i due casi direbbe a chiunque abbia una
+    # sessione che QUELL'ordine del libro pubblico e' passato da
+    # Barattolo — ed e' l'unico bit che i volti non danno gia': quelli
+    # rispondono solo dove un intestatario si conosce, e tacciono
+    # uguale sulle righe a intestatario ignoto. Chi ha preso l'ordine
+    # di un altro client resta dov'era.
+    if motivo == "estraneo":
+        return {"si": False, "motivo": "ignota", "gia": False}
+    if not _ammette_recensione_p2p(r["stato"]) and not mia:
+        motivo = motivo or "non_conclusa"
+    fuori = {"si": bool(per) and not motivo and not mia,
+             "motivo": motivo, "gia": bool(mia)}
+    if mia:
+        fuori["voto"] = mia["voto"]
+        fuori["commento"] = mia["commento"] or ""
+    return fuori
+
+
+@app.post("/api/p2p/recensione")
+async def recensione_p2p(req: Request, x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """Una delle due parti recensisce l'altra a scambio concluso.
+    Stesse regole del mercatino: da 1 a 5 stelle, un commento da 200
+    caratteri sotto il filtro, UNA per parte per scambio e DEFINITIVA
+    — «chiude il ricatto "cambia il feedback o…"», e la valvola resta
+    la rimozione di un moderatore.
+    IL GIUDICE DEI DOPPIONI E' IL DATABASE, come di la': l'indice
+    parziale `idx_feedback_scambio` e' il gemello della UNIQUE della
+    tabella, e un doppione si riconosce dall'IntegrityError e non da
+    una SELECT fatta prima (che due richieste in volo scavalcherebbero
+    tutte e due).
+    NESSUN GATE SULLA LEVA, e vale la pena scriverlo: la recensione e'
+    del MERCATINO — la sua media, il suo profilo — e lo scambio e' gia'
+    successo. Spegnere il P2P non deve togliere a nessuno il voto che
+    si e' guadagnato."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    ordine = str(d.get("ordine") or "").strip()
+    if not FORMA_ORDINE_P2P.fullmatch(ordine):
+        raise HTTPException(400, "Ordine in una forma sconosciuta")
+    try:
+        voto = int(d.get("voto", 0))
+    except (TypeError, ValueError):
+        voto = 0
+    if not 1 <= voto <= 5:
+        raise HTTPException(400, "Il voto va da 1 a 5 stelle")
+    commento = str(d.get("commento", "")).strip()
+    if len(commento) > 200:
+        raise HTTPException(400, "Commento troppo lungo (max 200 caratteri)")
+    if commento:
+        categoria = controlla_vietato(commento, "")
+        if categoria:
+            # L'ID DELLO SCAMBIO NON ESCE NEMMENO QUI (set 2026): al
+            # moderatore serve la persona, e quell'id — che di qua non
+            # si mostra a nessuno — nel canale degli avvisi diventa il
+            # collegamento fra un account e un ordine del libro
+            # pubblico, cioe' la cosa che `p2p_ordini` tiene chiusa.
+            await notifica_admin(
+                f"🚫 <b>Commento di recensione bloccato dal filtro</b> "
+                f"({categoria})\nScambio P2P — "
+                f"{user['first_name']} (id {user['id']})")
+            raise HTTPException(400, "Il commento contiene termini non "
+                                     "ammessi sul mercatino")
+    con = db()
+    try:
+        con.execute("BEGIN IMMEDIATE")
+        r = con.execute("SELECT tg_id, preso_da, stato FROM p2p_ordini "
+                        "WHERE ordine=?", (ordine,)).fetchone()
+        if not r:
+            con.rollback()
+            raise HTTPException(404, "Scambio non trovato")
+        per, motivo = _parti_recensione_p2p(r["tg_id"], r["preso_da"],
+                                            user["id"])
+        if motivo == "estraneo":
+            con.rollback()
+            raise HTTPException(403, "Operazione non permessa")
+        if not _ammette_recensione_p2p(r["stato"]):
+            con.rollback()
+            raise HTTPException(400, "La recensione si lascia a scambio "
+                                     "concluso")
+        if motivo == "ignota":
+            con.rollback()
+            raise HTTPException(400, "Dell'altra persona non sappiamo il "
+                                     "profilo: la recensione non avrebbe "
+                                     "dove andare")
+        if motivo:
+            con.rollback()
+            raise HTTPException(400, "Operazione non permessa")
+        try:
+            con.execute("INSERT INTO feedback(ordine_id, da_tg_id, "
+                        "per_tg_id, voto, commento, creato, scambio) "
+                        "VALUES(?,?,?,?,?,?,?)",
+                        (_numero_scambio_p2p(ordine), user["id"], per, voto,
+                         commento, int(time.time()), ordine))
+        except sqlite3.IntegrityError:
+            con.rollback()
+            raise HTTPException(400, "Hai già lasciato la recensione "
+                                     "per questo scambio")
+        _ricalcola_rating(con, per)
+        con.commit()
+    except Exception:
+        con.rollback()
+        raise
+    finally:
+        con.close()
+    stelle = "★" * voto
+    # NIENTE ID NEL MESSAGGIO: nella pagina dello scambio l'id non si
+    # mostra per decisione di Andrea («di qua non serve a nessuno, e di
+    # la' apre la porta a chi volesse dettarlo al telefono»), e un
+    # avviso non e' il posto per farlo rientrare dalla finestra.
+    await notifica(per,
+                   f"⭐ <b>Hai ricevuto una recensione:</b> {stelle} "
+                   f"({voto}/5) per uno scambio di sats."
+                   + (f"\n«{commento}»" if commento else ""))
+    # Una recensione puo' premiare entrambi, come nel mercatino: chi la
+    # lascia e chi la riceve.
+    await premia_distintivi(user["id"])
+    await premia_distintivi(per)
+    return {"ok": True, "voto": voto}
 
 
 @app.post("/api/p2p/chiavi")
@@ -35320,11 +35640,18 @@ def _euro_libro(valori) -> str:
 
 
 def _testo_libro_p2p(passaggio: str, ev: dict, fee, ore: int,
-                     ruolo: str = "maker") -> str:
+                     ruolo: str = "maker", recensibile: bool = False) -> str:
     """PURA: la frase per quel momento, coi numeri del libro. Lo stile
     e' uno solo — cosa e' successo, i numeri, di chi e' il prossimo
     passo — e non nomina mai il protocollo: chi legge entra da
     Telegram o da Nostr e non deve sapere cos'e' un relay.
+    `recensibile` (set 2026): se a scambio concluso c'e' davvero un
+    posto dove lasciare la recensione — cioe' se il server sa chi era
+    l'altra parte. L'invito NON si scrive quando non c'e': la frase
+    stava qui da prima che la recensione esistesse, e prometteva un
+    gesto che non si poteva fare. Il giudice e' `_parti_recensione_p2p`,
+    lo stesso della rotta: due elenchi da tenere in pari sarebbero il
+    posto dove un giorno la frase dice una cosa e la rotta un'altra.
     `lato` e' quello del libro (`k`): `sell` = chi ha pubblicato VENDE,
     e chi l'ha preso (`ruolo` taker) fa il contrario. Le frasi di chi
     prende dicono la stessa cosa dal suo lato: la presa e' una
@@ -35386,6 +35713,10 @@ def _testo_libro_p2p(passaggio: str, ev: dict, fee, ore: int,
         return ("🔄 <b>Chi aveva preso il tuo ordine non ha proseguito.</b> "
                 "È tornato in vetrina: non devi fare niente.")
     if passaggio in ("concluso", "disputa_conclusa"):
+        # E L'INVITO DICE DOVE SI FA: il posto e' la pagina dello
+        # scambio, la stessa da cui si e' seguito tutto il giro.
+        invito = ("\n\nLascia una recensione: la trovi nella pagina dello "
+                  "scambio." if recensibile else "")
         testa = ("⚖️ <b>La disputa è stata chiusa: lo scambio è andato "
                  "in porto.</b> " if passaggio == "disputa_conclusa"
                  else "✅ <b>Scambio concluso!</b> ")
@@ -35394,13 +35725,13 @@ def _testo_libro_p2p(passaggio: str, ev: dict, fee, ore: int,
                 else "Hai venduto bitcoin"
             if euro:
                 fatto += f" per {euro}"
-            return f"{testa}{fatto}.\n\nLascia una recensione su Barattolo."
+            return f"{testa}{fatto}.{invito}"
         if sats > 0 and fee is not None and fee >= 0:
             netto = sats - int(sats * float(fee) / 2 + 0.5)
             fatto = f"{_fmt_sats(netto)} sats sono in arrivo al tuo recapito"
         else:
             fatto = "I sats sono in arrivo al tuo recapito"
-        return f"{testa}{fatto}.\n\nLascia una recensione su Barattolo."
+        return f"{testa}{fatto}.{invito}"
     if passaggio == "annullato":
         return ("❌ <b>Lo scambio è stato annullato.</b> I sats "
                 "eventualmente in garanzia tornano a chi vende.")
@@ -35482,12 +35813,17 @@ def _avvisi_libro_p2p(con, eventi: list, adesso: int, fee, ore: int) -> list:
                                 (preso_da, passaggio_taker, "taker")):
             if chi <= 0 or not pas:
                 continue
+            # C'E' UN POSTO PER LA RECENSIONE? Lo chiede al giudice
+            # della rotta, coi campi di questa riga: senza l'altra
+            # parte l'invito non si scrive (vedi `_testo_libro_p2p`).
+            altro, perche = _parti_recensione_p2p(r["tg_id"], preso_da, chi)
             if not _avvisi_p2p_accesi(con, chi):
                 print(f"🔕 Libro P2P: {chi} ha gli avvisi P2P SPENTI "
                       f"(cassetto Avvisi): la frase «{pas}» non parte",
                       flush=True)
                 continue
-            testo = _testo_libro_p2p(pas, ev, fee, ore, ruolo)
+            testo = _testo_libro_p2p(pas, ev, fee, ore, ruolo,
+                                     bool(altro) and not perche)
             if testo:
                 fuori.append((chi, testo))
                 avvisati.add(chi)
@@ -41644,10 +41980,16 @@ async def rimuovi_feedback_admin(feedback_id: int,
         raise
     finally:
         con.close()
+    # DUE PROVENIENZE, DUE FRASI (set 2026): su una recensione di
+    # scambio il numero dell'affare non esiste — `ordine_id` e' la
+    # firma dello scambio, un negativo che non dice niente a nessuno.
     await notifica(f["da_tg_id"],
-                   "🧹 Un moderatore ha rimosso il tuo feedback "
-                   f"sull'affare #{f['ordine_id']} perché non rispettava "
-                   "le regole del mercatino.")
+                   ("🧹 Un moderatore ha rimosso la tua recensione su uno "
+                    "scambio di sats perché non rispettava le regole del "
+                    "mercatino." if f["scambio"] else
+                    "🧹 Un moderatore ha rimosso il tuo feedback "
+                    f"sull'affare #{f['ordine_id']} perché non rispettava "
+                    "le regole del mercatino."))
     return {"ok": True}
 
 

@@ -14521,7 +14521,7 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
         <span class="stars">${'★'.repeat(f.voto)}</span>
         <span>${nome} ${faccia}<br>
           ${f.commento?`${esc(f.commento)}<br>`:''}
-          <small style="opacity:.65">${f.ruolo==='acquirente'?'ha comprato qui':f.ruolo==='venditore'?'ha venduto qui':'utente'} · ${new Date(f.creato*1000).toLocaleDateString('it-IT')}</small>
+          <small style="opacity:.65">${f.ruolo==='acquirente'?'ha comprato qui':f.ruolo==='venditore'?'ha venduto qui':f.ruolo==='scambio'?'da uno scambio P2P':'utente'} · ${new Date(f.creato*1000).toLocaleDateString('it-IT')}</small>
           ${isAdmin?` <a href="#" onclick="rimuoviFeedback(${f.id});return false" style="color:var(--danger);font-size:12px">rimuovi</a>`:''}
         </span>
       </div>`;}).join('')}` : '';
@@ -39850,6 +39850,20 @@ function p2pTogliibile(o, adesso){
    `applicaMessaggioP2P` e `statoPubblicoOrdini`, che passano dal
    rimotore. Il lampo delle 24 ore resta al solo `rifiutato`, che
    porta un motivo da leggere. */
+/* IL GIUDICE DELLA RECENSIONE IN SOSPESO, uno per i due posti che lo
+   chiedono (la scopa e la ✕). Uno scambio concluso e' finale per i
+   sats, non per la reputazione: finche' c'e' una recensione da
+   lasciare la riga non si tocca — la sua chiave e' l'unica cosa che
+   permette di lasciarla.
+   `recensione` vale 'fatta' quando l'ho lasciata e 'senza' quando il
+   server ha detto che un posto non c'e': nel secondo caso non c'e'
+   piu' niente da aspettare, e la riga torna a invecchiare come le
+   altre. Chi quello scambio non lo apre mai non riceve nessuna delle
+   due risposte, e la sua riga resta: era gia' cosi' col voto del
+   coordinatore, ed e' il verso giusto in cui sbagliare. */
+function recensioneInSospesoP2P(o){
+  return !!o && o.stato === 'concluso' && !o.recensione;
+}
 const P2P_SCOPA_GIORNI = 30;
 const P2P_SCOPA_LAMPO_S = 24 * 3600;
 /* IL GIUDICE DEL RITIRATO, uno per i tre posti: annullato senza sats
@@ -39919,7 +39933,7 @@ function pulisciScambiP2P(){
   for (const k of Object.keys(tutti)) {
     const o = tutti[k];
     if (!o || !p2pTogliibile(o, adesso).si) continue;
-    if (o.stato === 'concluso' && o.votabile && !o.votato) continue;
+    if (recensioneInSospesoP2P(o)) continue;
     const mosso = o.quando || o.aggiornato || o.creato || 0;
     const lampo = (o.stato === 'annullato' || o.stato === 'rifiutato')
       && !o.hold && !(o.satsNetti > 0);
@@ -39950,7 +39964,7 @@ function togliScambioP2P(id, ev){
       : 'Questo scambio è ancora aperto');
     return;
   }
-  const votoAperto = o.stato === 'concluso' && o.votabile && !o.votato;
+  const votoAperto = recensioneInSospesoP2P(o);
   const perde = 'La riga e la sua chiave se ne vanno da questo dispositivo, e non tornano.';
   chiediConferma({
     titolo: 'Togliere questo scambio?',
@@ -40936,15 +40950,36 @@ const P2P_ANNULLA_INSIEME = ['attesa_mia_fattura', 'attesa_hold_venditore',
 const P2P_DISPUTABILI = ['attivo', 'pagamento_ritentato', 'euro_inviati'];
 /* PURA: i gesti che stanno SOTTO il bottone pieno. Mai il passo
    successivo — quello e' uno solo ed e' azioniDisponibili. */
-function azioniSecondarieP2P(o){
+function azioniSecondarieP2P(o, rec){
   if (!o) return [];
   const fuori = [];
   if (P2P_ANNULLA_SUBITO.indexOf(o.stato) >= 0) fuori.push('ritira');
   else if (P2P_ANNULLA_INSIEME.indexOf(o.stato) >= 0) fuori.push('annulla');
   if (o.stato === 'annullo_proposto') fuori.push('accetta-annullo');
-  if (o.votabile && !o.votato) fuori.push('vota');
+  const gesto = gestoRecensioneP2P(o, rec);
+  if (gesto) fuori.push(gesto);
   if (P2P_DISPUTABILI.indexOf(o.stato) >= 0) fuori.push('disputa');
   return fuori;
+}
+/* PURA: che gesto offrire a scambio concluso — '' quando non ce n'e'
+   nessuno. `rec` e' la risposta del server su QUESTO scambio (o
+   niente, finche' non arriva).
+   ⚠️ SENZA RISPOSTA NON SI OFFRE NIENTE, e non e' prudenza generica:
+   il bottone cambierebbe sotto il dito — «Lascia una recensione»
+   diventerebbe «Vota chi ha scambiato con te» un istante dopo — e chi
+   sta premendo si troverebbe un altro gesto. La card nasce senza e se
+   lo mette quando la risposta arriva, il patto dei volti.
+   `o.recensione` e' la memoria di questo dispositivo: 'fatta' se l'ho
+   lasciata, 'senza' se il server ha detto che un posto non c'e'. La
+   prima la sa anche il server (`gia`), e vince chi delle due dice si':
+   la riga vive nel browser, quindi da un altro dispositivo la memoria
+   e' solo quella del server. */
+function gestoRecensioneP2P(o, rec){
+  if (!o || o.stato !== 'concluso') return '';
+  if (o.recensione === 'fatta' || (rec && rec.gia)) return '';
+  if (!rec) return '';
+  if (rec.si) return 'recensisci';
+  return (o.votabile && !o.votato) ? 'vota' : '';
 }
 /* i quattro passi che si vedono, e a che punto sta ognuno stato */
 const P2P_PROGRESSO = {
@@ -42416,6 +42451,15 @@ const SECONDARI_P2P = {
   ritira: '<button class="btn ghost" onclick="annullaScambioP2P()">✕ Annulla l\'ordine</button>',
   annulla: '<button class="btn ghost" onclick="annullaScambioP2P()">✕ Chiedi di annullare</button>',
   'accetta-annullo': '<button class="btn ghost" onclick="accettaAnnulloP2P()">🤝 Accetta di annullare</button>',
+  /* A SCAMBIO CONCLUSO I GESTI SONO DUE E SI ESCLUDONO (set 2026, le
+     recensioni degli scambi): `recensisci` e' la recensione di casa —
+     stelle E commento, sul profilo Barattolo dell'altra persona, nella
+     STESSA media del mercatino — e compare quando il server sa chi era
+     dall'altra parte. `vota` e' quel che resta quando non lo sa: le
+     sole stelle sul circuito degli scambi, che per chi non e' di
+     Barattolo sono l'unica reputazione che ha. A decidere e'
+     `gestoRecensioneP2P`, mai il chiamante. */
+  recensisci: '<button class="btn ghost" onclick="apriRecensioneP2P()">⭐ Lascia una recensione</button>',
   vota: '<button class="btn ghost" onclick="apriVotoP2P()">⭐ Vota chi ha scambiato con te</button>',
   /* l'uscita, e sta in fondo come nell'ordine di Barattolo: prima
      il passo da fare, poi il modo di parlarsi, e per ultima la
@@ -42550,7 +42594,13 @@ function renderOrdineP2P(){
     'euro-inviati': '<button class="btn orange" onclick="euroInviatiP2P()">✅ Ho inviato gli euro</button>',
     rilascia: '<button class="btn orange" onclick="rilasciaP2P()">🔓 Libera i sats</button>'
   };
-  const secondarie = azioniSecondarieP2P(o);
+  /* LA DOMANDA PARTE DA QUI, una sola volta per scambio: «c'e' un
+     posto per la recensione, e l'ho gia' lasciata?». Non blocca il
+     render — la pagina si disegna e il gesto compare quando la
+     risposta arriva (il patto dei volti sul libro). */
+  if (o.stato === 'concluso') chiediRecensibileP2P(o.id);
+  const rec = p2pRecensioni[o.id];
+  const secondarie = azioniSecondarieP2P(o, rec);
   /* a ordine Amazon scaduto coi sats in garanzia l'annullo
      d'accordo si veste d'arancio: e' il gesto che risolve */
   const scadutoTab = P2P_TAB_IN_GARANZIA.indexOf(o.stato) >= 0
@@ -42626,8 +42676,30 @@ function renderOrdineP2P(){
        sopra il niente. La garanzia la dice il conto qui sopra con le
        sue cifre, e la spiega per intero «Info P2P», dove c'e' lo
        spazio anche per il perche'. */
+    rigaRecensioneP2P(o, rec) +
     secondarie.map(a => (scadutoTab && SECONDARI_EVIDENZA_P2P[a])
                         || SECONDARI_P2P[a] || '').join('');
+}
+/* PURA: quel che resta scritto quando il gesto non c'e' piu' — la
+   recensione lasciata (con le sue stelle) o la ragione per cui qui non
+   se ne puo' lasciare. A scambio non concluso: niente. */
+function rigaRecensioneP2P(o, rec){
+  if (!o || o.stato !== 'concluso') return '';
+  const mia = (rec && rec.gia) ? rec : (o.recensione === 'fatta' ? {voto: o.recVoto} : null);
+  /* ⚠️ IL VOTO SI CLAMPA PRIMA DI `repeat()`, ed e' la famiglia del
+     filtro-alfabeto: qui il numero arriva dal nostro server (dove un
+     CHECK lo tiene fra 1 e 5) oppure dalla RIGA in localStorage, che
+     e' un posto dove chiunque puo' scrivere quel che vuole — e un
+     -1 dentro repeat() non stampa niente di storto: solleva, e porta
+     via la pagina intera. */
+  const stelle = Math.max(0, Math.min(5, (mia && mia.voto) | 0));
+  if (mia)
+    return '<div class="trust-note nota-scambio"><span>⭐</span><span><b>Recensione lasciata</b>'
+      + (stelle ? '<br><span class="stars">' + '★'.repeat(stelle) + '</span>' : '')
+      + (mia.commento ? ' ' + esc(mia.commento) : '') + '</span></div>';
+  if (rec && !rec.si && rec.motivo === 'ignota' && !(o.votabile && !o.votato))
+    return '<div class="hint">Questa persona non ha un profilo su Barattolo: non c\'è un posto dove lasciarle una recensione.</div>';
+  return '';
 }
 
 /* ---- il foglio del pagamento da bloccare ----
@@ -44446,10 +44518,79 @@ async function inviaAnnulloP2P(modo){
   if (p2pOrdineAperto === id) renderOrdineP2P();
 }
 
-/* ---- il voto ----
+/* ═══ LA RECENSIONE DI UNO SCAMBIO (set 2026) ═══════════════════════
+   UNA REPUTAZIONE SOLA, e qui diventa un gesto: a scambio concluso si
+   recensisce l'altra persona come si recensisce chi ti ha venduto un
+   oggetto — stesse stelle, stesso commento, STESSA media. Il voto va
+   nella tabella dei feedback del mercatino con scritto da dove viene,
+   e il profilo mostra un numero solo.
+   DUE DESTINAZIONI, UN GESTO SOLO (decisione di questo cantiere): le
+   stelle — non il commento, che il protocollo non porta — partono
+   ANCHE verso il coordinatore, se e' stato lui a invitare al voto. Non
+   e' una seconda reputazione da leggere (quella e' uscita col cantiere
+   «Una reputazione sola», e non rientra): e' la reputazione che
+   l'altra persona si porta dietro FUORI da Barattolo, dove i nostri
+   voti non si vedono. Scriverla costa un messaggio, non scriverla
+   sarebbe scroccare il circuito degli altri.
+   ⚠️ E DOVE LA RECENSIONE NON HA UN POSTO resta il solo voto del
+   circuito: chi prende un ordine entrando da Nostr non viene annotato
+   (e' la ragione per cui quell'ingresso esiste) e chi scambia da un
+   altro client un profilo qui non ce l'ha. Si dice, e non si fa finta
+   di niente: il foglio lo scrive, e le stelle vanno dove possono. */
+let p2pStellaScelta = 0;       // le stelle scelte e non ancora mandate
+
+/* ⚠️ LE DUE CHE PARLANO COL NOSTRO SERVER STANNO DI LA' (set 2026):
+   `chiediRecensibileP2P` e `inviaRecensioneP2P` vivono nel blocco dei
+   VOLTI, dopo il marcatore «fine del motore dello scambio», e la
+   ragione e' una regola di casa che una sentinella fa rispettare — il
+   motore dello scambio non ha dentro NESSUNA `fetch`: quel che passa
+   da Barattolo si vede tutto in un posto solo. Da qui si chiamano, e
+   basta (come fa la presa con `registraOrdiniP2P`). */
+
+function apriRecensioneP2P(){
+  const o = ordiniP2P()[p2pOrdineAperto];
+  if (!o) return;
+  haptic();
+  p2pStellaScelta = 0;
+  renderRecensioneP2P();
+  el('sheetBg').classList.add('open');
+  el('p2pVotoSheet').classList.add('open');
+}
+function renderRecensioneP2P(){
+  const box = el('p2pVotoCorpo');
+  const o = ordiniP2P()[p2pOrdineAperto];
+  if (!box || !o) return;
+  const anche = o.votabile && !o.votato;
+  box.innerHTML =
+    '<div class="hint">Com\'è andata con chi ha scambiato con te? Le stelle e il commento vanno sul suo profilo di Barattolo, nella stessa media del mercatino.</div>' +
+    stelleSceltaP2P() +
+    '<textarea id="p2pRecCommento" maxlength="200" style="min-height:52px" placeholder="Commento (facoltativo, max 200 caratteri)"></textarea>' +
+    '<button class="btn primary" style="margin-top:10px" onclick="inviaRecensioneP2P(this)">⭐ Invia la recensione</button>' +
+    '<div class="hint">È definitiva: non potrà essere modificata.' +
+    (anche ? ' Le stelle viaggiano anche sul circuito degli scambi, che è la reputazione di chi scambia fuori da Barattolo; il commento resta qui.' : '') +
+    '</div>';
+}
+/* le cinque stelle da scegliere, gemelle di quelle del mercatino: si
+   accendono e basta, e a mandarle e' il bottone */
+function stelleSceltaP2P(){
+  return '<div class="p2p-stelle">' + [1, 2, 3, 4, 5].map(n =>
+    '<button type="button" class="p2p-stella" id="p2pStella' + n + '" data-n="' + n + '" ' +
+    'aria-label="' + n + ' su 5" onclick="sceltaStellaP2P(Number(this.dataset.n))">' +
+    (n <= p2pStellaScelta ? '★' : '☆') + '</button>').join('') + '</div>';
+}
+function sceltaStellaP2P(n){
+  haptic();
+  p2pStellaScelta = n;
+  for (let i = 1; i <= 5; i++) {
+    const b = el('p2pStella' + i);
+    if (b) b.textContent = i <= n ? '★' : '☆';
+  }
+}
+/* ---- il voto del solo circuito ----
    Il coordinatore lo chiede a scambio finito («rate»), e vale sulla
-   REPUTAZIONE del profilo di scambio — che e' un'altra cosa dalle
-   stelle di Barattolo, e va detto. */
+   REPUTAZIONE del profilo di scambio. Resta il gesto di quando una
+   recensione non ha dove andare: l'altra persona non e' di Barattolo,
+   e questa e' l'unica reputazione che ha. */
 function apriVotoP2P(){
   const o = ordiniP2P()[p2pOrdineAperto];
   if (!o) return;
@@ -44461,8 +44602,16 @@ function apriVotoP2P(){
 function renderVotoP2P(){
   const box = el('p2pVotoCorpo');
   if (!box) return;
+  /* ⚠️ DUE RAGIONI, DUE FRASI, e la seconda e' una cura scrivendo: da
+     qui si passa anche quando la domanda al server NON HA RISPOSTO, e
+     dire «non ha un profilo su Barattolo» a chi non lo sa nemmeno
+     sarebbe una bugia detta con sicurezza. Chi non sa lo dice. */
+  const rec = p2pRecensioni[p2pOrdineAperto] || {};
   box.innerHTML =
-    '<div class="hint">Com\'è andata con l\'altra persona? Il voto resta sul suo profilo di scambio.</div>' +
+    '<div class="hint">' + (rec.motivo === 'ignota'
+      ? 'Chi ha scambiato con te non ha un profilo su Barattolo: una recensione qui non avrebbe un posto dove vivere. Le stelle però puoi dargliele sul suo profilo di scambio, che è la reputazione che si porta dietro.'
+      : 'Non riesco a chiedere se su questo scambio si può lasciare una recensione. Le stelle puoi dargliele comunque sul suo profilo di scambio.')
+    + '</div>' +
     '<div class="p2p-stelle">' + [1, 2, 3, 4, 5].map(n =>
       '<button type="button" class="p2p-stella" data-n="' + n + '" ' +
       'aria-label="' + n + ' su 5" onclick="votaP2P(Number(this.dataset.n))">★</button>').join('') +
@@ -44476,15 +44625,22 @@ async function votaP2P(n){
   chiudiFoglioP2P('p2pVotoSheet');
   const rip = attesaP2P('Mando il voto…');
   try {
-    await chiamataOrdineP2P(o, 'rate-user', {rating_user: n});
-    const agg = ordiniP2P()[id] || o;
-    agg.votato = true;
-    scriviOrdineP2P(agg);
+    await stelleCircuitoP2P(o, n);
     toast('Grazie ⭐');
   } catch(e) {
     toast('Il voto non è partito: ' + ragioneGestoP2P(e));
   } finally { rip(); }
   if (p2pOrdineAperto === id) renderOrdineP2P();
+}
+/* le stelle al coordinatore, e il timbro sulla riga. Un posto solo per
+   i due chiamanti — il foglio del circuito e la recensione che se le
+   porta dietro — o il giorno che cambia il messaggio ne resterebbe
+   uno indietro. */
+async function stelleCircuitoP2P(o, n){
+  await chiamataOrdineP2P(o, 'rate-user', {rating_user: n});
+  const agg = ordiniP2P()[o.id] || o;
+  agg.votato = true;
+  scriviOrdineP2P(agg);
 }
 
 /* ---- I DUE RECAPITI CIFRATI (set 2026, fase 6 — al posto della chat)
@@ -45913,6 +46069,102 @@ async function registraOrdiniP2P(ids, pubblicati, presi){
     return r.ok;
   } catch(e){ return false; }
 }
+let p2pRecensioni = {};        // ordine -> {si, motivo, gia, voto, commento}
+let p2pRecChieste = new Set(); // mai due volte nella stessa sessione
+
+/* «Su questo scambio posso recensire, e l'ho gia' fatto?» — in
+   sottofondo, mai bloccante, e MAI due volte per lo stesso id.
+   ⚠️ IL MUTO NON E' UN NO: se la risposta non arriva si segna
+   `motivo: 'muto'` e il foglio ripiega sul voto del circuito, che e'
+   un gesto che non passa da noi. Un client che si fermasse qui
+   toglierebbe alla persona anche l'unica strada rimasta. */
+async function chiediRecensibileP2P(id){
+  if (DEMO || VETRINA || !myTgId) return false;
+  if (!id || p2pRecChieste.has(id)) return false;
+  p2pRecChieste.add(id);
+  let esito;
+  try {
+    const r = await fetch(`${API_BASE}/p2p/recensibile`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({ordine: id})});
+    esito = r.ok ? await r.json() : {si: false, motivo: 'muto'};
+  } catch(e) { esito = {si: false, motivo: 'muto'}; }
+  p2pRecensioni[id] = esito;
+  /* la memoria del dispositivo si allinea a quella del server: un
+     «non c'e' posto» detto una volta non si richiede piu', e la
+     scopa dei trenta giorni smette di tenere in vita quella riga */
+  const o = ordiniP2P()[id];
+  if (o) {
+    const prima = o.recensione;
+    if (esito.gia) { o.recensione = 'fatta'; o.recVoto = esito.voto || 0; }
+    else if (!esito.si && esito.motivo && esito.motivo !== 'muto'
+             && esito.motivo !== 'non_conclusa') o.recensione = 'senza';
+    if (o.recensione !== prima) scriviOrdineP2P(o);
+  }
+  if (p2pOrdineAperto === id && vistaAttivaP2P() === 'view-p2pordine')
+    renderOrdineP2P();
+  return true;
+}
+
+async function inviaRecensioneP2P(btn){
+  /* il cancello dell'anonimo come le tre sorelle di questo blocco:
+     ogni funzione che parla col nostro server ce l'ha, e qui e' una
+     cintura — il bottone nasce solo dalla risposta della domanda, che
+     in vetrina non parte */
+  if (DEMO || VETRINA || !myTgId) return false;
+  haptic();
+  const id = p2pOrdineAperto;
+  const o = ordiniP2P()[id];
+  if (!o) return;
+  if (!p2pStellaScelta) { toast('Scegli da 1 a 5 stelle'); return; }
+  const voto = p2pStellaScelta;
+  const commento = ((el('p2pRecCommento') || {}).value || '').trim();
+  chiediConferma({
+    titolo: 'Invii questa recensione?',
+    corpo: 'È definitiva: non potrà essere modificata.',
+    etichetta: '⭐ Invia',
+    poi: async () => {
+      const ripristina = bottoneInAttesa(btn, '⭐ Invio la recensione…');
+      let d = {};
+      let ok = false;
+      try {
+        const r = await fetch(`${API_BASE}/p2p/recensione`, {method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+          body: JSON.stringify({ordine: id, voto, commento})});
+        d = await r.json().catch(() => ({}));
+        ok = r.ok;
+      } catch(e) { d = {}; }
+      ripristina();
+      const agg = ordiniP2P()[id] || o;
+      if (!ok) {
+        /* UN DOPPIONE NON E' UN ERRORE DA RIPETERE: il server e'
+           l'unico che sa di tutti i dispositivi, e se dice che c'e'
+           gia' la riga locale si allinea invece di riproporre il
+           foglio per sempre. */
+        if (d.detail && d.detail.indexOf('già lasciato') >= 0) {
+          agg.recensione = 'fatta';
+          scriviOrdineP2P(agg);
+        }
+        toast(d.detail || 'Operazione non riuscita, riprova');
+        if (p2pOrdineAperto === id) renderOrdineP2P();
+        return;
+      }
+      chiudiFoglioP2P('p2pVotoSheet');
+      agg.recensione = 'fatta';
+      agg.recVoto = voto;
+      scriviOrdineP2P(agg);
+      p2pRecensioni[id] = {si: false, gia: true, voto, commento, motivo: ''};
+      p2pStellaScelta = 0;
+      toast('⭐ Grazie per la recensione!');
+      /* le stesse stelle al circuito, in sottofondo: e' un di piu' —
+         se non parte, la recensione che conta e' gia' al sicuro */
+      if (agg.votabile && !agg.votato)
+        stelleCircuitoP2P(agg, voto).catch(() => {});
+      if (p2pOrdineAperto === id) renderOrdineP2P();
+    }
+  });
+}
+
 /* «Di chi sono questi ordini?» — una domanda sola per giro di libro, e
    mai due volte per lo stesso id. Chi non risponde resta senza volto,
    e la card non se ne accorge. */

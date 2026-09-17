@@ -30597,8 +30597,13 @@ def prove_fogli_di_casa():
     # dicono due cifre diverse. Avvisa e non ferma (decisione di
     # Andrea): quasi sempre e' un errore di battitura, qualche volta
     # e' voluto, e la differenza la sa solo chi pubblica.
-    prova("i gesti che passano dalla domanda unica sono cinquantanove",
-          59, solo_codice(mini).count("chiediConferma({"))
+    # SESSANTA (set 2026, le recensioni degli scambi P2P): una
+    # recensione e' DEFINITIVA come il feedback del mercatino — «chiude
+    # il ricatto "cambia il feedback o…"» — e il gemello di la' la
+    # domanda ce l'ha da sempre. Un gesto che non si puo' disfare si
+    # chiede.
+    prova("i gesti che passano dalla domanda unica sono sessanta",
+          60, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -39805,8 +39810,14 @@ def prove_p2p_libro():
     prova("la stella della card non usa la classe dei bottoni del voto", True,
           'class="p2p-rep-stella"' in mini
           and 'class="p2p-stella"' not in pezzo_js(mini, "function stellaP2P(media){", "\n}\n"))
-    prova("...e i bottoni del voto restano i soli `p2p-stella`", 1,
-          mini.count('class="p2p-stella"'))
+    # DUE USI, UN MESTIERE (set 2026): i bottoni sono due gruppi — le
+    # stelle che si SCELGONO nella recensione e quelle che si premono
+    # nel voto del circuito — e la classe e' la stessa perche' la cosa
+    # e' la stessa (un bottone-stella dentro un foglio). Quel che la
+    # sentinella difende resta: la stella della CARD, che si chiama
+    # `p2p-rep-stella`, non entra in questa famiglia.
+    prova("...e i `p2p-stella` sono solo bottoni di un foglio del voto",
+          2, mini.count('class="p2p-stella"'))
     # ⚠️ LA TAGLIA DELLA STELLA STA IN UNA VARIABILE SOLA, e questa
     # sentinella nasce da un difetto VERO (11 set 2026, visto da
     # Andrea: «a 5,0 una striscia verticale più chiara in mezzo»).
@@ -43083,22 +43094,29 @@ def prove_volti_libro():
     # --- 2) COSA ESCE DA QUI: gli id degli ordini e nient'altro -----
     blocco = mini[i_volti:mini.index("/* ============ fine dei volti sul libro")]
     cod = re.sub(r"/\*[\s\S]*?\*/", "", blocco)
-    prova("le fetch del blocco sono DUE: scrive e legge", 2,
+    # QUATTRO DAL SET 2026 (le recensioni degli scambi): le due dei
+    # volti — «questi ordini sono miei» e «di chi sono questi» — piu'
+    # le due della recensione, che vivono qui per la stessa ragione (il
+    # motore dello scambio non ha dentro nessuna `fetch`).
+    prova("le fetch del blocco sono QUATTRO: due volti, due recensione", 4,
           cod.count("fetch("))
     corpi = set(re.findall(r"JSON\.stringify\(\{(\w+):", cod))
-    prova("...e nei corpi va SOLO la lista degli ordini", {"ordini"},
-          corpi)
+    prova("...e nei corpi vanno SOLO gli id degli ordini",
+          {"ordini", "ordine"}, corpi)
     # NIENTE ID NELL'URL: una GET li metterebbe nei log del web server,
     # e un log e' un posto dove le cose restano
-    prova("gli id viaggiano in POST, mai nell'indirizzo", 2,
+    prova("gli id viaggiano in POST, mai nell'indirizzo", 4,
           cod.count("method: 'POST'"))
     # I PROVVISORI NON SI REGISTRANO: cambiano nome quando il
     # coordinatore risponde, e occuperebbero una PK per sempre
     prova("i provvisori del client non si registrano", True,
           "!provvisorioP2P(id)" in cod)
     # la vetrina anonima non chiede niente: le card restano senza volto
-    prova("la vetrina anonima non chiede volti", 2,
-          cod.count("if (DEMO || VETRINA || !myTgId) return false;"))
+    # OGNI FUNZIONE DI QUESTO BLOCCO CE L'HA, ed e' la forma che rende
+    # la regola leggibile: quel che parla col nostro server passa dal
+    # cancello dell'anonimo, senza eccezioni da ricordare.
+    prova("la vetrina anonima non chiede niente, da nessuna delle quattro",
+          4, cod.count("if (DEMO || VETRINA || !myTgId) return false;"))
     # IL TOCCO SUL VOLTO APRE IL NEGOZIO (set 2026, richiesta di
     # Andrea): la porta vive nel blocco dei volti, ferma il tocco
     # prima che cada sulla card, e la card la lega SOLO quando un
@@ -45475,6 +45493,11 @@ function haptic(){}
    fuori dal motore: qui e' un si' che non chiama nessuno */
 let PRESI_DETTI = [];
 async function registraOrdiniP2P(ids, pubblicati, presi){ PRESI_DETTI.push([ids, !!presi]); return true; }
+/* e la domanda sulla recensione, per la stessa ragione (set 2026): la
+   sua prova sta in prove_recensione_p2p, qui serve solo a non far
+   esplodere il render di uno scambio concluso */
+let p2pRecensioni = {};
+async function chiediRecensibileP2P(id){ return false; }
 let nodi = {}, aperti = [], chiusi = [];
 function el(id){
   if (!nodi[id]) nodi[id] = {id: id, value: '', innerHTML: '', textContent: '',
@@ -46669,7 +46692,11 @@ def prove_p2p_stati():
     def riga(firma):
         i = mini.index(firma)
         return mini[i:mini.index("\n", i)]
-    secondarie = fn("function azioniSecondarieP2P(o){")
+    # (dal set 2026 prende anche la risposta del server sulla
+    # recensione: `azioniSecondarieP2P(o, rec)`, e chiede al giudice
+    # del gesto invece di guardare `votabile` da se')
+    secondarie = (fn("function azioniSecondarieP2P(o, rec){")
+                  + "\n" + fn("function gestoRecensioneP2P(o, rec){"))
     # le liste di stati si CENSISCONO e non si elencano: una nuova
     # (P2P_DISPUTABILI e' la terza) entra nel banco da sola, invece
     # di farlo cadere con un ReferenceError il giorno che nasce
@@ -46932,8 +46959,11 @@ out.secRitira = azioniSecondarieP2P({stato: 'pubblicato'});
 out.secAnnulla = azioniSecondarieP2P({stato: 'attivo'});
 out.secProposto = azioniSecondarieP2P({stato: 'annullo_proposto'});
 out.secConcluso = azioniSecondarieP2P({stato: 'concluso'});
-out.secVota = azioniSecondarieP2P({stato: 'concluso', votabile: true});
-out.secVotato = azioniSecondarieP2P({stato: 'concluso', votabile: true, votato: true});
+out.secRecensisce = azioniSecondarieP2P({stato: 'concluso'}, {si: true});
+out.secVota = azioniSecondarieP2P({stato: 'concluso', votabile: true},
+                                  {si: false, motivo: 'ignota'});
+out.secVotato = azioniSecondarieP2P({stato: 'concluso', votabile: true,
+                                     votato: true}, {si: false, motivo: 'ignota'});
 out.secSenza = azioniSecondarieP2P(null);
 /* IL RITIRO E L'ANNULLO NON COMPAIONO MAI INSIEME: sono la stessa
    azione per il coordinatore e due gesti diversi per chi guarda —
@@ -47107,8 +47137,14 @@ process.stdout.write(JSON.stringify(out));
     # di annullo ha una cosa sola da fare, dire di si'
     prova("...e se l'ha chiesto l'altro si accetta, e basta",
           ["accetta-annullo"], out["secProposto"])
-    prova("a scambio concluso non c'e' nessun gesto", [], out["secConcluso"])
-    prova("...finche' il coordinatore non chiede il voto",
+    # ⚠️ EMENDATA (set 2026, le recensioni degli scambi): a scambio
+    # concluso il gesto lo decide la risposta del SERVER — finche' non
+    # arriva non si offre niente (il bottone cambierebbe sotto il dito).
+    prova("a scambio concluso, finche' il server tace, nessun gesto",
+          [], out["secConcluso"])
+    prova("...c'e' un posto per la recensione: si recensisce",
+          ["recensisci"], out["secRecensisce"])
+    prova("...non c'e', e restano le stelle del circuito",
           ["vota"], out["secVota"])
     prova("...e il voto sparisce quando e' partito", [], out["secVotato"])
     prova("senza scambio non c'e' nessun gesto secondario", [],
@@ -47659,7 +47695,7 @@ def prove_p2p_chat():
           'disputa: \'<button class="btn allarme"' in mini)
     sec = pezzo_js(mini, "function azioniSecondarieP2P(", "\n}\n")
     prova("la disputa e' l'ULTIMA della colonna", True,
-          0 <= sec.rfind("fuori.push('vota')")
+          0 <= sec.rfind("fuori.push(gesto)")
           < sec.rfind("fuori.push('disputa')"))
     prova("...e si apre solo dove i sats sono gia' in custodia", True,
           "const P2P_DISPUTABILI = ['attivo', 'pagamento_ritentato', 'euro_inviati'];"
@@ -54224,8 +54260,14 @@ def prove_p2p_avvisi_libro():
     frasi = _senza_prosa(pezzo("_testo_libro_p2p"))
     for spia in ("nostr", "relay", "chiave", "pubkey", "npub", "kind"):
         prova(f"le frasi non dicono «{spia}»", False, spia in frasi.lower())
-    prova("le frasi invitano alla recensione", True,
-          "Lascia una recensione su Barattolo" in frasi)
+    # ⚠️ L'INVITO HA UNA CONDIZIONE (set 2026): si scrive solo dove la
+    # recensione ha un posto dove andare — cioe' dove il server sa chi
+    # era l'altra parte. Prima stava li' sempre, e prometteva un gesto
+    # che non esisteva ancora.
+    prova("le frasi invitano alla recensione, e dicono dove", True,
+          "Lascia una recensione: la trovi nella pagina dello" in frasi)
+    prova("...e l'invito e' appeso al giudice, non scritto sempre", True,
+          "if recensibile else" in frasi)
     prova("...e i metodi (testo di sconosciuti) passano da html.escape", True,
           "html.escape(str(m))" in frasi)
 
@@ -54249,6 +54291,7 @@ def prove_p2p_avvisi_libro():
            "STATI_LIBRO_PRESO": ("in-progress", "waiting-buyer-invoice",
                                  "waiting-payment")}
     for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
+              "_parti_recensione_p2p",
               "_euro_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
               "_ordini_puliti_p2p", "_registra_ordini_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
@@ -54354,9 +54397,16 @@ def prove_p2p_avvisi_libro():
           and "non devi fare niente" in fuori[0][1])
     giud(con, [ev(A, "in-progress", 2200, sats=50000)], 2210, 0.02, 168)
     fuori = giud(con, [ev(A, "success", 3000, sats=50000)], 3010, 0.02, 168)
-    prova("concluso, chi vende: quanto e per quanto, piu' la recensione", True,
-          len(fuori) == 1 and "Hai venduto 50.000 sats per 32,50 €" in fuori[0][1]
-          and "Lascia una recensione" in fuori[0][1])
+    # ⚠️ E L'INVITO QUI NON C'E' (set 2026, le recensioni degli
+    # scambi): di questo ordine il server non sa chi l'ha preso —
+    # nessuno l'ha dichiarato — quindi una recensione non avrebbe dove
+    # andare, e invitarla sarebbe promettere un gesto che non si puo'
+    # fare. Dove il posto c'e' l'invito c'e': lo prova l'ordine H, coi
+    # due destinatari.
+    prova("concluso, chi vende: quanto e per quanto", True,
+          len(fuori) == 1 and "Hai venduto 50.000 sats per 32,50 €" in fuori[0][1])
+    prova("...e senza sapere chi ha preso, nessun invito a recensire",
+          False, "recensione" in fuori[0][1])
     prova("...e l'ordine e' chiuso in tabella", "success", stato_di(A)[0])
 
     # B: 222 COMPRA (k=buy): il netto e' il conto del client
@@ -54461,6 +54511,11 @@ def prove_p2p_avvisi_libro():
     prova("concluso: chi vende legge quanto per quanto, chi compra il suo netto",
           True, "Hai venduto 50.000 sats per 32,50 €" in testi.get(111, "")
           and "49.500 sats sono in arrivo al tuo recapito" in testi.get(444, ""))
+    # QUI IL POSTO C'E' — due parti, tutt'e due conosciute — e l'invito
+    # arriva a tutt'e due, con scritto dove si fa
+    prova("...e tutt'e due sono invitati a recensire, coi due posti noti",
+          True, all("Lascia una recensione: la trovi nella pagina dello "
+                    "scambio." in testi.get(k, "") for k in (111, 444)))
 
     # I: chi ha pubblicato non e' di Barattolo — la riga nasce dalla presa
     reg(con, 222, [I], 20000, False, True)
@@ -54631,6 +54686,7 @@ def prove_p2p_orologio():
                "_P2P_SVEGLIA": {"ev": None}, "_P2P_LAMPI": {"n": 0},
                "_guardia_ascolto_p2p": lambda: None}
         for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
+              "_parti_recensione_p2p",
                   "_euro_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
                   "_ordini_puliti_p2p", "_registra_ordini_p2p",
                   "_relay_p2p_dice", "_esiti_p2p_dice", "_chiedi_relay_p2p",
@@ -54894,6 +54950,7 @@ def prove_p2p_tutti_i_relay():
                "_P2P_RELAY_MUTI": set()}
         asincrone = ("_chiedi_relay_p2p", "_chiedi_tutti_p2p", "_giro_libro_p2p", "_giro_p2p")
         for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
+              "_parti_recensione_p2p",
                   "_euro_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
                   "_ordini_puliti_p2p", "_registra_ordini_p2p", "_scambio_vivo_p2p",
                   "_nudge_p2p", "_relay_p2p_dice", "_esiti_p2p_dice",
@@ -55449,6 +55506,7 @@ def prove_p2p_ascolto():
     asincrone = ("_chiedi_relay_p2p", "_chiedi_tutti_p2p", "_giro_libro_p2p",
                  "_giro_p2p", "orologio_p2p")
     for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
+              "_parti_recensione_p2p",
               "_euro_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
               "_ordini_puliti_p2p", "_registra_ordini_p2p", "_scambio_vivo_p2p",
               "_nudge_p2p", "_relay_p2p_dice", "_esiti_p2p_dice",
@@ -64086,6 +64144,9 @@ def prove_scambi_p2p_vecchi():
         + pezzo_js(mini, "function ordiniP2P(){", "\n}") + "\n}\n"
         + pezzo_js(mini, "function p2pTogliibile(o, adesso){", "\n}") + "\n}\n"
         + pezzo_js(mini, "function p2pRitirato(o){", "\n}") + "\n}\n"
+        # il giudice della recensione in sospeso (set 2026): la scopa lo
+        # chiede, e senza di lui il banco esplode invece di arrossire
+        + pezzo_js(mini, "function recensioneInSospesoP2P(o){", "\n}") + "\n}\n"
         + pezzo_js(mini, "function pulisciScambiP2P(){", "\n}") + "\n}\n"
         "const ORA = Math.floor(Date.now() / 1000);\n"
         "const fa = ore => Math.floor(ORA - ore * 3600);\n"
@@ -64187,7 +64248,15 @@ def prove_scambi_p2p_vecchi():
         " rifiutato_stamattina: {id:'n', stato:'rifiutato',"
         "   creato: fa(24*60), aggiornato: fa(24*60), quando: fa(12)},"
         " ritirato_appena: {id:'o', stato:'annullato',"
-        "   creato: fa(1), quando: fa(0)}"
+        "   creato: fa(1), quando: fa(0)},"
+        # LE RECENSIONI (set 2026): finche' c'e' una recensione da
+        # lasciare la riga non si tocca — e' la sua chiave che permette
+        # di lasciarla. Quando il timbro c'e' (lasciata, o «un posto non
+        # c'e'») la riga torna a invecchiare come le altre.
+        " recensita: {id:'p', stato:'concluso', creato: fa(24*40),"
+        "   aggiornato: fa(24*31), recensione:'fatta'},"
+        " senza_posto: {id:'q', stato:'concluso', creato: fa(24*40),"
+        "   aggiornato: fa(24*31), recensione:'senza'}"
         "}")
     _prog2 = _banco + (
         "localStorage.setItem(MOSTRO_ORDINI_CHIAVE, JSON.stringify("
@@ -64219,11 +64288,21 @@ def prove_scambi_p2p_vecchi():
     # rifiutato tiene il lampo delle 24 ore (porta un motivo da
     # leggere), e la RICEVUTA — l'annullato con la hold in mano — i 30
     # giorni, come il concluso che porta il voto e l'export.
+    # ⚠️ EMENDATA (set 2026, le recensioni degli scambi): a tenere in
+    # vita un concluso non e' piu' il voto del coordinatore ma la
+    # RECENSIONE — quindi `vecchio_finito` e `voto_dato`, che una
+    # recensione non l'hanno lasciata, adesso RESTANO. E' la stessa
+    # regola di prima («finale per i sats, non per la reputazione») su
+    # un gesto che non dipende piu' dall'invito di un terzo: la
+    # recensione si puo' lasciare anche se il coordinatore non l'ha
+    # mai chiesta. A far uscire la riga e' il timbro — `recensita` e
+    # `senza_posto` se ne vanno.
     prova("la scopa toglie i vecchi, i ritirati e le notizie fredde",
           {"tolti": 7,
            "resta": ["aperto_vecchio", "fresco_finito",
                      "ricevuta_annullata", "rifiutato_stamattina",
-                     "sr_scaduto_ma_recente", "voto_in_sospeso"]},
+                     "sr_scaduto_ma_recente", "vecchio_finito",
+                     "voto_dato", "voto_in_sospeso"]},
           _o2)
     prova("il ritirato di ADESSO non arriva nemmeno al prossimo render",
           False, "ritirato_appena" in (_o2.get("resta") or []))
@@ -65128,6 +65207,417 @@ def prove_nip89_handler():
     vero2.close()
 
 
+def prove_recensione_p2p():
+    """UNA RECENSIONE PER SCAMBIO, NELLA MEDIA DI SEMPRE (set 2026).
+
+    A scambio P2P concluso le due parti si recensiscono come nel
+    mercatino, e quel voto finisce nella STESSA tabella e nella STESSA
+    media: e' «una reputazione sola» portata fino in fondo — prima la
+    regola valeva per quel che si LEGGE (il tag `rating` del
+    coordinatore non lo apriva piu' nessuno), adesso anche per quel
+    che si SCRIVE.
+    QUI DENTRO C'E' LA PROVA REGINA DI QUESTO CANTIERE: i due giudici
+    dei doppioni — la UNIQUE di sempre e l'indice parziale nuovo —
+    girano su un database di cartone, e si chiede che dicano la STESSA
+    cosa. E' l'unico modo in cui il cantiere puo' rompersi senza
+    fallire da solo: con uno zero al posto dell'ordine il database
+    direbbe «hai gia' recensito» al SECONDO scambio di ogni persona, e
+    nessuna sentinella sulla forma lo vedrebbe.
+    Il giro intero su un database vero sta in
+    `collaudo_recensione_p2p.py`."""
+    print("\n[le recensioni degli scambi P2P]")
+    import hashlib as _hl
+    import json as _js
+    import shutil as _sh
+    import sqlite3 as _sq
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) I TRE GIUDICI, GIRATI -----------------------------------
+    amb = {"STATI_RECENSIONE_P2P": ("success",), "hashlib": _hl}
+    for f in ("_ammette_recensione_p2p", "_parti_recensione_p2p",
+              "_numero_scambio_p2p"):
+        exec(pezzo(f), amb)
+    ammette = amb["_ammette_recensione_p2p"]
+    parti = amb["_parti_recensione_p2p"]
+    numero = amb["_numero_scambio_p2p"]
+
+    prova("'success': si recensisce", True, ammette("success"))
+    # gli stati del libro che si sono VISTI, piu' i finali del
+    # protocollo: nessuno di loro apre la porta
+    for s in ("pending", "in-progress", "waiting-buyer-invoice",
+              "waiting-payment", "canceled", "expired", "dispute",
+              "fiat-sent", "settled-hold-invoice", "", None):
+        prova(f"«{s}»: lo scambio non e' concluso in porto", False,
+              ammette(s))
+
+    prova("chi ha pubblicato recensisce chi ha preso", (222, ""),
+          parti(111, 222, 111))
+    prova("...e chi ha preso recensisce chi ha pubblicato", (111, ""),
+          parti(111, 222, 222))
+    prova("un account nato da Nostr e' un destinatario come un altro",
+          (-77, ""), parti(-77, 222, 222))
+    prova("l'estraneo non e' di quello scambio", (0, "estraneo"),
+          parti(111, 222, 333))
+    prova("...e nemmeno chi non ha una sessione", (0, "estraneo"),
+          parti(111, 222, 0))
+    prova("senza chi ha preso non c'e' destinatario", (0, "ignota"),
+          parti(111, 0, 111))
+    prova("...e senza chi ha pubblicato nemmeno", (0, "ignota"),
+          parti(0, 222, 222))
+    prova("le due meta' di un account fuso non si votano da sole",
+          (0, "se_stesso"), parti(111, 111, 111))
+    prova("una riga vuota non fa male a nessuno", (0, "estraneo"),
+          parti(None, None, None))
+
+    n1, n2 = numero("992e288e-1111-4a2b-9c3d-000000000001"), \
+        numero("992e288e-2222-4a2b-9c3d-000000000002")
+    prova("il posto dell'ordine e' NEGATIVO (i due mondi non si toccano)",
+          True, n1 < 0 and n2 < 0)
+    prova("...e sta dentro un intero di SQLite", True,
+          abs(n1) < 2 ** 63 and abs(n2) < 2 ** 63)
+    prova("...lo stesso scambio da' sempre lo stesso numero", n1,
+          numero("992e288e-1111-4a2b-9c3d-000000000001"))
+    prova("...e due scambi diversi due numeri diversi", True, n1 != n2)
+    prova("...e mai zero, che e' il posto di nessuno", True,
+          numero("") != 0)
+
+    # --- 2) LA PROVA REGINA: i due giudici dei doppioni dicono la
+    #        STESSA cosa, girando ------------------------------------
+    # La tabella e l'indice si ESTRAGGONO da server.py e si fanno
+    # GIRARE: ricopiarli qui vorrebbe dire provare la copia.
+    _i = _SORGENTE.index("CREATE TABLE IF NOT EXISTS feedback(")
+    _ddl = _SORGENTE[_i:_SORGENTE.index(");", _i) + 2]
+    _j = _SORGENTE.index("CREATE UNIQUE INDEX IF NOT EXISTS idx_feedback_scambio")
+    _indice = "".join(re.findall(r'"([^"]*)"', _SORGENTE[_j - 1:_j + 220]))
+    _indice = _indice[:_indice.index("scambio<>''") + 11]
+    prova("il DDL della tabella si estrae davvero", True,
+          "UNIQUE(ordine_id, da_tg_id)" in _ddl and "scambio TEXT" in _ddl)
+    prova("...e l'indice parziale pure", True,
+          _indice.startswith("CREATE UNIQUE INDEX")
+          and "ON feedback(scambio, da_tg_id) WHERE scambio<>''" in _indice)
+
+    con = _sq.connect(":memory:")
+    con.executescript(_ddl)
+    con.execute(_indice)
+
+    def metti(ordine_id, da, per, scambio=""):
+        try:
+            con.execute("INSERT INTO feedback(ordine_id, da_tg_id, "
+                        "per_tg_id, voto, commento, creato, scambio) "
+                        "VALUES(?,?,?,5,'',1,?)",
+                        (ordine_id, da, per, scambio))
+            return "scritta"
+        except _sq.IntegrityError:
+            return "doppione"
+
+    A = "992e288e-1111-4a2b-9c3d-000000000001"
+    B = "992e288e-2222-4a2b-9c3d-000000000002"
+    prova("la prima recensione di uno scambio si scrive", "scritta",
+          metti(numero(A), 111, 222, A))
+    prova("...e quella dell'ALTRA parte pure", "scritta",
+          metti(numero(A), 222, 111, A))
+    prova("la seconda della stessa parte e' un doppione", "doppione",
+          metti(numero(A), 111, 222, A))
+    # ⚠️ LA RIGA CHE REGGE TUTTO IL CANTIERE: con uno zero al posto
+    # dell'ordine questa sarebbe «doppione», e ogni persona avrebbe
+    # potuto recensire UN SOLO scambio in tutta la vita.
+    prova("un ALTRO scambio della stessa persona NON e' un doppione",
+          "scritta", metti(numero(B), 111, 222, B))
+    prova("e il giudice del mercatino non si e' mosso", "doppione",
+          (metti(7, 111, 222), metti(7, 111, 222))[1])
+    # quattro righe scritte: due parti sullo scambio A, la stessa
+    # persona sullo scambio B, e un affare del mercatino
+    prova("...e un affare e uno scambio convivono", 4,
+          con.execute("SELECT COUNT(*) FROM feedback").fetchone()[0])
+    prova("la media li conta TUTTI, che e' il punto", 4,
+          con.execute("SELECT COUNT(*) FROM feedback "
+                      "WHERE per_tg_id IN (111,222)").fetchone()[0])
+    con.close()
+
+    # --- 3) LA MEDIA NON SA DA DOVE VIENE IL VOTO -------------------
+    prova("`_ricalcola_rating` non guarda la provenienza", False,
+          "scambio" in pezzo("_ricalcola_rating"))
+    prova("...e conta ancora le PERSONE diverse", True,
+          "COUNT(DISTINCT da_tg_id)" in pezzo("_ricalcola_rating"))
+
+    # --- 4) LA ROTTA CHE SCRIVE -------------------------------------
+    rec = codice(pezzo("recensione_p2p"))
+    prova("il gate passa dai due giudici", True,
+          "_parti_recensione_p2p(r[\"tg_id\"], r[\"preso_da\"]," in rec
+          and "_ammette_recensione_p2p(r[\"stato\"])" in rec)
+    prova("...e il posto dell'ordine dal suo", True,
+          "_numero_scambio_p2p(ordine)" in rec)
+    prova("la riga porta lo scambio da cui viene", True,
+          "creato, scambio) " in rec and "INSERT INTO feedback(ordine_id" in rec)
+    prova("il doppione lo dice il DATABASE, non una SELECT gentile", True,
+          "except sqlite3.IntegrityError:" in rec
+          and "SELECT voto FROM feedback" not in rec)
+    prova("...dentro un BEGIN IMMEDIATE", True,
+          'con.execute("BEGIN IMMEDIATE")' in rec)
+    prova("la media si rifa' i conti da sola", True,
+          "_ricalcola_rating(con, per)" in rec)
+    prova("il commento passa dal filtro delle parole", True,
+          'controlla_vietato(commento, "")' in rec)
+    prova("...e i distintivi premiano entrambi, come nel mercatino", True,
+          "premia_distintivi(user[\"id\"])" in rec
+          and "premia_distintivi(per)" in rec)
+    # NIENTE ID NELL'URL: la regola dei volti, e per la stessa ragione
+    # (un log e' un posto dove le cose restano). L'id sta nel corpo.
+    for r in ('@app.post("/api/p2p/recensione")',
+              '@app.post("/api/p2p/recensibile")'):
+        prova(f"la rotta {r.split(chr(34))[1]} non porta id nell'URL", True,
+              r in _SORGENTE)
+    # e nemmeno nei messaggi: nella pagina dello scambio l'id non si
+    # mostra per decisione di Andrea, e un avviso non e' il posto per
+    # farlo rientrare dalla finestra
+    _avv = rec[rec.index("notifica(per,"):]
+    prova("l'id dello scambio non entra in un avviso", True,
+          "{ordine}" not in _avv and "uno scambio di sats" in _avv)
+    prova("...nemmeno in quello al moderatore", True,
+          "{ordine}" not in rec[rec.index("notifica_admin("):
+                                rec.index("notifica(per,")])
+    # NESSUN GATE SULLA LEVA, dichiarato: la recensione e' del
+    # mercatino, e lo scambio e' gia' successo
+    prova("la leva del P2P non chiude la porta a scambio finito", False,
+          "_p2p_per(" in rec)
+    # ⚠️ E LA ROTTA CHE APRE IL FOGLIO NON DISTINGUE L'ESTRANEO DA UNO
+    # SCAMBIO CHE NON C'E' (la lezione di Q3): due risposte diverse
+    # direbbero a chiunque abbia una sessione che quell'ordine del
+    # libro pubblico e' passato da Barattolo, che e' l'unico bit che i
+    # volti non danno gia'.
+    _apri = codice(pezzo("recensibile_p2p"))
+    prova("l'estraneo riceve la risposta di un id che non esiste", 2,
+          _apri.count('{"si": False, "motivo": "ignota", "gia": False}'))
+
+    # --- 5) IL POSTO DI CHI HA PRESO NON SI RUBA --------------------
+    _reg = codice(pezzo("_registra_ordini_p2p"))
+    prova("la presa si dichiara una volta, e la prima vince", True,
+          '"AND (preso_da=0 OR preso_da=?) "' in _reg)
+    prova("...e a scambio chiuso quel posto non si prende piu'", True,
+          '"AND stato NOT IN (\'success\',\'canceled\',\'expired\')"' in _reg)
+
+    # --- 6) LA FUSIONE NON ESPLODE SULLE RECENSIONI -----------------
+    _fus = codice(pezzo("esegui_fusione"))
+    prova("le recensioni fra le due meta' si cancellano", True,
+          "DELETE FROM feedback WHERE scambio<>'' AND scambio IN " in _fus)
+    prova("...PRIMA di migrare chi le ha scritte", True,
+          _fus.index("DELETE FROM feedback WHERE scambio<>''")
+          < _fus.index("UPDATE feedback SET da_tg_id"))
+    prova("...e prima che i due posti diventino lo stesso id", True,
+          _fus.index("DELETE FROM feedback WHERE scambio<>''")
+          < _fus.index("UPDATE p2p_ordini SET tg_id="))
+
+    # --- 7) IL NEGOZIO DICE DA DOVE VIENE --------------------------
+    _neg = pezzo("negozio")
+    prova("la riga del negozio marca la provenienza", True,
+          "WHEN f.scambio<>'' THEN 'scambio' " in _neg)
+    # ⚠️ IL RAMO STA PER PRIMO: una riga di scambio ha `ordine_id`
+    # negativo, quindi il LEFT JOIN non trova niente e `o.id IS NULL`
+    # la chiamerebbe «utente»
+    prova("...e sta PRIMA del ramo dell'ordine che non c'e'", True,
+          _neg.index("WHEN f.scambio<>''") < _neg.index("WHEN o.id IS NULL"))
+    prova("e il client lo scrive a parole", True,
+          "f.ruolo==='scambio'?'da uno scambio P2P'" in mini)
+
+    # --- 8) IL CLIENT: dove vivono le due che parlano col server ----
+    # il motore dello scambio non ha NESSUNA fetch (c'e' la sentinella
+    # di prove_p2p_motore): queste due stanno nel blocco dei volti
+    prova("la domanda e l'invio stanno FUORI dal motore", True,
+          mini.index("async function chiediRecensibileP2P(")
+          > mini.index("/* ============ fine del motore dello scambio")
+          and mini.index("async function inviaRecensioneP2P(")
+          > mini.index("/* ============ fine del motore dello scambio"))
+    _chiedi = pezzo_js(mini, "async function chiediRecensibileP2P(id){", "\n}\n")
+    prova("la domanda si fa una volta per scambio", True,
+          "p2pRecChieste.has(id)" in _chiedi
+          and "p2pRecChieste.add(id)" in _chiedi)
+    prova("...e un server muto non diventa un «no» definitivo", True,
+          "motivo: 'muto'" in _chiedi)
+    prova("...mentre un «non c'e' posto» si timbra sulla riga", True,
+          "o.recensione = 'senza'" in _chiedi
+          and "esito.motivo !== 'muto'" in _chiedi)
+    _invia = pezzo_js(mini, "async function inviaRecensioneP2P(btn){", "\n}\n")
+    prova("l'invio chiede prima, che e' definitiva", True,
+          "chiediConferma({" in _invia
+          and "non potrà essere modificata" in _invia)
+    prova("...e parla con la rotta giusta", True,
+          "/p2p/recensione`" in _invia)
+    prova("...e le STESSE stelle vanno anche al circuito", True,
+          "stelleCircuitoP2P(agg, voto)" in _invia)
+    prova("...e un doppione allinea la riga invece di ripetersi", True,
+          "già lasciato" in _invia and "agg.recensione = 'fatta';" in _invia)
+    # IL VOTO SI CLAMPA PRIMA DI repeat(), la famiglia del
+    # filtro-alfabeto: quel numero puo' venire da localStorage, dove
+    # chiunque scrive, e un -1 dentro repeat() porta via la pagina
+    _riga = pezzo_js(mini, "function rigaRecensioneP2P(o, rec){", "\n}\n")
+    prova("le stelle della riga passano da un clamp", True,
+          "Math.max(0, Math.min(5," in _riga)
+    prova("...e non da una repeat() sul numero nudo", False,
+          "repeat(mia.voto)" in _riga)
+    _circ = pezzo_js(mini, "async function stelleCircuitoP2P(o, n){", "\n}\n")
+    prova("le stelle del circuito hanno UN posto solo", True,
+          "chiamataOrdineP2P(o, 'rate-user', {rating_user: n})" in _circ
+          and mini.count("'rate-user'") == 1)
+    _voto = pezzo_js(mini, "async function votaP2P(n){", "\n}\n")
+    prova("...e il foglio del solo circuito ci passa", True,
+          "stelleCircuitoP2P(o, n)" in _voto)
+
+    # --- 9) LE PAROLE DEI DUE FOGLI --------------------------------
+    _rr = pezzo_js(mini, "function renderRecensioneP2P(){", "\n}\n")
+    prova("il foglio dice dove va la recensione", True,
+          "profilo di Barattolo" in _rr
+          and "stessa media del mercatino" in _rr)
+    prova("...e che e' definitiva", True, "definitiva" in _rr)
+    prova("...e che le stelle viaggiano anche di la', quando e' vero",
+          True, "circuito degli scambi" in _rr and "o.votato" in _rr)
+    _rv = pezzo_js(mini, "function renderVotoP2P(){", "\n}\n")
+    prova("il foglio del solo voto dice PERCHE' non c'e' la recensione",
+          True, "non ha un profilo su Barattolo" in _rv)
+    # ⚠️ e da qui si passa anche col server muto: li' «non ha un
+    # profilo» sarebbe una bugia detta con sicurezza
+    prova("...e col server muto non lo dice per certo", True,
+          "Non riesco a chiedere" in _rv and "rec.motivo === 'ignota'" in _rv)
+    prova("...e resta quello che non si confonde col negozio", True,
+          "negozio su Barattolo" in _rv)
+
+    # --- 10) IL GIUDICE DEL GESTO, girato --------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("i gesti a scambio concluso", "node non c'e'")
+        return
+    # ⚠️ `pezzo_js` taglia PRIMA della graffa che chiude: la si
+    # rimette, o il banco esce senza funzioni e le prove escono `None`
+    # invece che rosse per la ragione vera (visto scrivendolo).
+    banco = "\n".join([
+        pezzo_js(mini, "function gestoRecensioneP2P(o, rec){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function recensioneInSospesoP2P(o){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function azioniSecondarieP2P(o, rec){", "\n}\n") + "\n}",
+        "const P2P_ANNULLA_SUBITO = [], P2P_ANNULLA_INSIEME = [],"
+        " P2P_DISPUTABILI = [];",
+    ]) + r"""
+const out = {};
+const g = (o, rec) => gestoRecensioneP2P(o, rec);
+out.senzaRisposta = g({stato:'concluso', votabile:true}, undefined);
+out.siRecensisce = g({stato:'concluso'}, {si:true});
+out.giaFatta = g({stato:'concluso'}, {si:false, gia:true});
+out.timbroLocale = g({stato:'concluso', recensione:'fatta'}, {si:true});
+out.ignotaConVoto = g({stato:'concluso', votabile:true}, {si:false, motivo:'ignota'});
+out.ignotaSenzaVoto = g({stato:'concluso'}, {si:false, motivo:'ignota'});
+out.ignotaGiaVotato = g({stato:'concluso', votabile:true, votato:true},
+                        {si:false, motivo:'ignota'});
+out.mutoRipiega = g({stato:'concluso', votabile:true}, {si:false, motivo:'muto'});
+out.nonConcluso = g({stato:'attivo'}, {si:true});
+out.niente = g(null, {si:true});
+out.sospesa = recensioneInSospesoP2P({stato:'concluso'});
+out.sospesaFatta = recensioneInSospesoP2P({stato:'concluso', recensione:'fatta'});
+out.sospesaSenza = recensioneInSospesoP2P({stato:'concluso', recensione:'senza'});
+out.sospesaAperto = recensioneInSospesoP2P({stato:'attivo'});
+out.colonna = azioniSecondarieP2P({stato:'concluso'}, {si:true});
+console.log(JSON.stringify(out));
+"""
+    f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                               encoding="utf-8")
+    f.write(banco)
+    f.close()
+    r = _sp.run([node, f.name], capture_output=True, text=True, timeout=60,
+                encoding="utf-8")
+    os.unlink(f.name)
+    out = (_js.loads(r.stdout.strip()) if r.returncode == 0
+           else {"ERRORE": (r.stderr or "")[:200]})
+    attesi = {
+        # ⚠️ SENZA RISPOSTA NON SI OFFRE NIENTE: il bottone cambierebbe
+        # sotto il dito, e chi sta premendo si troverebbe un altro gesto
+        "senzaRisposta": ("finche' il server non risponde, nessun gesto", ""),
+        "siRecensisce": ("c'e' un posto: si recensisce", "recensisci"),
+        "giaFatta": ("...gia' lasciata: niente", ""),
+        "timbroLocale": ("...e il timbro di questo telefono basta", ""),
+        "ignotaConVoto": ("senza posto restano le stelle del circuito",
+                          "vota"),
+        "ignotaSenzaVoto": ("...e se nemmeno quelle, niente", ""),
+        "ignotaGiaVotato": ("...e votato una volta, niente", ""),
+        "mutoRipiega": ("un server muto non toglie l'ultima strada",
+                        "vota"),
+        "nonConcluso": ("a scambio aperto non si recensisce", ""),
+        "niente": ("...e senza scambio nemmeno", ""),
+        "sospesa": ("una recensione da lasciare tiene in vita la riga",
+                    True),
+        "sospesaFatta": ("...lasciata, la riga invecchia", False),
+        "sospesaSenza": ("...e senza posto pure", False),
+        "sospesaAperto": ("...e uno scambio aperto non c'entra", False),
+        "colonna": ("il gesto entra nella colonna dei secondari",
+                    ["recensisci"]),
+    }
+    for k, (nome, atteso) in attesi.items():
+        prova(nome, atteso, out.get(k))
+
+    # --- 11) E IL FOGLIO SI DISEGNA DAVVERO ------------------------
+    # Le sentinelle qui sopra dicono che le parole ci sono. Che il
+    # foglio ESCA — le cinque stelle, la casella del commento, il
+    # bottone che chiama l'invio — lo dice solo facendolo girare: e'
+    # la lezione del banco che non parte dove parte il dito.
+    banco2 = "\n".join([
+        pezzo_js(mini, "function renderRecensioneP2P(){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function stelleSceltaP2P(){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function sceltaStellaP2P(n){", "\n}\n") + "\n}",
+    ]) + r"""
+let p2pStellaScelta = 0;
+let p2pOrdineAperto = 'x';
+const scambi = {x: {id: 'x', stato: 'concluso', votabile: true, votato: false}};
+function ordiniP2P(){ return scambi; }
+const nodi = {};
+function el(id){
+  if (!nodi[id]) nodi[id] = {id: id, innerHTML: '', textContent: ''};
+  return nodi[id];
+}
+function haptic(){}
+const out = {};
+renderRecensioneP2P();
+const html = nodi['p2pVotoCorpo'].innerHTML;
+out.cinqueStelle = (html.match(/class="p2p-stella"/g) || []).length;
+out.vuoteAllInizio = (html.match(/\u2606/g) || []).length;
+out.casellaDelCommento = html.indexOf('id="p2pRecCommento"') >= 0
+  && html.indexOf('maxlength="200"') >= 0;
+out.bottoneChiamaInvio = html.indexOf('inviaRecensioneP2P(this)') >= 0;
+out.diceDoveVa = html.indexOf('profilo di Barattolo') >= 0;
+out.diceDelCircuito = html.indexOf('circuito degli scambi') >= 0;
+sceltaStellaP2P(3);
+out.treAccese = [1,2,3,4,5].map(n => el('p2pStella' + n).textContent).join('');
+out.scelta = p2pStellaScelta;
+/* ...e a voto gia' partito la riga del circuito non si scrive: quelle
+   stelle sono gia' andate */
+scambi.x.votato = true;
+renderRecensioneP2P();
+out.senzaCircuito = nodi['p2pVotoCorpo'].innerHTML.indexOf('circuito degli scambi') < 0;
+console.log(JSON.stringify(out));
+"""
+    f2 = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8")
+    f2.write(banco2)
+    f2.close()
+    r2 = _sp.run([node, f2.name], capture_output=True, text=True, timeout=60,
+                 encoding="utf-8")
+    os.unlink(f2.name)
+    o2 = (_js.loads(r2.stdout.strip()) if r2.returncode == 0
+          else {"ERRORE": (r2.stderr or "")[:300]})
+    prova("il foglio disegna le cinque stelle", 5, o2.get("cinqueStelle"))
+    prova("...e nascono VUOTE (si scelgono, non si premono)", 5,
+          o2.get("vuoteAllInizio"))
+    prova("...con la casella del commento e il suo tetto", True,
+          o2.get("casellaDelCommento"))
+    prova("...e il bottone che chiama l'invio", True,
+          o2.get("bottoneChiamaInvio"))
+    prova("...e dice dove va la recensione", True, o2.get("diceDoveVa"))
+    prova("a tre stelle se ne accendono tre", "\u2605\u2605\u2605\u2606\u2606",
+          o2.get("treAccese"))
+    prova("...e il numero se lo ricorda", 3, o2.get("scelta"))
+    prova("la riga del circuito c'e' quando il voto puo' ancora partire",
+          True, o2.get("diceDelCircuito"))
+    prova("...e non c'e' quando e' gia' partito", True,
+          o2.get("senzaCircuito"))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -65250,6 +65740,7 @@ def main():
               prove_pagina_dati,
               prove_font,
               prove_porta_timer, prove_feedback_confermato,
+              prove_recensione_p2p,
               prove_servizi,
               prove_sintassi_client,
               prove_banner_negozio, prove_slug_negozio, prove_link_descrizione,
