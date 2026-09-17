@@ -17121,3 +17121,59 @@ si sveste chiudendo. Più il verbo giusto in tutte e tre le uscite, il
 toast del fatto sulla buona, la ragione sul rifiuto, e la frase di
 casa sul mai-partito. `ragioneGestoP2P` entra nel banco **vera** e non
 doppiata: è la frase che si legge davvero.
+
+### ⚠️ E il velo non si vedeva lo stesso: la promessa buttata via (17 set 2026)
+
+Andrea dal vivo, subito dopo il deploy: «premo «Ritira ordine» e
+confermo, la pagina resta com'era — nessun anello e nessuna scritta».
+Il velo c'era, il verbo era giusto, il banco era verde. **E non si
+vedeva.**
+
+**LA CAUSA, e sta nel PERCORSO e non nel gesto.** `eseguiConferma`
+alza un velo SUO, **aspetta** `poi()` e nel `finally` lo rimette giù:
+
+```js
+const ripristina = bottoneInAttesa(btn, '…');
+try { await poi(); }
+finally { ripristina(); }
+```
+
+I sei `poi` del P2P avevano il corpo a **blocco** e nessun `return` —
+`poi: () => { inviaAnnulloP2P(...); }` — quindi restituivano
+`undefined`. `await undefined` si risolve al **microtask dopo**, il
+`finally` toglieva `on` mentre il gesto era ancora in volo, e il velo
+lampeggiava sotto il frame. Da fuori: premi e non succede niente. Nel
+resto dell'app i `poi` sono 35 e sono `async () => {...}`, che la
+promessa la restituiscono: il P2P era l'unico a non farlo.
+
+**LA PROVA DEL MECCANISMO, riprodotta dal vivo** con la sola rete
+stubbata a 2,5 s e il gesto premuto sul bottone vero — 50 campioni a
+60 ms, **zero col velo acceso**, e questa riga che vale più di tutte:
+
+```
+369ms  spento [anello] "Sto ritirando l'ordine…"
+```
+
+Il testo scritto e l'anello indossato — cioè il mio codice **aveva**
+girato — e `on` già tolto da qualcun altro. Dopo la cura: acceso da
+404 ms a 2807 ms, poi spento e sveStito. Le altre due uscite
+verificate uguale sul percorso vero (rifiuto e mai-partito: velo su,
+poi giù, e la frase giusta).
+
+**LA LEZIONE, e vale oltre questo cantiere: UN BANCO CHE NON PARTE
+DOVE PARTE IL DITO NON VEDE QUEL CHE IL DITO VEDE.** Il banco del
+primo giro faceva girare `inviaAnnulloP2P('ritira')` chiamandola a
+mano, ed era verde su tutt'e tre le uscite — perché il difetto non
+era nel gesto, era **fra la conferma e il gesto**. Adesso il banco
+porta dentro anche `eseguiConferma` e `annullaScambioP2P`, parte dal
+bottone e chiede una cosa sola: **mentre il coordinatore ci pensa, il
+velo è acceso?** Più una sentinella che rifiuta qualunque `poi`
+che chiami un gesto lento senza restituirne la promessa.
+Le due mutazioni che rimettono il difetto (annullo e disputa) adesso
+muoiono; prima passavano entrambe.
+
+⚠️ **E il registro del velo si legge per quel che SIGNIFICA**, non
+alla lettera: nel giro dal dito i veli sono DUE — quello di
+`eseguiConferma` e quello del gesto — quindi la stringa esatta
+racconta un'impilatura che non è la cosa da difendere. Si contano le
+accensioni e gli spegnimenti, e si chiede «adesso è acceso?».
