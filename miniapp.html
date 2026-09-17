@@ -35498,18 +35498,49 @@ const PEZZI_NOSTR = ['Relay', 'finalizeEvent', 'generateSecretKey',
   'getEventHash', 'getPublicKey', 'hkdf', 'hmac', 'nip04', 'nip13',
   'nip19', 'nip44', 'nip47', 'schnorr', 'secp256k1', 'sha256', 'utils',
   'verifyEvent'];
-const MSG_BUNDLE_VECCHIO = 'La libreria di sicurezza e\' incompleta o di '
-  + 'una versione vecchia. Ricarica l\'app; se non basta, svuota la cache '
+/* DUE MESSAGGI E NON UNO (17 set 2026, dal campo: su un'installazione
+   FRESCA il P2P diceva «versione vecchia» mentre la libreria non era
+   arrivata affatto — e mandava a svuotare una cache che non c'entrava
+   niente). La guardia non legge NESSUNA versione: guarda i NOMI, quindi
+   «vecchia» e' un'inferenza e si fa solo dove regge.
+   • MANCANO TUTTI = il globale non c'e', cioe' il file non e' arrivato
+     o non e' partito: un motore che non lo sa leggere, una pagina che
+     non e' il nostro JS, un'esecuzione che alza a meta'. In tutti e tre
+     `onload` scatta comunque — l'`error` dello script e' solo per il
+     fetch — ed e' per questo che il caso somiglia a un bundle vecchio
+     senza esserlo. Si riprova, e la cache non c'entra.
+   • NE MANCANO ALCUNI = il globale c'e' ed e' spuntato, cioe' e'
+     arrivata una COPIA VECCHIA — e quella sta in una cache: ricaricare,
+     e se non basta svuotarla.
+   ⚠️ E SVUOTARE NON E' GRATIS, ed e' la ragione per cui quella frase
+   sta solo nel secondo: fuori da Telegram il mazzo P2P vive nella
+   memoria di questa origine e non ha copia nel cloud (`cloudTelegram()`
+   e' null), quindi «svuota i dati del sito» si porta via un profilo
+   nato su questo dispositivo. */
+const MSG_BUNDLE_ASSENTE = 'La libreria di sicurezza non è arrivata: '
+  + 'controlla la rete e riprova.';
+const MSG_BUNDLE_VECCHIO = 'La libreria di sicurezza è una copia '
+  + 'incompleta. Ricarica l\'app; se non basta, svuota la cache '
   + 'del browser.';
+/* QUEL CHE LA GUARDIA HA VISTO, perche' la diagnosi copiabile lo porti:
+   la `console.warn` qui sotto nomina la causa, e su un telefono non la
+   legge nessuno. TRE STATI E NON DUE, la lezione di cloudLeggiEsito:
+   `null` e' «mai chiesta», l'array vuoto «completa», e l'elenco dice
+   quali nomi mancano. */
+let nostrPezziMancanti = null;
 /* Fail-closed: nel dubbio si alza. Sbagliare qui costa un ricaricamento,
    sbagliare nell'altro verso costa una firma che non torna e un
    coordinatore che tace. */
 function esigiBundleNostr(){
   const NT = window.NostrTools;
   const mancano = PEZZI_NOSTR.filter(p => !NT || !NT[p]);
+  /* si scrive SEMPRE e prima di giudicare: se si scrivesse solo nel
+     ramo che alza, «completa» non lo direbbe mai nessuno */
+  nostrPezziMancanti = mancano;
   if (mancano.length) {
     console.warn('[nostr] bundle incompleto, mancano:', mancano.join(', '));
-    throw new Error(MSG_BUNDLE_VECCHIO);
+    throw new Error(mancano.length === PEZZI_NOSTR.length
+      ? MSG_BUNDLE_ASSENTE : MSG_BUNDLE_VECCHIO);
   }
   return NT;
 }
@@ -41179,7 +41210,9 @@ function leggiBolt11(pr){
    a chi aiuta. ⚠️ DENTRO NON C'E' NESSUN SEGRETO, per costruzione:
    ne' chiavi private, ne' fatture, ne' recapiti, ne' la chiave della
    controparte — solo id, stati, ore, e le chiavi PUBBLICHE di scambio
-   accorciate a otto caratteri. */
+   accorciate a otto caratteri, piu' lo stato della libreria di
+   sicurezza — che e' la prima riga, e nomina il guasto come il
+   messaggio a schermo. */
 let p2pDiario = [];
 function diarioP2P(riga){
   const d = new Date();
@@ -41191,6 +41224,16 @@ function diarioP2P(riga){
 function testoDiagnosiP2P(){
   const righe = ['Barattolo P2P — diagnosi', 'ora: ' + new Date().toISOString(),
                  'conto: ' + (myTgId > 0 ? 'telegram' : 'nostr')];
+  /* LA LIBRERIA PER PRIMA, che senza di lei non c'e' ne' profilo ne'
+     scambi — e «nessuno» si legge come un profilo perduto.
+     E DICE QUALE DEI DUE GUASTI E', come il messaggio a schermo: sono
+     le due CURE, e «INCOMPLETA» seguita da diciassette nomi lo
+     direbbe solo a chi sa quanti pezzi sono. */
+  righe.push('libreria: ' + (nostrPezziMancanti === null ? 'mai chiesta'
+    : !nostrPezziMancanti.length ? 'completa'
+    : nostrPezziMancanti.length === PEZZI_NOSTR.length
+      ? 'NON ARRIVATA (mancano tutti e ' + PEZZI_NOSTR.length + ' i pezzi)'
+      : 'INCOMPLETA, mancano ' + nostrPezziMancanti.join(', ')));
   let mz = null;
   try { mz = mazzoMostro(); } catch(e){}
   righe.push('profilo: ' + (mz ? String(mz.pub || '').slice(0, 8) + ' indice ' + (mz.indice | 0) : 'nessuno'));

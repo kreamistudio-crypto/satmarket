@@ -12,7 +12,7 @@
    se cambi quelli, o l'elenco, alzala e le dispense vecchie si
    svuotano da sole. */
 
-const VERSIONE = 'barattolo-v8';
+const VERSIONE = 'barattolo-v9';
 const CACHE_STATICA = `statica-${VERSIONE}`;
 
 // La dispensa: solo asset di casa, immutabili o quasi. Mai pagine HTML
@@ -29,7 +29,6 @@ const PRECACHE = [
   '/assets/icona-192-maskable.png',
   '/assets/icona-512-maskable.png',
   '/assets/apple-touch-icon.png',
-  '/vendor/nostr.js',
   '/vendor/qrcode.js',
   // I font, da quando stanno in casa (ago 2026): SOLO i tre file del
   // latino, che sono quelli che servono a chiunque scriva in italiano.
@@ -41,7 +40,27 @@ const PRECACHE = [
   '/vendor/font/nunito-latin.woff2',
   '/vendor/font/jetbrains-mono-latin.woff2',
 ];
-const IN_DISPENSA = new Set(PRECACHE);
+/* LA DISPENSA A RUNTIME E' PIU' LARGA DELL'INSTALLAZIONE ATOMICA (17 set
+   2026). Le due liste facevano due mestieri sotto lo stesso nome, e per
+   `/vendor/nostr.js` uno dei due era finito: da quando il match rispetta
+   la query (set 2026, «la dispensa che rispetta la query») la voce NUDA
+   non risponde piu' a nessuno — la pagina chiede il file col suo timbro
+   `?v=`, che e' un'altra chiave — quindi si scaricavano 250 KB a ogni
+   salto di VERSIONE per non servire mai. Il gate di sotto invece guarda
+   `url.pathname`, e quello serve: il file entra in dispensa al PRIMO USO
+   vero, con la sua chiave timbrata, e da li' e' cache-first come gli
+   altri.
+   ⚠️ ED E' LA META' CHE UN'INSTALLAZIONE FRESCA NON HA, che e' la
+   ragione per cui il P2P si rompe la' e non qui: chi ha aperto il P2P
+   una volta ha il file appeso al timbro e non chiede piu' niente alla
+   rete, chi installa oggi lo prende in quel momento — e se li' qualcosa
+   va storto lo dice la guardia del client (`esigiBundleNostr`, che dal
+   17 set 2026 distingue «non e' arrivata» da «copia incompleta»).
+   IL SALTO DI VERSIONE CHE ACCOMPAGNA QUESTA RIGA NON E' BUROCRAZIA:
+   svuotando le dispense vecchie e' l'unica leva che abbiamo per buttare
+   via una copia stantia rimasta appesa a quel timbro su un telefono che
+   non possiamo toccare. */
+const IN_DISPENSA = new Set([...PRECACHE, '/vendor/nostr.js']);
 
 self.addEventListener('install', (e) => {
   // addAll e' atomico: o entra tutto in dispensa, o il SW non si

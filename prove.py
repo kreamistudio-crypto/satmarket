@@ -38690,8 +38690,22 @@ def prove_bundle_nostr():
     prova("bundle: il ?v= di ieri (nudo o -mostro) non c'e' piu'", True,
           "nostr.js?v=2.23.12`" not in mini
           and "nostr.js?v=2.23.12-mostro`" not in mini)
-    prova("bundle: e' in PRECACHE, quindi la VERSIONE del SW e' salita a 7+", True,
-          int(re.search(r"barattolo-v(\d+)", swjs).group(1)) >= 7)
+    # LE DUE LISTE DEL SW FANNO DUE MESTIERI (17 set 2026): il bundle
+    # non sta piu' nell'addAll ATOMICO — con la dispensa che rispetta la
+    # query la voce nuda non rispondeva alla richiesta timbrata, e si
+    # scaricava a ogni salto di VERSIONE per non servire nessuno — ma
+    # resta nella dispensa a RUNTIME, che e' quella che il gate sul
+    # pathname guarda. Le due sentinelle vanno in coppia: togliere la
+    # voce da tutte e due farebbe un bundle mai messo via.
+    pre = swjs[swjs.index("const PRECACHE = ["):]
+    pre = pre[:pre.index("];")]
+    prova("bundle: fuori dall'addAll atomico del SW", False,
+          "/vendor/nostr.js" in pre)
+    prova("bundle: dentro la dispensa a runtime del SW", True,
+          "const IN_DISPENSA = new Set([...PRECACHE, '/vendor/nostr.js']);"
+          in swjs)
+    prova("bundle: la VERSIONE del SW e' salita col cambio dell'elenco", True,
+          int(re.search(r"barattolo-v(\d+)", swjs).group(1)) >= 9)
     prova("bundle: la rotta dichiara che non e' il bundle di serie", True,
           "prove_bundle_nostr" in _SORGENTE and "cinque export in piu'" in _SORGENTE)
 
@@ -50997,12 +51011,25 @@ def prove_p2p_bundle():
     girare con un bundle VECCHIO, che e' la classe di guasto peggiore:
     due meta' che non si parlano. La dispensa si rifa' solo quando il
     service worker nuovo si ATTIVA, e lui aspetta (niente skipWaiting,
-    scelta dichiarata); il `?v=` nell'URL non lo scavalca, perche' il
-    service worker guarda `url.pathname` e la query non la vede.
+    scelta dichiarata). ⚠️ E LA META' DI QUESTO VERBALE E' INVECCHIATA
+    BENE: dal set 2026 («la dispensa che rispetta la query») il timbro
+    `?v=` E' parte della chiave, quindi un bundle nuovo non eredita piu'
+    la copia di ieri — ma la chiave timbrata, una volta messa via, resta
+    cache-first finche' VERSIONE non sale. Da qui i DUE casi di sotto:
+    chi ha gia' aperto il P2P non chiede piu' niente alla rete, chi
+    installa oggi prende il file in quel momento.
 
-    LA CURA E' UNA GUARDIA AL CARICAMENTO: se i pezzi che il client
-    chiama non ci sono tutti, si dice «ricarica l'app» invece di fallire
-    mille righe dopo dentro una derivazione di chiavi.
+    LA CURA SONO UNA GUARDIA AL CARICAMENTO E DUE MESSAGGI: se i pezzi
+    che il client chiama non ci sono tutti si parla subito, invece di
+    fallire mille righe dopo dentro una derivazione di chiavi — e si
+    dice QUALE dei due guasti e' (17 set 2026, dal campo: su
+    un'installazione fresca diceva «versione vecchia» mentre la libreria
+    non era arrivata affatto, e mandava a svuotare una cache che non
+    c'entrava). Mancano TUTTI = non e' arrivata, si riprova; ne mancano
+    ALCUNI = e' arrivata una copia vecchia, e quella sta in una cache.
+    Piu' la riga nella DIAGNOSI copiabile: il nome dei pezzi che mancano
+    viveva nella sola `console.warn`, che su un telefono non la legge
+    nessuno.
 
     L'ELENCO E' UN CENSIMENTO E NON UNA LISTA A MEMORIA: qui si rifa' il
     grep dei `NT.<nome>` sul client, quindi il pezzo che qualcuno
@@ -51035,7 +51062,15 @@ def prove_p2p_bundle():
 
     esigi = pezzo_js(mini, "function esigiBundleNostr(", "\n}\n")
     prova("la guardia ALZA e non torna un booleano", True,
-          "throw new Error(MSG_BUNDLE_VECCHIO)" in esigi)
+          "throw new Error(mancano.length === PEZZI_NOSTR.length" in esigi)
+    # I DUE VERSI, e sono l'uno il contrario dell'altro: scambiarli manda
+    # a svuotare la cache chi non ha mai ricevuto il file, e a riprovare
+    # all'infinito chi ne ha una copia vecchia appesa al timbro.
+    prova("...e i due messaggi stanno nei versi giusti", True,
+          "? MSG_BUNDLE_ASSENTE : MSG_BUNDLE_VECCHIO" in esigi)
+    prova("la guardia scrive quel che ha visto PRIMA di giudicare", True,
+          "nostrPezziMancanti = mancano;"
+          in esigi.split("if (mancano.length)")[0])
     # il messaggio deve dire la STRADA: un «libreria incompleta» secco
     # manda a cercare il guasto dove non e'
     # ⚠️ il taglio NON e' al primo ';': uno sta DENTRO il testo
@@ -51046,6 +51081,32 @@ def prove_p2p_bundle():
     for parola in ("Ricarica", "cache"):
         prova("il messaggio del bundle vecchio dice «%s»" % parola,
               True, parola in msg)
+    # E IL GEMELLO NON DEVE DIRLO: chi non ha mai ricevuto il file non ha
+    # una cache da svuotare, e fuori da Telegram svuotarla si porta via
+    # il mazzo (nessuna copia nel cloud). Il messaggio sbagliato qui non
+    # fa perdere tempo: fa perdere un profilo.
+    ass = re.search(r"const MSG_BUNDLE_ASSENTE[\s\S]*?;\s*?\r?\n",
+                    mini).group(0)
+    for parola in ("non \u00e8 arrivata", "riprova"):
+        prova("il messaggio della libreria assente dice «%s»" % parola,
+              True, parola in ass)
+    prova("...e NON manda a svuotare la cache", False, "cache" in ass)
+
+    # --- la riga nella diagnosi copiabile: il nome dei pezzi che mancano
+    #     esce dalla console, dove su un telefono non lo legge nessuno ---
+    diag = pezzo_js(mini, "function testoDiagnosiP2P(", "\n}\n")
+    prova("la diagnosi copiabile porta lo stato della libreria", True,
+          "'libreria: '" in diag and "nostrPezziMancanti" in diag)
+    # QUATTRO STATI: i due di servizio (mai chiesta, completa) e i DUE
+    # GUASTI, che sono le due cure — una diagnosi che li fonde in
+    # «INCOMPLETA» costringe chi legge a contare i pezzi per capire
+    # quale dei due messaggi ha visto l'altro.
+    prova("...e sono QUATTRO stati, che i due guasti sono due", True,
+          "mai chiesta" in diag and "completa" in diag
+          and "NON ARRIVATA (mancano tutti e " in diag
+          and "INCOMPLETA, mancano " in diag)
+    prova("...e li divide con lo STESSO conto del messaggio", True,
+          "nostrPezziMancanti.length === PEZZI_NOSTR.length" in diag)
 
     # --- il bundle VERO li esporta tutti: e' l'unica prova che guarda il
     #     file committato invece di quel che il client si aspetta ---
@@ -51079,6 +51140,78 @@ def prove_p2p_bundle():
         else:
             prova("il bundle committato esporta TUTTI i pezzi pretesi",
                   [], _jsb.loads(r.stdout))
+
+    # --- E I TRE CASI DELLA GUARDIA, FATTI GIRARE (17 set 2026) ------
+    # Le sentinelle di sopra dicono che il ternario c'e'; nessuna dice
+    # QUALE messaggio esce, ed e' l'unica cosa che conta — un «svuota la
+    # cache» a chi non ha mai ricevuto il file manda a perdere il mazzo
+    # per un guasto di rete. Qui gira `esigiBundleNostr` VERA, e i tre
+    # casi sono quelli veri: niente globale (il campo del 17 set), il
+    # bundle DI CASA, e il bundle DI SERIE — che si fabbrica togliendo
+    # al nostro i cinque export aggiunti a mano, cioe' e' esattamente la
+    # copia vecchia che una dispensa stantia servirebbe.
+    cost = mini[mini.index("const PEZZI_NOSTR = ["):
+                mini.index("let nostrPezziMancanti = null;")
+                + len("let nostrPezziMancanti = null;")]
+    # ⚠️ `pezzo_js` NON porta il terminatore, quindi la funzione arriva
+    # SENZA la sua graffa di chiusura: il `+ "\n}"` e' lo stesso che fa
+    # `fn()` nei banchi di sotto, e senza di lui node muore di
+    # SyntaxError in mezzo allo stack del loader (cioe' dicendo tutto
+    # tranne la causa).
+    banco_g = (cost + "\n" + esigi + "\n}\n"
+               + "const fs = require('fs');\n"
+               + "globalThis.window = globalThis;\n"
+               + "const NT = (0, eval)(fs.readFileSync("
+               + repr(os.path.join("vendor", "nostr.bundle.js")
+                      .replace("\\", "/"))
+               + ", 'utf8') + '\\n;NostrTools;');\n"
+               + """
+const AGGIUNTI = ['schnorr', 'sha256', 'hmac', 'hkdf', 'secp256k1'];
+const pieno = {};
+for (const p of PEZZI_NOSTR) pieno[p] = NT[p];
+const serie = Object.assign({}, pieno);
+for (const p of AGGIUNTI) delete serie[p];
+function giro(nt){
+  globalThis.window = {NostrTools: nt};
+  nostrPezziMancanti = null;
+  try { esigiBundleNostr(); return {alza: false, mancano: nostrPezziMancanti}; }
+  catch (e) { return {alza: true, msg: e.message, mancano: nostrPezziMancanti}; }
+}
+const warn = console.warn; console.warn = () => {};
+const out = {assente: giro(undefined), casa: giro(pieno), serie: giro(serie)};
+console.warn = warn;
+process.stdout.write(JSON.stringify(out));
+""")
+    with _tfb.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                 encoding="utf-8") as fh:
+        fh.write(banco_g)
+        pg = fh.name
+    try:
+        rg = _spb.run(["node", pg], capture_output=True, text=True,
+                      encoding="utf-8", timeout=60)
+    except (FileNotFoundError, OSError, _spb.TimeoutExpired):
+        os.unlink(pg)
+        salta("il banco dei tre casi della guardia", "node non c'e'")
+    else:
+        os.unlink(pg)
+        if rg.returncode != 0:
+            prova("il banco della guardia gira", "", rg.stderr[-400:])
+        else:
+            g = _jsb.loads(rg.stdout)
+            prova("banco: senza globale la guardia dice «non \u00e8 arrivata»",
+                  True, g["assente"]["alza"]
+                  and "non \u00e8 arrivata" in g["assente"]["msg"])
+            prova("...e la memoria per la diagnosi li conta tutti",
+                  len(sorted(dichiarati)), len(g["assente"]["mancano"]))
+            prova("banco: col bundle di casa non alza, e la memoria e' vuota",
+                  [False, []], [g["casa"]["alza"], g["casa"]["mancano"]])
+            prova("banco: col bundle DI SERIE dice «copia incompleta»", True,
+                  g["serie"]["alza"]
+                  and "copia" in g["serie"]["msg"]
+                  and "incompleta" in g["serie"]["msg"])
+            prova("...e la diagnosi nomina i cinque export aggiunti a mano",
+                  ["hkdf", "hmac", "schnorr", "secp256k1", "sha256"],
+                  sorted(g["serie"]["mancano"]))
 
     # --- il catch che parla (set 2026): un guasto prima di
     #     `apriOrdineP2P` lasciava schermo e console muti ---
@@ -55971,6 +56104,10 @@ process.stdout.write(JSON.stringify(out));
         fn("function avanzaOrdineP2P(ordine, azione, payload){"),
         fn("function applicaMessaggioP2P(ord, dentro){"),
         "let p2pDiario = [];", fn("function diarioP2P(riga){"),
+        # la guardia del bundle non entra nel banco, la sua memoria si':
+        # `testoDiagnosiP2P` la legge, e senza questa riga il banco
+        # morirebbe di ReferenceError invece di dire la sua
+        "let nostrPezziMancanti = null;",
         fn("function testoDiagnosiP2P(){"), fn("function copiaDiagnosiP2P(){"),
         "const FRESCA = " + _json.dumps(bolt11_finta(16673, 900, adesso - 30)) + ";",
     ]) + r"""
@@ -56100,6 +56237,7 @@ out.diagnosi = {
   stato: copiato.includes('stato=attesa_mia_hold') && copiato.includes('restore: active indice=54 guardata'),
   messaggi: copiato.includes('pay-invoice t=' + (T + 120) + ' attesa_fattura_compratore→attesa_mia_hold'),
   passato: copiato.includes('new-order t=' + T + ' PASSATO'),
+  libreria: copiato.includes('libreria: mai chiesta'),
   segreti: [SEGRETO, FRESCA, SUA, MIA].filter(s => copiato.includes(s)),
   toast: toasts[toasts.length - 1]
 };
@@ -56145,6 +56283,10 @@ process.stdout.write(JSON.stringify(out));
           True, o2["diagnosi"]["stato"])
     prova("...e i messaggi arrivati, con l'ora e la mossa", True, o2["diagnosi"]["messaggi"])
     prova("...e quelli scartati come passato", True, o2["diagnosi"]["passato"])
+    # il banco non chiama la guardia, quindi qui lo stato VERO e' il
+    # terzo: «mai chiesta» — ed e' la prova che i tre stati sono tre
+    prova("...e lo stato della libreria, che qui non e' stata chiesta",
+          True, o2["diagnosi"]["libreria"])
     prova("...e dentro NON c'e' nessun segreto: ne' la chiave del profilo, ne' la fattura, ne' le chiavi di scambio intere",
           [], o2["diagnosi"]["segreti"])
     prova("...e dice di incollarla a chi aiuta", True,
