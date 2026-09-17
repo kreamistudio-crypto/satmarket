@@ -53288,14 +53288,21 @@ def prove_p2p_campanello():
     # per dire che non lo tocca: si guarda il CODICE, o la sentinella
     # sarebbe rossa per colpa di una spiegazione (la trappola della
     # prosa, gia' pagata da `_decifra_contenuto`).
+    # (17 set 2026: l'estrattore e' uno solo, per il lettore al minuto e
+    # per l'ascolto — e le spie guardano anche lui e il filo)
+    estrattore = pezzo("_evento_buste_p2p")
     codice_nudo = codice("\n".join(_senza_prosa(f)
-                                   for f in (relay, nudge, giro)))
+                                   for f in (relay, nudge, giro, estrattore,
+                                             pezzo("_ascolto_p2p_filo"),
+                                             pezzo("_ascolto_porta"))))
     for spia in ("content", "nip44", "nip04", "decifra", "cifra",
                  "getConversationKey", "nsec", "privata"):
         prova(f"il campanello non nomina `{spia}`", False,
               spia in codice_nudo)
     prova("...e dal relay tornano tre cose sole: pubkey, quando, id",
-          True, "fuori.append((t[1], quando, ident))" in relay)
+          True, "fuori.extend(_evento_buste_p2p(msg[2]))" in relay
+          and "return [(str(t[1]), quando, ident) for t in ev.get(\"tags\", [])"
+          in estrattore)
     # LA CHAT NON SUONA, E LE DUE GUARDIE SONO INDIPENDENTI (decisione
     # di Andrea, set 2026): il filtro porta `authors` — la prova qui
     # sotto — e la chiave della conversazione NON entra nel mazzo. La
@@ -54096,12 +54103,22 @@ def prove_p2p_orologio():
                "_P2P_BATTITO": {"n": 0, "vivo": 0.0},
                "_P2P_CONTO": {"libro": "", "campanello": ""},
                "_P2P_RELAY_MUTI": set(), "_TASK_OROLOGIO_P2P": None,
-               "P2P_MARGINE_S": 120}
+               "P2P_MARGINE_S": 120,
+               "P2P_MAZZETTO_S": 0.05, "P2P_ASCOLTO_RITARDO_S": 20,
+               "_P2P_ASCOLTO": {"filo": None, "ferma": None, "stato": "spento",
+                                "da": 0.0, "connesso_da": 0.0, "segno": 0.0,
+                                "polso": 0.0, "vivi": 0, "cadute": 0,
+                                "perche": "", "portati": {}, "detti": set()},
+               "_P2P_MAZZETTO": {"libro": [], "buste": [], "timer": None},
+               "_P2P_SVEGLIA": {"ev": None}, "_P2P_LAMPI": {"n": 0},
+               "_guardia_ascolto_p2p": lambda: None}
         for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
                   "_euro_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
                   "_ordini_puliti_p2p", "_registra_ordini_p2p",
                   "_relay_p2p_dice", "_esiti_p2p_dice", "_chiedi_relay_p2p",
                   "_chiedi_tutti_p2p", "_unisci_p2p", "_conto_relay_p2p",
+                  "_chiave_evento_p2p", "_ascolto_porta", "_mazzetto_sveglia",
+                  "_mazzetto_prendi", "_ascolto_mancato_p2p", "_stato_ascolto_p2p",
                   "_giro_libro_p2p",
                   "orologio_p2p", "guardiano_p2p"):
             testo = _senza_prosa(pezzo(f))
@@ -54342,7 +54359,16 @@ def prove_p2p_tutti_i_relay():
                # blocco, che si porta dietro la costante: questo e' il ripiego)
                "P2P_INFO_OGNI_S": 3600, "MSG_NUDGE_P2P": "Novità in un tuo scambio P2P",
                "P2P_LIBRO_MEMORIA_S": 40 * 86400, "P2P_LIBRO_FRESCHI_S": 7200,
-               "P2P_PRIMO_SGUARDO": 600, "P2P_BLOCCO": 100, "P2P_MARGINE_S": 120,
+               "P2P_PRIMO_SGUARDO": 600, "P2P_BLOCCO": 100,
+               "P2P_MARGINE_S": 120,
+               "P2P_MAZZETTO_S": 0.05, "P2P_ASCOLTO_RITARDO_S": 20,
+               "_P2P_ASCOLTO": {"filo": None, "ferma": None, "stato": "spento",
+                                "da": 0.0, "connesso_da": 0.0, "segno": 0.0,
+                                "polso": 0.0, "vivi": 0, "cadute": 0,
+                                "perche": "", "portati": {}, "detti": set()},
+               "_P2P_MAZZETTO": {"libro": [], "buste": [], "timer": None},
+               "_P2P_SVEGLIA": {"ev": None}, "_P2P_LAMPI": {"n": 0},
+               "_guardia_ascolto_p2p": lambda: None,
                "_P2P_INFO": {"fee": None, "ore": 0, "quando": 0},
                "P2P_RELAY_MAX_S": 2, "_P2P_POOL": None, "_P2P_VISTI": set(),
                "_P2P_AVVIATO": {"campanello": False},
@@ -54353,7 +54379,9 @@ def prove_p2p_tutti_i_relay():
                   "_euro_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
                   "_ordini_puliti_p2p", "_registra_ordini_p2p", "_scambio_vivo_p2p",
                   "_nudge_p2p", "_relay_p2p_dice", "_esiti_p2p_dice",
-                  "_unisci_p2p", "_conto_relay_p2p") + asincrone:
+                  "_unisci_p2p", "_conto_relay_p2p", "_chiave_evento_p2p",
+                  "_ascolto_porta", "_mazzetto_sveglia", "_mazzetto_prendi",
+                  "_ascolto_mancato_p2p", "_stato_ascolto_p2p") + asincrone:
             testo = _senza_prosa(pezzo(f))
             exec(("async " if f in asincrone else "") + testo, amb)
         return amb, detto, mandati
@@ -54505,6 +54533,524 @@ def prove_p2p_tutti_i_relay():
         _gate_aperto()
         _aio.run(amb2["_giro_p2p"]())
         prova("...e infatti non risuonano", 2, len(mandati2))
+    finally:
+        import shutil as _sh
+        _sh.rmtree(dir_db, ignore_errors=True)
+
+
+def prove_p2p_ascolto():
+    """LE NOTIFICHE ISTANTANEE (17 set 2026, secondo tempo): una
+    connessione permanente allo specchio, che porta i 38383 e i kind 14
+    del coordinatore appena arrivano e SVEGLIA l'orologio. Il rischio
+    dichiarato da sempre e' la connessione che muore zitta: qui gira il
+    FILO vero contro un relay di cartone con copione — che risponde,
+    che smette di rispondere a meta', che non da' mai l'EOSE — e poi
+    l'orologio vero coi lampi, il controllo incrociato e la guardia."""
+    print("\n[l'ascolto P2P: le notifiche istantanee, e la connessione che non muore zitta]")
+    import asyncio as _aio
+    import html as _html
+    import queue as _queue
+    import re as _re
+    import socket as _socket
+    import sqlite3
+    import ssl as _ssl
+    import tempfile as _tf
+    import threading as _th
+    src = _SORGENTE
+    MOSTRO = "m" * 64
+    CHIAVE = "a" * 64
+    SPECCHIO = "wss://specchio.test"
+
+    # --- 1) LE RIGHE CHE NON DEVONO SPARIRE ---------------------------
+    filo = pezzo("_ascolto_p2p_filo")
+    prova("l'ascolto chiede i 38383 e i kind 14 del SOLO coordinatore", True,
+          '"kinds": [38383, 14], "authors": [mostro]' in filo)
+    prova("...senza nessuna trade key nel filtro (una chiave nuova non chiede di ri-sottoscrivere)",
+          False, '"#p"' in filo or '"#d"' in filo)
+    prova("...e l'autore lo RICONTROLLA lui, evento per evento", True,
+          'msg[2].get("pubkey") == mostro' in filo)
+    prova("passa dagli stessi due estrattori dei lettori al minuto", True,
+          "_evento_libro_p2p(ev)" in filo and "_evento_buste_p2p(ev)" in filo
+          and "_evento_libro_p2p(msg[2])" in pezzo("eventi_libro_da_relay")
+          and "_evento_buste_p2p(msg[2])" in pezzo("eventi_p2p_da_relay"))
+    nudo = codice(_senza_prosa(filo) + _senza_prosa(pezzo("_ascolto_porta"))
+                  + _senza_prosa(pezzo("_evento_libro_p2p"))
+                  + _senza_prosa(pezzo("_evento_buste_p2p")))
+    for spia in ("content", "nip44", "decifra", "notifica(", "db(", "timbro_scrivi"):
+        prova(f"il filo porta e basta: non nomina `{spia}`", False, spia in nudo)
+    guardiano = pezzo("guardiano_p2p")
+    prova("il guardiano guarda anche l'ascolto, col SUO try", True,
+          "_guardia_ascolto_p2p()" in guardiano
+          and codice(guardiano).count("except Exception as e:") == 2)
+    for nome in ("_giro_p2p", "_giro_libro_p2p"):
+        g = pezzo(nome)
+        prova(f"{nome}: il segnalibro e' del GIRO, mai del lampo", True,
+              "if portati is None:           # il segnalibro e' del GIRO, mai del lampo\n"
+              "        timbro_scrivi(" in g)
+    orologio = pezzo("orologio_p2p")
+    prova("la prima passata e' sempre INTERA (e' lei che recupera dal segnalibro)", True,
+          "libro_p, buste_p = ([], []) if not prossima else _mazzetto_prendi()" in orologio)
+    prova("un lampo non sposta il minuto della passata intera", True,
+          "if not lampo:\n            prossima = time.time() + P2P_GIRO_S" in orologio)
+    conf = open(os.path.join("deploy", "relay", "router.conf"), encoding="utf-8").read()
+    righe_filtro = [r for r in conf.split("\n") if r.strip().startswith("filter")]
+    prova("lo specchio copia tre kind — il 14 compreso — da UN autore, in discesa", True,
+          len(righe_filtro) == 1 and '"kinds": [38383, 38385, 14]' in righe_filtro[0]
+          and righe_filtro[0].count('"authors": ["') == 1
+          and righe_filtro[0].count(",") == 3 and 'dir = "down"' in conf)
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("la pagina «I tuoi dati» DICE che le buste del coordinatore stanno anche sul nostro relay",
+          True, "una copia dei <b>messaggi che il coordinatore ti manda</b>" in mini
+          and "<b>mai cosa dice</b>" in mini)
+    prova("...e non promette piu' di quel che e' vero: a non passare di li' sono le conversazioni fra le due parti",
+          True, "Le <b>conversazioni</b> fra te e l'altra persona invece non passano di lì" in mini
+          and "Le vostre <b>conversazioni</b> non passano di lì" not in mini)
+
+    # --- il relay di cartone, col COPIONE ------------------------------
+    class _Tempo(Exception):
+        pass
+    _Tempo.__name__ = "WebSocketTimeoutException"
+
+    class _Ws:
+        def __init__(self, n, copione):
+            self.n, self.copione = n, copione
+            self.coda, self.mandati, self.chiuso = _queue.Queue(), [], False
+
+        def settimeout(self, t):
+            pass
+
+        def send(self, testo):
+            m = json.loads(testo)
+            self.mandati.append(m)
+            self.copione(self, m)
+
+        def recv(self):
+            try:
+                return self.coda.get(timeout=0.02)
+            except _queue.Empty:
+                raise _Tempo("timed out")
+
+        def close(self):
+            self.chiuso = True
+
+        def dice(self, *msg):
+            self.coda.put(json.dumps(list(msg)))
+
+    def ev38383(ordine, stato, quando, autore=MOSTRO):
+        return {"kind": 38383, "pubkey": autore, "created_at": quando, "id": "9" * 64,
+                "content": "", "tags": [["d", ordine], ["s", stato], ["k", "buy"],
+                                        ["amt", "9000"], ["fa", "10"], ["pm", "Revolut"]]}
+
+    def ev14(ident, quando, a=CHIAVE, autore=MOSTRO):
+        return {"kind": 14, "pubkey": autore, "created_at": quando, "id": ident,
+                "content": "BUSTA-CIFRATA-CHE-NESSUNO-APRE", "tags": [["p", a]]}
+
+    def _ambiente(connessioni, copione, **piu):
+        detto = []
+
+        def _connetti(relay, timeout=0, sslopt=None):
+            ws = _Ws(len(connessioni) + 1, copione)
+            connessioni.append(ws)
+            if piu.get("rifiuta") and ws.n in piu["rifiuta"]:
+                raise ConnectionRefusedError("porta chiusa")
+            return ws
+
+        amb = {"asyncio": _aio, "time": time, "json": json, "ssl": _ssl,
+               "socket": _socket, "create_connection": _connetti,
+               "print": lambda *a, **k: detto.append(" ".join(str(x) for x in a)),
+               "P2P_MAZZETTO_S": 0.05, "P2P_ASCOLTO_POLSO_S": 0.15,
+               "P2P_ASCOLTO_EOSE_S": 0.3, "P2P_ASCOLTO_FERMO_S": 0.5,
+               "P2P_ASCOLTO_ATTESA_S": 0.05, "P2P_ASCOLTO_RITARDO_S": 20,
+               "_P2P_ASCOLTO": {"filo": None, "ferma": None, "stato": "spento",
+                                "da": 0.0, "connesso_da": 0.0, "segno": 0.0,
+                                "polso": 0.0, "vivi": 0, "cadute": 0,
+                                "perche": "", "portati": {}, "detti": set()},
+               "_P2P_MAZZETTO": {"libro": [], "buste": [], "timer": None},
+               "_P2P_SVEGLIA": {"ev": None}, "_P2P_LAMPI": {"n": 0},
+               "_p2p_leve": lambda: {"attivo": True, "mostro": MOSTRO, "relay": [],
+                                     "specchio": piu.get("specchio", [SPECCHIO])}}
+        for f in ("_evento_buste_p2p", "_evento_libro_p2p", "_chiave_evento_p2p",
+                  "_ascolto_porta", "_mazzetto_sveglia", "_mazzetto_prendi",
+                  "_ascolto_mancato_p2p", "_stato_ascolto_p2p",
+                  "_ascolto_p2p_filo", "_guardia_ascolto_p2p"):
+            exec(_senza_prosa(pezzo(f)), amb)
+        return amb, detto
+
+    async def _fino_a(cond, secondi=3.0):
+        fine = time.time() + secondi
+        while time.time() < fine:
+            if cond():
+                return True
+            await _aio.sleep(0.01)
+        return False
+
+    adesso = int(time.time())
+
+    # --- 2) IL FILO: solo il vivo, solo il coordinatore, e il polso -----
+    conn = []
+
+    def _copione_buono(ws, m):
+        if m[0] == "REQ" and m[1] == "ascolto":
+            ws.dice("EVENT", "ascolto", ev38383("ordine-passato", "pending", adesso - 1))
+            ws.dice("EOSE", "ascolto")
+        elif m[0] == "REQ" and m[1] == "polso":
+            ws.dice("EOSE", "polso")
+
+    amb, detto = _ambiente(conn, _copione_buono)
+    ferma = _th.Event()
+
+    async def _giro_filo():
+        loop = _aio.get_running_loop()
+        t = _th.Thread(target=amb["_ascolto_p2p_filo"], daemon=True,
+                       args=(SPECCHIO, MOSTRO, loop, ferma))
+        t.start()
+        ok = await _fino_a(lambda: amb["_P2P_ASCOLTO"]["stato"] == "connesso")
+        prova("il filo si connette e lo DICE, una volta", [True, 1],
+              [ok, sum(1 for r in detto if "👂 Ascolto P2P connesso a " + SPECCHIO in r)])
+        prova("quel che arriva PRIMA dell'EOSE e' passato, ed e' del giro al minuto: non si porta",
+              [], amb["_P2P_MAZZETTO"]["libro"])
+        ws = conn[0]
+        ws.dice("EVENT", "ascolto", ev14("1" * 64, adesso))
+        ws.dice("EVENT", "ascolto", ev38383("ordine-vivo", "waiting-payment", adesso))
+        ws.dice("EVENT", "ascolto", ev14("2" * 64, adesso, autore="f" * 64))
+        ws.dice("EVENT", "ascolto", ev38383("ordine-falso", "success", adesso, autore="f" * 64))
+        ws.dice("EVENT", "altra-sub", ev14("3" * 64, adesso))
+        await _fino_a(lambda: amb["_P2P_MAZZETTO"]["libro"] and amb["_P2P_MAZZETTO"]["buste"])
+        await _aio.sleep(0.1)
+        prova("il kind 14 VIVO del coordinatore arriva nel mazzetto: pubkey, quando, id — e basta",
+              [(CHIAVE, adesso, "1" * 64)], amb["_P2P_MAZZETTO"]["buste"])
+        prova("...e il 38383 vivo pure, coi soli tag della frase", ["ordine-vivo"],
+              [e["id"] for e in amb["_P2P_MAZZETTO"]["libro"]])
+        prova("...e niente di quel che porta nomina il contenuto della busta", False,
+              "BUSTA-CIFRATA" in repr(amb["_P2P_MAZZETTO"]) + repr(amb["_P2P_ASCOLTO"]))
+        prova("un evento firmato da un ALTRO non entra, nemmeno se il relay lo manda",
+              2, amb["_P2P_ASCOLTO"]["vivi"])
+        ok = await _fino_a(lambda: amb["_P2P_ASCOLTO"]["polso"] > 0)
+        prova("il polso parte da solo, e l'EOSE che torna si segna", True, ok)
+        prova("...la domandina si richiude (o al relay restano sottoscrizioni appese)", True,
+              await _fino_a(lambda: ["CLOSE", "polso"] in ws.mandati))
+        prova("la riga dello stato dice connesso, gli eventi vivi e il polso", True,
+              "connesso da " in amb["_stato_ascolto_p2p"]()
+              and "2 eventi vivi, polso " in amb["_stato_ascolto_p2p"]())
+        ferma.set()
+        await _fino_a(lambda: not t.is_alive())
+        prova("alzata la sua `ferma`, il filo esce e chiude la connessione",
+              [False, True], [t.is_alive(), ws.chiuso])
+
+    try:
+        _aio.run(_giro_filo())
+    finally:
+        ferma.set()
+
+    # --- 3) LA CONNESSIONE CHE MUORE ZITTA ------------------------------
+    conn2 = []
+
+    def _copione_zitto(ws, m):
+        # la PRIMA connessione risponde alla sottoscrizione e poi tace
+        # per sempre (il socket aperto a meta'); la seconda rifiuta; la
+        # terza e' sana
+        if m[0] == "REQ" and m[1] == "ascolto":
+            ws.dice("EOSE", "ascolto")
+        elif m[0] == "REQ" and m[1] == "polso" and ws.n >= 3:
+            ws.dice("EOSE", "polso")
+
+    amb2, detto2 = _ambiente(conn2, _copione_zitto, rifiuta={2})
+    ferma2 = _th.Event()
+
+    async def _giro_zitto():
+        loop = _aio.get_running_loop()
+        t = _th.Thread(target=amb2["_ascolto_p2p_filo"], daemon=True,
+                       args=(SPECCHIO, MOSTRO, loop, ferma2))
+        t.start()
+        ok = await _fino_a(lambda: any("CADUTO" in r for r in detto2))
+        prova("una connessione che smette di rispondere SENZA chiudersi si scopre dal polso, e si dice",
+              [True, 1], [ok, sum(1 for r in detto2 if "👂 Ascolto P2P CADUTO (TimeoutError: il polso non e' tornato" in r)])
+        prova("...e la connessione morta si CHIUDE, non si lascia appesa", True, conn2[0].chiuso)
+        ok = await _fino_a(lambda: len(conn2) >= 3 and amb2["_P2P_ASCOLTO"]["stato"] == "connesso")
+        prova("riprova da solo — anche dopo un rifiuto — e quando torna dice dopo quanti tentativi",
+              [True, 1], [ok, sum(1 for r in detto2 if "connesso a " + SPECCHIO + " dopo 2 tentativi" in r)])
+        prova("la caduta si dice UNA volta, non a ogni tentativo", 1,
+              sum(1 for r in detto2 if "CADUTO" in r))
+        conn2[-1].dice("EVENT", "ascolto", ev14("4" * 64, adesso))
+        prova("...e sulla connessione nuova gli eventi tornano ad arrivare", True,
+              await _fino_a(lambda: amb2["_P2P_MAZZETTO"]["buste"]))
+        ferma2.set()
+        await _fino_a(lambda: not t.is_alive())
+
+    try:
+        _aio.run(_giro_zitto())
+    finally:
+        ferma2.set()
+
+    conn3 = []
+    amb3, detto3 = _ambiente(conn3, lambda ws, m: None)     # non da' MAI l'EOSE
+    ferma3 = _th.Event()
+
+    async def _giro_senza_eose():
+        loop = _aio.get_running_loop()
+        t = _th.Thread(target=amb3["_ascolto_p2p_filo"], daemon=True,
+                       args=(SPECCHIO, MOSTRO, loop, ferma3))
+        t.start()
+        ok = await _fino_a(lambda: any("nessun EOSE alla sottoscrizione" in r for r in detto3))
+        prova("un relay che accetta e non risponde MAI non passa per connesso", [True, "giu"],
+              [ok, amb3["_P2P_ASCOLTO"]["stato"]])
+        prova("...e la riga dello stato lo dice, col perche' e i tentativi", True,
+              "GIU' da " in amb3["_stato_ascolto_p2p"]()
+              and "TimeoutError: nessun EOSE" in amb3["_stato_ascolto_p2p"]())
+        ferma3.set()
+        await _fino_a(lambda: not t.is_alive())
+
+    try:
+        _aio.run(_giro_senza_eose())
+    finally:
+        ferma3.set()
+
+    # --- 4) LA GUARDIA: parte, non raddoppia, rifa' il morto e il fermo --
+    conn4 = []
+    amb4, detto4 = _ambiente(conn4, _copione_buono)
+
+    async def _giro_guardia():
+        A = amb4["_P2P_ASCOLTO"]
+        amb4["_guardia_ascolto_p2p"]()
+        primo = A["filo"]
+        prova("la guardia fa PARTIRE l'ascolto, e lo dice", [True, 1],
+              [primo is not None and primo.is_alive(),
+               sum(1 for r in detto4 if "👂 Ascolto P2P: parte su " + SPECCHIO in r)])
+        await _fino_a(lambda: A["stato"] == "connesso")
+        amb4["_guardia_ascolto_p2p"]()
+        prova("con l'ascolto vivo lo sguardo dopo non ne fa nascere un secondo", True,
+              A["filo"] is primo)
+        ferma_primo = A["ferma"]
+        ferma_primo.set()                      # il filo ESCE: per la guardia e' morto
+        await _fino_a(lambda: not primo.is_alive())
+        A["filo"] = primo
+        amb4["_guardia_ascolto_p2p"]()
+        prova("il filo MORTO si dice e riparte", [1, True],
+              [sum(1 for r in detto4 if "💥 Ascolto P2P MORTO" in r),
+               A["filo"] is not primo and A["filo"].is_alive()])
+        secondo, ferma_secondo = A["filo"], A["ferma"]
+
+        class _Appeso:
+            def is_alive(self):
+                return True
+        A["filo"] = _Appeso()
+        A["segno"] = time.time() - 60
+        amb4["_guardia_ascolto_p2p"]()
+        prova("il filo FERMO (vivo, senza un segno) si abbandona: gli si alza la SUA ferma, e ne nasce un altro",
+              [1, True, True],
+              [sum(1 for r in detto4 if "⚠️ Ascolto P2P FERMO da" in r),
+               ferma_secondo.is_set(), A["ferma"] is not ferma_secondo])
+        A["ferma"].set()
+        ferma_secondo.set()
+
+    try:
+        _aio.run(_giro_guardia())
+    finally:
+        for k in ("ferma",):
+            if amb4["_P2P_ASCOLTO"].get(k):
+                amb4["_P2P_ASCOLTO"][k].set()
+
+    amb5, detto5 = _ambiente([], _copione_buono, specchio=[])
+
+    async def _giro_senza_specchio():
+        amb5["_guardia_ascolto_p2p"]()
+        amb5["_guardia_ascolto_p2p"]()
+
+    _aio.run(_giro_senza_specchio())
+    prova("senza specchio nel config l'ascolto non parte, e lo dice UNA volta",
+          [1, None], [sum(1 for r in detto5 if "nessuno specchio nel config" in r),
+                      amb5["_P2P_ASCOLTO"]["filo"]])
+    prova("...e la riga dello stato dice spento, non «giu'»", True,
+          amb5["_stato_ascolto_p2p"]().startswith("spento"))
+
+    # --- 5) L'OROLOGIO COI LAMPI: i due giri VERI, il database vero ------
+    dir_db = _tf.mkdtemp()
+    percorso = os.path.join(dir_db, "banco.db")
+    s_i = src.index("CREATE TABLE IF NOT EXISTS chiavi_p2p(")
+    schema = src[s_i:src.index("ON chiavi_p2p(tg_id);", s_i) + len("ON chiavi_p2p(tg_id);")]
+    o_i = src.index("CREATE TABLE IF NOT EXISTS p2p_ordini(")
+    schema += "\n" + src[o_i:src.index("ON p2p_ordini(tg_id);", o_i) + len("ON p2p_ordini(tg_id);")]
+    schema += "\nCREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, avvisi_p2p INTEGER DEFAULT 1);"
+    con0 = sqlite3.connect(percorso)
+    con0.executescript(schema)
+    con0.execute("INSERT INTO utenti VALUES(111, 1)")
+    con0.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)", (CHIAVE, 111))
+    con0.commit()
+    con0.close()
+
+    def _db():
+        c = sqlite3.connect(percorso)
+        c.row_factory = sqlite3.Row
+        return c
+
+    timbri = {"p2p_libro_visto": str(adesso - 300), "p2p_ultimo_visto": str(adesso - 300)}
+    sui_relay = {"libro": [], "buste": []}
+    chiesto, detto6, mandati = [], [], []
+
+    def _lettore(relay, ids, since, mostro):
+        chiesto.append(("libro", time.time()))
+        return [dict(e) for e in sui_relay["libro"] if e["id"] in ids and e["quando"] >= since]
+
+    def _buste(relay, pubs, since, mostro):
+        chiesto.append(("buste", time.time()))
+        return [e for e in sui_relay["buste"] if e[0] in pubs and e[1] >= since]
+
+    async def _notifica(tg_id, testo):
+        mandati.append((tg_id, testo))
+        return "cartone"
+
+    amb6 = {"asyncio": _aio, "time": time, "html": _html, "json": json,
+            "print": lambda *a, **k: detto6.append(" ".join(str(x) for x in a)),
+            "db": _db, "notifica": _notifica, "create_connection": object(),
+            "timbro_letto": lambda n: timbri.get(n),
+            "timbro_scrivi": lambda n, v: timbri.__setitem__(n, v),
+            "_p2p_leve": lambda: {"attivo": True, "mostro": MOSTRO,
+                                  "relay": ["wss://pubblico.test"], "specchio": [SPECCHIO]},
+            "eventi_libro_da_relay": _lettore, "eventi_p2p_da_relay": _buste,
+            "info_libro_da_relay": lambda relay, mostro: {"fee": 0.02, "ore": 168},
+            "FORMA_ORDINE_P2P": _re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
+            "MAX_ORDINI_P2P": 200, "P2P_NUDGE_S": 600, "P2P_NUDGE_VIVO_S": 90,
+            "STATI_LIBRO_PRESO": ("in-progress", "waiting-buyer-invoice", "waiting-payment"),
+            "TIMBRO_LIBRO_P2P": "p2p_libro_visto", "TIMBRO_P2P_VISTO": "p2p_ultimo_visto",
+            "P2P_INFO_OGNI_S": 3600, "MSG_NUDGE_P2P": "Novità in un tuo scambio P2P",
+            "P2P_LIBRO_MEMORIA_S": 40 * 86400, "P2P_LIBRO_FRESCHI_S": 7200,
+            "P2P_PRIMO_SGUARDO": 600, "P2P_BLOCCO": 100, "P2P_MARGINE_S": 120,
+            "_P2P_INFO": {"fee": None, "ore": 0, "quando": 0},
+            "P2P_RELAY_MAX_S": 2, "P2P_PASSATA_MAX_S": 5, "P2P_GIRO_S": 1.0,
+            "P2P_LOG_PASSATE": True, "_P2P_POOL": None, "_P2P_VISTI": set(),
+            "_P2P_AVVIATO": {"campanello": False},
+            "_P2P_BATTITO": {"n": 0, "vivo": 0.0},
+            "_P2P_CONTO": {"libro": "", "campanello": ""}, "_P2P_RELAY_MUTI": set(),
+            "P2P_MAZZETTO_S": 0.08, "P2P_ASCOLTO_RITARDO_S": 20,
+            "_P2P_ASCOLTO": {"filo": None, "ferma": None, "stato": "connesso",
+                             "da": 0.0, "connesso_da": float(adesso - 100), "segno": 0.0,
+                             "polso": 0.0, "vivi": 0, "cadute": 0,
+                             "perche": "", "portati": {}, "detti": set()},
+            "_P2P_MAZZETTO": {"libro": [], "buste": [], "timer": None},
+            "_P2P_SVEGLIA": {"ev": None}, "_P2P_LAMPI": {"n": 0}}
+    asincrone = ("_chiedi_relay_p2p", "_chiedi_tutti_p2p", "_giro_libro_p2p",
+                 "_giro_p2p", "orologio_p2p")
+    for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
+              "_euro_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
+              "_ordini_puliti_p2p", "_registra_ordini_p2p", "_scambio_vivo_p2p",
+              "_nudge_p2p", "_relay_p2p_dice", "_esiti_p2p_dice",
+              "_unisci_p2p", "_conto_relay_p2p", "_chiave_evento_p2p",
+              "_ascolto_porta", "_mazzetto_sveglia", "_mazzetto_prendi",
+              "_ascolto_mancato_p2p", "_stato_ascolto_p2p") + asincrone:
+        exec(("async " if f in asincrone else "") + _senza_prosa(pezzo(f)), amb6)
+
+    ORD = "ordine-del-lampo"
+    c = _db()
+    amb6["_registra_ordini_p2p"](c, 111, [ORD], adesso - 3600, True)
+    c.execute("UPDATE p2p_ordini SET stato='pending', visto=? WHERE ordine=?",
+              (adesso - 3000, ORD))
+    c.commit()
+    c.close()
+    presa = {"id": ORD, "stato": "waiting-payment", "lato": "sell", "sats": 9000,
+             "euro": ["10"], "metodi": ["Revolut"], "quando": adesso - 60}
+    busta = (CHIAVE, adesso - 60, "b" * 64)
+
+    async def _giro_lampi():
+        # un mazzetto che aspetta GIA' alla partenza: la prima resta intera
+        amb6["_ascolto_porta"]("buste", [("e" * 64, adesso - 2, "c" * 64)])   # di uno sconosciuto
+        t = _aio.ensure_future(amb6["orologio_p2p"]())
+        await _fino_a(lambda: any(r.startswith("· P2P passata 1:") for r in detto6))
+        prova("la PRIMA e' una passata intera anche con un mazzetto che aspetta", True,
+              not any(r.startswith("⚡") for r in detto6[:2]))
+        await _fino_a(lambda: any(r.startswith("⚡ P2P lampo 1") for r in detto6))
+        prova("il kind 14 di uno SCONOSCIUTO fa un lampo che non suona a nessuno",
+              [0, True], [len(mandati), any("1 buste portate, 0 nuove per chiavi nostre" in r
+                                            for r in detto6)])
+        # IL CASO VERO: il kind 14 arriva PRIMA del suo 38383
+        t0 = time.time()
+        amb6["_ascolto_porta"]("buste", [busta])
+        await _aio.sleep(0.02)
+        amb6["_ascolto_porta"]("libro", [dict(presa)])
+        ok = await _fino_a(lambda: len(mandati) >= 1, 2.0)
+        latenza = time.time() - t0
+        # il lampo finisce DOPO la notifica (il campanello gira per secondo)
+        await _fino_a(lambda: any(r.startswith("⚡ P2P lampo 2") for r in detto6))
+        prova("la presa si notifica SUBITO, senza aspettare il giro (mazzetto 0,08 s, giro 1 s)",
+              [True, True], [ok, latenza < 0.6])
+        prova("...UNA notifica sola, e la PRECISA: nel mazzetto il libro passa prima del kind 14 arrivato prima di lui",
+              [1, True], [len(mandati), "Il tuo ordine è stato preso!" in mandati[0][1]])
+        prova("...il campanello c'era, e ha trovato il gate timbrato dal libro", True,
+              any("e' nel gate" in r for r in detto6))
+        prova("...e NON sposta nessuno dei due segnalibri",
+              [str(adesso - 300), str(adesso - 300)],
+              [timbri["p2p_libro_visto"], timbri["p2p_ultimo_visto"]])
+        prova("la riga del lampo sta nel journal, e dice cosa ha portato", True,
+              any(r.startswith("⚡ P2P lampo 2 (dall'ascolto): libro — 1 ordini portati, 1 nostri")
+                  for r in detto6))
+        # poi i relay pubblici ci arrivano anche loro: la passata intera li ritrova
+        sui_relay["libro"].append(dict(presa))
+        sui_relay["buste"].append(busta)
+        passate = sum(1 for r in detto6 if r.startswith("· P2P passata "))
+        await _fino_a(lambda: sum(1 for r in detto6 if r.startswith("· P2P passata ")) >= passate + 2, 6.0)
+        prova("la passata intera ritrova gli stessi eventi e NON rinotifica", 1, len(mandati))
+        prova("...ed e' LEI a spostare i segnalibri", [str(adesso - 60), str(adesso - 60)],
+              [timbri["p2p_libro_visto"], timbri["p2p_ultimo_visto"]])
+        prova("...senza gridare al ritardo: quelli l'ascolto li aveva portati", 0,
+              sum(1 for r in detto6 if "NON l'ascolto" in r))
+        prova("la riga della passata dice come sta l'ascolto", True,
+              any(r.startswith("· P2P passata ") and "; ascolto — connesso da " in r for r in detto6))
+        # una raffica di lampi non affama la passata intera
+        passate = sum(1 for r in detto6 if r.startswith("· P2P passata "))
+        for n in range(25):
+            amb6["_ascolto_porta"]("buste", [("e" * 64, adesso, f"{n:064d}")])
+            await _aio.sleep(0.1)
+        prova("una raffica di lampi NON sposta il minuto della passata intera", True,
+              sum(1 for r in detto6 if r.startswith("· P2P passata ")) >= passate + 2)
+        t.cancel()
+        try:
+            await t
+        except BaseException:
+            pass
+
+    try:
+        _aio.run(_giro_lampi())
+
+        domande = len(chiesto)
+        _aio.run(amb6["_giro_libro_p2p"]([dict(presa)]))
+        _aio.run(amb6["_giro_p2p"]([busta]))
+        prova("i due giri sugli eventi PORTATI non chiedono a nessun relay", domande, len(chiesto))
+
+        # --- 6) IL CONTROLLO INCROCIATO --------------------------------
+        A = amb6["_P2P_ASCOLTO"]
+        mancato = {"id": ORD, "stato": "success", "lato": "sell", "sats": 9000,
+                   "euro": ["10"], "metodi": ["Revolut"], "quando": adesso - 40}
+        A["connesso_da"] = float(adesso - 100)
+        sui_relay["libro"] = [mancato]
+        sui_relay["buste"] = [(CHIAVE, adesso - 40, "d" * 64)]
+        detto6.clear()
+        _aio.run(amb6["_giro_libro_p2p"]())
+        _aio.run(amb6["_giro_p2p"]())
+        prova("un evento nato ad ascolto CONNESSO che trova solo il giro si scrive: lo specchio non l'ha avuto",
+              [1, 1], [sum(1 for r in detto6 if "il 38383 dell'ordine ordine-d (success) l'ha trovato il giro al minuto e NON l'ascolto" in r),
+                       sum(1 for r in detto6 if "il kind 14 dddddddd l'ha trovato il giro al minuto e NON l'ascolto" in r)])
+        prova("...e la notifica parte lo stesso: la rete di sicurezza e' il giro", True,
+              any("Scambio concluso" in t for _, t in mandati))
+        _aio.run(amb6["_giro_libro_p2p"]())
+        _aio.run(amb6["_giro_p2p"]())
+        prova("...e si scrive UNA volta per evento, non a ogni passata del margine", 2,
+              sum(1 for r in detto6 if "NON l'ascolto" in r))
+        detto6.clear()
+        A["detti"].clear()
+        sui_relay["buste"] = [(CHIAVE, adesso - 5, "5" * 64)]
+        _aio.run(amb6["_giro_p2p"]())
+        prova("un evento di cinque secondi fa non e' un ritardo: l'ascolto puo' averlo ancora nel mazzetto",
+              0, sum(1 for r in detto6 if "NON l'ascolto" in r))
+        sui_relay["buste"] = [(CHIAVE, adesso - 150, "6" * 64)]
+        A["connesso_da"] = float(adesso - 100)
+        timbri["p2p_ultimo_visto"] = str(adesso - 200)
+        _aio.run(amb6["_giro_p2p"]())
+        prova("...ne' lo e' uno nato PRIMA che l'ascolto si connettesse", 0,
+              sum(1 for r in detto6 if "NON l'ascolto" in r))
+        A["stato"] = "giu"
+        sui_relay["buste"] = [(CHIAVE, adesso - 40, "7" * 64)]
+        _aio.run(amb6["_giro_p2p"]())
+        prova("con l'ascolto GIU' non si grida al ritardo: lo dice gia' la riga dello stato", 0,
+              sum(1 for r in detto6 if "NON l'ascolto" in r))
     finally:
         import shutil as _sh
         _sh.rmtree(dir_db, ignore_errors=True)
@@ -64144,7 +64690,7 @@ def main():
     prove_p2p_card_scambio,
     prove_p2p_vista_miei,
     prove_p2p_campanello,
-    prove_p2p_avvisi_libro, prove_p2p_orologio, prove_p2p_tutti_i_relay, prove_p2p_esito_notifiche, prove_p2p_silenzi,
+    prove_p2p_avvisi_libro, prove_p2p_orologio, prove_p2p_tutti_i_relay, prove_p2p_ascolto, prove_p2p_esito_notifiche, prove_p2p_silenzi,
     prove_p2p_motore,
     prove_p2p_stati,
     prove_p2p_chat,
