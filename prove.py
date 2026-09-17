@@ -41457,8 +41457,14 @@ let p2pLibro = null;
    che avvisa «appena lo prendi vi vedete» ha un secondo verso per chi
    e' entrato senza un nome — tg_id negativo — perche' la sua presa
    non viene annotata e vedersi non succede. Qui e' uno stub, e il
-   banco lo gira da 111 a -9 per leggere tutt'e due le righe. */
+   banco lo gira da 111 a -9 per leggere tutt'e due le righe.
+   ⚠️ E DAL 17 SET 2026 QUEL VERSO HA UN INTERRUTTORE: chi entra da
+   Nostr puo' farsi riconoscere, e allora vale la riga di tutti. Lo
+   stub nasce SPENTO come nel client (le sue prove stanno in
+   `prove_recensione_p2p`), e serve anche a non far esplodere il
+   banco: senza, il foglio nomina una variabile che non c'e'. */
 let myTgId = 111;
+let myRiconosciP2P = false;
 /* le impostazioni del coordinator e la busta delle leve: i casi del
    conto le girano come vogliono, e il p2pCoord e' quello VERO */
 let p2pInfo = null;
@@ -54552,10 +54558,17 @@ def prove_p2p_avvisi_libro():
     _mini = open("miniapp.html", encoding="utf-8").read()
     # L'EMENDA DEL 16 SET 2026: il taker si registra, ma solo chi entra
     # da Telegram — chi entra da Nostr (tg_id < 0) resta sulla generica
-    # senza dover fare niente, e la pagina Info lo dice.
-    prova("la presa si annota solo a chi entra da Telegram (tg_id > 0)", True,
+    # senza dover fare niente, e la pagina «I tuoi dati» lo dice.
+    # ⚠️ EMENDATA IL 17 SET 2026 (l'interruttore «Fatti riconoscere
+    # negli scambi»): il segno del tg_id non si guarda piu' QUI, e la
+    # regola non e' cambiata — si e' spostata dentro un giudice, che da
+    # allora ha anche un secondo caso (chi entra da Nostr e lo accende).
+    # Le sue prove stanno in `prove_recensione_p2p`; questa resta a
+    # guardare che il cancello CI PASSI.
+    prova("la presa si annota a chi e' riconosciuto, e lo dice un giudice",
+          True,
           'bool((d or {}).get("presi"))\n'
-          '                                     and user["id"] > 0)'
+          '                                     and _p2p_riconosciuto(con, user["id"]))'
           in pezzo("registra_ordini_p2p"))
     prova("il client dichiara la presa dopo l'accettazione, nei due cammini",
           2, _mini.count("registraOrdiniP2P([id], false, true).catch(() => {});"))
@@ -65955,6 +65968,113 @@ console.log(JSON.stringify(out));
           True, o2.get("diceDelCircuito"))
     prova("...e non c'e' quando e' gia' partito", True,
           o2.get("senzaCircuito"))
+
+    # --- 12) L'INTERRUTTORE DEL RICONOSCIMENTO (17 set 2026) --------
+    # «Fatti riconoscere negli scambi»: chi entra da Nostr non viene
+    # annotato quando PRENDE, e senza quell'annotazione una recensione
+    # non ha dove andare (ne' in un verso ne' nell'altro). L'unica cosa
+    # che apre quella porta e' un gesto SUO.
+    amb2 = {}
+    exec(pezzo("_p2p_riconosciuto"), amb2)
+    ric = amb2["_p2p_riconosciuto"]
+    con2 = _sq.connect(":memory:")
+    con2.execute("CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, "
+                 "riconosci_p2p INTEGER DEFAULT 0)")
+    con2.execute("INSERT INTO utenti VALUES(111, 0)")
+    con2.execute("INSERT INTO utenti VALUES(-77, 0)")
+    con2.execute("INSERT INTO utenti VALUES(-88, 1)")
+    # ⚠️ CHI ENTRA DA TELEGRAM E' RICONOSCIUTO ANCHE COLLA COLONNA A
+    # ZERO: la sua presa si annota dal 16 set, l'interruttore non lo
+    # vede nemmeno, e un interruttore che non cambia niente mente.
+    prova("chi entra da Telegram e' riconosciuto, colonna o non colonna",
+          True, ric(con2, 111))
+    prova("...anche se in `utenti` non c'e' nemmeno", True,
+          ric(con2, 222))
+    prova("chi entra da Nostr parte SPENTO", False, ric(con2, -77))
+    prova("...e acceso e' acceso", True, ric(con2, -88))
+    # FAIL-CLOSED, al contrario del fratello degli avvisi: qui il
+    # silenzio protegge, e un default acceso regalerebbe un'identita'
+    # che nessuno ha chiesto di dare.
+    prova("una chiave Nostr senza riga vale SPENTO (fail-closed)", False,
+          ric(con2, -99))
+    con2.close()
+    prova("la colonna nasce a ZERO", True,
+          '"riconosci_p2p INTEGER DEFAULT 0"' in _SORGENTE)
+    # ...e il gemello degli avvisi resta col suo verso, che le due
+    # righe del cassetto non si confondano
+    prova("...mentre gli avvisi restano accesi di serie", True,
+          '"avvisi_p2p INTEGER DEFAULT 1"' in _SORGENTE)
+    _gate = codice(pezzo("registra_ordini_p2p"))
+    prova("il cancello della presa chiede al giudice", True,
+          "_p2p_riconosciuto(con, user[\"id\"])" in _gate)
+    prova("...e non guarda piu' il segno del tg_id da se'", False,
+          'user["id"] > 0' in _gate)
+    _rot = codice(pezzo("scegli_riconoscimi_p2p"))
+    prova("la rotta scrive la colonna", True,
+          "UPDATE utenti SET riconosci_p2p=? WHERE tg_id=?" in _rot)
+    prova("...e a chi entra da Telegram dice NO invece di farlo credere",
+          True, 'if user["id"] > 0:' in _rot and "409" in _rot)
+    prova("...e la risposta dice com'e' finita", True,
+          'return {"ok": True, "attivo": bool(attivo)}' in _rot)
+
+    # il cassetto: la riga c'e' solo per chi serve, e dice i DUE versi
+    _riga = pezzo_js(mini, "const rigaRiconosciP2P = () =>", "\n\n")
+    prova("la riga del cassetto e' solo di chi entra da Nostr", True,
+          "!(myTgId < 0)) ? '' : `" in _riga)
+    prova("...e solo a P2P accesso", True,
+          "!p2pLeve || !p2pLeve.attivo" in _riga)
+    prova("...si chiama come l'ha chiamata Andrea", True,
+          "Fatti riconoscere negli scambi" in _riga)
+    # ⚠️ LA FRASE STA SU TRE RIGHE DI HTML: si cerca sugli spazi
+    # normalizzati, o una sentinella sana esce rossa per l'andare a capo
+    _pian = " ".join(_riga.split())
+    prova("...e dice cosa comporta, nei due versi", True,
+          "l'altra parte vede il tuo profilo e potete recensirvi" in _pian
+          and "resti invisibile e su quegli scambi non ci sono recensioni"
+          in _pian)
+    prova("...e nasce SPENTO", True,
+          "let myRiconosciP2P = false;" in mini)
+    _set = pezzo_js(mini, "async function setRiconosciP2P(attivo){", "\n}\n")
+    prova("l'interruttore parla con la rotta giusta", True,
+          "/me/riconoscimi-p2p`" in _set
+          and "myRiconosciP2P = !!d.attivo" in _set)
+    # SPEGNENDOLO SI DICE CHE IL PREGRESSO RESTA: gli scambi gia' presi
+    # sono scambi in corso (l'altra parte aspetta le sue frasi) o
+    # chiusi con una recensione magari gia' scritta, e una recensione
+    # non si ritira con una leva.
+    prova("...e spegnendolo dice che gli scambi gia' presi restano", True,
+          "gli scambi già presi restano" in _set)
+    prova("lo stato arriva dal server col verso rovesciato", True,
+          "myRiconosciP2P = !!me.riconosci_p2p;" in mini)
+    # e le due righe che dicevano «resti anonimo» ora guardano
+    # l'interruttore: erano la verita' di ieri, e a chi si e' fatto
+    # riconoscere direbbero il falso — che e' l'unica cosa che una riga
+    # di avvertenza non puo' fare.
+    _av = pezzo_js(mini, "const rigaAvvisiP2P = () =>", "\n\n")
+    prova("la riga degli avvisi guarda l'interruttore", True,
+          "myRiconosciP2P" in _av
+          and "anche sulle prese ricevi la frase coi numeri" in _av)
+    _det = pezzo_js(mini, "function renderDettaglioP2P(){", "\n}\n")
+    prova("...e il foglio dove si prende un ordine pure", True,
+          "myTgId < 0 && !myRiconosciP2P" in _det)
+    prova("...e a chi resta anonimo dice dov'e' l'interruttore", True,
+          # RAW: nel sorgente del client gli apostrofi sono sfuggiti
+          # (`l\'`), e in una stringa normale Python se li mangia —
+          # cercava una cosa che nel file non c'e' (visto scrivendolo)
+          r"c\'è l\'interruttore nel cassetto" in _det)
+
+    # «I TUOI DATI» lo dice nelle due righe che prima lo negavano
+    dati = mini[mini.index('<h3 id="priv-p2p">'):]
+    dati = dati[:dati.index('<h3 id="priv-tor">')]
+    prova("«I tuoi dati» nomina l'interruttore", 2,
+          dati.count("Fatti riconoscere negli scambi"))
+    prova("...dicendo che e' spento di serie", True,
+          dati.count("spento di serie") >= 2)
+    prova("...e che accendendolo si apre la recensione", True,
+          "possono <b>recensirsi</b>" in dati
+          and "apre le <b>recensioni</b>" in dati)
+    prova("...e che il pregresso non si tocca", True,
+          "gli scambi già presi restano come erano" in dati)
 
 
 def main():

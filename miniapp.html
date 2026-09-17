@@ -8073,9 +8073,9 @@ document.getElementById('cartello')?.remove();</script>
       <p><b>Se entri con una chiave Nostr che è tua</b> e in passato l'hai resa il tuo profilo di scambio, resta così: <b>non lo può ricavare nessuno tranne te</b>, noi compresi, ed è lo stesso ovunque perché ce l'hai tu. Questa strada resta nel patto anche se oggi non ha più un gesto dentro l'app.</p>
       <p><b>Negli altri casi</b> — un profilo nato nel browser prima che arrivasse quello del conto — il profilo <b>vive sul dispositivo</b> e non lo può ricavare nessuno. Dentro Telegram ne salviamo una copia nel <b>cloud del tuo account Telegram</b>, così sopravvive alla cache svuotata e ti segue fra telefono e computer: <b>chi ha il tuo account Telegram ce l'ha anche lui</b> — è già così per tutto Barattolo — e Telegram potrebbe leggerlo, che è il prezzo. Il <b>codice segreto</b> serve a portare il profilo <b>fuori da Barattolo</b>, in un altro programma che parla con lo stesso coordinatore.</p>
       <p>In tutti e tre i casi il server conosce la <b>parte pubblica</b> del profilo e le <b>chiavi usa-e-getta</b> di ogni scambio, per poterti avvisare quando c'è una novità, e da settembre 2026 anche <b>a che numero di scambio sei arrivato</b>: serve a non riusare due volte la stessa chiave usa-e-getta quando apri Barattolo da un dispositivo nuovo, ed è un dato che dai conti che teneva già si sarebbe comunque ricavato. Dal foglio qui sotto il <b>codice segreto</b> lo vedi e lo copi, e il profilo lo <b>dimentichi</b>; dimenticandolo si cancella anche la parte pubblica che il server teneva.</p>
-      <p>Dal 16 settembre 2026 il server annota anche <b>quali ordini pubblichi e quali prendi</b>, per avvisarti con i numeri quando lo scambio si muove (preso, concluso, annullato, tornato in vetrina): sono i passaggi <b>pubblici</b> del libro, e la cifratura dei messaggi non si tocca. Chi entra <b>da Nostr</b> non viene annotato quando prende un ordine — sulle prese riceve l'avviso generico — perché quell'ingresso esiste per chi non vuole lasciare tracce. Gli avvisi si spengono tutti dal cassetto «🔔 Avvisi» del profilo.</p>
+      <p>Dal 16 settembre 2026 il server annota anche <b>quali ordini pubblichi e quali prendi</b>, per avvisarti con i numeri quando lo scambio si muove (preso, concluso, annullato, tornato in vetrina): sono i passaggi <b>pubblici</b> del libro, e la cifratura dei messaggi non si tocca. Chi entra <b>da Nostr</b> non viene annotato quando prende un ordine — sulle prese riceve l'avviso generico — perché quell'ingresso esiste per chi non vuole lasciare tracce. Dal <b>17 settembre 2026</b> però <b>può deciderlo lui</b>: nel cassetto «🔔 Avvisi» c'è «<b>Fatti riconoscere negli scambi</b>», spento di serie — accendendolo la presa viene annotata, chi ha pubblicato vede il suo profilo e le due parti possono <b>recensirsi</b>. Gli avvisi si spengono tutti dal cassetto «🔔 Avvisi» del profilo.</p>
       <p>Dal <b>17 settembre 2026</b>, quando un ordine viene <b>preso</b>, le due parti si vedono: chi ha pubblicato e chi ha preso vedono il <b>profilo</b> l'uno dell'altra — lo stesso che sta già sotto ogni annuncio del mercatino: nome, foto, stelline, livello e titolo — e i <b>bottoni per scriversi</b> su Telegram o su Nostr, ma solo dove quei canali esistono davvero (la npub soltanto se ne hai dimostrato il possesso). <b>Prima della presa non si vede niente</b>, e non c'è nessun altro modo di chiederlo: a questa domanda il server risponde solo a una delle due parti di quello scambio. Il perché è che dall'altra parte c'è una persona a cui stai per mandare dei soldi veri, e un volto con una reputazione è quello che rende <i>pesabile</i> la fiducia — la stessa ragione per cui nel mercatino chi vende ha un nome. Te lo diciamo <b>prima</b>: nel foglio dove pubblichi e in quello dove prendi. Al posto dei campi dove prima ci si scriveva il proprio contatto a mano, che non erano verificati da nessuno.</p>
-      <p><b>Chi entra con una chiave Nostr resta anonimo quando prende</b>: quella presa non viene annotata, chi ha pubblicato non saprà chi è, e nella pagina dello scambio legge che l'altra persona non si conosce. Chi entra con una chiave e <b>pubblica</b>, invece, si mostra — col profilo che ha qui, cioè il nome e la foto della sua chiave: è così da quando le card del libro hanno un volto, e il foglio dove si pubblica lo dice prima.</p>
+      <p><b>Chi entra con una chiave Nostr resta anonimo quando prende</b>: quella presa non viene annotata, chi ha pubblicato non saprà chi è, e nella pagina dello scambio legge che l'altra persona non si conosce. <b>A meno che non lo decida lui</b>: l'interruttore «Fatti riconoscere negli scambi» nel cassetto «🔔 Avvisi» — <b>spento di serie</b> — fa annotare la presa, mostra il suo profilo all'altra parte e apre le <b>recensioni</b> su quello scambio; lasciandolo spento resta invisibile, e su quegli scambi recensioni non ce ne sono. Vale da quando lo accende: gli scambi già presi restano come erano, e a cancellare il pregresso c'è «dimentica il profilo». Chi entra con una chiave e <b>pubblica</b>, invece, si mostra — col profilo che ha qui, cioè il nome e la foto della sua chiave: è così da quando le card del libro hanno un volto, e il foglio dove si pubblica lo dice prima.</p>
       <p>Le <b>conversazioni fuori da Barattolo</b> non sono nostre: se vi scrivete su Telegram o su Nostr quella chat è vostra e di chi la trasporta — non la leggiamo, non ce l'abbiamo, e <b>in una disputa non possiamo usarla</b>. A decidere sono i fatti dello scambio: chi ha bloccato i sats, chi ha detto di aver mandato gli euro, chi li ha liberati.</p>
       <button class="btn ghost" onclick="apriProfiloP2P()">👤 Il tuo profilo di scambio</button>
       <p>Gli <b>ordini di scambio</b> sono pubblici per come è fatto il coordinatore: vivono sui relay e li legge chiunque, e da settembre 2026 <b>una copia sta anche sul nostro relay</b> — serve a far vedere il libro degli scambi anche quando i relay del coordinatore non rispondono. Non c'è scritto chi sei: un ordine porta l'importo, il metodo di pagamento e una <b>chiave usa-e-getta</b>, diversa a ogni scambio. Sul nostro relay sta anche una copia dei <b>messaggi che il coordinatore ti manda</b> durante lo scambio: serve ad avvisarti subito quando tocca a te. Sono <b>buste cifrate</b>, le stesse che stanno già sui relay pubblici — si vede che una chiave usa-e-getta ha ricevuto un messaggio e quando, <b>mai cosa dice</b>: la chiave per aprirle sta solo nel tuo telefono. Le <b>conversazioni</b> fra te e l'altra persona invece non passano di lì: sono cifrate e viaggiano sui relay del coordinatore, e sul nostro non ne teniamo copia.</p>
@@ -24572,6 +24572,12 @@ let mySpedGratis = null, spedGratisLeve = null, spedGratisBozza = null;
    0 o assente = server di ieri, e la riga non lo nomina. */
 let mySuggerimenti = false, suggerimentiOgni = 0;
 let myAvvisiP2P = true;   // «⚡ Avvisi sugli scambi P2P»: accesi di serie
+/* «👤 Fatti riconoscere negli scambi»: SPENTO di serie, e lo zero e'
+   il punto — vale per chi entra da Nostr, la cui presa non si annota.
+   Nasce false anche qui e non «undefined»: un server di ieri non manda
+   la chiave, e il silenzio non deve accendere niente (il patto
+   rovesciato di `myAvvisatoTrasporto`, dove il silenzio TACE). */
+let myRiconosciP2P = false;
 let myVenditeOk = 0, myAcquistiOk = 0, myRating = 0, myNFeedback = 0, myNRecensori = 0, myNegozio = '';
 /* il francobollo della propria foto profilo e il suo selettore
    ('' = automatico, la catena Telegram → Nostr → iniziale; oppure
@@ -25524,7 +25530,7 @@ function renderAvvisi(){
      solo lo stato e le scelte */
   box.innerHTML = `
     <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.4">${stato}</div>${dentro}
-    ${rigaSuggerimenti()}${rigaAvvisiP2P()}`;
+    ${rigaSuggerimenti()}${rigaAvvisiP2P()}${rigaRiconosciP2P()}`;
 }
 
 /* «💡 Suggerimenti sui miei annunci»: l'interruttore dei consigli che
@@ -25583,13 +25589,63 @@ const rigaAvvisiP2P = () => (!p2pLeve || !p2pLeve.attivo) ? '' : `
       <div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">
         Quando il tuo ordine viene preso, quando lo scambio si chiude
         e quando tocca a te. Spenti, non ti scriviamo nulla dello scambio.${
-          myTgId < 0 ? " Entrando da Nostr, sulle prese ricevi l'avviso generico: non annotiamo quali ordini prendi." : ""}</div>
+          myTgId < 0 ? (myRiconosciP2P
+            ? " Ti sei fatto riconoscere negli scambi, quindi anche sulle prese ricevi la frase coi numeri."
+            : " Entrando da Nostr, sulle prese ricevi l'avviso generico: non annotiamo quali ordini prendi.") : ""}</div>
     </div>
     <button onclick="setAvvisiP2P(${myAvvisiP2P ? 'false' : 'true'})"
       aria-pressed="${myAvvisiP2P ? 'true' : 'false'}"
       style="flex:none;font:inherit;font-size:12.5px;font-weight:800;border:1px solid ${myAvvisiP2P?'var(--sats)':'var(--line)'};background:${myAvvisiP2P?'var(--sats)':'transparent'};color:${myAvvisiP2P?'#fff':'var(--muted)'};border-radius:99px;padding:6px 14px;cursor:pointer">
       ${myAvvisiP2P ? 'Attivi' : 'Spenti'}</button>
   </div>`;
+
+/* «👤 Fatti riconoscere negli scambi» (17 set 2026, decisione di
+   Andrea): chi entra da Nostr non viene annotato quando PRENDE un
+   ordine, e da quell'annotazione dipendono il volto che l'altra parte
+   vede e il posto dove una recensione puo' andare. Qui lo decide lui.
+   ⚠️ CHI ENTRA DA TELEGRAM NON LA VEDE NEMMENO, ed e' la meta' che
+   tiene onesto l'interruttore: per lui la presa si annota da sempre,
+   e un interruttore che non cambia niente e' un interruttore che
+   mente (il server risponde 409 a chi lo chiedesse comunque).
+   SPENTO DI SERIE, e la riga sotto dice cosa comporta nei DUE versi —
+   quel che si guadagna accendendolo e quel che si perde lasciandolo
+   spento: una frase che dice solo il beneficio e' meta' frase. */
+const rigaRiconosciP2P = () => (!p2pLeve || !p2pLeve.attivo
+    || !(myTgId < 0)) ? '' : `
+  <div style="display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+    <div style="min-width:0;flex:1">
+      <div style="font-size:13.5px;font-weight:800">👤 Fatti riconoscere negli scambi</div>
+      <div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">
+        Se lo accendi, quando prendi un ordine l'altra parte vede il tuo
+        profilo e potete recensirvi; se resta spento, resti invisibile e
+        su quegli scambi non ci sono recensioni.</div>
+    </div>
+    <button onclick="setRiconosciP2P(${myRiconosciP2P ? 'false' : 'true'})"
+      aria-pressed="${myRiconosciP2P ? 'true' : 'false'}"
+      style="flex:none;font:inherit;font-size:12.5px;font-weight:800;border:1px solid ${myRiconosciP2P?'var(--sats)':'var(--line)'};background:${myRiconosciP2P?'var(--sats)':'transparent'};color:${myRiconosciP2P?'#fff':'var(--muted)'};border-radius:99px;padding:6px 14px;cursor:pointer">
+      ${myRiconosciP2P ? 'Attivo' : 'Spento'}</button>
+  </div>`;
+
+async function setRiconosciP2P(attivo){
+  haptic();
+  if (DEMO) { toast('In demo non ci sono scambi veri 🙂'); return; }
+  try {
+    const r = await fetch(`${API_BASE}/me/riconoscimi-p2p`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({attivo})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+    myRiconosciP2P = !!d.attivo;
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  renderAvvisi();
+  /* IL PREGRESSO NON SI TOCCA, e spegnendo si dice: gli scambi gia'
+     presi restano annotati — l'altra parte aspetta le sue frasi, e una
+     recensione gia' scritta non si ritira con una leva. */
+  toast(myRiconosciP2P
+    ? '👤 Da ora chi scambia con te ti vede, e potete recensirvi'
+    : 'Da ora le tue prese non vengono annotate (gli scambi già presi restano)',
+    6000);
+}
 
 async function setAvvisiP2P(attivi){
   haptic();
@@ -42247,9 +42303,14 @@ function renderDettaglioP2P(){
        E IL VERSO E' DIVERSO PER CHI E' ENTRATO SENZA UN NOME: la sua
        presa non viene annotata (la decisione del 16 set 2026), quindi
        a lui «vi vedete» sarebbe falso. Guarda vedere: il profilo di
-       chi ha pubblicato lo legge lo stesso, qui sopra. */
-    (myTgId < 0
-      ? '<div class="hint">🕶️ Tu resti anonimo: sei entrato con un profilo senza nome, e chi ha pubblicato non saprà chi sei. Il suo profilo invece lo vedi qui sopra.</div>'
+       chi ha pubblicato lo legge lo stesso, qui sopra.
+       ⚠️ A MENO CHE L'ABBIA DECISO LUI (17 set 2026, l'interruttore
+       «Fatti riconoscere negli scambi»): acceso, la presa si annota e
+       allora vale la frase di tutti — e dire «resti anonimo» a chi si
+       e' fatto riconoscere sarebbe la bugia che questa riga esiste per
+       non dire. Il giudice e' lo stesso del cassetto Avvisi. */
+    (myTgId < 0 && !myRiconosciP2P
+      ? '<div class="hint">🕶️ Tu resti anonimo: sei entrato con un profilo senza nome, e chi ha pubblicato non saprà chi sei. Il suo profilo invece lo vedi qui sopra. Se vuoi farti riconoscere — e potervi recensire — c\'è l\'interruttore nel cassetto «🔔 Avvisi».</div>'
       : '<div class="hint">👤 Appena lo prendi vi vedete: tu e chi l\'ha pubblicato vedrete il profilo l\'uno dell\'altra — nome, foto, stelline e livello, gli stessi del mercatino — e i bottoni per scrivervi.</div>') +
     '<div class="hint" id="p2pDettManca" style="color:var(--danger);font-weight:800'
       + (manca ? '' : ';display:none') + '">' + esc(manca) + '</div>' +
@@ -47116,6 +47177,9 @@ async function avvia(){
     mySuggerimenti = !!me.suggerimenti_annunci;
     /* un server di ieri non manda la chiave: vale «accesi», il default */
     myAvvisiP2P = me.avvisi_p2p === undefined ? true : !!me.avvisi_p2p;
+    /* e il riconoscimento, col verso ROVESCIATO: un server di ieri
+       (chiave assente) vale SPENTO, che qui e' il lato che protegge */
+    myRiconosciP2P = !!me.riconosci_p2p;
     suggerimentiOgni = me.suggerimenti_ogni_giorni || 0;
     adottaFont(me);   // la misura scelta sull'altro telefono
     mySpedizioniere = me.spedizioniere || '';

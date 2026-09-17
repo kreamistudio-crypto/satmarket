@@ -4891,7 +4891,23 @@ def init_db():
                     # E' accanto a `canale_notifiche` e non dentro: il
                     # canale dice DOVE arrivano gli avvisi del mercatino,
                     # questo dice SE arrivano quelli del P2P.
-                    "avvisi_p2p INTEGER DEFAULT 1"):
+                    "avvisi_p2p INTEGER DEFAULT 1",
+                    # «FATTI RICONOSCERE NEGLI SCAMBI» (17 set 2026,
+                    # decisione di Andrea): 0 = SPENTO, e lo zero e'
+                    # il punto. Vale per chi entra da NOSTR, la cui
+                    # presa non si annota (16 set, «quell'ingresso
+                    # esiste per chi non vuole lasciare tracce»):
+                    # accendendolo la presa si annota, l'altra parte
+                    # vede il suo profilo e le due possono
+                    # recensirsi. Chi entra da Telegram e' riconosciuto
+                    # da sempre e l'interruttore non lo vede nemmeno.
+                    # ⚠️ IL DEFAULT E' ROVESCIATO rispetto ad
+                    # `avvisi_p2p`, e non e' distrazione: la' il
+                    # silenzio toglie un servizio che uno si aspetta,
+                    # qui il silenzio PROTEGGE — e un default acceso
+                    # regalerebbe un'identita' che nessuno ha chiesto
+                    # di dare. Giudice unico: `_p2p_riconosciuto`.
+                    "riconosci_p2p INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -32162,6 +32178,36 @@ async def scegli_avvisi_p2p(req: Request, x_tg_init_data: str = Header(""),
     return {"ok": True, "attivi": bool(attivi)}
 
 
+@app.post("/api/me/riconoscimi-p2p")
+async def scegli_riconoscimi_p2p(req: Request, x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """«Fatti riconoscere negli scambi» (17 set 2026, decisione di
+    Andrea): chi entra da Nostr lo accende per farsi annotare quando
+    PRENDE un ordine — cosi' l'altra parte vede il suo profilo e le due
+    possono recensirsi. Spento di serie, e spento vuol dire invisibile:
+    su quegli scambi non ci sono recensioni, in nessuno dei due versi.
+    Un si' o un no, come i suggerimenti e come gli avvisi.
+    ⚠️ A CHI ENTRA DA TELEGRAM SI RISPONDE NO, e non e' pignoleria: lui
+    e' riconosciuto da sempre (la sua presa si annota dal 16 set), il
+    cassetto l'interruttore non glielo mostra, e accettare un «spegni»
+    che non spegne niente sarebbe una promessa che non manteniamo — il
+    patto del bottone che non deve poter mentire.
+    IL PREGRESSO NON SI TOCCA: vedi `_p2p_riconosciuto`, dove c'e'
+    scritto perche' e qual e' il gesto che invece lo cancella."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if user["id"] > 0:
+        raise HTTPException(409, "Chi entra da Telegram e' gia' "
+                                 "riconosciuto negli scambi")
+    d = await leggi_json(req)
+    attivo = 1 if d.get("attivo") else 0
+    con = db()
+    con.execute("UPDATE utenti SET riconosci_p2p=? WHERE tg_id=?",
+                (attivo, user["id"]))
+    con.commit()
+    con.close()
+    return {"ok": True, "attivo": bool(attivo)}
+
+
 @app.post("/api/me/avviso-trasporto")
 async def timbra_avviso_trasporto(x_tg_init_data: str = Header(""),
                                   barattolo_sessione: str = Cookie("")):
@@ -33747,16 +33793,19 @@ async def registra_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(400, "Richiesta illeggibile")
     con = db()
     try:
-        # LA PRESA SI ANNOTA SOLO A CHI ENTRA DA TELEGRAM (16 set 2026):
-        # `tg_id < 0` e' l'account nato da Nostr — lo stesso giudice di
-        # notifica() — e per lui non si scrive «l'ha preso», senza che
-        # debba fare niente: resta sulla frase generica del campanello.
-        # E' scritto nella pagina Info del P2P e nel cassetto Avvisi.
+        # LA PRESA SI ANNOTA A CHI E' RICONOSCIUTO (16 set 2026, e
+        # dal 17 con l'interruttore): chi entra da Telegram lo e' da
+        # sempre; chi entra da Nostr no, e per lui non si scrive «l'ha
+        # preso» — resta sulla frase generica del campanello — finche'
+        # non accende «Fatti riconoscere negli scambi» dal cassetto
+        # «🔔 Avvisi». Il giudice e' UNO (`_p2p_riconosciuto`), che due
+        # letture della stessa cosa un giorno dicono cose diverse.
+        # E' scritto nella pagina «I tuoi dati» e nel cassetto Avvisi.
         esito = _registra_ordini_p2p(con, user["id"],
                                      (d or {}).get("ordini"), int(time.time()),
                                      bool((d or {}).get("pubblicati")),
                                      bool((d or {}).get("presi"))
-                                     and user["id"] > 0)
+                                     and _p2p_riconosciuto(con, user["id"]))
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
@@ -35576,6 +35625,33 @@ def _avvisi_p2p_accesi(con, tg_id: int) -> bool:
     if not r or r[0] is None:
         return True
     return bool(int(r[0]))
+
+
+def _p2p_riconosciuto(con, tg_id: int) -> bool:
+    """«FATTI RICONOSCERE NEGLI SCAMBI» (17 set 2026, decisione di
+    Andrea): quando qualcuno PRENDE un ordine la sua presa si annota,
+    e da quell'annotazione dipendono due cose — la frase precisa
+    dell'avviso e il posto dove una recensione puo' andare.
+    CHI ENTRA DA TELEGRAM E' RICONOSCIUTO DA SEMPRE, e l'interruttore
+    non lo vede nemmeno: per lui la presa si annota dal 16 set 2026, e
+    un interruttore che non cambia niente e' un interruttore che mente.
+    CHI ENTRA DA NOSTR (`tg_id < 0`) parte SPENTO e lo accende lui:
+    quell'ingresso esiste per chi non vuole lasciare tracce, e la
+    tracciabilita' non si regala per comodita' di un cantiere.
+    FAIL-CLOSED, al contrario del fratello degli avvisi: senza riga in
+    `utenti` — i banchi, un profilo mai nato — vale SPENTO, perche' qui
+    il silenzio protegge.
+    ⚠️ E GUARDA SOLO IL FUTURO: spegnerlo NON cancella le prese gia'
+    annotate. Quelle sono scambi in corso — l'altra parte aspetta le
+    sue frasi — o scambi chiusi su cui una recensione puo' essere gia'
+    stata scritta, e una recensione non si ritira spegnendo una leva.
+    A cancellare il pregresso c'e' «Dimentica il profilo», che e' il
+    gesto che esiste per quello e che porta via anche i volti."""
+    if tg_id > 0:
+        return True
+    r = con.execute("SELECT riconosci_p2p FROM utenti WHERE tg_id=?",
+                    (tg_id,)).fetchone()
+    return bool(r and r[0])
 
 
 def _passaggio_libro_p2p(prima: str, dopo: str, maker: int) -> str:

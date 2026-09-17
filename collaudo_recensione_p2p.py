@@ -28,8 +28,12 @@ fare e' far girare il giro intero su un database vero. Qui si cammina:
   8. il posto di chi ha preso non si ruba a cose fatte (o si
      dirotterebbe la recensione di un altro);
   9. l'invito nella notifica compare SOLO dove porta a qualcosa;
- 10. e la fusione di due account non esplode sulle recensioni fra le
-     due meta'.
+ 10. L'INTERRUTTORE del riconoscimento: chi entra da Nostr prende un
+     ordine e resta invisibile — nessuna recensione, in nessuno dei due
+     versi — poi lo accende, e dal prossimo scambio le due parti si
+     recensiscono;
+ 11. e la fusione di due account non esplode sulle recensioni fra le
+     due meta' (ULTIMA, che porta via la meta' Nostr da `utenti`).
 
 NON TOCCA NIENTE DI VERO: il modulo `config` viene sostituito PRIMA
 dell'import di server, o si aprirebbe il database di casa. Nessuna
@@ -56,6 +60,8 @@ SCAMBIO2 = "992e288e-2222-4a2b-9c3d-000000000002"
 APERTO = "992e288e-3333-4a2b-9c3d-000000000003"
 IGNOTO = "992e288e-4444-4a2b-9c3d-000000000004"
 FUSO = "992e288e-5555-4a2b-9c3d-000000000005"
+DA_NOSTR = "992e288e-6666-4a2b-9c3d-000000000006"
+DA_NOSTR2 = "992e288e-7777-4a2b-9c3d-000000000007"
 
 
 def prova(nome, atteso, avuto):
@@ -115,6 +121,11 @@ def avvio():
 
     server.notifica = notifica_finta
     server.notifica_admin = zitto
+    # LA LEVA DEL P2P CEDE, non la regola: le rotte che REGISTRANO
+    # vogliono la funzione attiva per quella persona, e nel config
+    # finto non c'e' nessun coordinatore da raggiungere. Quel gate ha
+    # le sue prove altrove; qui si cammina su quel che viene dopo.
+    server._p2p_per = lambda tg_id: {"attivo": True}
     server.premia_distintivi = zitto
     server.premia_xp = zitto
     server.polso_ordini_admin = zitto
@@ -173,6 +184,32 @@ def recensioni(scambio):
     return r
 
 
+def preso_da(ordine):
+    con = con_db()
+    r = con.execute("SELECT preso_da FROM p2p_ordini WHERE ordine=?",
+                    (ordine,)).fetchone()
+    con.close()
+    return r["preso_da"] if r else None
+
+
+def concludi(ordine):
+    """Lo scambio si chiude: e' quel che scriverebbe il giro del libro
+    vedendo il 38383 a `success`. Qui a mano, che di relay non ce n'e'."""
+    con = con_db()
+    con.execute("UPDATE p2p_ordini SET stato='success' WHERE ordine=?",
+                (ordine,))
+    con.commit()
+    con.close()
+
+
+def riconosce(tg_id):
+    con = con_db()
+    r = con.execute("SELECT riconosci_p2p FROM utenti WHERE tg_id=?",
+                    (tg_id,)).fetchone()
+    con.close()
+    return r["riconosci_p2p"] if r else None
+
+
 def quante_righe():
     con = con_db()
     n = con.execute("SELECT COUNT(*) FROM feedback").fetchone()[0]
@@ -204,7 +241,13 @@ def semina():
             # chi ha preso entrando da Nostr non viene annotato: il
             # posto resta a zero, ed e' il caso 5
             (IGNOTO, 111, 0, "success"),
-            (FUSO, 111, -77, "success")):
+            (FUSO, 111, -77, "success"),
+            # i due ordini del caso 11: nascono VIVI e senza nessuno
+            # nel posto di chi prende, perche' la presa si dichiara a
+            # scambio in corso — a cose fatte quel posto non si prende
+            # piu' (ed e' una delle cose che il caso prova)
+            (DA_NOSTR, 111, 0, "in-progress"),
+            (DA_NOSTR2, 111, 0, "in-progress")):
         con.execute("INSERT INTO p2p_ordini(ordine,tg_id,creato,stato,"
                     "lato,maker,visto,preso_da) VALUES(?,?,?,?,'sell',1,?,?)",
                     (ordine, tg_id, adesso, stato, adesso, preso_da))
@@ -368,7 +411,65 @@ def main():
     prova("...ma lo scambio resta concluso", True,
           "Scambio concluso" in senza)
 
-    print("\n[10. la fusione non esplode]")
+    print("\n[10. l'interruttore: chi entra da Nostr si fa riconoscere]")
+    # -77 e' l'account nato da Nostr: a interruttore SPENTO la sua
+    # presa non si annota, e senza quell'annotazione una recensione non
+    # ha dove andare — in nessuno dei due versi.
+    come(-77)
+    chiama(SRV.registra_ordini_p2p, {"ordini": [DA_NOSTR], "presi": True})
+    prova("a interruttore spento la presa non si annota", 0,
+          preso_da(DA_NOSTR))
+    concludi(DA_NOSTR)
+    come(111)
+    e = errore(SRV.recensione_p2p, {"ordine": DA_NOSTR, "voto": 5})
+    prova("...e a scambio concluso chi ha pubblicato non ha chi recensire",
+          (400, "Dell'altra persona non sappiamo il profilo: la recensione "
+                "non avrebbe dove andare"), e)
+    come(-77)
+    r = chiama(SRV.recensibile_p2p, {"ordine": DA_NOSTR})
+    prova("...e nemmeno lui, che di quello scambio non risulta parte",
+          {"si": False, "motivo": "ignota", "gia": False}, r)
+
+    # ...lo accende LUI, e su quello scambio NON cambia niente: vale da
+    # qui in avanti, e il posto di chi ha preso a cose fatte non si
+    # prende piu' (e' la stessa guardia del caso 8)
+    chiama(SRV.scegli_riconoscimi_p2p, {"attivo": True})
+    prova("l'interruttore si accende", 1, riconosce(-77))
+    chiama(SRV.registra_ordini_p2p, {"ordini": [DA_NOSTR], "presi": True})
+    prova("...ma lo scambio gia' chiuso non si recupera", 0,
+          preso_da(DA_NOSTR))
+
+    # ...e dal prossimo scambio si vedono e si recensiscono
+    chiama(SRV.registra_ordini_p2p, {"ordini": [DA_NOSTR2], "presi": True})
+    prova("la presa del nuovo scambio si annota", -77, preso_da(DA_NOSTR2))
+    concludi(DA_NOSTR2)
+    r = chiama(SRV.recensibile_p2p, {"ordine": DA_NOSTR2})
+    prova("...e la recensione si apre", {"si": True, "motivo": "",
+                                         "gia": False}, r)
+    chiama(SRV.recensione_p2p, {"ordine": DA_NOSTR2, "voto": 5})
+    come(111)
+    chiama(SRV.recensione_p2p, {"ordine": DA_NOSTR2, "voto": 4,
+                                "commento": "Veloce"})
+    prova("le due parti si sono recensite", 2, len(recensioni(DA_NOSTR2)))
+    prova("...e il voto e' arrivato anche a chi non ha un nome",
+          (4.0, 1), (utente(-77)["rating"], utente(-77)["n_feedback"]))
+
+    # ...e chi entra da Telegram non lo puo' nemmeno chiedere: lui e'
+    # riconosciuto da sempre, e un «spegni» che non spegne sarebbe una
+    # promessa che non manteniamo
+    e = errore(SRV.scegli_riconoscimi_p2p, {"attivo": False})
+    prova("a chi entra da Telegram la rotta dice no",
+          (409, "Chi entra da Telegram e' gia' riconosciuto negli scambi"), e)
+
+    # ...e spegnendolo il PREGRESSO resta: quello scambio e' chiuso e
+    # le recensioni ci sono
+    come(-77)
+    chiama(SRV.scegli_riconoscimi_p2p, {"attivo": False})
+    prova("spento, l'interruttore torna a zero", 0, riconosce(-77))
+    prova("...ma la presa gia' annotata resta", -77, preso_da(DA_NOSTR2))
+    prova("...e le recensioni pure", 2, len(recensioni(DA_NOSTR2)))
+
+    print("\n[11. la fusione non esplode]")
     come(-77)
     chiama(SRV.recensione_p2p, {"ordine": FUSO, "voto": 5})
     come(111)
