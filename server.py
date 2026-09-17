@@ -33569,6 +33569,104 @@ def _facce_ordini_p2p(con, ordini, adesso) -> dict:
     return fuori
 
 
+def _controparti_p2p(con, ordini, io: int, adesso) -> dict:
+    """Da una lista di id al VOLTO DI CHI STA SCAMBIANDO CON ME, e ai
+    canali per scrivergli. La gemella di `_facce_ordini_p2p` — stesso
+    vocabolario, stesso avatar, stessa media — con DUE differenze che
+    sono tutta la sostanza.
+
+    1) RISPONDE SOLO A UNA DELLE DUE PARTI. Il libro lo guarda chiunque
+    abbia una sessione, e quel che esce di la' e' il volto di chi ha
+    PUBBLICATO — la faccia che sta gia' sulla card. Qui esce anche il
+    volto di chi ha PRESO, che su nessuna card sta e che non riguarda
+    nessuno tranne l'altra parte: percio' la riga si guarda dai DUE
+    lati e quel che si serve e' sempre L'ALTRO. Chi non e' della
+    partita non riceve la riga — e nemmeno un errore: la risposta e'
+    semplicemente senza quell'id, come per un ordine che non esiste, e
+    i due casi non si distinguono apposta.
+
+    2) ESCONO ANCHE I CANALI PER SCRIVERSI: lo @username Telegram e la
+    npub, quest'ultima SOLO dal possesso dimostrato (`npub_accesso`,
+    oppure il badge `npub` ma solo se VERIFICATO — il giudice e'
+    `chiave_nostr_provata`, lo stesso dei ponti del mercatino). Una
+    npub NUDA e' una dichiarazione e non una prova, e un bottone che
+    ci portasse manderebbe chi scambia sul profilo di un'altra
+    persona. Sono gli STESSI due campi che le due parti di un ordine
+    del mercatino si vedono gia' da sempre in `/api/orders`, alla
+    stessa condizione: l'affare e' cominciato, e chi chiede e' una
+    delle due parti.
+
+    LA COORTE E IL LIVELLO passano dai loro giudici (`NOMI_TITOLI` e
+    `livello_utente`), come nella pagina negozio: il catalogo sta qui e
+    il client non ne tiene una copia che divergerebbe al primo titolo
+    nuovo. Il livello esce col solo NOME: gli XP sono roba di chi li
+    ha, e un numero altrui non aiuta nessuno a decidere se fidarsi.
+
+    ⚠️ CHI ENTRA DA NOSTR NON HA UNA RIGA DA MOSTRARE QUANDO PRENDE, e
+    non e' un caso da rattoppare: `preso_da` per lui non si scrive (la
+    decisione del 16 set 2026), quindi chi ha pubblicato non riceve
+    niente e la pagina lo dice. E' la forma in cui l'anonimato esiste
+    — l'unica che non chiede a nessuno di fidarsi di una promessa.
+
+    DUE QUERY E NON N: prima le righe degli ordini, poi UNA sola sui
+    volti delle persone che ne sono uscite. Con MAX_ORDINI_P2P a 200
+    la differenza si vede, e il client di oggi ne chiede pochi per
+    volta — ma il tetto e' il tetto, e le rotte si scrivono per lui."""
+    pulite = _ordini_puliti_p2p(ordini)
+    if not io:
+        return {}
+    segni = ",".join("?" * len(pulite))
+    righe = con.execute(
+        f"SELECT ordine, tg_id, preso_da FROM p2p_ordini "
+        f"WHERE ordine IN ({segni})", pulite).fetchall()
+    # ordine -> il tg_id DELL'ALTRO, per le sole righe di cui sono parte
+    altri = {}
+    for r in righe:
+        maker, taker = int(r["tg_id"] or 0), int(r["preso_da"] or 0)
+        altro = taker if io == maker else (maker if io == taker else 0)
+        # `altro == io` non capita (un ordine non si prende da soli, e
+        # mostrod lo rifiuta), ma se capitasse sarebbe il proprio volto
+        # servito come se fosse quello di un altro: si tace.
+        if altro and altro != io:
+            altri[r["ordine"]] = altro
+    if not altri:
+        return {}
+    unici = sorted(set(altri.values()))
+    segni_u = ",".join("?" * len(unici))
+    volti = {}
+    for u in con.execute(
+            f"SELECT tg_id, nome, username, npub, npub_verificata, "
+            f"npub_accesso, rating, n_feedback, negozio, registrato, "
+            f"titolo, xp, vendite_ok, acquisti_ok, "
+            f"(CASE WHEN avatar_scelta='nessuna' THEN '' "
+            f"ELSE avatar END) AS avatar "
+            f"FROM utenti WHERE tg_id IN ({segni_u})", unici):
+        voti = int(u["n_feedback"] or 0)
+        hexk = chiave_nostr_provata(u)
+        chi = {
+            "nome": u["nome"] or "",
+            "avatar": u["avatar"] or "",
+            "media": round(float(u["rating"] or 0), 1) if voti else 0,
+            "voti": voti,
+            "negozio": u["negozio"] or u["username"] or "",
+            "livello": livello_utente(
+                u["xp"] or 0,
+                (u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0))["nome"],
+            "titolo": NOMI_TITOLI.get(u["titolo"] or "", ""),
+            "telegram": u["username"] or "",
+            "npub": hex_to_npub(hexk) if hexk else "",
+        }
+        # LA CHIAVE MANCA QUANDO NON SI SA: gli account nati prima che
+        # il server timbrasse l'iscrizione hanno `registrato` a zero, e
+        # «0 giorni» direbbe «iscritto oggi» — il contrario esatto del
+        # vero. Chiave assente, e il client ci mette il suo trattino.
+        iscritto = int(u["registrato"] or 0)
+        if iscritto:
+            chi["giorni"] = max(0, (adesso - iscritto) // 86400)
+        volti[int(u["tg_id"])] = chi
+    return {o: volti[t] for o, t in altri.items() if t in volti}
+
+
 @app.post("/api/p2p/ordini")
 async def registra_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
                               barattolo_sessione: str = Cookie("")):
@@ -33634,6 +33732,41 @@ async def facce_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
     finally:
         con.close()
     return {"facce": facce}
+
+
+@app.post("/api/p2p/controparte")
+async def controparte_p2p(req: Request, x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """Chi sta scambiando con me su questi ordini, e come scrivergli.
+
+    ⚠️ LA SESSIONE SERVE, e qui serve per un'altra ragione che sul
+    libro: di la' il gate difende il COLLEGAMENTO fra un ordine
+    pubblico e un account nostro, qui difende una cosa che pubblica
+    non e' mai stata — chi ha PRESO un ordine. Il giudice non si
+    accontenta della sessione: serve essere una delle due parti, e a
+    dirlo e' `_controparti_p2p` guardando la riga dai due lati.
+    NIENTE ID NELL'URL: sono in un POST apposta, come per i volti —
+    una GET metterebbe gli id degli ordini nei log del web server, e
+    un log e' un posto dove le cose restano.
+    NESSUN GATE SULLA LEVA, come per i volti e per la stessa ragione
+    rovesciata: qui non si scrive niente e non si registra nessuno, e
+    un 409 colpirebbe solo chi ha uno scambio APERTO il giorno che la
+    leva si spegne — cioe' gli toglierebbe la faccia dell'altra parte
+    a meta' di un affare che deve comunque finire."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    try:
+        d = await req.json()
+    except Exception:
+        raise HTTPException(400, "Richiesta illeggibile")
+    con = db()
+    try:
+        chi = _controparti_p2p(con, (d or {}).get("ordini"), user["id"],
+                               int(time.time()))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    finally:
+        con.close()
+    return {"controparti": chi}
 
 
 @app.post("/api/p2p/chiavi")

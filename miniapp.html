@@ -8074,6 +8074,9 @@ document.getElementById('cartello')?.remove();</script>
       <p><b>Negli altri casi</b> — un profilo nato nel browser prima che arrivasse quello del conto — il profilo <b>vive sul dispositivo</b> e non lo può ricavare nessuno. Dentro Telegram ne salviamo una copia nel <b>cloud del tuo account Telegram</b>, così sopravvive alla cache svuotata e ti segue fra telefono e computer: <b>chi ha il tuo account Telegram ce l'ha anche lui</b> — è già così per tutto Barattolo — e Telegram potrebbe leggerlo, che è il prezzo. Il <b>codice segreto</b> serve a portare il profilo <b>fuori da Barattolo</b>, in un altro programma che parla con lo stesso coordinatore.</p>
       <p>In tutti e tre i casi il server conosce la <b>parte pubblica</b> del profilo e le <b>chiavi usa-e-getta</b> di ogni scambio, per poterti avvisare quando c'è una novità, e da settembre 2026 anche <b>a che numero di scambio sei arrivato</b>: serve a non riusare due volte la stessa chiave usa-e-getta quando apri Barattolo da un dispositivo nuovo, ed è un dato che dai conti che teneva già si sarebbe comunque ricavato. Dal foglio qui sotto il <b>codice segreto</b> lo vedi e lo copi, e il profilo lo <b>dimentichi</b>; dimenticandolo si cancella anche la parte pubblica che il server teneva.</p>
       <p>Dal 16 settembre 2026 il server annota anche <b>quali ordini pubblichi e quali prendi</b>, per avvisarti con i numeri quando lo scambio si muove (preso, concluso, annullato, tornato in vetrina): sono i passaggi <b>pubblici</b> del libro, e la cifratura dei messaggi non si tocca. Chi entra <b>da Nostr</b> non viene annotato quando prende un ordine — sulle prese riceve l'avviso generico — perché quell'ingresso esiste per chi non vuole lasciare tracce. Gli avvisi si spengono tutti dal cassetto «🔔 Avvisi» del profilo.</p>
+      <p>Dal <b>17 settembre 2026</b>, quando un ordine viene <b>preso</b>, le due parti si vedono: chi ha pubblicato e chi ha preso vedono il <b>profilo</b> l'uno dell'altra — lo stesso che sta già sotto ogni annuncio del mercatino: nome, foto, stelline, livello e titolo — e i <b>bottoni per scriversi</b> su Telegram o su Nostr, ma solo dove quei canali esistono davvero (la npub soltanto se ne hai dimostrato il possesso). <b>Prima della presa non si vede niente</b>, e non c'è nessun altro modo di chiederlo: a questa domanda il server risponde solo a una delle due parti di quello scambio. Il perché è che dall'altra parte c'è una persona a cui stai per mandare dei soldi veri, e un volto con una reputazione è quello che rende <i>pesabile</i> la fiducia — la stessa ragione per cui nel mercatino chi vende ha un nome. Te lo diciamo <b>prima</b>: nel foglio dove pubblichi e in quello dove prendi. Al posto dei campi dove prima ci si scriveva il proprio contatto a mano, che non erano verificati da nessuno.</p>
+      <p><b>Chi entra con una chiave Nostr resta anonimo quando prende</b>: quella presa non viene annotata, chi ha pubblicato non saprà chi è, e nella pagina dello scambio legge che l'altra persona non si conosce. Chi entra con una chiave e <b>pubblica</b>, invece, si mostra — col profilo che ha qui, cioè il nome e la foto della sua chiave: è così da quando le card del libro hanno un volto, e il foglio dove si pubblica lo dice prima.</p>
+      <p>Le <b>conversazioni fuori da Barattolo</b> non sono nostre: se vi scrivete su Telegram o su Nostr quella chat è vostra e di chi la trasporta — non la leggiamo, non ce l'abbiamo, e <b>in una disputa non possiamo usarla</b>. A decidere sono i fatti dello scambio: chi ha bloccato i sats, chi ha detto di aver mandato gli euro, chi li ha liberati.</p>
       <button class="btn ghost" onclick="apriProfiloP2P()">👤 Il tuo profilo di scambio</button>
       <p>Gli <b>ordini di scambio</b> sono pubblici per come è fatto il coordinatore: vivono sui relay e li legge chiunque, e da settembre 2026 <b>una copia sta anche sul nostro relay</b> — serve a far vedere il libro degli scambi anche quando i relay del coordinatore non rispondono. Non c'è scritto chi sei: un ordine porta l'importo, il metodo di pagamento e una <b>chiave usa-e-getta</b>, diversa a ogni scambio. Sul nostro relay sta anche una copia dei <b>messaggi che il coordinatore ti manda</b> durante lo scambio: serve ad avvisarti subito quando tocca a te. Sono <b>buste cifrate</b>, le stesse che stanno già sui relay pubblici — si vede che una chiave usa-e-getta ha ricevuto un messaggio e quando, <b>mai cosa dice</b>: la chiave per aprirle sta solo nel tuo telefono. Le <b>conversazioni</b> fra te e l'altra persona invece non passano di lì: sono cifrate e viaggiano sui relay del coordinatore, e sul nostro non ne teniamo copia.</p>
 
@@ -42140,6 +42143,19 @@ function renderDettaglioP2P(){
       ? 'Chi vende blocca i sats in garanzia, tu mandi gli euro col metodo scelto e i sats arrivano a te.'
       : 'Tu blocchi i sats in garanzia, ricevi gli euro col metodo scelto e i sats vanno al compratore.') +
     '</span></div>' +
+    /* ⚠️ SI DICE PRIMA DELLA PRESA (17 set 2026, decisione di Andrea
+       con Alan), ed e' tutta la sostanza del punto: da qui in poi le
+       due parti si vedono, e dirlo DOPO sarebbe dirlo a cose fatte —
+       cioe' trovarsi il profilo esposto senza averlo saputo. La
+       gemella sta nel foglio di chi pubblica, e le due si somigliano
+       apposta.
+       E IL VERSO E' DIVERSO PER CHI E' ENTRATO SENZA UN NOME: la sua
+       presa non viene annotata (la decisione del 16 set 2026), quindi
+       a lui «vi vedete» sarebbe falso. Guarda vedere: il profilo di
+       chi ha pubblicato lo legge lo stesso, qui sopra. */
+    (myTgId < 0
+      ? '<div class="hint">🕶️ Tu resti anonimo: sei entrato con un profilo senza nome, e chi ha pubblicato non saprà chi sei. Il suo profilo invece lo vedi qui sopra.</div>'
+      : '<div class="hint">👤 Appena lo prendi vi vedete: tu e chi l\'ha pubblicato vedrete il profilo l\'uno dell\'altra — nome, foto, stelline e livello, gli stessi del mercatino — e i bottoni per scrivervi.</div>') +
     '<div class="hint" id="p2pDettManca" style="color:var(--danger);font-weight:800'
       + (manca ? '' : ';display:none') + '">' + esc(manca) + '</div>' +
     '<div class="foglio-piede">' +
@@ -42586,6 +42602,16 @@ function renderOrdineP2P(){
                : 'ancora vivo nel libro, e la sua chiave serve a riprenderlo.') +
         ' Poi lo potrai togliere.</div>'
       : '') +
+    /* LE PARTI SI VEDONO (17 set 2026, decisione di Andrea con Alan):
+       appena l'ordine e' preso, il profilo dell'altra persona — quello
+       del mercatino — con i bottoni per scriverle. Sta SOPRA i
+       recapiti perche' risponde alla prima domanda («con chi sto
+       scambiando?») e i recapiti alla seconda («dove mando gli
+       euro?»).
+       IL GUARDIANO E' `o.peer`, la chiave dell'altra parte: prima
+       della presa non esiste, quindi prima della presa non c'e'
+       niente da mostrare — e non si chiede niente al server. */
+    (o.peer ? profiloControparteP2P(o) : '') +
     /* i recapiti stanno FRA il passo da fare e le uscite (fase 6, al
        posto della chat): quel che e' arrivato si mostra, quel che
        manca si chiede. Compaiono solo quando si sa con chi si sta
@@ -43879,6 +43905,12 @@ function renderNuovoOrdineP2P(){
        mercatino. */
     tetto + fee +
     '<div class="hint">Finché nessuno lo prende puoi ritirarlo quando vuoi. Gli euro viaggiano fra voi due, fuori da qui.</div>' +
+    /* ⚠️ E CHI PUBBLICA LO SA PRIMA DI PUBBLICARE (17 set 2026,
+       decisione di Andrea con Alan): appena qualcuno lo prende le due
+       parti si vedono. Vale per tutti, anche per chi e' entrato senza
+       un nome — pubblicare e' l'unico dei due gesti che si fa vedere
+       comunque, e il profilo che si mostra e' quello che ha qui. */
+    '<div class="hint">👤 Appena qualcuno lo prende vi vedete: tu e chi lo prende vedrete il profilo l\'uno dell\'altra — nome, foto, stelline e livello, gli stessi del mercatino — e i bottoni per scrivervi.</div>' +
     /* IL PIEDE HA UNA SOLA USCITA (set 2026, decisione di Andrea):
        «Annulla» se n'e' andato. Da una pagina a pieno schermo si
        torna con la freccia in alto, che e' la stessa via del gesto
@@ -45087,18 +45119,24 @@ function renderCampiP2P(){
         ? '<div class="trust-note nota-scambio"><span>💶</span><span><b>Dove mandare gli euro:</b><br>' + esc(loro.euro.testo).replace(/\n/g, '<br>') + '</span></div>'
         : '<div class="hint">💶 Chi vende non ha ancora detto dove ricevere gli euro: appena lo fa lo leggi qui.</div>')
       : '') +
+    /* ⚠️ IL CAMPO DEL PROPRIO RECAPITO NON C'E' PIU' (17 set 2026):
+       al suo posto, nella pagina dello scambio, il profilo dell'altra
+       persona e i bottoni per scriverle — verificati invece che
+       scritti a mano. LA LETTURA RESTA, ed e' la parte da non
+       togliere: un'app di ieri (o di un altro) puo' ancora mandarne
+       uno, e quel che arriva si mostra sempre. Il vocabolario delle
+       buste non si tocca: si e' smesso di SCRIVERE, non di leggere. */
     (loro.contatto
-      ? '<div class="hint">👤 Il contatto dell\'altra persona: <b>' + esc(loro.contatto.testo) + '</b></div>'
+      ? '<div class="hint">👤 Il contatto che ti ha mandato l\'altra persona: <b>' + esc(loro.contatto.testo) + '</b></div>'
       : '') +
     parteEuro +
-    '<div class="field" style="margin-top:14px"><label>Un tuo contatto (facoltativo)</label>' +
-    '<input type="text" id="p2pCampoContatto" maxlength="' + CAMPO_MAX_TESTO + '" ' +
-    'autocomplete="off" autocapitalize="off" spellcheck="false" ' +
-    'placeholder="@tuonome su Telegram, npub…"></div>' +
-    '<div class="hint">⚠️ Facoltativo, e rivela chi sei: l\'altra persona potrà collegare questo scambio alla tua identità.</div>' +
-    '<button class="btn ghost" onclick="inviaCampoP2P(\'contatto\', this)">👤 ' +
-    (miei.contatto ? 'Aggiorna il contatto' : 'Manda il contatto') + '</button>' +
-    '<div class="hint">I recapiti viaggiano cifrati fra te e l\'altra persona: nessun altro li legge, nemmeno Barattolo. Non scrivere qui password o codici di accesso.</div>';
+    '<div class="hint">I recapiti viaggiano cifrati fra te e l\'altra persona: nessun altro li legge, nemmeno Barattolo. Non scrivere qui password o codici di accesso.</div>' +
+    /* LA RIGA ONESTA (17 set 2026, richiesta di Andrea): sta accanto
+       alla sua gemella apposta, che e' li' che il confronto si legge
+       — dentro si', fuori no. Le due frasi dicono la stessa cosa dai
+       due lati, e separarle vorrebbe dire lasciare in piedi la meta'
+       che fa comodo. */
+    '<div class="hint">🔓 Fuori da Barattolo è un\'altra cosa: quello che vi dite in una chat non lo cifriamo noi, non ce l\'abbiamo, e in una disputa non possiamo usarlo — a decidere sono i fatti dello scambio.</div>';
   if (fr) fr.campi.forEach(c => {
     const inp = el('p2pCampoEuro_' + c.k);
     if (!inp) return;
@@ -45106,13 +45144,16 @@ function renderCampiP2P(){
     inp.value = scritti[id] !== undefined ? scritti[id]
               : (salvato && salvato.campi && salvato.campi[c.k]) || '';
   });
-  const cc = el('p2pCampoContatto');
-  if (cc) cc.value = scritti['p2pCampoContatto'] !== undefined
-    ? scritti['p2pCampoContatto'] : (miei.contatto ? miei.contatto.testo : '');
 }
 async function inviaCampoP2P(tipo, btn){
   const o = ordiniP2P()[p2pCampiOrdine];
-  if (!o || CAMPI_P2P.indexOf(tipo) < 0) return;
+  /* ⚠️ DA QUI PARTE IL SOLO RECAPITO DEGLI EURO (17 set 2026): il
+     contatto scritto a mano non si manda piu', e il vocabolario delle
+     buste resta di tre — si legge ancora tutto, si scrive uno. Il
+     giudice dice `euro` e non «uno dei tre» apposta: cosi' il giorno
+     che ne tornasse un secondo bisogna dirlo qui, invece di
+     ritrovarselo acceso per un elenco cambiato altrove. */
+  if (!o || tipo !== 'euro') return;
   let testo = '', daRicordare = null, tabRiga = null;
   if (tipo === 'euro') {
     /* il form del metodo: si raccolgono i campi, si compone il testo
@@ -45155,10 +45196,6 @@ async function inviaCampoP2P(tipo, btn){
     testo = fr.componi(campi).slice(0, CAMPO_MAX_TESTO);
     daRicordare = fr.ricorda === false ? null : {forma: fr.forma, campi: campi};
     if (tabRiga) tabRiga.testo = testo;
-  } else {
-    const inp = el('p2pCampoContatto');
-    testo = String((inp && inp.value) || '').trim().slice(0, CAMPO_MAX_TESTO);
-    if (!testo) { toast('Scrivi un contatto prima di mandarlo'); return; }
   }
   const rip = bottoneInAttesa(btn, 'Invio…');
   try {
@@ -45167,7 +45204,7 @@ async function inviaCampoP2P(tipo, btn){
     /* la riga segue la correzione: e' da li' che il conto alla
        rovescia di chi vende legge la data */
     if (tabRiga) { o.tabacchino = tabRiga; scriviOrdineP2P(o); }
-    toast(tipo === 'euro' ? 'Recapito inviato a chi compra ✓' : 'Contatto inviato ✓');
+    toast('Recapito inviato a chi compra ✓');
     renderCampiP2P();
   } catch(e) {
     toast('Non è partito: ' + String(e && e.message || e));
@@ -45933,6 +45970,137 @@ function apriNegozioP2P(ev, chi){
   apriNegozio(chi);
 }
 /* ============ fine dei volti sul libro ============ */
+
+/* ============ LE PARTI SI VEDONO (17 set 2026, con Alan) =========
+   Appena l'ordine e' PRESO, chi ha pubblicato e chi ha preso vedono il
+   profilo l'uno dell'altra — lo stesso del mercatino: nome, faccia,
+   stelline, livello e titolo — e i bottoni per scriversi.
+   ⚠️ E' IL GEMELLO DEI VOLTI SUL LIBRO, e la rotta e' un'altra perche'
+   la domanda e' un'altra: la' si chiede «di chi e' questo ordine?» e
+   risponde a chiunque abbia una sessione, che quella faccia sta gia'
+   sulla card; qui si chiede «chi sta scambiando con me?» e risponde
+   solo a UNA DELLE DUE PARTI — chi ha preso un ordine su nessuna card
+   sta, e non e' un fatto pubblico.
+   PERCHE' IL PASSAGGIO A MANO SE N'E' ANDATO: fino a ieri i due si
+   scambiavano il proprio recapito in un campo di testo dentro la busta
+   cifrata, e quel campo aveva tre difetti in fila. Si scriveva a mano,
+   e uno @ sbagliato non lo segnala nessuno. Diceva «facoltativo, e
+   rivela chi sei» a chi il volto ce l'aveva gia' sulla card del libro,
+   cioe' prometteva una riservatezza che li' accanto non c'era piu'. E
+   soprattutto non portava NIENTE di dimostrato: chiunque poteva
+   scriverci il recapito di un altro. Il profilo che arriva dal server
+   invece e' quello che regge gia' gli affari del mercatino, e il
+   secondo ponte esiste solo con la chiave DIMOSTRATA.
+   IL BLOCCO STA FUORI DA QUELLO DEI VOLTI, e non e' pignoleria: la
+   loro sentinella conta le fetch («sono DUE: scrive e legge») ed e' la
+   forma scritta di una promessa. Una terza infilata li' dentro
+   l'avrebbe fatta mentire su una cosa che non era cambiata. */
+let p2pControparti = {};        // ordine -> il profilo dell'altra parte
+let p2pControparteQuando = {};  // ordine -> quando l'ho chiesta, in ms
+let p2pControparteGiro = null;  // la domanda in volo
+/* IL RICORDO E' UN ORARIO E NON UN SI'/NO, ed e' la lezione dei volti
+   pagata li' e non ripetuta qui: `p2pFacceChieste` ricordava «gia'
+   chiesto» per tutta la sessione, quindi un «non lo so» del server
+   diventava definitivo e la faccia non arrivava piu'. Qui la corsa e'
+   la stessa e piu' stretta: chi ha pubblicato apre lo scambio
+   NELL'ISTANTE in cui gli arriva la presa, e chi ha preso dichiara al
+   server «l'ho preso io» in quello stesso istante — un giro solo
+   perde, e perde quasi sempre. Una risposta vuota si riprova dopo
+   mezzo minuto; una piena non si chiede mai piu'. */
+const P2P_CONTROPARTE_RIPROVA_MS = 30000;
+async function chiediContropartiP2P(ids){
+  if (DEMO || VETRINA || !myTgId) return false;
+  const adesso = Date.now();
+  const lista = (ids || []).filter(id => id && !provvisorioP2P(id)
+    && !p2pControparti[id]
+    && adesso - (p2pControparteQuando[id] || 0) > P2P_CONTROPARTE_RIPROVA_MS);
+  if (!lista.length || p2pControparteGiro) return false;
+  lista.forEach(id => { p2pControparteQuando[id] = adesso; });
+  p2pControparteGiro = (async () => {
+    try {
+      const r = await fetch(`${API_BASE}/p2p/controparte`, {method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+        body: JSON.stringify({ordini: lista})});
+      if (!r.ok) return false;
+      const d = await r.json();
+      const chi = (d && d.controparti) || {};
+      let nuove = 0;
+      for (const id in chi) { p2pControparti[id] = chi[id]; nuove++; }
+      return nuove > 0;
+    } catch(e){ return false; }
+    finally { p2pControparteGiro = null; }
+  })();
+  return p2pControparteGiro;
+}
+/* I DUE PONTI, con l'alfabeto filtrato come ovunque: username e npub
+   finiscono dentro un onclick, e da li' non deve poter uscire niente
+   che non sia un nome. La fabbrica dei bottoni e' QUELLA del
+   mercatino (`pontiContatto`): la stessa azione non puo' avere due
+   vestiti secondo la pagina da cui la si tocca — e' la regola gia'
+   scritta il giorno che i ponti del negozio e quelli dell'ordine sono
+   diventati uguali. */
+function pontiControparteP2P(c, chi){
+  return pontiContatto(String(c.telegram || '').replace(/[^A-Za-z0-9_]/g, ''),
+                       String(c.npub || '').replace(/[^a-z0-9]/g, ''), chi);
+}
+/* IL PROFILO DELL'ALTRA PARTE nella pagina dello scambio: il calco del
+   riquadro venditore del mercatino (`.seller`), che e' quello che chi
+   usa Barattolo ha gia' imparato a leggere — e leggerlo qui vuol dire
+   non doverne imparare un secondo. Zero CSS nuovo.
+   IL TOCCO APRE IL NEGOZIO come il volto sulle card, e senza negozio
+   resta un profilo e basta: mai una porta che non porta da nessuna
+   parte.
+   ⚠️ QUANDO NON SI SA, SI DICE UNA COSA SOLA e non si indovina fra i
+   casi: l'altra persona puo' essere entrata con una chiave (e allora
+   la presa non e' annotata apposta — e' la forma in cui l'anonimato
+   esiste), oppure scambiare da un'altra app che con Barattolo non
+   c'entra, oppure il server non ha ancora saputo. Da qui i tre non si
+   distinguono, quindi la riga dice il FATTO che vale in tutti e tre. */
+function profiloControparteP2P(o){
+  if (!o || !o.peer) return '';
+  const c = p2pControparti[o.id];
+  if (!c) {
+    chiediContropartiP2P([o.id]).then(n => {
+      if (n && p2pOrdineAperto === o.id) renderOrdineP2P();
+    }).catch(() => {});
+    return '<div class="trust-note nota-scambio"><span>🕶️</span><span>'
+      + "Dell'altra persona non sappiamo niente: può essere entrata con "
+      + 'un profilo anonimo, o scambiare da un\'altra app. Per parlarvi '
+      + 'restano i recapiti qui sotto, cifrati fra voi due.</span></div>';
+  }
+  const nome = c.nome || '—';
+  /* IL NOME DI BATTESIMO per la frase del bottone («Scrivi a Mario»),
+     il nome intero nel riquadro: e' lo stesso taglio del negozio. */
+  const primo = String(nome).split(' ')[0];
+  const rep = [];
+  if (c.voti > 0 && c.media > 0)
+    rep.push(stellaP2P(c.media) + ' '
+      + c.media.toLocaleString('it-IT',
+          {minimumFractionDigits: 1, maximumFractionDigits: 1})
+      + ' · ' + icoPersonaP2P() + ' ' + c.voti);
+  if (c.livello) rep.push(esc(c.livello));
+  /* I GIORNI SE CI SONO: la chiave manca quando il server non sa da
+     quando quella persona e' qui, e «0 giorni» direbbe «iscritta
+     oggi» — il contrario esatto del vero. Non si scrive niente. */
+  if (c.giorni !== undefined)
+    rep.push(c.giorni + (c.giorni === 1 ? ' giorno' : ' giorni') + ' qui');
+  const porta = c.negozio
+    ? ' role="button" tabindex="0" style="cursor:pointer" data-negozio="'
+      + esc(c.negozio) + '" onclick="apriNegozioP2P(event, this.dataset.negozio)"'
+    : '';
+  return '<div class="seller"' + porta + '>'
+    + '<div class="avatar">' + avatarImg(c.avatar) + esc(String(nome)[0]) + '</div>'
+    + '<div class="who"><b>' + esc(nome) + '</b>'
+    + titoloRiga(c.titolo)
+    + (rep.length ? '<div class="rep">' + rep.join(' · ') + '</div>' : '')
+    + '</div>'
+    + (c.negozio ? '<span style="color:var(--muted);font-size:20px;font-weight:700">›</span>' : '')
+    + '</div>'
+    + (pontiControparteP2P(c, primo ? 'a ' + esc(primo) : "all'altra persona")
+       || '<div class="hint">Non ha lasciato nessun canale pubblico: per '
+          + 'parlarvi restano i recapiti qui sotto, cifrati fra voi due.</div>');
+}
+/* ============ fine delle parti che si vedono ============ */
 
 /* Racconta un ordine appena pubblicato nel canale «Barattolo Vetrina»,
    come per un annuncio normale (chiesto da Andrea, set 2026). STA QUI

@@ -41416,6 +41416,12 @@ const fmtEur = e => e.toLocaleString('it-IT',
 let cambioVivo = true, eurPerSat = 0.0005;
 let p2pFacce = {};
 let p2pLibro = null;
+/* CHI STA GUARDANDO (17 set 2026, le parti che si vedono): la riga
+   che avvisa «appena lo prendi vi vedete» ha un secondo verso per chi
+   e' entrato senza un nome — tg_id negativo — perche' la sua presa
+   non viene annotata e vedersi non succede. Qui e' uno stub, e il
+   banco lo gira da 111 a -9 per leggere tutt'e due le righe. */
+let myTgId = 111;
 /* le impostazioni del coordinator e la busta delle leve: i casi del
    conto le girano come vogliono, e il p2pCoord e' quello VERO */
 let p2pInfo = null;
@@ -41602,6 +41608,17 @@ out.paginaVendi = el('p2pDettCorpo').innerHTML;
 out.unMetodoAcceso = out.paginaVendi.indexOf('id="p2pDettVai" disabled') < 0;
 /* senza volto il riquadro della reputazione non c'e' proprio */
 out.senzaVoltoNienteRep = out.paginaVendi.indexOf('p2p-rep-tre') < 0;
+
+/* ---- SI DICE PRIMA DELLA PRESA, e ha due versi (17 set 2026) ----
+   La pagina e' la STESSA e cambia una variabile sola: e' il modo di
+   provare che a decidere e' chi guarda e non l'ordine. */
+out.avvisoVedersi = out.paginaVendi.indexOf('Appena lo prendi vi vedete') >= 0;
+myTgId = -9;
+renderDettaglioP2P();
+out.paginaAnonima = el('p2pDettCorpo').innerHTML;
+out.anonimoTace = out.paginaAnonima.indexOf('Appena lo prendi vi vedete') < 0;
+out.anonimoLoDice = out.paginaAnonima.indexOf('Tu resti anonimo') >= 0;
+myTgId = 111;
 
 /* ...e su un intervallo il bottone devia sul foglio della cifra */
 p2pLibro = {ordini: [ordine({id: 'ord-3', euro: 20, euroMax: 100,
@@ -42218,6 +42235,14 @@ console.log(JSON.stringify(out));
           o["unMetodoAcceso"])
     prova("...e senza volto niente riquadro della reputazione", True,
           o["senzaVoltoNienteRep"])
+    # ⚠️ SI DICE PRIMA DELLA PRESA (17 set 2026, decisione di Andrea
+    # con Alan): da li' in poi le due parti si vedono, e dirlo dopo
+    # sarebbe dirlo a cose fatte. Il verso e' DUE perche' chi entra
+    # senza un nome non viene annotato quando prende: a lui «vi
+    # vedete» sarebbe una bugia, e la riga dice l'altra verita'.
+    prova("chi prende lo sa PRIMA di prendere", True, o["avvisoVedersi"])
+    prova("...e chi e' entrato senza un nome legge l'altro verso",
+          [True, True], [o["anonimoTace"], o["anonimoLoDice"]])
     prova("su un intervallo il bottone apre «Quanto» e non prende",
           [1, 0], o["rangeDevia"])
 
@@ -42226,6 +42251,338 @@ console.log(JSON.stringify(out));
     # FAIL-CLOSED: `campiLoro` e' testo che ha scritto l'altra persona
     prova("...e un metodo fuori dall'elenco vale «non ha scelto»",
           ["", ""], [o["metodoStorto"], o["metodoNiente"]])
+
+
+def prove_parti_si_vedono():
+    """LE PARTI SI VEDONO (17 set 2026, decisione di Andrea con Alan).
+
+    Appena l'ordine e' PRESO, chi ha pubblicato e chi ha preso vedono
+    il profilo l'uno dell'altra — quello del mercatino, nome, faccia,
+    stelline, livello e titolo — e i bottoni per scriversi; e i campi
+    dove ci si scriveva il proprio contatto a mano se ne vanno.
+
+    Quel che queste prove difendono e' il CONFINE, e qui e' piu'
+    stretto che sui volti del libro: di la' esce la faccia di chi ha
+    PUBBLICATO, che sta gia' sulla card e la legge chiunque abbia una
+    sessione; qui esce anche quella di chi ha PRESO, che su nessuna
+    card sta. Quindi il giudice risponde SOLO a una delle due parti,
+    serve sempre L'ALTRO e mai il proprio, e chi non e' della partita
+    non riceve nemmeno un errore — la sua risposta e' senza quell'id,
+    identica a quella per un ordine che non esiste.
+    Piu' le due promesse che questo cantiere fa a chi legge: che i
+    bottoni ci siano SOLO dove il canale esiste davvero (e la npub
+    solo dal possesso dimostrato, la regola dei ponti del mercatino), e
+    che prima della presa non si veda niente.
+    ⚠️ IL CASO NOSTR NON E' UN BUCO DA TAPPARE, ed e' scritto qui
+    perche' nessuno lo «sistemi» credendo a un difetto: chi entra con
+    una chiave non viene annotato quando prende (la decisione del 16
+    set 2026), quindi chi ha pubblicato non riceve niente e la pagina
+    lo dice. E' la forma in cui l'anonimato esiste."""
+    print("\n[le parti si vedono]")
+    import sqlite3
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) IL BLOCCO STA FUORI DA QUELLO DEI VOLTI ------------------
+    # La loro sentinella conta le fetch («sono DUE: scrive e legge») ed
+    # e' la forma scritta di una promessa sulla privacy: una terza
+    # infilata li' dentro l'avrebbe fatta mentire su una cosa che non
+    # era cambiata.
+    i_p = mini.index("/* ============ LE PARTI SI VEDONO")
+    prova("il blocco delle parti sta DOPO quello dei volti", True,
+          i_p > mini.index("/* ============ fine dei volti sul libro"))
+    prova("...e ha il suo marcatore di chiusura", True,
+          mini.index("/* ============ fine delle parti che si vedono")
+          > i_p)
+    blocco = mini[i_p:mini.index("/* ============ fine delle parti che si vedono")]
+    cod = re.sub(r"/\*[\s\S]*?\*/", "", blocco)
+    prova("la fetch del blocco e' UNA: qui si legge e basta", 1,
+          cod.count("fetch("))
+    prova("...e nel corpo va SOLO la lista degli ordini", {"ordini"},
+          set(re.findall(r"JSON\.stringify\(\{(\w+):", cod)))
+    prova("gli id viaggiano in POST, mai nell'indirizzo", 1,
+          cod.count("method: 'POST'"))
+    prova("la vetrina anonima non chiede niente", True,
+          "if (DEMO || VETRINA || !myTgId) return false;" in cod)
+    # ⚠️ IL RICORDO E' UN ORARIO E NON UN SI'/NO: la lezione dei volti,
+    # dove «gia' chiesto» valeva per la sessione e un «non lo so» del
+    # server diventava definitivo. Qui la corsa e' piu' stretta ancora
+    # — chi pubblica apre lo scambio nell'istante in cui gli arriva la
+    # presa, e chi prende la dichiara in quello stesso istante.
+    prova("una risposta vuota si riprova, una piena mai piu'", True,
+          "const P2P_CONTROPARTE_RIPROVA_MS = 30000;" in mini
+          and "!p2pControparti[id]" in cod
+          and "> P2P_CONTROPARTE_RIPROVA_MS" in cod)
+    # I PONTI SONO QUELLI DEL MERCATINO: la stessa azione non puo'
+    # avere due vestiti secondo la pagina da cui la si tocca.
+    prova("i due ponti sono la fabbrica del mercatino", True,
+          "return pontiContatto(" in cod)
+    prova("...con l'alfabeto filtrato, che finiscono in un onclick",
+          True, "/[^A-Za-z0-9_]/g" in cod and "/[^a-z0-9]/g" in cod)
+
+    # --- 2) PRIMA DELLA PRESA NON SI VEDE NIENTE --------------------
+    # Il guardiano e' `o.peer`, la chiave dell'altra parte: prima
+    # della presa non esiste, quindi non c'e' niente da mostrare e non
+    # si chiede niente al server.
+    ren = pezzo_js(mini, "function renderOrdineP2P(", "\n}\n")
+    prova("il profilo si disegna solo a ordine preso", True,
+          "(o.peer ? profiloControparteP2P(o) : '') +" in ren)
+    prova("...e sta SOPRA i recapiti", True,
+          0 <= ren.find("profiloControparteP2P(o)")
+          < ren.find("campiOrdineP2P(o)"))
+    prova("...e il guardiano c'e' anche dentro la funzione", True,
+          "if (!o || !o.peer) return '';" in cod)
+
+    # --- 3) IL CAMPO SCRITTO A MANO NON C'E' PIU' -------------------
+    prova("l'input del proprio contatto e' sparito", False,
+          "p2pCampoContatto" in mini)
+    prova("...e con lui il bottone che lo mandava", False,
+          "inviaCampoP2P('contatto'" in mini.replace("\\'", "'"))
+    # LA LETTURA RESTA, ed e' la parte da non togliere: un'app di ieri
+    # (o di un altro) puo' ancora mandarne uno, e quel che arriva si
+    # mostra. Il vocabolario delle buste non si tocca.
+    prova("il vocabolario delle buste resta di tre", True,
+          "const CAMPI_P2P = ['euro', 'contatto', 'metodo'];" in mini)
+    prova("...e quel che arriva si mostra ancora", True,
+          "esc(loro.contatto.testo)" in mini)
+
+    # --- 4) IL SERVER: la rotta, e chi puo' chiedere ----------------
+    prova("la rotta della controparte c'e'", True,
+          '@app.post("/api/p2p/controparte")' in _SORGENTE)
+    rot = pezzo("controparte_p2p")
+    prova("...e chiede la SESSIONE", True,
+          "verifica_utente(x_tg_init_data, barattolo_sessione)" in rot)
+    prova("...e passa chi chiede al giudice, che decide lui", True,
+          '_controparti_p2p(con, (d or {}).get("ordini"), user["id"]' in rot)
+    giud = pezzo("_controparti_p2p")
+    corpo = giud[giud.index('"""', giud.index('"""') + 3):]
+    # LA NPUB SOLO DAL POSSESSO DIMOSTRATO: il giudice e' quello dei
+    # ponti del mercatino, mai una regola ribattuta qui.
+    prova("la npub passa dal giudice del possesso dimostrato", True,
+          "chiave_nostr_provata(u)" in corpo)
+    prova("...e chi ha scelto «nessuna foto» resta senza foto", True,
+          "avatar_scelta='nessuna' THEN ''" in corpo)
+    prova("il tg_id non e' una chiave della risposta", False,
+          '"tg_id":' in corpo)
+    prova("due query e non N", 2, corpo.count("con.execute("))
+
+    # --- 5) IL GIUDICE SUL DATABASE VERO ----------------------------
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript(
+        "CREATE TABLE p2p_ordini(ordine TEXT PRIMARY KEY, tg_id INTEGER,"
+        " creato INTEGER, stato TEXT DEFAULT '', maker INTEGER DEFAULT 0,"
+        " preso_da INTEGER DEFAULT 0);"
+        "CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT,"
+        " avatar TEXT, rating REAL, n_feedback INTEGER,"
+        " avatar_scelta TEXT DEFAULT '', username TEXT DEFAULT '',"
+        " negozio TEXT DEFAULT '', registrato INTEGER DEFAULT 0,"
+        " titolo TEXT DEFAULT '', xp INTEGER DEFAULT 0,"
+        " vendite_ok INTEGER DEFAULT 0, acquisti_ok INTEGER DEFAULT 0,"
+        " npub TEXT DEFAULT '', npub_verificata INTEGER DEFAULT 0,"
+        " npub_accesso TEXT DEFAULT '');"
+        # Ada: @username, npub VERIFICATA (badge), 41 giorni qui, e
+        # abbastanza affari per il terzo gradino
+        "INSERT INTO utenti(tg_id,nome,avatar,rating,n_feedback,username,"
+        " negozio,registrato,titolo,xp,vendite_ok,acquisti_ok,npub,"
+        " npub_verificata) VALUES(111,'Ada Rossi','av_a.jpg',4.8,12,"
+        " 'ada_tg','ab12cd34',1000000 - 41*86400,'coorte_pioniere',"
+        " 300,6,0,'NPUB',1);"
+        # Bruno: NIENTE @username e una npub soltanto DICHIARATA —
+        # nessuno dei due ponti deve nascere
+        "INSERT INTO utenti(tg_id,nome,avatar,rating,n_feedback,username,"
+        " avatar_scelta,npub,npub_verificata) VALUES(222,'Bruno','av_b.jpg',"
+        " 0,0,'','nessuna','NPUB',0);"
+        # Cleo: entrata con la chiave (npub_accesso) e senza @username
+        "INSERT INTO utenti(tg_id,nome,npub_accesso) "
+        " VALUES(-7,'npub1abc…f00d','NPUB');"
+        # l'ordine preso: Ada ha pubblicato, Bruno ha preso
+        "INSERT INTO p2p_ordini VALUES('ordine-aaa',111,1,'',1,222);"
+        # un ordine pubblicato e non ancora preso
+        "INSERT INTO p2p_ordini VALUES('ordine-bbb',111,1,'',1,0);"
+        # un ordine di due estranei
+        "INSERT INTO p2p_ordini VALUES('ordine-ccc',333,1,'',1,444);"
+        # un ordine preso da chi e' entrato con una chiave: il server
+        # non lo annota, quindi `preso_da` resta zero
+        "INSERT INTO p2p_ordini VALUES('ordine-ddd',111,1,'',1,0);")
+    i_l = _SORGENTE.index('LIVELLI = [(0, 0, "nuovo"')
+    amb = {"FORMA_ORDINE_P2P": re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
+           "MAX_ORDINI_P2P": 200,
+           # IL CATALOGO E' UNO STUB DICHIARATO: qui si prova che il
+           # titolo passi dal catalogo, non che il catalogo sia giusto
+           # — quello ce l'ha `prove_coorti_titoli`.
+           "NOMI_TITOLI": {"coorte_pioniere": "🌱 Pioniere"},
+           # e la npub la si riconosce dalla sagoma: il giro bech32
+           # vero ha le sue prove, qui serve solo che il giudice del
+           # POSSESSO scelga la chiave giusta e nessun'altra
+           "chiave_nostr_provata": lambda u: (
+               "ab" * 32 if ((u["npub_accesso"] or "")
+                             or ((u["npub"] or "") and u["npub_verificata"]))
+               else ""),
+           "hex_to_npub": lambda h: "npub1" + h[:8]}
+    exec(_SORGENTE[i_l:_SORGENTE.index("]\n", i_l) + 1], amb)
+    for f in ("_ordini_puliti_p2p", "livello_utente", "_controparti_p2p"):
+        exec(pezzo(f), amb)
+    chi_di = amb["_controparti_p2p"]
+
+    def per(io, ordini=("ordine-aaa", "ordine-bbb", "ordine-ccc",
+                        "ordine-ddd")):
+        return chi_di(con, list(ordini), io, 1000000)
+
+    # IL PROFILO ESCE DAI DUE LATI, e ognuno vede L'ALTRO
+    a = per(111)
+    prova("chi ha pubblicato vede chi ha preso", "Bruno",
+          (a.get("ordine-aaa") or {}).get("nome"))
+    b = per(222)
+    prova("...e chi ha preso vede chi ha pubblicato", "Ada Rossi",
+          (b.get("ordine-aaa") or {}).get("nome"))
+    prova("il profilo porta livello e titolo del mercatino",
+          ["Mercante pratico", "🌱 Pioniere"],
+          [(b.get("ordine-aaa") or {}).get("livello"),
+           (b.get("ordine-aaa") or {}).get("titolo")])
+    prova("...le stelline e i giorni", [4.8, 12, 41],
+          [(b["ordine-aaa"]).get("media"), (b["ordine-aaa"]).get("voti"),
+           (b["ordine-aaa"]).get("giorni")])
+    # I CANALI SOLO DOVE ESISTONO: Ada ha lo @username e la npub
+    # VERIFICATA, Bruno non ha ne' l'uno (vuoto) ne' l'altra (soltanto
+    # dichiarata: una dichiarazione non e' una prova)
+    prova("i canali di Ada ci sono tutti e due",
+          ["ada_tg", "npub1abababab"],
+          [b["ordine-aaa"]["telegram"], b["ordine-aaa"]["npub"]])
+    prova("...e Bruno non ne ha nessuno: npub nuda e niente @", ["", ""],
+          [a["ordine-aaa"]["telegram"], a["ordine-aaa"]["npub"]])
+    # LA FOTO NEGATA RESTA NEGATA, come sui volti del libro
+    prova("chi ha scelto «nessuna foto» resta senza foto", "",
+          a["ordine-aaa"]["avatar"])
+    # PRIMA DELLA PRESA NON C'E' NIENTE DA SERVIRE
+    prova("un ordine pubblicato e non preso non ha controparte", False,
+          "ordine-bbb" in a)
+    # ⚠️ E CHI E' ENTRATO CON UNA CHIAVE RESTA ANONIMO QUANDO PRENDE:
+    # la sua presa non viene annotata, quindi qui non c'e' niente —
+    # ed e' voluto, non un difetto da tappare.
+    prova("...e nemmeno un ordine preso da chi resta anonimo", False,
+          "ordine-ddd" in a)
+    # IL CONFINE: un estraneo con una sessione non riceve niente, e
+    # non riceve nemmeno un errore
+    prova("un estraneo non riceve la riga di due altri", {},
+          per(999))
+    prova("...e chi non e' loggato nemmeno quella dei propri", {},
+          per(0))
+    prova("il proprio volto non esce mai servito come quello di un altro",
+          False, any(v.get("nome") == "Ada Rossi" for v in a.values()))
+    prova("una forma storta non arriva al database", True,
+          bool(_alza(lambda: chi_di(con, ["corto"], 111, 1))))
+    con.close()
+
+    # --- 6) IL BANCO DEL CLIENT: i bottoni e i tre casi -------------
+    import shutil as _sh, subprocess as _sp, tempfile as _tf, json as _js
+    _node = _sh.which("node")
+    if not _node:
+        salta("il profilo della controparte gira", "node non installato")
+        return
+    pezzi = [blocco]
+    for firma in ("function pontiContatto(username, npub, chi, cls){",
+                  "function icoPersonaP2P(){",
+                  "function frazioneStellaP2P(media){",
+                  "function stellaP2P(media){"):
+        pezzi.append(pezzo_js(mini, firma, "\n}\n") + "\n}\n")
+    for riga in ("const P2P_STELLA_D = ", "const titoloRiga = "):
+        i_a = mini.index(riga)
+        pezzi.append(mini[i_a:mini.index(";\n", i_a) + 1])
+    banco = ("let DEMO = false, VETRINA = false, myTgId = 111;\n"
+             "const API_BASE = '/api';\n"
+             "function authHdr(){ return 'x'; }\n"
+             "function provvisorioP2P(id){ return false; }\n"
+             "const ICO_NOSTR = '<svg/>';\n"
+             "const etichettaNostr = t => ICO_NOSTR + ' ' + t;\n"
+             "const esc = s => String(s == null ? '' : s)\n"
+             "  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')\n"
+             "  .replace(/\"/g,'&quot;').replace(/'/g,'&#39;');\n"
+             "function avatarImg(n){ return n ? '<img src=\"/foto/' + n + '\">' : ''; }\n"
+             "let p2pOrdineAperto = 'ord-1', render = 0;\n"
+             "function renderOrdineP2P(){ render++; }\n"
+             "let risposta = {}, chiamate = 0;\n"
+             "async function fetch(u, opt){ chiamate++;\n"
+             "  return {ok: true, json: async () => ({controparti: risposta})}; }\n"
+             + "\n".join(pezzi) + "\n" + r"""
+(async () => {
+const out = {};
+const ord = (o) => Object.assign({id: 'ord-1', peer: 'ff'.repeat(32)}, o);
+/* 1) PRIMA DELLA PRESA: niente profilo e nessuna domanda al server */
+out.primaDellaPresa = profiloControparteP2P(ord({peer: ''})) === '';
+out.primaNonChiede = chiamate === 0;
+/* 2) NON SI SA ANCORA: una riga sola, e non si indovina fra i casi */
+const attesa = profiloControparteP2P(ord({}));
+out.nonSiSa = attesa.indexOf('non sappiamo niente') >= 0
+  && attesa.indexOf('seller') < 0;
+await new Promise(r => setTimeout(r, 0));
+out.haChiesto = chiamate === 1;
+/* 3) IL PROFILO PIENO, coi due canali */
+p2pControparti = {}; p2pControparteQuando = {};
+risposta = {'ord-1': {nome: 'Ada Rossi', avatar: 'av_a.jpg', media: 4.8,
+  voti: 12, negozio: 'ab12cd34', giorni: 41, livello: 'Mercante pratico',
+  titolo: '\ud83c\udf31 Pioniere', telegram: 'ada_tg', npub: 'npub1abc'}};
+await chiediContropartiP2P(['ord-1']);
+const piena = profiloControparteP2P(ord({}));
+out.nome = piena.indexOf('<b>Ada Rossi</b>') >= 0;
+out.stelline = piena.indexOf('4,8') >= 0 && piena.indexOf('41 giorni qui') >= 0;
+out.livello = piena.indexOf('Mercante pratico') >= 0;
+out.titolo = piena.indexOf('Pioniere') >= 0;
+out.porta = piena.indexOf("apriNegozioP2P(event, this.dataset.negozio)") >= 0;
+out.dueBottoni = (piena.match(/class="btn ponte/g) || []).length === 2;
+/* 4) UN CANALE SOLO: nasce un bottone solo, e l'altro non c'e' */
+p2pControparti['ord-1'] = {nome: 'Bruno', telegram: '', npub: 'npub1xyz'};
+const uno = profiloControparteP2P(ord({}));
+out.unSoloBottone = (uno.match(/class="btn ponte/g) || []).length === 1
+  && uno.indexOf('su Telegram') < 0;
+/* 5) NESSUN CANALE: il profilo resta, e la riga dice cosa fare */
+p2pControparti['ord-1'] = {nome: 'Cleo', telegram: '', npub: ''};
+const zero = profiloControparteP2P(ord({}));
+out.zeroBottoni = zero.indexOf('class="btn ponte') < 0
+  && zero.indexOf('Non ha lasciato nessun canale') >= 0
+  && zero.indexOf('<b>Cleo</b>') >= 0;
+/* 6) SENZA VOTI NIENTE MEDIA INVENTATA, e senza giorni niente riga */
+out.senzaVoti = zero.indexOf('p2p-rep-stella') < 0
+  && zero.indexOf('giorni qui') < 0;
+/* 7) IL NOME DELL'ALTRA PERSONA PASSA DA esc(), come ovunque */
+p2pControparti['ord-1'] = {nome: '<b>x</b>', telegram: '', npub: ''};
+out.escapato = profiloControparteP2P(ord({})).indexOf('&lt;b&gt;x&lt;/b&gt;') >= 0;
+/* 8) LA VETRINA ANONIMA NON CHIEDE NIENTE */
+p2pControparti = {}; p2pControparteQuando = {}; myTgId = null;
+const prima = chiamate;
+out.vetrinaTace = (await chiediContropartiP2P(['ord-9'])) === false
+  && chiamate === prima;
+myTgId = 111;
+process.stdout.write(JSON.stringify(out));
+})();
+""")
+    _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                               encoding="utf-8")
+    _f.write(banco)
+    _f.close()
+    _r = _sp.run([_node, _f.name], capture_output=True, text=True,
+                 timeout=60, encoding="utf-8")
+    os.unlink(_f.name)
+    if _r.returncode != 0:
+        prova("il banco del profilo gira", "", _r.stderr[-500:])
+        return
+    o = _js.loads(_r.stdout.strip())
+    for k, nome in (
+            ("primaDellaPresa", "prima della presa il profilo non c'e'"),
+            ("primaNonChiede", "...e non si chiede niente al server"),
+            ("nonSiSa", "quando non si sa si dice una cosa sola"),
+            ("haChiesto", "...e intanto si chiede, una volta"),
+            ("nome", "il profilo porta il nome"),
+            ("stelline", "...le stelline e i giorni"),
+            ("livello", "...il livello"),
+            ("titolo", "...e il titolo, che e' il badge di coorte"),
+            ("porta", "il tocco apre il negozio"),
+            ("dueBottoni", "coi due canali nascono due bottoni"),
+            ("unSoloBottone", "...con uno solo ne nasce uno"),
+            ("zeroBottoni", "...e senza canali resta il profilo e una riga"),
+            ("senzaVoti", "senza voti niente media inventata"),
+            ("escapato", "il nome dell'altra persona passa da esc()"),
+            ("vetrinaTace", "la vetrina anonima non chiede niente")):
+        prova(nome, True, o.get(k))
 
 
 def prove_nav_p2p():
@@ -47231,15 +47588,30 @@ def prove_p2p_chat():
         prova(f"`{fn.split('function ')[1][:-1]}` non dice Nostr/nsec/relay/chiave",
               False, any(w in testo for w in ("nostr", "nsec", "relay", "chiave")))
     rc = pezzo_js(mini, "function renderCampiP2P(", "\n}\n")
+    inviaCampoP2P_ = pezzo_js(mini, "async function inviaCampoP2P(", "\n}\n")
     prova("i recapiti dell'altra persona passano da esc()", True,
           "esc(loro.euro.testo)" in rc and "esc(loro.contatto.testo)" in rc)
     prova("...e il foglio dice che nessun altro li legge", True,
           "nessun altro li legge, nemmeno Barattolo" in rc)
-    # IL CONTATTO DICE IL PREZZO: e' facoltativo e rivela chi sei —
-    # l'avvertenza sta nel foglio, accanto al campo (decisione di
-    # Andrea, fase 6).
-    prova("...e che il contatto e' facoltativo e rivela chi sei", True,
-          "rivela chi sei" in rc and "acoltativo" in rc)
+    # ⚠️ IL CAMPO DEL CONTATTO NON C'E' PIU' (17 set 2026, decisione
+    # di Andrea con Alan): la riga di ieri diceva «facoltativo, e
+    # rivela chi sei», e l'avvertenza e' caduta con la cosa che
+    # avvertiva. Al suo posto, nella pagina dello scambio, il profilo
+    # dell'altra parte coi bottoni per scriverle — vedi
+    # `prove_parti_si_vedono`. LA LETTURA RESTA, ed e' la riga qui
+    # sopra: un'app di ieri puo' ancora mandarne uno, e quel che
+    # arriva si mostra.
+    prova("il campo dove ci si scriveva il contatto non c'e' piu'",
+          False, "p2pCampoContatto" in mini)
+    prova("...e da qui parte il solo recapito degli euro", True,
+          "if (!o || tipo !== 'euro') return;" in inviaCampoP2P_)
+    # LA RIGA ONESTA (richiesta di Andrea): sta accanto alla gemella
+    # che promette la cifratura DENTRO — e' li' che il confronto si
+    # legge, e separarle vorrebbe dire lasciare in piedi la sola meta'
+    # che fa comodo.
+    prova("...e il foglio dice che FUORI non e' cifrato da noi", True,
+          "Fuori da Barattolo" in rc and "non possiamo usarlo" in rc
+          and rc.index("nemmeno Barattolo") < rc.index("Fuori da Barattolo"))
     prova("il foglio dei recapiti si chiude col velo", True,
           "el('p2pCampiSheet').classList.remove('open');"
           in pezzo_js(mini, "function closeSheet(", "\n}\n"))
@@ -50907,10 +51279,22 @@ def prove_p2p_server():
     # blocco e non la prosa, che «nsec» lo nomina apposta per dire che
     # non c'e'.
     for spia in ("nsec", "LNBITS", "paga_venditore", "crea_invoice",
-                 "PrivateKey", "_NOSTR"):
+                 "PrivateKey"):
         # A maiuscole indifferenti: MOSTRO_NSEC e' una nsec quanto nsec.
         prova(f"il blocco P2P non nomina `{spia}`", False,
               spia.lower() in cod.lower())
+    # ⚠️ `_NOSTR` VUOLE IL NOME ESATTO, e questa e' una sentinella
+    # AFFILATA il 17 set 2026 invece che ammorbidita: quel che si
+    # difende e' la COSTANTE con la chiave privata della piattaforma,
+    # che si chiama `_NOSTR` e in questo file e' sempre maiuscola. A
+    # maiuscole indifferenti pescava anche `chiave_nostr_provata` —
+    # il giudice della npub DIMOSTRATA, che di privato non legge
+    # niente: legge la chiave PUBBLICA di chi sta scambiando, la
+    # stessa che i ponti del mercatino usano da sempre. Una
+    # sentinella che chiama «chiave privata» una lettura di roba
+    # pubblica non difende piu' niente: insegna a disattivarla.
+    prova("il blocco P2P non nomina la costante `_NOSTR`", False,
+          bool(re.search(r"\b_NOSTR\b", cod)))
 
     # --- 6) IL PANNELLO DELLE LEVE CHIEDE AL GIUDICE ----------------
     # La trappola che quella pagina esiste per non far ricadere: la
@@ -64846,6 +65230,7 @@ def main():
     prove_nav_p2p,
     prove_timbro_asset,
     prove_volti_libro,
+              prove_parti_si_vedono,
     prove_p2p_chiavi,
     prove_p2p_card_scambio,
     prove_p2p_vista_miei,
