@@ -19332,3 +19332,65 @@ ancora «Chiedi di annullare» e «C'è un problema», che mostrod in
 `settled-hold-invoice` rifiuta: innocuo, ma è una bugia piccola, e ha
 una prova che inchioda la lista — cantiere suo. E la patch 0006 va
 compilata sul nodo.
+## Il tetto in euro degli ordini P2P: la leva sopra il tetto in sats (17 set 2026)
+
+LA RICHIESTA DI ANDREA: un tetto in EURO, di Barattolo, sugli ordini
+del P2P — sopra il `max_order_amount` in sats di mostro, che resta
+com'è. La leva è `P2P_MAX_EURO` nel config del VPS e nasce SPENTA:
+zero o non dichiarata è il mondo di ieri, byte per byte; storta
+SPEGNE e lo dice nel journal — mai un tetto inventato da un refuso.
+Dichiarata anche in `config_esempio.py` (la sentinella del config
+d'esempio la pretende, ed è stata la prima rossa del giro).
+
+PERCHÉ IN EURO, E PERCHÉ I TETTI RESTANO DUE: il tetto del
+coordinatore è in sats e vive nel 38385; quello nuovo è nella valuta
+in cui si SCRIVE la cifra nel foglio, quindi si giudica mentre si
+scrive, senza un cambio di mezzo. Tradurre il tetto in sats in euro
+sarebbe inventare una soglia che dipende dal cambio del momento (era
+già a verbale sotto `maxSatsTestoP2P`), e il verso opposto vale
+uguale — per questo non si fondono. E IL TETTO IN SATS RESTA VALIDO
+SOTTO, SEMPRE: chi passa il tetto in euro ma sfora i sats viene
+fermato lo stesso, perché nel giudice il controllo dei sats sta dopo
+e il primo «manca» ferma tutto.
+
+LA STRADA: la leva viaggia nella busta delle leve P2P (`_p2p_leve`,
+chiave `maxEuro`, presente SEMPRE anche a zero — un'assenza direbbe
+«server di ieri» e il client non saprebbe la differenza), e a
+giudicare è il CLIENT nel foglio Pubblica, come per tutto il foglio:
+il coordinatore non la conosce e non la applica. Nel giudice
+(`valeNuovoOrdineP2P`) oltre il tetto si rifiuta con «Troppi: il
+massimo è N €» sul campo che lo risolve — l'importo, o il capo alto
+dell'intervallo — e al bordo esatto si passa. Il giudice in euro vale
+per TUTTI gli ordini, che a prezzo di mercato l'importo in euro è
+l'unico numero che c'è; quello in sats resta del solo prezzo fisso,
+com'era.
+
+I TESTI, ED È LA PARTE DISEGNATA CON ANDREA: sotto il campo la
+scritta «max …» dice UN numero solo — gli euro quando la leva è
+accesa (la valuta del campo, il numero più stretto per chi scrive),
+i sats del coordinatore quando è spenta — dal giudice nuovo
+`maxTestoP2P`, che sotto ha `maxEuroP2P` e `maxSatsTestoP2P`. La
+scatola «Quanto si può, e quanto costa» li dice invece TUTT'E DUE
+quando ci sono tutt'e due («fino a 500 € (e mai oltre 500 000
+sats)»): tacerne uno lo farebbe scoprire al momento del rifiuto. Il
+pannello «⚙️ Stato delle leve» ha la sua riga, col valore vivo.
+
+PROVATO: la leva fatta GIRARE con un config finto (legge la cifra,
+non dichiarata spenta, una parola o un negativo spengono); la busta
+(sei chiavi, `maxEuro` viaggia anche a zero, accesa porta la cifra);
+e nel banco node del foglio il giudice e i testi: fermato sul campo
+dell'importo con la frase giusta, il capo alto sul campo suo, al
+bordo si passa, chi passa gli euro ma sfora i sats si ferma lo
+stesso, a leva spenta gli euro alti passano; i testi nei quattro
+casi (due tetti, solo euro, solo sats, niente). Il banco della riga
+ha avuto la sua seconda rossa: estrae `rigaTettoFeeP2P`, che ora
+chiama `maxEuroP2P`, e gli mancava la busta di cartone — vuota, così
+quella prova continua a dire i sats di ieri. Giro intero: 11314
+passate, 0 fallite, anche con PROVE_SEVERE=1.
+
+RESTA DA GUARDARE: il «Riprova a pubblicare» ricostruisce l'ordine
+dalla riga locale (`ordineDaRigaP2P`) senza ripassare dal giudice del
+foglio, quindi un ordine nato PRIMA di una stretta della leva si può
+ripubblicare sopra il tetto nuovo. È lo stesso patto che vale già per
+il tetto in sats del coordinatore, e la leva è di casa: si stringe
+sapendolo.
