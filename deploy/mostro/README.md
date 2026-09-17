@@ -1,6 +1,6 @@
-# IL FORK DI MOSTRO — quattro patch sopra il tag v0.18.7
+# IL FORK DI MOSTRO — cinque patch sopra il tag v0.18.7
 
-Qui dentro non c'è codice: ci sono le quattro patch che il nodo Mostro di
+Qui dentro non c'è codice in servizio: ci sono le patch che il nodo Mostro di
 Dublino applica sopra il sorgente upstream, prodotte con
 `git format-patch`. Il codice vero vive sul nodo, nel branch
 `barattolo/v0.18.7` di `~/nodo/mostro-src`, e queste sono la sua copia
@@ -15,7 +15,7 @@ esattamente il lavoro che non vogliamo.
 
 Fatto l'8 settembre 2026. Upstream: `v0.18.7`, commit `afc39a2`.
 
-## LE QUATTRO PATCH, cosa fanno e perché
+## LE CINQUE PATCH, cosa fanno e perché
 
 **0001 — `src/lnurl.rs`, i tre budget da 4s/2s/2s a 30s/15s/10s.**
 Un coordinator che esce solo da Tor misura **10,6 secondi** per la
@@ -77,6 +77,62 @@ fissava il vecchio comportamento è rinominato e ribaltato. Nasce da
 provate a secco sul sorgente del tag) e vive qui come `.patch` esportato
 dal nodo; il client Barattolo dalla stessa sera legge `price_too_stale`
 e dice «riprova fra poco, o pubblica a prezzo fisso».
+
+**0005 — le commissioni PER PARTE: `src/barattolo_fee.rs` (nuovo) e sette
+agganci in `main.rs`, `take_buy.rs`, `take_sell.rs`, `util.rs`,
+`flow.rs`, `add_invoice.rs`.** ⚠️ NON È ANCORA IN SERVIZIO (set 2026):
+scritta e provata a secco sul sorgente del tag, da compilare e provare
+sul nodo. È la sola delle cinque che NON va proposta a monte: è la
+politica di prezzo di Barattolo, non un difetto di Mostro.
+Chi è pioniere OPPURE ha il livello 5 su Barattolo paga mezzo punto in
+meno sulla SUA metà della commissione, e lo sconto lo applica mostrod
+alla fonte — hold invoice e payout nascono giusti, nessun rimborso dopo.
+Upstream ha UNA colonna `order.fee` per tutt'e due le parti, e `Order`
+sta in mostro-core, che non si forka. Quindi:
+- `order.fee` diventa **la fee del COMPRATORE**: i suoi usi
+  (`set_waiting_invoice_status`, `validate_invoice`, `do_payment`,
+  `check_failure_retries`, i messaggi al compratore) restano intatti
+  byte per byte;
+- la fee del **VENDITORE** va in una tabella a lato, `barattolo_fees`,
+  creata con `CREATE TABLE IF NOT EXISTS` e tenuta FUORI dalle
+  migrazioni sqlx apposta (una migrazione upstream nuova non ci litiga
+  mai), e si legge nei **TRE** posti dove upstream usa `order.fee` dal
+  lato di chi vende. Il disegno ne aveva visto uno solo
+  (`show_hold_invoice`); gli altri due — i messaggi `BuyerTookOrder` di
+  `flow.rs` e `add_invoice.rs` — li ha trovati il censimento, e senza di
+  loro il venditore si sarebbe sentito dire una cifra diversa da quella
+  della sua hold. Il patcher quel censimento lo RIFÀ a ogni giro: se
+  upstream aggiunge un quarto uso, si ferma.
+- `order.rs` NON si tocca: alla pubblicazione chi prende non esiste, e
+  la fee si riscrive alla presa, quando le due trade key sono note.
+
+**CHI ha lo sconto non lo sa mostrod**: alla presa chiede a Barattolo
+(`POST /api/p2p/sconto`, le due trade key in una richiesta sola, dietro
+un segreto) e riceve un sì o un no per chiave. **QUANTO vale lo sa solo
+mostrod** (`BARATTOLO_SCONTO_FEE`, col tetto cablato `MAX_DISCOUNT` =
+1%): chi bucasse il VPS può al massimo regalare mezzo punto a qualcuno,
+mai riscrivere una commissione.
+**SE IL SERVER NON RISPONDE: FEE PIENA per tutt'e due** — timeout (12 s,
+che è anche il massimo che un VPS morto può fermare il ciclo seriale
+dei messaggi), non-200, JSON storto, chiave assente dalla risposta,
+riga a lato che non si scrive. Ogni caso lascia UNA riga di log col
+motivo. Un **battito ogni 60 s** verso `/api/salute` tiene calda la
+connessione (la lezione della 0001: 10,6 s a circuito freddo), e parla
+nel log solo quando lo stato CAMBIA.
+**SENZA LE TRE VARIABILI D'AMBIENTE LA PATCH È INERTE**: nessuna
+richiesta, nessuna riga scritta, `order.fee` com'era — upstream byte
+per byte, ed è anche il rollback senza ricompilare. Le tre variabili
+stanno nel compose del nodo, servizio `mostro`:
+`BARATTOLO_SCONTO_FEE=0.005`, `BARATTOLO_SCONTO_URL=https://barattolo.store/api/p2p/sconto`,
+`BARATTOLO_SCONTO_SEGRETO=<lo stesso di P2P_SCONTO_SEGRETO sul VPS>`.
+⚠️ Il segreto è un segreto: mai nel canale Telegram del nodo, entra nel
+backup age col resto del compose.
+NON COPERTO, e dichiarato: la strada dei BOND (`[anti_abuse_bond]`, da
+noi spenta) mette `order.fee` nel contesto di chi prende e può far
+correre più prese sullo stesso ordine. Prima di accendere i bond questa
+patch si rilegge.
+Nasce da `patch-0005-fee-per-parte.py` (con `barattolo_fee.rs` accanto;
+`--secco` prova le ancore senza scrivere).
 
 ## COSA CURA, E COSA NO
 
@@ -168,10 +224,10 @@ non lo era.
 cd ~/nodo/mostro-src
 git fetch --tags
 git switch -c barattolo/vX.Y.Z vX.Y.Z
-git cherry-pick a9d387b 1d6652c 1d5f634 2b71308
+git cherry-pick a9d387b 1d6652c 1d5f634 2b71308   # + il commit della 0005, quando ci sarà
 docker build -f docker/Dockerfile -t mostro:vX.Y.Z-bar1 .
 docker build -f docker/Dockerfile --target builder -t mostro-test:bar1 .
-docker run --rm mostro-test:bar1 sh -c "cargo test --release lnurl && cargo test --release config::util && cargo test --release dev_fee && cargo test --release app::order && cargo test --release app::take_buy && cargo test --release app::take_sell"
+docker run --rm mostro-test:bar1 sh -c "cargo test --release lnurl && cargo test --release config::util && cargo test --release dev_fee && cargo test --release app::order && cargo test --release app::take_buy && cargo test --release app::take_sell && cargo test --release barattolo_fee && cargo test --release flow && cargo test --release app::add_invoice"
 ```
 
 poi la riga dell'immagine nel compose e `docker compose up -d mostro`.
