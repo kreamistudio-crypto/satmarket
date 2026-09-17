@@ -76,7 +76,14 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `journalctl -u barattolo --since "10 min ago" | grep -E "P2P|Libro|Campanello"`.
   Le righe: `▶️ Orologio P2P partito: …` a ogni avvio, coi relay;
   `· P2P passata N: libro — … ; campanello — … (1.2s)` UNA AL MINUTO
-  anche a vuoto (si spegne con `P2P_LOG_PASSATE = False` nel config);
+  anche a vuoto (si spegne con `P2P_LOG_PASSATE = False` nel config),
+  e fra quadre CHI HA DATO COSA: `[relay.mostro.network 0 ·
+  relay.damus.io ✗ · nos.lol 2 · relay.barattolo.store 2]` — `✗` non
+  ha risposto, un numero sono gli eventi che ha dato. ⚠️ UNO ZERO
+  ACCANTO A UN NUMERO e' un relay che risponde ma e' rimasto indietro:
+  dal 17 set non fa piu' danno (si chiede a tutti e si unisce), ma se
+  dura e' da guardare sul nodo — mostrod non riesce a scriverci. Sul
+  campanello lo specchio dice sempre 0: i kind 14 non li copia;
   `🔇 P2P: il relay … non risponde (…)` e `🔊 … e' tornato a
   rispondere`, al CAMBIO e non a ogni giro; `⚠️ … passata oltre 240s,
   abbandonata` e `⚠️ … battito saltato (Tipo: …)` quando una passata

@@ -24019,7 +24019,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   giro dei kind 14, una REQ al minuto (`eventi_libro_da_relay`: kinds
   38383, `authors` il coordinatore, `#d` gli id in tabella a blocchi di
   100, `since` il segnalibro `p2p_libro_visto` nei timbri) sui relay
-  del coordinatore e poi sullo specchio, il primo che risponde; le
+  del coordinatore e sullo specchio — A TUTTI INSIEME, e le risposte
+  si uniscono (17 set 2026: «il primo che risponde» rispondeva una
+  lista vuota; vedi «IL P2P CHIEDE A TUTTI I RELAY», qui sotto); le
   righe MAI VISTE si chiedono senza segnalibro e per due ore al più.
   Il 38385 (`info_libro_da_relay`: fee, expiration_hours) si rilegge
   una volta l'ora. Il giudice puro `_avvisi_libro_p2p` scrive su
@@ -24120,6 +24122,19 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (600 s). Il segnalibro si sposta solo a eventi LETTI, quindi una
   passata abbandonata non perde niente. Il journal: PRODUZIONE,
   «L'OROLOGIO P2P NEL JOURNAL».
+  IL P2P CHIEDE A TUTTI I RELAY (17 set 2026): libro e campanello
+  mandano ogni domanda a tutti — relay del coordinatore PIÙ specchio —
+  con `_chiedi_tutti_p2p`, e `_unisci_p2p` fa l'unione senza doppioni
+  contando quanti eventi ha dato ciascuno. Un `[]` di UN relay vuol
+  dire «non ce l'ho io», mai «non c'è»: `None` e `[]` non decidono più
+  a chi chiedere, decidono cosa si scrive nel journal (`✗` o `0`). Gli
+  eventi del libro si leggono in ordine di `created_at`, così la
+  versione vecchia di un 38383 rimasta su un relay indietro non
+  riporta indietro niente. Il `since` è il segnalibro MENO
+  `P2P_MARGINE_S` (120 s): gli eventi non arrivano sui relay
+  nell'ordine in cui nascono. La prima passata di un processo non
+  risuona i kind 14 sotto il segnalibro. Il 38385 resta «il primo che
+  ce l'ha». Il verbale: CANTIERI, «Il primo che risponde non basta».
   IL DIARIO E LA DIAGNOSI: `diarioP2P` tiene in MEMORIA (mai disco,
   mai server) le ultime 150 righe di quel che il P2P ha fatto nella
   sessione — messaggi con ora ed esito, restore, ripresa, e il perché

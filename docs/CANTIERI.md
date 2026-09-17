@@ -17733,3 +17733,129 @@ ok (messaggio N)» = il messaggio È nella chat del bot di quell'account
 silenziata, l'altro account); «NIENTE Telegram» = il cassetto Avvisi;
 un rifiuto = il suo motivo. E lo script, che lo dice subito senza
 aspettare uno scambio.
+
+## Il primo che risponde non basta: il P2P chiede a tutti i relay (17 set 2026)
+
+**IL FATTO.** Ordine `fdce9231` (buy, 10 €) preso alle 11:24:42 UTC.
+Mostro logga `waiting-payment` e manda i suoi kind 14 (pay-invoice a
+chi vende, waiting-seller-to-pay a chi compra). Le tre passate dopo —
+11:24:50, 11:25:52, 11:26:53 — dicono «35 ordini guardati (1 mai
+visti), 0 eventi» e «93 chiavi, 0 messaggi». Nessuna notifica a nessuno
+dei due. L'orologio girava (le righe del cantiere di stamattina c'erano
+tutte): era CIECO.
+
+**LA CAUSA, MISURATA E NON DEDOTTA.** Una sonda in sola lettura sui
+quattro relay, fatta alle 11:30 dello stesso giorno (`authors` il
+coordinatore, mai il `content`):
+- `relay.mostro.network` — RISPONDE in 0,3 s, e di mostro non ha più
+  niente dalla sera prima: ultimo 38383 il 16 alle 14:43, ultimo kind
+  14 alle 19:43, ultimo 38385 alle 19:58. Il libro che serve ha 65
+  ordini contro gli 81 degli altri, e `fdce9231` non c'è in nessuno
+  stato. Una lettura su quattro gli è andata in timeout.
+- `relay.damus.io` — 503 da Cloudflare (`error code: 1200`).
+- `nos.lol` — ha TUTTO: il 38383 e i kind 14 delle 11:24:42 e 11:24:43.
+- `relay.barattolo.store` (lo specchio) — i 38383 identici a nos.lol,
+  e ZERO kind 14: `router.conf` copia i soli 38383 e 38385.
+I due giri si fermavano «al primo che risponde», e il primo della
+lista rispondeva: una lista vuota. `None` («non ho potuto chiedere»)
+faceva passare al relay dopo; `[]` («non ho niente») chiudeva la
+domanda. Ma detto da UN relay `[]` vuol dire «non ce l'ho IO». E il
+campanello aveva un guaio in più: leggeva la sola lista `relay`, senza
+lo specchio — che comunque i kind 14 non li ha.
+Spiega anche perché il guasto va e viene: quando `relay.mostro.network`
+va in timeout il giro passa al secondo, e funziona. CHE SIA ANDATA COSÌ
+ANCHE LA MATTINA (l'orologio «appeso» delle 10:03) NON È PROVATO: quel
+giorno il journal non aveva ancora le righe per dirlo.
+
+**LE CINQUE DOMANDE DI ANDREA, una per una.** 1) Da quale relay legge:
+dal primo che risponde, cioè quasi sempre `relay.mostro.network`, che
+l'evento NON l'aveva. 2) Il `since`: un evento di 8 secondi prima della
+passata NON viene scartato (riprodotto: si vede) — il segnalibro è
+l'ultimo `created_at` letto, inclusivo. Ma lì accanto c'era un buco
+vero, vedi sotto. 3) L'ordine mai visto si chiede davvero senza
+`since` (il filtro non lo porta proprio): non lo trovava perché lo
+chiedeva al relay che non l'aveva. 4) Le chiavi: il client registra la
+trade key PRIMA della presa e della pubblicazione (`/api/p2p/chiavi`),
+quindi nelle 93 dovrebbero esserci. NON VERIFICATO sul database vero,
+che è fuori dal mio perimetro — la query per Andrea sta in fondo. Le
+due trade key di quello scambio, dai tag `p` dei kind 14 su nos.lol,
+cominciano per `260b482f` e `7f8c0b11`. 5) Il journal adesso lo dice.
+
+**LA CURA.** `_chiedi_tutti_p2p` manda ogni domanda a TUTTI i relay
+INSIEME (`asyncio.gather` di `_chiedi_relay_p2p`, quindi ognuno col
+suo tetto e nel pool del P2P, salito da 4 a 8 thread): la passata dura
+quanto il più lento, non la somma. `_unisci_p2p` fa l'unione senza
+doppioni — per il libro la chiave è (id, quando, stato), per i kind 14
+la terna intera — e segna quanti eventi ha dato ciascuno. Gli eventi
+del libro si leggono IN ORDINE DI TEMPO, ed è una riga che lavora: il
+38383 è sostituibile, quindi un relay rimasto indietro porta la
+versione VECCHIA dello stesso ordine; dal più vecchio al più nuovo il
+giudice la scavalca da solo (più vecchia del `visto` = non muove), e
+su una riga mai vista il `pending` di ieri seguito dalla presa di
+adesso è la storia vera — scopre il maker e poi racconta la presa. Il
+campanello chiede anche allo specchio: oggi dirà sempre 0, ma è un
+fatto che si legge nel journal invece di doverlo ricordare.
+
+**IL MARGINE DEL SEGNALIBRO (`P2P_MARGINE_S`, 120 s).** Gli eventi non
+arrivano sui relay nell'ordine in cui nascono: mostro pubblica via Tor,
+relay per relay. Un kind 14 nato due secondi PRIMA di quello già letto
+e comparso dopo restava sotto il segnalibro per sempre — riprodotto a
+banco. Ora si chiede da due minuti prima. I doppioni non costano: sul
+libro lo stato uguale non è un passaggio, sul campanello ci sono gli id
+già contati. DUE CONSEGUENZE CURATE: la prima passata di un processo
+segna come visti, senza suonare, i kind 14 PRIMA del segnalibro (o ogni
+deploy risuonerebbe gli ultimi due minuti; quello SUL segnalibro resta
+lo squillo di troppo di sempre); e al tetto dei 5000 id non si svuota
+tutto, si tengono quelli della passata — che col margine tornano.
+LA STRADA SCARTATA: 600 secondi come il client (`ultimoVistoP2P() −
+600`). Il client ha la dedup sul disco del telefono; il server ce l'ha
+in memoria, e dieci minuti di margine a ogni riavvio sono dieci minuti
+di messaggi da assorbire alla cieca.
+
+**IL JOURNAL.** La riga della passata porta, per il libro e per il
+campanello, chi ha dato cosa: `[relay.mostro.network 0 · relay.damus.io
+✗ · nos.lol 2 · relay.barattolo.store 2]`. `✗` = non ha risposto in
+questa passata; un numero = ha risposto, con quanti eventi. LO ZERO
+ACCANTO A UN DUE è il guasto di oggi scritto in una riga. Il campanello
+ora conta i messaggi NUOVI (id mai contati), non tutti quelli dal
+segnalibro: col margine gli stessi tornano per due passate, e «1
+messaggi» fisso avrebbe detto il falso.
+
+**PROVATO.** La riproduzione sul codice di prima, con le stesse righe
+del journal vero («0 eventi», «0 messaggi dal segnalibro», zero
+notifiche) e poi verde sul codice nuovo. `prove_p2p_tutti_i_relay`: 28
+prove coi due giri VERI contro quattro relay di cartone — l'evento su
+uno solo e di otto secondi prima, lo stesso evento da due relay, il
+relay indietro che non riporta lo stato a prima, la riga mai vista col
+`pending` di ieri, due relay giù e poi tutti e quattro (il segnalibro
+non si muove), l'evento in ritardo sotto il segnalibro, il riavvio che
+non risuona il margine, tre relay lenti che costano quanto uno, il
+tetto degli id. Otto mutazioni, otto uccise (chiedere al solo primo,
+via i due margini, via l'ordine di tempo, il riavvio che risuona,
+l'unione senza dedup, il tetto che svuota, il None contato zero). Tre
+sentinelle del campanello e dell'orologio EMENDATE, con la data: due
+di loro tenevano fermo proprio «passa al prossimo solo su None».
+LA LEZIONE DEL BANCO: l'unica rossa del giro era sua — `pezzo()`
+dell'ultima funzione di un blocco si porta dietro la costante che la
+segue, e il testo finto del campanello veniva ricoperto da quello vero.
+
+**RESTA DA GUARDARE, e la prima è la più grossa.**
+1) **PERCHÉ `relay.mostro.network` non riceve più niente dal nostro
+mostrod dalle 20 del 16 set.** È sul NODO, non qui: mostrod pubblica
+via Tor e quel relay può aver chiuso la porta ai nostri exit (come
+WoS e Boltz), o la connessione di mostrod verso di lui è morta e non
+si rialza. Conta più di questo cantiere: i CLIENT di altri leggono da
+lì. Si guarda nei log di mostrod, in sola lettura.
+2) La query per il punto 4, sul VPS, in sola lettura:
+`sqlite3 ~/satmarket/satmarket.db "SELECT substr(pubkey,1,8), tg_id,
+creato FROM chiavi_p2p WHERE pubkey LIKE '260b482f%' OR pubkey LIKE
+'7f8c0b11%'"` — due righe = erano registrate, e a mancare era solo il
+relay.
+3) La prima riga di passata dopo il deploy: deve dire `nos.lol` e
+`relay.barattolo.store` coi numeri uguali sul libro, e
+`relay.mostro.network` indietro finché il punto 1 è aperto.
+4) Il 38385 si legge ancora dal primo che ce l'ha: una fee di ieri
+sera è la fee di oggi, ma il giorno che si gira la fee un relay
+indietro la direbbe vecchia per un'ora.
+5) IL SECONDO TEMPO — le notifiche istantanee sullo specchio — parte
+da qui, e ha una decisione davanti: lo specchio i kind 14 non li ha.
