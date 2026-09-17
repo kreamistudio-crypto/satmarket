@@ -18135,3 +18135,154 @@ router mentre la scrittura diretta copre lo stesso buco. Serve un giro
 apposta: specchio fermo con la diretta ancora non accesa, un evento
 nuovo sui relay pubblici, e poi guardare se dopo `up -d specchio`
 compare.
+
+## Le parti si vedono: via il passaggio dell'username a mano (17 set 2026)
+
+Deciso con Alan: **nel P2P le parti si vedono, come nel mercatino**.
+Fino a ieri, a scambio preso, i due si passavano il recapito in un
+campo di testo dentro la busta cifrata — «Un tuo contatto
+(facoltativo)», con sotto la riga «⚠️ Facoltativo, e rivela chi sei».
+Da oggi al suo posto, nella pagina dello scambio, c'è il **profilo
+dell'altra persona** — quello del mercatino: nome, faccia, stelline,
+livello e titolo — e i **bottoni per scriverle**.
+
+**PERCHÉ IL CAMPO A MANO SE N'È ANDATO, e sono tre difetti in fila.**
+Si scriveva a mano, e uno @ sbagliato non lo segnala nessuno — resta
+un vicolo cieco muto in mezzo a uno scambio di denaro. Prometteva una
+riservatezza che lì accanto non c'era più: chi ha pubblicato ha il
+volto sulla card del libro dal cantiere «I volti sul libro», quindi
+«facoltativo, e rivela chi sei» era vero per uno dei due lati e falso
+per l'altro. E soprattutto **non portava niente di dimostrato**:
+chiunque poteva scriverci lo @ di un altro, e chi legge non ha modo di
+accorgersene. Il profilo che arriva dal server è invece quello che
+regge già gli affari del mercatino, e il ponte Nostr esiste **solo
+con la chiave DIMOSTRATA** (`chiave_nostr_provata`: `npub_accesso`,
+oppure il badge `npub` ma solo se verificato) — la stessa regola dei
+ponti del negozio e dell'ordine, mai ribattuta qui.
+
+**COM'È FATTO.** Server: `_controparti_p2p` e `POST
+/api/p2p/controparte`. È il **gemello** di `_facce_ordini_p2p`, e la
+rotta è un'altra perché la domanda è un'altra — di là si chiede «di
+chi è questo ordine?» e risponde a chiunque abbia una sessione, che
+quella faccia sta già sulla card; **qui si chiede «chi sta scambiando
+con me?» e risponde solo a UNA DELLE DUE PARTI**, perché chi ha PRESO
+un ordine su nessuna card sta. Il giudice guarda la riga di
+`p2p_ordini` dai due lati (`tg_id` e `preso_da`, la colonna
+dell'emenda del 16 set) e serve sempre **l'altro**, mai il proprio; a
+chi non è della partita non serve niente e **non dà nemmeno un
+errore** — la risposta è senza quell'id, identica a quella per un
+ordine che non esiste, e i due casi non si distinguono apposta. Esce
+quel che il mercatino mostra già (nome, avatar con la scelta «nessuna
+foto» rispettata, media solo con almeno un voto, negozio, giorni) più
+livello e titolo dai loro giudici — `livello_utente` e `NOMI_TITOLI`,
+il catalogo sta lì e il client non ne tiene una copia — e i **due
+canali**. Due query e non N, che il tetto è 200.
+
+**IL BLOCCO DEL CLIENT STA FUORI DA QUELLO DEI VOLTI**, e non è
+pignoleria: la loro sentinella conta le fetch («sono DUE: scrive e
+legge») ed è la forma scritta di una promessa sulla privacy. Una terza
+infilata lì dentro l'avrebbe fatta mentire su una cosa che non era
+cambiata. Il blocco nuovo ha i suoi marcatori e la sua sentinella: una
+fetch sola, e nel corpo i soli id.
+
+**IL GUARDIANO È `o.peer`**, la chiave dell'altra parte: prima della
+presa non esiste, quindi prima della presa non si vede niente e non si
+chiede niente al server. È lo stesso confine del server, detto due
+volte da due parti che non si parlano.
+
+**IL RICORDO È UN ORARIO E NON UN SÌ/NO**, ed è la lezione dei volti
+pagata lì e non ripetuta qui: `p2pFacceChieste` ricordava «già
+chiesto» per tutta la sessione, quindi un «non lo so» del server
+diventava definitivo e la faccia non arrivava più. Qui la corsa è più
+stretta ancora — **chi ha pubblicato apre lo scambio nell'istante in
+cui gli arriva la presa, e chi ha preso dichiara al server «l'ho preso
+io» in quello stesso istante**: un giro solo perde, e perde quasi
+sempre. Una risposta vuota si riprova dopo trenta secondi, una piena
+non si chiede mai più.
+
+**IL CASO NOSTR, che è la domanda che Andrea ha lasciato aperta.** La
+forma scelta è **dirlo prima del gesto**, su tutt'e due i lati, invece
+di inventare un'impostazione nuova. Nel foglio dove si pubblica:
+«appena qualcuno lo prende vi vedete». Nel foglio dove si prende la
+stessa riga, **con un secondo verso per chi è entrato senza un nome**
+(`myTgId < 0`): a lui «vi vedete» sarebbe una bugia, perché la sua
+presa non viene annotata — la decisione del 16 set 2026 — e chi ha
+pubblicato non riceve niente. Quindi legge l'altra verità: «tu resti
+anonimo, il suo profilo invece lo vedi qui sopra».
+⚠️ **E CHI ENTRA CON UNA CHIAVE E PUBBLICA SI MOSTRA**, col profilo
+che ha qui — nome e foto della sua chiave: è così da «I volti sul
+libro», e adesso il foglio dove si pubblica lo dice PRIMA invece di
+lasciarlo scoprire. Era esattamente la richiesta: *non trovarsi il
+profilo esposto senza saperlo*.
+
+**QUANDO NON SI SA, SI DICE UNA COSA SOLA.** L'altra persona può
+essere entrata con un profilo anonimo, o scambiare da un'altra app che
+con Barattolo non c'entra, o il server può non aver ancora saputo: da
+qui i tre casi **non si distinguono**, quindi la riga dice il fatto
+che vale in tutti e tre — «dell'altra persona non sappiamo niente» —
+invece di indovinarne uno.
+
+**LA RIGA ONESTA STA ACCANTO ALLA SUA GEMELLA**, nel foglio dei
+recapiti: sopra c'è «i recapiti viaggiano cifrati fra te e l'altra
+persona: nessun altro li legge, nemmeno Barattolo», e sotto «fuori da
+Barattolo è un'altra cosa: quello che vi dite in una chat non lo
+cifriamo noi, non ce l'abbiamo, e in una disputa non possiamo usarlo —
+a decidere sono i fatti dello scambio». Separarle vorrebbe dire
+lasciare in piedi la sola metà che fa comodo.
+
+**LA LETTURA DEL VECCHIO CAMPO RESTA, ed è la parte da non togliere**:
+si è smesso di SCRIVERE, non di leggere. `CAMPI_P2P` resta di tre e
+`campoArriva` accetta ancora un `contatto` — un'app di ieri, o di un
+altro, può ancora mandarne uno, e quel che arriva si mostra. A
+cambiare è `inviaCampoP2P`, la cui guardia adesso dice `tipo !==
+'euro'` e non «uno dei tre»: così il giorno che ne tornasse un secondo
+bisogna dirlo lì, invece di ritrovarselo acceso per un elenco cambiato
+altrove.
+
+⚠️ **E IL DIVIETO DELLA FASE 6 NON VALE PER I PONTI**, che è
+l'emenda da mettere a verbale. La regola era «nelle viste dello
+SCAMBIO niente nomi di terzi — mai Mostro, mai il coordinatore, mai
+Nostr»: il suo bersaglio è l'**impianto**, il protocollo che chi entra
+da Telegram non deve dover imparare per fare un gesto. Un bottone di
+contatto è un'altra cosa: è una **destinazione** che la persona
+sceglie di aprire, e che la porta FUORI da Barattolo. Nasconderne il
+nome non proteggerebbe nessuno — renderebbe il bottone disonesto. Le
+quattro funzioni sorvegliate dalla sentinella (`apriCampiP2P`,
+`renderCampiP2P`, `inviaCampoP2P`, `apriDisputaP2P`) restano mute come
+prima; i ponti vivono nella pagina dello scambio, con lo stesso
+vestito del mercatino — la regola che «la stessa azione non può avere
+due vestiti secondo la pagina da cui la si tocca».
+
+**UNA SENTINELLA SI È AFFILATA INVECE DI AMMORBIDIRSI.** Il blocco P2P
+del server ha un divieto a maiuscole indifferenti su sei parole, fra
+cui `_NOSTR` — la costante con la chiave privata della piattaforma — e
+`chiave_nostr_provata` la faceva rossa. Quella lettura di privato non
+ha niente: legge la chiave **pubblica** di chi sta scambiando, la
+stessa dei ponti del mercatino. Quindi `_NOSTR` ha ora il nome esatto
+(`\b_NOSTR\b`, e in quel file è sempre maiuscola) e le altre cinque
+restano com'erano. Una sentinella che chiama «chiave privata» una
+lettura di roba pubblica non difende più niente: insegna a
+disattivarla.
+
+**LE PROVE**: `prove_parti_si_vedono` — il confine del giudice sul
+database vero (chi ha pubblicato vede chi ha preso e viceversa; un
+estraneo con una sessione non riceve niente; un ordine non ancora
+preso non ha controparte; **un ordine preso da chi resta anonimo
+nemmeno**, ed è fissato perché nessuno lo «sistemi» credendo a un
+difetto), e il banco node sul profilo (due canali → due bottoni, uno →
+uno, nessuno → il profilo resta e una riga dice cosa fare; niente
+prima della presa; il nome che passa da `esc()`). Più i due versi
+dell'avviso, provati sulla stessa pagina cambiando la sola variabile
+che li divide. In tutto **51 righe nuove**, e il giro intero su base
+pulita fa **11041 passate, 0 fallite**.
+
+**COSA RESTA DA GUARDARE.** Il profilo si chiede **per lo scambio
+aperto**, uno alla volta: se un giorno «I miei scambi» volesse mostrare
+la faccia su ogni riga, la domanda va fatta in blocco come per i volti
+del libro — la rotta accetta già una lista. E il ritorno in vetrina
+(`in-progress→pending`) scollega `preso_da`: da lì il profilo
+dell'altro sparisce, che è giusto, ma `p2pControparti` lo tiene in RAM
+fino al ricaricamento — non si vede, perché a quel punto `o.peer` è
+quello di prima e la pagina dice un'altra cosa, ma è la prima cosa da
+guardare il giorno che una faccia restasse attaccata a uno scambio che
+non è più suo.

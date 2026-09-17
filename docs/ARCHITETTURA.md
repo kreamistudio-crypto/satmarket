@@ -24863,6 +24863,55 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   pillole (non c'è niente da scegliere) e l'invio automatico guarda
   la sola forma decisa: mandare l'IBAN a chi ha scelto Satispay vuol
   dire far ricominciare l'accordo a voce.
+- LE PARTI SI VEDONO (17 set 2026): a ordine PRESO, la pagina dello
+  scambio porta il profilo dell'altra persona — il calco del riquadro
+  venditore del mercatino (`.seller`: faccia, nome, titolo, e la riga
+  stelline · livello · giorni), zero CSS nuovo — e sotto i due ponti di
+  contatto, la stessa fabbrica del negozio e dell'ordine
+  (`pontiContatto`). Al loro posto c'erano i campi dove ciascuno si
+  scriveva il proprio recapito a mano: quelli non ci sono più.
+  LA ROTTA È `POST /api/p2p/controparte`, gemella di `/api/p2p/facce` e
+  con un confine più stretto: quella serve il LIBRO e risponde a
+  chiunque abbia una sessione (è la faccia che sta già sulla card),
+  questa risponde **solo a una delle due parti** di quello scambio,
+  perché chi ha PRESO un ordine non sta su nessuna card. `_controparti_p2p`
+  guarda la riga di `p2p_ordini` dai due lati (`tg_id`, `preso_da`) e
+  serve sempre L'ALTRO; a un estraneo non dà un errore ma una risposta
+  SENZA quell'id — indistinguibile da un ordine che non esiste, e lo è
+  apposta. POST e non GET come per i volti: gli id in una query
+  finirebbero nei log del web server.
+  COSA ESCE: quel che il mercatino mostra già (nome, avatar con la
+  scelta «nessuna foto» rispettata, media solo con almeno un voto,
+  negozio, giorni), più `livello` e `titolo` dai loro giudici
+  (`livello_utente`, `NOMI_TITOLI` — il catalogo sta nel server) e i
+  DUE CANALI: lo @username Telegram e la npub, quest'ultima **solo dal
+  possesso dimostrato** (`chiave_nostr_provata`, la regola dei ponti
+  del mercatino: `npub_accesso`, oppure il badge `npub` ma solo se
+  verificato). Una npub nuda è una dichiarazione, non una prova.
+  IL GUARDIANO È `o.peer`, la chiave dell'altra parte: prima della
+  presa non esiste, quindi prima della presa non si vede niente e non
+  si chiede niente. Lo stesso confine detto da due parti che non si
+  parlano — il client e il giudice del server.
+  IL RICORDO È UN ORARIO (`p2pControparteQuando` + 30 s) e non un
+  sì/no: la corsa è che chi ha pubblicato apre lo scambio nell'istante
+  in cui arriva la presa e chi ha preso la dichiara in quello stesso
+  istante, quindi un giro solo perde quasi sempre. È la lezione dei
+  volti, dove «già chiesto» valeva per la sessione e un «non lo so»
+  diventava definitivo.
+  QUANDO NON SI SA SI DICE UNA COSA SOLA: profilo anonimo, un'altra
+  app, o il server che non ha ancora saputo — da qui i tre non si
+  distinguono, e la riga dice il fatto che vale in tutti e tre.
+  SI DICE PRIMA DEL GESTO, su tutt'e due i lati: nel foglio dove si
+  pubblica e in quello dove si prende, e lì con un **secondo verso**
+  per chi è entrato senza un nome (`myTgId < 0`) — la sua presa non
+  viene annotata, quindi «vi vedete» sarebbe falso e legge l'altra
+  verità. Chi entra con una chiave e PUBBLICA invece si mostra, col
+  profilo che ha qui: era già così dai volti sul libro, e adesso il
+  foglio lo dice prima.
+  LA LETTURA DEL VECCHIO CAMPO RESTA: `CAMPI_P2P` è ancora di tre e
+  `campoArriva` accetta un `contatto` da un'app di ieri; a cambiare è
+  `inviaCampoP2P`, che scrive il solo `euro`. Il verbale: CANTIERI,
+  «Le parti si vedono».
 - LE ROTTE PUBBLICHE, l'elenco per intero (la regola ferrea 3 in
   CLAUDE.md tiene il divieto — mai StaticFiles su una directory — e le
   due sentinelle; l'elenco sta qui perché cresce a ogni cantiere, e a
