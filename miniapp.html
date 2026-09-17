@@ -36543,6 +36543,7 @@ function scollegaWallet(){
    coming soon: un'assenza non e' una bugia. In DEMO non arriva nessuna
    delle due, e il coming soon li' e' la verita'. */
 let p2pLeve = null;           // da /api/me.p2p_leve: {attivo, mostro, relay}
+let p2pSconto = null;         // da /api/me.p2p_sconto: {attivo, motivo, punti}
 let p2pLevaPubblica = null;   // da j.p2p nella busta di /api/listings
 const p2pAcceso = () => p2pLeve ? !!p2pLeve.attivo
                      : p2pLevaPubblica === null ? false : !!p2pLevaPubblica.attivo;
@@ -37352,6 +37353,73 @@ function commissioneListinoP2P(){
   const n = c ? Number(c.commissione) : 0;
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
+/* ---- LA FEE COME VALE PER ME (set 2026, le commissioni per persona) ----
+   Chi e' pioniere OPPURE ha il livello 5 paga mezzo punto in meno
+   sulla SUA meta' (uno sconto solo: al server e' un si' o un no, e
+   un booleano non si somma). Lo sconto lo applica il COORDINATORE
+   alla fonte — hold e payout nascono giusti, patch 0005 del fork —
+   e qui si fa solo il conto che lo racconta.
+   ESCE UNA FEE «INTERA» GIA' SCONTATA DUE VOLTE, e non e' un trucco:
+   ogni posto che fa il conto di chi legge prende la fee e ne fa la
+   META' (`nettoLatoP2P`, `mezzaCommissioneP2P`, il conto, il lordo
+   ricavato all'indietro). Dando a tutti loro una fee a cui lo sconto
+   e' gia' tolto per due, la loro meta' e' la MIA quota — e nessuna
+   di quelle quattro formule si tocca. Col 3% e mezzo punto: 0,03 −
+   0,01 = 0,02, e la meta' e' l'1% che pago.
+   ⚠️ A SCONTO SPENTO TORNA LA FEE VIVA COSI' COM'E', lo stesso
+   numero e non uno ricalcolato: il mondo di ieri byte per byte.
+   ⚠️ `scontoMancato` E' LA VERITA' CHE VINCE SULLA PROMESSA: se il
+   coordinatore su QUESTO scambio ha fatto prezzo pieno (non ha
+   potuto verificare lo sconto in tempo: vedi `scontoMancatoP2P`), il
+   conto di questo scambio torna alla meta' piena.
+   LA COMMISSIONE TOTALE RESTA `commissioneVivaP2P`: la pagina delle
+   regole e il confronto col listino parlano di quella.
+   `typeof` perche' i banchi di prova ritagliano questa funzione senza
+   lo stato attorno: un banco che non dichiara `p2pSconto` e' un
+   lettore senza sconto, che e' anche il caso piu' comune. */
+function feeMiaP2P(o){
+  const fee = commissioneVivaP2P();
+  if (fee === null) return null;
+  const s = (typeof p2pSconto !== 'undefined') ? p2pSconto : null;
+  const punti = (s && s.attivo && !(o && o.scontoMancato))
+    ? Number(s.punti) : 0;
+  if (!(punti > 0)) return fee;
+  return Math.max(0, fee - 2 * punti / 100);
+}
+/* il cartello accanto all'aliquota: PERCHE' pago questa cifra. Lo
+   sconto vince sulla beta (dice una cosa di ME, l'altra del momento);
+   lo sconto MANCATO vince su tutti e due, perche' e' l'unico dei tre
+   che chi legge non si aspetta. Vuoto = nessun cartello. */
+function cartelloFeeP2P(o){
+  const fee = commissioneVivaP2P();
+  if (fee === null) return '';
+  if (o && o.scontoMancato) return 'sconto non verificato';
+  if (fee > 0 && feeMiaP2P(o) < fee)
+    return p2pSconto.motivo === 'pioniere' ? 'pioniere' : 'livello 5';
+  return (commissioneListinoP2P() > 0 && fee * 100 < commissioneListinoP2P())
+    ? 'beta' : '';
+}
+/* LO SCONTO PROMESSO E NON ARRIVATO. Se il server di Barattolo non
+   risponde in tempo al coordinatore, quello fa PREZZO PIENO (mai uno
+   sconto non verificato) — e il conto deve dirlo invece di continuare
+   a raccontare l'1%.
+   ⚠️ SI VEDE SOLO A PREZZO FISSO, ed e' un limite dichiarato: per
+   accorgersene serve il LORDO detto da qualcun altro che non sia il
+   mio lato, e a prezzo fisso e' l'importo dell'ordine. A prezzo di
+   mercato il coordinatore a chi prende dice SOLO il suo lato, e da
+   una cifra sola le due letture (scontata su un lordo, piena su un
+   altro) non si distinguono: li' il mio lato resta giusto al satoshi
+   — e' il suo — e a sbagliare di mezzo punto e' il Subtotale.
+   PURA: `miei` e' l'importo del mio lato detto dal coordinatore. */
+function scontoMancatoP2P(o, miei){
+  const fee = commissioneVivaP2P();
+  const lordo = Math.floor(Number(o && o.sats) || 0);
+  if (!(miei > 0) || !(lordo > 0) || !(fee > 0)) return false;
+  const verso = {lato: o.lato === 'compro' ? 'sell' : 'buy'};
+  if (nettoLatoP2P(verso, lordo) === miei) return false;
+  const meta = Math.round(lordo * fee / 2);
+  return (verso.lato === 'sell' ? lordo - meta : lordo + meta) === miei;
+}
 /* ---- LA QUOTA DI CHI LEGGE (17 set 2026) ----
    La fee del coordinatore si spartisce META' A TESTA — chi compra
    riceve amount − meta', chi vende blocca amount + meta', letto sui
@@ -37374,7 +37442,7 @@ function mezzaCommissioneP2P(fee){
    (o zero) la cifra resta quella del mercato — una stima col suo ≈,
    mai un numero inventato. */
 function nettoLatoP2P(o, sats){
-  const fee = commissioneVivaP2P();
+  const fee = feeMiaP2P(o);
   if (!(sats > 0) || !(fee > 0)) return sats;
   const meta = Math.round(sats * fee / 2);
   return o.lato === 'sell' ? sats - meta : sats + meta;
@@ -37421,7 +37489,18 @@ function renderP2PInfo(){
       : '<p>La commissione dello scambio &egrave; <b>' + num(fee * 100)
         + '%</b>, e si divide <b>met&agrave; a testa</b>: nel conto che leggi c\'&egrave; la <b>tua met&agrave;</b>, cio&egrave; <b>'
         + num(fee * 50) + '%</b>.</p>'
-        + '<p>Non si paga a parte: &egrave; gi&agrave; dentro i sats che passano di mano — chi vende ne blocca un po\' di pi&ugrave;, chi compra ne riceve un po\' di meno.</p>';
+        + '<p>Non si paga a parte: &egrave; gi&agrave; dentro i sats che passano di mano — chi vende ne blocca un po\' di pi&ugrave;, chi compra ne riceve un po\' di meno.</p>'
+        /* LO SCONTO FEDELTA', solo a leva accesa (`punti` viaggia a
+           tutti, `attivo` e' di chi legge): la regola la legge
+           chiunque, la riga «tu» solo chi ce l'ha */
+        + ((p2pSconto && Number(p2pSconto.punti) > 0 && fee > 0)
+          ? '<p>Chi &egrave; <b>pioniere</b> o ha raggiunto il <b>livello 5</b> paga <b>'
+            + num(Number(p2pSconto.punti)) + ' punti in meno</b> sulla sua met&agrave; (uno sconto solo, non si sommano).'
+            + (feeMiaP2P(null) < fee
+              ? ' <b>Tu sei fra questi</b>: la tua met&agrave; &egrave; <b>'
+                + esc(mezzaCommissioneP2P(feeMiaP2P(null))) + '%</b>.' : '')
+            + '</p>'
+          : '');
   }
   /* LE DUE FINESTRE. La vita nel libro e' `expiration_hours`, la
      finestra del gesto `expiration_seconds`: si leggono, e i ripieghi
@@ -40925,6 +41004,9 @@ function avanzaOrdineP2P(ordine, azione, payload){
     const amt = Math.floor(Number(ord.amount) || 0);
     if (amt > 0 && P2P_IMPORTO_MIO.indexOf(azione) >= 0) {
       o.satsMiei = amt;
+      /* PRIMA del lordo: se lo sconto promesso non e' arrivato, il
+         lordo va ricavato a meta' PIENA */
+      if (scontoMancatoP2P(o, amt)) o.scontoMancato = true;
       const lordo = lordoDaMieiP2P(o, amt);
       if (lordo > 0) o.satsNetti = lordo;
     } else if (amt > 0) o.satsNetti = amt;
@@ -40957,6 +41039,7 @@ function avanzaOrdineP2P(ordine, azione, payload){
          del MIO lato, detto dalla fattura stessa, e il lordo si ricava */
       if (o.hold.sats > 0) {
         o.satsMiei = o.hold.sats;
+        if (scontoMancatoP2P(o, o.hold.sats)) o.scontoMancato = true;
         const lordo = lordoDaMieiP2P(o, o.hold.sats);
         if (lordo > 0) o.satsNetti = lordo;
       }
@@ -41925,7 +42008,9 @@ function contoDettP2P(o){
   const esatto = fisso || detto > 0;
   const ricavato = detto > 0 && !!Math.round(Number(o.premium) || 0);
   const vivo = esatto || (cambioVivo && eurPerSat > 0);
-  const fee = commissioneVivaP2P();
+  /* la fee di CHI LEGGE: con lo sconto fedelta' la sua meta' e' piu'
+     piccola, e tutte le righe qui sotto la prendono da qui */
+  const fee = feeMiaP2P(o);
   const r = (t, v, cls) => '<div class="ctrl-riga' + (cls ? ' ' + cls : '')
     + '"><span>' + t + '</span><span class="mono">' + v + '</span></div>';
   /* i capi dell'intervallo, un contarello per ciascuno: `premio` e
@@ -42002,9 +42087,13 @@ function contoDettP2P(o){
      lo stesso cartello del conto del mercatino */
   /* `dopo` perche' da oggi la pillola SEGUE il nome della voce
      invece di precedere la cifra: l'aria le serve dall'altra parte */
-  const promo = (fee !== null && commissioneListinoP2P() > 0
-                 && fee * 100 < commissioneListinoP2P())
-    ? '<span class="promo-tag dopo">in promo</span>' : '';
+  /* ⚠️ NON PIU' «IN PROMO» (set 2026, le commissioni per persona):
+     il cartello dice PERCHE' chi legge paga quella cifra — «beta»
+     finche' la fee viva sta sotto il listino, «pioniere» o
+     «livello 5» per chi ha lo sconto. Lo decide `cartelloFeeP2P`. */
+  const cartello = cartelloFeeP2P(o);
+  const promo = cartello
+    ? '<span class="promo-tag dopo">' + esc(cartello) + '</span>' : '';
   /* ⚠️ L'ALIQUOTA STA NELL'ETICHETTA (set 2026, ritocco di Andrea),
      come la percentuale del premio: a destra vanno le CIFRE, a
      sinistra il nome della voce con quanto vale — «Fee Barattolo 1%»
@@ -42714,6 +42803,7 @@ function renderOrdineP2P(){
      `contoDettP2P`. */
   const conto = contoDettP2P(Object.assign(comeLibroP2P(o),
                                            {satsDetti: o.satsNetti || 0,
+                                            scontoMancato: !!o.scontoMancato,
                                             mio: true}));
   const azione = azioniDisponibili(o);
   const bottoni = {
@@ -43004,10 +43094,13 @@ function satsDaRicevereP2P(o){
    UN sat, il mio lato mai. A commissione ignota torna 0: il lordo non
    si inventa. */
 function lordoDaMieiP2P(o, miei){
-  const fee = commissioneVivaP2P();
+  const fee = feeMiaP2P(o);
   if (!(miei > 0) || fee === null) return 0;
   if (!(fee > 0)) return miei;
-  const verso = {lato: (o && o.lato === 'compro') ? 'sell' : 'buy'};
+  /* il verso si porta dietro lo sconto mancato: o `nettoLatoP2P`
+     rifarebbe il conto scontato su uno scambio a prezzo pieno */
+  const verso = {lato: (o && o.lato === 'compro') ? 'sell' : 'buy',
+                 scontoMancato: !!(o && o.scontoMancato)};
   const base = Math.round(miei / (verso.lato === 'sell' ? 1 - fee / 2 : 1 + fee / 2));
   for (let d = -2; d <= 2; d++) {
     const c = base + d;
@@ -43936,11 +44029,17 @@ function rigaTettoFeeP2P(){
   const tetto = maxSatsTestoP2P();
   if (tetto)
     pezzi.push('al momento si accettano ordini fino a ' + tetto);
-  const fee = commissioneVivaP2P();
+  const fee = feeMiaP2P(null);
   if (fee > 0) {
     const q = mezzaCommissioneP2P(fee);
-    pezzi.push('la commissione di Barattolo è ' + articoloPercentoP2P(q)
-               + q + '% per parte');
+    /* con lo sconto la frase parla di ME: «per parte» direbbe che
+       anche l'altro paga l'1%, e non e' detto */
+    const mia = fee < commissioneVivaP2P();
+    pezzi.push(mia
+      ? 'la tua commissione è ' + articoloPercentoP2P(q) + q
+        + '% (sconto ' + cartelloFeeP2P(null) + ')'
+      : 'la commissione di Barattolo è ' + articoloPercentoP2P(q)
+        + q + '% per parte');
   }
   if (!pezzi.length) return '';
   /* la maiuscola la mette il MONTAGGIO e non i pezzi: cosi' ognuno dei
@@ -47337,6 +47436,9 @@ async function avvia(){
     /* la leva dello scambio P2P per chi e' dentro: la prima delle due
        fonti di p2pAcceso, il calco di astaLeve */
     p2pLeve = me.p2p_leve || null;
+    /* ...e lo sconto fedelta' di CHI E' DENTRO (pioniere o livello 5):
+       l'anonimo non ne ha, e la busta di vetrina non lo porta */
+    p2pSconto = me.p2p_sconto || null;
     /* quali funzioni in arrivo ho gia' votato: accende il bottone
        giusto se la pagina e' gia' aperta (i due canali arrivano
        separati, e questo puo' atterrare per ultimo) */

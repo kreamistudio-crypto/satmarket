@@ -19008,6 +19008,21 @@ def _leve_stato():
                          "client leggono viva dal suo 38385",
                   spento="nessuna promessa: il conto dei client dice "
                          "la sola fee viva del coordinator"),
+            # LO SCONTO FEDELTA': la leva dice la cifra che il CLIENT
+            # mostra; a scontare davvero e' il coordinatore (patch
+            # 0005), che chiede a /api/p2p/sconto. Due righe perche'
+            # sono due fatti: quanto vale, e se la porta e' aperta.
+            _leva("Sconto fedeltà P2P (punti % per parte)",
+                  "P2P_SCONTO_FEDELTA_PERCENTO",
+                  P2P_SCONTO_FEDELTA_PERCENTO,
+                  acceso="pionieri e livello 5 pagano questi punti in "
+                         "meno sulla loro metà; deve combaciare con "
+                         "BARATTOLO_SCONTO_FEE del nodo",
+                  spento="nessuno sconto: tutti pagano la metà piena"),
+            _leva("Sconto fedeltà P2P — porta del coordinatore",
+                  "P2P_SCONTO_SEGRETO", sconto_p2p_attivo(),
+                  spento="il coordinatore non può chiedere chi ha lo "
+                         "sconto: fa prezzo pieno a tutti"),
             # IL SEGRETO NON ESCE MAI, esce il FATTO: la regola di
             # CHIAVE_CONTENUTI_DIGITALI, applicata al segreto piu'
             # pesante che questo server abbia — chi lo ruba, col sale
@@ -30336,6 +30351,12 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # diverse, e il client ha gia' il calco di `asteAccese` per
     # metterle insieme.
     profilo["p2p_leve"] = _p2p_per(user["id"])
+    # LO SCONTO FEDELTA' DEL P2P, per il conto di CHI LEGGE: lo stesso
+    # giudice che risponde al coordinatore, dai fatti che qui sono gia'
+    # in mano. E' una STIMA per lo schermo: la cifra vera la dice
+    # mostrod, e il client quando puo' le confronta.
+    profilo["p2p_sconto"] = _sconto_p2p_fatti(
+        profilo.get("coorte"), _xp_ban, _aff_ban)
     # Il catalogo COMPLETO, con la data per i guadagnati e null per gli
     # altri: il frontend non deve mai conoscere la lista a memoria.
     profilo["distintivi"] = [
@@ -33166,6 +33187,52 @@ try:
     from config import P2P_COMMISSIONE_PERCENTO
 except ImportError:
     P2P_COMMISSIONE_PERCENTO = 2
+# LO SCONTO FEDELTA' SUL P2P (set 2026, deciso con Alan): chi e'
+# PIONIERE oppure ha raggiunto il livello 5 paga mezzo punto in meno
+# sulla SUA meta' della commissione — 1% invece dell'1,5% della beta.
+# UNO SCONTO SOLO, mai due: pioniere E livello 5 vale quanto uno dei
+# due, e la regola non sta in un `min()` ma nella FORMA della risposta
+# — al coordinatore si dice un SI' o un NO, e un booleano non si somma.
+# ⚠️ LO SCONTO LO APPLICA MOSTRO ALLA FONTE (la patch 0005 del fork:
+# vedi deploy/mostro/README.md): hold invoice e payout nascono giusti,
+# non c'e' nessun rimborso dopo. Quindi QUESTA LEVA NON SCONTA NIENTE,
+# come il listino qui sopra non incassa niente: dice al CLIENT quale
+# cifra mostrare, e deve combaciare con `BARATTOLO_SCONTO_FEE` del
+# compose del nodo (0.5 qui = 0.005 la'). Se le due si scollano il
+# conto del client sbaglia di mezzo punto la STIMA — mai la cifra
+# vera, che la dice sempre il coordinatore nei suoi messaggi.
+# 0 = SPENTA, ed e' il default: il mondo di ieri byte per byte.
+# FUORI SCALA SI SPEGNE e non si accende: uno sconto piu' grande della
+# meta' della commissione e' un refuso, e un refuso qui promette a
+# schermo un prezzo che il coordinatore non fara' mai.
+try:
+    from config import P2P_SCONTO_FEDELTA_PERCENTO
+    P2P_SCONTO_FEDELTA_PERCENTO = float(P2P_SCONTO_FEDELTA_PERCENTO)
+    if not 0 <= P2P_SCONTO_FEDELTA_PERCENTO <= 1:
+        raise ValueError("fuori scala")
+except ImportError:
+    P2P_SCONTO_FEDELTA_PERCENTO = 0.0
+except (TypeError, ValueError):
+    P2P_SCONTO_FEDELTA_PERCENTO = 0.0
+    print("[p2p] P2P_SCONTO_FEDELTA_PERCENTO non e' un numero fra 0 e "
+          "1: lo sconto resta SPENTO")
+# IL LIVELLO CHE APRE LO SCONTO: il NUMERO del gradino (1-based, come
+# `livello_utente`), non il suo nome — oggi il 5 e' l'ultimo, «Maestro
+# del banco», e il giorno che la scala si allungasse la regola resta
+# «dal quinto in su» senza toccare niente.
+P2P_SCONTO_LIVELLO = 5
+# LA PORTA DA CUI IL COORDINATORE VIENE A CHIEDERE: un segreto casuale,
+# lo stesso nel config del VPS e nel compose del nodo. Vuoto o
+# segnaposto = la rotta /api/p2p/sconto NON ESISTE (404), il calco di
+# RELAY_CHIAVI_TOKEN. Chi lo ruba impara UNA cosa — se una pubkey che
+# ha gia' in mano ha lo sconto — e non puo' DARE lo sconto a nessuno.
+try:
+    from config import P2P_SCONTO_SEGRETO
+except ImportError:
+    P2P_SCONTO_SEGRETO = ""
+# quante chiavi in una domanda: le due parti di uno scambio, e un po'
+# d'aria. Un elenco lungo non e' una domanda, e' una raccolta.
+MAX_PUBKEY_SCONTO_P2P = 4
 # LA FASE CHIUSA (set 2026, decisione di Andrea): prima di aprire il
 # P2P a tutti lo usano solo Andrea e Alan, su scambi veri e piccoli.
 # La lista dei tg_id ammessi E' la leva, e IL VUOTO E' L'APERTURA —
@@ -33342,6 +33409,119 @@ def _p2p_per(tg_id) -> dict:
     if leve["attivo"] and P2P_PROVA_IDS and tg_id not in P2P_PROVA_IDS:
         return {**leve, "attivo": False}
     return leve
+
+
+def sconto_p2p_attivo() -> bool:
+    """La porta del coordinatore ESISTE? Segreto scritto E sconto
+    acceso: senza il primo nessuno puo' chiedere, senza il secondo non
+    c'e' niente da rispondere — e una porta aperta su una funzione
+    spenta e' superficie che non paga affitto."""
+    return bool(P2P_SCONTO_SEGRETO
+                and not P2P_SCONTO_SEGRETO.startswith("INCOLLA")
+                and P2P_SCONTO_FEDELTA_PERCENTO > 0)
+
+
+def _sconto_p2p_fatti(coorte, xp, affari) -> dict:
+    """Lo sconto di UNA persona, dai tre fatti che lo decidono. PURA:
+    la chiamano /api/me (che i fatti li ha gia' in mano a connessione
+    chiusa) e `_sconto_p2p` (che li legge), cosi' le due risposte non
+    possono dire due cose diverse sulla stessa persona.
+    IL MOTIVO E' UNO SOLO anche quando i fatti sono due: vince
+    `pioniere`, che e' quello che non si perde. `punti` e' la LEVA e
+    viaggia sempre — anche a chi lo sconto non ce l'ha, perche' la
+    pagina delle regole lo racconta a tutti — mentre `attivo` e' della
+    persona. A leva spenta non e' attivo nessuno."""
+    punti = float(P2P_SCONTO_FEDELTA_PERCENTO)
+    motivo = ""
+    if punti > 0:
+        if coorte == "pioniere":
+            motivo = "pioniere"
+        elif (livello_utente(xp or 0, affari or 0)["numero"]
+              >= P2P_SCONTO_LIVELLO):
+            motivo = "livello"
+    return {"attivo": bool(motivo), "motivo": motivo, "punti": punti}
+
+
+def _sconto_p2p(con, tg_id: int) -> dict:
+    """Lo stesso giudizio, per chi ha in mano solo un tg_id. Pura sulla
+    connessione (il patto di `_registra_chiavi_p2p`). Uno sconosciuto
+    non ha sconto: e' la risposta giusta e anche la sola prudente."""
+    r = con.execute("SELECT coorte, xp, vendite_ok, acquisti_ok FROM "
+                    "utenti WHERE tg_id=?", (tg_id,)).fetchone()
+    if not r:
+        return _sconto_p2p_fatti("", 0, 0)
+    return _sconto_p2p_fatti(r["coorte"], r["xp"],
+                             (r["vendite_ok"] or 0) + (r["acquisti_ok"] or 0))
+
+
+def _sconti_per_chiavi_p2p(con, pubkeys) -> dict:
+    """{pubkey: True|False} per le chiavi chieste dal coordinatore.
+    Alza ValueError sulla forma storta e sul tetto — mai un 400 diretto
+    — cosi' la prova non ha bisogno di FastAPI.
+    ⚠️ ESCE UN BOOLEANO E NIENT'ALTRO, ed e' la riga da non ammorbidire:
+    mai il tg_id, mai il motivo, mai «questa chiave la conosco ma non
+    ha lo sconto» distinto da «mai vista» — tutt'e due sono False. Chi
+    tiene questo segreto impara il minimo che serve a fare il conto.
+    E MAI QUANTO VALE LO SCONTO: quello lo sa il coordinatore (col suo
+    tetto cablato), cosi' chi bucasse questo server puo' al massimo
+    regalare mezzo punto a qualcuno, mai riscrivere una commissione.
+    LA CHIAVE E' LA TRADE KEY dello scambio, che il client registra in
+    `chiavi_p2p` PRIMA di mandare la presa o l'ordine (con `await`):
+    una chiave non ancora arrivata e' un False, cioe' prezzo pieno.
+    IL BUCO DICHIARATO: chi ha lo sconto puo' registrare sotto il SUO
+    account la trade key di un amico e prestarglielo — una chiave alla
+    volta, a mano, a ogni scambio, per mezzo punto. Accettato a
+    verbale (CANTIERI, «Le commissioni per persona»)."""
+    if not isinstance(pubkeys, list) or not pubkeys:
+        raise ValueError("Nessuna chiave")
+    if len(pubkeys) > MAX_PUBKEY_SCONTO_P2P:
+        raise ValueError("Troppe chiavi in una domanda sola")
+    esito = {}
+    for p in pubkeys:
+        p = str(p).strip().lower()
+        if not FORMA_PUBKEY_P2P.fullmatch(p):
+            raise ValueError("Chiave in una forma sconosciuta")
+        r = con.execute("SELECT tg_id FROM chiavi_p2p WHERE pubkey=?",
+                        (p,)).fetchone()
+        esito[p] = bool(r and _sconto_p2p(con, r[0])["attivo"])
+    return esito
+
+
+def _porta_sconto_p2p(autorizzazione: str) -> None:
+    """404 a porta chiusa, 403 a segreto sbagliato: il calco di
+    `relay_chiavi`. Confronto a tempo costante."""
+    if not sconto_p2p_attivo():
+        raise HTTPException(404, "Non trovato")
+    # a BYTE: `compare_digest` su due str alza TypeError al primo
+    # carattere non ASCII, e un header lo scrive chi chiama
+    atteso = ("Bearer " + P2P_SCONTO_SEGRETO).encode("utf-8")
+    if not hmac.compare_digest(
+            str(autorizzazione or "").encode("utf-8"), atteso):
+        raise HTTPException(403, "Segreto sbagliato")
+
+
+@app.post("/api/p2p/sconto")
+async def sconto_p2p(req: Request):
+    """Il coordinatore chiede, alla presa in carico, se le due trade
+    key dello scambio hanno lo sconto. POST e non GET: le chiavi non
+    finiscono nell'URL ne' nei log di Caddy. Se questa rotta tace o
+    sbaglia, mostrod fa PREZZO PIENO a tutt'e due: mai uno sconto non
+    verificato. I giudici sono `_porta_sconto_p2p` e
+    `_sconti_per_chiavi_p2p`."""
+    _porta_sconto_p2p(req.headers.get("authorization", ""))
+    try:
+        d = await req.json()
+    except Exception:
+        raise HTTPException(400, "Richiesta illeggibile")
+    con = db()
+    try:
+        sconti = _sconti_per_chiavi_p2p(con, (d or {}).get("pubkeys"))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    finally:
+        con.close()
+    return JSONResponse({"ok": True, "sconti": sconti},
+                        headers={"Cache-Control": "no-store"})
 
 
 

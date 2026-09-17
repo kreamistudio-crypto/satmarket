@@ -648,9 +648,22 @@ MOSTRO_RELAY_SPECCHIO = []
 # percentuale sull'intero scambio. ⚠️ NON incassa niente: a incassare
 # e' la `fee` del coordinator (settings.toml del nodo), che i client
 # leggono viva dal suo 38385 e spartiscono meta' a testa nel conto.
-# Questa dice solo QUANDO quella e' una promo: fee viva sotto il
-# listino = il conto mostra «in promo», come nel mercatino.
+# Questa dice solo QUANDO si e' ancora in BETA: fee viva sotto il
+# listino = il conto del P2P mostra la pillola «beta».
+# Sul VPS il listino e' 4 (set 2026); in beta il nodo tiene `fee = 0.03`.
 P2P_COMMISSIONE_PERCENTO = 2
+# LO SCONTO FEDELTA' SUL P2P (set 2026): punti percentuali IN MENO
+# sulla propria meta' per chi e' pioniere OPPURE ha il livello 5 (uno
+# sconto solo, non si sommano). ⚠️ Lo sconto vero lo applica il
+# coordinatore (patch 0005 del fork, `BARATTOLO_SCONTO_FEE` nel compose
+# del nodo): questa leva dice al client che cifra mostrare, e le due
+# devono combaciare (0.5 qui = 0.005 la'). 0 = spento.
+P2P_SCONTO_FEDELTA_PERCENTO = 0
+# Il segreto con cui il coordinatore chiede a /api/p2p/sconto se una
+# trade key ha lo sconto. Lo stesso valore va nel compose del nodo
+# (`BARATTOLO_SCONTO_SEGRETO`). Vuoto o segnaposto = la rotta NON
+# ESISTE (404) e il coordinatore fa prezzo pieno a tutti.
+P2P_SCONTO_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
 # LA RIGA A OGNI PASSATA DELL'OROLOGIO P2P (17 set 2026): una al minuto
 # nel journal, anche quando non trova niente — e' quella che distingue
 # «gira a vuoto» da «non gira», che un giorno e' costata un'ora.

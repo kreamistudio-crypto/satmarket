@@ -21972,6 +21972,7 @@ _SEGRETI_FINTI = {
     # infila nel dizionario che il config finto consegna.
     "SEGRETI_PROFILO_P2P": "SEGRETO-profilo-p2p",
     "RELAY_CHIAVI_TOKEN": "SEGRETO-token-del-relay",
+    "P2P_SCONTO_SEGRETO": "SEGRETO-porta-dello-sconto-p2p",
     "DB": "SEGRETO-percorso-database",
 }
 
@@ -22162,7 +22163,8 @@ def _censimento(acceso):
     # `cassaforte_nuova`, stessa trappola dei tre qui sopra — e i due
     # nomi delle cassaforti vanno scritti, o `__missing__` li fa 7.
     amb["CASSAFORTE_SAAS"], amb["CASSAFORTE_NODO"] = "saas", "nodo"
-    for f in ("webhook_attivo", "relay_chiavi_attivo", "_leva", "_elenco",
+    for f in ("webhook_attivo", "relay_chiavi_attivo", "sconto_p2p_attivo",
+              "_leva", "_elenco",
               "_prezzo_banner", "_p2p_leve", "_segreto_p2p_vivo",
               "_nodo_configurato", "cassaforte_nuova", "_leve_stato"):
         exec(pezzo(f), amb)
@@ -40138,6 +40140,7 @@ def prove_p2p_libro():
         # la commissione del coordinatore (set 2026): la card mostra il
         # NETTO di tutto, e questi due sono i giudici che lo fanno
         "function commissioneVivaP2P(){",
+        "function feeMiaP2P(o){",
         "function nettoLatoP2P(o, sats){",
         # IL GIUDICE DI «e' mio» vive nel motore ma lo CHIAMA la card,
         # che sta qui: si porta dentro quello VERO invece di stubbarlo,
@@ -41406,7 +41409,9 @@ def prove_p2p_dettaglio():
         # invece di ribattere `fee * 50`, perche' la dice anche la riga
         # sotto l'importo del foglio «Pubblica» — e due formule sullo
         # stesso numero si scollano senza rompere niente.
+        "function cartelloFeeP2P(o){",
         "function mezzaCommissioneP2P(fee){",
+        "function feeMiaP2P(o){",
         "function nettoLatoP2P(o, sats){",
         # il conto del dettaglio tinge la percentuale del premio col
         # giudizio, e dal set 2026 lo CHIAMA invece di ribatterlo
@@ -41994,14 +41999,15 @@ console.log(JSON.stringify(out));
     # porta la sua sigla, mai una bandiera inventata
     prova("...e una valuta sconosciuta porta la sigla, non una bandiera",
           True, "6,00 USD" in o["contoAltra"] and "🇪🇺" not in o["contoAltra"])
-    # LA PROMO E IL LISTINO: la fee viva sotto il listino e' una promo
-    # col cartello del mercatino; a zero resta il cartello e basta.
-    prova("la fee sotto il listino porta «in promo» e la meta' vera",
+    # LA BETA E IL LISTINO (set 2026, le commissioni per persona): la
+    # fee viva sotto il listino e' la BETA, e il cartello lo dice; a
+    # zero resta il cartello e basta. «In promo» nel P2P non c'e' piu'.
+    prova("la fee sotto il listino porta «beta» e la meta' vera",
           # la pillola SEGUE il nome (classe `dopo`: l'aria le serve
           # dall'altra parte) e l'aliquota e' quella VIVA, meta' di
           # chi legge
-          True, '<span class="promo-tag dopo">in promo</span>'
-          in o["contoPromo"]
+          True, '<span class="promo-tag dopo">beta</span>'
+          in o["contoPromo"] and "in promo" not in o["contoPromo"]
           and '<b class="p2p-avviso">0,5%</b>' in o["contoPromo"]
           and '<span class="num meno">≈ −60 sats</span>' in o["contoPromo"]
           and "≈ 11940 sats" in o["contoPromo"])
@@ -42016,19 +42022,19 @@ console.log(JSON.stringify(out));
     # ⚠️ IL CASO VERO DI OGGI: listino 3 sul VPS, fee viva 2 — la
     # promo scatta e la pillola sta accanto all'aliquota di chi legge,
     # che e' la META' (1%) e non la fee intera.
-    prova("col listino 3 la fee al 2% e' in promo, e la meta' e' 1%",
+    prova("col listino 3 la fee al 2% e' beta, e la meta' e' 1%",
           True,
           '<span>Fee Barattolo <b class="p2p-avviso">1%</b>'
-          '<span class="promo-tag dopo">in promo</span></span>'
+          '<span class="promo-tag dopo">beta</span></span>'
           in o["contoListino3"])
     prova("...e a fee zero il cartello dice 0 sats, come il mercatino",
-          True, "in promo" in o["contoGratis"] and "0 sats" in o["contoGratis"]
+          True, ">beta<" in o["contoGratis"] and "0 sats" in o["contoGratis"]
           and "%" not in _riga_fee(o["contoGratis"]))
     # NON SI SA NON E' GRATIS: senza il 38385 la commissione e' un
     # trattino, mai uno zero — e nessun «in promo» inventato.
     prova("senza 38385 la commissione e' un trattino, senza promo", True,
           ">—<" in _riga_fee(o["contoIgnoto"])
-          and "in promo" not in o["contoIgnoto"]
+          and "promo-tag" not in o["contoIgnoto"]
           # ...e nemmeno un'aliquota inventata accanto al nome
           and "%" not in _riga_fee(o["contoIgnoto"]))
     prova("...e a cambio muto le cifre sono trattini, l'euro resta", True,
@@ -45386,8 +45392,13 @@ def prove_p2p_motore():
             # `mezzaCommissioneP2P is not defined` — la trappola
             # dei DUE RITAGLI, qui al SECONDO banco che gira il
             # conto (l'altro e' quello del dettaglio).
+            "function cartelloFeeP2P(o){",
             "function mezzaCommissioneP2P(fee){",
             "function satsMercatoP2P(o){",
+            "function feeMiaP2P(o){",
+            # `avanzaOrdineP2P` sta nella fetta del motore e da set 2026
+            # CHIAMA questo giudice, che vive di la' dal confine
+            "function scontoMancatoP2P(o, miei){",
             "function nettoLatoP2P(o, sats){",
             "function verboLatoP2P(o){",
             "function fraseLatoP2P(o){",
@@ -46866,7 +46877,9 @@ def prove_p2p_stati():
         # lato: le servono il giudice della meta' e la fee viva
         "let p2pInfo = {fee: 0.02};",
         fn("function commissioneVivaP2P(){"),
+        fn("function feeMiaP2P(o){"),
         fn("function nettoLatoP2P(o, sats){"),
+        fn("function scontoMancatoP2P(o, miei){"),
         fn("function lordoDaMieiP2P(o, miei){"),
         fn("function statoTestoP2P(o){"),
         # la cifra in euro di uno scambio: il giudice unico delle due
@@ -48250,6 +48263,7 @@ def prove_p2p_pubblica():
         + "\n" + _intera("function ripuliCifreP2P(inp){")
         + "\n" + _intera("function satsMercatoP2P(o){")
         + "\n" + _intera("function commissioneVivaP2P(){")
+        + "\n" + _intera("function feeMiaP2P(o){")
         + "\n" + _intera("function nettoLatoP2P(o, sats){")
         + "\n" + _intera("function ordineDaCampiP2P(v, lato){")
         + "\n" + _intera("function valeNuovoOrdineP2P(v){")
@@ -49514,6 +49528,7 @@ def prove_p2p_pubblica():
         "let p2pInfo = null;\n"
         + re.search(r"const fmt = [^\n]*;", mini).group(0) + "\n"
         + _intera("function commissioneVivaP2P(){")
+        + "\n" + _intera("function feeMiaP2P(o){")
         + "\n" + _intera("function mezzaCommissioneP2P(fee){")
         + "\n" + _intera("function articoloPercentoP2P(testo){")
         + "\n" + _intera("function rigaTettoFeeP2P(){")
@@ -53473,6 +53488,7 @@ def prove_p2p_card_scambio():
         "function tintaStatoP2P(o){",
         "function commissioneVivaP2P(){",
         "function satsMercatoP2P(o){",
+        "function feeMiaP2P(o){",
         "function nettoLatoP2P(o, sats){",
         "function satsScambioP2P(o){",
         "function statoTestoP2P(o){",
@@ -56341,7 +56357,9 @@ def prove_p2p_silenzi():
         fn("function importoBolt11(pr){"), fn("function leggiBolt11(pr){"),
         "let p2pInfo = {fee: 0.02, scadenzaSec: 900};",
         fn("function commissioneVivaP2P(){"),
+        fn("function feeMiaP2P(o){"),
         fn("function nettoLatoP2P(o, sats){"),
+        fn("function scontoMancatoP2P(o, miei){"),
         fn("function lordoDaMieiP2P(o, miei){"),
         fn("function statoTestoP2P(o){"),
         fn("function holdVivaP2P(o){"),
@@ -56446,7 +56464,9 @@ process.stdout.write(JSON.stringify(out));
         fn("function importoBolt11(pr){"), fn("function leggiBolt11(pr){"),
         "let p2pInfo = {fee: 0.02, scadenzaSec: 900};",
         fn("function commissioneVivaP2P(){"),
+        fn("function feeMiaP2P(o){"),
         fn("function nettoLatoP2P(o, sats){"),
+        fn("function scontoMancatoP2P(o, miei){"),
         fn("function lordoDaMieiP2P(o, miei){"),
         fn("function statoTestoP2P(o){"),
         fn("function holdVivaP2P(o){"),
@@ -64283,6 +64303,282 @@ def prove_punti_pubblici():
     prova("...e non lo da' a chi ha tutto il resto ma non ospita nulla",
           False, bool(_crit["punto_ritiro"](_tutto)))
 
+def prove_p2p_sconto():
+    """LE COMMISSIONI PER PERSONA (set 2026): lo sconto fedelta' del
+    P2P. Lo sconto vero lo applica il coordinatore (patch 0005 del
+    fork); qui si prova la meta' di Barattolo — CHI ha lo sconto, la
+    porta da cui il coordinatore lo chiede, e il conto del client."""
+    import sqlite3
+    import hmac as _hmac
+    print("\n[le commissioni per persona: lo sconto fedelta' del P2P]")
+
+    class _H(Exception):
+        def __init__(self, code, detail=""):
+            self.code, self.detail = code, detail
+
+    def amb_con(punti, segreto=""):
+        amb = {"__builtins__": __builtins__, "HTTPException": _H,
+               "hmac": _hmac, "re": re,
+               "P2P_SCONTO_FEDELTA_PERCENTO": punti,
+               "P2P_SCONTO_LIVELLO": 5, "MAX_PUBKEY_SCONTO_P2P": 4}
+        # il segreto entra dal dizionario e mai con un'assegnazione
+        # scritta: e' finto, ma lo scanner dei segreti non lo sa
+        amb["P2P_SCONTO_" + "SEGRETO"] = segreto
+        i = _SORGENTE.index("LIVELLI = [(0, 0,")
+        exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+        i = _SORGENTE.index("FORMA_PUBKEY_P2P = ")
+        exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+        for f in ("livello_utente", "sconto_p2p_attivo", "_sconto_p2p_fatti",
+                  "_sconto_p2p", "_sconti_per_chiavi_p2p",
+                  "_porta_sconto_p2p"):
+            exec(pezzo(f), amb)
+        return amb
+
+    # --- 1) CHI ha lo sconto ----------------------------------------
+    a = amb_con(0.5)
+    fatti = a["_sconto_p2p_fatti"]
+    prova("nessuno dei due fatti: niente sconto",
+          {"attivo": False, "motivo": "", "punti": 0.5}, fatti("", 100, 3))
+    prova("pioniere: sconto, e il motivo lo dice",
+          {"attivo": True, "motivo": "pioniere", "punti": 0.5},
+          fatti("pioniere", 0, 0))
+    prova("livello 4 (800 XP, 15 affari): NON basta", False,
+          fatti("", 800, 15)["attivo"])
+    prova("livello 5 (3000 XP, 40 affari): sconto",
+          {"attivo": True, "motivo": "livello", "punti": 0.5},
+          fatti("", 3000, 40))
+    prova("...ma 3000 XP con 39 affari e' ancora livello 4", False,
+          fatti("", 3000, 39)["attivo"])
+    # NON CUMULABILE: i due fatti insieme valgono quanto uno
+    tutti = fatti("pioniere", 5000, 99)
+    prova("pioniere E livello 5: UNO sconto solo, gli stessi punti",
+          {"attivo": True, "motivo": "pioniere", "punti": 0.5}, tutti)
+    prova("un'altra coorte non e' un pioniere", False,
+          fatti("fondatore", 0, 0)["attivo"])
+    spento = amb_con(0.0)["_sconto_p2p_fatti"]
+    prova("a leva spenta non ha lo sconto nemmeno il pioniere",
+          {"attivo": False, "motivo": "", "punti": 0.0},
+          spento("pioniere", 5000, 99))
+
+    # --- 2) la leva: fuori scala SPEGNE ------------------------------
+    i_l = _SORGENTE.index("try:\n    from config import P2P_SCONTO_FEDELTA_PERCENTO")
+    blocco = _SORGENTE[i_l:_SORGENTE.index("# IL LIVELLO CHE APRE LO SCONTO", i_l)]
+
+    def leva_con(valore):
+        amb = {"print": lambda *x, **k: None}
+        finto = type("C", (), {})()
+        if valore is not None:
+            finto.P2P_SCONTO_FEDELTA_PERCENTO = valore
+        vecchio = sys.modules.get("config")
+        sys.modules["config"] = finto
+        try:
+            exec(blocco, amb)
+        finally:
+            if vecchio is None:
+                sys.modules.pop("config", None)
+            else:
+                sys.modules["config"] = vecchio
+        return amb["P2P_SCONTO_FEDELTA_PERCENTO"]
+
+    prova("la leva legge mezzo punto", 0.5, leva_con(0.5))
+    prova("...non dichiarata: spenta (il mondo di ieri)", 0.0, leva_con(None))
+    prova("...un 5 (refuso per 0.5) SPEGNE, non accende", 0.0, leva_con(5))
+    prova("...un negativo spegne", 0.0, leva_con(-0.5))
+    prova("...una parola spegne", 0.0, leva_con("mezzo"))
+
+    # --- 3) la risposta al coordinatore ------------------------------
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript("""
+      CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, coorte TEXT DEFAULT '',
+        xp INT DEFAULT 0, vendite_ok INT DEFAULT 0, acquisti_ok INT DEFAULT 0);
+      CREATE TABLE chiavi_p2p(pubkey TEXT PRIMARY KEY, tg_id INT, creato INT);
+    """)
+    PION, NORM, MAES, ORFA, MAI = ("a" * 64, "b" * 64, "c" * 64, "d" * 64,
+                                   "e" * 64)
+    con.executemany("INSERT INTO utenti VALUES(?,?,?,?,?)", [
+        (111, "pioniere", 10, 0, 0), (222, "", 900, 10, 10),
+        (333, "", 4000, 30, 15)])
+    con.executemany("INSERT INTO chiavi_p2p VALUES(?,?,0)", [
+        (PION, 111), (NORM, 222), (MAES, 333), (ORFA, 9999)])
+    per = a["_sconti_per_chiavi_p2p"]
+    prova("pioniere e non: un si' e un no", {PION: True, NORM: False},
+          per(con, [PION, NORM]))
+    prova("ENTRAMBI con lo sconto: due si'", {PION: True, MAES: True},
+          per(con, [PION, MAES]))
+    prova("NESSUNO dei due: due no", {NORM: False, MAI: False},
+          per(con, [NORM, MAI]))
+    prova("una chiave mai vista e una di un account sparito: no, senza alzare",
+          {MAI: False, ORFA: False}, per(con, [MAI, ORFA]))
+    prova("le maiuscole si normalizzano", {PION: True}, per(con, [PION.upper()]))
+    esce = json.dumps(per(con, [PION, NORM, MAES]))
+    prova("ESCE UN BOOLEANO E NIENT'ALTRO: nessun tg_id, nessun motivo", True,
+          all(x not in esce for x in ("111", "222", "333", "pioniere",
+                                      "livello", "0.5")))
+    prova("a leva spenta la stessa chiave risponde no", {PION: False},
+          amb_con(0.0)["_sconti_per_chiavi_p2p"](con, [PION]))
+
+    def alza(chiavi):
+        try:
+            per(con, chiavi)
+            return "passa"
+        except ValueError:
+            return "ValueError"
+    prova("nessuna chiave: ValueError", "ValueError", alza([]))
+    prova("non una lista: ValueError", "ValueError", alza(PION))
+    prova("cinque chiavi: e' una raccolta, non una domanda", "ValueError",
+          alza([PION, NORM, MAES, ORFA, MAI]))
+    prova("una chiave storta: ValueError", "ValueError", alza(["npub1xyz"]))
+
+    # --- 4) la porta -------------------------------------------------
+    def porta(punti, segreto, header):
+        try:
+            amb_con(punti, segreto)["_porta_sconto_p2p"](header)
+            return 200
+        except _H as e:
+            return e.code
+    vero = "porta-" + "finta"
+    prova("senza segreto la rotta non esiste (404)", 404,
+          porta(0.5, "", "Bearer " + vero))
+    prova("col segnaposto la rotta non esiste (404)", 404,
+          porta(0.5, "INCOLLA_QUI_UN_SEGRETO_CASUALE", "Bearer x"))
+    prova("a sconto spento la porta e' chiusa anche col segreto (404)", 404,
+          porta(0.0, vero, "Bearer " + vero))
+    prova("segreto sbagliato: 403", 403, porta(0.5, vero, "Bearer altro"))
+    prova("senza Bearer: 403", 403, porta(0.5, vero, vero))
+    prova("un header non ASCII e' un 403, non un'esplosione", 403,
+          porta(0.5, vero, "Bearer caffè"))
+    prova("il segreto giusto passa", 200, porta(0.5, vero, "Bearer " + vero))
+    rotta = _SORGENTE[_SORGENTE.index('@app.post("/api/p2p/sconto")'):]
+    rotta = rotta[:rotta.index("\n\n\n")]
+    prova("la rotta passa dalla porta PRIMA di leggere il corpo", True,
+          rotta.index("_porta_sconto_p2p(") < rotta.index("await req.json()"))
+    prova("...e la risposta non si cacha", True, "no-store" in rotta)
+    prova("/api/me lo dice a chi legge, dallo STESSO giudice", True,
+          'profilo["p2p_sconto"] = _sconto_p2p_fatti(' in _SORGENTE)
+    # LO SCANNER DELLA CI LO CONOSCE PER NOME, come gli altri segreti
+    # senza una forma loro: un valore vero committato fa rosso il job
+    wf = open(".github/workflows/prove.yml", encoding="utf-8").read()
+    prova("lo scanner dei segreti conosce il segreto della porta", True,
+          "|P2P_SCONTO_" + "SEGRETO|" in wf)
+
+    # --- 5) il conto del client, fatto girare ------------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    # «in promo» nel P2P non c'e' piu': il cartello lo decide un giudice.
+    # Si guarda il CODICE del conto, senza i commenti che raccontano
+    # com'era (la trappola del commento che spiega perche' non c'e' piu')
+    conto = re.sub(r"/\*.*?\*/", "", pezzo_js(
+        mini, "function contoDettP2P(o){", "\n}\n"), flags=re.S)
+    prova("il conto del P2P non scrive piu' «in promo»", False,
+          "in promo" in conto)
+    prova("...e il cartello lo chiede al giudice", True,
+          "cartelloFeeP2P(o)" in conto)
+    # IL FILO: la macchina a stati guarda lo sconto mancato PRIMA di
+    # ricavare il lordo (o lo ricaverebbe scontato su uno scambio a
+    # prezzo pieno), nei DUE posti dove arriva l'importo del mio lato
+    av = pezzo_js(mini, "function avanzaOrdineP2P(", "\n}\n")
+    prova("avanzaOrdineP2P guarda lo sconto mancato prima del lordo", True,
+          av.index("scontoMancatoP2P(o, amt)") < av.index("lordoDaMieiP2P(o, amt)")
+          and av.index("scontoMancatoP2P(o, o.hold.sats)")
+          < av.index("lordoDaMieiP2P(o, o.hold.sats)"))
+    prova("...e la pagina dello scambio lo passa al conto", True,
+          "scontoMancato: !!o.scontoMancato," in mini)
+    import shutil, subprocess, tempfile
+    node = shutil.which("node")
+    if not node:
+        salta("il conto del client con lo sconto", "node non installato")
+        return
+    banco = "\n".join(
+        pezzo_js(mini, "function %s(" % n, "\n}\n") + "\n}"
+        for n in ("commissioneVivaP2P", "commissioneListinoP2P", "feeMiaP2P",
+                  "cartelloFeeP2P", "scontoMancatoP2P", "mezzaCommissioneP2P",
+                  "nettoLatoP2P", "lordoDaMieiP2P")) + r"""
+let p2pInfo = {fee: 0.03}, p2pSconto = null;
+const p2pCoord = () => ({commissione: 4});
+const out = {};
+const giro = () => ({
+  fee: feeMiaP2P(null), quota: mezzaCommissioneP2P(feeMiaP2P(null)),
+  cartello: cartelloFeeP2P(null),
+  compro: nettoLatoP2P({lato: 'sell'}, 100000),
+  vendo: nettoLatoP2P({lato: 'buy'}, 100000)});
+out.nessuno = giro();
+p2pSconto = {attivo: false, motivo: '', punti: 0.5};
+out.levaAccesaMaNonMio = giro();
+p2pSconto = {attivo: true, motivo: 'pioniere', punti: 0.5};
+out.pioniere = giro();
+p2pSconto = {attivo: true, motivo: 'livello', punti: 0.5};
+out.livello = giro();
+/* il lordo si ricava all'indietro anche con lo sconto, al satoshi */
+out.lordoCompro = lordoDaMieiP2P({lato: 'compro'}, 99000);
+out.lordoVendo = lordoDaMieiP2P({lato: 'vendo'}, 101000);
+/* LO SCONTO MANCATO, a prezzo fisso: prometto 1%, mostro fa 1,5% */
+const fisso = {lato: 'compro', sats: 100000};
+out.arrivato = scontoMancatoP2P(fisso, 99000);
+out.mancato = scontoMancatoP2P(fisso, 98500);
+out.mancatoVendo = scontoMancatoP2P({lato: 'vendo', sats: 100000}, 101500);
+out.mercato = scontoMancatoP2P({lato: 'compro', sats: 0}, 98500);
+const m = {lato: 'sell', scontoMancato: true};
+out.dopo = {fee: feeMiaP2P(m), netto: nettoLatoP2P(m, 100000),
+            cartello: cartelloFeeP2P(m),
+            lordo: lordoDaMieiP2P({lato: 'compro', scontoMancato: true}, 98500)};
+/* chi NON ha lo sconto non puo' averlo «mancato» */
+p2pSconto = {attivo: false, motivo: '', punti: 0.5};
+out.senzaSconto = scontoMancatoP2P(fisso, 98500);
+/* uno sconto piu' grande della meta' non va sotto zero */
+p2pSconto = {attivo: true, motivo: 'pioniere', punti: 5};
+out.pavimento = feeMiaP2P(null);
+/* 38385 mai arrivato: non si sa, e lo sconto non inventa un numero */
+p2pInfo = null;
+out.muto = [feeMiaP2P(null), cartelloFeeP2P(null)];
+/* a fine beta (fee viva = listino) il cartello «beta» cade */
+p2pInfo = {fee: 0.04}; p2pSconto = null;
+out.fineBeta = cartelloFeeP2P(null);
+console.log(JSON.stringify(out));
+"""
+    f = tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                    encoding="utf-8")
+    f.write(banco)
+    f.close()
+    r = subprocess.run([node, f.name], capture_output=True, text=True,
+                       timeout=60, encoding="utf-8")
+    os.unlink(f.name)
+    if r.returncode != 0:
+        prova("il banco del conto con lo sconto gira", "", r.stderr[-500:])
+        return
+    o = json.loads(r.stdout.strip())
+    piena = {"fee": 0.03, "quota": "1,5", "cartello": "beta",
+             "compro": 98500, "vendo": 101500}
+    prova("senza sconto: 1,5% beta, 98.500 a chi compra e 101.500 a chi vende",
+          piena, o["nessuno"])
+    prova("leva accesa ma lo sconto non e' mio: identico, byte per byte",
+          piena, o["levaAccesaMaNonMio"])
+    prova("pioniere: 1%, 99.000 e 101.000, e il cartello lo dice",
+          {"quota": "1", "cartello": "pioniere", "compro": 99000,
+           "vendo": 101000},
+          {k: o["pioniere"][k] for k in ("quota", "cartello", "compro", "vendo")})
+    prova("livello 5: gli stessi numeri, un altro cartello",
+          {"quota": "1", "cartello": "livello 5", "compro": 99000,
+           "vendo": 101000},
+          {k: o["livello"][k] for k in ("quota", "cartello", "compro", "vendo")})
+    prova("il lordo si ricava all'indietro anche scontato",
+          [100000, 100000], [o["lordoCompro"], o["lordoVendo"]])
+    prova("sconto ARRIVATO: niente da segnalare", False, o["arrivato"])
+    prova("sconto MANCATO a prezzo fisso: si vede, dai due lati",
+          [True, True], [o["mancato"], o["mancatoVendo"]])
+    prova("...a prezzo di mercato non si puo' vedere, e non si inventa",
+          False, o["mercato"])
+    prova("...e da li' il conto torna alla meta' PIENA e lo dice",
+          {"fee": 0.03, "netto": 98500, "cartello": "sconto non verificato",
+           "lordo": 100000}, o["dopo"])
+    prova("chi non ha lo sconto non puo' averlo mancato", False,
+          o["senzaSconto"])
+    prova("uno sconto fuori scala non porta la fee sotto zero", 0,
+          o["pavimento"])
+    prova("senza 38385 non si sa: null e nessun cartello", [None, ""],
+          o["muto"])
+    prova("a fine beta il cartello cade", "", o["fineBeta"])
+
+
 def prove_relay_chiavi():
     """La whitelist che il relay di Barattolo viene a chiedere.
 
@@ -66310,6 +66606,7 @@ def main():
               prove_nwc_cifratura,
               prove_bundle_nostr,
               prove_relay_chiavi,
+              prove_p2p_sconto,
               prove_p2p_server,
         prove_p2p_libro,
         prove_tour_p2p,
