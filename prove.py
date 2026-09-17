@@ -51677,7 +51677,12 @@ console.log(JSON.stringify(out));
     # quell'ordine non ha mai visto. Resta MIO lo stesso (la card lo
     # marca, il tocco lo dice), ma qui non nasce.
     prova("...e mai una riga che questo mazzo non sa firmare", True,
-          "if (voce.identita && voce.identita !== mz.pub) continue;" in ad16)
+          "if (voce.identita && voce.identita !== mz.pub) {" in ad16
+          # dal 17 set 2026 il ramo DICE nel diario perche' salta, e poi
+          # salta: il `continue` sta in fondo al suo blocco, prima che
+          # la chiave si derivi (il caso j del banco lo fa girare)
+          and 0 < ad16.index("if (voce.identita && voce.identita !== mz.pub) {")
+              < ad16.index("      continue;\n    }\n    let tk = null;"))
     # LA RIPARAZIONE: le righe scritte col mazzo sbagliato prima della
     # cura hanno la trade key storta. Se l'identita' e' la mia, quella
     # GIUSTA e' la stessa formula con cui l'ordine e' nato — non e'
@@ -51711,7 +51716,8 @@ console.log(JSON.stringify(out));
                                 "P2P_RIPRESA_PASSO")) + "\n" + "\n".join(
             pezzo_js(mini, f, "\n}\n") + "\n}"
             for f in ("function statoDaRestoreP2P(o, statoMostro){",
-                      "function riprendiDaRestoreP2P(o, statoMostro){")
+                      "function riprendiDaRestoreP2P(o, statoMostro){",
+                      "function diarioP2P(riga){")
         ) + "\n" + "\n".join(
             pezzo_js(mini, f, "\n}\n") + "\n}"
             for f in ("async function chiediMieiOrdiniP2P(",
@@ -51739,6 +51745,7 @@ function ordineMieiP2P(){ return P2P_ORDINE_MIEI_CASA; }
 function azioniDisponibili(o){ return ''; }
 const capoImportoP2P = (o, giu) => giu ? ((o.euroMax || o.euro) || 0) : (o.euro || 0);
 let p2pMieiOrdini = null, p2pMieiGiro = null, p2pPavimento = null;
+let p2pDiario = [];
 /* il seme del conto e' una fetch, e qui e' uno stub DICHIARATO: il
    suo giro vero (409 compreso) gira nel banco del motore */
 let SEME = null, semeChiesto = 0;
@@ -51902,10 +51909,19 @@ out.strisciaSubito = s1.includes('<loc ord-a>');
   scambiP2P();
   out.ripresaIgnoto = ordiniFinti['ord-ig'].stato;
   out.ripresaGrezzo = ordiniFinti['ord-ig'].statoGrezzo;
+  out.ripresaNelDiario = p2pDiario.some(r => r.includes('ripresa 8263bce5: il coordinatore dice active')
+                                             && r.includes('pubblicato → attivo'));
   // ...e una restore che poi lo capisce porta via anche il grezzo
   p2pMieiOrdini = {'ord-ig': {indice: 8, stato: 'fiat-sent', identita: 'P'}};
   scambiP2P();
   out.ripresaGrezzoVia = [ordiniFinti['ord-ig'].stato, 'statoGrezzo' in ordiniFinti['ord-ig']];
+  // ...e la restore di UN'ALTRA identita' su una riga locale lo DICE
+  ordiniFinti = {'ord-alt2': {id: 'ord-alt2', lato: 'compro', stato: 'attesa_mia_fattura',
+                              indice: 3, pubTrade: 'pub:3', creato: 10}};
+  p2pMieiOrdini = {'ord-alt2': {indice: 3, stato: 'active', identita: 'P-ALTRO'}};
+  scambiP2P(); scambiP2P();
+  out.altraIdentitaDetta = [ordiniFinti['ord-alt2'].stato,
+    p2pDiario.filter(r => r.includes('ord-alt2') && r.includes('SALTATA')).length];
   console.log = log0;
   // m) LA TABELLA PER INTERO: ogni stato del coordinatore, sui due lati,
   //    partendo dalla riga piu' indietro che c'e'
@@ -52016,6 +52032,10 @@ out.strisciaSubito = s1.includes('<loc ord-a>');
                   "euro_inviati", out5["ripresaSoloAvanti"])
             prova("...e uno stato mai visto non muove niente", "attivo",
                   out5["ripresaIgnoto"])
+            prova("la ripresa lascia la sua riga nel diario", True,
+                  out5["ripresaNelDiario"])
+            prova("la restore di un'ALTRA identita' non muove la riga, e il diario lo dice una volta",
+                  ["attesa_mia_fattura", 1], out5["altraIdentitaDetta"])
             prova("...ma resta scritto GREZZO sulla riga, da mostrare", "roba-nuova",
                   out5["ripresaGrezzo"])
             prova("...finche' una restore che si capisce non lo porta via",
@@ -54129,6 +54149,8 @@ process.stdout.write(JSON.stringify(out));
         fn("function holdVivaP2P(o){"),
         fn("function avanzaOrdineP2P(ordine, azione, payload){"),
         fn("function applicaMessaggioP2P(ord, dentro){"),
+        "let p2pDiario = [];", fn("function diarioP2P(riga){"),
+        fn("function testoDiagnosiP2P(){"), fn("function copiaDiagnosiP2P(){"),
         "const FRESCA = " + _json.dumps(bolt11_finta(16673, 900, adesso - 30)) + ";",
     ]) + r"""
 let righe = {}, toasts = [], pianificati = [];
@@ -54171,7 +54193,7 @@ const out = {};
 // a) lo scambio vero, in ordine: fino a «Sats in garanzia»
 nuova();
 for (const n of ['eco', 'attesa', 'paga', 'preso']) arriva('v', n);
-out.inOrdine = [righe.v.stato, righe.v.ultimoMsg === T + 180, righe.v.peer === SUA,
+out.inOrdine = [righe.v.stato, righe.v.ultimaMossa === T + 180, righe.v.peer === SUA,
                 toasts.filter(t => t === 'TOCCA').length];
 // b) LA RIAPERTURA: il relay ripete tutto alla rinfusa. Niente si muove,
 //    nessuna storia inventata, nessun toast
@@ -54210,6 +54232,30 @@ const C = [['add-invoice', {order: {amount: 16182}}, T + 10],
 for (const m of C) arriva('c', m);
 for (const m of [C[2], C[0], C[1], C[0]]) arriva('c', m);
 out.compratore = righe.c.stato;
+// f2) IL TAKER FERMO DEL 17 SET (Alan, 8263bce5): ha gia' dato la
+//     fattura, la garanzia e' accettata — ma e' fermo su «Dove vuoi i
+//     sats?», e li' il foglio col wallet collegato RIMANDA la fattura
+//     da solo: il coordinatore risponde `cant-do`, che diventa il
+//     messaggio PIU' RECENTE dello scambio. Alla riapertura il relay
+//     lo serve per primo: non deve far passare per «passato» la
+//     garanzia accettata, che e' arrivata prima di lui.
+const NO = ['cant-do', {cant_do: 'not-allowed-by-status'}, T + 600];
+const NO2 = ['cant-do', {cant_do: 'not-allowed-by-status'}, T + 900];
+out.takerFermo = [];
+for (const giro of [[NO2, NO, C[2], C[1], C[0]], [NO, C[0], NO2, C[2], C[1]],
+                    [C[0], C[1], C[2], NO, NO2], [NO2, C[0], C[1], NO, C[2]]]) {
+  righe = {c: {id: 'c', lato: 'compro', stato: 'attesa_mia_fattura', pubTrade: MIA,
+               euro: 10, satsNetti: 0, metodi: [], cantDo: '', errore: ''}};
+  for (const m of giro) arriva('c', m);
+  out.takerFermo.push(righe.c.stato);
+}
+// ...e lo stesso per il voto chiesto a fine scambio: `rate` non e' una
+// mossa, e non deve chiudere la porta al «concluso» che gli sta dietro
+righe = {c: {id: 'c', lato: 'compro', stato: 'euro_inviati', pubTrade: MIA,
+             euro: 10, satsNetti: 0, metodi: [], cantDo: '', errore: ''}};
+arriva('c', ['rate', null, T + 2000]);
+arriva('c', ['purchase-completed', null, T + 1990]);
+out.rateNonChiude = [righe.c.stato, righe.c.votabile === true];
 // g) alla pari si applica, e senza ora (un messaggio atteso da una
 //    chiamata di ieri) pure: meglio due volte che mai
 nuova();
@@ -54217,7 +54263,27 @@ arriva('v', 'eco');
 arriva('v', ['waiting-buyer-invoice', null, T]);
 out.allaPari = righe.v.stato;
 arriva('v', ['pay-invoice', {payment_request: [null, FRESCA, 16673]}, 0]);
-out.senzaOra = [righe.v.stato, righe.v.ultimoMsg === T];
+out.senzaOra = [righe.v.stato, righe.v.ultimaMossa === T];
+// h) LA DIAGNOSI: racconta, e non porta via niente di segreto
+const SEGRETO = 'ee'.repeat(32);
+function mazzoMostro(){ return {sk: SEGRETO, pub: 'cafebabe' + 'dd'.repeat(28), indice: 15}; }
+function ordiniP2P(){ return righe; }
+let myTgId = 111, copiato = '';
+function copiaLink(t, m){ copiato = t; toast(m); }
+let p2pMieiOrdini = {v: {indice: 54, stato: 'active', identita: 'cafebabe' + 'dd'.repeat(28), ripresa: true}};
+nuova();
+for (const n of ['eco', 'attesa', 'paga']) arriva('v', n);
+arriva('v', 'eco');
+copiaDiagnosiP2P();
+out.diagnosi = {
+  stato: copiato.includes('stato=attesa_mia_hold') && copiato.includes('restore: active indice=54 guardata'),
+  messaggi: copiato.includes('pay-invoice t=' + (T + 120) + ' attesa_fattura_compratore→attesa_mia_hold'),
+  passato: copiato.includes('new-order t=' + T + ' PASSATO'),
+  segreti: [SEGRETO, FRESCA, SUA, MIA].filter(s => copiato.includes(s)),
+  toast: toasts[toasts.length - 1]
+};
+p2pMieiOrdini = null;
+out.diagnosiSenzaRestore = testoDiagnosiP2P().includes('restore: mai conclusa in questa sessione');
 process.stdout.write(JSON.stringify(out));
 """
     d = _tf.mkdtemp()
@@ -54245,6 +54311,30 @@ process.stdout.write(JSON.stringify(out));
           ["pubblicato", "hold", False, 1], o2["ritornoVero"])
     prova("chi COMPRA: l'add-invoice di ieri non lo riporta a «Dove vuoi i sats?»",
           "attivo", o2["compratore"])
+    prova("IL TAKER FERMO: un «no» piu' recente non fa passare per passato la garanzia accettata, in nessun ordine",
+          ["attivo"] * 4, o2["takerFermo"])
+    prova("...e nemmeno la richiesta di voto chiude la porta al «concluso»",
+          ["concluso", True], o2["rateNonChiude"])
+    prova("l'orologio e' delle MOSSE: lo scrive solo un'azione che la tabella sa muovere",
+          True, "if (quando > 0 && AVANZA_P2P[azione]) nuovo.ultimaMossa = quando;"
+          in fn("function applicaMessaggioP2P(ord, dentro){"))
+    prova("...e il campo avvelenato di quelle ore non si legge piu' per decidere",
+          False, "ord.ultimoMsg" in fn("function applicaMessaggioP2P(ord, dentro){"))
+    prova("LA DIAGNOSI dice lo stato della riga e quel che ha detto la restore",
+          True, o2["diagnosi"]["stato"])
+    prova("...e i messaggi arrivati, con l'ora e la mossa", True, o2["diagnosi"]["messaggi"])
+    prova("...e quelli scartati come passato", True, o2["diagnosi"]["passato"])
+    prova("...e dentro NON c'e' nessun segreto: ne' la chiave del profilo, ne' la fattura, ne' le chiavi di scambio intere",
+          [], o2["diagnosi"]["segreti"])
+    prova("...e dice di incollarla a chi aiuta", True,
+          "Diagnosi copiata" in (o2["diagnosi"]["toast"] or ""))
+    prova("...e una restore mai conclusa si legge", True, o2["diagnosiSenzaRestore"])
+    prova("il bottone della diagnosi sta in Info P2P, con la promessa scritta", True,
+          'onclick="copiaDiagnosiP2P()">🩺 Copia la diagnosi dei tuoi scambi</button>' in mini
+          and "<b>Non contiene chiavi, fatture né recapiti.</b>" in mini)
+    prova("il diario vive in memoria: niente disco, niente server", False,
+          any(s in _nudo(fn("function diarioP2P(riga){") + fn("function testoDiagnosiP2P(){"))
+              for s in ("localStorage", "fetch(", "setItem")))
     prova("alla pari (stesso secondo) si applica", "attesa_fattura_compratore",
           o2["allaPari"])
     prova("...e un messaggio senza ora pure, senza toccare l'ora della riga",

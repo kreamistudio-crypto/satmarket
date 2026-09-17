@@ -7608,6 +7608,8 @@ document.getElementById('cartello')?.remove();</script>
       <p><b>Annullare d'accordo.</b> Uno dei due propone di annullare, l'altro accetta, e i sats tornano a chi li aveva bloccati. Serve il <b>sì di tutti e due</b>: nessuno si tira indietro da solo dopo che l'altro si è mosso.</p>
       <p><b>La disputa.</b> Si apre quando i sats sono <b>già in garanzia</b> — prima non c'è niente da contendere. Da quel momento lo scambio si ferma: né tu né l'altra persona potete più muovere i sats, e a decidere chi li riceve è un <b>moderatore del coordinatore</b>, cioè <b>di Barattolo</b>: guardiamo le prove di tutti e due e scegliamo. Anche lì le strade restano <b>due</b> — i sats vanno a chi compra o tornano a chi vende — e lo diciamo adesso, invece di lasciartelo scoprire quel giorno.</p>
       <p class="sicu-nota">Tieni le prove di quello che hai fatto: la ricevuta del bonifico, la schermata del pagamento. Sono quelle che guarda chi decide.</p>
+      <p><b>Uno scambio fermo sul passo sbagliato.</b> Se la pagina non dice quello che è successo davvero, copia la diagnosi e mandacela: racconta cosa ha visto l'app in questa sessione. <b>Non contiene chiavi, fatture né recapiti.</b></p>
+      <button class="btn ghost" onclick="copiaDiagnosiP2P()">🩺 Copia la diagnosi dei tuoi scambi</button>
 
       <h3>Chi sei, qui dentro</h3>
       <ul class="sicu-lista sicu-cose">
@@ -40516,12 +40518,16 @@ async function chiediMieiOrdiniP2P(){
        riconosciuto — cioe' il difetto, al contrario. Il vuoto VERO
        arriva dentro una risposta, e quello si', si tiene. */
     if (!esiti.every(Boolean)) {
+      diarioP2P('restore: hanno risposto ' + esiti.filter(Boolean).length
+                + ' identita\' su ' + esiti.length + ': NON si conclude');
       console.log('🔁 [p2p] i miei ordini: hanno risposto in '
                   + esiti.filter(Boolean).length + ' su ' + esiti.length
                   + ', non si conclude');
       return p2pMieiOrdini;
     }
     p2pMieiOrdini = trovati;
+    diarioP2P('restore: ' + Object.keys(trovati).map(k => k.slice(0, 8) + '='
+              + trovati[k].stato).join(' ') + ' (identita\' chieste: ' + esiti.length + ')');
     console.log('🔁 [p2p] i miei ordini: ' + Object.keys(trovati).length
                 + ' dalla restore (identità chieste: ' + esiti.length + ')');
     return trovati;
@@ -40529,6 +40535,7 @@ async function chiediMieiOrdiniP2P(){
     /* FAIL-OPEN: se non si sa, si torna a sapere quel che si sapeva —
        la lista locale. Mai un elenco vuoto spacciato per «non ne hai»,
        che marcherebbe come altrui un ordine proprio. */
+    diarioP2P('restore: non si sa (' + (e && e.message || e) + ')');
     console.log('🔁 [p2p] i miei ordini: non si sa (' + (e && e.message || e) + ')');
     return p2pMieiOrdini;
   }).finally(() => { p2pMieiGiro = null; });
@@ -41116,6 +41123,59 @@ function leggiBolt11(pr){
   return {sats: sats, quando: quando, scadenza: scadenza, scade: quando + scadenza, cltv: cltv};
 }
 
+/* ═══ IL DIARIO E LA DIAGNOSI (17 set 2026, sera) ═══════════════════
+   Sul telefono la console non c'e', e uno scambio fermo sul passo
+   sbagliato si e' dovuto diagnosticare a ipotesi. Il diario tiene IN
+   MEMORIA (mai sul disco, mai al server) le ultime righe di quel che
+   il P2P ha fatto in questa sessione — messaggi arrivati con l'ora e
+   l'esito, la restore, la ripresa — e «Copia la diagnosi» in Info P2P
+   le mette negli appunti insieme allo stato delle righe, da incollare
+   a chi aiuta. ⚠️ DENTRO NON C'E' NESSUN SEGRETO, per costruzione:
+   ne' chiavi private, ne' fatture, ne' recapiti, ne' la chiave della
+   controparte — solo id, stati, ore, e le chiavi PUBBLICHE di scambio
+   accorciate a otto caratteri. */
+let p2pDiario = [];
+function diarioP2P(riga){
+  const d = new Date();
+  const ora = [d.getHours(), d.getMinutes(), d.getSeconds()]
+    .map(n => String(n).padStart(2, '0')).join(':');
+  p2pDiario.push(ora + ' ' + String(riga));
+  if (p2pDiario.length > 150) p2pDiario.splice(0, p2pDiario.length - 150);
+}
+function testoDiagnosiP2P(){
+  const righe = ['Barattolo P2P — diagnosi', 'ora: ' + new Date().toISOString(),
+                 'conto: ' + (myTgId > 0 ? 'telegram' : 'nostr')];
+  let mz = null;
+  try { mz = mazzoMostro(); } catch(e){}
+  righe.push('profilo: ' + (mz ? String(mz.pub || '').slice(0, 8) + ' indice ' + (mz.indice | 0) : 'nessuno'));
+  righe.push('restore: ' + (p2pMieiOrdini === null ? 'mai conclusa in questa sessione'
+    : Object.keys(p2pMieiOrdini).length + ' ordini'));
+  const tutti = ordiniP2P();
+  for (const id of Object.keys(tutti)) {
+    const o = tutti[id];
+    if (!o) continue;
+    const v = p2pMieiOrdini && p2pMieiOrdini[id];
+    righe.push('- ' + String(id).slice(0, 8) + ' ' + o.lato + (o.mio ? ' mio' : '')
+      + ' stato=' + o.stato + ' indice=' + (o.indice | 0)
+      + ' chiave=' + String(o.pubTrade || '').slice(0, 8)
+      + ' mossa=' + (o.ultimaMossa || 0)
+      + (o.ultimoMsg ? ' (vecchio orologio ' + o.ultimoMsg + ')' : '')
+      + ' hold=' + (o.hold ? 'si' : 'no') + ' controparte=' + (o.peer ? 'si' : 'no')
+      + (o.giroMorto ? ' giroMorto=' + o.giroMorto : '')
+      + (o.statoGrezzo ? ' grezzo=' + o.statoGrezzo : '')
+      + (o.cantDo ? ' no=«' + o.cantDo + '»' : '') + (o.errore ? ' errore=«' + o.errore + '»' : '')
+      + ' | restore: ' + (v ? v.stato + ' indice=' + (v.indice | 0)
+          + (mz && v.identita && v.identita !== mz.pub ? ' ALTRA IDENTITA' : '')
+          + (v.ripresa ? ' guardata' : ' non guardata') : 'non c\'e\''));
+  }
+  righe.push('--- diario (' + p2pDiario.length + ')');
+  return righe.concat(p2pDiario).join('\n');
+}
+function copiaDiagnosiP2P(){
+  haptic();
+  copiaLink(testoDiagnosiP2P(), 'Diagnosi copiata 📋 Incollala a chi ti sta aiutando');
+}
+
 /* ---- quel che succede quando un messaggio si applica ---- */
 function applicaMessaggioP2P(ord, dentro){
   const azione = dentro && dentro.action;
@@ -41131,18 +41191,32 @@ function applicaMessaggioP2P(ord, dentro){
      pagata, e l'`add-invoice` di ieri riportava chi compra a «Dove
      vuoi i sats?». Col cantiere dei silenzi quell'eco vecchia faceva
      anche scattare «Di nuovo nel libro», cioe' una storia inventata.
-     La riga tiene l'ora dell'ultimo messaggio APPLICATO (`ultimoMsg`,
+     La riga tiene l'ora dell'ultima MOSSA applicata (`ultimaMossa`,
      che vive col resto della riga): uno piu' vecchio non muove niente
      e non fa parlare nessuno. Gli si prende solo QUEL CHE MANCA — la
      controparte, la richiesta da pagare se e' quella che si aspetta —
      perche' su un dispositivo nuovo i messaggi arrivano dal piu'
      recente, e quelli dietro portano i dati.
+     ⚠️ L'OROLOGIO E' DELLE MOSSE, NON DEI MESSAGGI (17 set 2026, sera:
+     il taker fermo). La prima stesura lo avanzava a OGNI messaggio, e
+     un `cant-do` — che non muove niente — diventava «l'ultimo»: chi
+     compra, fermo su «Dove vuoi i sats?» col wallet collegato, rimanda
+     la fattura DA SOLO a ogni apertura del foglio, il coordinatore
+     risponde «no», e quel «no» e' il messaggio piu' recente dello
+     scambio. Alla riapertura arrivava per primo e faceva passare per
+     PASSATO la garanzia accettata. Ora l'ora la scrive solo un'azione
+     che la tabella sa muovere (`AVANZA_P2P`). E IL CAMPO HA CAMBIATO
+     NOME, da `ultimoMsg` a `ultimaMossa`, apposta: le righe scritte
+     in quelle ore portano un orologio avvelenato, e col nome nuovo
+     ripartono da «senza ora» — che converge da se'.
      Alla pari (stesso secondo) si applica: meglio due volte che mai.
      Una riga di prima della cura non ha l'ora: converge da sola, in
      qualunque ordine arrivino, perche' dopo il piu' recente gli altri
      sono passato. */
   const quando = Number(dentro.quando) || 0;
-  if (quando > 0 && (Number(ord.ultimoMsg) || 0) > quando) {
+  if (quando > 0 && (Number(ord.ultimaMossa) || 0) > quando) {
+    diarioP2P('msg ' + String(ord.id).slice(0, 8) + ' ' + azione + ' t=' + quando
+              + ' PASSATO (ultima mossa ' + ord.ultimaMossa + ', stato ' + ord.stato + ')');
     const eco = avanzaOrdineP2P(ord, azione, dentro.payload || null);
     let preso = false;
     const peerNuovo = !ord.peer && !!eco.peer;
@@ -41158,7 +41232,10 @@ function applicaMessaggioP2P(ord, dentro){
     return;
   }
   const nuovo = avanzaOrdineP2P(ord, azione, dentro.payload || null);
-  if (quando > 0) nuovo.ultimoMsg = quando;
+  if (quando > 0 && AVANZA_P2P[azione]) nuovo.ultimaMossa = quando;
+  diarioP2P('msg ' + String(ord.id).slice(0, 8) + ' ' + azione + ' t=' + quando
+            + ' ' + prima + '→' + nuovo.stato
+            + (nuovo.cantDo ? ' no=«' + nuovo.cantDo + '»' : ''));
   /* IL RINOME STA QUI e non in chi ha creato l'ordine: la risposta
      puo' arrivare anche quando nessuno la sta aspettando (app riaperta,
      relay che ripete), e da li' in poi lo scambio deve avere il nome
@@ -45552,7 +45629,13 @@ function adottaOrdiniAltroveP2P(locali){
        non lo e'. Un ordine dell'altra identita' resta comunque MIO —
        la card lo marca e il tocco lo dice — ma qui non nasce nessuna
        riga che prometta un ritiro che non partirebbe. */
-    if (voce.identita && voce.identita !== mz.pub) continue;
+    if (voce.identita && voce.identita !== mz.pub) {
+      if (locali[id] && !voce.dettoAltra) {
+        voce.dettoAltra = true;
+        diarioP2P('ripresa ' + id.slice(0, 8) + ': SALTATA, la restore viene da un\'altra identita\'');
+      }
+      continue;
+    }
     let tk = null;
     try { tk = chiaveScambio(mz.sk, indice); } catch(e) { continue; }
     const gia = locali[id];
@@ -45566,6 +45649,9 @@ function adottaOrdiniAltroveP2P(locali){
         voce.ripresa = true;
         const st = String(voce.stato || '').trim().toLowerCase();
         const ripreso = riprendiDaRestoreP2P(gia, st);
+        diarioP2P('ripresa ' + id.slice(0, 8) + ': il coordinatore dice ' + (st || '(vuoto)')
+                  + ', la riga e\' a ' + gia.stato + ' → '
+                  + (ripreso ? ripreso.stato : 'ferma'));
         if (ripreso) {
           console.log('🔁 [p2p] ripresa: ' + id.slice(0, 8) + ' da «' + gia.stato
                       + '» a «' + ripreso.stato + '» (il coordinatore dice ' + st + ')');
