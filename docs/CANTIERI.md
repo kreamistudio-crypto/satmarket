@@ -19038,3 +19038,115 @@ patch (a sconto spento non devono accorgersi di niente: se uno diventa
 rosso, la frase «byte per byte» qui sopra è falsa); e la strada dei
 BOND, che la patch dichiara NON coperta — prima di accenderli si
 rilegge.
+
+## Il foglio senza la cifra: «Copia la cifra» sparito da «Dove ricevere i sats» (17 set 2026)
+
+DAL CAMPO, e la segnalazione arrivava già con due sospetti: «stamattina
+c'era — l'ho visto negli screenshot dello scambio con Alan — e oggi no.
+Quel foglio l'hanno toccato due cantieri: la priorità rovesciata (prima
+la fattura, l'indirizzo in alternativa) e il campo che nasce vuoto con
+la scorciatoia dell'indirizzo salvato. Guarda se uno dei due l'ha perso
+per strada o messo dietro una condizione».
+
+**NESSUNO DEI DUE**, e va a verbale per primo perché non si torni a
+cercarlo lì: il bottone sta nel foglio, e la condizione che lo regge —
+`netto > 0` — è **più vecchia di tutti e due**, identica nella versione
+di ieri. I due cantieri l'hanno spostato e rivestito (`btn ghost` →
+`btn primary`, sopra il campo), mai tolto né ristretto.
+
+**A MANCARE NON ERA IL BOTTONE: ERA LA CIFRA.** Il foglio promette
+«Riceverai N» e offre la copia dalla stessa sorgente — `satsDaRicevereP2P`
+— e quando quella torna zero cadono tutt'e due insieme, in silenzio. Il
+caso è stato riprodotto **dal vivo**, aprendo il foglio nell'app vera
+(non a banco): una riga di chi compra, il foglio aperto, e dentro solo
+«Incolla una richiesta di pagamento del tuo wallet: senza importo».
+
+### Perché la riga non sapeva più la cifra
+
+LA COLPEVOLE È DI STAMATTINA, ma è un'altra: **la ripresa dalla
+restore** (voce «La restore che diceva active», 11:39). Da quando la
+fotografia del coordinatore muove le righe in avanti, una riga arriva a
+«Dove vuoi i sats?» **senza aver mai visto l'`add-invoice`** — che è il
+solo messaggio che la cifra la porta. La `restore-session` risponde con
+`{order_id, trade_index, status}` e nient'altro: censiti i campi che
+`unaRestoreP2P` legge, di importi non ce n'è nemmeno uno. Prima di
+stamattina quello stato lo scriveva solo l'`add-invoice`, e con lo
+stato arrivava sempre anche il numero; da stamattina i due si possono
+separare, e la prima volta che si sono separati il bottone è sparito.
+
+IL SECONDO BUCO È NELLO STESSO COMMIT, e da solo basta a rifare il
+difetto: nel ramo **PASSATO** di `applicaMessaggioP2P` — quello che
+impedisce a un messaggio vecchio di riportare indietro lo stato — si
+prendeva «solo quel che manca», e la lista era *la controparte e la
+richiesta da pagare*. Il commento lo dichiarava e ne diceva pure il
+perché («su un dispositivo nuovo i messaggi arrivano dal più recente, e
+quelli dietro portano i dati»): **la cifra è esattamente uno di quei
+dati, e non era nella lista.** Su un telefono che riapre, il messaggio
+che porta l'importo del mio lato è quasi sempre il più vecchio dei
+suoi, cioè quello che quel ramo scarta.
+
+### La cura, e quel che NON si è fatto
+
+**IL LORDO CHE SI SA** (`lordoNotoP2P`): prima quel che ha detto il
+coordinatore (`satsNetti`), poi il lordo del **libro**, che la presa
+scrive sulla riga (`sats`) e che da lì non leggeva più nessuno. Da lì
+la metà della fee si toglie con la formula di sempre (`nettoLatoP2P`),
+che è la stessa del coordinatore: non è una stima, è lo stesso conto.
+
+⚠️ **E SI USA SOLO DOVE È UN FATTO**, che è tutta la prudenza del
+punto. `amt` del 38383 vale **zero** su un ordine a prezzo di mercato —
+lì la cifra la fissa il coordinatore AL TAKE (`get_market_amount_and_fee`)
+e il libro non la sa — e un intervallo è a mercato per definizione.
+**LA STRADA SCARTATA**, e non si riproponga: ricavare la cifra dal
+cambio di adesso, come fa la card del libro. Lì una stima col suo `≈` è
+onesta; qui sarebbe **una fattura rifiutata con l'aria di essere
+giusta**, cioè peggio di nessun numero — il coordinatore accetta solo
+`amount − fee` esatto, o una fattura senza importo.
+
+**E QUANDO LA CIFRA NON SI SA, IL FOGLIO LO DICE.** Un bottone che
+sparisce senza un perché si legge come un guasto (è la regola già
+scritta per il ✕ di uno scambio, in `p2pTogliibile`), e prima lì non
+restava niente: né la promessa, né la copia, né una parola. Adesso c'è
+una riga — «la cifra esatta qui non la sappiamo: il messaggio che la
+dice non è arrivato su questo dispositivo. Falla **senza importo** —
+quella va bene comunque» — che dice anche la seconda metà, cioè che la
+via senza importo non è un ripiego peggiore: quella mostro l'accetta
+sempre (`amount_sat != 0`, letto sui byte di `validate_bolt11_invoice`).
+
+### La lezione: il banco era verde, e non poteva non esserlo
+
+IL FOGLIO AVEVA GIÀ LE SUE PROVE — «con la cifra da copiare», «con
+«Copia la cifra» in evidenza, e prima del campo» — ed erano **verdi
+mentre il bottone spariva sul telefono**. Il motivo è tutto in una riga
+del banco: la riga di prova si scriveva a mano **con `satsMiei` già
+dentro**, cioè nello stato che il cammino rotto non produce mai. Una
+prova che semina l'antecedente non può vedere chi l'antecedente non ce
+l'ha — ed è la parente stretta della lezione già a verbale sul velo
+P2P: *un banco che chiama il gesto a mano non vede i difetti che stanno
+fra il bottone e il gesto*. Qui il difetto stava fra il **messaggio** e
+il foglio.
+
+LE PROVE NUOVE PARTONO QUINDI DA DOVE PARTE LA RIGA VERA: presa →
+`riprendiDaRestoreP2P` → foglio, e **il bottone è preteso** (39604 del
+libro meno 396 di mezza fee = 39208, promessa e copia). Più il caso
+rovescio — a prezzo di mercato e su un intervallo **non si inventa
+niente**, e il foglio dice perché — più il ramo PASSATO che non muove
+lo stato ma **lascia la cifra**. E una sentinella sul **legame**: se il
+foglio nomina una cifra, il bottone per copiarla c'è; se non la nomina,
+non c'è. Le due righe vengono dallo stesso giudice e da qui in poi non
+possono divergere.
+CONTROPROVA FATTA: disfatte le tre cure a banco fermo, **cinque delle
+nuove escono rosse** — la prova riproduce il difetto invece di
+certificarlo.
+
+I NUMERI: `prove.py` **11.294 passate, 0 fallite** (11.282 → 11.294),
+misurate dopo il rebase sul lavoro arrivato da un'altra sessione — le
+commissioni per persona, che toccano `nettoLatoP2P` proprio sotto
+questo ripiego. La fusione era pulita e si è guardata lo stesso: la
+chiamata resta quella che l'upstream fa da sé
+(`nettoLatoP2P({lato: 'sell'}, lordo)`), e il loro `scontoMancatoP2P`
+legge `o.sats` col nostro stesso limite dichiarato — «a prezzo fisso è
+l'importo dell'ordine, a prezzo di mercato il coordinatore dice solo il
+tuo lato» — cioè conferma la guardia da un'altra strada.
+La riproduzione è stata fatta nell'app vera, col foglio aperto due
+volte: senza la cifra e poi con la cifra ritrovata.
