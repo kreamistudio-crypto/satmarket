@@ -49,6 +49,28 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   davanti. Al primo riavvio dopo il deploy il server aggiunge da solo
   le quattro colonne a `p2p_ordini` e `avvisi_p2p` a `utenti`
   (ALTER TABLE, come tutte le colonne nuove): niente da fare a mano.
+- «AVVISATI N» NON VUOL DIRE ARRIVATO (17 set 2026): quella riga
+  conta chi si e' PROVATO ad avvisare. L'esito sta nelle righe subito
+  sotto, una per destinatario: `   📖 ↳ 700000001: telegram ok
+  (messaggio 8841)` — il numero e' la ricevuta di Telegram —, oppure
+  `telegram 403: non ha avviato il bot, o l'ha bloccato`, `telegram
+  400: NON arrivato — …chat not found`, `DM Nostr in volo e NIENTE
+  Telegram (canale scelto: «nostr»)`, `NESSUN CANALE (…)`.
+  DAL CHAT ID ALL'ACCOUNT: in una chat privata il chat id E' il
+  `tg_id`, quindi sul VPS, in sola lettura:
+  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT tg_id, nome, username, canale_notifiche, avvisi_p2p FROM utenti WHERE tg_id IN (<id1>, <id2>);"`
+  — la colonna `canale_notifiche` e' quella da guardare per prima:
+  `nostr` vuol dire che sul bot non arriva niente PER SCELTA.
+  IL BOT E' UNO SOLO: mercatino e P2P passano dalla stessa `notifica`
+  e dallo stesso `BOT_TOKEN`.
+  CHI TACE LO DICE: `🔕 … ha gli avvisi P2P SPENTI (cassetto Avvisi)`
+  quando a fermare un invio e' l'interruttore, `⏳ Campanello P2P: … e'
+  nel gate (ultimo avviso Ns fa, pausa Ps)` quando e' la pausa.
+  LA PROVA VERA DEL TRASPORTO, sul VPS:
+  `cd ~/satmarket && python3 prova_notifica.py <chat_id>` — fa la
+  stessa `sendMessage` del server con lo stesso token (che non stampa
+  mai) e mostra la risposta di Telegram cosi' com'e'; prima dice CHI
+  e' quel chat id (`getChat`: nome e username, se ha avviato il bot).
 - L'OROLOGIO P2P NEL JOURNAL (17 set 2026): «non gira» e «gira a
   vuoto» adesso si distinguono, e si guarda cosi':
   `journalctl -u barattolo --since "10 min ago" | grep -E "P2P|Libro|Campanello"`.

@@ -17654,3 +17654,82 @@ giorno che ricapita, QUALE riga compare: «🔇 relay» o «passata
 abbandonata» dicono che era la rete, «💥 MORTO» o «⚠️ FERMO» che era
 il task — è così che la causa di oggi si chiude, a posteriori. La riga
 al minuto sono 1.440 righe al giorno nel journal: se pesa, si spegne.
+
+## «Avvisati 2», e niente sui telefoni (17 set 2026)
+
+Aperto da Andrea col journal davanti: pubblica con un account, prende
+col suo secondo account, due telefoni. «🔔 Campanello P2P: avvisati 2»
+alle 10:40 e «📖 Libro P2P: avvisati 2» alle 10:41, destinatari giusti,
+nessun errore — e su nessuno dei due telefoni arriva niente, mentre le
+notifiche del mercatino, dallo stesso bot, arrivano.
+
+**LE RISPOSTE, dal codice.** 1) «AVVISATI N» NON CONOSCEVA L'ESITO:
+contava chi si era PROVATO ad avvisare. `notifica` non restituiva
+niente. La risposta di Telegram invece si guarda, dal set 2026: 429,
+403 e ogni altro rifiuto hanno la loro riga in `_manda_telegram`, e il
+trasporto che cade la sua in `notifica`. Ma il giorno buono non stampa
+— giusto, i chiamanti sono decine — quindi «nessun errore» voleva dire
+una di DUE cose, indistinguibili: Telegram ha risposto 200, oppure
+Telegram non è stato chiamato affatto.
+2) I DUE PERCORSI SONO LO STESSO: mercatino e P2P chiamano la stessa
+`notifica`, che chiama lo stesso `_manda_telegram` con lo stesso
+`BOT_TOKEN`. Il P2P non passa da una coda né da un thread: gira dentro
+l'orologio, `await` diretto, con un try per destinatario che STAMPA se
+qualcosa alza. Divergono in un punto solo, a monte dell'invio, e vale
+per tutti e due: `notifica` sceglie la STRADA dal cassetto Avvisi
+dell'utente, e chi ha scelto «nostr» (con una npub provata) riceve un
+DM cifrato e sul bot NIENTE — senza una riga. È l'unico ramo del file
+che «manda» senza chiamare Telegram e senza dirlo.
+3) GLI INTERRUTTORI — `avvisi_p2p` e il gate — fermavano un invio in
+silenzio. Ma qui non c'entrano: chi è fermato da loro NON finisce in
+«avvisati».
+⚠️ QUALE SIA STATA OGGI NON LO SO, e non lo deduco: se il mercatino
+arriva su quegli stessi account per quella stessa strada, il canale
+«nostr» da solo non spiega. Lo dicono la riga nuova al prossimo avviso
+e lo script di prova — sono lì per questo.
+
+**LA CURA.** L'ESITO SI RESTITUISCE, strada per strada:
+`_manda_telegram` torna «telegram ok (messaggio N)» col `message_id` —
+la ricevuta, con cui il messaggio si ritrova nella chat del bot — o il
+rifiuto col numero e il testo di Telegram; `notifica` torna le strade
+prese («DM Nostr in volo e NIENTE Telegram (canale scelto: «nostr»)»,
+«NESSUN CANALE»); e i due giri del P2P lo scrivono sotto «avvisati»,
+una riga per destinatario (`_esiti_p2p_dice`). Il giorno buono di
+`_manda_telegram` continua a non stampare e gli altri chiamanti il
+valore lo ignorano come prima. Un esito mancante si scrive «esito non
+detto», mai un ok dedotto. CHI TACE LO DICE: l'interruttore spento e
+il gate lasciano la loro riga, con la pausa e da quanto. E LA PROVA
+VERA: `prova_notifica.py <chat_id>`, da lanciare sul VPS — la stessa
+`sendMessage`, lo stesso token (mai stampato, nemmeno nell'errore), la
+risposta di Telegram così com'è, e prima un `getChat` che dice CHI è
+quel numero. Non importa `server.py`, che all'import fa l'avvio.
+⚠️ NON L'HO LANCIATO IO: il token vero vive solo sul VPS, che è fuori
+dal mio perimetro. A banco ho provato l'uso e la forma; la risposta
+vera di Telegram la vede chi lo lancia.
+
+**UNA STRADA PRESA E RITIRATA NELLO STESSO GIRO, a verbale perché il
+buco è vero:** a metà cantiere un messaggio diceva che la frase era
+andata al taker del giro PRIMA. Era sbagliato (corretto da Andrea poco
+dopo) e la cura è stata tolta prima del commit. Ma leggendo per quella
+è uscito un fatto: il 38383 è un evento SOSTITUIBILE — il relay tiene
+solo l'ultimo per ordine — quindi il `pending` fra due prese lo vede
+solo una passata che cade lì in mezzo, e lo scollegamento di `preso_da`
+«a ogni pending visto» non è garantito. Con due prese nello stesso
+minuto, o a orologio fermo, la presa vecchia resterebbe annotata. La
+cura disegnata era una data sulla dichiarazione (`preso_il`). NON
+DECISA: da riprendere se capita davvero.
+
+**PROVATO** (24 prove nuove, da 10850 a 10874; quattro mutazioni
+uccise) con le funzioni vere contro un Telegram di cartone: il 200 con
+la ricevuta, il 200 illeggibile, il 403, il «chat not found»; le strade
+di `notifica` una per una, compreso chi ha scelto «nostr» e chi non ha
+nessun canale; il gate e l'interruttore che tacciono e lo dicono; le
+righe del journal; lo script che non importa il server e non stampa il
+token.
+
+**RESTA DA GUARDARE:** la riga sotto il prossimo «avvisati». «telegram
+ok (messaggio N)» = il messaggio È nella chat del bot di quell'account
+(e allora la domanda diventa dove lo si cerca: chat archiviata,
+silenziata, l'altro account); «NIENTE Telegram» = il cassetto Avvisi;
+un rifiuto = il suo motivo. E lo script, che lo dice subito senza
+aspettare uno scambio.
