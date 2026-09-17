@@ -48458,8 +48458,13 @@ def prove_p2p_pubblica():
     # sta scrivendo la cifra. Le due letture — questa e il riepilogo
     # della scatola — vengono dallo STESSO giudice, o un giorno
     # direbbero due cifre nello stesso foglio.
-    prova("sotto il campo dell'importo c'e' il tetto", True,
-          '\'<div class="hint">max \' + maxTestoP2P()' in _foglio)
+    # «FASE BETA:» DAVANTI (17 set 2026, ritocco di Andrea): la
+    # scritta dice anche il perche' del tetto. Il prefisso e' fisso
+    # e il numero resta vivo, dallo stesso giudice.
+    prova("sotto il campo dell'importo c'e' il tetto, con «Fase beta:»",
+          True,
+          '\'<div class="hint">Fase beta: max \' + maxTestoP2P()'
+          in _foglio)
     # IL TETTO IN EURO (set 2026): quando la leva P2P_MAX_EURO e'
     # accesa la scritta sotto il campo dice GLI EURO — la valuta del
     # campo — e quando e' spenta restano i sats del coordinatore. Il
