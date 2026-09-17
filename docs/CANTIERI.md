@@ -17448,3 +17448,94 @@ ritorno e poi la richiesta: la macchina a stati non guarda il
 `add-invoice` di chi compra, che in app oggi è muto come lo era la
 hold; e l'eco della PROPRIA pubblicazione, che fa suonare la generica
 per un gesto appena fatto — è lei che timbrava il gate.
+
+## La restore che diceva active, e il passato che si riapplicava (17 set 2026)
+
+Aperto da Andrea a scambio FERMO, l'ordine 8263bce5: garanzia pagata
+(una hold da 16673 sats sul nodo), mostro la conferma, e alla
+restore-session risponde `active` a tutt'e due le parti (trade_index 15
+chi ha preso, 54 chi ha pubblicato). Il client mostrava «Ordine
+pubblicato» a chi vendeva e «Dove vuoi i sats?» a chi comprava. E a
+cantiere aperto è arrivata la seconda metà: col cantiere dei silenzi
+atterrato un'ora prima, a chi vendeva compariva «Di nuovo nel libro:
+chi aveva preso l'ordine non ha proseguito» — FALSA.
+
+**QUELLA FRASE FALSA È STATA LA DIAGNOSI.** «Di nuovo nel libro» nasce
+da UNA sola azione, `new-order`, e in quello scambio di `new-order` ce
+n'era uno solo: l'ECO DELLA PUBBLICAZIONE, il primo messaggio di tutti.
+Quindi i messaggi non si erano PERSI, come avevo scritto nella prima
+stesura di questa voce: arrivavano tutti, e poi arrivavano DI NUOVO. A
+ogni riapertura il riascolto riparte dallo scambio aperto più vecchio,
+`p2pVisti` vive solo in memoria, e il relay — col coro, più d'uno —
+ripete i kind 14 dello scambio nell'ordine che vuole lui. La macchina a
+stati li riapplicava TUTTI, e vinceva l'ultimo ARRIVATO invece
+dell'ultimo SUCCESSO: l'eco riportava a «pubblicato» chi vendeva,
+l'`add-invoice` di prima riportava chi compra a «Dove vuoi i sats?».
+Il difetto c'era da sempre; finché gli scambi si chiudevano in una
+seduta sola nessuno riapriva l'app a metà.
+
+**LE DUE CURE, e la prima è quella vera.**
+1) IL PASSATO NON SI RIAPPLICA. Ogni messaggio porta l'ora dell'evento
+(il `created_at`, che firma il coordinatore) e la riga tiene quella
+dell'ultimo APPLICATO (`ultimoMsg`, che vive col resto della riga e
+quindi sopravvive alla riapertura). Uno più vecchio non muove niente e
+non fa parlare nessuno — né stato, né toast, né giro morto. Gli si
+prende solo QUEL CHE MANCA: la controparte, e la richiesta da pagare se
+è quella che la riga sta aspettando; perché su un dispositivo nuovo i
+messaggi arrivano dal più recente, e quelli dietro portano i dati. Alla
+pari (stesso secondo) si applica: meglio due volte che mai. Una riga di
+prima della cura non ha l'ora e GUARISCE DA SOLA: in qualunque ordine
+arrivino i ripetuti, dopo il più recente gli altri sono passato — la
+riga di Andrea, ferma a «pubblicato» con la storia falsa sopra, torna
+ad `attivo` alla prima riapertura. E IL GIRO MORTO scatta solo su un
+`new-order` PIÙ RECENTE dell'ultimo messaggio: cioè uno vero.
+⚠️ IL PRESUPPOSTO, dichiarato: che quei `created_at` siano veri e non
+sparsi all'indietro come nei gift wrap. Non l'ho potuto sondare (la
+npub del coordinatore non sta nella repo, e il VPS è fuori perimetro),
+ma ci poggiano già due cose che in produzione funzionano: il `since`
+del riascolto e il segnalibro del campanello. Se un giorno mostro li
+sparpagliasse, si romperebbero quelle prima di questa.
+2) LA RIPRESA DALLA RESTORE, che era la richiesta: lo stato del
+coordinatore stava già in `p2pMieiOrdini[id].stato` e lo usava solo
+l'adozione, per far NASCERE righe pending; sulle righe già locali non
+lo leggeva nessuno (la scelta del 9 set: «non si traduce a memoria»).
+`P2P_DA_RESTORE` traduce il vocabolario di mostro-core PER INTERO —
+waiting-buyer-invoice e waiting-payment dipendono dal lato; active →
+«Sats in garanzia», con le frasi di `attivo` che sono già per lato
+(chi compra manda gli euro, chi vende li aspetta); fiat-sent,
+settled-hold-invoice, success e i due esiti dell'admin, i quattro
+annulli, dispute. `pending` e `in-progress` non muovono. SOLO IN
+AVANTI (`P2P_RIPRESA_PASSO`) e UNA VOLTA PER FOTOGRAFIA (`ripresa`
+sulla voce in memoria): la restore si chiede una volta per sessione e
+l'adozione gira a ogni render — senza i due freni un «euro inviati»
+appena detto tornerebbe «attivo». È la rete sotto la cura 1: vale
+quando i messaggi sul relay non ci sono più.
+⚠️ COSA È VISTO E COSA NO (Q4, detta onestamente): `pending` e `active`
+visti dalla restore vera, i due `waiting-*` sul libro; gli altri
+vengono dall'elenco del protocollo, su richiesta esplicita di Andrea.
+
+**LO STATO SCONOSCIUTO NON SI RACCONTA** (regola di Andrea, dallo stesso
+giro): si mostra GREZZO e si logga. `statoGrezzo` sulla riga, ripulito
+a lettere cifre e trattini perché è testo altrui; la card dice «Stato:
+«…»», che non lo interpretiamo, e qual era l'ultimo passo noto. Lo
+porta via una mossa vera del coordinatore o una restore che si capisce.
+
+**PROVATO:** 41 prove nuove (da 10767 a 10808, zero fallite). Il banco
+fa girare `applicaMessaggioP2P` VERA sui quattro messaggi dello scambio:
+in ordine; poi ripetuti alla rinfusa (niente si muove, nessuna storia,
+nessun toast); la riga di oggi senza l'ora, in quattro ordini diversi,
+sempre ad `attivo`; la controparte raccolta dai messaggi dietro; il
+ritorno VERO nel libro che scatta ancora; chi compra che non torna a
+«Dove vuoi i sats?»; la pari e il senza-ora. E la restore: il caso vero
+sui due lati, una volta per fotografia, solo in avanti, quindici stati
+per due lati con nessuno a «pubblicato», lo stato ignoto scritto
+grezzo. Tortura: quattordici mutazioni, quattordici uccise — tolta la
+guardia dell'ora, cinque rosse: il banco RIPRODUCE il difetto. Una era
+sopravvissuta al primo giro (la pulizia del giro morto aveva due difese
+e la prova ne vedeva una sola).
+
+**RESTA DA GUARDARE:** la conferma sul campo su 8263bce5 — alla
+riapertura tutt'e due devono vedere «Sats in garanzia», e in console la
+riga «🔁 [p2p] ripresa» se a muovere è stata la restore; un ordine PRESO
+senza riga locale (altro dispositivo) resta fuori dall'adozione, come
+era; e la domanda del mattino sui quattro `no_route`, ancora aperta.

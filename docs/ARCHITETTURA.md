@@ -24082,6 +24082,28 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   senza guardare la vista, solo su una richiesta ancora pagabile
   (`holdVivaP2P`: la data della bolt11 più `expiration_seconds`).
   Il verbale: CANTIERI, «I silenzi del P2P».
+  LA RIPRESA DALLA RESTORE (17 set 2026): lo stato che il coordinatore
+  dà nella restore-session muove anche le righe GIÀ LOCALI, non solo fa
+  nascere quelle che mancano. `P2P_DA_RESTORE` traduce il vocabolario
+  di mostro-core per intero (due voci dipendono dal lato: chi deve la
+  fattura, chi la garanzia), `riprendiDaRestoreP2P` è il giudice puro
+  e va SOLO IN AVANTI (`P2P_RIPRESA_PASSO`: la fotografia è d'inizio
+  sessione, un gesto fatto dopo non torna indietro; disputa e finali
+  in cima), e `adottaOrdiniAltroveP2P` lo applica UNA volta per
+  fotografia (`ripresa` sulla voce in memoria). `pending` e
+  `in-progress` non muovono, uno stato fuori tabella nemmeno — lascia
+  una riga in console e la parola GREZZA sulla riga (`statoGrezzo`,
+  che statoTestoP2P mostra senza interpretarla), mai un default.
+  IL PASSATO NON SI RIAPPLICA: `mostroArriva` mette sull'oggetto del
+  messaggio l'ora dell'evento (`quando`, il `created_at` firmato dal
+  coordinatore) e la riga tiene quella dell'ultimo messaggio APPLICATO
+  (`ultimoMsg`). `applicaMessaggioP2P` a un messaggio più vecchio non
+  fa muovere niente e non fa dire niente: gli prende solo quel che
+  manca (la controparte; la richiesta da pagare, se è quella che si
+  aspetta). Alla pari si applica. È la cura del difetto vero del 17
+  set: alla riapertura il relay ripete i kind 14 dello scambio in
+  ordine sparso, e vinceva l'ultimo ARRIVATO invece dell'ultimo
+  SUCCESSO. Il verbale: CANTIERI, «La restore che diceva active».
   LA CIFRA DI CHI PRENDE UN INTERVALLO viaggia come `Payload::Amount`
   (`{"amount": N}`), che mostrod legge SOLO su `take-sell` e `take-buy`
   (`get_amount` in `message.rs`) e confronta con min/max
