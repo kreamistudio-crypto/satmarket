@@ -54089,7 +54089,8 @@ def prove_p2p_orologio():
         for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
                   "_euro_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
                   "_ordini_puliti_p2p", "_registra_ordini_p2p",
-                  "_relay_p2p_dice", "_chiedi_relay_p2p", "_giro_libro_p2p",
+                  "_relay_p2p_dice", "_esiti_p2p_dice", "_chiedi_relay_p2p",
+                  "_giro_libro_p2p",
                   "orologio_p2p", "guardiano_p2p"):
             testo = _senza_prosa(pezzo(f))
             if f in ("_chiedi_relay_p2p", "_giro_libro_p2p", "orologio_p2p", "guardiano_p2p"):
@@ -54147,6 +54148,10 @@ def prove_p2p_orologio():
         _aio.run(amb2["_giro_libro_p2p"]())
         prova("...e la passata dopo non lo ridice (since inclusivo, stato gia' scritto)",
               1, len(mandati2))
+        # «avvisati N» conta chi si e' PROVATO ad avvisare: l'esito sta
+        # nella riga sotto, per destinatario (vedi prove_p2p_esito_notifiche)
+        prova("sotto «avvisati» c'e' la riga dell'esito, per destinatario — e un notifica che non lo dice NON diventa un ok",
+              1, sum(1 for r in detto2 if "📖 ↳ 111: esito non detto" in r))
         # due eventi in coda, come il «concluso» rimasto indietro quel giorno
         libro_finto.append(ev("in-progress", T0 + 400))
         libro_finto.append(ev("success", T0 + 500))
@@ -54232,6 +54237,178 @@ def prove_p2p_orologio():
         appeso.set()
         import shutil as _sh
         _sh.rmtree(dir_db, ignore_errors=True)
+
+
+def prove_p2p_esito_notifiche():
+    """«AVVISATI 2» E NIENTE SUI TELEFONI (17 set 2026, dal campo): il
+    journal contava chi si era PROVATO ad avvisare, e l'esito non lo
+    guardava nessuno — `notifica` non restituiva niente, e il giorno
+    buono `_manda_telegram` non stampa (giusto: decine di chiamanti al
+    minuto). Ora l'esito si RESTITUISCE, strada per strada, e il P2P lo
+    scrive per destinatario. Qui girano le funzioni vere contro un
+    Telegram di cartone."""
+    print("\n[le notifiche P2P dicono com'e' andata, per destinatario]")
+    import asyncio as _aio
+    import html as _h
+    src = _SORGENTE
+
+    class Risposta:
+        def __init__(self, status_code, testo=""):
+            self.status_code, self.text = status_code, testo
+
+    def manda(risposta):
+        righe = []
+
+        class Cliente:
+            def __init__(self, timeout=None):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+            async def post(self, url, json=None):
+                return risposta
+
+        amb_s = {"re": re, "html": _h}
+        exec(pezzo("spoglia_html"), amb_s)
+        amb = {"httpx": type("H", (), {"AsyncClient": Cliente}), "json": json,
+               "BOT_TOKEN": "finto", "MODALITA_COLLAUDO": False,
+               "spoglia_html": amb_s["spoglia_html"],
+               "print": lambda *a, **k: righe.append(" ".join(str(x) for x in a))}
+        exec("async " + pezzo("_manda_telegram"), amb)
+        return _aio.run(amb["_manda_telegram"](700000001, "<b>ciao</b>")), righe
+
+    esito, righe = manda(Risposta(200, '{"ok":true,"result":{"message_id":8841}}'))
+    prova("il 200 torna con la RICEVUTA di Telegram, il message_id",
+          "telegram ok (messaggio 8841)", esito)
+    prova("...e il giorno buono continua a non stampare niente", [], righe)
+    esito, _ = manda(Risposta(200, "non e' json"))
+    prova("un 200 illeggibile resta un ok, senza inventare il numero",
+          "telegram ok (messaggio ?)", esito)
+    esito, righe = manda(Risposta(403, '{"description":"Forbidden: bot was blocked by the user"}'))
+    prova("il 403 torna col suo motivo", True,
+          esito.startswith("telegram 403:") and "bloccato" in esito and len(righe) == 1)
+    esito, _ = manda(Risposta(400, '{"description":"Bad Request: chat not found"}'))
+    prova("«chat not found» torna col numero e col testo di Telegram", True,
+          esito.startswith("telegram 400: NON arrivato") and "chat not found" in esito)
+
+    # --- notifica(): per quale STRADA e' passata ----------------------
+    def avvisa(riga, tg_id=700000001):
+        mandati, nostr = [], []
+
+        class Con:
+            def execute(self, *a):
+                return self
+
+            def fetchone(self):
+                return riga
+
+            def close(self):
+                pass
+
+        async def _tg(chi, testo):
+            mandati.append(chi)
+            return "telegram ok (messaggio 7)"
+
+        async def _dm(npub, testo, ripiego):
+            nostr.append((npub, ripiego))
+
+        amb = {"db": lambda: Con(), "_manda_telegram": _tg,
+               "_dm_nostr_con_ripiego": _dm, "asyncio": _aio,
+               "MODALITA_COLLAUDO": False, "print": lambda *a, **k: None}
+        exec("async " + pezzo("notifica"), amb)
+
+        async def _giro():
+            e = await amb["notifica"](tg_id, "ciao")
+            await _aio.sleep(0)
+            return e
+        return _aio.run(_giro()), mandati, nostr
+
+    base = {"canale_notifiche": "", "npub": "", "npub_verificata": 0, "npub_accesso": ""}
+    esito, mandati, _ = avvisa(dict(base))
+    prova("senza preferenza chi ha Telegram riceve li', e l'esito e' quello di Telegram",
+          ("telegram ok (messaggio 7)", [700000001]), (esito, mandati))
+    esito, mandati, nostr = avvisa(dict(base, canale_notifiche="nostr", npub_accesso="npub1finta"))
+    prova("⚠️ chi ha scelto «nostr» NON riceve sul bot: e' il caso che da fuori sembra «mandato e mai arrivato»",
+          [], mandati)
+    prova("...e l'esito lo DICE, invece di tacere", True,
+          "DM Nostr in volo" in esito and "NIENTE Telegram" in esito and "«nostr»" in esito
+          and len(nostr) == 1)
+    esito, mandati, _ = avvisa(dict(base, canale_notifiche="entrambi", npub_accesso="npub1finta"))
+    prova("«entrambi» dice tutt'e due le strade", True,
+          esito == "DM Nostr in volo + telegram ok (messaggio 7)" and mandati == [700000001])
+    esito, mandati, _ = avvisa(dict(base, canale_notifiche="nostr"))
+    prova("chi preferiva Nostr ma non ha piu' la npub ripiega su Telegram, e si legge",
+          ("telegram ok (messaggio 7)", [700000001]), (esito, mandati))
+    esito, mandati, _ = avvisa(dict(base), tg_id=-5)
+    prova("chi non ha nessuna strada NON e' un avvisato: l'esito dice NESSUN CANALE",
+          True, esito.startswith("NESSUN CANALE") and mandati == [])
+
+    # --- CHI TACE LO DICE: l'interruttore e il gate nel journal ---------
+    import sqlite3
+    s_i = src.index("CREATE TABLE IF NOT EXISTS chiavi_p2p(")
+    schema = src[s_i:src.index("ON chiavi_p2p(tg_id);", s_i) + len("ON chiavi_p2p(tg_id);")]
+    o_i = src.index("CREATE TABLE IF NOT EXISTS p2p_ordini(")
+    schema += "\n" + src[o_i:src.index("ON p2p_ordini(tg_id);", o_i) + len("ON p2p_ordini(tg_id);")]
+    schema += "\nCREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, avvisi_p2p INTEGER DEFAULT 1);"
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript(schema)
+    con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)", ("a" * 64, 700000001))
+    con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)", ("b" * 64, 700000002))
+    con.execute("INSERT INTO utenti VALUES(700000002, 0)")
+    zitti = []
+    amb = {"P2P_NUDGE_S": 600, "P2P_NUDGE_VIVO_S": 90,
+           "STATI_LIBRO_PRESO": ("in-progress", "waiting-buyer-invoice", "waiting-payment"),
+           "print": lambda *a, **k: zitti.append(" ".join(str(x) for x in a))}
+    for f in ("_avvisi_p2p_accesi", "_scambio_vivo_p2p", "_nudge_p2p"):
+        exec(_senza_prosa(pezzo(f)), amb)
+    prova("chi suona non lascia righe di silenzio", (700000001, []),
+          (amb["_nudge_p2p"](con, "a" * 64, 5000), list(zitti)))
+    prova("chi e' nel GATE tace, e il journal dice da quanto e con quale pausa", True,
+          amb["_nudge_p2p"](con, "a" * 64, 5100) == 0 and len(zitti) == 1
+          and "700000001 e' nel gate (ultimo avviso 100s fa, pausa 600s)" in zitti[0])
+    prova("chi ha gli avvisi P2P SPENTI tace, e il journal dice che e' l'interruttore", True,
+          amb["_nudge_p2p"](con, "b" * 64, 5000) == 0 and len(zitti) == 2
+          and "700000002 ha gli avvisi P2P SPENTI" in zitti[1])
+    con.close()
+    giudice = codice(pezzo("_avvisi_libro_p2p"))
+    prova("...e il libro pure: l'interruttore che ferma una frase lo scrive, con la frase", True,
+          "ha gli avvisi P2P SPENTI" in giudice and "la frase «{pas}» non parte" in giudice)
+
+    # --- LA PROVA VERA: lo script che guarda la risposta di Telegram ----
+    script = open("prova_notifica.py", encoding="utf-8").read()
+    nudo = codice(re.sub(r'"""[\s\S]*?"""', "", script, count=1))
+    prova("lo script di prova NON importa il server (che all'import fa l'avvio)", False,
+          "import server" in nudo or "from server" in nudo)
+    prova("...legge il solo BOT_TOKEN, e non lo stampa mai", True,
+          "from config import BOT_TOKEN" in nudo
+          and not re.search(r"print\([^)]*BOT_TOKEN", nudo)
+          and "replace(token, '<token>')" in nudo)
+    prova("...fa la STESSA chiamata del server: sendMessage, HTML, venti secondi", True,
+          '"sendMessage"' in nudo and '"parse_mode": "HTML"' in nudo and "timeout=20" in nudo)
+    prova("...e dice chi e' quel chat id (getChat)", True, '"getChat"' in nudo)
+
+    # --- il journal del P2P -------------------------------------------
+    detto = []
+    amb = {"print": lambda *a, **k: detto.append(" ".join(str(x) for x in a))}
+    exec(pezzo("_esiti_p2p_dice"), amb)
+    amb["_esiti_p2p_dice"]("🔔", [(700000001, "telegram ok (messaggio 8841)"),
+                                  (700000002, "telegram 403: non ha avviato il bot, o l'ha bloccato"),
+                                  (5, None)])
+    prova("una riga per destinatario, con l'esito vero", True,
+          len(detto) == 3 and "↳ 700000001: telegram ok (messaggio 8841)" in detto[0]
+          and "↳ 700000002: telegram 403" in detto[1])
+    prova("...e un esito mancante non diventa mai un ok", True,
+          "↳ 5: esito non detto" in detto[2])
+    for nome, segno in (("_giro_p2p", "🔔"), ("_giro_libro_p2p", "📖")):
+        corpo = codice(pezzo(nome))
+        prova(f"`{nome}` raccoglie l'esito di ogni notifica e lo scrive sotto «avvisati»",
+              True, "await notifica(tg_id, " in corpo and "esiti.append((tg_id, " in corpo
+              and f'_esiti_p2p_dice("{segno}", esiti)' in corpo)
 
 
 def prove_p2p_silenzi():
@@ -63696,7 +63873,7 @@ def main():
     prove_p2p_card_scambio,
     prove_p2p_vista_miei,
     prove_p2p_campanello,
-    prove_p2p_avvisi_libro, prove_p2p_orologio, prove_p2p_silenzi,
+    prove_p2p_avvisi_libro, prove_p2p_orologio, prove_p2p_esito_notifiche, prove_p2p_silenzi,
     prove_p2p_motore,
     prove_p2p_stati,
     prove_p2p_chat,

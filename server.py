@@ -9203,7 +9203,7 @@ async def _manda_telegram(tg_id: int, testo: str):
     if MODALITA_COLLAUDO and tg_id < 100000:
         # Utente finto del collaudo: la notifica si stampa in console
         print(f"📨 [notifica simulata per utente {tg_id}] {testo}")
-        return
+        return "simulata (collaudo)"
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     async with httpx.AsyncClient(timeout=20) as c:
         r = await c.post(url, json={"chat_id": tg_id, "text": testo,
@@ -9226,6 +9226,21 @@ async def _manda_telegram(tg_id: int, testo: str):
         elif r.status_code != 200:
             print(f"⚠️ Telegram ha rifiutato l'avviso per l'utente "
                   f"{tg_id} ({r.status_code}): {r.text[:200]}")
+        # L'ESITO SI RESTITUISCE (17 set 2026, le notifiche P2P «mandate»
+        # e mai viste): il giorno buono qui non stampa niente — e' la
+        # regola di sempre, decine di chiamanti al minuto — ma chi vuole
+        # sapere com'e' andata adesso ha un valore da guardare. Col 200
+        # c'e' il `message_id` di Telegram: e' la ricevuta, e con quello
+        # il messaggio si ritrova nella chat del bot.
+        if r.status_code == 200:
+            try:
+                mid = json.loads(r.text)["result"]["message_id"]
+            except Exception:
+                mid = "?"
+            return f"telegram ok (messaggio {mid})"
+        if r.status_code == 403:
+            return "telegram 403: non ha avviato il bot, o l'ha bloccato"
+        return f"telegram {r.status_code}: NON arrivato — {r.text[:120]}"
 
 
 async def _dm_nostr_con_ripiego(npub: str, testo: str, ripiego_tg_id: int):
@@ -9272,6 +9287,15 @@ async def notifica(tg_id: int, testo: str):
     via_telegram = canale in ("telegram", "entrambi") and tg_id > 0
     if canale == "nostr" and not via_nostr and tg_id > 0:
         via_telegram = True   # preferiva Nostr ma la npub non c'e' piu'
+    # L'ESITO, PER STRADA (17 set 2026): si restituisce e non si stampa
+    # — i chiamanti sono decine e quasi nessuno lo guarda; il P2P si'.
+    # ⚠️ La strada Nostr SENZA Telegram e' il caso che da fuori sembra
+    # «mandato e mai arrivato»: chi ha scelto «nostr» nel cassetto
+    # Avvisi riceve un DM cifrato e sul bot non vede niente.
+    esito = []
+    if via_nostr:
+        esito.append("DM Nostr in volo" + ("" if via_telegram else
+                     f" e NIENTE Telegram (canale scelto: «{canale}»)"))
     if via_nostr:
         # In sottofondo: i relay possono metterci secondi e notifica()
         # gira anche dentro l'orologio e gli sblocchi. Il ripiego
@@ -9295,12 +9319,17 @@ async def notifica(tg_id: int, testo: str):
         # delle tre possa alzare. Chi vuole sapere com'e' andata non ha
         # un valore di ritorno da guardare: ha il journal.
         try:
-            await _manda_telegram(tg_id, testo)
+            esito.append(await _manda_telegram(tg_id, testo) or "telegram: esito non detto")
         except Exception as e:
+            esito.append(f"telegram NON consegnato ({type(e).__name__}: {e})")
             print(f"⚠️ Avviso Telegram non consegnato all'utente "
                   f"{tg_id} ({e}): il flusso continua")
     elif not via_nostr and MODALITA_COLLAUDO:
         print(f"🔕 [utente {tg_id}: nessun canale per la notifica] {testo}")
+    if not esito:
+        npub_dice = "senza una npub provata" if not dest_npub else "con la npub"
+        esito.append(f"NESSUN CANALE (canale «{canale}», {npub_dice})")
+    return " + ".join(esito)
 
 
 # ---------- I TIMBRI DEGLI AVVISI PERIODICI (ago 2026) --------------
@@ -34107,6 +34136,18 @@ _TASK_OROLOGIO_P2P = None
 _TASK_GUARDIANO_P2P = None
 
 
+def _esiti_p2p_dice(segno: str, esiti: list):
+    """«AVVISATI N» NON DICE SE E' ARRIVATO (17 set 2026, dal campo:
+    il journal diceva «avvisati 2», nessun errore, e su nessuno dei due
+    telefoni era arrivato niente). Quella riga conta chi si e' PROVATO
+    ad avvisare; questa dice, per destinatario, per quale strada e'
+    passato e cosa ha risposto Telegram — col `message_id` quando e'
+    andata, che e' la ricevuta. Un esito vuoto (un `notifica` di ieri,
+    o di cartone) si dice come tale: mai un «ok» dedotto."""
+    for tg_id, esito in esiti:
+        print(f"   {segno} ↳ {tg_id}: {esito or 'esito non detto'}", flush=True)
+
+
 def _relay_p2p_dice(relay: str, muto: bool, perche: str = ""):
     """Il journal dice quando un relay SMETTE di rispondere e quando
     RIPRENDE — al cambio, non a ogni passata: un relay giu' per un'ora
@@ -34267,6 +34308,11 @@ def _nudge_p2p(con, pubkey: str, adesso: int) -> int:
     # riceve nemmeno la generica. Prima del gate, o un «no» brucerebbe
     # il turno dei dieci minuti a chi poi li riaccende.
     if not _avvisi_p2p_accesi(con, tg_id):
+        # CHI TACE LO DICE (17 set 2026): un invio fermato
+        # dall'interruttore o dal gate non lasciava traccia, e dal
+        # journal «non avvisato» e «non successo» erano la stessa cosa
+        print(f"🔕 Campanello P2P: {tg_id} ha gli avvisi P2P SPENTI "
+              "(cassetto Avvisi): non suona", flush=True)
         return 0
     q = con.execute("SELECT MAX(ultimo_nudge) FROM chiavi_p2p WHERE tg_id=?",
                     (tg_id,)).fetchone()
@@ -34274,6 +34320,9 @@ def _nudge_p2p(con, pubkey: str, adesso: int) -> int:
     # puo' chiedere un suo gesto (vedi P2P_NUDGE_VIVO_S)
     pausa = P2P_NUDGE_VIVO_S if _scambio_vivo_p2p(con, tg_id) else P2P_NUDGE_S
     if adesso - int(q[0] or 0) < pausa:
+        print(f"⏳ Campanello P2P: {tg_id} e' nel gate (ultimo avviso "
+              f"{adesso - int(q[0] or 0)}s fa, pausa {pausa}s): non suona",
+              flush=True)
         return 0
     con.execute("UPDATE chiavi_p2p SET ultimo_nudge=? WHERE tg_id=?",
                 (adesso, tg_id))
@@ -34343,16 +34392,19 @@ async def _giro_p2p():
             da_avvisare.append(tg_id)
     con.commit()
     con.close()
+    esiti = []
     for tg_id in da_avvisare:
         try:
-            await notifica(tg_id, MSG_NUDGE_P2P)
+            esiti.append((tg_id, await notifica(tg_id, MSG_NUDGE_P2P)))
         except Exception as e:
+            esiti.append((tg_id, f"SALTATO ({type(e).__name__}: {e})"))
             print(f"⚠️ Campanello P2P saltato per {tg_id}: {e}")
         await asyncio.sleep(0.2)
     _P2P_CONTO["campanello"] += f", {len(da_avvisare)} avvisi"
     if da_avvisare:
         print(f"🔔 Campanello P2P: avvisati {len(da_avvisare)} "
               f"{da_avvisare}", flush=True)
+        _esiti_p2p_dice("🔔", esiti)
 
 
 async def orologio_p2p():
@@ -34812,7 +34864,12 @@ def _avvisi_libro_p2p(con, eventi: list, adesso: int, fee, ore: int) -> list:
                   f"(da «{prima}») sull'ordine {ev['id'][:8]}")
         for chi, pas, ruolo in ((int(r["tg_id"] or 0), passaggio, "maker"),
                                 (preso_da, passaggio_taker, "taker")):
-            if chi <= 0 or not pas or not _avvisi_p2p_accesi(con, chi):
+            if chi <= 0 or not pas:
+                continue
+            if not _avvisi_p2p_accesi(con, chi):
+                print(f"🔕 Libro P2P: {chi} ha gli avvisi P2P SPENTI "
+                      f"(cassetto Avvisi): la frase «{pas}» non parte",
+                      flush=True)
                 continue
             testo = _testo_libro_p2p(pas, ev, fee, ore, ruolo)
             if testo:
@@ -34897,16 +34954,19 @@ async def _giro_libro_p2p():
     avvisi = _avvisi_libro_p2p(con, eventi, adesso, _P2P_INFO["fee"],
                                _P2P_INFO["ore"])
     con.close()
+    esiti = []
     for tg_id, testo in avvisi:
         try:
-            await notifica(tg_id, testo)
+            esiti.append((tg_id, await notifica(tg_id, testo)))
         except Exception as e:
+            esiti.append((tg_id, f"SALTATO ({type(e).__name__}: {e})"))
             print(f"⚠️ Avviso del libro P2P saltato per {tg_id}: {e}")
         await asyncio.sleep(0.2)
     _P2P_CONTO["libro"] += f", {len(avvisi)} avvisi"
     if avvisi:
         print(f"📖 Libro P2P: avvisati {len(avvisi)} "
               f"{sorted({t for t, _ in avvisi})}", flush=True)
+        _esiti_p2p_dice("📖", esiti)
 
 
 TIMBRO_CAMPAGNA_P2P = "campagna_p2p_acceso"

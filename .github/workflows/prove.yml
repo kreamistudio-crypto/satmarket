@@ -59,7 +59,7 @@ jobs:
              censimento_spedizione.py censimento_payout.py capitale_cassa.py orfani.py
              ripulisci_anello_nostr.py
              ricategorizza.py sposta_a_mano.py ritaglia_categorie.py
-             presenta_release.py config_esempio.py
+             presenta_release.py config_esempio.py prova_notifica.py
              importa_negozio.py collaudo_connettori.py
              og_categorie.py
              assegna_sottocategorie.py ripulisci_avatar_min.py
