@@ -3175,6 +3175,242 @@ def riallinea_spedizionieri(con):
                 "WHERE spedizioniere <> '' AND spedizionieri = ''")
 
 
+# ⚠️ QUESTO BLOCCO STA SOPRA init_db() APPOSTA, e non e' un
+# riordino estetico: la migrazione delle zone (dentro init_db)
+# costruisce la mappa del travaso da ZONE_SPEDIZIONE, e init_db()
+# si chiama all'IMPORT del modulo — quindi un catalogo definito
+# piu' in basso, accanto agli altri, non esiste ancora quando
+# serve. Il server non partiva proprio, e a trovarlo e' stato il
+# giro dal vivo: le prove montano i pezzi a mano e l'ordine del
+# file non lo vedono.
+# ------------- LE ZONE DI SPEDIZIONE (set 2026) ----------------------
+# La spedizione costa secondo DOVE va, e le zone sono il PAESE DI CASA
+# del venditore piu' i SETTE continenti. E' la terza dimensione della
+# tariffa — dopo la VIA (casa/punto) e il PEZZO (il supplemento) — e
+# come le altre due si appoggia su `consegna_scelta` senza toccarla:
+# il patto di via_punto e di anche_digitale, cosi' timer, solleciti e
+# finestre restano veri per costruzione.
+#
+# IL DOMESTICO E' UN PAESE E NON «l'Italia» (decisione di Andrea, set
+# 2026): il venditore lo sceglie, e vale Italia per chi non dice
+# niente. E' la riga che rende il mercatino esportabile senza un
+# secondo cantiere — un venditore spagnolo dichiara ES e le sue
+# tariffe funzionano identiche.
+#
+# IL DOMESTICO VINCE SEMPRE SUL SUO CONTINENTE: chi vende da Milano
+# scrive «Italia 0» e «Europa 20.000», e un ordine da Roma paga zero
+# anche se l'Italia in Europa ci sta. Senza questa precedenza le due
+# righe si contraddirebbero e vincerebbe quella scritta per ultima.
+ZONE_SPEDIZIONE = ("dom", "eu", "asia", "nordamerica", "sudamerica",
+                   "oceania", "africa", "medioriente")
+
+# Il nome pubblico della zona — uno solo, e lo dicono foglio di
+# pubblicazione, cassa, ricevuta, ordine, notifica e CSV. Sei copie
+# direbbero, prima o poi, sei cose diverse sulla stessa spedizione.
+# 'dom' non ha un nome suo: prende quello del PAESE dichiarato, che e'
+# l'unica cosa vera da dire («Italia», non «domestico»).
+ZONA_ETICHETTA = {"eu": "Europa", "asia": "Asia",
+                  "nordamerica": "Nord America",
+                  "sudamerica": "Sud America", "oceania": "Oceania",
+                  "africa": "Africa", "medioriente": "Medio Oriente"}
+
+# Il paese di casa quando il venditore non ne dichiara uno: '' in
+# colonna vale IT, che e' il mondo di ieri e il mercatino in cui siamo.
+DOMESTICO_DEFAULT = "IT"
+
+# GLI ENCLAVATI SEGUONO IL DOMESTICO (decisione di Andrea): per un
+# corriere italiano San Marino e la Citta' del Vaticano sono
+# spedizioni di casa, e chiedere a chi compra di capire da solo che
+# «San Marino non e' UE ma costa come l'Italia» sarebbe scaricargli
+# addosso una nostra tabella. La tabella e' per DOMESTICO, cosi' il
+# giorno che il domestico sara' CH o ES qui ci sara' la sua riga (a
+# oggi non ne conosciamo altre, e una tabella vuota e' una risposta).
+ENCLAVI_DOMESTICO = {"IT": ("SM", "VA")}
+
+# ---- LA TABELLA PAESE -> CONTINENTE, ed e' NOSTRA -------------------
+# Scritta qui, a mano, e messa a verbale: non c'e' nessuna libreria da
+# importare per una cosa che cambia una volta ogni dieci anni, e una
+# dipendenza esterna per una tabella di duecento righe si paga a ogni
+# deploy. Il modello e' quello dei SETTE CONTINENTI, col MEDIO ORIENTE
+# ritagliato dall'Asia — che e' la zona che i corrieri prezzano a
+# parte, ed e' l'unica ragione per cui esiste come voce.
+#
+# LE QUATTRO DECISIONI AMBIGUE, a verbale perche' qualcuno le
+# ricontestera' e la risposta dev'essere gia' scritta:
+#   · RUSSIA -> EUROPA. Tre quarti della popolazione stanno a ovest
+#     degli Urali e i corrieri la prezzano con l'Europa. Il verso
+#     giusto in cui sbagliare: chi spedisce a Vladivostok se ne
+#     accorge, chi spedisce a Mosca no.
+#   · TURCHIA -> MEDIO ORIENTE. Geograficamente e' divisa; la voce
+#     «Medio Oriente» esiste per prezzare diversamente da Europa, e
+#     con l'Europa la Turchia non ci sta nelle tariffe vere.
+#   · REGNO UNITO -> EUROPA. La zona qui e' il CONTINENTE, non
+#     l'Unione: la dogana la fa il paese, non la nostra tabella.
+#   · CIPRO -> EUROPA (geograficamente Asia, ma e' UE e per un
+#     corriere europeo e' Europa). Caucaso (GE, AM, AZ) -> ASIA.
+#     AMERICA CENTRALE E CARAIBI -> NORD AMERICA, il modello
+#     continentale classico. EGITTO -> AFRICA.
+#
+# Si scrive RAGGRUPPATA PER ZONA e non paese per paese: cosi' la
+# decisione si legge a colpo d'occhio invece di doverla ricostruire
+# leggendo duecento righe, ed e' il motivo per cui questa forma vale
+# la riga in piu' che costa derivare il dizionario.
+PAESI_PER_ZONA = {
+    "eu": (
+        ("AD", "Andorra"), ("AL", "Albania"), ("AT", "Austria"),
+        ("BA", "Bosnia ed Erzegovina"), ("BE", "Belgio"),
+        ("BG", "Bulgaria"), ("BY", "Bielorussia"), ("CH", "Svizzera"),
+        ("CY", "Cipro"), ("CZ", "Repubblica Ceca"), ("DE", "Germania"),
+        ("DK", "Danimarca"), ("EE", "Estonia"), ("ES", "Spagna"),
+        ("FI", "Finlandia"), ("FO", "Isole Fær Øer"),
+        ("FR", "Francia"), ("GB", "Regno Unito"), ("GI", "Gibilterra"),
+        ("GR", "Grecia"), ("HR", "Croazia"), ("HU", "Ungheria"),
+        ("IE", "Irlanda"), ("IS", "Islanda"), ("IT", "Italia"),
+        ("LI", "Liechtenstein"), ("LT", "Lituania"),
+        ("LU", "Lussemburgo"), ("LV", "Lettonia"), ("MC", "Monaco"),
+        ("MD", "Moldavia"), ("ME", "Montenegro"),
+        ("MK", "Macedonia del Nord"), ("MT", "Malta"),
+        ("NL", "Paesi Bassi"), ("NO", "Norvegia"), ("PL", "Polonia"),
+        ("PT", "Portogallo"), ("RO", "Romania"), ("RS", "Serbia"),
+        ("RU", "Russia"), ("SE", "Svezia"), ("SI", "Slovenia"),
+        ("SK", "Slovacchia"), ("SM", "San Marino"), ("UA", "Ucraina"),
+        ("VA", "Città del Vaticano"), ("XK", "Kosovo"),
+    ),
+    "asia": (
+        ("AF", "Afghanistan"), ("AM", "Armenia"), ("AZ", "Azerbaigian"),
+        ("BD", "Bangladesh"), ("BN", "Brunei"), ("BT", "Bhutan"),
+        ("CN", "Cina"), ("GE", "Georgia"), ("HK", "Hong Kong"),
+        ("ID", "Indonesia"), ("IN", "India"), ("JP", "Giappone"),
+        ("KG", "Kirghizistan"), ("KH", "Cambogia"),
+        ("KP", "Corea del Nord"), ("KR", "Corea del Sud"),
+        ("KZ", "Kazakistan"), ("LA", "Laos"), ("LK", "Sri Lanka"),
+        ("MM", "Myanmar"), ("MN", "Mongolia"), ("MO", "Macao"),
+        ("MV", "Maldive"), ("MY", "Malaysia"), ("NP", "Nepal"),
+        ("PH", "Filippine"), ("PK", "Pakistan"), ("SG", "Singapore"),
+        ("TH", "Thailandia"), ("TJ", "Tagikistan"),
+        ("TM", "Turkmenistan"), ("TW", "Taiwan"), ("UZ", "Uzbekistan"),
+        ("VN", "Vietnam"),
+    ),
+    "medioriente": (
+        ("AE", "Emirati Arabi Uniti"), ("BH", "Bahrein"),
+        ("IL", "Israele"), ("IQ", "Iraq"), ("IR", "Iran"),
+        ("JO", "Giordania"), ("KW", "Kuwait"), ("LB", "Libano"),
+        ("OM", "Oman"), ("PS", "Palestina"), ("QA", "Qatar"),
+        ("SA", "Arabia Saudita"), ("SY", "Siria"), ("TR", "Turchia"),
+        ("YE", "Yemen"),
+    ),
+    "nordamerica": (
+        ("AG", "Antigua e Barbuda"), ("AI", "Anguilla"), ("AW", "Aruba"),
+        ("BB", "Barbados"), ("BM", "Bermuda"), ("BS", "Bahamas"),
+        ("BZ", "Belize"), ("CA", "Canada"), ("CR", "Costa Rica"),
+        ("CU", "Cuba"), ("CW", "Curaçao"), ("DM", "Dominica"),
+        ("DO", "Repubblica Dominicana"), ("GD", "Grenada"),
+        ("GL", "Groenlandia"), ("GP", "Guadalupa"), ("GT", "Guatemala"),
+        ("HN", "Honduras"), ("HT", "Haiti"), ("JM", "Giamaica"),
+        ("KN", "Saint Kitts e Nevis"), ("KY", "Isole Cayman"),
+        ("LC", "Santa Lucia"), ("MQ", "Martinica"), ("MX", "Messico"),
+        ("NI", "Nicaragua"), ("PA", "Panama"), ("PR", "Porto Rico"),
+        ("SV", "El Salvador"), ("SX", "Sint Maarten"),
+        ("TC", "Isole Turks e Caicos"), ("TT", "Trinidad e Tobago"),
+        ("US", "Stati Uniti"), ("VC", "Saint Vincent e Grenadine"),
+        ("VG", "Isole Vergini Britanniche"),
+        ("VI", "Isole Vergini Americane"),
+    ),
+    "sudamerica": (
+        ("AR", "Argentina"), ("BO", "Bolivia"), ("BR", "Brasile"),
+        ("CL", "Cile"), ("CO", "Colombia"), ("EC", "Ecuador"),
+        ("FK", "Isole Falkland"), ("GF", "Guyana francese"),
+        ("GY", "Guyana"), ("PE", "Perù"), ("PY", "Paraguay"),
+        ("SR", "Suriname"), ("UY", "Uruguay"), ("VE", "Venezuela"),
+    ),
+    "oceania": (
+        ("AS", "Samoa Americane"), ("AU", "Australia"),
+        ("CK", "Isole Cook"), ("FJ", "Figi"), ("FM", "Micronesia"),
+        ("GU", "Guam"), ("KI", "Kiribati"), ("MH", "Isole Marshall"),
+        ("MP", "Isole Marianne Settentrionali"),
+        ("NC", "Nuova Caledonia"), ("NR", "Nauru"), ("NU", "Niue"),
+        ("NZ", "Nuova Zelanda"), ("PF", "Polinesia francese"),
+        ("PG", "Papua Nuova Guinea"), ("PW", "Palau"),
+        ("SB", "Isole Salomone"), ("TO", "Tonga"), ("TV", "Tuvalu"),
+        ("VU", "Vanuatu"), ("WS", "Samoa"),
+    ),
+    "africa": (
+        ("AO", "Angola"), ("BF", "Burkina Faso"), ("BI", "Burundi"),
+        ("BJ", "Benin"), ("BW", "Botswana"),
+        ("CD", "Congo (Rep. Dem.)"), ("CF", "Rep. Centrafricana"),
+        ("CG", "Congo"), ("CI", "Costa d'Avorio"), ("CM", "Camerun"),
+        ("CV", "Capo Verde"), ("DJ", "Gibuti"), ("DZ", "Algeria"),
+        ("EG", "Egitto"), ("ER", "Eritrea"), ("ET", "Etiopia"),
+        ("GA", "Gabon"), ("GH", "Ghana"), ("GM", "Gambia"),
+        ("GN", "Guinea"), ("GQ", "Guinea Equatoriale"),
+        ("GW", "Guinea-Bissau"), ("KE", "Kenya"), ("KM", "Comore"),
+        ("LR", "Liberia"), ("LS", "Lesotho"), ("LY", "Libia"),
+        ("MA", "Marocco"), ("MG", "Madagascar"), ("ML", "Mali"),
+        ("MR", "Mauritania"), ("MU", "Mauritius"), ("MW", "Malawi"),
+        ("MZ", "Mozambico"), ("NA", "Namibia"), ("NE", "Niger"),
+        ("NG", "Nigeria"), ("RE", "Riunione"), ("RW", "Ruanda"),
+        ("SC", "Seychelles"), ("SD", "Sudan"), ("SL", "Sierra Leone"),
+        ("SN", "Senegal"), ("SO", "Somalia"), ("SS", "Sud Sudan"),
+        ("ST", "São Tomé e Príncipe"), ("SZ", "Eswatini"),
+        ("TD", "Ciad"), ("TG", "Togo"), ("TN", "Tunisia"),
+        ("TZ", "Tanzania"), ("UG", "Uganda"), ("YT", "Mayotte"),
+        ("ZA", "Sudafrica"), ("ZM", "Zambia"), ("ZW", "Zimbabwe"),
+    ),
+}
+# I due dizionari che il codice interroga, DERIVATI dalla tabella qui
+# sopra: una fonte sola, e nessuna lista da tenere in pari a mano.
+_PAESE_ZONA = {c: z for z, righe in PAESI_PER_ZONA.items()
+               for c, _n in righe}
+_PAESE_NOME = {c: n for righe in PAESI_PER_ZONA.values()
+               for c, n in righe}
+# Il catalogo piatto, ordinato per NOME: e' quel che disegna il menu
+# della cassa e quello del paese domestico.
+PAESI_SPEDIZIONE = tuple(sorted(
+    ((c, _PAESE_NOME[c], _PAESE_ZONA[c]) for c in _PAESE_ZONA),
+    key=lambda r: r[1]))
+
+
+def zona_da_paese(codice: str, domestico: str = "") -> str:
+    """La ZONA di una destinazione, visto da un venditore che ha
+    dichiarato `domestico` come paese di casa. '' se il codice non e'
+    in tabella.
+
+    IL DOMESTICO VINCE SUL SUO CONTINENTE, ed e' la prima riga apposta:
+    l'Italia sta in Europa, ma per un venditore italiano un ordine da
+    Roma e' 'dom' e non 'eu'. Senza questa precedenza le due tariffe
+    si contraddirebbero e vincerebbe quella scritta per ultima.
+
+    ASSENTE E PRESENTE-MA-IGNOTO SONO DUE COSE DIVERSE, e il chiamante
+    le tratta diversamente: chi non manda il campo e' un client di
+    ieri e vale il domestico, chi manda un codice che non conosciamo
+    si prende un 400. Far ricadere l'ignoto sul domestico sarebbe
+    spedire dall'altra parte del mondo alla tariffa di casa, cioe' il
+    verso sbagliato in cui sbagliare."""
+    c = (codice or "").strip().upper()
+    if c not in _PAESE_ZONA:
+        return ""
+    dom = ((domestico or "").strip().upper() or DOMESTICO_DEFAULT)
+    if c == dom or c in ENCLAVI_DOMESTICO.get(dom, ()):
+        return "dom"
+    return _PAESE_ZONA[c]
+
+
+def nome_paese(codice: str) -> str:
+    """Il nome del paese come si scrive su una busta ('' se ignoto)."""
+    return _PAESE_NOME.get((codice or "").strip().upper(), "")
+
+
+def etichetta_zona(zona: str, domestico: str = "") -> str:
+    """Il nome pubblico di una zona. Il domestico prende il nome del
+    suo PAESE («Italia», non «domestico»): e' l'unica cosa vera da
+    dire a chi legge, e l'unica che non invecchia il giorno che il
+    domestico non sara' piu' l'Italia."""
+    if zona == "dom":
+        return nome_paese((domestico or "").strip().upper()
+                          or DOMESTICO_DEFAULT)
+    return ZONA_ETICHETTA.get(zona, "")
+
+
 def init_db():
     con = db()
     con.executescript("""
@@ -4985,6 +5221,99 @@ def init_db():
             con.execute(f"ALTER TABLE annunci ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
             pass
+    # ---------------- LE ZONE DI SPEDIZIONE (set 2026) --------------
+    # DUE COLONNE E NON OTTO, ed e' la decisione di struttura del
+    # cantiere (Andrea, set 2026): le tariffe fuori casa vivono in una
+    # MAPPA zona -> prezzo, non in una colonna per zona. Il giorno che
+    # servira' un override per un singolo paese («in Francia 12.000, nel
+    # resto d'Europa 20.000») sara' una chiave in piu' dentro il JSON,
+    # senza ALTER TABLE, senza un deploy che tocca il database e senza
+    # una riga nuova nei quindici posti che leggono un annuncio.
+    #
+    # `paese_domestico`: il paese di CASA del venditore. '' = IT, che
+    # e' il mondo di ieri; si dichiara dal foglio di pubblicazione.
+    #
+    # `spedizione_zone`: JSON {zona: {"sats": n, "eur": x}} per le sole
+    # zone NON domestiche. LA PRESENZA DELLA CHIAVE E' LA
+    # DICHIARAZIONE: c'e' = spedisco li' (0 = gratis), non c'e' = li'
+    # non spedisco. E' il patto di `spedizione_punto_dichiarata`
+    # senza bisogno di un flag, perche' un dizionario sa gia'
+    # distinguere «assente» da «zero» — che e' precisamente cio' che
+    # una colonna INTEGER non sa fare.
+    #
+    # IL DOMESTICO NON STA NELLA MAPPA, e va detto perche' sembra
+    # un'incoerenza: e' rimasto `spedizione_sats`/`spedizione_eur`, le
+    # colonne di sempre. Non e' pigrizia — quel numero lo leggono gia'
+    # la card della vetrina, il NIP-99, il post del canale, l'import
+    # CSV, i negozi collegati, il libro mastro e il filtro della
+    # ricerca, tutti scritti prima di questo cantiere. Spostarlo nella
+    # mappa sarebbe stato un cantiere di migrazione su tutta l'app per
+    # guadagnare una simmetria; la mappa serve a cio' che e' NUOVO e a
+    # cio' che verra', e il domestico non e' ne' l'uno ne' l'altro.
+    # L'ORDINE DI QUESTE TRE MOSSE E' IL CUORE DELLA MIGRAZIONE, e
+    # non e' scambiabile: nasce la colonna della MAPPA, si travasa, e
+    # SOLO ALLA FINE nasce `paese_domestico`, che e' la sentinella.
+    # Cosi' un errore in mezzo (un disco pieno, un riavvio, un difetto
+    # del codice) lascia il travaso ANCORA DA FARE invece di saltarlo
+    # per sempre: al giro dopo la sentinella non c'e' ancora e si
+    # ricomincia. L'ha insegnato il giro dal vivo — la prima stesura
+    # gateava sulla colonna della mappa, e un NameError fra l'ALTER e
+    # l'UPDATE aveva lasciato trentotto annunci senza zone e nessun
+    # modo di accorgersene.
+    gia_annunci = {r[1] for r in con.execute("PRAGMA table_info(annunci)")}
+    prima_volta_zone = "paese_domestico" not in gia_annunci
+    try:
+        con.execute("ALTER TABLE annunci ADD COLUMN "
+                    "spedizione_zone TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+    if prima_volta_zone:
+        # LA MIGRAZIONE A (decisione di Andrea): il costo di oggi vale
+        # come prezzo domestico E su TUTTI i continenti. L'alternativa
+        # era lasciare l'estero spento e farlo accendere a chi lo
+        # vuole; si e' scelto di non chiedere niente a nessuno, e il
+        # prezzo si dichiara invece di nasconderlo — da domani quegli
+        # annunci spediscono anche fuori, alla tariffa di casa. Chi non
+        # vuole svuota la casella, e il foglio glielo dice.
+        # UNA VOLTA SOLA E MAI PIU': il gate e' la NASCITA della
+        # colonna, non il valore delle righe. Un travaso che
+        # ricontrolla i valori rimetterebbe in piedi, al riavvio dopo,
+        # proprio le zone che un venditore ha appena svuotato.
+        # SI SCRIVE RIGA PER RIGA e non con un UPDATE solo: il JSON
+        # porta DUE numeri diversi per annuncio (i sats fissi o l'euro
+        # ancorato), e comporlo in SQL vorrebbe dire concatenare
+        # stringhe con dentro dei float — cioe' il posto dove nasce un
+        # JSON storto che nessuno vedra' fino al primo acquisto.
+        # `spedizione_zone=''` nella WHERE: se il giro di prima si e'
+        # fermato a meta', questo riprende da dove aveva lasciato
+        # invece di riscrivere quel che era gia' a posto.
+        righe = con.execute(
+            "SELECT id, spedizione_sats, spedizione_eur FROM annunci "
+            "WHERE consegna IN ('spedizione','entrambe') "
+            "AND spedizione_zone=''").fetchall()
+        for r in righe:
+            # TUTTE le zone, 'dom' COMPRESA: il ripiego di
+            # `_zona_offerta` vale sulla mappa VUOTA, e dopo il travaso
+            # vuota non lo e' piu' — senza questa riga ogni annuncio
+            # gia' pubblicato smetterebbe di spedire IN CASA il minuto
+            # del deploy, che e' il guasto peggiore che questo cantiere
+            # potesse produrre. L'ha trovato il giro di fumo sulla
+            # copia del database vero, non una rilettura.
+            mappa = {z: {"sats": r["spedizione_sats"] or 0,
+                         "eur": r["spedizione_eur"] or 0.0}
+                     for z in ZONE_SPEDIZIONE}
+            con.execute("UPDATE annunci SET spedizione_zone=? WHERE id=?",
+                        (json.dumps(mappa), r["id"]))
+        con.commit()
+        print(f"\U0001f30d Zone di spedizione: travaso una-tantum su "
+              f"{len(righe)} annunci (il costo di casa vale anche fuori)",
+              flush=True)
+    # ...e SOLO ADESSO la sentinella, che e' anche una colonna vera.
+    try:
+        con.execute("ALTER TABLE annunci ADD COLUMN "
+                    "paese_domestico TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
     # Migrazione categorie (lug 2026): il set nuovo rinomina tre voci
     # vecchie, le altre restano com'erano. COLLATE NOCASE raddrizza
     # anche le maiuscole storte dei vecchi import ('casa' minuscola,
@@ -5396,6 +5725,33 @@ def init_db():
                     # dal catalogo: `punto_barattolo()` risponde anche
                     # sugli spenti apposta.
                     "punto_barattolo TEXT DEFAULT ''",
+                    # LA ZONA APPLICATA (set 2026) e il PAESE che
+                    # l'ha decisa. MAI un valore nuovo di
+                    # consegna_scelta, che resta 'spedizione': il
+                    # patto di via_punto, di rete_punto e di
+                    # anche_digitale — ortogonale, cosi' timer,
+                    # solleciti e finestre restano veri per
+                    # costruzione.
+                    # '' NON E' UNA ZONA MA IL MONDO DI IERI: gli
+                    # ordini nati prima del cantiere e quelli dei
+                    # client che il campo non lo mandano. Vale il
+                    # domestico, che e' quel che erano — e nessuno
+                    # prova a dedurlo dall'indirizzo, che puo' essere
+                    # ancora vuoto quando l'ordine nasce.
+                    # LA ZONA SI SCRIVE ANCHE QUANDO E' 'dom': e' la
+                    # ricevuta di quale tariffa e' stata applicata, e
+                    # una ricevuta che tace sul caso normale non e' una
+                    # ricevuta. La leggono ordine, disputa e CSV.
+                    # SOLO SULLA SPEDIZIONE, pero': un ritiro a mano e
+                    # un codice online non hanno una zona di
+                    # destinazione, e scrivergliene una sarebbe un
+                    # fatto inventato che poi qualcuno leggerebbe.
+                    # IL PAESE DEL VENDITORE SI FOTOGRAFA COL RESTO:
+                    # e' lui a dire cosa vuol dire 'dom' su questo
+                    # ordine, e il venditore puo' cambiarlo domani.
+                    "zona_sped TEXT DEFAULT ''",
+                    "paese_sped TEXT DEFAULT ''",
+                    "domestico_sped TEXT DEFAULT ''",
 
                     # L'OBIEZIONE DEL VENDITORE SUL PUNTO (ago 2026):
                     # il punto lo scrive chi compra, ed e' testo libero
@@ -8310,11 +8666,12 @@ def _decifra_blob(blob: bytes) -> bytes | None:
 
 async def consegna_da_payload(d: dict, valuta: str):
     """Il giudice unico dei campi di consegna (lug 2026): legge il
-    payload di pubblica/modifica e ritorna la 10-tupla
+    payload di pubblica/modifica e ritorna la 11-tupla
     (consegna, spedizione_sats, spedizione_eur, spedizione_punto_sats,
     spedizione_punto_eur, spedizione_punto_dichiarata,
     spedizione_extra_sats, spedizione_extra_eur, taglia_pacco,
-    anche_digitale), gia' normalizzata. Pattern categoria: i valori
+    anche_digitale, paese_domestico, zone), gia' normalizzata.
+    Pattern categoria: i valori
     sconosciuti si normalizzano a '' (mai un 400 — i client di ieri
     non sanno di consegne, e non devono rompersi). anche_digitale e'
     la combo della gift card («ti spedisco la tessera, oppure ti
@@ -8340,7 +8697,30 @@ async def consegna_da_payload(d: dict, valuta: str):
     dichiarazione, perche' non le serve — «supplemento 0» e «nessun
     supplemento» sono la stessa cosa, mentre per il punto vuoto e zero
     dicono due cose diverse. Quindi qui basta il numero, e il campo
-    svuotato in modifica e' esprimibile mandando 0."""
+    svuotato in modifica e' esprimibile mandando 0.
+
+    LE ZONE (set 2026) escono nell'undicesimo e dodicesimo posto:
+    `paese_domestico` (il paese di casa del venditore, '' = IT) e
+    `zone`, la mappa {zona: (sats, eur)} delle zone DICHIARATE — con
+    dentro anche 'dom', i cui numeri sono gli stessi
+    `spedizione_sats`/`spedizione_eur` del secondo e terzo posto: non
+    una copia che possa divergere, escono dallo stesso `_leggi_costo`
+    chiamato una volta sola.
+    LA DICHIARAZIONE E' LA PRESENZA DELLA CHIAVE, e nella mappa non
+    serve nessun flag per dirla: un dizionario sa gia' distinguere
+    «assente» da «zero»: assente = li' non spedisco, zero = spedisco
+    gratis. E' la ragione per cui questo cantiere non ha una colonna
+    per zona — con gli INTEGER quella distinzione avrebbe voluto un
+    flag per ciascuna, e un flag dimenticato e' una porta aperta.
+    ⚠️ IL SIGNIFICATO E' ROVESCIATO rispetto al punto: li' «non
+    dichiarato» vuol dire «vale la tariffa di casa» (un ripiego), qui
+    vuol dire «li' non spedisco» (una porta chiusa). Il giorno che
+    qualcuno generalizzasse il ripiego del punto anche a queste,
+    aprirebbe l'estero a tutti gli annunci del mercatino in una riga.
+    QUI NON SI ALZA MAI: un annuncio che spedisce e non dichiara
+    nessuna zona esce com'e', e a chiudere il caso e' `_zona_offerta`
+    — che sul domestico ha un ripiego apposta per il mondo di ieri (i
+    client e gli importatori che le zone non le conoscono)."""
     consegna = d.get("consegna", "")
     if consegna not in MODALITA_CONSEGNA:
         consegna = ""
@@ -8368,15 +8748,23 @@ async def consegna_da_payload(d: dict, valuta: str):
                            and consegna in ("spedizione", "ritiro",
                                             "entrambe")) else 0
 
-    async def _leggi_costo(chiave_sats, chiave_eur):
+    async def _leggi_costo(chiave_sats, chiave_eur, dove=None):
         """UNA tariffa nella valuta del listino: la liturgia di sempre
         (fisso batte ancorato, l'euro sul listino sats resta ancorato
-        e diventa sats solo all'acquisto), usata due volte — casa e
-        punto — cosi' non puo' divergere."""
+        e diventa sats solo all'acquisto), usata per casa, per il
+        punto, per il supplemento e per OGNI zona — cosi' non puo'
+        divergere.
+
+        `dove` e' il dizionario da cui leggere, di serie il payload:
+        le zone arrivano annidate ({"eu": {"sats": 20000}}) e riusano
+        questa liturgia invece di averne una loro. La forma annidata
+        e' la stessa convenzione delle chiavi piatte — il NOME della
+        chiave dice la valuta — e non una terza."""
         sats, eur = 0, 0.0
+        fonte = d if dove is None else dove
         if valuta == "eur":
             try:
-                eur = max(0.0, round(float(d.get(chiave_eur, 0)), 2))
+                eur = max(0.0, round(float(fonte.get(chiave_eur, 0)), 2))
             except (TypeError, ValueError):
                 eur = 0.0
             if eur > 0:
@@ -8389,7 +8777,7 @@ async def consegna_da_payload(d: dict, valuta: str):
                     sats = round(eur / cambio * 100_000_000)
         else:
             try:
-                sats = max(0, int(d.get(chiave_sats, 0)))
+                sats = max(0, int(fonte.get(chiave_sats, 0)))
             except (TypeError, ValueError):
                 sats = 0
             # Sul listino sats il costo scritto in euro resta ANCORATO
@@ -8404,21 +8792,49 @@ async def consegna_da_payload(d: dict, valuta: str):
             # sats) hanno spedizione_eur=0 e restano fissi.
             if not sats:
                 try:
-                    eur = max(0.0, round(float(d.get(chiave_eur, 0)), 2))
+                    eur = max(0.0, round(float(fonte.get(chiave_eur, 0)), 2))
                 except (TypeError, ValueError):
                     eur = 0.0
         return sats, eur
 
+    # Dichiarata da PRESENZA, mai da valore: vuoto ≠ zero.
+    def _porta(k):
+        v = d.get(k, None)
+        return v is not None and str(v).strip() != ""
+
     sped_sats, sped_eur = 0, 0.0
     punto_sats, punto_eur, punto_dich = 0, 0.0, 0
     extra_sats, extra_eur = 0, 0.0
+    zone = {}
+    # Il paese di casa: catalogo, quindi sconosciuto -> '' (che vale
+    # IT) e mai un 400. E' la regola di `consegna` e di `taglia`.
+    domestico = (str(d.get("paese_domestico") or "")).strip().upper()
+    if domestico and not nome_paese(domestico):
+        domestico = ""
     if consegna in ("spedizione", "entrambe"):
         sped_sats, sped_eur = await _leggi_costo("spedizione_sats",
                                                  "spedizione_eur")
-        # Dichiarata da PRESENZA, mai da valore: vuoto ≠ zero.
-        def _porta(k):
-            v = d.get(k, None)
-            return v is not None and str(v).strip() != ""
+        # IL DOMESTICO E' LA TARIFFA DI SEMPRE, guardata come zona:
+        # resta nelle sue colonne (le leggono card, NIP-99, canale,
+        # import e libro mastro) e nella mappa entra solo per DIRSI
+        # dichiarato — i due numeri sono gli stessi, da una chiamata
+        # sola, e non possono divergere. I client di ieri mandano
+        # sempre la chiave (fosse anche a zero) e restano dichiarati
+        # senza saperlo: e' il mondo di ieri, e va tenuto.
+        if _porta("spedizione_sats") or _porta("spedizione_eur"):
+            zone["dom"] = (sped_sats, sped_eur)
+        # LE ZONE, annidate: {"eu": {"sats": 20000}, "asia": {"eur": 15}}
+        # — la chiave dice la valuta, come nelle chiavi piatte. La
+        # zona ASSENTE non entra, ed e' cosi' che si dice «li' non
+        # spedisco» senza nessun flag.
+        grezzo = d.get("spedizione_zone")
+        if isinstance(grezzo, dict):
+            for z, v in grezzo.items():
+                if z not in ZONE_SPEDIZIONE or z == "dom":
+                    continue
+                if not isinstance(v, dict) or not v:
+                    continue
+                zone[z] = await _leggi_costo("sats", "eur", v)
         if (_porta("spedizione_punto_sats")
                 or _porta("spedizione_punto_eur")
                 or d.get("spedizione_punto_dichiarata")):
@@ -8430,7 +8846,46 @@ async def consegna_da_payload(d: dict, valuta: str):
                                                    "spedizione_extra_eur")
     return (consegna, sped_sats, sped_eur,
             punto_sats, punto_eur, punto_dich,
-            extra_sats, extra_eur, taglia, anche_digitale)
+            extra_sats, extra_eur, taglia, anche_digitale,
+            domestico, zone)
+
+
+def zone_json(zone: dict) -> str:
+    """La mappa delle zone come va in colonna: '' quando e' vuota.
+
+    UN POSTO SOLO PER SERIALIZZARE, e sono tre a chiamarlo (pubblica,
+    la modifica e l'import): tre `json.dumps` sparsi diventerebbero
+    tre forme leggermente diverse, e il lettore ne conosce una."""
+    if not zone:
+        return ""
+    return json.dumps({z: {"sats": s, "eur": e}
+                       for z, (s, e) in sorted(zone.items())})
+
+
+def guardia_almeno_una_zona(consegna: str, zone: dict):
+    """Chi spunta la spedizione deve dire ALMENO una zona (set 2026).
+
+    Sta qui e non dentro `consegna_da_payload` perche' quel giudice non
+    alza mai — normalizza e basta, ed e' il patto che tiene in piedi i
+    client di ieri. Questa invece e' una CONTRADDIZIONE, non un valore
+    sconosciuto: «spedisco» e «in nessuna zona» non possono essere veri
+    insieme, e lasciarla passare vorrebbe dire un annuncio con il
+    camioncino in vetrina che non si puo' comprare da nessun posto.
+
+    LA CHIAMANO SOLO LE DUE PORTE UMANE — pubblica() e la modifica —
+    e mai l'import ne' la modifica firmata da Nostr: quelle mandano
+    sempre la chiave dell'Italia (fosse anche a zero), quindi non ci
+    inciampano mai; e se un giorno ci inciampassero, un CSV da mille
+    righe non deve morire su una contraddizione che il ripiego di
+    `_zona_offerta` sa gia' assorbire."""
+    if consegna not in ("spedizione", "entrambe"):
+        return
+    if not zone:
+        raise HTTPException(400, "Dicci dove spedisci: scrivi il costo "
+                                 "per almeno una zona — il tuo paese, "
+                                 "oppure uno dei continenti. Zero vuol "
+                                 "dire gratis; una casella vuota vuol "
+                                 "dire che lì non spedisci.")
 
 
 def guardia_venditore_digitale(tg_id: int, consegna: str,
@@ -13392,20 +13847,6 @@ MODALITA_CONSEGNA = ("spedizione", "ritiro", "entrambe", "digitale",
                      "servizio")
 TAGLIE_PACCO = ("busta", "piccolo", "medio", "grande", "ingombrante")
 
-# Le reti di punti di ritiro del NEGOZIO (ago 2026, pagina d'acquisto;
-# al PLURALE dal cantiere «chi spedisce dichiara»): con che corrieri
-# lavora il venditore. Si dichiarano nel Profilo e valgono per tutti i
-# suoi annunci; senza, la via punto resta OFFERTA lo stesso (secondo
-# giro, decisione di Andrea: meglio l'accordo in chat che la porta
-# chiusa) e il compratore sceglie il punto senza sapere la rete.
-# NON e' il catalogo corrieri del tracking (quello vive nel client,
-# CORRIERI, e ha sette voci) ne' le sentinelle CORRIERI_SENTINELLA:
-# qui si dice la rete dei PUNTI, non chi porta il pacco. Il client
-# riceve le voci da /api/me: mai hardcodate.
-# E' UNA LISTA APERTA (decisione di Andrea): se ne aggiunge una il
-# giorno che si trova la sua MAPPA — una voce senza mappa e' lo stato
-# «Altro», cioe' nessun link, e un link fuorviante e' peggio di
-# nessun link.
 SPEDIZIONIERI = ("Barattolo", "InPost", "Poste Italiane", "Altro")
 
 
@@ -13952,6 +14393,14 @@ CAMPI_VETRINA = (
     # client della spedizione gratuita, che senza di lui direbbe
     # «gratis» su un annuncio dove solo il primo pezzo lo e'
     "a.spedizione_extra_sats, a.spedizione_extra_eur, "
+    # LE ZONE (set 2026). In VETRINA la card mostra il solo prezzo
+    # DOMESTICO — che e' gia' `spedizione_sats`/`_eur` qui sopra,
+    # quindi per lei non serviva niente — e queste due colonne
+    # servono altrove: alla precompilazione del form Vendi (dove le
+    # caselle devono ritrovare quel che il venditore aveva scritto) e
+    # al menu dei paesi del foglio d'acquisto, che spegne le zone non
+    # servite invece di far scoprire la porta chiusa a cose fatte.
+    "a.paese_domestico, a.spedizione_zone, "
     "a.anche_digitale, a.condizione, a.regione, "
     # IL DOVE E IL QUANTO DELLA PRESTAZIONE, ago 2026. Erano scritti in
     # colonna dal form e non uscivano da nessuna parte: tornavano solo
@@ -14906,8 +15355,9 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # cambio, e tra lo scudo anti-doppione e l'INSERT non deve esserci
     # nessun await (il patto del server mono-processo).
     (consegna, sped_sats, sped_eur, punto_sats, punto_eur, punto_dich,
-     extra_sats, extra_eur, taglia,
-     anche_dig) = await consegna_da_payload(d, valuta)
+     extra_sats, extra_eur, taglia, anche_dig,
+     domestico, zone) = await consegna_da_payload(d, valuta)
+    guardia_almeno_una_zona(consegna, zone)
     guardia_venditore_digitale(user["id"], consegna, anche_dig)
     condizione = guardia_zona_condizione(d, consegna)
     quantita = quantita_da_payload(d)
@@ -15017,17 +15467,22 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         "spedizione_punto_sats,spedizione_punto_eur,"
         "spedizione_punto_dichiarata,"
         "spedizione_extra_sats,spedizione_extra_eur,taglia_pacco,"
+        # le zone (set 2026): il paese di casa e la MAPPA. Due
+        # colonne per otto zone e per tutte quelle che verranno —
+        # vedi il commento della migrazione.
+        "paese_domestico,spedizione_zone,"
         "anche_digitale,condizione,quantita,quantita_max,stato,creato,"
         "asta_base_sats,asta_scadenza,asta_creato,"
         # la prestazione (ago 2026): dove e quanto dura — le due
         # colonne che per tre settimane nessuno scriveva
         "servizio_dove,durata_min) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          sotto, prezzo_sats, zona, valuta, prezzo_eur,
          lat, lon, regione, consegna, sped_sats, sped_eur,
          punto_sats, punto_eur, punto_dich,
-         extra_sats, extra_eur, taglia, anche_dig,
+         extra_sats, extra_eur, taglia,
+         domestico, zone_json(zone), anche_dig,
          # il massimo nasce uguale alla quantita': da qui in poi puo'
          # solo salire, e non scende mai coi pezzi venduti
          condizione, quantita, quantita,
@@ -16288,8 +16743,9 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     d = await leggi_json(req)
     valuta, prezzo_sats, prezzo_eur = await prezzo_da_payload(d)
     (consegna, sped_sats, sped_eur, punto_sats, punto_eur, punto_dich,
-     extra_sats, extra_eur, taglia,
-     anche_dig) = await consegna_da_payload(d, valuta)
+     extra_sats, extra_eur, taglia, anche_dig,
+     domestico, zone) = await consegna_da_payload(d, valuta)
+    guardia_almeno_una_zona(consegna, zone)
     guardia_venditore_digitale(user["id"], consegna, anche_dig)
     con = db()
     a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
@@ -16432,6 +16888,8 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         "spedizione_punto_sats=?, spedizione_punto_eur=?, "
         "spedizione_punto_dichiarata=?, "
         "spedizione_extra_sats=?, spedizione_extra_eur=?, taglia_pacco=?, "
+        # le zone, nello stesso ordine dell'INSERT di pubblica()
+        "paese_domestico=?, spedizione_zone=?, "
         "anche_digitale=?, condizione=?, quantita=?, "
         # il massimo non si assegna MAI secco: una modifica che abbassa
         # la quantita' non deve cancellare la memoria dei pezzi avuti
@@ -16441,7 +16899,8 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
          sotto, prezzo_sats, zona, valuta, prezzo_eur,
          lat, lon, regione, consegna, sped_sats, sped_eur,
          punto_sats, punto_eur, punto_dich,
-         extra_sats, extra_eur, taglia, anche_dig,
+         extra_sats, extra_eur, taglia,
+         domestico, zone_json(zone), anche_dig,
          condizione, quantita, quantita,
          "revisione" if in_revisione else "attivo",
          int(time.time()),
@@ -19149,10 +19608,22 @@ CAMPI_INDIRIZZO = (
     # il campo che i corrieri chiedono sempre e che nessun modulo
     # prevede mai: citofono, scala, interno, orari
     ("note",      "le note per il corriere", 120, False),
+    # IL PAESE (set 2026, col cantiere delle zone): finche' si
+    # spediva solo in Italia era sottinteso, e un campo sottinteso non
+    # si scrive. Da quando la destinazione puo' essere Lisbona, senza
+    # questa riga il venditore ha in mano un indirizzo che non sa
+    # indirizzare — cioe' la funzione intera non sta in piedi.
+    # FACOLTATIVO NEL CATALOGO e obbligatorio dove SERVE: sull'Italia
+    # non si chiede niente a nessuno (lo scrive il server dal codice
+    # paese), e il solo caso in cui lo scrive chi compra e' il paese
+    # fuori elenco — vedi il gate in fondo a _indirizzo_da_payload.
+    # Cosi' gli ordini di ieri, che la chiave non ce l'hanno, restano
+    # leggibili: `_indirizzo_letto` usa .get e non trova niente.
+    ("paese",     "il paese",               56,  False),
 )
 
 
-def _indirizzo_da_payload(d) -> tuple:
+def _indirizzo_da_payload(d, paese: str = "") -> tuple:
     """(blob CIFRATO, atteso) dall'indirizzo scritto dal compratore.
 
     ATTESO E' LA PRESENZA DELLA CHIAVE, mai il suo valore (il patto di
@@ -19163,6 +19634,16 @@ def _indirizzo_da_payload(d) -> tuple:
     correzione dall'ordine) e basta che uno se ne dimentichi perche' un
     indirizzo di casa finisca in chiaro nel database. Un posto solo,
     e la sentinella lo conta.
+
+    IL PAESE LO SCRIVE IL SERVER, NON IL CLIENT (set 2026): arriva il
+    CODICE gia' validato da `_paese_da_payload`, e il nome sulla
+    busta esce dal catalogo. E' quel che impedisce di mandare 'FR' e
+    farsi scrivere «Italia» accanto — la tariffa e l'indirizzo
+    direbbero due paesi diversi, e a spedire sarebbe il venditore.
+    L'UNICA ECCEZIONE E' IL PAESE FUORI ELENCO ('ZZ'), dove il nome
+    non ce l'ha nessuno: li' lo scrive chi compra ED E' OBBLIGATORIO —
+    un ordine per «un altro paese» senza dire quale e' un pacco che
+    non parte, e il no si da' PRIMA di prendere i sats.
 
     I 400 sono STATICI e non rimandano mai il valore: quei messaggi
     finiscono nei log di uvicorn, e un CAP dentro un log e' un CAP
@@ -19187,8 +19668,18 @@ def _indirizzo_da_payload(d) -> tuple:
         dati[campo] = valore
     if not any(dati.values()):
         # dichiarato ma ancora vuoto: l'ordine nasce «in attesa
-        # dell'indirizzo» e il gate di segna_spedito fa il resto
+        # dell'indirizzo» e il gate di segna_spedito fa il resto.
+        # IL PAESE SI SCRIVE DOPO QUESTA RIGA, mai prima: iniettarlo
+        # sopra renderebbe `any(dati.values())` vero su un indirizzo
+        # vuoto, e lo stato «in attesa» — che e' un pezzo del flusso,
+        # non un incidente — sparirebbe in silenzio.
         return "", 1
+    if paese and paese != "ZZ":
+        dati["paese"] = nome_paese(paese)
+    elif paese == "ZZ" and not dati["paese"]:
+        raise HTTPException(400, "Scrivi anche il paese di destinazione: "
+                                 "senza, chi vende non può scrivere "
+                                 "l'indirizzo sul pacco")
     for campo, etichetta, _tetto, serve in CAMPI_INDIRIZZO:
         if serve and not dati[campo]:
             raise HTTPException(400, f"Per la spedizione a casa serve "
@@ -19419,15 +19910,180 @@ def _email_corriere_letta(blob: str) -> str:
     return testo if "@" in testo else ""
 
 
-def _tariffa_dichiarata(a, via: str) -> tuple:
-    """(sats, eur) della tariffa di spedizione per la via chiesta:
-    'punto' con la dichiarazione accesa usa le colonne punto — anche
-    (0, 0.0): gratis dichiarato e' gratis — altrimenti SEMPRE la
-    tariffa casa. E' la retrocompat decisa da Andrea: un costo solo
-    dichiarato vale per entrambe le strade finche' il venditore non
-    rifinisce il secondo."""
+def frase_zona(zona: str, paese: str = "", domestico: str = "") -> str:
+    """LA ZONA APPLICATA, in parole, e in un posto solo (set 2026).
+
+    La dicono la ricevuta di chi compra, la riga dell'ordine che
+    leggono tutt'e due le parti, il CSV della contabilita' e la nota
+    che il moderatore ha davanti in disputa. QUATTRO superfici: con
+    quattro formule si finirebbe per avere quattro versioni della
+    stessa spedizione, e in disputa la versione giusta sarebbe
+    indecidibile.
+
+    IL PAESE SI NOMINA SOLO QUANDO AGGIUNGE QUALCOSA: sul domestico il
+    nome della zona E' gia' il nome del paese (dire «Italia — Italia»
+    e' rumore), e fuori si dicono tutt'e due — «Europa — Francia».
+
+    '' NON E' UN BUCO ma il mondo di ieri: vale il domestico, ed e'
+    quel che quegli ordini sono sempre stati."""
+    z = zona or "dom"
+    etichetta = etichetta_zona(z, domestico)
+    nome = nome_paese(paese) if z != "dom" else ""
+    return f"{etichetta} — {nome}" if nome else etichetta
+
+
+def _paese_da_payload(d) -> str:
+    """Il CODICE del paese di destinazione scelto da chi compra.
+
+    IL GIUDICE UNICO DELLA DESTINAZIONE: lo chiedono il preventivo e
+    l'acquisto, mono e set — quattro porte, una regola sola, o la
+    pagina e la fattura finirebbero per leggere il paese in due modi.
+
+    TORNA IL PAESE E NON LA ZONA, ed e' una conseguenza della
+    struttura nuova: la zona dipende anche dal PAESE DI CASA DEL
+    VENDITORE (l'Italia e' 'dom' per chi vende da Milano e 'eu' per
+    chi vende da Madrid), quindi non si puo' decidere senza avere
+    davanti l'annuncio. A risolverla e' `_zona_ordine`.
+
+    ASSENTE E IGNOTO NON SONO LA STESSA COSA, ed e' l'unico punto in
+    cui questo cantiere si stacca dal «sconosciuto -> vuoto e mai un
+    400» di `consegna_da_payload`. Chi non manda il campo e' un client
+    di ieri e vale il DOMESTICO: e' quello che i suoi ordini sono
+    sempre stati, e per lui non cambia niente. Chi manda un codice che
+    la tabella non conosce si prende un 400: farlo ricadere sul
+    domestico vorrebbe dire spedire dall'altra parte del mondo alla
+    tariffa di casa, cioe' un ordine che il venditore non puo' onorare
+    e una disputa che nasce dal nostro silenzio.
+
+    IL CODICE VIAGGIA, IL NOME NO: sulla busta il nome lo scrive il
+    catalogo (`nome_paese`), non il client — cosi' non si puo'
+    mandare 'FR' e farsi scrivere «Italia» accanto."""
+    grezzo = (str(d.get("paese") or "")).strip().upper()
+    if not grezzo:
+        return ""
+    if not nome_paese(grezzo):
+        raise HTTPException(400, "Non riconosciamo questo paese di "
+                                 "destinazione: riapri l'app e riprova")
+    return grezzo
+
+
+def _domestico(a) -> str:
+    """Il paese di casa di un annuncio ('' in colonna = IT)."""
+    return (a["paese_domestico"] or "").strip().upper() or DOMESTICO_DEFAULT
+
+
+def _zona_ordine(a, paese: str) -> str:
+    """La zona che si applica a QUESTO annuncio per QUELLA
+    destinazione. Paese assente = il domestico del venditore, che e'
+    il mondo di ieri."""
+    if not paese:
+        return "dom"
+    return zona_da_paese(paese, _domestico(a))
+
+
+def _zone_annuncio(a) -> dict:
+    """La mappa {zona: (sats, eur)} di un annuncio, letta dal JSON.
+
+    IL PARSE E' DIFENSIVO, e per la stessa ragione di
+    `_indirizzo_letto`: questa colonna la legge la VETRINA, cioe' il
+    percorso piu' caldo del server, e un JSON storto (una riga scritta
+    a mano, un rollback a meta') non deve diventare un 500 su tutta la
+    pagina. Mappa vuota = l'annuncio spedisce solo a casa, che e' lo
+    stato di ogni annuncio nato prima di questo cantiere.
+
+    NORMALIZZA QUI E NON NEI CHIAMANTI, che sono cinque: le zone che
+    non esistono si buttano, i numeri storti si buttano, i negativi si
+    schiacciano a zero. Quel che esce di qui e' gia' buono, e nessuno
+    a valle deve ricordarsene."""
+    try:
+        grezzo = json.loads(a["spedizione_zone"] or "{}")
+    except (ValueError, TypeError):
+        return {}
+    if not isinstance(grezzo, dict):
+        return {}
+    fuori = {}
+    for z, v in grezzo.items():
+        if z not in ZONE_SPEDIZIONE or not isinstance(v, dict):
+            continue
+        try:
+            fuori[z] = (max(0, int(v.get("sats") or 0)),
+                        max(0.0, round(float(v.get("eur") or 0.0), 2)))
+        except (TypeError, ValueError):
+            continue
+    return fuori
+
+
+def _zona_offerta(a, zona: str) -> bool:
+    """Questo annuncio spedisce in quella zona? (set 2026)
+
+    IL GIUDICE UNICO DELLA PORTA CHIUSA, e sta qui perche' lo chiedono
+    in quattro — il preventivo (per spegnere la strada col motivo),
+    compra(), _compra_set e il menu dei paesi — e quattro copie
+    finirebbero per dire quattro cose diverse sullo stesso annuncio.
+
+    LA PRESENZA DELLA CHIAVE E' LA DICHIARAZIONE: la zona c'e' nella
+    mappa = spedisco li' (anche a zero, che vuol dire gratis), non c'e'
+    = li' non spedisco. Un dizionario sa distinguere «assente» da
+    «zero», che e' precisamente cio' che una colonna INTEGER non sa
+    fare — ed e' la ragione della mappa.
+
+    IL DOMESTICO HA UN RIPIEGO CHE LE ALTRE NON HANNO, ed e' la riga
+    piu' importante della funzione: un annuncio scritto da chi le zone
+    non le conosce — un client di ieri, `importa_nostr.py` che scrive
+    dritto nel database, una riga messa a mano — ha la mappa VUOTA, e
+    leggerla alla lettera vorrebbe dire toglierlo dal mercato di casa,
+    cioe' spegnere il mercatino per curare l'estero. Quindi mappa
+    vuota = spedisce a casa e basta. Il venditore che svuota il
+    domestico e riempie l'Europa ottiene quel che ha chiesto, perche'
+    la sua mappa NON e' vuota.
+
+    L'ESTERO NON HA NESSUN RIPIEGO, ed e' voluto: una porta che si
+    apre da sola e' peggio di una chiusa — significherebbe impegnare
+    un venditore a spedire in Australia senza che l'abbia mai detto.
+    Il travaso una-tantum della migrazione e' un gesto dichiarato e
+    datato; questo sarebbe una regola silenziosa."""
+    if a["consegna"] not in ("spedizione", "entrambe"):
+        return False
+    zone = _zone_annuncio(a)
+    if zona == "dom":
+        return "dom" in zone or not zone
+    return zona in zone
+
+
+def _tariffa_dichiarata(a, via: str, zona: str = "dom") -> tuple:
+    """(sats, eur) della tariffa di spedizione per la via e la zona
+    chieste: 'punto' con la dichiarazione accesa usa le colonne punto
+    — anche (0, 0.0): gratis dichiarato e' gratis — altrimenti la
+    tariffa della ZONA. E' la retrocompat decisa da Andrea: un costo
+    solo dichiarato vale per entrambe le strade finche' il venditore
+    non rifinisce il secondo.
+
+    IL DOMESTICO ESCE DALLE COLONNE E NON DALLA MAPPA, ed e' il punto
+    in cui la struttura si vede: `spedizione_sats`/`spedizione_eur`
+    restano la fonte del prezzo di casa — le leggono la card, il
+    NIP-99, il canale, l'import e il libro mastro — mentre la mappa ne
+    porta una COPIA che serve a una cosa sola, dire che il domestico
+    e' dichiarato. Le due si scrivono nella stessa istruzione, da un
+    `_leggi_costo` solo: non possono divergere, e c'e' la prova.
+
+    IL PUNTO VIENE PRIMA E NON GUARDA LA ZONA, e non e' una
+    dimenticanza: la via punto si offre solo a CASA (le reti sono
+    italiane — vedi SPEDIZIONIERI), quindi il chiamante non arriva mai
+    qui con ('punto', 'asia'). Se un giorno esistessero locker
+    europei, questa e' la riga da cambiare per prima.
+
+    IL RIPIEGO SUL DOMESTICO E' UNA CINTURA, non una strada: chi
+    chiede 'asia' su un annuncio che l'Asia non la dichiara ha gia'
+    sbagliato prima — `_zona_offerta` avrebbe dovuto chiudergli la
+    porta — e qui si preferisce una cifra di casa a un'eccezione,
+    perche' il chiamante e' un conto e non una pagina. La prova che il
+    caso non arriva mai vive accanto al gate, non qui."""
     if via == "punto" and a["spedizione_punto_dichiarata"]:
         return a["spedizione_punto_sats"], a["spedizione_punto_eur"]
+    if zona and zona != "dom":
+        zone = _zone_annuncio(a)
+        if zona in zone:
+            return zone[zona]
     return a["spedizione_sats"], a["spedizione_eur"]
 
 
@@ -19443,7 +20099,8 @@ def _sped_in_sats(sped_sats: int, sped_eur: float, cambio: float):
     return sped_sats
 
 
-def _sped_pacco(righe: list, via: str, cambio: float) -> dict:
+def _sped_pacco(righe: list, via: str, cambio: float,
+                paese: str = "") -> dict:
     """LA SPEDIZIONE DI UN ORDINE INTERO, in una riga sola:
     **la spedizione piu' cara fa da base, e ogni altro pezzo aggiunge
     il suo supplemento.**
@@ -19485,6 +20142,24 @@ def _sped_pacco(righe: list, via: str, cambio: float) -> dict:
     _unitario_effettivo: qui vale doppio, perche' questo numero
     finisce dentro ordini.spedizione_sats e _righe_ordine lo sottrae.
 
+    LA ZONA (set 2026) sceglie la BASE e non tocca il supplemento, ed
+    e' una decisione: il supplemento resta UNO per annuncio anche con
+    otto zone. La ragione scritta quando nacque — «dipende
+    dall'OGGETTO e non dalla destinazione, un sacco di riso pesa
+    uguale ovunque vada» — vale ancora fra casa e punto e regge meno
+    fra Bari e Sydney, e questo e' dichiarato invece che nascosto: il
+    secondo pezzo per l'Oceania costa quanto il secondo pezzo a casa.
+    Il giorno che qualcuno lo volesse per zona, la mappa lo regge
+    senza una colonna nuova — e' precisamente perche' e' una mappa.
+
+    SI RICEVE IL PAESE, NON LA ZONA, ed e' la conseguenza del
+    domestico configurabile: la stessa destinazione e' 'dom' per un
+    venditore e 'eu' per un altro, quindi la zona si risolve RIGA PER
+    RIGA con `_zona_ordine`. Nel carrello le righe sono di un
+    venditore solo, ma la colonna e' dell'ANNUNCIO: risolvere una
+    volta sola sarebbe giusto oggi e sbagliato al primo annuncio con
+    un paese di casa diverso.
+
     sats None = una tariffa e' ancorata all'euro e il cambio manca:
     decide il chiamante (503 in compra dopo aver richiesto il cambio,
     strada spenta col motivo nel preventivo)."""
@@ -19496,7 +20171,7 @@ def _sped_pacco(righe: list, via: str, cambio: float) -> dict:
     extra, extra_eur, stima, pezzi = 0, 0.0, False, 0
     sats_puri = False          # una tariffa che contribuisce nata in sats
     for a, qta in righe:
-        b_sats, b_eur = _tariffa_dichiarata(a, via)
+        b_sats, b_eur = _tariffa_dichiarata(a, via, _zona_ordine(a, paese))
         b = _sped_in_sats(b_sats, b_eur, cambio)
         s = _sped_in_sats(a["spedizione_extra_sats"],
                           a["spedizione_extra_eur"], cambio)
@@ -19540,7 +20215,7 @@ def _eur_interi(sats: int, cambio: float):
 
 
 def _sped_gratis(articolo: int, articolo_eur, soglia: int,
-                 valuta: str) -> bool:
+                 valuta: str, zona: str = "dom") -> bool:
     """LA SPEDIZIONE GRATIS SOPRA SOGLIA (ago 2026): la seconda
     promessa di negozio — «da N di articoli la spedizione la offro
     io» — che azzera la tariffa della via scelta. Ritiro e digitale
@@ -19589,7 +20264,24 @@ def _sped_gratis(articolo: int, articolo_eur, soglia: int,
     essere d'accordo; il caso opposto — soglia in euro su listino in
     sats — esiste da sempre ed e' accettato. La novita' e' che adesso
     un negozio tutto-sats puo' essere ESATTO, cosa che prima non
-    poteva."""
+    poteva.
+
+    ⚠️ LA PROMESSA VALE SOLO A CASA (set 2026, col cantiere delle
+    zone), ed e' una CINTURA messa da chi scriveva il cantiere, non una
+    richiesta: chi promette «da 50 € la spedizione la offro io» sta
+    pensando al pacco che parte per Bari, non a quello che parte per
+    Sydney. Senza questa riga il travaso della migrazione — che apre
+    TUTTI gli annunci esistenti al mondo intero — avrebbe anche
+    regalato la tariffa piu' cara del catalogo a ogni negozio che
+    quella promessa ce l'aveva gia' accesa: due decisioni innocue che
+    si moltiplicano in una terza che nessuno ha preso.
+    RIAPRIRLA E' UNA RIGA (togliere questo `if`), ma va DECISO e non
+    ereditato — e il giorno che si decidesse, la promessa andrebbe
+    dichiarata PER ZONA, che e' la forma che la mappa gia' regge.
+    LA ZONA DI SERIE E' 'dom' apposta: i chiamanti di ieri non la
+    passano, e per loro non cambia un sat."""
+    if zona and zona != "dom":
+        return False
     if soglia <= 0 or valuta not in ("sats", "eur"):
         return False
     misura = articolo if valuta == "sats" else articolo_eur
@@ -23352,6 +24044,12 @@ async def _compra_set(user: dict, d: dict) -> dict:
     solo chi firma l'evento. Stessa liturgia del mono:
     fail-fast di cortesia, poi la invoice, poi il ricontrollo che fa
     fede — per OGNI riga — senza await fino all'INSERT."""
+    # La destinazione, dal giudice unico: assente = il domestico (il
+    # mondo di ieri), presente e ignota = 400. Sta PRIMA di aprire il
+    # database perche' e' una pura, e un 400 che non ha aperto niente
+    # non ha niente da chiudere. La ZONA si risolve dopo, sull'annuncio:
+    # dipende anche dal paese di casa del venditore.
+    paese = _paese_da_payload(d)
     # --- Le righe richieste: 2..MAX, annunci distinti, quantita sane
     grezze = d.get("righe") or []
     if not isinstance(grezze, list) or len(grezze) < 2:
@@ -23510,6 +24208,33 @@ async def _compra_set(user: dict, d: dict) -> dict:
                                      "di consegna")
         scelta = "spedizione" if "spedizione" in strade else "ritiro"
 
+    # LA PORTA DELLA ZONA (set 2026), e sul set e' l'INTERSEZIONE: un
+    # pacco solo non parte per meta', quindi basta un pezzo che in
+    # quella zona non spedisca. Il 400 NOMINA IL PEZZO, che e' la
+    # differenza dal mono e quel che rende l'errore azionabile — «non
+    # spedisco in Europa» su un carrello di otto cose lascerebbe chi
+    # compra a toglierle a una a una per indovinare quale.
+    # LA ZONA DELL'ORDINE E' UNA SOLA, e qui va anche verificato che
+    # lo sia: il paese di casa e' dell'ANNUNCIO, quindi due pezzi
+    # dello stesso venditore possono in teoria risolvere zone diverse
+    # sulla stessa destinazione. Un pacco solo non puo' avere due
+    # tariffe, quindi si dice no — come per l'origine.
+    zona = "dom"
+    if scelta == "spedizione":
+        zone_viste = {_zona_ordine(a, paese) for a in tutti.values()}
+        if len(zone_viste) > 1:
+            con.close()
+            raise HTTPException(400, "Questi oggetti partono da paesi "
+                                     "diversi: si comprano uno per volta")
+        zona = zone_viste.pop() if zone_viste else "dom"
+        for a in tutti.values():
+            if not _zona_offerta(a, zona):
+                con.close()
+                raise HTTPException(400,
+                    f"«{a['titolo'][:40]}» non si spedisce in "
+                    f"{frase_zona(zona, paese, _domestico(a))}: toglilo dal "
+                    f"carrello, oppure scegli un'altra destinazione")
+
     # La VIA della spedizione, come nel mono (il venditore del set e'
     # UNO: una SELECT sola per lo spedizioniere). Lettura prima della
     # invoice: il patto del ricontrollo senza await non si tocca.
@@ -23523,6 +24248,17 @@ async def _compra_set(user: dict, d: dict) -> dict:
             con.close()
             raise HTTPException(400, "Il punto di ritiro vale solo con "
                                      "la spedizione")
+        # I PUNTI DI RITIRO SONO A CASA (set 2026): le reti che
+        # conosciamo sono italiane, e un locker di Poste Italiane a
+        # Lisbona non esiste. Il preventivo la via nemmeno la offre,
+        # fuori dal domestico; questa e' la cintura per chi arriva con
+        # un body scritto a mano.
+        if zona != "dom":
+            con.close()
+            raise HTTPException(400, "I punti di ritiro che conosciamo "
+                                     "sono in Italia: per una "
+                                     "destinazione all'estero c'è la "
+                                     "spedizione a casa")
         # QUARTO giro (decisione di Andrea, rovescia il terzo): il
         # punto si sceglie SEMPRE in pagina, prima di «Paga» — la
         # regola vive nel CLIENT. Qui il 400 resta SOLO con la rete
@@ -23577,7 +24313,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
     ind, ind_atteso = "", 0
     if scelta == "spedizione" and not via_punto:
         try:
-            ind, ind_atteso = _indirizzo_da_payload(d)
+            ind, ind_atteso = _indirizzo_da_payload(d, paese)
         except HTTPException:
             con.close()
             raise
@@ -23762,7 +24498,7 @@ async def _compra_set(user: dict, d: dict) -> dict:
     serve_cambio_duro = any(
         (a["valuta"] == "eur" and a["prezzo_eur"] > 0)
         or (scelta == "spedizione"
-            and (_tariffa_dichiarata(a, via)[1] > 0
+            and (_tariffa_dichiarata(a, via, _zona_ordine(a, paese))[1] > 0
                  # il supplemento ancorato all'euro conta come la
                  # tariffa: se lo si dimentica qui, _sped_pacco torna
                  # None e il max() di ieri dava un TypeError, cioe' un
@@ -23835,7 +24571,8 @@ async def _compra_set(user: dict, d: dict) -> dict:
     # non da un TypeError (che qui era `max(sped, None)`, cioe' un 500
     # col database aperto).
     sp = _sped_pacco([(tutti[aid], q) for aid, q in richieste.items()],
-                     via if scelta == "spedizione" else "", cambio_ordine)
+                     via if scelta == "spedizione" else "", cambio_ordine,
+                     paese)
     sped = sp["sats"]
 
     # IL PATTUITO DELL'ACCORDO SUL CARRELLO, e la voce di testata che
@@ -23884,7 +24621,8 @@ async def _compra_set(user: dict, d: dict) -> dict:
     # _strade_preventivo: preventivo e invoice devono dire la stessa
     # cifra per costruzione.
     sped_gratis_sats, supplemento = 0, sp["supplemento"]
-    if sped and _sped_gratis(misura_art, misura_eur, sog_gratis, val_sg):
+    if sped and _sped_gratis(misura_art, misura_eur, sog_gratis, val_sg,
+                             zona):
         # la promessa offre la spedizione INTERA, supplemento compreso
         sped_gratis_sats, sped, supplemento = sped, 0, 0
     conto = _conto_ordine(articolo, sped, PROTEZIONE_PERCENTO,
@@ -23943,16 +24681,24 @@ async def _compra_set(user: dict, d: dict) -> dict:
         "INSERT INTO ordini(cassaforte,annuncio_id,compratore_id,venditore_id,"
         "prezzo_sats,stato,payment_hash,invoice,creato,aggiornato,"
         "cambio_ordine,consegna_scelta,punto_ritiro,via_punto,rete_punto,"
-        "tipo_punto,punto_barattolo,"
+        "tipo_punto,punto_barattolo,zona_sped,paese_sped,domestico_sped,"
         "nota_compratore,email_corriere,email_corriere_il,"
         "indirizzo,indirizzo_il,indirizzo_atteso,"
         "spedizione_sats,protezione_sats,quantita,"
         "sconto_sats,sconto_percento,sped_gratis_sats,"
         "codice_sconto,codice_sconto_id,accordo_sats) "
-        "VALUES(?,0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(?,0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (cf, user["id"], venditore_id, totale, "creato", inv["payment_hash"],
          inv["payment_request"], adesso, adesso, cambio_ordine, scelta,
-         punto, via_punto, rete, tipo, pid, nota,
+         punto, via_punto, rete, tipo, pid,
+         # la zona applicata, il paese che l'ha decisa e il paese di
+         # CASA che dice cosa vuol dire 'dom': SOLO sulla spedizione —
+         # un ritiro non ha una destinazione da timbrare
+         zona if scelta == "spedizione" else "",
+         paese if scelta == "spedizione" else "",
+         (_domestico(list(tutti.values())[0])
+          if scelta == "spedizione" and tutti else ""),
+         nota,
          # il timbro guarda il BLOB: col degrado non c'e' niente in
          # colonna, quindi non c'e' nessun «primo» da datare
          mail, adesso if mail else 0,
@@ -24044,6 +24790,15 @@ async def _compra_set(user: dict, d: dict) -> dict:
             "rete_punto": rete, "tipo_punto": tipo,
             "punto_barattolo": pid,
             "nota_compratore": nota,
+            # LA ZONA APPLICATA torna a chi paga (set 2026): il
+            # paySheet riscrive le sue righe con le cifre della
+            # RISPOSTA un istante dopo averle scritte con quelle del
+            # preventivo, e una zona che sparisce fra i due si legge
+            # come «e' cambiato qualcosa» proprio mentre si paga. E'
+            # la stessa ragione per cui viaggiano `consegna` e
+            # «per N pezzi».
+            "zona": zona if scelta == "spedizione" else "",
+            "paese": paese if scelta == "spedizione" else "",
             "quantita": pezzi, "set": True, "taglia_stimata": stima,
             "righe": [{"annuncio_id": r["annuncio_id"],
                        "titolo": r["titolo"], "quantita": r["quantita"],
@@ -24061,7 +24816,8 @@ def _strade_preventivo(righe: list, articolo: int, cambio: float,
                        disponibili: set, articolo_eur: float = 0.0,
                        sconto: int = 0, sconto_eur: float = 0.0,
                        sped_gratis: bool = False,
-                       accordo: int = 0, accordo_eur: float = 0.0) -> list:
+                       accordo: int = 0, accordo_eur: float = 0.0,
+                       paese: str = "") -> list:
     """Le strade del preventivo coi loro totali, nell'ordine FISSO
     ritiro → casa → punto → digitale. `disponibili` le decide il
     CHIAMANTE — per il mono le strade dell'annuncio, per il set
@@ -24098,7 +24854,22 @@ def _strade_preventivo(righe: list, articolo: int, cambio: float,
     risponde 503. Il prezzo dichiarato e' che una tariffa ancorata
     all'euro col cambio muto spegne la strada anche quando la
     spedizione sarebbe gratis — raro e transitorio, e il verso giusto
-    in cui sbagliare."""
+    in cui sbagliare.
+
+    LA ZONA (set 2026) puo' SPEGNERE la strada di casa, e lo fa col
+    suo motivo: `zona_non_offerta`, il gemello di `cambio_assente` —
+    la via esce senza numeri e la pagina scrive perche', invece di
+    sparire lasciando chi compra a chiedersi dove sia finita. Sul
+    CARRELLO basta UN annuncio che non spedisca in quella zona perche'
+    la strada si spenga per tutti: e' l'INTERSEZIONE, la stessa regola
+    che `disponibili` applica gia' alle strade fisiche — un pacco solo
+    non puo' partire per meta'.
+    LA VIA PUNTO ESISTE SOLO A CASA, e non e' una restrizione che
+    inventiamo qui: le reti sono italiane (vedi SPEDIZIONIERI), e un
+    locker di Poste Italiane a Lisbona non c'e'. Fuori dal domestico
+    la via non si offre per niente — spenta col motivo sarebbe
+    peggio, perche' il motivo suonerebbe come una scelta del
+    venditore."""
     fuori = []
 
     def _entra(v, sped, stima_sped, sped_eur=0.0, extra=None):
@@ -24134,12 +24905,27 @@ def _strade_preventivo(righe: list, articolo: int, cambio: float,
         # la via punto c'e' SEMPRE dove c'e' la spedizione (secondo
         # giro, decisione di Andrea che SUPERA il gate dello
         # spedizioniere) — senza rete il punto arriva dopo, dal campo
-        # dell'ordine (terzo giro); la tariffa e' il fallback casa
-        for v in ("casa", "punto"):
+        # dell'ordine (terzo giro); la tariffa e' il fallback casa.
+        # FUORI DAL DOMESTICO LA VIA PUNTO NON C'E': le reti sono
+        # italiane, e offrirla vorrebbe dire promettere un locker che
+        # in quel paese non esiste.
+        a_casa = all(_zona_ordine(a, paese) == "dom" for a, _ in righe)
+        vie = ("casa", "punto") if a_casa else ("casa",)
+        # LA PORTA CHIUSA, e in una riga sola: basta un annuncio del
+        # carrello che in quella zona non spedisca.
+        zona_ok = all(_zona_offerta(a, _zona_ordine(a, paese))
+                      for a, _ in righe)
+        for v in vie:
+            if not zona_ok:
+                # spenta col MOTIVO, come `cambio_assente`: senza
+                # numeri e senza conto, che un totale accanto a una
+                # strada morta si legge come un prezzo.
+                fuori.append({"via": v, "zona_non_offerta": True})
+                continue
             # il MAX (e il supplemento per pezzo) li fa la pura, la
             # stessa da cui passano compra() e _compra_set: qui non si
             # ricalcola niente, o sarebbero due conti da tenere in pari
-            p = _sped_pacco(righe, v, cambio)
+            p = _sped_pacco(righe, v, cambio, paese)
             sped, sped_eur, stima_sped = p["sats"], p["eur"], p["stima"]
             extra = ({"fallback_casa": not any(
                 a["spedizione_punto_dichiarata"] for a, _ in righe)}
@@ -24199,6 +24985,12 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     d = await leggi_json(req)
     if not d.get("annuncio_id") and isinstance(d.get("righe"), list):
         return await _preventivo_set(user, d)
+    # La destinazione, dal giudice unico: assente = il domestico (il
+    # mondo di ieri), presente e ignota = 400. Sta PRIMA di aprire il
+    # database perche' e' una pura, e un 400 che non ha aperto niente
+    # non ha niente da chiudere. La ZONA si risolve dopo, sull'annuncio:
+    # dipende anche dal paese di casa del venditore.
+    paese = _paese_da_payload(d)
     con = db()
     a = con.execute("SELECT * FROM annunci WHERE id=? AND stato='attivo'",
                     (d.get("annuncio_id"),)).fetchone()
@@ -24385,7 +25177,8 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     # `mancano_sped_eur` lo conta il server anche se il client potrebbe:
     # e' esattamente il numero dove vive un off-by-one (mancano_pezzi).
     misura_eur = _eur_interi(articolo, cambio)
-    gratis = _sped_gratis(articolo, misura_eur, sog_gratis, val_sg)
+    gratis = _sped_gratis(articolo, misura_eur, sog_gratis, val_sg,
+                          _zona_ordine(a, paese))
     # LO SCONTO, come nel set (ago 2026, il mono sconta): `pezzi` e' la
     # quantita' richiesta, la misura a valore e' lo stesso lordo della
     # promessa gemella. Il gemello in euro si aziona SOLO dietro al
@@ -24605,7 +25398,22 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             "strade": _strade_preventivo([(a, richiesti)], articolo, cambio,
                                          disponibili, articolo_eur,
                                          sconto, sconto_eur,
-                                         sped_gratis=gratis)}
+                                         sped_gratis=gratis,
+                                         paese=paese),
+            # LA DESTINAZIONE TORNA INDIETRO, e non e' un'eco inutile:
+            # la pagina disegna le zone con quel che il SERVER ha
+            # capito, non con quel che credeva di aver mandato — e' lo
+            # stesso patto di `consegna` nella risposta di compra().
+            "paese": paese, "zona": _zona_ordine(a, paese),
+            # il paese di CASA di questo venditore: senza, il client
+            # non saprebbe che «dom» qui vuol dire Italia (e domani,
+            # su un altro venditore, Spagna)
+            "domestico": _domestico(a),
+            # quali zone questo annuncio serve davvero: il menu dei
+            # paesi spegne le altre invece di far scoprire la porta
+            # chiusa dopo averla scelta
+            "zone_offerte": [z for z in ZONE_SPEDIZIONE
+                             if _zona_offerta(a, z)]}
 
 
 async def _preventivo_set(user: dict, d: dict) -> dict:
@@ -24613,6 +25421,12 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     lettura, il conto dalle stesse pure. Le strade del set restano
     quelle FISICHE (intersezione), col punto in piu' se lo
     spedizioniere e' dichiarato."""
+    # La destinazione, dal giudice unico: assente = il domestico (il
+    # mondo di ieri), presente e ignota = 400. Sta PRIMA di aprire il
+    # database perche' e' una pura, e un 400 che non ha aperto niente
+    # non ha niente da chiudere. La ZONA si risolve dopo, sull'annuncio:
+    # dipende anche dal paese di casa del venditore.
+    paese = _paese_da_payload(d)
     grezze = d.get("righe") or []
     if not isinstance(grezze, list) or len(grezze) < 2:
         raise HTTPException(400, "Un set ha almeno due oggetti diversi: "
@@ -25073,9 +25887,29 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
                                           in richieste.items()], articolo,
                                          cambio, strade, articolo_eur,
                                          sconto, sconto_eur,
-                                         _sped_gratis(misura_art, misura_eur,
-                                                      sog_gratis, val_sg),
-                                         accordo_sats_v, accordo_eur),
+                                         _sped_gratis(
+                                             misura_art, misura_eur,
+                                             sog_gratis, val_sg,
+                                             _zona_ordine(
+                                                 next(iter(tutti.values())),
+                                                 paese) if tutti else "dom"),
+                                         accordo_sats_v, accordo_eur,
+                                         paese),
+            "paese": paese,
+            # la zona del set: una sola per costruzione (i pezzi sono
+            # di un venditore solo; se i loro paesi di casa
+            # divergessero, _compra_set dice no e qui si mostra la
+            # prima, che e' quel che la pagina sa gia' disegnare)
+            "zona": _zona_ordine(next(iter(tutti.values())), paese)
+                    if tutti else "dom",
+            "domestico": _domestico(next(iter(tutti.values())))
+                         if tutti else DOMESTICO_DEFAULT,
+            # l'INTERSEZIONE, come per le strade fisiche: un pacco solo
+            # non parte per meta', quindi una zona la serve il set solo
+            # se la servono TUTTI i pezzi
+            "zone_offerte": [z for z in ZONE_SPEDIZIONE
+                             if all(_zona_offerta(x, z)
+                                    for x in tutti.values())],
             "righe": righe}
 
 
@@ -25089,6 +25923,12 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # con annuncio_id tutto e' l'acquisto di sempre, byte per byte.
     if not d.get("annuncio_id") and isinstance(d.get("righe"), list):
         return await _compra_set(user, d)
+    # La destinazione, dal giudice unico: assente = il domestico (il
+    # mondo di ieri), presente e ignota = 400. Sta PRIMA di aprire il
+    # database perche' e' una pura, e un 400 che non ha aperto niente
+    # non ha niente da chiudere. La ZONA si risolve dopo, sull'annuncio:
+    # dipende anche dal paese di casa del venditore.
+    paese = _paese_da_payload(d)
     con = db()
     a = con.execute("SELECT * FROM annunci WHERE id=? AND stato='attivo'",
                     (d["annuncio_id"],)).fetchone()
@@ -25144,6 +25984,23 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                   else "servizio" if "servizio" in disponibili
                   else "digitale")
 
+    # LA PORTA DELLA ZONA (set 2026): una zona lasciata vuota dal
+    # venditore vuol dire «li' non spedisco», e chi ha la destinazione
+    # li' non compra — col PERCHE' scritto, che e' la meta' che conta.
+    # Un 404 o un silenzio manderebbero a cercare il guasto dalla
+    # parte sbagliata; qui si dice chi ha deciso e cosa si puo' fare.
+    # La pagina d'acquisto lo sa gia' (`zone_offerte` nel preventivo)
+    # e la strada e' spenta prima: questo e' il gate che fa fede.
+    zona = _zona_ordine(a, paese)
+    if scelta == "spedizione" and not _zona_offerta(a, zona):
+        con.close()
+        raise HTTPException(400,
+            f"Questo venditore non spedisce in "
+            f"{frase_zona(zona, paese, _domestico(a))}: scegli un'altra "
+            f"destinazione"
+            + (", oppure il ritiro in zona"
+               if "ritiro" in disponibili else ""))
+
     # La VIA della spedizione (ago 2026, pagina d'acquisto): 'casa' e'
     # il default — i client di ieri non mandano il campo e per loro
     # nulla cambia — 'punto' e' la spedizione a un punto di ritiro,
@@ -25164,6 +26021,17 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             con.close()
             raise HTTPException(400, "Il punto di ritiro vale solo con "
                                      "la spedizione")
+        # I PUNTI DI RITIRO SONO A CASA (set 2026): le reti che
+        # conosciamo sono italiane, e un locker di Poste Italiane a
+        # Lisbona non esiste. Il preventivo la via nemmeno la offre,
+        # fuori dal domestico; questa e' la cintura per chi arriva con
+        # un body scritto a mano.
+        if zona != "dom":
+            con.close()
+            raise HTTPException(400, "I punti di ritiro che conosciamo "
+                                     "sono in Italia: per una "
+                                     "destinazione all'estero c'è la "
+                                     "spedizione a casa")
         # QUARTO giro, il patto del set (rovescia il terzo): il punto
         # si sceglie SEMPRE in pagina — la regola vive nel CLIENT, e
         # il 400 resta SOLO con la rete dichiarata: tolleranza per il
@@ -25226,7 +26094,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     ind, ind_atteso = "", 0
     if scelta == "spedizione" and not via_punto:
         try:
-            ind, ind_atteso = _indirizzo_da_payload(d)
+            ind, ind_atteso = _indirizzo_da_payload(d, paese)
         except HTTPException:
             con.close()
             raise
@@ -25306,6 +26174,22 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                   # grezzo direbbe «diversa» su un ordine identico.
                   and (mio["rete_punto"] or "") == rete
                   and (mio["tipo_punto"] or "") == tipo
+                  # E LA ZONA (set 2026), per la ragione identica: la
+                  # zona CAMBIA IL PREZZO, quindi entra nel confronto
+                  # come tutto cio' che lo cambia. Senza questa riga
+                  # chi sceglie Italia, tocca Paga, si accorge che il
+                  # regalo va a Berlino e corregge la destinazione si
+                  # ritroverebbe LA FATTURA DI PRIMA — alla tariffa
+                  # italiana — e il venditore un pacco per la Germania
+                  # pagato come Bari: lo stesso identico guasto da cui
+                  # sono nate le due righe qui sopra.
+                  # SI NORMALIZZA '' A 'it', e non e' cosmesi: gli
+                  # ordini 'creato' nati prima del cantiere hanno la
+                  # colonna vuota, e un confronto secco li dichiarerebbe
+                  # tutti «diversi» — cioe' una fattura nuova a ogni
+                  # tocco su Paga per chi aveva un ordine in sospeso il
+                  # giorno del deploy.
+                  and (mio["zona_sped"] or "dom") == zona
                   # E IL CODICE SCONTO, che il prezzo lo cambia per
                   # costruzione — quindi entra nel confronto come tutto
                   # cio' che lo cambia, al contrario dell'indirizzo (che
@@ -25417,6 +26301,11 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
                     "consegna": mio["consegna_scelta"],
                     "punto_ritiro": mio["punto_ritiro"],
                     "via_punto": mio["via_punto"] or 0,
+                    # la zona CONGELATA nell'ordine, non quella appena
+                    # chiesta: la fattura ripresentata e' quella di
+                    # prima, e deve raccontare se stessa
+                    "zona": mio["zona_sped"] or "",
+                    "paese": mio["paese_sped"] or "",
                     # anche sulla ripresa: chi ha appena scritto
                     # un'email deve sapere che non e' stata salvata,
                     # e la fattura ripresentata non cambia niente
@@ -25544,7 +26433,7 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # preventivo devono dire la stessa cifra per costruzione. Qui
     # restano cambio, 503 e tetto — hanno await e HTTPException.
     adesso = int(time.time())
-    t_eur = (_tariffa_dichiarata(a, via)[1]
+    t_eur = (_tariffa_dichiarata(a, via, zona)[1]
              if scelta == "spedizione" else 0.0)
     cambio_ordine = 0.0
     # LE PROMESSE DEL VENDITORE SI LEGGONO QUI, e la posizione e' il
@@ -25682,7 +26571,8 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     # con le colonne `spedizione*_eur` di annunci — chi ne aggiungera'
     # una quarta lo sentira' dalla CI invece che da un 500.
     sp = _sped_pacco([(a, richiesti)],
-                     via if scelta == "spedizione" else "", cambio_ordine)
+                     via if scelta == "spedizione" else "", cambio_ordine,
+                     paese)
     sped = sp["sats"]
     # LE DUE PROMESSE, sullo stesso LORDO — e dall'ago 2026 tutte e
     # due anche sul MONO (decisione di Andrea, che ROVESCIA il «il
@@ -25703,7 +26593,8 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
     sconto, pct, chi_sc = _sconto_vincente(articolo, misura_eur, richiesti,
                                            regole_sc, cod_reg, cambio_misura)
     sped_gratis_sats, supplemento = 0, sp["supplemento"]
-    if sped and _sped_gratis(articolo, misura_eur, sog_gratis, val_sg):
+    if sped and _sped_gratis(articolo, misura_eur, sog_gratis, val_sg,
+                             zona):
         # intera, supplemento compreso: e' quello che il venditore
         # promette quando dice «la spedizione la offro io»
         sped_gratis_sats, sped, supplemento = sped, 0, 0
@@ -25796,15 +26687,22 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         "INSERT INTO ordini(cassaforte,annuncio_id,compratore_id,venditore_id,prezzo_sats,"
         "stato,payment_hash,invoice,creato,aggiornato,cambio_ordine,"
         "consegna_scelta,punto_ritiro,via_punto,rete_punto,tipo_punto,"
-        "punto_barattolo,nota_compratore,email_corriere,email_corriere_il,"
+        "punto_barattolo,zona_sped,paese_sped,domestico_sped,"
+        "nota_compratore,email_corriere,email_corriere_il,"
         "indirizzo,indirizzo_il,indirizzo_atteso,spedizione_sats,"
         "protezione_sats,quantita,sconto_sats,sconto_percento,"
         "sped_gratis_sats,codice_sconto,codice_sconto_id) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (cf, a["id"], user["id"], a["venditore_id"], totale,
          "creato", inv["payment_hash"], inv["payment_request"],
          int(time.time()), int(time.time()),
          cambio_ordine, scelta, punto, via_punto, rete, tipo, pid,
+         # la zona applicata, il paese che l'ha decisa e il paese di
+         # CASA (vuoti fuori dalla spedizione: il ritiro non ha una
+         # destinazione)
+         zona if scelta == "spedizione" else "",
+         paese if scelta == "spedizione" else "",
+         _domestico(a) if scelta == "spedizione" else "",
          nota,
          # il timbro guarda il BLOB e non il testo: col degrado non c'e'
          # niente in colonna, quindi non c'e' nessun «primo» da datare
@@ -25870,6 +26768,15 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
             "rete_punto": rete, "tipo_punto": tipo,
             "punto_barattolo": pid,
             "nota_compratore": nota,
+            # LA ZONA APPLICATA torna a chi paga (set 2026): il
+            # paySheet riscrive le sue righe con le cifre della
+            # RISPOSTA un istante dopo averle scritte con quelle del
+            # preventivo, e una zona che sparisce fra i due si legge
+            # come «e' cambiato qualcosa» proprio mentre si paga. E'
+            # la stessa ragione per cui viaggiano `consegna` e
+            # «per N pezzi».
+            "zona": zona if scelta == "spedizione" else "",
+            "paese": paese if scelta == "spedizione" else "",
             "quantita": richiesti, "articolo_unitario_sats": unitario,
             "offerta_id": off["id"] if off else 0}
 
@@ -25962,11 +26869,20 @@ async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header(""),
 # giudice e' PURO e prende i campi, non la riga (il patto di in_ferie):
 # cosi' serve l'ordine vero e la prova in CI.
 def _coda_ricevuta(consegna: str, via_punto: int, punto_scritto: bool,
-                   ind_atteso: int, ind_scritto: bool) -> str:
+                   ind_atteso: int, ind_scritto: bool,
+                   zona: str = "", paese: str = "",
+                   domestico: str = "") -> str:
     """Cosa succede ADESSO, secondo la strada che il compratore ha
     scelto. Statica: nessun testo dell'utente ci entra mai — il punto
     di ritiro lo si guarda solo per sapere SE c'e', il suo contenuto
-    resta nell'ordine, dove passa da esc()."""
+    resta nell'ordine, dove passa da esc().
+
+    LA ZONA SI DICE SEMPRE DOVE SI SPEDISCE (set 2026, chiesto da
+    Andrea): e' la ricevuta di QUALE tariffa e' stata applicata, e una
+    ricevuta che la nomina solo quando e' insolita non serve a niente
+    — proprio sul caso normale e' quella che chiude la discussione.
+    I nomi escono dal catalogo tramite `frase_zona`, mai dal testo di
+    qualcuno: qui dentro non entra una parola scritta da un utente."""
     if consegna == "digitale":
         # MAI «i sats partono solo quando confermi»: sul digitale il
         # tempo cammina da solo. Il come e il quando li dice la
@@ -25977,15 +26893,19 @@ def _coda_ricevuta(consegna: str, via_punto: int, punto_scritto: bool,
         return ("mettetevi d'accordo con il venditore per il ritiro. "
                 "Quando hai l'oggetto in mano, confermalo nella Mini "
                 "App e i sats vanno a lui.")
+    zona = (f" La tariffa applicata è quella per "
+            f"{frase_zona(zona, paese, domestico)}."
+            if consegna == "spedizione" else "")
     if consegna == "spedizione" and via_punto:
         if not punto_scritto:
             # Il residuo del quarto giro (ordini nati da un client di
             # ieri, che il server tollera senza punto): qui la palla e'
             # SUA, e il venditore non puo' spedire finche' non scrive.
             return ("indica il punto di ritiro nell'ordine, che al "
-                    "venditore serve per spedire il pacco.")
+                    "venditore serve per spedire il pacco." + zona)
         return ("il venditore spedisce al punto di ritiro che hai "
-                "scelto. Ti avvisiamo appena il pacco ti aspetta là.")
+                "scelto. Ti avvisiamo appena il pacco ti aspetta là."
+                + zona)
     if consegna == "spedizione":
         # TRE rami e non due, ed e' la stessa distinzione del punto:
         # l'indirizzo SCRITTO si nomina, quello ATTESO si chiede, e
@@ -25996,13 +26916,13 @@ def _coda_ricevuta(consegna: str, via_punto: int, punto_scritto: bool,
             return ("il venditore spedisce all'indirizzo che hai "
                     "indicato e ti manda il tracciamento. Quando "
                     "arriva, confermalo nella Mini App e i sats vanno "
-                    "a lui.")
+                    "a lui." + zona)
         if ind_atteso:
             return ("indica l'indirizzo di spedizione nell'ordine, che "
-                    "al venditore serve per spedire il pacco.")
+                    "al venditore serve per spedire il pacco." + zona)
         return ("il venditore prepara il pacco e ti manderà il "
                 "tracciamento. Quando arriva, confermalo nella Mini "
-                "App e i sats vanno a lui.")
+                "App e i sats vanno a lui." + zona)
     # Consegna non dichiarata: gli annunci storici e gli importati da
     # Nostr, dove il tag `delivery` non c'era. Nessuna promessa su una
     # strada che nessuno ha scelto.
@@ -26177,6 +27097,22 @@ async def _incassa_ordine(ordine_id: int) -> dict:
         msg += ("\n\n🏠 Il compratore ha scelto la <b>spedizione a "
                 "casa</b>: indicherà l'indirizzo nell'ordine, e ti "
                 "avviseremo appena lo scrive.")
+    # LA ZONA, e SOLO quando non e' l'Italia (set 2026). Qui la regola
+    # e' l'opposto di quella della ricevuta, ed e' deliberato: al
+    # compratore la zona si dice SEMPRE perche' e' la ricevuta della
+    # tariffa che ha pagato, al venditore si dice quando CAMBIA QUEL
+    # CHE DEVE FARE — una riga «destinazione: Italia» su
+    # novantanove vendite su cento e' rumore, e il rumore si impara a
+    # saltare proprio in tempo per saltare quella che contava.
+    # Il nome del paese esce dal CATALOGO e mai dal testo di qualcuno:
+    # `frase_zona` non sa nemmeno leggere l'indirizzo, e la notifica e'
+    # HTML — la lezione dell'avviso di spedizione.
+    if (o["consegna_scelta"] == "spedizione"
+            and (o["zona_sped"] or "dom") != "dom"):
+        msg += (f"\n\n🌍 Questa spedizione va "
+                f"<b>fuori casa</b>: {frase_zona(o['zona_sped'], o['paese_sped'], o['domestico_sped'])}. "
+                f"Controlla la tariffa che hai dichiarato per quella "
+                f"zona prima di comprare l'etichetta.")
     # LA NOTA e' un «if» a se' e non un quinto ramo della catena qui
     # sopra: quella e' mutuamente esclusiva sulla STRADA, la nota no —
     # si puo' avere una nota su qualunque via, e su nessuna. Il testo
@@ -26214,7 +27150,9 @@ async def _incassa_ordine(ordine_id: int) -> dict:
                    + _coda_ricevuta(o["consegna_scelta"], o["via_punto"],
                                     bool(o["punto_ritiro"]),
                                     o["indirizzo_atteso"],
-                                    bool(o["indirizzo_il"])))
+                                    bool(o["indirizzo_il"]),
+                                    o["zona_sped"], o["paese_sped"],
+                                    o["domestico_sped"]))
     # Il polso dei moderatori: e' nato un ordine, sats in cassaforte
     await polso_ordini_admin(
         f"🛒 <b>Nuovo ordine:</b> «{titolo}» — "
@@ -26734,9 +27672,13 @@ async def indica_indirizzo(ordine_id: int, req: Request,
     il testo del compratore non entra MAI in un tubo HTML."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
-    ind, _atteso = _indirizzo_da_payload(d)
-    if not ind:
-        raise HTTPException(400, "Scrivi l'indirizzo per la spedizione")
+    # IL PAESE LO DICE L'ORDINE, NON QUESTA RICHIESTA (set 2026), e per
+    # questo la lettura del payload e' scesa SOTTO le guardie: la zona
+    # e' stata scelta quando si e' pagato, e da qui non si cambia — chi
+    # corregge l'indirizzo corregge la via e il civico, non la tariffa
+    # gia' incassata. Scrivere il paese dal body vorrebbe dire lasciar
+    # spostare un pacco da Bari a Sydney dopo che i sats sono in
+    # cassaforte, che e' il gemello del guasto chiuso nella ripresa.
     con = db()
     o = con.execute("SELECT * FROM ordini WHERE id=? AND compratore_id=? "
                     "AND stato='locked'", (ordine_id, user["id"])).fetchone()
@@ -26747,6 +27689,14 @@ async def indica_indirizzo(ordine_id: int, req: Request,
         con.close()
         raise HTTPException(400, "Questo ordine non è una spedizione a "
                                  "casa")
+    try:
+        ind, _atteso = _indirizzo_da_payload(d, o["paese_sped"] or "")
+    except HTTPException:
+        con.close()
+        raise
+    if not ind:
+        con.close()
+        raise HTTPException(400, "Scrivi l'indirizzo per la spedizione")
     adesso = int(time.time())
     correzione = bool(o["indirizzo_il"])
     con.execute("UPDATE ordini SET indirizzo=?, indirizzo_il=?, "
@@ -38740,6 +39690,8 @@ def scarica_export(biglietto: str):
     righe = con.execute(
         "SELECT o.id, o.annuncio_id, o.aggiornato, o.prezzo_sats, o.stato, "
         "o.cambio_eur, o.venditore_id, o.consegna_scelta, o.indirizzo, "
+        # la zona applicata: la colonna nuova del foglio (set 2026)
+        "o.zona_sped, o.paese_sped, o.domestico_sped, "
         "o.indirizzo_purgato_il, a.titolo, a.zona, a.servizio_dove, "
         "uc.username AS compratore_username FROM ordini o "
         # LEFT: i SET (annuncio_id=0) devono uscire in contabilita'
@@ -38761,8 +39713,11 @@ def scarica_export(biglietto: str):
     con.close()
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";")    # il ; e' il CSV che Excel italiano apre bene
+    # «zona» dopo «consegna»: e' la tariffa che e' stata applicata,
+    # e in contabilita' una spedizione in Australia e una a Bari non si
+    # distinguerebbero altrimenti (set 2026).
     w.writerow(["data", "ruolo", "annuncio", "sats", "esito",
-               "controvalore_eur", "compratore", "consegna", "dove"])
+               "controvalore_eur", "compratore", "consegna", "zona", "dove"])
     CONSEGNA_ETICHETTA = {"spedizione": "spedizione", "ritiro": "ritiro in zona",
                           "digitale": "digitale", "servizio": "servizio"}
     for r in righe:
@@ -38806,7 +39761,14 @@ def scarica_export(biglietto: str):
         w.writerow([time.strftime("%Y-%m-%d", time.localtime(r["aggiornato"])),
                     "vendita" if mio_lato_vendita else "acquisto",
                     titoli_set.get(r["id"], r["titolo"] or "?"), r["prezzo_sats"],
-                    esito, eur, compratore, consegna, dove_consegnare])
+                    esito, eur, compratore, consegna,
+                    # vuota fuori dalla spedizione: un ritiro a mano
+                    # non ha una zona, e scriverne una sarebbe un dato
+                    # inventato in un foglio di contabilita'
+                    (frase_zona(r["zona_sped"], r["paese_sped"],
+                                r["domestico_sped"])
+                     if r["consegna_scelta"] == "spedizione" else ""),
+                    dove_consegnare])
     nome = time.strftime(
         f"barattolo-affari{'-tutti' if tutti else ''}-%Y%m%d.csv")
     return Response(content="\ufeff" + buf.getvalue(),   # BOM: cosi' Excel legge l'UTF-8
@@ -39181,7 +40143,8 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
         else:
             payload_consegna["spedizione_extra_sats"] = extra_testo or 0
         (consegna, sped_sats, sped_eur, punto_sats, punto_eur,
-         punto_dich, extra_sats, extra_eur, taglia, anche_dig) = \
+         punto_dich, extra_sats, extra_eur, taglia, anche_dig,
+         _domestico_csv, zone_csv) = \
             await consegna_da_payload(payload_consegna, valuta)
         # La regola della zona e' quella del form Vendi (lug 2026): col
         # RITIRO il comune e' d'obbligo, e in ogni caso una zona
@@ -39240,6 +40203,16 @@ async def import_prepara(req: Request, x_tg_init_data: str = Header(""),
                       "spedizione_punto_dichiarata": punto_dich,
                       "spedizione_extra_sats": extra_sats,
                       "spedizione_extra_eur": extra_eur,
+                      # LE ZONE: il CSV dichiara il DOMESTICO e
+                      # nient'altro (set 2026). Il modello non ha
+                      # colonne per l'estero, e un catalogo che non
+                      # nomina l'estero non lo sta promettendo — le
+                      # altre zone restano spente, che e' la risposta
+                      # vera. Si scrive la mappa invece di lasciarla
+                      # dedurre al ripiego di `_zona_offerta`: quel
+                      # ripiego e' per il mondo di ieri, non per una
+                      # porta che scriviamo oggi.
+                      "spedizione_zone": zone_json(zone_csv),
                       "taglia_pacco": taglia,
                       "anche_digitale": anche_dig,
                       # colonna facoltativa, sinonimi tollerati:
@@ -39349,8 +40322,9 @@ async def _crea_riga_import(lavoro: dict, riga: dict):
         "spedizione_punto_sats,spedizione_punto_eur,"
         "spedizione_punto_dichiarata,"
         "spedizione_extra_sats,spedizione_extra_eur,taglia_pacco,"
+        "spedizione_zone,"
         "anche_digitale,condizione,quantita,quantita_max,stato,creato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (lavoro["tg_id"], riga["titolo"], riga["descrizione"],
          riga["categoria"], riga.get("sottocategoria", ""),
          riga["prezzo_sats"], riga["zona"],
@@ -39364,6 +40338,7 @@ async def _crea_riga_import(lavoro: dict, riga: dict):
          riga.get("spedizione_extra_sats", 0),
          riga.get("spedizione_extra_eur", 0),
          riga.get("taglia_pacco", ""),
+         riga.get("spedizione_zone", ""),
          riga.get("anche_digitale", 0), riga.get("condizione", ""),
          # il massimo nasce uguale alla quantita', come in pubblica():
          # questo INSERT ha una vita sua ed e' il punto che si dimentica

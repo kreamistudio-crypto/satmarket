@@ -17177,3 +17177,186 @@ alla lettera: nel giro dal dito i veli sono DUE — quello di
 `eseguiConferma` e quello del gesto — quindi la stringa esatta
 racconta un'impilatura che non è la cosa da difendere. Si contano le
 accensioni e gli spegnimenti, e si chiede «adesso è acceso?».
+
+LE ZONE DI SPEDIZIONE (set 2026, richiesta di un utente: «gratis in
+Italia, 15 € in Europa, 40 € fuori»). La tariffa secondo DOVE va il
+pacco: il PAESE DI CASA del venditore più i SETTE continenti — Europa,
+Asia, Nord America, Sud America, Oceania, Africa, Medio Oriente. È la
+terza dimensione del costo dopo la VIA (casa/punto) e il PEZZO (il
+supplemento), e come le altre due si appoggia su `consegna_scelta`
+senza toccarla: il patto di via_punto e di anche_digitale, così timer,
+solleciti e finestre restano veri per costruzione.
+
+**IL CANTIERE HA CAMBIATO FORMA A METÀ, e la prima stesura è morta.**
+Era partito con TRE FASCE FISSE (Italia / Europa UE / resto del
+mondo) in sette colonne nuove; a lavoro finito e prove verdi Andrea ha
+fermato tutto e ha dato lo schema definitivo — paese domestico
+configurabile, sette continenti, e sotto il cofano una MAPPA zona →
+prezzo invece di colonne fisse. Quel che si è salvato è l'IMPIANTO
+(dove si innesta un giudice, quali superfici devono dirlo, quali gate
+servono); quel che si è buttato sono i nomi e la forma dei dati. La
+lezione: su una struttura dati il secondo giro costa poco se il primo
+ha già trovato tutti i punti di innesto, e moltissimo se ha già
+migrato dei dati. Qui non aveva ancora migrato niente.
+
+**DUE COLONNE E NON OTTO**, ed è la decisione di struttura: le tariffe
+fuori casa vivono in `annunci.spedizione_zone`, un JSON {zona:
+{"sats", "eur"}}. Il giorno che servirà un override per un singolo
+paese («in Francia 12.000, nel resto d'Europa 20.000») sarà una chiave
+in più dentro quel JSON — senza ALTER TABLE, senza un deploy che tocca
+il database, senza una riga nuova nei quindici posti che leggono un
+annuncio. **LA PRESENZA DELLA CHIAVE È LA DICHIARAZIONE**: la zona c'è
+= spedisco lì (0 = gratis), non c'è = lì non spedisco. Un dizionario
+sa distinguere «assente» da «zero», che è precisamente ciò che una
+colonna INTEGER non sa fare — con gli INTEGER sarebbe servito un flag
+per zona, e un flag dimenticato è una porta aperta.
+
+**IL DOMESTICO NON STA NELLA MAPPA**, e va detto perché sembra
+un'incoerenza: è rimasto `spedizione_sats`/`spedizione_eur`, le
+colonne di sempre, e nella mappa entra solo per DIRSI dichiarato (i
+due numeri escono da un `_leggi_costo` solo e non possono divergere).
+Non è pigrizia: quel numero lo leggono già la card della vetrina, il
+NIP-99, il post del canale, l'import CSV, i negozi collegati, il libro
+mastro e il filtro della ricerca, tutti scritti prima di questo
+cantiere. Spostarlo sarebbe stato un cantiere di migrazione su tutta
+l'app per guadagnare una simmetria; la mappa serve a ciò che è NUOVO e
+a ciò che verrà.
+
+**IL PAESE DI CASA È CONFIGURABILE** (default Italia): è la riga che
+rende il mercatino esportabile senza un secondo cantiere — un
+venditore spagnolo dichiara ES e le sue tariffe funzionano identiche.
+E **IL DOMESTICO VINCE SEMPRE SUL SUO CONTINENTE**: chi vende da
+Milano scrive «Italia 0» ed «Europa 20.000», e un ordine da Roma paga
+zero anche se l'Italia in Europa ci sta. Senza quella precedenza le due
+righe si contraddirebbero e vincerebbe quella scritta per ultima.
+
+**IL COMPRATORE SCEGLIE UN PAESE, NON UNA ZONA**, ed è la decisione
+che regge tutto il resto: «sono in Francia» è una cosa che si sa,
+«sono in fascia UE» è una cosa da indovinare. La zona la deriva il
+server, e così San Marino e la Città del Vaticano stanno in fascia
+ITALIA (decisione di Andrea) senza che nessuno debba saperlo — per un
+corriere italiano sono spedizioni di casa. Gli enclavati stanno in una
+tabella PER DOMESTICO, così il giorno che il domestico sarà CH o ES ci
+sarà la sua riga.
+
+**LA TABELLA PAESE → CONTINENTE È NOSTRA**, scritta a mano in
+`server.py`, 224 paesi raggruppati PER ZONA (così la decisione si
+legge a colpo d'occhio invece di ricostruirla leggendo duecento
+righe). Niente libreria: una dipendenza esterna per una tabella che
+cambia una volta ogni dieci anni si paga a ogni deploy. Il modello è
+quello dei sette continenti col MEDIO ORIENTE ritagliato dall'Asia —
+è la zona che i corrieri prezzano a parte, ed è l'unica ragione per
+cui esiste come voce.
+**LE DECISIONI AMBIGUE, a verbale perché qualcuno le ricontesterà:**
+· **RUSSIA → EUROPA.** Tre quarti della popolazione sta a ovest degli
+  Urali e i corrieri la prezzano con l'Europa. Il verso giusto in cui
+  sbagliare: chi spedisce a Vladivostok se ne accorge, chi spedisce a
+  Mosca no.
+· **TURCHIA → MEDIO ORIENTE.** Geograficamente è divisa; la voce
+  «Medio Oriente» esiste per prezzare diversamente dall'Europa, e con
+  l'Europa la Turchia non ci sta nelle tariffe vere.
+· **REGNO UNITO → EUROPA.** La zona qui è il CONTINENTE, non l'Unione:
+  la dogana la fa il paese, non la nostra tabella. (È anche il punto
+  in cui la prima stesura — dove «Europa» era l'UE — si è semplificata
+  passando ai continenti.)
+· **CIPRO → EUROPA** (geograficamente Asia, ma è UE e per un corriere
+  europeo è Europa). **Caucaso (GE, AM, AZ) → ASIA. America centrale e
+  Caraibi → NORD AMERICA**, il modello continentale classico.
+  **EGITTO → AFRICA.**
+Ognuna ha la sua prova col suo nome: cambiarla vuol dire far diventare
+rossa una riga che la nomina.
+
+**LA MIGRAZIONE A** (decisione di Andrea): il costo di oggi si copia
+sul prezzo domestico E su tutti i continenti. L'alternativa era
+lasciare l'estero spento e farlo accendere a chi lo vuole; si è scelto
+di non chiedere niente a nessuno. **LA CONSEGUENZA SI DICHIARA invece
+di nasconderla**: da domani gli annunci già pubblicati spediscono
+anche fuori, alla tariffa di casa — chi non vuole svuota la casella, e
+il foglio glielo dice.
+
+**LA PROMESSA «SPEDIZIONE GRATIS SOPRA SOGLIA» VALE SOLO A CASA**, ed
+è una CINTURA messa da chi scriveva il cantiere e non una richiesta:
+chi promette «da 50 € la spedizione la offro io» sta pensando al pacco
+per Bari, non a quello per Sydney. Senza quella riga il travaso —
+che apre TUTTI gli annunci esistenti al mondo intero — avrebbe anche
+regalato la tariffa più cara del catalogo a ogni negozio che quella
+promessa ce l'aveva già accesa: due decisioni innocue che si
+moltiplicano in una terza che nessuno ha preso. Riaprirla è togliere
+un `if`, ma va DECISO — e il giorno che si decidesse, la promessa
+andrebbe dichiarata PER ZONA, che è la forma che la mappa già regge.
+
+**IL PAESE È ENTRATO NELL'INDIRIZZO**, e senza non stava in piedi
+niente: «Europa» non è un indirizzo, «Francia» sì. Lo scrive il SERVER
+dal codice scelto, mai il client — così non si può mandare 'FR' e
+farsi scrivere «Italia» accanto, che sarebbe una tariffa e un
+indirizzo che dicono due paesi diversi mentre a spedire è il
+venditore. E la CORREZIONE dell'indirizzo legge il paese
+DALL'ORDINE: dal body si sposterebbe un pacco da Bari a Sydney a sats
+già incassati, il gemello del guasto chiuso nella ripresa.
+
+**LA VIA PUNTO ESISTE SOLO A CASA**: le reti che conosciamo sono
+italiane, e un locker di Poste Italiane a Lisbona non c'è. Fuori dal
+domestico la via non si offre per niente — spenta col motivo sarebbe
+peggio, perché il motivo suonerebbe come una scelta del venditore.
+
+**LA ZONA SI DICE DOVE LA SPEDIZIONE SI NOMINA** (chiesto da Andrea):
+ricevuta del compratore, riga dell'ordine che leggono tutt'e due le
+parti, CSV della contabilità (colonna `zona` nuova, fra `consegna` e
+`dove`) e — al venditore — una riga nella notifica di vendita, ma SOLO
+quando non è casa. Le due regole sono opposte apposta: al compratore
+la zona è la ricevuta della tariffa che ha pagato e si dice sempre; al
+venditore si dice quando CAMBIA QUEL CHE DEVE FARE, e una riga
+«destinazione: Italia» su novantanove vendite su cento è rumore che si
+impara a saltare proprio in tempo per saltare quella che contava.
+
+**DUE GUASTI VERI TROVATI DAL BANCO, e nessuno dei due da una
+rilettura.**
+1) **IL TRAVASO NON SCRIVEVA `dom` NELLA MAPPA**, e l'ha detto il giro
+di fumo su una COPIA del database vero: il ripiego di `_zona_offerta`
+vale sulla mappa VUOTA, e dopo il travaso vuota non lo è più — quindi
+ogni annuncio già pubblicato avrebbe smesso di spedire IN CASA il
+minuto del deploy. Il guasto peggiore che questo cantiere potesse
+produrre, e invisibile a chiunque legga il codice convinto che il
+ripiego basti.
+2) **IL CATALOGO STAVA SOTTO `init_db()`**, che lo usa: il server non
+partiva proprio. L'hanno visto i log del giro dal vivo, non le prove —
+quelle montano i pezzi a mano e l'ordine del file non lo vedono mai.
+Il blocco è salito sopra `init_db` con la riga che dice perché sta lì.
+**E IL SECONDO HA INSEGNATO UNA TERZA COSA**: il crash era avvenuto
+FRA l'ALTER e il travaso, lasciando la colonna nata e il travaso mai
+fatto — cioè saltato per sempre. Il gate è diventato `paese_domestico`,
+che nasce PER ULTIMA, dopo il travaso: un errore in mezzo lascia il
+lavoro ancora da fare invece di saltarlo, e un giro interrotto riprende
+dalle righe che gli mancano (`AND spedizione_zone=''`).
+
+**COLLAUDATO: 10.714 prove verdi, 0 rosse** (erano 10.572) — la
+famiglia nuova `prove_zone_spedizione` con la tabella dei paesi
+torturata voce per voce, le quattro decisioni ambigue ognuna con la
+sua riga, il ripiego del domestico nei due versi, lo zero che è una
+promessa e non un'assenza, il parse difensivo su quattro modi di
+rompersi, il MAX del carrello sulla zona chiesta, la zona risolta PER
+RIGA (un annuncio spagnolo in un carrello italiano), e la sentinella
+che incrocia la tabella del client con quella del server **paese per
+paese, nome per nome**. Più il giro di fumo sulla copia del database
+locale (38 annunci travasati, una-tantum verificata rilanciando il
+travaso) e **il giro dal vivo**: form di pubblicazione a 375px col
+cassetto internazionale, pubblicazione end-to-end, il 400 onesto
+dell'annuncio senza zone, i preventivi da IT/SM/FR/AU/JP (San Marino
+paga come l'Italia, il Giappone è una porta chiusa col motivo), la
+**prova regina preventivo == fattura AL SAT** su una destinazione
+estera, la zona scritta nell'ordine e nella ricevuta, il paese dentro
+l'indirizzo cifrato, e la promessa del negozio che scatta a casa e non
+in Francia.
+
+**IN PRODUZIONE BASTA IL DEPLOY**: due colonne nuove su `annunci`, tre
+su `ordini`, e il travaso una-tantum che gira all'avvio (stampa quanti
+annunci ha toccato). **DA GUARDARE al primo giro**: il primo venditore
+che apre il cassetto internazionale, e il primo ordine dall'estero —
+che è anche il primo momento in cui si scopre se un corriere italiano
+accetta davvero l'indirizzo che gli abbiamo composto.
+**RESTA FUORI, e va detto**: la dogana. La riga nel cassetto dice che
+è a carico di chi riceve, ma nessuno la calcola e Barattolo non la
+anticipa. Il giorno che un venditore vero esporterà sul serio, quella
+riga non basterà — e la domanda («chi paga il dazio se il pacco torna
+indietro?») è la stessa famiglia del parere legale MiCA già nel
+backlog.

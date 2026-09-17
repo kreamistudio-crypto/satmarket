@@ -16754,6 +16754,54 @@
   `tag_commercio` ed `evento_annuncio` ciechi per sentinella
   (imperfezione dichiarata: un client Nostr vede la sola tariffa
   casa).
+  LE ZONE DI SPEDIZIONE (set 2026): la tariffa secondo DOVE va il
+  pacco. Catalogo `ZONE_SPEDIZIONE` = il domestico ('dom') piu' i
+  sette continenti (eu, asia, nordamerica, sudamerica, oceania,
+  africa, medioriente); `ZONA_ETICHETTA` i nomi pubblici, e 'dom'
+  prende il nome del PAESE dichiarato ("Italia", mai "domestico").
+  Sull'annuncio: `paese_domestico` ('' = IT) e `spedizione_zone`,
+  JSON {zona: {"sats", "eur"}} — due colonne per otto zone e per
+  quelle che verranno, cosi' un override per singolo paese sara' una
+  chiave in piu' invece di un ALTER TABLE. LA PRESENZA DELLA CHIAVE
+  E' LA DICHIARAZIONE: c'e' = spedisco li' (0 = gratis), non c'e' =
+  li' non spedisco — e' cio' che una colonna INTEGER non sa dire, ed
+  e' la ragione della mappa. Il DOMESTICO resta in
+  `spedizione_sats`/`spedizione_eur` (le leggono card, NIP-99,
+  canale, import CSV, connettori, libro mastro) e nella mappa entra
+  solo per dirsi dichiarato: i due numeri escono da un `_leggi_costo`
+  solo. `PAESI_PER_ZONA` e' la tabella nostra, 224 paesi raggruppati
+  per zona, e il blocco vive SOPRA `init_db()` perche' la migrazione
+  lo usa all'import. Giudici: `zona_da_paese(codice, domestico)` (il
+  domestico VINCE sul suo continente; `ENCLAVI_DOMESTICO` fa seguire
+  SM e VA all'Italia), `_paese_da_payload` (assente = mondo di ieri,
+  ignoto = 400 — l'unico punto in cui il cantiere si stacca dal
+  "sconosciuto -> vuoto"), `_zona_ordine(a, paese)`,
+  `_zone_annuncio` (parse difensivo: JSON storto = mappa vuota),
+  `_zona_offerta` (la porta: sul domestico ha il RIPIEGO della mappa
+  vuota, per i client e gli importatori che le zone non le
+  conoscono), `_tariffa_dichiarata(a, via, zona)`, `frase_zona` (come
+  si NOMINA, in un posto solo: ricevuta, ordine, CSV, disputa),
+  `zone_json` (come va in colonna), `guardia_almeno_una_zona`.
+  Sull'ordine: `zona_sped`, `paese_sped`, `domestico_sped` —
+  ortogonali a `consegna_scelta`, che resta 'spedizione' (il patto di
+  via_punto), e scritte SOLO sulla spedizione. La zona entra nel
+  confronto della RIPRESA ('' si normalizza a 'dom'). La via PUNTO si
+  offre solo a casa (le reti sono italiane).
+  `CAMPI_INDIRIZZO` ha il `paese`, scritto dal SERVER dal codice
+  scelto; la correzione dell'indirizzo lo legge DALL'ORDINE. La
+  promessa "spedizione gratis sopra soglia" vale SOLO a casa
+  (`_sped_gratis(..., zona)`). Vetrina: la card mostra il prezzo
+  DOMESTICO; il menu dei paesi della cassa spegne le zone non servite
+  (`zone_offerte` nel preventivo) e la strada esce con
+  `zona_non_offerta` invece di sparire. Client: catalogo gemello
+  compatto (`PAESI_ZONA_RAW`, "CC:Nome|CC:Nome") con una sentinella
+  che lo incrocia col server paese per paese; il form Vendi ha il
+  paese di casa, il suo prezzo, e i sette continenti dentro un
+  `<details>` "Spedizione internazionale" col conto delle zone accese
+  nel titolo. Vedi Cantieri, «LE ZONE DI SPEDIZIONE», per le quattro
+  decisioni ambigue (Russia, Turchia, Regno Unito, Cipro) e i due
+  guasti che ha trovato il banco.
+
   IL SUPPLEMENTO PER PEZZO (ago 2026, caso dal campo: il riso da 4 kg
   venduto a sacchi con la spedizione di UNO solo dichiarata — chi ne
   comprava dieci pagava la spedizione di uno, e ci rimetteva il

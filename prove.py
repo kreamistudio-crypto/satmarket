@@ -79,16 +79,43 @@ def codice(testo):
 _SORGENTE = open("server.py", encoding="utf-8").read()
 
 
-def reale(nome):
+def reale(nome, extra=None):
     """Il pezzo VERO, per gli ambienti finti che ne hanno bisogno.
     Meglio di uno stub scritto a mano, e la ragione l'ha insegnata
     _fmt_sats: il finto sollevava sul None esattamente come quello
     vero PRIMA della cura, quindi la prova restava rossa anche a
     guasto riparato — uno stub che imita un pezzo finisce per
-    imitarne anche i bug."""
-    amb = {}
+    imitarne anche i bug.
+
+    `extra` monta le dipendenze che il pezzo NOMINA (set 2026, col
+    cantiere delle zone: `_coda_ricevuta` chiama `frase_zona`, e un
+    exec nudo darebbe NameError). Ci vanno i pezzi VERI, mai stub —
+    vale parola per parola la ragione qui sopra."""
+    amb = dict(extra or {})
     exec(pezzo(nome), amb)
     return amb[nome]
+
+
+def cataloghi_zone():
+    """I cataloghi delle zone e i loro tre lettori, VERI.
+
+    SI ESEGUE LA FETTA DI SORGENTE invece di ricopiarla: una tabella
+    di paesi battuta a mano qui dentro resterebbe verde per sempre il
+    giorno che una voce cambia continente di la' — cioe' la prova
+    direbbe che la Turchia e' Medio Oriente mentre il mercatino la fa
+    pagare come Europa. E' la lezione di `reale`, applicata a dei
+    dati."""
+    amb = {}
+    # la fetta finisce a `def init_db(`, che e' cio' che segue il
+    # blocco: il catalogo vive SOPRA init_db apposta (la migrazione lo
+    # usa all'import), e agganciare la fine a un altro catalogo piu'
+    # in basso farebbe entrare qui dentro mezzo server.
+    i = _SORGENTE.index("ZONE_SPEDIZIONE = (")
+    exec(_SORGENTE[i:_SORGENTE.index("def init_db(")], amb)
+    return amb
+
+
+CATALOGHI_ZONE = cataloghi_zone()
 
 
 def _classe(nome):
@@ -6572,6 +6599,11 @@ def prove_indirizzo_casa():
         stato TEXT, consegna_scelta TEXT DEFAULT 'spedizione',
         via_punto INT DEFAULT 0, aggiornato INT DEFAULT 0,
         spedito_il INT DEFAULT 0, consegnato INT DEFAULT 0,
+        -- il paese dell'ordine (set 2026): la correzione dell'indirizzo
+        -- lo legge da QUI e mai dal body, o si sposterebbe un pacco a
+        -- sats gia' incassati
+        paese_sped TEXT DEFAULT '', zona_sped TEXT DEFAULT '',
+        domestico_sped TEXT DEFAULT '',
         indirizzo TEXT DEFAULT '', indirizzo_il INT DEFAULT 0,
         indirizzo_corretto_il INT DEFAULT 0,
         indirizzo_correzioni INT DEFAULT 0,
@@ -8276,18 +8308,23 @@ def prove_lista_ordini():
         CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
           compratore_id INT, venditore_id INT, prezzo_sats INT,
           stato TEXT, cambio_eur REAL, aggiornato INT,
-          consegna_scelta TEXT, indirizzo TEXT, indirizzo_purgato_il INT);
+          consegna_scelta TEXT, indirizzo TEXT, indirizzo_purgato_il INT,
+          zona_sped TEXT DEFAULT '', paese_sped TEXT DEFAULT '',
+          domestico_sped TEXT DEFAULT '');
         INSERT INTO annunci VALUES(1,'Un oggetto','Torino (TO)','');
         INSERT INTO utenti VALUES(222,'mariorossi');
         INSERT INTO ordini VALUES
           -- released, spedizione, ma indirizzo GIA' PURGATO: dove resta vuoto
-          (1,1,222,111,1000,'released',60000,1000,'spedizione','{"nome":"Mario Rossi"}',1500),
+          (1,1,222,111,1000,'released',60000,1000,'spedizione','{"nome":"Mario Rossi"}',1500,'dom','IT','IT'),
           -- creato, ritiro: dove diventa la zona dell'annuncio
-          (2,1,222,111,2000,'creato',60000,2000,'ritiro','',0),
-          -- dispute, spedizione, indirizzo VIVO: dove mostra i campi
-          (3,1,222,111,3000,'dispute',60000,3000,'spedizione','{"nome":"Ada Bianchi","via":"Via Roma 1","cap":"10100","citta":"Torino"}',0),
+          (2,1,222,111,2000,'creato',60000,2000,'ritiro','',0,'','',''),
+          -- dispute, spedizione, indirizzo VIVO: dove mostra i campi.
+          -- E' anche l'ordine ALL'ESTERO (set 2026): la colonna `zona`
+          -- del foglio deve dirlo, o in contabilita' una spedizione in
+          -- Francia e una a Bari sarebbero la stessa riga.
+          (3,1,222,111,3000,'dispute',60000,3000,'spedizione','{"nome":"Ada Bianchi","via":"Via Roma 1","cap":"10100","citta":"Torino"}',0,'eu','FR','IT'),
           -- annullato, digitale: nessun indirizzo possibile
-          (4,1,222,111,4000,'annullato',60000,4000,'digitale','',0);
+          (4,1,222,111,4000,'annullato',60000,4000,'digitale','',0,'','','');
         """)
         return c
 
@@ -8301,6 +8338,10 @@ def prove_lista_ordini():
                # si prova solo il FILO fra scarica_export e il letto
                "_indirizzo_letto": lambda blob: (
                    json_mod.loads(blob) if blob else None),
+               # il giudice VERO della zona, catalogo compreso: qui si
+               # prova il FILO, ma la frase dev'essere quella di
+               # produzione o il foglio direbbe un'altra cosa
+               "frase_zona": reale("frase_zona", CATALOGHI_ZONE),
                "BIGLIETTI_EXPORT": {"tik": (chi, time.time() + 300, tutti)}}
         exec(pezzo("scarica_export"), amb)
         testo = amb["scarica_export"]("tik").lstrip("﻿")
@@ -8332,19 +8373,30 @@ def prove_lista_ordini():
     per_esito = {r[4]: r for r in tutti_csv[1:]}
     prova("il venditore vede sempre chi ha comprato", {"mariorossi"},
           {r[6] for r in tutti_csv[1:]})
+    # dal set 2026 le colonne sono dieci: `zona` si e' infilata fra
+    # `consegna` (7) e `dove` (9)
+    prova("l'intestazione dice anche la ZONA, fra consegna e dove",
+          ["consegna", "zona", "dove"], tutti_csv[0][7:10])
     prova("indirizzo GIA' PURGATO (l'ordine released): 'dove' resta "
           "onestamente vuoto", ("spedizione", ""),
-          (per_esito["released"][7], per_esito["released"][8]))
+          (per_esito["released"][7], per_esito["released"][9]))
+    prova("...ma la ZONA resta, che e' la tariffa applicata e non un "
+          "dato personale da purgare", "Italia",
+          per_esito["released"][8])
     prova("ritiro: 'dove' e' la zona dell'annuncio, non un indirizzo",
           ("ritiro in zona", "Torino (TO)"),
-          (per_esito["creato"][7], per_esito["creato"][8]))
+          (per_esito["creato"][7], per_esito["creato"][9]))
+    prova("...e la colonna ZONA resta vuota: un ritiro a mano non ha "
+          "una destinazione", "", per_esito["creato"][8])
     prova("spedizione con indirizzo vivo: 'dove' porta i campi", True,
-          "Ada Bianchi" in per_esito["dispute"][8]
-          and "Via Roma 1" in per_esito["dispute"][8]
-          and "10100" in per_esito["dispute"][8])
+          "Ada Bianchi" in per_esito["dispute"][9]
+          and "Via Roma 1" in per_esito["dispute"][9]
+          and "10100" in per_esito["dispute"][9])
+    prova("...e l'ordine fuori casa DICE la zona e il paese",
+          "Europa — Francia", per_esito["dispute"][8])
     prova("digitale: nessun indirizzo, nessuna via di mezzo",
           ("digitale", ""),
-          (per_esito["annullato"][7], per_esito["annullato"][8]))
+          (per_esito["annullato"][7], per_esito["annullato"][9]))
 
     # PRIVACY: dallo stesso database, guardato dal COMPRATORE — non
     # deve vedere ne' il proprio username spacciato per «compratore»
@@ -8354,7 +8406,7 @@ def prove_lista_ordini():
     dal_compratore = _righe_csv(con_exp, True, chi=222)
     prova("il compratore non vede 'compratore' ne' 'dove' nel proprio "
           "export: sono dati per chi vende, non per chi ha comprato",
-          {("", "")}, {(r[6], r[8]) for r in dal_compratore[1:]})
+          {("", "")}, {(r[6], r[9]) for r in dal_compratore[1:]})
 
 
 def prove_dettaglio_ordine():
@@ -10569,10 +10621,11 @@ def prove_notifica_fail_open():
         "consegna_scelta TEXT, punto_ritiro TEXT, via_punto INT, "
         "indirizzo_il INT, indirizzo_atteso INT, nota_compratore TEXT, "
         "email_corriere_il INT, payment_hash TEXT, creato INT, "
-        "aggiornato INT)")
+        "aggiornato INT, zona_sped TEXT, paese_sped TEXT, "
+        "domestico_sped TEXT)")
     vero.execute(
         "INSERT INTO ordini VALUES(151,7,111,222,7338,0,0,0,1,'creato',"
-        "'spedizione','',0,1,0,'',0,'hash',1000,1000)")
+        "'spedizione','',0,1,0,'',0,'hash',1000,1000,'dom','IT','IT')")
     vero.execute("CREATE TABLE annunci(id INT, venditore_id INT, "
                  "titolo TEXT, quantita INT, stato TEXT, "
                  "contatto_nostr TEXT, taglia_pacco TEXT)")
@@ -13566,6 +13619,421 @@ def prove_conto_acquisto():
 
 
 # ====================================================================
+def prove_zone_spedizione():
+    """LE ZONE DI SPEDIZIONE (set 2026): la tariffa secondo DOVE va il
+    pacco — il paese di CASA del venditore piu' i sette continenti,
+    in una MAPPA e non in una colonna per zona. Qui si torturano la
+    tabella dei paesi, i quattro giudici e le porte chiuse: il posto
+    dove un errore fa spedire in Australia al prezzo di Bari, o fa
+    sparire dal mercatino un annuncio che non aveva chiesto niente."""
+    print("\n[le zone di spedizione]")
+    import json as json_mod
+    C = CATALOGHI_ZONE
+    zona_da_paese = C["zona_da_paese"]
+    nome_paese = C["nome_paese"]
+
+    # ---- 1) la tabella dei paesi ----------------------------------
+    paesi = C["PAESI_SPEDIZIONE"]
+    codici = [c for c, _n, _z in paesi]
+    prova("nessun codice paese ripetuto", len(codici), len(set(codici)))
+    prova("ogni paese ha un continente del catalogo", set(),
+          {z for _c, _n, z in paesi} - set(C["ZONE_SPEDIZIONE"]))
+    prova("nessun paese e' finito nella pseudo-zona 'dom'", [],
+          [c for c, _n, z in paesi if z == "dom"])
+    prova("ogni continente ha la sua etichetta pubblica", set(),
+          set(C["ZONE_SPEDIZIONE"]) - set(C["ZONA_ETICHETTA"]) - {"dom"})
+    prova("ogni continente ha almeno un paese", [],
+          [z for z in C["ZONE_SPEDIZIONE"] if z != "dom"
+           and not C["PAESI_PER_ZONA"].get(z)])
+    prova("i codici sono tutti ISO a due lettere maiuscole", [],
+          [c for c in codici if len(c) != 2 or not c.isupper()])
+    # il catalogo piatto e' ORDINATO PER NOME: e' lui a disegnare i due
+    # menu, e un elenco non ordinato di duecento voci non si scorre
+    prova("il catalogo piatto e' ordinato per nome", True,
+          [n for _c, n, _z in paesi] == sorted(n for _c, n, _z in paesi))
+
+    # ---- 2) LE QUATTRO DECISIONI AMBIGUE, a verbale e provate -----
+    # Chi le ricontestera' fra sei mesi trova qui la risposta, e
+    # cambiarla vuol dire far diventare rossa una riga col suo nome.
+    prova("Russia -> Europa (tre quarti della gente sta a ovest "
+          "degli Urali, e i corrieri la prezzano cosi')", "eu",
+          zona_da_paese("RU"))
+    prova("Turchia -> Medio Oriente (la voce esiste per prezzare "
+          "diversamente da Europa, e li' la Turchia non ci sta)",
+          "medioriente", zona_da_paese("TR"))
+    prova("Regno Unito -> Europa (la zona e' il CONTINENTE, non "
+          "l'Unione: la dogana la fa il paese)", "eu",
+          zona_da_paese("GB"))
+    prova("Cipro -> Europa (geograficamente Asia, ma per un corriere "
+          "europeo e' Europa)", "eu", zona_da_paese("CY"))
+    prova("il Caucaso -> Asia", ["asia", "asia", "asia"],
+          [zona_da_paese(c) for c in ("GE", "AM", "AZ")])
+    prova("America centrale e Caraibi -> Nord America",
+          {"nordamerica"},
+          {zona_da_paese(c) for c in ("MX", "CR", "CU", "JM", "PA")})
+    prova("Egitto -> Africa", "africa", zona_da_paese("EG"))
+    # LA DECISIONE DI ANDREA, gia' a verbale col primo giro: per un
+    # corriere italiano sono spedizioni di casa.
+    prova("San Marino segue il domestico Italia", "dom",
+          zona_da_paese("SM"))
+    prova("...e la Citta' del Vaticano pure", "dom", zona_da_paese("VA"))
+
+    # ---- 3) il domestico VINCE sul suo continente -----------------
+    prova("l'Italia, per chi vende dall'Italia, e' CASA", "dom",
+          zona_da_paese("IT"))
+    prova("...e per chi vende dalla Spagna e' Europa", "eu",
+          zona_da_paese("IT", "ES"))
+    prova("la Spagna, per chi vende dalla Spagna, e' CASA", "dom",
+          zona_da_paese("ES", "ES"))
+    # e gli enclavati NON seguono un domestico che non e' il loro
+    prova("San Marino, per un venditore spagnolo, e' Europa e non casa",
+          "eu", zona_da_paese("SM", "ES"))
+    prova("un codice che non conosciamo non ha zona", "",
+          zona_da_paese("QQ"))
+    prova("...e nemmeno il vuoto", "", zona_da_paese(""))
+    prova("il codice si legge senza badare alle maiuscole", "eu",
+          zona_da_paese("fr"))
+    prova("il nome sulla busta esce dal catalogo", "Francia",
+          nome_paese("FR"))
+    prova("...e di un codice ignoto non si inventa", "",
+          nome_paese("QQ"))
+
+    # ---- 4) il giudice della destinazione -------------------------
+    class _H(Exception):
+        def __init__(self, code, detail=""):
+            self.code, self.detail = code, detail
+
+    dest = reale("_paese_da_payload", dict(C, HTTPException=_H))
+
+    def chiedi(d):
+        try:
+            return dest(d)
+        except _H as e:
+            return f"{e.code} {e.detail[:30]}"
+
+    # ASSENTE = IL MONDO DI IERI, ed e' la riga che tiene in vita i
+    # client in cache il giorno del deploy
+    prova("campo assente: vuoto, e nessun 400", "", chiedi({}))
+    prova("...e il vuoto vale come l'assenza", "", chiedi({"paese": ""}))
+    prova("un paese vero: il codice, normalizzato", "FR",
+          chiedi({"paese": " fr "}))
+    # PRESENTE MA IGNOTO = 400, e NON il domestico: e' l'unico punto
+    # in cui questo cantiere si stacca dal ripiego di casa, perche'
+    # li' costerebbe un pacco spedito in Giappone alla tariffa di Bari
+    prova("un paese che non conosciamo e' un 400, mai un ripiego",
+          True, str(chiedi({"paese": "QQ"})).startswith("400"))
+
+    # ---- 5) la mappa, e la porta ----------------------------------
+    letto = reale("_zone_annuncio",
+                  {"json": json_mod,
+                   "ZONE_SPEDIZIONE": C["ZONE_SPEDIZIONE"]})
+    offerta = reale("_zona_offerta", {"_zone_annuncio": letto,
+                                      "ZONE_SPEDIZIONE":
+                                          C["ZONE_SPEDIZIONE"]})
+
+    def ann(consegna="spedizione", **zone):
+        mappa = {z: {"sats": v, "eur": 0.0} for z, v in zone.items()}
+        return {"consegna": consegna,
+                "spedizione_zone": json_mod.dumps(mappa) if mappa else "",
+                "spedizione_sats": 500, "spedizione_eur": 0.0,
+                "paese_domestico": ""}
+
+    # IL RIPIEGO DEL DOMESTICO, la riga piu' importante: un annuncio
+    # scritto da chi le zone non le conosce (un client di ieri,
+    # importa_nostr.py che scrive dritto nel database, una riga messa
+    # a mano) ha la MAPPA VUOTA, e leggerla alla lettera lo
+    # toglierebbe dal mercato di casa.
+    vecchio = ann()
+    prova("annuncio del mondo di ieri: casa resta APERTA", True,
+          offerta(vecchio, "dom"))
+    prova("...e l'estero resta chiuso, che non l'ha mai promesso",
+          [], [z for z in C["ZONE_SPEDIZIONE"] if z != "dom"
+               and offerta(vecchio, z)])
+    # ...ma il ripiego si spegne appena qualcuno le zone le SCRIVE
+    solo_eu = ann(eu=2000)
+    prova("chi dichiara solo l'Europa NON spedisce a casa", False,
+          offerta(solo_eu, "dom"))
+    prova("...e in Europa si'", True, offerta(solo_eu, "eu"))
+    prova("...e in Asia no", False, offerta(solo_eu, "asia"))
+    # LO ZERO E' UNA PROMESSA, non un'assenza: e' la ragione della
+    # mappa (una colonna INTEGER non sa distinguerli)
+    gratis = ann(oceania=0)
+    prova("zona dichiarata a ZERO: spedisce, ed e' gratis", True,
+          offerta(gratis, "oceania"))
+    tutte = ann(**{z: 1000 for z in C["ZONE_SPEDIZIONE"]})
+    prova("chi le dichiara tutte spedisce ovunque",
+          [], [z for z in C["ZONE_SPEDIZIONE"] if not offerta(tutte, z)])
+    prova("l'annuncio che non spedisce non ha nessuna zona aperta",
+          [], [z for z in C["ZONE_SPEDIZIONE"]
+               if offerta(ann("ritiro", eu=1, asia=1), z)])
+    prova("...e nemmeno il digitale", False,
+          offerta(ann("digitale", eu=1), "eu"))
+    prova("'entrambe' spedisce come 'spedizione'", True,
+          offerta(ann("entrambe", asia=1), "asia"))
+    # IL PARSE E' DIFENSIVO: questa colonna la legge la VETRINA
+    prova("JSON storto: mappa vuota, mai un errore",
+          {}, letto({"spedizione_zone": "{non e' json"}))
+    prova("JSON che non e' un oggetto: mappa vuota",
+          {}, letto({"spedizione_zone": "[1,2,3]"}))
+    prova("una zona che non esiste si butta", {},
+          letto({"spedizione_zone": '{"marte": {"sats": 1}}'}))
+    prova("un valore storto si butta, le altre zone restano",
+          {"eu": (10, 0.0)},
+          letto({"spedizione_zone":
+                 '{"eu": {"sats": 10}, "asia": {"sats": "molti"}}'}))
+    prova("i negativi si schiacciano a zero", {"eu": (0, 0.0)},
+          letto({"spedizione_zone": '{"eu": {"sats": -5}}'}))
+
+    # ---- 6) la tariffa per zona -----------------------------------
+    tariffa = reale("_tariffa_dichiarata", {"_zone_annuncio": letto})
+
+    def a(dom=500, punto=None, **zone):
+        r = ann(**zone)
+        r["spedizione_sats"] = dom
+        r["spedizione_punto_sats"] = punto or 0
+        r["spedizione_punto_eur"] = 0.0
+        r["spedizione_punto_dichiarata"] = 0 if punto is None else 1
+        return r
+
+    tre = a(dom=500, eu=1500, oceania=9000)
+    prova("il domestico esce dalle COLONNE, non dalla mappa", (500, 0.0),
+          tariffa(tre, "casa", "dom"))
+    prova("l'Europa ha la sua", (1500, 0.0), tariffa(tre, "casa", "eu"))
+    prova("l'Oceania la sua", (9000, 0.0), tariffa(tre, "casa", "oceania"))
+    # la zona di serie e' il domestico: i chiamanti di ieri non
+    # passavano il terzo argomento e non devono cambiare di un sat
+    prova("senza zona vale il domestico (i chiamanti di ieri)",
+          (500, 0.0), tariffa(tre, "casa"))
+    # LA CINTURA: chiedere una zona non dichiarata non solleva e non
+    # regala — ricade sul domestico. Il caso non arriva mai (la porta
+    # l'ha gia' chiusa), e la prova sta qui per dire COSA fa se
+    # arrivasse.
+    prova("zona non dichiarata: cintura sul domestico, mai un'eccezione",
+          (500, 0.0), tariffa(tre, "casa", "africa"))
+    # IL PUNTO VIENE PRIMA E NON GUARDA LA ZONA: la via si offre solo
+    # a casa, quindi ('punto','eu') non nasce mai — ma se nascesse,
+    # la riga da cambiare per prima e' quella.
+    prova("la via punto batte la zona (ed e' offerta solo a casa)",
+          (200, 0.0), tariffa(a(dom=500, punto=200, eu=1500),
+                              "punto", "dom"))
+    prova("...e senza tariffa punto dichiarata vale quella di casa",
+          (500, 0.0), tariffa(tre, "punto", "dom"))
+
+    # ---- 7) il pacco intero: la zona sceglie la BASE ---------------
+    amb = dict(C, json=json_mod)
+    for f in ("_domestico", "_zona_ordine", "_zone_annuncio",
+              "_tariffa_dichiarata", "_sped_in_sats", "_sped_pacco"):
+        exec(pezzo(f), amb)
+    pacco = amb["_sped_pacco"]
+
+    def b(dom=0, extra=0, **zone):
+        r = a(dom=dom, **zone)
+        r["spedizione_extra_sats"] = extra
+        r["spedizione_extra_eur"] = 0.0
+        return r
+
+    uno = b(dom=500, extra=100, eu=1500, oceania=9000)
+    prova("un pezzo a casa: la tariffa di casa", 500,
+          pacco([(uno, 1)], "casa", 0.0, "IT")["sats"])
+    prova("un pezzo in Francia: quella europea", 1500,
+          pacco([(uno, 1)], "casa", 0.0, "FR")["sats"])
+    prova("un pezzo in Australia: quella dell'Oceania", 9000,
+          pacco([(uno, 1)], "casa", 0.0, "AU")["sats"])
+    # IL SUPPLEMENTO RESTA UNO PER ANNUNCIO anche con otto zone, ed e'
+    # dichiarato: il secondo pezzo per l'Oceania costa quanto il
+    # secondo pezzo a casa. La mappa lo reggerebbe per zona senza una
+    # colonna nuova — e' precisamente perche' e' una mappa.
+    prova("tre pezzi in Australia: base della zona + due supplementi",
+          9000 + 200, pacco([(uno, 3)], "casa", 0.0, "AU")["sats"])
+    prova("...e il supplemento e' lo STESSO che a casa", 200,
+          pacco([(uno, 3)], "casa", 0.0, "IT")["supplemento"])
+    # il MAX sulla zona chiesta, non su quella di casa: due annunci
+    # che a casa costano uguale possono divergere fuori
+    x = b(dom=500, eu=900)
+    y = b(dom=500, eu=2500)
+    prova("nel carrello vince il MAX della ZONA chiesta", 2500,
+          pacco([(x, 1), (y, 1)], "casa", 0.0, "FR")["sats"])
+    prova("...e a casa gli stessi due pareggiano a 500", 500,
+          pacco([(x, 1), (y, 1)], "casa", 0.0, "IT")["sats"])
+    # IL PAESE DI CASA E' DELL'ANNUNCIO, e la zona si risolve RIGA PER
+    # RIGA: lo stesso ordine e' 'dom' per un annuncio e 'eu' per
+    # l'altro, e risolvere una volta sola sarebbe giusto oggi e
+    # sbagliato al primo annuncio con un paese di casa diverso.
+    spagnolo = b(dom=700, eu=1200)
+    spagnolo["paese_domestico"] = "ES"
+    prova("la zona si risolve per RIGA, non una volta per ordine",
+          1200, pacco([(spagnolo, 1)], "casa", 0.0, "IT")["sats"])
+
+    # ---- 8) come si NOMINA la zona ---------------------------------
+    frase = reale("frase_zona", C)
+    prova("il domestico si dice col NOME DEL PAESE, mai 'domestico'",
+          "Italia", frase("dom", "IT"))
+    prova("...e il mondo di ieri ('') pure", "Italia", frase("", ""))
+    prova("...e per un venditore spagnolo dice Spagna", "Spagna",
+          frase("dom", "ES", "ES"))
+    prova("fuori si dice la zona E il paese",
+          "Europa — Francia", frase("eu", "FR"))
+    prova("...e senza paese resta la sola zona", "Oceania",
+          frase("oceania", ""))
+
+    # ---- 9) la guardia «almeno una zona» --------------------------
+    guardia = reale("guardia_almeno_una_zona", {"HTTPException": _H})
+
+    def spunta(consegna, zone):
+        try:
+            guardia(consegna, zone)
+            return "ok"
+        except _H as e:
+            return f"{e.code}"
+
+    prova("spedizione senza nessuna zona: 400 che lo dice", "400",
+          spunta("spedizione", {}))
+    prova("...basta una zona qualunque", "ok",
+          spunta("spedizione", {"africa": (0, 0.0)}))
+    prova("il ritiro non deve dichiarare niente", "ok",
+          spunta("ritiro", {}))
+    prova("...e nemmeno il digitale", "ok", spunta("digitale", {}))
+
+    # ---- 10) il serializzatore ------------------------------------
+    jso = reale("zone_json", {"json": json_mod})
+    prova("mappa vuota: colonna vuota, mai un '{}' da parsare", "",
+          jso({}))
+    prova("la mappa torna leggibile dal suo lettore",
+          {"dom": (500, 0.0), "eu": (1500, 0.0)},
+          letto({"spedizione_zone": jso({"dom": (500, 0.0),
+                                         "eu": (1500, 0.0)})}))
+
+    # ---- 11) le sentinelle di forma -------------------------------
+    src = _SORGENTE
+    # LA MIGRAZIONE A: il travaso e' una-tantum, e il gate e' la
+    # NASCITA della colonna e mai il valore delle righe. Con un gate
+    # sui valori, il riavvio dopo rimetterebbe in piedi le zone che un
+    # venditore ha appena svuotato — cioe' un annuncio che torna a
+    # spedire in Australia da solo.
+    # IL GATE E' `paese_domestico`, che nasce PER ULTIMA — dopo il
+    # travaso. Cosi' un errore in mezzo (disco pieno, riavvio, un
+    # difetto del codice) lascia il travaso ANCORA DA FARE invece di
+    # saltarlo per sempre: al giro dopo la sentinella non c'e' e si
+    # ricomincia. L'ha insegnato il giro dal vivo, dove un NameError
+    # fra l'ALTER e l'UPDATE aveva lasciato trentotto annunci senza
+    # zone e nessun modo di accorgersene.
+    prova("il travaso guarda se la SENTINELLA e' nata, non i valori",
+          True, '"paese_domestico" not in gia_annunci' in src)
+    prova("...e la sentinella nasce DOPO il travaso, mai prima", True,
+          src.index("if prima_volta_zone:")
+          < src.index('"paese_domestico TEXT'))
+    prova("...e gira una volta sola, dentro il suo `if`", 1,
+          src.count("if prima_volta_zone:"))
+    prova("...e un giro interrotto riprende da dove era rimasto", True,
+          "AND spedizione_zone=''" in src)
+    prova("...e copia la tariffa di casa su TUTTE le zone, 'dom'"
+          " compresa", True,
+          "for z in ZONE_SPEDIZIONE}" in src)
+    prova("...solo sugli annunci che spediscono davvero", True,
+          "WHERE consegna IN ('spedizione','entrambe')" in src)
+    # LA RIPRESA: la zona cambia il prezzo, quindi entra nel confronto
+    # — e '' si normalizza a 'dom', o gli ordini in sospeso il giorno
+    # del deploy conierebbero una fattura nuova a ogni tocco su Paga.
+    _c = pezzo("compra")
+    _rip = _c[_c.index("stessa = ("):_c.index("# Rinnovo")]
+    prova("la ripresa confronta la ZONA", True,
+          'mio["zona_sped"] or "dom"' in _rip)
+    # LE DUE PORTE CHIUSE, una per ramo
+    prova("il mono chiude la porta con _zona_offerta", True,
+          "_zona_offerta(a, zona)" in _c)
+    prova("...e il set la chiude riga per riga", True,
+          "_zona_offerta(a, zona)" in pezzo("_compra_set"))
+    prova("...e il set rifiuta due paesi di casa in un pacco solo",
+          True, "len(zone_viste) > 1" in pezzo("_compra_set"))
+    # LA VIA PUNTO E' DI CASA: le reti sono italiane
+    _sp = pezzo("_strade_preventivo")
+    prova("fuori casa la via punto non si offre nemmeno", True,
+          '("casa", "punto") if a_casa else ("casa",)' in _sp)
+    prova("...e la strada spenta esce col MOTIVO, senza numeri", True,
+          '"zona_non_offerta": True' in _sp)
+    # I DUE INSERT scrivono la zona, e solo sulla spedizione
+    teste = [m.start() for m in re.finditer(r"INSERT INTO ordini", src)]
+    prova("gli INSERT che creano un ordine sono sempre tre", 3,
+          len(teste))
+    prova("...e i due dell'acquisto scrivono la zona", 2,
+          sum("zona_sped" in src[i:src.index("VALUES", i)]
+              for i in teste))
+    # QUATTRO: i due INSERT, piu' le due RISPOSTE (mono e set) che la
+    # rimandano al client. E' la stessa condizione scritta nello
+    # stesso modo in tutti e quattro i posti, ed e' quello che si
+    # sorveglia — se un giorno uno dei quattro si mettesse a scrivere
+    # la zona su un ritiro, la ricevuta e la contabilita' direbbero
+    # una destinazione che nessuno ha scelto.
+    prova("...e mai fuori dalla spedizione", 4,
+          src.count('zona if scelta == "spedizione" else ""'))
+    prova("...e il paese la segue, sempre e solo con lei", 4,
+          src.count('paese if scelta == "spedizione" else ""'))
+    # LA CORREZIONE DELL'INDIRIZZO legge il paese DALL'ORDINE
+    prova("correggere l'indirizzo non sposta la destinazione", True,
+          '_indirizzo_da_payload(d, o["paese_sped"] or "")'
+          in pezzo("indica_indirizzo"))
+    # e la frase della zona si scrive in UN posto solo
+    prova("la frase della zona si scrive in un posto solo", 1,
+          src.count("def frase_zona("))
+    prova("...e la ricevuta la usa", True,
+          "frase_zona(zona, paese, domestico)" in pezzo("_coda_ricevuta"))
+
+    # ---- 12) il gemello CLIENT, paese per paese -------------------
+    # La tabella del client e' una COPIA, e una copia si controlla:
+    # il giorno che un paese cambia continente di la', qui diventa
+    # rossa una riga invece di far pagare a qualcuno una tariffa che
+    # il server non applichera'.
+    mini = open("miniapp.html", encoding="utf-8").read()
+    grezzo = mini[mini.index("const PAESI_ZONA_RAW = {"):]
+    grezzo = grezzo[:grezzo.index("\n};")]
+    client = {}
+    for riga in grezzo.split("\n")[1:]:
+        riga = riga.strip()
+        if ":" not in riga or "'" not in riga:
+            continue
+        z = riga.split(":", 1)[0].strip()
+        # dal PRIMO apice all'ULTIMO, e mai uno split: un nome con
+        # l'apostrofo dentro (Costa d'Avorio, scappato in JS)
+        # taglierebbe la riga a meta' e la sentinella direbbe che
+        # il client conosce meno paesi del server, cioe' un
+        # allarme rosso su una copia sana — il modo in cui gli
+        # allarmi si imparano a ignorare.
+        voci = riga[riga.index("'") + 1:riga.rindex("'")]
+        for v in voci.split("|"):
+            if ":" in v:
+                cod, nome = v.split(":", 1)
+                client[cod] = (nome.replace("\\'", "'"), z)
+    server = {c: (n, z) for c, n, z in paesi}
+    prova("il client conosce gli STESSI paesi del server",
+          len(server), len(client))
+    prova("...e li mette negli stessi continenti, uno per uno", [],
+          sorted(c for c in server
+                 if client.get(c, (None, None))[1] != server[c][1]))
+    prova("...e li chiama con gli stessi nomi", [],
+          sorted(c for c in server
+                 if client.get(c, (None, None))[0] != server[c][0]))
+    prova("il client ha le stesse etichette delle zone", [],
+          [z for z in C["ZONA_ETICHETTA"]
+           if f"{z}:'{C['ZONA_ETICHETTA'][z]}'" not in mini])
+    prova("il client ha lo stesso paese di casa di serie", True,
+          "const DOM_DEFAULT = 'IT'" in mini
+          and C["DOMESTICO_DEFAULT"] == "IT")
+    # e i giudici gemelli ci sono, uno per uno
+    for nome_g in ("zonaPaese", "zonaOfferta", "tariffaZona",
+                   "etichettaZona"):
+        prova(f"il client ha il suo {nome_g}", True,
+              f"function {nome_g}(" in mini or f"const {nome_g} =" in mini)
+    # IL CASSETTO INTERNAZIONALE: chiuso di serie, e col conto nel
+    # titolo — un cassetto che nasconde una promessa e' peggio di
+    # sette campi in vista
+    prova("i sette campi delle zone si montano da UN posto solo", 1,
+          mini.count("function montaZoneIntl("))
+    prova("...e l'elenco viene da ZONA_NOME, non da una lista a parte",
+          True, "const ZONE_INTL = Object.keys(ZONA_NOME)" in mini)
+    prova("il cassetto dice quante zone sono accese senza aprirsi",
+          True, "sellIntlConto" in mini)
+
+
 def prove_supplemento_spedizione():
     """IL SUPPLEMENTO PER PEZZO (ago 2026, caso dal campo: il riso da
     4 kg venduto a sacchi con la spedizione di UNO dichiarata). La
@@ -13574,8 +14042,15 @@ def prove_supplemento_spedizione():
     da sola: e' il posto dove un errore costa sats veri, e la pura
     nasce provata PRIMA che i quattro chiamanti la usino."""
     print("\n[il supplemento di spedizione per pezzo]")
-    amb = {}
-    for f in ("_tariffa_dichiarata", "_sped_in_sats", "_sped_pacco"):
+    # dal set 2026 il pacco risolve la ZONA riga per riga: servono
+    # anche i tre giudici che ci arrivano, o il banco esplode su un
+    # NameError invece di dire che il supplemento e' sbagliato
+    amb = {"json": __import__("json"),
+           "DOMESTICO_DEFAULT": CATALOGHI_ZONE["DOMESTICO_DEFAULT"],
+           "ZONE_SPEDIZIONE": CATALOGHI_ZONE["ZONE_SPEDIZIONE"],
+           "zona_da_paese": CATALOGHI_ZONE["zona_da_paese"]}
+    for f in ("_domestico", "_zona_ordine", "_zone_annuncio",
+              "_tariffa_dichiarata", "_sped_in_sats", "_sped_pacco"):
         exec(pezzo(f), amb)
     pacco = amb["_sped_pacco"]
     CAMBIO = 100_000.0                 # 1.000 sats = 1 euro, tondo
@@ -15458,9 +15933,19 @@ def prove_sped_gratis():
     # un accordo, l'articolo byte per byte quando non c'e' — e i due
     # del MONO restano sull'articolo. Il conto TOTALE resta quattro:
     # 2 + 2, e chi ne aggiunge un quinto lo sente comunque.
+    # dal set 2026 il SET spezza la chiamata su piu' righe (la zona
+    # si risolve dal primo annuncio): si conta il nome della funzione
+    # col suo primo argomento, che e' la parte che non si spezza
     prova("...e i chiamanti sono i quattro percorsi del conto", (2, 2),
           (src.count("_sped_gratis(articolo, misura_eur"),
-           src.count("_sped_gratis(misura_art, misura_eur")))
+           src.count("_sped_gratis(misura_art, misura_eur")
+          + src.count("_sped_gratis(\n                                             misura_art")))
+    # ...E TUTTI E QUATTRO PORTANO LA ZONA: la promessa vale solo a
+    # casa, e un percorso che dimenticasse di dirla regalerebbe in
+    # silenzio la tariffa piu' cara del catalogo
+    prova("...e tutti e quattro dicono la ZONA", 4,
+          src.count("sog_gratis, val_sg,\n")
+          + src.count("sog_gratis, val_sg,\r\n"))
     # ...e ricevono TUTTE E DUE le facce dell'articolo, sempre nello
     # stesso ordine: se un domani un percorso passasse solo l'euro, la
     # sua soglia in sats smetterebbe di scattare in silenzio
@@ -15740,15 +16225,42 @@ def prove_sped_gratis():
     # nominano via _tariffa_dichiarata, che le sceglie per via: si
     # accetta l'una o l'altra forma.)
     colonne_eur = sorted(set(re.findall(r'"(spedizione\w*_eur) REAL', _SORGENTE)))
+    # RESTANO TRE (set 2026): le zone nuove NON sono colonne, vivono
+    # nella mappa — quindi questo conto non si muove, ed e' proprio
+    # questo a renderlo ancora un allarme buono. Il conto e' scritto a
+    # mano APPOSTA: e' lui a far diventare rossa questa riga il giorno
+    # che qualcuno aggiunge una quarta COLONNA senza nominarla nei due
+    # blocchi del cambio.
     prova("le tariffe ancorabili all'euro sono tre", 3, len(colonne_eur))
-    for chi, c2, tramite in (("compra", corpo_mono, "_tariffa_dichiarata(a, via)"),
+    for chi, c2, tramite in (("compra", corpo_mono,
+                              "_tariffa_dichiarata(a, via, zona)"),
                              ("_compra_set", corpo_set,
-                              "_tariffa_dichiarata(a, via)")):
+                              "_tariffa_dichiarata(a, via, _zona_ordine(a, paese))")):
         for col in colonne_eur:
             prova(f"{chi}: il cambio guarda {col}", True,
                   f'["{col}"] > 0' in c2
-                  or (col.startswith("spedizione_punto") and tramite in c2)
-                  or (col == "spedizione_eur" and tramite in c2))
+                  # le tariffe che si scelgono per VIA e per ZONA le
+                  # nomina il giudice unico, non il blocco del cambio:
+                  # si accetta l'una o l'altra forma. Il supplemento
+                  # no — quello dal giudice non passa, e va nominato.
+                  or (col != "spedizione_extra_eur" and tramite in c2))
+    # ...E LA MAPPA DELLE ZONE, che una colonna non ce l'ha e quindi
+    # dal conto qui sopra non si vede: la sua tariffa in euro passa
+    # dallo STESSO giudice, e se un giorno qualcuno la leggesse a mano
+    # il cambio non la coprirebbe piu' e il conto esploderebbe come
+    # faceva `max(sped, None)`. Qui si prova che il giudice e' l'unica
+    # strada per arrivarci.
+    # DUE e non uno: `_zona_offerta` (la porta) e
+    # `_tariffa_dichiarata` (il prezzo). Nessun altro apre quel JSON,
+    # ed e' cio' che rende vero il commento del lettore — chi
+    # normalizza sta in un posto solo, e a valle nessuno deve
+    # ricordarsene. Un terzo lettore fa diventare rossa questa riga.
+    prova("la mappa delle zone la leggono i DUE giudici e nessun altro",
+          2, _SORGENTE.count("_zone_annuncio(a)")
+             - _SORGENTE.count("def _zone_annuncio(a)"))
+    prova("...e sono proprio loro", [True, True],
+          ["_zone_annuncio(a)" in pezzo("_zona_offerta"),
+           "_zone_annuncio(a)" in pezzo("_tariffa_dichiarata")])
 
     # IL CLIENT: il giudice unico che alla prima promessa c'era e alla
     # seconda no (buco trovato col cantiere dell'euro). Sono QUATTRO le
@@ -16014,7 +16526,11 @@ def prove_consegna_payload_punto():
     amb = {"MODALITA_CONSEGNA": ("spedizione", "ritiro", "entrambe",
                                  "digitale"),
            "TAGLIE_PACCO": ("busta", "piccolo", "medio", "grande",
-                            "ingombrante")}
+                            "ingombrante"),
+           # dal set 2026 il giudice riempie anche la mappa delle zone,
+           # e il catalogo gli serve per validarle
+           "ZONE_SPEDIZIONE": CATALOGHI_ZONE["ZONE_SPEDIZIONE"],
+           "nome_paese": CATALOGHI_ZONE["nome_paese"]}
 
     async def _cambio():
         return 100_000.0
@@ -16022,14 +16538,19 @@ def prove_consegna_payload_punto():
     exec("async " + pezzo("consegna_da_payload"), amb)
 
     def giudica(d, valuta="sats"):
-        (_, _, _, p_sats, p_eur, p_dich, _, _, _, _) = \
+        # dodici posti dal set 2026: gli ultimi due sono il paese di
+        # casa e la mappa delle zone, che hanno la loro famiglia
+        (_, _, _, p_sats, p_eur, p_dich, _, _, _, _, _, _) = \
             gira(amb["consegna_da_payload"](d, valuta))
         return p_sats, p_eur, p_dich
 
     def supplemento(d, valuta="sats"):
-        (_, _, _, _, _, _, e_sats, e_eur, _, _) = \
+        (_, _, _, _, _, _, e_sats, e_eur, _, _, _, _) = \
             gira(amb["consegna_da_payload"](d, valuta))
         return e_sats, e_eur
+
+    def zone(d, valuta="sats"):
+        return gira(amb["consegna_da_payload"](d, valuta))[11]
 
     prova("chiavi assenti: NON dichiarata (i client di ieri)",
           (0, 0.0, 0), giudica({"consegna": "spedizione"}))
@@ -16086,7 +16607,7 @@ def prove_consegna_payload_punto():
 
     # la simmetria con la tariffa casa: stesso aiutante, stessi numeri
     def entrambe(d, valuta="sats"):
-        (_, s_sats, s_eur, p_sats, p_eur, _, _, _, _, _) = \
+        (_, s_sats, s_eur, p_sats, p_eur, _, _, _, _, _, _, _) = \
             gira(amb["consegna_da_payload"](d, valuta))
         return (s_sats, s_eur) == (p_sats, p_eur)
     prova("stessa cifra nei due campi = stessa lettura", True,
@@ -17067,11 +17588,11 @@ def prove_punti_salvati():
           fetta("function renderAcquisto(){").count("precompilaPunto("))
     # ...e la contro-prova che la fetta VEDE davvero: senza, uno zero
     # qui sopra sembrerebbe una promozione invece che una cecita'.
-    # il tetto e' salito con la modalita' accordo (ago 2026, ~45,5k):
-    # resta una cintura contro una fetta che ingoia il file, non una
-    # misura fine
+    # il tetto e' salito con la modalita' accordo (ago 2026, ~45,5k)
+    # e col menu dei paesi della cassa (set 2026, ~55,4k): resta una
+    # cintura contro una fetta che ingoia il file, non una misura fine
     prova("(e la fetta del render e' quella giusta)", True,
-          0 < len(fetta("function renderAcquisto(){")) < 55000
+          0 < len(fetta("function renderAcquisto(){")) < 62000
           and "cassettoPunto" in fetta("function renderAcquisto(){"))
     prova("precompilaPunto ha UN chiamante solo", 1,
           mini.count("precompilaPunto(")
@@ -23892,13 +24413,22 @@ def prove_ricevuta_compratore():
     import time as _time
     import types
 
-    _coda = reale("_coda_ricevuta")
+    # il giudice della ricevuta nomina quello della zona: si monta
+    # quello VERO, catalogo compreso (vedi `cataloghi_zone`)
+    _coda = reale("_coda_ricevuta",
+                  {"frase_zona": reale("frase_zona", CATALOGHI_ZONE)})
     _reg = _pezzi_registro()
     # l'indirizzo di casa (ago 2026) ha allargato la firma di due
     # bool: qui si chiama col MONDO DI IERI (mai chiesto, mai
     # scritto), cosi' le prove storiche restano quelle di sempre e i
     # rami nuovi hanno le loro, sotto.
-    coda = lambda c, vp, ps, ia=0, isc=False: _coda(c, vp, ps, ia, isc)
+    # dal set 2026 la coda prende anche la ZONA: qui il default e' il
+    # MONDO DI IERI (zona vuota = casa), cosi' le prove storiche
+    # restano quelle di sempre e i rami nuovi hanno le loro. La firma
+    # deve reggere anche la chiamata a SETTE argomenti, che e' quella
+    # che fa `_incassa_ordine` col cartone montato piu' sotto.
+    coda = lambda c, vp, ps, ia=0, isc=False, zo="", pa="", do="": \
+        _coda(c, vp, ps, ia, isc, zo, pa, do)
 
     # --- 1) IL GIUDICE DELLA CODA, strada per strada ---------------
     sped = coda("spedizione", 0, False)
@@ -23991,6 +24521,12 @@ def prove_ricevuta_compratore():
               email_corriere_il INT DEFAULT 0,
               spedizione_sats INT DEFAULT 0, protezione_sats INT DEFAULT 0,
               sconto_sats INT DEFAULT 0,
+              -- la zona applicata (set 2026): la ricevuta la NOMINA, e
+              -- un cartone senza queste tre non fa una prova rossa, fa
+              -- ESPLODERE la famiglia con un IndexError — la classe
+              -- di guasto gia' pagata da email_corriere_il qui sopra
+              zona_sped TEXT DEFAULT '', paese_sped TEXT DEFAULT '',
+              domestico_sped TEXT DEFAULT '',
               indirizzo_atteso INT DEFAULT 0, indirizzo_il INT DEFAULT 0,
               aggiornato INT DEFAULT 0);
             CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
@@ -62236,6 +62772,7 @@ def main():
               prove_classifica,
               prove_ferie, prove_stock_raccontato, prove_pausa,
               prove_xp, prove_coorti_titoli, prove_conto_acquisto,
+              prove_zone_spedizione,
               prove_supplemento_spedizione,
               prove_sconto_pacco, prove_forma_sconto_pacco,
               prove_codice_a_valore,

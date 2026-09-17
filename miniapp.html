@@ -4302,6 +4302,40 @@
     min-width:0}
   .via-opzione .via-sped{font-size:11.5px;color:var(--muted);
     font-weight:600}
+  /* Le righe delle zone nel form Vendi (set 2026): il nome della
+     zona a sinistra e il campo a destra, cosi' le caselle si leggono
+     come una tabellina invece che come campi indipendenti — sono la
+     stessa domanda fatta otto volte. */
+  /* Il paese nella cassa (set 2026): la riga sta SOPRA l'indirizzo,
+     dentro il cassetto della via casa, e si legge come una domanda
+     sola — etichetta piccola, menu a tutta larghezza. */
+  .acq-paese{margin-bottom:10px}
+  .acq-paese label{display:block;font-size:12px;font-weight:700;
+    color:var(--muted);margin-bottom:4px}
+  .acq-paese select{width:100%;padding:10px 12px;border-radius:12px;
+    border:1px solid var(--line);background:var(--card);
+    color:var(--ink);font:inherit;font-weight:600}
+  .acq-paese select option:disabled{color:var(--muted)}
+  .sped-zona{display:flex;align-items:center;gap:10px;margin-top:8px}
+  .sped-zona:first-of-type{margin-top:0}
+  .sped-zona-nome{flex:0 0 34%;font-size:13px;font-weight:700;
+    color:var(--muted)}
+  .sped-zona .sats-input{flex:1;min-width:0}
+  .sped-zona .sped-paese{flex:1;min-width:0;padding:10px 12px;
+    border-radius:12px;border:1px solid var(--line);
+    background:var(--card);color:var(--ink);font:inherit;font-weight:600}
+  /* IL CASSETTO DELL'INTERNAZIONALE (set 2026): chiuso di serie, e
+     quando dentro c'e' qualcosa il conto nel titolo lo dice senza
+     aprirlo — un cassetto che nasconde una promessa e' peggio di
+     sette campi in vista. */
+  .sped-intl{margin-top:10px;border:1px solid var(--line);
+    border-radius:12px;padding:8px 10px;background:var(--bg)}
+  .sped-intl>summary{cursor:pointer;font-size:13px;font-weight:800;
+    color:var(--ink);list-style:none}
+  .sped-intl>summary::-webkit-details-marker{display:none}
+  .sped-intl>summary::after{content:'\25be';float:right;color:var(--muted)}
+  .sped-intl[open]>summary::after{content:'\25b4'}
+  .sped-intl-conto{font-weight:700;color:var(--sats);margin-left:6px}
   .via-opzione .via-tot{font-family:'JetBrains Mono',monospace;
     flex:0 0 auto;font-size:14.5px}
   /* «gratuita» e' una parola, non un numero: niente mono, grassetto
@@ -8254,17 +8288,34 @@ document.getElementById('cartello')?.remove();</script>
           <div class="sats-input" style="margin-top:8px"><input id="sellServDurata" type="number" inputmode="numeric" min="1" placeholder="60"><span class="suffix" style="pointer-events:none">minuti</span></div>
           <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Quanto dura, e che cosa comprende: scrivilo nella descrizione. <b>Una prestazione si vende qui se è stabilita PRIMA</b> — «un'ora di conversazione in inglese» sì, «ti sviluppo quello che ti serve» no: senza un perimetro, in disputa non si può decidere niente. Dopo il pagamento proponi tu giorno e ora, e chi ha comprato conferma.</div>
         </div></div>
+      <!-- LE ZONE (set 2026): la tariffa secondo DOVE va il pacco.
+           Due campi per chi vende solo a casa — il PAESE e il suo
+           prezzo — e i sette continenti ripiegati sotto
+           «Spedizione internazionale»: chi non esporta non li vede
+           mai, e chi esporta li apre una volta. E' la decisione di
+           Andrea (set 2026), e vale piu' di un risparmio di pixel:
+           sette campi aperti su un form che gia' ne ha dodici fanno
+           abbandonare la pubblicazione.
+           ⚠️ VUOTO E ZERO DICONO DUE COSE DIVERSE, ed e' il
+           contrario di prima: 0 = spedizione gratis, casella vuota =
+           in quella zona NON spedisco. Vale anche per il paese di
+           casa, e la riga sotto lo dice a voce alta perche' e'
+           l'unica abitudine che questo cantiere cambia.
+           IL PAESE DI CASA e' un menu e non un testo: e' lui a dire
+           cosa vuol dire «casa», e un refuso li' dentro
+           sposterebbe le tariffe di tutto l'annuncio. -->
       <div class="field" id="sellSpedField" style="display:none"><label>Costo di spedizione</label>
-        <div class="sats-input"><input id="sellSped" type="number" inputmode="numeric" placeholder="0" oninput="aggiornaSpedHint()"><button type="button" class="suffix" id="sellSpedCur" onclick="toggleSpedCur()" title="Scegli come scrivere il costo">sats ⇄</button></div>
+        <div class="sped-zona"><span class="sped-zona-nome">Paese di casa</span>
+          <select id="sellPaeseDom" class="sped-paese" onchange="aggiornaSpedHint()"></select></div>
+        <div class="sped-zona"><span class="sped-zona-nome" id="sellSpedDomNome">Italia</span>
+          <div class="sats-input"><input id="sellSped" type="number" inputmode="numeric" placeholder="0" oninput="aggiornaSpedHint()"><button type="button" class="suffix" id="sellSpedCur" onclick="toggleSpedCur()" title="Scegli come scrivere il costo">sats ⇄</button></div></div>
+        <details class="sped-intl" id="sellIntl">
+          <summary>🌍 Spedizione internazionale <span class="sped-intl-conto" id="sellIntlConto"></span></summary>
+          <div id="sellZoneCampi"></div>
+          <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Dogana ed eventuale IVA sono a carico di chi riceve: non le incassi tu e non le anticipa Barattolo.</div>
+        </details>
         <div id="sellSpedHint" style="margin-top:6px;font-size:12px;color:var(--sats-text);font-weight:700;line-height:1.4"></div>
-        <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Lo paga chi compra, tu lo incassi per intero. 0&nbsp;= spedizione gratuita, inclusa nel prezzo.</div>
-        <!-- La promessa del negozio, DOVE la tariffa si scrive (ago
-             2026, chiesto da Andrea): chi sta digitando un costo deve
-             sapere quando quel costo verra' azzerato — sopra soglia
-             non lo paga nessuno e la differenza la mette lui. Riempita
-             da aggiornaHintPolitiche come la gemella del Prezzo; la
-             VISIBILITA' invece se la fa da sola, che vive dentro
-             #sellSpedField e sparisce col suo campo. -->
+        <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Lo paga chi compra, tu lo incassi per intero. <b>0&nbsp;= gratis</b> in quella zona; <b>casella vuota&nbsp;= lì non spedisci</b>. San Marino e Città del Vaticano contano come Italia.</div>
         <div id="sellSpedGratisHint" style="display:none;margin-top:6px;font-size:12px;color:var(--sats-text);font-weight:700;line-height:1.4"></div></div>
       <!-- Il SECONDO costo (ago 2026, pagina d'acquisto): la tariffa
            verso un punto di ritiro. Facoltativo, stessa valuta del
@@ -9865,6 +9916,107 @@ function titoloConCondizione(l){
   const prima = i < 0 ? '' : t.slice(0, i) + ' ';
   return `${prima}<span class="fine-titolo">${ultima} ${p}</span>`;
 }
+/* LE ZONE DI SPEDIZIONE (set 2026): gemello client del catalogo del
+   server. Il catalogo VERO e' quello di la' — qui c'e' la copia che
+   serve a disegnare i due menu (il paese di CASA nel foglio di
+   pubblicazione, la DESTINAZIONE alla cassa), e una sentinella in
+   `prove.py` incrocia le due tabelle paese per paese: il giorno che
+   una voce cambia continente di la', qui una riga diventa rossa
+   invece di far pagare a qualcuno una tariffa che il server non
+   applichera'.
+   LA TABELLA E' COMPATTA («CC:Nome|CC:Nome») e non un array di
+   oggetti, e non e' avarizia: sono duecentoventiquattro paesi, e in
+   forma estesa questo blocco peserebbe quanto una pagina intera del
+   file — si paga una `split` all'avvio e si guadagna un file che si
+   legge ancora.
+   IL DOMESTICO NON E' UN CONTINENTE ma il paese di casa del
+   venditore: 'dom' e' una pseudo-zona che vince sempre sul suo
+   continente, e il suo NOME e' il nome del paese (mai «domestico»). */
+const ZONA_NOME = {eu:'Europa', asia:'Asia', nordamerica:'Nord America', sudamerica:'Sud America', oceania:'Oceania', africa:'Africa', medioriente:'Medio Oriente'};
+/* Gli ENCLAVATI seguono il domestico: per un corriere italiano San
+   Marino e il Vaticano sono spedizioni di casa. Tabella per
+   DOMESTICO, come di la'. */
+const ENCLAVI_DOM = {IT:'SM|VA'};
+const PAESI_ZONA_RAW = {
+  eu: 'AD:Andorra|AL:Albania|AT:Austria|BA:Bosnia ed Erzegovina|BE:Belgio|BG:Bulgaria|BY:Bielorussia|CH:Svizzera|CY:Cipro|CZ:Repubblica Ceca|DE:Germania|DK:Danimarca|EE:Estonia|ES:Spagna|FI:Finlandia|FO:Isole Fær Øer|FR:Francia|GB:Regno Unito|GI:Gibilterra|GR:Grecia|HR:Croazia|HU:Ungheria|IE:Irlanda|IS:Islanda|IT:Italia|LI:Liechtenstein|LT:Lituania|LU:Lussemburgo|LV:Lettonia|MC:Monaco|MD:Moldavia|ME:Montenegro|MK:Macedonia del Nord|MT:Malta|NL:Paesi Bassi|NO:Norvegia|PL:Polonia|PT:Portogallo|RO:Romania|RS:Serbia|RU:Russia|SE:Svezia|SI:Slovenia|SK:Slovacchia|SM:San Marino|UA:Ucraina|VA:Città del Vaticano|XK:Kosovo',
+  asia: 'AF:Afghanistan|AM:Armenia|AZ:Azerbaigian|BD:Bangladesh|BN:Brunei|BT:Bhutan|CN:Cina|GE:Georgia|HK:Hong Kong|ID:Indonesia|IN:India|JP:Giappone|KG:Kirghizistan|KH:Cambogia|KP:Corea del Nord|KR:Corea del Sud|KZ:Kazakistan|LA:Laos|LK:Sri Lanka|MM:Myanmar|MN:Mongolia|MO:Macao|MV:Maldive|MY:Malaysia|NP:Nepal|PH:Filippine|PK:Pakistan|SG:Singapore|TH:Thailandia|TJ:Tagikistan|TM:Turkmenistan|TW:Taiwan|UZ:Uzbekistan|VN:Vietnam',
+  nordamerica: 'AG:Antigua e Barbuda|AI:Anguilla|AW:Aruba|BB:Barbados|BM:Bermuda|BS:Bahamas|BZ:Belize|CA:Canada|CR:Costa Rica|CU:Cuba|CW:Curaçao|DM:Dominica|DO:Repubblica Dominicana|GD:Grenada|GL:Groenlandia|GP:Guadalupa|GT:Guatemala|HN:Honduras|HT:Haiti|JM:Giamaica|KN:Saint Kitts e Nevis|KY:Isole Cayman|LC:Santa Lucia|MQ:Martinica|MX:Messico|NI:Nicaragua|PA:Panama|PR:Porto Rico|SV:El Salvador|SX:Sint Maarten|TC:Isole Turks e Caicos|TT:Trinidad e Tobago|US:Stati Uniti|VC:Saint Vincent e Grenadine|VG:Isole Vergini Britanniche|VI:Isole Vergini Americane',
+  sudamerica: 'AR:Argentina|BO:Bolivia|BR:Brasile|CL:Cile|CO:Colombia|EC:Ecuador|FK:Isole Falkland|GF:Guyana francese|GY:Guyana|PE:Perù|PY:Paraguay|SR:Suriname|UY:Uruguay|VE:Venezuela',
+  oceania: 'AS:Samoa Americane|AU:Australia|CK:Isole Cook|FJ:Figi|FM:Micronesia|GU:Guam|KI:Kiribati|MH:Isole Marshall|MP:Isole Marianne Settentrionali|NC:Nuova Caledonia|NR:Nauru|NU:Niue|NZ:Nuova Zelanda|PF:Polinesia francese|PG:Papua Nuova Guinea|PW:Palau|SB:Isole Salomone|TO:Tonga|TV:Tuvalu|VU:Vanuatu|WS:Samoa',
+  africa: 'AO:Angola|BF:Burkina Faso|BI:Burundi|BJ:Benin|BW:Botswana|CD:Congo (Rep. Dem.)|CF:Rep. Centrafricana|CG:Congo|CI:Costa d\'Avorio|CM:Camerun|CV:Capo Verde|DJ:Gibuti|DZ:Algeria|EG:Egitto|ER:Eritrea|ET:Etiopia|GA:Gabon|GH:Ghana|GM:Gambia|GN:Guinea|GQ:Guinea Equatoriale|GW:Guinea-Bissau|KE:Kenya|KM:Comore|LR:Liberia|LS:Lesotho|LY:Libia|MA:Marocco|MG:Madagascar|ML:Mali|MR:Mauritania|MU:Mauritius|MW:Malawi|MZ:Mozambico|NA:Namibia|NE:Niger|NG:Nigeria|RE:Riunione|RW:Ruanda|SC:Seychelles|SD:Sudan|SL:Sierra Leone|SN:Senegal|SO:Somalia|SS:Sud Sudan|ST:São Tomé e Príncipe|SZ:Eswatini|TD:Ciad|TG:Togo|TN:Tunisia|TZ:Tanzania|UG:Uganda|YT:Mayotte|ZA:Sudafrica|ZM:Zambia|ZW:Zimbabwe',
+  medioriente: 'AE:Emirati Arabi Uniti|BH:Bahrein|IL:Israele|IQ:Iraq|IR:Iran|JO:Giordania|KW:Kuwait|LB:Libano|OM:Oman|PS:Palestina|QA:Qatar|SA:Arabia Saudita|SY:Siria|TR:Turchia|YE:Yemen',
+};
+/* I due dizionari che il codice interroga, derivati una volta sola. */
+const PAESE_ZONA = {}, PAESE_NOME = {};
+for (const z in PAESI_ZONA_RAW)
+  for (const voce of PAESI_ZONA_RAW[z].split('|')){
+    const i = voce.indexOf(':');
+    PAESE_ZONA[voce.slice(0, i)] = z;
+    PAESE_NOME[voce.slice(0, i)] = voce.slice(i + 1);
+  }
+/* Il catalogo piatto ordinato per NOME: disegna i due menu. */
+const PAESI = Object.keys(PAESE_NOME)
+  .map(c => [c, PAESE_NOME[c], PAESE_ZONA[c]])
+  .sort((a, b) => a[1].localeCompare(b[1], 'it'));
+const DOM_DEFAULT = 'IT';
+/* La zona di una destinazione, visto da un venditore con quel paese
+   di casa: '' se il codice non e' in tabella. IL DOMESTICO VINCE SUL
+   SUO CONTINENTE — l'Italia sta in Europa, ma per chi vende da Milano
+   un ordine da Roma e' 'dom'. Gemella di `zona_da_paese`. */
+function zonaPaese(c, domestico){
+  const cod = (c || '').trim().toUpperCase();
+  if (!PAESE_ZONA[cod]) return '';
+  const dom = (domestico || '').trim().toUpperCase() || DOM_DEFAULT;
+  if (cod === dom) return 'dom';
+  if ((ENCLAVI_DOM[dom] || '').split('|').includes(cod)) return 'dom';
+  return PAESE_ZONA[cod];
+}
+const nomePaese = c => PAESE_NOME[(c || '').trim().toUpperCase()] || '';
+/* Il nome pubblico di una zona. Il domestico prende il nome del suo
+   PAESE: e' l'unica cosa vera da dire a chi legge, e l'unica che non
+   invecchia il giorno che il domestico non sara' piu' l'Italia. */
+const etichettaZona = (z, dom) => z === 'dom'
+  ? nomePaese((dom || '').trim().toUpperCase() || DOM_DEFAULT)
+  : (ZONA_NOME[z] || '');
+/* Le sette zone internazionali, nell'ordine in cui si disegnano.
+   L'ORDINE VIENE DA ZONA_NOME e non da una lista a parte: due elenchi
+   diverghrebbero al primo continente aggiunto, e il primo segno
+   sarebbe una casella che il server non sa leggere. */
+const ZONE_INTL = Object.keys(ZONA_NOME);
+/* I sette campi del cassetto internazionale, montati una volta sola:
+   scriverli a mano nell'HTML sarebbe la settima copia della stessa
+   riga, e la prima a sfasarsi il giorno dell'ottavo continente. */
+function montaZoneIntl(){
+  const box = el('sellZoneCampi');
+  if (!box || box.dataset.montato) return;
+  box.innerHTML = ZONE_INTL.map(z => `<div class="sped-zona">
+    <span class="sped-zona-nome">${esc(ZONA_NOME[z])}</span>
+    <div class="sats-input"><input id="sellZona_${z}" type="number"
+      inputmode="numeric" placeholder="non spedisco"
+      style="min-width:0"
+      oninput="aggiornaSpedHint()"><span class="suffix"
+      id="sellZonaCur_${z}" style="pointer-events:none">sats</span></div>
+  </div>`).join('');
+  box.dataset.montato = '1';
+}
+/* Il menu del paese di CASA: gli stessi paesi della destinazione —
+   un venditore spagnolo deve poter dire ES, ed e' la riga che rende
+   il mercatino esportabile senza un secondo cantiere. */
+function montaPaesiDom(){
+  const s = el('sellPaeseDom');
+  if (!s || s.dataset.montato) return;
+  s.innerHTML = PAESI.map(([c, nome]) =>
+    `<option value="${c}">${esc(nome)}</option>`).join('');
+  s.value = DOM_DEFAULT;
+  s.dataset.montato = '1';
+}
+function svuotaZoneIntl(){
+  ZONE_INTL.forEach(z => { const i = el('sellZona_' + z);
+                           if (i) i.value = ''; });
+  if (el('sellPaeseDom')) el('sellPaeseDom').value = DOM_DEFAULT;
+  if (el('sellIntl')) el('sellIntl').open = false;
+}
+
 /* Le taglie del pacco (lug 2026): gemello client di TAGLIE_PACCO del
    server, con l'esempio concreto che nel form aiuta a scegliere («come
    una scatola di scarpe») — le stesse parole che vivevano nelle
@@ -10059,6 +10211,17 @@ function mapListing(a){
     spedExtra:a.spedizione_extra_sats||0,
     spedExtraEur:a.spedizione_extra_eur||0,
     spedPuntoDich:!!a.spedizione_punto_dichiarata,
+    /* LE ZONE (set 2026): il paese di CASA e la MAPPA. Il prezzo di
+       casa e' gia' `sped`/`spedEur` qui sopra — nella mappa c'e' la
+       sua copia, che serve solo a dire che e' dichiarato. Il parse e'
+       difensivo come quello del server: un JSON storto vale mappa
+       vuota (spedisce solo a casa), mai un errore su tutta la
+       vetrina. */
+    paeseDom:a.paese_domestico||'',
+    zone:(()=>{ try {
+        const m = JSON.parse(a.spedizione_zone||'{}');
+        return (m && typeof m === 'object') ? m : {};
+      } catch(e){ return {}; } })(),
     /* la combo della gift card: modalita' fisica + codice in
        piattaforma, sceglie chi compra */
     ancheDigitale:!!a.anche_digitale,
@@ -10205,6 +10368,13 @@ function mapOrder(o){
     /* il conto scomposto (lug 2026): listing.price resta il TOTALE
        in cassaforte, le quote dicono com'e' fatto */
     consegnaScelta:o.consegna_scelta||'', spedSats:o.spedizione_sats||0,
+    /* LA ZONA APPLICATA (set 2026): e' la ricevuta di QUALE tariffa
+       e' stata pagata, e la leggono l'inciso del conto e — in
+       disputa — il moderatore. '' non e' un buco ma il mondo di
+       ieri: vale Italia, ed e' quel che quegli ordini sono sempre
+       stati (allora una sola zona esisteva). */
+    zonaSped:o.zona_sped||'', paeseSped:o.paese_sped||'',
+    domesticoSped:o.domestico_sped||'',
     protSats:o.protezione_sats||0,
     /* lo sconto carrello FOTOGRAFATO (ago 2026): serve perche' le
        righe qui sotto sono LORDE — senza questa cifra il compratore
@@ -15022,10 +15192,37 @@ scriviDurate();
    oppure l'ancora all'euro dei listini sats) e i sats sono una STIMA
    al cambio vivo — il valore vero si fissa alla creazione
    dell'ordine. spedEur vuoto = sats fissi. */
-function satsSpedizione(l){
-  if (l.spedEur>0 && cambioVivo)
-    return Math.round(l.spedEur / eurPerSat);
-  return l.sped||0;
+/* QUESTO ANNUNCIO SPEDISCE IN QUELLA ZONA? Gemello client di
+   `_zona_offerta`, ripiego del domestico compreso: un annuncio che le
+   zone non le ha mai viste (i client di ieri, gli importati da
+   Nostr) ha la mappa VUOTA, e leggerla alla lettera lo toglierebbe
+   dal mercato di casa. Quindi la mappa vuota vale «spedisce a casa
+   e basta». */
+function zonaOfferta(l, z){
+  if (l.consegna !== 'spedizione' && l.consegna !== 'entrambe') return false;
+  const m = l.zone || {};
+  if (z === 'dom') return ('dom' in m) || !Object.keys(m).length;
+  return z in m;
+}
+/* La tariffa di una zona, nella sua valuta nativa: gemella di
+   `_tariffa_dichiarata` sul solo ramo della zona (la via punto la
+   sceglie il server, che e' l'unico a sapere se e' dichiarata). Il
+   DOMESTICO esce dalle colonne di sempre, come di la'. */
+function tariffaZona(l, z){
+  const v = (l.zone || {})[z];
+  if (z && z !== 'dom' && v)
+    return {sats: v.sats||0, eur: v.eur||0};
+  return {sats: l.sped||0, eur: l.spedEur||0};
+}
+/* La zona di serie e' il DOMESTICO, e i dieci chiamanti di ieri non
+   la passano: la card, il badge e le stime restano quelle di sempre
+   — in vetrina si mostra il prezzo di casa (decisione di Andrea), le
+   zone complete si vedono alla cassa e nel foglio di pubblicazione. */
+function satsSpedizione(l, z){
+  const tar = tariffaZona(l, z || 'dom');
+  if (tar.eur>0 && cambioVivo)
+    return Math.round(tar.eur / eurPerSat);
+  return tar.sats;
 }
 /* Il supplemento per pezzo, stessa liturgia della tariffa. */
 function satsSupplemento(l){
@@ -16706,6 +16903,11 @@ function apriAcquisto(l){
              puntoAperto:false, rete:'',
              tipoPunto:'', puntoToccato:false, precompilato:false,
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
+             /* la destinazione (set 2026): l'Italia di serie — e' il
+                mercatino in cui siamo, e chiedere a novantanove
+                persone su cento di dichiarare l'ovvio sarebbe un
+                gesto in piu' per tutti per servirne uno */
+             paese:'IT',
              email:'',
              nota:'', notaAperta: notaApertaDefault([l.cat]),
              codice:'', codiceAperto:false,
@@ -16787,6 +16989,11 @@ function apriAcquistoSet(){
              puntoAperto:false, rete:'',
              tipoPunto:'', puntoToccato:false, precompilato:false,
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
+             /* la destinazione (set 2026): l'Italia di serie — e' il
+                mercatino in cui siamo, e chiedere a novantanove
+                persone su cento di dichiarare l'ovvio sarebbe un
+                gesto in piu' per tutti per servirne uno */
+             paese:'IT',
              email:'',
              nota:'', notaAperta: notaApertaDefault([...setScelte.keys()]
                .map(id => (listings.find(t => t.id === id) || {}).cat)),
@@ -16802,6 +17009,12 @@ function apriAcquistoSet(){
    giro si offre sempre dove c'e' la spedizione — con la tariffa del
    fallback casa, che in demo e' l'unica che esista. */
 function preventivoDemo(l){
+  /* LA ZONA ANCHE IN DEMO (set 2026): senza, la vetrina di prova
+     direbbe la tariffa italiana su una destinazione estera — e la
+     demo esiste proprio per far vedere come va a finire. */
+  const zonaDemo = zonaPaese((acqDati && acqDati.paese) || DOM_DEFAULT,
+                             l.paeseDom) || 'dom';
+  const zonaViva = zonaOfferta(l, zonaDemo);
   const art = artStima(l) * qtaScelta;
   const prot = Math.floor(art * protPercento / 100);
   /* l'euro NATIVO anche in demo (il giudice del ≈ vale ovunque):
@@ -16812,27 +17025,39 @@ function preventivoDemo(l){
   for (const v of stradeConsegna(l)){
     /* la spedizione dei pezzi scelti, supplemento compreso: la demo
        deve dire la stessa cifra della pagina vera */
-    const sped = v==='spedizione' ? satsSpedPezzi(l, qtaScelta) : 0;
+    const sped = v==='spedizione'
+      ? satsSpedizione(l, zonaDemo)
+        + satsSupplemento(l) * Math.max(0, qtaScelta - 1) : 0;
     const suppl = v==='spedizione'
-      ? sped - satsSpedizione(l) : 0;
-    const stima = v==='spedizione' && (l.spedEur>0 || l.spedExtraEur>0);
+      ? sped - satsSpedizione(l, zonaDemo) : 0;
+    const tarDemo = tariffaZona(l, zonaDemo);
+    const stima = v==='spedizione' && (tarDemo.eur>0 || l.spedExtraEur>0);
     /* l'euro nativo esiste solo se TUTTE le tariffe che contribuiscono
        sono nate in euro: mescolarle e' un ≈, come sul server */
     const spedEur = (v==='spedizione' && sped
-                     && (!(l.sped>0) || l.spedEur>0)
+                     && (!(tarDemo.sats>0) || tarDemo.eur>0)
                      && (!(l.spedExtra>0) || l.spedExtraEur>0))
-      ? Math.round(((l.spedEur||0)
+      ? Math.round((tarDemo.eur
           + (l.spedExtraEur||0) * Math.max(0, qtaScelta-1)) * 100) / 100 : 0;
     const totEur = (artEur>0 && !prot && (!sped || spedEur>0))
       ? Math.round((artEur + spedEur) * 100) / 100 : 0;
     if (v==='spedizione'){
-      strade.push({via:'casa', spedizione_sats:sped, spedizione_eur:spedEur,
-                   totale_sats:art+sped+prot, totale_eur:totEur, stima,
-                   supplemento_sats:suppl, pezzi:qtaScelta});
-      strade.push({via:'punto', spedizione_sats:sped, spedizione_eur:spedEur,
-                   totale_sats:art+sped+prot, totale_eur:totEur, stima,
-                   supplemento_sats:suppl, pezzi:qtaScelta,
-                   fallback_casa:true});
+      /* la porta chiusa anche in demo, e la via punto che fuori
+         dall'Italia non si offre: le due regole del server, o la
+         demo mostrerebbe strade che la pagina vera non ha */
+      if (!zonaViva){
+        strade.push({via:'casa', zona_non_offerta:true});
+      } else {
+        strade.push({via:'casa', spedizione_sats:sped, spedizione_eur:spedEur,
+                     totale_sats:art+sped+prot, totale_eur:totEur, stima,
+                     supplemento_sats:suppl, pezzi:qtaScelta});
+        if (zonaDemo === 'dom')
+          strade.push({via:'punto', spedizione_sats:sped,
+                       spedizione_eur:spedEur,
+                       totale_sats:art+sped+prot, totale_eur:totEur, stima,
+                       supplemento_sats:suppl, pezzi:qtaScelta,
+                       fallback_casa:true});
+      }
     } else {
       strade.push({via:v, spedizione_sats:0, spedizione_eur:0,
                    totale_sats:art+prot,
@@ -16850,6 +17075,11 @@ function preventivoDemo(l){
           articolo_unitario_eur: artEur>0 ? Math.round(l.priceEur*100)/100 : 0,
           protezione_sats:prot,
           commissione_sats:0, stima:l.valuta==='eur', spedizioniere:'',
+          /* le zone che l'annuncio serve: il menu dei paesi spegne le
+             altre, in demo come in pagina vera */
+          zone_offerte:['dom', ...ZONE_INTL].filter(z => zonaOfferta(l, z)),
+          paese:(acqDati && acqDati.paese) || DOM_DEFAULT, zona:zonaDemo,
+          domestico:(l.paeseDom || DOM_DEFAULT),
           strade};
 }
 /* IL DEFAULT DELLA VIA E' IL PUNTO DI RITIRO (ago 2026, decisione di
@@ -16895,6 +17125,11 @@ async function caricaPreventivo(){
        ...(d0.accordoId ? {offerta_carrello_id: d0.accordoId} : {})}
     : {annuncio_id: d0.annuncioId, quantita: d0.qta,
        offerta_id: d0.offertaId};
+  /* LA DESTINAZIONE va anche nel PREVENTIVO, o la pagina direbbe la
+     tariffa italiana e la fattura ne chiederebbe un'altra: e' il
+     patto «preventivo e invoice dicono la stessa cifra», che qui
+     acquista una terza variabile. */
+  body.paese = d0.paese || 'IT';
   /* IL CODICE SCONTO anche qui, ed e' il varco che conta: senza,
      la pagina direbbe un prezzo e la invoice ne chiederebbe un altro.
      Va sui QUATTRO — questo, startBuy, startBuySet e la strada del
@@ -17658,7 +17893,7 @@ function renderAcquisto(){
      invia niente: a mandare l'ordine e' «Paga», piu' in basso. */
   const iVal = d.indirizzo || indirizzoVuoto();
   const campiIndirizzo = `<form onsubmit="return false" class="ind-form">
-    ${CAMPI_IND.map(c => `<label for="acqInd_${c.k}">${c.et}${c.serve?'':' <span class="ind-facolt">(facoltativo)</span>'}</label>
+    ${campiIndirizzoVisibili(d.paese || 'IT').map(c => `<label for="acqInd_${c.k}">${c.et}${c.serve?'':' <span class="ind-facolt">(facoltativo)</span>'}</label>
       <input id="acqInd_${c.k}" maxlength="${c.max}" value="${esc(iVal[c.k]||'')}"
         ${c.ac ? `autocomplete="${c.ac}"` : 'autocomplete="off"'}
         ${c.k==='cap' ? 'inputmode="numeric"' : ''}
@@ -17687,8 +17922,38 @@ function renderAcquisto(){
         onclick="apriIndirizzoAcquisto()"><span class="punto-testo">${esc(indirizzoRiassunto(iVal))}</span><span class="punto-cambia">Cambia</span></button>`
     : `<button type="button" class="btn ghost" aria-expanded="false"
         onclick="apriIndirizzoAcquisto()">Indica l'indirizzo di spedizione</button>`;
+  /* --- IL PAESE DI DESTINAZIONE (set 2026) --- vive DENTRO il
+     cassetto della via casa, e non e' una quarta radio: le vie sono
+     COME arriva la roba, il paese e' DOVE — due domande diverse, e
+     moltiplicarle darebbe sei righe da leggere per comprare una
+     lampada. Sta SOPRA l'indirizzo perche' lo governa: cambiando
+     paese cambiano la tariffa e, sul paese fuori elenco, i campi.
+     LE ZONE CHE IL VENDITORE NON SERVE SONO SPENTE, non nascoste:
+     «non spedisce li'» e' un'informazione, e toglierla dall'elenco
+     farebbe cercare una voce che sembra sparita. Il server dice quali
+     servire (`zone_offerte`); finche' il preventivo non e' tornato
+     si mostra tutto, che e' lo stato di partenza e non una promessa. */
+  /* `p` e' null finche' il conto non e' tornato: allo scheletro il
+     menu esce INTERO, che e' lo stato di partenza e non una promessa
+     — le zone spente arrivano col preventivo, un istante dopo. */
+  const offerte = (p && p.zone_offerte) || null;
+  /* il paese di CASA di chi vende: lo dice il preventivo, perche' e'
+     lui a sapere cosa vuol dire «dom» su questo annuncio */
+  const domVend = (p && p.domestico) || DOM_DEFAULT;
+  const paeseSel = d.paese || 'IT';
+  const opzioni = PAESI.map(([c, nome]) => {
+    const vivo = !offerte || offerte.includes(zonaPaese(c, domVend));
+    return `<option value="${c}"${c===paeseSel?' selected':''}${
+      vivo ? '' : ' disabled'}>${esc(nome)}${
+      vivo ? '' : ' — non spedisce qui'}</option>`;
+  }).join('');
+  const cassettoPaese = `<div class="acq-paese">
+    <label for="acqPaese">Dove lo spediamo</label>
+    <select id="acqPaese" onchange="setPaeseAcquisto(this.value)">${opzioni}</select>
+  </div>`;
   const cassettoIndirizzo = `<div class="${d.indirizzoAperto?'field':''}" id="acqIndCampo"
       onclick="event.stopPropagation()">
+    ${cassettoPaese}
     ${d.indirizzoAperto ? campiIndirizzo : indChiuso}
   </div>`;
   /* --- LA NOTA PER IL VENDITORE (ago 2026) --- il terzo cassetto
@@ -17839,6 +18104,17 @@ function renderAcquisto(){
       if (s.cambio_assente)
         return `<div class="via-opzione off"><span class="via-nome">${nomeVia(s.via)}
           <span class="via-sped">il cambio euro non è disponibile: riprova tra poco</span></span></div>`;
+      /* LA PORTA CHIUSA DELLA ZONA (set 2026), gemella di quella del
+         cambio: la strada si SPEGNE col motivo invece di sparire.
+         Sparendo, chi compra crederebbe che la spedizione non esista
+         — e la differenza conta, perche' qui basta cambiare il paese
+         qui sopra per riaprirla. */
+      if (s.zona_non_offerta)
+        return `<div class="via-opzione off"><span class="via-nome">${nomeVia(s.via)}
+          <span class="via-sped">chi vende non spedisce in ${
+            esc(etichettaZona(zonaPaese(d.paese || DOM_DEFAULT, domVend),
+                              domVend) || 'questa zona')
+          }: prova un'altra destinazione</span></span></div>`;
       /* «Consigliato» sulla via punto (ago 2026, decisione di Andrea):
          la pillola CONSIGLIA la strada, non spiega la tariffa — il
          «come a casa» del fallback e' sparito, e per chi compra la
@@ -18169,6 +18445,26 @@ function setViaAcquisto(v){
   if (v === 'punto' && acqDati.puntoAperto) el('acqPunto')?.focus();
   if (v === 'casa' && acqDati.indirizzoAperto)
     el('acqInd_nome')?.focus({preventScroll:true});
+}
+/* LA SCELTA DEL PAESE (set 2026): cambia la TARIFFA, quindi rifa' il
+   conto — e lo rifa' dal server, mai a mente: il client la matematica
+   delle zone non la conosce e non deve impararla (il patto
+   «preventivo e invoice dicono la stessa cifra per costruzione»).
+   LA VIA PUNTO NON SOPRAVVIVE ALL'ESTERO: le reti che conosciamo sono
+   italiane, e il preventivo quella strada fuori dall'Italia non la
+   manda proprio — quindi chi l'aveva scelta si ritroverebbe su una
+   via che non c'e' piu'. Si riporta a casa QUI, prima del conto, che
+   e' l'unico posto in cui si sa che il paese e' appena cambiato. */
+function setPaeseAcquisto(c){
+  if (!acqDati || !c) return;
+  haptic();
+  acqDati.paese = c;
+  const domV = (acqDati.preventivo && acqDati.preventivo.domestico)
+               || DOM_DEFAULT;
+  if (zonaPaese(c, domV) !== 'dom' && acqDati.via === 'punto')
+    acqDati.via = 'casa';
+  renderAcquisto();
+  if (!DEMO) caricaPreventivo();
 }
 /* Il cassetto del punto si apre da UN posto solo — il bottone, la
    radio del punto a campo vuoto (via setViaAcquisto) e le due guardie
@@ -18626,7 +18922,23 @@ const CAMPI_IND = [
      VENDITORE dell'oggetto. A distinguerli sono le parole. */
   {k:'note',      et:'Note per il corriere (citofono, scala, orari)',
                                             ac:'',               max:120, serve:false},
+  /* IL PAESE (set 2026, col cantiere delle zone): finche' si
+     spediva solo in Italia era sottinteso, e un campo sottinteso non
+     si scrive. Da quando la destinazione puo' essere Lisbona, senza
+     questa riga chi vende ha in mano un indirizzo che non sa
+     indirizzare. Sta in catalogo per restare allineato a
+     CAMPI_INDIRIZZO del server — e' quello a validare — ma NON si
+     disegna quasi mai: per i paesi in elenco lo scrive il server dal
+     codice, e chiederlo due volte sarebbe chiedere di ripetersi.
+     L'unica volta che si disegna e' il paese FUORI elenco, dove il
+     nome non ce l'ha nessuno. Vedi `campiIndirizzoVisibili`. */
+  {k:'paese',     et:'Paese',               ac:'country-name',    max:56,  serve:false},
 ];
+/* I campi che si DISEGNANO, che sono meno di quelli del catalogo: il
+   paese compare solo con la voce «Un altro paese», e li' e' l'unico
+   modo che ha chi compra di dire dove abita. */
+const campiIndirizzoVisibili = paese =>
+  CAMPI_IND.filter(c => c.k !== 'paese' || paese === 'ZZ');
 function indirizzoVuoto(){
   const o = {}; CAMPI_IND.forEach(c => o[c.k] = ''); return o;
 }
@@ -18681,7 +18993,11 @@ function corpoConsegna(){
   if (v==='ritiro' || v==='digitale' || v==='servizio')
     return {consegna: v, ...extra};
   const out = {consegna:'spedizione', ...extra,
-               spedizione_via: v==='punto' ? 'punto' : 'casa'};
+               spedizione_via: v==='punto' ? 'punto' : 'casa',
+               /* LA DESTINAZIONE viaggia con la spedizione e con
+                  nient'altro: un ritiro a mano non ha un paese, e
+                  mandarglielo lo farebbe finire in una ricevuta. */
+               paese: acqDati.paese || 'IT'};
   /* dal quarto giro il punto c'e' sempre (ctaAcquisto lo esige
      prima di chiamare): il trim e' la cintura contro il vuoto */
   if (v==='punto' && acqDati.punto.trim())
@@ -22305,6 +22621,11 @@ async function pagaOffertaCarrello(id){
              puntoAperto:false, rete:'',
              tipoPunto:'', puntoToccato:false, precompilato:false,
              indirizzo: indirizzoVuoto(), indirizzoAperto:false,
+             /* la destinazione (set 2026): l'Italia di serie — e' il
+                mercatino in cui siamo, e chiedere a novantanove
+                persone su cento di dichiarare l'ovvio sarebbe un
+                gesto in piu' per tutti per servirne uno */
+             paese:'IT',
              email:'',
              nota:'', notaAperta: notaApertaDefault(righe.map(f =>
                (listings.find(t=>t.id===f.annuncio_id)||{}).cat)),
@@ -23136,12 +23457,32 @@ function aggiornaCifreOrdine(){
    c'e' gia' la riga «🚚 Spedizione gratuita», che in piu' dice
    quanto ha offerto chi vende. Il font si rimette a mano perche' il
    prezzo e' in mono, e un inciso di prosa in mono si legge male. */
+/* LA ZONA DI UN ORDINE, in parole: gemella client di `frase_zona`.
+   '' vale ITALIA, come di la': gli ordini nati prima del cantiere non
+   avevano un'altra zona da scegliere, quindi dirlo non e' inventare.
+   Il PAESE si nomina solo quando aggiunge qualcosa — mai sull'Italia
+   («Italia (Italia)» e' rumore) e mai sul paese fuori elenco, dove
+   il nome non ce l'abbiamo: quello l'ha scritto chi compra
+   nell'indirizzo, ed e' li' che si legge. */
+function zonaOrdine(o){
+  const z = o.zonaSped || 'dom';
+  const nome = z !== 'dom' && o.paeseSped ? nomePaese(o.paeseSped) : '';
+  const dove = 'in ' + (etichettaZona(z, o.domesticoSped) || '');
+  return dove + (nome ? ` (${esc(nome)})` : '');
+}
 function incisoConto(o){
   /* cifre NUDE: l'unita' e il «≈» li ha gia' detti il prezzo grande
      un centimetro sopra, e ripeterli qui farebbe «≈ 8,50 € · di cui
-     ≈ 4,20 € di spedizione» — tre simboli per un dettaglio */
+     ≈ 4,20 € di spedizione» — tre simboli per un dettaglio.
+     LA ZONA invece si dice (set 2026, chiesto da Andrea): l'inciso e'
+     il posto in cui la spedizione si NOMINA, quindi e' li' che deve
+     dire quale tariffa e' stata applicata — in disputa e' la riga
+     che chiude la discussione. Solo dove si spedisce davvero: un
+     ritiro a mano una zona non ce l'ha. */
+  const zona = o.consegnaScelta === 'spedizione'
+    ? ' ' + zonaOrdine(o) : '';
   const voci = [
-    o.spedSats>0 ? `${cifraOrdine(o, o.spedSats, 1)} di spedizione` : '',
+    o.spedSats>0 ? `${cifraOrdine(o, o.spedSats, 1)} di spedizione${zona}` : '',
     o.protSats>0 ? `${cifraOrdine(o, o.protSats, 1)} di protezione` : ''
   ].filter(Boolean);
   return voci.length ? `<span class="eur-hint" style="margin:0 0 0 6px;font-family:'Nunito',sans-serif">· di cui ${voci.join(' e ')}</span>` : '';
@@ -32910,10 +33251,11 @@ function toggleSpedCur(){
   haptic();
   spedValuta = spedValuta==='sats' ? 'eur' : 'sats';
   el('sellSped').value = '';
-  /* il toggle e' UNO per i tre costi: cambiarlo azzera anche il campo
-     punto e il supplemento, o resterebbero numeri nella valuta di prima */
-  if (el('sellSpedPunto')) el('sellSpedPunto').value = '';
-  if (el('sellSpedExtra')) el('sellSpedExtra').value = '';
+  /* il toggle e' UNO per TUTTI i costi: cambiarlo azzera anche le due
+     zone, il campo punto e il supplemento, o resterebbero numeri
+     nella valuta di prima */
+  [...ZONE_INTL.map(z => 'sellZona_' + z), 'sellSpedPunto',
+   'sellSpedExtra'].forEach(i => { if (el(i)) el(i).value = ''; });
   aggiornaSpedCampo();
 }
 function aggiornaSpedCampo(){
@@ -32929,7 +33271,8 @@ function aggiornaSpedCampo(){
   inp.placeholder = inEur ? '0,00' : '0';
   /* il campo punto e il supplemento SEGUONO il toggle del campo casa
      (un interruttore solo, mai semantiche diverse per i tre costi) */
-  [['sellSpedPunto','sellSpedPuntoCur'],
+  [...ZONE_INTL.map(z => ['sellZona_' + z, 'sellZonaCur_' + z]),
+   ['sellSpedPunto','sellSpedPuntoCur'],
    ['sellSpedExtra','sellSpedExtraCur']].forEach(([ci, ce])=>{
     const i2 = el(ci), e2 = el(ce);
     if (!i2 || !e2) return;
@@ -32944,6 +33287,19 @@ function aggiornaSpedCampo(){
 function aggiornaSpedHint(){
   const h = el('sellSpedHint');
   if (!h) return;
+  /* la riga del prezzo di casa prende il NOME del paese scelto: e'
+     l'unica cosa vera da scriverci, e cambia col menu */
+  const dom = el('sellPaeseDom')?.value || DOM_DEFAULT;
+  if (el('sellSpedDomNome'))
+    el('sellSpedDomNome').textContent = nomePaese(dom) || 'Casa';
+  /* IL CONTO NEL TITOLO DEL CASSETTO: un cassetto chiuso che nasconde
+     tre promesse e' peggio di sette campi in vista, quindi il titolo
+     dice quante zone sono accese senza doverlo aprire. */
+  const accese = ZONE_INTL.filter(
+    z => String(el('sellZona_' + z)?.value ?? '').trim() !== '').length;
+  if (el('sellIntlConto'))
+    el('sellIntlConto').textContent = accese
+      ? (accese === 1 ? '· 1 zona' : `· ${accese} zone`) : '';
   if (sellValuta==='sats' && spedValuta==='eur'){
     const e = eurCampo('sellSped');
     h.textContent = ((e>0 && cambioVivo)
@@ -33282,6 +33638,7 @@ function aggiornaConsegnaForm(){
         rit = el('sellConsRitiro').checked,
         asta = astaAccesa();
   el('sellSpedField').style.display = (sped && !asta) ? '' : 'none';
+  if (sped && !asta){ montaZoneIntl(); montaPaesiDom(); }
   /* LE DUE TARIFFE IN PIU' E LA TAGLIA RESTANO FUORI DALLA STRADA
      FIRMATA (ago 2026), ed e' la regola del cantiere: li' si dichiara
      solo quel che l'evento NIP-99 porta e l'import rilegge, e per
@@ -33361,9 +33718,36 @@ function consegnaPayload(){
   const out = {consegna, taglia_pacco:el('sellTaglia').value};
   if (anche_digitale) out.anche_digitale = 1;
   if (consegna==='spedizione' || consegna==='entrambe'){
-    if (sellValuta==='eur' || spedValuta==='eur')
-      out.spedizione_eur = eurCampo('sellSped');
-    else out.spedizione_sats = parseInt(el('sellSped').value)||0;
+    /* LE ZONE (set 2026): VUOTO ≠ ZERO anche per il paese di CASA,
+       ed e' il rovescio di come funzionava fino a ieri — la chiave
+       si manda solo se la casella e' PIENA, perche' la sua presenza
+       E' la dichiarazione «li' spedisco». Un ||0 su un campo vuoto
+       direbbe al server «spedisco gratis», che e' il contrario.
+       Il client vecchio in cache manda sempre la chiave di casa
+       (fosse anche a zero) e resta dichiarato senza saperlo: e'
+       esattamente il mondo di ieri, e va tenuto. */
+    const inEur = (sellValuta==='eur' || spedValuta==='eur');
+    /* IL PREZZO DI CASA nelle chiavi di sempre: le legge tutta l'app
+       (card, NIP-99, canale, import, libro mastro), ed e' la ragione
+       per cui non e' finito nella mappa. */
+    const vDom = String(el('sellSped')?.value ?? '').trim();
+    if (vDom !== ''){
+      if (inEur) out.spedizione_eur = eurCampo('sellSped');
+      else out.spedizione_sats = parseInt(vDom)||0;
+    }
+    out.paese_domestico = el('sellPaeseDom')?.value || DOM_DEFAULT;
+    /* LE ZONE nella mappa, e la chiave c'e' solo se la casella e'
+       PIENA: la sua presenza E' la dichiarazione «li' spedisco».
+       Un ||0 su un campo vuoto direbbe al server «spedisco gratis»,
+       che e' il contrario. */
+    const zone = {};
+    ZONE_INTL.forEach(z => {
+      const v = String(el('sellZona_' + z)?.value ?? '').trim();
+      if (v === '') return;
+      zone[z] = inEur ? {eur: eurCampo('sellZona_' + z)}
+                      : {sats: parseInt(v)||0};
+    });
+    out.spedizione_zone = zone;
     /* La tariffa PUNTO: VUOTO ≠ ZERO, mai un ||0 sul test di
        presenza — vuoto = non dichiarata (vale la casa), «0» scritto
        = gratis al punto. La dichiarazione esplicita (anche a 0)
@@ -33425,10 +33809,36 @@ function riempiFormDa(l){
      spedizione gratis e il solo supplemento in euro (o la sola
      tariffa punto) la base e' 0 e il toggle sarebbe tornato su sats,
      rileggendo degli euro come se fossero sats. */
-  spedValuta = (l.spedEur>0 || l.spedPuntoEur>0 || l.spedExtraEur>0)
+  const _zoneEur = Object.values(l.zone || {})
+    .some(v => v && (v.eur || 0) > 0);
+  spedValuta = (l.spedEur>0 || l.spedPuntoEur>0 || l.spedExtraEur>0
+                || _zoneEur)
     ? 'eur' : (sellValuta==='eur' ? 'eur' : 'sats');
-  el('sellSped').value = (l.consegna==='spedizione'||l.consegna==='entrambe')
+  /* LE ZONE si ritrovano come sono state scritte, e la casella VUOTA
+     e' un valore: dice «li' non spedisco». La PRESENZA nella mappa
+     e' l'unica cosa che la distingue dallo ZERO, che invece e' una
+     promessa («gratis») — leggere il solo numero le confonderebbe, e
+     un venditore che riapre l'annuncio si ritroverebbe a promettere
+     una spedizione gratuita in Australia.
+     IL DOMESTICO HA IL SUO RIPIEGO, lo stesso di `_zona_offerta` lato
+     server: un annuncio che le zone non le ha mai viste (i client di
+     ieri, gli importati) ha la mappa vuota, e qui la sua casella si
+     riempie lo stesso — o riaprendo un annuncio vecchio per
+     cambiargli il titolo gli si toglierebbe il mercato di casa. */
+  const _spedisce = (l.consegna==='spedizione'||l.consegna==='entrambe');
+  montaZoneIntl();
+  montaPaesiDom();
+  if (el('sellPaeseDom'))
+    el('sellPaeseDom').value = (l.paeseDom || DOM_DEFAULT);
+  el('sellSped').value = (_spedisce && zonaOfferta(l, 'dom'))
     ? (l.spedEur>0 ? l.spedEur : (l.sped||0)) : '';
+  ZONE_INTL.forEach(z => {
+    const campo = el('sellZona_' + z);
+    if (!campo) return;
+    const v = (l.zone || {})[z];
+    campo.value = (_spedisce && v)
+      ? ((v.eur||0) > 0 ? v.eur : (v.sats||0)) : '';
+  });
   /* la tariffa punto si precompila SOLO se dichiarata: il campo
      vuoto e' il suo modo di dire «vale il costo qui sopra» */
   if (el('sellSpedPunto'))
@@ -33540,6 +33950,7 @@ function annullaModifica(){
   consegnaFirmata = false;
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped',
    'sellSpedPunto','sellSpedExtra','sellQta'].forEach(i=>{ if (el(i)) el(i).value=''; });
+  svuotaZoneIntl();
   el('sellTaglia').value = '';
   el('sellCond').value = '';
   if (el('sellAsta')) { el('sellAsta').checked = false; aggiornaAstaForm(); }
@@ -34137,6 +34548,7 @@ async function publish(){
   corrieriChiesto = false;
   ['sellTitle','sellPrice','sellZone','sellDesc','sellSped',
    'sellSpedPunto','sellSpedExtra','sellQta'].forEach(i=>{ if (el(i)) el(i).value=''; });
+  svuotaZoneIntl();
   el('sellTaglia').value = '';
   el('sellCond').value = '';
   if (el('sellAsta')) { el('sellAsta').checked = false; aggiornaAstaForm(); }
@@ -34499,9 +34911,18 @@ function consegnaPayloadFirmata(){
   const out = {consegna, condizione:el('sellCond').value,
                quantita:qtaForm()};
   if (consegna==='spedizione' || consegna==='entrambe'){
-    if (sellValuta==='eur' || spedValuta==='eur')
-      out.spedizione_eur = eurCampo('sellSped');
-    else out.spedizione_sats = parseInt(el('sellSped').value)||0;
+    /* SOLO L'ITALIA, e non e' una dimenticanza: l'evento NIP-99 porta
+       UNA tariffa sola (il tag `delivery shipping`), e le zone di
+       la' non esistono. Mandarne otto da qui vorrebbe dire scrivere
+       nel database un impegno che l'evento firmato non racconta.
+       Le altre due colonne non si toccano: l'UPDATE della modifica
+       firmata nomina solo queste, quindi restano quelle di prima. */
+    const v = String(el('sellSped')?.value ?? '').trim();
+    if (v !== ''){
+      if (sellValuta==='eur' || spedValuta==='eur')
+        out.spedizione_eur = eurCampo('sellSped');
+      else out.spedizione_sats = parseInt(v)||0;
+    }
   }
   return out;
 }
