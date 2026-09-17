@@ -46014,6 +46014,79 @@ function reset(){
     && ricevuti[2].dentro.action === 'add-invoice'
     && ricevuti[2].dentro.payload.payment_request[1] === FATT.libera_1g;
 
+  /* ---- 4-ter) IL FOGLIO CHE VIENE DALLA RIPRESA (17 set 2026) -----
+     DAL CAMPO: «📋 Copia la cifra» sparito dal foglio, e con lui la
+     promessa «Riceverai N». La restore-session porta lo STATO e
+     nient'altro (`{indice, stato}`), quindi da quando la ripresa muove
+     le righe una riga arriva a «Dove vuoi i sats?» senza aver mai
+     visto l'`add-invoice` — che e' il solo messaggio con la cifra. Il
+     lordo pero' sta sulla riga dalla presa, e il foglio lo usa. */
+  reset();
+  rispondi = r => [];
+  scriviOrdineP2P({id: 'x5', lato: 'compro', indice: 0, pubTrade: '',
+                   stato: 'prendo', euro: 25, euroMax: 0, importoScelto: 0,
+                   sats: 39604, satsNetti: 0, metodi: [], creato: 1});
+  scriviOrdineP2P(riprendiDaRestoreP2P(ordiniP2P()['x5'], 'waiting-buyer-invoice'));
+  p2pOrdineAperto = 'x5';
+  await assicuraMazzo();
+  apriIncassoP2P();
+  {
+    const h = nodi.p2pIncassoCorpo.innerHTML || '';
+    out.ripresaApreIlFoglio = ordiniP2P()['x5'].stato;
+    /* IL BOTTONE E' PRETESO, ed e' il punto di tutta la voce: senza,
+       la cifra esatta non si ribatte nel wallet e la fattura torna
+       indietro. 39604 − 396 (meta' del 2%) = 39208. */
+    out.ripresaCopiaLaCifra = h.indexOf("copiaLink('39208'") >= 0
+      && h.indexOf('📋 Copia la cifra: 39208') >= 0;
+    out.ripresaDiceLaCifra = h.indexOf('Riceverai <b>39208 sats</b>') >= 0;
+    /* IL LEGAME: se il foglio nomina una cifra c'e' il bottone per
+       copiarla, e se non la nomina non c'e' — vengono dallo stesso
+       giudice e non devono poter divergere */
+    out.cifraEBottoneInsieme = (h.indexOf('Riceverai') >= 0)
+      === (h.indexOf('Copia la cifra') >= 0);
+  }
+  /* ...E QUEL CHE NON E' UN FATTO NON SI INVENTA: su un ordine a
+     prezzo di mercato `amt` del libro vale zero — la cifra la fissa il
+     coordinatore al take — e su un intervallo il lordo del libro non
+     e' quello dello scambio. Niente numero, niente bottone, e il
+     foglio DICE perche' (un bottone che sparisce senza un perche' si
+     legge come un guasto). */
+  scriviOrdineP2P({id: 'x6', lato: 'compro', indice: 0, pubTrade: '',
+                   stato: 'attesa_mia_fattura', euro: 25, euroMax: 0,
+                   importoScelto: 0, sats: 0, satsNetti: 0, metodi: [], creato: 1});
+  p2pOrdineAperto = 'x6';
+  apriIncassoP2P();
+  {
+    const h = nodi.p2pIncassoCorpo.innerHTML || '';
+    out.mercatoNienteCifra = h.indexOf('Riceverai') < 0
+      && h.indexOf('Copia la cifra') < 0;
+    out.mercatoLoDice = h.indexOf('La cifra esatta qui non la sappiamo') >= 0
+      && h.indexOf('senza importo</b> — quella va bene comunque') >= 0;
+    out.mercatoCifraEBottoneInsieme = (h.indexOf('Riceverai') >= 0)
+      === (h.indexOf('Copia la cifra') >= 0);
+  }
+  scriviOrdineP2P({id: 'x7', lato: 'compro', indice: 0, pubTrade: '',
+                   stato: 'attesa_mia_fattura', euro: 25, euroMax: 0,
+                   importoScelto: 30, sats: 39604, satsNetti: 0,
+                   metodi: [], creato: 1});
+  out.intervalloNonInventa = satsDaRicevereP2P(ordiniP2P()['x7']);
+  /* IL PASSATO NON SI RIAPPLICA, MA LA CIFRA LA LASCIA: su un
+     dispositivo che riapre i messaggi arrivano dal piu' RECENTE, e
+     quello con l'importo del mio lato e' quasi sempre passato. Non
+     muove lo stato — e non deve — ma quel che MANCA glielo si prende,
+     come la controparte. */
+  scriviOrdineP2P({id: 'x8', lato: 'compro', indice: 0, pubTrade: '',
+                   stato: 'attesa_hold_venditore', euro: 25, sats: 0,
+                   satsNetti: 0, metodi: [], creato: 1, ultimaMossa: 2000});
+  applicaMessaggioP2P(ordiniP2P()['x8'],
+    {action: 'add-invoice', quando: 1000, payload: {order: {amount: 7543}}});
+  {
+    const v = ordiniP2P()['x8'];
+    out.passatoNonMuove = v.stato;
+    out.passatoLasciaLaCifra = v.satsMiei;
+    out.passatoRicavaIlLordo = v.satsNetti;
+  }
+
   /* ---- 4-bis) LA FATTURA LA FA IL WALLET (NWC, 16 set 2026) -------
      Col wallet collegato e `make_invoice` fra i metodi, il foglio
      chiede la fattura al wallet appena si apre — importo esatto in
@@ -46642,6 +46715,17 @@ function reset(){
         "foglioScorciatoiaSottoLAvviso": "...resta a un tocco, sotto l'avviso sui provider, e mai dentro un onclick",
         "foglioScorciatoiaScrive": "...e il tocco scrive nel campo senza mandare niente",
         "foglioSenzaSalvatoNienteScorciatoia": "...e senza un indirizzo salvato la scorciatoia non c'e'",
+        "ripresaApreIlFoglio": ("la ripresa dalla restore porta a «Dove vuoi i sats?»", "attesa_mia_fattura"),
+        "ripresaCopiaLaCifra": "...e il foglio HA il bottone che copia la cifra, anche senza l'add-invoice",
+        "ripresaDiceLaCifra": "...e la promette: 39208, il lordo del libro meno la mia meta'",
+        "cifraEBottoneInsieme": "...cifra promessa e bottone per copiarla stanno o cadono insieme",
+        "mercatoNienteCifra": ("a prezzo di mercato la cifra non si sa, e non si inventa", True),
+        "mercatoLoDice": "...e il foglio dice perche', e che la senza-importo va bene comunque",
+        "mercatoCifraEBottoneInsieme": ("...e il legame vale anche di la'", True),
+        "intervalloNonInventa": ("su un intervallo il lordo del libro non e' quello dello scambio", 0),
+        "passatoNonMuove": ("un messaggio passato non muove lo stato", "attesa_hold_venditore"),
+        "passatoLasciaLaCifra": ("...ma la cifra che manca gliela si prende", 7543),
+        "passatoRicavaIlLordo": ("...e il lordo si ricava all'indietro", 7619),
         "importoStortoFermato": "la fattura vera del 16 set (7468) si ferma, e la ragione dice 7543",
         "nonChiedeIlLordo": "...mai il lordo",
         "laMetaDueVolteFermata": "...e 7468 con un giorno di vita si ferma lo stesso: era la meta' tolta due volte",

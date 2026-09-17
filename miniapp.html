@@ -41469,6 +41469,19 @@ function applicaMessaggioP2P(ord, dentro){
     if (!ord.hold && eco.hold && ord.stato === 'attesa_mia_hold') {
       ord.hold = eco.hold; preso = true;
     }
+    /* ⚠️ E LA CIFRA E' UN DATO COME LA CONTROPARTE (17 set 2026, il
+       foglio senza «Copia la cifra»): l'importo del mio lato lo porta
+       il solo `add-invoice`, e su un dispositivo che riapre i messaggi
+       arrivano dal piu' RECENTE — quello che la cifra la porta e'
+       quasi sempre passato. Non muove lo stato e non fa parlare
+       nessuno, ma quel che MANCA glielo si prende lo stesso: un
+       importo non cambia col tempo, e' lo stesso ordine. */
+    if (!(ord.satsMiei > 0) && eco.satsMiei > 0) {
+      ord.satsMiei = eco.satsMiei; preso = true;
+    }
+    if (!(ord.satsNetti > 0) && eco.satsNetti > 0) {
+      ord.satsNetti = eco.satsNetti; preso = true;
+    }
     if (preso) {
       scriviOrdineP2P(ord);
       if (peerNuovo) { pianificaMetodoP2P(ord.id); pianificaAutoRecapito(ord.id); }
@@ -43076,12 +43089,39 @@ async function fatturaDalWalletP2P(id){
 function satsDaRicevereP2P(o){
   /* la cifra che il coordinatore ha DETTO nell'`add-invoice` e' quella
      che pretende nella fattura (`amount − order.fee`, gia' fatta da
-     lui): si ripete, non si ricalcola. Il ramo sotto e' il ripiego
-     per una riga scritta prima del 16 set 2026, dove c'e' solo il lordo. */
+     lui): si ripete, non si ricalcola. Sotto c'e' il LORDO, da
+     qualunque parte lo si sappia (`lordoNotoP2P`), e la meta' si
+     toglie con la formula di sempre. */
   if (o && o.satsMiei > 0) return o.satsMiei;
-  const lordo = (o && o.satsNetti > 0) ? o.satsNetti : 0;
+  const lordo = lordoNotoP2P(o);
   if (!(lordo > 0) || commissioneVivaP2P() === null) return 0;
   return nettoLatoP2P({lato: 'sell'}, lordo);
+}
+/* ---- IL LORDO DELL'ORDINE, IN ORDINE DI VERITA' ----
+   PURA. Prima quel che ha DETTO il coordinatore (`satsNetti`), poi il
+   lordo del LIBRO — che la presa scrive sulla riga (`sats`) e che da
+   qui non leggeva piu' nessuno.
+   ⚠️ IL SECONDO RAMO E' NATO DAL FOGLIO SENZA LA CIFRA (17 set 2026,
+   dal campo: «Copia la cifra» sparito). La ripresa dalla restore porta
+   lo STATO e nient'altro — `{indice, stato}`, censiti i campi di
+   `unaRestoreP2P` — quindi da quel giorno una riga arriva a «Dove vuoi
+   i sats?» anche senza aver mai visto l'`add-invoice`, che e' il solo
+   messaggio che la cifra la porta. Senza questo ramo il foglio non
+   prometteva niente, il bottone che copia la cifra spariva, e chi
+   compra non aveva piu' modo di ribattere l'importo esatto.
+   ⚠️ E SI USA SOLO DOVE E' UN FATTO, che e' tutta la prudenza del
+   punto: `amt` del 38383 vale ZERO su un ordine a prezzo di mercato —
+   li' la cifra la fissa il coordinatore AL TAKE
+   (`get_market_amount_and_fee`) e il libro non la sa — e un intervallo
+   e' a mercato per definizione. Un numero ricavato di li' sarebbe una
+   fattura RIFIUTATA con l'aria di essere giusta, cioe' peggio di
+   nessun numero: quando non e' un fatto si torna a zero, e il foglio
+   lo dice invece di inventare. */
+function lordoNotoP2P(o){
+  if (!o) return 0;
+  if (o.satsNetti > 0) return o.satsNetti;
+  if (o.sats > 0 && !(o.euroMax > 0) && !(o.importoScelto > 0)) return o.sats;
+  return 0;
 }
 /* PURA: dall'importo del MIO lato all'importo dell'ORDINE, rifacendo
    al contrario il conto del coordinatore (`get_fee`: la meta' della
@@ -43140,6 +43180,16 @@ function renderIncassoP2P(){
       'Incolla una richiesta di pagamento del tuo wallet: <b>senza importo</b>' +
       (quanti ? ', o di ' + esc(quanti) + ' esatti' : '') +
       ', valida più di ' + vale + '.</div>' +
+    /* ⚠️ UN BOTTONE CHE SPARISCE SENZA UN PERCHE' SI LEGGE COME UN
+       GUASTO (17 set 2026, dal campo): a cifra ignota — un ordine a
+       prezzo di mercato ripreso dalla restore, che la cifra non ce
+       l'ha da nessuna parte (vedi `lordoNotoP2P`) — qui non c'era piu'
+       ne' la promessa ne' la copia, e il foglio taceva sul perche'. Si
+       dice, e si dice anche che la via senza importo non e' un ripiego
+       peggiore: quella il coordinatore la accetta sempre. */
+    (quanti ? ''
+      : '<div class="hint">La cifra esatta qui non la sappiamo: il messaggio che la dice non è arrivato su questo dispositivo. '
+        + 'Falla <b>senza importo</b> — quella va bene comunque.</div>') +
     (netto > 0
       ? '<button class="btn primary" type="button" onclick="copiaLink(\'' + netto + '\', \'📋 Cifra copiata\')">📋 Copia la cifra: ' + esc(fmt(netto)) + '</button>'
       : '') +
