@@ -53365,9 +53365,14 @@ def prove_p2p_campanello():
     # LA RIGA INTERA e non il nome, la lezione del reaper: col solo
     # nome un `pass  # asyncio.create_task(orologio_p2p())` la
     # lascerebbe verde con l'orologio mai avviato.
+    # DAL 17 SET 2026 a leva accesa parte il GUARDIANO, che l'orologio
+    # lo avvia e ne tiene il riferimento (vedi prove_p2p_orologio)
     prova("l'orologio si avvia, e solo a leva accesa", True,
           'if _p2p_leve()["attivo"]:\n'
-          "        asyncio.create_task(orologio_p2p())\n" in src)
+          "        global _TASK_GUARDIANO_P2P\n"
+          "        _TASK_GUARDIANO_P2P = asyncio.create_task(guardiano_p2p())\n" in src
+          and "_TASK_OROLOGIO_P2P = asyncio.create_task(orologio_p2p())"
+          in pezzo("guardiano_p2p"))
     prova("il campanello lascia la riga nel journal", True,
           "Campanello P2P: avvisati" in giro)
 
@@ -53605,8 +53610,8 @@ def prove_p2p_avvisi_libro():
 
     # --- 2) IL GIRO: prima il libro, poi i kind 14 ------------------
     prova("l'orologio passa dal libro PRIMA dei kind 14", True,
-          orologio.index("await _giro_libro_p2p()")
-          < orologio.index("await _giro_p2p()"))
+          orologio.index("await asyncio.wait_for(_giro_libro_p2p(), P2P_PASSATA_MAX_S)")
+          < orologio.index("await asyncio.wait_for(_giro_p2p(), P2P_PASSATA_MAX_S)"))
     prova("...e ognuno dei due ha il suo try (un battito storto non ferma l'altro)",
           2, codice(orologio).count("except Exception as e:"))
     prova("le righe mai viste si chiedono senza segnalibro", True,
@@ -53981,6 +53986,252 @@ def prove_p2p_avvisi_libro():
     prova("e il ritorno in vetrina si racconta anche da li'", True,
           len(fuori) == 1 and "non ha proseguito" in fuori[0][1])
     con.close()
+
+
+def prove_p2p_orologio():
+    """L'OROLOGIO CHE NON SI APPENDE (17 set 2026, dal journal del VPS:
+    dopo il riavvio del deploy il giro del libro non ha piu' detto
+    niente, la presa e' rimasta muta un quarto d'ora, e un restart a
+    mano ha fatto arrivare tutto). Qui GIRANO le funzioni vere — il
+    giro del libro, l'orologio, il guardiano — contro relay di cartone:
+    uno che non risponde MAI durante la passata, il servizio riavviato
+    con un evento nel mezzo, il giro che esplode, quello che si appende,
+    l'orologio che muore e quello che si ferma."""
+    print("\n[l'orologio P2P: tetti, guardiano, e il segnalibro che recupera]")
+    import asyncio as _aio
+    import html as _html
+    import re as _re
+    import sqlite3
+    import tempfile as _tf
+    import threading as _th
+    src = _SORGENTE
+
+    # --- 1) LE RIGHE CHE NON DEVONO SPARIRE ---------------------------
+    libro, camp = pezzo("_giro_libro_p2p"), pezzo("_giro_p2p")
+    prova("nessuna domanda ai relay del P2P gira piu' senza tetto", 0,
+          codice(libro).count("asyncio.to_thread") + codice(camp).count("asyncio.to_thread"))
+    prova("...passano tutte dal chiedi-relay (due nel libro, una nel campanello)",
+          [2, 1], [codice(libro).count("await _chiedi_relay_p2p("),
+                   codice(camp).count("await _chiedi_relay_p2p(")])
+    chiedi = pezzo("_chiedi_relay_p2p")
+    prova("il chiedi-relay ha il tetto sull'attesa intera, e un pool di thread suo",
+          True, "asyncio.wait_for(" in chiedi and "P2P_RELAY_MAX_S)" in chiedi
+          and "loop.run_in_executor(_P2P_POOL, fn, relay, *args)" in chiedi)
+    prova("il tetto del fermo copre un giro piu' due passate al tetto", True,
+          "P2P_FERMO_S = 600" in src and "P2P_PASSATA_MAX_S = 240" in src
+          and "P2P_GIRO_S = 60" in src)
+    prova("la riga a ogni passata si spegne dal config, ed e' accesa di serie", True,
+          "    from config import P2P_LOG_PASSATE\nexcept ImportError:\n"
+          "    P2P_LOG_PASSATE = True" in src)
+
+    # --- l'ambiente: le funzioni VERE, il mondo di cartone -------------
+    dir_db = _tf.mkdtemp()
+    percorso = os.path.join(dir_db, "banco.db")
+    s_i = src.index("CREATE TABLE IF NOT EXISTS chiavi_p2p(")
+    schema = src[s_i:src.index("ON chiavi_p2p(tg_id);", s_i) + len("ON chiavi_p2p(tg_id);")]
+    o_i = src.index("CREATE TABLE IF NOT EXISTS p2p_ordini(")
+    schema += "\n" + src[o_i:src.index("ON p2p_ordini(tg_id);", o_i) + len("ON p2p_ordini(tg_id);")]
+    schema += "\nCREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, avvisi_p2p INTEGER DEFAULT 1);"
+    con0 = sqlite3.connect(percorso)
+    con0.executescript(schema)
+    con0.execute("INSERT INTO utenti VALUES(111, 1)")
+    con0.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)", ("a" * 64, 111))
+    con0.commit()
+    con0.close()
+
+    def _db():
+        c = sqlite3.connect(percorso)
+        c.row_factory = sqlite3.Row
+        return c
+
+    timbri = {}                       # SOPRAVVIVONO al «riavvio», come sul disco
+    libro_finto = []                  # quel che il coordinatore ha pubblicato
+    chiesto = []                      # (relay, since) di ogni domanda arrivata
+    appeso = _th.Event()              # tiene fermo il relay muto finche' serve
+
+    def _lettore(relay, ids, since, mostro):
+        chiesto.append((relay, since))
+        if "muto" in relay:
+            appeso.wait(5)            # non risponde MAI, per quel che dura la passata
+            return None
+        return [dict(e) for e in libro_finto
+                if e["id"] in ids and e["quando"] >= since]
+
+    def _processo(relays, relay_max=0.3):
+        """Un PROCESSO NUOVO: memoria vergine, stesso disco."""
+        detto, mandati = [], []
+
+        async def _notifica(tg_id, testo):
+            mandati.append((tg_id, testo))
+
+        amb = {"asyncio": _aio, "time": time, "html": _html, "json": json,
+               "print": lambda *a, **k: detto.append(" ".join(str(x) for x in a)),
+               "db": _db, "notifica": _notifica, "create_connection": object(),
+               "timbro_letto": lambda n: timbri.get(n),
+               "timbro_scrivi": lambda n, v: timbri.__setitem__(n, v),
+               "_p2p_leve": lambda: {"attivo": True, "mostro": "m" * 64,
+                                     "relay": list(relays), "specchio": []},
+               "eventi_libro_da_relay": _lettore,
+               "info_libro_da_relay": lambda relay, mostro: {"fee": 0.02, "ore": 168},
+               "FORMA_ORDINE_P2P": _re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
+               "MAX_ORDINI_P2P": 200, "P2P_NUDGE_S": 600, "P2P_NUDGE_VIVO_S": 90,
+               "STATI_LIBRO_PRESO": ("in-progress", "waiting-buyer-invoice", "waiting-payment"),
+               "TIMBRO_LIBRO_P2P": "p2p_libro_visto", "P2P_INFO_OGNI_S": 3600,
+               "P2P_LIBRO_MEMORIA_S": 40 * 86400, "P2P_LIBRO_FRESCHI_S": 7200,
+               "P2P_PRIMO_SGUARDO": 600, "P2P_BLOCCO": 100,
+               "_P2P_INFO": {"fee": None, "ore": 0, "quando": 0},
+               "P2P_RELAY_MAX_S": relay_max, "P2P_PASSATA_MAX_S": 0.4,
+               "P2P_GIRO_S": 0.02, "P2P_GUARDIA_S": 0.02, "P2P_FERMO_S": 0.25,
+               "P2P_LOG_PASSATE": True, "_P2P_POOL": None,
+               "_P2P_BATTITO": {"n": 0, "vivo": 0.0},
+               "_P2P_CONTO": {"libro": "", "campanello": ""},
+               "_P2P_RELAY_MUTI": set(), "_TASK_OROLOGIO_P2P": None}
+        for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
+                  "_euro_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
+                  "_ordini_puliti_p2p", "_registra_ordini_p2p",
+                  "_relay_p2p_dice", "_chiedi_relay_p2p", "_giro_libro_p2p",
+                  "orologio_p2p", "guardiano_p2p"):
+            testo = _senza_prosa(pezzo(f))
+            if f in ("_chiedi_relay_p2p", "_giro_libro_p2p", "orologio_p2p", "guardiano_p2p"):
+                testo = "async " + testo
+            exec(testo, amb)
+        return amb, detto, mandati
+
+    ORD = "ordine-orologio"
+    # dentro i dieci minuti del PRIMO SGUARDO (un segnalibro mai scritto
+    # parte da adesso-600), e con tutta la coda nel passato
+    T0 = int(time.time()) - 520
+
+    def ev(stato, quando):
+        return {"id": ORD, "stato": stato, "lato": "sell", "sats": 8138,
+                "euro": ["5"], "metodi": ["Revolut"], "quando": quando}
+
+    try:
+        # --- 2) IL RELAY CHE NON RISPONDE DURANTE LA PASSATA ----------
+        amb, detto, mandati = _processo(["wss://muto.test", "wss://buono.test"])
+        c = _db()
+        amb["_registra_ordini_p2p"](c, 111, [ORD], T0, True)
+        c.close()
+        libro_finto.append(ev("pending", T0))
+        t = time.time()
+        _aio.run(amb["_giro_libro_p2p"]())
+        durata = time.time() - t
+        prova("col primo relay che non risponde MAI, la passata finisce lo stesso (il tetto, non il relay, decide quanto dura)",
+              True, durata < 2.0)
+        prova("...e passa al relay dopo, che risponde", ["wss://muto.test", "wss://buono.test"],
+              [r for r, _ in chiesto])
+        prova("...e il journal dice QUALE relay non risponde", 1,
+              sum(1 for r in detto if "wss://muto.test non risponde" in r and "passo al successivo" in r))
+        prova("...e lo stato letto dal relay buono e' scritto", "pending",
+              _db().execute("SELECT stato FROM p2p_ordini WHERE ordine=?", (ORD,)).fetchone()[0])
+        segnalibro = timbri.get("p2p_libro_visto")
+        prova("...col segnalibro fermo sull'ultimo evento LETTO", str(T0), segnalibro)
+        _aio.run(amb["_giro_libro_p2p"]())
+        prova("il relay ancora muto non si ridice a ogni passata", 1,
+              sum(1 for r in detto if "wss://muto.test non risponde" in r))
+        appeso.set()
+
+        # --- 3) IL SERVIZIO RIAVVIATO CON UN EVENTO NEL MEZZO ----------
+        # il giro e' FERMO (nessuno lo chiama) mentre Alan prende l'ordine
+        libro_finto.append(ev("waiting-buyer-invoice", T0 + 300))
+        chiesto.clear()
+        amb2, detto2, mandati2 = _processo(["wss://buono.test"])   # memoria vergine
+        _aio.run(amb2["_giro_libro_p2p"]())
+        prova("dopo il riavvio la PRIMA passata chiede dal segnalibro rimasto sul disco",
+              [("wss://buono.test", T0)], chiesto)
+        prova("...e l'evento caduto nella finestra del fermo ARRIVA: la presa si notifica",
+              True, len(mandati2) == 1 and mandati2[0][0] == 111
+              and "Il tuo ordine è stato preso!" in mandati2[0][1])
+        prova("...il segnalibro avanza all'evento recuperato", str(T0 + 300),
+              timbri.get("p2p_libro_visto"))
+        _aio.run(amb2["_giro_libro_p2p"]())
+        prova("...e la passata dopo non lo ridice (since inclusivo, stato gia' scritto)",
+              1, len(mandati2))
+        # due eventi in coda, come il «concluso» rimasto indietro quel giorno
+        libro_finto.append(ev("in-progress", T0 + 400))
+        libro_finto.append(ev("success", T0 + 500))
+        amb3, detto3, mandati3 = _processo(["wss://buono.test"])
+        _aio.run(amb3["_giro_libro_p2p"]())
+        prova("una coda di eventi si recupera tutta, e in ordine racconta il solo momento nuovo",
+              True, len(mandati3) == 1 and "Scambio concluso" in mandati3[0][1])
+
+        # --- 4) L'OROLOGIO: il giro che esplode e quello che si appende --
+        amb4, detto4, _m = _processo(["wss://buono.test"])
+        giri = {"libro": 0, "camp": 0}
+
+        async def _libro_matto():
+            giri["libro"] += 1
+            if giri["libro"] == 1:
+                raise RuntimeError("database is locked")
+            if giri["libro"] == 2:
+                await _aio.sleep(30)          # appeso: nessun tetto interno lo prende
+            amb4["_P2P_CONTO"]["libro"] = "1 ordini guardati (0 mai visti), 0 eventi"
+
+        async def _camp():
+            giri["camp"] += 1
+
+        amb4["_giro_libro_p2p"], amb4["_giro_p2p"] = _libro_matto, _camp
+
+        async def _per(funz, secondi):
+            t = _aio.ensure_future(funz())
+            await _aio.sleep(secondi)
+            t.cancel()
+            try:
+                await t
+            except BaseException:
+                pass
+
+        _aio.run(_per(amb4["orologio_p2p"], 1.2))
+        prova("l'orologio dice che e' PARTITO, coi relay", 1,
+              sum(1 for r in detto4 if "Orologio P2P partito" in r and "wss://buono.test" in r))
+        prova("il giro che ESPLODE si dice nel journal, col tipo dell'errore", 1,
+              sum(1 for r in detto4 if "Libro P2P: battito saltato (RuntimeError: database is locked)" in r))
+        prova("il giro che si APPENDE si abbandona al tetto, e si dice", 1,
+              sum(1 for r in detto4 if "Libro P2P: passata oltre" in r and "abbandonata" in r))
+        prova("...e nessuno dei due ferma le passate dopo", True,
+              giri["libro"] >= 4 and giri["camp"] >= 4)
+        prova("...ne' toglie il suo turno al campanello nello stesso battito", True,
+              giri["camp"] >= giri["libro"] - 1)
+        passate = [r for r in detto4 if r.startswith("· P2P passata ")]
+        prova("OGNI passata lascia la sua riga, anche quando non trova niente", True,
+              len(passate) >= 4 and any("0 eventi" in r for r in passate))
+        prova("...e la riga dice quale e' stata SALTATA e quale ABBANDONATA", True,
+              "SALTATA" in passate[0] and "ABBANDONATA" in passate[1])
+        amb4["P2P_LOG_PASSATE"] = False
+        prima = len([r for r in detto4 if r.startswith("· P2P passata ")])
+        _aio.run(_per(amb4["orologio_p2p"], 0.2))
+        prova("con P2P_LOG_PASSATE spento la riga a passata tace (le altre no)", True,
+              len([r for r in detto4 if r.startswith("· P2P passata ")]) == prima
+              and sum(1 for r in detto4 if "Orologio P2P partito" in r) == 2)
+
+        # --- 5) IL GUARDIANO: l'orologio che muore e quello che si ferma --
+        amb5, detto5, _m = _processo(["wss://buono.test"])
+        nati = {"n": 0}
+
+        async def _orologio_finto():
+            nati["n"] += 1
+            if nati["n"] == 1:
+                raise ValueError("esplosa fuori dai try")
+            if nati["n"] == 2:
+                await _aio.sleep(30)          # FERMO: vivo, ma senza battito
+            while True:
+                amb5["_P2P_BATTITO"]["vivo"] = time.time()
+                await _aio.sleep(0.02)
+
+        amb5["orologio_p2p"] = _orologio_finto
+        _aio.run(_per(amb5["guardiano_p2p"], 1.5))
+        prova("l'orologio MORTO si dice nel journal, col perche', e riparte", 1,
+              sum(1 for r in detto5 if "Orologio P2P MORTO (ValueError: esplosa fuori dai try)" in r))
+        prova("l'orologio FERMO (vivo, senza battito) si annulla e si dice", 1,
+              sum(1 for r in detto5 if "Orologio P2P FERMO da" in r))
+        prova("...e riparte una terza volta, quella buona, che poi nessuno tocca",
+              3, nati["n"])
+        prova("il guardiano TIENE il riferimento all'orologio", True,
+              amb5["_TASK_OROLOGIO_P2P"] is not None)
+    finally:
+        appeso.set()
+        import shutil as _sh
+        _sh.rmtree(dir_db, ignore_errors=True)
 
 
 def prove_p2p_silenzi():
@@ -63445,7 +63696,7 @@ def main():
     prove_p2p_card_scambio,
     prove_p2p_vista_miei,
     prove_p2p_campanello,
-    prove_p2p_avvisi_libro, prove_p2p_silenzi,
+    prove_p2p_avvisi_libro, prove_p2p_orologio, prove_p2p_silenzi,
     prove_p2p_motore,
     prove_p2p_stati,
     prove_p2p_chat,

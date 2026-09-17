@@ -651,6 +651,12 @@ MOSTRO_RELAY_SPECCHIO = []
 # Questa dice solo QUANDO quella e' una promo: fee viva sotto il
 # listino = il conto mostra «in promo», come nel mercatino.
 P2P_COMMISSIONE_PERCENTO = 2
+# LA RIGA A OGNI PASSATA DELL'OROLOGIO P2P (17 set 2026): una al minuto
+# nel journal, anche quando non trova niente — e' quella che distingue
+# «gira a vuoto» da «non gira», che un giorno e' costata un'ora.
+# False la spegne; le righe di partenza, di relay muto e di guasto
+# restano comunque.
+P2P_LOG_PASSATE = True
 
 DB = "satmarket.db"
 

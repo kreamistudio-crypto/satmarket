@@ -34069,6 +34069,84 @@ P2P_BLOCCO = 100         # quante pubkey in un filtro (i relay hanno tetti)
 P2P_PRIMO_SGUARDO = 600  # al primo avvio si guarda indietro dieci minuti
 _P2P_VISTI = set()       # gli id gia' contati, dentro questo processo
 
+# ═══ L'OROLOGIO CHE NON SI APPENDE (17 set 2026, dal journal del VPS) ═══
+# Il fatto: dal riavvio del deploy delle 10:03 il journal non ha piu'
+# avuto una riga del libro, la presa delle 10:09 e' rimasta muta per
+# un quarto d'ora a tutt'e due, e un `systemctl restart` a mano ha
+# fatto arrivare subito le frasi giuste, quella in coda compresa. Segnalibro e recupero
+# funzionavano; era il GIRO a non girare, e dal journal non si
+# distingueva «non gira» da «gira a vuoto», perche' il giro parlava
+# solo quando avvisava qualcuno.
+# DUE COSE POTEVANO FERMARLO SENZA UNA RIGA, e quale sia stata quel
+# giorno non e' provato — quindi si curano tutt'e due:
+# 1) le domande ai relay giravano in un thread SENZA UN TETTO: i
+#    timeout dei socket coprono connessione e lettura, non il DNS ne'
+#    un thread che non parte perche' il pool comune e' pieno. Un await
+#    che non torna ferma TUTTE le passate dopo, per sempre.
+# 2) l'orologio nasceva con un `create_task` di cui nessuno teneva il
+#    riferimento (gli altri orologi hanno il loro `_TASK_…`), e niente
+#    lo sorvegliava: morto o appeso, restava cosi' fino al deploy dopo.
+# LE CINTURE, dalla piu' stretta alla piu' larga: ogni domanda a un
+# relay ha il suo tetto e un pool di thread SUO (chi e' lento non
+# affama gli altri, e gli altri non affamano lui); ogni passata ha il
+# suo; e un guardiano tiene il riferimento, guarda il battito e fa
+# ripartire l'orologio se e' morto o fermo — dicendolo.
+P2P_RELAY_MAX_S = 20      # il tetto di UNA domanda a UN relay
+P2P_PASSATA_MAX_S = 240   # il tetto di una passata intera (libro, o campanello)
+P2P_GUARDIA_S = 30        # ogni quanto il guardiano guarda il battito
+P2P_FERMO_S = 600         # oltre, l'orologio e' FERMO: un giro + due passate al tetto + margine
+try:
+    from config import P2P_LOG_PASSATE
+except ImportError:
+    P2P_LOG_PASSATE = True   # la riga a ogni passata: si spegne dal config
+_P2P_POOL = None          # il pool di thread del solo P2P: nasce al primo uso
+_P2P_BATTITO = {"n": 0, "vivo": 0.0}
+_P2P_CONTO = {"libro": "", "campanello": ""}   # cosa ha fatto l'ultima passata
+_P2P_RELAY_MUTI = set()   # i relay che tacciono ADESSO: si dice al cambio, non a ogni giro
+_TASK_OROLOGIO_P2P = None
+_TASK_GUARDIANO_P2P = None
+
+
+def _relay_p2p_dice(relay: str, muto: bool, perche: str = ""):
+    """Il journal dice quando un relay SMETTE di rispondere e quando
+    RIPRENDE — al cambio, non a ogni passata: un relay giu' per un'ora
+    sarebbero sessanta righe uguali, e la riga che conta ci annegherebbe."""
+    if muto and relay not in _P2P_RELAY_MUTI:
+        _P2P_RELAY_MUTI.add(relay)
+        print(f"🔇 P2P: il relay {relay} non risponde ({perche}): "
+              "passo al successivo", flush=True)
+    elif not muto and relay in _P2P_RELAY_MUTI:
+        _P2P_RELAY_MUTI.discard(relay)
+        print(f"🔊 P2P: il relay {relay} e' tornato a rispondere", flush=True)
+
+
+async def _chiedi_relay_p2p(fn, relay: str, *args):
+    """UNA domanda a UN relay, col suo tetto. Le funzioni che leggono
+    sono sincrone (websocket-client) e hanno i timeout dei socket; qui
+    sta il tetto che manca a loro — quello sull'ATTESA INTERA, thread
+    compreso. Allo scadere si torna None («non ho potuto chiedere») e
+    il chiamante passa al relay dopo; il thread rimasto indietro muore
+    da solo coi suoi timeout, nel pool del P2P e non in quello comune.
+    Qualunque eccezione e' un relay muto, mai un giro che cade."""
+    global _P2P_POOL
+    if _P2P_POOL is None:
+        from concurrent.futures import ThreadPoolExecutor
+        _P2P_POOL = ThreadPoolExecutor(max_workers=4,
+                                       thread_name_prefix="p2p-relay")
+    loop = asyncio.get_running_loop()
+    try:
+        fuori = await asyncio.wait_for(
+            loop.run_in_executor(_P2P_POOL, fn, relay, *args),
+            P2P_RELAY_MAX_S)
+    except asyncio.TimeoutError:
+        _relay_p2p_dice(relay, True, f"oltre {P2P_RELAY_MAX_S}s")
+        return None
+    except Exception as e:
+        _relay_p2p_dice(relay, True, f"{type(e).__name__}: {e}")
+        return None
+    _relay_p2p_dice(relay, fuori is None, "connessione o lettura fallita")
+    return fuori
+
 # IL TESTO DEL 16 SET 2026 (decisione di Andrea con Alan, insieme alle
 # frasi precise del libro): dice DOVE guardare e che il prossimo passo,
 # se e' tuo, sta la'. La riga sulla cifratura resta: i tre momenti
@@ -34229,12 +34307,14 @@ async def _giro_p2p():
         blocco = pubkeys[i:i + P2P_BLOCCO]
         eventi = None
         for relay in leve["relay"]:
-            eventi = await asyncio.to_thread(
+            eventi = await _chiedi_relay_p2p(
                 eventi_p2p_da_relay, relay, blocco, since, leve["mostro"])
             if eventi is not None:
                 break             # il primo che risponde basta
         if eventi:
             trovati.extend(eventi)
+    _P2P_CONTO["campanello"] = (f"{len(pubkeys)} chiavi, "
+                                f"{len(trovati)} messaggi dal segnalibro")
     if not trovati:
         return
     # IL SEGNALIBRO NON SUPERA L'OROLOGIO, ed e' la riga gia' pagata
@@ -34269,9 +34349,10 @@ async def _giro_p2p():
         except Exception as e:
             print(f"⚠️ Campanello P2P saltato per {tg_id}: {e}")
         await asyncio.sleep(0.2)
+    _P2P_CONTO["campanello"] += f", {len(da_avvisare)} avvisi"
     if da_avvisare:
         print(f"🔔 Campanello P2P: avvisati {len(da_avvisare)} "
-              f"{da_avvisare}")
+              f"{da_avvisare}", flush=True)
 
 
 async def orologio_p2p():
@@ -34279,19 +34360,88 @@ async def orologio_p2p():
     sorelle: un battito che va male e' una riga in console, e il
     prossimo arriva lo stesso — un giro che muore in silenzio sarebbe
     peggio di nessun campanello."""
+    # LA RIGA DI PARTENZA (17 set 2026): dal journal si deve poter dire
+    # «e' partito» senza aspettare che avvisi qualcuno
+    leve = _p2p_leve()
+    print(f"▶️ Orologio P2P partito: una passata ogni {P2P_GIRO_S}s, "
+          f"relay {list(leve['relay']) + list(leve['specchio'])}", flush=True)
     while True:
+        _P2P_BATTITO["n"] += 1
+        _P2P_BATTITO["vivo"] = time.time()
+        inizio = time.time()
+        _P2P_CONTO["libro"] = _P2P_CONTO["campanello"] = "niente da guardare"
         # PRIMA IL LIBRO, POI I KIND 14 (16 set 2026): la frase precisa
         # timbra il gate del campanello, quindi deve avere la prima
         # parola dentro lo stesso battito — un momento, una notifica.
+        # OGNI PASSATA HA IL SUO TETTO: una che non finisce si
+        # abbandona e si DICE — la prossima riparte dal segnalibro, che
+        # si sposta solo a eventi letti, quindi non si perde niente.
         try:
-            await _giro_libro_p2p()
+            await asyncio.wait_for(_giro_libro_p2p(), P2P_PASSATA_MAX_S)
+        except asyncio.TimeoutError:
+            _P2P_CONTO["libro"] = "ABBANDONATA"
+            print(f"⚠️ Libro P2P: passata oltre {P2P_PASSATA_MAX_S}s, "
+                  "abbandonata — la prossima riparte dal segnalibro", flush=True)
         except Exception as e:
-            print(f"⚠️ Libro P2P: battito saltato ({e})")
+            _P2P_CONTO["libro"] = "SALTATA"
+            print(f"⚠️ Libro P2P: battito saltato "
+                  f"({type(e).__name__}: {e})", flush=True)
+        _P2P_BATTITO["vivo"] = time.time()
         try:
-            await _giro_p2p()
+            await asyncio.wait_for(_giro_p2p(), P2P_PASSATA_MAX_S)
+        except asyncio.TimeoutError:
+            _P2P_CONTO["campanello"] = "ABBANDONATA"
+            print(f"⚠️ Campanello P2P: passata oltre {P2P_PASSATA_MAX_S}s, "
+                  "abbandonata — la prossima riparte dal segnalibro", flush=True)
         except Exception as e:
-            print(f"⚠️ Campanello P2P: battito saltato ({e})")
+            _P2P_CONTO["campanello"] = "SALTATA"
+            print(f"⚠️ Campanello P2P: battito saltato "
+                  f"({type(e).__name__}: {e})", flush=True)
+        _P2P_BATTITO["vivo"] = time.time()
+        # UNA RIGA A PASSATA, ANCHE A VUOTO: e' quella che distingue
+        # «gira e non trova niente» da «non gira» — la domanda che il
+        # 17 set e' costata un'ora. Si spegne con P2P_LOG_PASSATE=False
+        # nel config; le righe di partenza, di relay muto e di guasto no.
+        if P2P_LOG_PASSATE:
+            print(f"· P2P passata {_P2P_BATTITO['n']}: libro — "
+                  f"{_P2P_CONTO['libro']}; campanello — "
+                  f"{_P2P_CONTO['campanello']} "
+                  f"({time.time() - inizio:.1f}s)", flush=True)
         await asyncio.sleep(P2P_GIRO_S)
+
+
+async def guardiano_p2p():
+    """TIENE il riferimento all'orologio, e lo fa ripartire. Due casi,
+    e tutt'e due si DICONO nel journal: il task e' FINITO (un'eccezione
+    sfuggita, un annullo) oppure e' FERMO — vivo ma senza battito da
+    piu' di P2P_FERMO_S, cioe' appeso su qualcosa che nessun tetto ha
+    preso. Il fermo si annulla e al giro dopo risulta finito: riparte
+    da li'. Il guardiano stesso non puo' cadere: ogni giro ha il suo
+    try, e il suo riferimento lo tiene `_TASK_GUARDIANO_P2P`."""
+    global _TASK_OROLOGIO_P2P
+    while True:
+        try:
+            t = _TASK_OROLOGIO_P2P
+            if t is None or t.done():
+                if t is not None:
+                    if t.cancelled():
+                        motivo = "annullato"
+                    else:
+                        e = t.exception()
+                        motivo = f"{type(e).__name__}: {e}" if e else "uscito da solo"
+                    print(f"💥 Orologio P2P MORTO ({motivo}): riparte adesso",
+                          flush=True)
+                _P2P_BATTITO["vivo"] = time.time()
+                _TASK_OROLOGIO_P2P = asyncio.create_task(orologio_p2p())
+            elif time.time() - _P2P_BATTITO["vivo"] > P2P_FERMO_S:
+                print(f"⚠️ Orologio P2P FERMO da "
+                      f"{int(time.time() - _P2P_BATTITO['vivo'])}s: lo annullo, "
+                      "riparte al prossimo sguardo", flush=True)
+                t.cancel()
+        except Exception as e:
+            print(f"⚠️ Guardiano P2P: sguardo saltato "
+                  f"({type(e).__name__}: {e})", flush=True)
+        await asyncio.sleep(P2P_GUARDIA_S)
 
 
 # ---------- IL LIBRO CHE AVVISA: le notifiche precise del P2P ---------
@@ -34418,7 +34568,9 @@ def info_libro_da_relay(relay: str, mostro: str):
             elif msg[0] == "EOSE":
                 break
         ws.close()
-        return fuori
+        # ha risposto ma il 38385 non ce l'ha: {} e non None, che e'
+        # «relay muto» e finirebbe nel journal come tale
+        return fuori if fuori is not None else {}
     except Exception:
         return None
 
@@ -34709,7 +34861,7 @@ async def _giro_libro_p2p():
     relays = list(leve["relay"]) + list(leve["specchio"])
     if _P2P_INFO["fee"] is None or adesso - _P2P_INFO["quando"] > P2P_INFO_OGNI_S:
         for relay in relays:
-            info = await asyncio.to_thread(info_libro_da_relay, relay,
+            info = await _chiedi_relay_p2p(info_libro_da_relay, relay,
                                            leve["mostro"])
             if info:
                 _P2P_INFO.update(info)
@@ -34727,12 +34879,14 @@ async def _giro_libro_p2p():
             blocco = ids[i:i + P2P_BLOCCO]
             trovati = None
             for relay in relays:
-                trovati = await asyncio.to_thread(
+                trovati = await _chiedi_relay_p2p(
                     eventi_libro_da_relay, relay, blocco, da, leve["mostro"])
                 if trovati is not None:
                     break
             if trovati:
                 eventi.extend(trovati)
+    _P2P_CONTO["libro"] = (f"{len(nuovi) + len(vecchi)} ordini guardati "
+                           f"({len(nuovi)} mai visti), {len(eventi)} eventi")
     if not eventi:
         return
     # il segnalibro: mai oltre l'orologio, mai indietro (le regole del
@@ -34749,9 +34903,10 @@ async def _giro_libro_p2p():
         except Exception as e:
             print(f"⚠️ Avviso del libro P2P saltato per {tg_id}: {e}")
         await asyncio.sleep(0.2)
+    _P2P_CONTO["libro"] += f", {len(avvisi)} avvisi"
     if avvisi:
         print(f"📖 Libro P2P: avvisati {len(avvisi)} "
-              f"{sorted({t for t, _ in avvisi})}")
+              f"{sorted({t for t, _ in avvisi})}", flush=True)
 
 
 TIMBRO_CAMPAGNA_P2P = "campagna_p2p_acceso"
@@ -46632,8 +46787,11 @@ async def avvia_orologio():
     # SOLO a leva accesa: le leve si leggono dal config all'import e
     # non cambiano a runtime, quindi un task che gira a vuoto per
     # sempre non aiuterebbe nessuno.
+    # DAL 17 SET 2026 PARTE IL GUARDIANO, che l'orologio lo avvia, ne
+    # TIENE il riferimento e lo fa ripartire se muore o si ferma.
     if _p2p_leve()["attivo"]:
-        asyncio.create_task(orologio_p2p())
+        global _TASK_GUARDIANO_P2P
+        _TASK_GUARDIANO_P2P = asyncio.create_task(guardiano_p2p())
     # Le foto nate prima delle miniature ne ricevono una, in un
     # thread: l'avvio non aspetta nessuno (oggi i file sono pochi)
     asyncio.create_task(asyncio.to_thread(genera_miniature_mancanti))
