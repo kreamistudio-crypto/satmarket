@@ -19394,3 +19394,72 @@ foglio, quindi un ordine nato PRIMA di una stretta della leva si può
 ripubblicare sopra il tetto nuovo. È lo stesso patto che vale già per
 il tetto in sats del coordinatore, e la leva è di casa: si stringe
 sapendolo.
+
+## La causa vera del payout fallito: il tetto delle fee di rotta (17 set 2026)
+
+**IL FATTO, LETTO SUL NODO E NON DEDOTTO.** I due payout falliti dello
+scambio `3fcdb207` (14.837 sats, verso Wallet of Satoshi), interrogati
+su LND con `--include_incomplete`, dicono **FAILURE_REASON_NO_ROUTE** —
+e la fattura era VIVA, che lo scambio era durato cinque minuti. Cade
+quindi l'ipotesi della scadenza che stava nel foglio, e cade il
+sospetto sulla fattura: Phoenix, allo stesso giro, era passato al primo
+colpo. «No route» non vuol dire «nessuna strada esiste»: vuol dire
+nessuna strada DENTRO I LIMITI che il pagatore ha dato.
+
+**IL LIMITE ERA IL NOSTRO, E I NUMERI COMBACIANO.** Nel `settings.toml`
+di mostro `max_routing_fee` valeva 0.002: su 14.837 sats fa un tetto di
+**29 sats** di fee di rotta (`routing_fee_cap_sats` in
+`src/lightning/mod.rs`: `amount × max_routing_fee`, troncato). Con un
+canale solo ogni rotta parte da ACINQ: verso Phoenix — che di ACINQ è
+cliente — la strada è corta e costa spiccioli; verso WoS servono più
+hop, e ogni rotta sopra i 29 sats era esclusa PER COSTRUZIONE. La cura:
+**0.002 → 0.01** in `settings.toml` (Andrea, sul nodo), cioè 148 sats
+di tetto su quello scambio. **CONFERMATO DAL VIVO**: col tetto nuovo il
+payout verso WoS è passato al primo colpo. Era la fee.
+
+**PERCHÉ 0.01 NON È UN COSTO MA UN LIMITE.** LND sceglie comunque la
+rotta più economica che trova: alzare il tetto non alza la fee media,
+apre solo le rotte care-ma-uniche. Sotto i 1000 sats il config è
+IGNORATO dal codice (1% con pavimento di 10 sats, hardcoded nella
+stessa funzione), quindi 0.01 rende il tetto coerente su tutta la
+scala; e il caso peggiore — 1% di routing — resta dentro il 2% della
+commissione dello scambio. **NOTA PER IL FUTURO**: con più canali (più
+prime tappe, quindi più rotte economiche raggiungibili) il tetto si può
+anche riabbassare — la leva è reversibile, e adesso si sa cosa guarda.
+
+**GLI ALTRI FRENI AL PAGAMENTO, censiti su v0.18.7** perché il prossimo
+non si riscopra da capo:
+— `payment_cltv_limit` (1008 nel template) → il `cltv_limit` di
+`SendPaymentV2`: tetto sul TIMELOCK totale della rotta, col pavimento
+`max_final_cltv_expiry_delta + 576` (`MIN_ROUTE_CLTV_HEADROOM`); sotto
+il pavimento o a 0 mostro DIFERISCE al `--max-cltv-expiry` del nodo,
+con l'errore nel journal. Può produrre NO_ROUTE anche lui, ma a 1008 è
+largo.
+— Il retry «senza tetto» esiste SOLO per il cltv, e solo se LND rifiuta
+la richiesta con un messaggio che contiene «cltv»
+(`is_cltv_limit_rejection`): su un NO_ROUTE non scatta niente.
+— `timeout_seconds` = 60, COMPILATO: LND smette di tentare rotte dopo
+un minuto.
+— Il retry del payout è di mostro: `payment_attempts` 3, a distanza di
+`payment_retries_interval` 60 s, sempre sulla STESSA fattura; esauriti,
+l'`add-invoice` della fattura nuova (la voce qui sopra).
+
+**L'AVVISO SU WoS ESCE DAL FOGLIO.** L'hint ⏳ sulla scadenza incolpava
+WoS per lo scambio sbagliato — la fattura di `3fcdb207` era viva — e
+col tetto curato non c'è più niente da avvisare: via l'hint, il suo
+commento e la sentinella `fnFoglioWos`. Resta, ed è un'ALTRA cosa,
+l'avviso sui provider che non rispondono alla verifica dell'INDIRIZZO
+(quello è misurato e vale ancora); e resta il foglio della fattura
+nuova, che è la rete per qualunque causa futura — compresa la scadenza
+vera, che per gli scambi lunghi resta possibile (la guardia chiede solo
+un'ora di vita).
+
+**PATCH 0006 RESTA NEL GIRO DEL PASSO 3** di PRODUZIONE: la causa del
+fallimento era nostra, non sua, ma la risposta «dammi una fattura
+nuova» a `settled-hold-invoice` resta giusta comunque.
+
+PROVATO: giro intero nel worktree su `origin/main`, 11333 passate, 0
+fallite. RESTA DA GUARDARE: il prossimo payout verso un wallet ancora
+diverso (il tetto nuovo si giudica sull'uso), e il canale in più verso
+un hub ben connesso — che è la cura STRUTTURALE del NO_ROUTE, e il
+biglietto per riabbassare il tetto.
