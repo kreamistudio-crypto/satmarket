@@ -17011,3 +17011,113 @@ a 320 **con Chrome headless via CDP**: il Browser pane oggi rispondeva
 col mosaico 2×2 — il modo di fallire che non sembra un guasto — e le
 misure via JS erano l'unica cosa di cui fidarsi finché il CDP non ha
 dato scatti veri.
+
+### E il marchio Barattozon è passato nel testo (17 set 2026)
+
+Stava appoggiato sulla FIGURA, in basso a sinistra: un ornamento, e da
+quando la striscia si è abbassata era per giunta stretto contro il
+carrello. Adesso prende il posto della **parola** «Barattozon» nella
+frase — dove il nome serve a leggere, non a decorare — e ci sta
+**nudo**, senza la tessera navy che porta nel libro e nel foglio
+«Pubblica».
+
+⚠️ **E SENZA TESSERA SERVONO DUE MARCHI**, che è il prezzo di
+toglierla: la parola del marchio è BIANCA, e in una frase su carta
+chiara sparirebbe. È la riga già scritta nel CSS della tessera, vista
+dall'altro lato — il fondo scuro glielo dava lei; senza, glielo deve
+dare il TEMA. Quindi `barattozon-scuro.webp`: la stessa immagine con
+la sola metà bianca portata nell'inchiostro di casa (#23282C) e
+l'arancio lasciato dov'era. I due si scambiano con
+`html[data-tema="scuro"]`, che è il giudice unico del tema (lo scrive
+`applicaTema`, e vale anche per l'automatico). Il nome da sostituire
+nella frase **viene dal catalogo** (`P2P_VESTE_METODI`), non da una
+seconda stringa: il marchio ha UN nome, e c'è una sentinella che conta
+quante volte è scritto a mano.
+
+**DUE INCIAMPI, E TUTT'E DUE VISTI DAL VIVO** — nessuna prova sulla
+forma li avrebbe presi, perché in tutti e due i casi il CSS era
+«giusto» e il markup pure:
+
+1. **IL MARCHIO SDOPPIATO.** `.giro-marchio img{display:block}` vale
+   (0,1,1) e batte `.giro-m-scuro{display:none}` (0,1,0): i due
+   vestiti del tema restavano **tutt'e due** `display:block`, impilati
+   dentro un riquadro alto 15 px, e in pagina si leggeva come un
+   marchio sdoppiato che sfondava la riga. ⚠️ **È lo stesso inciampo
+   del marchio sulla figura, preso due volte nello stesso giorno** —
+   e la prima volta l'avevo perfino scritto nel commento accanto. La
+   cura è che le tre regole del tema NOMINANO `img`, e una prova lo
+   pretende.
+2. **LA FRASE SPEZZATA IN TRE.** `.giro-testo` centra il testo col
+   flex, e **in un contenitore flex ogni figlio è un elemento a sé**:
+   da quando in mezzo alla frase c'è uno `<span>`, la frase si
+   spezzava in tre pezzi affiancati — «Con», il marchio, tutto il
+   resto — con le righe a capo dove capitava. Il centraggio verticale
+   e il testo in riga non possono vivere nello stesso elemento: la
+   frase ha preso un involucro suo (`.giro-frase`), e il flex centra
+   QUELLO. Non falliva niente: si spezzava e basta.
+
+La misura è in **em** e non in pixel (1.45em): il marchio sta dentro
+una frase, quindi deve crescere con lei — e la frase cresce davvero,
+che l'app ha la scala del testo.
+
+## Il velo dei gesti P2P (17 set 2026)
+
+Dal campo, e lo ha visto Andrea: si toccava «Annulla l'ordine» e la
+pagina restava lì, senza dire cosa stesse facendo, finché il
+coordinatore non rispondeva. Adesso ogni gesto che parla col
+coordinatore alza il velo a tutto schermo — **l'anello sottile** che
+gira, col **verbo di quel gesto** — e lo richiude su tutt'e tre le
+uscite.
+
+**QUEL CHE HO TROVATO GUARDANDO, e non era quel che sembrava.** I
+gesti che parlano col coordinatore sono nove, e stavano in tre stati
+diversi:
+- **MUTI DAVVERO** erano «Ho inviato gli euro» e «Libero i sats»
+  (`mossaOrdineP2P`): nessun velo, nessun cambio di stato, niente —
+  indistinguibili da un tocco che non era stato registrato. Questi
+  erano il difetto vero.
+- **IL VELO CE L'AVEVANO** annullo, disputa, voto e incasso, ma col
+  **barattolino** e — sull'annullo — con **il verbo di un altro
+  gesto**: «Chiedo di annullare…» compariva anche su «Sì, ritira».
+  Una frase che parla di un'altra cosa è peggio di nessuna frase.
+- **NON SONO MUTI E SI LASCIANO COM'ERANO**: prendere un ordine,
+  pubblicarne uno, i due «Riprova». Quelli aprono la pagina
+  dell'ordine e ci scrivono lo stato — «sto pubblicando» —, quindi un
+  velo sopra coprirebbe una pagina che sta già parlando.
+
+⚠️ **E IL BARATTOLINO NON ERA IL BARATTOLINO.** `attesaRitardata`
+VESTE il velo con una classe (barattolino o anello) e alla chiusura
+**non la toglie**: bastava una lettura del libro P2P — che l'anello lo
+chiede — perché da lì in poi OGNI velo dell'app girasse con l'anello.
+Non si legge come un guasto: si legge come «il barattolino ogni tanto
+non c'è», ed è il modo in cui una cosa del genere resta in piedi per
+mesi. Adesso il velo immediato si RIVENDICA il barattolino, e chi
+vuole l'anello passa da `attesaP2P`.
+
+**LE TRE USCITE, e si chiudono nel `finally`.** Risposta buona → velo
+giù e il toast del fatto; rifiuto → velo giù e la ragione (già
+tradotta da `motivoCantDo`); **messaggio mai partito** → velo giù e la
+frase onesta di casa, che è un'altra perché la cura è un'altra
+(nessuno l'ha presa in consegna: si riprova, con la stessa chiave). La
+parola «relay» non compare, che è la regola delle parole di casa.
+⚠️ **Il `finally` non è pignoleria**: le uscite sono tre e domani
+saranno quattro, e un `rip()` scritto a mano in fondo lo dimentica il
+ramo nuovo. Un velo che resta aperto è l'app bloccata, e non c'è
+niente che lo tolga da fuori.
+
+**IL VERBO STA IN UNA TABELLA, non nei chiamanti.** I gesti
+dell'annullo sono TRE — ritirare un ordine che nessuno ha preso,
+CHIEDERE di annullare uno scambio in corso, ACCETTARE la richiesta
+dell'altra persona — e il messaggio al coordinatore è uno solo
+(`cancel`). `ANNULLI_P2P` tiene insieme il verbo del velo e quello del
+toast, che sono le due cose che chi guarda confronta: in due posti
+diversi, un giorno divergono.
+
+**COSA È STATO PROVATO.** Un banco node fa GIRARE i gesti veri —
+`inviaAnnulloP2P` e `mossaOrdineP2P`, non un cartone — sulle tre
+uscite, e guarda il registro del velo: `-anello +on +anello -on
+-anello` in tutti e sei i giri, cioè si alza, si veste dell'anello, e
+si sveste chiudendo. Più il verbo giusto in tutte e tre le uscite, il
+toast del fatto sulla buona, la ragione sul rifiuto, e la frase di
+casa sul mai-partito. `ragioneGestoP2P` entra nel banco **vera** e non
+doppiata: è la frase che si legge davvero.

@@ -24759,6 +24759,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    `/assets/barattozon.webp` (il marchio del metodo «Contanti al
    tabacchino», 16 set 2026: WebP con trasparenza, 305x96, cartella
    sua e mai assets/categorie/ — vedi «IL VESTITO BARATTOZON»),
+   `/assets/barattozon-scuro.webp` (il marchio SCURO, 17 set 2026: la
+   stessa immagine con la sola metà bianca portata nell'inchiostro di
+   casa, per quando il marchio sta in una frase su carta chiara —
+   vedi CANTIERI, «E il marchio Barattozon è passato nel testo»),
    `/assets/tour-p2p/{nome}` (le sei illustrazioni del tour di
    benvenuto del P2P, 17 set 2026: whitelist a tupla
    `FILE_TOUR_P2P`, 756x360 WebP (21:10, la forma della scatola nel
