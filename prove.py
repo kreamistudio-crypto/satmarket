@@ -53327,13 +53327,19 @@ def prove_p2p_campanello():
     prova("il filtro porta `authors` col coordinator", True,
           '"authors": [mostro]' in relay)
     prova("...e il chiamante gli passa la chiave del giudice, mai una sua",
-          True, 'eventi_p2p_da_relay, relay, blocco, since, leve["mostro"]'
-          in giro and "leve = _p2p_leve()" in giro)
+          True, "eventi_p2p_da_relay, relays, blocco," in giro
+          and 'since - P2P_MARGINE_S, leve["mostro"])' in giro
+          and "leve = _p2p_leve()" in giro)
     prova("...e chiede i soli kind 14", True, '"kinds": [14]' in relay)
     prova("il relay muto e' None e non una lista vuota", True,
           codice(relay).count("return None") == 2 and "return fuori" in relay)
-    prova("...e il chiamante passa al prossimo solo su None", True,
-          "if eventi is not None:" in giro)
+    # EMENDATA (17 set 2026): «passa al prossimo solo su None» credeva
+    # alla lista vuota del primo relay. Ora chiede a tutti e unisce —
+    # il banco sta in prove_p2p_tutti_i_relay
+    prova("...e il chiamante chiede a TUTTI e unisce: nessun relay ha l'ultima parola",
+          True, "await _chiedi_tutti_p2p(" in codice(giro)
+          and "_unisci_p2p(risposte" in codice(giro)
+          and "break" not in codice(_senza_prosa(giro)))
     prova("le pubkey si chiedono a blocchi (i relay hanno tetti)", True,
           "for i in range(0, len(pubkeys), P2P_BLOCCO):" in giro)
 
@@ -53615,7 +53621,7 @@ def prove_p2p_avvisi_libro():
     prova("...e ognuno dei due ha il suo try (un battito storto non ferma l'altro)",
           2, codice(orologio).count("except Exception as e:"))
     prova("le righe mai viste si chiedono senza segnalibro", True,
-          "for ids, da in ((nuovi, 0), (vecchi, since)):" in giro)
+          "for ids, da in ((nuovi, 0), (vecchi, since - P2P_MARGINE_S)):" in giro)
     prova("...e solo per due ore: un id che il libro non mostra smette di farsi cercare",
           True, "P2P_LIBRO_FRESCHI_S" in giro and "P2P_LIBRO_FRESCHI_S = 7200" in testi)
     prova("...e le righe di ieri — mai viste e non piu' fresche — restano nella domanda col segnalibro",
@@ -54010,9 +54016,13 @@ def prove_p2p_orologio():
     libro, camp = pezzo("_giro_libro_p2p"), pezzo("_giro_p2p")
     prova("nessuna domanda ai relay del P2P gira piu' senza tetto", 0,
           codice(libro).count("asyncio.to_thread") + codice(camp).count("asyncio.to_thread"))
-    prova("...passano tutte dal chiedi-relay (due nel libro, una nel campanello)",
-          [2, 1], [codice(libro).count("await _chiedi_relay_p2p("),
-                   codice(camp).count("await _chiedi_relay_p2p(")])
+    prova("...passano tutte dal chiedi-relay: il 38385 da solo, gli eventi dal chiedi-TUTTI (che e' fatto di chiedi-relay)",
+          [1, 0, 1, 1], [codice(libro).count("await _chiedi_relay_p2p("),
+                         codice(camp).count("await _chiedi_relay_p2p("),
+                         codice(libro).count("await _chiedi_tutti_p2p("),
+                         codice(camp).count("await _chiedi_tutti_p2p(")])
+    prova("...e il chiedi-tutti non ha una strada sua verso i relay", True,
+          "_chiedi_relay_p2p(fn, relay, *args) for relay in relays" in pezzo("_chiedi_tutti_p2p"))
     chiedi = pezzo("_chiedi_relay_p2p")
     prova("il chiedi-relay ha il tetto sull'attesa intera, e un pool di thread suo",
           True, "asyncio.wait_for(" in chiedi and "P2P_RELAY_MAX_S)" in chiedi
@@ -54085,15 +54095,18 @@ def prove_p2p_orologio():
                "P2P_LOG_PASSATE": True, "_P2P_POOL": None,
                "_P2P_BATTITO": {"n": 0, "vivo": 0.0},
                "_P2P_CONTO": {"libro": "", "campanello": ""},
-               "_P2P_RELAY_MUTI": set(), "_TASK_OROLOGIO_P2P": None}
+               "_P2P_RELAY_MUTI": set(), "_TASK_OROLOGIO_P2P": None,
+               "P2P_MARGINE_S": 120}
         for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
                   "_euro_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
                   "_ordini_puliti_p2p", "_registra_ordini_p2p",
                   "_relay_p2p_dice", "_esiti_p2p_dice", "_chiedi_relay_p2p",
+                  "_chiedi_tutti_p2p", "_unisci_p2p", "_conto_relay_p2p",
                   "_giro_libro_p2p",
                   "orologio_p2p", "guardiano_p2p"):
             testo = _senza_prosa(pezzo(f))
-            if f in ("_chiedi_relay_p2p", "_giro_libro_p2p", "orologio_p2p", "guardiano_p2p"):
+            if f in ("_chiedi_relay_p2p", "_chiedi_tutti_p2p", "_giro_libro_p2p",
+                     "orologio_p2p", "guardiano_p2p"):
                 testo = "async " + testo
             exec(testo, amb)
         return amb, detto, mandati
@@ -54119,8 +54132,10 @@ def prove_p2p_orologio():
         durata = time.time() - t
         prova("col primo relay che non risponde MAI, la passata finisce lo stesso (il tetto, non il relay, decide quanto dura)",
               True, durata < 2.0)
-        prova("...e passa al relay dopo, che risponde", ["wss://muto.test", "wss://buono.test"],
-              [r for r, _ in chiesto])
+        # EMENDATA (17 set 2026): non «passa al dopo» — li chiede INSIEME,
+        # quindi l'ordine d'arrivo e' dei thread e si confronta ordinato
+        prova("...e nel frattempo ha chiesto anche all'altro, che risponde",
+              ["wss://buono.test", "wss://muto.test"], sorted(r for r, _ in chiesto))
         prova("...e il journal dice QUALE relay non risponde", 1,
               sum(1 for r in detto if "wss://muto.test non risponde" in r and "passo al successivo" in r))
         prova("...e lo stato letto dal relay buono e' scritto", "pending",
@@ -54138,8 +54153,8 @@ def prove_p2p_orologio():
         chiesto.clear()
         amb2, detto2, mandati2 = _processo(["wss://buono.test"])   # memoria vergine
         _aio.run(amb2["_giro_libro_p2p"]())
-        prova("dopo il riavvio la PRIMA passata chiede dal segnalibro rimasto sul disco",
-              [("wss://buono.test", T0)], chiesto)
+        prova("dopo il riavvio la PRIMA passata chiede dal segnalibro rimasto sul disco (meno il margine)",
+              [("wss://buono.test", T0 - 120)], chiesto)
         prova("...e l'evento caduto nella finestra del fermo ARRIVA: la presa si notifica",
               True, len(mandati2) == 1 and mandati2[0][0] == 111
               and "Il tuo ordine è stato preso!" in mandati2[0][1])
@@ -54235,6 +54250,262 @@ def prove_p2p_orologio():
               amb5["_TASK_OROLOGIO_P2P"] is not None)
     finally:
         appeso.set()
+        import shutil as _sh
+        _sh.rmtree(dir_db, ignore_errors=True)
+
+
+def prove_p2p_tutti_i_relay():
+    """IL PRIMO CHE RISPONDE NON BASTA (17 set 2026, dal campo: ordine
+    fdce9231 preso alle 11:24:42, tre passate con «0 eventi» e «0
+    messaggi»). `relay.mostro.network` rispondeva — una lista vuota: di
+    mostro non aveva piu' niente dalla sera prima — e il giro gli
+    credeva. Qui GIRANO i due giri veri contro quattro relay di
+    cartone: l'evento su UNO solo, l'evento di otto secondi fa, lo
+    stesso evento da due, il relay rimasto indietro con la versione
+    vecchia, l'evento comparso IN RITARDO sotto il segnalibro, e il
+    riavvio che non deve risuonare il margine."""
+    print("\n[il P2P chiede a tutti i relay: nessuno ha l'ultima parola]")
+    import asyncio as _aio
+    import html as _html
+    import re as _re
+    import sqlite3
+    import tempfile as _tf
+    src = _SORGENTE
+    R1, R2, R3, SP = ("wss://primo.test", "wss://secondo.test",
+                      "wss://terzo.test", "wss://specchio.test")
+    CHIAVE = "a" * 64
+
+    dir_db = _tf.mkdtemp()
+    percorso = os.path.join(dir_db, "banco.db")
+    s_i = src.index("CREATE TABLE IF NOT EXISTS chiavi_p2p(")
+    schema = src[s_i:src.index("ON chiavi_p2p(tg_id);", s_i) + len("ON chiavi_p2p(tg_id);")]
+    o_i = src.index("CREATE TABLE IF NOT EXISTS p2p_ordini(")
+    schema += "\n" + src[o_i:src.index("ON p2p_ordini(tg_id);", o_i) + len("ON p2p_ordini(tg_id);")]
+    schema += "\nCREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, avvisi_p2p INTEGER DEFAULT 1);"
+    con0 = sqlite3.connect(percorso)
+    con0.executescript(schema)
+    con0.execute("INSERT INTO utenti VALUES(111, 1)")
+    con0.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)", (CHIAVE, 111))
+    con0.commit()
+    con0.close()
+
+    def _db():
+        c = sqlite3.connect(percorso)
+        c.row_factory = sqlite3.Row
+        return c
+
+    adesso = int(time.time())
+    timbri = {"p2p_libro_visto": str(adesso - 300), "p2p_ultimo_visto": str(adesso - 300)}
+    libro = {}                        # relay -> i 38383 che HA
+    buste = {}                        # relay -> i kind 14 che HA
+    giu = set()                       # i relay che non rispondono (None)
+    lenti = {}                        # relay -> secondi prima di rispondere
+    chiesto = []                      # (cosa, relay, since)
+
+    def _lettore(relay, ids, since, mostro):
+        chiesto.append(("libro", relay, since))
+        time.sleep(lenti.get(relay, 0))
+        if relay in giu:
+            return None
+        return [dict(e) for e in libro.get(relay, [])
+                if e["id"] in ids and e["quando"] >= since]
+
+    def _buste(relay, pubs, since, mostro):
+        chiesto.append(("buste", relay, since))
+        time.sleep(lenti.get(relay, 0))
+        if relay in giu:
+            return None
+        return [e for e in buste.get(relay, []) if e[0] in pubs and e[1] >= since]
+
+    def _processo():
+        """Un PROCESSO NUOVO: memoria vergine, stesso disco."""
+        detto, mandati = [], []
+
+        async def _notifica(tg_id, testo):
+            mandati.append((tg_id, testo))
+            return "cartone"
+
+        amb = {"asyncio": _aio, "time": time, "html": _html, "json": json,
+               "print": lambda *a, **k: detto.append(" ".join(str(x) for x in a)),
+               "db": _db, "notifica": _notifica, "create_connection": object(),
+               "timbro_letto": lambda n: timbri.get(n),
+               "timbro_scrivi": lambda n, v: timbri.__setitem__(n, v),
+               "_p2p_leve": lambda: {"attivo": True, "mostro": "m" * 64,
+                                     "relay": [R1, R2, R3], "specchio": [SP]},
+               "eventi_libro_da_relay": _lettore, "eventi_p2p_da_relay": _buste,
+               "info_libro_da_relay": lambda relay, mostro: {"fee": 0.02, "ore": 168},
+               "FORMA_ORDINE_P2P": _re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
+               "MAX_ORDINI_P2P": 200, "P2P_NUDGE_S": 600, "P2P_NUDGE_VIVO_S": 90,
+               "STATI_LIBRO_PRESO": ("in-progress", "waiting-buyer-invoice", "waiting-payment"),
+               "TIMBRO_LIBRO_P2P": "p2p_libro_visto", "TIMBRO_P2P_VISTO": "p2p_ultimo_visto",
+               # (il testo vero arriva col `pezzo` dell'ultima funzione del
+               # blocco, che si porta dietro la costante: questo e' il ripiego)
+               "P2P_INFO_OGNI_S": 3600, "MSG_NUDGE_P2P": "Novità in un tuo scambio P2P",
+               "P2P_LIBRO_MEMORIA_S": 40 * 86400, "P2P_LIBRO_FRESCHI_S": 7200,
+               "P2P_PRIMO_SGUARDO": 600, "P2P_BLOCCO": 100, "P2P_MARGINE_S": 120,
+               "_P2P_INFO": {"fee": None, "ore": 0, "quando": 0},
+               "P2P_RELAY_MAX_S": 2, "_P2P_POOL": None, "_P2P_VISTI": set(),
+               "_P2P_AVVIATO": {"campanello": False},
+               "_P2P_CONTO": {"libro": "", "campanello": ""},
+               "_P2P_RELAY_MUTI": set()}
+        asincrone = ("_chiedi_relay_p2p", "_chiedi_tutti_p2p", "_giro_libro_p2p", "_giro_p2p")
+        for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
+                  "_euro_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
+                  "_ordini_puliti_p2p", "_registra_ordini_p2p", "_scambio_vivo_p2p",
+                  "_nudge_p2p", "_relay_p2p_dice", "_esiti_p2p_dice",
+                  "_unisci_p2p", "_conto_relay_p2p") + asincrone:
+            testo = _senza_prosa(pezzo(f))
+            exec(("async " if f in asincrone else "") + testo, amb)
+        return amb, detto, mandati
+
+    def _gate_aperto():
+        c = _db()
+        c.execute("UPDATE chiavi_p2p SET ultimo_nudge=0")
+        c.commit()
+        c.close()
+
+    def ev(ordine, stato, quando):
+        return {"id": ordine, "stato": stato, "lato": "buy", "sats": 9000,
+                "euro": ["10"], "metodi": ["Revolut"], "quando": quando}
+
+    ORD = "fdce9231-cartone"
+    try:
+        amb, detto, mandati = _processo()
+        c = _db()
+        amb["_registra_ordini_p2p"](c, 111, [ORD], adesso - 3600, True)
+        c.execute("UPDATE p2p_ordini SET stato='pending', visto=? WHERE ordine=?",
+                  (adesso - 3000, ORD))
+        c.commit()
+        c.close()
+
+        # --- 1) L'EVENTO SU UN RELAY SOLO, OTTO SECONDI PRIMA ----------
+        # e' il caso del campo: il terzo della lista ce l'ha, i primi
+        # due rispondono — una lista vuota
+        libro[R3] = [ev(ORD, "waiting-payment", adesso - 8)]
+        _aio.run(amb["_giro_libro_p2p"]())
+        prova("un 38383 che sta su UN relay solo dei quattro si VEDE (era «0 eventi»)",
+              True, len(mandati) == 1 and "Il tuo ordine è stato preso!" in mandati[0][1])
+        prova("...anche se e' nato otto secondi prima della passata", "waiting-payment",
+              _db().execute("SELECT stato FROM p2p_ordini WHERE ordine=?", (ORD,)).fetchone()[0])
+        prova("...e la domanda e' arrivata a TUTTI e quattro", [R1, R2, SP, R3],
+              sorted(r for cosa, r, _ in chiesto if cosa == "libro"))
+        prova("la riga della passata dice quanti eventi ha dato CIASCUNO", True,
+              "1 eventi [primo.test 0 · secondo.test 0 · terzo.test 1 · specchio.test 0]"
+              in amb["_P2P_CONTO"]["libro"])
+        _gate_aperto()
+        buste[R3] = [(CHIAVE, adesso - 8, "e" * 64)]
+        _aio.run(amb["_giro_p2p"]())
+        prova("un kind 14 che sta su UN relay solo fa SUONARE (era «0 messaggi»)",
+              [2, 111, True], [len(mandati), (mandati or [(0, "")])[-1][0],
+                               "Novità in un tuo scambio P2P" in (mandati or [(0, "")])[-1][1]])
+        prova("...e il campanello chiede anche allo specchio, che dice il suo zero",
+              True, "1 messaggi nuovi [primo.test 0 · secondo.test 0 · terzo.test 1 · specchio.test 0]"
+              in amb["_P2P_CONTO"]["campanello"])
+
+        # --- 2) LO STESSO EVENTO DA DUE RELAY E' UN EVENTO SOLO --------
+        libro[R1] = [ev(ORD, "success", adesso - 4)]
+        libro[SP] = [ev(ORD, "success", adesso - 4)]
+        _gate_aperto()
+        _aio.run(amb["_giro_libro_p2p"]())
+        prova("lo stesso 38383 da due relay muove lo scambio UNA volta", True,
+              len(mandati) == 3 and "Scambio concluso" in mandati[2][1])
+        # (l'unione ne conta due: il `success` e il `waiting-payment`
+        # di R3, che e' rimasto indietro — e non riporta indietro niente)
+        prova("...e il relay rimasto INDIETRO non riporta lo stato a prima", "success",
+              _db().execute("SELECT stato FROM p2p_ordini WHERE ordine=?", (ORD,)).fetchone()[0])
+        prova("...nell'unione il doppione cade: due eventi diversi, non tre", True,
+              "2 eventi [primo.test 1 · secondo.test 0 · terzo.test 1 · specchio.test 1]"
+              in amb["_P2P_CONTO"]["libro"])
+        buste[R2] = list(buste[R3])
+        _gate_aperto()
+        _aio.run(amb["_giro_p2p"]())
+        prova("lo stesso kind 14 da due relay non risuona", 3, len(mandati))
+
+        # --- 3) L'ORDINE MAI VISTO, E IL RELAY CON LA VERSIONE DI IERI --
+        ORD2 = "ordine-mai-visto"
+        c = _db()
+        amb["_registra_ordini_p2p"](c, 111, [ORD2], adesso - 60)   # dalla restore: ruolo ignoto
+        c.close()
+        libro[R1] = [ev(ORD2, "waiting-buyer-invoice", adesso - 5)]
+        libro[R2] = [ev(ORD2, "pending", adesso - 50000)]          # indietro di ore
+        chiesto.clear()
+        _gate_aperto()
+        _aio.run(amb["_giro_libro_p2p"]())
+        prova("la riga mai vista si chiede SENZA segnalibro, e a tutti", [0, 0, 0, 0],
+              [s for cosa, r, s in chiesto if cosa == "libro"][:4])
+        prova("il `pending` di ieri e la presa di adesso si leggono IN ORDINE DI TEMPO: il maker si scopre e la presa si racconta",
+              True, len(mandati) == 4 and "Il tuo ordine è stato preso!" in mandati[3][1])
+
+        # --- 4) CHI NON RISPONDE E' «✗», E GLI ALTRI BASTANO -----------
+        giu.update({R1, R2})
+        libro[R3] = [ev(ORD2, "success", adesso - 2)]
+        _gate_aperto()
+        _aio.run(amb["_giro_libro_p2p"]())
+        prova("con due relay giu' su quattro il libro si legge lo stesso", True,
+              len(mandati) == 5 and "Scambio concluso" in mandati[4][1])
+        prova("...e la riga distingue chi NON HA RISPOSTO (✗) da chi non aveva niente (0)",
+              True, "[primo.test ✗ · secondo.test ✗ · terzo.test 1 · specchio.test 0]"
+              in amb["_P2P_CONTO"]["libro"])
+        prova("...e il journal l'ha detto al cambio, relay per relay", 2,
+              sum(1 for r in detto if "non risponde" in r and "passo al successivo" in r))
+        giu.update({R3, SP})
+        segnalibro = timbri["p2p_ultimo_visto"]
+        _aio.run(amb["_giro_p2p"]())
+        prova("con TUTTI giu' la passata finisce, non suona e non sposta il segnalibro",
+              [5, segnalibro], [len(mandati), timbri["p2p_ultimo_visto"]])
+        prova("...e la riga lo dice: quattro ✗", 4,
+              amb["_P2P_CONTO"]["campanello"].count("✗"))
+        giu.clear()
+
+        # --- 5) L'EVENTO COMPARSO IN RITARDO SOTTO IL SEGNALIBRO -------
+        T = int(timbri["p2p_ultimo_visto"])
+        prova("(il segnalibro del campanello sta sull'ultimo kind 14 letto)", adesso - 8, T)
+        buste[R1] = [(CHIAVE, T - 2, "f" * 64)]    # nato PRIMA, arrivato DOPO
+        _gate_aperto()
+        _aio.run(amb["_giro_p2p"]())
+        prova("un kind 14 nato due secondi PRIMA del segnalibro e comparso dopo SUONA (il margine)",
+              6, len(mandati))
+        prova("...senza riportare indietro il segnalibro", str(T), timbri["p2p_ultimo_visto"])
+        _gate_aperto()
+        _aio.run(amb["_giro_p2p"]())
+        prova("...e alla passata dopo il margine lo riporta, ma non risuona", 6, len(mandati))
+        prova("fuori dal margine non si chiede: la domanda parte da segnalibro − 120",
+              {T - 120}, {s for cosa, r, s in chiesto if cosa == "buste"})
+
+        # --- 6) IL RIAVVIO NON RISUONA IL MARGINE ----------------------
+        amb2, detto2, mandati2 = _processo()       # memoria vergine: _P2P_VISTI vuoto
+        _gate_aperto()
+        _aio.run(amb2["_giro_p2p"]())
+        prova("dopo un riavvio i kind 14 PRIMA del segnalibro non risuonano (uno squillo a ogni deploy)",
+              True, "1 messaggi nuovi" in amb2["_P2P_CONTO"]["campanello"]
+              and "f" * 64 in amb2["_P2P_VISTI"])
+        prova("...e quello SUL segnalibro resta lo squillo di troppo di sempre, al piu' uno",
+              1, len(mandati2))
+        buste[R2] = buste[R2] + [(CHIAVE, T + 3, "9" * 64)]
+        _gate_aperto()
+        _aio.run(amb2["_giro_p2p"]())
+        prova("...mentre quello nato DOPO il segnalibro suona, da qualunque relay arrivi",
+              2, len(mandati2))
+
+        # --- 7) INSIEME, NON IN FILA ------------------------------------
+        lenti.update({R1: 0.4, R2: 0.4, R3: 0.4})
+        t0 = time.time()
+        _aio.run(amb2["_giro_p2p"]())
+        durata = time.time() - t0
+        prova("tre relay lenti costano quanto UNO: le domande partono insieme", True,
+              durata < 1.0)
+        lenti.clear()
+
+        # --- 8) IL TETTO DEGLI ID TIENE QUELLI CHE TORNANO --------------
+        amb2["_P2P_VISTI"].update(str(n) for n in range(5001))
+        _gate_aperto()
+        _aio.run(amb2["_giro_p2p"]())
+        prova("al tetto degli id gia' contati restano quelli di QUESTA passata (col margine tornerebbero a suonare)",
+              True, len(amb2["_P2P_VISTI"]) < 10 and "9" * 64 in amb2["_P2P_VISTI"])
+        _gate_aperto()
+        _aio.run(amb2["_giro_p2p"]())
+        prova("...e infatti non risuonano", 2, len(mandati2))
+    finally:
         import shutil as _sh
         _sh.rmtree(dir_db, ignore_errors=True)
 
@@ -63873,7 +64144,7 @@ def main():
     prove_p2p_card_scambio,
     prove_p2p_vista_miei,
     prove_p2p_campanello,
-    prove_p2p_avvisi_libro, prove_p2p_orologio, prove_p2p_esito_notifiche, prove_p2p_silenzi,
+    prove_p2p_avvisi_libro, prove_p2p_orologio, prove_p2p_tutti_i_relay, prove_p2p_esito_notifiche, prove_p2p_silenzi,
     prove_p2p_motore,
     prove_p2p_stati,
     prove_p2p_chat,

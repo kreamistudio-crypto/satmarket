@@ -34172,7 +34172,11 @@ async def _chiedi_relay_p2p(fn, relay: str, *args):
     global _P2P_POOL
     if _P2P_POOL is None:
         from concurrent.futures import ThreadPoolExecutor
-        _P2P_POOL = ThreadPoolExecutor(max_workers=4,
+        # otto e non quattro: da quando si chiede a TUTTI i relay
+        # insieme, quattro thread li occupa una domanda sola — e uno
+        # rimasto indietro coi suoi timeout non deve far fare la coda
+        # alla domanda dopo
+        _P2P_POOL = ThreadPoolExecutor(max_workers=8,
                                        thread_name_prefix="p2p-relay")
     loop = asyncio.get_running_loop()
     try:
@@ -34187,6 +34191,79 @@ async def _chiedi_relay_p2p(fn, relay: str, *args):
         return None
     _relay_p2p_dice(relay, fuori is None, "connessione o lettura fallita")
     return fuori
+
+
+# ═══ SI CHIEDE A TUTTI, E SI UNISCE (17 set 2026, dal campo) ═══
+# Il fatto: l'ordine fdce9231 preso alle 11:24:42 UTC, mostro manda i
+# suoi kind 14 e ripubblica il 38383 — e tre passate di fila dicono
+# «0 eventi», «0 messaggi». La sonda sui relay veri, fatta nello stesso
+# quarto d'ora: `relay.mostro.network` RISPONDEVA in 0,3 s ma di mostro
+# non aveva piu' niente dalla sera prima (ultimo 38383 il 16 alle
+# 14:43, ultimo kind 14 alle 19:43); nos.lol aveva tutto, lo specchio i
+# 38383, damus dava 503. Il giro si fermava «al primo che risponde», e
+# il primo della lista rispondeva: una lista VUOTA. Un `[]` e' «non ho
+# niente», e detto da UN relay non vuol dire che non ci sia niente —
+# vuol dire che non ce l'ha LUI. (Quando quello stesso relay va in
+# timeout — nella sonda e' successo una volta su quattro — il giro
+# passava al secondo e funzionava: e' il modo in cui un guasto cosi'
+# va e viene. Che sia andata cosi' anche la mattina non e' provato.)
+# LA CURA: ogni domanda va a TUTTI i relay INSIEME — ognuno col suo
+# tetto, quindi la passata dura quanto il piu' lento e non la somma — e
+# le risposte si UNISCONO. Lo stesso evento da due relay e' lo stesso
+# evento (stesso id): cade nell'unione, e i doppioni che restano li
+# rendono inerti il giudice del libro (stato uguale = nessun passaggio)
+# e gli id gia' contati del campanello.
+# E IL JOURNAL DICE CHI HA DATO COSA, a ogni passata: «nos.lol 2 ·
+# relay.mostro.network 0 · relay.damus.io ✗». Lo zero accanto a un due
+# e' il guasto di quel giorno scritto in una riga; «✗» e' chi non ha
+# risposto affatto.
+# IL MARGINE DEL SEGNALIBRO: il `since` e' l'ultimo `created_at` letto,
+# ma gli eventi NON arrivano sui relay nell'ordine in cui sono nati —
+# mostro pubblica via Tor, relay per relay. Uno nato due secondi PRIMA
+# di quello gia' letto e comparso dopo restava sotto il segnalibro per
+# sempre (riprodotto a banco). Si chiede da un po' prima: i doppioni
+# non costano niente, per le due ragioni qui sopra.
+P2P_MARGINE_S = 120       # quanto indietro dal segnalibro si richiede
+_P2P_AVVIATO = {"campanello": False}   # la prima passata di QUESTO processo
+
+
+async def _chiedi_tutti_p2p(fn, relays: list, *args) -> list:
+    """La stessa domanda a TUTTI i relay, insieme. Torna le coppie
+    (relay, risposta) nell'ordine della lista, con None per chi non ha
+    potuto rispondere — `_chiedi_relay_p2p` non alza mai, quindi un
+    relay che cade non porta giu' gli altri."""
+    risposte = await asyncio.gather(
+        *[_chiedi_relay_p2p(fn, relay, *args) for relay in relays])
+    return list(zip(relays, risposte))
+
+
+def _unisci_p2p(risposte: list, chiave, conto: dict) -> list:
+    """PURA: dalle risposte di tutti all'unione senza doppioni, e nel
+    frattempo SEGNA in `conto` quanti eventi ha dato ciascuno. `conto`
+    parte da None per ogni relay («non ha mai risposto in questa
+    passata») e diventa un numero alla prima risposta: chi ha risposto
+    a un blocco e non a un altro resta un numero, e il suo silenzio
+    l'ha gia' detto `_relay_p2p_dice`."""
+    visti, uniti = set(), []
+    for relay, eventi in risposte:
+        conto.setdefault(relay, None)
+        if eventi is None:
+            continue
+        conto[relay] = (conto[relay] or 0) + len(eventi)
+        for e in eventi:
+            k = chiave(e)
+            if k not in visti:
+                visti.add(k)
+                uniti.append(e)
+    return uniti
+
+
+def _conto_relay_p2p(conto: dict) -> str:
+    """Il pezzo di riga che dice chi ha dato cosa: «nos.lol 2 ·
+    relay.damus.io ✗». Senza `wss://`, che nel journal e' solo rumore."""
+    return " · ".join(
+        f"{r.split('://', 1)[-1]} {'✗' if n is None else n}"
+        for r, n in conto.items())
 
 # IL TESTO DEL 16 SET 2026 (decisione di Andrea con Alan, insieme alle
 # frasi precise del libro): dice DOVE guardare e che il prossimo passo,
@@ -34236,9 +34313,10 @@ def eventi_p2p_da_relay(relay: str, pubkeys: list, since: int, mostro: str):
     un messaggio della controparte servirebbero DUE cambi, non uno.
 
     None = «non ho potuto chiedere» (relay muto o irraggiungibile), che
-    e' un'altra cosa da `[]` = «non c'e' niente di nuovo»: la
-    distinzione di `cerca_ids`, e serve al chiamante per passare al
-    relay dopo invece di credere al silenzio."""
+    e' un'altra cosa da `[]` = «IO non ho niente di nuovo»: la
+    distinzione di `cerca_ids`. Dal 17 set 2026 il chiamante chiede a
+    tutti e unisce, quindi la distinzione non decide piu' a chi
+    chiedere: decide cosa si SCRIVE nel journal — «✗» o «0»."""
     if not create_connection:
         return None
     try:
@@ -34351,19 +34429,32 @@ async def _giro_p2p():
         # tutti per scambi vecchi di settimane.
         since = adesso - P2P_PRIMO_SGUARDO
     leve = _p2p_leve()
-    trovati = []
+    # TUTTI i relay, specchio compreso: oggi lo specchio i kind 14 non
+    # li copia (`router.conf` prende i soli 38383 e 38385) e nella riga
+    # dira' sempre 0 — ma e' un fatto da leggere nel journal, non da
+    # ricordare, e il giorno che li copiasse qui non c'e' da toccare.
+    relays = list(leve["relay"]) + list(leve["specchio"])
+    trovati, conto = [], {}
     for i in range(0, len(pubkeys), P2P_BLOCCO):
         blocco = pubkeys[i:i + P2P_BLOCCO]
-        eventi = None
-        for relay in leve["relay"]:
-            eventi = await _chiedi_relay_p2p(
-                eventi_p2p_da_relay, relay, blocco, since, leve["mostro"])
-            if eventi is not None:
-                break             # il primo che risponde basta
-        if eventi:
-            trovati.extend(eventi)
-    _P2P_CONTO["campanello"] = (f"{len(pubkeys)} chiavi, "
-                                f"{len(trovati)} messaggi dal segnalibro")
+        risposte = await _chiedi_tutti_p2p(
+            eventi_p2p_da_relay, relays, blocco,
+            since - P2P_MARGINE_S, leve["mostro"])
+        trovati.extend(_unisci_p2p(risposte, lambda e: e, conto))
+    # LA PRIMA PASSATA DEL PROCESSO NON RISUONA IL MARGINE: gli id gia'
+    # contati vivono nel processo, e a ogni deploy i kind 14 degli
+    # ultimi due minuti tornerebbero tutti «nuovi». Quelli PRIMA del
+    # segnalibro si segnano come visti senza suonare; da li' in su vale
+    # la regola di sempre (al riavvio, al piu', uno squillo di troppo).
+    if not _P2P_AVVIATO["campanello"]:
+        _P2P_AVVIATO["campanello"] = True
+        for _, q, i in trovati:
+            if q < since:
+                _P2P_VISTI.add(i)
+    _P2P_CONTO["campanello"] = (
+        f"{len(pubkeys)} chiavi, "
+        f"{len({i for _, _, i in trovati if i not in _P2P_VISTI})} "
+        f"messaggi nuovi [{_conto_relay_p2p(conto)}]")
     if not trovati:
         return
     # IL SEGNALIBRO NON SUPERA L'OROLOGIO, ed e' la riga gia' pagata
@@ -34381,7 +34472,9 @@ async def _giro_p2p():
     for _, _, i in trovati:
         _P2P_VISTI.add(i)
     if len(_P2P_VISTI) > 5000:
-        _P2P_VISTI.clear()
+        # si tengono quelli di QUESTA passata: col margine tornano al
+        # giro dopo, e svuotando tutto risuonerebbero
+        _P2P_VISTI.intersection_update({i for _, _, i in trovati})
     if not nuovi:
         return
     con = db()
@@ -34893,9 +34986,13 @@ async def _giro_libro_p2p():
     chiedono dal segnalibro in poi, che e' quasi sempre niente. Il costo e' una REQ al minuto con gli
     id in `#d`, e la risposta sono i soli 38383 ripubblicati da
     allora: a scambi fermi, zero byte.
-    I RELAY SONO QUELLI DEL COORDINATORE E POI LO SPECCHIO: il primo
-    che risponde basta. Il 38385 (fee e finestre) si rilegge una volta
-    l'ora, e solo se c'e' qualcosa da guardare."""
+    I RELAY SONO QUELLI DEL COORDINATORE E LO SPECCHIO, E SI CHIEDE A
+    TUTTI (17 set 2026): «il primo che risponde basta» e' costato uno
+    scambio muto, perche' il primo rispondeva una lista vuota — vedi
+    «SI CHIEDE A TUTTI, E SI UNISCE». Il 38385 (fee e finestre) si
+    rilegge una volta l'ora, e solo se c'e' qualcosa da guardare: li'
+    il primo che ce l'ha basta ancora, che una fee di ieri sera e' la
+    fee di oggi."""
     leve = _p2p_leve()
     if not leve["attivo"] or not create_connection:
         return
@@ -34930,20 +35027,27 @@ async def _giro_libro_p2p():
         since = 0
     if since <= 0:
         since = adesso - P2P_PRIMO_SGUARDO
-    eventi = []
-    for ids, da in ((nuovi, 0), (vecchi, since)):
+    eventi, conto = [], {}
+    # le mai viste senza segnalibro; le altre dal segnalibro MENO il
+    # margine (vedi P2P_MARGINE_S: gli eventi non arrivano in ordine)
+    for ids, da in ((nuovi, 0), (vecchi, since - P2P_MARGINE_S)):
         for i in range(0, len(ids), P2P_BLOCCO):
             blocco = ids[i:i + P2P_BLOCCO]
-            trovati = None
-            for relay in relays:
-                trovati = await _chiedi_relay_p2p(
-                    eventi_libro_da_relay, relay, blocco, da, leve["mostro"])
-                if trovati is not None:
-                    break
-            if trovati:
-                eventi.extend(trovati)
+            risposte = await _chiedi_tutti_p2p(
+                eventi_libro_da_relay, relays, blocco, da, leve["mostro"])
+            eventi.extend(_unisci_p2p(
+                risposte, lambda e: (e["id"], e["quando"], e["stato"]), conto))
+    # IN ORDINE DI TEMPO, ed e' una riga che lavora: il 38383 e'
+    # SOSTITUIBILE, quindi un relay rimasto indietro porta la versione
+    # VECCHIA dello stesso ordine. Dal piu' vecchio al piu' nuovo il
+    # giudice la scavalca da solo (piu' vecchia del `visto` = non
+    # muove) — e su una riga mai vista il `pending` di ieri seguito
+    # dal `waiting-payment` di adesso e' proprio la storia vera, che
+    # scopre il maker e poi racconta la presa.
+    eventi.sort(key=lambda e: e["quando"])
     _P2P_CONTO["libro"] = (f"{len(nuovi) + len(vecchi)} ordini guardati "
-                           f"({len(nuovi)} mai visti), {len(eventi)} eventi")
+                           f"({len(nuovi)} mai visti), {len(eventi)} eventi "
+                           f"[{_conto_relay_p2p(conto)}]")
     if not eventi:
         return
     # il segnalibro: mai oltre l'orologio, mai indietro (le regole del
