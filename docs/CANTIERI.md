@@ -18728,6 +18728,60 @@ cade da sola e resta l'avviso, che è vero comunque. Un riquadro che
 sparisse col silenzio del coordinatore porterebbe via anche quello — e
 c'è una prova che lo gira con `p2pInfo` a `null`.
 
+**E UN TERZO GIRO, la sera stessa — tre ritocchi che chiudono il
+foglio.**
+
+**1) L'AVVISO «APPENA QUALCUNO LO PRENDE VI VEDETE» ESCE DAL FOGLIO
+PUBBLICA, e non si sposta: si cancella.** È una decisione di Andrea, e
+sta scritta qui perché **non torni per sbaglio**: quell'informazione
+vive nella pagina **«I tuoi dati»** e nel **foglio di chi PRENDE** un
+ordine, che sono i due posti dove resta. Nel foglio Pubblica era la
+terza copia, sul gesto in cui pesava di meno — chi pubblica si mostra
+comunque, e lo scopre quando qualcuno prende; chi prende invece sta
+decidendo, ed è lì che la frase cambia qualcosa. **C'è una sentinella
+che la tiene fuori dall'intero foglio** — non dal solo montaggio: i
+pezzi guardati sono tutte le funzioni che compongono quella pagina.
+
+**2) LA SCATOLA SCENDE ALL'ULTIMO POSTO**, sotto il Premio e appena
+sopra il bottone. È il terzo posto in un giorno, e il giro ha un senso
+che vale la pena scrivere: in fondo (due righe sciolte che nessuno
+leggeva) → sotto l'importo (dove i numeri servono mentre si scrive) →
+in fondo di nuovo, ma **come scatola e non come riga**, con il tetto
+salito sotto il campo. Cioè: il numero che serve *mentre* si scrive sta
+accanto al campo, e il riepilogo di tetto e prezzo sta dov'è naturale
+rileggerlo, subito prima di premere.
+
+**IL TITOLO È CAMBIATO COL CONTENUTO**, e non è cosmesi: «Prima di
+pubblicare» prometteva un elenco di cose da sapere, e con una riga sola
+dentro consegnerebbe un tetto e un prezzo. Adesso è **«Quanto si può, e
+quanto costa»** — il titolo dice quel che c'è. Con lui è cambiato anche
+il nome della funzione (`riquadroLimitiP2P`), che altrimenti avrebbe
+continuato a dire «Prima» di un titolo che non esiste più.
+**E LA SCATOLA CADE COL SILENZIO DEL COORDINATORE**: senza il 38385 la
+riga non nasce, e una scatola vuota col solo titolo direbbe che manca
+qualcosa. Niente riga, niente scatola — al contrario del giro
+precedente, dove la scatola restava perché dentro c'era anche l'avviso.
+
+**3) IL TETTO COMPARE ANCHE SOTTO IL CAMPO**, in piccolo: «max 500 000
+sats». Serve *mentre* si scrive la cifra, ed è lo stesso numero vivo —
+**un giudice solo**, `maxSatsTestoP2P`, che serve tutt'e due i posti:
+due letture dello stesso `maxSats` si scollano, e a scoprirlo sarebbe
+chi legge due cifre diverse nello stesso foglio.
+⚠️ **E IL NUMERO È IN SATS MENTRE IL CAMPO È IN EURO**, che è una
+stranezza VERA e non un refuso: il tetto lo mette il coordinatore
+sull'importo in sats (`max_order_amount`), e a euro non si traduce —
+dipende dal cambio del momento in cui qualcuno prende. Dire «max 500 000
+sats» è quel che si sa; convertirlo sarebbe inventare una soglia in euro
+che il coordinatore non applica.
+
+**LE PROVE** dell'ordine stanno in **una sentinella sola**, che dice tre
+cose insieme: quali sono le scatole, in che ordine, e che sotto l'ultima
+c'è soltanto il bottone. Più il titolo, il contenuto (la sola riga), la
+scatola che non nasce senza riga, il tetto sotto il campo col suo
+giudice unico, e la sentinella che tiene «vi vedete» fuori da ogni pezzo
+del foglio.
+
+
 E POI L'INTERRUTTORE È ARRIVATO (17 set 2026, sì di Andrea con i
 paletti: «si chiama *Fatti riconoscere negli scambi*, sta in 🔔 Avvisi,
 è SPENTO di default, e sotto ha la riga che dice cosa comporta»).

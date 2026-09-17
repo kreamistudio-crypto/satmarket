@@ -25087,15 +25087,27 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Barattolo» del conto (`contoDettP2P`) e la riga sotto l'importo del
   foglio «Pubblica»; esce testo già all'italiana e senza il segno di
   percento, che in un posto sta dentro un `<b>` e nell'altro no.
-  LA RIGA SOTTO L'IMPORTO è `rigaTettoFeeP2P()`: «Al momento si
-  accettano ordini fino a N sats — la commissione di Barattolo è
-  dell'1% per parte». Vive dentro `riquadroPrimaP2P()`, una scatola
-  come le altre del foglio (`sezioneNuovoP2P`, senza icona, titolo
-  «Prima di pubblicare») che sta fra il riquadro dell'importo e quello
-  dei metodi, e che porta anche l'avviso «appena qualcuno lo prende vi
-  vedete» — salito lì dal fondo del foglio, che ora sotto le scatole
-  ha solo il bottone. La scatola c'è SEMPRE: senza 38385 cade la riga
-  dei numeri e resta l'avviso.
+  LA RIGA DEL TETTO E DELLA COMMISSIONE è `rigaTettoFeeP2P()`: «Al
+  momento si accettano ordini fino a N sats — la commissione di
+  Barattolo è dell'1% per parte». Vive dentro `riquadroLimitiP2P()`,
+  una scatola come le altre del foglio (`sezioneNuovoP2P`, senza
+  icona, titolo «Quanto si può, e quanto costa») che sta per ULTIMA,
+  sotto il Premio e appena sopra il bottone — sotto di lei non c'è
+  altro. Senza 38385 la riga non nasce, e senza riga non nasce la
+  scatola: una scatola vuota col solo titolo direbbe che manca
+  qualcosa.
+  IL TETTO STA ANCHE SOTTO IL CAMPO dell'importo, in piccolo («max N
+  sats»), che è dove serve mentre si scrive la cifra. UN GIUDICE SOLO
+  per i due posti, `maxSatsTestoP2P` — due letture dello stesso
+  `maxSats` si scollano, e a scoprirlo sarebbe chi legge due cifre
+  diverse nello stesso foglio. ⚠️ Il numero è in SATS mentre il campo
+  è in EURO: il tetto il coordinatore lo mette sull'importo in sats e
+  a euro non si traduce (dipende dal cambio al momento della presa).
+  ⚠️ E L'AVVISO «APPENA QUALCUNO LO PRENDE VI VEDETE» NON STA IN
+  QUESTO FOGLIO, per decisione di Andrea: vive in «I tuoi dati» e nel
+  foglio di chi PRENDE un ordine. C'è una sentinella che lo tiene
+  fuori da ogni pezzo del foglio Pubblica, perché non torni per
+  sbaglio.
   Prima erano due righe lunghe in fondo al foglio, e la percentuale
   era quella INTERA — cioè il doppio di quel che paga chi legge. Tetto
   da `maxSats` del 38385, percentuale dalla metà della fee viva: senza
