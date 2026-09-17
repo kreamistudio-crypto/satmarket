@@ -37296,6 +37296,23 @@ function commissioneListinoP2P(){
   const n = c ? Number(c.commissione) : 0;
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
+/* ---- LA QUOTA DI CHI LEGGE (17 set 2026) ----
+   La fee del coordinatore si spartisce META' A TESTA — chi compra
+   riceve amount − meta', chi vende blocca amount + meta', letto sui
+   numeri del primo scambio vero — quindi la percentuale da mostrare a
+   UNA persona e' la meta' della fee viva, mai il totale.
+   UN GIUDICE SOLO perche' i due posti che la dicono — la riga «Fee
+   Barattolo» del conto e la riga sotto l'importo del foglio
+   «Pubblica» — non possano dire due numeri diversi sullo stesso
+   scambio; e il giorno che la spartizione non fosse piu' a meta', a
+   cambiare e' una riga invece di due. Esce TESTO gia' all'italiana
+   (virgola decimale) e SENZA il segno di percento: quello lo mette
+   chi scrive la frase, che in un posto sta dentro un <b> e
+   nell'altro no. */
+function mezzaCommissioneP2P(fee){
+  const n = Number(fee) || 0;
+  return (n * 50).toLocaleString('it-IT', {maximumFractionDigits: 2});
+}
 /* quanti sats passano DAVVERO di mano per chi legge: la meta' della
    fee si toglie a chi compra e si aggiunge a chi vende. A fee ignota
    (o zero) la cifra resta quella del mercato — una stima col suo ≈,
@@ -41932,7 +41949,6 @@ function contoDettP2P(o){
   const promo = (fee !== null && commissioneListinoP2P() > 0
                  && fee * 100 < commissioneListinoP2P())
     ? '<span class="promo-tag dopo">in promo</span>' : '';
-  const pct = n => esc(n.toLocaleString('it-IT', {maximumFractionDigits: 2}));
   /* ⚠️ L'ALIQUOTA STA NELL'ETICHETTA (set 2026, ritocco di Andrea),
      come la percentuale del premio: a destra vanno le CIFRE, a
      sinistra il nome della voce con quanto vale — «Fee Barattolo 1%»
@@ -41946,7 +41962,8 @@ function contoDettP2P(o){
      che vestono le cifre a destra: le due letture stanno in due
      colonne diverse. */
   const etichettaFee = 'Fee Barattolo'
-    + (fee > 0 ? ' <b class="p2p-avviso">' + pct(fee * 50) + '%</b>' : '')
+    + (fee > 0 ? ' <b class="p2p-avviso">' + esc(mezzaCommissioneP2P(fee))
+                 + '%</b>' : '')
     + promo;
   const commissione = fee === null ? num('—')
     : fee > 0 ? num(cifraNuda('meta', compro ? '−' : '+'),
@@ -43814,6 +43831,59 @@ function ordineDaRigaP2P(o){
     premio: o.premium || 0
   }, o.lato);
 }
+/* ---- LA RIGA DEL TETTO E DELLA COMMISSIONE (17 set 2026, ritocco
+   di Andrea) ----
+   Stava in fondo al foglio, in due righe lunghe, e i numeri servono
+   DOVE si scrive la cifra: adesso e' una riga sola, discreta, sotto
+   il riquadro dell'importo.
+   ⚠️ I DUE NUMERI SONO VIVI E NON BATTUTI A MANO, ed e' tutta la
+   ragione per cui questa e' una funzione invece di una stringa: il
+   tetto e' il `maxSats` del 38385 e la percentuale e' la META' della
+   fee viva — la quota che paga CHI LEGGE, perche' la fee si spartisce
+   meta' a testa e scrivere il totale direbbe il doppio del vero. Il
+   giorno che la fee cambia sul nodo, la riga cambia da sola.
+   E OGNI PEZZO CADE DA SOLO: senza il 38385 non c'e' ne' tetto ne'
+   commissione e la riga non nasce affatto; con uno solo dei due si
+   dice quello — mai un numero inventato, mai uno zero che direbbe
+   «gratis». */
+function rigaTettoFeeP2P(){
+  const pezzi = [];
+  const max = p2pInfo ? (Number(p2pInfo.maxSats) || 0) : 0;
+  if (max > 0)
+    pezzi.push('al momento si accettano ordini fino a ' + fmt(max) + ' sats');
+  const fee = commissioneVivaP2P();
+  if (fee > 0) {
+    const q = mezzaCommissioneP2P(fee);
+    pezzi.push('la commissione di Barattolo è ' + articoloPercentoP2P(q)
+               + q + '% per parte');
+  }
+  if (!pezzi.length) return '';
+  /* la maiuscola la mette il MONTAGGIO e non i pezzi: cosi' ognuno dei
+     due puo' restare solo senza portarsi dietro una maiuscola in
+     mezzo alla frase */
+  const riga = pezzi.join(' — ');
+  return '<div class="hint">' + riga.charAt(0).toUpperCase()
+    + riga.slice(1) + '</div>';
+}
+/* «dell'1%», «del 2%», «dello 0,5%»: l'articolo lo decide come il
+   numero SI LEGGE, non come si scrive — «uno» e «otto» cominciano per
+   vocale, «due» e «tre» no. Scriverlo fisso vorrebbe dire «dell'2%»
+   il giorno che la fee cambia sul nodo, cioe' proprio il giorno per
+   cui questa riga esiste.
+   Copre quel che puo' capitare a una commissione: lo zero virgola
+   («dello»), l'uno, l'otto e l'undici («dell'»), gli ottanta
+   («dell'»), tutto il resto («del»). Sopra il centinaio una
+   commissione non esiste, e qui non si finge di saperlo.
+   Prende il testo GIA' all'italiana, che e' quello che finisce nella
+   frase: `parseInt` si ferma alla virgola, quindi «1,5» legge uno e
+   «0,5» legge zero — che e' esattamente come si pronunciano. */
+function articoloPercentoP2P(testo){
+  const intero = parseInt(String(testo || '').trim(), 10) || 0;
+  if (intero === 0) return 'dello ';
+  if (intero === 1 || intero === 8 || intero === 11
+      || (intero >= 80 && intero <= 89)) return 'dell\'';
+  return 'del ';
+}
 function renderNuovoOrdineP2P(){
   const box = el('p2pNuovoCorpo');
   if (!box) return;
@@ -43996,11 +44066,6 @@ function renderNuovoOrdineP2P(){
       '<div class="hint" id="p2pNuovoPremioNota">' + premioNotaP2P(compro, p2pNuovoPremio) + '</div>'
   });
 
-  const tetto = (p2pInfo && p2pInfo.maxSats > 0)
-    ? '<div class="hint">Si accettano ordini fino a ' + fmt(p2pInfo.maxSats) + ' sats.</div>' : '';
-  const fee = (p2pInfo && p2pInfo.fee > 0)
-    ? '<div class="hint">La commissione è ' + esc(String(Math.round(p2pInfo.fee * 10000) / 100)) + '%.</div>' : '';
-
   /* LA RIGA D'APERTURA NON C'E' PIU' (ritocco di Andrea): «Stai
      chiedendo di comprare sats pagando in euro…» diceva col paragrafo
      quel che il titolo dice con tre parole, e su un foglio a pieno
@@ -44009,7 +44074,18 @@ function renderNuovoOrdineP2P(){
      scambio e in «I tuoi dati» — e la riga in fondo a questo foglio lo
      ripete a chi arriva fin la'. */
   box.innerHTML =
-    valuta + importo + metodi + scontrino + tipo + quanti + premio +
+    /* ⚠️ LA RIGA DEL TETTO E DELLA COMMISSIONE STA QUI, SOTTO
+       L'IMPORTO (17 set 2026, ritocco di Andrea): erano due righe
+       lunghe in fondo al foglio — «Si accettano ordini fino a…» e «La
+       commissione è…» — cioe' due numeri che servono mentre si SCRIVE
+       la cifra, messi dopo il punto in cui la cifra e' gia' scritta.
+       Adesso sono una riga sola sotto il riquadro che li riguarda.
+       E LA PERCENTUALE E' LA META', che prima non lo era: la riga
+       vecchia diceva la fee INTERA del coordinatore, cioe' il doppio
+       di quel che paga chi legge — «per parte» non e' una precisazione
+       ma la correzione di un numero che diceva il doppio. */
+    valuta + importo + rigaTettoFeeP2P() + metodi + scontrino + tipo
+    + quanti + premio +
     /* LA RIGA ROSSA NON C'E' PIU' (set 2026, col bottone sempre
        acceso), e cade insieme alla ragione per cui era nata: serviva a
        dire PERCHE' il bottone fosse spento, cioe' a curare un vicolo
@@ -44018,7 +44094,6 @@ function renderNuovoOrdineP2P(){
        riempire e' un rimprovero per una cosa che nessuno ha ancora
        sbagliato. Adesso l'avviso arriva AL TOCCO, come nel foglio del
        mercatino. */
-    tetto + fee +
     '<div class="hint">Finché nessuno lo prende puoi ritirarlo quando vuoi. Gli euro viaggiano fra voi due, fuori da qui.</div>' +
     /* ⚠️ E CHI PUBBLICA LO SA PRIMA DI PUBBLICARE (17 set 2026,
        decisione di Andrea con Alan): appena qualcuno lo prende le due
@@ -44050,16 +44125,33 @@ function renderNuovoOrdineP2P(){
     '</div>';
 }
 /* la nota del premio: cosa cambia PER CHI STA LEGGENDO, col lato che
-   ha scelto. A zero non c'e' niente da dire e la riga tace. */
+   ha scelto.
+   ⚠️ L'APERTURA DICE IL GESTO E NON LA CONSEGUENZA (17 set 2026,
+   richiesta di Andrea): la nota cominciava con «Sopra il mercato:» —
+   cioe' da quel che SUCCEDE — e chi legge doveva ricavarsi da solo di
+   quale gesto si stesse parlando, proprio mentre muoveva il cursore.
+   Adesso comincia da quel che sta facendo: il VERBO segue il lato
+   scelto (comprare/vendere), la DIREZIONE segue il segno
+   (sopra/sotto), e la coda e' la frase di prima, parola per parola.
+   La sua vecchia testa non si e' persa: e' salita nell'apertura, che
+   la dice meglio — «sotto al prezzo di mercato» invece di «sotto il
+   mercato», e attaccata al gesto invece che sospesa.
+   A PREMIO ZERO L'APERTURA SI ADATTA invece di sparire: «al prezzo di
+   mercato» e' anch'essa una scelta, e dirla dal verso di chi la sta
+   facendo e' la stessa regola degli altri due casi. */
 function premioNotaP2P(compro, premio){
   const p = Math.round(Number(premio) || 0);
-  if (!p) return 'Al prezzo di mercato del momento in cui qualcuno prende l\'offerta.';
+  const verbo = compro ? 'comprare' : 'vendere';
+  if (!p) return 'Vuoi ' + verbo + ' Bitcoin al prezzo di mercato: quello '
+    + 'del momento in cui qualcuno prende l\'offerta.';
   const su = p > 0;
-  return su
-    ? (compro ? 'Sopra il mercato: chi vende riceve i tuoi euro e consegna <b>meno</b> sats. Un ordine più appetibile per chi vende.'
-              : 'Sopra il mercato: consegni <b>meno</b> sats per gli stessi euro. Conviene a te, meno a chi compra.')
-    : (compro ? 'Sotto il mercato: chi vende consegna <b>più</b> sats per i tuoi euro. Conviene a te, meno a chi vende.'
-              : 'Sotto il mercato: consegni <b>più</b> sats per gli stessi euro. Un ordine più appetibile per chi compra.');
+  const apre = 'Vuoi ' + verbo + ' Bitcoin ' + (su ? 'sopra' : 'sotto')
+    + ' al prezzo di mercato: ';
+  return apre + (su
+    ? (compro ? 'chi vende riceve i tuoi euro e consegna <b>meno</b> sats. Un ordine più appetibile per chi vende.'
+              : 'consegni <b>meno</b> sats per gli stessi euro. Conviene a te, meno a chi compra.')
+    : (compro ? 'chi vende consegna <b>più</b> sats per i tuoi euro. Conviene a te, meno a chi vende.'
+              : 'consegni <b>più</b> sats per gli stessi euro. Un ordine più appetibile per chi compra.'));
 }
 /* SI RISCRIVE IL SOLO BOTTONE, mai il foglio: un render intero mentre
    si digita porta via il cursore (la lezione delle pillole). */

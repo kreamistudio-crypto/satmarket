@@ -40070,9 +40070,16 @@ def prove_p2p_libro():
     # ordine, che tace su quel che il coordinator non ha detto. A
     # VERBALE (CANTIERI, «La testata del P2P»): la commissione deve
     # ricomparire anche per chi PRENDE, prima del pubblico.
+    # EMENDATA (17 set 2026, la riga sotto l'importo): le due righe
+    # lunghe in fondo al foglio sono diventate UNA riga sotto il
+    # riquadro dell'importo, e le due guardie vivono ora dentro
+    # `rigaTettoFeeP2P` — che senza nessuno dei due numeri non nasce
+    # affatto. La domanda e' la stessa: il foglio tace su quel che il
+    # coordinator non ha detto.
+    _rtf = pezzo_js(mini, "function rigaTettoFeeP2P(){", "\n}\n")
     prova("...e il foglio del nuovo ordine tace su quel che non sa", True,
-          "(p2pInfo && p2pInfo.fee > 0)" in mini
-          and "(p2pInfo && p2pInfo.maxSats > 0)" in mini)
+          "if (max > 0)" in _rtf and "if (fee > 0) {" in _rtf
+          and "if (!pezzi.length) return '';" in _rtf)
 
     # --- 7) IL BANCO NODE: il parser GIRA ------------------------------
     node = _sh.which("node")
@@ -41387,6 +41394,11 @@ def prove_p2p_dettaglio():
         "function segnoMonetaP2P(o){",
         "function commissioneVivaP2P(){",
         "function commissioneListinoP2P(){",
+        # LA QUOTA DI CHI LEGGE (17 set 2026): il conto la CHIAMA
+        # invece di ribattere `fee * 50`, perche' la dice anche la riga
+        # sotto l'importo del foglio «Pubblica» — e due formule sullo
+        # stesso numero si scollano senza rompere niente.
+        "function mezzaCommissioneP2P(fee){",
         "function nettoLatoP2P(o, sats){",
         # il conto del dettaglio tinge la percentuale del premio col
         # giudizio, e dal set 2026 lo CHIAMA invece di ribatterlo
@@ -45308,6 +45320,12 @@ def prove_p2p_motore():
             "function ragioneGestoP2P(e){",
             "function commissioneVivaP2P(){",
             "function commissioneListinoP2P(){",
+            # LA QUOTA DI CHI LEGGE (17 set 2026): il conto la
+            # CHIAMA, e senza questa riga il banco esplode su
+            # `mezzaCommissioneP2P is not defined` — la trappola
+            # dei DUE RITAGLI, qui al SECONDO banco che gira il
+            # conto (l'altro e' quello del dettaglio).
+            "function mezzaCommissioneP2P(fee){",
             "function satsMercatoP2P(o){",
             "function nettoLatoP2P(o, sats){",
             "function verboLatoP2P(o){",
@@ -48057,7 +48075,37 @@ def prove_p2p_pubblica():
         "function renderNuovoOrdineP2P(){",
         "function sezioneNuovoP2P(o){",
         "function premioNotaP2P(compro, premio){",
-        "function premioValP2P(){"))
+        "function premioValP2P(){",
+        # ...e la riga sotto l'importo (17 set 2026), che e' testo del
+        # foglio quanto le sezioni: fuori di qui una parola vietata
+        # uscirebbe a schermo con la sentinella verde
+        "function rigaTettoFeeP2P(){",
+        "function articoloPercentoP2P(testo){"))
+    # --- 8b) LA RIGA SOTTO L'IMPORTO (17 set 2026, ritocco di Andrea)
+    # Le due righe lunghe in fondo al foglio — «Si accettano ordini
+    # fino a…» e «La commissione è…» — dicevano due numeri che servono
+    # mentre si SCRIVE la cifra, dopo il punto in cui la cifra e' gia'
+    # scritta. Adesso sono una riga sola sotto il riquadro che li
+    # riguarda. E LA PERCENTUALE E' LA META', che prima non lo era: la
+    # riga vecchia diceva la fee INTERA del coordinatore, cioe' il
+    # DOPPIO di quel che paga chi legge.
+    prova("la riga sta sotto il riquadro dell'importo", True,
+          "valuta + importo + rigaTettoFeeP2P() + metodi" in mini)
+    # ⚠️ SI GUARDA IL FOGLIO SENZA I COMMENTI, che qui sopra le due
+    # righe vecchie sono NOMINATE per spiegare cosa se n'e' andato —
+    # e una sentinella che legge la spiegazione risponde per il
+    # vicino (la trappola gia' pagata tre volte in due giorni).
+    _foglio = re.sub(r"/\*[\s\S]*?\*/", "",
+                     pezzo_js(mini, "function renderNuovoOrdineP2P(){",
+                              "\n}\n"))
+    prova("...e le due righe lunghe in fondo non ci sono piu'", False,
+          "Si accettano ordini fino a" in _foglio
+          or "La commissione è" in _foglio)
+    prova("la quota di chi legge ha un giudice solo", 1,
+          mini.count("(n * 50).toLocaleString("))
+    prova("...e il conto lo chiama invece di ribattere la formula",
+          True, "esc(mezzaCommissioneP2P(fee))"
+          in pezzo_js(mini, "function contoDettP2P(o){", "\n}\n"))
     for parola in ("Nostr", "nsec", "npub", "relay"):
         prova("il foglio del nuovo ordine non nomina «%s»" % parola,
               False, parola.lower() in nuovo.lower())
@@ -49341,6 +49389,155 @@ def prove_p2p_pubblica():
           pezzo_js(mini, "function celaVeriP2P(cela){", "\n}\n")
           and "meta.style.visibility = cela ? 'hidden' : '';" in
           pezzo_js(mini, "function celaVeriP2P(cela){", "\n}\n"))
+
+    # H) LA RIGA SOTTO L'IMPORTO, FATTA GIRARE COI NUMERI CHE CAMBIANO
+    #    Le sentinelle qui sopra dicono che la riga c'e' e che sta al
+    #    suo posto. Nessuna puo' dire che il numero sia VIVO: a dirlo
+    #    e' solo girarla con le impostazioni del coordinator che
+    #    cambiano sotto, ed e' il punto del ritocco — «quando la fee
+    #    cambia la riga si aggiorna da sola».
+    #    ⚠️ E L'ARTICOLO CAMBIA COL NUMERO: «dell'1%» ma «del 2%»,
+    #    perche' «uno» comincia per vocale e «due» no. Scritto fisso,
+    #    il giorno della fee nuova il foglio avrebbe detto «dell'2%» —
+    #    cioe' il numero vivo dentro una prosa morta.
+    banco8 = (
+        "let p2pInfo = null;\n"
+        + re.search(r"const fmt = [^\n]*;", mini).group(0) + "\n"
+        + _intera("function commissioneVivaP2P(){")
+        + "\n" + _intera("function mezzaCommissioneP2P(fee){")
+        + "\n" + _intera("function articoloPercentoP2P(testo){")
+        + "\n" + _intera("function rigaTettoFeeP2P(){")
+        + "\nconst out = {};\n"
+        # il caso di oggi sul nodo: tetto 500 000, fee 2% -> 1% a testa
+        "p2pInfo = {maxSats: 500000, fee: 0.02};\n"
+        "out.oggi = rigaTettoFeeP2P();\n"
+        # la fee cambia e la riga cambia DA SOLA, articolo compreso
+        "p2pInfo = {maxSats: 500000, fee: 0.04};\n"
+        "out.quattro = rigaTettoFeeP2P();\n"
+        # ...e la meta' con la virgola, all'italiana
+        "p2pInfo = {maxSats: 500000, fee: 0.03};\n"
+        "out.tre = rigaTettoFeeP2P();\n"
+        # sotto l'uno l'articolo e' un terzo: «dello 0,5%»
+        "p2pInfo = {maxSats: 500000, fee: 0.01};\n"
+        "out.mezzo = rigaTettoFeeP2P();\n"
+        # un pezzo solo resta solo, e si prende la maiuscola
+        "p2pInfo = {maxSats: 500000, fee: 0};\n"
+        "out.soloTetto = rigaTettoFeeP2P();\n"
+        "p2pInfo = {maxSats: 0, fee: 0.02};\n"
+        "out.soloFee = rigaTettoFeeP2P();\n"
+        # 38385 mai arrivato: la riga non nasce affatto — mai uno zero,
+        # che direbbe «gratis», e mai un tetto inventato
+        "p2pInfo = null;\n"
+        "out.muto = rigaTettoFeeP2P();\n"
+        "out.articoli = ['0,5', '1', '1,5', '2', '3', '8', '11', '80']"
+        ".map(articoloPercentoP2P);\n"
+        "console.log(JSON.stringify(out));\n")
+    f8 = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8")
+    f8.write(banco8)
+    f8.close()
+    r8 = _sp.run([_node, f8.name], capture_output=True, text=True,
+                 timeout=60, encoding="utf-8")
+    os.unlink(f8.name)
+    if r8.returncode != 0:
+        prova("il banco della riga gira", "", r8.stderr[-400:])
+        return
+    o8 = _js.loads(r8.stdout.strip())
+    prova("la riga di oggi, coi due numeri vivi",
+          '<div class="hint">Al momento si accettano ordini fino a '
+          '500\u202f000 sats \u2014 la commissione di Barattolo '
+          "\u00e8 dell'1% per parte</div>", o8["oggi"])
+    prova("...e con la fee al 4% la riga dice «del 2% per parte»", True,
+          "del 2% per parte" in o8["quattro"])
+    prova("...al 3% la meta' porta la virgola italiana", True,
+          "dell'1,5% per parte" in o8["tre"])
+    prova("...e sotto l'uno l'articolo e' un terzo", True,
+          "dello 0,5% per parte" in o8["mezzo"])
+    prova("un pezzo solo resta solo, con la sua maiuscola", [True, True],
+          [o8["soloTetto"].startswith('<div class="hint">Al momento')
+           and "commissione" not in o8["soloTetto"],
+           o8["soloFee"].startswith('<div class="hint">La commissione')
+           and "ordini fino a" not in o8["soloFee"]])
+    prova("...e senza impostazioni la riga non nasce affatto", "", o8["muto"])
+    prova("gli articoli, uno per uno",
+          ["dello ", "dell'", "dell'", "del ", "del ", "dell'",
+           "dell'", "dell'"], o8["articoli"])
+
+    # I) LA NOTA DEL PREMIO COMINCIA DAL GESTO (17 set 2026, richiesta
+    #    di Andrea). Cominciava con «Sopra il mercato:», cioe' dalla
+    #    CONSEGUENZA, e chi legge doveva ricavarsi da solo di quale
+    #    gesto si parlasse proprio mentre muoveva il cursore. Le due
+    #    cose che le prove tengono ferme sono quelle che si possono
+    #    scambiare leggendo il codice in fretta: il VERBO viene dal
+    #    LATO e la DIREZIONE dal SEGNO — non l'uno dall'altro —, e la
+    #    CODA e' la frase di ieri parola per parola, che l'apertura si
+    #    aggiunge e non riscrive.
+    banco9 = (_intera("function premioNotaP2P(compro, premio){")
+              + "\nconsole.log(JSON.stringify({\n"
+              "  vendiSconto: premioNotaP2P(false, -3),\n"
+              "  vendiPremio: premioNotaP2P(false, 4),\n"
+              "  compraSconto: premioNotaP2P(true, -3),\n"
+              "  compraPremio: premioNotaP2P(true, 4),\n"
+              "  zeroVendi: premioNotaP2P(false, 0),\n"
+              "  zeroCompra: premioNotaP2P(true, 0),\n"
+              # un premio che si arrotonda a zero E' zero, e la frase
+              # dello zero e' un'altra: il giudice e' `Math.round`
+              "  quasiZero: premioNotaP2P(false, 0.4)}));\n")
+    f9 = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8")
+    f9.write(banco9)
+    f9.close()
+    r9 = _sp.run([_node, f9.name], capture_output=True, text=True,
+                 timeout=60, encoding="utf-8")
+    os.unlink(f9.name)
+    if r9.returncode != 0:
+        prova("il banco della nota del premio gira", "", r9.stderr[-400:])
+        return
+    o9 = _js.loads(r9.stdout.strip())
+    prova("vendi-sconto",
+          "Vuoi vendere Bitcoin sotto al prezzo di mercato: consegni "
+          "<b>pi\u00f9</b> sats per gli stessi euro. Un ordine pi\u00f9 "
+          "appetibile per chi compra.", o9["vendiSconto"])
+    prova("vendi-premio",
+          "Vuoi vendere Bitcoin sopra al prezzo di mercato: consegni "
+          "<b>meno</b> sats per gli stessi euro. Conviene a te, meno a "
+          "chi compra.", o9["vendiPremio"])
+    prova("compra-sconto",
+          "Vuoi comprare Bitcoin sotto al prezzo di mercato: chi vende "
+          "consegna <b>pi\u00f9</b> sats per i tuoi euro. Conviene a te, "
+          "meno a chi vende.", o9["compraSconto"])
+    prova("compra-premio",
+          "Vuoi comprare Bitcoin sopra al prezzo di mercato: chi vende "
+          "riceve i tuoi euro e consegna <b>meno</b> sats. Un ordine "
+          "pi\u00f9 appetibile per chi vende.", o9["compraPremio"])
+    prova("zero, coi due versi",
+          ["Vuoi vendere Bitcoin al prezzo di mercato: quello del momento "
+           "in cui qualcuno prende l'offerta.",
+           "Vuoi comprare Bitcoin al prezzo di mercato: quello del momento "
+           "in cui qualcuno prende l'offerta."],
+          [o9["zeroVendi"], o9["zeroCompra"]])
+    prova("...e un premio che si arrotonda a zero E' zero", True,
+          o9["quasiZero"] == o9["zeroVendi"])
+    # IL VERBO VIENE DAL LATO e la DIREZIONE DAL SEGNO: le due si
+    # possono scambiare leggendo in fretta, e il giro incrociato e'
+    # l'unico modo di vedere che non e' successo.
+    prova("il verbo segue il LATO, in tutt'e quattro i casi",
+          [True, True, True, True],
+          [o9["vendiSconto"].startswith("Vuoi vendere"),
+           o9["vendiPremio"].startswith("Vuoi vendere"),
+           o9["compraSconto"].startswith("Vuoi comprare"),
+           o9["compraPremio"].startswith("Vuoi comprare")])
+    prova("...e la direzione segue il SEGNO, nei due lati",
+          [True, True, True, True],
+          ["sotto al prezzo di mercato" in o9["vendiSconto"],
+           "sotto al prezzo di mercato" in o9["compraSconto"],
+           "sopra al prezzo di mercato" in o9["vendiPremio"],
+           "sopra al prezzo di mercato" in o9["compraPremio"]])
+    # LA VECCHIA TESTA E' SALITA NELL'APERTURA, non si e' sdoppiata:
+    # «Sopra il mercato:» diceva la direzione una seconda volta
+    _pn = pezzo_js(mini, "function premioNotaP2P(compro, premio){", "\n}\n")
+    prova("la testa di ieri non e' rimasta sotto l'apertura", False,
+          "Sopra il mercato" in _pn or "Sotto il mercato" in _pn)
 
 
 def prove_p2p_barattozon():
