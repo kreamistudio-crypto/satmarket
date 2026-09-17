@@ -18827,3 +18827,63 @@ cassetto che compare solo a chi serve e dice i due versi, lo stato che
 arriva dal server col verso rovesciato, e le due righe di «I tuoi
 dati» che prima lo negavano); `collaudo_recensione_p2p.py` **55
 verdi**, col caso 10 che è il giro intero dell'interruttore.
+
+## L'avviso «vi vedete» esce da tutti i fogli del P2P (17 set 2026)
+
+Decisione di Andrea, e sta scritta col suo nome perché **non rientri
+per sbaglio**. L'avviso era nato la mattina stessa con «Le parti si
+vedono», in due fogli — quello dove si **pubblica** un ordine e quello
+dove se ne **prende** uno —, era uscito dal primo in serata, e adesso
+esce anche dal secondo. **Cancellato, non spostato.**
+
+**IL CENSIMENTO PRIMA DI TOGLIERE**, che è l'ordine giusto: la frase
+viveva in due punti soli del client, più i commenti che la
+raccontavano.
+- `renderDettaglioP2P` — il foglio di chi prende, quello col cappello
+  «Stai comprando sats» / «Stai vendendo sats»: «👤 Appena lo prendi vi
+  vedete: tu e chi l'ha pubblicato vedrete il profilo l'uno dell'altra
+  — nome, foto, stelline e livello, gli stessi del mercatino — e i
+  bottoni per scrivervi.»
+- `renderNuovoOrdineP2P` — il foglio dove si pubblica, con la gemella
+  «Appena qualcuno lo prende vi vedete…»: già tolta in serata, col
+  ritocco del riquadro.
+- **E BASTA**: nel server non c'era (le frasi delle notifiche non la
+  dicono), nel tour nemmeno, e l'unica altra occorrenza di «vi vedete»
+  nel client è una frase del mercatino che non c'entra — «se vi vedete
+  di persona», nel campo del link per una videoconferenza.
+
+**IL PERCHÉ, a verbale.** Le due parti si vedono davvero: quello non è
+cambiato. Ma dirlo su **ogni gesto** vuol dire ripetere, su un foglio
+dove si sta decidendo una cifra, una cosa che non cambia la decisione —
+e un foglio che avverte di tutto è un foglio che non si legge più. Il
+posto dove le cose si spiegano è **«I tuoi dati»**, che lo dice per
+intero e col perché: lì resta, e lì non si tocca.
+
+**LA SENTINELLA È LARGA QUANTO IL CLIENT, non quanto il P2P**, ed è
+più di quel che era stato chiesto per una ragione: una frase che
+rientrasse da un'altra pagina sarebbe lo stesso difetto con un
+indirizzo diverso. È un **divieto con un'eccezione sola** — fuori dalla
+vista «I tuoi dati» quelle parole non esistono, dentro ci sono per
+intero — e guarda cinque forme della frase, non una: le due aperture
+(«appena lo prendi», «appena qualcuno lo prende»), i due modi di dire
+la conseguenza, e i due punti dopo «vi vedete», che è quel che
+distingue l'avviso dalla frase del mercatino.
+⚠️ **E PORTA LA SUA RETE**: prima dei cinque divieti c'è una prova che
+tiene un'**ancora viva** nel testo che resta da guardare. Senza, il
+giorno che lo spoglia-commenti si mangiasse la zona sbagliata i cinque
+divieti passerebbero **tutti**, senza guardare niente — una sentinella
+cieca che si legge verde. La rete vale più dell'elenco.
+
+⚠️ **RESTA LA RIGA DI CHI È ENTRATO SENZA UN NOME**, e non è una
+dimenticanza: non dice «vi vedete», dice il contrario — che di lui non
+si vede niente — e finisce portando all'interruttore «Fatti riconoscere
+negli scambi», che è un gesto che da lì si può fare. **Un avviso che
+informa e basta se n'è andato; una riga che apre una porta resta.** È
+anche testo di un altro cantiere (quello dell'interruttore), e toglierlo
+di straforo insieme al proprio sarebbe stato il modo sbagliato di
+chiudere questo.
+
+Con l'avviso se ne va anche la sua prova del mattino («chi prende lo sa
+PRIMA di prendere»): al suo posto due sentinelle rovesciate — la frase
+non c'è in **nessuno dei due versi** della pagina, e la riga di chi
+resta anonimo la legge **solo lui**.

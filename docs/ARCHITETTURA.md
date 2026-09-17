@@ -25069,13 +25069,19 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   QUANDO NON SI SA SI DICE UNA COSA SOLA: profilo anonimo, un'altra
   app, o il server che non ha ancora saputo — da qui i tre non si
   distinguono, e la riga dice il fatto che vale in tutti e tre.
-  SI DICE PRIMA DEL GESTO, su tutt'e due i lati: nel foglio dove si
-  pubblica e in quello dove si prende, e lì con un **secondo verso**
-  per chi è entrato senza un nome (`myTgId < 0`) — la sua presa non
-  viene annotata, quindi «vi vedete» sarebbe falso e legge l'altra
-  verità. Chi entra con una chiave e PUBBLICA invece si mostra, col
-  profilo che ha qui: era già così dai volti sul libro, e adesso il
-  foglio lo dice prima.
+  ⚠️ NON SI DICE PIÙ SUI FOGLI, e non è una svista: l'avviso «appena
+  lo prendi / appena qualcuno lo prende vi vedete» stava nei due fogli
+  del gesto ed è uscito da tutt'e due (17 set 2026, decisione di
+  Andrea). Il posto dove si spiega è «I tuoi dati», e una sentinella
+  larga quanto il CLIENT lo tiene fuori da ogni altra pagina — con
+  un'ancora viva che impedisce alla sentinella di diventare cieca.
+  Resta la riga di chi è entrato senza un nome, che dice il contrario
+  («di te non si vede niente») e porta all'interruttore «Fatti
+  riconoscere negli scambi»: un avviso che informa e basta se n'è
+  andato, una riga che apre una porta resta. Chi entra con una chiave
+  e PUBBLICA si mostra comunque, col profilo che ha qui — era già così
+  dai volti sul libro. Il verbale: CANTIERI, «L'avviso vi vedete esce
+  da tutti i fogli del P2P».
   LA LETTURA DEL VECCHIO CAMPO RESTA: `CAMPI_P2P` è ancora di tre e
   `campoArriva` accetta un `contatto` da un'app di ieri; a cambiare è
   `inviaCampoP2P`, che scrive il solo `euro`. Il verbale: CANTIERI,
@@ -25104,10 +25110,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   è in EURO: il tetto il coordinatore lo mette sull'importo in sats e
   a euro non si traduce (dipende dal cambio al momento della presa).
   ⚠️ E L'AVVISO «APPENA QUALCUNO LO PRENDE VI VEDETE» NON STA IN
-  QUESTO FOGLIO, per decisione di Andrea: vive in «I tuoi dati» e nel
-  foglio di chi PRENDE un ordine. C'è una sentinella che lo tiene
-  fuori da ogni pezzo del foglio Pubblica, perché non torni per
-  sbaglio.
+  NESSUN FOGLIO DEL P2P, per decisione di Andrea: vive nella sola
+  pagina «I tuoi dati». La sentinella che lo tiene fuori è larga
+  quanto il client e sta in `prove_parti_si_vedono`.
   Prima erano due righe lunghe in fondo al foglio, e la percentuale
   era quella INTERA — cioè il doppio di quel che paga chi legge. Tetto
   da `maxSats` del 38385, percentuale dalla metà della fee viva: senza
