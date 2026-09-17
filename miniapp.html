@@ -40827,6 +40827,15 @@ function avanzaOrdineP2P(ordine, azione, payload){
   if (azione === 'rate-received') { o.votato = true; return o; }
   const nuovo = AVANZA_P2P[azione];
   if (nuovo && !finito) {
+    /* IL GIRO MORTO SI SCRIVE (17 set 2026): vedi P2P_GIRO_APERTO */
+    if (P2P_GIRO_APERTO.indexOf(o.stato) >= 0
+        && (nuovo === 'pubblicato' || nuovo === 'annullato')) {
+      o.giroMorto = o.stato === 'attesa_mia_hold' ? 'hold' : 'prima';
+      /* la richiesta del giro morto non si paga piu': il coordinatore
+         l'ha gia' annullata. Sull'ANNULLATO resta — li' e' la ricevuta
+         che tiene la riga (vedi p2pRitirato) e nessun bottone la apre. */
+      if (nuovo === 'pubblicato') delete o.hold;
+    } else if (nuovo !== 'pubblicato' && nuovo !== 'annullato') delete o.giroMorto;
     o.stato = nuovo;
     o.aggiornato = Math.floor(Date.now() / 1000);
     o.cantDo = '';
@@ -40835,6 +40844,46 @@ function avanzaOrdineP2P(ordine, azione, payload){
   }
   return o;
 }
+/* ═══ IL GIRO MORTO (17 set 2026, dal collaudo vero con Alan) ═══════
+   Un ordine preso puo' tornare indietro PRIMA della garanzia: chi ha
+   preso ci ripensa, o una finestra scade. Il coordinatore allora
+   rimanda un `new-order` (l'ordine torna nel libro) o un `canceled`, e
+   la riga tornava a «Ordine pubblicato» come se non fosse successo
+   niente — con in pancia la richiesta di pagamento di un giro che non
+   esiste piu'. Questi sono gli stati da cui un ritorno E' una notizia:
+   l'ordine era preso e la garanzia non c'era ancora. Da `attivo` in
+   poi e' un'altra storia (annullo insieme, disputa) e ha le sue voci.
+   `giroMorto` vale 'hold' se toccava a ME bloccare i sats, 'prima'
+   altrimenti; lo legge statoTestoP2P, e si toglie alla presa dopo. */
+const P2P_GIRO_APERTO = ['attesa_mia_fattura', 'attesa_hold_venditore',
+  'attesa_fattura_compratore', 'attesa_mia_hold'];
+const P2P_GIRO_MORTO = {
+  pubblicato: {t: 'Di nuovo nel libro',
+    hold: 'Il giro di prima si è chiuso senza che la garanzia venisse bloccata: nessun sat si è mosso, e l\'ordine è tornato nel libro. Se qualcuno lo riprende te lo diciamo subito: il tempo per bloccare i sats è poco.',
+    prima: 'Chi aveva preso l\'ordine non ha proseguito: nessun sat si è mosso, e l\'ordine è tornato nel libro.'},
+  annullato: {t: 'Scambio annullato',
+    hold: 'Si è chiuso prima che la garanzia venisse bloccata: nessun sat si è mosso.',
+    prima: 'Si è chiuso prima che la garanzia venisse bloccata: nessun sat si è mosso.'}
+};
+/* LA RICHIESTA E' ANCORA PAGABILE? Il toast «tocca a te» non deve
+   suonare su una richiesta morta: alla riapertura il relay ripete i
+   messaggi degli ultimi dieci minuti, e un `pay-invoice` di un giro
+   gia' chiuso direbbe di pagare una fattura annullata. La data la dice
+   la bolt11 stessa, la finestra il 38385 (`expiration_seconds`, 900 s
+   se non si e' letto). Una richiesta che non si legge vale viva: non
+   si tace su un fatto che non si sa. */
+function holdVivaP2P(o){
+  const b = o && o.hold && leggiBolt11(o.hold.bolt11);
+  if (!b) return true;
+  const finestra = (p2pInfo && p2pInfo.scadenzaSec > 0) ? p2pInfo.scadenzaSec : 900;
+  return Math.floor(Date.now() / 1000) < b.quando + finestra;
+}
+const P2P_TOAST_HOLD = '⚡ Tocca a te: blocca i sats in garanzia';
+const P2P_TOAST_GIRO_MORTO = {
+  pubblicato: 'Il giro si è chiuso senza garanzia: l\'ordine è tornato nel libro',
+  annullato: 'Scambio annullato prima della garanzia: nessun sat si è mosso'
+};
+
 /* PURA: l'UNICO bottone pieno della pagina. Chi compra consegna dove
    ricevere i sats e poi dice «ho inviato gli euro»; chi vende blocca
    il pagamento e poi libera i sats. Mai due gesti insieme. */
@@ -40971,6 +41020,10 @@ function statoTestoP2P(o){
   /* il messaggio che non e' partito vince sul lato e sul verso: la
      frase e' la stessa per tutti, perche' il fatto e' lo stesso */
   if (o && o.nonPartito && s.t_muto) return {t: s.t_muto, d: s.d_muto};
+  /* il giro morto vince sulla frase di vetrina: «Ordine pubblicato»
+     sarebbe vera e muta — la notizia e' che era stato preso */
+  const gm = o && o.giroMorto && P2P_GIRO_MORTO[o.stato];
+  if (gm) return {t: gm.t, d: gm[o.giroMorto] || gm.prima};
   /* il verso di chi ha PUBBLICATO vince sul lato: e' la stessa riga
      letta da un'altra parte del banco, e la sua frase e' un'altra */
   const mio = !!(o && o.mio);
@@ -41096,8 +41149,23 @@ function applicaMessaggioP2P(ord, dentro){
       && nuovo.stato !== 'attesa_mia_hold') {
     chiudiFoglioP2P('p2pHoldSheet');
     p2pHoldOrdine = '';
-    toast('Sats bloccati ✅');
+    /* «bloccati» SOLO SE LO SONO (17 set 2026): da qui si esce anche
+       col giro morto o con un annullo, e il foglio diceva ✅ lo stesso */
+    if (nuovo.stato === 'attivo') toast('Sats bloccati ✅');
   }
+  /* TOCCA A TE, OVUNQUE TU SIA (17 set 2026): la richiesta di bloccare
+     la garanzia ha un quarto d'ora di vita, e prima si vedeva solo con
+     lo scambio gia' aperto davanti. Il toast non guarda la vista. */
+  if (nuovo.stato === 'attesa_mia_hold' && prima !== 'attesa_mia_hold'
+      && holdVivaP2P(nuovo)) {
+    haptic();
+    toast(P2P_TOAST_HOLD, 6000);
+  }
+  /* ...e il giro che muore lo dice, invece di tornare a «pubblicato»
+     in silenzio (la riga lo tiene scritto: statoTestoP2P) */
+  if (nuovo.giroMorto && P2P_GIRO_APERTO.indexOf(prima) >= 0
+      && P2P_TOAST_GIRO_MORTO[nuovo.stato])
+    toast(P2P_TOAST_GIRO_MORTO[nuovo.stato], 6000);
   if (nuovo.stato === 'concluso' && prima !== 'concluso') {
     /* L'AUTOAPERTURA DEL FOGLIO A FINE SCAMBIO E' USCITA (fase 6): il
        foglio vive in «I tuoi dati» e la vista P2P non lo apre mai.

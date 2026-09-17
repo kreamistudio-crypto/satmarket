@@ -53270,7 +53270,19 @@ def prove_p2p_campanello():
     # consulta prima di suonare
     con.executescript(schema + "\nCREATE TABLE utenti(tg_id INTEGER "
                       "PRIMARY KEY, avvisi_p2p INTEGER DEFAULT 1);")
-    amb = {"P2P_NUDGE_S": 600}
+    # ...e `p2p_ordini` (17 set 2026): il gate guarda sul libro se la
+    # persona ha uno scambio PRESO, e allora la pausa e' corta
+    o_i = src.index("CREATE TABLE IF NOT EXISTS p2p_ordini(")
+    con.executescript(src[o_i:src.index("ON p2p_ordini(tg_id);", o_i)
+                          + len("ON p2p_ordini(tg_id);")])
+    PRESI = ("in-progress", "waiting-buyer-invoice", "waiting-payment")
+    prova("la presa sul libro sono tre stati, e la pausa corta novanta secondi",
+          True, 'STATI_LIBRO_PRESO = ("in-progress", "waiting-buyer-invoice",\n'
+          '                     "waiting-payment")' in src
+          and "\nP2P_NUDGE_VIVO_S = 90\n" in src)
+    amb = {"P2P_NUDGE_S": 600, "P2P_NUDGE_VIVO_S": 90,
+           "STATI_LIBRO_PRESO": PRESI}
+    exec(_senza_prosa(pezzo("_scambio_vivo_p2p")), amb)
     exec(_senza_prosa(nudge), amb)
     exec(_senza_prosa(pezzo("_avvisi_p2p_accesi")), amb)
     gate = amb["_nudge_p2p"]
@@ -53301,6 +53313,37 @@ def prove_p2p_campanello():
     con.execute("UPDATE utenti SET avvisi_p2p=1 WHERE tg_id=222")
     prova("...e riacceso suona subito: il no non aveva bruciato il turno",
           222, gate(con, C, 1000 + 1301))
+    # IL GATE CORTO (17 set 2026, il collaudo vero): pubblico, il
+    # campanello suona e timbra; tre minuti dopo Alan prende. Finche'
+    # l'ordine e' in vetrina la pausa e' di dieci minuti; appena il
+    # libro lo dice PRESO ogni messaggio puo' chiedere un mio gesto, e
+    # la pausa scende a novanta secondi.
+    con.execute("INSERT INTO p2p_ordini(ordine, tg_id, creato, stato) "
+                "VALUES('ordine-vivo', 111, 0, 'pending')")
+    prova("pubblico: il campanello suona (e timbra)", 111, gate(con, A, 10000))
+    prova("con l'ordine in vetrina, tre minuti dopo TACE ancora", 0,
+          gate(con, B, 10180))
+    for n, stato in enumerate(PRESI):
+        con.execute("UPDATE p2p_ordini SET stato=? WHERE ordine='ordine-vivo'",
+                    (stato,))
+        con.execute("UPDATE chiavi_p2p SET ultimo_nudge=10000 WHERE tg_id=111")
+        prova(f"...ma con l'ordine preso («{stato}») tre minuti dopo SUONA",
+              111, gate(con, B, 10180))
+    prova("la pausa corta c'e' lo stesso: a 89 secondi tace (un momento, una notifica)",
+          0, gate(con, A, 10180 + 89))
+    prova("...e a 90 risuona", 111, gate(con, A, 10180 + 90))
+    con.execute("UPDATE p2p_ordini SET stato='dispute' WHERE ordine='ordine-vivo'")
+    prova("la disputa e' uno scambio vivo", 111, gate(con, A, 10270 + 100))
+    con.execute("UPDATE p2p_ordini SET stato='success' WHERE ordine='ordine-vivo'")
+    prova("uno scambio concluso no: torna la pausa lunga", 0,
+          gate(con, A, 10370 + 100))
+    # chi ha PRESO sta in `preso_da`, su una riga che non e' sua
+    con.execute("INSERT INTO p2p_ordini(ordine, tg_id, creato, stato, preso_da) "
+                "VALUES('ordine-preso', 0, 0, 'waiting-buyer-invoice', 222)")
+    con.execute("UPDATE chiavi_p2p SET ultimo_nudge=20000 WHERE tg_id=222")
+    prova("anche chi ha PRESO ha la pausa corta", 222, gate(con, C, 20100))
+    con.execute("UPDATE p2p_ordini SET preso_da=0 WHERE ordine='ordine-preso'")
+    prova("...e scollegato dalla presa torna alla lunga", 0, gate(con, C, 20300))
     con.close()
 
     # --- 8) IL BANCO DELLA CAMPAGNA: gira intera --------------------
@@ -53521,7 +53564,9 @@ def prove_p2p_avvisi_libro():
     import re as _re
     amb = {"html": _html, "print": lambda *a, **k: None,
            "FORMA_ORDINE_P2P": _re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
-           "MAX_ORDINI_P2P": 200}
+           "MAX_ORDINI_P2P": 200,
+           "STATI_LIBRO_PRESO": ("in-progress", "waiting-buyer-invoice",
+                                 "waiting-payment")}
     for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
               "_euro_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
               "_ordini_puliti_p2p", "_registra_ordini_p2p"):
@@ -53560,6 +53605,45 @@ def prove_p2p_avvisi_libro():
     prova("dispute→canceled e' la disputa chiusa", "disputa_annullata",
           passaggio("dispute", "canceled", 1))
     prova("stato uguale: niente", "", passaggio("in-progress", "in-progress", 1))
+    # LA PRESA SONO TRE STATI (17 set 2026): il libro dice anche
+    # `waiting-buyer-invoice` e `waiting-payment`, e prima finivano nel
+    # journal come «mai visti» — la presa di Alan e' passata muta
+    for s in ("waiting-buyer-invoice", "waiting-payment"):
+        prova(f"pending→{s} e' «preso»", "preso", passaggio("pending", s, 1))
+        prova(f"...e {s}→pending e' «tornato»", "tornato", passaggio(s, "pending", 1))
+        prova(f"...e {s}→canceled e' «annullato»", "annullato",
+              passaggio(s, "canceled", 1))
+        prova(f"...e {s}→in-progress e' un passo DENTRO la presa: niente", "",
+              passaggio(s, "in-progress", 1))
+    prova("waiting-buyer-invoice→waiting-payment: niente (resta al campanello)", "",
+          passaggio("waiting-buyer-invoice", "waiting-payment", 1))
+    testo = amb["_testo_libro_p2p"]
+    _e = lambda stato, lato="sell": {"stato": stato, "lato": lato, "sats": 8138,
+                                     "euro": ["5"], "metodi": ["Revolut"]}
+    prova("manca la garanzia, e vendo io: tocca a me ADESSO", True,
+          "Il tuo ordine è stato preso!</b> Vendi 8.138 sats per 5,00 € via Revolut"
+          in testo("preso", _e("waiting-payment"), 0.02, 168)
+          and testo("preso", _e("waiting-payment"), 0.02, 168)
+          .endswith("Apri Barattolo: tocca a te bloccare la garanzia."))
+    prova("...e a chi compra si dice che l'altro la sta bloccando", True,
+          "Hai preso l'ordine!</b> Compri" in testo("preso", _e("waiting-payment"),
+                                                    0.02, 168, "taker")
+          and "Chi vende sta bloccando la garanzia"
+          in testo("preso", _e("waiting-payment"), 0.02, 168, "taker"))
+    prova("manca il recapito: a chi compra tocca ADESSO", True,
+          testo("preso", _e("waiting-buyer-invoice"), 0.02, 168, "taker")
+          .endswith("tocca a te indicare dove ricevere i sats."))
+    prova("...e chi vende sa che dopo tocca a lui", True,
+          "appena chi compra indica dove ricevere i sats, tocca a te bloccare la garanzia"
+          in testo("preso", _e("waiting-buyer-invoice"), 0.02, 168))
+    prova("...e sul lato `buy` i ruoli si rovesciano (chi ha pubblicato COMPRA)", True,
+          testo("preso", _e("waiting-buyer-invoice", "buy"), 0.02, 168)
+          .endswith("tocca a te indicare dove ricevere i sats.")
+          and testo("preso", _e("waiting-payment", "buy"), 0.02, 168, "taker")
+          .endswith("tocca a te bloccare la garanzia."))
+    prova("con `in-progress` restano le frasi di sempre", True,
+          "appena chi compra indica dove ricevere" in testo(
+              "preso", _e("in-progress"), 0.02, 168))
     prova("gli euro all'italiana", "32,50 €", euro(["32.5"]))
     prova("...e l'intervallo non ancora scelto", "da 20,00 a 1.000,00 €",
           euro(["20", "1000"]))
@@ -53732,7 +53816,172 @@ def prove_p2p_avvisi_libro():
     fuori = giud(con, [ev(L, "in-progress", 50100, sats=100)], 50100, 0.02, 168)
     prova("l'interruttore vale anche per chi ha preso", [111], [t for t, _ in fuori])
     prova("...e la sua presa resta scritta", (111, 333), riga(L)[:2])
+
+    # M: IL COLLAUDO DEL 17 SET 2026, per intero — pubblicato, preso
+    # senza fattura, poi la garanzia che manca, poi il ritorno in vetrina
+    M = "ordine-mmmm"
+    reg(con, 111, [M], 60000, True)
+    giud(con, [ev(M, "pending", 60000, sats=8138)], 60000, 0.02, 168)
+    fuori = giud(con, [ev(M, "waiting-buyer-invoice", 60100, sats=8138)],
+                 60100, 0.02, 168)
+    prova("preso senza fattura: la frase PARTE (era il silenzio di oggi)", True,
+          len(fuori) == 1 and fuori[0][0] == 111
+          and "Il tuo ordine è stato preso!" in fuori[0][1])
+    prova("...lo stato vero resta scritto", "waiting-buyer-invoice", stato_di(M)[0])
+    prova("...e il gate e' timbrato", 60100, nudge_di(111))
+    fuori = giud(con, [ev(M, "waiting-payment", 60160, sats=8138)], 60160, 0.02, 168)
+    prova("il passo dentro la presa non fa una seconda frase", [], fuori)
+    prova("...ma lo stato avanza", "waiting-payment", stato_di(M)[0])
+    fuori = giud(con, [ev(M, "pending", 60300, sats=8138)], 60300, 0.02, 168)
+    prova("e il ritorno in vetrina si racconta anche da li'", True,
+          len(fuori) == 1 and "non ha proseguito" in fuori[0][1])
     con.close()
+
+
+def prove_p2p_silenzi():
+    """I SILENZI DEL P2P (17 set 2026, dal collaudo vero: Andrea
+    pubblica, Alan prende, e non arriva niente — ne' su Telegram ne' in
+    app). I due silenzi del server stanno nei banchi del campanello e
+    del libro; qui sta quello del CLIENT, e si fa GIRARE: la richiesta
+    di bloccare la garanzia lo dice ovunque, un giro che muore prima
+    della garanzia resta scritto sulla riga e butta la richiesta
+    vecchia, e «Sats bloccati ✅» esce solo quando lo sono."""
+    print("\n[i silenzi del P2P: il client dice quel che succede]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    _nudo = lambda js: re.sub(r"/\*[\s\S]*?\*/", "", js)
+
+    def fn(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}"
+
+    def blocco(nome):
+        i = mini.index("const " + nome + " = {")
+        return mini[i:mini.index("\n};", i) + 3]
+
+    # --- 1) DOVE STANNO LE RIGHE -------------------------------------
+    appl = _nudo(fn("function applicaMessaggioP2P(ord, dentro){"))
+    prova("«Sats bloccati ✅» esce solo quando lo scambio e' attivo", True,
+          "if (nuovo.stato === 'attivo') toast('Sats bloccati ✅');" in appl)
+    prova("...e non ne esiste un'altra copia senza condizione", 1,
+          appl.count("toast('Sats bloccati ✅')"))
+    prova("il «tocca a te» scatta all'INGRESSO nello stato, su una richiesta viva",
+          True, "if (nuovo.stato === 'attesa_mia_hold' && prima !== 'attesa_mia_hold'\n"
+          "      && holdVivaP2P(nuovo)) {" in appl
+          and "toast(P2P_TOAST_HOLD, 6000);" in appl)
+    i_toast = appl.index("toast(P2P_TOAST_HOLD")
+    prova("...e non guarda quale vista e' aperta", False,
+          "p2pOrdineAperto" in appl[appl.index("if (nuovo.stato === 'attesa_mia_hold'"):i_toast])
+    prova("il giro morto lo dice a voce, una volta: solo venendo da un giro aperto",
+          True, "if (nuovo.giroMorto && P2P_GIRO_APERTO.indexOf(prima) >= 0" in appl)
+    prova("il toast dice di bloccare i sats in garanzia", True,
+          "const P2P_TOAST_HOLD = '⚡ Tocca a te: blocca i sats in garanzia';" in mini)
+
+    # --- 2) IL BANCO NODE --------------------------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("il giro morto e il «tocca a te»", "node non c'e'")
+        return
+    liste = "\n".join(re.findall(r"^const P2P_[A-Z_]+ = \[[^\]]*\];", mini, re.M))
+    adesso = int(time.time())
+    banco = "\n".join([
+        blocco("AVANZA_P2P"), blocco("STATI_P2P"), blocco("MOTIVI_CANTDO"),
+        blocco("P2P_GIRO_MORTO"), liste,
+        fn("function motivoCantDo(payload){"),
+        fn("function importoBolt11(pr){"), fn("function leggiBolt11(pr){"),
+        "let p2pInfo = {fee: 0.02, scadenzaSec: 900};",
+        fn("function commissioneVivaP2P(){"),
+        fn("function nettoLatoP2P(o, sats){"),
+        fn("function lordoDaMieiP2P(o, miei){"),
+        fn("function statoTestoP2P(o){"),
+        fn("function holdVivaP2P(o){"),
+        fn("function avanzaOrdineP2P(ordine, azione, payload){"),
+        fn("function azioniDisponibili(o){"),
+        "const FRESCA = " + _json.dumps(bolt11_finta(8302, 900, adesso - 30)) + ";",
+        "const VECCHIA = " + _json.dumps(bolt11_finta(8302, 900, adesso - 1200)) + ";",
+    ]) + r"""
+const out = {};
+const mio = {id: 'm', lato: 'vendo', mio: true, stato: 'pubblicato', euro: 5,
+             satsNetti: 8138, metodi: [], cantDo: '', errore: ''};
+const hold = b => ({order: {amount: 8302}, payment_request: [null, b, 8302]});
+/* il caso di oggi: preso, richiesta arrivata, giro morto, di nuovo nel libro */
+const chiesto = avanzaOrdineP2P(mio, 'pay-invoice', hold(FRESCA));
+out.chiesto = [chiesto.stato, !!chiesto.hold, azioniDisponibili(chiesto), chiesto.giroMorto || ''];
+const tornato = avanzaOrdineP2P(chiesto, 'new-order', {order: {amount: 8138}});
+out.tornato = [tornato.stato, 'hold' in tornato, tornato.giroMorto, azioniDisponibili(tornato)];
+out.tornatoTesto = statoTestoP2P(tornato);
+out.vetrinaTesto = statoTestoP2P(mio).t;
+out.nonMuta = [!!chiesto.hold, chiesto.stato];
+/* ripreso da un altro: la notizia vecchia sparisce, e a garanzia
+   bloccata non c'e' piu' */
+const ripreso = avanzaOrdineP2P(tornato, 'pay-invoice', hold(FRESCA));
+out.ripreso = [ripreso.stato, ripreso.giroMorto || '', !!ripreso.hold];
+out.bloccato = avanzaOrdineP2P(ripreso, 'buyer-took-order', null).giroMorto || '';
+/* l'eco di una pubblicazione NON e' un giro morto */
+out.eco = avanzaOrdineP2P(Object.assign({}, mio, {stato: 'pubblico'}),
+                          'new-order', {order: {amount: 8138}}).giroMorto || '';
+/* non toccava a me: chi aveva preso non ha indicato dove ricevere */
+const aspetto = avanzaOrdineP2P(mio, 'waiting-buyer-invoice', null);
+const mollato = avanzaOrdineP2P(aspetto, 'new-order', null);
+out.mollato = [mollato.stato, mollato.giroMorto, statoTestoP2P(mollato).d];
+/* annullato prima della garanzia: la ricevuta resta, la frase cambia */
+const ann = avanzaOrdineP2P(chiesto, 'canceled', null);
+out.annullato = [ann.stato, !!ann.hold, ann.giroMorto, statoTestoP2P(ann).d];
+/* annullato DOPO la garanzia: la frase di sempre */
+const attivo = avanzaOrdineP2P(chiesto, 'buyer-took-order', null);
+const annDopo = avanzaOrdineP2P(attivo, 'canceled', null);
+out.annullatoDopo = [annDopo.giroMorto || '', statoTestoP2P(annDopo).d];
+/* la richiesta viva e quella morta */
+out.viva = [holdVivaP2P(chiesto),
+            holdVivaP2P(avanzaOrdineP2P(mio, 'pay-invoice', hold(VECCHIA))),
+            holdVivaP2P({hold: {bolt11: 'robaccia'}}), holdVivaP2P({})];
+p2pInfo = null;
+out.vivaSenzaInfo = holdVivaP2P(chiesto);
+process.stdout.write(JSON.stringify(out));
+"""
+    d = _tf.mkdtemp()
+    try:
+        p = os.path.join(d, "banco.js")
+        open(p, "w", encoding="utf-8").write(banco)
+        r = _sp.run([node, p], capture_output=True, encoding="utf-8", timeout=60)
+        if r.returncode != 0:
+            prova("il banco node dei silenzi gira", "", r.stderr[-700:])
+            return
+        out = _json.loads(r.stdout.strip().splitlines()[-1])
+    finally:
+        _sh.rmtree(d, ignore_errors=True)
+
+    prova("la richiesta arriva: tocca a me, con la hold in mano",
+          ["attesa_mia_hold", True, "hold", ""], out["chiesto"])
+    prova("il giro muore: torna nel libro, la hold vecchia SPARISCE, e resta scritto che toccava a me",
+          ["pubblicato", False, "hold", ""], out["tornato"])
+    prova("...e la riga non dice piu' «Ordine pubblicato»", "Di nuovo nel libro",
+          out["tornatoTesto"]["t"])
+    prova("...ma che la garanzia non e' stata bloccata e nessun sat si e' mosso", True,
+          "senza che la garanzia venisse bloccata" in out["tornatoTesto"]["d"]
+          and "nessun sat si è mosso" in out["tornatoTesto"]["d"])
+    prova("...mentre una vetrina qualunque resta «Ordine pubblicato»",
+          "Ordine pubblicato", out["vetrinaTesto"])
+    prova("la macchina resta pura: l'ordine di prima non e' toccato",
+          [True, "attesa_mia_hold"], out["nonMuta"])
+    prova("ripreso da un altro: la notizia vecchia cade e la hold e' quella nuova",
+          ["attesa_mia_hold", "", True], out["ripreso"])
+    prova("...e a garanzia bloccata non ce n'e' traccia", "", out["bloccato"])
+    prova("l'eco di una pubblicazione non e' un giro morto", "", out["eco"])
+    prova("se non toccava a me, la riga dice che e' l'altro a non aver proseguito",
+          True, out["mollato"][:2] == ["pubblicato", "prima"]
+          and "non ha proseguito" in out["mollato"][2])
+    prova("annullato prima della garanzia: la ricevuta resta e la frase dice che nessun sat si e' mosso",
+          True, out["annullato"][:3] == ["annullato", True, "hold"]
+          and "nessun sat si è mosso" in out["annullato"][3])
+    prova("annullato DOPO la garanzia: la frase di sempre", True,
+          out["annullatoDopo"][0] == ""
+          and "sono tornati a chi li aveva bloccati" in out["annullatoDopo"][1])
+    prova("la richiesta fresca e' viva, quella di venti minuti fa no, e una che non si legge vale viva",
+          [True, False, True, True], out["viva"])
+    prova("...e senza il 38385 la finestra e' di 900 secondi", True, out["vivaSenzaInfo"])
 
 
 def prove_nwc_cifratura():
@@ -62832,7 +63081,7 @@ def main():
     prove_p2p_card_scambio,
     prove_p2p_vista_miei,
     prove_p2p_campanello,
-    prove_p2p_avvisi_libro,
+    prove_p2p_avvisi_libro, prove_p2p_silenzi,
     prove_p2p_motore,
     prove_p2p_stati,
     prove_p2p_chat,

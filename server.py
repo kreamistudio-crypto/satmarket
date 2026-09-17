@@ -34044,6 +34044,27 @@ async def annuncia_ordine_p2p_canale(req: Request,
 TIMBRO_P2P_VISTO = "p2p_ultimo_visto"   # il segnalibro, sopravvive al riavvio
 P2P_GIRO_S = 60          # ogni quanto si guarda: la latenza del campanello
 P2P_NUDGE_S = 600        # il gate: al piu' uno squillo ogni dieci minuti
+# IL GATE CORTO DI CHI HA UNO SCAMBIO VIVO (17 set 2026, dal collaudo
+# vero: la presa di Alan e' passata muta). I dieci minuti sono quasi
+# quanto la finestra di un GESTO (`expiration_seconds`, 900 s): la
+# pubblicazione timbrava il gate, la presa arrivava tre minuti dopo e
+# il campanello se la mangiava — cioe' taceva proprio sul messaggio che
+# chiedeva di fare qualcosa entro un quarto d'ora. Il server i kind 14
+# non li legge, quindi QUALE messaggio chieda un gesto non lo sa; sa
+# pero' dal LIBRO se la persona ha uno scambio PRESO, ed e' li' che
+# ogni messaggio del coordinatore e' un passo che puo' toccare a lei.
+# Novanta secondi: piu' di un battito (60), cosi' il kind 14 dello
+# STESSO momento della frase precisa — anche visto al giro dopo — non
+# fa doppione; meno di due, cosi' il gesto chiesto due minuti dopo
+# suona. Con soli ordini in vetrina resta il gate lungo.
+P2P_NUDGE_VIVO_S = 90
+# «PRESO» SUL LIBRO SONO TRE STATI E NON UNO (17 set 2026): il 38383
+# dice `waiting-buyer-invoice` (preso, manca la fattura di chi compra)
+# e `waiting-payment` (preso, manca la garanzia di chi vende) prima di
+# `in-progress`. Il 16 set si era visto il solo `in-progress`, e gli
+# altri due finivano nel journal come «mai visti» — senza frase.
+STATI_LIBRO_PRESO = ("in-progress", "waiting-buyer-invoice",
+                     "waiting-payment")
 P2P_BLOCCO = 100         # quante pubkey in un filtro (i relay hanno tetti)
 P2P_PRIMO_SGUARDO = 600  # al primo avvio si guarda indietro dieci minuti
 _P2P_VISTI = set()       # gli id gia' contati, dentro questo processo
@@ -34126,6 +34147,23 @@ def eventi_p2p_da_relay(relay: str, pubkeys: list, since: int, mostro: str):
         return None               # relay muto: si prova il prossimo
 
 
+def _scambio_vivo_p2p(con, tg_id: int) -> bool:
+    """Questa persona ha uno scambio PRESO, da una parte o dall'altra?
+    Lo dice il libro (`p2p_ordini.stato`, scritto dal giro che passa
+    PRIMA del campanello nello stesso battito): chi ha pubblicato
+    (`tg_id`) o chi ha preso (`preso_da`), su un ordine nei tre stati
+    della presa o in disputa. Un ordine in vetrina non conta: li' non
+    c'e' nessun gesto che scade. Chi entra da Nostr e prende non e'
+    annotato (`preso_da` resta 0): per lui vale il gate lungo, come
+    gia' vale la sola generica."""
+    segni = ",".join("?" * (len(STATI_LIBRO_PRESO) + 1))
+    r = con.execute(
+        "SELECT 1 FROM p2p_ordini WHERE (tg_id=? OR preso_da=?) "
+        f"AND stato IN ({segni}) LIMIT 1",
+        (tg_id, tg_id) + tuple(STATI_LIBRO_PRESO) + ("dispute",)).fetchone()
+    return bool(r)
+
+
 def _nudge_p2p(con, pubkey: str, adesso: int) -> int:
     """A chi suonare, e se e' il momento. Torna il tg_id da avvisare, o
     0. Puro sulla connessione (il patto di `_registra_chiavi_p2p`),
@@ -34154,7 +34192,10 @@ def _nudge_p2p(con, pubkey: str, adesso: int) -> int:
         return 0
     q = con.execute("SELECT MAX(ultimo_nudge) FROM chiavi_p2p WHERE tg_id=?",
                     (tg_id,)).fetchone()
-    if adesso - int(q[0] or 0) < P2P_NUDGE_S:
+    # chi ha uno scambio PRESO ha il gate corto: li' ogni messaggio
+    # puo' chiedere un suo gesto (vedi P2P_NUDGE_VIVO_S)
+    pausa = P2P_NUDGE_VIVO_S if _scambio_vivo_p2p(con, tg_id) else P2P_NUDGE_S
+    if adesso - int(q[0] or 0) < pausa:
         return 0
     con.execute("UPDATE chiavi_p2p SET ultimo_nudge=? WHERE tg_id=?",
                 (adesso, tg_id))
@@ -34281,6 +34322,9 @@ async def orologio_p2p():
 # nel vocabolario di mostro-core ma non li abbiamo ancora visti
 # ripubblicati: i rami ci sono, e uno stato mai visto lascia una riga
 # nel journal invece di una notifica inventata.
+# E IL 17 SET 2026 QUELLA RIGA HA PARLATO: `waiting-buyer-invoice` e
+# `waiting-payment`, visti sul collaudo vero. Sono la PRESA prima di
+# `in-progress` (`STATI_LIBRO_PRESO`, su accanto al gate).
 TIMBRO_LIBRO_P2P = "p2p_libro_visto"  # il segnalibro del libro, sopravvive al riavvio
 P2P_INFO_OGNI_S = 3600                # ogni quanto si rilegge il 38385 (fee, finestre)
 P2P_LIBRO_MEMORIA_S = 40 * 86400      # un ordine vive al piu' 15 giorni in libro + lo scambio
@@ -34410,7 +34454,15 @@ def _passaggio_libro_p2p(prima: str, dopo: str, maker: int) -> str:
     pending→expired SCADUTO; dispute→success/canceled la DISPUTA
     chiusa. pending→canceled e' il RITIRO di chi ha pubblicato: l'ha
     fatto lui, e non c'era garanzia — niente. in-progress→dispute e'
-    un momento interno (resta al campanello)."""
+    un momento interno (resta al campanello).
+    LA PRESA SONO TRE STATI (17 set 2026, `STATI_LIBRO_PRESO`): qui si
+    leggono come uno solo, quindi il passo DENTRO la presa —
+    waiting-buyer-invoice→waiting-payment→in-progress — non racconta
+    niente (e' un momento interno, del campanello), mentre il primo dei
+    tre che si vede e' «preso» e da ognuno dei tre si torna, si
+    conclude o si annulla."""
+    prima = "in-progress" if prima in STATI_LIBRO_PRESO else prima
+    dopo = "in-progress" if dopo in STATI_LIBRO_PRESO else dopo
     if dopo == prima or not maker:
         return ""
     if prima in ("", "pending") and dopo == "in-progress":
@@ -34472,6 +34524,27 @@ def _testo_libro_p2p(passaggio: str, ev: dict, fee, ore: int,
     metodi = ", ".join(html.escape(str(m)) for m in (ev.get("metodi") or []))
     quanto = (f"{_fmt_sats(sats)} sats" if sats > 0 else "bitcoin") + \
         (f" per {euro}" if euro else "") + (f" via {metodi}" if metodi else "")
+    # LA FRASE SEGUE LO STATO, quando il libro lo dice (17 set 2026):
+    # `waiting-payment` = manca la garanzia, e il gesto e' di chi vende
+    # ADESSO; `waiting-buyer-invoice` = manca il recapito, e il gesto e'
+    # di chi compra ADESSO. Con `in-progress` — che non dice a chi
+    # tocca — restano le frasi di sempre, qui sotto.
+    stato = str(ev.get("stato") or "")
+    if passaggio == "preso" and stato in ("waiting-payment",
+                                          "waiting-buyer-invoice"):
+        testa = ("⚡ <b>Hai preso l'ordine!</b> " if taker
+                 else "⚡ <b>Il tuo ordine è stato preso!</b> ")
+        testa += ("Vendi " if vende else "Compri ") + quanto + ".\n\n"
+        if stato == "waiting-payment" and vende:
+            return testa + "Apri Barattolo: tocca a te bloccare la garanzia."
+        if stato == "waiting-payment":
+            return testa + ("Chi vende sta bloccando la garanzia: apri "
+                            "Barattolo per seguire lo scambio.")
+        if not vende:
+            return testa + ("Apri Barattolo: tocca a te indicare dove "
+                            "ricevere i sats.")
+        return testa + ("Apri Barattolo: appena chi compra indica dove "
+                        "ricevere i sats, tocca a te bloccare la garanzia.")
     if passaggio == "preso" and taker:
         if vende:
             return (f"⚡ <b>Hai preso l'ordine!</b> Vendi {quanto}.\n\n"
@@ -34581,9 +34654,8 @@ def _avvisi_libro_p2p(con, eventi: list, adesso: int, fee, ore: int) -> list:
              # si fosse perso l'in-progress in mezzo — o la prossima
              # presa di un altro direbbe «hai preso» a chi non c'e' piu'
              0 if dopo == "pending" else preso_da, ev["id"]))
-        if prima and dopo != prima and dopo not in (
-                "pending", "in-progress", "success", "canceled",
-                "expired", "dispute"):
+        if prima and dopo != prima and dopo not in STATI_LIBRO_PRESO + (
+                "pending", "success", "canceled", "expired", "dispute"):
             print(f"📖 Libro P2P: stato mai visto «{dopo}» "
                   f"(da «{prima}») sull'ordine {ev['id'][:8]}")
         for chi, pas, ruolo in ((int(r["tg_id"] or 0), passaggio, "maker"),
