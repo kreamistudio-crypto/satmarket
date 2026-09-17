@@ -19205,3 +19205,130 @@ RESTA DA GUARDARE: niente. Il riquadro «Chi ha pubblicato quest'ordine»
 del dettaglio resta com'è — lì senza volto sparisce la sezione intera,
 che è un altro mestiere: non un buco in una cornice, ma un riquadro che
 senza dati non ha niente da dire.
+
+## Il pagamento fallito dopo il rilascio: la fattura nuova che il client non sapeva chiedere (17 set 2026)
+
+**IL FATTO.** Scambio `3fcdb207` (buy, 10 €): chi vende rilascia, il
+coordinatore incassa la garanzia (`settled-hold-invoice`) e il payout a
+chi compra fallisce tre volte. **14.837 sats fermi nel nodo**, e il
+client di chi compra diceva «Sats liberati, stanno arrivando» senza
+offrire nessun campo. Bloccato.
+
+**COSA MANDA DAVVERO MOSTROD, letto sui byte di v0.18.7**
+(`check_failure_retries` in `src/app/release.rs`): al PRIMO fallimento
+un `payment-failed` (payload `payment_failed` coi tentativi e
+l'intervallo), e i tentativi di mezzo **non dicono niente**; all'ULTIMO
+un **`add-invoice`** — la STESSA azione dell'inizio dello scambio — con
+dentro l'ordine a stato `settled-hold-invoice`, l'importo `amount − fee`
+e la fattura vecchia come promemoria. Quindi «`settled-hold-invoice` +
+`add-invoice` = pagamento fallito» è giusto, e `payment-failed` arriva
+ANCHE lui, prima, ed era già mappato (`pagamento_ritentato`).
+
+**PERCHÉ IL CLIENT RESTAVA FERMO, ed erano due difetti in fila.**
+1) La tabella leggeva quell'`add-invoice` come quello dell'inizio:
+«Dove vuoi i sats?», cioè il passo UNO. 2) La ripresa dalla restore è
+«solo in avanti» (`P2P_RIPRESA_PASSO`), e la restore dice
+`settled-hold-invoice` → `rilasciato`, passo 4: alla riapertura
+**4 > 1**, e il campo della fattura spariva sotto «stanno arrivando».
+Lo stesso valeva per `pagamento_ritentato`, che stava a passo 2.
+3) E ce n'era un terzo in agguato, trovato leggendo
+`pay_new_invoice` (`src/app/add_invoice.rs`): alla fattura nuova
+mostrod risponde **`invoice-updated`**, che la tabella porta ad
+`attivo` — dopo il rilascio avrebbe riportato chi compra a «manda gli
+euro».
+
+**LA CURA.** Uno stato nuovo della macchina P2P, `fattura_nuova`, e un
+giudice PURO — `mossaDopoRilascioP2P` — che legge le due azioni col
+significato che hanno DOPO il rilascio: `add-invoice` → `fattura_nuova`,
+`invoice-updated` → `rilasciato`. **DUE CRITERI, col ripiego
+dichiarato** (la lezione della sonda): lo `status` che il coordinatore
+scrive nell'ordine, che vale anche sul dispositivo che non ha visto il
+resto, e lo stato della riga, che vale se quel campo un giorno mancasse.
+I tre stati del dopo-rilascio (`rilasciato`, `pagamento_ritentato`,
+`fattura_nuova`) stanno **alla pari a passo 4**: la restore dice la
+stessa parola per tutti e tre e non sa quale sia — alla pari non li
+muove, e a dire quale dei tre è restano i messaggi.
+IL GESTO: bottone pieno «⚡ Dai una fattura nuova», che apre lo STESSO
+foglio di «Dove ricevere i sats» — stessa cifra (14.837, da `satsMiei`:
+l'`add-invoice` del fallimento la riporta), stesso «Copia la cifra»,
+stessa guardia — con in testa il perché. E SUONA: toast di otto secondi
+ovunque si sia, haptic, e con lo scambio davanti il foglio si apre da
+solo (col wallet NWC collegato la fattura la chiede lui).
+LA NOTIFICA a chi ha l'app chiusa resta il campanello del server, e
+**non può essere più precisa di così**: il server i kind 14 non li
+decifra (regola ferrea 2), dice «guarda». Il gate corto da 90 s per chi
+ha uno scambio preso c'è già.
+
+**«STANNO ARRIVANDO» NON SI DICE PIÙ.** Era una promessa su un
+pagamento che può fallire. `rilasciato` adesso dice «Sats liberati: in
+pagamento», e a chi compra aggiunge che se non riesce potrà dare una
+fattura nuova.
+
+**LA PORTA DI RISERVA.** A chi compra, in `rilasciato` e
+`pagamento_ritentato`, resta un gesto ghost «I sats non arrivano? Dai
+una fattura nuova». Serve al caso in cui il messaggio non arrivi su
+quel dispositivo (un relay fermo, una riga ripresa dalla sola restore).
+NON PUÒ FARE DANNI, verificato sui byte: `pay_new_invoice` accetta la
+fattura nuova solo con `status = settled-hold-invoice AND
+payout_payment_hash IS NULL` — con un pagamento in volo risponde
+`not-allowed-by-status` e non muove niente.
+
+**L'AVVISO SU WALLET OF SATOSHI** sta nel foglio, PRIMA del campo e
+anche la prima volta: la fattura si dà all'inizio e si paga alla fine,
+e la guardia pretende solo la finestra del coordinatore (un'ora).
+Consiglia la senza-importo o un wallet con la scadenza lunga.
+
+⚠️ **E LA CAUSA DI QUEL GIORNO NON ERA LA SCADENZA** (corretto da
+Andrea a cantiere aperto: lo scambio era durato cinque minuti). La prima
+stesura del foglio diceva «quasi sempre perché era scaduta»: tolta. Il
+foglio elenca le due cause e non ne sceglie una, perché **il
+coordinatore il motivo non lo dice** — vedi sotto.
+
+**COSA VUOL DIRE «Invoice with hash … has failed!», dal sorgente.**
+Quella riga nasce in UN posto: il watcher di `do_payment`, quando lo
+stream di `SendPaymentV2` (gRPC — non c'è nessun ponte REST) consegna
+`status = FAILED`. Quindi LND il pagamento **l'ha preso in carico e
+l'ha fallito lui**. Un rifiuto PRIMA dello stream (RPC error) scrive
+un'altra riga — «payout dispatch failed (…); re-arming retry», col
+motivo dentro — e un indirizzo che non si risolve un'altra ancora
+(«could not resolve payout address»). «LND non ha nessun tentativo» e
+«LND ha fallito il pagamento» stanno insieme: NO_ROUTE,
+INSUFFICIENT_BALANCE e TIMEOUT falliscono **senza un solo HTLC**, e
+`lncli listpayments` i falliti li NASCONDE senza `--include_incomplete`.
+Il motivo LND lo conserva: `lncli trackpayment <hash>`.
+DUE SOSPETTI DA GUARDARE PER PRIMI, e nessuno dei due è provato:
+`fee_limit_sat` è `amount × max_routing_fee` (`routing_fee_cap_sats`),
+cioè una quindicina di sats su 14.837 allo 0,1% di default — e LND a
+fee limit troppo basso risponde NO_ROUTE, non «fee»; e il saldo
+spendibile del canale.
+**mostrod `failure_reason` non lo legge IN NESSUN PUNTO**: è la
+**patch 0006** (`deploy/mostro/patch-0006-perche-e-fallito.py`), solo
+log — motivo, codice grezzo e numero di tentativi HTLC sulla stessa
+riga. ⚠️ MAI COMPILATA qui (niente cargo): provata a secco sul sorgente
+vero di v0.18.7, l'ancora c'è una volta.
+
+**LE PROVE.** La sequenza VERA gira nel banco del motore — messaggi
+cifrati nip44, ognuno con la SUA ora, dentro `mostroArriva`: fattura,
+garanzia, euro, rilascio, primo fallimento, `add-invoice` a
+`settled-hold-invoice`. Poi la restore che non scavalca, i ripetuti
+alla rinfusa, il foglio (perché, 14.837, copia, avviso), l'invio con
+l'`invoice-updated` che torna «in pagamento», il secondo giro di
+fallimenti che risuona, il `purchase-completed`, e il dispositivo che
+riapre fermo a `rilasciato`.
+UNA TRAPPOLA DEL BANCO, pagata e scritta: il coordinatore di cartone
+rispondeva con l'ora di ADESSO mentre la scena correva nel futuro, e la
+risposta passava per PASSATO. Ora le risposte portano la loro ora
+(`rispondiQuando`).
+LA TORTURA: tredici mutazioni, una riga alla volta. Dodici uccise al
+primo giro e UNA VIVA — il criterio dello `status`, che nessuna prova
+esercitava DA SOLO: ogni scena arrivava all'`add-invoice` con la riga
+già nel dopo-rilascio, e il ripiego rispondeva per lui (la lezione «due
+difese sullo stesso caso, e quella che nomini non la prova nessuno»).
+Aggiunto il dispositivo fermo a «euro inviati»: tredici su tredici.
+
+**QUEL CHE RESTA DA GUARDARE.** La prova dal vivo sullo scambio
+`3fcdb207` (è il motivo del cantiere). `pagamento_ritentato` offre
+ancora «Chiedi di annullare» e «C'è un problema», che mostrod in
+`settled-hold-invoice` rifiuta: innocuo, ma è una bugia piccola, e ha
+una prova che inchioda la lista — cantiere suo. E la patch 0006 va
+compilata sul nodo.
