@@ -43648,6 +43648,24 @@ def prove_velo_p2p():
           "'Sto avvisando che hai pagato…'" in mini
           and "'Sto liberando i sats…'" in mini)
 
+    # --- 2b) LA PROMESSA NON SI BUTTA VIA ---------------------------
+    # ⚠️ IL DIFETTO CHE HA APERTO IL SECONDO GIRO (17 set 2026, visto
+    # dal vivo da Andrea): `eseguiConferma` alza un velo suo, ASPETTA
+    # `poi()` e nel `finally` lo rimette giu'. I sei `poi` del P2P
+    # avevano il corpo a BLOCCO e nessun `return`, quindi tornavano
+    # `undefined`: l'attesa finiva al microtask dopo e il velo si
+    # spegneva mentre il gesto era ancora in volo. Da fuori: premi e
+    # non succede niente. Il velo c'era e il verbo era giusto, e non
+    # si vedeva lo stesso — nessuna prova sul solo gesto poteva dirlo.
+    GESTI_LENTI = ("inviaAnnulloP2P", "inviaDisputaP2P",
+                   "mossaOrdineP2P", "inviaNuovoOrdineP2P",
+                   "votaP2P", "inviaIncassoP2P")
+    _sordi = []
+    for _corpo in re.findall(r"poi: \(\) => \{(.*?)\}", mini, re.S):
+        if any(g in _corpo for g in GESTI_LENTI) and "return" not in _corpo:
+            _sordi.append(" ".join(_corpo.split())[:64])
+    prova("nessun `poi` butta via la promessa del gesto", [], _sordi)
+
     # --- 3) IL BARATTOLINO TORNA IL BARATTOLINO ---------------------
     # `attesaRitardata` VESTE il velo con una classe e alla chiusura
     # non la toglie: bastava una lettura del libro P2P perche' da li'
@@ -43679,14 +43697,18 @@ def prove_velo_p2p():
             "function attesaP2P(testo, btn){",
             "function ragioneGestoP2P(e){",
             "async function mossaOrdineP2P(id, azione, fatto, sto){",
-            "async function inviaAnnulloP2P(modo){"))
+            "async function inviaAnnulloP2P(modo){",
+            "async function eseguiConferma(btn){",
+            "function annullaScambioP2P(){"))
     _npart = re.search(r"const P2P_NON_PARTITO = '[^']*';", mini).group(0)
     # `pezzo_js` porta gia' la riga di APERTURA nel pezzo: rimetterla
     # davanti la scrive due volte, e il banco muore al parse
     _tabella = _tab + "\n};"
     _banco = (
         "const reg = [], toasts = [];\n"
+        "const nulla = {classList: {add(){}, remove(){}}};\n"
         "const finti = {attesaTesto: {textContent: ''},\n"
+        "  confermaSheet: nulla, sheetBg: nulla,\n"
         "  attesaOverlay: {classList: {\n"
         "    add: c => reg.push('+' + c),\n"
         "    remove: c => reg.push('-' + c)}}};\n"
@@ -43698,6 +43720,16 @@ def prove_velo_p2p():
         "function scriviOrdineP2P(o){ riga = o; }\n"
         "let render = 0; function renderOrdineP2P(){ render++; }\n"
         "function provvisorioP2P(){ return false; }\n"
+        "function haptic(){}\n"
+        "function fmtEur(n){ return String(n); }\n"
+        "const P2P_ANNULLA_SUBITO = ['pubblicato'];\n"
+        "let confermaAzione = null;\n"
+        # `chiediConferma` vero tocca sei id del foglio: al banco
+        # basta il suo MESTIERE — mettere da parte l'azione —
+        # perche' quel che si prova e' `eseguiConferma`, che e'
+        # dove stava il difetto.
+        "function chiediConferma(c){ confermaAzione = c.poi || null; }\n"
+        "const document = {querySelector: () => null};\n"
         "let risposta = null;\n"
         "async function chiamataOrdineP2P(){ if (risposta) throw risposta;\n"
         "  return {ok: true}; }\n"
@@ -43724,6 +43756,32 @@ def prove_velo_p2p():
              "        toast: toasts.join('|')};\n"
              "    }\n"
              "  }\n"
+             "  // ---- E IL GIRO CHE PARTE DAL DITO ----\n"
+             "  // Il primo banco faceva girare il GESTO da solo, e il\n"
+             "  // difetto stava nel PERCORSO: `eseguiConferma` aspetta\n"
+             "  // `poi()` e nel finally rimette giu' il velo, quindi un\n"
+             "  // `poi` che non restituisce la promessa lo spegne mentre\n"
+             "  // il gesto e' ancora in volo. Qui il velo si guarda\n"
+             "  // MENTRE il coordinatore ci pensa, non alla fine.\n"
+             "  reg.length = 0; toasts.length = 0;\n"
+             "  riga = {id: 'ord1', errore: '', stato: 'pubblicato'};\n"
+             "  let sblocca; risposta = null;\n"
+             "  chiamataOrdineP2P = () => new Promise(r => { sblocca = r; });\n"
+             "  annullaScambioP2P();\n"
+             "  const inVolo = eseguiConferma({innerHTML: 'Sì, ritira',\n"
+             "                                 disabled: false});\n"
+             "  await new Promise(r => setTimeout(r, 30));\n"
+             "  const acceso = () => reg.filter(x => x === '+on').length >\n"
+             "                       reg.filter(x => x === '-on').length;\n"
+             "  esito['dal dito/mentre aspetta'] = {velo: reg.join(' '),\n"
+             "    acceso: acceso(),\n"
+             "    detto: finti.attesaTesto.textContent, toast: ''};\n"
+             "  sblocca({ok: 1});\n"
+             "  await inVolo;\n"
+             "  esito['dal dito/alla fine'] = {velo: reg.join(' '),\n"
+             "    acceso: acceso(),\n"
+             "    detto: finti.attesaTesto.textContent,\n"
+             "    toast: toasts.join('|')};\n"
              "  console.log(JSON.stringify(esito));\n"
              "})();")
     _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
@@ -43741,14 +43799,17 @@ def prove_velo_p2p():
     # i gesti P2P gli mettono addosso, `-on -anello` e' la chiusura
     # che rimette il velo com'era per il resto dell'app.
     VELO = "-anello +on +anello -on -anello"
+    _sei0 = {k: v for k, v in _out.items() if not k.startswith("dal dito")}
     prova("il velo si alza e si richiude su tutte e tre le uscite",
-          {k: VELO for k in _out},
-          {k: v.get("velo") for k, v in _out.items()})
+          {k: VELO for k in _sei0},
+          {k: v.get("velo") for k, v in _sei0.items()})
     # IL VERBO E' QUELLO DEL GESTO, in tutte e tre le uscite
+    # i SEI giri del gesto (il dito ha le sue due letture qui sotto)
+    _sei = {k: v for k, v in _out.items() if not k.startswith("dal dito")}
     prova("...e il verbo e' quello del gesto, sempre",
           {k: ("Sto ritirando l'ordine…" if k.endswith("ritira")
-               else "Sto liberando i sats…") for k in _out},
-          {k: v.get("detto") for k, v in _out.items()})
+               else "Sto liberando i sats…") for k in _sei},
+          {k: v.get("detto") for k, v in _sei.items()})
     # LE TRE USCITE DICONO TRE COSE DIVERSE: la conferma, la ragione
     # del no, e — quando il messaggio non e' nemmeno partito — la
     # frase onesta di casa, che ha una cura diversa (si riprova).
@@ -43760,6 +43821,24 @@ def prove_velo_p2p():
           [True, True],
           [("disponibile" in _out.get("rifiuto/ritira", {}).get("toast", "")),
            ("disponibile" in _out.get("rifiuto/release", {}).get("toast", ""))])
+    # ⚠️ LA RIGA CHE IL PRIMO GIRO NON AVEVA: il velo dev'essere ancora
+    # ACCESO mentre il coordinatore ci pensa. Col `poi` che buttava via
+    # la promessa qui compariva gia' il `-on` di `eseguiConferma`, e da
+    # fuori il gesto sembrava non fare niente.
+    prova("dal dito: il velo e' ancora acceso mentre si aspetta",
+          True, _out.get("dal dito/mentre aspetta", {}).get("acceso"))
+    # ...e l'anello ce l'ha addosso: e' il giro dei gesti P2P, non
+    # il barattolino di `eseguiConferma` rimasto sotto
+    prova("...vestito dell'anello", True,
+          str(_out.get("dal dito/mentre aspetta", {}).get("velo", ""))
+          .endswith("+anello"))
+    prova("...col verbo del gesto, gia' da li'",
+          "Sto ritirando l'ordine…",
+          _out.get("dal dito/mentre aspetta", {}).get("detto"))
+    prova("...e alla fine si chiude e conferma",
+          [False, "Ordine ritirato"],
+          [_out.get("dal dito/alla fine", {}).get("acceso"),
+           _out.get("dal dito/alla fine", {}).get("toast")])
     prova("il messaggio mai partito ha la sua frase, e non nomina la rete",
           [True, True, False],
           ["Il messaggio non è partito"

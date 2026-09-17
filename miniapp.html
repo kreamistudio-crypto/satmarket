@@ -42261,8 +42261,16 @@ function euroInviatiP2P(){
     titolo: 'Hai inviato gli euro?',
     corpo: 'Dillo solo dopo aver davvero mandato ' + fmtEur(o.euro) + ' € con il metodo concordato. Chi vende lo vedrà e libererà i sats.',
     etichetta: 'Sì, li ho inviati',
-    poi: () => { mossaOrdineP2P(o.id, 'fiat-sent', 'Fatto ✅',
-                                'Sto avvisando che hai pagato…'); }
+    /* ⚠️ LA PROMESSA SI RESTITUISCE, e non e' stile: `eseguiConferma`
+       ASPETTA `poi()` e nel suo `finally` rimette giu' il velo. Col
+       corpo a blocco e nessun `return` qui tornava `undefined`, quindi
+       l'attesa finiva al microtask dopo e il velo si spegneva mentre il
+       gesto era ancora in volo: da fuori, la pagina non faceva niente.
+       Visto dal vivo (17 set 2026), e nessun banco sul solo gesto
+       poteva vederlo — il difetto sta nel PERCORSO, fra la conferma e
+       il gesto. */
+    poi: () => mossaOrdineP2P(o.id, 'fiat-sent', 'Fatto ✅',
+                              'Sto avvisando che hai pagato…')
   });
 }
 function rilasciaP2P(){
@@ -42272,8 +42280,9 @@ function rilasciaP2P(){
     titolo: 'Liberi i sats?',
     corpo: 'Fallo solo se hai ricevuto ' + fmtEur(o.euro) + ' € davvero. I sats partono verso chi compra e non tornano indietro.',
     etichetta: 'Sì, libero i sats',
-    poi: () => { mossaOrdineP2P(o.id, 'release', 'Sats liberati ✅',
-                                'Sto liberando i sats…'); }
+    /* la promessa si restituisce: vedi la nota in `euroInviatiP2P` */
+    poi: () => mossaOrdineP2P(o.id, 'release', 'Sats liberati ✅',
+                              'Sto liberando i sats…')
   });
 }
 /* `sto` E' IL VERBO DEL VELO, e si passa sempre (17 set 2026, dal
@@ -43547,7 +43556,9 @@ async function inviaNuovoOrdineP2P(){
         + ' € e lo scambio di ' + fmt(interoP2P(campi.euro).n)
         + ' €. Chi compra pagherà al tabacchino l\'importo dell\'ordine Amazon. Pubblico lo stesso?',
       etichetta: 'Sì, pubblica',
-      poi: () => { p2pNuovoTabConfermato = true; inviaNuovoOrdineP2P(); }
+      /* la promessa si restituisce: vedi la nota in `euroInviatiP2P` */
+      poi: () => { p2pNuovoTabConfermato = true;
+                   return inviaNuovoOrdineP2P(); }
     });
     return;
   }
@@ -43669,7 +43680,8 @@ function annullaScambioP2P(){
       ? 'L\'ordine esce dal libro. Nessuno ha ancora scambiato niente con te.'
       : 'Lo scambio si annulla solo se anche l\'altra persona è d\'accordo. Se lo è, i sats tornano a chi li ha bloccati.',
     etichetta: subito ? 'Sì, ritira' : 'Sì, chiedilo',
-    poi: () => { inviaAnnulloP2P(subito ? 'ritira' : 'chiedi'); }
+    /* la promessa si restituisce: vedi la nota in `euroInviatiP2P` */
+    poi: () => inviaAnnulloP2P(subito ? 'ritira' : 'chiedi')
   });
 }
 function accettaAnnulloP2P(){
@@ -43680,7 +43692,8 @@ function accettaAnnulloP2P(){
     titolo: 'Accetti di annullare?',
     corpo: 'Lo scambio si chiude e i sats tornano a chi li aveva bloccati. Nessuno perde niente.',
     etichetta: 'Sì, annulliamo',
-    poi: () => { inviaAnnulloP2P('accetta'); }
+    /* la promessa si restituisce: vedi la nota in `euroInviatiP2P` */
+    poi: () => inviaAnnulloP2P('accetta')
   });
 }
 /* ⚠️ IL VERBO E' QUELLO DEL GESTO, e i gesti sono TRE mentre il
@@ -44502,7 +44515,8 @@ function apriDisputaP2P(){
       + 'A decidere è Barattolo, e le strade restano due: i sats vanno a chi compra o tornano a chi vende.\n\n'
       + 'Prima di aprirla, dai tempo all\'altra persona: quasi sempre è un ritardo. Se vi siete mandati un contatto, provate a sentirvi.',
     etichetta: 'Sì, apri la disputa',
-    poi: () => { inviaDisputaP2P(); }
+    /* la promessa si restituisce: vedi la nota in `euroInviatiP2P` */
+    poi: () => inviaDisputaP2P()
   });
 }
 async function inviaDisputaP2P(){
