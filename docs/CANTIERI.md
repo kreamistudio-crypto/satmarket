@@ -18502,3 +18502,109 @@ sbagliare. 3) Il `rate-user` mai confermato dal nodo (sopra). 4) E
 `n_recensori` conta le PERSONE: due voti dalla stessa persona — uno
 per un oggetto e uno per uno scambio — restano «1 persona», che è
 giusto e va saputo prima di leggere il numero.
+
+## I due messaggi della guardia, e la voce morta in dispensa (17 set 2026)
+
+Dal campo, e sono **due installazioni dell'app di Zapstore**: quella
+rodata funziona, quella scaricata oggi nel P2P dice «la libreria di
+sicurezza è incompleta o di una versione vecchia» e non parte.
+
+**LA DIAGNOSI STA IN TRE FATTI, e nessuno dei tre è l'APK.** 1) L'app è
+un **involucro** (TWA v1.3 del 22 lug 2026, `store.barattolo.app`, host
+`barattolo.store`, startUrl `/`): dentro non c'è codice web, quindi
+client, libreria e service worker arrivano da produzione, vivi, su
+tutt'e due le installazioni — la build vecchia non può essere la causa.
+2) La copia in produzione è quella giusta, verificato sul **blob di
+`origin/pronto`** e non sul file in cartella: i cinque export aggiunti a
+mano ci sono tutti, e il banco node li esercita a ogni CI. 3) Quel che
+la rodata ha IN PIÙ è la **dispensa a runtime**: al primo P2P riuscito
+il file è finito in `statica-{VERSIONE}` sotto la sua chiave timbrata
+(`c.put(r, fresca.clone())`), e da allora è servito **cache-first senza
+chiedere più niente alla rete**. Quell'installazione non può rompersi
+perché non sta guardando. Una fresca deve prendere il file in quel
+momento, e farlo girare col motore di quel dispositivo.
+
+**E LA GUARDIA DICEVA UNA COSA SOLA, che in un caso su due era falsa.**
+`PEZZI_NOSTR.filter(p => !NT || !NT[p])` mette insieme due guasti
+diversi: con `window.NostrTools` **assente** mancano tutti e 17 i nomi,
+e chi legge si sente dire «versione vecchia, svuota la cache» — cioè
+viene mandato a riparare una cache che non c'entra niente. È lo stesso
+difetto per cui questa guardia esiste, un gradino più in alto: **un
+messaggio che nomina una causa sbagliata chiude la domanda**, e un «non
+lo so» l'avrebbe tenuta aperta.
+
+**COSA SI È DECISO.** Due messaggi, scelti dal conto dei nomi
+(`mancano.length === PEZZI_NOSTR.length`): **«non è arrivata: controlla
+la rete e riprova»** quando il globale non c'è, **«copia incompleta:
+ricarica; se non basta svuota la cache»** quando c'è ed è spuntato. La
+frase sulla cache sta **solo nel secondo**, e non è cosmetica: fuori da
+Telegram il mazzo P2P vive nel `localStorage` di questa origine e non ha
+copia nel cloud (`cloudTelegram()` è null), quindi «svuota i dati del
+sito» si porta via un profilo nato là — il messaggio sbagliato qui non
+fa perdere tempo, fa perdere un profilo. E i nomi che mancano **escono
+dalla console**: la guardia li scrive in `nostrPezziMancanti` (tre
+stati: `null` mai chiesta, vuoto completa, elenco quali) e la diagnosi
+copiabile di Info P2P li porta come prima riga, che su un telefono la
+`console.warn` non la legge nessuno.
+
+**LA VOCE MORTA IN DISPENSA, ed è il difetto che nessuno stava
+cercando.** `/vendor/nostr.js` stava in `PRECACHE` — l'install atomico —
+ma da «la dispensa che rispetta la query» (9 set 2026) il match guarda
+l'URL INTERO: la voce **nuda** non ha più risposto alla richiesta
+timbrata della pagina, cioè si scaricavano 250 KB a ogni salto di
+`VERSIONE` per non servire nessuno. Le due liste facevano **due
+mestieri sotto lo stesso nome**: `PRECACHE` è quel che si scarica
+all'install, `IN_DISPENSA` è quali percorsi il ramo cache-first
+sorveglia. Il bundle esce dalla prima e resta nella seconda
+(`new Set([...PRECACHE, '/vendor/nostr.js'])`), e questa è la metà che
+a un'installazione fresca manca — la ragione per cui il P2P si rompe
+là e non qui.
+
+**LA STRADA SCARTATA: mettere l'URL TIMBRATA in `PRECACHE`.** Due
+ragioni, e la prima è strutturale: il gate del ramo cache-first gira su
+`url.pathname`, quindi una voce con la query farebbe cadere
+l'intercettazione **proprio per quel file** — si scaricherebbe
+all'install e poi non verrebbe mai servito. La seconda è che il numero
+di versione vivrebbe in due posti (`sw.js` e `miniapp.html`), che è il
+modo in cui un giorno divergono.
+
+**IL SALTO DI VERSIONE (v8→v9) NON È BUROCRAZIA**, e il prezzo si
+dichiara. La regola del file dice di alzarla quando l'elenco cambia;
+qui serve a qualcosa in più — svuotando le dispense vecchie è **l'unica
+leva che abbiamo** per buttare via una copia stantia rimasta appesa al
+timbro su un telefono che non possiamo toccare. In cambio
+l'installazione rodata perde il file appeso e lo richiede alla rete al
+primo P2P: se quel dispositivo è sano non cambia niente, e se non lo è
+adesso lo dice il messaggio giusto invece di quello sbagliato.
+
+**LE PROVE.** Le sentinelle dicono che le righe ci sono (i due versi
+del ternario, la memoria scritta PRIMA del giudizio, il messaggio
+assente che **non** nomina la cache, i tre stati nella diagnosi, il
+bundle fuori dall'addAll e dentro la dispensa, la `VERSIONE` salita); il
+**banco node fa girare `esigiBundleNostr` vera nei tre casi veri**:
+niente globale → «non è arrivata» con tutti e 17 i nomi in memoria;
+bundle DI CASA → non alza e la memoria resta vuota; bundle **DI SERIE**
+— fabbricato togliendo al nostro i cinque export aggiunti a mano, cioè
+esattamente la copia che una dispensa stantia servirebbe → «copia
+incompleta», e nomina quei cinque. Più il banco della diagnosi, che
+legge il terzo stato («mai chiesta») perché lì la guardia non gira. Il
+giro intero, sulla base rebasata sul cantiere delle recensioni: **11162 passate, 0 fallite**.
+
+**⚠️ E UNA ROSSA HA INSEGNATO LA SUA**: `pezzo_js` **non porta il
+terminatore**, quindi la funzione estratta arriva senza la graffa di
+chiusura — i banchi di sotto la rimettono con `fn()`, il mio primo giro
+no, e node è morto di `SyntaxError` in mezzo allo stack del loader,
+cioè dicendo tutto tranne la causa (lo `stderr[-400:]` mostrava solo la
+coda). Chi monta un banco nuovo usi `fn()`, o si ricordi il `+ "\n}"`.
+
+**COSA RESTA DA GUARDARE, e sta sul telefono.** Quale dei due messaggi
+esce su quell'installazione. Se «non è arrivata», la libreria non ci
+arriva o non ci **gira**: il bundle vuole ≈Chrome 80 (optional
+chaining, letterali BigInt, campi privati di classe) e l'APK dichiara
+minSdk 21, cioè può girare dove il motore è molto più vecchio del
+nostro. Se «copia incompleta», c'era una copia stantia appesa al timbro
+— e il salto a v9 l'ha già buttata. La diagnosi copiabile ora lo dice
+**senza cavo USB**, che era l'unico modo di leggere quella riga. E il
+P2P resta dietro `P2P_PROVA_IDS`: chi scarica l'app oggi non arriva a
+quel muro, ma la STESSA libreria serve il **login Nostr** e la modifica
+firmata degli annunci importati, che sono pubblici.

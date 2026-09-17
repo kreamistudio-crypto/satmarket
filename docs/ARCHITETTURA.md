@@ -21964,8 +21964,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   rilancia alza VERSIONE in sw.js: le icone sono in dispensa) +
   `sw.js` PRUDENTE servito dalla RADICE, sempre
   no-cache. Il SW: dispensa `statica-{VERSIONE}` con addAll atomico
-  (asset di casa + `/vendor/nostr.js` + `offline.html` + i tre font
-  del latino), NIENTE cache-first runtime — c'era per i font di
+  (asset di casa + `offline.html` + i tre font del latino),
+  NIENTE cache-first runtime di terze parti — c'era per i font di
   Google, ed è sparita con loro (ago 2026): da quando i font stanno in
   casa cadono nel ramo degli asset nostri, e `font-{VERSIONE}` e
   `fontDallaDispensa` non esistono più. Navigazioni
@@ -21975,7 +21975,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (cache HTTP propria), telegram.org (script che gestiscono l'auth),
   metodi non-GET. Niente skipWaiting: la versione nuova aspetta la
   visita successiva; REGOLA: chi cambia un file in PRECACHE alza
-  `VERSIONE`. VINCOLO DI FERRO: dentro la WebView di Telegram tutto
+  `VERSIONE`.
+  ⚠️ E LE DUE LISTE FANNO DUE MESTIERI (set 2026): `PRECACHE` è quel
+  che si scarica all'install — atomico, o tutto o niente — mentre
+  `IN_DISPENSA` dice quali PERCORSI il ramo cache-first sorveglia, e
+  `/vendor/nostr.js` sta SOLO nella seconda. Il perché è il timbro: la
+  pagina lo chiede con `?v=`, e da quando il match rispetta la query
+  («la dispensa che rispetta la query») la voce nuda non risponde più a
+  nessuno — si scaricava 250 KB a ogni salto di `VERSIONE` per non
+  servire mai. In dispensa entra al PRIMO USO vero, con la sua chiave
+  timbrata, e da lì è cache-first come gli altri. Chi le rifonde
+  riporta quei 250 KB nell'addAll atomico e, se ci mette l'URL
+  timbrata, spegne anche il gate — che gira su `url.pathname`. Vedi
+  Cantieri, «I due messaggi della guardia».
+  VINCOLO DI FERRO: dentro la WebView di Telegram tutto
   identico — il SW si registra solo con `!tg?.initData` (e protocollo
   http: la DEMO da file:// non esplode); la WebView ha comunque
   storage separato dal browser, niente unregister (sarebbe esso
@@ -24238,6 +24251,32 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   messaggio che dice la STRADA — «ricarica l'app; se non basta, svuota
   la cache» — invece di fallire mille righe dopo dentro una derivazione
   di chiavi, con un errore che la causa non la nomina.
+  E I MESSAGGI SONO DUE, NON UNO (set 2026, dal campo: su
+  un'installazione FRESCA il P2P diceva «versione vecchia» mentre la
+  libreria non era arrivata affatto). La guardia non legge NESSUNA
+  versione — guarda i NOMI — quindi «vecchia» è un'inferenza, e regge
+  in un caso su due. MANCANO TUTTI = il globale non c'è, cioè il file
+  non è arrivato o non è partito (un motore che non lo sa leggere, una
+  pagina che non è il nostro JS, un'esecuzione che alza a metà: in
+  tutti e tre `onload` scatta comunque, che l'`error` dello script è
+  solo per il fetch) → «non è arrivata: controlla la rete e riprova».
+  NE MANCANO ALCUNI = il globale c'è ed è spuntato, cioè è arrivata una
+  copia vecchia, e quella sta in una cache → «copia incompleta:
+  ricarica; se non basta svuota la cache». ⚠️ E SVUOTARE NON È GRATIS,
+  ed è perché quella frase sta solo nel secondo: fuori da Telegram il
+  mazzo P2P vive nel localStorage di questa origine e non ha copia nel
+  cloud (`cloudTelegram()` è null), quindi «svuota i dati del sito» si
+  porta via un profilo nato su quel dispositivo.
+  E IL NOME DEI PEZZI CHE MANCANO ESCE DALLA CONSOLE: la guardia lo
+  scrive in `nostrPezziMancanti` — tre stati, la lezione di
+  `cloudLeggiEsito`: `null` «mai chiesta», l'array vuoto «completa»,
+  l'elenco quali — e la DIAGNOSI copiabile di Info P2P lo porta come
+  PRIMA riga. Su un telefono la `console.warn` non la legge nessuno, ed
+  è l'unico dato che distingue le due cure. La riga della diagnosi le
+  distingue con lo STESSO conto del messaggio («NON ARRIVATA (mancano
+  tutti e 17 i pezzi)» contro «INCOMPLETA, mancano …»): fonderle in una
+  parola sola costringerebbe chi legge a contare i pezzi per sapere
+  quale dei due messaggi ha visto l'altro.
   STA IN TUTTI E DUE I RAMI, ed è la riga che si dimentica: senza
   quella del ramo corto (`if (window.NostrTools)`) un primo caricamento
   andato male resterebbe muto per tutte le volte dopo. E un bundle
