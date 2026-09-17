@@ -24135,6 +24135,23 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   nell'ordine in cui nascono. La prima passata di un processo non
   risuona i kind 14 sotto il segnalibro. Il 38385 resta «il primo che
   ce l'ha». Il verbale: CANTIERI, «Il primo che risponde non basta».
+  L'ASCOLTO P2P (17 set 2026): accanto al giro al minuto — che RESTA,
+  identico, come rete di sicurezza — un thread (`_ascolto_p2p_filo`)
+  tiene UNA connessione permanente allo specchio e chiede tutto quel
+  che firma il coordinatore (38383 e kind 14, nessuna trade key nel
+  filtro). Non giudica: porta gli eventi VIVI (dopo l'EOSE, autore
+  ricontrollato, mai il contenuto) in un mazzetto che aspetta
+  `P2P_MAZZETTO_S` (3 s) e sveglia l'orologio, che fa un LAMPO — gli
+  stessi due giri con `portati`, senza chiedere ai relay, libro prima
+  e kind 14 poi. Il lampo NON sposta i segnalibri (sono del giro) e la
+  prima passata di un processo e' sempre intera. La connessione si
+  prova ogni 45 s con un polso che pretende l'EOSE entro 10; caduta e
+  ripresa si dicono al cambio, lo stato a ogni passata; il guardiano
+  rifa' il filo morto o fermo (`_guardia_ascolto_p2p`). Il controllo
+  incrociato (`_ascolto_mancato_p2p`) scrive quando il giro trova un
+  evento che l'ascolto connesso non ha portato. Lo specchio copia i
+  kind 14 del coordinatore dal 17 set 2026 (`deploy/relay/router.conf`).
+  Il verbale: CANTIERI, «L'ascolto».
   IL DIARIO E LA DIAGNOSI: `diarioP2P` tiene in MEMORIA (mai disco,
   mai server) le ultime 150 righe di quel che il P2P ha fatto nella
   sessione — messaggi con ora ed esito, restore, ripresa, e il perché

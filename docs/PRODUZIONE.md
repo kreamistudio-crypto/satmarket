@@ -97,6 +97,37 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   Le righe gia' in tabella prendono lo stato alla PRIMA ripubblicazione
   del loro ordine, senza frase: l'orologio non ha visto il passaggio
   e non lo inventa.
+- L'ASCOLTO P2P E IL 14 SULLO SPECCHIO (17 set 2026). Nel journal del
+  VPS: `👂 Ascolto P2P: parte su …`, `👂 Ascolto P2P connesso a …`,
+  `👂 Ascolto P2P CADUTO (perche'): riprovo…` e `… connesso … dopo N
+  tentativi` AL CAMBIO; `⚡ P2P lampo N (dall'ascolto): …` a ogni
+  mazzetto; in coda alla riga della passata `ascolto — connesso da …,
+  N eventi vivi, polso Ns fa` oppure `GIU' da … (N tentativi): …`; e
+  `⚠️ Ascolto P2P: … l'ha trovato il giro al minuto e NON l'ascolto`
+  quando lo specchio non ha avuto un evento che i relay pubblici
+  avevano. ⚠️ Un polso piu' vecchio di un minuto con lo stato
+  «connesso» non deve esistere: il filo si dichiara caduto prima.
+  LA RIGA SUL RELAY (macchina del relay, `/opt/relay`), una volta:
+  `cd /opt/relay && cp router.conf router.conf.prima-del-14`, poi
+  `sed -i 's/"kinds": \[38383, 38385\]/"kinds": [38383, 38385, 14]/' router.conf`,
+  si guarda con `grep -n '"kinds"' router.conf` (una riga, tre kind,
+  UN autore), e `docker compose up -d --force-recreate specchio` — COL
+  NOME DEL SERVIZIO, che un `up -d` nudo ricrea anche il relay vivo.
+  Poi `docker compose logs --tail 20 specchio` (le tre connessioni ai
+  relay del coordinator, nessun errore di config). La copia nel repo
+  (`deploy/relay/router.conf`) e' gia' aggiornata, commenti compresi.
+  LA VERIFICA CHE I KIND 14 ARRIVANO, dopo il prossimo messaggio di
+  mostro (una presa, una pubblicazione):
+  `docker compose -f /opt/relay/compose.yml exec relay strfry scan '{"kinds":[14],"authors":["HEX"],"since":EPOCH}' | jq -r '[.created_at, .id[0:8], (.tags[]|select(.[0]=="p")|.[1][0:8])] | @tsv'`
+  (HEX = la chiave del coordinator, quella di `router.conf`; EPOCH =
+  `date -d '10 min ago' +%s`)
+  — righe = arrivano (mai il `content`: il filtro di jq non lo
+  stampa). E dal lato di chi legge, sul VPS: spariscono i «NON
+  l'ascolto» sui kind 14 e compaiono i lampi con `buste portate`.
+  PER TORNARE INDIETRO: `cp router.conf.prima-del-14 router.conf` e lo
+  stesso `up -d --force-recreate specchio`; i kind 14 gia' copiati
+  restano nel db finche' non si tolgono con `strfry delete` — e la
+  pagina «I tuoi dati» va riportata alla frase di prima.
 - COME SI LEGGE COSA HA FATTO IL COORDINATOR DI UNA RICHIESTA (15 set
   2026, dal silenzio sull'ordine di Alan). Tutto in sola lettura, e in
   ORDINE: prima si cerca la richiesta, poi la risposta, poi il perché.

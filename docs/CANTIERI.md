@@ -17859,3 +17859,128 @@ sera è la fee di oggi, ma il giorno che si gira la fee un relay
 indietro la direbbe vecchia per un'ora.
 5) IL SECONDO TEMPO — le notifiche istantanee sullo specchio — parte
 da qui, e ha una decisione davanti: lo specchio i kind 14 non li ha.
+
+## L'ascolto: le notifiche P2P istantanee, e la connessione che non muore zitta (17 set 2026)
+
+**DA DOVE SI PARTE.** Il primo tempo («Il primo che risponde non
+basta», qui sopra) è stato confermato dal campo lo stesso giorno: presa
+alle 11:59, alle 12:01 «avvisati 2» con `telegram ok` (messaggi 5031 e
+5032), arrivati su tutt'e due i telefoni. Restava la latenza: fino a
+sessanta secondi, più il giro. Andrea: una connessione permanente allo
+specchio, il giro al minuto come rete di sicurezza, «stesso guardiano e
+stesse righe nel journal: una connessione che muore in silenzio è il
+guasto di stamattina». Prima il disegno, poi il codice.
+
+**LA DECISIONE SUI KIND 14 (Andrea: «vada per la A»).** Lo specchio
+copiava i soli 38383 e 38385, quindi un ascolto lì avrebbe reso
+istantanee le sole frasi del libro. Tre strade: A) aggiungere il 14 al
+filtro di `router.conf` — sempre UN autore, sempre in discesa; B)
+ascoltare i relay pubblici direttamente; C) lasciare i kind 14 al giro
+al minuto. PRESA LA A: una riga, un relay solo da sorvegliare ed è il
+nostro, niente 503 e niente ban altrui sulla strada veloce. IL COSTO SI
+DICHIARA: sul nostro relay sta da oggi una copia delle BUSTE che il
+coordinatore manda a chi scambia. Sono cifrate e già pubbliche sui tre
+relay del coordinatore — si vede che una trade key ha ricevuto un
+messaggio e quando, mai cosa dice — ma la pagina «I tuoi dati» diceva
+«sul nostro non ne teniamo copia», e quella frase è cambiata NELLO
+STESSO PUSH, prima che la riga arrivi sul relay. La chat fra le due
+parti (kind 14 anche lei, ma firmata dalle trade key) dal filtro NON
+passa: l'autore resta uno.
+
+**IL DISEGNO, cinque regole.** Stanno in testa al blocco «L'ASCOLTO» di
+`server.py`; qui i perché.
+1) **L'ascolto non giudica niente.** Un thread (`_ascolto_p2p_filo`)
+tiene la connessione e porta gli eventi in un MAZZETTO; la sveglia fa
+partire un LAMPO dell'orologio, cioè gli STESSI due giri
+(`_giro_libro_p2p(portati)`, `_giro_p2p(portati)`) sugli eventi già in
+mano, senza chiedere a nessun relay. Un solo esecutore — l'orologio —
+quindi niente lucchetti e niente seconda strada che un giorno diverge.
+LA STRADA SCARTATA: far applicare gli eventi all'ascolto stesso. Due
+esecutori sugli stessi giudici, con degli `await` in mezzo.
+2) **Il mazzetto aspetta 3 secondi** (`P2P_MAZZETTO_S`): mostro manda
+il kind 14 nello stesso istante in cui ripubblica il 38383, in ordine
+qualunque. Raccolti insieme passa PRIMA il libro, che timbra il gate, e
+il campanello trova il gate chiuso: un momento, una notifica — la
+precisa. A banco il kind 14 arriva apposta per primo.
+3) **Solo il vivo.** Quel che arriva prima dell'EOSE si butta: il
+passato è del giro, che ha il segnalibro.
+4) **IL SEGNALIBRO È DEL GIRO, MAI DEL LAMPO**, ed è la riga che il
+disegno mostrato ad Andrea non aveva: l'avevo pensata al contrario
+(«stessi segnalibri») e scrivendo è uscito il buco. Dopo un riavvio la
+prima passata segna come «margine già visto» i kind 14 sotto il
+segnalibro; se un lampo lo avesse appena portato avanti, un messaggio
+MAI LETTO caduto nel fermo sarebbe stato assorbito in silenzio. Il
+lampo non tocca i segnalibri, la passata ritrova gli stessi eventi
+inerti (stato uguale, id già contati) e li sposta lei. Per la stessa
+ragione LA PRIMA DI UN PROCESSO È SEMPRE UNA PASSATA INTERA, anche con
+un mazzetto che aspetta.
+5) **La connessione che muore zitta.** Ogni 45 s una domandina (`REQ
+polso`, il 38385 con `limit 1`) e l'EOSE entro 10: un socket aperto a
+metà non risponde, si chiude e si riprova con l'attesa che cresce (5 s
+per caduta, tetto 60). Un relay che accetta e non dà MAI l'EOSE non
+passa per connesso. Il journal dice caduta e ripresa AL CAMBIO («CADUTO
+(perché)», «connesso … dopo N tentativi»), e la riga della passata
+porta lo stato ogni minuto (`ascolto — connesso da 3h, 12 eventi vivi,
+polso 20s fa` / `GIU' da 4m (3 tentativi): …`). Il guardiano guarda
+anche lui, col suo try: lo fa partire, lo rifà se il filo è morto, e se
+è FERMO (nessun segno da 180 s) gli alza la SUA `ferma` e lo abbandona
+— un thread non si uccide — facendone nascere un altro.
+E IL CONTROLLO INCROCIATO, per il guasto che il polso non vede
+(specchio vivo, router fermo): se il giro al minuto trova un evento
+nato ad ascolto connesso, più vecchio di 20 s, che l'ascolto non ha
+portato, lo scrive — una volta per evento. FINCHÉ LA RIGA DEL 14 NON È
+SUL RELAY QUESTA RIGA USCIRÀ A OGNI KIND 14, ed è giusto: è la verifica,
+dal lato di chi legge, che la A non è ancora in servizio. Il giorno che
+smette e compaiono i lampi, lo è.
+NESSUNA TRADE KEY NEL FILTRO: si chiede tutto quel che firma il
+coordinatore e a chi è indirizzato si guarda in tabella — una chiave
+nuova non chiede di ri-sottoscrivere niente, e il lampo di uno
+sconosciuto non suona a nessuno (il coordinatore è pubblico: capita).
+L'AUTORE SI RICONTROLLA nel filo: il filtro lo chiede al relay, ma da
+quella porta un 38383 fa partire «scambio concluso». La firma no, come
+non la verificano i lettori al minuto: a verbale.
+È UN THREAD perché `websocket-client` è sincrona: una libreria
+asincrona era una dipendenza pip in più sul VPS.
+I DUE ESTRATTORI (`_evento_libro_p2p`, `_evento_buste_p2p`) sono usciti
+dai lettori e li usano lettori e filo: un posto solo che guarda dentro
+un evento, e il contenuto non lo tocca.
+
+**PROVATO.** `prove_p2p_ascolto`, 60 prove: il FILO VERO contro un relay
+di cartone con copione — il passato buttato, l'evento di un altro
+autore rifiutato, la busta il cui contenuto non compare in niente di
+quel che si porta, il polso, la connessione che tace senza chiudersi
+(scoperta, detta UNA volta, chiusa), il rifiuto in mezzo, la ripresa
+«dopo 2 tentativi», il relay senza EOSE; la guardia (parte, non
+raddoppia, rifà il morto, abbandona il fermo, tace senza specchio); e
+l'OROLOGIO VERO coi due giri veri su sqlite: il kind 14 arrivato prima
+del suo 38383 → UNA notifica, la precisa, sotto i 0,6 s con mazzetto a
+0,08 e giro a 1 s; segnalibri fermi dopo il lampo e spostati dalla
+passata; nessuna rinotifica; una raffica di 25 lampi che non affama la
+passata; il controllo incrociato nei suoi cinque casi. Sedici
+mutazioni, sedici uccise. Tre giri di fila identici (i tempi del banco
+sono larghi apposta).
+E DAL VIVO, in sola lettura, il filo vero contro lo specchio VERO per
+sei minuti: connesso, polso regolare, uscita pulita — e la risposta
+alla domanda che reggeva tutto il disegno: **strfry CONSEGNA ai
+sottoscritti quel che il router scrive nel db** (un 38385 nato alle
+12:19:43 è arrivato alle 12:19:50: sette secondi da mostro a noi,
+passando per Tor, un relay pubblico e il router).
+LA LEZIONE DEL BANCO: due rosse erano sue — guardava il journal 0,15 s
+dopo la notifica, ma il lampo finisce DOPO (il campanello gira per
+secondo, con lo 0,2 s di cortesia fra gli invii). Si aspetta la riga,
+non un tempo.
+
+**RESTA DA GUARDARE.**
+1) La riga sul relay la mette Andrea: PRODUZIONE, «L'ASCOLTO P2P E IL
+14 SULLO SPECCHIO», coi comandi e le due verifiche.
+2) Il primo scambio dopo: `⚡ P2P lampo N` entro pochi secondi dalla
+presa, UNA notifica a testa, e nessun «NON l'ascolto».
+3) Lo specchio vive di fatto del solo nos.lol (relay.mostro.network
+fermo alla sera del 16, damus in 503): se tace nos.lol l'ascolto resta
+connesso e muto, il controllo incrociato tace anche lui (nemmeno il
+giro trova niente) e il guasto è a monte — la voce aperta sul nodo.
+4) Un mazzetto arrivato DURANTE una passata intera aspetta che finisca
+(fino al tetto di un relay lento, 20 s): quella passata di solito
+l'evento lo trova da sé.
+5) La dedup del lampo vive in memoria: un riavvio fra il lampo e la
+passata può dare uno squillo di troppo, mai uno in meno.
