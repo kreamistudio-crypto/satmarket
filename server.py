@@ -14833,6 +14833,17 @@ def relay_chiavi(request: Request):
     il server sta firmando ADESSO. Il giorno che la nsec cambia, la
     lista resta giusta da se'.
 
+    E SUBITO DOPO C'E' IL COORDINATOR (17 set 2026), che fino a ieri
+    non doveva starci: il ramo era stato dichiarato decaduto perche'
+    lo specchio lo riempiva il ROUTER, un altro processo che apre
+    l'LMDB e ci scrive dentro scavalcando il plugin. Da quando
+    mostrod scrive DIRETTAMENTE su relay.barattolo.store, la sua
+    websocket passa dall'ingester come quella di chiunque — cioe' dal
+    plugin — e senza questa riga si prenderebbe «restricted: solo
+    Barattolo e i suoi venditori». Anche lei viva e non scolpita: si
+    ricava da MOSTRO_NPUB del config, quindi il giorno che il
+    coordinator cambia chiave la lista resta giusta da se'.
+
     IL TOKEN E' UNA PORTA E NON UN'AUTENTICAZIONE: 404 quando la leva
     e' spenta — come il campanello del webhook, e per la stessa
     ragione: una rotta che non deve esistere non dice nemmeno di
@@ -14856,12 +14867,21 @@ def relay_chiavi(request: Request):
         "SELECT COALESCE(NULLIF(npub_accesso,''), npub) AS chiave "
         f"FROM utenti WHERE {SQL_CHIAVE_PROVATA}").fetchall()
     con.close()
-    # La nostra per prima, poi le loro. dict.fromkeys tiene l'ordine e
-    # toglie i doppioni: la stessa chiave puo' stare in due righe
-    # (npub_accesso di una e badge dell'altra), e al relay una lista
-    # con dei doppioni non fa danno ma non dice la verita' su quanti
-    # sono.
+    # La nostra per prima, poi il coordinator, poi le loro.
+    # dict.fromkeys tiene l'ordine e toglie i doppioni: la stessa
+    # chiave puo' stare in due righe (npub_accesso di una e badge
+    # dell'altra), e al relay una lista con dei doppioni non fa danno
+    # ma non dice la verita' su quanti sono.
     chiavi = [_NOSTR[1].lower()] if _NOSTR else []
+    if MOSTRO_HEX:
+        # IL CANCELLO E' LA CHIAVE, NON P2P_ATTIVO, ed e' una scelta:
+        # quella leva dice se il MERCATINO mostra lo scambio, non se
+        # il coordinator pubblica — lui il libro lo firma comunque, e
+        # spegnerla per un'ora chiuderebbe mostrod fuori dallo
+        # specchio per i dieci minuti buoni del timer successivo,
+        # senza che niente lo dica. Vuota o storta (npub non
+        # bech32) = riga assente: _mostro_hex e' gia' fail-closed.
+        chiavi.append(MOSTRO_HEX.lower())
     for r in righe_db:
         try:
             chiavi.append(npub_to_hex(r["chiave"]).lower())

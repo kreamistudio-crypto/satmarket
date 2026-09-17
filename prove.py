@@ -63402,6 +63402,13 @@ def prove_relay_chiavi():
     # con cui il server firma ADESSO.
     prova("la piattaforma si legge da _NOSTR e non da una copia",
           True, "_NOSTR" in rotta)
+    # E il coordinator uguale (17 set 2026): da MOSTRO_HEX, che nasce
+    # da MOSTRO_NPUB del config. Una hex scolpita qui dentro sarebbe
+    # la stessa fotografia del plugin, e il giorno del cambio chiave
+    # il relay direbbe «restricted» proprio a chi firma il libro.
+    prova("il coordinator si legge da MOSTRO_HEX e non e' scolpito",
+          True, "MOSTRO_HEX" in rotta
+                and not re.search(r"[0-9a-f]{64}", rotta))
     prova("la lista non si cacha da nessuna parte",
           True, "no-store" in rotta)
 
@@ -63438,6 +63445,7 @@ def prove_relay_chiavi():
     B = "bb" * 32          # badge VERIFICATO
     C = "cc" * 32          # badge NON verificato: resta fuori
     D = "dd" * 32          # la stessa chiave in due righe diverse
+    M = "11" * 32          # il coordinator: non e' un utente di nessuno
 
     amb0 = {}
     exec(_costante("CHARSET_BECH32"), amb0)
@@ -63471,10 +63479,10 @@ def prove_relay_chiavi():
         def close(self):
             pass
 
-    def chiama(token, header, nostr=("finta", P.upper())):
+    def chiama(token, header, nostr=("finta", P.upper()), mostro=M):
         amb = {"HTTPException": _H, "Response": _Resp, "Request": object,
                "hmac": hmac, "db": lambda: Con(), "_NOSTR": nostr,
-               "RELAY_CHIAVI_TOKEN": token}
+               "RELAY_CHIAVI_TOKEN": token, "MOSTRO_HEX": mostro}
         exec(_costante("CHARSET_BECH32"), amb)
         exec(_costante("SQL_CHIAVE_PROVATA", "\n\n"), amb)
         exec(pezzo("npub_to_hex"), amb)
@@ -63506,10 +63514,11 @@ def prove_relay_chiavi():
     chiavi = righe[:-1]
 
     prova("la piattaforma esce per prima e minuscola", P, chiavi[0])
+    prova("il coordinator esce subito dopo", M, chiavi[1])
     prova("la lista e' quella attesa, senza doppioni",
-          [P, A, B, D], chiavi)
+          [P, M, A, B, D], chiavi)
     prova("il badge NON verificato resta fuori", False, C in chiavi)
-    prova("la npub illeggibile non ferma le altre", 4, len(chiavi))
+    prova("la npub illeggibile non ferma le altre", 5, len(chiavi))
     prova("una chiave per riga, niente spazi",
           True, all(len(k) == 64 and k == k.strip() for k in chiavi))
     prova("il testo non si cacha", "no-store",
@@ -63519,8 +63528,25 @@ def prove_relay_chiavi():
     # Il relay non e' un pezzo della firma: se la chiave della
     # piattaforma non e' configurata, i venditori ci scrivono uguale.
     r = chiama("segreto-vero", "Bearer segreto-vero", nostr=None)
-    prova("senza nsec restano i soli venditori",
-          [A, B, D], r.corpo.split("\n")[:-1])
+    prova("senza nsec restano coordinator e venditori",
+          [M, A, B, D], r.corpo.split("\n")[:-1])
+
+    # --- il coordinator (17 set 2026) ------------------------------
+    # Senza MOSTRO_NPUB nel config e' il mondo di ieri, byte per byte:
+    # la riga non c'e' e non c'e' nemmeno una riga vuota al posto suo,
+    # che `aggiorna-chiavi.sh` la scarterebbe INTERA («risposta non
+    # valida: tengo la lista di ieri») lasciando fuori anche i
+    # venditori.
+    r = chiama("segreto-vero", "Bearer segreto-vero", mostro="")
+    prova("senza coordinator la lista e' quella di ieri",
+          [P, A, B, D], r.corpo.split("\n")[:-1])
+
+    # Una chiave che e' GIA' nella lista non esce due volte, e esce
+    # minuscola: il plugin del relay confronta stringhe, e due scritture
+    # della stessa chiave sono due chiavi diverse per lui.
+    r = chiama("segreto-vero", "Bearer segreto-vero", mostro=D.upper())
+    prova("un coordinator gia' in lista non si sdoppia",
+          [P, D, A, B], r.corpo.split("\n")[:-1])
 
 
 def prove_esclusioni_relay():
