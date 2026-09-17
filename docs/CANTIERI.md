@@ -19150,3 +19150,58 @@ l'importo dell'ordine, a prezzo di mercato il coordinatore dice solo il
 tuo lato» — cioè conferma la guardia da un'altra strada.
 La riproduzione è stata fatta nell'app vera, col foglio aperto due
 volte: senza la cifra e poi con la cifra ritrovata.
+
+## Il tappo che non manca mai: l'anello del libro non resta vuoto (17 set 2026)
+
+IL DIFETTO, VISTO DAL CAMPO DA ANDREA: durante un riavvio del servizio
+le facce del libro tacciono per qualche secondo (`/api/p2p/facce` non
+risponde, o la risposta è in viaggio), e le card mostravano il solo
+anello del tempo con **il buco vuoto in mezzo**. Il primo sospetto era
+«chi non ha la foto profilo su Telegram resta senza segnaposto», ed è
+stato smontato riproducendo: server della copia, identità di collaudo
+222 senza avatar, e l'iniziale sul tondo scuro **usciva** — la scala di
+ripieghi di `avatarImg` (foto → iniziale) c'era già ed era giusta. Il
+vuoto vero stava un gradino sopra: quando `p2pFacce[o.id]` non è ancora
+arrivato, la card non disegnava proprio il volto.
+
+LA DECISIONE CHE SI ROVESCIA, e va detto perché era stata presa: «I
+volti sul libro» aveva scelto che *senza volto resta l'anello piccolo
+di ieri* — pensando alla vetrina anonima e agli ordini di chi Barattolo
+non ce l'ha, dove il volto non arriverà mai e l'anello nudo diceva il
+tempo lo stesso. Ma la stessa strada la percorre anche la finestra in
+cui il volto **sta per arrivare**, e lì il buco si legge come un
+difetto: la regola nuova di Andrea è **mai un anello vuoto** — dentro
+c'è sempre il tappo del mercatino: foto se c'è, iniziale se si sa il
+nome, «?» finché non si sa niente.
+
+COM'È FATTO, ed è meno codice di prima: in `anelloScadenzaP2P` il
+volto che manca diventa un **vuoto-oggetto** (`p2pFacce[o.id] || {}`),
+così le letture di sempre (avatar, nome, negozio) reggono senza un
+ramo per caso — `avatarImg('')` non scrive l'`<img>`, `(f.nome||'?')`
+mette il «?», e senza `negozio` il volto resta senza porta, come
+prima. Con il volto sempre disegnato la variante piccola dell'anello
+(22px) e la classe che la distingueva **se ne sono andate**: l'anello
+è sempre la cornice da 44px e la testa della card lascia sempre i suoi
+52px. Una variante che non può più presentarsi non si lascia nel CSS a
+fare la polvere.
+
+LA STRADA SCARTATA: distinguere «in attesa» da «non arriverà mai» (per
+esempio tappo solo durante il caricamento, anello nudo in vetrina).
+Sono due stati che il client spesso **non sa distinguere** — un server
+muto e un utente senza account producono lo stesso silenzio — e due
+vestiti su un fatto indistinguibile sarebbero una bugia a metà. Il «?»
+dice il vero in tutti e due i casi: «non si sa chi è».
+
+PROVATO: dal vivo sulla copia (server vero, rotta vera, DB seminato)
+nei tre casi — faccia mai arrivata → tappo col «?», utente senza foto
+Telegram → iniziale sul tondo, utente con foto → la foto — in tema
+chiaro e scuro. In `prove.py` il banco delle card ora pretende il
+tappo col «?» sulla card senza volto, l'iniziale senza `<img>` per chi
+non ha foto, e una sentinella conta **zero** occorrenze della classe
+morta. Il commento della rotta `/api/p2p/facce` sulla vetrina anonima
+è stato emendato, che diceva ancora «card senza volto» e basta.
+
+RESTA DA GUARDARE: niente. Il riquadro «Chi ha pubblicato quest'ordine»
+del dettaglio resta com'è — lì senza volto sparisce la sezione intera,
+che è un altro mestiere: non un buco in una cornice, ma un riquadro che
+senza dati non ha niente da dire.
