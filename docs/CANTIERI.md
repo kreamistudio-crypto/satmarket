@@ -18689,3 +18689,48 @@ se n'è andato), e la quota di chi legge ha un giudice solo.
 lo gira sia il banco del dettaglio sia quello del motore, e il secondo
 è esploso su `mezzaCommissioneP2P is not defined` — la trappola dei DUE
 RITAGLI, trovata dal giro intero e non dalle prove del cantiere.
+E POI L'INTERRUTTORE È ARRIVATO (17 set 2026, sì di Andrea con i
+paletti: «si chiama *Fatti riconoscere negli scambi*, sta in 🔔 Avvisi,
+è SPENTO di default, e sotto ha la riga che dice cosa comporta»).
+È la seconda metà del punto 5 qui sopra: la proposta era lasciata a
+lui, e lui l'ha presa — con le parole già scritte, che sono finite nel
+client alla lettera.
+COSA APRE: la presa di chi entra da Nostr viene annotata, quindi
+l'altra parte vede il suo profilo e le due possono recensirsi. Cosa
+resta com'era a spento: invisibile, e su quegli scambi recensioni non
+ce ne sono — in nessuno dei due versi, nemmeno da parte sua, ed è la
+metà della frase che una riga «dice il beneficio» avrebbe taciuto.
+CHI ENTRA DA TELEGRAM NON LO VEDE NEMMENO, ed è la riga che tiene
+onesto l'interruttore: per lui la presa si annota dal 16 set, e un
+interruttore che non cambia niente è un interruttore che mente. La
+rotta risponde **409** a chi lo chiedesse comunque — accettare un
+«spegni» che non spegne sarebbe una promessa che non manteniamo.
+⚠️ IL DEFAULT È ROVESCIATO rispetto al fratello degli avvisi, e il
+perché va scritto: là il silenzio toglie un servizio che uno si
+aspetta (quindi acceso di serie, e senza riga in `utenti` vale
+acceso), qui il silenzio PROTEGGE — quindi spento di serie e
+FAIL-CLOSED, che un default acceso regalerebbe un'identità che nessuno
+ha chiesto di dare.
+⚠️ E GUARDA SOLO IL FUTURO, in tutt'e due i versi. Spegnendolo le
+prese già annotate restano: sono scambi in corso — l'altra parte
+aspetta le sue frasi — o chiusi con una recensione magari già
+scritta, e una recensione non si ritira con una leva (a cancellare il
+pregresso c'è «dimentica il profilo», il gesto che esiste per quello,
+e il toast dello spegnimento lo dice). Accendendolo, uno scambio già
+CHIUSO non si recupera: quel posto a cose fatte non si prende più, ed
+è la stessa guardia che questo cantiere aveva messo contro chi si
+intestava lo scambio di un altro. Il collaudo cammina su tutt'e due.
+LA LEZIONE DEL BANCO, che vale oltre questo giro: il caso nuovo l'avevo
+messo DOPO la fusione, e falliva — la fusione porta via la metà Nostr
+da `utenti`, quindi l'interruttore non si accendeva e il giudice
+diceva «spento» per la ragione sbagliata. **Il gesto distruttivo va
+ULTIMO in un collaudo che cammina**, e a dirlo non è stato un
+ragionamento: è stata una riga di DEBUG sullo stato vero, dopo due
+tentativi di indovinare.
+I NUMERI: `prove.py` **11.209 passate, 0 fallite** (+25 righe nella
+voce delle recensioni: il giudice sui suoi cinque casi, il default a
+zero, il cancello che gli chiede, la rotta col 409, la riga del
+cassetto che compare solo a chi serve e dice i due versi, lo stato che
+arriva dal server col verso rovesciato, e le due righe di «I tuoi
+dati» che prima lo negavano); `collaudo_recensione_p2p.py` **55
+verdi**, col caso 10 che è il giro intero dell'interruttore.

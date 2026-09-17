@@ -24424,10 +24424,39 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   le stesse due ragioni dei gemelli del mercatino: sarebbero auto-voti,
   e due righe sullo stesso scambio collidono sull'indice parziale
   PROPRIO durante la migrazione — cioè farebbero fallire la fusione.
-  IL COLLAUDO ESEGUIBILE è `collaudo_recensione_p2p.py` (41 verdi): il
-  giro vero sui dieci casi, dalla coppia di recensioni alla media
+  ⚠️ «FATTI RICONOSCERE NEGLI SCAMBI» (17 set 2026, decisione di
+  Andrea): l'interruttore che apre le recensioni a chi entra da NOSTR.
+  Sta nel cassetto «🔔 Avvisi», è SPENTO di serie, e la riga sotto dice
+  cosa comporta nei due versi — «se lo accendi, quando prendi un ordine
+  l'altra parte vede il tuo profilo e potete recensirvi; se resta
+  spento, resti invisibile e su quegli scambi non ci sono recensioni».
+  PERCHÉ SERVIVA: la presa di chi entra da Nostr non si annota (16 set,
+  «quell'ingresso esiste per chi non vuole lasciare tracce»), e senza
+  quell'annotazione lo scambio non ha un destinatario — quindi su
+  quegli scambi non si recensiva in NESSUNO dei due versi, nemmeno da
+  parte sua. Adesso lo decide lui.
+  IL GIUDICE È UNO, `_p2p_riconosciuto(con, tg_id)`: chi entra da
+  TELEGRAM è riconosciuto da sempre e l'interruttore non lo vede
+  nemmeno (la sua presa si annota dal 16 set, e un interruttore che non
+  cambia niente è un interruttore che mente — la rotta gli risponde
+  409); chi entra da Nostr parte spento. FAIL-CLOSED al contrario del
+  fratello `_avvisi_p2p_accesi`: senza riga in `utenti` vale SPENTO,
+  perché qui il silenzio protegge e un default acceso regalerebbe
+  un'identità che nessuno ha chiesto di dare (`riconosci_p2p INTEGER
+  DEFAULT 0`, e lo zero è il punto).
+  ⚠️ GUARDA SOLO IL FUTURO, e va detto perché sembra il contrario:
+  spegnerlo NON cancella le prese già annotate — sono scambi in corso
+  (l'altra parte aspetta le sue frasi) o chiusi con una recensione
+  magari già scritta, e una recensione non si ritira con una leva. A
+  cancellare il pregresso c'è «dimentica il profilo». E per la stessa
+  ragione accenderlo non recupera uno scambio già chiuso: quel posto,
+  a cose fatte, non si prende più (è la guardia del posto di chi ha
+  preso, qui sopra).
+  IL COLLAUDO ESEGUIBILE è `collaudo_recensione_p2p.py` (55 verdi): il
+  giro vero sugli undici casi, dalla coppia di recensioni alla media
   unica, dal doppione allo scambio aperto, dall'altra parte senza
-  profilo alla fusione.
+  profilo all'interruttore che si accende e si spegne, e la fusione
+  per ultima — che porta via la metà Nostr da `utenti`.
 
 - LA TESTATA DEL LIBRO RESTA IN ALTO (set 2026): tab, logo e pillola
   del filtro stanno in `.p2p-sticky`, un blocco `position:sticky`
