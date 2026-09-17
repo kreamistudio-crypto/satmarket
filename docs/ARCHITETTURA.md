@@ -25087,9 +25087,15 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Barattolo» del conto (`contoDettP2P`) e la riga sotto l'importo del
   foglio «Pubblica»; esce testo già all'italiana e senza il segno di
   percento, che in un posto sta dentro un `<b>` e nell'altro no.
-  LA RIGA SOTTO L'IMPORTO è `rigaTettoFeeP2P()`, e sta fra il riquadro
-  dell'importo e quello dei metodi: «Al momento si accettano ordini
-  fino a N sats — la commissione di Barattolo è dell'1% per parte».
+  LA RIGA SOTTO L'IMPORTO è `rigaTettoFeeP2P()`: «Al momento si
+  accettano ordini fino a N sats — la commissione di Barattolo è
+  dell'1% per parte». Vive dentro `riquadroPrimaP2P()`, una scatola
+  come le altre del foglio (`sezioneNuovoP2P`, senza icona, titolo
+  «Prima di pubblicare») che sta fra il riquadro dell'importo e quello
+  dei metodi, e che porta anche l'avviso «appena qualcuno lo prende vi
+  vedete» — salito lì dal fondo del foglio, che ora sotto le scatole
+  ha solo il bottone. La scatola c'è SEMPRE: senza 38385 cade la riga
+  dei numeri e resta l'avviso.
   Prima erano due righe lunghe in fondo al foglio, e la percentuale
   era quella INTERA — cioè il doppio di quel che paga chi legge. Tetto
   da `maxSats` del 38385, percentuale dalla metà della fee viva: senza

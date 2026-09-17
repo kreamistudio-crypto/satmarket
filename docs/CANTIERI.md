@@ -18689,6 +18689,45 @@ se n'è andato), e la quota di chi legge ha un giudice solo.
 lo gira sia il banco del dettaglio sia quello del motore, e il secondo
 è esploso su `mezzaCommissioneP2P is not defined` — la trappola dei DUE
 RITAGLI, trovata dal giro intero e non dalle prove del cantiere.
+**EMENDATO LA SERA STESSA, e sono tre ritocchi che vanno insieme.**
+
+**1) LA RIGA DIVENTA UN RIQUADRO.** Restava una riga grigia sciolta in
+mezzo a cinque scatole, e una riga sciolta si legge come uno scarto del
+montaggio invece che come una cosa che qualcuno ha voluto dire. Adesso
+sta in una scatola sua — `riquadroPrimaP2P`, che è `sezioneNuovoP2P`
+come tutte le altre: stesso fondo, stessi angoli, stesso respiro, zero
+CSS nuovo — col titolo **«Prima di pubblicare»** e **senza icona**,
+come il Premio: un cerchio tondo qui vorrebbe un glifo nuovo e una
+tinta nuova per dire quel che il titolo dice già. I numeri restano vivi
+come prima: `rigaTettoFeeP2P` non è cambiata di una riga, è solo
+finita dentro.
+
+**2) E 3) IL FONDO DEL FOGLIO RESTA PULITO:** sotto le scatole solo il
+bottone che pubblica. Se ne vanno le due righe sciolte che stavano lì —
+«Finché nessuno lo prende puoi ritirarlo quando vuoi. Gli euro
+viaggiano fra voi due, fuori da qui.» e l'avviso delle parti che si
+vedono. La prima era una rassicurazione su una cosa che il foglio non
+sta chiedendo: si ritira dalla **pagina dello scambio**, e lo dice lì,
+con i giorni che restano. Una riga grigia sopra un bottone arancione è
+quel che si legge per ultimo e si ricorda per primo, e nessuna delle
+due meritava quel posto.
+
+⚠️ **E L'AVVISO CHE LE PARTI SI VEDONO NON SI È PERSO, è SALITO nel
+riquadro** — è la cosa che Andrea ha chiesto di non lasciar cadere, e
+la ragione per cui non poteva semplicemente sparire sta nel cantiere
+di stamattina: *dirlo dopo sarebbe dirlo a cose fatte*, cioè trovarsi
+il profilo esposto senza averlo saputo. Le due alternative erano
+accanto al bottone o dentro la scatola. **Accanto al bottone sarebbe
+tornata una riga sciolta**, cioè esattamente la cosa che questi tre
+ritocchi tolgono; nella scatola sta col suo simile — l'altra cosa che
+si sa prima del gesto — e soprattutto sta PRIMA, che è l'unico
+requisito vero.
+
+**LA SCATOLA C'È SEMPRE**, anche senza il 38385: la riga dei numeri
+cade da sola e resta l'avviso, che è vero comunque. Un riquadro che
+sparisse col silenzio del coordinatore porterebbe via anche quello — e
+c'è una prova che lo gira con `p2pInfo` a `null`.
+
 E POI L'INTERRUTTORE È ARRIVATO (17 set 2026, sì di Andrea con i
 paletti: «si chiama *Fatti riconoscere negli scambi*, sta in 🔔 Avvisi,
 è SPENTO di default, e sotto ha la riga che dice cosa comporta»).
