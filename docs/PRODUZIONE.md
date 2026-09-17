@@ -128,6 +128,86 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   stesso `up -d --force-recreate specchio`; i kind 14 gia' copiati
   restano nel db finche' non si tolgono con `strfry delete` — e la
   pagina «I tuoi dati» va riportata alla frase di prima.
+- MOSTRO SCRIVE DIRETTAMENTE SULLO SPECCHIO (17 set 2026). Tre
+  macchine in un gesto solo, e **l'ORDINE CONTA**: prima la whitelist,
+  poi il nodo. Al contrario mostrod si prende un «restricted: solo
+  Barattolo e i suoi venditori» per ogni evento, e a dirlo c'e' solo
+  il suo journal.
+  **1) IL VPS DI BARATTOLO** (deploy automatico, niente da fare a
+  mano): la rotta `/api/relay/chiavi` mette la chiave del coordinator
+  in lista da se', letta da `MOSTRO_NPUB`. Basta che quella riga e
+  `RELAY_CHIAVI_TOKEN` ci siano nel config — si guarda dal pannello
+  «⚙️ Stato delle leve», che chiede al valore VIVO.
+  **2) LA MACCHINA DEL RELAY**, per non aspettare il timer dei dieci
+  minuti — e la verifica, che non ha bisogno di sapere la hex a
+  memoria (la prende da `router.conf`, dove vive gia'):
+  `sudo systemctl start barattolo-chiavi.service`
+  `HEX=$(grep -o '[0-9a-f]\{64\}' /opt/relay/router.conf | head -1); wc -l < /opt/relay/policy/chiavi.txt; grep -qx "$HEX" /opt/relay/policy/chiavi.txt && echo "coordinator IN LISTA" || echo "NON c'e'"`
+  Il relay NON si riavvia: il plugin rilegge il file quando cambia
+  l'mtime. Se dice «NON c'e'», il guasto e' sul VPS (deploy non
+  passato, o una delle due leve mancante) e
+  `journalctl -u barattolo-chiavi -n 20` dice quale: `aggiorna-chiavi.sh`
+  in caso di dubbio TIENE LA LISTA DI IERI e lo scrive.
+  **3) IL NODO, prima di toccare niente**: che il relay risponda
+  DALLA STRADA DI MOSTRO, cioe' da Tor. E' un NIP-11, una riga:
+  `docker run --rm --pull never --network container:nodo-mostro-1 curlimages/curl -s -m 30 -o /dev/null -w '%{http_code} %{time_appconnect}s\n' -H 'Accept: application/nostr+json' https://relay.barattolo.store`
+  200 = passa (⚠️ si guarda `time_appconnect`, che `time_connect`
+  mente sotto il proxy trasparente). `000` o `403` = non si tocca
+  `settings.toml`: e' la stessa forma del difetto della dev fee.
+  **4) LA RIGA**, in `~/nodo/mostro/settings.toml`. Prima si guarda
+  com'e' scritta oggi, che la copia nel repo non c'e':
+  `grep -n -A10 '^\[nostr\]' ~/nodo/mostro/settings.toml`
+  poi la copia di sicurezza — `cp settings.toml settings.toml.prima-dello-specchio`
+  — e lo specchio si AGGIUNGE in testa, senza togliere niente:
+  ```toml
+  relays = [
+      "wss://relay.barattolo.store",
+      "wss://relay.mostro.network",
+      "wss://relay.damus.io",
+      "wss://nos.lol",
+  ]
+  ```
+  ⚠️ IN AGGIUNTA E NON AL POSTO, ed e' una scelta: `relay.mostro.network`
+  e' la piazza pubblica dove i client altrui ci trovano, e un ordine
+  nato da un client esterno col nostro coordinator e' lavoro nostro
+  (la hold invoice sta sul nostro nodo, l'1% lo incassiamo noi).
+  Costa una connessione; toglierlo si puo' sempre, ed e' una riga.
+  **5) IL RIAVVIO**, come per la patch 0004 e per i provider del
+  prezzo: `cd ~/nodo && docker compose restart mostro` — dal COMPOSE,
+  che `docker restart mostrod` risponde «No such container» (il
+  servizio si chiama `mostro`, il container `nodo-mostro-1`). Poi
+  `docker compose logs --tail 40 mostro`: «Settings correctly loaded»
+  e le righe «Connected to relay», la nostra compresa.
+  **6) LA PROVA CHE SCRIVE DAVVERO, e non che il libro e' arrivato**
+  — sono due cose diverse, perche' il router copia gli stessi eventi e
+  un 38385 fresco sullo specchio non dice da quale delle due strade e'
+  entrato. Si spegne il router per il tempo della prova, e allora
+  resta una strada sola. Sulla macchina del relay:
+  `cd /opt/relay && docker compose stop specchio`
+  poi sul nodo il riavvio del punto 5 (all'avvio mostrod ripubblica il
+  suo 38385), poi di nuovo sul relay, entro un minuto:
+  `docker compose -f /opt/relay/compose.yml exec relay strfry scan "{\"kinds\":[38385],\"since\":$(date -d '2 min ago' +%s)}" | jq -r '[.created_at, .id[0:8]] | @tsv'`
+  Una riga = mostrod ha scritto QUI, di suo. ⚠️ NESSUNA RIGA NON E'
+  ANCORA UN NO: il 38385 lo ripubblica mostrod quando decide lui
+  (stessa trappola gia' scritta per `hold_invoice_cltv_delta`: «se
+  dice ancora il vecchio numero, non ha ancora ripubblicato»). Prima
+  si guarda il suo journal — «Connected to relay
+  wss://relay.barattolo.store» dice che il filo c'e', un «restricted»
+  dice che la whitelist non e' arrivata — e si riprova allargando il
+  `since`. Un `no such container` o un silenzio totale sono altri due
+  guasti, e non questo.
+  Poi si riaccende il router: `docker compose up -d specchio` — COL
+  NOME DEL SERVIZIO, che un `up -d` nudo ricrea anche il relay vivo.
+  I minuti col router fermo non si perdono: alla riconnessione rifa'
+  la REQ e si riprende il libro.
+  **7) E DAL LATO DI CHI LEGGE**, nel journal del VPS: spariscono i
+  «⚠️ Ascolto P2P: … NON l'ascolto» (erano il segno che lo specchio
+  arrivava dopo i relay pubblici) e i lampi restano con `buste
+  portate`.
+  **PER TORNARE INDIETRO**: `cp settings.toml.prima-dello-specchio
+  settings.toml` e lo stesso `restart mostro`. La chiave in
+  `chiavi.txt` puo' restare: permette, non obbliga — e al giro dopo
+  la rotta la rimette comunque.
 - COME SI LEGGE COSA HA FATTO IL COORDINATOR DI UNA RICHIESTA (15 set
   2026, dal silenzio sull'ordine di Alan). Tutto in sola lettura, e in
   ORDINE: prima si cerca la richiesta, poi la risposta, poi il perché.

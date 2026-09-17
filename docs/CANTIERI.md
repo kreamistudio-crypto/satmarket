@@ -17984,3 +17984,143 @@ giro trova niente) e il guasto è a monte — la voce aperta sul nodo.
 l'evento lo trova da sé.
 5) La dedup del lampo vive in memoria: un riavvio fra il lampo e la
 passata può dare uno squillo di troppo, mai uno in meno.
+
+## Mostro scrive sullo specchio, e la chiave entra nella whitelist (17 set 2026)
+
+`relay.mostro.network` dalla sera del 16 **accetta e non serve più
+niente**: gli eventi entrano, le REQ tornano vuote o ferme a ieri. Tre
+danni in un giorno, e la voce aperta del cantiere dell'ascolto — «lo
+specchio vive di fatto del solo nos.lol» — che smette di essere una
+cosa da guardare e diventa il guasto.
+
+LA CURA NON È CAMBIARE RELAY, È TOGLIERE L'INTERMEDIARIO. Finora il
+libro arrivava sullo specchio per rimbalzo: mostrod pubblica sui relay
+pubblici, il nostro `strfry router` ne tiene una copia. Bastano due
+relay pubblici raffreddati e la copia si assottiglia, e non c'è niente
+che possiamo fare su macchine di altri. Da oggi **mostrod scrive anche
+DIRETTAMENTE su `relay.barattolo.store`**, che è una macchina nostra:
+la gamba che non dipende da nessuno.
+
+**IL RAMO DECADUTO RIENTRA, E IL PERCHÉ DI ALLORA ERA GIUSTO.** Il
+cantiere dello specchio aveva scritto, verificandolo: la whitelist non
+c'entra, perché `chi-scrive.py` lo invoca l'ingester del processo
+`strfry relay`, mentre il router è un ALTRO processo che apre l'LMDB e
+ci scrive dentro — e la conferma stava nel binario di strfry 1.1.3,
+che porta sia `pluginDown` sia `pluginUp`. Da lì la riga «la chiave
+del coordinator NON entra in `chiavi.txt`, e non deve entrarci», e il
+ramo di riserva (`MOSTRO_HEX` in testa a `/api/relay/chiavi`)
+dichiarato decaduto prima di essere scritto.
+**Non si rovescia una decisione, si aggiunge una strada**: una
+websocket che arriva da fuori passa dall'ingester come quella di
+chiunque, quindi dal plugin. Il ragionamento di allora regge intero e
+vale ancora per il router; è il mondo ad avere una porta in più. Il
+commento in `router.conf` lo dice al posto giusto, che è dove la
+domanda torna.
+
+**LA CHIAVE È VIVA, NON SCOLPITA**, e lo si è ottenuto senza inventare
+niente: `/api/relay/chiavi` la mette in seconda posizione — dopo la
+piattaforma, prima dei venditori — leggendola da `MOSTRO_HEX`, che
+nasce da `MOSTRO_NPUB` del config ed è già fail-closed (npub storta =
+stringa vuota = riga assente). Il giorno che il coordinator cambia
+chiave, la lista resta giusta da sé: è la stessa ragione per cui la
+nostra si legge da `_NOSTR` invece che dalla copia cablata nel plugin.
+**IL CANCELLO È LA CHIAVE, NON `P2P_ATTIVO`**: quella leva dice se il
+mercatino MOSTRA lo scambio, non se il coordinator pubblica. Spegnerla
+per un'ora chiuderebbe mostrod fuori dallo specchio per i dieci minuti
+buoni del timer successivo, in silenzio.
+**E NIENTE GEMELLO CABLATO NEL PLUGIN.** `chi-scrive.py` ha la chiave
+della piattaforma scritta a mano come rete fail-closed: se
+`chiavi.txt` non si legge, almeno noi scriviamo. Per il coordinator
+non serve, e sarebbe la seconda fotografia da tenere in pari: la sua
+rete di sicurezza è il router, che non passa di lì.
+
+**COSA C'È DAVVERO SULLA STRADA DELLA SCRITTURA** (la domanda era: il
+plugin ha altre condizioni che fermerebbero i 38383/38385/14?).
+Letto riga per riga: `chi-scrive.py` guarda **solo la pubkey**. Niente
+elenco di kind, niente IP — `sourceType` e `sourceInfo`, che strfry
+passa nella stessa busta, non li apre nemmeno — niente finestra
+temporale, niente conteggio. Quel che resta nel percorso è di strfry e
+non del plugin: la firma (mostrod firma, e infatti il router copia i
+suoi eventi da mesi), `maxEventSize = 65536` (un 38383 sta in un
+ventesimo), `maxWebsocketPayloadSize = 131072`, e i 10 secondi di
+`writePolicy.timeoutSeconds`, che per un ciclo su stdin non sono un
+vincolo. **NIP-42 non c'entra con lo scrivere**: `restrictedReadKinds
+= "4, 1059"` gatta le LETTURE di quei due kind, e il 14 non è in
+elenco — come oggi, che i 14 li porta il router.
+⚠️ **L'ALLARGAMENTO SI DICHIARA**: la whitelist ammette una CHIAVE, non
+tre kind. Il router copia 38383/38385/14 e basta; la scrittura diretta
+porta tutto ciò che il coordinator firma. Si è deciso di non mettere un
+filtro di kind nel plugin: il coordinator è nostro, e un filtro
+scritto oggi butterebbe in silenzio quel che mostrod pubblicherà
+domani — che è esattamente il modo in cui un relay «funziona» e
+intanto perde roba. I limiti che restano sono la dimensione
+dell'evento e il disco.
+
+**I DOPPIONI NON ESISTONO, E NON PER FORTUNA.** Lo stesso evento ha lo
+stesso `id` da qualunque strada arrivi — l'id è l'hash dell'evento
+serializzato, non della consegna — e nel db ci sta una volta sola.
+Sopra ci sono altri due strati che già lavorano da prima: 38383 e
+38385 sono *addressable*, quindi di ogni `(kind, pubkey, d)` resta la
+versione più fresca comunque arrivi, e un vecchio che arrivasse dopo
+un nuovo non lo scavalca; il 14 è regolare e si ferma sull'id. E dal
+lato di chi legge la dedup c'era già, perché leggere da quattro relay
+è il mestiere di sempre: nel client `libroDaEventi` con la mappa dei
+morti, nel server `_P2P_VISTI` sugli id delle buste. **Quindi niente
+righe doppie nel db e nessuno squillo doppio.**
+
+**IL ROUTER RESTA, ED È UNA SCELTA E NON INERZIA.** Le due strade
+falliscono in modi diversi, ed è questo che le rende due:
+la scrittura diretta è fire-and-forget — quel che mostrod manda mentre
+il nostro relay è giù (riavvio, deploy, Caddy che rinnova) **è perso**,
+perché nessuno lo ripubblica; il router alla riconnessione rifà la REQ
+e **si riprende il libro**. E ancora: al ripristino della macchina
+`chiavi.txt` non c'è (è un segreto, non sta nel repo), quindi per i due
+minuti prima del primo `aggiorna-chiavi.sh` il plugin ammette la sola
+piattaforma — e in quella finestra il libro arriva lo stesso, dal
+router. Tenerlo costa tre sottoscrizioni filtrate su relay altrui.
+
+**LA STRADA SCARTATA: togliere `relay.mostro.network` dalla lista di
+mostrod.** È rotto oggi, ma è anche la piazza pubblica dove i client
+altrui ci trovano, e il cantiere dello specchio ha già messo a verbale
+che un ordine nato da un client esterno col nostro coordinator è
+**lavoro nostro** — la hold invoice sta sul nostro nodo, l'1% lo
+incassiamo noi. Toglierlo ci renderebbe invisibili a quella piazza il
+giorno che si riprende, e ce ne accorgeremmo tardi. Costa una
+connessione: si aggiunge lo specchio **in testa** e non si toglie
+niente. Il giorno che quel relay è morto per davvero, si cancella una
+riga.
+
+**PROVATO.** `prove_relay_chiavi` sale a 25 prove: il banco fa girare
+la rotta VERA su un database di cartone, col giro chiuso della bech32,
+e adesso dice anche che il coordinator esce **secondo** e minuscolo,
+che senza `MOSTRO_NPUB` la lista è quella di ieri *byte per byte* (una
+riga vuota al posto suo farebbe scartare la risposta INTERA da
+`aggiorna-chiavi.sh` — «tengo la lista di ieri» — e resterebbero fuori
+anche i venditori), e che una chiave già in elenco non si sdoppia.
+**Tre mutazioni, tre uccise**, ognuna in una cartella sua perché il
+banco legge `server.py` dal cwd: il ramo che sparisce (5 rosse), la hex
+scolpita al posto di `MOSTRO_HEX` (5 rosse, sentinella compresa), il
+`.lower()` tolto (1 rossa, quella del doppione). Suite intera:
+10.986 passate, 0 fallite.
+
+**RESTA DA GUARDARE**, e i comandi stanno in PRODUZIONE, «MOSTRO SCRIVE
+DIRETTAMENTE SULLO SPECCHIO»:
+1) I passi sulle macchine sono di Andrea, **in quest'ordine**: prima la
+whitelist (e la verifica che la hex di `router.conf` sia in
+`chiavi.txt`), poi la riga in `settings.toml` e il riavvio dal compose.
+Al contrario mostrod raccoglie un «restricted» per evento.
+2) La prova che distingue le due strade è **spegnere il router** per il
+tempo del riavvio: con tutt'e due accese, un 38385 fresco sullo
+specchio non dice da dove è entrato. E un 38385 che non arriva subito
+non è ancora un no — lo ripubblica mostrod quando decide lui, come già
+imparato col `hold_invoice_cltv_delta`.
+3) Il `Caddyfile` del relay **non è nel repo** (debito già dichiarato:
+il giro che raccolse i file guardava `/opt/relay` e
+`/etc/systemd/system`), quindi se lì ci fosse un filtro per IP o un
+rate limit, da qui non si vede. mostrod arriva da un exit Tor: è
+l'unica condizione della strada che non ho potuto leggere, e si guarda
+sulla macchina.
+4) Cosa fa mostrod quando una publish fallisce — ritenta, o lascia
+cadere? Non è scritto da nessuna parte che abbiamo letto, e decide
+quanto vale davvero la rete di sicurezza del router. Si scopre alla
+prima disconnessione vera.
