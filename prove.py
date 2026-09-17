@@ -41660,14 +41660,19 @@ out.unMetodoAcceso = out.paginaVendi.indexOf('id="p2pDettVai" disabled') < 0;
 /* senza volto il riquadro della reputazione non c'e' proprio */
 out.senzaVoltoNienteRep = out.paginaVendi.indexOf('p2p-rep-tre') < 0;
 
-/* ---- SI DICE PRIMA DELLA PRESA, e ha due versi (17 set 2026) ----
-   La pagina e' la STESSA e cambia una variabile sola: e' il modo di
+/* ---- L'AVVISO «VI VEDETE» NON C'E' PIU' (17 set 2026, decisione
+   di Andrea) ----
+   Stava qui e nel foglio di chi pubblica, ed e' uscito da tutt'e due.
+   RESTA la riga di chi e' entrato senza un nome, che dice un'altra
+   cosa — che di lui non si vede niente — e porta all'interruttore: la
+   pagina e' la STESSA e cambia una variabile sola, che e' il modo di
    provare che a decidere e' chi guarda e non l'ordine. */
-out.avvisoVedersi = out.paginaVendi.indexOf('Appena lo prendi vi vedete') >= 0;
+out.nienteAvviso = out.paginaVendi.indexOf('vi vedete') < 0;
+out.notoNonLaVede = out.paginaVendi.indexOf('Tu resti anonimo') < 0;
 myTgId = -9;
 renderDettaglioP2P();
 out.paginaAnonima = el('p2pDettCorpo').innerHTML;
-out.anonimoTace = out.paginaAnonima.indexOf('Appena lo prendi vi vedete') < 0;
+out.anonimoNienteAvviso = out.paginaAnonima.indexOf('vi vedete') < 0;
 out.anonimoLoDice = out.paginaAnonima.indexOf('Tu resti anonimo') >= 0;
 myTgId = 111;
 
@@ -42286,14 +42291,18 @@ console.log(JSON.stringify(out));
           o["unMetodoAcceso"])
     prova("...e senza volto niente riquadro della reputazione", True,
           o["senzaVoltoNienteRep"])
-    # ⚠️ SI DICE PRIMA DELLA PRESA (17 set 2026, decisione di Andrea
-    # con Alan): da li' in poi le due parti si vedono, e dirlo dopo
-    # sarebbe dirlo a cose fatte. Il verso e' DUE perche' chi entra
-    # senza un nome non viene annotato quando prende: a lui «vi
-    # vedete» sarebbe una bugia, e la riga dice l'altra verita'.
-    prova("chi prende lo sa PRIMA di prendere", True, o["avvisoVedersi"])
-    prova("...e chi e' entrato senza un nome legge l'altro verso",
-          [True, True], [o["anonimoTace"], o["anonimoLoDice"]])
+    # ⚠️ L'AVVISO «VI VEDETE» NON C'E' PIU' (17 set 2026, decisione di
+    # Andrea): stava qui e nel foglio di chi pubblica, ed e' uscito da
+    # tutt'e due. Il posto dove le cose si spiegano e' «I tuoi dati»,
+    # e li' resta — la sentinella larga sta in `prove_parti_si_vedono`.
+    # RESTA INVECE la riga di chi e' entrato senza un nome, ed e'
+    # un'altra cosa: non dice «vi vedete», dice il contrario, e porta
+    # all'interruttore. Un avviso che informa e basta se n'e' andato;
+    # una riga che apre una porta resta.
+    prova("l'avviso «vi vedete» non c'e' in nessuno dei due versi",
+          [True, True], [o["nienteAvviso"], o["anonimoNienteAvviso"]])
+    prova("...e la riga di chi resta anonimo la legge solo lui",
+          [True, True], [o["anonimoLoDice"], o["notoNonLaVede"]])
     prova("su un intervallo il bottone apre «Quanto» e non prende",
           [1, 0], o["rangeDevia"])
 
@@ -42523,6 +42532,44 @@ def prove_parti_si_vedono():
     prova("una forma storta non arriva al database", True,
           bool(_alza(lambda: chi_di(con, ["corto"], 111, 1))))
     con.close()
+
+    # --- 5b) LA FRASE NON RIENTRA, DA NESSUNA PARTE (17 set 2026) --
+    # L'avviso «appena lo prendi / appena qualcuno lo prende vi
+    # vedete» era nato con questo cantiere e stava in DUE fogli: quello
+    # di chi pubblica e quello di chi prende. Andrea li ha tolti
+    # tutt'e due, e la ragione sta a verbale: le due parti si vedono
+    # davvero, ma dirlo su OGNI gesto vuol dire ripetere — su un
+    # foglio dove si sta decidendo una cifra — una cosa che non cambia
+    # la decisione, e un foglio che avverte di tutto e' un foglio che
+    # non si legge piu'.
+    # IL POSTO DOVE LE COSE SI SPIEGANO E' «I tuoi dati», e li' non si
+    # tocca: percio' la sentinella e' un DIVIETO CON UN'ECCEZIONE SOLA
+    # — fuori da quella vista la frase non esiste, dentro c'e' per
+    # intero. Si guarda TUTTO il client e non i soli fogli del P2P:
+    # una frase che rientrasse da un'altra pagina sarebbe lo stesso
+    # difetto con un indirizzo diverso.
+    _nudo = re.sub(r"/\*[\s\S]*?\*/", "", mini).replace("\\'", "'")
+    _pi = _nudo.index('<div class="view" id="view-privacy">')
+    _pj = _nudo.index('<div class="view" id=', _pi + 10)
+    _dentro, _fuori = _nudo[_pi:_pj], (_nudo[:_pi] + _nudo[_pj:]).lower()
+    # ⚠️ LA RETE PRIMA DELL'ELENCO: se lo spoglia-commenti si mangiasse
+    # la zona da guardare, i divieti qui sotto passerebbero tutti senza
+    # guardare niente — una sentinella cieca che si legge verde. Questa
+    # riga tiene un'ancora VIVA nel pezzo che resta.
+    prova("il censimento guarda davvero il client", True,
+          "tu resti anonimo" in _fuori)
+    for _frase in ("appena lo prendi vi vedete",
+                   "appena qualcuno lo prende vi vedete",
+                   "vi vedete:",
+                   "vedrete il profilo l'uno dell'altra",
+                   "vedete il profilo l'uno dell'altra"):
+        prova("«%s» non compare fuori da «I tuoi dati»" % _frase,
+              False, _frase in _fuori)
+    # ...e togliere la frase dai fogli non vuol dire smettere di dirlo:
+    # la pagina che spiega la dice per intero, col suo perche'
+    prova("...e «I tuoi dati» lo spiega ancora, per intero", True,
+          "le due parti si vedono" in _dentro
+          and "Prima della presa non si vede niente" in _dentro)
 
     # --- 6) IL BANCO DEL CLIENT: i bottoni e i tre casi -------------
     import shutil as _sh, subprocess as _sp, tempfile as _tf, json as _js
@@ -48145,16 +48192,14 @@ def prove_p2p_pubblica():
     prova("...e nemmeno la riga sul ritiro in fondo", False,
           "Finché nessuno lo prende" in _foglio
           or "Gli euro viaggiano fra voi due" in _foglio)
-    # ⚠️ E «VI VEDETE» NON STA PIU' IN QUESTO FOGLIO, da nessuna parte
-    # — decisione di Andrea, e la sentinella esiste perche' non torni
-    # per sbaglio: quell'informazione vive nella pagina «I tuoi dati»
-    # e nel foglio di chi PRENDE un ordine, che sono i due posti dove
-    # resta. Qui era la terza copia, sul gesto in cui pesava di meno.
-    # Si guarda TUTTO il foglio — le sezioni, la riga, la scatola — e
-    # non il solo montaggio.
-    prova("«vi vedete» non compare in NESSUN pezzo del foglio", False,
-          "vi vedete" in re.sub(r"/\*[\s\S]*?\*/", "", nuovo).lower()
-          or "vi vedete" in _foglio.lower())
+    # ⚠️ LA SENTINELLA DEL «VI VEDETE» SE N'E' ANDATA DI CASA (17 set
+    # 2026): guardava questo foglio, e dal giro della sera la frase e'
+    # uscita da TUTTO il client tranne «I tuoi dati» — quindi il
+    # divieto e' largo quanto il client e vive in
+    # `prove_parti_si_vedono`, dove sta il cantiere che quella frase
+    # l'aveva scritta. Due difese sullo stesso caso sarebbero una di
+    # troppo, e quella che si nomina non e' detto sia quella che
+    # prova.
     # IL TETTO SOTTO IL CAMPO (17 set 2026): la scritta piccola dove si
     # sta scrivendo la cifra. Le due letture — questa e il riepilogo
     # della scatola — vengono dallo STESSO giudice, o un giorno

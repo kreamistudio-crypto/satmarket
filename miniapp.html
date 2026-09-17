@@ -42294,24 +42294,31 @@ function renderDettaglioP2P(){
       ? 'Chi vende blocca i sats in garanzia, tu mandi gli euro col metodo scelto e i sats arrivano a te.'
       : 'Tu blocchi i sats in garanzia, ricevi gli euro col metodo scelto e i sats vanno al compratore.') +
     '</span></div>' +
-    /* ⚠️ SI DICE PRIMA DELLA PRESA (17 set 2026, decisione di Andrea
-       con Alan), ed e' tutta la sostanza del punto: da qui in poi le
-       due parti si vedono, e dirlo DOPO sarebbe dirlo a cose fatte —
-       cioe' trovarsi il profilo esposto senza averlo saputo. La
-       gemella sta nel foglio di chi pubblica, e le due si somigliano
-       apposta.
-       E IL VERSO E' DIVERSO PER CHI E' ENTRATO SENZA UN NOME: la sua
-       presa non viene annotata (la decisione del 16 set 2026), quindi
-       a lui «vi vedete» sarebbe falso. Guarda vedere: il profilo di
-       chi ha pubblicato lo legge lo stesso, qui sopra.
-       ⚠️ A MENO CHE L'ABBIA DECISO LUI (17 set 2026, l'interruttore
-       «Fatti riconoscere negli scambi»): acceso, la presa si annota e
-       allora vale la frase di tutti — e dire «resti anonimo» a chi si
-       e' fatto riconoscere sarebbe la bugia che questa riga esiste per
-       non dire. Il giudice e' lo stesso del cassetto Avvisi. */
+    /* ⚠️ L'AVVISO «APPENA LO PRENDI VI VEDETE» NON C'E' PIU', NE' QUI
+       NE' IN NESSUN ALTRO FOGLIO DEL P2P (17 set 2026, decisione di
+       Andrea). Era nato la mattina stessa con «Le parti si vedono» e
+       stava in due posti — il foglio di chi pubblica e questo, di chi
+       prende —, poi e' uscito dal primo e adesso anche da qui.
+       IL PERCHE', a verbale perche' non rientri: le due parti si
+       vedono davvero, ma dirlo su OGNI gesto vuol dire ripetere su
+       un foglio dove si sta decidendo una cifra una cosa che non
+       cambia la decisione — e un foglio che avverte di tutto e' un
+       foglio che non si legge piu'. IL POSTO DOVE LE COSE SI SPIEGANO
+       E' «I tuoi dati», che lo dice per intero e con dentro il
+       perche'; li' resta, e li' non si tocca. C'e' una sentinella che
+       tiene la frase fuori da TUTTO il resto del client.
+       ⚠️ RESTA LA RIGA DI CHI E' ENTRATO SENZA UN NOME, ed e' un'altra
+       cosa: non dice «vi vedete», dice il contrario — che di lui non
+       si vede niente — e porta all'interruttore «Fatti riconoscere
+       negli scambi», che e' un gesto che si puo' fare da li'. Un
+       avviso che informa e basta se n'e' andato; una riga che apre una
+       porta resta. Il giudice e' lo stesso del cassetto Avvisi:
+       acceso, la presa si annota e la riga tace, che dire «resti
+       anonimo» a chi si e' fatto riconoscere sarebbe la bugia che
+       questa riga esiste per non dire. */
     (myTgId < 0 && !myRiconosciP2P
       ? '<div class="hint">🕶️ Tu resti anonimo: sei entrato con un profilo senza nome, e chi ha pubblicato non saprà chi sei. Il suo profilo invece lo vedi qui sopra. Se vuoi farti riconoscere — e potervi recensire — c\'è l\'interruttore nel cassetto «🔔 Avvisi».</div>'
-      : '<div class="hint">👤 Appena lo prendi vi vedete: tu e chi l\'ha pubblicato vedrete il profilo l\'uno dell\'altra — nome, foto, stelline e livello, gli stessi del mercatino — e i bottoni per scrivervi.</div>') +
+      : '') +
     '<div class="hint" id="p2pDettManca" style="color:var(--danger);font-weight:800'
       + (manca ? '' : ';display:none') + '">' + esc(manca) + '</div>' +
     '<div class="foglio-piede">' +
