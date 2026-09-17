@@ -18887,3 +18887,154 @@ Con l'avviso se ne va anche la sua prova del mattino («chi prende lo sa
 PRIMA di prendere»): al suo posto due sentinelle rovesciate — la frase
 non c'è in **nessuno dei due versi** della pagina, e la riga di chi
 resta anonimo la legge **solo lui**.
+
+## Le commissioni per persona: lo sconto fedeltà del P2P, applicato alla fonte (17 set 2026)
+
+**COSA SI È DECISO** (Andrea e Alan): la commissione del P2P ha un
+listino del **4%** totale; in **beta**, senza scadenza, è il **3%** —
+1,5% a testa. Chi è **pioniere OPPURE ha il livello 5** paga **mezzo
+punto in meno** sulla sua metà: 1%. Uno sconto solo, non si sommano. E
+lo sconto lo applica **MOSTRO ALLA FONTE** — hold invoice e payout
+nascono giusti al primo colpo — non un rimborso dopo: quindi è una
+patch al fork, la **0005**.
+⚠️ IL LIVELLO 5 È L'ULTIMO della scala di oggi («Maestro del banco»,
+3000 XP e 40 affari): nei fatti, per un bel po', lo sconto è dei
+pionieri. La regola è scritta sul NUMERO del gradino
+(`P2P_SCONTO_LIVELLO = 5`), così se la scala si allunga resta «dal
+quinto in su».
+
+**LO STATO, che è la riga da leggere per prima: il cantiere è a DUE
+TERZI.** Passo 1 (server + client + prove) è in produzione a leva
+SPENTA. Passo 2 (il modulo Rust, il patcher, il censimento) è scritto e
+provato A SECCO sul sorgente del tag — **non è mai stato compilato**:
+qui `cargo` non c'è, e il primo compilatore che lo vede è la build sul
+nodo. Passo 3 (la messa in servizio) è da fare, e la sua sequenza sta in
+PRODUZIONE, «LO SCONTO FEDELTÀ DEL P2P».
+
+**COME MOSTRO VIENE A SAPERE LO SCONTO: CHIEDE, per trade key, alla
+presa.** `POST /api/p2p/sconto` con le due trade key in una richiesta
+sola, dietro `P2P_SCONTO_SEGRETO`; esce `{pubkey: true|false}` e
+nient'altro — mai un tg_id, mai il motivo, e «la conosco ma non ha lo
+sconto» non si distingue da «mai vista». Regge su un fatto che c'era
+già: il client registra la trade key in `chiavi_p2p` **con `await`
+PRIMA** di mandare la presa o l'ordine.
+**IL SERVER DICE CHI, MOSTRO SA QUANTO**, ed è la riga di sicurezza: la
+cifra dello sconto sta nel compose del nodo (`BARATTOLO_SCONTO_FEE`) con
+un tetto CABLATO all'1%. Chi bucasse il VPS può al massimo regalare
+mezzo punto a qualcuno, mai riscrivere una commissione. E «non
+cumulabile» non sta in un `min()`: sta nella FORMA — un booleano non si
+somma.
+**SE IL SERVER NON RISPONDE: FEE PIENA per tutt'e due**, su ogni guasto
+(12 s senza risposta, non-200, JSON storto, chiave assente, riga a lato
+che non si scrive), con UNA riga di log che dice il motivo — la lezione
+del `pow_first_contact`, che falliva muto in tre direzioni.
+
+**LE TRE SCELTE DI ANDREA**: il battito ogni 60 s da subito (tiene
+calda la connessione: a freddo il circuito Tor costa 10,6 s, e la presa
+sta nel ciclo SERIALE dei messaggi); il budget a 12 s (è anche il
+massimo che un VPS morto può fermare una presa); il **prestito fra
+amici accettato e a verbale** — chi ha lo sconto può registrare sotto
+il SUO account la trade key di un altro e prestarglielo, una chiave
+alla volta, a mano, a ogni scambio, per mezzo punto. Si vede
+(`chiavi_p2p` ha il tg_id) e non vale una difesa.
+
+**DOVE ENTRA NEL FORK, e cosa ha trovato il censimento.** Upstream ha
+UNA colonna `order.fee` per tutt'e due le parti, e `Order` sta in
+mostro-core, che non si forka. Quindi `order.fee` diventa **la fee del
+COMPRATORE** (i suoi usi restano intatti byte per byte) e quella del
+**VENDITORE** va in una tabella a lato, `barattolo_fees`, fuori dalle
+migrazioni sqlx apposta.
+⚠️ IL DISEGNO AVEVA VISTO UN SOLO USO dal lato di chi vende
+(`show_hold_invoice`), letto su tre file. **Il censimento su tutte le
+`.rs` ne ha trovati TRE**: gli altri due sono i messaggi
+`BuyerTookOrder` di `flow.rs` e `add_invoice.rs`, che dicono al
+venditore `amount + order.fee`. Senza di loro la hold sarebbe nata
+giusta e il messaggio accanto avrebbe detto un'altra cifra — nessun
+errore, nessun test rosso, solo due numeri diversi sullo stesso
+scambio. Il patcher quel censimento lo RIFÀ a ogni giro e si ferma se
+ne compare un quarto.
+**`order.rs` NON SI TOCCA**, ed è una risposta diversa da quella
+chiesta («i tre punti del prezzo»): alla pubblicazione chi prende non
+esiste e nessuno paga niente; la fee si riscrive alla presa, quando le
+due chiavi sono note. Un file in meno da ricucire a ogni aggiornamento.
+**SENZA SCONTO PER NESSUNO L'ORDINE RESTA COM'È UPSTREAM**, byte per
+byte (la fee congelata alla creazione degli ordini a prezzo fisso
+compresa), e senza le tre variabili d'ambiente la patch è inerte: è
+anche il rollback senza ricompilare. L'eccezione è l'ordine a prezzo
+fisso tornato nel libro dopo un timeout, che porta ancora la fee
+scontata di chi l'aveva preso prima: lo si riconosce dalla riga a lato,
+e allora si ricalcola da `amount`.
+
+**IL CLIENT: UN GIUDICE SOLO, `feeMiaP2P`.** Esce la fee viva a cui lo
+sconto è già tolto PER DUE: i quattro posti che ne fanno la metà
+(`nettoLatoP2P`, `mezzaCommissioneP2P`, il conto, il lordo ricavato
+all'indietro) non cambiano formula, e la loro metà è la quota di chi
+legge. Il cartello «in promo» del P2P non c'è più: dice **beta**,
+**pioniere** o **livello 5** — quello del mercatino non si tocca.
+**LA VERITÀ RESTA DI MOSTRO**: se prometto l'1% e il coordinatore fa
+l'1,5% (non ha potuto verificare), il conto torna alla metà piena e il
+cartello dice «sconto non verificato». ⚠️ SI VEDE SOLO A PREZZO FISSO,
+e va dichiarato: per accorgersene serve il lordo detto da qualcun altro
+che non sia il mio lato, e a prezzo di mercato il coordinatore a chi
+prende dice una cifra sola — da cui le due letture non si distinguono.
+Lì il mio lato resta giusto al satoshi (è il suo) e a sbagliare di
+mezzo punto è il Subtotale. Sotto il conto non si è aggiunta nessuna
+frase: «sotto il conto non c'è più niente» era già deciso.
+
+**LE STRADE SCARTATE.**
+• **(b) il client dichiara la fee e mostro verifica**: ha bisogno della
+STESSA telefonata al server, più un campo che il messaggio di
+mostro-core non ha. È la (a) con un pezzo in più e una bugia possibile
+in più.
+• **La LISTA degli aventi diritto scaricata a intervalli** (l'alternativa
+di Andrea: mostro decide da solo, senza telefonata alla presa). Ha due
+pregi veri — la presa non aspetta la rete, e un VPS giù non toglie lo
+sconto a nessuno — e tre costi. 1) **Le trade key nascono a ogni
+scambio**, registrate pochi secondi prima della presa: in una lista
+scaricata ogni minuto non ci sono mai. La lista dovrebbe essere per
+chiave d'IDENTITÀ, che mostrod tiene CIFRATA nel suo database per il
+maker (si può aprire, ma è altro codice nel fork) e che chi scambia in
+anonimo non ha affatto: per lui identità e trade key coincidono, quindi
+niente sconto. 2) **Il dato sul nodo**: quella lista è «queste identità
+Mostro sono account privilegiati di Barattolo», cioè la correlazione
+che `GET /api/p2p/chiavi` esiste per non scrivere mai («esce un conto,
+mai una pubkey») — esportata per intero, ogni minuto, su una macchina
+dove oggi non c'è niente del genere. Con la domanda per chiave il nodo
+impara un sì o un no su chiavi che ha GIÀ in mano per lo scambio. 3)
+Più codice nel fork: un job, una scadenza della lista («quanto vecchia
+è ancora verificata?»), la decifratura.
+• **Una CACHE sulla risposta** è il compromesso giusto SE servirà, ma
+non oggi: per trade key non serve a niente (ogni chiave si chiede una
+volta), e per identità ha metà dei costi della lista. La versione
+economica — ricordare in RAM per un giorno «questa IDENTITÀ di chi
+prende aveva lo sconto» — costa trenta righe e copre solo chi torna. Si
+riapre coi NUMERI: le righe `discount NOT verified` nel log del nodo
+sono il termometro, e col battito acceso dovrebbero essere zero.
+• **Una colonna in più in `orders`**: vorrebbe una migrazione sqlx nel
+fork, cioè un litigio garantito con la prossima migrazione upstream.
+• **Interrogare il maker alla pubblicazione**: una seconda telefonata e
+uno stato da conservare per giorni, per un numero che alla presa si
+riscrive comunque.
+
+**COSA È STATO PROVATO.** `prove_p2p_sconto`: chi ha lo sconto
+(nessuno, pioniere, livello 4 no / 5 sì, entrambi → uno solo, leva
+spenta), la leva (un 5 scritto per 0.5 SPEGNE), la risposta (nessuno,
+uno, entrambi; mai un tg_id nel JSON), la porta (404 / 403, header non
+ASCII), e il conto del client fatto girare in node: su 100.000 sats,
+98.500 / 101.500 a fee piena e 99.000 / 101.000 con lo sconto, il lordo
+ricavato all'indietro, lo sconto mancato dai due lati. **Torturata con
+14 mutazioni**: 13 uccise, una sopravvissuta — una guardia INERTE in
+`scontoMancatoP2P`, tolta. Suite 11.283 / 0, CI verde sul passo 1. Il
+patcher: a secco, vero e rilanciato (si ferma) sul tag v0.18.7 con le
+quattro patch sopra; 7 agganci in 6 file.
+**COSA NON È PROVATO, ed è la parte onesta**: il Rust non è mai stato
+compilato, i suoi 10 test non sono mai girati, e nessuna hold è mai
+nata scontata. Si chiude sul nodo, e poi con due scambi veri: uno con
+UNO solo scontato (il conto al satoshi contro LND e contro
+`barattolo_fees`), e uno col VPS irraggiungibile apposta — fee piena e
+la riga nel log.
+**DA GUARDARE**: i test upstream di `take_buy`/`take_sell` dopo la
+patch (a sconto spento non devono accorgersi di niente: se uno diventa
+rosso, la frase «byte per byte» qui sopra è falsa); e la strada dei
+BOND, che la patch dichiara NON coperta — prima di accenderli si
+rilegge.

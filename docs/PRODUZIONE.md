@@ -517,3 +517,53 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   Prima di ogni `ufw enable` futuro: la porta SSH ammessa per prima e
   una seconda sessione gia' aperta, che le connessioni vive non
   vengono tagliate.
+- LO SCONTO FEDELTÀ DEL P2P, la messa in servizio (patch 0005 del
+  fork; il perché sta in CANTIERI, «Le commissioni per persona»). Si fa
+  a SCAMBI FERMI e in quest'ordine, che non è estetica: finché la leva
+  del VPS è a 0 la porta risponde 404, quindi il nodo può salire per
+  primo e fa prezzo pieno a tutti — client e coordinatore dicono la
+  stessa cifra in ogni momento del giro.
+  1) IL SEGRETO, generato sul PC: `python -c "import secrets;
+  print(secrets.token_urlsafe(32))"`. Va in DUE posti e in nessun
+  altro: `P2P_SCONTO_SEGRETO = "..."` nel `config.py` del VPS, e
+  `BARATTOLO_SCONTO_SEGRETO` nel compose del nodo. Mai nel canale
+  Telegram del nodo.
+  2) SUL NODO, il fork: `cd ~/nodo/mostro-src`, branch
+  `barattolo/v0.18.7`; con `patch-0005-fee-per-parte.py` e
+  `barattolo_fee.rs` nella stessa cartella: `python3 .../patch-0005-fee-per-parte.py --secco`,
+  poi senza `--secco`. I test PRIMA della build vera:
+  `docker build -f docker/Dockerfile --target builder -t mostro-test:bar3 .`
+  e `docker run --rm mostro-test:bar3 sh -c "cargo test --release barattolo_fee && cargo test --release app::take_buy && cargo test --release app::take_sell && cargo test --release flow && cargo test --release app::add_invoice"`.
+  Verdi: `git add -A && git commit`, `git format-patch -1` (la copia
+  torna nel repo), e `docker build -f docker/Dockerfile -t mostro:v0.18.7-bar3 .`
+  — un tag nuovo, mai sovrascritto.
+  3) SUL NODO, il compose (copia prima: `cp docker-compose.yml
+  docker-compose.yml.prima-bar3`): l'immagine a `mostro:v0.18.7-bar3`,
+  e sotto `environment:` del servizio `mostro` le tre righe
+  `BARATTOLO_SCONTO_FEE=0.005`, `BARATTOLO_SCONTO_URL=https://barattolo.store/api/p2p/sconto`,
+  `BARATTOLO_SCONTO_SEGRETO=...`. In `~/nodo/mostro/settings.toml`
+  (copia prima), `[mostro]`: `fee = 0.03` — col punto, è un f64.
+  4) `docker compose up -d mostro` (`up -d`, NON `restart`: cambia
+  l'immagine e cambia l'ambiente). Si guarda:
+  `docker inspect --format '{{.Config.Image}}' nodo-mostro-1` dice
+  `-bar3`; nei log «Settings correctly loaded» e la riga
+  `barattolo_fee: per-party discount 0.005 verified against https://...`
+  (se dice `not configured` manca una delle tre variabili); e dal
+  38385 `fee` 0.03, letto dallo specchio.
+  5) SUL VPS, nel `config.py`: `P2P_SCONTO_SEGRETO`, poi
+  `P2P_SCONTO_FEDELTA_PERCENTO = 0.5` e `P2P_COMMISSIONE_PERCENTO = 4`;
+  `sudo systemctl restart barattolo`. Il pannello «Stato delle leve»
+  deve dire accese le due righe dello sconto. La porta si prova dal
+  VPS stesso: `curl -s -X POST http://127.0.0.1:8080/api/p2p/sconto -H
+  "Authorization: Bearer IL_SEGRETO" -H "Content-Type: application/json"
+  -d '{"pubkeys":["<64 esadecimali qualunque>"]}'` → `{"ok":true,
+  "sconti":{"...":false}}`; senza l'header → 403.
+  6) I DUE SCAMBI DI PROVA, piccoli: uno con UNO solo dei due scontato
+  — hold e payout al satoshi contro `lncli`, e sul nodo `sqlite3
+  <mostro.db> "SELECT * FROM barattolo_fees ORDER BY created_at DESC
+  LIMIT 1"`; e uno col VPS irraggiungibile APPOSTA (`sudo systemctl
+  stop barattolo` per il minuto della presa): fee piena per tutt'e due
+  e nel log del nodo `discount NOT verified`.
+  IL ROLLBACK ha due gradini: togliere le tre variabili dal compose e
+  `up -d` (la patch diventa inerte, upstream byte per byte), oppure
+  l'immagine a `-bar2`. La `fee` e il listino si rimettono a mano.
