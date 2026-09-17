@@ -17539,3 +17539,37 @@ riapertura tutt'e due devono vedere «Sats in garanzia», e in console la
 riga «🔁 [p2p] ripresa» se a muovere è stata la restore; un ordine PRESO
 senza riga locale (altro dispositivo) resta fuori dall'adozione, come
 era; e la domanda del mattino sui quattro `no_route`, ancora aperta.
+
+**L'EMENDA DELLA SERA, E L'ERRORE ERA MIO.** Dopo il deploy Alan ha
+chiuso e riaperto Telegram: ancora «Dove vuoi i sats?». La cura
+dell'ora aveva un buco che ho riprodotto a banco PRIMA di toccarla: la
+prima stesura avanzava l'orologio della riga a OGNI messaggio, anche a
+quelli che non muovono niente. E chi compra, fermo su «Dove vuoi i
+sats?» col wallet collegato, rimanda la fattura DA SOLO a ogni apertura
+del foglio (`fatturaDalWalletP2P`): il coordinatore risponde `cant-do`,
+e quel «no» diventa il messaggio PIÙ RECENTE dello scambio. Alla
+riapertura, se il relay lo serviva prima, la «garanzia accettata»
+risultava passato — tre ordini d'arrivo su quattro davano esattamente
+lo schermo di Alan. Cioè: il difetto teneva viva la sua stessa causa.
+LA CURA: l'orologio è delle MOSSE — lo scrive solo un'azione che
+`AVANZA_P2P` sa muovere — e il campo ha CAMBIATO NOME, da `ultimoMsg` a
+`ultimaMossa`, apposta: le righe scritte in quelle ore portano un
+orologio avvelenato, e col nome nuovo ripartono «senza ora», che
+converge da sé. Stessa cura per `rate`, che avrebbe chiuso la porta al
+«concluso».
+LA LEZIONE: avevo provato i messaggi che MUOVONO in ogni ordine, e
+nessuno di quelli che non muovono. Una guardia sul tempo va torturata
+con gli eventi che il tempo lo spostano senza fare altro.
+**PERCHÉ LA RIPRESA DALLA RESTORE NON L'ABBIA MOSSO NON LO SO,** e non
+lo invento: le due strade note sono la restore che non conclude (con
+due identità devono rispondere TUTTE) e la restore arrivata da
+un'identità diversa dal profilo in uso, che la ripresa salta. Per
+saperlo senza console è nato IL DIARIO: in memoria, mai sul disco né al
+server, le ultime 150 righe di quel che il P2P ha fatto nella sessione,
+e «🩺 Copia la diagnosi dei tuoi scambi» in Info P2P («Se qualcosa va
+storto») che le mette negli appunti con lo stato delle righe — senza
+chiavi, fatture né recapiti, provato sul testo prodotto. Una ripresa
+saltata per identità ora lo DICE.
+I NUMERI DELLA SERA: da 10808 a 10822 (14 prove nuove), quattro
+mutazioni uccise; il caso del taker fermo era ROSSO col codice del
+pomeriggio, in tre ordini su quattro.

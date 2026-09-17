@@ -24096,14 +24096,25 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   che statoTestoP2P mostra senza interpretarla), mai un default.
   IL PASSATO NON SI RIAPPLICA: `mostroArriva` mette sull'oggetto del
   messaggio l'ora dell'evento (`quando`, il `created_at` firmato dal
-  coordinatore) e la riga tiene quella dell'ultimo messaggio APPLICATO
-  (`ultimoMsg`). `applicaMessaggioP2P` a un messaggio più vecchio non
+  coordinatore) e la riga tiene quella dell'ultima MOSSA applicata
+  (`ultimaMossa`: la scrive solo un'azione di `AVANZA_P2P` — un
+  `cant-do` o un `rate` non sono mosse, e la prima stesura, che
+  avanzava l'orologio a ogni messaggio col nome `ultimoMsg`, teneva
+  fermo chi compra dietro al «no» più recente).
+  `applicaMessaggioP2P` a un messaggio più vecchio non
   fa muovere niente e non fa dire niente: gli prende solo quel che
   manca (la controparte; la richiesta da pagare, se è quella che si
   aspetta). Alla pari si applica. È la cura del difetto vero del 17
   set: alla riapertura il relay ripete i kind 14 dello scambio in
   ordine sparso, e vinceva l'ultimo ARRIVATO invece dell'ultimo
   SUCCESSO. Il verbale: CANTIERI, «La restore che diceva active».
+  IL DIARIO E LA DIAGNOSI: `diarioP2P` tiene in MEMORIA (mai disco,
+  mai server) le ultime 150 righe di quel che il P2P ha fatto nella
+  sessione — messaggi con ora ed esito, restore, ripresa, e il perché
+  di una ripresa saltata — e «🩺 Copia la diagnosi» in Info P2P
+  (`testoDiagnosiP2P`) le mette negli appunti con lo stato delle
+  righe. Senza segreti per costruzione: id, stati, ore, chiavi
+  pubbliche di scambio accorciate a otto caratteri.
   LA CIFRA DI CHI PRENDE UN INTERVALLO viaggia come `Payload::Amount`
   (`{"amount": N}`), che mostrod legge SOLO su `take-sell` e `take-buy`
   (`get_amount` in `message.rs`) e confronta con min/max
