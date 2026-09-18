@@ -20761,3 +20761,150 @@ secondi dopo il gesto nasce davvero l'eco: se stesse spesso oltre i
 trenta, la finestra e l'attesa del client si allungano INSIEME. Se
 l'uscita «per un'altra strada» viene usata a sproposito. E la patch
 0007, che renderà precisi i tre generici di mezzo.
+
+## Il foglio di acquisto che diceva NaN: la strada chiusa che nessuno giudicava (18 set 2026)
+
+**IL DIFETTO, visto dal vivo** alle 23:14 su Android, sullo
+«Smartphone Degoogled - Motorola…» da 234 €: nel foglio di acquisto il
+banner verde «✅ Spedizione gratis», le due vie di spedizione spente
+con «chi vende non spedisce in Italia: prova un'altra destinazione», e
+nel conto Spedizione «gratuita», Totale da pagare «NaN €», «Paga»
+acceso.
+
+**SONO DUE DIFETTI, E VANNO TENUTI DISTINTI.**
+**1) IL NaN, il verde e «Paga» sono del CLIENT, ed è la causa certa.**
+Il cantiere delle zone (`79a7e34`, 17 set) ha dato al server un
+secondo modo di spegnere una strada — `zona_non_offerta`, gemello di
+`cambio_assente`: la via esce SENZA NUMERI. Il client quel motivo lo
+DISEGNAVA (la via sbiadita, con la frase) ma non lo GIUDICAVA: i
+quattro posti che chiedevano «è viva?» guardavano ancora il solo
+cambio. Quindi `caricaPreventivo` metteva la strada chiusa fra le
+«vive» e `viaDefault` la SCEGLIEVA (il punto, che è il default);
+`renderAcquisto` leggeva il suo `totale_sats`, che non c'è →
+`undefined` → «NaN €»; `(spedizione_sats||0) === 0` leggeva l'assenza
+come uno zero → il verde «Spedizione gratis» e «gratuita» nel conto;
+e niente spegneva «Paga». **Soldi non ne sono mai partiti**: `compra()`
+ha lo stesso `_zona_offerta` e risponde 400 — a mentire era la pagina.
+È la stessa riga che il verbale del badge 🚚 chiamava «quella che si
+sbaglia per prima» (`cambio_assente` NON È GRATIS): scritta per un
+motivo, mancava per l'altro.
+**2) «NON SPEDISCE IN ITALIA» lo dice il SERVER, e il client lo legge
+bene.** Non è la lettura di `zone`/`zoneSped` di stamattina, né
+`domestico_sped`: il preventivo con casa E punto spente dice che la
+zona era `dom` e che `_zona_offerta(a, 'dom')` ha risposto no — cioè
+la mappa dell'annuncio è NON VUOTA e SENZA `dom`. Nel codice c'è UNA
+sola strada che la produce, e l'ho riprodotta dal vivo: nel modulo la
+casella del paese di casa lasciata VUOTA con almeno un continente
+pieno. La guardia «almeno una zona» passa (l'Europa c'è), le colonne
+di casa restano a 0 — quindi card e scheda dicono «Spedizione
+gratuita» — e l'Italia è chiusa. **Combacia con tutto quel che si è
+visto** (gratis + italiano + non spedisce in Italia), e la trappola è
+nel modulo: la casella di casa vuota mostrava un placeholder «0»
+grigio, che si legge come uno zero già scritto («gratis»), mentre le
+sette sorelle dei continenti dicevano onestamente «non spedisco».
+⚠️ Resta un'IPOTESI finché non si guarda la riga vera: il VPS è fuori
+dal mio perimetro, la query di sola lettura sta nel report del 18 set.
+Scartate coi byte: lo «0» in euro (`eurCampo` manda il numero 0, e
+`_porta` lo conta come dichiarato), il client vecchio in cache (manda
+sempre la chiave di casa), gli import (non scrivono la mappa: mappa
+vuota = ripiego su casa), la migrazione (scrive `dom` per prima).
+
+**LA CURA.** `stradaViva(s)`: un giudice solo per «è viva?», coi due
+motivi dentro, e ci passano il default della via (vero e demo),
+`costiVieUguali`, il verde, il ⚡ del wallet. `statoCassa(p, via)`: la
+pura che dà alla cassa i numeri del conto e, quando numeri non ce ne
+sono, la FRASE — «Nessuna consegna disponibile per la tua
+destinazione», «Il cambio euro non è disponibile…», «Scegli qui sopra
+come vuoi riceverlo» — con una cintura per il motivo di domani: una
+strada viva il cui totale non è un numero si chiude anche lei. A
+conto chiuso la frase prende il posto delle righe, «Paga» esce
+spento (senza l'id `acqCompra`, come nello scheletro), e
+`ctaAcquisto` ha la sua cintura. `cifraCtrl` non scrive mai una cifra
+che non è un numero («—»). **IL MENU DEL PAESE** viveva solo nel
+cassetto della via casa, che a via spenta non si apre: «prova
+un'altra destinazione» era un vicolo cieco. Ora sta sotto la via
+spenta, fuori dal div sbiadito.
+Nel modulo: la casella di casa vuota dice «non spedisco» come le
+sorelle, e casa vuota + estero pieno accende un avviso col rimedio
+(«Se è gratis, scrivi 0»). La scelta resta legittima — la mappa la sa
+dire, ed è una decisione del 17 — ma non è più silenziosa.
+**IL VECCHIO RIPIEGO È CADUTO, ed è voluto:** a via morta il conto
+mostrava articolo + protezione, una cifra che non corrispondeva a
+nessun acquisto possibile. Col cambio muto su tutte le strade la
+pagina ora dice la frase invece di quel numero.
+
+**LE STRADE SCARTATE.** Far ripiegare il SERVER su casa quando la
+mappa non ha `dom`: rovescerebbe la regola del 17 («chi svuota il
+domestico e riempie l'Europa ottiene quel che ha chiesto») indovinando
+l'intenzione di chi vende, e aprirebbe una spedizione che forse non
+vuole fare. Un 400 alla pubblicazione per «casa vuota»: stessa
+ragione. Si avvisa, non si vieta.
+
+**L'ASTA E IL FOGLIO DELL'OFFERTA** (chiesti nel giro). L'asta dal
+foglio di acquisto non passa (l'ordine nasce da `crea_ordine_pagato`),
+quindi il NaN non la tocca — ma lo stesso cantiere l'aveva rotta
+ALTROVE: con l'asta accesa il campo del costo è nascosto, la chiave di
+casa non partiva, la mappa nasceva vuota e il server rispondeva
+«Dicci dove spedisci» indicando una casella che in pagina non c'è.
+**Dal 17 set un'asta con spedizione non si pubblicava più**
+(riprodotto: 400). Cura di tre righe in `consegnaPayload`: in asta la
+casa si dichiara a zero — la spedizione è inclusa nel prezzo, da
+sempre — e l'estero non si manda, che un numero rimasto in una
+casella nascosta sarebbe una promessa mai vista. Il foglio
+dell'offerta la spedizione non la conta proprio (l'accettata si paga
+poi dal foglio di acquisto, che è quello curato): non è toccato.
+
+**LE PROVE (`prove_cassa_strada_chiusa`, 47).** Il CONTRATTO: i motivi
+con cui `_strade_preventivo` spegne una strada, letti dal sorgente del
+server, devono essere tutti noti a `stradaViva` — il terzo motivo
+dimenticato di qua sarebbe di nuovo un NaN. Il CENSIMENTO: chi legge i
+due flag a mano è contato (3 e 5). Il BANCO node, a casi indipendenti:
+il caso del 18 (anche con la via morta GIÀ scelta, che era lo stato
+vero), col ritiro a mano, sano, cambio muto, la strada «viva» senza
+totale, lo storico — e LA SENTINELLA chiesta: in ogni caso il totale
+che esce è un numero, e nemmeno `contoRighe` con un totale assente
+scrive «NaN». Il payload dell'asta e l'avviso del modulo, fatti
+girare su un form di cartone. Nel banco del badge 🚚, che fa girare il
+blocco VERO, due casi nuovi: strada chiusa dalla zona → né verde né
+invito. Tre prove di ieri leggevano le righe traslocate nel giudice e
+sono state riscritte sul punto (non ammorbidite): una misurava
+«l'apertura PRIMA del toast» sul primo `toast(` di `ctaAcquisto`, che
+ora è la cintura.
+**LA TORTURA: 20 mutazioni, 18 uccise al primo giro.** Le due
+sopravvissute erano la chiamata della DEMO (`viaDefault` ha due
+chiamanti, e la sentinella ne guardava uno) e l'avviso del modulo, che
+nessuna prova faceva girare. Chiuse, secondo giro 20 su 20. Da
+leggere: il verde che torna a guardare il solo cambio (M5) muore per
+le sentinelle di testo e non per il banco — nel banco la fila delle
+promesse è già spenta da `spedisceQui`, cioè le due difese coprono lo
+stesso caso; le mutazioni le prendono una per una.
+Suite intera: 11.761 verdi, 0 rosse (11.712 prima del cantiere: 47 nella famiglia nuova, 2 nel banco del badge).
+
+**IL GIRO DAL VIVO** (collaudo, porta mia 8137, copia del database
+locale). Venditore 222 pubblica col payload ESATTO del modulo a casa
+vuota ed Europa a 15 €: il server accetta, mappa `{"eu": …}` senza
+`dom`, e il preventivo da Compratore 111 torna identico a quello di
+produzione (casa e punto `zona_non_offerta`). Aperto il foglio dal
+bottone vero «Acquista»: nessun NaN, niente verde, la frase nel conto,
+«Paga» spento, il menu del paese sotto la via spenta. Scelta la
+Germania dal menu: strada viva, 15,00 € di spedizione, totale
+225,60 €, «Paga» acceso; tornato in Italia: si richiude pulito. Nel
+modulo: placeholder «non spedisco», l'avviso compare scrivendo 9000
+nell'Europa a casa vuota, e con l'asta accesa il payload porta
+`spedizione_sats: 0` e nessuna zona (il 9000 nascosto non trapela);
+il server quell'asta la pubblica, mappa `{"dom": 0}`. Uno scatto
+solo (poi il pane non componeva più: il DOM è la prova).
+NON PROVATO dal vivo: il telefono Android vero, il carrello (la
+strada è la stessa `statoCassa`, ma non l'ho aperto), il ⚡ del wallet
+(in locale un wallet non c'è), e il «prima» sul client di ieri — il
+difetto l'ho riprodotto sul server e nel banco (M1 lo rifà), non
+rivisto a schermo.
+
+**RESTA DA GUARDARE.** La query sul VPS: la riga del Motorola, e
+quanti annunci hanno la mappa senza `dom` — quelli oggi NON si possono
+comprare con la spedizione dall'Italia, e la cura è del venditore
+(riaprire l'annuncio e scrivere il costo di casa, fosse anche 0): il
+codice non indovina. E una cosa vista passando, NON toccata: card e
+scheda dicono «Spedizione gratuita» anche per un annuncio che a casa
+non spedisce (`spedGratis` guarda le colonne a zero, non la porta) —
+è il gemello in vetrina del verde curato qui.

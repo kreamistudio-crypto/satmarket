@@ -16814,6 +16814,20 @@
   nel titolo. Vedi Cantieri, «LE ZONE DI SPEDIZIONE», per le quattro
   decisioni ambigue (Russia, Turchia, Regno Unito, Cipro) e i due
   guasti che ha trovato il banco.
+  LA STRADA VIVA (18 set 2026): una strada del preventivo esce SPENTA
+  in due modi — `cambio_assente` e `zona_non_offerta` — e in tutti e
+  due SENZA NUMERI. Nel client «è viva?» lo chiede `stradaViva(s)`, un
+  giudice solo: ci passano il default della via (`caricaPreventivo` e
+  la demo), `costiVieUguali`, il verde della 🚚, il ⚡ del wallet e
+  `statoCassa(p, via)`, la pura che dà alla cassa `viaOk`, `sped`,
+  `tot` e la frase `chiuso`. IL TOTALE NON È MAI NaN: a via morta (o
+  viva ma senza un totale numerico) il conto diventa la frase
+  (`contoChiuso`) e «Paga» esce spento, senza l'id `acqCompra`. Un
+  terzo motivo per spegnere una strada si aggiunge a `stradaViva` e
+  in nessun altro posto: una sentinella incrocia i motivi che
+  `_strade_preventivo` emette con quelli che il giudice conosce, e
+  un'altra conta chi legge i due flag a mano. Vedi Cantieri, «Il
+  foglio di acquisto che diceva NaN».
 
   IL SUPPLEMENTO PER PEZZO (ago 2026, caso dal campo: il riso da 4 kg
   venduto a sacchi con la spedizione di UNO solo dichiarata — chi ne
