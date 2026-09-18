@@ -20417,3 +20417,126 @@ del 18 set). E la lezione vale oltre: `mapListing` ha ormai cento
 chiavi e ogni cantiere ne aggiunge una in fondo — la sentinella delle
 chiavi ripetute è la ragione per cui la prossima collisione sarà rossa
 invece che silenziosa.
+
+## La finestra scorrevole della vetrina: il 4º annuncio non va più in fondo (18 set 2026)
+
+**IL DIFETTO**, visto il 18 set su due casi veri: le RAM Corsair di
+Andrea (Torino) e quattro prodotti di un venditore di Dro (TN) in
+«Alimenti e bevande». Le tornate d'agosto («3 ogni 30», vedi
+«LA VETRINA SI ORDINA A TORNATE», oggi riscritta) ordinavano per
+`tornata, creato`: il 4º annuncio di chiunque finiva SOTTO i primi tre
+di tutti gli altri venditori, anche vecchi di un mese. Era scritto
+anche nella voce d'agosto («rovescia una promessa dichiarata… è la
+decisione di prodotto, detta ad alta voce»): detta, ma mai vista coi
+dati di un giorno normale, dove chi pubblica quattro cose in una
+mattina non è una valanga. L'intento da tenere era l'altro: un
+negozio collegato che importa 200 prodotti in un colpo non deve
+occupare da solo le prime pagine.
+
+**LA DECISIONE: LA REGOLA A, LA FINESTRA SCORREVOLE.** In qualunque 12
+card consecutive un venditore ne ha al più 3; il successivo slitta
+alla prima posizione che lo permette; per il resto «più recenti
+prima». Leve `VETRINA_PER_VENDITORE` (3, e 0 spegne tutto come prima)
+e `VETRINA_FINESTRA` (12, nuova). Vale per la vetrina generale e per i
+reparti (si riordina la rosa filtrata), non per prezzo/lampo/asta,
+ricerca, negozio e «i miei».
+
+**IL CONFRONTO, coi numeri.** Non ho una copia del database di
+produzione (il VPS è fuori dal mio perimetro, e i backup sul PC sono
+cifrati con una chiave che non ho): il confronto è sul database di
+COLLAUDO (859 annunci attivi, 24 venditori — la stessa forma del
+«tornata 0 da 70 righe» di agosto), spostato in avanti al 17 set, coi
+due casi RICOSTRUITI PER FORMA (quattro annunci di un venditore in una
+mattina, il più vecchio è le RAM; quattro prodotti di Dro in un
+pomeriggio) e il negozio finto da 200 allo stesso secondo. Posizione
+del 4º annuncio, puro · tornate · A · B:
+- RAM (vetrina generale): **16 · 86 · 24 · 16**; nel reparto
+  Informatica (5 annunci) 4 · 5 · 5 · 4. Con le tornate sopra le RAM
+  stavano 11 annunci vecchi di oltre un mese; con A e B nessuno.
+- Dro (vetrina generale): **12 · 85 · 21 · 15**; nel reparto Alimenti
+  (14 annunci) 7 · 10 · 10 · 7.
+- Negozio da 200, card sue nelle prime 12/30/60: puro 12/30/60 ·
+  tornate 3/3/3 · **A 3/9/15** · **B 12/30/60**.
+
+**PERCHÉ NON B (tornate per giornata).** Salva i due casi quasi quanto
+A, ma BOCCIA l'anti-valanga, ed è la ragione che decide: il giorno
+dell'import quasi nessun altro ha pubblicato, quindi la «tornata 1 di
+oggi» è tutta del negozio, e le 200 card vanno in testa in blocco —
+il primo annuncio di ieri scivola al posto 201. Cioè B ripara il
+difetto riaprendo esattamente il buco che le tornate chiudevano. In più
+ha un confine di mezzanotte che si vede (alle 23:59 e alle 00:01 lo
+stesso annuncio cambia di pagine) e non si spiega in una frase.
+
+**IL PREZZO DI A, DETTO.** Il negozio da 200 tiene 3 card ogni 12 —
+una su quattro, a blocchi di tre (posti 1-3, 13-15, 25-27…) — finché
+gli altri hanno qualcosa da mostrare; con le tornate ne teneva circa
+una su venticinque. Non occupa DA SOLO nessuna pagina, che è
+l'intento; ma pesa di più. La leva per stringerlo è la LARGHEZZA:
+`VETRINA_FINESTRA` 24 → 3/6/9 (1 su 8), 30 → 3/3/6 (1 su 10), e il 4º
+delle RAM slitta di tanto in più quanto è larga la finestra (a 12 va
+al posto 13 dal primo, a 30 al 31). K=3 e N=12 sono il punto di
+partenza chiesto, non una taratura: si guarda come respira.
+
+**IL SEGNALIBRO È CAMBIATO DUE VOLTE, ed è la lezione del cantiere.**
+Prima stesura: una FOTOGRAFIA — `'{creato}_{id}_{posizione}_{ultimo}'`,
+«rifai il riordino sulla rosa della prima pagina e riparti dopo
+l'ultima card vista». Reggeva alle pubblicazioni, e la tortura ha
+lasciato viva una mutazione («riparti dalla sola posizione»): nessuna
+prova vendeva un annuncio GIÀ VISTO. Scritta quella prova, a caso: 178
+scorrimenti su 300 con un BUCO. Il perché è strutturale: nella
+finestra un annuncio dipende dai vicini, quindi togliere una card già
+vista libera uno slot, un rimandato sale sopra il segnalibro e quello
+non lo vede più nessuno. **Un riordino che dipende dai vicini non si
+ricalcola: si riprende.** Il segnalibro ora è il QUADERNO del riordino
+— `'f{fronte}_{testa}_{ultimi}_{attesi}'`: fin dove si è letta la
+fila, l'annuncio letto e non messo, i venditori delle ultime 11 card,
+e per chi aspetta la data del suo ultimo mostrato. Da lì cosa è già
+stato mostrato si dice con le sole date (per venditore le card escono
+sempre dal più recente), e la pagina dopo riparte da quello stato.
+Resta corto per costruzione (con 3 ogni 12 al tetto stanno al più tre
+venditori): 120 caratteri dal vivo, sotto i 300 nel caso peggiore.
+Le tornate avevano lo stesso difetto e non lo diceva nessuno: la
+vendita del 3º annuncio di un venditore spostava il suo 4º in un'altra
+tornata.
+
+**LE STRADE SCARTATE.** La colonna materializzata (invecchia a ogni
+venduto/rimosso, come ad agosto). La finestra in SQL (è un riordino
+che dipende dalle scelte precedenti: nessuna window function lo dice;
+l'algoritmo sta in Python, `ordine_finestra`, puro e a generatore, e
+la prima pagina si ferma appena è piena). La fotografia (sopra). Con
+l'SQL se ne va anche la soglia SQLite 3.25 e il suo fail-open.
+
+**PROVATO.** `prove_finestra` (51 verdi): la funzione pura contro la
+frase della regola a forza bruta (400 file a caso), il 4º al posto 13,
+la vetrina a pagine da 6/7/30 identica a quella chiesta in un colpo,
+pochi venditori senza pagine corte, e il mondo che cambia — pubblicato,
+venduto già visto, venduto non visto, e 150 scorrimenti con vendite e
+pubblicazioni a OGNI pagina, tutti esatti. **Tortura: 22 mutazioni, 22
+uccise** (le due del quaderno «il fronte non avanza» e «il mostrato
+non si aggiorna» muoiono facendo esplodere il caso, che è rosso per la
+ragione giusta). `collaudo_finestra.py` (era `collaudo_tornate.py`)
+sulla rotta vera: 27 verdi, compreso «si pubblica mentre si scorre».
+**DAL VIVO** (server del worktree sulla porta 8177, copia del database
+di collaudo con tre venditori di banco aggiunti): 36 pagine, 1067 card,
+1067 uniche, `totale` 1067; il 4º del finto «RAM» al posto 19, quello
+del finto «Dro» al 16, il negozio ai posti 1-3, 13-15, 25-27; nel
+reparto Alimenti 11 card su 11. La vetrina disegnata apre con tre 🏡
+del negozio, tre 🍎 di Dro e poi 💻 (letta dal DOM: lo scatto usciva
+coperto dal velo d'ingresso).
+
+**NON PROVATO.** I due casi VERI: li ho ricostruiti per forma, e i
+numeri veri li dà `confronta_vetrina.py`, che è fatto apposta per
+girare in SOLA LETTURA sul database di produzione (`mode=ro`, tre
+regole e il negozio finto in memoria, la `ordine_finestra` letta dal
+sorgente vero): `cd ~/satmarket && python3 confronta_vetrina.py
+satmarket.db`. Lo scorrimento infinito nel Browser pane (gli
+IntersectionObserver lì non emettono): la coerenza delle pagine è
+provata sull'API. Il telefono.
+
+**RESTA DA GUARDARE.** Nessun gesto obbligatorio sul VPS: le due leve
+hanno il default nel codice. Dopo il deploy, il pannello «⚙️ Stato
+delle leve» deve dire 3 e 12; se dicesse altro, c'è una riga esplicita
+nel config del VPS. Chi scorre a cavallo del deploy riceve la prima
+pagina una volta (il cursore delle tornate non ha la forma nuova):
+dichiarato. E la taratura: se il negozio collegato pesa troppo, si
+allarga `VETRINA_FINESTRA`, non si torna alle tornate.
