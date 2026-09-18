@@ -1,4 +1,4 @@
-# IL FORK DI MOSTRO — cinque patch sopra il tag v0.18.7
+# IL FORK DI MOSTRO — sei patch sopra il tag v0.18.7
 
 Qui dentro non c'è codice in servizio: ci sono le patch che il nodo Mostro di
 Dublino applica sopra il sorgente upstream, prodotte con
@@ -15,7 +15,7 @@ esattamente il lavoro che non vogliamo.
 
 Fatto l'8 settembre 2026. Upstream: `v0.18.7`, commit `afc39a2`.
 
-## LE CINQUE PATCH, cosa fanno e perché
+## LE SEI PATCH, cosa fanno e perché
 
 **0001 — `src/lnurl.rs`, i tre budget da 4s/2s/2s a 30s/15s/10s.**
 Un coordinator che esce solo da Tor misura **10,6 secondi** per la
@@ -80,9 +80,10 @@ e dice «riprova fra poco, o pubblica a prezzo fisso».
 
 **0005 — le commissioni PER PARTE: `src/barattolo_fee.rs` (nuovo) e sette
 agganci in `main.rs`, `take_buy.rs`, `take_sell.rs`, `util.rs`,
-`flow.rs`, `add_invoice.rs`.** ⚠️ NON È ANCORA IN SERVIZIO (set 2026):
-scritta e provata a secco sul sorgente del tag, da compilare e provare
-sul nodo. È la sola delle cinque che NON va proposta a monte: è la
+`flow.rs`, `add_invoice.rs`.** IN SERVIZIO dal 18 set 2026 (immagine
+`-bar3`, commit `3a7a121` sul nodo): compilata al primo colpo, e provata
+con uno scambio vero — vedi PROVATO, qui sotto, con quel che ancora
+manca. È la sola delle sei che NON va proposta a monte: è la
 politica di prezzo di Barattolo, non un difetto di Mostro.
 Chi è pioniere OPPURE ha il livello 5 su Barattolo paga mezzo punto in
 meno sulla SUA metà della commissione, e lo sconto lo applica mostrod
@@ -132,7 +133,25 @@ noi spenta) mette `order.fee` nel contesto di chi prende e può far
 correre più prese sullo stesso ordine. Prima di accendere i bond questa
 patch si rilegge.
 Nasce da `patch-0005-fee-per-parte.py` (con `barattolo_fee.rs` accanto;
-`--secco` prova le ancore senza scrivere).
+`--secco` prova le ancore senza scrivere) e vive qui come `.patch`
+esportato dal nodo.
+
+**0006 — `src/app/release.rs`: «has failed!» dice PERCHÉ.** In servizio
+dal 18 set 2026 nella stessa `-bar3` (commit `4f20e04` sul nodo). Solo
+log, nessun comportamento cambia. Quando il payout a chi compra
+fallisce, upstream scrive «Invoice with hash: … has failed!» e basta —
+ma quella riga nasce quando lo stream di `SendPaymentV2` consegna
+`status = FAILED`, e nello STESSO messaggio LND dice il motivo
+(`payment.failure_reason`: NO_ROUTE, INSUFFICIENT_BALANCE, TIMEOUT…),
+che mostrod non leggeva in nessun punto. Il 17 set 2026 (scambio
+`3fcdb207`, 14.837 sats fermi) ci ha fatto tirare a indovinare: era
+NO_ROUTE per il tetto delle fee di rotta, trovato da `lncli` e non dal
+log. Ora la riga porta il motivo (nome e codice grezzo) e quanti
+tentativi HTLC sono partiti — zero vuol dire che LND non ha nemmeno
+provato una strada. Nasce da `patch-0006-perche-e-fallito.py`. Questa
+SÌ è da proporre a monte: è un difetto di diagnosi di chiunque.
+⚠️ MAI VISTA PARLARE: compila e i test sono verdi, ma la riga esce solo
+quando un payout fallisce, e dal 18 set non ne è fallito nessuno.
 
 ## COSA CURA, E COSA NO
 
@@ -150,22 +169,28 @@ Il difetto ha due facce, e le patch le trattano in modo diverso.
 
 ## IN SERVIZIO
 
-Immagine `mostro:v0.18.7-bar2` dal 15 set 2026 sera (la `-bar1` con le
-prime tre patch è restata sulla macchina, come tag di rollback), costruita
-sul nodo con `docker build -f docker/Dockerfile -t mostro:v0.18.7-bar2 .` dentro
+Immagine `mostro:v0.18.7-bar3` dal 18 set 2026 (la `-bar2` con le prime
+quattro patch e la `-bar1` con le prime tre sono restate sulla macchina,
+come tag di rollback), costruita
+sul nodo con `docker build -f docker/Dockerfile -t mostro:v0.18.7-bar3 .` dentro
 `~/nodo/mostro-src`. Il `Dockerfile` fa `COPY . .`, cioè copia il
 sorgente LOCALE e non lo riscarica: è la ragione per cui le patch
 finiscono davvero nel binario, ed è la cosa da riverificare se un
 domani quel file cambia.
 
 **Un tag non si sovrascrive mai.** `mostro:v0.18.5` e `mostro:v0.18.6`
-sono ancora sulla macchina, e il giorno che servisse una `-bar2` prende
-un nome nuovo. Un tag riusato è un rollback che non si può fare.
+sono ancora sulla macchina, e il giorno che servisse una build nuova
+prende un nome nuovo (`-bar4`). Un tag riusato è un rollback che non si
+può fare.
 
 Il compose passa alla versione nuova in **una riga** (la 64 di
 `~/nodo/docker-compose.yml`), e quella riga è anche tutto il rollback:
 rimessa a `v0.18.6` e rifatto l'`up -d`, si torna indietro. Copie di
 sicurezza sul nodo: `docker-compose.yml.prima-bar1`.
+La 0005 ha un gradino di rollback PRIMA di quello: tolte dal compose le
+tre variabili `BARATTOLO_SCONTO_*` e rifatto l'`up -d`, la patch è
+inerte senza cambiare immagine. La `fee` in `settings.toml` (0.03 dal
+18 set 2026) si rimette a mano: è config, non patch.
 
 ⚠️ **`up -d`, non `restart`.** `docker compose restart mostro` riavvia
 il container ESISTENTE, che resta quello costruito sull'immagine
@@ -208,8 +233,18 @@ tornerebbe identico.
   una build verde non dice niente su di loro, vanno lanciati a parte.
 - La 0004: `market_priced_order_without_price_data_is_a_cant_do` verde
   nei test di `app::order`, `app::take_buy`, `app::take_sell` sul nodo.
-- In servizio: `inspect` dice `mostro:v0.18.7-bar2` (era `-bar1` fino al
-  15 set 2026), log con
+- La 0005 e la 0006 (18 set 2026): build verde AL PRIMO COLPO — il Rust
+  non era mai stato compilato, sul PC non c'è `cargo` — e **144 test
+  verdi, zero falliti** nello stadio `builder`, coi cinque filtri
+  `barattolo_fee app::take_buy app::take_sell flow app::add_invoice`.
+  I test upstream dei due take non si sono accorti di niente, che è la
+  prova di «a sconto spento, upstream byte per byte».
+- LO SCAMBIO DI PROVA della 0005 (18 set 2026, ordine `4ed69365`, 7388
+  sats, due pionieri): `discount true` per tutt'e due, fee **74 + 74**
+  (1% a testa: `round(0.02 × 7388 / 2)`), hold **7462**, payout **7314**,
+  37 sats di rotta. Al satoshi.
+- In servizio: `inspect` dice `mostro:v0.18.7-bar3` (era `-bar2` fino al
+  18 set 2026), log con
   «Settings correctly loaded!», prezzi pubblicati su Nostr.
 
 **Quello che NON è provato**, ed è la parte onesta: che la dev fee ora
@@ -217,6 +252,15 @@ passi davvero a circuito freddo. Si prova solo al prossimo scambio
 vero, senza scaldare il circuito prima — che è esattamente l'accidente
 che il 7 settembre 2026 aveva fatto sembrare risolto un problema che
 non lo era.
+E DELLA 0005, tre cose: 1) **il caso fail-closed** — server muto o
+segreto sbagliato, fee piena per tutt'e due e la riga `discount NOT
+verified` nel log; 2) **il caso senza sconto** con la patch accesa;
+3) e quella che conta di più: **lo scambio con UNO SOLO scontato**. Fra
+due pionieri la fee di chi compra e quella di chi vende sono UGUALI,
+quindi quello scambio non distingue `order.fee` dalla riga di
+`barattolo_fees`: se i tre posti del venditore leggessero la colonna
+sbagliata, il conto sarebbe tornato identico. La tabella a lato esiste
+per il caso asimmetrico, e il caso asimmetrico dal vivo non c'è ancora.
 
 ## AGGIORNARE A UNA VERSIONE UPSTREAM NUOVA
 
@@ -224,13 +268,16 @@ non lo era.
 cd ~/nodo/mostro-src
 git fetch --tags
 git switch -c barattolo/vX.Y.Z vX.Y.Z
-git cherry-pick a9d387b 1d6652c 1d5f634 2b71308   # + il commit della 0005, quando ci sarà
+git cherry-pick a9d387b 1d6652c 1d5f634 2b71308 3a7a121 4f20e04
 docker build -f docker/Dockerfile -t mostro:vX.Y.Z-bar1 .
 docker build -f docker/Dockerfile --target builder -t mostro-test:bar1 .
-docker run --rm mostro-test:bar1 sh -c "cargo test --release lnurl && cargo test --release config::util && cargo test --release dev_fee && cargo test --release app::order && cargo test --release app::take_buy && cargo test --release app::take_sell && cargo test --release barattolo_fee && cargo test --release flow && cargo test --release app::add_invoice"
+docker run --rm mostro-test:bar1 cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice
 ```
 
 poi la riga dell'immagine nel compose e `docker compose up -d mostro`.
+I filtri vanno TUTTI dopo `--`, in un colpo solo: la forma vecchia
+(`sh -c "… && …"`) ha le virgolette annidate, e lanciata dal PC dentro
+`ssh "…"` PowerShell non le fa passare.
 
 **Un conflitto su `lnurl.rs` o su `dev_fee.rs` è la NOTIZIA BUONA**:
 vuol dire che upstream ci ha messo mano, e la domanda diventa se la

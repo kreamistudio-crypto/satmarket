@@ -1,0 +1,39 @@
+From 4f20e0488289cd8cdb88e5668de9a433dc77fa7f Mon Sep 17 00:00:00 2001
+From: kreamistudio-crypto <kreamistudio-crypto@users.noreply.github.com>
+Date: Fri, 18 Sep 2026 07:17:13 +0000
+Subject: [PATCH 6/6] release: log why a payout has failed
+
+---
+ src/app/release.rs | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
+
+diff --git a/src/app/release.rs b/src/app/release.rs
+index f87114a..188c622 100644
+--- a/src/app/release.rs
++++ b/src/app/release.rs
+@@ -1025,9 +1025,20 @@ pub async fn do_payment(
+                                 }
+                             }
+                             PaymentStatus::Failed => {
++                                // LND says WHY in the same update: surface it, or a
++                                // failed payout is a guessing game (no route? balance?
++                                // timeout?). Zero HTLC attempts means LND never even
++                                // tried a route.
+                                 warn!(
+-                                    "Order Id {}: Invoice with hash: {} has failed!",
+-                                    order.id, msg.payment.payment_hash
++                                    "Order Id {}: Invoice with hash: {} has failed! reason: {:?} (code {}), htlc attempts: {}",
++                                    order.id,
++                                    msg.payment.payment_hash,
++                                    fedimint_tonic_lnd::lnrpc::PaymentFailureReason::try_from(
++                                        msg.payment.failure_reason
++                                    )
++                                    .ok(),
++                                    msg.payment.failure_reason,
++                                    msg.payment.htlcs.len()
+                                 );
+ 
+                                 // Release our own claim (scoped to this hash and
+-- 
+2.47.3
+
