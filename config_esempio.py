@@ -58,6 +58,18 @@ LNBITS_NODO_INVOICE_KEY = "INCOLLA_QUI_LA_INVOICE_KEY_DEL_NODO"
 LNBITS_NODO_ADMIN_KEY = "INCOLLA_QUI_LA_ADMIN_KEY_DEL_NODO"  # SEGRETA!
 CASSAFORTE_NUOVA = False    # True = i nuovi ordini nascono sul nodo
 
+# IL GUARDIANO DEL PONTE (set 2026): con le tre righe del nodo presenti,
+# ogni minuto il server bussa a LND attraverso il ponte (lnd-ponte,
+# 127.0.0.1:18080). Dopo due minuti di silenzio riavvia tor e il ponte,
+# riguarda dopo 45 secondi e lo dice su Telegram — al massimo un avviso
+# ogni 15 minuti. Lo stato esce anche in /api/salute («ponte»).
+GUARDIANO_PONTE = True       # False = nessun controllo e nessun riavvio
+GUARDIANO_PONTE_AVVISA = []  # a chi scrive, per id Telegram: es.
+                             # [123456789]. Vuota = ai moderatori
+                             # (ADMIN_IDS): un guasto del denaro non
+                             # deve poter restare senza nessuno che lo
+                             # sappia, come il 18 set 2026
+
 # --- Regole del mercatino --------------------------------------------
 COMMISSIONE_PERCENTO = 0     # trattenuta a vendita conclusa (0 = sospesa: cifra da decidere)
 PROTEZIONE_PERCENTO = 0      # protezione acquisti a carico del COMPRATORE

@@ -21977,9 +21977,13 @@ _SEGRETI_FINTI = {
 }
 
 
-def _censimento(acceso):
+def _censimento(acceso, dopo=None):
     """Gira il censimento con tutte le leve accese o tutte spente, e
-    restituisce (voci per chiave, JSON di tutto)."""
+    restituisce (voci per chiave, JSON di tutto). `dopo` sostituisce dei
+    nomi DOPO gli exec — le funzioni li cercano al momento della
+    chiamata, quindi vale anche per i giudici veri (serve al guardiano
+    del ponte, la cui riga col nodo configurato qui non si vedrebbe
+    mai: l'URL finto del nodo e' un segreto di cartone)."""
     import json
     amb = _ConfigFinto(_SEGRETI_FINTI)
     amb["__builtins__"] = __builtins__
@@ -22067,7 +22071,8 @@ def _censimento(acceso):
                  "CONNETTORI_SYNC_MANUALE_S", "MAX_TARIFFA_CONNETTORE",
                  "CLASSIFICA_ATTIVA", "CLASSIFICA_TOP", "CLASSIFICA_K",
                  "CLASSIFICA_XP_RIF", "CLASSIFICA_PESO_XP",
-                 "CLASSIFICA_KD", "P2P_ATTIVO", "MOSTRO_NPUB"):
+                 "CLASSIFICA_KD", "P2P_ATTIVO", "MOSTRO_NPUB",
+                 "GUARDIANO_PONTE"):
         amb[nome] = acceso and 24
     # IL PIENO DEL BANNER VUOLE UN VALORE SUO, e non il 7 implicito di
     # `__missing__`: il prezzo vale 7 da li', quindi con 7 anche il
@@ -22166,8 +22171,13 @@ def _censimento(acceso):
     for f in ("webhook_attivo", "relay_chiavi_attivo", "sconto_p2p_attivo",
               "_leva", "_elenco",
               "_prezzo_banner", "_p2p_leve", "_segreto_p2p_vivo",
-              "_nodo_configurato", "cassaforte_nuova", "_leve_stato"):
+              "_nodo_configurato", "cassaforte_nuova",
+              # il guardiano del ponte (set 2026): la sua riga CHIAMA
+              # questi tre, la stessa trappola di `cassaforte_nuova`
+              "_guardiano_ponte_attivo", "_destinatari_ponte",
+              "_chi_avvisa_ponte", "_leve_stato"):
         exec(pezzo(f), amb)
+    amb.update(dopo or {})
     gruppi = amb["_leve_stato"]()
     voci = {v["chiave"]: v for g in gruppi for v in g["voci"]}
     return gruppi, voci, json.dumps(gruppi, default=str, ensure_ascii=False)
@@ -36482,6 +36492,420 @@ def prove_deploy():
     # riga ancora li' da leggere.
     prova("...nel blocco [Service]", True,
           "Environment=HOME=/root" in corpo[corpo.index("[Service]"):])
+
+
+class _BastaPonte(BaseException):
+    """Il mondo finto del guardiano ha finito le risposte: si esce dal
+    ciclo VERO (`guardiano_ponte`, che e' un `while True`). BaseException
+    e non Exception apposta: la cintura del ciclo e la sonda prendono
+    `Exception`, e questa deve passare in mezzo a tutt'e due."""
+
+
+def _mondo_ponte(risposte, ritorno=0, errore_cmd=None, timbro="",
+                 avvisa=(700000001,), attivo=True):
+    """Il guardiano del ponte in un mondo di cartone: un orologio che
+    avanza solo coi `sleep`, un ponte che risponde a copione (True =
+    LND ha risposto, False = il rifiuto di tor del 18 set), un
+    systemctl che si registra e un Telegram che mette da parte.
+    `ritorno` e' il codice d'uscita dei due systemctl, `errore_cmd`
+    un'eccezione da alzare al posto del processo (o «appeso»)."""
+    import asyncio as _aio
+    import html as _html
+    import types
+    m = types.SimpleNamespace(ora=1_000_000.0, domande=[], comandi=[],
+                              messaggi=[], righe=[], client=[], uccisi=0,
+                              timbri={"ponte_avviso": timbro} if timbro
+                              else {}, copione=list(risposte))
+
+    class ConnectError(Exception):
+        pass
+
+    class Risposta:
+        status_code = 200
+
+    class Cliente:
+        def __init__(self, **kw):
+            m.client.append(kw)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, **kw):
+            if not m.copione:
+                raise _BastaPonte()
+            m.domande.append((m.ora, url))
+            if m.copione.pop(0):
+                return Risposta()
+            raise ConnectError("socks: connect request rejected or failed "
+                               "<18080>")
+
+    class Proc:
+        returncode = ritorno
+
+        async def communicate(self):
+            # col `<` dentro: le parole di systemctl finiscono in un
+            # messaggio HTML, e se non si scappano l'avviso non parte
+            return b"", (b"Failed to restart tor.service: Interactive "
+                         b"authentication required <polkit>."
+                         if ritorno else b"")
+
+        def kill(self):
+            m.uccisi += 1
+
+    class Aio:
+        TimeoutError = _aio.TimeoutError
+        subprocess = types.SimpleNamespace(PIPE=-1)
+
+        async def sleep(self, s):
+            m.ora += s
+
+        async def create_subprocess_exec(self, *argv, **kw):
+            m.comandi.append((m.ora, argv))
+            if isinstance(errore_cmd, BaseException):
+                raise errore_cmd
+            return Proc()
+
+        async def wait_for(self, coro, t):
+            if errore_cmd == "appeso":
+                coro.close()
+                raise _aio.TimeoutError()
+            return await coro
+
+    async def manda(chat, testo):
+        m.messaggi.append((m.ora, chat, testo))
+        return "telegram ok (messaggio 1)"
+
+    amb = {"html": _html, "httpx": types.SimpleNamespace(AsyncClient=Cliente),
+           "asyncio": Aio(),
+           "time": types.SimpleNamespace(time=lambda: m.ora,
+                                         monotonic=lambda: m.ora),
+           "print": lambda *a, **k: m.righe.append(" ".join(map(str, a))),
+           "timbro_letto": lambda n: m.timbri.get(n, ""),
+           "timbro_scrivi": lambda n, v: m.timbri.__setitem__(n, v),
+           "_manda_telegram": manda, "ADMIN_IDS": [999],
+           "GUARDIANO_PONTE": attivo, "GUARDIANO_PONTE_AVVISA": list(avvisa),
+           "_nodo_configurato": lambda: True}
+    # LE COSTANTI VERE e lo stato di partenza vero, ritagliati dal
+    # sorgente: le prove girano sui numeri che girano in produzione, e
+    # chi cambia un 900 in un 90 lo vede qui.
+    i = _SORGENTE.index("PONTE_LND_URL = ")
+    exec(_SORGENTE[i:_SORGENTE.index("_TASK_PONTE = None", i)], amb)
+    for f in ("_guardiano_ponte_attivo", "_destinatari_ponte",
+              "_chi_avvisa_ponte", "_ponte_passo", "_ponte_esito_cura",
+              "_ponte_avviso_permesso", "_ponte_pubblico", "_minuti_ponte",
+              "_testo_guasto_ponte", "_testo_esito_ponte",
+              "_testo_tornato_ponte"):
+        exec(pezzo(f), amb)
+    # pezzo() taglia dalla parola `def`: alle coroutine il prefisso si
+    # rimette a mano, il patto di `pezzo_async` qui sopra
+    for f in ("_sonda_ponte", "_riavvia_ponte", "_avvisa_ponte",
+              "_cura_ponte", "_giro_guardiano_ponte", "guardiano_ponte"):
+        exec("async " + pezzo(f), amb)
+    m.amb = amb
+    m.inizio = m.ora
+
+    def gira():
+        """Il ciclo VERO, finche' il copione non finisce."""
+        try:
+            _aio.run(amb["guardiano_ponte"]())
+        except _BastaPonte:
+            pass
+    m.gira = gira
+    # gli orari relativi all'avvio, che si leggono meglio
+    m.quando = lambda lista: [round(t - m.inizio) for t, *_ in lista]
+    return m
+
+
+def prove_guardiano_ponte():
+    """IL GUARDIANO DEL PONTE VERSO LND (18 set 2026). Nove ore di
+    acquisti falliti senza che nessuno lo sapesse: tor rifiutava il
+    ponte socat, LNbits non raggiungeva LND, e la cura erano due
+    riavvii. Qui si prova che il guardiano li fa da solo, al momento
+    giusto e non un minuto prima, che lo DICE, che non lo dice troppo,
+    e che una cura che non cura non gira in tondo per sempre.
+
+    SI FA GIRARE IL CICLO VERO (`guardiano_ponte`, un `while True`) su
+    un mondo di cartone, e non i pezzi a mano: la lezione del «banco
+    che non parte dove parte il dito» — i difetti che stanno FRA i
+    pezzi, qui il ritmo del minuto e il freno fra due cure, un banco
+    che chiama i gesti a mano non li vede."""
+    print("\n[il guardiano del ponte verso LND]")
+    TOR = ("systemctl", "restart", "tor")
+    PONTE = ("systemctl", "restart", "lnd-ponte.service")
+
+    # --- 1) IL 18 SETTEMBRE, rifatto ---------------------------------
+    # tre NO di fila a un minuto l'uno dall'altro, la cura, e dopo 45
+    # secondi LND risponde
+    m = _mondo_ponte([False, False, False, True, True, True])
+    m.gira()
+    prova("tre no di fila: la cura arriva al TERZO controllo",
+          [120, 120], m.quando(m.comandi))
+    prova("...e sono i due comandi della mattina, in quell'ordine",
+          [TOR, PONTE], [argv for _t, argv in m.comandi])
+    prova("il secondo sguardo arriva 45 secondi dopo la cura",
+          [0, 60, 120, 165, 180, 240], m.quando(m.domande))
+    prova("...e il minuto riparte dall'INIZIO del giro di prima", 180,
+          m.quando(m.domande)[4])
+    prova("due avvisi: il guasto PRIMA del riavvio, l'esito dopo",
+          [120, 165], m.quando(m.messaggi))
+    guasto, esito = m.messaggi[0][2], m.messaggi[1][2]
+    prova("...a chi dice la leva, e a nessun altro", [700000001] * 2,
+          [c for _t, c, _x in m.messaggi])
+    prova("il guasto dice da quanto, e cosa fa", True,
+          "almeno 2 minuti" in guasto and "Riavvio tor e lnd-ponte" in guasto)
+    prova("...e l'errore di tor arriva SCAPPATO", True,
+          "&lt;18080&gt;" in guasto and "<18080>" not in guasto)
+    prova("l'esito dice che e' tornato", True,
+          "tornato" in esito and "✅" in esito)
+    prova("...e dice i due comandi riusciti", True,
+          "systemctl restart tor" in esito
+          and "systemctl restart lnd-ponte.service" in esito)
+    prova("il freno si timbra all'ora del guasto", str(int(m.inizio + 120)),
+          m.timbri.get("ponte_avviso"))
+    prova("alla fine il ponte e' ok, e la salute lo dice", "ok",
+          m.amb["_ponte_pubblico"](True, m.amb["_ponte"]["stato"]))
+    prova("la sonda bussa a LND attraverso il ponte", True,
+          all(u == "https://127.0.0.1:18080/v1/state" for _t, u in m.domande))
+    # `curl -k` e un tetto: il certificato e' la SECONDA domanda di
+    # PRODUZIONE, non questa, e un circuito freddo va aspettato
+    prova("...senza verificare il cert, e con un tetto di 20 s", True,
+          all(k.get("verify") is False and k.get("timeout") == 20
+              for k in m.client))
+    prova("il journal lo racconta ai CAMBI, non a ogni giro", 1,
+          sum("nessuna risposta" in r for r in m.righe))
+
+    # --- 2) UN BUCO CORTO NON E' UN GUASTO ---------------------------
+    m = _mondo_ponte([False, False, True, True])
+    m.gira()
+    prova("due no e poi si': nessun riavvio", [], m.comandi)
+    prova("...e nessun avviso", [], m.messaggi)
+    prova("...ma il journal ha visto il buco e la fine", True,
+          any("nessuna risposta" in r for r in m.righe)
+          and any("di nuovo vivo" in r for r in m.righe))
+    # e il si' AZZERA il conto: due no, un si', un no non sono tre di fila
+    m = _mondo_ponte([False, False, True, False, True])
+    m.gira()
+    prova("no, no, si', no: il conto riparte e non si cura", [], m.comandi)
+
+    # --- 3) IL FRENO DEGLI AVVISI ------------------------------------
+    # un avviso cinque minuti fa: la cura si fa lo stesso, in silenzio
+    m = _mondo_ponte([False, False, False, True, True],
+                     timbro=str(int(1_000_000 - 300)))
+    m.gira()
+    prova("col freno tirato la cura si fa lo stesso", [TOR, PONTE],
+          [argv for _t, argv in m.comandi])
+    prova("...ma non si dice niente", [], m.messaggi)
+    prova("...e il timbro resta quello di prima", str(int(1_000_000 - 300)),
+          m.timbri["ponte_avviso"])
+    prova("...e il journal dice perche' tace", True,
+          any("trattenuto dal freno" in r for r in m.righe))
+
+    # --- 4) LA CURA CHE NON CURA non gira in tondo -------------------
+    # il nodo e' spento: ogni sguardo dice no per venti minuti, poi LND
+    # torna da solo. Senza freno, tor si riavvierebbe ogni tre minuti.
+    no = [False] * 21
+    m = _mondo_ponte(no + [True, True])
+    m.gira()
+    cure = sorted({t for t in m.quando(m.comandi)})
+    prova("una cura fallita non si ripete prima di 15 minuti",
+          [120, 1080], cure)
+    prova("...e ogni cura e' due comandi", 4, len(m.comandi))
+    prova("guasto ed esito per OGNI cura, e il tornato alla fine",
+          [120, 165, 1080, 1125, 1140], m.quando(m.messaggi))
+    testi = [x for _t, _c, x in m.messaggi]
+    prova("l'esito fallito dice che e' ancora giu'", True,
+          "ancora giù" in testi[1] and "❌" in testi[1])
+    prova("...quando si ritenta", True, "fra 15 minuti" in testi[1])
+    prova("...e dove guardare a mano", True, "journalctl -u tor" in testi[1])
+    prova("il tornato chiude la domanda rimasta aperta", True,
+          "tornato" in testi[4] and "di guasto" in testi[4])
+
+    # --- 5) SYSTEMCTL CHE DICE NO ------------------------------------
+    # il giorno che barattolo non girasse piu' come root: il riavvio
+    # fallisce, e l'avviso lo deve DIRE — mai in silenzio
+    m = _mondo_ponte([False, False, False, False, True], ritorno=1)
+    m.gira()
+    prova("systemctl rifiuta: si provano lo stesso tutti e due",
+          [TOR, PONTE], [argv for _t, argv in m.comandi])
+    prova("...e l'esito porta le parole di systemctl", True,
+          "Interactive authentication required" in m.messaggi[1][2]
+          and "❌ <code>systemctl restart tor</code>" in m.messaggi[1][2])
+    prova("...scappate, o il messaggio HTML non parte", True,
+          "&lt;polkit&gt;" in m.messaggi[1][2]
+          and "<polkit>" not in m.messaggi[1][2])
+    m = _mondo_ponte([False, False, False, False, True],
+                     errore_cmd=FileNotFoundError("systemctl"))
+    m.gira()
+    prova("senza systemctl si dice cosa manca", True,
+          "FileNotFoundError" in m.messaggi[1][2])
+    prova("...e il secondo comando si prova lo stesso", [TOR, PONTE],
+          [argv for _t, argv in m.comandi])
+    m = _mondo_ponte([False, False, False, False, True], errore_cmd="appeso")
+    m.gira()
+    prova("un systemctl appeso si uccide e si dice", (2, True),
+          (m.uccisi, "nessuna risposta in 90 s" in m.messaggi[1][2]))
+    prova("...e il guardiano va avanti lo stesso", 5, len(m.domande))
+
+    # --- 6) I GIUDICI PURI, ai bordi ---------------------------------
+    m = _mondo_ponte([])
+    a = m.amb
+    prova("la soglia e' il TERZO no (due minuti pieni)", 3,
+          a["PONTE_NO_PER_CURARE"])
+    # contato in controlli: un risveglio in anticipo di un soffio non
+    # sposta la cura di un minuto intero
+    p = dict(a["_ponte"])
+    esiti = [a["_ponte_passo"](p, False, "x", t)
+             for t in (5000, 5059.99, 5119.98)]
+    prova("tre no in 119,98 s curano lo stesso", ["", "", "cura"], esiti)
+    # IL TORNATO DI UNA CURA SILENZIOSA: coi due freni uguali non capita
+    # (l'avviso di un episodio aperto ha sempre piu' di 15 minuti quando
+    # la cura dopo e' permessa), ed e' proprio per questo che si prova
+    # qui, sul giudice: e' il ramo che tiene la promessa «la domanda
+    # aperta si chiude» il giorno che qualcuno separa i due numeri.
+    p = dict(a["_ponte"], stato="giu", no=3, giu_da=100.0, annunciato=True)
+    prova("cura taciuta ma domanda aperta: si chiude col tornato",
+          "tornato", a["_ponte_esito_cura"](p, True, "", 2000.0, False))
+    p = dict(a["_ponte"], stato="giu", no=3, giu_da=100.0, annunciato=False)
+    prova("...e senza domanda aperta si tace", "",
+          a["_ponte_esito_cura"](p, True, "", 2000.0, False))
+    permesso = a["_ponte_avviso_permesso"]
+    prova("freno: mai timbrato, si parla", True, permesso("", 5000))
+    prova("freno: 899 s fa, si tace", False, permesso("4101", 5000))
+    prova("freno: 900 s fa, si parla", True, permesso("4100", 5000))
+    prova("freno: un timbro storto non zittisce", True, permesso("ieri", 5000))
+    prova("freno: un timbro nel futuro non zittisce", True,
+          permesso("9000", 5000))
+    pub = a["_ponte_pubblico"]
+    prova("la salute dice una parola sola, da un insieme chiuso",
+          ["spento", "ok", "giu", "attesa", "attesa"],
+          [pub(False, "giu"), pub(True, "ok"), pub(True, "giu"),
+           pub(True, "attesa"), pub(True, "ConnectError: <segreto>")])
+    dest = a["_destinatari_ponte"]
+    prova("destinatari: vuota = i moderatori", [999], dest([], [999]))
+    prova("...un id senza parentesi vale una lista", [5], dest(5, [999]))
+    # PIU' CIFRE, apposta: con «5» una stringa sgranata carattere per
+    # carattere darebbe lo stesso [5], e la prova non guarderebbe niente
+    prova("...anche scritto fra virgolette", [4242], dest("4242", [999]))
+    prova("...True non e' un id", [999], dest(True, [999]))
+    prova("...i doppioni e gli storti si scartano", [5, -100123],
+          dest([0, "x", 5, 5, -100123], [999]))
+    prova("chi avvisa si dice come CONTEGGIO, mai con gli id", True,
+          "1 destinatario" in a["_chi_avvisa_ponte"]()
+          and "700000001" not in a["_chi_avvisa_ponte"]())
+    a["GUARDIANO_PONTE_AVVISA"] = []
+    prova("il conteggio dice il ripiego sui moderatori", True,
+          "moderatori (1)" in a["_chi_avvisa_ponte"]())
+    a["_nodo_configurato"] = lambda: False
+    prova("senza nodo il guardiano non gira", False,
+          a["_guardiano_ponte_attivo"]())
+    a["_nodo_configurato"], a["GUARDIANO_PONTE"] = (lambda: True), False
+    prova("...e nemmeno con la leva spenta", False,
+          a["_guardiano_ponte_attivo"]())
+
+    # --- 7) LA SALUTE: una parola, e il codice non cambia ------------
+    # col ponte giu' la risposta resta 200: il deploy guarda il codice
+    # per il rollback, e un guasto di tor non e' una versione rotta
+    class _Http(Exception):
+        def __init__(self, codice, *_a):
+            self.codice = codice
+
+    class _Con:
+        def __init__(self, rotto):
+            self.rotto = rotto
+
+        def execute(self, *_a):
+            if self.rotto:
+                raise RuntimeError("database illeggibile")
+            return self
+
+        def fetchone(self):
+            return (1,)
+
+        def close(self):
+            pass
+
+    def salute(rotto, stato, attivo=True):
+        amb = {"HTTPException": _Http, "db": lambda: _Con(rotto),
+               "_ponte": {"stato": stato},
+               "_guardiano_ponte_attivo": lambda: attivo,
+               "_ponte_pubblico": a["_ponte_pubblico"]}
+        exec(pezzo("salute"), amb)
+        try:
+            return amb["salute"]()
+        except _Http as e:
+            return e.codice
+
+    prova("ponte giu': 200, e la parola", {"ok": True, "ponte": "giu"},
+          salute(False, "giu"))
+    prova("ponte ok", {"ok": True, "ponte": "ok"}, salute(False, "ok"))
+    prova("guardiano spento: lo si dice", {"ok": True, "ponte": "spento"},
+          salute(False, "giu", attivo=False))
+    prova("database rotto: 503 come sempre, col ponte vivo", 503,
+          salute(True, "ok"))
+
+    # --- 8) LE SENTINELLE ---------------------------------------------
+    prova("i comandi sono FISSI, e sono questi due", ((TOR, PONTE)),
+          a["PONTE_COMANDI"])
+    # il primo sottoprocesso del server, e l'unico: senza shell e dentro
+    # la cura. Un secondo, domani, si guarda prima di lasciarlo passare.
+    cod = codice(_SORGENTE)
+    prova("un solo sottoprocesso in tutto il server", 1,
+          cod.count("create_subprocess"))
+    prova("...ed e' quello della cura", True,
+          "create_subprocess_exec(" in pezzo("_riavvia_ponte"))
+    prova("...e nessuno passa da una shell", False,
+          "shell=True" in cod or "os.system(" in cod
+          or "create_subprocess_shell" in cod)
+    # su Telegram, come chiesto: notifica() seguirebbe il canale scelto
+    # per gli ORDINI, e per chi ha scelto Nostr sarebbe un DM
+    # la CHIAMATA e non la parola: il docstring nomina notifica() apposta,
+    # per dire perche' non la si usa
+    prova("gli avvisi vanno su Telegram, non dal canale preferito", True,
+          "await _manda_telegram(" in pezzo("_avvisa_ponte")
+          and "await notifica(" not in pezzo("_avvisa_ponte"))
+    prova("il guardiano parte all'avvio", True,
+          '@app.on_event("startup")\nasync def avvia_guardiano_ponte'
+          in _SORGENTE)
+    prova("...e il ciclo gira dal task", True,
+          "asyncio.create_task(guardiano_ponte())"
+          in pezzo("avvia_guardiano_ponte"))
+    prova("la salute dice il ponte col suo giudice", True,
+          "_ponte_pubblico(" in pezzo("salute"))
+    cfg = open("config_esempio.py", encoding="utf-8").read()
+    prova("le due leve stanno nel config d'esempio", True,
+          "GUARDIANO_PONTE = True" in cfg
+          and "GUARDIANO_PONTE_AVVISA = []" in cfg)
+    prova("...e nel codice il guardiano nasce acceso", True,
+          "GUARDIANO_PONTE = True\n" in _SORGENTE)
+
+    # --- 9) IL PANNELLO DELLE LEVE ------------------------------------
+    # Il censimento da solo non vede mai il nodo configurato (l'URL
+    # finto del nodo non comincia per http, apposta: e' un segreto di
+    # cartone), quindi i due mondi col nodo si chiedono con `dopo`.
+    _g, voci_off, _j = _censimento(False)
+    prova("il pannello conosce il guardiano", True,
+          "GUARDIANO_PONTE" in voci_off)
+    prova("...senza nodo lo dice spento e spiega perche'", True,
+          voci_off["GUARDIANO_PONTE"]["valore"] is False
+          and "non c'è un nodo" in voci_off["GUARDIANO_PONTE"]["nota"])
+    prova("...e senza nodo non suona l'allarme", False,
+          voci_off["GUARDIANO_PONTE"].get("allarme", False))
+    col_nodo = {"_nodo_configurato": lambda: True}
+    _g, voci, json_on = _censimento(True, col_nodo)
+    riga = voci["GUARDIANO_PONTE"]
+    prova("col nodo e la leva: acceso, e dice chi avvisa", True,
+          riga["valore"] is True and "1 destinatario" in riga["nota"])
+    prova("...come CONTEGGIO: nessun id nel pannello", True,
+          "111111111" not in json_on)
+    _g, voci, _j = _censimento(True, dict(col_nodo, GUARDIANO_PONTE=False))
+    riga = voci["GUARDIANO_PONTE"]
+    prova("col nodo e la leva spenta: ALLARME", (False, True),
+          (riga["valore"], riga.get("allarme", False)))
+    prova("...e la nota dice cosa si rischia", True,
+          "in silenzio" in riga["nota"])
 
 
 def prove_strisce_web():
@@ -67523,6 +67947,7 @@ def main():
               prove_altri_scorrimento, prove_widget, prove_ricerca,
               prove_condivisione_venditore,
               prove_script_nel_workflow, prove_deploy,
+              prove_guardiano_ponte,
               prove_bussola, prove_tetto_claude_md,
               prove_canale_comunita,
               prove_podio_sfondo,

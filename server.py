@@ -183,6 +183,17 @@ try:
     from config import CASSAFORTE_NUOVA
 except ImportError:
     CASSAFORTE_NUOVA = False
+# IL GUARDIANO DEL PONTE VERSO LND (set 2026): acceso di serie, e vive
+# solo dove le tre righe del nodo ci sono — altrove non c'e' nessun
+# ponte da guardare. Il perche' sta sopra `guardiano_ponte`.
+try:
+    from config import GUARDIANO_PONTE
+except ImportError:
+    GUARDIANO_PONTE = True
+try:
+    from config import GUARDIANO_PONTE_AVVISA
+except ImportError:
+    GUARDIANO_PONTE_AVVISA = []
 
 # Il segreto con cui il RELAY di Barattolo ci chiede la lista di chi
 # ci puo' scrivere. Segnaposto o vuoto = la rotta non esiste (404):
@@ -8514,6 +8525,372 @@ async def avvia_fee_dinamica():
     _TASK_FEE_DINAMICA = asyncio.create_task(orologio_fee_dinamica())
 
 
+# ============ IL GUARDIANO DEL PONTE VERSO LND (set 2026) ============
+# IL FATTO CHE L'HA FATTO NASCERE, 18 set 2026: dalle 00:00 alle 08:58
+# tor ha rifiutato il ponte `lnd-ponte` (socat, 127.0.0.1:18080 -> la
+# REST di LND sull'onion del nodo) ogni dieci secondi — «socks: connect
+# request rejected or failed». LNbits non raggiungeva piu' LND
+# («Funding source status unavailable»), ogni acquisto si prendeva
+# «errore nella creazione dell'invoice», e NESSUNO se n'e' accorto per
+# nove ore. La cura sono state due righe — `systemctl restart tor` e
+# `restart lnd-ponte.service` — e adesso le scrive il guardiano.
+#
+# PERCHE' NEL SERVER E NON IN UN TIMER systemd, ed e' una scelta:
+#  · il guasto lo SUBISCE il server (e' lui che risponde «errore nella
+#    creazione dell'invoice»), e /api/salute vive qui: lo stato passa
+#    dal guardiano alla salute senza un file in mezzo che puo'
+#    invecchiare, o non essere mai stato scritto;
+#  · non c'e' niente da installare: un timer e' un gesto sul VPS, e un
+#    guardiano mai installato sono le nove ore di nuovo, in silenzio.
+#    Questo parte col deploy;
+#  · avvisi e freno riusano pezzi gia' provati — `_manda_telegram` coi
+#    suoi timeout, e i timbri che sopravvivono a un riavvio;
+#  · i giudici sono puri e si torturano in prove.py come il resto,
+#    mentre di uno script bash si sorveglierebbe solo il testo.
+# IL PREZZO, dichiarato: e' il primo sottoprocesso del server. Due
+# comandi FISSI (PONTE_COMANDI), senza shell e senza niente che arrivi
+# da fuori; funzionano perche' `barattolo` gira come root (vive in
+# /root/satmarket). Se un giorno non fosse piu' cosi' il riavvio
+# fallisce e l'avviso lo DICE, col messaggio di systemctl. E se muore
+# il processo del mercatino muore anche il guardiano: ma allora non
+# compra nessuno, e quel guasto lo vede il deploy.
+#
+# COSA GUARDA: la PRIMA delle tre domande di PRODUZIONE («il ponte
+# arriva?») — la stessa strada di LNbits, dallo stesso host, fino allo
+# stesso LND — ed e' l'unica che la sua cura sa riparare. VIVO = LND ha
+# risposto in HTTP, con QUALUNQUE codice: all'altro capo del ponte non
+# c'e' nessun altro che parli TLS e HTTP, quindi una risposta e' la
+# prova che socat, tor e l'onion hanno portato la domanda fino a lui.
+# Niente macaroon (`/v1/state` non lo chiede, e se un giorno lo
+# chiedesse il suo rifiuto direbbe lo stesso «ci sono») e niente
+# verifica del certificato, come il `curl -k` di quella domanda: il
+# cert che scade e il macaroon che non apre sono la seconda e la terza,
+# che un riavvio di tor non ripara e che questo guardiano non finge di
+# vedere.
+PONTE_LND_URL = "https://127.0.0.1:18080/v1/state"
+PONTE_OGNI_S = 60          # un controllo al minuto
+PONTE_SOGLIA_S = 120       # «piu' di due minuti di fila»...
+PONTE_NO_PER_CURARE = PONTE_SOGLIA_S // PONTE_OGNI_S + 1
+#                            ...cioe' il TERZO no di fila: fra il primo
+#                            e il terzo passano due minuti pieni
+PONTE_ATTESA_S = 20        # quanto si aspetta LND a ogni domanda: un
+#                            circuito tor freddo ne vuole una decina
+PONTE_RIGUARDA_S = 45      # il controllo dopo la cura
+PONTE_FRENO_S = 900        # un avviso ogni 15 minuti al massimo, e una
+#                            cura che non ha curato non si ripete prima:
+#                            UN numero per le due cose, cosi' ogni cura
+#                            dopo una fallita si racconta sempre
+PONTE_COMANDI = (("systemctl", "restart", "tor"),
+                 ("systemctl", "restart", "lnd-ponte.service"))
+PONTE_COMANDO_S = 90       # un systemctl appeso non ferma il guardiano
+TIMBRO_PONTE = "ponte_avviso"
+
+# Lo stato vivo, in memoria: un riavvio lo azzera, e costa al massimo
+# due minuti di conteggio. Il freno degli AVVISI invece sta nei timbri,
+# perche' un deploy non deve poter raddoppiare un allarme.
+_ponte = {"stato": "attesa", "no": 0, "giu_da": 0.0, "errore": "",
+          "cura_fallita_il": 0.0, "annunciato": False}
+_TASK_PONTE = None   # il patto di _TASK_CAMBIO: il riferimento lo tiene vivo
+
+
+def _guardiano_ponte_attivo() -> bool:
+    """Il guardiano gira? La leva E le tre righe del nodo: dove non c'e'
+    il nodo non c'e' nessun ponte, e un guardiano che bussa a una porta
+    che non esiste riavvierebbe tor ogni quindici minuti per niente."""
+    return bool(GUARDIANO_PONTE) and _nodo_configurato()
+
+
+def _destinatari_ponte(lista, moderatori) -> list:
+    """A chi scrive il guardiano: gli id della leva o, se la leva e'
+    vuota o storta, i moderatori. MAI nessuno — il 18 set 2026 il
+    difetto era proprio che non lo sapeva nessuno. Un id solo scritto
+    senza parentesi vale come una lista di uno; un id negativo e' un
+    gruppo o un canale Telegram, e si tiene."""
+    if isinstance(lista, bool):
+        lista = []
+    elif isinstance(lista, (int, str)):
+        lista = [lista]
+    ids = []
+    for x in (lista or []):
+        try:
+            n = int(x)
+        except (TypeError, ValueError):
+            continue
+        if n and n not in ids:
+            ids.append(n)
+    return ids or [int(x) for x in moderatori]
+
+
+def _chi_avvisa_ponte() -> str:
+    """Chi riceve gli avvisi, detto per il journal e per il pannello:
+    un CONTEGGIO, mai gli id (il patto di ADMIN_IDS nel pannello)."""
+    propri = _destinatari_ponte(GUARDIANO_PONTE_AVVISA, [])
+    if propri:
+        return (f"{len(propri)} destinatar{'io' if len(propri) == 1 else 'i'}"
+                " di GUARDIANO_PONTE_AVVISA")
+    return (f"i moderatori ({len(ADMIN_IDS)}), perché "
+            "GUARDIANO_PONTE_AVVISA è vuota")
+
+
+def _ponte_passo(p: dict, vivo: bool, errore: str, adesso: float) -> str:
+    """UN controllo nella vita del guardiano: aggiorna lo stato `p` e
+    dice cosa fare — 'cura', 'tornato' o '' (niente). PURA: niente
+    rete e niente orologio, l'ora arriva da fuori. Tre regole:
+     · la cura arriva al TERZO no di fila (PONTE_NO_PER_CURARE),
+       contato in CONTROLLI e non in secondi: un risveglio con qualche
+       millisecondo d'anticipo non deve spostarla di un minuto intero;
+     · una cura che NON ha curato non si ripete prima di PONTE_FRENO_S.
+       Se il guasto sta sul nodo (spento, LND fermo) riavviare tor ogni
+       tre minuti non ripara niente, e a ogni giro spegne anche l'onion
+       del mercatino: e' il freno del deploy («.deploy-bocciato»), con
+       la stessa ragione — senza, il rimedio gira in tondo per sempre;
+     · 'tornato' esce SOLO se l'ultima cosa detta era «ancora giu'»:
+       la domanda aperta si chiude, un guasto mai annunciato no."""
+    if vivo:
+        annunciato = p.get("annunciato", False)
+        p.update(stato="ok", no=0, giu_da=0.0, errore="",
+                 cura_fallita_il=0.0, annunciato=False)
+        return "tornato" if annunciato else ""
+    p["stato"], p["errore"] = "giu", errore
+    p["no"] = p.get("no", 0) + 1
+    if not p.get("giu_da"):
+        p["giu_da"] = adesso
+    if p["no"] < PONTE_NO_PER_CURARE:
+        return ""
+    if (p.get("cura_fallita_il")
+            and adesso - p["cura_fallita_il"] < PONTE_FRENO_S):
+        return ""
+    return "cura"
+
+
+def _ponte_esito_cura(p: dict, vivo: bool, errore: str, adesso: float,
+                      detto: bool) -> str:
+    """Lo stato dopo il controllo dei 45 secondi, e cosa dire: 'esito'
+    (l'avviso del guasto e' partito, quindi il suo seguito si deve),
+    'tornato' (cura trattenuta dal freno, ma c'era un «ancora giu'»
+    rimasto aperto da chiudere) o ''. PURA, come `_ponte_passo`."""
+    if vivo:
+        aperto = p.get("annunciato", False)
+        p.update(stato="ok", no=0, giu_da=0.0, errore="",
+                 cura_fallita_il=0.0, annunciato=False)
+        if detto:
+            return "esito"
+        return "tornato" if aperto else ""
+    p.update(stato="giu", errore=errore, cura_fallita_il=adesso)
+    if detto:
+        p["annunciato"] = True
+        return "esito"
+    return ""
+
+
+def _ponte_avviso_permesso(timbro: str, adesso: float) -> bool:
+    """Il freno degli avvisi: uno ogni PONTE_FRENO_S al massimo. Un
+    timbro storto, o nel futuro (orologio tornato indietro), vale «mai
+    avvisato»: il verso di `timbro_letto` — fra un doppione e un
+    guasto taciuto, il doppione."""
+    try:
+        ultimo = float(timbro or 0)
+    except (TypeError, ValueError):
+        return True
+    if ultimo > adesso:
+        return True
+    return adesso - ultimo >= PONTE_FRENO_S
+
+
+def _ponte_pubblico(attivo: bool, stato: str) -> str:
+    """Quel che /api/salute dice del ponte: UNA parola da un insieme
+    chiuso — mai l'errore, mai l'indirizzo, mai da quanto. La rotta e'
+    pubblica (vedi il suo docstring)."""
+    if not attivo:
+        return "spento"
+    return stato if stato in ("ok", "giu") else "attesa"
+
+
+def _minuti_ponte(secondi: float) -> str:
+    m = max(1, round(secondi / 60))
+    return f"{m} minut{'o' if m == 1 else 'i'}"
+
+
+def _testo_guasto_ponte(secondi: float, errore: str) -> str:
+    return (f"🌉⚠️ <b>Ponte verso LND giù</b> da almeno "
+            f"{_minuti_ponte(secondi)}: LNbits non raggiunge il nodo, "
+            "quindi chi compra si prende «errore nella creazione "
+            "dell'invoice».\n"
+            f"Ultimo errore: <code>{html.escape(errore[:200])}</code>\n"
+            f"Riavvio tor e lnd-ponte, e riguardo fra {PONTE_RIGUARDA_S} "
+            "secondi.")
+
+
+def _testo_esito_ponte(vivo: bool, esiti: list, errore: str) -> str:
+    if vivo:
+        testa = ("🌉✅ <b>Ponte verso LND tornato</b> dopo il riavvio: "
+                 "LND risponde, e gli acquisti ricevono di nuovo la "
+                 "fattura.")
+    else:
+        testa = ("🌉❌ <b>Ponte ancora giù</b> dopo il riavvio: "
+                 f"<code>{html.escape(errore[:200])}</code>\n"
+                 f"Il prossimo tentativo fra {PONTE_FRENO_S // 60} minuti. "
+                 "A mano: <code>journalctl -u tor -u lnd-ponte -n 30</code> "
+                 "— e se tor sta bene, il guasto è dall'altra parte, sul "
+                 "nodo.")
+    righe = [f"{'✅' if ok else '❌'} <code>{html.escape(' '.join(cmd))}</code>"
+             + ("" if ok else f": {html.escape(msg)}")
+             for cmd, ok, msg in esiti]
+    return testa + "\n" + "\n".join(righe)
+
+
+def _testo_tornato_ponte(secondi: float) -> str:
+    return (f"🌉✅ <b>Ponte verso LND tornato</b> dopo "
+            f"{_minuti_ponte(secondi)} di guasto: gli acquisti ricevono "
+            "di nuovo la fattura.")
+
+
+async def _sonda_ponte() -> tuple:
+    """(vivo, errore): UNA domanda a LND attraverso il ponte. Qualunque
+    risposta HTTP e' vivo (vedi sopra, «COSA GUARDA»)."""
+    try:
+        async with httpx.AsyncClient(timeout=PONTE_ATTESA_S,
+                                     verify=False) as c:
+            await c.get(PONTE_LND_URL)
+        return True, ""
+    except Exception as e:
+        # httpx a volte non ha parole (il giro dal vivo: «ConnectError: »
+        # e niente dopo): allora il nome del guasto basta da solo
+        return False, (f"{type(e).__name__}: {e}" if str(e)
+                       else type(e).__name__)[:300]
+
+
+async def _riavvia_ponte() -> list:
+    """La cura: i due comandi in fila, tor e poi il ponte, come la
+    mattina del 18 set. Torna [(comando, riuscito, messaggio)]. Il
+    secondo parte anche se il primo fallisce: riavviare il solo socat
+    non costa niente, e a volte basta."""
+    esiti = []
+    for cmd in PONTE_COMANDI:
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd, stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE)
+            try:
+                _out, err = await asyncio.wait_for(proc.communicate(),
+                                                   PONTE_COMANDO_S)
+            except asyncio.TimeoutError:
+                proc.kill()
+                esiti.append((cmd, False,
+                              f"nessuna risposta in {PONTE_COMANDO_S} s"))
+                continue
+            if proc.returncode == 0:
+                esiti.append((cmd, True, ""))
+            else:
+                msg = (err or b"").decode("utf-8", "replace").strip()
+                esiti.append((cmd, False, msg[:200] or
+                              f"uscito con {proc.returncode}"))
+        except Exception as e:
+            esiti.append((cmd, False, f"{type(e).__name__}: {e}"[:200]))
+    return esiti
+
+
+async def _avvisa_ponte(testo: str):
+    """Su TELEGRAM e non dal canale preferito di notifica(): i DM Nostr
+    sono la scelta di qualcuno per gli ordini, ma un avviso di macchina
+    e' stato chiesto li' (e Telegram non passa dal ponte). Fail-open, e
+    una riga nel journal per destinatario: un avviso che non arriva si
+    deve poter leggere."""
+    for chat in _destinatari_ponte(GUARDIANO_PONTE_AVVISA, ADMIN_IDS):
+        try:
+            esito = await _manda_telegram(chat, testo)
+            print(f"   🌉 ↳ {chat}: {esito or 'mandato'}", flush=True)
+        except Exception as e:
+            print(f"⚠️ Avviso del ponte NON consegnato a {chat}: {e}",
+                  flush=True)
+
+
+async def _cura_ponte(p: dict):
+    """Avviso (se il freno lo lascia), riavvio, 45 secondi, secondo
+    sguardo, esito. L'avviso del guasto parte PRIMA del riavvio: se la
+    cura si impianta, quello che sta succedendo si sa gia'."""
+    adesso = time.time()
+    giu = adesso - p["giu_da"]
+    detto = _ponte_avviso_permesso(timbro_letto(TIMBRO_PONTE), adesso)
+    print(f"🌉 Ponte verso LND giù da {giu:.0f} s: riavvio tor e "
+          f"lnd-ponte{'' if detto else ' (avviso trattenuto dal freno)'}",
+          flush=True)
+    if detto:
+        # il timbro PRIMA dell'invio, il patto di `timbro_scrivi`: un
+        # errore di rete puo' perdere un avviso, mai raddoppiarlo
+        timbro_scrivi(TIMBRO_PONTE, str(int(adesso)))
+        await _avvisa_ponte(_testo_guasto_ponte(giu, p["errore"]))
+    esiti = await _riavvia_ponte()
+    for cmd, ok, msg in esiti:
+        print(f"   🌉 {' '.join(cmd)}: {'ok' if ok else msg}", flush=True)
+    await asyncio.sleep(PONTE_RIGUARDA_S)
+    vivo, errore = await _sonda_ponte()
+    adesso = time.time()
+    giu = adesso - p["giu_da"]
+    fatto = _ponte_esito_cura(p, vivo, errore, adesso, detto)
+    print(f"🌉 Ponte verso LND dopo la cura: "
+          f"{'VIVO' if vivo else 'ancora giù — ' + errore}", flush=True)
+    if fatto == "esito":
+        await _avvisa_ponte(_testo_esito_ponte(vivo, esiti, errore))
+    elif fatto == "tornato":
+        await _avvisa_ponte(_testo_tornato_ponte(giu))
+
+
+async def _giro_guardiano_ponte(p: dict):
+    """Un controllo e quel che ne segue. Staccato dal ciclo perche' le
+    prove lo possano far girare un passo alla volta."""
+    vivo, errore = await _sonda_ponte()
+    adesso = time.time()
+    durata = adesso - p["giu_da"] if p.get("giu_da") else 0.0
+    prima = p.get("stato")
+    azione = _ponte_passo(p, vivo, errore, adesso)
+    # il journal parla ai CAMBI, non a ogni giro: una riga al minuto
+    # per nove ore e' il modo in cui un allarme diventa tappezzeria
+    if not vivo and prima != "giu":
+        print(f"🌉 Ponte verso LND: nessuna risposta ({errore})", flush=True)
+    elif vivo and prima == "giu":
+        print(f"🌉 Ponte verso LND: di nuovo vivo dopo {durata:.0f} s",
+              flush=True)
+    if azione == "tornato":
+        await _avvisa_ponte(_testo_tornato_ponte(durata))
+    elif azione == "cura":
+        await _cura_ponte(p)
+
+
+async def guardiano_ponte():
+    """Il ciclo: un giro al minuto contato da un INIZIO all'altro (un
+    controllo che aspetta venti secondi non allunga il minuto), e i giri
+    in fila — mai due domande insieme, e mai una domanda mentre la cura
+    sta ancora aspettando i suoi 45 secondi."""
+    while True:
+        inizio = time.monotonic()
+        try:
+            await _giro_guardiano_ponte(_ponte)
+        except Exception as e:
+            # un giro che muore non si rialza da solo: la cintura
+            print(f"⚠️ Guardiano del ponte: giro saltato ({e})",
+                  flush=True)
+        await asyncio.sleep(max(1.0, PONTE_OGNI_S
+                                - (time.monotonic() - inizio)))
+
+
+@app.on_event("startup")
+async def avvia_guardiano_ponte():
+    """La riga nel journal c'e' SEMPRE, acceso o spento: e' il primo
+    posto da guardare il giorno che ci si chiede se qualcuno stia
+    guardando il ponte."""
+    if not _guardiano_ponte_attivo():
+        perche = ("GUARDIANO_PONTE = False" if not GUARDIANO_PONTE else
+                  "niente nodo: le tre righe LNBITS_NODO_* mancano")
+        print(f"🌉 Guardiano del ponte verso LND: spento ({perche})",
+              flush=True)
+        return
+    print(f"🌉 Guardiano del ponte verso LND: acceso — un controllo al "
+          f"minuto, avvisi a {_chi_avvisa_ponte()}", flush=True)
+    global _TASK_PONTE
+    _TASK_PONTE = asyncio.create_task(guardiano_ponte())
+
+
 async def prezzo_da_payload(d: dict) -> tuple[str, int, float]:
     """Legge il prezzo dal form di pubblicazione/modifica e restituisce
     (valuta, prezzo_sats, prezzo_eur), gia' validati e col tetto di
@@ -14853,7 +15230,18 @@ def salute():
     versioni del codice, percorsi o nomi di file — sono tutte cose che
     aiutano chi guarda il server da fuori a sapere cosa ha davanti. Il
     «cosa sta girando» lo dice il journal del VPS, che e' di chi ha le
-    chiavi."""
+    chiavi.
+
+    L'UNICA ECCEZIONE E' IL PONTE (set 2026, chiesta da Andrea dopo le
+    nove ore mute del 18 set), e passa la regola invece di romperla:
+    «il ponte verso LND e' giu'» da fuori si vede GIA' — chi prova a
+    comprare si prende l'errore — quindi dirlo non insegna niente che
+    un tentativo d'acquisto non dica. Esce UNA parola da un insieme
+    chiuso (`_ponte_pubblico`: ok, giu, attesa, spento), mai l'errore,
+    l'indirizzo o da quanto. E NON TOCCA IL CODICE: col ponte giu' la
+    risposta resta 200, perche' il deploy guarda il codice per decidere
+    il rollback, e un guasto di tor non e' una ragione per buttare via
+    una versione sana."""
     try:
         con = db()
         con.execute("SELECT 1 FROM annunci LIMIT 1").fetchone()
@@ -14863,7 +15251,9 @@ def salute():
         # guarda il CODICE, e un guasto travestito da risposta buona
         # e' il modo in cui un rollback non parte.
         raise HTTPException(503, "non sto bene")
-    return {"ok": True}
+    return {"ok": True,
+            "ponte": _ponte_pubblico(_guardiano_ponte_attivo(),
+                                     _ponte["stato"])}
 
 
 @app.get("/api/relay/chiavi")
@@ -18433,6 +18823,20 @@ def _leve_stato():
                          "«cassaforte») fino a chiusura, rimborsi compresi. "
                          "False e riavvia rimanda il nuovo sul SaaS — le "
                          "righe del nodo continuano a chiudersi lì"),
+            # Allarme se c'e' un nodo e nessuno guarda il suo ponte: e'
+            # il mondo del 18 set 2026, nove ore di acquisti falliti.
+            _leva("Guardiano del ponte verso LND", "GUARDIANO_PONTE",
+                  _guardiano_ponte_attivo(),
+                  allarme=_nodo_configurato() and not GUARDIANO_PONTE,
+                  spento=("nessuno guarda il ponte: se tor lo rifiuta, gli "
+                          "acquisti falliscono in silenzio finché qualcuno "
+                          "se ne accorge" if _nodo_configurato() else
+                          "non c'è un nodo, quindi non c'è un ponte da "
+                          "guardare"),
+                  acceso="ogni minuto bussa a LND attraverso il ponte; "
+                         "dopo due minuti di silenzio riavvia tor e "
+                         "lnd-ponte e lo dice a " + _chi_avvisa_ponte() +
+                         ". Lo stato di adesso: /api/salute, «ponte»"),
             _leva("Auto-sblocco dei sats", "AUTO_SBLOCCO_ATTIVO",
                   bool(AUTO_SBLOCCO_ATTIVO),
                   spento="nessun timer sposta sats: al posto dello sblocco "
