@@ -13975,6 +13975,41 @@
   guadagnare aggiungendo pezzi». Nel SET quella chiave adesso ESCE, ma
   solo per colpa di un codice che copre — la prova che diceva «nel set
   non si afferma» ha cambiato lato.
+  ⚠️ LA PERCENTUALE DELLA PROMESSA HA UNA CHIAVE SUA (19 set 2026), ed
+  è il conto che questo cantiere aveva lasciato aperto senza saperlo.
+  Da quando la percentuale del preventivo esce da `_sconto_vincente`,
+  `sconto_percento` è la fotografia di chi HA SCONTATO — zero finché
+  non sconta nessuno, ed è giusto: è la stessa cifra che finisce in
+  `ordini.sconto_percento`. Ma era anche l'UNICA percentuale che il
+  client riceveva, e `renderAcquisto` ci gatava tutto il blocco della
+  🎁: sotto soglia valeva 0, e «Ancora N → −X%» moriva prima di
+  nascere. Nel foglio Paga restava la sola 🚚 (visto dal vivo da
+  Andrea), mentre il carrello — che l'invito se lo conta da sé con la
+  regola pubblica del negozio — continuava a mostrarle tutte e due: è
+  per questo che sembrava un difetto della pagina e non del preventivo.
+  Il caso scritto tre righe qui sopra («codice −5% e promessa −10%:
+  l'invito è ancora vero e utile») non era mai stato vero in pagina:
+  senza codice l'invito non c'era, col codice avrebbe detto −5%.
+  LA CURA: `sconto_promessa_percento`, la percentuale della GAMBA che
+  `_gamba_invito` ha scelto — la restituiva da sempre, e i due
+  preventivi la buttavano via spacchettando. Esce accanto a
+  `sconto_criterio` e alle soglie, che è la famiglia a cui appartiene.
+  Il client legge `p.sconto_promessa_percento || p.sconto_percento` (il
+  ripiego è il server di ieri e la DEMO) per la guardia, per l'invito e
+  per la prosa del cambio muto; IL VERDE RESTA su `sconto_percento`,
+  perché è un fatto e dice la percentuale che ha scontato.
+  LA STRADA SCARTATA: ridare a `sconto_percento` il mestiere di prima
+  (la percentuale della REGOLA, scattata o no). Costava una riga e
+  avrebbe curato anche il client vecchio in cache, ma quella chiave
+  oggi porta la percentuale del CODICE quando vince lui: un solo numero
+  non può dire insieme «ha scontato il 5» e «ti prometto il 10».
+  IL CONTO NON HA MAI SBAGLIATO: sconto, spedizione gratis e fattura
+  escono dagli stessi giudici in preventivo e in compra, e
+  `collaudo_conto.py` adesso lo prova con le DUE promesse accese
+  insieme e una spedizione vera da pagare (sezione [8]). LA SPEDIZIONE
+  GRATIS MISURA IL LORDO, come lo sconto: con 40 € di listino e −10% si
+  pagano 36 € e la spedizione è gratis lo stesso — le due promesse sono
+  indipendenti, nessuna misura l'altra.
   IL CASSETTO DEL VENDITORE è una LISTA con un tetto, quindi il modello
   è `renderRicerche` e NON i due gemelli: sta fra la spedizione gratis
   e le ferie, che continuano a chiudere il gruppo. Esaurito o scaduto

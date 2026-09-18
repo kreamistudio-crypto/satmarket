@@ -21314,3 +21314,125 @@ di casa, quindi per un annuncio con la spunta direbbero il falso —
 oggi non ce n'è nessuno, e il giorno del primo vanno messi in pari; e
 il commento del travaso del 17 in `init_db` racconta ancora il ripiego
 della mappa vuota, che è storia e non più la regola.
+
+## Il foglio Paga senza l'avanzamento dello sconto: una percentuale sola per due fatti (19 set 2026)
+
+**IL DIFETTO, visto dal vivo da Andrea.** Un venditore con due soglie —
+spedizione gratis oltre X e sconto del Y% oltre Z. Nel carrello le due
+barre verdi ci sono tutte e due; nel foglio «Paga» resta la sola 🚚, e
+quella dello sconto sparisce. Uguale nell'acquisto singolo.
+
+**LA CAUSA NON ERA NELLA PAGINA.** `renderAcquisto` la pillola 🎁 ce
+l'ha dal 12 ago, con la sua barra e il suo verde: quel codice non è
+mai stato toccato. A sparire era un NUMERO del preventivo. Dal cantiere
+dei codici sconto (`37cc11a`) la percentuale esce da `_sconto_vincente`,
+cioè è quella di chi HA SCONTATO — zero finché non sconta nessuno, ed è
+giusto, perché è la cifra che finisce in ricevuta. Prima di allora lì
+usciva `regole_sc[0][2]`, la percentuale della REGOLA, scattata o no.
+Il client gata l'intero blocco su `sconto_percento > 0`: sotto soglia
+quel numero è diventato 0, e l'invito è morto sulla sua prima guardia.
+Il carrello non se n'è accorto perché l'invito se lo conta da sé, con
+la regola pubblica del negozio — ed è la ragione per cui il difetto
+sembrava «della pagina Paga».
+RIPRODOTTO PRIMA DI CURARE, nei due modi: il preventivo vero su un
+database usa-e-getta (`sconto_percento: 0` con `mancano_eur: 15` e
+`sconto_raggiungibile: true` — tutto giusto tranne l'unica cifra che la
+guardia guardava) e il foglio nel browser, con la sola 🚚 in fila.
+⚠️ SOPRA SOGLIA FUNZIONAVA GIÀ, ed è da dire perché la segnalazione lo
+dava per rotto: a sconto scattato la percentuale c'è, e «✅ Sconto −10%»
+con la riga «Sconto −10%» nel conto sono sempre usciti. Verificato dal
+vivo sul codice di PRIMA della cura.
+
+**LA CURA: `sconto_promessa_percento`.** La gamba scelta da
+`_gamba_invito` la sua percentuale l'ha sempre restituita; i due
+preventivi (mono e set) la buttavano via spacchettando la tupla. Adesso
+esce, accanto a criterio e soglie. Il client legge
+`p.sconto_promessa_percento || p.sconto_percento` per la guardia, per
+l'invito e per la prosa del cambio muto; il verde resta su
+`sconto_percento`, che è il fatto. Ventuno righe sul server, quasi tutte
+commento; sul client undici nuove e tre ritoccate.
+**LA STRADA SCARTATA:** ridare a `sconto_percento` il mestiere di prima.
+Una riga, e avrebbe curato anche un client vecchio in cache. Ma oggi
+quella chiave porta la percentuale del CODICE quando vince lui, e il
+caso che l'Architettura dichiara voluto — codice −5% che sconta,
+promessa −10% ancora da raggiungere — vuole DUE numeri: con uno solo
+l'invito avrebbe detto «→ −5%». Non era mai stato vero in pagina: senza
+codice l'invito non c'era, col codice avrebbe detto la cifra sbagliata.
+
+**QUEL CHE NON HO CAMBIATO, e va detto perché la richiesta lo nominava.**
+I testi chiesti erano «Ti mancano X per lo sconto del Y%» e «Sconto del
+Y% applicato: −Z», e la riga del conto «Sconto venditore». La richiesta
+diceva anche «stessa forma, stessa riga verde della spedizione» — e la
+forma della spedizione è la pillola «🚚 Ancora N → spedizione gratis» /
+«✅ Spedizione gratis». La 🎁 parla già quella lingua («🎁 Ancora N →
+−Y%» / «✅ Sconto −Y%»), decisa da Andrea il 12-13 ago e tenuta da
+sentinelle: ho tenuto la FORMA, che era la richiesta vera, e non le
+frasi. Il «−Z» sta nella riga del conto, due dita sotto: la pillola è il
+cartello, il conto è il fatto. E la riga resta «Sconto −10%»: «SCONTO
+SECCO col suo tag» è una decisione misurata a 320px (ago 2026):
+« codice» chiedeva ~48px e di margine ne lasciava 35, e « venditore» è
+più lungo. NON l'ho misurato: se Andrea la vuole, si misura prima.
+
+**PERCHÉ NESSUNA PROVA L'AVEVA VISTO**, che è la lezione. Le sentinelle
+di `prove.py` guardavano che il client LEGGESSE `mancano_*`; il
+collaudo del conto che il server li CONTASSE giusti. Tutte e due vere.
+Nessuno faceva girare il blocco del client con la forma che il server
+manda DAVVERO sotto soglia: due metà verdi, e in mezzo una guardia che
+nessuna delle due nominava. È la famiglia di «prove che rispondono per
+il vicino», vista dal lato del contratto fra due file.
+
+**LE PROVE.** `prove_percentuale_della_promessa` (16): la gamba che
+porta la sua percentuale (pura, girata), le due chiavi nei due
+preventivi, e IL BLOCCO VERO DELLA 🎁 affettato da `renderAcquisto` e
+GIRATO in node su nove forme di preventivo — sotto soglia a valore in
+euro, in sats, a pezzi, sopra soglia, codice −5% con promessa −10%, il
+server di ieri senza la chiave, nessuna percentuale da nessuna parte
+(mai un «−0%»), soglia non raggiungibile, negozio senza promessa.
+`collaudo_conto.py` sezione [8], LE DUE PROMESSE INSIEME (76 prove,
+212 in tutto): sconto da 25 e spedizione gratis da 40, nelle due unità,
+singolo e carrello, comprando A CASA con una spedizione vera —
+preventivo == compra al sat, la bolt11 che chiede quel totale, il
+bilancio riletto dal database — coi totali fatti a mano (13.500 /
+31.350 / 37.800); il listino in euro con le soglie in sats; il codice
+−5% sotto la promessa −10%; il codice che copre. `confronta()` ha
+guadagnato `alla_cassa`, perché fin qui il collaudo comprava solo col
+ritiro: le due promesse insieme con una spedizione da pagare non le
+aveva mai provate nessuno.
+IL CAMBIO È UNO SOLO PER COSTRUZIONE: `mancano_*` li conta il server
+nella stessa chiamata che fa il conto, con lo stesso `cambio`, e la
+pillola li scrive nell'unità della promessa senza convertire niente.
+**LA TORTURA:** 13 mutazioni (7 sul server, 6 sul client) in una copia
+dell'albero, 13 uccise, guardando QUALI rosse. Il server in `prove.py`
+muore sulle sole sentinelle di forma; a ucciderlo per FUNZIONE è il
+collaudo, che la CI compila e non gira — dichiarato, non curato. Due
+mutazioni facevano ESPLODERE il collaudo (KeyError) invece di dare una
+rossa: la chiave nuova adesso si legge con `.get`.
+Suite intera: 11.892 verdi, 0 rosse (erano 11.876).
+
+**IL GIRO DAL VIVO** (banco sulla 8131: server vero del worktree,
+config finto, database usa-e-getta, LNbits finto, cambio tondo anche
+nella cache che legge il client). PRIMA della cura: 1 pezzo, la sola
+🚚; 3 pezzi, il verde e la riga del conto c'erano. DOPO: soglie in euro,
+1-2-3-4 pezzi — «🚚 Ancora 30 € / 🎁 Ancora 15 €», poi 20/5, poi
+«✅ Sconto −10%» con la 🚚 a 10, poi tutte e due verdi, «Spedizione
+gratuita» e totale 36,00 €; il carrello a 2 e a 4 pezzi uguale, col
+bottone «← Aggiungi altro nel carrello» finché un invito è aperto;
+soglie in SATS col conto in euro («Ancora 5000 sats → −10%»); e un
+acquisto fino alla fattura: paySheet «Articolo 40 000 · Sconto −10%
+−4000 · Totale 36 000», bolt11 finta coniata per 36.000.
+NON PROVATO dal vivo: il telefono; LNbits vero; la corsa animata della
+barra (il pane emula reduced-motion: la larghezza di partenza era
+giusta, 40% su 10/25, la corsa non si vede); la via «a casa» dal foglio
+(provata nel collaudo, non col dito); un codice sconto scritto nel
+cassetto insieme all'invito.
+
+**RESTA DA GUARDARE.** Sul telefono, dopo il deploy: un negozio con le
+due soglie, un articolo sotto tutte e due → due barre; aggiungere pezzi
+fino a far scattare lo sconto → verde e riga nel conto; il totale del
+foglio uguale alla cifra del wallet. E una cosa vista passando e NON
+toccata: A CAMBIO MUTO la prosa «🎁 … lo sconto non si applica» non può
+più uscire — da quando `_gamba_invito` lascia fuori dal giro la gamba
+che non si sa misurare, il preventivo non nomina nessuna gamba
+(`sconto_criterio` vuoto, verificato), e il client non ha di che
+scrivere. La 🚚 la sua prosa ce l'ha ancora. È dei due criteri insieme
+(ago 2026), non di oggi.
