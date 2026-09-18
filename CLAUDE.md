@@ -275,11 +275,11 @@ leve girate il 6 set 2026 si leggono **DAL LIBRO PUBBLICO** e non piu'
 dal solo `settings.toml`, cioe' sono verificate dal lato di chi legge e
 non da quello di chi le ha scritte. Piu' `bond_enabled` false (coerente
 con `[anti_abuse_bond]` commentata), `maintenance_mode` false,
-`max_order_amount` 500000 (dal 17 set) e **`fee` 0.02** — la commissione di
-Barattolo, girata da 0.01 il 10 set 2026 col cantiere del conto
-scorporato e verificata dallo specchio: il client la legge viva dal
-38385 e la mostra a chi scambia, meta' a testa (vedi CANTIERI, «Il
-conto scorporato del dettaglio, e la commissione del 2%»).
+`max_order_amount` 500000 (dal 17 set) e **`fee` 0.03** — la commissione di
+Barattolo: 0.01, poi 0.02 il 10 set 2026, e 0.03 dal 18 set con lo sconto
+fedelta' PER PARTE della patch 0005 (1,5% a testa, 1% a pionieri e
+livello 5). Il client la legge viva dal 38385, meta' a testa (vedi
+CANTIERI, «Il passo 3 delle commissioni per persona»).
 ⚠️ E SI CALCOLA DOPO IL PREMIO, verificato sui byte (11 set 2026,
 `src/util.rs`): `get_market_amount_and_fee` chiama
 `get_fee(new_sats_amount)`, e quel numero esce da `get_market_quote`
