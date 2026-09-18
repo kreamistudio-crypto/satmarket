@@ -518,7 +518,12 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   una seconda sessione gia' aperta, che le connessioni vive non
   vengono tagliate.
 - LO SCONTO FEDELTÀ DEL P2P, la messa in servizio (patch 0005 del
-  fork; il perché sta in CANTIERI, «Le commissioni per persona»). Si fa
+  fork; il perché sta in CANTIERI, «Le commissioni per persona»).
+  ✅ FATTA il 18 set 2026 — immagine `-bar3`, con la 0006 nello stesso
+  giro: il verbale è in CANTIERI, «Il passo 3 delle commissioni per
+  persona». La sequenza resta qui perché è la stessa di ogni patch
+  futura al fork, corretta nei due punti dove il campo l'ha smentita
+  (i test e il format-patch). Si fa
   a SCAMBI FERMI e in quest'ordine, che non è estetica: finché la leva
   del VPS è a 0 la porta risponde 404, quindi il nodo può salire per
   primo e fa prezzo pieno a tutti — client e coordinatore dicono la
@@ -527,15 +532,28 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   print(secrets.token_urlsafe(32))"`. Va in DUE posti e in nessun
   altro: la riga `P2P_SCONTO_SEGRETO` nel `config.py` del VPS, e
   `BARATTOLO_SCONTO_SEGRETO` nel compose del nodo. Mai nel canale
-  Telegram del nodo.
+  Telegram del nodo — E MAI IN UNA CHAT CON CLAUDE: il 18 set 2026 il
+  primo è finito incollato lì, ed è stato RUOTATO prima ancora di
+  installarlo (regola 1). Nei comandi che Claude scrive c'è un
+  segnaposto: lui non ha bisogno di vederlo.
   2) SUL NODO, il fork: `cd ~/nodo/mostro-src`, branch
   `barattolo/v0.18.7`; con `patch-0005-fee-per-parte.py` e
-  `barattolo_fee.rs` nella stessa cartella: `python3 .../patch-0005-fee-per-parte.py --secco`,
+  `barattolo_fee.rs` nella stessa cartella — una cartella FUORI da
+  `mostro-src` (`~/nodo/patch-bar3`), o il `git add -A` di dopo si
+  porta i patcher nel commit del fork: `python3 .../patch-0005-fee-per-parte.py --secco`,
   poi senza `--secco`. I test PRIMA della build vera:
   `docker build -f docker/Dockerfile --target builder -t mostro-test:bar3 .`
-  e `docker run --rm mostro-test:bar3 sh -c "cargo test --release barattolo_fee && cargo test --release app::take_buy && cargo test --release app::take_sell && cargo test --release flow && cargo test --release app::add_invoice"`.
-  Verdi: `git add -A && git commit`, `git format-patch -1` (la copia
-  torna nel repo), e `docker build -f docker/Dockerfile -t mostro:v0.18.7-bar3 .`
+  e `docker run --rm mostro-test:bar3 cargo test --release -- barattolo_fee app::take_buy app::take_sell flow app::add_invoice`
+  — i cinque filtri in UN COLPO SOLO, tutti dopo `--`. La forma di
+  prima (`sh -c "cargo test … && cargo test …"`) ha le virgolette
+  annidate, e dal PC va lanciata dentro `ssh "…"`: PowerShell non le
+  fa passare. Il 18 set 2026: 144 verdi, zero falliti.
+  Verdi: UN COMMIT PER PATCH (`git add -A && git commit` dopo la 0005,
+  e di nuovo dopo la 0006), poi `git format-patch -2 --start-number 5`
+  — `-2` perché i commit sono due, `--start-number 5` perché senza i
+  file nascerebbero `0001-` e `0002-` e nel repo pesterebbero le prime
+  due patch. La copia torna nel repo con `scp`. E
+  `docker build -f docker/Dockerfile -t mostro:v0.18.7-bar3 .`
   — un tag nuovo, mai sovrascritto.
   3) SUL NODO, il compose (copia prima: `cp docker-compose.yml
   docker-compose.yml.prima-bar3`): l'immagine a `mostro:v0.18.7-bar3`,
@@ -564,6 +582,12 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   LIMIT 1"`; e uno col VPS irraggiungibile APPOSTA (`sudo systemctl
   stop barattolo` per il minuto della presa): fee piena per tutt'e due
   e nel log del nodo `discount NOT verified`.
+  ⚠️ DEI DUE, IL 18 SET 2026 NON SE N'È FATTO NESSUNO NELLA FORMA
+  SCRITTA QUI: lo scambio di prova (`4ed69365`) era fra DUE pionieri,
+  cioè con TUTT'E DUE scontati — conto al satoshi, ma a fee uguali la
+  riga di `barattolo_fees` e la colonna `order.fee` non si
+  distinguono. Quello con UNO solo scontato e quello col VPS spento
+  RESTANO DA FARE, e il primo è quello che prova la tabella a lato.
   IL ROLLBACK ha due gradini: togliere le tre variabili dal compose e
   `up -d` (la patch diventa inerte, upstream byte per byte), oppure
   l'immagine a `-bar2`. La `fee` e il listino si rimettono a mano.

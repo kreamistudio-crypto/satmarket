@@ -19833,3 +19833,118 @@ l'altezza di un `div` alto `100dvh` — dicono in un colpo quale modello
 è quello vero.
 
 Giro intero nel worktree su `origin/main`: 11406 passate, 0 fallite.
+
+## Il passo 3 delle commissioni per persona: la -bar3 in servizio, e lo scambio fra due pionieri (18 set 2026)
+
+**LO STATO, per primo: il cantiere «Le commissioni per persona» è IN
+SERVIZIO**, e quel che là era scritto «a due terzi» non vale più. Sul
+nodo gira `mostro:v0.18.7-bar3` — le patch 0005 (le commissioni per
+parte) e 0006 («has failed!» dice perché), commit `3a7a121` e `4f20e04`
+sul branch `barattolo/v0.18.7` — con `fee = 0.03` in `settings.toml` e
+le tre variabili `BARATTOLO_SCONTO_*` nel compose. Sul VPS: listino
+`P2P_COMMISSIONE_PERCENTO = 4`, `P2P_SCONTO_FEDELTA_PERCENTO = 0.5`, e
+il segreto. Le due `.patch` esportate dal nodo stanno in
+`deploy/mostro/`, col README che dice sei patch.
+Tutto in **guarda-e-riferisci**: i comandi scritti qui, eseguiti da
+Andrea, l'output incollato.
+
+**HA COMPILATO AL PRIMO COLPO, ed era la cosa che nessuno si
+aspettava** — nemmeno la consegna, che diceva «quando la compilazione
+dà errori (aspettateli)». Il Rust non aveva mai visto un compilatore:
+sul PC `cargo` non c'è. Build verde e **144 test verdi, zero falliti**
+nello stadio `builder`, coi cinque filtri (`barattolo_fee`,
+`app::take_buy`, `app::take_sell`, `flow`, `app::add_invoice`). I test
+upstream dei due take non si sono accorti di niente: è la prova della
+frase «a sconto spento, upstream byte per byte», che il verbale di ieri
+lasciava da guardare.
+NON È STATA FORTUNA, ed è la riga da tenere: prima del primo comando si
+è clonato il tag `v0.18.7` nello scratchpad, ci si sono applicate le
+quattro patch con `git am` e i due patcher, e si sono lette le FIRME
+che il modulo usa contro il sorgente vero — `DB_POOL` è
+`OnceLock<Arc<SqlitePool>>`, `get_dev_fee(i64)`, reqwest ha la feature
+`json`, `order` è `mut` nei due take, non c'è nessun `lib.rs` (quindi
+`crate::barattolo_fee` dai moduli interni risolve). **Senza un
+compilatore si può ancora leggere quel che il compilatore leggerebbe**:
+dieci minuti sul PC contro un giro di build sul nodo per ogni errore.
+Lo stesso giro ha detto che le ancore della 0005 e della 0006 non si
+pestano (sei file contro il solo `release.rs`), in tutti e due gli
+ordini, e che la 0005 rilanciata si ferma.
+
+**LO SCAMBIO DI PROVA, AL SATOSHI** (18 set 2026, ordine `4ed69365`,
+7388 sats, fra due PIONIERI): `discount true` per tutt'e due, fee
+**74 + 74** — l'1% a testa, `round(0.02 × 7388 / 2) = round(73,88)` —
+hold invoice **7462** (7388 + 74), payout **7314** (7388 − 74), e **37
+sats di rotta**. Trattenuti 148, meno i 37: **+111** per il nodo (la dev
+fee è a zero).
+⚠️ QUEI 37 SONO UN QUARTO DELL'INCASSO, e vanno guardati: è lo 0,5% del
+payout, dentro il tetto `max_routing_fee` alzato a 0.01 la sera del 17
+(«La causa vera del payout fallito»), che su questo importo vale 73. All'1% a
+testa il margine è 2 punti, e la rotta può mangiarsene fino a uno. Non
+è un difetto di questo cantiere; è il conto che la commissione minima
+fissa del backlog dovrà fare.
+
+**QUEL CHE NON È PROVATO DAL VIVO, ed è la parte onesta.**
+1) **Il fail-closed**: server muto o segreto sbagliato → fee piena per
+tutt'e due e la riga `discount NOT verified` nel log del nodo. Coperto
+dai test (`parse_answer` in ogni forma storta), mai visto succedere.
+2) **Il caso SENZA sconto** con la patch accesa: nessuna riga scritta,
+`order.fee` com'era.
+3) **E QUELLO CHE CONTA DI PIÙ, che la sequenza chiedeva e non si è
+fatto: lo scambio con UNO SOLO scontato.** Fra due pionieri la fee di
+chi compra e quella di chi vende sono UGUALI (74 e 74), quindi quello
+scambio **non distingue `order.fee` dalla riga di `barattolo_fees`**: se
+uno dei tre posti del venditore leggesse la colonna sbagliata, hold e
+payout sarebbero usciti identici. Tutta la tabella a lato esiste per il
+caso asimmetrico, e il caso asimmetrico dal vivo non c'è ancora. È la
+lezione «la prova verde per una ragione diversa da quella che credi»,
+stavolta su uno scambio vero: **un conto che torna al satoshi prova
+l'aritmetica, non la strada che ha fatto.** Serve un non-pioniere sotto
+il livello 5 da un lato: 7388 sats darebbero 111 da una parte e 74
+dall'altra, e lì i due numeri parlano.
+4) La 0006 **non ha mai parlato**: la sua riga esce solo quando un
+payout fallisce, e dal 18 set non ne è fallito nessuno. Compila, e
+basta.
+
+**TRE COSE DEL GIRO CHE NON ERANO NEL PIANO.**
+• **I PATCHER NON ERANO DOVE SI CREDEVA.** La cartella principale del
+PC era 19 commit INDIETRO rispetto a `origin/main`, con le modifiche
+vive di un'altra sessione sopra: lì `patch-0005`, `patch-0006` e
+`barattolo_fee.rs` non esistevano, e lo `scp` scritto sulla fiducia
+sarebbe fallito al primo comando. Si è lavorato da un worktree su
+`origin/main` (`.claude/worktrees/passo3-fee`), e lo scp è partito da
+lì. Prima di dare un percorso ad Andrea, si guarda che il file ci sia.
+• **IL SEGRETO È FINITO IN CHAT**, incollato nella consegna. Non era
+ancora installato da nessuna parte, quindi ruotarlo è costato niente:
+rigenerato al momento del compose, messo da Andrea nei due posti, mai
+più passato di qui. La regola 1 vale anche per un segreto di trenta
+secondi di vita, e PRODUZIONE ora lo dice nel punto dove si genera.
+• **IL BANCO SUL PC HA MENTITO UNA VOLTA**: al primo giro la 0005 si è
+fermata su `take_buy.rs` — ancora «0 volte». Non era la patch: `git am`
+sotto Windows con `autocrlf` globale aveva riscritto in CRLF i soli
+file toccati dalla 0004, che sono proprio i due take. Il clone va fatto
+con `core.autocrlf=false` INCHIODATO nel clone (`git config`), non
+passato al solo `git clone -c`: la trappola era già in memoria per il
+patcher, e ci si è ricaduti da `git am`.
+
+**LE DUE CORREZIONI ALLA PROCEDURA** (in PRODUZIONE, «LO SCONTO FEDELTÀ
+DEL P2P», e nel README del fork):
+• i `cargo test` si lanciano **coi cinque filtri in un colpo solo**,
+`cargo test --release -- barattolo_fee app::take_buy app::take_sell
+flow app::add_invoice`: la forma scritta ieri (`sh -c "… && …"`) ha le
+virgolette annidate, e da PowerShell dentro `ssh "…"` non passano;
+• l'esportazione è **`git format-patch -2 --start-number 5`**: i commit
+sono due (uno per patch), e senza `--start-number` i file nascerebbero
+`0001-` e `0002-`, pronti a pestare nel repo le prime due patch.
+
+**LE STRADE NON PRESE.** Correggere a mano sul nodo in caso di errore di
+compilazione: la consegna lo vietava già (si corregge nel repo, si
+ricommitta, si rifà lo scp) e non è servito. Mettere i patcher DENTRO
+`mostro-src`: il `git add -A` della sequenza se li sarebbe portati nel
+commit del fork — stanno in `~/nodo/patch-bar3`.
+
+**RESTA DA GUARDARE.** Lo scambio asimmetrico (il punto 3, prima di
+tutto il resto) e quello col VPS spento per il minuto della presa; le
+righe `discount NOT verified` nel log del nodo, che col battito acceso
+devono restare a zero e sono il termometro che riaprirebbe la cache; i
+37 sats di rotta contro un incasso di 148; e la strada dei BOND, che la
+0005 dichiara non coperta — prima di accenderli si rilegge.
