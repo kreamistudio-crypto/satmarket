@@ -20330,3 +20330,90 @@ fattura (la procedura sta in PRODUZIONE, «IL GATE CHE RIMANDA»). Il primo
 scaduto vero con la frase nuova. Quante eco dei propri gesti arrivano
 come avviso rimandato, prima di decidere se serve il «visto fin qui» dal
 client. E il buco del `sell` preso con la fattura, che è di mostro.
+
+## Il comune che diceva «[object Object]»: la chiave scritta due volte (18 set 2026)
+
+**IL DIFETTO, visto dal vivo.** Modificando un annuncio col ritiro a
+mano (la RAM VENGEANCE da 55 €, Torino), il campo «Zona — il tuo
+comune» del modulo mostrava «[object Object]». La pagina dell'annuncio
+era sana — «📍 Torino (TO)» — e il database pure.
+
+**LA CAUSA è una riga del cantiere delle zone di spedizione**
+(`79a7e34`, 17 set, GIÀ su main — non era il lavoro non committato
+della cartella principale). In `mapListing` la mappa delle tariffe per
+zona era stata messa sotto la chiave `zone`, che era GIÀ il comune
+dell'annuncio, trenta righe sopra (`zone:a.zona||'—'`). In un
+letterale JavaScript una chiave ripetuta non è un errore: vince
+l'ultima, in silenzio. Da quel commit `l.zone` era un oggetto in tutto
+il client, e `riempiFormDa` lo scriveva nel campo del comune.
+**PERCHÉ SI VEDEVA SOLO LÌ:** la card, il dettaglio e il negozio non
+leggono `l.zone` ma `l.comune`, che arriva dal server già estratto
+(`zona_comune`); i filtri e la ricerca li fa il server. Censiti tutti i
+lettori di `l.zone`: restavano il modulo (modifica E duplica, che
+passano dalla stessa `riempiFormDa`) e la ricerca della sola DEMO, che
+cercava dentro «[object Object]». Le quattro letture della mappa
+(`zonaOfferta`, `tariffaZona`, le tariffe estere e il toggle
+dell'euro in `riempiFormDa`) funzionavano per caso: leggevano la chiave
+giusta perché era l'ultima.
+
+**IL DATO NON SI È SPORCATO, ed è il motivo per cui non serve una
+scopa** (salvo la verifica qui sotto): salvando dalla modifica, il
+client chiede «è un comune vero?» prima di partire e «[object Object]»
+non lo è — si fermava con «Controlla la zona». Il server dice lo stesso
+con `guardia_zona_condizione`. **L'unica strada aperta** era la
+modifica FIRMATA degli importati da Nostr, dove la seconda regola è
+spenta apposta (`esigi_luogo=False`): lì il testo rotto poteva passare.
+Per questo la query di sola lettura sta nel report ad Andrea.
+
+**LA CURA.** La mappa si chiama `zoneSped`, e `zone` torna a essere
+solo il comune, com'era prima del 17. Cinque righe cambiate, i cinque
+lettori della mappa. E in `riempiFormDa` il campo accetta solo un
+TESTO: se un giorno arrivasse di nuovo un oggetto, il campo resta
+vuoto e il salvataggio col ritiro si ferma chiedendo il comune — che è
+meglio di mandare al server una stringa rotta.
+**LA STRADA SCARTATA:** rinominare il comune invece della mappa. Il
+comune come `zone` è letto da mesi in più posti (demo, ricerca,
+modulo, i dati finti), la mappa ha un giorno di vita e quattro lettori.
+
+**LE PROVE (`prove_zona_comune_in_modifica`).** 1) `mapListing` FATTA
+GIRARE in node su tre righe: l'annuncio del 18 (comune + mappa), uno
+di prima delle zone, uno senza zona col JSON storto — comune e mappa
+devono tornare separati e interi. 2) Una sentinella delle CHIAVI
+RIPETUTE al primo livello del letterale, su `mapListing` e `mapOrder`
+(toglie commenti, stringhe, template e classi di regex, poi conta le
+graffe): su `origin/main` di prima trova esattamente `['zone']`, e c'è
+una prova che la fa girare sul caso del 17 perché non sia verde per
+niente. 3) Il campo Zona scrive solo un testo, e le tariffe si leggono
+da `zoneSped`.
+**LA TORTURA ha trovato due buchi al primo giro**, ed è la parte da
+tenere: su sette mutazioni, `zonaOfferta` e `tariffaZona` che leggono
+il COMUNE invece della mappa sopravvivevano — nessuna prova, in tutta
+la suite, le faceva girare con una mappa vera; i due lettori erano
+coperti solo da sentinelle di testo. Il banco node ora le chiama
+(casa sì, UE sì, Asia no; i 12 € della UE; il ripiego a casa senza
+mappa), e al secondo giro sono 7 su 7. Una morte va letta: la
+`zonaOfferta` mutata non dà un risultato sbagliato, fa ESPLODERE il
+banco (`'dom' in "Torino (TO)"` lancia), che è comunque una rossa per
+la ragione giusta. E il primo giro ha mostrato un banco fragile — un
+`KeyError` su un caso mancante si mangiava le prove dopo —: le
+letture sono tutte `.get`, un caso rotto fa UNA rossa col suo nome.
+11.498 verdi, 0 rosse; 11.574 dopo il rebase sul campanello.
+
+**IL GIRO DAL VIVO** (collaudo, porta mia, copia del database locale,
+Venditore 222): annuncio «Zaino da trekking», Trento, ritiro +
+spedizione in euro su tutte le zone. Aperta la modifica dal bottone
+vero: il campo Zona dice «Trento (TN)», le tariffe estere si
+ricaricano (UE 5 €). Salvato senza toccare niente: «Annuncio
+aggiornato!», nel database `zona` è ancora «Trento (TN)», la mappa è
+intera e `modificato` si è mosso — cioè il salvataggio è passato
+davvero. La pagina dice «📍 Trento (TN)». Il primo candidato,
+«Grammofono a tromba» (Torino), era un'asta chiusa senza «Modifica».
+Gli scatti non ci sono: il Browser pane non componeva, e il DOM è la
+prova. NON provato dal vivo: un importato Nostr (strada firmata), e
+il telefono.
+
+**RESTA DA GUARDARE.** La query sul VPS per gli importati (nel report
+del 18 set). E la lezione vale oltre: `mapListing` ha ormai cento
+chiavi e ogni cantiere ne aggiunge una in fondo — la sentinella delle
+chiavi ripetute è la ragione per cui la prossima collisione sarà rossa
+invece che silenziosa.
