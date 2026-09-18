@@ -62846,14 +62846,17 @@ def prove_connettori_cassetto():
     prova("...e che ricollegare e' un catalogo nuovo", True,
           "come annunci nuovi" in sc)
 
-def _ambiente_tornate():
-    """`pagina_annunci` VERA su un database di cartone: annunci e
-    utenti col minimo che la query tocca."""
+def _ambiente_finestra():
+    """`pagina_annunci` VERA (con `ordine_finestra` e `_pagina_finestra`)
+    su un database di cartone: annunci e utenti col minimo che la
+    query tocca."""
     import sqlite3
     amb = {}
     i = _SORGENTE.index("ORDINAMENTI = {")
     exec(_SORGENTE[i:_SORGENTE.index("\n}\n", i) + 3], amb)
-    exec(pezzo("pagina_annunci"), amb)
+    for f in ("ordine_finestra", "pagina_annunci",
+              "_leggi_segnalibro_finestra", "_pagina_finestra"):
+        exec(pezzo(f), amb)
     con = sqlite3.connect(":memory:")
     con.row_factory = sqlite3.Row
     con.executescript(
@@ -62878,20 +62881,33 @@ def _semina(con, venditori):
     con.commit()
 
 
-def _scorri(amb, con, limit, per_venditore=3, ordina="", tetto=200):
+def _scorri(amb, con, limit, per_venditore=3, ordina="", tetto=200,
+            finestra=12, dopo_la_prima=None):
     """Tutte le pagine, come farebbe `caricaAltri`: una lista di
-    pagine, ognuna una lista di (id, venditore_id)."""
+    pagine, ognuna una lista di (id, venditore_id). `dopo_la_prima`,
+    se c'e', gira fra la prima pagina e la seconda (il mondo che
+    cambia mentre si scorre)."""
     pagine, cursore, giri = [], "", 0
     while True:
         righe, cursore = amb["pagina_annunci"](
             con, "a.id, a.venditore_id, a.creato, a.prezzo_sats",
             "a.stato='attivo'", [], limit, cursore or "", ordina,
-            per_venditore=per_venditore)
+            per_venditore=per_venditore, finestra=finestra)
         pagine.append([(r["id"], r["venditore_id"]) for r in righe])
         giri += 1
+        if giri == 1 and dopo_la_prima:
+            dopo_la_prima()
         if not cursore or giri > tetto:
             break
     return pagine
+
+
+def _peggio_finestra(vend, n=12):
+    """Il massimo di card di UN venditore in una qualunque fila di n
+    posizioni consecutive."""
+    from collections import Counter
+    return max((max(Counter(vend[i:i + n]).values())
+                for i in range(max(1, len(vend) - n + 1))), default=0)
 
 
 def prove_ordini_prova():
@@ -63088,164 +63104,285 @@ def prove_ordini_prova():
     con.close()
 
 
-def prove_tornate():
-    """«3 OGNI 30» (ago 2026): il riordino a tornate della vetrina.
-    Si gira il pezzo vero su sqlite in memoria, perche' qui il modo
-    tipico di fallire non e' un'eccezione — e' una prima pagina
-    piena di un venditore solo, o un annuncio che non compare mai,
-    che non alzano niente."""
-    print("\n[tornate]")
+def prove_finestra():
+    """LA FINESTRA SCORREVOLE (set 2026, al posto delle tornate «3 ogni
+    30»): in qualunque 12 card consecutive un venditore ne ha al piu'
+    3, e per il resto la vetrina e' «piu' recenti prima». Si gira il
+    pezzo vero su sqlite in memoria, perche' qui il modo tipico di
+    fallire non e' un'eccezione — e' una prima pagina piena di un
+    venditore solo, un annuncio che non compare mai o uno che compare
+    due volte, che non alzano niente. Ogni caso ha il suo try: uno che
+    inciampa non si porta dietro gli altri."""
+    print("\n[finestra scorrevole della vetrina]")
     from collections import Counter
     try:
-        amb, con = _ambiente_tornate()
+        amb, con = _ambiente_finestra()
     except Exception as e:
-        salta("le tornate", f"l'ambiente non si monta: {e}")
+        salta("la finestra scorrevole", f"l'ambiente non si monta: {e}")
         return
+    pa = amb["pagina_annunci"]
 
-    # IL CASO DEL QUADRO: un venditore con 25 righe piu' recenti di
-    # tutte, e dieci venditori con 3 annunci a testa — cioe' una prima
-    # tornata da 33, piu' lunga della pagina. (Con meno di 30 righe
-    # nella prima tornata il resto della pagina e' per forza del
-    # catalogo grosso: e' il riparto equo, ed e' il caso di sotto.)
-    _semina(con, {1: 25, **{v: 3 for v in range(2, 12)}})
-    tutti = {r[0] for r in con.execute("SELECT id FROM annunci")}
-    totale = con.execute("SELECT COUNT(*) FROM annunci "
-                         "WHERE stato='attivo'").fetchone()[0]
+    def daccapo(venditori):
+        con.execute("DELETE FROM annunci"); con.execute("DELETE FROM utenti")
+        _semina(con, venditori)
 
-    # senza la leva e' il mondo di ieri: il catalogo grosso in testa
-    ieri = _scorri(amb, con, 30, per_venditore=0)
-    prova("leva a 0: la prima pagina e' tutta del catalogo grosso", 25,
-          Counter(v for _, v in ieri[0])[1])
-    prova("leva a 0: il cursore e' a due pezzi (il formato di ieri)", 2,
-          len(amb["pagina_annunci"](con, "a.id, a.creato", "a.stato='attivo'",
-                                    [], 30, "", "")[1].split("_")))
+    def caso(nome, f):
+        try:
+            f()
+        except Exception as e:
+            prova(f"{nome}: il caso non esplode", "",
+                  f"{type(e).__name__}: {e}")
 
-    # LA REGOLA: nella prima finestra un venditore ne occupa al piu' 3
-    pagine = _scorri(amb, con, 30)
-    conta = Counter(v for _, v in pagine[0])
-    prova("prima pagina: il catalogo grosso ne occupa 3, non 25", 3,
-          conta[1])
-    prova("...e nessun altro ne ha piu' di 3", True,
-          max(conta.values()) <= 3)
-    prova("la prima pagina e' PIENA: riordinare non accorcia", 30,
-          len(pagine[0]))
+    # --- LA FUNZIONE PURA -------------------------------------------
+    of = amb["ordine_finestra"]
 
-    # LA PROVA REGINA: e' una permutazione, non un filtro — l'unione
-    # delle pagine e' la rosa, senza doppioni, e il totale di sempre
-    # (il COUNT sulla WHERE) resta VERO.
-    visti = [i for p in pagine for i, _ in p]
-    prova("l'unione delle pagine e' ESATTAMENTE la rosa", tutti,
-          set(visti))
-    prova("zero doppioni fra una pagina e l'altra", len(tutti),
-          len(visti))
-    prova("il COUNT(*) della WHERE dice quante card scorrono", totale,
-          len(visti))
-    # il rimandato NON si perde: il 25º annuncio del catalogo grosso
-    # arriva, in coda
-    quarto = con.execute("SELECT id FROM annunci WHERE venditore_id=1 "
-                         "ORDER BY creato DESC, id DESC LIMIT 1 OFFSET 3"
-                         ).fetchone()[0]
-    prova("il 4º annuncio del catalogo grosso e' rimandato, non perso",
-          True, quarto in visti and visti.index(quarto) >= 30)
+    def pura():
+        # il 4º di un venditore slitta alla PRIMA posizione che rispetta
+        # la regola: con A1-A4 in testa e venti singoli sotto, la
+        # finestra che finisce al posto 13 contiene A2 e A3 soltanto
+        fila = [(i, "A" if i < 4 else i) for i in range(24)]
+        v = [x for _, x in of(fila, 3, 12)]
+        prova("il 4º slitta al posto 13, non in fondo", 12,
+              [p for p, x in enumerate(v) if x == "A"][3])
+        prova("...e i singoli restano in ordine di data", list(range(4, 24)),
+              [x for x in v if x != "A"])
+        prova("i primi tre restano in cima", ["A"] * 3, v[:3])
+        # a leva morbida: chi non sfora non si muove di un posto
+        fila = [(i, i % 7) for i in range(40)]
+        prova("nessuno sfora: la fila esce identica", fila,
+              list(of(fila, 3, 12)))
+        # a forza bruta contro la frase della regola
+        import random
+        rnd = random.Random(7)
+        buone = 0
+        for _ in range(400):
+            k, n = rnd.randint(1, 4), rnd.randint(2, 15)
+            fila = [(i, rnd.randrange(rnd.randint(1, 8)))
+                    for i in range(rnd.randint(0, 50))]
+            fuori = list(of(fila, k, n))
+            resto, attesa = list(fila), []
+            while resto:
+                w = Counter(x for _, x in attesa[-(n - 1):])
+                c = next((r for r in resto if w[r[1]] < k), resto[0])
+                resto.remove(c)
+                attesa.append(c)
+            buone += fuori == attesa
+        prova("400 file a caso: e' ESATTAMENTE «il piu' recente che puo' "
+              "starci»", 400, buone)
+    caso("la funzione pura", pura)
 
-    # dentro la tornata vale «piu' recenti prima»
-    def creati(ids):
-        return [con.execute("SELECT creato FROM annunci WHERE id=?",
-                            (i,)).fetchone()[0] for i in ids]
-    prima_tornata = [i for i, _ in pagine[0]]   # tutta tornata 0 (33 > 30)
-    prova("dentro la tornata l'ordine resta per data, dal piu' nuovo",
-          sorted(creati(prima_tornata), reverse=True), creati(prima_tornata))
+    # --- IL CASO DEL QUADRO -------------------------------------------
+    def quadro():
+        daccapo({1: 25, **{v: 3 for v in range(2, 12)}})
+        tutti = {r[0] for r in con.execute("SELECT id FROM annunci")}
+        totale = con.execute("SELECT COUNT(*) FROM annunci "
+                             "WHERE stato='attivo'").fetchone()[0]
+        ieri = _scorri(amb, con, 30, per_venditore=0)
+        prova("leva a 0: la prima pagina e' tutta del catalogo grosso", 25,
+              Counter(v for _, v in ieri[0])[1])
+        prova("leva a 0: il cursore e' a due pezzi (il formato di ieri)", 2,
+              len(pa(con, "a.id, a.creato", "a.stato='attivo'", [], 30, "",
+                     "")[1].split("_")))
+        pagine = _scorri(amb, con, 30)
+        vend = [v for p in pagine for _, v in p]
+        prova("prima pagina: in 12 card consecutive nessuno ne ha piu' di 3",
+              3, _peggio_finestra(vend[:30]))
+        prova("...e il catalogo grosso nelle prime 12 ne ha 3", 3,
+              vend[:12].count(1))
+        prova("la prima pagina e' PIENA: riordinare non accorcia", 30,
+              len(pagine[0]))
+        visti = [i for p in pagine for i, _ in p]
+        prova("l'unione delle pagine e' ESATTAMENTE la rosa", tutti,
+              set(visti))
+        prova("zero doppioni fra una pagina e l'altra", len(tutti),
+              len(visti))
+        prova("il COUNT(*) della WHERE dice quante card scorrono", totale,
+              len(visti))
+        prova("gli altri, che non sforano, restano in ordine di data",
+              sorted((i for i, v in zip(visti, vend) if v != 1),
+                     reverse=True),
+              [i for i, v in zip(visti, vend) if v != 1])
+        # LA PROVA DEL SEGNALIBRO: la vetrina a pagine da 6, da 7 e da 30
+        # e' la STESSA fila della vetrina chiesta tutta in un colpo — il
+        # riordino non riparte a ogni pagina
+        intera = [r["id"] for r in pa(
+            con, "a.id", "a.stato='attivo'", [], 1000, "", "",
+            per_venditore=3, finestra=12)[0]]
+        for lim in (6, 7, 30):
+            prova(f"a pagine da {lim} e' la stessa fila di una pagina sola",
+                  intera, [i for p in _scorri(amb, con, lim) for i, _ in p])
+    caso("il quadro", quadro)
 
-    # LA TRAPPOLA DEL KEYSET DENTRO LA CTE, con un caso che la
-    # DISTINGUE: col cursore dentro, il rango si ricalcola sul residuo
-    # e alla pagina dopo il catalogo grosso ripartirebbe da 1 — cioe'
-    # 3 per PAGINA, il tetto che non morde. Qui A ha 8 annunci tutti
-    # piu' recenti, dieci venditori ne hanno 1, pagine da 6: la
-    # tornata 0 e' A1-A3 + i dieci, quindi la pagina 2 NON contiene A.
-    con.execute("DELETE FROM annunci"); con.execute("DELETE FROM utenti")
-    _semina(con, {1: 8, **{v: 1 for v in range(2, 12)}})
-    pagine = _scorri(amb, con, 6)
-    prova("pagina 2: il catalogo grosso NON riparte da 1 (keyset fuori "
-          "dalla CTE)", 0, Counter(v for _, v in pagine[1])[1])
-    visti = [i for p in pagine for i, _ in p]
-    vend = [v for p in pagine for _, v in p]
-    prova("...e i suoi annunci dal 4º in poi arrivano DOPO i singoli",
-          [1] * 5, vend[-5:])
-    prova("anche qui: unione = rosa, zero doppioni", (18, 18),
-          (len(set(visti)), len(visti)))
-    # POCHI VENDITORI: le tornate degradano al riparto equo invece di
-    # lasciare pagine corte (con 5 venditori «3 ogni 30» non esiste)
-    con.execute("DELETE FROM annunci"); con.execute("DELETE FROM utenti")
-    _semina(con, {v: 20 for v in range(1, 6)})
-    p1 = _scorri(amb, con, 30)[0]
-    prova("cinque venditori: la prima pagina resta piena", 30, len(p1))
-    prova("...e nessuno ne ha piu' di 6 (due tornate da 3)", 6,
-          max(Counter(v for _, v in p1).values()))
-    # e quando la prima tornata e' piu' CORTA della pagina, il resto
-    # lo riempie chi ha altro da mostrare: il caso del quadro con i
-    # piccoli da 1, 2 o 3 annunci (21 righe) da' al grosso 3+3+3
-    con.execute("DELETE FROM annunci"); con.execute("DELETE FROM utenti")
-    _semina(con, {1: 25, **{v: 1 + v % 3 for v in range(2, 12)}})
-    p1 = _scorri(amb, con, 30)[0]
-    prova("prima tornata corta: i 3 del grosso, poi i piccoli, poi ancora "
-          "lui a tornate di 3", [1] * 3 + [0] * 21 + [1] * 6,
-          [int(v == 1) for _, v in p1])
+    # --- POCHI VENDITORI: la regola si piega, la pagina resta piena ----
+    def pochi():
+        daccapo({v: 20 for v in range(1, 6)})
+        p1 = _scorri(amb, con, 30)[0]
+        prova("cinque venditori: la prima pagina resta piena", 30, len(p1))
+        prova("...e 5×3 ≥ 12, quindi la regola regge", 3,
+              _peggio_finestra([v for _, v in p1]))
+        daccapo({v: 20 for v in range(1, 4)})
+        pagine = _scorri(amb, con, 30)
+        prova("tre venditori (9 < 12): nessuna pagina corta", [30, 30],
+              [len(p) for p in pagine])
+    caso("pochi venditori", pochi)
 
-    # l'ordinamento esplicito NON dirada: chi chiede il prezzo lo vuole
-    # intero, e il cursore resta a due pezzi
-    con.execute("DELETE FROM annunci"); con.execute("DELETE FROM utenti")
-    _semina(con, {1: 25, **{v: 1 for v in range(2, 12)}})
-    righe, cur = amb["pagina_annunci"](
-        con, "a.id, a.venditore_id, a.prezzo_sats", "a.stato='attivo'", [],
-        10, "", "prezzo_giu", per_venditore=3)
-    prova("ordina=prezzo: le tornate non si applicano", 10,
-          Counter(r["venditore_id"] for r in righe)[1])
-    prova("ordina=prezzo: cursore a due pezzi", 2, len(cur.split("_")))
-    # un cursore a DUE pezzi con le tornate accese (il client fermo a
-    # meta' scorrimento a cavallo del deploy): prima pagina, mai un 500
-    righe, _ = amb["pagina_annunci"](
-        con, "a.id, a.venditore_id, a.creato", "a.stato='attivo'", [], 30,
-        "1000010_10", "", per_venditore=3)
-    prova("cursore di ieri sulle tornate: prima pagina, non un errore",
-          30, len(righe))
-    # il rango non esce dalle righe: e' un attrezzo, non un dato
-    righe, _ = amb["pagina_annunci"](
-        con, "a.id, a.creato", "a.stato='attivo'", [], 5, "", "",
-        per_venditore=3)
-    prova("`_tornata` non esce dalle righe", False,
-          any("_tornata" in r for r in righe))
+    # --- IL MONDO CHE CAMBIA MENTRE SI SCORRE ---------------------------
+    def mondo():
+        daccapo({1: 25, **{v: 3 for v in range(2, 12)}})
+        tutti = {r[0] for r in con.execute("SELECT id FROM annunci")}
+
+        def nuovo():
+            con.execute("INSERT INTO utenti VALUES(99, 'nuovo')")
+            con.execute("INSERT INTO annunci(id,venditore_id,creato,"
+                        "prezzo_sats) VALUES(900, 99, 9000000, 1)")
+        pagine = _scorri(amb, con, 7, dopo_la_prima=nuovo)
+        visti = [i for p in pagine for i, _ in p]
+        prova("pubblicato a meta' scorrimento: zero doppioni e zero buchi",
+              (tutti, len(tutti)), (set(visti), len(visti)))
+        prova("...e il nuovo apre la prossima PRIMA pagina", 900,
+              pa(con, "a.id", "a.stato='attivo'", [], 7, "", "",
+                 per_venditore=3, finestra=12)[0][0]["id"])
+        con.execute("DELETE FROM annunci WHERE id=900")
+        # IL CASO CHE HA CAMBIATO IL SEGNALIBRO: si vende un annuncio
+        # GIA' VISTO. Un riordino rifatto a ogni pagina si sposta (lo
+        # slot liberato fa salire un rimandato) e qualcuno salta: col
+        # quaderno la finestra riparte da dov'era.
+        visto = {}
+
+        def venduto_visto():
+            visto["id"] = pa(con, "a.id", "a.stato='attivo'", [], 7, "", "",
+                             per_venditore=3, finestra=12)[0][2]["id"]
+            con.execute("UPDATE annunci SET stato='venduto' WHERE id=?",
+                        (visto["id"],))
+        pagine = _scorri(amb, con, 7, dopo_la_prima=venduto_visto)
+        visti = [i for p in pagine for i, _ in p]
+        prova("venduto uno GIA' VISTO: zero buchi e zero doppioni",
+              (tutti, len(tutti)), (set(visti), len(visti)))
+        con.execute("UPDATE annunci SET stato='attivo'")
+        # uno che non si era ancora visto
+        ultimo = con.execute("SELECT MIN(id) FROM annunci").fetchone()[0]
+
+        def venduto():
+            con.execute("UPDATE annunci SET stato='venduto' WHERE id=?",
+                        (ultimo,))
+        pagine = _scorri(amb, con, 7, dopo_la_prima=venduto)
+        visti = [i for p in pagine for i, _ in p]
+        prova("venduto uno non ancora visto: non compare, e niente doppioni",
+              (tutti - {ultimo}, len(tutti) - 1), (set(visti), len(visti)))
+        con.execute("UPDATE annunci SET stato='attivo'")
+    caso("il mondo che cambia", mondo)
+
+    def a_ogni_pagina():
+        # a forza bruta: a OGNI pagina si vende qualcosa (visto o no) e
+        # si pubblica qualcosa. Chi c'era dall'inizio alla fine compare
+        # UNA volta, chi e' nato durante non entra, e il segnalibro
+        # resta corto.
+        import random
+        rnd = random.Random(11)
+        buone, lungo = 0, 0
+        for _ in range(150):
+            con.execute("DELETE FROM annunci")
+            con.execute("DELETE FROM utenti")
+            vs = {v: rnd.randint(1, 12) for v in range(1, rnd.randint(2, 14))}
+            _semina(con, vs)
+            inizio = {r[0] for r in con.execute("SELECT id FROM annunci")}
+            tolti, nuovi, nid = set(), set(), 10_000
+            lim, k, n = rnd.randint(2, 9), rnd.randint(1, 4), rnd.randint(2, 14)
+            visti, cur, giri = [], "", 0
+            while True:
+                r, cur = pa(con, "a.id", "a.stato='attivo'", [], lim,
+                            cur or "", "", per_venditore=k, finestra=n)
+                visti += [x["id"] for x in r]
+                giri += 1
+                lungo = max(lungo, len(cur or ""))
+                for _ in range(rnd.randint(0, 2)):
+                    vivi = [x[0] for x in con.execute(
+                        "SELECT id FROM annunci WHERE stato='attivo'")]
+                    if rnd.random() < 0.5 and vivi:
+                        x = rnd.choice(vivi)
+                        con.execute("UPDATE annunci SET stato='venduto' "
+                                    "WHERE id=?", (x,))
+                        tolti.add(x)
+                    else:
+                        nid += 1
+                        con.execute("INSERT INTO annunci(id,venditore_id,"
+                                    "creato,prezzo_sats) VALUES(?,?,?,1)",
+                                    (nid, rnd.choice(list(vs)), 5_000_000 + nid))
+                        nuovi.add(nid)
+                if not cur or giri > 500:
+                    break
+            buone += (len(visti) == len(set(visti))
+                      and inizio - tolti <= set(visti) <= inizio)
+        prova("150 scorrimenti col mondo che cambia a ogni pagina: tutti "
+              "esatti", 150, buone)
+        prova("...e il segnalibro resta corto (sotto i 300 caratteri)", True,
+              0 < lungo < 300)
+    caso("a ogni pagina", a_ogni_pagina)
+
+    # --- DOVE NON SI APPLICA, e i cursori di ieri -----------------------
+    def fuori():
+        daccapo({1: 25, **{v: 1 for v in range(2, 12)}})
+        righe, cur = pa(con, "a.id, a.venditore_id, a.prezzo_sats",
+                        "a.stato='attivo'", [], 10, "", "prezzo_giu",
+                        per_venditore=3, finestra=12)
+        prova("ordina=prezzo: la finestra non si applica", 10,
+              Counter(r["venditore_id"] for r in righe)[1])
+        prova("ordina=prezzo: cursore a due pezzi", 2, len(cur.split("_")))
+        _, cur = pa(con, "a.id", "a.stato='attivo'", [], 10, "", "",
+                    per_venditore=3, finestra=12)
+        prova("la finestra: il segnalibro e' il quaderno ('f' e cinque "
+              "pezzi)", (True, 5), (cur[:1] == "f", len(cur.split("_"))))
+        for vecchio in ("1000010_10", "0_1000010_10", "a_b_c_d", "zzz",
+                        "f1_2_3", "fx_1_0__", "f1_2_0_a_"):
+            righe, _ = pa(con, "a.id", "a.stato='attivo'", [], 30, vecchio,
+                          "", per_venditore=3, finestra=12)
+            prova(f"cursore storto «{vecchio}»: prima pagina, non un "
+                  "errore", 30, len(righe))
+        prova("finestra ≤ 1: la finestra non morde, ordine puro", 10,
+              Counter(r["venditore_id"] for r in pa(
+                  con, "a.id, a.venditore_id, a.creato", "a.stato='attivo'", [], 10,
+                  "", "", per_venditore=3, finestra=1)[0])[1])
+        righe, _ = pa(con, "a.id, a.creato", "a.stato='attivo'", [], 5, "",
+                      "", per_venditore=3, finestra=12)
+        prova("le righe portano i soli `campi` chiesti", {"id", "creato"},
+              set(righe[0]))
+        con.execute("DELETE FROM annunci")
+        prova("vetrina vuota: niente pagina e niente cursore", ([], None),
+              pa(con, "a.id", "a.stato='attivo'", [], 5, "", "",
+                 per_venditore=3, finestra=12))
+    caso("dove non si applica", fuori)
 
     # --- LE SENTINELLE -------------------------------------------------
+    of_src = codice(pezzo("ordine_finestra"))
+    prova("ordine_finestra e' PURA: niente database, niente orologio",
+          False, any(x in of_src for x in ("con.", "execute", "time.")))
     p = codice(pezzo("pagina_annunci"))
-    # `find` e mai `index`: una mutazione che sposta l'ancora deve fare
-    # ROSSA la riga, non farla esplodere portandosi dietro le sorelle
-    inizio = p.find("WITH r AS (")
-    fine = p.find("AS tornata FROM annunci a WHERE {dove}) ")
-    prova("la CTE si chiude subito dopo `dove`: niente cursore dentro",
-          True, 0 < inizio < fine)
-    cte = p[inizio:fine] if 0 < inizio < fine else p
-    prova("il cursore sta FUORI dalla CTE (nessun `?`-keyset dentro)",
-          False, "cursore" in cte or "tornata >" in cte)
-    prova("la CTE ha il FROM della query del totale (niente `u.`)", False,
-          " u." in cte or "JOIN utenti" in cte)
-    prova("le tornate valgono solo sull'ordinamento di default", True,
-          'per_venditore > 0 and chiave == "creato"' in p)
+    prova("la finestra vale solo sull'ordinamento di default", True,
+          'per_venditore > 0 and finestra > 1 and chiave == "creato"' in p)
+    pf = codice(pezzo("_pagina_finestra"))
+    prova("il segnalibro dice cosa RESTA con le sole date (fronte, testa, "
+          "attesi)", True, '"(a.creato, a.id) < (?, ?)", "a.id = ?"' in pf
+          and "(a.venditore_id = ? AND (a.creato, a.id) < (?, ?))" in pf)
+    prova("la fila si legge dal piu' recente", True,
+          "ORDER BY a.creato DESC, a.id DESC" in pf)
     la = codice(pezzo("lista_annunci"))
-    prova("lista_annunci passa la leva nei DUE rami (paginato e legacy)",
-          2, la.count("per_venditore=VETRINA_PER_VENDITORE"))
+    prova("lista_annunci passa le due leve nei DUE rami (paginato e legacy)",
+          (2, 2), (la.count("per_venditore=VETRINA_PER_VENDITORE"),
+                   la.count("finestra=VETRINA_FINESTRA")))
     prova("il ramo legacy non ha piu' una ORDER BY scritta a mano", False,
           "ORDER BY a.creato DESC, a.id DESC LIMIT ?" in la)
     for f in ("miei_annunci", "negozio"):
-        prova(f"{f} NON dirada (un venditore solo)", False,
+        prova(f"{f} NON riordina (un venditore solo)", False,
               "per_venditore" in codice(pezzo(f)))
-    prova("la leva nasce a 3 nel codice", True,
-          "VETRINA_PER_VENDITORE = 3" in _SORGENTE)
-    prova("fail-open dichiarato sotto SQLite 3.25", True,
-          "sqlite3.sqlite_version_info < (3, 25)" in _SORGENTE
-          and "VETRINA_PER_VENDITORE = 0" in _SORGENTE)
-    prova("il pannello delle leve la conosce", True,
-          '"VETRINA_PER_VENDITORE", VETRINA_PER_VENDITORE' in
-          codice(pezzo("_leve_stato")))
+    prova("le leve nascono a 3 e 12 nel codice", True,
+          "VETRINA_PER_VENDITORE = 3" in _SORGENTE
+          and "VETRINA_FINESTRA = 12" in _SORGENTE)
+    leve = codice(pezzo("_leve_stato"))
+    prova("il pannello delle leve le conosce tutte e due", True,
+          '"VETRINA_PER_VENDITORE", VETRINA_PER_VENDITORE' in leve
+          and '"VETRINA_FINESTRA", VETRINA_FINESTRA' in leve)
+    prova("le tornate non ci sono piu' (niente ROW_NUMBER in vetrina)",
+          False, "ROW_NUMBER() OVER (PARTITION BY" in p + pf)
     mini = open("miniapp.html", encoding="utf-8").read()
     prova("il client non legge MAI dentro il cursore (e' del server)",
           False, "vetrinaCursore.split" in mini or "cursore.split" in mini)
@@ -68717,7 +68854,7 @@ def main():
               prove_connettori_woo, prove_connettori_registro,
               prove_connettori_ingresso,
               prove_connettori_cassetto,
-              prove_tornate,
+              prove_finestra,
               prove_ordini_prova,
               prove_tutorial,
               prove_bunker_muto,

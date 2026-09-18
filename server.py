@@ -682,24 +682,25 @@ try:
 except ImportError:
     GIORNI_DATA_ANNUNCIO = 60
 
-# «3 OGNI 30» (ago 2026, decisione di Andrea): nella prima finestra
-# della vetrina un venditore non ne occupa piu' di N. NON e' un filtro
-# — e' un RIORDINO a «tornate» (vedi pagina_annunci): nessuna riga
-# sparisce, `totale` resta vero e il keyset resta senza stato. 0 =
-# spento, il mondo di ieri byte per byte. Vale sul solo ordinamento di
-# default di /api/listings: un ordine esplicito (prezzo, lampo, asta)
-# e la ricerca hanno il loro, e negozio/miei sono di un venditore solo.
-# FAIL-OPEN DICHIARATO: vuole le window function (SQLite >= 3.25,
-# 2018); sotto, la leva si spegne da sola e l'avvio lo dice.
+# LA FINESTRA SCORREVOLE (set 2026, al posto delle tornate «3 ogni 30»
+# di agosto): in QUALUNQUE fila di VETRINA_FINESTRA posizioni
+# consecutive un venditore ha al piu' VETRINA_PER_VENDITORE annunci; il
+# successivo slitta alla prima posizione che rispetta la regola. Per il
+# resto l'ordine e' quello di sempre, dal piu' recente. NON e' un
+# filtro — e' un RIORDINO (vedi ordine_finestra): nessuna riga sparisce
+# e `totale` resta vero. VETRINA_PER_VENDITORE = 0 spegne tutto, il
+# mondo «piu' recenti prima» byte per byte. Vale sul solo ordinamento
+# di default di /api/listings (reparti compresi): un ordine esplicito
+# (prezzo, lampo, asta) e la ricerca hanno il loro, e negozio/miei sono
+# di un venditore solo.
 try:
     from config import VETRINA_PER_VENDITORE
 except ImportError:
     VETRINA_PER_VENDITORE = 3
-if VETRINA_PER_VENDITORE and sqlite3.sqlite_version_info < (3, 25):
-    print("⚠️ SQLite " + sqlite3.sqlite_version + " senza window function: "
-          "VETRINA_PER_VENDITORE spenta, la vetrina resta «piu' recenti "
-          "prima» senza il riordino a tornate")
-    VETRINA_PER_VENDITORE = 0
+try:
+    from config import VETRINA_FINESTRA
+except ImportError:
+    VETRINA_FINESTRA = 12
 
 # I post automatici (la piattaforma che racconta i fatti) sono nati
 # dopo: i config.py gia' compilati possono non avere le chiavi. I
@@ -15135,8 +15136,88 @@ ORDINAMENTI = {
 }
 
 
+def ordine_finestra(fila, per_venditore, finestra, stato=None):
+    """LA FINESTRA SCORREVOLE (set 2026): riordina la `fila` — coppie
+    (id, venditore_id) gia' in ordine «piu' recenti prima» — in modo
+    che in qualunque `finestra` posizioni consecutive un venditore ne
+    abbia al piu' `per_venditore`. Un generatore: esce una coppia alla
+    volta, e chi chiede la prima pagina non paga il riordino di tutta
+    la vetrina.
+
+    La regola e' una frase sola: a ogni posto va l'annuncio PIU'
+    RECENTE fra quelli che possono starci. Chi non puo' (il suo
+    venditore ne ha gia' `per_venditore` nelle ultime `finestra` − 1
+    posizioni) aspetta in una fila sua, e ne esce appena la finestra
+    glielo permette — prima della testa della fila, che e' piu'
+    vecchia di lui. Quindi un annuncio slitta solo di quanto serve, e
+    solo se il suo venditore ha appena riempito la finestra.
+
+    QUANDO NESSUNO PUO' STARCI (restano solo annunci di pochi
+    venditori, tutti al tetto) si prende comunque il piu' recente: la
+    regola si piega in fondo alla vetrina invece di lasciarla corta.
+
+    `stato` (facoltativo) e' il quaderno del riordino, ed e' cio' che
+    permette di RIPRENDERLO a meta' invece di rifarlo: dentro ci sono
+    `ultimi` (i venditori delle ultime `finestra` − 1 posizioni),
+    `attesa` (venditore -> deque di (indice, id), dal piu' recente),
+    `testa` (l'annuncio letto dalla fila e non ancora messo) e
+    `indice` (quanti ne sono gia' stati numerati). Chi lo passa pieno
+    riparte da li'; il generatore lo tiene aggiornato a ogni uscita,
+    PRIMA di cedere la coppia, cosi' chi lo guarda fra una coppia e
+    l'altra lo trova coerente. PURA: niente database, niente
+    orologio — la stessa fila dallo stesso stato da' sempre la stessa
+    vetrina, ed e' cio' che rende il segnalibro coerente."""
+    from collections import Counter, deque
+    stato = {} if stato is None else stato
+    ultimi = stato["ultimi"] = deque(stato.get("ultimi", ()))
+    attesa = stato.setdefault("attesa", {})
+    quanti = Counter(ultimi)
+    fila = iter(fila)
+    finita = False
+    while True:
+        # la testa della fila: chi adesso non puo' starci va in attesa
+        while not finita:
+            if stato.get("testa") is None:
+                r = next(fila, None)
+                if r is None:
+                    finita = True
+                    break
+                stato["testa"] = (stato.get("indice", 0), r[0], r[1])
+                stato["indice"] = stato.get("indice", 0) + 1
+            testa = stato["testa"]
+            if quanti[testa[2]] < per_venditore:
+                break
+            attesa.setdefault(testa[2], deque()).append(testa[:2])
+            stato["testa"] = None
+        testa = stato.get("testa")
+        # il piu' recente fra la testa e gli attesi che ora possono starci
+        scelta = testa
+        for v, d in attesa.items():
+            if quanti[v] < per_venditore and (scelta is None
+                                              or d[0][0] < scelta[0]):
+                scelta = (d[0][0], d[0][1], v)
+        if scelta is None:
+            # nessuno puo' starci senza sforare: il piu' recente che resta
+            teste = [(d[0][0], d[0][1], v) for v, d in attesa.items()]
+            if not teste:
+                return
+            scelta = min(teste)
+        if testa is not None and scelta[0] == testa[0]:
+            stato["testa"] = None
+        else:
+            d = attesa[scelta[2]]
+            d.popleft()
+            if not d:
+                del attesa[scelta[2]]
+        ultimi.append(scelta[2])
+        quanti[scelta[2]] += 1
+        if len(ultimi) >= finestra:
+            quanti[ultimi.popleft()] -= 1
+        yield scelta[1], scelta[2]
+
+
 def pagina_annunci(con, campi, dove, par, limit, cursore, ordina="",
-                   per_venditore=0):
+                   per_venditore=0, finestra=0):
     """Una pagina di annunci nell'ordine chiesto (default: nuovi
     prima). Chiede una riga in piu' del limite: se arriva, c'e'
     un'altra pagina e l'ultima riga tenuta diventa il prossimo
@@ -15144,69 +15225,147 @@ def pagina_annunci(con, campi, dove, par, limit, cursore, ordina="",
     sconosciuto) vale come il default: mai un errore (fail-safe
     verso client vecchi o link rotti).
 
-    LE TORNATE (ago 2026, «3 ogni 30»): con `per_venditore` > 0 e
-    l'ordinamento di default, ogni annuncio prende il RANGO dentro il
-    suo venditore (1º, 2º, 3º… per data) e la tornata e' il rango
-    diviso N — la tornata 0 sono gli N piu' recenti di OGNI venditore,
-    in ordine di data, poi la tornata 1, e cosi' via. E' una
-    PERMUTAZIONE della rosa, non un filtro: nessuna riga sparisce,
-    quindi il `totale` di chi chiama resta vero e lo scorrimento
-    ricompone la rosa intera; e il keyset resta senza stato, con una
-    chiave in piu' davanti — il cursore diventa
-    '{tornata}_{creato}_{id}'. Il rango si calcola al volo (niente
-    colonna da tenere in pari coi ~48 UPDATE di annunci) sulla rosa
-    FILTRATA: dentro un reparto conta fra gli annunci di quel
-    venditore in quel reparto.
-    ⚠️ IL CURSORE STA FUORI DALLA CTE, ed e' la riga da non spostare:
-    dentro, il rango si ricalcolerebbe sul RESIDUO e a ogni pagina il
-    venditore ripartirebbe da 1 — N per pagina, cioe' il tetto che
-    non morde e la vetrina che si riempie di lui, in silenzio.
-    Un cursore a DUE pezzi (un client fermo a meta' scorrimento a
-    cavallo del deploy) cade nel ramo di sempre: prima pagina, mai un
-    errore — una pagina ripetuta una volta, dichiarato."""
+    LA FINESTRA SCORREVOLE (set 2026): con `per_venditore` > 0 e
+    l'ordinamento di default la vetrina passa da `ordine_finestra` —
+    vedi il suo commento, e `_pagina_finestra` per il segnalibro."""
     chiave, verso, op = ORDINAMENTI.get(ordina, ORDINAMENTI[""])
-    tornate = per_venditore > 0 and chiave == "creato"
-    if tornate:
-        # la CTE ha lo stesso FROM della query del totale (niente `u.`:
-        # `dove` e' gia' JOIN-free, il patto di _sql_soglia_negozio)
-        q = ("WITH r AS (SELECT a.id, (ROW_NUMBER() OVER (PARTITION BY "
-             "a.venditore_id ORDER BY a.creato DESC, a.id DESC) - 1) / ? "
-             f"AS tornata FROM annunci a WHERE {dove}) "
-             f"SELECT {campi}, r.tornata AS _tornata FROM r "
-             "JOIN annunci a ON a.id = r.id "
-             "JOIN utenti u ON u.tg_id = a.venditore_id")
-        par = [per_venditore] + par
-    else:
-        q = (f"SELECT {campi} FROM annunci a "
-             f"JOIN utenti u ON u.tg_id = a.venditore_id WHERE {dove}")
+    if per_venditore > 0 and finestra > 1 and chiave == "creato":
+        return _pagina_finestra(con, campi, dove, par, limit, cursore,
+                                per_venditore, finestra)
+    q = (f"SELECT {campi} FROM annunci a "
+         f"JOIN utenti u ON u.tg_id = a.venditore_id WHERE {dove}")
     if cursore:
         try:
-            if tornate:
-                t, c, i = cursore.split("_")
-                par = par + [int(t), int(t), int(c), int(i)]
-                q += (" WHERE r.tornata > ? OR (r.tornata = ? "
-                      f"AND (a.{chiave}, a.id) {op} (?, ?))")
-            else:
-                c, i = cursore.split("_")
-                par = par + [int(c), int(i)]
-                q += f" AND (a.{chiave}, a.id) {op} (?, ?)"
+            c, i = cursore.split("_")
+            par = par + [int(c), int(i)]
+            q += f" AND (a.{chiave}, a.id) {op} (?, ?)"
         except (ValueError, AttributeError):
             pass
-    q += ((" ORDER BY r.tornata, " if tornate else " ORDER BY ")
-          + f"a.{chiave} {verso}, a.id {verso} LIMIT ?")
+    q += f" ORDER BY a.{chiave} {verso}, a.id {verso} LIMIT ?"
     righe = [dict(r) for r in con.execute(q, par + [limit + 1])]
     prossimo = None
     if len(righe) > limit:
         righe = righe[:limit]
         u = righe[-1]
-        prossimo = (f"{u['_tornata']}_" if tornate else "") + \
-            f"{u[chiave]}_{u['id']}"
-    if tornate:
-        # il rango e' un attrezzo della paginazione, non un dato: non
-        # esce (il patto di quantita_max)
-        for r in righe:
-            r.pop("_tornata", None)
+        prossimo = f"{u[chiave]}_{u['id']}"
     return righe, prossimo
+
+
+def _leggi_segnalibro_finestra(cursore):
+    """'f{creato}_{id}_{testa}_{ultimi}_{attesi}' -> i suoi pezzi, o
+    None se il cursore ha un'altra forma (quello a due pezzi del
+    keyset, i tre delle tornate d'agosto, un link rotto): chi chiama
+    riparte dalla prima pagina, mai un errore."""
+    try:
+        if not cursore.startswith("f"):
+            return None
+        fc, fi, testa, ultimi, attesi = cursore[1:].split("_")
+        return {"fronte": (int(fc), int(fi)), "testa": int(testa),
+                "ultimi": [int(v) for v in ultimi.split(".") if v],
+                "attesi": {int(v): (int(c), int(i)) for v, c, i in (
+                    x.split("~") for x in attesi.split(".") if x)}}
+    except (ValueError, AttributeError):
+        return None
+
+
+def _pagina_finestra(con, campi, dove, par, limit, cursore,
+                     per_venditore, finestra):
+    """Una pagina della vetrina riordinata dalla finestra scorrevole.
+
+    IL SEGNALIBRO E' IL QUADERNO DEL RIORDINO, non una posizione:
+    'f{creato}_{id}_{testa}_{ultimi}_{attesi}' dice
+      · il FRONTE: fin dove la fila (dal piu' recente) e' stata letta;
+      · la `testa`: l'annuncio letto e non ancora messo (0 = nessuno);
+      · `ultimi`: i venditori delle ultime `finestra` − 1 card;
+      · `attesi`: per ogni venditore che ha annunci in attesa, la data
+        del suo ultimo annuncio GIA' mostrato (`v~creato~id`).
+    Da questi, cosa e' GIA' STATO MOSTRATO si dice con le sole date:
+    tutto quel che sta sopra il fronte, tranne la testa e, per chi
+    aspetta, quel che sta sotto il suo ultimo mostrato (per venditore
+    gli annunci escono sempre dal piu' recente, quindi i mostrati sono
+    un blocco in cima). E' cio' che rende lo scorrimento ESATTO anche
+    se il mondo cambia intanto: un annuncio venduto — visto o no — non
+    sposta niente, perche' la finestra riparte dal quaderno e non da
+    un riordino rifatto; un annuncio pubblicato sta sopra il fronte (o
+    sopra l'ultimo mostrato del suo venditore) e quindi vale come gia'
+    visto — non entra nella fila di chi scorre, e apre la prossima
+    prima pagina. Un annuncio rilanciato esce allo stesso modo, e si
+    ritrova in cima. Il quaderno resta corto per costruzione: con 3
+    ogni 12, in attesa ci sono al piu' una manciata di venditori.
+    Un cursore di altra forma vale come prima pagina: mai un errore.
+
+    Il riordino non e' una colonna: a ogni pagina si legge la fila
+    leggera (id, venditore, data — tre interi a riga) di quel che
+    resta da mostrare, e la lettura si ferma appena la pagina e'
+    piena. Poi le righe intere della pagina, e SQL le serve
+    nell'ordine che gli pare: si rimettono in fila qui."""
+    s = _leggi_segnalibro_finestra(cursore) if cursore else None
+    q = ("SELECT a.id, a.venditore_id, a.creato FROM annunci a "
+         f"JOIN utenti u ON u.tg_id = a.venditore_id WHERE {dove}")
+    p = list(par)
+    if s:
+        # quel che resta da mostrare: sotto il fronte, la testa, e per
+        # chi aspetta cio' che sta sotto il suo ultimo mostrato
+        resto = ["(a.creato, a.id) < (?, ?)", "a.id = ?"]
+        p += [*s["fronte"], s["testa"]]
+        for v, w in s["attesi"].items():
+            resto.append("(a.venditore_id = ? AND (a.creato, a.id) < (?, ?))")
+            p += [v, *w]
+        q += f" AND ({' OR '.join(resto)})"
+    q += " ORDER BY a.creato DESC, a.id DESC"
+    cur = con.execute(q, p)
+    fronte = partenza = s["fronte"] if s else None
+    mostrato = dict(s["attesi"]) if s else {}   # venditore -> ultimo mostrato
+    data = {}                                   # id -> (creato, id)
+    stato = {"ultimi": s["ultimi"] if s else [], "attesa": {}, "indice": 0}
+    # SI RIMETTE IL QUADERNO COM'ERA: gli attesi (sopra il fronte)
+    # tornano nelle loro file, la testa torna in testa
+    riga = cur.fetchone()
+    from collections import deque
+    while s and riga is not None and \
+            (riga["creato"], riga["id"]) >= fronte and riga["id"] != s["testa"]:
+        data[riga["id"]] = (riga["creato"], riga["id"])
+        stato["attesa"].setdefault(riga["venditore_id"], deque()).append(
+            (stato["indice"], riga["id"]))
+        stato["indice"] += 1
+        riga = cur.fetchone()
+
+    def fila():
+        nonlocal fronte
+        r = riga
+        while r is not None:
+            data[r["id"]] = fronte = (r["creato"], r["id"])
+            yield r["id"], r["venditore_id"]
+            r = cur.fetchone()
+
+    def segnalibro():
+        testa = stato.get("testa")
+        # chi aspetta senza aver avuto card in QUESTO giro ha l'ultima
+        # mostrata sopra il fronte di partenza: quel fronte basta a
+        # dire cosa gli resta (nessun suo annuncio sta in mezzo)
+        w = {v: mostrato.get(v) or partenza for v in stato["attesa"]}
+        attesi = ".".join(f"{v}~{w[v][0]}~{w[v][1]}" for v in w)
+        return (f"f{fronte[0]}_{fronte[1]}_{testa[1] if testa else 0}_"
+                + ".".join(str(v) for v in stato["ultimi"]) + f"_{attesi}")
+
+    pagina, prossimo = [], None
+    for i, v in ordine_finestra(fila(), per_venditore, finestra, stato):
+        if len(pagina) == limit:
+            break           # ce n'e' un'altra: il segnalibro e' gia' preso
+        pagina.append(i)
+        mostrato[v] = data[i]
+        if len(pagina) == limit:
+            prossimo = segnalibro()
+    else:
+        prossimo = None     # la fila e' finita proprio sull'ultima card
+    if not pagina:
+        return [], None
+    segni = ",".join("?" * len(pagina))
+    righe = {r["id"]: dict(r) for r in con.execute(
+        f"SELECT {campi} FROM annunci a "
+        f"JOIN utenti u ON u.tg_id = a.venditore_id "
+        f"WHERE a.id IN ({segni})", pagina)}
+    return [righe[i] for i in pagina if i in righe], prossimo
 
 
 # --------------------- CONTATORE PIONIERI ---------------------------
@@ -15658,14 +15817,15 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # Client senza paginazione (JS vecchio in cache): l'array puro
         # di sempre, col tetto di sicurezza. Sotto i 500 annunci la
         # risposta e' IDENTICA a prima.
-        # Stesso ordine della vetrina paginata (le tornate comprese):
+        # Stesso ordine della vetrina paginata (la finestra compresa):
         # una verita' sola, anche per chi legge l'array di ieri. Il
         # cursore si butta.
         righe = (_righe_per_id(con, campi, ordinati[:TETTO_LEGACY])
                  if ordinati is not None else
                  arricchisci_righe_vetrina(pagina_annunci(
                      con, campi, dove, par, TETTO_LEGACY, "",
-                     per_venditore=VETRINA_PER_VENDITORE)[0]))
+                     per_venditore=VETRINA_PER_VENDITORE,
+                     finestra=VETRINA_FINESTRA)[0]))
         con.close()
         return righe
     limit = min(limit, LIMITE_PAGINA_MAX)
@@ -15690,7 +15850,8 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
     else:
         righe, prossimo = pagina_annunci(con, campi, dove, par, limit,
                                          cursore, ordina,
-                                         per_venditore=VETRINA_PER_VENDITORE)
+                                         per_venditore=VETRINA_PER_VENDITORE,
+                                         finestra=VETRINA_FINESTRA)
         righe = arricchisci_righe_vetrina(righe)
     risposta = {"annunci": righe, "cursore": prossimo}
     if not cursore:
@@ -19357,10 +19518,22 @@ def _leve_stato():
             _leva("«Pubblicato N giorni fa» fino a (giorni)",
                   "GIORNI_DATA_ANNUNCIO", GIORNI_DATA_ANNUNCIO,
                   spento="la data non si mostra mai nel dettaglio"),
-            _leva("Annunci per venditore in testa alla vetrina",
+            _leva("Annunci per venditore in ogni finestra della vetrina",
                   "VETRINA_PER_VENDITORE", VETRINA_PER_VENDITORE,
                   spento="la vetrina e' «piu' recenti prima» e basta: un "
-                         "catalogo grosso si prende le prime pagine"),
+                         "catalogo grosso si prende le prime pagine",
+                  acceso=f"in {VETRINA_FINESTRA} card consecutive un "
+                         f"venditore ne ha al piu' {VETRINA_PER_VENDITORE}"
+                         "; il successivo slitta al primo posto libero"),
+            _leva("Larghezza della finestra (card consecutive)",
+                  "VETRINA_FINESTRA", VETRINA_FINESTRA,
+                  allarme=bool(VETRINA_PER_VENDITORE)
+                  and VETRINA_FINESTRA <= 1,
+                  spento="sotto 2 la finestra non morde: il riordino "
+                         "resta spento anche con l'altra leva accesa",
+                  acceso="sotto 2 la finestra non morde: il riordino "
+                         "resta spento anche con l'altra leva accesa"
+                         if VETRINA_FINESTRA <= 1 else ""),
             _leva("Annunci nel barattolo", "MAX_PREFERITI", MAX_PREFERITI),
             _leva("Pezzi per annuncio", "MAX_QUANTITA_ANNUNCIO",
                   MAX_QUANTITA_ANNUNCIO),

@@ -5479,77 +5479,84 @@
   tocchi svelti su due categorie: vince l'ultima, senza mescolare.
   REGOLA: chi aggiunge una vista paginata (negozio, miei) e la svuota
   prima di ricaricarla deve darle il suo giro, o si ricompra questo bug.
-  LA VETRINA SI ORDINA A TORNATE (ago 2026, «3 ogni 30», decisione di
-  Andrea): in testa alla home un venditore non ne occupa più di 3.
-  Misurato prima di toccare: sul database di produzione-copia nella
-  prima finestra di 30 card UN venditore ne aveva 25, e coi connettori
-  (200 righe a `creato` identico) sarebbero state le prime sette
-  pagine in blocco.
-  NON SI DIRADA, SI RIORDINA, ed è la riga che regge tutto: ogni
-  annuncio prende il RANGO dentro il suo venditore (1º, 2º, 3º… per
-  `creato DESC, id DESC`) e la tornata è `(rango−1)//3` — la vetrina
-  si ordina per `tornata ASC, creato DESC, id DESC`. La tornata 0 sono
-  i 3 più recenti di OGNI venditore, in ordine di data; poi la 1, e
-  così via. È una PERMUTAZIONE della rosa, non un filtro — ed è ciò
-  che chiude da soli i due punti di rottura del quadro: nessuna riga
-  sparisce, quindi `totale` (il `COUNT(*)` di sempre) resta VERO e lo
-  scroll ricompone la rosa intera; e il keyset resta SENZA STATO, con
-  una chiave in più davanti — il cursore è `'{tornata}_{creato}_{id}'`
-  e la condizione `tornata > ? OR (tornata = ? AND (creato, id) <
-  (?, ?))`. Un filtro in Python con un cursore opaco che porta gli id
-  rimandati darebbe la STESSA permutazione con uno stato che cresce
-  (un catalogo da 200 = 200 id nell'URL): scartato per questo. La
-  colonna materializzata invecchia a ogni venduto/rimosso: scartata.
-  IL RANGO SI CALCOLA AL VOLO, `ROW_NUMBER() OVER (PARTITION BY
-  a.venditore_id …)` in una CTE sulla rosa FILTRATA (`dove`: dentro un
-  reparto conta fra gli annunci di quel venditore in quel reparto —
-  coerente con «i filtri si applicano alla rosa intera»). Costa 0,7 ms
-  a pagina su 859 righe (~10 ms stimati a 10.000), a OGNI pagina.
-  ⚠️ IL CURSORE STA FUORI DALLA CTE, ed è la trappola che il quadro
-  aveva nominato e che la prova DISTINGUE con un caso apposta (A con 8
-  annunci più recenti, dieci venditori da 1, pagine da 6: la pagina 2
-  non deve contenere nessun A): dentro, il rango si ricalcolerebbe sul
-  RESIDUO e a ogni pagina il venditore ripartirebbe da 1 — 3 per
-  PAGINA, il tetto che non morde e la vetrina che si riempie di lui,
-  in silenzio.
-  COSA SIGNIFICA DAVVERO «3 OGNI 30», e va detto perché il primo che
-  lo nota lo chiamerà bug: la garanzia è «al massimo 3 per TORNATA»,
-  che è ≡ «3 nei primi 30» finché la prima tornata è lunga ≥ 30, cioè
-  finché almeno 10 venditori hanno ≥ 3 annunci (oggi: 70 righe). Con
-  POCHI venditori la regola letterale è insoddisfacibile (5 venditori
-  → 6 a testa) e le tornate degradano da sole al riparto equo invece
-  di lasciare pagine corte: la pagina si riempie con le tornate
-  successive di chi ha altro da mostrare. A cavallo fra due tornate
-  una finestra di 30 può contenerne fino a 6 dello stesso. E ROVESCIA
-  una promessa dichiarata, «più recenti prima»: vale DENTRO la
-  tornata, non fra tornate — il 4º annuncio di oggi di un venditore
-  sta sotto il 3º di un mese fa di un altro. È la decisione di
-  prodotto, detta ad alta voce.
+  LA VETRINA SI ORDINA A FINESTRA SCORREVOLE (set 2026, al posto delle
+  tornate «3 ogni 30» d'agosto; il perché del cambio sta in CANTIERI,
+  «La finestra scorrevole della vetrina»). LA REGOLA IN UNA FRASE: in
+  qualunque `VETRINA_FINESTRA` (12) card consecutive un venditore ne
+  ha al più `VETRINA_PER_VENDITORE` (3); il successivo slitta alla
+  prima posizione che lo permette, e per il resto l'ordine è «più
+  recenti prima». Detta come algoritmo (`ordine_finestra`, PURA, un
+  generatore): a ogni posto va l'annuncio PIÙ RECENTE fra quelli che
+  possono starci; chi non può aspetta in una fila del suo venditore e
+  ne esce appena la finestra glielo permette, prima della testa della
+  fila che è più vecchia di lui. Quindi un annuncio slitta solo di
+  quanto serve, e solo se il suo venditore ha appena riempito la
+  finestra: il 4º di quattro annunci consecutivi va al posto 13, non
+  sotto i primi tre di tutti gli altri. Quando NESSUNO può starci
+  (restano pochi venditori, tutti al tetto) si prende comunque il più
+  recente: la regola si piega in fondo alla vetrina invece di lasciare
+  pagine corte. È una PERMUTAZIONE della rosa, non un filtro: nessuna
+  riga sparisce e `totale` (il `COUNT(*)` di sempre) resta VERO.
+  L'ANTI-VALANGA, detto coi numeri: un negozio collegato da 200 righe
+  allo stesso secondo tiene 3 card ogni 12 (a blocchi di tre: posti
+  1-3, 13-15, 25-27…) finché gli altri hanno qualcosa da mostrare —
+  1 card su 4, contro circa 1 su 25 delle tornate. È il prezzo di non
+  seppellire più il 4º annuncio di nessuno, e la leva per stringerlo è
+  la LARGHEZZA: a 24 è 1 su 8, a 30 1 su 10.
+  IL SEGNALIBRO È IL QUADERNO DEL RIORDINO, non una posizione
+  (`_pagina_finestra`): `'f{creato}_{id}_{testa}_{ultimi}_{attesi}'` =
+  il FRONTE (fin dove la fila dal più recente è stata letta), la
+  TESTA (letta e non ancora messa, 0 se nessuna), i venditori delle
+  ultime 11 card, e per ogni venditore in ATTESA la data del suo
+  ultimo annuncio già mostrato (`v~creato~id`). Da lì cosa è GIÀ
+  STATO MOSTRATO si dice con le sole date — tutto sopra il fronte,
+  tranne la testa e, per chi aspetta, quel che sta sotto il suo ultimo
+  mostrato (per venditore le card escono sempre dal più recente,
+  quindi i mostrati sono un blocco in cima) — e la pagina dopo RIPRENDE
+  il riordino da quello stato invece di rifarlo. È ciò che rende lo
+  scorrimento ESATTO col mondo che cambia: un annuncio venduto (visto
+  o no) non sposta niente; uno pubblicato sta sopra il fronte, vale
+  come già visto e apre la prossima prima pagina; uno rilanciato esce
+  allo stesso modo e si ritrova in cima. Il quaderno resta corto per
+  costruzione (con 3 ogni 12 al tetto stanno al più tre venditori
+  alla volta): sotto i 300 caratteri. Un cursore di altra forma (i due
+  pezzi del keyset, i tre delle tornate) vale come prima pagina, mai
+  un 500.
+  ⚠️ LA PRIMA STESURA ERA UNA FOTOGRAFIA, e la tortura l'ha bocciata:
+  `'{creato}_{id}_{posizione}_{ultimo}'`, cioè «rifai il riordino
+  sulla rosa di allora e riparti dopo l'ultima card vista». Reggeva
+  alle pubblicazioni ma non alle VENDITE di una card già vista: lo
+  slot liberato fa salire un rimandato sopra il segnalibro, e quello
+  non lo vede più nessuno — 178 scorrimenti su 300 con un buco, a
+  caso. Un riordino che dipende dai vicini non si ricalcola: si
+  riprende.
+  IL RANGO NON È UNA COLONNA: a ogni pagina si legge la fila leggera
+  (id, venditore, data) di quel che RESTA della rosa FILTRATA — il
+  riordino si fa sulle card che si vedono, quindi dentro un reparto la
+  finestra conta fra le card di quel reparto — e la lettura si ferma
+  appena ha la pagina; poi le righe intere per id, rimesse in fila in
+  Python. Niente window function: la vecchia soglia SQLite 3.25 e il
+  suo fail-open non servono più.
   DOVE NON SI APPLICA, e c'è una prova per ognuno: `ordina` ≠ default
   (chi chiede il prezzo lo vuole intero; lampo e asta paginano sulla
   loro scadenza), la RICERCA (ordine di pertinenza, cursore `r{n}`),
   `/api/listings/miei` e `/api/negozio` (un venditore solo: non passano
-  il flag), la DEMO da `file://` e il cartello SEO / `/categoria/{slug}`
+  le leve), la DEMO da `file://` e il cartello SEO / `/categoria/{slug}`
   (query loro per i crawler, `creato DESC`). Il path LEGACY senza
   `limit` prende lo STESSO ordine: una verità sola.
-  Leva `VETRINA_PER_VENDITORE` (3; 0 = spento, il mondo di ieri byte
-  per byte), nel config d'esempio e nel pannello «⚙️ Stato delle
-  leve»; FAIL-OPEN dichiarato all'avvio sotto SQLite 3.25 (le window
-  function), il patto di FTS5 e dello stemmer. Un cursore a DUE pezzi
-  sulle tornate (client fermo a metà scorrimento a cavallo del deploy)
-  cade nel ramo del cursore storto: prima pagina, mai un 500 — una
-  pagina ripetuta una volta, dichiarato. Nel CLIENT non cambia una
-  riga: il cursore è opaco e `caricaAltri` non ha bisogno di nessuna
-  deduplica, che doppioni non ce ne sono per costruzione (c'è la
-  sentinella che il client non legga MAI dentro il cursore).
-  Provato: `prove_tornate` gira il pezzo vero su sqlite in memoria
-  (13 mutazioni, 13 rosse — la tortura ha trovato una sentinella che
-  ESPLODEVA invece di farsi rossa, la lezione del `find()`) e
-  `collaudo_tornate.py` la rotta vera su un database usa-e-getta col
-  caso dei connettori (23 verdi). IN PRODUZIONE basta il deploy: zero
-  colonne, zero migrazioni, zero rotte, zero client — e la query del
-  §4 del quadro (max per venditore nella prima pagina) deve dire ≤ 3
-  con `totale` invariato.
+  Leve `VETRINA_PER_VENDITORE` (3; 0 = spento, il mondo «più recenti
+  prima» byte per byte, cursore a due pezzi) e `VETRINA_FINESTRA` (12;
+  sotto 2 la finestra non morde e il pannello lo segna in rosso), nel
+  config d'esempio e nel pannello «⚙️ Stato delle leve». Nel CLIENT
+  non cambia una riga: il cursore è opaco (c'è la sentinella che il
+  client non legga MAI dentro il cursore).
+  Provato: `prove_finestra` gira il pezzo vero su sqlite in memoria
+  (compresa la forza bruta contro la frase della regola, la vetrina a
+  pagine da 6, 7 e 30 identica a quella chiesta in un colpo, e 150
+  scorrimenti col mondo che cambia a ogni pagina: tutti esatti),
+  `collaudo_finestra.py` la rotta vera sul caso dei connettori, e
+  `confronta_vetrina.py` mette a confronto — in SOLA LETTURA, su
+  qualunque database — tornate, finestra e tornate per giornata.
   Modifica annuncio (lug 2026): `POST /api/listings/{id}/modifica` —
   solo il proprietario su annunci attivi, 400 se esiste un ordine NON
   terminale (anche `creato`: chi sta pagando deve trovare l'annuncio
@@ -23251,8 +23258,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   di ORDINAMENTO, e va deciso a parte (il quadro delle quattro strade
   — distribuire, tetto per venditore, separare i negozi, cambiare
   l'ordinamento — è stato fatto ad ago 2026: la risposta di Andrea è
-  «3 ogni 30», FATTA il 23 ago 2026 come riordino a tornate — vedi
-  «LA VETRINA SI ORDINA A TORNATE» sotto il giro della vetrina).
+  «3 ogni 30», FATTA il 23 ago 2026 come riordino a tornate e rifatta
+  a set 2026 come finestra scorrevole — vedi «LA VETRINA SI ORDINA A
+  FINESTRA SCORREVOLE» sotto il giro della vetrina).
   Il tetto tocca la sola NASCITA (`puo_creare`): chi c'è già si
   aggiorna come sempre — un prezzo che cambia non aspetta il proprio
   turno.

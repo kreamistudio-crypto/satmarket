@@ -85,14 +85,17 @@ FEE_DINAMICA_TOTALE_PERCENTO = 5.0
                              # in server.py, vicino a orologio_fee_dinamica.
 GIORNI_DATA_ANNUNCIO = 60    # «pubblicato N giorni fa» nel dettaglio:
                              # oltre questi giorni la riga non si mostra
-VETRINA_PER_VENDITORE = 3    # «3 ogni 30» (ago 2026): in testa alla
-                             # vetrina un venditore non ne occupa piu' di
-                             # N. Non e' un filtro ma un riordino a
-                             # «tornate» (gli N piu' recenti di ognuno,
-                             # poi i successivi): nessun annuncio sparisce,
-                             # cambia solo l'ordine. 0 = spento, «piu'
-                             # recenti prima» e basta. Vuole SQLite >= 3.25
-                             # (sotto si spegne da sola e l'avvio lo dice)
+VETRINA_PER_VENDITORE = 3    # la finestra scorrevole (set 2026): in
+VETRINA_FINESTRA = 12        # qualunque VETRINA_FINESTRA card consecutive
+                             # un venditore ne ha al piu'
+                             # VETRINA_PER_VENDITORE, e il successivo
+                             # slitta al primo posto che lo permette. Per
+                             # il resto «piu' recenti prima». Non e' un
+                             # filtro: nessun annuncio sparisce, cambia
+                             # solo l'ordine. VETRINA_PER_VENDITORE = 0
+                             # spegne tutto; allargare la finestra stringe
+                             # l'anti-valanga (a 12 un negozio da 200
+                             # prodotti tiene 1 card su 4, a 30 1 su 10)
 AUTO_SBLOCCO_ATTIVO = False  # IL DISARMO (ago 2026): False = i sats non
                              # si muovono MAI senza un gesto umano. Gatea
                              # i soli rami FISICI dell'orologio; le due
