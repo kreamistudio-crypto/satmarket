@@ -28,7 +28,10 @@ Accanto ci sono le altre tre domande che si fanno insieme a quella:
   · la ronda del libro mastro, che su tutto questo deve TACERE.
 
 COSA COPRE OGGI: lo sconto carrello coi suoi due criteri, che e' il
-cantiere per cui e' nato (ago 2026, «da 3 pezzi O da 25 €»). CHI TOCCA
+cantiere per cui e' nato (ago 2026, «da 3 pezzi O da 25 €»), i codici
+sconto, e dal set 2026 LE DUE PROMESSE INSIEME — sconto e spedizione
+gratis con una spedizione VERA da pagare, e la percentuale che l'invito
+del foglio Paga deve poter leggere anche sotto soglia. CHI TOCCA
 IL CONTO CI AGGIUNGA IL SUO CASO invece di rifarsi un ambiente: la
 funzione `confronta()` non sa niente dello sconto — prende una
 richiesta e verifica le quattro cose qui sopra, qualunque sia la
@@ -221,7 +224,7 @@ def usi_di(cid):
 
 
 
-def confronta(nome, richiesta, via="ritiro"):
+def confronta(nome, richiesta, via="ritiro", alla_cassa=None):
     """LE QUATTRO DOMANDE, sulla stessa richiesta: il preventivo e la
     invoice dicono la stessa cifra? la bolt11 chiede quel totale? il
     bilancio torna RILEGGENDO dal database? lo sconto in colonna e'
@@ -231,7 +234,12 @@ def confronta(nome, richiesta, via="ritiro"):
     INVOICES.clear()
     p = chiama(SRV.preventivo_ordine, richiesta)
     atteso = next(s["totale_sats"] for s in p["strade"] if s["via"] == via)
-    c = chiama(SRV.compra, dict(richiesta, consegna=via))
+    # `alla_cassa` (set 2026): quel che la via chiede IN PIU' per
+    # comprare davvero — a casa serve un indirizzo, e la consegna si
+    # chiama «spedizione». Il default lascia ogni chiamata di ieri
+    # identica, byte per byte.
+    c = chiama(SRV.compra, {**richiesta, "consegna": via,
+                            **(alla_cassa or {})})
     prova(f"{nome}: preventivo == compra, al sat", atteso, c["prezzo_sats"])
     prova(f"{nome}: ...e la bolt11 chiede quel totale",
           [c["prezzo_sats"]], INVOICES)
@@ -636,6 +644,181 @@ def prove_codice_valore():
     prova("...e l'unitario e' quello di sempre", 10_000, lordo9 // 3)
 
 
+A_CASA = {"consegna": "spedizione", "spedizione_via": "casa",
+          "indirizzo": {"nome": "Mario Rossi", "via": "Via Roma 1",
+                        "cap": "10100", "citta": "Torino",
+                        "provincia": "TO", "telefono": "3330000000"}}
+
+
+def semina_due_promesse(unita="eur", listino="sats"):
+    """LE DUE PROMESSE DEL NEGOZIO INSIEME: spedizione gratis da 40 e
+    sconto −10% da 25, tutt'e due nell'unita' `unita` ('eur' | 'sats').
+    Tre annunci da 10 € — 10.000 sats col cambio tondo — nati nel
+    listino `listino`, che spediscono a casa per 3.000 sats.
+    Le soglie sono DIVERSE apposta: fra 25 e 40 lo sconto e' scattato
+    e la spedizione no, che e' il caso in cui le due promesse si
+    distinguono (e quello visto dal vivo il 19 set 2026)."""
+    con = SRV.db()
+    for t in ("ordine_righe", "ordini", "annunci", "codici_sconto"):
+        con.execute(f"DELETE FROM {t}")
+    in_eur = unita == "eur"
+    con.execute(
+        "INSERT OR REPLACE INTO utenti(tg_id,nome,negozio,registrato,"
+        "sconto_pacco_criterio,sconto_pacco_soglia,sconto_pacco_valore,"
+        "sconto_pacco_valore_eur,sconto_pacco_valore_valuta,"
+        "sconto_pacco_percento,sped_gratis_soglia,sped_gratis_soglia_eur,"
+        "sped_gratis_valuta) VALUES(222,'Vende','neg22222',1,'valore',0,"
+        "?,?,?,10,?,?,?)",
+        (0 if in_eur else 25_000, 25 if in_eur else 0, unita,
+         0 if in_eur else 40_000, 40 if in_eur else 0, unita))
+    con.execute("INSERT OR REPLACE INTO utenti(tg_id,nome,negozio,registrato)"
+                " VALUES(111,'Compra','neg11111',1)")
+    ids = []
+    for n in range(3):
+        cur = con.execute(
+            "INSERT INTO annunci(venditore_id,titolo,descrizione,prezzo_sats,"
+            "prezzo_eur,categoria,zona,stato,creato,consegna,quantita,valuta,"
+            "condizione,spedizione_sats) VALUES(222,?,'desc',10000,?,'Altro',"
+            "'Torino (TO)','attivo',1,'entrambe',9,?,'buono',3000)",
+            (f"Cosa {n}", 10 if listino == "eur" else 0, listino))
+        ids.append(cur.lastrowid)
+    con.commit()
+    con.close()
+    return ids
+
+
+def prove_due_promesse():
+    """LE DUE PROMESSE INSIEME, e la percentuale dell'INVITO (19 set
+    2026, il difetto visto dal vivo: nel foglio Paga l'avanzamento dello
+    sconto era sparito e restava la sola spedizione).
+    IL CONTO NON AVEVA MAI SBAGLIATO — a mancare era una chiave del
+    preventivo — ma la domanda «lo sconto sopra soglia finisce DAVVERO
+    nella fattura, anche quando insieme scatta la spedizione gratis?»
+    non l'aveva mai fatta nessuno con le due promesse accese insieme e
+    una spedizione VERA da pagare: tutte le sezioni qui sopra comprano
+    col ritiro. Il conto a mano, col cambio tondo e la protezione al 5%
+    sul NETTO:
+      1 pezzo  = 10.000            + 3.000 + 500   = 13.500
+      3 pezzi  = 30.000 − 3.000    + 3.000 + 1.350 = 31.350
+      4 pezzi  = 40.000 − 4.000    + 0     + 1.800 = 37.800
+    LA SPEDIZIONE GRATIS MISURA IL LORDO, come lo sconto: a 4 pezzi si
+    pagano 36 € di articoli e la spedizione e' gratis lo stesso, perche'
+    la soglia dei 40 guarda i 40 del listino — le due promesse sono
+    indipendenti, e nessuna delle due misura l'altra."""
+    print("\n[8] LE DUE PROMESSE INSIEME — sconto da 25, spedizione da 40")
+    for unita in ("eur", "sats"):
+        manca_sc = "mancano_eur" if unita == "eur" else "mancano_sats"
+        manca_sg = ("mancano_sped_eur" if unita == "eur"
+                    else "mancano_sped_sats")
+        k = 1 if unita == "eur" else 1_000
+        a, b, _ = semina_due_promesse(unita)
+        p = confronta(f"[{unita}] un pezzo: sotto TUTTE E DUE",
+                      {"annuncio_id": a, "quantita": 1}, "casa", A_CASA)
+        prova("...il totale e' quello fatto a mano", 13_500,
+              next(s["totale_sats"] for s in p["strade"]
+                   if s["via"] == "casa"))
+        # IL DIFETTO DEL 19 SET: qui usciva la sola `sconto_percento`,
+        # che sotto soglia vale zero — e il client spegneva l'invito
+        prova("...l'INVITO porta la percentuale della promessa", 10,
+              p.get("sconto_promessa_percento"))
+        prova("...mentre quella di chi HA SCONTATO resta a zero", 0,
+              p["sconto_percento"])
+        prova("...e quanto manca, per tutte e due", (15 * k, 30 * k),
+              (p[manca_sc], p[manca_sg]))
+
+        a, b, _ = semina_due_promesse(unita)
+        p = confronta(f"[{unita}] tre pezzi: SCONTO si', spedizione no",
+                      {"annuncio_id": a, "quantita": 3}, "casa", A_CASA)
+        prova("...il totale e' quello fatto a mano", 31_350,
+              next(s["totale_sats"] for s in p["strade"]
+                   if s["via"] == "casa"))
+        prova("...lo sconto e' il 10% del lordo", (3_000, 10, "negozio"),
+              (p["sconto_sats"], p["sconto_percento"], p["sconto_origine"]))
+        prova("...alla spedizione manca ancora il suo", 10 * k, p[manca_sg])
+
+        a, b, _ = semina_due_promesse(unita)
+        p = confronta(f"[{unita}] quattro pezzi: scattano TUTTE E DUE",
+                      {"annuncio_id": a, "quantita": 4}, "casa", A_CASA)
+        casa = next(s for s in p["strade"] if s["via"] == "casa")
+        prova("...il totale e' quello fatto a mano", 37_800,
+              casa["totale_sats"])
+        prova("...sconto pieno E spedizione a zero", (4_000, 0),
+              (p["sconto_sats"], casa["spedizione_sats"]))
+
+        # IL CARRELLO: altra strada nel codice, stesse cifre
+        a, b, _ = semina_due_promesse(unita)
+        p = confronta(f"[{unita}] carrello da 2: sotto tutte e due",
+                      {"righe": [{"annuncio_id": a, "quantita": 1},
+                                 {"annuncio_id": b, "quantita": 1}]},
+                      "casa", A_CASA)
+        prova("...l'INVITO porta la percentuale anche nel carrello",
+              (10, 0, 5 * k, 20 * k),
+              (p.get("sconto_promessa_percento"), p["sconto_percento"],
+               p[manca_sc], p[manca_sg]))
+
+        a, b, _ = semina_due_promesse(unita)
+        p = confronta(f"[{unita}] carrello da 3: SCONTO si', spedizione no",
+                      {"righe": [{"annuncio_id": a, "quantita": 2},
+                                 {"annuncio_id": b, "quantita": 1}]},
+                      "casa", A_CASA)
+        prova("...il totale e' quello del singolo a tre pezzi", 31_350,
+              next(s["totale_sats"] for s in p["strade"]
+                   if s["via"] == "casa"))
+
+        a, b, _ = semina_due_promesse(unita)
+        p = confronta(f"[{unita}] carrello da 4: scattano TUTTE E DUE",
+                      {"righe": [{"annuncio_id": a, "quantita": 2},
+                                 {"annuncio_id": b, "quantita": 2}]},
+                      "casa", A_CASA)
+        casa = next(s for s in p["strade"] if s["via"] == "casa")
+        prova("...il totale e' quello del singolo a quattro pezzi",
+              (37_800, 4_000, 0),
+              (casa["totale_sats"], p["sconto_sats"],
+               casa["spedizione_sats"]))
+
+    # SOGLIE IN UN'UNITA', LISTINO NELL'ALTRA: l'avanzamento usa lo
+    # STESSO cambio del conto, perche' lo conta il server nella stessa
+    # chiamata che fa il conto — il client riceve, non calcola. Col
+    # cambio tondo 10 € e 10.000 sats sono la stessa cosa, quindi le
+    # cifre devono essere quelle di sopra in tutti e due gli incroci.
+    a, _, _ = semina_due_promesse("sats", listino="eur")
+    p = confronta("listino in EURO, soglie in SATS: tre pezzi",
+                  {"annuncio_id": a, "quantita": 3}, "casa", A_CASA)
+    prova("...sconto scattato, e alla spedizione mancano 10.000 sats",
+          (3_000, 10_000, 0), (p["sconto_sats"], p["mancano_sped_sats"],
+                               p["mancano_sped_eur"]))
+    a, _, _ = semina_due_promesse("sats", listino="eur")
+    p = chiama(SRV.preventivo_ordine, {"annuncio_id": a, "quantita": 2})
+    prova("...e a due pezzi l'invito dice 5.000 sats al −10%",
+          (10, 5_000, 0), (p.get("sconto_promessa_percento"),
+                           p["mancano_sats"], p["mancano_eur"]))
+
+    # IL CASO CHE LA FORMA DI PRIMA NON AVREBBE RETTO: un codice −5%
+    # sconta GIA', e la promessa −10% e' ancora da raggiungere. Le due
+    # percentuali sono due FATTI diversi e il preventivo li dice tutti
+    # e due: chi ha scontato (5) e cosa promette l'invito (10).
+    a, _, _ = semina_due_promesse("eur")
+    semina_codice("CINQUE", 5)
+    p = confronta("codice −5% sotto la soglia della promessa −10%",
+                  {"annuncio_id": a, "quantita": 1,
+                   "codice_sconto": "CINQUE"}, "casa", A_CASA)
+    prova("...sconta il CODICE col suo 5, l'invito promette il 10",
+          ("codice", 5, 10, 15),
+          (p["sconto_origine"], p["sconto_percento"],
+           p.get("sconto_promessa_percento"), p["mancano_eur"]))
+    # ...e un codice che COPRE la promessa spegne l'invito: niente
+    # percentuale da promettere, perche' non c'e' piu' niente da
+    # guadagnare aggiungendo pezzi
+    a, _, _ = semina_due_promesse("eur")
+    semina_codice("VENTI", 20)
+    p = chiama(SRV.preventivo_ordine, {"annuncio_id": a, "quantita": 1,
+                                       "codice_sconto": "VENTI"})
+    prova("un codice che copre: l'invito tace, percentuale compresa",
+          (0, "", False),
+          (p.get("sconto_promessa_percento"), p["sconto_criterio"],
+           p["sconto_raggiungibile"]))
+
+
 def prove_ronda():
     """La ronda del libro mastro LEGGE E BASTA, e su un database sano
     deve TACERE: un allarme che suona sul normale e' peggio di nessun
@@ -655,6 +838,7 @@ def main():
     prove_regressione()
     prove_codice_sconto()
     prove_codice_valore()
+    prove_due_promesse()
     prove_ronda()
     print("\n" + "=" * 58)
     print(f"  {PASSATE} passate, {FALLITE} fallite")

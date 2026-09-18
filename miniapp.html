@@ -18402,17 +18402,25 @@ function renderAcquisto(){
      La PROSA del cambio muto resta dov'e': senza conversione la
      raggiungibilita' in euro non si sa, e si dice quel che si sa. */
   const scPct = p.sconto_percento||0, scCrit = p.sconto_criterio||'';
+  /* LA PERCENTUALE DELLA PROMESSA (19 set 2026, il difetto visto dal
+     vivo: qui restava la sola 🚚). `sconto_percento` e' di chi HA
+     SCONTATO, quindi sotto soglia vale ZERO — e su quello zero
+     l'invito moriva prima di nascere. La promessa porta la SUA
+     (`sconto_promessa_percento`, accanto a criterio e soglia); il
+     ripiego copre il server di ieri e la DEMO. Il verde resta su
+     scPct: e' un FATTO, e dice la percentuale che ha scontato. */
+  const scPrm = p.sconto_promessa_percento || scPct;
   const scVal = p.sconto_valuta||'eur';
   const scSogliaPag = scCrit === 'pezzi' ? (p.sconto_soglia||0)
                     : ((p.sconto_valore||0) || (p.sconto_valore_eur||0));
   let pillaSc = '';
-  if (scPct > 0 && scSogliaPag > 0){
+  if (scPrm > 0 && scSogliaPag > 0){
     const scManca = scCrit === 'pezzi' ? (p.mancano_pezzi||0)
                   : ((p.mancano_sats||0) || (p.mancano_eur||0));
     const scSospeso = p.promesse_sospese && scCrit === 'valore'
                    && scVal === 'eur';
     if (scSospeso)
-      note += `<div class="acq-nota">🎁 Il negozio fa −${scPct}% da ${cifraSoglia(scSogliaPag, scVal)} di articoli, ma adesso non riusciamo a fare il cambio: su questo acquisto lo sconto non si applica.</div>`;
+      note += `<div class="acq-nota">🎁 Il negozio fa −${scPrm}% da ${cifraSoglia(scSogliaPag, scVal)} di articoli, ma adesso non riusciamo a fare il cambio: su questo acquisto lo sconto non si applica.</div>`;
     /* IL VERDE DICE LA PROMESSA DEL NEGOZIO, e col codice sconto
           vincente `sconto_percento` porta la percentuale di UN'ALTRA
           COSA: senza questa guardia la pillola direbbe «la promessa e'
@@ -18424,7 +18432,7 @@ function renderAcquisto(){
     else if ((p.sconto_sats||0) > 0 && p.sconto_origine !== 'codice')
       pillaSc = `<span class="pill pill-trust" data-barra="sc">✅ Sconto <b>−${scPct}%</b></span>`;
     else if (scManca > 0 && p.sconto_raggiungibile !== false)
-      pillaSc = `<span class="pill pill-barra" data-barra="sc"${barraPromessa(scSogliaPag, scManca)}>🎁 Ancora ${scCrit==='pezzi' ? `${fmt(scManca)} pezz${scManca===1?'o':'i'}` : cifraSoglia(scManca, scVal)} → <b>−${scPct}%</b></span>`;
+      pillaSc = `<span class="pill pill-barra" data-barra="sc"${barraPromessa(scSogliaPag, scManca)}>🎁 Ancora ${scCrit==='pezzi' ? `${fmt(scManca)} pezz${scManca===1?'o':'i'}` : cifraSoglia(scManca, scVal)} → <b>−${scPrm}%</b></span>`;
   }
   /* L'INVITO DELLA SPEDIZIONE GRATIS: compare solo dove una
      spedizione c'e' davvero — spedisceQui dice se il NEGOZIO spedisce

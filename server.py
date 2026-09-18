@@ -26234,6 +26234,22 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
     _g_sc = _gamba_invito(_sc_ragg, richiesti, articolo, misura_eur)
     _crit_sc, _sog_sc, _val_sc, _manca_sc = (
         (_g_sc[0], _g_sc[1], _g_sc[3], _g_sc[4]) if _g_sc else ("", 0, "", 0))
+    # LA PERCENTUALE DELLA PROMESSA, in una chiave SUA (19 set 2026, il
+    # difetto visto dal vivo: nel foglio Paga l'invito dello sconto era
+    # sparito, e restava la sola spedizione). `sconto_percento` e' la
+    # fotografia di chi HA SCONTATO — zero finche' non sconta nessuno,
+    # ed e' giusto cosi' (vedi _sconto_vincente) — ma dal cantiere dei
+    # codici sconto era rimasta anche l'UNICA percentuale che il
+    # preventivo diceva al client: sotto soglia valeva 0, e la pillola
+    # «Ancora N → −X%» moriva sulla sua prima guardia. Prima di allora
+    # qui usciva la percentuale della REGOLA, scattata o no. La gamba
+    # la sua l'ha sempre avuta in mano — _gamba_invito la restituisce,
+    # e due righe qui sopra si buttava via: esce lei, accanto a
+    # criterio e soglia, che e' la famiglia a cui appartiene.
+    # E regge il caso che la forma di prima NON avrebbe retto: codice
+    # −5% che sconta, promessa −10% ancora da raggiungere — l'invito
+    # deve dire 10, mai il 5 del codice.
+    _pct_prm = _g_sc[2] if _g_sc else 0
     # L'UNITARIO SCONTATO, SOLO QUANDO LA DIVISIONE E' ESATTA (13 ago
     # 2026, decisione di Andrea sulla misura vera: in produzione ZERO
     # inesatti su 52 annunci scontati — il ramo senza cifra e' una
@@ -26274,6 +26290,7 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
             # gambe vive la frase PUBBLICA le nomina entrambe — la',
             # pero', e' una regola del negozio e non un verdetto su
             # questo carrello.
+            "sconto_promessa_percento": _pct_prm,
             "sconto_criterio": _crit_sc,
             "sconto_valuta": _val_sc,
             "sconto_soglia": _sog_sc if _crit_sc == "pezzi" else 0,
@@ -26719,6 +26736,9 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     _g_sc = _gamba_invito(_sc_vive, pezzi, misura_art, misura_eur)
     _crit_sc, _sog_sc, _val_sc, _manca_sc = (
         (_g_sc[0], _g_sc[1], _g_sc[3], _g_sc[4]) if _g_sc else ("", 0, "", 0))
+    # la percentuale della PROMESSA, in una chiave sua: come nel mono
+    # (vedi la', «LA PERCENTUALE DELLA PROMESSA»)
+    _pct_prm = _g_sc[2] if _g_sc else 0
     # il gemello in euro si aziona SOLO dietro al fratello in sats: la
     # decisione e' una sola, e sta di la' (vedi _sconto_pacco_eur)
     sconto_eur = _sconto_pacco_eur(articolo_eur, pct) if sconto else 0.0
@@ -26801,6 +26821,7 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
             # verso uno sconto che non arrivera' mai.
             **({"sconto_raggiungibile": False}
                if cod_reg and regole_sc and not _sc_vive else {}),
+            "sconto_promessa_percento": _pct_prm,
             "sconto_criterio": _crit_sc,
             "sconto_valuta": _val_sc,
             "sconto_soglia": _sog_sc if _crit_sc == "pezzi" else 0,

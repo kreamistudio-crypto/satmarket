@@ -32873,6 +32873,129 @@ def prove_promesse_badge():
           or "statoScontoPacco(netto" in mini)
 
 
+def prove_percentuale_della_promessa():
+    """L'AVANZAMENTO DELLO SCONTO CHE ERA SPARITO DAL FOGLIO PAGA (19
+    set 2026, visto dal vivo da Andrea: restava la sola spedizione).
+    IL CONTO NON AVEVA MAI SBAGLIATO. A mancare era una chiave: dal
+    cantiere dei codici sconto la percentuale del preventivo e' quella
+    di chi HA SCONTATO (`_sconto_vincente`), che sotto soglia vale ZERO
+    — ed era rimasta l'UNICA percentuale che il client riceveva, quindi
+    la pillola «Ancora N → −X%» moriva sulla sua prima guardia.
+    PERCHE' NESSUNA PROVA L'AVEVA VISTO, che e' la lezione: le
+    sentinelle guardavano che il client LEGGESSE `mancano_*` e il
+    collaudo che il server li CONTASSE giusti — tutte e due vere — ma
+    nessuno faceva girare il blocco del client con la forma che il
+    server manda DAVVERO sotto soglia. Due meta' verdi, e in mezzo una
+    guardia che nessuna delle due nominava. Qui il blocco GIRA."""
+    print("\n[la percentuale della promessa: l'invito dello sconto in Paga]")
+    src = open("server.py", encoding="utf-8").read()
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # ---- 1. IL SERVER: la gamba porta la SUA percentuale, e il
+    # preventivo non la butta piu' via
+    amb = {}
+    exec(pezzo("_gamba_invito"), amb)
+    ginv = amb["_gamba_invito"]
+    prova("la gamba sotto soglia porta la sua percentuale",
+          ("valore", 25, 10, "eur", 15),
+          ginv([("valore", 25, 10, "eur")], 1, 10_000, 10))
+    prova("...e anche quella gia' scattata", ("pezzi", 3, 10, "", 0),
+          ginv([("pezzi", 3, 10, "")], 3, 30_000, 30))
+    prova("i DUE preventivi la tengono in mano", 2,
+          src.count("_pct_prm = _g_sc[2] if _g_sc else 0"))
+    prova("...e la dicono al client, in una chiave SUA", 2,
+          src.count('"sconto_promessa_percento": _pct_prm,'))
+    # LA CHIAVE DI CHI HA SCONTATO NON CAMBIA MESTIERE: resta la
+    # fotografia del vincitore, zero finche' non sconta nessuno. Farle
+    # dire la promessa avrebbe rotto il caso «codice −5% che sconta,
+    # promessa −10% da raggiungere»: l'invito avrebbe detto 5.
+    prova("...senza toccare la percentuale di chi HA scontato", 2,
+          src.count('"sconto_percento": pct,'))
+
+    # ---- 2. IL CLIENT: il blocco vero, GIRATO con le forme del server
+    _ra = pezzo_js(mini, "function renderAcquisto(){", "\n}")
+    prova("la guardia dell'invito guarda la PROMESSA", (1, 0),
+          (_ra.count("if (scPrm > 0 && scSogliaPag > 0){"),
+           _ra.count("if (scPct > 0 && scSogliaPag > 0){")))
+    prova("...col ripiego sul server di ieri", 1,
+          _ra.count("const scPrm = p.sconto_promessa_percento || scPct;"))
+    _da = _ra.index("const scPct = p.sconto_percento||0")
+    _a = _ra.index("/* L'INVITO DELLA SPEDIZIONE GRATIS")
+    blocco = _ra[_da:_a]
+
+    import json, shutil, subprocess, tempfile
+    node = shutil.which("node")
+    if not node:
+        salta("il blocco dell'invito risponde giusto", "node non installato")
+        return
+
+    def p(**o):
+        """La forma del preventivo SOTTO soglia, a valore in euro, come
+        la manda il server oggi: `sconto_percento` a ZERO."""
+        base = {"sconto_sats": 0, "sconto_percento": 0,
+                "sconto_promessa_percento": 10, "sconto_origine": "",
+                "sconto_criterio": "valore", "sconto_valuta": "eur",
+                "sconto_soglia": 0, "sconto_valore": 0,
+                "sconto_valore_eur": 25, "mancano_pezzi": 0,
+                "mancano_sats": 0, "mancano_eur": 15,
+                "sconto_raggiungibile": True, "promesse_sospese": False}
+        base.update(o)
+        return base
+    casi = [
+        # (nome, preventivo, cosa DEVE esserci, cosa NON deve esserci)
+        ("sotto soglia a valore: l'invito c'e', con la sua percentuale",
+         p(), ["pill-barra", "Ancora 15 €", "−10%"], ["pill-trust"]),
+        ("sotto soglia in SATS: la cifra resta nella sua unita'",
+         p(sconto_valuta="sats", sconto_valore=25_000, sconto_valore_eur=0,
+           mancano_sats=15_000, mancano_eur=0),
+         ["pill-barra", "Ancora 15000 sats", "−10%"], ["€"]),
+        ("sotto soglia a PEZZI",
+         p(sconto_criterio="pezzi", sconto_valuta="", sconto_soglia=3,
+           sconto_valore_eur=0, mancano_pezzi=2, mancano_eur=0),
+         ["pill-barra", "Ancora 2 pezzi", "−10%"], []),
+        ("sopra soglia: il verde, con la percentuale che HA scontato",
+         p(sconto_sats=3_000, sconto_percento=10, sconto_origine="negozio",
+           mancano_eur=0),
+         ["pill-trust", "✅ Sconto", "−10%"], ["pill-barra"]),
+        ("codice −5% che sconta, promessa −10% da raggiungere: dice 10",
+         p(sconto_sats=500, sconto_percento=5, sconto_origine="codice"),
+         ["pill-barra", "−10%"], ["−5%", "pill-trust"]),
+        ("il server di ieri (nessuna chiave nuova): vale il ripiego",
+         {k: v for k, v in p(sconto_percento=10).items()
+          if k != "sconto_promessa_percento"},
+         ["pill-barra", "−10%"], []),
+        ("nessuna percentuale da nessuna parte: si tace, mai un «−0%»",
+         p(sconto_promessa_percento=0), [], ["pill", "%"]),
+        ("soglia non raggiungibile: l'invito tace",
+         p(sconto_raggiungibile=False), [], ["pill"]),
+        ("negozio senza promessa: niente",
+         p(sconto_promessa_percento=0, sconto_criterio="",
+           sconto_valore_eur=0, mancano_eur=0), [], ["pill"]),
+    ]
+    prog = ("const fmt = n => String(n);\n"
+            "const cifraSoglia = (q, v) => q + (v === 'sats' ? ' sats' : ' €');\n"
+            "const barraPromessa = () => '';\n"
+            "function gira(p){ let note = '';\n" + blocco
+            + "\nreturn pillaSc + note; }\n"
+            "const casi = " + json.dumps([c[1] for c in casi]) + ";\n"
+            "console.log(JSON.stringify(casi.map(gira)));")
+    f = tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                    encoding="utf-8")
+    f.write(prog)
+    f.close()
+    r = subprocess.run([node, f.name], capture_output=True, text=True,
+                       timeout=60, encoding="utf-8")
+    os.unlink(f.name)
+    if r.returncode != 0:
+        prova("il blocco dell'invito gira", "", r.stderr[:300])
+        return
+    rese = json.loads(r.stdout.strip())
+    for (nome, _p, si, no), resa in zip(casi, rese):
+        prova(nome, ([], []),
+              ([s for s in si if s not in resa],
+               [n for n in no if n in resa]))
+
+
 def prove_promesse_raggiungibili():
     """L'INVITO CHE NON SI PUO' ACCETTARE, E IL VERDE IN VETRINA (ago
     2026, decisione di Andrea). Due difetti opposti sulla stessa
@@ -70567,6 +70690,7 @@ def main():
               prove_obiezione_punto,
               prove_ordini_fermi, prove_numero_ordine,
               prove_promesse_badge, prove_promesse_raggiungibili,
+              prove_percentuale_della_promessa,
               prove_verde_e_filtri, prove_prezzo_accordo,
               prove_scoprire,
         prove_strisce_web,
