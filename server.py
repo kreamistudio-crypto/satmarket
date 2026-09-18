@@ -3820,7 +3820,16 @@ def init_db():
         pubkey TEXT PRIMARY KEY,
         tg_id INTEGER NOT NULL,
         creato INTEGER,
-        ultimo_nudge INTEGER DEFAULT 0
+        ultimo_nudge INTEGER DEFAULT 0,
+        -- IL GATE CHE RIMANDA (18 set 2026): `coperto` e' il
+        -- created_at dell'evento del libro dell'ultima frase PRECISA
+        -- (le buste GEMELLE di quel momento non suonano), `rimandato`
+        -- il created_at piu' recente delle buste arrivate a gate chiuso
+        -- e non ancora dette (0 = nessuna in coda). Come `ultimo_nudge`
+        -- sono della PERSONA: si scrivono su tutte le sue chiavi e si
+        -- leggono col MAX. Vedi «IL GATE RIMANDA E ACCORPA».
+        coperto INTEGER DEFAULT 0,
+        rimandato INTEGER DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_chiavi_p2p_tg ON chiavi_p2p(tg_id);
     CREATE TABLE IF NOT EXISTS p2p_ordini(
@@ -4931,6 +4940,13 @@ def init_db():
                     "preso_da INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE p2p_ordini ADD COLUMN {colonna}")
+        except sqlite3.OperationalError:
+            pass
+    # ...e le due del gate che rimanda su chiavi_p2p (18 set 2026), per i
+    # database che la tabella ce l'avevano gia'
+    for colonna in ("coperto INTEGER DEFAULT 0", "rimandato INTEGER DEFAULT 0"):
+        try:
+            con.execute(f"ALTER TABLE chiavi_p2p ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
             pass
     # La levetta binaria avatar_visibile e' vissuta solo nei DB di
@@ -35242,11 +35258,40 @@ P2P_NUDGE_S = 600        # il gate: al piu' uno squillo ogni dieci minuti
 # fa doppione; meno di due, cosi' il gesto chiesto due minuti dopo
 # suona. Con soli ordini in vetrina resta il gate lungo.
 P2P_NUDGE_VIVO_S = 90
-# «PRESO» SUL LIBRO SONO TRE STATI E NON UNO (17 set 2026): il 38383
-# dice `waiting-buyer-invoice` (preso, manca la fattura di chi compra)
-# e `waiting-payment` (preso, manca la garanzia di chi vende) prima di
-# `in-progress`. Il 16 set si era visto il solo `in-progress`, e gli
-# altri due finivano nel journal come «mai visti» — senza frase.
+# ═══ IL GATE RIMANDA E ACCORPA, NON SCARTA (18 set 2026, dal journal
+# del VPS: 08:10:11 la presa, 08:10:21 la richiesta di bloccare la
+# garanzia «e' nel gate: non suona», e l'avviso non e' arrivato MAI) ═══
+# Il gate esiste contro lo spam: al piu' un avviso generico per pausa.
+# Ma scartava, e una busta che arriva dieci secondi dopo la frase della
+# presa e' quasi sempre il passo SUCCESSIVO — proprio quello che chiede
+# un gesto entro un quarto d'ora. Da oggi una busta a gate chiuso si
+# METTE IN CODA (`chiavi_p2p.rimandato`), e alla scadenza della pausa
+# parte UN avviso solo per tutte quelle arrivate nel frattempo.
+# LE FRASI PRECISE DEL LIBRO NON ASPETTANO MAI: sono quelle che dicono
+# «tocca a te» (la presa, a chi deve fare il primo gesto) e le altre
+# sono una per passaggio pubblico — un concluso o un annullato non si
+# tengono in tasca novanta secondi per non disturbare. Il gate e' dei
+# soli avvisi generici, che sono l'unica cosa che puo' fare raffica.
+# UN MOMENTO, UNA NOTIFICA resta vero, ma per un'altra strada: prima lo
+# garantiva il gate (la frase precisa lo timbrava, e la busta dello
+# stesso istante cadeva dentro), ora lo garantisce l'ORA. mostrod manda
+# le buste di un passo nello stesso secondo in cui ripubblica il 38383,
+# quindi una busta nata entro `P2P_GEMELLI_S` dall'evento del libro
+# dell'ultima frase precisa e' la sua GEMELLA, e non suona; una nata
+# dieci secondi dopo e' un altro passo, e si mette in coda.
+P2P_GEMELLI_S = 3
+_P2P_CODA = {"scade": 0}   # quando scade la prima pausa con buste in coda: sveglia l'orologio
+# LA PRESA SUL LIBRO E' `in-progress`, E BASTA (corretto il 18 set
+# 2026, letto sul sorgente di mostrod 0.18.7 e visto sullo specchio).
+# Il 17 set qui c'era scritto che il 38383 dice anche
+# `waiting-buyer-invoice` e `waiting-payment`: FALSO. Quei due stati
+# stanno nel LOG di mostro e nella restore-session, mai sul libro —
+# `create_status_tags` in `src/nip33.rs` pubblica i soli quattro
+# secchi di NIP-69 (pending, in-progress, success, canceled), e un
+# ordine in `waiting-*` esce come `in-progress`. Restano nella tupla
+# perche' un coordinatore che li pubblicasse (una versione nuova, o la
+# patch che servirebbe per le frasi dei passi interni) non deve far
+# cadere la presa fra gli stati «mai visti».
 STATI_LIBRO_PRESO = ("in-progress", "waiting-buyer-invoice",
                      "waiting-payment")
 P2P_BLOCCO = 100         # quante pubkey in un filtro (i relay hanno tetti)
@@ -35434,9 +35479,13 @@ def _evento_buste_p2p(ev: dict) -> list:
 
 def _evento_libro_p2p(ev: dict):
     """PURA: da un 38383 ai SOLI tag che servono alla frase — id,
-    stato, lato, sats, euro, metodi, quando — o None se manca il `d` o
-    lo stato. L'unico posto che guarda dentro un 38383, per il lettore
-    al minuto e per l'ascolto."""
+    stato, lato, sats, euro, metodi, quando, scade — o None se manca il
+    `d` o lo stato. L'unico posto che guarda dentro un 38383, per il
+    lettore al minuto e per l'ascolto.
+    `scade` (18 set 2026) e' il tag `expires_at`, la scadenza dell'ORDINE
+    scritta dal coordinatore: e' l'unico modo di distinguere uno scaduto
+    da un ritiro, perche' mostrod li pubblica tutt'e due come
+    `canceled` (vedi `_passaggio_libro_p2p`). 0 = non si sa."""
     tag = {}
     for t in ev.get("tags", []):
         if len(t) > 1 and t[0] not in tag:
@@ -35447,11 +35496,15 @@ def _evento_libro_p2p(ev: dict):
         sats = max(0, int(float(tag.get("amt", ["0"])[0])))
     except ValueError:
         sats = 0
+    try:
+        scade = max(0, int(float(tag.get("expires_at", ["0"])[0])))
+    except (ValueError, OverflowError):
+        scade = 0
     return {"id": tag["d"][0], "stato": tag["s"][0],
             "lato": (tag.get("k") or [""])[0],
             "sats": sats, "euro": tag.get("fa") or [],
             "metodi": tag.get("pm") or [],
-            "quando": int(ev.get("created_at") or 0)}
+            "quando": int(ev.get("created_at") or 0), "scade": scade}
 
 
 # ═══ L'ASCOLTO: le notifiche P2P istantanee (17 set 2026) ═══
@@ -35820,10 +35873,14 @@ def _scambio_vivo_p2p(con, tg_id: int) -> bool:
     return bool(r)
 
 
-def _nudge_p2p(con, pubkey: str, adesso: int) -> int:
-    """A chi suonare, e se e' il momento. Torna il tg_id da avvisare, o
-    0. Puro sulla connessione (il patto di `_registra_chiavi_p2p`),
-    cosi' si gira su sqlite in memoria invece di guardarlo soltanto.
+def _nudge_p2p(con, pubkey: str, adesso: int, quando: int,
+               suonati=()) -> int:
+    """A chi suonare per UNA busta, e se e' il momento. Torna il tg_id
+    da avvisare ADESSO, o 0. Puro sulla connessione (il patto di
+    `_registra_chiavi_p2p`), cosi' si gira su sqlite in memoria invece
+    di guardarlo soltanto.
+    `quando` e' il created_at della busta; `suonati` le persone che
+    QUESTA passata ha gia' deciso di avvisare.
 
     IL GATE E' DELLA PERSONA E NON DELLA PUBKEY, ed e' la riga da non
     ammorbidire: un mazzo ha una trade key per SCAMBIO, quindi due
@@ -35833,6 +35890,13 @@ def _nudge_p2p(con, pubkey: str, adesso: int) -> int:
     E' il rovescio della pausa dei solleciti, che invece e' dell'ORDINE
     apposta: la' il messaggio nomina l'ordine, qui no.
 
+    0 NON VUOL PIU' DIRE «SCARTATA» (18 set 2026): una busta che non
+    suona adesso e' di nessuno, o di chi ha spento gli avvisi, o gia'
+    detta (la GEMELLA di una frase precisa, o dentro l'avviso che questa
+    stessa passata manda), oppure RIMANDATA — a gate chiuso si mette in
+    coda, e la porta via `_scarica_rimandati_p2p` alla scadenza della
+    pausa. Vedi «IL GATE RIMANDA E ACCORPA».
+
     Una pubkey che non e' di nessuno non fa suonare niente: puo'
     arrivare da un tag `p` di un evento indirizzato anche a un
     terzo."""
@@ -35841,6 +35905,10 @@ def _nudge_p2p(con, pubkey: str, adesso: int) -> int:
     if not r:
         return 0
     tg_id = r["tg_id"]
+    # la stessa persona con due buste nella stessa passata: l'avviso che
+    # parte per la prima dice «guarda i tuoi scambi», e le copre tutte
+    if tg_id in suonati:
+        return 0
     # L'INTERRUTTORE (16 set 2026): chi ha spento gli avvisi P2P non
     # riceve nemmeno la generica. Prima del gate, o un «no» brucerebbe
     # il turno dei dieci minuti a chi poi li riaccende.
@@ -35851,19 +35919,77 @@ def _nudge_p2p(con, pubkey: str, adesso: int) -> int:
         print(f"🔕 Campanello P2P: {tg_id} ha gli avvisi P2P SPENTI "
               "(cassetto Avvisi): non suona", flush=True)
         return 0
-    q = con.execute("SELECT MAX(ultimo_nudge) FROM chiavi_p2p WHERE tg_id=?",
-                    (tg_id,)).fetchone()
+    q = con.execute("SELECT MAX(ultimo_nudge), MAX(coperto), MAX(rimandato) "
+                    "FROM chiavi_p2p WHERE tg_id=?", (tg_id,)).fetchone()
+    ultimo, coperto, rimandato = (int(q[0] or 0), int(q[1] or 0),
+                                  int(q[2] or 0))
+    # UN MOMENTO, UNA NOTIFICA: la busta nata insieme all'evento del
+    # libro che ha appena fatto partire la frase precisa e' la sua
+    # gemella — la frase ha gia' detto tutto, e di piu'
+    if coperto and abs(int(quando) - coperto) <= P2P_GEMELLI_S:
+        print(f"· Campanello P2P: {tg_id}, busta gemella della frase precisa "
+              f"({abs(int(quando) - coperto)}s dall'evento del libro): "
+              "gia' detta", flush=True)
+        return 0
     # chi ha uno scambio PRESO ha il gate corto: li' ogni messaggio
     # puo' chiedere un suo gesto (vedi P2P_NUDGE_VIVO_S)
     pausa = P2P_NUDGE_VIVO_S if _scambio_vivo_p2p(con, tg_id) else P2P_NUDGE_S
-    if adesso - int(q[0] or 0) < pausa:
+    if adesso - ultimo < pausa:
+        # IL GATE RIMANDA, NON SCARTA: in coda, col created_at piu'
+        # recente fra quelle che aspettano (mai zero: zero e' «vuota»)
+        con.execute("UPDATE chiavi_p2p SET rimandato=? WHERE tg_id=?",
+                    (max(rimandato, int(quando), 1), tg_id))
         print(f"⏳ Campanello P2P: {tg_id} e' nel gate (ultimo avviso "
-              f"{adesso - int(q[0] or 0)}s fa, pausa {pausa}s): non suona",
+              f"{adesso - ultimo}s fa, pausa {pausa}s): RIMANDATO, parte "
+              f"fra {pausa - (adesso - ultimo)}s in un avviso solo",
               flush=True)
         return 0
-    con.execute("UPDATE chiavi_p2p SET ultimo_nudge=? WHERE tg_id=?",
-                (adesso, tg_id))
+    # suona adesso, e si porta via anche la coda: «guarda i tuoi
+    # scambi» dice tutto quel che e' arrivato fin qui
+    con.execute("UPDATE chiavi_p2p SET ultimo_nudge=?, rimandato=0 "
+                "WHERE tg_id=?", (adesso, tg_id))
     return tg_id
+
+
+def _scarica_rimandati_p2p(con, adesso: int) -> tuple:
+    """LA CODA DEL GATE: chi ha buste rimandate e la pausa ormai
+    scaduta riceve adesso UN avviso solo, per tutte. Pura sulla
+    connessione, come `_nudge_p2p`. Torna (a chi suonare, quando scade
+    la prossima pausa con buste in coda — 0 se nessuna — e quante
+    persone restano in coda).
+    La pausa si guarda com'e' ADESSO (`_scambio_vivo_p2p`): uno scambio
+    concluso nel frattempo ha gia' mandato la sua frase precisa, che la
+    coda l'ha svuotata (vedi `_avvisi_libro_p2p`).
+    CHI HA SPENTO GLI AVVISI nel frattempo non riceve niente, e la coda
+    si svuota: alla riaccensione un avviso vecchio non direbbe il vero.
+    IL TIMBRO PRIMA DELL'INVIO, il patto delle sveglie: la coda si
+    svuota qui e il chiamante manda dopo — un giro che muore a meta'
+    perde un avviso, mai lo raddoppia."""
+    fuori, prossima, in_coda = [], 0, 0
+    righe = con.execute(
+        "SELECT tg_id, MAX(ultimo_nudge), MAX(rimandato) FROM chiavi_p2p "
+        "GROUP BY tg_id HAVING MAX(rimandato) > 0").fetchall()
+    for r in righe:
+        tg_id, ultimo = r[0], int(r[1] or 0)
+        if not _avvisi_p2p_accesi(con, tg_id):
+            con.execute("UPDATE chiavi_p2p SET rimandato=0 WHERE tg_id=?",
+                        (tg_id,))
+            print(f"🔕 Campanello P2P: {tg_id} ha spento gli avvisi P2P: "
+                  "l'avviso rimandato non parte", flush=True)
+            continue
+        pausa = P2P_NUDGE_VIVO_S if _scambio_vivo_p2p(con, tg_id) else P2P_NUDGE_S
+        if adesso - ultimo < pausa:
+            in_coda += 1
+            scade = ultimo + pausa
+            prossima = scade if not prossima else min(prossima, scade)
+            continue
+        con.execute("UPDATE chiavi_p2p SET ultimo_nudge=?, rimandato=0 "
+                    "WHERE tg_id=?", (adesso, tg_id))
+        print(f"📬 Campanello P2P: {tg_id}, finita la pausa ({pausa}s): "
+              "parte l'avviso rimandato, uno per tutte le buste arrivate "
+              "intanto", flush=True)
+        fuori.append(tg_id)
+    return fuori, prossima, in_coda
 
 
 async def _giro_p2p(portati=None):
@@ -35931,21 +36057,25 @@ async def _giro_p2p(portati=None):
             f"{len(pubkeys)} chiavi, {nuovi_id} "
             f"messaggi nuovi [{_conto_relay_p2p(conto)}]")
         _ascolto_mancato_p2p("buste", trovati, adesso)
-    if not trovati:
-        return
-    # IL SEGNALIBRO NON SUPERA L'OROLOGIO, ed e' la riga gia' pagata
-    # dalla chat: il `created_at` lo scrive chi manda, e uno sballato
-    # nel futuro porterebbe il `since` avanti di ore — i messaggi veri
-    # di dopo non si vedrebbero MAI piu'. E non torna indietro, o si
-    # rileggerebbe in eterno la stessa fetta.
-    visto = max([q for _, q, _ in trovati] + [since])
-    if portati is None:           # il segnalibro e' del GIRO, mai del lampo
-        timbro_scrivi(TIMBRO_P2P_VISTO, str(min(visto, adesso)))
+    # (18 set 2026: niente piu' `return` a mani vuote qui sotto — anche
+    # una passata senza buste nuove deve arrivare alla CODA del gate,
+    # che e' l'unico posto dove una busta rimandata riparte)
+    if trovati:
+        # IL SEGNALIBRO NON SUPERA L'OROLOGIO, ed e' la riga gia' pagata
+        # dalla chat: il `created_at` lo scrive chi manda, e uno sballato
+        # nel futuro porterebbe il `since` avanti di ore — i messaggi veri
+        # di dopo non si vedrebbero MAI piu'. E non torna indietro, o si
+        # rileggerebbe in eterno la stessa fetta.
+        visto = max([q for _, q, _ in trovati] + [since])
+        if portati is None:       # il segnalibro e' del GIRO, mai del lampo
+            timbro_scrivi(TIMBRO_P2P_VISTO, str(min(visto, adesso)))
     # `since` in Nostr e' inclusivo, quindi l'ultimo evento torna a
     # ogni giro: senza gli id gia' contati il campanello suonerebbe
     # ogni dieci minuti per sempre sullo stesso messaggio. Il set vive
     # nel processo; al riavvio, al piu', uno squillo di troppo.
-    nuovi = [p for p, _, i in trovati if i and i not in _P2P_VISTI]
+    # Col created_at accanto (18 set 2026): serve al gate per
+    # riconoscere la gemella di una frase precisa.
+    nuovi = [(p, q) for p, q, i in trovati if i and i not in _P2P_VISTI]
     for _, _, i in trovati:
         _P2P_VISTI.add(i)
     if len(_P2P_VISTI) > 5000:
@@ -35954,14 +36084,18 @@ async def _giro_p2p(portati=None):
         # un lampo ne porta due, e farebbe dimenticare tutti gli altri
         if portati is None:
             _P2P_VISTI.intersection_update({i for _, _, i in trovati})
-    if not nuovi:
-        return
     con = db()
     da_avvisare = []
-    for pub in nuovi:
-        tg_id = _nudge_p2p(con, pub, adesso)
+    for pub, quando in nuovi:
+        tg_id = _nudge_p2p(con, pub, adesso, quando, da_avvisare)
         if tg_id:
             da_avvisare.append(tg_id)
+    # LA CODA: chi aveva buste rimandate e ha la pausa scaduta riceve
+    # adesso il suo avviso, uno solo. E l'orologio impara quando
+    # svegliarsi per la prossima, invece di aspettare il suo minuto.
+    rimandati, scade, in_coda = _scarica_rimandati_p2p(con, adesso)
+    _P2P_CODA["scade"] = scade
+    da_avvisare += [t for t in rimandati if t not in da_avvisare]
     con.commit()
     con.close()
     esiti = []
@@ -35972,7 +36106,10 @@ async def _giro_p2p(portati=None):
             esiti.append((tg_id, f"SALTATO ({type(e).__name__}: {e})"))
             print(f"⚠️ Campanello P2P saltato per {tg_id}: {e}")
         await asyncio.sleep(0.2)
-    _P2P_CONTO["campanello"] += f", {len(da_avvisare)} avvisi"
+    _P2P_CONTO["campanello"] += (
+        f", {len(da_avvisare)} avvisi"
+        + (f" ({len(rimandati)} dalla coda)" if rimandati else "")
+        + (f", {in_coda} in coda" if in_coda else ""))
     if da_avvisare:
         print(f"🔔 Campanello P2P: avvisati {len(da_avvisare)} "
               f"{da_avvisare}", flush=True)
@@ -36068,9 +36205,21 @@ async def orologio_p2p():
         pronto = bool(_P2P_MAZZETTO["libro"] or _P2P_MAZZETTO["buste"]) \
             and _P2P_MAZZETTO["timer"] is None
         if not pronto:
+            # LA CODA DEL GATE PARTE ALLA SCADENZA (18 set 2026): se una
+            # pausa con buste rimandate finisce prima della prossima
+            # passata, ci si sveglia li' (mezzo secondo dopo, per stare
+            # sicuri di esserci oltre) e la passata intera la scarica.
+            # Una scadenza gia' PASSATA non si guarda: vorrebbe dire che
+            # la passata non e' riuscita a scaricarla, e svegliarsi
+            # subito sarebbe un giro a vuoto contro i relay, in tondo —
+            # ci pensa la passata del minuto.
+            limite = prossima
+            coda = _P2P_CODA["scade"]
+            if coda and time.time() < coda + 0.5 < limite:
+                limite = coda + 0.5
             try:
                 await asyncio.wait_for(sveglia.wait(),
-                                       max(0.0, prossima - time.time()))
+                                       max(0.0, limite - time.time()))
             except asyncio.TimeoutError:
                 pass
 
@@ -36144,9 +36293,23 @@ async def guardiano_p2p():
 # nel vocabolario di mostro-core ma non li abbiamo ancora visti
 # ripubblicati: i rami ci sono, e uno stato mai visto lascia una riga
 # nel journal invece di una notifica inventata.
-# E IL 17 SET 2026 QUELLA RIGA HA PARLATO: `waiting-buyer-invoice` e
-# `waiting-payment`, visti sul collaudo vero. Sono la PRESA prima di
-# `in-progress` (`STATI_LIBRO_PRESO`, su accanto al gate).
+# ⚠️ CORRETTO IL 18 SET 2026, dal sorgente e dal libro vero. Il 17 qui
+# c'era scritto che `waiting-buyer-invoice` e `waiting-payment` si
+# erano visti sul libro: FALSO, venivano dal LOG di mostro. Il 38383
+# di mostrod 0.18.7 dice SOLO i quattro secchi di NIP-69 (pending,
+# in-progress, success, canceled — `create_status_tags`, `src/nip33.rs`)
+# e quindi, per chi legge da fuori:
+# • LA PRESA e' `pending→in-progress`, e dice gia' A CHI TOCCA: su un
+#   ordine `sell` esce da `waiting-buyer-invoice` (manca il recapito di
+#   chi compra), su un `buy` da `waiting-payment` (manca la garanzia di
+#   chi vende). Da li' il libro resta `in-progress` fino alla fine:
+#   garanzia bloccata, fiat inviato e disputa NON si pubblicano.
+# • LO SCADUTO esce come `canceled`, identico al ritiro: si distingue
+#   solo dal tag `expires_at` (visto dal vivo il 18 set: tre ordini
+#   scaduti, `canceled` 9, 36 e 40 secondi DOPO la loro scadenza; gli
+#   86 ritiri sullo specchio, tutti PRIMA). Vedi `_passaggio_libro_p2p`.
+# • `expired` e `dispute` non escono MAI: i loro rami restano per un
+#   coordinatore che li pubblicasse, e non costano niente.
 TIMBRO_LIBRO_P2P = "p2p_libro_visto"  # il segnalibro del libro, sopravvive al riavvio
 P2P_INFO_OGNI_S = 3600                # ogni quanto si rilegge il 38385 (fee, finestre)
 P2P_LIBRO_MEMORIA_S = 40 * 86400      # un ordine vive al piu' 15 giorni in libro + lo scambio
@@ -36275,7 +36438,8 @@ def _p2p_riconosciuto(con, tg_id: int) -> bool:
     return bool(r and r[0])
 
 
-def _passaggio_libro_p2p(prima: str, dopo: str, maker: int) -> str:
+def _passaggio_libro_p2p(prima: str, dopo: str, maker: int,
+                         scaduto: bool = False) -> str:
     """PURA: da due stati del libro al MOMENTO da raccontare, o '' se
     non c'e' niente da dire. `maker` dice se di questa persona si SA
     il ruolo: chi ha pubblicato (dichiarato o scoperto dal libro) e,
@@ -36297,13 +36461,34 @@ def _passaggio_libro_p2p(prima: str, dopo: str, maker: int) -> str:
     waiting-buyer-invoice→waiting-payment→in-progress — non racconta
     niente (e' un momento interno, del campanello), mentre il primo dei
     tre che si vede e' «preso» e da ognuno dei tre si torna, si
-    conclude o si annulla."""
+    conclude o si annulla. (18 set 2026: mostrod 0.18.7 i due `waiting-*`
+    non li pubblica affatto — la tolleranza resta, vedi
+    `STATI_LIBRO_PRESO`.)
+    LO SCADUTO (18 set 2026): mostrod lo pubblica come `canceled`,
+    quindi `pending→canceled` e' il RITIRO di chi ha pubblicato oppure
+    la SCADENZA — e a separarli e' `scaduto`, che il chiamante ricava
+    dall'evento (created_at non prima dell'`expires_at` dell'ordine: un
+    ritiro sta per forza prima, uno scaduto dopo, perche' mostrod lo
+    scrive al primo giro del suo job dopo la scadenza). Da un ordine
+    PRESO invece `canceled` e' sempre un annullo: un ordine preso non
+    scade, e un annullo d'accordo puo' benissimo arrivare dopo la data.
+    CONCLUSO ANCHE DA `pending` (18 set 2026): su un ordine `sell` preso
+    CON la fattura gia' in mano — un altro client puo' farlo, il nostro
+    no — mostrod salta dritto a `waiting-payment`, che per un `sell` non
+    pubblica: il libro va da `pending` a `success` senza passare da
+    `in-progress`. Lo stesso salto lo vede chi e' stato fermo durante
+    tutto lo scambio — o una riga mai vista, se si sa chi l'ha
+    pubblicata. «Scambio concluso» e' vero in tutti i casi."""
     prima = "in-progress" if prima in STATI_LIBRO_PRESO else prima
     dopo = "in-progress" if dopo in STATI_LIBRO_PRESO else dopo
     if dopo == prima or not maker:
         return ""
     if prima in ("", "pending") and dopo == "in-progress":
         return "preso"
+    if prima in ("", "pending") and dopo == "canceled" and scaduto:
+        return "scaduto"
+    if prima in ("", "pending") and dopo == "success":
+        return "concluso"
     if prima == "pending" and dopo == "expired":
         return "scaduto"
     if prima == "in-progress":
@@ -36337,7 +36522,8 @@ def _euro_libro(valori) -> str:
 
 
 def _testo_libro_p2p(passaggio: str, ev: dict, fee, ore: int,
-                     ruolo: str = "maker", recensibile: bool = False) -> str:
+                     ruolo: str = "maker", recensibile: bool = False,
+                     nome: str = "") -> str:
     """PURA: la frase per quel momento, coi numeri del libro. Lo stile
     e' uno solo — cosa e' successo, i numeri, di chi e' il prossimo
     passo — e non nomina mai il protocollo: chi legge entra da
@@ -36356,11 +36542,25 @@ def _testo_libro_p2p(passaggio: str, ev: dict, fee, ore: int,
     indica dove ricevere i sats, chi vende blocca la garanzia (mostrod
     gli manda la hold nello stesso istante) — e il timeout e' «non hai
     proseguito», che per lui e' la notizia vera.
-    IL NETTO di chi compra e' il conto del client, lasciato buono dal
-    cantiere della fattura da 7468: la meta' della fee del 38385,
-    arrotondata — `sats − round(sats × fee / 2)`. Senza fee (38385 mai
-    letto) il numero NON si inventa: la frase resta senza cifra.
-    I METODI sono testo di sconosciuti e passano da html.escape."""
+    IL NETTO DI CIASCUNO e' il conto del client, lasciato buono dal
+    cantiere della fattura da 7468: la meta' della fee, arrotondata —
+    `round(sats × fee / 2)` — TOLTA a chi compra e AGGIUNTA a chi vende
+    (la sua garanzia e' i sats piu' la sua meta'). `fee` e' quella di
+    CHI LEGGE: dal 18 set 2026 il chiamante ci toglie gia' il suo
+    sconto fedelta' (`_fee_di_p2p`, il calco di `feeMiaP2P`), perche'
+    dalla patch 0005 le due meta' non sono piu' per forza uguali. Senza
+    fee (38385 mai letto) il numero NON si inventa: la frase resta
+    senza cifra.
+    `nome` (18 set 2026) e' il nome di chi ha PUBBLICATO come lo mostra
+    la sua card nel libro — lo passa il chiamante solo a chi ha preso,
+    e solo se la card ce l'ha. Il nome di chi prende non esce mai: su
+    nessuna card sta scritto.
+    `ore` non si usa piu' (18 set 2026): lo scaduto diceva «dopo N
+    giorni» con le ore del 38385, che sono il DEFAULT del coordinatore
+    e non la vita di quell'ordine — il tabacchino, per dirne uno, ne
+    chiede 48. Resta nella firma per i chiamanti.
+    I METODI sono testo di sconosciuti e passano da html.escape, e il
+    nome pure."""
     taker = ruolo == "taker"
     vende = (ev.get("lato") == "sell") != taker
     sats = int(ev.get("sats") or 0)
@@ -36368,15 +36568,23 @@ def _testo_libro_p2p(passaggio: str, ev: dict, fee, ore: int,
     metodi = ", ".join(html.escape(str(m)) for m in (ev.get("metodi") or []))
     quanto = (f"{_fmt_sats(sats)} sats" if sats > 0 else "bitcoin") + \
         (f" per {euro}" if euro else "") + (f" via {metodi}" if metodi else "")
+    meta = (int(sats * float(fee) / 2 + 0.5)
+            if sats > 0 and fee is not None and fee >= 0 else None)
+    hai_preso = ("⚡ <b>Hai preso l'ordine"
+                 + (f" di {html.escape(str(nome))}" if nome else "") + "!</b> ")
     # LA FRASE SEGUE LO STATO, quando il libro lo dice (17 set 2026):
     # `waiting-payment` = manca la garanzia, e il gesto e' di chi vende
     # ADESSO; `waiting-buyer-invoice` = manca il recapito, e il gesto e'
     # di chi compra ADESSO. Con `in-progress` — che non dice a chi
     # tocca — restano le frasi di sempre, qui sotto.
+    # ⚠️ (18 set 2026) Questo ramo e' la TOLLERANZA di
+    # `STATI_LIBRO_PRESO`: mostrod 0.18.7 i due `waiting-*` non li
+    # pubblica, e la presa arriva come `in-progress` — che dice a chi
+    # tocca lo stesso, dal lato: vedi le frasi qui sotto.
     stato = str(ev.get("stato") or "")
     if passaggio == "preso" and stato in ("waiting-payment",
                                           "waiting-buyer-invoice"):
-        testa = ("⚡ <b>Hai preso l'ordine!</b> " if taker
+        testa = (hai_preso if taker
                  else "⚡ <b>Il tuo ordine è stato preso!</b> ")
         testa += ("Vendi " if vende else "Compri ") + quanto + ".\n\n"
         if stato == "waiting-payment" and vende:
@@ -36389,11 +36597,21 @@ def _testo_libro_p2p(passaggio: str, ev: dict, fee, ore: int,
                             "ricevere i sats.")
         return testa + ("Apri Barattolo: appena chi compra indica dove "
                         "ricevere i sats, tocca a te bloccare la garanzia.")
+    # LA PRESA SUL LIBRO DICE GIA' A CHI TOCCA (18 set 2026, letto sul
+    # sorgente di mostrod): `pending→in-progress` su un ordine `sell`
+    # nasce da `waiting-buyer-invoice` — il client di Barattolo prende
+    # SENZA fattura — e su un `buy` da `waiting-payment`. Quindi chi ha
+    # preso ha SEMPRE il primo gesto: il recapito se compra, la garanzia
+    # se vende. E la variante «aspetta che blocchi la garanzia» a chi
+    # compra non esiste, perche' sarebbe una bugia: la presa con la
+    # fattura dentro il client di Barattolo non la fa, e quella di un
+    # altro client su un `sell` il libro non la mostra nemmeno (resta
+    # `pending`, vedi `_passaggio_libro_p2p`).
     if passaggio == "preso" and taker:
         if vende:
-            return (f"⚡ <b>Hai preso l'ordine!</b> Vendi {quanto}.\n\n"
+            return (f"{hai_preso}Vendi {quanto}.\n\n"
                     "Apri Barattolo: tocca a te bloccare la garanzia.")
-        return (f"⚡ <b>Hai preso l'ordine!</b> Compri {quanto}.\n\n"
+        return (f"{hai_preso}Compri {quanto}.\n\n"
                 "Apri Barattolo: tocca a te indicare dove ricevere i sats.")
     if passaggio == "preso":
         if vende:
@@ -36422,10 +36640,14 @@ def _testo_libro_p2p(passaggio: str, ev: dict, fee, ore: int,
                 else "Hai venduto bitcoin"
             if euro:
                 fatto += f" per {euro}"
+            # IL SUO NETTO (18 set 2026): quel che e' uscito davvero dal
+            # suo wallet, la garanzia intera — i sats piu' la sua meta'
+            if meta:
+                fatto += (f": in tutto {_fmt_sats(sats + meta)} sats, "
+                          "commissione compresa")
             return f"{testa}{fatto}.{invito}"
-        if sats > 0 and fee is not None and fee >= 0:
-            netto = sats - int(sats * float(fee) / 2 + 0.5)
-            fatto = f"{_fmt_sats(netto)} sats sono in arrivo al tuo recapito"
+        if meta is not None:
+            fatto = f"{_fmt_sats(sats - meta)} sats sono in arrivo al tuo recapito"
         else:
             fatto = "I sats sono in arrivo al tuo recapito"
         return f"{testa}{fatto}.{invito}"
@@ -36436,11 +36658,32 @@ def _testo_libro_p2p(passaggio: str, ev: dict, fee, ore: int,
         return ("⚖️ <b>La disputa è stata chiusa: lo scambio è stato "
                 "annullato.</b> I sats in garanzia tornano a chi vende.")
     if passaggio == "scaduto":
-        giorni = int(ore) // 24 if ore and int(ore) >= 24 else 0
-        dopo = f" dopo {giorni} giorni" if giorni else ""
-        return (f"⏰ <b>Il tuo ordine è scaduto</b>{dopo}. Puoi "
-                "ripubblicarlo quando vuoi.")
+        # (18 set 2026) la frase chiesta da Andrea, piu' QUALE ordine:
+        # chi ne ha tre in vetrina deve sapere quale e' scaduto
+        return ("⏰ <b>Il tuo ordine è scaduto</b> senza che la presa fosse "
+                f"completata: {'vendevi' if vende else 'compravi'} {quanto}. "
+                "Puoi ripubblicarlo quando vuoi.")
     return ""
+
+
+def _fee_di_p2p(con, tg_id: int, fee):
+    """La fee viva del 38385 con lo sconto fedelta' di QUESTA persona
+    gia' tolto, per due: il calco di `feeMiaP2P` del client, cosi' la
+    frase del concluso e il conto nella pagina dello scambio dicono lo
+    stesso numero. None resta None: senza 38385 la cifra non si inventa.
+    Il giudice dello sconto e' `_sconto_p2p`, lo stesso che risponde al
+    coordinatore alla presa.
+    ⚠️ IL LIMITE E' QUELLO DEL CLIENT, e si dichiara: se alla presa il
+    coordinatore non ha potuto verificare lo sconto (server muto: fee
+    piena, fail-closed) la frase racconta lo stesso lo scontato. A
+    prezzo di mercato non lo viene a sapere nessuno dei due."""
+    if fee is None:
+        return None
+    s = _sconto_p2p(con, tg_id)
+    punti = float(s["punti"]) if s["attivo"] else 0.0
+    if not (punti > 0):
+        return float(fee)
+    return max(0.0, float(fee) - 2 * punti / 100)
 
 
 def _avvisi_libro_p2p(con, eventi: list, adesso: int, fee, ore: int) -> list:
@@ -36472,8 +36715,16 @@ def _avvisi_libro_p2p(con, eventi: list, adesso: int, fee, ore: int) -> list:
     con la frase del suo lato. Al ritorno in vetrina chi aveva preso
     viene SCOLLEGATO dalla riga dopo la sua frase: la prossima presa e'
     di un altro, e non deve leggere «hai preso» per lui. Lo scaduto e'
-    solo di chi ha pubblicato: un ordine preso non scade."""
-    fuori, avvisati = [], set()
+    solo di chi ha pubblicato: un ordine preso non scade.
+    IL GATE DOPO LA FRASE (18 set 2026, «IL GATE RIMANDA E ACCORPA»):
+    oltre a `ultimo_nudge`, chi riceve la frase precisa si vede scritto
+    in `coperto` il created_at dell'evento che l'ha fatta partire — le
+    buste GEMELLE di quel momento non suonano — e la sua coda si svuota
+    se tutto quel che aspettava e' nato non dopo quel momento: la frase
+    racconta un passo piu' avanti, e un «guarda i tuoi scambi» per un
+    passo vecchio sarebbe solo rumore. Una busta nata DOPO resta in
+    coda, e parte a pausa scaduta."""
+    fuori, avvisati = [], {}
     for ev in eventi:
         r = con.execute(
             "SELECT tg_id, stato, maker, visto, preso_da FROM p2p_ordini "
@@ -36486,10 +36737,15 @@ def _avvisi_libro_p2p(con, eventi: list, adesso: int, fee, ore: int) -> list:
         maker = int(r["maker"] or 0)
         if not prima and dopo == "pending":
             maker = 1
-        passaggio = _passaggio_libro_p2p(prima, dopo, maker)
+        # LO SCADUTO (18 set 2026): mostrod lo pubblica `canceled` come
+        # un ritiro, e a distinguerlo e' la scadenza dell'ordine scritta
+        # nell'evento — un ritiro sta prima, uno scaduto non prima
+        scade = int(ev.get("scade") or 0)
+        scaduto = scade > 0 and int(ev.get("quando") or 0) >= scade
+        passaggio = _passaggio_libro_p2p(prima, dopo, maker, scaduto)
         preso_da = int(r["preso_da"] or 0)
         # chi ha preso: il ruolo e' certo (1), e lo scaduto non e' suo
-        passaggio_taker = _passaggio_libro_p2p(prima, dopo, 1) \
+        passaggio_taker = _passaggio_libro_p2p(prima, dopo, 1, scaduto) \
             if preso_da > 0 else ""
         if passaggio_taker == "scaduto":
             passaggio_taker = ""
@@ -36519,14 +36775,37 @@ def _avvisi_libro_p2p(con, eventi: list, adesso: int, fee, ore: int) -> list:
                       f"(cassetto Avvisi): la frase «{pas}» non parte",
                       flush=True)
                 continue
-            testo = _testo_libro_p2p(pas, ev, fee, ore, ruolo,
-                                     bool(altro) and not perche)
+            # IL NOME DI CHI HA PUBBLICATO, a chi ha preso (18 set 2026):
+            # quello della sua card nel libro, dallo STESSO giudice che
+            # la disegna — cosi' la frase non dice mai un nome che la
+            # card non mostra. E' un di piu': se non si legge, la frase
+            # parte senza, e il journal lo dice.
+            nome = ""
+            if ruolo == "taker" and pas == "preso":
+                try:
+                    nome = (_facce_ordini_p2p(con, [ev["id"]], adesso)
+                            .get(ev["id"], {}).get("nome") or "")
+                except Exception as e:
+                    print(f"⚠️ Libro P2P: il nome sulla card di "
+                          f"{ev['id'][:8]} non si legge "
+                          f"({type(e).__name__}): la frase parte senza",
+                          flush=True)
+            testo = _testo_libro_p2p(pas, ev, _fee_di_p2p(con, chi, fee),
+                                     ore, ruolo, bool(altro) and not perche,
+                                     nome)
             if testo:
                 fuori.append((chi, testo))
-                avvisati.add(chi)
-    for tg_id in avvisati:
-        con.execute("UPDATE chiavi_p2p SET ultimo_nudge=? WHERE tg_id=?",
-                    (adesso, tg_id))
+                avvisati[chi] = max(avvisati.get(chi, 0),
+                                    int(ev.get("quando") or 0))
+    for tg_id, quando in avvisati.items():
+        q = con.execute("SELECT MAX(rimandato) FROM chiavi_p2p WHERE tg_id=?",
+                        (tg_id,)).fetchone()
+        rimandato = int(q[0] or 0)
+        con.execute("UPDATE chiavi_p2p SET ultimo_nudge=?, coperto=?, "
+                    "rimandato=? WHERE tg_id=?",
+                    (adesso, quando,
+                     0 if rimandato <= quando + P2P_GEMELLI_S else rimandato,
+                     tg_id))
     con.commit()
     return fuori
 
