@@ -2628,12 +2628,48 @@
          raggiunge scrollando — è tagliato via. Cioè il taglio
          peggiore capitava a chi ha CHIESTO i caratteri grandi.
          `--tastiera` si sottrae DOPO la divisione perché
-         tastieraSegue la scrive già divisa per la scala. */
-      height:calc(100vh / var(--fs-zoom,1) - var(--tastiera,0px));
-      height:calc(100dvh / var(--fs-zoom,1) - var(--tastiera,0px));
+         tastieraSegue la scrive già divisa per la scala.
+         ⚠️ E IL FOGLIO CHIUSO NON SI ACCORCIA PIU' (18 set 2026, dal
+         campo su iPhone): qui l'altezza è lo schermo INTERO, e la
+         tastiera la toglie solo a chi è in scena (regola sotto). Un
+         chiuso sta nascosto con `translateY(100%)`, cioè di quanto è
+         ALTO: accorciato dalla tastiera si nascondeva di meno, e la
+         sua testa — «Stai comprando sats», il dettaglio — spuntava
+         subito sotto il fondo del foglio aperto. È lo stesso difetto
+         del cappello a 0,9 qui sopra, rientrato da `--tastiera`. */
+      height:calc(100vh / var(--fs-zoom,1));
+      height:calc(100dvh / var(--fs-zoom,1));
       display:flex;flex-direction:column;overflow:hidden;
     }
     .sheet.pieno.open{transform:none}
+    /* CHI E' IN SCENA cede l'altezza alla tastiera: l'aperto, e quello
+       della morfosi mentre svanisce (`.morfo` senza `.open` sta ancora
+       al suo posto, e chiudiMorfoP2P ci misura il bottone d'arrivo). */
+    .sheet.pieno.open,.sheet.pieno.morfo{
+      height:calc(100vh / var(--fs-zoom,1) - var(--tastiera,0px));
+      height:calc(100dvh / var(--fs-zoom,1) - var(--tastiera,0px));
+    }
+    /* ⚠️ A TASTIERA SU IL FOGLIO E' LA FINESTRA VISIBILE, PUNTO (18 set
+       2026, iPhone dentro Telegram: il foglio ridotto a testata e
+       bottone, sotto il dettaglio chiuso, e in mezzo il mercatino).
+       La riga qui sopra fa un conto con DUE fonti — `100dvh` dal CSS e
+       `innerHeight - vv.height` dal JS — e regge solo finche' le due
+       dicono la stessa altezza. Dove `100dvh` SI accorcia con la
+       tastiera e `innerHeight` no, la tastiera si toglie DUE volte:
+       812 - 336 - 336 = 140px di foglio. E quando iOS fa scorrere la
+       finestra visibile per mostrare il campo (`vv.offsetTop`), un
+       foglio inchiodato a `top:0` resta indietro e la testata esce
+       di scena.
+       Qui la fonte e' UNA: `--vv-su` e `--vv-alto` sono `offsetTop` e
+       `height` di visualViewport, scritti da tastieraSegue. Il foglio
+       comincia dove comincia quel che si vede e finisce dove finisce.
+       I ripieghi valgono il conto di prima: senza le variabili non
+       cambia niente. */
+    html.con-tastiera .sheet.pieno.open,
+    html.con-tastiera .sheet.pieno.morfo{
+      top:var(--vv-su,0px);
+      height:var(--vv-alto,calc(100dvh / var(--fs-zoom,1) - var(--tastiera,0px)));
+    }
     /* IL FOGLIO DELLA MORFOSI NON SALE: sfuma sul posto. Due
        ragioni, e la prima e' una misura — per sapere DOVE arriva il
        bottone bisogna misurarlo a foglio gia' alla sua altezza, e
@@ -6359,6 +6395,32 @@
      fotogramma per fotogramma. Non si rallenta niente: si toglie
      l'inseguimento, e l'assestamento resta immediato. */
   html.con-tastiera .sheet.open{transition:none}
+  /* IL TETTO DEI FOGLI DAL BASSO, A TASTIERA SU, VIENE DALLA FINESTRA
+     VISIBILE (18 set 2026, il gemello della cura del foglio pieno — la
+     spiegazione intera sta la', «A TASTIERA SU IL FOGLIO E' LA FINESTRA
+     VISIBILE»): il max-height qui sopra fa `100dvh - tastiera`, e dove
+     `100dvh` si accorcia gia' da solo la tastiera si toglie due volte —
+     un foglio con un campo («Dove ricevere i sats», i filtri) resta
+     una feritoia di cento pixel. `--vv-alto` e' quel che si vede
+     davvero; senza la variabile vale il conto di prima.
+     `:not(.pieno)` perche' il foglio pieno ha la regola sua e qui
+     perderebbe sedici pixel; sotto i 768px perche' da li' in su il
+     foglio e' un modale centrato che la tastiera non l'ha mai seguita,
+     e non e' questo il cantiere che glielo insegna. */
+  @media (max-width:767px){
+    html.con-tastiera .sheet.open:not(.pieno){
+      max-height:calc(var(--vv-alto,
+        calc(100dvh / var(--fs-zoom,1) - var(--tastiera,0px))) - 16px)}
+  }
+  /* SOTTO UN FOGLIO APERTO LA PAGINA NON SCORRE (18 set 2026): la
+     classe la mette fermaPaginaSotto guardando il velo, che si accende
+     con OGNI foglio. Sul `body` e non su `html`, come fanno gia' la
+     lightbox e il visore; e solo sotto i 768px — la' i fogli sono
+     modali, e togliere la barra di scorrimento a un monitor sposta
+     la pagina di quindici pixel dietro il velo. */
+  @media (max-width:767px){
+    html.foglio-su body{overflow:hidden}
+  }
   .sheet .grab{width:44px;height:5px;border-radius:999px;background:var(--field-line);margin:0 auto 14px}
   /* ⚠️ E' QUESTA LA REGOLA CHE DECIDE la taglia dei titoli dei fogli,
      non `.foglio-testa h3` che sta piu' su: stessa specificita', e a
@@ -47885,18 +47947,91 @@ function tastieraSegue(){
     const z = parseFloat(getComputedStyle(document.documentElement)
                 .getPropertyValue('--fs-zoom')) || 1;
     const coperto = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-    const su = coperto > 80;
-    document.documentElement.style.setProperty(
-      '--tastiera', (su ? coperto / z : 0) + 'px');
+    /* ⚠️ «E' SU» NON E' «COPRE» (18 set 2026): `coperto` e' quanto
+       resta nascosto IN FONDO al layout, e quando iOS fa scorrere la
+       finestra visibile fino in fondo vale ZERO a tastiera spalancata
+       — giusto per i fogli dal basso, che li' non hanno niente da
+       alzare, ma il foglio pieno ha ancora la testata fuori scena. A
+       dire che la tastiera c'e' e' la finestra visibile piu' CORTA
+       del layout, ovunque sia scorsa. */
+    const su = window.innerHeight - vv.height > 80;
+    const stile = document.documentElement.style;
+    stile.setProperty('--tastiera', (su ? coperto / z : 0) + 'px');
+    /* LA FINESTRA VISIBILE, DETTA PER INTERO (18 set 2026, iPhone):
+       dove comincia e quanto e' alta, dalla stessa fonte. `--tastiera`
+       da sola e' una DIFFERENZA, e chi la spende contro `100dvh`
+       scommette che CSS e JS misurino lo stesso schermo — dentro
+       Telegram su iOS non e' detto (vedi CSS, «A TASTIERA SU IL FOGLIO
+       E' LA FINESTRA VISIBILE»). A tastiera giu' le due variabili si
+       TOLGONO, cosi' i ripieghi del CSS tornano al conto di sempre. */
+    if (su) {
+      stile.setProperty('--vv-su', (Math.max(0, vv.offsetTop) / z) + 'px');
+      stile.setProperty('--vv-alto', (vv.height / z) + 'px');
+    } else {
+      stile.removeProperty('--vv-su');
+      stile.removeProperty('--vv-alto');
+    }
     /* la classe spegne la transizione dei fogli mentre la tastiera si
        muove: senza, il foglio insegue invece di seguire (vedi CSS) */
     document.documentElement.classList.toggle('con-tastiera', su);
+    return su;
   };
-  vv.addEventListener('resize', applica);
+  /* ...e il campo in cui si scrive resta in vista. Al `resize` (la
+     tastiera che sale accorcia il foglio sotto il campo) e al cambio
+     di fuoco a tastiera gia' su; NON allo `scroll` del viewport, che
+     e' il dito di chi sta guardando altrove. */
+  vv.addEventListener('resize', () => { if (applica()) campoInVistaFoglio(); });
   vv.addEventListener('scroll', applica);
+  document.addEventListener('focusin', () => {
+    if (document.documentElement.classList.contains('con-tastiera'))
+      campoInVistaFoglio();
+  });
   applica();
 }
+/* IL CAMPO A FUOCO DENTRO UN FOGLIO APERTO, RIPORTATO IN VISTA (18 set
+   2026). Non e' uno `scrollIntoView` e non parte dal fuoco che arriva
+   — quella e' la strada gia' scartata, lo scatto del picker: qui si
+   tocca il solo `scrollTop` di CHI SCORRE dentro il foglio (il corpo
+   nel foglio pieno, il foglio stesso negli altri) e SOLO se il campo
+   e' davvero coperto. Un campo gia' a vista non muove niente.
+   Il fondo utile e' il piede appiccicato, quando c'e': sotto i due
+   bottoni un campo e' coperto quanto sotto i tasti.
+   Si divide per la scala: i rettangoli arrivano in pixel dipinti, lo
+   `scrollTop` si spende dentro `html` zoomato. */
+function campoInVistaFoglio(){
+  const z = parseFloat(getComputedStyle(document.documentElement)
+              .getPropertyValue('--fs-zoom')) || 1;
+  const campo = document.activeElement;
+  const foglio = campo && campo.closest && campo.closest('.sheet.open');
+  if (!foglio || foglio === campo) return 0;
+  const chi = campo.closest('.foglio-corpo') || foglio;
+  const r = campo.getBoundingClientRect(), s = chi.getBoundingClientRect();
+  const piede = chi.querySelector('.foglio-piede');
+  const fondo = Math.min(s.bottom,
+    piede && !piede.contains(campo) ? piede.getBoundingClientRect().top : s.bottom);
+  const aria = 12;
+  let passo = 0;
+  if (r.bottom > fondo - aria) passo = r.bottom - (fondo - aria);
+  else if (r.top < s.top + aria) passo = r.top - (s.top + aria);
+  if (passo) chi.scrollTop += passo / z;
+  return passo;
+}
+/* SOTTO UN FOGLIO LA PAGINA STA FERMA (18 set 2026). I fogli li aprono
+   in quaranta posti e li chiudono in tre modi: invece di ricordarsi
+   della pagina in ognuno, si guarda IL VELO, che si accende con ogni
+   foglio e si spegne con l'ultimo — la stessa strada dell'occhio della
+   morfosi, un occhio sulle classi. La regola sta nel CSS
+   (`html.foglio-su body`). */
+function fermaPaginaSotto(){
+  const velo = el('sheetBg');
+  if (!velo || !window.MutationObserver) return;
+  const dice = () => document.documentElement.classList.toggle(
+    'foglio-su', velo.classList.contains('open'));
+  new MutationObserver(dice).observe(velo,
+    {attributes: true, attributeFilter: ['class']});
+}
 tastieraSegue();
+fermaPaginaSotto();
 navMotore();   /* il gesto indietro, prima che parta qualunque vista */
 avvia();
 /* Il calore delle illustrazioni delle categorie (vedi scaldaSfoglia): a

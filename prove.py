@@ -66103,6 +66103,286 @@ def prove_badge_nostr():
           "uno solo)", 2, corpo_gancio.count("try:"))
 
 
+def prove_foglio_tastiera_iphone():
+    """IL FOGLIO PIENO E LA TASTIERA DELL'iPHONE (18 set 2026, dal
+    campo: nel foglio «Vuoi comprare Bitcoin», al tocco sull'importo,
+    restavano la testata e «Pubblica ordine» schiacciati in cima, sotto
+    «Stai comprando sats» — che e' la testa di un ALTRO foglio, il
+    dettaglio, CHIUSO — poi una fascia vuota e in mezzo il mercatino).
+
+    TRE DIFETTI IN UNO, e il banco li tiene separati:
+    1) L'altezza del foglio si faceva con DUE fonti — `100dvh` dal CSS
+       e `innerHeight - vv.height` dal JS — e dove `100dvh` si accorcia
+       gia' da solo la tastiera si toglieva due volte (812-336-336=140).
+    2) I fogli pieni CHIUSI si accorciavano anche loro, e un chiuso sta
+       nascosto di quanto e' ALTO: spuntava sotto l'aperto.
+    3) «E' su» si giudicava da `coperto`, che a finestra visibile
+       scorsa fino in fondo vale ZERO a tastiera spalancata.
+
+    ⚠️ SENZA iPHONE IL CASO RESTA SIMULATO: qui gira il JS vero contro
+    un visualViewport di cartone. Dice che il conto e' giusto in ogni
+    modello di tastiera che conosciamo; NON dice quale modello sia
+    quello di Telegram su iOS. E' la ragione per cui la cura non
+    sceglie un modello: legge la finestra visibile e basta."""
+    print("\n[il foglio pieno e la tastiera dell'iPhone]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    stile = mini[:mini.index("</style>")].replace("\r\n", "\n")
+    # i commenti si tolgono PRIMA di guardare: quello che spiega perche'
+    # una riga non c'e' piu' la nomina per forza
+    nudo = re.sub(r"/\*.*?\*/", "", stile, flags=re.S)
+
+    # 1) IL CHIUSO NON SI ACCORCIA. Si guarda la regola BASE di
+    # `.sheet.pieno`, da sola: dentro non deve comparire `--tastiera`.
+    _i = nudo.index(".sheet.pieno{")
+    _base = nudo[_i:nudo.index("}", _i)]
+    prova("il foglio pieno CHIUSO e' alto lo schermo intero", True,
+          "height:calc(100dvh / var(--fs-zoom,1));" in _base)
+    prova("...e la tastiera non lo accorcia (o la sua testa spunta "
+          "sotto l'aperto)", False, "--tastiera" in _base)
+    # chi e' in scena: l'aperto, e quello della morfosi mentre svanisce
+    # (chiudiMorfoP2P ci misura il bottone d'arrivo a foglio gia' chiuso)
+    prova("la tastiera toglie altezza solo a chi e' in scena", True,
+          ".sheet.pieno.open,.sheet.pieno.morfo{\n"
+          "      height:calc(100vh / var(--fs-zoom,1) - var(--tastiera,0px));\n"
+          "      height:calc(100dvh / var(--fs-zoom,1) - var(--tastiera,0px));"
+          in nudo)
+
+    # 2) A TASTIERA SU LA FONTE E' UNA: la finestra visibile.
+    # ⚠️ SI CERCA, NON SI PRETENDE: un `index` che alza farebbe
+    # esplodere la funzione intera, e una prova esplosa non dice
+    # QUALE riga manca (la tortura: M05 inciampata, non uccisa)
+    _j = nudo.find("html.con-tastiera .sheet.pieno.open,")
+    _vv = nudo[_j:nudo.index("}", _j)] if _j >= 0 else ""
+    prova("a tastiera su il foglio pieno comincia dove comincia quel "
+          "che si vede", True, "top:var(--vv-su,0px);" in _vv)
+    prova("...ed e' alto quanto quel che si vede, col conto di prima "
+          "per ripiego", True,
+          "height:var(--vv-alto,calc(100dvh / var(--fs-zoom,1) "
+          "- var(--tastiera,0px)));" in _vv)
+    prova("...morfosi compresa", True,
+          "html.con-tastiera .sheet.pieno.morfo{" in _vv)
+    # il gemello dei fogli dal basso: il tetto, e il pieno ne resta
+    # fuori (la' perderebbe sedici pixel)
+    prova("il tetto dei fogli dal basso viene dalla finestra visibile",
+          True,
+          "html.con-tastiera .sheet.open:not(.pieno){\n"
+          "      max-height:calc(var(--vv-alto,\n"
+          "        calc(100dvh / var(--fs-zoom,1) - var(--tastiera,0px))) - 16px)}"
+          in nudo)
+
+    # 3) LA PAGINA SOTTO STA FERMA, e lo decide il velo
+    prova("sotto un foglio aperto la pagina non scorre (solo telefono)",
+          True,
+          "@media (max-width:767px){\n    html.foglio-su body{overflow:hidden}\n  }"
+          in nudo)
+    prova("...e `:has()` resta fuori da questo file", False, ":has(" in nudo)
+    prova("i due guardiani partono all'avvio, prima della nav", True,
+          "\ntastieraSegue();\nfermaPaginaSotto();\nnavMotore();"
+          in mini.replace("\r\n", "\n"))
+
+    # --- E SI FA GIRARE ------------------------------------------
+    import json as _js, shutil as _sh, subprocess as _sp, tempfile as _tf
+    _node = _sh.which("node")
+    if not _node:
+        salta("il banco della tastiera gira", "node non installato")
+        return
+
+    def _intera(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}\n"
+
+    _banco = (
+        """
+        // ---- IL TELEFONO DI CARTONE ----
+        const VAR = {}, CLASSI = new Set(), ASCOLTI = {resize: [], scroll: [], focusin: []};
+        let ZOOM = '';
+        const html = {
+          style: {setProperty: (k, v) => { VAR[k] = v; },
+                  removeProperty: k => { delete VAR[k]; }},
+          classList: {toggle: (c, si) => { si ? CLASSI.add(c) : CLASSI.delete(c); return si; },
+                      contains: c => CLASSI.has(c)}
+        };
+        const getComputedStyle = () => ({getPropertyValue: () => ZOOM});
+        // un ascolto che il banco non prevede si registra lo stesso:
+        // deve far rossa la SUA riga, non far esplodere il banco
+        const ascolta = (t, f) => (ASCOLTI[t] || (ASCOLTI[t] = [])).push(f);
+        const vv = {height: 812, offsetTop: 0, addEventListener: ascolta};
+        const window = {visualViewport: vv, innerHeight: 812,
+          MutationObserver: class { constructor(f){ OCCHI.push(f); } observe(){} }};
+        const MutationObserver = window.MutationObserver;
+        const OCCHI = [];
+        // il DOM: un campo, chi scorre, il piede appiccicato
+        const rett = (top, bottom) => ({top, bottom, height: bottom - top});
+        let SCENA = null;
+        const document = {documentElement: html,
+          addEventListener: ascolta,
+          get activeElement(){ return SCENA && SCENA.campo; }};
+        function scena(o){
+          // o.pieno: il campo vive in un .foglio-corpo; senno' scorre il foglio
+          const piede = o.piede ? {getBoundingClientRect: () => rett(o.piede[0], o.piede[1]),
+                                   contains: c => !!o.campoNelPiede} : null;
+          const chi = {scrollTop: 100, getBoundingClientRect: () => rett(o.chi[0], o.chi[1]),
+                       querySelector: s => s === '.foglio-piede' ? piede : null};
+          const foglio = o.pieno ? {scrollTop: 0, querySelector: () => null,
+                                    getBoundingClientRect: () => rett(o.chi[0], o.chi[1])} : chi;
+          if (o.stesso) { chi.closest = s => s === '.sheet.open' ? chi : null;
+            SCENA = {campo: chi, chi}; return chi; }
+          const campo = o.fuoriFoglio ? {closest: () => null} : {
+            closest: s => s === '.sheet.open' ? (o.chiuso ? null : foglio)
+                        : s === '.foglio-corpo' ? (o.pieno ? chi : null) : null,
+            getBoundingClientRect: () => rett(o.campo[0], o.campo[1])};
+          SCENA = {campo, chi};
+          return chi;
+        }
+        const VELO = {classi: new Set(), classList: {contains: c => VELO.classi.has(c)}};
+        function el(id){ return id === 'sheetBg' ? VELO : null; }
+        """
+        + _intera("function tastieraSegue(){")
+        + "\n" + _intera("function campoInVistaFoglio(){")
+        + "\n" + _intera("function fermaPaginaSotto(){")
+        + """
+        tastieraSegue();
+        fermaPaginaSotto();
+        const soffia = t => ASCOLTI[t].forEach(f => f());
+        function tastiera(inner, alto, su, tipo){
+          window.innerHeight = inner; vv.height = alto; vv.offsetTop = su;
+          soffia(tipo || 'resize');
+          return [VAR['--tastiera'], VAR['--vv-su'] || null, VAR['--vv-alto'] || null,
+                  CLASSI.has('con-tastiera')];
+        }
+        const CASI = {
+          // a riposo: niente variabili, i ripieghi del CSS valgono
+          riposo(){ return tastiera(812, 812, 0); },
+          // Safari di scuola: la finestra si accorcia e non scorre
+          ferma(){ return tastiera(812, 476, 0); },
+          // iOS fa scorrere la finestra visibile per mostrare il campo
+          scorsa(){ return tastiera(812, 476, 150); },
+          // ...fino in fondo: `coperto` fa ZERO, e la tastiera e' su
+          inFondo(){ return tastiera(812, 476, 336); },
+          // l'elastico di iOS: offsetTop sotto zero non alza il foglio
+          elastico(){ return tastiera(812, 476, -40); },
+          // la barra degli indirizzi che respira NON e' una tastiera
+          barra(){ return tastiera(812, 760, 0); },
+          // la tastiera scende: le variabili si TOLGONO
+          scende(){ tastiera(812, 476, 150); return tastiera(812, 812, 0); },
+          // la scala dei caratteri: la misura si spende dentro html zoomato
+          zoom(){ ZOOM = '1.25'; const r = tastiera(812, 500, 100); ZOOM = ''; return r; },
+          // lo `scroll` del viewport aggiorna la geometria...
+          scrollGeometria(){ tastiera(812, 476, 0); return tastiera(812, 476, 90, 'scroll'); },
+          // ---- IL CAMPO IN VISTA ----
+          // coperto dal piede: sale di quanto basta, piu' l'aria
+          sottoIlPiede(){ const c = scena({pieno: 1, chi: [56, 476], piede: [399, 476], campo: [420, 455]});
+            tastiera(812, 476, 0); return c.scrollTop; },
+          // gia' a vista: non si muove NIENTE
+          giaInVista(){ const c = scena({pieno: 1, chi: [56, 476], piede: [399, 476], campo: [222, 257]});
+            tastiera(812, 476, 0); return c.scrollTop; },
+          // finito sopra, sotto la testata: scende
+          sopra(){ const c = scena({pieno: 1, chi: [56, 476], piede: [399, 476], campo: [30, 65]});
+            tastiera(812, 476, 0); return c.scrollTop; },
+          // foglio dal basso, senza piede: il fondo e' il foglio
+          senzaPiede(){ const c = scena({chi: [100, 476], campo: [460, 500]});
+            tastiera(812, 476, 0); return c.scrollTop; },
+          // un campo DENTRO il piede non si misura contro il piede
+          nelPiede(){ const c = scena({pieno: 1, chi: [56, 476], piede: [399, 476], campo: [410, 445], campoNelPiede: 1});
+            tastiera(812, 476, 0); return c.scrollTop; },
+          // con la scala: i pixel dipinti si dividono
+          conZoom(){ ZOOM = '1.25'; const c = scena({pieno: 1, chi: [56, 476], piede: [399, 476], campo: [420, 455]});
+            tastiera(812, 476, 0); ZOOM = ''; return c.scrollTop; },
+          // lo scroll del viewport e' il dito di chi guarda altrove:
+          // aggiorna la geometria e NON riporta il campo
+          scrollNonTira(){ tastiera(812, 476, 0);
+            const c = scena({pieno: 1, chi: [56, 476], piede: [399, 476], campo: [420, 455]});
+            soffia('scroll'); return c.scrollTop; },
+          // il fuoco che passa a un altro campo, a tastiera gia' su
+          fuocoConTastiera(){ tastiera(812, 476, 0);
+            const c = scena({pieno: 1, chi: [56, 476], piede: [399, 476], campo: [420, 455]});
+            soffia('focusin'); return c.scrollTop; },
+          // ...e a tastiera giu' il fuoco non tira niente
+          fuocoSenzaTastiera(){ tastiera(812, 812, 0);
+            const c = scena({pieno: 1, chi: [56, 812], piede: [735, 812], campo: [780, 800]});
+            soffia('focusin'); return c.scrollTop; },
+          // la tastiera che SCENDE non riporta niente
+          scendeNonTira(){ tastiera(812, 476, 0);
+            const c = scena({pieno: 1, chi: [56, 812], piede: [735, 812], campo: [780, 800]});
+            tastiera(812, 812, 0); return c.scrollTop; },
+          // fuori da ogni foglio, o in un foglio CHIUSO: mani in tasca
+          fuoriFoglio(){ scena({fuoriFoglio: 1}); tastiera(812, 476, 0); return campoInVistaFoglio(); },
+          foglioChiuso(){ const c = scena({chiuso: 1, pieno: 1, chi: [56, 476], campo: [420, 455]});
+            tastiera(812, 476, 0); return c.scrollTop; },
+          // il fuoco sul FOGLIO stesso: non e' un campo da riportare
+          foglioStesso(){ const c = scena({stesso: 1, chi: [100, 476]});
+            tastiera(812, 476, 0); return c.scrollTop; },
+          // ---- LA PAGINA SOTTO ----
+          velo(){ const prima = CLASSI.has('foglio-su');
+            VELO.classi.add('open'); OCCHI.forEach(f => f());
+            const su = CLASSI.has('foglio-su');
+            VELO.classi.delete('open'); OCCHI.forEach(f => f());
+            return [prima, su, CLASSI.has('foglio-su'), OCCHI.length]; }
+        };
+        const out = {};
+        for (const k of Object.keys(CASI)) {
+          SCENA = null;
+          try { out[k] = CASI[k](); } catch (e) { out[k] = 'ESPLOSO: ' + e.message; }
+        }
+        console.log(JSON.stringify(out));
+        """)
+    _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8")
+    _f.write(_banco)
+    _f.close()
+    _r = _sp.run([_node, _f.name], capture_output=True, text=True,
+                 timeout=60, encoding="utf-8")
+    os.unlink(_f.name)
+    try:
+        _v = _js.loads((_r.stdout or "").strip())
+    except Exception:
+        _v = None
+    prova("il banco della tastiera gira", True, _v is not None
+          or "node ha detto: %s" % (_r.stderr or "")[:300])
+    _v = _v or {}
+    # [--tastiera, --vv-su, --vv-alto, con-tastiera]
+    prova("a riposo: nessuna variabile, valgono i ripieghi del CSS",
+          ["0px", None, None, False], _v.get("riposo"))
+    prova("tastiera su, finestra ferma: il foglio e' 0..476",
+          ["336px", "0px", "476px", True], _v.get("ferma"))
+    prova("finestra scorsa di 150: il foglio la SEGUE (150..626)",
+          ["186px", "150px", "476px", True], _v.get("scorsa"))
+    prova("scorsa fino in fondo: `coperto` fa zero e la tastiera E' SU",
+          ["0px", "336px", "476px", True], _v.get("inFondo"))
+    prova("l'elastico sotto zero non alza il foglio",
+          "0px", (_v.get("elastico") or [None, None])[1])
+    prova("la barra che respira (52px) non e' una tastiera",
+          ["0px", None, None, False], _v.get("barra"))
+    prova("la tastiera scende: le variabili si TOLGONO, non restano a zero",
+          ["0px", None, None, False], _v.get("scende"))
+    prova("con la scala a 1,25 le tre misure si dividono",
+          ["169.6px", "80px", "400px", True], _v.get("zoom"))
+    prova("lo scroll del viewport aggiorna la geometria",
+          ["246px", "90px", "476px", True], _v.get("scrollGeometria"))
+    # il campo: scrollTop parte da 100
+    prova("campo sotto il piede: sale di quanto basta piu' l'aria (455-387)",
+          168, _v.get("sottoIlPiede"))
+    prova("campo gia' a vista: non si muove niente", 100, _v.get("giaInVista"))
+    prova("campo finito sopra: scende (30-68)", 62, _v.get("sopra"))
+    prova("foglio dal basso, senza piede: il fondo e' il foglio (500-464)",
+          136, _v.get("senzaPiede"))
+    prova("un campo DENTRO il piede non si misura contro il piede",
+          100, _v.get("nelPiede"))
+    prova("con la scala i pixel dipinti si dividono (68/1,25)",
+          154.4, _v.get("conZoom"))
+    prova("lo scroll del viewport NON riporta il campo (e' il dito di "
+          "chi guarda altrove)", 100, _v.get("scrollNonTira"))
+    prova("il fuoco che cambia campo a tastiera su lo riporta",
+          168, _v.get("fuocoConTastiera"))
+    prova("...a tastiera giu' no", 100, _v.get("fuocoSenzaTastiera"))
+    prova("la tastiera che scende non riporta niente", 100,
+          _v.get("scendeNonTira"))
+    prova("fuori da ogni foglio: mani in tasca", 0, _v.get("fuoriFoglio"))
+    prova("in un foglio CHIUSO: mani in tasca", 100, _v.get("foglioChiuso"))
+    prova("il fuoco sul foglio stesso non lo fa scorrere da solo", 100,
+          _v.get("foglioStesso"))
+    prova("il velo acceso ferma la pagina, spento la libera (un occhio solo)",
+          [False, True, False, 1], _v.get("velo"))
+
+
 def prove_reputazione_nostr():
     """NIP-85 (set 2026): il livello/XP/affari del mercatino come kind
     30382 (Trusted Assertion), firmato dalla PIATTAFORMA — mai
@@ -67280,6 +67560,7 @@ def main():
               prove_font,
               prove_porta_timer, prove_feedback_confermato,
               prove_recensione_p2p,
+              prove_foglio_tastiera_iphone,
               prove_servizi,
               prove_sintassi_client,
               prove_banner_negozio, prove_slug_negozio, prove_link_descrizione,
