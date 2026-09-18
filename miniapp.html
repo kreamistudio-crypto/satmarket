@@ -44469,7 +44469,7 @@ function renderNuovoOrdineP2P(){
   const premio = p2pNuovoFisso ? '' : sezioneNuovoP2P({
     ico: '', titolo: 'Premio (%)', info: 'spiegaPremioP2P()',
     corpo: '<div class="p2p-premio">' +
-      '<div class="p2p-premio-val">' + premioValP2P() + '</div>' +
+      '<div class="p2p-premio-val" id="p2pNuovoPremioBox">' + premioValP2P() + '</div>' +
       '<input type="range" id="p2pNuovoPremioCursore" min="-' + P2P_PREMIO_MAX + '" ' +
         'max="' + P2P_PREMIO_MAX + '" step="1" value="' + p2pNuovoPremio + '" ' +
         'style="' + stilePremioP2P(p2pNuovoPremio, p2pLato) + '" ' +
@@ -44752,9 +44752,16 @@ function cambiaPremioP2P(v, da){
      resta su — quindi un `document.activeElement` direbbe «sta
      scrivendo» proprio nel caso da curare. Il campo si riscrive quando
      a muovere e' un ALTRO; quando e' lui resta com'e', che riscriverlo
-     sotto le dita porterebbe via il cursore (la lezione qui sotto). */
+     sotto le dita porterebbe via il cursore (la lezione qui sotto).
+     ⚠️ E DAL SECONDO GIRO (18 set 2026) CHI MUOVE DA FUORI LO CHIUDE:
+     il numero seguiva, ma restava dentro il campo bianco — senza il
+     colore del giudizio, senza la matita — finche' non si toccava
+     «Fatto». Chi e' passato al cursore ha finito di scrivere: torna la
+     pillola, e da li' in poi e' come se il campo non si fosse mai
+     aperto. La riscrittura del campo resta come CINTURA: se la
+     chiusura non riesce, il numero almeno non mente. */
   const mano = el('p2pNuovoPremioMano');
-  if (mano && da !== mano) mano.value = String(p2pNuovoPremio);
+  if (mano && da !== mano && !chiudiPremioManoP2P()) mano.value = String(p2pNuovoPremio);
   const cur = el('p2pNuovoPremioCursore');
   if (cur && String(cur.value) !== String(p2pNuovoPremio)) cur.value = String(p2pNuovoPremio);
   if (cur) {
@@ -44845,7 +44852,7 @@ function svelaSecondoImportoP2P(){
    una parola che dice gia' tutto e' rumore, e su un fondo chiaro
    quella matita era la cosa piu' scura della sezione. */
 function premioModP2P(){
-  return '<button type="button" class="p2p-premio-mod" onclick="scriviPremioP2P()">' +
+  return '<button type="button" class="p2p-premio-mod" id="p2pNuovoPremioMod" onclick="scriviPremioP2P()">' +
     (p2pNuovoPremioMano ? 'Fatto' : 'Modifica') + '</button>';
 }
 /* LA PILLOLA SI TOCCA (ritocco di Andrea): prima a scrivere il premio
@@ -44876,6 +44883,29 @@ function premioValP2P(){
     '<span class="p2p-premio-matita" aria-hidden="true">' +
       '<svg viewBox="2 2 20 20"><path d="M15.2 3.6l5.2 5.2L9.6 19.6l-6 .8.8-6z"/>' +
       '<path d="M13.4 5.4l5.2 5.2"/></svg></span></button>';
+}
+/* IL CURSORE CHIUDE IL CAMPO, E NON RIDISEGNA IL FOGLIO: un
+   `renderNuovoOrdineP2P()` qui rifarebbe anche il CURSORE, cioe'
+   toglierebbe da sotto il dito il nodo che si sta trascinando — la
+   corsa si fermerebbe al primo passo. Si scambiano solo il riquadro
+   della pillola e la parola del bottone, e a scriverli sono LE STESSE
+   due funzioni del render (`premioValP2P`, `premioModP2P`): la pillola
+   che torna e' quella di prima per costruzione, non per somiglianza.
+   ⚠️ IL `blur()` E' UNA PULIZIA, NON UN GIUDICE: su iOS il fuoco resta
+   sul campo mentre si trascina, e certe WebView tengono su la tastiera
+   se il campo col fuoco sparisce senza averlo lasciato. A decidere che
+   si chiude resta chi ha mosso (`da`, in `cambiaPremioP2P`).
+   Torna `true` se ha chiuso: chi la chiama sa se deve ripiegare. */
+function chiudiPremioManoP2P(){
+  const box = el('p2pNuovoPremioBox');
+  if (!p2pNuovoPremioMano || !box) return false;
+  const mano = el('p2pNuovoPremioMano');
+  if (mano) { try { mano.blur(); } catch(e){} }
+  p2pNuovoPremioMano = false;
+  box.innerHTML = premioValP2P();
+  const mod = el('p2pNuovoPremioMod');
+  if (mod) mod.outerHTML = premioModP2P();
+  return true;
 }
 function scriviPremioP2P(){
   haptic();
