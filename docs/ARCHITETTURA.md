@@ -16790,9 +16790,10 @@
   ignoto = 400 — l'unico punto in cui il cantiere si stacca dal
   "sconosciuto -> vuoto"), `_zona_ordine(a, paese)`,
   `_zone_annuncio` (parse difensivo: JSON storto = mappa vuota),
-  `_zona_offerta` (la porta: sul domestico ha il RIPIEGO della mappa
-  vuota, per i client e gli importatori che le zone non le
-  conoscono), `_tariffa_dichiarata(a, via, zona)`, `frase_zona` (come
+  `_zona_offerta` (la porta: per i CONTINENTI decide la presenza
+  della chiave; la CASA dal 18 set 2026 e' sempre aperta, salvo la
+  spunta — vedi qui sotto «CASA VUOTA VUOL DIRE GRATIS»),
+  `_tariffa_dichiarata(a, via, zona)`, `frase_zona` (come
   si NOMINA, in un posto solo: ricevuta, ordine, CSV, disputa),
   `zone_json` (come va in colonna), `guardia_almeno_una_zona`.
   Sull'ordine: `zona_sped`, `paese_sped`, `domestico_sped` —
@@ -16828,6 +16829,33 @@
   `_strade_preventivo` emette con quelli che il giudice conosce, e
   un'altra conta chi legge i due flag a mano. Vedi Cantieri, «Il
   foglio di acquisto che diceva NaN».
+  CASA VUOTA VUOL DIRE GRATIS (18 set 2026, decisione di Andrea che
+  ROVESCIA il 17). Per il paese di casa la regola della presenza NON
+  vale piu': vuoto o zero = gratis, e la mappa per la casa non si
+  guarda proprio. A chiuderla e' solo `annunci.non_spedisce_casa`
+  (INTEGER, default 0), la spunta esplicita «Non spedisco in <paese>»,
+  che nasce da un gesto e mai da un vuoto. Giudici:
+  `non_spedisce_casa_da_payload(d, consegna)` (assente = 0; lo
+  chiamano il giudice dei campi e le due porte umane, stessa lettura),
+  `consegna_da_payload` (`dom` entra nella mappa SEMPRE, salvo la
+  spunta, che azzera anche le colonne di casa),
+  `guardia_almeno_una_zona(consegna, zone, no_casa)` (ha cambiato
+  bersaglio: alza solo su «non spedisco a casa» senza un continente),
+  `_non_spedisce_casa(a)` (tollerante sulla colonna che manca) e
+  `_zona_offerta(a, 'dom')`, che e' la sola lettura. NESSUN TRAVASO: i
+  dati di ieri restano come sono, e una mappa senza `dom` si legge
+  «casa aperta» alla tariffa delle colonne, cioe' zero. Per i
+  CONTINENTI la presenza resta la dichiarazione, e una chiave estera
+  arrivata con un valore vuoto non diventa uno zero. L'ASTA con
+  spedizione nasce sempre `{"dom": 0}` senza spunta. In vetrina la
+  colonna viaggia in `CAMPI_VETRINA`; «Spedizione gratuita» chiede la
+  strada di casa VIVA in tutti e tre i posti che lo dicono:
+  `spedGratis` e `spedGratisQui` nel client (via `zonaOfferta(l,
+  'dom')`) e `_where_sped_gratis` nel filtro SQL. Nel form la spunta
+  sta FUORI dal cassetto internazionale, compare solo con un
+  continente pieno e sparendo si spegne; il segnaposto della casella
+  di casa lo scrive il solo `aggiornaSpedHint`. Vedi Cantieri, «Casa
+  vuota vuol dire gratis».
 
   IL SUPPLEMENTO PER PEZZO (ago 2026, caso dal campo: il riso da 4 kg
   venduto a sacchi con la spedizione di UNO solo dichiarata — chi ne

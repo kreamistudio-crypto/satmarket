@@ -21162,3 +21162,155 @@ compare a circuito caldo, il POST si perde per un'altra ragione e va
 letta quella riga del nodo. Il `router.conf` nuovo sulla macchina del
 relay. E le cinque colonne morte di `chiavi_p2p`: non danno fastidio, e
 il giorno che la tabella si rifacesse per un altro motivo se ne vanno.
+
+## Casa vuota vuol dire gratis: la regola del 17 rovesciata, e la spunta che la sostituisce (18 set 2026)
+
+**LA DECISIONE** (Andrea, 18 set sera), e ROVESCIA quella del 17: nel
+modulo di vendita la casella del costo per il PAESE DI CASA lasciata
+vuota, o a 0, vuol dire «spedizione gratuita nel paese di casa», MAI
+«lì non spedisco». Chi davvero non spedisce nel proprio paese lo
+dichiara con una spunta esplicita — «Non spedisco in <paese>», spenta
+di serie — che compare solo se ha compilato almeno una zona estera.
+
+**PERCHÉ SI ROVESCIA, e va detto perché il 17 aveva le sue ragioni.**
+Il 17 la casa seguiva la regola dei continenti: LA PRESENZA DELLA
+CHIAVE È LA DICHIARAZIONE, «il venditore che svuota il domestico e
+riempie l'Europa ottiene quel che ha chiesto». Era coerente, e in un
+giorno ha mostrato che a casa l'errore costa nel VERSO OPPOSTO che
+fuori. Una casella estera saltata per sbaglio chiude una porta che
+quasi nessuno userebbe; la casella di CASA saltata chiude il mercato
+intero — e chi la salta non se ne accorge mai, perché un annuncio che
+non vende non avvisa. Il caso vero è il 434 (Mister G, il Motorola da
+234 €): sette continenti a 0 e nessuna casa, cioè un venditore che
+voleva dire «gratis ovunque» e a casa — dove lo «0» grigio del
+segnaposto sembrava già scritto — non ha digitato niente. La cura di
+stamattina (segnaposto «non spedisco» e un avviso) spiegava la regola
+invece di cambiarla, e ne resta solo il foglio di acquisto: questa la
+cambia. **Il verso giusto in cui sbagliare:** chi si ritrova a spedire
+gratis un pacco che non voleva spedire se ne accorge al primo ordine e
+ha la spunta; chi non vende perché l'Italia è chiusa non lo saprà mai.
+
+**COME È FATTO.** Una colonna, `annunci.non_spedisce_casa` (default
+0), e UNA lettura cambiata: `_zona_offerta(a, 'dom')` non guarda più la
+mappa — risponde «aperta» salvo la spunta. La tariffa di casa resta
+nelle colonne di sempre, e su una mappa senza `dom` sono a zero: gratis.
+**NESSUN TRAVASO, ed è la parte che conta:** i dati restano come sono,
+il 434 e gli altri della lista tornano comprabili dall'Italia senza che
+nessun venditore tocchi niente, e non c'è nessun UPDATE da sbagliare il
+minuto del deploy (la lezione del travaso del 17, che `dom` se l'era
+dimenticata). Al primo salvataggio l'annuncio si raddrizza da solo: il
+giudice dei campi adesso `dom` la scrive SEMPRE, salvo la spunta — che
+azzera anche le due colonne di casa, perché un costo rimasto scritto
+accanto a «non spedisco» non lo paga nessuno e in vetrina si leggerebbe.
+PER I CONTINENTI NON CAMBIA NIENTE: lì il vuoto resta una porta chiusa,
+ed è giusto.
+La guardia `guardia_almeno_una_zona` ha CAMBIATO BERSAGLIO tenendo il
+nome: «spedisco e in nessuna zona» col 17 si otteneva lasciando tutto
+vuoto; adesso una zona c'è sempre (la casa), e l'unico modo di non
+averne è la spunta senza un continente. Il form quel caso non lo
+produce (la riga nascosta si spegne, e il payload ha la sua cintura): il
+400 è per chi il form non lo usa.
+La chiave `non_spedisco_casa` ASSENTE vale 0. È la decisione, non una
+tolleranza: il vuoto non chiude mai la casa, e i client di ieri
+restano aperti — gratis, se la casella era vuota.
+
+**IL PUNTO 5 DEL GIRO: IL MODULO NON SCRIVE 0 PER LE ZONE ESTERE
+VUOTE.** Verificato in tre modi, perché i sette zeri del 434 lo
+facevano sospettare: nel codice (`if (v === '') return;` — la chiave
+non parte), nel banco node (casa e continenti vuoti → `spedizione_zone:
+{}`), e dal vivo (sette caselle vuote, payload senza zone). Il modulo
+lo zero lo CONSERVA se c'era (la modifica ritrova «0» e lo rimanda),
+non lo inventa. Quindi i sette zeri o sono stati digitati, o vengono
+dal TRAVASO del 17 — che per decisione di allora copiava il costo di
+casa (qui zero) su tutti i continenti: lo dicono `creato` e
+`modificato` della riga, e la query sta nel report. In nessuno dei due
+casi è un difetto del modulo. **Una cintura in più, lato server:** una
+chiave estera arrivata con un VALORE vuoto (`{"asia": {"sats": ""}}`)
+diventava 0 in `_leggi_costo`, cioè «gratis in Asia» da una casella mai
+scritta. Il nostro form non la manda; adesso, se arrivasse da altrove,
+si butta.
+
+**LE SUPERFICI.** Il modulo: segnaposto «0 = gratis» (lo «0» nudo resta
+vietato: era la trappola), il testo d'aiuto dice le due regole in due
+frasi, la spunta sta FUORI dal cassetto internazionale — chiuso,
+nasconderebbe una porta sbarrata — e accesa svuota e spegne la casella
+di casa. Il segnaposto lo scrive un posto solo (`aggiornaSpedHint`):
+prima erano due, e si sarebbero pestati. Il foglio di acquisto non ha
+avuto bisogno di niente: con `dom` aperta a zero le strade arrivano
+vive, e banner e conto tornano coerenti da soli (`stradaViva` di
+stamattina resta, per la spunta e per i continenti). «Spedizione
+gratuita» chiede la strada di casa VIVA nei tre posti che lo dicono —
+`spedGratis`, `spedGratisQui` e il filtro SQL, dove la condizione sta
+sulla STRADA e non sulla sola gratuità dichiarata, o il ramo della
+soglia del negozio avrebbe pescato la casa chiusa. L'asta con
+spedizione nasce sempre `{"dom": 0}` senza spunta, qualunque payload
+arrivi: il vincitore dal foglio non passa, e una tariffa estera lì
+sarebbe una promessa che nessun conto legge.
+
+**LE STRADE SCARTATE.** Un travaso che aggiunge `dom` alle mappe che
+non ce l'hanno: inutile (la lettura basta) e rischioso. CONSERVARE la
+spunta quando un client vecchio in cache salva senza la chiave: la
+spunta nasce oggi, nessun annuncio la porta al deploy, e conservarla
+avrebbe aperto il caso «spunta conservata + estero svuotato», cioè il
+400 a chi non ha fatto niente. La spunta DENTRO il cassetto
+internazionale, più vicina alle caselle che la fanno comparire: un
+cassetto chiuso col conto «· 1 zona» non direbbe che la casa è chiusa.
+E normalizzare a 0 la spunta senza estero invece di rispondere 400:
+direbbe «spedisco gratis a casa» a chi ha appena detto il contrario.
+
+**LE PROVE.** Famiglia nuova `prove_casa_vuota_gratis` (51): la spunta
+dal payload valore per valore, il giudice dei campi FATTO GIRARE
+(casa assente, vuota, con la spunta, la zona estera dal valore vuoto),
+la colonna che nasce a 0 e che nessun UPDATE tocca, le due porte, e
+due banchi node — la porta di casa sul 434 COM'È SALVATO, e il modulo
+con la spunta in cinque stati più la cintura del payload e l'asta
+spuntata. **RISCRITTE SUL PUNTO, non ammorbidite**, le prove che
+codificavano la regola vecchia: del 17 «chi dichiara solo l'Europa NON
+spedisce a casa» (ora spedisce) e la guardia «senza nessuna zona: 400»
+(ora passa, è casa gratis); del 18 mattina il segnaposto «non
+spedisco», «la casa VUOTA resta non dichiarata» e l'avviso «lì NON
+spedisci», che è sparito col suo banco. Il banco dei filtri SQL ha la
+colonna e il caso seminato in fondo (tariffa a zero PER FORZA, prezzo
+sopra soglia: gratis per tutti e due i rami, se da casa si comprasse).
+**LA TORTURA:** 31 mutazioni (14 sul server, 17 sul client), 31 uccise al primo giro — e UNA per la ragione sbagliata, che e' la parte da tenere: «la card torna a chiedere spedisce(l)» moriva con otto rosse perche' il banco node ESPLODEVA (nel programma `spedisce` non c'era), non perche' rispondesse il falso. Col pezzo vero nel banco muore con UNA rossa, quella giusta («la card NON dice gratuita»). Da leggere anche: la colonna in vetrina, le due scritture in colonna, il default della migrazione, le due righe dell'asta, il verdetto della soglia e il reset del form muoiono per sentinelle di TESTO e non per un banco che gira — le ha viste girare il giro dal vivo.
+Suite intera: 11.876 verdi, 0 rosse, sull'albero REBASATO sulla patch 0007 arrivata a meta' cantiere (11.818 prima del rebase; la sonda delle righe tolte diceva 152 prima e 152 dopo, cioe' solo le mie).
+
+**IL GIRO DAL VIVO** (collaudo, porta 8138, copia del database
+locale). Un annuncio riscritto a mano nella forma del 434 — sette
+continenti a 0, nessuna `dom`, 234 €: il preventivo da IT e da SM dà
+casa e punto VIVE a zero, da FR e JP la casa a zero; aperto il foglio
+dal bottone vero, «✅ Spedizione gratis», Spedizione «gratuita»,
+totale 210,60 €, «Paga» acceso, nessun NaN. Il modulo: segnaposto
+«0 = gratis», casa vuota → `spedizione_sats: 0` e NESSUNA zona estera
+nel payload; scritto 9000 in Europa compare «Non spedisco in Italia»
+spenta; accesa, la casella di casa si svuota e si spegne, il testo
+dice dove si compra, il payload porta la spunta e nessun costo di
+casa. Pubblicato quel payload: dall'Italia casa e punto chiuse con la
+frase di stamattina e il menu del paese raggiungibile, dalla Francia
+9000 sats; la card dice «Spedizione disponibile» (il 434 e lo zero
+dichiarato «gratuita»), il filtro «Spedizione gratis» lo salta. La
+spunta senza estero: 400 con la frase. La zona estera dal valore
+vuoto: non entra nella mappa, lo «0» scritto sì. La MODIFICA dai
+bottoni veri: l'annuncio con la spunta la ritrova e la conserva al
+salvataggio; il «434» si apre con casa «0» e i sette «0», e salvato
+senza toccare niente si raddrizza (`dom` + i sette zeri, spunta 0).
+L'asta con un payload ostile (spunta + Europa): nasce `{"dom": 0}`,
+spunta 0.
+NON PROVATO dal vivo: un acquisto fino alla fattura (il collaudo
+locale ha LNbits VERO: mi sono fermato al preventivo, che esce dalla
+stessa pura di `compra()`), il carrello con dentro un annuncio dalla
+spunta accesa, il telefono, un client vecchio in cache contro il
+server nuovo (il caso è coperto dal giudice dei campi a chiave
+assente), e il deploy vero sul database di produzione — l'ALTER è
+nato e rinato solo sulla copia locale.
+
+**RESTA DA GUARDARE.** Dopo il deploy, la query di sola lettura del
+report: gli annunci senza `dom` devono avere `non_spedisce_casa = 0`,
+e il 434 si deve poter comprare dall'app. Le date del 434 (`creato`,
+`modificato`) dicono se i sette zeri sono del travaso o della mano di
+chi vende. E due cose viste passando e NON toccate: il NIP-99 e il
+post del canale dicono «spedizione gratuita» guardando le sole colonne
+di casa, quindi per un annuncio con la spunta direbbero il falso —
+oggi non ce n'è nessuno, e il giorno del primo vanno messi in pari; e
+il commento del travaso del 17 in `init_db` racconta ancora il ripiego
+della mappa vuota, che è storia e non più la regola.
