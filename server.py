@@ -3830,7 +3830,18 @@ def init_db():
         -- sono della PERSONA: si scrivono su tutte le sue chiavi e si
         -- leggono col MAX. Vedi «IL GATE RIMANDA E ACCORPA».
         coperto INTEGER DEFAULT 0,
-        rimandato INTEGER DEFAULT 0
+        rimandato INTEGER DEFAULT 0,
+        -- L'ECO DEL PROPRIO GESTO (18 set 2026, terzo giro): `gesto` e'
+        -- QUANDO la persona ha fatto un gesto con QUESTA chiave (lo
+        -- dice il suo client, un attimo prima di parlare al
+        -- coordinatore), `eco_fino` fin quando la prima busta che
+        -- torna a questa chiave e' la risposta a quel gesto, e non
+        -- suona. Sono della CHIAVE e non della persona, al contrario
+        -- delle tre qui sopra: l'eco e' di UNO scambio, e le buste
+        -- degli altri scambi della stessa persona suonano come sempre.
+        -- Due orari: nemmeno qui c'e' un posto per un segreto.
+        gesto INTEGER DEFAULT 0,
+        eco_fino INTEGER DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_chiavi_p2p_tg ON chiavi_p2p(tg_id);
     CREATE TABLE IF NOT EXISTS p2p_ordini(
@@ -3882,7 +3893,18 @@ def init_db():
         lato TEXT DEFAULT '',
         maker INTEGER DEFAULT 0,
         visto INTEGER DEFAULT 0,
-        preso_da INTEGER DEFAULT 0
+        preso_da INTEGER DEFAULT 0,
+        -- «DOVE RICEVERE GLI EURO» (18 set 2026, terzo giro): `euro` e'
+        -- la cifra del libro gia' scritta come si legge («10,00 €»,
+        -- pubblica: e' il tag `fa` del 38383), per dirla nell'avviso a
+        -- chi compra; `recapito_avviso` quando quell'avviso e' partito
+        -- l'ultima volta e `recapito_n` quante volte, che sono il suo
+        -- freno. Il RECAPITO qui non entra e non ha una colonna dove
+        -- finire: viaggia cifrato fra i due telefoni, e il server sa
+        -- solo che e' partito — perche' glielo dice chi l'ha mandato.
+        euro TEXT DEFAULT '',
+        recapito_avviso INTEGER DEFAULT 0,
+        recapito_n INTEGER DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_p2p_ordini_tg ON p2p_ordini(tg_id);
     CREATE TABLE IF NOT EXISTS p2p_indice(
@@ -4938,14 +4960,19 @@ def init_db():
     # ce l'avevano gia' (il calco del giro di `pagamenti` qui sotto).
     for colonna in ("stato TEXT DEFAULT ''", "lato TEXT DEFAULT ''",
                     "maker INTEGER DEFAULT 0", "visto INTEGER DEFAULT 0",
-                    "preso_da INTEGER DEFAULT 0"):
+                    "preso_da INTEGER DEFAULT 0",
+                    "euro TEXT DEFAULT ''",
+                    "recapito_avviso INTEGER DEFAULT 0",
+                    "recapito_n INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE p2p_ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
             pass
     # ...e le due del gate che rimanda su chiavi_p2p (18 set 2026), per i
     # database che la tabella ce l'avevano gia'
-    for colonna in ("coperto INTEGER DEFAULT 0", "rimandato INTEGER DEFAULT 0"):
+    # ...e le due dell'eco del proprio gesto (18 set 2026, terzo giro)
+    for colonna in ("coperto INTEGER DEFAULT 0", "rimandato INTEGER DEFAULT 0",
+                    "gesto INTEGER DEFAULT 0", "eco_fino INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE chiavi_p2p ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -35077,6 +35104,194 @@ def conta_chiavi_p2p(x_tg_init_data: str = Header(""),
     return {"ok": True, **esito}
 
 
+def _segna_gesto_p2p(con, tg_id: int, pubkey, lunga: bool, adesso: int) -> bool:
+    """«Sto facendo un gesto con questa chiave»: timbra la riga, e dice
+    se l'ha trovata. Puro sulla connessione (il patto di
+    `_registra_chiavi_p2p`).
+    LA CHIAVE DEV'ESSERE SUA: il `tg_id` sta nella WHERE, e chi manda la
+    chiave di un altro non zittisce il campanello di nessuno — la riga
+    non si trova e basta. Zittire il PROPRIO si puo', ed e' il mestiere
+    della rotta: a rimetterci e' solo chi lo fa.
+    `lunga` e' la finestra della garanzia pagata a mano (vedi
+    `P2P_ECO_PAGA_S`). Un gesto nuovo riscrive il timbro di prima."""
+    if not isinstance(pubkey, str) or not re.fullmatch(r"[0-9a-f]{64}", pubkey):
+        raise ValueError("Chiave non valida")
+    fino = int(adesso) + (P2P_ECO_PAGA_S if lunga else P2P_ECO_S)
+    n = con.execute("UPDATE chiavi_p2p SET gesto=?, eco_fino=? "
+                    "WHERE pubkey=? AND tg_id=?",
+                    (int(adesso), fino, pubkey, tg_id)).rowcount
+    con.commit()
+    return n > 0
+
+
+@app.post("/api/p2p/gesto")
+async def gesto_p2p(req: Request, x_tg_init_data: str = Header(""),
+                    barattolo_sessione: str = Cookie("")):
+    """Il client, un attimo prima di parlare al coordinatore: la busta
+    di risposta e' un'eco, e non deve suonare a chi ha l'app in mano.
+    COSA IMPARA IL SERVER: che questo account ha fatto UN gesto, adesso,
+    con una chiave che sapeva gia' sua. Non quale gesto, non su quale
+    ordine — e nel corpo non c'e' la sintassi per dirlo.
+    Fail-open dal lato del client: se questa chiamata non arriva, il
+    gesto parte lo stesso e l'eco suona, com'era ieri."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not _p2p_per(user["id"])["attivo"]:
+        raise HTTPException(409, "Lo scambio P2P non e' attivo")
+    try:
+        d = await req.json()
+    except Exception:
+        raise HTTPException(400, "Richiesta illeggibile")
+    con = db()
+    try:
+        trovata = _segna_gesto_p2p(con, user["id"], (d or {}).get("pubkey"),
+                                   bool((d or {}).get("lunga")),
+                                   int(time.time()))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    finally:
+        con.close()
+    return {"ok": trovata}
+
+
+# ═══ «DOVE RICEVERE GLI EURO» E' UN PASSO DELLO SCAMBIO (18 set 2026,
+# terzo giro, dalla prova dal vivo: chi vende indicava dove ricevere
+# gli euro e a chi comprava non arrivava NIENTE) ═══
+# Quel passo e' nostro e non del coordinatore: il recapito viaggia
+# cifrato fra i due telefoni, firmato da una chiave che il server non
+# conosce (e non deve: vedi «E LA CHAT FRA LE DUE PARTI NON SUONA»). Il
+# server quindi non lo VEDE partire — glielo dice il telefono di chi
+# l'ha mandato, col solo id dell'ordine, e lui avvisa l'altra parte,
+# che conosce gia' da `p2p_ordini`. Il recapito di qui non passa.
+# ⚠️ E' UN FATTO DICHIARATO DA UNA PARTE, e il verbale del secondo giro
+# aveva scartato proprio quella strada («far dichiarare il momento al
+# client»: la regola 5 rovesciata). Questa non la riapre, e la
+# differenza va scritta:
+# • chi vende dichiara un gesto SUO («ti ho detto dove mandarli»), non
+#   un fatto sui sats: la frase NON dice che la garanzia e' bloccata;
+# • la frase non porta il recapito, quindi per pagare bisogna APRIRE lo
+#   scambio — e li' lo stato lo dice il coordinatore, non chi vende: a
+#   garanzia non bloccata il bottone «Ho inviato gli euro» non esiste,
+#   e sopra il recapito c'e' scritto di non mandare niente;
+# • e la frase stessa lo ripete: «invia solo se la pagina dice che i
+#   sats sono in garanzia».
+# Il client onesto la manda solo a scambio ATTIVO (dal suo lato la
+# garanzia e' bloccata e la fattura c'e'): e' li' che «tocca a te» e'
+# vero. Il server non lo puo' verificare, e per questo la frase non lo
+# afferma.
+# IL FRENO: al piu' `P2P_RECAPITO_MAX` avvisi per ordine (il primo, e
+# due correzioni), mai piu' fitti di `P2P_RECAPITO_PAUSA_S`.
+# SALTA IL GATE del campanello e non lo timbra: non e' una busta del
+# coordinatore, e' un «tocca a te» preciso — l'interruttore degli
+# avvisi invece lo rispetta, come tutto il resto.
+P2P_RECAPITO_MAX = 3
+P2P_RECAPITO_PAUSA_S = 60
+
+
+def _avviso_recapito_p2p(con, ordine, io: int, adesso: int) -> tuple:
+    """Chi vende ha mandato dove ricevere gli euro: a chi dirlo, e con
+    che frase. Puro sulla connessione. Torna `(tg_id, testo)`, o
+    `(0, perche')` quando non parte niente — e il perche' e' per il
+    journal, mai per chi chiama: alla rotta non si risponde «l'altra
+    parte ha gli avvisi spenti».
+    CHI CHIAMA DEV'ESSERE CHI VENDE su quell'ordine: su un `sell` chi
+    l'ha pubblicato, su un `buy` chi l'ha preso. E l'ordine dev'essere
+    PRESO sul libro: prima non c'e' nessuno a cui dirlo, dopo non c'e'
+    piu' niente da pagare.
+    IL TIMBRO PRIMA DELL'INVIO, il patto delle sorelle."""
+    pulite = _ordini_puliti_p2p([ordine] if isinstance(ordine, str) else ordine)
+    if len(pulite) != 1:
+        raise ValueError("Serve un ordine")
+    r = con.execute(
+        "SELECT ordine, tg_id, preso_da, stato, lato, euro, recapito_avviso, "
+        "recapito_n FROM p2p_ordini WHERE ordine=?", (pulite[0],)).fetchone()
+    if not r or not io:
+        return 0, "ordine sconosciuto"
+    maker, taker = int(r["tg_id"] or 0), int(r["preso_da"] or 0)
+    if io not in (maker, taker) or maker == taker:
+        return 0, "non e' una delle due parti"
+    if (r["stato"] or "") not in STATI_LIBRO_PRESO:
+        return 0, f"l'ordine sul libro e' «{r['stato'] or 'mai visto'}», non preso"
+    lato = r["lato"] or ""
+    vende = maker if lato == "sell" else (taker if lato == "buy" else 0)
+    if io != vende:
+        return 0, "non e' chi vende"
+    altro = taker if io == maker else maker
+    if altro <= 0:
+        return 0, "l'altra parte non e' annotata (entra da Nostr, o un altro client)"
+    n, ultimo = int(r["recapito_n"] or 0), int(r["recapito_avviso"] or 0)
+    if n >= P2P_RECAPITO_MAX:
+        return 0, f"gia' {n} avvisi su quest'ordine"
+    if adesso - ultimo < P2P_RECAPITO_PAUSA_S:
+        return 0, f"l'ultimo avviso e' di {adesso - ultimo}s fa"
+    if not _avvisi_p2p_accesi(con, altro):
+        return 0, f"{altro} ha gli avvisi P2P spenti"
+    con.execute("UPDATE p2p_ordini SET recapito_avviso=?, recapito_n=? "
+                "WHERE ordine=?", (adesso, n + 1, r["ordine"]))
+    con.commit()
+    # il nome di chi vende come lo vede l'altra parte nella pagina dello
+    # scambio: lo STESSO giudice («LE PARTI SI VEDONO»), cosi' la frase
+    # non dice mai un nome che la pagina non mostra
+    nome = ""
+    try:
+        nome = (_controparti_p2p(con, [r["ordine"]], altro, adesso)
+                .get(r["ordine"], {}).get("nome") or "")
+    except Exception as e:
+        print(f"⚠️ Recapito P2P: il nome di chi vende su {r['ordine'][:8]} "
+              f"non si legge ({type(e).__name__}): la frase parte senza",
+              flush=True)
+    chi = html.escape(str(nome)) if nome else "Chi ti vende i sats"
+    euro = html.escape(str(r["euro"] or ""))
+    # l'intervallo non ancora scelto («da 20,00 a 100,00 €») non e' una
+    # cifra da mandare: si tace
+    cifra = euro if euro and not euro.startswith("da ") else "gli euro"
+    verbo = "ha aggiornato" if n > 0 else "ti ha indicato"
+    return altro, (
+        f"💶 <b>{chi} {verbo} dove inviare {cifra}: tocca a te.</b>\n"
+        "Apri Barattolo → P2P → I miei scambi: il recapito è lì, cifrato "
+        "fra voi due.\n\n"
+        "<i>Invia solo se la pagina dello scambio dice «Sats in garanzia»: "
+        "lo dice il coordinatore, non chi vende.</i>")
+
+
+@app.post("/api/p2p/recapito")
+async def recapito_p2p(req: Request, x_tg_init_data: str = Header(""),
+                       barattolo_sessione: str = Cookie("")):
+    """«Ho mandato all'altra parte dove ricevere gli euro»: il server
+    avvisa chi compra. Nel corpo c'e' il solo id dell'ordine — il
+    recapito NON passa di qui, e non c'e' un campo dove metterlo.
+    LA RISPOSTA E' SEMPRE `{"ok": true}` quando la richiesta si legge:
+    se l'avviso e' partito, a chi, e perche' no lo dice il journal e
+    non la rotta — o chi chiama imparerebbe se l'altra parte ha gli
+    avvisi accesi."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not _p2p_per(user["id"])["attivo"]:
+        raise HTTPException(409, "Lo scambio P2P non e' attivo")
+    try:
+        d = await req.json()
+    except Exception:
+        raise HTTPException(400, "Richiesta illeggibile")
+    con = db()
+    try:
+        a_chi, testo = _avviso_recapito_p2p(con, (d or {}).get("ordine"),
+                                            user["id"], int(time.time()))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    finally:
+        con.close()
+    if not a_chi:
+        print(f"· Recapito P2P: da {user['id']}, nessun avviso ({testo})",
+              flush=True)
+        return {"ok": True}
+    try:
+        esito = await notifica(a_chi, testo)
+    except Exception as e:
+        esito = f"SALTATO ({type(e).__name__}: {e})"
+    print(f"💶 Recapito P2P: {user['id']} ha indicato dove ricevere gli "
+          f"euro, avvisato {a_chi}", flush=True)
+    _esiti_p2p_dice("💶", [(a_chi, esito)])
+    return {"ok": True}
+
+
 @app.post("/api/p2p/seme")
 def seme_profilo_p2p(x_tg_init_data: str = Header(""),
                      barattolo_sessione: str = Cookie("")):
@@ -35453,6 +35668,42 @@ P2P_NUDGE_VIVO_S = 90
 # dell'ultima frase precisa e' la sua GEMELLA, e non suona; una nata
 # dieci secondi dopo e' un altro passo, e si mette in coda.
 P2P_GEMELLI_S = 3
+# ═══ L'ECO DEL PROPRIO GESTO NON SUONA (18 set 2026, terzo giro, dalla
+# prova dal vivo: «novita' in un tuo scambio» a chi aveva APPENA
+# pubblicato, dato la fattura, detto «euro inviati») ═══
+# Meta' delle buste del coordinatore sono la RISPOSTA a chi ha appena
+# fatto un gesto: la persona ha l'app in mano e quel che e' successo lo
+# sa gia'. Il server i gesti NON li vede — dal telefono vanno dritti ai
+# relay, e il motore dello scambio non chiama mai casa — quindi glielo
+# dice il client, un attimo PRIMA di parlare al coordinatore: «sto
+# facendo un gesto con questa chiave» (`/api/p2p/gesto`: la chiave
+# pubblica, che il server ha gia', e nient'altro — ne' quale gesto, ne'
+# quale ordine).
+# LA PRIMA BUSTA nata dopo quel momento, entro la finestra, verso
+# QUELLA chiave e' l'eco: non suona, non va in coda, e CONSUMA il
+# timbro — la seconda suona. E' per chiave e non per persona apposta:
+# la busta dello stesso momento per L'ALTRA PARTE va a un'altra chiave
+# di un'altra persona e non passa nemmeno di qui, e un altro scambio
+# della stessa persona ha un'altra chiave.
+# TRENTA SECONDI, e il numero non e' una taratura: e' QUANTO IL CLIENT
+# ASPETTA la risposta (`P2P_ATTESA_MS` in miniapp.html, e una prova li
+# tiene uguali). Finche' lui aspetta, col velo alzato, la busta e'
+# un'eco; passati i trenta il client dice «la risposta sta tardando, se
+# arriva ti avvisiamo» — e da li' la risposta e' una NOTIZIA, che deve
+# suonare. Via Tor arriva di solito in 10-20 s. Una finestra piu' lunga
+# mangerebbe proprio l'avviso appena promesso; una piu' corta farebbe
+# suonare a chi sta ancora guardando il velo.
+# LA GARANZIA SI PAGA A MANO, in un altro wallet, e ci vogliono minuti:
+# li' il gesto e' «ho aperto la richiesta da pagare», e la finestra e'
+# di cinque minuti — un terzo dei 900 s che il coordinatore da' per
+# quel passo.
+# UNA BUSTA NATA PRIMA DEL GESTO, verso quella chiave, e' gia' VISTA:
+# per fare un gesto su uno scambio bisogna averlo davanti. Non suona e
+# il timbro non lo consuma (arriva solo quando l'ascolto e' giu' e il
+# giro al minuto la trova in ritardo).
+P2P_ECO_S = 30
+P2P_ECO_PAGA_S = 300
+P2P_ECO_SCARTO_S = 5     # gli orologi di due macchine non sono uno solo
 _P2P_CODA = {"scade": 0}   # quando scade la prima pausa con buste in coda: sveglia l'orologio
 # LA PRESA SUL LIBRO E' `in-progress`, E BASTA (corretto il 18 set
 # 2026, letto sul sorgente di mostrod 0.18.7 e visto sullo specchio).
@@ -36073,11 +36324,41 @@ def _nudge_p2p(con, pubkey: str, adesso: int, quando: int,
     Una pubkey che non e' di nessuno non fa suonare niente: puo'
     arrivare da un tag `p` di un evento indirizzato anche a un
     terzo."""
-    r = con.execute("SELECT tg_id FROM chiavi_p2p WHERE pubkey=?",
-                    (pubkey,)).fetchone()
+    r = con.execute("SELECT tg_id, gesto, eco_fino FROM chiavi_p2p "
+                    "WHERE pubkey=?", (pubkey,)).fetchone()
     if not r:
         return 0
     tg_id = r["tg_id"]
+    # L'ECO DEL PROPRIO GESTO (18 set 2026, terzo giro): prima di tutto
+    # il resto, perche' un'eco non deve ne' suonare ne' finire in coda
+    # ne' bruciare un turno del gate. E' della CHIAVE: la busta dello
+    # stesso istante per l'altra parte ha un'altra chiave, e suona.
+    gesto, eco_fino = int(r["gesto"] or 0), int(r["eco_fino"] or 0)
+    if gesto > 0:
+        # LA SOGLIA DEL GESTO LUNGO STA IN AVANTI, e non e' simmetria
+        # mancata: il foglio della garanzia si apre DA SOLO nell'istante
+        # in cui arriva la richiesta da pagare, quindi il suo timbro
+        # nasce un secondo DOPO quella busta — dentro lo scarto degli
+        # orologi. Trattata da eco, consumerebbe lei il timbro lungo, e
+        # la conferma del pagamento — l'eco vera, minuti dopo —
+        # suonerebbe. Nessuno paga una richiesta in meno di cinque
+        # secondi: fin li' e' roba gia' vista. Il gesto corto invece
+        # precede SEMPRE la sua eco, e li' lo scarto sta indietro.
+        lungo = eco_fino - gesto > P2P_ECO_S
+        soglia = gesto + P2P_ECO_SCARTO_S if lungo else gesto - P2P_ECO_SCARTO_S
+        if int(quando) < soglia:
+            print(f"· Campanello P2P: {tg_id}, busta nata "
+                  f"{gesto - int(quando)}s PRIMA del suo ultimo gesto su "
+                  "quello scambio: gia' vista", flush=True)
+            return 0
+        if int(quando) <= eco_fino:
+            # UNA SOLA: il timbro si consuma, la prossima suona
+            con.execute("UPDATE chiavi_p2p SET gesto=0, eco_fino=0 "
+                        "WHERE pubkey=?", (pubkey,))
+            print(f"· Campanello P2P: {tg_id}, ECO del suo gesto "
+                  f"({max(0, int(quando) - gesto)}s dopo): non suona",
+                  flush=True)
+            return 0
     # la stessa persona con due buste nella stessa passata: l'avviso che
     # parte per la prima dice «guarda i tuoi scambi», e le copre tutte
     if tg_id in suonati:
@@ -36924,8 +37205,10 @@ def _avvisi_libro_p2p(con, eventi: list, adesso: int, fee, ore: int) -> list:
             passaggio_taker = ""
         con.execute(
             "UPDATE p2p_ordini SET stato=?, lato=?, maker=?, visto=?, "
-            "preso_da=? WHERE ordine=?",
+            "euro=?, preso_da=? WHERE ordine=?",
             (dopo, ev.get("lato") or "", maker, int(ev.get("quando") or 0),
+             # la cifra del libro, per l'avviso del recapito (18 set 2026)
+             _euro_libro(ev.get("euro")),
              # un ordine in vetrina non ha un taker per definizione: la
              # presa si scollega a OGNI pending visto, anche se il giro
              # si fosse perso l'in-progress in mezzo — o la prossima

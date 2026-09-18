@@ -7613,7 +7613,7 @@ document.getElementById('cartello')?.remove();</script>
         <li><b>Qualcuno pubblica un ordine.</b> Dice se compra o vende sats, per quanti euro e con quali metodi di pagamento. L'ordine finisce nel <b>libro degli ordini</b>, che vedono tutti.</li>
         <li><b>Tu lo prendi.</b> Scegli con quale metodo vuoi pagare (o essere pagato) e l'ordine si riserva a te: da quel momento non lo può più prendere nessun altro.</li>
         <li><b>Chi vende blocca i sats.</b> Paga una richiesta particolare, che <b>trattiene</b> i sats invece di consegnarli: escono dal suo wallet ma non arrivano a nessuno. Da qui in poi sono <b>in garanzia</b>.</li>
-        <li><b>Chi compra manda gli euro.</b> Col metodo scelto, al recapito che l'altra persona gli lascia qui dentro. Poi lo dice qui.</li>
+        <li><b>Chi compra manda gli euro.</b> Col metodo scelto, al recapito che l'altra persona gli lascia qui dentro: finché non arriva il bottone resta spento, e appena arriva ti avvisiamo. Poi lo dice qui.</li>
         <li><b>Chi vende libera i sats.</b> Controlla di aver ricevuto gli euro e li libera: arrivano all'indirizzo Lightning indicato da chi compra all'inizio.</li>
       </ol>
 
@@ -7662,6 +7662,16 @@ document.getElementById('cartello')?.remove();</script>
         <li>Se il tempo scade <b>prima</b> che i sats siano bloccati, la richiesta di pagamento si annulla e <b>nessuno perde niente</b>. Se a mancare è stato chi ha <i>preso</i> l'ordine, l'ordine <b>torna nel libro</b> per qualcun altro; se è stato chi l'ha <i>pubblicato</i>, si chiude.</li>
         <li>Quando invece i sats sono <b>già in garanzia</b>, nessun timer li sblocca da solo. Restano lì finché uno dei due si muove, o finché decide un moderatore.</li>
       </ul>
+
+      <h3 id="p2pinfo-avvisi">Gli avvisi: cosa ti diciamo, e quando</h3>
+      <p>Ad app aperta la pagina dello scambio <b>si muove da sola</b>: la richiesta da pagare, il foglio dove indicare i sats e il passo dopo compaiono appena arrivano — via Tor ci vogliono di solito dieci-venti secondi. Ad app chiusa ti avvisiamo su Telegram o su Nostr, secondo le tue impostazioni.</p>
+      <ul class="sicu-lista">
+        <li><b>Con i numeri</b>, quando il fatto è pubblico: il tuo ordine è stato <b>preso</b> (e a chi tocca il primo passo), lo scambio è <b>concluso</b> (con quanto hai ricevuto o pagato, commissione compresa), è stato <b>annullato</b>, è <b>tornato nel libro</b> perché chi l'aveva preso non ha proseguito, oppure è <b>scaduto</b> senza che nessuno lo prendesse.</li>
+        <li><b>«Ti ha indicato dove inviare gli euro: tocca a te»</b>, quando chi vende ti lascia il recapito. Il recapito <b>non è nell'avviso</b>: lo leggi qui dentro, cifrato — e prima di pagare guarda che la pagina dica <b>«Sats in garanzia»</b>.</li>
+        <li><b>«Novità in un tuo scambio»</b>, senza dire quale, per i passi di mezzo — la garanzia da bloccare, i sats da indicare, gli euro inviati. Quei messaggi sono <b>cifrati</b> e li apre solo il tuo telefono: noi vediamo che ne è arrivato uno, non cosa dice.</li>
+        <li><b>Niente</b>, per la risposta a un gesto che hai <b>appena fatto tu</b>: l'hai già davanti.</li>
+      </ul>
+      <p class="sicu-nota">Gli avvisi si spengono tutti dal cassetto «🔔 Avvisi» del profilo. A scambio aperto conviene tenerli accesi: alcuni passi hanno un quarto d'ora di tempo.</p>
 
       <h3 id="p2pinfo-storto">Se qualcosa va storto</h3>
       <p>Prima di tutto: <b>dai tempo all'altra persona</b>. Quasi sempre è un bonifico che deve arrivare, o qualcuno che dorme.</p>
@@ -8134,6 +8144,7 @@ document.getElementById('cartello')?.remove();</script>
       <p><b>Negli altri casi</b> — un profilo nato nel browser prima che arrivasse quello del conto — il profilo <b>vive sul dispositivo</b> e non lo può ricavare nessuno. Dentro Telegram ne salviamo una copia nel <b>cloud del tuo account Telegram</b>, così sopravvive alla cache svuotata e ti segue fra telefono e computer: <b>chi ha il tuo account Telegram ce l'ha anche lui</b> — è già così per tutto Barattolo — e Telegram potrebbe leggerlo, che è il prezzo. Il <b>codice segreto</b> serve a portare il profilo <b>fuori da Barattolo</b>, in un altro programma che parla con lo stesso coordinatore.</p>
       <p>In tutti e tre i casi il server conosce la <b>parte pubblica</b> del profilo e le <b>chiavi usa-e-getta</b> di ogni scambio, per poterti avvisare quando c'è una novità, e da settembre 2026 anche <b>a che numero di scambio sei arrivato</b>: serve a non riusare due volte la stessa chiave usa-e-getta quando apri Barattolo da un dispositivo nuovo, ed è un dato che dai conti che teneva già si sarebbe comunque ricavato. Dal foglio qui sotto il <b>codice segreto</b> lo vedi e lo copi, e il profilo lo <b>dimentichi</b>; dimenticandolo si cancella anche la parte pubblica che il server teneva.</p>
       <p>Dal 16 settembre 2026 il server annota anche <b>quali ordini pubblichi e quali prendi</b>, per avvisarti con i numeri quando lo scambio si muove (preso, concluso, annullato, tornato in vetrina): sono i passaggi <b>pubblici</b> del libro, e la cifratura dei messaggi non si tocca. Chi entra <b>da Nostr</b> non viene annotato quando prende un ordine — sulle prese riceve l'avviso generico — perché quell'ingresso esiste per chi non vuole lasciare tracce. Dal <b>17 settembre 2026</b> però <b>può deciderlo lui</b>: nel cassetto «🔔 Avvisi» c'è «<b>Fatti riconoscere negli scambi</b>», spento di serie — accendendolo la presa viene annotata, chi ha pubblicato vede il suo profilo e le due parti possono <b>recensirsi</b>. Gli avvisi si spengono tutti dal cassetto «🔔 Avvisi» del profilo.</p>
+      <p>Dal <b>18 settembre 2026</b> il tuo telefono dice al server due cose in più, tutt'e due <b>senza contenuto</b>. La prima: «<b>sto facendo un gesto</b> con questa chiave usa-e-getta» — serve a <b>non farti suonare</b> l'avviso per la risposta a una cosa che hai appena fatto tu; non dice quale gesto né su quale ordine, e la chiave il server la conosceva già. La seconda, solo se <b>vendi</b>: «<b>ho indicato all'altra persona dove ricevere gli euro</b>», col numero dell'ordine — serve ad avvisarla che tocca a lei. Il <b>recapito non passa da noi</b>: l'IBAN, il RevTag o il numero viaggiano cifrati fra i vostri due telefoni, e nell'avviso non ci sono.</p>
       <p>Dal <b>17 settembre 2026</b>, quando un ordine viene <b>preso</b>, le due parti si vedono: chi ha pubblicato e chi ha preso vedono il <b>profilo</b> l'uno dell'altra — lo stesso che sta già sotto ogni annuncio del mercatino: nome, foto, stelline, livello e titolo — e i <b>bottoni per scriversi</b> su Telegram o su Nostr, ma solo dove quei canali esistono davvero (la npub soltanto se ne hai dimostrato il possesso). <b>Prima della presa non si vede niente</b>, e non c'è nessun altro modo di chiederlo: a questa domanda il server risponde solo a una delle due parti di quello scambio. Il perché è che dall'altra parte c'è una persona a cui stai per mandare dei soldi veri, e un volto con una reputazione è quello che rende <i>pesabile</i> la fiducia — la stessa ragione per cui nel mercatino chi vende ha un nome. Te lo diciamo <b>prima</b>: nel foglio dove pubblichi e in quello dove prendi. Al posto dei campi dove prima ci si scriveva il proprio contatto a mano, che non erano verificati da nessuno.</p>
       <p><b>Chi entra con una chiave Nostr resta anonimo quando prende</b>: quella presa non viene annotata, chi ha pubblicato non saprà chi è, e nella pagina dello scambio legge che l'altra persona non si conosce. <b>A meno che non lo decida lui</b>: l'interruttore «Fatti riconoscere negli scambi» nel cassetto «🔔 Avvisi» — <b>spento di serie</b> — fa annotare la presa, mostra il suo profilo all'altra parte e apre le <b>recensioni</b> su quello scambio; lasciandolo spento resta invisibile, e su quegli scambi recensioni non ce ne sono. Vale da quando lo accende: gli scambi già presi restano come erano, e a cancellare il pregresso c'è «dimentica il profilo». Chi entra con una chiave e <b>pubblica</b>, invece, si mostra — col profilo che ha qui, cioè il nome e la foto della sua chiave: è così da quando le card del libro hanno un volto, e il foglio dove si pubblica lo dice prima.</p>
       <p>Le <b>conversazioni fuori da Barattolo</b> non sono nostre: se vi scrivete su Telegram o su Nostr quella chat è vostra e di chi la trasporta — non la leggiamo, non ce l'abbiamo, e <b>in una disputa non possiamo usarla</b>. A decidere sono i fatti dello scambio: chi ha bloccato i sats, chi ha detto di aver mandato gli euro, chi li ha liberati.</p>
@@ -40932,12 +40943,25 @@ async function mostroChiama(skTrade, msg, opz){
      viene scartato in silenzio. */
   if (bits > 0) NT.nip13.minePow(ev, bits);
   const firmato = NT.finalizeEvent(ev, NT.utils.hexToBytes(skTrade));
+  /* L'ECO NON DEVE SUONARE (18 set 2026, terzo giro): la risposta a
+     questo gesto e' una busta che il campanello del server vedrebbe
+     come una novita', e suonerebbe a chi ha l'app in mano. Glielo si
+     dice PRIMA di parlare — dopo, la risposta puo' arrivare prima del
+     timbro. Sta QUI perche' di qui passano tutti i gesti: un posto
+     solo, nessun chiamante che se lo dimentica. La chiamata vive fuori
+     dal motore (vedi `dichiaraGestoP2P`), ha il suo tetto e non ferma
+     mai il gesto. */
+  if (typeof dichiaraGestoP2P === 'function') await dichiaraGestoP2P(ev.pubkey);
   const rid = riferimentoRichiesta(msg);
   const attesa = new Promise((ok, no) => {
     p2pAttese[rid] = {ok, no, t: setTimeout(() => {
       delete p2pAttese[rid];
-      no(new Error('Nessuna risposta ('
-                   + Math.round((o.timeoutMs || P2P_ATTESA_MS) / 1000) + ' s)'));
+      /* `silenzio`: il messaggio e' PARTITO e la risposta non e' ancora
+         arrivata — via Tor capita. Non e' un «no» e non e' un guasto, e
+         chi chiama lo dice con un'altra frase (18 set 2026). */
+      no(Object.assign(new Error('Nessuna risposta ('
+                   + Math.round((o.timeoutMs || P2P_ATTESA_MS) / 1000) + ' s)'),
+                       {silenzio: true}));
     }, o.timeoutMs || P2P_ATTESA_MS)};
   });
   try {
@@ -41229,10 +41253,43 @@ function azioniDisponibili(o){
   /* il pagamento dei sats e' fallito: l'unico gesto e' la fattura nuova */
   if (o.lato === 'compro' && o.stato === 'fattura_nuova')      return 'fattura-nuova';
   if (o.lato === 'vendo'  && o.stato === 'attesa_mia_hold')    return 'hold';
-  if (o.lato === 'compro' && o.stato === 'attivo')             return 'euro-inviati';
+  /* «DOVE RICEVERE GLI EURO» E' UN PASSO (18 set 2026, terzo giro, dal
+     vivo): a garanzia bloccata chi compra leggeva «tocca a te» col
+     bottone acceso, e chi vende non aveva ancora detto DOVE mandarli.
+     Finche' il recapito non e' arrivato il gesto e' di chi VENDE: a
+     lui il bottone pieno, a chi compra niente — e la pagina glielo
+     spiega (`aspettaRecapitoP2P`). Torna '' e non un nome nuovo
+     apposta: da qui escono anche il 👉 della card e il gruppo «tocca a
+     te», e chi aspetta non ha niente da fare. */
+  if (o.lato === 'compro' && o.stato === 'attivo')
+    return recapitoEuroArrivatoP2P(o) ? 'euro-inviati' : '';
+  if (o.lato === 'vendo'  && o.stato === 'attivo' && o.peer
+      && !(o.campiMiei || {}).euro)                            return 'recapito';
   if (o.lato === 'vendo'  && o.stato === 'euro_inviati')       return 'rilascia';
   return '';
 }
+/* PURE, le due meta' dello stesso fatto. Il recapito e' ARRIVATO
+   quando sta nella riga (`campiLoro.euro`): lo scrive `campoArriva`
+   dopo aver verificato le due firme, quindi non e' una dichiarazione
+   di nessuno. `o.recapitoAltrove` e' l'uscita per chi scambia con
+   qualcuno che usa un'altra app e il recapito qui dentro non lo
+   mandera' mai: lo accende chi compra, con un gesto suo. */
+function recapitoEuroArrivatoP2P(o){
+  return !!(o && (((o.campiLoro || {}).euro) || o.recapitoAltrove));
+}
+function aspettaRecapitoP2P(o){
+  return !!(o && o.lato === 'compro' && o.stato === 'attivo'
+            && !recapitoEuroArrivatoP2P(o));
+}
+/* il nome dell'altra parte, se la pagina lo mostra gia' (`LE PARTI SI
+   VEDONO`): la frase non dice mai un nome che sopra non c'e' */
+function nomeControparteP2P(o, ripiego){
+  const c = (typeof p2pControparti !== 'undefined' && o) ? p2pControparti[o.id] : null;
+  const primo = c && c.nome ? String(c.nome).split(' ')[0] : '';
+  return primo || ripiego;
+}
+const P2P_TOAST_FATTURA = '⚡ Tocca a te: indica dove ricevere i sats';
+const P2P_TOAST_RECAPITO = 'ti ha indicato dove inviare gli euro: tocca a te';
 /* Da quali stati si puo' chiedere di annullare — e sono DUE cose
    diverse col nome uguale: da 'pubblicato' l'ordine e' ancora di
    nessuno e sparisce, da uno scambio gia' preso l'annullo e' una
@@ -41318,6 +41375,15 @@ const STATI_P2P = {
                       quindi la frase e' un'altra. Vale per chi prende e
                       per chi pubblica: il messaggio non e' arrivato a
                       NESSUNO, e non c'e' un libro da controllare. */
+                   /* IN RITARDO (18 set 2026, terzo giro): la richiesta
+                      e' partita — qualcuno l'ha presa in consegna — e la
+                      risposta non e' arrivata nel tempo del velo. Via Tor
+                      capita, e non e' un errore: se arriva la pagina si
+                      muove da sola, e a chi ha chiuso l'app lo dice il
+                      campanello (l'eco tace solo finche' il client
+                      aspetta: vedi P2P_ECO_S sul server). */
+                   t_tardi: 'La risposta sta tardando',
+                   d_tardi: 'La richiesta è partita, ma la risposta non è ancora arrivata: a volte ci vuole più di mezzo minuto. Se arriva, questa pagina si aggiorna da sola e ti avvisiamo; se fra un paio di minuti è ancora tutto fermo, riprova.',
                    t_muto: 'Il messaggio non è partito',
                    d_muto: 'Nessuno ha preso in consegna la richiesta: la rete non ha confermato di averla ricevuta. Riprova fra un momento, con la stessa chiave.'},
   rifiutato: {t: 'Ordine non preso', d: 'La richiesta non è stata accettata.',
@@ -41390,6 +41456,9 @@ const P2P_TINTA_STATO = {
    whitelist, quindi qui dentro non puo' entrare niente di scritto da
    altri. */
 function tintaStatoP2P(o){
+  /* chi aspetta il recapito ha la palla dall'altra parte: viola, non
+     l'arancio del gesto (18 set 2026) */
+  if (aspettaRecapitoP2P(o)) return ' badge confirmed';
   const c = P2P_TINTA_STATO[o && o.stato];
   return c ? ' badge ' + c : '';
 }
@@ -41398,6 +41467,8 @@ function statoTestoP2P(o){
   /* il messaggio che non e' partito vince sul lato e sul verso: la
      frase e' la stessa per tutti, perche' il fatto e' lo stesso */
   if (o && o.nonPartito && s.t_muto) return {t: s.t_muto, d: s.d_muto};
+  /* la risposta IN RITARDO non e' una risposta mancata (18 set 2026) */
+  if (o && o.inRitardo && !o.mio && s.t_tardi) return {t: s.t_tardi, d: s.d_tardi};
   /* il giro morto vince sulla frase di vetrina: «Ordine pubblicato»
      sarebbe vera e muta — la notizia e' che era stato preso */
   const gm = o && o.giroMorto && P2P_GIRO_MORTO[o.stato];
@@ -41406,6 +41477,17 @@ function statoTestoP2P(o){
   if (o && o.statoGrezzo)
     return {t: 'Stato: «' + o.statoGrezzo + '»',
             d: 'Il coordinatore riporta uno stato che questa versione di Barattolo non conosce, e non lo interpretiamo. L\'ultimo passo noto qui era «' + s.t + '».'};
+  /* A GARANZIA BLOCCATA MANCA ANCORA UN PEZZO (18 set 2026, terzo
+     giro): finche' chi vende non ha detto dove mandare gli euro, chi
+     compra ASPETTA — e a chi vende tocca dirlo. Le due frasi di
+     `attivo` tornano vere appena il recapito e' partito. */
+  if (aspettaRecapitoP2P(o))
+    return {t: s.t, d: 'I sats sono al sicuro in garanzia. Aspetta che '
+      + nomeControparteP2P(o, 'chi vende') + ' ti indichi dove inviare gli euro: '
+      + 'appena arriva lo leggi qui, il bottone si accende e ti avvisiamo.'};
+  if (o && o.stato === 'attivo' && o.lato === 'vendo' && o.peer && !(o.campiMiei || {}).euro)
+    return {t: s.t, d: 'I tuoi sats sono bloccati. Ora indica a '
+      + nomeControparteP2P(o, 'chi compra') + ' dove mandarti gli euro: senza, non può pagarti.'};
   /* il verso di chi ha PUBBLICATO vince sul lato: e' la stessa riga
      letta da un'altra parte del banco, e la sua frase e' un'altra */
   const mio = !!(o && o.mio);
@@ -41674,7 +41756,26 @@ function applicaMessaggioP2P(ord, dentro){
       && holdVivaP2P(nuovo)) {
     haptic();
     toast(P2P_TOAST_HOLD, 6000);
+    /* L'APP SEGUE LO SCAMBIO (18 set 2026, terzo giro): chi sta
+       guardando proprio questo scambio non deve cercare il bottone —
+       la richiesta da pagare gli si apre davanti. Mai sopra un altro
+       foglio, mai da un'altra vista. */
+    if (seguibileP2P(nuovo.id)) apriHoldP2P();
   }
+  /* ...e lo stesso per «dove vuoi i sats»: la garanzia e' bloccata (o
+     l'ordine e' appena stato preso) e tocca a chi compra. Col wallet
+     collegato la fattura la chiede il foglio da solo. */
+  if (nuovo.stato === 'attesa_mia_fattura' && prima !== 'attesa_mia_fattura'
+      && nuovo.lato === 'compro') {
+    haptic();
+    toast(P2P_TOAST_FATTURA, 6000);
+    if (seguibileP2P(nuovo.id)) apriIncassoP2P();
+  }
+  /* a scambio ATTIVO chi vende col recapito gia' partito (quello
+     ricordato parte alla presa) lo fa sapere adesso all'altra parte:
+     prima «tocca a te» non era vero */
+  if (nuovo.stato === 'attivo' && prima !== 'attivo'
+      && typeof avvisaRecapitoP2P === 'function') avvisaRecapitoP2P(nuovo.id);
   /* IL PAGAMENTO FALLITO CHIEDE UN GESTO, E SUONA (17 set 2026): i
      sats restano fermi finche' chi compra non da' una fattura nuova, e
      nessun altro puo' farlo per lui. Toast ovunque sia, e se sta
@@ -42649,6 +42750,7 @@ async function eseguiPresaP2P(id, scelto, metodo){
      dall'elenco non e' una scelta — e' un errore, e vale come
      «nessuna». Vedi «IL METODO SCELTO VIAGGIA», sotto. */
   const met = (riga.metodi || []).indexOf(metodo) >= 0 ? metodo : '';
+  let rip = null;
   let ord = {
     id: id, lato: riga.lato === 'sell' ? 'compro' : 'vendo', indice: 0, pubTrade: '',
     stato: 'prendo', euro: scelta || riga.euro, euroMax: 0, importoScelto: scelta,
@@ -42673,6 +42775,14 @@ async function eseguiPresaP2P(id, scelto, metodo){
     ord.pubTrade = tk.pub;
     scriviOrdineP2P(ord);
     apriOrdineP2P(id);              /* la pagina si apre subito: si vede l'attesa */
+    /* IL VELO COL SUO VERBO (18 set 2026, terzo giro): dopo «vendi» la
+       pagina restava ferma su «Sto prendendo…» e la richiesta da
+       pagare arrivava in un bottone da andare a cercare. Adesso il
+       velo dice cosa si sta aspettando, e quando la busta arriva il
+       foglio si apre da solo (`applicaMessaggioP2P`). Se non arriva
+       nel tempo del velo non e' un errore: vedi il `catch`. */
+    rip = attesaP2P(ord.lato === 'vendo' ? 'Sto preparando la garanzia…'
+                                         : 'Sto prendendo l\'ordine…');
     await registraChiaviP2P([tk.pub]);
     await mostroRiascolta();
     const msg = messaggioMostro(ord.lato === 'compro' ? 'take-sell' : 'take-buy',
@@ -42690,11 +42800,21 @@ async function eseguiPresaP2P(id, scelto, metodo){
     registraOrdiniP2P([id], false, true).catch(() => {});
   } catch(e) {
     ord = ordiniP2P()[id] || ord;
-    ord.stato = (e && e.cantDo) ? 'rifiutato' : 'senza_risposta';
-    ord.errore = String(e && e.message || e);
-    ord.nonPartito = !!(e && e.relayMuti);
-    scriviOrdineP2P(ord);
-  }
+    /* LA RISPOSTA PUO' ESSERE ARRIVATA LO STESSO (18 set 2026): la
+       macchina a stati si muove su ogni busta, anche su quella che
+       nessuno aspettava piu'. Se lo scambio e' gia' andato avanti il
+       silenzio di questa chiamata non riporta indietro niente. */
+    if (ord.stato === 'prendo') {
+      ord.stato = (e && e.cantDo) ? 'rifiutato' : 'senza_risposta';
+      /* IL SILENZIO NON E' UN ERRORE: la richiesta e' partita e la
+         risposta non e' ancora qui. Niente riquadro arancio: lo dice
+         la frase dello stato, che spiega anche cosa succede adesso. */
+      ord.errore = (e && e.silenzio) ? '' : String(e && e.message || e);
+      ord.inRitardo = !!(e && e.silenzio);
+      ord.nonPartito = !!(e && e.relayMuti);
+      scriviOrdineP2P(ord);
+    }
+  } finally { if (rip) rip(); }
   if (p2pOrdineAperto === id) renderOrdineP2P(); else apriOrdineP2P(id);
 }
 /* la richiesta si rimanda con la STESSA chiave e lo stesso indice: se
@@ -42704,6 +42824,7 @@ async function riprovaPresaP2P(){
   const o = ordiniP2P()[id];
   if (!o) return;
   o.stato = 'prendo'; o.errore = ''; o.cantDo = ''; o.nonPartito = false;
+  o.inRitardo = false;
   scriviOrdineP2P(o);
   renderOrdineP2P();
   try {
@@ -42717,7 +42838,9 @@ async function riprovaPresaP2P(){
   } catch(e) {
     const agg = ordiniP2P()[id] || o;
     agg.stato = (e && e.cantDo) ? 'rifiutato' : 'senza_risposta';
-    agg.errore = String(e && e.message || e);
+    /* il silenzio non e' un errore: la regola di eseguiPresaP2P */
+    agg.errore = (e && e.silenzio) ? '' : String(e && e.message || e);
+    agg.inRitardo = !!(e && e.silenzio);
     agg.nonPartito = !!(e && e.relayMuti);
     scriviOrdineP2P(agg);
   }
@@ -42859,7 +42982,13 @@ function campiOrdineP2P(o){
   let fuori = '';
   if (o.lato === 'compro' && loro.euro)
     fuori += '<div class="trust-note nota-scambio"><span>💶</span><span><b>Dove mandare gli euro:</b><br>'
-      + esc(loro.euro.testo).replace(/\n/g, '<br>') + '</span></div>';
+      + esc(loro.euro.testo).replace(/\n/g, '<br>') + '</span></div>'
+      /* IL RECAPITO PUO' ARRIVARE PRIMA DELLA GARANZIA (chi vende l'ha
+         ricordato e parte da solo alla presa): finche' la pagina non
+         dice «Sats in garanzia» non si manda niente, e si scrive QUI,
+         sotto l'IBAN, che e' dove l'occhio sta (18 set 2026) */
+      + ((P2P_PROGRESSO[o.stato] || 0) < P2P_PROGRESSO.attivo && P2P_FINALI.indexOf(o.stato) < 0
+         ? '<div class="hint">⚠️ <b>Non inviare ancora niente:</b> aspetta che questa pagina dica «Sats in garanzia».</div>' : '');
   if (o.lato === 'vendo' && !miei.euro)
     fuori += '<div class="hint">💶 Di\' a chi compra <b>dove mandarti gli euro</b>: senza, non può pagarti.</div>';
   fuori += '<button class="btn ghost" onclick="apriCampiP2P()">🤝 I vostri recapiti'
@@ -42889,6 +43018,12 @@ function apriOrdineP2P(id){
 function vistaAttivaP2P(){
   const v = document.querySelector('.view.active');
   return v ? v.id : '';
+}
+/* «sta guardando QUESTO scambio, e non ha altro davanti»: la sola
+   condizione alla quale un foglio si apre da solo */
+function seguibileP2P(id){
+  return p2pOrdineAperto === id && vistaAttivaP2P() === 'view-p2pordine'
+    && !altroFoglioAperto();
 }
 function renderOrdineP2P(){
   const box = el('p2pOrdineCorpo');
@@ -42962,11 +43097,17 @@ function renderOrdineP2P(){
                                             scontoMancato: !!o.scontoMancato,
                                             mio: true}));
   const azione = azioniDisponibili(o);
+  /* chi vende e riapre l'app a scambio attivo: se l'avviso del
+     recapito non era partito, parte adesso (le condizioni le guarda
+     lui, e non ripete) */
+  if (typeof avvisaRecapitoP2P === 'function') avvisaRecapitoP2P(o.id);
   const bottoni = {
     fattura: '<button class="btn orange" onclick="apriIncassoP2P()">💸 Dove ricevere i sats</button>',
     'fattura-nuova': '<button class="btn orange" onclick="apriIncassoP2P()">⚡ Dai una fattura nuova</button>',
     hold: '<button class="btn orange" onclick="apriHoldP2P()">🔒 Blocca i sats</button>',
     'euro-inviati': '<button class="btn orange" onclick="euroInviatiP2P()">✅ Ho inviato gli euro</button>',
+    /* il gesto di chi vende a garanzia bloccata (18 set 2026) */
+    recapito: '<button class="btn orange" onclick="apriCampiP2P()">💶 Indica dove ricevere gli euro</button>',
     rilascia: '<button class="btn orange" onclick="rilasciaP2P()">🔓 Libera i sats</button>'
   };
   /* LA DOMANDA PARTE DA QUI, una sola volta per scambio: «c'e' un
@@ -43004,6 +43145,17 @@ function renderOrdineP2P(){
     '<div class="trust-note nota-scambio"><span><b>' + esc(st.t) + '</b><br>' + esc(st.d) + '</span></div>' +
     (avviso ? '<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⚠️ <span>' + esc(avviso) + '</span></div>' : '') +
     (bottoni[azione] || '') +
+    /* IL BOTTONE SPENTO DI CHI ASPETTA IL RECAPITO (18 set 2026): si
+       vede, cosi' si sa qual e' il passo dopo, e non si tocca. Sotto,
+       l'uscita per chi il recapito l'ha avuto per un'altra strada —
+       l'altra persona puo' scambiare da un'altra app, e li' il nostro
+       foglio dei recapiti non esiste: senza, lo scambio resterebbe
+       fermo per sempre su un bottone spento. */
+    (aspettaRecapitoP2P(o)
+      ? '<button class="btn orange" disabled>✅ Ho inviato gli euro</button>'
+        + '<div class="hint">Si accende quando arriva il recapito. '
+        + '<button type="button" class="scopri-link" onclick="recapitoAltroveP2P()">Te l\'ha già dato per un\'altra strada?</button></div>'
+      : '') +
     /* IL «RIPROVA» HA DUE VERSI (15 set 2026, dal campo con Alan): su
        un ordine PUBBLICATO senza risposta il bottone mandava una
        take-buy del proprio ordine, e siccome quello un nome vero non
@@ -43091,6 +43243,11 @@ async function apriHoldP2P(){
   }
   haptic();
   p2pHoldOrdine = id;
+  /* LA GARANZIA SI PAGA IN UN ALTRO WALLET, e da li' nessun gesto passa
+     di qui: aprire questo foglio E' il gesto, e la conferma del
+     coordinatore che torna dopo il pagamento e' la sua eco — con la
+     finestra lunga, che pagare a mano vuole minuti (18 set 2026) */
+  if (typeof dichiaraGestoP2P === 'function') dichiaraGestoP2P(o.pubTrade, true);
   renderHoldP2P();
   el('sheetBg').classList.add('open');
   el('p2pHoldSheet').classList.add('open');
@@ -43471,6 +43628,24 @@ async function inviaIncassoP2P(){
   }
 }
 
+/* l'uscita dal bottone spento: lo dice chi compra, e resta scritto
+   sulla riga. Non manda niente a nessuno. */
+function recapitoAltroveP2P(){
+  const o = ordiniP2P()[p2pOrdineAperto];
+  if (!o) return;
+  chiediConferma({
+    titolo: 'Hai già il recapito?',
+    corpo: 'Qui dentro non è arrivato. Se chi vende ti ha detto dove mandare gli euro per un\'altra strada, accendi il bottone — ma paga solo a un recapito che ti ha dato LUI, e solo perché questa pagina dice «Sats in garanzia».',
+    etichetta: 'Sì, ce l\'ho',
+    poi: () => {
+      const agg = ordiniP2P()[o.id];
+      if (!agg) return;
+      agg.recapitoAltrove = 1;
+      scriviOrdineP2P(agg);
+      if (p2pOrdineAperto === agg.id) renderOrdineP2P();
+    }
+  });
+}
 /* ---- i due gesti che muovono lo scambio ---- */
 function euroInviatiP2P(){
   const o = ordiniP2P()[p2pOrdineAperto];
@@ -45473,10 +45648,21 @@ function campoScrivi(o, tipo, campo, mio){
   const c = mappa[tipo];
   if (c && c.id === campo.id) return o;
   if (c && (c.t || 0) > (campo.t || 0)) return o;
+  const primoEuro = !mio && tipo === 'euro' && !c;
   mappa[tipo] = campo;
   if (mio) o.campiMiei = mappa; else o.campiLoro = mappa;
   if (!mio && p2pCampiOrdine !== o.id) o.campiNuovi = 1;
   scriviOrdineP2P(o);
+  /* IL RECAPITO DEGLI EURO MUOVE LO SCAMBIO (18 set 2026, terzo giro):
+     a chi compra, con la garanzia gia' bloccata, accende il bottone —
+     e glielo si dice ovunque sia; a chi vende fa partire l'avviso per
+     l'altra parte (`avvisaRecapitoP2P`, che le condizioni le guarda da
+     se'). Una correzione non ri-suona qui: la porta il server. */
+  if (primoEuro && o.lato === 'compro' && o.stato === 'attivo') {
+    haptic();
+    toast('💶 ' + nomeControparteP2P(o, 'Chi vende') + ' ' + P2P_TOAST_RECAPITO, 6000);
+  }
+  if (mio && tipo === 'euro' && typeof avvisaRecapitoP2P === 'function') avvisaRecapitoP2P(o.id);
   if (p2pCampiOrdine === o.id) renderCampiP2P();
   if (p2pOrdineAperto === o.id) renderOrdineP2P();
   return o;
@@ -47111,6 +47297,125 @@ function sincronizzaSvegliaP2P(o, scade, finale, adesso){
       const agg = ordiniP2P()[o.id];
       if (agg) { agg.sveglia = vuole; scriviOrdineP2P(agg); }
     }).catch(() => {});
+}
+
+/* ---- L'ECO DEL PROPRIO GESTO (18 set 2026, terzo giro) ----
+   «Sto facendo un gesto con questa chiave»: il server tace sulla
+   busta di risposta, che per chi ha l'app in mano non e' una novita'.
+   STA QUI, fuori dal motore, per il patto della sveglia: il motore
+   non chiama mai casa, e questa e' una chiamata vera. Sul filo va la
+   sola chiave PUBBLICA dello scambio, che il server ha gia' — ne'
+   quale gesto, ne' quale ordine. `lunga` e' la garanzia pagata a mano.
+   NON FERMA MAI IL GESTO: ha un tetto corto e torna sempre, vera o
+   falsa che sia; se non arriva, l'eco suona com'era ieri. */
+let P2P_GESTO_MS = 1200;         // `let`: il banco lo accorcia
+function dichiaraGestoP2P(pub, lunga){
+  if (typeof VETRINA !== 'undefined' && VETRINA) return Promise.resolve(false);
+  if (typeof DEMO !== 'undefined' && DEMO) return Promise.resolve(false);
+  if (!myTgId || !FORMA_HEX64.test(String(pub || ''))) return Promise.resolve(false);
+  const corpo = {pubkey: pub};
+  if (lunga) corpo.lunga = true;
+  const giro = fetch(`${API_BASE}/p2p/gesto`, {method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+    body: JSON.stringify(corpo)}).then(r => !!(r && r.ok), () => false);
+  const tetto = new Promise(ok => setTimeout(() => ok(false), P2P_GESTO_MS));
+  return Promise.race([giro, tetto]);
+}
+
+/* ---- «HO DETTO DOVE MANDARE GLI EURO» (18 set 2026, terzo giro) ----
+   Il recapito viaggia cifrato fra i due telefoni e il server non lo
+   vede partire: glielo dice chi l'ha mandato, col SOLO id dell'ordine,
+   e lui avvisa chi compra («tocca a te»). Il recapito di qui non
+   passa, e nel corpo non c'e' un campo dove metterlo.
+   SOLO A SCAMBIO ATTIVO: prima la garanzia non e' bloccata, e «tocca a
+   te» sarebbe falso — il recapito ricordato parte gia' alla presa, e
+   l'avviso lo aspetta qui. Una volta per recapito (`recapitoAvvisato`
+   ne tiene l'id: una correzione e' un altro id e riparte), mai due
+   giri insieme, e dopo un fallimento si riprova non prima di un
+   minuto — a ogni render della pagina, che e' anche la strada di chi
+   riapre l'app dopo. */
+let p2pRecapitoTentati = {};
+function avvisaRecapitoP2P(id){
+  if (typeof VETRINA !== 'undefined' && VETRINA) return;
+  if (typeof DEMO !== 'undefined' && DEMO) return;
+  if (!myTgId) return;
+  const o = ordiniP2P()[id];
+  const campo = o && (o.campiMiei || {}).euro;
+  if (!o || o.lato !== 'vendo' || o.stato !== 'attivo' || !campo) return;
+  if (o.recapitoAvvisato === campo.id || !idMostroVero(o.id)) return;
+  const adesso = Date.now();
+  if ((p2pRecapitoTentati[id] || 0) > adesso - 60000) return;
+  p2pRecapitoTentati[id] = adesso;
+  fetch(`${API_BASE}/p2p/recapito`, {method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+    body: JSON.stringify({ordine: o.id})})
+    .then(r => {
+      if (!r || !r.ok) return;
+      const agg = ordiniP2P()[id];
+      if (agg) { agg.recapitoAvvisato = campo.id; scriviOrdineP2P(agg); }
+    }).catch(() => {});
+}
+
+/* ---- L'APP CHE TORNA IN PRIMO PIANO (18 set 2026, terzo giro) ----
+   La garanzia si paga in un altro wallet: l'app va sotto, il telefono
+   le addormenta le connessioni, e al ritorno sembrano vive ma non
+   portano piu' niente — la pagina restava sul passo di prima finche'
+   non la si riapriva. Al ritorno si rifa' l'ascolto da capo (la
+   domanda riparte da prima dell'assenza, e i doppioni li ferma
+   `p2pVisti`), e un relay che si dice connesso ma non risponde a una
+   domanda da niente si chiude: la riconnessione che c'e' gia' fa il
+   resto. E finche' uno scambio PRESO e' aperto davanti, la stessa
+   domanda si rifa' ogni venti secondi: e' una REQ con pochi eventi, e
+   copre l'ascolto che muore senza dirlo. */
+let P2P_POLSO_MS = 20000;
+let P2P_SONDA_MS = 6000;
+let p2pUltimoRisveglio = 0;
+const P2P_STATI_POLSO = ['prendo', 'attesa_mia_fattura', 'attesa_hold_venditore',
+  'attesa_fattura_compratore', 'attesa_mia_hold', 'attivo', 'euro_inviati',
+  'rilasciato', 'pagamento_ritentato', 'fattura_nuova'];
+function sondaRelayP2P(){
+  for (const url of Object.keys(p2pRelayVivi)) {
+    const relay = p2pRelayVivi[url];
+    if (!relay || !relay.connected) continue;
+    let vivo = false, sub = null;
+    try {
+      sub = relay.subscribe([{kinds: [38385], limit: 1}],
+                            {oneose(){ vivo = true; try { sub && sub.close(); } catch(e){} }});
+    } catch(e) { }
+    setTimeout(() => {
+      if (vivo || p2pRelayVivi[url] !== relay) return;
+      console.log('🔁 [p2p] ' + url + ' si dice connesso ma non risponde: lo richiudo');
+      delete p2pRelayVivi[url];
+      for (const a of p2pAscolti) { delete a.per[url]; delete a.eose[url]; }
+      try { relay.close(); } catch(e){}
+      connettiUnoP2P(url).then(() => { p2pSubChiavi = ''; return mostroRiascolta(); }).catch(() => {});
+    }, P2P_SONDA_MS);
+  }
+}
+async function risvegliaP2P(sonda){
+  if (typeof VETRINA !== 'undefined' && VETRINA) return;
+  if (!window.NostrTools || !Object.keys(ordiniAscoltoP2P()).length) return;
+  const adesso = Date.now();
+  if (adesso - p2pUltimoRisveglio < 5000) return;
+  p2pUltimoRisveglio = adesso;
+  try {
+    await mostroConnetti();
+    if (sonda) sondaRelayP2P();
+    p2pSubChiavi = '';
+    await mostroRiascolta();
+  } catch(e) { }
+}
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') risvegliaP2P(true);
+  });
+  setInterval(() => {
+    if (document.visibilityState !== 'visible') return;
+    const o = p2pOrdineAperto && ordiniP2P()[p2pOrdineAperto];
+    if (!o || P2P_STATI_POLSO.indexOf(o.stato) < 0) return;
+    if (vistaAttivaP2P() !== 'view-p2pordine') return;
+    risvegliaP2P(false);
+  }, P2P_POLSO_MS);
 }
 
 /* ---- import in blocco da CSV: per i cataloghi grandi. Due fasi
