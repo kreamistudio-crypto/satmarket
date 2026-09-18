@@ -97,6 +97,37 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   Le righe gia' in tabella prendono lo stato alla PRIMA ripubblicazione
   del loro ordine, senza frase: l'orologio non ha visto il passaggio
   e non lo inventa.
+- L'ECO E IL RECAPITO NEL JOURNAL (18 set 2026, terzo giro). Cinque
+  colonne nuove nascono da sole al riavvio (ALTER): `chiavi_p2p.gesto`
+  e `.eco_fino`, `p2p_ordini.euro`, `.recapito_avviso` e
+  `.recapito_n`. Le righe nuove: `· Campanello P2P: N, ECO del
+  suo gesto (Ns dopo): non suona` — la risposta a un gesto appena fatto
+  da N, che prima dava «RIMANDATO» o una «Novità»; `· Campanello P2P:
+  N, busta nata Ns PRIMA del suo ultimo gesto su quello scambio: gia'
+  vista`; `💶 Recapito P2P: N ha indicato dove ricevere gli euro,
+  avvisato M` con sotto l'esito di Telegram; e `· Recapito P2P: da N,
+  nessun avviso (perche')` — il perche' e' scritto per intero («non e'
+  chi vende», «l'ordine sul libro e' …, non preso», «l'altra parte non
+  e' annotata», «M ha gli avvisi P2P spenti», «l'ultimo avviso e' di Ns
+  fa», «gia' 3 avvisi»). ⚠️ I «Ns dopo» dell'eco sono il NUMERO DA
+  GUARDARE: se stanno spesso vicino a 30, la finestra (`P2P_ECO_S`) e
+  l'attesa del client (`P2P_ATTESA_MS`) si allungano INSIEME — una
+  prova le tiene uguali.
+  LA PROVA DAL VIVO, con due account (A compra e pubblica, B vende e
+  prende): `journalctl -u barattolo -f | grep -E "Campanello|Libro|Recapito|📬|⏳"`.
+  Deve dire: alla pubblicazione di A un «ECO» e nessuna Novità; alla
+  presa `📖 Libro P2P: avvisati 2`; B apre il foglio e paga — un «ECO»
+  per B, e ad A la «Novità» (dove vuoi i sats); A da' la fattura — un
+  «ECO» per A, e a B la «Novità»; B indica dove ricevere gli euro —
+  «💶 Recapito P2P … avvisato A», e sul telefono di A «B ti ha
+  indicato dove inviare 10,00 €: tocca a te»; A segna gli euro — «ECO»
+  per A, «Novità» a B; B rilascia — «ECO» per B, e il concluso a
+  tutt'e due. Sui telefoni, ad app APERTA: a B dopo «vendi» il velo
+  «Sto preparando la garanzia…» e poi la richiesta da pagare che si
+  apre da sola; ad A, a garanzia bloccata, il foglio «dove ricevere i
+  sats» che si apre da solo; ad A, a scambio attivo, il bottone «Ho
+  inviato gli euro» SPENTO con «Aspetta che B ti indichi…» finche' il
+  recapito non arriva, poi acceso col toast.
 - IL GATE CHE RIMANDA NEL JOURNAL (18 set 2026). Al posto del vecchio
   «e' nel gate … non suona» ci sono tre righe: `· Campanello P2P: N,
   busta gemella della frase precisa (Ns dall'evento del libro): gia'

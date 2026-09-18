@@ -20540,3 +20540,224 @@ nel config del VPS. Chi scorre a cavallo del deploy riceve la prima
 pagina una volta (il cursore delle tornate non ha la forma nuova):
 dichiarato. E la taratura: se il negozio collegato pesa troppo, si
 allarga `VETRINA_FINESTRA`, non si torna alle tornate.
+
+## Il campanello, terzo giro: gli echi, «dove ricevere gli euro», l'app che segue (18 set 2026)
+
+Aperto da Andrea con la prova dal vivo del pomeriggio (A compra, B
+vende). Tre cose storte: 1) «novità in un tuo scambio» a chi aveva
+APPENA fatto il gesto — A alla pubblicazione, B dopo la garanzia, A dopo
+la fattura e dopo «euro inviati»; 2) quando B indica dove ricevere gli
+euro non arriva niente a nessuno; 3) subito dopo la garanzia A legge
+«tocca a te» col bottone «Ho inviato gli euro» acceso, e B non ha ancora
+detto dove mandarli. È il prezzo che il verbale del secondo giro aveva
+dichiarato («metà delle buste sono l'eco di un gesto appena fatto… la
+cura vera sarebbe un "l'app è aperta" mandato dal client»), arrivato il
+giorno stesso.
+
+**PRIMA DEL CODICE, UNA PREMESSA DA CORREGGERE.** La richiesta diceva:
+«il server sa quando un utente compie un gesto P2P: passano tutti dalle
+sue rotte». NON È COSÌ, ed è una decisione e non una svista: il motore
+dello scambio parla col coordinatore dai relay e **non chiama mai casa**
+(c'è la sentinella che conta le `fetch(` là dentro e pretende zero). Il
+server vede solo `/p2p/chiavi` prima di una pubblicazione o di una presa
+e `/p2p/ordini` dopo; fattura, «euro inviati», rilascio e annullo non li
+vede, e la garanzia si paga addirittura in un altro wallet. Quindi per
+zittire gli echi serviva un segnale NUOVO, e il disegno è partito da lì.
+
+**A. GLI ECHI.** Il client, un attimo PRIMA di parlare al coordinatore,
+dice al server «sto facendo un gesto con questa chiave»
+(`POST /api/p2p/gesto`, corpo `{pubkey}` e al più `lunga`). Parte da
+`mostroChiama`, che è la porta UNICA dei messaggi — un posto solo,
+nessun chiamante che se lo dimentica — ma la funzione che chiama
+(`dichiaraGestoP2P`) vive FUORI dal motore, accanto alla sveglia, per il
+patto di cui sopra. Ha un tetto di 1,2 s e non ferma mai il gesto: se
+non arriva, l'eco suona com'era ieri.
+• COSA IMPARA IL SERVER: che quell'account ha fatto UN gesto, adesso,
+con una chiave che sapeva già sua. Non quale gesto, non su quale
+ordine — nel corpo non c'è la sintassi per dirlo, e c'è la prova che lo
+tiene così. Sta scritto nel patto sui dati.
+• IL GIUDICE (`_nudge_p2p`, prima di tutto il resto): la PRIMA busta
+nata dopo il gesto, entro la finestra, verso QUELLA chiave è l'eco — non
+suona, non va in coda, non brucia il gate — e **consuma il timbro**: la
+seconda suona. Due colonne su `chiavi_p2p`, `gesto` ed `eco_fino`, che
+al contrario delle tre del gate sono della CHIAVE e non della persona.
+È questo che risponde al «non perdere le buste dello stesso momento per
+l'altra parte»: vanno a un'altra chiave di un'altra persona, e di lì
+non passano nemmeno; e un altro scambio della stessa persona ha
+un'altra chiave.
+• **LA FINESTRA È DI 30 SECONDI, e il numero non è una taratura**: è
+quanto il client aspetta la risposta (`P2P_ATTESA_MS`, e una prova li
+tiene uguali). Finché lui aspetta col velo alzato la busta è un'eco;
+passati i trenta il client dice «la risposta sta tardando, se arriva ti
+avvisiamo» — e da lì la risposta è una NOTIZIA, che deve suonare. La
+prima stesura diceva 60 («il doppio, per prudenza») e avrebbe mangiato
+proprio l'avviso appena promesso dalla pagina. Non serve più corta —
+il timbro si consuma alla prima busta, e una finestra larga non ne
+mangia una seconda.
+• LA GARANZIA è il caso a parte: si paga a mano in un altro wallet e da
+lì nessun gesto passa di qui. Il gesto è **aprire il foglio della
+richiesta da pagare**, con la finestra lunga (`P2P_ECO_PAGA_S`, 300 s:
+un terzo dei 900 del passo).
+• Una busta nata PRIMA del gesto verso quella chiave è già VISTA (per
+fare un gesto su uno scambio bisogna averlo davanti): non suona e il
+timbro non lo consuma. Cinque secondi di scarto fra i due orologi.
+• LE FRASI PRECISE NON SI TOCCANO: «Hai preso l'ordine di Anna!» a chi
+ha appena preso è un'eco anche lei, ma porta i numeri e il primo gesto
+— e non era nell'elenco di Andrea.
+⚠️ IL PREZZO, dichiarato: dentro la finestra lunga della garanzia un
+annullo proposto dall'altra parte sarebbe la «prima busta», e tacerebbe
+(la frase precisa dell'annullo arriva comunque alla fine). E chi chiude
+l'app nei trenta secondi dopo un gesto non riceve la risposta come
+avviso: per la presa la copre la frase precisa, per gli altri gesti la
+risposta non chiede niente a lui.
+⚠️ LA STRADA SCARTATA: ordinare le buste della passata per nascita
+(«l'eco è la prima»). Scritta e tolta: con due buste in volo, quale
+delle due consumi il timbro non cambia QUANTI avvisi partono — uno —
+e una riga che nessun caso distingue è una riga che nessuna prova
+difende.
+
+**B. «DOVE RICEVERE GLI EURO» È UN PASSO.** Quel passo è nostro e non
+del coordinatore: il recapito viaggia cifrato fra i due telefoni,
+firmato da una chiave che il server non conosce (e non deve: «E LA CHAT
+FRA LE DUE PARTI NON SUONA» resta vera — lì il costo era registrare le
+chiavi della conversazione; qui non si registra niente).
+• NEL CLIENT: a scambio `attivo` `azioniDisponibili` dà a chi compra
+«euro-inviati» SOLO se il recapito è arrivato (`campiLoro.euro`, che
+`campoArriva` scrive dopo aver verificato le due firme — non è una
+dichiarazione di nessuno), e a chi vende il bottone pieno «💶 Indica
+dove ricevere gli euro» finché non l'ha mandato. Chi aspetta vede il
+bottone SPENTO, la frase «Aspetta che Bruno ti indichi dove inviare gli
+euro», il viola di chi ha la palla dall'altra parte, e non è più
+«tocca a te» (il 👉 e il gruppo escono dallo stesso giudice). Quando il
+recapito arriva: bottone acceso, toast ovunque sia, una volta (una
+correzione si mostra e non risuona). A chi riapre l'app dopo, lo stato
+torna da solo: l'ascolto riparte dalla nascita dello scambio e la
+busta del recapito si rilegge.
+• L'USCITA, e va detta perché indebolisce il «spento»: sotto il bottone
+c'è «Te l'ha già dato per un'altra strada?», che lo accende sulla
+parola di chi compra, con la domanda unica. Senza, chi scambia con uno
+che usa UN'ALTRA APP — il libro è pubblico, e lì il nostro foglio dei
+recapiti non esiste — resterebbe per sempre davanti a un bottone
+spento. Se Andrea non la vuole è una riga.
+• E IL RECAPITO PUÒ ARRIVARE PRIMA DELLA GARANZIA (quello ricordato
+parte da solo alla presa): si mostra, con sotto «⚠️ Non inviare ancora
+niente: aspetta che questa pagina dica "Sats in garanzia"».
+• SUL SERVER: `POST /api/p2p/recapito`, corpo `{ordine}` e basta — il
+recapito di lì non passa e non c'è una colonna dove finirebbe. Il
+giudice (`_avviso_recapito_p2p`) vuole che chi chiama sia CHI VENDE su
+quell'ordine (su un `sell` chi ha pubblicato, su un `buy` chi ha
+preso), che l'ordine sia PRESO sul libro, che l'altra parte sia
+annotata e abbia gli avvisi accesi. Freno: al più tre avvisi per ordine
+(il primo e due correzioni, «ha aggiornato»), mai più fitti di un
+minuto, timbro prima dell'invio. Salta il gate e non lo timbra: non è
+una busta. La rotta risponde SEMPRE ok: il perché di un avviso non
+partito sta nel journal, o chi chiama imparerebbe se l'altro ha gli
+avvisi accesi. La cifra («10,00 €») è quella del libro, che il giudice
+del libro ora scrive in `p2p_ordini.euro`; un intervallo non scelto
+diventa «gli euro». Il nome è quello che l'altra parte vede nella
+pagina (`_controparti_p2p`, lo stesso giudice).
+⚠️ **È UN FATTO DICHIARATO DA UNA PARTE, cioè la strada che il secondo
+giro aveva SCARTATO** («far dichiarare il momento al client»: la regola
+5 rovesciata, il bonifico mandato a una garanzia mai bloccata). Non la
+riapre, e la differenza è questa: chi vende dichiara un gesto SUO («ti
+ho detto dove mandarli»), non un fatto sui sats; la frase **non dice
+che la garanzia è bloccata**, non porta il recapito — per pagare
+bisogna APRIRE lo scambio, e lì lo stato lo dice il coordinatore: a
+garanzia non bloccata il bottone non esiste e sopra l'IBAN c'è l'alt —
+e lo ripete: «Invia solo se la pagina dice "Sats in garanzia": lo dice
+il coordinatore, non chi vende». Il client onesto la manda solo a
+scambio attivo (se il recapito era partito prima, aspetta il momento
+in cui lo scambio DIVENTA attivo, o il primo render dopo).
+
+**C. L'APP SEGUE LO SCAMBIO.** Ad app aperta la macchina a stati si
+muoveva già su ogni busta; mancavano tre cose. 1) Dopo «vendi» (e dopo
+«compra») il velo col suo verbo — «Sto preparando la garanzia…», «Sto
+prendendo l'ordine…» — e quando la busta arriva **il foglio si apre da
+solo**: la richiesta da pagare, o «dove ricevere i sats» (col wallet
+collegato la fattura la chiede lui). Solo a chi sta guardando PROPRIO
+quello scambio e non ha un altro foglio davanti (`seguibileP2P`); agli
+altri il toast «tocca a te». 2) IL SILENZIO NON È UN ERRORE: se la
+risposta non arriva nei trenta secondi il riquadro arancio «Nessuna
+risposta (30 s)» non c'è più; lo stato dice «La risposta sta tardando…
+se arriva questa pagina si aggiorna da sola e ti avvisiamo; se fra un
+paio di minuti è ancora tutto fermo, riprova». E se intanto la risposta
+è arrivata, il silenzio della chiamata non riporta indietro niente.
+3) L'APP CHE TORNA IN PRIMO PIANO: la garanzia si paga altrove, l'app va
+sotto e il telefono le addormenta le connessioni. Al ritorno
+(`visibilitychange`) l'ascolto si rifà da capo, e un relay che si dice
+connesso ma non risponde in sei secondi a una domanda da niente si
+richiude (la riconnessione che c'era già fa il resto); e finché uno
+scambio PRESO è aperto davanti, la stessa domanda si rifà ogni venti
+secondi. NIENTE È PRECISO DAL TELEFONO sui momenti che solo mostro
+conosce: quello è la patch 0007.
+
+**LA TABELLA, momento → avviso → preciso/generico → fonte.**
+
+| Momento | A chi | Avviso | | Fonte |
+|---|---|---|---|---|
+| Pubblicazione | chi pubblica | niente (eco) | — | il suo gesto |
+| Presa | tutt'e due | «Hanno preso…» / «Hai preso l'ordine di Anna!» + di chi è il primo gesto | preciso | libro 38383 |
+| Richiesta di bloccare la garanzia | chi vende | se ha appena preso: niente (eco, o gemella); se ha pubblicato: «Novità» | generico | busta cifrata |
+| Garanzia bloccata | chi vende | niente (eco del foglio aperto, 5 min) | — | il suo gesto |
+| «Dove vuoi i sats» | chi compra | «Novità» (se ha appena preso: eco) | generico | busta cifrata |
+| Fattura data | chi compra | niente (eco) | — | il suo gesto |
+| Fattura data | chi vende | «Novità» (tocca a lui dire dove ricevere gli euro) | generico | busta cifrata |
+| **Dove ricevere gli euro** | chi compra | «Bruno ti ha indicato dove inviare 10,00 €: tocca a te» | **preciso** | **il telefono di chi vende** (NUOVO) |
+| Euro inviati | chi compra | niente (eco) | — | il suo gesto |
+| Euro inviati | chi vende | «Novità» | generico | busta cifrata |
+| Rilascio | chi vende | niente (eco) | — | il suo gesto |
+| Concluso | tutt'e due | «Scambio concluso» col netto di ciascuno | preciso | libro 38383 |
+| Annullato / tornato nel libro | tutt'e due / chi ha pubblicato | la frase sua | preciso | libro 38383 |
+| Scaduto | chi ha pubblicato | «⏰ Il tuo ordine è scaduto…» | preciso | libro 38383 + `expires_at` |
+| Sei ore / un'ora alla scadenza (tabacchino) | chi l'ha chiesta | la sveglia | preciso | il suo telefono |
+| Pagamento dei sats fallito | chi compra | «Novità» | generico | busta cifrata |
+
+I generici restano generici finché mostro non dice al server a che punto
+è lo scambio (patch 0007). La pagina Info P2P ha la sua voce «Gli
+avvisi: cosa ti diciamo, e quando», con lo scaduto che mancava.
+
+**PROVATO.** Due sezioni nuove: `prove_p2p_eco_gesto` — le righe, il
+timbro (la chiave di un altro non si timbra), il giudice vero caso per
+caso e soprattutto i casi che devono CONTINUARE a suonare (l'altra
+parte nello stesso istante, l'altro scambio della stessa persona, la
+busta dopo, un secondo oltre la finestra), il caso del 18 set per
+intero, e un giro VERO contro un relay di cartone;
+`prove_p2p_recapito_passo` — il giudice del recapito sui due lati
+(`buy` e `sell`), chi non può chiederlo, il freno, gli avvisi spenti
+che non lo bruciano, la frase (escape, nessun recapito, nessuna
+garanzia affermata), e i due segnali del client fatti girare in node (il
+corpo porta la sola chiave / il solo ordine; rete giù e server lento non
+fermano il gesto). Nel banco del motore: il gesto dichiarato PRIMA del
+messaggio, i due fogli che si aprono da soli, i due veli, il silenzio
+senza errore, e la pagina di chi aspetta il recapito (spento, frase,
+uscita, arrivo, correzione, l'alt prima della garanzia). Undici banchi
+vecchi emendati con la data: i fogli che ora si aprono da soli (il
+banco li riapriva a mano: due QR, due fatture), «tocca a te» che a riga
+nuda sono quattro casi e col recapito sei, le colonne di `chiavi_p2p`
+che da sei passano a otto, la domanda unica numero sessantuno. Suite da
+11.574 a **11.712, zero fallite**. **Tortura: quarantuno mutazioni su una copia, quarantuno uccise, nessuna inciampata. Due vanno dette. Il foglio della garanzia che non si apre da solo al primo giro moriva perche' il banco ESPLODEVA (un TypeError tre righe sotto l'attesa), non per la sua asserzione: il banco adesso lo apre a mano e va avanti, e la mutazione muore per la ragione giusta. E LA TORTURA HA FATTO TROVARE UNA CORSA VERA prima di scriverne la mutazione: il foglio della garanzia si apre da solo nell'istante in cui arriva la richiesta da pagare, quindi il suo timbro lungo nasceva un secondo DOPO quella busta — dentro lo scarto degli orologi — e a consumarlo sarebbe stata LEI, lasciando suonare la conferma del pagamento minuti dopo. Per il gesto lungo la soglia sta in avanti (fino a cinque secondi dal foglio aperto e' roba gia' vista: nessuno paga in meno), per quello corto resta indietro; tre mutazioni la tengono.**
+**DAL VIVO** (copia usa-e-getta, coordinatore e relay FINTI perché
+niente toccasse quelli veri): le due rotte sul server vero — il timbro
+nel database a trenta secondi e a cinque minuti, la chiave altrui che
+resta nuda, l'avviso a chi compra col nome e la cifra, il freno, il
+journal che dice ogni «no» col suo perché; nel browser, la pagina di
+chi compra col bottone spento e «Aspetta che Bruno…», poi una busta
+VERA (cifrata e firmata dall'altra parte, passata da `mostroArriva`)
+che accende il bottone e fa dire il toast; la pagina di chi vende col
+suo bottone, e il recapito che parte e chiama il server col solo id.
+⚠️ Il banco ha mentito una volta: a Bruno la frase diceva «indica a
+Bruno» — il cambio d'identità del collaudo non ricarica la pagina, e la
+cache dei volti è di sessione. Svuotata, il nome è giusto.
+NON PROVATO dal vivo: uno scambio vero a due telefoni via Tor (i tempi,
+l'eco vera di mostro, il ritorno dal wallet con le connessioni
+addormentate — la sonda del relay è scritta e provata solo a pezzi), e
+il secondo account che riceve davvero l'avviso del recapito su Telegram.
+
+**RESTA DA GUARDARE.** Nel journal del prossimo scambio: `· Campanello
+P2P: N, ECO del suo gesto (Ns dopo): non suona` a ogni gesto, e `💶
+Recapito P2P: N ha indicato dove ricevere gli euro, avvisato M` (la
+procedura sta in PRODUZIONE, «L'ECO E IL RECAPITO NEL JOURNAL»). Quanti
+secondi dopo il gesto nasce davvero l'eco: se stesse spesso oltre i
+trenta, la finestra e l'attesa del client si allungano INSIEME. Se
+l'uscita «per un'altra strada» viene usata a sproposito. E la patch
+0007, che renderà precisi i tre generici di mezzo.

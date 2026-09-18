@@ -24146,6 +24146,45 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `in-progress`), e lo SCADUTO: `pending→canceled` con created_at non
   prima del tag `expires_at` (`_evento_libro_p2p` lo porta in `scade`).
   Il verbale: CANTIERI, «Il campanello che rimanda».
+  L'ECO DEL PROPRIO GESTO E IL RECAPITO DEGLI EURO (18 set 2026, terzo
+  giro). Il server i gesti P2P NON li vede (il motore del client non
+  chiama mai casa), quindi due segnali nuovi, tutt'e due FUORI dal
+  motore e senza contenuto. `POST /api/p2p/gesto` `{pubkey, lunga?}`:
+  «sto facendo un gesto con questa chiave», mandato da
+  `dichiaraGestoP2P` dentro `mostroChiama` PRIMA del publish (tetto
+  1,2 s, fail-open) e all'apertura del foglio della garanzia (`lunga`).
+  `_segna_gesto_p2p` timbra `chiavi_p2p.gesto`/`eco_fino` sulla SOLA
+  riga di quella chiave e solo se e' di chi chiama. In `_nudge_p2p`,
+  prima di interruttore, gemelle, gate e coda: busta nata prima di
+  `gesto − P2P_ECO_SCARTO_S` (5) = gia' vista, tace e non consuma;
+  nata entro `eco_fino` = ECO, tace, non va in coda e AZZERA il timbro
+  (la seconda suona). `P2P_ECO_S` = 30 = `P2P_ATTESA_MS` del client
+  (una prova li tiene uguali: finche' il client aspetta e' un'eco, dopo
+  e' una notizia); `P2P_ECO_PAGA_S` = 300 per la garanzia pagata a
+  mano. `POST /api/p2p/recapito` `{ordine}`: chi VENDE ha mandato
+  all'altra parte dove ricevere gli euro (il recapito viaggia cifrato
+  fra i due telefoni e di qui NON passa). `_avviso_recapito_p2p`: chi
+  chiama dev'essere chi vende su quell'ordine (`sell` → maker, `buy` →
+  `preso_da`), ordine in `STATI_LIBRO_PRESO`, altra parte annotata e
+  con gli avvisi accesi; freno `P2P_RECAPITO_MAX` (3) e
+  `P2P_RECAPITO_PAUSA_S` (60) su `p2p_ordini.recapito_n` /
+  `.recapito_avviso`, timbro prima dell'invio; la cifra e'
+  `p2p_ordini.euro`, scritta dal giudice del libro; il nome quello di
+  `_controparti_p2p`. Frase precisa, salta il gate e non lo timbra, e
+  NON afferma la garanzia («invia solo se la pagina dice "Sats in
+  garanzia"»). La rotta risponde sempre `ok`: il perche' sta nel
+  journal. NEL CLIENT: `recapitoEuroArrivatoP2P` / `aspettaRecapitoP2P`
+  decidono `azioniDisponibili` a scambio `attivo` (chi compra:
+  «euro-inviati» solo a recapito arrivato o `recapitoAltrove`; chi
+  vende: `recapito` finche' non l'ha mandato), la frase, la tinta e il
+  bottone spento; `avvisaRecapitoP2P` chiama la rotta solo a `attivo`,
+  una volta per id di recapito (`recapitoAvvisato`), da `campoScrivi`,
+  dal passaggio ad `attivo` e da ogni render. `seguibileP2P` apre da
+  solo il foglio della garanzia e quello dei sats a chi guarda quello
+  scambio; `risvegliaP2P` rifa' l'ascolto al ritorno in primo piano
+  (e `sondaRelayP2P` richiude il relay che non risponde), piu' un polso
+  di 20 s a scambio preso aperto. Il verbale: CANTIERI, «Il campanello,
+  terzo giro».
   NEL CLIENT il giro che muore prima della garanzia si SCRIVE
   (`giroMorto` sulla riga, `P2P_GIRO_APERTO` gli stati da cui un
   ritorno è una notizia, `P2P_GIRO_MORTO` le frasi che statoTestoP2P
