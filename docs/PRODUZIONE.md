@@ -97,6 +97,11 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   Le righe gia' in tabella prendono lo stato alla PRIMA ripubblicazione
   del loro ordine, senza frase: l'orologio non ha visto il passaggio
   e non lo inventa.
+- (⚠️ DELL'ECO QUI SOTTO NON RESTA NIENTE dal 18 set 2026, patch 0007: via
+  le righe «ECO del suo gesto» e «busta nata PRIMA», e le «Novità» della
+  prova dal vivo. Le righe del RECAPITO restano, con un perché in più:
+  «non e' una delle due parti (secondo il coordinatore | i due
+  telefoni)». Vedi in fondo, «GLI AVVISI P2P DAL COORDINATORE».)
 - L'ECO E IL RECAPITO NEL JOURNAL (18 set 2026, terzo giro). Cinque
   colonne nuove nascono da sole al riavvio (ALTER): `chiavi_p2p.gesto`
   e `.eco_fino`, `p2p_ordini.euro`, `.recapito_avviso` e
@@ -128,6 +133,9 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   sats» che si apre da solo; ad A, a scambio attivo, il bottone «Ho
   inviato gli euro» SPENTO con «Aspetta che B ti indichi…» finche' il
   recapito non arriva, poi acceso col toast.
+- (⚠️ TOLTO il 18 set 2026 dalla patch 0007: il gate, la coda e le righe
+  qui sotto non esistono più. Resta a verbale com'era. Vedi in fondo,
+  «GLI AVVISI P2P DAL COORDINATORE».)
 - IL GATE CHE RIMANDA NEL JOURNAL (18 set 2026). Al posto del vecchio
   «e' nel gate … non suona» ci sono tre righe: `· Campanello P2P: N,
   busta gemella della frase precisa (Ns dall'evento del libro): gia'
@@ -155,6 +163,11 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   commissione compresa» e B il suo netto. Per lo SCADUTO: un ordine
   pubblicato e lasciato scadere (il tabacchino vive 48 ore) deve dare
   «⏰ Il tuo ordine è scaduto senza che la presa fosse completata».
+- (⚠️ DAL 18 SET 2026, patch 0007, L'ASCOLTO PORTA IL SOLO LIBRO e lo
+  specchio il kind 14 non lo copia più: `router.conf` della repo ha i
+  due kind pubblici, e sulla macchina del relay va sostituito — punto
+  10 di «GLI AVVISI P2P DAL COORDINATORE», in fondo. Le righe
+  dell'ascolto qui sotto valgono ancora, per il 38383.)
 - L'ASCOLTO P2P E IL 14 SULLO SPECCHIO (17 set 2026). Nel journal del
   VPS: `👂 Ascolto P2P: parte su …`, `👂 Ascolto P2P connesso a …`,
   `👂 Ascolto P2P CADUTO (perche'): riprovo…` e `… connesso … dopo N
@@ -675,3 +688,114 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   IL ROLLBACK ha due gradini: togliere le tre variabili dal compose e
   `up -d` (la patch diventa inerte, upstream byte per byte), oppure
   l'immagine a `-bar2`. La `fee` e il listino si rimettono a mano.
+- GLI AVVISI P2P DAL COORDINATORE, la messa in servizio (patch 0007 del
+  fork; il perché sta in CANTIERI, «Mostro è l'unica fonte degli avvisi
+  P2P»). ⚠️ DA FARE: al 18 set 2026 il codice del server è su main e in
+  servizio, la patch sul nodo NO — e finché non c'è valgono i soli
+  avvisi del libro (presa, concluso, annullato, scaduto, tornato), che a
+  porta chiusa partono SUBITO com'era. **Garanzia chiesta e bloccata,
+  fattura data, euro inviati, disputa e pagamento fallito in quella
+  finestra NON avvisano nessuno**: il campanello generico che li copriva
+  non c'è più. A pagina aperta l'app segue da sola; a pagina chiusa no.
+  Per questo il nodo si fa PRESTO, e a scambi fermi.
+  LA SEQUENZA, la stessa liturgia della 0005 (un comando alla volta):
+  1) IL SEGRETO, generato sul PC: `python -c "import secrets;
+  print(secrets.token_urlsafe(32))"`. UNO NUOVO, non quello dello
+  sconto: quello fa una domanda, questo fa partire avvisi a persone
+  vere — due porte, due chiavi, si ruotano una alla volta. Va in DUE
+  posti: `P2P_EVENTI_SEGRETO` nel `config.py` del VPS e
+  `BARATTOLO_EVENTI_SEGRETO` nel compose del nodo. Mai nel canale
+  Telegram del nodo, MAI in una chat con Claude (è già successo il 18
+  set: nei comandi c'è un segnaposto). Se `BARATTOLO_EVENTI_SEGRETO`
+  manca, mostrod usa `BARATTOLO_SCONTO_SEGRETO`: è un ripiego, non la
+  forma consigliata.
+  2) SUL PC, i due file al nodo (dalla cartella della repo):
+  `scp deploy/mostro/patch-0007-eventi-al-server.py deploy/mostro/barattolo_eventi.rs UTENTE@NODO:nodo/patch-bar3/`
+  (utente e indirizzo sono quelli con cui si entra di solito sul nodo)
+  — la cartella dei patcher sta FUORI da `mostro-src`, o il `git add -A`
+  di dopo se li porta nel commit del fork. Poi, sul nodo,
+  `sha256sum ~/nodo/patch-bar3/barattolo_eventi.rs` contro
+  `sha256sum deploy/mostro/barattolo_eventi.rs` sul PC.
+  3) SUL NODO: `cd ~/nodo/mostro-src`, e `git status` deve dire branch
+  `barattolo/v0.18.7` e albero pulito. A secco:
+  `python3 ~/nodo/patch-bar3/patch-0007-eventi-al-server.py --secco`
+  deve dire «A SECCO: 24 agganci in 13 file, tutte le ancore uniche, 13
+  azioni note». Poi senza `--secco`: «FATTO: 24 agganci in 13 file».
+  4) I TEST PRIMA DELLA BUILD VERA:
+  `docker build -f docker/Dockerfile --target builder -t mostro-test:bar4 .`
+  e poi, in UN comando solo e senza virgolette annidate (da PowerShell
+  dentro `ssh "…"` non passano):
+  `docker run --rm mostro-test:bar4 cargo test --release -- barattolo_eventi barattolo_fee app::take_buy app::take_sell flow app::add_invoice app::fiat_sent app::release app::cancel app::dispute scheduler app::admin_cancel app::admin_settle`
+  ⚠️ IL RUST DELLA 0007 NON È MAI STATO COMPILATO (sul PC non c'è
+  cargo): se la build o i test si fermano, l'errore si incolla a Claude
+  e si corregge NEL REPO (`barattolo_eventi.rs` o il patcher), poi sul
+  nodo `git checkout -- . && rm -f src/barattolo_eventi.rs` e si
+  riparte dal punto 2. Niente ritocchi a mano sul nodo: la copia nel
+  repo deve restare quella vera.
+  5) VERDI: `git add -A` e `git commit -m "events: tell the marketplace
+  server about every order transition"`, poi
+  `git format-patch -1 --start-number 7` — senza `--start-number` il
+  file nascerebbe `0001-` e nel repo pesterebbe la prima patch. Il
+  `.patch` torna sul PC con `scp`, in `deploy/mostro/`.
+  6) LA BUILD VERA: `docker build -f docker/Dockerfile -t mostro:v0.18.7-bar4 .`
+  — un tag nuovo, mai sovrascritto (`-bar3` resta sulla macchina: è il
+  rollback).
+  7) IL COMPOSE (`cd ~/nodo`, copia prima: `cp docker-compose.yml
+  docker-compose.yml.prima-bar4`): l'immagine a `mostro:v0.18.7-bar4`, e
+  sotto `environment:` del servizio `mostro` le due righe
+  `BARATTOLO_EVENTI_URL=https://barattolo.store/api/p2p/evento` e
+  `BARATTOLO_EVENTI_SEGRETO=...`.
+  8) A LIBRO FERMO — nessuno scambio preso in corso:
+  `docker compose up -d mostro` (`up -d` e NON `restart`: cambiano
+  immagine e ambiente). Si guarda:
+  `docker inspect --format '{{.Config.Image}}' nodo-mostro-1` dice
+  `-bar4`; e `docker compose logs mostro | grep barattolo_eventi` dice
+  `barattolo_eventi: order events go to https://barattolo.store/api/p2p/evento`
+  (se dice `not configured` manca una delle due variabili). Da lì in
+  poi ogni passo di ogni scambio lascia UNA riga:
+  `barattolo_eventi: order <id> taken: delivered (HTTP 200, 840 ms)`, o
+  `NOT delivered (…), giving up` — quel che dice al server la riserva
+  del libro lo recupera un minuto dopo, per i cinque momenti pubblici.
+  Finché il VPS non ha il segreto la porta risponde 404, e il nodo lo
+  scrive (`NOT delivered (HTTP 404), no retry`): è atteso, e non ferma
+  niente — è l'opposto del fail-closed dello sconto.
+  9) SUL VPS, nel `config.py`: `P2P_EVENTI_SEGRETO = "..."`, poi
+  `sudo systemctl restart barattolo`. Il pannello «Stato delle leve»
+  deve dire accesa «Avvisi P2P — porta del coordinatore», e il journal
+  alla partenza `▶️ Orologio P2P partito: … eventi del coordinatore
+  ACCESI`. La porta si prova dal VPS stesso:
+  `curl -s -o /dev/null -w "%{http_code}\n" -X POST http://127.0.0.1:8080/api/p2p/evento -H "Authorization: Bearer IL_SEGRETO" -H "Content-Type: application/json" -d '{}'`
+  → `400` (la porta è aperta, il corpo vuoto è rifiutato); senza
+  l'header → `403`; col segreto vuoto nel config → `404`.
+  10) LO SPECCHIO, quando capita (non blocca niente): il
+  `router.conf` della repo non copia più i kind 14. Sulla macchina del
+  relay si sostituisce il file e si riavvia il router (vedi «LO
+  SPECCHIO GIRA SULLA MACCHINA DEL RELAY»). Finché resta il vecchio le
+  buste continuano ad arrivare sullo specchio, e nessuno le guarda.
+  NEL JOURNAL DEL VPS, le righe nuove:
+  `journalctl -u barattolo -f | grep -E "Evento P2P|Attese P2P|Riserva P2P|Libro P2P|Recapito P2P"`.
+  `🛰️ Evento P2P: 0f3a5c1e «fiat» da buyer (giro 1): avvisati [222]`
+  con sotto l'esito di Telegram per destinatario; `🛰️ Evento P2P: …
+  nessuno da avvisare (giro 1, compra 111, vende 222)` per i momenti
+  che non parlano (la metà muta di una coppia, il gesto di chi è solo);
+  `· Evento P2P: … ripetuto (il retry del coordinatore)`; `· Evento
+  P2P: … e' gia' stato detto: non si ripete`; `🔕 Evento P2P: N ha gli
+  avvisi P2P SPENTI`; `⚠️ Evento P2P rifiutato: …` (un corpo storto:
+  400); `📖 Libro P2P: 1 frasi in attesa per [222] (fra 60s, se il
+  coordinatore tace)`; `· Riserva P2P: … l'ha gia' raccontato il
+  coordinatore: il libro tace` — la riga di TUTTI I GIORNI — e
+  `⚠️ Riserva P2P: … il coordinatore NON l'ha raccontato in 60s: parla
+  il libro`, che è la riga DA GUARDARE: vuol dire un POST perso, e il
+  perché sta nel log del nodo (`grep barattolo_eventi`).
+  LA CRONACA DI UN ORDINE, quando qualcosa non torna (in sola lettura):
+  `sqlite3 ~/satmarket/satmarket.db "SELECT datetime(quando,'unixepoch'), momento, dettaglio, attore, fonte, giro FROM p2p_momenti WHERE ordine LIKE '0f3a5c1e%' ORDER BY quando"`
+  e chi è stato avvisato di cosa:
+  `sqlite3 ~/satmarket/satmarket.db "SELECT datetime(quando,'unixepoch'), momento, giro, tg_id, fonte FROM p2p_avvisi WHERE ordine LIKE '0f3a5c1e%' ORDER BY quando"`.
+  LA PROVA A DUE TELEFONI (A compra e pubblica, B vende e prende; poi
+  SUBITO un secondo scambio a parti rovesciate — è il caso che il 18 set
+  ha rotto tutto): la checklist sta nel verbale in CANTIERI, e ogni riga
+  ha il suo avviso atteso e chi NON deve riceverlo.
+  IL ROLLBACK ha due gradini, come la 0005: togliere
+  `BARATTOLO_EVENTI_URL` dal compose e `up -d` (la patch diventa inerte,
+  e sul VPS svuotare `P2P_EVENTI_SEGRETO` fa tornare il libro a parlare
+  subito), oppure l'immagine a `-bar3`.

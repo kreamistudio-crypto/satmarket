@@ -20908,3 +20908,257 @@ codice non indovina. E una cosa vista passando, NON toccata: card e
 scheda dicono «Spedizione gratuita» anche per un annuncio che a casa
 non spedisce (`spedGratis` guarda le colonne a zero, non la porta) —
 è il gemello in vetrina del verde curato qui.
+## Mostro è l'unica fonte degli avvisi P2P: via il campanello che deduceva (18 set 2026, patch 0007)
+
+**LA DECISIONE** (Andrea con Alan, la sera del 18 set): il server può
+sapere a che punto è ogni scambio. Gli avvisi generici «Novità in un tuo
+scambio» spariscono del tutto, da ogni punto dell'app e del server, e al
+loro posto c'è UN avviso preciso per passo, alla parte che deve agire o
+sapere, mai a chi ha fatto il gesto.
+
+**PERCHÉ.** Il server deduceva cosa succede da buste cifrate che non può
+leggere, e attorno a quella cecità erano cresciuti in tre giorni quattro
+meccanismi, ognuno per curare il precedente: il gate a due pause (600 e
+90 s) contro le raffiche, la coda perché il gate non scartasse, la busta
+gemella perché la coda non raddoppiasse le frasi del libro, la finestra
+dell'eco perché non suonasse a chi aveva l'app in mano. Dal vivo il 18
+set (journal 20:15-20:26) ha dato avvisi a caso: la pausa da 600 s
+rimasta attaccata alla persona per tutto lo scambio dopo, le buste di
+uno scambio già concluso che suonavano, il recapito scartato («non è una
+delle due parti»), il «concluso» mai arrivato a chi vendeva.
+LA LEZIONE, che vale oltre il P2P: **quattro cure in fila sullo stesso
+sintomo dicono che il difetto non è in una taratura, è nella fonte.** Si
+deduceva un fatto che qualcuno — il coordinatore, che è nostro — SA. Il
+terzo giro del campanello l'aveva scritto in fondo al suo verbale («la
+patch 0007, che renderà precisi i tre generici di mezzo») senza vedere
+che la stessa patch rendeva inutile tutto il resto.
+
+**COSA SI È FATTO, in tre parti.**
+A — MOSTRO (`deploy/mostro/barattolo_eventi.rs`, il patcher
+`patch-0007-eventi-al-server.py`). A ogni transizione di stato mostrod
+fa un POST a `BARATTOLO_EVENTI_URL`, sulla strada dello sconto: lo
+STESSO client HTTP della 0005 (quindi lo stesso circuito Tor tenuto
+caldo dal battito), segreto in header. Tredici azioni, ventiquattro
+agganci in tredici file, uno per transizione. Fire-and-forget, l'opposto
+del fail-closed dello sconto: `emit*` sono funzioni sincrone che tornano
+subito, il POST vive in un task suo (8 s, poi UN retry a 12), e nessun
+gesto dello scambio lo aspetta. Senza la variabile la patch è inerte.
+B — IL SERVER. `POST /api/p2p/evento` con quattro giudici puri (la
+forma, la cronaca, a chi, la frase) e tre tabelle (`p2p_momenti`,
+`p2p_scambi`, `p2p_avvisi`) più `p2p_attese`. TOLTI: il giro dei kind
+14, `MSG_NUDGE_P2P`, il gate, la coda, la gemella, l'eco, la rotta
+`/api/p2p/gesto`, `dichiaraGestoP2P` nel client, le cinque colonne di
+`chiavi_p2p` (nei database già nati restano, morte), il kind 14
+dall'ascolto e dal router dello specchio. Il libro resta come RISERVA:
+la sua frase aspetta 60 s e parte solo se mostrod ha taciuto.
+C — IL CLIENT. Il recapito ricordato non parte più da solo; la
+pubblicazione ha il velo e la spunta; Info P2P, patto sui dati e la riga
+del cassetto Avvisi dicono il vero nuovo.
+
+**LA TABELLA: evento → a chi → frase → fonte.** (A compra 15.000 sats
+per 10,00 € via SEPA, B vende. «Libro» = c'è anche la riserva.)
+- `taken` → a chi ha PUBBLICATO: «Il tuo ordine è stato preso da B: vendi
+  / compri 15.000 sats per 10,00 € via SEPA», più il passo che si apre
+  («Paga la garanzia: la richiesta è nell'app» / «Appena B indica dove
+  ricevere i sats, tocca a te bloccare la garanzia» / «Appena B blocca
+  la garanzia, tocca a te indicare dove ricevere i sats»). A chi ha
+  preso: niente. Mostro + libro.
+- `hold-invoice-requested` → a chi vende: «Paga la garanzia: la
+  richiesta è nell'app. A ha indicato dove ricevere i sats, ora tocca a
+  te» — SOLO quando nasce dalla fattura di chi compra (`invoice`); alla
+  presa (`take`) tace, la copre la frase della presa. Solo mostro.
+- `hold-invoice-paid` → a chi compra: «B ha bloccato i sats in garanzia:
+  indica dove ricevere i sats», oppure (fattura già data) «…Appena ti
+  indica dove inviare 10,00 €, tocca a te». Solo mostro.
+- `buyer-invoice-requested` → a nessuno, mai: o è la metà muta della
+  garanzia pagata, o nasce con una presa fatta proprio da chi compra.
+- `buyer-invoice-added` → a chi vende: «A ha indicato dove ricevere i
+  sats. Se non l'hai ancora fatto, indica dove ricevere gli euro»
+  (`active`); tace se dopo viene la garanzia (`hold-next`) o se è una
+  fattura NUOVA (`new-invoice`, che però riapre l'avviso del payout
+  fallito). Solo mostro.
+- il RECAPITO (nostro: mostrod non lo vede) → a chi compra: «B ti ha
+  indicato dove inviare 10,00 €: tocca a te. Invia solo se la pagina
+  dice "Sats in garanzia"». Dal client di chi vende.
+- `fiat-sent` → a chi vende: «A dice di aver inviato 10,00 €: controlla
+  il conto e rilascia i sats», con «rilascia solo quando gli euro sono
+  arrivati davvero». Solo mostro.
+- `released` → a nessuno SUBITO; il «hai venduto» di chi vende va in
+  attesa un minuto e parte se `success` non arriva. Quello di un
+  moderatore a tutti e due.
+- `success` → a tutti e due, col netto di ciascuno al satoshi
+  («14.775 sats in arrivo al tuo recapito» / «Hai venduto 15.000 sats
+  per 10,00 €, in tutto 15.225 sats commissione compresa») e l'invito a
+  recensire dove il posto c'è. Mostro + libro.
+- `cancel-requested` → all'altra parte: «B chiede di annullare lo
+  scambio…». Solo mostro. NON era nella richiesta: l'ha aggiunta il
+  censimento, senza di lei l'annullo d'accordo era muto a metà.
+- `canceled` → all'altra parte («B ha annullato lo scambio», «B ha
+  accettato di annullare…», «Un moderatore ha annullato…»); se chi
+  aveva preso si ritira l'ordine TORNA in vetrina e lo sente chi ha
+  pubblicato. Mostro + libro.
+- `expired` → `book`: a chi ha pubblicato, «Il tuo ordine è scaduto
+  senza che la presa fosse completata»; `taker-timeout`: a tutti e due,
+  ognuno dal suo lato (tornato in vetrina); `maker-timeout` e
+  `escrow-deadline`: annullato, a tutti e due. Mostro + libro.
+- `dispute-opened` → all'altra parte: «A ha aperto una disputa sullo
+  scambio da 10,00 €: i moderatori vi contatteranno». Solo mostro.
+- `payout-failed` → a chi compra: «Il pagamento dei sats non è passato
+  (non si è trovata una strada fino al tuo wallet): apri "Dove ricevere
+  i sats" e dai una fattura nuova». Solo mostro.
+
+**LE DECISIONI MIE, dichiarate** (ognuna è una riga da rovesciare).
+1) UN SEGRETO NUOVO, `P2P_EVENTI_SEGRETO`, non quello dello sconto: quello
+fa una domanda (chi lo ruba impara se una chiave ha lo sconto), questo
+fa partire avvisi a persone vere. Le frasi le scrive il server e non chi
+chiama, quindi il danno ha un tetto — ma due porte con due mestieri si
+ruotano una alla volta. Costa una riga. Sul nodo, se manca, vale quello
+dello sconto: un ripiego, non la forma consigliata.
+2) TRE IMPORTI ALLA CHIUSURA, non uno: l'ordine, il netto a chi compra e
+il totale bloccato da chi vende. La richiesta diceva «solo per success
+l'importo»; ma dalla 0005 le due fee possono differire, e la frase di
+chi vende («in tutto 15.225») il server da solo al satoshi non la
+saprebbe. Su tutte le altre azioni gli importi non entrano: lo prova un
+caso della tortura.
+3) I DETTAGLI-MACCHINA. mostrod fa certi passi A COPPIE nello stesso
+istante (presa + garanzia chiesta; garanzia pagata + fattura chiesta),
+con due POST indipendenti che arrivano nell'ordine che capita. Senza un
+dettaglio che dica quale ramo è passato il server avrebbe dovuto
+indovinare dall'ordine d'arrivo — cioè rifare, in piccolo, il difetto da
+cui si partiva. Di ogni coppia parla UNO.
+4) IL GIRO CONTA LE PRESE, non i ritorni. Un ordine tornato in vetrina
+e ripreso dev'essere un avviso nuovo e non il doppione del primo. Contare
+i ritorni sembrava più naturale ed era sbagliato: un ritorno perso per
+strada lascerebbe il contatore indietro proprio sullo scambio dopo,
+mentre una presa è sempre un evento nuovo.
+5) LA PRESA NON SI RACCONTA A CHI HA PRESO, nemmeno dalla riserva del
+libro («Hai preso l'ordine di Anna!» non parte più). La regola è una.
+6) IL TABACCHINO PARTE ANCORA DA SOLO. La richiesta parlava di
+«coordinate salvate», e i tre dati del tabacchino non lo sono: li scrive
+chi vende PER QUELL'ordine, nel foglio della pubblicazione. Se si vuole
+fermare anche lui è una riga in `recapitoDaAutoInvio`.
+7) CHI ENTRA DA NOSTR RICEVE I SUOI AVVISI: le sue chiavi stanno in
+`chiavi_p2p` per questo, e prima gli restava solo il generico. `preso_da`
+continua a non scriversi senza «Fatti riconoscere», quindi il suo nome
+negli avvisi dell'altra persona non compare.
+8) IL KIND 14 VIA DAL ROUTER DELLO SPECCHIO. Non era nella richiesta, ma
+quella copia esisteva solo per il campanello tolto, e il patto sui dati
+la raccontava: tenerla voleva dire spiegare a cosa serve, e non serve.
+9) «E TI AVVISIAMO» TOLTO dalla frase «la risposta sta tardando»: gli
+avvisi non vanno a chi ha fatto il gesto, quindi la risposta in ritardo
+al PROPRIO gesto non suona più. È l'unico caso in cui si perde qualcosa
+rispetto a ieri, e la frase ora dice di restare sulla pagina.
+
+**LE STRADE SCARTATE.** Un aggancio SOLO in `update_order_event` (il
+punto da cui passa ogni cambio di stato): un'ancora invece di
+ventiquattro, ma lì non si sa CHI ha fatto il gesto, ed è metà della
+regola. Far creare al server le righe di `p2p_ordini` dagli eventi: una
+riga a intestatario ignoto la potrebbe rivendicare chiunque legga l'id
+dal libro, prendendosi la faccia sulla card di un altro. Riconoscere «lo
+stesso momento» fra libro e mostro col solo giro: i due contatori
+possono divergere se un POST si perde; si usa il tempo (30 s, stesso
+orologio) per far tacere la riserva e il giro per l'anti-doppione.
+Tenere il campanello generico acceso finché il nodo non ha la patch: è
+esattamente «togli del tutto» non fatto.
+
+**PROVATO.** Suite da 11.712 a **11.768, zero fallite**. Tre collaudi
+nuovi — `prove_p2p_eventi` (lo scambio intero nei due versi sui giudici
+veri, la tabella a chi, la porta fatta GIRARE, l'idempotenza, il giro,
+le uscite storte, cosa non può entrare), `prove_p2p_riserva_libro` (il
+libro che tace, che parla, a porta chiusa, il ritardatario, l'attesa del
+rilascio) e `prove_p2p_velo_pubblica` (la `inviaNuovoOrdineP2P` VERA in
+node su quattro uscite: la spunta su una sola) —, `prove_p2p_campanello`
+riscritto per sorvegliare che il castello non torni, due collaudi tolti
+con ciò che provavano (il gate che accorpa, l'eco del gesto), e otto
+emendati con la data. La PROVA APPOSTA del punto 5 sta in
+`prove_p2p_chat`: un ricordo pronto, la controparte nota, e non parte
+niente; col gesto sì; il tabacchino ancora sì. Il difetto delle 20:24 è
+riprodotto in `prove_p2p_recapito_passo` (senza il coordinatore chi
+vende non risulta; con, sì — e al giro dopo chi vendeva prima non è più
+una parte).
+**Tortura: quaranta mutazioni su una copia, trentanove uccise.** La
+quarantesima («un kind 14 entra nell'ascolto») è un mutante
+EQUIVALENTE, e va detto perché: una busta fatta passare dal controllo
+del filo muore comunque nell'estrattore del libro, che senza i tag `d` e
+`s` torna None. Le difese sono tre (il filtro della REQ, il kind nel
+filo, l'estrattore) e la seconda da sola non la prova nessuno — è la
+trappola già a verbale, «verde per una ragione diversa da quella che
+credi». Il banco ha inciampato due volte e tutt'e due per colpa mia: una
+riga rotta con un parametro SQL di troppo (la mutazione «moriva» per
+un'esplosione: rifatta, uccisa davvero) e due fette lanciate sulla
+stessa copia perché i processi vecchi non erano morti (rifatte da capo).
+**DAL VIVO** (server di collaudo dal worktree, porta 8087, database
+suo): la porta — 403 senza header, 403 col segreto sbagliato, 400 al
+corpo vuoto, 404 a segreto non scritto; due scambi di fila fatti
+arrivare alla rotta vera come li manderebbe mostrod, il secondo SUBITO
+dopo e a parti rovesciate: ogni avviso alla parte giusta coi nomi
+giusti, il retry riconosciuto (`nuovo: false`), le due metà mute delle
+coppie, il concluso a tutti e due al satoshi; al secondo scambio il
+payout fallito a chi compra col motivo in parole, e un minuto dopo — dal
+giro delle attese, svegliato apposta — il «per te lo scambio è concluso»
+a chi vendeva, mentre l'attesa del primo scambio taceva («già detto»);
+il recapito con chi compra e un estraneo respinti col perché nel
+journal, e chi vende che passa.
+**NON PROVATO, e sono tre cose grosse.** 1) **IL RUST NON È MAI STATO
+COMPILATO**: sul PC non c'è cargo. Verificate le ventiquattro ancore sul
+clone del tag con le sei patch applicate (tutte uniche; rilanciato, il
+patcher si ferma; regge un `barattolo_fee.rs` in CRLF), e LETTE le firme
+che ogni aggancio usa — ma il primo `cargo build` è sul nodo, e gli
+errori si correggono nel repo. 2) Nessun evento VERO è mai arrivato: i
+corpi della prova dal vivo li ho scritti io sul formato del modulo, e se
+il modulo avesse un difetto di forma lo scoprirebbe solo mostrod. 3) Il
+client non è stato guardato in un browser: il velo della pubblicazione
+gira in node (quattro uscite) e il CSS della spunta ha le sue sentinelle,
+ma COM'È sullo schermo — se l'arancio regge sul tema scuro, se 2,5 s
+sono giusti — va visto sul telefono.
+
+**LA FINESTRA CHE SI APRE COL PUSH, e va saputa.** Il server va in
+produzione al push; la patch sul nodo no. Finché il nodo non ha `-bar4`
+e il VPS non ha `P2P_EVENTI_SEGRETO`, gli avvisi sono i SOLI cinque del
+libro (che a porta chiusa partono subito, com'era): garanzia, fattura
+data, euro inviati, disputa e payout fallito non avvisano nessuno. A
+pagina aperta l'app segue da sola; a pagina chiusa no. La sequenza per
+il nodo sta in PRODUZIONE, «GLI AVVISI P2P DAL COORDINATORE».
+
+**LA PROVA A DUE TELEFONI** (A compra e pubblica, B vende e prende; nel
+journal `grep -E "Evento P2P|Attese P2P|Riserva P2P|Recapito P2P"`).
+A OGNI RIGA: chi riceve, e chi NON deve ricevere niente.
+1. A pubblica → velo «Sto pubblicando…», poi spunta arancione «Ordine
+   pubblicato» ferma ~2,5 s, poi si chiude. NESSUN avviso a nessuno.
+2. B prende → ad A «Il tuo ordine è stato preso da B: compri …»; a B
+   niente (la richiesta da pagare gli si apre da sola).
+3. B paga la garanzia → ad A «B ha bloccato i sats in garanzia: indica
+   dove ricevere i sats»; a B niente.
+4. A dà la fattura → a B «A ha indicato dove ricevere i sats. Se non
+   l'hai ancora fatto, indica dove ricevere gli euro»; ad A niente.
+5. B apre il foglio: le coordinate sono GIÀ SCRITTE ma non sono
+   partite (sul telefono di A il bottone «Ho inviato gli euro» è SPENTO).
+   B preme «Invia a chi compra» → ad A «B ti ha indicato dove inviare
+   10,00 €: tocca a te», e il bottone si accende.
+6. A preme «Ho inviato gli euro» → a B «A dice di aver inviato 10,00 €:
+   controlla il conto e rilascia i sats»; ad A niente.
+7. B rilascia → entro pochi secondi a TUTTI E DUE «Scambio concluso!»,
+   ad A col netto, a B col totale. B NON deve riceverne due (l'attesa
+   del rilascio deve tacere: nel journal «gia' stato detto»).
+8. Nel journal, per tutto lo scambio: nessuna riga «Novità», nessuna
+   «⚠️ Riserva P2P … parla il libro» (sarebbe un POST perso), e per ogni
+   momento pubblico «il libro tace».
+9. **SUBITO DOPO, un secondo scambio a parti rovesciate** (B pubblica
+   un ordine di vendita, A lo prende): è il caso che il 18 set ha rotto
+   tutto. Gli stessi passi, e in più: nessun avviso del PRIMO scambio
+   deve tornare a suonare; al punto 5 l'avviso del recapito DEVE partire
+   (era «non è una delle due parti»); nessuna pausa deve mangiarsi un
+   avviso — il secondo scambio suona come il primo.
+10. Da fare una volta, a parte: prendere un ordine e lasciar scadere i
+    15 minuti (a tutti e due il ritorno in vetrina, ognuno con la sua
+    frase), e un annullo d'accordo (la richiesta all'altra parte, poi
+    l'annullo a chi l'aveva chiesto).
+
+**RESTA DA GUARDARE.** La compilazione sul nodo, prima di tutto. Poi,
+nel log del nodo, i millisecondi di `barattolo_eventi: … delivered (HTTP
+200, N ms)`: se stanno spesso oltre gli 8000 il primo tentativo è corto
+per quel circuito, e si allunga lui (non la riserva). Se `⚠️ Riserva P2P`
+compare a circuito caldo, il POST si perde per un'altra ragione e va
+letta quella riga del nodo. Il `router.conf` nuovo sulla macchina del
+relay. E le cinque colonne morte di `chiavi_p2p`: non danno fastidio, e
+il giorno che la tabella si rifacesse per un altro motivo se ne vanno.

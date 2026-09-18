@@ -24058,7 +24058,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Il ritiro del proprio ordine (`pending→canceled`) e i tre momenti
   interni — garanzia depositata, fiat inviato, disputa aperta — non
   hanno una frase: il libro li mostra tutti come `in-progress`, e
-  restano al campanello generico, cifratura compresa.
+  restano al campanello generico, cifratura compresa. (⚠️ Dal 18 set
+  2026 il campanello generico NON C'È PIÙ, e di quei momenti parla il
+  coordinatore: vedi «MOSTRO È L'UNICA FONTE DEGLI AVVISI P2P».)
   COM'È FATTO: `_giro_libro_p2p` gira nell'`orologio_p2p` PRIMA del
   giro dei kind 14, una REQ al minuto (`eventi_libro_da_relay`: kinds
   38383, `authors` il coordinatore, `#d` gli id in tabella a blocchi di
@@ -24130,6 +24132,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   pubblicano; lo scaduto esce `canceled`. `STATI_LIBRO_PRESO` e il ramo
   delle frasi per stato restano come TOLLERANZA, per un coordinatore
   che quegli stati li pubblicasse.
+  (⚠️ TOLTO lo stesso 18 set 2026 dalla patch 0007 — gate, coda e busta
+  gemella: resta a verbale com'era fatto; vedi «MOSTRO È L'UNICA FONTE
+  DEGLI AVVISI P2P».)
   IL GATE RIMANDA E ACCORPA, NON SCARTA (18 set 2026, dal journal: la
   richiesta di bloccare la garanzia dieci secondi dopo la frase della
   presa «nel gate: non suona», e mai più detta). Due colonne nuove su
@@ -24160,6 +24165,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `in-progress`), e lo SCADUTO: `pending→canceled` con created_at non
   prima del tag `expires_at` (`_evento_libro_p2p` lo porta in `scade`).
   Il verbale: CANTIERI, «Il campanello che rimanda».
+  (⚠️ DELL'ECO NON RESTA NIENTE dal 18 set 2026, patch 0007: via la
+  rotta `/api/p2p/gesto` e `dichiaraGestoP2P`. Il RECAPITO resta, col
+  giudice delle parti e il freno nuovi; vedi «MOSTRO È L'UNICA FONTE
+  DEGLI AVVISI P2P».)
   L'ECO DEL PROPRIO GESTO E IL RECAPITO DEGLI EURO (18 set 2026, terzo
   giro). Il server i gesti P2P NON li vede (il motore del client non
   chiama mai casa), quindi due segnali nuovi, tutt'e due FUORI dal
@@ -24199,6 +24208,100 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (e `sondaRelayP2P` richiude il relay che non risponde), piu' un polso
   di 20 s a scambio preso aperto. Il verbale: CANTIERI, «Il campanello,
   terzo giro».
+  MOSTRO È L'UNICA FONTE DEGLI AVVISI P2P (18 set 2026, patch 0007 del
+  fork, decisione di Andrea con Alan). ⚠️ QUESTA VOCE SOSTITUISCE le
+  quattro qui sopra per tutto quel che riguarda il CAMPANELLO GENERICO:
+  il giro dei kind 14, `MSG_NUDGE_P2P` («Novità in un tuo scambio»),
+  il gate a due pause (`P2P_NUDGE_S`, `P2P_NUDGE_VIVO_S`), la coda
+  (`rimandato`, `_scarica_rimandati_p2p`), la busta gemella (`coperto`,
+  `P2P_GEMELLI_S`), la finestra dell'eco (`/api/p2p/gesto`,
+  `_segna_gesto_p2p`, `P2P_ECO_S`, `dichiaraGestoP2P` nel client) NON
+  ESISTONO PIÙ, e non si rimettono: deducevano da buste cifrate quel
+  che il coordinatore — che è nostro — SA. Le cinque colonne di
+  `chiavi_p2p` che li servivano restano morte nei database già nati.
+  IL SERVER RICEVE da mostrod, a ogni transizione di stato,
+  `POST /api/p2p/evento` (bearer `P2P_EVENTI_SEGRETO`, un segreto SUO
+  e non quello dello sconto: quello fa una domanda, questo fa partire
+  avvisi; vuoto = 404, la stessa forma): `{v, order, action, ts,
+  buyer, seller, actor, detail, sats*}` — id ordine, azione, l'ora di
+  mostrod, le due TRADE key, chi ha fatto il gesto
+  (buyer/seller/mostro), un dettaglio-macchina, e SOLO su
+  `released`/`success` tre importi (l'ordine, il netto a chi compra,
+  il totale bloccato da chi vende). MAI fatture, preimage, hash, testi,
+  coordinate. Le tredici azioni: taken, hold-invoice-requested,
+  hold-invoice-paid, buyer-invoice-requested, buyer-invoice-added,
+  fiat-sent, released, success, cancel-requested, canceled, expired,
+  dispute-opened, payout-failed.
+  QUATTRO GIUDICI PURI: `_evento_p2p_pulito` (la forma: un'azione fuori
+  elenco è un 400; l'ora di mostrod a più di `P2P_EVENTO_OROLOGIO_S`
+  dalla nostra è un 400, perché è parte della chiave);
+  `_registra_evento_p2p` (la cronaca `p2p_momenti`, PK ordine + momento
+  + ora + fonte: è l'IDEMPOTENZA — il retry di mostrod porta lo stesso
+  corpo con la stessa ora — e le parti in `p2p_scambi`, riscritte a
+  ogni evento dalle trade key via `chiavi_p2p`; il GIRO è quante PRESE
+  mostrod ha raccontato per quell'ordine); `_destinatari_evento_p2p`
+  (A CHI: alla parte che deve agire o sapere, MAI a chi ha fatto il
+  gesto; se il gesto è di mostrod, a tutti e due);
+  `_testo_evento_p2p` (la frase, coi numeri del libro: `p2p_ordini`
+  porta ora anche `sats` e `metodi`, scritti da `_avvisi_libro_p2p`,
+  perché l'evento dice chi e cosa, mai quanto). Il momento ha il
+  vocabolario del libro (`_momento_evento_p2p`): preso,
+  garanzia_chiesta, garanzia_pagata, fattura_chiesta, fattura_data,
+  fiat, rilasciato, concluso, annullo_chiesto, annullato, tornato,
+  scaduto, disputa, payout_fallito.
+  I MOMENTI NATI IN COPPIA: mostrod fa certi passi a due a due nello
+  stesso istante, con due POST indipendenti che arrivano nell'ordine
+  che capita. Non si indovina: il `detail` dice quale ramo è passato, e
+  di ogni coppia parla UNO — la presa (`hold-next`) copre la garanzia
+  chiesta (`take`); la garanzia chiesta (`invoice`) copre la fattura
+  data (`hold-next`); la garanzia pagata copre la fattura chiesta, che
+  non parla mai.
+  L'ANTI-DOPPIONE È UNO (`p2p_avvisi`, PK ordine + momento + giro +
+  persona): ci scrivono gli avvisi del coordinatore, la riserva del
+  libro e il recapito, sempre PRIMA dell'invio. Una fattura nuova dopo
+  un pagamento fallito (`buyer-invoice-added`/`new-invoice`) cancella
+  la riga del `payout_fallito`, così un secondo fallimento risuona.
+  LA RETE DI SICUREZZA È IL LIBRO: `_avvisi_libro_p2p` non manda più,
+  mette la frase in `p2p_attese` con scadenza a `P2P_RISERVA_S` (60;
+  zero a porta chiusa: allora parte nella stessa passata, com'era), e
+  `_scarica_attese_p2p` la BUTTA se in `p2p_momenti` c'è lo stesso
+  momento di mostrod a meno di `P2P_STESSO_MOMENTO_S` (30), se no la
+  manda — «se l'evento è arrivato, il libro tace». Il giro della
+  riserva è `p2p_ordini.tornati + 1` (lo scaduto: `tornati`), che
+  combacia col conto delle prese. La presa NON si dice più a chi ha
+  preso, nemmeno dalla riserva. IL RILASCIO usa la stessa tabella: al
+  `released` di chi vende il suo «hai venduto» va in attesa un minuto,
+  e parte se `success` non arriva (il 18 set il «concluso» a chi
+  vendeva non era arrivato MAI: il payout era fallito).
+  L'OROLOGIO ha tre sveglie: il minuto (libro dai relay + attese), il
+  lampo dell'ascolto (libro dal mazzetto + attese) e la scadenza di
+  un'attesa (SOLE attese, nessuna domanda ai relay). L'ascolto sullo
+  specchio porta il solo 38383, e `deploy/relay/router.conf` non copia
+  più i kind 14. La frase della presa aspetta fino a `P2P_RESPIRO_S`
+  (6) che il libro porti i numeri della presa, e `P2P_RESPIRO_NOME_S`
+  (3) il nome di chi ha preso (`_controparti_p2p`: mai un nome che la
+  pagina non mostra).
+  IL RECAPITO (`_avviso_recapito_p2p`) riconosce le parti dallo SCAMBIO
+  IN CORSO (`_parti_scambio_p2p`: prima `p2p_scambi`, cioè il
+  coordinatore; poi, se lui tace, `p2p_ordini` come prima), e `vivo`
+  basta che lo dica una delle due fonti. Il freno (3 avvisi, 60 s) sta
+  in `p2p_avvisi` come `recapito1..3` di QUEL giro. NEL CLIENT il
+  recapito RICORDATO non parte più da solo (`recapitoDaAutoInvio`
+  guarda la sola riga del tabacchino): si precompila, e parte col tocco
+  di chi vende. La pubblicazione alza il velo dei gesti («Sto
+  pubblicando…»), mostra la spunta arancione ferma «Ordine pubblicato»
+  per `P2P_SPUNTA_MS` (2,5 s, `spuntaAttesaP2P`, classe `fatto`
+  sull'overlay) e lo chiude nel `finally`.
+  COSA SA IN PIÙ IL SERVER, ed è il prezzo: a che punto è ogni scambio
+  e fra quali due account. La cronaca si cancella a 40 giorni
+  (`_pulisci_memoria_p2p`) e con «Dimentica il profilo»; la fusione
+  dei conti porta con sé le tre tabelle. Chi entra da Nostr riceve i
+  SUOI avvisi (le sue chiavi sono in `chiavi_p2p` per questo), ma
+  `preso_da` continua a non scriversi senza «Fatti riconoscere», quindi
+  il suo nome non esce negli avvisi altrui. Sul lato mostrod:
+  `deploy/mostro/` (`barattolo_eventi.rs`, 24 agganci, fire-and-forget:
+  8 s + un retry a 12 s in un task suo, mai bloccante). Il verbale:
+  CANTIERI, «Mostro è l'unica fonte degli avvisi P2P».
   NEL CLIENT il giro che muore prima della garanzia si SCRIVE
   (`giroMorto` sulla riga, `P2P_GIRO_APERTO` gli stati da cui un
   ritorno è una notizia, `P2P_GIRO_MORTO` le frasi che statoTestoP2P
