@@ -19463,3 +19463,94 @@ fallite. RESTA DA GUARDARE: il prossimo payout verso un wallet ancora
 diverso (il tetto nuovo si giudica sull'uso), e il canale in più verso
 un hub ben connesso — che è la cura STRUTTURALE del NO_ROUTE, e il
 biglietto per riabbassare il tetto.
+
+## Il premio scritto a mano: il campo che non seguiva più il cursore (18 set 2026)
+
+IL CASO DAL CAMPO (Andrea): nel foglio «Vuoi comprare Bitcoin» del P2P,
+scritto «5» a mano nel campo del premio, il cursore non muoveva più il
+numero a schermo — restava 5. Prima della scrittura a mano il cursore
+funzionava.
+
+**LA CAUSA NON ERA UN BLOCCO, ED È LA PARTE DA TENERE.** I due controlli
+non scrivono variabili diverse e il valore a mano non ferma niente:
+tutti e due chiamano `cambiaPremioP2P`, che aggiorna `p2pNuovoPremio`,
+il cursore, la fascia, la nota e il numero della pillola
+(`p2pNuovoPremioVal`). Ma quando si tocca la pillola, `premioValP2P`
+rende IL CAMPO AL POSTO della pillola — e `p2pNuovoPremioVal` non c'è
+più. La funzione trovava `null`, saltava la riga, e il campo
+`p2pNuovoPremioMano` non lo riscriveva nessuno. Quindi il premio VERO
+seguiva il cursore, e a schermo restava quello battuto.
+⚠️ NON ERA SOLO ESTETICA: fascia e nota si muovevano, il numero no — chi
+trascinava dopo aver scritto poteva pubblicare un premio diverso da
+quello che leggeva. Col «Fatto» la pillola tornava e diceva il vero, ma
+niente obbliga a toccarlo prima di «Pubblica ordine».
+
+**LA CURA: LA FUNZIONE SA CHI HA MOSSO.** `cambiaPremioP2P(v, da)`: i
+due `oninput` passano `this`, e il campo a mano si riscrive (col valore
+TOSATO alla fascia, mai col grezzo) quando a muovere è un ALTRO. Quando
+a scrivere è il campo stesso resta com'è: la regola già a verbale — il
+campo non si riscrive sotto le dita, chi batte «-45» vede il cursore
+fermarsi al tetto e il numero tornare in fascia col «Fatto» — non si è
+toccata. Al primo movimento del cursore il campo rientra in pari da sé.
+
+**LA STRADA SCARTATA: IL FUOCO COME GIUDICE.** La forma ovvia era «non
+riscrivere il campo se ha il fuoco» (`document.activeElement`). Su iOS
+toccare un cursore NON toglie il fuoco a un campo di testo — la
+tastiera resta su — quindi quel giudice avrebbe detto «sta scrivendo»
+proprio nel caso da curare, e il difetto sarebbe rimasto intero sui
+telefoni dove con ogni probabilità è stato visto. Chi ha mosso è un
+fatto che l'evento porta con sé; chi ha il fuoco è una deduzione che
+cambia da un browser all'altro.
+
+**«VUOI VENDERE BITCOIN» È LO STESSO RENDER.** I due fogli sono
+`renderNuovoOrdineP2P` con `p2pLato` diverso: una sezione Premio sola,
+una funzione sola, quindi una cura sola li copre tutt'e due — e le prove
+girano sui due lati lo stesso, perché «è lo stesso codice» è vero oggi e
+non è una garanzia. L'altro cursore del premio, quello doppio dei filtri
+(`doppioP2P`), non ha un campo a mano: lo schema lì non esiste.
+
+**LE PROVE FANNO GIRARE LA FUNZIONE**, perché le sentinelle qui non
+potevano vedere niente: ogni riga c'era, mancava quella che non era mai
+stata scritta. Un banco node con un DOM di cartone — campo aperto e
+campo chiuso, lato compro e lato vendo: scrivo 5 → il cursore segue;
+trascino a 12 → IL CAMPO SEGUE (il difetto); riscrivo −7 dopo il
+cursore; ritrascino; fuori fascia a mano (tosato, campo intatto) e
+rientro col cursore; il «-» da solo a metà battitura; un terzo che
+chiama senza dire chi è; e a campo chiuso la pillola. Nel banco IL
+FUOCO È INCHIODATO SUL CAMPO, come su un iPhone.
+
+**LA TORTURA: 10 mutazioni, 10 uccise — ma al primo giro erano 9, e una
+era uccisa per la ragione sbagliata.** 1) VIVA: nel campo il grezzo
+invece del tosato — col cursore vero (passo 1, dentro la fascia) i due
+numeri coincidono sempre, quindi nessun caso li distingueva; ora c'è il
+«terzo» che chiama con 33.4. 2) UCCISA MALE: il giudice sul fuoco moriva
+perché nel banco `document` non esisteva e node ESPLODEVA — diciotto
+rosse che dicevano «il banco è rotto», non «su iPhone il campo non
+segue». È la famiglia già a memoria della prova verde per la ragione
+sbagliata, vista dal lato rosso: adesso il banco ha un `document` col
+fuoco sul campo, e quella mutazione muore sul caso «trascino» — cioè
+sul comportamento. La tortura gira su una copia nello scratchpad e sul
+solo `prove_p2p_pubblica` (due secondi a giro).
+
+PROVATO DAL VIVO (app vera in collaudo, identità 111, servita da una
+copia isolata; Browser pane, desktop): lato compro con GESTI VERI —
+tocco sulla pillola, «5» dalla tastiera → campo 5, cursore 5; clic sul
+binario → campo 13, cursore 13; «−7» riscritto dopo il cursore →
+cursore −7; pallino TRASCINATO → campo 7, cursore 7. Poi, con eventi
+`input` sintetici: il caso iPhone (fuoco tenuto sul campo mentre il
+cursore va a −11 → campo −11), «Fatto» → pillola «−11%», e tutto il
+giro sul lato VENDO (5 → 14 col fuoco sul campo; −30 a mano → cursore e
+premio −20, campo intatto; «Fatto» → «−20%»).
+⚠️ IL FOGLIO SI È APERTO CHIAMANDO `apriNuovoOrdineP2P()` A MANO: in
+locale `P2P_ATTIVO` è spento e la tab porta al «presto». Il tratto fra
+il + e il foglio quindi NON è stato percorso — ma questo cantiere non
+lo tocca.
+NON PROVATO: un telefono vero. Il caso iOS è simulato (fuoco inchiodato
++ evento sintetico), non toccato col dito; né Telegram Android, né la
+tastiera numerica vera. Nessun ordine è stato pubblicato: che il premio
+PUBBLICATO sia quello a schermo discende da `p2pNuovoPremio`, che era
+giusto anche prima — a mentire era solo il campo.
+RESTA DA GUARDARE: Andrea sul telefono — scrivere 5, trascinare, e
+guardare che il numero nel campo si muova col pallino.
+
+Giro intero nel worktree su `origin/main`: 11355 passate, 0 fallite.
