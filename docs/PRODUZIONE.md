@@ -97,6 +97,33 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   Le righe gia' in tabella prendono lo stato alla PRIMA ripubblicazione
   del loro ordine, senza frase: l'orologio non ha visto il passaggio
   e non lo inventa.
+- IL GATE CHE RIMANDA NEL JOURNAL (18 set 2026). Al posto del vecchio
+  «e' nel gate … non suona» ci sono tre righe: `· Campanello P2P: N,
+  busta gemella della frase precisa (Ns dall'evento del libro): gia'
+  detta` — la busta dello stesso istante di una frase del libro, che
+  non deve suonare; `⏳ Campanello P2P: N e' nel gate (ultimo avviso
+  Ns fa, pausa Ps): RIMANDATO, parte fra Ns in un avviso solo`; e,
+  alla scadenza, `📬 Campanello P2P: N, finita la pausa (Ps): parte
+  l'avviso rimandato…` seguita dal solito «🔔 avvisati» con l'esito.
+  Nella riga della passata il campanello dice `… N avvisi (M dalla
+  coda), K in coda`. Le colonne nuove (`chiavi_p2p.coperto`,
+  `.rimandato`) nascono da sole al riavvio (ALTER). ⚠️ UN «⏳
+  RIMANDATO» SENZA IL SUO «📬» DOPO LA PAUSA (90 s con uno scambio
+  preso, 600 senza) e' il difetto da guardare: la coda si scarica a
+  ogni passata e l'orologio si sveglia apposta alla scadenza.
+  LA PROVA DAL VIVO, con due account (come il collaudo del 17 set): A
+  pubblica una VENDITA, B la prende e dà subito dove ricevere i sats,
+  A blocca la garanzia, B segna «euro inviati», A rilascia. Intanto:
+  `journalctl -u barattolo -f | grep -E "Campanello|Libro|📬|⏳"`.
+  Deve dire: alla presa `📖 Libro P2P: avvisati 2` e due «busta
+  gemella»; alla fattura di B un «⏳ … RIMANDATO» per A (e uno per B,
+  l'eco del suo gesto) e poi il «📬» entro un minuto e mezzo; al
+  rilascio `📖 … avvisati 2` con «Scambio concluso». Sui telefoni: B
+  legge «Hai preso l'ordine di <nome di A>!», A riceve la «Novità»
+  quando tocca a lui bloccare, e al concluso A legge «in tutto N sats,
+  commissione compresa» e B il suo netto. Per lo SCADUTO: un ordine
+  pubblicato e lasciato scadere (il tabacchino vive 48 ore) deve dare
+  «⏰ Il tuo ordine è scaduto senza che la presa fosse completata».
 - L'ASCOLTO P2P E IL 14 SULLO SPECCHIO (17 set 2026). Nel journal del
   VPS: `👂 Ascolto P2P: parte su …`, `👂 Ascolto P2P connesso a …`,
   `👂 Ascolto P2P CADUTO (perche'): riprovo…` e `… connesso … dopo N

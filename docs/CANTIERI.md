@@ -15658,6 +15658,12 @@ niente. `in-progress→dispute` è interno e resta al campanello.
 E `relay.mostro.network` dal mio PC è andato in timeout mentre lo
 specchio rispondeva: non dice niente del VPS, ma dice perché la lista
 dei relay si scorre e non ci si ferma al primo muto.
+⚠️ RISPOSTO IL 18 SET 2026, dal sorgente e dal vivo: `expired` e
+`dispute` mostrod 0.18.7 non li pubblica MAI (il 38383 ha i soli
+quattro secchi di NIP-69). Lo scaduto esce `canceled`, come il ritiro,
+e a distinguerlo è l'`expires_at` scritto nell'evento — visti arrivare
+tre scaduti veri, 9, 36 e 40 secondi dopo la loro scadenza. Vedi «Il
+campanello che rimanda».
 
 **IL MAKER NON SI INVENTA, E CHI PRENDE NON SI REGISTRA.** `p2p_ordini`
 sa «questo ordine è di Tizio» ma non se Tizio l'ha PUBBLICATO o PRESO:
@@ -17385,6 +17391,20 @@ In tabella resta lo stato VERO, e la frase lo usa: `waiting-payment` =
 = «tocca a te indicare dove ricevere i sats» a chi compra; l'altro lato
 riceve la frase di chi aspetta. Con `in-progress`, che non dice a chi
 tocca, restano le frasi di sempre.
+⚠️ CORRETTO IL 18 SET 2026, ed era sbagliato: **i due `waiting-*` NON
+venivano dal libro, ma dal LOG di mostro.** Il 38383 di mostrod 0.18.7
+dice solo `pending`, `in-progress`, `success`, `canceled`
+(`create_status_tags` in `src/nip33.rs`, e nessun altro stato sui 97
+ordini dello specchio): un ordine in `waiting-*` esce `in-progress`,
+e quella riga «stato mai visto» sul libro non può essere comparsa. La
+cura 1 di questa voce quindi non ha mai curato niente — la presa
+arrivava già come `in-progress`, che il lettore conosceva — e resta
+come TOLLERANZA. E `in-progress` il turno lo dice eccome, dal lato:
+sul `sell` nasce da `waiting-buyer-invoice`, sul `buy` da
+`waiting-payment`. Il silenzio di quel mattino l'avevano fatto il gate
+(la cura 2, vera) e con ogni probabilità il relay rimasto indietro
+trovato poche ore dopo («Il primo che risponde non basta»), che per
+quel mattino resta non provato. Vedi «Il campanello che rimanda».
 
 **2) IL GATE ERA LUNGO QUANTO IL GESTO.** Dieci minuti a persona,
 contro una finestra di quindici per bloccare la garanzia: la
@@ -17513,6 +17533,9 @@ quando i messaggi sul relay non ci sono più.
 ⚠️ COSA È VISTO E COSA NO (Q4, detta onestamente): `pending` e `active`
 visti dalla restore vera, i due `waiting-*` sul libro; gli altri
 vengono dall'elenco del protocollo, su richiesta esplicita di Andrea.
+(⚠️ CORRETTO IL 18 SET 2026: i due `waiting-*` sul libro non ci sono
+mai stati — venivano dal log di mostro. Sulla restore restano quel che
+erano: il vocabolario di mostro-core, non ancora visto dal vivo.)
 
 **LO STATO SCONOSCIUTO NON SI RACCONTA** (regola di Andrea, dallo stesso
 giro): si mostra GREZZO e si logga. `statoGrezzo` sulla riga, ripulito
@@ -20136,3 +20159,174 @@ fatture falliscono lo stesso: quella è la ronda del nodo, non questa.
 E riavviare tor spegne per qualche secondo anche l'onion di Barattolo:
 con la cura frenata a una ogni quindici minuti quando non serve, è un
 prezzo che si paga di rado.
+
+## Il campanello che rimanda, e il libro che dice quattro parole (18 set 2026)
+
+Aperto da Andrea col journal del VPS davanti, in tre parti: il gate che
+zittisce, le frasi precise dal libro, lo scaduto che si legge «ritirato».
+
+**PRIMA DEL CODICE, IL LIBRO VERO — e ha rovesciato la richiesta.** La
+richiesta dava per pubblici, nei 38383, `waiting-buyer-invoice`,
+`waiting-payment`, `active` e forse `fiat-sent`. Letto il sorgente di
+mostrod 0.18.7 (`create_status_tags` in `src/nip33.rs`, su un clone
+pulito del tag, commit `afc39a2`; delle sei patch del fork nessuna tocca
+`nip33.rs` né una transizione di stato) e guardato lo specchio: **il
+38383 dice SOLO i quattro secchi di NIP-69 — `pending`, `in-progress`,
+`success`, `canceled`** (97 ordini sullo specchio: 86 canceled, 6
+success, 4 pending, 1 in-progress; nessun altro stato). Nel dettaglio:
+• `waiting-buyer-invoice` esce come `in-progress` solo su un ordine
+`sell`, `waiting-payment` solo su un `buy` — cioè **la presa pubblica
+`pending→in-progress` una volta sola, e dal lato si sa già a chi tocca
+il primo gesto** (sul `sell` a chi compra, il recapito; sul `buy` a chi
+vende, la garanzia). Il client di Barattolo prende sempre SENZA fattura,
+quindi è sempre così.
+• `active`, `fiat-sent`, `settled-hold-invoice` e `dispute` **non si
+pubblicano affatto** (`(false, …)`: nessun evento). Il libro resta
+`in-progress` dalla presa alla fine.
+• `expired` esce **`canceled`**, identico al ritiro. E `completed-by-admin`
+è nella tabella ma nessun codice lo scrive.
+• ⚠️ UN BUCO DI MOSTRO, a verbale: un `sell` preso CON la fattura dentro
+(un altro client può farlo, il nostro no) salta dritto a
+`waiting-payment`, che su un `sell` non si pubblica — sul libro l'ordine
+resta `pending` fino al `success`, e intanto nessun altro lo può
+prendere.
+
+**QUINDI I TRE MOMENTI DI MEZZO RESTANO GENERICI, e non per scelta.** La
+richiesta lo prevedeva per il solo `fiat-sent` («se non è pubblico resta
+generico, e va nel verbale come caso per una patch di mostro»): la
+stessa regola vale, identica, per la garanzia chiesta (punto 2) e per la
+garanzia bloccata (punto 3, che era la novità principale). Il server
+vede le buste del coordinatore ma non le legge, e non sa nemmeno a quale
+ordine va una trade key: dedurre il momento dall'ordine delle buste
+sarebbe un «tocca a te» indovinato, e una frase precisa che sbaglia è
+peggio di una generica che dice il vero.
+**IL CASO PER UNA PATCH A MOSTRO**, se un giorno si vorrà: far
+conoscere al server il passaggio `waiting-payment → active → fiat-sent`
+senza rompere NIP-69 per i client altrui (che si aspettano i quattro
+secchi) e senza mettere in piazza a che punto è ogni scambio. La forma
+non è decisa; il posto nel nostro codice c'è già — `STATI_LIBRO_PRESO` e
+il ramo delle frasi per stato restano apposta.
+⚠️ LA STRADA SCARTATA, e va scritta perché è la prima che viene in
+mente: **far dichiarare il momento al client** («ho bloccato», «ho
+mandato gli euro») e girarlo all'altra parte. La garanzia bloccata la
+dichiarerebbe chi vende, e la frase che ne nasce dice a chi compra
+«manda gli euro»: è la regola 5 rovesciata — un fatto che conviene a una
+parte scritto da quella parte — e un truffatore ci manderebbe il
+bonifico a una garanzia mai bloccata, con la firma di Barattolo sotto.
+Verificarlo sulla hold del nodo vorrebbe dire dare al server una lettura
+delle fatture di mostrod: altro cantiere, e un'altra superficie.
+
+**PARTE 1, IL GATE RIMANDA E ACCORPA.** Il caso del journal: 08:10:11 la
+presa (frase precisa, gate timbrato), 08:10:21 la richiesta di bloccare
+la garanzia «è nel gate: non suona» — e da lì più niente, con quindici
+minuti di finestra. Da oggi:
+• una busta a gate chiuso **va in coda** (`chiavi_p2p.rimandato`, il
+created_at più recente fra quelle che aspettano) e **alla scadenza della
+pausa parte UN avviso solo** per tutte (`_scarica_rimandati_p2p`, a ogni
+passata e a ogni lampo);
+• l'orologio **si sveglia alla scadenza** della prima coda
+(`_P2P_CODA["scade"]`, mezzo secondo dopo) invece di aspettare il suo
+minuto — ma una scadenza già passata non lo sveglia, o una coda che non
+si scarica lo farebbe girare in tondo contro i relay;
+• **UN MOMENTO, UNA NOTIFICA resta vero, per un'altra strada.** Prima lo
+garantiva proprio il gate che scartava; ora lo garantisce l'ORA: chi
+riceve una frase precisa si vede scritto in `chiavi_p2p.coperto` il
+created_at dell'evento del libro, e una busta nata entro
+`P2P_GEMELLI_S` (3 s) da lì è la sua GEMELLA — non suona e non va in
+coda. mostrod manda le buste di un passo nello stesso secondo in cui
+ripubblica il 38383; la richiesta della garanzia, dieci secondi dopo, è
+un altro passo;
+• la frase precisa **svuota la coda vecchia** (buste nate non dopo il
+suo momento: racconta un passo più avanti) e lascia quella nuova;
+• due buste della stessa persona nella stessa passata fanno un avviso
+(`suonati`), non uno subito e uno fra novanta secondi;
+• chi spegne gli avvisi mentre aspetta non riceve l'avviso rimandato, e
+la coda si svuota.
+«UN AVVISO CHE DICE "TOCCA A TE" SALTA LA PAUSA»: gli unici che lo dicono
+sono le frasi precise della presa, e **le frasi precise non passano dal
+gate** — non aspettano mai, come prima. Ho letto «gli altri si accodano»
+come «le generiche»: le precise sono una per passaggio pubblico, non
+fanno raffica, e tenere in tasca novanta secondi un «scambio concluso»
+non protegge nessuno. Se la lettura voleva anche le precise in coda, è
+una riga nel giudice del libro.
+⚠️ IL PREZZO DI «NON SCARTA», dichiarato: metà delle buste sono l'eco di
+un gesto appena fatto (la fattura data, la garanzia pagata, «euro
+inviati»), e il vecchio gate ne zittiva molte per caso. Adesso arrivano,
+accorpate, fino a novanta secondi dopo (dieci minuti a chi non ha
+scambi presi). La cura vera sarebbe un «l'app è aperta e ha visto fin
+qui» mandato dal client; non l'ho fatta, non era chiesta.
+
+**PARTE 2, LE FRASI.** Quel che il libro permette, preciso: la PRESA a
+tutt'e due — a chi ha preso **col nome di chi ha pubblicato** («Hai
+preso l'ordine di Anna!»), preso dal giudice della card
+(`_facce_ordini_p2p`), così la frase non dice mai un nome che la card
+non mostra; il nome di chi prende non esce mai, su nessuna card sta
+scritto. **La variante «aspetta che Anna blocchi la garanzia» non
+esiste**: sarebbe una frase che mente — il nostro client non prende con
+la fattura dentro, e la presa di un altro client con la fattura il libro
+non la mostra nemmeno. Il CONCLUSO col **netto di ciascuno**: chi compra
+i sats meno la sua metà, chi vende quanto gli è uscito in tutto («in
+tutto 15.225 sats, commissione compresa»), con lo **sconto per persona**
+della patch 0005 (`_fee_di_p2p`, il calco di `feeMiaP2P`) — prima il
+server contava la metà piena a tutti, e dal 18 set per un pioniere era
+sbagliata di mezzo punto. E il concluso scatta anche da `pending` (il
+buco di mostro qui sopra, o un server fermo per tutto lo scambio).
+L'ANNULLO resta «lo scambio è stato annullato» a tutt'e due: **chi ha
+annullato il libro non lo dice** (in-progress→canceled è il ritiro di chi
+ha pubblicato, l'annullo d'accordo, il timeout di chi pubblica o la
+decisione di un moderatore), e «X ha annullato» sarebbe indovinato.
+**PARTE 3, LO SCADUTO.** `pending→canceled` è un ritiro se nasce PRIMA
+dell'`expires_at` dell'ordine (tag del 38383, ora nell'estrattore), uno
+scaduto se nasce non prima: mostrod lo scrive al primo giro del suo job
+dopo la scadenza. Frase: «⏰ Il tuo ordine è scaduto senza che la presa
+fosse completata: vendevi bitcoin per 10,00 € via SEPA.» — la frase
+chiesta, più quale ordine. Da un ordine PRESO `canceled` resta un
+annullo anche oltre la data (un annullo d'accordo può arrivare dopo).
+**LO SCADUTO VISTO DAL VIVO**: tre ordini veri dello specchio scadevano
+proprio alle 10:04–10:05 UTC di oggi; ascoltati in sola lettura, sono
+arrivati `canceled` **9, 36 e 40 secondi dopo** il loro `expires_at`,
+mentre tutti gli 86 ritiri dello specchio stanno PRIMA (il più vicino,
+sette ore prima). E via il «dopo 7 giorni»: le ore del 38385 sono il
+default del coordinatore, e il tabacchino ne chiede 48 — diceva il falso.
+
+**LA CORREZIONE DEL 17 SET** («I silenzi del P2P» e «La restore che
+diceva active», emendate al loro posto): i `waiting-*` NON venivano dal
+libro ma dal LOG di mostro. Dopo questo cantiere è ancora così — non si
+tocca mostro — e la cura 1 di quel giorno non ha mai curato niente: la
+presa arriva come `in-progress`, che il lettore conosceva già. Quel
+mattino il silenzio l'avevano fatto il gate (la cura 2, vera) e con
+ogni probabilità il relay rimasto indietro trovato poche ore dopo («Il
+primo che risponde non basta»), che però per quel mattino resta non
+provato.
+
+**PROVATO.** Due sezioni nuove: `prove_p2p_gate_accorpa` — il caso del
+journal sul giudice vero (gemelle, coda, «parte fra 81s», scarico a 90
+s, nessun doppione), gli altri casi (stessa passata, coda vecchia e
+nuova al confine esatto, avvisi spenti e riaccesi, gate aperto, pausa
+lunga, busta senza ora), i due giri VERI contro un relay di cartone
+(precise subito, due gemelle zitte, due rimandate, scaricate dopo la
+pausa), e l'OROLOGIO VERO che con la passata a 30 s e la pausa a 2 s fa
+la seconda passata solo perché la coda l'ha svegliato — e con una
+scadenza già passata ne fa una sola; `prove_p2p_avvisi_precisi` — i
+passaggi, i tre scaduti e il ritiro VERI dello specchio, lo scenario di
+Anna e Bruno punto per punto, il nome (escape, niente nome senza card,
+niente nome a chi pubblica), e il netto al satoshi con lo scambio vero
+4ed69365 (hold 7462, payout 7314 fra due pionieri; 7277 se chi compra
+non lo è). Sei banchi vecchi emendati con la data (il gate che ora
+rimanda, la gemella al posto del «nel gate», il segnalibro che non conta
+gli spazi), più il censimento delle colonne di `chiavi_p2p`, che da
+quattro passa a sei — due orari, nessun posto per un segreto. Suite da
+11.483 a **11.559, zero fallite** (76 prove nuove). **Tortura:
+venticinque mutazioni su una copia, venticinque uccise, nessuna
+inciampata** (il gate che torna a scartare ne fa cadere quindici). Una
+va detta: la finestra delle gemelle portata a 30 secondi la uccide la
+SOLA sentinella della costante — i banchi portano il loro 3, quindi il
+numero giusto lo difende una riga, non un comportamento.
+
+**RESTA DA GUARDARE.** Dal vivo: il prossimo scambio deve dare nel
+journal `· Campanello P2P: …, busta gemella` alla presa e `⏳ … RIMANDATO,
+parte fra Ns` seguito da `📬 …, finita la pausa` quando chi compra dà la
+fattura (la procedura sta in PRODUZIONE, «IL GATE CHE RIMANDA»). Il primo
+scaduto vero con la frase nuova. Quante eco dei propri gesti arrivano
+come avviso rimandato, prima di decidere se serve il «visto fin qui» dal
+client. E il buco del `sell` preso con la fattura, che è di mostro.

@@ -24027,9 +24027,12 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   vetrina (`in-progress→pending`: chi aveva preso non ha proseguito),
   concluso (`→success`: chi vende legge quanto per quanto, chi compra
   il NETTO, `sats − round(sats × fee/2)` con la `fee` viva del 38385 —
-  il conto del client, cantiere della fattura da 7468), annullato
-  (`in-progress→canceled`), scaduto (`pending→expired`, i giorni da
-  `expiration_hours`), disputa chiusa (`dispute→success|canceled`).
+  il conto del client, cantiere della fattura da 7468; dal 18 set 2026
+  col netto di CIASCUNO e lo sconto per persona, qui sotto), annullato
+  (`in-progress→canceled`), scaduto (dal 18 set 2026 `pending→canceled`
+  nato non prima dell'`expires_at` dell'ordine: mostrod lo pubblica
+  come un ritiro), disputa chiusa (`dispute→success|canceled`, che
+  0.18.7 non pubblica mai).
   Il ritiro del proprio ordine (`pending→canceled`) e i tre momenti
   interni — garanzia depositata, fiat inviato, disputa aperta — non
   hanno una frase: il libro li mostra tutti come `in-progress`, e
@@ -24069,7 +24072,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   portano `preso_da` con sé.
   UN MOMENTO, UNA NOTIFICA: chi riceve la frase precisa vede timbrato
   `ultimo_nudge` su tutte le sue chiavi, e il kind 14 dello stesso
-  istante non fa suonare anche la generica. L'INTERRUTTORE è
+  istante non fa suonare anche la generica (dal 18 set 2026 per l'ORA
+  e non per il gate: vedi «IL GATE RIMANDA E ACCORPA»). L'INTERRUTTORE è
   `utenti.avvisi_p2p` (1 di serie, rotta `/api/me/avvisi-p2p`, riga
   «⚡ Avvisi sugli scambi P2P» nel cassetto Avvisi, solo a leva
   accesa): il giudice `_avvisi_p2p_accesi` lo guarda sia il libro sia
@@ -24093,6 +24097,47 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   = 90 s, tutti gli altri i 600 di sempre. Novanta perché sta fra uno
   e due battiti: il kind 14 dello stesso momento della frase precisa
   non raddoppia, il gesto chiesto due minuti dopo suona.
+  ⚠️ CORRETTO IL 18 SET 2026: il libro i due `waiting-*` NON li dice —
+  venivano dal log di mostro. Il 38383 di mostrod 0.18.7 ha i soli
+  quattro secchi di NIP-69 (`create_status_tags`, `src/nip33.rs`):
+  `pending`, `in-progress`, `success`, `canceled`. La presa è
+  `pending→in-progress` una volta sola, e dal LATO si sa a chi tocca il
+  primo gesto (`sell`: a chi compra il recapito — esce da
+  `waiting-buyer-invoice`; `buy`: a chi vende la garanzia — da
+  `waiting-payment`). Garanzia bloccata, fiat inviato e disputa NON si
+  pubblicano; lo scaduto esce `canceled`. `STATI_LIBRO_PRESO` e il ramo
+  delle frasi per stato restano come TOLLERANZA, per un coordinatore
+  che quegli stati li pubblicasse.
+  IL GATE RIMANDA E ACCORPA, NON SCARTA (18 set 2026, dal journal: la
+  richiesta di bloccare la garanzia dieci secondi dopo la frase della
+  presa «nel gate: non suona», e mai più detta). Due colonne nuove su
+  `chiavi_p2p`, della PERSONA come `ultimo_nudge` (scritte su tutte le
+  sue chiavi, lette col MAX): `rimandato`, il created_at più recente
+  delle buste arrivate a gate chiuso (0 = coda vuota), e `coperto`, il
+  created_at dell'evento del libro dell'ultima frase PRECISA.
+  `_nudge_p2p(con, pubkey, adesso, quando, suonati)` decide per UNA
+  busta: di nessuno, avvisi spenti, già coperta da un avviso di questa
+  passata (`suonati`), GEMELLA di una frase precisa (nata entro
+  `P2P_GEMELLI_S` = 3 s da `coperto`: non suona e non va in coda),
+  gate chiuso → in coda, gate aperto → suona e si porta via la coda.
+  `_scarica_rimandati_p2p` gira a ogni passata e a ogni lampo: chi ha
+  la coda e la pausa scaduta riceve UN avviso generico per tutte, chi
+  ha spento gli avvisi nel frattempo non riceve niente; torna anche la
+  prima scadenza futura, che finisce in `_P2P_CODA["scade"]` e sveglia
+  l'orologio mezzo secondo dopo (una scadenza già passata no: niente
+  giri in tondo). Le frasi precise NON passano dal gate e non aspettano
+  mai — le uniche che dicono «tocca a te» sono loro, alla presa — e
+  scrivendo `coperto` svuotano la coda nata non dopo il loro momento.
+  E dal 18 set il libro dice anche: il NOME di chi ha pubblicato a chi
+  ha preso («Hai preso l'ordine di Anna!», dal giudice della card,
+  `_facce_ordini_p2p`, mai il nome di chi prende), il netto di
+  CIASCUNO al concluso con lo sconto per persona (`_fee_di_p2p`, il
+  calco di `feeMiaP2P`: chi compra i sats meno la sua metà, chi vende
+  i sats più la sua), il concluso anche da `pending` (un `sell` preso
+  con la fattura dentro — un altro client — su 0.18.7 non passa mai da
+  `in-progress`), e lo SCADUTO: `pending→canceled` con created_at non
+  prima del tag `expires_at` (`_evento_libro_p2p` lo porta in `scade`).
+  Il verbale: CANTIERI, «Il campanello che rimanda».
   NEL CLIENT il giro che muore prima della garanzia si SCRIVE
   (`giroMorto` sulla riga, `P2P_GIRO_APERTO` gli stati da cui un
   ritorno è una notizia, `P2P_GIRO_MORTO` le frasi che statoTestoP2P
