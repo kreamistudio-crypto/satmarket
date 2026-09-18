@@ -3814,34 +3814,23 @@ def init_db():
         -- nasce e vive nel browser, e questa tabella non ha nemmeno una
         -- colonna dove potrebbe finire. Una riga per pubkey: la PK e'
         -- l'idempotenza, il client le rimanda a ogni avvio e a ogni
-        -- chiave nuova con un INSERT OR IGNORE. `ultimo_nudge` e' il
-        -- gate del campanello (10 min), `creato` dice da quando si
-        -- guarda. «Dimentica il profilo» (DELETE) toglie le righe di
-        -- quell'utente: senza pubkey non c'e' niente da guardare.
+        -- chiave nuova con un INSERT OR IGNORE. `creato` dice da quando
+        -- la si conosce. «Dimentica il profilo» (DELETE) toglie le
+        -- righe di quell'utente.
+        -- DALLA PATCH 0007 (18 set 2026) E' UN ELENCO DEL TELEFONO E
+        -- NON PIU' UN ELENCO DI SORVEGLIATI: sui relay non si guarda
+        -- piu' nessuna busta. E' il coordinatore a dire «su questo
+        -- ordine chi compra e' la chiave X e chi vende la Y», e qui si
+        -- legge di CHI sono — per sapere a chi mandare l'avviso.
+        -- ⚠️ Nei database nati prima restano CINQUE COLONNE MORTE —
+        -- `ultimo_nudge`, `coperto`, `rimandato`, `gesto`, `eco_fino`:
+        -- il gate, la coda e l'eco del campanello generico. Non le
+        -- legge e non le scrive piu' nessuno; SQLite non le sa togliere
+        -- senza rifare la tabella, e una tabella rifatta per estetica
+        -- e' un rischio che non compra niente.
         pubkey TEXT PRIMARY KEY,
         tg_id INTEGER NOT NULL,
-        creato INTEGER,
-        ultimo_nudge INTEGER DEFAULT 0,
-        -- IL GATE CHE RIMANDA (18 set 2026): `coperto` e' il
-        -- created_at dell'evento del libro dell'ultima frase PRECISA
-        -- (le buste GEMELLE di quel momento non suonano), `rimandato`
-        -- il created_at piu' recente delle buste arrivate a gate chiuso
-        -- e non ancora dette (0 = nessuna in coda). Come `ultimo_nudge`
-        -- sono della PERSONA: si scrivono su tutte le sue chiavi e si
-        -- leggono col MAX. Vedi «IL GATE RIMANDA E ACCORPA».
-        coperto INTEGER DEFAULT 0,
-        rimandato INTEGER DEFAULT 0,
-        -- L'ECO DEL PROPRIO GESTO (18 set 2026, terzo giro): `gesto` e'
-        -- QUANDO la persona ha fatto un gesto con QUESTA chiave (lo
-        -- dice il suo client, un attimo prima di parlare al
-        -- coordinatore), `eco_fino` fin quando la prima busta che
-        -- torna a questa chiave e' la risposta a quel gesto, e non
-        -- suona. Sono della CHIAVE e non della persona, al contrario
-        -- delle tre qui sopra: l'eco e' di UNO scambio, e le buste
-        -- degli altri scambi della stessa persona suonano come sempre.
-        -- Due orari: nemmeno qui c'e' un posto per un segreto.
-        gesto INTEGER DEFAULT 0,
-        eco_fino INTEGER DEFAULT 0
+        creato INTEGER
     );
     CREATE INDEX IF NOT EXISTS idx_chiavi_p2p_tg ON chiavi_p2p(tg_id);
     CREATE TABLE IF NOT EXISTS p2p_ordini(
@@ -3904,9 +3893,116 @@ def init_db():
         -- solo che e' partito — perche' glielo dice chi l'ha mandato.
         euro TEXT DEFAULT '',
         recapito_avviso INTEGER DEFAULT 0,
-        recapito_n INTEGER DEFAULT 0
+        recapito_n INTEGER DEFAULT 0,
+        -- I NUMERI DEL LIBRO PER LE FRASI DEL COORDINATORE (patch 0007,
+        -- 18 set 2026): `sats` e `metodi` sono i tag `amt` e `pm` del
+        -- 38383 — pubblici, come `euro` — tenuti qui perche' l'evento
+        -- di mostrod NON li porta (dice chi e cosa, mai quanto), e la
+        -- frase «vendi 15.000 sats per 10,00 € via SEPA» li vuole.
+        -- `tornati` conta le volte che l'ordine e' TORNATO in vetrina:
+        -- e' il «giro» con cui il libro firma i suoi avvisi, cosi' una
+        -- seconda presa dello stesso ordine non passa per doppione
+        -- della prima (vedi `p2p_avvisi`).
+        sats INTEGER DEFAULT 0,
+        metodi TEXT DEFAULT '',
+        tornati INTEGER DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_p2p_ordini_tg ON p2p_ordini(tg_id);
+    CREATE TABLE IF NOT EXISTS p2p_momenti(
+        -- COSA HA RACCONTATO IL COORDINATORE, ordine per ordine (patch
+        -- 0007, 18 set 2026): una riga per ogni evento arrivato a
+        -- /api/p2p/evento. E' l'IDEMPOTENZA della rotta — la chiave e'
+        -- ordine + momento + l'ora scritta da mostrod, e il suo retry
+        -- porta lo stesso corpo con la stessa ora: non suona due volte
+        -- — ed e' quel che fa TACERE IL LIBRO: prima di mandare il suo
+        -- avviso di riserva, il libro guarda se qui c'e' gia' lo stesso
+        -- momento a pochi secondi di distanza.
+        -- `fonte` e' 'mostro', oppure 'libro' quando la riserva e'
+        -- partita davvero (cosi' un evento in ritardo di un minuto non
+        -- ridice la stessa cosa). `giro` e' quante PRESE mostrod ha
+        -- raccontato fin li' per quell'ordine: una presa apre un giro.
+        -- NIENTE IMPORTI, NIENTE CHIAVI: chi sono le parti sta in
+        -- `p2p_scambi`, e qui resta la sola cronaca.
+        ordine TEXT NOT NULL,
+        momento TEXT NOT NULL,
+        quando INTEGER NOT NULL,
+        fonte TEXT NOT NULL DEFAULT 'mostro',
+        giro INTEGER DEFAULT 0,
+        attore TEXT DEFAULT '',
+        dettaglio TEXT DEFAULT '',
+        arrivato INTEGER DEFAULT 0,
+        PRIMARY KEY(ordine, momento, quando, fonte)
+    );
+    CREATE TABLE IF NOT EXISTS p2p_scambi(
+        -- LE DUE PARTI DELLO SCAMBIO IN CORSO, dette dal coordinatore
+        -- (patch 0007): mostrod manda le due TRADE key, qui stanno gli
+        -- account a cui `chiavi_p2p` le fa corrispondere (0 = una
+        -- chiave che non e' di nessuno dei nostri: un altro client).
+        -- E' DA QUI CHE SI SA A CHI TOCCA — non piu' da quel che i due
+        -- telefoni dichiarano (`p2p_ordini.preso_da`), che il 18 set
+        -- 2026 su uno scambio nato subito dopo un altro era arrivato
+        -- tardi, e l'avviso del recapito era caduto con «non e' una
+        -- delle due parti».
+        -- A OGNI EVENTO SI RISCRIVE: un ordine tornato in vetrina e
+        -- ripreso da un altro ha un'altra parte, e vale l'ultima detta.
+        -- `preso_dal` e' il lato di chi ha PRESO ('buyer' | 'seller'),
+        -- cioe' l'altro e' chi ha pubblicato: serve al ritorno in
+        -- vetrina, dove le due frasi sono diverse.
+        -- I TRE IMPORTI arrivano SOLO alla chiusura (rilasciato /
+        -- concluso): l'ordine, il netto pagato a chi compra, il totale
+        -- bloccato da chi vende. Sono gli unici numeri che mostrod
+        -- manda, e servono alla frase «hai venduto … in tutto …».
+        ordine TEXT PRIMARY KEY,
+        compratore INTEGER DEFAULT 0,
+        venditore INTEGER DEFAULT 0,
+        preso_dal TEXT DEFAULT '',
+        giro INTEGER DEFAULT 0,
+        sats INTEGER DEFAULT 0,
+        sats_compratore INTEGER DEFAULT 0,
+        sats_venditore INTEGER DEFAULT 0,
+        aggiornato INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS p2p_avvisi(
+        -- L'ANTI-DOPPIONE, ed e' UNO per tutte le strade (patch 0007):
+        -- stesso ordine + stesso momento + stessa persona (+ stesso
+        -- giro) non suona due volte. Ci scrivono gli avvisi del
+        -- coordinatore, la riserva del libro e il recapito, SEMPRE
+        -- prima dell'invio (il patto dei timbri: un giro che muore a
+        -- meta' perde un avviso, mai lo raddoppia). Ha preso il posto
+        -- del gate, della coda, della busta gemella e della finestra
+        -- dell'eco — che deducevano, mentre questa sa.
+        ordine TEXT NOT NULL,
+        momento TEXT NOT NULL,
+        giro INTEGER NOT NULL DEFAULT 0,
+        tg_id INTEGER NOT NULL,
+        quando INTEGER DEFAULT 0,
+        fonte TEXT DEFAULT '',
+        PRIMARY KEY(ordine, momento, giro, tg_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_p2p_avvisi_tg ON p2p_avvisi(tg_id);
+    CREATE TABLE IF NOT EXISTS p2p_attese(
+        -- GLI AVVISI CHE ASPETTANO UN MINUTO (patch 0007). Due casi:
+        -- la RISERVA DEL LIBRO — presa, concluso, annullato, scaduto,
+        -- tornato si leggono anche dal 38383, e se l'evento di mostrod
+        -- non e' arrivato entro `P2P_RISERVA_S` parte la frase del
+        -- libro; se e' arrivato, la riga si butta e il libro tace — e
+        -- il RILASCIO: chi vende ha finito quando rilascia, ma
+        -- «concluso» mostrod lo dice solo a pagamento riuscito. Se in
+        -- un minuto non lo dice, a chi vende il suo «hai venduto»
+        -- arriva lo stesso (il 18 set 2026 non gli era arrivato MAI).
+        -- STA IN TABELLA e non in memoria: un deploy in quel minuto
+        -- non si porta via l'avviso.
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ordine TEXT NOT NULL,
+        momento TEXT NOT NULL,
+        giro INTEGER DEFAULT 0,
+        tg_id INTEGER NOT NULL,
+        testo TEXT NOT NULL,
+        quando INTEGER DEFAULT 0,
+        scade INTEGER NOT NULL,
+        fonte TEXT DEFAULT 'libro'
+    );
+    CREATE INDEX IF NOT EXISTS idx_p2p_attese_scade ON p2p_attese(scade);
     CREATE TABLE IF NOT EXISTS p2p_indice(
         -- IL PAVIMENTO DELL'INDICE DELLE TRADE KEY (set 2026): quante
         -- chiavi usa-e-getta quel profilo ha gia' BRUCIATO. Serve a
@@ -4963,20 +5059,19 @@ def init_db():
                     "preso_da INTEGER DEFAULT 0",
                     "euro TEXT DEFAULT ''",
                     "recapito_avviso INTEGER DEFAULT 0",
-                    "recapito_n INTEGER DEFAULT 0"):
+                    "recapito_n INTEGER DEFAULT 0",
+                    # i numeri del libro per le frasi del coordinatore,
+                    # e il giro della riserva (patch 0007, 18 set 2026)
+                    "sats INTEGER DEFAULT 0",
+                    "metodi TEXT DEFAULT ''",
+                    "tornati INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE p2p_ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
             pass
-    # ...e le due del gate che rimanda su chiavi_p2p (18 set 2026), per i
-    # database che la tabella ce l'avevano gia'
-    # ...e le due dell'eco del proprio gesto (18 set 2026, terzo giro)
-    for colonna in ("coperto INTEGER DEFAULT 0", "rimandato INTEGER DEFAULT 0",
-                    "gesto INTEGER DEFAULT 0", "eco_fino INTEGER DEFAULT 0"):
-        try:
-            con.execute(f"ALTER TABLE chiavi_p2p ADD COLUMN {colonna}")
-        except sqlite3.OperationalError:
-            pass
+    # (le quattro colonne del gate e dell'eco su `chiavi_p2p` non si
+    # aggiungono piu': dalla patch 0007 non le legge nessuno. Dove ci
+    # sono gia' restano, morte — vedi lo schema)
     # La levetta binaria avatar_visibile e' vissuta solo nei DB di
     # collaudo (mai deployata): chi l'aveva spenta passa a 'nessuna'
     # nel selettore che l'ha sostituita, la colonna vecchia resta
@@ -10150,6 +10245,22 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE p2p_ordini SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         con.execute("UPDATE p2p_ordini SET preso_da=? WHERE preso_da=?",
+                    (id_telegram, id_nostr))
+        # ...e le tre tabelle degli avvisi del coordinatore (patch 0007,
+        # set 2026). Le PARTI dello scambio in corso seguono l'utente
+        # con l'UPDATE secco (la PK e' l'ordine). L'ANTI-DOPPIONE ha il
+        # tg_id nella PK e le due meta' possono aver ricevuto lo stesso
+        # avviso: `OR IGNORE` + `DELETE`, e una riga basta — dice «gia'
+        # detto», che e' vero per la persona intera. Le ATTESE hanno un
+        # id loro: UPDATE secco.
+        con.execute("UPDATE p2p_scambi SET compratore=? WHERE compratore=?",
+                    (id_telegram, id_nostr))
+        con.execute("UPDATE p2p_scambi SET venditore=? WHERE venditore=?",
+                    (id_telegram, id_nostr))
+        con.execute("UPDATE OR IGNORE p2p_avvisi SET tg_id=? WHERE tg_id=?",
+                    (id_telegram, id_nostr))
+        con.execute("DELETE FROM p2p_avvisi WHERE tg_id=?", (id_nostr,))
+        con.execute("UPDATE p2p_attese SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         # Il sale del profilo di scambio segue l'utente. Qui la PK E'
         # il tg_id, quindi le due meta' POSSONO collidere — e allora
@@ -19652,6 +19763,19 @@ def _leve_stato():
                   "P2P_SCONTO_SEGRETO", sconto_p2p_attivo(),
                   spento="il coordinatore non può chiedere chi ha lo "
                          "sconto: fa prezzo pieno a tutti"),
+            # GLI AVVISI DEL P2P (patch 0007): esce il FATTO che la
+            # porta e' aperta, mai il segreto. Da spenta non e' un
+            # guasto muto: gli avvisi ci sono lo stesso, ma solo i
+            # quattro che il libro pubblico sa dire.
+            _leva("Avvisi P2P — porta del coordinatore",
+                  "P2P_EVENTI_SEGRETO", eventi_p2p_attivi(),
+                  acceso="il coordinatore racconta ogni passo dello "
+                         "scambio e da lì nascono gli avvisi precisi; "
+                         "il libro fa da riserva dopo un minuto",
+                  spento="il coordinatore non può raccontare niente: "
+                         "restano i soli avvisi del libro (presa, "
+                         "concluso, annullato, scaduto), e garanzia, "
+                         "euro inviati e disputa NON avvisano nessuno"),
             # IL SEGRETO NON ESCE MAI, esce il FATTO: la regola di
             # CHIAVE_CONTENUTI_DIGITALI, applicata al segreto piu'
             # pesante che questo server abbia — chi lo ruba, col sale
@@ -33882,6 +34006,19 @@ try:
     from config import P2P_SCONTO_SEGRETO
 except ImportError:
     P2P_SCONTO_SEGRETO = ""
+# LA PORTA DA CUI IL COORDINATORE VIENE A RACCONTARE (patch 0007 del
+# fork, 18 set 2026): a ogni passo di ogni scambio mostrod fa un POST a
+# /api/p2p/evento, ed e' da li' che nascono gli avvisi del P2P. Stessa
+# forma della porta qui sopra — vuoto o segnaposto = la rotta NON ESISTE
+# (404) — ma UN SEGRETO SUO, e il perche' e' cosa si puo' fare rubandolo:
+# con quello dello sconto si fa una DOMANDA, con questo si fanno PARTIRE
+# AVVISI a persone vere («paga la garanzia»). Le frasi le scrive il
+# server e non chi chiama, quindi il danno ha un tetto — ma due porte
+# con due mestieri hanno due chiavi, e si ruotano una alla volta.
+try:
+    from config import P2P_EVENTI_SEGRETO
+except ImportError:
+    P2P_EVENTI_SEGRETO = ""
 # quante chiavi in una domanda: le due parti di uno scambio, e un po'
 # d'aria. Un elenco lungo non e' una domanda, e' una raccolta.
 MAX_PUBKEY_SCONTO_P2P = 4
@@ -35042,6 +35179,18 @@ def dimentica_chiavi_p2p(x_tg_init_data: str = Header(""),
     # deve restare nemmeno «l'ha preso lui»
     con.execute("UPDATE p2p_ordini SET preso_da=0 WHERE preso_da=?",
                 (user["id"],))
+    # ...e quel che il COORDINATORE ha detto di me (patch 0007, 18 set
+    # 2026): il mio posto negli scambi in corso, gli avvisi che ho gia'
+    # ricevuto e quelli che aspettavano il loro minuto. Senza le chiavi
+    # un evento nuovo non mi trova piu' — ma «dimentica» vuol dire anche
+    # che il gia' scritto se ne va, e qui c'e' scritto «su quest'ordine
+    # c'era lui».
+    con.execute("UPDATE p2p_scambi SET compratore=0 WHERE compratore=?",
+                (user["id"],))
+    con.execute("UPDATE p2p_scambi SET venditore=0 WHERE venditore=?",
+                (user["id"],))
+    con.execute("DELETE FROM p2p_avvisi WHERE tg_id=?", (user["id"],))
+    con.execute("DELETE FROM p2p_attese WHERE tg_id=?", (user["id"],))
     con.commit()
     con.close()
     return {"ok": True, "tolte": tolte, "volti": volti}
@@ -35104,64 +35253,16 @@ def conta_chiavi_p2p(x_tg_init_data: str = Header(""),
     return {"ok": True, **esito}
 
 
-def _segna_gesto_p2p(con, tg_id: int, pubkey, lunga: bool, adesso: int) -> bool:
-    """«Sto facendo un gesto con questa chiave»: timbra la riga, e dice
-    se l'ha trovata. Puro sulla connessione (il patto di
-    `_registra_chiavi_p2p`).
-    LA CHIAVE DEV'ESSERE SUA: il `tg_id` sta nella WHERE, e chi manda la
-    chiave di un altro non zittisce il campanello di nessuno — la riga
-    non si trova e basta. Zittire il PROPRIO si puo', ed e' il mestiere
-    della rotta: a rimetterci e' solo chi lo fa.
-    `lunga` e' la finestra della garanzia pagata a mano (vedi
-    `P2P_ECO_PAGA_S`). Un gesto nuovo riscrive il timbro di prima."""
-    if not isinstance(pubkey, str) or not re.fullmatch(r"[0-9a-f]{64}", pubkey):
-        raise ValueError("Chiave non valida")
-    fino = int(adesso) + (P2P_ECO_PAGA_S if lunga else P2P_ECO_S)
-    n = con.execute("UPDATE chiavi_p2p SET gesto=?, eco_fino=? "
-                    "WHERE pubkey=? AND tg_id=?",
-                    (int(adesso), fino, pubkey, tg_id)).rowcount
-    con.commit()
-    return n > 0
-
-
-@app.post("/api/p2p/gesto")
-async def gesto_p2p(req: Request, x_tg_init_data: str = Header(""),
-                    barattolo_sessione: str = Cookie("")):
-    """Il client, un attimo prima di parlare al coordinatore: la busta
-    di risposta e' un'eco, e non deve suonare a chi ha l'app in mano.
-    COSA IMPARA IL SERVER: che questo account ha fatto UN gesto, adesso,
-    con una chiave che sapeva gia' sua. Non quale gesto, non su quale
-    ordine — e nel corpo non c'e' la sintassi per dirlo.
-    Fail-open dal lato del client: se questa chiamata non arriva, il
-    gesto parte lo stesso e l'eco suona, com'era ieri."""
-    user = verifica_utente(x_tg_init_data, barattolo_sessione)
-    if not _p2p_per(user["id"])["attivo"]:
-        raise HTTPException(409, "Lo scambio P2P non e' attivo")
-    try:
-        d = await req.json()
-    except Exception:
-        raise HTTPException(400, "Richiesta illeggibile")
-    con = db()
-    try:
-        trovata = _segna_gesto_p2p(con, user["id"], (d or {}).get("pubkey"),
-                                   bool((d or {}).get("lunga")),
-                                   int(time.time()))
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-    finally:
-        con.close()
-    return {"ok": trovata}
-
-
 # ═══ «DOVE RICEVERE GLI EURO» E' UN PASSO DELLO SCAMBIO (18 set 2026,
 # terzo giro, dalla prova dal vivo: chi vende indicava dove ricevere
 # gli euro e a chi comprava non arrivava NIENTE) ═══
 # Quel passo e' nostro e non del coordinatore: il recapito viaggia
 # cifrato fra i due telefoni, firmato da una chiave che il server non
-# conosce (e non deve: vedi «E LA CHAT FRA LE DUE PARTI NON SUONA»). Il
-# server quindi non lo VEDE partire — glielo dice il telefono di chi
-# l'ha mandato, col solo id dell'ordine, e lui avvisa l'altra parte,
-# che conosce gia' da `p2p_ordini`. Il recapito di qui non passa.
+# conosce (e non deve). Il server quindi non lo VEDE partire — glielo
+# dice il telefono di chi l'ha mandato, col solo id dell'ordine, e lui
+# avvisa l'altra parte. Il recapito di qui non passa. E' L'UNICO avviso
+# dello scambio che non nasce dal coordinatore (patch 0007), proprio
+# perche' e' l'unico passo che il coordinatore non vede.
 # ⚠️ E' UN FATTO DICHIARATO DA UNA PARTE, e il verbale del secondo giro
 # aveva scartato proprio quella strada («far dichiarare il momento al
 # client»: la regola 5 rovesciata). Questa non la riapre, e la
@@ -35174,17 +35275,75 @@ async def gesto_p2p(req: Request, x_tg_init_data: str = Header(""),
 #   e sopra il recapito c'e' scritto di non mandare niente;
 # • e la frase stessa lo ripete: «invia solo se la pagina dice che i
 #   sats sono in garanzia».
-# Il client onesto la manda solo a scambio ATTIVO (dal suo lato la
-# garanzia e' bloccata e la fattura c'e'): e' li' che «tocca a te» e'
-# vero. Il server non lo puo' verificare, e per questo la frase non lo
-# afferma.
-# IL FRENO: al piu' `P2P_RECAPITO_MAX` avvisi per ordine (il primo, e
-# due correzioni), mai piu' fitti di `P2P_RECAPITO_PAUSA_S`.
-# SALTA IL GATE del campanello e non lo timbra: non e' una busta del
-# coordinatore, e' un «tocca a te» preciso — l'interruttore degli
-# avvisi invece lo rispetta, come tutto il resto.
+# DAL 18 SET 2026 (patch 0007) IL RECAPITO PARTE SOLO COL GESTO di chi
+# vende — «Indica dove ricevere gli euro»: le coordinate ricordate si
+# PRECOMPILANO e basta, e senza quel tocco non parte niente. Prima
+# partivano da sole alla presa, cioe' prima della garanzia.
+# LE DUE PARTI SONO QUELLE DELLO SCAMBIO IN CORSO, dette dal
+# coordinatore (`p2p_scambi`), e solo se lui non ha ancora parlato si
+# ripiega su quel che i due telefoni hanno dichiarato (`p2p_ordini`).
+# Il 18 set 2026 alle 20:24 la sola dichiarazione aveva fatto cadere
+# l'avviso — «non e' una delle due parti» — su uno scambio nato subito
+# dopo un altro: la presa dichiarata dal telefono non era ancora
+# arrivata, e chi vendeva non risultava da nessuna parte.
+# IL FRENO: al piu' `P2P_RECAPITO_MAX` avvisi per scambio (il primo, e
+# due correzioni), mai piu' fitti di `P2P_RECAPITO_PAUSA_S`. Sta
+# nell'anti-doppione di tutti (`p2p_avvisi`: i momenti `recapito1`,
+# `recapito2`, `recapito3` di QUEL giro), quindi un ordine tornato in
+# vetrina e ripreso riparte da zero — con le due colonne di prima no.
 P2P_RECAPITO_MAX = 3
 P2P_RECAPITO_PAUSA_S = 60
+# i momenti che CHIUDONO un giro dello scambio: da li' in poi non c'e'
+# piu' nessuno a cui dire dove mandare gli euro
+P2P_MOMENTI_FINALI = ("rilasciato", "concluso", "annullato", "tornato", "scaduto")
+# ...e quelli che dicono che uno scambio e' IN CORSO
+P2P_MOMENTI_IN_CORSO = ("preso", "garanzia_chiesta", "garanzia_pagata",
+                        "fattura_chiesta", "fattura_data", "fiat", "disputa",
+                        "annullo_chiesto")
+
+
+def _parti_scambio_p2p(con, ordine: str) -> dict:
+    """CHI COMPRA E CHI VENDE SU QUEST'ORDINE, ADESSO. Pura sulla
+    connessione. Torna `{compratore, venditore, giro, vivo, fonte}`.
+    PRIMA IL COORDINATORE: se mostrod ha raccontato quest'ordine
+    (`p2p_scambi`), le parti sono le sue — due trade key che
+    `chiavi_p2p` ha fatto corrispondere a due account.
+    POI I DUE TELEFONI: senza una parola del coordinatore (la patch non
+    e' ancora sul nodo, o quegli eventi si sono persi) valgono
+    `p2p_ordini.tg_id` e `preso_da`, col lato del libro a dire chi dei
+    due vende. E' la strada di prima, tenuta come riserva: non si butta
+    cio' che funziona nel giorno in cui la fonte nuova tace.
+    `vivo` = lo scambio e' IN CORSO, e basta che lo dica UNA delle due
+    fonti: per il coordinatore, nel giro in corso c'e' un passo dello
+    scambio e nessun momento che lo chiude; per il libro, l'ordine e'
+    preso. L'OR e' voluto: se la presa di mostrod si perdesse per
+    strada il suo giro resterebbe quello di prima — magari gia' chiuso
+    — e a tenere in piedi il passo sarebbe il libro."""
+    r = con.execute("SELECT tg_id, preso_da, stato, lato, tornati "
+                    "FROM p2p_ordini WHERE ordine=?", (ordine,)).fetchone()
+    vivo_libro = bool(r) and (r["stato"] or "") in STATI_LIBRO_PRESO
+    s = con.execute("SELECT compratore, venditore, giro FROM p2p_scambi "
+                    "WHERE ordine=?", (ordine,)).fetchone()
+    if s and (int(s["compratore"] or 0) or int(s["venditore"] or 0)):
+        giro = int(s["giro"] or 0)
+        momenti = {m[0] for m in con.execute(
+            "SELECT momento FROM p2p_momenti WHERE ordine=? AND giro=? "
+            "AND fonte='mostro'", (ordine, giro))}
+        vivo = bool(momenti & set(P2P_MOMENTI_IN_CORSO)) \
+            and not momenti & set(P2P_MOMENTI_FINALI)
+        return {"compratore": int(s["compratore"] or 0),
+                "venditore": int(s["venditore"] or 0),
+                "giro": giro, "vivo": vivo or vivo_libro, "fonte": "mostro"}
+    if not r:
+        return {"compratore": 0, "venditore": 0, "giro": 0, "vivo": False,
+                "fonte": ""}
+    maker, taker = int(r["tg_id"] or 0), int(r["preso_da"] or 0)
+    lato = r["lato"] or ""
+    vende = maker if lato == "sell" else (taker if lato == "buy" else 0)
+    compra = taker if lato == "sell" else (maker if lato == "buy" else 0)
+    return {"compratore": compra, "venditore": vende,
+            "giro": int(r["tornati"] or 0) + 1,
+            "vivo": vivo_libro, "fonte": "libro"}
 
 
 def _avviso_recapito_p2p(con, ordine, io: int, adesso: int) -> tuple:
@@ -35193,54 +35352,59 @@ def _avviso_recapito_p2p(con, ordine, io: int, adesso: int) -> tuple:
     `(0, perche')` quando non parte niente — e il perche' e' per il
     journal, mai per chi chiama: alla rotta non si risponde «l'altra
     parte ha gli avvisi spenti».
-    CHI CHIAMA DEV'ESSERE CHI VENDE su quell'ordine: su un `sell` chi
-    l'ha pubblicato, su un `buy` chi l'ha preso. E l'ordine dev'essere
-    PRESO sul libro: prima non c'e' nessuno a cui dirlo, dopo non c'e'
-    piu' niente da pagare.
+    CHI CHIAMA DEV'ESSERE CHI VENDE su quell'ordine, e lo scambio
+    dev'essere VIVO: prima della presa non c'e' nessuno a cui dirlo,
+    dopo non c'e' piu' niente da pagare. Il giudice delle parti e'
+    `_parti_scambio_p2p`.
     IL TIMBRO PRIMA DELL'INVIO, il patto delle sorelle."""
     pulite = _ordini_puliti_p2p([ordine] if isinstance(ordine, str) else ordine)
     if len(pulite) != 1:
         raise ValueError("Serve un ordine")
-    r = con.execute(
-        "SELECT ordine, tg_id, preso_da, stato, lato, euro, recapito_avviso, "
-        "recapito_n FROM p2p_ordini WHERE ordine=?", (pulite[0],)).fetchone()
-    if not r or not io:
+    ordine = pulite[0]
+    if not io:
         return 0, "ordine sconosciuto"
-    maker, taker = int(r["tg_id"] or 0), int(r["preso_da"] or 0)
-    if io not in (maker, taker) or maker == taker:
-        return 0, "non e' una delle due parti"
-    if (r["stato"] or "") not in STATI_LIBRO_PRESO:
-        return 0, f"l'ordine sul libro e' «{r['stato'] or 'mai visto'}», non preso"
-    lato = r["lato"] or ""
-    vende = maker if lato == "sell" else (taker if lato == "buy" else 0)
+    parti = _parti_scambio_p2p(con, ordine)
+    if not parti["fonte"]:
+        return 0, "ordine sconosciuto"
+    compra, vende = parti["compratore"], parti["venditore"]
+    if io not in (compra, vende) or compra == vende:
+        return 0, (f"non e' una delle due parti (secondo "
+                   f"{'il coordinatore' if parti['fonte'] == 'mostro' else 'i due telefoni'})")
+    if not parti["vivo"]:
+        return 0, "lo scambio non e' in corso (non preso, o gia' chiuso)"
     if io != vende:
         return 0, "non e' chi vende"
-    altro = taker if io == maker else maker
-    if altro <= 0:
-        return 0, "l'altra parte non e' annotata (entra da Nostr, o un altro client)"
-    n, ultimo = int(r["recapito_n"] or 0), int(r["recapito_avviso"] or 0)
+    altro = compra
+    # (chi entra da Nostr ha un id NEGATIVO ed e' un destinatario come
+    # gli altri: `notifica` gli manda il DM. Zero e' «non si sa chi e'»)
+    if not altro:
+        return 0, "l'altra parte non e' dei nostri (un altro client, o non annotata)"
+    giro = parti["giro"]
+    fatti = con.execute(
+        "SELECT COUNT(*), MAX(quando) FROM p2p_avvisi WHERE ordine=? "
+        "AND giro=? AND tg_id=? AND momento LIKE 'recapito%'",
+        (ordine, giro, altro)).fetchone()
+    n, ultimo = int(fatti[0] or 0), int(fatti[1] or 0)
     if n >= P2P_RECAPITO_MAX:
-        return 0, f"gia' {n} avvisi su quest'ordine"
+        return 0, f"gia' {n} avvisi su questo scambio"
     if adesso - ultimo < P2P_RECAPITO_PAUSA_S:
         return 0, f"l'ultimo avviso e' di {adesso - ultimo}s fa"
     if not _avvisi_p2p_accesi(con, altro):
         return 0, f"{altro} ha gli avvisi P2P spenti"
-    con.execute("UPDATE p2p_ordini SET recapito_avviso=?, recapito_n=? "
-                "WHERE ordine=?", (adesso, n + 1, r["ordine"]))
+    scritto = con.execute(
+        "INSERT OR IGNORE INTO p2p_avvisi(ordine, momento, giro, tg_id, "
+        "quando, fonte) VALUES(?,?,?,?,?,'recapito')",
+        (ordine, f"recapito{n + 1}", giro, altro, adesso)).rowcount
     con.commit()
+    if not scritto:
+        return 0, "gia' detto (un altro giro l'ha scritto nello stesso istante)"
     # il nome di chi vende come lo vede l'altra parte nella pagina dello
     # scambio: lo STESSO giudice («LE PARTI SI VEDONO»), cosi' la frase
     # non dice mai un nome che la pagina non mostra
-    nome = ""
-    try:
-        nome = (_controparti_p2p(con, [r["ordine"]], altro, adesso)
-                .get(r["ordine"], {}).get("nome") or "")
-    except Exception as e:
-        print(f"⚠️ Recapito P2P: il nome di chi vende su {r['ordine'][:8]} "
-              f"non si legge ({type(e).__name__}): la frase parte senza",
-              flush=True)
-    chi = html.escape(str(nome)) if nome else "Chi ti vende i sats"
-    euro = html.escape(str(r["euro"] or ""))
+    chi = _nome_altro_p2p(con, ordine, altro, adesso) or "Chi ti vende i sats"
+    r = con.execute("SELECT euro FROM p2p_ordini WHERE ordine=?",
+                    (ordine,)).fetchone()
+    euro = html.escape(str((r["euro"] if r else "") or ""))
     # l'intervallo non ancora scelto («da 20,00 a 100,00 €») non e' una
     # cifra da mandare: si tace
     cifra = euro if euro and not euro.startswith("da ") else "gli euro"
@@ -35601,110 +35765,65 @@ async def annuncia_ordine_p2p_canale(req: Request,
     return {"ok": True, "postato": postato}
 
 
-# ---------- IL CAMPANELLO DELLO SCAMBIO P2P (set 2026, tappa 7) ------
-# Uno scambio dura ore: il taker ha 900 secondi per la sua mossa,
-# l'ordine 24. Fra una mossa e l'altra la Mini App e' CHIUSA — e le
-# risposte del coordinatore arrivano lo stesso, sui relay, dove nessuno
-# le guarda. Senza un campanello, chi vende scopre che il compratore ha
-# preso l'ordine quando riapre l'app, e magari e' tardi.
+# ---------- GLI AVVISI DELLO SCAMBIO P2P: MOSTRO E' L'UNICA FONTE ------
+# (patch 0007, 18 set 2026, decisione di Andrea con Alan)
+# Uno scambio dura ore: chi ha preso ha 900 secondi per la sua mossa, e
+# fra una mossa e l'altra la Mini App e' CHIUSA. Senza un avviso, chi
+# vende scopre che gli euro sono partiti quando riapre l'app — e magari
+# e' tardi.
 #
-# UN GIRO D'OROLOGIO DA UN MINUTO, NON UNA WEBSOCKET LUNGA, ed e' la
-# scelta che governa il resto: una connessione persistente ai relay
-# vorrebbe riconnessioni, backoff e un task che puo' morire in
-# silenzio — cioe' un campanello che smette di suonare senza dirlo a
-# nessuno. Un giro sincrono in `to_thread` (il calco di
-# `chiedi_relay_dm`) non ha niente da tenere vivo: se un battito va
-# male, il prossimo arriva fra sessanta secondi. La latenza e' <= 60 s,
-# che su una finestra di 900 e' niente.
-# EMENDATA IL 17 SET 2026, e il giro RESTA: accanto a lui c'e' adesso
-# un ascolto permanente sullo specchio, che lo fa partire prima. Il
-# rischio scritto qui sopra — il task che muore in silenzio — e' vero,
-# e ha le sue regole: vedi «L'ASCOLTO», piu' sotto. Se l'ascolto cade,
-# questo giro non se ne accorge nemmeno: continua al suo minuto.
+# FINO AL 18 SET 2026 QUI C'ERA UN CAMPANELLO CHE DEDUCEVA. Il server
+# guardava sui relay le buste cifrate del coordinatore verso le chiavi
+# dei nostri utenti, e non potendole leggere diceva «Novita' in un tuo
+# scambio». Attorno a quella frase cieca era cresciuto un castello: un
+# gate da 600 secondi e uno da 90 contro le raffiche, una coda per non
+# perdere la busta arrivata a gate chiuso, la «busta gemella» per non
+# raddoppiare le frasi del libro, e una finestra dell'eco — il telefono
+# diceva «sto facendo un gesto» — per non suonare a chi aveva l'app in
+# mano. DAL VIVO (journal del VPS, 18 set, 20:15-20:26) HA DATO AVVISI
+# A CASO: la pausa da 600 s rimasta attaccata alla persona per tutto lo
+# scambio dopo, le buste di uno scambio gia' concluso che suonavano, il
+# «concluso» mai arrivato a chi vendeva.
+# Il difetto non era in una taratura: era nel DEDURRE. E c'e' chi i
+# fatti li SA — il coordinatore, che e' nostro. Dalla patch 0007 mostrod
+# racconta ogni passo a `/api/p2p/evento`, e da li' nasce UN avviso
+# preciso, alla parte che deve agire o sapere, MAI a chi ha fatto il
+# gesto. Il castello e' stato tolto per intero, e non si rimette: vedi
+# CANTIERI, «Mostro e' l'unica fonte degli avvisi P2P».
 #
-# IL SERVER NON DECIFRA NIENTE, E NON PER ATTENZIONE: la funzione che
-# legge dai relay tiene di ogni evento tre cose — a chi e' indirizzato,
-# quando, e l'id per non ricontarlo — e il `content` non lo tocca
-# nessuno. Non ne avrebbe nemmeno il modo (la meta' privata del mazzo
-# vive nel browser: regola ferrea 2), ed e' anche il motivo per cui il
-# campanello non puo' dire COSA e' successo. Dice «guarda», e chi apre
-# lo scopre dal suo scambio.
-TIMBRO_P2P_VISTO = "p2p_ultimo_visto"   # il segnalibro, sopravvive al riavvio
-P2P_GIRO_S = 60          # ogni quanto si guarda: la latenza del campanello
-P2P_NUDGE_S = 600        # il gate: al piu' uno squillo ogni dieci minuti
-# IL GATE CORTO DI CHI HA UNO SCAMBIO VIVO (17 set 2026, dal collaudo
-# vero: la presa di Alan e' passata muta). I dieci minuti sono quasi
-# quanto la finestra di un GESTO (`expiration_seconds`, 900 s): la
-# pubblicazione timbrava il gate, la presa arrivava tre minuti dopo e
-# il campanello se la mangiava — cioe' taceva proprio sul messaggio che
-# chiedeva di fare qualcosa entro un quarto d'ora. Il server i kind 14
-# non li legge, quindi QUALE messaggio chieda un gesto non lo sa; sa
-# pero' dal LIBRO se la persona ha uno scambio PRESO, ed e' li' che
-# ogni messaggio del coordinatore e' un passo che puo' toccare a lei.
-# Novanta secondi: piu' di un battito (60), cosi' il kind 14 dello
-# STESSO momento della frase precisa — anche visto al giro dopo — non
-# fa doppione; meno di due, cosi' il gesto chiesto due minuti dopo
-# suona. Con soli ordini in vetrina resta il gate lungo.
-P2P_NUDGE_VIVO_S = 90
-# ═══ IL GATE RIMANDA E ACCORPA, NON SCARTA (18 set 2026, dal journal
-# del VPS: 08:10:11 la presa, 08:10:21 la richiesta di bloccare la
-# garanzia «e' nel gate: non suona», e l'avviso non e' arrivato MAI) ═══
-# Il gate esiste contro lo spam: al piu' un avviso generico per pausa.
-# Ma scartava, e una busta che arriva dieci secondi dopo la frase della
-# presa e' quasi sempre il passo SUCCESSIVO — proprio quello che chiede
-# un gesto entro un quarto d'ora. Da oggi una busta a gate chiuso si
-# METTE IN CODA (`chiavi_p2p.rimandato`), e alla scadenza della pausa
-# parte UN avviso solo per tutte quelle arrivate nel frattempo.
-# LE FRASI PRECISE DEL LIBRO NON ASPETTANO MAI: sono quelle che dicono
-# «tocca a te» (la presa, a chi deve fare il primo gesto) e le altre
-# sono una per passaggio pubblico — un concluso o un annullato non si
-# tengono in tasca novanta secondi per non disturbare. Il gate e' dei
-# soli avvisi generici, che sono l'unica cosa che puo' fare raffica.
-# UN MOMENTO, UNA NOTIFICA resta vero, ma per un'altra strada: prima lo
-# garantiva il gate (la frase precisa lo timbrava, e la busta dello
-# stesso istante cadeva dentro), ora lo garantisce l'ORA. mostrod manda
-# le buste di un passo nello stesso secondo in cui ripubblica il 38383,
-# quindi una busta nata entro `P2P_GEMELLI_S` dall'evento del libro
-# dell'ultima frase precisa e' la sua GEMELLA, e non suona; una nata
-# dieci secondi dopo e' un altro passo, e si mette in coda.
-P2P_GEMELLI_S = 3
-# ═══ L'ECO DEL PROPRIO GESTO NON SUONA (18 set 2026, terzo giro, dalla
-# prova dal vivo: «novita' in un tuo scambio» a chi aveva APPENA
-# pubblicato, dato la fattura, detto «euro inviati») ═══
-# Meta' delle buste del coordinatore sono la RISPOSTA a chi ha appena
-# fatto un gesto: la persona ha l'app in mano e quel che e' successo lo
-# sa gia'. Il server i gesti NON li vede — dal telefono vanno dritti ai
-# relay, e il motore dello scambio non chiama mai casa — quindi glielo
-# dice il client, un attimo PRIMA di parlare al coordinatore: «sto
-# facendo un gesto con questa chiave» (`/api/p2p/gesto`: la chiave
-# pubblica, che il server ha gia', e nient'altro — ne' quale gesto, ne'
-# quale ordine).
-# LA PRIMA BUSTA nata dopo quel momento, entro la finestra, verso
-# QUELLA chiave e' l'eco: non suona, non va in coda, e CONSUMA il
-# timbro — la seconda suona. E' per chiave e non per persona apposta:
-# la busta dello stesso momento per L'ALTRA PARTE va a un'altra chiave
-# di un'altra persona e non passa nemmeno di qui, e un altro scambio
-# della stessa persona ha un'altra chiave.
-# TRENTA SECONDI, e il numero non e' una taratura: e' QUANTO IL CLIENT
-# ASPETTA la risposta (`P2P_ATTESA_MS` in miniapp.html, e una prova li
-# tiene uguali). Finche' lui aspetta, col velo alzato, la busta e'
-# un'eco; passati i trenta il client dice «la risposta sta tardando, se
-# arriva ti avvisiamo» — e da li' la risposta e' una NOTIZIA, che deve
-# suonare. Via Tor arriva di solito in 10-20 s. Una finestra piu' lunga
-# mangerebbe proprio l'avviso appena promesso; una piu' corta farebbe
-# suonare a chi sta ancora guardando il velo.
-# LA GARANZIA SI PAGA A MANO, in un altro wallet, e ci vogliono minuti:
-# li' il gesto e' «ho aperto la richiesta da pagare», e la finestra e'
-# di cinque minuti — un terzo dei 900 s che il coordinatore da' per
-# quel passo.
-# UNA BUSTA NATA PRIMA DEL GESTO, verso quella chiave, e' gia' VISTA:
-# per fare un gesto su uno scambio bisogna averlo davanti. Non suona e
-# il timbro non lo consuma (arriva solo quando l'ascolto e' giu' e il
-# giro al minuto la trova in ritardo).
-P2P_ECO_S = 30
-P2P_ECO_PAGA_S = 300
-P2P_ECO_SCARTO_S = 5     # gli orologi di due macchine non sono uno solo
-_P2P_CODA = {"scade": 0}   # quando scade la prima pausa con buste in coda: sveglia l'orologio
+# IL SERVER CONTINUA A NON DECIFRARE NIENTE — adesso non guarda nemmeno
+# piu' le buste. COSA SA IN PIU', e va detto perche' e' il prezzo: a che
+# punto e' ogni scambio e fra quali due trade key (quindi, per i nostri
+# utenti, fra quali due account). NON sa gli importi, tranne i tre della
+# chiusura; non vede fatture, preimage, ne' dove vanno gli euro.
+#
+# LA RETE DI SICUREZZA E' IL LIBRO PUBBLICO: presa, concluso, annullato,
+# scaduto e il ritorno in vetrina si leggono anche dal 38383, come dal
+# 16 set 2026. Il giro del libro RESTA — uno al minuto, piu' l'ascolto
+# sullo specchio — ma la sua frase aspetta `P2P_RISERVA_S`: se intanto
+# l'evento di mostrod e' arrivato il libro TACE, se no parla lui. Finche'
+# la porta degli eventi e' chiusa (`P2P_EVENTI_SEGRETO` vuoto: la patch
+# non e' ancora sul nodo) il libro non aspetta nessuno e parla subito,
+# com'era.
+P2P_GIRO_S = 60          # ogni quanto si guarda il libro: la latenza della riserva
+P2P_RISERVA_S = 60       # quanto il libro aspetta il coordinatore prima di parlare lui
+# DUE FONTI, UN MOMENTO: l'evento di mostrod porta l'ora del suo
+# orologio, il 38383 il suo `created_at` — stessa macchina, stesso
+# istante, a meno dei secondi che `monotonic_order_event_timestamp`
+# aggiunge per tenere in fila due eventi dello stesso ordine. Trenta
+# secondi sono larghi per quello e stretti per tutto il resto: due prese
+# VERE dello stesso ordine a meno di mezzo minuto non esistono (in mezzo
+# ci vuole un ritiro o un timeout da 900 s).
+P2P_STESSO_MOMENTO_S = 30
+# IL RESPIRO DELLA PRESA: l'evento di mostrod arriva in un secondo, il
+# 38383 coi NUMERI della presa (a prezzo di mercato i sats si fissano
+# li') in tre, e il telefono di chi ha preso dichiara il suo nome poco
+# dopo. La frase della presa aspetta fin qui i numeri, e meno il nome:
+# sei secondi contro i sessanta di prima.
+P2P_RESPIRO_S = 6
+P2P_RESPIRO_NOME_S = 3
+_P2P_ATTESE = {"scade": 0}   # quando scade la prima attesa: sveglia l'orologio
+_TASK_EVENTI_P2P = set()     # gli invii in volo: un task senza riferimento si perde
 # LA PRESA SUL LIBRO E' `in-progress`, E BASTA (corretto il 18 set
 # 2026, letto sul sorgente di mostrod 0.18.7 e visto sullo specchio).
 # Il 17 set qui c'era scritto che il 38383 dice anche
@@ -35713,14 +35832,12 @@ _P2P_CODA = {"scade": 0}   # quando scade la prima pausa con buste in coda: sveg
 # `create_status_tags` in `src/nip33.rs` pubblica i soli quattro
 # secchi di NIP-69 (pending, in-progress, success, canceled), e un
 # ordine in `waiting-*` esce come `in-progress`. Restano nella tupla
-# perche' un coordinatore che li pubblicasse (una versione nuova, o la
-# patch che servirebbe per le frasi dei passi interni) non deve far
-# cadere la presa fra gli stati «mai visti».
+# perche' un coordinatore che li pubblicasse non deve far cadere la
+# presa fra gli stati «mai visti».
 STATI_LIBRO_PRESO = ("in-progress", "waiting-buyer-invoice",
                      "waiting-payment")
-P2P_BLOCCO = 100         # quante pubkey in un filtro (i relay hanno tetti)
+P2P_BLOCCO = 100         # quanti id in un filtro (i relay hanno tetti)
 P2P_PRIMO_SGUARDO = 600  # al primo avvio si guarda indietro dieci minuti
-_P2P_VISTI = set()       # gli id gia' contati, dentro questo processo
 
 # ═══ L'OROLOGIO CHE NON SI APPENDE (17 set 2026, dal journal del VPS) ═══
 # Il fatto: dal riavvio del deploy delle 10:03 il journal non ha piu'
@@ -35745,7 +35862,7 @@ _P2P_VISTI = set()       # gli id gia' contati, dentro questo processo
 # suo; e un guardiano tiene il riferimento, guarda il battito e fa
 # ripartire l'orologio se e' morto o fermo — dicendolo.
 P2P_RELAY_MAX_S = 20      # il tetto di UNA domanda a UN relay
-P2P_PASSATA_MAX_S = 240   # il tetto di una passata intera (libro, o campanello)
+P2P_PASSATA_MAX_S = 240   # il tetto di una passata intera (libro, o attese)
 P2P_GUARDIA_S = 30        # ogni quanto il guardiano guarda il battito
 P2P_FERMO_S = 600         # oltre, l'orologio e' FERMO: un giro + due passate al tetto + margine
 try:
@@ -35754,7 +35871,7 @@ except ImportError:
     P2P_LOG_PASSATE = True   # la riga a ogni passata: si spegne dal config
 _P2P_POOL = None          # il pool di thread del solo P2P: nasce al primo uso
 _P2P_BATTITO = {"n": 0, "vivo": 0.0}
-_P2P_CONTO = {"libro": "", "campanello": ""}   # cosa ha fatto l'ultima passata
+_P2P_CONTO = {"libro": "", "attese": ""}   # cosa ha fatto l'ultima passata
 _P2P_RELAY_MUTI = set()   # i relay che tacciono ADESSO: si dice al cambio, non a ogni giro
 _TASK_OROLOGIO_P2P = None
 _TASK_GUARDIANO_P2P = None
@@ -35835,8 +35952,10 @@ async def _chiedi_relay_p2p(fn, relay: str, *args):
 # tetto, quindi la passata dura quanto il piu' lento e non la somma — e
 # le risposte si UNISCONO. Lo stesso evento da due relay e' lo stesso
 # evento (stesso id): cade nell'unione, e i doppioni che restano li
-# rendono inerti il giudice del libro (stato uguale = nessun passaggio)
-# e gli id gia' contati del campanello.
+# rende inerti il giudice del libro (stato uguale = nessun passaggio).
+# (Dalla patch 0007, 18 set 2026, ai relay si chiede il SOLO libro: i
+# kind 14 del coordinatore non si guardano piu'. Il guasto di quel
+# giorno resta la ragione per cui si chiede a tutti.)
 # E IL JOURNAL DICE CHI HA DATO COSA, a ogni passata: «nos.lol 2 ·
 # relay.mostro.network 0 · relay.damus.io ✗». Lo zero accanto a un due
 # e' il guasto di quel giorno scritto in una riga; «✗» e' chi non ha
@@ -35848,7 +35967,6 @@ async def _chiedi_relay_p2p(fn, relay: str, *args):
 # sempre (riprodotto a banco). Si chiede da un po' prima: i doppioni
 # non costano niente, per le due ragioni qui sopra.
 P2P_MARGINE_S = 120       # quanto indietro dal segnalibro si richiede
-_P2P_AVVIATO = {"campanello": False}   # la prima passata di QUESTO processo
 
 
 async def _chiedi_tutti_p2p(fn, relays: list, *args) -> list:
@@ -35890,17 +36008,6 @@ def _conto_relay_p2p(conto: dict) -> str:
         for r, n in conto.items())
 
 
-def _evento_buste_p2p(ev: dict) -> list:
-    """PURA: da un kind 14 del coordinatore alle terne `(pubkey,
-    created_at, id)`, una per tag `p`. E' l'UNICO posto che guarda
-    dentro un kind 14, per il lettore al minuto e per l'ascolto — e
-    guarda i tag, il tempo e l'id: il contenuto non lo tocca."""
-    quando = int(ev.get("created_at") or 0)
-    ident = str(ev.get("id") or "")
-    return [(str(t[1]), quando, ident) for t in ev.get("tags", [])
-            if len(t) > 1 and t[0] == "p"]
-
-
 def _evento_libro_p2p(ev: dict):
     """PURA: da un 38383 ai SOLI tag che servono alla frase — id,
     stato, lato, sats, euro, metodi, quando, scade — o None se manca il
@@ -35934,22 +36041,25 @@ def _evento_libro_p2p(ev: dict):
 # ═══ L'ASCOLTO: le notifiche P2P istantanee (17 set 2026) ═══
 # Il giro al minuto ha una latenza fino a sessanta secondi, su finestre
 # da novecento. Qui il server tiene UNA connessione permanente al
-# NOSTRO specchio (`relay.barattolo.store`) e reagisce al 38383 e ai
-# kind 14 del coordinatore appena arrivano.
-# IL COMMENTO IN TESTA AL CAMPANELLO DICEVA DI NO («un giro d'orologio,
+# NOSTRO specchio (`relay.barattolo.store`) e reagisce al 38383 del
+# coordinatore appena arriva.
+# (DALLA PATCH 0007, 18 set 2026, ASCOLTA IL SOLO LIBRO: i kind 14 —
+# le buste cifrate — non li guarda piu' nessuno, ne' qui ne' al minuto.
+# A cosa serve ancora: a riempire SUBITO `p2p_ordini` coi numeri della
+# presa, che la frase nata dall'evento di mostrod aspetta per pochi
+# secondi (`P2P_RESPIRO_S`), e ad armare la riserva del libro.)
+# LA PRIMA STESURA DI QUESTA SEZIONE DICEVA DI NO («un giro d'orologio,
 # non una websocket lunga… un task che puo' morire in silenzio»), e
 # aveva ragione sul rischio: la risposta non e' ignorarlo, sono le
 # CINQUE REGOLE qui sotto. Il giro al minuto RESTA, identico: e' la
 # rete di sicurezza, e l'ascolto e' solo un modo di farlo partire prima.
 # 1) L'ASCOLTO NON GIUDICA NIENTE. Porta gli eventi in un MAZZETTO e
-#    sveglia l'orologio, che li passa agli STESSI due giri — stessi
-#    giudici, stesso segnalibro, stessi id gia' contati, stesso gate.
-#    Un solo esecutore: niente lucchetti, niente due strade che
-#    divergono.
-# 2) IL MAZZETTO ASPETTA TRE SECONDI: mostro manda il kind 14 nello
-#    stesso istante in cui ripubblica il 38383, e i due arrivano in
-#    ordine qualunque. Raccolti insieme si applica PRIMA il libro —
-#    che timbra il gate — e poi i kind 14: un momento, una notifica.
+#    sveglia l'orologio, che li passa allo STESSO giro — stesso
+#    giudice, stesso segnalibro. Un solo esecutore: niente lucchetti,
+#    niente due strade che divergono.
+# 2) IL MAZZETTO ASPETTA TRE SECONDI: mostro ripubblica il 38383 a
+#    raffica quando un passo ne porta un altro, e raccolti insieme si
+#    applicano in ordine di tempo, in una passata sola.
 # 3) SOLO IL VIVO. Quel che il relay manda PRIMA dell'EOSE e' passato,
 #    e il passato e' del giro al minuto (che ha il segnalibro): qui si
 #    butta. Un evento caduto in un buco di connessione lo prende il
@@ -35969,10 +36079,7 @@ def _evento_libro_p2p(ev: dict):
 # chiave nuova non chiede di ri-sottoscrivere niente.
 # E' UN THREAD E NON UN TASK perche' websocket-client e' sincrona, e
 # una libreria asincrona sarebbe una dipendenza pip in piu' sul VPS.
-# ⚠️ LO SPECCHIO I KIND 14 LI COPIA SOLO SE `router.conf` LO DICE
-# (deploy/relay): finche' non lo dice l'ascolto rende istantaneo il
-# solo libro, e il controllo incrociato lo scrive a ogni kind 14.
-P2P_MAZZETTO_S = 3            # quanto si aspetta per raccogliere i gemelli
+P2P_MAZZETTO_S = 3            # quanto si aspetta per raccogliere una raffica
 P2P_ASCOLTO_POLSO_S = 45      # ogni quanto la domandina
 P2P_ASCOLTO_EOSE_S = 10       # entro quanto deve tornare l'EOSE
 P2P_ASCOLTO_ATTESA_S = 5      # l'attesa prima di riprovare: per caduta, tetto 60
@@ -35981,18 +36088,17 @@ P2P_ASCOLTO_RITARDO_S = 20    # un evento piu' vecchio di cosi' l'ascolto doveva
 _P2P_ASCOLTO = {"filo": None, "ferma": None, "stato": "spento", "da": 0.0,
                 "connesso_da": 0.0, "segno": 0.0, "polso": 0.0, "vivi": 0,
                 "cadute": 0, "perche": "", "portati": {}, "detti": set()}
-_P2P_MAZZETTO = {"libro": [], "buste": [], "timer": None}
+_P2P_MAZZETTO = {"libro": [], "timer": None}
 _P2P_SVEGLIA = {"ev": None}   # l'asyncio.Event dell'orologio che gira ADESSO
 _P2P_LAMPI = {"n": 0}
 
 
 def _chiave_evento_p2p(tipo: str, dato) -> tuple:
     """Come si riconosce lo STESSO evento fra ascolto e giro: il 38383
-    per (ordine, quando, stato) — il lettore il suo id non lo tiene —
-    e il kind 14 per id."""
-    if tipo == "libro":
-        return ("libro", dato["id"], dato["quando"], dato["stato"])
-    return ("buste", dato[2])
+    per (ordine, quando, stato) — il lettore il suo id non lo tiene.
+    `tipo` e' rimasto nella firma, e vale sempre `libro`: dalla patch
+    0007 l'ascolto non porta nient'altro."""
+    return (tipo, dato["id"], dato["quando"], dato["stato"])
 
 
 def _ascolto_porta(tipo: str, dati: list):
@@ -36019,11 +36125,11 @@ def _mazzetto_sveglia():
         _P2P_SVEGLIA["ev"].set()
 
 
-def _mazzetto_prendi() -> tuple:
-    """Svuota il mazzetto e lo consegna: (libro, buste)."""
-    libro, buste = _P2P_MAZZETTO["libro"], _P2P_MAZZETTO["buste"]
-    _P2P_MAZZETTO["libro"], _P2P_MAZZETTO["buste"] = [], []
-    return libro, buste
+def _mazzetto_prendi() -> list:
+    """Svuota il mazzetto e lo consegna: i 38383 portati dall'ascolto."""
+    libro = _P2P_MAZZETTO["libro"]
+    _P2P_MAZZETTO["libro"] = []
+    return libro
 
 
 def _ascolto_mancato_p2p(tipo: str, dati: list, adesso: int):
@@ -36036,7 +36142,7 @@ def _ascolto_mancato_p2p(tipo: str, dati: list, adesso: int):
     if _P2P_ASCOLTO["stato"] != "connesso" or not da:
         return
     for d in dati:
-        quando = d["quando"] if tipo == "libro" else d[1]
+        quando = d["quando"]
         if quando <= da + 5 or adesso - quando < P2P_ASCOLTO_RITARDO_S:
             continue
         k = _chiave_evento_p2p(tipo, d)
@@ -36045,8 +36151,7 @@ def _ascolto_mancato_p2p(tipo: str, dati: list, adesso: int):
         if len(_P2P_ASCOLTO["detti"]) > 5000:
             _P2P_ASCOLTO["detti"].clear()
         _P2P_ASCOLTO["detti"].add(k)
-        cosa = (f"il 38383 dell'ordine {str(d['id'])[:8]} ({d['stato']})"
-                if tipo == "libro" else f"il kind 14 {str(d[2])[:8]}")
+        cosa = f"il 38383 dell'ordine {str(d['id'])[:8]} ({d['stato']})"
         print(f"⚠️ Ascolto P2P: {cosa} l'ha trovato il giro al minuto e "
               f"NON l'ascolto, che era connesso ({adesso - quando}s dopo): "
               "lo specchio non l'ha ricevuto, o non lo copia", flush=True)
@@ -36091,8 +36196,10 @@ def _ascolto_p2p_filo(relay: str, mostro: str, loop, ferma):
             ws = create_connection(relay, timeout=10,
                                    sslopt={"cert_reqs": ssl.CERT_NONE})
             ws.settimeout(5)
+            # IL SOLO LIBRO (patch 0007, 18 set 2026): le buste cifrate
+            # non si guardano piu', nemmeno per sapere che esistono
             ws.send(json.dumps(["REQ", "ascolto", {
-                "kinds": [38383, 14], "authors": [mostro],
+                "kinds": [38383], "authors": [mostro],
                 "since": int(inizio)}]))
             vivo, polso_mandato, ultimo_polso = False, 0.0, inizio
             while not ferma.is_set():
@@ -36134,11 +36241,6 @@ def _ascolto_p2p_filo(relay: str, mostro: str, loop, ferma):
                             if letto:
                                 loop.call_soon_threadsafe(
                                     _ascolto_porta, "libro", [letto])
-                        elif ev.get("kind") == 14:
-                            buste = _evento_buste_p2p(ev)
-                            if buste:
-                                loop.call_soon_threadsafe(
-                                    _ascolto_porta, "buste", buste)
                 if not vivo and adesso - inizio > P2P_ASCOLTO_EOSE_S:
                     raise TimeoutError("nessun EOSE alla sottoscrizione")
                 if polso_mandato and adesso - polso_mandato > P2P_ASCOLTO_EOSE_S:
@@ -36206,403 +36308,189 @@ def _guardia_ascolto_p2p():
     A["filo"].start()
     print(f"👂 Ascolto P2P: parte su {relay}", flush=True)
 
-# IL TESTO DEL 16 SET 2026 (decisione di Andrea con Alan, insieme alle
-# frasi precise del libro): dice DOVE guardare e che il prossimo passo,
-# se e' tuo, sta la'. La riga sulla cifratura resta: i tre momenti
-# interni — garanzia depositata, fiat inviato, disputa aperta — restano
-# generici PER SCELTA, e la patch 0005 a mostro che li avrebbe resi
-# leggibili dal libro non si fara' (vedi CANTIERI, «Il libro che
-# avvisa», l'emenda).
-MSG_NUDGE_P2P = (
-    "⚡ <b>Novità in un tuo scambio P2P:</b> apri Barattolo → P2P → "
-    "I miei scambi. Se tocca a te, il prossimo passo è lì.\n\n"
-    "<i>Cosa sia successo lo sa solo il tuo telefono: i messaggi dello "
-    "scambio sono cifrati e Barattolo non li legge.</i>")
+
+# ═══ LE ATTESE: gli avvisi che aspettano il loro minuto (patch 0007) ═══
+# Due cose aspettano, e tutt'e due in tabella (`p2p_attese`), cosi' un
+# deploy in mezzo non se le porta via:
+# • LA RISERVA DEL LIBRO. Il libro legge presa, concluso, annullato,
+#   scaduto e ritorno in vetrina, ma non parla subito: mette la sua
+#   frase in attesa per `P2P_RISERVA_S`. Alla scadenza, se mostrod ha
+#   raccontato LO STESSO momento di QUELL'ordine (`p2p_momenti`, a meno
+#   di `P2P_STESSO_MOMENTO_S`), la frase si butta — il libro tace. Se
+#   no parte lei: un evento perso costa un minuto, non un avviso.
+# • IL RILASCIO. «Concluso» mostrod lo dice a pagamento RIUSCITO, e chi
+#   vende ha finito prima, quando rilascia. Se il pagamento a chi compra
+#   si impianta (il 17 set 2026: tre tentativi, NO_ROUTE), a chi vende
+#   il suo «hai venduto» non arrivava mai. Al rilascio la sua frase va
+#   in attesa: se entro il minuto arriva «concluso» gliela dice lui (e
+#   l'anti-doppione ferma questa), se no parte questa.
+# L'ANTI-DOPPIONE E' UNO, e sta all'ULTIMO passo prima dell'invio: la
+# riga in `p2p_avvisi` — stesso ordine, stesso momento, stessa persona,
+# stesso giro — si scrive con INSERT OR IGNORE, e chi non riesce a
+# scriverla non manda.
 
 
-def eventi_p2p_da_relay(relay: str, pubkeys: list, since: int, mostro: str):
-    """Chiede a UN relay se il coordinatore ha scritto a queste pubkey.
-    E' SINCRONA: va in asyncio.to_thread (il calco di
-    `chiedi_relay_dm`).
-
-    Torna una lista di `(pubkey, created_at, id)` — e MAI il contenuto:
-    quelle tre cose bastano a sapere A CHI suonare e a non suonare due
-    volte per lo stesso evento. Il `content` non si legge, non si passa
-    e non esce da qui; c'e' la sentinella.
-
-    IL FILTRO PORTA `authors`, ed e' una stretta e non un dettaglio:
-    senza, un estraneo qualunque potrebbe far suonare il campanello a
-    chiunque scrivendo un kind 14 a una trade key — quelle pubkey le
-    vede chiunque legga i relay. Col filtro suona solo il coordinatore.
-
-    E LA CHAT FRA LE DUE PARTI NON SUONA, ed e' una decisione e non una
-    conseguenza (Andrea, set 2026): il campanello copre le risposte del
-    COORDINATORE, che sono i momenti in cui tocca a te fare qualcosa —
-    la richiesta accettata, la fattura da pagare, il bonifico
-    confermato. Un messaggio della controparte no: quello si legge
-    aprendo lo scambio.
-    IL PERCHE' E' IL COSTO, ed e' un dato NUOVO e non uno in piu' dello
-    stesso tipo: le chiavi della conversazione escono da un ECDH fra le
-    due chiavi di scambio (tappa 6) e nel mazzo non ci sono, quindi per
-    farle suonare bisognerebbe REGISTRARLE qui — e oggi il server sa
-    «questa pubkey e' di Tizio», mentre con quella saprebbe «Tizio e
-    Caio si stanno parlando», cioe' metterebbe in relazione due utenti
-    nostri. Una correlazione sul nostro server per un guadagno piccolo.
-    LE DUE GUARDIE SONO INDIPENDENTI, e questo e' quel che rende la
-    decisione difficile da rovesciare per distrazione: la chiave della
-    chat non e' nel mazzo E il filtro porta `authors`. Per far suonare
-    un messaggio della controparte servirebbero DUE cambi, non uno.
-
-    None = «non ho potuto chiedere» (relay muto o irraggiungibile), che
-    e' un'altra cosa da `[]` = «IO non ho niente di nuovo»: la
-    distinzione di `cerca_ids`. Dal 17 set 2026 il chiamante chiede a
-    tutti e unisce, quindi la distinzione non decide piu' a chi
-    chiedere: decide cosa si SCRIVE nel journal — «✗» o «0»."""
-    if not create_connection:
-        return None
-    try:
-        ws = create_connection(relay, timeout=5,
-                               sslopt={"cert_reqs": ssl.CERT_NONE})
-        ws.send(json.dumps(["REQ", "p2p", {
-            "kinds": [14], "authors": [mostro], "#p": list(pubkeys),
-            "since": int(since), "limit": 500}]))
-        inizio = time.time()
-        fuori = []
-        while time.time() - inizio < 8:
-            msg = json.loads(ws.recv())
-            if msg[0] == "EVENT" and msg[1] == "p2p":
-                fuori.extend(_evento_buste_p2p(msg[2]))
-            elif msg[0] == "EOSE":
-                break
-        ws.close()
-        return fuori
-    except Exception:
-        return None               # relay muto: si prova il prossimo
+def eventi_p2p_attivi() -> bool:
+    """La porta del coordinatore ESISTE? Il calco di `sconto_p2p_attivo`:
+    senza segreto la rotta non c'e' (404), e il libro non aspetta
+    nessuno — parla subito, com'era prima della patch 0007."""
+    return bool(P2P_EVENTI_SEGRETO
+                and not P2P_EVENTI_SEGRETO.startswith("INCOLLA"))
 
 
-def _scambio_vivo_p2p(con, tg_id: int) -> bool:
-    """Questa persona ha uno scambio PRESO, da una parte o dall'altra?
-    Lo dice il libro (`p2p_ordini.stato`, scritto dal giro che passa
-    PRIMA del campanello nello stesso battito): chi ha pubblicato
-    (`tg_id`) o chi ha preso (`preso_da`), su un ordine nei tre stati
-    della presa o in disputa. Un ordine in vetrina non conta: li' non
-    c'e' nessun gesto che scade. Chi entra da Nostr e prende non e'
-    annotato (`preso_da` resta 0): per lui vale il gate lungo, come
-    gia' vale la sola generica."""
-    segni = ",".join("?" * (len(STATI_LIBRO_PRESO) + 1))
-    r = con.execute(
-        "SELECT 1 FROM p2p_ordini WHERE (tg_id=? OR preso_da=?) "
-        f"AND stato IN ({segni}) LIMIT 1",
-        (tg_id, tg_id) + tuple(STATI_LIBRO_PRESO) + ("dispute",)).fetchone()
-    return bool(r)
-
-
-def _nudge_p2p(con, pubkey: str, adesso: int, quando: int,
-               suonati=()) -> int:
-    """A chi suonare per UNA busta, e se e' il momento. Torna il tg_id
-    da avvisare ADESSO, o 0. Puro sulla connessione (il patto di
-    `_registra_chiavi_p2p`), cosi' si gira su sqlite in memoria invece
-    di guardarlo soltanto.
-    `quando` e' il created_at della busta; `suonati` le persone che
-    QUESTA passata ha gia' deciso di avvisare.
-
-    IL GATE E' DELLA PERSONA E NON DELLA PUBKEY, ed e' la riga da non
-    ammorbidire: un mazzo ha una trade key per SCAMBIO, quindi due
-    risposte nello stesso giro sono due pubkey diverse dello stesso
-    utente — col gate per pubkey riceverebbe due campanelli per la
-    stessa frase («guarda i tuoi scambi»), che non dice nemmeno quale.
-    E' il rovescio della pausa dei solleciti, che invece e' dell'ORDINE
-    apposta: la' il messaggio nomina l'ordine, qui no.
-
-    0 NON VUOL PIU' DIRE «SCARTATA» (18 set 2026): una busta che non
-    suona adesso e' di nessuno, o di chi ha spento gli avvisi, o gia'
-    detta (la GEMELLA di una frase precisa, o dentro l'avviso che questa
-    stessa passata manda), oppure RIMANDATA — a gate chiuso si mette in
-    coda, e la porta via `_scarica_rimandati_p2p` alla scadenza della
-    pausa. Vedi «IL GATE RIMANDA E ACCORPA».
-
-    Una pubkey che non e' di nessuno non fa suonare niente: puo'
-    arrivare da un tag `p` di un evento indirizzato anche a un
-    terzo."""
-    r = con.execute("SELECT tg_id, gesto, eco_fino FROM chiavi_p2p "
-                    "WHERE pubkey=?", (pubkey,)).fetchone()
-    if not r:
-        return 0
-    tg_id = r["tg_id"]
-    # L'ECO DEL PROPRIO GESTO (18 set 2026, terzo giro): prima di tutto
-    # il resto, perche' un'eco non deve ne' suonare ne' finire in coda
-    # ne' bruciare un turno del gate. E' della CHIAVE: la busta dello
-    # stesso istante per l'altra parte ha un'altra chiave, e suona.
-    gesto, eco_fino = int(r["gesto"] or 0), int(r["eco_fino"] or 0)
-    if gesto > 0:
-        # LA SOGLIA DEL GESTO LUNGO STA IN AVANTI, e non e' simmetria
-        # mancata: il foglio della garanzia si apre DA SOLO nell'istante
-        # in cui arriva la richiesta da pagare, quindi il suo timbro
-        # nasce un secondo DOPO quella busta — dentro lo scarto degli
-        # orologi. Trattata da eco, consumerebbe lei il timbro lungo, e
-        # la conferma del pagamento — l'eco vera, minuti dopo —
-        # suonerebbe. Nessuno paga una richiesta in meno di cinque
-        # secondi: fin li' e' roba gia' vista. Il gesto corto invece
-        # precede SEMPRE la sua eco, e li' lo scarto sta indietro.
-        lungo = eco_fino - gesto > P2P_ECO_S
-        soglia = gesto + P2P_ECO_SCARTO_S if lungo else gesto - P2P_ECO_SCARTO_S
-        if int(quando) < soglia:
-            print(f"· Campanello P2P: {tg_id}, busta nata "
-                  f"{gesto - int(quando)}s PRIMA del suo ultimo gesto su "
-                  "quello scambio: gia' vista", flush=True)
-            return 0
-        if int(quando) <= eco_fino:
-            # UNA SOLA: il timbro si consuma, la prossima suona
-            con.execute("UPDATE chiavi_p2p SET gesto=0, eco_fino=0 "
-                        "WHERE pubkey=?", (pubkey,))
-            print(f"· Campanello P2P: {tg_id}, ECO del suo gesto "
-                  f"({max(0, int(quando) - gesto)}s dopo): non suona",
-                  flush=True)
-            return 0
-    # la stessa persona con due buste nella stessa passata: l'avviso che
-    # parte per la prima dice «guarda i tuoi scambi», e le copre tutte
-    if tg_id in suonati:
-        return 0
-    # L'INTERRUTTORE (16 set 2026): chi ha spento gli avvisi P2P non
-    # riceve nemmeno la generica. Prima del gate, o un «no» brucerebbe
-    # il turno dei dieci minuti a chi poi li riaccende.
-    if not _avvisi_p2p_accesi(con, tg_id):
-        # CHI TACE LO DICE (17 set 2026): un invio fermato
-        # dall'interruttore o dal gate non lasciava traccia, e dal
-        # journal «non avvisato» e «non successo» erano la stessa cosa
-        print(f"🔕 Campanello P2P: {tg_id} ha gli avvisi P2P SPENTI "
-              "(cassetto Avvisi): non suona", flush=True)
-        return 0
-    q = con.execute("SELECT MAX(ultimo_nudge), MAX(coperto), MAX(rimandato) "
-                    "FROM chiavi_p2p WHERE tg_id=?", (tg_id,)).fetchone()
-    ultimo, coperto, rimandato = (int(q[0] or 0), int(q[1] or 0),
-                                  int(q[2] or 0))
-    # UN MOMENTO, UNA NOTIFICA: la busta nata insieme all'evento del
-    # libro che ha appena fatto partire la frase precisa e' la sua
-    # gemella — la frase ha gia' detto tutto, e di piu'
-    if coperto and abs(int(quando) - coperto) <= P2P_GEMELLI_S:
-        print(f"· Campanello P2P: {tg_id}, busta gemella della frase precisa "
-              f"({abs(int(quando) - coperto)}s dall'evento del libro): "
-              "gia' detta", flush=True)
-        return 0
-    # chi ha uno scambio PRESO ha il gate corto: li' ogni messaggio
-    # puo' chiedere un suo gesto (vedi P2P_NUDGE_VIVO_S)
-    pausa = P2P_NUDGE_VIVO_S if _scambio_vivo_p2p(con, tg_id) else P2P_NUDGE_S
-    if adesso - ultimo < pausa:
-        # IL GATE RIMANDA, NON SCARTA: in coda, col created_at piu'
-        # recente fra quelle che aspettano (mai zero: zero e' «vuota»)
-        con.execute("UPDATE chiavi_p2p SET rimandato=? WHERE tg_id=?",
-                    (max(rimandato, int(quando), 1), tg_id))
-        print(f"⏳ Campanello P2P: {tg_id} e' nel gate (ultimo avviso "
-              f"{adesso - ultimo}s fa, pausa {pausa}s): RIMANDATO, parte "
-              f"fra {pausa - (adesso - ultimo)}s in un avviso solo",
-              flush=True)
-        return 0
-    # suona adesso, e si porta via anche la coda: «guarda i tuoi
-    # scambi» dice tutto quel che e' arrivato fin qui
-    con.execute("UPDATE chiavi_p2p SET ultimo_nudge=?, rimandato=0 "
-                "WHERE tg_id=?", (adesso, tg_id))
-    return tg_id
-
-
-def _scarica_rimandati_p2p(con, adesso: int) -> tuple:
-    """LA CODA DEL GATE: chi ha buste rimandate e la pausa ormai
-    scaduta riceve adesso UN avviso solo, per tutte. Pura sulla
-    connessione, come `_nudge_p2p`. Torna (a chi suonare, quando scade
-    la prossima pausa con buste in coda — 0 se nessuna — e quante
-    persone restano in coda).
-    La pausa si guarda com'e' ADESSO (`_scambio_vivo_p2p`): uno scambio
-    concluso nel frattempo ha gia' mandato la sua frase precisa, che la
-    coda l'ha svuotata (vedi `_avvisi_libro_p2p`).
-    CHI HA SPENTO GLI AVVISI nel frattempo non riceve niente, e la coda
-    si svuota: alla riaccensione un avviso vecchio non direbbe il vero.
-    IL TIMBRO PRIMA DELL'INVIO, il patto delle sveglie: la coda si
-    svuota qui e il chiamante manda dopo — un giro che muore a meta'
-    perde un avviso, mai lo raddoppia."""
-    fuori, prossima, in_coda = [], 0, 0
+def _scarica_attese_p2p(con, adesso: int) -> tuple:
+    """Le attese SCADUTE: chi avvisare adesso, e con che frase. Pura
+    sulla connessione. Torna `(avvisi, prossima)`: la lista di
+    `(tg_id, testo, fonte)` e quando scade la prossima attesa rimasta
+    (0 = nessuna), che e' l'ora a cui l'orologio si sveglia.
+    LA RIGA SI TOGLIE COMUNQUE, che parta o no: un'attesa giudicata una
+    volta non si rigiudica. E IL TIMBRO STA PRIMA DELL'INVIO, il patto
+    delle sorelle: un giro che muore a meta' perde un avviso, mai lo
+    raddoppia.
+    CHI HA SPENTO GLI AVVISI nel frattempo non riceve niente, e non si
+    timbra: alla riaccensione un avviso vecchio non direbbe il vero, ma
+    nemmeno deve risultare «gia' detto» quel che non lo e' stato."""
+    fuori = []
     righe = con.execute(
-        "SELECT tg_id, MAX(ultimo_nudge), MAX(rimandato) FROM chiavi_p2p "
-        "GROUP BY tg_id HAVING MAX(rimandato) > 0").fetchall()
+        "SELECT id, ordine, momento, giro, tg_id, testo, quando, fonte "
+        "FROM p2p_attese WHERE scade<=? ORDER BY scade, id",
+        (adesso,)).fetchall()
     for r in righe:
-        tg_id, ultimo = r[0], int(r[1] or 0)
-        if not _avvisi_p2p_accesi(con, tg_id):
-            con.execute("UPDATE chiavi_p2p SET rimandato=0 WHERE tg_id=?",
-                        (tg_id,))
-            print(f"🔕 Campanello P2P: {tg_id} ha spento gli avvisi P2P: "
-                  "l'avviso rimandato non parte", flush=True)
+        con.execute("DELETE FROM p2p_attese WHERE id=?", (r["id"],))
+        corto = str(r["ordine"])[:8]
+        if r["fonte"] == "libro" and con.execute(
+                "SELECT 1 FROM p2p_momenti WHERE ordine=? AND momento=? "
+                "AND fonte='mostro' AND ABS(quando-?)<=?",
+                (r["ordine"], r["momento"], int(r["quando"] or 0),
+                 P2P_STESSO_MOMENTO_S)).fetchone():
+            print(f"· Riserva P2P: {corto} «{r['momento']}» l'ha gia' "
+                  "raccontato il coordinatore: il libro tace", flush=True)
             continue
-        pausa = P2P_NUDGE_VIVO_S if _scambio_vivo_p2p(con, tg_id) else P2P_NUDGE_S
-        if adesso - ultimo < pausa:
-            in_coda += 1
-            scade = ultimo + pausa
-            prossima = scade if not prossima else min(prossima, scade)
+        if not _avvisi_p2p_accesi(con, r["tg_id"]):
+            print(f"🔕 Attese P2P: {r['tg_id']} ha gli avvisi P2P SPENTI "
+                  f"(cassetto Avvisi): «{r['momento']}» non parte", flush=True)
             continue
-        con.execute("UPDATE chiavi_p2p SET ultimo_nudge=?, rimandato=0 "
-                    "WHERE tg_id=?", (adesso, tg_id))
-        print(f"📬 Campanello P2P: {tg_id}, finita la pausa ({pausa}s): "
-              "parte l'avviso rimandato, uno per tutte le buste arrivate "
-              "intanto", flush=True)
-        fuori.append(tg_id)
-    return fuori, prossima, in_coda
-
-
-async def _giro_p2p(portati=None):
-    """Un battito del campanello: si guarda chi ha scritto, si suona a
-    chi tocca, si sposta il segnalibro.
-    `portati` (17 set 2026, l'ascolto): le terne che l'ascolto ha gia'
-    in mano. Allora NON si chiede ai relay, si tengono le sole terne
-    indirizzate a una chiave NOSTRA (l'ascolto non filtra per chiave)
-    e IL SEGNALIBRO NON SI TOCCA: dice fin dove ha letto il GIRO, e se
-    un lampo lo portasse avanti la prima passata dopo un riavvio
-    prenderebbe per «margine gia' visto» un messaggio mai letto. Il
-    giro al minuto li ritrova, inerti (gli id sono gia' contati), e il
-    segnalibro lo sposta lui."""
-    if not _p2p_leve()["attivo"] or not create_connection:
-        return
-    con = db()
-    pubkeys = [r["pubkey"] for r in
-               con.execute("SELECT pubkey FROM chiavi_p2p").fetchall()]
-    con.close()
-    if not pubkeys:
-        return                    # nessuno ha ancora un profilo di scambio
-    adesso = int(time.time())
-    try:
-        since = int(timbro_letto(TIMBRO_P2P_VISTO) or 0)
-    except ValueError:
-        since = 0                 # timbro storto: vale «mai guardato»
-    if since <= 0:
-        # Primo avvio (o database nuovo): si guarda indietro dieci
-        # minuti e non la storia intera — al primo giro suonerebbe a
-        # tutti per scambi vecchi di settimane.
-        since = adesso - P2P_PRIMO_SGUARDO
-    leve = _p2p_leve()
-    # TUTTI i relay, specchio compreso: e' un fatto da leggere nel
-    # journal, non da ricordare — finche' `router.conf` non copia i
-    # kind 14 lo specchio dira' 0, e dal giorno che li copia dira' il
-    # numero degli altri senza toccare niente qui.
-    relays = list(leve["relay"]) + list(leve["specchio"])
-    trovati, conto = [], {}
-    if portati is not None:
-        nostre = set(pubkeys)
-        trovati = [e for e in portati if e[0] in nostre]
-        pubkeys = []              # niente da chiedere: il ciclo qui sotto non gira
-    for i in range(0, len(pubkeys), P2P_BLOCCO):
-        blocco = pubkeys[i:i + P2P_BLOCCO]
-        risposte = await _chiedi_tutti_p2p(
-            eventi_p2p_da_relay, relays, blocco,
-            since - P2P_MARGINE_S, leve["mostro"])
-        trovati.extend(_unisci_p2p(risposte, lambda e: e, conto))
-    # LA PRIMA PASSATA DEL PROCESSO NON RISUONA IL MARGINE: gli id gia'
-    # contati vivono nel processo, e a ogni deploy i kind 14 degli
-    # ultimi due minuti tornerebbero tutti «nuovi». Quelli PRIMA del
-    # segnalibro si segnano come visti senza suonare; da li' in su vale
-    # la regola di sempre (al riavvio, al piu', uno squillo di troppo).
-    if portati is None and not _P2P_AVVIATO["campanello"]:
-        _P2P_AVVIATO["campanello"] = True
-        for _, q, i in trovati:
-            if q < since:
-                _P2P_VISTI.add(i)
-    nuovi_id = len({i for _, _, i in trovati if i not in _P2P_VISTI})
-    if portati is not None:
-        _P2P_CONTO["campanello"] = (f"{len(portati)} buste portate, "
-                                    f"{nuovi_id} nuove per chiavi nostre")
-    else:
-        _P2P_CONTO["campanello"] = (
-            f"{len(pubkeys)} chiavi, {nuovi_id} "
-            f"messaggi nuovi [{_conto_relay_p2p(conto)}]")
-        _ascolto_mancato_p2p("buste", trovati, adesso)
-    # (18 set 2026: niente piu' `return` a mani vuote qui sotto — anche
-    # una passata senza buste nuove deve arrivare alla CODA del gate,
-    # che e' l'unico posto dove una busta rimandata riparte)
-    if trovati:
-        # IL SEGNALIBRO NON SUPERA L'OROLOGIO, ed e' la riga gia' pagata
-        # dalla chat: il `created_at` lo scrive chi manda, e uno sballato
-        # nel futuro porterebbe il `since` avanti di ore — i messaggi veri
-        # di dopo non si vedrebbero MAI piu'. E non torna indietro, o si
-        # rileggerebbe in eterno la stessa fetta.
-        visto = max([q for _, q, _ in trovati] + [since])
-        if portati is None:       # il segnalibro e' del GIRO, mai del lampo
-            timbro_scrivi(TIMBRO_P2P_VISTO, str(min(visto, adesso)))
-    # `since` in Nostr e' inclusivo, quindi l'ultimo evento torna a
-    # ogni giro: senza gli id gia' contati il campanello suonerebbe
-    # ogni dieci minuti per sempre sullo stesso messaggio. Il set vive
-    # nel processo; al riavvio, al piu', uno squillo di troppo.
-    # Col created_at accanto (18 set 2026): serve al gate per
-    # riconoscere la gemella di una frase precisa.
-    nuovi = [(p, q) for p, q, i in trovati if i and i not in _P2P_VISTI]
-    for _, _, i in trovati:
-        _P2P_VISTI.add(i)
-    if len(_P2P_VISTI) > 5000:
-        # si tengono quelli di QUESTA passata: col margine tornano al
-        # giro dopo, e svuotando tutto risuonerebbero. Solo dal GIRO:
-        # un lampo ne porta due, e farebbe dimenticare tutti gli altri
-        if portati is None:
-            _P2P_VISTI.intersection_update({i for _, _, i in trovati})
-    con = db()
-    da_avvisare = []
-    for pub, quando in nuovi:
-        tg_id = _nudge_p2p(con, pub, adesso, quando, da_avvisare)
-        if tg_id:
-            da_avvisare.append(tg_id)
-    # LA CODA: chi aveva buste rimandate e ha la pausa scaduta riceve
-    # adesso il suo avviso, uno solo. E l'orologio impara quando
-    # svegliarsi per la prossima, invece di aspettare il suo minuto.
-    rimandati, scade, in_coda = _scarica_rimandati_p2p(con, adesso)
-    _P2P_CODA["scade"] = scade
-    da_avvisare += [t for t in rimandati if t not in da_avvisare]
+        if not con.execute(
+                "INSERT OR IGNORE INTO p2p_avvisi(ordine, momento, giro, "
+                "tg_id, quando, fonte) VALUES(?,?,?,?,?,?)",
+                (r["ordine"], r["momento"], int(r["giro"] or 0), r["tg_id"],
+                 adesso, r["fonte"])).rowcount:
+            print(f"· Attese P2P: {corto} «{r['momento']}» a {r['tg_id']} "
+                  "e' gia' stato detto: non si ripete", flush=True)
+            continue
+        if r["fonte"] == "libro":
+            # la cronaca dell'ordine dice CHI ha parlato: qui il libro,
+            # perche' il coordinatore non l'ha fatto in tempo
+            con.execute(
+                "INSERT OR IGNORE INTO p2p_momenti(ordine, momento, quando, "
+                "fonte, giro, arrivato) VALUES(?,?,?,'libro',?,?)",
+                (r["ordine"], r["momento"], int(r["quando"] or 0),
+                 int(r["giro"] or 0), adesso))
+            if eventi_p2p_attivi():
+                print(f"⚠️ Riserva P2P: {corto} «{r['momento']}» il "
+                      f"coordinatore NON l'ha raccontato in {P2P_RISERVA_S}s: "
+                      "parla il libro (nel log del nodo: barattolo_eventi)",
+                      flush=True)
+        fuori.append((r["tg_id"], r["testo"], r["fonte"]))
+    q = con.execute("SELECT MIN(scade) FROM p2p_attese").fetchone()
     con.commit()
-    con.close()
+    return fuori, int((q and q[0]) or 0)
+
+
+def _pulisci_memoria_p2p(con, adesso: int) -> int:
+    """La cronaca non e' un archivio: oltre `P2P_LIBRO_MEMORIA_S` — la
+    vita piu' lunga che un ordine possa avere, scambio compreso — le
+    righe di momenti, avvisi e parti se ne vanno. Pura sulla
+    connessione; torna quante ne ha tolte."""
+    limite = adesso - P2P_LIBRO_MEMORIA_S
+    tolte = 0
+    for tabella, colonna in (("p2p_momenti", "arrivato"),
+                             ("p2p_avvisi", "quando"),
+                             ("p2p_scambi", "aggiornato")):
+        tolte += con.execute(f"DELETE FROM {tabella} WHERE {colonna}<?",
+                             (limite,)).rowcount
+    con.commit()
+    return tolte
+
+
+async def _giro_attese_p2p():
+    """Un battito delle attese: partono quelle scadute, e l'orologio
+    impara quando svegliarsi per la prossima. Gira DOPO il libro dentro
+    lo stesso battito, cosi' a porta chiusa (nessuna riserva da
+    aspettare) la frase del libro parte nella stessa passata che l'ha
+    letta, com'era."""
+    if not _p2p_leve()["attivo"]:
+        return
+    adesso = int(time.time())
+    con = db()
+    try:
+        avvisi, prossima = _scarica_attese_p2p(con, adesso)
+        if adesso - _P2P_ATTESE.get("pulito", 0) > 3600:
+            _P2P_ATTESE["pulito"] = adesso
+            tolte = _pulisci_memoria_p2p(con, adesso)
+            if tolte:
+                print(f"🧹 P2P: tolte {tolte} righe di cronaca piu' vecchie "
+                      f"di {P2P_LIBRO_MEMORIA_S // 86400} giorni", flush=True)
+    finally:
+        con.close()
+    _P2P_ATTESE["scade"] = prossima
     esiti = []
-    for tg_id in da_avvisare:
+    for tg_id, testo, _ in avvisi:
         try:
-            esiti.append((tg_id, await notifica(tg_id, MSG_NUDGE_P2P)))
+            esiti.append((tg_id, await notifica(tg_id, testo)))
         except Exception as e:
             esiti.append((tg_id, f"SALTATO ({type(e).__name__}: {e})"))
-            print(f"⚠️ Campanello P2P saltato per {tg_id}: {e}")
+            print(f"⚠️ Avviso P2P in attesa saltato per {tg_id}: {e}")
         await asyncio.sleep(0.2)
-    _P2P_CONTO["campanello"] += (
-        f", {len(da_avvisare)} avvisi"
-        + (f" ({len(rimandati)} dalla coda)" if rimandati else "")
-        + (f", {in_coda} in coda" if in_coda else ""))
-    if da_avvisare:
-        print(f"🔔 Campanello P2P: avvisati {len(da_avvisare)} "
-              f"{da_avvisare}", flush=True)
-        _esiti_p2p_dice("🔔", esiti)
+    _P2P_CONTO["attese"] = f"{len(avvisi)} avvisi partiti"
+    if avvisi:
+        print(f"📬 Attese P2P: avvisati {len(avvisi)} "
+              f"{sorted({t for t, _, _ in avvisi})} "
+              f"({', '.join(sorted({f for _, _, f in avvisi}))})", flush=True)
+        _esiti_p2p_dice("📬", esiti)
 
 
 async def orologio_p2p():
-    """Il giro del campanello, uno al minuto. Fail-open come le
-    sorelle: un battito che va male e' una riga in console, e il
-    prossimo arriva lo stesso — un giro che muore in silenzio sarebbe
-    peggio di nessun campanello."""
+    """Il giro del P2P, uno al minuto: il LIBRO (la rete di sicurezza
+    degli avvisi) e le ATTESE (gli avvisi che aspettano il loro
+    minuto). Fail-open come le sorelle: un battito che va male e' una
+    riga in console, e il prossimo arriva lo stesso — un giro che muore
+    in silenzio sarebbe peggio di nessun giro."""
     # LA RIGA DI PARTENZA (17 set 2026): dal journal si deve poter dire
     # «e' partito» senza aspettare che avvisi qualcuno
     leve = _p2p_leve()
     print(f"▶️ Orologio P2P partito: una passata ogni {P2P_GIRO_S}s, "
-          f"relay {list(leve['relay']) + list(leve['specchio'])}", flush=True)
+          f"relay {list(leve['relay']) + list(leve['specchio'])}; eventi del "
+          f"coordinatore {'ACCESI' if eventi_p2p_attivi() else 'spenti (parla il libro, subito)'}",
+          flush=True)
     # LA SVEGLIA DELL'ASCOLTO (17 set 2026): l'orologio non dorme piu'
     # sessanta secondi filati, aspetta la sveglia PER sessanta secondi.
-    # Se suona prima e' un LAMPO — i due giri sugli eventi che l'ascolto
+    # Se suona prima e' un LAMPO — il giro sugli eventi che l'ascolto
     # ha gia' in mano, senza chiedere a nessun relay — e la passata
     # intera resta al suo minuto, che un lampo non sposta.
     # LA PRIMA E' SEMPRE UNA PASSATA INTERA: e' lei che recupera dal
     # segnalibro quel che e' successo a servizio fermo.
+    # E C'E' UNA TERZA SVEGLIA (patch 0007, 18 set 2026): un'attesa che
+    # scade prima del minuto. Li' non c'e' niente da chiedere a nessuno
+    # — ne' ai relay ne' al mazzetto — e gira il SOLO giro delle attese.
     sveglia = asyncio.Event()
     _P2P_SVEGLIA["ev"] = sveglia
     prossima = 0.0
     while True:
-        libro_p, buste_p = ([], []) if not prossima else _mazzetto_prendi()
-        lampo = bool(libro_p or buste_p)
+        libro_p = [] if not prossima else _mazzetto_prendi()
+        lampo = bool(libro_p)
+        solo_attese = bool(prossima) and not lampo \
+            and time.time() < prossima - 1
         if lampo:
             _P2P_LAMPI["n"] += 1
-        else:
+        elif not solo_attese:
             _P2P_BATTITO["n"] += 1
         _P2P_BATTITO["vivo"] = time.time()
         inizio = time.time()
-        _P2P_CONTO["libro"] = _P2P_CONTO["campanello"] = "niente da guardare"
-        # PRIMA IL LIBRO, POI I KIND 14 (16 set 2026): la frase precisa
-        # timbra il gate del campanello, quindi deve avere la prima
-        # parola dentro lo stesso battito — un momento, una notifica.
+        _P2P_CONTO["libro"] = _P2P_CONTO["attese"] = "niente da guardare"
+        # PRIMA IL LIBRO, POI LE ATTESE: a porta degli eventi chiusa la
+        # frase del libro non aspetta nessuno, e deve partire nella
+        # stessa passata che l'ha letta.
         # OGNI PASSATA HA IL SUO TETTO: una che non finisce si
         # abbandona e si DICE — la prossima riparte dal segnalibro, che
         # si sposta solo a eventi letti, quindi non si perde niente.
@@ -36610,7 +36498,7 @@ async def orologio_p2p():
             if lampo:
                 await asyncio.wait_for(_giro_libro_p2p(libro_p),
                                        P2P_PASSATA_MAX_S)
-            else:
+            elif not solo_attese:
                 await asyncio.wait_for(_giro_libro_p2p(), P2P_PASSATA_MAX_S)
         except asyncio.TimeoutError:
             _P2P_CONTO["libro"] = "ABBANDONATA"
@@ -36622,55 +36510,52 @@ async def orologio_p2p():
                   f"({type(e).__name__}: {e})", flush=True)
         _P2P_BATTITO["vivo"] = time.time()
         try:
-            if lampo:
-                await asyncio.wait_for(_giro_p2p(buste_p), P2P_PASSATA_MAX_S)
-            else:
-                await asyncio.wait_for(_giro_p2p(), P2P_PASSATA_MAX_S)
+            await asyncio.wait_for(_giro_attese_p2p(), P2P_PASSATA_MAX_S)
         except asyncio.TimeoutError:
-            _P2P_CONTO["campanello"] = "ABBANDONATA"
-            print(f"⚠️ Campanello P2P: passata oltre {P2P_PASSATA_MAX_S}s, "
-                  "abbandonata — la prossima riparte dal segnalibro", flush=True)
+            _P2P_CONTO["attese"] = "ABBANDONATA"
+            print(f"⚠️ Attese P2P: passata oltre {P2P_PASSATA_MAX_S}s, "
+                  "abbandonata — le attese restano in tabella", flush=True)
         except Exception as e:
-            _P2P_CONTO["campanello"] = "SALTATA"
-            print(f"⚠️ Campanello P2P: battito saltato "
+            _P2P_CONTO["attese"] = "SALTATA"
+            print(f"⚠️ Attese P2P: battito saltato "
                   f"({type(e).__name__}: {e})", flush=True)
         _P2P_BATTITO["vivo"] = time.time()
         # UNA RIGA A PASSATA, ANCHE A VUOTO: e' quella che distingue
         # «gira e non trova niente» da «non gira» — la domanda che il
         # 17 set e' costata un'ora. Si spegne con P2P_LOG_PASSATE=False
         # nel config; le righe di partenza, di relay muto e di guasto no.
+        # (La sveglia delle sole attese non ha una riga sua: quando fa
+        # partire qualcosa lo dice gia' il giro delle attese.)
         if P2P_LOG_PASSATE and lampo:
             print(f"⚡ P2P lampo {_P2P_LAMPI['n']} (dall'ascolto): libro — "
-                  f"{_P2P_CONTO['libro']}; campanello — "
-                  f"{_P2P_CONTO['campanello']} "
+                  f"{_P2P_CONTO['libro']}; attese — "
+                  f"{_P2P_CONTO['attese']} "
                   f"({time.time() - inizio:.1f}s)", flush=True)
-        elif P2P_LOG_PASSATE:
+        elif P2P_LOG_PASSATE and not solo_attese:
             print(f"· P2P passata {_P2P_BATTITO['n']}: libro — "
-                  f"{_P2P_CONTO['libro']}; campanello — "
-                  f"{_P2P_CONTO['campanello']}; ascolto — "
+                  f"{_P2P_CONTO['libro']}; attese — "
+                  f"{_P2P_CONTO['attese']}; ascolto — "
                   f"{_stato_ascolto_p2p()} "
                   f"({time.time() - inizio:.1f}s)", flush=True)
-        if not lampo:
+        if not lampo and not solo_attese:
             prossima = time.time() + P2P_GIRO_S
         # si dorme fino alla prossima passata intera, o fino alla
         # sveglia. Un mazzetto gia' PRONTO (arrivato durante la passata,
         # col suo timer gia' scattato) non aspetta: si riparte subito
         sveglia.clear()
-        pronto = bool(_P2P_MAZZETTO["libro"] or _P2P_MAZZETTO["buste"]) \
+        pronto = bool(_P2P_MAZZETTO["libro"]) \
             and _P2P_MAZZETTO["timer"] is None
         if not pronto:
-            # LA CODA DEL GATE PARTE ALLA SCADENZA (18 set 2026): se una
-            # pausa con buste rimandate finisce prima della prossima
-            # passata, ci si sveglia li' (mezzo secondo dopo, per stare
-            # sicuri di esserci oltre) e la passata intera la scarica.
-            # Una scadenza gia' PASSATA non si guarda: vorrebbe dire che
-            # la passata non e' riuscita a scaricarla, e svegliarsi
-            # subito sarebbe un giro a vuoto contro i relay, in tondo —
-            # ci pensa la passata del minuto.
+            # UN'ATTESA PARTE ALLA SUA SCADENZA: se scade prima della
+            # prossima passata ci si sveglia li' (mezzo secondo dopo,
+            # per stare sicuri di esserci oltre). Una scadenza gia'
+            # PASSATA non si guarda: vorrebbe dire che il giro non e'
+            # riuscito a scaricarla, e svegliarsi subito sarebbe un giro
+            # a vuoto, in tondo — ci pensa la passata del minuto.
             limite = prossima
-            coda = _P2P_CODA["scade"]
-            if coda and time.time() < coda + 0.5 < limite:
-                limite = coda + 0.5
+            attesa = _P2P_ATTESE["scade"]
+            if attesa and time.time() < attesa + 0.5 < limite:
+                limite = attesa + 0.5
             try:
                 await asyncio.wait_for(sveglia.wait(),
                                        max(0.0, limite - time.time()))
@@ -36719,28 +36604,29 @@ async def guardiano_p2p():
         await asyncio.sleep(P2P_GUARDIA_S)
 
 
-# ---------- IL LIBRO CHE AVVISA: le notifiche precise del P2P ---------
-# (16 set 2026, decisione di Andrea con Alan). Il campanello dice «c'e'
-# una novita'» e basta, perche' i kind 14 sono cifrati e il server non
-# li legge. Ma i PASSAGGI PUBBLICI dello scambio stanno sul libro — il
-# 38383 e' in chiaro per mestiere — e di quelli si puo' dire tutto: cosa
-# e' successo, i numeri, di chi e' il prossimo passo. Qui il server
-# legge il libro dei SOLI ordini che ha in tabella (`p2p_ordini`, i
-# volti sul libro) e a chi li ha pubblicati — e, dal 16 set 2026 sera,
-# a chi li ha presi — manda la frase precisa, adattata al lato.
+# ---------- IL LIBRO CHE AVVISA: la rete di sicurezza degli avvisi P2P --
+# (16 set 2026, decisione di Andrea con Alan; dal 18 set 2026, con la
+# patch 0007, e' la RISERVA e non piu' la fonte). I PASSAGGI PUBBLICI
+# dello scambio stanno sul libro — il 38383 e' in chiaro per mestiere —
+# e di quelli si puo' dire tutto: cosa e' successo, i numeri, di chi e'
+# il prossimo passo. Qui il server legge il libro dei SOLI ordini che
+# ha in tabella (`p2p_ordini`, i volti sul libro) e per chi li ha
+# pubblicati — e, dal 16 set 2026 sera, per chi li ha presi — prepara
+# la frase precisa, adattata al lato.
 # NON TOCCA MOSTRO, NON TOCCA LA CIFRATURA: legge quel che chiunque puo'
 # leggere, e lo dice a chi ne ha titolo.
-# I TRE MOMENTI INTERNI — garanzia depositata, fiat inviato, disputa
-# aperta — restano al campanello generico, cifratura compresa: il
-# libro non li distingue (li mostra tutti come `in-progress`).
-# UN MOMENTO, UNA NOTIFICA SOLA: chi riceve la frase precisa vede
-# anche timbrato il gate del campanello (`ultimo_nudge`), cosi' il
-# kind 14 dello stesso momento — che mostrod manda nello stesso
-# istante in cui ripubblica il 38383 — non fa suonare anche la
-# generica. E il giro del libro passa PRIMA di quello dei kind 14
-# dentro lo stesso battito, cosi' e' la precisa ad avere la prima
-# parola. Resta il caso raro del kind 14 arrivato al giro prima del
-# 38383: due frasi per un momento, e si dichiara.
+# LA FRASE NON PARTE SUBITO: va in ATTESA (`p2p_attese`) per
+# `P2P_RISERVA_S`, e parte solo se intanto il coordinatore non ha
+# raccontato lui lo stesso momento — vedi «LE ATTESE». A porta degli
+# eventi chiusa l'attesa e' zero, e parte nella stessa passata.
+# I MOMENTI INTERNI — garanzia chiesta e bloccata, fattura data, fiat
+# inviato, disputa, pagamento fallito — il libro NON LI VEDE (li mostra
+# tutti come `in-progress`): di quelli parla il solo coordinatore, e se
+# un suo evento si perde la' non c'e' riserva. E' dichiarato, e il
+# rimedio e' la pagina dello scambio, che segue da sola.
+# E NEL FRATTEMPO IL LIBRO SCRIVE I NUMERI (`sats`, `euro`, `metodi`)
+# che le frasi del coordinatore usano: mostrod nell'evento non li
+# ripete, e il libro li ha in chiaro.
 # GLI STATI SI SCRIVONO QUANDO SI VEDONO (la lezione di Q4): sul libro
 # vero, letto il 16 set 2026 dallo specchio, gli stati sono `pending`,
 # `in-progress`, `canceled` e `success`. `expired` e `dispute` sono
@@ -36769,13 +36655,23 @@ P2P_INFO_OGNI_S = 3600                # ogni quanto si rilegge il 38385 (fee, fi
 P2P_LIBRO_MEMORIA_S = 40 * 86400      # un ordine vive al piu' 15 giorni in libro + lo scambio
 P2P_LIBRO_FRESCHI_S = 7200            # una riga mai vista sul libro si cerca per due ore
 STATI_LIBRO_FINALI = ("success", "canceled", "expired")
+# I PASSAGGI DEL LIBRO COL NOME CHE USA IL COORDINATORE (patch 0007):
+# e' per NOME che le due fonti si riconoscono — la riserva tace se
+# mostrod ha gia' raccontato «lo stesso momento», e l'anti-doppione e'
+# uno. Le due chiusure di una disputa sono un concluso e un annullato.
+MOMENTI_DEL_LIBRO_P2P = {"preso": "preso", "tornato": "tornato",
+                         "concluso": "concluso",
+                         "disputa_conclusa": "concluso",
+                         "annullato": "annullato",
+                         "disputa_annullata": "annullato",
+                         "scaduto": "scaduto"}
 _P2P_INFO = {"fee": None, "ore": 0, "quando": 0}   # il 38385, in memoria
 
 
 def eventi_libro_da_relay(relay: str, ids: list, since: int, mostro: str):
     """Chiede a UN relay lo stato pubblico di questi ordini: il 38383
     del coordinatore, per `d`. SINCRONA, va in asyncio.to_thread (il
-    calco di `eventi_p2p_da_relay`). `since` a zero = senza segnalibro,
+    calco di `chiedi_relay_dm`). `since` a zero = senza segnalibro,
     per le righe che il libro non ha ancora mostrato.
 
     Torna una lista di dizionari con i SOLI tag che servono alla frase
@@ -37161,28 +37057,40 @@ def _avvisi_libro_p2p(con, eventi: list, adesso: int, fee, ore: int) -> list:
     L'INTERRUTTORE si guarda per riga, e chi l'ha spento non riceve
     niente — ma lo stato si aggiorna lo stesso, o alla riaccensione
     riceverebbe un passaggio vecchio di giorni.
-    E CHI RICEVE LA FRASE PRECISA VEDE TIMBRATO IL GATE DEL CAMPANELLO,
-    su tutte le sue chiavi: e' l'anti-doppione, un momento una
-    notifica sola.
+    LE FRASI NON TORNANO PIU' PER ESSERE MANDATE (patch 0007, 18 set
+    2026): vanno in ATTESA in `p2p_attese`, con la scadenza a
+    `P2P_RISERVA_S` — zero se la porta degli eventi e' chiusa — e da
+    li' le prende `_scarica_attese_p2p`, che le butta se il coordinatore
+    ha raccontato lui lo stesso momento. La lista che torna e' la
+    stessa di prima, `(tg_id, testo)`: serve al conto della passata e
+    alle prove, NON a chi manda.
+    IL GIRO DELLA RISERVA: `tornati` conta i ritorni in vetrina, e un
+    avviso del libro e' del giro `tornati + 1` (lo scaduto, che e' di
+    un ordine mai preso, del giro `tornati`). E' lo stesso numero che
+    il coordinatore ricava contando le prese, e serve all'anti-
+    doppione: la seconda presa dello stesso ordine non e' il doppione
+    della prima.
     DUE DESTINATARI PER RIGA (16 set 2026, l'emenda): chi ha pubblicato
     (`tg_id`, se il ruolo e' noto) e chi ha preso (`preso_da`), ognuno
     con la frase del suo lato. Al ritorno in vetrina chi aveva preso
     viene SCOLLEGATO dalla riga dopo la sua frase: la prossima presa e'
     di un altro, e non deve leggere «hai preso» per lui. Lo scaduto e'
     solo di chi ha pubblicato: un ordine preso non scade.
-    IL GATE DOPO LA FRASE (18 set 2026, «IL GATE RIMANDA E ACCORPA»):
-    oltre a `ultimo_nudge`, chi riceve la frase precisa si vede scritto
-    in `coperto` il created_at dell'evento che l'ha fatta partire — le
-    buste GEMELLE di quel momento non suonano — e la sua coda si svuota
-    se tutto quel che aspettava e' nato non dopo quel momento: la frase
-    racconta un passo piu' avanti, e un «guarda i tuoi scambi» per un
-    passo vecchio sarebbe solo rumore. Una busta nata DOPO resta in
-    coda, e parte a pausa scaduta."""
-    fuori, avvisati = [], {}
+    LA PRESA NON SI DICE PIU' A CHI HA PRESO (patch 0007): e' il suo
+    gesto, ha l'app in mano e la pagina gli mostra il passo — la regola
+    degli avvisi e' «mai a chi ha fatto il gesto», e la riserva la
+    rispetta come la fonte. Il ramo «Hai preso l'ordine» resta in
+    `_testo_libro_p2p`, che e' pura e lo sa ancora dire: e' qui che non
+    glielo si chiede piu'.
+    CHI ENTRA DA NOSTR ha un id NEGATIVO ed e' un destinatario come gli
+    altri (`notifica` gli manda il DM): prima restava sul campanello
+    generico, che non c'e' piu'. Zero e' «non si sa chi e'»."""
+    fuori = []
+    riserva = P2P_RISERVA_S if eventi_p2p_attivi() else 0
     for ev in eventi:
         r = con.execute(
-            "SELECT tg_id, stato, maker, visto, preso_da FROM p2p_ordini "
-            "WHERE ordine=?", (ev["id"],)).fetchone()
+            "SELECT tg_id, stato, maker, visto, preso_da, tornati "
+            "FROM p2p_ordini WHERE ordine=?", (ev["id"],)).fetchone()
         if not r:
             continue
         if int(ev.get("quando") or 0) < int(r["visto"] or 0):
@@ -37198,14 +37106,19 @@ def _avvisi_libro_p2p(con, eventi: list, adesso: int, fee, ore: int) -> list:
         scaduto = scade > 0 and int(ev.get("quando") or 0) >= scade
         passaggio = _passaggio_libro_p2p(prima, dopo, maker, scaduto)
         preso_da = int(r["preso_da"] or 0)
-        # chi ha preso: il ruolo e' certo (1), e lo scaduto non e' suo
+        # chi ha preso: il ruolo e' certo (1); lo scaduto non e' suo, e
+        # la presa e' il SUO gesto — non gliela si racconta
         passaggio_taker = _passaggio_libro_p2p(prima, dopo, 1, scaduto) \
-            if preso_da > 0 else ""
-        if passaggio_taker == "scaduto":
+            if preso_da else ""
+        if passaggio_taker in ("scaduto", "preso"):
             passaggio_taker = ""
+        # IL GIRO: i ritorni in vetrina visti FIN QUI. Il ritorno stesso
+        # e' ancora del giro che chiude, e il contatore sale dopo.
+        tornati = int(r["tornati"] or 0)
+        torna = _passaggio_libro_p2p(prima, dopo, 1, scaduto) == "tornato"
         con.execute(
             "UPDATE p2p_ordini SET stato=?, lato=?, maker=?, visto=?, "
-            "euro=?, preso_da=? WHERE ordine=?",
+            "euro=?, preso_da=?, sats=?, metodi=?, tornati=? WHERE ordine=?",
             (dopo, ev.get("lato") or "", maker, int(ev.get("quando") or 0),
              # la cifra del libro, per l'avviso del recapito (18 set 2026)
              _euro_libro(ev.get("euro")),
@@ -37213,14 +37126,20 @@ def _avvisi_libro_p2p(con, eventi: list, adesso: int, fee, ore: int) -> list:
              # presa si scollega a OGNI pending visto, anche se il giro
              # si fosse perso l'in-progress in mezzo — o la prossima
              # presa di un altro direbbe «hai preso» a chi non c'e' piu'
-             0 if dopo == "pending" else preso_da, ev["id"]))
+             0 if dopo == "pending" else preso_da,
+             # i numeri per le frasi del coordinatore (patch 0007): i
+             # sats del libro e i metodi, com'e' scritto nel 38383
+             int(ev.get("sats") or 0),
+             json.dumps([str(m) for m in (ev.get("metodi") or [])][:12],
+                        ensure_ascii=False),
+             tornati + (1 if torna else 0), ev["id"]))
         if prima and dopo != prima and dopo not in STATI_LIBRO_PRESO + (
                 "pending", "success", "canceled", "expired", "dispute"):
             print(f"📖 Libro P2P: stato mai visto «{dopo}» "
                   f"(da «{prima}») sull'ordine {ev['id'][:8]}")
         for chi, pas, ruolo in ((int(r["tg_id"] or 0), passaggio, "maker"),
                                 (preso_da, passaggio_taker, "taker")):
-            if chi <= 0 or not pas:
+            if not chi or not pas:
                 continue
             # C'E' UN POSTO PER LA RECENSIONE? Lo chiede al giudice
             # della rotta, coi campi di questa riga: senza l'altra
@@ -37231,37 +37150,19 @@ def _avvisi_libro_p2p(con, eventi: list, adesso: int, fee, ore: int) -> list:
                       f"(cassetto Avvisi): la frase «{pas}» non parte",
                       flush=True)
                 continue
-            # IL NOME DI CHI HA PUBBLICATO, a chi ha preso (18 set 2026):
-            # quello della sua card nel libro, dallo STESSO giudice che
-            # la disegna — cosi' la frase non dice mai un nome che la
-            # card non mostra. E' un di piu': se non si legge, la frase
-            # parte senza, e il journal lo dice.
-            nome = ""
-            if ruolo == "taker" and pas == "preso":
-                try:
-                    nome = (_facce_ordini_p2p(con, [ev["id"]], adesso)
-                            .get(ev["id"], {}).get("nome") or "")
-                except Exception as e:
-                    print(f"⚠️ Libro P2P: il nome sulla card di "
-                          f"{ev['id'][:8]} non si legge "
-                          f"({type(e).__name__}): la frase parte senza",
-                          flush=True)
             testo = _testo_libro_p2p(pas, ev, _fee_di_p2p(con, chi, fee),
-                                     ore, ruolo, bool(altro) and not perche,
-                                     nome)
-            if testo:
-                fuori.append((chi, testo))
-                avvisati[chi] = max(avvisati.get(chi, 0),
-                                    int(ev.get("quando") or 0))
-    for tg_id, quando in avvisati.items():
-        q = con.execute("SELECT MAX(rimandato) FROM chiavi_p2p WHERE tg_id=?",
-                        (tg_id,)).fetchone()
-        rimandato = int(q[0] or 0)
-        con.execute("UPDATE chiavi_p2p SET ultimo_nudge=?, coperto=?, "
-                    "rimandato=? WHERE tg_id=?",
-                    (adesso, quando,
-                     0 if rimandato <= quando + P2P_GEMELLI_S else rimandato,
-                     tg_id))
+                                     ore, ruolo, bool(altro) and not perche)
+            if not testo:
+                continue
+            fuori.append((chi, testo))
+            # IN ATTESA, non in volo: il momento col nome che usa il
+            # coordinatore, il giro, e la scadenza della riserva
+            con.execute(
+                "INSERT INTO p2p_attese(ordine, momento, giro, tg_id, testo, "
+                "quando, scade, fonte) VALUES(?,?,?,?,?,?,?,'libro')",
+                (ev["id"], MOMENTI_DEL_LIBRO_P2P.get(pas, pas),
+                 tornati if pas == "scaduto" else tornati + 1, chi, testo,
+                 int(ev.get("quando") or 0), adesso + riserva))
     con.commit()
     return fuori
 
@@ -37287,8 +37188,12 @@ async def _giro_libro_p2p(portati=None):
     `portati` (17 set 2026, l'ascolto): i 38383 che l'ascolto ha gia'
     in mano. Allora NON si chiede ai relay — nemmeno il 38385, che
     costerebbe secondi a una notifica che ne vale tre — e IL
-    SEGNALIBRO NON SI TOCCA (il perche' sta in `_giro_p2p`). Il giudice
-    e' lo stesso, e un ordine che non e' in tabella lo salta da solo."""
+    SEGNALIBRO NON SI TOCCA: dice fin dove ha letto il GIRO, e se un
+    lampo lo portasse avanti la prima passata dopo un riavvio
+    prenderebbe per «margine gia' visto» un evento mai letto. Il giro
+    al minuto li ritrova, inerti (uno stato uguale non e' un
+    passaggio), e il segnalibro lo sposta lui. Il giudice e' lo
+    stesso, e un ordine che non e' in tabella lo salta da solo."""
     leve = _p2p_leve()
     if not leve["attivo"] or not create_connection:
         return
@@ -37364,22 +37269,625 @@ async def _giro_libro_p2p(portati=None):
     if portati is None:           # il segnalibro e' del GIRO, mai del lampo
         timbro_scrivi(TIMBRO_LIBRO_P2P, str(min(visto, adesso)))
     con = db()
-    avvisi = _avvisi_libro_p2p(con, eventi, adesso, _P2P_INFO["fee"],
-                               _P2P_INFO["ore"])
-    con.close()
-    esiti = []
-    for tg_id, testo in avvisi:
-        try:
-            esiti.append((tg_id, await notifica(tg_id, testo)))
-        except Exception as e:
-            esiti.append((tg_id, f"SALTATO ({type(e).__name__}: {e})"))
-            print(f"⚠️ Avviso del libro P2P saltato per {tg_id}: {e}")
-        await asyncio.sleep(0.2)
-    _P2P_CONTO["libro"] += f", {len(avvisi)} avvisi"
+    try:
+        avvisi = _avvisi_libro_p2p(con, eventi, adesso, _P2P_INFO["fee"],
+                                   _P2P_INFO["ore"])
+    finally:
+        con.close()
+    # NON SI MANDA DA QUI (patch 0007, 18 set 2026): le frasi sono in
+    # `p2p_attese`, e a farle partire — o a buttarle, se il coordinatore
+    # ha gia' raccontato lo stesso momento — e' il giro delle attese, che
+    # passa subito dopo dentro lo stesso battito.
+    _P2P_CONTO["libro"] += f", {len(avvisi)} frasi in attesa"
     if avvisi:
-        print(f"📖 Libro P2P: avvisati {len(avvisi)} "
-              f"{sorted({t for t, _ in avvisi})}", flush=True)
-        _esiti_p2p_dice("📖", esiti)
+        quando = (f"fra {P2P_RISERVA_S}s, se il coordinatore tace"
+                  if eventi_p2p_attivi() else "subito: la porta degli eventi e' chiusa")
+        print(f"📖 Libro P2P: {len(avvisi)} frasi in attesa per "
+              f"{sorted({t for t, _ in avvisi})} ({quando})", flush=True)
+
+
+# ---------- GLI EVENTI DEL COORDINATORE: da dove nascono gli avvisi ----
+# (patch 0007 del fork di mostrod, 18 set 2026). A ogni passo di ogni
+# scambio mostrod fa un POST qui, sulla strada dello sconto (patch
+# 0005): stesso client, segreto in header. Il corpo:
+#   {"v":1, "order":"<uuid>", "action":"fiat-sent", "ts":1790000000,
+#    "buyer":"<trade key|null>", "seller":"<trade key|null>",
+#    "actor":"buyer|seller|mostro", "detail":"<parola-macchina>",
+#    "sats":…, "sats_buyer":…, "sats_seller":…}     ← solo alla chiusura
+# MAI fatture, preimage, hash, testi o coordinate: non c'e' un campo
+# dove starebbero, e il pulitore qui sotto butta quel che non conosce.
+# QUATTRO PASSI, ognuno col suo giudice puro sulla connessione:
+# 1) `_evento_p2p_pulito`: la forma. Un'azione fuori elenco e' un 400,
+#    non un avviso inventato.
+# 2) `_registra_evento_p2p`: la cronaca (`p2p_momenti`) e le parti
+#    (`p2p_scambi`). E' l'IDEMPOTENZA: lo stesso evento — stesso ordine,
+#    stesso momento, stessa ora di mostrod — non si registra due volte,
+#    e un evento non registrato non avvisa nessuno.
+# 3) `_destinatari_evento_p2p`: A CHI. La regola e' una: alla parte che
+#    deve AGIRE o SAPERE, MAI a chi ha fatto il gesto — che ha l'app in
+#    mano e lo sa gia'.
+# 4) `_testo_evento_p2p`: la frase, coi numeri del libro.
+# I MOMENTI NATI IN COPPIA: mostrod fa certi passi a due a due nello
+# stesso istante (la presa E la richiesta di garanzia; la garanzia
+# pagata E la richiesta della fattura), e sono due POST indipendenti
+# che arrivano nell'ordine che capita. Non si indovina: il `detail`
+# dice quale ramo e' passato, e DI OGNI COPPIA PARLA UNO SOLO — la
+# tabella sta in `_destinatari_evento_p2p`.
+P2P_AZIONI_EVENTO = (
+    "taken", "hold-invoice-requested", "hold-invoice-paid",
+    "buyer-invoice-requested", "buyer-invoice-added", "fiat-sent",
+    "released", "success", "cancel-requested", "canceled", "expired",
+    "dispute-opened", "payout-failed")
+P2P_ATTORI_EVENTO = ("buyer", "seller", "mostro")
+FORMA_DETTAGLIO_P2P = re.compile(r"[A-Za-z0-9_-]{0,40}")
+# quanto l'ora di mostrod puo' stare lontana dalla nostra: i due orologi
+# sono sincronizzati, e il suo retry arriva entro mezzo minuto. Un'ora
+# fuori da qui e' un corpo costruito a mano o un orologio rotto — e
+# l'ora e' parte della chiave dell'idempotenza, quindi non si aggiusta.
+P2P_EVENTO_OROLOGIO_S = 900
+P2P_SATS_MAX_EVENTO = 10 ** 9
+
+
+def _momento_evento_p2p(azione: str, dettaglio: str) -> str:
+    """PURA: dall'azione di mostrod al MOMENTO dello scambio, col
+    vocabolario che ha gia' il libro (`_passaggio_libro_p2p`) — e' per
+    nome che le due fonti si riconoscono.
+    DUE AZIONI SI DIVIDONO SUL DETTAGLIO: `canceled` e' un ANNULLO, ma
+    se chi aveva preso si ritira l'ordine non muore — TORNA in vetrina
+    (`republished`); `expired` e' lo SCADUTO di un ordine che nessuno
+    ha preso (`book`), il RITORNO se non ha proseguito chi aveva preso
+    (`taker-timeout`), l'ANNULLO se non ha proseguito chi aveva
+    pubblicato o se la garanzia e' arrivata al capolinea."""
+    if azione == "canceled":
+        return "tornato" if dettaglio == "republished" else "annullato"
+    if azione == "expired":
+        return {"book": "scaduto",
+                "taker-timeout": "tornato"}.get(dettaglio, "annullato")
+    return {"taken": "preso",
+            "hold-invoice-requested": "garanzia_chiesta",
+            "hold-invoice-paid": "garanzia_pagata",
+            "buyer-invoice-requested": "fattura_chiesta",
+            "buyer-invoice-added": "fattura_data",
+            "fiat-sent": "fiat",
+            "released": "rilasciato",
+            "success": "concluso",
+            "cancel-requested": "annullo_chiesto",
+            "dispute-opened": "disputa",
+            "payout-failed": "payout_fallito"}.get(azione, "")
+
+
+def _evento_p2p_pulito(d, adesso: int) -> dict:
+    """PURA: il corpo del POST in una forma di cui ci si puo' fidare, o
+    ValueError (mai un 400 diretto: la prova non ha bisogno di FastAPI).
+    SI TIENE SOLO QUEL CHE SI CONOSCE: un campo in piu' non e' un
+    errore — mostrod di domani potrebbe averne — ma di qui non passa.
+    Gli importi si leggono SOLO sulle due azioni di chiusura."""
+    if not isinstance(d, dict):
+        raise ValueError("Evento illeggibile")
+    ordine = str(d.get("order") or "").strip()
+    if not FORMA_ORDINE_P2P.fullmatch(ordine):
+        raise ValueError("Ordine in una forma sconosciuta")
+    azione = str(d.get("action") or "")
+    if azione not in P2P_AZIONI_EVENTO:
+        raise ValueError("Azione sconosciuta")
+    attore = str(d.get("actor") or "")
+    if attore not in P2P_ATTORI_EVENTO:
+        raise ValueError("Attore sconosciuto")
+    try:
+        ts = int(d.get("ts"))
+    except (TypeError, ValueError):
+        raise ValueError("Ora illeggibile")
+    if isinstance(d.get("ts"), bool) or abs(ts - int(adesso)) > P2P_EVENTO_OROLOGIO_S:
+        raise ValueError("Ora fuori misura")
+    dettaglio = d.get("detail")
+    dettaglio = "" if dettaglio is None else str(dettaglio)
+    if not FORMA_DETTAGLIO_P2P.fullmatch(dettaglio):
+        raise ValueError("Dettaglio in una forma sconosciuta")
+    chiavi = {}
+    for lato in ("buyer", "seller"):
+        k = d.get(lato)
+        if k is None or k == "":
+            chiavi[lato] = ""
+            continue
+        k = str(k).strip().lower()
+        if not re.fullmatch(r"[0-9a-f]{64}", k):
+            raise ValueError("Chiave non valida")
+        chiavi[lato] = k
+    ev = {"ordine": ordine, "azione": azione, "attore": attore, "ts": ts,
+          "dettaglio": dettaglio, "compratore_key": chiavi["buyer"],
+          "venditore_key": chiavi["seller"],
+          "momento": _momento_evento_p2p(azione, dettaglio),
+          "sats": 0, "sats_compratore": 0, "sats_venditore": 0}
+    if azione in ("released", "success"):
+        for campo, chiave in (("sats", "sats"), ("sats_buyer", "sats_compratore"),
+                              ("sats_seller", "sats_venditore")):
+            v = d.get(campo)
+            if v is None:
+                continue
+            if isinstance(v, bool) or not isinstance(v, int) \
+                    or not 0 <= v <= P2P_SATS_MAX_EVENTO:
+                raise ValueError("Importo fuori misura")
+            ev[chiave] = v
+    return ev
+
+
+def _registra_evento_p2p(con, ev: dict, adesso: int):
+    """LA CRONACA E LE PARTI. Pura sulla connessione. Torna None se
+    l'evento e' GIA' ARRIVATO (il retry di mostrod porta lo stesso
+    corpo, con la stessa ora: la chiave di `p2p_momenti` lo ferma), se
+    no il quadro che serve a decidere gli avvisi: `{momento, giro,
+    compratore, venditore, preso_dal}`.
+    IL GIRO E' QUANTE PRESE mostrod ha raccontato per quell'ordine, la
+    presente compresa: un ordine tornato in vetrina e ripreso apre un
+    giro nuovo, e i suoi avvisi non passano per doppioni di quelli di
+    prima. Conta le PRESE e non i ritorni apposta: una presa e' sempre
+    un evento nuovo, mentre un ritorno perso per strada lascerebbe il
+    contatore indietro proprio sullo scambio dopo.
+    LE PARTI SI RISCRIVONO A OGNI EVENTO, e vale l'ultima parola: una
+    chiave che `chiavi_p2p` non conosce (un altro client) vale 0. Un
+    evento SENZA una delle due chiavi — un ordine ancora in vetrina ha
+    solo chi l'ha pubblicato — azzera quel posto, o al giro dopo ci
+    resterebbe chi aveva preso il giro prima."""
+    scritto = con.execute(
+        "INSERT OR IGNORE INTO p2p_momenti(ordine, momento, quando, fonte, "
+        "attore, dettaglio, arrivato) VALUES(?,?,?,'mostro',?,?,?)",
+        (ev["ordine"], ev["momento"], ev["ts"], ev["attore"],
+         ev["dettaglio"], adesso)).rowcount
+    if not scritto:
+        return None
+    giro = con.execute(
+        "SELECT COUNT(*) FROM p2p_momenti WHERE ordine=? AND momento='preso' "
+        "AND fonte='mostro'", (ev["ordine"],)).fetchone()[0]
+    con.execute("UPDATE p2p_momenti SET giro=? WHERE ordine=? AND momento=? "
+                "AND quando=? AND fonte='mostro'",
+                (giro, ev["ordine"], ev["momento"], ev["ts"]))
+    parti = {}
+    for lato in ("compratore", "venditore"):
+        chiave = ev[lato + "_key"]
+        r = con.execute("SELECT tg_id FROM chiavi_p2p WHERE pubkey=?",
+                        (chiave,)).fetchone() if chiave else None
+        parti[lato] = int(r["tg_id"]) if r else 0
+    prima = con.execute("SELECT preso_dal FROM p2p_scambi WHERE ordine=?",
+                        (ev["ordine"],)).fetchone()
+    preso_dal = (prima["preso_dal"] if prima else "") or ""
+    if ev["momento"] == "preso":
+        preso_dal = ev["attore"] if ev["attore"] in ("buyer", "seller") else ""
+    con.execute(
+        "INSERT INTO p2p_scambi(ordine, compratore, venditore, preso_dal, "
+        "giro, aggiornato) VALUES(?,?,?,?,?,?) "
+        "ON CONFLICT(ordine) DO UPDATE SET compratore=excluded.compratore, "
+        "venditore=excluded.venditore, preso_dal=excluded.preso_dal, "
+        "giro=excluded.giro, aggiornato=excluded.aggiornato",
+        (ev["ordine"], parti["compratore"], parti["venditore"], preso_dal,
+         giro, adesso))
+    if ev["sats"] > 0:
+        con.execute("UPDATE p2p_scambi SET sats=?, sats_compratore=?, "
+                    "sats_venditore=? WHERE ordine=?",
+                    (ev["sats"], ev["sats_compratore"], ev["sats_venditore"],
+                     ev["ordine"]))
+    # UNA FATTURA NUOVA DOPO UN PAGAMENTO FALLITO riapre quel campanello:
+    # se fallisse anche questa, chi compra deve sentirlo di nuovo
+    if ev["momento"] == "fattura_data" and ev["dettaglio"] == "new-invoice":
+        con.execute("DELETE FROM p2p_avvisi WHERE ordine=? AND giro=? "
+                    "AND momento='payout_fallito'", (ev["ordine"], giro))
+    con.commit()
+    return {"momento": ev["momento"], "giro": giro,
+            "compratore": parti["compratore"], "venditore": parti["venditore"],
+            "preso_dal": preso_dal}
+
+
+def _destinatari_evento_p2p(momento: str, attore: str, dettaglio: str,
+                            compratore: int, venditore: int) -> list:
+    """PURA: A CHI va l'avviso di questo momento, come lista di
+    `(tg_id, ruolo)` con ruolo `compra` | `vende`.
+    LA REGOLA: alla parte che deve AGIRE o SAPERE, MAI a chi ha fatto il
+    gesto. Quando il gesto e' di mostrod (un timeout, un moderatore, il
+    pagamento riuscito) non l'ha fatto nessuno dei due: lo sanno tutti
+    e due. Chi non e' dei nostri vale 0 e non e' nella lista.
+    LE COPPIE, e di ognuna parla UNO:
+    • presa + garanzia chiesta (`take`): parla la PRESA, e la sua frase
+      a chi vende dice gia' «paga la garanzia»;
+    • fattura data (`hold-next`) + garanzia chiesta (`invoice`): parla
+      la GARANZIA CHIESTA, a chi vende: «ha indicato dove ricevere i
+      sats, ora paga la garanzia»;
+    • garanzia pagata + fattura chiesta: parla la GARANZIA PAGATA, a chi
+      compra — e la FATTURA CHIESTA non parla MAI: o e' la meta' di
+      questa coppia, o nasce con una presa fatta proprio da chi compra,
+      che ha l'app in mano.
+    IL RILASCIO di chi vende non avvisa nessuno ADESSO: chi compra
+    sentira' «concluso» a pagamento riuscito, e a chi vende ci pensa
+    l'attesa (vedi «LE ATTESE»). Quello di un moderatore si' — non
+    l'ha fatto nessuno dei due."""
+    parti = {"compra": int(compratore or 0), "vende": int(venditore or 0)}
+    chi_ha_fatto = {"buyer": "compra", "seller": "vende"}.get(attore, "")
+    altri = [r for r in ("compra", "vende") if r != chi_ha_fatto]
+    if momento == "preso":
+        ruoli = altri
+    elif momento == "garanzia_chiesta":
+        ruoli = [] if dettaglio == "take" else ["vende"]
+    elif momento == "garanzia_pagata":
+        ruoli = ["compra"]
+    elif momento == "fattura_data":
+        ruoli = ["vende"] if dettaglio in ("", "active") else []
+    elif momento == "fiat":
+        ruoli = ["vende"]
+    elif momento == "rilasciato":
+        ruoli = ["compra", "vende"] if attore == "mostro" else []
+    elif momento == "payout_fallito":
+        ruoli = ["compra"]
+    elif momento in ("concluso", "scaduto"):
+        ruoli = ["compra", "vende"]
+    elif momento in ("annullo_chiesto", "annullato", "tornato", "disputa"):
+        ruoli = altri
+    else:                         # fattura_chiesta, e quel che non si conosce
+        ruoli = []
+    return [(parti[r], r) for r in ruoli if parti[r]]
+
+
+# I MOTIVI DI LND, in parole: sono gli stessi che la patch 0006 scrive
+# nel log del nodo. Quel che non si conosce resta generico — mai il
+# codice grezzo in faccia a chi compra.
+MOTIVI_PAYOUT_P2P = {
+    "NO_ROUTE": "non si è trovata una strada fino al tuo wallet",
+    "TIMEOUT": "il tempo è scaduto",
+    "INSUFFICIENT_BALANCE": "sul nodo mancava liquidità in quel momento",
+    "INCORRECT_PAYMENT_DETAILS": "la fattura non è più valida",
+}
+
+
+def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
+                      nome: str = "", maker: bool = False,
+                      recensibile: bool = False) -> str:
+    """PURA: la frase di quel momento per quella parte. Lo stile e'
+    quello del libro — cosa e' successo, i numeri, di chi e' il passo —
+    e non nomina mai il protocollo.
+    `ruolo` e' di CHI LEGGE (`compra` | `vende`); `nome` e' dell'ALTRA
+    parte come la pagina dello scambio la mostra, gia' scappato, o
+    vuoto: allora si dice «chi vende» / «chi compra», mai un nome che
+    la pagina non mostra. `maker` dice se chi legge e' chi ha
+    PUBBLICATO l'ordine: serve ai due timeout, dove le due frasi sono
+    diverse. `dati` porta i numeri del libro (`sats`, `euro`, `metodi`)
+    e, alla chiusura, i due netti detti da mostrod (`netto`, `totale`).
+    SENZA NUMERI LA FRASE RESTA SENZA CIFRA: non si inventa."""
+    vende = ruolo == "vende"
+    altro = nome or ("Chi compra" if vende else "Chi vende")
+    l_altro = nome or ("chi compra" if vende else "chi vende")
+    sats = int(dati.get("sats") or 0)
+    euro = str(dati.get("euro") or "")
+    # l'intervallo non ancora scelto non e' una cifra
+    cifra = euro if euro and not euro.startswith("da ") else ""
+    metodi = str(dati.get("metodi") or "")
+    quanto = (f"{_fmt_sats(sats)} sats" if sats > 0 else "bitcoin") + \
+        (f" per {euro}" if euro else "") + (f" via {metodi}" if metodi else "")
+    if momento == "preso":
+        testa = ("⚡ <b>Il tuo ordine è stato preso"
+                 + (f" da {nome}" if nome else "") + "!</b> "
+                 + ("Vendi " if vende else "Compri ") + quanto + ".\n\n")
+        if vende and dettaglio == "hold-next":
+            return testa + "Paga la garanzia: la richiesta è nell'app."
+        if vende:
+            return testa + (f"Appena {l_altro} indica dove ricevere i sats, "
+                            "tocca a te bloccare la garanzia.")
+        return testa + (f"Appena {l_altro} blocca la garanzia, tocca a te "
+                        "indicare dove ricevere i sats.")
+    if momento == "garanzia_chiesta":
+        if dettaglio == "invoice":
+            return (f"🔒 <b>Paga la garanzia: la richiesta è nell'app.</b> "
+                    f"{altro} ha indicato dove ricevere i sats, ora tocca a te.")
+        return "🔒 <b>Paga la garanzia: la richiesta è nell'app.</b>"
+    if momento == "garanzia_pagata":
+        if dettaglio == "active":
+            return (f"🔒 <b>{altro} ha bloccato i sats in garanzia.</b> Appena "
+                    f"ti indica dove inviare {cifra or 'gli euro'}, tocca a te.")
+        return (f"🔒 <b>{altro} ha bloccato i sats in garanzia:</b> indica "
+                "dove ricevere i sats.")
+    if momento == "fattura_data":
+        return (f"⚡ <b>{altro} ha indicato dove ricevere i sats.</b> Se non "
+                "l'hai ancora fatto, indica dove ricevere gli euro.")
+    if momento == "fiat":
+        return (f"💶 <b>{altro} dice di aver inviato {cifra or 'gli euro'}:</b> "
+                "controlla il conto e rilascia i sats.\n\n"
+                "<i>Rilascia solo quando gli euro sono arrivati davvero.</i>")
+    if momento in ("concluso", "rilasciato_vende"):
+        invito = ("\n\nLascia una recensione: la trovi nella pagina dello "
+                  "scambio." if recensibile else "")
+        if vende:
+            testa = ("✅ <b>Hai rilasciato i sats: per te lo scambio è "
+                     "concluso.</b> " if momento == "rilasciato_vende"
+                     else "✅ <b>Scambio concluso!</b> ")
+            fatto = (f"Hai venduto {_fmt_sats(sats)} sats" if sats > 0
+                     else "Hai venduto bitcoin") + (f" per {euro}" if euro else "")
+            totale = int(dati.get("totale") or 0)
+            if totale > sats > 0:
+                fatto += (f", in tutto {_fmt_sats(totale)} sats commissione "
+                          "compresa")
+            return f"{testa}{fatto}.{invito}"
+        netto = int(dati.get("netto") or 0)
+        fatto = (f"{_fmt_sats(netto)} sats in arrivo al tuo recapito"
+                 if netto > 0 else "I sats sono in arrivo al tuo recapito")
+        return f"✅ <b>Scambio concluso!</b> {fatto}.{invito}"
+    if momento == "rilasciato":
+        # solo il moderatore arriva qui: il rilascio di chi vende non
+        # avvisa nessuno (vedi `_destinatari_evento_p2p`)
+        return ("⚖️ <b>Un moderatore ha chiuso la disputa: i sats vanno a "
+                "chi compra.</b>")
+    if momento == "annullo_chiesto":
+        return (f"↩️ <b>{altro} chiede di annullare lo scambio.</b> Se sei "
+                "d'accordo, annulla anche tu dalla pagina dello scambio; se "
+                "no non fare niente, e lo scambio continua.")
+    if momento == "annullato":
+        coda = " I sats eventualmente in garanzia tornano a chi vende."
+        if dettaglio == "cooperative":
+            return (f"❌ <b>{altro} ha accettato di annullare: lo scambio è "
+                    f"annullato.</b>{coda}")
+        if dettaglio == "admin":
+            return f"⚖️ <b>Un moderatore ha annullato lo scambio.</b>{coda}"
+        if dettaglio == "maker-timeout" and maker:
+            return ("⏰ <b>Non hai proseguito in tempo:</b> il tuo ordine è "
+                    "stato annullato. Puoi ripubblicarlo quando vuoi.")
+        if dettaglio == "maker-timeout":
+            return ("⏰ <b>Chi aveva pubblicato l'ordine non ha proseguito in "
+                    "tempo:</b> lo scambio è annullato, non devi fare niente.")
+        if dettaglio == "escrow-deadline":
+            return ("⏰ <b>La garanzia è arrivata a scadenza: lo scambio è "
+                    "annullato.</b> I sats tornano a chi vende.")
+        return f"❌ <b>{altro} ha annullato lo scambio.</b>{coda}"
+    if momento == "tornato":
+        if dettaglio == "republished":
+            return (f"🔄 <b>{altro} ha annullato lo scambio.</b> Il tuo ordine "
+                    "è tornato in vetrina: non devi fare niente.")
+        if maker:
+            return ("🔄 <b>Chi aveva preso il tuo ordine non ha proseguito.</b> "
+                    "È tornato in vetrina: non devi fare niente.")
+        return ("🔄 <b>Non hai proseguito in tempo:</b> l'ordine è tornato "
+                "in vetrina. Se ti interessa ancora, puoi riprenderlo.")
+    if momento == "scaduto":
+        return ("⏰ <b>Il tuo ordine è scaduto</b> senza che la presa fosse "
+                f"completata: {'vendevi' if vende else 'compravi'} {quanto}. "
+                "Puoi ripubblicarlo quando vuoi.")
+    if momento == "disputa":
+        return (f"⚖️ <b>{altro} ha aperto una disputa sullo scambio"
+                + (f" da {cifra}" if cifra else "")
+                + ":</b> i moderatori vi contatteranno.")
+    if momento == "payout_fallito":
+        motivo = MOTIVI_PAYOUT_P2P.get(dettaglio, "")
+        return ("⚠️ <b>Il pagamento dei sats non è passato"
+                + (f" ({motivo})" if motivo else "")
+                + ":</b> apri «Dove ricevere i sats» e dai una fattura nuova."
+                "\n\n<i>I sats restano fermi per te finché il pagamento non "
+                "passa.</i>")
+    return ""
+
+
+def _nome_altro_p2p(con, ordine: str, per: int, adesso: int) -> str:
+    """Il nome dell'ALTRA parte come lo vede `per` nella pagina dello
+    scambio, gia' scappato — o vuoto. LO STESSO GIUDICE della pagina
+    (`_controparti_p2p`, «LE PARTI SI VEDONO»): la frase non dice mai un
+    nome che la pagina non mostra, e chi entra da Nostr senza farsi
+    riconoscere resta «chi vende» / «chi compra» anche qui. E' un di
+    piu': se non si legge la frase parte senza, e il journal lo dice."""
+    try:
+        nome = (_controparti_p2p(con, [ordine], per, adesso)
+                .get(ordine, {}).get("nome") or "")
+    except Exception as e:
+        print(f"⚠️ Avvisi P2P: il nome dell'altra parte su {ordine[:8]} non "
+              f"si legge ({type(e).__name__}): la frase parte senza",
+              flush=True)
+        return ""
+    return html.escape(str(nome))
+
+
+def _dati_frase_p2p(con, ordine: str) -> dict:
+    """I NUMERI DELLA FRASE, da dove stanno: `sats`, `euro` e `metodi`
+    dal libro (`p2p_ordini`: sono i tag pubblici del 38383, che mostrod
+    nell'evento NON ripete), i due netti della chiusura da `p2p_scambi`
+    (gli unici importi che manda). A chiusura detta, i sats di mostrod
+    vincono su quelli del libro: sono quelli veri dello scambio. Un
+    ordine che il libro non segue da' un dizionario vuoto, e la frase
+    esce senza cifre."""
+    dati = {"sats": 0, "euro": "", "metodi": "", "netto": 0, "totale": 0,
+            "maker": 0, "preso_da": 0}
+    r = con.execute("SELECT tg_id, preso_da, sats, euro, metodi FROM p2p_ordini "
+                    "WHERE ordine=?", (ordine,)).fetchone()
+    if r:
+        try:
+            metodi = json.loads(r["metodi"] or "[]")
+        except ValueError:
+            metodi = []
+        dati.update(sats=int(r["sats"] or 0), euro=html.escape(str(r["euro"] or "")),
+                    metodi=", ".join(html.escape(str(m)) for m in metodi
+                                     if isinstance(m, str)),
+                    maker=int(r["tg_id"] or 0), preso_da=int(r["preso_da"] or 0))
+    s = con.execute("SELECT sats, sats_compratore, sats_venditore FROM p2p_scambi "
+                    "WHERE ordine=?", (ordine,)).fetchone()
+    if s and int(s["sats"] or 0) > 0:
+        dati.update(sats=int(s["sats"]), netto=int(s["sats_compratore"] or 0),
+                    totale=int(s["sats_venditore"] or 0))
+    return dati
+
+
+def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
+    """Dall'evento registrato agli avvisi da mandare: lista di `(tg_id,
+    testo)`. Pura sulla connessione, e nel frattempo SCRIVE l'anti-
+    doppione (`p2p_avvisi`, PRIMA dell'invio) e, al rilascio di chi
+    vende, la sua attesa.
+    CHI TACE LO DICE: ogni avviso che non parte lascia una riga nel
+    journal col perche' — l'interruttore spento, il gia' detto, la
+    parte che non e' dei nostri. Il 17 set 2026 «non avvisato» e «non
+    successo» nel journal erano la stessa cosa, ed e' costato un'ora."""
+    ordine, momento, giro = ev["ordine"], fatto["momento"], fatto["giro"]
+    corto = ordine[:8]
+    dati = _dati_frase_p2p(con, ordine)
+    # chi ha PUBBLICATO: l'altro lato rispetto a chi ha preso
+    lato_maker = {"buyer": "vende", "seller": "compra"}.get(fatto["preso_dal"], "")
+    fuori = []
+
+    def recensibile(chi):
+        altro, perche = _parti_recensione_p2p(dati["maker"], dati["preso_da"], chi)
+        return bool(altro) and not perche
+
+    if momento == "rilasciato" and ev["attore"] == "seller" and fatto["venditore"]:
+        # L'ATTESA DI CHI VENDE: se «concluso» non arriva entro il
+        # minuto, il suo «hai venduto» parte lo stesso
+        chi = fatto["venditore"]
+        testo = _testo_evento_p2p("rilasciato_vende", "", "vende", dati,
+                                  recensibile=recensibile(chi))
+        con.execute(
+            "INSERT INTO p2p_attese(ordine, momento, giro, tg_id, testo, "
+            "quando, scade, fonte) VALUES(?,?,?,?,?,?,?,'rilascio')",
+            (ordine, "concluso", giro, chi, testo, ev["ts"],
+             adesso + P2P_RISERVA_S))
+    attore = ev["attore"]
+    if momento == "preso" and attore == "mostro" and dati["maker"]:
+        # mostrod non ha saputo dire chi ha preso (la chiave di chi ha
+        # pubblicato non combacia con nessuna delle due: un ordine figlio
+        # di un intervallo). Il libro sa chi ha PUBBLICATO: l'altro e'
+        # chi ha preso. Senza nemmeno quello la presa la sentirebbero
+        # tutti e due come «il tuo ordine», e per uno sarebbe falso.
+        attore = {fatto["compratore"]: "seller",
+                  fatto["venditore"]: "buyer"}.get(dati["maker"], "mostro")
+        lato_maker = {"buyer": "vende", "seller": "compra"}.get(attore, "")
+    if momento == "preso" and attore == "mostro":
+        destinatari = []
+    else:
+        destinatari = _destinatari_evento_p2p(
+            momento, attore, ev["dettaglio"],
+            fatto["compratore"], fatto["venditore"])
+    if not destinatari:
+        print(f"🛰️ Evento P2P: {corto} «{momento}»"
+              + (f"/{ev['dettaglio']}" if ev["dettaglio"] else "")
+              + f" da {ev['attore']}: nessuno da avvisare (giro {giro}, "
+              f"compra {fatto['compratore'] or '—'}, vende "
+              f"{fatto['venditore'] or '—'})", flush=True)
+    for chi, ruolo in destinatari:
+        if not _avvisi_p2p_accesi(con, chi):
+            print(f"🔕 Evento P2P: {chi} ha gli avvisi P2P SPENTI (cassetto "
+                  f"Avvisi): «{momento}» su {corto} non parte", flush=True)
+            continue
+        if not con.execute(
+                "INSERT OR IGNORE INTO p2p_avvisi(ordine, momento, giro, "
+                "tg_id, quando, fonte) VALUES(?,?,?,?,?,'mostro')",
+                (ordine, momento, giro, chi, adesso)).rowcount:
+            print(f"· Evento P2P: {corto} «{momento}» a {chi} e' gia' stato "
+                  "detto: non si ripete", flush=True)
+            continue
+        testo = _testo_evento_p2p(
+            momento, ev["dettaglio"], ruolo, dati,
+            nome=_nome_altro_p2p(con, ordine, chi, adesso),
+            maker=(ruolo == lato_maker),
+            recensibile=(momento == "concluso" and recensibile(chi)))
+        if testo:
+            fuori.append((chi, testo))
+    con.commit()
+    return fuori
+
+
+async def _respiro_presa_p2p(ordine: str):
+    """LA FRASE DELLA PRESA ASPETTA I SUOI NUMERI: l'evento di mostrod
+    arriva un attimo prima che il libro mostri la presa (a prezzo di
+    mercato i sats si fissano LI') e che il telefono di chi ha preso
+    dichiari chi e'. Si guarda la riga ogni secondo: appena ci sono i
+    numeri E il nome si parte; il nome si aspetta meno dei numeri, e
+    chi entra da Nostr senza farsi riconoscere non lo dichiara mai. Un
+    ordine che il libro non segue non ha niente da aspettare."""
+    inizio = time.time()
+    while time.time() - inizio < P2P_RESPIRO_S:
+        con = db()
+        try:
+            r = con.execute("SELECT sats, stato, preso_da FROM p2p_ordini "
+                            "WHERE ordine=?", (ordine,)).fetchone()
+        finally:
+            con.close()
+        if not r:
+            return
+        numeri = int(r["sats"] or 0) > 0 and (r["stato"] or "") in STATI_LIBRO_PRESO
+        if numeri and (int(r["preso_da"] or 0)
+                       or time.time() - inizio >= P2P_RESPIRO_NOME_S):
+            return
+        await asyncio.sleep(1)
+
+
+async def _manda_evento_p2p(ev: dict, fatto: dict):
+    """L'invio, in un task suo: mostrod ha gia' avuto il suo 200 e non
+    aspetta Telegram. Fail-open come le sorelle: un invio che va male e'
+    una riga nel journal, mai un'eccezione che sale."""
+    try:
+        if fatto["momento"] == "preso":
+            await _respiro_presa_p2p(ev["ordine"])
+        con = db()
+        try:
+            avvisi = _avvisi_evento_p2p(con, ev, fatto, int(time.time()))
+        finally:
+            con.close()
+        if fatto["momento"] == "rilasciato" and _P2P_SVEGLIA["ev"] is not None:
+            # l'attesa di chi vende scade fra un minuto: l'orologio si
+            # sveglia li', invece di aspettare il suo giro
+            asyncio.get_running_loop().call_later(
+                P2P_RISERVA_S + 0.5, _P2P_SVEGLIA["ev"].set)
+        esiti = []
+        for tg_id, testo in avvisi:
+            try:
+                esiti.append((tg_id, await notifica(tg_id, testo)))
+            except Exception as e:
+                esiti.append((tg_id, f"SALTATO ({type(e).__name__}: {e})"))
+            await asyncio.sleep(0.2)
+        if avvisi:
+            print(f"🛰️ Evento P2P: {ev['ordine'][:8]} «{fatto['momento']}»"
+                  + (f"/{ev['dettaglio']}" if ev["dettaglio"] else "")
+                  + f" da {ev['attore']} (giro {fatto['giro']}): avvisati "
+                  f"{[t for t, _ in avvisi]}", flush=True)
+            _esiti_p2p_dice("🛰️", esiti)
+    except Exception as e:
+        print(f"⚠️ Evento P2P {ev.get('ordine', '')[:8]} «{ev.get('azione')}»: "
+              f"invio saltato ({type(e).__name__}: {e})", flush=True)
+
+
+def _porta_eventi_p2p(autorizzazione: str) -> None:
+    """404 a porta chiusa, 403 a segreto sbagliato: il calco di
+    `_porta_sconto_p2p`. Confronto a tempo costante, e a BYTE
+    (`compare_digest` su due str alza TypeError al primo carattere non
+    ASCII, e un header lo scrive chi chiama)."""
+    if not eventi_p2p_attivi():
+        raise HTTPException(404, "Non trovato")
+    atteso = ("Bearer " + P2P_EVENTI_SEGRETO).encode("utf-8")
+    if not hmac.compare_digest(
+            str(autorizzazione or "").encode("utf-8"), atteso):
+        raise HTTPException(403, "Segreto sbagliato")
+
+
+@app.post("/api/p2p/evento")
+async def evento_p2p(req: Request):
+    """Il coordinatore racconta un passo di uno scambio. La risposta
+    parte SUBITO — mostrod non deve aspettare Telegram — e dice solo se
+    l'evento era nuovo: a chi e' andato l'avviso lo dice il journal.
+    `nuovo: false` e' il suo retry arrivato dopo un primo invio che era
+    passato: tutto bene, e niente suona due volte.
+    I giudici sono `_porta_eventi_p2p`, `_evento_p2p_pulito`,
+    `_registra_evento_p2p` e `_avvisi_evento_p2p`."""
+    _porta_eventi_p2p(req.headers.get("authorization", ""))
+    try:
+        d = await req.json()
+    except Exception:
+        raise HTTPException(400, "Richiesta illeggibile")
+    adesso = int(time.time())
+    con = db()
+    try:
+        ev = _evento_p2p_pulito(d, adesso)
+        fatto = _registra_evento_p2p(con, ev, adesso)
+    except ValueError as e:
+        print(f"⚠️ Evento P2P rifiutato: {e}", flush=True)
+        raise HTTPException(400, str(e))
+    finally:
+        con.close()
+    if fatto is None:
+        print(f"· Evento P2P: {ev['ordine'][:8]} «{ev['azione']}» ripetuto "
+              "(il retry del coordinatore): gia' registrato", flush=True)
+    else:
+        t = asyncio.create_task(_manda_evento_p2p(ev, fatto))
+        _TASK_EVENTI_P2P.add(t)
+        t.add_done_callback(_TASK_EVENTI_P2P.discard)
+    return JSONResponse({"ok": True, "nuovo": fatto is not None},
+                        headers={"Cache-Control": "no-store"})
 
 
 TIMBRO_CAMPAGNA_P2P = "campagna_p2p_acceso"

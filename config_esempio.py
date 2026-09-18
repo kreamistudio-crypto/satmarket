@@ -686,6 +686,17 @@ P2P_SCONTO_FEDELTA_PERCENTO = 0
 # (`BARATTOLO_SCONTO_SEGRETO`). Vuoto o segnaposto = la rotta NON
 # ESISTE (404) e il coordinatore fa prezzo pieno a tutti.
 P2P_SCONTO_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
+# Il segreto con cui il coordinatore RACCONTA a /api/p2p/evento ogni
+# passo di ogni scambio (patch 0007 del fork): e' da li' che nascono gli
+# avvisi precisi del P2P — «paga la garanzia», «gli euro sono partiti».
+# Lo stesso valore va nel compose del nodo (`BARATTOLO_EVENTI_SEGRETO`).
+# E' UN SEGRETO SUO, diverso da quello dello sconto qui sopra: quello fa
+# una DOMANDA (chi lo ruba impara se una chiave ha lo sconto), questo fa
+# PARTIRE AVVISI a persone vere — due porte, due chiavi, e si ruotano
+# una alla volta. Vuoto o segnaposto = la rotta NON ESISTE (404): gli
+# avvisi restano quelli del libro pubblico (presa, concluso, annullato,
+# scaduto), che allora partono subito invece di aspettare il coordinatore.
+P2P_EVENTI_SEGRETO = "INCOLLA_QUI_UN_SEGRETO_CASUALE"
 # LA RIGA A OGNI PASSATA DELL'OROLOGIO P2P (17 set 2026): una al minuto
 # nel journal, anche quando non trova niente — e' quella che distingue
 # «gira a vuoto» da «non gira», che un giorno e' costata un'ora.

@@ -1,4 +1,4 @@
-# IL FORK DI MOSTRO — sei patch sopra il tag v0.18.7
+# IL FORK DI MOSTRO — sette patch sopra il tag v0.18.7
 
 Qui dentro non c'è codice in servizio: ci sono le patch che il nodo Mostro di
 Dublino applica sopra il sorgente upstream, prodotte con
@@ -15,7 +15,7 @@ esattamente il lavoro che non vogliamo.
 
 Fatto l'8 settembre 2026. Upstream: `v0.18.7`, commit `afc39a2`.
 
-## LE SEI PATCH, cosa fanno e perché
+## LE SETTE PATCH, cosa fanno e perché
 
 **0001 — `src/lnurl.rs`, i tre budget da 4s/2s/2s a 30s/15s/10s.**
 Un coordinator che esce solo da Tor misura **10,6 secondi** per la
@@ -83,7 +83,7 @@ agganci in `main.rs`, `take_buy.rs`, `take_sell.rs`, `util.rs`,
 `flow.rs`, `add_invoice.rs`.** IN SERVIZIO dal 18 set 2026 (immagine
 `-bar3`, commit `3a7a121` sul nodo): compilata al primo colpo, e provata
 con uno scambio vero — vedi PROVATO, qui sotto, con quel che ancora
-manca. È la sola delle sei che NON va proposta a monte: è la
+manca. Con la 0007 è una delle due che NON vanno proposte a monte: è la
 politica di prezzo di Barattolo, non un difetto di Mostro.
 Chi è pioniere OPPURE ha il livello 5 su Barattolo paga mezzo punto in
 meno sulla SUA metà della commissione, e lo sconto lo applica mostrod
@@ -152,6 +152,83 @@ provato una strada. Nasce da `patch-0006-perche-e-fallito.py`. Questa
 SÌ è da proporre a monte: è un difetto di diagnosi di chiunque.
 ⚠️ MAI VISTA PARLARE: compila e i test sono verdi, ma la riga esce solo
 quando un payout fallisce, e dal 18 set non ne è fallito nessuno.
+
+**0007 — gli EVENTI al server di Barattolo: `src/barattolo_eventi.rs`
+(nuovo) e ventiquattro agganci in tredici file.** ⚠️ SCRITTA il 18 set
+2026 e **MAI COMPILATA**: sul PC non c'è `cargo`, e il primo
+`cargo build` è quello sul nodo. NON è in servizio, e in questa cartella
+non c'è ancora il suo `.patch`: nasce dal nodo, a test verdi, come le
+sorelle. Come la 0005 NON va proposta a monte: è l'integrazione di
+Barattolo, non un difetto di Mostro.
+IL PERCHÉ: il server di Barattolo deduceva cosa succede in uno scambio
+dalle buste cifrate che non può leggere — da lì gli avvisi generici
+«Novità in un tuo scambio» e, dal vivo il 18 set, avvisi a caso. mostrod
+i fatti li SA. A ogni transizione di stato di un ordine fa un POST a
+`BARATTOLO_EVENTI_URL`, sulla strada dello sconto: **lo stesso client
+HTTP della 0005** (`barattolo_fee::http()`, che la patch rende
+`pub(crate)`), quindi lo stesso pool di connessioni e lo stesso circuito
+Tor che il battito da 60 s tiene caldo; segreto in header (bearer). Se
+lo sconto non è configurato e il suo battito non gira, il modulo ne
+avvia uno suo.
+COSA ESCE, e nient'altro: l'id dell'ordine, l'azione, l'ora, le due
+TRADE pubkey, chi ha fatto il gesto (`buyer` / `seller` / `mostro`), un
+dettaglio-macchina breve e — SOLO su `released` e `success` — tre
+importi in sats (l'ordine, il netto a chi compra, il totale bloccato da
+chi vende: dopo la 0005 le due fee possono differire, e il server da
+solo non li saprebbe al satoshi). **Mai fatture, preimage, hash, testi,
+coordinate**: `event_of` è l'UNICO lettore di `Order` del modulo, un
+dettaglio è ripulito a 40 caratteri di `[A-Za-z0-9_-]`, una chiave che
+non sia 64 esadecimali esce `null` — e un test guarda che quei campi non
+escano, azione per azione.
+LE TREDICI AZIONI: `taken`, `hold-invoice-requested`,
+`hold-invoice-paid`, `buyer-invoice-requested`, `buyer-invoice-added`,
+`fiat-sent`, `released`, `success`, `cancel-requested`, `canceled`,
+`expired`, `dispute-opened`, `payout-failed` (col motivo di LND, lo
+stesso numero che la 0006 scrive nel log). Dodici erano nella richiesta;
+`cancel-requested` — il primo passo dell'annullo d'accordo — l'ha
+aggiunta il censimento: senza, all'altra parte non arriverebbe che le
+si chiede di annullare.
+I DETTAGLI sono un vocabolario CHIUSO (il blocco «THE DETAILS» nel
+modulo), e non sono decorazione: mostrod fa certi passi A COPPIE nello
+stesso istante — la presa E la richiesta di garanzia; la garanzia pagata
+E la richiesta della fattura — con due POST indipendenti che arrivano
+nell'ordine che capita. Il dettaglio dice quale ramo è passato, così il
+server manda UN avviso per coppia invece di tirare a indovinare.
+**FIRE-AND-FORGET, l'opposto del fail-closed della 0005**: `emit*` sono
+funzioni SINCRONE che ritornano subito; il POST vive in un task suo, 8 s
+di budget, poi UN solo retry dopo 5 s con 12 s (un circuito freddo ne
+misura 10,6) — 25 s in tutto, sotto i 60 dopo i quali il server ripiega
+sul libro pubblico. Un 4xx non si riprova (è un errore nostro). Nessun
+gesto dello scambio aspetta mai: se il server è giù mostrod va avanti
+come upstream. UNA riga di log per POST, con l'esito.
+**SENZA `BARATTOLO_EVENTI_URL` LA PATCH È INERTE**: nessun task, nessuna
+richiesta. Il segreto è `BARATTOLO_EVENTI_SEGRETO`; se manca vale
+`BARATTOLO_SCONTO_SEGRETO`. Consigliato uno SUO — lo stesso di
+`P2P_EVENTI_SEGRETO` sul VPS: quello dello sconto fa una domanda, questo
+fa partire avvisi, e due porte si ruotano una alla volta.
+DOVE SI AGGANCIA, in breve: `show_hold_invoice` e `update_order_status`
+(la presa e quel che apre), `hold_invoice_paid`, `add_invoice_action` e
+`pay_new_invoice`, `fiat_sent_action`, `release_action`,
+`payment_success`, il ramo `Failed` del watcher di `do_payment`, i
+quattro annulli di `cancel.rs` (d'accordo in due passi, di chi ha preso,
+di chi ha pubblicato a presa in corso e in vetrina), i tre job dello
+scheduler (presa non completata, garanzia a fine CLTV, ordine scaduto
+nel libro), `dispute_action`, e le due chiusure del moderatore.
+⚠️ DOVE UPSTREAM **MUOVE** `order` dentro un'altra funzione
+(`add_invoice_action` → `show_hold_invoice`) l'aggancio tiene una COPIA
+e avvisa solo a gesto riuscito; e l'annullo di chi aveva preso avvisa
+PRIMA che `edit_pubkeys_order` gli cancelli le chiavi dall'ordine.
+NON COPERTO, e dichiarato: la strada dei BOND (le prese in gara sullo
+stesso ordine) e il ramo Cashu non hanno agganci; su questo nodo sono
+spenti tutti e due.
+Nasce da `patch-0007-eventi-al-server.py` (con `barattolo_eventi.rs`
+accanto; `--secco` prova le ancore senza scrivere). Il patcher, oltre
+alle ancore uniche, controlla tre cose che Rust non controlla perché
+sono stringhe: che ogni azione mandata stia nell'elenco del modulo, che
+ogni azione dell'elenco abbia un aggancio, che ogni dettaglio sia
+dichiarato — e che nessun aggancio sia finito sotto `#[cfg(test)]`. I
+fine-riga sono quelli del file che trova (un `barattolo_fee.rs` arrivato
+in CRLF da un checkout Windows non fa cadere l'ancora).
 
 ## COSA CURA, E COSA NO
 
@@ -252,6 +329,16 @@ passi davvero a circuito freddo. Si prova solo al prossimo scambio
 vero, senza scaldare il circuito prima — che è esattamente l'accidente
 che il 7 settembre 2026 aveva fatto sembrare risolto un problema che
 non lo era.
+DELLA 0007 NON È PROVATO NIENTE SUL CAMPO, e sul PC nemmeno compilata:
+verificate sul clone del tag (con le sei patch applicate) le ANCORE —
+ventiquattro, tutte uniche, e il patcher rilanciato si ferma — e LETTE
+le firme che ogni aggancio usa (il tipo di `order` in quel punto, se è
+ancora vivo o già mosso, i campi di `Order` in mostro-core 0.14.6,
+`failure_reason` come `i32`, `HoldInvoiceOrigin: PartialEq`). I test
+Rust sono scritti — la forma del corpo, cosa non esce MAI, un server
+HTTP di cartone per il retry (uno solo), il rifiuto non riprovato, il
+server morto che è un `false` e non un blocco — e il loro primo giro è
+`cargo test` sul nodo.
 E DELLA 0005, tre cose: 1) **il caso fail-closed** — server muto o
 segreto sbagliato, fee piena per tutt'e due e la riga `discount NOT
 verified` nel log; 2) **il caso senza sconto** con la patch accesa;
@@ -268,7 +355,7 @@ per il caso asimmetrico, e il caso asimmetrico dal vivo non c'è ancora.
 cd ~/nodo/mostro-src
 git fetch --tags
 git switch -c barattolo/vX.Y.Z vX.Y.Z
-git cherry-pick a9d387b 1d6652c 1d5f634 2b71308 3a7a121 4f20e04
+git cherry-pick a9d387b 1d6652c 1d5f634 2b71308 3a7a121 4f20e04   # + il commit della 0007, quando c'è
 docker build -f docker/Dockerfile -t mostro:vX.Y.Z-bar1 .
 docker build -f docker/Dockerfile --target builder -t mostro-test:bar1 .
 docker run --rm mostro-test:bar1 cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice
