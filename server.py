@@ -5488,6 +5488,22 @@ def init_db():
                     "paese_domestico TEXT DEFAULT ''")
     except sqlite3.OperationalError:
         pass
+    # `non_spedisce_casa` (18 set 2026): LA SPUNTA ESPLICITA «non
+    # spedisco nel mio paese». Rovescia la regola del 17, dove a dirlo
+    # era l'ASSENZA di `dom` nella mappa — cioe' una casella lasciata
+    # vuota: in un giorno aveva gia' chiuso il mercato di casa a un
+    # annuncio vero (il Motorola da 234 EUR), a un venditore che
+    # voleva dire «gratis». Da qui la casa e' SEMPRE aperta — vuota o
+    # zero = gratis — e per chiuderla serve questo 1, che nasce solo
+    # da un gesto. NESSUN TRAVASO, ed e' voluto: a cambiare e' la
+    # LETTURA (`_zona_offerta`), i dati restano come sono — le mappe
+    # senza `dom` gia' salvate tornano comprabili da casa senza che
+    # nessuno le tocchi, e il default 0 e' esattamente quella risposta.
+    try:
+        con.execute("ALTER TABLE annunci ADD COLUMN "
+                    "non_spedisce_casa INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
     # Migrazione categorie (lug 2026): il set nuovo rinomina tre voci
     # vecchie, le altre restano com'erano. COLLATE NOCASE raddrizza
     # anche le maiuscole storte dei vecchi import ('casa' minuscola,
@@ -9273,9 +9289,16 @@ async def consegna_da_payload(d: dict, valuta: str):
     qualcuno generalizzasse il ripiego del punto anche a queste,
     aprirebbe l'estero a tutti gli annunci del mercatino in una riga.
     QUI NON SI ALZA MAI: un annuncio che spedisce e non dichiara
-    nessuna zona esce com'e', e a chiudere il caso e' `_zona_offerta`
-    — che sul domestico ha un ripiego apposta per il mondo di ieri (i
-    client e gli importatori che le zone non le conoscono)."""
+    nessuna zona esce com'e', e a leggerlo e' `_zona_offerta`.
+    ⚠️ LA CASA FA ECCEZIONE ALLA «PRESENZA» (18 set 2026, decisione di
+    Andrea che ROVESCIA il 17): per il paese di casa la casella vuota
+    NON vuol dire «li' non spedisco», vuol dire GRATIS, come lo zero.
+    `dom` entra nella mappa SEMPRE, e la sola cosa che la tiene fuori
+    e' la spunta esplicita (`non_spedisce_casa_da_payload`), che
+    azzera anche le due colonne di casa. Per i continenti la regola
+    della presenza resta intatta: li' il vuoto e' una porta chiusa,
+    ed e' giusto — nessuno deve ritrovarsi a spedire in Australia per
+    una casella saltata. A casa l'errore costava nel verso opposto."""
     consegna = d.get("consegna", "")
     if consegna not in MODALITA_CONSEGNA:
         consegna = ""
@@ -9367,16 +9390,19 @@ async def consegna_da_payload(d: dict, valuta: str):
     if domestico and not nome_paese(domestico):
         domestico = ""
     if consegna in ("spedizione", "entrambe"):
-        sped_sats, sped_eur = await _leggi_costo("spedizione_sats",
-                                                 "spedizione_eur")
         # IL DOMESTICO E' LA TARIFFA DI SEMPRE, guardata come zona:
         # resta nelle sue colonne (le leggono card, NIP-99, canale,
-        # import e libro mastro) e nella mappa entra solo per DIRSI
+        # import e libro mastro) e nella mappa entra per DIRSI
         # dichiarato — i due numeri sono gli stessi, da una chiamata
-        # sola, e non possono divergere. I client di ieri mandano
-        # sempre la chiave (fosse anche a zero) e restano dichiarati
-        # senza saperlo: e' il mondo di ieri, e va tenuto.
-        if _porta("spedizione_sats") or _porta("spedizione_eur"):
+        # sola, e non possono divergere.
+        # VUOTO O ZERO = GRATIS (18 set 2026): la chiave assente si
+        # legge zero da `_leggi_costo`, e `dom` entra lo stesso. A
+        # tenerla fuori e' solo la SPUNTA, che azzera anche le colonne:
+        # un costo rimasto scritto accanto a «non spedisco» sarebbe
+        # un numero che nessuno puo' pagare, e in vetrina si leggerebbe.
+        if not non_spedisce_casa_da_payload(d, consegna):
+            sped_sats, sped_eur = await _leggi_costo("spedizione_sats",
+                                                     "spedizione_eur")
             zone["dom"] = (sped_sats, sped_eur)
         # LE ZONE, annidate: {"eu": {"sats": 20000}, "asia": {"eur": 15}}
         # — la chiave dice la valuta, come nelle chiavi piatte. La
@@ -9388,6 +9414,14 @@ async def consegna_da_payload(d: dict, valuta: str):
                 if z not in ZONE_SPEDIZIONE or z == "dom":
                     continue
                 if not isinstance(v, dict) or not v:
+                    continue
+                # UNA ZONA ESTERA «VUOTA» NON E' UNO ZERO (18 set 2026):
+                # il form la chiave vuota non la manda proprio, ma un
+                # {"sats": ""} arrivato da altrove diventerebbe 0 in
+                # `_leggi_costo`, cioe' «gratis in Asia» da una casella
+                # mai scritta. Fuori casa il vuoto resta una porta chiusa.
+                if not any(x is not None and str(x).strip() != ""
+                           for x in v.values()):
                     continue
                 zone[z] = await _leggi_costo("sats", "eur", v)
         if (_porta("spedizione_punto_sats")
@@ -9417,30 +9451,49 @@ def zone_json(zone: dict) -> str:
                        for z, (s, e) in sorted(zone.items())})
 
 
-def guardia_almeno_una_zona(consegna: str, zone: dict):
-    """Chi spunta la spedizione deve dire ALMENO una zona (set 2026).
+def non_spedisce_casa_da_payload(d: dict, consegna: str) -> int:
+    """LA SPUNTA «non spedisco nel mio paese» (18 set 2026): 1 solo
+    se chi vende l'ha DETTO, su una consegna che spedisce.
+
+    ASSENTE = 0, ed e' la decisione: il vuoto non chiude mai la casa.
+    I client di ieri la chiave non la mandano e restano aperti a casa
+    — gratis se la casella era vuota — che e' precisamente quel che la
+    regola nuova vuole per loro. Pura e senza await apposta: la
+    chiamano il giudice dei campi (per decidere se `dom` entra nella
+    mappa) e le due porte umane (per scriverla in colonna), e le due
+    letture non possono divergere perche' e' la stessa."""
+    if consegna not in ("spedizione", "entrambe"):
+        return 0
+    v = d.get("non_spedisco_casa")
+    return 1 if v in (1, True, "1", "true", "on") else 0
+
+
+def guardia_almeno_una_zona(consegna: str, zone: dict, no_casa: int = 0):
+    """Chi NON spedisce a casa deve dire ALMENO una zona estera.
+
+    IL 18 SET 2026 LA GUARDIA HA CAMBIATO BERSAGLIO, e il nome e'
+    rimasto perche' la contraddizione e' la stessa — «spedisco» e «in
+    nessuna zona» non possono essere veri insieme, o si avrebbe il
+    camioncino in vetrina su un annuncio che non si compra da nessun
+    posto. Col 17 ci si arrivava lasciando vuote tutte le caselle;
+    adesso la casa vuota vuol dire GRATIS, quindi una zona c'e'
+    sempre, e l'unico modo di non averne nessuna e' spuntare «non
+    spedisco nel mio paese» senza aver scritto un continente. Il form
+    la spunta la mostra solo con un continente pieno: qui arriva chi
+    il form non lo usa.
 
     Sta qui e non dentro `consegna_da_payload` perche' quel giudice non
     alza mai — normalizza e basta, ed e' il patto che tiene in piedi i
-    client di ieri. Questa invece e' una CONTRADDIZIONE, non un valore
-    sconosciuto: «spedisco» e «in nessuna zona» non possono essere veri
-    insieme, e lasciarla passare vorrebbe dire un annuncio con il
-    camioncino in vetrina che non si puo' comprare da nessun posto.
-
-    LA CHIAMANO SOLO LE DUE PORTE UMANE — pubblica() e la modifica —
-    e mai l'import ne' la modifica firmata da Nostr: quelle mandano
-    sempre la chiave dell'Italia (fosse anche a zero), quindi non ci
-    inciampano mai; e se un giorno ci inciampassero, un CSV da mille
-    righe non deve morire su una contraddizione che il ripiego di
-    `_zona_offerta` sa gia' assorbire."""
+    client di ieri. LA CHIAMANO SOLO LE DUE PORTE UMANE — pubblica() e
+    la modifica — e mai l'import ne' la modifica firmata da Nostr, che
+    la spunta non la conoscono."""
     if consegna not in ("spedizione", "entrambe"):
         return
-    if not zone:
-        raise HTTPException(400, "Dicci dove spedisci: scrivi il costo "
-                                 "per almeno una zona — il tuo paese, "
-                                 "oppure uno dei continenti. Zero vuol "
-                                 "dire gratis; una casella vuota vuol "
-                                 "dire che lì non spedisci.")
+    if no_casa and not any(z != "dom" for z in zone):
+        raise HTTPException(400, "Se non spedisci nel tuo paese, scrivi "
+                                 "il costo per almeno una zona estera: "
+                                 "così com'è l'annuncio non si potrebbe "
+                                 "spedire da nessuna parte.")
 
 
 def guardia_venditore_digitale(tg_id: int, consegna: str,
@@ -15014,6 +15067,10 @@ CAMPI_VETRINA = (
     # al menu dei paesi del foglio d'acquisto, che spegne le zone non
     # servite invece di far scoprire la porta chiusa a cose fatte.
     "a.paese_domestico, a.spedizione_zone, "
+    # la spunta «non spedisco nel mio paese» (18 set 2026): serve alla
+    # card e alla scheda, che «Spedizione gratuita» lo dicono solo se
+    # la strada di casa e' viva, e al form che la deve ritrovare
+    "a.non_spedisce_casa, "
     "a.anche_digitale, a.condizione, a.regione, "
     # IL DOVE E IL QUANTO DELLA PRESTAZIONE, ago 2026. Erano scritti in
     # colonna dal form e non uscivano da nessuna parte: tornavano solo
@@ -15807,7 +15864,14 @@ def _where_sped_gratis(cambio: float, adesso: int):
     proprieta' dell'annuncio); il ramo della soglia no."""
     piena = ("(a.spedizione_sats=0 AND a.spedizione_eur=0"
              " AND a.spedizione_extra_sats=0 AND a.spedizione_extra_eur=0)")
-    strada = " AND a.consegna IN ('spedizione','entrambe')"
+    # (18 set 2026) LA STRADA DI CASA DEV'ESSERE APERTA, e vale per
+    # tutti e due i rami: con la spunta «non spedisco nel mio paese» le
+    # colonne di casa sono a zero PER FORZA (il filtro le leggerebbe
+    # come gratis), e la promessa del negozio vale solo a casa — dove
+    # quell'annuncio non arriva. E' il gemello di `zonaOfferta(l,'dom')`
+    # dentro `spedGratis` e `spedGratisQui` del client.
+    strada = (" AND a.consegna IN ('spedizione','entrambe')"
+              " AND a.non_spedisce_casa=0")
     if not SPED_GRATIS_ATTIVO:
         # leva spenta: resta la sola gratuita' dichiarata, che non
         # dipende da nessuna promessa di negozio
@@ -16163,7 +16227,8 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     (consegna, sped_sats, sped_eur, punto_sats, punto_eur, punto_dich,
      extra_sats, extra_eur, taglia, anche_dig,
      domestico, zone) = await consegna_da_payload(d, valuta)
-    guardia_almeno_una_zona(consegna, zone)
+    no_casa = non_spedisce_casa_da_payload(d, consegna)
+    guardia_almeno_una_zona(consegna, zone, no_casa)
     guardia_venditore_digitale(user["id"], consegna, anche_dig)
     condizione = guardia_zona_condizione(d, consegna)
     quantita = quantita_da_payload(d)
@@ -16185,6 +16250,15 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         sped_sats, sped_eur = 0, 0.0
         punto_sats, punto_eur, punto_dich = 0, 0.0, 0
         quantita = 1
+        # LE ZONE DELL'ASTA (18 set 2026), stessa regola degli altri: la
+        # casa e' aperta e gratis — la spedizione e' inclusa nel prezzo,
+        # da sempre — e nient'altro. La spunta «non spedisco a casa» e i
+        # continenti su un'asta non hanno un posto dove valere: il
+        # vincitore non passa dal foglio di acquisto, e una tariffa
+        # estera scritta li' sarebbe una promessa che nessun conto legge.
+        no_casa = 0
+        if consegna in ("spedizione", "entrambe"):
+            zone = {"dom": (0, 0.0)}
 
     # --- Moderazione, strato 1: filtro parole (gratis, istantaneo) ---
     categoria = controlla_vietato(d["titolo"], d.get("descrizione", ""))
@@ -16276,19 +16350,19 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         # le zone (set 2026): il paese di casa e la MAPPA. Due
         # colonne per otto zone e per tutte quelle che verranno —
         # vedi il commento della migrazione.
-        "paese_domestico,spedizione_zone,"
+        "paese_domestico,spedizione_zone,non_spedisce_casa,"
         "anche_digitale,condizione,quantita,quantita_max,stato,creato,"
         "asta_base_sats,asta_scadenza,asta_creato,"
         # la prestazione (ago 2026): dove e quanto dura — le due
         # colonne che per tre settimane nessuno scriveva
         "servizio_dove,durata_min) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          sotto, prezzo_sats, zona, valuta, prezzo_eur,
          lat, lon, regione, consegna, sped_sats, sped_eur,
          punto_sats, punto_eur, punto_dich,
          extra_sats, extra_eur, taglia,
-         domestico, zone_json(zone), anche_dig,
+         domestico, zone_json(zone), no_casa, anche_dig,
          # il massimo nasce uguale alla quantita': da qui in poi puo'
          # solo salire, e non scende mai coi pezzi venduti
          condizione, quantita, quantita,
@@ -17561,7 +17635,8 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     (consegna, sped_sats, sped_eur, punto_sats, punto_eur, punto_dich,
      extra_sats, extra_eur, taglia, anche_dig,
      domestico, zone) = await consegna_da_payload(d, valuta)
-    guardia_almeno_una_zona(consegna, zone)
+    no_casa = non_spedisce_casa_da_payload(d, consegna)
+    guardia_almeno_una_zona(consegna, zone, no_casa)
     guardia_venditore_digitale(user["id"], consegna, anche_dig)
     con = db()
     a = con.execute("SELECT * FROM annunci WHERE id=? AND venditore_id=? "
@@ -17705,7 +17780,7 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         "spedizione_punto_dichiarata=?, "
         "spedizione_extra_sats=?, spedizione_extra_eur=?, taglia_pacco=?, "
         # le zone, nello stesso ordine dell'INSERT di pubblica()
-        "paese_domestico=?, spedizione_zone=?, "
+        "paese_domestico=?, spedizione_zone=?, non_spedisce_casa=?, "
         "anche_digitale=?, condizione=?, quantita=?, "
         # il massimo non si assegna MAI secco: una modifica che abbassa
         # la quantita' non deve cancellare la memoria dei pezzi avuti
@@ -17716,7 +17791,7 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
          lat, lon, regione, consegna, sped_sats, sped_eur,
          punto_sats, punto_eur, punto_dich,
          extra_sats, extra_eur, taglia,
-         domestico, zone_json(zone), anche_dig,
+         domestico, zone_json(zone), no_casa, anche_dig,
          condizione, quantita, quantita,
          "revisione" if in_revisione else "attivo",
          int(time.time()),
@@ -20892,6 +20967,17 @@ def _zone_annuncio(a) -> dict:
     return fuori
 
 
+def _non_spedisce_casa(a) -> bool:
+    """La spunta letta da una riga. TOLLERANTE sulla colonna che manca
+    — una riga presa con un elenco di colonne scritto prima del 18 set,
+    un dizionario dei banchi — perche' l'assenza ha una risposta sola
+    ed e' quella di serie: la casa e' aperta."""
+    try:
+        return bool(a["non_spedisce_casa"])
+    except (KeyError, IndexError):
+        return False
+
+
 def _zona_offerta(a, zona: str) -> bool:
     """Questo annuncio spedisce in quella zona? (set 2026)
 
@@ -20906,15 +20992,24 @@ def _zona_offerta(a, zona: str) -> bool:
     «zero», che e' precisamente cio' che una colonna INTEGER non sa
     fare — ed e' la ragione della mappa.
 
-    IL DOMESTICO HA UN RIPIEGO CHE LE ALTRE NON HANNO, ed e' la riga
-    piu' importante della funzione: un annuncio scritto da chi le zone
-    non le conosce — un client di ieri, `importa_nostr.py` che scrive
-    dritto nel database, una riga messa a mano — ha la mappa VUOTA, e
-    leggerla alla lettera vorrebbe dire toglierlo dal mercato di casa,
-    cioe' spegnere il mercatino per curare l'estero. Quindi mappa
-    vuota = spedisce a casa e basta. Il venditore che svuota il
-    domestico e riempie l'Europa ottiene quel che ha chiesto, perche'
-    la sua mappa NON e' vuota.
+    LA CASA E' SEMPRE APERTA, SALVO LA SPUNTA (18 set 2026, decisione
+    di Andrea che ROVESCIA il 17), ed e' la riga piu' importante della
+    funzione. Il 17 la casa seguiva la regola delle altre — `dom` nella
+    mappa, oppure la mappa vuota del mondo di ieri — e «il venditore
+    che svuota il domestico e riempie l'Europa ottiene quel che ha
+    chiesto». In un giorno si e' visto che NON l'aveva chiesto: la
+    casella di casa vuota voleva dire «gratis», e il Motorola da 234
+    EUR non si poteva comprare dall'Italia. Adesso la mappa, per la
+    casa, NON SI GUARDA PROPRIO: a chiuderla e' solo
+    `non_spedisce_casa`, che nasce da un gesto e mai da un vuoto. La
+    tariffa resta nelle colonne di sempre (`_tariffa_dichiarata`), e
+    su una mappa senza `dom` sono a zero: gratis.
+    VALE PER I DATI GIA' SALVATI, senza toccarli: la colonna nuova
+    nasce a 0 su tutti, quindi ogni mappa senza `dom` di ieri oggi si
+    legge «casa aperta, gratis». E' il verso giusto in cui sbagliare —
+    un venditore che spedisce gratis un pacco che non voleva spedire
+    se ne accorge al primo ordine e ha la spunta; uno che non vende
+    perche' l'Italia e' chiusa non se ne accorge mai.
 
     L'ESTERO NON HA NESSUN RIPIEGO, ed e' voluto: una porta che si
     apre da sola e' peggio di una chiusa — significherebbe impegnare
@@ -20923,10 +21018,9 @@ def _zona_offerta(a, zona: str) -> bool:
     datato; questo sarebbe una regola silenziosa."""
     if a["consegna"] not in ("spedizione", "entrambe"):
         return False
-    zone = _zone_annuncio(a)
     if zona == "dom":
-        return "dom" in zone or not zone
-    return zona in zone
+        return not _non_spedisce_casa(a)
+    return zona in _zone_annuncio(a)
 
 
 def _tariffa_dichiarata(a, via: str, zona: str = "dom") -> tuple:

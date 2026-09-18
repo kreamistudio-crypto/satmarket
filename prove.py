@@ -13728,6 +13728,8 @@ def prove_zone_spedizione():
                   {"json": json_mod,
                    "ZONE_SPEDIZIONE": C["ZONE_SPEDIZIONE"]})
     offerta = reale("_zona_offerta", {"_zone_annuncio": letto,
+                                      "_non_spedisce_casa":
+                                          reale("_non_spedisce_casa"),
                                       "ZONE_SPEDIZIONE":
                                           C["ZONE_SPEDIZIONE"]})
 
@@ -13749,12 +13751,33 @@ def prove_zone_spedizione():
     prova("...e l'estero resta chiuso, che non l'ha mai promesso",
           [], [z for z in C["ZONE_SPEDIZIONE"] if z != "dom"
                and offerta(vecchio, z)])
-    # ...ma il ripiego si spegne appena qualcuno le zone le SCRIVE
+    # LA CASA E' SEMPRE APERTA (18 set 2026, ROVESCIA il 17): qui c'era
+    # «chi dichiara solo l'Europa NON spedisce a casa», ed era la riga
+    # che in un giorno ha chiuso l'Italia al Motorola da 234 EUR. La
+    # casella di casa vuota voleva dire gratis: per la casa la mappa
+    # non si guarda piu', e a chiuderla e' solo la spunta esplicita.
     solo_eu = ann(eu=2000)
-    prova("chi dichiara solo l'Europa NON spedisce a casa", False,
+    prova("chi dichiara solo l'Europa a casa spedisce LO STESSO", True,
           offerta(solo_eu, "dom"))
     prova("...e in Europa si'", True, offerta(solo_eu, "eu"))
-    prova("...e in Asia no", False, offerta(solo_eu, "asia"))
+    prova("...e in Asia no: fuori casa il vuoto resta una porta chiusa",
+          False, offerta(solo_eu, "asia"))
+    # IL 434 COM'E' SALVATO: sette continenti a zero, nessuna `dom`.
+    # Nessuno tocca il dato — cambia la lettura, e torna comprabile.
+    il_434 = ann(**{z: 0 for z in C["ZONE_SPEDIZIONE"] if z != "dom"})
+    prova("il 434 (sette zeri, nessuna casa) si compra dall'Italia", True,
+          offerta(il_434, "dom"))
+    # LA SPUNTA: l'unica cosa che chiude la casa, e chiude SOLO quella
+    chiusa = dict(solo_eu, non_spedisce_casa=1)
+    prova("la spunta «non spedisco a casa» chiude la casa", False,
+          offerta(chiusa, "dom"))
+    prova("...e lascia aperto l'estero dichiarato", True,
+          offerta(chiusa, "eu"))
+    prova("...anche se nella mappa fosse rimasta una `dom`: vince lei",
+          False, offerta(dict(ann(dom=500, eu=2000),
+                              non_spedisce_casa=1), "dom"))
+    prova("una riga SENZA la colonna (elenchi di ieri, banchi) e' aperta",
+          True, offerta(ann(eu=1), "dom"))
     # LO ZERO E' UNA PROMESSA, non un'assenza: e' la ragione della
     # mappa (una colonna INTEGER non sa distinguerli)
     gratis = ann(oceania=0)
@@ -13879,17 +13902,25 @@ def prove_zone_spedizione():
     # ---- 9) la guardia «almeno una zona» --------------------------
     guardia = reale("guardia_almeno_una_zona", {"HTTPException": _H})
 
-    def spunta(consegna, zone):
+    def spunta(consegna, zone, no_casa=0):
         try:
-            guardia(consegna, zone)
+            guardia(consegna, zone, no_casa)
             return "ok"
         except _H as e:
             return f"{e.code}"
 
-    prova("spedizione senza nessuna zona: 400 che lo dice", "400",
-          spunta("spedizione", {}))
-    prova("...basta una zona qualunque", "ok",
-          spunta("spedizione", {"africa": (0, 0.0)}))
+    # (18 set 2026) LA GUARDIA HA CAMBIATO BERSAGLIO: qui c'era
+    # «spedizione senza nessuna zona: 400». Adesso la casa vuota vuol
+    # dire GRATIS, quindi una zona c'e' sempre — e l'unico modo di non
+    # spedire da nessuna parte e' la spunta senza un continente.
+    prova("spedizione senza nessuna zona scritta: passa, e' casa gratis",
+          "ok", spunta("spedizione", {}))
+    prova("«non spedisco a casa» SENZA estero: 400 che lo dice", "400",
+          spunta("spedizione", {}, 1))
+    prova("...e nemmeno con una `dom` rimasta li' per sbaglio", "400",
+          spunta("entrambe", {"dom": (0, 0.0)}, 1))
+    prova("...con un continente, fosse anche a zero, passa", "ok",
+          spunta("spedizione", {"africa": (0, 0.0)}, 1))
     prova("il ritiro non deve dichiarare niente", "ok",
           spunta("ritiro", {}))
     prova("...e nemmeno il digitale", "ok", spunta("digitale", {}))
@@ -16535,6 +16566,8 @@ def prove_consegna_payload_punto():
     async def _cambio():
         return 100_000.0
     amb["cambio_btc_eur"] = _cambio
+    # (18 set 2026) il giudice chiede alla spunta se `dom` entra
+    exec(pezzo("non_spedisce_casa_da_payload"), amb)
     exec("async " + pezzo("consegna_da_payload"), amb)
 
     def giudica(d, valuta="sats"):
@@ -32319,9 +32352,12 @@ def prove_promesse_badge():
     # e nemmeno in ASTA (ago 2026): li' il prezzo e' una puntata in
     # corso e la spedizione e' inclusa per costruzione — trovato dal
     # vivo col filtro nuovo, che pescava un'asta sopra soglia
+    # (18 set 2026: la porta non e' piu' «spedisce» ma la STRADA DI
+    # CASA — la promessa del negozio vale solo li', e con la spunta
+    # «non spedisco nel mio paese» li' non si arriva)
     prova("in ferie e in asta non si da' nessun verdetto", True,
-          "if (!spedisce(l) || inFerie(l) || astaE(l)) return false;"
-          in _sq)
+          "if (!zonaOfferta(l, 'dom') || inFerie(l) || astaE(l)) "
+          "return false;" in _sq)
     # ...ma la gratuita' PIENA resta visibile anche in ferie: e' una
     # proprieta' dell'annuncio, non un verdetto su un acquisto
     prova("...mentre la gratuita' piena non guarda le ferie", False,
@@ -33522,7 +33558,8 @@ def prove_verde_e_filtri():
                 "valuta TEXT, consegna TEXT, spedizione_sats INT, "
                 "spedizione_eur REAL, spedizione_extra_sats INT, "
                 "spedizione_extra_eur REAL, lampo_percento INT, "
-                "lampo_scadenza INT, asta_base_sats INT, asta_scadenza INT)")
+                "lampo_scadenza INT, asta_base_sats INT, asta_scadenza INT, "
+                "non_spedisce_casa INT DEFAULT 0)")
     con.execute("CREATE TABLE utenti(tg_id INT, ferie_fino INT, "
                 "sped_gratis_soglia INT, sped_gratis_soglia_eur INT, "
                 "sped_gratis_valuta TEXT, sconto_pacco_percento INT, "
@@ -33550,9 +33587,9 @@ def prove_verde_e_filtri():
     ]
     for (i, p, sp, lp, ab, *_r) in CASI:
         con.execute("INSERT INTO annunci VALUES(?,1,?,0,'sats',"
-                    "'spedizione',?,0,0,0,?,?,?,?)",
+                    "'spedizione',?,0,0,0,?,?,?,?,?)",
                     (i, p, sp, lp, ORA + 999 if lp else 0, ab,
-                     ORA + 999 if ab else 0))
+                     ORA + 999 if ab else 0, 0))
     ATT = {c[0]: {"lampo": c[5], "asta": c[6], "sconto": c[7],
                   "gratis": c[8]} for c in CASI}
 
@@ -33611,9 +33648,22 @@ def prove_verde_e_filtri():
     con.execute("INSERT INTO utenti VALUES(2,0,0,0,'eur',"
                 "15,'entrambi',45000,0,'sats')")
     con.execute("INSERT INTO annunci VALUES(7,2,60000,0,'sats',"
-                "'spedizione',1500,0,0,0,0,0,0,0)")
+                "'spedizione',1500,0,0,0,0,0,0,0,0)")
     prova("il filtro pesca anche chi ha TUTTI E DUE i criteri", True,
           7 in _chiedi(0, 0, 1, 0))
+    # LA SPUNTA «non spedisco a casa» (18 set 2026), seminata in fondo
+    # per la stessa ragione: tariffa a zero PER FORZA e prezzo sopra la
+    # soglia del negozio 1 — cioe' «gratis» per TUTTI E DUE i rami, se
+    # non fosse che da casa non si compra. Lo sconto invece resta: e'
+    # sugli articoli, vale su ogni strada.
+    con.execute("INSERT INTO annunci VALUES(8,1,60000,0,'sats',"
+                "'spedizione',0,0,0,0,0,0,0,0,1)")
+    prova("casa chiusa dalla spunta: NON e' spedizione gratis", False,
+          8 in _chiedi(0, 0, 0, 1))
+    prova("...mentre il gemello senza spunta (il 3) lo e'", True,
+          3 in _chiedi(0, 0, 0, 1))
+    prova("...e lo sconto sugli articoli gli resta", True,
+          8 in _chiedi(0, 0, 1, 0))
     con.close()
     # LA STRUTTURA, perche' il giorno che qualcuno rimette l'AND lo
     # dica anche una sentinella e non solo i numeri qui sopra
@@ -37823,11 +37873,13 @@ def prove_cassa_strada_chiusa():
     prova("«Paga» ha la cintura sotto il bottone spento", True,
           "if (!stC.viaOk){ toast(stC.chiuso); return; }" in cta)
 
-    # 4) IL MODULO: la casella di casa vuota non si traveste da zero
-    prova("la casella di casa vuota dice «non spedisco»", True,
+    # 4) IL MODULO (riscritta la sera stessa: la decisione del 18 ha
+    # ROVESCIATO la regola — casa vuota vuol dire GRATIS — e questa
+    # prova, che la mattina esigeva «non spedisco», ora esige il
+    # contrario. Lo «0» nudo resta vietato: era la trappola.)
+    prova("la casella di casa vuota dice «0 = gratis»", True,
           'id="sellSped" type="number" inputmode="numeric" '
-          'placeholder="non spedisco"' in mini
-          and "inp.placeholder = 'non spedisco';" in nudo
+          'placeholder="0 = gratis"' in mini
           and "inp.placeholder = inEur ? '0,00' : '0';" not in nudo)
 
     import json as _jsC, shutil as _shC, subprocess as _spC
@@ -38016,63 +38068,310 @@ def prove_cassa_strada_chiusa():
                       oa.get("asta", {}).get("spedizione_sats")])
     prova("...e non promette l'estero con un numero rimasto nascosto",
           {}, oa.get("asta", {}).get("spedizione_zone"))
-    prova("fuori dall'asta la casa VUOTA resta non dichiarata",
-          [False, {"eu": {"sats": 9000}}],
-          ["spedizione_sats" in oa.get("casaVuota", {}),
+    # (riscritta la sera del 18: «la casa VUOTA resta non dichiarata»
+    # era la regola del 17; adesso vuota e zero dicono la stessa cosa)
+    prova("fuori dall'asta la casa VUOTA parte a zero: gratis",
+          [0, 0, {"eu": {"sats": 9000}}],
+          [oa.get("casaVuota", {}).get("spedizione_sats"),
+           oa.get("casaVuota", {}).get("non_spedisco_casa"),
            oa.get("casaVuota", {}).get("spedizione_zone")])
+    prova("...e l'asta non porta mai la spunta", 0,
+          oa.get("asta", {}).get("non_spedisco_casa"))
     prova("...e lo zero scritto resta «gratis», dichiarato",
           [True, 0], ["spedizione_sats" in oa.get("casaZero", {}),
                       oa.get("casaZero", {}).get("spedizione_sats")])
 
-    # 6) L'AVVISO DELLA CASELLA DI CASA VUOTA, fatto girare (la tortura
-    # l'ha trovato scoperto): casa vuota con l'estero pieno e' la
-    # strada che ha chiuso l'Italia al Motorola, e si dice PRIMA.
-    _progH = (
+
+def prove_casa_vuota_gratis():
+    """CASA VUOTA VUOL DIRE GRATIS (18 set 2026, decisione di Andrea che
+    ROVESCIA il 17).
+
+    Il 17 la casa seguiva la regola dei continenti — la PRESENZA della
+    chiave e' la dichiarazione — e una casella di casa lasciata vuota
+    voleva dire «li' non spedisco». In un giorno ha chiuso l'Italia a
+    un annuncio vero (il 434, sette continenti a zero e nessuna casa).
+    Adesso: a casa vuoto o zero = gratis, e chi non spedisce nel suo
+    paese lo DICE con una spunta (`non_spedisce_casa`), spenta di
+    serie e in pagina solo con un continente pieno. I DATI NON SI
+    TOCCANO: cambia la lettura, e le mappe senza `dom` gia' salvate
+    tornano comprabili da casa."""
+    print("\n[casa vuota vuol dire gratis]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    srv = open("server.py", encoding="utf-8").read()
+
+    # ---- 1) la spunta dal payload: nasce solo da un gesto ----------
+    spunta = reale("non_spedisce_casa_da_payload")
+    prova("chiave assente: la casa e' aperta (i client di ieri)", 0,
+          spunta({}, "spedizione"))
+    for v in (0, "", None, "0", "no", False):
+        prova(f"valore {v!r}: aperta", 0,
+              spunta({"non_spedisco_casa": v}, "spedizione"))
+    for v in (1, True, "1"):
+        prova(f"valore {v!r}: chiusa", 1,
+              spunta({"non_spedisco_casa": v}, "entrambe"))
+    prova("senza spedizione la spunta non vuol dire niente", 0,
+          spunta({"non_spedisco_casa": 1}, "ritiro"))
+
+    # ---- 2) il giudice dei campi: `dom` entra SEMPRE, salvo la spunta
+    import asyncio as _asC
+    amb = {"MODALITA_CONSEGNA": ("spedizione", "ritiro", "entrambe",
+                                 "digitale"),
+           "TAGLIE_PACCO": ("busta", "piccolo"), "SERVIZI_ATTIVI": False,
+           "ZONE_SPEDIZIONE": CATALOGHI_ZONE["ZONE_SPEDIZIONE"],
+           "nome_paese": CATALOGHI_ZONE["nome_paese"]}
+
+    async def _cambio():
+        return 100_000.0
+    amb["cambio_btc_eur"] = _cambio
+    exec(pezzo("non_spedisce_casa_da_payload"), amb)
+    exec("async " + pezzo("consegna_da_payload"), amb)
+
+    def giudica(d, valuta="sats"):
+        t = _asC.new_event_loop().run_until_complete(
+            amb["consegna_da_payload"](d, valuta))
+        return {"sats": t[1], "eur": t[2], "zone": t[11]}
+
+    g = giudica({"consegna": "spedizione"})
+    prova("nessuna chiave di casa: `dom` a zero, cioe' GRATIS",
+          {"dom": (0, 0.0)}, g["zone"])
+    g = giudica({"consegna": "spedizione", "spedizione_sats": ""})
+    prova("casella vuota: `dom` a zero lo stesso", {"dom": (0, 0.0)},
+          g["zone"])
+    g = giudica({"consegna": "spedizione", "spedizione_sats": "700",
+                 "spedizione_zone": {"eu": {"sats": 9000}}})
+    prova("casa e un continente: tutti e due, coi loro prezzi",
+          {"dom": (700, 0.0), "eu": (9000, 0.0)}, g["zone"])
+    g = giudica({"consegna": "spedizione", "non_spedisco_casa": 1,
+                 "spedizione_sats": "700",
+                 "spedizione_zone": {"eu": {"sats": 9000}}})
+    prova("con la spunta `dom` resta fuori dalla mappa",
+          {"eu": (9000, 0.0)}, g["zone"])
+    prova("...e le colonne di casa vanno a zero, anche se un costo c'era",
+          (0, 0.0), (g["sats"], g["eur"]))
+    # FUORI CASA IL VUOTO RESTA UNA PORTA CHIUSA (punto 5 del giro): il
+    # form la chiave vuota non la manda, e se arrivasse da altrove non
+    # deve diventare uno zero — cioe' «gratis in Asia» mai scritto
+    g = giudica({"consegna": "spedizione", "spedizione_zone": {
+        "asia": {"sats": ""}, "africa": {"eur": None}, "oceania": {},
+        "eu": {"sats": "0"}}})
+    prova("zona estera con valore vuoto: NON offerta; lo zero scritto si'",
+          {"dom": (0, 0.0), "eu": (0, 0.0)}, g["zone"])
+
+    # ---- 3) i dati: colonna nuova, nessun travaso ------------------
+    _mig = srv[srv.index("def init_db("):]
+    _mig = _mig[:_mig.index("\ndef ", 10)]
+    prova("la colonna nasce a 0, accanto alla sentinella delle zone",
+          True, '"non_spedisce_casa INTEGER DEFAULT 0")' in _mig)
+    prova("...e NESSUN UPDATE la tocca: cambia la lettura, non i dati",
+          False, "SET non_spedisce_casa" in _mig)
+    prova("la vetrina porta la spunta al client", True,
+          '"a.non_spedisce_casa, "' in srv)
+    for nome in ("pubblica", "modifica_annuncio"):
+        _p = srv[srv.index(f"async def {nome}("):]
+        _p = _p[:_p.index("\n@app.", 10)]
+        prova(f"{nome} legge la spunta e la passa alla guardia", True,
+              "no_casa = non_spedisce_casa_da_payload(d, consegna)" in _p
+              and "guardia_almeno_una_zona(consegna, zone, no_casa)" in _p)
+        prova(f"...e la scrive in colonna", True,
+              "zone_json(zone), no_casa, anche_dig," in _p)
+    _pb = srv[srv.index("async def pubblica("):]
+    _pb = _pb[:_pb.index("\n@app.", 10)]
+    prova("l'asta con spedizione: casa aperta a zero, e nient'altro",
+          True, 'zone = {"dom": (0, 0.0)}' in _pb
+          and "no_casa = 0" in _pb)
+    _ws = pezzo("_where_sped_gratis")
+    prova("il filtro «spedizione gratis» vuole la strada di casa aperta",
+          True, '" AND a.non_spedisce_casa=0")' in _ws)
+
+    # ---- 4) il client, fatto girare ---------------------------------
+    import json as _jsV, shutil as _shV, subprocess as _spV
+    import tempfile as _tfV
+    if not _shV.which("node"):
+        salta("casa vuota vuol dire gratis, in node", "node non installato")
+        return
+
+    def _node(prog, nome):
+        with _tfV.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+            f.write(prog)
+            p = f.name
+        try:
+            r = _spV.run(["node", p], capture_output=True, text=True,
+                         encoding="utf-8", timeout=60)
+        finally:
+            os.unlink(p)
+        if r.returncode != 0:
+            prova(nome + " gira in node", "", r.stderr[-300:])
+            return None
+        return _jsV.loads(r.stdout)
+
+    _pz = lambda f: pezzo_js(mini, f, "\n}\n") + "\n}\n"
+    _sg = mini[mini.index("const spedGratis = l =>"):]
+    _sg = _sg[:_sg.index(";") + 1]
+    # ...e `spedisce`, quello VERO: la tortura ha mostrato che senza di
+    # lui un `spedGratis` tornato a chiedere «spedisce(l)» faceva
+    # ESPLODERE il banco invece di rispondere il falso — una morte per
+    # la ragione sbagliata, che e' una prova che non prova
+    _sp = mini[mini.index("const spedisce = l =>"):]
+    _sg = _sp[:_sp.index(";") + 1] + "\n" + _sg
+    o = _node(
+        "const EMOJI_CAT = {};\n"
+        "function fotoUrl(n){ return n; }\nfunction fotoMini(n){ return n; }\n"
+        + _pz("function mapListing(") + _pz("function zonaOfferta(")
+        + _sg + "\n"
+        "const Z7 = JSON.stringify(Object.fromEntries(['eu','asia',"
+        "'nordamerica','sudamerica','oceania','africa','medioriente']"
+        ".map(z => [z, {sats:0, eur:0}])));\n"
+        "const casi = {\n"
+        # il 434 COM'E' in produzione: sette zeri, nessuna casa
+        "  il434: {id:434, consegna:'spedizione', spedizione_zone: Z7},\n"
+        "  spunta: {id:2, consegna:'spedizione', non_spedisce_casa:1,"
+        " spedizione_zone:'{\"eu\":{\"sats\":9000,\"eur\":0}}'},\n"
+        "  ieri: {id:3, consegna:'entrambe', spedizione_sats:700},\n"
+        "  ritiro: {id:4, consegna:'ritiro'},\n"
+        "};\n"
+        "const out = {};\n"
+        "for (const k in casi){\n"
+        "  try { const l = mapListing(casi[k]);\n"
+        "    out[k] = {casa: zonaOfferta(l,'dom'), eu: zonaOfferta(l,'eu'),"
+        " asia: zonaOfferta(l,'asia'), gratis: spedGratis(l),"
+        " flag: l.noSpedCasa}; }\n"
+        "  catch(e){ out[k] = {esploso: String(e)}; }\n"
+        "}\n"
+        "console.log(JSON.stringify(out));\n", "la porta di casa")
+    if o is not None:
+        for k in ("il434", "spunta", "ieri", "ritiro"):
+            prova(f"il caso «{k}» non esplode", None,
+                  (o.get(k) or {"esploso": "manca"}).get("esploso"))
+        prova("il 434: casa aperta, e «Spedizione gratuita» e' VERA",
+              [True, True, True], [o.get("il434", {}).get("casa"),
+                                   o.get("il434", {}).get("gratis"),
+                                   o.get("il434", {}).get("eu")])
+        prova("con la spunta: casa chiusa, estero aperto, e la card NON"
+              " dice gratuita", [False, True, False, False, True],
+              [o.get("spunta", {}).get("casa"), o.get("spunta", {}).get("eu"),
+               o.get("spunta", {}).get("asia"),
+               o.get("spunta", {}).get("gratis"),
+               o.get("spunta", {}).get("flag")])
+        prova("un annuncio di ieri: casa aperta al suo prezzo, non gratis",
+              [True, False, False], [o.get("ieri", {}).get("casa"),
+                                     o.get("ieri", {}).get("eu"),
+                                     o.get("ieri", {}).get("gratis")])
+        prova("chi non spedisce non ha nessuna casa da aprire",
+              [False, False], [o.get("ritiro", {}).get("casa"),
+                               o.get("ritiro", {}).get("gratis")])
+
+    # ---- 5) il modulo: la spunta, fatta girare ----------------------
+    _form = (
         "const ZONE_INTL = ['eu', 'asia'];\n"
         "const DOM_DEFAULT = 'IT';\n"
         "let sellValuta = 'sats', spedValuta = 'sats', cambioVivo = false;\n"
-        "const nomePaese = c => ({IT: 'Italia'})[c] || '';\n"
-        "const eurCampo = () => 0, fmt = String, fmtEur = String;\n"
+        "const nomePaese = c => ({IT: 'Italia', ES: 'Spagna'})[c] || '';\n"
+        "const eurCampo = id => parseFloat((NODI[id]||{}).value) || 0;\n"
+        "const fmt = String, fmtEur = String;\n"
         "const aggiornaSupplHint = () => {};\n"
+        "let ASTA = false; const astaAccesa = () => ASTA;\n"
+        "const consegnaForm = () => ({consegna: 'spedizione',"
+        " anche_digitale: 0, servizio_dove: '', durata_min: 0});\n"
         "let NODI = {};\n"
         "const el = id => NODI[id] || null;\n"
-        + pezzo_js(mini, "function aggiornaSpedHint(){", "\n}\n") + "\n}\n"
+        + _pz("function aggiornaSpedHint(){")
+        + _pz("function consegnaPayload(){") +
         "const out = {};\n"
-        "const giro = (nome, casa, eu) => {\n"
+        "const giro = (nome, casa, eu, spunta, paese, opz) => {\n"
         "  try {\n"
+        "    ASTA = !!(opz && opz.asta);\n"
         "    NODI = {sellSpedHint: {textContent: ''},"
-        " sellPaeseDom: {value: 'IT'}, sellSpedDomNome: {},"
+        " sellPaeseDom: {value: paese || 'IT'}, sellSpedDomNome: {},"
         " sellIntlConto: {}, sellConsSped: {checked: true},"
-        " sellSped: {value: casa}, sellZona_eu: {value: eu},"
-        " sellZona_asia: {value: ''}};\n"
-        "    aggiornaSpedHint();\n"
-        "    out[nome] = NODI.sellSpedHint.textContent;\n"
-        "  } catch(e){ out[nome] = 'ESPLOSO ' + e; }\n"
+        " sellTaglia: {value: ''}, sellSpedPunto: {value: ''},"
+        " sellSpedExtra: {value: ''},"
+        " sellSped: {value: casa, placeholder: '', disabled: false},"
+        " sellZona_eu: {value: eu}, sellZona_asia: {value: ''},"
+        " sellNoCasaRiga: {style: {display: 'none'}},"
+        " sellNoCasa: {checked: spunta}, sellNoCasaNome: {}};\n"
+        "    if (!(opz && opz.senzaHint)) aggiornaSpedHint();\n"
+        "    out[nome] = {riga: NODI.sellNoCasaRiga.style.display,"
+        " accesa: NODI.sellNoCasa.checked, nome: NODI.sellNoCasaNome"
+        ".textContent, casa: NODI.sellSped.value, spenta: NODI.sellSped"
+        ".disabled, segnaposto: NODI.sellSped.placeholder,"
+        " hint: NODI.sellSpedHint.textContent, p: consegnaPayload()};\n"
+        "  } catch(e){ out[nome] = {esploso: String(e)}; }\n"
         "};\n"
-        "giro('vuotaConEstero', '', '9000');\n"
-        "giro('zeroConEstero', '0', '9000');\n"
-        "giro('vuotaSenzaEstero', '', '');\n"
+        "giro('vuota', '', '', false);\n"
+        "giro('vuotaConEstero', '', '9000', false);\n"
+        "giro('spuntata', '700', '9000', true, 'ES');\n"
+        # la spunta rimasta accesa e l'estero svuotato: si spegne da se'
+        "giro('spuntaOrfana', '', '', true);\n"
+        # LA CINTURA DEL PAYLOAD, da sola: senza che aggiornaSpedHint
+        # abbia spento niente, una spunta senza estero non parte
+        "giro('cintura', '', '', true, 'IT', {senzaHint: true});\n"
+        # e in ASTA la spunta non vale, nemmeno accesa con l'estero pieno
+        "giro('astaSpuntata', '', '9000', true, 'IT',"
+        " {asta: true, senzaHint: true});\n"
         "console.log(JSON.stringify(out));\n")
-    with _tfC.NamedTemporaryFile("w", suffix=".js", delete=False,
-                                 encoding="utf-8") as f:
-        f.write(_progH)
-        p = f.name
-    try:
-        r = _spC.run(["node", p], capture_output=True, text=True,
-                     encoding="utf-8", timeout=60)
-    finally:
-        os.unlink(p)
-    if r.returncode != 0:
-        prova("aggiornaSpedHint gira in node", "", r.stderr[-300:])
+    f = _node(_form, "il modulo della spedizione")
+    if f is None:
         return
-    oh = _jsC.loads(r.stdout)
-    prova("casa vuota e l'estero pieno: il modulo lo dice, col rimedio",
-          "⚠️ Casella «Italia» vuota: lì NON spedisci. Se è gratis, "
-          "scrivi 0.", oh.get("vuotaConEstero"))
-    prova("...con lo zero scritto l'avviso tace", False,
-          "⚠️" in (oh.get("zeroConEstero") or "⚠️"))
-    prova("...e senza estero pure: li' parla la guardia del server",
-          False, "⚠️" in (oh.get("vuotaSenzaEstero") or "⚠️"))
+    for k in ("vuota", "vuotaConEstero", "spuntata", "spuntaOrfana"):
+        prova(f"il modulo «{k}» non esplode", None,
+              (f.get(k) or {"esploso": "manca"}).get("esploso"))
+    v = f.get("vuota", {})
+    prova("casa vuota: «0 = gratis», nessuna spunta in vista, nessun"
+          " avviso", ["0 = gratis", "none", False],
+          [v.get("segnaposto"), v.get("riga"), "⚠️" in (v.get("hint") or "")])
+    prova("...e parte a zero: gratis, con la spunta spenta", [0, 0, {}],
+          [v.get("p", {}).get("spedizione_sats"),
+           v.get("p", {}).get("non_spedisco_casa"),
+           v.get("p", {}).get("spedizione_zone")])
+    e = f.get("vuotaConEstero", {})
+    prova("con un continente pieno la spunta COMPARE, spenta",
+          ["", False, "Italia"],
+          [e.get("riga"), e.get("accesa"), e.get("nome")])
+    prova("...e la casa vuota resta gratis: NIENTE avviso «non spedisci»",
+          [0, False], [e.get("p", {}).get("spedizione_sats"),
+                       "NON spedisci" in (e.get("hint") or "")])
+    sp = f.get("spuntata", {})
+    prova("spuntata: la casa si svuota, si spegne e lo dice",
+          ["", True, "non spedisco", "Spagna"],
+          [sp.get("casa"), sp.get("spenta"), sp.get("segnaposto"),
+           sp.get("nome")])
+    prova("...il testo sotto dice dove si compra", True,
+          "In Spagna non spedisci" in (sp.get("hint") or ""))
+    prova("...e il payload porta la spunta e NESSUN costo di casa",
+          [1, False, False, {"eu": {"sats": 9000}}],
+          [sp.get("p", {}).get("non_spedisco_casa"),
+           "spedizione_sats" in sp.get("p", {}),
+           "spedizione_eur" in sp.get("p", {}),
+           sp.get("p", {}).get("spedizione_zone")])
+    orf = f.get("spuntaOrfana", {})
+    prova("la spunta senza estero si spegne da se', e la casa torna gratis",
+          ["none", False, False, 0, 0],
+          [orf.get("riga"), orf.get("accesa"), orf.get("spenta"),
+           orf.get("p", {}).get("non_spedisco_casa"),
+           orf.get("p", {}).get("spedizione_sats")])
+    ci = f.get("cintura", {})
+    prova("la cintura del payload: spunta senza estero non parte", [0, 0],
+          [ci.get("p", {}).get("non_spedisco_casa"),
+           ci.get("p", {}).get("spedizione_sats")])
+    asp = f.get("astaSpuntata", {})
+    prova("in asta la spunta non vale: casa a zero, e nessun continente",
+          [0, 0, {}], [asp.get("p", {}).get("non_spedisco_casa"),
+                       asp.get("p", {}).get("spedizione_sats"),
+                       asp.get("p", {}).get("spedizione_zone")])
+    # la precompilazione ritrova la spunta PRIMA di tirarne le somme
+    rf = _senza_commenti_js(pezzo_js(mini, "function riempiFormDa(",
+                                     "\n}\n"))
+    prova("la modifica ritrova la spunta, prima di aggiornaSpedCampo",
+          True, "el('sellNoCasa').checked = _spedisce && !!l.noSpedCasa;"
+          in rf and rf.index("el('sellNoCasa').checked")
+          < rf.index("aggiornaSpedCampo();"))
+    prova("...e il reset del form la spegne", True,
+          "if (el('sellNoCasa')) el('sellNoCasa').checked = false;"
+          in pezzo_js(mini, "function svuotaZoneIntl(", "\n}\n"))
+    prova("la spunta sta FUORI dal cassetto internazionale", True,
+          mini.index('id="sellNoCasaRiga"') > mini.index("</details>",
+              mini.index('id="sellIntl"')))
 
 
 def prove_condivisione_venditore():
@@ -70279,6 +70578,7 @@ def main():
               prove_condivisione_venditore,
               prove_zona_comune_in_modifica,
               prove_cassa_strada_chiusa,
+              prove_casa_vuota_gratis,
               prove_script_nel_workflow, prove_deploy,
               prove_guardiano_ponte,
               prove_bussola, prove_tetto_claude_md,

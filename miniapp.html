@@ -8398,14 +8398,22 @@ document.getElementById('cartello')?.remove();</script>
         <div class="sped-zona"><span class="sped-zona-nome">Paese di casa</span>
           <select id="sellPaeseDom" class="sped-paese" onchange="aggiornaSpedHint()"></select></div>
         <div class="sped-zona"><span class="sped-zona-nome" id="sellSpedDomNome">Italia</span>
-          <div class="sats-input"><input id="sellSped" type="number" inputmode="numeric" placeholder="non spedisco" oninput="aggiornaSpedHint()"><button type="button" class="suffix" id="sellSpedCur" onclick="toggleSpedCur()" title="Scegli come scrivere il costo">sats ⇄</button></div></div>
+          <div class="sats-input"><input id="sellSped" type="number" inputmode="numeric" placeholder="0 = gratis" oninput="aggiornaSpedHint()"><button type="button" class="suffix" id="sellSpedCur" onclick="toggleSpedCur()" title="Scegli come scrivere il costo">sats ⇄</button></div></div>
         <details class="sped-intl" id="sellIntl">
           <summary>🌍 Spedizione internazionale <span class="sped-intl-conto" id="sellIntlConto"></span></summary>
           <div id="sellZoneCampi"></div>
           <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Dogana ed eventuale IVA sono a carico di chi riceve: non le incassi tu e non le anticipa Barattolo.</div>
         </details>
+        <!-- LA SPUNTA ESPLICITA (18 set 2026, decisione di Andrea che
+             rovescia il 17): la casa vuota vuol dire GRATIS, e chi
+             davvero non spedisce nel suo paese lo DICE qui. Spenta di
+             serie, e in pagina solo con almeno una zona estera piena:
+             senza, «non spedisco a casa» vorrebbe dire «non spedisco»,
+             e per quello c'e' gia' la casella Spedizione. Sta FUORI
+             dal cassetto: chiuso, nasconderebbe una porta sbarrata. -->
+        <label class="cons-riga" id="sellNoCasaRiga" style="display:none"><input type="checkbox" id="sellNoCasa" onchange="aggiornaSpedHint()"> <span>Non spedisco in <span id="sellNoCasaNome">Italia</span></span></label>
         <div id="sellSpedHint" style="margin-top:6px;font-size:12px;color:var(--sats-text);font-weight:700;line-height:1.4"></div>
-        <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Lo paga chi compra, tu lo incassi per intero. <b>0&nbsp;= gratis</b> in quella zona; <b>casella vuota&nbsp;= lì non spedisci</b>. San Marino e Città del Vaticano contano come Italia.</div>
+        <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Lo paga chi compra, tu lo incassi per intero. Nel tuo paese <b>vuoto o 0&nbsp;= gratis</b>. Nelle zone estere <b>0&nbsp;= gratis</b> e <b>casella vuota&nbsp;= lì non spedisci</b>. San Marino e Città del Vaticano contano come Italia.</div>
         <div id="sellSpedGratisHint" style="display:none;margin-top:6px;font-size:12px;color:var(--sats-text);font-weight:700;line-height:1.4"></div></div>
       <!-- Il SECONDO costo (ago 2026, pagina d'acquisto): la tariffa
            verso un punto di ritiro. Facoltativo, stessa valuta del
@@ -10105,6 +10113,7 @@ function svuotaZoneIntl(){
                            if (i) i.value = ''; });
   if (el('sellPaeseDom')) el('sellPaeseDom').value = DOM_DEFAULT;
   if (el('sellIntl')) el('sellIntl').open = false;
+  if (el('sellNoCasa')) el('sellNoCasa').checked = false;
 }
 
 /* Le taglie del pacco (lug 2026): gemello client di TAGLIE_PACCO del
@@ -10313,6 +10322,9 @@ function mapListing(a){
        giorno la mappa ha coperto il comune, e il campo Zona della
        modifica mostrava «[object Object]». */
     paeseDom:a.paese_domestico||'',
+    /* la spunta «non spedisco nel mio paese» (18 set 2026): l'unica
+       cosa che chiude la strada di casa — vedi zonaOfferta */
+    noSpedCasa:!!a.non_spedisce_casa,
     zoneSped:(()=>{ try {
         const m = JSON.parse(a.spedizione_zone||'{}');
         return (m && typeof m === 'object') ? m : {};
@@ -15288,16 +15300,19 @@ scriviDurate();
    al cambio vivo — il valore vero si fissa alla creazione
    dell'ordine. spedEur vuoto = sats fissi. */
 /* QUESTO ANNUNCIO SPEDISCE IN QUELLA ZONA? Gemello client di
-   `_zona_offerta`, ripiego del domestico compreso: un annuncio che le
-   zone non le ha mai viste (i client di ieri, gli importati da
-   Nostr) ha la mappa VUOTA, e leggerla alla lettera lo toglierebbe
-   dal mercato di casa. Quindi la mappa vuota vale «spedisce a casa
-   e basta». */
+   `_zona_offerta`.
+   LA CASA E' SEMPRE APERTA, SALVO LA SPUNTA (18 set 2026, decisione di
+   Andrea che ROVESCIA il 17): per la casa la mappa non si guarda
+   proprio — vuota, piena, con o senza `dom` — perche' una casella di
+   casa lasciata vuota voleva dire «gratis» e per un giorno ha voluto
+   dire «non spedisco» (il Motorola da 234 EUR, sette continenti a
+   zero e l'Italia chiusa). A chiuderla e' solo `noSpedCasa`, che
+   nasce da un gesto. Per i continenti resta la PRESENZA: la chiave
+   c'e' = spedisco li', non c'e' = li' non spedisco. */
 function zonaOfferta(l, z){
   if (l.consegna !== 'spedizione' && l.consegna !== 'entrambe') return false;
-  const m = l.zoneSped || {};
-  if (z === 'dom') return ('dom' in m) || !Object.keys(m).length;
-  return z in m;
+  if (z === 'dom') return !l.noSpedCasa;
+  return z in (l.zoneSped || {});
 }
 /* La tariffa di una zona, nella sua valuta nativa: gemella di
    `_tariffa_dichiarata` sul solo ramo della zona (la via punto la
@@ -15611,7 +15626,12 @@ const spedisce = l => l.consegna==='spedizione' || l.consegna==='entrambe';
    due condizioni la card avrebbe scritto «🚚 gratis» su un annuncio
    dove due pezzi si pagano. Fail-closed: non si promette una
    gratuita' che regge solo per un pezzo. */
-const spedGratis = l => spedisce(l) && !(l.sped > 0) && !(l.spedEur > 0)
+/* ...E LA STRADA DI CASA DEV'ESSERE VIVA (18 set 2026): con la spunta
+   «non spedisco nel mio paese» le tariffe di casa sono a zero PER
+   FORZA, e senza `zonaOfferta` la card direbbe «gratuita» di una
+   spedizione che da qui non si puo' comprare. */
+const spedGratis = l => zonaOfferta(l, 'dom')
+  && !(l.sped > 0) && !(l.spedEur > 0)
   && !(l.spedExtra > 0) && !(l.spedExtraEur > 0);
 /* Il badge della spedizione accanto al prezzo (lug 2026, stile
    Subito.it): dice SE si spedisce, e quando la spedizione e' GRATUITA
@@ -15712,7 +15732,9 @@ function testoSpedBadge(l){
    vivo col filtro nuovo, che pescava un'asta il cui prezzo di base
    superava la soglia. */
 function spedGratisQui(l, qta){
-  if (!spedisce(l) || inFerie(l) || astaE(l)) return false;
+  /* la promessa del negozio vale SOLO a casa (vedi `_sped_gratis`):
+     a casa chiusa non c'e' niente da promettere */
+  if (!zonaOfferta(l, 'dom') || inFerie(l) || astaE(l)) return false;
   const r = regolaSpedGratis(l.spedGratisSats, l.spedGratisEur,
                              l.spedGratisValuta);
   if (!r) return false;
@@ -33500,11 +33522,8 @@ function aggiornaSpedCampo(){
   btn.style.pointerEvents = sellValuta==='sats' ? '' : 'none';
   inp.step = inEur ? '0.01' : '1';
   inp.inputMode = inEur ? 'decimal' : 'numeric';
-  /* VUOTA = «LI' NON SPEDISCO», anche a CASA (18 set 2026): qui c'era
-     uno «0» grigio, che si legge come uno zero gia' scritto — cioe'
-     «gratis» — mentre il server lo legge per quel che e', una casella
-     vuota. Le sette sorelle dei continenti lo dicevano gia'. */
-  inp.placeholder = 'non spedisco';
+  /* (il segnaposto lo scrive aggiornaSpedHint, qui sotto: dipende
+     dalla spunta «non spedisco», e due scrittori si pesterebbero) */
   /* il campo punto e il supplemento SEGUONO il toggle del campo casa
      (un interruttore solo, mai semantiche diverse per i tre costi) */
   [...ZONE_INTL.map(z => ['sellZona_' + z, 'sellZonaCur_' + z]),
@@ -33544,13 +33563,29 @@ function aggiornaSpedHint(){
   } else if (sellValuta==='sats' && el('sellConsSped')?.checked){
     h.textContent = 'Costo fisso in sats, qualunque cosa faccia il cambio';
   } else h.textContent = '';
-  /* CASA VUOTA E L'ESTERO PIENO: e' una scelta legittima (la mappa la
-     sa dire) ma quasi sempre una svista, e costa il mercato di casa.
-     Si dice prima, con le parole che servono a rimediare. */
-  if (el('sellConsSped')?.checked && accese
-      && String(el('sellSped')?.value ?? '').trim() === '')
-    h.textContent = `⚠️ Casella «${nomePaese(dom) || 'Casa'}» vuota: `
-      + 'lì NON spedisci. Se è gratis, scrivi 0.';
+  /* LA SPUNTA «NON SPEDISCO IN <CASA>» (18 set 2026, sera — rovescia
+     la cura di stamattina, che AVVISAVA «casella vuota: li' non
+     spedisci»: la casella vuota adesso vuol dire GRATIS, e un avviso
+     sarebbe una bugia). La riga c'e' solo con un continente pieno;
+     sparendo si SPEGNE, o resterebbe accesa di nascosto — e il server
+     a una spunta senza estero risponde 400. Accesa, la casella di
+     casa si svuota e si spegne: un costo scritto accanto a «non
+     spedisco» non lo paga nessuno. */
+  const rigaNC = el('sellNoCasaRiga'), boxNC = el('sellNoCasa');
+  if (rigaNC) rigaNC.style.display = accese ? '' : 'none';
+  if (boxNC && !accese) boxNC.checked = false;
+  if (el('sellNoCasaNome'))
+    el('sellNoCasaNome').textContent = nomePaese(dom) || 'casa';
+  const casaChiusa = !!(boxNC && boxNC.checked);
+  const inpCasa = el('sellSped');
+  if (inpCasa){
+    inpCasa.disabled = casaChiusa;
+    if (casaChiusa) inpCasa.value = '';
+    inpCasa.placeholder = casaChiusa ? 'non spedisco' : '0 = gratis';
+  }
+  if (casaChiusa)
+    h.textContent = `In ${nomePaese(dom) || 'casa'} non spedisci: `
+      + 'si compra solo dalle zone estere che hai compilato.';
   aggiornaSupplHint();
 }
 /* Il conto ad alta voce del supplemento, sotto il suo campo: e' la
@@ -33961,14 +33996,11 @@ function consegnaPayload(){
   const out = {consegna, taglia_pacco:el('sellTaglia').value};
   if (anche_digitale) out.anche_digitale = 1;
   if (consegna==='spedizione' || consegna==='entrambe'){
-    /* LE ZONE (set 2026): VUOTO ≠ ZERO anche per il paese di CASA,
-       ed e' il rovescio di come funzionava fino a ieri — la chiave
-       si manda solo se la casella e' PIENA, perche' la sua presenza
-       E' la dichiarazione «li' spedisco». Un ||0 su un campo vuoto
-       direbbe al server «spedisco gratis», che e' il contrario.
-       Il client vecchio in cache manda sempre la chiave di casa
-       (fosse anche a zero) e resta dichiarato senza saperlo: e'
-       esattamente il mondo di ieri, e va tenuto. */
+    /* LE ZONE: per i CONTINENTI vuoto ≠ zero (la chiave si manda solo
+       a casella PIENA: la presenza E' la dichiarazione «li' spedisco»).
+       PER LA CASA NO, e dal 18 set 2026 e' una decisione: vuoto e zero
+       dicono la stessa cosa, GRATIS — il 17 valeva il contrario, e una
+       casella di casa saltata chiudeva l'Italia a un annuncio vero. */
     const inEur = (sellValuta==='eur' || spedValuta==='eur');
     /* IL PREZZO DI CASA nelle chiavi di sempre: le legge tutta l'app
        (card, NIP-99, canale, import, libro mastro), ed e' la ragione
@@ -33982,11 +34014,18 @@ function consegnaPayload(){
        asta non si dichiara: le caselle sono nascoste anche loro, e un
        numero rimasto li' da prima sarebbe una promessa mai vista. */
     const inAsta = astaAccesa();
-    const vDom = inAsta ? '0' : String(el('sellSped')?.value ?? '').trim();
-    if (vDom !== ''){
-      if (inEur) out.spedizione_eur = eurCampo('sellSped');
-      else out.spedizione_sats = parseInt(vDom)||0;
-      if (inAsta){ delete out.spedizione_eur; out.spedizione_sats = 0; }
+    /* CASA VUOTA O ZERO = GRATIS (18 set 2026, sera): la chiave di
+       casa parte SEMPRE, e a toglierla e' solo la spunta esplicita —
+       che vale solo con un continente pieno, come nel form (la riga
+       nascosta si spegne da se', questa e' la cintura). */
+    const noCasa = !inAsta && !!el('sellNoCasa')?.checked
+      && ZONE_INTL.some(z =>
+           String(el('sellZona_' + z)?.value ?? '').trim() !== '');
+    out.non_spedisco_casa = noCasa ? 1 : 0;
+    if (!noCasa){
+      if (inEur && !inAsta) out.spedizione_eur = eurCampo('sellSped');
+      else out.spedizione_sats = inAsta ? 0
+        : (parseInt(el('sellSped')?.value)||0);
     }
     out.paese_domestico = el('sellPaeseDom')?.value || DOM_DEFAULT;
     /* LE ZONE nella mappa, e la chiave c'e' solo se la casella e'
@@ -34078,11 +34117,10 @@ function riempiFormDa(l){
      promessa («gratis») — leggere il solo numero le confonderebbe, e
      un venditore che riapre l'annuncio si ritroverebbe a promettere
      una spedizione gratuita in Australia.
-     IL DOMESTICO HA IL SUO RIPIEGO, lo stesso di `_zona_offerta` lato
-     server: un annuncio che le zone non le ha mai viste (i client di
-     ieri, gli importati) ha la mappa vuota, e qui la sua casella si
-     riempie lo stesso — o riaprendo un annuncio vecchio per
-     cambiargli il titolo gli si toglierebbe il mercato di casa. */
+     LA CASA NON SEGUE QUESTA REGOLA (18 set 2026): e' sempre aperta,
+     con o senza `dom` nella mappa, e la sua casella si riempie col
+     costo di sempre (0 = gratis). Resta vuota solo con la spunta
+     «non spedisco», che si ritrova qui sotto. */
   const _spedisce = (l.consegna==='spedizione'||l.consegna==='entrambe');
   montaZoneIntl();
   montaPaesiDom();
@@ -34090,6 +34128,11 @@ function riempiFormDa(l){
     el('sellPaeseDom').value = (l.paeseDom || DOM_DEFAULT);
   el('sellSped').value = (_spedisce && zonaOfferta(l, 'dom'))
     ? (l.spedEur>0 ? l.spedEur : (l.sped||0)) : '';
+  /* la spunta si ritrova com'era: PRIMA di aggiornaSpedCampo, che
+     passa da aggiornaSpedHint e ne tira le conseguenze (riga in
+     vista, casella di casa spenta) */
+  if (el('sellNoCasa'))
+    el('sellNoCasa').checked = _spedisce && !!l.noSpedCasa;
   ZONE_INTL.forEach(z => {
     const campo = el('sellZona_' + z);
     if (!campo) return;
