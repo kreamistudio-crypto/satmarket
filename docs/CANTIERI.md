@@ -20970,11 +20970,16 @@ per 10,00 € via SEPA, B vende. «Libro» = c'è anche la riserva.)
 - `hold-invoice-paid` → a chi compra: «B ha bloccato i sats in garanzia:
   indica dove ricevere i sats», oppure (fattura già data) «…Appena ti
   indica dove inviare 10,00 €, tocca a te». Solo mostro.
+  ⚠️ EMENDATA IL 19 SET 2026: la sente ANCHE chi vende, che l'ha pagata
+  da fuori — «Garanzia bloccata ✓: ora indica dove ricevere gli euro» /
+  «…aspetta gli euro» — e a chi compra, col recapito già detto, dice
+  che c'è già. La tabella intera sta in «La garanzia pagata la sente
+  anche chi vende», più sotto.
 - `buyer-invoice-requested` → a nessuno, mai: o è la metà muta della
   garanzia pagata, o nasce con una presa fatta proprio da chi compra.
 - `buyer-invoice-added` → a chi vende: «A ha indicato dove ricevere i
   sats. Se non l'hai ancora fatto, indica dove ricevere gli euro»
-  (`active`); tace se dopo viene la garanzia (`hold-next`) o se è una
+  (`active`; dal 19 set, col recapito già detto: «…aspetta gli euro»); tace se dopo viene la garanzia (`hold-next`) o se è una
   fattura NUOVA (`new-invoice`, che però riapre l'avviso del payout
   fallito). Solo mostro.
 - il RECAPITO (nostro: mostrod non lo vede) → a chi compra: «B ti ha
@@ -21436,3 +21441,148 @@ che non si sa misurare, il preventivo non nomina nessuna gamba
 (`sconto_criterio` vuoto, verificato), e il client non ha di che
 scrivere. La 🚚 la sua prosa ce l'ha ancora. È dei due criteri insieme
 (ago 2026), non di oggi.
+
+## La garanzia pagata la sente anche chi vende (19 set 2026, dal giro dal vivo a 0007 in produzione)
+
+**IL CASO.** B pubblica «vendo», A prende. B paga la garanzia dal suo
+wallet, FUORI dall'app, torna dentro — e non trova niente: né su
+Telegram né in app. La 0007 avvisava il solo compratore, perché «mai a
+chi ha fatto il gesto»: regola giusta per ogni altro momento, sbagliata
+per questo. Un gesto fatto con l'app in mano si vede da sé; questo si
+fa altrove, e il passo dopo è ANCORA di chi l'ha fatto.
+
+**LA TABELLA, per la sola garanzia pagata** (A compra, B vende; «detto»
+= B ha già mandato il recapito in questo giro):
+- `hold-invoice-paid`/`active`, non detto → a B: «Garanzia bloccata ✓:
+  ora indica dove ricevere gli euro.» · ad A: «B ha bloccato i sats in
+  garanzia. Appena ti indica dove inviare 10,00 €, tocca a te.»
+- `hold-invoice-paid`/`active`, detto → a B: «Garanzia bloccata ✓:
+  aspetta gli euro.» · ad A: «B ha bloccato i sats in garanzia e ti ha
+  già indicato dove inviare 10,00 €: tocca a te.» (timbra `recapito1`)
+- `hold-invoice-paid`/`invoice-next` (B ha PRESO) → a B: «Garanzia
+  bloccata ✓: appena A indica dove ricevere i sats, tocca a te indicare
+  dove ricevere gli euro.» · ad A: «B ha bloccato i sats in garanzia:
+  indica dove ricevere i sats.»
+- `buyer-invoice-added`/`active`, detto → a B: «A ha indicato dove
+  ricevere i sats: aspetta gli euro.» (non detto: la frase di prima).
+Fonte: solo mostro, come prima. In app, a chi vende, la STESSA frase in
+un toast di 6 s (`passoDopoGaranziaP2P`), e se sta guardando quello
+scambio il bottone pieno va a vista col battito (`evidenziaPassoP2P`).
+
+**TRE COSE CHE LA RICHIESTA NON POTEVA SAPERE, e le ho decise io.**
+1) «VALE PER ENTRAMBI I VERSI», ma nel verso in cui chi vende ha PRESO
+la frase non può dire «ora indica». Letto sul sorgente di mostrod:
+`hold_invoice_paid`, nel ramo senza fattura, manda a chi vende il
+messaggio con `buyer_trade_pubkey` AZZERATA — la chiave dell'altra parte
+arriva a scambio attivo. Senza quella le coordinate cifrate non partono
+e il bottone «💶 Indica dove ricevere gli euro» non c'è: «ora indica»
+sarebbe un invito a un bottone che non esiste. La frase dice cosa viene
+dopo, e il «tocca a te» lo porta la fattura data.
+2) «SALTA LA PAUSA» non vuol dire più niente: dopo la 0007 le pause non
+esistono, resta il solo anti-doppione (ordine + momento + giro +
+persona). Non c'era niente da saltare.
+3) «SE HA GIÀ INDICATO LE COORDINATE» il server non poteva saperlo: il
+recapito viaggia cifrato fra i due telefoni e il client chiamava
+`/api/p2p/recapito` SOLO a scambio attivo — mentre i dati del
+tabacchino partono alla presa. Da qui due SÌ/NO in più sul filo:
+`attivo` (false = «lo dichiaro e basta, non avvisare») e `ripetuto`
+(true = «è lo stesso di prima, non è una correzione»). Ancora nessun
+recapito sul server. L'app vecchia, che manda il solo `ordine`, vale
+`attivo` come ieri (`is not False`).
+
+**LE STRADE SCARTATE.** Far dedurre «già detto» dal libro o dal kind 14:
+è il castello che la 0007 ha appena tolto. Tenere «Sats bloccati ✅»
+accanto alla frase nuova: usciva solo a foglio della garanzia ancora
+aperto, cioè mai per chi paga da fuori — due frasi per lo stesso fatto.
+Aprire da soli il foglio del recapito al ritorno: a chi l'ha già
+precompilato parrebbe una richiesta di rifarlo; il bottone a vista
+basta, e il gesto resta suo (patch 0007, punto 5).
+
+**IL DIFETTO VISTO SOLO DAL VIVO.** L'alone del bottone non si
+dipingeva: `.btn.orange` sta più sotto nel CSS con lo stesso peso di
+`.btn.in-evidenza`, e la sua `box-shadow` vinceva. A banco la regola
+«c'era». Cura: `.btn.orange.in-evidenza`, e l'ombra del bottone ripetuta
+in ogni riga (o il gradino spariva per 4 secondi). La sentinella ora
+chiede il PESO, non la presenza.
+
+**PROVATO.** Giro intero nel worktree: 11.938 passate, 0 fallite. Tortura: 32 mutazioni, 32 uccise — ma
+5 erano SOPRAVVISSUTE al primo giro e hanno fatto nascere le prove che
+mancavano (la frase combinata fuori dallo scambio attivo; il recapito
+del giro PRIMA; il telefono rimasto indietro; gli scambi a cavallo del
+deploy; il freno del «presto» che fermava la dichiarazione a scambio
+attivo), e 1 faceva ESPLODERE il banco invece di farlo rosso
+(`undefined` che JSON butta via: curato il banco). DAL VIVO, su un
+server di collaudo (porta 8087, database suo, notifiche simulate): tre
+scambi mandati a `/api/p2p/evento` come li manda mostrod, col recapito
+da `/api/p2p/recapito` — il caso del giro, il recapito partito alla
+presa (presto tace, garanzia → «aspetta gli euro» + frase combinata,
+ridichiarato tace), e l'altro verso. Le frasi nel journal sono quelle
+della tabella. In browser: `passoDopoGaranziaP2P` e l'alone, a «meno
+movimento» (il pane lo emula).
+NON PROVATO: il telefono; mostrod vero che manda l'evento (la 0007 è in
+produzione, ma questo giro è stato di cartone); il BATTITO animato (il
+pane emula reduced-motion: visto solo l'alone fermo); il toast al
+ritorno da un wallet vero, che dipende da QUANDO il kind 14 arriva
+all'app riaperta.
+
+**RESTA DA GUARDARE, a due telefoni.** B pubblica «vendo» senza
+tabacchino, A prende; B paga da un wallet esterno e torna: su Telegram
+«Garanzia bloccata ✓: ora indica…», in app il toast e il bottone che
+batte. Poi lo stesso con un metodo che ha i dati salvati e partiti
+alla presa: «…aspetta gli euro» a B, e ad A UNA sola notifica (la
+combinata), non due. Poi il verso rovesciato (A pubblica «compro», B
+prende): a B la frase lunga, e «ora indica» NON deve comparire. Nel
+journal: `Recapito P2P: … nessun avviso (registrato: la garanzia non
+c'e' ancora…)` e `(gia' detto a chi compra…)` sono righe SANE.
+⚠️ Una cosa vista e NON toccata: una CORREZIONE del recapito fatta
+entro 60 s dall'avviso precedente tace (il freno di sempre) e il client
+la segna lo stesso come avvisata, perché la rotta risponde sempre `ok`.
+Con la frase combinata che timbra `recapito1` il caso è un filo meno
+raro di ieri. È della 0007, non di oggi.
+
+## I fogli dal basso e la tastiera dell'iPhone: il fondo è quello che si vede (19 set 2026)
+
+**IL CASO.** «Dove ricevere i sats» su iPhone: si tocca il campo della
+fattura, sale la tastiera, e il foglio si taglia a metà. È il sintomo
+del foglio P2P del 18 set (`0e0ed69`), che però ai fogli DAL BASSO aveva
+curato il solo `max-height`: DOVE stanno lo decideva ancora un conto
+con due fonti — `bottom:0` lo misura il CSS sul layout, `--tastiera` lo
+misura il JS su `innerHeight`. Dove il layout si accorcia già con la
+tastiera e `innerHeight` no, la tastiera si toglie due volte: 812 − 336
+− 336 = 140, il fondo del foglio a 140 px su 476 visibili, e il resto
+sopra lo schermo.
+
+**LA CURA, la stessa del foglio pieno.** Una fonte sola: il fondo del
+foglio è il fondo della FINESTRA VISIBILE (`--vv-su + --vv-alto`, che
+`tastieraSegue` scrive già), e il foglio ci si appende sopra di quanto
+è alto (`top` + `translateY(-100%)`, `bottom:auto`). Solo l'aperto,
+solo i non pieni, solo sotto i 768px; i ripieghi ricostruiscono il
+fondo di ieri. `campoInVistaFoglio` stringe i limiti sulla finestra
+visibile: un campo «dentro il foglio» ma dietro i tasti non era in
+vista. La pagina sotto era già ferma (`fermaPaginaSotto`, il velo): la
+prova ora guarda che i cinque fogli nominati lo accendano a ogni
+apertura. VALE PER LA CLASSE: tutti i 30 e passa fogli dal basso, non
+un elenco — recapito euro, i due filtri P2P e `nostrSheet` compresi.
+
+**PROVATO.** A banco i quattro modelli di tastiera: in tre il fondo di
+ieri e quello di oggi coincidono (la cura non sposta niente dove
+funzionava), nella doppia sottrazione ieri 140 e oggi 476. NEL BROWSER,
+a tastiera FINTA: finestra vera 375×476 con `innerHeight` finto a 812
+(il modello che si rompe) — `nostrSheet` ieri stava a [−300, 140], cioè
+tagliato a metà, oggi a [36, 476]; gli altri quattro fogli uguale. Nel
+modello di Safari (finestra 812, `vv.height` finto 476) ieri = oggi =
+476.
+⚠️ NON PROVATO, e va detto forte: L'IPHONE. Tutto il caso è SIMULATO.
+Il modello della doppia sottrazione è un'ipotesi che spiega il sintomo
+e che la cura del 18 set ha già usato — ma la conferma di QUELLA cura
+sul telefono non è mai arrivata, quindi questa poggia su un'ipotesi
+non ancora confermata due volte.
+
+**RESTA DA GUARDARE sul telefono.** «Dove ricevere i sats», tocco sul
+campo: il foglio deve stare INTERO sopra i tasti, col campo visibile.
+Poi recapito euro, un filtro P2P, e «Entra con Nostr» → bunker. Se è
+ancora rotto NON si ritocca a occhio: servono i quattro numeri della
+voce del 18 set (`innerHeight`, `visualViewport.height`,
+`visualViewport.offsetTop`, e l'altezza di un `div` alto `100dvh`), che
+dicono quale modello è — più, stavolta, il `getBoundingClientRect()`
+del foglio, che dice dove è finito.

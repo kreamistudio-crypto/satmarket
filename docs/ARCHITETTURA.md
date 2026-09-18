@@ -10866,6 +10866,29 @@
   sospetto successivo è la `max-height` che cambia durante
   l'animazione: il foglio è ancorato in basso, quindi accorciandosi
   muove il bordo alto — e si vede solo sul telefono.
+  ⚠️ DAL 19 SET 2026 A TASTIERA SU IL FOGLIO DAL BASSO NON SI ALZA PIÙ
+  COL TRANSFORM DI `--tastiera`, e questa riga emenda le due voci qui
+  sopra per il solo caso `html.con-tastiera`: sotto i 768px
+  `.sheet.open:not(.pieno)` ha `top: --vv-su + --vv-alto`, `bottom:auto`
+  e `translateY(-100%)` — il FONDO del foglio è il fondo della finestra
+  visibile, detta per intero da `tastieraSegue`, e il foglio ci si
+  appende sopra di quanto è alto. Il perché: `bottom:0` lo misura il
+  CSS sul layout e `--tastiera` lo misura il JS su `innerHeight`; dove
+  il layout si accorcia già con la tastiera e `innerHeight` no (dentro
+  Telegram su iOS), la tastiera si toglieva DUE volte e il foglio
+  finiva con metà corpo sopra lo schermo (812 − 336 − 336 = 140: è lo
+  stesso difetto del foglio pieno del 18 set, visto dal fondo). Nel
+  modello di Safari i due conti danno lo stesso numero, e non cambia
+  niente. I chiusi restano appesi a `bottom:0` col loro
+  `translateY(100%)` (la lezione qui sopra vale ancora), e i ripieghi
+  delle due variabili ricostruiscono il fondo di prima.
+  `campoInVistaFoglio` stringe i suoi due limiti sulla finestra
+  visibile (`vv.offsetTop`, `vv.offsetTop + vv.height`): «in vista» è
+  dentro quel che si vede, non solo dentro il foglio. Vale per la
+  CLASSE, non per un elenco: «Dove ricevere i sats», il recapito euro,
+  i due filtri P2P e `nostrSheet` sono fogli dal basso qualunque, e una
+  prova lo guarda. Il verbale: CANTIERI, «I fogli dal basso e la
+  tastiera dell'iPhone».
   IL TOTALE IN SUPERFICIE (ago 2026, decisione di Andrea che EMENDA
   «LA CIFRA RESTA L'UNITARIO» qui sopra — e la emenda per METÀ, che è
   la riga da leggere due volte): **la superficie parla il totale, la
@@ -24304,7 +24327,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   ogni evento dalle trade key via `chiavi_p2p`; il GIRO è quante PRESE
   mostrod ha raccontato per quell'ordine); `_destinatari_evento_p2p`
   (A CHI: alla parte che deve agire o sapere, MAI a chi ha fatto il
-  gesto; se il gesto è di mostrod, a tutti e due);
+  gesto — con UNA eccezione nominata, la garanzia pagata: vedi «LA
+  GARANZIA PAGATA LA SENTE ANCHE CHI L'HA PAGATA», qui sotto; se il
+  gesto è di mostrod, a tutti e due);
   `_testo_evento_p2p` (la frase, coi numeri del libro: `p2p_ordini`
   porta ora anche `sats` e `metodi`, scritti da `_avvisi_libro_p2p`,
   perché l'evento dice chi e cosa, mai quanto). Il momento ha il
@@ -24365,6 +24390,61 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `deploy/mostro/` (`barattolo_eventi.rs`, 24 agganci, fire-and-forget:
   8 s + un retry a 12 s in un task suo, mai bloccante). Il verbale:
   CANTIERI, «Mostro è l'unica fonte degli avvisi P2P».
+  LA GARANZIA PAGATA LA SENTE ANCHE CHI L'HA PAGATA (19 set 2026, dal
+  giro dal vivo): è l'UNICA eccezione al «mai a chi ha fatto il gesto»,
+  e una prova la tiene unica (il censimento di `prove_p2p_eventi` dà
+  `{"garanzia_pagata"}`: una seconda lo fa rosso). Il perché: la
+  garanzia si paga da un wallet ESTERNO, non con l'app in mano — chi
+  torna non ha davanti niente che dica com'è andata, e il passo dopo è
+  ancora suo. `_destinatari_evento_p2p` dà `["compra", "vende"]`, e
+  `_testo_evento_p2p` sceglie la frase di chi vende su due fatti, il
+  `detail` e `recapito_detto`:
+  · `active`, recapito non detto → «Garanzia bloccata ✓: ora indica
+    dove ricevere gli euro.»
+  · `active` o `invoice-next`, recapito già detto → «Garanzia bloccata
+    ✓: aspetta gli euro.» — e a chi COMPRA, solo su `active`, la frase
+    combinata («…ha bloccato i sats in garanzia e ti ha già indicato
+    dove inviare N €: tocca a te»), che timbra `recapito1` in
+    `p2p_avvisi`: vale come il suo primo avviso del recapito.
+  · `invoice-next` (chi vende ha PRESO) → «Garanzia bloccata ✓: appena
+    X indica dove ricevere i sats, tocca a te indicare dove ricevere
+    gli euro.» NON «ora indica»: letto sul sorgente di mostrod,
+    `hold_invoice_paid` nel ramo senza fattura azzera
+    `buyer_trade_pubkey` nel messaggio a chi vende — la chiave
+    dell'altra parte arriva a scambio attivo, quindi le coordinate
+    cifrate non le può ancora mandare e il bottone non c'è. Glielo
+    dice la `fattura_data`/`active`, che col recapito già detto
+    diventa anche lei «aspetta gli euro».
+  «GIÀ DETTO» IL SERVER LO SA DAL TELEFONO, perché il recapito di qui
+  non passa: `POST /api/p2p/recapito` porta ora `{ordine, attivo,
+  ripetuto}` — due SÌ/NO letti per identità (`is not False`, `is
+  True`: l'app vecchia che manda il solo `ordine` vale `attivo`, come
+  ieri). `_avviso_recapito_p2p` SCRIVE sempre la dichiarazione
+  (`p2p_momenti`, momento `recapito`, fonte `telefono`, del giro in
+  corso); con `attivo: false` e la garanzia non ancora pagata non
+  avvisa nessuno; se la garanzia c'è GIÀ avvisa comunque (il telefono
+  può essere rimasto indietro: lo decide chi lo sa); con `ripetuto` e
+  un avviso già partito tace (non è una correzione), e un `ripetuto`
+  mai detto parte. `_dati_frase_p2p` dà `recapito_detto` dalle DUE
+  fonti del giro in corso: la riga del telefono, o un `recapito%` già
+  in `p2p_avvisi` (gli scambi a cavallo del deploy). NEL CLIENT
+  `avvisaRecapitoP2P` dichiara anche PRIMA dello scambio attivo — solo
+  negli stati di `P2P_GIRO_APERTO`, timbro `recapitoDetto`, freno suo
+  (`id:presto`) che non ferma la dichiarazione a scambio attivo — e a
+  scambio attivo manda `ripetuto` se l'id del recapito è lo stesso.
+  `passoDopoGaranziaP2P` (pura) dà in app la STESSA frase uscendo da
+  `attesa_mia_hold`, ovunque sia chi vende e qualunque foglio sia
+  aperto («Sats bloccati ✅» usciva solo a foglio della garanzia
+  aperto, e non c'è più); da lì si esce anche con un annullo o un giro
+  morto, e allora tace: si guarda dove si ARRIVA. `evidenziaPassoP2P`
+  porta a vista il bottone pieno della pagina dello scambio e gli mette
+  `in-evidenza` per 4,2 s, solo se si sta guardando QUELLO scambio. Il
+  CSS è `.btn.orange.in-evidenza`, con TRE classi e l'ombra del bottone
+  ripetuta in ogni riga: `.btn.orange` sta più sotto con lo stesso peso
+  e la sua `box-shadow` vinceva. ⚠️ «Salta la pausa» dopo la 0007 non
+  vuol dire niente: le pause non esistono più, resta il solo
+  anti-doppione. Il verbale: CANTIERI, «La garanzia pagata la sente
+  anche chi vende».
   NEL CLIENT il giro che muore prima della garanzia si SCRIVE
   (`giroMorto` sulla riga, `P2P_GIRO_APERTO` gli stati da cui un
   ritorno è una notizia, `P2P_GIRO_MORTO` le frasi che statoTestoP2P
