@@ -19670,3 +19670,166 @@ la cura non è tornare al blur: è guardare chi si muove (la lezione del
 foglio ancorato, già a memoria).
 
 Giro intero nel worktree su `origin/main`: 11370 passate, 0 fallite.
+
+## Il foglio P2P e la tastiera dell'iPhone: la tastiera tolta due volte, e il foglio chiuso che spuntava (18 set 2026)
+
+IL DIFETTO (Andrea, dal campo, iPhone dentro Telegram): nel foglio
+«Vuoi comprare Bitcoin», al tocco sul campo dell'importo, la tastiera
+si apre e il foglio si spezza — in cima restano «Pubblica ordine» e
+«Stai comprando sats», sotto una fascia vuota, e in mezzo si vede il
+mercatino. Il campo in cui si scrive non si vede.
+
+**LA RIGA CHE HA APERTO LA DIAGNOSI È «STAI COMPRANDO SATS».** Quel
+titolo nel foglio «Pubblica» NON ESISTE: è la testata di
+`#p2pDettSheet`, il dettaglio di un ordine — un ALTRO foglio, e CHIUSO.
+Quindi lo schermo non mostrava un foglio rotto: ne mostrava DUE, quello
+aperto ridotto a testata e piede, e sotto la testa di quello chiuso.
+
+**NON È STATO `eafaf83` (il cantiere slider).** Guardato con git prima
+di toccare niente: quel commit ha tre hunk, tutti JS del premio
+(`renderNuovoOrdineP2P`, `cambiaPremioP2P`, `premioValP2P`); le tre
+righe della geometria — l'altezza del foglio pieno, il conto di
+`tastieraSegue`, `.sheet.pieno.open{transform:none}` — sono identiche
+byte per byte prima e dopo. La geometria nasce il 10 set con `bb65141`
+e `52dcbe8` (il ridisegno a pieno schermo e l'ancora in alto). Il
+difetto c'era dal primo giorno del foglio pieno.
+
+**TRE DIFETTI IN UNO**, e si tengono separati perché si curano in tre
+posti:
+1. **LA TASTIERA TOLTA DUE VOLTE.** L'altezza era `100dvh − --tastiera`,
+   cioè un conto con DUE fonti: `100dvh` la misura il CSS, `--tastiera`
+   la misura il JS come `innerHeight − vv.height − vv.offsetTop`. Regge
+   solo finché le due parlano dello stesso schermo. Il commento di
+   agosto diceva «nemmeno `100dvh` si accorcia su iOS» — vero in
+   Safari; ma dove `100dvh` SI accorcia con la tastiera e `innerHeight`
+   no, il conto fa 812 − 336 − 336 = **140px** di foglio: testata e
+   piede schiacciati, corpo a zero.
+2. **IL FOGLIO PIENO CHIUSO SI ACCORCIAVA ANCHE LUI.** Un chiuso sta
+   nascosto con `translateY(100%)`, cioè di quanto è ALTO: alto 140 si
+   nasconde di 140, e la sua testa finisce esattamente sotto il fondo
+   dell'aperto. È IL DIFETTO DEL CAPPELLO A 0,9 (`078cd79`) rientrato
+   da un'altra porta: là era la scala a fare il foglio più basso dello
+   schermo, qui `--tastiera`.
+3. **«È SU» NON È «COPRE».** Il giudice era `coperto > 80`, e `coperto`
+   è quanto resta nascosto IN FONDO al layout: quando iOS fa scorrere
+   la finestra visibile fino in fondo per mostrare il campo vale ZERO a
+   tastiera spalancata. Giusto per i fogli dal basso, che lì non hanno
+   niente da alzare; sbagliato per il foglio pieno, che inchiodato a
+   `top:0` resta indietro con la testata fuori scena.
+
+**LA DECISIONE: A TASTIERA SU IL FOGLIO PIENO È LA FINESTRA VISIBILE,
+E LA FONTE È UNA.** `tastieraSegue` scrive `--vv-su` e `--vv-alto`
+(`offsetTop` e `height` di visualViewport, divisi per la scala), e
+`html.con-tastiera .sheet.pieno.open` fa `top:var(--vv-su)` e
+`height:var(--vv-alto)`. Il foglio comincia dove comincia quel che si
+vede e finisce dove finisce. È LA LEZIONE DELLA SONDA DEL COORDINATOR
+applicata al CSS: **quando non si sa quale sarà il criterio buono, si
+rende robusto il lettore invece di scommettere sul campo** — qui non si
+sa quale modello di tastiera abbia la WebView di Telegram su iOS, e la
+cura non ne sceglie uno. I ripieghi dei `var()` sono il conto di prima:
+senza le variabili non cambia niente, e a tastiera giù le variabili si
+TOLGONO (non restano a zero).
+- Il chiuso torna alto lo schermo intero; la tastiera toglie altezza
+  solo a chi è in scena — `.open`, e `.morfo` mentre svanisce, perché
+  `chiudiMorfoP2P` ci misura il bottone d'arrivo a foglio già chiuso.
+- `su = innerHeight − vv.height > 80`: la finestra visibile più CORTA
+  del layout, ovunque sia scorsa. `--tastiera` resta `coperto`, che per
+  i fogli dal basso è il numero giusto.
+- IL GEMELLO DEI FOGLI DAL BASSO: il loro `max-height` faceva lo stesso
+  conto a due fonti — nel modello della doppia sottrazione «Dove
+  ricevere i sats» o un filtro restano una feritoia di 124px. A
+  tastiera su il tetto è `--vv-alto − 16px`, `:not(.pieno)` e solo
+  sotto i 768px (da lì in su il foglio è un modale centrato che la
+  tastiera non l'ha mai seguita: non è questo il cantiere).
+- **IL CAMPO A FUOCO TORNA IN VISTA** (`campoInVistaFoglio`): tocca il
+  solo `scrollTop` di chi scorre dentro il foglio, e SOLO se il campo è
+  davvero coperto — il fondo utile è il piede appiccicato. Parte al
+  `resize` del viewport e al cambio di fuoco a tastiera già su; NON
+  allo `scroll` del viewport, che è il dito di chi guarda altrove.
+  ⚠️ NON È LA STRADA SCARTATA AD AGOSTO: quella era lo
+  `scrollIntoView`/il fuoco che trascina (lo scatto del picker), e
+  `focus({preventScroll:true})` resta dov'è. Un campo già a vista non
+  muove niente.
+- **SOTTO UN FOGLIO LA PAGINA STA FERMA** (`fermaPaginaSotto`): i fogli
+  si aprono in quaranta posti, quindi si guarda IL VELO — si accende
+  con ogni foglio e si spegne con l'ultimo — con un MutationObserver
+  sulla sua sola classe, la strada dell'occhio della morfosi.
+  `html.foglio-su body{overflow:hidden}`, sul `body` come già fanno
+  lightbox e visore, solo sotto i 768px (su un monitor togliere la
+  barra sposta la pagina di quindici pixel dietro il velo).
+
+**LE STRADE SCARTATE.** `:has(.sheet.open)` per fermare la pagina: una
+riga sola, ma in questo file `:has()` non si usa da nessuna parte ed è
+scritto (ora c'è anche la sentinella). `viewportChanged` di Telegram:
+dice l'altezza della WebView, non DOVE è scorsa la finestra visibile,
+e visualViewport dice tutt'e due — una fonte sola era il punto.
+`visibility:hidden` sui pieni chiusi: categorico, ma si intreccia con
+le transizioni della morfosi, che il pane non fa vedere (emula
+reduced-motion); il chiuso alto uno schermo sta sotto il bordo del
+layout per costruzione. Il blocco `position:fixed` sul body: ferma
+tutto, ma sposta la pagina e va disfatto al pixel. Inchiodare il
+foglio alla finestra visibile SEMPRE, anche a tastiera giù: un pinch
+su un desktop stretto lo rimpicciolirebbe.
+
+**GLI ALTRI FOGLI, guardati.** Pieni sono solo due (`p2pNuovoSheet`,
+`p2pDettSheet`): lo spezzarsi è loro. «Pubblica annuncio» è una VISTA
+(`view-vendi`), non un foglio fisso: lì la tastiera è quella nativa
+della pagina, e adesso il blocco dello scroll non la tocca perché non
+c'è velo. «Dove ricevere i sats» e i filtri sono fogli dal basso:
+il bordo in fondo era già giusto, il tetto è stato curato qui sopra.
+
+**LE PROVE** (`prove_foglio_tastiera_iphone`, 34): dieci sentinelle sul
+CSS a commenti TOLTI (il commento che spiega perché una riga non c'è
+più la nomina per forza), e un banco node che fa GIRARE le tre funzioni
+vere contro un telefono di cartone — nove geometrie (riposo, ferma,
+scorsa, scorsa fino in fondo, l'elastico sotto zero, la barra che
+respira, la tastiera che scende, la scala a 1,25, lo scroll), tredici
+casi del campo, il velo. A casi indipendenti col try/catch.
+**LA TORTURA: 33 su 33 — ma al primo giro 30, con UNA VIVA e DUE
+INCIAMPATE**, tutte e tre del banco: M05 faceva esplodere la sentinella
+(un `index` che alza: ora si CERCA e le tre righe diventano rosse una
+per una), M20 faceva esplodere il node (un ascolto che il telefono di
+cartone non prevedeva: ora lo registra lo stesso), M29 viva (il fuoco
+sul foglio STESSO: caso aggiunto). Prima ancora, il giro a codice
+INTATTO aveva fermato il banco perché alla copia mancava `server.py`.
+⚠️ UNA UCCISA VALE MENO DELLE ALTRE, e si dichiara: M28 (`.sheet.open`
+→ `.sheet`) muore perché il DOM di cartone risponde solo a quel
+selettore — è una sentinella sulla stringa, non sul comportamento.
+
+PROVATO DAL VIVO (app vera in collaudo, identità 111, servita dal
+worktree; Browser pane a 375×812) — **CON UNA TASTIERA FINTA**: un
+visualViewport di cartone messo al posto del vero e `tastieraSegue()`
+rilanciata, poi misure in coordinate di layout contro la finestra
+visibile [T, T+476]. PRIMA della cura: a finestra ferma il foglio
+regge; scorsa di 150 e di 336 la testata esce di scena (e a 336 anche
+il campo); e nel MODELLO DELLA DOPPIA SOTTRAZIONE — finestra reale
+alta 476 perché `100dvh` valga 476, `innerHeight` finto a 812 — il
+foglio è alto 140px e `p2pDettSheet` compare a 140–280: **la sequenza
+dello screenshot di Andrea, pezzo per pezzo**. DOPO: nei quattro
+modelli il foglio combacia con la finestra al pixel, testata e piede
+in vista, nessun chiuso in scena; il premio a mano (y=544, sotto i
+tasti) torna a y=352 sopra il piede; alle scale 0,9 / 1 / 1,15 lo
+scarto è [0,0]; tre fogli dal basso con un campo (riscuoti, punta,
+rifornisci) stanno dentro la finestra col tetto a 460 invece di 124;
+la pagina si ferma all'apertura, si libera alla chiusura, e lo
+scorrimento resta dov'era.
+**NON PROVATO, ed è il grosso: UN iPHONE.** Tutto quel che c'è sopra è
+un conto giusto su modelli di tastiera; QUALE sia quello di Telegram su
+iOS non lo so — la doppia sottrazione è l'unico che ricostruisce lo
+screenshot, ma resta una deduzione. Non provati nemmeno: il DITO sulla
+pagina sotto (`overflow:hidden` ferma il dito e non gli script — da
+script la pagina scorre ancora, e nel pane il dito non c'è); la
+morfosi a tastiera su (il pane emula reduced-motion: quel ramo non è
+girato); Telegram Android; se iOS, dopo che il foglio è sceso a
+`--vv-su`, fa scorrere di nuovo la finestra.
+RESTA DA GUARDARE: Andrea sull'iPhone, dentro Telegram — aprire
+«Vuoi comprare Bitcoin», toccare l'importo: la testata deve restare in
+cima, «Pubblica ordine» subito sopra la tastiera, il campo a vista,
+niente mercatino sotto. Poi lo stesso su «Vuoi vendere», e un foglio
+dal basso con un campo («Dove ricevere i sats»). SE È ANCORA ROTTO, la
+prima cosa da leggere sono quattro numeri a tastiera su:
+`innerHeight`, `visualViewport.height`, `visualViewport.offsetTop`, e
+l'altezza di un `div` alto `100dvh` — dicono in un colpo quale modello
+è quello vero.
+
+Giro intero nel worktree su `origin/main`: 11406 passate, 0 fallite.
