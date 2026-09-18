@@ -44473,7 +44473,7 @@ function renderNuovoOrdineP2P(){
       '<input type="range" id="p2pNuovoPremioCursore" min="-' + P2P_PREMIO_MAX + '" ' +
         'max="' + P2P_PREMIO_MAX + '" step="1" value="' + p2pNuovoPremio + '" ' +
         'style="' + stilePremioP2P(p2pNuovoPremio, p2pLato) + '" ' +
-        'oninput="cambiaPremioP2P(this.value)" aria-label="Premio in percento">' +
+        'oninput="cambiaPremioP2P(this.value, this)" aria-label="Premio in percento">' +
       '</div>' +
       /* sotto la pillola il suo bottone, sotto la barra i suoi capi —
          IN TINTA DALLO STESSO GIUDICE della fascia, ai due estremi:
@@ -44736,11 +44736,25 @@ function stilePremioP2P(premio, lato){
   const f = fasciaPremioP2P(premio, lato);
   return '--da:' + f.da + ';--a:' + f.a + ';--tinta:' + f.tinta;
 }
-function cambiaPremioP2P(v){
+function cambiaPremioP2P(v, da){
   const n = Math.round(Number(v) || 0);
   p2pNuovoPremio = Math.max(-P2P_PREMIO_MAX, Math.min(P2P_PREMIO_MAX, n));
   const c = el('p2pNuovoPremioVal');
   if (c) c.textContent = premioTestoP2P(p2pNuovoPremio);
+  /* IL CAMPO A MANO SEGUE IL CURSORE (18 set 2026, caso dal campo):
+     quando la pillola e' diventata il campo, `p2pNuovoPremioVal` non
+     c'e' piu' e qui sopra non si scrive niente — il premio VERO
+     cambiava, ma il numero a schermo restava quello battuto a mano.
+     Chi trascinava dopo aver scritto «5» pubblicava un premio che non
+     stava leggendo.
+     ⚠️ A DECIDERE E' CHI HA MOSSO (`da`), NON CHI HA IL FUOCO: su iOS
+     toccare un cursore non toglie il fuoco al campo — la tastiera
+     resta su — quindi un `document.activeElement` direbbe «sta
+     scrivendo» proprio nel caso da curare. Il campo si riscrive quando
+     a muovere e' un ALTRO; quando e' lui resta com'e', che riscriverlo
+     sotto le dita porterebbe via il cursore (la lezione qui sotto). */
+  const mano = el('p2pNuovoPremioMano');
+  if (mano && da !== mano) mano.value = String(p2pNuovoPremio);
   const cur = el('p2pNuovoPremioCursore');
   if (cur && String(cur.value) !== String(p2pNuovoPremio)) cur.value = String(p2pNuovoPremio);
   if (cur) {
@@ -44852,7 +44866,7 @@ function premioValP2P(){
   if (p2pNuovoPremioMano)
     return '<input id="p2pNuovoPremioMano" type="number" inputmode="numeric" step="1" ' +
       'min="-' + P2P_PREMIO_MAX + '" max="' + P2P_PREMIO_MAX + '" value="' + p2pNuovoPremio +
-      '" style="width:56px;text-align:center" oninput="cambiaPremioP2P(this.value)" ' +
+      '" style="width:56px;text-align:center" oninput="cambiaPremioP2P(this.value, this)" ' +
       'aria-label="Premio in percento">';
   const giudizio = fasciaPremioP2P(p2pNuovoPremio, p2pLato).giudizio;
   return '<button type="button" class="p2p-premio-cifra' + (giudizio ? ' ' + giudizio : '') +

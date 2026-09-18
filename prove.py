@@ -49426,7 +49426,7 @@ def prove_p2p_pubblica():
     # fermo dov'era.
     prova("la fascia parte gia' scritta", True,
           "'style=\"' + stilePremioP2P(p2pNuovoPremio, p2pLato) + '\" '" in nuovo)
-    _cp = pezzo_js(mini, "function cambiaPremioP2P(v){", "\n}\n")
+    _cp = pezzo_js(mini, "function cambiaPremioP2P(v, da){", "\n}\n")
     prova("...e si riscrive a ogni movimento, tutt'e tre le variabili",
           True, all(("cur.style.setProperty('--%s', f.%s);" % (k, k)) in _cp
                     for k in ("da", "a", "tinta")))
@@ -49480,6 +49480,142 @@ def prove_p2p_pubblica():
     # la matita non la riconosce
     prova("...e «Modifica» resta la porta scritta", True,
           "'Fatto' : 'Modifica'" in pezzo_js(mini, "function premioModP2P(){", "\n}\n"))
+
+    # G) CAMPO E CURSORE RESTANO IN PARI NEI DUE SENSI (18 set 2026,
+    # caso dal campo: scritto «5» a mano, il cursore non muoveva piu'
+    # il numero). Non era un blocco: quando la pillola DIVENTA il
+    # campo, `p2pNuovoPremioVal` sparisce e nessuno riscriveva il campo
+    # — il premio VERO cambiava e a schermo restava il 5. Le sentinelle
+    # non lo potevano vedere, perche' ogni riga c'era: qui la funzione
+    # GIRA, con un DOM di cartone, nei due sensi e sui due lati (il
+    # foglio «comprare» e il foglio «vendere» sono lo stesso render,
+    # cambia solo `p2pLato`).
+    _cpb = pezzo_js(mini, "function cambiaPremioP2P(v, da){", "\n}\n")
+    prova("cursore e campo dicono CHI ha mosso", 2,
+          mini.count("oninput=\"cambiaPremioP2P(this.value, this)\""))
+    prova("...e nessuno dei due chiama piu' senza dirlo", 0,
+          mini.count("oninput=\"cambiaPremioP2P(this.value)\""))
+    # ⚠️ il giudice e' CHI HA MOSSO e non chi ha il fuoco: su iOS il
+    # cursore non toglie il fuoco al campo, e un `activeElement`
+    # lascerebbe il difetto proprio dove e' stato visto. Si guarda il
+    # CODICE, tolti i commenti — quello che spiega perche' non c'e'
+    # lo nomina per forza.
+    _cpb_nudo = re.sub(r"/\*.*?\*/", "", _cpb, flags=re.S)
+    prova("...e a decidere non e' il fuoco", True,
+          "activeElement" not in _cpb_nudo and "da !== mano" in _cpb_nudo)
+    _banco_pr = (
+        "const P2P_PREMIO_MAX = %d;\n" % P2P_PREMIO_MAX_da(mini)
+        + re.search(r"const P2P_POLLICE = \d+;", mini).group(0) + "\n"
+        + "let p2pNuovoPremio = 0, p2pLato = 'compro';\n"
+        # i tre che qui non si giudicano: la tinta ha le sue prove sopra
+        + "function affareP2P(o){ return o.premium < 0; }\n"
+        + "function comeLibroP2P(o){ return o; }\n"
+        + "function premioNotaP2P(c, p){ return (c ? 'C' : 'V') + p; }\n"
+        + _intera("function premioTestoP2P(n){")
+        + "\n" + _intera("function bordoPremioP2P(frazione){")
+        + "\n" + _intera("function fasciaPremioP2P(premio, lato){")
+        + "\n" + _intera("function cambiaPremioP2P(v, da){")
+        + """
+          let DOM = {};
+          function el(id){ return DOM[id] || null; }
+          // IL TELEFONO E' UN iPHONE: il fuoco resta SEMPRE sul campo,
+          // anche mentre si trascina il cursore. Senza questo, un
+          // giudice scritto sul fuoco farebbe esplodere il banco invece
+          // di sbagliare — e una prova rossa per la ragione sbagliata
+          // non dice che il caso e' coperto.
+          const document = {get activeElement(){
+            return DOM.p2pNuovoPremioMano || null; }};
+          function nodo(v){ return {value: v, textContent: '', innerHTML: '',
+            style: {setProperty(){}}, classList: {toggle(){}}}; }
+          // il foglio col campo APERTO: niente pillola, c'e' il campo
+          function aperto(lato, premio){
+            p2pLato = lato; p2pNuovoPremio = premio;
+            DOM = {p2pNuovoPremioCursore: nodo(String(premio)),
+                   p2pNuovoPremioMano: nodo(String(premio)),
+                   p2pNuovoPremioNota: nodo('')};
+          }
+          // il foglio col campo CHIUSO: la pillola e il suo numero
+          function chiuso(lato, premio){
+            p2pLato = lato; p2pNuovoPremio = premio;
+            DOM = {p2pNuovoPremioCursore: nodo(String(premio)),
+                   p2pNuovoPremioVal: nodo(''), p2pNuovoPremioPil: nodo(''),
+                   p2pNuovoPremioNota: nodo('')};
+          }
+          const out = {};
+          for (const lato of ['compro', 'vendo']) {
+            const r = {};
+            // 1) IL CASO DAL CAMPO: scrivo 5, poi trascino a 12
+            aperto(lato, 0);
+            let mano = DOM.p2pNuovoPremioMano, cur = DOM.p2pNuovoPremioCursore;
+            mano.value = '5'; cambiaPremioP2P(mano.value, mano);
+            r.scrivo = [p2pNuovoPremio, cur.value, mano.value];
+            cur.value = '12'; cambiaPremioP2P(cur.value, cur);
+            r.trascino = [p2pNuovoPremio, cur.value, mano.value];
+            // 2) e di nuovo a mano DOPO il cursore, negativo
+            mano.value = '-7'; cambiaPremioP2P(mano.value, mano);
+            r.riscrivo = [p2pNuovoPremio, cur.value, mano.value];
+            cur.value = '-3'; cambiaPremioP2P(cur.value, cur);
+            r.ritrascino = [p2pNuovoPremio, cur.value, mano.value];
+            // 3) FUORI FASCIA a mano: il cursore si ferma al tetto, ma
+            //    il campo NON si riscrive sotto le dita
+            mano.value = '-45'; cambiaPremioP2P(mano.value, mano);
+            r.fuori = [p2pNuovoPremio, cur.value, mano.value];
+            //    ...e il primo movimento del cursore lo rimette in pari
+            cur.value = String(-P2P_PREMIO_MAX + 1); cambiaPremioP2P(cur.value, cur);
+            r.rientro = [p2pNuovoPremio, cur.value, mano.value];
+            // 4) a meta' battitura («-» da solo): zero, campo intatto
+            mano.value = '-'; cambiaPremioP2P(mano.value, mano);
+            r.meta = [p2pNuovoPremio, cur.value, mano.value];
+            // 4b) chi chiama SENZA dire chi e' (un terzo, domani) e con
+            //     un numero fuori fascia: nel campo va il TOSATO, mai il
+            //     grezzo — o campo e premio vero tornano a dire due cose
+            cambiaPremioP2P('33.4');
+            r.terzo = [p2pNuovoPremio, cur.value, mano.value];
+            // 5) a campo CHIUSO il cursore scrive la pillola, e non
+            //    inciampa sul campo che non c'e'
+            chiuso(lato, 0);
+            cur = DOM.p2pNuovoPremioCursore;
+            cur.value = '9'; cambiaPremioP2P(cur.value, cur);
+            r.pillola = [p2pNuovoPremio, DOM.p2pNuovoPremioVal.textContent,
+                         DOM.p2pNuovoPremioNota.innerHTML];
+            out[lato] = r;
+          }
+          console.log(JSON.stringify(out));
+        """)
+    _fpr = _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8")
+    _fpr.write(_banco_pr)
+    _fpr.close()
+    _rpr = _sp.run([_node, _fpr.name], capture_output=True, text=True,
+                   timeout=60, encoding="utf-8")
+    os.unlink(_fpr.name)
+    try:
+        _vpr = _js.loads((_rpr.stdout or "").strip())
+    except Exception:
+        _vpr = None
+    prova("il banco del premio gira", True, _vpr is not None
+          or "node ha detto: %s" % (_rpr.stderr or "")[:300])
+    _tetto = P2P_PREMIO_MAX_da(mini)
+    for _lato in ("compro", "vendo"):
+        _r = (_vpr or {}).get(_lato) or {}
+        prova("[%s] scrivo 5: il cursore si sposta, il campo resta mio" % _lato,
+              [5, "5", "5"], _r.get("scrivo"))
+        prova("[%s] ...poi trascino a 12: IL CAMPO SEGUE (era il difetto)" % _lato,
+              [12, "12", "12"], _r.get("trascino"))
+        prova("[%s] ...riscrivo -7 dopo il cursore: il cursore segue" % _lato,
+              [-7, "-7", "-7"], _r.get("riscrivo"))
+        prova("[%s] ...e ritrascino a -3: il campo segue ancora" % _lato,
+              [-3, "-3", "-3"], _r.get("ritrascino"))
+        prova("[%s] fuori fascia a mano: tosato, ma il campo non si tocca" % _lato,
+              [-_tetto, str(-_tetto), "-45"], _r.get("fuori"))
+        prova("[%s] ...e il cursore lo rimette in pari" % _lato,
+              [-_tetto + 1, str(-_tetto + 1), str(-_tetto + 1)], _r.get("rientro"))
+        prova("[%s] a meta' battitura vale zero e il «-» resta" % _lato,
+              [0, "0", "-"], _r.get("meta"))
+        prova("[%s] un terzo fuori fascia: nel campo va il tosato" % _lato,
+              [_tetto, str(_tetto), str(_tetto)], _r.get("terzo"))
+        prova("[%s] a campo chiuso il cursore scrive la pillola" % _lato,
+              [9, "+9%", ("C" if _lato == "compro" else "V") + "9"],
+              _r.get("pillola"))
 
     # --- 12) LA MORFOSI DEL + (set 2026, richiesta di Andrea) -------
     # Il + della barra e il bottone che pubblica sono LO STESSO
