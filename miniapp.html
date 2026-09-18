@@ -5596,6 +5596,23 @@
      pulsa: l'attesa e' finita, e un segno che si muove direbbe il
      contrario. La accende `spuntaAttesaP2P` con la classe `fatto`, e a
      toglierla e' la chiusura del velo — sempre, nel `finally`. */
+  /* IL PASSO IN EVIDENZA (19 set 2026): il bottone che tocca a te, con
+     un alone che batte tre volte e si ferma. Tre e non per sempre: un
+     bottone che pulsa ancora dopo che l'hai visto e' rumore.
+     ⚠️ `.btn.orange.in-evidenza`, CON TRE CLASSI, e l'ombra del bottone
+     ripetuta in ogni riga: `.btn.orange` sta piu' sotto con lo stesso
+     peso e la sua `box-shadow` vinceva — a «meno movimento» l'alone
+     fermo non si dipingeva proprio (visto dal vivo, non a banco), e
+     col battito il bottone perdeva il suo gradino per 4 secondi. */
+  .btn.orange.in-evidenza{animation:passo-batte 1.4s ease-in-out 3}
+  @keyframes passo-batte{
+    0%,100%{box-shadow:0 3px 0 var(--sats-deep),0 0 0 0 rgba(247,147,26,0)}
+    50%{box-shadow:0 3px 0 var(--sats-deep),0 0 0 8px rgba(247,147,26,.35)}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .btn.orange.in-evidenza{animation:none;
+      box-shadow:0 3px 0 var(--sats-deep),0 0 0 4px rgba(247,147,26,.35)}
+  }
   .attesa-spunta{display:none;width:26px;height:26px;flex:none;border-radius:50%;
     background:var(--sats);color:#fff;font-size:16px;font-weight:900;line-height:26px;
     text-align:center}
@@ -6425,6 +6442,36 @@
     html.con-tastiera .sheet.open:not(.pieno){
       max-height:calc(var(--vv-alto,
         calc(100dvh / var(--fs-zoom,1) - var(--tastiera,0px))) - 16px)}
+  }
+  /* ⚠️ E ANCHE LA POSIZIONE, NON SOLO IL TETTO (19 set 2026, dal giro
+     dal vivo su iPhone: in «Dove ricevere i sats», al tocco sul campo
+     della fattura, la tastiera sale e il foglio si taglia a meta'). Il
+     18 set ai fogli dal basso era stato curato il solo `max-height`; ma
+     DOVE stanno lo decideva ancora un conto con DUE fonti — `bottom:0`
+     lo misura il CSS sul layout, `--tastiera` lo misura il JS come
+     `innerHeight - vv.height - vv.offsetTop` — ed e' lo stesso difetto
+     del foglio pieno visto dal fondo: dove il layout SI ACCORCIA gia'
+     con la tastiera e `innerHeight` no, `bottom:0` sta gia' sopra i
+     tasti e il transform lo alza di ALTRI 336px. Il foglio finisce con
+     meta' corpo sopra il bordo alto dello schermo: «tagliato a meta'».
+     QUI LA FONTE E' UNA, la stessa del foglio pieno: il fondo del
+     foglio e' il fondo della FINESTRA VISIBILE, `--vv-su + --vv-alto`,
+     e il foglio ci si appende sopra di quanto e' alto (`-100%`). Non si
+     chiede piu' al CSS dove sia il fondo dello schermo.
+     NEL MODELLO DI SAFARI NON CAMBIA NIENTE, ed e' voluto: li'
+     `innerHeight - coperto` e `offsetTop + height` sono lo stesso
+     numero. Cambia solo dove i due conti divergevano.
+     I RIPIEGHI ricostruiscono il fondo di prima (`100dvh - tastiera`):
+     senza le due variabili il foglio sta dov'era.
+     `:not(.pieno)`, sotto i 768px, e solo l'APERTO: i chiusi restano
+     appesi a `bottom:0` col loro `translateY(100%)`, e da 768px in su
+     il foglio e' un modale centrato che la tastiera non segue. */
+  @media (max-width:767px){
+    html.con-tastiera .sheet.open:not(.pieno){
+      top:calc(var(--vv-su,0px) + var(--vv-alto,
+        calc(100dvh / var(--fs-zoom,1) - var(--tastiera,0px))));
+      bottom:auto;
+      transform:translateY(-100%)}
   }
   /* SOTTO UN FOGLIO APERTO LA PAGINA NON SCORRE (18 set 2026): la
      classe la mette fermaPaginaSotto guardando il velo, che si accende
@@ -41452,6 +41499,34 @@ function nomeControparteP2P(o, ripiego){
   const primo = c && c.nome ? String(c.nome).split(' ')[0] : '';
   return primo || ripiego;
 }
+/* PURA: cosa dire a chi VENDE quando la garanzia risulta bloccata, o ''
+   se non lo e' (da `attesa_mia_hold` si esce anche con un annullo). E'
+   la stessa frase che il server manda su Telegram a garanzia pagata —
+   chi ha l'app aperta la legge qui, chi l'ha chiusa la' — nei suoi tre
+   casi: il recapito gia' dato, lo scambio attivo (tocca a lui), e chi
+   compra che deve ancora dire dove vuole i sats (li' il bottone del
+   recapito non c'e' ancora: il coordinatore la chiave dell'altra parte
+   la dice a scambio attivo). */
+function passoDopoGaranziaP2P(o){
+  if (!o || o.lato !== 'vendo') return '';
+  if (o.stato === 'attivo')
+    return (o.campiMiei || {}).euro ? 'Garanzia bloccata ✓: aspetta gli euro'
+                                    : 'Garanzia bloccata ✓: ora indica dove ricevere gli euro';
+  if (o.stato === 'attesa_fattura_compratore')
+    return 'Garanzia bloccata ✓: ora chi compra indica dove ricevere i sats';
+  return '';
+}
+/* IL PASSO IN EVIDENZA: il bottone pieno della pagina portato a vista,
+   con un battito che dura poco. Sulla PAGINA e non in un foglio: lo
+   `scrollIntoView` che ad agosto faceva lo scatto del picker era dentro
+   un foglio con la tastiera su, qui non c'e' ne' l'uno ne' l'altra. */
+function evidenziaPassoP2P(){
+  const b = document.querySelector('#view-p2pordine .btn.orange');
+  if (!b) return;
+  try { b.scrollIntoView({block: 'nearest', behavior: 'smooth'}); } catch(e) {}
+  b.classList.add('in-evidenza');
+  setTimeout(() => b.classList.remove('in-evidenza'), 4200);
+}
 const P2P_TOAST_FATTURA = '⚡ Tocca a te: indica dove ricevere i sats';
 const P2P_TOAST_RECAPITO = 'ti ha indicato dove inviare gli euro: tocca a te';
 /* Da quali stati si puo' chiedere di annullare — e sono DUE cose
@@ -41913,9 +41988,24 @@ function applicaMessaggioP2P(ord, dentro){
       && nuovo.stato !== 'attesa_mia_hold') {
     chiudiFoglioP2P('p2pHoldSheet');
     p2pHoldOrdine = '';
-    /* «bloccati» SOLO SE LO SONO (17 set 2026): da qui si esce anche
-       col giro morto o con un annullo, e il foglio diceva ✅ lo stesso */
-    if (nuovo.stato === 'attivo') toast('Sats bloccati ✅');
+  }
+  /* LA GARANZIA E' BLOCCATA, E CHI VENDE TORNA DAL WALLET (19 set 2026,
+     dal giro dal vivo): la si paga FUORI dall'app, e al ritorno non
+     c'era niente che dicesse com'era andata ne' cosa toccava — il
+     «Sats bloccati ✅» usciva solo a foglio della garanzia ancora
+     aperto. Adesso lo si dice OVUNQUE sia, con quel che viene dopo, e
+     se sta guardando proprio questo scambio il passo gli arriva sotto
+     gli occhi (`evidenziaPassoP2P`).
+     «bloccati» SOLO SE LO SONO (17 set 2026): da `attesa_mia_hold` si
+     esce anche col giro morto o con un annullo — si guarda dove si
+     ARRIVA, non da dove si parte. */
+  if (nuovo.lato === 'vendo' && prima === 'attesa_mia_hold') {
+    const passo = passoDopoGaranziaP2P(nuovo);
+    if (passo) {
+      haptic();
+      toast(passo, 6000);
+      if (p2pOrdineAperto === nuovo.id) evidenziaPassoP2P();
+    }
   }
   /* TOCCA A TE, OVUNQUE TU SIA (17 set 2026): la richiesta di bloccare
      la garanzia ha un quarto d'ora di vita, e prima si vedeva solo con
@@ -47478,15 +47568,20 @@ function sincronizzaSvegliaP2P(o, scade, finale, adesso){
    vede partire: glielo dice chi l'ha mandato, col SOLO id dell'ordine,
    e lui avvisa chi compra («tocca a te»). Il recapito di qui non
    passa, e nel corpo non c'e' un campo dove metterlo.
-   SOLO A SCAMBIO ATTIVO: prima la garanzia non e' bloccata, e «tocca a
-   te» sarebbe falso — i dati del tabacchino partono gia' alla presa, e
-   l'avviso li aspetta qui. (Il recapito ricordato dalla patch 0007 non
-   parte piu' da solo: parte col gesto di chi vende, che a scambio
-   attivo passa di qui subito.) Una volta per recapito (`recapitoAvvisato`
+   «TOCCA A TE» SI DICE SOLO A SCAMBIO ATTIVO: prima la garanzia non e'
+   bloccata, e sarebbe falso. Una volta per recapito (`recapitoAvvisato`
    ne tiene l'id: una correzione e' un altro id e riparte), mai due
    giri insieme, e dopo un fallimento si riprova non prima di un
    minuto — a ogni render della pagina, che e' anche la strada di chi
-   riapre l'app dopo. */
+   riapre l'app dopo.
+   ⚠️ MA SI DICHIARA ANCHE PRIMA (19 set 2026): i dati del tabacchino
+   partono gia' alla presa, e a garanzia bloccata il server deve sapere
+   se a chi vende va detto «ora indica dove ricevere gli euro» o
+   «aspetta gli euro». Presto si manda `attivo: false`: il server LO
+   SCRIVE e non avvisa nessuno (`recapitoDetto` ne tiene l'id). A
+   scambio attivo si ridichiara con `ripetuto: true`: se a chi compra
+   l'ha gia' detto la frase della garanzia, il server tace — non e' una
+   correzione. Due SI'/NO in piu' sul filo, e ancora nessun recapito. */
 let p2pRecapitoTentati = {};
 function avvisaRecapitoP2P(id){
   if (typeof VETRINA !== 'undefined' && VETRINA) return;
@@ -47494,18 +47589,26 @@ function avvisaRecapitoP2P(id){
   if (!myTgId) return;
   const o = ordiniP2P()[id];
   const campo = o && (o.campiMiei || {}).euro;
-  if (!o || o.lato !== 'vendo' || o.stato !== 'attivo' || !campo) return;
-  if (o.recapitoAvvisato === campo.id || !idMostroVero(o.id)) return;
-  const adesso = Date.now();
-  if ((p2pRecapitoTentati[id] || 0) > adesso - 60000) return;
-  p2pRecapitoTentati[id] = adesso;
+  if (!o || o.lato !== 'vendo' || !campo || !idMostroVero(o.id)) return;
+  const attivo = o.stato === 'attivo';
+  /* dopo lo scambio attivo (euro inviati, concluso…) non c'e' piu'
+     niente da dire a nessuno; prima si', ma solo la dichiarazione */
+  if (!attivo && (P2P_GIRO_APERTO.indexOf(o.stato) < 0)) return;
+  if (attivo ? o.recapitoAvvisato === campo.id : o.recapitoDetto === campo.id) return;
+  const adesso = Date.now(), chiave = id + (attivo ? '' : ':presto');
+  if ((p2pRecapitoTentati[chiave] || 0) > adesso - 60000) return;
+  p2pRecapitoTentati[chiave] = adesso;
+  const corpo = {ordine: o.id, attivo: attivo};
+  if (attivo && o.recapitoDetto === campo.id) corpo.ripetuto = true;
   fetch(`${API_BASE}/p2p/recapito`, {method: 'POST',
     headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
-    body: JSON.stringify({ordine: o.id})})
+    body: JSON.stringify(corpo)})
     .then(r => {
       if (!r || !r.ok) return;
       const agg = ordiniP2P()[id];
-      if (agg) { agg.recapitoAvvisato = campo.id; scriviOrdineP2P(agg); }
+      if (!agg) return;
+      if (attivo) agg.recapitoAvvisato = campo.id; else agg.recapitoDetto = campo.id;
+      scriviOrdineP2P(agg);
     }).catch(() => {});
 }
 
@@ -48474,12 +48577,23 @@ function campoInVistaFoglio(){
   const chi = campo.closest('.foglio-corpo') || foglio;
   const r = campo.getBoundingClientRect(), s = chi.getBoundingClientRect();
   const piede = chi.querySelector('.foglio-piede');
+  /* «IN VISTA» E' DENTRO LA FINESTRA VISIBILE, non solo dentro il
+     foglio (19 set 2026): un foglio dal basso puo' sbordare da quel che
+     si vede — sopra, se e' piu' alto della finestra mentre il tetto
+     arriva un fotogramma dopo; sotto, se la tastiera lo copre ancora —
+     e un campo «dentro il foglio» ma dietro i tasti e' un campo in cui
+     si scrive alla cieca. I rettangoli sono in coordinate di LAYOUT,
+     come `offsetTop`: si confrontano senza convertire niente. Senza
+     visualViewport i due limiti non stringono, e vale il foglio. */
+  const vv = window.visualViewport;
+  const tetto = Math.max(s.top, vv ? vv.offsetTop : s.top);
   const fondo = Math.min(s.bottom,
+    vv ? vv.offsetTop + vv.height : s.bottom,
     piede && !piede.contains(campo) ? piede.getBoundingClientRect().top : s.bottom);
   const aria = 12;
   let passo = 0;
   if (r.bottom > fondo - aria) passo = r.bottom - (fondo - aria);
-  else if (r.top < s.top + aria) passo = r.top - (s.top + aria);
+  else if (r.top < tetto + aria) passo = r.top - (tetto + aria);
   if (passo) chi.scrollTop += passo / z;
   return passo;
 }

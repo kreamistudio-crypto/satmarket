@@ -35461,7 +35461,8 @@ def _parti_scambio_p2p(con, ordine: str) -> dict:
             "vivo": vivo_libro, "fonte": "libro"}
 
 
-def _avviso_recapito_p2p(con, ordine, io: int, adesso: int) -> tuple:
+def _avviso_recapito_p2p(con, ordine, io: int, adesso: int,
+                         attivo: bool = True, ripetuto: bool = False) -> tuple:
     """Chi vende ha mandato dove ricevere gli euro: a chi dirlo, e con
     che frase. Puro sulla connessione. Torna `(tg_id, testo)`, o
     `(0, perche')` quando non parte niente — e il perche' e' per il
@@ -35471,6 +35472,18 @@ def _avviso_recapito_p2p(con, ordine, io: int, adesso: int) -> tuple:
     dev'essere VIVO: prima della presa non c'e' nessuno a cui dirlo,
     dopo non c'e' piu' niente da pagare. Il giudice delle parti e'
     `_parti_scambio_p2p`.
+    SI PUO' DICHIARARE PRIMA CHE LO SCAMBIO SIA ATTIVO (19 set 2026): i
+    dati del tabacchino partono alla presa, e a garanzia bloccata il
+    server deve sapere se a chi vende va detto «indica dove ricevere gli
+    euro» o «aspetta gli euro». La dichiarazione si SCRIVE sempre (la
+    cronaca, `fonte` = 'telefono'); l'avviso a chi compra parte solo se
+    la garanzia C'E' — lo dice il coordinatore (`garanzia_pagata` nel
+    giro), o in sua assenza il telefono (`attivo`, la fiducia di prima).
+    Prima no: «tocca a te» sarebbe falso, e a garanzia bloccata glielo
+    dira' la frase della garanzia.
+    `ripetuto` = lo STESSO recapito, ridichiarato a scambio attivo dopo
+    una dichiarazione fatta presto: se a chi compra e' gia' stato detto
+    non e' una correzione, e tace.
     IL TIMBRO PRIMA DELL'INVIO, il patto delle sorelle."""
     pulite = _ordini_puliti_p2p([ordine] if isinstance(ordine, str) else ordine)
     if len(pulite) != 1:
@@ -35495,11 +35508,26 @@ def _avviso_recapito_p2p(con, ordine, io: int, adesso: int) -> tuple:
     if not altro:
         return 0, "l'altra parte non e' dei nostri (un altro client, o non annotata)"
     giro = parti["giro"]
+    # LA DICHIARAZIONE SI SCRIVE, che l'avviso parta o no: e' da qui che
+    # la frase della garanzia sa che chi vende il recapito l'ha gia' dato
+    con.execute(
+        "INSERT OR IGNORE INTO p2p_momenti(ordine, momento, quando, fonte, "
+        "giro, attore, arrivato) VALUES(?,'recapito',?,'telefono',?,'seller',?)",
+        (ordine, adesso, giro, adesso))
+    con.commit()
+    garanzia = con.execute(
+        "SELECT 1 FROM p2p_momenti WHERE ordine=? AND giro=? AND fonte='mostro' "
+        "AND momento='garanzia_pagata' LIMIT 1", (ordine, giro)).fetchone()
+    if not garanzia and not attivo:
+        return 0, ("registrato: la garanzia non c'e' ancora, a chi compra lo "
+                   "dira' l'avviso della garanzia")
     fatti = con.execute(
         "SELECT COUNT(*), MAX(quando) FROM p2p_avvisi WHERE ordine=? "
         "AND giro=? AND tg_id=? AND momento LIKE 'recapito%'",
         (ordine, giro, altro)).fetchone()
     n, ultimo = int(fatti[0] or 0), int(fatti[1] or 0)
+    if ripetuto and n > 0:
+        return 0, "gia' detto a chi compra: e' lo stesso recapito, ridichiarato"
     if n >= P2P_RECAPITO_MAX:
         return 0, f"gia' {n} avvisi su questo scambio"
     if adesso - ultimo < P2P_RECAPITO_PAUSA_S:
@@ -35536,7 +35564,9 @@ def _avviso_recapito_p2p(con, ordine, io: int, adesso: int) -> tuple:
 async def recapito_p2p(req: Request, x_tg_init_data: str = Header(""),
                        barattolo_sessione: str = Cookie("")):
     """«Ho mandato all'altra parte dove ricevere gli euro»: il server
-    avvisa chi compra. Nel corpo c'e' il solo id dell'ordine — il
+    avvisa chi compra. Nel corpo c'e' l'id dell'ordine e, dal 19 set
+    2026, due SI'/NO — `attivo` (il telefono vede lo scambio attivo?) e
+    `ripetuto` (e' lo stesso recapito di prima, ridichiarato?) — il
     recapito NON passa di qui, e non c'e' un campo dove metterlo.
     LA RISPOSTA E' SEMPRE `{"ok": true}` quando la richiesta si legge:
     se l'avviso e' partito, a chi, e perche' no lo dice il journal e
@@ -35551,8 +35581,12 @@ async def recapito_p2p(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(400, "Richiesta illeggibile")
     con = db()
     try:
-        a_chi, testo = _avviso_recapito_p2p(con, (d or {}).get("ordine"),
-                                            user["id"], int(time.time()))
+        # `attivo` manca nei telefoni di ieri, che chiamavano SOLO a
+        # scambio attivo: l'assenza vale True
+        a_chi, testo = _avviso_recapito_p2p(
+            con, (d or {}).get("ordine"), user["id"], int(time.time()),
+            attivo=(d or {}).get("attivo") is not False,
+            ripetuto=(d or {}).get("ripetuto") is True)
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
@@ -37609,6 +37643,9 @@ def _destinatari_evento_p2p(momento: str, attore: str, dettaglio: str,
       compra — e la FATTURA CHIESTA non parla MAI: o e' la meta' di
       questa coppia, o nasce con una presa fatta proprio da chi compra,
       che ha l'app in mano.
+    LA GARANZIA PAGATA e' l'unica eccezione al «mai a chi ha fatto il
+    gesto»: la si paga da un wallet esterno, e chi vende torna nell'app
+    senza sapere com'e' andata (vedi il ramo, qui sotto).
     IL RILASCIO di chi vende non avvisa nessuno ADESSO: chi compra
     sentira' «concluso» a pagamento riuscito, e a chi vende ci pensa
     l'attesa (vedi «LE ATTESE»). Quello di un moderatore si' — non
@@ -37621,7 +37658,15 @@ def _destinatari_evento_p2p(momento: str, attore: str, dettaglio: str,
     elif momento == "garanzia_chiesta":
         ruoli = [] if dettaglio == "take" else ["vende"]
     elif momento == "garanzia_pagata":
-        ruoli = ["compra"]
+        # L'ECCEZIONE ALLA REGOLA, ed e' una sola (19 set 2026, dal giro
+        # dal vivo): la garanzia la paga chi vende, ma da un wallet
+        # ESTERNO — fuori dall'app, che intanto e' sotto o chiusa. Non e'
+        # un gesto fatto con l'app in mano: chi torna dal wallet non ha
+        # davanti niente che gli dica che e' andata, e il passo dopo e'
+        # ancora SUO (dire dove vuole gli euro). Il coordinatore e'
+        # l'unico a sapere che il pagamento e' arrivato: lo dice a tutti
+        # e due.
+        ruoli = ["compra", "vende"]
     elif momento == "fattura_data":
         ruoli = ["vende"] if dettaglio in ("", "active") else []
     elif momento == "fiat":
@@ -37690,13 +37735,39 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
             return (f"🔒 <b>Paga la garanzia: la richiesta è nell'app.</b> "
                     f"{altro} ha indicato dove ricevere i sats, ora tocca a te.")
         return "🔒 <b>Paga la garanzia: la richiesta è nell'app.</b>"
+    # IL RECAPITO E' GIA' PARTITO? (19 set 2026) Lo dichiara il telefono
+    # di chi vende (`_avviso_recapito_p2p`), anche PRIMA che lo scambio
+    # sia attivo: i dati del tabacchino partono alla presa. A chi l'ha
+    # gia' mandato non si dice di mandarlo.
+    detto = bool(dati.get("recapito_detto"))
+    if momento == "garanzia_pagata" and vende:
+        # A CHI VENDE (19 set 2026): ha pagato da un wallet esterno, e
+        # tornando nell'app deve sapere che e' andata e cosa tocca a lui
+        if detto:
+            return "🔒 <b>Garanzia bloccata ✓:</b> aspetta gli euro."
+        if dettaglio == "active":
+            return ("🔒 <b>Garanzia bloccata ✓:</b> ora indica dove ricevere "
+                    "gli euro.")
+        # `invoice-next`: chi vende e' chi ha PRESO. mostrod non gli ha
+        # ancora detto la chiave dell'altra parte — la manda a scambio
+        # attivo — quindi le coordinate cifrate non puo' ancora mandarle:
+        # «ora indica» sarebbe un bottone che non c'e'. Glielo dira' la
+        # fattura data, che e' il momento in cui il bottone compare.
+        return (f"🔒 <b>Garanzia bloccata ✓:</b> appena {l_altro} indica dove "
+                "ricevere i sats, tocca a te indicare dove ricevere gli euro.")
     if momento == "garanzia_pagata":
+        if dettaglio == "active" and detto:
+            return (f"🔒 <b>{altro} ha bloccato i sats in garanzia e ti ha già "
+                    f"indicato dove inviare {cifra or 'gli euro'}:</b> tocca a te.")
         if dettaglio == "active":
             return (f"🔒 <b>{altro} ha bloccato i sats in garanzia.</b> Appena "
                     f"ti indica dove inviare {cifra or 'gli euro'}, tocca a te.")
         return (f"🔒 <b>{altro} ha bloccato i sats in garanzia:</b> indica "
                 "dove ricevere i sats.")
     if momento == "fattura_data":
+        if detto:
+            return (f"⚡ <b>{altro} ha indicato dove ricevere i sats:</b> "
+                    "aspetta gli euro.")
         return (f"⚡ <b>{altro} ha indicato dove ricevere i sats.</b> Se non "
                 "l'hai ancora fatto, indica dove ricevere gli euro.")
     if momento == "fiat":
@@ -37801,7 +37872,7 @@ def _dati_frase_p2p(con, ordine: str) -> dict:
     ordine che il libro non segue da' un dizionario vuoto, e la frase
     esce senza cifre."""
     dati = {"sats": 0, "euro": "", "metodi": "", "netto": 0, "totale": 0,
-            "maker": 0, "preso_da": 0}
+            "maker": 0, "preso_da": 0, "recapito_detto": False}
     r = con.execute("SELECT tg_id, preso_da, sats, euro, metodi FROM p2p_ordini "
                     "WHERE ordine=?", (ordine,)).fetchone()
     if r:
@@ -37813,11 +37884,24 @@ def _dati_frase_p2p(con, ordine: str) -> dict:
                     metodi=", ".join(html.escape(str(m)) for m in metodi
                                      if isinstance(m, str)),
                     maker=int(r["tg_id"] or 0), preso_da=int(r["preso_da"] or 0))
-    s = con.execute("SELECT sats, sats_compratore, sats_venditore FROM p2p_scambi "
-                    "WHERE ordine=?", (ordine,)).fetchone()
+    s = con.execute("SELECT sats, sats_compratore, sats_venditore, giro "
+                    "FROM p2p_scambi WHERE ordine=?", (ordine,)).fetchone()
     if s and int(s["sats"] or 0) > 0:
         dati.update(sats=int(s["sats"]), netto=int(s["sats_compratore"] or 0),
                     totale=int(s["sats_venditore"] or 0))
+    # IL RECAPITO GIA' DETTO IN QUESTO GIRO (19 set 2026): la cronaca
+    # porta la dichiarazione del telefono di chi vende (`fonte` =
+    # 'telefono'), l'anti-doppione l'avviso gia' arrivato a chi compra.
+    # Del giro in corso e non dell'ordine: un ordine tornato in vetrina
+    # e ripreso ha un'altra persona davanti, che non ha ricevuto niente.
+    giro = int(s["giro"] or 0) if s else 0
+    dati["recapito_detto"] = bool(
+        con.execute("SELECT 1 FROM p2p_momenti WHERE ordine=? AND giro=? "
+                    "AND momento='recapito' AND fonte='telefono' LIMIT 1",
+                    (ordine, giro)).fetchone()
+        or con.execute("SELECT 1 FROM p2p_avvisi WHERE ordine=? AND giro=? "
+                       "AND momento LIKE 'recapito%' LIMIT 1",
+                       (ordine, giro)).fetchone())
     return dati
 
 
@@ -37893,6 +37977,16 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
             recensibile=(momento == "concluso" and recensibile(chi)))
         if testo:
             fuori.append((chi, testo))
+            # A CHI COMPRA LA GARANZIA HA DETTO ANCHE IL RECAPITO (19 set
+            # 2026): vale come il suo primo avviso del recapito, o il
+            # telefono di chi vende — che a scambio attivo lo ridichiara
+            # — glielo farebbe risuonare un minuto dopo come «correzione»
+            if (momento == "garanzia_pagata" and ruolo == "compra"
+                    and ev["dettaglio"] == "active" and dati["recapito_detto"]):
+                con.execute(
+                    "INSERT OR IGNORE INTO p2p_avvisi(ordine, momento, giro, "
+                    "tg_id, quando, fonte) VALUES(?,'recapito1',?,?,?,'mostro')",
+                    (ordine, giro, chi, adesso))
     con.commit()
     return fuori
 

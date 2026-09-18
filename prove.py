@@ -57164,8 +57164,10 @@ def prove_p2p_eventi():
         ("preso", "buyer", "invoice-next", [B]),
         ("garanzia_chiesta", "mostro", "take", []),
         ("garanzia_chiesta", "mostro", "invoice", [B]),
-        ("garanzia_pagata", "seller", "invoice-next", [A]),
-        ("garanzia_pagata", "seller", "active", [A]),
+        # (19 set 2026) LA SOLA ECCEZIONE: la garanzia si paga da un wallet
+        # ESTERNO, e chi vende torna nell'app senza sapere com'e' andata
+        ("garanzia_pagata", "seller", "invoice-next", [A, B]),
+        ("garanzia_pagata", "seller", "active", [A, B]),
         ("fattura_chiesta", "mostro", "", []),
         ("fattura_data", "buyer", "active", [B]),
         ("fattura_data", "buyer", "hold-next", []),
@@ -57194,7 +57196,14 @@ def prove_p2p_eventi():
     colpevoli = [(m, attore, d) for m, attore, d, _ in TABELLA
                  if {"buyer": A, "seller": B}.get(attore)
                  in [t for t, _ in dest(m, attore, d, A, B)]]
-    prova("NESSUN momento avvisa chi ha fatto il gesto", [], colpevoli)
+    # (19 set 2026) UNA, e si NOMINA: la garanzia pagata. Non e' un gesto
+    # fatto con l'app in mano — la si paga da un wallet esterno — e il
+    # passo dopo e' ancora di chi l'ha pagata. La prova resta un
+    # censimento: una SECONDA eccezione la farebbe rossa, e chi la vuole
+    # viene a scriverla qui col suo perche'.
+    prova("NESSUN momento avvisa chi ha fatto il gesto — tranne UNO, la "
+          "garanzia pagata fuori dall'app", {"garanzia_pagata"},
+          {m for m, _, _ in colpevoli})
     prova("...e la tabella copre tutti i momenti che il coordinatore sa dire",
           set(), {mom(a, d) for a in amb["P2P_AZIONI_EVENTO"]
                   for d in ("", "republished", "book", "taker-timeout")}
@@ -57245,8 +57254,12 @@ def prove_p2p_eventi():
                "indicare dove ricevere i sats.")], detti)
     prova("...e la garanzia chiesta nello stesso istante non e' un secondo avviso",
           [], arriva("hold-invoice-requested", "mostro", "take", ORA))
-    prova("la garanzia pagata la sente chi compra: tocca a lui",
-          [(A, "🔒 Anna ha bloccato i sats in garanzia: indica dove ricevere i sats.")],
+    prova("la garanzia pagata la sente chi compra (tocca a lui) E chi l'ha "
+          "pagata da fuori: qui chi vende ha PRESO, e il bottone degli euro "
+          "non ce l'ha ancora — la frase dice cosa viene dopo, non «ora indica»",
+          [(A, "🔒 Anna ha bloccato i sats in garanzia: indica dove ricevere i sats."),
+           (B, "🔒 Garanzia bloccata ✓: appena Bruno indica dove ricevere i sats, "
+               "tocca a te indicare dove ricevere gli euro.")],
           arriva("hold-invoice-paid", "seller", "invoice-next", ORA + 60))
     prova("...e la fattura chiesta nello stesso istante non parla", [],
           arriva("buyer-invoice-requested", "mostro", "", ORA + 60))
@@ -57301,10 +57314,103 @@ def prove_p2p_eventi():
                     "indicato dove ricevere i sats, ora tocca a te.")]),
           (arriva("buyer-invoice-added", "buyer", "hold-next", ORA + 30, ORD2),
            arriva("hold-invoice-requested", "mostro", "invoice", ORA + 30, ORD2)))
-    prova("...chi vende paga: chi compra sa che ora aspetta il recapito degli euro",
+    prova("...chi vende paga da un wallet esterno: a lui «ora indica dove "
+          "ricevere gli euro», a chi compra che aspetta il recapito",
           [(A, "🔒 Anna ha bloccato i sats in garanzia. Appena ti indica dove "
-               "inviare 10,00 €, tocca a te.")],
+               "inviare 10,00 €, tocca a te."),
+           (B, "🔒 Garanzia bloccata ✓: ora indica dove ricevere gli euro.")],
           arriva("hold-invoice-paid", "seller", "active", ORA + 90, ORD2))
+
+    # --- 5b) IL RECAPITO GIA' DATO (19 set 2026) --------------------
+    # I dati del tabacchino partono alla PRESA, prima della garanzia: il
+    # telefono di chi vende lo dichiara subito (`attivo: false`), il
+    # server lo SCRIVE e non avvisa nessuno — e a garanzia pagata sa che
+    # a chi vende non va detto di mandare quel che ha gia' mandato.
+    recapito = amb["_avviso_recapito_p2p"]
+    ORDT = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+    libro(ORDT, B, A, "sell")
+    arriva("taken", "buyer", "invoice-next", ORA, ORDT)
+    esito = recapito(con, ORDT, B, ORA + 5, attivo=False)
+    prova("il recapito dichiarato PRIMA della garanzia si scrive, e a chi "
+          "compra non si dice ancora niente («tocca a te» sarebbe falso)",
+          [0, True, 1, 0],
+          [esito[0], "la garanzia non c'e' ancora" in esito[1],
+           con.execute("SELECT COUNT(*) FROM p2p_momenti WHERE ordine=? AND "
+                       "momento='recapito' AND fonte='telefono'", (ORDT,)).fetchone()[0],
+           con.execute("SELECT COUNT(*) FROM p2p_avvisi WHERE ordine=? AND "
+                       "momento LIKE 'recapito%'", (ORDT,)).fetchone()[0]])
+    arriva("buyer-invoice-added", "buyer", "hold-next", ORA + 20, ORDT)
+    arriva("hold-invoice-requested", "mostro", "invoice", ORA + 20, ORDT)
+    prova("...a garanzia pagata chi vende legge «aspetta gli euro», e chi "
+          "compra che il recapito c'e' GIA': tocca a lui",
+          [(A, "🔒 Anna ha bloccato i sats in garanzia e ti ha già indicato dove "
+               "inviare 10,00 €: tocca a te."),
+           (B, "🔒 Garanzia bloccata ✓: aspetta gli euro.")],
+          arriva("hold-invoice-paid", "seller", "active", ORA + 60, ORDT))
+    # ...e il telefono, che a scambio attivo RIDICHIARA lo stesso recapito,
+    # non lo fa risuonare a chi compra come una «correzione»
+    prova("...lo stesso recapito ridichiarato a scambio attivo TACE: a chi "
+          "compra l'ha gia' detto la garanzia",
+          (0, "gia' detto a chi compra: e' lo stesso recapito, ridichiarato"),
+          recapito(con, ORDT, B, ORA + 200, attivo=True, ripetuto=True))
+    a_chi, testo = recapito(con, ORDT, B, ORA + 400, attivo=True)
+    prova("...mentre un recapito NUOVO e' una correzione, e parte",
+          [A, True], [a_chi, "ha aggiornato dove inviare 10,00 €" in testo])
+    # SENZA IL COORDINATORE vale la parola del telefono, com'era: presto
+    # no, a scambio attivo si' — anche se e' un «ripetuto» mai detto
+    ORDL = "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff"
+    libro(ORDL, B, A, "sell")
+    prova("senza il coordinatore: dichiarato presto non avvisa, a scambio "
+          "attivo si' — il ripetuto MAI DETTO non e' un doppione",
+          [0, A], [recapito(con, ORDL, B, ORA, attivo=False)[0],
+                   recapito(con, ORDL, B, ORA + 70, attivo=True, ripetuto=True)[0]])
+    prova("...e la fattura data a chi ha gia' indicato il recapito dice «aspetta gli euro»",
+          True, "aspetta gli euro" in amb["_testo_evento_p2p"](
+              "fattura_data", "active", "vende", {"recapito_detto": True}, nome="Bruno")
+          and "Se non l'hai ancora fatto" in amb["_testo_evento_p2p"](
+              "fattura_data", "active", "vende", {}, nome="Bruno"))
+    # --- 5c) DALLA TORTURA (19 set 2026): quattro righe che nessuno
+    # guardava. Ognuna e' una difesa che stava in piedi da sola.
+    # 1. la frase combinata e' SOLO dello scambio attivo: a `invoice-next`
+    #    tocca a chi compra dire dove vuole i sats, e «tocca a te» sugli
+    #    euro sarebbe il passo sbagliato
+    _presto = amb["_testo_evento_p2p"]("garanzia_pagata", "invoice-next", "compra",
+                                       {"recapito_detto": True}, nome="Anna")
+    prova("col recapito gia' detto ma lo scambio NON ancora attivo, a chi "
+          "compra si chiede la fattura e non gli euro", [True, False],
+          ["indica dove ricevere i sats" in _presto, "ti ha già indicato" in _presto])
+    # 2. il giro: il recapito dichiarato a chi aveva preso PRIMA non vale
+    #    per chi prende DOPO, che non ha ricevuto niente
+    ORDG = "cccccccc-dddd-4eee-8fff-000000000001"
+    libro(ORDG, B, A, "sell")
+    arriva("taken", "buyer", "invoice-next", ORA, ORDG)
+    recapito(con, ORDG, B, ORA + 5, attivo=False)
+    arriva("canceled", "buyer", "republished", ORA + 40, ORDG)
+    arriva("taken", "buyer", "invoice-next", ORA + 70, ORDG)
+    arriva("buyer-invoice-added", "buyer", "hold-next", ORA + 80, ORDG)
+    arriva("hold-invoice-requested", "mostro", "invoice", ORA + 80, ORDG)
+    prova("il recapito dichiarato nel giro di PRIMA non vale per il giro dopo: "
+          "a chi vende si dice di indicarlo",
+          [(A, "🔒 Anna ha bloccato i sats in garanzia. Appena ti indica dove "
+               "inviare 10,00 €, tocca a te."),
+           (B, "🔒 Garanzia bloccata ✓: ora indica dove ricevere gli euro.")],
+          arriva("hold-invoice-paid", "seller", "active", ORA + 120, ORDG))
+    # 3. il telefono rimasto indietro: dichiara «presto» a garanzia GIA'
+    #    pagata (lo stato sul telefono arriva dopo l'evento). Il server sa
+    #    che la garanzia c'e': a chi compra lo dice, non aspetta un altro giro
+    prova("...e un telefono rimasto indietro (`attivo: false` a garanzia GIA' "
+          "pagata) non zittisce l'avviso: lo decide il server, che lo sa",
+          A, recapito(con, ORDG, B, ORA + 130, attivo=False)[0])
+    # 4. gli scambi a cavallo del deploy: l'avviso del recapito partito dal
+    #    server di ieri sta in `p2p_avvisi` e NON ha la riga del telefono
+    ORDV = "cccccccc-dddd-4eee-8fff-000000000002"
+    libro(ORDV, B, A, "sell")
+    arriva("taken", "buyer", "invoice-next", ORA, ORDV)
+    con.execute("INSERT INTO p2p_avvisi(ordine, momento, giro, tg_id, quando, fonte) "
+                "VALUES(?,'recapito1',1,?,?,'telefono')", (ORDV, A, ORA + 10))
+    prova("un recapito gia' AVVISATO a chi compra vale come detto, anche senza "
+          "la riga del telefono (gli scambi a cavallo del deploy)",
+          True, amb["_dati_frase_p2p"](con, ORDV)["recapito_detto"])
 
     # --- 6) IL GIRO: la seconda presa non e' il doppione della prima -
     ORD3 = "99999999-8888-4777-8666-555544443333"
@@ -59334,8 +59440,11 @@ def prove_p2p_esito_notifiche():
         fatto = amb["_registra_evento_p2p"](con, e, quando)
         return [t for t, _ in amb["_avvisi_evento_p2p"](con, e, fatto, quando)]
 
+    # (19 set 2026: la garanzia pagata la sentono in DUE, e qui chi vende
+    # ha gli avvisi spenti — per «chi viene avvisato» si usa un momento
+    # che ha un destinatario solo, ed e' lui ad averli accesi)
     prova("chi viene avvisato non lascia righe di silenzio", ([700000001], []),
-          (_evento("hold-invoice-paid", "seller", ORA_E, "invoice-next"), list(zitti)))
+          (_evento("dispute-opened", "seller", ORA_E), list(zitti)))
     prova("chi ha gli avvisi P2P SPENTI tace, e il journal dice che e' l'interruttore, e su cosa",
           True, _evento("fiat-sent", "buyer", ORA_E + 10) == [] and len(zitti) == 1
           and "700000002 ha gli avvisi P2P SPENTI" in zitti[0]
@@ -59684,8 +59793,17 @@ def prove_p2p_recapito_passo():
           all(c in src for c in ('"euro TEXT DEFAULT \'\'"', '"recapito_avviso INTEGER DEFAULT 0"',
                                  '"recapito_n INTEGER DEFAULT 0"')))
     rotta = pezzo("recapito_p2p")
-    prova("la rotta legge dal corpo il SOLO id dell'ordine", ["ordine"],
+    # (19 set 2026) l'id dell'ordine e due SI'/NO: `attivo` (il telefono
+    # vede lo scambio attivo?) e `ripetuto` (e' lo stesso recapito di
+    # prima?). Ancora nessun posto per il recapito, e i due si leggono
+    # con `is`: una stringa — o un IBAN — in quei campi non vale niente.
+    prova("la rotta legge dal corpo l'id dell'ordine e due SI'/NO, e nient'altro",
+          ["attivo", "ordine", "ripetuto"],
           sorted(set(re.findall(r'\.get\("(\w+)"\)', codice(rotta)))))
+    prova("...e i due SI'/NO si leggono per identita': quel che non e' un "
+          "booleano non vale niente", True,
+          '.get("attivo") is not False' in rotta
+          and '.get("ripetuto") is True' in rotta)
     prova("...risponde sempre ok (chi chiama non impara se l'altra parte ha gli avvisi accesi)",
           [2, 0], [codice(rotta).count('return {"ok": True}'), codice(rotta).count('"ok": False')])
     giud_src = codice(_senza_prosa(pezzo("_avviso_recapito_p2p")))
@@ -59916,15 +60034,37 @@ const pausa = ms => new Promise(r => setTimeout(r, ms));
                              avvisaRecapitoP2P(ID); await pausa(20); return chiamate.length; };
   out.recapitoParte = await prova({});
   out.recapitoCorpo = JSON.stringify(chiamate[0].corpo) + ' ' + chiamate[0].url;
-  out.recapitoSegnato = ordini[ID].recapitoAvvisato;
+  out.recapitoSegnato = ordini[ID].recapitoAvvisato || '';
   chiamate = []; p2pRecapitoTentati = {};
   avvisaRecapitoP2P(ID); await pausa(20);
   out.recapitoNonRipete = chiamate.length;
   out.correzioneRiparte = await prova({recapitoAvvisato: 'm1',
     campiMiei: {euro: {id: 'm2', testo: 'IBAN NUOVO', t: 9}}});
-  out.soloAttivo = [await prova({stato: 'attesa_fattura_compratore'}),
-                    await prova({stato: 'attesa_mia_hold'}),
-                    await prova({stato: 'euro_inviati'}), await prova({stato: 'concluso'})];
+  /* (19 set 2026) PRIMA dello scambio attivo si DICHIARA e basta:
+     `attivo: false`, e si segna in `recapitoDetto` — «tocca a te» lo
+     decide il server, che sa quando la garanzia c'e' */
+  out.prestoDichiara = [await prova({stato: 'attesa_mia_hold'}),
+                        JSON.stringify(chiamate[0].corpo),
+                        ordini[ID].recapitoDetto, ordini[ID].recapitoAvvisato === undefined];
+  chiamate = []; p2pRecapitoTentati = {};
+  avvisaRecapitoP2P(ID); await pausa(20);
+  out.prestoNonRipete = chiamate.length;
+  /* ...e a scambio attivo lo STESSO recapito si ridichiara come tale */
+  chiamate = []; p2pRecapitoTentati = {};
+  ordini[ID].stato = 'attivo';
+  avvisaRecapitoP2P(ID); await pausa(20);
+  out.attivoRidichiara = [chiamate.length, JSON.stringify((chiamate[0] || {}).corpo),
+                          ordini[ID].recapitoAvvisato];
+  /* I DUE FRENI SONO DUE (dalla tortura): il «non prima di un minuto»
+     del presto non ferma la dichiarazione a scambio attivo, che arriva
+     anche dieci secondi dopo — e' il momento in cui serve */
+  riga({stato: 'attesa_mia_hold'}); chiamate = []; p2pRecapitoTentati = {};
+  avvisaRecapitoP2P(ID); await pausa(20);
+  ordini[ID].stato = 'attivo';
+  avvisaRecapitoP2P(ID); await pausa(20);
+  out.freniSeparati = chiamate.map(c => c.corpo.attivo);
+  out.dopoNo = [await prova({stato: 'euro_inviati'}), await prova({stato: 'concluso'}),
+                await prova({stato: 'pubblicato'})];
   out.soloChiVende = await prova({lato: 'compro'});
   out.senzaRecapito = await prova({campiMiei: {}});
   /* il server che non risponde: non si segna, e si riprova non prima di un minuto */
@@ -59938,7 +60078,11 @@ const pausa = ms => new Promise(r => setTimeout(r, ms));
 """
     pezzi = "\n".join(pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
         "function avvisaRecapitoP2P(id){",))
-    pezzi = ("let p2pRecapitoTentati = {};\n" + pezzi)
+    # (19 set 2026) gli stati da cui il recapito si DICHIARA presto sono
+    # quelli del giro aperto: la costante VERA, non una copia
+    _ga = mini.index("const P2P_GIRO_APERTO = [")
+    pezzi = ("let p2pRecapitoTentati = {};\n"
+             + mini[_ga:mini.index("];", _ga) + 2] + "\n" + pezzi)
     d = _tf.mkdtemp()
     try:
         f = os.path.join(d, "segnali.js")
@@ -59953,12 +60097,23 @@ const pausa = ms => new Promise(r => setTimeout(r, ms));
         _sh.rmtree(d, ignore_errors=True)
     prova("chi vende, a scambio attivo, col recapito partito: l'avviso parte", 1, o["recapitoParte"])
     prova("...col SOLO id dell'ordine: il recapito non passa dal server",
-          '{"ordine":"0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000a"} /api/p2p/recapito', o["recapitoCorpo"])
+          '{"ordine":"0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000a","attivo":true} /api/p2p/recapito',
+          o["recapitoCorpo"])
     prova("...si segna QUALE recapito e' stato detto, e non si ripete", ["m1", 0],
           [o["recapitoSegnato"], o["recapitoNonRipete"]])
     prova("...una correzione e' un altro recapito, e riparte", 1, o["correzioneRiparte"])
-    prova("prima dello scambio attivo (e dopo) non parte: «tocca a te» non sarebbe vero",
-          [0, 0, 0, 0], o["soloAttivo"])
+    prova("PRIMA dello scambio attivo si dichiara e basta: `attivo: false`, "
+          "segnato a parte — e «avvisato» resta vuoto",
+          [1, '{"ordine":"0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000a","attivo":false}', "m1", True],
+          o["prestoDichiara"])
+    prova("...una volta sola", 0, o["prestoNonRipete"])
+    prova("...e a scambio attivo lo stesso recapito si RIDICHIARA come ripetuto",
+          [1, '{"ordine":"0199b7c1-2d3e-4f50-a1b2-c3d4e5f6000a","attivo":true,"ripetuto":true}', "m1"],
+          o["attivoRidichiara"])
+    prova("...e il freno del «presto» non ferma la dichiarazione a scambio "
+          "attivo, dieci secondi dopo", [False, True], o.get("freniSeparati"))
+    prova("dopo lo scambio attivo, o a ordine ancora in vetrina, non parte niente",
+          [0, 0, 0], o["dopoNo"])
     prova("chi compra non avvisa nessuno, e senza recapito non c'e' niente da dire",
           [0, 0], [o["soloChiVende"], o["senzaRecapito"]])
     prova("se il server non risponde non si segna (si riprovera')", [1, True], o["fallitoNonSegna"])
@@ -59972,7 +60127,8 @@ def prove_p2p_silenzi():
     del libro; qui sta quello del CLIENT, e si fa GIRARE: la richiesta
     di bloccare la garanzia lo dice ovunque, un giro che muore prima
     della garanzia resta scritto sulla riga e butta la richiesta
-    vecchia, e «Sats bloccati ✅» esce solo quando lo sono."""
+    vecchia, e «Garanzia bloccata ✓» esce solo quando lo e' — ovunque
+    sia chi vende, che la paga FUORI dall'app (19 set 2026)."""
     print("\n[i silenzi del P2P: il client dice quel che succede]")
     import json as _json
     import shutil as _sh
@@ -59990,10 +60146,45 @@ def prove_p2p_silenzi():
 
     # --- 1) DOVE STANNO LE RIGHE -------------------------------------
     appl = _nudo(fn("function applicaMessaggioP2P(ord, dentro){"))
-    prova("«Sats bloccati ✅» esce solo quando lo scambio e' attivo", True,
-          "if (nuovo.stato === 'attivo') toast('Sats bloccati ✅');" in appl)
-    prova("...e non ne esiste un'altra copia senza condizione", 1,
-          appl.count("toast('Sats bloccati ✅')"))
+    # (19 set 2026) «Sats bloccati ✅» usciva solo a foglio della garanzia
+    # ancora aperto — e chi vende la paga da un wallet ESTERNO: al ritorno
+    # il foglio e' un dettaglio. Adesso la frase la decide un giudice puro
+    # che guarda dove si ARRIVA, e il ramo non chiede quale foglio c'e'.
+    prova("il vecchio «Sats bloccati ✅» non c'e' piu', da nessuna parte", 0,
+          _nudo(mini).count("Sats bloccati ✅"))
+    _k = appl.find("if (nuovo.lato === 'vendo' && prima === 'attesa_mia_hold') {")
+    _ramo = appl[_k:appl.index("\n  }\n", _k)] if _k >= 0 else ""
+    prova("a garanzia bloccata chi vende lo sente USCENDO da «tocca a te», "
+          "e la frase la da' il giudice", True,
+          "const passo = passoDopoGaranziaP2P(nuovo);" in _ramo
+          and "toast(passo, 6000);" in _ramo)
+    prova("...senza chiedere se il foglio della garanzia e' aperto", False,
+          "p2pHoldOrdine" in _ramo)
+    prova("...e il passo va in evidenza solo se sta guardando QUESTO scambio",
+          True, "if (p2pOrdineAperto === nuovo.id) evidenziaPassoP2P();" in _ramo)
+    _ev = _nudo(fn("function evidenziaPassoP2P(){"))
+    prova("l'evidenza e' il bottone pieno della pagina dello scambio: a "
+          "vista, col battito che si toglie da solo", [True, True, True],
+          ["document.querySelector('#view-p2pordine .btn.orange')" in _ev,
+           "b.scrollIntoView({block: 'nearest', behavior: 'smooth'})" in _ev,
+           "setTimeout(() => b.classList.remove('in-evidenza'), 4200);" in _ev])
+    _css = _nudo(mini)
+    prova("il battito batte tre volte e si ferma, e chi ha chiesto meno "
+          "movimento ha un alone fermo", [True, True],
+          [".btn.orange.in-evidenza{animation:passo-batte 1.4s ease-in-out 3}" in _css,
+           ".btn.orange.in-evidenza{animation:none;\n      box-shadow:0 3px 0 "
+           "var(--sats-deep),0 0 0 4px rgba(247,147,26,.35)}" in _css])
+    # VISTO DAL VIVO E NON A BANCO: `.btn.orange` sta piu' sotto con lo
+    # stesso peso di `.btn.in-evidenza`, e la sua ombra vinceva — l'alone
+    # fermo non si dipingeva. Serve una classe in piu', e l'ombra del
+    # bottone ripetuta in ogni riga o il gradino sparisce col battito.
+    prova("...col PESO per battere l'ombra di `.btn.orange`, che sta piu' "
+          "sotto: mai la regola a due classi", 0, _css.count(".btn.in-evidenza"))
+    _kf = _css[_css.find("@keyframes passo-batte{"):]
+    _kf = _kf[:_kf.find("@media")]
+    prova("...e il gradino del bottone resta in OGNI fotogramma del battito",
+          [2, 2], [_kf.count("box-shadow:"),
+                   _kf.count("box-shadow:0 3px 0 var(--sats-deep),")])
     prova("il «tocca a te» scatta all'INGRESSO nello stato, su una richiesta viva",
           True, "if (nuovo.stato === 'attesa_mia_hold' && prima !== 'attesa_mia_hold'\n"
           "      && holdVivaP2P(nuovo)) {" in appl
@@ -60152,6 +60343,10 @@ process.stdout.write(JSON.stringify(out));
         "const P2P_TOAST_FATTURA = 'DOVE';",
         "function seguibileP2P(id){ return false; }",
         "function apriHoldP2P(){}",
+        # (19 set 2026) chi vende torna dal wallet: il giudice e' quello
+        # vero, l'evidenza e' di cartone e si conta
+        fn("function passoDopoGaranziaP2P(o){"),
+        "let evidenze = 0; function evidenziaPassoP2P(){ evidenze++; }",
         fn("function applicaMessaggioP2P(ord, dentro){"),
         "let p2pDiario = [];", fn("function diarioP2P(riga){"),
         # la guardia del bundle non entra nel banco, la sua memoria si':
@@ -60203,11 +60398,53 @@ nuova();
 for (const n of ['eco', 'attesa', 'paga', 'preso']) arriva('v', n);
 out.inOrdine = [righe.v.stato, righe.v.ultimaMossa === T + 180, righe.v.peer === SUA,
                 toasts.filter(t => t === 'TOCCA').length];
+// a2) CHI VENDE TORNA DAL WALLET (19 set 2026): la garanzia bloccata si
+//     dice UNA volta, col passo che viene dopo — e p2pHoldOrdine e' ''
+//     per tutto il banco, cioe' il foglio della garanzia NON e' aperto
+const GAR = t => t.indexOf('Garanzia bloccata') === 0;
+out.passoDetto = [toasts.filter(GAR), evidenze];
 // b) LA RIAPERTURA: il relay ripete tutto alla rinfusa. Niente si muove,
 //    nessuna storia inventata, nessun toast
 toasts = [];
 for (const n of ['eco', 'paga', 'attesa', 'preso', 'eco', 'attesa']) arriva('v', n);
 out.replay = [righe.v.stato, righe.v.giroMorto || '', toasts.length, statoTestoP2P(righe.v).t];
+// ...a pagina dello scambio aperta il bottone va in evidenza
+nuova(); evidenze = 0; p2pOrdineAperto = 'v';
+for (const n of ['eco', 'attesa', 'paga', 'preso']) arriva('v', n);
+out.passoInEvidenza = [toasts.filter(GAR).length, evidenze];
+// ...ma se sta guardando un ALTRO scambio no: il toast si', il battito no
+nuova(); evidenze = 0; p2pOrdineAperto = 'altro';
+for (const n of ['eco', 'attesa', 'paga', 'preso']) arriva('v', n);
+out.passoAltrove = [toasts.filter(GAR).length, evidenze];
+p2pOrdineAperto = '';
+// ...col recapito GIA' dato (il tabacchino parte alla presa) non c'e'
+// niente da indicare: aspetta gli euro
+nuova({campiMiei: {euro: {id: 'c1'}}}); evidenze = 0;
+for (const n of ['eco', 'attesa', 'paga', 'preso']) arriva('v', n);
+out.passoGiaDato = toasts.filter(GAR);
+// ...chi vende ha PRESO: paga la garanzia PRIMA che chi compra dica dove
+// vuole i sats, e il passo dopo non e' suo
+nuova({mio: false, stato: 'prendo'});
+arriva('v', 'paga');
+arriva('v', ['waiting-buyer-invoice', {order: {amount: 16345}}, T + 180]);
+out.passoPreso = [righe.v.stato, toasts.filter(GAR)];
+// ...e da «tocca a te» si esce anche SENZA garanzia: annullo e giro morto
+// non dicono «bloccata»
+nuova();
+for (const n of ['eco', 'attesa', 'paga']) arriva('v', n);
+arriva('v', ['canceled', null, T + 300]);
+const annullo = toasts.filter(GAR).length;
+nuova();
+for (const n of ['eco', 'attesa', 'paga']) arriva('v', n);
+arriva('v', ['new-order', {order: {amount: 16345}}, T + 400]);
+out.passoMaiFalso = [annullo, toasts.filter(GAR).length];
+// ...il giudice, da solo: chi compra non lo sente mai, e gli altri stati tacciono
+out.passoPuro = [
+  passoDopoGaranziaP2P({lato: 'compro', stato: 'attivo'}),
+  passoDopoGaranziaP2P({lato: 'vendo', stato: 'annullato'}),
+  passoDopoGaranziaP2P({lato: 'vendo', stato: 'pubblicato'}),
+  passoDopoGaranziaP2P({lato: 'vendo', stato: 'attivo', campiMiei: {}}),
+  passoDopoGaranziaP2P(null)];
 // c) LA RIGA DI PRIMA DELLA CURA, quella di oggi: ferma a «pubblicato»
 //    con la storia falsa scritta sopra, senza l'ora. In QUALUNQUE ordine
 //    arrivino i ripetuti, finisce ad attivo e la storia sparisce
@@ -60308,6 +60545,28 @@ process.stdout.write(JSON.stringify(out));
         _sh.rmtree(d, ignore_errors=True)
     prova("lo scambio vero, in ordine: «Sats in garanzia», con l'ora, la controparte e UN «tocca a te»",
           ["attivo", True, True, 1], o2["inOrdine"])
+    # --- CHI VENDE TORNA DAL WALLET (19 set 2026) ---
+    prova("a garanzia bloccata chi vende lo sente UNA volta, col passo che "
+          "tocca a lui — a foglio della garanzia CHIUSO, e senza battito se "
+          "non sta guardando lo scambio",
+          [["Garanzia bloccata ✓: ora indica dove ricevere gli euro"], 0],
+          o2["passoDetto"])
+    prova("...a pagina dello scambio aperta il bottone va in evidenza, una volta",
+          [1, 1], o2["passoInEvidenza"])
+    prova("...se guarda un ALTRO scambio il toast si' e il battito no",
+          [1, 0], o2["passoAltrove"])
+    prova("...col recapito gia' dato non c'e' niente da indicare: aspetta gli euro",
+          ["Garanzia bloccata ✓: aspetta gli euro"], o2["passoGiaDato"])
+    prova("...chi vende ha PRESO: il passo dopo e' di chi compra, e lo dice",
+          ["attesa_fattura_compratore",
+           ["Garanzia bloccata ✓: ora chi compra indica dove ricevere i sats"]],
+          o2["passoPreso"])
+    prova("...e «bloccata» non si dice MAI uscendo da «tocca a te» per un "
+          "annullo o un giro morto", [0, 0], o2["passoMaiFalso"])
+    prova("il giudice da solo: chi compra e gli altri stati tacciono, e un "
+          "recapito vuoto non e' un recapito",
+          ["", "", "", "Garanzia bloccata ✓: ora indica dove ricevere gli euro", ""],
+          o2["passoPuro"])
     prova("LA RIAPERTURA: i messaggi ripetuti alla rinfusa non muovono niente, non inventano storie, non parlano",
           ["attivo", "", 0, "Sats in garanzia"], o2["replay"])
     prova("la riga di oggi (ferma a «pubblicato» con la storia falsa, senza l'ora) guarisce in QUALUNQUE ordine",
@@ -69344,6 +69603,45 @@ def prove_foglio_tastiera_iphone():
           "        calc(100dvh / var(--fs-zoom,1) - var(--tastiera,0px))) - 16px)}"
           in nudo)
 
+    # 2b) E ANCHE LA POSIZIONE DEI FOGLI DAL BASSO (19 set 2026, dal
+    # giro dal vivo: «Dove ricevere i sats» tagliato a meta' al tocco sul
+    # campo della fattura). Il 18 era stato curato il solo tetto: DOVE
+    # sta il foglio lo decideva ancora `bottom:0` + `--tastiera`, due
+    # fonti. Ora il fondo del foglio e' il fondo della finestra visibile.
+    _k = nudo.find("html.con-tastiera .sheet.open:not(.pieno){\n      top:")
+    _pos = nudo[_k:nudo.index("}", _k)] if _k >= 0 else ""
+    prova("a tastiera su il foglio dal basso si appende al FONDO della "
+          "finestra visibile", True,
+          "top:calc(var(--vv-su,0px) + var(--vv-alto," in _pos)
+    prova("...col fondo di prima per ripiego (senza le variabili sta dov'era)",
+          True, "calc(100dvh / var(--fs-zoom,1) - var(--tastiera,0px))));" in _pos)
+    prova("...e si stacca da `bottom:0`, che e' la seconda fonte", True,
+          "bottom:auto;" in _pos)
+    prova("...alzandosi di quanto e' alto, non di quanto copre la tastiera",
+          [True, False], ["transform:translateY(-100%)" in _pos,
+                          "--tastiera" in _pos.split("transform:")[-1]])
+    # chi NON deve prenderla: i chiusi (restano appesi a bottom:0 col
+    # loro translateY(100%)), il foglio pieno, e i modali da 768px in su
+    _prima = nudo[:_k] if _k >= 0 else ""
+    prova("...solo l'APERTO, solo i non pieni, solo sotto i 768px", True,
+          _k >= 0 and _prima.rstrip().endswith("@media (max-width:767px){")
+          and "html.con-tastiera .sheet:not(" not in nudo
+          and "html.con-tastiera .sheet{" not in nudo)
+    # VALE PER TUTTI I FOGLI DAL BASSO, non per un elenco: la regola e'
+    # sulla classe. Qui si guarda che i quattro nominati nel giro dal
+    # vivo SIANO fogli dal basso qualunque — `.sheet` e non `.pieno` —
+    # e che accendano il velo, che e' quel che ferma la pagina sotto.
+    _m = mini.replace("\r\n", "\n")
+    for _id in ("p2pIncassoSheet", "p2pCampiSheet", "p2pFiltroSheet",
+                "p2pMieiFiltroSheet", "nostrSheet"):
+        _apre = [i for i in range(len(_m))
+                 if _m.startswith("el('%s').classList.add('open')" % _id, i)]
+        prova(f"`{_id}` e' un foglio dal basso qualunque, e ogni sua apertura "
+              "accende il velo", [True, True],
+              ['<div class="sheet" id="%s"' % _id in _m,
+               bool(_apre) and all("el('sheetBg').classList.add('open')"
+                                   in _m[i - 160:i] for i in _apre)])
+
     # 3) LA PAGINA SOTTO STA FERMA, e lo decide il velo
     prova("sotto un foglio aperto la pagina non scorre (solo telefono)",
           True,
@@ -69485,6 +69783,41 @@ def prove_foglio_tastiera_iphone():
           // il fuoco sul FOGLIO stesso: non e' un campo da riportare
           foglioStesso(){ const c = scena({stesso: 1, chi: [100, 476]});
             tastiera(812, 476, 0); return c.scrollTop; },
+          // ---- «IN VISTA» E' DENTRO LA FINESTRA VISIBILE (19 set 2026) ----
+          // il foglio dal basso SBORDA SOTTO i tasti (300..700, si vede
+          // fino a 476): il campo e' «dentro il foglio» e dietro la tastiera
+          sbordaSotto(){ const c = scena({chi: [300, 700], campo: [500, 540]});
+            tastiera(812, 476, 0); return c.scrollTop; },
+          // ...o SOPRA il bordo alto (il foglio tagliato a meta'): il campo
+          // e' dentro il foglio e fuori dallo schermo
+          sbordaSopra(){ const c = scena({chi: [-100, 476], campo: [-40, -5]});
+            tastiera(812, 476, 0); return c.scrollTop; },
+          // la finestra visibile SCORSA di 150: i limiti scorrono con lei
+          scorsaSotto(){ const c = scena({chi: [250, 900], campo: [640, 680]});
+            tastiera(812, 476, 150); return c.scrollTop; },
+          scorsaSopra(){ const c = scena({chi: [0, 626], campo: [100, 135]});
+            tastiera(812, 476, 150); return c.scrollTop; },
+          // senza visualViewport vale il foglio, come prima
+          senzaVV(){ tastiera(812, 476, 0);
+            const c = scena({chi: [100, 700], campo: [660, 700]});
+            const vero = window.visualViewport; window.visualViewport = null;
+            try { campoInVistaFoglio(); } finally { window.visualViewport = vero; }
+            return c.scrollTop; },
+          // ---- IL FONDO DEL FOGLIO DAL BASSO, NEI QUATTRO MODELLI ----
+          // [layout, innerHeight, vv.height, vv.offsetTop] -> dove finisce
+          // il foglio col conto di IERI (`bottom:0` del layout meno
+          // `--tastiera`) e con quello di OGGI (`--vv-su + --vv-alto`),
+          // contro il fondo di quel che si VEDE
+          fondi(){
+            const px = v => parseFloat(v);
+            return [['safari', 812, 812, 476, 0], ['scorsa', 812, 812, 476, 150],
+                    ['inFondo', 812, 812, 476, 336], ['doppia', 476, 812, 476, 0]]
+              .map(([nome, layout, inner, alto, su]) => {
+                tastiera(inner, alto, su);
+                return [nome, layout - px(VAR['--tastiera']),
+                        px(VAR['--vv-su']) + px(VAR['--vv-alto']), su + alto];
+              });
+          },
           // ---- LA PAGINA SOTTO ----
           velo(){ const prima = CLASSI.has('foglio-su');
             VELO.classi.add('open'); OCCHI.forEach(f => f());
@@ -69555,6 +69888,27 @@ def prove_foglio_tastiera_iphone():
           _v.get("foglioStesso"))
     prova("il velo acceso ferma la pagina, spento la libera (un occhio solo)",
           [False, True, False, 1], _v.get("velo"))
+    # --- «IN VISTA» E' DENTRO LA FINESTRA VISIBILE (19 set 2026) ---
+    prova("il foglio sborda SOTTO i tasti: il campo «dentro il foglio» ma "
+          "dietro la tastiera torna a vista (540-464)", 176, _v.get("sbordaSotto"))
+    prova("il foglio sborda SOPRA lo schermo (tagliato a meta'): il campo "
+          "fuori dal bordo alto scende (-40-12)", 48, _v.get("sbordaSopra"))
+    prova("a finestra scorsa di 150 i due limiti scorrono con lei: sotto "
+          "(680-614)...", 166, _v.get("scorsaSotto"))
+    prova("...e sopra (100-162)", 38, _v.get("scorsaSopra"))
+    prova("senza visualViewport vale il foglio, come prima (700-688)", 112,
+          _v.get("senzaVV"))
+    # --- IL FONDO DEL FOGLIO NEI QUATTRO MODELLI DI TASTIERA ---
+    # [modello, fondo di IERI, fondo di OGGI, fondo di quel che si VEDE]
+    _fondi = {f[0]: f[1:] for f in (_v.get("fondi") or [])}
+    prova("nel modello di Safari i due conti coincidono: la cura non sposta "
+          "niente dove funzionava", [[476, 476, 476], [626, 626, 626]],
+          [_fondi.get("safari"), _fondi.get("scorsa")])
+    prova("nel modello della DOPPIA SOTTRAZIONE ieri il fondo del foglio "
+          "stava a 140 su 476 — tagliato a meta' — e oggi sta sul fondo di "
+          "quel che si vede", [140, 476, 476], _fondi.get("doppia"))
+    prova("in NESSUN modello il fondo di oggi si stacca da quel che si vede",
+          [], [k for k, f in _fondi.items() if f[1] != f[2]])
 
 
 def prove_reputazione_nostr():
