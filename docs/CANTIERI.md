@@ -19554,3 +19554,119 @@ RESTA DA GUARDARE: Andrea sul telefono — scrivere 5, trascinare, e
 guardare che il numero nel campo si muova col pallino.
 
 Giro intero nel worktree su `origin/main`: 11355 passate, 0 fallite.
+
+## Il premio scritto a mano, secondo giro: il cursore chiude il campo e torna la pillola (18 set 2026)
+
+IL RESTO DEL DIFETTO (Andrea, dopo il giro qui sopra): scritto il premio
+a mano, muovendo il cursore il numero adesso seguiva — ma restava
+DENTRO IL CAMPO BIANCO. Niente colore del giudizio, niente matita,
+«Fatto» ancora lì: la pillola tornava solo toccando «Fatto». Il primo
+giro aveva curato il numero che mentiva e lasciato la pagina in uno
+stato che nessuno aveva chiesto — un campo di scrittura aperto sotto un
+dito che sta facendo altro.
+
+**LA DECISIONE: CHI MUOVE IL PREMIO DA FUORI CHIUDE IL CAMPO.** Chi è
+passato al cursore ha finito di scrivere. Torna la pillola — stessi
+colori, stessa matita, «Modifica», stessa fascia e stessa nota — e da
+lì in poi il foglio si comporta come se il campo non si fosse mai
+aperto. Per riscrivere a mano si ritocca la pillola (o «Modifica»),
+come sempre. Vale per «Vuoi comprare Bitcoin» e «Vuoi vendere Bitcoin»,
+che sono lo stesso render con `p2pLato` diverso.
+
+**IL GIUDICE RESTA `da`, E NON DIVENTA IL BLUR.** La strada che viene
+in mente per prima è «chiudi quando il campo perde il fuoco»: su iOS
+toccare un cursore NON toglie il fuoco al campo (già a verbale qui
+sopra), quindi il blur non arriverebbe proprio nel caso da curare. A
+decidere è sempre chi ha mosso: in `cambiaPremioP2P(v, da)`, se c'è il
+campo e `da` non è lui, si chiama `chiudiPremioManoP2P()`. Il `blur()`
+che sta DENTRO la chiusura è una pulizia e non un giudice: certe
+WebView tengono su la tastiera se il campo col fuoco sparisce dal DOM
+senza averlo lasciato. Una sentinella tiene fuori l'`onblur` dal campo.
+
+**LA CHIUSURA NON RIDISEGNA IL FOGLIO, ed è la trappola del cantiere.**
+La forma corta era `p2pNuovoPremioMano = false; renderNuovoOrdineP2P()`
+— quella che usa «Fatto». Ma il render rifà TUTTA la sezione, cursore
+compreso: toglierebbe da sotto il dito il nodo che si sta trascinando,
+e la corsa si fermerebbe al primo passo. Si scambiano solo due pezzi,
+che per questo hanno preso un nome: il riquadro della pillola
+(`p2pNuovoPremioBox`) e il bottone (`p2pNuovoPremioMod`). E a scriverli
+sono LE STESSE due funzioni del render, `premioValP2P` e
+`premioModP2P`: la pillola che torna è quella di prima per costruzione,
+non per somiglianza. «Fatto» resta com'era (render pieno): lì non c'è
+nessun dito su un cursore.
+
+**LA CURA DEL PRIMO GIRO RESTA COME CINTURA.** `chiudiPremioManoP2P`
+torna `true` se ha chiuso; se non riesce (il riquadro non si trova), il
+campo viene riscritto col valore tosato come ieri — il numero almeno
+non mente. È un ramo che oggi non gira mai, e per questo ha la sua
+prova: un ramo di ripiego mai esercitato è il primo a marcire.
+
+**LE PROVE.** Il banco node del primo giro aveva un DOM dove i nodi
+restavano per sempre: lì una chiusura finta sarebbe stata verde. Adesso
+il riquadro è un oggetto che, riscritto, PORTA VIA i nodi che aveva
+dentro e fa nascere quelli del testo nuovo — letti dall'HTML vero che
+`premioValP2P` rende. Il metro non è un elenco di attesi scritti a mano
+ma UN FOGLIO MAI APERTO portato allo stesso numero: «trascino col campo
+aperto» deve dare ESATTAMENTE quel che dà «mai aperto» (premio, cursore,
+campo assente, numero, classe della pillola, parola del bottone, stato,
+nota), e lo stesso un passo dopo. Più: si riapre e si batte −7; fuori
+fascia e «-» a metà battitura NON chiudono e non riscrivono; «Fatto»;
+il terzo che chiama senza dire chi è; la cintura; la chiusura a vuoto;
+il conto dei render (la chiusura non ne fa) e del blur. Sui due lati,
+col fuoco inchiodato sul campo come su un iPhone.
+
+**LA TORTURA: 20 su 20 — ma al primo giro SEI ERANO INCIAMPATE, il
+giorno dopo aver scritto la lezione.** Il banco era una catena lunga
+per lato: la mutazione «si torna al primo giro» lasciava il campo
+aperto, il passo dopo lo richiudeva con `scriviPremioP2P`, e `batti`
+esplodeva su un campo che non c'era — TUTTI i risultati buttati,
+venticinque rosse che dicevano «il banco è rotto». Sei mutazioni
+risultavano uccise così. Lo script della tortura adesso lo DICE da sé
+(stampa INCIAMPATA se fra le rosse c'è «il banco gira»), che è la
+ragione per cui si è visto subito invece che mai. La cura è di
+struttura: OGNI CASO È SOLO, col suo foglio nuovo e il suo try/catch, e
+un gesto su un nodo assente torna `null` invece di esplodere. Due erano
+anche VIVE: la cintura che scrive il grezzo (col cursore vero grezzo e
+tosato coincidono: ora la prova il terzo con 33.4) e la chiusura che
+dice sempre «non ho chiuso» (invisibile a schermo: ora il valore di
+ritorno ha la sua riga). Secondo giro: venti uccise, zero inciampate.
+
+PROVATO DAL VIVO (app vera in collaudo, identità 111, servita da una
+copia isolata; Browser pane, desktop). Con GESTI VERI, lato compro:
+il METRO — foglio mai aperto a mano, clic sul binario → «+13%» in tinta
+avviso; poi foglio nuovo, tocco sulla pillola, «5» dalla tastiera →
+campo 5, cursore 5, «Fatto»; PALLINO TRASCINATO da 5 → una spia sugli
+`input` ha contato due passi: «9» col campo ancora lì, «13» GIÀ SULLA
+PILLOLA — cioè la chiusura è scattata al primo passo e la corsa è
+CONTINUATA, sullo STESSO nodo del cursore. A fine corsa l'HTML della
+sezione Premio è IDENTICO AL METRO BYTE PER BYTE (1232 su 1232), e il
+colore calcolato della pillola è lo stesso. Poi: pillola ritoccata,
+«−7» battuto → campo −7, cursore −7; clic sul binario a sinistra →
+campo chiuso, «−15%» in tinta affare.
+Con eventi `input` sintetici: il CASO iPHONE (fuoco tenuto sul campo,
+il cursore va a −11 → campo chiuso, «−11%»; poi a 6 → «+6%», la tinta
+cambia); e il lato VENDO per intero — metro a 14, poi −30 a mano (campo
+«−30» intatto e aperto, cursore e premio −20), cursore a 14 → chiuso e
+IDENTICO AL METRO del lato vendo; riaperto con `scriviPremioP2P()` (il
+campo nasce a 14); «Fatto».
+⚠️ IL FOGLIO SI È APERTO CHIAMANDO `apriNuovoOrdineP2P()` A MANO, come
+ieri: in locale `P2P_ATTIVO` è spento. E gli scatti del pane arrivano
+in ritardo su questo foglio (uno mostrava «+9%» col DOM già a 13): a
+far fede sono le letture del DOM, lo scatto finale è stato preso a
+gesto fermo.
+NON PROVATO: un telefono vero, ed è qui che sta l'incognita del giro.
+Su iPhone la chiusura toglie dal DOM il campo che ha il fuoco MENTRE il
+dito è sul cursore: la tastiera dovrebbe scendere, e il foglio è
+ancorato in alto (`.sheet.pieno`, `top:0`) quindi non dovrebbe muoversi
+sotto il dito — ma «dovrebbe» è una deduzione, e la tastiera che scende
+a metà trascinamento è esattamente il genere di cosa che un desktop non
+mostra. Nemmeno Telegram Android, né la tastiera numerica vera. Nessun
+ordine pubblicato.
+RESTA DA GUARDARE: Andrea sul telefono — toccare la pillola, scrivere
+5, TRASCINARE il pallino senza toccare «Fatto»: deve tornare la pillola
+colorata al primo movimento, il pallino deve continuare a seguire il
+dito, e la pagina non deve saltare quando la tastiera scende. Se salta,
+la cura non è tornare al blur: è guardare chi si muove (la lezione del
+foglio ancorato, già a memoria).
+
+Giro intero nel worktree su `origin/main`: 11370 passate, 0 fallite.
