@@ -394,7 +394,12 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   dice NIENT'ALTRO: niente conteggi, versioni, percorsi o nomi di
   file, che sono tutte cose che aiutano chi guarda il server da fuori
   a sapere cosa ha davanti. Il «cosa sta girando» lo dice il journal,
-  che è di chi ha le chiavi. Sul guasto risponde 503 e non un 200 con
+  che è di chi ha le chiavi. L'UNICA ECCEZIONE (18 set 2026) è una
+  parola sul ponte verso LND (`"ponte": "ok"`, vedi «IL GUARDIANO DEL
+  PONTE» più sotto), che da fuori si vedeva già provando a comprare —
+  e NON cambia il codice: col ponte giù resta 200, perché un guasto di
+  tor non è una ragione per tornare alla versione di prima. Sul guasto
+  del database risponde 503 e non un 200 con
   «ok: false»: chi controlla la salute guarda il CODICE, e un guasto
   travestito da risposta buona è il modo in cui un rollback non parte.
   L'unità systemd COPIA lo script in /tmp prima di eseguirlo, e non è
@@ -470,6 +475,27 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `--cacert /opt/lnbits/data/tls.cert` (il cert combacia?), con
   l'header `Grpc-Metadata-macaroon` letto da file (il macaroon
   apre?); ognuno risponde a una domanda diversa.
+  IL GUARDIANO DEL PONTE (18 set 2026, dopo nove ore di acquisti
+  falliti senza che nessuno lo sapesse): il server fa da solo la PRIMA
+  delle tre domande, ogni minuto. Al terzo «no» di fila riavvia `tor` e poi `lnd-ponte.service`,
+  riguarda dopo 45 secondi e lo scrive su Telegram (il guasto prima
+  del riavvio, l'esito dopo), al massimo un avviso ogni 15 minuti; una
+  cura che non ha curato non si ripete prima di 15 minuti. Il perché
+  di ogni numero sta in CANTIERI, «Il guardiano del ponte verso LND».
+  DOVE SI LEGGE: `journalctl -u barattolo | grep 🌉` — all'avvio c'è
+  sempre la riga «Guardiano del ponte verso LND: acceso» (o «spento»,
+  col perché), poi solo i cambi. E da fuori `/api/salute` porta
+  `"ponte"`: `ok`, `giu`, `attesa` (prima del primo controllo) o
+  `spento`. A CHI SCRIVE: gli id di `GUARDIANO_PONTE_AVVISA = [...]`
+  nel config, e a lista vuota (o riga assente) i moderatori. LEVA:
+  `GUARDIANO_PONTE = False` + riavvio lo spegne. IL RIAVVIO RICHIEDE
+  ROOT: `systemctl show barattolo -p User` deve dire `User=` vuoto o
+  `root`, o la cura fallisce (e l'avviso lo dice con le parole di
+  systemctl). IL DRILL, a mercatino fermo: `systemctl stop lnd-ponte`,
+  e in circa tre minuti il guardiano lo deve rimettere su da solo,
+  con i due avvisi. Quello che NON vede: un cert scaduto, un macaroon
+  che non apre, un LND bloccato che risponde — la seconda e la terza
+  domanda restano a mano.
   LE LEVE DEL DOPPIO WALLET si AGGIUNGONO al config del VPS, come
   quelle del P2P: `LNBITS_NODO_URL = "http://127.0.0.1:5001"`,
   `LNBITS_NODO_INVOICE_KEY`, `LNBITS_NODO_ADMIN_KEY` (dal wallet

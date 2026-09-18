@@ -19948,3 +19948,191 @@ righe `discount NOT verified` nel log del nodo, che col battito acceso
 devono restare a zero e sono il termometro che riaprirebbe la cache; i
 37 sats di rotta contro un incasso di 148; e la strada dei BOND, che la
 0005 dichiara non coperta — prima di accenderli si rilegge.
+
+## Il guardiano del ponte verso LND: le nove ore mute non si ripetono (18 set 2026)
+
+**IL FATTO CHE L'HA APERTO.** Il 18 set 2026, dalle 00:00 alle 08:58,
+tor sul VPS ha rifiutato il ponte `lnd-ponte.service` (socat da
+`127.0.0.1:18080` verso la REST di LND sull'onion del nodo) ogni dieci
+secondi — «socks: connect request rejected or failed». LNbits non
+raggiungeva LND («RuntimeError: Funding source status unavailable»),
+ogni acquisto si prendeva «errore nella creazione dell'invoice», e
+**nessuno se n'è accorto per nove ore**. La cura sono state due righe,
+`systemctl restart tor` e `systemctl restart lnd-ponte.service`. Il
+guardiano le scrive da solo, e soprattutto lo DICE.
+
+**NEL SERVER E NON IN UN TIMER systemd**, e Andrea aveva lasciato la
+scelta aperta. Quattro ragioni: 1) il guasto lo SUBISCE il server, e
+`/api/salute` vive lì — lo stato passa dal guardiano alla salute senza
+un file in mezzo che può invecchiare o non essere mai stato scritto;
+2) non c'è niente da installare: un timer è un gesto sul VPS, e un
+guardiano mai installato sono le nove ore di nuovo, in silenzio —
+questo parte col deploy; 3) avvisi e freno riusano pezzi già provati,
+`_manda_telegram` coi suoi timeout e i `timbri` che sopravvivono a un
+riavvio; 4) i giudici sono puri e si torturano in `prove.py`, mentre
+di uno script bash si sorveglierebbe solo il testo (come `deploy.sh`).
+**IL PREZZO, dichiarato:** è il PRIMO sottoprocesso del server. Due
+comandi fissi (`PONTE_COMANDI`), senza shell e senza niente che arrivi
+da fuori, e una sentinella che fa rosso il giorno che ne compare un
+secondo. Funzionano perché `barattolo` gira come root (vive in
+`/root/satmarket`); se un giorno non fosse più così, il riavvio
+fallisce e l'avviso lo dice con le parole di systemctl. E se muore il
+processo del mercatino muore anche il guardiano — ma allora non compra
+nessuno, e quel guasto lo vede il deploy.
+
+**COSA GUARDA: la PRIMA delle tre domande di PRODUZIONE**, «il ponte
+arriva?» — un `GET https://127.0.0.1:18080/v1/state`, la stessa strada
+di LNbits dallo stesso host fino allo stesso LND. VIVO = LND ha
+risposto in HTTP, con QUALUNQUE codice: dall'altra parte del ponte non
+c'è nessun altro che parli TLS e HTTP, quindi una risposta è la prova
+che socat, tor e l'onion hanno fatto il loro mestiere. Niente macaroon
+(`/v1/state` non lo chiede, e se un giorno lo chiedesse il rifiuto
+direbbe lo stesso «ci sono») e niente verifica del certificato, come
+il `curl -k` di quella domanda. Il cert che scade (22 ott 2027) e il
+macaroon che non apre sono la seconda e la terza domanda: un riavvio
+di tor non le ripara, e il guardiano non finge di vederle. Tetto di
+20 secondi a domanda: un circuito tor freddo ne vuole una decina.
+
+**LE REGOLE, come le ha chieste Andrea e dove ho dovuto scegliere.**
+• Un controllo al minuto, contato da un INIZIO all'altro: una domanda
+che aspetta venti secondi non allunga il minuto. I giri stanno in
+fila, quindi nessuna domanda parte mentre la cura aspetta.
+• «Più di due minuti di fila» = il TERZO no consecutivo: fra il primo
+e il terzo passano due minuti pieni. Si contano CONTROLLI e non
+secondi: un risveglio arrivato con qualche millisecondo d'anticipo
+sposterebbe la cura di un minuto intero (c'è la prova a 119,98 s). Un
+sì in mezzo azzera il conto.
+• La cura: `restart tor`, poi `restart lnd-ponte.service`, come la
+mattina del 18. Il secondo parte anche se il primo fallisce (riavviare
+il solo socat non costa niente), e un systemctl appeso si uccide dopo
+90 secondi.
+• 45 secondi dopo, il secondo sguardo.
+• Gli avvisi su TELEGRAM, due per cura: il guasto PRIMA del riavvio
+(se la cura si impianta, quel che sta succedendo si sa già) e l'esito
+dopo. Su Telegram e non via `notifica()`, che segue il canale scelto
+per gli ORDINI: chi ha scelto i DM Nostr riceverebbe lì un avviso di
+macchina che è stato chiesto su Telegram.
+• IL FRENO, uno ogni 15 minuti, sta nei `timbri` (`ponte_avviso`) e
+non in memoria: un deploy non deve poter raddoppiare un allarme.
+Timbro storto o nel futuro vale «mai avvisato»: fra un doppione e un
+guasto taciuto, il doppione.
+• **UNA CURA CHE NON HA CURATO NON SI RIPETE PRIMA DI 15 MINUTI**, e
+questa non era nella richiesta: l'ho aggiunta io. Se il guasto sta sul
+nodo (spento, LND fermo), riavviare tor ogni tre minuti non ripara
+niente, e a ogni giro spegne per qualche secondo anche l'onion del
+mercatino. È il freno del deploy (`.deploy-bocciato`) con la stessa
+ragione: senza, il rimedio gira in tondo per sempre. E usa LO STESSO
+numero del freno degli avvisi, apposta: così ogni cura che arriva
+dopo una fallita viene sempre raccontata. Una cura che invece HA
+curato non frena niente: se il ponte ricade cinque minuti dopo, la
+cura riparte ai soliti due minuti, e tace solo l'avviso.
+• «Tornato» esce SOLO se l'ultima cosa detta era «ancora giù»: la
+domanda rimasta aperta si chiude, un guasto mai annunciato no. Il
+giudice lo garantisce anche nel caso che coi due freni uguali non
+capita (una cura silenziosa con una domanda aperta), perché è il ramo
+che tiene la promessa il giorno che qualcuno separa i due numeri.
+• Il journal parla ai CAMBI (primo no, cura, esito, ritorno) e non a
+ogni giro: una riga al minuto per nove ore è il modo in cui un
+allarme diventa tappezzeria. Tutte le righe cominciano con 🌉.
+
+**`/api/salute` DICE IL PONTE, e la regola della rotta è stata
+EMENDATA, non rotta.** La salute aveva scritto «NON DICE NIENTE DI
+PIU'»: è pubblica, e conteggi, versioni e percorsi aiutano chi guarda
+da fuori. Il ponte passa quella regola invece di romperla: «il ponte è
+giù» da fuori si vede già — chi prova a comprare si prende l'errore —
+quindi dirlo non insegna niente che un tentativo d'acquisto non dica.
+Esce UNA parola da un insieme chiuso (`_ponte_pubblico`: `ok`, `giu`,
+`attesa` prima del primo controllo, `spento`), mai l'errore,
+l'indirizzo o da quanto. **E IL CODICE RESTA 200 col ponte giù**:
+`deploy.sh` guarda il codice per decidere il rollback, e un guasto di
+tor non è una versione rotta. Il 503 resta del solo database.
+
+**LE LEVE.** `GUARDIANO_PONTE` (True di serie, e gira solo dove le tre
+righe `LNBITS_NODO_*` ci sono) e `GUARDIANO_PONTE_AVVISA`, la lista
+degli id Telegram a cui scrivere. **L'id di Andrea non sta nella
+repo**, come quelli dei fondatori: si scrive nel config del VPS. A
+lista vuota gli avvisi vanno ai moderatori (`ADMIN_IDS`): mai a
+nessuno, perché il difetto del 18 settembre era proprio che non lo
+sapeva nessuno. Un id negativo (un gruppo o un canale) si tiene. Il
+pannello «Stato delle leve» ha la riga sua, con l'allarme se c'è un
+nodo e nessuno guarda il ponte, e dice chi avvisa come CONTEGGIO, mai
+con gli id. All'avvio il journal dice sempre «🌉 Guardiano del ponte
+verso LND: acceso — …» oppure «spento (perché)».
+
+**COSA È PROVATO.** `prove_guardiano_ponte`, 77 prove, fa girare il
+ciclo VERO (`guardiano_ponte`, un `while True`) su un mondo di
+cartone — orologio che avanza coi soli `sleep`, ponte a copione,
+systemctl che si registra, Telegram che mette da parte — invece di
+chiamare i pezzi a mano: i difetti che stanno FRA i pezzi, il ritmo
+del minuto e il freno fra due cure, un banco a mano non li vede. Sei
+scenari (il 18 settembre rifatto, il buco corto, il freno, la cura che
+non cura per venti minuti, systemctl che dice no, appeso o assente), i
+giudici ai bordi, la salute (200 col ponte giù, 503 col database
+rotto) e le sentinelle. **Tortura: 46 mutazioni, 46 uccise** al
+secondo giro. Al primo erano 40 su 46, e le sei vive accusavano tutte
+la PROVA: il sì che non azzerava il conto dei no non aveva un caso;
+la stringa `"5"` sgranata carattere per carattere dà lo stesso `[5]`
+(ora è `"4242"`); lo stderr finto di systemctl non aveva un `<` da
+scappare; il conto dei comandi tentati col `FileNotFoundError` non si
+guardava; il pannello col nodo configurato il censimento non lo vede
+mai (ora `_censimento` accetta `dopo=`, nomi sostituiti dopo gli
+exec). Giro intero nel worktree su `origin/main`, `PYTHONUTF8=1
+PROVE_SEVERE=1`: 11483 passate, 0 fallite.
+
+**COSA È PROVATO DAL VIVO** (18 set 2026, sul PC): uvicorn vero da una
+copia del worktree, un ponte finto HTTPS su 18443 (certificato
+auto-firmato, e da «rotto» accetta e chiude come socat quando tor
+rifiuta) e un systemctl finto. Tre episodi. 1) Il 18 settembre al
+contrario: primo no alle 11:25:58, salute `{"ok":true,"ponte":"giu"}`
+con HTTP 200, cura alle 11:27:58 (terzo controllo), i due comandi in
+fila, secondo sguardo alle 11:28:43 → vivo, salute `ok`. 2) Server
+RIAVVIATO e ponte di nuovo rotto: cura alle 11:34:09 con «avviso
+trattenuto dal freno» e nessun messaggio, cioè il timbro è
+sopravvissuto al riavvio. 3) Timbro cancellato a mano e ponte che la
+cura non ripara: avviso del guasto, cura, «ancora giù», avviso ❌;
+un controllo dopo, nessuna nuova cura; ponte riacceso, «di nuovo vivo
+dopo 240 s» e l'avviso ✅ «tornato dopo 4 minuti». Il giro ha anche
+trovato un difetto di testo: httpx a volte alza senza parole, e
+l'avviso diceva «ConnectError: » coi due punti e niente dopo — ora
+dice il solo nome del guasto.
+⚠️ **E IL BANCO HA SBAGLIATO UNA VOLTA, e va scritto perché è una
+trappola:** in collaudo `_manda_telegram` simula SOLO per gli id sotto
+100000 (111, 222, 999). Il primo episodio avvisava un id finto
+700000001, quindi la chiamata è partita DAVVERO verso
+`api.telegram.org` — col token SEGNAPOSTO del config d'esempio, e
+Telegram ha risposto 404: non è arrivato niente a nessuno. Gli
+episodi 2 e 3 usavano il 999. In compenso ha mostrato che un avviso
+non consegnato finisce nel journal («🌉 ↳ …: telegram 404: NON
+arrivato»).
+
+**COSA NON È PROVATO**, ed è la parte onesta: systemctl VERO come root
+su Linux, tor e socat veri, il messaggio consegnato davvero su
+Telegram, l'asyncio di Linux (il sottoprocesso è girato sul loop di
+Windows). La prima cura in produzione sarà la prima vera. Il drill
+che la prova senza aspettare un guasto sta in PRODUZIONE.
+
+**LE STRADE SCARTATE.** • Il TIMER systemd: vedi sopra; il suo solo
+vantaggio vero (sopravvivere a un server morto) non serve, perché il
+guasto che il guardiano ripara conta solo quando il server è vivo.
+• Chiedere lo stato del funding source a LNbits: servirebbe una rotta
+che lo tocchi con le sole chiavi del wallet che Barattolo ha — NON ne
+ho verificata nessuna su v1.6.1, e tenerla allineata a ogni versione
+di LNbits sarebbe un debito in più —, creare una fattura al minuto per
+saperlo sporcherebbe il registro, e comunque un guasto di LNbits
+stesso la cura di tor non lo ripara. • Verificare il certificato di
+LND: è un'altra domanda, e farla qui voleva dire riavviare tor ogni
+quindici minuti per un file scaduto. • Il 503 sulla salute col ponte
+giù: rollback di versioni sane. • `notifica()` al posto di
+`_manda_telegram`: il canale degli ordini non è il canale degli
+allarmi. • La soglia in secondi invece che in controlli. • Nessun
+freno sulla cura: il rimedio in tondo.
+
+**RESTA DA GUARDARE.** Il primo `🌉` vero nel journal dopo il deploy.
+`systemctl show barattolo -p User` sul VPS: vuoto o `root`, altrimenti
+il riavvio fallisce (e l'avviso lo dirà). Il drill con `systemctl stop
+lnd-ponte`, a mercatino fermo. Un LND BLOCCATO (dopo un riavvio del
+nodo) risponde, quindi per il guardiano il ponte è vivo mentre le
+fatture falliscono lo stesso: quella è la ronda del nodo, non questa.
+E riavviare tor spegne per qualche secondo anche l'onion di Barattolo:
+con la cura frenata a una ogni quindici minuti quando non serve, è un
+prezzo che si paga di rado.

@@ -25124,6 +25124,23 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   lato, direzione dal segno, e la coda è la frase di sempre — «Vuoi
   vendere Bitcoin sotto al prezzo di mercato: consegni più sats…». Il
   verbale: CANTIERI, «Due ritocchi al foglio Pubblica».
+- IL GUARDIANO DEL PONTE VERSO LND (18 set 2026): un task asyncio del
+  server (`guardiano_ponte`, avviato allo startup, SOLO dove le tre
+  righe `LNBITS_NODO_*` ci sono) chiede ogni minuto
+  `https://127.0.0.1:18080/v1/state` — la strada di LNbits verso LND,
+  socat + tor + onion — e conta VIVO qualunque risposta HTTP. Tre no
+  di fila = cura: `PONTE_COMANDI`, i due systemctl FISSI, primo e
+  unico sottoprocesso del server (una sentinella lo tiene unico e
+  senza shell). I giudici sono puri e stanno uno per regola:
+  `_ponte_passo` (quando curare), `_ponte_esito_cura` (cosa dire dopo),
+  `_ponte_avviso_permesso` (il freno, sul timbro `ponte_avviso`),
+  `_ponte_pubblico` (la parola di `/api/salute`, da un insieme
+  chiuso), `_destinatari_ponte` (la leva o, vuota, i moderatori). Lo
+  stato vivo sta in memoria (`_ponte`), il freno degli avvisi nel
+  database. Il perché di ogni scelta — server e non timer, controlli e
+  non secondi, il freno sulla cura — sta in CANTIERI, «Il guardiano
+  del ponte verso LND»; i comandi in PRODUZIONE, «IL GUARDIANO DEL
+  PONTE».
 - LE ROTTE PUBBLICHE, l'elenco per intero (la regola ferrea 3 in
   CLAUDE.md tiene il divieto — mai StaticFiles su una directory — e le
   due sentinelle; l'elenco sta qui perché cresce a ogni cantiere, e a
