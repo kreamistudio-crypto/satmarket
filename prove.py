@@ -37575,6 +37575,151 @@ def prove_annotazioni_negli_ambienti():
           [], scoperti)
 
 
+def _chiavi_ripetute_js(corpo):
+    """Le chiavi scritte DUE VOLTE al primo livello di un letterale JS
+    `return {...}`. In un letterale la chiave ripetuta non e' un
+    errore: vince l'ultima, in silenzio, e la prima sparisce senza che
+    niente diventi rosso. Il lettore toglie commenti, stringhe e
+    template (il contenuto, non i confini), poi conta le graffe e le
+    parentesi: una `chiave:` conta solo a profondita' 1, cosi' gli
+    oggetti annidati (la IIFE della mappa) non fanno rumore."""
+    s = re.sub(r"/\*[\s\S]*?\*/", " ", corpo)
+    s = re.sub(r"(?m)^\s*//.*$", " ", s)
+    s = re.sub(r"'(?:\\.|[^'\\\n])*'", "''", s)
+    s = re.sub(r'"(?:\\.|[^"\\\n])*"', '""', s)
+    s = re.sub(r"`(?:\\.|[^`\\])*`", "``", s)
+    # le classi di caratteri delle regex (`/[^A-Za-z0-9_.-]/g`) non
+    # hanno graffe ne' chiavi: basta svuotarle
+    s = re.sub(r"\[[^\]\n]*\]", "[]", s)
+    i = s.index("return {")
+    prof, visti, doppi = 0, set(), []
+    for m in re.finditer(r"[{}()\[\]]|\b([A-Za-z_$][\w$]*)\s*:(?!:)",
+                         s[i + len("return "):]):
+        t = m.group(0)
+        if t in "{([":
+            prof += 1
+        elif t in "})]":
+            prof -= 1
+            if prof == 0:
+                break
+        elif prof == 1:
+            k = m.group(1)
+            if k in visti:
+                doppi.append(k)
+            visti.add(k)
+    return doppi
+
+
+def prove_zona_comune_in_modifica():
+    """IL CAMPO ZONA DELLA MODIFICA DICEVA «[object Object]» (18 set 2026).
+
+    Il cantiere delle zone di spedizione (17 set) ha messo in
+    `mapListing` la mappa delle tariffe sotto la chiave `zone` — che
+    era GIA' il comune dell'annuncio, qualche riga sopra. In un
+    letterale JS la chiave ripetuta non e' un errore: vince l'ultima.
+    Da quel commit `l.zone` era un oggetto dappertutto, e il form di
+    modifica lo scriveva nel campo del comune. La pagina dell'annuncio
+    era sana perche' legge `l.comune`, che arriva dal server gia'
+    estratto — ed e' per questo che il difetto si e' visto solo
+    aprendo la modifica.
+
+    Tre prove: mapListing FATTO GIRARE su una riga con comune E mappa
+    (le due chiavi devono tornare separate e intere), la sentinella
+    delle chiavi ripetute sui due adattatori, e il form che scrive
+    nel campo solo un testo."""
+    print("\n[il comune nel form di modifica]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    for f in ("function mapListing(", "function mapOrder("):
+        prova(f"nessuna chiave ripetuta in {f[9:-1]}", [],
+              _chiavi_ripetute_js(pezzo_js(mini, f, "\n}\n")))
+    # la sentinella si prova sul caso che l'ha fatta nascere: se non
+    # vedesse la `zone` doppia di ieri, sarebbe verde per niente
+    prova("...e la sentinella vede il caso del 17 set", ["zone"],
+          _chiavi_ripetute_js("function f(a){\n  return {id:a.id,"
+                              " zone:a.zona||'—', x:{zone:1},\n"
+                              "    zone:(()=>({}))()};\n}"))
+    rf = _senza_commenti_js(pezzo_js(mini, "function riempiFormDa(",
+                                     "\n}\n"))
+    prova("il campo Zona accetta solo un testo", True,
+          "el('sellZone').value = (typeof l.zone === 'string'" in rf)
+    prova("...e le tariffe si leggono dalla mappa, non dal comune",
+          True, "l.zoneSped" in rf and "l.zone ||" not in rf)
+
+    import json as _jsZ, shutil as _shZ, subprocess as _spZ
+    import tempfile as _tfZ
+    if not _shZ.which("node"):
+        salta("mapListing tiene comune e mappa separati",
+              "node non installato")
+        return
+    _prog = (
+        "const EMOJI_CAT = {};\n"
+        "function fotoUrl(n){ return '/foto/' + n; }\n"
+        "function fotoMini(n){ return n; }\n"
+        + pezzo_js(mini, "function mapListing(", "\n}\n") + "\n}\n"
+        + pezzo_js(mini, "function zonaOfferta(", "\n}\n") + "\n}\n"
+        + pezzo_js(mini, "function tariffaZona(", "\n}\n") + "\n}\n"
+        "const ls = [\n"
+        "  {id: 1, titolo: 'RAM', zona: 'Torino (TO)',"
+        " zona_comune: 'Torino (TO)', consegna: 'entrambe',"
+        " spedizione_zone: '{\"dom\":{\"sats\":0,\"eur\":0},"
+        "\"eu\":{\"sats\":0,\"eur\":12}}'},\n"
+        "  {id: 2, titolo: 'Vecchio', zona: 'Pavia (PV)',"
+        " consegna: 'spedizione', spedizione_sats: 700},\n"
+        "  {id: 3, titolo: 'Senza zona', spedizione_zone: 'storto{'},\n"
+        "].map(mapListing);\n"
+        "const r = ls.map(l => ({zone: l.zone, comune: l.comune,"
+        " sped: l.zoneSped}));\n"
+        # i due lettori della mappa, FATTI GIRARE: prima di questi
+        # casi una `zonaOfferta` che leggesse il comune sopravviveva
+        # alla tortura — nessuna prova la esercitava con una mappa vera
+        "r[0].offre = ['dom', 'eu', 'asia'].map(z => zonaOfferta(ls[0], z));\n"
+        "r[0].tariffa = tariffaZona(ls[0], 'eu');\n"
+        "r[1].offre = ['dom', 'eu'].map(z => zonaOfferta(ls[1], z));\n"
+        "r[1].tariffa = tariffaZona(ls[1], 'eu');\n"
+        "console.log(JSON.stringify(r));\n")
+    with _tfZ.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                 encoding="utf-8") as f:
+        f.write(_prog)
+        p = f.name
+    try:
+        r = _spZ.run(["node", p], capture_output=True, text=True,
+                     encoding="utf-8", timeout=60)
+    finally:
+        os.unlink(p)
+    if r.returncode != 0:
+        prova("mapListing gira in node", "", r.stderr[-300:])
+        return
+    o = _jsZ.loads(r.stdout)
+    # IL CASO DEL 18 SET: annuncio col ritiro a Torino E la mappa delle
+    # zone. `zone` e' il comune (testo), `zoneSped` la mappa (oggetto)
+    # (sempre .get: un caso che manca fa UNA rossa col suo nome, non
+    # fa esplodere le altre — la tortura l'ha visto succedere)
+    prova("la zona resta il comune, un testo", "Torino (TO)",
+          o[0].get("zone"))
+    prova("...e la mappa delle tariffe arriva intera accanto",
+          {"dom": {"sats": 0, "eur": 0}, "eu": {"sats": 0, "eur": 12}},
+          o[0].get("sped"))
+    # la mappa si LEGGE: casa e UE dichiarate, l'Asia no
+    prova("zonaOfferta legge la mappa: casa si', UE si', Asia no",
+          [True, True, False], o[0].get("offre"))
+    prova("...e tariffaZona trova i 12 euro della UE",
+          {"sats": 0, "eur": 12}, o[0].get("tariffa"))
+    # l'annuncio di prima delle zone: nessuna mappa, il comune c'e'
+    prova("un annuncio di prima delle zone tiene il comune",
+          "Pavia (PV)", o[1].get("zone"))
+    prova("...e la sua mappa e' vuota, non assente", {},
+          o[1].get("sped"))
+    # e senza mappa il ripiego di sempre: spedisce solo a casa
+    prova("senza mappa si spedisce solo a casa", [True, False],
+          o[1].get("offre"))
+    prova("...alla tariffa di casa", {"sats": 700, "eur": 0},
+          o[1].get("tariffa"))
+    # senza zona: il trattino di sempre, e un JSON storto vale vuoto
+    prova("senza zona c'e' il trattino di sempre", "—",
+          o[2].get("zone"))
+    prova("...e un JSON storto vale mappa vuota", {}, o[2].get("sped"))
+
+
 def prove_condivisione_venditore():
     """IL TESTO CONDIVISO DICE CHI VENDE (ago 2026).
 
@@ -68522,6 +68667,7 @@ def main():
               prove_guardia_is_bot,
               prove_altri_scorrimento, prove_widget, prove_ricerca,
               prove_condivisione_venditore,
+              prove_zona_comune_in_modifica,
               prove_script_nel_workflow, prove_deploy,
               prove_guardiano_ponte,
               prove_bussola, prove_tetto_claude_md,

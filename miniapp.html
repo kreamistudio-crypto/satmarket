@@ -10281,9 +10281,14 @@ function mapListing(a){
        sua copia, che serve solo a dire che e' dichiarato. Il parse e'
        difensivo come quello del server: un JSON storto vale mappa
        vuota (spedisce solo a casa), mai un errore su tutta la
-       vetrina. */
+       vetrina.
+       IL NOME E' `zoneSped` E NON `zone` (18 set 2026): `zone` e'
+       gia' il COMUNE, qualche riga sopra, e in un letterale la chiave
+       ripetuta non da' errore — vince l'ultima, in silenzio. Per un
+       giorno la mappa ha coperto il comune, e il campo Zona della
+       modifica mostrava «[object Object]». */
     paeseDom:a.paese_domestico||'',
-    zone:(()=>{ try {
+    zoneSped:(()=>{ try {
         const m = JSON.parse(a.spedizione_zone||'{}');
         return (m && typeof m === 'object') ? m : {};
       } catch(e){ return {}; } })(),
@@ -15265,7 +15270,7 @@ scriviDurate();
    e basta». */
 function zonaOfferta(l, z){
   if (l.consegna !== 'spedizione' && l.consegna !== 'entrambe') return false;
-  const m = l.zone || {};
+  const m = l.zoneSped || {};
   if (z === 'dom') return ('dom' in m) || !Object.keys(m).length;
   return z in m;
 }
@@ -15274,7 +15279,7 @@ function zonaOfferta(l, z){
    sceglie il server, che e' l'unico a sapere se e' dichiarata). Il
    DOMESTICO esce dalle colonne di sempre, come di la'. */
 function tariffaZona(l, z){
-  const v = (l.zone || {})[z];
+  const v = (l.zoneSped || {})[z];
   if (z && z !== 'dom' && v)
     return {sats: v.sats||0, eur: v.eur||0};
   return {sats: l.sped||0, eur: l.spedEur||0};
@@ -33913,7 +33918,11 @@ function riempiFormDa(l){
   impostaSellValuta(l.valuta==='eur' && l.priceEur>0 ? 'eur' : 'sats');
   el('sellPrice').value = sellValuta==='eur' ? l.priceEur : l.price;
   el('sellCat').value = l.cat;
-  el('sellZone').value = l.zone==='—' ? '' : l.zone;
+  /* il COMUNE e' un testo, e qui entra solo un testo: un oggetto
+     scritto in un campo diventa «[object Object]», e salvando senza
+     toccarlo si sarebbe mandato quello (18 set 2026, v. mapListing) */
+  el('sellZone').value = (typeof l.zone === 'string' && l.zone !== '—')
+    ? l.zone : '';
   el('sellDesc').value = l.desc==='—' ? '' : l.desc;
   impostaConsegnaForm(l.consegna||'', l.ancheDigitale,
                       l.servDove, l.durataMin);
@@ -33930,7 +33939,7 @@ function riempiFormDa(l){
      spedizione gratis e il solo supplemento in euro (o la sola
      tariffa punto) la base e' 0 e il toggle sarebbe tornato su sats,
      rileggendo degli euro come se fossero sats. */
-  const _zoneEur = Object.values(l.zone || {})
+  const _zoneEur = Object.values(l.zoneSped || {})
     .some(v => v && (v.eur || 0) > 0);
   spedValuta = (l.spedEur>0 || l.spedPuntoEur>0 || l.spedExtraEur>0
                 || _zoneEur)
@@ -33956,7 +33965,7 @@ function riempiFormDa(l){
   ZONE_INTL.forEach(z => {
     const campo = el('sellZona_' + z);
     if (!campo) return;
-    const v = (l.zone || {})[z];
+    const v = (l.zoneSped || {})[z];
     campo.value = (_spedisce && v)
       ? ((v.eur||0) > 0 ? v.eur : (v.sats||0)) : '';
   });
