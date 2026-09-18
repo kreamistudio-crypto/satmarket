@@ -8384,7 +8384,7 @@ document.getElementById('cartello')?.remove();</script>
         <div class="sped-zona"><span class="sped-zona-nome">Paese di casa</span>
           <select id="sellPaeseDom" class="sped-paese" onchange="aggiornaSpedHint()"></select></div>
         <div class="sped-zona"><span class="sped-zona-nome" id="sellSpedDomNome">Italia</span>
-          <div class="sats-input"><input id="sellSped" type="number" inputmode="numeric" placeholder="0" oninput="aggiornaSpedHint()"><button type="button" class="suffix" id="sellSpedCur" onclick="toggleSpedCur()" title="Scegli come scrivere il costo">sats ⇄</button></div></div>
+          <div class="sats-input"><input id="sellSped" type="number" inputmode="numeric" placeholder="non spedisco" oninput="aggiornaSpedHint()"><button type="button" class="suffix" id="sellSpedCur" onclick="toggleSpedCur()" title="Scegli come scrivere il costo">sats ⇄</button></div></div>
         <details class="sped-intl" id="sellIntl">
           <summary>🌍 Spedizione internazionale <span class="sped-intl-conto" id="sellIntlConto"></span></summary>
           <div id="sellZoneCampi"></div>
@@ -16672,6 +16672,10 @@ const firmaSet = () =>
    spegnerebbe il ≈ (che guarda sats>0) proprio dove serve, e fmt()
    lo scriverebbe col trattino ASCII invece del meno tipografico. */
 function cifraCtrl(sats, circa, eurNativo, meno){
+  /* UNA CIFRA E' UN NUMERO O NON SI SCRIVE (18 set 2026): «NaN €» sul
+     totale da pagare si e' visto dal vivo. La cura vera sta a monte
+     (statoCassa); questa e' l'ultima cintura, per tutte le righe. */
+  if (!Number.isFinite(sats)) return '—';
   const m = meno ? '−' : '';
   if (valutaVista==='eur'){
     if (eurNativo > 0)
@@ -16685,6 +16689,9 @@ function cifraCtrl(sats, circa, eurNativo, meno){
    (che a costo 0 resta, invece di sparire), la protezione solo
    quando esiste, e il totale evidenziato. artEur/spedEur/totEur sono
    gli euro NATIVI dal server (0 = quella cifra e' nata in sats). */
+function contoChiuso(frase){
+  return `<div class="acq-nota conto-chiuso" role="status">${esc(frase)}</div>`;
+}
 function contoRighe(c){
   /* `onclick` (set 2026, la fee dinamica): facoltativo, e quando c'e'
      porta anche il cursore a mano — l'unico segno che invita al
@@ -16946,7 +16953,7 @@ const nomeVia = v => v==='ritiro' ? '🤝 Ritiro in zona'
 function costiVieUguali(strade){
   const c = strade.find(s=>s.via==='casa');
   const p = strade.find(s=>s.via==='punto');
-  if (!c || !p || c.cambio_assente || p.cambio_assente) return false;
+  if (!stradaViva(c) || !stradaViva(p)) return false;
   if (p.fallback_casa) return true;
   const cS = c.spedizione_sats||0, pS = p.spedizione_sats||0;
   if (!cS && !pS) return true;
@@ -16998,7 +17005,7 @@ function apriAcquisto(l){
   if (DEMO) {
     acqDati.preventivo = preventivoDemo(l);
     /* lo stesso giudice della pagina vera: demo e vera non divergono */
-    acqDati.via = viaDefault(acqDati.preventivo.strade);
+    acqDati.via = viaDefault(acqDati.preventivo.strade.filter(stradaViva));
     renderAcquisto();
     return;
   }
@@ -17192,6 +17199,50 @@ function viaDefault(vive){
     if (vive.some(s => s.via === v)) return v;
   return vive.length ? vive[0].via : '';
 }
+/* LA STRADA VIVA, UN GIUDICE SOLO (18 set 2026). Una strada del
+   preventivo puo' arrivare SPENTA in due modi — `cambio_assente` (ago)
+   e `zona_non_offerta` (set, le zone di spedizione) — e in tutti e due
+   esce SENZA NUMERI: niente `spedizione_sats`, niente `totale_sats`.
+   Il secondo motivo era nato nel server e nella riga che disegna la
+   via, ma i QUATTRO posti che chiedevano «e' viva?» guardavano ancora
+   il solo cambio: la strada chiusa veniva SCELTA come default, il suo
+   totale assente diventava «NaN €», lo zero finto della spedizione
+   accendeva «✅ Spedizione gratis» e «gratuita» nel conto, e «Paga»
+   restava acceso (visto dal vivo, il Motorola da 234 €). Il prossimo
+   motivo per spegnere una strada si aggiunge QUI e in nessun altro
+   posto: c'e' la sentinella che conta chi legge i due flag a mano. */
+function stradaViva(s){
+  return !!s && !s.cambio_assente && !s.zona_non_offerta;
+}
+/* IL CONTO DELLA CASSA IN NUMERI, e la frase quando numeri non ce ne
+   sono. Pura apposta: renderAcquisto e' un template da 55 KB che
+   nessuna prova fa girare, questa la chiama un banco node.
+   IL TOTALE NON E' MAI NaN: se la via scelta non e' viva — o e' viva
+   ma il numero non e' un numero, che e' la cintura per il motivo di
+   domani — `viaOk` e' falso, `tot` e' zero e `chiuso` dice PERCHE'.
+   Chi disegna mostra la frase al posto del conto e spegne «Paga».
+   Prima, a via morta, il conto ripiegava su articolo + protezione:
+   una cifra che non corrispondeva a nessun acquisto possibile. */
+function statoCassa(p, via){
+  const strade = (p && p.strade) || [];
+  const sel = strade.find(s => s.via === via) || null;
+  let viaOk = stradaViva(sel);
+  let chiuso = '';
+  if (viaOk && !Number.isFinite(sel.totale_sats)){
+    viaOk = false;
+    chiuso = 'Non riusciamo a fare il conto: riprova tra poco';
+  } else if (!viaOk)
+    chiuso = strade.some(stradaViva)
+      ? 'Scegli qui sopra come vuoi riceverlo'
+      : strade.some(s => s.zona_non_offerta)
+        ? 'Nessuna consegna disponibile per la tua destinazione'
+        : strade.some(s => s.cambio_assente)
+          ? 'Il cambio euro non è disponibile: riprova tra poco'
+          : 'Non riusciamo a fare il conto: riprova tra poco';
+  return {sel, viaOk, chiuso,
+          sped: viaOk ? (sel.spedizione_sats||0) : 0,
+          tot: viaOk ? sel.totale_sats : 0};
+}
 async function caricaPreventivo(){
   const d0 = acqDati; if (!d0) return;
   const body = d0.tipo==='set'
@@ -17245,7 +17296,7 @@ async function caricaPreventivo(){
        ma una via GIA' SCELTA si conserva se e' ancora viva (12 ago
        2026, con lo stepper): un ± non deve riportare chi aveva
        scelto «a casa» sul ritiro */
-    const vive = (d.strade||[]).filter(s => !s.cambio_assente);
+    const vive = (d.strade||[]).filter(stradaViva);
     acqDati.via = vive.some(s => s.via === d0.via) ? d0.via
       : viaDefault(vive);
     precompilaPunto(d0, d);
@@ -18195,7 +18246,13 @@ function renderAcquisto(){
           <span class="via-sped">chi vende non spedisce in ${
             esc(etichettaZona(zonaPaese(d.paese || DOM_DEFAULT, domVend),
                               domVend) || 'questa zona')
-          }: prova un'altra destinazione</span></span></div>`;
+          }: prova un'altra destinazione</span></span></div>${
+          /* IL MENU DEL PAESE VIVE NEL CASSETTO DELLA VIA CASA, e una
+             via spenta il cassetto non lo apre: «prova un'altra
+             destinazione» senza un posto dove provarla era un vicolo
+             cieco. Sta FUORI dal div sbiadito, o si leggerebbe spento
+             anche lui. */
+          s.via==='casa' ? cassettoPaese : ''}`;
       /* «Consigliato» sulla via punto (ago 2026, decisione di Andrea):
          la pillola CONSIGLIA la strada, non spiega la tariffa — il
          «come a casa» del fallback e' sparito, e per chi compra la
@@ -18349,7 +18406,7 @@ function renderAcquisto(){
      `sped_gratis_eur` da solo, su un negozio in sats spariva TUTTO il
      blocco, invito compreso. */
   const spedisceQui = (p.strade||[]).some(
-    s => s.via==='casa' || s.via==='punto');
+    s => (s.via==='casa' || s.via==='punto') && !s.zona_non_offerta);
   const sgVal = p.sped_gratis_valuta
              || ((p.sped_gratis_soglia||0) > 0 ? 'sats' : 'eur');
   const sgSoglia = (p.sped_gratis_eur||0) || (p.sped_gratis_soglia||0);
@@ -18388,7 +18445,7 @@ function renderAcquisto(){
      cifra — a mentire era il solo cartello. Il verde agganciato al
      FATTO chiude quel caso per costruzione: dove si paga, la cifra
      non e' zero, e il badge non c'e'. */
-  const sgGratisOra = !!stradaSel && !stradaSel.cambio_assente
+  const sgGratisOra = stradaViva(stradaSel)
                    && (stradaSel.spedizione_sats||0) === 0;
   let pillaSg = '';
   if (spedisceQui && d.via !== 'ritiro' && d.via !== 'digitale'){
@@ -18414,12 +18471,11 @@ function renderAcquisto(){
   const pillole = pillaSg + pillaSc;
   const fila = pillole ? `<div class="pills fila-promesse">${pillole}</div>` : '';
   /* --- il conto della strada scelta, riga per riga --- */
-  const viaOk = stradaSel && !stradaSel.cambio_assente;
-  const sped = viaOk ? (stradaSel.spedizione_sats||0) : 0;
-  const tot = viaOk ? stradaSel.totale_sats
-            : p.articolo_sats + (p.protezione_sats||0);
+  const st = statoCassa(p, d.via);
+  const viaOk = st.viaOk, sped = st.sped, tot = st.tot;
   const circa = (p.stima || (stradaSel && stradaSel.stima)) ? '≈ ' : '';
-  const conto = contoRighe({/* «Prezzo» e' il LORDO, lo sconto la riga
+  const conto = st.chiuso ? contoChiuso(st.chiuso)
+              : contoRighe({/* «Prezzo» e' il LORDO, lo sconto la riga
                                sotto: il ripiego copre il server di
                                ieri. Dall'ago 2026 anche sul MONO —
                                il mono sconta, e la riga nasce da se'. */
@@ -18472,7 +18528,7 @@ function renderAcquisto(){
   /* --- il fondo: ⚡ NWC (solo mono, col wallet), Paga, e i due
      secondari del carrello (sul singolo non ci sono: l'offerta ce
      l'ha la scheda, col suo bottone in barra) --- */
-  const nwc = (d.tipo==='mono' && !DEMO && !VETRINA && walletNwcPaga())
+  const nwc = (viaOk && d.tipo==='mono' && !DEMO && !VETRINA && walletNwcPaga())
     ? `<button class="btn orange compra" onclick="compraSubito()">⚡ Compra subito<span class="cifra">${circa}${fmt(tot)} sats</span></button>
        <div class="escrow-note" style="margin:0">In un tocco, col wallet collegato</div>` : '';
   const secondari = d.tipo==='set'
@@ -18492,7 +18548,10 @@ function renderAcquisto(){
     <div class="section-label conto-tit">Il conto${toggleValuta()}</div>
     <div class="ctrl-conto">${conto}</div>
     <div class="ctrl-fondo">${nwc}
-      <button class="btn orange" id="acqCompra" onclick="ctaAcquisto()">Paga</button>
+      ${/* A CONTO CHIUSO «PAGA» E' SPENTO, e come nello scheletro
+            NON porta l'id acqCompra: quello e' il bottone che paga. */
+        viaOk ? `<button class="btn orange" id="acqCompra" onclick="ctaAcquisto()">Paga</button>`
+              : `<button class="btn orange" disabled>Paga</button>`}
       ${secondari}
     </div>`;
   /* ...e il via: partenze e bersagli li mette barreCorri, il ferro
@@ -19174,6 +19233,9 @@ function puntoDiCasaMancante(d){
 function ctaAcquisto(){
   haptic();
   const d = acqDati; if (!d || !d.preventivo) return;
+  /* la cintura del bottone spento: una via senza conto non si paga */
+  const stC = statoCassa(d.preventivo, d.via);
+  if (!stC.viaOk){ toast(stC.chiuso); return; }
   /* il corriere PRIMA del punto: e' l'ordine in cui si decide — la
      mappa da aprire dipende dalla rete — ed e' anche l'ordine in cui
      il cassetto disegna le due cose */
@@ -21218,7 +21280,7 @@ function compraSubito(){
      (non dovrebbe succedere) si ripiega sul flusso manuale. */
   const p = acqDati?.preventivo;
   const via = p && (p.strade||[]).find(x=>x.via===acqDati.via);
-  if (!p || !via || via.cambio_assente) { startBuy(); return; }
+  if (!p || !stradaViva(via)) { startBuy(); return; }
   if (reteMancante(acqDati)){
     apriPuntoAcquisto();
     toast('Scegli con quale corriere vuoi ricevere il pacco');
@@ -33405,7 +33467,11 @@ function aggiornaSpedCampo(){
   btn.style.pointerEvents = sellValuta==='sats' ? '' : 'none';
   inp.step = inEur ? '0.01' : '1';
   inp.inputMode = inEur ? 'decimal' : 'numeric';
-  inp.placeholder = inEur ? '0,00' : '0';
+  /* VUOTA = «LI' NON SPEDISCO», anche a CASA (18 set 2026): qui c'era
+     uno «0» grigio, che si legge come uno zero gia' scritto — cioe'
+     «gratis» — mentre il server lo legge per quel che e', una casella
+     vuota. Le sette sorelle dei continenti lo dicevano gia'. */
+  inp.placeholder = 'non spedisco';
   /* il campo punto e il supplemento SEGUONO il toggle del campo casa
      (un interruttore solo, mai semantiche diverse per i tre costi) */
   [...ZONE_INTL.map(z => ['sellZona_' + z, 'sellZonaCur_' + z]),
@@ -33445,6 +33511,13 @@ function aggiornaSpedHint(){
   } else if (sellValuta==='sats' && el('sellConsSped')?.checked){
     h.textContent = 'Costo fisso in sats, qualunque cosa faccia il cambio';
   } else h.textContent = '';
+  /* CASA VUOTA E L'ESTERO PIENO: e' una scelta legittima (la mappa la
+     sa dire) ma quasi sempre una svista, e costa il mercato di casa.
+     Si dice prima, con le parole che servono a rimediare. */
+  if (el('sellConsSped')?.checked && accese
+      && String(el('sellSped')?.value ?? '').trim() === '')
+    h.textContent = `⚠️ Casella «${nomePaese(dom) || 'Casa'}» vuota: `
+      + 'lì NON spedisci. Se è gratis, scrivi 0.';
   aggiornaSupplHint();
 }
 /* Il conto ad alta voce del supplemento, sotto il suo campo: e' la
@@ -33867,10 +33940,20 @@ function consegnaPayload(){
     /* IL PREZZO DI CASA nelle chiavi di sempre: le legge tutta l'app
        (card, NIP-99, canale, import, libro mastro), ed e' la ragione
        per cui non e' finito nella mappa. */
-    const vDom = String(el('sellSped')?.value ?? '').trim();
+    /* L'ASTA DICHIARA CASA A ZERO, SEMPRE (18 set 2026): li' il campo
+       del costo e' NASCOSTO — chi vince non paga nient'altro, la
+       spedizione e' inclusa — quindi la chiave non partiva mai, la
+       mappa nasceva vuota e il server rispondeva «Dicci dove
+       spedisci» indicando una casella che in pagina non c'e'. Dal 17
+       set un'asta con spedizione non si pubblicava piu'. L'estero in
+       asta non si dichiara: le caselle sono nascoste anche loro, e un
+       numero rimasto li' da prima sarebbe una promessa mai vista. */
+    const inAsta = astaAccesa();
+    const vDom = inAsta ? '0' : String(el('sellSped')?.value ?? '').trim();
     if (vDom !== ''){
       if (inEur) out.spedizione_eur = eurCampo('sellSped');
       else out.spedizione_sats = parseInt(vDom)||0;
+      if (inAsta){ delete out.spedizione_eur; out.spedizione_sats = 0; }
     }
     out.paese_domestico = el('sellPaeseDom')?.value || DOM_DEFAULT;
     /* LE ZONE nella mappa, e la chiave c'e' solo se la casella e'
@@ -33879,7 +33962,8 @@ function consegnaPayload(){
        che e' il contrario. */
     const zone = {};
     ZONE_INTL.forEach(z => {
-      const v = String(el('sellZona_' + z)?.value ?? '').trim();
+      const v = inAsta ? ''
+        : String(el('sellZona_' + z)?.value ?? '').trim();
       if (v === '') return;
       zone[z] = inEur ? {eur: eurCampo('sellZona_' + z)}
                       : {sats: parseInt(v)||0};

@@ -18138,8 +18138,13 @@ def prove_pagina_acquisto():
     prova("...e nessuna mette piu' il fuoco su un campo nascosto",
           False, "el('acqPunto')?.focus(); return;" in mini3)
     _cta = pezzo_js(mini3, "function ctaAcquisto(){", "\n}")
+    # (dal 18 set 2026 il PRIMO toast della funzione e' la cintura del
+    # conto chiuso, che non apre nessun cassetto: l'ordine si misura
+    # sul primo toast delle guardie del punto, che e' cio' che la
+    # prova ha sempre voluto dire)
     prova("...in ctaAcquisto l'apertura sta PRIMA del toast", True,
-          _cta.index("apriPuntoAcquisto()") < _cta.index("toast("))
+          _cta.index("apriPuntoAcquisto()")
+          < _cta.index("toast('Scegli con quale corriere"))
     _nwc = pezzo_js(mini3, "function compraSubito(){", "\n}")
     prova("...e in compraSubito idem", True,
           _nwc.index("apriPuntoAcquisto()")
@@ -18293,8 +18298,9 @@ def prove_pagina_acquisto():
     prova("...mai «uguali» attraverso una conversione", True,
           "if (cE>0 && pE>0) return cE === pE;" in mini3
           and "!c.stima && !p.stima" in mini3)
-    prova("...e a cambio muto non si confronta niente", True,
-          "c.cambio_assente || p.cambio_assente" in mini3)
+    # (18 set 2026: «spenta» ha due motivi, e li sa stradaViva)
+    prova("...e a strada spenta non si confronta niente", True,
+          "if (!stradaViva(c) || !stradaViva(p)) return false;" in mini3)
     #    Il cassetto del punto vive DENTRO il riquadro della via punto
     #    e si disegna solo a via selezionata; la radio che lo ospita
     #    e' un DIV role="radio" (HTML vieta interattivi annidati, la
@@ -32988,8 +32994,11 @@ def prove_promesse_raggiungibili():
     # dove non sappiamo quanto costa. E' la riga che si sbaglia per
     # prima, e la mutazione che la toglie e' la piu' silenziosa del
     # cantiere.
-    prova("...e il fatto esclude la strada spenta dal cambio muto", True,
-          "!stradaSel.cambio_assente" in re.sub(r"\s+", " ", _rac))
+    # (18 set 2026: passa dal giudice unico, che di motivi ne sa due —
+    # la strada chiusa dalla ZONA accendeva il verde proprio cosi')
+    prova("...e il fatto esclude la strada spenta, per ogni motivo", True,
+          "const sgGratisOra = stradaViva(stradaSel)"
+          in re.sub(r"\s+", " ", _rac))
     prova("...e si legge sulla via SCELTA, non su una qualsiasi", True,
           "(stradaSel.spedizione_sats||0) === 0" in _rac)
     # LA SOGLIA GATEA SOLO CHI LA USA (prosa e invito), MAI IL FATTO:
@@ -33056,7 +33065,9 @@ def prove_promesse_raggiungibili():
                  "mancano_sped_eur": manca, "mancano_sped_sats": 0,
                  "sped_gratis_raggiungibile": ragg,
                  "promesse_sospese": sospese}
-            js = ("const cifraSoglia=(n,v)=>`${n}`;"
+            js = (pezzo_js(mini, "function stradaViva(", "\n}\n")
+                  + "\n}\n"
+                  "const cifraSoglia=(n,v)=>`${n}`;"
                   "const barraPromessa=()=>'';let note='';"
                   "const p=" + _json.dumps(p) + ";const d={via:'casa'};"
                   "const stradaSel=(p.strade||[]).find(s=>s.via===d.via)"
@@ -33101,6 +33112,15 @@ def prove_promesse_raggiungibili():
         prova("non si sa (strada spenta dal cambio muto): mai il verde",
               "prosa", _badge({"via": "casa", "cambio_assente": True},
                               50, 20, True, True))
+        # IL 18 SET 2026, dal vivo: la strada chiusa dalla ZONA non
+        # porta la tariffa nemmeno lei, e il suo zero finto accendeva
+        # «✅ Spedizione gratis» sopra due vie spente. Ne' verde ne'
+        # invito: dove non si spedisce non c'e' niente da promettere.
+        prova("non si spedisce (strada chiusa dalla zona): mai il verde",
+              "niente", _badge({"via": "casa", "zona_non_offerta": True}))
+        prova("...e nemmeno l'invito della soglia", "niente",
+              _badge({"via": "casa", "zona_non_offerta": True},
+                     50, 20, True))
 
     # ---- 2d. LE TRE SUPERFICI DICONO LA STESSA COSA. La regola vale
     # in card, nel dettaglio e in pagina Paga: card e dettaglio il
@@ -37722,6 +37742,330 @@ def prove_zona_comune_in_modifica():
     prova("senza zona c'e' il trattino di sempre", "—",
           o[2].get("zone"))
     prova("...e un JSON storto vale mappa vuota", {}, o[2].get("sped"))
+
+
+def prove_cassa_strada_chiusa():
+    """«TOTALE DA PAGARE: NaN €» (18 set 2026, visto dal vivo).
+
+    Il server puo' spegnere una strada in DUE modi — `cambio_assente`
+    e, dalle zone di spedizione, `zona_non_offerta` — e in tutti e due
+    la strada esce senza numeri. Il client il secondo motivo lo
+    DISEGNAVA (la via sbiadita con «chi vende non spedisce in Italia»)
+    ma non lo GIUDICAVA: la strada chiusa veniva scelta come default,
+    `totale_sats` assente diventava NaN, lo zero finto accendeva
+    «✅ Spedizione gratis» e «gratuita», e «Paga» restava acceso.
+
+    Il banco fa girare i giudici VERI in node sul caso del 18 set, e a
+    CASI INDIPENDENTI: un caso che esplode fa una rossa col suo nome e
+    non si mangia gli altri."""
+    print("\n[la cassa a strada chiusa: mai un totale che non e' un numero]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    srv = open("server.py", encoding="utf-8").read()
+
+    # 1) IL CONTRATTO COL SERVER: ogni motivo con cui _strade_preventivo
+    # spegne una strada dev'essere noto al giudice del client. Il
+    # motivo di domani, dimenticato di qua, e' di nuovo un NaN.
+    import re as _reC
+    _sp = srv[srv.index("def _strade_preventivo("):]
+    _sp = _sp[:_sp.index("\n@app.")]
+    motivi = sorted(set(_reC.findall(
+        r'\{"via": v, "([a-z_]+)": True\}', _sp)))
+    prova("il server spegne una strada in due modi, e si sa quali",
+          ["cambio_assente", "zona_non_offerta"], motivi)
+    giudice = _senza_commenti_js(pezzo_js(mini, "function stradaViva(",
+                                          "\n}\n"))
+    for m in motivi:
+        prova(f"...e stradaViva conosce `{m}`", True, f"!s.{m}" in giudice)
+
+    # 2) NESSUNO GIUDICA A MANO: fuori dai due giudici, i flag li legge
+    # solo chi DISEGNA il motivo (le due vie sbiadite, la fila delle
+    # promesse) e la demo che li scrive. Un lettore nuovo alza il conto.
+    nudo = _senza_commenti_js(mini)
+    prova("`cambio_assente` lo leggono in tre, contati", 3,
+          nudo.count("cambio_assente"))
+    prova("`zona_non_offerta` lo leggono in cinque, contati", 5,
+          nudo.count("zona_non_offerta"))
+
+    # 3) I QUATTRO POSTI CHE CHIEDEVANO «E' VIVA?» passano dal giudice
+    cp = _senza_commenti_js(pezzo_js(mini, "async function caricaPreventivo(",
+                                     "\n}\n"))
+    prova("il default della via si sceglie fra le strade vive", True,
+          "(d.strade||[]).filter(stradaViva)" in cp)
+    # (la tortura: la DEMO ha la sua chiamata, e scappava)
+    prova("...anche in demo, che ha la sua chiamata", True,
+          "viaDefault(acqDati.preventivo.strade.filter(stradaViva))"
+          in _senza_commenti_js(pezzo_js(mini, "function apriAcquisto(",
+                                         "\n}\n")))
+    ra = _senza_commenti_js(pezzo_js(mini, "function renderAcquisto(){",
+                                     "\nfunction setViaAcquisto("))
+    prova("il conto della cassa lo fa statoCassa", True,
+          "const st = statoCassa(p, d.via);" in ra
+          and "st.chiuso ? contoChiuso(st.chiuso)" in ra)
+    prova("...e il vecchio ripiego articolo+protezione non c'e' piu'",
+          False, "p.articolo_sats + (p.protezione_sats||0)" in ra)
+    prova("il verde «Spedizione gratis» chiede una strada viva", True,
+          "const sgGratisOra = stradaViva(stradaSel)" in ra)
+    prova("a conto chiuso «Paga» e' spento, senza l'id che paga", True,
+          ': `<button class="btn orange" disabled>Paga</button>`}' in ra)
+    prova("...e il ⚡ del wallet non compare", True,
+          "const nwc = (viaOk && d.tipo==='mono'" in ra)
+    prova("il menu del paese resta raggiungibile a via casa chiusa",
+          True, "s.via==='casa' ? cassettoPaese : ''" in ra)
+    cta = _senza_commenti_js(pezzo_js(mini, "function ctaAcquisto(){",
+                                      "\n}\n"))
+    prova("«Paga» ha la cintura sotto il bottone spento", True,
+          "if (!stC.viaOk){ toast(stC.chiuso); return; }" in cta)
+
+    # 4) IL MODULO: la casella di casa vuota non si traveste da zero
+    prova("la casella di casa vuota dice «non spedisco»", True,
+          'id="sellSped" type="number" inputmode="numeric" '
+          'placeholder="non spedisco"' in mini
+          and "inp.placeholder = 'non spedisco';" in nudo
+          and "inp.placeholder = inEur ? '0,00' : '0';" not in nudo)
+
+    import json as _jsC, shutil as _shC, subprocess as _spC
+    import tempfile as _tfC
+    if not _shC.which("node"):
+        salta("la cassa a strada chiusa gira in node", "node non installato")
+        return
+    _prog = (
+        "let valutaVista = 'sats', eurPerSat = 0.001;\n"
+        "const esc = t => String(t);\n"
+        "const fmt = n => String(n);\n"
+        "const fmtEur = n => Number(n).toFixed(2);\n"
+        + pezzo_js(mini, "function stradaViva(", "\n}\n") + "\n}\n"
+        + pezzo_js(mini, "function statoCassa(", "\n}\n") + "\n}\n"
+        + pezzo_js(mini, "function viaDefault(", "\n}\n") + "\n}\n"
+        + pezzo_js(mini, "function costiVieUguali(", "\n}\n") + "\n}\n"
+        + pezzo_js(mini, "function cifraCtrl(", "\n}\n") + "\n}\n"
+        + pezzo_js(mini, "function contoChiuso(", "\n}\n") + "\n}\n"
+        + pezzo_js(mini, "function contoRighe(", "\n}\n") + "\n}\n"
+        "const viva = (via, sped, tot) => ({via, spedizione_sats: sped,"
+        " spedizione_eur: 0, totale_sats: tot, totale_eur: 0,"
+        " stima: false});\n"
+        "const P = {\n"
+        # il 18 set: casa e punto chiuse dalla zona, nient'altro
+        "  motorola: {articolo_sats: 250000, strade: ["
+        "{via:'casa', zona_non_offerta:true},"
+        "{via:'punto', zona_non_offerta:true}]},\n"
+        # lo stesso annuncio col ritiro a mano: una strada resta
+        "  conRitiro: {articolo_sats: 250000, strade: ["
+        "viva('ritiro', 0, 250000),"
+        "{via:'casa', zona_non_offerta:true},"
+        "{via:'punto', zona_non_offerta:true}]},\n"
+        "  sano: {articolo_sats: 250000, strade: ["
+        "viva('casa', 7000, 257000), viva('punto', 5000, 255000)]},\n"
+        "  cambioMuto: {articolo_sats: 250000, strade: ["
+        "{via:'casa', cambio_assente:true},"
+        "{via:'punto', cambio_assente:true}]},\n"
+        # la cintura: una strada «viva» che arriva senza totale
+        "  monco: {articolo_sats: 250000, strade: [{via:'casa',"
+        " spedizione_sats: 0}]},\n"
+        "  storico: {articolo_sats: 9000, strade: [viva('', 0, 9000)]},\n"
+        "};\n"
+        "const out = {};\n"
+        "for (const k in P){\n"
+        "  try {\n"
+        "    const vive = P[k].strade.filter(stradaViva);\n"
+        "    const via = viaDefault(vive);\n"
+        "    const st = statoCassa(P[k], via);\n"
+        # ...e il caso ESATTO del 18: la via morta gia' scelta
+        "    const forzata = statoCassa(P[k], 'punto');\n"
+        "    out[k] = {via, viaOk: st.viaOk, tot: st.tot, sped: st.sped,\n"
+        "      chiuso: st.chiuso, totNumero: Number.isFinite(st.tot),\n"
+        "      forzataOk: forzata.viaOk,\n"
+        "      forzataNumero: Number.isFinite(forzata.tot),\n"
+        "      mute: costiVieUguali(P[k].strade)};\n"
+        "  } catch(e){ out[k] = {esploso: String(e)}; }\n"
+        "}\n"
+        "try {\n"
+        "  out.cintura = {nan: cifraCtrl(NaN, '', 0),"
+        " indef: cifraCtrl(undefined, '≈ ', 0), zero: cifraCtrl(0, '', 0)};\n"
+        "  valutaVista = 'eur';\n"
+        "  out.cintura.nanEur = cifraCtrl(NaN, '', 0);\n"
+        "  out.cintura.conto = contoRighe({art: 250000, sped: 0,"
+        " tot: undefined, circa: ''});\n"
+        "  out.cintura.frase = contoChiuso('Nessuna consegna');\n"
+        "} catch(e){ out.cintura = {esploso: String(e)}; }\n"
+        "console.log(JSON.stringify(out));\n")
+    with _tfC.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                 encoding="utf-8") as f:
+        f.write(_prog)
+        p = f.name
+    try:
+        r = _spC.run(["node", p], capture_output=True, text=True,
+                     encoding="utf-8", timeout=60)
+    finally:
+        os.unlink(p)
+    if r.returncode != 0:
+        prova("la cassa a strada chiusa gira in node", "", r.stderr[-300:])
+        return
+    o = _jsC.loads(r.stdout)
+    for k in ("motorola", "conRitiro", "sano", "cambioMuto", "monco",
+              "storico", "cintura"):
+        prova(f"il caso «{k}» non esplode", None,
+              (o.get(k) or {"esploso": "manca"}).get("esploso"))
+    m = o.get("motorola", {})
+    prova("il 18 set: nessuna via di default fra due strade chiuse", "",
+          m.get("via"))
+    prova("...il conto e' chiuso", False, m.get("viaOk"))
+    prova("...con la frase giusta",
+          "Nessuna consegna disponibile per la tua destinazione",
+          m.get("chiuso"))
+    prova("...e anche con la via morta GIA' scelta (lo stato del 18)",
+          [False, True], [m.get("forzataOk"), m.get("forzataNumero")])
+    prova("...e due strade chiuse non hanno cifre da dire «uguali»",
+          False, m.get("mute"))
+    c = o.get("conRitiro", {})
+    prova("col ritiro a mano il default salta le strade chiuse",
+          ["ritiro", True, 250000, ""],
+          [c.get("via"), c.get("viaOk"), c.get("tot"), c.get("chiuso")])
+    sn = o.get("sano", {})
+    prova("il caso sano resta quello di sempre",
+          ["punto", True, 255000, 5000, ""],
+          [sn.get("via"), sn.get("viaOk"), sn.get("tot"), sn.get("sped"),
+           sn.get("chiuso")])
+    cm = o.get("cambioMuto", {})
+    prova("il cambio muto chiude il conto con la SUA frase",
+          [False, "Il cambio euro non è disponibile: riprova tra poco"],
+          [cm.get("viaOk"), cm.get("chiuso")])
+    mo = o.get("monco", {})
+    prova("una strada viva senza totale non diventa NaN: si chiude",
+          [False, True, "Non riusciamo a fare il conto: riprova tra poco"],
+          [mo.get("viaOk"), mo.get("totNumero"), mo.get("chiuso")])
+    st = o.get("storico", {})
+    prova("la pseudo-strada degli storici si paga come sempre",
+          ["", True, 9000], [st.get("via"), st.get("viaOk"), st.get("tot")])
+    # LA SENTINELLA: qualunque totale mostrato e' un numero
+    prova("in OGNI caso il totale che esce da statoCassa e' un numero",
+          [], [k for k in ("motorola", "conRitiro", "sano", "cambioMuto",
+                           "monco", "storico")
+               if not o.get(k, {}).get("totNumero")])
+    ci = o.get("cintura", {})
+    prova("la cifra che non e' un numero non si scrive, in sats e in €",
+          ["—", "—", "—"], [ci.get("nan"), ci.get("indef"),
+                            ci.get("nanEur")])
+    prova("...lo zero invece e' un numero", True,
+          "0" in (ci.get("zero") or ""))
+    prova("...e nemmeno un conto col totale assente scrive «NaN»",
+          False, "NaN" in (ci.get("conto") or "NaN"))
+    prova("la frase del conto chiuso si annuncia", True,
+          'role="status"' in (ci.get("frase") or ""))
+
+    # 5) L'ASTA CON SPEDIZIONE (stesso giorno, stessa famiglia): li' il
+    # campo del costo e' nascosto, la chiave di casa non partiva e il
+    # server rispondeva «Dicci dove spedisci». Il payload VERO, fatto
+    # girare su un form di cartone: asta accesa e spenta.
+    _cp = pezzo_js(mini, "function consegnaPayload(){", "\n}\n") + "\n}\n"
+    _progA = (
+        "const ZONE_INTL = ['eu', 'asia'];\n"
+        "const DOM_DEFAULT = 'IT';\n"
+        "let sellValuta = 'sats', spedValuta = 'sats', ASTA = false;\n"
+        "let CAMPI = {};\n"
+        "const el = id => (id in CAMPI) ? {value: CAMPI[id]} : null;\n"
+        "const eurCampo = id => parseFloat(CAMPI[id]) || 0;\n"
+        "const astaAccesa = () => ASTA;\n"
+        "const consegnaForm = () => ({consegna: 'spedizione',"
+        " anche_digitale: 0, servizio_dove: '', durata_min: 0});\n"
+        + _cp +
+        "const out = {};\n"
+        "const giro = (nome, asta, campi) => {\n"
+        "  try { ASTA = asta; CAMPI = campi;"
+        " out[nome] = consegnaPayload(); }\n"
+        "  catch(e){ out[nome] = {esploso: String(e)}; }\n"
+        "};\n"
+        # l'asta: i campi sono nascosti, quello di casa e' vuoto e
+        # nell'Europa e' rimasto un numero di prima
+        "giro('asta', true, {sellTaglia: '', sellSped: '',"
+        " sellPaeseDom: 'IT', sellZona_eu: '9000', sellZona_asia: '',"
+        " sellSpedPunto: '', sellSpedExtra: ''});\n"
+        # la vendita normale con casa VUOTA: la chiave non parte, che
+        # e' la dichiarazione «li' non spedisco» — e non deve cambiare
+        "giro('casaVuota', false, {sellTaglia: '', sellSped: '',"
+        " sellPaeseDom: 'IT', sellZona_eu: '9000', sellZona_asia: '',"
+        " sellSpedPunto: '', sellSpedExtra: ''});\n"
+        "giro('casaZero', false, {sellTaglia: '', sellSped: '0',"
+        " sellPaeseDom: 'IT', sellZona_eu: '', sellZona_asia: '',"
+        " sellSpedPunto: '', sellSpedExtra: ''});\n"
+        "console.log(JSON.stringify(out));\n")
+    with _tfC.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                 encoding="utf-8") as f:
+        f.write(_progA)
+        p = f.name
+    try:
+        r = _spC.run(["node", p], capture_output=True, text=True,
+                     encoding="utf-8", timeout=60)
+    finally:
+        os.unlink(p)
+    if r.returncode != 0:
+        prova("consegnaPayload gira in node", "", r.stderr[-300:])
+        return
+    oa = _jsC.loads(r.stdout)
+    for k in ("asta", "casaVuota", "casaZero"):
+        prova(f"il payload «{k}» non esplode", None,
+              (oa.get(k) or {"esploso": "manca"}).get("esploso"))
+    prova("l'asta con spedizione dichiara casa, a zero",
+          [True, 0], ["spedizione_sats" in oa.get("asta", {}),
+                      oa.get("asta", {}).get("spedizione_sats")])
+    prova("...e non promette l'estero con un numero rimasto nascosto",
+          {}, oa.get("asta", {}).get("spedizione_zone"))
+    prova("fuori dall'asta la casa VUOTA resta non dichiarata",
+          [False, {"eu": {"sats": 9000}}],
+          ["spedizione_sats" in oa.get("casaVuota", {}),
+           oa.get("casaVuota", {}).get("spedizione_zone")])
+    prova("...e lo zero scritto resta «gratis», dichiarato",
+          [True, 0], ["spedizione_sats" in oa.get("casaZero", {}),
+                      oa.get("casaZero", {}).get("spedizione_sats")])
+
+    # 6) L'AVVISO DELLA CASELLA DI CASA VUOTA, fatto girare (la tortura
+    # l'ha trovato scoperto): casa vuota con l'estero pieno e' la
+    # strada che ha chiuso l'Italia al Motorola, e si dice PRIMA.
+    _progH = (
+        "const ZONE_INTL = ['eu', 'asia'];\n"
+        "const DOM_DEFAULT = 'IT';\n"
+        "let sellValuta = 'sats', spedValuta = 'sats', cambioVivo = false;\n"
+        "const nomePaese = c => ({IT: 'Italia'})[c] || '';\n"
+        "const eurCampo = () => 0, fmt = String, fmtEur = String;\n"
+        "const aggiornaSupplHint = () => {};\n"
+        "let NODI = {};\n"
+        "const el = id => NODI[id] || null;\n"
+        + pezzo_js(mini, "function aggiornaSpedHint(){", "\n}\n") + "\n}\n"
+        "const out = {};\n"
+        "const giro = (nome, casa, eu) => {\n"
+        "  try {\n"
+        "    NODI = {sellSpedHint: {textContent: ''},"
+        " sellPaeseDom: {value: 'IT'}, sellSpedDomNome: {},"
+        " sellIntlConto: {}, sellConsSped: {checked: true},"
+        " sellSped: {value: casa}, sellZona_eu: {value: eu},"
+        " sellZona_asia: {value: ''}};\n"
+        "    aggiornaSpedHint();\n"
+        "    out[nome] = NODI.sellSpedHint.textContent;\n"
+        "  } catch(e){ out[nome] = 'ESPLOSO ' + e; }\n"
+        "};\n"
+        "giro('vuotaConEstero', '', '9000');\n"
+        "giro('zeroConEstero', '0', '9000');\n"
+        "giro('vuotaSenzaEstero', '', '');\n"
+        "console.log(JSON.stringify(out));\n")
+    with _tfC.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                 encoding="utf-8") as f:
+        f.write(_progH)
+        p = f.name
+    try:
+        r = _spC.run(["node", p], capture_output=True, text=True,
+                     encoding="utf-8", timeout=60)
+    finally:
+        os.unlink(p)
+    if r.returncode != 0:
+        prova("aggiornaSpedHint gira in node", "", r.stderr[-300:])
+        return
+    oh = _jsC.loads(r.stdout)
+    prova("casa vuota e l'estero pieno: il modulo lo dice, col rimedio",
+          "⚠️ Casella «Italia» vuota: lì NON spedisci. Se è gratis, "
+          "scrivi 0.", oh.get("vuotaConEstero"))
+    prova("...con lo zero scritto l'avviso tace", False,
+          "⚠️" in (oh.get("zeroConEstero") or "⚠️"))
+    prova("...e senza estero pure: li' parla la guardia del server",
+          False, "⚠️" in (oh.get("vuotaSenzaEstero") or "⚠️"))
 
 
 def prove_condivisione_venditore():
@@ -69566,6 +69910,7 @@ def main():
               prove_altri_scorrimento, prove_widget, prove_ricerca,
               prove_condivisione_venditore,
               prove_zona_comune_in_modifica,
+              prove_cassa_strada_chiusa,
               prove_script_nel_workflow, prove_deploy,
               prove_guardiano_ponte,
               prove_bussola, prove_tetto_claude_md,
