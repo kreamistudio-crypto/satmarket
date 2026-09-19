@@ -75,6 +75,14 @@ nella sezione «sano». I comandi per lanciarli stanno in fondo.
 
 ## G1 — «Non è uscito» premuto su un pagamento ancora in volo: si paga due volte
 
+> ✅ **CURATA lo stesso giorno** dal cantiere «I pagamenti in volo» (vedi
+> `docs/CANTIERI.md`): il bottone verifica su LNbits e LND prima di
+> decidere, ogni ritentativo guarda TUTTI gli hash tentati, e la
+> riproduzione qui sotto è diventata una prova di `prove.py` (rossa sul
+> codice di prima, verde adesso). La metà «LND» aspetta il macaroon di
+> sola lettura e il drill: vedi `docs/PRODUZIONE.md`. Il testo che segue
+> resta com'era, perché descrive il codice di PRIMA.
+
 **Chi perde:** Barattolo (il deposito di garanzia, cioè in ultima analisi i
 sats degli altri ordini). **Quanto:** il netto dell'ordine, o l'intero
 prezzo nella variante del rimborso. **Serve:** un venditore (o un

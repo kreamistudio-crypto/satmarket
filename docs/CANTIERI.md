@@ -21586,3 +21586,171 @@ voce del 18 set (`innerHeight`, `visualViewport.height`,
 `visualViewport.offsetTop`, e l'altezza di un `div` alto `100dvh`), che
 dicono quale modello è — più, stavolta, il `getBoundingClientRect()`
 del foglio, che dice dove è finito.
+
+## I pagamenti in volo: «non è uscito» che non paga due volte (19 set 2026, la falla 1 dell'audit)
+
+**DA DOVE VIENE.** L'audit dei pagamenti dello stesso giorno
+(`docs/AUDIT-PAGAMENTI-2026-09-19.md`, G1) aveva riprodotto un doppio
+payout con le funzioni vere: il pannello 🧊 con «non è uscito» azzerava
+`payout_stato` SENZA CHIEDERE A NESSUNO com'era finito quell'hash. Su
+un pagamento tenuto in volo — e chi riceve può tenerlo appeso quanto
+vuole, con una hold invoice dietro il suo Lightning address — il giro
+dopo coniava una fattura NUOVA, la pagava, e poi si saldava anche la
+prima: 1000 dovuti, 2000 usciti. E dal campo (18 set, ordine #163) due
+fatti in più: quel bottone NON ritentava, al contrario di quel che
+prometteva — sbloccava e basta — e la ronda si fermava al silenzio di
+LNbits (ReadTimeout alle 20:56) mentre LND la risposta ce l'aveva.
+
+**LA DECISIONE: LE FONTI SONO DUE, E DECIDE LA VERITÀ, NON UNA PERSONA.**
+LNbits è il cassiere (sa cosa ha CHIESTO al nodo), LND è il nodo (sa
+cosa è USCITO): quando non combaciano ha ragione LND, quando LNbits
+tace LND basta. Il giudice è una tabella, `_verdetto_pagamento`, con
+cinque uscite: `uscito`, `fallito`, `mai_partito` (si può ripagare),
+`in_volo`, `ignoto` (NON PARTE NIENTE, né da un giro né da un bottone).
+E si chiede su TUTTI gli hash tentati per una riga, non sull'ultimo:
+`payout_hash` ne ricordava uno solo, e il buco stava lì — il tentativo
+nuovo copriva il nome di quello vecchio ancora in volo. La memoria è la
+tabella `payout_tentati`; le righe di ieri ci entrano alla prima
+occhiata, trascritte da `_verita_riga`.
+
+**COME SI CHIEDE A LND.** `GET /v2/router/track/{hash}` attraverso lo
+stesso ponte di LNbits (`lnd-ponte`), con l'hash in base64url, il TLS
+verificato contro il `tls.cert` di LND e un macaroon SUO di SOLA
+LETTURA (`offchain:read`, `root_key_id 2`). È la risposta alla domanda
+di Andrea «basta il macaroon di LNbits?»: quasi certamente sì — per
+pagare gli serve `offchain`, e `track` chiede `offchain:read`; non l'ho
+verificato, e non serve saperlo — ma NON si usa, ed è una decisione:
+questo processo è un server web pubblico che gira da root (audit, A1),
+e una chiave che sa PAGARE dal nodo qui dentro non entra. Il minimo permesso in più è un macaroon che sa solo LEGGERE i
+pagamenti, revocabile da solo. È uno stream: su un pagamento in volo
+LND tiene aperta la risposta, quindi si legge la PRIMA riga e si chiude.
+
+**LE DUE RIGHE PIÙ DELICATE, e perché sono fatte così.**
+1) «ASSENTE» HA UNA FORMA SOLA: l'errore `payment isn't initiated`. Un
+404 qualunque è «muto» — il gateway REST risponde «Not Found» anche a
+una ROTTA che non esiste, e se quello valesse «il pagamento non c'è»,
+un URL sbagliato diventerebbe l'autorizzazione a ripagare tutto.
+2) IL CANARINO: un «assente» si crede solo se, nello stesso giro, LND
+riconosce un hash che conosce di sicuro (uno per cui ha già detto
+SUCCEEDED: il timbro `lnd_canarino`, o gli ultimi payout usciti dal
+nodo). PERCHÉ: questa strada va in produzione senza essere mai stata
+provata contro LND vero, e il suo modo di sbagliare è il peggiore — un
+«assente» falso (un hash codificato male, un LND ripristinato senza
+storia) dopo 15 minuti autorizza un secondo pagamento. Il canarino
+trasforma «mi fido del mio codice» in «l'ho appena visto funzionare».
+In tutti i dubbi si dice «muto»: un «non lo so» tiene la domanda
+aperta, un falso «non c'è» fa uscire i sats due volte.
+
+**N = 15 MINUTI** (`MAI_PARTITO_DOPO_S`), e il numero ha una ragione:
+fra la nostra richiesta e il momento in cui LND la vede c'è un solo
+tratto lento, la connessione di LNbits attraverso socat e tor. Una
+connessione tor che non riesce muore in 2 minuti (`SocksTimeout`); il
+guardiano del ponte, nel caso peggiore, fa tutto il giro «giù → curato»
+in meno di 4. Quindici sono quasi quattro volte tanto e più di un
+battito dell'orologio: una richiesta che dopo 15 minuti LND non ha MAI
+visto non è in viaggio, non è partita — e LNbits non rimanda da sola
+una richiesta vecchia. IL PREZZO, dichiarato: un fallimento in cui LND
+non ha mai visto l'hash (il ponte giù) si ritenta dopo 15-25 minuti
+invece che dopo 5. Un fallimento che LND CONOSCE (`FAILED`: niente
+rotta) si ritenta coi tempi di sempre.
+
+**IL BOTTONE.** «↩︎ Non è uscito — riprova» diventa «🔎 Verifica e
+riprova»: uscito → chiude come pagato e lo dice; fallito o mai partito
+→ cade il fermo e si RIPAGA passando da `_riprendi_uscita`, cioè dalla
+funzione d'uscita di sempre (stessa fattura se è ancora buona, sennò
+una nuova dal Lightning address, sennò la si chiede a chi aspetta i
+sats), che rifà da capo tutte le verifiche; in volo → 409 con la frase
+chiara, resta 🧊; non verificabile → 503, resta 🧊. «Uscito» a mano
+resta, ma vale da solo solo se le fonti dicono uscito: se dicono altro
+(LND `FAILED`, nessuna traccia, silenzio) il server risponde
+`serve_conferma` con COSA dicono e il client chiede una seconda volta,
+a carte scoperte (è il gesto SESSANTADUE della domanda unica); su un
+pagamento in volo non passa nemmeno con la conferma. `non_uscito`, il
+nome di ieri che un client in cache manda ancora, vale `verifica`.
+
+**LA RONDA** (`risolvi_pagamenti_in_volo`) chiede la stessa verità, e
+si ferma solo se tacciono TUTT'E DUE le fonti. Riguarda anche i
+CONGELATI che hanno un hash: se nel frattempo LND ha deciso, il caso si
+chiude da solo e ai moderatori arriva «🧊→✅ si è chiarito da solo».
+L'UPDATE è condizionato allo stato LETTO: se mentre lei chiedeva (su
+tor sono secondi) ha deciso una persona, non riscrive.
+
+**UNA SOLA MANO PAGA.** `_prendi_la_mano`: un UPDATE condizionato che
+passa solo su riga libera e nello stesso colpo scrive `in_volo`, l'hash
+e la memoria — PRIMA di chiamare LNbits. Due click, due giri, due
+processi: il secondo trova zero righe. Un riavvio a metà lascia una
+riga `in_volo` con un nome, cioè quel che la ronda sa riprendere; prima
+lasciava una riga PULITA, e il giro dopo ripagava. Chi arriva secondo
+riceve un QUINTO verbo, `OCCUPATO`, e non tocca la riga: né INCERTO (il
+congelamento riscriverebbe `payout_hash`) né NON_CHIESTO (scriverebbe
+`da_riprovare` sopra l'`in_volo` dell'altro) andavano bene. E
+`_congela_pagamento` non cambia più nome al pagamento: se sulla riga un
+hash c'è già, vince quello.
+
+**LE STRADE SCARTATE.** a) Dare a Barattolo il macaroon di LNbits:
+sopra. b) `verify=False` verso il ponte, come la sonda del guardiano:
+quella non manda segreti, questa sì. c) Chiedere a LND la lista dei
+pagamenti (`/v1/payments`): è paginata e senza filtro per hash — «un
+elenco paginato di cui non conosci l'ordine non è una fonte», lezione
+del 14 set. d) Credere ad «assente» senza canarino: sopra. e) Far
+passare da LND anche la fattura FRESCA, mai tentata e ignota a LNbits:
+è libera per costruzione, e chi ha premuto «Conferma» avrebbe aspettato
+un giro su tor (30 secondi a ponte giù) per sentirselo dire; senza
+quella riga un LND muto avrebbe fermato OGNI pagamento nuovo, cioè il
+guasto del ponte sarebbe diventato il guasto di tutto. f) Un flag con
+scadenza al posto dell'UPDATE condizionato: la scadenza è un secondo
+orologio da tenere in pari, e `in_volo` + ronda fanno già quel mestiere.
+
+**COSA HA TROVATO IL BANCO, prima di un venditore.** La prima stesura
+contava fra i «tentativi da chiarire» anche una fattura MAI pagata: a
+LNbits muta `paga_venditore` tornava NON_CHIESTO, ma il diario aveva
+già scritto l'hash della fattura nuova su `payout_hash`, e al giro dopo
+quell'hash — ignoto a tutti, e giovane — fermava il ritentativo per un
+pagamento mai esistito. Due cure sullo stesso caso (il quarto verbo non
+lascia un nome sulla riga; `payout_hash` entra nella memoria solo per
+le righe di ieri), e la tortura le prova INSIEME, perché una alla volta
+sopravvivono: è la lezione delle due difese sullo stesso caso.
+
+**PROVATO.** La riproduzione dell'audit è la PRIMA prova della sezione
+nuova `prove_pagamenti_in_volo`: sul `server.py` di prima è ROSSA per
+il motivo giusto (due pagamenti saldati), su questo è verde (un 409 e
+un pagamento solo). 107 prove nuove — il giudice riga per riga (31
+casi), il lettore di LND (13 forme, «Not Found» compreso), il canarino,
+LNbits muta con LND SUCCEEDED / FAILED, «assente» giovane e vecchio,
+il bottone nei suoi cinque esiti, doppio click, due conferme insieme,
+due PROCESSI (lucchetti separati, stesso database), lo stato scritto
+prima della POST, il journal — con funzioni tutte vere e di cartone i
+soli due estremi. Suite **12046 verdi, 0 rosse**. TORTURA: **26
+mutazioni, 26 uccise**; al primo giro due erano VIVE (l'hash di prima
+già uscito a riga libera; la ronda che riscrive una riga decisa mentre
+chiedeva) e hanno fatto scrivere le due prove che mancavano. E
+`_chiedi_lnd`, l'unica funzione che `prove.py` non fa mai girare (in CI
+httpx non c'è), gira DAL VIVO in `collaudo_verita_lnd.py` contro un LND
+di cartone con TLS vero: 17 su 17 — stream lasciato aperto, base64url,
+certificato sbagliato (il macaroon NON parte), rotta sbagliata, ponte
+giù, e il macaroon che non finisce mai nel journal.
+
+**NON PROVATO, e va detto.** LND VERO: la forma delle sue risposte nel
+collaudo l'ho scritta io, a memoria della sua API. Se `track` rispondesse
+in un'altra forma il codice dice «muto» — cioè si ferma e chiama una
+persona, non ripaga — ma finché il drill non lo conferma, la metà
+«LND» di questo cantiere è una promessa. Il client non l'ho visto
+girare in un browser (la pezza è un bottone e due fogli di conferma).
+La hold invoice dal vivo non l'ho vista.
+
+**RESTA DA FARE, di Andrea (sta in PRODUZIONE, «I PAGAMENTI DA
+VERIFICARE»).** Il macaroon di sola lettura sul nodo e la riga
+`LND_PONTE_MACAROON_LETTURA` nel config del VPS; il drill in quattro
+passi, col `curl` che dice PRIMA se la forma è quella attesa. Finché il
+macaroon non c'è LND vale «spento»: decide LNbits da sola, con le regole
+nuove (pending = fermo, i 15 minuti, tutti gli hash, la mano) — cioè la
+falla del doppio payout è chiusa DA SUBITO anche senza LND; quel che
+manca senza LND è il caso del #163 (LNbits muta), che resta a una
+persona.
+
+**RESTA APERTO, dichiarato.** Una hold invoice tiene fermo un payout
+fino al CLTV (giorni): adesso non fa più danni, ma l'ordine non si
+chiude e la liquidità resta impegnata (audit, M3) — un tetto al tempo
+dell'HTLC in uscita è un cantiere suo. `uscito` non ricorda ancora il
+VERSO (audit, M1). E lo «Stato delle leve» non dice se LND è acceso: lo
+dice solo la riga d'avvio del journal.
