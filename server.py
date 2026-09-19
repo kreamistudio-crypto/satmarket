@@ -6403,6 +6403,19 @@ def init_db():
                 con.execute(f"ALTER TABLE {tabella} ADD COLUMN {colonna}")
             except sqlite3.OperationalError:
                 pass
+    # LA MEMORIA DEGLI HASH (set 2026, cantiere dei pagamenti in volo):
+    # una riga per OGNI payment hash con cui si e' provato a pagare una
+    # riga d'uscita. `payout_hash` ne ricorda uno solo, l'ultimo, e la
+    # falla del doppio pagamento stava tutta li': il tentativo nuovo
+    # copriva il nome di quello vecchio ancora in volo. `esito` si
+    # scrive solo quando e' DEFINITIVO ('fallito', 'mai_partito',
+    # 'uscito'), cosi' un hash chiuso non si richiede a ogni giro.
+    con.execute(
+        "CREATE TABLE IF NOT EXISTS payout_tentati("
+        "tabella TEXT NOT NULL, riga_id INTEGER NOT NULL, "
+        "hash TEXT NOT NULL, quando INTEGER NOT NULL DEFAULT 0, "
+        "esito TEXT NOT NULL DEFAULT '', "
+        "PRIMARY KEY(tabella, riga_id, hash))")
     # LA CASSAFORTE DI OGNI RIGA (set 2026, il doppio wallet): in quale
     # LNbits vivono i sats di questa riga — 'saas' o 'nodo'. Il DEFAULT
     # e' il SaaS apposta: tutto il pregresso e' nato la', e una colonna
@@ -7416,6 +7429,15 @@ async def invoice_pagata(payment_hash: str, cassaforte: str) -> bool:
 # con «lampo», «attesa» e «nota».
 PAGATO, NON_PAGATO, INCERTO = "pagato", "non_pagato", "incerto"
 NON_CHIESTO = "non_chiesto"
+# E IL QUINTO (set 2026, cantiere dei pagamenti in volo): OCCUPATO =
+# «un'altra mano sta gia' pagando QUESTA riga». Non e' un esito del
+# pagamento — nessuna richiesta e' partita da qui — ed e' per questo che
+# non si riusa nessuno dei quattro: INCERTO farebbe congelare (e il
+# congelamento riscrive `payout_hash`, cioe' cancellerebbe il nome del
+# pagamento che l'altra mano sta facendo davvero), NON_CHIESTO farebbe
+# scrivere 'da_riprovare' SOPRA il suo 'in_volo'. Chi lo riceve non
+# tocca la riga: esce e basta.
+OCCUPATO = "occupato"
 
 
 class LnbitsMuto(Exception):
@@ -7517,6 +7539,375 @@ async def _stato_pagamento(payment_hash: str, cassaforte: str) -> str:
         raise LnbitsMuto("stato del pagamento: risposta illeggibile")
 
 
+# ─────────────────────────────────────────────────────────────────────
+# LA VERITA' DI UN PAGAMENTO (set 2026, cantiere dei pagamenti in volo).
+#
+# IL BUCO CHE CHIUDE, dall'audit del 19 set (falla 1): «non e' uscito»
+# azzerava il fermo SENZA CHIEDERE A NESSUNO com'era finito quell'hash.
+# Un pagamento ancora in volo — e chi riceve puo' tenerlo appeso quanto
+# vuole, con una hold invoice dietro il suo Lightning address — veniva
+# dichiarato «mai uscito» da una persona; il giro dopo coniava una
+# fattura NUOVA, la pagava, e poi si saldava anche la prima: 1000
+# dovuti, 2000 usciti. E sull'ordine #163 (18 set) LNbits taceva
+# (ReadTimeout) mentre LND la risposta ce l'aveva.
+#
+# LE FONTI SONO DUE E NON VALGONO UGUALE. LNbits e' il cassiere: sa
+# quel che ha CHIESTO al nodo. LND e' il nodo: sa quel che e' USCITO.
+# Quando i due non combaciano ha ragione LND, e quando LNbits tace LND
+# basta. Si chiede a LND attraverso lo stesso ponte di LNbits
+# (`lnd-ponte`, socat + tor), con un macaroon SUO e di SOLA LETTURA
+# (`offchain:read`): questo processo e' un server web pubblico, e una
+# chiave che sa pagare qui dentro non ci entra. Il TLS si verifica
+# contro il `tls.cert` di LND, lo stesso file di cui si fida LNbits: un
+# macaroon non si manda a un certificato che non si e' guardato.
+#
+# SOLO LA CASSAFORTE «nodo» HA UN LND NOSTRO. Per il SaaS, e finche' il
+# macaroon non e' nel config, LND vale «spento» e decide LNbits da sola
+# — con la regola che c'era gia' (pending = fermo) e una in piu': la
+# traccia che manca non vale «mai partito» prima di
+# `MAI_PARTITO_DOPO_S`.
+try:
+    from config import LND_PONTE_MACAROON_LETTURA
+except ImportError:
+    LND_PONTE_MACAROON_LETTURA = ""
+try:
+    from config import LND_PONTE_CERT
+except ImportError:
+    LND_PONTE_CERT = "/opt/lnbits/data/tls.cert"
+try:
+    from config import LND_PONTE_URL
+except ImportError:
+    LND_PONTE_URL = "https://127.0.0.1:18080"
+
+LND_SUCCEEDED, LND_IN_FLIGHT, LND_FAILED = "SUCCEEDED", "IN_FLIGHT", "FAILED"
+LND_ASSENTE, LND_MUTO, LND_SPENTO = "assente", "muto", "spento"
+LND_ATTESA_S = 30
+
+# N = 15 MINUTI, e il numero ha una ragione. Fra la nostra richiesta a
+# LNbits e il momento in cui LND la VEDE c'e' un solo tratto lento: la
+# connessione di LNbits attraverso socat e tor. Una connessione tor che
+# non riesce muore da sola in 2 minuti (`SocksTimeout`), e il guardiano
+# del ponte, nel caso peggiore, ci mette 3 minuti ad accorgersi e 45
+# secondi a riguardare: l'intero giro «ponte giu' → curato» sta sotto i
+# 4 minuti. Quindici sono quasi quattro volte tanto, e sono anche piu'
+# di un battito dell'orologio (dieci): una richiesta che dopo 15 minuti
+# LND non ha MAI visto non e' in viaggio — non e' partita. LNbits non
+# rimanda da sola una richiesta vecchia: chiede solo com'e' finita.
+MAI_PARTITO_DOPO_S = 900
+LND_CANARINO_VALE_S = 600
+TIMBRO_CANARINO = "lnd_canarino"
+_lnd_canarino = {"ok_fino": 0.0}
+
+
+def _lnd_configurato() -> bool:
+    m = str(LND_PONTE_MACAROON_LETTURA or "").strip()
+    return bool(m) and re.fullmatch(r"[0-9a-fA-F]{40,}", m) is not None
+
+
+def _lnd_stato_da_riga(riga: str) -> str:
+    """Una riga della risposta di `/v2/router/track/{hash}` → lo stato.
+
+    «ASSENTE» HA UNA FORMA SOLA, ed e' la riga piu' delicata del
+    cantiere: e' l'errore di LND `payment isn't initiated`. Un 404
+    qualunque NON basta — il gateway REST risponde «Not Found» anche a
+    una ROTTA che non esiste, e se quello valesse «il pagamento non c'e'»
+    un URL sbagliato diventerebbe l'autorizzazione a ripagare tutto.
+    Qualunque cosa non si riconosca e' MUTO: un «non lo so» tiene la
+    domanda aperta, un falso «non c'e'» fa uscire i sats due volte."""
+    try:
+        d = json.loads(riga)
+    except ValueError:
+        return LND_MUTO
+    if not isinstance(d, dict):
+        return LND_MUTO
+    err = d.get("error")
+    if err:
+        msg = str(err.get("message") if isinstance(err, dict) else err)
+        return LND_ASSENTE if "isn't initiated" in msg.lower() else LND_MUTO
+    if "message" in d and "status" not in d and "result" not in d:
+        return (LND_ASSENTE if "isn't initiated" in str(d["message"]).lower()
+                else LND_MUTO)
+    pag = d.get("result") if isinstance(d.get("result"), dict) else d
+    stato = str(pag.get("status") or "").upper()
+    return stato if stato in (LND_SUCCEEDED, LND_IN_FLIGHT,
+                              LND_FAILED) else LND_MUTO
+
+
+async def _chiedi_lnd(payment_hash: str) -> str:
+    """La domanda nuda a LND, senza canarino. NON ALZA MAI: ogni guasto
+    e' MUTO, e del guasto si stampa il TIPO e basta (mai l'URL coi suoi
+    header, mai il macaroon)."""
+    if not _lnd_configurato():
+        return LND_SPENTO
+    try:
+        nome = base64.urlsafe_b64encode(
+            bytes.fromhex(payment_hash)).decode("ascii")
+    except ValueError:
+        return LND_MUTO
+    try:
+        tls = ssl.create_default_context(cafile=LND_PONTE_CERT)
+        async with httpx.AsyncClient(timeout=LND_ATTESA_S, verify=tls) as c:
+            async with c.stream(
+                    "GET", f"{LND_PONTE_URL}/v2/router/track/{nome}",
+                    headers={"Grpc-Metadata-macaroon":
+                             str(LND_PONTE_MACAROON_LETTURA).strip()}) as r:
+                # E' UNO STREAM: su un pagamento in volo LND tiene aperta
+                # la risposta finche' non finisce. La PRIMA riga e' lo
+                # stato di adesso, ed e' tutto quel che si vuole sapere.
+                async for riga in r.aiter_lines():
+                    if riga.strip():
+                        return _lnd_stato_da_riga(riga)
+        return LND_MUTO
+    except Exception as e:
+        print(f"🔎 LND non ha risposto ({type(e).__name__})", flush=True)
+        return LND_MUTO
+
+
+async def _lnd_ci_vede() -> bool:
+    """IL CANARINO: prima di credere a un «non c'e'», si chiede a LND un
+    hash che LND CONOSCE — uno per cui lui stesso, una volta, ha detto
+    SUCCEEDED. Se oggi risponde «non c'e'» anche a quello, a essere
+    rotta e' la DOMANDA (un hash codificato male, un LND ripristinato
+    senza storia, un ponte che porta a un altro nodo), e ogni «assente»
+    di questo giro vale MUTO.
+    PERCHE' ESISTE: questa strada non e' mai stata provata dal vivo
+    prima di andare in produzione, e il suo modo di sbagliare e' il
+    peggiore — un «assente» falso, dopo 15 minuti, autorizza un secondo
+    pagamento. Il canarino trasforma «mi fido del mio codice» in «l'ho
+    appena visto funzionare». Senza canarino un «assente» NON SI CREDE."""
+    if time.time() < _lnd_canarino["ok_fino"]:
+        return True
+    candidati = [timbro_letto(TIMBRO_CANARINO) or ""]
+    try:
+        con = db()
+        for tab in ("ordini", "rimborsi_asta", "pagamenti"):
+            candidati += [r[0] for r in con.execute(
+                f"SELECT payout_hash FROM {tab} WHERE payout_stato='uscito' "
+                "AND cassaforte=? AND COALESCE(payout_hash,'')<>'' "
+                "ORDER BY id DESC LIMIT 2", (CASSAFORTE_NODO,))]
+        con.close()
+    except Exception as e:
+        print(f"🔎 Canarino di LND: candidati non letti ({e})", flush=True)
+    for h in [c for c in dict.fromkeys(candidati) if c][:4]:
+        if await _chiedi_lnd(h) == LND_SUCCEEDED:
+            _lnd_canarino["ok_fino"] = time.time() + LND_CANARINO_VALE_S
+            if timbro_letto(TIMBRO_CANARINO) != h:
+                timbro_scrivi(TIMBRO_CANARINO, h)
+            return True
+    print("🔎 Canarino di LND: nessun hash noto risulta SUCCEEDED — gli "
+          "«assente» di questo giro NON si credono", flush=True)
+    return False
+
+
+async def _stato_lnd(payment_hash: str, cassaforte: str) -> str:
+    """Com'e' finito questo hash SECONDO LND. Uno fra SUCCEEDED,
+    IN_FLIGHT, FAILED, 'assente' (LND non l'ha mai visto — creduto solo
+    a canarino vivo), 'muto' (non si e' potuto sapere) e 'spento' (non
+    e' una riga del nodo, o il macaroon di lettura non c'e')."""
+    if cassaforte != CASSAFORTE_NODO or not payment_hash:
+        return LND_SPENTO
+    stato = await _chiedi_lnd(payment_hash)
+    if stato == LND_SUCCEEDED:
+        # ogni SUCCEEDED e' un canarino fresco, gratis
+        _lnd_canarino["ok_fino"] = time.time() + LND_CANARINO_VALE_S
+        if timbro_letto(TIMBRO_CANARINO) != payment_hash:
+            timbro_scrivi(TIMBRO_CANARINO, payment_hash)
+    if stato == LND_ASSENTE and not await _lnd_ci_vede():
+        return LND_MUTO
+    return stato
+
+
+print("🔎 Verità dei pagamenti: LND "
+      + ("ACCESO — si chiede anche al nodo, attraverso il ponte"
+         if _lnd_configurato() else
+         "SPENTO (manca LND_PONTE_MACAROON_LETTURA nel config): decide "
+         "LNbits da sola"), flush=True)
+
+USCITO, IN_VOLO, FALLITO, MAI_PARTITO, IGNOTO = (
+    "uscito", "in_volo", "fallito", "mai_partito", "ignoto")
+
+
+def _verdetto_pagamento(lnbits: str, lnd: str, eta_s) -> str:
+    """IL GIUDICE, ed e' una tabella: due voci e un orologio → un verdetto.
+
+    `lnbits` e' 'success' | 'pending' | 'failed' | 'assente' | 'muto';
+    `lnd` e' uno dei sei di `_stato_lnd`; `eta_s` sono i secondi passati
+    dal tentativo, o None se per quell'hash NON ABBIAMO MAI tentato.
+
+    SI PUO' PAGARE ANCORA SOLO SU 'fallito' E 'mai_partito'. Su
+    'in_volo' e 'ignoto' non parte niente, ne' da un giro ne' da un
+    bottone: e' la regola che chiude la falla.
+
+    L'ORDINE DELLE RIGHE E' L'ORDINE DI CHI HA RAGIONE: prima quel che
+    dice LND dei sats, poi quel che dice LNbits, e «non c'e' traccia»
+    per ultimo — e mai prima di `MAI_PARTITO_DOPO_S`, che una richiesta
+    appena partita «non c'e'» per definizione."""
+    if lnd == LND_SUCCEEDED:
+        return USCITO
+    if lnd == LND_IN_FLIGHT:
+        return IN_VOLO
+    if lnbits == "success":
+        # LNbits dice pagato e LND dice FALLITO: uno dei due mente, e
+        # non lo decide una macchina. (LND 'assente' invece e' lecito:
+        # e' un pagamento INTERNO a LNbits, che dal nodo non passa.)
+        return IGNOTO if lnd == LND_FAILED else USCITO
+    if lnd == LND_FAILED:
+        return FALLITO
+    if lnbits == "pending" and lnd in (LND_MUTO, LND_SPENTO):
+        return IN_VOLO
+    if eta_s is None and lnbits == "assente":
+        # MAI TENTATO da noi e mai visto da LNbits: non c'e' niente che
+        # possa essere in volo, anche se LND tace. Senza questa riga un
+        # LND muto (o un canarino che manca) fermerebbe OGNI pagamento
+        # nuovo — cioe' il guasto del ponte diventerebbe il guasto di
+        # tutto, che e' il contrario di quel che questo cantiere vuole.
+        return MAI_PARTITO
+    if lnbits == "muto" or lnd == LND_MUTO:
+        return IGNOTO
+    # da qui: LND 'assente' o 'spento', LNbits pending / failed / assente
+    if lnbits == "failed" and lnd == LND_SPENTO:
+        # senza un LND da sentire, il «fallito» di LNbits e' tutto quel
+        # che c'e', ed e' la regola di sempre: non si aspetta
+        return FALLITO
+    if eta_s is not None and eta_s < MAI_PARTITO_DOPO_S:
+        return IN_VOLO
+    if lnbits == "failed":
+        return FALLITO
+    if lnbits == "pending":
+        # LND (a canarino vivo) non l'ha MAI visto e il tempo e' passato:
+        # la riga di LNbits e' rimasta appesa a una richiesta mai arrivata
+        return MAI_PARTITO if lnd == LND_ASSENTE else IN_VOLO
+    return MAI_PARTITO
+
+
+async def _verita_pagamento(payment_hash: str, cassaforte: str,
+                            eta_s=None, etichetta: str = "") -> dict:
+    """Chiede alle DUE fonti e giudica. NON ALZA: un canale che tace e'
+    una voce della tabella ('muto'), non un'eccezione — cosi' LNbits
+    muta non impedisce piu' di sentire LND, che era il guasto del 18 set.
+
+    E SCRIVE LA SUA RIGA NEL JOURNAL, sempre: ordine, hash, le due voci,
+    il verdetto. Un pagamento deciso senza che resti scritto PERCHE' e'
+    un pagamento che fra un mese nessuno sa ricostruire."""
+    try:
+        lnbits = await _stato_pagamento(payment_hash, cassaforte) or "assente"
+    except LnbitsMuto:
+        lnbits = "muto"
+    lnd = await _stato_lnd(payment_hash, cassaforte)
+    verdetto = _verdetto_pagamento(lnbits, lnd, eta_s)
+    print(f"🔎 Verifica pagamento {etichetta or '?'}: hash "
+          f"{payment_hash[:16]}… LNbits={lnbits} LND={lnd}"
+          + (f" eta={int(eta_s)}s" if eta_s is not None else "")
+          + f" → {verdetto}", flush=True)
+    return {"hash": payment_hash, "lnbits": lnbits, "lnd": lnd,
+            "verdetto": verdetto}
+
+
+def _hash_tentati(con, tabella: str, riga_id: int) -> list:
+    """TUTTI gli hash con cui si e' provato a pagare questa riga, dal
+    piu' vecchio: `(hash, quando, esito)`. E' la memoria che mancava —
+    `payout_hash` ne tiene UNO, l'ultimo, e il buco era proprio li': il
+    tentativo dopo lo sovrascriveva e del primo non sapeva piu' niente
+    nessuno.
+
+    LE RIGHE DI IERI, nate prima di questa tabella, portano il solo
+    `payout_hash`: entra nel conto con l'ora di `payout_ultimo`, e
+    `_verita_riga` lo TRASCRIVE qui alla prima occhiata, cosi' non si
+    perde il giorno che un tentativo nuovo lo copre. SOLO LORO, pero':
+    appena la riga ha una memoria sua, un `payout_hash` che non ci sta
+    dentro e' per costruzione una fattura MAI PAGATA (la mano scrive la
+    memoria prima di pagare), e contarla come un tentativo da chiarire
+    fermerebbe il ritentativo per un pagamento che non e' mai esistito
+    — trovato dal banco, prima che da un venditore."""
+    righe = [(r[0], int(r[1] or 0), r[2] or "") for r in con.execute(
+        "SELECT hash, quando, esito FROM payout_tentati WHERE tabella=? "
+        "AND riga_id=? ORDER BY quando, rowid", (tabella, riga_id))]
+    if not righe:
+        r = con.execute(f"SELECT payout_hash, payout_ultimo FROM {tabella} "
+                        "WHERE id=?", (riga_id,)).fetchone()
+        if r and r[0]:
+            righe.append((r[0], int(r[1] or 0), ""))
+    return righe
+
+
+async def _verita_riga(tabella: str, riga_id: int, cassaforte: str,
+                       salta: str = "") -> dict:
+    """La verita' di una RIGA: il verdetto PEGGIORE fra tutti i suoi
+    hash. Uno solo 'uscito' → la riga e' pagata; uno solo in volo o
+    ignoto → la riga e' ferma; tutti falliti o mai partiti → libera.
+    `salta` e' l'hash della fattura che si sta per pagare, che ha il suo
+    giudizio a parte. Un 'fallito' o 'mai_partito' si SCRIVE e non si
+    richiede piu': sono definitivi, e ogni domanda e' un giro su tor."""
+    con = db()
+    tentati = _hash_tentati(con, tabella, riga_id)
+    for h, quando, _ in tentati:
+        con.execute("INSERT OR IGNORE INTO payout_tentati(tabella, riga_id, "
+                    "hash, quando, esito) VALUES(?,?,?,?,'')",
+                    (tabella, riga_id, h, quando))
+    con.commit()
+    con.close()
+    adesso = int(time.time())
+    esiti, fermo = [], None
+    for h, quando, esito in tentati:
+        if h == salta or esito in (FALLITO, MAI_PARTITO):
+            continue
+        v = await _verita_pagamento(
+            h, cassaforte, (adesso - quando) if quando else None,
+            f"{tabella}#{riga_id}")
+        esiti.append(v)
+        if v["verdetto"] in (FALLITO, MAI_PARTITO, USCITO):
+            con = db()
+            con.execute(
+                "INSERT INTO payout_tentati(tabella, riga_id, hash, quando, "
+                "esito) VALUES(?,?,?,?,?) ON CONFLICT(tabella, riga_id, hash) "
+                "DO UPDATE SET esito=excluded.esito",
+                (tabella, riga_id, h, quando, v["verdetto"]))
+            con.commit()
+            con.close()
+        if v["verdetto"] == USCITO:
+            return {**v, "esiti": esiti, "hash_noti": len(tentati)}
+        if v["verdetto"] in (IN_VOLO, IGNOTO) and (
+                fermo is None or v["verdetto"] == IN_VOLO):
+            fermo = v
+    if fermo:
+        return {**fermo, "esiti": esiti, "hash_noti": len(tentati)}
+    return {"hash": "", "lnbits": "", "lnd": "", "verdetto": MAI_PARTITO,
+            "esiti": esiti, "hash_noti": len(tentati)}
+
+
+def _prendi_la_mano(tabella: str, riga_id: int, verso: str,
+                    payment_hash: str) -> bool:
+    """UNA SOLA MANO PAGA, e lo stato si scrive PRIMA di toccare LNbits.
+
+    L'UPDATE e' condizionato: passa solo se la riga e' libera ('' o
+    'da_riprovare'), e nello stesso colpo la marca 'in_volo' col NOME
+    del pagamento che sta per partire e lo aggiunge alla memoria degli
+    hash. Due giri, due click, due processi: il secondo trova zero
+    righe e non paga. E un riavvio a meta' — il server che muore fra
+    questa riga e la risposta di LNbits — lascia una riga 'in_volo' con
+    un hash, cioe' esattamente quel che la ronda sa riprendere
+    chiedendo la verita'; prima lasciava una riga PULITA, e il giro
+    dopo ripagava.
+    Il lucchetto asyncio delle funzioni d'uscita resta: questo e' il suo
+    gemello che regge anche fuori dal processo."""
+    adesso = int(time.time())
+    con = db()
+    cur = con.execute(
+        f"UPDATE {tabella} SET payout_stato='in_volo', payout_hash=?, "
+        "payout_verso=?, payout_ultimo=? WHERE id=? "
+        "AND COALESCE(payout_stato,'') IN ('','da_riprovare')",
+        (payment_hash, verso, adesso, riga_id))
+    if cur.rowcount:
+        con.execute(
+            "INSERT INTO payout_tentati(tabella, riga_id, hash, quando, esito) "
+            "VALUES(?,?,?,?,'') ON CONFLICT(tabella, riga_id, hash) "
+            "DO UPDATE SET quando=excluded.quando, esito=''",
+            (tabella, riga_id, payment_hash, adesso))
+    con.commit()
+    con.close()
+    return bool(cur.rowcount)
+
+
 async def _avvisa_payout_fallito(taccuino: dict, sats: int):
     """L'avviso ai moderatori quando un pagamento in USCITA fallisce
     davvero (set 2026). Prima di questa riga un payout senza rotta non
@@ -7606,7 +7997,7 @@ def _quando_ritentare(tentativi: int, ultimo: int) -> int:
 
 async def paga_venditore(invoice: str, atteso_sats: int,
                          diario: dict | None = None, *,
-                         cassaforte: str) -> str:
+                         cassaforte: str, riga: tuple = ()) -> str:
     """Sblocca i sats: paga la invoice fornita dal venditore.
 
     DA QUALE CASSAFORTE (set 2026): `cassaforte` e' la colonna della
@@ -7661,7 +8052,17 @@ async def paga_venditore(invoice: str, atteso_sats: int,
     quello lo sa il chiamante, che poi li passa a `_timbra_pagamento`.
     Il tipo di ritorno resta la stringa dei quattro verbi, e non e'
     pigrizia: c'e' una sentinella che verifica che nessuno la rimetta
-    dentro un «if»."""
+    dentro un «if».
+
+    `riga` (set 2026, cantiere dei pagamenti in volo) e' LA RIGA CHE
+    ASPETTA I SATS: `(tabella, id, verso)`. Con lei la funzione fa tre
+    cose che prima non poteva: guarda TUTTI gli hash gia' tentati per
+    quella riga, non solo quello della fattura che ha in mano (una
+    fattura nuova ha un hash nuovo, e il vecchio in volo non lo vedeva
+    nessuno: era la falla); chiede la verita' anche a LND; e PRENDE LA
+    MANO prima di pagare. Le quattro funzioni d'uscita la passano
+    sempre, e c'e' la sentinella. Senza `riga` resta la cintura di
+    prima, su LNbits sola: e' la forma delle prove piu' vecchie."""
     taccuino = diario if diario is not None else {}
     cf = _chiavi_cassaforte(cassaforte)
     taccuino["cassaforte"] = cf.nome
@@ -7714,12 +8115,91 @@ async def paga_venditore(invoice: str, atteso_sats: int,
     # hash invece di svegliare un moderatore. E' il perno del cantiere
     # B, e sta qui perche' qui l'hash esiste gia' ed e' gratis.
     taccuino["risolvibile"] = bool(phash)
+    if riga and phash:
+        tabella, riga_id, verso = riga
+        # 1. GLI ALTRI HASH DI QUESTA RIGA. Se uno e' uscito la riga e'
+        #    PAGATA e non si paga piu' niente; se uno e' in volo (o non
+        #    si riesce a saperlo) non parte niente — e il nome che resta
+        #    sulla riga e' il SUO, cosi' la ronda continua a seguire il
+        #    pagamento vero e non la fattura che non abbiamo pagato.
+        passato = await _verita_riga(tabella, riga_id, cf.nome, salta=phash)
+        if passato["verdetto"] == USCITO:
+            print(f"✅ {tabella}#{riga_id}: un pagamento precedente "
+                  f"({passato['hash'][:16]}…) risulta USCITO: la riga e' "
+                  f"pagata, la fattura nuova non si tocca.", flush=True)
+            taccuino["hash"], taccuino["errore"] = passato["hash"], ""
+            return PAGATO
+        if passato["verdetto"] == IGNOTO and passato["lnbits"] == "muto":
+            # LNbits tace: da qui non e' partito niente e niente partira'
+            # finche' tace. E' il quarto verbo, non un congelamento.
+            print(f"🔁 Pagamento NON CHIESTO: LNbits tace e di un "
+                  f"pagamento precedente di {tabella}#{riga_id} non si "
+                  f"sa com'e' finito. Niente e' partito.", flush=True)
+            # ...e sulla riga non resta il nome di una fattura mai pagata
+            taccuino.pop("hash", None)
+            return NON_CHIESTO
+        if passato["verdetto"] in (IN_VOLO, IGNOTO):
+            taccuino["hash"] = passato["hash"]
+            taccuino["errore"] = (
+                f"un pagamento precedente e' ancora "
+                f"{'in volo' if passato['verdetto'] == IN_VOLO else 'da chiarire'}"
+                f" (LNbits {passato['lnbits']}, LND {passato['lnd']})")
+            print(f"🧊 {tabella}#{riga_id}: {taccuino['errore']} — "
+                  f"{passato['hash'][:16]}…: NON si paga.", flush=True)
+            return INCERTO
+        # 2. L'HASH DI QUESTA FATTURA, chiesto a tutt'e due le fonti.
+        con = db()
+        miei = {h: q for h, q, _ in _hash_tentati(con, tabella, riga_id)}
+        con.close()
+        eta = (int(time.time()) - miei[phash]) if miei.get(phash) else None
+        try:
+            eco = await _stato_pagamento(phash, cf.nome)
+        except LnbitsMuto:
+            eco = None
+        if phash not in miei and eco == "":
+            # la strada di tutti i giorni: fattura fresca, mai tentata,
+            # mai vista da LNbits. Libera per costruzione (vedi il
+            # giudice), e chi ha premuto «Conferma» non aspetta un giro
+            # su tor per sentirselo dire.
+            mia = {"verdetto": MAI_PARTITO, "lnbits": "assente", "lnd": ""}
+        else:
+            mia = await _verita_pagamento(phash, cf.nome, eta,
+                                          f"{tabella}#{riga_id}")
+        if mia["verdetto"] == USCITO:
+            print("✅ Pagamento gia' uscito per questo hash: non si ripaga.")
+            taccuino["errore"] = ""
+            return PAGATO
+        if mia["verdetto"] != IN_VOLO and mia["lnbits"] == "muto":
+            print("🔁 Pagamento NON CHIESTO (LNbits tace): non si e' potuto "
+                  "sapere se quell'hash fosse gia' uscito. Niente e' partito.")
+            if phash not in miei:
+                taccuino.pop("hash", None)
+            return NON_CHIESTO
+        if mia["verdetto"] in (IN_VOLO, IGNOTO):
+            taccuino["errore"] = (f"un pagamento con questo hash e' gia' in "
+                                  f"volo (LNbits {mia['lnbits']}, LND "
+                                  f"{mia['lnd']})")
+            return INCERTO
+        if mia["verdetto"] == FALLITO or mia["lnbits"] != "assente":
+            # fallita, o mai arrivata a LND ma con la sua riga su LNbits:
+            # in tutti e due i casi LNbits questa bolt11 non la ripaga.
+            taccuino["errore"] = "fattura gia' bruciata da un tentativo fallito"
+            taccuino["ritentabile"] = True
+            await _avvisa_payout_fallito(taccuino, atteso_sats)
+            return NON_PAGATO
+        # 3. LA MANO. Da qui in poi la riga dice 'in_volo' col nome di
+        #    questo pagamento, PRIMA che LNbits senta qualcosa.
+        if not _prendi_la_mano(tabella, riga_id, verso, phash):
+            print(f"✋ {tabella}#{riga_id}: un'altra mano sta gia' pagando "
+                  f"questa riga. Qui non parte niente.", flush=True)
+            return OCCUPATO
     # L'ECO. Se per questo hash un pagamento esiste gia', una seconda
     # richiesta non ritenta: torna il record vecchio, e chi guardasse
     # solo il numero HTTP lo leggerebbe come una risposta fresca. Qui
     # si risponde con quel che quel record dice, senza toccare il nodo.
     try:
-        gia = await _stato_pagamento(phash, cf.nome) if phash else ""
+        gia = (await _stato_pagamento(phash, cf.nome)
+               if phash and not riga else "")
     except LnbitsMuto as e:
         print(f"🔁 Pagamento NON CHIESTO ({e}): non si e' potuto sapere se "
               f"quell'hash fosse gia' uscito. Niente e' partito.")
@@ -7913,7 +8393,15 @@ async def _congela_pagamento(con, tabella: str, riga_id: int, bolt11: str,
     questo pagamento su LNbits» senza dire quale manda il moderatore a
     cercare un hash dove non c'e' — e un 404 letto la' e' un «mai
     uscito» falso."""
-    phash = await _payment_hash(bolt11)
+    # IL NOME CHE C'E' VINCE (set 2026): il diario ha appena scritto
+    # `payout_hash`, e quando a fermare tutto e' un pagamento VECCHIO
+    # ancora in volo quel nome e' il suo — mentre `bolt11` e' la fattura
+    # nuova, che non abbiamo pagato. Consegnare ai moderatori l'hash di
+    # una fattura mai pagata vorrebbe dire fargli cercare il pagamento
+    # sbagliato, e trovarlo «mai partito».
+    gia = con.execute(f"SELECT payout_hash FROM {tabella} WHERE id=?",
+                      (riga_id,)).fetchone()
+    phash = (gia[0] if gia and gia[0] else "") or await _payment_hash(bolt11)
     con.execute(f"UPDATE {tabella} SET payout_stato='incerto', "
                 "payout_hash=?, payout_verso=?, aggiornato=? WHERE id=?",
                 (phash, verso, int(time.time()), riga_id))
@@ -18621,15 +19109,31 @@ def coda_pagamenti(x_tg_init_data: str = Header(""),
 @app.post("/api/admin/pagamenti/decidi")
 async def decidi_pagamento(req: Request, x_tg_init_data: str = Header(""),
                            barattolo_sessione: str = Cookie("")):
-    """SOLO ADMIN: com'e' finito quel pagamento.
+    """SOLO ADMIN: com'e' finito quel pagamento — ma PRIMA SI CHIEDE.
 
-    - 'uscito'     = su LNbits i sats risultano partiti. La riga passa
-                     a 'uscito' e si richiama la funzione di sempre,
-                     che vede il timbro, NON paga e va dritta al ramo
-                     riuscito: contatori, notifiche e stato finale
-                     restano scritti in un posto solo.
-    - 'non_uscito' = non e' partito niente. Il congelamento cade e le
-                     strade normali possono ritentare.
+    FINO AL 19 SET 2026 questa rotta si fidava della persona: «non e'
+    uscito» azzerava il fermo e basta, senza domandare a nessuno. Su un
+    pagamento ancora in volo era la strada per pagare due volte (audit,
+    falla 1) — e nemmeno ritentava, al contrario di quel che il bottone
+    prometteva: sbloccava, e il pagamento ripartiva solo se qualcun
+    altro lo richiamava. Adesso ogni decisione passa da `_verita_riga`,
+    cioe' da LNbits E da LND, su TUTTI gli hash tentati per quella riga.
+
+    - 'verifica' = «Verifica e riprova». USCITO → si chiude come pagato
+                   e lo si dice. FALLITO o MAI PARTITO → cade il fermo e
+                   si RITENTA DAVVERO, dalla funzione d'uscita di
+                   sempre (stessa fattura se e' ancora buona, senno' una
+                   nuova dal Lightning address, senno' la si chiede a
+                   chi aspetta i sats). IN VOLO → 409, resta 🧊.
+                   NON SI SA → 503, resta 🧊.
+    - 'uscito'   = la parola della persona. Vale da sola solo se le
+                   fonti dicono USCITO; se dicono altro (LND: FAILED, o
+                   nessuna traccia, o silenzio) serve `conferma: true`,
+                   che il client chiede mostrando COSA dicono le fonti.
+                   Su IN VOLO non passa nemmeno con la conferma: un
+                   pagamento in volo non e' ancora ne' uscito ne' no.
+    - 'non_uscito' e' il nome di ieri, e un client rimasto in cache lo
+                   manda ancora: vale 'verifica', cioe' la strada sicura.
 
     UPDATE condizionato sul congelamento, come decidi_revisione: il
     secondo moderatore trova il 409, mai due chiusure."""
@@ -18639,44 +19143,129 @@ async def decidi_pagamento(req: Request, x_tg_init_data: str = Header(""),
     d = await leggi_json(req)
     tipo, riga_id = d.get("tipo", ""), int(d.get("id") or 0)
     esito = d.get("esito", "")
+    if esito == "non_uscito":
+        esito = "verifica"
     if tipo not in ("ordine", "rimborso", "sblocco") or esito not in (
-            "uscito", "non_uscito"):
+            "uscito", "verifica"):
         raise HTTPException(400, "Decisione non valida")
+    conferma = d.get("conferma") is True
     tabella = {"ordine": "ordini", "rimborso": "rimborsi_asta",
                "sblocco": "pagamenti"}[tipo]
+    gia_deciso = HTTPException(409, "Questo pagamento non è più in attesa: "
+                                    "l'ha già deciso qualcun altro")
+    con = db()
+    r = con.execute(f"SELECT payout_stato, payout_verso FROM {tabella} "
+                    "WHERE id=?", (riga_id,)).fetchone()
+    if not r or r["payout_stato"] != "incerto":
+        con.close()
+        raise gia_deciso
+    verso = r["payout_verso"] or ""
+    try:
+        cf = _cassaforte_riga(con, tabella, riga_id)
+    except ValueError as e:
+        con.close()
+        raise HTTPException(409, f"Non so da quale cassaforte è uscito "
+                                 f"questo pagamento ({e}): va guardato a mano")
+    con.close()
+
+    verita = await _verita_riga(tabella, riga_id, cf)
+    v = verita["verdetto"]
+    voci = ("; ".join(f"{e['hash'][:12]}…: LNbits dice «{e['lnbits']}», "
+                      f"LND dice «{e['lnd']}»" for e in verita["esiti"])
+            or ("gli hash tentati erano già chiusi come falliti o mai partiti"
+                if verita["hash_noti"] else
+                "questa riga non ha nessun payment hash, quindi non c'è "
+                "niente da chiedere né a LNbits né a LND"))
+
+    def a_verbale(fatto: str):
+        print(f"⚖️ Decisione sul pagamento {tabella}#{riga_id} (moderatore "
+              f"{user['id']}): chiesto «{esito}»"
+              f"{' con conferma' if conferma else ''}, verità «{v}» — "
+              f"{voci} → {fatto}", flush=True)
+
+    if v == IN_VOLO:
+        a_verbale("RIFIUTATO, resta congelato")
+        raise HTTPException(409, (
+            f"Questo pagamento è ANCORA IN VOLO ({voci}): i sats possono "
+            f"ancora arrivare, quindi non si può né chiudere né ripagare. "
+            f"Resta qui 🧊 e si chiude da solo appena il nodo decide."))
+    if esito == "uscito":
+        chiudi = True
+        if v != USCITO and not conferma:
+            a_verbale("chiesta la conferma esplicita")
+            raise HTTPException(409, {
+                "serve_conferma": True,
+                "messaggio": (f"Le fonti NON dicono che è uscito: {voci}. "
+                              f"Se lo chiudi come pagato, a chi aspetta i "
+                              f"sats non partirà più niente.")})
+    elif v == USCITO:
+        chiudi = True
+    elif v == IGNOTO:
+        a_verbale("NON VERIFICABILE, resta congelato")
+        raise HTTPException(503, (
+            f"Non riesco a verificare questo pagamento ({voci}). Non "
+            f"parte niente e resta qui 🧊: riprova fra qualche minuto."))
+    else:
+        chiudi = False
+        if not verita["hash_noti"] and not conferma:
+            a_verbale("chiesta la conferma esplicita (riga senza hash)")
+            raise HTTPException(409, {
+                "serve_conferma": True,
+                "messaggio": ("Questa riga non ha un payment hash: non posso "
+                              "verificare niente. Prima di ripagare, cerca "
+                              "su LNbits per importo e orario che NON sia "
+                              "uscito nulla.")})
+
     con = db()
     cur = con.execute(
         f"UPDATE {tabella} SET payout_stato=?, aggiornato=? "
         "WHERE id=? AND payout_stato='incerto'",
-        ("uscito" if esito == "uscito" else "", int(time.time()), riga_id))
+        ("uscito" if chiudi else "", int(time.time()), riga_id))
     con.commit()
     con.close()
     if cur.rowcount == 0:
-        raise HTTPException(409, "Questo pagamento non è più in attesa: "
-                                 "l'ha già deciso qualcun altro")
-    if esito != "uscito":
-        return {"ok": True, "stato": "sbloccato"}
-    # I sats erano usciti: si chiude l'affare senza pagare di nuovo.
-    # Quale delle due strade dipende da chi aspettava i sats.
-    if tipo == "rimborso":
-        return await _paga_rimborso(riga_id)
-    if tipo == "sblocco":
-        # il timbro 'uscito' e' gia' scritto: la funzione lo vede,
-        # NON paga di nuovo e va dritta alla chiusura — contatori,
-        # notifiche e stato finale restano in un posto solo.
-        return await _rimborsa_sblocco(riga_id, user["id"])
-    con = db()
-    o = con.execute("SELECT payout_verso FROM ordini WHERE id=?",
-                    (riga_id,)).fetchone()
-    con.close()
-    if not o:
-        raise HTTPException(404, "Ordine non trovato")
-    # CHI aspettava i sats lo dice la colonna, mai lo stato: un ordine
-    # in 'dispute' puo' essere su tutte e due le strade, e indovinare
-    # vorrebbe dire chiudere l'affare a favore della persona sbagliata.
-    if o["payout_verso"] == "compratore":
-        return await _rimborsa_compratore(riga_id)
-    return await _sblocca_sats(riga_id)
+        raise gia_deciso
+    a_verbale("CHIUSO come pagato" if chiudi else "fermo tolto, SI RITENTA")
+    # Si ripassa dalla funzione d'uscita di sempre, in tutti e due i
+    # casi. Col timbro 'uscito' lo vede, NON paga e va dritta al ramo
+    # riuscito: contatori, notifiche e stato finale restano in un posto
+    # solo. Senza timbro RITENTA — e rifa' da capo tutte le verifiche,
+    # quindi fra questa riga e il pagamento non c'e' niente di creduto
+    # sulla parola. CHI aspettava i sats lo dice `payout_verso`, mai lo
+    # stato (vedi `_riprendi_uscita`).
+    try:
+        fatto = (await _rimborsa_sblocco(riga_id, user["id"])
+                 if tipo == "sblocco"
+                 else await _riprendi_uscita(tabella, riga_id, verso))
+    except Exception as e:
+        print(f"⚠️ Decisione {tabella}#{riga_id}: la strada d'uscita e' "
+              f"saltata ({type(e).__name__}: {e})", flush=True)
+        fatto = {"ok": False, "errore": True}
+    if chiudi:
+        messaggio = ("✅ Verificato: era USCITO. Affare chiuso come pagato."
+                     if v == USCITO else "✅ Affare chiuso come pagato.")
+    elif fatto.get("ok"):
+        messaggio = "✅ Non era uscito: ripagato ORA, i sats sono partiti."
+    elif fatto.get("in_volo"):
+        messaggio = ("↩︎ Non era uscito: il nuovo pagamento è partito ed è "
+                     "in volo, lo segue la ronda.")
+    elif fatto.get("incerto"):
+        messaggio = ("🧊 Non era uscito, ma il nuovo tentativo non ha avuto "
+                     "risposta: è tornato qui, da verificare.")
+    elif fatto.get("non_chiesto"):
+        messaggio = ("↩︎ Non era uscito. LNbits adesso non risponde: si "
+                     "riprova da soli al prossimo giro.")
+    elif fatto.get("ritenta"):
+        messaggio = ("↩︎ Non era uscito, e il nuovo tentativo è fallito: si "
+                     "riprova da soli nelle prossime ore.")
+    elif fatto.get("errore"):
+        messaggio = ("⚠️ Il fermo è tolto ma il ritentativo è saltato: "
+                     "guarda il journal.")
+    else:
+        messaggio = ("↩︎ Non era uscito. Serve una fattura nuova: l'abbiamo "
+                     "chiesta a chi aspetta i sats.")
+    return {**fatto, "ok": True, "esito": "chiuso" if chiudi else "ritentato",
+            "verita": v, "messaggio": messaggio}
 
 
 @app.post("/api/admin/pagamenti/{pagamento_id}/rimborsa")
@@ -22808,11 +23397,17 @@ async def _paga_rimborso(rimborso_id: int) -> dict:
                     bolt11 = await invoice_da_ln_address(u["ln_address"], importo)
             esito = (PAGATO if r["payout_stato"] == "uscito"
                      else await paga_venditore(bolt11, importo, taccuino,
-                                               cassaforte=cf)
+                                               cassaforte=cf,
+                                               riga=("rimborsi_asta",
+                                                     rimborso_id,
+                                                     "puntatore"))
                      if bolt11 else NON_PAGATO)
         except LnbitsMuto as e:
             print(f"🔁 Rimborso d'asta #{rimborso_id}: {e}")
             esito = NON_CHIESTO
+        if esito == OCCUPATO:
+            con.close()
+            return {"ok": False, "stato": r["stato"], "in_volo": True}
         _timbra_pagamento(con, "rimborsi_asta", rimborso_id, taccuino)
         if esito == INCERTO:
             if (taccuino.get("risolvibile")
@@ -32480,11 +33075,17 @@ async def _rimborsa_sblocco(pagamento_id: int,
                                                          importo)
             esito = (PAGATO if p["payout_stato"] == "uscito"
                      else await paga_venditore(bolt11, importo, taccuino,
-                                               cassaforte=p["cassaforte"])
+                                               cassaforte=p["cassaforte"],
+                                               riga=("pagamenti",
+                                                     pagamento_id,
+                                                     "pagante"))
                      if bolt11 else NON_PAGATO)
         except LnbitsMuto as e:
             print(f"🔁 Rimborso dello sblocco #{pagamento_id}: {e}")
             esito = NON_CHIESTO
+        if esito == OCCUPATO:
+            con.close()
+            return {"ok": False, "stato": p["stato"], "in_volo": True}
         _timbra_pagamento(con, "pagamenti", pagamento_id, taccuino)
         if esito == INCERTO:
             if (taccuino.get("risolvibile")
@@ -41538,11 +42139,17 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                     bolt11 = await invoice_da_ln_address(v["ln_address"], netto)
             esito = (PAGATO if o["payout_stato"] == "uscito"
                      else await paga_venditore(bolt11, netto, taccuino,
-                                               cassaforte=o["cassaforte"])
+                                               cassaforte=o["cassaforte"],
+                                               riga=("ordini", ordine_id,
+                                                     "venditore"))
                      if bolt11 else NON_PAGATO)
         except LnbitsMuto as e:
             print(f"🔁 Ordine #{ordine_id}: {e}")
             esito = NON_CHIESTO
+        if esito == OCCUPATO:
+            # un'altra mano sta pagando questa riga: NON la si tocca
+            con.close()
+            return {"ok": False, "stato": o["stato"], "in_volo": True}
         # Il diario si scrive PRIMA dei rami, e per tutti gli esiti: i
         # due timbri dello stato chiudono la connessione, quindi da
         # dentro quei rami non ci si tornerebbe piu'.
@@ -41815,11 +42422,16 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
                                                          importo)
             esito = (PAGATO if o["payout_stato"] == "uscito"
                      else await paga_venditore(bolt11, importo, taccuino,
-                                               cassaforte=o["cassaforte"])
+                                               cassaforte=o["cassaforte"],
+                                               riga=("ordini", ordine_id,
+                                                     "compratore"))
                      if bolt11 else NON_PAGATO)
         except LnbitsMuto as e:
             print(f"🔁 Rimborso sull'ordine #{ordine_id}: {e}")
             esito = NON_CHIESTO
+        if esito == OCCUPATO:
+            con.close()
+            return {"ok": False, "stato": o["stato"], "in_volo": True}
         _timbra_pagamento(con, "ordini", ordine_id, taccuino)
         if esito == INCERTO:
             if (taccuino.get("risolvibile")
@@ -45348,21 +45960,36 @@ async def risolvi_pagamenti_in_volo():
 
     UNA RIGA ALLA VOLTA E SI FERMA AL PRIMO SILENZIO, come il giro
     gemello: se LNbits tace per una tace per tutte, e insistere
-    vorrebbe dire bussare venti volte per niente a ogni battito."""
+    vorrebbe dire bussare venti volte per niente a ogni battito.
+
+    DAL 19 SET 2026 LE FONTI SONO DUE (cantiere dei pagamenti in volo):
+    a ogni riga si chiede `_verita_pagamento`, cioe' LNbits E LND, e il
+    silenzio che ferma il giro e' quello di TUTT'E DUE. Quando LNbits
+    tace ma LND dice SUCCEEDED o FAILED il caso si chiude da solo;
+    quando LND non ha mai visto l'hash e sono passati
+    `MAI_PARTITO_DOPO_S` si chiude come «mai partito» e si ritenta. E
+    il giro riguarda anche i CONGELATI che hanno un nome: una persona
+    serve solo dove una macchina non sa chiedere."""
     con = db()
     righe = []
     for tab in ("ordini", "rimborsi_asta", "pagamenti"):
         try:
             # prima la lista, poi la cassaforte di ognuna: sui rimborsi
             # d'asta `_cassaforte_riga` puo' scrivere, e non lo fa
-            # mentre un cursore legge
+            # mentre un cursore legge.
+            # ANCHE I CONGELATI CON UN NOME (set 2026): un 'incerto' che
+            # ha un hash e' una domanda che una macchina sa rifare, e se
+            # nel frattempo LND ha deciso non c'e' ragione di aspettare
+            # un moderatore. Quelli senza hash restano alle persone.
             trovate = con.execute(
-                f"SELECT id, payout_hash, payout_verso, "
-                f"payout_ultimo FROM {tab} "
-                "WHERE payout_stato='in_volo' ORDER BY id").fetchall()
+                f"SELECT id, payout_hash, payout_verso, payout_ultimo, "
+                f"payout_stato FROM {tab} "
+                "WHERE payout_stato='in_volo' OR (payout_stato='incerto' "
+                "AND COALESCE(payout_hash,'')<>'') ORDER BY id").fetchall()
             righe += [(tab, r["id"], r["payout_hash"] or "",
                        r["payout_verso"] or "", r["payout_ultimo"] or 0,
-                       _cassaforte_riga(con, tab, r["id"]))
+                       _cassaforte_riga(con, tab, r["id"]),
+                       r["payout_stato"])
                       for r in trovate]
         except Exception as e:
             print(f"⚠️ In volo, tabella {tab} saltata: {e}")
@@ -45371,41 +45998,70 @@ async def risolvi_pagamenti_in_volo():
         return
     adesso = int(time.time())
     decisi = fermi = 0
-    for tab, riga_id, phash, verso, quando, cf in righe[:MAX_RIPRESE_GIRO]:
-        verdetto = ""
-        if phash:
-            try:
-                verdetto = await _stato_pagamento(phash, cf)
-            except LnbitsMuto as e:
-                print(f"🔁 In volo, LNbits tace ({e}): si riguarda al "
-                      f"battito dopo.")
-                break
-            if verdetto == "pending":
-                if adesso - quando <= IN_VOLO_LIMITE_S:
-                    fermi += 1
-                    continue
-        # o e' deciso, o e' in volo da troppo (o non ha un nome, che e'
-        # un difetto nostro): in tutti e tre i casi si esce da qui.
-        if verdetto == "pending" or not phash:
+    for tab, riga_id, phash, verso, quando, cf, stato in righe[:MAX_RIPRESE_GIRO]:
+        if not phash:
+            # in volo senza un nome: e' un difetto nostro, e nessuna
+            # fonte puo' risponderci. Decide una persona.
             await _arrenditi_in_volo(tab, riga_id, phash, quando)
             continue
+        # LA VERITA', DA TUTT'E DUE LE FONTI: prima qui si chiedeva alla
+        # sola LNbits e al suo primo silenzio ci si fermava — il 18 set,
+        # ordine #163, LNbits dava ReadTimeout e LND la risposta l'aveva.
+        v = await _verita_pagamento(
+            phash, cf, (adesso - quando) if quando else None,
+            f"{tab}#{riga_id}")
+        if v["lnbits"] == "muto" and v["lnd"] in (LND_MUTO, LND_SPENTO):
+            print("🔁 In volo, tacciono tutte le fonti: si riguarda al "
+                  "battito dopo.")
+            break
+        if v["verdetto"] in (IN_VOLO, IGNOTO):
+            if stato == "in_volo" and adesso - quando > IN_VOLO_LIMITE_S:
+                await _arrenditi_in_volo(
+                    tab, riga_id, phash, quando,
+                    f"LNbits dice «{v['lnbits']}», LND dice «{v['lnd']}»")
+            else:
+                fermi += 1
+            continue
+        # DECISO: uscito, fallito o mai partito. L'UPDATE e' condizionato
+        # allo stato LETTO: se nel frattempo ha deciso una persona, o
+        # un'altra mano, qui non si riscrive niente.
         con = db()
-        con.execute(f"UPDATE {tab} SET payout_stato=? WHERE id=? "
-                    "AND payout_stato='in_volo'",
-                    ("uscito" if verdetto == "success" else "", riga_id))
+        cur = con.execute(f"UPDATE {tab} SET payout_stato=? WHERE id=? "
+                          "AND payout_stato=?",
+                          ("uscito" if v["verdetto"] == USCITO else "",
+                           riga_id, stato))
         con.commit()
         con.close()
+        if not cur.rowcount:
+            continue
+        print(f"🛬 {tab}#{riga_id}: era «{stato}», la verita' e' "
+              f"«{v['verdetto']}» (LNbits {v['lnbits']}, LND {v['lnd']}) → "
+              f"{'si chiude come pagato' if v['verdetto'] == USCITO else 'si ritenta'}",
+              flush=True)
+        if stato == "incerto":
+            try:
+                await notifica_admin(
+                    f"🧊→{'✅' if v['verdetto'] == USCITO else '↩︎'} <b>Un "
+                    f"pagamento congelato si è chiarito da solo.</b> "
+                    f"{tab} #{riga_id}: LNbits dice «{v['lnbits']}», LND "
+                    f"dice «{v['lnd']}» → "
+                    + ("era <b>uscito</b>, l'affare si chiude come pagato."
+                       if v["verdetto"] == USCITO else
+                       "<b>non era uscito</b>, il pagamento riparte.")
+                    + " Non devi fare niente.")
+            except Exception as e:
+                print(f"⚠️ Avviso ai moderatori non partito: {e}")
         try:
             await _riprendi_uscita(tab, riga_id, verso)
         except Exception as e:
             print(f"⚠️ Ripresa dal volo saltata ({tab} #{riga_id}): {e}")
         decisi += 1
-    print(f"🛬 Pagamenti in volo: {len(righe)}, decisi {decisi}, "
-          f"ancora in volo {fermi}")
+    print(f"🛬 Pagamenti in volo o congelati: {len(righe)}, decisi "
+          f"{decisi}, ancora fermi {fermi}")
 
 
 async def _arrenditi_in_volo(tabella: str, riga_id: int, phash: str,
-                             quando: int):
+                             quando: int, voci: str = ""):
     """Mezz'ora in volo senza un verdetto: da qui in poi decide una
     persona. Si timbra 'incerto' — cioe' le quattro uscite restano
     chiuse, che e' la parte che conta — e ai moderatori si consegna
@@ -45423,10 +46079,14 @@ async def _arrenditi_in_volo(tabella: str, riga_id: int, phash: str,
     try:
         await notifica_admin(
             f"🧊 <b>Pagamento da verificare a mano.</b> {tabella} "
-            f"#{riga_id} è in volo da <b>{minuti} minuti</b> e LNbits non "
-            f"dice ancora com'è finito.\n\nNessun ritentativo partirà da "
-            f"solo. Cerca questo pagamento su LNbits e poi rispondi dal "
-            f"Profilo, nella sezione «🧊 Pagamenti da verificare».\n"
+            f"#{riga_id} è in volo da <b>{minuti} minuti</b> e nessuna "
+            f"fonte dice ancora com'è finito"
+            + (f" ({voci})" if voci else "")
+            + f".\n\nNessun ritentativo partirà da solo, e la ronda "
+            f"continua a chiederlo: se si chiarisce, si chiude da sé. Dal "
+            f"Profilo, in «🧊 Pagamenti da verificare», c'è «Verifica e "
+            f"riprova», che chiede a LNbits e a LND prima di muovere un "
+            f"sat.\n"
             + (f"<code>{phash}</code>" if phash else
                "(questa riga non ha un payment_hash: è un difetto "
                "nostro, e va guardata con calma)"))

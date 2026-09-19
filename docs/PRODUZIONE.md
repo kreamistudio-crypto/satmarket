@@ -583,6 +583,93 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   discesa a zero (timbro `saas_senza_doveri` in `timbri`: si riarma da
   solo se un dovere ricompare, e nel dubbio — un conteggio che esplode
   — non dichiara zero). Parla solo col denaro nuovo sul nodo.
+  I PAGAMENTI DA VERIFICARE, il 🧊 (19 set 2026, dopo l'audit): un
+  pagamento in USCITA di cui non si sa com'e' finito non lo decide
+  piu' la parola di una persona. Prima di ogni decisione e di ogni
+  ritentativo il server chiede la VERITA' a due fonti — LNbits (cosa
+  ha chiesto al nodo) e LND (cosa e' uscito), e quando non combaciano
+  ha ragione LND — su TUTTI gli hash tentati per quella riga (tabella
+  `payout_tentati`). I cinque verdetti: `uscito` (si chiude come
+  pagato), `fallito` e `mai_partito` (si puo' ripagare), `in_volo` e
+  `ignoto` (NON PARTE NIENTE, ne' da un giro ne' da un bottone).
+  COSA FA DA SOLO: l'orologio (ogni 10 minuti) richiede tutti gli
+  `in_volo` E i congelati che hanno un hash. LNbits muta ma LND dice
+  SUCCEEDED → chiude; LND dice FAILED → ritenta; LND non ha MAI visto
+  l'hash e sono passati 15 minuti (`MAI_PARTITO_DOPO_S`) → «mai
+  partito», ritenta; ancora in volo dopo 30 minuti → 🧊 e avviso ai
+  moderatori. Un congelato che si chiarisce da solo manda «🧊→✅».
+  COSA FA IL PANNELLO (Profilo → 🧊 Pagamenti da verificare):
+  «🔎 Verifica e riprova» chiede alle fonti e poi — uscito: chiude;
+  fallito o mai partito: RIPAGA SUBITO dalla strada di sempre (prima
+  sbloccava e basta); in volo: rifiuta e resta 🧊; non verificabile:
+  503 e resta 🧊. «✅ L'ho visto io: è uscito» vale da solo solo se le
+  fonti dicono uscito; se dicono altro mostra COSA dicono e chiede una
+  seconda conferma; su un pagamento in volo non passa nemmeno cosi'.
+  ⚠️ UN PAGAMENTO «pending» DA ORE O GIORNI NON E' UN GUASTO: e' quasi
+  sempre una HOLD INVOICE tenuta appesa da chi riceve. Si aspetta: si
+  chiude da solo quando il nodo decide (al piu' tardi alla scadenza
+  del CLTV). Dichiararlo «non uscito» era il modo di pagare due volte.
+  DOVE SI LEGGE: `journalctl -u barattolo | grep -E "🔎|⚖️|🛬|✋"` —
+  🔎 ogni verifica (riga, hash, voce di LNbits, voce di LND, verdetto),
+  ⚖️ ogni decisione di un moderatore (chi, cosa ha chiesto, com'e'
+  finita), 🛬 la ronda, ✋ una seconda mano respinta. All'avvio c'e'
+  sempre «🔎 Verità dei pagamenti: LND ACCESO» (o SPENTO, col perche').
+  IL MACAROON DI SOLA LETTURA (una volta sola). Questo server e'
+  pubblico e gira da root: una chiave che sa PAGARE qui non entra, e
+  quella di LNbits resta dov'e'. Sul NODO, dalla cartella `~/nodo`:
+  `docker compose exec lnd lncli bakemacaroon --root_key_id 2 --save_to /tmp/barattolo-lettura.macaroon offchain:read`
+  e poi `docker compose exec lnd xxd -p -c 9999 /tmp/barattolo-lettura.macaroon`
+  (se il servizio non si chiama `lnd`, il nome giusto lo dice
+  `docker compose ps`; se nel container manca `xxd`, lo stesso lo fa
+  `od -An -tx1 -v FILE | tr -d ' \n'`). L'esadecimale va nel config
+  del VPS:
+  `LND_PONTE_MACAROON_LETTURA = "INCOLLA_QUI"`; `LND_PONTE_CERT` e
+  `LND_PONTE_URL` hanno gia' i default giusti (`/opt/lnbits/data/tls.cert`
+  e `https://127.0.0.1:18080`). Poi si cancella il file sul nodo e si
+  riavvia `barattolo`. Si revoca da solo, senza toccare LNbits:
+  `lncli deletemacaroonid 2`. Non passa MAI dal canale Telegram.
+  Senza macaroon LND vale «spento»: decide LNbits da sola, come prima,
+  ma con le regole nuove (pending = fermo, e i 15 minuti).
+  IL CANARINO: un «LND non l'ha mai visto» si crede solo se, nello
+  stesso giro, LND riconosce un hash che conosce di sicuro — uno per
+  cui lui stesso ha gia' detto SUCCEEDED (timbro `lnd_canarino`, o gli
+  ultimi payout usciti dal nodo). Senza canarino «assente» vale
+  «muto», cioe' si aspetta. Non c'e' niente da seminare a mano: basta
+  che nel database ci sia UN payout riuscito dalla cassaforte `nodo`.
+  I CONTROLLI A MANO, tutti di sola lettura. Sul VPS, la coda:
+  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT 'ordini',id,stato,payout_stato,payout_verso,payout_tentativi,payout_hash FROM ordini WHERE payout_stato NOT IN ('','uscito') UNION ALL SELECT 'rimborsi',id,stato,payout_stato,payout_verso,payout_tentativi,payout_hash FROM rimborsi_asta WHERE payout_stato NOT IN ('','uscito') UNION ALL SELECT 'sblocchi',id,stato,payout_stato,payout_verso,payout_tentativi,payout_hash FROM pagamenti WHERE payout_stato NOT IN ('','uscito');"`
+  Tutti gli hash tentati per una riga (qui l'ordine 163):
+  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT hash,datetime(quando,'unixepoch'),esito FROM payout_tentati WHERE tabella='ordini' AND riga_id=163;"`
+  La voce di LND per un hash, dal VPS attraverso il ponte (il
+  macaroon sta in un file 600, NON sulla riga di comando):
+  `H=<payment_hash>; B=$(python3 -c "import base64,sys;print(base64.urlsafe_b64encode(bytes.fromhex(sys.argv[1])).decode())" $H); curl -s --max-time 30 --cacert /opt/lnbits/data/tls.cert -H "Grpc-Metadata-macaroon: $(cat /root/lettura.macaroon.hex)" https://127.0.0.1:18080/v2/router/track/$B | head -c 600`
+  — `"status":"SUCCEEDED"`, `"IN_FLIGHT"` o `"FAILED"`; un hash mai
+  visto risponde `payment isn't initiated`. Sul nodo la stessa cosa e'
+  `lncli trackpayment <payment_hash>`, e gli appesi di adesso sono
+  `lncli listpayments --include_incomplete | grep -c IN_FLIGHT`. La
+  voce di LNbits: il pannello (tunnel SSH sulla 5001), cercando l'hash.
+  IL DRILL, a mercatino fermo e con un ordine di prova da pochi sats:
+  1) riavviato il servizio, il journal dice «LND ACCESO»; 2) il `curl`
+  qui sopra su un hash di un payout VECCHIO e riuscito risponde
+  SUCCEEDED, e su un hash inventato (64 cifre esadecimali a caso)
+  risponde `payment isn't initiated` — se risponde altro, la forma
+  che il codice si aspetta e' sbagliata e va detto PRIMA di fidarsi;
+  3) un ordine di prova pagato e confermato a ponte sano: si chiude
+  come sempre, e nel journal NON compare nessuna riga 🔎 (una fattura
+  fresca non fa il giro su tor: e' voluto); 4) un secondo ordine di
+  prova — il venditore di prova deve avere un LIGHTNING ADDRESS: con
+  una fattura incollata a mano, a tentativo fallito gliene si chiede
+  una nuova e il giro non si chiude da solo — e
+  `systemctl stop lnd-ponte` PRIMA della conferma: il payout
+  non parte, il guardiano rimette su il ponte in ~3 minuti, e il
+  pagamento si chiude DA SOLO — ma non subito: finche' non sono
+  passati i 15 minuti un hash che LND non ha mai visto vale «in volo»,
+  quindi ci vogliono due o tre battiti dell'orologio (20-30 minuti).
+  Nel journal si leggono le righe 🔎 con `LND=assente` e poi la 🛬
+  che ritenta; su LNbits, alla fine, UN solo pagamento riuscito e
+  nessun 🧊. Quel che il drill non prova e' la hold
+  invoice: si puo' fare con un wallet che le sa coniare, ed e' l'unico
+  modo di vedere dal vivo il 409 «ANCORA IN VOLO».
   IL CONTROLLO DEGLI ORFANI, sulle due casseforti (set 2026):
   `cd ~/satmarket && python3 orfani.py` — sola lettura, legge il
   registro di ogni cassaforte configurata con la sua invoice key e

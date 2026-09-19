@@ -2622,7 +2622,7 @@ def prove_importo_uscita():
                # i quattro esiti (ago 2026): qui interessa il rifiuto,
                # ma senza i nomi la funzione non gira nemmeno
                "PAGATO": "pagato", "NON_PAGATO": "non_pagato",
-               "INCERTO": "incerto", "NON_CHIESTO": "non_chiesto",
+               "INCERTO": "incerto", "NON_CHIESTO": "non_chiesto", "OCCUPATO": "occupato",
                "LnbitsMuto": LnbitsMuto,
                # e il formattatore dei sats, che l'avviso ai
                # moderatori usa da quando un satoshi si scrive in un
@@ -3006,7 +3006,8 @@ def prove_doppio_wallet():
           "async def _stato_pagamento(payment_hash: str, cassaforte: str)"
           in src)
     prova("paga_venditore: cassaforte solo per nome e senza default", True,
-          "*,\n                         cassaforte: str) -> str:" in pv)
+          "*,\n                         cassaforte: str, riga: tuple = ()) "
+          "-> str:" in pv)
     # ...e le sentinelle dell'ordine leggono ancora i nomi delle chiavi
     prova("le chiavi tengono i loro nomi dentro l'oggetto", True,
           "cf.LNBITS_ADMIN_KEY" in pv and "cf.LNBITS_INVOICE_KEY" in
@@ -3305,7 +3306,7 @@ def prove_esito_pagamento():
         return "async " + pezzo(nome)
 
     ESITI = {"PAGATO": "pagato", "NON_PAGATO": "non_pagato",
-             "INCERTO": "incerto", "NON_CHIESTO": "non_chiesto",
+             "INCERTO": "incerto", "NON_CHIESTO": "non_chiesto", "OCCUPATO": "occupato",
              "LnbitsMuto": LnbitsMuto}
     leggi = reale("_esito_lnbits")
 
@@ -3707,12 +3708,22 @@ def prove_esito_pagamento():
         async def _avvisa(t):
             avvisi.append(t)
 
+        async def _lnd_spento(_h, _cf=""):
+            return "spento"
+
         amb = {"db": Con, "time": __import__("time"),
                "_stato_pagamento": _stato, "_riprendi_uscita": _riprendi,
                "_cassaforte_riga": lambda con, tab, rid: "saas",
                "notifica_admin": _avvisa, "LnbitsMuto": LnbitsMuto,
                "MAX_RIPRESE_GIRO": 20, "IN_VOLO_LIMITE_S": 1800,
+               # dal cantiere dei pagamenti in volo la ronda chiede la
+               # VERITA' a due fonti: qui il giudice e' quello vero, e
+               # LND e' spento — cioe' la riga del SaaS, dove decide
+               # LNbits da sola come ha sempre fatto
+               "_stato_lnd": _lnd_spento, **costanti_verita(),
                "print": lambda *a, **k: None}
+        exec(pezzo("_verdetto_pagamento"), amb)
+        exec(pezzo_async("_verita_pagamento"), amb)
         exec(pezzo_async("_arrenditi_in_volo"), amb)
         exec(pezzo_async("risolvi_pagamenti_in_volo"), amb)
         gira(amb["risolvi_pagamenti_in_volo"]())
@@ -3735,7 +3746,13 @@ def prove_esito_pagamento():
     # «nessuna traccia» si tratta come un fallimento, ed e' voluto: si
     # ripassa dalla strada di sempre, che ricontrolla tutto da capo
     # prima di muovere un sat
-    stato, _, ripresi, _ = in_volo("")
+    # ...ma NON SUBITO (cantiere dei pagamenti in volo): una richiesta
+    # appena partita «non c'e'» per definizione, e prima di
+    # MAI_PARTITO_DOPO_S la traccia che manca non autorizza niente
+    stato, _, ripresi, _ = in_volo("", eta=60)
+    prova("volo senza traccia, ma giovane: si aspetta",
+          ("in_volo", []), (stato, ripresi))
+    stato, _, ripresi, _ = in_volo("", eta=1000)
     prova("volo senza traccia: si ripassa dalla strada di sempre",
           ("", [("ordini", 1, "venditore")]), (stato, ripresi))
 
@@ -3868,6 +3885,665 @@ def prove_esito_pagamento():
           giro(1, adesso - 301, esito={"ok": False, "ritenta": True}))
 
 
+def costanti_verita():
+    """I nomi della VERITA' DI UN PAGAMENTO, presi dal sorgente e non
+    ricopiati: il giorno che 'in_volo' cambiasse grafia di la', un
+    dizionario battuto a mano qui resterebbe verde a giudice rotto."""
+    amb = {}
+    for inizio in ("LND_SUCCEEDED, LND_IN_FLIGHT, LND_FAILED = ",
+                   "LND_ASSENTE, LND_MUTO, LND_SPENTO = ",
+                   "MAI_PARTITO_DOPO_S = ", "LND_CANARINO_VALE_S = ",
+                   "TIMBRO_CANARINO = ",
+                   "USCITO, IN_VOLO, FALLITO, MAI_PARTITO, IGNOTO = ("):
+        i = _SORGENTE.index("\n" + inizio) + 1
+        fine = (_SORGENTE.index(")\n", i) + 1 if inizio.endswith("(")
+                else _SORGENTE.index("\n", i))
+        exec(_SORGENTE[i:fine], amb)
+    amb.pop("__builtins__", None)
+    return amb
+
+
+def prove_pagamenti_in_volo():
+    """«NON E' USCITO» CHE NON PAGA DUE VOLTE (set 2026).
+
+    L'audit del 19 set aveva riprodotto il doppio payout con le
+    funzioni vere: un pagamento tenuto in volo da una hold invoice, un
+    moderatore che dichiara «non e' uscito», una fattura nuova pagata, e
+    poi la prima che si salda — 1000 dovuti, 2000 usciti. Quella
+    riproduzione sta QUI, ed e' la prima prova della sezione: sul codice
+    di prima e' ROSSA (2000), su questo e' verde (1000 e un 409).
+
+    IL MONDO E' DI CARTONE MA LE FUNZIONI SONO TUTTE VERE: la strada
+    d'uscita, `paga_venditore`, i timbri, il giudice, la ronda e la
+    rotta del moderatore. Di finto ci sono i due estremi — LNbits (un
+    httpx che tiene una riga per hash, come il vero) e LND (un
+    dizionario dietro `_chiedi_lnd`) — piu' l'anagrafe e le notifiche.
+    Ogni scena nasce in un mondo SUO: un lucchetto asyncio conteso in un
+    event loop non si riusa in un altro."""
+    print("\n[i pagamenti in volo: «non e' uscito» che non paga due volte]")
+    import asyncio
+    import collections
+    import sqlite3
+    import time as _time
+
+    def gira(coro):
+        return asyncio.new_event_loop().run_until_complete(coro)
+
+    try:
+        K = costanti_verita()
+    except ValueError:
+        # il codice di PRIMA non ha nemmeno i nomi: la scena dell'audit
+        # gira lo stesso (e' la numero 1 apposta), il resto esplodera'
+        K = {}
+
+    class Rifiuto(Exception):
+        def __init__(self, status_code, detail=None):
+            self.status_code, self.detail = status_code, detail
+
+    class _R:
+        def __init__(self, code, dati):
+            self.status_code, self._d = code, dati
+
+        def json(self):
+            return self._d
+
+    def mondo(invoice="", address="chi@wallet.tld", stato="delivered",
+              condiviso=None):
+        """Torna un oggetto con dentro tutto: `m.sblocca`, `m.ronda`,
+        `m.decidi`, `m.nodo` (lnbits/lnd/partiti/modi/muto), `m.vero`
+        (il database), `m.detto` (i print) e `m.avvisi`. Con `condiviso`
+        si monta un SECONDO processo sugli stessi database e nodo: ha i
+        suoi lucchetti, che e' tutto il punto."""
+        m = type("Mondo", (), {})()
+        if condiviso is None:
+            vero = sqlite3.connect(":memory:")
+            vero.row_factory = sqlite3.Row
+            vero.execute(
+                "CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,"
+                " compratore_id INT, venditore_id INT, prezzo_sats INT, "
+                "protezione_sats INT, quantita INT, stato TEXT, disputata "
+                "INT, invoice_venditore TEXT, aggiornato INT, cambio_eur "
+                "REAL, payout_stato TEXT, payout_hash TEXT, payout_verso "
+                "TEXT, sbloccato_auto_il INT DEFAULT 0, cassaforte TEXT "
+                "DEFAULT 'nodo', payout_tentativi INT DEFAULT 0, "
+                "payout_ultimo INT DEFAULT 0, payout_errore TEXT DEFAULT '')")
+            vero.execute(
+                "INSERT INTO ordini VALUES(1,7,111,222,1000,0,1,?,0,?,0,0,"
+                "'','','',0,'nodo',0,0,'')", (stato, invoice))
+            vero.execute("CREATE TABLE utenti(tg_id INT, ln_address TEXT, "
+                         "vendite_ok INT, acquisti_ok INT)")
+            vero.execute("INSERT INTO utenti VALUES(222,?,0,0)", (address,))
+            # la tabella VERA, con la sua chiave: e' l'ON CONFLICT che
+            # la pezza usa, e uno schema ricopiato a meta' lo farebbe
+            # esplodere qui invece che in produzione
+            try:
+                i = _SORGENTE.index(
+                    '"CREATE TABLE IF NOT EXISTS payout_tentati("')
+                j = _SORGENTE.index('hash))")', i) + len('hash))"')
+                vero.execute(eval("(" + _SORGENTE[i:j] + ")"))
+            except ValueError:
+                # il codice di PRIMA non ha la tabella: la scena
+                # dell'audit gira lo stesso, ed e' rossa per i 2000
+                vero.execute("CREATE TABLE payout_tentati(tabella TEXT, "
+                             "riga_id INT, hash TEXT, quando INT, esito TEXT)")
+            vero.commit()
+            nodo = type("Nodo", (), {})()
+            nodo.lnbits, nodo.lnd, nodo.partiti = {}, {}, []
+            nodo.modi, nodo.muto, nodo.alla_post = {}, False, None
+            nodo.coniate, nodo.timbri, nodo.alla_lnd = [], {}, None
+        else:
+            vero, nodo = condiviso.vero, condiviso.nodo
+        m.vero, m.nodo, m.detto, m.avvisi = vero, nodo, [], []
+
+        class Con:
+            def execute(self, *a):
+                return vero.execute(*a)
+
+            def commit(self):
+                vero.commit()
+
+            def close(self):
+                pass
+
+        class Client:
+            def __init__(self, *a, **k):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+            async def get(self, url, headers=None, **k):
+                await asyncio.sleep(0)
+                if nodo.muto:
+                    raise OSError("ReadTimeout")
+                h = url.rsplit("/", 1)[-1]
+                if h not in nodo.lnbits:
+                    return _R(404, {})
+                return _R(200, {"status": nodo.lnbits[h],
+                                "paid": nodo.lnbits[h] == "success"})
+
+            async def post(self, url, headers=None, json=None, **k):
+                h = "hash-di-" + json["bolt11"]
+                if nodo.alla_post:
+                    nodo.alla_post(h)
+                await asyncio.sleep(0)
+                modo = nodo.modi.get(json["bolt11"], "ok")
+                if modo == "perso":        # mai arrivata nemmeno a LNbits
+                    raise OSError("ConnectTimeout")
+                if h in nodo.lnbits:       # una riga per hash: l'eco
+                    return _R(201, {"status": nodo.lnbits[h]})
+                nodo.partiti.append(h)
+                lnb, lnd = {"ok": ("success", "SUCCEEDED"),
+                            "hold": ("pending", "IN_FLIGHT"),
+                            "fail": ("failed", "FAILED"),
+                            "timeout_ok": ("success", "SUCCEEDED"),
+                            "timeout_fail": ("failed", "FAILED"),
+                            "mai_a_lnd": ("pending", None)}[modo]
+                nodo.lnbits[h] = lnb
+                if lnd:
+                    nodo.lnd[h] = lnd
+                if modo.startswith("timeout"):
+                    nodo.muto = True
+                    raise OSError("ReadTimeout")
+                return _R(201, {"status": lnb})
+
+        async def _niente(*a, **k):
+            return None
+
+        async def _chiedi_lnd(h):
+            await asyncio.sleep(0)
+            if nodo.alla_lnd:
+                nodo.alla_lnd()
+            return nodo.lnd.get(h, K["LND_ASSENTE"])
+
+        async def _decodifica(bolt11, cassaforte=""):
+            return {"payment_hash": "hash-di-" + bolt11,
+                    "amount_msat": 1000 * 1000}
+
+        async def _importo(bolt11, dec=None, cassaforte=""):
+            return 1000
+
+        async def _address(addr, sats):
+            nodo.coniate.append(addr)
+            return f"lnbc-fattura-{len(nodo.coniate)}"
+
+        async def _avvisa(t):
+            m.avvisi.append(t)
+
+        async def _corpo(req):
+            return req
+
+        Cf = collections.namedtuple(
+            "Cf", "nome LNBITS_URL LNBITS_INVOICE_KEY LNBITS_ADMIN_KEY")
+        amb = {
+            "db": Con, "time": _time, "asyncio": asyncio,
+            "html": __import__("html"), "json": __import__("json"),
+            "httpx": type("H", (), {"AsyncClient": Client}),
+            "_lucchetti_ordine": collections.defaultdict(asyncio.Lock),
+            "_chiavi_cassaforte":
+                lambda nome="": Cf(nome or "nodo", "http://finto", "k", "K"),
+            "_cassaforte_riga": lambda con, tab, rid: "nodo",
+            "CASSAFORTE_NODO": "nodo", "_chiedi_lnd": _chiedi_lnd,
+            "timbro_letto": lambda k: nodo.timbri.get(k, ""),
+            "timbro_scrivi": lambda k, v: nodo.timbri.__setitem__(k, v),
+            "_lnd_canarino": {"ok_fino": 0.0},
+            "decodifica_invoice": _decodifica, "importo_invoice": _importo,
+            "invoice_da_ln_address": _address,
+            "netto_venditore": lambda p: p, "_fmt_sats": reale("_fmt_sats"),
+            "_righe_ordine": lambda con, o: [],
+            "_titolo_ordine": lambda righe: "una cosa",
+            "cambio_btc_eur": _niente, "notifica": _niente,
+            "notifica_admin": _avvisa, "premia_distintivi": _niente,
+            "polso_ordini_admin": _niente, "premia_xp": _niente,
+            "xp_ordine": lambda *a: 0, "premia_reputazione_nostr": _niente,
+            "PAGATO": "pagato", "NON_PAGATO": "non_pagato",
+            "INCERTO": "incerto", "NON_CHIESTO": "non_chiesto",
+            "OCCUPATO": "occupato", "LnbitsMuto": LnbitsMuto,
+            "MAX_TENTATIVI_PAYOUT": 5, "IN_VOLO_LIMITE_S": 1800,
+            "MAX_RIPRESE_GIRO": 20, "ATTESE_ESITO": 1,
+            "SECONDI_FRA_ATTESE": 0,
+            "verifica_utente": lambda *a: {"id": 999},
+            "e_admin": lambda i: True, "leggi_json": _corpo,
+            "HTTPException": Rifiuto, "Header": lambda *a: "",
+            "Cookie": lambda *a: "", "Request": object,
+            "print": lambda *a, **k: m.detto.append(" ".join(map(str, a))),
+            **K}
+        for nome, asincrona in (
+                ("_esito_lnbits", 0), ("_stato_pagamento", 1),
+                ("_avvisa_payout_fallito", 1), ("_lnd_ci_vede", 1),
+                ("_stato_lnd", 1), ("_verdetto_pagamento", 0),
+                ("_verita_pagamento", 1), ("_hash_tentati", 0),
+                ("_verita_riga", 1), ("_prendi_la_mano", 0),
+                ("paga_venditore", 1), ("_timbra_pagamento", 0),
+                ("_in_volo", 0), ("_sospendi_pagamento", 0),
+                ("_payment_hash", 1), ("_congela_pagamento", 1),
+                ("_msg_ritentiamo", 0), ("_sblocca_sats", 1),
+                ("_riprendi_uscita", 1), ("_arrenditi_in_volo", 1),
+                ("risolvi_pagamenti_in_volo", 1), ("decidi_pagamento", 1)):
+            try:
+                exec(("async " if asincrona else "") + pezzo(nome), amb)
+            except ValueError:
+                # sul codice di PRIMA i pezzi nuovi non ci sono: la scena
+                # dell'audit deve poter girare anche la', ed essere rossa
+                # per il motivo giusto (2000 usciti), non per un NameError
+                pass
+        m.amb = amb
+        m.sblocca = lambda: amb["_sblocca_sats"](1)
+        m.ronda = lambda: amb["risolvi_pagamenti_in_volo"]()
+        m.decidi = lambda esito, **k: amb["decidi_pagamento"](
+            {"tipo": "ordine", "id": 1, "esito": esito, **k})
+        return m
+
+    def riga(m):
+        r = m.vero.execute("SELECT stato, payout_stato, payout_hash FROM "
+                           "ordini WHERE id=1").fetchone()
+        return tuple(r)
+
+    def saldati(m):
+        return [h for h in m.nodo.partiti
+                if m.nodo.lnd.get(h) == "SUCCEEDED"
+                or m.nodo.lnbits.get(h) == "success"]
+
+    def invecchia(m, secondi):
+        m.vero.execute("UPDATE ordini SET payout_ultimo=payout_ultimo-?",
+                       (secondi,))
+        m.vero.execute("UPDATE payout_tentati SET quando=quando-?",
+                       (secondi,))
+        m.vero.commit()
+
+    def canarino(m):
+        m.nodo.lnd["hash-di-ieri"] = "SUCCEEDED"
+        m.nodo.timbri[K["TIMBRO_CANARINO"]] = "hash-di-ieri"
+
+    def campo(risposta, chiave):
+        # una risposta che doveva essere un dizionario e invece e' un
+        # rifiuto deve far cadere la prova ROSSA, non farla esplodere
+        return risposta.get(chiave) if isinstance(risposta, dict) else None
+
+    async def prova_a(coro):
+        try:
+            return await coro
+        except Rifiuto as e:
+            return e
+
+    # --- 1. LA RIPRODUZIONE DELL'AUDIT ------------------------------
+    m = mondo()
+    m.nodo.modi["lnbc-fattura-1"] = "hold"
+    gira(m.sblocca())
+    prova("audit: la hold invoice lascia il payout in volo",
+          ("delivered", "in_volo", "hash-di-lnbc-fattura-1"), riga(m))
+    invecchia(m, 3600)
+    gira(m.ronda())
+    prova("audit: dopo mezz'ora la ronda lo consegna a una persona",
+          "incerto", riga(m)[1])
+    # il moderatore dice «non e' uscito» col NOME DI IERI, che e' quello
+    # che il codice vecchio capiva: sul nuovo vale «verifica»
+    esito = gira(prova_a(m.decidi("non_uscito")))
+    prova("audit: «non e' uscito» su un pagamento in volo e' RIFIUTATO",
+          409, getattr(esito, "status_code", None))
+    prova("...e la riga resta congelata, col nome del pagamento vero",
+          ("delivered", "incerto", "hash-di-lnbc-fattura-1"), riga(m))
+    gira(m.sblocca())       # il compratore ripreme «Conferma»
+    m.nodo.lnd["hash-di-lnbc-fattura-1"] = "SUCCEEDED"   # e il ladro salda
+    m.nodo.lnbits["hash-di-lnbc-fattura-1"] = "success"
+    prova("audit: 1000 dovuti, 1000 usciti (erano 2000)",
+          ["hash-di-lnbc-fattura-1"], saldati(m))
+    prova("...e nessuna seconda fattura e' mai stata pagata",
+          ["hash-di-lnbc-fattura-1"], m.nodo.partiti)
+    gira(m.ronda())
+    prova("audit: saldata la prima, la ronda chiude da sola come pagato",
+          ("released", "uscito"), riga(m)[:2])
+    prova("...avvisando che il congelato si e' chiarito da solo", True,
+          any("chiarito da solo" in a for a in m.avvisi))
+
+    # --- 2. IL GIUDICE, riga per riga -------------------------------
+    giudice = reale("_verdetto_pagamento", dict(K))
+    N = K["MAI_PARTITO_DOPO_S"]
+    for lnbits, lnd, eta, atteso in (
+            ("pending", "SUCCEEDED", 5, "uscito"),
+            ("muto", "SUCCEEDED", 5, "uscito"),
+            ("failed", "SUCCEEDED", 5, "uscito"),
+            ("success", "IN_FLIGHT", 5, "in_volo"),
+            ("muto", "IN_FLIGHT", 99999, "in_volo"),
+            ("failed", "IN_FLIGHT", 99999, "in_volo"),
+            ("success", "assente", 5, "uscito"),      # interno a LNbits
+            ("success", "spento", 5, "uscito"),
+            ("success", "FAILED", 5, "ignoto"),       # uno dei due mente
+            ("pending", "FAILED", 5, "fallito"),
+            ("muto", "FAILED", 5, "fallito"),
+            ("pending", "muto", 99999, "in_volo"),
+            ("pending", "spento", 99999, "in_volo"),
+            ("muto", "muto", 99999, "ignoto"),
+            ("muto", "spento", 99999, "ignoto"),
+            ("failed", "muto", 99999, "ignoto"),
+            ("assente", "muto", 99999, "ignoto"),
+            ("failed", "spento", 5, "fallito"),       # la regola di sempre
+            ("failed", "assente", 5, "in_volo"),
+            ("failed", "assente", N, "fallito"),
+            ("pending", "assente", N - 1, "in_volo"),
+            ("pending", "assente", N, "mai_partito"),
+            ("muto", "assente", N, "ignoto"),
+            ("assente", "assente", N - 1, "in_volo"),
+            ("assente", "assente", N, "mai_partito"),
+            ("assente", "spento", N - 1, "in_volo"),
+            ("assente", "spento", N, "mai_partito"),
+            ("assente", "assente", None, "mai_partito"),   # mai tentato
+            ("assente", "muto", None, "mai_partito"),
+            ("assente", "spento", None, "mai_partito"),
+            ("muto", "muto", None, "ignoto")):
+        prova(f"giudice: LNbits {lnbits}, LND {lnd}, eta {eta} → {atteso}",
+              atteso, giudice(lnbits, lnd, eta))
+    prova("N e' almeno un battito dell'orologio (600 s)", True, N >= 600)
+
+    # --- 3. IL LETTORE DI LND ---------------------------------------
+    leggi = reale("_lnd_stato_da_riga", {**K, "json": __import__("json")})
+    for corpo, atteso in (
+            ('{"result":{"status":"SUCCEEDED"}}', "SUCCEEDED"),
+            ('{"result":{"status":"IN_FLIGHT","htlcs":[]}}', "IN_FLIGHT"),
+            ('{"result":{"status":"FAILED","failure_reason":"X"}}', "FAILED"),
+            ('{"status":"SUCCEEDED"}', "SUCCEEDED"),
+            ('{"error":{"code":5,"message":"payment isn\'t initiated"}}',
+             "assente"),
+            ('{"code":5,"message":"payment isn\'t initiated","details":[]}',
+             "assente"),
+            # LA RIGA CHE CONTA: «Not Found» e' anche la risposta a una
+            # ROTTA sbagliata, e non deve MAI valere «il pagamento non c'e'»
+            ('{"code":5,"message":"Not Found","details":[]}', "muto"),
+            ('{"error":{"code":5,"message":"Not Found"}}', "muto"),
+            ('{"error":{"code":2,"message":"permission denied"}}', "muto"),
+            ('{"result":{"status":"UNKNOWN"}}', "muto"),
+            ('<html>502 Bad Gateway</html>', "muto"), ('[]', "muto"),
+            ('', "muto")):
+        prova(f"LND: {corpo[:44] or '(vuoto)'} → {atteso}", atteso,
+              leggi(corpo))
+
+    # --- 4. IL CANARINO ---------------------------------------------
+    m = mondo()
+    prova("senza canarino un «assente» di LND NON si crede (muto)", "muto",
+          gira(m.amb["_stato_lnd"]("hash-mai-visto", "nodo")))
+    canarino(m)
+    prova("...a canarino vivo si'", "assente",
+          gira(m.amb["_stato_lnd"]("hash-mai-visto", "nodo")))
+    m.amb["_lnd_canarino"]["ok_fino"] = 0.0
+    m.nodo.lnd.pop("hash-di-ieri")          # LND ripristinato senza storia
+    prova("...e se LND non riconosce piu' nemmeno il canarino, di nuovo no",
+          "muto", gira(m.amb["_stato_lnd"]("hash-mai-visto", "nodo")))
+    prova("una riga del SaaS non ha un LND nostro: spento", "spento",
+          gira(m.amb["_stato_lnd"]("hash-mai-visto", "saas")))
+
+    # --- 5. LNBITS MUTO, LND CHE SA (l'ordine #163 del 18 set) ------
+    m = mondo()
+    m.nodo.modi["lnbc-fattura-1"] = "timeout_ok"
+    gira(m.sblocca())
+    prova("#163: ReadTimeout sulla richiesta → in volo, non perso",
+          ("delivered", "in_volo"), riga(m)[:2])
+    gira(m.ronda())
+    prova("#163: LNbits muto ma LND dice SUCCEEDED → chiuso da solo",
+          ("released", "uscito"), riga(m)[:2])
+    prova("...con un pagamento solo", 1, len(m.nodo.partiti))
+    prova("...senza svegliare nessuno", [], m.avvisi)
+
+    m = mondo()
+    m.nodo.modi["lnbc-fattura-1"] = "timeout_fail"
+    gira(m.sblocca())
+    gira(m.ronda())
+    prova("LNbits muto e LND dice FAILED → il fermo cade, e a LNbits "
+          "muto non parte niente", ("delivered", "da_riprovare"),
+          riga(m)[:2])
+    m.nodo.muto = False
+    gira(m.sblocca())
+    prova("...tornata LNbits si ripaga, con una fattura NUOVA",
+          ("released", 2, True),
+          (riga(m)[0], len(m.nodo.partiti),
+           m.nodo.partiti[-1] != "hash-di-lnbc-fattura-1"))
+    prova("...e di saldato ce n'e' uno solo",
+          [m.nodo.partiti[-1]], saldati(m))
+
+    # --- 6. LND NON HA MAI VISTO L'HASH ------------------------------
+    m = mondo(invoice="lnbc-del-venditore", address="")
+    canarino(m)
+    m.nodo.modi["lnbc-del-venditore"] = "perso"
+    gira(m.sblocca())
+    prova("richiesta persa: la riga e' in volo col suo nome",
+          ("delivered", "in_volo", "hash-di-lnbc-del-venditore"), riga(m))
+    gira(m.ronda())
+    prova("...e prima di N minuti «non c'e' traccia» NON vale mai partito",
+          "in_volo", riga(m)[1])
+    invecchia(m, N + 1)
+    m.nodo.modi["lnbc-del-venditore"] = "ok"
+    gira(m.ronda())
+    prova("...dopo N si chiude come mai partito e si RITENTA, con la "
+          "stessa fattura che e' ancora buona",
+          ("released", ["hash-di-lnbc-del-venditore"]),
+          (riga(m)[0], m.nodo.partiti))
+
+    m = mondo()
+    m.nodo.modi["lnbc-fattura-1"] = "mai_a_lnd"     # LNbits pending, LND no
+    gira(m.sblocca())
+    invecchia(m, N + 1)
+    gira(m.ronda())
+    prova("assente SENZA canarino: non si ritenta, nemmeno dopo N",
+          ("delivered", "in_volo", 1),
+          (*riga(m)[:2], len(m.nodo.partiti)))
+
+    # --- 7. IL BOTTONE «VERIFICA E RIPROVA» -------------------------
+    def congelato(modo):
+        m = mondo()
+        m.nodo.modi["lnbc-fattura-1"] = modo
+        gira(m.sblocca())
+        m.vero.execute("UPDATE ordini SET payout_stato='incerto'")
+        m.vero.commit()
+        return m
+
+    m = congelato("fail")
+    # `fail` torna NON_PAGATO e non congela: la riga si congela a mano,
+    # com'era sul #163 dopo il giro della ronda
+    esito = gira(prova_a(m.decidi("verifica")))
+    prova("verifica su FALLITO: RITENTA DAVVERO (il #163 sbloccava e basta)",
+          ("ritentato", "released", 2),
+          (campo(esito, "esito"), riga(m)[0], len(m.nodo.partiti)))
+    prova("...e lo dice con parole sue", True,
+          "ripagato" in (campo(esito, "messaggio") or "").lower())
+    prova("...pagando una volta sola", ["hash-di-lnbc-fattura-2"],
+          saldati(m))
+
+    m = congelato("timeout_ok")
+    m.nodo.muto = False
+    esito = gira(prova_a(m.decidi("verifica")))
+    prova("verifica su USCITO: chiude come pagato, senza pagare",
+          ("chiuso", "released", 1),
+          (campo(esito, "esito"), riga(m)[0], len(m.nodo.partiti)))
+
+    m = congelato("hold")
+    for gesto, extra in (("verifica", {}), ("uscito", {}),
+                         ("uscito", {"conferma": True})):
+        esito = gira(prova_a(m.decidi(gesto, **extra)))
+        prova(f"in volo: «{gesto}»{' con conferma' if extra else ''} → 409, "
+              f"resta congelato", (409, "incerto"),
+              (getattr(esito, "status_code", None), riga(m)[1]))
+    prova("...e la frase dice IN VOLO", True,
+          "IN VOLO" in str(getattr(esito, "detail", "")))
+
+    m = congelato("timeout_fail")          # LNbits muta, LND dice FAILED
+    esito = gira(prova_a(m.decidi("uscito")))
+    prova("«uscito» con LND che dice FAILED: chiede la conferma esplicita",
+          (409, True, "incerto"),
+          (getattr(esito, "status_code", None),
+           isinstance(getattr(esito, "detail", None), dict)
+           and esito.detail.get("serve_conferma"), riga(m)[1]))
+    prova("...mostrando cosa dicono le fonti", True,
+          "FAILED" in str(getattr(esito, "detail", "")))
+    esito = gira(prova_a(m.decidi("uscito", conferma=True)))
+    prova("...e con la conferma la parola della persona vale",
+          ("chiuso", "released", 1),
+          (campo(esito, "esito"), riga(m)[0], len(m.nodo.partiti)))
+
+    m = congelato("hold")
+    m.nodo.muto = True
+    m.nodo.lnd.clear()                      # tacciono tutti: LND 'assente'
+    esito = gira(prova_a(m.decidi("verifica")))   # ...e senza canarino
+    prova("non verificabile: 503, non parte niente, resta congelato",
+          (503, "incerto", 1),
+          (getattr(esito, "status_code", None), riga(m)[1],
+           len(m.nodo.partiti)))
+
+    # --- 8. UNA SOLA MANO PAGA --------------------------------------
+    m = congelato("fail")
+
+    async def due_click():
+        return await asyncio.gather(prova_a(m.decidi("verifica")),
+                                    prova_a(m.decidi("verifica")))
+    primo, secondo = gira(due_click())
+    prova("doppio click: uno decide, l'altro trova il 409",
+          ["409", "deciso"],
+          sorted(str(getattr(x, "status_code", "deciso"))
+                 for x in (primo, secondo)))
+    prova("...e il ritentativo e' uno solo", 2, len(m.nodo.partiti))
+
+    m = mondo()
+
+    async def due_conferme():
+        return await asyncio.gather(m.sblocca(), m.sblocca())
+    gira(due_conferme())
+    prova("due conferme insieme, stesso processo: un pagamento solo",
+          (1, "released"), (len(m.nodo.partiti), riga(m)[0]))
+
+    a = mondo()
+    b = mondo(condiviso=a)      # un SECONDO processo: lucchetti suoi
+
+    async def due_processi():
+        return await asyncio.gather(a.sblocca(), b.sblocca())
+    esiti = gira(due_processi())
+    prova("due giri concorrenti, due processi: un pagamento solo",
+          1, len(a.nodo.partiti))
+    prova("...e chi perde la mano esce senza toccare la riga",
+          ("released", "uscito"), riga(a)[:2])
+    prova("...rispondendo «in volo», non «serve una fattura nuova»",
+          [{"ok": False, "stato": "delivered", "in_volo": True}],
+          [e for e in esiti if not e.get("ok")])
+
+    # LA SECONDA CINTURA, quella che regge anche se la prima cede: la
+    # riga e' LIBERA (uno l'ha liberata a mano, o e' una riga di ieri)
+    # ma un suo pagamento di prima e' ancora in volo. Non si paga.
+    m = mondo()
+    m.nodo.modi["lnbc-fattura-1"] = "hold"
+    gira(m.sblocca())
+    m.vero.execute("UPDATE ordini SET payout_stato=''")
+    m.vero.commit()
+    gira(m.sblocca())
+    prova("riga liberata a mano col vecchio in volo: NON si paga, e torna "
+          "in volo col nome del pagamento vero",
+          ("delivered", "in_volo", "hash-di-lnbc-fattura-1", 1),
+          (*riga(m), len(m.nodo.partiti)))
+    # ...e se quel pagamento di prima e' USCITO, la riga e' pagata
+    m.nodo.lnd["hash-di-lnbc-fattura-1"] = "SUCCEEDED"
+    m.vero.execute("UPDATE ordini SET payout_stato=''")
+    m.vero.commit()
+    gira(m.sblocca())
+    prova("riga libera col vecchio USCITO: si chiude come pagata, senza "
+          "pagare la fattura nuova",
+          ("released", "uscito", "hash-di-lnbc-fattura-1", 1),
+          (*riga(m), len(m.nodo.partiti)))
+
+    # la ronda chiede (e ci mette dei secondi, su tor): se nel frattempo
+    # ha deciso una persona, la ronda NON riscrive
+    m = mondo()
+    m.nodo.modi["lnbc-fattura-1"] = "timeout_fail"
+    gira(m.sblocca())
+
+    def una_persona_decide():
+        m.vero.execute("UPDATE ordini SET payout_stato='uscito', "
+                       "stato='released'")
+        m.vero.commit()
+    m.nodo.alla_lnd = una_persona_decide
+    gira(m.ronda())
+    prova("la ronda non riscrive una riga decisa mentre lei chiedeva",
+          ("released", "uscito"), riga(m)[:2])
+
+    # a tentativi finiti un INCERTO congela: e il nome che resta sulla
+    # riga dev'essere quello del pagamento IN VOLO, non quello della
+    # fattura nuova che non abbiamo pagato
+    m = mondo()
+    m.nodo.modi["lnbc-fattura-1"] = "hold"
+    gira(m.sblocca())
+    m.vero.execute("UPDATE ordini SET payout_stato='', payout_tentativi=5")
+    m.vero.commit()
+    gira(m.sblocca())
+    prova("il vecchio e' in volo e i tentativi sono finiti: si congela "
+          "col nome del pagamento VERO",
+          ("delivered", "incerto", "hash-di-lnbc-fattura-1", 1),
+          (*riga(m), len(m.nodo.partiti)))
+    prova("...dicendolo nel journal", True,
+          any("un'altra mano" in r for r in a.detto + b.detto))
+
+    # --- 9. IL RIAVVIO A META' PAYOUT -------------------------------
+    m = mondo()
+    visto = []
+    m.nodo.alla_post = lambda h: visto.append(
+        (riga(m), [tuple(r) for r in m.vero.execute(
+            "SELECT tabella, riga_id, hash FROM payout_tentati")]))
+    gira(m.sblocca())
+    prova("lo stato e' scritto PRIMA di chiamare LNbits: in volo, col nome",
+          (("delivered", "in_volo", "hash-di-lnbc-fattura-1"),
+           [("ordini", 1, "hash-di-lnbc-fattura-1")]), visto[0])
+
+    # --- 10. IL JOURNAL ---------------------------------------------
+    m = congelato("hold")
+    gira(prova_a(m.decidi("verifica")))
+    verifica = [r for r in m.detto if "Verifica pagamento" in r]
+    prova("journal: ogni verifica scrive ordine, hash, LNbits, LND, esito",
+          True, any("ordini#1" in r and "hash-di-lnbc-fat" in r
+                    and "LNbits=pending" in r and "LND=IN_FLIGHT" in r
+                    and "→ in_volo" in r for r in verifica))
+    prova("journal: ogni decisione scrive chi, cosa ha chiesto e com'e' "
+          "finita", True,
+          any("Decisione sul pagamento ordini#1" in r and "999" in r
+              and "verifica" in r and "RIFIUTATO" in r for r in m.detto))
+
+    # --- 11. LE SENTINELLE ------------------------------------------
+    sorg = codice(_SORGENTE)
+    chiamate = re.findall(
+        r"await paga_venditore\((?:[^()]|\([^()]*\))*\)", sorg)
+    prova("le funzioni d'uscita sono quattro", 4, len(chiamate))
+    prova("...e tutte passano la RIGA a paga_venditore", [],
+          [c for c in chiamate if "riga=(" not in c])
+    pv = codice(pezzo("paga_venditore"))
+    prova("la mano si prende PRIMA della chiave che paga", True,
+          0 < pv.find("_prendi_la_mano(") < pv.find("LNBITS_ADMIN_KEY"))
+    prova("...e gli hash di prima si guardano prima ancora", True,
+          0 < pv.find("_verita_riga(") < pv.find("_prendi_la_mano("))
+    dec = codice(pezzo("decidi_pagamento"))
+    prova("la rotta del moderatore chiede la verita' PRIMA di scrivere",
+          True, 0 < dec.find("_verita_riga(")
+          < dec.find('f"UPDATE {tabella} SET payout_stato=?'))
+    prova("...e ritenta passando dalla funzione d'uscita", True,
+          "_riprendi_uscita(tabella, riga_id, verso)" in dec)
+    ronda = codice(pezzo("risolvi_pagamenti_in_volo"))
+    prova("la ronda chiede a tutt'e due le fonti, non alla sola LNbits",
+          True, "_verita_pagamento(" in ronda
+          and "_stato_pagamento(" not in ronda)
+    prova("...e riguarda anche i congelati che hanno un nome", True,
+          "payout_stato='incerto'" in ronda)
+    lnd = codice(pezzo("_chiedi_lnd"))
+    prova("a LND si parla col certificato guardato, mai a occhi chiusi",
+          True, "cafile=LND_PONTE_CERT" in lnd and "verify=False" not in lnd)
+    prova("...e del guasto si stampa il tipo, mai il macaroon", True,
+          "type(e).__name__" in lnd
+          and "MACAROON" not in lnd[lnd.find("except Exception"):])
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il bottone si chiama «Verifica e riprova» e manda 'verifica'",
+          True, "Verifica e riprova" in mini
+          and "decidiPagamento('${esc(p.tipo)}',${p.id},'verifica')" in mini)
+    prova("...e il vecchio «Non è uscito — riprova» non c'e' piu'", False,
+          "Non è uscito — riprova" in mini)
+    prova("...e la conferma esplicita ha la sua strada nel client", True,
+          "serve_conferma" in mini and "conferma:true" in
+          mini.replace(" ", ""))
+
+
 def prove_pagamento_incerto():
     """Il timeout di paga_venditore (ago 2026, audit). LNbits puo'
     aver pagato e non essere riuscito a dircelo: prima l'eccezione
@@ -3889,7 +4565,7 @@ def prove_pagamento_incerto():
         return None
 
     ESITI = {"PAGATO": "pagato", "NON_PAGATO": "non_pagato",
-             "INCERTO": "incerto", "NON_CHIESTO": "non_chiesto",
+             "INCERTO": "incerto", "NON_CHIESTO": "non_chiesto", "OCCUPATO": "occupato",
              "LnbitsMuto": LnbitsMuto, "_sospendi_pagamento": lambda *a: None}
 
     # --- 1. I quattro esiti di paga_venditore -----------------------
@@ -4034,7 +4710,8 @@ def prove_pagamento_incerto():
         async def _dice(chi, testo, *a, **k):
             detto.append((chi, testo))
 
-        async def _paga(bolt11, atteso, diario=None, cassaforte=""):
+        async def _paga(bolt11, atteso, diario=None, cassaforte="",
+                        riga=()):
             tentativi.append((bolt11, atteso))
             # il taccuino di set 2026: chi chiama lo pre-riempie con
             # l'etichetta e lo ritrova pieno. Qui si risponde come il
@@ -4318,7 +4995,10 @@ def prove_pagamento_incerto():
           True, "payout_verso=?" in pezzo("_congela_pagamento"))
     # e la coda admin non deve indovinare la strada dallo stato
     prova("sentinella: la coda admin legge payout_verso, non lo stato",
-          True, 'payout_verso"] == "compratore"' in pezzo("decidi_pagamento"))
+          True, 'verso = r["payout_verso"]' in pezzo("decidi_pagamento")
+          and "_riprendi_uscita(tabella, riga_id, verso)"
+          in pezzo("decidi_pagamento")
+          and 'verso == "compratore"' in pezzo("_riprendi_uscita"))
 
     # --- 4. SENTINELLE DEL QUARTO ESITO (ago 2026) ------------------
     # LA PIU' PERICOLOSA DI TUTTO IL CANTIERE: NON_CHIESTO e' sicuro da
@@ -30664,8 +31344,14 @@ def prove_fogli_di_casa():
     # recapito?» — l'uscita dal bottone spento di chi aspetta dove
     # mandare gli euro. Accende un gesto che muove soldi veri fuori di
     # qui, e lo fa sulla parola di chi compra: si chiede.
-    prova("i gesti che passano dalla domanda unica sono sessantuno",
-          61, solo_codice(mini).count("chiediConferma({"))
+    # SESSANTADUE (19 set 2026, i pagamenti in volo): «Le fonti non lo
+    # confermano» — la SECONDA domanda del pannello 🧊, che si apre solo
+    # quando il server risponde `serve_conferma`: chi modera vuole
+    # chiudere come pagato un'uscita che LNbits e LND non confermano, e
+    # prima di farlo legge cosa dicono. E' la parola di una persona
+    # contro due fonti: si chiede, a carte scoperte.
+    prova("i gesti che passano dalla domanda unica sono sessantadue",
+          62, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -61010,7 +61696,7 @@ def prove_porta_timer():
                # NON_CHIESTO serve anche dove l'eccezione non arriva
                # mai: `if esito == NON_CHIESTO:` si valuta a OGNI giro,
                # e senza il nome la prova ESPLODE invece di fallire.
-               "INCERTO": "incerto", "NON_CHIESTO": "non_chiesto",
+               "INCERTO": "incerto", "NON_CHIESTO": "non_chiesto", "OCCUPATO": "occupato",
                "LnbitsMuto": LnbitsMuto}
         # il diario di set 2026: qui non ha niente da scrivere — non si
         # e' mai chiesto niente a nessuno — e la prova sta proprio nel
@@ -70989,6 +71675,7 @@ def main():
               prove_foto_spenta, prove_foto_telegram_fallita,
               prove_nome_da_nostr,
               prove_pagamento_incerto, prove_esito_pagamento,
+              prove_pagamenti_in_volo,
               prove_doppio_wallet, prove_saas_senza_doveri, prove_orfani, prove_capitale_cassa,
               prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,

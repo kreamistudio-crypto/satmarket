@@ -32802,37 +32802,59 @@ const rigaPagamento = p => `
       <div class="sub" style="margin-top:4px">stato dell'ordine: <b>${esc(p.stato||'—')}</b> · fermo dal ${p.aggiornato?new Date(p.aggiornato*1000).toLocaleString('it-IT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—'}</div>
       <div class="mono" style="margin-top:6px;font-size:11px;color:var(--muted);word-break:break-all">${p.payout_hash ? esc(p.payout_hash) : 'payment_hash non leggibile: cerca per importo e orario'}</div>
       <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-        <span class="badge" onclick="decidiPagamento('${esc(p.tipo)}',${p.id},'uscito')" style="cursor:pointer;background:var(--trust-soft);color:var(--trust-text)">✅ Su LNbits è uscito</span>
-        <span class="badge" onclick="decidiPagamento('${esc(p.tipo)}',${p.id},'non_uscito')" style="cursor:pointer;background:var(--warn-bg);color:var(--ink)">↩︎ Non è uscito — riprova</span>
+        <span class="badge" onclick="decidiPagamento('${esc(p.tipo)}',${p.id},'verifica')" style="cursor:pointer;background:var(--warn-bg);color:var(--ink)">🔎 Verifica e riprova</span>
+        <span class="badge" onclick="decidiPagamento('${esc(p.tipo)}',${p.id},'uscito')" style="cursor:pointer;background:var(--trust-soft);color:var(--trust-text)">✅ L'ho visto io: è uscito</span>
       </div>
     </div>`;
 
 /* Qui si muovono sats veri in tutt'e due i versi, quindi si chiede
-   sempre — e la domanda dice cosa succede, non «sei sicuro?». Il
-   foglio di casa porta anche la guardia del doppio tocco, che sul
-   ramo «non è uscito» vale doppio: due tocchi sarebbero due riprove
-   dello stesso pagamento. */
-async function decidiPagamento(tipo, id, esito){
+   sempre — e la domanda dice cosa succede, non «sei sicuro?».
+   DAL SET 2026 A DECIDERE NON È PIÙ LA PAROLA DI CHI PREME: il server
+   chiede com'è finito quel pagamento a LNbits E a LND, e «Verifica e
+   riprova» fa quel che dice — se era uscito chiude, se non era uscito
+   RIPAGA (prima sbloccava e basta), se è ancora in volo si rifiuta.
+   Il vecchio «Non è uscito» si fidava della persona, e su un pagamento
+   tenuto in volo faceva pagare due volte.
+   «L'ho visto io» resta, per quando le fonti tacciono: ma se dicono
+   altro il server risponde `serve_conferma` con COSA dicono, e qui si
+   richiede una seconda volta, a carte scoperte. */
+async function decidiPagamento(tipo, id, esito, conferma){
+  const manda = async () => {
+    try {
+      const r = await fetch(`${API_BASE}/admin/pagamenti/decidi`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+        body: JSON.stringify(conferma ? {tipo, id, esito, conferma:true}
+                                      : {tipo, id, esito})});
+      const j = await r.json().catch(()=>({}));
+      if (!r.ok) {
+        const d = j.detail;
+        if (d && typeof d === 'object' && d.serve_conferma && !conferma) {
+          chiediConferma({
+            titolo: 'Le fonti non lo confermano',
+            corpo: String(d.messaggio || ''),
+            etichetta: esito==='uscito' ? 'Chiudi lo stesso come pagato'
+                                        : 'Ho controllato: ripaga',
+            poi: () => decidiPagamento(tipo, id, esito, true)});
+          return;
+        }
+        toast(typeof d === 'string' ? d : 'Non è andata');
+        loadAdminStats(); return;
+      }
+      toast(j.messaggio || (esito==='uscito' ? '✅ Affare chiuso' : '↩︎ Fatto'));
+    } catch(e) { toast('Non è andata'); }
+    loadAdminStats();
+  };
+  if (conferma) return manda();
   chiediConferma({
     titolo: esito==='uscito'
-      ? 'Su LNbits risulta USCITO?'
-      : 'Su LNbits NON è uscito niente?',
+      ? 'Hai visto TU che è uscito?'
+      : 'Verifico e, se non è uscito, ripago?',
     corpo: esito==='uscito'
-      ? 'L\'affare verrà chiuso come pagato, senza far partire nessun altro pagamento.'
-      : 'Il pagamento tornerà a partire normalmente: se invece era uscito, uscirebbe una seconda volta.',
-    etichetta: esito==='uscito' ? '✅ È uscito' : '↩︎ Non è uscito',
-    poi: async () => {
-      try {
-        const r = await fetch(`${API_BASE}/admin/pagamenti/decidi`, {
-          method:'POST',
-          headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
-          body: JSON.stringify({tipo, id, esito})});
-        const j = await r.json().catch(()=>({}));
-        if (!r.ok) { toast(j.detail || 'Non è andata'); loadAdminStats(); return; }
-        toast(esito==='uscito' ? '✅ Affare chiuso' : '↩︎ Il pagamento può ripartire');
-      } catch(e) { toast('Non è andata'); }
-      loadAdminStats();
-    }});
+      ? 'L\'affare verrà chiuso come pagato, senza far partire nessun altro pagamento. Prima lo chiedo comunque a LNbits e a LND: se dicono altro te lo mostro.'
+      : 'Chiedo a LNbits e a LND com\'è finito. Se è uscito chiudo l\'affare; se è fallito o non è mai partito lo ripago adesso; se è ancora in volo non tocco niente.',
+    etichetta: esito==='uscito' ? '✅ È uscito' : '🔎 Verifica e riprova',
+    poi: manda});
 }
 
 /* La riga di un annuncio in attesa: titolo, prezzo, venditore, motivo

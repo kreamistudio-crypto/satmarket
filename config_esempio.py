@@ -70,6 +70,19 @@ GUARDIANO_PONTE_AVVISA = []  # a chi scrive, per id Telegram: es.
                              # deve poter restare senza nessuno che lo
                              # sappia, come il 18 set 2026
 
+# LA VERITA' DEI PAGAMENTI IN USCITA (set 2026): prima di decidere o di
+# ritentare un pagamento, il server chiede com'e' finito anche a LND,
+# attraverso lo stesso ponte di LNbits. Serve un macaroon SUO, di SOLA
+# LETTURA — sul nodo:
+#   lncli bakemacaroon --root_key_id 2 --save_to lettura.macaroon offchain:read
+#   xxd -p -c 9999 lettura.macaroon
+# — perche' questo e' un server web pubblico, e una chiave che sa pagare
+# qui dentro non ci entra. Vuoto = LND «spento»: decide LNbits da sola,
+# come prima. Vedi docs/PRODUZIONE.md, «I PAGAMENTI DA VERIFICARE».
+LND_PONTE_MACAROON_LETTURA = ""          # esadecimale, tutto su una riga
+LND_PONTE_CERT = "/opt/lnbits/data/tls.cert"   # il tls.cert di LND
+LND_PONTE_URL = "https://127.0.0.1:18080"      # lnd-ponte (socat + tor)
+
 # --- Regole del mercatino --------------------------------------------
 COMMISSIONE_PERCENTO = 0     # trattenuta a vendita conclusa (0 = sospesa: cifra da decidere)
 PROTEZIONE_PERCENTO = 0      # protezione acquisti a carico del COMPRATORE
