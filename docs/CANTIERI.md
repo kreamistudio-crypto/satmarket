@@ -22270,3 +22270,137 @@ suo ambiente: la cura non ne dipende, ma dice se in quell'ambiente si
 perde anche il resto (wallet, firmatario), che è un'altra
 conversazione. E `nwc` per persona o per dispositivo, se Andrea vuole
 rovesciarlo.
+
+## Il paracadute dei pagamenti smista per motivo (20 set 2026)
+
+**DA DOVE NASCE.** La sera del 20 set sul nodo è arrivata una fattura
+da 5.000 sats col memo «Barattolo link negozio #…: untempoperte»,
+pagata, e né il journal né i moderatori ne sapevano niente. Cercando
+cosa fosse (è il link del negozio a scelta del 15 set, vivo e in
+produzione) sono usciti DUE difetti, uno piccolo e uno vero.
+
+**IL PICCOLO: l'incasso riuscito era MUTO.** `_incassa_slug_negozio`
+avvisava il venditore e basta: nessuna riga di journal, nessun polso
+ai moderatori — che invece il banner manda dal primo giorno («💰
+Sblocco banner pagato»). Non era una scelta: la riga non era stata
+copiata. Adesso il journal scrive SEMPRE una riga («🔗 Link negozio
+pagato: <nome>, N sats da #id (pagamento #n)», con la coda «NOME
+CONTESO, link non scritto» quando serve) e ai moderatori arriva «🔗
+Link negozio pagato: <nome>, N sats» sull'incasso riuscito. Sul nome
+conteso il messaggio ai moderatori resta UNO — quello che chiede un
+gesto — e non si annuncia anche come un incasso qualunque. La cifra
+passa da `_fmt_sats` anche nel journal: la sentinella delle cifre a
+mano l'ha preteso al primo giro, e aveva ragione.
+
+**IL VERO: i due giri dell'orologio non guardavano il `motivo`.**
+`controlla_abbandonati` (chi paga e chiude l'app prima del poll) e
+`controlla_annullati` (chi annulla e paga lo stesso) erano nati ad ago
+2026 col SOLO banner in tabella, e passavano ogni riga di `pagamenti`
+a `_incassa_sblocco`. La tabella si dichiarava «GENERICA CON UN TIPO»
+fin dallo schema; i giri no. Il 15 set è arrivato `negozio_slug` con
+rotte e incasso suoi, e nessuno ha riaperto i giri: un link pagato a
+telefono chiuso avrebbe segnato la riga `pagato`, APERTO LA PORTA DEL
+BANNER (20.000 sats) per 5.000, NON scritto il link, detto «🖼 Porta
+aperta!» al venditore e «💰 Sblocco banner pagato. 5.000 sats» ai
+moderatori. Riprodotto sul `server.py` vero di prima, riga per riga.
+IL 20 SET NON È SCATTATO, e lo dice il silenzio stesso: quel ramo
+avrebbe scritto nel journal e avvisato i moderatori. Ha incassato il
+poll del telefono, in silenzio e giusto. E se fosse scattato la ronda
+del libro mastro l'avrebbe detto entro un giorno, da DUE controlli
+(«porta del banner aperta senza pagamento» e «link del negozio pagato
+e non applicato») — ma un giorno dopo, e a cose fatte.
+
+**PERCHÉ NESSUNA PROVA L'AVEVA VISTO, che è la lezione.**
+`prove_abbandonati` gira i giri su un database vero, ma la sua tabella
+`pagamenti` è VUOTA: crea lo schema e non ci mette una riga, quindi il
+terzo ramo non l'ha MAI eseguito nessuno, né ad agosto né il 15 set.
+E il cantiere del 15 set aveva scritto — giustamente — una rotta di
+verifica SUA perché «la tabella tiene motivi diversi nello stesso
+spazio di id, e un endpoint unico dovrebbe smistare per motivo PRIMA
+di incassare»: la stessa frase valeva per i due giri, che sono
+esattamente un endpoint unico, e non è stata riletta lì. **Quando una
+tabella guadagna un tipo, si cercano TUTTI i lettori della tabella,
+non solo le rotte che si stanno scrivendo** (`grep -n "FROM
+pagamenti" server.py`: ventidue righe da rileggere una per una — ed è
+rileggendole che è uscito anche il cugino, in fondo a questa voce).
+
+**LA CURA: `_incasso_del_motivo`, un posto solo.** `banner` →
+`_incassa_sblocco`, `negozio_slug` → `_incassa_slug_negozio`, e
+QUALUNQUE ALTRO MOTIVO → `None`. Le due SELECT portano il `motivo` con
+la riga e i due rami chiedono allo smistatore. Il dizionario si
+costruisce alla chiamata, così i nomi si risolvono quando servono e un
+banco può metterci le sue casse.
+UN MOTIVO SCONOSCIUTO NON SI TOCCA, ed è la decisione da non
+ammorbidire: né un incasso tirato a indovinare (era il difetto) né
+una LAPIDE su una fattura che magari è pagata — resta com'è, e
+`invoice_pagata` non si chiama nemmeno. A dirlo sono in due: una
+sentinella di `prove.py` che censisce i motivi scritti dalle `INSERT
+INTO pagamenti` contro lo smistatore (un motivo nuovo non nasce senza
+la sua cassa: la CI va rossa prima che esista), e un controllo nuovo
+del libro mastro, «pagamento con un motivo che nessuno sa incassare»,
+per il giorno che la riga arrivasse da una strada che la sentinella
+non vede. I tre elenchi — INSERT, smistatore, `NOT IN` del libro
+mastro — sono tenuti uguali dalla stessa prova.
+LO SMISTAMENTO STA DENTRO IL `try`, e l'ha chiesto la tortura: fuori,
+una riga storta (la mutazione che toglieva `motivo` dalla SELECT)
+faceva esplodere il giro intero e le righe DOPO non le guardava più
+nessuno. Dentro, vale il patto di sempre: una riga che inciampa si
+riprova al giro dopo, le altre vanno avanti.
+LE RIGHE DEL JOURNAL CAMBIANO NOME: «Sblocco banner #N pagato e mai
+verificato» diventa «Pagamento #N (motivo) pagato e mai verificato:
+riacciuffato», e così le gemelle. Chi cerca nel journal cerca
+«riacciuffato».
+
+**LE STRADE SCARTATE.** Filtrare le SELECT con `motivo='banner'` e
+scrivere due rami gemelli per lo slug: è il modo in cui il difetto è
+nato (ogni motivo nuovo deve ricordarsi di due posti lontani
+diecimila righe dalle sue rotte), e il terzo motivo ci ricadrebbe.
+Un ripiego sul banner per i motivi sconosciuti: è il difetto con un
+altro nome. Avvisare i moderatori a ogni giro per un motivo
+sconosciuto: sarebbe un messaggio al minuto per sempre — il libro
+mastro lo dice una volta al giorno, che è il ritmo giusto per una
+cosa che la CI impedisce di nascere.
+
+**COSA È STATO PROVATO.** `prove_paracadute_motivo`, nuova: la forma
+(sul solo CODICE: i commenti dei giri nominano `_incassa_sblocco` per
+spiegare il difetto), lo smistatore girato, il censimento dei tre
+elenchi, e IL GIRO VERO su un database in memoria con gli incassi
+VERI e non di cartone — la domanda non è «a chi l'ha passato» ma
+«cosa c'è scritto dopo»: dieci righe (banner e link, pagati e no,
+annullati e no, fattura viva, motivo sconosciuto pagato e non
+pagato). LA CONTROPROVA VIVE NELLA PROVA: lo stesso mondo si gira con
+lo smistatore «cieco» di prima (tutto al banner) e DEVE uscirne il
+difetto — porta aperta, link non scritto — sennò il banco non sarebbe
+capace di vederlo. `prove_slug_negozio` ha il testo esatto del polso
+ai moderatori, la riga del journal e il conteso che non si annuncia
+come incasso; `prove_libro_mastro` il caso rotto del controllo nuovo.
+TORTURA su una copia: 18 mutazioni, **18 uccise** al secondo giro — al
+primo erano 17 più una INCIAMPATA (il banco esplodeva su un
+`KeyError`), ed è quella che ha spostato lo smistamento dentro il
+`try`. Suite intera verde con `PROVE_SEVERE=1`: **12425 verdi, 0 rosse**.
+
+**NON PROVATO, e va detto.** Niente di questo ha girato contro LNbits
+vero né sul VPS: `invoice_pagata` è di cartone in tutti i banchi, come
+sempre per questi giri. Il ramo «annullato e poi pagato» per il link
+ha un caso che resta da guardare il giorno che capitasse: chi cambia
+nome a fattura aperta (la vecchia si SUPERA, cioè va ad `annullato`) e
+poi paga TUTT'E DUE si ritrova col nome dell'ULTIMA pagata, e il
+controllo «link del negozio pagato e non applicato» suona — che è
+giusto, perché lì ci sono 5.000 sats di troppo e serve una persona.
+
+**COSA RESTA DA GUARDARE.** 1) La query sul VPS per sapere se è MAI
+scattato fra il 15 e il 20 set (in PRODUZIONE non va: è una domanda
+di una volta): `SELECT p.id, p.tg_id, p.riferimento, u.negozio_slug
+FROM pagamenti p JOIN utenti u ON u.tg_id=p.tg_id WHERE
+p.motivo='negozio_slug' AND p.stato='pagato' AND
+u.banner_sbloccato_il=p.pagato_il;` — la coincidenza è ESATTA perché
+`_incassa_sblocco` scrive le due colonne con lo stesso `adesso`.
+2) **IL CUGINO, trovato e NON curato** (fuori dal perimetro del
+cantiere): `_rimborsa_sblocco` prende un pagamento PER NUMERO e non
+guarda il `motivo` — un moderatore che rimborsasse da «↩︎ Rimborsa uno
+sblocco» un pagamento `negozio_slug` (il caso del nome conteso lo
+invita a farlo) richiuderebbe la porta del BANNER di quell'utente e
+gli spegnerebbe l'insegna, lasciando il link com'è. Stessa famiglia,
+stessa cura. 3) Il gemello `query_libro_mastro.sql` non ha né il
+controllo del link del 15 set né quello di oggi: nessuna prova lo
+pretende, ma chi lancia le query a mano non li vede.

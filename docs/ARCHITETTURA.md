@@ -7713,6 +7713,15 @@
   pagamento — il buco chiuso ad ago 2026 con «nessuna riga si
   cancella senza aver chiesto a LNbits». Queste righe sono il
   REGISTRO CONTABILE del nostro primo incasso: restano per sempre.
+  I DUE RAMI SMISTANO PER MOTIVO (set 2026): `pagamenti` tiene più
+  motivi (`banner`, `negozio_slug`) e a dire CHI incassa è
+  `_incasso_del_motivo`, un posto solo — fino al 20 set passavano
+  tutto a `_incassa_sblocco`, e un link del negozio pagato a telefono
+  chiuso avrebbe aperto la porta del banner. Un motivo SCONOSCIUTO
+  non si tocca (né incasso né lapide): lo dice il libro mastro, e una
+  sentinella censisce le `INSERT INTO pagamenti` contro lo smistatore
+  perché un motivo nuovo non nasca senza la sua cassa. Vedi Cantieri,
+  «Il paracadute dei pagamenti smista per motivo».
   LA FUSIONE NON ERA NEL PIANO e l'ha trovata il censimento delle
   tabelle figlie, non la lettura: il nativo Nostr che paga e poi
   collega Telegram perdeva i suoi 10.000 sats, perché
