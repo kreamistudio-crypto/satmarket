@@ -141,6 +141,62 @@
   della chiave che paga e che i quattro rami timbrino. Il perché per
   intero — l'ordine 149 e i 67.672 sats — sta in CANTIERI, alla voce
   «Il giudice dell'esito: un 201 che diceva «fallito»».
+  LO STADIO «IN PAGAMENTO» (set 2026). Fra la decisione — una conferma,
+  un timer, un moderatore — e 'released' c'è uno stadio che si vede:
+  «💸 In pagamento al venditore». NON È UNO STATO: si DERIVA, e il
+  giudice unico è `stadio_pagamento(o, passi, tentati, adesso)` — puro,
+  niente rete né database — che legge `stato` + `payout_stato` +
+  `payout_verso`. È in pagamento un ordine 'confirmed', oppure un ordine
+  ancora aperto (locked, shipped, delivered, dispute) su cui un'uscita
+  verso il VENDITORE è in volo, in verifica o sospesa: la stessa
+  domanda, senza la linea del tempo, è `_in_pagamento(o)`, ed è la
+  guardia della CONFERMA DEFINITIVA — da lì `conferma_ricezione`,
+  `apri_disputa` e `sollecita_acquirente` rispondono 409 (con le parole
+  di CHI ha deciso: `_rifiuto_in_pagamento`), e `controlla_scadenze`
+  non ci ripassa. Lo stato vivo (`passo`) è uno di: in_volo,
+  in_verifica, riparte (si ritenta da soli), serve_fattura (l'UNICO che
+  chiede un gesto, e solo a chi vende; motivo 'metodo' = non ci ha mai
+  detto dove), arrivato. Con lui viaggiano `motivo` (le otto parole di
+  `_motivo_payout`, più lnbits_muto, fattura, metodo), `nostro`,
+  `deciso_da`, `da`, `lungo`, `prossimo`, `sats`, `via` e `linea`.
+  LA SOLA COSA SCRITTA sono le date: la tabella `payout_passi`
+  (tabella, riga_id, passo, motivo, via, quando, ultimo, volte), una
+  riga per passaggio, coi passi uguali DI FILA compressi (`volte`,
+  `ultimo`). La scrive `_segna_passo` (non committa, sotto try, e torna
+  True se la riga è nuova); il primo passo è `_segna_deciso`, che
+  committa SUBITO — la connessione di `_sblocca_sats` resta aperta per
+  tutto `paga_venditore`, e una scrittura non committata terrebbe il
+  lucchetto di SQLite mentre la mano scrive dalla sua. «Partito» non si
+  scrive: si legge da `payout_tentati`, che l'ora della mano ce l'ha
+  già. SE LA TABELLA NON SI LEGGE tutto va come prima del cantiere
+  (fail-open dichiarato). `via` è lo spazio dell'on-chain: oggi vale
+  sempre 'lightning', e il client sa già dire `attesa_conferme`.
+  IL RITENTATIVO HA DUE CADENZE, e sceglie `_tocca_riprovare`: dopo un
+  guasto NOSTRO (`MOTIVI_NOSTRI`: saldo, ponte, lnbits_muto)
+  `BACKOFF_NOSTRO` — 1, 5, 15, 30 minuti, poi ogni ora, SENZA TETTO —
+  contando i guasti di fila con `_conta_guasti` (che «in volo» e «in
+  verifica» non spezzano); dopo una rotta che manca `BACKOFF_PAYOUT` e
+  il tetto di `MAX_TENTATIVI_PAYOUT`, come sempre. Il quarto verbo segna
+  il passo in UN posto, `_sospendi_pagamento`, così vale per tutte e
+  quattro le uscite. IL PONTE GIÙ NON SI SFIDA: in `paga_venditore`,
+  prima della mano, se la cassaforte è il nodo e il guardiano dice
+  «giu» esce NON_CHIESTO — la fattura incollata NON si brucia. Un
+  fallimento DOPO la chiamata che paga resta sotto la regola dei
+  pagamenti in volo: non si ritenta finché LND non dice «mai partito»
+  (15 minuti), e il tetto dei cinque lì non congela più se il guasto è
+  nostro. `IN_PAGAMENTO_LUNGO_S` È `IN_VOLO_LIMITE_S`: le due parti
+  leggono «ci stiamo lavorando» nello stesso istante in cui a chi
+  modera parte il 🧊 di sempre. IL BATTITO CORTO: `orologio_pagamenti`,
+  ogni 60 secondi, fa i soli due giri dei pagamenti (la ronda con
+  `solo_in_volo=True`: i congelati restano al battito da dieci) e solo
+  se `_pagamenti_da_guardare()` — tre SELECT, niente rete — dice che
+  c'è qualcosa; l'orologio grande continua a farli, e a non farli mai
+  girare insieme è il lucchetto `_giro_pagamenti`. Lo stadio esce in
+  `/api/orders` (chiave `pagamento`, SOLO dove c'è) e in
+  `/api/admin/pagamenti`, dallo stesso `_stadi_ordini`; nel client le
+  parole stanno in `PASSI_PAGAMENTO`, `MOTIVI_PAGAMENTO`,
+  `frasePagamento` e `pannelloPagamento`. Il perché sta in CANTIERI,
+  «Lo stadio «in pagamento»».
   IL PAGAMENTO IN VOLO (set 2026, cantiere B). `payout_stato` ha un
   terzo timbro, `in_volo`, e le tre parole dicono tre cose che prima si
   confondevano in due: `da_riprovare` = nessun sat si è mosso, si

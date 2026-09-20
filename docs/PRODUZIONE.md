@@ -702,6 +702,36 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   ripaga: toglie il fermo, chiede la fattura nuova, e lo dice («⌛ …la
   fattura che avevamo è SCADUTA»). Un tentativo di POCHI MINUTI fa resta
   «in volo» comunque: i 15 minuti non li scavalca nessun calendario.
+  LO STADIO «IN PAGAMENTO» (set 2026). Dalla conferma in poi l'ordine
+  mostra «💸 In pagamento al venditore» a tutt'e due le parti, con lo
+  stato vivo e la linea del tempo. COSA ASPETTARSI DA UN GUASTO NOSTRO
+  (LNbits muta, ponte giù, nodo giù): a compratore e venditore NON
+  arriva niente oltre ai due avvisi d'ingresso («ci pensa Barattolo»,
+  «sono in arrivo»); nel journal una riga 🔁 a ogni ritentativo — a 1,
+  6, 21, 51 minuti e poi ogni ora, senza tetto — e il payout che parte
+  da solo quando il nodo torna. Il guardiano del ponte e l'avviso
+  giornaliero «🔁 Pagamenti in uscita fermi» restano quelli di sempre;
+  dopo 30 minuti IN VOLO parte il 🧊 di sempre, e in quell'istante le
+  due parti leggono «ci stiamo lavorando noi».
+  DOVE SI LEGGE. Gli ordini in pagamento adesso:
+  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT id,stato,payout_stato,payout_verso,payout_tentativi,payout_errore FROM ordini WHERE stato='confirmed' OR (payout_verso='venditore' AND payout_stato IN ('in_volo','incerto','da_riprovare')) ORDER BY id DESC;"`
+  La linea del tempo di UN ordine (sostituisci 152):
+  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT datetime(quando,'unixepoch','localtime'),passo,motivo,volte,datetime(ultimo,'unixepoch','localtime') FROM payout_passi WHERE tabella='ordini' AND riga_id=152 ORDER BY id;"`
+  Nel journal: `journalctl -u barattolo | grep -E "🔁|🛬|🧊|⌛"`.
+  IL DRILL (col venditore di prova, fattura INCOLLATA e lunga):
+  `systemctl stop lnd-ponte`, si aspetta che il guardiano dica «giù»
+  (la riga ⚠️ nel journal, un paio di minuti), poi il compratore
+  conferma. Atteso: la pagina dice «riparte da solo», su LNbits NON
+  nasce nessuna riga, la fattura resta in colonna; rimesso su il ponte,
+  entro il giro dopo il payout parte da solo con la STESSA fattura e a
+  chi vende arriva «Arrivati ✓». ⚠️ Se la conferma arriva PRIMA che il
+  guardiano si accorga del guasto, LNbits tenta, segna `failed`, e
+  quella fattura è bruciata: con un Lightning address si riparte da
+  soli (dopo i 15 minuti dei pagamenti in volo), con una fattura
+  incollata se ne chiede una nuova dicendo che la colpa è nostra. È la
+  finestra dichiarata del cantiere.
+  IL ROLLBACK è il commit precedente: la tabella `payout_passi` resta
+  lì e non dà fastidio a nessuno (il codice di prima non la legge).
   IL CONTROLLO DEGLI ORFANI, sulle due casseforti (set 2026):
   `cd ~/satmarket && python3 orfani.py` — sola lettura, legge il
   registro di ogni cassaforte configurata con la sua invoice key e

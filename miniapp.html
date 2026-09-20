@@ -6131,6 +6131,21 @@
     .off-svelata{animation:none}}
   .payout .okline{display:flex;gap:6px;align-items:center;color:var(--trust);
     font-weight:800;font-size:13px;margin-top:10px}
+  /* LO STADIO «IN PAGAMENTO» (set 2026): lo stato vivo in una riga, e
+     sotto la linea del tempo — piccola, che racconta e non chiede */
+  .pag-stato{display:inline-block;margin:2px 0 8px;padding:3px 10px;border-radius:999px;
+    background:var(--sats-soft);color:var(--sats-text);font-weight:800;font-size:12.5px}
+  .pag-stato.ok{background:var(--trust-soft);color:var(--trust-text)}
+  .pag-stato.gesto{background:var(--warn-bg);color:var(--ink)}
+  /* la via sta FUORI dalla pillola: «fallito: serve una fattura nuova»
+     a 375px la riempie da sola, e una pillola che va a capo si rompe */
+  .pag-via{font-size:12px;color:var(--muted);font-weight:700;white-space:nowrap;margin-left:4px}
+  .pag-linea{margin:10px 0 0;padding:8px 0 0;border-top:1px dashed var(--line-soft);
+    list-style:none;font-size:12px;color:var(--muted);font-weight:600;line-height:1.55}
+  .pag-linea li{display:flex;gap:8px}
+  .pag-linea .quando{font-family:'JetBrains Mono',monospace;white-space:nowrap;min-width:84px}
+  .pag-linea li.ora{color:var(--ink);font-weight:800}
+  .payout.pag-evidenza{border-color:var(--sats);box-shadow:0 0 0 3px var(--sats-soft)}
   .order .sub{color:var(--muted);font-size:12.5px;font-weight:600;margin-top:3px}
   /* La cifra di un ordine non si spezza MAI: «≈», numero e unita'
      sono un gruppo solo, e a cedere e' il testo attorno. Senza, la
@@ -10491,6 +10506,10 @@ function mapOrder(o){
        e i rari casi di cambio muto): li' l'euro non si mostra. */
     cambioOrdine:o.cambio_ordine||0,
     sellerInvoice:o.invoice_venditore||'',
+    /* LO STADIO «IN PAGAMENTO» (set 2026): lo decide il server
+       (`stadio_pagamento`), qui arriva gia' giudicato — null dove non
+       c'e', e allora la pagina e' quella di sempre */
+    pagamento:o.pagamento||null,
     corriere:o.corriere||'', tracking:o.tracking||'',
     corriereReso:o.corriere_reso||'', trackingReso:o.tracking_reso||'',
     /* quando un moderatore ha corretto il tracciamento (0 = mai): la
@@ -23869,7 +23888,14 @@ function renderOrders(){
             <div class="sub"><span class="mono">#${o.id}</span> · ${verboOrdine(o)} · ${o.when}</div>
           </div>
         </div>
-        <span class="badge ${STATES[o.state].badge}">${STATES[o.state].label}</span>${x}
+        ${/* IN PAGAMENTO si dice anche qui (set 2026): e' uno stadio
+               DERIVATO — lo stato resta quello di prima — quindi senza
+               questa riga un ordine gia' confermato direbbe ancora
+               «Spedito». A chi vende e deve un gesto resta «Da
+               incassare», che e' il suo verbo. */''}
+        <span class="badge ${inPagamento(o) ? 'confirmed' : STATES[o.state].badge}">${
+          inPagamento(o) && !(o.role==='seller' && o.pagamento.gesto_venditore)
+            ? '💸 In pagamento' : inPagamento(o) ? STATES.confirmed.label : STATES[o.state].label}</span>${x}
       </div>
     </div>`;}).join('')
     + rigaNascosti
@@ -24025,7 +24051,7 @@ function openOrder(id){
         ? {t:'Consegna a mano',     d:'Vi incontrate e l\'oggetto passa di mano'}
         : {t:'Oggetto spedito',     d:o.tracking?rigaSpedizione()
             :(o.role==='seller'?'Hai consegnato al corriere':'Il venditore ha consegnato al corriere')},
-      {t:s==='delivered' ? (digitale?'Rivelato: in attesa di conferma':'Consegnato: in attesa di conferma')
+      {t:(s==='delivered' && !inPagamento(o)) ? (digitale?'Rivelato: in attesa di conferma':'Consegnato: in attesa di conferma')
                          : (digitale?'Rivelato e confermato':'Ricevuto e confermato'),
        /* L'ATTESA E' DI CHI COMPRA (ago 2026): la finestra per
           confermare o aprire disputa e' un gesto SUO, e questa riga
@@ -24048,6 +24074,11 @@ function openOrder(id){
         : {t:'Sats sbloccati al venditore', d:'Affare concluso, feedback reciproco'},
     ];
     progress = {creato:0, locked:1, shipped:2, delivered:2, confirmed:3, released:4, annullato:-1}[s];
+    /* IN PAGAMENTO il pallino sta sull'ULTIMO passo (set 2026): a
+       payout in volo o sospeso lo stato e' ancora 'shipped', e senza
+       questa riga lo stepper direbbe «in attesa di conferma» a chi ha
+       appena confermato */
+    if (inPagamento(o) && progress < 3) progress = 3;
   }
   /* Le frasi di chiusura parlano a CHI legge: il venditore incassa,
      l'acquirente viene rimborsato, gli altri osservano */
@@ -24076,6 +24107,11 @@ function openOrder(id){
                             : 'L\'acquirente sta rispedendo l\'oggetto')
         : (o.role==='buyer' ? 'Il reso è in viaggio: al rientro ti rimborsiamo'
                             : 'L\'acquirente ha rispedito l\'oggetto')}
+    : inPagamento(o)            ? {ic:'💸', b:'In pagamento al venditore',
+      d:o.role==='buyer'  ? 'La tua parte è finita: ora tocca a Barattolo'
+       :o.role==='seller' ? (o.pagamento.gesto_venditore ? 'I tuoi sats ti aspettano: serve un tuo gesto'
+                                                         : 'I tuoi sats stanno arrivando')
+                          : 'Barattolo sta consegnando i sats al venditore'}
     : s==='dispute'             ? {ic:'⚖️', b:'Deposito congelato', d:'Disputa in corso: i sats restano fermi fino alla decisione'}
     : s==='annullato'           ? {ic:'✖️', b:'Ordine annullato',   d:'Nessun pagamento è stato trattenuto'}
     :                             {ic:'🔒', b:'Sats nel deposito di garanzia', d:'I sats sono al sicuro, nessuno può toccarli'};
@@ -24178,7 +24214,8 @@ function openOrder(id){
             </div>`).join('')}
         </div>
       </div>
-      ${s==='dispute' ? `<div class="trust-note" style="background:var(--warn-bg);color:var(--danger)">⚠️ <span>Disputa aperta. Un moderatore esaminerà la conversazione e i sats resteranno bloccati fino alla decisione.</span></div>`:''}
+      ${pannelloPagamento(o)}
+      ${s==='dispute' && !inPagamento(o) ? `<div class="trust-note" style="background:var(--warn-bg);color:var(--danger)">⚠️ <span>Disputa aperta. Un moderatore esaminerà la conversazione e i sats resteranno bloccati fino alla decisione.</span></div>`:''}
       ${/* IL BANNER E' DEL PUNTO, E DI NIENT'ALTRO (ago 2026): diceva
             anche «Spedito con X — tracciamento Y», che e' parola per
             parola il passo «Oggetto spedito» dentro il recinto, due
@@ -24235,7 +24272,11 @@ function openOrder(id){
           <button class="btn primary" style="margin-top:12px" onclick="resoRicevuto(this)">✓ Ho ricevuto il reso — rimborsa l'acquirente</button>
         </div>`:''}
       ${o.role==='buyer' && s==='return_shipped' ? `<div class="trust-note">↩️ <span>Reso in viaggio. Quando il venditore lo riceve e conferma, il rimborso parte automaticamente.</span></div>`:''}
-      ${o.role==='seller' && ['locked','shipped','delivered','confirmed'].includes(s) ? payoutPanel(o) : ''}
+      ${/* a payout in corso il pannello dell'incasso TACE (set 2026):
+            direbbe «appena l'acquirente conferma…» a conferma gia' data.
+            Torna — in evidenza — solo se serve un gesto di chi vende. */''}
+      ${o.role==='seller' && ['locked','shipped','delivered','confirmed'].includes(s)
+          && !(inPagamento(o) && !o.pagamento.gesto_venditore) ? payoutPanel(o) : ''}
       ${o.role==='buyer' && s==='locked' && o.asta && !o.consegnaScelta ? `
         <div class="payout">
           <h4>🏆 Hai vinto: come vuoi riceverlo?</h4>
@@ -24318,10 +24359,10 @@ function openOrder(id){
       ${pannelloServizioCompratore(o)}
       ${o.role==='buyer' && s==='creato' ? `<button class="btn primary" onclick="verificaOrdine(currentOrder.id)">🔄 Ho pagato la invoice — verifica</button>
       <button class="btn danger-ghost" onclick="annullaOrdine()">✖️ Annulla questo ordine</button>`:''}
-      ${o.role==='seller' && s==='shipped' ? `<button class="btn ghost" onclick="sollecita(this)">🔔 Sollecita l'acquirente a confermare</button>`:''}
+      ${!inPagamento(o) && o.role==='seller' && s==='shipped' ? `<button class="btn ghost" onclick="sollecita(this)">🔔 Sollecita l'acquirente a confermare</button>`:''}
       ${notaTrackingSbagliato(o, s)}
-      ${o.role==='buyer' && s==='delivered' ? `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>${o.consegnaScelta==='digitale'?'Contenuto rivelato!':'Pacco consegnato!'}</b> ${o.consegnaScelta==='digitale'?'Provalo subito: conferma qui sotto, o apri una disputa se non funziona — poi l\'acquisto è definitivo. Allo scadere del tempo i sats si sbloccano automaticamente al venditore.':'Controlla l\'oggetto: conferma qui sotto, o apri una disputa se c\'è un problema. I sats restano nel deposito finché non decidi tu — nessuna fretta, ma non sparire: dopo un po\' di silenzio interviene un moderatore.'}</span></div>`:''}
-      ${o.role==='buyer' && s==='locked' && o.consegnaScelta==='ritiro' ? `<div class="trust-note">🤝 <span><b>Ritiro in zona.</b> Quando hai l'oggetto in mano, conferma qui sotto: non serve aspettare che il venditore segni nulla. Finché non confermi, i sats restano al sicuro nel deposito.</span></div>`:''}
+      ${o.role==='buyer' && s==='delivered' && !inPagamento(o) ? `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>${o.consegnaScelta==='digitale'?'Contenuto rivelato!':'Pacco consegnato!'}</b> ${o.consegnaScelta==='digitale'?'Provalo subito: conferma qui sotto, o apri una disputa se non funziona — poi l\'acquisto è definitivo. Allo scadere del tempo i sats si sbloccano automaticamente al venditore.':'Controlla l\'oggetto: conferma qui sotto, o apri una disputa se c\'è un problema. I sats restano nel deposito finché non decidi tu — nessuna fretta, ma non sparire: dopo un po\' di silenzio interviene un moderatore.'}</span></div>`:''}
+      ${o.role==='buyer' && s==='locked' && o.consegnaScelta==='ritiro' && !inPagamento(o) ? `<div class="trust-note">🤝 <span><b>Ritiro in zona.</b> Quando hai l'oggetto in mano, conferma qui sotto: non serve aspettare che il venditore segni nulla. Finché non confermi, i sats restano al sicuro nel deposito.</span></div>`:''}
       ${/* L'ORDINE DEI BOTTONI del compratore (ago 2026, decisione di
             Andrea): prima il gesto PRINCIPALE — libera i sats, che e'
             l'unico pieno e si legge per primo —, poi le strade per
@@ -24335,7 +24376,12 @@ function openOrder(id){
             e taceva il costo. Sul DIGITALE 'delivered' resta vivo: la'
             lo scrive la rivelazione del codice, che e' una ricevuta
             vera, e i due bottoni qui sotto lo servono ancora. */''}
-      ${o.role==='buyer' && (['delivered'].includes(s) || (s==='shipped' && o.consegnaScelta!=='digitale') || (s==='locked' && (o.consegnaScelta==='ritiro' || (o.consegnaScelta==='servizio' && o.appuntamentoIl && o.appuntamentoIl < Date.now()/1000)))) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':o.consegnaScelta==='servizio'?'C\'è stata':o.consegnaScelta==='ritiro'?'L\'ho ritirato':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
+      ${/* LA CONFERMA E' DEFINITIVA (set 2026): a payout in volo o
+            sospeso lo stato e' ancora 'shipped', e questi due bottoni —
+            «libera i sats» qui, «apri disputa» in fondo — restavano
+            davanti a chi aveva gia' confermato. Il server li rifiuta
+            comunque (409): qui semplicemente non si offrono. */''}
+      ${o.role==='buyer' && !inPagamento(o) && (['delivered'].includes(s) || (s==='shipped' && o.consegnaScelta!=='digitale') || (s==='locked' && (o.consegnaScelta==='ritiro' || (o.consegnaScelta==='servizio' && o.appuntamentoIl && o.appuntamentoIl < Date.now()/1000)))) ? `<button class="btn orange" onclick="confirmReceived(this)">✅ ${o.consegnaScelta==='digitale'?'Il contenuto funziona':o.consegnaScelta==='servizio'?'C\'è stata':o.consegnaScelta==='ritiro'?'L\'ho ritirato':'Ho ricevuto l\'oggetto'} — libera i sats</button>`:''}
       ${/* A 'confirmed' ci si arriva in TRE modi, e la riga ne
             raccontava uno solo: «Hai confermato… per te e' tutto
             fatto!», che a chi l'affare l'ha chiuso un TIMER dice
@@ -24346,7 +24392,10 @@ function openOrder(id){
             sotto: la nota e il voto rispondono alla STESSA domanda —
             «questo confirmed e' chiuso davvero?» — e non possono piu'
             dire due cose diverse a due righe di distanza. */''}
-      ${o.role==='buyer' && s==='confirmed' && !decidibileDalModeratore(s, o.disputata, o.sbloccatoAuto) ? `<div class="trust-note">✅ <span>Hai confermato la ricezione: i sats verranno consegnati <b>automaticamente</b> appena il venditore attiva il suo metodo di incasso. Per te è tutto fatto!</span></div>`:''}
+      ${/* con lo stadio dal server la nota la dice il pannello «in
+            pagamento», due dita piu' su: questa resta per il server di
+            ieri, che `pagamento` non lo manda */''}
+      ${o.role==='buyer' && !o.pagamento && s==='confirmed' && !decidibileDalModeratore(s, o.disputata, o.sbloccatoAuto) ? `<div class="trust-note">✅ <span>Hai confermato la ricezione: i sats verranno consegnati <b>automaticamente</b> appena il venditore attiva il suo metodo di incasso. Per te è tutto fatto!</span></div>`:''}
       ${notaChiusoDalTimer(o, s)}
       ${notaFermo(o)}
       ${bottoneSollecito(o)}
@@ -24357,7 +24406,7 @@ function openOrder(id){
         : o.role==='buyer'
           ? pontiOrdine(o.usernameVenditore, o.nostrVenditore, 'al venditore', 'Il venditore')
           : pontiOrdine(o.usernameCompratore, o.nostrCompratore, "all'acquirente", "L'acquirente")}
-      ${o.role==='buyer' && ['locked','shipped','delivered'].includes(s) ? `<button class="btn allarme" onclick="openDispute()">⚠️ C'è un problema — apri disputa</button>`:''}
+      ${o.role==='buyer' && ['locked','shipped','delivered'].includes(s) && !inPagamento(o) ? `<button class="btn allarme" onclick="openDispute()">⚠️ C'è un problema — apri disputa</button>`:''}
     </div>`;
   go('ordine');
   /* le cifre le ha gia' scritte il giudice qui sopra; questo giro
@@ -24582,6 +24631,126 @@ async function salvaCorrieriEPubblica(){
 /* ---- pannello incasso del venditore ---- */
 let myLnAddress = '';   // il Lightning address dell'utente (incassi automatici)
 
+/* ---- LO STADIO «💸 IN PAGAMENTO AL VENDITORE» (set 2026) ----
+   Fra la conferma e «Concluso» c'e' un tempo — secondi se va bene,
+   giorni se il payout inciampa, minuti o ore il giorno dell'on-chain —
+   che fino a ieri non vedeva nessuno: chi aveva comprato non sapeva se
+   aveva finito (e aveva ancora davanti «libera i sats» e «apri
+   disputa»), chi vendeva non sapeva se i sats arrivavano. Lo stadio lo
+   GIUDICA IL SERVER (`stadio_pagamento`) e qui arriva in `o.pagamento`:
+   questo file ci mette solo le parole, girate a chi legge. */
+const PASSI_PAGAMENTO = {
+  deciso:          'Decisione presa',
+  partito:         'Pagamento partito',
+  in_volo:         'In volo',
+  in_verifica:     'In verifica',
+  riparte:         'Riparte da solo',
+  guasto_nostro:   'Intoppo nostro, si riprova da soli',
+  fallito:         'Non è arrivato',
+  serve_fattura:   'Serve un gesto del venditore',
+  arrivato:        'Arrivato ✓',
+  /* lo spazio dell'on-chain: oggi il server non lo scrive mai */
+  attesa_conferme: 'In attesa di conferma, ~10 min',
+};
+const DECISO_DA = {
+  conferma: 'conferma dell\'acquirente',
+  timer:    'tempo di conferma scaduto',
+  disputa:  'decisione del moderatore',
+};
+/* il motivo IN PAROLE: le otto di `_motivo_payout` sul server, piu' le
+   tre di casa. Vuoto = non c'e' niente di utile da aggiungere */
+const MOTIVI_PAGAMENTO = {
+  scaduta:        'la fattura era scaduta',
+  nessuna_strada: 'la rete Lightning non ha trovato una strada fino al wallet',
+  tempo:          'il pagamento è scaduto per strada',
+  rifiutata:      'il wallet di chi riceve ha rifiutato il pagamento',
+  bruciata:       'quella fattura era già stata tentata',
+  fattura:        'la fattura non andava bene',
+  saldo:          'un problema del nostro nodo',
+  ponte:          'il nostro nodo non rispondeva',
+  lnbits_muto:    'il nostro nodo non rispondeva',
+  ignoto: '', metodo: '',
+};
+const inPagamento = o => !!(o && o.pagamento && o.state!=='released');
+function quandoPagamento(ts){
+  if (!ts) return '—';
+  const d = new Date(ts*1000), oggi = new Date();
+  const ora = d.toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'});
+  return d.toDateString()===oggi.toDateString() ? ora
+    : `${d.toLocaleDateString('it-IT', {day:'numeric', month:'short'})} ${ora}`;
+}
+/* lo stato VIVO, in tre parole: e' la riga colorata del pannello e,
+   accorciata, il badge della lista */
+function statoPagamento(p){
+  return p.passo==='arrivato'      ? 'arrivato ✓'
+       : p.passo==='in_volo'       ? 'partito, in volo'
+       : p.passo==='in_verifica'   ? 'in verifica'
+       : p.passo==='riparte'       ? 'riparte da solo'
+       : p.motivo==='metodo'       ? 'in attesa del venditore'
+       :                             'fallito: serve una fattura nuova';
+}
+function frasePagamento(o){
+  const p = o.pagamento, chi = esc(o.usernameVenditore ? '@'+o.usernameVenditore : 'chi vende');
+  const sats = `<b class="net">${fmt(p.sats)}<span class="unit">sats</span></b>`;
+  const motivo = MOTIVI_PAGAMENTO[p.motivo] || '';
+  const lungo = p.lungo ? ' <b>Ci sta mettendo più del solito: ci stiamo lavorando noi, non devi fare niente.</b>' : '';
+  const prossimo = (p.passo==='riparte' && p.prossimo)
+    ? ` Prossimo tentativo verso le <b>${quandoPagamento(p.prossimo)}</b>.` : '';
+  if (p.passo==='arrivato')
+    return o.role==='seller' ? `I tuoi ${sats} sono arrivati nel tuo wallet.`
+         : `I sats sono arrivati a ${chi}.`;
+  if (o.role==='buyer') {
+    const testa = p.deciso_da==='timer'
+        ? `Il tempo per confermare è scaduto: ora tocca a Barattolo consegnare i sats a ${chi}.`
+      : p.deciso_da==='disputa'
+        ? `La disputa è stata decisa a favore del venditore: ora tocca a Barattolo consegnargli i sats.`
+        : `<b>Hai fatto tutto</b>: ora tocca a Barattolo consegnare i sats a ${chi}.`;
+    return testa + (p.gesto_venditore
+      ? ` Aspettiamo che ${chi} ci dica dove riceverli: tu non devi fare niente.` : lungo);
+  }
+  if (o.role==='seller') {
+    if (p.gesto_venditore)
+      return p.motivo==='metodo'
+        ? `I tuoi ${sats} ti aspettano: dicci qui sotto dove mandarteli.`
+        : `I tuoi ${sats} ti aspettano, ma <b>serve un tuo gesto</b>${motivo?`: ${motivo}`:''}. Incolla qui sotto una fattura <b>nuova</b>, o imposta il Lightning address e ci pensiamo noi.`;
+    const come = p.passo==='in_volo' ? ' Il pagamento è partito ed è in volo verso il tuo wallet.'
+      : p.passo==='in_verifica' ? ' Stiamo verificando com\'è finito l\'ultimo tentativo.'
+      : p.nostro ? ' C\'è stato un intoppo dalla <b>nostra</b> parte, non dalla tua: ci riproviamo da soli.'
+      : ` Al primo tentativo non sono arrivati${motivo?` (${motivo})`:''}: ci riproviamo da soli.`;
+    return `I tuoi ${sats} stanno arrivando.${come}${prossimo} Non devi fare niente.${lungo}`;
+  }
+  /* chi modera: terza persona, e il motivo senza giri di parole */
+  return `Decisione presa (${DECISO_DA[p.deciso_da]||p.deciso_da}): Barattolo sta consegnando ${sats} al venditore.`
+    + (motivo ? ` Ultimo intoppo: ${motivo}${p.nostro?' — <b>guasto nostro</b>, si ritenta senza tetto':''}.` : '')
+    + prossimo
+    + (p.lungo ? ' <b>In pagamento da più di 30 minuti.</b>' : '');
+}
+function lineaPagamento(p){
+  if (!p.linea || !p.linea.length) return '';
+  const ultimo = p.linea.length-1;
+  return `<ul class="pag-linea">${p.linea.map((x,i)=>{
+    const m = MOTIVI_PAGAMENTO[x.motivo] || '';
+    const nome = x.passo==='deciso'
+      ? `${PASSI_PAGAMENTO.deciso} (${DECISO_DA[x.motivo]||'—'})`
+      : (PASSI_PAGAMENTO[x.passo] || esc(x.passo)) + (m && x.passo!=='serve_fattura' ? `: ${m}` : '');
+    const volte = x.volte>1 ? ` · ${fmt(x.volte)} volte, l'ultima ${quandoPagamento(x.ultimo)}` : '';
+    return `<li class="${i===ultimo?'ora':''}"><span class="quando">${quandoPagamento(x.quando)}</span><span>${nome}${volte}</span></li>`;
+  }).join('')}</ul>`;
+}
+function pannelloPagamento(o){
+  const p = o.pagamento;
+  if (!p) return '';
+  const fatto = p.passo==='arrivato';
+  const via = p.via==='onchain' ? 'on-chain ⛓' : 'Lightning ⚡';
+  return `
+    <div class="payout" id="pannelloPagamento">
+      <h4>${fatto ? '✅ Pagamento al venditore' : '💸 In pagamento al venditore'}</h4>
+      <span class="pag-stato${fatto?' ok':p.gesto_venditore?' gesto':''}">${statoPagamento(p)}</span><span class="pag-via">via ${via}</span>
+      <div class="hint">${frasePagamento(o)}</div>
+      ${lineaPagamento(p)}
+    </div>`;
+}
+
 function payoutPanel(o){
   // articolo + spedizione, dal giudice unico (vedi nettoVenditore)
   /* QUI I SATS RESTANO SATS, e il toggle non ci arriva (ago 2026):
@@ -24612,9 +24781,12 @@ function payoutPanel(o){
       <button class="btn ghost" onclick="currentOrder.sellerInvoice='';openOrder(currentOrder.id)">↻ Sostituisci invoice</button>
     </div>`;
 
-  /* Nessun metodo impostato: address consigliato, invoice come piano B */
+  /* Nessun metodo impostato: address consigliato, invoice come piano B.
+     IN EVIDENZA quando e' l'unico gesto che manca (set 2026): lo stadio
+     «in pagamento» dice a chi vende che serve una fattura, e il campo
+     dove metterla e' questo. */
   return `
-    <div class="payout">
+    <div class="payout${o.pagamento && o.pagamento.gesto_venditore ? ' pag-evidenza' : ''}">
       <h4>💰 ${o.state==='confirmed'?'Incassa subito i tuoi sats':'Come vuoi incassare?'}</h4>
       <div class="hint">${o.state==='confirmed'
         ? `L'acquirente ha <b>già confermato la ricezione</b>: ti aspettano <b class="net">${fmt(net)}<span class="unit">sats</span></b> in cassaforte.`
@@ -28650,9 +28822,24 @@ async function confirmReceived(btn){
          scrivere 'confirmed' a mano: senza, chi compra vedrebbe
          «confermato», non ripremerebbe il bottone, e il promemoria
          automatico che gli resta gli sembrerebbe sbagliato. */
-      else if (d.non_chiesto) { currentOrder.state = d.stato || currentOrder.state;
-        toast('✅ Confermato. Il pagamento non è potuto partire ora — problema nostro, non tuo: i sats sono nel deposito e ci riproviamo da soli'); }
-      else { currentOrder.state='confirmed'; toast('✅ Confermato! I sats partiranno appena il venditore fornisce la invoice'); }
+      /* IN VOLO, IN VERIFICA O SOSPESO (set 2026): la conferma c'e' ed
+         e' definitiva, ma l'ordine sul server e' rimasto com'era — lo
+         stadio «in pagamento» e' DERIVATO. Quindi lo si RILEGGE: a
+         scrivere qui uno stato a mano i due bottoni tornerebbero
+         davanti a chi ha appena confermato. Il guasto, se c'e', e'
+         nostro e non si racconta: chi ha comprato ha finito. */
+      else if (d.non_chiesto || d.in_volo || d.incerto) {
+        currentOrder.state = d.stato || currentOrder.state;
+        toast('✅ Confermato: per te è tutto fatto. Ora tocca a Barattolo consegnare i sats al venditore');
+        const id = currentOrder.id;
+        try { await loadOrders(); renderOrders(); } catch(e) {}
+        if (orders.find(x=>x.id===id)) openOrder(id);
+        return;
+      }
+      else { currentOrder.state='confirmed'; toast('✅ Confermato! Ora tocca a Barattolo: i sats partono appena il venditore ci dice dove riceverli');
+        const id = currentOrder.id;
+        try { await loadOrders(); renderOrders(); } catch(e) {}
+        if (orders.find(x=>x.id===id)) { openOrder(id); return; } }
       openOrder(currentOrder.id);
     }});
 }
@@ -32799,6 +32986,9 @@ const rigaPagamento = p => `
           ${p.titolo ? ` — ${esc(p.titolo)}` : ''}</b>
         <span class="mono" style="white-space:nowrap;font-weight:800;color:var(--sats-deep)">${fmt(p.importo)} sats</span>
       </div>
+      ${/* LO STESSO STADIO delle due parti (set 2026): stesso giudice,
+            stesse parole, e la linea del tempo della pagina dell'ordine */
+        p.pagamento ? `<div class="sub" style="margin-top:4px">💸 in pagamento al venditore: <b>${statoPagamento(p.pagamento)}</b> · deciso da ${DECISO_DA[p.pagamento.deciso_da]||'—'} · da ${quandoPagamento(p.pagamento.da)}</div>${lineaPagamento(p.pagamento)}` : ''}
       <div class="sub" style="margin-top:4px">stato dell'ordine: <b>${esc(p.stato||'—')}</b> · fermo dal ${p.aggiornato?new Date(p.aggiornato*1000).toLocaleString('it-IT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—'}</div>
       <div class="mono" style="margin-top:6px;font-size:11px;color:var(--muted);word-break:break-all">${p.payout_hash ? esc(p.payout_hash) : 'payment_hash non leggibile: cerca per importo e orario'}</div>
       <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">

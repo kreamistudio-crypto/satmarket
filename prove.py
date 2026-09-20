@@ -3723,6 +3723,7 @@ def prove_esito_pagamento():
                # LND e' spento — cioe' la riga del SaaS, dove decide
                # LNbits da sola come ha sempre fatto
                "_stato_lnd": _lnd_spento, **costanti_verita(),
+               **ambiente_in_pagamento(),
                "print": lambda *a, **k: None}
         exec(pezzo("_verdetto_pagamento"), amb)
         exec(pezzo_async("_verita_pagamento"), amb)
@@ -3861,6 +3862,7 @@ def prove_esito_pagamento():
                "timbro_letto": lambda _n: "gia-oggi",
                "timbro_scrivi": lambda *a: None,
                "TIMBRO_SOSPESI": "x", "notifica_admin": _zitto,
+               **ambiente_in_pagamento(),
                "print": lambda *a, **k: None}
         exec(pezzo("_quando_ritentare"), amb)
         exec(pezzo_async("riprova_pagamenti_sospesi"), amb)
@@ -3905,6 +3907,56 @@ def costanti_verita():
     return amb
 
 
+NOMI_IN_PAGAMENTO = (
+    "VIA_LIGHTNING", "VIA_ONCHAIN", "IN_PAGAMENTO_LUNGO_S", "BACKOFF_NOSTRO",
+    "MOTIVO_LNBITS_MUTO", "MOTIVI_NOSTRI", "PASSO_DECISO", "PASSO_PARTITO",
+    "PASSO_IN_VOLO", "PASSO_IN_VERIFICA", "PASSO_GUASTO", "PASSO_FALLITO",
+    "PASSO_SERVE", "PASSO_ARRIVATO", "PASSO_RIPARTE", "PASSO_CONFERME",
+    "_segna_passo", "_segna_deciso", "_ultimo_passo", "_conta_guasti",
+    "_gia_detto", "_quando_ritentare_nostro", "_tocca_riprovare", "_campo",
+    "_in_pagamento", "_rifiuto_in_pagamento", "stadio_pagamento",
+    "_stadi_ordini", "_avvisa_in_pagamento")
+
+
+def ambiente_in_pagamento(notifica=None, commissione=0):
+    """I pezzi VERI dello stadio «in pagamento» (set 2026), per gli
+    ambienti finti che fanno girare `_sblocca_sats`, le rotte
+    dell'ordine e la lista: da quel giorno li chiamano, e un ambiente
+    che non li monta esplode con un NameError — la trappola delle
+    funzioni estratte, che ogni cantiere dei pagamenti ha ripagato.
+
+    UN AMBIENTE PRIVATO, e si esportano i soli NOMI del cantiere: le
+    funzioni restano legate al dizionario in cui nascono, quindi le
+    loro dipendenze (`netto_venditore`, la commissione, `notifica`)
+    stanno qui dentro e non cadono nell'ambiente di chi le monta, dove
+    coprirebbero le sue.
+
+    SUI BANCHI DI IERI LA TABELLA `payout_passi` NON C'E', ed e' il
+    fail-open dichiarato: i passi non si scrivono, `_segna_deciso` dice
+    «primo giro» e tutto va come prima del cantiere — i messaggi sono
+    quelli di sempre. Gli avvisi nuovi su quei banchi sono MUTI apposta
+    (`notifica=None`): chi li vuole contare passa la sua `notifica`,
+    come fa `prove_in_pagamento`."""
+    async def _muta(*a, **k):
+        return None
+
+    p = {"time": time, "html": __import__("html"),
+         "notifica": notifica or _muta,
+         "COMMISSIONE_PERCENTO": commissione,
+         "_fmt_sats": reale("_fmt_sats")}
+    for inizio in ("IN_VOLO_LIMITE_S = ", "BACKOFF_PAYOUT = (",
+                   "MOTIVO_SCADUTA, MOTIVO_STRADA, ",
+                   "VIA_LIGHTNING, VIA_ONCHAIN = "):
+        i = _SORGENTE.index("\n" + inizio) + 1
+        exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], p)
+    for nome in ("netto_venditore", "_quando_ritentare") + tuple(
+            n for n in NOMI_IN_PAGAMENTO if n[0] == "_" or n[0].islower()):
+        # `pezzo` taglia dal `def`: all'unica asincrona l'`async` va rimesso
+        exec(("async " if nome == "_avvisa_in_pagamento" else "")
+             + pezzo(nome), p)
+    return {n: p[n] for n in NOMI_IN_PAGAMENTO}
+
+
 def ambiente_scadenza():
     """I pezzi VERI del cantiere delle fatture scadute (20 set 2026),
     per gli ambienti finti che fanno girare `paga_venditore` e
@@ -3933,6 +3985,10 @@ def ambiente_scadenza():
                  "_msg_fattura_nuova"):
         exec(pezzo(nome), amb)
     amb.pop("__builtins__", None)
+    # ...e dal cantiere dopo, quelli dello stadio «in pagamento»: chi
+    # monta `_sblocca_sats` ha bisogno di tutt'e due le famiglie
+    amb.update(ambiente_in_pagamento())
+    amb["CASSAFORTE_NODO"] = "nodo"
     return amb
 
 
@@ -4026,6 +4082,17 @@ def prove_pagamenti_in_volo(attrezzi=False):
                 # dell'audit gira lo stesso, ed e' rossa per i 2000
                 vero.execute("CREATE TABLE payout_tentati(tabella TEXT, "
                              "riga_id INT, hash TEXT, quando INT, esito TEXT)")
+            # ...e la linea del tempo (set 2026, lo stadio «in
+            # pagamento»), VERA anche lei: senza, ogni scena girerebbe
+            # nel fail-open dei passi non scritti, cioe' proverebbe il
+            # codice di ieri con 140 righe di lamento nel journal
+            try:
+                i = _SORGENTE.index(
+                    '"CREATE TABLE IF NOT EXISTS payout_passi("')
+                j = _SORGENTE.index('DEFAULT 1)")', i) + len('DEFAULT 1)"')
+                vero.execute(eval("(" + _SORGENTE[i:j] + ")"))
+            except ValueError:
+                pass          # il codice di PRIMA: vedi qui sopra
             vero.commit()
             nodo = type("Nodo", (), {})()
             nodo.lnbits, nodo.lnd, nodo.partiti = {}, {}, []
@@ -5119,6 +5186,759 @@ def prove_fatture_scadute():
           "rami", (True, True),
           ("_msg_fattura_nuova(netto, taccuino)" in sbl,
            "_msg_ritentiamo(netto, taccuino)" in sbl))
+
+
+def prove_in_pagamento():
+    """LO STADIO «💸 IN PAGAMENTO AL VENDITORE» (set 2026).
+
+    Fra la conferma e 'released' c'e' un tempo che non vedeva nessuno, e
+    in quel tempo un guasto NOSTRO sembrava colpa di chi compra o di chi
+    vende. Qui si prova: il giudice unico (`stadio_pagamento`, puro), la
+    linea del tempo, la conferma DEFINITIVA (tre rotte che rifiutano),
+    gli avvisi senza doppioni, il ritentativo per cause nostre a 1, 5,
+    15, 30 minuti e poi ogni ora SENZA TETTO — con la scena che il
+    cantiere chiedeva per nome: il nodo giu' per un'ora, e poi il payout
+    che parte da solo senza che nessuno abbia sentito niente.
+
+    IL MONDO E' QUELLO DEI PAGAMENTI IN VOLO (`attrezzi=True`), con tre
+    aggiunte: la tabella VERA dei passi (il suo DDL si esegue dal
+    sorgente), le notifiche che si SENTONO, e i pezzi del cantiere
+    rimontati DENTRO il mondo — quelli di `ambiente_in_pagamento` sono
+    muti apposta, e qui sono proprio gli avvisi la cosa da contare."""
+    print("\n[lo stadio «in pagamento»: il tempo fra la conferma e i sats "
+          "arrivati]")
+    import shutil
+    import subprocess
+    import tempfile
+    a = prove_pagamenti_in_volo(attrezzi=True)
+    mondo0, gira, riga = a["mondo"], a["gira"], a["riga"]
+    prova_a, invecchia = a["prova_a"], a["invecchia"]
+    P = ambiente_in_pagamento()
+    adesso = int(time.time())
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    def pezzo_async(nome):
+        return "async " + pezzo(nome)
+
+    def mondo(**k):
+        chi = k.pop("chi", 111)
+        m = mondo0(**k)
+        i = src.index('"CREATE TABLE IF NOT EXISTS payout_passi("')
+        j = src.index('DEFAULT 1)")', i) + len('DEFAULT 1)"')
+        m.vero.execute(eval("(" + src[i:j] + ")"))
+        m.vero.commit()
+        m.sentite = []
+
+        async def _n(a_chi, testo):
+            m.sentite.append((a_chi, testo))
+        m.amb["notifica"] = _n
+        m.amb["verifica_utente"] = lambda *x: {"id": chi}
+        m.amb.update({"TIMBRO_SOSPESI": "sospesi-prova",
+                      "BACKOFF_PAYOUT": (300, 1800, 7200, 21600, 86400)})
+        for nome, asincrona in (
+                ("_quando_ritentare", 0), ("_avvisa_in_pagamento", 1),
+                ("riprova_pagamenti_sospesi", 1), ("conferma_ricezione", 1),
+                ("apri_disputa", 1), ("sollecita_acquirente", 1)):
+            exec(("async " if asincrona else "") + pezzo(nome), m.amb)
+        m.giro = lambda: m.amb["riprova_pagamenti_sospesi"]()
+        return m
+
+    def passi(m):
+        return [(r[0], r[1], r[2]) for r in m.vero.execute(
+            "SELECT passo, motivo, volte FROM payout_passi "
+            "WHERE tabella='ordini' AND riga_id=1 ORDER BY id")]
+
+    def stadio(m):
+        # UNO STADIO CHE MANCA FA CADERE LA PROVA ROSSA, NON LA SEZIONE:
+        # alla tortura, con la guardia rotta, qui tornava None e il banco
+        # esplodeva — cioe' la mutazione moriva per la ragione sbagliata
+        o = dict(m.vero.execute("SELECT * FROM ordini WHERE id=1").fetchone())
+        return m.amb["_stadi_ordini"](m.vero, [o]).get(1) or {
+            "passo": None, "motivo": None, "deciso_da": None, "nostro": None,
+            "gesto_venditore": None, "lungo": None, "linea": []}
+
+    def passa_il_tempo(m, secondi):
+        """L'orologio non si ferma: si INVECCHIA quel che e' scritto,
+        come fa `invecchia` coi tentativi. E' lo stesso tempo per tutti."""
+        m.vero.execute("UPDATE payout_passi SET quando=quando-?, "
+                       "ultimo=ultimo-?", (secondi, secondi))
+        m.vero.commit()
+        invecchia(m, secondi)
+
+    async def tenta(coro):
+        """Una rotta che doveva rifiutare e invece PROSEGUE va a sbattere
+        nel mondo di cartone (colonne che non ha): la prova deve uscirne
+        rossa, col suo «nessun 409», non esplodere."""
+        try:
+            return await coro
+        except Exception as e:
+            return e
+
+    def detti(m, a_chi, spia):
+        return sum(1 for c, t in m.sentite if c == a_chi and spia in t)
+
+    # --- 0. I NUMERI, e il loro senso --------------------------------
+    prova("il ritentativo per cause nostre: 1, 5, 15, 30 minuti, poi l'ora",
+          (60, 300, 900, 1800, 3600), P["BACKOFF_NOSTRO"])
+    qn = P["_quando_ritentare_nostro"]
+    prova("...letto dal numero dei giri a vuoto di fila",
+          [60, 300, 900, 1800, 3600],
+          [qn(v, 1000) - 1000 for v in (1, 2, 3, 4, 5)])
+    prova("...e SENZA TETTO: al cinquantesimo giro e' ancora un'ora", 3600,
+          qn(50, 1000) - 1000)
+    prova("«ci stiamo lavorando» scatta quando scatta il 🧊: un numero solo",
+          True, "\nIN_PAGAMENTO_LUNGO_S = IN_VOLO_LIMITE_S\n" in src)
+    prova("i guasti di casa sono tre: saldo, ponte, LNbits muta",
+          ("saldo", "ponte", "lnbits_muto"), P["MOTIVI_NOSTRI"])
+
+    # --- 1. IL GIUDICE, riga per riga --------------------------------
+    # (un «non e' in pagamento» torna come stadio VUOTO: a guardia rotta
+    # le prove qui sotto devono cadere rosse una per una, non far
+    # esplodere la sezione al primo `s["passo"]` — l'ha chiesto la tortura)
+    VUOTO = {"passo": None, "motivo": None, "deciso_da": None,
+             "nostro": None, "gesto_venditore": None, "lungo": None,
+             "prossimo": None, "via": None, "linea": [{"passo": None}]}
+
+    def giudice(*a):
+        return P["stadio_pagamento"](*a) or VUOTO
+
+    def o_(**k):
+        base = {"id": 1, "stato": "shipped", "payout_stato": "",
+                "payout_verso": "", "disputata": 0, "sbloccato_auto_il": 0,
+                "aggiornato": adesso - 10, "prezzo_sats": 1000,
+                "protezione_sats": 0, "payout_tentativi": 0,
+                "payout_ultimo": 0}
+        base.update(k)
+        return base
+
+    def p_(passo, motivo="", eta=10, volte=1, via="lightning"):
+        return {"passo": passo, "motivo": motivo, "via": via,
+                "quando": adesso - eta, "ultimo": adesso - eta,
+                "volte": volte}
+
+    def passo_di(o, ps=()):
+        return giudice(o, ps, (), adesso)["passo"]
+
+    for nome, o, ps, atteso in (
+            ("un ordine spedito e basta NON e' in pagamento", o_(), (), None),
+            ("'confirmed' lo e' sempre", o_(stato="confirmed"), (),
+             "serve_fattura"),
+            ("spedito + in volo verso chi VENDE lo e'",
+             o_(payout_stato="in_volo", payout_verso="venditore"), (),
+             "in_volo"),
+            ("...e 'incerto' e' «in verifica»",
+             o_(payout_stato="incerto", payout_verso="venditore"), (),
+             "in_verifica"),
+            ("...e 'da_riprovare' e' «riparte da solo»",
+             o_(payout_stato="da_riprovare", payout_verso="venditore"), (),
+             "riparte"),
+            ("un'uscita verso chi COMPRA non e' questo stadio",
+             o_(stato="dispute", payout_stato="in_volo",
+                payout_verso="compratore"), (), None),
+            ("una disputa decisa a chi vende, col payout in volo, si'",
+             o_(stato="dispute", payout_stato="in_volo",
+                payout_verso="venditore", disputata=1), (), "in_volo"),
+            ("un rimborso in corso no", o_(stato="refund"), (), None),
+            ("'released' SENZA storia tace (gli affari di ieri)",
+             o_(stato="released"), (), None),
+            ("'released' con la sua storia dice «arrivato»",
+             o_(stato="released"), (p_("deciso", "conferma"),
+                                    p_("arrivato")), "arrivato")):
+        prova("giudice: " + nome, atteso, passo_di(o, ps))
+    s = giudice(o_(stato="confirmed"), (), (), adesso)
+    prova("senza metodo il gesto e' di chi vende, e il motivo e' «metodo»",
+          (True, "metodo", False),
+          (s["gesto_venditore"], s["motivo"], s["lungo"]))
+    s = giudice(o_(stato="confirmed"),
+                (p_("deciso", "conferma"), p_("fallito", "scaduta"),
+                 p_("serve_fattura", "scaduta")), (), adesso)
+    prova("fattura scaduta: serve una fattura nuova, col motivo in parole",
+          ("serve_fattura", "scaduta", True, False),
+          (s["passo"], s["motivo"], s["gesto_venditore"], s["nostro"]))
+    s = giudice(o_(payout_stato="da_riprovare", payout_verso="venditore"),
+                (p_("deciso", "conferma", 400),
+                 p_("guasto_nostro", "ponte", 100, volte=2)), (), adesso)
+    prova("guasto nostro: riparte da solo, e' NOSTRO, nessun gesto",
+          ("riparte", "ponte", True, False),
+          (s["passo"], s["motivo"], s["nostro"], s["gesto_venditore"]))
+    prova("...e dice quando si riprova: 5 minuti dopo il secondo giro",
+          adesso - 100 + 300, s["prossimo"])
+    s = giudice(o_(payout_stato="da_riprovare", payout_verso="venditore",
+                   payout_tentativi=1, payout_ultimo=adesso - 50),
+                (p_("deciso", "conferma", 60),
+                 p_("fallito", "nessuna_strada", 50)), (), adesso)
+    prova("una ROTTA che manca tiene la cadenza di sempre (5 minuti)",
+          (adesso - 50 + 300, False), (s["prossimo"], s["nostro"]))
+    L = P["IN_PAGAMENTO_LUNGO_S"]
+    for nome, o, eta, atteso in (
+            ("in volo da 29 minuti non e' ancora lungo",
+             o_(payout_stato="in_volo", payout_verso="venditore"),
+             L - 60, False),
+            ("in volo da 31 minuti: «ci stiamo lavorando»",
+             o_(payout_stato="in_volo", payout_verso="venditore"),
+             L + 60, True),
+            ("un 'incerto' e' lungo per definizione (il 🧊 e' gia' partito)",
+             o_(payout_stato="incerto", payout_verso="venditore"), 5, True),
+            ("chi vende che non ci da' un metodo NON e' «ci lavoriamo noi»",
+             o_(stato="confirmed"), L * 10, False)):
+        s = giudice(o, (p_("deciso", "conferma", eta),), (), adesso)
+        prova("giudice: " + nome, atteso, s["lungo"])
+    s = giudice(o_(payout_stato="in_volo", payout_verso="venditore"),
+                (p_("deciso", "timer", 30),), (), adesso)
+    prova("chi ha deciso si legge dal primo passo", "timer", s["deciso_da"])
+    s = giudice(o_(stato="confirmed", disputata=1), (), (), adesso)
+    prova("...e sugli ordini di ieri si ricava dalla riga", "disputa",
+          s["deciso_da"])
+    s = giudice(o_(payout_stato="in_volo", payout_verso="venditore"),
+                (p_("deciso", "conferma", 30),), (), adesso)
+    prova("la via di oggi e' Lightning", "lightning", s["via"])
+    s = giudice(o_(payout_stato="in_volo", payout_verso="venditore"),
+                (p_("deciso", "conferma", 900, via="onchain"),
+                 p_("attesa_conferme", "", 600, via="onchain")), (), adesso)
+    prova("lo spazio dell'on-chain: la via viaggia coi passi",
+          ("onchain", "attesa_conferme"), (s["via"], s["linea"][-1]["passo"]))
+    s = giudice(o_(payout_stato="in_volo", payout_verso="venditore"),
+                (p_("deciso", "conferma", 20), p_("in_volo", "", 18)),
+                (("h1", adesso - 20, ""),), adesso)
+    prova("la linea mette «partito» dall'ora VERA della mano, fra deciso "
+          "e in volo", ["deciso", "partito", "in_volo"],
+          [x["passo"] for x in s["linea"]])
+    prova("...e nella linea non viaggia nessun hash", False,
+          "h1" in json.dumps(s))
+
+    # --- 2. I PASSI UGUALI SI COMPRIMONO ------------------------------
+    m = mondo()
+    sp = m.amb["_segna_passo"]
+    nuovi = [sp(m.vero, "ordini", 1, "guasto_nostro", "ponte"),
+             sp(m.vero, "ordini", 1, "guasto_nostro", "ponte"),
+             sp(m.vero, "ordini", 1, "guasto_nostro", "lnbits_muto")]
+    prova("lo stesso guasto due volte e' UNA riga (e non e' una notizia)",
+          ([True, False, True],
+           [("guasto_nostro", "ponte", 2), ("guasto_nostro", "lnbits_muto", 1)]),
+          (nuovi, passi(m)))
+    senza = a["mondo"]()      # un database di ieri: la tabella non c'e'
+    senza.vero.execute("DROP TABLE payout_passi")
+    prova("senza la tabella il passo non ferma niente, e dice «nuovo»", True,
+          senza.amb["_segna_passo"](senza.vero, "ordini", 1, "in_volo"))
+    prova("...e `_segna_deciso` dice «primo giro»: i messaggi di sempre",
+          True, senza.amb["_segna_deciso"](
+              senza.vero, 1, senza.vero.execute(
+                  "SELECT * FROM ordini WHERE id=1").fetchone(), False))
+
+    # --- 3. IN VOLO: la conferma e' DEFINITIVA ------------------------
+    m = mondo(stato="shipped")
+    m.nodo.modi["lnbc-fattura-1"] = "hold"
+    esito = gira(m.amb["conferma_ricezione"](1))
+    prova("conferma con una hold invoice: il payout resta in volo",
+          ("shipped", "in_volo"), riga(m)[:2])
+    prova("...e chi compra sente UNA volta che ha finito", 1,
+          detti(m, 111, "Hai confermato: i sats vanno al venditore, ci "
+                        "pensa Barattolo"))
+    prova("...e chi vende UNA volta che i sats sono in arrivo", 1,
+          detti(m, 222, "I tuoi 1.000 sats sono in arrivo"))
+    prova("...detto col PERCHE' vero: ha confermato l'acquirente", 1,
+          detti(m, 222, "L'acquirente ha confermato la ricezione"))
+    s = stadio(m)
+    prova("lo stadio: in volo, deciso da una conferma, nessun gesto",
+          ("in_volo", "conferma", False, False),
+          (s["passo"], s["deciso_da"], s["gesto_venditore"], s["lungo"]))
+    prova("la linea del tempo: deciso, partito, in volo",
+          ["deciso", "partito", "in_volo"], [x["passo"] for x in s["linea"]])
+    for rotta, spia in (("conferma_ricezione", "Hai già confermato"),
+                        ("apri_disputa", "la conferma è definitiva")):
+        e = gira(tenta(m.amb[rotta](1)))
+        prova(f"{rotta}: a conferma data e' un 409",
+              409, getattr(e, "status_code", None))
+        prova("...con le parole di chi ha confermato", True,
+              spia in str(getattr(e, "detail", "")))
+    prova("...e l'ordine NON e' andato in disputa", "shipped", riga(m)[0])
+    m.amb["verifica_utente"] = lambda *x: {"id": 222}
+    e = gira(tenta(m.amb["sollecita_acquirente"](1)))
+    prova("chi vende non puo' sollecitare una conferma gia' data", 409,
+          getattr(e, "status_code", None))
+    prova("nessuno di questi rifiuti ha detto niente a nessuno", 2,
+          len(m.sentite))
+    prova("...e nessun secondo pagamento e' partito", 1, len(m.nodo.partiti))
+    # ...il ladro salda: la ronda chiude, e chi vende sente «Arrivati ✓»
+    m.nodo.lnd["hash-di-lnbc-fattura-1"] = "SUCCEEDED"
+    m.nodo.lnbits["hash-di-lnbc-fattura-1"] = "success"
+    gira(m.ronda())
+    prova("saldata, la ronda chiude da sola", ("released", "uscito"),
+          riga(m)[:2])
+    prova("chi vende sente «Arrivati ✓»", 1, detti(m, 222, "Arrivati ✓"))
+    prova("...e NON si sente ridire «L'acquirente ha confermato»", 1,
+          detti(m, 222, "ha confermato la ricezione"))
+    prova("...ne' una seconda volta «sono in arrivo»", 1,
+          detti(m, 222, "sats sono in arrivo.</b>"))
+    prova("chi compra sente che l'affare e' concluso", 1,
+          detti(m, 111, "Affare concluso"))
+    s = stadio(m)
+    prova("lo stadio resta come storia: arrivato ✓",
+          ("arrivato", ["deciso", "partito", "in_volo", "arrivato"]),
+          (s["passo"], [x["passo"] for x in s["linea"]]))
+
+    # --- 4. SUBITO RIUSCITO: nessun avviso in piu' ---------------------
+    m = mondo(stato="shipped")
+    gira(m.amb["conferma_ricezione"](1))
+    prova("payout riuscito nello stesso giro: released", "released",
+          riga(m)[0])
+    prova("...e gli avvisi sono i DUE di sempre, non quattro", 2,
+          len(m.sentite))
+    prova("...«Sats sbloccati!» a chi vende, come ieri", 1,
+          detti(m, 222, "Sats sbloccati!"))
+    prova("...e nessun «sono in arrivo» tre secondi prima", 0,
+          detti(m, 222, "sats sono in arrivo.</b>")
+          + detti(m, 111, "Hai confermato"))
+    prova("la storia c'e' lo stesso: deciso, partito, arrivato",
+          ["deciso", "partito", "arrivato"],
+          [x["passo"] for x in stadio(m)["linea"]])
+
+    # --- 5. IL NODO GIU' PER UN'ORA ------------------------------------
+    # La scena che il cantiere chiedeva per nome. Fattura INCOLLATA e
+    # buona, nessun address: il caso peggiore, perche' se la bruciassimo
+    # toccherebbe a chi vende darcene un'altra per un guasto nostro.
+    m = mondo(invoice="lnbc-incollata", address="", stato="shipped")
+    m.amb["_ponte"]["stato"] = "giu"
+    try:
+        gira(m.amb["conferma_ricezione"](1))
+        prova("ponte giu': la conferma passa, il payout NON si tenta",
+              ("shipped", "da_riprovare", []),
+              (riga(m)[0], riga(m)[1], m.nodo.partiti))
+        prova("...la fattura incollata resta al suo posto, NON bruciata",
+              ("lnbc-incollata", {}),
+              (m.vero.execute("SELECT invoice_venditore FROM ordini")
+               .fetchone()[0], m.nodo.lnbits))
+        prova("...e sulla riga non resta il nome di un pagamento mai nato",
+              "", riga(m)[2])
+        prova("il passo dice di chi e' il guasto",
+              [("deciso", "conferma", 1), ("guasto_nostro", "ponte", 1)],
+              passi(m))
+        prova("chi compra e chi vende sentono SOLO che ci pensiamo noi", 2,
+              len(m.sentite))
+        prova("...e a nessuno dei due si nomina il guasto", False,
+              any("ponte" in t.lower() or "nodo" in t.lower()
+                  or "problema" in t.lower() for _, t in m.sentite))
+        s = stadio(m)
+        prova("lo stadio: riparte da solo, guasto nostro, nessun gesto",
+              ("riparte", True, False),
+              (s["passo"], s["nostro"], s["gesto_venditore"]))
+        # l'ORA: un battito al minuto, col ponte sempre giu'
+        bussate = []
+        for minuto in range(1, 61):
+            passa_il_tempo(m, 60)
+            prima = len([d for d in m.detto if "ponte verso LND" in d])
+            gira(m.giro())
+            if len([d for d in m.detto if "ponte verso LND" in d]) > prima:
+                bussate.append(minuto)
+        prova("in un'ora si ribussa a 1, 6, 21 e 51 minuti — e basta",
+              [1, 6, 21, 51], bussate)
+        prova("...LNbits non ha visto NIENTE, la fattura e' ancora buona",
+              ([], {}), (m.nodo.partiti, m.nodo.lnbits))
+        prova("...e a compratore e venditore non e' arrivata una parola in "
+              "piu'", 2, len(m.sentite))
+        prova("...un'ora di guasto e' UNA riga nella linea del tempo",
+              [("deciso", "conferma", 1), ("guasto_nostro", "ponte", 5)],
+              passi(m))
+        prova("...chi modera ha il suo avviso di sempre, UNA volta", 1,
+              sum(1 for x in m.avvisi if "Pagamenti in uscita fermi" in x))
+        s = stadio(m)
+        prova("dopo un'ora le due parti leggono «ci stiamo lavorando»", True,
+              s["lungo"])
+        e = gira(tenta(m.amb["apri_disputa"](1)))
+        prova("...e la conferma resta definitiva anche a payout sospeso",
+              (409, "shipped"), (getattr(e, "status_code", None), riga(m)[0]))
+        # IL NODO TORNA
+        m.amb["_ponte"]["stato"] = "ok"
+        gira(m.giro())
+        prova("appena tornato NON si bussa: si aspetta il proprio turno",
+              [], m.nodo.partiti)
+        passa_il_tempo(m, 3600)
+        gira(m.giro())
+        prova("al suo turno il payout PARTE DA SOLO e arriva",
+              ("released", "uscito", ["hash-di-lnbc-incollata"]),
+              (riga(m)[0], riga(m)[1], m.nodo.partiti))
+        prova("...con la STESSA fattura incollata un'ora prima", True,
+              m.nodo.lnbits.get("hash-di-lnbc-incollata") == "success")
+        prova("chi vende sente «Arrivati ✓»: e' il suo secondo messaggio",
+              (1, 2), (detti(m, 222, "Arrivati ✓"),
+                       sum(1 for c, _ in m.sentite if c == 222)))
+        prova("la linea racconta l'ora per intero",
+              ["deciso", "guasto_nostro", "partito", "arrivato"],
+              [x["passo"] for x in stadio(m)["linea"]])
+    finally:
+        m.amb["_ponte"]["stato"] = "ok"
+    # dove il guardiano non gira `_ponte` vale «attesa», e non morde
+    m = mondo(invoice="lnbc-incollata", address="", stato="shipped")
+    m.amb["_ponte"]["stato"] = "attesa"
+    try:
+        gira(m.amb["conferma_ricezione"](1))
+        prova("senza guardiano («attesa») si paga come ieri", "released",
+              riga(m)[0])
+    finally:
+        m.amb["_ponte"]["stato"] = "ok"
+    # ...e la cassaforte del SaaS col ponte non c'entra
+    m = mondo(invoice="lnbc-incollata", address="", stato="shipped")
+    m.amb["_ponte"]["stato"] = "giu"
+    m.amb["_chiavi_cassaforte"] = lambda nome="": type(
+        "Cf", (), {"nome": "saas", "LNBITS_URL": "http://finto",
+                   "LNBITS_INVOICE_KEY": "k", "LNBITS_ADMIN_KEY": "K"})()
+    try:
+        gira(m.amb["conferma_ricezione"](1))
+        prova("il ponte giu' non ferma un ordine del SaaS", "released",
+              riga(m)[0])
+    finally:
+        m.amb["_ponte"]["stato"] = "ok"
+
+    # --- 6. LNBITS MUTA, poi torna -------------------------------------
+    m = mondo(invoice="lnbc-incollata", address="", stato="delivered")
+    m.nodo.muto = True
+    gira(m.amb["conferma_ricezione"](1))
+    prova("LNbits muta: sospeso, guasto nostro, fattura al suo posto",
+          ("da_riprovare", [("deciso", "conferma", 1),
+                            ("guasto_nostro", "lnbits_muto", 1)], []),
+          (riga(m)[1], passi(m), m.nodo.partiti))
+    gira(m.giro())
+    prova("prima del suo minuto il giro non la tocca", 1, passi(m)[-1][2])
+    m.nodo.muto = False
+    passa_il_tempo(m, 61)
+    gira(m.giro())
+    prova("un minuto dopo, a LNbits tornata, parte da solo", "released",
+          riga(m)[0])
+
+    # --- 7. GUASTO NOSTRO DOPO LA POST, con l'address ------------------
+    # LNbits risponde 520 «non raggiungo LND»: la fattura coniata e'
+    # bruciata, ma dall'address se ne conia un'altra — senza tetto.
+    # E QUI IL RITENTATIVO HA DUE TEMPI, non uno: il nostro (1, 5, 15...)
+    # e quello della VERITA' — un tentativo fallito dopo la chiamata che
+    # paga non si ripete finche' LND non dice che non e' mai partito (un
+    # quarto d'ora: e' il cantiere dei pagamenti in volo, e non si tocca).
+    m = mondo(stato="shipped")
+    a["canarino"](m)
+    m.vero.execute("UPDATE ordini SET payout_tentativi=9")
+    m.vero.commit()
+    # (la fattura 2 e la 4 si coniano e NON si pagano: il giro le conia
+    # prima di sapere che il tentativo di prima non e' ancora chiaro)
+    m.nodo.modi["lnbc-fattura-1"] = (520, "Unable to connect to LND")
+    m.nodo.modi["lnbc-fattura-3"] = (520, "Unable to connect to LND")
+    gira(m.amb["conferma_ricezione"](1))
+    prova("guasto nostro oltre il tetto dei cinque: si ritenta LO STESSO",
+          ("confirmed", "da_riprovare"), riga(m)[:2])
+    prova("...chi vende sente che non e' colpa sua, UNA volta", 1,
+          detti(m, 222, "non per colpa tua"))
+    gira(m.giro())
+    prova("...e prima del minuto non si ribussa", 1, len(m.nodo.partiti))
+    passa_il_tempo(m, 61)
+    gira(m.giro())
+    prova("al suo minuto si riprova, ma PRIMA si chiede a LND: il tentativo "
+          "di prima non e' ancora chiaro, e si aspetta in volo",
+          ("in_volo", 1), (riga(m)[1], len(m.nodo.partiti)))
+    prova("...in volo e NON congelato, anche oltre il tetto: nessun 🧊", 0,
+          sum(1 for x in m.avvisi if "verificare a mano" in x))
+    passa_il_tempo(m, 900)
+    gira(m.ronda())
+    prova("dopo il quarto d'ora LND dice «mai partito»: si ritenta davvero",
+          ("da_riprovare", 2), (riga(m)[1], len(m.nodo.partiti)))
+    prova("...ma chi vende NON lo risente: non e' una notizia", 1,
+          detti(m, 222, "non per colpa tua"))
+    prova("...e i guasti di fila sono DUE, anche con un «in volo» in mezzo",
+          (2, [("guasto_nostro", "ponte", 1), ("in_volo", "", 1),
+               ("guasto_nostro", "ponte", 1)]),
+          (P["_conta_guasti"]([dict(zip(("passo", "motivo", "volte",
+                                         "quando", "ultimo"), r))
+                               for r in m.vero.execute(
+              "SELECT passo, motivo, volte, quando, ultimo FROM "
+              "payout_passi ORDER BY id")])[0], passi(m)[1:]))
+    passa_il_tempo(m, 61)
+    gira(m.giro())
+    prova("...quindi al giro dopo non basta piu' un minuto: ne servono 5",
+          "da_riprovare", riga(m)[1])
+    passa_il_tempo(m, 240)
+    gira(m.giro())
+    passa_il_tempo(m, 900)
+    gira(m.ronda())
+    prova("al terzo tentativo il nodo c'e': arrivato, con la terza fattura",
+          ("released", 3), (riga(m)[0], len(m.nodo.partiti)))
+    prova("...e chi vende ha sentito in tutto DUE cose: il motivo, e "
+          "«Arrivati ✓»", (1, 1, 2),
+          (detti(m, 222, "non per colpa tua"), detti(m, 222, "Arrivati ✓"),
+           sum(1 for c, _ in m.sentite if c == 222)))
+    # ...mentre una ROTTA che manca il tetto ce l'ha ancora
+    m = mondo(stato="shipped")
+    m.vero.execute("UPDATE ordini SET payout_tentativi=9")
+    m.vero.commit()
+    m.nodo.modi["lnbc-fattura-1"] = (520, "no_route")
+    gira(m.amb["conferma_ricezione"](1))
+    prova("una rotta che manca, oltre il tetto, chiede un gesto a chi vende",
+          ("confirmed", "", "serve_fattura", "nessuna_strada"),
+          (riga(m)[0], riga(m)[1], stadio(m)["passo"], stadio(m)["motivo"]))
+
+    # --- 8. LA FATTURA SCADUTA: l'unico gesto, e solo a chi vende ------
+    scaduta = bolt11_finta(1000, 3600, adesso - 4 * 86400)
+    m = mondo(invoice=scaduta, address="", stato="shipped")
+    gira(m.amb["conferma_ricezione"](1))
+    s = stadio(m)
+    prova("fattura scaduta: serve una fattura nuova, e lo dice il motivo",
+          ("confirmed", "serve_fattura", "scaduta", True),
+          (riga(m)[0], s["passo"], s["motivo"], s["gesto_venditore"]))
+    prova("...a chi compra si dice solo che ha finito", (1, 1),
+          (detti(m, 111, "Hai confermato"),
+           sum(1 for c, _ in m.sentite if c == 111)))
+    prova("...a chi vende il SUO messaggio, e non anche «in arrivo»", (1, 0),
+          (detti(m, 222, "è scaduta"),
+           detti(m, 222, "sats sono in arrivo.</b>")))
+    prova("la linea: deciso, non arrivato (scaduta), serve un gesto",
+          [("deciso", "conferma", 1), ("fallito", "scaduta", 1),
+           ("serve_fattura", "scaduta", 1)], passi(m))
+    # nessun metodo: non e' un fallimento, e' un'attesa di chi vende
+    m = mondo(address="", stato="shipped")
+    gira(m.amb["conferma_ricezione"](1))
+    prova("nessun metodo: «in attesa del venditore», senza un fallimento",
+          [("deciso", "conferma", 1), ("serve_fattura", "metodo", 1)],
+          passi(m))
+
+    # --- 9. IL TIMER E LA DISPUTA hanno le loro parole ------------------
+    m = mondo(stato="delivered")
+    m.nodo.modi["lnbc-fattura-1"] = "hold"
+    gira(m.amb["_sblocca_sats"](1, automatico=True))
+    prova("chiuso da un timer: a chi compra NON si dice «hai confermato»",
+          0, detti(m, 111, "Hai confermato"))
+    prova("...e a chi vende si dice che e' scaduto il tempo", 1,
+          detti(m, 222, "Il tempo di conferma è scaduto"))
+    prova("...lo stadio lo sa", "timer", stadio(m)["deciso_da"])
+    m.amb["verifica_utente"] = lambda *x: {"id": 111}
+    e = gira(tenta(m.amb["apri_disputa"](1)))
+    prova("...e il rifiuto non dice «hai confermato» a chi non l'ha fatto",
+          (409, True, False),
+          (getattr(e, "status_code", None),
+           "Il tempo per confermare è scaduto" in str(getattr(e, "detail", "")),
+           "Hai già confermato" in str(getattr(e, "detail", ""))))
+    # un ordine GIA' 'confirmed' da giorni: nessun «hai confermato» oggi
+    m = mondo(stato="confirmed")
+    m.vero.execute("UPDATE ordini SET aggiornato=?", (adesso - 3 * 86400,))
+    m.vero.commit()
+    gira(m.sblocca())
+    prova("un 'confirmed' di tre giorni fa non risveglia nessun compratore",
+          0, sum(1 for c, _ in m.sentite if c == 111 and "Hai confermato" in _))
+    prova("...il suo «deciso» porta la data di allora", adesso - 3 * 86400,
+          m.vero.execute("SELECT quando FROM payout_passi WHERE "
+                         "passo='deciso'").fetchone()[0])
+    prova("...e chi aspettava da giorni sente «Arrivati ✓»", 1,
+          detti(m, 222, "Arrivati ✓"))
+
+    # --- 10. LUNGO = 🧊: un momento solo --------------------------------
+    m = mondo(stato="shipped")
+    m.nodo.modi["lnbc-fattura-1"] = "hold"
+    gira(m.amb["conferma_ricezione"](1))
+    passa_il_tempo(m, L + 60)
+    prova("prima della ronda e' gia' lungo (31 minuti)", True,
+          stadio(m)["lungo"])
+    gira(m.ronda())
+    prova("la ronda si arrende: 'incerto', e il passo «in verifica»",
+          ("incerto", "in_verifica"), (riga(m)[1], passi(m)[-1][0]))
+    prova("...a chi modera parte il 🧊 di sempre, UNO", 1,
+          sum(1 for x in m.avvisi if "Pagamento da verificare a mano" in x))
+    prova("...e alle due parti nessuna parola in piu'", 2, len(m.sentite))
+    # il battito corto lascia stare i congelati
+    chieste = []
+    m.nodo.alla_lnd = lambda: chieste.append(1)
+    gira(m.amb["risolvi_pagamenti_in_volo"](solo_in_volo=True))
+    prova("il battito da un minuto NON richiede i congelati", [], chieste)
+    gira(m.amb["risolvi_pagamenti_in_volo"]())
+    prova("...quello da dieci si'", True, len(chieste) > 0)
+
+    # --- 11. LE SENTINELLE DEL SERVER -----------------------------------
+    corto = pezzo("orologio_pagamenti")
+    prova("il battito corto fa i due giri dei pagamenti, e solo quelli",
+          True, "risolvi_pagamenti_in_volo(solo_in_volo=True)" in corto
+          and "riprova_pagamenti_sospesi()" in corto
+          and corto.index("risolvi_pagamenti_in_volo")
+          < corto.index("riprova_pagamenti_sospesi"))
+    prova("...sotto lo stesso lucchetto dell'orologio grande", (True, 2),
+          ("async with _giro_pagamenti:" in corto,
+           codice(pezzo("orologio")).count("async with _giro_pagamenti:")))
+    prova("...ogni minuto", True, "\nBATTITO_PAGAMENTI_S = 60\n" in src)
+    prova("...e parte all'avvio, col riferimento tenuto vivo", True,
+          "_TASK_PAGAMENTI = asyncio.create_task(orologio_pagamenti())"
+          in pezzo("avvia_orologio"))
+    prova("...senza toccare la rete per sapere se c'e' da fare", False,
+          "await" in codice(pezzo("_pagamenti_da_guardare")))
+    scad = codice(pezzo("controlla_scadenze"))
+    prova("un ordine in pagamento non e' piu' del timer: lo SALTA", True,
+          "        if gia and _in_pagamento(gia):\n            continue\n"
+          in scad and scad.index("_in_pagamento(gia)")
+          < scad.index("_sblocca_sats(oid, automatico=True)"))
+    prova("il sollecito degli incassi tace mentre la palla e' nostra", True,
+          "AND COALESCE(o.payout_stato,'')='' "
+          in codice(pezzo("sollecita_incassi")))
+    pv = codice(pezzo("paga_venditore"))
+    dove = [pv.find(x) for x in ('_ponte.get("stato") == "giu"',
+                                 "_prendi_la_mano(tabella", "c.post(")]
+    prova("il ponte giu' si guarda PRIMA della mano e della POST", True,
+          -1 not in dove and dove == sorted(dove))
+    prova("...e solo per la cassaforte del nodo", True,
+          'cf.nome == CASSAFORTE_NODO and _ponte.get("stato") == "giu"' in pv)
+    prova("il quarto verbo segna il passo in UN posto, per le quattro uscite",
+          (1, True), (codice(src).count("PASSO_GUASTO,\n                 "
+                                        "motivo or MOTIVO_LNBITS_MUTO)"),
+                      "_segna_passo(" in pezzo("_sospendi_pagamento")))
+    prova("«deciso» committa subito: la connessione resta aperta un minuto",
+          True, "con.commit()" in codice(pezzo("_segna_deciso")))
+    for rotta in ("conferma_ricezione", "apri_disputa",
+                  "sollecita_acquirente"):
+        prova(f"{rotta} passa dalla guardia", True,
+              "if _in_pagamento(o):" in codice(pezzo(rotta)))
+    prova("la lista degli ordini porta lo stadio, e solo dove c'e'", True,
+          'r["pagamento"] = stadi[r["id"]]' in pezzo("miei_ordini"))
+    prova("...e il pannello di chi modera lo STESSO", True,
+          "_stadi_ordini(con, list(interi.values()))"
+          in pezzo("coda_pagamenti"))
+    prova("nessuno stato nuovo: la regola 4 non si e' mossa", False,
+          "'in_pagamento'" in src or '"in_pagamento"' in src)
+
+    # --- 12. IL CLIENT ---------------------------------------------------
+    prova("lo stadio arriva al client", True,
+          "pagamento:o.pagamento||null," in mini)
+    diz = pezzo_js(mini, "const PASSI_PAGAMENTO = {", "\n};")
+    for nome in NOMI_IN_PAGAMENTO:
+        if nome.startswith("PASSO_"):
+            prova(f"il client ha le parole per il passo «{P[nome]}»", True,
+                  f"\n  {P[nome]}:" in diz)
+    prova("...compreso lo spazio dell'on-chain, ~10 min", True,
+          "attesa_conferme: 'In attesa di conferma, ~10 min'" in diz)
+    motivi = pezzo_js(mini, "const MOTIVI_PAGAMENTO = {", "\n};")
+    S_ = ambiente_scadenza()
+    for nome in sorted(k for k in S_ if k.startswith("MOTIVO_")):
+        prova(f"...e per il motivo «{S_[nome]}»", True,
+              f"{S_[nome]}:" in motivi)
+    frase = pezzo_js(mini, "function frasePagamento(o){", "\n}\n")
+    for chi, parole in (
+            ("chi compra", "<b>Hai fatto tutto</b>: ora tocca a Barattolo "
+                           "consegnare i sats a ${chi}."),
+            ("chi vende", "stanno arrivando."),
+            ("chi vende, col gesto", "<b>serve un tuo gesto</b>"),
+            ("tutti, oltre il limite", "Ci sta mettendo più del solito: ci "
+                                       "stiamo lavorando noi, non devi fare "
+                                       "niente."),
+            ("chi modera", "Barattolo sta consegnando")):
+        prova(f"le parole per {chi}", True, parole in frase)
+    prova("lo stato vivo dice «fallito: serve una fattura nuova»", True,
+          "'fallito: serve una fattura nuova'"
+          in pezzo_js(mini, "function statoPagamento(p){", "\n}\n"))
+    ordine = mini[mini.index("function openOrder(id){"):]
+    ordine = ordine[:ordine.index("/* ---- feedback reciproco")]
+    for nome, spia in (
+            ("«libera i sats»", "o.role==='buyer' && !inPagamento(o) && "
+                                "(['delivered'].includes(s)"),
+            ("«apri disputa»", "['locked','shipped','delivered'].includes(s)"
+                               " && !inPagamento(o) ? `<button class=\"btn "
+                               "allarme\""),
+            ("«sollecita»", "!inPagamento(o) && o.role==='seller' && "
+                            "s==='shipped' ?")):
+        prova(f"a conferma data {nome} non si offre piu'", True,
+              spia in ordine)
+    prova("il pannello sta nella pagina dell'ordine, per tutti e tre", True,
+          "${pannelloPagamento(o)}" in ordine)
+    prova("...e il campo della fattura va in evidenza solo se serve", True,
+          "o.pagamento.gesto_venditore ? ' pag-evidenza' : ''" in mini)
+    prova("...e tace quando chi vende non deve fare niente", True,
+          "!(inPagamento(o) && !o.pagamento.gesto_venditore) ? "
+          "payoutPanel(o)" in ordine)
+    prova("la lista dice «In pagamento»", True, "'💸 In pagamento'" in mini)
+    cr = mini[mini.index("async function confirmReceived"):]
+    cr = cr[:cr.index("\nasync function")]
+    # NEL SUO RAMO, non in tutta la funzione: anche il ramo accanto
+    # rilegge, e cercando largo la prova restava verde a rilettura tolta
+    # (l'ha trovato la tortura)
+    mite = cr[cr.find("d.non_chiesto || d.in_volo || d.incerto"):]
+    mite = mite[:mite.find("return;")]
+    prova("dopo la conferma l'ordine si RILEGGE dal server", True,
+          "await loadOrders()" in mite and "openOrder(id)" in cr)
+    prova("...e a chi ha comprato non si racconta il guasto", False,
+          "problema nostro" in cr)
+    prova("chi modera vede lo stesso stadio nella riga del 🧊", True,
+          "statoPagamento(p.pagamento)" in mini
+          and "lineaPagamento(p.pagamento)" in mini)
+    node = shutil.which("node")
+    if not node:
+        salta("le parole del client girano davvero", "node non c'e'")
+    else:
+        casi = []
+        for ruolo in ("buyer", "seller", "admin"):
+            for st in (stadio_finto for stadio_finto in (
+                    {"passo": "in_volo", "motivo": ""},
+                    {"passo": "in_verifica", "motivo": "", "lungo": True},
+                    {"passo": "riparte", "motivo": "ponte", "nostro": True,
+                     "prossimo": adesso + 300},
+                    {"passo": "riparte", "motivo": "nessuna_strada"},
+                    {"passo": "serve_fattura", "motivo": "scaduta",
+                     "gesto_venditore": True},
+                    {"passo": "serve_fattura", "motivo": "metodo",
+                     "gesto_venditore": True},
+                    {"passo": "arrivato", "motivo": ""})):
+                casi.append({"role": ruolo, "state": "shipped",
+                             "usernameVenditore": "pedro",
+                             "pagamento": dict(
+                                 {"via": "lightning", "deciso_da": "conferma",
+                                  "sats": 1000, "da": adesso, "lungo": False,
+                                  "nostro": False, "prossimo": 0,
+                                  "gesto_venditore": False,
+                                  "linea": [{"passo": "deciso",
+                                             "motivo": "conferma",
+                                             "quando": adesso, "volte": 1,
+                                             "ultimo": adesso},
+                                            {"passo": "guasto_nostro",
+                                             "motivo": "ponte",
+                                             "quando": adesso, "volte": 5,
+                                             "ultimo": adesso}]}, **st)})
+        i = mini.index("const PASSI_PAGAMENTO = {")
+        j = mini.index("\nfunction payoutPanel(o){")
+        js = ("const esc = s => String(s); const fmt = n => String(n);\n"
+              + mini[i:j] + "\nconsole.log(JSON.stringify("
+              + json.dumps(casi) + ".map(o => [o.role, o.pagamento.passo, "
+              "o.pagamento.motivo, statoPagamento(o.pagamento), "
+              "frasePagamento(o), pannelloPagamento(o)])));\n")
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                         encoding="utf-8") as f:
+            f.write(js)
+        try:
+            out = subprocess.run([node, f.name], capture_output=True,
+                                 encoding="utf-8", timeout=60)
+            righe = json.loads(out.stdout or "[]")
+        finally:
+            os.unlink(f.name)
+        prova("le parole del client girano davvero: 21 casi, nessun errore",
+              (21, ""), (len(righe), (out.stderr or "")[:200]))
+        tutte = {(r[0], r[1], r[2]): r for r in righe}
+        prova("nessuna frase esce con un «undefined» dentro", [],
+              [k for k, r in tutte.items() if "undefined" in r[4] + r[5]])
+        prova("a chi COMPRA non si nomina mai un guasto, ne' nostro ne' suo",
+              [], [k for k, r in tutte.items() if k[0] == "buyer"
+                   and ("intoppo" in r[4] or "nodo" in r[4])])
+        prova("a chi compra: «Hai fatto tutto»", True,
+              "Hai fatto tutto" in tutte[("buyer", "in_volo", "")][4])
+        prova("a chi vende, guasto nostro: «non dalla tua», e nessun gesto",
+              (True, True, False),
+              ("non dalla tua" in tutte[("seller", "riparte", "ponte")][4],
+               "Non devi fare niente" in tutte[("seller", "riparte",
+                                                "ponte")][4],
+               "Incolla" in tutte[("seller", "riparte", "ponte")][4]))
+        prova("a chi vende, fattura scaduta: il gesto e il motivo",
+              (True, True),
+              ("serve un tuo gesto" in tutte[("seller", "serve_fattura",
+                                              "scaduta")][4],
+               "la fattura era scaduta" in tutte[("seller", "serve_fattura",
+                                                  "scaduta")][4]))
+        prova("il gesto si chiede SOLO a chi vende", [],
+              [k for k, r in tutte.items() if k[0] != "seller"
+               and "Incolla" in r[4]])
+        prova("«ci stiamo lavorando» a tutti e due, quando e' lungo",
+              (True, True),
+              tuple("ci stiamo lavorando noi" in tutte[(chi, "in_verifica",
+                                                        "")][4]
+                    for chi in ("buyer", "seller")))
+        prova("la linea comprime: «5 volte»", True,
+              "5 volte" in tutte[("admin", "in_volo", "")][5])
 
 
 def prove_pagamento_incerto():
@@ -9375,7 +10195,7 @@ def prove_nascondi_ordine():
                "pulisci_ordini_fantasma": lambda con: None,
                "e_admin": lambda tg: False,
                "stima_taglia_set": lambda t: "",
-               "json": __import__("json")}
+               "json": __import__("json"), **ambiente_in_pagamento()}
         exec(pezzo("_titolo_ordine"), amb)
         exec(pezzo("miei_ordini"), amb)
         return {r["id"]: r for r in amb["miei_ordini"](0, "", "")}
@@ -32450,7 +33270,8 @@ def prove_sollecito_a_comando():
         amb = {"db": Con, "HTTPException": _H, "notifica": _notifica,
                "time": type("t", (), {"time": staticmethod(lambda: ORA)}),
                "Header": lambda d="": d, "Cookie": lambda d="": d,
-               "verifica_utente": lambda h, s: {"id": chi}}
+               "verifica_utente": lambda h, s: {"id": chi},
+               **ambiente_in_pagamento()}
         exec("async " + pezzo("sollecita_acquirente"), amb)
         try:
             esito = asyncio.new_event_loop().run_until_complete(
@@ -62279,7 +63100,7 @@ def prove_porta_timer():
                # mai: `if esito == NON_CHIESTO:` si valuta a OGNI giro,
                # e senza il nome la prova ESPLODE invece di fallire.
                "INCERTO": "incerto", "NON_CHIESTO": "non_chiesto", "OCCUPATO": "occupato",
-               "LnbitsMuto": LnbitsMuto}
+               "LnbitsMuto": LnbitsMuto, **ambiente_in_pagamento()}
         # il diario di set 2026: qui non ha niente da scrivere — non si
         # e' mai chiesto niente a nessuno — e la prova sta proprio nel
         # fatto che la riga non si muove
@@ -62973,6 +63794,7 @@ def prove_servizi():
                "_lucchetti_ordine": __import__("collections").defaultdict(
                    __import__("asyncio").Lock),
                "_quando_appuntamento": _a["_quando_appuntamento"],
+               **ambiente_in_pagamento(),
                "app": type("a", (), {"post": lambda *a, **k:
                                      (lambda f: f)})()}
         # `pezzo` taglia dal `def`, quindi l'`async` va rimesso: e' la
@@ -72258,6 +73080,7 @@ def main():
               prove_nome_da_nostr,
               prove_pagamento_incerto, prove_esito_pagamento,
               prove_pagamenti_in_volo, prove_fatture_scadute,
+              prove_in_pagamento,
               prove_doppio_wallet, prove_saas_senza_doveri, prove_orfani, prove_capitale_cassa,
               prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,

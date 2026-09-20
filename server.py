@@ -6416,6 +6416,30 @@ def init_db():
         "hash TEXT NOT NULL, quando INTEGER NOT NULL DEFAULT 0, "
         "esito TEXT NOT NULL DEFAULT '', "
         "PRIMARY KEY(tabella, riga_id, hash))")
+    # I PASSI DEL PAGAMENTO (set 2026, lo stadio «in pagamento»): la
+    # linea del tempo di un'uscita, una riga per passaggio. PERCHE' UNA
+    # TABELLA e non lo stato derivato e basta: lo STADIO si deriva
+    # (`stadio_pagamento`: stato + payout_stato + payout_verso, nessuno
+    # stato nuovo — regola 4), ma le DATE dei passaggi non stavano
+    # scritte da nessuna parte: `payout_tentati` sa quando e' PARTITO un
+    # hash, non quando si e' deciso, quando si e' chiesta una fattura
+    # nuova, quando il nodo taceva. E una data che non e' stata scritta
+    # non si deriva. `volte` e `ultimo` comprimono i passi uguali di
+    # fila — un nodo giu' per un giorno e' UNA riga «ritentato 27
+    # volte», non ventisette — e sono anche il contatore del
+    # ritentativo per cause nostre (`BACKOFF_NOSTRO`). `via` e' lo
+    # spazio dell'on-chain: oggi vale sempre 'lightning'.
+    con.execute(
+        "CREATE TABLE IF NOT EXISTS payout_passi("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "tabella TEXT NOT NULL, riga_id INTEGER NOT NULL, "
+        "passo TEXT NOT NULL, motivo TEXT NOT NULL DEFAULT '', "
+        "via TEXT NOT NULL DEFAULT 'lightning', "
+        "quando INTEGER NOT NULL DEFAULT 0, "
+        "ultimo INTEGER NOT NULL DEFAULT 0, "
+        "volte INTEGER NOT NULL DEFAULT 1)")
+    con.execute("CREATE INDEX IF NOT EXISTS payout_passi_riga "
+                "ON payout_passi(tabella, riga_id, id)")
     # LA CASSAFORTE DI OGNI RIGA (set 2026, il doppio wallet): in quale
     # LNbits vivono i sats di questa riga — 'saas' o 'nodo'. Il DEFAULT
     # e' il SaaS apposta: tutto il pregresso e' nato la', e una colonna
@@ -8394,6 +8418,26 @@ async def paga_venditore(invoice: str, atteso_sats: int,
         #    E' la cintura della scadenza, al suo secondo passaggio.
         if scade_presto:
             return await _non_si_tenta()
+        # 2c. IL PONTE GIU' NON SI SFIDA (set 2026, lo stadio «in
+        #    pagamento»). Se il guardiano dice che LND non si raggiunge,
+        #    chiedere a LNbits di pagare vuol dire farle scrivere una
+        #    riga `failed` su una fattura BUONA — e da li' quella bolt11
+        #    e' bruciata: a chi l'aveva incollata toccherebbe darcene
+        #    un'altra per un guasto NOSTRO. Qui invece non parte niente,
+        #    la fattura resta al suo posto, e l'orologio ci torna da
+        #    solo (`BACKOFF_NOSTRO`). E' il quarto verbo: sta PRIMA
+        #    della mano e prima della chiamata che paga, come i suoi
+        #    fratelli. Dove il guardiano non gira `_ponte` resta
+        #    «attesa» e questa riga non morde: e' il comportamento di
+        #    ieri.
+        if cf.nome == CASSAFORTE_NODO and _ponte.get("stato") == "giu":
+            taccuino["motivo"] = MOTIVO_PONTE
+            if phash not in miei:
+                taccuino.pop("hash", None)
+            print(f"🔁 Pagamento NON CHIESTO: il ponte verso LND e' giu' "
+                  f"({tabella}#{riga_id}). Niente e' partito, la fattura "
+                  f"resta buona: si riprova da soli.", flush=True)
+            return NON_CHIESTO
         # 3. LA MANO. Da qui in poi la riga dice 'in_volo' col nome di
         #    questo pagamento, PRIMA che LNbits senta qualcosa.
         if not _prendi_la_mano(tabella, riga_id, verso, phash):
@@ -8754,7 +8798,8 @@ def _in_volo(con, tabella: str, riga_id: int, verso: str):
     con.close()
 
 
-def _sospendi_pagamento(con, tabella: str, riga_id: int, verso: str):
+def _sospendi_pagamento(con, tabella: str, riga_id: int, verso: str,
+                        motivo: str = ""):
     """Il gemello mite di `_congela_pagamento`: non abbiamo potuto
     CHIEDERE, quindi non c'e' niente da congelare e nessuno da avvisare
     — si timbra la riga perche' il giro dell'orologio sappia dove
@@ -8776,11 +8821,412 @@ def _sospendi_pagamento(con, tabella: str, riga_id: int, verso: str):
     `payout_verso` invece si scrive, perche' CHI aspettava i sats non si
     deduce dallo stato: un ordine in disputa puo' essere sulla strada del
     venditore o su quella del compratore, e indovinare vorrebbe dire
-    riprovare a favore della persona sbagliata."""
+    riprovare a favore della persona sbagliata.
+
+    E SEGNA IL PASSO (set 2026): «guasto nostro», con `volte` che sale a
+    ogni giro a vuoto di fila. E' il contatore di `BACKOFF_NOSTRO`, e
+    sta QUI — nel timbro unico del quarto verbo — cosi' vale per tutte
+    e quattro le uscite senza quattro copie. Prima il quarto verbo si
+    ritentava a OGNI battito, per sempre: a dieci minuti andava bene, a
+    un minuto sarebbe bussare 1.440 volte al giorno al Lightning
+    address di chi aspetta."""
+    _segna_passo(con, tabella, riga_id, PASSO_GUASTO,
+                 motivo or MOTIVO_LNBITS_MUTO)
     con.execute(f"UPDATE {tabella} SET payout_stato='da_riprovare', "
                 "payout_verso=? WHERE id=?", (verso, riga_id))
     con.commit()
     con.close()
+
+
+# ============ LO STADIO «IN PAGAMENTO» (set 2026) =====================
+# Quando chi compra conferma, la SUA parte e' finita: da li' portare i
+# sats a chi vende e' responsabilita' di Barattolo. Fino a ieri quel
+# tempo — secondi se va bene, giorni se il payout inciampa, minuti o ore
+# il giorno dell'on-chain — non lo vedeva nessuno: l'ordine restava
+# com'era e poi saltava a 'released'. Chi aveva comprato non sapeva se
+# aveva finito (e vedeva ancora «Conferma» e «Apri disputa»), chi
+# vendeva non sapeva se i sats arrivavano, e un ponte giu' NOSTRO
+# sembrava colpa loro.
+# LO STADIO SI DERIVA, NON SI SCRIVE: `stadio_pagamento` e' il giudice
+# unico e legge `stato` + `payout_stato` + `payout_verso`. Nessuno
+# stato nuovo (regola 4): 'confirmed' resta «i sats spettano a chi
+# vende, manca il modo di darglieli», e i rami miti — in volo, in
+# verifica, sospeso — restano sullo stato di prima, col timbro che dice
+# il resto. La sola cosa che si SCRIVE sono le date (`payout_passi`).
+VIA_LIGHTNING, VIA_ONCHAIN = "lightning", "onchain"
+# OLTRE QUESTO, «ci stiamo lavorando»: e' LO STESSO numero dopo il quale
+# la ronda si arrende e manda il 🧊 ai moderatori (`_arrenditi_in_volo`),
+# e non un secondo orologio — cosi' il momento in cui le due parti
+# leggono «ci stiamo lavorando noi» e' quello in cui una persona e'
+# stata chiamata davvero. Un 'incerto' e' lungo per definizione.
+IN_PAGAMENTO_LUNGO_S = IN_VOLO_LIMITE_S
+# IL RITENTATIVO PER CAUSE NOSTRE: 1, 5, 15, 30 minuti, poi ogni ora,
+# SENZA TETTO. Non e' `BACKOFF_PAYOUT`, e la differenza e' la natura del
+# guasto: quello e' tarato su una ROTTA che manca (torna in ore, e si
+# bussa al wallet di un terzo: cinque volte e basta), questo su un
+# guasto NOSTRO — LNbits muta, il ponte giu', il nodo giu' — che torna
+# in minuti e durante il quale a nessun terzo si bussa davvero. Chi
+# aspetta i sats non deve fare niente e non deve sentire niente: un
+# nodo giu' per un'ora sono righe nel journal e un payout un'ora dopo.
+BACKOFF_NOSTRO = (60, 300, 900, 1800, 3600)
+MOTIVO_LNBITS_MUTO = "lnbits_muto"
+MOTIVI_NOSTRI = (MOTIVO_SALDO, MOTIVO_PONTE, MOTIVO_LNBITS_MUTO)
+(PASSO_DECISO, PASSO_PARTITO, PASSO_IN_VOLO, PASSO_IN_VERIFICA,
+ PASSO_GUASTO, PASSO_FALLITO, PASSO_SERVE, PASSO_ARRIVATO,
+ PASSO_RIPARTE, PASSO_CONFERME) = (
+    "deciso", "partito", "in_volo", "in_verifica", "guasto_nostro",
+    "fallito", "serve_fattura", "arrivato", "riparte",
+    # lo spazio dell'on-chain: oggi non lo scrive nessuno, ma la linea
+    # del tempo del client lo sa gia' leggere («in attesa di conferma»)
+    "attesa_conferme")
+
+
+def _segna_passo(con, tabella: str, riga_id: int, passo: str,
+                 motivo: str = "", via: str = VIA_LIGHTNING,
+                 quando: int = 0) -> bool:
+    """Un passaggio nella linea del tempo. Torna True se la riga e'
+    NUOVA, False se era lo stesso passo di prima (stesso motivo) e si e'
+    solo alzato `volte`: chi chiama lo usa per non ridire a nessuno una
+    cosa gia' detta. NON COMMITTA: la connessione e' di chi chiama.
+    SOTTO TRY, e in caso di guaio dice True: una linea del tempo non
+    ferma un pagamento, e nel dubbio un avviso in piu' e' meglio di uno
+    in meno. `tabella` e' un letterale del nostro codice."""
+    try:
+        adesso = int(time.time())
+        u = con.execute(
+            "SELECT id, passo, motivo FROM payout_passi WHERE tabella=? "
+            "AND riga_id=? ORDER BY id DESC LIMIT 1",
+            (tabella, riga_id)).fetchone()
+        if u and u[1] == passo and (u[2] or "") == (motivo or ""):
+            con.execute("UPDATE payout_passi SET volte=volte+1, ultimo=? "
+                        "WHERE id=?", (adesso, u[0]))
+            return False
+        con.execute(
+            "INSERT INTO payout_passi(tabella, riga_id, passo, motivo, "
+            "via, quando, ultimo) VALUES(?,?,?,?,?,?,?)",
+            (tabella, riga_id, passo, motivo or "", via,
+             quando or adesso, quando or adesso))
+        return True
+    except Exception as e:
+        print(f"⚠️ Passo del pagamento non scritto ({tabella}#{riga_id}, "
+              f"{passo}): {e}")
+        return True
+
+
+def _segna_deciso(con, ordine_id: int, o, automatico: bool) -> bool:
+    """IL PRIMO PASSO: «da qui tocca a Barattolo». Si scrive una volta
+    sola — se la riga ha gia' una linea del tempo non fa niente — e
+    torna True solo in quel giro: e' il «primo giro» degli avvisi.
+    COMMITTA SUBITO, ed e' la riga da non togliere: questa connessione
+    resta aperta per tutto `paga_venditore`, cioe' fino a un minuto, e
+    una scrittura non committata terrebbe il lucchetto di SQLite proprio
+    mentre `_prendi_la_mano` deve scrivere dalla sua.
+    CHI HA DECISO si dice: una conferma, un timer o un moderatore — le
+    parole per chi compra non possono essere le stesse («Hai fatto
+    tutto» a chi ha perso una disputa sarebbe una presa in giro).
+    Un ordine GIA' 'confirmed' (quelli di ieri, nati prima di questa
+    tabella) prende l'ora di `aggiornato`, che e' quando ci e' entrato:
+    e per lui NON e' un primo giro — nessuno deve sentirsi dire oggi
+    «hai confermato» di una conferma di tre giorni fa.
+    SE LA LINEA DEL TEMPO NON SI PUO' LEGGERE dice True, cioe' «primo
+    giro»: senza la sua memoria il pagamento si comporta come prima di
+    questo cantiere, coi messaggi di sempre."""
+    try:
+        if con.execute("SELECT 1 FROM payout_passi WHERE tabella='ordini' "
+                       "AND riga_id=? LIMIT 1", (ordine_id,)).fetchone():
+            return False
+        da = ("disputa" if (o["disputata"] or o["stato"] == "dispute")
+              else "timer" if (automatico or o["sbloccato_auto_il"])
+              else "conferma")
+        vecchio = o["stato"] == "confirmed"
+        _segna_passo(con, "ordini", ordine_id, PASSO_DECISO, da,
+                     quando=int(o["aggiornato"] or 0) if vecchio else 0)
+        con.commit()
+        return not vecchio
+    except Exception as e:
+        print(f"⚠️ Passo «deciso» non scritto (ordine #{ordine_id}): {e}")
+        return True
+
+
+def _ultimo_passo(con, tabella: str, riga_id: int):
+    """L'ultimo passo scritto per quella riga, o None."""
+    try:
+        r = con.execute(
+            "SELECT passo, motivo, quando, ultimo, volte FROM payout_passi "
+            "WHERE tabella=? AND riga_id=? ORDER BY id DESC LIMIT 1",
+            (tabella, riga_id)).fetchone()
+    except Exception:
+        return None
+    return ({"passo": r[0], "motivo": r[1] or "", "quando": int(r[2] or 0),
+             "ultimo": int(r[3] or 0), "volte": int(r[4] or 1)}
+            if r else None)
+
+
+def _conta_guasti(passi) -> tuple:
+    """I GUASTI NOSTRI DI FILA, dal piu' recente all'indietro: `(volte,
+    ora dell'ultimo)`, o `(0, 0)` se l'ultima cosa successa non e' un
+    guasto nostro. PURA: `passi` sono dizionari, in ordine di tempo.
+    «In volo» e «in verifica» NON spezzano la fila, ed e' il punto: un
+    tentativo fallito DOPO la chiamata che paga passa sempre di li' —
+    prima di riprovare si aspetta che LND dica che non e' mai partito —
+    e senza questa riga il conto ripartirebbe da uno a ogni giro, cioe'
+    si ribusserebbe ogni minuto per sempre."""
+    volte = ultimo = 0
+    for p in reversed(list(passi or ())):
+        if p["passo"] == PASSO_GUASTO:
+            volte += int(p["volte"] or 1)
+            ultimo = ultimo or int(p["ultimo"] or p["quando"] or 0)
+        elif p["passo"] in (PASSO_IN_VOLO, PASSO_IN_VERIFICA) and volte:
+            continue
+        else:
+            break
+    return volte, ultimo
+
+
+def _gia_detto(con, tabella: str, riga_id: int, passo: str,
+               motivo: str) -> bool:
+    """A chi aspetta i sats QUESTO l'abbiamo gia' detto? Vero se l'ultimo
+    intoppo scritto (guasto, fallimento, richiesta di un gesto) e' lo
+    stesso passo con lo stesso motivo. Si chiede PRIMA di segnare il
+    passo nuovo. Nel dubbio dice False: un avviso in piu' e' meglio di
+    uno in meno."""
+    try:
+        r = con.execute(
+            "SELECT passo, motivo FROM payout_passi WHERE tabella=? AND "
+            "riga_id=? AND passo IN (?,?,?) ORDER BY id DESC LIMIT 1",
+            (tabella, riga_id, PASSO_GUASTO, PASSO_FALLITO,
+             PASSO_SERVE)).fetchone()
+        return bool(r and r[0] == passo and (r[1] or "") == (motivo or ""))
+    except Exception:
+        return False
+
+
+def _quando_ritentare_nostro(volte: int, ultimo: int) -> int:
+    """Da che momento si ribussa dopo un guasto NOSTRO: 1, 5, 15, 30
+    minuti, poi ogni ora, per sempre. `volte` sono i giri a vuoto di
+    fila, `ultimo` l'ora dell'ultimo."""
+    passo = BACKOFF_NOSTRO[min(max(volte - 1, 0), len(BACKOFF_NOSTRO) - 1)]
+    return (ultimo or 0) + passo
+
+
+def _tocca_riprovare(con, tabella: str, r, adesso: int) -> bool:
+    """Questa riga 'da_riprovare' e' di turno? Se l'ultima cosa successa
+    e' un guasto nostro decide `BACKOFF_NOSTRO`; altrimenti la cadenza
+    di sempre (`_quando_ritentare`: una rotta che manca)."""
+    try:
+        passi = [{"passo": p[0], "quando": p[1], "ultimo": p[2],
+                  "volte": p[3]} for p in con.execute(
+            "SELECT passo, quando, ultimo, volte FROM payout_passi WHERE "
+            "tabella=? AND riga_id=? ORDER BY id", (tabella, r["id"]))]
+    except Exception:
+        passi = []
+    volte, ultimo = _conta_guasti(passi)
+    if volte:
+        return _quando_ritentare_nostro(volte, ultimo) <= adesso
+    return _quando_ritentare(r["payout_tentativi"] or 0,
+                             r["payout_ultimo"] or 0) <= adesso
+
+
+def _campo(o, chiave: str, vuoto=""):
+    """Una colonna da una riga che puo' essere un sqlite3.Row o un dict
+    (la lista degli ordini lavora sui dict)."""
+    try:
+        return (o[chiave] if chiave in o.keys() else vuoto) or vuoto
+    except Exception:
+        return vuoto
+
+
+def _in_pagamento(o) -> bool:
+    """LA DECISIONE E' PRESA e i sats stanno andando a chi vende. Vale
+    'confirmed', e vale ogni stato aperto su cui un'uscita verso il
+    VENDITORE e' in volo, in verifica o sospesa. E' la guardia della
+    CONFERMA DEFINITIVA: da qui non si riconferma, non si apre una
+    disputa, non si sollecita, e nessun timer ci ripassa sopra. Prima
+    un ordine col payout sospeso restava 'shipped': chi aveva
+    confermato poteva aprire una disputa, e il giro dell'orologio
+    pagava il venditore lo stesso, a disputa aperta."""
+    stato = _campo(o, "stato")
+    if stato == "confirmed":
+        return True
+    return (stato in ("locked", "shipped", "delivered", "dispute")
+            and _campo(o, "payout_verso") == "venditore"
+            and _campo(o, "payout_stato") in ("in_volo", "incerto",
+                                              "da_riprovare"))
+
+
+def _rifiuto_in_pagamento(o, gesto: str) -> str:
+    """Le parole per chi prova un gesto su un ordine gia' deciso. Dicono
+    CHI ha deciso: «hai gia' confermato» a chi si e' visto chiudere
+    l'affare da un timer sarebbe falso."""
+    if _campo(o, "sbloccato_auto_il", 0) and not _campo(o, "disputata", 0):
+        testa = ("Il tempo per confermare è scaduto e i sats stanno "
+                 "andando al venditore")
+    elif _campo(o, "disputata", 0):
+        testa = ("La disputa è già stata decisa e i sats stanno andando "
+                 "al venditore")
+    else:
+        testa = ("Hai già confermato la ricezione: la conferma è "
+                 "definitiva e i sats stanno andando al venditore")
+    if gesto == "conferma":
+        return f"{testa}. Ci pensa Barattolo: non devi fare altro."
+    if gesto == "sollecita":
+        return ("La ricezione è già confermata: i tuoi sats stanno "
+                "arrivando, ci pensa Barattolo.")
+    return (f"{testa}. Se c'è un problema scrivi ai moderatori col numero "
+            f"dell'ordine.")
+
+
+def stadio_pagamento(o, passi=(), tentati=(), adesso: int = 0):
+    """IL GIUDICE UNICO DELLO STADIO «💸 In pagamento al venditore».
+    PURO: niente rete, niente database, l'ora arriva da fuori. Lo
+    leggono la pagina dell'ordine, la lista, il pannello dei moderatori
+    — tutti la stessa risposta, o un giorno ne dicono due.
+
+    None = l'ordine non e' in pagamento (e non ci e' mai passato).
+    Altrimenti: `passo` e' lo stato VIVO — in_volo, in_verifica,
+    riparte (si ritenta da soli), serve_fattura (l'unico che chiede un
+    gesto, e solo a chi vende), arrivato — con `motivo` in una parola
+    delle otto di `_motivo_payout` (piu' 'lnbits_muto', 'metodo',
+    'fattura'), `nostro` se il guasto e' di casa, `lungo` oltre
+    `IN_PAGAMENTO_LUNGO_S` (solo quando la palla e' NOSTRA: chi vende
+    che non ci da' un metodo non e' «ci stiamo lavorando»), `prossimo`
+    = quando si riprova, `via` = lightning (domani onchain), e `linea`
+    = la linea del tempo, coi passi uguali di fila gia' compressi."""
+    stato = _campo(o, "stato")
+    passi = list(passi or ())
+    arrivato = stato == "released"
+    if arrivato and not passi:
+        return None          # gli affari di ieri: nessuna storia da dire
+    if not arrivato and not _in_pagamento(o):
+        return None
+    adesso = adesso or int(time.time())
+    ps = _campo(o, "payout_stato")
+    passo = (PASSO_ARRIVATO if arrivato
+             else PASSO_IN_VOLO if ps == "in_volo"
+             else PASSO_IN_VERIFICA if ps in ("incerto", "uscito")
+             else PASSO_RIPARTE if ps == "da_riprovare"
+             else PASSO_SERVE)
+    motivo = ""
+    if passo in (PASSO_RIPARTE, PASSO_SERVE):
+        for p in reversed(passi):
+            if p["passo"] in (PASSO_GUASTO, PASSO_FALLITO, PASSO_SERVE):
+                motivo = p["motivo"] or ""
+                break
+        if passo == PASSO_SERVE and not motivo:
+            motivo = "metodo"
+    deciso = next((p for p in passi if p["passo"] == PASSO_DECISO), None)
+    da = int((deciso or (passi[0] if passi else {})).get("quando")
+             or _campo(o, "aggiornato", 0) or 0)
+    nostra = passo in (PASSO_IN_VOLO, PASSO_IN_VERIFICA, PASSO_RIPARTE)
+    lungo = bool(nostra and (ps == "incerto"
+                             or (da and adesso - da > IN_PAGAMENTO_LUNGO_S)))
+    prossimo = 0
+    if passo == PASSO_RIPARTE:
+        volte, ultimo = _conta_guasti(passi)
+        prossimo = (_quando_ritentare_nostro(volte, ultimo) if volte else
+                    _quando_ritentare(_campo(o, "payout_tentativi", 0),
+                                      _campo(o, "payout_ultimo", 0)))
+    via = (passi[-1].get("via") if passi else "") or VIA_LIGHTNING
+    # la linea: i passi scritti, piu' «partito» per ogni hash tentato —
+    # quell'ora la sa `payout_tentati`, scritta dalla mano PRIMA della
+    # chiamata che paga, ed e' piu' vera di qualunque timbro a cose fatte
+    rango = {PASSO_DECISO: 0, PASSO_PARTITO: 1}
+    linea = [{"passo": p["passo"], "motivo": p["motivo"] or "",
+              "quando": int(p["quando"] or 0),
+              "ultimo": int(p["ultimo"] or 0),
+              "volte": int(p["volte"] or 1),
+              "via": p.get("via") or VIA_LIGHTNING} for p in passi]
+    linea += [{"passo": PASSO_PARTITO, "motivo": "", "quando": int(q or 0),
+               "ultimo": int(q or 0), "volte": 1, "via": via}
+              for _, q, _ in (tentati or ()) if q]
+    linea.sort(key=lambda x: (x["quando"], rango.get(x["passo"], 2)))
+    return {
+        "via": via, "passo": passo, "motivo": motivo,
+        "nostro": motivo in MOTIVI_NOSTRI,
+        "deciso_da": ((deciso or {}).get("motivo")
+                      or ("disputa" if _campo(o, "disputata", 0)
+                          else "timer" if _campo(o, "sbloccato_auto_il", 0)
+                          else "conferma")),
+        "da": da, "lungo": lungo, "prossimo": int(prossimo or 0),
+        "gesto_venditore": passo == PASSO_SERVE,
+        "sats": netto_venditore(int(_campo(o, "prezzo_sats", 0))
+                                - int(_campo(o, "protezione_sats", 0))),
+        "linea": linea,
+    }
+
+
+def _stadi_ordini(con, righe: list) -> dict:
+    """Lo stadio di ogni ordine della lista che ne ha uno: DUE query per
+    tutti, non due per ordine. `righe` sono dict con le colonne di
+    `ordini`. Fail-open: se la linea del tempo non si legge, lo stadio
+    esce lo stesso, senza linea."""
+    ids = [r["id"] for r in righe
+           if r.get("stato") == "released" or _in_pagamento(r)]
+    if not ids:
+        return {}
+    passi: dict[int, list] = {}
+    tentati: dict[int, list] = {}
+    try:
+        for i in range(0, len(ids), 500):
+            pezzo = ids[i:i + 500]
+            seg = ",".join("?" * len(pezzo))
+            for p in con.execute(
+                    "SELECT riga_id, passo, motivo, via, quando, ultimo, "
+                    f"volte FROM payout_passi WHERE tabella='ordini' AND "
+                    f"riga_id IN ({seg}) ORDER BY id", pezzo):
+                passi.setdefault(p[0], []).append(
+                    {"passo": p[1], "motivo": p[2], "via": p[3],
+                     "quando": p[4], "ultimo": p[5], "volte": p[6]})
+            for t in con.execute(
+                    "SELECT riga_id, hash, quando, esito FROM payout_tentati "
+                    f"WHERE tabella='ordini' AND riga_id IN ({seg}) "
+                    "ORDER BY quando, rowid", pezzo):
+                tentati.setdefault(t[0], []).append((t[1], t[2], t[3]))
+    except Exception as e:
+        print(f"⚠️ Linea del tempo dei pagamenti non letta: {e}")
+    adesso = int(time.time())
+    stadi = {}
+    for r in righe:
+        if r["id"] in ids:
+            s = stadio_pagamento(r, passi.get(r["id"]), tentati.get(r["id"]),
+                                 adesso)
+            if s:
+                stadi[r["id"]] = s
+    return stadi
+
+
+async def _avvisa_in_pagamento(o, netto: int, automatico: bool,
+                               al_venditore: bool):
+    """I DUE AVVISI DELL'INGRESSO NELLO STADIO, una volta sola (li chiama
+    solo il primo giro). NIENTE DOPPIONI, ed e' il motivo delle due
+    condizioni: se il payout riesce NELLO STESSO GIRO questi non partono
+    affatto — arriva «Affare concluso» e basta, che tre secondi dopo un
+    «sono in arrivo» sarebbe rumore — e a chi vende non si dice «in
+    arrivo» quando nello stesso giro gli si sta gia' dicendo il SUO
+    messaggio (ci riproviamo, serve una fattura, come vuoi incassare).
+    A chi compra si parla solo se ha CONFERMATO LUI: sul timer e sulla
+    disputa ha gia' le sue parole, e «hai confermato» sarebbe falso.
+    Sotto try: un avviso non rompe mai un'uscita."""
+    try:
+        if not automatico and not o["disputata"]:
+            await notifica(
+                o["compratore_id"],
+                "✅ <b>Hai confermato: i sats vanno al venditore, ci pensa "
+                "Barattolo.</b> Per te è tutto fatto: non devi fare altro, "
+                "e la conferma è definitiva. Ti avvisiamo quando l'affare "
+                "si chiude.")
+        if al_venditore:
+            perche = ("La disputa è stata decisa a tuo favore"
+                      if o["disputata"] else
+                      "Il tempo di conferma è scaduto" if automatico else
+                      "L'acquirente ha confermato la ricezione")
+            await notifica(
+                o["venditore_id"],
+                f"💸 <b>I tuoi {_fmt_sats(netto)} sats sono in arrivo.</b> "
+                f"{perche}: da qui consegnarteli tocca a Barattolo. Non "
+                f"devi fare niente — ti avvisiamo appena arrivano.")
+    except Exception as e:
+        print(f"⚠️ Avviso «in pagamento» non partito: {e}")
 
 
 def netto_venditore(prezzo_sats: int) -> int:
@@ -19585,6 +20031,19 @@ def coda_pagamenti(x_tg_init_data: str = Header(""),
         "  'sblocco banner' AS titolo "
         "FROM pagamenti p WHERE p.payout_stato='incerto' "
         "ORDER BY aggiornato ASC")]
+    # LO STESSO STADIO che leggono le due parti (set 2026): chi modera
+    # vede «in verifica da 40 minuti, deciso da una conferma» con le
+    # parole e la linea del tempo della pagina dell'ordine.
+    ordini = [r for r in righe if r["tipo"] == "ordine"]
+    if ordini:
+        seg = ",".join("?" * len(ordini))
+        interi = {x["id"]: dict(x) for x in con.execute(
+            f"SELECT * FROM ordini WHERE id IN ({seg})",
+            [r["id"] for r in ordini])}
+        stadi = _stadi_ordini(con, list(interi.values()))
+        for r in ordini:
+            if r["id"] in stadi:
+                r["pagamento"] = stadi[r["id"]]
     con.close()
     return righe
 
@@ -31197,6 +31656,9 @@ async def sollecita_acquirente(ordine_id: int, x_tg_init_data: str = Header(""),
     if not o:
         con.close()
         raise HTTPException(400, "Operazione non permessa")
+    if _in_pagamento(o):
+        con.close()      # ha gia' confermato: non c'e' nessuno da sollecitare
+        raise HTTPException(409, _rifiuto_in_pagamento(o, "sollecita"))
     if o["sollecito_il"] and o["sollecito_il"] > int(time.time()) - 86400:
         con.close()
         raise HTTPException(400, "Hai già inviato un promemoria nelle "
@@ -42617,6 +43079,11 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             con.close()   # un pagamento in volo di cui non sappiamo l'esito:
             #               finche' non si sa com'e' finito, qui non si paga
             return {"ok": False, "stato": o["stato"], "incerto": True}
+        # LO STADIO «IN PAGAMENTO» COMINCIA QUI (set 2026): la decisione
+        # e' presa — una conferma, un timer, un moderatore — e da questa
+        # riga in giu' consegnare i sats tocca a noi. `primo_passo` e'
+        # vero in un giro solo, ed e' il «primo giro» degli avvisi nuovi.
+        primo_passo = _segna_deciso(con, ordine_id, o, automatico)
         v = con.execute("SELECT * FROM utenti WHERE tg_id=?",
                         (o["venditore_id"],)).fetchone()
         # Al venditore va articolo + spedizione: la protezione del
@@ -42664,15 +43131,35 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             # nessuno — lo si richiede al battito dopo. Il tetto dei
             # tentativi e' il freno dell'anello: esaurito quello,
             # l'umano torna a essere la risposta giusta.
+            # IL TIMBRO DEL TIMER ANCHE QUI (set 2026): senza, un ordine
+            # chiuso da un timer e finito in volo tornerebbe dalla ronda
+            # come chiamata NON automatica — e lo stadio direbbe «hai
+            # confermato» a chi non ha confermato niente.
+            con.execute("UPDATE ordini SET sbloccato_auto_il="
+                        "MAX(sbloccato_auto_il, ?) WHERE id=?",
+                        (auto_il, ordine_id))
+            # ...E IL TETTO NON VALE PER I GUASTI NOSTRI: un tentativo
+            # fallito per il ponte giu' passa di qui a OGNI ritentativo
+            # (si aspetta che LND dica «mai partito»), e col tetto dal
+            # sesto giro ogni attesa diventerebbe un 🧊 ai moderatori.
+            guasto_in_corso = (_ultimo_passo(con, "ordini", ordine_id)
+                               or {}).get("passo") == PASSO_GUASTO
             if (taccuino.get("risolvibile")
-                    and (o["payout_tentativi"] or 0) < MAX_TENTATIVI_PAYOUT):
+                    and (guasto_in_corso or (o["payout_tentativi"] or 0)
+                         < MAX_TENTATIVI_PAYOUT)):
+                _segna_passo(con, "ordini", ordine_id, PASSO_IN_VOLO)
                 _in_volo(con, "ordini", ordine_id, "venditore")
+                if primo_passo:
+                    await _avvisa_in_pagamento(o, netto, automatico, True)
                 return {"ok": False, "stato": o["stato"], "in_volo": True}
+            _segna_passo(con, "ordini", ordine_id, PASSO_IN_VERIFICA)
             await _congela_pagamento(
                 con, "ordini", ordine_id, bolt11, "venditore",
                 f"Incasso del venditore sull'ordine #{ordine_id}: "
                 f"<b>{_fmt_sats(netto)} sats</b>.",
                 cassaforte=o["cassaforte"])
+            if primo_passo:
+                await _avvisa_in_pagamento(o, netto, automatico, True)
             return {"ok": False, "stato": o["stato"], "incerto": True}
         if esito == NON_CHIESTO:
             # Non si e' potuto chiedere: la riga resta ESATTAMENTE
@@ -42693,7 +43180,13 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             con.execute("UPDATE ordini SET sbloccato_auto_il="
                         "MAX(sbloccato_auto_il, ?) WHERE id=?",
                         (auto_il, ordine_id))
-            _sospendi_pagamento(con, "ordini", ordine_id, "venditore")
+            _sospendi_pagamento(con, "ordini", ordine_id, "venditore",
+                                taccuino.get("motivo") or "")
+            # E QUI NESSUNO SENTE NIENTE DEL GUASTO: il nodo giu' e'
+            # affare nostro. Al primo giro le due parti sanno solo che
+            # la decisione e' presa e che da qui ci pensiamo noi.
+            if primo_passo:
+                await _avvisa_in_pagamento(o, netto, automatico, True)
             return {"ok": False, "stato": o["stato"], "non_chiesto": True}
 
         if esito == PAGATO:
@@ -42710,6 +43203,7 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                         "sbloccato_auto_il=MAX(sbloccato_auto_il, ?), "
                         "aggiornato=? WHERE id=?",
                         (cambio, auto_il, int(time.time()), ordine_id))
+            _segna_passo(con, "ordini", ordine_id, PASSO_ARRIVATO)
             con.execute("UPDATE utenti SET vendite_ok=vendite_ok+1 WHERE tg_id=?",
                         (o["venditore_id"],))
             con.execute("UPDATE utenti SET acquisti_ok=acquisti_ok+1 WHERE tg_id=?",
@@ -42740,6 +43234,19 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                                f"⚖️ <b>La disputa su «{titolo}» è stata decisa a "
                                f"favore del venditore:</b> i sats gli sono stati "
                                f"sbloccati. {invito}")
+            elif not primo_passo:
+                # «ARRIVATI ✓» (set 2026): chi vende aveva gia' sentito
+                # «sono in arrivo» (o aspettava da un giro precedente),
+                # quindi qui non gli si ridice che l'acquirente ha
+                # confermato: gli si dice la sola cosa nuova.
+                await notifica(o["venditore_id"],
+                               f"✅ <b>Arrivati ✓</b> I tuoi "
+                               f"<b>{_fmt_sats(netto)} sats</b> sono nel tuo "
+                               f"wallet. Affare concluso! ⚡ {invito}")
+                await notifica(o["compratore_id"],
+                               f"✅ <b>Affare concluso:</b> «{titolo}». "
+                               f"I sats sono arrivati al venditore. "
+                               f"Grazie per aver usato Barattolo 🫙 {invito}")
             else:
                 await notifica(o["venditore_id"],
                                f"🔓 <b>Sats sbloccati!</b> L'acquirente ha confermato la "
@@ -42800,8 +43307,29 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
         # quarto esito (non si e' chiesto) e ora anche per questa
         # (si e' chiesto e la risposta e' stata un no definitivo, senza
         # preimage). A distanziare i tentativi e' `_quando_ritentare`.
+        # UN GUASTO NOSTRO NON HA TETTO (set 2026): il freno dei cinque
+        # tentativi esiste per non bussare in eterno al wallet di un
+        # terzo su una ROTTA che non c'e'; il saldo nostro che non basta
+        # o il ponte giu' tornano da soli, e arrendersi li' vorrebbe
+        # dire chiedere un gesto a chi non ha sbagliato niente. A
+        # distanziare i giri e' `BACKOFF_NOSTRO`, letto dal passo.
+        motivo_no = taccuino.get("motivo") or ""
+        nostro = motivo_no in MOTIVI_NOSTRI
         ritenta = bool(taccuino.get("ritentabile") and v and v["ln_address"]
-                       and (o["payout_tentativi"] or 0) < MAX_TENTATIVI_PAYOUT)
+                       and (nostro or (o["payout_tentativi"] or 0)
+                            < MAX_TENTATIVI_PAYOUT))
+        # LA LINEA DEL TEMPO: cos'e' successo, e — se da soli non c'e'
+        # piu' niente da tentare — che adesso serve un gesto di chi
+        # vende. `gia_detto` dice se e' una notizia o una replica, e si
+        # chiede PRIMA di segnare il passo.
+        gia_detto = False
+        if taccuino.get("ritentabile") or motivo_no:
+            tipo = PASSO_GUASTO if nostro else PASSO_FALLITO
+            gia_detto = _gia_detto(con, "ordini", ordine_id, tipo, motivo_no)
+            _segna_passo(con, "ordini", ordine_id, tipo, motivo_no)
+        if not ritenta:
+            _segna_passo(con, "ordini", ordine_id, PASSO_SERVE,
+                         motivo_no or ("fattura" if bolt11 else "metodo"))
         con.execute("UPDATE ordini SET invoice_venditore='', stato='confirmed', "
                     "payout_stato=?, "
                     "sbloccato_auto_il=MAX(sbloccato_auto_il, ?), "
@@ -42883,7 +43411,18 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                    f"i tuoi <b>{_fmt_sats(netto)} sats</b>: apri l'ordine nella Mini App e "
                    f"imposta il tuo Lightning address (incassi automatici, per "
                    f"sempre) oppure incolla una invoice di esattamente quell'importo. 💰")
-        await notifica(o["venditore_id"], msg)
+        # A CHI COMPRA, al primo giro: la sua parte e' finita. A chi
+        # vende qui NON si dice «in arrivo»: sta per ricevere il suo
+        # messaggio, quello sopra, che e' piu' preciso.
+        if primo_passo:
+            await _avvisa_in_pagamento(o, netto, automatico, False)
+        # UN RITENTATIVO CHE FALLISCE UGUALE NON E' UNA NOTIZIA (set
+        # 2026): mentre ci riproviamo da soli chi vende sente il motivo
+        # UNA volta, non a ogni giro — senza tetto ai tentativi sarebbe
+        # un messaggio all'ora per tutto il tempo del guasto. Dove
+        # invece serve un suo gesto lo si dice sempre.
+        if not ritenta or not gia_detto:
+            await notifica(o["venditore_id"], msg)
         return {"ok": False, "stato": "confirmed", "ritenta": ritenta,
                 "motivo": taccuino.get("motivo") or "",
                 "scaduta": taccuino.get("scaduta") or ""}
@@ -43330,6 +43869,11 @@ async def conferma_ricezione(ordine_id: int, x_tg_init_data: str = Header(""),
     con.close()
     if not o:
         raise HTTPException(400, "Operazione non permessa")
+    # LA CONFERMA E' DEFINITIVA E NON SI RIPETE (set 2026): se il payout
+    # e' in volo, in verifica o sospeso l'ordine e' ancora 'shipped', e
+    # un secondo tocco ripasserebbe dall'uscita scavalcando l'orologio.
+    if _in_pagamento(o):
+        raise HTTPException(409, _rifiuto_in_pagamento(o, "conferma"))
     return await _sblocca_sats(ordine_id)
 
 
@@ -43343,6 +43887,13 @@ async def apri_disputa(ordine_id: int, x_tg_init_data: str = Header(""),
                     (ordine_id, user["id"])).fetchone()
     if not o:
         raise HTTPException(400, "Operazione non permessa")
+    # ...E NON SI ANNULLA: a payout sospeso lo stato era ancora
+    # 'shipped', quindi chi aveva confermato poteva aprire una disputa —
+    # e il giro dell'orologio, che segue `payout_verso`, pagava il
+    # venditore lo stesso, a disputa aperta.
+    if _in_pagamento(o):
+        con.close()
+        raise HTTPException(409, _rifiuto_in_pagamento(o, "disputa"))
     # disputata resta 1 per sempre, anche a disputa risolta: e' la
     # memoria su cui si giudica il distintivo Specchiato
     con.execute("UPDATE ordini SET stato='dispute', disputata=1, "
@@ -44089,8 +44640,14 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
                 r["taglia_stimata"] = (
                     stima_taglia_set(taglie_ordine.get(r["id"], []))
                     if r["consegna_scelta"] == "spedizione" else "")
+    # LO STADIO «IN PAGAMENTO» (set 2026): lo stesso giudice per chi
+    # compra, chi vende e chi modera. La chiave c'e' SOLO dove c'e' uno
+    # stadio: un client che non la trova disegna la pagina di ieri.
+    stadi = _stadi_ordini(con, righe)
     con.close()
     for r in righe:
+        if r["id"] in stadi:
+            r["pagamento"] = stadi[r["id"]]
         # Il contenuto digitale NON esce mai da qui: si legge solo da
         # /contenuto, dove la prima lettura del compratore fa da
         # ricevuta. Resta il flag: il client sa se c'e' qualcosa da
@@ -45338,6 +45895,16 @@ async def controlla_scadenze():
     con.commit()
     con.close()
     for oid in scaduti_consegna + scaduti_silenzio + scaduti_digitale:
+        # UN ORDINE GIA' IN PAGAMENTO NON E' DEL TIMER (set 2026): la
+        # decisione c'e' gia', e a riportarlo all'uscita sono i due giri
+        # dei pagamenti. Passarci di qui timbrerebbe `sbloccato_auto_il`
+        # su una conferma fatta da una PERSONA, e da li' chi vende
+        # leggerebbe «il tempo di conferma è scaduto».
+        con = db()
+        gia = con.execute("SELECT * FROM ordini WHERE id=?", (oid,)).fetchone()
+        con.close()
+        if gia and _in_pagamento(gia):
+            continue
         print(f"⏰ Sblocco automatico dell'ordine #{oid}")
         await _sblocca_sats(oid, automatico=True)
 
@@ -46431,8 +46998,14 @@ async def _riprendi_uscita(tabella: str, riga_id: int, verso: str) -> dict:
         riga_id, automatico=bool(o and o["sbloccato_auto_il"]))
 
 
-async def risolvi_pagamenti_in_volo():
+async def risolvi_pagamenti_in_volo(solo_in_volo: bool = False):
     """IL GIRO CHE TOGLIE L'UMANO DALLA CATENA (set 2026, cantiere B).
+
+    `solo_in_volo` e' del battito corto (`orologio_pagamenti`): ogni
+    minuto si riguardano i soli pagamenti IN VOLO, che e' dove un minuto
+    conta — chi ha appena confermato sta guardando la pagina. I
+    CONGELATI restano al battito da dieci: possono restare li' giorni, e
+    chiederli ogni minuto sarebbero 1.440 righe di journal al giorno.
 
     Un pagamento che a budget scaduto non aveva ancora un verdetto
     finiva in mano a un moderatore, e non perche' servisse un giudizio
@@ -46487,8 +47060,11 @@ async def risolvi_pagamenti_in_volo():
             trovate = con.execute(
                 f"SELECT id, payout_hash, payout_verso, payout_ultimo, "
                 f"payout_stato FROM {tab} "
-                "WHERE payout_stato='in_volo' OR (payout_stato='incerto' "
-                "AND COALESCE(payout_hash,'')<>'') ORDER BY id").fetchall()
+                "WHERE payout_stato='in_volo'"
+                + ("" if solo_in_volo else
+                   " OR (payout_stato='incerto' "
+                   "AND COALESCE(payout_hash,'')<>'')")
+                + " ORDER BY id").fetchall()
             righe += [(tab, r["id"], r["payout_hash"] or "",
                        r["payout_verso"] or "", r["payout_ultimo"] or 0,
                        _cassaforte_riga(con, tab, r["id"]),
@@ -46574,6 +47150,11 @@ async def _arrenditi_in_volo(tabella: str, riga_id: int, phash: str,
     con = db()
     cur = con.execute(f"UPDATE {tabella} SET payout_stato='incerto' "
                       "WHERE id=? AND payout_stato='in_volo'", (riga_id,))
+    if cur.rowcount:
+        # la linea del tempo: da qui le due parti leggono «in verifica:
+        # ci stiamo lavorando noi», ed e' lo stesso istante in cui parte
+        # il 🧊 qui sotto — un numero solo, `IN_VOLO_LIMITE_S`
+        _segna_passo(con, tabella, riga_id, PASSO_IN_VERIFICA)
     con.commit()
     con.close()
     if not cur.rowcount:
@@ -46647,8 +47228,10 @@ async def riprova_pagamenti_sospesi():
                 # al nodo aspetta il suo turno. Il filtro sta QUI e non
                 # dopo il taglio di MAX_RIPRESE_GIRO, o venti righe in
                 # attesa coprirebbero quella pronta.
-                if _quando_ritentare(r["payout_tentativi"] or 0,
-                                     r["payout_ultimo"] or 0) <= adesso]
+                # DUE CADENZE (set 2026): dopo un guasto NOSTRO 1, 5, 15,
+                # 30 minuti e poi ogni ora, senza tetto; dopo una rotta
+                # che manca quella di sempre. Sceglie `_tocca_riprovare`.
+                if _tocca_riprovare(con, tab, r, adesso)]
         except Exception as e:
             print(f"⚠️ Ripresa, tabella {tab} saltata: {e}")
     con.close()
@@ -46711,6 +47294,54 @@ async def riprova_pagamenti_sospesi():
             print(f"⚠️ Avviso pagamenti fermi non partito: {e}")
 
 
+# IL BATTITO CORTO DEI PAGAMENTI (set 2026, lo stadio «in pagamento»).
+# L'orologio grande batte ogni dieci minuti, e per un pagamento e'
+# un'eternita' due volte: chi ha appena confermato guarda la pagina e
+# vuole leggere «arrivato ✓», e un ritentativo «dopo 1 minuto, poi 5»
+# a dieci minuti per battito non esiste. Questo gira ogni minuto e fa
+# SOLO i due giri dei pagamenti — e solo se c'e' qualcosa da guardare,
+# con una domanda che non tocca la rete: a mercatino tranquillo costa
+# tre SELECT al minuto e zero righe di journal.
+# NON SOSTITUISCE l'orologio grande, che quei due giri continua a farli
+# (coi congelati, che qui non si guardano): se questo task morisse, il
+# comportamento di ieri resta intero. A non farli mai girare INSIEME e'
+# `_giro_pagamenti`; a non pagare mai due volte restano, come sempre,
+# il lucchetto per ordine e la mano.
+BATTITO_PAGAMENTI_S = 60
+_giro_pagamenti = asyncio.Lock()
+_TASK_PAGAMENTI = None   # il patto di _TASK_CAMBIO: il riferimento lo tiene vivo
+
+
+def _pagamenti_da_guardare() -> bool:
+    """C'e' almeno un'uscita in volo o da riprovare? Solo database."""
+    con = db()
+    try:
+        for tab in ("ordini", "rimborsi_asta", "pagamenti"):
+            try:
+                if con.execute(
+                        f"SELECT 1 FROM {tab} WHERE payout_stato IN "
+                        "('in_volo','da_riprovare') LIMIT 1").fetchone():
+                    return True
+            except Exception:
+                continue
+        return False
+    finally:
+        con.close()
+
+
+async def orologio_pagamenti():
+    while True:
+        await asyncio.sleep(BATTITO_PAGAMENTI_S)
+        try:
+            if _giro_pagamenti.locked() or not _pagamenti_da_guardare():
+                continue
+            async with _giro_pagamenti:
+                await risolvi_pagamenti_in_volo(solo_in_volo=True)
+                await riprova_pagamenti_sospesi()
+        except Exception as e:
+            print(f"⚠️ Battito dei pagamenti saltato: {e}")
+
+
 async def sollecita_incassi():
     """Il promemoria degli incassi fermi: un ordine 'confirmed' senza
     metodo d'incasso non fa rumore da solo — la notifica della
@@ -46735,6 +47366,12 @@ async def sollecita_incassi():
         # LEFT: anche i SET (annuncio_id=0) meritano il promemoria
         "LEFT JOIN annunci a ON a.id = o.annuncio_id "
         "WHERE o.stato='confirmed' AND o.solleciti_incasso <= ? "
+        # LA PALLA DEV'ESSERE DI CHI VENDE (set 2026): con un payout in
+        # volo, in verifica o che stiamo ritentando noi, «imposta il tuo
+        # Lightning address» direbbe di fare qualcosa a chi non deve
+        # fare niente — e da quando un guasto nostro si ritenta senza
+        # tetto, quella riga puo' restare 'da_riprovare' per giorni.
+        "AND COALESCE(o.payout_stato,'')='' "
         "AND MAX(o.aggiornato, o.sollecito_incasso_il) < ?",
         (SOLLECITO_INCASSO_MAX, adesso - passo)).fetchall()
     if not righe:
@@ -49512,7 +50149,10 @@ async def orologio():
             # qui puo' diventare da riprovare nello stesso battito, e
             # il giro qui sotto la raccoglie subito invece che fra
             # dieci minuti.
-            await risolvi_pagamenti_in_volo()
+            # (il lucchetto e' quello del battito corto: i due orologi
+            # non fanno mai lo stesso giro insieme)
+            async with _giro_pagamenti:
+                await risolvi_pagamenti_in_volo()
         except Exception as e:
             print(f"⚠️ Pagamenti in volo saltati: {e}")
         try:
@@ -49520,7 +50160,8 @@ async def orologio():
             # rimasto in sospeso: un ordine ripreso qui non deve poi
             # ricevere il promemoria di un incasso che nel frattempo
             # e' partito.
-            await riprova_pagamenti_sospesi()
+            async with _giro_pagamenti:
+                await riprova_pagamenti_sospesi()
         except Exception as e:
             print(f"⚠️ Ripresa dei pagamenti saltata: {e}")
         try:
@@ -51140,6 +51781,8 @@ async def avvisa_saas_senza_doveri():
 @app.on_event("startup")
 async def avvia_orologio():
     asyncio.create_task(orologio())
+    global _TASK_PAGAMENTI
+    _TASK_PAGAMENTI = asyncio.create_task(orologio_pagamenti())
     # Il campanello dello scambio P2P ha un giro SUO da un minuto (la
     # finestra del taker e' 900 secondi: dieci minuti li' dentro
     # sarebbero un ottavo del tempo che ha per rispondere). Si avvia

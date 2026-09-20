@@ -227,6 +227,16 @@ def chiama(fn, *args, corpo=None):
     return asyncio.run(fn(*args))
 
 
+def _passa_un_minuto():
+    """Il ritentativo per cause nostre aspetta il suo turno (1, 5, 15...
+    minuti): invece di fermare l'orologio si INVECCHIA la linea del
+    tempo, che e' da dove il giro legge l'ora dell'ultimo guasto."""
+    con = SRV.db()
+    con.execute("UPDATE payout_passi SET quando=quando-61, ultimo=ultimo-61")
+    con.commit()
+    con.close()
+
+
 def riga(oid):
     con = SRV.db()
     con.row_factory = sqlite3.Row
@@ -313,12 +323,27 @@ def main():
     prova("al venditore non si dice che il suo wallet non risponde",
           [], [t for _, t in DETTO if "wallet" in t])
     prova("ai moderatori non arriva nessun allarme", [], AVVISI)
-    prova("a nessuno arriva niente, in generale", 0, len(DETTO))
+    # DAL SET 2026 (lo stadio «in pagamento») DAL RAMO MITE PARTONO DUE
+    # AVVISI, E SOLO QUELLI: chi ha confermato sente che ha finito, chi
+    # vende che i sats sono in arrivo. La regola di ago 2026 resta nella
+    # sua sostanza — NESSUNO sente parlare del guasto, che e' nostro:
+    # prima qui si contava zero, adesso si conta due e si guarda cosa
+    # dicono.
+    prova("alle due parti arriva SOLO l'ingresso nello stadio", [111, 222],
+          sorted(chi for chi, _ in DETTO))
+    prova("...e a nessuno dei due si nomina il guasto", [],
+          [t for _, t in DETTO if any(x in t.lower() for x in (
+              "nodo", "problema", "non risponde", "riprov"))])
 
     # ---- 2) il nodo torna, e il giro paga ------------------------
     print("\n[il nodo torna su]")
     NODO["codice"] = 200
     DETTO.clear(); USCITE.clear()
+    # UN GUASTO NOSTRO SI RITENTA DOPO UN MINUTO (set 2026), non al
+    # primo battito: prima del suo turno il giro non tocca la riga
+    asyncio.run(SRV.riprova_pagamenti_sospesi())
+    prova("prima del suo minuto il giro non la tocca", 0, len(USCITE))
+    _passa_un_minuto()
     asyncio.run(SRV.riprova_pagamenti_sospesi())
     fine = riga(oid)
     prova("il giro paga davvero", 1, len(USCITE))
@@ -336,8 +361,13 @@ def main():
           bool(fine["payout_hash"]))
     prova("il venditore lo viene a sapere", True,
           any(chi == 222 for chi, _ in DETTO))
-    prova("...con le parole di chi ha CONFERMATO, non del timer", True,
-          any("confermato" in t for chi, t in DETTO if chi == 222))
+    # «Arrivati ✓» (set 2026): che l'acquirente ha confermato gliel'ha
+    # gia' detto l'avviso d'ingresso nello stadio, qui arriva la sola
+    # cosa nuova — e di certo NON le parole del timer
+    prova("...con «Arrivati ✓», non con le parole del timer", (True, False),
+          (any("Arrivati ✓" in t for chi, t in DETTO if chi == 222),
+           any("scaduto" in t or "automaticamente" in t
+               for chi, t in DETTO if chi == 222)))
 
     # ---- 3) il deposito col nodo giu' ----------------------------
     print("\n[depositare una invoice mentre il nodo tace]")
@@ -394,10 +424,17 @@ def main():
           tre["payout_stato"])
     prova("...e il timbro del timer resta scritto", True,
           tre["sbloccato_auto_il"] > 0)
-    prova("...senza dire niente a nessuno", 0, len(DETTO))
+    # a chi COMPRA niente (non ha confermato lui); a chi vende l'ingresso
+    # nello stadio, con le parole del timer — e nessuna parola sul guasto
+    prova("...a chi compra non si dice niente", 0,
+          sum(1 for chi, _ in DETTO if chi == 111))
+    prova("...a chi vende che i sats sono in arrivo, e PERCHE'", [True],
+          ["Il tempo di conferma è scaduto" in t
+           for chi, t in DETTO if chi == 222])
 
     NODO["codice"] = 200
     DETTO.clear()
+    _passa_un_minuto()
     asyncio.run(SRV.riprova_pagamenti_sospesi())
     prova("ripreso dal giro, l'ordine si chiude", "released",
           riga(oid3)["stato"])
