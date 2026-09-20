@@ -670,6 +670,38 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   nessun 🧊. Quel che il drill non prova e' la hold
   invoice: si puo' fare con un wallet che le sa coniare, ed e' l'unico
   modo di vedere dal vivo il 409 «ANCORA IN VOLO».
+  LE FATTURE SCADUTE (20 set 2026, ordine #152). Una fattura
+  incollata ha una scadenza scritta dentro, e fra la spedizione e la
+  conferma passano giorni. Prima di ogni payout il server la legge: se
+  è scaduta (o le restano meno di 2 minuti) NON TENTA — su LNbits non
+  nasce nessuna riga, non c'è niente da verificare — toglie la fattura
+  morta, lascia l'ordine in `confirmed`, e dice al venditore «la
+  fattura che avevi incollato è scaduta il …: incollane una nuova, o
+  metti un Lightning address». Se il venditore un address ce l'ha, si
+  paga da lì al giro dopo, da soli. Ai moderatori arriva «⌛ Pagamento
+  in uscita NON TENTATO: fattura scaduta» — è un'informazione, non un
+  allarme: non c'è NIENTE da fare. Alla porta: una fattura scaduta, o
+  troppo corta per quando partiranno i sats, si rifiuta SUBITO e si
+  dice perché (10 minuti se si paga all'istante; 30 giorni se i sats
+  partono alla conferma — `FATTURA_ANTICIPATA_GIORNI` in `server.py`,
+  0 = controllo spento).
+  DOVE SI LEGGE: `journalctl -u barattolo | grep "⌛"`. Il motivo di
+  ogni payout mancato sta nella riga dell'ordine:
+  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT id,stato,payout_stato,payout_tentativi,payout_errore FROM ordini WHERE COALESCE(payout_errore,'')<>'' ORDER BY id DESC LIMIT 20;"`
+  «Pagamento in uscita FALLITO» adesso dice il PERCHÉ in parole
+  (fattura scaduta, nessuna strada, saldo NOSTRO insufficiente, ponte
+  giù, tempo scaduto per strada, rifiutata da chi riceve, fattura già
+  bruciata) col testo grezzo di LNbits accanto. «Saldo nostro» e
+  «ponte giù» sono gli unici due che chiedono un gesto NOSTRO, subito.
+  IL CENSIMENTO: `cd ~/satmarket && python3 censimento_scadenze.py` —
+  sola lettura, niente rete. Dice da dove veniva la fattura di ogni
+  ordine pagato (incollata o Lightning address), con che margine è
+  arrivata al payout, e — la parte che serve — quali ordini APERTI
+  hanno in colonna una fattura già scaduta o che scade entro 7 giorni.
+  ⚠️ «Verifica e riprova» (🧊) su una riga la cui fattura è scaduta NON
+  ripaga: toglie il fermo, chiede la fattura nuova, e lo dice («⌛ …la
+  fattura che avevamo è SCADUTA»). Un tentativo di POCHI MINUTI fa resta
+  «in volo» comunque: i 15 minuti non li scavalca nessun calendario.
   IL CONTROLLO DEGLI ORFANI, sulle due casseforti (set 2026):
   `cd ~/satmarket && python3 orfani.py` — sola lettura, legge il
   registro di ogni cassaforte configurata con la sua invoice key e

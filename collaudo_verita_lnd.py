@@ -131,8 +131,13 @@ class FintoLnd(http.server.BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
+        # il PERCHE' sta nella stessa riga dello stato (20 set 2026):
+        # LND lo manda sempre, e vale NONE finche' non e' un fallimento
         self.wfile.write((json.dumps({"result": {
-            "payment_hash": h, "status": stato, "htlcs": []}}) + "\n")
+            "payment_hash": h, "status": stato, "htlcs": [],
+            "failure_reason": ("FAILURE_REASON_NO_ROUTE"
+                               if stato == "FAILED" else
+                               "FAILURE_REASON_NONE")}}) + "\n")
             .encode())
         self.wfile.flush()
         if stato == "IN_FLIGHT":
@@ -168,8 +173,14 @@ def main():
                "LND_SUCCEEDED": "SUCCEEDED", "LND_IN_FLIGHT": "IN_FLIGHT",
                "LND_FAILED": "FAILED", "LND_ASSENTE": "assente",
                "LND_MUTO": "muto", "LND_SPENTO": "spento",
+               # dal 20 set 2026 `_chiedi_lnd` mette da parte il
+               # `failure_reason`: senza questi due il NameError finisce
+               # nel suo `except` largo e OGNI risposta esce «muto» — la
+               # trappola delle funzioni estratte, presa dal vivo
+               "_lnd_motivi": {},
                "print": lambda *a, **k: detto.append(" ".join(map(str, a)))}
-        for nome in ("_lnd_configurato", "_lnd_stato_da_riga", "_chiedi_lnd"):
+        for nome in ("_lnd_configurato", "_lnd_stato_da_riga",
+                     "_ricorda_motivo_lnd", "_chiedi_lnd"):
             exec(pezzo(nome), amb)
         chiedi = lambda h: asyncio.run(amb["_chiedi_lnd"](h))
 
@@ -183,6 +194,9 @@ def main():
         prova("...senza aspettare che lo stream finisca (LND lo tiene "
               "aperto)", True, time.time() - t0 < 3)
         prova("un hash mai visto: «assente»", "assente", chiedi(H_MAI))
+        prova("il PERCHE' del fallito si tiene — e solo il suo: un NONE "
+              "non e' un motivo", {H_NO: "FAILURE_REASON_NO_ROUTE"},
+              dict(amb["_lnd_motivi"]))
         prova("un hash che non e' esadecimale: muto, senza bussare",
               ("muto", len(VISTI)), (chiedi("non-e-hex"), len(VISTI)))
 

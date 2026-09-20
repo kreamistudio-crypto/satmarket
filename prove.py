@@ -2606,7 +2606,8 @@ def prove_importo_uscita():
             avvisi.append(t)
             detti.append(t)
 
-        amb = {"httpx": _finto_lnbits(uscite, codice,
+        amb = {**ambiente_scadenza(),
+               "httpx": _finto_lnbits(uscite, codice,
                                       corpo={"status": "success"}),
                "importo_invoice": _importo, "notifica_admin": _admin,
                "decodifica_invoice": _decodifica,
@@ -3396,7 +3397,8 @@ def prove_esito_pagamento():
         async def _avvisa(t):
             avvisi.append(t)
 
-        amb = {"httpx": _finto_lnbits(uscite, codice, muto, corpo),
+        amb = {**ambiente_scadenza(),
+               "httpx": _finto_lnbits(uscite, codice, muto, corpo),
                "decodifica_invoice": _decodifica, "importo_invoice": _importo,
                "_stato_pagamento": _stato, "_esito_lnbits": leggi,
                "notifica_admin": _avvisa, "asyncio": asyncio,
@@ -3903,7 +3905,38 @@ def costanti_verita():
     return amb
 
 
-def prove_pagamenti_in_volo():
+def ambiente_scadenza():
+    """I pezzi VERI del cantiere delle fatture scadute (20 set 2026),
+    per gli ambienti finti che fanno girare `paga_venditore` e
+    `_sblocca_sats`: da quel giorno la cintura della scadenza e i motivi
+    in parole stanno DENTRO quelle due, e un ambiente che non li monta
+    esplode con un NameError invece di provare qualcosa — la trappola
+    delle funzioni estratte, al suo ennesimo giro. Si eseguono le fette
+    del sorgente, mai una copia: e' la regola di `reale`.
+
+    Le fatture di cartone dei banchi piu' vecchi («lnbc», «lnbc1»,
+    «lnbc-fattura-1») il lettore vero non le legge, quindi di loro non
+    afferma niente e la strada resta quella di ieri: e' il fail-open
+    dichiarato, ed e' anche il motivo per cui quei banchi restano verdi
+    senza toccarne una riga."""
+    amb = {"time": time, "json": json, "html": __import__("html"),
+           "_ponte": {"stato": "ok"}, "_lnd_motivi": {},
+           "_fmt_sats": reale("_fmt_sats")}
+    for inizio in ("MARGINE_SCADENZA_PAYOUT_S = ", "_BECH32_ALFABETO = ",
+                   "MESI_IT = (", "MOTIVO_SCADUTA, MOTIVO_STRADA, ",
+                   "PAROLE_MOTIVO = {", "_MOTIVI_LND = {"):
+        i = _SORGENTE.index("\n" + inizio) + 1
+        exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
+    for nome in ("leggi_bolt11", "vita_fattura", "giorno_scadenza",
+                 "rifiuto_scadenza", "_durata_a_parole", "_motivo_payout",
+                 "_annota_motivo", "_ricorda_motivo_lnd",
+                 "_msg_fattura_nuova"):
+        exec(pezzo(nome), amb)
+    amb.pop("__builtins__", None)
+    return amb
+
+
+def prove_pagamenti_in_volo(attrezzi=False):
     """«NON E' USCITO» CHE NON PAGA DUE VOLTE (set 2026).
 
     L'audit del 19 set aveva riprodotto il doppio payout con le
@@ -3919,8 +3952,15 @@ def prove_pagamenti_in_volo():
     httpx che tiene una riga per hash, come il vero) e LND (un
     dizionario dietro `_chiedi_lnd`) — piu' l'anagrafe e le notifiche.
     Ogni scena nasce in un mondo SUO: un lucchetto asyncio conteso in un
-    event loop non si riusa in un altro."""
-    print("\n[i pagamenti in volo: «non e' uscito» che non paga due volte]")
+    event loop non si riusa in un altro.
+
+    `attrezzi=True` (20 set 2026) non gira nessuna scena: RESTITUISCE il
+    banco — `mondo` e i suoi aiutanti — a `prove_fatture_scadute`, che
+    ha bisogno dello stesso mondo di cartone. Una seconda copia di
+    duecento righe sarebbe la copia che un giorno resta indietro."""
+    if not attrezzi:
+        print("\n[i pagamenti in volo: «non e' uscito» che non paga due "
+              "volte]")
     import asyncio
     import collections
     import sqlite3
@@ -4026,7 +4066,10 @@ def prove_pagamenti_in_volo():
                                 "paid": nodo.lnbits[h] == "success"})
 
             async def post(self, url, headers=None, json=None, **k):
-                h = "hash-di-" + json["bolt11"]
+                # TRONCO A 100, come fa `paga_venditore` col payment
+                # hash: con una bolt11 VERA (300 caratteri) nodo e server
+                # parlerebbero altrimenti di due pagamenti diversi
+                h = ("hash-di-" + json["bolt11"])[:100]
                 if nodo.alla_post:
                     nodo.alla_post(h)
                 await asyncio.sleep(0)
@@ -4036,6 +4079,12 @@ def prove_pagamenti_in_volo():
                 if h in nodo.lnbits:       # una riga per hash: l'eco
                     return _R(201, {"status": nodo.lnbits[h]})
                 nodo.partiti.append(h)
+                if isinstance(modo, tuple):
+                    # IL RIFIUTO COL SUO PERCHE' (20 set 2026): LNbits
+                    # segna la riga `failed` e risponde un numero >= 300
+                    # col motivo nel `detail` — il 520 dell'ordine #152
+                    nodo.lnbits[h] = "failed"
+                    return _R(modo[0], {"detail": modo[1]})
                 lnb, lnd = {"ok": ("success", "SUCCEEDED"),
                             "hold": ("pending", "IN_FLIGHT"),
                             "fail": ("failed", "FAILED"),
@@ -4060,7 +4109,7 @@ def prove_pagamenti_in_volo():
             return nodo.lnd.get(h, K["LND_ASSENTE"])
 
         async def _decodifica(bolt11, cassaforte=""):
-            return {"payment_hash": "hash-di-" + bolt11,
+            return {"payment_hash": ("hash-di-" + bolt11)[:100],
                     "amount_msat": 1000 * 1000}
 
         async def _importo(bolt11, dec=None, cassaforte=""):
@@ -4110,7 +4159,10 @@ def prove_pagamenti_in_volo():
             "HTTPException": Rifiuto, "Header": lambda *a: "",
             "Cookie": lambda *a: "", "Request": object,
             "print": lambda *a, **k: m.detto.append(" ".join(map(str, a))),
-            **K}
+            **ambiente_scadenza(), **K}
+        # l'orologio e' di QUESTO mondo: `ambiente_scadenza` porta il
+        # suo, e qui deve vincere quello che le scene possono fermare
+        amb["time"] = _time
         for nome, asincrona in (
                 ("_esito_lnbits", 0), ("_stato_pagamento", 1),
                 ("_avvisa_payout_fallito", 1), ("_lnd_ci_vede", 1),
@@ -4122,7 +4174,8 @@ def prove_pagamenti_in_volo():
                 ("_payment_hash", 1), ("_congela_pagamento", 1),
                 ("_msg_ritentiamo", 0), ("_sblocca_sats", 1),
                 ("_riprendi_uscita", 1), ("_arrenditi_in_volo", 1),
-                ("risolvi_pagamenti_in_volo", 1), ("decidi_pagamento", 1)):
+                ("risolvi_pagamenti_in_volo", 1), ("decidi_pagamento", 1),
+                ("deposita_invoice", 1)):
             try:
                 exec(("async " if asincrona else "") + pezzo(nome), amb)
             except ValueError:
@@ -4168,6 +4221,11 @@ def prove_pagamenti_in_volo():
             return await coro
         except Rifiuto as e:
             return e
+
+    if attrezzi:
+        return {"mondo": mondo, "gira": gira, "riga": riga, "K": K,
+                "prova_a": prova_a, "invecchia": invecchia,
+                "canarino": canarino}
 
     # --- 1. LA RIPRODUZIONE DELL'AUDIT ------------------------------
     m = mondo()
@@ -4544,6 +4602,525 @@ def prove_pagamenti_in_volo():
           mini.replace(" ", ""))
 
 
+def prove_fatture_scadute():
+    """UNA FATTURA SCADUTA NON SI TENTA, E SI DICE PERCHE' (20 set 2026).
+
+    IL CASO VERO, ordine #152: fattura Zeus incollata alla spedizione,
+    payout alla consegna confermata quattro giorni dopo, fattura
+    scaduta da quattro. LND la rifiuta prima di cercare una strada,
+    LNbits risponde 520, noi scrivevamo «LNbits ha risposto 520» a chi
+    modera e «la rete non ha trovato una strada» a chi vendeva.
+
+    IL MONDO E' QUELLO DEI PAGAMENTI IN VOLO (`attrezzi=True`), con le
+    funzioni tutte vere; di nuovo ci sono le FATTURE, che qui sono
+    bolt11 sintatticamente vere (`bolt11_finta`: bech32 col suo
+    checksum, la scadenza nel campo `x`) — perche' il giudice della
+    scadenza la legge dalla fattura, e una stringa di cartone non gli
+    dice niente. L'hash resta quello di cartone del banco."""
+    print("\n[le fatture scadute al payout: non si tentano, e si dice "
+          "perche']")
+    import calendar
+    import shutil
+    import subprocess
+    import tempfile
+
+    a = prove_pagamenti_in_volo(attrezzi=True)
+    mondo, gira, riga = a["mondo"], a["gira"], a["riga"]
+    prova_a, canarino = a["prova_a"], a["canarino"]
+    S = ambiente_scadenza()
+    adesso = int(time.time())
+    GIORNO = 86400
+    M = S["MARGINE_SCADENZA_PAYOUT_S"]
+    MI = S["MARGINE_SCADENZA_INCOLLA_S"]
+    GA = S["FATTURA_ANTICIPATA_GIORNI"]
+
+    # --- 0. I TRE NUMERI --------------------------------------------
+    # Le scene del limite SEGUONO le costanti (o resterebbero rosse a
+    # ogni taratura), quindi da sole non le difendono: a margine zero
+    # erano tutte verdi, l'ha trovato la tortura. Qui si difende il
+    # SENSO: minuti e non secondi, e ogni margine piu' largo del
+    # precedente, che e' l'ordine in cui il tempo passa.
+    prova("il margine del payout e' di MINUTI: non zero, non ore", True,
+          60 <= M <= 600)
+    prova("...quello della porta lo contiene, e resta sotto l'ora dei "
+          "wallet comuni", True, M < MI <= 1800)
+    prova("...e l'anticipata, se e' accesa, si conta in settimane", True,
+          GA == 0 or 14 <= GA <= 90)
+
+    # --- 1. IL LETTORE ----------------------------------------------
+    leggi = S["leggi_bolt11"]
+    vera = leggi(BOLT11_VERA_7468) or {}
+    prova("lettore: la fattura vera del 16 set nasce alle 14:28:38 UTC",
+          calendar.timegm((2026, 9, 16, 14, 28, 38)), vera.get("quando"))
+    prova("...dura un'ora, e scade un'ora dopo", (3600, 3600),
+          (vera.get("scadenza"), vera.get("scade", 0) - vera.get("quando", 0)))
+    f30 = bolt11_finta(1000, 30 * GIORNO, adesso)
+    prova("lettore: una fattura da trenta giorni, andata e ritorno",
+          {"quando": adesso, "scadenza": 30 * GIORNO,
+           "scade": adesso + 30 * GIORNO}, leggi(f30))
+    prova("lettore: senza il campo della scadenza vale un'ora (BOLT-11)",
+          3600, (leggi(bolt11_finta(1000, None, adesso)) or {}).get(
+              "scadenza"))
+    prova("lettore: MAIUSCOLA si legge uguale", leggi(f30),
+          leggi(f30.upper()))
+    # LA FIRMA NON SONO CAMPI: questi 104 gruppi cominciano come un
+    # campo `x` da 31 secondi, e un lettore che non si ferma prima della
+    # firma darebbe per morta una fattura da trenta giorni
+    firmata = bolt11_finta(1000, 30 * GIORNO, adesso,
+                           firma=[6, 0, 1, 31] + [0] * 100)
+    prova("lettore: la firma non si legge come un campo", 30 * GIORNO,
+          (leggi(firmata) or {}).get("scadenza"))
+    rotta = f30[:-1] + ("q" if f30[-1] != "q" else "p")
+    prova("lettore: un carattere cambiato e il checksum la boccia", None,
+          leggi(rotta))
+    prova("lettore: il cartone dei banchi vecchi non si legge (e va bene)",
+          [None] * 7,
+          [leggi(x) for x in ("", None, "lnbc", "lnbc1", "lnbc-fattura-1",
+                              "lnurl1dp68gurn8ghj7", "ciao")])
+
+    # --- 2. IL GEMELLO: client e server leggono le stesse fatture ----
+    node = shutil.which("node")
+    if not node:
+        salta("il lettore del server e quello del client sono gemelli",
+              "node non c'e'")
+    else:
+        mini = open("miniapp.html", encoding="utf-8").read()
+        mazzo = [BOLT11_VERA_7468, f30, rotta, "lnbc1", firmata,
+                 bolt11_finta(1000, None, adesso),
+                 bolt11_finta(21, 600, adesso - 900),
+                 bolt11_finta(0, 86400, adesso)]
+        js = (pezzo_js(mini, "function importoBolt11(pr){", "\n}\n") + "\n}\n"
+              + pezzo_js(mini, "function leggiBolt11(pr){", "\n}\n") + "\n}\n"
+              + "console.log(JSON.stringify(" + json.dumps(mazzo)
+              + ".map(leggiBolt11)));\n")
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                         encoding="utf-8") as f:
+            f.write(js)
+        try:
+            out = subprocess.run([node, f.name], capture_output=True,
+                                 encoding="utf-8", timeout=60)
+            dal_client = [None if x is None else
+                          {k: x[k] for k in ("quando", "scadenza", "scade")}
+                          for x in json.loads(out.stdout or "[]")]
+        except Exception as e:
+            dal_client = f"node e' esploso: {e}"
+        finally:
+            os.unlink(f.name)
+        prova("gemelli: `leggiBolt11` e `leggi_bolt11` dicono le stesse "
+              "cose di otto fatture", [leggi(x) for x in mazzo], dal_client)
+
+    # --- 3. LA VITA, IL GIORNO, IL RIFIUTO ALLA PORTA ---------------
+    vita = S["vita_fattura"]
+    prova("vita: quel che resta, al secondo", 30 * GIORNO - 5,
+          vita(f30, adesso + 5))
+    prova("vita: negativa se e' scaduta", True,
+          vita(BOLT11_VERA_7468) < -3 * GIORNO)
+    prova("vita: di una fattura che non si legge non si afferma niente",
+          None, vita("lnbc-fattura-1"))
+    prova("giorno: «il 16 settembre», senza l'ora", "il 16 settembre",
+          S["giorno_scadenza"](BOLT11_VERA_7468))
+    prova("giorno: scaduta oggi si dice «oggi»", "oggi",
+          S["giorno_scadenza"](bolt11_finta(1000, 3600, adesso - 3600)))
+    prova("giorno: vuoto se non si legge", "", S["giorno_scadenza"]("lnbc1"))
+    no = S["rifiuto_scadenza"]
+    prova("porta: una fattura scaduta si rifiuta, col giorno", True,
+          "già scaduta" in no(BOLT11_VERA_7468, True)
+          and "16 settembre" in no(BOLT11_VERA_7468, False))
+    al_limite = bolt11_finta(1000, 3600, adesso - 3600 + MI)
+    prova("porta: si paga subito — al LIMITE del margine passa", "",
+          no(al_limite, True, adesso))
+    prova("...e un secondo sotto no", True,
+          "scade fra" in no(al_limite, True, adesso + 1))
+    prova("porta: si paga fra giorni — trenta giorni esatti passano", "",
+          no(f30, False, adesso))
+    sotto = no(f30, False, adesso + 1)
+    prova("...e un secondo sotto no, e il rifiuto dice le tre strade", True,
+          "Lightning address" in sotto and f"{GA} giorni" in sotto
+          and "ti avvisiamo noi" in sotto)
+    un_ora = bolt11_finta(1000, 3600, adesso - 5)
+    prova("porta: la fattura «da un'ora» va bene SE si paga subito", "",
+          no(un_ora, True))
+    prova("...e non va bene se i sats partono fra giorni", True,
+          bool(no(un_ora, False)))
+    prova("porta: il cartone non si rifiuta (fail-open dichiarato)", "",
+          no("lnbc-fattura-1", False))
+    S0 = ambiente_scadenza()
+    S0["rifiuto_scadenza"].__globals__["FATTURA_ANTICIPATA_GIORNI"] = 0
+    prova("porta: con la leva a ZERO il controllo anticipato e' spento",
+          "", S0["rifiuto_scadenza"](un_ora, False))
+    prova("...ma una fattura gia' scaduta si rifiuta lo stesso", True,
+          bool(S0["rifiuto_scadenza"](BOLT11_VERA_7468, False)))
+
+    # --- 4. I MOTIVI, IN PAROLE -------------------------------------
+    motivo = S["_motivo_payout"]
+    for testo, lnd, atteso in (
+            ("", "FAILURE_REASON_NO_ROUTE", "nessuna_strada"),
+            ("", "FAILURE_REASON_TIMEOUT", "tempo"),
+            ("", "FAILURE_REASON_INSUFFICIENT_BALANCE", "saldo"),
+            ("", "FAILURE_REASON_INCORRECT_PAYMENT_DETAILS", "rifiutata"),
+            # LND vince sul testo di LNbits: e' lui che l'ha avuto in mano
+            ("invoice expired", "FAILURE_REASON_NO_ROUTE", "nessuna_strada"),
+            ("Payment failed: invoice expired. Valid until 2026", "",
+             "scaduta"),
+            ("Payment failed: no_route", "", "nessuna_strada"),
+            ("unable to find a path to destination", "", "nessuna_strada"),
+            ("Insufficient balance.", "", "saldo"),
+            ("Unable to connect to LND", "", "ponte"),
+            ("payment timed out", "", "tempo"),
+            ("FAILURE_REASON_ERROR", "FAILURE_REASON_ERROR", "ignoto"),
+            ("una frase mai vista", "", "ignoto"),
+            ("", "", "ignoto")):
+        prova(f"motivo: LNbits «{testo[:28]}», LND «{lnd[15:]}»", atteso,
+              motivo(un_ora, testo, lnd))
+    prova("motivo: senza nessuna voce, la fattura SCADUTA parla da sola",
+          "scaduta", motivo(BOLT11_VERA_7468))
+    prova("...ma se LND dice perche', ha ragione LND", "nessuna_strada",
+          motivo(BOLT11_VERA_7468, "", "FAILURE_REASON_NO_ROUTE"))
+    motivo.__globals__["_ponte"]["stato"] = "giu"
+    prova("motivo: nessuno sa niente e il ponte e' giu' adesso → ponte",
+          "ponte", motivo(un_ora, "boh"))
+    motivo.__globals__["_ponte"]["stato"] = "ok"
+    prova("ogni motivo ha le sue parole, e nessuna e' vuota", True,
+          all(S["PAROLE_MOTIVO"].get(m) for m in (
+              "scaduta", "nessuna_strada", "saldo", "ponte", "tempo",
+              "rifiutata", "bruciata", "ignoto")))
+    ricorda, visti = S["_ricorda_motivo_lnd"], S["_lnd_motivi"]
+    ricorda("h1", json.dumps({"result": {
+        "status": "FAILED", "failure_reason": "FAILURE_REASON_NO_ROUTE"}}))
+    ricorda("h2", json.dumps({
+        "status": "FAILED", "failure_reason": "FAILURE_REASON_TIMEOUT"}))
+    ricorda("h3", json.dumps({
+        "status": "SUCCEEDED", "failure_reason": "FAILURE_REASON_NONE"}))
+    for storta in ("non e' json", "[1, 2]", "null", ""):
+        ricorda("h4", storta)
+    prova("LND: il `failure_reason` si tiene, nelle due forme della riga",
+          {"h1": "FAILURE_REASON_NO_ROUTE", "h2": "FAILURE_REASON_TIMEOUT"},
+          dict(visti))
+    prova("...e `_chiedi_lnd` lo mette da parte PRIMA di rispondere", True,
+          "_ricorda_motivo_lnd(payment_hash, riga)" in
+          codice(pezzo("_chiedi_lnd")))
+
+    # --- 5. LE SCENE -------------------------------------------------
+    def orecchie(m, chi=222):
+        """Le notifiche si SENTONO (nel banco di ieri erano mute), e a
+        bussare alle rotte e' il venditore, non il moderatore."""
+        m.sentite = []
+
+        async def _n(a_chi, testo):
+            m.sentite.append((a_chi, testo))
+        m.amb["notifica"] = _n
+        m.amb["verifica_utente"] = lambda *a: {"id": chi}
+        return m
+
+    def ferma(m, t):
+        """L'orologio del mondo, fermo a `t`: il limite del margine si
+        guarda al secondo, e un banco che corre non lo sa fare."""
+        class Fermo:
+            def time(self):
+                return t
+
+            def __getattr__(self, nome):
+                return getattr(time, nome)
+        m.amb["time"] = Fermo()
+        m.amb["vita_fattura"].__globals__["time"] = Fermo()
+
+    def colonne(m, *nomi):
+        return tuple(m.vero.execute(
+            f"SELECT {', '.join(nomi)} FROM ordini WHERE id=1").fetchone())
+
+    def incolla(m, bolt11):
+        return gira(prova_a(m.amb["deposita_invoice"](
+            1, {"invoice": bolt11}, "", "")))
+
+    def H(bolt11):
+        """L'hash che il nodo di cartone da' a una fattura: tronco a
+        100, come quello vero sulla riga."""
+        return ("hash-di-" + bolt11)[:100]
+
+    quattro_giorni_fa = bolt11_finta(1000, 3600, adesso - 4 * GIORNO - 3600)
+    il_giorno = S["giorno_scadenza"](quattro_giorni_fa)
+
+    # 5a. L'ORDINE #152: incollata alla spedizione, scaduta al payout
+    m = orecchie(mondo(invoice=quattro_giorni_fa, address=""))
+    esito = gira(m.sblocca())
+    prova("#152: a LNbits non si chiede di pagare NIENTE", [],
+          m.nodo.partiti)
+    prova("...e su LNbits non nasce nessuna riga `failed` da chiarire", {},
+          m.nodo.lnbits)
+    prova("...l'ordine va in «confirmed»: i sats spettano a lui, manca il "
+          "modo", ("confirmed", "", ""), riga(m))
+    prova("...la fattura morta si toglie, il giro a vuoto si conta, e "
+          "l'eta' dell'ultimo tentativo VERO non si tocca", ("", 1, 0),
+          colonne(m, "invoice_venditore", "payout_tentativi",
+                  "payout_ultimo"))
+    prova("...il diario dice perche'", True,
+          "scaduta" in colonne(m, "payout_errore")[0])
+    prova("...e nessun hash entra nella memoria dei tentativi", 0,
+          m.vero.execute("SELECT COUNT(*) FROM payout_tentati").fetchone()[0])
+    al_venditore = " ".join(t for chi, t in m.sentite if chi == 222)
+    prova("#152: al venditore si dice CHE e' scaduta e QUANDO", True,
+          f"è scaduta {il_giorno}" in al_venditore)
+    prova("...cosa fare, con la cifra, e la cura che non scade mai", True,
+          "fattura <b>nuova</b>" in al_venditore and "1.000" in al_venditore
+          and "Lightning address" in al_venditore)
+    prova("...e MAI PIU' che la rete non ha trovato una strada", False,
+          "non ha trovato una strada" in al_venditore)
+    prova("#152: ai moderatori «NON TENTATO», col giorno — non «FALLITO»",
+          (True, False),
+          (any("NON TENTATO" in x and il_giorno in x for x in m.avvisi),
+           any("FALLITO" in x for x in m.avvisi)))
+    prova("...e il journal ha la sua riga ⌛", True,
+          any("⌛" in d and "scaduta" in d for d in m.detto))
+    prova("...e chi ha chiamato lo sa (e' quel che legge il pannello 🧊)",
+          "scaduta", esito.get("motivo"))
+    # Pedro rincolla LA STESSA: si rifiuta alla porta, con le parole
+    e = incolla(m, quattro_giorni_fa)
+    prova("#152: la STESSA fattura rincollata si rifiuta alla porta",
+          (400, True), (getattr(e, "status_code", None),
+                        "già scaduta" in str(getattr(e, "detail", ""))))
+    # ...e ne incolla una NUOVA: parte subito, una volta sola
+    nuova = bolt11_finta(1000, 3600, adesso - 5)
+    e = incolla(m, nuova)
+    prova("#152: la fattura NUOVA si paga subito, una volta",
+          ("released", [H(nuova)]),
+          (e.get("stato") if isinstance(e, dict) else e, m.nodo.partiti))
+
+    # 5b. scaduta, ma c'e' il Lightning address: ci pensiamo noi
+    m = orecchie(mondo(invoice=quattro_giorni_fa, address="chi@wallet.tld"))
+    gira(m.sblocca())
+    prova("address: la scaduta non si tenta e la riga aspetta il giro",
+          ([], ("confirmed", "da_riprovare", "")),
+          (m.nodo.partiti, riga(m)))
+    al_venditore = " ".join(t for chi, t in m.sentite if chi == 222)
+    prova("...e al venditore si dice che ci pensiamo noi, dall'address",
+          True, "è scaduta" in al_venditore
+          and "Lightning address" in al_venditore
+          and "non devi fare niente" in al_venditore)
+    gira(m.sblocca())
+    prova("...al giro dopo si conia dall'address e si paga, una volta",
+          ("released", ["hash-di-lnbc-fattura-1"]),
+          (riga(m)[0], m.nodo.partiti))
+
+    # 5c. IL LIMITE DEL MARGINE, al secondo
+    sul_filo = bolt11_finta(1000, 3600, adesso - 3600 + M)
+    m = mondo(invoice=sul_filo, address="")
+    ferma(m, adesso + 1)                 # le restano M-1 secondi
+    gira(m.sblocca())
+    prova(f"limite: a {M - 1} secondi dalla scadenza NON si tenta", [],
+          m.nodo.partiti)
+    m = mondo(invoice=sul_filo, address="")
+    ferma(m, adesso)                     # le restano M secondi esatti
+    gira(m.sblocca())
+    prova(f"...a {M} secondi esatti si paga", [H(sul_filo)],
+          m.nodo.partiti)
+
+    # 5d. IMPORTO DIVERSO: e' un allarme, e vince sulla scadenza
+    async def _storto(bolt11, dec=None, cassaforte=""):
+        return 999
+    m = orecchie(mondo(invoice=quattro_giorni_fa, address=""))
+    m.amb["importo_invoice"] = _storto
+    gira(m.sblocca())
+    prova("importo: storto E scaduta → «rifiutato», non «scaduta»",
+          ([], True, False),
+          (m.nodo.partiti,
+           any("Pagamento rifiutato" in x and "999" in x for x in m.avvisi),
+           any("NON TENTATO" in x for x in m.avvisi)))
+    m = orecchie(mondo(address="", stato="confirmed"))
+    m.amb["importo_invoice"] = _storto
+    e = incolla(m, nuova)
+    prova("importo: alla porta l'importo sbagliato si rifiuta, e si dice "
+          "quale", (400, True),
+          (getattr(e, "status_code", None),
+           "Importo sbagliato" in str(getattr(e, "detail", ""))
+           and "999" in str(getattr(e, "detail", ""))))
+
+    # 5e. IL 520 COL SUO PERCHE': il numero non e' il motivo
+    for detail, spia_admin, spia_venditore, vietata in (
+            ("Payment failed: invoice expired. Valid until 16 set",
+             "<b>scaduta</b>", "è scaduta", "non ha trovato una strada"),
+            ("Payment failed: no_route", "non ha trovato una strada",
+             "non ha trovato una strada", "è scaduta"),
+            ("Insufficient balance.", "NOSTRO saldo", "non per colpa tua",
+             "non ha trovato una strada"),
+            ("Unable to connect to LND", "ponte verso il nodo",
+             "non per colpa tua", "non ha trovato una strada"),
+            ("una frase mai vista", "non si è potuto leggere",
+             "non è riuscito", "non ha trovato una strada")):
+        m = orecchie(mondo(invoice=nuova, address=""))
+        m.nodo.modi[nuova] = (520, detail)
+        gira(m.sblocca())
+        avviso = " ".join(m.avvisi)
+        al_venditore = " ".join(t for chi, t in m.sentite if chi == 222)
+        prova(f"520 «{detail[:24]}»: ai moderatori il PERCHE' in parole",
+              True, "FALLITO" in avviso and "Perché:" in avviso
+              and spia_admin in avviso)
+        prova("...col testo grezzo di LNbits accanto, e nel diario", True,
+              detail[:20] in avviso
+              and detail[:20] in colonne(m, "payout_errore")[0])
+        prova("...e al venditore la frase giusta, non quella di un altro "
+              "guasto", (True, False),
+              (spia_venditore in al_venditore, vietata in al_venditore))
+        if "expired" in detail:
+            prova("...senza un giorno: per il nostro orologio era ancora "
+                  "viva, e una data nel futuro farebbe dubitare del resto",
+                  True, "è scaduta</b>" in al_venditore
+                  and "<b>scaduta</b>. LND" in avviso)
+
+    # 5f. SCADUTA ≠ IN VOLO: la forma del #152 DOPO il fatto — l'hash ha
+    # una riga `failed` su LNbits, LND non l'ha mai visto, la fattura
+    # morta e' ancora in colonna — finita sul tavolo dei moderatori
+    def congelata(eta_s):
+        m = orecchie(mondo(invoice=quattro_giorni_fa, address=""))
+        h = H(quattro_giorni_fa)
+        m.nodo.lnbits[h] = "failed"
+        m.vero.execute("INSERT INTO payout_tentati(tabella, riga_id, hash, "
+                       "quando, esito) VALUES('ordini',1,?,?,'')",
+                       (h, adesso - eta_s))
+        m.vero.execute("UPDATE ordini SET payout_stato='incerto', "
+                       "payout_hash=?, payout_verso='venditore', "
+                       "payout_ultimo=?, payout_tentativi=1",
+                       (h, adesso - eta_s))
+        m.vero.commit()
+        canarino(m)
+        m.amb["verifica_utente"] = lambda *a: {"id": 999}
+        return m, h
+    m, h = congelata(4 * GIORNO)
+    r = gira(prova_a(m.decidi("verifica")))
+    prova("🧊 «Verifica e riprova» su una scaduta: NON ripaga la vecchia",
+          [], m.nodo.partiti)
+    prova("...toglie il fermo e chiede una fattura nuova",
+          ("confirmed", "", h), riga(m))
+    prova("...per la strada delle FONTI: e' un tentativo FALLITO di una "
+          "fattura scaduta, non un «non tentato»", (True, False),
+          (any("FALLITO" in x and "<b>scaduta</b>" in x for x in m.avvisi),
+           any("NON TENTATO" in x for x in m.avvisi)))
+    prova("...e al moderatore dice che era SCADUTA, non «in volo»", True,
+          isinstance(r, dict) and "SCADUTA" in r.get("messaggio", "")
+          and "niente in volo" in r.get("messaggio", ""))
+    prova("...e al venditore pure", True,
+          any("è scaduta" in t for chi, t in m.sentite if chi == 222))
+    m, h = congelata(60)
+    r = gira(prova_a(m.decidi("verifica")))
+    prova("🧊 ...ma un tentativo di UN MINUTO fa resta «in volo»: i 15 "
+          "minuti di ieri non li scavalca nessun calendario", (409, []),
+          (getattr(r, "status_code", None), m.nodo.partiti))
+
+    # 5g. LA PORTA: quando si incolla
+    m = orecchie(mondo(address="", stato="shipped"))
+    e = incolla(m, un_ora)
+    prova("porta: spedito, fattura da un'ora → rifiutata con le tre strade",
+          (400, True, ""),
+          (getattr(e, "status_code", None),
+           "Lightning address" in str(getattr(e, "detail", "")),
+           colonne(m, "invoice_venditore")[0]))
+    lunga = bolt11_finta(1000, 31 * GIORNO, adesso - 5)
+    e = incolla(m, lunga)
+    prova("porta: spedito, fattura da 31 giorni → salvata, e si aspetta",
+          (True, lunga, "shipped", []),
+          (isinstance(e, dict) and e.get("ok"),
+           colonne(m, "invoice_venditore")[0], riga(m)[0], m.nodo.partiti))
+    m = orecchie(mondo(address="", stato="confirmed"))
+    e = incolla(m, bolt11_finta(1000, 3600, adesso - 3600 + 300))
+    prova("porta: confermato, fattura che muore fra 5 minuti → rifiutata",
+          (400, True, []),
+          (getattr(e, "status_code", None),
+           "scade fra" in str(getattr(e, "detail", "")), m.nodo.partiti))
+    e = incolla(m, un_ora)
+    prova("porta: confermato, fattura da un'ora → pagata all'istante",
+          "released", e.get("stato") if isinstance(e, dict) else e)
+
+    # 5h. SCADUTA MA GIA' PAGATA: la fattura e' morta DOPO che il suo
+    # pagamento era partito (e arrivato). A dire com'e' finita sono le
+    # fonti, non il calendario: l'affare si chiude, e non si chiede
+    # nessuna fattura nuova a chi i sats li ha gia'.
+    def gia_tentata(lnbits, lnd, eta_s=4 * GIORNO, address=""):
+        m = orecchie(mondo(invoice=quattro_giorni_fa, address=address))
+        h = H(quattro_giorni_fa)
+        if lnbits:
+            m.nodo.lnbits[h] = lnbits
+        if lnd:
+            m.nodo.lnd[h] = lnd
+        m.vero.execute("INSERT INTO payout_tentati(tabella, riga_id, hash, "
+                       "quando, esito) VALUES('ordini',1,?,?,'')",
+                       (h, adesso - eta_s))
+        m.vero.commit()
+        canarino(m)
+        return m
+    m = gia_tentata("success", "SUCCEEDED")
+    gira(m.sblocca())
+    prova("scaduta ma GIA' USCITA: l'affare si chiude come pagato, senza "
+          "un secondo pagamento", ("released", "uscito", []),
+          (riga(m)[0], riga(m)[1], m.nodo.partiti))
+    prova("...e a nessuno si chiede una fattura nuova", False,
+          any("scaduta" in t for _, t in m.sentite))
+    # 5i. gia' tentata, MAI PARTITA (le fonti non ne sanno niente, ed e'
+    # passato il tempo), e adesso scaduta: si potrebbe riprovare — ma la
+    # fattura e' morta. E' il secondo passaggio della cintura.
+    m = gia_tentata("", "")
+    gira(m.sblocca())
+    prova("gia' tentata, mai partita, e adesso scaduta: NON si ritenta",
+          ([], True), (m.nodo.partiti,
+                       any("è scaduta" in t for _, t in m.sentite)))
+    # 5j. LA FATTURA BRUCIATA: viva, ma gia' fallita una volta
+    m = orecchie(mondo(invoice=nuova, address=""))
+    m.nodo.lnbits[H(nuova)] = "failed"
+    m.vero.execute("INSERT INTO payout_tentati(tabella, riga_id, hash, "
+                   "quando, esito) VALUES('ordini',1,?,?,'')",
+                   (H(nuova), adesso - GIORNO))
+    m.vero.commit()
+    canarino(m)
+    gira(m.sblocca())
+    prova("bruciata: ai moderatori «già stata tentata», e non si ripaga",
+          (True, []), (any("già stata tentata" in x for x in m.avvisi),
+                       m.nodo.partiti))
+    m = mondo(address="")
+    m.nodo.lnbits[H(nuova)] = "failed"
+    tac = {}
+    gira(m.amb["paga_venditore"](nuova, 1000, tac, cassaforte="nodo"))
+    prova("...anche sulla strada vecchia, senza la riga", "bruciata",
+          tac.get("motivo"))
+    # 5k. COLPA NOSTRA, e c'e' l'address: ci riproviamo, senza accusare
+    m = orecchie(mondo(invoice=nuova, address="chi@wallet.tld"))
+    m.nodo.modi[nuova] = (520, "Insufficient balance.")
+    gira(m.sblocca())
+    al_venditore = " ".join(t for chi, t in m.sentite if chi == 222)
+    prova("saldo nostro + address: «non per colpa tua», e ci riproviamo",
+          ("da_riprovare", True, False),
+          (riga(m)[1], "non per colpa tua" in al_venditore
+           and "ci riproviamo noi" in al_venditore,
+           "non ha trovato una strada" in al_venditore))
+
+    # --- 6. LE SENTINELLE: la forma che non deve sparire -------------
+    pv = codice(pezzo("paga_venditore"))
+    ordine = [pv.index(x) for x in (
+        "chiesto != atteso_sats", "scade_presto =", "_verita_riga(",
+        "_prendi_la_mano(", "c.post(")]
+    prova("la cintura della scadenza sta DOPO l'importo e PRIMA della "
+          "verita', della mano e della POST", sorted(ordine), ordine)
+    prova("...e ripassa una seconda volta prima della mano (gia' tentata, "
+          "mai partita, e adesso scaduta)", True,
+          pv.count("return await _non_si_tenta()") == 2
+          and pv.rindex("return await _non_si_tenta()")
+          < pv.index("_prendi_la_mano("))
+    corpo = pv[pv.index("async def _non_si_tenta("):pv.index("if scade_presto:")]
+    prova("...chi non tenta non tocca la rete e non lascia un nome sulla "
+          "riga", (False, True),
+          ("httpx" in corpo or "_stato_pagamento" in corpo,
+           'taccuino.pop("hash", None)' in corpo))
+    dep = codice(pezzo("deposita_invoice"))
+    prova("alla porta la scadenza si guarda dopo l'importo e prima di "
+          "salvare", True,
+          dep.index("Importo sbagliato") < dep.index("rifiuto_scadenza(")
+          < dep.index("UPDATE ordini SET"))
+    prova("...anche sui rimborsi d'asta, dove si paga all'istante", True,
+          "rifiuto_scadenza(bolt11, subito=True)" in _SORGENTE)
+    sbl = codice(pezzo("_sblocca_sats"))
+    prova("in `_sblocca_sats` le parole le sceglie il MOTIVO, nei due "
+          "rami", (True, True),
+          ("_msg_fattura_nuova(netto, taccuino)" in sbl,
+           "_msg_ritentiamo(netto, taccuino)" in sbl))
+
+
 def prove_pagamento_incerto():
     """Il timeout di paga_venditore (ago 2026, audit). LNbits puo'
     aver pagato e non essere riuscito a dircelo: prima l'eccezione
@@ -4591,7 +5168,8 @@ def prove_pagamento_incerto():
         async def _avvisa(t):
             avvisi.append(t)
 
-        amb = {"httpx": _finto_lnbits(uscite, codice, muto,
+        amb = {**ambiente_scadenza(),
+               "httpx": _finto_lnbits(uscite, codice, muto,
                                       corpo={"status": "success"}),
                "importo_invoice": _importo, "notifica_admin": _avvisa,
                "decodifica_invoice": _decodifica,
@@ -4736,7 +5314,8 @@ def prove_pagamento_incerto():
             coniate.append(addr)
             return f"lnbc-nuova-{len(coniate)}"
 
-        amb = {"db": Con, "time": __import__("time"),
+        amb = {**ambiente_scadenza(),
+               "db": Con, "time": __import__("time"),
                "_lucchetti_ordine": __import__("collections").defaultdict(
                    asyncio.Lock),
                "netto_venditore": lambda p: p,
@@ -9357,7 +9936,7 @@ BOLT11_VERA_7468 = (
     "lnbc74680n1p424fukpp59hgjkkeervlh9420ekttlnjnvtwt8e5sc2ymk9qm69flw05450qqdqqcqzzsxqrrssrzjqgc2t099trn8g9rqcy7axnnrdk3gu540myw0j0dc0mgmqwf2w3nwhapyqqqqqqqjqvqqqqqqqqqq86qq2qsp5ua8gfecmkqufz5vmzudqwwaucupxhu8p24f7fp045ytsv9w2s7fs9qxpqysgqf98q726nmlrfld7wh39r8rauly63hadqn8mm330qtdxrn773r5nzfxc23j6j8rhnzew9nd8se623rmj9cznpp4spntx50zdd88elzxqq0vemvd")
 
 
-def bolt11_finta(sats, scadenza, quando):
+def bolt11_finta(sats, scadenza, quando, firma=None):
     """Una bolt11 SINTATTICAMENTE vera — bech32 col suo checksum, i
     campi taggati al posto giusto, la firma di zeri — per provare il
     lettore del client senza una chiave: `leggiBolt11` verifica il
@@ -9383,10 +9962,13 @@ def bolt11_finta(sats, scadenza, quando):
     dati = bits(quando, 7)
     dati += tag(1, [0] * 52)             # p: payment hash di zeri (256 bit)
     dati += tag(13, [])                  # d: descrizione vuota
-    dati += tag(6, minimo(scadenza))     # x: la scadenza
+    if scadenza is not None:             # senza `x` vale un'ora (BOLT-11)
+        dati += tag(6, minimo(scadenza))     # x: la scadenza
     dati += tag(24, minimo(80))          # c: cltv finale, come LND
     dati += tag(16, [0] * 52)            # s: payment secret di zeri
-    dati += [0] * 104                    # la firma: 65 byte di zeri
+    # la firma: 65 byte di zeri — o 104 gruppi scelti da chi prova un
+    # lettore che non deve scambiarli per campi (20 set 2026)
+    dati += list(firma) if firma else [0] * 104
 
     def polymod(v):
         GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3]
@@ -71675,7 +72257,7 @@ def main():
               prove_foto_spenta, prove_foto_telegram_fallita,
               prove_nome_da_nostr,
               prove_pagamento_incerto, prove_esito_pagamento,
-              prove_pagamenti_in_volo,
+              prove_pagamenti_in_volo, prove_fatture_scadute,
               prove_doppio_wallet, prove_saas_senza_doveri, prove_orfani, prove_capitale_cassa,
               prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,

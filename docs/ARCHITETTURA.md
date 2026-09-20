@@ -61,6 +61,43 @@
   `amount_msat` una volta sola, la `pr` mai restituita nuda): questo
   controllo sparisce in un riordino senza rompere nessuna prova
   funzionale, ed è esattamente il tipo di riga che va sorvegliata.
+  LA SCADENZA DI OGNI BOLT11 IN USCITA SI GUARDA PRIMA DI TENTARE (20
+  set 2026, ordine #152: fattura incollata alla spedizione, payout
+  quattro giorni dopo, fattura morta da quattro). Giudice unico
+  `vita_fattura`, che legge nascita e scadenza DALLA BOLT11
+  (`leggi_bolt11`: bech32 col checksum, timestamp su 35 bit, campo `x`,
+  3600 s se manca) e NON da LNbits: la forma del JSON di
+  `/payments/decode` è di LNbits e cambia con le sue versioni, la
+  bolt11 è uno standard — e il client ha già il suo gemello
+  (`leggiBolt11`), con una prova che li fa leggere le stesse fatture.
+  Ci passano TRE posti: la cintura di `paga_venditore` (sotto
+  `MARGINE_SCADENZA_PAYOUT_S`, 2 minuti, NON SI TENTA: niente rete,
+  nessun hash sulla riga, nessuna riga `failed` su LNbits da chiarire
+  dopo), la porta del deposito a mano (`rifiuto_scadenza`: 10 minuti se
+  si paga subito, `FATTURA_ANTICIPATA_GIORNI` — 30, e 0 = spento — se i
+  sats partono alla conferma) e la scelta delle PAROLE. La cintura sta
+  DOPO quella dell'importo (un importo storto è un allarme, e vince) e
+  vale solo per una fattura che NOI non abbiamo mai tentato: se
+  l'abbiamo già provata, a dire com'è finita sono le fonti
+  (`_verita_pagamento`), non il calendario — un pagamento partito in
+  tempo può saldarsi a fattura scaduta. Una fattura che non si legge
+  NON si rifiuta (fail-open dichiarato: al peggio è il comportamento di
+  ieri). Un giro a vuoto CONTA nel freno dell'anello
+  (`payout_tentativi`) ma non tocca `payout_ultimo`, che è l'età
+  dell'ultimo tentativo VERO.
+  IL MOTIVO DI UN PAYOUT MANCATO SI DICE IN PAROLE (`_motivo_payout`,
+  otto voci: scaduta, nessuna_strada, saldo, ponte, tempo, rifiutata,
+  bruciata, ignoto), e l'ordine delle fonti è quello di chi ne sa di
+  più: il `failure_reason` di LND (che `_chiedi_lnd` mette da parte in
+  `_lnd_motivi` leggendo `track`), poi la FATTURA — la fonte giusta
+  proprio quando LND non ha nessuna riga, perché una scaduta la rifiuta
+  prima di registrarla — poi il `detail` del 520 di LNbits (spie su un
+  testo libero: scelgono una frase, non decidono niente), poi il
+  guardiano del ponte. «Ignoto» si dice, con la riga grezza accanto:
+  un motivo inventato manda a guardare nel posto sbagliato. Le parole
+  per chi modera stanno in `PAROLE_MOTIVO`; per chi aspetta i sats in
+  `_msg_fattura_nuova` e `_msg_ritentiamo` — tre famiglie: scaduta,
+  COLPA NOSTRA (saldo, ponte: lo si dice), e il resto.
   E `paga_venditore` HA QUATTRO ESITI (ago 2026): PAGATO, NON_PAGATO,
   INCERTO e **NON_CHIESTO** — la voce dei tre sta qui sotto, il quarto
   è più giù, sotto «NON HO POTUTO CHIEDERE».

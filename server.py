@@ -7633,6 +7633,31 @@ def _lnd_stato_da_riga(riga: str) -> str:
                               LND_FAILED) else LND_MUTO
 
 
+# IL PERCHE' DI UN «FAILED» (20 set 2026). LND lo dice nella stessa
+# riga dello stato — `failure_reason` — e fino a ieri lo buttavamo via:
+# si sapeva CHE era fallito, mai PERCHE'. Si tiene in memoria e basta
+# (un riavvio lo perde, e non importa: serve a scegliere le PAROLE di
+# un avviso, mai a muovere un sat), con un tetto, che un dizionario
+# senza fondo in un processo che campa settimane e' una perdita lenta.
+_lnd_motivi = {}
+
+
+def _ricorda_motivo_lnd(payment_hash: str, riga: str):
+    """Mette da parte il `failure_reason` di una riga di `track`. NON
+    ALZA MAI e non decide niente: una riga che non si legge non lascia
+    nessun motivo, e chi lo cerca trova il vuoto."""
+    try:
+        d = json.loads(riga)
+        pag = d.get("result") if isinstance(d.get("result"), dict) else d
+        motivo = str(pag.get("failure_reason") or "").upper()
+    except Exception:
+        return
+    if motivo and motivo != "FAILURE_REASON_NONE":
+        if len(_lnd_motivi) > 500:
+            _lnd_motivi.clear()
+        _lnd_motivi[payment_hash] = motivo
+
+
 async def _chiedi_lnd(payment_hash: str) -> str:
     """La domanda nuda a LND, senza canarino. NON ALZA MAI: ogni guasto
     e' MUTO, e del guasto si stampa il TIPO e basta (mai l'URL coi suoi
@@ -7656,6 +7681,7 @@ async def _chiedi_lnd(payment_hash: str) -> str:
                 # stato di adesso, ed e' tutto quel che si vuole sapere.
                 async for riga in r.aiter_lines():
                     if riga.strip():
+                        _ricorda_motivo_lnd(payment_hash, riga)
                         return _lnd_stato_da_riga(riga)
         return LND_MUTO
     except Exception as e:
@@ -7908,6 +7934,116 @@ def _prendi_la_mano(tabella: str, riga_id: int, verso: str,
     return bool(cur.rowcount)
 
 
+# I MOTIVI DI UN PAYOUT CHE NON ARRIVA (20 set 2026, ordine #152).
+# Fino a ieri l'avviso diceva «LNbits ha risposto 520», cioe' il numero
+# di una porta sbattuta: chi lo leggeva non sapeva se guardare il nodo,
+# il saldo, o scrivere al venditore. Il motivo si dice IN PAROLE, e sono
+# otto perche' otto sono le cose diverse da FARE.
+MOTIVO_SCADUTA, MOTIVO_STRADA, MOTIVO_SALDO, MOTIVO_PONTE = (
+    "scaduta", "nessuna_strada", "saldo", "ponte")
+MOTIVO_TEMPO, MOTIVO_RIFIUTATA, MOTIVO_BRUCIATA, MOTIVO_IGNOTO = (
+    "tempo", "rifiutata", "bruciata", "ignoto")
+
+PAROLE_MOTIVO = {
+    MOTIVO_SCADUTA: (
+        "la fattura era <b>scaduta</b>{quando}. LND una fattura scaduta "
+        "la rifiuta prima ancora di cercare una strada: per questo sul "
+        "nodo, in <code>listpayments</code>, non c'è nessuna riga"),
+    MOTIVO_STRADA: (
+        "la rete Lightning <b>non ha trovato una strada</b> fino al "
+        "wallet di chi riceve — nessuna rotta, o liquidità che manca "
+        "lungo il percorso. Il wallet di un telefono si fa raggiungere "
+        "solo da sveglio"),
+    MOTIVO_SALDO: (
+        "<b>il NOSTRO saldo non basta</b>: nella cassaforte, o nei canali "
+        "in uscita del nodo, non ci sono abbastanza sats per questo "
+        "pagamento. Non è colpa di chi riceve, e va guardato adesso"),
+    MOTIVO_PONTE: (
+        "<b>il ponte verso il nodo è giù</b>: LNbits non è riuscita a "
+        "parlare con LND. Non è colpa di chi riceve né della sua "
+        "fattura; il guardiano del ponte lo sta rimettendo su"),
+    MOTIVO_TEMPO: (
+        "il pagamento è <b>scaduto per strada</b>: il nodo ha provato "
+        "finché ha potuto e nessun tentativo è arrivato in tempo"),
+    MOTIVO_RIFIUTATA: (
+        "il wallet di chi riceve ha <b>rifiutato</b> il pagamento — "
+        "dettagli che non tornano: di solito una fattura già pagata, "
+        "annullata, o scaduta dal suo lato"),
+    MOTIVO_BRUCIATA: (
+        "questa fattura era <b>già stata tentata</b> ed era fallita: "
+        "LNbits tiene una riga per payment hash e non la ritenta"),
+    MOTIVO_IGNOTO: (
+        "il motivo <b>non si è potuto leggere</b>: né LND né LNbits lo "
+        "dicono in una forma che conosciamo (la riga grezza è qui sotto)"),
+}
+
+# Come LND chiama i suoi fallimenti (`failure_reason` di `track`)...
+_MOTIVI_LND = {
+    "FAILURE_REASON_NO_ROUTE": MOTIVO_STRADA,
+    "FAILURE_REASON_TIMEOUT": MOTIVO_TEMPO,
+    "FAILURE_REASON_INSUFFICIENT_BALANCE": MOTIVO_SALDO,
+    "FAILURE_REASON_INCORRECT_PAYMENT_DETAILS": MOTIVO_RIFIUTATA,
+}
+# ...e le parole con cui li racconta LNbits nel `detail` di un 520. Sono
+# SPIE su un testo libero, in ordine: la prima che si trova vince. Non
+# decidono niente — scelgono una frase — e quel che non riconoscono
+# resta «ignoto», con la riga grezza accanto.
+_SPIE_LNBITS = (
+    (("expired", "scadut"), MOTIVO_SCADUTA),
+    (("insufficient", "not enough", "balance"), MOTIVO_SALDO),
+    (("no_route", "no route", "unable to find a path", "find a route",
+      "route not found"), MOTIVO_STRADA),
+    (("incorrect_payment_details", "incorrect payment details",
+      "already paid"), MOTIVO_RIFIUTATA),
+    (("unable to connect", "connection refused", "cannot connect",
+      "unavailable", "socks", "connecterror"), MOTIVO_PONTE),
+    (("timeout", "timed out"), MOTIVO_TEMPO),
+)
+
+
+def _motivo_payout(invoice: str, testo_lnbits: str = "",
+                   motivo_lnd: str = "") -> str:
+    """PERCHE' non e' arrivato, in una parola delle otto. L'ordine e'
+    quello di chi ne sa di piu': prima LND, che il pagamento l'ha avuto
+    in mano; poi la FATTURA, che la sua scadenza la porta scritta —
+    ed e' la fonte giusta proprio quando LND non ha nessuna riga,
+    perche' una fattura scaduta LND la rifiuta prima di registrarla;
+    poi il testo di LNbits; poi il guardiano, se il ponte e' giu'
+    adesso. E se nessuno lo sa, si dice «ignoto»: un motivo inventato
+    manda a guardare nel posto sbagliato."""
+    if motivo_lnd in _MOTIVI_LND:
+        return _MOTIVI_LND[motivo_lnd]
+    vita = vita_fattura(invoice)
+    if vita is not None and vita <= 0:
+        return MOTIVO_SCADUTA
+    testo = str(testo_lnbits or "").lower()
+    for spie, motivo in _SPIE_LNBITS:
+        if any(s in testo for s in spie):
+            return motivo
+    if _ponte.get("stato") == "giu":
+        return MOTIVO_PONTE
+    return MOTIVO_IGNOTO
+
+
+def _annota_motivo(taccuino: dict, invoice: str, testo_lnbits: str = ""):
+    """Scrive nel taccuino il MOTIVO (e il giorno, se e' una scadenza)
+    di un pagamento che non e' arrivato. Il `failure_reason` di LND c'e'
+    se in questo giro qualcuno gliel'ha chiesto — `_verita_pagamento` lo
+    fa per ogni hash gia' tentato — e se non c'e' non si fa un giro su
+    tor apposta: chi ha premuto un bottone sta guardando una rotella."""
+    motivo = _motivo_payout(invoice, testo_lnbits,
+                            _lnd_motivi.get(taccuino.get("hash") or "", ""))
+    taccuino["motivo"] = motivo
+    if motivo == MOTIVO_SCADUTA:
+        # IL GIORNO SI DICE SOLO SE E' PASSATO: quando «scaduta» lo dice
+        # LNbits di una fattura che per il nostro orologio e' ancora
+        # viva, la data scritta dentro e' nel FUTURO — e «scaduta il
+        # 21» letto il 20 farebbe dubitare di tutto il resto.
+        vita = vita_fattura(invoice)
+        taccuino["scaduta"] = (giorno_scadenza(invoice)
+                               if vita is not None and vita <= 0 else "")
+
+
 async def _avvisa_payout_fallito(taccuino: dict, sats: int):
     """L'avviso ai moderatori quando un pagamento in USCITA fallisce
     davvero (set 2026). Prima di questa riga un payout senza rotta non
@@ -7919,10 +8055,32 @@ async def _avvisa_payout_fallito(taccuino: dict, sats: int):
     Sotto try come il suo gemello del rifiuto: un avviso non deve mai
     rompere l'esito che lo ha generato."""
     try:
+        motivo = taccuino.get("motivo") or MOTIVO_IGNOTO
+        quando = (f" {taccuino['scaduta']}" if taccuino.get("scaduta")
+                  else "")
+        if motivo == MOTIVO_SCADUTA and taccuino.get("non_tentata"):
+            # NON E' UN FALLIMENTO, e non lo si chiama cosi': non e'
+            # partito niente, su LNbits non c'e' nessuna riga per
+            # quell'hash e non c'e' NIENTE da verificare. Chi modera
+            # deve poterlo leggere e passare oltre.
+            await notifica_admin(
+                f"⌛ <b>Pagamento in uscita NON TENTATO: fattura "
+                f"scaduta{quando}.</b> "
+                f"{taccuino.get('etichetta') or 'Un pagamento'} — "
+                f"<b>{_fmt_sats(sats)} sats</b>.\n\n"
+                f"La fattura che avevamo in mano non era più valida, "
+                f"quindi <b>non abbiamo nemmeno provato</b>: nessun sat "
+                f"si è mosso, su LNbits non c'è nessuna riga e non c'è "
+                f"niente da verificare. A chi aspetta i sats ne abbiamo "
+                f"chiesta una <b>nuova</b> (se ha un Lightning address, "
+                f"si riprova da lì da soli).")
+            return
         await notifica_admin(
             f"⚠️ <b>Pagamento in uscita FALLITO.</b> "
             f"{taccuino.get('etichetta') or 'Un pagamento'} — "
             f"<b>{_fmt_sats(sats)} sats</b>.\n\n"
+            f"<b>Perché:</b> "
+            f"{PAROLE_MOTIVO[motivo].format(quando=quando)}.\n\n"
             f"I sats <b>non sono usciti</b> e restano nel deposito di "
             f"garanzia. Quella fattura non si può ripagare: LNbits tiene "
             f"una riga per payment hash e a una seconda richiesta "
@@ -7930,8 +8088,8 @@ async def _avvisa_payout_fallito(taccuino: dict, sats: int):
             f"<b>nuova</b>."
             + (f"\n<code>{taccuino.get('hash')}</code>"
                if taccuino.get("hash") else "")
-            + (f"\n{taccuino.get('errore')}" if taccuino.get("errore")
-               else ""))
+            + (f"\n{html.escape(str(taccuino.get('errore')))}"
+               if taccuino.get("errore") else ""))
     except Exception as e:
         print(f"⚠️ Avviso ai moderatori non partito: {e}")
 
@@ -8115,6 +8273,46 @@ async def paga_venditore(invoice: str, atteso_sats: int,
     # hash invece di svegliare un moderatore. E' il perno del cantiere
     # B, e sta qui perche' qui l'hash esiste gia' ed e' gratis.
     taccuino["risolvibile"] = bool(phash)
+    # LA CINTURA DELLA SCADENZA (20 set 2026, ordine #152). Una fattura
+    # scaduta — o che scade mentre il pagamento e' per strada — NON SI
+    # TENTA: LND la rifiuterebbe prima di cercare una strada, LNbits ci
+    # scriverebbe sopra una riga `failed` e da li' in poi quell'hash
+    # sarebbe «un tentativo fallito» da chiarire, mentre non e' mai
+    # stato niente. Qui non si tocca la rete e non si scrive nessun
+    # hash: la riga resta pulita, e chi chiama sa il MOTIVO e il giorno.
+    # STA DOPO LA CINTURA DELL'IMPORTO (un importo storto e' un allarme,
+    # e vince) E PRIMA DELLA VERITA': vale solo per una fattura che NOI
+    # non abbiamo mai tentato — se l'abbiamo gia' pagata o provata, a
+    # dire com'e' finita sono le fonti, non il calendario (un pagamento
+    # partito in tempo puo' benissimo saldarsi a fattura scaduta).
+    vita = vita_fattura(invoice)
+    scade_presto = vita is not None and vita < MARGINE_SCADENZA_PAYOUT_S
+
+    async def _non_si_tenta() -> str:
+        quando = giorno_scadenza(invoice)
+        taccuino["motivo"] = MOTIVO_SCADUTA
+        taccuino["scaduta"] = quando if vita <= 0 else ""
+        taccuino["errore"] = (
+            f"fattura scaduta {quando}: non tentata" if vita <= 0 else
+            f"fattura che scade fra {vita}s: non tentata")
+        taccuino["ritentabile"] = True
+        taccuino["non_tentata"] = True
+        taccuino.pop("hash", None)   # nessun pagamento porta quel nome
+        print(f"⌛ {taccuino.get('etichetta') or 'Pagamento'}: "
+              f"{taccuino['errore']} ({phash[:16]}…). Niente e' partito, "
+              f"serve una fattura nuova.", flush=True)
+        await _avvisa_payout_fallito(taccuino, atteso_sats)
+        return NON_PAGATO
+
+    if scade_presto:
+        gia_tentata = False
+        if riga and phash:
+            con = db()
+            gia_tentata = any(h == phash for h, _, _ in
+                              _hash_tentati(con, riga[0], riga[1]))
+            con.close()
+        if not gia_tentata:
+            return await _non_si_tenta()
     if riga and phash:
         tabella, riga_id, verso = riga
         # 1. GLI ALTRI HASH DI QUESTA RIGA. Se uno e' uscito la riga e'
@@ -8185,8 +8383,17 @@ async def paga_venditore(invoice: str, atteso_sats: int,
             # in tutti e due i casi LNbits questa bolt11 non la ripaga.
             taccuino["errore"] = "fattura gia' bruciata da un tentativo fallito"
             taccuino["ritentabile"] = True
+            _annota_motivo(taccuino, invoice)
+            if taccuino["motivo"] == MOTIVO_IGNOTO:
+                taccuino["motivo"] = MOTIVO_BRUCIATA
             await _avvisa_payout_fallito(taccuino, atteso_sats)
             return NON_PAGATO
+        # 2b. GIA' TENTATA, MAI PARTITA, E ADESSO SCADUTA: le fonti hanno
+        #    detto che di quel tentativo non c'e' traccia, quindi si
+        #    potrebbe riprovare — ma la fattura nel frattempo e' morta.
+        #    E' la cintura della scadenza, al suo secondo passaggio.
+        if scade_presto:
+            return await _non_si_tenta()
         # 3. LA MANO. Da qui in poi la riga dice 'in_volo' col nome di
         #    questo pagamento, PRIMA che LNbits senta qualcosa.
         if not _prendi_la_mano(tabella, riga_id, verso, phash):
@@ -8221,6 +8428,9 @@ async def paga_venditore(invoice: str, atteso_sats: int,
         # storto e' un wallet rotto o un tentativo di prelievo, e
         # ribussarci da soli sarebbe insistere su un allarme.
         taccuino["ritentabile"] = True
+        _annota_motivo(taccuino, invoice)
+        if taccuino["motivo"] == MOTIVO_IGNOTO:
+            taccuino["motivo"] = MOTIVO_BRUCIATA
         await _avvisa_payout_fallito(taccuino, atteso_sats)
         return NON_PAGATO
     try:
@@ -8230,8 +8440,21 @@ async def paga_venditore(invoice: str, atteso_sats: int,
                              headers={"X-Api-Key": cf.LNBITS_ADMIN_KEY},
                              json={"out": True, "bolt11": invoice})
         if r.status_code >= 300:
-            taccuino["errore"] = f"LNbits ha risposto {r.status_code}"
+            # IL NUMERO NON E' IL MOTIVO (20 set 2026): il 520 del #152
+            # portava nel corpo «invoice expired», e noi scrivevamo «ha
+            # risposto 520». Il `detail` si legge e si tiene — corto, e
+            # sotto try: un corpo che non e' JSON non deve rompere
+            # l'esito che lo ha generato.
+            try:
+                detto = r.json()
+                detto = str(detto.get("detail") or detto.get("message")
+                            or "") if isinstance(detto, dict) else ""
+            except Exception:
+                detto = ""
+            taccuino["errore"] = (f"LNbits ha risposto {r.status_code}"
+                                  + (f": {detto[:140]}" if detto else ""))
             taccuino["ritentabile"] = True
+            _annota_motivo(taccuino, invoice, detto)
             await _avvisa_payout_fallito(taccuino, atteso_sats)
             return NON_PAGATO
         try:
@@ -8261,6 +8484,7 @@ async def paga_venditore(invoice: str, atteso_sats: int,
         print(f"⛔ Pagamento fallito ({phash[:16]}): il nodo non ha "
               f"consegnato. I sats non sono usciti.")
         taccuino["ritentabile"] = True
+        _annota_motivo(taccuino, invoice)
         await _avvisa_payout_fallito(taccuino, atteso_sats)
         return NON_PAGATO
     # Ancora in corso a budget scaduto: e' un «non lo so» a tutti gli
@@ -8273,7 +8497,7 @@ async def paga_venditore(invoice: str, atteso_sats: int,
     return INCERTO
 
 
-def _msg_ritentiamo(sats: int) -> str:
+def _msg_ritentiamo(sats: int, taccuino: dict | None = None) -> str:
     """LE PAROLE DI CHI ASPETTA I SATS mentre ci riproviamo (set 2026).
 
     Quella che sostituisce diceva «il pagamento automatico dei tuoi sats
@@ -8295,7 +8519,29 @@ def _msg_ritentiamo(sats: int) -> str:
     NON PROMETTE UN TEMPO, ed e' voluto: non lo sappiamo. «Nelle
     prossime ore» e' il massimo che si puo' dire restando veri, e una
     promessa piu' precisa sarebbe la riga che poi fa scrivere ai
-    moderatori."""
+    moderatori.
+
+    E DAL 20 SET 2026 NON DICE PIU' «NON HA TROVATO UNA STRADA» QUANDO
+    NON E' VERO: col `taccuino` in mano sa il motivo, e una fattura
+    SCADUTA o un guasto NOSTRO (saldo, ponte) hanno le loro parole. Chi
+    chiama senza taccuino sente la frase di sempre."""
+    motivo = (taccuino or {}).get("motivo")
+    if motivo and motivo == MOTIVO_SCADUTA:
+        quando = (f" {taccuino['scaduta']}" if taccuino.get("scaduta")
+                  else "")
+        return (f"⌛ <b>La fattura che ci avevi dato è scaduta{quando}</b>, "
+                f"quindi non l'abbiamo usata — e non è un problema. I tuoi "
+                f"<b>{_fmt_sats(sats)} sats</b> restano nel deposito di "
+                f"garanzia e te li mandiamo al tuo <b>Lightning address</b>, "
+                f"che non scade mai: <b>ci pensiamo noi</b> nei prossimi "
+                f"minuti, non devi fare niente.")
+    if motivo and motivo in (MOTIVO_SALDO, MOTIVO_PONTE):
+        return (f"⏳ <b>I tuoi sats non sono ancora partiti</b>, e non per "
+                f"colpa tua: è un problema del <b>nostro</b> nodo Lightning, "
+                f"e lo stiamo guardando. Sono tuoi — "
+                f"<b>{_fmt_sats(sats)} sats</b> — e restano nel deposito di "
+                f"garanzia finché non li ricevi: <b>ci riproviamo noi</b> "
+                f"nelle prossime ore, non devi fare niente.")
     return (f"⏳ <b>I tuoi sats non sono ancora arrivati.</b> Sono tuoi — "
             f"<b>{_fmt_sats(sats)} sats</b> — e restano nel deposito di "
             f"garanzia finché non li ricevi. Al primo tentativo la rete "
@@ -8303,6 +8549,57 @@ def _msg_ritentiamo(sats: int) -> str:
             f"<b>ci riproviamo noi</b> nelle prossime ore, non devi fare "
             f"niente. Se il tuo wallet vive su un telefono, tenere l'app "
             f"aperta un momento aiuta.")
+
+
+def _msg_fattura_nuova(sats: int, taccuino: dict) -> str:
+    """LE PAROLE PER CHI DEVE DARCI UNA FATTURA NUOVA (20 set 2026).
+
+    Quella di ieri diceva a tutti «la rete Lightning non ha trovato una
+    strada fino alla fattura che ci avevi dato» — e a Pedro, ordine
+    #152, l'ha detto di una fattura SCADUTA da quattro giorni, per cui
+    nessuna strada era mai stata cercata. Una frase falsa sul perche'
+    manda a fare la cosa sbagliata: chi crede a un problema di rotta
+    tiene aperto il wallet e rincolla la STESSA fattura.
+
+    TRE FAMIGLIE, perche' tre sono le cose che chi legge puo' fare.
+    SCADUTA: non e' colpa di nessuno, serve una fattura nuova — e gli
+    si dice la cura che chiude il problema per sempre, il Lightning
+    address. COLPA NOSTRA (saldo, ponte): lo si dice, o chi aspetta i
+    sats va a cercare il guasto nel suo wallet. IL RESTO: la frase di
+    ieri dove e' vera (nessuna strada, tempo scaduto per strada),
+    neutra dove il motivo non si sa. In tutt'e tre: i sats sono SUOI e
+    dove stanno, per primi — e' la prima domanda di chiunque legga."""
+    motivo = taccuino.get("motivo") or MOTIVO_IGNOTO
+    coda = (f"I <b>{_fmt_sats(sats)} sats</b> sono tuoi e sono al sicuro nel "
+            f"deposito di garanzia: apri l'ordine nella Mini App e incolla "
+            f"una fattura <b>nuova</b> da esattamente "
+            f"<b>{_fmt_sats(sats)} sats</b>")
+    if motivo == MOTIVO_SCADUTA:
+        quando = (f" {taccuino['scaduta']}" if taccuino.get("scaduta")
+                  else "")
+        return (f"⌛ <b>La fattura che avevi incollato è scaduta{quando}</b>, "
+                f"quindi il pagamento non è nemmeno partito: una fattura "
+                f"Lightning vale per un tempo limitato, e quel tempo è finito "
+                f"prima che toccasse a lei. {coda} — oppure metti "
+                f"un <b>Lightning address</b> nel Profilo: quello non scade "
+                f"mai, e da lì in poi ci pensiamo noi.")
+    if motivo in (MOTIVO_SALDO, MOTIVO_PONTE):
+        return (f"⚠️ <b>Il pagamento dei tuoi sats non è riuscito, e non per "
+                f"colpa tua</b>: è un problema del <b>nostro</b> nodo "
+                f"Lightning, e lo stiamo guardando. La fattura che ci avevi "
+                f"dato però non si può più usare. {coda}. Se imposti il tuo "
+                f"Lightning address, la prossima volta ci pensiamo noi.")
+    if motivo in (MOTIVO_STRADA, MOTIVO_TEMPO):
+        return ("⚠️ <b>Il pagamento non è arrivato al tuo wallet.</b> "
+                "La rete Lightning non ha trovato una strada fino alla "
+                "fattura che ci avevi dato, e quella fattura ora non si "
+                f"può più usare. {coda}. Se il tuo wallet vive su un "
+                "telefono, tienilo aperto mentre la incolli. Se imposti il "
+                "tuo Lightning address, la prossima volta ci pensiamo noi.")
+    return ("⚠️ <b>Il pagamento dei tuoi sats non è riuscito</b>, e la "
+            "fattura che ci avevi dato ora non si può più usare. "
+            f"{coda}. Se imposti il tuo Lightning address, la prossima "
+            "volta ci pensiamo noi.")
 
 
 def _timbra_pagamento(con, tabella: str, riga_id: int, diario: dict):
@@ -8349,6 +8646,15 @@ def _timbra_pagamento(con, tabella: str, riga_id: int, diario: dict):
         pezzi.append("payout_tentativi=payout_tentativi+1")
         pezzi.append("payout_ultimo=?")
         valori.append(int(time.time()))
+    elif diario.get("non_tentata"):
+        # UN GIRO A VUOTO CONTA (20 set 2026): la fattura era scaduta e
+        # non si e' tentato niente, ma il freno dell'anello deve
+        # sentirlo lo stesso — un Lightning address che conia fatture
+        # da un minuto verrebbe ribussato a ogni battito, per sempre.
+        # `payout_ultimo` invece NON si tocca: e' l'eta' dell'ultimo
+        # tentativo VERO, e ringiovanirla farebbe sembrare «in volo» un
+        # hash di ieri alle righe nate prima della memoria.
+        pezzi.append("payout_tentativi=payout_tentativi+1")
     if diario.get("errore"):
         pezzi.append("payout_errore=?")
         valori.append(str(diario["errore"])[:200])
@@ -8549,6 +8855,183 @@ async def importo_invoice(bolt11: str, dec: dict | None = None,
     if dec is None:
         return None
     return int(dec.get("amount_msat", 0)) // 1000
+
+
+# ---- LA SCADENZA DI UNA FATTURA (20 set 2026, ordine #152) ----------
+# IL CASO VERO: il venditore incolla una fattura Zeus quando spedisce;
+# il payout parte alla consegna confermata, QUATTRO GIORNI dopo; la
+# fattura era scaduta da quattro giorni (la scadenza sta scritta dentro
+# la bolt11). LND la rifiuta prima ancora di cercare una strada — nessuna
+# riga in `listpayments` — LNbits segna `failed` e risponde 520, e noi
+# scrivevamo «LNbits ha risposto 520» a chi modera e «la rete Lightning
+# non ha trovato una strada» a chi vendeva. Due frasi, nessuna vera.
+# Una fattura scaduta non e' un pagamento fallito: e' un pagamento che
+# non andava nemmeno TENTATO, e lo si sa leggendo la fattura.
+#
+# I TRE NUMERI, e il perche' di ognuno.
+# `MARGINE_SCADENZA_PAYOUT_S` (2 minuti): sotto questa vita residua non
+#   si paga. Un pagamento dura — la POST a LNbits ha un minuto di tempo,
+#   il nodo prova piu' strade — e chi riceve rifiuta gli HTLC che
+#   arrivano a fattura scaduta: partire con un minuto di vita vuol dire
+#   fallire a meta', BRUCIARE la bolt11 (LNbits tiene una riga per hash)
+#   e non saper dire perche'. E' corto apposta: le fatture coniate da un
+#   Lightning address si pagano nello stesso istante, e certi servizi le
+#   fanno durare cinque minuti.
+# `MARGINE_SCADENZA_INCOLLA_S` (10 minuti): la fattura incollata quando
+#   il pagamento parte SUBITO (ordine gia' confermato, rimborsi). Dieci
+#   minuti sono un battito dell'orologio: se il nostro nodo tace, il
+#   giro dopo la trova ancora viva. Una fattura «da un'ora» appena fatta
+#   passa larga.
+# `FATTURA_ANTICIPATA_GIORNI` (30): la fattura incollata PRIMA della
+#   conferma, cioe' quando il pagamento e' lontano giorni e nessuno sa
+#   quanti — spedizione, viaggio, e una conferma che con l'auto-sblocco
+#   disarmato non ha un orologio. Trenta giorni coprono la strada lunga;
+#   sotto, la si rifiuta SUBITO e si dice perche', invece di accettarla
+#   e scoprirlo il giorno dei sats. Chi ha un nodo suo (Zeus) la
+#   scadenza la sceglie; chi non puo' aspetta il nostro «tocca a te».
+MARGINE_SCADENZA_PAYOUT_S = 120
+MARGINE_SCADENZA_INCOLLA_S = 600
+FATTURA_ANTICIPATA_GIORNI = 30
+
+_BECH32_ALFABETO = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+_BECH32_GEN = (0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3)
+
+
+def leggi_bolt11(bolt11: str) -> dict | None:
+    """Quando e' NATA e quando SCADE una bolt11, letto dalla bolt11.
+    E' il gemello di `leggiBolt11` del client (miniapp.html), e c'e' una
+    prova che li fa leggere le stesse fatture.
+
+    SI LEGGE QUI E NON SI CHIEDE A LNBITS, ed e' una decisione: la forma
+    del JSON di `/payments/decode` e' di LNbits e cambia con le sue
+    versioni (`date` ed `expiry` ci sono oggi, e domani?), mentre la
+    bolt11 e' uno standard — BOLT-11: bech32, il timestamp sui primi 35
+    bit, poi i campi taggati [tipo, lunghezza, dati], in coda 104 gruppi
+    di firma; `x` (6) e' la scadenza in secondi, 3600 se manca. Non
+    serve la rete, non serve una chiave, e si prova con fatture vere.
+    Il checksum si verifica, la firma NO: quella la guarda LND il giorno
+    che paga. Qui non si muove un sat: si decide solo se VALE LA PENA
+    provarci, e con che parole dirlo.
+
+    None = non si legge, e allora NON SI AFFERMA NIENTE: chi chiama
+    tira dritto come faceva ieri."""
+    s = str(bolt11 or "").strip().lower()
+    sep = s.rfind("1")
+    if not s.startswith("ln") or sep < 2:
+        return None
+    hrp, corpo = s[:sep], s[sep + 1:]
+    try:
+        v = [_BECH32_ALFABETO.index(c) for c in corpo]
+    except ValueError:
+        return None
+    chk = 1
+    for x in ([ord(c) >> 5 for c in hrp] + [0]
+              + [ord(c) & 31 for c in hrp] + v):
+        alto = chk >> 25
+        chk = ((chk & 0x1ffffff) << 5) ^ x
+        for i, g in enumerate(_BECH32_GEN):
+            if (alto >> i) & 1:
+                chk ^= g
+    if chk != 1:
+        return None
+    d = v[:-6]                        # via il checksum
+    if len(d) < 7 + 104:              # timestamp + firma
+        return None
+
+    def num(gruppi):
+        n = 0
+        for g in gruppi:
+            n = n * 32 + g
+        return n
+
+    quando, scadenza, fine, i = num(d[:7]), 3600, len(d) - 104, 7
+    while i + 3 <= fine:
+        tipo, lung = d[i], d[i + 1] * 32 + d[i + 2]
+        if i + 3 + lung > fine:
+            break
+        if tipo == 6:
+            scadenza = num(d[i + 3:i + 3 + lung])
+        i += 3 + lung
+    return {"quando": quando, "scadenza": scadenza,
+            "scade": quando + scadenza}
+
+
+def vita_fattura(bolt11: str, adesso: int | None = None) -> int | None:
+    """Quanti secondi restano a questa fattura: negativo = scaduta da
+    tanto, None = non si legge (e non si afferma niente). E' il GIUDICE
+    UNICO della scadenza: ci passano il deposito a mano, la cintura di
+    `paga_venditore` e la scelta fra fattura e Lightning address."""
+    letta = leggi_bolt11(bolt11)
+    if letta is None:
+        return None
+    return letta["scade"] - int(time.time() if adesso is None else adesso)
+
+
+def giorno_scadenza(bolt11: str) -> str:
+    """«il 16 settembre»: QUANDO e' scaduta, come lo dice una persona.
+    Senza l'ora, ed e' voluto: l'orologio del server non e' quello di
+    chi legge, e un'ora sbagliata di due farebbe dubitare anche del
+    giorno, che invece e' giusto. Vuoto se la fattura non si legge."""
+    letta = leggi_bolt11(bolt11)
+    if letta is None:
+        return ""
+    t = time.localtime(letta["scade"])
+    if time.localtime()[:3] == t[:3]:
+        return "oggi"
+    return f"il {t.tm_mday} {MESI_IT[t.tm_mon - 1]}"
+
+
+def rifiuto_scadenza(bolt11: str, subito: bool,
+                     adesso: int | None = None) -> str:
+    """PERCHE' questa fattura non si puo' accettare ADESSO, o '' se va
+    bene. E' la domanda del deposito a mano, e la si fa li' perche' li'
+    costa un toast: il giorno del payout costa un affare fermo e un
+    venditore che non capisce.
+
+    `subito` = il pagamento parte appena la si accetta (ordine gia'
+    confermato, rimborsi): basta che campi `MARGINE_SCADENZA_INCOLLA_S`.
+    Senza `subito` il pagamento e' lontano giorni, e deve campare
+    `FATTURA_ANTICIPATA_GIORNI` — a zero quel controllo e' SPENTO, e
+    resta solo il rifiuto di una fattura gia' scaduta.
+
+    Una fattura che non si legge NON si rifiuta qui: l'importo l'ha
+    gia' letto LNbits, e di una scadenza che non so leggere non affermo
+    niente (fail-open: al peggio e' il comportamento di ieri, e la
+    cintura di `paga_venditore` ci ripassa comunque). `adesso` e' per
+    le prove, che il limite lo guardano al secondo."""
+    vita = vita_fattura(bolt11, adesso)
+    if vita is None:
+        return ""
+    if vita <= 0:
+        return (f"Questa fattura è già scaduta ({giorno_scadenza(bolt11)}): "
+                "fanne una nuova nel tuo wallet e incolla quella.")
+    if subito:
+        if vita < MARGINE_SCADENZA_INCOLLA_S:
+            return (f"Questa fattura scade fra {_durata_a_parole(vita)}: "
+                    "troppo poco per pagarla con sicurezza. Fanne una nuova "
+                    "e incollala subito.")
+        return ""
+    if FATTURA_ANTICIPATA_GIORNI and vita < FATTURA_ANTICIPATA_GIORNI * 86400:
+        return (f"Questa fattura scade fra {_durata_a_parole(vita)}, ma i "
+                "sats partono solo quando l'acquirente conferma, e possono "
+                "volerci giorni: arriverebbe scaduta. Tre strade: metti un "
+                "Lightning address nel Profilo (non scade mai, è la più "
+                "comoda); oppure fai una fattura che duri almeno "
+                f"{FATTURA_ANTICIPATA_GIORNI} giorni, se il tuo wallet lo "
+                "permette; oppure aspetta: alla conferma ti avvisiamo noi, "
+                "e la incolli in quel momento.")
+    return ""
+
+
+def _durata_a_parole(secondi: int) -> str:
+    """Una vita residua come la dice una persona: «40 minuti», «3 ore»,
+    «6 giorni». Serve solo a spiegare un rifiuto."""
+    s = max(0, int(secondi))
+    if s < 5400:
+        return f"{max(1, s // 60)} minuti"
+    if s < 2 * 86400:
+        return f"{s // 3600} ore"
+    return f"{s // 86400} giorni"
 
 
 # I domini che servono indirizzi BIP-353, cioe' via DNS e non via
@@ -19261,6 +19744,15 @@ async def decidi_pagamento(req: Request, x_tg_init_data: str = Header(""),
     elif fatto.get("errore"):
         messaggio = ("⚠️ Il fermo è tolto ma il ritentativo è saltato: "
                      "guarda il journal.")
+    elif fatto.get("motivo") == MOTIVO_SCADUTA:
+        # UNA FATTURA SCADUTA NON E' UN PAGAMENTO INCERTO (20 set 2026):
+        # chi modera deve leggerlo qui, o resta col dubbio di aver
+        # sbloccato qualcosa che andava guardato.
+        messaggio = (f"⌛ Non era uscito, e non c'è niente in volo: la "
+                     f"fattura che avevamo è SCADUTA"
+                     f"{' ' + fatto['scaduta'] if fatto.get('scaduta') else ''}"
+                     f". Non l'abbiamo ritentata: ne abbiamo chiesta una "
+                     f"nuova a chi aspetta i sats.")
     else:
         messaggio = ("↩︎ Non era uscito. Serve una fattura nuova: l'abbiamo "
                      "chiesta a chi aspetta i sats.")
@@ -23629,6 +24121,10 @@ async def deposita_invoice_rimborso(rimborso_id: int, req: Request,
             f"Importo sbagliato: la invoice è di {_fmt_sats(importo_sats)} sats, "
             f"deve essere esattamente {_fmt_sats(r['importo_sats'])} sats "
             f"(rimborso integrale)")
+    no = rifiuto_scadenza(bolt11, subito=True)   # qui si paga all'istante
+    if no:
+        con.close()
+        raise HTTPException(400, no)
     con.execute("UPDATE rimborsi_asta SET invoice_riscossione=?, "
                 "aggiornato=? WHERE id=?",
                 (bolt11, int(time.time()), rimborso_id))
@@ -42069,6 +42565,15 @@ async def deposita_invoice(ordine_id: int, req: Request,
         raise HTTPException(400,
             f"Importo sbagliato: la invoice e' di {_fmt_sats(importo_sats)} sats, "
             f"deve essere esattamente {spiegazione}")
+    # LA SCADENZA SI GUARDA QUI, non il giorno del payout (20 set 2026,
+    # ordine #152: incollata alla spedizione, pagata quattro giorni
+    # dopo, scaduta da quattro). `subito` = i sats partono appena la si
+    # accetta; altrimenti partono alla conferma, cioe' fra giorni.
+    no = rifiuto_scadenza(
+        bolt11, subito=(ruolo == "compratore" or o["stato"] == "confirmed"))
+    if no:
+        con.close()
+        raise HTTPException(400, no)
 
     con.execute(f"UPDATE ordini SET {colonna}=?, aggiornato=? WHERE id=?",
                 (bolt11, int(time.time()), ordine_id))
@@ -42337,7 +42842,7 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                 f"(<b>#{ordine_id}</b>): finché i sats sono lì, il caso si "
                 f"può ancora decidere.")
         if ritenta:
-            msg = _msg_ritentiamo(netto)
+            msg = _msg_ritentiamo(netto, taccuino)
         elif taccuino.get("ritentabile") and v and v["ln_address"]:
             # LA RESA: si e' provato e riprovato, e la strada non c'e'.
             # Adesso l'invito ad agire e' giusto, perche' da soli non
@@ -42353,14 +42858,10 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
             # La fattura incollata a mano, bruciata: dirgli «riprova»
             # senza dirgli «con una NUOVA» lo manderebbe a incollare la
             # stessa, che LNbits non ripaghera' mai.
-            msg = ("⚠️ <b>Il pagamento non è arrivato al tuo wallet.</b> "
-                   "La rete Lightning non ha trovato una strada fino alla "
-                   "fattura che ci avevi dato, e quella fattura ora non si "
-                   "può più usare. I sats sono al sicuro nel deposito di "
-                   "garanzia: apri l'ordine nella Mini App e incollane una "
-                   f"<b>nuova</b> da <b>{_fmt_sats(netto)} sats</b>. Se "
-                   "imposti il tuo Lightning address, la prossima volta ci "
-                   "pensiamo noi.")
+            # ...e il PERCHE' e' quello vero (20 set 2026): a Pedro,
+            # ordine #152, questa riga disse «la rete non ha trovato una
+            # strada» di una fattura scaduta da quattro giorni.
+            msg = _msg_fattura_nuova(netto, taccuino)
         elif o["invoice_venditore"] or (v and v["ln_address"]):
             # Un metodo c'era, ma al nodo non ci siamo nemmeno arrivati:
             # non si dichiara un fallimento che non e' stato osservato.
@@ -42383,7 +42884,9 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                    f"imposta il tuo Lightning address (incassi automatici, per "
                    f"sempre) oppure incolla una invoice di esattamente quell'importo. 💰")
         await notifica(o["venditore_id"], msg)
-        return {"ok": False, "stato": "confirmed", "ritenta": ritenta}
+        return {"ok": False, "stato": "confirmed", "ritenta": ritenta,
+                "motivo": taccuino.get("motivo") or "",
+                "scaduta": taccuino.get("scaduta") or ""}
 
 
 async def _rimborsa_compratore(ordine_id: int) -> dict:
