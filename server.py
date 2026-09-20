@@ -34673,7 +34673,15 @@ async def _incassa_slug_negozio(pagamento_id: int) -> dict:
                     (slug, p["tg_id"]))
     con.commit()
     con.close()
-    # Dopo il commit, mai prima.
+    # Dopo il commit, mai prima. LA RIGA NEL JOURNAL C'E' SEMPRE (set
+    # 2026): fino a ieri un incasso riuscito non lasciava traccia da
+    # nessuna parte — 5.000 sats arrivati sul nodo, e ne' il journal
+    # ne' i moderatori ne sapevano niente. Il banner lo diceva, qui
+    # la riga non era stata copiata.
+    print(f"🔗 Link negozio pagato: {slug}, "
+          f"{_fmt_sats(p['importo_sats'])} sats da #{p['tg_id']} "
+          f"(pagamento #{pagamento_id})"
+          + ("" if libero else " — NOME CONTESO, link non scritto"))
     if not libero:
         try:
             await notifica(
@@ -34699,6 +34707,15 @@ async def _incassa_slug_negozio(pagamento_id: int) -> dict:
             f"{URL_PUBBLICO}/negozio/{slug}")
     except Exception as e:
         print(f"⚠️ Avviso del link non partito: {e}")
+    # Ai moderatori il fatto, come fa il banner: e' un incasso nostro,
+    # e si guarda.
+    try:
+        await notifica_admin(
+            f"🔗 <b>Link negozio pagato:</b> {slug}, "
+            f"{_fmt_sats(p['importo_sats'])} sats da #{p['tg_id']} "
+            f"(pagamento #{pagamento_id}).")
+    except Exception as e:
+        print(f"⚠️ Polso del link non partito: {e}")
     return {"stato": "pagato", "slug": slug}
 
 
@@ -44342,6 +44359,31 @@ def pulisci_ordini_fantasma(con):
                 "(SELECT 1 FROM rilanci r WHERE r.puntata_id=puntate.id)")
 
 
+def _incasso_del_motivo(motivo: str):
+    """A CHI VA L'INCASSO (set 2026): ogni `motivo` della tabella
+    `pagamenti` ha la SUA funzione, e i due giri dell'orologio
+    (`controlla_annullati`, `controlla_abbandonati`) lo chiedono QUI
+    invece di saperlo a memoria.
+    IL DIFETTO CHE L'HA FATTO NASCERE: i due giri erano stati scritti
+    quando in tabella c'era il solo banner, e passavano ogni riga a
+    `_incassa_sblocco` senza guardare il motivo. Il 15 set 2026 e'
+    arrivato `negozio_slug` con le sue rotte e il suo incasso — ma chi
+    pagava il link (5.000 sats) e chiudeva l'app prima del poll si
+    sarebbe visto aprire la porta del BANNER (20.000) senza che il
+    link si scrivesse. La tabella lo prometteva dal primo giorno
+    («GENERICA CON UN TIPO»); i giri no.
+    UN MOTIVO SCONOSCIUTO TORNA None, e chi chiama NON TOCCA la riga:
+    ne' un incasso tirato a indovinare ne' una lapide su una fattura
+    che magari e' pagata. A dirlo e' il libro mastro («pagamento con
+    un motivo che nessuno sa incassare»), e prima ancora una sentinella
+    di `prove.py` che conta i motivi scritti dalle INSERT contro
+    questo elenco: un motivo nuovo non nasce senza la sua cassa.
+    Il dizionario si costruisce ALLA CHIAMATA: i nomi si risolvono
+    quando servono, e un banco puo' metterci le sue casse di cartone."""
+    return {"banner": _incassa_sblocco,
+            "negozio_slug": _incassa_slug_negozio}.get(motivo)
+
+
 async def controlla_annullati():
     """Il riacciuffo (ago 2026): un pagamento arrivato su una fattura
     ANNULLATA. Succede nella corsa annulla-vs-saldo (finestra di
@@ -44364,10 +44406,11 @@ async def controlla_annullati():
     rilanci = [dict(r) for r in con.execute(
         "SELECT * FROM rilanci WHERE stato='annullato' AND creato >= ?",
         (adesso - RILANCIO_STANTIO,))]
-    # gli sblocchi del banner: stessa finestra degli ordini, che la
-    # loro fattura vive gli stessi 15 minuti
+    # i pagamenti nostri (banner, link del negozio): stessa finestra
+    # degli ordini, che la loro fattura vive gli stessi 15 minuti. IL
+    # MOTIVO VIAGGIA CON LA RIGA: e' lui a dire chi incassa.
     sblocchi = [dict(r) for r in con.execute(
-        "SELECT id, payment_hash, cassaforte FROM pagamenti WHERE stato='annullato' "
+        "SELECT id, motivo, payment_hash, cassaforte FROM pagamenti WHERE stato='annullato' "
         "AND payment_hash != '' AND creato >= ?", (adesso - 1800,))]
     con.close()
     for o in ordini:
@@ -44433,8 +44476,13 @@ async def controlla_annullati():
     # resuscitata; il timbro fresco su `creato` la tiene fuori dalla
     # finestra della RIPRESA, che altrimenti gli ripresenterebbe una
     # fattura ormai saldata.
+    # OGNI MOTIVO ALLA SUA CASSA (set 2026, vedi `_incasso_del_motivo`):
+    # un motivo che nessuno sa incassare non si resuscita nemmeno.
     for p in sblocchi:
         try:
+            incassa = _incasso_del_motivo(p["motivo"])
+            if not incassa:
+                continue
             if not await invoice_pagata(p["payment_hash"], p["cassaforte"]):
                 continue
             con = db()
@@ -44446,11 +44494,11 @@ async def controlla_annullati():
             con.close()
             if cur.rowcount == 0:
                 continue
-            print(f"⚠️ Sblocco banner #{p['id']} annullato ma pagato: "
-                  f"riacciuffato")
-            await _incassa_sblocco(p["id"])
+            print(f"⚠️ Pagamento #{p['id']} ({p['motivo']}) annullato "
+                  f"ma pagato: riacciuffato")
+            await incassa(p["id"])
         except Exception as e:
-            print(f"⚠️ Riacciuffo sblocco #{p['id']} saltato: {e}")
+            print(f"⚠️ Riacciuffo pagamento #{p['id']} saltato: {e}")
 
 
 async def controlla_abbandonati():
@@ -44501,7 +44549,7 @@ async def controlla_abbandonati():
         "SELECT * FROM rilanci WHERE stato='creato' AND payment_hash != '' "
         "AND creato < ?", (adesso - RILANCIO_EXPIRY,))]
     sblocchi = [dict(r) for r in con.execute(
-        "SELECT id, payment_hash, cassaforte FROM pagamenti WHERE stato='creato' "
+        "SELECT id, motivo, payment_hash, cassaforte FROM pagamenti WHERE stato='creato' "
         "AND payment_hash != '' AND creato < ?",
         (adesso - INVOICE_EXPIRY,))]
     con.close()
@@ -44582,12 +44630,20 @@ async def controlla_abbandonati():
     # riconciliazione con LNbits. Per questo qui non c'e' nessuna
     # purga gemella di `pulisci_ordini_fantasma`: la' la lapide si
     # spazza perche' tiene occupato lo stock, qui non tiene niente.
+    # OGNI MOTIVO ALLA SUA CASSA (set 2026): fino a ieri questo ramo
+    # passava TUTTO a `_incassa_sblocco`, e un link del negozio pagato
+    # a telefono chiuso avrebbe aperto la porta del banner. Un motivo
+    # che nessuno sa incassare NON SI TOCCA — ne' incasso ne' lapide:
+    # resta 'creato' e lo dice il libro mastro.
     for p in sblocchi:
         try:
+            incassa = _incasso_del_motivo(p["motivo"])
+            if not incassa:
+                continue
             if await invoice_pagata(p["payment_hash"], p["cassaforte"]):
-                print(f"⚠️ Sblocco banner #{p['id']} pagato e mai "
-                      f"verificato: riacciuffato")
-                await _incassa_sblocco(p["id"])
+                print(f"⚠️ Pagamento #{p['id']} ({p['motivo']}) pagato e "
+                      f"mai verificato: riacciuffato")
+                await incassa(p["id"])
                 continue
             con = db()
             con.execute("UPDATE pagamenti SET stato='annullato', "
@@ -44599,7 +44655,7 @@ async def controlla_abbandonati():
             # FAIL-OPEN NEL VERSO GIUSTO: LNbits muto = la riga resta
             # 'creato' e si riprova al giro dopo. Meglio una riga che
             # si attarda che un pagamento perso di vista.
-            print(f"⚠️ Ultimo sguardo sullo sblocco #{p['id']} "
+            print(f"⚠️ Ultimo sguardo sul pagamento #{p['id']} "
                   f"saltato: {e}")
 
 
@@ -51588,6 +51644,20 @@ CONTROLLI_LIBRO_MASTRO = (
      "AND u.negozio_slug<>p.riferimento AND p.id=(SELECT MAX(p2.id) "
      "FROM pagamenti p2 WHERE p2.tg_id=p.tg_id "
      "AND p2.motivo='negozio_slug' AND p2.stato='pagato')"),
+    # --- il motivo senza cassa (set 2026) ---------------------------
+    # I due giri dell'orologio smistano per motivo
+    # (`_incasso_del_motivo`) e una riga che non riconoscono NON la
+    # toccano: resta com'e' per sempre, pagata o no. Qui e' dove lo
+    # si viene a sapere — l'elenco e' lo stesso dello smistatore, e
+    # una sentinella di prove.py li tiene uguali.
+    ("pagamento con un motivo che nessuno sa incassare",
+     "una riga di `pagamenti` porta un motivo che "
+     "`_incasso_del_motivo` non conosce: i giri dell'orologio non la "
+     "guardano, quindi se la fattura e' stata pagata a telefono chiuso "
+     "nessuno l'ha incassata — si guarda a mano su LNbits col suo "
+     "payment_hash, e si da' al motivo la sua cassa",
+     "SELECT id FROM pagamenti "
+     "WHERE motivo NOT IN ('banner','negozio_slug')"),
     # E QUALI NON NASCONO QUI, con la stessa domanda:
     # - «una lapide senza payment_hash»: NO, e' innocua e non dice
     #   niente a nessuno — una riga 'annullato' non tiene occupato

@@ -21914,6 +21914,12 @@ def prove_libro_mastro():
         ("UPDATE utenti SET negozio_slug='preso-da-un-altro' "
          "WHERE tg_id=222",
          "link del negozio pagato e non applicato", "5"),
+        # IL MOTIVO SENZA CASSA (set 2026): una riga che lo smistatore
+        # dei due giri non riconosce resta ferma per sempre, pagata o
+        # no — e questo e' l'unico posto che lo dice.
+        ("INSERT INTO pagamenti(id,tg_id,motivo,importo_sats,stato) "
+         "VALUES(19, 222, 'sponsor', 100, 'creato')",
+         "pagamento con un motivo che nessuno sa incassare", "19"),
         # L'OBIEZIONE SUL PUNTO (ago 2026): il timbro senza il motivo e'
         # una guardia caduta a meta' UPDATE. Il ramo che morde davvero
         # e' l'altro — un'obiezione fuori dalla via punto — perche' li'
@@ -68286,6 +68292,259 @@ def prove_profilo_sezioni():
             prova(nome, atteso, avuto)
 
 
+def prove_paracadute_motivo():
+    """IL PARACADUTE DEI PAGAMENTI SMISTA PER MOTIVO (set 2026).
+    I due giri dell'orologio che raccolgono chi ha pagato a telefono
+    chiuso (`controlla_abbandonati`) o dopo aver annullato
+    (`controlla_annullati`) erano nati col solo banner in tabella, e
+    passavano OGNI riga di `pagamenti` a `_incassa_sblocco`. Dal 15 set
+    in quella tabella c'e' anche `negozio_slug`: un link pagato (5.000
+    sats) e mai verificato dal telefono avrebbe aperto la porta del
+    banner (20.000) senza scrivere il link.
+    PERCHE' NESSUNA PROVA L'AVEVA VISTO: `prove_abbandonati` gira i due
+    rami di ordini e rilanci su un database vero, ma la sua tabella
+    `pagamenti` e' VUOTA — il terzo ramo non l'ha mai eseguito nessuno.
+    Qui si gira quello, e CON GLI INCASSI VERI (non di cartone): la
+    domanda non e' «a chi l'ha passato» ma «cosa c'e' scritto dopo»."""
+    print("\n[il paracadute dei pagamenti smista per motivo]")
+    import asyncio
+    import re as _re
+    import sqlite3
+    import time as _t
+
+    def gira(coro):
+        return asyncio.new_event_loop().run_until_complete(coro)
+
+    # ---- 1. LA FORMA -------------------------------------------------
+    # SOLO CODICE: il commento dei due giri NOMINA `_incassa_sblocco`
+    # per spiegare il difetto, e una sentinella che lo cercasse nel
+    # testo intero sarebbe rossa per la prosa.
+    for nome in ("controlla_annullati", "controlla_abbandonati"):
+        c = codice(pezzo(nome))
+        prova(f"{nome}: non chiama piu' una cassa a nome fisso", [],
+              [x for x in ("_incassa_sblocco", "_incassa_slug_negozio")
+               if x in c])
+        prova(f"{nome}: chiede allo smistatore", True,
+              '_incasso_del_motivo(p["motivo"])' in c)
+        prova(f"{nome}: la SELECT porta il motivo con la riga", True,
+              "SELECT id, motivo, payment_hash, cassaforte FROM pagamenti"
+              in c)
+
+    # ---- 2. LO SMISTATORE, girato ------------------------------------
+    casse = {"_incassa_sblocco": object(),
+             "_incassa_slug_negozio": object()}
+    amb0 = dict(casse)
+    exec(pezzo("_incasso_del_motivo"), amb0)
+    smista = amb0["_incasso_del_motivo"]
+    prova("banner -> _incassa_sblocco", True,
+          smista("banner") is casse["_incassa_sblocco"])
+    prova("negozio_slug -> _incassa_slug_negozio", True,
+          smista("negozio_slug") is casse["_incassa_slug_negozio"])
+    prova("un motivo sconosciuto non ha cassa (None), mai un ripiego",
+          [None, None, None],
+          [smista("sponsor"), smista(""), smista("BANNER")])
+
+    # ---- 3. IL CENSIMENTO: un motivo nuovo non nasce senza cassa -----
+    # I motivi che il server SCRIVE (le INSERT in `pagamenti`) contro
+    # quelli che lo smistatore conosce, contro quelli che il libro
+    # mastro esclude dal suo allarme. Tre elenchi, un solo insieme.
+    scritti = set()
+    for m in _re.finditer(r"INSERT INTO pagamenti\(", _SORGENTE):
+        fetta = _SORGENTE[m.start():m.start() + 400]
+        scritti |= set(_re.findall(r"VALUES\(\?,'([a-z_]+)'", fetta))
+    # la cintura del censimento stesso: una regex che non trova piu'
+    # niente renderebbe verde il confronto qui sotto (vuoto == vuoto)
+    prova("il censimento delle INSERT vede almeno i due motivi del "
+          "set 2026", True, {"banner", "negozio_slug"} <= scritti)
+    noti = set(_re.findall(r'"([a-z_]+)": _incassa',
+                           pezzo("_incasso_del_motivo")))
+    prova("ogni motivo scritto ha la sua cassa nello smistatore",
+          scritti, noti)
+    i = _SORGENTE.index('("pagamento con un motivo che nessuno sa '
+                        'incassare"')
+    voce = _SORGENTE[i:_SORGENTE.index('"),', i)]
+    prova("...e il libro mastro esclude dall'allarme gli stessi, e "
+          "solo quelli", scritti,
+          set(_re.findall(r"'([a-z_]+)'",
+                          voce[voce.index("NOT IN"):])))
+
+    # ---- 4. IL GIRO VERO, con gli incassi VERI -----------------------
+    def mondo(cieco=False):
+        vero = sqlite3.connect(":memory:")
+        vero.row_factory = sqlite3.Row
+        vero.executescript("""
+          CREATE TABLE ordini(id INTEGER PRIMARY KEY, stato TEXT,
+            payment_hash TEXT, creato INT, aggiornato INT,
+            cassaforte TEXT DEFAULT 'saas');
+          CREATE TABLE rilanci(id INTEGER PRIMARY KEY, stato TEXT,
+            payment_hash TEXT, creato INT, aggiornato INT,
+            cassaforte TEXT DEFAULT 'saas');
+          CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, negozio TEXT,
+            username TEXT DEFAULT '', negozio_slug TEXT DEFAULT '',
+            banner_sbloccato_il INT DEFAULT 0);
+          CREATE TABLE pagamenti(id INTEGER PRIMARY KEY,
+            tg_id INT, motivo TEXT, riferimento TEXT DEFAULT '',
+            importo_sats INT, payment_hash TEXT DEFAULT '',
+            invoice TEXT DEFAULT '', stato TEXT DEFAULT 'creato',
+            creato INT, pagato_il INT DEFAULT 0, aggiornato INT,
+            cassaforte TEXT DEFAULT 'saas');
+          INSERT INTO utenti(tg_id,negozio) VALUES
+            (1,'aa11'),(2,'bb22'),(3,'cc33'),(4,'dd44'),(5,'ee55'),
+            (6,'ff66'),(7,'gg77'),(8,'hh88'),(9,'ii99');
+        """)
+        ora = int(_t.time())
+        vecchia, fresca = ora - 2000, ora - 60
+        vero.executemany(
+            "INSERT INTO pagamenti(id,tg_id,motivo,riferimento,"
+            "importo_sats,payment_hash,stato,creato) "
+            "VALUES(?,?,?,?,?,?,?,?)", [
+            # --- gli ABBANDONATI: 'creato' a fattura morta ---
+            (1, 1, "banner", "", 20000, "hash-pagato", "creato", vecchia),
+            (2, 2, "negozio_slug", "untempoperte", 5000, "hash-pagato",
+             "creato", vecchia),                       # IL CASO DEL 20 SET
+            (3, 3, "banner", "", 20000, "hash-muto", "creato", vecchia),
+            (4, 4, "negozio_slug", "mai-pagato", 5000, "hash-muto",
+             "creato", vecchia),
+            (5, 5, "sponsor", "", 7000, "hash-pagato", "creato", vecchia),
+            (6, 6, "negozio_slug", "ancora-viva", 5000, "hash-pagato",
+             "creato", fresca),                        # fattura VIVA
+            # --- gli ANNULLATI e poi pagati ---
+            (7, 7, "negozio_slug", "ci-ho-ripensato", 5000, "hash-pagato",
+             "annullato", fresca),
+            (8, 8, "banner", "", 20000, "hash-pagato", "annullato",
+             fresca),
+            (9, 9, "sponsor", "", 7000, "hash-pagato", "annullato",
+             fresca),
+            # sconosciuto e MAI pagato: e' il caso che distingue «non
+            # si tocca» da «si prova e va male» — senza la guardia
+            # prenderebbe la lapide
+            (10, 9, "sponsor", "", 7000, "hash-muto", "creato",
+             vecchia)])
+        vero.commit()
+
+        class Con:
+            def execute(self, *a):
+                return vero.execute(*a)
+
+            def commit(self):
+                vero.commit()
+
+            def close(self):
+                pass
+
+        detti, journal = [], []
+
+        async def _pagata(h, _cf=""):
+            return h == "hash-pagato"
+
+        async def _notifica(tg, testo):
+            detti.append((tg, testo))
+
+        async def _notifica_admin(testo):
+            detti.append(("admin", testo))
+
+        async def _mai(*a):
+            raise AssertionError("qui non ci sono ne' ordini ne' rilanci")
+
+        amb = {"db": Con, "time": _t, "invoice_pagata": _pagata,
+               "_incassa_ordine": _mai, "_paga_rimborso": _mai,
+               "notifica": _notifica, "notifica_admin": _notifica_admin,
+               "_fmt_sats": lambda n: str(n),
+               "URL_PUBBLICO": "https://barattolo.store",
+               "print": lambda *a, **k: journal.append(
+                   " ".join(map(str, a))),
+               "INVOICE_EXPIRY": 900, "RILANCIO_EXPIRY": 600,
+               "RILANCIO_STANTIO": 1800}
+        exec(pezzo("_slug_negozio_libero"), amb)
+        exec("async " + pezzo("_incassa_sblocco"), amb)
+        exec("async " + pezzo("_incassa_slug_negozio"), amb)
+        exec(pezzo("_incasso_del_motivo"), amb)
+        if cieco:
+            # LO SMISTATORE DI PRIMA, rimesso a mano: tutto al banner,
+            # qualunque cosa ci sia scritto nel motivo. E' il codice
+            # del 15-20 set detto in una riga, e serve a una cosa
+            # sola: provare che QUESTO banco il difetto lo vede.
+            amb["_incasso_del_motivo"] = (
+                lambda motivo: amb["_incassa_sblocco"])
+        exec("async " + pezzo("controlla_abbandonati"), amb)
+        exec("async " + pezzo("controlla_annullati"), amb)
+        return amb, vero, detti, journal
+
+    def riga(vero, pid):
+        return vero.execute("SELECT stato FROM pagamenti WHERE id=?",
+                            (pid,)).fetchone()["stato"]
+
+    def utente(vero, tg):
+        r = vero.execute("SELECT negozio_slug, banner_sbloccato_il>0 "
+                         "AS porta FROM utenti WHERE tg_id=?",
+                         (tg,)).fetchone()
+        return (r["negozio_slug"], r["porta"])
+
+    # ---- 4a. LA CONTROPROVA: il banco vede il difetto ----------------
+    amb, vero, detti, journal = mondo(cieco=True)
+    gira(amb["controlla_abbandonati"]())
+    prova("CODICE DI PRIMA: il link pagato apre la porta del banner e "
+          "il link NON si scrive (il difetto, riprodotto)",
+          ("pagato", ("", 1)), (riga(vero, 2), utente(vero, 2)))
+    prova("...e al venditore si annuncia una porta che non ha comprato",
+          True, any(t == 2 and "Porta aperta" in x for t, x in detti))
+
+    # ---- 4b. GLI ABBANDONATI, col codice di adesso -------------------
+    amb, vero, detti, journal = mondo()
+    gira(amb["controlla_abbandonati"]())
+    prova("link pagato e mai verificato: il LINK si scrive, la porta "
+          "del banner resta chiusa",
+          ("pagato", ("untempoperte", 0)),
+          (riga(vero, 2), utente(vero, 2)))
+    prova("...al venditore si dice il link, mai la porta", (True, False),
+          (any(t == 2 and "/negozio/untempoperte" in x
+               for t, x in detti),
+           any(t == 2 and "Porta aperta" in x for t, x in detti)))
+    prova("...e ai moderatori arriva «Link negozio pagato»", True,
+          any(t == "admin" and "Link negozio pagato" in x
+              and "untempoperte" in x and "5000" in x
+              for t, x in detti))
+    prova("banner pagato e mai verificato: la porta si apre, e nessun "
+          "link si scrive", ("pagato", ("", 1)),
+          (riga(vero, 1), utente(vero, 1)))
+    prova("banner mai pagato: lapide", ("annullato", ("", 0)),
+          (riga(vero, 3), utente(vero, 3)))
+    prova("link mai pagato: lapide, e niente si scrive",
+          ("annullato", ("", 0)), (riga(vero, 4), utente(vero, 4)))
+    prova("MOTIVO SCONOSCIUTO e pagato: non si tocca — ne' incasso ne' "
+          "lapide, e nessuna porta", ("creato", ("", 0)),
+          (riga(vero, 5), utente(vero, 5)))
+    prova("...e nessuno ne ha annunciato l'incasso", [],
+          [x for t, x in detti if "#5" in x])
+    prova("...e nemmeno il journal: non si e' chiesto niente a LNbits",
+          [], [r for r in journal if "#5 " in r or "#10 " in r])
+    prova("motivo sconosciuto e NON pagato: niente lapide, resta com'e'",
+          "creato", riga(vero, 10))
+    prova("fattura ancora VIVA: non si guarda nemmeno",
+          ("creato", ("", 0)), (riga(vero, 6), utente(vero, 6)))
+    prova("il journal dice QUALE motivo ha riacciuffato", True,
+          any("#2 (negozio_slug)" in r for r in journal)
+          and any("#1 (banner)" in r for r in journal))
+
+    # ---- 4c. GLI ANNULLATI E POI PAGATI ------------------------------
+    gira(amb["controlla_annullati"]())
+    prova("link annullato ma pagato: chi paga ha comprato — il LINK",
+          ("pagato", ("ci-ho-ripensato", 0)),
+          (riga(vero, 7), utente(vero, 7)))
+    prova("banner annullato ma pagato: la porta",
+          ("pagato", ("", 1)), (riga(vero, 8), utente(vero, 8)))
+    prova("motivo sconosciuto annullato e pagato: la lapide NON si "
+          "resuscita (resterebbe 'creato' per sempre)",
+          ("annullato", ("", 0)), (riga(vero, 9), utente(vero, 9)))
+    # e il giro degli annullati col codice di prima, per la stessa
+    # ragione della 4a
+    amb, vero, detti, journal = mondo(cieco=True)
+    gira(amb["controlla_annullati"]())
+    prova("CODICE DI PRIMA, annullati: stesso difetto (porta aperta, "
+          "link non scritto)", ("pagato", ("", 1)),
+          (riga(vero, 7), utente(vero, 7)))
+
+
 def prove_slug_negozio():
     """IL LINK DEL NEGOZIO A SCELTA (set 2026): la personalizzazione
     SUBITO DOPO il banner nella scala (decisione di Andrea) — un
@@ -68436,6 +68695,7 @@ def prove_slug_negozio():
                 "payment_request": f"lnbc{len(fatture)}"}
 
     detti = []
+    journal = []
 
     async def _notif(tg, testo): detti.append((tg, testo))
     async def _notif_admin(testo): detti.append(("admin", testo))
@@ -68450,6 +68710,8 @@ def prove_slug_negozio():
             "SLUG_NEGOZIO_PREZZO_SATS": 5_000,
             "MSG_SLUG_SPENTO": "spento", "MSG_SLUG_GIA_TUO": "gia' tuo",
             "notifica": _notif, "notifica_admin": _notif_admin,
+            "_fmt_sats": lambda n: f"{n:,}".replace(",", "."),
+            "print": lambda *a, **k: journal.append(" ".join(map(str, a))),
             "URL_PUBBLICO": "https://barattolo.store",
             "re": __import__("re"), "MIN_SLUG_NEGOZIO": 3,
             "MAX_SLUG_NEGOZIO": 30}
@@ -68531,6 +68793,20 @@ def prove_slug_negozio():
                       ).fetchone()[0])
     prova("...il venditore lo viene a sapere", True,
           any(t == 2 for t, _ in detti))
+    # IL POLSO AI MODERATORI E LA RIGA NEL JOURNAL (set 2026): il 20
+    # set sono arrivati 5.000 sats sul nodo col memo «link negozio» e
+    # ne' il journal ne' i moderatori ne sapevano niente — l'incasso
+    # riuscito era muto. Il nome e la cifra ci sono tutti e due: e'
+    # quel che serve per riconoscere il memo della fattura.
+    prova("...i moderatori ricevono «Link negozio pagato» col nome e "
+          "la cifra", ["🔗 <b>Link negozio pagato:</b> bottega-nuova, "
+                       f"5.000 sats da #2 (pagamento "
+                       f"#{r3['pagamento_id']})."],
+          [x for t, x in detti if t == "admin"])
+    prova("...e il journal ha la sua riga", 1,
+          sum(1 for r in journal
+              if r.startswith("🔗 Link negozio pagato: bottega-nuova, "
+                              "5.000 sats da #2")))
 
     # IL NOME CONTESO: pagato ma preso da un altro nel frattempo.
     chi(3)
@@ -68547,6 +68823,16 @@ def prove_slug_negozio():
                       ).fetchone()[0])
     prova("...e lo dice a chi ha pagato e ai moderatori", True,
           any(t == 3 for t, _ in detti) and any(t == "admin" for t, _ in detti))
+    # il conteso NON si annuncia come un incasso qualunque: ai
+    # moderatori arriva UN messaggio, quello che chiede un gesto
+    prova("...ai moderatori un messaggio solo, e non e' «pagato»",
+          (1, False),
+          (sum(1 for t, _ in detti if t == "admin"),
+           any("Link negozio pagato" in x for t, x in detti
+               if t == "admin")))
+    prova("...ma il journal lo scrive lo stesso, e dice che e' conteso",
+          True, any("bottega-contesa" in r and "NOME CONTESO" in r
+                    for r in journal))
     con2.close()
 
     # ---- 6. Il cassetto del venditore --------------------------------
@@ -73613,7 +73899,8 @@ def main():
               prove_foglio_tastiera_iphone,
               prove_servizi,
               prove_sintassi_client,
-              prove_banner_negozio, prove_slug_negozio, prove_link_descrizione,
+              prove_banner_negozio, prove_paracadute_motivo,
+              prove_slug_negozio, prove_link_descrizione,
               prove_foto_vuota, prove_foto_metadati,
               prove_connettori, prove_connettori_sync,
               prove_connettori_woo, prove_connettori_registro,
