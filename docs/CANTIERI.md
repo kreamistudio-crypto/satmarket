@@ -21754,3 +21754,162 @@ chiude e la liquidità resta impegnata (audit, M3) — un tetto al tempo
 dell'HTLC in uscita è un cantiere suo. `uscito` non ricorda ancora il
 VERSO (audit, M1). E lo «Stato delle leve» non dice se LND è acceso: lo
 dice solo la riga d'avvio del journal.
+
+## Le fatture scadute al payout: non si tentano, e si dice perché (20 set 2026, ordine #152)
+
+**DA DOVE VIENE.** Ordine #152: il venditore ha incollato una fattura
+Zeus quando ha spedito; il payout è partito alla consegna confermata,
+QUATTRO GIORNI dopo; la fattura era scaduta dal 16 set (la scadenza sta
+scritta dentro la bolt11). LND una fattura scaduta la rifiuta prima di
+cercare una strada — nessuna riga in `listpayments` — LNbits segna
+`failed` e risponde 520, e noi scrivevamo «LNbits ha risposto 520» a chi
+modera e «la rete Lightning non ha trovato una strada» a chi vendeva.
+Due frasi, nessuna vera: e quella falsa al venditore manda a fare la
+cosa sbagliata (tenere aperto il wallet, rincollare la STESSA fattura).
+
+**LA DECISIONE: UNA FATTURA SCADUTA NON È UN PAGAMENTO FALLITO, È UN
+PAGAMENTO CHE NON ANDAVA TENTATO.** Prima di ogni payout
+`paga_venditore` legge la scadenza e, sotto il margine, non tenta:
+niente rete, nessun hash sulla riga, nessuna riga `failed` su LNbits da
+chiarire dopo. Esce `NON_PAGATO` col MOTIVO nel taccuino, e da lì vale
+la strada di sempre — nessuno stato nuovo (regola 4): «serve una
+fattura nuova» È `confirmed` con la colonna vuota, quello che
+`sollecita_incassi` già sorveglia. Se il venditore ha un Lightning
+address la riga va `da_riprovare` e al giro dopo si paga da lì, da soli.
+
+**LA SCADENZA SI LEGGE DALLA BOLT11, NON DA LNBITS** (`leggi_bolt11`,
+giudice unico `vita_fattura`). La lezione è quella di ieri: la forma di
+una risposta scritta a memoria è una promessa. `date` ed `expiry` nel
+JSON di `/payments/decode` ci sono oggi e non li ho mai visti dal vivo;
+BOLT-11 è uno standard, si prova con fatture vere senza rete né chiavi,
+e il client aveva GIÀ il suo lettore (`leggiBolt11`, 16 set): adesso
+sono gemelli, con una prova che li fa leggere le stesse otto fatture.
+Il checksum si verifica, la firma no: quella la guarda LND quando paga.
+Una fattura che non si legge NON si rifiuta — fail-open dichiarato: al
+peggio è il comportamento di ieri, e qui non si muove un sat.
+
+**I TRE NUMERI, proposti e motivati.** `MARGINE_SCADENZA_PAYOUT_S` =
+120: un pagamento dura (la POST ha un minuto, il nodo prova più strade)
+e chi riceve rifiuta gli HTLC che arrivano a fattura scaduta — partire
+con un minuto di vita vuol dire fallire a metà e BRUCIARE la bolt11. È
+corto apposta: le fatture coniate da un Lightning address si pagano
+nello stesso istante, e certi servizi le fanno durare cinque minuti.
+`MARGINE_SCADENZA_INCOLLA_S` = 600, quando si paga appena la si
+accetta: un battito dell'orologio, così se il nodo tace il giro dopo la
+trova viva; la fattura «da un'ora» dei wallet comuni passa larga.
+`FATTURA_ANTICIPATA_GIORNI` = 30, quando i sats partono alla conferma:
+spedizione, viaggio, e una conferma che con l'auto-sblocco disarmato
+non ha un orologio. Sotto, la porta la rifiuta SUBITO e dice le tre
+strade (address; fattura lunga, per chi ha un nodo suo; aspettare il
+nostro avviso). ⚠️ È il numero che tocca il punto 2, che Andrea ha
+tenuto per sé: sta in UNA costante, e a ZERO il controllo anticipato è
+spento (resta solo il rifiuto di una fattura già morta).
+
+**LA CINTURA STA IN UN POSTO PRECISO, e passa due volte.** Dopo la
+cintura dell'importo — un importo storto è un allarme, e vince — e
+prima della verità. Vale SOLO per una fattura che noi non abbiamo mai
+tentato: se l'hash è nella memoria dei tentativi, a dire com'è finita
+sono le fonti e non il calendario, perché un pagamento partito in tempo
+può saldarsi a fattura scaduta (e allora l'affare si CHIUDE, non si
+chiede una fattura nuova a chi i sats li ha già). Il secondo passaggio
+sta subito prima della mano: già tentata, le fonti dicono «mai
+partita», e adesso è morta → non si ritenta.
+
+**SCADUTA ≠ IN VOLO (il punto 4), e la strada SCARTATA.** Con la
+cintura una fattura scaduta non lascia più nessuna riga su LNbits:
+l'equivoco non può più NASCERE. Per le righe che ce l'hanno già (il
+#152) il giudice di ieri dà `fallito` da solo — LNbits `failed`, LND
+assente o spento, tentativo vecchio di giorni — e «Verifica e riprova»
+toglie il fermo, NON ripaga la fattura morta, chiede la nuova, e al
+moderatore dice «⌛ la fattura che avevamo è SCADUTA, non c'è niente in
+volo». SCARTATO, e non si riproponga senza un motivo nuovo: far
+scavalcare al calendario i 15 minuti di `MAI_PARTITO_DOPO_S` («è
+scaduta, quindi LND non l'ha mai vista, quindi è fallita SUBITO»). È
+vero solo se il tentativo è partito DOPO la scadenza, e a fallimento
+avvenuto non lo si sa più distinguere da uno partito 130 secondi prima,
+rimasto appeso, e scaduto per strada: in quel caso LND ha un HTLC in
+volo, e un «fallito» deciso dal calendario sarebbe la porta del doppio
+payout che il cantiere di ieri ha chiuso. Il prezzo è un'attesa di
+15-25 minuti su un caso che da oggi non si produce più. C'è la prova
+che lo tiene fermo (un tentativo di un minuto fa resta 409).
+
+**IL MOTIVO IN PAROLE (il punto 3).** `_motivo_payout`, otto voci
+perché otto sono le cose diverse da FARE: scaduta, nessuna strada,
+saldo NOSTRO, ponte giù, tempo scaduto per strada, rifiutata da chi
+riceve, già bruciata, ignoto. L'ordine delle fonti è di chi ne sa di
+più: il `failure_reason` di LND (lo si buttava via: `_chiedi_lnd`
+leggeva lo stato e basta; adesso lo mette da parte), poi la FATTURA —
+la fonte giusta proprio quando LND non ha la riga — poi il `detail` del
+520 (che si legge e si tiene nel diario: il #152 lo portava scritto, e
+noi salvavamo il numero), poi il guardiano del ponte. Le spie sul testo
+di LNbits scelgono una FRASE e non decidono niente; quel che non
+riconoscono resta «ignoto» con la riga grezza accanto. NON si fa un
+giro su tor apposta per chiedere il motivo a LND: chi ha premuto un
+bottone sta guardando una rotella, e il motivo c'è quando il giro
+l'aveva già chiesto. Al venditore tre famiglie: scaduta (con la cura
+che chiude il problema per sempre, l'address), COLPA NOSTRA — saldo e
+ponte si DICONO, o chi aspetta i sats cerca il guasto nel suo wallet —
+e il resto, con «nessuna strada» solo dove è vero.
+
+**IL FRENO DELL'ANELLO.** Un giro a vuoto conta in `payout_tentativi`
+(un address che coniasse fatture da un minuto verrebbe ribussato a ogni
+battito, per sempre) ma NON tocca `payout_ultimo`: quella è l'età
+dell'ultimo tentativo VERO, e ringiovanirla farebbe sembrare «in volo»
+un hash di ieri alle righe nate prima di `payout_tentati`.
+
+**IL PUNTO 2 NON È IMPLEMENTATO, per decisione di Andrea** (il momento
+giusto per chiedere la fattura): la proposta sta nel report del
+cantiere. Di suo il codice fa solo quel che il punto 1 chiedeva — il
+controllo alla porta — e non tocca il foglio dell'incasso, l'ordine fra
+fattura incollata e address, né gli avvisi.
+
+**COSA HA TROVATO IL BANCO.** 1) Un'incoerenza SUA: `paga_venditore`
+tronca il payment hash a 100 caratteri, e il nodo di cartone — che
+ieri vedeva solo fatture corte — con una bolt11 vera da 300 usava
+l'hash intero: nodo e server parlavano di due pagamenti diversi, e le
+prove della scena 🧊 erano verdi per la strada sbagliata («già tentata»
+non scattava mai; il messaggio era lo stesso per caso). L'ha smascherato la
+scena della fattura scaduta-ma-già-pagata; ora ogni scena dice anche
+PER QUALE strada è passata («FALLITO», non «NON TENTATO»). 2) Il
+giorno nel FUTURO: quando «scaduta» lo dice LNbits di una fattura che
+per il nostro orologio è viva, la data scritta dentro è domani — il
+giorno si dice solo se è passato. 3) La colonna `invoice_venditore`
+nello schema vero nasce NULL, non vuota: l'ha visto il collaudo col
+server intero, non `prove.py`.
+
+**PROVATO.** `prove_fatture_scadute`: 107 prove — i tre numeri, il
+lettore (la fattura VERA del 16 set, andata e ritorno, default,
+maiuscole, checksum, la firma che non è un campo), i gemelli
+client/server via node, la porta ai due limiti AL SECONDO, i motivi
+riga per riga, e le scene: il #152 per intero (non tentata → stessa
+rincollata rifiutata → nuova pagata una volta), con l'address, il
+limite del margine a orologio fermo, importo storto che vince, il 520
+nei suoi cinque perché, 🧊 su scaduta vecchia e giovane, già uscita, mai
+partita, bruciata, colpa nostra. Suite intera verde. TORTURA: 47
+mutazioni; al primo giro 45 uccise e due VIVE — il margine a zero (le
+scene del limite SEGUIVANO la costante: ora c'è la prova del senso dei
+numeri) e la firma letta come campi (ora c'è la fattura con la firma
+che comincia come un campo `x`). DAL VIVO, nel senso di casa:
+`collaudo_fatture_scadute.py`, il SERVER VERO (modulo intero, schema
+vero, rotte vere) su database usa-e-getta col nodo di cartone: 28 su 28.
+
+**NON PROVATO, e va detto.** LNbits VERO: il testo del `detail` di un
+520 («invoice expired», «no_route», «Insufficient balance») l'ho
+scritto a memoria — se è diverso il motivo esce «ignoto» con la riga
+grezza accanto, cioè non peggio di ieri, e le spie si tarano sul primo
+caso vero. Il `failure_reason` di LND dal vivo non l'ho visto (è la
+stessa metà non provata di ieri: serve il macaroon di lettura). Una
+fattura Zeus vera non è passata dal lettore: è passata la fattura vera
+di un wallet (16 set), e il formato è uno solo. Il client non è stato toccato: il
+rifiuto alla porta arriva nel toast di sempre, e il foglio dell'incasso
+dice ancora «Invoice salvata: incasso automatico alla conferma» senza
+parlare di scadenze — è del punto 2.
+
+**RESTA DA FARE, di Andrea.** Per il #152 lo stato ATTESO — da
+guardare con la query del report, che il VPS io non lo vedo — è
+`confirmed`, fermo vuoto, colonna della fattura vuota: se è così non
+serve nessun gesto sul database, e appena Pedro ne incolla una nuova (o
+mette un address) il pagamento parte da solo. Il censimento
+(`python3 censimento_scadenze.py`, sola lettura) dice se era il primo
+caso e — soprattutto — quali ordini APERTI hanno già in colonna una
+fattura morta. Le procedure stanno in PRODUZIONE, «LE FATTURE SCADUTE».
