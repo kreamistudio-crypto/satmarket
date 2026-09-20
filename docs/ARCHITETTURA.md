@@ -15985,8 +15985,11 @@
   seconda torna chiusa com'era. Collaudo dal vivo: bottone admin
   «🧽 Trattami da nuovo» in fondo alle statistiche
   (`trattamiDaNuovo()`) — azzera barattolo_hint, va su Esplora (il
-  tour vive lì) e riarma tour e checklist SUL DISPOSITIVO: gli hint
-  sono localStorage puro, il server non c'entra (per questo non è un
+  tour vive lì) e riarma tour e checklist. (Fino al set 2026 qui c'era
+  scritto «SUL DISPOSITIVO: gli hint sono localStorage puro, il server
+  non c'entra»: non è più vero, vedi «I TIMBRI SOPRAVVIVONO AL
+  DISPOSITIVO» qui sotto — adesso il gesto azzera anche il profilo e
+  la nuvola, con `azzera`, che è degli admin.) Non è comunque un
   comando bot) e annunci/ordini/profilo non si toccano (azzera anche
   `barattolo_test`, la memoria del cartello qui sotto).
   IL «TUTORIAL» È PER TUTTI, «TRATTAMI DA NUOVO» RESTA DEGLI ADMIN
@@ -16018,9 +16021,13 @@
   `hintAttivi()`, che è la STESSA guardia che `tourBenvenuto`
   interroga per prima: in DEMO e in VETRINA il tour non parte, e un
   bottone che porta a un muro è peggio di un bottone che non c'è (la
-  regola di `bottoneRifornisci`). Zero server, zero colonne: gli hint
-  sono localStorage puro, ed è anche il motivo per cui il gesto vale
-  per DISPOSITIVO e non per persona.
+  regola di `bottoneRifornisci`). Il Tutorial resta un gesto SENZA
+  server anche dal set 2026, quando i timbri sono saliti sul profilo:
+  toglie il timbro dalla cache e dalla memoria dell'apertura
+  (`delete vistiMem.tour`, o `hintLetti` lo rimetterebbe nell'unione e
+  il tour non partirebbe più per nessuno) e al server non dice niente —
+  il buco dura un istante, o il tour parte e si ritimbra o il timbro
+  torna, e di là «visto» non ha mai smesso di essere vero.
   NIENTE 🎓 NELL'ETICHETTA, ed è la trappola del doppio significato
   già pagata con «lampo» e con «attesa»: dall'ago 2026 quel glifo è
   il reparto «Lezioni e corsi». Il 👋 dice quel che il tour è, cioè
@@ -16029,6 +16036,55 @@
   che i sette timbri SOPRAVVIVANO — quello lo dice il banco che fa
   girare `riavviaTour` con node su un localStorage di cartone e conta
   cosa resta dentro. È la stessa lezione presa nove volte.
+  I TIMBRI SOPRAVVIVONO AL DISPOSITIVO (set 2026, dal campo: su
+  Telegram Desktop il tour ripartiva a OGNI avvio). «Tour visto» e i
+  suoi fratelli vivevano nel solo localStorage, e c'è chi fra un avvio
+  e l'altro non lo conserva (Telegram nel browser, cache svuotata
+  all'uscita, client vecchio). NON SI INDOVINA QUALE: i posti diventano
+  TRE e la verità è la loro UNIONE, perché un timbro è un fatto che
+  sale e basta. 1) IL PROFILO: `utenti.visti`, una mappa JSON
+  `{id: millisecondi}` che arriva con `/api/me` (chiave `visti`, già
+  pulita da `_visti_leggi`) insieme al catalogo `visti_noti`; vale su
+  ogni dispositivo e anche per chi entra da Nostr, che ha la sua riga
+  in `utenti` col tg_id negativo — stessa colonna, nessun ramo.
+  2) IL CLOUDSTORAGE di Telegram (`barattolo_visti`), il secondo posto
+  per il giorno che la POST non arriva: è già per utente, quindi una
+  chiave sola senza il tg_id nel nome. 3) IL LOCALSTORAGE, che resta
+  la cache che era. `vistiMem` è quel che server e nuvola hanno detto
+  in QUESTA apertura: serve dove il localStorage non risponde proprio,
+  e si rifà da capo a ogni `/me` (in collaudo l'identità cambia senza
+  ricaricare).
+  LA ROTTA È UNA, `POST /api/me/visti`: il client manda la sua mappa e
+  riceve l'unione. IL GIUDICE è `_visti_unisci`: unione, per ogni id il
+  timbro più RECENTE (serve al cartello, che è «una volta al giorno» e
+  il suo giorno avanza), chi manda MENO non toglie niente, un id fuori
+  da `VISTI_NOTI` si IGNORA e non è un 400 (il client di domani non
+  deve perdere i timbri di oggi), e IL FUTURO NON SI TIMBRA — si taglia
+  ad adesso, o un orologio avanti di un anno spegnerebbe il cartello
+  per un anno su ogni dispositivo. Il verso opposto non esiste, con UNA
+  eccezione: `azzera`, il gesto di «Trattami da nuovo», che è degli
+  admin (403 agli altri: un «Non ora» spegne per sempre) — e il client
+  lo ASPETTA prima di far ripartire il tour, o un `azzera` arrivato
+  dopo il timbro nuovo se lo porterebbe via.
+  LA PENNA È UNA SOLA, `timbraVisto(id)`: memoria, cache, server e
+  nuvola; `ricordaVisto` è la metà per chi ha una casa sua. DUE TIMBRI
+  HANNO CASA LORO e in `barattolo_hint` non entrano
+  (`VISTI_CASA_LORO`): il tour del P2P porta il CONTO nel nome e il
+  cartello tiene il suo GIORNO — `barattolo_hint` è del dispositivo, e
+  versarceli vorrebbe dire passarli al conto sbagliato.
+  LA MIGRAZIONE È SILENZIOSA ed è `adottaVisti`, a ogni `/me`: quel che
+  la cache sa IN PIÙ del server gli si porta su — chi il tour l'aveva
+  già visto non lo rivede, ed è anche il ritentativo di una POST persa
+  — ma SOLO gli id di `visti_noti` (uno di ieri rimasto nel telefono
+  verrebbe ignorato, quindi rimandato a ogni apertura per sempre; e
+  col server di ieri, che il catalogo non lo manda, non si porta su
+  niente). ⚠️ LA CACHE HA UN PADRONE (`barattolo_hint_conto`), ed è «il
+  conto sul dispositivo» pagato prima che costi: finché i timbri
+  restavano nel telefono due conti sullo stesso browser si passavano i
+  «Non ora» e basta; adesso che SALGONO, senza il padrone i timbri del
+  primo conto finirebbero nel profilo del secondo, su ogni suo
+  dispositivo. Cache di un altro = si butta; cache senza nome = è di
+  ieri, e la adotta il primo che entra.
   Cartello «fase di test» (lug 2026): l'avviso di rodaggio
   all'apertura — modale a tutto schermo col velo SFOCATO
   (`#testModale`, z-index 90: sopra i fogli e sopra il tour), si

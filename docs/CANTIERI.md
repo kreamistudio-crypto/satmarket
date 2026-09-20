@@ -22079,3 +22079,194 @@ tranne questo e quello emendato. Il pannello guardato nel browser a
 (il drill sta in PRODUZIONE). Se LNbits ripaghi una bolt11 `failed`:
 vale la dottrina di casa, «bruciata». Il client sul telefono, dentro
 Telegram. Il battito corto in produzione.
+
+
+## Il tour che si ripeteva su Telegram Desktop: i timbri «una volta sola» salgono sul profilo (20 set 2026)
+
+**DAL CAMPO (18 set, Signor Rail).** Su Telegram Desktop, a ogni avvio
+della mini app, il tour di benvenuto ripartiva da capo. Sul telefono
+no. Sul PC di Andrea (Telegram Desktop, Windows) nemmeno: lì il timbro
+resta. Quindi la causa sta in un ambiente che **non conserva il
+localStorage fra un avvio e l'altro** — Telegram aperto nel browser,
+Linux o macOS, la cache svuotata all'uscita, un client vecchio. Quale
+sia il suo lo si sta chiedendo a lui, e **la cura non aspetta la
+risposta**: non si indovina l'ambiente, si smette di dipendere da lui.
+
+**LA CURA: TRE POSTI, E LA VERITÀ È LA LORO UNIONE.** Un timbro è un
+fatto che sale e basta — «visto» non torna «non visto» — quindi tre
+copie non possono litigare: si uniscono. 1) **Il profilo sul server**,
+`utenti.visti`, una mappa JSON `{id: millisecondi}` che arriva con
+`/api/me`: vale su ogni dispositivo della persona. 2) **Il CloudStorage
+di Telegram** (`barattolo_visti`), il secondo posto, per il giorno che
+la POST non arriva. 3) **Il localStorage**, che resta la cache che era.
+In più `vistiMem`, quel che server e nuvola hanno detto in QUESTA
+apertura: senza di lei, dove il localStorage non risponde proprio il
+tour ripartirebbe lo stesso.
+
+**UNA COLONNA E NON UNDICI.** Il precedente in casa è
+`avvisato_trasporto`, un intero per un timbro. Undici interi sarebbero
+stati undici migrazioni oggi e una a ogni hint di domani; una mappa
+JSON con un catalogo (`VISTI_NOTI`) costa una colonna sola, e il
+DEFAULT `'{}'` è anche la migrazione.
+
+**CHI ENTRA DA NOSTR NON HA UN RAMO SUO.** La richiesta diceva «il flag
+va nel profilo Nostr lato server, stesso meccanismo» — ed è uscito più
+semplice del previsto: chi entra con una chiave ha la sua riga in
+`utenti` come tutti, col tg_id negativo. Stessa colonna, stessa rotta.
+Provato sul database di cartone con l'id `-5`.
+
+**IL GIUDICE, `_visti_unisci`, e le sue quattro righe scomode.**
+Unione; per ogni id il timbro più RECENTE (serve al cartello, che è
+«una volta al giorno» e il suo giorno avanza); **chi manda MENO non
+toglie niente** (un dispositivo rimasto indietro manda una mappa più
+povera); un id fuori catalogo **si ignora e non è un 400** — un client
+più nuovo del server deve poter mandare il timbro di domani senza
+perdere quelli di oggi; e **il futuro non si timbra**: un orologio
+avanti di un anno spegnerebbe il cartello per un anno, su ogni
+dispositivo, quindi si taglia ad adesso e al peggio lo spegne per oggi.
+Leggi-unisci-scrivi in una transazione (`BEGIN IMMEDIATE`): due
+dispositivi che timbrano insieme non si mangiano un timbro.
+
+**IL VERSO OPPOSTO NON ESISTE, CON UNA ECCEZIONE DICHIARATA.** È il
+patto di `avviso-trasporto` («un avviso letto non si può slettere»), e
+qui pesa di più: cinque di quei timbri sono «Non ora» ESPLICITI, e la
+regola di casa è che spengono per sempre. L'eccezione è `azzera`, il
+gesto di «🧽 Trattami da nuovo», che è degli admin: a chiunque altro
+403. **E il client lo ASPETTA**: un attimo dopo il tour riparte e
+ritimbra, e un `azzera` arrivato dopo quel timbro se lo porterebbe via
+— il tour tornerebbe a sorpresa all'apertura dopo. «Trattami da nuovo»
+è diventata `async` per questo.
+
+**IL TUTORIAL RESTA SENZA SERVER.** `riavviaTour` toglie il timbro
+dalla cache e — riga nuova — da `vistiMem`, o `hintLetti` lo
+rimetterebbe nell'unione e il bottone non farebbe più niente a
+nessuno. Al server non dice niente: il buco dura un istante (o il tour
+parte e si ritimbra, o il timbro torna), e di là «visto» non ha mai
+smesso di essere vero.
+
+**LA MIGRAZIONE SILENZIOSA È `adottaVisti`, A OGNI `/me`.** Quel che la
+cache sa IN PIÙ del server gli si porta su: chi il tour l'ha già visto
+non lo rivede dopo il deploy, ed è anche il ritentativo di una POST
+persa. **Solo gli id che il server conosce** (`visti_noti`, che arriva
+con `/me` — il client non tiene il catalogo a memoria): un id di ieri
+rimasto nel telefono verrebbe ignorato, e quindi rimandato a OGNI
+apertura, per sempre. Col server di ieri, che il catalogo non lo manda,
+non si porta su niente. A regime le POST sono ZERO: misurato dal vivo
+su tre aperture e due cambi di conto.
+
+**⚠️ LA CACHE HA UN PADRONE, ed è «il conto sul dispositivo» pagato
+PRIMA che costi.** `barattolo_hint` è del dispositivo: finché i timbri
+restavano nel telefono, due conti sullo stesso browser si passavano i
+«Non ora» e basta. Adesso la cache SALE sul profilo — senza una riga in
+più i timbri del primo conto sarebbero finiti nel profilo del secondo,
+su OGNI suo dispositivo, e lui il tour non l'avrebbe visto mai, da
+nessuna parte. È un danno che prima non esisteva e che questo cantiere
+avrebbe introdotto. `barattolo_hint_conto` dice di chi è la cache:
+di un altro = si butta (i suoi timbri stanno già sul SUO profilo);
+senza nome = è di ieri, e la adotta il primo che entra, come i nomi
+nudi di `allineaContoP2P`. `String(myTgId)`, mai `| 0`: provato con un
+id sopra 2^31.
+
+**DUE TIMBRI HANNO CASA LORO** (`VISTI_CASA_LORO`) e in
+`barattolo_hint` non entrano: il tour del P2P porta il CONTO nel nome
+(decisione del 17 set) e il cartello tiene il suo GIORNO. Salgono sul
+profilo con `ricordaVisto`, la metà della penna che non tocca la cache.
+Il tour del P2P già visto migra dalla SUA casa.
+
+**GLI ALTRI FLAG, CENSITI UNO PER UNO.**
+• SPOSTATI (undici id): `tour`, `tour_p2p`, `cartello`, `condcat`,
+`checklistvista`, `duetocchi`, `barraweb`, e i quattro «Non ora» —
+`nwc`, `lnaddr`, `npubverifica`, `nostrpub`. Le otto scritture sparse
+sono diventate una penna sola, `timbraVisto`; una prova conta che la
+cache si scriva in tre posti e in nessun altro.
+• `nwc` SALE ANCHE LUI, e rovescia un inciso scritto ad ago 2026
+accanto ad `avvisato_trasporto` («a differenza del dismiss del wallet
+NWC, che il wallet ce l'ha solo quel telefono»). Il wallet vive su un
+dispositivo, ed è questo a decidere se l'hint SERVE lì (la condizione
+«manca davvero»); ma il «Non ora» è della persona. E nell'ambiente di
+Signor Rail la connessione al wallet si perde a ogni avvio insieme al
+resto: lì l'hint tornerebbe a ogni apertura, che è il difetto di
+partenza. Se Andrea lo preferisce per dispositivo, è una riga.
+• GIÀ A POSTO: «Fatti riconoscere negli scambi», gli avvisi P2P, i
+suggerimenti, il canale, l'avviso del trasporto, il contatore
+dell'invito ai corrieri — tutti in colonna da quando sono nati.
+• **TROVATO DI STRISCIA, ED ERA UN DIFETTO VERO: la misura del testo
+al server non arrivava mai da dentro Telegram.** `setFont` mandava
+`headers:{..., ...authHdr()}`, ma `authHdr()` torna una STRINGA:
+spalmarla fa gli header «0», «1», «2»… e nessun `X-Tg-Init-Data`. Il
+fetch non si lamenta, il server risponde 401, il `catch` è vuoto. Dal
+browser andava (lì comanda il cookie), quindi in collaudo web non si
+vedeva. Era l'unico in tutto il file. Curato e provato dal vivo: 100 →
+115 sul server, e ritorno.
+• LASCIATI DOVE SONO, e va detto perché: **tema e valuta** sono del
+dispositivo per scelta (un PC e un telefono non vogliono per forza lo
+stesso tema); **la festa delle monete** (`barattolo_festa`, una volta
+per ordine) ha lo stesso difetto — dove la memoria non dura i
+coriandoli ripartono a ogni riapertura di un ordine concluso — ma è
+una mappa che cresce con gli ordini, e metterla in `/api/me` a ogni
+apertura non vale un ornamento: la cura giusta è un'altra (un timbro
+sulla riga dell'ordine) e ha il suo cantiere; **wallet NWC, sessione
+bunker, mazzo P2P** non salgono MAI (regola ferrea 2) — il mazzo ha
+già la sua copia nel CloudStorage, gli altri due in quell'ambiente si
+perdono a ogni avvio e non c'è cura che non sia custodire un segreto.
+• L'ANONIMO IN VETRINA non ha un profilo: per lui il cartello del
+giorno resta nel solo localStorage, com'era.
+
+**LA PAGINA «I TUOI DATI» DICEVA IL CONTRARIO**, ed è la riga che si
+dimentica: prometteva che «la dimensione del testo» e «quali
+suggerimenti hai già visto» *non arrivano mai qui*. La prima era già
+falsa sulla carta dall'ago 2026 (e vera nei fatti, per il difetto qui
+sopra); la seconda sarebbe diventata falsa oggi. Riscritta: restano sul
+telefono tema, valuta, wallet e firmatario; stanno nel profilo la
+misura del testo e quali avvisi hai visto o chiuso — il nome
+dell'avviso e il momento, nient'altro — più la copia nello spazio di
+Telegram. Una prova tiene il paragrafo onesto.
+
+**STRADE SCARTATE.** Il solo CloudStorage: non esiste fuori da
+Telegram, quindi niente per chi entra dal browser o da Nostr, ed è una
+callback che passa dal client — non il posto da cui far dipendere «il
+tour parte o no». Indovinare l'ambiente e curare quello: quattro
+ipotesi, nessuna verificabile da qui. Una rotta per timbro: undici
+rotte. Portare i timbri nella fusione Nostr→Telegram: non li porta
+nemmeno `font_scala`, e la cache del browser li rimigra da sé sul
+profilo che sopravvive.
+
+**COSA È STATO PROVATO.** 51 prove nuove in `prove_timbri_visti` più
+due nel banco del Tutorial: il giudice del server GIRA (undici casi),
+la rotta gira su un database di cartone (unione, 403, azzera, id
+negativo), il client gira con node a **quindici casi indipendenti**,
+ognuno col suo try/catch — il caso del campo (memoria svuotata, il
+profilo dice «visto»), la migrazione, il localStorage muto, la cache di
+un altro conto, l'id sopra 2^31, il server di ieri, le case loro, la
+nuvola in più / muta / indietro / in pari, la penna, la vetrina, il
+cambio d'identità. **Tortura: trenta mutazioni, trenta uccise**, e
+nessuna per esplosione — ma non al primo giro: la #10 (la chiamata
+`adottaVisti` commentata) era VIVA, perché la sentinella la trovava
+DENTRO il commento, e la #18 moriva perché il banco esplodeva su un
+`undefined` sparito dal JSON. Curate tutt'e due: regex a inizio riga, e
+`|| 0`. La trentesima è il difetto di ieri rimesso a mano.
+DAL VIVO, server vero del worktree su database suo, nel Browser pane:
+tour visto → `localStorage.clear()` → ricarico → **il tour non
+riparte** e il cartello nemmeno, con la cache rifatta dal profilo; la
+migrazione (`{tour, nwc, benvenuto}` in cache → sul server salgono i
+primi due); il cambio di conto (cache di 222 buttata, 999 vede il SUO
+tour); il tour del P2P dopo lo svuotamento; il localStorage che lancia
+su ogni accesso; il Tutorial che riparte col profilo che dice «visto»;
+«Trattami da nuovo» con le quattro POST nell'ordine giusto; la misura
+del testo. Suite intera verde con `PROVE_SEVERE=1`.
+
+**NON PROVATO, e va detto.** **Telegram Desktop vero e Telegram nel
+browser (web.telegram.org): nessuno dei due si può aprire da qui**, e
+sono proprio l'ambiente del difetto — quello che è provato è il suo
+EFFETTO (una memoria che si svuota fra due avvii), non lui. **Il
+CloudStorage vero**: fuori da Telegram `cloudTelegram()` torna null,
+quindi il secondo posto ha girato solo sulla nuvola di cartone del
+banco. Il tour del P2P dal suo innesco vero (in locale la leva è
+spenta: provata la coppia `apriTourP2P` / `tourP2PVisto` a mano). Un
+telefono.
+
+**COSA RESTA DA GUARDARE.** La risposta di Signor Rail su quale sia il
+suo ambiente: la cura non ne dipende, ma dice se in quell'ambiente si
+perde anche il resto (wallet, firmatario), che è un'altra
+conversazione. E `nwc` per persona o per dispositivo, se Andrea vuole
+rovesciarlo.
