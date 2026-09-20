@@ -8263,7 +8263,8 @@ document.getElementById('cartello')?.remove();</script>
       <p class="sicu-nota">Una cosa che facciamo e va detta: il server, come ogni server del mondo, <b>vede l'indirizzo IP</b> di chi si collega mentre gli risponde. Finisce nel registro tecnico della macchina — non nel database, non in un profilo, e non lo incrociamo con niente.</p>
 
       <h3>Quello che resta sul tuo telefono</h3>
-      <p>Alcune cose non arrivano mai qui: vivono nel tuo browser e se ne vanno se lo ripulisci. Sono il tema chiaro o scuro, la valuta con cui leggi i prezzi, la dimensione del testo, quali suggerimenti hai già visto, e — le due che contano — <b>la connessione al tuo wallet</b> e <b>la sessione con il tuo firmatario Nostr</b>.</p>
+      <p>Alcune cose non arrivano mai qui: vivono nel tuo browser e se ne vanno se lo ripulisci. Sono il tema chiaro o scuro, la valuta con cui leggi i prezzi, e — le due che contano — <b>la connessione al tuo wallet</b> e <b>la sessione con il tuo firmatario Nostr</b>.</p>
+      <p>Due piccole cose invece le teniamo <b>nel tuo profilo</b>, perché ti seguano su ogni dispositivo: la <b>dimensione del testo</b> che hai scelto e <b>quali avvisi hai già visto o chiuso</b> — il giro di benvenuto, i «Non ora» dei suggerimenti, il cartello del giorno. Sono solo il nome dell'avviso e il momento in cui l'hai visto: servono a non mostrartelo di nuovo, anche dove il browser non ricorda niente fra un'apertura e l'altra. Dentro Telegram una copia sta anche nello spazio che Telegram riserva all'app per il tuo account.</p>
 
       <h3>Cosa puoi fare adesso</h3>
       <ul class="sicu-lista">
@@ -15956,7 +15957,7 @@ async function setFont(s){
   if (DEMO || VETRINA) return;
   try {
     await fetch('/api/me/font-scala', {method:'POST',
-      headers:{'Content-Type':'application/json', ...authHdr()},
+      headers:{'Content-Type':'application/json', 'X-Tg-Init-Data':authHdr()},
       body: JSON.stringify({scala: s})});
   } catch(e){}
 }
@@ -15984,14 +15985,152 @@ applicaFont();
    compaiono solo se la funzione manca davvero, un "Non ora" li
    spegne per sempre, e in demo/vetrina non esistono proprio. */
 const HINT_CHIAVE = 'barattolo_hint';
+/* I TIMBRI SOPRAVVIVONO AL DISPOSITIVO (set 2026, dal campo: su
+   Telegram Desktop il tour ripartiva a OGNI avvio). Il timbro viveva
+   nel solo localStorage, e c'e' chi fra un avvio e l'altro non lo
+   conserva — Telegram nel browser, la cache svuotata all'uscita, un
+   client vecchio. Non si indovina quale: i posti diventano TRE e la
+   verita' e' la loro UNIONE, perche' un timbro e' un fatto che sale e
+   basta. 1) il profilo sul server (`utenti.visti`, arriva con /me):
+   vale su ogni dispositivo, e anche per chi entra da Nostr; 2) il
+   CloudStorage di Telegram, il secondo posto, per il giorno che la
+   POST non arriva; 3) il localStorage, che resta la cache che era.
+   `vistiMem` e' quel che server e nuvola hanno detto in QUESTA
+   apertura: serve dove il localStorage non risponde proprio, e li'
+   senza di lei il tour ripartirebbe lo stesso. */
+let vistiMem = {};
+let vistiNoti = null;    // il catalogo del server; null = server di ieri
+const HINT_CONTO_CHIAVE = 'barattolo_hint_conto';   // di chi e' la cache
+/* DUE TIMBRI HANNO GIA' UNA CASA LORO e in `barattolo_hint` non
+   entrano: il tour del P2P porta il CONTO nel nome (due account sullo
+   stesso telefono: il secondo e' un utente nuovo) e il cartello tiene
+   il suo GIORNO. `barattolo_hint` e' del dispositivo: versarceli
+   vorrebbe dire passarli al conto sbagliato al primo cambio. */
+const VISTI_CASA_LORO = ['tour_p2p', 'cartello'];
+function unisciVisti(a, b){
+  const u = Object.assign({}, a);
+  for (const k in (b || {})) {
+    const v = Number(b[k]);
+    if (v > 0 && !(Number(u[k]) >= v)) u[k] = v;
+  }
+  return u;
+}
 function hintLetti(){
-  try { return JSON.parse(localStorage.getItem(HINT_CHIAVE)) || {}; }
-  catch(e) { return {}; }
+  let h = {};
+  try { h = JSON.parse(localStorage.getItem(HINT_CHIAVE)) || {}; }
+  catch(e) { h = {}; }
+  const mem = {};
+  for (const k in vistiMem) if (!VISTI_CASA_LORO.includes(k)) mem[k] = vistiMem[k];
+  return unisciVisti(h, mem);
 }
 function hintDismesso(id){ return !!hintLetti()[id]; }
-function dismettiHint(id, nodo){
-  const h = hintLetti(); h[id] = Date.now();
+/* IL TIMBRO HA UNA PENNA SOLA: memoria, cache, server e nuvola, in
+   quest'ordine — i primi due in sincrono (chi chiede un istante dopo
+   deve trovarlo), gli altri due fire-and-forget. Fail-open in ogni
+   verso: una POST persa la ritenta `adottaVisti` alla prossima
+   apertura, perche' la cache la sa ancora. */
+function timbraVisto(id){
+  const ora = Date.now();
+  const h = hintLetti(); h[id] = ora;
   try { localStorage.setItem(HINT_CHIAVE, JSON.stringify(h)); } catch(e){}
+  ricordaVisto(id, ora);
+}
+/* ...e questa e' la meta' che serve a chi ha una casa sua (tour del
+   P2P, cartello): la cache la scrive lui, qui vanno gli altri tre. */
+function ricordaVisto(id, quando){
+  vistiMem[id] = quando;
+  spingiVisti({[id]: quando});
+}
+function spingiVisti(mappa){
+  if (DEMO || VETRINA || !API_BASE || !myTgId) return;
+  fetch(`${API_BASE}/me/visti`, {method:'POST',
+    headers:{'Content-Type':'application/json', 'X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({visti: mappa})}).catch(()=>{});
+  nuvolaVisti();
+}
+/* LA NUVOLA E' PER CONTO DA SOLA (il CloudStorage e' del bot E
+   dell'utente), quindi una chiave sola senza il tg_id nel nome. Ci va
+   tutta `vistiMem`: poche decine di byte per timbro, lontanissimo dai
+   4096 del valore. Fuori da Telegram `cloudScrivi` risponde false e
+   non succede niente. */
+const CLOUD_VISTI = 'barattolo_visti';
+function nuvolaVisti(){
+  cloudScrivi(CLOUD_VISTI, JSON.stringify(vistiMem));
+}
+/* A OGNI /me: il server dice i suoi, e quel che la cache sa IN PIU' gli
+   si porta su in silenzio — e' la MIGRAZIONE di chi il tour l'aveva
+   gia' visto prima che la colonna nascesse, ed e' anche il ritentativo
+   di una POST persa. `vistiMem` si rifa' da capo: in collaudo l'identita'
+   cambia senza ricaricare, e i timbri del conto di prima non sono di
+   quello di adesso.
+   SI PORTA SU SOLO QUEL CHE IL SERVER CONOSCE (`visti_noti`): un id di
+   ieri rimasto in cache («benvenuto») il server lo ignorerebbe, e
+   senza il filtro lo si rimanderebbe a OGNI apertura, per sempre. Un
+   server di ieri non manda il catalogo: allora non si porta su niente,
+   che tanto non c'e' nessuno ad ascoltare. */
+function adottaVisti(me){
+  vistiNoti = Array.isArray(me?.visti_noti) ? me.visti_noti : null;
+  vistiMem = unisciVisti({}, me?.visti);
+  if (!vistiNoti) return;
+  /* LA CACHE HA UN PADRONE, ed e' «il conto sul dispositivo» pagato
+     prima che costi: `barattolo_hint` e' del dispositivo, e finche'
+     restava li' due conti sullo stesso browser si passavano i «Non
+     ora» e basta. Adesso la cache SALE sul profilo: senza questa riga
+     i timbri del primo conto finirebbero nel profilo del secondo, su
+     OGNI suo dispositivo — e lui il tour non lo vedrebbe mai, da
+     nessuna parte. Cache di un altro = si butta (i suoi timbri stanno
+     gia' sul SUO profilo); cache senza nome = e' di ieri, la adotta il
+     primo che entra, come i nomi nudi di `allineaContoP2P`. */
+  let cache = {};
+  try {
+    const di = localStorage.getItem(HINT_CONTO_CHIAVE);
+    if (di === null || di === String(myTgId))
+      cache = JSON.parse(localStorage.getItem(HINT_CHIAVE)) || {};
+    else localStorage.removeItem(HINT_CHIAVE);
+    localStorage.setItem(HINT_CONTO_CHIAVE, String(myTgId));
+  } catch(e){}
+  for (const k of VISTI_CASA_LORO) delete cache[k];
+  /* il tour del P2P dalla SUA casa, che porta gia' il conto giusto:
+     `allineaContoP2P` e' appena passato, qui sopra in avvia() */
+  try {
+    const t = parseInt(localStorage.getItem(chiaveTourP2P()), 10);
+    if (t > 0) cache.tour_p2p = t;
+  } catch(e){}
+  const inPiu = {};
+  for (const k in cache)
+    if (vistiNoti.includes(k) && Number(cache[k]) > 0 && !vistiMem[k])
+      inPiu[k] = Number(cache[k]);
+  /* la cache si riallinea all'unione: e' quel che la tiene una cache */
+  const h = hintLetti();
+  try { localStorage.setItem(HINT_CHIAVE, JSON.stringify(h)); } catch(e){}
+  vistiMem = unisciVisti(vistiMem, inPiu);
+  if (Object.keys(inPiu).length) spingiVisti(inPiu);
+  adottaNuvolaVisti();
+}
+/* Il secondo posto si legge in sottofondo: la risposta passa dal client
+   Telegram e nessuno la aspetta — il tour parte in coda ad avvia(),
+   molti giri di rete dopo, e per allora e' arrivata da un pezzo. Quel
+   che la nuvola sa IN PIU' del server (una POST mai arrivata) gli si
+   porta su, come per la cache. `ok:false` e' «non lo so», non «vuota»:
+   non si scrive niente sopra (il patto di cloudLeggiEsito). */
+async function adottaNuvolaVisti(){
+  const conto = myTgId;
+  const e = await cloudLeggiEsito(CLOUD_VISTI);
+  if (!e.ok || conto !== myTgId || !vistiNoti) return;
+  let nuv = {};
+  try { nuv = JSON.parse(e.testo || '{}') || {}; } catch(err){ nuv = {}; }
+  const inPiu = {};
+  for (const k in nuv)
+    if (vistiNoti.includes(k) && Number(nuv[k]) > 0 && !vistiMem[k])
+      inPiu[k] = Number(nuv[k]);
+  if (Object.keys(inPiu).length) {
+    vistiMem = unisciVisti(vistiMem, inPiu);
+    spingiVisti(inPiu);          // che la nuvola la riscrive da se'
+  } else if (Object.keys(vistiMem).some(k => !(Number(nuv[k]) >= vistiMem[k])))
+    nuvolaVisti();     // il server ne sa piu' della nuvola: la si aggiorna
+}
+function dismettiHint(id, nodo){
+  timbraVisto(id);
   nodo?.closest('.hintline')?.remove();   // la riga sparisce, senza re-render
 }
 function hintAttivi(){ return !DEMO && !VETRINA; }
@@ -16052,9 +16191,9 @@ function tourBenvenuto(){
   tourTappe = TAPPE_TOUR.filter(t => { const b = t.trova(); return b && b.offsetParent !== null; });
   if (!tourTappe.length) return;
   /* consumato alla comparsa: anche ignorato, non torna (il patto
-     one-shot del vecchio benvenuto) */
-  const h = hintLetti(); h.tour = Date.now();
-  try { localStorage.setItem(HINT_CHIAVE, JSON.stringify(h)); } catch(e){}
+     one-shot del vecchio benvenuto). E il timbro sale sul profilo:
+     vedi «I TIMBRI SOPRAVVIVONO AL DISPOSITIVO». */
+  timbraVisto('tour');
   tourInCorso = true;
   const ib = el('installBanner'); if (ib) ib.style.display = 'none';
   window.scrollTo(0, 0);          // le quattro tappe vivono tutte in alto
@@ -16149,6 +16288,12 @@ function riavviaTour(){
   const h = hintLetti();
   const prima = h.tour;            // per rimetterlo se il tour non parte
   delete h.tour;
+  /* ...e via anche dalla memoria dell'apertura, o `hintLetti` lo
+     rimetterebbe nell'unione e il tour non partirebbe mai. AL SERVER
+     NON SI DICE NIENTE, e non e' una dimenticanza: il buco dura un
+     istante — o il tour parte e si ritimbra, o il timbro torna qui
+     sotto — e di la' «visto» non ha mai smesso di essere vero. */
+  delete vistiMem.tour;
   try { localStorage.setItem(HINT_CHIAVE, JSON.stringify(h)); } catch(e){}
   go('esplora');                   // le quattro tappe vivono tutte li'
   tourBenvenuto();
@@ -16159,6 +16304,7 @@ function riavviaTour(){
   if (!tourInCorso) {
     if (prima) {
       h.tour = prima;
+      vistiMem.tour = prima;
       try { localStorage.setItem(HINT_CHIAVE, JSON.stringify(h)); } catch(e){}
     }
     toast("Qui non c'è niente da mostrare: togli i filtri e riprova");
@@ -16171,17 +16317,21 @@ function riavviaTour(){
    apra l'app, autenticati e anonimi in vetrina; mai la demo coi dati
    finti. E lo vede UNA VOLTA AL GIORNO per dispositivo: i tester
    aprono l'app di continuo, un cartello a ogni apertura lo
-   odierebbero. La memoria e' in localStorage come gli hint — il
-   server non c'entra, e ogni dispositivo ha il suo giorno. */
+   odierebbero. La memoria e' in localStorage e, dal set 2026, anche
+   nel profilo di chi e' dentro (il timbro `cartello`: vedi «I TIMBRI
+   SOPRAVVIVONO AL DISPOSITIVO») — dove il localStorage non dura fra
+   un avvio e l'altro tornava a ogni apertura. L'anonimo in vetrina un
+   profilo non ce l'ha: per lui resta il giorno del dispositivo. */
 const TEST_CHIAVE = 'barattolo_test';
 let testModaleInCorso = false;
 let dopoModaleTest = null;    // chi aspetta il suo turno: il tour
 let bannerTest = null;        // la risposta del server: null = niente rodaggio
 let bannerTestPromessa = null;  // il fetch, UNO per apertura (cache della promessa)
-function giornoOggi(){
-  const d = new Date();       // giorno LOCALE, non UTC: le 2 di notte
+function giornoDi(quando){
+  const d = new Date(quando); // giorno LOCALE, non UTC: le 2 di notte
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;   // sono ancora ieri sera
 }
+function giornoOggi(){ return giornoDi(Date.now()); }
 /* L'interruttore, il testo e il link arrivano tutti da qui: li usano
    sia il cartello (una volta al giorno) sia la fascia fissa in
    vetrina (sempre). Un solo giro di rete per apertura — e la cache e'
@@ -16242,9 +16392,18 @@ async function modaleTest(dopo){
   let visto = '';
   try { visto = localStorage.getItem(TEST_CHIAVE) || ''; } catch(e){}
   if (visto === giornoOggi()) return finiscoModaleTest();
+  /* ...e il giorno lo sa anche il PROFILO (set 2026): dove il
+     localStorage non dura il cartello tornava a ogni apertura, che e'
+     proprio quel che «una volta al giorno» voleva evitare ai tester.
+     Il timbro e' un istante, e il giorno si ricava QUI, col fuso di
+     chi guarda — il patto di giornoOggi. L'anonimo in vetrina non ha
+     un profilo: per lui resta il solo localStorage, com'era. */
+  if (vistiMem.cartello && giornoDi(vistiMem.cartello) === giornoOggi())
+    return finiscoModaleTest();
   /* consumato alla comparsa, come il tour: un ricaricamento della
      pagina non lo ripropone lo stesso giorno */
   try { localStorage.setItem(TEST_CHIAVE, giornoOggi()); } catch(e){}
+  ricordaVisto('cartello', Date.now());
   /* la PRIMA riga del testo e' il titolo, il resto il messaggio:
      tutto scritto nel config, niente da indovinare qui */
   const righe = d.testo.split('\n');
@@ -21984,8 +22143,13 @@ function simulatePaid(){
 /* ---------------- festa: le monete quando i sats si sbloccano ----------------
    Coriandoli di monete ₿ dal messaggio di chiusura: pioggia piena per
    chi incassa, versione discreta per chi ha comprato. Una sola volta
-   per ordine e per dispositivo (stesso patto degli hint: localStorage,
-   frontend puro); con prefers-reduced-motion la festa non parte. */
+   per ordine e per dispositivo (localStorage, frontend puro); con
+   prefers-reduced-motion la festa non parte.
+   ⚠️ NON E' SALITA SUL PROFILO COI TIMBRI (set 2026), ed e' voluto:
+   e' una mappa che cresce con gli ordini, e farla viaggiare in /me a
+   ogni apertura non vale un ornamento. Dove il localStorage non dura
+   i coriandoli ripartono a ogni riapertura: la cura giusta e' un
+   timbro sulla riga dell'ordine, e ha il suo cantiere. */
 const FESTA_CHIAVE = 'barattolo_festa';
 function festaGiaFatta(id){
   try { return !!(JSON.parse(localStorage.getItem(FESTA_CHIAVE))||{})[id]; }
@@ -25118,8 +25282,7 @@ function renderChecklist(){
     checklistPrimoSguardo = false;
     if (!hintDismesso('checklistvista')) {
       checklistAperta = true;
-      const h = hintLetti(); h.checklistvista = Date.now();
-      try { localStorage.setItem(HINT_CHIAVE, JSON.stringify(h)); } catch(e){}
+      timbraVisto('checklistvista');
     }
   }
   const righe = voci.filter(v=>!v.ok).map(v=>
@@ -33640,13 +33803,28 @@ function aggiornaAdmDot(n){
 }
 
 /* «Trattami da nuovo»: il pulsante del collaudo dal vivo, solo per
-   gli admin. Gli hint vivono SOLO in localStorage del dispositivo
-   (barattolo_hint): non c'e' nulla da chiedere al server — si azzera
-   la memoria locale e si riarmano tour e checklist, subito.
-   Annunci, ordini e profilo restano intatti. */
-function trattamiDaNuovo(){
+   gli admin. Fino al set 2026 gli hint vivevano nel SOLO localStorage
+   e bastava azzerare quello; adesso stanno anche sul profilo e nella
+   nuvola di Telegram, e si azzerano tutti e tre (vedi sotto).
+   Annunci, ordini e il resto del profilo restano intatti. */
+async function trattamiDaNuovo(){
   if (!isAdmin) return;
   try { localStorage.removeItem(HINT_CHIAVE); localStorage.removeItem(TEST_CHIAVE); } catch(e){}
+  /* DAL SET 2026 I TIMBRI STANNO ANCHE SUL PROFILO E NELLA NUVOLA, e
+     azzerare il solo localStorage non riarmerebbe piu' niente: alla
+     prossima apertura /me li riporterebbe tutti. `azzera` e' l'unico
+     verso opposto che il server conosce, ed e' degli admin (a chiunque
+     altro risponde 403: un «Non ora» spegne per sempre).
+     SI ASPETTANO, tutt'e due: un attimo dopo il tour riparte e
+     RITIMBRA, e un `azzera` arrivato dopo quel timbro se lo
+     porterebbe via — il tour tornerebbe a sorpresa alla prossima
+     apertura. Fail-open: se il server tace si riarma lo stesso, per
+     questa apertura, con la memoria svuotata qui sotto. */
+  vistiMem = {};
+  await fetch(`${API_BASE}/me/visti`, {method:'POST',
+    headers:{'Content-Type':'application/json', 'X-Tg-Init-Data':authHdr()},
+    body: JSON.stringify({azzera: true})}).catch(()=>{});
+  await cloudCancella(CLOUD_VISTI);
   /* IL TIMBRO DEL TOUR P2P NON STA IN `barattolo_hint`, e va tolto a
      parte: vive sotto un nome SUO col conto attaccato
      (`barattolo_tour_p2p@<tg_id>`), quindi la riga qui sopra non lo
@@ -35697,10 +35875,9 @@ function barraWeb(nome){
     + `<button class="demo-cta" onclick="esciWeb()"`
     + ` style="border:none;cursor:pointer">Esci</button>`;
 }
-/* La ✕ del banner: memoria nel solito localStorage degli hint */
+/* La ✕ del banner: memoria nel solito timbro degli hint */
 function chiudiBarraWeb(){
-  const h = hintLetti(); h.barraweb = Date.now();
-  try { localStorage.setItem(HINT_CHIAVE, JSON.stringify(h)); } catch(e){}
+  timbraVisto('barraweb');
   el('demoBanner').style.display = 'none';
 }
 async function esciWeb(){
@@ -35824,7 +36001,7 @@ async function cambiaAccount(tgId){
    nessuno da solo — e' la lezione del tocco lungo sulle card delle
    categorie, e la risposta e' la stessa: un TOAST, che e' l'unica
    forma a zero pixel di layout (se ne va da solo e non sposta
-   niente). Si consuma col timbro degli hint, per dispositivo e per
+   niente). Si consuma col timbro degli hint, per persona e per
    sempre.
    PARLA SOLO A CHI HA GIA' DUE ACCOUNT: con uno solo il gesto
    porterebbe a un menu che non ha ancora niente da scegliere, e un
@@ -35833,8 +36010,7 @@ function accennaAccount(){
   renderAccountSheet();
   if (!accountVivi() || accountAperti.length < 2) return;
   if (hintDismesso('duetocchi')) return;
-  const h = hintLetti(); h.duetocchi = Date.now();
-  try { localStorage.setItem(HINT_CHIAVE, JSON.stringify(h)); } catch(e){}
+  timbraVisto('duetocchi');
   setTimeout(()=>toast('💡 Tocca di nuovo la tua foto per cambiare account', 4200), 900);
 }
 
@@ -40247,6 +40423,12 @@ function marchioNelTestoP2P(testo, conMarchio){
 }
 function chiaveTourP2P(){ return chiaveP2P(TOUR_P2P_CHIAVE); }
 function tourP2PVisto(){
+  /* PRIMA IL PROFILO (set 2026): dove il localStorage non dura fra un
+     avvio e l'altro il tour tornava a ogni ingresso nel P2P, e il
+     ripiego qui sotto non lo vedeva — li' la memoria non e' MUTA, e'
+     VUOTA, che e' un'altra cosa. `vistiMem` arriva con /me ed e' gia'
+     del conto giusto: il server i timbri li tiene per persona. */
+  if (vistiMem.tour_p2p) return true;
   try { return localStorage.getItem(chiaveTourP2P()) !== null; }
   catch(e) { return true; }      /* memoria muta = «visto»: vedi sopra */
 }
@@ -40258,6 +40440,7 @@ function scordaTourP2P(){
     localStorage.removeItem(chiaveTourP2P());
     localStorage.removeItem(TOUR_P2P_CHIAVE);
   } catch(e){}
+  delete vistiMem.tour_p2p;      // la memoria dell'apertura, o non si riarma
 }
 /* L'ingresso automatico: UNA volta, e solo col libro gia' in mano.
    Sta in `renderP2P` dopo `chiudiAttesaP2P` e non in `vaiP2P`, per due
@@ -40284,6 +40467,7 @@ function apriTourP2P(){
   if (tourP2PInCorso) return;
   /* consumato alla COMPARSA, non alla fine: vedi il patto qui sopra */
   try { localStorage.setItem(chiaveTourP2P(), Date.now()); } catch(e){}
+  ricordaVisto('tour_p2p', Date.now());   // ...e sul profilo: vedi tourP2PVisto
   tourP2PInCorso = true;
   const nastro = el('tourP2PNastro'), punti = el('tourP2PPunti');
   nastro.innerHTML = TAPPE_TOUR_P2P.map(t =>
@@ -48447,6 +48631,7 @@ async function avvia(){
     myRiconosciP2P = !!me.riconosci_p2p;
     suggerimentiOgni = me.suggerimenti_ogni_giorni || 0;
     adottaFont(me);   // la misura scelta sull'altro telefono
+    adottaVisti(me);  // i timbri «una volta sola»: tour visto, «Non ora»
     mySpedizioniere = me.spedizioniere || '';
     spedizionieriCatalogo = me.spedizionieri || [];
     /* le SUE reti da una chiave nuova; un server di ieri non la manda

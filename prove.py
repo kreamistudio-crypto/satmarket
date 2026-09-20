@@ -67886,7 +67886,8 @@ def prove_portachiavi():
     prova("l'accenno parla solo con due account", True,
           "accountAperti.length < 2" in acc)
     prova("...e si consuma col timbro degli hint", True,
-          "hintDismesso('duetocchi')" in acc and "h.duetocchi" in acc)
+          "hintDismesso('duetocchi')" in acc
+          and "timbraVisto('duetocchi');" in acc)
 
 
 def _fetta(testo, ancora, quanti=1400):
@@ -69049,6 +69050,403 @@ def prove_config_esempio():
     # sempre.
     prova("...e sta tutta su una riga", True, "\n" not in forme.strip())
 
+def prove_timbri_visti():
+    """I TIMBRI «UNA VOLTA SOLA» SOPRAVVIVONO AL DISPOSITIVO (set 2026).
+    Dal campo: su Telegram Desktop il tour di benvenuto ripartiva a OGNI
+    avvio, perche' «tour visto» viveva nel solo localStorage e c'e' chi
+    fra un avvio e l'altro non lo conserva. I posti diventano tre —
+    profilo sul server, CloudStorage di Telegram, localStorage come
+    cache — e la verita' e' la loro UNIONE.
+    LE SENTINELLE NON BASTANO, la lezione di sempre: il giudice del
+    server si fa GIRARE, la rotta gira su un database di cartone, e il
+    client gira con node a CASI INDIPENDENTI — ognuno col suo
+    try/catch, o il primo che inciampa si porta via gli altri."""
+    print("\n[I timbri «una volta sola» sopravvivono al dispositivo]")
+    import asyncio, sqlite3
+    import json as _js, shutil as _sh, subprocess as _sp, tempfile as _tf
+    srv = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) IL GIUDICE DEL SERVER, FATTO GIRARE ---------------------
+    i = srv.index("VISTI_NOTI = (")
+    amb = {"json": json}
+    exec(srv[i:srv.index(")\n", i) + 1], amb)
+    exec(pezzo("_visti_leggi"), amb)
+    exec(pezzo("_visti_unisci"), amb)
+    uni, leggi = amb["_visti_unisci"], amb["_visti_leggi"]
+    ADESSO = 2_000_000
+    prova("l'unione tiene quel che c'era e quel che arriva",
+          {"tour": 5, "nwc": 7}, uni({"tour": 5}, {"nwc": 7}, ADESSO))
+    # il dispositivo rimasto indietro manda una mappa piu' povera: non
+    # toglie niente — «visto» non torna «non visto»
+    prova("chi manda MENO non toglie niente",
+          {"tour": 5, "nwc": 7}, uni({"tour": 5, "nwc": 7}, {}, ADESSO))
+    prova("per ogni id vale il timbro piu' RECENTE (il giorno del "
+          "cartello avanza)", {"cartello": 9},
+          uni({"cartello": 4}, {"cartello": 9}, ADESSO))
+    prova("...e uno piu' vecchio non scalza il nuovo", {"cartello": 9},
+          uni({"cartello": 9}, {"cartello": 4}, ADESSO))
+    # un orologio avanti di un anno spegnerebbe il cartello per un anno,
+    # su OGNI dispositivo della persona
+    prova("il futuro non si timbra: si taglia ad adesso",
+          {"cartello": ADESSO}, uni({}, {"cartello": 10 ** 14}, ADESSO))
+    prova("un id che il catalogo non conosce si ignora (niente 400: il "
+          "client di domani non perde i timbri di oggi)",
+          {"tour": 3}, uni({}, {"tour": 3, "benvenuto": 1}, ADESSO))
+    prova("un booleano non e' un timbro", {}, uni({}, {"tour": True}, ADESSO))
+    prova("...ne' uno zero, un negativo o una stringa", {},
+          uni({}, {"tour": 0, "nwc": -4, "lnaddr": "ieri"}, ADESSO))
+    prova("un corpo che non e' una mappa lascia tutto com'era",
+          {"tour": 5}, uni({"tour": 5}, "ciao", ADESSO))
+    prova("la colonna storta vale «nessun timbro», mai un'eccezione",
+          [{}, {}, {}, {}],
+          [leggi("{rotto"), leggi("[1,2]"), leggi(None), leggi("")])
+    prova("...e in lettura passano solo gli id del catalogo",
+          {"tour": 8}, leggi('{"tour": 8, "ignoto": 9, "nwc": true}'))
+
+    # --- 2) LA ROTTA, SU UN DATABASE DI CARTONE ---------------------
+    class _Err(Exception):
+        def __init__(self, codice, testo=""):
+            self.codice, self.testo = codice, testo
+            super().__init__(f"{codice}: {testo}")
+
+    class _SenzaClose:
+        def __init__(self, c): self._c = c
+        def __getattr__(self, n): return getattr(self._c, n)
+        def close(self): pass
+
+    c = sqlite3.connect(":memory:")
+    c.row_factory = sqlite3.Row
+    c.executescript("""
+    CREATE TABLE utenti(tg_id INT, visti TEXT DEFAULT '{}');
+    INSERT INTO utenti(tg_id) VALUES(955),(999),(-5);
+    """)
+    chi = {"id": 955}
+    corpo = {}
+
+    async def json_finto(_req):
+        return corpo
+
+    amb_r = dict(amb)
+    amb_r.update({
+        "Request": object, "Header": lambda d: d, "Cookie": lambda d: d,
+        "HTTPException": _Err, "leggi_json": json_finto,
+        "verifica_utente": lambda *a: dict(chi),
+        "e_admin": lambda i: i == 999,
+        "db": lambda: _SenzaClose(c),
+        "time": type("t", (), {"time": staticmethod(lambda: 5000.0)})})
+    exec("async " + pezzo("timbra_visti"), amb_r)
+
+    def posta(tg_id, d):
+        chi["id"] = tg_id
+        corpo.clear()
+        corpo.update(d)
+        try:
+            return asyncio.run(amb_r["timbra_visti"](None))["visti"]
+        except _Err as e:
+            return e.codice
+
+    def colonna(tg_id):
+        return json.loads(c.execute(
+            "SELECT visti FROM utenti WHERE tg_id=?", (tg_id,)
+        ).fetchone()["visti"])
+
+    prova("il timbro arriva in colonna", {"tour": 100},
+          posta(955, {"visti": {"tour": 100}}))
+    prova("...e il secondo si UNISCE al primo", {"tour": 100, "nwc": 200},
+          posta(955, {"visti": {"nwc": 200}}))
+    prova("...scritto davvero, non solo risposto",
+          {"tour": 100, "nwc": 200}, colonna(955))
+    # un «Non ora» spegne per sempre: il verso opposto e' degli admin
+    prova("chi non e' admin NON azzera: 403", 403, posta(955, {"azzera": True}))
+    prova("...e la sua colonna resta com'era",
+          {"tour": 100, "nwc": 200}, colonna(955))
+    posta(999, {"visti": {"tour": 1}})
+    prova("l'admin azzera («Trattami da nuovo»)", {}, posta(999, {"azzera": True}))
+    prova("...il SUO profilo, non quello degli altri",
+          [{}, {"tour": 100, "nwc": 200}], [colonna(999), colonna(955)])
+    # chi entra da Nostr ha la sua riga in `utenti` col tg_id negativo:
+    # stessa colonna, stessa rotta, nessun ramo
+    prova("chi entra da Nostr (id negativo) timbra come tutti",
+          {"tour_p2p": 300}, posta(-5, {"visti": {"tour_p2p": 300}}))
+    rotta = pezzo("timbra_visti")
+    prova("leggi-unisci-scrivi sta in UNA transazione", True,
+          "BEGIN IMMEDIATE" in rotta)
+    prova("la colonna nasce con la migrazione, vuota", True,
+          "\"visti TEXT DEFAULT '{}'\"" in srv)
+    me = pezzo("mio_profilo", "\n\n\n")
+    prova("/api/me manda la mappa PULITA, non la stringa della colonna",
+          True, 'profilo["visti"] = _visti_leggi(' in me)
+    prova("...e il catalogo, che il client non tiene a memoria", True,
+          'profilo["visti_noti"] = list(VISTI_NOTI)' in me)
+
+    # --- 3) IL CATALOGO E IL CLIENT DICONO GLI STESSI ID -------------
+    # Un id usato di la' e sconosciuto di qua si perderebbe in silenzio
+    # (il server ignora, il client non lo sa): e' l'elenco copiato a
+    # meta', preso per il verso giusto.
+    usati = set(re.findall(
+        r"(?:hintDismesso|dismettiHint|timbraVisto|ricordaVisto|hintHTML)"
+        r"\('(\w+)'", mini))
+    prova("gli id che il client timbra sono quelli del catalogo",
+          sorted(amb["VISTI_NOTI"]), sorted(usati))
+
+    # --- 4) LA PENNA E' UNA SOLA ------------------------------------
+    # Otto scritture sparse erano otto posti da cui il timbro non
+    # saliva sul profilo. Restano le tre che DEVONO scrivere la cache
+    # da se', e ognuna ha il suo perche' scritto accanto.
+    penne = {}
+    for nome in ("function timbraVisto(id){", "function adottaVisti(me){",
+                 "function riavviaTour(){"):
+        penne[nome] = pezzo_js(mini, nome, "\n}\n").count(
+            "localStorage.setItem(HINT_CHIAVE")
+    prova("la cache degli hint si scrive in tre posti soli",
+          {"function timbraVisto(id){": 1, "function adottaVisti(me){": 1,
+           "function riavviaTour(){": 2}, penne)
+    prova("...e da nessun'altra parte", sum(penne.values()),
+          mini.count("localStorage.setItem(HINT_CHIAVE"))
+    av = pezzo_js(mini, "async function avvia(){", "\n}\n")
+    # A INIZIO RIGA, e non `in`: la tortura ha commentato la chiamata
+    # e la prima stesura di questa prova la trovava lo stesso, dentro
+    # il commento — il commento che risponde per il codice.
+    _all = re.search(r"^\s*allineaContoP2P\(\);", av, re.M)
+    _ado = re.search(r"^\s*adottaVisti\(me\);", av, re.M)
+    prova("i timbri si adottano a ogni /me, DOPO che il P2P sa di chi "
+          "e' il dispositivo", True,
+          bool(_all and _ado and _all.start() < _ado.start()))
+    mt = pezzo_js(mini, "async function modaleTest(dopo){", "\n}\n")
+    prova("il cartello chiede il giorno anche al profilo", True,
+          "giornoDi(vistiMem.cartello) === giornoOggi()" in mt
+          and "ricordaVisto('cartello', Date.now());" in mt)
+    ap = pezzo_js(mini, "function apriTourP2P(){", "\n}\n")
+    prova("il tour del P2P timbra anche il profilo", True,
+          "ricordaVisto('tour_p2p', Date.now());" in ap)
+    sc = pezzo_js(mini, "function scordaTourP2P(){", "\n}\n")
+    prova("...e scordarlo lo toglie anche dalla memoria dell'apertura",
+          True, "delete vistiMem.tour_p2p;" in sc)
+    td = pezzo_js(mini, "async function trattamiDaNuovo(){", "\n}\n")
+    prova("«Trattami da nuovo» azzera anche il profilo e la nuvola",
+          True, "JSON.stringify({azzera: true})" in td
+          and "await cloudCancella(CLOUD_VISTI);" in td
+          and "vistiMem = {};" in td)
+    # un `azzera` arrivato DOPO il timbro del tour che riparte se lo
+    # porterebbe via: il tour tornerebbe a sorpresa all'apertura dopo
+    prova("...e il server lo ASPETTA, prima di far ripartire il tour",
+          True, 0 < td.find("await fetch(`${API_BASE}/me/visti`")
+          < td.find("modaleTest(tourBenvenuto);"))
+    # LA PREFERENZA CHE NON SALIVA (trovata di striscia): `...authHdr()`
+    # spalma una STRINGA — header «0», «1», «2»... e nessun
+    # X-Tg-Init-Data — quindi da dentro Telegram la misura del testo al
+    # server non arrivava mai, in silenzio (il fetch non si lamenta).
+    prova("nessun header nasce spalmando la stringa di authHdr()", 0,
+          mini.count("...authHdr()"))
+    sf = pezzo_js(mini, "async function setFont(s){", "\n}\n")
+    prova("la misura del testo viaggia con l'header giusto", True,
+          "'X-Tg-Init-Data':authHdr()" in sf)
+    # LA PAGINA «I TUOI DATI» NON DEVE MENTIRE: prometteva che «quali
+    # suggerimenti hai gia' visto» e la dimensione del testo «non
+    # arrivano mai qui». Da oggi arrivano, e la pagina lo dice.
+    i_tel = mini.index("<h3>Quello che resta sul tuo telefono</h3>")
+    resta = mini[i_tel:mini.index("</p>", i_tel)]
+    prova("«non arrivano mai qui» non nomina piu' i timbri ne' la "
+          "misura del testo", [False, False],
+          ["suggerimenti" in resta, "dimensione del testo" in resta])
+    dopo_tel = mini[i_tel:mini.index("<h3>", i_tel + 10)]
+    prova("...e la pagina dice che stanno nel profilo", True,
+          "nel tuo profilo" in dopo_tel
+          and "quali avvisi hai già visto o chiuso" in dopo_tel
+          and "dimensione del testo" in dopo_tel)
+
+    # --- 5) E IL CLIENT SI FA GIRARE --------------------------------
+    _node = _sh.which("node")
+    if not _node:
+        salta("i timbri del client girano", "node non installato")
+        return
+    pezzi = "".join(
+        pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
+            "function unisciVisti(a, b){", "function hintLetti(){",
+            "function timbraVisto(id){", "function ricordaVisto(id, quando){",
+            "function spingiVisti(mappa){", "function nuvolaVisti(){",
+            "function adottaVisti(me){",
+            "async function adottaNuvolaVisti(){",
+            "function tourP2PVisto(){"))
+    _prog = (
+        "const HINT_CHIAVE = 'barattolo_hint';\n"
+        "const HINT_CONTO_CHIAVE = 'barattolo_hint_conto';\n"
+        "const CLOUD_VISTI = 'barattolo_visti';\n"
+        "const VISTI_CASA_LORO = ['tour_p2p', 'cartello'];\n"
+        "const NOTI = " + _js.dumps(list(amb["VISTI_NOTI"])) + ";\n"
+        "let vistiMem = {}, vistiNoti = null;\n"
+        "let DEMO = false, VETRINA = false, API_BASE = '/api', myTgId = 111;\n"
+        "let magazzino = {}, muto = false, poste = [], nuvola = {},\n"
+        "    nuvolaOk = true, nuvolaScritte = 0;\n"
+        "const localStorage = {\n"
+        "  getItem: k => { if (muto) throw new Error('muto');\n"
+        "    return (k in magazzino) ? magazzino[k] : null; },\n"
+        "  setItem: (k, v) => { if (muto) throw new Error('muto');\n"
+        "    magazzino[k] = String(v); },\n"
+        "  removeItem: k => { if (muto) throw new Error('muto');\n"
+        "    delete magazzino[k]; },\n"
+        "};\n"
+        "function authHdr(){ return 'collaudo'; }\n"
+        "function chiaveTourP2P(){ return 'barattolo_tour_p2p@' + myTgId; }\n"
+        "function fetch(u, o){ poste.push(JSON.parse(o.body));\n"
+        "  return Promise.resolve({ok: true}); }\n"
+        "function cloudScrivi(k, v){ nuvolaScritte++; nuvola[k] = v;\n"
+        "  return Promise.resolve(true); }\n"
+        "function cloudLeggiEsito(k){ return Promise.resolve(\n"
+        "  {ok: nuvolaOk, testo: nuvolaOk ? (nuvola[k] || '') : ''}); }\n"
+        "function hintDismesso(id){ return !!hintLetti()[id]; }\n"
+        + pezzi +
+        "function daCapo(){ vistiMem = {}; vistiNoti = null; magazzino = {};\n"
+        "  muto = false; poste = []; nuvola = {}; nuvolaOk = true;\n"
+        "  nuvolaScritte = 0; DEMO = false; VETRINA = false; myTgId = 111; }\n"
+        "const attesa = () => new Promise(r => setTimeout(r, 5));\n"
+        "const esiti = {};\n"
+        "async function caso(nome, f){ daCapo();\n"
+        "  try { esiti[nome] = await f(); }\n"
+        "  catch(e) { esiti[nome] = 'ESPLOSO: ' + e.message; } }\n"
+        "(async () => {\n"
+        # il caso del campo: memoria svuotata, il profilo dice «visto»
+        "await caso('rail', async () => {\n"
+        "  adottaVisti({visti: {tour: 9}, visti_noti: NOTI}); await attesa();\n"
+        "  return {visto: hintDismesso('tour'), poste: poste.length,\n"
+        "          cache: JSON.parse(magazzino.barattolo_hint)}; });\n"
+        # la migrazione silenziosa di chi il tour l'aveva gia' visto
+        "await caso('migra', async () => {\n"
+        "  magazzino.barattolo_hint = JSON.stringify(\n"
+        "    {tour: 123, nwc: 456, benvenuto: 1});\n"
+        "  adottaVisti({visti: {}, visti_noti: NOTI}); await attesa();\n"
+        "  return {poste, visto: hintDismesso('tour'),\n"
+        "          padrone: magazzino.barattolo_hint_conto}; });\n"
+        # dove il localStorage non risponde proprio
+        "await caso('muto', async () => { muto = true;\n"
+        "  adottaVisti({visti: {tour: 9, tour_p2p: 4}, visti_noti: NOTI});\n"
+        "  await attesa();\n"
+        "  return {visto: hintDismesso('tour'), p2p: tourP2PVisto()}; });\n"
+        # la cache di un ALTRO conto non sale sul profilo di questo
+        "await caso('altro_conto', async () => { myTgId = 999;\n"
+        "  magazzino.barattolo_hint = JSON.stringify({nwc: 5});\n"
+        "  magazzino.barattolo_hint_conto = '222';\n"
+        "  adottaVisti({visti: {}, visti_noti: NOTI}); await attesa();\n"
+        "  return {poste: poste.length, nwc: hintDismesso('nwc'),\n"
+        "          padrone: magazzino.barattolo_hint_conto}; });\n"
+        # i tg_id stanno sopra 2^31: mai `| 0` (il conto sul dispositivo)
+        "await caso('id_grande', async () => { myTgId = 7000000001;\n"
+        "  adottaVisti({visti: {}, visti_noti: NOTI}); await attesa();\n"
+        "  return magazzino.barattolo_hint_conto; });\n"
+        # un server di ieri non manda il catalogo: niente da portare su
+        "await caso('server_ieri', async () => {\n"
+        "  magazzino.barattolo_hint = JSON.stringify({tour: 1});\n"
+        "  adottaVisti({}); await attesa();\n"
+        "  return {poste: poste.length, visto: hintDismesso('tour')}; });\n"
+        # tour del P2P e cartello hanno casa loro: fuori da barattolo_hint
+        "await caso('casa_loro', async () => {\n"
+        "  adottaVisti({visti: {tour_p2p: 7, cartello: 8, nwc: 2},\n"
+        "               visti_noti: NOTI}); await attesa();\n"
+        "  return {chiavi: Object.keys(hintLetti()).sort(),\n"
+        "          cache: Object.keys(JSON.parse(magazzino.barattolo_hint)),\n"
+        "          p2p: tourP2PVisto()}; });\n"
+        # ...e il tour del P2P gia' visto sale dalla SUA casa
+        "await caso('p2p_migra', async () => {\n"
+        "  magazzino['barattolo_tour_p2p@111'] = '555';\n"
+        "  adottaVisti({visti: {}, visti_noti: NOTI}); await attesa();\n"
+        "  return {poste, cache: magazzino.barattolo_hint}; });\n"
+        # il secondo posto: quel che la nuvola sa in piu' sale sul server
+        "await caso('nuvola_in_piu', async () => {\n"
+        "  nuvola.barattolo_visti = JSON.stringify({lnaddr: 77, ignoto: 1});\n"
+        "  adottaVisti({visti: {tour: 9}, visti_noti: NOTI}); await attesa();\n"
+        "  return {poste, visto: hintDismesso('lnaddr'),\n"
+        "          nuvola: JSON.parse(nuvola.barattolo_visti)}; });\n"
+        # «non lo so» non e' «vuota»: non ci si scrive sopra
+        "await caso('nuvola_muta', async () => { nuvolaOk = false;\n"
+        "  adottaVisti({visti: {tour: 9}, visti_noti: NOTI}); await attesa();\n"
+        "  return {scritte: nuvolaScritte, poste: poste.length}; });\n"
+        # il server ne sa piu' della nuvola: la nuvola si aggiorna
+        "await caso('nuvola_indietro', async () => {\n"
+        "  adottaVisti({visti: {tour: 9}, visti_noti: NOTI}); await attesa();\n"
+        "  return {poste: poste.length,\n"
+        "          nuvola: JSON.parse(nuvola.barattolo_visti || '{}')}; });\n"
+        # ...e a nuvola in pari non si scrive niente, a ogni apertura
+        "await caso('nuvola_in_pari', async () => {\n"
+        "  nuvola.barattolo_visti = JSON.stringify({tour: 9});\n"
+        "  adottaVisti({visti: {tour: 9}, visti_noti: NOTI}); await attesa();\n"
+        "  return {scritte: nuvolaScritte, poste: poste.length}; });\n"
+        # la penna: memoria, cache, server e nuvola
+        "await caso('timbra', async () => {\n"
+        "  adottaVisti({visti: {}, visti_noti: NOTI}); await attesa();\n"
+        "  poste = []; timbraVisto('condcat'); await attesa();\n"
+        "  return {mem: vistiMem.condcat > 0,\n"
+        "          cache: JSON.parse(magazzino.barattolo_hint).condcat > 0,\n"
+        "          poste: poste.map(p => Object.keys(p.visti)),\n"
+        "          nuvola: Object.keys(JSON.parse(nuvola.barattolo_visti))}; });\n"
+        # in vetrina non c'e' un profilo a cui dirlo
+        "await caso('vetrina', async () => { VETRINA = true;\n"
+        "  timbraVisto('condcat'); await attesa();\n"
+        "  return {poste: poste.length, scritte: nuvolaScritte}; });\n"
+        # l'identita' cambia senza ricaricare (collaudo): la memoria del
+        # conto di prima non e' di quello di adesso
+        "await caso('cambio', async () => {\n"
+        "  adottaVisti({visti: {tour: 9}, visti_noti: NOTI}); await attesa();\n"
+        # stesso dispositivo (la cache RESTA, ed e' di 111), altra
+        # persona — e quindi altra nuvola: il CloudStorage e' per utente
+        "  myTgId = 222; nuvola = {};\n"
+        "  adottaVisti({visti: {}, visti_noti: NOTI}); await attesa();\n"
+        "  return hintDismesso('tour'); });\n"
+        "console.log(JSON.stringify(esiti));\n"
+        "})();\n")
+    _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8")
+    _f.write(_prog)
+    _f.close()
+    _r = _sp.run([_node, _f.name], capture_output=True, text=True,
+                 timeout=60, encoding="utf-8")
+    os.unlink(_f.name)
+    if _r.returncode != 0:
+        prova("i timbri del client girano", True,
+              "ERRORE: %s" % _r.stderr[:300])
+        return
+    d = _js.loads(_r.stdout.strip())
+    prova("IL CASO DEL CAMPO: memoria svuotata, il profilo dice «visto» "
+          "e il tour non riparte", {"visto": True, "poste": 0,
+                                    "cache": {"tour": 9}}, d["rail"])
+    prova("la migrazione silenziosa: la cache sale sul profilo, e solo "
+          "con gli id che il server conosce",
+          {"poste": [{"visti": {"tour": 123, "nwc": 456}}], "visto": True,
+           "padrone": "111"}, d["migra"])
+    prova("dove il localStorage non risponde vale la memoria "
+          "dell'apertura", {"visto": True, "p2p": True}, d["muto"])
+    prova("la cache di un ALTRO conto non sale sul profilo di questo",
+          {"poste": 0, "nwc": False, "padrone": "999"}, d["altro_conto"])
+    prova("il padrone della cache e' il tg_id intero, anche sopra 2^31",
+          "7000000001", d["id_grande"])
+    prova("col server di ieri non si porta su niente, e la cache vale "
+          "ancora", {"poste": 0, "visto": True}, d["server_ieri"])
+    prova("tour del P2P e cartello restano FUORI da barattolo_hint "
+          "(che e' del dispositivo, e loro portano il conto)",
+          {"chiavi": ["nwc"], "cache": ["nwc"], "p2p": True},
+          d["casa_loro"])
+    prova("il tour del P2P gia' visto sale dalla SUA casa",
+          {"poste": [{"visti": {"tour_p2p": 555}}], "cache": "{}"},
+          d["p2p_migra"])
+    prova("quel che la nuvola sa IN PIU' sale sul server",
+          {"poste": [{"visti": {"lnaddr": 77}}], "visto": True,
+           "nuvola": {"tour": 9, "lnaddr": 77}}, d["nuvola_in_piu"])
+    prova("una nuvola che non risponde non si sovrascrive",
+          {"scritte": 0, "poste": 0}, d["nuvola_muta"])
+    prova("la nuvola rimasta indietro si aggiorna, senza disturbare il "
+          "server", {"poste": 0, "nuvola": {"tour": 9}},
+          d["nuvola_indietro"])
+    prova("...e a nuvola in pari non si scrive niente",
+          {"scritte": 0, "poste": 0}, d["nuvola_in_pari"])
+    prova("la penna scrive in tutti e quattro i posti",
+          {"mem": True, "cache": True, "poste": [["condcat"]],
+           "nuvola": ["condcat"]}, d["timbra"])
+    prova("in vetrina non c'e' un profilo a cui dirlo",
+          {"poste": 0, "scritte": 0}, d["vetrina"])
+    prova("cambiando identita' la memoria del conto di prima non vale",
+          False, d["cambio"])
+
+
 def prove_tutorial():
     """«TUTORIAL» PER TUTTI, «TRATTAMI DA NUOVO» AGLI ADMIN (ago 2026).
     La riga da non ammorbidire: in `barattolo_hint` non vive il solo
@@ -69112,8 +69510,17 @@ def prove_tutorial():
         salta("riavviaTour tocca il solo tour", "node non installato")
         return
     letti = pezzo_js(mini, "function hintLetti(){", "\n}\n")
+    unisci = pezzo_js(mini, "function unisciVisti(a, b){", "\n}\n")
     _prog = (
         "const HINT_CHIAVE = 'barattolo_hint';\n"
+        # LA MEMORIA DELL'APERTURA (set 2026): il profilo dice «tour
+        # visto» — e il Tutorial deve ripartire LO STESSO, o dal giorno
+        # che i timbri stanno sul server il bottone non farebbe piu'
+        # niente a nessuno
+        "let vistiMem = {tour: 1, nwc: 2};\n"
+        "const VISTI_CASA_LORO = ['tour_p2p', 'cartello'];\n"
+        + unisci + "\n}\n"
+        "function hintDismesso(id){ return !!hintLetti()[id]; }\n"
         "const magazzino = {\n"
         "  barattolo_hint: JSON.stringify({tour:1, nwc:2, lnaddr:3,\n"
         "    npubverifica:4, nostrpub:5, condcat:6, checklistvista:7,\n"
@@ -69130,11 +69537,15 @@ def prove_tutorial():
         "function haptic(){}\n"
         "function go(v){ andati.push(v); }\n"
         "function toast(t){ detti.push(t); }\n"
-        "function tourBenvenuto(){ tourInCorso = partito; }\n"
+        # come quello vero: se il timbro c'e' ancora, non parte
+        "function tourBenvenuto(){\n"
+        "  tourInCorso = partito && !hintDismesso('tour'); }\n"
         + letti + "\n}\n" + rt + "\n}\n"
         # il caso normale: il tour parte
         "partito = true; riavviaTour();\n"
         "const dopo = JSON.parse(magazzino.barattolo_hint);\n"
+        "const ripartito = tourInCorso;\n"
+        "vistiMem = {tour: 1, nwc: 2};\n"
         # la vetrina vuota: il tour non parte e il timbro torna
         "magazzino.barattolo_hint = JSON.stringify({tour:1, nwc:2});\n"
         "tourInCorso = false; partito = false; riavviaTour();\n"
@@ -69144,6 +69555,9 @@ def prove_tutorial():
         "  cartello: magazzino.barattolo_test,\n"
         "  esplora: andati[0],\n"
         "  muto: Object.keys(muto).sort(),\n"
+        # `|| 0`: un undefined sparirebbe dal JSON e la prova, invece
+        # di uscire rossa, ESPLODEREBBE — che non e' la stessa cosa
+        "  ripartito, memTorna: vistiMem.tour || 0,\n"
         "  detto: detti.length,\n"
         "}));")
     _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
@@ -69164,6 +69578,10 @@ def prove_tutorial():
     prova("...e il tour vive in vetrina: ci si va", "esplora", d["esplora"])
     prova("a vetrina vuota il timbro torna com'era",
           ["nwc", "tour"], d["muto"])
+    prova("il tutorial riparte anche se il PROFILO dice «visto»",
+          True, d["ripartito"])
+    prova("...e a vetrina vuota torna anche nella memoria dell'apertura",
+          1, d["memTorna"])
     prova("...e si dice perche'", 1, d["detto"])
 
 
@@ -73204,6 +73622,7 @@ def main():
               prove_finestra,
               prove_ordini_prova,
               prove_tutorial,
+              prove_timbri_visti,
               prove_bunker_muto,
               prove_login_qr,
               prove_profilo_sezioni,

@@ -4859,7 +4859,10 @@ def init_db():
                     # sempre; colonna e non localStorage perche' e' un
                     # fatto della PERSONA e non del dispositivo (a
                     # differenza del dismiss del wallet NWC, che il
-                    # wallet ce l'ha solo quel telefono).
+                    # wallet ce l'ha solo quel telefono — cosi' fino al
+                    # set 2026: da allora anche quel «Non ora» sta nel
+                    # profilo, nella colonna `visti`, e li' c'e' scritto
+                    # perche').
                     "avvisato_trasporto INTEGER DEFAULT 0",
                     # UN POST IN CANALE A SETTIMANA (ago 2026): il
                     # timbro dell'ultimo annuncio di questo venditore
@@ -4876,6 +4879,18 @@ def init_db():
                     # quindi il DEFAULT e' anche la migrazione: nessuno
                     # si ritrova l'app cambiata sotto gli occhi.
                     "font_scala INTEGER DEFAULT 100",
+                    # I TIMBRI «UNA VOLTA SOLA» (set 2026): il tour
+                    # visto, i «Non ora» degli hint, il giorno del
+                    # cartello — una mappa JSON {id: millisecondi}.
+                    # Colonna e non localStorage perche' c'e' chi il
+                    # localStorage lo perde a ogni chiusura (Telegram
+                    # nel browser, cache svuotata all'uscita), e li' il
+                    # tour ripartiva a OGNI avvio. '{}' = nessun timbro,
+                    # quindi il DEFAULT e' anche la migrazione: chi li
+                    # ha gia' nel telefono li porta su da se', in
+                    # silenzio, alla prima apertura (vedi adottaVisti
+                    # nel client). Il giudice e' `_visti_unisci`.
+                    "visti TEXT DEFAULT '{}'",
                     # IL NEGOZIO IN FERIE (ago 2026): 0 = aperto,
                     # altrimenti il timestamp del rientro. UNA colonna
                     # e non un booleano piu' una data, ed e' la scelta
@@ -32613,6 +32628,16 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # scelto esce gia' dal SELECT * (`font_scala`), le voci no — e il
     # client non le hardcoda mai (il patto di max_barattolo).
     profilo["scale_font"] = list(SCALE_FONT)
+    # I timbri «una volta sola» (tour visto, «Non ora», giorno del
+    # cartello): dal SELECT * la colonna esce GREZZA, una stringa JSON,
+    # e qui la si sostituisce con la mappa pulita — il client non deve
+    # avere un secondo parser, e una colonna storta vale «nessun
+    # timbro» invece di un 500 sulla porta dell'app.
+    profilo["visti"] = _visti_leggi(u["visti"] if u else "")
+    # ...e il catalogo, perche' il client porta su dalla sua cache SOLO
+    # gli id che qui si conoscono: uno di ieri rimasto nel telefono
+    # verrebbe ignorato, e quindi rimandato a ogni apertura, per sempre.
+    profilo["visti_noti"] = list(VISTI_NOTI)
     # Il negozio in ferie, per il cassetto «🌴»: lo stato di adesso e
     # le sue leve — il client non hardcoda mai un tetto (il patto di
     # max_barattolo). `ferie_fino` esce gia' dal SELECT *, ma il
@@ -33242,6 +33267,110 @@ async def scegli_font_scala(req: Request,
     con.commit()
     con.close()
     return {"ok": True, "scala": scala}
+
+
+# ------------- I TIMBRI «UNA VOLTA SOLA» (set 2026) ------------------
+# Dal campo (18 set 2026): su Telegram Desktop il tour di benvenuto
+# ripartiva A OGNI AVVIO della mini app. Il timbro «tour visto» viveva
+# nel solo localStorage, e c'e' chi il localStorage non lo conserva fra
+# un avvio e l'altro — Telegram aperto nel browser, la cache svuotata
+# all'uscita, un client vecchio. NON SI INDOVINA QUALE: si smette di
+# dipendere da lui. Il timbro sta QUI, nel profilo, e vale su ogni
+# dispositivo della persona; il secondo posto e' il CloudStorage di
+# Telegram, e il localStorage resta la cache che era.
+# CHI ENTRA DA NOSTR ha la sua riga in `utenti` come tutti (tg_id
+# negativo): stessa colonna, stessa rotta, nessun ramo.
+#
+# IL CATALOGO E' UNA WHITELIST (il patto dei nomi che arrivano dal
+# client): un id sconosciuto si IGNORA e non e' un 400 — un client piu'
+# nuovo del server deve poter mandare il suo timbro di domani senza
+# perdere quelli di oggi. Una prova tiene in pari questo elenco con gli
+# id che il client usa davvero.
+# `nwc` STA QUI ANCHE LUI, e rovescia l'inciso scritto accanto ad
+# `avvisato_trasporto`: il wallet vive su un dispositivo solo, ed e'
+# questo a decidere se l'hint SERVE li' (la condizione «manca davvero»,
+# che resta del client) — ma il «Non ora» e' della PERSONA. E dove il
+# localStorage non dura fra due avvii la connessione al wallet si perde
+# insieme al resto: li' l'hint tornerebbe a ogni apertura, che e' il
+# difetto da cui e' nata la colonna.
+VISTI_NOTI = ("tour", "tour_p2p", "cartello", "condcat", "checklistvista",
+              "nwc", "lnaddr", "npubverifica", "nostrpub", "barraweb",
+              "duetocchi")
+
+
+def _visti_leggi(grezzo) -> dict:
+    """La colonna `utenti.visti` -> mappa pulita {id: millisecondi}.
+    Storta, vuota o di ieri = nessun timbro, MAI un'eccezione: da qui
+    passa /api/me, e un JSON rotto in una colonna di cortesia non deve
+    poter chiudere la porta dell'app."""
+    try:
+        d = json.loads(grezzo or "{}")
+    except (TypeError, ValueError):
+        return {}
+    if not isinstance(d, dict):
+        return {}
+    return {k: int(v) for k, v in d.items()
+            if k in VISTI_NOTI and not isinstance(v, bool)
+            and isinstance(v, (int, float)) and v > 0}
+
+
+def _visti_unisci(vecchi: dict, nuovi, adesso_ms: int) -> dict:
+    """IL GIUDICE: l'UNIONE, e per ogni id il timbro piu' RECENTE.
+    Un timbro e' un fatto che sale e basta — «visto» non torna «non
+    visto» perche' un dispositivo rimasto indietro manda una mappa piu'
+    povera: chi manda meno non toglie niente (a togliere c'e' solo
+    `azzera`, che e' degli admin). Il piu' recente serve al cartello
+    del rodaggio, che e' «una volta al GIORNO» e il suo giorno avanza.
+    ⚠️ E IL FUTURO NON SI TIMBRA: un orologio avanti di un anno
+    spegnerebbe il cartello per un anno, su OGNI dispositivo. Si taglia
+    ad adesso, quindi al peggio lo spegne per oggi."""
+    fuori = dict(vecchi)
+    if not isinstance(nuovi, dict):
+        return fuori
+    for k, v in nuovi.items():
+        if k not in VISTI_NOTI or isinstance(v, bool):
+            continue
+        if not isinstance(v, (int, float)) or v <= 0:
+            continue
+        v = min(int(v), adesso_ms)
+        if v > fuori.get(k, 0):
+            fuori[k] = v
+    return fuori
+
+
+@app.post("/api/me/visti")
+async def timbra_visti(req: Request, x_tg_init_data: str = Header(""),
+                       barattolo_sessione: str = Cookie("")):
+    """«L'ho visto», per tutti i timbri una-volta-sola insieme. Il
+    client manda la SUA mappa e riceve l'unione: e' anche la migrazione
+    silenziosa di chi il tour l'aveva gia' visto prima che la colonna
+    nascesse. Il verso opposto non esiste (il patto di
+    avviso-trasporto: un avviso letto non si puo' slettere), con UNA
+    eccezione dichiarata: `azzera`, il gesto di «🧽 Trattami da nuovo»,
+    che e' degli admin e serve al collaudo dal vivo — a chiunque altro
+    si risponde 403, perche' un «Non ora» spegne per sempre."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    if d.get("azzera") and not e_admin(user["id"]):
+        raise HTTPException(403, "Solo gli admin azzerano i timbri")
+    con = db()
+    try:
+        # leggi-unisci-scrivi in UNA transazione: due dispositivi che
+        # timbrano insieme non si devono mangiare un timbro a vicenda
+        con.execute("BEGIN IMMEDIATE")
+        riga = con.execute("SELECT visti FROM utenti WHERE tg_id=?",
+                           (user["id"],)).fetchone()
+        if d.get("azzera"):
+            visti = {}
+        else:
+            visti = _visti_unisci(_visti_leggi(riga["visti"] if riga else ""),
+                                  d.get("visti"), int(time.time() * 1000))
+        con.execute("UPDATE utenti SET visti=? WHERE tg_id=?",
+                    (json.dumps(visti, separators=(",", ":")), user["id"]))
+        con.commit()
+    finally:
+        con.close()
+    return {"ok": True, "visti": visti}
 
 
 # IL SALVATAGGIO CHE NON SALVA E' PEGGIO DI UN ERRORE (ago 2026): un
