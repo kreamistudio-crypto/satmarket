@@ -21913,3 +21913,169 @@ mette un address) il pagamento parte da solo. Il censimento
 (`python3 censimento_scadenze.py`, sola lettura) dice se era il primo
 caso e — soprattutto — quali ordini APERTI hanno già in colonna una
 fattura morta. Le procedure stanno in PRODUZIONE, «LE FATTURE SCADUTE».
+
+## Lo stadio «in pagamento»: il tempo fra la conferma e i sats arrivati (20 set 2026)
+
+**DA DOVE VIENE.** Quando chi compra conferma, la SUA parte è finita:
+da lì portare i sats a chi vende è responsabilità di Barattolo. Ma
+l'ordine restava com'era finché il payout non riusciva, e poi saltava a
+'released': in mezzo ci sono secondi, o giorni se il payout inciampa, e
+non li vedeva nessuno. Chi aveva comprato non sapeva se aveva finito,
+chi vendeva non sapeva se i sats arrivavano, e un intoppo NOSTRO (ponte
+giù, nodo giù) sembrava colpa loro. Con l'on-chain quel tempo sarà di
+minuti o ore.
+
+**COSA HA TROVATO LA LETTURA, prima di scrivere una riga.** A payout in
+volo, in verifica o sospeso l'ordine resta 'shipped'/'delivered': quindi
+chi aveva GIÀ confermato aveva ancora davanti «libera i sats» e «apri
+disputa», e il server li accettava. Il secondo era un buco vero: aperta
+la disputa, il giro dell'orologio — che segue `payout_verso`, non lo
+stato — pagava il venditore lo stesso. Non l'ha mai fatto nessuno, ma la
+strada c'era.
+
+**LA DECISIONE: LO STADIO SI DERIVA, NON SI SCRIVE.** «💸 In pagamento al
+venditore» non è un tredicesimo stato (regola 4): è `stadio_pagamento`,
+giudice unico e puro, che legge `stato` + `payout_stato` +
+`payout_verso`. È in pagamento un 'confirmed', oppure un ordine ancora
+aperto su cui un'uscita verso il VENDITORE è in volo, in verifica o
+sospesa. Lo stato vivo è uno di cinque: in volo, in verifica, riparte da
+solo, serve una fattura nuova (l'unico che chiede un gesto, e solo a chi
+vende), arrivato ✓. SCARTATA la strada che sembrava più pulita — far
+entrare in 'confirmed' anche i rami miti, così che lo stadio coincidesse
+con lo stato: `primo_giro = stato != 'confirmed'` regge due avvisi che
+partono una volta sola (a chi ha perso la disputa, a chi si è visto
+chiudere l'affare da un timer), il quarto verbo ha per patto «la riga
+resta ESATTAMENTE com'era», e il sollecito degli incassi pesca tutti i
+'confirmed'. Tre cose da rifare per risparmiare una funzione.
+
+**L'UNICA COSA CHE SI SCRIVE SONO LE DATE, ed è la sola modifica al
+database.** La tabella `payout_passi`, una riga per passaggio. Motivo: la
+linea del tempo chiede QUANDO si è deciso, quando si è chiesta una
+fattura nuova, quando il nodo taceva — e quelle ore non stavano scritte
+da nessuna parte (`payout_tentati` sa quando è PARTITO un hash, e basta:
+infatti «partito» non si scrive, si legge da lì). Una data che non è
+stata scritta non si deriva. I passi uguali DI FILA si comprimono
+(`volte`, `ultimo`): un nodo giù per un giorno è UNA riga «27 volte», e
+quel conto è anche il contatore del ritentativo — una tabella, due
+mestieri, nessuna colonna nuova su `ordini`. `_segna_deciso` committa
+SUBITO: la connessione di `_sblocca_sats` resta aperta per tutto
+`paga_venditore`, fino a un minuto, e una scrittura non committata
+terrebbe il lucchetto di SQLite mentre la mano scrive dalla sua. Se la
+tabella non si legge, tutto va come prima del cantiere.
+
+**LA CONFERMA È DEFINITIVA.** `_in_pagamento(o)` è la guardia: conferma,
+disputa e sollecito rispondono 409, e il timer non ci ripassa (avrebbe
+timbrato `sbloccato_auto_il` su una conferma fatta da una PERSONA, e chi
+vende avrebbe letto «il tempo di conferma è scaduto»). Le parole del
+rifiuto dicono CHI ha deciso: «hai già confermato» a chi si è visto
+chiudere l'affare da un timer sarebbe falso. Per lo stesso motivo il
+ramo «in volo» adesso scrive il timbro del timer, che prima si perdeva.
+
+**IL RITENTATIVO PER CAUSE NOSTRE: 1, 5, 15, 30 minuti, poi ogni ora,
+SENZA TETTO** (`BACKOFF_NOSTRO`). Non è `BACKOFF_PAYOUT`, e la differenza
+è la natura del guasto: quello è tarato su una ROTTA che manca (torna in
+ore, e si bussa al wallet di un terzo: cinque volte e basta), questo su
+LNbits muta, il ponte giù, il nodo giù — che tornano in minuti, e durante
+i quali a nessun terzo si bussa davvero. Prima il quarto verbo si
+ritentava a OGNI battito: a dieci minuti andava bene, a un minuto
+sarebbero 1.440 fatture al giorno coniate dal Lightning address di chi
+aspetta. Il passo si segna in UN posto (`_sospendi_pagamento`), così la
+cadenza vale per tutte e quattro le uscite.
+
+**IL PONTE GIÙ NON SI SFIDA, ed è la riga che vale di più.** Se il
+guardiano dice che LND non si raggiunge, chiedere a LNbits di pagare
+vuol dire farle scrivere `failed` su una fattura BUONA — e da lì quella
+bolt11 è bruciata: a chi l'aveva incollata toccherebbe darcene un'altra
+per un guasto nostro, cioè esattamente il gesto che il cantiere vieta.
+Quindi in `paga_venditore`, prima della mano, a ponte giù esce il quarto
+verbo: non parte niente, la fattura resta al suo posto, l'orologio ci
+torna. Solo per la cassaforte del nodo; dove il guardiano non gira
+`_ponte` vale «attesa» e non morde.
+
+**QUEL CHE RESTA FUORI, dichiarato.** La finestra fra il ponte che cade e
+il guardiano che se ne accorge (un controllo al minuto): lì LNbits tenta,
+segna `failed`, e la fattura è bruciata. Con un Lightning address si
+riparte da soli — ma non a 1 e 5 minuti: un tentativo fallito DOPO la
+chiamata che paga resta sotto la regola dei pagamenti in volo, e non si
+ripete finché LND non dice «mai partito», cioè un quarto d'ora. Non si
+tocca: è la porta del doppio payout. Con una fattura INCOLLATA se ne
+chiede una nuova, col messaggio «non per colpa tua» del cantiere di
+ieri. È l'unico caso in cui un guasto nostro chiede ancora un gesto.
+Dove il tetto dei cinque avrebbe trasformato ogni attesa in un 🧊, per i
+guasti nostri adesso non congela più.
+
+**IL BATTITO CORTO.** L'orologio batte ogni dieci minuti: «dopo 1
+minuto, poi 5» lì non esiste, e chi ha appena confermato guarda la
+pagina. `orologio_pagamenti` gira ogni 60 secondi e fa SOLO i due giri
+dei pagamenti, e solo se c'è qualcosa da guardare (tre SELECT, niente
+rete); i CONGELATI restano al battito da dieci — possono restare lì
+giorni, e a un minuto sarebbero 1.440 righe di journal. L'orologio
+grande quei giri continua a farli: se il task corto morisse, resta
+intero il comportamento di ieri. A non farli girare insieme è un
+lucchetto; a non pagare due volte restano, come sempre, il lucchetto per
+ordine e la mano.
+
+**GLI AVVISI, E LA REGOLA DI AGOSTO EMENDATA.** Da ago 2026 «dal ramo
+mite non parte NESSUNA notifica». Adesso ne partono DUE, all'ingresso
+nello stadio e una volta sola: a chi compra «Hai confermato: i sats
+vanno al venditore, ci pensa Barattolo», a chi vende «I tuoi N sats sono
+in arrivo» col PERCHÉ vero (conferma, timer o disputa). La sostanza
+della regola resta — del GUASTO non sente parlare nessuno — e il
+collaudo che contava zero ora conta due e guarda cosa dicono. NIENTE
+DOPPIONI: se il payout riesce nello stesso giro partono solo i due di
+sempre; a chi vende non si dice «in arrivo» nel giro in cui riceve già
+il SUO messaggio; e dopo un'attesa «Sats sbloccati! L'acquirente ha
+confermato…» diventa «Arrivati ✓», che è la sola cosa nuova. Un
+ritentativo che fallisce uguale non è una notizia: chi vende sente il
+motivo UNA volta (`_gia_detto`), non a ogni giro — senza tetto ai
+tentativi sarebbe un messaggio all'ora. E il promemoria «imposta il tuo
+Lightning address» tace finché la palla è nostra.
+
+**IL TEMPO MASSIMO: 30 MINUTI, ED È IL NUMERO DEL 🧊.**
+`IN_PAGAMENTO_LUNGO_S` È `IN_VOLO_LIMITE_S`, non un secondo orologio:
+le due parti leggono «ci stiamo lavorando noi, non devi fare niente»
+nello stesso istante in cui a chi modera parte il 🧊 di sempre. Un
+'incerto' è lungo per definizione; chi vende che non ci dà un metodo
+NO — lì non stiamo lavorando noi. Nessun avviso nuovo ai moderatori: per
+il ponte c'è il guardiano, per i sospesi che restano l'avviso
+giornaliero, per i pagamenti in volo il 🧊.
+
+**LO SPAZIO DELL'ON-CHAIN.** Lo stadio porta `via` (oggi sempre
+'lightning'), la tabella ha la colonna, e il client sa già dire
+«In attesa di conferma, ~10 min» e «via on-chain ⛓». Nessuno lo scrive.
+
+**COSA HA TROVATO IL BANCO.** 1) La scena del guasto dopo la POST era
+verde per la ragione sbagliata: il giro conia la fattura PRIMA di sapere
+che il tentativo di prima non è chiaro, quindi la «seconda» pagata era
+la terza. 2) Con un «in volo» in mezzo, i guasti di fila ripartivano da
+uno: si sarebbe ribussato ogni minuto per sempre (`_conta_guasti`).
+3) La dedup degli avvisi fatta sull'ULTIMO passo non reggeva per la
+stessa ragione (`_gia_detto` guarda l'ultimo INTOPPO). 4) Il timbro del
+timer perso nel ramo in volo. 5) Dieci rosse in
+`collaudo_lnbits_muto.py`: era la regola di agosto, sopra.
+
+**PROVATO.** `prove_in_pagamento`: 175 prove — il giudice riga per riga,
+i numeri, la compressione, e le scene con le funzioni vere: in volo
+(conferma, disputa e sollecito rifiutati; saldato, «Arrivati ✓»),
+riuscito subito (due avvisi, non quattro), IL NODO GIÙ PER UN'ORA
+(ribussate a 1, 6, 21, 51 minuti; LNbits non sente niente; nessuna
+parola in più; tornato il nodo il payout parte da solo con la STESSA
+fattura), LNbits muta, il guasto dopo la POST oltre il tetto, la fattura
+scaduta, il timer, il 'confirmed' di tre giorni fa, lungo = 🧊, e le
+parole del client fatte girare in node (21 casi). Suite intera verde.
+TORTURA: 50 mutazioni, alla fine 50 uccise. Al primo giro due erano VIVE
+(il `continue` del timer, e la rilettura del client cercata in tutta la
+funzione invece che nel suo ramo) e cinque facevano ESPLODERE il banco
+invece di farlo fallire, due senza nemmeno una rossa prima: una mutazione
+che muore perché il banco esplode non è uccisa, e si sono curate tutte.
+Quella del timer è stata provata anche contro il server vero (due rosse). DAL VIVO, nel senso di casa:
+`collaudo_in_pagamento.py`, il server VERO intero su database
+usa-e-getta, 44 su 44, col timer provato insieme al suo gemello che
+scatta. I trenta collaudi girati su due alberi: identici alla base
+tranne questo e quello emendato. Il pannello guardato nel browser a
+375px sugli ordini del DEMO.
+
+**NON PROVATO, e va detto.** LNbits e LND veri. Il ponte giù DAVVERO
+(il drill sta in PRODUZIONE). Se LNbits ripaghi una bolt11 `failed`:
+vale la dottrina di casa, «bruciata». Il client sul telefono, dentro
+Telegram. Il battito corto in produzione.
