@@ -7015,6 +7015,49 @@
     body.con-barra #barraCompra{animation:none}
     body.con-pacco #barraPacco{animation:none}
   }
+
+  /* ---------- EFFETTI RIDOTTI (set 2026) ----------
+     Dal campo: su Mercurygram Desktop (Flatpak, Wayland/GNOME) la mini
+     app si vedeva DISEGNATA A PEZZI. Il guasto e' del compositore di
+     quel client, ma la pagina gli dava molto da fare: sfocature dietro
+     le barre, fogli che scivolano, la morfosi del «+», aloni che
+     battono. Non si indovina quale di questi lo manda in crisi: si
+     da' un interruttore che li toglie TUTTI, e il resto resta identico.
+     LA CLASSE STA SU <html> e la mette UNA mano sola (lo snippet
+     dell'head prima del primo paint, poi `applicaEffetti`): si accende
+     da sola con `prefers-reduced-motion`, e a mano da «🌗 Aspetto».
+     E' lei che il JS interroga (`effettiRidotti`), quindi CSS e JS non
+     possono dirsi due cose diverse.
+     ⚠️ LA REGOLA E' UNIVERSALE E CON `!important`, ed e' voluto: un
+     elenco di selettori invecchia al primo effetto nuovo, questa no —
+     l'animazione di domani nasce gia' spenta. I blocchi
+     `@media (prefers-reduced-motion:reduce)` sparsi nel foglio restano
+     dove sono (valgono anche senza JS) e questa li contiene tutti.
+     `none` E NON UNA DURATA A ZERO: e' la strada che quei blocchi
+     battono da mesi, e in tutto il file nessuno ascolta `transitionend`
+     o `animationend` — i cambi di stato restano, arrivano di scatto.
+     QUEL CHE LA REGOLA NON PUO' FARE DA SOLA sta scritto sotto di lei,
+     e `prove_effetti_ridotti` lo censisce perche' un effetto nuovo non
+     le sfugga: 1) dove c'era una sfocatura serve un COLORE PIENO, o il
+     testo che scorre sotto si leggerebbe attraverso; 2) dove un alone
+     batteva, il ripiego fermo gia' scritto per reduced-motion va
+     gemellato qui; 3) un `!important` su un'animazione altrove la
+     batterebbe per specificita'; 4) il JS (scorse morbide, monete,
+     morfosi) passa da `effettiRidotti()`. */
+  html.fx-ridotti *,html.fx-ridotti *::before,html.fx-ridotti *::after{
+    animation:none!important;transition:none!important;
+    backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+    scroll-behavior:auto!important}
+  /* 1) il colore pieno: le quattro barre sfocate bevono tutte da
+        --nav-bg (.96 di alfa), il cartello di test ha un velo suo */
+  html.fx-ridotti{--nav-bg:#FFFFFF}
+  html.fx-ridotti[data-tema="scuro"]{--nav-bg:#2C2517}
+  html.fx-ridotti #testModale{background:rgba(15,12,6,.82)}
+  /* 2) gli aloni che battevano restano FERMI: gli stessi due ripieghi
+        dei blocchi reduced-motion, dichiarazione per dichiarazione */
+  html.fx-ridotti .p2p-manca{box-shadow:0 0 0 3px rgba(194,65,12,.55)}
+  html.fx-ridotti .btn.orange.in-evidenza{
+    box-shadow:0 3px 0 var(--sats-deep),0 0 0 4px rgba(247,147,26,.35)}
 </style>
 <script>
 /* Anti-flash: il tema giusto PRIMA del primo paint. La logica completa
@@ -7030,6 +7073,16 @@
     (tw && tw.initData) ? tw.colorScheme==='dark'
     : matchMedia('(prefers-color-scheme: dark)').matches));
   if (scuro) document.documentElement.dataset.tema = 'scuro';
+  /* EFFETTI RIDOTTI (set 2026): la classe va messa QUI per la stessa
+     ragione del tema — un foglio che scivola per un fotogramma e poi
+     smette e' proprio il lavoro che si voleva risparmiare al
+     compositore. `barattolo_fx` e' la copia svelta della scelta a
+     mano: la tiene in pari `applicaEffetti`, che e' anche chi sa il
+     resto (i due timbri sul profilo). */
+  let fx = false;
+  try { fx = localStorage.getItem('barattolo_fx') === '1'; } catch(e){}
+  if (fx || matchMedia('(prefers-reduced-motion: reduce)').matches)
+    document.documentElement.classList.add('fx-ridotti');
   /* DA CHE PORTA SI GUARDA (ago 2026): fuori da Telegram, e da 768px in
      su, le card di «Da scoprire» e delle categorie crescono — dentro la
      Mini App non cambia NULLA, nemmeno di un byte (il vincolo di ferro
@@ -8264,7 +8317,7 @@ document.getElementById('cartello')?.remove();</script>
 
       <h3>Quello che resta sul tuo telefono</h3>
       <p>Alcune cose non arrivano mai qui: vivono nel tuo browser e se ne vanno se lo ripulisci. Sono il tema chiaro o scuro, la valuta con cui leggi i prezzi, e — le due che contano — <b>la connessione al tuo wallet</b> e <b>la sessione con il tuo firmatario Nostr</b>.</p>
-      <p>Due piccole cose invece le teniamo <b>nel tuo profilo</b>, perché ti seguano su ogni dispositivo: la <b>dimensione del testo</b> che hai scelto e <b>quali avvisi hai già visto o chiuso</b> — il giro di benvenuto, i «Non ora» dei suggerimenti, il cartello del giorno. Sono solo il nome dell'avviso e il momento in cui l'hai visto: servono a non mostrartelo di nuovo, anche dove il browser non ricorda niente fra un'apertura e l'altra. Dentro Telegram una copia sta anche nello spazio che Telegram riserva all'app per il tuo account.</p>
+      <p>Due piccole cose invece le teniamo <b>nel tuo profilo</b>, perché ti seguano su ogni dispositivo: la <b>dimensione del testo</b> che hai scelto e <b>quali avvisi hai già visto o chiuso</b> — il giro di benvenuto, i «Non ora» dei suggerimenti, il cartello del giorno, e se hai acceso o spento gli <b>effetti ridotti</b>. Sono solo il nome dell'avviso e il momento in cui l'hai visto: servono a non mostrartelo di nuovo, anche dove il browser non ricorda niente fra un'apertura e l'altra. Dentro Telegram una copia sta anche nello spazio che Telegram riserva all'app per il tuo account.</p>
 
       <h3>Cosa puoi fare adesso</h3>
       <ul class="sicu-lista">
@@ -8910,6 +8963,7 @@ document.getElementById('cartello')?.remove();</script>
             <b style="color:var(--ink)">ogni dispositivo</b>.</div>
           <div id="fontPillole"
                style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"></div>
+          <div id="fxRiga"></div>
         </div>
       </div>
 
@@ -16029,8 +16083,8 @@ function hintDismesso(id){ return !!hintLetti()[id]; }
    deve trovarlo), gli altri due fire-and-forget. Fail-open in ogni
    verso: una POST persa la ritenta `adottaVisti` alla prossima
    apertura, perche' la cache la sa ancora. */
-function timbraVisto(id){
-  const ora = Date.now();
+function timbraVisto(id, quando){
+  const ora = quando || Date.now();
   const h = hintLetti(); h[id] = ora;
   try { localStorage.setItem(HINT_CHIAVE, JSON.stringify(h)); } catch(e){}
   ricordaVisto(id, ora);
@@ -16129,6 +16183,86 @@ async function adottaNuvolaVisti(){
   } else if (Object.keys(vistiMem).some(k => !(Number(nuv[k]) >= vistiMem[k])))
     nuvolaVisti();     // il server ne sa piu' della nuvola: la si aggiorna
 }
+
+/* ---------------- effetti ridotti ----------------
+   Il perche' sta nel CSS, accanto a `html.fx-ridotti`. Qui le tre
+   meta' che servono al JS.
+   LA SCELTA A MANO SONO DUE TIMBRI, `fx_ridotti` e `fx_pieni`, e vince
+   il piu' RECENTE. Non una colonna nuova ne' una rotta nuova: i timbri
+   hanno gia' la strada che serve (profilo, nuvola di Telegram, cache),
+   e il loro giudice e' un'unione che per ogni id tiene il momento piu'
+   alto — cioe' un interruttore che si puo' anche SPEGNERE ci sta
+   dentro senza rompere «un timbro sale e basta»: salgono tutti e due,
+   e a decidere e' quale dei due e' salito per ultimo. A pari merito, o
+   senza nessuno dei due, gli effetti sono pieni.
+   SENZA TIMBRI VALE IL DISPOSITIVO (`barattolo_fx`): e' il caso
+   dell'anonimo in vetrina, e di un secondo conto che entra su un
+   computer dove il primo l'aveva acceso — li' il guasto e' dello
+   schermo, non della persona. */
+const FX_CHIAVE = 'barattolo_fx';
+/* in una costante, come `mqScuro`: certi WebKit vecchi la buttano via
+   col garbage collector, e con lei l'ascoltatore */
+const mqFermo = matchMedia('(prefers-reduced-motion: reduce)');
+function fxScelti(){
+  const h = hintLetti();
+  const si = Number(h.fx_ridotti) || 0, no = Number(h.fx_pieni) || 0;
+  if (si || no) return si > no;
+  try { return localStorage.getItem(FX_CHIAVE) === '1'; }
+  catch(e) { return false; }
+}
+/* IL GIUDICE UNICO, e guarda la CLASSE: e' la stessa cosa che vede il
+   CSS, quindi una scorsa non puo' restare morbida mentre i fogli sono
+   gia' secchi. Chi anima da JS chiede a lui e a nessun altro — una
+   prova conta che `prefers-reduced-motion` non si interroghi altrove. */
+const effettiRidotti = () =>
+  document.documentElement.classList.contains('fx-ridotti');
+function applicaEffetti(){
+  const scelti = fxScelti();
+  document.documentElement.classList.toggle('fx-ridotti',
+    scelti || mqFermo.matches);
+  try { localStorage.setItem(FX_CHIAVE, scelti ? '1' : '0'); } catch(e){}
+  const box = el('fxRiga');
+  if (!box) return;
+  /* SE LO CHIEDE IL SISTEMA L'INTERRUTTORE NON SI MUOVE, e lo dice:
+     una leva che si lascia spegnere senza che cambi niente e' una
+     leva che mente. */
+  const dalSistema = mqFermo.matches && !scelti;
+  const su = scelti || mqFermo.matches;
+  box.innerHTML = `
+  <div style="display:flex;align-items:center;gap:10px;margin-top:16px;padding-top:12px;border-top:1px solid var(--line)">
+    <div style="min-width:0;flex:1">
+      <div style="font-size:13.5px;font-weight:800">🍃 Effetti ridotti</div>
+      <div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">
+        Niente sfocature né animazioni: tutto compare di scatto, e il
+        resto è identico. Accendilo se Barattolo si vede a pezzi o va a
+        scatti — capita su alcuni Telegram per computer.
+        ${dalSistema
+          ? '<b style="color:var(--ink)">Lo tiene acceso il tuo sistema</b>, che chiede meno movimento.'
+          : 'La scelta ti segue su <b style="color:var(--ink)">ogni dispositivo</b>.'}</div>
+    </div>
+    <button id="fxLeva" onclick="setEffetti(${scelti ? 'false' : 'true'})"
+      role="switch" aria-checked="${su ? 'true' : 'false'}"
+      aria-label="Effetti ridotti" ${dalSistema ? 'disabled' : ''}
+      style="flex:none;font:inherit;font-size:12.5px;font-weight:800;border:1px solid ${su?'var(--sats)':'var(--line)'};background:${su?'var(--sats)':'transparent'};color:${su?'#fff':'var(--ink)'};border-radius:999px;padding:8px 14px;cursor:${dalSistema?'default':'pointer'};opacity:${dalSistema?'.6':'1'}">
+      ${su ? 'Attivo' : 'Spento'}</button>
+  </div>`;
+}
+/* IL MOMENTO E' «DOPO L'ALTRO», non «adesso»: con l'orologio del
+   dispositivo indietro il timbro nuovo nascerebbe piu' VECCHIO di
+   quello che vuole battere, e l'interruttore tornerebbe dov'era al
+   primo /me — su ogni dispositivo. */
+function setEffetti(ridotti){
+  haptic();
+  const h = hintLetti();
+  const altro = Number(h[ridotti ? 'fx_pieni' : 'fx_ridotti']) || 0;
+  const quando = Math.max(Date.now(), altro + 1);
+  if (ridotti) timbraVisto('fx_ridotti', quando);
+  else timbraVisto('fx_pieni', quando);
+  applicaEffetti();
+}
+try { mqFermo.addEventListener('change', applicaEffetti); } catch(e){}
+applicaEffetti();
+
 function dismettiHint(id, nodo){
   timbraVisto(id);
   nodo?.closest('.hintline')?.remove();   // la riga sparisce, senza re-render
@@ -16157,7 +16291,7 @@ function apriCassettoProfilo(idAcc){
      qualcuno aggiungera' fra sei mesi, senza un elenco da ricordare. */
   c?.closest('.grp')?.classList.add('open');
   if (c && !c.classList.contains('open')) c.classList.add('open');
-  setTimeout(()=>c?.scrollIntoView({behavior:'smooth', block:'start'}), 80);
+  setTimeout(()=>c?.scrollIntoView({behavior: tourRidotto() ? 'auto' : 'smooth', block:'start'}), 80);
 }
 /* ---------------- tour di benvenuto ----------------
    Ha preso il posto della vecchia riga one-shot: alla prima visita di
@@ -16182,7 +16316,9 @@ const TAPPE_TOUR = [
   { trova: () => [...document.querySelectorAll('.avatar-btn.on')].find(a => a.offsetParent !== null), tondo: true,
     testo: `Questo è il tuo <b>tappo</b>: da qui completi il profilo, colleghi il wallet e trovi i tuoi annunci. Buon mercatino! 🎉` },
 ];
-const tourRidotto = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+/* il nome e' di quando lo chiedeva il solo tour; da set 2026 e' il
+   giudice unico degli effetti ridotti, e lo chiedono tutte le scorse */
+const tourRidotto = () => effettiRidotti();
 function tourBenvenuto(){
   if (tourInCorso || !hintAttivi() || hintDismesso('tour')) return;
   /* la foto delle tappe vive: se non c'e' nulla da illuminare (vista
@@ -22161,7 +22297,7 @@ function ricordaFesta(id){
   catch(e){}
 }
 function festaSats(ancora, mini){
-  if (!ancora || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (!ancora || effettiRidotti()) return;
   const r = ancora.getBoundingClientRect();
   const box = document.createElement('div');
   box.className = 'festa-box';
@@ -41919,7 +42055,7 @@ function passoDopoGaranziaP2P(o){
 function evidenziaPassoP2P(){
   const b = document.querySelector('#view-p2pordine .btn.orange');
   if (!b) return;
-  try { b.scrollIntoView({block: 'nearest', behavior: 'smooth'}); } catch(e) {}
+  try { b.scrollIntoView({block: 'nearest', behavior: tourRidotto() ? 'auto' : 'smooth'}); } catch(e) {}
   b.classList.add('in-evidenza');
   setTimeout(() => b.classList.remove('in-evidenza'), 4200);
 }
@@ -44643,7 +44779,7 @@ function morfosiP2P(da, a){
 const tondoBarraP2P = () => document.querySelector('#nav-vendi .ic');
 
 function morfoPuoiP2P(){
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+  if (effettiRidotti()) return false;
   if (!matchMedia('(max-width: 767px)').matches) return false;
   const tondo = tondoBarraP2P();
   return !!(el('p2pMorfo') && el('p2pNuovoInvia') && tondo
@@ -48632,6 +48768,7 @@ async function avvia(){
     suggerimentiOgni = me.suggerimenti_ogni_giorni || 0;
     adottaFont(me);   // la misura scelta sull'altro telefono
     adottaVisti(me);  // i timbri «una volta sola»: tour visto, «Non ora»
+    applicaEffetti(); // ...e fra i timbri, gli effetti ridotti scelti altrove
     mySpedizioniere = me.spedizioniere || '';
     spedizionieriCatalogo = me.spedizionieri || [];
     /* le SUE reti da una chiave nuova; un server di ieri non la manda

@@ -33433,9 +33433,14 @@ async def scegli_font_scala(req: Request,
 # localStorage non dura fra due avvii la connessione al wallet si perde
 # insieme al resto: li' l'hint tornerebbe a ogni apertura, che e' il
 # difetto da cui e' nata la colonna.
+# `fx_ridotti` E `fx_pieni` (set 2026) SONO UN INTERRUTTORE FATTO DI DUE
+# TIMBRI: «effetti ridotti» si accende e si SPEGNE, e un timbro da solo
+# sa soltanto salire. In due ci stanno senza toccare il giudice qui
+# sotto — salgono tutti e due, e il client guarda quale e' salito per
+# ultimo. Niente colonna e niente rotta in piu'.
 VISTI_NOTI = ("tour", "tour_p2p", "cartello", "condcat", "checklistvista",
               "nwc", "lnaddr", "npubverifica", "nostrpub", "barraweb",
-              "duetocchi")
+              "duetocchi", "fx_ridotti", "fx_pieni")
 
 
 def _visti_leggi(grezzo) -> dict:

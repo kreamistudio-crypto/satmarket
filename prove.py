@@ -53915,8 +53915,8 @@ def prove_p2p_pubblica():
     #    di sempre: in reduced-motion il foglio si apre come si e'
     #    sempre aperto, e da 768px in su non c'e' nessun tondo che
     #    scende (il + e' una pillola nella topbar).
-    prova("in reduced-motion la morfosi non nasce", True,
-          "matchMedia('(prefers-reduced-motion: reduce)').matches" in puoi)
+    prova("con gli effetti ridotti la morfosi non nasce", True,
+          "if (effettiRidotti()) return false;" in puoi)
     prova("...e nemmeno da 768px in su", True,
           "matchMedia('(max-width: 767px)').matches" in puoi)
     prova("...e allora il foglio si apre come sempre", True,
@@ -62535,7 +62535,8 @@ def prove_p2p_silenzi():
     prova("l'evidenza e' il bottone pieno della pagina dello scambio: a "
           "vista, col battito che si toglie da solo", [True, True, True],
           ["document.querySelector('#view-p2pordine .btn.orange')" in _ev,
-           "b.scrollIntoView({block: 'nearest', behavior: 'smooth'})" in _ev,
+           "b.scrollIntoView({block: 'nearest', behavior: "
+           "tourRidotto() ? 'auto' : 'smooth'})" in _ev,
            "setTimeout(() => b.classList.remove('in-evidenza'), 4200);" in _ev])
     _css = _nudo(mini)
     prova("il battito batte tre volte e si ferma, e chi ha chiesto meno "
@@ -68208,7 +68209,8 @@ function Nodo(cls, id){
 }
 Nodo.prototype.appendChild = function(n){ n.padre = this; this.figli.push(n); return n; };
 Nodo.prototype.setAttribute = function(k,v){ this.attr[k] = v; };
-Nodo.prototype.scrollIntoView = function(){ SCROLL++; };
+let COME = null;
+Nodo.prototype.scrollIntoView = function(o){ SCROLL++; COME = o && o.behavior; };
 Nodo.prototype.closest = function(sel){
   const c = sel.replace('.','');
   let n = this;
@@ -68255,6 +68257,10 @@ function haptic(){}
 function closeSheet(){}
 function go(){}
 function esc(s){ return String(s); }
+// il giudice degli effetti ridotti (set 2026): la scorsa del cassetto
+// gli chiede se puo' essere morbida, e il banco gli fa dire i due versi
+let RIDOTTI = false;
+const tourRidotto = () => RIDOTTI;
 let ONION = false;
 function suOnion(){ return ONION; }
 let onionHost = '';
@@ -68296,8 +68302,10 @@ renderTor();
 out.dentro = NODI['torBlocco'].innerHTML;
 // lo scroll parte da un setTimeout(80): si aspetta, o si
 // misurerebbe zero e la prova direbbe il falso.
-setTimeout(()=>{ out.scroll = SCROLL;
-  console.log(JSON.stringify(out)); }, 250);
+setTimeout(()=>{ out.scroll = SCROLL; out.come = COME;
+  RIDOTTI = true; apriCassettoProfilo('c3');
+  setTimeout(()=>{ out.comeRidotti = COME;
+    console.log(JSON.stringify(out)); }, 250); }, 250);
 """
     with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
                                      encoding="utf-8") as f:
@@ -68321,6 +68329,10 @@ setTimeout(()=>{ out.scroll = SCROLL;
         ("apriCassettoProfilo apre il cassetto E la sua sezione",
          [True, True], [o["cassetto"], o["gruppo"]]),
         ("e lo scroll parte lo stesso", 1, o["scroll"]),
+        # la scorsa chiede al giudice degli effetti ridotti (set 2026):
+        # morbida di serie, secca per chi li ha accesi
+        ("...morbido di serie, secco a effetti ridotti",
+         ["smooth", "auto"], [o["come"], o["comeRidotti"]]),
         ("toggleGrp apre il suo e non tocca gli altri",
          [True, False], [o["g2"], o["g1"]]),
         ("e lo dice a voce", "true", o["aria"]),
@@ -69755,12 +69767,12 @@ def prove_timbri_visti():
     # saliva sul profilo. Restano le tre che DEVONO scrivere la cache
     # da se', e ognuna ha il suo perche' scritto accanto.
     penne = {}
-    for nome in ("function timbraVisto(id){", "function adottaVisti(me){",
+    for nome in ("function timbraVisto(id, quando){", "function adottaVisti(me){",
                  "function riavviaTour(){"):
         penne[nome] = pezzo_js(mini, nome, "\n}\n").count(
             "localStorage.setItem(HINT_CHIAVE")
     prova("la cache degli hint si scrive in tre posti soli",
-          {"function timbraVisto(id){": 1, "function adottaVisti(me){": 1,
+          {"function timbraVisto(id, quando){": 1, "function adottaVisti(me){": 1,
            "function riavviaTour(){": 2}, penne)
     prova("...e da nessun'altra parte", sum(penne.values()),
           mini.count("localStorage.setItem(HINT_CHIAVE"))
@@ -69824,7 +69836,7 @@ def prove_timbri_visti():
     pezzi = "".join(
         pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
             "function unisciVisti(a, b){", "function hintLetti(){",
-            "function timbraVisto(id){", "function ricordaVisto(id, quando){",
+            "function timbraVisto(id, quando){", "function ricordaVisto(id, quando){",
             "function spingiVisti(mappa){", "function nuvolaVisti(){",
             "function adottaVisti(me){",
             "async function adottaNuvolaVisti(){",
@@ -74035,6 +74047,360 @@ console.log(JSON.stringify(out));
           "gli scambi già presi restano come erano" in dati)
 
 
+def prove_effetti_ridotti():
+    """EFFETTI RIDOTTI (set 2026). Dal campo: su Mercurygram Desktop
+    (Flatpak, Wayland/GNOME) la mini app si vedeva disegnata a pezzi —
+    il guasto e' del compositore di quel client, ma la pagina gli dava
+    molto da fare. Una classe su <html> toglie sfocature, animazioni,
+    transizioni, aloni che battono e morfosi; si accende da sola con
+    `prefers-reduced-motion` e a mano da «🌗 Aspetto», con due timbri
+    sul profilo.
+    QUESTA E' UNA SENTINELLA DI CENSIMENTO, e il suo mestiere e' il
+    DOMANI: la regola universale spegne da sola l'animazione che
+    nascera', ma ci sono quattro cose che da sola non puo' fare — il
+    colore pieno dove c'era una sfocatura, il ripiego fermo dove un
+    alone batteva, un `!important` altrui che la batterebbe, e il JS
+    che anima per conto suo. Ognuna ha qui il suo elenco, e un effetto
+    nuovo che non ci passa esce rosso col suo nome.
+    E IL CLIENT SI FA GIRARE, a casi indipendenti: che la classe ci sia
+    non dice che l'interruttore si spenga davvero."""
+    print("\n[Effetti ridotti: la classe, il censimento, l'interruttore]")
+    import collections
+    import json as _js, shutil as _sh, subprocess as _sp, tempfile as _tf
+    srv = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    i_fine = mini.index("</style>")
+
+    def stretto(t):
+        """Senza commenti e senza spazi che non contano: due regole
+        uguali scritte con un a-capo diverso restano uguali."""
+        t = re.sub(r"/\*.*?\*/", "", t, flags=re.S)
+        t = re.sub(r"\s+", " ", t)
+        return re.sub(r"\s*([{};:,>])\s*", r"\1", t).strip()
+
+    css = stretto(mini[mini.index("<style>"):i_fine])
+    # `accept="image/*"` apre un commento che non e' un commento: senza
+    # questa riga lo spoglio si mangerebbe il codice fino al primo `*/`
+    # vero, e la sentinella sarebbe cieca proprio li' senza dirlo
+    js = _senza_commenti_js(mini[i_fine:].replace("image/*", "image/STELLA"))
+    prova("lo spoglio dei commenti non si e' mangiato il codice",
+          [True, True, True, True],
+          [f in js for f in ("function festaSats(", "function morfoPuoiP2P(",
+                             "function evidenziaPassoP2P(",
+                             "function applicaEffetti(")])
+
+    # --- 1) LA REGOLA UNIVERSALE ------------------------------------
+    UNIVERSALE = ("html.fx-ridotti *,html.fx-ridotti *::before,"
+                  "html.fx-ridotti *::after{"
+                  "animation:none!important;transition:none!important;"
+                  "backdrop-filter:none!important;"
+                  "-webkit-backdrop-filter:none!important;"
+                  "scroll-behavior:auto!important}")
+    prova("la regola universale c'e', e copre anche ::before e ::after",
+          1, css.count(UNIVERSALE))
+    i_fx = css.index(UNIVERSALE) if UNIVERSALE in css else len(css)
+    fuori, blocco = css[:i_fx], css[i_fx:]
+    prova("tutto quel che riguarda la classe sta in UN posto, in fondo al "
+          "foglio: un gemello sparso e' un gemello che si dimentica",
+          0, fuori.count("fx-ridotti"))
+    # un `!important` altrove batterebbe la regola per specificita' (o
+    # per ordine): vale per il foglio, per gli stili in riga e per il JS
+    _imp = (r"(?:animation|transition|backdrop-filter|scroll-behavior)"
+            r"[a-z-]*\s*:[^;}\"']*!\s*important")
+    tutto = fuori + js
+    prova("nessun `!important` su animazioni, transizioni o sfocature "
+          "fuori dalla regola: la batterebbe", [], re.findall(_imp, tutto))
+    prova("...e nessuno lo scrive da JS con setProperty(…, 'important')",
+          [], re.findall(r"setProperty\([^)]*important", js))
+
+    # --- 2) IL COLORE PIENO AL POSTO DELLA SFOCATURA ----------------
+    # Tolta la sfocatura, un fondo con l'alfa lascia leggere attraverso
+    # il testo che scorre sotto. Ogni regola che sfoca deve avere il suo
+    # pieno: o beve da --nav-bg (che la classe ridefinisce opaco), o ha
+    # il suo fondo scritto nel blocco.
+    regole = re.findall(r"([^{}]+)\{([^{}]*)\}", fuori)
+    sfocano = [(s, c) for s, c in regole if "backdrop-filter:" in c]
+    prova("le regole che sfocano sono queste cinque (chi ne aggiunge una "
+          "la scrive qui, e le da' il suo colore pieno)",
+          ["#barraCompra", "#barraPacco", "#testModale",
+           "#view-acquisto .ctrl-fondo", "nav"],
+          sorted(s for s, c in sfocano))
+    senza_pieno = [s for s, c in sfocano
+                   if "background:var(--nav-bg)" not in c
+                   and ("html.fx-ridotti %s{background:" % s) not in blocco]
+    prova("ogni sfocatura ha il suo colore pieno", [], senza_pieno)
+    prova("--nav-bg nasce con l'alfa in due temi...", 2,
+          len(re.findall(r"--nav-bg:rgba\(", fuori)))
+    prova("...e la classe lo ridefinisce PIENO in tutti e due", [True, True],
+          [bool(re.search(r"html\.fx-ridotti\{--nav-bg:#[0-9A-Fa-f]{6}\}",
+                          blocco)),
+           bool(re.search(r"html\.fx-ridotti\[data-tema=\"scuro\"\]"
+                          r"\{--nav-bg:#[0-9A-Fa-f]{6}\}", blocco))])
+    # il velo del cartello non puo' essere pieno (coprirebbe la pagina):
+    # senza sfocatura si fa piu' fitto di quello di partenza
+    _velo = re.search(r"#testModale\{[^}]*background:rgba\(15,12,6,(\.\d+)\)",
+                      fuori)
+    _velo_fx = re.search(r"html\.fx-ridotti #testModale\{background:"
+                         r"rgba\(15,12,6,(\.\d+)\)", blocco)
+    prova("il velo del cartello, senza sfocatura, e' piu' fitto", True,
+          bool(_velo and _velo_fx
+               and float(_velo_fx.group(1)) > float(_velo.group(1))))
+    # le sfocature che NON sono backdrop: una sola, ferma, su un'icona
+    prova("l'unico `filter:blur` e' la luce dell'icona Nostr (1.2px, "
+          "fermo: non e' uno strato che si ricompone)", [".ico-nostr .lux"],
+          [s for s, c in regole
+           if re.search(r"(?<![a-z-])filter:[^;]*blur\(", c)])
+
+    # --- 3) GLI ALONI CHE BATTEVANO RESTANO FERMI -------------------
+    # I blocchi reduced-motion non fanno solo `none`: due danno un
+    # ripiego FERMO al posto del battito. La classe deve dire lo stesso,
+    # dichiarazione per dichiarazione — e chi domani ne scrive un terzo
+    # lo trova rosso qui finche' non lo gemella.
+    ripieghi = {}
+    for m in re.finditer(r"@media \(prefers-reduced-motion:reduce\)\{", fuori):
+        i, fondo = m.end(), 1
+        while fondo:
+            fondo += {"{": 1, "}": -1}.get(fuori[i], 0)
+            i += 1
+        for s, c in re.findall(r"([^{}]+)\{([^{}]*)\}", fuori[m.end():i - 1]):
+            resto = [d for d in c.split(";") if d
+                     and d not in ("animation:none", "transition:none")]
+            if resto:
+                for uno in s.split(","):
+                    ripieghi[uno] = ";".join(resto)
+    prova("i ripieghi fermi dei blocchi reduced-motion sono due",
+          [".btn.orange.in-evidenza", ".p2p-manca"], sorted(ripieghi))
+    prova("...e la classe li gemella tutti, con le stesse dichiarazioni",
+          [], [s for s, d in ripieghi.items()
+               if "html.fx-ridotti %s{%s}" % (s, d) not in blocco])
+
+    # --- 4) IL JS PASSA DA UN GIUDICE SOLO --------------------------
+    prova("`prefers-reduced-motion` si interroga in due posti soli: lo "
+          "snippet dell'head e la costante del giudice", 2,
+          len(re.findall(r"matchMedia\(\s*['\"`]\(prefers-reduced-motion", js)))
+    prova("il giudice guarda la CLASSE, cioe' quel che vede il CSS", True,
+          "const effettiRidotti = () =>\n"
+          "  document.documentElement.classList.contains('fx-ridotti');" in js)
+    prova("tourRidotto (il nome che usano le scorse) chiede a lui", True,
+          "const tourRidotto = () => effettiRidotti();" in js)
+    prova("le monete della festa non partono", True,
+          "if (!ancora || effettiRidotti()) return;"
+          in pezzo_js(mini, "function festaSats(ancora, mini){", "\n}\n"))
+    prova("la morfosi del «+» non nasce: e' la PRIMA cosa che chiede", True,
+          pezzo_js(mini, "function morfoPuoiP2P(){", "\n}\n").startswith(
+              "function morfoPuoiP2P(){\n  if (effettiRidotti()) return false;"))
+    # ogni `behavior:` di una scorsa: o e' secco, o chiede al giudice
+    _buone = {"tourRidotto() ? 'auto' : 'smooth'", "corto ? 'smooth' : 'auto'",
+              "'auto'", "'instant'"}
+    _valori = [v.strip() for v in
+               re.findall(r"behavior\s*:\s*([^,})]+\)?[^,})]*)", js)]
+    prova("nessuna scorsa e' morbida senza chiedere al giudice", [],
+          sorted(set(_valori) - _buone))
+    prova("...e le scorse censite non sono sparite (la prova non e' cieca)",
+          True, len(_valori) >= 11)
+    prova("`corto` (galleria, tour del P2P) porta il giudice nella sua riga",
+          js.count("corto ? 'smooth' : 'auto'"),
+          len(re.findall(r"const corto = [^;]*&& !tourRidotto\(\);", js)))
+    # le strade per animare che oggi NESSUNO usa: chi ne apre una la
+    # fa passare da effettiRidotti() e la dichiara qui
+    prova("nessuno anima per strade che la classe non vede (Web "
+          "Animations, View Transitions, SMIL)", [0, 0, 0],
+          [js.count(".animate("), js.count("startViewTransition"),
+           len(re.findall(r"<animate(?:Transform|Motion)?\b", mini))])
+    # requestAnimationFrame non e' un effetto, ma e' da li' che ne nasce
+    # uno a mano: si censisce CHI lo chiama, col suo perche'
+    #   tourBenvenuto, mostraTappa: attese di fotogramma (una classe che
+    #     si toglie dopo il paint), la corsa e' del CSS e la classe la spegne
+    #   barreCorri: il FLIP delle barre — idem, la transizione e' del CSS
+    #   lbApplica: segue il DITO nel lightbox, non e' un'animazione
+    #   passo: le monete di festaSats, che il giudice ferma alla porta
+    chi = collections.Counter()
+    for m in re.finditer(r"requestAnimationFrame", js):
+        nomi = re.findall(r"function\s+(\w+)\s*\(", js[:m.start()])
+        chi[nomi[-1] if nomi else "?"] += 1
+    prova("chi chiama requestAnimationFrame e' censito, col suo perche'",
+          {"tourBenvenuto": 2, "mostraTappa": 2, "barreCorri": 2,
+           "lbApplica": 1, "passo": 2}, dict(chi))
+
+    # --- 5) PRIMA DEL PRIMO PAINT, E DOPO /me -----------------------
+    testa = mini[i_fine:mini.index("<body")]
+    prova("la classe si mette nell'head, prima del primo paint",
+          [True, True, True],
+          ["localStorage.getItem('barattolo_fx') === '1'" in testa,
+           "matchMedia('(prefers-reduced-motion: reduce)').matches" in testa,
+           "document.documentElement.classList.add('fx-ridotti');" in testa])
+    prova("...con la stessa chiave che tiene in pari applicaEffetti", True,
+          "const FX_CHIAVE = 'barattolo_fx';" in js)
+    av = pezzo_js(mini, "async function avvia(){", "\n}\n")
+    _ado = re.search(r"^\s*adottaVisti\(me\);", av, re.M)
+    _app = re.search(r"^\s*applicaEffetti\(\);", av, re.M)
+    prova("dopo /me gli effetti si riapplicano, DOPO aver adottato i "
+          "timbri del profilo", True,
+          bool(_ado and _app and _ado.start() < _app.start()))
+    i_asp = mini.index('id="accAspetto"')
+    prova("l'interruttore sta in «🌗 Aspetto»", True,
+          '<div id="fxRiga"></div>' in mini[i_asp:mini.index('id="accLivello"')])
+    i_tel = mini.index("<h3>Quello che resta sul tuo telefono</h3>")
+    prova("«I tuoi dati» dice che la scelta sta nel profilo", True,
+          "effetti ridotti" in mini[i_tel:mini.index("<h3>", i_tel + 10)])
+
+    # --- 6) IL SERVER: DUE TIMBRI, VINCE IL PIU' RECENTE ------------
+    i = srv.index("VISTI_NOTI = (")
+    amb = {"json": json}
+    exec(srv[i:srv.index(")\n", i) + 1], amb)
+    exec(pezzo("_visti_unisci"), amb)
+    uni = amb["_visti_unisci"]
+    prova("il catalogo conosce i due timbri", [True, True],
+          ["fx_ridotti" in amb["VISTI_NOTI"], "fx_pieni" in amb["VISTI_NOTI"]])
+    _acceso = uni({}, {"fx_ridotti": 100}, 10_000)
+    _spento = uni(_acceso, {"fx_pieni": 200}, 10_000)
+    _riacceso = uni(_spento, {"fx_ridotti": 300}, 10_000)
+    prova("acceso, spento e riacceso: l'unione li tiene tutti e due, e "
+          "l'ultimo gesto e' il piu' alto",
+          [{"fx_ridotti": 100}, {"fx_ridotti": 100, "fx_pieni": 200},
+           {"fx_ridotti": 300, "fx_pieni": 200}],
+          [_acceso, _spento, _riacceso])
+    prova("un dispositivo rimasto indietro non riaccende quel che e' "
+          "stato spento dopo", {"fx_ridotti": 300, "fx_pieni": 200},
+          uni(_riacceso, {"fx_ridotti": 100, "fx_pieni": 150}, 10_000))
+
+    # --- 7) E IL CLIENT SI FA GIRARE --------------------------------
+    _node = _sh.which("node")
+    if not _node:
+        salta("l'interruttore degli effetti gira", "node non installato")
+        return
+    pezzi = "".join(
+        pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
+            "function unisciVisti(a, b){", "function hintLetti(){",
+            "function timbraVisto(id, quando){",
+            "function ricordaVisto(id, quando){",
+            "function spingiVisti(mappa){", "function nuvolaVisti(){",
+            "function fxScelti(){", "function applicaEffetti(){",
+            "function setEffetti(ridotti){"))
+    _prog = (
+        "const HINT_CHIAVE = 'barattolo_hint';\n"
+        "const CLOUD_VISTI = 'barattolo_visti';\n"
+        "const VISTI_CASA_LORO = ['tour_p2p', 'cartello'];\n"
+        "const FX_CHIAVE = 'barattolo_fx';\n"
+        "let vistiMem = {};\n"
+        "let DEMO = false, VETRINA = false, API_BASE = '/api', myTgId = 111;\n"
+        "let magazzino = {}, muto = false, poste = [];\n"
+        "const localStorage = {\n"
+        "  getItem: k => { if (muto) throw new Error('muto');\n"
+        "    return (k in magazzino) ? magazzino[k] : null; },\n"
+        "  setItem: (k, v) => { if (muto) throw new Error('muto');\n"
+        "    magazzino[k] = String(v); },\n"
+        "};\n"
+        "let classi = new Set();\n"
+        "const document = {documentElement: {classList: {\n"
+        "  toggle: (c, su) => { su ? classi.add(c) : classi.delete(c); },\n"
+        "  contains: c => classi.has(c)}}};\n"
+        "const box = {innerHTML: ''};\n"
+        "const el = id => id === 'fxRiga' ? box : null;\n"
+        "const mqFermo = {matches: false};\n"
+        "function haptic(){}\n"
+        "function authHdr(){ return 'collaudo'; }\n"
+        "function fetch(u, o){ poste.push(JSON.parse(o.body).visti);\n"
+        "  return Promise.resolve({ok: true}); }\n"
+        "function cloudScrivi(){ return Promise.resolve(true); }\n"
+        + pezzo_js(mini, "const effettiRidotti = () =>", ";\n") + ";\n"
+        + pezzi +
+        "function daCapo(){ vistiMem = {}; magazzino = {}; muto = false;\n"
+        "  poste = []; classi = new Set(); box.innerHTML = '';\n"
+        "  mqFermo.matches = false; VETRINA = false; }\n"
+        "const stato = () => ({su: effettiRidotti(),\n"
+        "  chiave: magazzino.barattolo_fx,\n"
+        "  leva: (box.innerHTML.match(/aria-checked=\"(\\w+)\"/) || [])[1],\n"
+        "  ferma: box.innerHTML.includes(' disabled'),\n"
+        "  prossimo: (box.innerHTML.match(/setEffetti\\((\\w+)\\)/) || [])[1]});\n"
+        "const esiti = {};\n"
+        "function caso(nome, f){ daCapo();\n"
+        "  try { esiti[nome] = f(); }\n"
+        "  catch(e) { esiti[nome] = 'ESPLOSO: ' + e.message; } }\n"
+        # chi non ha mai toccato niente: effetti pieni
+        "caso('vergine', () => { applicaEffetti(); return stato(); });\n"
+        # il gesto: classe, chiave per l'head, timbro che sale
+        "caso('accendi', () => { applicaEffetti(); setEffetti(true);\n"
+        "  return {...stato(), poste: poste.map(p => Object.keys(p))}; });\n"
+        # ...e si SPEGNE: e' la meta' che un timbro solo non sapeva fare
+        "caso('spegni', () => { setEffetti(true); setEffetti(false);\n"
+        "  const h = JSON.parse(magazzino.barattolo_hint);\n"
+        "  return {...stato(), ultimo: h.fx_pieni > h.fx_ridotti}; });\n"
+        "caso('riaccendi', () => { setEffetti(true); setEffetti(false);\n"
+        "  setEffetti(true); return stato(); });\n"
+        # l'orologio del dispositivo e' INDIETRO rispetto al timbro che
+        # deve battere: il gesto deve vincere lo stesso
+        "caso('orologio_indietro', () => {\n"
+        "  vistiMem = {fx_ridotti: Date.now() + 86400000};\n"
+        "  applicaEffetti(); const prima = effettiRidotti();\n"
+        "  setEffetti(false); return {prima, ...stato()}; });\n"
+        # lo chiede il SISTEMA: acceso, e la leva non finge di spegnersi
+        "caso('sistema', () => { mqFermo.matches = true; applicaEffetti();\n"
+        "  return {...stato(),\n"
+        "    dice: box.innerHTML.includes('Lo tiene acceso il tuo sistema')}; });\n"
+        # scelto sull'ALTRO dispositivo: qui la cache non sa niente
+        "caso('altro_dispositivo', () => { vistiMem = {fx_ridotti: 9};\n"
+        "  applicaEffetti(); return stato(); });\n"
+        # ...e spento altrove: il profilo batte la chiave svelta di qui
+        "caso('spento_altrove', () => { magazzino.barattolo_fx = '1';\n"
+        "  magazzino.barattolo_hint = JSON.stringify({fx_ridotti: 5});\n"
+        "  vistiMem = {fx_ridotti: 5, fx_pieni: 8};\n"
+        "  applicaEffetti(); return stato(); });\n"
+        # senza timbri vale il dispositivo (anonimo, secondo conto)
+        "caso('solo_dispositivo', () => { magazzino.barattolo_fx = '1';\n"
+        "  applicaEffetti(); return stato(); });\n"
+        "caso('pari_merito', () => { vistiMem = {fx_ridotti: 7, fx_pieni: 7};\n"
+        "  applicaEffetti(); return stato().su; });\n"
+        # in vetrina non c'e' un profilo: la scelta vale lo stesso, qui
+        "caso('vetrina', () => { VETRINA = true; setEffetti(true);\n"
+        "  return {su: effettiRidotti(), poste: poste.length}; });\n"
+        # dove il localStorage non risponde non si esplode
+        "caso('muto', () => { muto = true; vistiMem = {fx_ridotti: 3};\n"
+        "  applicaEffetti(); setEffetti(false); return effettiRidotti(); });\n"
+        "console.log(JSON.stringify(esiti));\n")
+    _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8")
+    _f.write(_prog)
+    _f.close()
+    _r = _sp.run([_node, _f.name], capture_output=True, text=True,
+                 timeout=60, encoding="utf-8")
+    os.unlink(_f.name)
+    if _r.returncode != 0:
+        prova("l'interruttore degli effetti gira", True,
+              "ERRORE: %s" % _r.stderr[:300])
+        return
+    d = _js.loads(_r.stdout.strip())
+    SPENTO = {"su": False, "chiave": "0", "leva": "false", "ferma": False,
+              "prossimo": "true"}
+    ACCESO = {"su": True, "chiave": "1", "leva": "true", "ferma": False,
+              "prossimo": "false"}
+    prova("chi non ha mai toccato niente ha gli effetti pieni",
+          SPENTO, d["vergine"])
+    prova("il gesto accende: la classe, la chiave per l'head, e il timbro "
+          "che sale sul profilo", dict(ACCESO, poste=[["fx_ridotti"]]),
+          d["accendi"])
+    prova("...e SPEGNE: il secondo timbro nasce piu' recente del primo",
+          dict(SPENTO, ultimo=True), d["spegni"])
+    prova("...e riaccende, quante volte si vuole", ACCESO, d["riaccendi"])
+    prova("con l'orologio INDIETRO il gesto vince lo stesso",
+          dict(SPENTO, prima=True), d["orologio_indietro"])
+    prova("se lo chiede il sistema e' acceso, la leva sta ferma e lo dice "
+          "— e la scelta a mano resta «non fatta»",
+          {"su": True, "chiave": "0", "leva": "true", "ferma": True,
+           "prossimo": "true", "dice": True}, d["sistema"])
+    prova("scelto sull'altro dispositivo: qui si accende, e la chiave "
+          "svelta si mette in pari per il prossimo avvio",
+          ACCESO, d["altro_dispositivo"])
+    prova("spento altrove: il profilo batte la chiave svelta di qui",
+          SPENTO, d["spento_altrove"])
+    prova("senza timbri vale il dispositivo", ACCESO, d["solo_dispositivo"])
+    prova("a pari merito gli effetti sono pieni", False, d["pari_merito"])
+    prova("in vetrina la scelta vale, e non si chiama nessun server",
+          {"su": True, "poste": 0}, d["vetrina"])
+    prova("dove il localStorage non risponde non si esplode, e vale la "
+          "memoria dell'apertura", False, d["muto"])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -74184,6 +74550,7 @@ def main():
               prove_ordini_prova,
               prove_tutorial,
               prove_timbri_visti,
+              prove_effetti_ridotti,
               prove_bunker_muto,
               prove_login_qr,
               prove_profilo_sezioni,
