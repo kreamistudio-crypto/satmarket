@@ -22613,3 +22613,174 @@ suo posto, ed è un cantiere suo. CLAUDE.md non è stato toccato (nessuna
 regola è cambiata, e il tetto è pieno): il giorno che il piano B si
 toglie, la voce delle «sette cose aperte» che parla dell'hidden
 service con client-auth va riletta.
+
+## Effetti ridotti: una classe che toglie sfocature e movimento, e una sentinella che li censisce (21 set 2026)
+
+**IL CASO.** Un utente su Mercurygram Desktop (Flatpak, Wayland/GNOME)
+vede la mini app DISEGNATA A PEZZI. Il guasto è del compositore del suo
+client, non nostro — ma la nostra pagina gli dà molto da fare:
+`backdrop-filter` dietro quattro barre e un velo, fogli che scivolano,
+la morfosi del «+», aloni che battono, il fadein di ogni vista. Da qui
+non si può sapere QUALE di questi lo manda in crisi (quel client non lo
+posso aprire), quindi non si cura un effetto: si dà un modo di toglierli
+TUTTI, e il resto resta identico.
+
+**IL DISEGNO, e il perché di ogni pezzo.**
+• UNA CLASSE SU `<html>`, `fx-ridotti`. La mette lo snippet dell'head
+prima del primo paint — accanto al tema e per la stessa ragione: un
+foglio che scivola per un fotogramma e poi smette è proprio il lavoro
+che si voleva risparmiare — e poi `applicaEffetti()`. Si accende da
+sola con `prefers-reduced-motion`, e a mano da «🌗 Aspetto».
+• NEL CSS UNA REGOLA UNIVERSALE con `!important`, in fondo al foglio.
+LA STRADA SCARTATA è l'elenco dei selettori (ce n'erano già 27, i
+blocchi `@media (prefers-reduced-motion…)` sparsi: 22 `reduce` e 5
+`no-preference`): un elenco invecchia al primo effetto nuovo, la
+regola no — l'animazione di domani nasce già spenta. I blocchi restano dove sono (valgono anche
+senza JS) e non sono stati toccati.
+• `none` E NON «DURATA A ZERO», ed è la seconda strada scartata, quella
+che si trova in ogni reset: `animation-duration:.001ms` tiene vivi gli
+stati finali di chi ha `fill-mode:both`, ma è un comportamento NUOVO
+su tutta la pagina, mentre `none` è quel che i 22 `reduce` fanno da
+mesi sotto reduced-motion, provato sul campo. Verificato prima di
+scegliere: in tutto il file nessuno ascolta `transitionend` o
+`animationend` (con `none` non arriverebbero mai), e le tre animazioni
+`both` (gli impulsi) hanno già il loro `animation:none` nei blocchi.
+• IL COLORE PIENO AL POSTO DELLA SFOCATURA. Le sfocature vere sono
+CINQUE (due altre citate nei commenti erano già state tolte): `nav`,
+`#barraCompra`, `#barraPacco`, `.ctrl-fondo` — che bevono tutte da
+`--nav-bg`, .96 di alfa: basta ridefinire il token, opaco, nei due
+temi — e il velo del cartello di test, che pieno non può essere
+(coprirebbe la pagina) e passa da .55 a .82.
+• GLI ALONI CHE BATTEVANO RESTANO FERMI: due blocchi reduced-motion
+non facevano solo `none`, davano un alone fisso (`.p2p-manca`,
+`.btn.orange.in-evidenza`). Gemellati sulla classe, dichiarazione per
+dichiarazione.
+• IL JS HA UN GIUDICE SOLO, `effettiRidotti()`, e GUARDA LA CLASSE:
+è la stessa cosa che vede il CSS, quindi non possono dirsi due cose
+diverse. I giudici sparsi erano tre (`tourRidotto`, la festa delle
+monete, `morfoPuoiP2P`), ognuno col suo `matchMedia`: ora chiedono a
+lui. `tourRidotto` TIENE IL NOME — lo usano una dozzina di scorse e
+cinque prove vecchie — e cambia solo il corpo. Trovate di striscia DUE scorse morbide per
+tutti (l'apertura di una sezione del profilo, l'evidenza del passo
+P2P): passano dal giudice anche loro.
+• L'INTERRUTTORE SONO DUE TIMBRI, `fx_ridotti` e `fx_pieni`, e vince il
+più recente. Andrea l'ha chiesto «salvato nel profilo come gli altri
+timbri», e un timbro sa solo salire mentre un interruttore si deve
+poter spegnere: in due ci stanno SENZA toccare `_visti_unisci` —
+salgono tutti e due, e a decidere è quale è salito per ultimo. Niente
+colonna, niente rotta, e profilo + nuvola di Telegram + cache arrivano
+gratis. LA STRADA SCARTATA: una colonna sua come `font_scala` — più
+leggibile, ma un'altra migrazione e un'altra rotta per un booleano, e
+senza la nuvola. Il gesto timbra «dopo l'altro» e non «adesso»
+(`Math.max(Date.now(), altro + 1)`): con l'orologio indietro il timbro
+nuovo nascerebbe più vecchio di quello che deve battere, e
+l'interruttore tornerebbe dov'era al primo /me. Per questo
+`timbraVisto` ha un secondo parametro.
+• SENZA TIMBRI VALE IL DISPOSITIVO (`barattolo_fx`): l'anonimo in
+vetrina, e il secondo conto che entra su un computer dove il primo
+l'aveva acceso — lì il guasto è dello schermo, non della persona.
+• SE LO CHIEDE IL SISTEMA LA LEVA STA FERMA, sbiadita, e lo dice; la
+scelta a mano resta «non fatta» (`barattolo_fx` a '0'), così il giorno
+che il sistema cambia idea gli effetti tornano.
+• «I TUOI DATI» lo dice: la pagina elencava quel che teniamo nel
+profilo, e questo ci si aggiunge.
+
+**LA SENTINELLA, `prove_effetti_ridotti` (43 prove).** Il suo mestiere è
+il DOMANI. La regola universale copre da sola l'animazione che nascerà;
+censite sono le quattro cose che da sola non sa fare: 1) le regole che
+sfocano, PER NOME, e ognuna col suo colore pieno; 2) i ripieghi fermi,
+letti DAI blocchi reduced-motion (chi ne scrive un terzo lo trova rosso
+finché non lo gemella); 3) nessun `!important` su animazioni,
+transizioni o sfocature fuori dalla regola, né da `setProperty`; 4) il
+JS — `matchMedia('(prefers-reduced-motion` in due posti soli, ogni
+`behavior:` di una scorsa o secco o col giudice, zero Web Animations /
+View Transitions / SMIL, e chi chiama `requestAnimationFrame` censito
+per funzione col suo perché. Più: tutto quel che riguarda la classe sta
+in UN posto (un gemello sparso è un gemello che si dimentica), l'unico
+`filter:blur` è la luce ferma dell'icona Nostr, e l'interruttore GIRA
+in node a dodici casi indipendenti.
+⚠️ DUE TRAPPOLE DEL BANCO, prese prima che mordessero:
+`accept="image/*"` nell'HTML apre un commento che non è un commento, e
+lo spoglio dei commenti si sarebbe mangiato il codice fino al primo
+`*/` vero, cieco senza dirlo (si neutralizza, e una prova controlla
+che le funzioni-spia ci siano ancora); e la parola
+`prefers-reduced-motion` sta anche in un commento HTML — si conta il
+GESTO (`matchMedia(`), non la parola. È «il commento che risponde per
+il codice», una volta di più.
+
+**LA TORTURA: 40 mutazioni, 40 uccise, nessuna per esplosione del
+banco**, su una copia nello scratchpad, col giro a codice intatto per
+primo. Tredici sul CSS (la regola monca in tre modi, i due token, il
+velo più rado, i gemelli tolti o storti, e i QUATTRO effetti nuovi che
+devono uscire rossi: una sfocatura, un `!important`, un ripiego, un
+`blur`), dodici sul JS dei giudici e dell'avvio (la chiamata
+COMMENTATA compresa), dodici sull'interruttore, tre sul server. Si è
+guardato QUALI rosse: ognuna muore per la prova che porta il suo nome.
+
+**UNA ROSSA CHE LA SENTINELLA NON POTEVA VEDERE, e l'ha presa il giro
+intero.** Far passare dal giudice la scorsa di `apriCassettoProfilo`
+ha rotto il banco del Profilo, che quella funzione la fa GIRARE in node
+in un ambiente di cartone dove `tourRidotto` non esisteva
+(`ReferenceError`). Le prove mirate erano verdi: a dirlo è stato solo
+`prove.py` per intero. La cura è stata dare il giudice al banco — non
+toglierlo dalla funzione — e farglielo usare nei due versi: la scorsa
+è `smooth` di serie e `auto` a effetti ridotti, provato e non letto.
+La lezione è di sempre: una funzione toccata può avere un banco che la
+esegue ALTROVE, e il giro intero non si salta perché «ho cambiato una
+riga».
+
+**COSA HO PROVATO DAL VIVO** — Chrome headless via CDP a 375×812, con
+`prefers-reduced-motion` FORZATO a `no-preference` (headless dichiara
+`reduce` di suo: senza quella riga l'interruttore a mano non si prova),
+server e database del worktree. A effetti PIENI: `blur(10px)`,
+`fadein`, fogli a 0,22 s, morfosi che corre (21 animazioni a metà
+corsa), 20 monete. IL TOCCO VERO sulla leva (non la funzione chiamata a
+mano): «Spento» → «Attivo», classe su, chiave '1', e `/api/me` porta
+`fx_ridotti`. A effetti RIDOTTI: sfocatura `none`, fondo della nav
+`rgb(255,255,255)` (scuro: `rgb(44,37,23)`), zero animazioni in corsa,
+il foglio del P2P già a posto dopo 120 ms e SENZA morfosi, zero monete,
+i due aloni fermi con l'ombra giusta, il velo del cartello a .82.
+«TUTTO IL RESTO IDENTICO» è misurato: 124 rettangoli (header, nav,
+card, pillole) uguali al pixel nei due modi, e la barra Compra con i
+suoi figli pure — era il dubbio vero, perché `backdrop-filter` fa da
+containing block ai figli `fixed` e toglierlo poteva spostarli.
+RICARICANDO la classe c'è già a DOMContentLoaded, first-paint e
+first-contentful-paint. L'ALTRO DISPOSITIVO (`localStorage.clear()`):
+dopo /me la classe torna dal profilo e la chiave svelta si rimette in
+pari. SI SPEGNE: tutto torna com'era, e sul server `fx_pieni` >
+`fx_ridotti`. COL SISTEMA che chiede meno movimento: accesa da sola,
+leva ferma che lo dice, e cambiando idea a pagina aperta la classe
+segue. Nel Browser pane (che dichiara `reduce`) lo stesso ramo, visto
+una seconda volta.
+
+**COSA NON HO PROVATO, e va detto per primo: IL CASO.** Mercurygram
+Desktop non lo posso aprire, quindi NON SO se tolti questi effetti la
+pagina smette di disegnarsi a pezzi: ho provato che gli effetti si
+tolgono, non che il guasto passa. Se resta, il prossimo sospetto sono
+le ombre (`box-shadow` grandi) e i `position:fixed`/`sticky`, che la
+classe non tocca. Né Telegram vero (il CloudStorage, qui come nel
+cantiere dei timbri, non ha mai girato), né un telefono vero, né
+iOS/Safari — dove `-webkit-backdrop-filter` è coperto dalla regola ma
+non visto.
+
+**DECISIONI CHE ANDREA PUÒ ROVESCIARE.** 1) LA SCELTA SEGUE LA PERSONA,
+come chiesto: chi l'accende sul computer rotto se la ritrova sul
+telefono sano. Se dal campo risulta fastidioso, la cura è farla del
+dispositivo (basta non timbrare: `barattolo_fx` c'è già). 2) Il
+`filter:blur(1.2px)` della luce dell'icona Nostr è rimasto: è fermo e
+minuscolo, e senza diventerebbe una macchia bianca dura; è censito, e
+si toglie in una riga. 3) Col sistema che chiede meno movimento gli
+effetti pieni non si possono riavere a mano: non è stato chiesto.
+
+**LIMITI DICHIARATI.** Dopo la nuvola di Telegram (`adottaNuvolaVisti`,
+in sottofondo) gli effetti NON si riapplicano: conterebbe solo se la
+POST al server fosse fallita E si aprisse un secondo dispositivo prima
+del ritentativo; alla prossima apertura è a posto. E un orologio AVANTI
+di ore su un dispositivo, con un secondo dispositivo nel mezzo, può
+far vincere lì per un po' il timbro locale non tagliato: il server
+taglia il futuro, la cache no.
+
+**RESTA DA GUARDARE.** Dal campo: la parola dell'utente di Mercurygram,
+che è l'unica prova del caso. Sul telefono e da PC: vedi il report
+della sessione. CLAUDE.md non è stato toccato: nessuna regola è
+cambiata.

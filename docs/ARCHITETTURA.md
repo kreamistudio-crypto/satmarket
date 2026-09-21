@@ -16094,6 +16094,60 @@
   primo conto finirebbero nel profilo del secondo, su ogni suo
   dispositivo. Cache di un altro = si butta; cache senza nome = è di
   ieri, e la adotta il primo che entra.
+  EFFETTI RIDOTTI (set 2026, dal campo: su Mercurygram Desktop —
+  Flatpak, Wayland/GNOME — la mini app si vedeva disegnata a pezzi).
+  Il guasto è del compositore di quel client, ma la pagina gli dava
+  molto da fare; non si indovina QUALE effetto lo manda in crisi, si
+  dà un modo di toglierli tutti. UNA CLASSE SU `<html>`, `fx-ridotti`,
+  e una mano sola che la mette: lo snippet dell'head PRIMA del primo
+  paint (accanto al tema, per la stessa ragione), poi
+  `applicaEffetti()`. Si accende DA SOLA con `prefers-reduced-motion`
+  e A MANO da «🌗 Aspetto». NEL CSS È UNA REGOLA UNIVERSALE con
+  `!important` in fondo al foglio — `animation:none`,
+  `transition:none`, `backdrop-filter:none`, `scroll-behavior:auto`
+  su `*`, `*::before`, `*::after` — perché un elenco di selettori
+  invecchia al primo effetto nuovo e questa no: l'animazione di domani
+  nasce già spenta. `none` e non una durata a zero: è la strada che i
+  blocchi `@media (prefers-reduced-motion:reduce)` battono da mesi
+  (restano dove sono, valgono anche senza JS, e la regola li contiene
+  tutti), e nel file nessuno ascolta `transitionend`/`animationend`.
+  QUATTRO COSE LA REGOLA NON LE SA FARE DA SOLA, e stanno scritte sotto
+  di lei: 1) IL COLORE PIENO dove c'era una sfocatura — le quattro
+  barre (`nav`, `#barraCompra`, `#barraPacco`, `.ctrl-fondo`) bevono da
+  `--nav-bg`, che la classe ridefinisce opaco nei due temi; il
+  cartello di test ha un velo suo, che senza sfocatura si fa più fitto
+  (.55 → .82: pieno coprirebbe la pagina); 2) I RIPIEGHI FERMI dei due
+  aloni che battevano (`.p2p-manca`, `.btn.orange.in-evidenza`),
+  gemelli dichiarazione per dichiarazione di quelli reduced-motion;
+  3) un `!important` altrui su un'animazione la batterebbe; 4) IL JS:
+  `effettiRidotti()` è il GIUDICE UNICO e guarda la CLASSE, cioè quel
+  che vede il CSS — una scorsa non può restare morbida mentre i fogli
+  sono già secchi. `tourRidotto()` (il nome che le scorse usano da
+  sempre) chiede a lui, e così le monete della festa e la morfosi del
+  «+»; `prefers-reduced-motion` si interroga in due posti soli, l'head
+  e la costante `mqFermo`.
+  LA SCELTA A MANO SONO DUE TIMBRI, `fx_ridotti` e `fx_pieni`, e vince
+  il più RECENTE: un interruttore si deve poter SPEGNERE e un timbro sa
+  solo salire, ma in due ci stanno senza toccare `_visti_unisci` —
+  salgono tutti e due, e il client guarda quale è salito per ultimo
+  (`fxScelti`; a pari merito, pieni). Niente colonna e niente rotta in
+  più: viaggiano con gli altri (profilo, nuvola, cache). Il gesto
+  timbra «DOPO L'ALTRO» e non «adesso» (`Math.max(Date.now(),
+  altro + 1)`, per questo `timbraVisto` ha preso un secondo parametro):
+  con l'orologio indietro il timbro nuovo nascerebbe più vecchio di
+  quello che deve battere. SENZA TIMBRI VALE IL DISPOSITIVO
+  (`barattolo_fx`, la chiave svelta che legge l'head e che
+  `applicaEffetti` tiene in pari): l'anonimo in vetrina, e un secondo
+  conto che entra su un computer dove il primo l'aveva acceso — lì il
+  guasto è dello schermo. SE LO CHIEDE IL SISTEMA LA LEVA STA FERMA e
+  lo dice, e la scelta a mano resta «non fatta»: una leva che si
+  lascia spegnere senza che cambi niente è una leva che mente.
+  `prove_effetti_ridotti` CENSISCE i quattro punti: le regole che
+  sfocano per nome, i ripieghi letti DAI blocchi reduced-motion, gli
+  `!important`, ogni `behavior:` di una scorsa, le strade che nessuno
+  usa (Web Animations, View Transitions, SMIL) e chi chiama
+  `requestAnimationFrame` col suo perché — un effetto nuovo che non ci
+  passa esce rosso col suo nome.
   Cartello «fase di test» (lug 2026): l'avviso di rodaggio
   all'apertura — modale a tutto schermo col velo SFOCATO
   (`#testModale`, z-index 90: sopra i fogli e sopra il tour), si
