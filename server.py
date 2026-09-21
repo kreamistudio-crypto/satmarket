@@ -9343,16 +9343,17 @@ async def importo_invoice(bolt11: str, dec: dict | None = None,
 #   minuti sono un battito dell'orologio: se il nostro nodo tace, il
 #   giro dopo la trova ancora viva. Una fattura «da un'ora» appena fatta
 #   passa larga.
-# `FATTURA_ANTICIPATA_GIORNI` (30): la fattura incollata PRIMA della
-#   conferma, cioe' quando il pagamento e' lontano giorni e nessuno sa
-#   quanti — spedizione, viaggio, e una conferma che con l'auto-sblocco
-#   disarmato non ha un orologio. Trenta giorni coprono la strada lunga;
-#   sotto, la si rifiuta SUBITO e si dice perche', invece di accettarla
-#   e scoprirlo il giorno dei sats. Chi ha un nodo suo (Zeus) la
-#   scadenza la sceglie; chi non puo' aspetta il nostro «tocca a te».
+# IL TERZO NUMERO NON C'E' PIU' (21 set 2026, deciso con Alan):
+#   `FATTURA_ANTICIPATA_GIORNI` (30) misurava la fattura incollata PRIMA
+#   della conferma. Da oggi quella fattura non si incolla proprio — la
+#   porta la accetta solo quando il pagamento parte SUBITO (vedi
+#   `deposita_invoice`) — e un numero che giudica un caso che non si
+#   produce e' un numero da togliere. Il censimento del 20 set: 61
+#   pagamenti, 49 via Lightning address, 12 con fattura incollata di cui
+#   3 passate per un pelo e 1 scaduta (#152). Le fatture dei wallet
+#   durano da un'ora a sette giorni: incollarle prima era sbagliato.
 MARGINE_SCADENZA_PAYOUT_S = 120
 MARGINE_SCADENZA_INCOLLA_S = 600
-FATTURA_ANTICIPATA_GIORNI = 30
 
 _BECH32_ALFABETO = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 _BECH32_GEN = (0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3)
@@ -9442,18 +9443,18 @@ def giorno_scadenza(bolt11: str) -> str:
     return f"il {t.tm_mday} {MESI_IT[t.tm_mon - 1]}"
 
 
-def rifiuto_scadenza(bolt11: str, subito: bool,
-                     adesso: int | None = None) -> str:
+def rifiuto_scadenza(bolt11: str, adesso: int | None = None) -> str:
     """PERCHE' questa fattura non si puo' accettare ADESSO, o '' se va
     bene. E' la domanda del deposito a mano, e la si fa li' perche' li'
     costa un toast: il giorno del payout costa un affare fermo e un
     venditore che non capisce.
 
-    `subito` = il pagamento parte appena la si accetta (ordine gia'
-    confermato, rimborsi): basta che campi `MARGINE_SCADENZA_INCOLLA_S`.
-    Senza `subito` il pagamento e' lontano giorni, e deve campare
-    `FATTURA_ANTICIPATA_GIORNI` — a zero quel controllo e' SPENTO, e
-    resta solo il rifiuto di una fattura gia' scaduta.
+    UNA DOMANDA SOLA (21 set 2026): dalle tre porte che la chiamano il
+    pagamento parte APPENA la fattura si accetta — ordine gia'
+    confermato, rimborso, rimborso d'asta — quindi basta che campi
+    `MARGINE_SCADENZA_INCOLLA_S`. Il ramo «si paga fra giorni» col suo
+    `FATTURA_ANTICIPATA_GIORNI` e' uscito insieme al caso che giudicava:
+    prima dell'incasso una fattura non si incolla piu'.
 
     Una fattura che non si legge NON si rifiuta qui: l'importo l'ha
     gia' letto LNbits, e di una scadenza che non so leggere non affermo
@@ -9466,22 +9467,22 @@ def rifiuto_scadenza(bolt11: str, subito: bool,
     if vita <= 0:
         return (f"Questa fattura è già scaduta ({giorno_scadenza(bolt11)}): "
                 "fanne una nuova nel tuo wallet e incolla quella.")
-    if subito:
-        if vita < MARGINE_SCADENZA_INCOLLA_S:
-            return (f"Questa fattura scade fra {_durata_a_parole(vita)}: "
-                    "troppo poco per pagarla con sicurezza. Fanne una nuova "
-                    "e incollala subito.")
-        return ""
-    if FATTURA_ANTICIPATA_GIORNI and vita < FATTURA_ANTICIPATA_GIORNI * 86400:
-        return (f"Questa fattura scade fra {_durata_a_parole(vita)}, ma i "
-                "sats partono solo quando l'acquirente conferma, e possono "
-                "volerci giorni: arriverebbe scaduta. Tre strade: metti un "
-                "Lightning address nel Profilo (non scade mai, è la più "
-                "comoda); oppure fai una fattura che duri almeno "
-                f"{FATTURA_ANTICIPATA_GIORNI} giorni, se il tuo wallet lo "
-                "permette; oppure aspetta: alla conferma ti avvisiamo noi, "
-                "e la incolli in quel momento.")
+    if vita < MARGINE_SCADENZA_INCOLLA_S:
+        return (f"Questa fattura scade fra {_durata_a_parole(vita)}: "
+                "troppo poco per pagarla con sicurezza. Fanne una nuova "
+                "e incollala subito.")
     return ""
+
+
+# LA FATTURA SI INCOLLA SOLO ALL'INCASSO (21 set 2026). Le parole di chi
+# bussa PRIMA: un client vecchio, o chi scrive alla rotta a mano. Dicono
+# il perche', cosa succedera', e la strada che chiude il problema.
+MSG_FATTURA_PRESTO = (
+    "La fattura si incolla solo al momento dell'incasso: una fattura "
+    "Lightning scade (da un'ora a pochi giorni) e i sats partono quando "
+    "l'acquirente conferma. Appena tocca a te ti avvisiamo noi. Per non "
+    "pensarci più imposta il tuo Lightning address nel Profilo: non scade "
+    "mai, e lo usiamo al momento del pagamento.")
 
 
 def _durata_a_parole(secondi: int) -> str:
@@ -9547,7 +9548,8 @@ CONSIGLIO_LNURL = (
     "Per gli incassi automatici serve un Lightning address LNURL: il "
     "più semplice è Wallet of Satoshi — installi l'app e in «Receive» "
     "trovi già pronto il tuo nome@walletofsatoshi.com. Oppure lascia "
-    "vuoto questo campo e incolla una invoice a mano quando vendi."
+    "vuoto questo campo: a ogni vendita ti avvisiamo noi quando tocca a "
+    "te, e in quel momento incolli una fattura."
 )
 
 
@@ -24765,7 +24767,7 @@ async def deposita_invoice_rimborso(rimborso_id: int, req: Request,
             f"Importo sbagliato: la invoice è di {_fmt_sats(importo_sats)} sats, "
             f"deve essere esattamente {_fmt_sats(r['importo_sats'])} sats "
             f"(rimborso integrale)")
-    no = rifiuto_scadenza(bolt11, subito=True)   # qui si paga all'istante
+    no = rifiuto_scadenza(bolt11)   # qui si paga all'istante
     if no:
         con.close()
         raise HTTPException(400, no)
@@ -43304,12 +43306,25 @@ async def promo_rimuovi(annuncio_id: int):
 async def deposita_invoice(ordine_id: int, req: Request,
                            x_tg_init_data: str = Header(""),
                            barattolo_sessione: str = Cookie("")):
-    """Deposita una invoice Lightning sull'ordine:
-    - il VENDITORE (stati locked/shipped/confirmed) per incassare:
-      importo = prezzo - commissione; se l'acquirente aveva gia'
-      confermato, i sats partono immediatamente
+    """Deposita una invoice Lightning sull'ordine, e SOLO quando il
+    pagamento parte subito (21 set 2026, deciso con Alan):
+    - il VENDITORE a ordine 'confirmed', per incassare: importo =
+      prezzo - commissione, e i sats partono immediatamente
     - l'ACQUIRENTE (stato refund, disputa vinta) per il rimborso:
-      importo = prezzo pieno; il rimborso parte immediatamente."""
+      importo = prezzo pieno; il rimborso parte immediatamente.
+
+    PRIMA DELLA CONFERMA LA FATTURA NON SI ACCETTA PIU'. Fino a ieri il
+    venditore poteva incollarla da 'locked' e 'shipped', e restava in
+    colonna per giorni: le fatture dei wallet durano da un'ora a sette
+    giorni, e il #152 e' arrivato al payout scaduto da quattro. Il
+    metodo che si imposta IN ANTICIPO e' uno solo, il Lightning address,
+    che non scade; la fattura e' il gesto di chi non ce l'ha, e si fa
+    quando tocca. Gli ordini che una fattura in colonna ce l'hanno GIA'
+    non si toccano: `_sblocca_sats` la paga come ieri, e se e' scaduta
+    la cintura di `paga_venditore` non la tenta e se ne chiede una nuova.
+    ⚠️ I commenti sparsi che dicono «deposita_invoice accetta il
+    venditore proprio su 'locked'» raccontano il mondo di ieri: le
+    ancore che difendono (mai `aggiornato`) restano giuste lo stesso."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     bolt11 = (d.get("invoice") or "").strip()
@@ -43319,7 +43334,11 @@ async def deposita_invoice(ordine_id: int, req: Request,
     con = db()
     o = con.execute("SELECT * FROM ordini WHERE id=?", (ordine_id,)).fetchone()
     if o and o["venditore_id"] == user["id"] \
-            and o["stato"] in ("locked", "shipped", "confirmed"):
+            and o["stato"] in ("locked", "shipped", "delivered"):
+        # troppo presto: si dice perche', PRIMA di scomodare LNbits
+        con.close()
+        raise HTTPException(400, MSG_FATTURA_PRESTO)
+    if o and o["venditore_id"] == user["id"] and o["stato"] == "confirmed":
         # L'incasso del venditore: il totale meno la protezione (che
         # resta alla piattaforma), cioe' articolo + spedizione.
         ruolo, atteso, colonna = "venditore", \
@@ -43350,10 +43369,9 @@ async def deposita_invoice(ordine_id: int, req: Request,
             f"deve essere esattamente {spiegazione}")
     # LA SCADENZA SI GUARDA QUI, non il giorno del payout (20 set 2026,
     # ordine #152: incollata alla spedizione, pagata quattro giorni
-    # dopo, scaduta da quattro). `subito` = i sats partono appena la si
-    # accetta; altrimenti partono alla conferma, cioe' fra giorni.
-    no = rifiuto_scadenza(
-        bolt11, subito=(ruolo == "compratore" or o["stato"] == "confirmed"))
+    # dopo, scaduta da quattro). Da questa porta i sats partono SEMPRE
+    # appena la si accetta: basta il margine di chi paga subito.
+    no = rifiuto_scadenza(bolt11)
     if no:
         con.close()
         raise HTTPException(400, no)
@@ -43365,9 +43383,7 @@ async def deposita_invoice(ordine_id: int, req: Request,
 
     if ruolo == "compratore":                      # rimborso: parte subito
         return await _rimborsa_compratore(ordine_id)
-    if o["stato"] == "confirmed":                  # incasso: parte subito
-        return await _sblocca_sats(ordine_id)
-    return {"ok": True, "stato": o["stato"], "netto": atteso}
+    return await _sblocca_sats(ordine_id)          # incasso: parte subito
 
 
 # Un lucchetto per ordine: sblocco e rimborso MUOVONO FONDI e possono
@@ -43728,10 +43744,16 @@ async def _sblocca_sats(ordine_id: int, automatico: bool = False) -> dict:
                      "⏳ <b>Il tempo di conferma è scaduto!</b>"
                      if automatico else
                      "✅ <b>L'acquirente ha confermato la ricezione!</b>")
-            msg = (f"{testa} Per incassare "
-                   f"i tuoi <b>{_fmt_sats(netto)} sats</b>: apri l'ordine nella Mini App e "
-                   f"imposta il tuo Lightning address (incassi automatici, per "
-                   f"sempre) oppure incolla una invoice di esattamente quell'importo. 💰")
+            # «TOCCA A TE» (21 set 2026): la fattura si incolla ADESSO,
+            # che si paga subito — non esiste piu' una fattura messa
+            # da parte prima. L'address resta la strada che chiude il
+            # problema, e si dice perche': non scade.
+            msg = (f"{testa} <b>Tocca a te:</b> per ricevere "
+                   f"i tuoi <b>{_fmt_sats(netto)} sats</b> apri l'ordine nella Mini App e "
+                   f"incolla una fattura di esattamente quell'importo, fatta "
+                   f"adesso (la paghiamo subito). Oppure imposta il tuo "
+                   f"Lightning address: non scade mai, e da lì in poi gli "
+                   f"incassi sono automatici. 💰")
         # A CHI COMPRA, al primo giro: la sua parte e' finita. A chi
         # vende qui NON si dice «in arrivo»: sta per ricevere il suo
         # messaggio, quello sopra, che e' piu' preciso.

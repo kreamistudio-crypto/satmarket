@@ -3975,6 +3975,7 @@ def ambiente_scadenza():
            "_ponte": {"stato": "ok"}, "_lnd_motivi": {},
            "_fmt_sats": reale("_fmt_sats")}
     for inizio in ("MARGINE_SCADENZA_PAYOUT_S = ", "_BECH32_ALFABETO = ",
+                   "MSG_FATTURA_PRESTO = (",
                    "MESI_IT = (", "MOTIVO_SCADUTA, MOTIVO_STRADA, ",
                    "PAROLE_MOTIVO = {", "_MOTIVI_LND = {"):
         i = _SORGENTE.index("\n" + inizio) + 1
@@ -4699,9 +4700,8 @@ def prove_fatture_scadute():
     GIORNO = 86400
     M = S["MARGINE_SCADENZA_PAYOUT_S"]
     MI = S["MARGINE_SCADENZA_INCOLLA_S"]
-    GA = S["FATTURA_ANTICIPATA_GIORNI"]
 
-    # --- 0. I TRE NUMERI --------------------------------------------
+    # --- 0. I DUE NUMERI (il terzo e' uscito il 21 set 2026) ---------
     # Le scene del limite SEGUONO le costanti (o resterebbero rosse a
     # ogni taratura), quindi da sole non le difendono: a margine zero
     # erano tutte verdi, l'ha trovato la tortura. Qui si difende il
@@ -4711,8 +4711,21 @@ def prove_fatture_scadute():
           60 <= M <= 600)
     prova("...quello della porta lo contiene, e resta sotto l'ora dei "
           "wallet comuni", True, M < MI <= 1800)
-    prova("...e l'anticipata, se e' accesa, si conta in settimane", True,
-          GA == 0 or 14 <= GA <= 90)
+    # L'ANTICIPATA NON C'E' PIU' (21 set 2026): la fattura si incolla
+    # solo all'incasso, quindi il numero che giudicava quella incollata
+    # prima non ha piu' un caso. Si guardano i NOMI dell'albero
+    # sintattico e non il testo: commenti e docstring la nominano
+    # apposta, per dire perche' e' uscita, e una ricerca sul testo
+    # risponderebbe per loro.
+    import ast
+    nomi = {n.id for n in ast.walk(ast.parse(_SORGENTE))
+            if isinstance(n, ast.Name)}
+    prova("`FATTURA_ANTICIPATA_GIORNI` e' uscita: nessuno la assegna, "
+          "nessuno la legge", (False, False),
+          ("FATTURA_ANTICIPATA_GIORNI" in S,
+           "FATTURA_ANTICIPATA_GIORNI" in nomi))
+    prova("...e il controllo dei nomi vede davvero (la sorella c'e')", True,
+          "MARGINE_SCADENZA_INCOLLA_S" in nomi)
 
     # --- 1. IL LETTORE ----------------------------------------------
     leggi = S["leggi_bolt11"]
@@ -4791,32 +4804,26 @@ def prove_fatture_scadute():
     prova("giorno: vuoto se non si legge", "", S["giorno_scadenza"]("lnbc1"))
     no = S["rifiuto_scadenza"]
     prova("porta: una fattura scaduta si rifiuta, col giorno", True,
-          "già scaduta" in no(BOLT11_VERA_7468, True)
-          and "16 settembre" in no(BOLT11_VERA_7468, False))
+          "già scaduta" in no(BOLT11_VERA_7468)
+          and "16 settembre" in no(BOLT11_VERA_7468))
     al_limite = bolt11_finta(1000, 3600, adesso - 3600 + MI)
-    prova("porta: si paga subito — al LIMITE del margine passa", "",
-          no(al_limite, True, adesso))
+    prova("porta: al LIMITE del margine passa", "",
+          no(al_limite, adesso))
     prova("...e un secondo sotto no", True,
-          "scade fra" in no(al_limite, True, adesso + 1))
-    prova("porta: si paga fra giorni — trenta giorni esatti passano", "",
-          no(f30, False, adesso))
-    sotto = no(f30, False, adesso + 1)
-    prova("...e un secondo sotto no, e il rifiuto dice le tre strade", True,
-          "Lightning address" in sotto and f"{GA} giorni" in sotto
-          and "ti avvisiamo noi" in sotto)
+          "scade fra" in no(al_limite, adesso + 1))
     un_ora = bolt11_finta(1000, 3600, adesso - 5)
-    prova("porta: la fattura «da un'ora» va bene SE si paga subito", "",
-          no(un_ora, True))
-    prova("...e non va bene se i sats partono fra giorni", True,
-          bool(no(un_ora, False)))
+    prova("porta: la fattura «da un'ora» va bene — da qui si paga subito",
+          "", no(un_ora))
     prova("porta: il cartone non si rifiuta (fail-open dichiarato)", "",
-          no("lnbc-fattura-1", False))
-    S0 = ambiente_scadenza()
-    S0["rifiuto_scadenza"].__globals__["FATTURA_ANTICIPATA_GIORNI"] = 0
-    prova("porta: con la leva a ZERO il controllo anticipato e' spento",
-          "", S0["rifiuto_scadenza"](un_ora, False))
-    prova("...ma una fattura gia' scaduta si rifiuta lo stesso", True,
-          bool(S0["rifiuto_scadenza"](BOLT11_VERA_7468, False)))
+          no("lnbc-fattura-1"))
+    # UNA DOMANDA SOLA (21 set 2026): il ramo «si paga fra giorni» e'
+    # uscito col caso che giudicava. Se tornasse un secondo parametro
+    # tornerebbe anche la domanda «e quando NON si paga subito?», che
+    # da questa porta non ha piu' una risposta.
+    import inspect
+    prova("porta: `rifiuto_scadenza` fa UNA domanda (la fattura, e "
+          "l'orologio per le prove)", ["bolt11", "adesso"],
+          list(inspect.signature(no).parameters))
 
     # --- 4. I MOTIVI, IN PAROLE -------------------------------------
     motivo = S["_motivo_payout"]
@@ -4952,6 +4959,51 @@ def prove_fatture_scadute():
           ("released", [H(nuova)]),
           (e.get("stato") if isinstance(e, dict) else e, m.nodo.partiti))
 
+    # 5a-bis. LA FATTURA SI INCOLLA SOLO ALL'INCASSO (21 set 2026).
+    # Prima della conferma la porta e' chiusa, e lo dice con le parole
+    # che servono: perche', cosa succedera', e la strada che non scade.
+    # Si guarda anche cosa NON succede: LNbits non si scomoda (il no
+    # arriva prima dell'importo) e la colonna resta com'era.
+    buona = bolt11_finta(1000, 7 * GIORNO, adesso - 5)
+    for prima in ("locked", "shipped", "delivered"):
+        m = orecchie(mondo(invoice="", address="", stato=prima))
+        chiesto = []
+
+        async def _conta(bolt11, dec=None, cassaforte="", _c=chiesto):
+            _c.append(bolt11)
+            return 1000
+        m.amb["importo_invoice"] = _conta
+        e = incolla(m, buona)
+        d = str(getattr(e, "detail", ""))
+        prova(f"porta chiusa a «{prima}»: una fattura BUONA, da sette "
+              "giorni, si rifiuta lo stesso", 400,
+              getattr(e, "status_code", None))
+        prova("...con le parole: solo all'incasso, ti avvisiamo noi, e "
+              "l'address che non scade", True,
+              "solo al momento dell'incasso" in d and "ti avvisiamo" in d
+              and "Lightning address" in d and "non scade" in d)
+        prova("...senza scomodare LNbits, senza scrivere la colonna, "
+              "senza pagare", ([], ("", prima), []),
+              (chiesto, colonne(m, "invoice_venditore", "stato"),
+               m.nodo.partiti))
+    # ...e a 'confirmed' la porta e' aperta: e' la scena del #152 qui
+    # sopra (la NUOVA pagata subito). Qui il caso che mancava: chi
+    # compra NON e' chi vende, e da 'confirmed' non incolla niente.
+    m = orecchie(mondo(invoice="", address="", stato="confirmed"), chi=111)
+    e = incolla(m, buona)
+    prova("porta: a 'confirmed' chi COMPRA non incolla la fattura di chi "
+          "vende", (400, []),
+          (getattr(e, "status_code", None), m.nodo.partiti))
+    # GLI ORDINI DI IERI: una fattura gia' in colonna, incollata alla
+    # spedizione e ancora VIVA, si paga come ieri — il cantiere chiude
+    # la porta, non butta via quel che c'e' dentro.
+    di_ieri = bolt11_finta(1000, 7 * GIORNO, adesso - 2 * GIORNO)
+    m = orecchie(mondo(invoice=di_ieri, address="", stato="shipped"))
+    gira(m.sblocca())
+    prova("ordini di ieri: la fattura gia' in colonna, viva, si paga "
+          "come sempre", ("released", [H(di_ieri)]),
+          (riga(m)[0], m.nodo.partiti))
+
     # 5b. scaduta, ma c'e' il Lightning address: ci pensiamo noi
     m = orecchie(mondo(invoice=quattro_giorni_fa, address="chi@wallet.tld"))
     gira(m.sblocca())
@@ -5072,19 +5124,16 @@ def prove_fatture_scadute():
           "minuti di ieri non li scavalca nessun calendario", (409, []),
           (getattr(r, "status_code", None), m.nodo.partiti))
 
-    # 5g. LA PORTA: quando si incolla
-    m = orecchie(mondo(address="", stato="shipped"))
-    e = incolla(m, un_ora)
-    prova("porta: spedito, fattura da un'ora → rifiutata con le tre strade",
-          (400, True, ""),
-          (getattr(e, "status_code", None),
-           "Lightning address" in str(getattr(e, "detail", "")),
-           colonne(m, "invoice_venditore")[0]))
+    # 5g. LA PORTA: quando si incolla. A ordine SPEDITO non si incolla
+    # piu' niente, nemmeno la fattura da 31 giorni che fino al 20 set si
+    # salvava (la scena sta in 5a-bis, coi tre stati): qui resta la
+    # porta APERTA, quella di 'confirmed', coi suoi due limiti.
     lunga = bolt11_finta(1000, 31 * GIORNO, adesso - 5)
+    m = orecchie(mondo(address="", stato="shipped"))
     e = incolla(m, lunga)
-    prova("porta: spedito, fattura da 31 giorni → salvata, e si aspetta",
-          (True, lunga, "shipped", []),
-          (isinstance(e, dict) and e.get("ok"),
+    prova("porta: spedito, fattura da 31 giorni → NON si salva piu'",
+          (400, "", "shipped", []),
+          (getattr(e, "status_code", None),
            colonne(m, "invoice_venditore")[0], riga(m)[0], m.nodo.partiti))
     m = orecchie(mondo(address="", stato="confirmed"))
     e = incolla(m, bolt11_finta(1000, 3600, adesso - 3600 + 300))
@@ -5180,12 +5229,158 @@ def prove_fatture_scadute():
           dep.index("Importo sbagliato") < dep.index("rifiuto_scadenza(")
           < dep.index("UPDATE ordini SET"))
     prova("...anche sui rimborsi d'asta, dove si paga all'istante", True,
-          "rifiuto_scadenza(bolt11, subito=True)" in _SORGENTE)
+          "rifiuto_scadenza(bolt11)" in codice(pezzo(
+              "deposita_invoice_rimborso")))
+    # LA PORTA CHIUSA STA PRIMA DI TUTTO (21 set 2026): prima
+    # dell'importo — cioe' prima di LNbits — e prima della scrittura
+    prova("alla porta il «troppo presto» si dice PRIMA di chiedere "
+          "l'importo a LNbits", True,
+          # `find` e non `index`: una sentinella che ESPLODE si porta via
+          # la sezione, e una mutazione morta cosi' non e' uccisa
+          0 < dep.find("MSG_FATTURA_PRESTO") < dep.find("importo_invoice(")
+          < dep.find("UPDATE ordini SET"))
+    prova("...e non esiste piu' un ramo che salva e aspetta: da qui si "
+          "paga, o si rimborsa", (False, True),
+          ('"netto": atteso' in dep,
+           "    return await _sblocca_sats(ordine_id)" in dep))
     sbl = codice(pezzo("_sblocca_sats"))
     prova("in `_sblocca_sats` le parole le sceglie il MOTIVO, nei due "
           "rami", (True, True),
           ("_msg_fattura_nuova(netto, taccuino)" in sbl,
            "_msg_ritentiamo(netto, taccuino)" in sbl))
+
+
+def prove_fattura_solo_incasso():
+    """LIGHTNING ADDRESS PREFERITO, FATTURA SOLO ALL'INCASSO (21 set
+    2026, deciso con Alan) — il lato del CLIENT.
+
+    Il server la sua meta' la prova in `prove_fatture_scadute` (la porta
+    chiusa prima di 'confirmed'). Qui si prova quel che VEDE chi vende:
+    prima della conferma il foglio dell'incasso ha UN campo, il
+    Lightning address, con la ragione scritta («non scade mai, lo usiamo
+    al momento del pagamento»); il campo della fattura compare quando
+    tocca, a 'confirmed'. `payoutPanel` e' quello VERO, fatto girare in
+    node: una prova sul testo del sorgente direbbe di si' anche a un
+    ramo che non si raggiunge.
+
+    GLI ORDINI DI IERI che una fattura in colonna ce l'hanno gia' si
+    vedono dire la verita' su di lei — viva o scaduta, letta dalla
+    bolt11 — senza un bottone per sostituirla: prima dell'incasso da
+    qui non si incolla piu' niente."""
+    print("\n[Lightning address preferito: la fattura si incolla solo "
+          "all'incasso]")
+    import shutil
+    import subprocess
+    import tempfile
+
+    mini = open("miniapp.html", encoding="utf-8").read()
+    pp = pezzo_js(mini, "function payoutPanel(o){", "\n}\n") + "\n}\n"
+    ss = pezzo_js(mini, "async function saveSellerInvoice(btn){", "\n}\n")
+
+    # --- 1. LA FORMA: quel che non deve tornare ----------------------
+    senza_commenti = re.sub(r"/\*.*?\*/", "", pp, flags=re.S)
+    prova("il foglio non ha piu' ne' «Salva invoice» ne' «Sostituisci»",
+          [], [x for x in ("Salva invoice", "Sostituisci invoice",
+                           "Invoice salvata in cassaforte",
+                           "Incasso pronto") if x in senza_commenti])
+    prova("...e nessun toast promette piu' un incasso «alla conferma» da "
+          "una fattura salvata", False,
+          "incasso automatico alla conferma" in
+          re.sub(r"/\*.*?\*/", "", ss, flags=re.S))
+    prova("il profilo dice perche' l'address: non scade, e si usa al "
+          "momento del pagamento", True,
+          "<b>non scade mai</b>, lo usiamo\n      al momento del pagamento"
+          in pezzo_js(mini, "function renderLnAddress(){", "\n}\n")
+          .replace("\r\n", "\n"))
+    prova("«I tuoi dati» dice che nel Profilo non si salva nessuna fattura",
+          True, "nel Profilo non se ne salva nessuna" in mini)
+    prova("Info dice a chi vende le due strade, e quando si incolla", True,
+          "<b>Se sei tu a vendere:</b>" in mini
+          and "in quel momento incolli una fattura nell'ordine" in mini)
+
+    # --- 2. IL FOGLIO VERO, in node ----------------------------------
+    node = shutil.which("node")
+    if not node:
+        salta("il foglio dell'incasso prima e dopo la conferma",
+              "node non c'e'")
+        return
+    adesso = int(time.time())
+    viva = bolt11_finta(1000, 7 * 86400, adesso - 86400)
+    morta = bolt11_finta(1000, 3600, adesso - 4 * 86400)
+    js = ("const fmt = n => String(n);\n"
+          "const esc = x => String(x);\n"
+          "let myLnAddress = '';\n"
+          "function nettoVenditore(o){ return o.listing.price; }\n"
+          + pezzo_js(mini, "function importoBolt11(pr){", "\n}\n") + "\n}\n"
+          + pezzo_js(mini, "function leggiBolt11(pr){", "\n}\n") + "\n}\n"
+          + pp +
+          "const o = (state, inv, gesto) => ({state, sellerInvoice: inv || '',"
+          " listing: {price: 1000},"
+          " pagamento: gesto ? {gesto_venditore: true} : null});\n"
+          "const out = {};\n"
+          "for (const st of ['locked', 'shipped', 'delivered'])\n"
+          "  out[st] = payoutPanel(o(st));\n"
+          "out.confirmed = payoutPanel(o('confirmed', '', true));\n"
+          "out.viva = payoutPanel(o('shipped', " + json.dumps(viva) + "));\n"
+          "out.morta = payoutPanel(o('shipped', " + json.dumps(morta) + "));\n"
+          "out.cartone = payoutPanel(o('shipped', 'lnbc-fattura-1'));\n"
+          "myLnAddress = 'io@wallet.com';\n"
+          "out.conAddress = payoutPanel(o('shipped'));\n"
+          "out.conAddressConfermato = payoutPanel(o('confirmed'));\n"
+          "console.log(JSON.stringify(out));\n")
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(js)
+    try:
+        r = subprocess.run([node, f.name], capture_output=True,
+                           encoding="utf-8", timeout=60)
+        out = json.loads(r.stdout or "{}")
+        if not out:
+            print("      node:", (r.stderr or "")[-400:])
+    except Exception as e:
+        out = {}
+        print(f"      node e' esploso: {e}")
+    finally:
+        os.unlink(f.name)
+
+    for st in ("locked", "shipped", "delivered"):
+        h = out.get(st, "")
+        prova(f"«{st}»: il foglio ha il campo dell'address e NON quello "
+              "della fattura", (True, False, False),
+              ('id="lnAddrInput"' in h, 'id="sellerInvoice"' in h,
+               "saveSellerInvoice" in h))
+        prova("...dice perche' l'address, e cosa succede a chi non ce l'ha",
+              True, "<b>non scade mai</b>, lo usiamo al momento del "
+              "pagamento" in h and "<b>ti avvisiamo noi</b>" in h
+              and "arriverebbe scaduta" in h)
+    h = out.get("confirmed", "")
+    prova("«confirmed»: tocca a lui, e il campo della fattura C'E', in "
+          "evidenza", (True, True, True),
+          ('id="sellerInvoice"' in h, "saveSellerInvoice(this)" in h,
+           "pag-evidenza" in h))
+    prova("...con l'address ancora consigliato, e la fattura «adesso»",
+          True, 'id="lnAddrInput"' in h and "<b>non scade mai</b>" in h
+          and "genera <b>adesso</b>" in h and "La paghiamo subito" in h)
+    h = out.get("viva", "")
+    prova("ordine di ieri, fattura VIVA in colonna: lo dice, e non offre "
+          "di sostituirla", (True, False, False),
+          ("avevi già salvato una fattura" in h, 'id="sellerInvoice"' in h,
+           "è già scaduta" in h))
+    h = out.get("morta", "")
+    prova("ordine di ieri, fattura SCADUTA in colonna: lo dice adesso, "
+          "non il giorno dei sats", (True, False),
+          ("<b>è già scaduta</b>" in h and "ne incolli una nuova" in h,
+           'id="sellerInvoice"' in h))
+    prova("...e una fattura che non si legge non si da' per morta", True,
+          "avevi già salvato una fattura" in out.get("cartone", "")
+          and "è già scaduta" not in out.get("cartone", ""))
+    h = out.get("conAddress", "")
+    prova("chi ha gia' l'address non vede cambiare niente", True,
+          "Incasso automatico attivo" in h and "io@wallet.com" in h
+          and 'id="sellerInvoice"' not in h)
+    prova("...e se a 'confirmed' i sats non sono partiti, la fattura "
+          "resta la sua uscita", True,
+          'id="sellerInvoice"' in out.get("conAddressConfermato", ""))
 
 
 def prove_in_pagamento():
@@ -15246,8 +15441,11 @@ def prove_bip353():
     prova("il consiglio nomina un wallet CONCRETO", True,
           "Wallet of Satoshi" in consiglio)
     prova("...e dice come si fa", True, "Receive" in consiglio)
-    prova("...e lascia la via della invoice a mano", True,
-          "invoice" in consiglio)
+    # (21 set 2026: la fattura si incolla solo all'incasso, e il
+    # consiglio dice QUANDO — «ti avvisiamo noi» — non piu' «quando vendi»)
+    prova("...e lascia la via della fattura a mano, detta col suo momento",
+          True, "incolli una fattura" in consiglio
+          and "ti avvisiamo noi quando tocca a" in consiglio)
     prova("tutti e tre gli errori lo portano", 3,
           _SORGENTE.count("{CONSIGLIO_LNURL}"))
 
@@ -49185,6 +49383,13 @@ def prove_p2p_motore():
           "const b = leggiBolt11(testo);" in _ii
           and "if (b.scade < adesso + finestra) {" in _ii
           and "finestraFatturaP2P()" in _ii)
+    # LA DURATA (21 set 2026): dopo la finestra del coordinatore c'e' la
+    # nostra — un giorno, perche' si paga al rilascio — e sta DOPO, o il
+    # «no» piu' severo coprirebbe quello che il coordinatore darebbe comunque
+    prova("...e DOPO la finestra del coordinatore guarda la durata dello scambio", True,
+          0 < _ii.find("if (b.scade < adesso + finestra) {")
+          < _ii.find("const giorno = vitaMinimaFatturaP2P(o);")
+          < _ii.find("await chiamataOrdineP2P(o, 'add-invoice'"))
     _ff = pezzo_js(mini, "function finestraFatturaP2P(){", "\n}\n")
     prova("...con la finestra del 38385, e senza 38385 i 3600 s del nodo", True,
           "p2pInfo.fattFinestra" in _ff and "return f > 0 ? f : 3600;" in _ff)
@@ -49193,7 +49398,7 @@ def prove_p2p_motore():
     _fw = pezzo_js(mini, "async function fatturaDalWalletP2P(id){", "\n}\n")
     prova("la fattura del wallet passa dalla STESSA guardia della fattura incollata", True,
           "leggiBolt11(bolt)" in _fw and "b.sats !== deve" in _fw
-          and "finestraFatturaP2P()" in _fw)
+          and "+ vitaMinimaFatturaP2P(o))" in _fw)
     prova("...con l'importo di satsDaRicevereP2P e la vita dell'ordine", True,
           "satsDaRicevereP2P(o)" in _fw and "scadenzaFatturaP2P()" in _fw)
     prova("...e il wallet ha 15 secondi, non i 30 del mercatino", True,
@@ -49574,6 +49779,7 @@ def prove_p2p_motore():
         "f7543_1h": bolt11_finta(7543, 3600, _adesso),
         "f7543_1g": bolt11_finta(7543, 86400, _adesso),
         "f7543_7g": bolt11_finta(7543, 7 * 86400, _adesso),
+        "f7543_6h": bolt11_finta(7543, 6 * 3600, _adesso),
         "libera_1h": bolt11_finta(0, 3600, _adesso),
         "libera_1g": bolt11_finta(0, 86400, _adesso)}) + ";\n")
     # IL WALLET NWC (16 set 2026): le pure della custodia e il client
@@ -49745,7 +49951,7 @@ class FintoWallet {
     if (walletModo === 'muto') return;
     const risposta = walletModo === 'rifiuta'
       ? {error: {code: 'RESTRICTED', message: 'permesso negato'}}
-      : {result: {invoice: {buona: FATT.f7543_7g, storta: FATT.f7468_1g, corta: FATT.f7543_1h}[walletModo]}};
+      : {result: {invoice: {buona: FATT.f7543_7g, storta: FATT.f7468_1g, corta: FATT.f7543_1h, seiore: FATT.f7543_6h}[walletModo]}};
     const content = NT0.nip04.encrypt(WALLET_SK, ev.pubkey, JSON.stringify(risposta));
     setTimeout(() => this.h.onevent({kind: 23195, pubkey: WALLET_PUB, tags: [['e', ev.id]], content: content}), 0);
   }
@@ -50173,20 +50379,29 @@ function reset(){
        si consiglia, e la scadenza si dice PRIMA coi minuti del nodo */
     out.foglioCopiaLaCifra = h.indexOf("copiaLink('7543'") >= 0;
     out.foglioConsigliaLaLibera = h.indexOf('<b>senza importo</b>') >= 0;
-    out.foglioAvvisaSullaScadenza = h.indexOf('valida più di un\'ora') >= 0;
-    /* LA PRIORITA' (17 set 2026): la fattura PRIMA dell'indirizzo, la
-       copia della cifra in evidenza e prima del campo, e l'indirizzo
-       col suo avviso — mai piu' «la via più semplice» */
-    out.foglioFatturaPrima = h.indexOf('Incolla una richiesta di pagamento del tuo wallet') >= 0
-      && h.indexOf('Incolla una richiesta') < h.indexOf('indirizzo Lightning');
-    out.foglioCifraEsatta = h.indexOf(', o di 7543 sats esatti, valida') >= 0;
+    /* LA DURATA (21 set 2026): prima del rilascio non basta piu' «valida
+       più di un'ora» — la fattura si paga al RILASCIO, ore dopo — e la
+       frase accanto al campo chiede un giorno */
+    out.foglioAvvisaSullaScadenza = h.indexOf('<b>fai una fattura che duri almeno un giorno</b>') >= 0
+      && h.indexOf('valida più di') < 0;
+    /* LA PRIORITA' (21 set 2026, rovescia il 17): l'INDIRIZZO prima
+       della fattura — non scade — ma col suo avviso ACCANTO; la copia
+       della cifra in evidenza e prima del campo — mai piu' «la via più
+       semplice» */
+    out.foglioIndirizzoPrima = h.indexOf('<b>⚡ Consigliato: il tuo indirizzo Lightning</b>') >= 0
+      && h.indexOf('Non scade mai') >= 0
+      && h.indexOf('Consigliato: il tuo indirizzo') < h.indexOf('<b>Oppure una fattura</b>');
+    out.foglioCifraEsatta = h.indexOf(', o di 7543 sats esatti, <b>fai una fattura') >= 0;
     out.foglioCopiaInEvidenza = h.indexOf('<button class="btn primary" type="button" onclick="copiaLink(') >= 0
       && h.indexOf('copiaLink(') < h.indexOf('id="p2pIncassoInp"');
+    /* l'avviso sui provider sta NELLA STESSA FRASE che consiglia
+       l'indirizzo, e PRIMA del campo: chi segue il consiglio l'ha letto */
     out.foglioAvvisaSuiProvider = h.indexOf('Wallet of Satoshi') >= 0
       && h.indexOf('non rispondono alla verifica dell\'indirizzo') >= 0
       && h.toLowerCase().indexOf('coordinatore') < 0
       && h.indexOf('se il tuo indirizzo viene rifiutato, usa la fattura') >= 0
-      && h.indexOf('id="p2pIncassoInp"') < h.indexOf('non rispondono alla verifica dell\'indirizzo');
+      && h.indexOf('Consigliato: il tuo indirizzo') < h.indexOf('non rispondono alla verifica dell\'indirizzo')
+      && h.indexOf('non rispondono alla verifica dell\'indirizzo') < h.indexOf('id="p2pIncassoInp"');
     out.foglioNonDicePiuSemplice = h.indexOf('via più semplice') < 0;
     /* IL CAMPO NASCE VUOTO (17 set 2026): l'indirizzo degli incassi non
        si precompila piu' — sta a un tocco, SOTTO l'avviso sui provider,
@@ -50396,6 +50611,10 @@ function reset(){
     out.walletFoglioChiuso = chiusi.indexOf('p2pIncassoSheet') >= 0;
     out.walletLoDice = toasts.some(t => t.indexOf('wallet') >= 0 && t.indexOf('✅') >= 0);
     out.walletDopo = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'].stato;
+    /* (21 set 2026) anche la fattura del WALLET lascia la sua scadenza
+       sulla riga: se al rilascio fallisce, il motivo vero si dice uguale */
+    out.walletRicordaLaScadenza = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'].fatturaScade
+      === leggiBolt11(FATT.f7543_7g).scade;
   }
   /* il silenzio: dopo l'attesa il foglio a mano e' li', con la ragione,
      e lo scambio non si e' mosso */
@@ -50422,6 +50641,14 @@ function reset(){
   await presaConWallet('corta');
   out.cortaNonManda = ricevuti.length === 1;
   out.cortaLoDice = (el('p2pIncassoAvviso').textContent || '').indexOf('scade troppo presto') >= 0;
+  /* ...E QUELLA DA SEI ORE NEMMENO (21 set 2026): il coordinatore la
+     accetterebbe, ma la paga al rilascio. Al wallet si chiede la vita
+     dell'ordine; se la ignora si torna al foglio a mano, dove la regola
+     — e la sua uscita — stanno scritte. */
+  await presaConWallet('seiore');
+  out.walletSeiOreNonManda = ricevuti.length === 1
+    && (el('p2pIncassoAvviso').textContent || '').indexOf('scade troppo presto') >= 0
+    && chiusi.indexOf('p2pIncassoSheet') < 0;
   /* senza make_invoice fra i metodi il wallet non si disturba: il
      foglio e' quello a mano di sempre */
   await presaConWallet('buona', ['pay_invoice', 'get_info']);
@@ -50495,6 +50722,143 @@ function reset(){
   await pausa(60);
   out.senzaFeeNonSbarra = ricevuti.length === 2
     && ricevuti[1].dentro.action === 'add-invoice';
+
+  /* ---- 4-quater) LA FATTURA DEVE COPRIRE LO SCAMBIO (21 set 2026) --
+     Il coordinatore la vuole alla PRESA e la paga al RILASCIO: una
+     fattura da sei ore lui la accetta (vale piu' della sua finestra), e
+     stasera e' morta. Il foglio la ferma UNA volta, dice la regola —
+     almeno un giorno — e la via che non scade; la stessa rimandata
+     parte, perche' la regola e' nostra e un wallet che non fa scegliere
+     la scadenza non deve restare in un vicolo cieco. Quella da UN
+     GIORNO ESATTO passa al primo colpo (le scene qui sopra): e' la
+     tolleranza delle 23 ore, e senza di lei sarebbero rosse loro.
+     OGNI CASO HA IL SUO try/catch: un caso che esplode non si porta
+     via gli altri, e si legge col suo nome. */
+  const presaPerLaDurata = async () => {
+    reset();
+    rispondi = r => {
+      const d = r.dentro;
+      if (d.action === 'take-sell')
+        return [ordine('add-invoice', d.request_id, d.id,
+                       {order: {id: d.id, amount: 7543}})];
+      if (d.action === 'add-invoice')
+        return [ordine('waiting-seller-to-pay', d.request_id, d.id)];
+      return [];
+    };
+    await prendiOrdineP2P('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002');
+    await finoA(() => oltrePrendo('0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'));
+    await pausa(30);
+    apriIncassoP2P();
+  };
+  try {
+    await presaPerLaDurata();
+    el('p2pIncassoInp').value = FATT.f7543_6h;
+    await inviaIncassoP2P();
+    {
+      const t = String(nodi.p2pIncassoAvviso.textContent || '');
+      out.cortaFermataUnaVolta = ricevuti.length === 1 && /scade fra \d+ ore/.test(t);
+      out.cortaDiceLaRegola = t.indexOf('Fai una fattura che duri almeno un giorno') >= 0
+        && t.indexOf('indirizzo Lightning, che non scade') >= 0
+        && t.indexOf('arriverebbe scaduta') >= 0;
+      out.cortaDiceLUscita = t.indexOf('tocca di nuovo «Invia»') >= 0
+        && t.indexOf('te ne chiederemo una nuova') >= 0;
+    }
+    await inviaIncassoP2P();
+    await pausa(60);
+    out.cortaRimandataParte = ricevuti.length === 2
+      && ricevuti[1].dentro.payload.payment_request[1] === FATT.f7543_6h;
+    {
+      const oc = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'];
+      const b6 = leggiBolt11(FATT.f7543_6h);
+      out.cortaRicordaLaScadenza = !!oc && oc.fatturaScade === b6.scade
+        && oc.stato === 'attesa_hold_venditore';
+    }
+  } catch(e) { out.cortaEsplosa = String(e && e.message || e); }
+  /* ...un foglio RIAPERTO riparte da zero: l'avviso si rilegge */
+  try {
+    await presaPerLaDurata();
+    el('p2pIncassoInp').value = FATT.f7543_6h;
+    await inviaIncassoP2P();
+    apriIncassoP2P();
+    el('p2pIncassoInp').value = FATT.f7543_6h;
+    await inviaIncassoP2P();
+    out.cortaFoglioRiapertoRiavvisa = ricevuti.length === 1;
+  } catch(e) { out.cortaRiapertoEsploso = String(e && e.message || e); }
+  /* ...e con la leva a `false` il blocco torna secco */
+  try {
+    await presaPerLaDurata();
+    P2P_FATTURA_CORTA_SI_MANDA = false;
+    el('p2pIncassoInp').value = FATT.f7543_6h;
+    await inviaIncassoP2P();
+    await inviaIncassoP2P();
+    out.cortaLevaSpentaBlocca = ricevuti.length === 1
+      && String(nodi.p2pIncassoAvviso.textContent).indexOf('tocca di nuovo') < 0
+      && String(nodi.p2pIncassoAvviso.textContent).indexOf('almeno un giorno') >= 0;
+  } catch(e) { out.cortaLevaEsplosa = String(e && e.message || e); }
+  P2P_FATTURA_CORTA_SI_MANDA = true;
+  /* ...l'INDIRIZZO non ha scadenza: parte, e sulla riga resta 0 */
+  try {
+    await presaPerLaDurata();
+    el('p2pIncassoInp').value = 'io@wallet.com';
+    await inviaIncassoP2P();
+    await pausa(60);
+    const oa = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'];
+    out.indirizzoNonRicordaScadenze = ricevuti.length === 2 && !!oa && oa.fatturaScade === 0;
+  } catch(e) { out.indirizzoDurataEsploso = String(e && e.message || e); }
+  /* PURE: la durata chiesta, prima e dopo il rilascio */
+  try {
+    const fin = finestraFatturaP2P();
+    out.vitaMinimaPura = [
+      vitaMinimaFatturaP2P({stato: 'attesa_mia_fattura'}) === 23 * 3600,
+      vitaMinimaFatturaP2P(null) === 23 * 3600,
+      vitaMinimaFatturaP2P({stato: 'fattura_nuova'}) === fin,
+      vitaMinimaFatturaP2P({stato: 'rilasciato'}) === fin,
+      vitaMinimaFatturaP2P({stato: 'pagamento_ritentato'}) === fin,
+      fin < 23 * 3600,
+    ].every(Boolean);
+    out.percheFallitoPura = [
+      percheFallitoP2P({fatturaScade: 100}, 100) === 'scaduta',
+      percheFallitoP2P({fatturaScade: 100}, 99) === 'viva',
+      percheFallitoP2P({fatturaScade: 0}, 99) === '',
+      percheFallitoP2P({}, 99) === '',
+      percheFallitoP2P(null, 99) === '',
+    ].every(Boolean);
+  } catch(e) { out.durataPureEsplose = String(e && e.message || e); }
+  /* IL PAYOUT FALLITO DICE IL MOTIVO VERO, quando e' un fatto: tre
+     righe uguali tranne la scadenza della fattura che avevamo dato */
+  try {
+    const foglioFallito = async (id, scade) => {
+      reset();
+      rispondi = r => [];
+      const riga = {id, lato: 'compro', indice: 0, pubTrade: '',
+                    stato: 'fattura_nuova', euro: 5, sats: 0,
+                    satsNetti: 7619, satsMiei: 7543, metodi: [], creato: 1};
+      if (scade !== null) riga.fatturaScade = scade;
+      scriviOrdineP2P(riga);
+      p2pOrdineAperto = id;
+      await assicuraMazzo();
+      apriIncassoP2P();
+      return {h: nodi.p2pIncassoCorpo.innerHTML || '',
+              d: statoTestoP2P(ordiniP2P()[id]).d};
+    };
+    const ora = Math.floor(Date.now() / 1000);
+    const morta = await foglioFallito('f1', ora - 3600);
+    const viva = await foglioFallito('f2', ora + 86400);
+    const ignota = await foglioFallito('f3', null);
+    out.fallitoScadutaLoDice = morta.h.indexOf('<b>la fattura che avevi dato è scaduta</b>') >= 0
+      && morta.h.indexOf('può essere scaduta') < 0
+      && morta.d.indexOf('La fattura che avevi dato è scaduta') === 0;
+    out.fallitoVivaEscludeLaScadenza = viva.h.indexOf('non è la scadenza') >= 0
+      && viva.h.indexOf('è scaduta</b>') < 0
+      && viva.d.indexOf('può essere scaduta') >= 0;
+    out.fallitoIgnotaNonAfferma = ignota.h.indexOf('può essere scaduta, oppure') >= 0
+      && ignota.h.indexOf('non è la scadenza') < 0
+      && ignota.d.indexOf('può essere scaduta') >= 0;
+    /* ...e DOPO il rilascio il giorno non si chiede: si paga subito */
+    out.fallitoNonChiedeUnGiorno = morta.h.indexOf('almeno un giorno') < 0
+      && morta.h.indexOf('valida più di un\'ora') >= 0
+      && morta.h.indexOf('id="p2pIncassoInp"') >= 0;
+  } catch(e) { out.fallitoEsploso = String(e && e.message || e); }
 
   /* ---- 4-ter) IL «NO» SU UN INDIRIZZO NON E' IL «NO» SU UNA FATTURA
      (17 set 2026). Il coordinatore dice `invalid_invoice` a tutt'e due
@@ -51212,11 +51576,11 @@ function reset(){
         "foglioDiceIlMioLato": "il foglio promette la cifra DETTA dal coordinatore: 7543, non 7468 ne' 7619",
         "foglioCopiaLaCifra": "...con la cifra da copiare",
         "foglioConsigliaLaLibera": "...consiglia la fattura senza importo",
-        "foglioAvvisaSullaScadenza": "...e avvisa PRIMA sulla vita che il nodo pretende: piu' di un'ora",
-        "foglioFatturaPrima": "la via principale del foglio e' la FATTURA, detta prima dell'indirizzo",
+        "foglioAvvisaSullaScadenza": "...e chiede PRIMA una fattura che duri almeno un giorno: si paga al rilascio, non all'arrivo",
+        "foglioIndirizzoPrima": "la via consigliata del foglio e' l'INDIRIZZO, che non scade, detto prima della fattura",
         "foglioCifraEsatta": "...senza importo, o della cifra esatta",
         "foglioCopiaInEvidenza": "...con «Copia la cifra» in evidenza, e prima del campo",
-        "foglioAvvisaSuiProvider": "...e l'indirizzo resta in alternativa, sotto il campo, con l'avviso sui provider",
+        "foglioAvvisaSuiProvider": "...con l'avviso sui provider nella stessa frase, e prima del campo",
         "foglioNonDicePiuSemplice": "...e nessuno dice piu' che l'indirizzo e' la via piu' semplice",
         "foglioCampoVuoto": "...e il campo nasce VUOTO: l'indirizzo degli incassi non si precompila piu'",
         "foglioScorciatoiaSottoLAvviso": "...resta a un tocco, sotto l'avviso sui provider, e mai dentro un onclick",
@@ -51236,6 +51600,27 @@ function reset(){
         "importoStortoFermato": "la fattura vera del 16 set (7468) si ferma, e la ragione dice 7543",
         "nonChiedeIlLordo": "...mai il lordo",
         "laMetaDueVolteFermata": "...e 7468 con un giorno di vita si ferma lo stesso: era la meta' tolta due volte",
+        "cortaFermataUnaVolta": "DURATA: la fattura da sei ore — che il coordinatore accetterebbe — si ferma, con le ore che restano",
+        "cortaDiceLaRegola": "...e dice la regola (almeno un giorno), il perche' e la via che non scade",
+        "cortaDiceLUscita": "...e l'uscita per i wallet che la scadenza non la fanno scegliere",
+        "cortaRimandataParte": "...la STESSA rimandata parte: la regola e' nostra, non un vicolo cieco",
+        "cortaRicordaLaScadenza": "...e la sua scadenza resta sulla riga, per dire il motivo vero se al rilascio fallisce",
+        "cortaFoglioRiapertoRiavvisa": "...un foglio riaperto riparte da zero: l'avviso si rilegge",
+        "cortaLevaSpentaBlocca": "...e con la leva a false il blocco e' secco, senza promettere un'uscita",
+        "indirizzoNonRicordaScadenze": "...l'indirizzo non ha una scadenza da ricordare",
+        "vitaMinimaPura": "DURATA: 23 ore prima del rilascio, la finestra del coordinatore dopo",
+        "percheFallitoPura": "...e il perche' di un payout fallito e' un fatto solo se la scadenza si sa",
+        "fallitoScadutaLoDice": "PAYOUT FALLITO: a fattura scaduta foglio e pagina dicono SCADUTA, non «puo' essere»",
+        "fallitoVivaEscludeLaScadenza": "...a fattura viva il foglio ESCLUDE la scadenza",
+        "fallitoIgnotaNonAfferma": "...e senza quel dato restano le due cause del 17 set: non si afferma niente",
+        "fallitoNonChiedeUnGiorno": "...dopo il rilascio il campo c'e' subito e un giorno non si chiede: si paga all'arrivo",
+        # un caso che ESPLODE non e' un caso fallito: si legge col suo nome
+        "cortaEsplosa": ("DURATA: il caso della fattura corta non esplode", None),
+        "cortaRiapertoEsploso": ("...ne' quello del foglio riaperto", None),
+        "cortaLevaEsplosa": ("...ne' quello della leva spenta", None),
+        "indirizzoDurataEsploso": ("...ne' quello dell'indirizzo", None),
+        "durataPureEsplose": ("...ne' le pure", None),
+        "fallitoEsploso": ("...ne' il foglio del payout fallito", None),
         "scadenzaCortaFermata": "la cifra giusta da un'ora ESATTA si ferma, coi minuti che restano",
         "scadenzaCortaDiceCome": "...e la cura e' rifare la fattura piu' lunga, detto come — mai l'indirizzo",
         "liberaCortaFermata": "...e la senza-importo da un'ora pure: la regola e' sulla scadenza",
@@ -51251,6 +51636,7 @@ function reset(){
         "walletFoglioChiuso": "...il foglio si chiude",
         "walletLoDice": "...e lo dice",
         "walletDopo": ("...e si aspetta chi vende", "attesa_hold_venditore"),
+        "walletRicordaLaScadenza": "...e la sua scadenza resta sulla riga, come per la fattura incollata",
         "mutoNonManda": "un wallet MUTO non manda niente",
         "mutoLoDice": "...e dopo l'attesa il foglio dice che non risponde e che si puo' incollare",
         "mutoFoglioAperto": "...col foglio a mano ancora aperto",
@@ -51262,6 +51648,7 @@ function reset(){
         "stortaLoDice": "...e la ragione dice le due cifre (la stessa guardia della fattura incollata)",
         "cortaNonManda": "una fattura del wallet da un'ora non parte",
         "cortaLoDice": "...e la ragione dice che scade troppo presto",
+        "walletSeiOreNonManda": "...e nemmeno una da sei ore: il coordinatore la accetterebbe, ma si paga al rilascio",
         "senzaMetodoNonChiede": "senza make_invoice fra i metodi il wallet non si disturba",
         "migraAlConto": "la riga NWC di ieri migra alla chiave del conto",
         "vecchiaPagaAncora": "...e per il mercatino vale ancora (era stata collegata con pay_invoice)",
@@ -74901,6 +75288,7 @@ def main():
               prove_nome_da_nostr,
               prove_pagamento_incerto, prove_esito_pagamento,
               prove_pagamenti_in_volo, prove_fatture_scadute,
+              prove_fattura_solo_incasso,
               prove_in_pagamento,
               prove_doppio_wallet, prove_saas_senza_doveri, prove_orfani, prove_capitale_cassa,
               prove_disputa_incagliata,

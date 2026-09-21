@@ -98,9 +98,9 @@ def main():
 
     def ordine_con_fattura(annuncio, bolt11):
         oid = banco.ordine_pagato(annuncio)
-        banco.come(222)
-        banco.chiama(SRV.deposita_invoice, oid, None,
-                     corpo={"invoice": bolt11})
+        # la porta prima della conferma e' chiusa (21 set 2026): e' un
+        # ordine di ieri, con la fattura gia' in colonna
+        banco.fattura_di_ieri(oid, bolt11)
         return oid
 
     # ---- 0) lo schema vero ---------------------------------------

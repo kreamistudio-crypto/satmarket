@@ -20,8 +20,8 @@ LE FATTURE SONO BOLT11 SINTATTICAMENTE VERE (`bolt11_finta` di
 prove.py: bech32 col checksum, la scadenza nel campo `x`), perche' il
 giudice della scadenza la legge DALLA FATTURA.
 
-  1. la porta: spedito + fattura da un'ora → rifiutata con le tre
-     strade; fattura da 31 giorni → salvata;
+  1. la porta: PRIMA della conferma non si incolla niente (21 set
+     2026) — rifiutata quella da un'ora e pure quella da 31 giorni;
   2. il #152: in colonna c'e' una fattura scaduta da quattro giorni, il
      compratore conferma → NESSUNA richiesta di pagamento, l'ordine va
      in 'confirmed', la fattura morta si toglie, al venditore si dice
@@ -75,17 +75,21 @@ def main():
     print("\n[la porta: quando si incolla]")
     oid = banco.ordine_pagato(a1)
     banco.come(222)
-    e = rifiuto(SRV.deposita_invoice, oid, None, corpo={"invoice": un_ora})
-    prova("spedizione ancora da fare, fattura da un'ora: rifiutata", 400,
-          getattr(e, "status_code", None))
-    prova("...con le tre strade nel messaggio", True,
-          all(x in str(getattr(e, "detail", "")) for x in (
-              "Lightning address", "30 giorni", "ti avvisiamo noi")))
-    prova("...e in colonna non e' entrato niente", "",
-          banco.riga(oid)["invoice_venditore"] or "")
-    e = rifiuto(SRV.deposita_invoice, oid, None, corpo={"invoice": lunga})
-    prova("fattura da 31 giorni: salvata", lunga,
-          banco.riga(oid)["invoice_venditore"])
+    # DAL 21 SET 2026 la fattura si incolla SOLO all'incasso: prima della
+    # conferma la porta e' chiusa a tutte, anche a quella da 31 giorni
+    # che fino al 20 si salvava. Il metodo che si imposta prima e' uno
+    # solo, l'address.
+    for nome, fattura in (("da un'ora", un_ora), ("da 31 giorni", lunga)):
+        e = rifiuto(SRV.deposita_invoice, oid, None,
+                    corpo={"invoice": fattura})
+        prova(f"prima della conferma, fattura {nome}: rifiutata", 400,
+              getattr(e, "status_code", None))
+        prova("...col perche', l'avviso che arrivera', e l'address", True,
+              all(x in str(getattr(e, "detail", "")) for x in (
+                  "solo al momento dell'incasso", "ti avvisiamo",
+                  "Lightning address", "non scade")))
+        prova("...e in colonna non e' entrato niente", "",
+              banco.riga(oid)["invoice_venditore"] or "")
 
     # ---- 2) il #152 ----------------------------------------------
     print("\n[il #152: in colonna c'e' una fattura scaduta da 4 giorni]")

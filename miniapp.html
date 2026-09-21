@@ -7991,6 +7991,9 @@ document.getElementById('cartello')?.remove();</script>
         <li><b>Il venditore consegna.</b> Spedisce e segna il corriere, oppure vi mettete d'accordo per il ritiro in zona, oppure — se è un codice o un buono — te lo consegna qui dentro, mai in chat private.</li>
         <li><b>Ricevi e confermi.</b> Quando l'oggetto è arrivato ed è come promesso, lo confermi. <b>Solo in quel momento</b> i sats passano al venditore.</li>
       </ol>
+      <!-- LA FATTURA SOLO ALL'INCASSO (21 set 2026): l'unico metodo che
+           si imposta prima e' l'address, e qui si dice il perche' -->
+      <p class="sicu-nota"><b>Se sei tu a vendere:</b> i sats ti arrivano da soli sul tuo <b>Lightning address</b> — lo imposti una volta nel Profilo, <b>non scade mai</b>, e lo usiamo al momento del pagamento. Se non ne hai uno, quando chi compra conferma <b>ti avvisiamo</b> e in quel momento incolli una fattura nell'ordine. Prima no: una fattura Lightning scade, da un'ora a pochi giorni, e arriverebbe scaduta.</p>
 
       <h3>I tempi</h3>
       <ul class="sicu-lista">
@@ -8132,6 +8135,7 @@ document.getElementById('cartello')?.remove();</script>
         <li>I tuoi <b>annunci</b>: sono pubblici per definizione — è il loro mestiere.</li>
         <li>I tuoi <b>ordini</b>: cosa hai comprato o venduto, quanto, quando, e come è andata.</li>
         <li>Il tuo <b>Lightning address</b>, se lo imposti per incassare da solo: è un <span class="mono">nome@dominio</span>, come una mail, e ce l'abbiamo <b>in chiaro</b> — è lì che ti mandiamo i sats quando un affare si chiude, quindi dobbiamo poterlo leggere. Non esce da nessuna parte: non lo vede chi compra, non lo vedono i moderatori.</li>
+        <li>La <b>fattura</b> che incolli per incassare, se l'address non lo usi: si incolla <b>solo al momento dell'incasso</b> — nel Profilo non se ne salva nessuna, perché una fattura scade e vale per un pagamento solo — e resta scritta in quell'ordine, come ricevuta di dove sono andati i sats.</li>
         <li>La tua <b>reputazione</b>: voti ricevuti, distintivi, il livello, e gli <b>XP</b>, che contano una cosa sola — quanto hai comprato e venduto.</li>
         <li>La tua posizione in <b>classifica</b>, se ci entri: lì di te si vedono nome, foto, titolo, media dei voti, da quante persone, quanti affari e il <b>punteggio</b>. Il punteggio mette insieme la media e il commercio, quindi da lì si può <b>ricavare quanto hai commerciato</b> — è una scelta presa sapendolo, perché senza quel numero l'ordine della lista non si legge. Gli XP in chiaro invece non escono mai, e nemmeno il tuo identificativo.</li>
         <li>Il tuo <b>barattolo</b>, cioè gli annunci che hai messo da parte. Di questi si vede <b>quanti</b> l'hanno salvato, mai <b>chi</b>: nemmeno chi vende sa che sei stato tu — a meno che tu non condivida il barattolo col suo link, che è un gesto tuo: la voce qui sotto dice cosa comporta.</li>
@@ -25071,35 +25075,60 @@ function payoutPanel(o){
       <button class="btn ghost" onclick="myLnAddress='';openOrder(currentOrder.id)">↻ Cambia indirizzo</button>
     </div>`;
 
-  /* Invoice depositata per questo ordine */
-  if (o.sellerInvoice) return `
+  /* LA FATTURA SI INCOLLA SOLO ALL'INCASSO (21 set 2026, deciso con
+     Alan). Fino a ieri da qui si poteva «salvare» una invoice appena
+     venduto, e restava in colonna per giorni: le fatture dei wallet
+     durano da un'ora a sette giorni, e il #152 e' arrivato al payout
+     scaduto da quattro. «Salvata» faceva pensare a un metodo che si
+     riusa, e una fattura non lo e'. Quindi PRIMA della conferma qui
+     c'e' un campo solo, il Lightning address — l'unico metodo che non
+     scade — e il campo della fattura compare quando tocca: a ordine
+     'confirmed', dove il server la paga all'istante. */
+  if (o.state!=='confirmed') {
+    /* gli ordini di IERI che una fattura in colonna ce l'hanno gia':
+       si pagano come sempre, e se e' scaduta lo si DICE adesso (la
+       scadenza sta scritta nella bolt11) invece di scoprirlo il
+       giorno dei sats */
+    let vecchia = '';
+    if (o.sellerInvoice) {
+      const b = leggiBolt11(o.sellerInvoice);
+      const morta = b && b.scade <= Math.floor(Date.now()/1000);
+      vecchia = morta
+        ? `<div class="hint" style="margin-bottom:10px">⌛ La fattura che avevi salvato su questo ordine <b>è già scaduta</b>: non la useremo. Alla conferma ti avvisiamo e ne incolli una nuova — oppure imposta qui sotto il Lightning address, e non ci pensi più.</div>`
+        : `<div class="hint" style="margin-bottom:10px">Su questo ordine avevi già salvato una fattura: alla conferma proviamo a pagarla. Se per allora fosse scaduta te ne chiediamo una nuova — con il Lightning address qui sotto non succede.</div>`;
+    }
+    return `
     <div class="payout">
-      <h4>💰 Incasso pronto</h4>
-      <div class="hint">Hai depositato la tua invoice da <b class="net">${fmt(net)}<span class="unit">sats</span></b>:
-        verrà pagata <b>automaticamente</b> quando l'acquirente conferma la ricezione.</div>
-      <div class="okline">✓ Invoice salvata in cassaforte</div>
-      <button class="btn ghost" onclick="currentOrder.sellerInvoice='';openOrder(currentOrder.id)">↻ Sostituisci invoice</button>
+      <h4>💰 Come ricevi i tuoi sats</h4>
+      ${vecchia}
+      <div class="hint">Alla conferma dell'acquirente riceverai <b class="net">${fmt(net)}<span class="unit">sats</span></b>.
+        <br><br><b>⚡ Imposta il tuo Lightning address</b> (lo trovi nel tuo wallet,
+        tipo <span class="mono" style="font-size:11px">nome@walletofsatoshi.com</span>):
+        <b>non scade mai</b>, lo usiamo al momento del pagamento, e lo fai <b>una volta sola</b> per tutte le vendite.</div>
+      <textarea id="lnAddrInput" style="min-height:38px" placeholder="nome@walletofsatoshi.com"></textarea>
+      <button class="btn orange" onclick="saveLnAddress(this)">⚡ Attiva incassi automatici</button>
+      <div class="hint" style="margin-top:14px">Non hai un Lightning address? Va bene lo stesso: quando l'acquirente conferma
+        <b>ti avvisiamo noi</b>, e in quel momento incolli qui una fattura. Prima no: una fattura Lightning scade, e arriverebbe scaduta.</div>
     </div>`;
+  }
 
-  /* Nessun metodo impostato: address consigliato, invoice come piano B.
+  /* Tocca a lui: address consigliato, fattura come gesto di adesso.
      IN EVIDENZA quando e' l'unico gesto che manca (set 2026): lo stadio
      «in pagamento» dice a chi vende che serve una fattura, e il campo
      dove metterla e' questo. */
   return `
     <div class="payout${o.pagamento && o.pagamento.gesto_venditore ? ' pag-evidenza' : ''}">
-      <h4>💰 ${o.state==='confirmed'?'Incassa subito i tuoi sats':'Come vuoi incassare?'}</h4>
-      <div class="hint">${o.state==='confirmed'
-        ? `L'acquirente ha <b>già confermato la ricezione</b>: ti aspettano <b class="net">${fmt(net)}<span class="unit">sats</span></b> in cassaforte.`
-        : `Alla conferma dell'acquirente riceverai <b class="net">${fmt(net)}<span class="unit">sats</span></b>.`}
+      <h4>💰 Incassa subito i tuoi sats</h4>
+      <div class="hint">L'acquirente ha <b>già confermato la ricezione</b>: ti aspettano <b class="net">${fmt(net)}<span class="unit">sats</span></b> in cassaforte.
         <br><br><b>⚡ Consigliato:</b> imposta il tuo Lightning address (lo trovi nel tuo wallet,
         tipo <span class="mono" style="font-size:11px">nome@walletofsatoshi.com</span>):
-        lo fai <b>una volta sola</b> e tutti gli incassi, di ogni vendita, saranno automatici.</div>
+        <b>non scade mai</b>, lo fai <b>una volta sola</b> e tutti gli incassi, di ogni vendita, saranno automatici.</div>
       <textarea id="lnAddrInput" style="min-height:38px" placeholder="nome@walletofsatoshi.com"></textarea>
       <button class="btn orange" onclick="saveLnAddress(this)">⚡ Attiva incassi automatici</button>
-      <div class="hint" style="margin-top:14px"><b>Oppure</b>, solo per questo ordine: genera nel tuo wallet
-        una invoice di <b>esattamente ${fmt(net)} sats</b> e incollala qui.</div>
-      <textarea id="sellerInvoice" placeholder="lnbc… (incolla qui la tua invoice Lightning)"></textarea>
-      <button class="btn ghost" style="margin-top:0" onclick="saveSellerInvoice(this)">${o.state==='confirmed'?'Incassa con questa invoice':'Salva invoice'}</button>
+      <div class="hint" style="margin-top:14px"><b>Oppure</b>, solo per questo ordine: genera <b>adesso</b> nel tuo wallet
+        una fattura di <b>esattamente ${fmt(net)} sats</b> e incollala qui. La paghiamo subito.</div>
+      <textarea id="sellerInvoice" placeholder="lnbc… (incolla qui la tua fattura Lightning)"></textarea>
+      <button class="btn ghost" style="margin-top:0" onclick="saveSellerInvoice(this)">Incassa con questa fattura</button>
     </div>`;
 }
 
@@ -25156,8 +25185,11 @@ function renderLnAddress(){
       <input id="lnAddrProfilo" placeholder="nome@walletofsatoshi.com" value="${esc(myLnAddress)}"></div>
     <button class="btn ghost" style="margin-top:0" onclick="salvaLnAddressProfilo(this)">⚡ Attiva incassi automatici</button>
     <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
-      Lo trovi nella app del tuo wallet: lo imposti una volta sola e
-      tutti gli incassi, di ogni vendita, arrivano da soli.</div>`;
+      Lo trovi nella app del tuo wallet: <b>non scade mai</b>, lo usiamo
+      al momento del pagamento, e lo imposti una volta sola per tutte
+      le vendite. È l'unico metodo che si salva qui: senza, a ogni
+      vendita ti avvisiamo quando tocca a te e incolli una fattura
+      nell'ordine.</div>`;
 }
 
 async function salvaLnAddressProfilo(btn){
@@ -25199,9 +25231,10 @@ async function rimuoviLnAddress(){
   if (!myLnAddress) return;
   chiediConferma({
     titolo: 'Rimuovere il tuo Lightning address?',
-    corpo: 'Gli incassi tornano a mano: a ogni vendita dovrai incollare '
-         + 'tu una invoice per farti pagare, e gli ordini gia\' '
-         + 'confermati restano in attesa finche\' non lo fai.'
+    corpo: 'Gli incassi tornano a mano: a ogni vendita, quando chi '
+         + 'compra conferma, ti avvisiamo e dovrai incollare tu una '
+         + 'fattura per farti pagare. Gli ordini gia\' confermati '
+         + 'restano in attesa finche\' non lo fai.'
          + '\n\nPuoi rimetterlo quando vuoi.',
     etichetta: '🗑 Rimuovi',
     poi: async () => {
@@ -29073,8 +29106,10 @@ async function saveSellerInvoice(btn){
   const inv = el('sellerInvoice').value.trim();
   if (!inv.toLowerCase().startsWith('ln')) { toast('Incolla una invoice Lightning valida (inizia con "ln…")'); return; }
   if (DEMO) {
+    /* il campo c'e' solo quando si paga subito: a 'confirmed' (chi
+       vende) e a 'refund' (chi ha vinto la disputa) */
     if (currentOrder.state==='confirmed') { currentOrder.state='released'; toast('🔓 Sats incassati! Affare concluso ⚡'); }
-    else { currentOrder.sellerInvoice=inv; toast('✓ Invoice salvata: incasso automatico alla conferma'); }
+    else if (currentOrder.state==='refund') { currentOrder.state='refunded'; toast('↩️ Rimborso in arrivo nel tuo wallet!'); }
     openOrder(currentOrder.id); return;
   }
   const ripristina = bottoneInAttesa(btn);
@@ -29090,9 +29125,16 @@ async function saveSellerInvoice(btn){
   /* Prima del ramo 'refund', o chi ha appena depositato una invoice
      BUONA si sentirebbe dire di rifarla mentre a tacere e' il nodo. */
   else if (d.non_chiesto) { currentOrder.sellerInvoice=inv;
-    toast('✓ Invoice salvata. Il pagamento non è potuto partire ora — il nostro nodo non risponde — e ci riproviamo da soli'); }
+    toast('✓ Fattura ricevuta. Il pagamento non è potuto partire ora — il nostro nodo non risponde — e ci riproviamo da soli'); }
   else if (d.stato==='refund') { toast('Il pagamento non è riuscito: riprova con una invoice nuova'); }
-  else { currentOrder.sellerInvoice=inv; toast('✓ Invoice salvata: incasso automatico alla conferma'); }
+  /* in volo o in verifica: e' partito, e l'esito non si sa ancora */
+  else if (d.in_volo || d.incerto) { toast('⏳ Pagamento partito: lo stiamo verificando, non devi fare altro'); }
+  /* QUI NON C'E' PIU' NESSUN «SALVATA PER DOPO» (21 set 2026): da
+     questa porta il pagamento parte sempre subito, quindi arrivare in
+     fondo vuol dire che NON e' riuscito — e fino a ieri questo ramo
+     diceva «✓ Invoice salvata: incasso automatico alla conferma» anche
+     a un ordine gia' confermato. Il motivo lo dice il pannello. */
+  else { toast('Il pagamento non è riuscito: i sats restano al sicuro. Guarda qui sotto il motivo e riprova con una fattura nuova', 7000); }
   openOrder(currentOrder.id);
 }
 
@@ -42263,6 +42305,15 @@ function statoTestoP2P(o){
   if (o && o.stato === 'attivo' && o.lato === 'vendo' && o.peer && !(o.campiMiei || {}).euro)
     return {t: s.t, d: 'I tuoi sats sono bloccati. Ora indica a '
       + nomeControparteP2P(o, 'chi compra') + ' dove mandarti gli euro: senza, non può pagarti.'};
+  /* LA FATTURA SCADUTA SI DICE, QUANDO E' UN FATTO (21 set 2026): la
+     frase di `fattura_nuova` elenca due cause perche' il coordinatore
+     il motivo non lo dice — ma se la fattura che avevamo dato e' morta
+     lo sappiamo noi (`percheFallitoP2P`), e il foglio dice lo stesso */
+  if (o && o.stato === 'fattura_nuova' && o.lato === 'compro'
+      && percheFallitoP2P(o, Math.floor(Date.now() / 1000)) === 'scaduta')
+    return {t: s.t, d: 'La fattura che avevi dato è scaduta prima che i sats venissero liberati, '
+      + 'quindi il pagamento non è riuscito. I sats non sono persi: sono fermi al sicuro e restano tuoi. '
+      + 'Dai una fattura nuova e ripartono.'};
   /* il verso di chi ha PUBBLICATO vince sul lato: e' la stessa riga
      letta da un'altra parte del banco, e la sua frase e' un'altra */
   const mio = !!(o && o.mio);
@@ -44072,12 +44123,17 @@ function copiaHoldP2P(){
 }
 
 /* ---- il foglio di dove ricevere i sats ---- */
+/* la fattura CORTA gia' avvisata una volta: rimandata uguale, parte
+   (vedi `P2P_FATTURA_CORTA_SI_MANDA`). Un foglio riaperto riparte da
+   zero: l'avviso si rilegge. */
+let p2pFatturaCortaVista = '';
 function apriIncassoP2P(){
   const id = p2pOrdineAperto;
   const o = ordiniP2P()[id];
   if (!o) return;
   haptic();
   p2pIncassoOrdine = id;
+  p2pFatturaCortaVista = '';
   renderIncassoP2P();
   el('sheetBg').classList.add('open');
   el('p2pIncassoSheet').classList.add('open');
@@ -44135,10 +44191,14 @@ async function fatturaDalWalletP2P(id){
     const b = leggiBolt11(bolt);
     if (!b) throw new Error('ha risposto con una fattura che non si legge');
     if (b.sats !== deve) throw new Error('ha fatto una fattura di ' + fmt(b.sats) + ' sats invece di ' + fmt(deve));
-    if (b.scade < Math.floor(Date.now() / 1000) + finestraFatturaP2P())
+    /* la durata e' quella del foglio a mano (`vitaMinimaFatturaP2P`:
+       un giorno prima del rilascio, la finestra del coordinatore dopo):
+       al wallet si chiede la vita dell'ordine, ma puo' ignorarla */
+    if (b.scade < Math.floor(Date.now() / 1000) + vitaMinimaFatturaP2P(o))
       throw new Error('ha fatto una fattura che scade troppo presto');
     if (p2pIncassoOrdine !== id) return false;   /* il foglio e' gia' passato ad altro */
     await chiamataOrdineP2P(o, 'add-invoice', {payment_request: [null, bolt, null]});
+    ricordaFatturaP2P(id, b.scade);
     chiudiFoglioP2P('p2pIncassoSheet');
     p2pIncassoOrdine = '';
     toast('⚡ Fattura fatta dal wallet e inviata ✅');
@@ -44244,6 +44304,55 @@ function finestraFatturaP2P(){
   const f = p2pInfo ? Math.floor(Number(p2pInfo.fattFinestra) || 0) : 0;
   return f > 0 ? f : 3600;
 }
+/* ---- LA FATTURA DEVE COPRIRE LO SCAMBIO, NON SOLO L'ARRIVO ----
+   (21 set 2026, deciso con Alan, dal cantiere «fattura solo
+   all'incasso» del mercatino.) Nel P2P la fattura NON si puo' chiedere
+   al momento del pagamento: il coordinatore la vuole ALLA PRESA
+   (`waiting-buyer-invoice`) e la paga AL RILASCIO, che arriva quando
+   chi vende ha visto gli euro — minuti, o ore. La finestra del
+   coordinatore (`finestraFatturaP2P`, un'ora) guarda solo l'ARRIVO:
+   una fattura da due ore la passa, e al rilascio di stasera e' morta.
+   Quindi qui si chiede UN GIORNO, e la frase accanto al campo lo dice.
+   ⚠️ 23 ORE E NON 24, ed e' voluto: tanti wallet fanno fatture da 24
+   ore esatte, e a incollarla passa un minuto — con 86400 secchi la
+   fattura «da un giorno» verrebbe rifiutata per sessanta secondi.
+   ⚠️ DOPO IL RILASCIO NON VALE: la fattura nuova di un payout fallito
+   (o della porta di riserva) si paga APPENA ARRIVA, e li' basta la
+   finestra del coordinatore — chiedere un giorno a chi sta aspettando
+   i suoi sats sarebbe un ostacolo senza una ragione.
+   PURA. */
+const P2P_FATTURA_VITA_MIN_S = 23 * 3600;
+/* UNA FATTURA CORTA SI PUO' MANDARE LO STESSO, al secondo tocco e
+   sapendolo: ci sono wallet che la scadenza non la fanno scegliere, e
+   se in piu' il loro indirizzo non passa la verifica il blocco secco
+   sarebbe un vicolo cieco. Il prezzo di una fattura scaduta al
+   rilascio e' un'attesa, non una perdita: il coordinatore ne chiede
+   una nuova (`fattura_nuova`). A `false` il blocco torna secco. */
+let P2P_FATTURA_CORTA_SI_MANDA = true;
+function vitaMinimaFatturaP2P(o){
+  const finestra = finestraFatturaP2P();
+  const dopo = !!o && P2P_DOPO_RILASCIO.indexOf(o.stato) >= 0;
+  return dopo ? finestra : Math.max(finestra, P2P_FATTURA_VITA_MIN_S);
+}
+/* PURA: il PERCHE' di un payout fallito, quando e' un FATTO. Il
+   coordinatore il motivo non lo dice, ma la scadenza della fattura che
+   abbiamo dato la sappiamo noi (`fatturaScade`, scritta sulla riga
+   quando parte): 'scaduta' | 'viva' | '' (non si sa: era un indirizzo,
+   o la riga e' di prima del 21 set 2026). */
+function percheFallitoP2P(o, adesso){
+  const s = o ? Math.floor(Number(o.fatturaScade) || 0) : 0;
+  if (!(s > 0)) return '';
+  return s <= adesso ? 'scaduta' : 'viva';
+}
+/* la scadenza della fattura appena PARTITA resta sulla riga (0 = era
+   un indirizzo): serve solo a `percheFallitoP2P`. Si rilegge la riga,
+   che nel frattempo la risposta del coordinatore ha gia' riscritto. */
+function ricordaFatturaP2P(id, scade){
+  const agg = ordiniP2P()[id];
+  if (!agg) return;
+  agg.fatturaScade = Math.floor(Number(scade) || 0);
+  scriviOrdineP2P(agg);
+}
 function renderIncassoP2P(){
   const box = el('p2pIncassoCorpo');
   const o = ordiniP2P()[p2pIncassoOrdine];
@@ -44252,16 +44361,16 @@ function renderIncassoP2P(){
   const quanti = netto > 0 ? fmt(netto) + ' sats' : '';
   const minuti = Math.ceil(finestraFatturaP2P() / 60);
   const vale = minuti === 60 ? 'un\'ora' : minuti + ' minuti';
-  /* LA VIA PRINCIPALE E' LA FATTURA (17 set 2026, dal campo): fino a
-     ieri qui c'era scritto che l'indirizzo «è la via più semplice», ed
-     era la via che si rompeva — il coordinatore l'indirizzo lo VERIFICA
-     da dietro Tor con tre timeout stretti, e certi provider (Wallet of
+  /* IL 17 SET 2026 LA FATTURA ERA PASSATA DAVANTI (dal campo): qui
+     c'era scritto che l'indirizzo «è la via più semplice», ed era la
+     via che si rompeva — il coordinatore l'indirizzo lo VERIFICA da
+     dietro Tor con tre timeout stretti, e certi provider (Wallet of
      Satoshi) a quel giro non rispondono: `invalid-invoice`, senza un
-     perche'. La fattura invece mostro la valida senza rete. Quindi,
-     nell'ordine in cui servono: la cifra con la sua copia IN EVIDENZA
-     (si ribatte a mano nel wallet), le due regole della bolt11 dette
-     PRIMA — senza importo o esatta, e piu' lunga della finestra (vedi
-     `leggiBolt11`) — e l'indirizzo per ultimo, col suo avviso. */
+     perche'. DAL 21 SET L'INDIRIZZO TORNA PRIMO, ma non come allora: col
+     suo avviso ACCANTO, e senza dire mai «la via più semplice» (vedi
+     «LE DUE VIE» qui sotto). Restano del 17: la cifra con la sua copia
+     IN EVIDENZA (si ribatte a mano nel wallet) e le regole della bolt11
+     dette PRIMA del campo — senza importo o esatta, e la durata. */
   /* IL FOGLIO DEL PAGAMENTO FALLITO (17 set 2026): stesso foglio,
      stessa cifra, stesso campo — cambia la prima cosa che dice, che
      qui e' il PERCHE'. Dalla porta di riserva («i sats non arrivano?»)
@@ -44270,17 +44379,37 @@ function renderIncassoP2P(){
   const riserva = o.stato === 'rilasciato' || o.stato === 'pagamento_ritentato';
   const tit = el('p2pIncassoTit');
   if (tit) tit.textContent = (fallito || riserva) ? '⚡ Una fattura nuova' : '💸 Dove ricevere i sats';
+  /* IL PERCHE' SI AFFERMA SOLO QUANDO E' UN FATTO (21 set 2026). Il
+     coordinatore il motivo non lo dice, ma la scadenza della fattura
+     che avevamo dato la sappiamo NOI: se e' passata, «scaduta» non e'
+     piu' un'ipotesi; se era viva, la scadenza si ESCLUDE. Senza quel
+     dato resta la frase a due cause del 17 set. */
+  const perche = fallito ? percheFallitoP2P(o, Math.floor(Date.now() / 1000)) : '';
+  const causa = perche === 'scaduta'
+    ? '<b>la fattura che avevi dato è scaduta</b> prima che chi vende liberasse i sats (una fattura Lightning vale per un tempo limitato). '
+    : perche === 'viva'
+    ? 'la fattura era ancora valida, quindi non è la scadenza: di solito vuol dire che il pagamento non ha trovato una strada fino al tuo wallet. '
+    : 'può essere scaduta, oppure il pagamento non ha trovato una strada fino al tuo wallet. ';
+  /* LE DUE VIE, E QUALE PRIMA (21 set 2026, deciso con Alan — rovescia
+     l'ordine del 17 set, e il perche' va scritto). Il 17 la fattura era
+     passata davanti perche' l'indirizzo era «la via che si rompeva»; ma
+     la fattura ha il SUO modo di rompersi, ed e' peggiore perche'
+     arriva tardi: scade, e lo si scopre al rilascio. L'indirizzo non
+     scade, e quando non passa la verifica lo si sa SUBITO, col campo
+     ancora davanti. Quindi: l'indirizzo consigliato, col suo avviso sui
+     provider che dietro Tor non rispondono; e la fattura subito sotto,
+     con la regola nuova — che duri almeno un giorno. Dopo il rilascio
+     (fallito/riserva) la fattura si paga appena arriva: li' resta la
+     finestra del coordinatore, e «un giorno» non si chiede. */
+  const dopo = fallito || riserva;
+  const durata = dopo
+    ? 'valida più di ' + vale
+    : '<b>fai una fattura che duri almeno un giorno</b>: i sats ti arrivano quando chi vende li libera, e possono passare ore';
   box.innerHTML =
     (fallito
       ? '<div class="hint" style="color:var(--danger);font-weight:800">⚠️ Il pagamento dei tuoi sats non è riuscito.</div>'
-        /* IL PERCHE' NON SI AFFERMA (17 set 2026, corretto da Andrea
-           nello stesso giorno): la prima stesura diceva «quasi sempre
-           scaduta», e lo scambio che ha aperto il cantiere era durato
-           CINQUE minuti — la fattura era viva. Il coordinatore non dice
-           il motivo (mostrod butta via il `failure_reason` di LND), quindi
-           qui si elencano le due cause e non se ne sceglie una. */
         + '<div class="hint">Chi vende li ha liberati, ma il pagamento verso la richiesta che avevi dato non è andato a buon fine: '
-        + 'può essere scaduta, oppure il pagamento non ha trovato una strada fino al tuo wallet. '
+        + causa
         + 'I sats non sono persi — sono fermi al sicuro e restano tuoi: dai qui una richiesta nuova e ripartono. '
         + 'Se con lo stesso wallet fallisce ancora, prova con un altro.</div>'
       : riserva
@@ -44288,9 +44417,19 @@ function renderIncassoP2P(){
         + 'Se il pagamento è ancora in corso ti viene risposto di no, e non cambia niente.</div>'
       : '') +
     '<div class="hint">' + (quanti ? 'Riceverai <b>' + esc(quanti) + '</b>. ' : '') +
-      'Incolla una richiesta di pagamento del tuo wallet: <b>senza importo</b>' +
+      '<b>⚡ Consigliato: il tuo indirizzo Lightning</b> (quello che finisce per @qualcosa). Non scade mai, quindi va bene anche se lo scambio dura ore. ' +
+      'Alcuni provider (per esempio Wallet of Satoshi) non rispondono alla verifica dell\'indirizzo: ' +
+      'se il tuo indirizzo viene rifiutato, usa la fattura.</div>' +
+    /* la scorciatoia sta SOTTO l'avviso, che cosi' vale anche per lei;
+       l'indirizzo e' testo dell'utente: a schermo passa da esc(), e
+       nell'onclick non ci entra — lo rilegge la funzione */
+    (myLnAddress
+      ? '<button class="btn ghost" type="button" onclick="usaIndirizzoSalvatoP2P()">⚡ Usa l\'indirizzo dei tuoi incassi: '
+        + esc(myLnAddress) + '</button>'
+      : '') +
+    '<div class="hint" style="margin-top:12px"><b>Oppure una fattura</b> del tuo wallet: <b>senza importo</b>' +
       (quanti ? ', o di ' + esc(quanti) + ' esatti' : '') +
-      ', valida più di ' + vale + '.</div>' +
+      ', ' + durata + '.</div>' +
     /* ⚠️ UN BOTTONE CHE SPARISCE SENZA UN PERCHE' SI LEGGE COME UN
        GUASTO (17 set 2026, dal campo): a cifra ignota — un ordine a
        prezzo di mercato ripreso dalla restore, che la cifra non ce
@@ -44305,17 +44444,7 @@ function renderIncassoP2P(){
       ? '<button class="btn primary" type="button" onclick="copiaLink(\'' + netto + '\', \'📋 Cifra copiata\')">📋 Copia la cifra: ' + esc(fmt(netto)) + '</button>'
       : '') +
     '<div class="field"><label>Dove vuoi ricevere i sats</label>' +
-      '<input type="text" id="p2pIncassoInp" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="lnbc… oppure tuonome@wallet.com"></div>' +
-    '<div class="hint">In alternativa puoi scrivere il tuo indirizzo Lightning (quello che finisce per @qualcosa). ' +
-      'Alcuni provider (per esempio Wallet of Satoshi) non rispondono alla verifica dell\'indirizzo: ' +
-      'se il tuo indirizzo viene rifiutato, usa la fattura.</div>' +
-    /* la scorciatoia sta SOTTO l'avviso, che cosi' vale anche per lei;
-       l'indirizzo e' testo dell'utente: a schermo passa da esc(), e
-       nell'onclick non ci entra — lo rilegge la funzione */
-    (myLnAddress
-      ? '<button class="btn ghost" type="button" onclick="usaIndirizzoSalvatoP2P()">⚡ Usa l\'indirizzo dei tuoi incassi: '
-        + esc(myLnAddress) + '</button>'
-      : '') +
+      '<input type="text" id="p2pIncassoInp" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="tuonome@wallet.com oppure lnbc…"></div>' +
     '<div class="hint" id="p2pIncassoAvviso" style="display:none"></div>' +
     '<button class="btn orange" id="p2pIncassoBtn" onclick="inviaIncassoP2P()">Invia</button>';
 }
@@ -44353,6 +44482,7 @@ async function inviaIncassoP2P(){
   const dillo = m => { if (av) { av.textContent = m; av.style.display = ''; } };
   if (!testo) { dillo('Serve un indirizzo o una richiesta di pagamento.'); return; }
   const bolt = /^ln[a-z0-9]+$/i.test(testo);
+  let scadeData = 0;   /* quando scade la fattura che parte; 0 = indirizzo */
   if (bolt) {
     const b = leggiBolt11(testo);
     if (!b) { dillo('Questa richiesta di pagamento non si legge: controlla di averla copiata tutta.'); return; }
@@ -44379,6 +44509,25 @@ async function inviaIncassoP2P(){
         + ' minuti quando arriva: quelle da un\'ora esatta non bastano. Rifalla con una scadenza più lunga, un giorno va benissimo: molti wallet la fanno scegliere nelle opzioni della richiesta, alla voce «Scadenza» (o «Expiry»).');
       return;
     }
+    /* ...E DEVE COPRIRE LO SCAMBIO (21 set 2026): il coordinatore la
+       accetterebbe, ma la paga al RILASCIO, che puo' arrivare ore dopo
+       — vedi `vitaMinimaFatturaP2P`. Questa regola e' NOSTRA, quindi
+       ha un'uscita: la stessa fattura mandata una seconda volta parte,
+       e chi la manda ha letto cosa rischia (un'attesa, non i sats). */
+    const giorno = vitaMinimaFatturaP2P(o);
+    scadeData = b.scade;
+    if (b.scade < adesso + giorno
+        && !(P2P_FATTURA_CORTA_SI_MANDA && p2pFatturaCortaVista === testo)) {
+      p2pFatturaCortaVista = testo;
+      const ore = Math.floor((b.scade - adesso) / 3600);
+      dillo('Questa fattura scade fra ' + (ore >= 2 ? ore + ' ore' : 'meno di due ore')
+        + ', ma i sats ti arrivano quando chi vende li libera, e possono passare ore: arriverebbe scaduta. '
+        + 'Fai una fattura che duri almeno un giorno — molti wallet la fanno scegliere alla voce «Scadenza» (o «Expiry») — oppure usa il tuo indirizzo Lightning, che non scade.'
+        + (P2P_FATTURA_CORTA_SI_MANDA
+            ? ' Se il tuo wallet non le fa più lunghe, tocca di nuovo «Invia»: la mandiamo lo stesso, e se scade prima del rilascio te ne chiederemo una nuova.'
+            : ''));
+      return;
+    }
   } else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(testo)) {
     dillo('Non sembra un indirizzo Lightning né una richiesta di pagamento.');
     return;
@@ -44391,6 +44540,8 @@ async function inviaIncassoP2P(){
        coordinatore, che quel giro di rete lo sa gia' fare — e cosi'
        nessun wallet di terzi deve rispondere al nostro browser */
     await chiamataOrdineP2P(o, 'add-invoice', {payment_request: [null, testo, null]});
+    ricordaFatturaP2P(o.id, scadeData);
+    p2pFatturaCortaVista = '';
     chiudiFoglioP2P('p2pIncassoSheet');
     p2pIncassoOrdine = '';
     toast('Inviato ✅');

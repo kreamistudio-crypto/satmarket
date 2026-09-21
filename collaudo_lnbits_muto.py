@@ -245,6 +245,21 @@ def riga(oid):
     return dict(o)
 
 
+def fattura_di_ieri(oid, bolt11):
+    """LA FATTURA GIA' IN COLONNA (21 set 2026). Fino al 20 set il
+    venditore la incollava appena venduto, e i banchi la mettevano li'
+    passando da `deposita_invoice`; da quando la fattura si incolla solo
+    all'incasso quella porta prima della conferma e' CHIUSA. Gli ordini
+    che una fattura ce l'hanno gia' pero' esistono, e si pagano come
+    ieri: e' il caso che queste scene tengono vivo, e si semina
+    scrivendo la colonna, come ha fatto il tempo."""
+    con = SRV.db()
+    con.execute("UPDATE ordini SET invoice_venditore=? WHERE id=?",
+                (bolt11, oid))
+    con.commit()
+    con.close()
+
+
 def semina():
     """Un venditore SENZA Lightning address: cosi' l'unica strada e' la
     invoice depositata a mano, che e' proprio quella che il vecchio
@@ -295,9 +310,7 @@ def main():
     print("\n[il nodo tace mentre il compratore conferma]")
     oid = ordine_pagato(a1)
     NODO["codice"] = 200
-    come(222)
-    chiama(SRV.deposita_invoice, oid, None,
-           corpo={"invoice": "lnbc-del-venditore"})
+    fattura_di_ieri(oid, "lnbc-del-venditore")
     prima = riga(oid)
     prova("la invoice depositata e' in colonna", "lnbc-del-venditore",
           prima["invoice_venditore"])
@@ -372,6 +385,12 @@ def main():
     # ---- 3) il deposito col nodo giu' ----------------------------
     print("\n[depositare una invoice mentre il nodo tace]")
     oid2 = ordine_pagato(a2)
+    # la porta si apre solo all'incasso (21 set 2026): l'ordine e' gia'
+    # confermato, e il venditore senza metodo incolla la sua fattura
+    con = SRV.db()
+    con.execute("UPDATE ordini SET stato='confirmed' WHERE id=?", (oid2,))
+    con.commit()
+    con.close()
     com_era = riga(oid2)["invoice_venditore"]
     NODO["codice"] = 520
     come(222)
@@ -412,9 +431,8 @@ def main():
     # ---- 5) il timer, e le parole giuste -------------------------
     print("\n[un ordine chiuso dal timer e ripreso dal giro]")
     oid3 = ordine_pagato(a3)
-    come(222)
     NODO["codice"] = 200
-    chiama(SRV.deposita_invoice, oid3, None, corpo={"invoice": "lnbc-terza"})
+    fattura_di_ieri(oid3, "lnbc-terza")
     NODO["codice"] = 520
     DETTO.clear()
     # e' il timer a chiudere: `automatico=True`, come da controlla_scadenze
@@ -473,9 +491,7 @@ def main():
     oid5 = ordine_pagato(a2)
     NODO["codice"] = 200
     NODO["esito"] = "failed"        # prende, e poi non consegna
-    come(222)
-    chiama(SRV.deposita_invoice, oid5, None,
-           corpo={"invoice": "lnbc-che-fallisce"})
+    fattura_di_ieri(oid5, "lnbc-che-fallisce")
     DETTO.clear(); AVVISI.clear(); USCITE.clear()
     come(111)
     chiama(SRV.conferma_ricezione, oid5, None)
