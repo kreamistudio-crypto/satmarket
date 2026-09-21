@@ -729,3 +729,19 @@ SELECT 'payout congelati o in volo', cassaforte, COUNT(*), 0
 -- non questo file: la leva si legge VIVA. Lo stesso conto lo fa
 -- l''orologio da solo (`avvisa_saas_senza_doveri`) e avvisa UNA volta,
 -- il giorno che scende a zero.
+-- ---------------------------------------------------------------------
+-- 25) I CREDITI DA RECUPERARE (21 set 2026, «paga da un''altra
+-- cassaforte»): i pagamenti rimasti appesi su una cassaforte mentre
+-- l''ordine veniva pagato da un''altra. 'aperto' = sats impegnati la';
+-- 'doppio' = si e'' saldato lo stesso, chi vende ha ricevuto due volte.
+-- Vuoto e'' la risposta sana. La ronda quotidiana lo grida da sola.
+SELECT '25) I CREDITI DA RECUPERARE (vuoto = niente di appeso)' AS controllo;
+SELECT id, tabella, riga_id, cassaforte, pagato_da, sats, stato,
+       datetime(deciso_il, 'unixepoch', 'localtime') AS deciso, deciso_da,
+       motivo, nota
+  FROM crediti_cassaforte WHERE stato IN ('aperto','doppio');
+-- ...e gli ordini che pagano da una cassaforte diversa dalla loro: ognuno
+-- deve avere la sua nota (chi, quando, perche'')
+SELECT '25b) GLI INCASSI DEVIATI (un polso: ognuno con la sua nota)' AS polso;
+SELECT id, stato, payout_stato, cassaforte, cassaforte_payout, payout_nota
+  FROM ordini WHERE COALESCE(cassaforte_payout,'') <> '';

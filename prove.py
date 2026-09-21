@@ -3170,6 +3170,8 @@ def prove_saas_senza_doveri():
             stato TEXT, cassaforte TEXT DEFAULT '', payout_stato TEXT DEFAULT '');
         CREATE TABLE pagamenti(id INTEGER PRIMARY KEY, stato TEXT,
             cassaforte TEXT DEFAULT 'saas', payout_stato TEXT DEFAULT '');
+        CREATE TABLE crediti_cassaforte(id INTEGER PRIMARY KEY,
+            cassaforte TEXT, stato TEXT DEFAULT 'aperto');
     """)
     timbri, avvisi, nuova = {}, [], ["nodo"]
 
@@ -3235,6 +3237,15 @@ def prove_saas_senza_doveri():
          "INSERT INTO rimborsi_asta(puntata_id, stato, payout_stato, cassaforte) "
          "VALUES(9,'riscosso','incerto','saas')",
          "UPDATE rimborsi_asta SET payout_stato='uscito'"),
+        # IL SESTO (21 set 2026): l'ordine e' chiuso — pagato dal nodo —
+        # ma sul SaaS c'e' un pagamento appeso coi suoi sats dentro
+        ("credito da recuperare sul SaaS",
+         "INSERT INTO crediti_cassaforte(cassaforte) VALUES('saas')",
+         "UPDATE crediti_cassaforte SET stato='rientrato'"),
+        ("credito saldato due volte sul SaaS",
+         "INSERT INTO crediti_cassaforte(cassaforte, stato) "
+         "VALUES('saas','doppio')",
+         "UPDATE crediti_cassaforte SET stato='recuperato'"),
     ]
     for nome, apri, chiudi in casi:
         prima = len(avvisi)
@@ -3588,7 +3599,10 @@ def prove_esito_pagamento():
                "timbro_letto": lambda n: ("2000-01-01" if oggi_gia_fatto
                                           else timbri.get(n, "")),
                "timbro_scrivi": lambda n, v: timbri.__setitem__(n, v),
-               "print": lambda *a, **k: None}
+               "print": lambda *a, **k: None,
+               # dal 21 set 2026 la ronda chiede ogni hash alla cassaforte
+               # che l'ha TENTATO, e ripiega su quella della riga
+               **ambiente_altra_cassaforte()}
         if oggi_gia_fatto:
             # il timbro del giorno gia' scritto DA OGGI: si finge che
             # `time.strftime` e il timbro combacino
@@ -3909,7 +3923,8 @@ def costanti_verita():
 
 NOMI_IN_PAGAMENTO = (
     "VIA_LIGHTNING", "VIA_ONCHAIN", "IN_PAGAMENTO_LUNGO_S", "BACKOFF_NOSTRO",
-    "MOTIVO_LNBITS_MUTO", "MOTIVI_NOSTRI", "PASSO_DECISO", "PASSO_PARTITO",
+    "MOTIVO_LNBITS_MUTO", "MOTIVO_ALTRA_CASSAFORTE", "MOTIVO_FATTURA_NUOVA",
+    "MOTIVI_NOSTRI", "PASSO_DECISO", "PASSO_PARTITO",
     "PASSO_IN_VOLO", "PASSO_IN_VERIFICA", "PASSO_GUASTO", "PASSO_FALLITO",
     "PASSO_SERVE", "PASSO_ARRIVATO", "PASSO_RIPARTE", "PASSO_CONFERME",
     "_segna_passo", "_segna_deciso", "_ultimo_passo", "_conta_guasti",
@@ -3954,7 +3969,37 @@ def ambiente_in_pagamento(notifica=None, commissione=0):
         # `pezzo` taglia dal `def`: all'unica asincrona l'`async` va rimesso
         exec(("async " if nome == "_avvisa_in_pagamento" else "")
              + pezzo(nome), p)
-    return {n: p[n] for n in NOMI_IN_PAGAMENTO}
+    # ...e i quattro di «paga da un'altra cassaforte» (21 set 2026), che
+    # stanno dentro le stesse funzioni d'uscita: chi monta questi monta
+    # anche quelli, o `_sblocca_sats` e la ronda esplodono un cantiere dopo
+    return {**{n: p[n] for n in NOMI_IN_PAGAMENTO},
+            **ambiente_altra_cassaforte()}
+
+
+NOMI_ALTRA_CASSAFORTE = ("DEVIATO", "_dove_tentati", "_cassaforte_tentata",
+                         "_cassaforte_uscita")
+
+
+def ambiente_altra_cassaforte():
+    """I QUATTRO NOMI che «paga da un'altra cassaforte» (21 set 2026) ha
+    messo DENTRO le funzioni d'uscita di sempre — `_verita_riga`,
+    `paga_venditore`, `_sblocca_sats`, la ronda, la riconciliazione — e
+    che quindi ogni ambiente finto che le fa girare deve montare, o
+    esplode con un NameError: la trappola delle funzioni estratte, al
+    giro dopo. Ambiente PRIVATO, come `ambiente_in_pagamento`: si
+    esportano i soli nomi del cantiere.
+    SUI BANCHI DI IERI le colonne nuove possono non esserci (uno schema
+    di cartone scritto a mano): `_dove_tentati` allora risponde vuoto e
+    `cassaforte_payout` manca dalla riga, cioe' ogni hash si chiede alla
+    cassaforte della riga e si paga da quella — il comportamento di
+    ieri, ed e' il fail-open dichiarato."""
+    p = {"sqlite3": __import__("sqlite3")}
+    i = _SORGENTE.index("\nDEVIATO = ") + 1
+    exec(_SORGENTE[i:_SORGENTE.index("\n", i)], p)
+    for nome in ("_campo", "_dove_tentati", "_cassaforte_tentata",
+                 "_cassaforte_uscita"):
+        exec(pezzo(nome), p)
+    return {n: p[n] for n in NOMI_ALTRA_CASSAFORTE}
 
 
 def ambiente_scadenza():
@@ -4099,6 +4144,16 @@ def prove_pagamenti_in_volo(attrezzi=False):
             nodo.lnbits, nodo.lnd, nodo.partiti = {}, {}, []
             nodo.modi, nodo.muto, nodo.alla_post = {}, False, None
             nodo.coniate, nodo.timbri, nodo.alla_lnd = [], {}, None
+            # LE LNBITS SONO DUE (21 set 2026): `lnbits` resta quella del
+            # nodo — tutte le scene di ieri vivono li' — e `saas` e'
+            # l'altra, che un LND dietro non ce l'ha. A distinguerle e'
+            # l'URL, come in produzione. `chiesti` ricorda A CHI si e'
+            # domandato ogni hash; `hash_di` e' come il nodo da' un nome
+            # a una fattura (il cartone di sempre, o quello vero per chi
+            # usa bolt11 che si leggono).
+            nodo.saas, nodo.muto_saas, nodo.chiesti = {}, False, []
+            nodo.bolt11_di, nodo.pagati_da = {}, []
+            nodo.hash_di = lambda bolt: ("hash-di-" + bolt)[:100]
         else:
             vero, nodo = condiviso.vero, condiviso.nodo
         m.vero, m.nodo, m.detto, m.avvisi = vero, nodo, [], []
@@ -4125,33 +4180,41 @@ def prove_pagamenti_in_volo(attrezzi=False):
 
             async def get(self, url, headers=None, **k):
                 await asyncio.sleep(0)
-                if nodo.muto:
+                di_la = "//saas" in url
+                if nodo.muto_saas if di_la else nodo.muto:
                     raise OSError("ReadTimeout")
+                banca = nodo.saas if di_la else nodo.lnbits
                 h = url.rsplit("/", 1)[-1]
-                if h not in nodo.lnbits:
+                nodo.chiesti.append(("saas" if di_la else "nodo", h))
+                if h not in banca:
                     return _R(404, {})
-                return _R(200, {"status": nodo.lnbits[h],
-                                "paid": nodo.lnbits[h] == "success"})
+                return _R(200, {"status": banca[h],
+                                "paid": banca[h] == "success",
+                                **({"details": {"bolt11": nodo.bolt11_di[h]}}
+                                   if h in nodo.bolt11_di else {})})
 
             async def post(self, url, headers=None, json=None, **k):
                 # TRONCO A 100, come fa `paga_venditore` col payment
                 # hash: con una bolt11 VERA (300 caratteri) nodo e server
                 # parlerebbero altrimenti di due pagamenti diversi
-                h = ("hash-di-" + json["bolt11"])[:100]
+                h = nodo.hash_di(json["bolt11"])
+                di_la = "//saas" in url
+                banca = nodo.saas if di_la else nodo.lnbits
                 if nodo.alla_post:
                     nodo.alla_post(h)
                 await asyncio.sleep(0)
                 modo = nodo.modi.get(json["bolt11"], "ok")
                 if modo == "perso":        # mai arrivata nemmeno a LNbits
                     raise OSError("ConnectTimeout")
-                if h in nodo.lnbits:       # una riga per hash: l'eco
-                    return _R(201, {"status": nodo.lnbits[h]})
+                if h in banca:             # una riga per hash: l'eco
+                    return _R(201, {"status": banca[h]})
                 nodo.partiti.append(h)
+                nodo.pagati_da.append(("saas" if di_la else "nodo", h))
                 if isinstance(modo, tuple):
                     # IL RIFIUTO COL SUO PERCHE' (20 set 2026): LNbits
                     # segna la riga `failed` e risponde un numero >= 300
                     # col motivo nel `detail` — il 520 dell'ordine #152
-                    nodo.lnbits[h] = "failed"
+                    banca[h] = "failed"
                     return _R(modo[0], {"detail": modo[1]})
                 lnb, lnd = {"ok": ("success", "SUCCEEDED"),
                             "hold": ("pending", "IN_FLIGHT"),
@@ -4159,8 +4222,8 @@ def prove_pagamenti_in_volo(attrezzi=False):
                             "timeout_ok": ("success", "SUCCEEDED"),
                             "timeout_fail": ("failed", "FAILED"),
                             "mai_a_lnd": ("pending", None)}[modo]
-                nodo.lnbits[h] = lnb
-                if lnd:
+                banca[h] = lnb
+                if lnd and not di_la:      # il SaaS un LND nostro non ce l'ha
                     nodo.lnd[h] = lnd
                 if modo.startswith("timeout"):
                     nodo.muto = True
@@ -4177,7 +4240,7 @@ def prove_pagamenti_in_volo(attrezzi=False):
             return nodo.lnd.get(h, K["LND_ASSENTE"])
 
         async def _decodifica(bolt11, cassaforte=""):
-            return {"payment_hash": ("hash-di-" + bolt11)[:100],
+            return {"payment_hash": nodo.hash_di(bolt11),
                     "amount_msat": 1000 * 1000}
 
         async def _importo(bolt11, dec=None, cassaforte=""):
@@ -4201,7 +4264,9 @@ def prove_pagamenti_in_volo(attrezzi=False):
             "httpx": type("H", (), {"AsyncClient": Client}),
             "_lucchetti_ordine": collections.defaultdict(asyncio.Lock),
             "_chiavi_cassaforte":
-                lambda nome="": Cf(nome or "nodo", "http://finto", "k", "K"),
+                lambda nome="": Cf(nome or "nodo",
+                                   "http://saas" if nome == "saas"
+                                   else "http://finto", "k", "K"),
             "_cassaforte_riga": lambda con, tab, rid: "nodo",
             "CASSAFORTE_NODO": "nodo", "_chiedi_lnd": _chiedi_lnd,
             "timbro_letto": lambda k: nodo.timbri.get(k, ""),
@@ -6134,6 +6199,845 @@ def prove_in_pagamento():
                     for chi in ("buyer", "seller")))
         prova("la linea comprime: «5 volte»", True,
               "5 volte" in tutte[("admin", "in_volo", "")][5])
+
+
+def prove_altra_cassaforte():
+    """PAGA DA UN'ALTRA CASSAFORTE (21 set 2026, ordine #152).
+
+    IL CASO VERO sta in testa, per intero: l'incasso di chi vende appeso
+    in «pending» sul LNbits ospitato (che un LND nostro dietro non ce
+    l'ha), la fattura di quel tentativo che scade, il moderatore che
+    prova troppo presto, poi chiede la fattura nuova, chi vende che la
+    incolla, e il pagamento che parte DAL NODO passando dalla strada
+    d'uscita di sempre. E il suo contrario: un'origine IN_FLIGHT non si
+    scavalca nemmeno a fattura scaduta da un mese.
+
+    IL MONDO E' QUELLO DEI PAGAMENTI IN VOLO (`attrezzi=True`), con le
+    LNbits che da oggi sono due: le funzioni sono tutte vere, di cartone
+    restano i due estremi. IN PIU' C'E' UN OROLOGIO CHE SI SPOSTA: il
+    calendario e' una delle due prove che il pagamento d'origine e'
+    morto, e una scadenza non si aspetta — quindi il lettore delle
+    fatture si rimonta DENTRO il mondo, dove legge l'ora di li'."""
+    print("\n[paga da un'altra cassaforte: il caso #152]")
+    import asyncio
+    import shutil
+    import subprocess
+    import tempfile
+    import time as _time
+
+    A = prove_pagamenti_in_volo(attrezzi=True)
+    gira, prova_a, K = A["gira"], A["prova_a"], A["K"]
+
+    class Orologio:
+        def __init__(self):
+            self.avanti = 0
+
+        def time(self):
+            return _time.time() + self.avanti
+
+        def localtime(self, t=None):
+            return _time.localtime(self.time() if t is None else t)
+
+        def strftime(self, forma, t=None):
+            return _time.strftime(forma, t or self.localtime())
+
+    def h(n):
+        return f"{n:064x}"
+
+    def mondo2(cassaforte="saas", address="", invoice_n=1, vita=3600,
+               condiviso=None, stato="confirmed"):
+        """Un ordine 'confirmed' da 1000 sats nella cassaforte data, con
+        in colonna la fattura numero `invoice_n` (nata adesso). Torna il
+        mondo con `m.orologio`, `m.detto_a` (le notifiche alle parti) e
+        `m.F(n)` per coniare altre fatture all'ora di quel mondo."""
+        orologio = condiviso.orologio if condiviso else Orologio()
+
+        def F(n, vita=3600):
+            return bolt11_finta(1000, vita, int(orologio.time()), phash=n)
+
+        m = A["mondo"](invoice=F(invoice_n, vita) if invoice_n else "",
+                       address=address, stato=stato,
+                       condiviso=condiviso)
+        m.orologio, m.F = orologio, F
+        m.detto_a = condiviso.detto_a if condiviso else []
+        if condiviso is None:
+            for col in ("cassaforte_payout TEXT DEFAULT ''",
+                        "payout_nota TEXT DEFAULT ''"):
+                m.vero.execute(f"ALTER TABLE ordini ADD COLUMN {col}")
+            m.vero.execute("UPDATE ordini SET cassaforte=?", (cassaforte,))
+            i = _SORGENTE.index(
+                '"CREATE TABLE IF NOT EXISTS crediti_cassaforte("')
+            j = _SORGENTE.index('hash))")', i) + len('hash))"')
+            m.vero.execute(eval("(" + _SORGENTE[i:j] + ")"))
+            m.vero.commit()
+            m.nodo.pronte = ["saas", "nodo"]
+
+        async def _nota(chi, testo, *a, **k):
+            m.detto_a.append((chi, testo))
+
+        amb = m.amb
+        amb.update({
+            "time": orologio, "notifica": _nota, "sqlite3": __import__("sqlite3"),
+            "CASSAFORTI": ("saas", "nodo"), "CASSAFORTE_SAAS": "saas",
+            "_lnd_configurato": lambda: True,
+            "_cassaforte_pronta": lambda nome: nome in m.nodo.pronte})
+        # il lettore delle fatture DENTRO il mondo: legge l'ora di qui
+        for nome in ("leggi_bolt11", "vita_fattura", "giorno_scadenza",
+                     "rifiuto_scadenza", "_durata_a_parole",
+                     "_cassaforte_riga"):
+            exec(pezzo(nome), amb)
+        leggi = amb["leggi_bolt11"]
+        m.nodo.hash_di = lambda bolt: (
+            (leggi(bolt, con_hash=True) or {}).get("hash")
+            or ("hash-di-" + bolt)[:100])
+        i = _SORGENTE.index("\nALTRA_CASSAFORTE_DOPO_SCADENZA_S = ") + 1
+        exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+        for nome, asincrona in (
+                ("_giudica_origine", 0), ("_trascrivi_scadenza", 0),
+                ("_scadenza_da_lnbits", 1), ("_fattura_nuova_pronta", 0),
+                ("_esamina_altra_cassaforte", 1),
+                ("_altra_cassaforte_forse", 0),
+                ("posso_altra_cassaforte", 1),
+                ("paga_da_altra_cassaforte", 1), ("_chiedi_fattura_nuova", 1),
+                ("lista_crediti", 0), ("chiudi_credito", 1),
+                ("sorveglia_crediti", 1), ("deposita_invoice", 1)):
+            exec(("async " if asincrona else "") + pezzo(nome), amb)
+        return m
+
+    def riga(m):
+        return tuple(m.vero.execute(
+            "SELECT stato, payout_stato, payout_hash, cassaforte, "
+            "cassaforte_payout FROM ordini WHERE id=1").fetchone())
+
+    def primo(m, sql, *par):
+        # la prima colonna della prima riga, o None: una riga che manca
+        # fa una prova ROSSA, non un banco che salta
+        r = m.vero.execute(sql, par).fetchone()
+        return r[0] if r else None
+
+    async def tenta(coro):
+        # UNA MUTAZIONE CHE FA ESPLODERE IL BANCO NON E' UCCISA: qualunque
+        # cosa salti dentro una rotta torna come valore, e la prova che la
+        # guarda diventa rossa per conto suo
+        try:
+            return await coro
+        except Exception as e:
+            return e
+
+    def posso(m):
+        return gira(tenta(m.amb["posso_altra_cassaforte"]("ordine", 1)))
+
+    def paga(m, **k):
+        return gira(tenta(m.amb["paga_da_altra_cassaforte"](
+            {"tipo": "ordine", "id": 1, **k})))
+
+    def campo(risposta, chiave):
+        return risposta.get(chiave) if isinstance(risposta, dict) else None
+
+    def codice_http(risposta):
+        return getattr(risposta, "status_code", None)
+
+    def incolla(m, bolt):
+        m.amb["verifica_utente"] = lambda *a: {"id": 222}
+        try:
+            return gira(tenta(m.amb["deposita_invoice"](
+                1, {"invoice": bolt})))
+        finally:
+            m.amb["verifica_utente"] = lambda *a: {"id": 999}
+
+    def stadio(m):
+        o = m.vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+        return (m.amb["_stadi_ordini"](m.amb["db"](), [dict(o)])
+                .get(1) or {})
+
+    def fino_al_congelato(m, modo="hold"):
+        """Il tentativo d'origine parte, resta appeso, e dopo 40 minuti
+        la ronda lo consegna a una persona: da qui cominciano le scene."""
+        bolt = m.vero.execute("SELECT invoice_venditore FROM ordini "
+                              "WHERE id=1").fetchone()[0]
+        m.nodo.modi[bolt] = modo
+        gira(m.sblocca())
+        m.orologio.avanti = 2400
+        gira(m.ronda())
+
+    MINUTI = 60
+
+    # ================= 1. IL CASO #152, PER INTERO ===================
+    m = mondo2()
+    F1 = m.vero.execute("SELECT invoice_venditore FROM ordini").fetchone()[0]
+    m.nodo.modi[F1] = "hold"
+    gira(m.sblocca())
+    prova("#152: il payout parte dal SaaS e resta appeso",
+          ("confirmed", "in_volo", h(1), "saas", ""), riga(m))
+    prova("...la POST e' andata al SaaS, non al nodo", [("saas", h(1))],
+          m.nodo.pagati_da)
+    t = m.vero.execute("SELECT cassaforte, scade FROM payout_tentati "
+                       "WHERE hash=?", (h(1),)).fetchone()
+    prova("...e la memoria ricorda DA DOVE e' partito e QUANDO scade la "
+          "sua fattura", ("saas", m.amb["leggi_bolt11"](F1)["scade"]),
+          tuple(t or ()))
+    m.orologio.avanti = 40 * MINUTI
+    gira(m.ronda())
+    prova("#152: dopo mezz'ora la ronda lo consegna a una persona",
+          "incerto", riga(m)[1])
+    forse = m.amb["_altra_cassaforte_forse"]
+    o = m.vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+    prova("il bottone e' SPENTO: la fattura d'origine non e' ancora scaduta",
+          False, forse(m.amb["db"](), o, int(m.orologio.time()))["forse"])
+    r = posso(m)
+    prova("troppo presto (fattura viva): la porta e' chiusa, e dice «viva»",
+          (False, "viva"), (campo(r, "ok"), campo(r, "codice")))
+    r = paga(m, cassaforte="nodo", conferma=True)
+    prova("...e la rotta RIFIUTA con un 409", 409, codice_http(r))
+    prova("...con la frase chiara", True,
+          "non è ancora scaduta" in str(getattr(r, "detail", "")))
+    m.orologio.avanti = 70 * MINUTI         # scaduta da dieci minuti
+    r = posso(m)
+    prova("scaduta da 10 minuti: e' «presto», e dice fra quanto",
+          ("presto", True),
+          (campo(r, "codice"), "riprova fra 50" in (campo(r, "perche") or "")))
+    m.orologio.avanti = 130 * MINUTI        # scaduta da settanta
+    o = m.vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+    prova("scaduta da 70 minuti: il bottone si ACCENDE", True,
+          forse(m.amb["db"](), o, int(m.orologio.time()))["forse"])
+    r = posso(m)
+    prova("l'origine e' morta, ma MANCA la fattura nuova (in colonna c'e' "
+          "la vecchia)", ("manca_fattura", True, True),
+          (campo(r, "codice"), campo(r, "origine_morta"),
+           campo(r, "fattura_vecchia")))
+    r = paga(m, cassaforte="nodo", conferma=True)
+    prova("...e senza fattura nuova NON si paga (409)", 409, codice_http(r))
+    prova("...ne' si e' mosso niente", ([("saas", h(1))], "incerto"),
+          (m.nodo.pagati_da, riga(m)[1]))
+    r = paga(m, azione="chiedi_fattura")
+    prova("il moderatore CHIEDE la fattura nuova", "chiesta",
+          campo(r, "esito"))
+    prova("...a chi vende arriva UN messaggio, che dice di chi e' la colpa",
+          (1, True), (len([x for x in m.detto_a if x[0] == 222]),
+                      "guasto <b>nostro</b>" in m.detto_a[-1][1]))
+    prova("...la vecchia fattura esce dalla colonna", "",
+          m.vero.execute("SELECT invoice_venditore FROM ordini").fetchone()[0])
+    s = stadio(m)
+    prova("...e lo stadio apre il campo a chi vende, restando «in verifica»",
+          ("in_verifica", True, "altra_cassaforte"),
+          (s.get("passo"), s.get("gesto_venditore"), s.get("motivo")))
+    r = paga(m, azione="chiedi_fattura")
+    prova("il doppio click non ridice niente a nessuno",
+          ("gia_chiesta", 1),
+          (campo(r, "esito"), len([x for x in m.detto_a if x[0] == 222])))
+    F2 = m.F(2)
+    r = incolla(m, F2)
+    prova("chi vende incolla la fattura nuova: NON parte niente, attende "
+          "un moderatore", (True, [("saas", h(1))]),
+          (campo(r, "attende_moderatore"), m.nodo.pagati_da))
+    prova("...ai moderatori arriva l'avviso", True,
+          any("fattura nuova" in a and "📥" in a for a in m.avvisi))
+    prova("...e il gesto di chi vende si spegne", False,
+          stadio(m).get("gesto_venditore"))
+    r = posso(m)
+    prova("adesso SI PUO': origine, destinazioni, cifra, e un credito",
+          (True, "saas", ["nodo"], 1000, "fattura", 1),
+          (campo(r, "ok"), campo(r, "origine"), campo(r, "destinazioni"),
+           campo(r, "sats"), campo(r, "fattura"),
+           len(campo(r, "crediti") or [])))
+    prova("...con le voci delle fonti da mostrare a chi conferma", True,
+          "LNbits dice «pending», LND dice «spento»"
+          in " ".join(campo(r, "voci") or []))
+    prova("senza la conferma esplicita: 400", 400,
+          codice_http(paga(m, cassaforte="nodo")))
+    prova("verso la STESSA cassaforte: 400", 400,
+          codice_http(paga(m, cassaforte="saas", conferma=True)))
+    prova("verso una cassaforte che non esiste: 400", 400,
+          codice_http(paga(m, cassaforte="luna", conferma=True)))
+    prova("...e fin qui non si e' mosso niente", [("saas", h(1))],
+          m.nodo.pagati_da)
+    r = paga(m, cassaforte="nodo", conferma=True)
+    prova("#152: PAGATO DAL NODO", (True, "deviato", "released"),
+          (campo(r, "ok"), campo(r, "esito"), campo(r, "stato")))
+    prova("...la POST nuova e' andata al nodo, con la fattura nuova",
+          [("saas", h(1)), ("nodo", h(2))], m.nodo.pagati_da)
+    prova("...l'ordine e' chiuso; `cassaforte` NON e' cambiata, "
+          "`cassaforte_payout` dice da dove e' uscito",
+          ("released", "uscito", h(2), "saas", "nodo"), riga(m))
+    nota = m.vero.execute("SELECT payout_nota FROM ordini").fetchone()[0]
+    prova("...la nota dice da dove, invece di dove, chi, e perche'",
+          [True] * 4,
+          [x in nota for x in ("pagato dalla cassaforte nodo invece di saas",
+                               "deciso da 999", "motivo:", "pending")])
+    c = m.vero.execute("SELECT cassaforte, hash, sats, pagato_da, deciso_da, "
+                       "stato FROM crediti_cassaforte").fetchall()
+    prova("...sul SaaS resta UN credito da recuperare, col suo hash",
+          [("saas", h(1), 1000, "nodo", 999, "aperto")],
+          [tuple(x) for x in c])
+    prova("...l'hash d'origine e' «deviato» e ricorda la sua cassaforte",
+          ("deviato", "saas"),
+          tuple(m.vero.execute("SELECT esito, cassaforte FROM payout_tentati "
+                               "WHERE hash=?", (h(1),)).fetchone() or ()))
+    prova("...chi vende riceve «Arrivati ✓», come sempre", True,
+          any(chi == 222 and "Arrivati ✓" in t for chi, t in m.detto_a))
+    prova("...i moderatori leggono il verbale, col credito", True,
+          any("🔀" in a and "credito da recuperare" in a for a in m.avvisi))
+    prova("...il journal ha la riga della decisione", True,
+          any("⚖️ Altra cassaforte" in d and "DEVIATO da saas a nodo" in d
+              for d in m.detto))
+    prova("...e l'hash del SaaS NON e' mai stato chiesto al nodo", False,
+          ("nodo", h(1)) in m.nodo.chiesti)
+    prova("secondo click: 409, e nessun pagamento in piu'",
+          (409, 2), (codice_http(paga(m, cassaforte="nodo", conferma=True)),
+                     len(m.nodo.pagati_da)))
+    ctrl = [c for c in eval(
+        _SORGENTE[_SORGENTE.index("CONTROLLI_LIBRO_MASTRO = (")
+                  + len("CONTROLLI_LIBRO_MASTRO = "):
+                  _SORGENTE.index("\n)\n", _SORGENTE.index(
+                      "CONTROLLI_LIBRO_MASTRO = (")) + 2])
+        if c[0] in ("credito da recuperare su un'altra cassaforte",
+                    "incasso deviato senza verbale")]
+    prova("il libro mastro grida il credito, e NON la deviazione (ha il "
+          "suo verbale)", [[1], []],
+          [[x[0] for x in m.vero.execute(c[2]).fetchall()] for c in ctrl])
+
+    # ---- il credito, dopo: rientra da solo, o e' un doppio -----------
+    m.orologio.avanti += 3600
+    gira(m.amb["sorveglia_crediti"]())
+    prova("credito ancora appeso: resta aperto, in silenzio",
+          ("aperto", 0),
+          (primo(m, "SELECT stato FROM crediti_cassaforte"),
+           len([a for a in m.avvisi if "Credito" in a or "DOPPIO" in a])))
+    m.nodo.saas[h(1)] = "failed"
+    prima = len(m.nodo.chiesti)
+    gira(m.amb["sorveglia_crediti"]())
+    prova("...e nella stessa ora non richiede (un giro all'ora)", prima,
+          len(m.nodo.chiesti))
+    m.orologio.avanti += 3600
+    gira(m.amb["sorveglia_crediti"]())
+    prova("il pagamento appeso FALLISCE: il credito rientra da solo",
+          "rientrato",
+          primo(m, "SELECT stato FROM crediti_cassaforte"))
+    prova("...e lo si dice una volta", 1,
+          len([a for a in m.avvisi if "Credito rientrato" in a]))
+    m.vero.execute("UPDATE crediti_cassaforte SET stato='aperto'")
+    m.nodo.saas[h(1)] = "success"
+    m.orologio.avanti += 3600
+    gira(m.amb["sorveglia_crediti"]())
+    prova("il pagamento appeso SI SALDA: e' un DOPPIO, e si grida",
+          ("doppio", True),
+          (primo(m, "SELECT stato FROM crediti_cassaforte"),
+           any("DOPPIO PAGAMENTO" in a for a in m.avvisi)))
+    prova("la sorveglianza non paga e non tocca l'ordine",
+          (2, "released"), (len(m.nodo.pagati_da), riga(m)[0]))
+    r = gira(prova_a(m.amb["chiudi_credito"](1, {"nota": "ok"})))
+    prova("chiudere a mano senza una nota vera: 400", 400, codice_http(r))
+    r = gira(prova_a(m.amb["chiudi_credito"](
+        1, {"nota": "restituiti da chi vende il 22 set"})))
+    prova("...con la nota: chiuso, e resta scritto chi e perche'",
+          (True, "recuperato", True),
+          (campo(r, "ok"),) + (lambda x: (x[0], "999: restituiti" in x[1]))(
+              m.vero.execute("SELECT stato, nota FROM crediti_cassaforte")
+              .fetchone() or ("", "")))
+    prova("...due volte no", 409, codice_http(gira(prova_a(
+        m.amb["chiudi_credito"](1, {"nota": "restituiti un'altra volta"})))))
+
+    # ================= 2. L'ORIGINE IN_FLIGHT NON SI SCAVALCA ========
+    m = mondo2(cassaforte="nodo")
+    fino_al_congelato(m)
+    m.orologio.avanti = 30 * 86400          # scaduta da UN MESE
+    m.vero.execute("UPDATE ordini SET invoice_venditore=?", (m.F(2),))
+    r = posso(m)
+    prova("IN_FLIGHT su LND: «viva», anche a fattura scaduta da un mese",
+          (False, "viva"), (campo(r, "ok"), campo(r, "codice")))
+    o = m.vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+    prova("...il bottone pero' e' acceso: dove c'e' LND si chiede al tocco",
+          True, forse(m.amb["db"](), o, int(m.orologio.time()))["forse"])
+    r = paga(m, cassaforte="saas", conferma=True)
+    prova("...e la rotta RIFIUTA: 409, «IN VOLO»", (409, True),
+          (codice_http(r), "IN VOLO" in str(getattr(r, "detail", ""))))
+    prova("...niente pagato, niente toccato",
+          ([("nodo", h(1))], ("confirmed", "incerto", h(1), "nodo", ""), 0),
+          (m.nodo.pagati_da, riga(m), primo(m, "SELECT COUNT(*) FROM crediti_cassaforte")))
+
+    # ================= 3. DOVE C'E' LND, DECIDE LND ==================
+    m = mondo2(cassaforte="nodo")
+    fino_al_congelato(m)
+    m.nodo.lnd[h(1)] = "FAILED"              # LNbits resta «pending»
+    m.vero.execute("UPDATE ordini SET invoice_venditore=?", (m.F(2),))
+    r = posso(m)
+    prova("LND dice FAILED: morta subito, senza guardare il calendario",
+          (True, ["saas"]), (campo(r, "ok"), campo(r, "destinazioni")))
+    prova("...e siccome LNbits la tiene «pending», nasce un credito", 1,
+          len(campo(r, "crediti") or []))
+    r = paga(m, cassaforte="saas", conferma=True)
+    prova("...si paga dal SaaS", (True, ("saas", h(2))),
+          (campo(r, "ok"), m.nodo.pagati_da[-1]))
+    m = mondo2(cassaforte="nodo")
+    fino_al_congelato(m, modo="mai_a_lnd")
+    m.vero.execute("UPDATE ordini SET invoice_venditore=?", (m.F(2),))
+    r = posso(m)
+    prova("«payment isn't initiated» SENZA canarino non si crede: ignota",
+          "ignota", campo(r, "codice"))
+    prova("...e la rotta risponde 503, non 409", 503,
+          codice_http(paga(m, cassaforte="saas", conferma=True)))
+    A["canarino"](m)
+    r = posso(m)
+    prova("...a canarino vivo e dopo un quarto d'ora: mai partito, morta",
+          True, campo(r, "ok"))
+    m = mondo2(cassaforte="nodo")
+    bolt = m.vero.execute("SELECT invoice_venditore FROM ordini").fetchone()[0]
+    m.nodo.modi[bolt] = "mai_a_lnd"
+    gira(m.sblocca())
+    A["canarino"](m)
+    m.vero.execute("UPDATE ordini SET payout_stato='incerto'")
+    r = posso(m)
+    prova("LND non l'ha mai visto ma il tentativo e' di un minuto fa: presto",
+          "presto", campo(r, "codice"))
+
+    # ================= 4. IL SAAS CHE TACE, O CHE HA PAGATO ==========
+    m = mondo2()
+    fino_al_congelato(m)
+    m.orologio.avanti = 130 * MINUTI
+    m.vero.execute("UPDATE ordini SET invoice_venditore=?", (m.F(2),))
+    m.nodo.muto_saas = True
+    r = posso(m)
+    prova("il SaaS non risponde: ignota (il calendario da solo non basta)",
+          "ignota", campo(r, "codice"))
+    prova("...503, e non parte niente", (503, 1),
+          (codice_http(paga(m, cassaforte="nodo", conferma=True)),
+           len(m.nodo.pagati_da)))
+    m.nodo.muto_saas = False
+    m.nodo.saas[h(1)] = "success"
+    r = paga(m, cassaforte="nodo", conferma=True)
+    prova("il SaaS dice «success»: e' USCITO, non si ripaga (409)",
+          (409, True, 1),
+          (codice_http(r), "Verifica e riprova" in str(getattr(r, "detail", "")),
+           len(m.nodo.pagati_da)))
+    m.nodo.saas[h(1)] = "failed"
+    r = posso(m)
+    prova("il SaaS dice «failed»: morta, e SENZA credito (i sats sono "
+          "gia' rientrati)", (True, 0),
+          (campo(r, "ok"), len(campo(r, "crediti") or [])))
+
+    # ================= 5. LA SCADENZA CHE NON SI SA ==================
+    def senza_scadenza():
+        m = mondo2()
+        fino_al_congelato(m)
+        m.orologio.avanti = 130 * MINUTI
+        # chi vende ha GIA' coperto la vecchia fattura, e la memoria e'
+        # quella di una riga di ieri: la scadenza non la sa nessuno
+        m.vero.execute("UPDATE ordini SET invoice_venditore=?", (m.F(2),))
+        m.vero.execute("UPDATE payout_tentati SET scade=0")
+        return m
+
+    m = senza_scadenza()
+    r = posso(m)
+    prova("scadenza ignota e LNbits non la dice: ignota, porta chiusa",
+          ("ignota", True),
+          (campo(r, "codice"), "non conosco la scadenza"
+           in (campo(r, "perche") or "")))
+    m = senza_scadenza()
+    m.nodo.bolt11_di[h(1)] = bolt11_finta(
+        1000, 3600, int(_time.time()) - 60, phash=9)
+    prova("LNbits rende la bolt11 di UN ALTRO pagamento: non le si crede",
+          "ignota", campo(posso(m), "codice"))
+    m = senza_scadenza()
+    m.nodo.bolt11_di[h(1)] = bolt11_finta(1000, 3600, int(_time.time()),
+                                          phash=1)
+    r = posso(m)
+    prova("LNbits rende QUELLA bolt11 (l'hash combacia): la scadenza si "
+          "legge da li'", True, campo(r, "ok"))
+    prova("...e si trascrive, cosi' non si richiede", True,
+          (primo(m, "SELECT scade FROM payout_tentati") or 0) > 0)
+    # la riga DI IERI: nessuna memoria, il solo payout_hash, e in colonna
+    # ancora la fattura di quel tentativo (e' il #152 com'e' sul VPS)
+    m = mondo2()
+    fino_al_congelato(m)
+    m.vero.execute("DELETE FROM payout_tentati")
+    m.orologio.avanti = 130 * MINUTI
+    r = posso(m)
+    prova("riga di ieri: l'hash entra in memoria e la scadenza si legge "
+          "dalla fattura in colonna",
+          ("manca_fattura", (h(1), True)),
+          (campo(r, "codice"), (lambda x: (x[0], x[1] > 0))(
+              m.vero.execute("SELECT hash, scade FROM payout_tentati")
+              .fetchone() or ("", 0))))
+    m.vero.execute("UPDATE ordini SET invoice_venditore=?", (m.F(2),))
+    r = paga(m, cassaforte="nodo", conferma=True)
+    prova("...si paga dal nodo, e l'hash di ieri — che una cassaforte non "
+          "la ricordava — adesso porta scritto «saas»",
+          ("released", [("deviato", "saas"), ("", "nodo")]),
+          (campo(r, "stato"), [tuple(x) for x in m.vero.execute(
+              "SELECT esito, cassaforte FROM payout_tentati ORDER BY quando, "
+              "rowid")]))
+
+    # ================= 6. UNA SOLA MANO ==============================
+    def pronto():
+        m = mondo2()
+        fino_al_congelato(m)
+        m.orologio.avanti = 130 * MINUTI
+        m.vero.execute("UPDATE ordini SET invoice_venditore=?", (m.F(2),))
+        return m
+
+    async def insieme(*cori):
+        return await asyncio.gather(*[prova_a(c) for c in cori])
+
+    m = pronto()
+    corpo = {"tipo": "ordine", "id": 1, "cassaforte": "nodo",
+             "conferma": True}
+    esiti = gira(insieme(m.amb["paga_da_altra_cassaforte"](dict(corpo)),
+                         m.amb["paga_da_altra_cassaforte"](dict(corpo))))
+    prova("doppio click nello stesso istante: un pagamento, e un 409",
+          ([409, None], 1),
+          (sorted((codice_http(e) for e in esiti), key=str),
+           len([x for x in m.nodo.pagati_da if x[0] == "nodo"])))
+    m = pronto()
+    m2 = mondo2(condiviso=m)
+    esiti = gira(insieme(m.amb["paga_da_altra_cassaforte"](dict(corpo)),
+                         m2.amb["paga_da_altra_cassaforte"](dict(corpo))))
+    prova("due moderatori da due PROCESSI (lucchetti separati): uno solo",
+          ([409, None], 1, 1),
+          (sorted((codice_http(e) for e in esiti), key=str),
+           len([x for x in m.nodo.pagati_da if x[0] == "nodo"]),
+           primo(m, "SELECT COUNT(*) FROM crediti_cassaforte")))
+    m = pronto()
+    esiti = gira(insieme(m.amb["paga_da_altra_cassaforte"](dict(corpo)),
+                         m.decidi("verifica")))
+    prova("«altra cassaforte» e «Verifica e riprova» insieme: dal nodo al "
+          "massimo UN pagamento, dal SaaS nessuno in piu'", (True, 1),
+          (len([x for x in m.nodo.pagati_da if x[0] == "nodo"]) <= 1,
+           len([x for x in m.nodo.pagati_da if x[0] == "saas"])))
+
+    # ================= 7. LA STESSA FATTURA DA DUE CASSAFORTI ========
+    m = mondo2(cassaforte="nodo", vita=30 * 86400)
+    fino_al_congelato(m)
+    m.nodo.lnd[h(1)] = "FAILED"
+    r = posso(m)
+    prova("la fattura in colonna e' quella GIA' tentata: non vale come nuova",
+          "manca_fattura", campo(r, "codice"))
+    F1 = m.vero.execute("SELECT invoice_venditore FROM ordini").fetchone()[0]
+    m.vero.execute("UPDATE ordini SET payout_stato=''")
+    taccuino = {}
+    esito = gira(m.amb["paga_venditore"](
+        F1, 1000, taccuino, cassaforte="saas", riga=("ordini", 1, "venditore")))
+    prova("...e `paga_venditore` stessa, dall'ALTRA cassaforte, non la paga",
+          ("non_pagato", 1, True),
+          (esito, len(m.nodo.pagati_da),
+           "gia' tentata dalla cassaforte nodo" in taccuino.get("errore", "")))
+
+    m = mondo2()
+    fino_al_congelato(m)
+    m.orologio.avanti = 130 * MINUTI
+    m.vero.execute("UPDATE ordini SET invoice_venditore='lnbc-cartone'")
+    r = posso(m)
+    prova("una fattura in colonna che non si legge NON vale come nuova "
+          "(fail-closed)", ("manca_fattura", True),
+          (campo(r, "codice"), "non si riesce a leggere"
+           in (campo(r, "perche") or "")))
+    m = pronto()
+    m.vero.execute("UPDATE ordini SET invoice_venditore=?", (m.F(2, 300),))
+    r = posso(m)
+    prova("la fattura NUOVA ma con cinque minuti di vita non basta: la "
+          "scadenza si guarda anche qui", ("manca_fattura", True),
+          (campo(r, "codice"), "non va bene" in (campo(r, "perche") or "")))
+    prova("...e non si paga", (409, 1),
+          (codice_http(paga(m, cassaforte="nodo", conferma=True)),
+           len(m.nodo.pagati_da)))
+    m = pronto()
+    r = paga(m, azione="chiedi_fattura")
+    prova("la fattura nuova c'e' gia': chiederla di nuovo e' un 409, e a "
+          "chi vende non arriva niente", (409, 0),
+          (codice_http(r), len([x for x in m.detto_a if x[0] == 222])))
+
+    # ================= 8. COL LIGHTNING ADDRESS ======================
+    m = mondo2(address="pedro@wallet.tld")
+    fino_al_congelato(m)
+    m.orologio.avanti = 130 * MINUTI
+    r = posso(m)
+    prova("chi vende ha un address: si puo' senza incollare niente",
+          (True, "address", True),
+          (campo(r, "ok"), campo(r, "fattura"), campo(r, "fattura_vecchia")))
+    r = paga(m, cassaforte="nodo", conferma=True)
+    prova("...la vecchia esce dalla colonna, si conia dall'address e si "
+          "paga dal nodo", (True, ["pedro@wallet.tld"], "nodo", "released"),
+          (campo(r, "ok"), m.nodo.coniate, m.nodo.pagati_da[-1][0],
+           riga(m)[0]))
+
+    # ================= 9. SE DAL NODO FALLISCE =======================
+    m = pronto()
+    F2 = m.vero.execute("SELECT invoice_venditore FROM ordini").fetchone()[0]
+    m.nodo.modi[F2] = "fail"
+    r = paga(m, cassaforte="nodo", conferma=True)
+    prova("il pagamento dal nodo FALLISCE: la cassaforte resta cambiata, "
+          "l'ordine torna a chiedere una fattura",
+          (True, False, ("confirmed", "", "nodo")),
+          (campo(r, "ok") is True, "Pagato" in (campo(r, "messaggio") or ""),
+           (riga(m)[0], riga(m)[1], riga(m)[4])))
+    prova("...il credito sul SaaS resta aperto", "aperto",
+          primo(m, "SELECT stato FROM crediti_cassaforte"))
+    r = incolla(m, m.F(3))
+    prova("...e la fattura dopo si paga DA SOLA, dal nodo, senza moderatori",
+          ("released", ("nodo", h(3))),
+          (campo(r, "stato"), m.nodo.pagati_da[-1]))
+
+    # ================= 9a. DAL NODO RESTA IN VOLO ====================
+    # Da qui la riga e' del SaaS ma il suo pagamento vivo sta sul NODO:
+    # la ronda e «Verifica e riprova» devono chiedere LA', o il SaaS
+    # risponde «mai visto» e dopo un quarto d'ora si ripaga.
+    m = pronto()
+    F2 = m.vero.execute("SELECT invoice_venditore FROM ordini").fetchone()[0]
+    m.nodo.modi[F2] = "hold"
+    r = paga(m, cassaforte="nodo", conferma=True)
+    prova("dal nodo resta in volo: lo segue la ronda",
+          (True, "in_volo"), (campo(r, "in_volo"), riga(m)[1]))
+    m.orologio.avanti += 20 * MINUTI
+    del m.nodo.chiesti[:]
+    gira(m.ronda())
+    prova("...che chiede l'hash nuovo AL NODO, e mai al SaaS",
+          ([("nodo", h(2))], "in_volo"),
+          (sorted(set(m.nodo.chiesti)), riga(m)[1]))
+    m.orologio.avanti += 20 * MINUTI
+    gira(m.ronda())
+    prova("...dopo mezz'ora torna 🧊", "incerto", riga(m)[1])
+    del m.nodo.chiesti[:]
+    r = gira(tenta(m.decidi("verifica")))
+    prova("«Verifica e riprova» chiede al nodo anche lei: in volo, 409",
+          (409, False), (codice_http(r), ("saas", h(2)) in m.nodo.chiesti))
+    prova("...e non ha ripagato niente", 2, len(m.nodo.pagati_da))
+    r = posso(m)
+    prova("di nuovo «altra cassaforte», al contrario: il nodo e' IN_FLIGHT, "
+          "viva", "viva", campo(r, "codice"))
+    m.nodo.lnbits[h(2)] = "success"
+    m.nodo.lnd[h(2)] = "SUCCEEDED"
+    gira(m.ronda())
+    prova("il nodo salda: la ronda chiude come pagato, un pagamento solo "
+          "dal nodo", ("released", 1),
+          (riga(m)[0], len([x for x in m.nodo.pagati_da if x[0] == "nodo"])))
+
+    # ================= 9b. L'ORDINE RIMASTO 'shipped' ================
+    # Il ramo mite non cambia lo stato: un payout finito in volo lascia
+    # l'ordine com'era, e la porta «la fattura si incolla solo
+    # all'incasso» gli direbbe «troppo presto» mentre aspettiamo proprio
+    # lui. L'ha trovato il collaudo col server vero.
+    m = mondo2(stato="shipped")
+    fino_al_congelato(m)
+    m.orologio.avanti = 130 * MINUTI
+    r = incolla(m, m.F(2))
+    prova("'shipped' e congelato, ma NESSUNO ha chiesto la fattura: la "
+          "porta resta quella di ieri (400)", 400, codice_http(r))
+    paga(m, azione="chiedi_fattura")
+    r = incolla(m, m.F(2))
+    prova("...chiesta da un moderatore, la porta si apre",
+          True, campo(r, "attende_moderatore"))
+    r = paga(m, cassaforte="nodo", conferma=True)
+    prova("...e si paga dal nodo", ("released", ("nodo", h(2))),
+          (campo(r, "stato"), m.nodo.pagati_da[-1]))
+    # la richiesta e' rimasta l'ultima riga della linea del tempo, ma
+    # il payout NON e' piu' congelato (si e' chiarito da solo): la porta
+    # torna quella di ieri, o una fattura resterebbe in colonna per giorni
+    m = mondo2(stato="shipped")
+    fino_al_congelato(m)
+    m.orologio.avanti = 130 * MINUTI
+    paga(m, azione="chiedi_fattura")
+    m.vero.execute("UPDATE ordini SET payout_stato=''")
+    prova("...una richiesta VECCHIA su un payout non piu' congelato non "
+          "apre la porta", 400, codice_http(incolla(m, m.F(2))))
+    m = mondo2(stato="shipped")
+    fino_al_congelato(m)
+    m.orologio.avanti = 130 * MINUTI
+    paga(m, azione="chiedi_fattura")
+    m.amb["verifica_utente"] = lambda *a: {"id": 111}
+    r = gira(prova_a(m.amb["deposita_invoice"](1, {"invoice": m.F(2)})))
+    m.amb["verifica_utente"] = lambda *a: {"id": 999}
+    prova("...ma solo a chi vende: chi compra resta fuori", 400,
+          codice_http(r))
+
+    # ================= 10. IL GIUDICE, RIGA PER RIGA =================
+    giudica = m.amb["_giudica_origine"]
+    N = m.amb["ALTRA_CASSAFORTE_DOPO_SCADENZA_S"]
+    ORA = 1_000_000
+    casi = [
+        # verdetto, lnbits, lnd, scade, atteso
+        ("uscito", "success", "spento", ORA - 9 * N, "uscita"),
+        ("uscito", "pending", "SUCCEEDED", ORA - 9 * N, "uscita"),
+        ("in_volo", "pending", "IN_FLIGHT", ORA - 9 * N, "viva"),
+        ("ignoto", "muto", "IN_FLIGHT", ORA - 9 * N, "viva"),
+        ("fallito", "pending", "FAILED", 0, "morta"),
+        ("fallito", "failed", "spento", 0, "morta"),
+        ("mai_partito", "pending", "assente", 0, "morta"),
+        ("in_volo", "pending", "assente", ORA - 9 * N, "presto"),
+        ("in_volo", "pending", "muto", ORA - 9 * N, "ignota"),
+        ("ignoto", "success", "FAILED", ORA - 9 * N, "ignota"),
+        ("ignoto", "muto", "spento", ORA - 9 * N, "ignota"),
+        ("in_volo", "assente", "spento", ORA - 9 * N, "presto"),
+        ("in_volo", "pending", "spento", 0, "ignota"),
+        ("in_volo", "pending", "spento", ORA + 1, "viva"),
+        ("in_volo", "pending", "spento", ORA - N + 1, "presto"),
+        ("in_volo", "pending", "spento", ORA - N, "morta"),
+    ]
+    prova("il giudice dell'origine, sedici righe",
+          [c[4] for c in casi],
+          [giudica({"verdetto": c[0], "lnbits": c[1], "lnd": c[2]},
+                   c[3], ORA)[0] for c in casi])
+    prova("N e' un'ora, cioe' quattro volte il «mai partito»",
+          (3600, True), (N, N >= 4 * K["MAI_PARTITO_DOPO_S"]))
+    corpo_g = codice(pezzo("_giudica_origine"))
+    prova("il giudice e' PURO: niente rete, niente database", False,
+          any(x in corpo_g for x in ("await ", "db(", "httpx", "time.time")))
+
+    # ================= 11. I PEZZI, UNO PER UNO ======================
+    ALF = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+    i = BOLT11_VERA_7468.index("pp5") + 3
+    a_mano = "".join(f"{ALF.index(c):05b}"
+                     for c in BOLT11_VERA_7468[i:i + 52])[:256]
+    prova("il payment hash di una fattura VERA, contro il conto a mano",
+          f"{int(a_mano, 2):064x}",
+          m.amb["leggi_bolt11"](BOLT11_VERA_7468, con_hash=True)["hash"])
+    prova("...e senza `con_hash` il dizionario e' quello di ieri (il gemello)",
+          {"quando", "scadenza", "scade"},
+          set(m.amb["leggi_bolt11"](BOLT11_VERA_7468)))
+    pronta = reale("_cassaforte_pronta", {
+        "CASSAFORTE_NODO": "nodo", "CASSAFORTE_SAAS": "saas",
+        "_nodo_configurato": lambda: False, "LNBITS_URL": "http://x",
+        "LNBITS_ADMIN_KEY": "INCOLLA_QUI"})
+    prova("cassaforte pronta: il segnaposto non e' una chiave, e un nome "
+          "ignoto non e' una cassaforte", [False, False, False],
+          [pronta("nodo"), pronta("saas"), pronta("luna")])
+    m = pronto()
+    m.nodo.pronte = ["saas"]
+    o = m.vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+    prova("senza un'altra cassaforte configurata: bottone spento, e 409",
+          (False, "nessuna"),
+          (forse(m.amb["db"](), o, int(m.orologio.time()))["forse"],
+           campo(posso(m), "codice")))
+    m = pronto()
+    m.vero.execute("UPDATE ordini SET payout_verso='compratore'")
+    prova("un rimborso al compratore non si devia: torna da dove e' venuto",
+          "non_congelato", campo(posso(m), "codice"))
+    prova("solo gli ordini", 400, codice_http(gira(prova_a(
+        m.amb["posso_altra_cassaforte"]("rimborso", 1)))))
+
+    # ================= 12. LE SENTINELLE =============================
+    rotta = codice(pezzo("paga_da_altra_cassaforte"))
+    prova("la rotta e' dei moderatori, e il 403 sta PRIMA del corpo", True,
+          0 < rotta.index("e_admin(") < rotta.index("leggi_json("))
+    prova("...e anche il «posso?» e le due dei crediti", [True] * 3,
+          ["e_admin(" in pezzo(n) for n in (
+              "posso_altra_cassaforte", "lista_crediti", "chiudi_credito")])
+    prova("la rotta NON paga da se': ripassa dalla strada d'uscita",
+          (True, False, False),
+          ("_riprendi_uscita(" in rotta, "paga_venditore(" in rotta,
+           "httpx" in rotta))
+    prova("le guardie si rifanno DENTRO la rotta, non ci si fida del «posso?»",
+          True, rotta.index("_esamina_altra_cassaforte(")
+          < rotta.index("UPDATE ordini SET payout_stato=''"))
+    prova("una sola mano: l'UPDATE e' condizionato al congelamento e alla "
+          "cassaforte letta", True,
+          "AND payout_stato='incerto'" in rotta
+          and "COALESCE(NULLIF(cassaforte_payout,''), cassaforte)=?" in rotta)
+    prova("`cassaforte` non la riscrive nessuno", False,
+          " cassaforte=?" in rotta.replace("payout_tentati SET cassaforte=?",
+                                           ""))
+    esce = codice(pezzo("_sblocca_sats"))
+    prova("`_sblocca_sats` paga e congela dalla cassaforte d'USCITA",
+          (2, False), (esce.count("_cassaforte_uscita(o)"),
+                       'cassaforte=o["cassaforte"]' in esce))
+    prova("...il rimborso al compratore invece no", False,
+          "_cassaforte_uscita" in pezzo("_rimborsa_compratore"))
+    prova("la ronda e la riconciliazione chiedono alla cassaforte dell'hash",
+          [True, True],
+          ["_cassaforte_tentata(" in pezzo(n) for n in (
+              "risolvi_pagamenti_in_volo", "riconcilia_payout")])
+    prova("l'orologio chiama la ronda dei crediti", True,
+          "await sorveglia_crediti()" in pezzo("orologio"))
+    prova("la ronda dei crediti legge e avvisa: non paga e non tocca gli "
+          "ordini", False,
+          any(x in codice(pezzo("sorveglia_crediti")) for x in (
+              "paga_venditore(", "_riprendi_uscita(", "UPDATE ordini")))
+    prova("la coda del pannello dice da dove esce e se il bottone e' acceso",
+          True, "_altra_cassaforte_forse(" in pezzo("coda_pagamenti")
+          and "_cassaforte_uscita(" in pezzo("coda_pagamenti"))
+    mini = open("miniapp.html", encoding="utf-8").read()
+    riga_p = pezzo_js(mini, "const rigaPagamento = p => `", "\n    </div>`;")
+    prova("client: il TERZO bottone sta accanto agli altri due",
+          (True, True),
+          (riga_p.index("decidiPagamento(") < riga_p.index("altraCassaforte("),
+           "🔀 Paga da un'altra cassaforte" in riga_p))
+    foglio = pezzo_js(mini, "async function altraCassaforte(id){", "\n}\n")
+    prova("client: prima si chiede al server, poi la scelta e la conferma "
+          "esplicita", (True, True, True, True),
+          ("admin/pagamenti/altra-cassaforte?tipo=ordine" in foglio,
+           'id="altraCfSel"' in foglio, "conferma:true" in foglio,
+           "azione:'chiedi_fattura'" in foglio))
+    prova("client: il rischio che resta sta scritto nel foglio", True,
+          "due volte" in foglio and "CREDITO DA RECUPERARE" in foglio)
+    pannello = pezzo_js(mini, "function payoutPanel(o){", "\n}\n")
+    prova("client: a chi vende il campo della fattura si apre anche se "
+          "l'ordine non e' 'confirmed'", (True, 2),
+          ("const tocca = !!(o.pagamento && o.pagamento.gesto_venditore);"
+           in pannello, pannello.count("&& !tocca")))
+    prova("client: la scatola dei crediti c'e', e chiude con una nota",
+          (True, True),
+          ("${boxCrediti(crediti)}" in mini,
+           "admin/crediti/${id}/chiudi" in mini))
+    # IL CLIENT FATTO GIRARE, non solo letto: la riga del pannello e la
+    # scatola dei crediti disegnate da node, coi dati che manda il server
+    node = shutil.which("node")
+    if not node:
+        salta("client: la riga del 🧊 e la scatola dei crediti si disegnano",
+              "node non c'e'")
+    else:
+        js = ("const esc = s => String(s).replace(/[&<>\"']/g, c => '&#' "
+              "+ c.charCodeAt(0) + ';');\n"
+              "const fmt = n => String(n);\n"
+              + pezzo_js(mini, "const rigaPagamento = p => `",
+                         "\n    </div>`;") + "\n    </div>`;\n"
+              + pezzo_js(mini, "const STATI_CREDITO = {", "\n};") + "\n};\n"
+              + pezzo_js(mini, "function boxCrediti(crediti){", "\n}\n")
+              + "\n}\n"
+              + "const base = {tipo:'ordine', id:152, importo:247707, "
+              "payout_hash:'ab', cassaforte:'saas'};\n"
+              "console.log(JSON.stringify({\n"
+              " acceso: rigaPagamento({...base, altra_cassaforte:{forse:true}}),\n"
+              " spento: rigaPagamento({...base, altra_cassaforte:"
+              "{forse:false, perche:\"non c'è un'altra\"}}),\n"
+              " rimborso: rigaPagamento({...base, tipo:'rimborso'}),\n"
+              " vuota: boxCrediti([]),\n"
+              " crediti: boxCrediti([{id:1, riga_id:152, cassaforte:'saas', "
+              "pagato_da:'nodo', sats:247707, stato:'aperto', hash:'ab', "
+              "deciso_da:999, deciso_il:1, motivo:\"<b>x</b>\", nota:''}, "
+              "{id:2, riga_id:9, cassaforte:'saas', pagato_da:'nodo', sats:1, "
+              "stato:'rientrato', hash:'cd', deciso_da:999, deciso_il:1, "
+              "motivo:'', nota:''}])}));\n")
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                         encoding="utf-8") as f:
+            f.write(js)
+        try:
+            out = subprocess.run([node, f.name], capture_output=True,
+                                 encoding="utf-8", timeout=60)
+            d = json.loads(out.stdout or "{}")
+        except Exception as e:
+            d = {"errore": str(e)}
+        finally:
+            os.unlink(f.name)
+        prova("client, girato: acceso e spento portano TUTT'E DUE al server "
+              "(che dice perche' no), e cambia solo il colore",
+              (1, 1, True, True),
+              (d.get("acceso", "").count("altraCassaforte(152)"),
+               d.get("spento", "").count("altraCassaforte(152)"),
+               "--chip-bg" in d.get("acceso", "").split("altraCassaforte")[-1],
+               "--off-bg" in d.get("spento", "").split("altraCassaforte")[-1]))
+        prova("...la riga dice da dove esce, e un rimborso d'asta il terzo "
+              "bottone non ce l'ha", (True, False),
+              ("cassaforte <b>saas</b>" in d.get("acceso", ""),
+               "altraCassaforte" in d.get("rimborso", "x altraCassaforte")))
+        prova("...senza crediti la scatola non c'e'; coi crediti conta i "
+              "vivi, e chiude a mano solo quelli", ("", True, 1, False),
+              (d.get("vuota"), "Crediti da recuperare (1)"
+               in d.get("crediti", ""),
+               d.get("crediti", "").count("chiudiCredito("),
+               "<b>x</b>" in d.get("crediti", "<b>x</b>")))
+    doc = open("docs/PRODUZIONE.md", encoding="utf-8").read()
+    prova("PRODUZIONE ha la procedura, col caso #152 e il recupero del "
+          "credito", (True, True, True),
+          ("PAGARE DA UN'ALTRA CASSAFORTE" in doc, "#152" in doc,
+           "recuperare il credito" in doc.lower()))
 
 
 def prove_pagamento_incerto():
@@ -10951,7 +11855,7 @@ BOLT11_VERA_7468 = (
     "lnbc74680n1p424fukpp59hgjkkeervlh9420ekttlnjnvtwt8e5sc2ymk9qm69flw05450qqdqqcqzzsxqrrssrzjqgc2t099trn8g9rqcy7axnnrdk3gu540myw0j0dc0mgmqwf2w3nwhapyqqqqqqqjqvqqqqqqqqqq86qq2qsp5ua8gfecmkqufz5vmzudqwwaucupxhu8p24f7fp045ytsv9w2s7fs9qxpqysgqf98q726nmlrfld7wh39r8rauly63hadqn8mm330qtdxrn773r5nzfxc23j6j8rhnzew9nd8se623rmj9cznpp4spntx50zdd88elzxqq0vemvd")
 
 
-def bolt11_finta(sats, scadenza, quando, firma=None):
+def bolt11_finta(sats, scadenza, quando, firma=None, phash=0):
     """Una bolt11 SINTATTICAMENTE vera — bech32 col suo checksum, i
     campi taggati al posto giusto, la firma di zeri — per provare il
     lettore del client senza una chiave: `leggiBolt11` verifica il
@@ -10975,7 +11879,10 @@ def bolt11_finta(sats, scadenza, quando, firma=None):
         return bits(n, g)
 
     dati = bits(quando, 7)
-    dati += tag(1, [0] * 52)             # p: payment hash di zeri (256 bit)
+    # p: il payment hash (256 bit su 52 gruppi, 4 bit di riempimento).
+    # Di zeri se non lo si sceglie; chi deve distinguere DUE fatture —
+    # «paga da un'altra cassaforte», 21 set 2026 — ne passa uno suo.
+    dati += tag(1, bits(phash << 4, 52))
     dati += tag(13, [])                  # d: descrizione vuota
     if scadenza is not None:             # senza `x` vale un'ora (BOLT-11)
         dati += tag(6, minimo(scadenza))     # x: la scadenza
@@ -21649,7 +22556,11 @@ def prove_libro_mastro():
           codice_sconto TEXT DEFAULT '', codice_sconto_id INT DEFAULT 0,
           punto_obiezione TEXT DEFAULT '', punto_obiettato_il INT DEFAULT 0,
           punto_obiezioni INT DEFAULT 0,
-          venditore_id INT DEFAULT 0);
+          venditore_id INT DEFAULT 0,
+          cassaforte TEXT DEFAULT 'saas',
+          cassaforte_payout TEXT DEFAULT '', payout_nota TEXT DEFAULT '');
+        CREATE TABLE crediti_cassaforte(id INTEGER PRIMARY KEY,
+          riga_id INT, cassaforte TEXT, stato TEXT DEFAULT 'aperto');
         CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
           annuncio_id INT, quantita INT, unitario_sats INT,
           titolo TEXT DEFAULT '');
@@ -22146,6 +23057,23 @@ def prove_libro_mastro():
         # parti non passa da nessun punto.
         ("UPDATE ordini SET punto_barattolo='da-mario' WHERE id=1",
          "punto di casa fuori contratto", "1"),
+        # PAGA DA UN'ALTRA CASSAFORTE (21 set 2026). Il credito aperto:
+        # l'ordine 2 e' stato pagato dal nodo e sul SaaS resta il suo
+        # pagamento appeso. E il gemello strutturale nei suoi tre bracci:
+        # la colonna scritta A MANO (senza la nota di chi ha deciso),
+        # verso la stessa cassaforte, o verso una che non esiste.
+        ("INSERT INTO crediti_cassaforte(riga_id, cassaforte) "
+         "VALUES(2,'saas')",
+         "credito da recuperare su un'altra cassaforte", "2"),
+        ("INSERT INTO crediti_cassaforte(riga_id, cassaforte, stato) "
+         "VALUES(6,'saas','doppio')",
+         "credito da recuperare su un'altra cassaforte", "6"),
+        ("UPDATE ordini SET cassaforte_payout='nodo' WHERE id=1",
+         "incasso deviato senza verbale", "1"),
+        ("UPDATE ordini SET cassaforte_payout='saas', payout_nota='x' "
+         "WHERE id=2", "incasso deviato senza verbale", "2"),
+        ("UPDATE ordini SET cassaforte_payout='luna', payout_nota='x' "
+         "WHERE id=6", "incasso deviato senza verbale", "6"),
     ]
     for sql, atteso, id_atteso in casi:
         con = db_sano()
@@ -32956,8 +33884,16 @@ def prove_fogli_di_casa():
     # chiudere come pagato un'uscita che LNbits e LND non confermano, e
     # prima di farlo legge cosa dicono. E' la parola di una persona
     # contro due fonti: si chiede, a carte scoperte.
-    prova("i gesti che passano dalla domanda unica sono sessantadue",
-          62, solo_codice(mini).count("chiediConferma({"))
+    # SESSANTATRE, SESSANTAQUATTRO, SESSANTACINQUE (21 set 2026, «paga da
+    # un'altra cassaforte»): i tre fogli del terzo bottone del pannello
+    # 🧊, e se ne apre UNO solo — quale lo decide il server. «Pago N sats
+    # da un'altra cassaforte?» e' il gesto vero: muove sats sulla parola
+    # di un calendario, e chi lo preme legge la cifra, le voci delle
+    # fonti e il rischio che resta. «Manca la fattura nuova» manda un
+    # messaggio a chi vende e gli apre un campo: si chiede. «Da un'altra
+    # cassaforte non si puo'» e' un AVVISO degenere: dice perche' no.
+    prova("i gesti che passano dalla domanda unica sono sessantacinque",
+          65, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -75289,7 +76225,7 @@ def main():
               prove_pagamento_incerto, prove_esito_pagamento,
               prove_pagamenti_in_volo, prove_fatture_scadute,
               prove_fattura_solo_incasso,
-              prove_in_pagamento,
+              prove_in_pagamento, prove_altra_cassaforte,
               prove_doppio_wallet, prove_saas_senza_doveri, prove_orfani, prove_capitale_cassa,
               prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,

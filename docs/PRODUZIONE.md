@@ -783,6 +783,107 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   finestra dichiarata del cantiere.
   IL ROLLBACK è il commit precedente: la tabella `payout_passi` resta
   lì e non dà fastidio a nessuno (il codice di prima non la legge).
+  PAGARE DA UN'ALTRA CASSAFORTE (21 set 2026, ordine #152). Il server
+  paga sempre dalla cassaforte in cui i sats dell'ordine sono entrati.
+  Quando quella cassaforte ha un pagamento APPESO che non si decide — il
+  #152: 247.707 sats per Pedro, «pending» sul LNbits ospitato dal 20
+  set, fattura scaduta la sera stessa — l'incasso resta 🧊 e nessuno
+  può pagare chi vende dall'altra, che funziona. Pagare a mano da
+  LNbits e scrivere l'hash nel database sono i gesti che l'audit ha
+  vietato: la strada è il TERZO BOTTONE del pannello, «🔀 Paga da
+  un'altra cassaforte» (Profilo → 🧊 Pagamenti da verificare), accanto
+  a «Verifica e riprova» e «L'ho visto io: è uscito».
+  COSA FA: non paga lui. Cambia DA DOVE si paga (`cassaforte_payout`
+  sull'ordine; `cassaforte` NON si tocca: dice dove sono entrati i sats
+  del compratore) e ripassa dalla strada d'uscita di sempre — importo,
+  scadenza, verità su LNbits e LND, una sola mano, stadio, «Arrivati ✓».
+  QUANDO SI PUÒ, le due guardie. 1) Il pagamento d'origine è PROVATO
+  MORTO: dove c'è un LND nostro (cassaforte `nodo`) lo dice LND —
+  FAILED, o `payment isn't initiated` a canarino vivo e dopo 15 minuti;
+  lì il calendario non conta, e IN_FLIGHT rifiuta sempre. Dove LND non
+  c'è (il SaaS): LNbits risponde, NON dice «success», e la fattura di
+  quel tentativo è scaduta da almeno 60 MINUTI
+  (`ALTRA_CASSAFORTE_DOPO_SCADENZA_S`). 2) Chi vende ci ha già dato un
+  modo NUOVO: una fattura nuova e valida in colonna, o un Lightning
+  address. Il bottone è ACCESO quando dal database il gesto ha senso;
+  le guardie vere girano al tocco (chiede alle fonti) e di nuovo alla
+  conferma. Rifiuti: 409 con la frase (in volo, uscito, presto, manca
+  la fattura), 503 se una fonte tace. Doppio click o due moderatori:
+  uno solo passa, l'altro legge «l'ha già deciso qualcun altro».
+  ⚠️ IL RISCHIO CHE RESTA, e sta scritto anche nel foglio di conferma:
+  una fattura scaduta NON prova che un HTLC già accettato da chi riceve
+  (una hold invoice) non possa più saldarsi — può, fino al suo CLTV. Se
+  succedesse, chi vende avrebbe ricevuto DUE volte. Per questo la regola
+  del calendario non la usa nessun automatismo: la usa una persona, con
+  le voci delle fonti davanti, e il pagamento d'origine resta
+  SORVEGLIATO (sotto).
+  ⚠️ I SATS ESCONO DAL SALDO DELL'ALTRA CASSAFORTE, dove ci sono i
+  depositi di ALTRI ordini. Prima di premere: nella cassaforte di
+  destinazione deve esserci capitale NOSTRO pari all'importo (più la
+  riserva fee di LNbits, `max(1%, 2000 sats)`), e sul nodo liquidità in
+  USCITA sufficiente. Si guarda col polso 23 di
+  `query_libro_mastro.sql` e con `python3 capitale_cassa.py`; se non
+  basta si versa PRIMA capitale nostro in quel wallet, e lo si dichiara
+  (`capitale_nodo_sats`). Dopo la deviazione il polso 23 mostrerà il
+  SaaS «lungo» e il nodo «corto» della stessa cifra: è il credito.
+  IL CREDITO DA RECUPERARE. Se alla decisione LNbits teneva ancora
+  «pending» il pagamento d'origine, quei sats di là restano impegnati:
+  nasce una riga in `crediti_cassaforte` (ordine, cassaforte, hash,
+  sats, chi ha deciso, perché), visibile nel pannello («🔀 Crediti da
+  recuperare») e gridata ogni giorno dal libro mastro («credito da
+  recuperare su un'altra cassaforte») finché è aperta. Sull'ordine
+  restano `cassaforte_payout`, l'hash nuovo in `payout_hash` e la frase
+  in `payout_nota` («pagato dalla cassaforte X invece di Y, deciso da…
+  il… motivo:…»). Un credito aperto sul SaaS è un DOVERE del SaaS:
+  l'avviso «🏁 il SaaS non ha più doveri» non parte finché c'è.
+  COME RECUPERARE IL CREDITO. La ronda `sorveglia_crediti` richiede
+  quell'hash una volta all'ora. a) Il pagamento appeso FALLISCE (il
+  supporto del SaaS lo sblocca, o l'HTLC scade da solo): i sats tornano
+  nel saldo di quella cassaforte, la riga va `rientrato`, arriva «✅
+  Credito rientrato» e non c'è altro da fare — quel saldo in più è
+  capitale nostro rimasto di là, e rientra con lo sweep della fase 5 (o
+  prima, con un prelievo a mano verso il wallet del nodo, dichiarando i
+  due capitali). b) Il pagamento appeso SI SALDA: arriva «🚨 DOPPIO
+  PAGAMENTO», la riga va `doppio`; i sats vanno chiesti indietro a chi
+  vende da una persona, e quando sono tornati il credito si chiude dal
+  pannello con una nota («✍️ Chiudi con questa nota», almeno dieci
+  caratteri: chi, quando, come). c) Il SaaS rimborsa per altra via: si
+  chiude a mano allo stesso modo.
+  IL #152, PASSO PER PASSO (dopo il deploy; il VPS lo guarda Andrea).
+  1) Lo stato di partenza, in sola lettura:
+  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT id,stato,payout_stato,payout_verso,cassaforte,cassaforte_payout,payout_hash,length(invoice_venditore) FROM ordini WHERE id=152;"`
+  — atteso `confirmed | incerto | venditore | saas | (vuoto) | <hash> |
+  <lunghezza>`. Se `payout_stato` è `in_volo` si aspetta la ronda (30
+  minuti dal tentativo). Gli hash tentati, con cassaforte e scadenza:
+  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT hash,datetime(quando,'unixepoch'),esito,cassaforte,datetime(scade,'unixepoch') FROM payout_tentati WHERE tabella='ordini' AND riga_id=152;"`
+  (`scade` a 1970 = ancora ignota: la trascrive il primo tocco del
+  bottone, dalla fattura in colonna o chiedendola a LNbits).
+  2) Il capitale sul nodo: vedi l'avviso qui sopra. 247.707 + ~2.500.
+  3) Pannello → 🧊 → ordine #152 → «🔀 Paga da un'altra cassaforte». Se
+  Pedro non ha un address e non ha ancora incollato niente, il foglio
+  dice «Manca la fattura nuova» → «📨 Chiedi la fattura a chi vende»: a
+  lui arriva il messaggio e nell'ordine gli si apre il campo. 4) Quando
+  la incolla arriva «📥 …ha incollato la fattura nuova» — una fattura
+  scade, non si aspetta. 5) Di nuovo il bottone: il foglio mostra le
+  voci delle fonti, «da «saas» a [nodo]», la cifra e il rischio →
+  «🔀 Sì, paga da lì». 6) Atteso: toast «✅ Pagato da «nodo»», a Pedro
+  «Arrivati ✓», ai moderatori «🔀 …pagato da un'altra cassaforte», e in
+  «🔀 Crediti da recuperare» la riga del #152 sul SaaS.
+  DOVE SI LEGGE: `journalctl -u barattolo | grep -E "⚖️ Altra cassaforte|🔎"`.
+  I crediti: `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT id,riga_id,cassaforte,pagato_da,sats,stato,datetime(deciso_il,'unixepoch','localtime'),motivo,nota FROM crediti_cassaforte;"`
+  SE VA STORTO. Il pagamento dal nodo fallisce (nessuna strada, saldo):
+  l'ordine torna a «serve una fattura nuova», la cassaforte d'uscita
+  RESTA il nodo, e la prossima fattura che Pedro incolla si paga da lì
+  da sola. Per tornare a pagare dalla cassaforte d'origine NON c'è un
+  bottone (non è mai servito): si rifà il giro al contrario solo se
+  quel pagamento finisce 🧊. IL ROLLBACK è il commit precedente: le
+  colonne e la tabella nuove restano e non danno fastidio, ma un ordine
+  GIÀ deviato e non ancora pagato tornerebbe a pagare dalla cassaforte
+  d'origine — si guarda prima che non ce ne siano:
+  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT id,stato,payout_stato FROM ordini WHERE COALESCE(cassaforte_payout,'')<>'' AND stato NOT IN ('released','refunded');"`
+  NON PROVATO DAL VIVO: LNbits vero sulle due cassaforti, la forma di
+  `details.bolt11` (è un ripiego, e si crede solo se l'hash combacia),
+  il bottone sul telefono. Provato: tutto il resto, su cartone.
   IL CONTROLLO DEGLI ORFANI, sulle due casseforti (set 2026):
   `cd ~/satmarket && python3 orfani.py` — sola lettura, legge il
   registro di ogni cassaforte configurata con la sua invoice key e

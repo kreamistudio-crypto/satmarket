@@ -24973,6 +24973,10 @@ const MOTIVI_PAGAMENTO = {
   saldo:          'un problema del nostro nodo',
   ponte:          'il nostro nodo non rispondeva',
   lnbits_muto:    'il nostro nodo non rispondeva',
+  /* «paga da un'altra cassaforte» (21 set 2026): il pagamento di prima
+     e' rimasto appeso da NOI, e i sats partono da un'altra strada */
+  altra_cassaforte: 'il pagamento di prima è rimasto bloccato per un guasto nostro, e te li mandiamo da un\'altra strada',
+  fattura_nuova:    'fattura nuova ricevuta',
   ignoto: '', metodo: '',
 };
 const inPagamento = o => !!(o && o.pagamento && o.state!=='released');
@@ -24988,6 +24992,9 @@ function quandoPagamento(ts){
 function statoPagamento(p){
   return p.passo==='arrivato'      ? 'arrivato ✓'
        : p.passo==='in_volo'       ? 'partito, in volo'
+       /* in verifica MA un moderatore ha chiesto la fattura nuova: a chi
+          vende si apre il campo, e la riga colorata lo dice */
+       : p.passo==='in_verifica' && p.gesto_venditore ? 'serve una fattura nuova'
        : p.passo==='in_verifica'   ? 'in verifica'
        : p.passo==='riparte'       ? 'riparte da solo'
        : p.motivo==='metodo'       ? 'in attesa del venditore'
@@ -25064,9 +25071,16 @@ function payoutPanel(o){
      La regola del cantiere del cambio congelato: parla euro cio' che
      RACCONTA l'affare, restano sats le cifre con cui si AGISCE. */
   const net = nettoVenditore(o);
+  /* TOCCA A LUI ANCHE SE L'ORDINE NON E' 'confirmed' (21 set 2026,
+     «paga da un'altra cassaforte»): un payout finito in volo dal ramo
+     mite lascia l'ordine 'locked' o 'shipped', e se quel pagamento si
+     pianta un moderatore chiede una fattura NUOVA. Lo stadio lo dice
+     (`gesto_venditore`), e allora il campo della fattura serve ADESSO:
+     i due fogli «prima della conferma» qui sotto non valgono. */
+  const tocca = !!(o.pagamento && o.pagamento.gesto_venditore);
 
   /* Incasso automatico già attivo */
-  if (myLnAddress && o.state!=='confirmed') return `
+  if (myLnAddress && o.state!=='confirmed' && !tocca) return `
     <div class="payout">
       <h4>⚡ Incasso automatico attivo</h4>
       <div class="hint">Appena l'acquirente conferma la ricezione, <b class="net">${fmt(net)}<span class="unit">sats</span></b>
@@ -25084,7 +25098,7 @@ function payoutPanel(o){
      c'e' un campo solo, il Lightning address — l'unico metodo che non
      scade — e il campo della fattura compare quando tocca: a ordine
      'confirmed', dove il server la paga all'istante. */
-  if (o.state!=='confirmed') {
+  if (o.state!=='confirmed' && !tocca) {
     /* gli ordini di IERI che una fattura in colonna ce l'hanno gia':
        si pagano come sempre, e se e' scaduta lo si DICE adesso (la
        scadenza sta scritta nella bolt11) invece di scoprirlo il
@@ -25119,7 +25133,9 @@ function payoutPanel(o){
   return `
     <div class="payout${o.pagamento && o.pagamento.gesto_venditore ? ' pag-evidenza' : ''}">
       <h4>💰 Incassa subito i tuoi sats</h4>
-      <div class="hint">L'acquirente ha <b>già confermato la ricezione</b>: ti aspettano <b class="net">${fmt(net)}<span class="unit">sats</span></b> in cassaforte.
+      <div class="hint">${o.pagamento && o.pagamento.motivo==='altra_cassaforte'
+        ? 'Il pagamento di prima è rimasto <b>bloccato per un guasto nostro</b>, non tuo, e te li mandiamo da un\'altra strada: ci serve una fattura <b>nuova</b>. Ti aspettano'
+        : 'L\'acquirente ha <b>già confermato la ricezione</b>: ti aspettano'} <b class="net">${fmt(net)}<span class="unit">sats</span></b> in cassaforte.
         <br><br><b>⚡ Consigliato:</b> imposta il tuo Lightning address (lo trovi nel tuo wallet,
         tipo <span class="mono" style="font-size:11px">nome@walletofsatoshi.com</span>):
         <b>non scade mai</b>, lo fai <b>una volta sola</b> e tutti gli incassi, di ogni vendita, saranno automatici.</div>
@@ -29127,6 +29143,10 @@ async function saveSellerInvoice(btn){
   else if (d.non_chiesto) { currentOrder.sellerInvoice=inv;
     toast('✓ Fattura ricevuta. Il pagamento non è potuto partire ora — il nostro nodo non risponde — e ci riproviamo da soli'); }
   else if (d.stato==='refund') { toast('Il pagamento non è riuscito: riprova con una invoice nuova'); }
+  /* a pagamento CONGELATO (21 set 2026) da qui non parte niente: la
+     fattura resta in colonna e la fa pagare un moderatore, da un'altra
+     cassaforte. Prima del ramo qui sotto, che direbbe «partito». */
+  else if (d.attende_moderatore) { toast('✓ Fattura ricevuta. Il pagamento lo fa partire un moderatore, a breve: non devi fare altro', 7000); }
   /* in volo o in verifica: e' partito, e l'esito non si sa ancora */
   else if (d.in_volo || d.incerto) { toast('⏳ Pagamento partito: lo stiamo verificando, non devi fare altro'); }
   /* QUI NON C'E' PIU' NESSUN «SALVATA PER DOPO» (21 set 2026): da
@@ -32946,6 +32966,14 @@ async function loadAdminStats(){
         {headers:{'X-Tg-Init-Data':authHdr()}});
       if (rp.ok) incerti = await rp.json();
     } catch(e) {}
+    /* i crediti da recuperare: pagamenti rimasti appesi su una
+       cassaforte mentre l'ordine veniva pagato da un'altra */
+    let crediti = [];
+    try {
+      const rk = await fetch(`${API_BASE}/admin/crediti`,
+        {headers:{'X-Tg-Init-Data':authHdr()}});
+      if (rk.ok) crediti = await rk.json();
+    } catch(e) {}
     /* gli ordini coi sats in cassaforte su cui non si muove più
        nessuno: si chiedono SEMPRE — dopo il 🧊 questa è l'unica
        vista che li mostra, e una coda vuota è essa stessa la
@@ -32996,6 +33024,7 @@ async function loadAdminStats(){
       <div class="section-label" style="padding:26px 0 0">🧊 Pagamenti da verificare (${incerti.length})</div>
       <div class="sub" style="margin-top:6px">Il nodo non ha risposto: <b>non sappiamo</b> se questi sats sono usciti. Cerca il payment_hash su LNbits e dì com'è andata — finché non lo fai, nessun pagamento riparte da solo.</div>
       <div style="margin-top:10px">${incerti.map(rigaPagamento).join('')}</div>` : ''}
+      ${boxCrediti(crediti)}
       ${boxFermi()}
       ${rev.length ? `
       <div class="section-label" style="padding:26px 0 0">⏳ In revisione (${rev.length})</div>
@@ -33335,8 +33364,122 @@ const rigaPagamento = p => `
       <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
         <span class="badge" onclick="decidiPagamento('${esc(p.tipo)}',${p.id},'verifica')" style="cursor:pointer;background:var(--warn-bg);color:var(--ink)">🔎 Verifica e riprova</span>
         <span class="badge" onclick="decidiPagamento('${esc(p.tipo)}',${p.id},'uscito')" style="cursor:pointer;background:var(--trust-soft);color:var(--trust-text)">✅ L'ho visto io: è uscito</span>
+        ${/* IL TERZO BOTTONE (21 set 2026): ACCESO solo se dal database
+              il gesto ha senso (un'altra cassaforte c'e', e' l'incasso di
+              chi vende, la fattura d'origine e' scaduta da abbastanza);
+              SPENTO si puo' toccare lo stesso, e il server dice PERCHE'
+              no. Le guardie vere — LNbits e LND — girano al tocco, e di
+              nuovo alla conferma. */
+          p.tipo!=='ordine' || !p.altra_cassaforte ? ''
+          : p.altra_cassaforte.forse
+            ? `<span class="badge" onclick="altraCassaforte(${p.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)">🔀 Paga da un'altra cassaforte</span>`
+            : `<span class="badge" onclick="altraCassaforte(${p.id})" style="cursor:pointer;background:var(--off-bg);color:var(--muted)">🔀 Paga da un'altra cassaforte</span>`}
       </div>
+      ${p.cassaforte ? `<div class="sub" style="margin-top:6px">esce dalla cassaforte <b>${esc(p.cassaforte)}</b></div>` : ''}
     </div>`;
+
+/* PAGA DA UN'ALTRA CASSAFORTE (21 set 2026, ordine #152). Tre fogli,
+   uno solo per volta, e a scegliere quale e' IL SERVER: prima gli si
+   chiede «posso?» — lui interroga LNbits e LND sul pagamento d'origine —
+   e qui si mostra quel che ha risposto, con le voci delle fonti.
+   - non si puo' → un avviso che dice PERCHE' (in volo, uscito, presto…)
+   - e' morto ma manca la fattura nuova → si chiede a chi vende
+   - si puo' → la scelta della cassaforte e la conferma ESPLICITA, con
+     la cifra e il rischio scritti: e' l'unico gesto del pannello che
+     muove sats sulla parola di un calendario, e chi lo preme lo legge. */
+async function altraCassaforte(id){
+  let j = {};
+  try {
+    const r = await fetch(`${API_BASE}/admin/pagamenti/altra-cassaforte?tipo=ordine&id=${id}`,
+      {headers:{'X-Tg-Init-Data':authHdr()}});
+    j = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(typeof j.detail==='string' ? j.detail : 'Non è andata'); return; }
+  } catch(e) { toast('Non è andata'); return; }
+  const voci = (j.voci||[]).length ? '\n\nCosa dicono le fonti:\n• ' + j.voci.join('\n• ') : '';
+  if (j.manca_fattura) {
+    chiediConferma({
+      titolo: 'Manca la fattura nuova',
+      corpo: `${j.perche||''}${voci}\n\nGliela chiedo io: a chi vende arriva un messaggio e nell'ordine gli si apre il campo per incollarla. Quando c'è, vi arriva l'avviso e si paga da qui.`,
+      etichetta: '📨 Chiedi la fattura a chi vende',
+      poi: () => mandaAltraCassaforte({tipo:'ordine', id, azione:'chiedi_fattura'})});
+    return;
+  }
+  if (!j.ok) {
+    chiediConferma({
+      avviso: true,
+      titolo: 'Da un\'altra cassaforte non si può',
+      corpo: `${j.perche||'Non si può'}${voci}`,
+      etichetta: 'Ho capito'});
+    return;
+  }
+  const scelte = (j.destinazioni||[]).map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  chiediConferma({
+    titolo: `Pago ${fmt(j.sats)} sats da un'altra cassaforte?`,
+    testata: `<span style="font-size:28px">🔀</span><span style="font-size:13px;font-weight:700">da «${esc(j.origine)}» a <select id="altraCfSel" style="font:inherit;padding:4px 8px;border-radius:8px">${scelte}</select></span>`,
+    corpo: `Il pagamento d'origine risulta MORTO.${voci}\n\nChi vende ci ha dato ${j.fattura==='address' ? 'un Lightning address' : 'una fattura nuova'}: parte adesso, dalla strada di sempre, con tutte le sue verifiche.\n\nI sats escono dal saldo dell'altra cassaforte, dove ci sono i depositi di altri ordini: lì deve esserci capitale NOSTRO per coprirli.${(j.crediti||[]).length ? `\n\nSu «${j.origine}» quei sats restano impegnati finché quel pagamento non si decide: nasce un CREDITO DA RECUPERARE, e lo sorveglia la ronda.` : ''}\n\n⚠️ Una fattura scaduta non prova che un pagamento tenuto appeso da chi riceve non possa più saldarsi: se un giorno succedesse, chi vende avrebbe ricevuto due volte ${fmt(j.sats)} sats. Te lo diremmo subito, ma a chiederli indietro saresti tu.`,
+    etichetta: '🔀 Sì, paga da lì',
+    poi: () => mandaAltraCassaforte({tipo:'ordine', id, azione:'paga',
+      cassaforte: (el('altraCfSel')||{}).value || (j.destinazioni||[])[0] || '', conferma:true})});
+}
+async function mandaAltraCassaforte(corpo){
+  try {
+    const r = await fetch(`${API_BASE}/admin/pagamenti/altra-cassaforte`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify(corpo)});
+    const j = await r.json().catch(()=>({}));
+    toast(r.ok ? (j.messaggio || '↩︎ Fatto')
+               : (typeof j.detail==='string' ? j.detail : 'Non è andata'), 7000);
+  } catch(e) { toast('Non è andata'); }
+  loadAdminStats();
+}
+
+/* I CREDITI DA RECUPERARE: il pagamento rimasto appeso sulla cassaforte
+   d'origine di un ordine che abbiamo pagato da un'altra. 'aperto' = i
+   sats sono impegnati la' e la ronda continua a chiedere; 'doppio' = si
+   e' saldato lo stesso, chi vende ha ricevuto due volte; 'rientrato' e
+   'recuperato' sono la storia. L'hash passa da esc(): viene dal database. */
+const STATI_CREDITO = {
+  aperto:     ['⏳', 'da recuperare'],
+  doppio:     ['🚨', 'PAGATO DUE VOLTE'],
+  rientrato:  ['✅', 'rientrato da solo'],
+  recuperato: ['✅', 'chiuso a mano'],
+};
+function boxCrediti(crediti){
+  if (!crediti || !crediti.length) return '';
+  const vivi = crediti.filter(c => c.stato==='aperto' || c.stato==='doppio').length;
+  return `
+      <div class="section-label" style="padding:26px 0 0">🔀 Crediti da recuperare (${vivi})</div>
+      <div class="sub" style="margin-top:6px">Ordini pagati da un'altra cassaforte: qui sotto il pagamento rimasto <b>appeso</b> su quella d'origine. Finché è appeso quei sats sono impegnati là; se fallisce rientrano da soli, se si salda chi vende ha ricevuto due volte.</div>
+      <div style="margin-top:10px">${crediti.map(c => { const s = STATI_CREDITO[c.stato] || ['❓', esc(c.stato)]; return `
+        <div class="order">
+          <div class="row">
+            <b style="min-width:0;overflow:hidden;text-overflow:ellipsis">${s[0]} Ordine #${c.riga_id} — ${s[1]}</b>
+            <span class="mono" style="white-space:nowrap;font-weight:800;color:var(--sats-deep)">${fmt(c.sats)} sats</span>
+          </div>
+          <div class="sub" style="margin-top:4px">appeso su <b>${esc(c.cassaforte)}</b>, pagato da <b>${esc(c.pagato_da)}</b> · deciso da ${esc(String(c.deciso_da))} il ${c.deciso_il?new Date(c.deciso_il*1000).toLocaleString('it-IT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—'}</div>
+          <div class="sub" style="margin-top:2px">${esc(c.motivo||'')}${c.nota?` · <b>${esc(c.nota)}</b>`:''}</div>
+          <div class="mono" style="margin-top:6px;font-size:11px;color:var(--muted);word-break:break-all">${esc(c.hash)}</div>
+          ${c.stato==='aperto' || c.stato==='doppio' ? `<textarea id="credNota${c.id}" style="min-height:38px;margin-top:10px" placeholder="Recuperato? Scrivi chi, quando e come: fra un mese lo chiederà qualcuno"></textarea><div style="margin-top:6px"><span class="badge" onclick="chiudiCredito(${c.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)">✍️ Chiudi con questa nota</span></div>` : ''}
+        </div>`; }).join('')}</div>`;
+}
+/* Non muove un sat: e' una riga di contabilita', con la nota di chi la
+   chiude. Niente foglio di conferma — la nota E' la conferma, e il
+   server la vuole di almeno dieci caratteri. Il campo sta nella riga:
+   i dialoghi di sistema in questa app non esistono. */
+async function chiudiCredito(id){
+  const nota = ((el('credNota'+id)||{}).value || '').trim();
+  if (nota.length < 10) { toast('Scrivi in due righe com\'è stato recuperato'); return; }
+  try {
+    const r = await fetch(`${API_BASE}/admin/crediti/${id}/chiudi`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({nota})});
+    const j = await r.json().catch(()=>({}));
+    toast(r.ok ? '✅ Credito chiuso' : (typeof j.detail==='string' ? j.detail : 'Non è andata'));
+  } catch(e) { toast('Non è andata'); }
+  loadAdminStats();
+}
 
 /* Qui si muovono sats veri in tutt'e due i versi, quindi si chiede
    sempre — e la domanda dice cosa succede, non «sei sicuro?».

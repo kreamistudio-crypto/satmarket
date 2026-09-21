@@ -214,6 +214,55 @@
   parole stanno in `PASSI_PAGAMENTO`, `MOTIVI_PAGAMENTO`,
   `frasePagamento` e `pannelloPagamento`. Il perché sta in CANTIERI,
   «Lo stadio «in pagamento»».
+  PAGA DA UN'ALTRA CASSAFORTE (21 set 2026). Un incasso congelato si
+  può pagare da una cassaforte DIVERSA da quella in cui i sats sono
+  entrati: `POST /api/admin/pagamenti/altra-cassaforte` (moderatori; il
+  `GET` omonimo è il «posso?» che il pannello chiama prima della
+  conferma). LA ROTTA NON PAGA: scrive `ordini.cassaforte_payout` e
+  ripassa da `_riprendi_uscita` — cioè da `_sblocca_sats` e
+  `paga_venditore`, che leggono `_cassaforte_uscita(o)`
+  (`cassaforte_payout` se c'è, sennò `cassaforte`). `cassaforte` NON SI
+  TOCCA: dice dove vive il denaro del compratore. Vale per il solo
+  verso `venditore`: un rimborso torna da dove i sats sono arrivati.
+  LE DUE GUARDIE stanno in `_esamina_altra_cassaforte`, e le rifà la
+  rotta stessa. 1) L'origine è MORTA: giudice puro `_giudica_origine`
+  (voci di `_verita_pagamento` + scadenza della fattura di quel
+  tentativo). Dove c'è LND decide LND e il calendario non conta; dove
+  LND è «spento» (il SaaS) serve LNbits che risponde senza dire
+  «success» E la fattura scaduta da `ALTRA_CASSAFORTE_DOPO_SCADENZA_S`
+  (un'ora). Solo `morta` apre; `uscita`, `viva`, `presto` rispondono
+  409, `ignota` 503. 2) C'è un modo NUOVO di pagare
+  (`_fattura_nuova_pronta`): una fattura in colonna che NON è quella di
+  un tentativo già fatto e non è scaduta, o un Lightning address;
+  fail-CLOSED su una fattura che non si legge. UNA SOLA MANO: l'UPDATE
+  è condizionato a `payout_stato='incerto'` e alla cassaforte d'uscita
+  letta; dopo restano il lucchetto per ordine e `_prendi_la_mano`.
+  LA MEMORIA DEGLI HASH SA DOVE: `payout_tentati` porta `cassaforte` e
+  `scade` (li scrive la mano PRIMA della POST). Ogni hash si chiede
+  alla LNbits che l'ha tentato — `_dove_tentati` in `_verita_riga`,
+  `_cassaforte_tentata` nella ronda e nella riconciliazione — perché
+  l'altra risponderebbe «mai visto», cioè «ripaga». Un hash d'origine
+  scavalcato prende l'esito `deviato` (chiuso come un `fallito`), e
+  `paga_venditore` rifiuta una fattura già tentata da un'ALTRA
+  cassaforte: stessa preimage, due pagamenti. `leggi_bolt11(...,
+  con_hash=True)` dà il payment hash senza chiedere a LNbits.
+  SE MANCA LA FATTURA: `azione: 'chiedi_fattura'` scrive il passo
+  `serve_fattura/altra_cassaforte`; finché è l'ultima riga della linea
+  del tempo `stadio_pagamento` dà `gesto_venditore` pur restando «in
+  verifica», e `deposita_invoice` accetta chi vende anche su un ordine
+  rimasto 'locked' o 'shipped'. A payout congelato il deposito NON
+  paga: risponde `attende_moderatore` e avvisa i moderatori.
+  I CREDITI: `crediti_cassaforte`, una riga per ogni hash d'origine che
+  LNbits teneva «pending» alla decisione — `aperto` → `rientrato` (la
+  ronda `sorveglia_crediti`, una volta all'ora: fallito, i sats sono
+  tornati nel saldo) | `doppio` (si è saldato: chi vende ha ricevuto
+  due volte) | `recuperato` (chiuso a mano, con nota). Li gridano due
+  controlli del libro mastro («credito da recuperare su un'altra
+  cassaforte», «incasso deviato senza verbale») e contano fra i doveri
+  del SaaS. Nel client: terzo bottone di `rigaPagamento`,
+  `altraCassaforte` (tre fogli, ne sceglie uno il server), `boxCrediti`.
+  Il perché, e il rischio dichiarato del calendario, stanno in
+  CANTIERI, «Paga da un'altra cassaforte».
   IL PAGAMENTO IN VOLO (set 2026, cantiere B). `payout_stato` ha un
   terzo timbro, `in_volo`, e le tre parole dicono tre cose che prima si
   confondevano in due: `da_riprovare` = nessun sat si è mosso, si
