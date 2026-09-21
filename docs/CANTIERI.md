@@ -23222,3 +23222,174 @@ scritto che il server legge una COPIA del cert,
 quando LND rigenera il suo; e lo stato al 21 set: servizio da
 `barattolo`, firme accese (firmatari andrea e alan), drill del deploy
 rifiutato riuscito.
+
+## Paga da un'altra cassaforte: l'incasso appeso sul SaaS che il nodo non poteva pagare (21 set 2026, ordine #152)
+
+**DA DOVE VIENE.** Ordine #152, Pedro, 247.707 sats, cassaforte
+`saas`. Il payout è appeso in «pending» sul LNbits ospitato dal 20 set:
+HTLC bloccato, fattura scaduta alle 18:16 UTC di quel giorno, riga mai
+aggiornata dal SaaS, supporto contattato. Il server paga SEMPRE dalla
+cassaforte dell'ordine («i sats escono da dove sono entrati», il doppio
+wallet), quindi nessuno poteva pagarlo dalla cassaforte `nodo`, che
+funziona. Le due scorciatoie — pagare a mano da LNbits, scrivere l'hash
+nel database — sono i gesti che l'audit del 19 set ha vietato.
+
+**LA DECISIONE: LA ROTTA NON PAGA, CAMBIA DA DOVE SI PAGA.**
+`POST /api/admin/pagamenti/altra-cassaforte` scrive
+`ordini.cassaforte_payout` e ripassa da `_riprendi_uscita`, cioè dalla
+strada di sempre: la cintura dell'importo, quella della scadenza, la
+verità su LNbits e LND, la mano, lo stadio, «Arrivati ✓», il journal
+restano in UN posto. `_sblocca_sats` legge `_cassaforte_uscita(o)`.
+`cassaforte` NON SI TOCCA, ed è la riga da non ammorbidire: dice dove
+vive il denaro del COMPRATORE, e riscriverla falsificherebbe il conto
+della cassaforte d'origine (il polso 23, gli orfani, i doveri del
+SaaS). Vale per il solo verso `venditore`: un rimborso torna al
+compratore da dove è arrivato. SCARTATO: una colonna sola riscritta
+(sopra); e un «paga adesso» che chiamasse `paga_venditore` dalla rotta —
+una seconda strada d'uscita è la copia che un giorno salta una cintura.
+
+**«MORTO» SI PROVA IN DUE MODI SOLI** (`_giudica_origine`, tabella
+pura). Dove c'è un LND nostro decide LND — FAILED, o `payment isn't
+initiated` a canarino vivo dopo i 15 minuti — e il calendario NON
+conta: IN_FLIGHT rifiuta anche a fattura scaduta da un mese. Dove LND
+non c'è (il SaaS: `_stato_lnd` dice «spento», e il giudice di ieri
+risponde «in volo» PER SEMPRE su un `pending`, che è la ragione per cui
+il #152 non si muoveva) servono tutt'e due: LNbits risponde senza dire
+«success», E la fattura di quel tentativo è scaduta da almeno N.
+LNbits muta → «ignota», 503: il calendario da solo non basta.
+
+**N = 60 MINUTI, e quel che NON copre.** Dopo la scadenza chi riceve
+rifiuta gli HTLC che arrivano (LND annulla la fattura scaduta) e chi
+paga smette di tentare in un minuto o due: un'ora è quattro volte
+`MAI_PARTITO_DOPO_S` e sono sei battiti in cui la ronda ha richiesto
+quell'hash. ⚠️ NON È UNA PROVA CONTRO UNA HOLD INVOICE: un HTLC già
+accettato si salda fino al suo CLTV — giorni — qualunque cosa dica la
+fattura. È esattamente la ragione per cui il cantiere del 20 set ha
+SCARTATO il calendario come giudice, e LÌ RESTA SCARTATO: nessun giro,
+nessun automatismo usa questa regola. La differenza è CHI la usa: una
+persona, con le voci delle fonti e la cifra davanti, che legge nel
+foglio «se un giorno si saldasse, chi vende avrebbe ricevuto due
+volte». Il rischio è limitato a QUELL'importo, è sorvegliato (sotto), e
+l'alternativa era un venditore non pagato per settimane per un guasto
+non suo. Una prova vera sarebbe aspettare il CLTV massimo (due
+settimane): è la strada che non si è presa, e va detto.
+
+**LA SECONDA GUARDIA, e il buco che aveva sotto.** Serve un modo NUOVO
+di pagare: una fattura in colonna che NON sia quella di un tentativo
+già fatto (si riconosce dal payment hash: `leggi_bolt11(...,
+con_hash=True)` lo legge dalla bolt11, senza chiedere a una LNbits che
+può essere proprio quella che tace), non scaduta; o un Lightning
+address. FAIL-CLOSED su una fattura che non si legge, al contrario
+della porta del deposito: qui si paga da una cassaforte che di quella
+riga non sa niente. Ma a payout congelato chi vende NON POTEVA
+incollare niente: lo stadio dice «in verifica» e il campo non c'è.
+Quindi `azione: 'chiedi_fattura'`: scrive il passo
+`serve_fattura/altra_cassaforte`, e finché è l'ULTIMA riga della linea
+del tempo lo stadio dà `gesto_venditore` pur restando «in verifica».
+La fattura incollata scrive la riga dopo e il gesto si spegne da solo;
+da lì NON parte niente (`attende_moderatore`) e ai moderatori arriva 📥.
+
+**LA MEMORIA DEGLI HASH SA DOVE.** `payout_tentati` porta `cassaforte` e
+`scade`, scritte dalla mano PRIMA della POST. Un hash si chiede alla
+LNbits che l'ha tentato: l'altra risponde «mai visto» su un pagamento
+magari saldato, e dopo 15 minuti quel «mai visto» vale «ripaga».
+`_verita_riga` chiede ogni hash a casa sua (`_dove_tentati`), la ronda e
+la riconciliazione pure (`_cassaforte_tentata`, e sennò la riga).
+L'hash d'origine prende l'esito `deviato`: chiuso come un `fallito`, lo
+segue il registro dei crediti. E `paga_venditore` rifiuta una fattura
+già tentata da un'ALTRA cassaforte: stessa preimage, due pagamenti.
+Per il #152, nato prima di queste colonne, la scadenza si trascrive
+dalla fattura ancora in colonna (`_trascrivi_scadenza`, anche nel
+deposito, prima che la nuova la copra); se la colonna è già stata
+coperta, IL RIPIEGO chiede la bolt11 a LNbits — forma scritta a
+memoria, e per questo creduta SOLO se il payment hash, riletto dal
+nostro lettore, è quello chiesto.
+
+**IL CREDITO.** Se alla decisione LNbits teneva ancora «pending»
+l'origine, quei sats di là restano impegnati: una riga in
+`crediti_cassaforte`. `sorveglia_crediti`, una volta all'ora: fallito →
+`rientrato` (i sats sono tornati nel saldo, lo si dice una volta);
+saldato → `doppio`, 🚨, e a chiederli indietro è una persona; ancora
+appeso → silenzio. Legge e avvisa, non paga e non tocca gli ordini. Il
+libro mastro ha due controlli: «credito da recuperare su un'altra
+cassaforte» — che suona OGNI GIORNO finché è aperto, ed è voluto: è
+l'unico controllo del catalogo il cui stato «rotto» nasce da un gesto
+previsto, e il commento lo dichiara — e «incasso deviato senza
+verbale», il gemello strutturale che prende la colonna scritta a mano.
+Un credito aperto sul SaaS è un DOVERE del SaaS: senza, l'avviso della
+fase 5 avrebbe detto «si può disdire» con 247.707 sats appesi di là.
+
+**UNA SOLA MANO.** Le guardie si rifanno DENTRO la rotta (fra il tocco e
+la conferma passano minuti), poi un UPDATE condizionato a
+`payout_stato='incerto'` E alla cassaforte d'uscita letta. Doppio click,
+due moderatori, due processi, «Verifica e riprova» arrivata prima, la
+ronda che nel frattempo ha chiarito: chi arriva secondo trova zero righe
+e un 409. Da lì restano il lucchetto per ordine e `_prendi_la_mano`.
+
+**IL PANNELLO.** Terzo bottone accanto agli altri due. ACCESO se dal
+database il gesto ha senso (`_altra_cassaforte_forse`: niente rete — la
+coda si apre a ogni visita e non può fare un giro su tor per riga);
+SPENTO si può toccare lo stesso, e il server dice PERCHÉ no. Al tocco
+il «posso?» interroga le fonti e il client apre UNO di tre fogli, scelto
+dal server: non si può (con le voci), manca la fattura (la si chiede),
+si può — con la scelta della cassaforte, la cifra, il credito che
+nasce, il rischio, e l'avviso che i sats escono dal saldo dell'altra
+cassaforte, dove ci sono i depositi di altri ordini: lì serve capitale
+NOSTRO. Sotto, la scatola «🔀 Crediti da recuperare».
+
+**COSA HANNO TROVATO I BANCHI.** 1) Il collaudo col SERVER VERO, un
+difetto vero: un payout finito in volo dal ramo mite lascia l'ordine
+'locked' o 'shipped', e la porta del 21 set («la fattura si incolla solo
+all'incasso») rispondeva «troppo presto» a chi stavamo aspettando. Ora
+la porta si apre a richiesta fatta (e solo allora, e solo a payout
+ancora congelato), e nel client `payoutPanel` mostra il campo quando lo
+stadio dice che tocca a lui. `prove.py` non l'avrebbe visto: il suo
+ordine era 'confirmed'. 2) La tortura, primo giro: 51 uccise, 3 VIVE, 5
+ESPLOSE. Le vive: la scadenza della fattura NUOVA non la provava
+nessuno; una richiesta vecchia su un payout non più congelato apriva la
+porta; e un controllo ridondante (chi bussa), tolto — un mutante
+equivalente è codice in più. Le esplose erano tutte del banco (`[0]` su
+una riga che non c'è): ora i lettori dicono None e le rotte passano da
+`tenta`, che mangia ogni eccezione. 3) Tre volte l'heredoc della shell
+ha mangiato le escape (`\n` finiti come a-capo veri nel client, ancore
+che non combaciavano): gli script si scrivono su file. Era già a verbale.
+
+**PROVATO.** `prove_altra_cassaforte`, 125 prove: il #152 per intero
+(troppo presto → presto → morto senza fattura → chiesta → incollata →
+pagato DAL NODO → nota, credito, «Arrivati ✓», libro mastro → il
+credito che rientra, o che è un doppio, o che si chiude a mano); il
+rifiuto con origine IN_FLIGHT a fattura scaduta da un mese; LND FAILED,
+assente con e senza canarino, giovane; il SaaS muto e il SaaS «success»;
+la scadenza ignota nei suoi tre casi; la riga di ieri fino al pagamento;
+doppio click, due processi, e «altra cassaforte» insieme a «Verifica e
+riprova»; la stessa fattura da due cassaforti; l'address; il nodo che
+fallisce; il nodo che resta in volo (la ronda e la verifica chiedono AL
+NODO); l'ordine rimasto 'shipped'; il giudice in sedici righe; il client
+girato in node. Il mondo di cartone ha da oggi DUE LNbits distinte
+dall'URL e un orologio che si sposta. Suite intera verde. TORTURA: 58
+mutazioni, alla fine 58 uccise e nessuna esplosa. DAL VIVO, nel senso di
+casa: `collaudo_altra_cassaforte.py`, il server VERO su database
+usa-e-getta (anche migrato da uno schema di ieri), 34 su 34; gli altri
+quattro collaudi dei pagamenti identici a prima.
+
+**NON PROVATO, e va detto.** LNbits vero, su nessuna delle due
+cassaforti. LND vero (è la metà ancora aperta dal 19 set: il macaroon di
+lettura). La forma di `details.bolt11` nella risposta di LNbits — è un
+ripiego, e se è diversa la porta resta chiusa con «scadenza ignota». Il
+pannello nel browser e sul telefono: i tre fogli li ho fatti girare in
+node e ne ho verificato la sintassi, non li ho VISTI. Una hold invoice
+dal vivo. E il #152 stesso: lo stato che mi aspetto sul VPS
+(`confirmed`, `incerto`, la fattura del 20 set ancora in colonna) è una
+deduzione, e la prima query della procedura serve a verificarla.
+
+**RESTA DA FARE, di Andrea.** I passi stanno in PRODUZIONE, «PAGARE DA
+UN'ALTRA CASSAFORTE»: lo stato del #152, il CAPITALE sul nodo (247.707
+più la riserva, e liquidità in uscita), il bottone, la fattura di Pedro,
+la conferma. Poi il credito: si chiude da solo quando il SaaS sblocca
+quel pagamento. RESTA APERTO, dichiarato: i rimborsi d'asta e gli
+sblocchi non si deviano (non è mai servito); non c'è un bottone per
+tornare alla cassaforte d'origine; `collaudo_porta_timer.py` e
+`collaudo_sblocco_banner.py` sono rotti dal 19 set (`riga=`), e non li
+ho toccati; e «payout fuori contratto» nel libro mastro non conosce
+`in_volo` — se la ronda quotidiana passa mentre un pagamento è in volo,
+suona. Segnalato, non curato.
