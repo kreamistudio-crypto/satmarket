@@ -59,6 +59,7 @@ LIBRERIE="uvicorn fastapi httpx PIL pillow_heif coincurve cryptography websocket
 
 dillo()  { echo "$*"; }
 guasto() { echo "❌ $*" >&2; }
+avviso() { echo "⚠️ $*"; }     # non ferma niente, e sta in FILA con le altre righe
 
 main() {
   local gesto="${1:-}"
@@ -90,6 +91,23 @@ aspetta_salute() {
     sleep 2
   done
   return 1
+}
+
+# La copia del database con l'API di sqlite DENTRO python, come fa
+# deploy.sh, e non col comando `sqlite3`: quello e' un pacchetto a
+# parte, e il giorno della prova su una macchina gemella non c'era —
+# lo script si sarebbe fermato (prima di toccare niente, ma fermato).
+copia_db() {
+  (cd "$1" && python3 - "$2" <<'PY'
+import sys, sqlite3
+from config import DB
+sorgente = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+destinazione = sqlite3.connect(sys.argv[1])
+with destinazione:
+    sorgente.backup(destinazione)
+destinazione.close(); sorgente.close()
+PY
+  )
 }
 
 # L'UNICO file fuori dalla cartella che il server legge: il certificato
@@ -252,7 +270,7 @@ fai() {
   [[ -n "$TIMER" ]] && systemctl stop $TIMER 2>/dev/null
   while systemctl is-active --quiet barattolo-deploy.service 2>/dev/null; do sleep 2; done
   mkdir -p "$qui/backup" && chmod 700 "$qui/backup"
-  sqlite3 "$qui/satmarket.db" ".backup '$qui/backup/pre-cambio-utente-$(date +%Y%m%d-%H%M%S).db'" \
+  copia_db "$qui" "$qui/backup/pre-cambio-utente-$(date +%Y%m%d-%H%M%S).db" \
     || { guasto "la copia del database non e' riuscita: non ho fermato niente"; systemctl start $TIMER 2>/dev/null; exit 1; }
   dillo "💾 copia del database in backup/"
 
@@ -332,14 +350,24 @@ PY
 
   # il guardiano: i quattro riavvii si', tutto il resto no. `sudo -l
   # <comando>` CHIEDE se e' permesso, non lo esegue.
-  local u
+  # UNA riga sola dice com'e' andata, e il «si'» esce solo se e' vero
+  # per tutt'e quattro: al banco da root una mancava, e sotto l'avviso
+  # usciva lo stesso «i quattro riavvii si'» — due righe che si
+  # smentiscono, e chi legge in fretta crede alla seconda.
+  local u senza_mani=0
   for u in tor lnd-ponte.service lnd-ponte-tor.service wg-quick@wg0.service; do
-    sudo -u "$UTENTE" sudo -n -l /usr/bin/systemctl restart "$u" >/dev/null 2>&1 \
-      || guasto "⚠️ $UTENTE NON puo' riavviare $u: il guardiano resterebbe senza mani (sudo -l -U $UTENTE)"
+    if ! sudo -u "$UTENTE" sudo -n -l /usr/bin/systemctl restart "$u" >/dev/null 2>&1; then
+      avviso "$UTENTE NON puo' riavviare $u: il guardiano resterebbe senza mani"
+      senza_mani=1
+    fi
   done
   if sudo -u "$UTENTE" sudo -n -l /usr/bin/systemctl restart "$SERVIZIO" >/dev/null 2>&1 \
      || sudo -u "$UTENTE" sudo -n -l /usr/bin/systemctl stop tor >/dev/null 2>&1; then
-    guasto "⚠️ la regola di sudoers e' PIU' LARGA del dovuto: sudo -l -U $UTENTE"
+    avviso "la regola di sudoers e' PIU' LARGA del dovuto"
+    senza_mani=1
+  fi
+  if ((senza_mani)); then
+    avviso "il cambio e' FATTO e il sito gira, ma sudo non e' come dev'essere: guarda «sudo -l -U $UTENTE» e rimetti deploy/utente/sudoers-barattolo-ponte"
   else
     dillo "🔑 sudo: i quattro riavvii del guardiano si', il resto no"
   fi

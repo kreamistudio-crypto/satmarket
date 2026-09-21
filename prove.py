@@ -39146,7 +39146,7 @@ def prove_servizio_non_root():
                        ("l'utente", "useradd --system"),
                        ("visudo sulla regola", "visudo -cf"),
                        ("il certificato di LND", "cert_leggibile"),
-                       ("la copia del database", ".backup")):
+                       ("la copia del database", 'copia_db "$qui"')):
         prova(f"PRIMA dello stop: {nome}", True, -1 < fai.find(riga) < stop)
     prova("la regola di sudoers si prova PRIMA di posarla", True,
           fai.index("visudo -cf") < fai.index("install -m 440"))
@@ -39190,6 +39190,20 @@ def prove_servizio_non_root():
     prova("...e che sudo non sia piu' largo del dovuto", True,
           'sudo -n -l /usr/bin/systemctl restart "$SERVIZIO"' in fai
           and "sudo -n -l /usr/bin/systemctl stop tor" in fai)
+    # DAL BANCO DA ROOT (21 set, nel WSL di Andrea, nomi finti): a una
+    # unit mancava il permesso, e sotto l'avviso usciva lo stesso «i
+    # quattro riavvii si'». Il si' esce solo se e' vero per tutte.
+    prova("il «si'» di sudo esce solo se nessun riavvio e' mancato", True,
+          -1 < fai.find("senza_mani=1") < fai.find("if ((senza_mani)); then")
+          < fai.find("i quattro riavvii del guardiano si'"))
+    # ...e li' il comando `sqlite3` non c'era: e' un pacchetto a parte.
+    # La copia si fa con l'API dentro python, come in deploy.sh.
+    prova("lo script non dipende dal comando sqlite3", [],
+          [r.strip() for r in sc.split("\n")
+           if re.match(r"\s*sqlite3\s", r)])
+    prova("...la copia del database usa l'API di python", True,
+          "sorgente.backup(destinazione)" in sc
+          and 'copia_db "$qui"' in fai)
     torna = sc[sc.index("\ntorna() {"):sc.index("\nfallito() {")]
     prova("tornare a root: via il drop-in, reload, restart", True,
           torna.index('rm -f "$DROPIN"') < torna.index("daemon-reload")
