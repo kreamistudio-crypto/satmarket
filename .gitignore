@@ -33,6 +33,17 @@ censimento*.txt
 # (il freno che gli impedisce di riprovarlo ogni minuto)
 backup/
 .deploy-bocciato
+# ...e i suoi due fratelli (set 2026): il commit che il giudice ha
+# RIFIUTATO (si dice una volta, non ogni minuto) e quello per cui sta
+# ASPETTANDO una risposta da GitHub
+.deploy-rifiutato
+.deploy-attesa
+
+# Il database, da quando il mercatino non gira piu' da root (set 2026):
+# sqlite scrive il suo journal ACCANTO al file, quindi la cartella del
+# database dev'essere scrivibile dal servizio — e la cartella del
+# CODICE no, mai. Sul VPS `satmarket.db` e' un collegamento a qui.
+dati/
 
 # La whitelist di chi puo' scrivere sul relay: la genera
 # aggiorna-chiavi.sh sul VPS leggendo il database, ed e' un elenco di

@@ -1,0 +1,25 @@
+# I QUATTRO RIAVVII DEL GUARDIANO DEL PONTE, e nient'altro (set 2026).
+#
+# Il mercatino gira come utente `barattolo`, senza privilegi. Il suo
+# guardiano (server.py, «IL GUARDIANO DEL PONTE VERSO LND») deve pero'
+# poter riavviare il ponte quando cade: queste righe gli permettono
+# QUEI quattro comandi, scritti per intero — sudoers confronta anche
+# gli argomenti, quindi `restart tor` non apre `restart barattolo`, ne'
+# `stop tor`, ne' `restart tor qualcosaltro`.
+#
+# SONO GLI STESSI di PONTE_STRADE in server.py, e una prova in prove.py
+# li tiene uguali: chi aggiunge una strada la' arrossisce finche' non
+# la aggiunge qui — e poi QUESTO FILE VA RIMESSO A MANO SUL VPS, perche'
+# /etc non viaggia col deploy:
+#     install -m 440 -o root -g root deploy/utente/sudoers-barattolo-ponte /etc/sudoers.d/barattolo-ponte
+#     visudo -c
+# (`visudo -c` PRIMA di fidarsi: un file di sudoers rotto spegne sudo
+# per tutti. Qui non si rischia di restare chiusi fuori — sul VPS si
+# entra da root — ma il guardiano resterebbe senza mani.)
+#
+# NIENTE `Defaults` e niente alias: quattro righe che si leggono a
+# occhio valgono piu' di una regola elegante.
+barattolo ALL=(root) NOPASSWD: /usr/bin/systemctl restart tor
+barattolo ALL=(root) NOPASSWD: /usr/bin/systemctl restart lnd-ponte.service
+barattolo ALL=(root) NOPASSWD: /usr/bin/systemctl restart lnd-ponte-tor.service
+barattolo ALL=(root) NOPASSWD: /usr/bin/systemctl restart wg-quick@wg0.service

@@ -195,6 +195,16 @@ Nessuna prova fa girare un «non_uscito».
 
 ## G2 — Il ref `pronto` non è protetto e il server gira da root: chi scrive sul repo arriva a tutti i fondi
 
+> ✅ **CURATA NEL CODICE il 21 set 2026** dal cantiere «Il deploy che si
+> fida solo di main, e il servizio non root» (vedi `docs/CANTIERI.md`):
+> `deploy.sh` tira un commit solo se sta su main, va in avanti, ha la CI
+> verde chiesta a GitHub e — a firme accese — la punta firmata da una
+> chiave scritta sul VPS. ⚠️ SUL VPS resta la sequenza di
+> `docs/PRODUZIONE.md` («IL DEPLOY CHE SI FIDA SOLO DI MAIN»): finché le
+> FIRME non sono accese, chi scrive su MAIN passa ancora — è il punto 3
+> della cura qui sotto, l'unico che regge a un account bucato. Il testo
+> che segue resta com'era, perché descrive il codice di PRIMA.
+
 **Chi perde:** tutti — il wallet LNbits del deposito di garanzia, e (via
 A2) i sats dei venditori P2P. **Serve:** le credenziali GitHub di UNO dei
 due account con diritto di scrittura, o un token con `contents:write`
@@ -253,6 +263,13 @@ andrebbe corretta quando si fa il cantiere.
 # ALTA
 
 ## A1 — Il server pubblico gira da root
+
+> ✅ **CURATA NEL CODICE il 21 set 2026**, stesso cantiere: utente
+> `barattolo`, il guardiano passa da `sudo -n` con una regola di sudoers
+> che nomina i soli quattro riavvii, e la copia degli script di deploy
+> e backup sta sotto `/run` invece che in `/tmp` (la BASSA qui sotto).
+> Il cambio sul VPS lo fa `deploy/utente/cambio-utente.sh`, quando lo
+> lancia Andrea: fino ad allora il servizio gira ANCORA da root.
 
 `PONTE_COMANDI` (`server.py:8738`) lancia `systemctl restart tor` e
 `systemctl restart lnd-ponte.service`, e per riuscirci il servizio

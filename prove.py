@@ -38699,12 +38699,93 @@ def prove_deploy():
     # --- 2) IL VPS TIRA, E TIRA IL RAMO GIUSTO -------------------
     prova("il deploy segue «pronto», non main", True,
           'RAMO="${BARATTOLO_RAMO:-pronto}"' in sh)
-    prova("...e non tocca mai main", False, "origin/main" in sh)
+    # FINO AL 21 SET 2026 QUI C'ERA «...e non tocca mai main»: il ref
+    # mosso ERA la prova che la CI fosse verde. Ma `pronto` lo sposta
+    # chiunque abbia scrittura (audit del 19 set, G2), quindi adesso
+    # main e' il METRO: si tira anche lui, e ci si misura il commit.
+    prova("...ma si tira anche main, che e' il metro", True,
+          '"+refs/heads/$MAIN:refs/remotes/origin/$MAIN"' in sh)
+    # il reset resta sul commit GIUDICATO: mai su main direttamente
+    prova("...e non ci si resetta mai sopra", False,
+          'reset --hard --quiet "origin/' in sh or "reset --hard origin" in sh)
     # NESSUNA chiave della macchina dei sats nei secret di GitHub: se
     # un giorno comparisse un `ssh` nel workflow, la direzione del
     # deploy si e' rovesciata e va guardata.
     prova("nessuna chiave del VPS nella CI", True,
           "ssh" not in wf.lower() and "secrets." not in wf)
+
+    # --- 2b) IL GIUDICE (set 2026): il campanello non e' una prova --
+    # I quattro controlli, e l'ORDINE: tutti PRIMA del reset, e prima
+    # perfino della copia del database — un commit rifiutato non deve
+    # muovere niente.
+    giudice = sh[sh.index("giudica() {"):sh.index("\nfirme_dette()")]
+    prova("a) sta su main", True,
+          'git merge-base --is-ancestor "$sha" "origin/$MAIN"' in giudice)
+    prova("b) va solo in avanti rispetto a quel che gira", True,
+          'git merge-base --is-ancestor "$QUI" "$sha"' in giudice)
+    prova("c) la firma si verifica contro un file DI QUESTA MACCHINA", True,
+          'gpg.ssh.allowedSignersFile="$FIRMATARI"' in giudice
+          and 'verify-commit "$sha"' in giudice
+          and 'FIRMATARI="${BARATTOLO_FIRMATARI:-/etc/' in sh)
+    prova("...e il file dei firmatari NON sta nel repo", False,
+          os.path.exists("firmatari") or "firmatari" in
+          open(".gitignore", encoding="utf-8").read())
+    prova("d) la CI si chiede al giudice in Python", True,
+          'python3 giudice_deploy.py ci "$sha"' in giudice)
+    # l'ordine: dal controllo che costa meno a quello che esce in rete
+    prova("i controlli locali vengono prima della rete", True,
+          giudice.index("is-ancestor") < giudice.index("verify-commit")
+          < giudice.index("giudice_deploy.py"))
+    # NEL DUBBIO NON SI TIRA: solo lo 0 del giudice fa passare, e ogni
+    # uscita che non e' 0 ne' 10 (un crash compreso) vale «aspetta»
+    coda = giudice[giudice.index("giudice_deploy.py"):]
+    prova("solo lo 0 del giudice fa passare", True,
+          "0)  return 0 ;;" in coda and "10) return 10 ;;" in coda
+          and "return 20 ;;" in coda[coda.index("*)"):])
+    # (`find` e non `index`: un'ancora sparita dev'essere una ROSSA che
+    # si legge, non un'esplosione che nasconde le prove dopo di lei —
+    # l'ha chiesto la tortura)
+    chiamata = sh.find('\ngiudica "$LA"\ncase $? in\n  0) rm')
+    prova("il giudice si chiama NUDO, senza condizioni davanti", True,
+          chiamata > -1)
+    prova("il giudice gira PRIMA di toccare qualunque cosa", True,
+          -1 < chiamata < sh.index("sorgente.backup")
+          < sh.index('reset --hard --quiet "$LA"'))
+    # --forza riprova, ma non salta il giudice: fra `giudica` e il reset
+    # non c'e' nessun ramo che guardi --forza
+    fra = sh[max(chiamata, 0):sh.index('reset --hard --quiet "$LA"')]
+    prova("--forza non salta il giudice", False,
+          chiamata < 0 or "--forza" in fra)
+    prova("...e nemmeno --dimmi lo salta: lo racconta", True,
+          "RIFIUTEREBBE" in sh and "ASPETTEREBBE" in sh)
+    # un rifiuto si dice, e si dice UNA volta (il freno, un passo prima)
+    prova("il rifiuto avvisa i moderatori", True,
+          'avvisa "⛔ <b>Deploy rifiutato</b>: $(scappa "$MOTIVO")' in sh)
+    prova("...si timbra, e il giro dopo tace", True,
+          'echo "$LA" > .deploy-rifiutato' in sh
+          and '"$LA" == "$RIFIUTATO"' in sh)
+    prova("...e il timbro lo toglie solo un deploy riuscito", True,
+          "rm -f .deploy-bocciato .deploy-rifiutato" in sh)
+    # un'attesa che non finisce SI DICE: e' il git fetch muto dell'ago
+    # 2026, che lasciava il mercatino indietro per ore in silenzio
+    prova("un'attesa lunga si dice, una volta", True,
+          "AVVISA_ATTESA_DOPO=600" in sh
+          and 'avvisa "⏳ <b>Deploy fermo</b>' in sh
+          and 'echo "$LA $A_DA 1" > .deploy-attesa' in sh)
+    ign = open(".gitignore", encoding="utf-8").read()
+    prova("i due timbri nuovi non finiscono nella repo", True,
+          ".deploy-rifiutato" in ign and ".deploy-attesa" in ign)
+    # i nomi dei lavori che il giudice pretende SONO quelli che il
+    # semaforo aspetta: due elenchi che divergono lascerebbero passare
+    # un commit a cui la CI non ha fatto una delle due domande
+    import giudice_deploy as _g
+    prova("il giudice pretende gli stessi lavori del semaforo", True,
+          "needs: [" + ", ".join(_g.LAVORI_RICHIESTI) + "]" in job)
+    prova("...e guarda il workflow che c'e' davvero", True,
+          os.path.exists(_g.WORKFLOW))
+    # la copia del database di prima del deploy e' il database INTERO
+    prova("la cartella dei backup e' solo di root", True,
+          "chmod 700 backup" in sh)
 
     # --- 3) IL FRENO, che e' la riga che si dimentica ------------
     # Dopo un rollback `pronto` resta AVANTI: senza il timbro del
@@ -38763,7 +38844,20 @@ def prove_deploy():
     # LO SCRIPT SI COPIA PRIMA DI ESEGUIRLO: bash legge il file mentre
     # lo esegue, e `git reset` lo riscrive a meta' corsa.
     prova("lo script si copia prima di girare", True,
-          "cp /root/satmarket/deploy.sh /tmp/" in unita)
+          "cp /root/satmarket/deploy.sh /run/barattolo-deploy/" in unita)
+    # ...e NON in /tmp (set 2026): da quando sulla macchina gira un
+    # utente che non e' root, un nome fisso in /tmp lo puo' occupare
+    # lui prima, e root eseguirebbe un file SUO. Vale per le due unit
+    # che copiano-ed-eseguono.
+    for nome_unit in ("barattolo-deploy", "barattolo-backup"):
+        u = "\n".join(r for r in open(f"deploy/{nome_unit}.service",
+                                      encoding="utf-8").read().split("\n")
+                      if not r.lstrip().startswith(";"))
+        prova(f"{nome_unit}: niente script eseguiti da /tmp", False,
+              "/tmp/" in u)
+        prova(f"...la copia sta in una cartella di root, chiusa", True,
+              f"RuntimeDirectory={nome_unit}" in u
+              and "RuntimeDirectoryMode=0700" in u)
     timer = open("deploy/barattolo-deploy.timer", encoding="utf-8").read()
     prova("il timer batte ogni minuto", True,
           "OnUnitActiveSec=1min" in timer)
@@ -38793,6 +38887,322 @@ def prove_deploy():
           "Environment=HOME=/root" in corpo[corpo.index("[Service]"):])
 
 
+def prove_giudice_deploy():
+    """IL GIUDICE DELLA CI (set 2026, audit G2): `giudice_deploy.py`, la
+    meta' in Python dei controlli di deploy.sh. I giudici sono puri e
+    si provano a tavolino; il mondo intorno (git, GitHub) entra da una
+    funzione finta. Il banco dal vivo — commit finti su ref finti,
+    firme vere, GitHub vero in sola lettura — sta nel verbale."""
+    print("\n[il giudice del deploy]")
+    import giudice_deploy as g
+    SHA = "a" * 40
+    ALTRO = "b" * 40
+
+    def giro(**kw):
+        return dict({"id": 7, "head_sha": SHA, "path": g.WORKFLOW,
+                     "event": "push", "head_branch": "main",
+                     "status": "completed"}, **kw)
+
+    def lavoro(nome, conclusione="success", stato="completed"):
+        return {"name": nome, "status": stato, "conclusion": conclusione}
+    VERDI = [lavoro("prove"), lavoro("segreti"), lavoro("pronto", None,
+                                                       "in_progress")]
+
+    # --- quali giri contano -------------------------------------------
+    conta = lambda **kw: len(g.giri_di_main(
+        {"workflow_runs": [giro(**kw)]}, SHA))
+    prova("il giro di quel commit, su main, da un push: conta", 1, conta())
+    prova("un ALTRO commit: no", 0, conta(head_sha=ALTRO))
+    prova("lo stesso commit su un ramo di lato: no", 0,
+          conta(head_branch="di-lato"))
+    prova("una pull request: no", 0, conta(event="pull_request"))
+    prova("un giro lanciato a mano: no", 0, conta(event="workflow_dispatch"))
+    prova("un ALTRO workflow: no", 0,
+          conta(path=".github/workflows/verde-finto.yml"))
+    prova("una risposta vuota o storta non esplode", [0, 0, 0],
+          [len(g.giri_di_main(r, SHA)) for r in ({}, None,
+                                                 {"workflow_runs": None})])
+
+    # --- i lavori di un giro ------------------------------------------
+    v = lambda lavori, finito=False: g.giudica_lavori(lavori, finito)[0]
+    prova("prove e segreti verdi: si' (anche col semaforo ancora in corsa)",
+          g.SI, v(VERDI))
+    prova("prove rosso: no", g.NO,
+          v([lavoro("prove", "failure"), lavoro("segreti")]))
+    prova("segreti rosso: no", g.NO,
+          v([lavoro("prove"), lavoro("segreti", "failure")]))
+    for esito in ("cancelled", "skipped", "timed_out", "neutral", None):
+        prova(f"«{esito}» non e' un verde", g.NO,
+              v([lavoro("prove"), lavoro("segreti", esito)]))
+    prova("un lavoro che gira ancora: aspetta", g.ASPETTA,
+          v([lavoro("prove", None, "in_progress"), lavoro("segreti")]))
+    prova("...anche se e' in coda", g.ASPETTA,
+          v([lavoro("prove"), lavoro("segreti", None, "queued")]))
+    prova("manca «segreti» a giro in corso: aspetta", g.ASPETTA,
+          v([lavoro("prove")], finito=False))
+    # il workflow a cui qualcuno ha TOLTO una delle due domande
+    prova("manca «segreti» a giro FINITO: no", g.NO,
+          v([lavoro("prove")], finito=True))
+    prova("nessun lavoro: mai un si'", [g.ASPETTA, g.NO],
+          [v([]), v(None, finito=True)])
+    prova("un nome che SOMIGLIA non vale", g.NO,
+          v([lavoro("prove"), lavoro("segreti-finti")], finito=True))
+    prova("il no dice QUALE lavoro e com'e' finito", True,
+          "«segreti»" in g.giudica_lavori(
+              [lavoro("prove"), lavoro("segreti", "failure")], True)[1]
+          and "failure" in g.giudica_lavori(
+              [lavoro("prove"), lavoro("segreti", "failure")], True)[1])
+
+    # --- piu' giri ------------------------------------------------------
+    somma = lambda *vv: g.somma_verdetti([(x, x) for x in vv])[0]
+    prova("nessun giro: aspetta, mai si'", g.ASPETTA, somma())
+    prova("basta un si'", g.SI, somma(g.NO, g.SI))
+    prova("un dubbio batte un no", g.ASPETTA, somma(g.NO, g.ASPETTA))
+    prova("tutti no: no", g.NO, somma(g.NO, g.NO))
+
+    # --- il giro intero, col mondo finto ----------------------------------
+    def mondo(giri, lavori, codici=(200, 200)):
+        viste = []
+
+        def chiedi(percorso, token):
+            viste.append((percorso, token))
+            if "/jobs" in percorso:
+                return codici[1], {"jobs": lavori}, {}
+            return codici[0], {"workflow_runs": giri}, {}
+        return chiedi, viste
+    chiedi, viste = mondo([giro()], VERDI)
+    prova("il giro intero: verde", g.SI,
+          g.giudica_ci(SHA, "tok", "noi/repo", chiedi)[0])
+    prova("...chiede le due rotte delle Actions, di QUEL repo e QUEL sha",
+          [f"/repos/noi/repo/actions/runs?head_sha={SHA}&per_page=100",
+           "/repos/noi/repo/actions/runs/7/jobs?filter=latest&per_page=100"],
+          [p_ for p_, _t in viste])
+    chiedi, viste = mondo([giro(head_branch="di-lato")], VERDI)
+    prova("un verde solo su un ramo di lato: aspetta, e non chiede i lavori",
+          (g.ASPETTA, 1),
+          (g.giudica_ci(SHA, "tok", "noi/repo", chiedi)[0], len(viste)))
+    chiedi, _ = mondo([giro()], [lavoro("prove", "failure"),
+                                 lavoro("segreti")])
+    prova("il giro intero: rosso", g.NO,
+          g.giudica_ci(SHA, "tok", "noi/repo", chiedi)[0])
+    # NEL DUBBIO NON SI TIRA: ogni inciampo del mondo e' «aspetta»
+    for nome, args, mondo_ in (
+            ("uno sha che non e' uno sha", ("main", "tok", "noi/repo"),
+             mondo([giro()], VERDI)),
+            ("uno sha corto", (SHA[:8], "tok", "noi/repo"),
+             mondo([giro()], VERDI)),
+            ("senza token", (SHA, "", "noi/repo"), mondo([giro()], VERDI)),
+            ("senza repo", (SHA, "tok", ""), mondo([giro()], VERDI)),
+            ("GitHub muto", (SHA, "tok", "noi/repo"),
+             mondo([giro()], VERDI, (0, 0))),
+            ("401", (SHA, "tok", "noi/repo"),
+             mondo([giro()], VERDI, (401, 200))),
+            ("403", (SHA, "tok", "noi/repo"),
+             mondo([giro()], VERDI, (403, 200))),
+            ("500 sui lavori", (SHA, "tok", "noi/repo"),
+             mondo([giro()], VERDI, (200, 500))),
+            ("muto sui lavori", (SHA, "tok", "noi/repo"),
+             mondo([giro()], VERDI, (200, 0)))):
+        prova(f"{nome}: aspetta", g.ASPETTA,
+              g.giudica_ci(*args, mondo_[0])[0])
+    prova("il 403 dice cosa manca al token", True,
+          "Actions: Read-only" in g.motivo_http(403)
+          and "Actions: Read-only" in g.motivo_http(404))
+    prova("il 401 dice che il token e' scaduto", True,
+          "401" in g.motivo_http(401) and "scaduto" in g.motivo_http(401))
+
+    # uno sha e' QUARANTA esadecimali minuscoli: uno corto lo capirebbe
+    # anche GitHub (e risponderebbe per un commit che comincia cosi')
+    prova("cos'e' uno sha", [True, False, False, False, False],
+          [g.sha_valido(x) for x in (SHA, SHA[:8], SHA[:39], SHA.upper(),
+                                     None)])
+
+    # --- i codici d'uscita, che sono il patto con deploy.sh -------------
+    prova("il patto con deploy.sh: 0 si tira, 10 rifiutato, 20 aspetta",
+          {g.SI: 0, g.NO: 10, g.ASPETTA: 20}, g.USCITE)
+
+    # --- da dove vengono repo e token -----------------------------------
+    prova("il repo dall'URL del remoto",
+          ["noi/satmarket"] * 4 + ["", ""],
+          [g.repo_da_url(u) for u in (
+              "https://github.com/noi/satmarket.git",
+              "https://github.com/noi/satmarket",
+              "https://x:segreto@github.com/noi/satmarket.git",
+              "git@github.com:noi/satmarket.git",
+              "https://gitlab.com/noi/satmarket.git", "")])
+    prova("il token dalla risposta di git credential", "abc",
+          g.token_da_credenziali("protocol=https\nhost=github.com\n"
+                                 "username=x\npassword=abc\n"))
+    prova("...e se non c'e', vuoto", ["", ""],
+          [g.token_da_credenziali("username=x\n"),
+           g.token_da_credenziali(None)])
+    prova("il ripiego: il token dentro l'URL",
+          ["tok", "tok", "", ""],
+          [g.token_da_url(u) for u in (
+              "https://x:tok@github.com/noi/r.git",
+              "https://tok@github.com/noi/r.git",
+              "https://github.com/noi/r.git",
+              "https://x:tok@altrove.example/noi/r.git")])
+
+    # --- IL TOKEN NON SI STAMPA MAI --------------------------------------
+    TOK = "github_pat_" + "A1b2C3d4" * 4
+    prova("la cintura toglie il token da qualunque testo", False,
+          TOK in g._senza_token(f"errore su https://x:{TOK}@github.com", TOK))
+    # un token di forma SCONOSCIUTA (GitHub le cambia): la regex non lo
+    # riconosce, quindi a toglierlo dev'essere il confronto esatto
+    prova("...anche se ha una forma che nessuno conosce", False,
+          "cartone1234567890" in g._senza_token(
+              "401 per cartone1234567890", "cartone1234567890"))
+    prova("...anche quando non sa qual e' (lo riconosce dalla forma)", False,
+          "ghp_" in g._senza_token("Bearer ghp_" + "Z9" * 12, ""))
+    prova("...e non mangia il resto", "la CI e' verde",
+          g._senza_token("la CI e' verde", TOK))
+    prova("la descrizione del token non lo contiene", False,
+          any(TOK[:20] in g.descrivi_token(TOK, x) for x in (None, "", "repo")))
+    prova("un fine-grained si riconosce", True,
+          "fine-grained" in g.descrivi_token(TOK, ""))
+    prova("un classico che SA SCRIVERE si denuncia", True,
+          "SA SCRIVERE" in g.descrivi_token("ghp_" + "x" * 30, "repo, gist"))
+    prova("...uno senza scope di scrittura no", False,
+          "SA SCRIVERE" in g.descrivi_token("ghp_" + "x" * 30, "read:org"))
+    prova("nessun token: lo dice", True,
+          "nessun token" in g.descrivi_token("", None))
+    # il token NON passa da argomenti ne' da variabili d'ambiente (li
+    # vede `ps`): deploy.sh gli passa il solo sha, e il giudice il token
+    # se lo va a prendere da git
+    sh = codice(open("deploy.sh", encoding="utf-8").read())
+    prova("deploy.sh non maneggia nessun token", False,
+          any(x in sh for x in ("credential fill", "TOKEN=", "Bearer",
+                                "Authorization")))
+    sorgente = codice(open("giudice_deploy.py", encoding="utf-8").read())
+    prova("ogni riga stampata dal giudice passa dalla cintura", True,
+          sorgente.count("print(") == sorgente.count("print(_senza_token(")
+          + 1)      # l'unica nuda e' l'aiuto, che non ha variabili
+    prova("il giudice e' solo libreria standard", [],
+          sorted({r.split()[1].split(".")[0] for r in sorgente.split("\n")
+                  if r.startswith(("import ", "from "))}
+                 - {"json", "os", "re", "subprocess", "sys", "urllib"}))
+    wf = open(".github/workflows/prove.yml", encoding="utf-8").read()
+    prova("il giudice si compila in CI", True, "giudice_deploy.py" in wf)
+
+
+def prove_servizio_non_root():
+    """IL MERCATINO NON GIRA DA ROOT (set 2026, audit A1). Qui non si
+    prova il VPS — quello lo fa `cambio-utente.sh` sul posto — ma le
+    righe che tengono insieme i pezzi: la regola di sudoers UGUALE ai
+    comandi del guardiano, il drop-in che non si spara sui piedi, e la
+    regola dei permessi («barattolo non scrive dove root esegue»)."""
+    print("\n[il servizio non root]")
+    amb = {}
+    i = _SORGENTE.index("PONTE_LND_URL = ")
+    exec(_SORGENTE[i:_SORGENTE.index("_TASK_PONTE = None", i)], amb)
+
+    def corpo(percorso, commento):
+        return [r.strip() for r in open(percorso, encoding="utf-8")
+                .read().split("\n")
+                if r.strip() and not r.lstrip().startswith(commento)]
+
+    # --- 1) SUDOERS = I RIAVVII DEL GUARDIANO, NE' PIU' NE' MENO --------
+    regole = corpo("deploy/utente/sudoers-barattolo-ponte", "#")
+    attese = sorted({"barattolo ALL=(root) NOPASSWD: "
+                     + " ".join(amb["PONTE_SUDO"][2:] + cmd[1:])
+                     for strada in amb["PONTE_STRADE"].values()
+                     for cmd in strada})
+    prova("sudoers permette ESATTAMENTE i riavvii di PONTE_STRADE",
+          attese, sorted(regole))
+    prova("...che sono quattro", 4, len(regole))
+    for r in regole:
+        prova(f"niente jolly ne' ALL nel comando: {r.split(': ')[1]}",
+              False, any(x in r.split(": ")[1] for x in ("*", "?", "ALL")))
+    prova("...e mai il servizio stesso", False,
+          any("restart barattolo" in r for r in regole))
+    prova("le domande del guardiano non passano da sudo", True,
+          all(cmd[1] in ("is-active", "is-enabled")
+              for cmd in amb["PONTE_DOMANDE"].values()))
+
+    # --- 2) IL DROP-IN ---------------------------------------------------
+    drop = corpo("deploy/utente/barattolo-utente.conf", ";")
+    prova("il drop-in cambia utente, gruppo e cartella",
+          ["[Service]", "User=barattolo", "Group=barattolo",
+           "WorkingDirectory=/srv/barattolo", "UMask=0027"], drop)
+    # sudo con NoNewPrivileges risponde «no new privileges»: il ponte
+    # cadrebbe senza piu' nessuno che lo rialzi. Con `User=` lo
+    # sottintendono anche i suoi parenti.
+    for timbro in ("NoNewPrivileges", "ProtectKernel", "RestrictNamespaces",
+                   "SystemCallFilter", "PrivateDevices", "LockPersonality",
+                   "MemoryDenyWriteExecute", "RestrictRealtime",
+                   "RestrictSUIDSGID", "ProtectClock"):
+        prova(f"niente {timbro}: spegnerebbe il sudo del guardiano", False,
+              any(r.startswith(timbro) for r in drop))
+
+    # --- 3) LO SCRIPT DEL CAMBIO ----------------------------------------
+    sc = codice(open("deploy/utente/cambio-utente.sh",
+                     encoding="utf-8").read())
+    prova("nudo GUARDA e basta: per fare serve --fai", True,
+          '"")       guarda; exit $? ;;' in sc and "--fai)    fai ;;" in sc)
+    fai = sc[sc.index("\nfai() {"):]
+    stop = fai.index('systemctl stop "$SERVIZIO"')
+    for nome, riga in (("la fotografia", "guarda || exit 1"),
+                       ("l'utente", "useradd --system"),
+                       ("visudo sulla regola", "visudo -cf"),
+                       ("il certificato di LND", "cert_leggibile"),
+                       ("la copia del database", ".backup")):
+        prova(f"PRIMA dello stop: {nome}", True, -1 < fai.find(riga) < stop)
+    prova("la regola di sudoers si prova PRIMA di posarla", True,
+          fai.index("visudo -cf") < fai.index("install -m 440"))
+    prova("l'utente non ha shell ne' casa sua", True,
+          "--shell /usr/sbin/nologin" in fai and "--no-create-home" in fai)
+    # dopo lo stop ogni passo che fallisce TORNA A ROOT da solo
+    dopo = fai[stop:fai.index('dillo "== il sito e\' tornato su')]
+    nudi = [r.strip() for r in dopo.split("\n")
+            if r.strip().startswith(("mv ", "ln -s", "chown", "systemctl st"))
+            and "|| fallito" not in r and "&& mv" not in r]
+    prova("a sito fermo nessun passo che conta fallisce in silenzio",
+          [], nudi)
+    prova("...e un Ctrl-C a meta' torna a root anche lui", True,
+          -1 < fai.find("trap 'fallito") < stop)
+    # LA REGOLA DEI PERMESSI: barattolo non scrive dove root esegue
+    prova("codice e config restano di root", True,
+          'chown root:"$UTENTE" . config.py' in fai
+          and "chmod 640 config.py" in fai and "chmod 750 ." in fai)
+    prova("...sue sono solo le cartelle dei dati",
+          'SUE="dati foto buste contenuti import_tmp"',
+          next(r.split("   #")[0].strip() for r in sc.split("\n")
+               if r.startswith("SUE=")))
+    prova("...e lo si VERIFICA, da lui, prima dello start", True,
+          fai.index("test ! -w server.py -a ! -w config.py -a ! -w .")
+          < fai.index('systemctl start "$SERVIZIO"'))
+    # le cartelle in cui il server scrive sono TUTTE fra le sue
+    scrive = set(re.findall(r'^(\w+_DIR) = "(\w+)"', _SORGENTE, re.M))
+    prova("ogni cartella in cui il server scrive e' fra le sue", [],
+          sorted(nome for nome, cartella in scrive
+                 if cartella not in "dati foto buste contenuti import_tmp"
+                 .split()))
+    prova("...e ne ho trovate almeno quattro (la sentinella guarda)", True,
+          len(scrive) >= 4)
+    # /api/salute LEGGE soltanto: la scrittura si prova a parte
+    prova("la scrittura sul database si prova DA LUI prima dello start",
+          True, fai.index("BEGIN IMMEDIATE")
+          < fai.index('systemctl start "$SERVIZIO"')
+          and "con.rollback()" in fai)
+    prova("alla fine si guarda CHI gira davvero", True,
+          'ps -o user= -p "$pid"' in fai)
+    prova("...e che sudo non sia piu' largo del dovuto", True,
+          'sudo -n -l /usr/bin/systemctl restart "$SERVIZIO"' in fai
+          and "sudo -n -l /usr/bin/systemctl stop tor" in fai)
+    torna = sc[sc.index("\ntorna() {"):sc.index("\nfallito() {")]
+    prova("tornare a root: via il drop-in, reload, restart", True,
+          torna.index('rm -f "$DROPIN"') < torna.index("daemon-reload")
+          < torna.index('systemctl restart "$SERVIZIO"'))
+    prova("...rimettendo prima i due collegamenti, se mancano", True,
+          torna.index('ln -s "$NUOVA" "$VECCHIA"')
+          < torna.index('rm -f "$DROPIN"')
+          and "ln -s dati/satmarket.db" in torna)
+    ign = open(".gitignore", encoding="utf-8").read()
+    prova("la cartella del database non finisce nella repo", True,
+          "\ndati/\n" in ign.replace("\r", ""))
+
+
 class _BastaPonte(BaseException):
     """Il mondo finto del guardiano ha finito le risposte: si esce dal
     ciclo VERO (`guardiano_ponte`, che e' un `while True`). BaseException
@@ -38802,7 +39212,7 @@ class _BastaPonte(BaseException):
 
 def _mondo_ponte(risposte, ritorno=0, errore_cmd=None, timbro="",
                  avvisa=(700000001,), attivo=True, tor_acceso=False,
-                 tunnel=True):
+                 tunnel=True, uid=0):
     """Il guardiano del ponte in un mondo di cartone: un orologio che
     avanza solo coi `sleep`, un ponte che risponde a copione (True =
     LND ha risposto, False = il rifiuto di tor del 18 set), un
@@ -38814,12 +39224,18 @@ def _mondo_ponte(risposte, ritorno=0, errore_cmd=None, timbro="",
     secondi dall'avvio, per accenderlo FRA due cure) e `tunnel`
     (`wg-quick@wg0` e' abilitato?). Di serie il mondo e' quello di dopo
     il trasloco: tunnel abilitato, piano B spento. Le domande si
-    registrano in `m.chieste`, i riavvii restano in `m.comandi`."""
+    registrano in `m.chieste`, i riavvii restano in `m.comandi`.
+    DAL 21 SET 2026 IL SERVIZIO NON E' PIU' ROOT: `uid` e' chi gira (0 di
+    serie, cosi' le prove di prima restano quelle; None = una macchina
+    senza `geteuid`, cioe' Windows). Un riavvio chiesto da un altro
+    utente arriva come `sudo -n /usr/bin/systemctl …`: il mondo lo
+    SPOGLIA (in `m.comandi` resta il comando di systemctl, come prima)
+    e mette l'argv VERO in `m.argv`, che e' quel che sudoers vedrebbe."""
     import asyncio as _aio
     import html as _html
     import types
     m = types.SimpleNamespace(ora=1_000_000.0, domande=[], comandi=[],
-                              chieste=[], compiti=0,
+                              chieste=[], compiti=0, argv=[],
                               messaggi=[], righe=[], client=[], uccisi=0,
                               timbri={"ponte_avviso": timbro} if timbro
                               else {}, copione=list(risposte))
@@ -38876,6 +39292,9 @@ def _mondo_ponte(risposte, ritorno=0, errore_cmd=None, timbro="",
             m.compiti += 1
 
         async def create_subprocess_exec(self, *argv, **kw):
+            m.argv.append(argv)
+            if argv[:3] == ("sudo", "-n", "/usr/bin/systemctl"):
+                argv = ("systemctl",) + argv[3:]
             domanda = argv[1] in ("is-active", "is-enabled")
             (m.chieste if domanda else m.comandi).append((m.ora, argv))
             if isinstance(errore_cmd, BaseException):
@@ -38899,8 +39318,10 @@ def _mondo_ponte(risposte, ritorno=0, errore_cmd=None, timbro="",
         m.messaggi.append((m.ora, chat, testo))
         return "telegram ok (messaggio 1)"
 
+    finto_os = (types.SimpleNamespace() if uid is None
+                else types.SimpleNamespace(geteuid=lambda: uid))
     amb = {"html": _html, "httpx": types.SimpleNamespace(AsyncClient=Cliente),
-           "asyncio": Aio(),
+           "asyncio": Aio(), "os": finto_os,
            "time": types.SimpleNamespace(time=lambda: m.ora,
                                          monotonic=lambda: m.ora),
            "print": lambda *a, **k: m.righe.append(" ".join(map(str, a))),
@@ -38916,7 +39337,7 @@ def _mondo_ponte(risposte, ritorno=0, errore_cmd=None, timbro="",
     exec(_SORGENTE[i:_SORGENTE.index("_TASK_PONTE = None", i)], amb)
     for f in ("_guardiano_ponte_attivo", "_destinatari_ponte",
               "_chi_avvisa_ponte", "_ponte_passo", "_ponte_esito_cura",
-              "_ponte_strada", "_a_mano_ponte",
+              "_ponte_strada", "_a_mano_ponte", "_argv_ponte", "_uid_ponte",
               "_ponte_avviso_permesso", "_ponte_pubblico", "_minuti_ponte",
               "_testo_guasto_ponte", "_testo_esito_ponte",
               "_testo_tornato_ponte"):
@@ -39099,6 +39520,48 @@ def prove_guardiano_ponte():
     prova("...scappate, o il messaggio HTML non parte", True,
           "&lt;polkit&gt;" in _detto(m, 1)
           and "<polkit>" not in _detto(m, 1))
+    # --- 5b) NON PIU' ROOT (21 set 2026) -------------------------------
+    # il mercatino gira come `barattolo`: i riavvii passano da sudo,
+    # nella forma ESATTA che la regola di sudoers permette; le domande
+    # restano nude, che le sa chiunque.
+    m = _mondo_ponte([False, False, False, True], uid=993)
+    m.gira()
+    SUDO = ("sudo", "-n", "/usr/bin/systemctl")
+    prova("da utente qualunque la cura e' la stessa di prima",
+          [TUNNEL, PONTE], [argv for _t, argv in m.comandi])
+    prova("...ma i due riavvii passano da sudo -n, col percorso pieno",
+          [SUDO + TUNNEL[1:], SUDO + PONTE[1:]],
+          [a_ for a_ in m.argv if "restart" in a_])
+    prova("...e le due domande NO: non chiedono permessi",
+          [CHIEDE_TOR, CHIEDE_TUNNEL],
+          [a_ for a_ in m.argv if "restart" not in a_])
+    prova("...e l'avviso racconta il comando di systemctl, non sudo", True,
+          "✅ <code>systemctl restart wg-quick@wg0.service</code>"
+          in _detto(m, 1) and "sudo" not in _detto(m, 1))
+    m = _mondo_ponte([False, False, False, True], uid=0)
+    m.gira()
+    prova("da root nessun sudo (i giorni prima del cambio, o un ritorno)",
+          [], [a_ for a_ in m.argv if a_[0] == "sudo"])
+    m = _mondo_ponte([False, False, False, True], uid=None)
+    m.gira()
+    prova("su una macchina senza geteuid (Windows) non esplode", 2,
+          len(m.comandi))
+    arg = m.amb["_argv_ponte"]
+    prova("il giudice dell'argv: solo `restart` si veste di sudo",
+          [SUDO + ("restart", "tor"), CHIEDE_TOR, TOR],
+          [arg(TOR, 993), arg(CHIEDE_TOR, 993), arg(TOR, 0)])
+    # LA PORTA RESTA QUELLA: sudo non allarga l'elenco. Un comando che
+    # non e' ammesso non parte ne' nudo ne' vestito.
+    import asyncio as _aio5
+    m = _mondo_ponte([], uid=993)
+    prova("la porta rifiuta anche da non-root, e non parte niente",
+          ((None, "comando non ammesso"), []),
+          (_aio5.run(m.amb["_systemctl_ponte"](
+              ("systemctl", "restart", "barattolo"))), m.argv))
+    prova("...e rifiuta chi le porta un sudo gia' fatto",
+          (None, "comando non ammesso"),
+          _aio5.run(m.amb["_systemctl_ponte"](SUDO + ("restart", "tor"))))
+
     m = _mondo_ponte([False, False, False, False, True],
                      errore_cmd=FileNotFoundError("systemctl"))
     m.gira()
@@ -74494,6 +74957,7 @@ def main():
               prove_cassa_strada_chiusa,
               prove_casa_vuota_gratis,
               prove_script_nel_workflow, prove_deploy,
+              prove_giudice_deploy, prove_servizio_non_root,
               prove_guardiano_ponte,
               prove_bussola, prove_tetto_claude_md,
               prove_canale_comunita,

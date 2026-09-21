@@ -40,13 +40,13 @@ modo in cui si rifà un errore già pagato.
 - DEPLOY AUTOMATICO (ago 2026): commit+push su main, e basta. Entro un
   minuto è online — se la CI è verde. Config e database NON viaggiano
   mai (restano fuori dalla repo, e `git reset` non li tocca).
-  IL VPS TIRA, NON VIENE SPINTO, ed è una decisione di SICUREZZA e non
-  di comodità: nessuna chiave di quella macchina sta nei secret di
-  GitHub, quindi chi compromette GitHub — o una action di terzi — non
-  arriva al nodo Lightning. Per la stessa ragione «la CI è verde» non
-  è una domanda da fare a un'API con un token in mano: è il fatto
-  stesso che il ref si sia mosso. Un commit rosso resta su main e in
-  produzione non ci arriva mai.
+  IL VPS TIRA, NON VIENE SPINTO — ma ESEGUE quel che tira, e il ref
+  `pronto` lo sposta chiunque scriva sul repo (audit G2). Dal 21 set
+  2026 `deploy.sh` tira un commit SOLO se sta su main, va in avanti, ha
+  la CI verde (chiesta a GitHub, token di SOLA LETTURA) e — a firme
+  accese — la punta FIRMATA da una chiave scritta sul VPS: la sola
+  difesa che regge a un GitHub bucato. Sennò «⛔ Deploy rifiutato». Il
+  servizio gira da `barattolo`, MAI da root: PRODUZIONE, «IL DEPLOY CHE SI FIDA SOLO DI MAIN».
   IL FRENO È LA RIGA CHE SI DIMENTICA: dopo un rollback il ref `pronto`
   resta AVANTI, quindi al giro dopo — fra un minuto — si riproverebbe
   lo STESSO commit rotto, e poi ancora, riavviando il mercatino ogni

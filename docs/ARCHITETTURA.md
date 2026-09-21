@@ -25700,7 +25700,19 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   sceglie fra le tre `PONTE_STRADE`, due systemctl FISSI l'una. Tutto
   passa da `_systemctl_ponte`, primo e unico sottoprocesso del server,
   che RIFIUTA ogni comando fuori da quei due elenchi (una sentinella
-  lo tiene unico, senza shell, e chiamato da due soli posti). LE TRE
+  lo tiene unico, senza shell, e chiamato da due soli posti). DAL 21
+  SET 2026 IL SERVER NON GIRA DA ROOT: `_argv_ponte` — puro — veste di
+  `sudo -n /usr/bin/systemctl` i soli RIAVVII quando chi gira non è
+  root (le due domande restano nude), e a permetterli è
+  `deploy/utente/sudoers-barattolo-ponte`, che una prova tiene uguale a
+  `PONTE_STRADE`. La regola dei permessi sul disco: `barattolo` non
+  scrive in NESSUN posto da cui root esegue (codice, `.git`,
+  `config.py` sono di root; suoi sono `dati/`, `foto/`, `buste/`,
+  `contenuti/`, `import_tmp/`) — vedi PRODUZIONE, «IL DEPLOY CHE SI
+  FIDA SOLO DI MAIN», dove sta anche IL GIUDICE DEL DEPLOY
+  (`giudice_deploy.py`: tre verdetti — si, no, aspetta — e nel dubbio
+  non si tira mai; a giudicare un commit è sempre lo script GIÀ in
+  produzione, mai quello che il commit porta con sé). LE TRE
   MACCHINE, dopo il trasloco: il VPS parla al nodo dal tunnel
   (`10.77.0.2` → `10.77.0.1:18080`, solo la REST di LND), il nodo
   parla al mondo — Lightning, relay, e il VPS stesso per mostro —

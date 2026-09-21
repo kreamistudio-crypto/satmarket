@@ -451,10 +451,12 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
 - LA CATENA DEL DEPLOY, i pezzi che CLAUDE.md non tiene (là restano
   il fatto — push su main e sei online —, il perché di sicurezza
   e il freno):
-  LA CATENA, in tre pezzi: 1) il job `pronto` del workflow fa avanzare
-  il ref `pronto` SOLO quando prove e controllo dei segreti sono
+  LA CATENA, in quattro pezzi: 1) il job `pronto` del workflow fa
+  avanzare il ref `pronto` quando prove e controllo dei segreti sono
   passati; 2) sul VPS un timer systemd chiama `deploy.sh` ogni minuto,
-  che guarda se quel ref si è mosso; 3) dopo il riavvio si chiede a
+  che guarda se quel ref si è mosso; 2b) DAL 21 SET 2026 il ref mosso è
+  solo il CAMPANELLO: prima di tirare, `deploy.sh` GIUDICA il commit —
+  vedi più sotto «IL DEPLOY CHE SI FIDA SOLO DI MAIN»; 3) dopo il riavvio si chiede a
   `/api/salute` e, se non risponde entro 45 secondi, si torna al
   commit di prima e si riavvia ancora.
   `/api/salute` TOCCA IL DATABASE apposta (una lettura, la più piccola
@@ -473,7 +475,11 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   del database risponde 503 e non un 200 con
   «ok: false»: chi controlla la salute guarda il CODICE, e un guasto
   travestito da risposta buona è il modo in cui un rollback non parte.
-  L'unità systemd COPIA lo script in /tmp prima di eseguirlo, e non è
+  L'unità systemd COPIA lo script prima di eseguirlo — dal set 2026
+  in `/run/barattolo-deploy/`, una cartella di root che systemd crea a
+  ogni giro (`RuntimeDirectory=`), e non più in /tmp: lì il nome era
+  fisso, e un utente non-root (ora c'è: `barattolo`) poteva occuparlo
+  prima e far eseguire a root un file suo. La copia non è
   una stranezza: bash legge un file mentre lo esegue, quindi se
   `git reset` lo riscrivesse a metà corsa la riga dopo sarebbe di un
   altro script. Il deploy in corso finisce col codice con cui è
@@ -572,10 +578,18 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `"ponte"`: `ok`, `giu`, `attesa` (prima del primo controllo) o
   `spento`. A CHI SCRIVE: gli id di `GUARDIANO_PONTE_AVVISA = [...]`
   nel config, e a lista vuota (o riga assente) i moderatori. LEVA:
-  `GUARDIANO_PONTE = False` + riavvio lo spegne. IL RIAVVIO RICHIEDE
-  ROOT: `systemctl show barattolo -p User` deve dire `User=` vuoto o
-  `root`, o la cura fallisce (e l'avviso lo dice con le parole di
-  systemctl). IL DRILL, a mercatino fermo: `systemctl stop lnd-ponte`
+  `GUARDIANO_PONTE = False` + riavvio lo spegne. IL RIAVVIO NON
+  RICHIEDE PIÙ ROOT (21 set 2026): da utente `barattolo` i quattro
+  riavvii passano da `sudo -n /usr/bin/systemctl restart …`, e li
+  permette `/etc/sudoers.d/barattolo-ponte` (copia in
+  `deploy/utente/sudoers-barattolo-ponte`, tenuta uguale a
+  `PONTE_STRADE` da una prova: chi aggiunge una strada RIMETTE il file
+  sul VPS a mano, `/etc` non viaggia col deploy). Si controlla con
+  `sudo -l -U barattolo` — quattro righe, nient'altro. Se la regola
+  manca la cura fallisce e l'avviso lo dice con le parole di sudo («a
+  password is required»). Da root (prima del cambio, o dopo un ritorno)
+  il guardiano non usa sudo: guarda chi è nell'istante del comando.
+  IL DRILL, a mercatino fermo: `systemctl stop lnd-ponte`
   (o, per il tunnel, `systemctl stop wg-quick@wg0`),
   e in circa tre minuti il guardiano lo deve rimettere su da solo,
   con i due avvisi. All'avvio il journal dice anche la strada che la
@@ -631,7 +645,7 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   finita), 🛬 la ronda, ✋ una seconda mano respinta. All'avvio c'e'
   sempre «🔎 Verità dei pagamenti: LND ACCESO» (o SPENTO, col perche').
   IL MACAROON DI SOLA LETTURA (una volta sola). Questo server e'
-  pubblico e gira da root: una chiave che sa PAGARE qui non entra, e
+  pubblico (e fino al set 2026 girava da root): una chiave che sa PAGARE qui non entra, e
   quella di LNbits resta dov'e'. Sul NODO, dalla cartella `~/nodo`:
   `docker compose exec lnd lncli bakemacaroon --root_key_id 2 --save_to /tmp/barattolo-lettura.macaroon offchain:read`
   e poi `docker compose exec lnd xxd -p -c 9999 /tmp/barattolo-lettura.macaroon`
@@ -1137,3 +1151,194 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `BARATTOLO_EVENTI_URL` dal compose e `up -d` (la patch diventa inerte,
   e sul VPS svuotare `P2P_EVENTI_SEGRETO` fa tornare il libro a parlare
   subito), oppure l'immagine a `-bar3`.
+- IL DEPLOY CHE SI FIDA SOLO DI MAIN, E IL SERVIZIO NON ROOT (21 set
+  2026, audit del 19 set: G2 e A1). IL BUCO: il VPS eseguiva entro un
+  minuto, da root, qualunque commit su cui stesse il ref `pronto` — e
+  su un repo privato gratuito quel ref lo sposta chiunque abbia
+  scrittura (`git push origin qualunque:pronto`), senza che la CI giri.
+  Un account GitHub bucato valeva il VPS, con le chiavi di LNbits.
+  I QUATTRO CONTROLLI di `deploy.sh`, tutti PRIMA di toccare qualcosa:
+  a) il commit STA SU MAIN (antenato di `origin/main`); b) va IN AVANTI
+  rispetto a quel che gira; c) la punta è FIRMATA da una chiave di
+  `/etc/barattolo-deploy/firmatari` — o, finché quel file non c'è, ha
+  un autore dei nostri, che è una cintura di cartone (in git l'autore è
+  testo libero); d) la CI è VERDE su di lui: `giudice_deploy.py` lo
+  chiede alle Actions di GitHub (il giro nato da un push SU MAIN, coi
+  lavori `prove` e `segreti` in `success`).
+  TRE ESITI. Si tira → «🚀». RIFIUTATO → journal, «⛔ Deploy rifiutato:
+  <motivo>» ai moderatori UNA volta (timbro `.deploy-rifiutato`), e non
+  si riprova da solo. ASPETTA (la CI gira, GitHub muto, token che non
+  apre) → non tira, riprova al giro dopo, e dopo 10 minuti manda «⏳
+  Deploy fermo» una volta (timbro `.deploy-attesa`). `--forza` riprova
+  un rifiutato ma NON salta il giudice; `./deploy.sh --dimmi` dice cosa
+  ne pensa il giudice senza toccare niente.
+  ⚠️ COSA FERMA E COSA NO, senza raccontarsela: a), b) e d) fermano il
+  push di lato su `pronto`, il ritorno a una versione vecchia e il
+  commit rosso. NON fermano chi sa scrivere su MAIN: quello riscrive
+  anche il workflow, e la CI diventa verde quanto vuole. Contro un
+  account GitHub compromesso regge SOLO la firma, perché la chiave non
+  sta su GitHub e l'elenco dei firmatari non sta nel repo. Finché le
+  firme sono spente ogni deploy lo dice nel journal («⚠️ FIRME NON
+  RICHIESTE»).
+  LA SEQUENZA PER IL VPS, un passo alla volta. Si può fermare dopo
+  ogni passo: ognuno lascia la macchina in uno stato che funziona.
+  PASSO 1 — IL TOKEN DEL VPS, che deve saper LEGGERE e basta. Tre
+  controlli, nessuno mostra il token:
+  `cd ~/satmarket && python3 giudice_deploy.py token`
+  — dice che token è. «fine-grained» va bene; «⚠️ token CLASSICO … SA
+  SCRIVERE» va sostituito.
+  `cd ~/satmarket && git push --dry-run origin HEAD:refs/heads/prova-permessi`
+  — DEVE FALLIRE con un 403 («Write access to repository not granted»
+  o simile). `--dry-run` non scrive niente nemmeno se il permesso ci
+  fosse; se invece risponde «To https://github.com/…» senza errori, il
+  token SA SCRIVERE.
+  `./deploy.sh --dimmi`
+  — l'ultima riga dev'essere «⚖️ il giudice lo tirerebbe: la CI e'
+  verde…». Se dice «⏳ … non puo' leggere le Actions», al token manca
+  un permesso.
+  Il terzo controllo è sulla pagina: GitHub → Settings → Developer
+  settings → Personal access tokens → Fine-grained tokens → il token
+  del VPS: Repository access «Only select repositories: satmarket»;
+  Permissions «Contents: Read-only», «Actions: Read-only» (e
+  «Metadata: Read-only», che si mette da solo). NIENT'ALTRO.
+  PER SOSTITUIRLO: se ne genera uno nuovo lì, con quei permessi e una
+  scadenza (alla scadenza il deploy si ferma e «⏳ … (401): scaduto o
+  revocato?» lo dice); dove sta quello vecchio lo dice
+  `git -C ~/satmarket config --get-regexp 'credential|remote.origin.url'`
+  — con `credential.helper store` è la riga di `/root/.git-credentials`
+  (`https://UTENTE:TOKEN@github.com`): si apre con `nano`, si cambia il
+  solo TOKEN, e `chmod 600 /root/.git-credentials`. Poi i tre controlli
+  di nuovo, e il token VECCHIO si REVOCA su GitHub. Il token non si
+  incolla mai in chat.
+  PASSO 2 — LE DUE UNIT (la copia dello script sotto `/run`). Prima si
+  guarda che sul VPS non abbiano ritocchi a mano:
+  `cd ~/satmarket && for u in barattolo-deploy barattolo-backup; do git diff --no-index --stat /etc/systemd/system/$u.service deploy/$u.service; done`
+  — devono cambiare SOLO le righe `RuntimeDirectory…`, `ExecStart` e i
+  commenti. Se c'è altro: FERMATI e riferisci. Poi:
+  `cp deploy/barattolo-deploy.service deploy/barattolo-backup.service /etc/systemd/system/ && systemctl daemon-reload`
+  `systemctl start barattolo-deploy.service && journalctl -u barattolo-deploy -n 5 --no-pager`
+  — nessun errore (nel caso normale non scrive niente: è in pari).
+  PASSO 3 — IL CAMBIO D'UTENTE. Lo fa uno script, perché per qualche
+  secondo il sito è giù e in quei secondi non si digita. PRIMA si
+  guarda, e non tocca niente:
+  `cd ~/satmarket && bash deploy/utente/cambio-utente.sh`
+  — stampa LA FOTOGRAFIA (come gira il servizio, dove stanno
+  l'interprete e le librerie, il database, il disco). Se c'è un «ALT»
+  il cambio oggi non si fa: si incolla l'uscita a Claude. Se finisce
+  con «nessun ALT»:
+  `bash deploy/utente/cambio-utente.sh --fai`
+  COSA FA: crea l'utente `barattolo` (di sistema, senza shell né
+  password), posa la regola di sudoers (provata con `visudo` prima),
+  controlla che `barattolo` veda le stesse librerie di root, copia il
+  database in `backup/`, ferma i timer di deploy e backup — tutto a
+  sito ACCESO. Poi ferma il mercatino (DA QUI IL SITO È GIÙ), sposta
+  `/root/satmarket` in `/srv/barattolo` lasciando un COLLEGAMENTO al
+  posto di prima (in `/root` un utente qualunque non entra; col
+  collegamento ogni comando di questo file, e le unit di deploy e
+  backup, valgono uguali), sposta il database in `dati/` lasciando il
+  collegamento `satmarket.db` (sqlite scrive il journal ACCANTO al file
+  vero, verificato su Ubuntu 26.04: la cartella del database dev'essere
+  scrivibile dal servizio, quella del codice MAI), sistema i permessi,
+  posa il drop-in `barattolo.service.d/utente.conf`, prova da
+  `barattolo` una SCRITTURA sul database (e la annulla), riavvia e
+  aspetta `/api/salute` (IL SITO È TORNATO: lo script dice per quanti
+  secondi è stato giù — una decina, se il disco è lo stesso). Se un
+  passo dopo lo stop fallisce, TORNA A ROOT DA SOLO.
+  I PERMESSI, e la regola che li tiene: `barattolo` non scrive in
+  NESSUN posto da cui root esegue — il deploy gira da root dentro
+  quella cartella, e se il servizio potesse scriverci chi buca il
+  servizio diventerebbe root al deploy dopo. `/srv/barattolo` è
+  `root:barattolo 750`; il codice e `.git` (700) sono di root;
+  `config.py` è `root:barattolo 640` (il servizio lo legge, non lo
+  riscrive, nessun altro lo vede); `backup/` è `root 700`; di
+  `barattolo` sono SOLO `dati/`, `foto/`, `buste/`, `contenuti/`,
+  `import_tmp/`. La 8080 non chiede root (è sopra la 1024). Il token di
+  GitHub (`/root/.git-credentials`, 600) e `/opt/lnbits/.env` il
+  servizio non li vede più.
+  I CONTROLLI DOPO:
+  `systemctl show barattolo -p User -p MainPID && ps -o user=,cmd= -p $(systemctl show barattolo -p MainPID --value)`
+  — `User=barattolo`, e il processo è suo.
+  `sudo -l -U barattolo`
+  — le quattro righe `systemctl restart` (tor, lnd-ponte,
+  lnd-ponte-tor, wg-quick@wg0) e NIENT'ALTRO.
+  `ls -ld /srv/barattolo /srv/barattolo/config.py /srv/barattolo/dati /srv/barattolo/.git /srv/barattolo/backup`
+  `sudo -u barattolo cat /root/.git-credentials /opt/lnbits/.env`
+  — DEVE dire «Permission denied» due volte.
+  `journalctl -u barattolo --since "10 min ago" --no-pager | grep -E "🌉|Traceback|Permission|readonly" | head`
+  — la riga «🌉 Guardiano del ponte…», e nessun Permission/readonly.
+  `journalctl -u barattolo -u barattolo-deploy --since "14 days ago" | grep -ciE "github_pat_|gh[pousr]_[A-Za-z0-9]{20}|lnbc[0-9a-z]{80,}|api\.telegram\.org/bot[0-9]|macaroon"`
+  — deve dare 0: il journal non stampa segreti.
+  E una prova VERA di scrittura: dall'app si mette e si toglie un
+  preferito, si carica una foto su un annuncio di prova.
+  IL DRILL DEL GUARDIANO, in un momento calmo (è lui che usa sudo):
+  `systemctl stop lnd-ponte` — in circa tre minuti arrivano i due
+  avvisi 🌉 e il ponte torna su DA SOLO. Se l'esito dice «a password is
+  required» manca la regola di sudoers.
+  ⚠️ DA QUEL GIORNO GLI SCRIPT CHE SCRIVONO si lanciano DA LUI:
+  `cd ~/satmarket && sudo -u barattolo python3 <script>.py`. Da root
+  funzionano lo stesso, ma un file NATO da root in `dati/` o `foto/` il
+  servizio non lo sa più riscrivere. Le letture (`sqlite3 -readonly`,
+  i censimenti) restano come sono.
+  TORNARE A ROOT, se qualcosa non gira:
+  `bash ~/satmarket/deploy/utente/cambio-utente.sh --torna`
+  — o, a mano, i due comandi che fa lui:
+  `rm /etc/systemd/system/barattolo.service.d/utente.conf`
+  `systemctl daemon-reload && systemctl restart barattolo`
+  La cartella resta in `/srv/barattolo` col collegamento: da root non
+  cambia niente, quindi non c'è nient'altro da disfare.
+  QUEL CHE IL DROP-IN NON HA, ed è voluto: `NoNewPrivileges` e i suoi
+  parenti (con `User=` lo sottintendono anche `ProtectKernel*`,
+  `SystemCallFilter`, `RestrictNamespaces`…). Il guardiano passa da
+  sudo, e sudo con quel timbro risponde «no new privileges»: il ponte
+  cadrebbe senza nessuno che lo rialzi. Una prova lo difende. La strada
+  che li sbloccherebbe è polkit al posto di sudoers — cantiere suo.
+  PASSO 4 — LE FIRME, la sola difesa che regge a un GitHub compromesso.
+  SUL PC (PowerShell), una volta:
+  `ssh-keygen -t ed25519 -C "firma-barattolo-andrea" -f $env:USERPROFILE\.ssh\firma_barattolo`
+  — alla domanda sulla passphrase, INVIO due volte (vuota): le sessioni
+  di Claude committano da sole, e una passphrase le fermerebbe. La
+  chiave vive solo su quel PC, ed è un segreto che GitHub non ha.
+  `git config --global gpg.format ssh`
+  `git config --global user.signingkey C:/Users/Andrea/.ssh/firma_barattolo.pub`
+  `git -C C:\Users\Andrea\Documents\GitHub\satmarket config commit.gpgsign true`
+  `Get-Content $env:USERPROFILE\.ssh\firma_barattolo.pub`
+  — la riga che comincia con `ssh-ed25519` è la PUBBLICA: questa sì che
+  si può incollare. Si fa un commit qualunque, si pusha, si aspetta il
+  🚀 (le firme sono ancora spente), e SUL VPS si guarda che la firma si
+  legga PRIMA di pretenderla:
+  `mkdir -p /etc/barattolo-deploy && chmod 700 /etc/barattolo-deploy`
+  `nano /etc/barattolo-deploy/firmatari.prova`
+  — una riga per chiave: `andrea namespaces="git" ssh-ed25519 AAAA…`
+  `cd ~/satmarket && git -c gpg.ssh.allowedSignersFile=/etc/barattolo-deploy/firmatari.prova verify-commit -v HEAD 2>&1 | head -3`
+  — deve dire `Good "git" signature for andrea`. SOLO ALLORA:
+  `mv /etc/barattolo-deploy/firmatari.prova /etc/barattolo-deploy/firmatari && chmod 600 /etc/barattolo-deploy/firmatari`
+  `./deploy.sh --dimmi` — la prima riga ora dice «firma richiesta».
+  Da lì un commit la cui PUNTA non è firmata viene rifiutato («⛔ … non
+  porta la firma»). Alan manda la sua pubblica e diventa una seconda
+  riga (`alan namespaces="git" ssh-ed25519 …`). ⚠️ Un merge fatto DAL
+  SITO di GitHub lo firma GitHub, non noi: viene rifiutato, ed è
+  giusto. Dopo un merge dal sito si spinge un commit firmato sopra
+  (`git pull && git commit --allow-empty -m "Rilascio" && git push`).
+  ⚠️ `git commit-tree` NON guarda `commit.gpgsign`: chi costruisce un
+  commit a mano gli passa `-S`. SPEGNERE LE FIRME, se servisse:
+  `mv /etc/barattolo-deploy/firmatari /etc/barattolo-deploy/firmatari.spento`.
+  PASSO 5 — LA VERIFICA FINALE, tutt'e due le metà. 1) Un push normale
+  su main → entro un minuto dalla CI verde arriva «🚀 Barattolo
+  aggiornato», e nel journal `journalctl -u barattolo-deploy -n 3
+  --no-pager` la riga «🚀 aggiornamento: … · la CI e' verde su main per
+  questo commit · firma richiesta». 2) Il ref `pronto` spostato A MANO
+  su un commit fuori da main → rifiutato e avvisato. DAL PC, in una
+  cartella usa-e-getta (mai nella cartella di lavoro condivisa):
+  `git -C C:\Users\Andrea\Documents\GitHub\satmarket worktree add --detach $env:TEMP\prova-pronto origin/main`
+  `git -C $env:TEMP\prova-pronto commit --allow-empty -m "PROVA: commit finto fuori da main"`
+  `git -C $env:TEMP\prova-pronto push origin HEAD:refs/heads/pronto`
+  — entro un minuto su Telegram: «⛔ Deploy rifiutato: xxxxxxxx non sta
+  su main: qualcuno ha spostato «pronto» a mano». Sul VPS
+  `./deploy.sh --dimmi` dice «⛔ il giudice lo RIFIUTEREBBE», e
+  `git -C ~/satmarket log -1 --oneline` è ANCORA il commit di prima.
+  POI SI RIMETTE A POSTO, o il prossimo semaforo della CI trova
+  `pronto` fuori strada e diventa rosso:
+  `git -C $env:TEMP\prova-pronto push --force origin origin/main:refs/heads/pronto`
+  `git -C C:\Users\Andrea\Documents\GitHub\satmarket worktree remove --force $env:TEMP\prova-pronto`
+  (rimettere `pronto` sulla punta di main non è un rischio: da oggi il
+  VPS la CI la chiede da sé, e una punta non ancora verde aspetta.)

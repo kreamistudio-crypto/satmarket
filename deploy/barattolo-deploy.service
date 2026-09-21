@@ -8,6 +8,19 @@
 ; versione nuova dello script entra in vigore al giro dopo — che e'
 ; anche l'ordine giusto.
 ;
+; LA COPIA STA SOTTO /run, IN UNA CARTELLA DI ROOT, e non piu' in /tmp
+; (set 2026, audit del 19 set). In /tmp il nome era FISSO, e da quando
+; sulla macchina gira un utente che non e' root — `barattolo`, il
+; mercatino — quel nome lo puo' occupare lui PRIMA: `cp` scriverebbe
+; dentro un file SUO, che lui riscrive mentre bash lo sta leggendo da
+; root. `RuntimeDirectory=` la crea systemd a ogni giro, di root e
+; chiusa (0700), e la toglie alla fine.
+;
+; /root/satmarket DAL SET 2026 E' UN COLLEGAMENTO a /srv/barattolo (il
+; mercatino non gira piu' da root, e dentro /root non entrerebbe). Qui
+; resta il nome di sempre apposta: questa unit gira da root, il
+; collegamento lo segue, e vale uguale PRIMA e DOPO il trasloco.
+;
 ; Installazione (una volta sola, da root):
 ;     cp deploy/barattolo-deploy.* /etc/systemd/system/
 ;     systemctl daemon-reload
@@ -42,7 +55,9 @@ Environment=HOME=/root
 ; stdlib piu' config.py — nessun pacchetto di terzi, quindi non serve
 ; il python di un venv. Chi aggiungesse un `import` di terzi in uno
 ; di quegli heredoc si ricompra il guasto da un'altra porta.
-ExecStart=/bin/bash -c 'cp /root/satmarket/deploy.sh /tmp/barattolo-deploy.sh && exec /bin/bash /tmp/barattolo-deploy.sh'
+RuntimeDirectory=barattolo-deploy
+RuntimeDirectoryMode=0700
+ExecStart=/bin/bash -c 'cp /root/satmarket/deploy.sh /run/barattolo-deploy/deploy.sh && exec /bin/bash /run/barattolo-deploy/deploy.sh'
 ; Un deploy che si impianta non deve restare appeso per sempre: il
 ; giro dopo riprova da capo.
 TimeoutStartSec=300

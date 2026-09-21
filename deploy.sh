@@ -6,20 +6,41 @@
 # mosso e in quel caso aggiorna il mercatino. Nel caso normale — cioe'
 # quasi sempre — fa un `git fetch` e se ne va senza dire niente.
 #
-# LE QUATTRO REGOLE, che sono il motivo per cui questo file esiste
+# LE CINQUE REGOLE, che sono il motivo per cui questo file esiste
 # invece di un `git pull && systemctl restart` in un cron:
 #
-# 1) SI SEGUE `pronto`, NON `main`. Quel ref lo fa avanzare solo la CI
+# 1) SI SEGUE `pronto`, NON `main`. Quel ref lo fa avanzare la CI
 #    quando prove e controllo dei segreti sono verdi (vedi il job
-#    `pronto` in .github/workflows/prove.yml). Cosi' «la CI e' passata»
-#    non e' una domanda da fare a un'API con un token in mano: e' il
-#    fatto stesso che il ref si sia mosso. Un commit rosso resta su
-#    main e in produzione non ci arriva mai.
+#    `pronto` in .github/workflows/prove.yml): e' il CAMPANELLO che
+#    dice «c'e' qualcosa da guardare». Un commit rosso resta su main e
+#    il campanello non suona.
 #
 # 2) SI TIRA, NON SI VIENE SPINTI. Nessuna chiave di questa macchina
-#    sta nei secret di GitHub: chi compromette GitHub, o una action di
-#    terzi, non arriva al nodo Lightning. La direzione del deploy e'
-#    una decisione di sicurezza, non di comodita'.
+#    sta nei secret di GitHub. La direzione del deploy e' una decisione
+#    di sicurezza, non di comodita'.
+#
+# 5) IL CAMPANELLO NON E' UNA PROVA (set 2026, audit G2 — il numero e'
+#    l'ordine in cui e' arrivata, non quello in cui gira: gira PRIMA
+#    di tutto il resto). Fino al 21 set qui c'era scritto che «la CI
+#    e' passata» stava nel fatto stesso che il ref si fosse mosso. Era
+#    vero finche' a muoverlo era la CI: ma il repo e' privato su un
+#    piano gratuito, i rami non si possono proteggere, e chiunque
+#    abbia scrittura fa `git push origin qualunque:pronto` senza che
+#    la CI giri nemmeno. E questo script ESEGUE quel che tira. Quindi
+#    un commit si tira solo se, giudicato DA QUI:
+#      a) sta su main (e' antenato di origin/main);
+#      b) va IN AVANTI rispetto a quel che gira (niente ritorni a una
+#         versione vecchia, niente storia riscritta);
+#      c) la punta e' FIRMATA da una chiave scritta in un file di
+#         QUESTA macchina — o, finche' quel file non c'e', ha almeno un
+#         autore dei nostri, che e' una cintura di cartone (vedi sotto);
+#      d) la CI e' verde SU DI LUI, chiesto a GitHub col token di sola
+#         lettura di questa macchina (giudice_deploy.py).
+#    Se uno fallisce NON SI TIRA, si scrive nel journal e si avvisano
+#    i moderatori: «⛔ Deploy rifiutato». Nel dubbio — GitHub muto, la
+#    CI che gira ancora — si ASPETTA, e dopo dieci minuti lo si dice.
+#    IL GIUDICE E' SEMPRE QUELLO DI PRIMA: a giudicare un commit e' lo
+#    script gia' in produzione, mai quello che il commit porta con se'.
 #
 # 3) SI TORNA INDIETRO DA SOLI. Dopo il riavvio si chiede a
 #    /api/salute — che tocca il database, non solo il processo — e se
@@ -36,7 +57,10 @@
 # Uso a mano (utile per il primo giro e per il collaudo):
 #     ./deploy.sh            aggiorna se c'e' qualcosa di nuovo
 #     ./deploy.sh --forza    riapplica e riavvia anche se e' gia' in pari
-#     ./deploy.sh --dimmi    guarda e basta, non tocca niente
+#                            (e riprova un commit rifiutato o bocciato:
+#                            il GIUDICE pero' non lo salta nemmeno lei)
+#     ./deploy.sh --dimmi    guarda e basta, non tocca niente — e dice
+#                            anche cosa ne pensa il giudice
 
 set -uo pipefail
 
@@ -45,7 +69,23 @@ SERVIZIO="${BARATTOLO_SERVIZIO:-barattolo}"
 SALUTE="${BARATTOLO_SALUTE:-http://127.0.0.1:8080/api/salute}"
 ATTESA="${BARATTOLO_ATTESA:-45}"     # secondi dati al server per rispondere
 RAMO="${BARATTOLO_RAMO:-pronto}"
+MAIN="${BARATTOLO_MAIN:-main}"
 BACKUP_DA_TENERE=5
+# LA FIRMA. Il file dei firmatari sta SU QUESTA MACCHINA e fuori dal
+# repo, di root: e' l'unica meta' della regola che chi ha in mano
+# GitHub non puo' riscrivere. Formato di ssh (`allowed_signers`), una
+# riga per chiave: `andrea namespaces="git" ssh-ed25519 AAAA...`.
+# Si guarda la sola PUNTA: chi firma la punta risponde di quel che c'e'
+# sotto, ed e' il gesto «questo lo rilascio io». Finche' il file non
+# c'e' (o e' vuoto) la firma NON si chiede, e ogni deploy lo dice.
+FIRMATARI="${BARATTOLO_FIRMATARI:-/etc/barattolo-deploy/firmatari}"
+# LA CINTURA DI CARTONE, per i giorni senza firme: l'autore della punta
+# dev'essere uno di noi. In git l'autore e' TESTO LIBERO — lo scrive
+# chiunque — quindi questa riga non ferma nessuno che sappia cosa fa:
+# ferma il bot, la action di terzi, il commit arrivato da chissa' dove.
+# La cura vera e' il file qui sopra.
+NOSTRI="${BARATTOLO_AUTORI:-kreami.studio@gmail.com 62957276+alanbimbati@users.noreply.github.com}"
+AVVISA_ATTESA_DOPO=600   # secondi di «aspetto» prima di dirlo a qualcuno
 
 cd "$CARTELLA" || { echo "❌ non trovo $CARTELLA"; exit 1; }
 
@@ -91,7 +131,14 @@ aspetta_che_stia_bene() {
   return 1
 }
 
-git fetch --quiet origin "$RAMO" 2>/dev/null || {
+# le parole di un motivo finiscono in un messaggio HTML
+scappa() { sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g' <<<"$1"; }
+
+# SI TIRANO TUTT'E DUE: `pronto` e' il campanello, `main` e' il metro
+# con cui lo si misura. I refspec sono ESPLICITI: un clone nato
+# `--single-branch` tirerebbe main senza scrivere origin/main, e il
+# giudice misurerebbe contro un metro fermo al giorno del clone.
+git fetch --quiet origin     "+refs/heads/$RAMO:refs/remotes/origin/$RAMO"     "+refs/heads/$MAIN:refs/remotes/origin/$MAIN" 2>/dev/null || {
   dillo "⚠️ git fetch non riuscito (rete? credenziali?): riprovo al giro dopo"
   exit 0
 }
@@ -102,10 +149,63 @@ LA="$(git rev-parse "origin/$RAMO" 2>/dev/null)" || {
   exit 0
 }
 
+# IL GIUDICE (regola 5). Torna 0 = si tira, 10 = RIFIUTATO, 20 =
+# ASPETTA; in MOTIVO le parole. L'ordine va dal controllo che costa
+# meno a quello che esce in rete: un commit che non sta su main non
+# merita nemmeno una domanda a GitHub. Non scrive niente su disco:
+# lo chiama anche --dimmi.
+MOTIVO=""
+giudica() {
+  local sha="$1" esito chi
+  if ! git merge-base --is-ancestor "$sha" "origin/$MAIN" 2>/dev/null; then
+    MOTIVO="${sha:0:8} non sta su $MAIN: qualcuno ha spostato «$RAMO» a mano"
+    return 10
+  fi
+  if ! git merge-base --is-ancestor "$QUI" "$sha" 2>/dev/null; then
+    MOTIVO="${sha:0:8} non viene DOPO ${QUI:0:8}, che e' quel che gira: un ritorno indietro o una storia riscritta"
+    return 10
+  fi
+  if [[ -s "$FIRMATARI" ]]; then
+    if ! git -c gpg.ssh.allowedSignersFile="$FIRMATARI" \
+           verify-commit "$sha" >/dev/null 2>&1; then
+      MOTIVO="${sha:0:8} non porta la firma di una chiave di $FIRMATARI"
+      return 10
+    fi
+  else
+    chi="$(git log -1 --format=%ae "$sha" 2>/dev/null)"
+    case " $NOSTRI " in
+      *" $chi "*) ;;
+      *) MOTIVO="${sha:0:8} ha per autore «$chi», che non e' dei nostri"
+         return 10 ;;
+    esac
+  fi
+  MOTIVO="$(python3 giudice_deploy.py ci "$sha" 2>/dev/null)"
+  esito=$?
+  MOTIVO="${MOTIVO%%$'
+'*}"          # la prima riga: il motivo
+  case "$esito" in
+    0)  return 0 ;;
+    10) return 10 ;;
+    *)  [[ -n "$MOTIVO" ]] || MOTIVO="il giudice della CI non ha risposto (uscito con $esito)"
+        return 20 ;;
+  esac
+}
+
+firme_dette() {
+  [[ -s "$FIRMATARI" ]] && echo "firma richiesta ($FIRMATARI)" \
+    || echo "⚠️ FIRME NON RICHIESTE: manca $FIRMATARI, vale solo l'autore"
+}
+
 if [[ "${1:-}" == "--dimmi" ]]; then
-  dillo "qui: ${QUI:0:8}  ·  pronto: ${LA:0:8}"
+  dillo "qui: ${QUI:0:8}  ·  pronto: ${LA:0:8}  ·  $(firme_dette)"
   [[ "$QUI" == "$LA" ]] && dillo "in pari" || dillo "c'e' un aggiornamento"
   git --no-pager log --oneline "$QUI..$LA" 2>/dev/null | sed 's/^/    /'
+  giudica "$LA"
+  case $? in
+    0)  dillo "⚖️ il giudice lo tirerebbe: $MOTIVO" ;;
+    10) dillo "⛔ il giudice lo RIFIUTEREBBE: $MOTIVO" ;;
+    *)  dillo "⏳ il giudice ASPETTEREBBE: $MOTIVO" ;;
+  esac
   exit 0
 fi
 
@@ -125,8 +225,48 @@ if [[ "$LA" == "$BOCCIATO" && "${1:-}" != "--forza" ]]; then
   exit 0
 fi
 
+# UN RIFIUTO SI DICE UNA VOLTA. Il ref resta dov'e', quindi senza
+# questo timbro il giro dopo — fra un minuto — rigiudicherebbe lo
+# stesso commit e riavviserebbe, ogni sessanta secondi. E' il freno di
+# `.deploy-bocciato`, un passo prima.
+RIFIUTATO="$(cat .deploy-rifiutato 2>/dev/null || true)"
+if [[ "$LA" == "$RIFIUTATO" && "${1:-}" != "--forza" ]]; then
+  exit 0
+fi
+
+giudica "$LA"
+case $? in
+  0) rm -f .deploy-attesa ;;
+  10)
+    dillo "⛔ deploy RIFIUTATO: $MOTIVO"
+    echo "$LA" > .deploy-rifiutato
+    rm -f .deploy-attesa
+    avvisa "⛔ <b>Deploy rifiutato</b>: $(scappa "$MOTIVO")
+Resta in produzione <code>${QUI:0:8}</code>. Non lo riprovo da solo: se e' un errore, si spinge un commit nuovo su main; se non lo e', qualcuno ha le mani sul repo."
+    exit 1 ;;
+  *)
+    # ASPETTARE NON E' UN GUASTO — la CI che finisce, GitHub che
+    # singhiozza — ma un'attesa che non finisce SI': e' il `git fetch`
+    # muto dell'ago 2026, che lasciava il mercatino indietro per ore
+    # mentre da fuori sembrava solo che non ci fosse niente di nuovo.
+    # Si scrive la prima volta, e dopo dieci minuti lo si dice a
+    # qualcuno, una volta sola.
+    read -r A_SHA A_DA A_DETTO < .deploy-attesa 2>/dev/null || A_SHA=""
+    ADESSO="$(date +%s)"
+    if [[ "$A_SHA" != "$LA" ]]; then
+      dillo "⏳ aspetto a tirare ${LA:0:8}: $MOTIVO"
+      echo "$LA $ADESSO 0" > .deploy-attesa
+    elif [[ "${A_DETTO:-0}" == "0" ]] && ((ADESSO - A_DA >= AVVISA_ATTESA_DOPO)); then
+      dillo "⏳ ${LA:0:8} aspetta da $(((ADESSO - A_DA) / 60)) minuti: $MOTIVO"
+      echo "$LA $A_DA 1" > .deploy-attesa
+      avvisa "⏳ <b>Deploy fermo</b> da $(((ADESSO - A_DA) / 60)) minuti su <code>${LA:0:8}</code>: $(scappa "$MOTIVO")
+Non tiro niente finche' non lo so. Resta in produzione <code>${QUI:0:8}</code>."
+    fi
+    exit 0 ;;
+esac
+
 NOVITA="$(git --no-pager log --oneline "$QUI..$LA" 2>/dev/null | head -10)"
-dillo "🚀 aggiornamento: ${QUI:0:8} → ${LA:0:8}"
+dillo "🚀 aggiornamento: ${QUI:0:8} → ${LA:0:8}  ·  $MOTIVO  ·  $(firme_dette)"
 
 # IL DATABASE SI COPIA PRIMA, e si copia con l'API di sqlite invece che
 # con `cp`: il server sta girando, e un file copiato a caldo mentre
@@ -135,6 +275,7 @@ dillo "🚀 aggiornamento: ${QUI:0:8} → ${LA:0:8}"
 # per i cinque minuti attorno al deploy, quando gira anche `init_db`
 # con le sue migrazioni.
 mkdir -p backup
+chmod 700 backup     # dentro c'e' il database intero: solo root
 python3 - "backup/pre-deploy-$(date +%Y%m%d-%H%M%S)-${QUI:0:8}.db" <<'PY' 2>/dev/null \
   && dillo "💾 copia del database messa da parte" \
   || dillo "⚠️ copia del database non riuscita: si va avanti lo stesso"
@@ -175,7 +316,7 @@ systemctl restart "$SERVIZIO" || {
 }
 
 if aspetta_che_stia_bene; then
-  rm -f .deploy-bocciato
+  rm -f .deploy-bocciato .deploy-rifiutato
   dillo "✅ in produzione ${LA:0:8}"
   avvisa "🚀 <b>Barattolo aggiornato</b> — <code>${LA:0:8}</code>
 $(echo "$NOVITA" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')"

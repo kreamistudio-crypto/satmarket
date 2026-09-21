@@ -87,6 +87,7 @@ jobs:
              marca_prove.py recupera_xp_ordini.py livelli_prova.py
              collaudo_offerta_carrello.py collaudo_punti_barattolo.py
              spoglia_foto_esistenti.py collaudo_verita_lnd.py
+             giudice_deploy.py
 
       # Secondo scalino: il config d'esempio deve restare allineato,
       # perche' e' quello da cui Andrea copia quando mette mano al VPS.
@@ -331,11 +332,18 @@ jobs:
           echo "cronologia pulita"
   # ---------------- IL SEMAFORO DEL DEPLOY (ago 2026) ---------------
   #
-  # Il VPS non guarda `main`: guarda il ref `pronto`, e a farlo
-  # avanzare e' SOLO questo job, che parte solo quando le due domande
-  # di sopra hanno gia' risposto di si'. Cosi' «la CI e' verde» non e'
-  # una cosa che il server deve andare a chiedere a un'API con un
-  # token in mano: e' scritta nel fatto stesso che il ref si e' mosso.
+  # Il VPS guarda il ref `pronto`, e a farlo avanzare e' questo job,
+  # che parte solo quando le due domande di sopra hanno gia' risposto
+  # di si'.
+  #
+  # DAL 21 SET 2026 E' UN CAMPANELLO, NON UNA PROVA. Qui c'era scritto
+  # che «la CI e' verde» stava nel fatto stesso che il ref si fosse
+  # mosso: ma su un repo privato gratuito i rami non si proteggono, e
+  # `pronto` lo sposta chiunque abbia scrittura — senza passare di qui.
+  # Quindi il VPS, prima di tirare, lo CHIEDE: che il commit stia su
+  # main e che `prove` e `segreti` siano verdi su di lui (deploy.sh e
+  # giudice_deploy.py, che guarda i NOMI di questi due lavori: chi li
+  # rinomina arrossisce in prove.py).
   #
   # E' anche il motivo per cui il deploy e' PULL e non PUSH: nessuna
   # chiave del server sta nei secret di questo repo. Da qui non si

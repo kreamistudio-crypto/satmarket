@@ -28,7 +28,11 @@ Environment=BARATTOLO_DIR=/root/satmarket
 ; La lezione del deploy: un servizio di sistema nasce senza HOME, e
 ; qui `crontab -l` (che finisce nell'archivio) ne ha bisogno.
 Environment=HOME=/root
-ExecStart=/bin/bash -c 'cp /root/satmarket/deploy/backup-fuori.sh /tmp/barattolo-backup.sh && exec /bin/bash /tmp/barattolo-backup.sh'
+; La copia sta sotto /run in una cartella di root, non in /tmp: il
+; perche' sta nella unit gemella del deploy (set 2026).
+RuntimeDirectory=barattolo-backup
+RuntimeDirectoryMode=0700
+ExecStart=/bin/bash -c 'cp /root/satmarket/deploy/backup-fuori.sh /run/barattolo-backup/backup-fuori.sh && exec /bin/bash /run/barattolo-backup/backup-fuori.sh'
 ; Un archivio da ~5 MB su una rete viva parte in secondi; dieci minuti
 ; coprono anche la giornata storta senza restare appesi per sempre.
 TimeoutStartSec=600

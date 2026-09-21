@@ -10137,9 +10137,18 @@ async def avvia_fee_dinamica():
 # IL PREZZO, dichiarato: e' il primo sottoprocesso del server. Comandi
 # FISSI (PONTE_STRADE e PONTE_DOMANDE), senza shell e senza niente che
 # arrivi da fuori — e `_systemctl_ponte`, l'unica porta, RIFIUTA quel
-# che non sta in quei due elenchi; funzionano perche' `barattolo` gira
-# come root (vive in /root/satmarket). Se un giorno non fosse piu' cosi' il riavvio
-# fallisce e l'avviso lo DICE, col messaggio di systemctl. E se muore
+# che non sta in quei due elenchi. DAL 21 SET 2026 `barattolo` NON
+# GIRA PIU' DA ROOT (audit del 19 set, A1: lo stesso processo decodifica
+# immagini caricate da chiunque, e un difetto in una di quelle librerie
+# valeva la macchina intera). I quattro riavvii passano da `sudo -n`, e
+# a permetterli e' una regola di sudoers che nomina QUEI quattro comandi
+# e nient'altro (`deploy/sudoers-barattolo-ponte`, tenuta uguale a
+# PONTE_STRADE da una prova). Le due DOMANDE non chiedono permessi e
+# restano nude. Chi gira da root — i giorni fra questo codice e il
+# cambio d'utente, o un ritorno a root in emergenza — non passa da
+# sudo: `_argv_ponte` guarda chi e' NELL'ISTANTE del comando. Se la
+# regola manca il riavvio
+# fallisce e l'avviso lo DICE, con le parole di sudo. E se muore
 # il processo del mercatino muore anche il guardiano: ma allora non
 # compra nessuno, e quel guasto lo vede il deploy.
 #
@@ -10223,6 +10232,9 @@ PONTE_NOMI = {"wireguard": "il tunnel WireGuard e lnd-ponte",
               "tor": "tor e lnd-ponte-tor (il piano B)",
               "tor_di_prima": "tor e lnd-ponte"}
 PONTE_COMANDO_S = 90       # un systemctl appeso non ferma il guardiano
+# il percorso PIENO, perche' sudoers confronta quello: e `-n`, perche'
+# un sudo che chiede la password a un servizio resta appeso per sempre
+PONTE_SUDO = ("sudo", "-n", "/usr/bin/systemctl")
 # la sola porta verso systemd (`_systemctl_ponte`) accetta SOLO i comandi
 # scritti qui sopra: il giorno che qualcuno la chiamasse con qualcosa
 # che arriva da fuori, rifiuta invece di eseguire
@@ -10439,6 +10451,23 @@ async def _sonda_ponte() -> tuple:
                        else type(e).__name__)[:300]
 
 
+def _argv_ponte(cmd: tuple, uid: int) -> tuple:
+    """Quel che si esegue DAVVERO per un comando ammesso. Da root, o per
+    una domanda (`is-active`, `is-enabled`: le sa chiunque), il comando
+    com'e'. Un RIAVVIO chiesto da un utente qualunque passa da sudo —
+    `sudo -n /usr/bin/systemctl restart <unit>`, la forma esatta che la
+    regola di sudoers permette."""
+    if uid == 0 or cmd[1] != "restart":
+        return cmd
+    return PONTE_SUDO + cmd[1:]
+
+
+def _uid_ponte() -> int:
+    """Chi sono, adesso. Windows — il collaudo in locale — non ha
+    `geteuid`: li' systemctl non c'e' comunque, e si risponde root."""
+    return os.geteuid() if hasattr(os, "geteuid") else 0
+
+
 async def _systemctl_ponte(cmd: tuple) -> tuple:
     """L'UNICA porta del server verso un sottoprocesso: UN comando
     FISSO, senza shell. Torna (codice d'uscita, messaggio); il codice e'
@@ -10450,7 +10479,8 @@ async def _systemctl_ponte(cmd: tuple) -> tuple:
         return None, "comando non ammesso"
     try:
         proc = await asyncio.create_subprocess_exec(
-            *cmd, stdout=asyncio.subprocess.PIPE,
+            *_argv_ponte(cmd, _uid_ponte()),
+            stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE)
         try:
             _out, err = await asyncio.wait_for(proc.communicate(),
