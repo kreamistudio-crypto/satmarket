@@ -1,0 +1,34 @@
+# lnd-rest-wg.service - NODO (/etc/systemd/system/)
+# LA REST DI LND ESPOSTA SOLO SULL'IP WIREGUARD (21 set 2026).
+# Un socat sull'HOST del nodo: ascolta su 10.77.0.1:18080 - l'indirizzo
+# del tunnel, e nessun altro - e porta alla REST di LND nel suo
+# container, all'indirizzo scritto in /etc/default/lnd-rest-wg
+# (LND_REST=IP:porta, lo stesso che usa l'hidden service di tor).
+# PERCHE' UN SOCAT e non una `ports:` nel compose: LND non si tocca e
+# non si riavvia, e un container che pubblica su un IP che ancora non
+# esiste NON PARTE - cioe' un tunnel giu' all'avvio avrebbe tenuto giu'
+# LND. Cosi' e' il contrario: senza tunnel cade solo questo socat.
+# Requires/After/PartOf: nasce dopo il tunnel, muore con lui, e un
+# `restart wg-quick@wg0` riavvia anche lui (la lezione del namespace
+# prestato: chi dipende da un altro riparte NELLO STESSO GESTO).
+# CHI PUO' BUSSARE lo decide il firewall in wg0.conf (catena WG-PONTE),
+# non questo file: qui c'e' solo il bind sull'indirizzo del tunnel.
+[Unit]
+Description=REST di LND solo sull'IP WireGuard (10.77.0.1:18080), per il ponte di Barattolo
+Requires=wg-quick@wg0.service
+After=wg-quick@wg0.service docker.service
+PartOf=wg-quick@wg0.service
+
+[Service]
+EnvironmentFile=/etc/default/lnd-rest-wg
+ExecStart=/usr/bin/socat TCP4-LISTEN:18080,bind=10.77.0.1,reuseaddr,fork,max-children=64 TCP4:${LND_REST},connect-timeout=10
+Restart=always
+RestartSec=5
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

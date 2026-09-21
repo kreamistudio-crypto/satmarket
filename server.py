@@ -10134,10 +10134,11 @@ async def avvia_fee_dinamica():
 #    suoi timeout, e i timbri che sopravvivono a un riavvio;
 #  · i giudici sono puri e si torturano in prove.py come il resto,
 #    mentre di uno script bash si sorveglierebbe solo il testo.
-# IL PREZZO, dichiarato: e' il primo sottoprocesso del server. Due
-# comandi FISSI (PONTE_COMANDI), senza shell e senza niente che arrivi
-# da fuori; funzionano perche' `barattolo` gira come root (vive in
-# /root/satmarket). Se un giorno non fosse piu' cosi' il riavvio
+# IL PREZZO, dichiarato: e' il primo sottoprocesso del server. Comandi
+# FISSI (PONTE_STRADE e PONTE_DOMANDE), senza shell e senza niente che
+# arrivi da fuori — e `_systemctl_ponte`, l'unica porta, RIFIUTA quel
+# che non sta in quei due elenchi; funzionano perche' `barattolo` gira
+# come root (vive in /root/satmarket). Se un giorno non fosse piu' cosi' il riavvio
 # fallisce e l'avviso lo DICE, col messaggio di systemctl. E se muore
 # il processo del mercatino muore anche il guardiano: ma allora non
 # compra nessuno, e quel guasto lo vede il deploy.
@@ -10154,6 +10155,35 @@ async def avvia_fee_dinamica():
 # cert che scade e il macaroon che non apre sono la seconda e la terza,
 # che un riavvio di tor non ripara e che questo guardiano non finge di
 # vedere.
+#
+# DAL 21 SET 2026 IL PONTE PASSA DA WIREGUARD, e la cura lo segue. Tre
+# cadute in 24 ore (18-19 set) e un singhiozzo di 40 secondi ogni ora
+# (20 set): il tor del NODO serve LND, mostro e il ponte insieme, e
+# riavviare il tor NOSTRO curava il sintomo per qualche ora. Adesso
+# `lnd-ponte.service` e' un socat verso l'IP WireGuard del nodo — stessa
+# porta locale, quindi LNbits e la verita' dei pagamenti non si
+# accorgono di niente — e il ponte di prima resta installato e SPENTO
+# come `lnd-ponte-tor.service`: il piano B.
+# LA CURA GUARDA QUALE STRADA E' IN PIEDI, e non lo ricorda: due domande
+# a systemd (PONTE_DOMANDE) fatte nell'istante della cura, perche' fra
+# una cura e l'altra qualcuno puo' aver acceso il piano B a mano.
+#  · il piano B e' ACCESO → tor e `lnd-ponte-tor`. Vince anche col
+#    tunnel abilitato: chi e' tornato a tor lo ha fatto per una ragione,
+#    e la cura non gliela disfa;
+#  · senno', il tunnel e' ABILITATO → il tunnel e `lnd-ponte`.
+#    ABILITATO e non ATTIVO, apposta: il drill e' `systemctl stop
+#    wg-quick@wg0`, e un tunnel fermo e' esattamente quel che la cura
+#    deve rimettere su — chi guardasse «attivo» lo scambierebbe per una
+#    macchina senza tunnel, e riavvierebbe tor;
+#  · senno' (nessun tunnel su questa macchina: i giorni fra il deploy di
+#    questo codice e il trasloco, o un VPS rifatto dal backup) → la cura
+#    di sempre, tor e `lnd-ponte`. Questo codice arriva in produzione
+#    col push, il tunnel arriva quando lo monta Andrea: in mezzo il
+#    ponte cade tre volte al giorno, e la cura non puo' essere rotta.
+# NESSUN RIPIEGO AUTOMATICO su tor quando il tunnel non torna, ed e'
+# deciso: due strade che si scambiano da sole sono due guasti da capire
+# invece di uno. Accendere il piano B e' un gesto — una riga, e
+# l'avviso del fallimento la porta scritta.
 PONTE_LND_URL = "https://127.0.0.1:18080/v1/state"
 PONTE_OGNI_S = 60          # un controllo al minuto
 PONTE_SOGLIA_S = 120       # «piu' di due minuti di fila»...
@@ -10162,14 +10192,43 @@ PONTE_NO_PER_CURARE = PONTE_SOGLIA_S // PONTE_OGNI_S + 1
 #                            e il terzo passano due minuti pieni
 PONTE_ATTESA_S = 20        # quanto si aspetta LND a ogni domanda: un
 #                            circuito tor freddo ne vuole una decina
-PONTE_RIGUARDA_S = 45      # il controllo dopo la cura
+PONTE_RIGUARDA_S = 90      # il controllo dopo la cura. Erano 45 fino al
+#                            21 set 2026: a tor servivano piu' di 45
+#                            secondi per rifare il circuito, e l'esito
+#                            diceva «ancora giù» di un ponte che un
+#                            minuto dopo era vivo. Un fallimento si
+#                            dichiara dopo 90 secondi, non prima
 PONTE_FRENO_S = 900        # un avviso ogni 15 minuti al massimo, e una
 #                            cura che non ha curato non si ripete prima:
 #                            UN numero per le due cose, cosi' ogni cura
 #                            dopo una fallita si racconta sempre
-PONTE_COMANDI = (("systemctl", "restart", "tor"),
-                 ("systemctl", "restart", "lnd-ponte.service"))
+PONTE_TUNNEL = "wg-quick@wg0.service"
+PONTE_UNIT = "lnd-ponte.service"           # il ponte in servizio
+PONTE_UNIT_TOR = "lnd-ponte-tor.service"   # il piano B, spento di serie
+PONTE_STRADE = {
+    "wireguard": (("systemctl", "restart", PONTE_TUNNEL),
+                  ("systemctl", "restart", PONTE_UNIT)),
+    "tor": (("systemctl", "restart", "tor"),
+            ("systemctl", "restart", PONTE_UNIT_TOR)),
+    "tor_di_prima": (("systemctl", "restart", "tor"),
+                     ("systemctl", "restart", PONTE_UNIT)),
+}
+PONTE_DOMANDE = {
+    "tor_acceso": ("systemctl", "is-active", "--quiet", PONTE_UNIT_TOR),
+    "tunnel_abilitato": ("systemctl", "is-enabled", "--quiet",
+                         PONTE_TUNNEL),
+}
+# come si chiama ogni strada negli avvisi e nel journal
+PONTE_NOMI = {"wireguard": "il tunnel WireGuard e lnd-ponte",
+              "tor": "tor e lnd-ponte-tor (il piano B)",
+              "tor_di_prima": "tor e lnd-ponte"}
 PONTE_COMANDO_S = 90       # un systemctl appeso non ferma il guardiano
+# la sola porta verso systemd (`_systemctl_ponte`) accetta SOLO i comandi
+# scritti qui sopra: il giorno che qualcuno la chiamasse con qualcosa
+# che arriva da fuori, rifiuta invece di eseguire
+_PONTE_AMMESSI = frozenset(
+    [c for strada in PONTE_STRADE.values() for c in strada]
+    + list(PONTE_DOMANDE.values()))
 TIMBRO_PONTE = "ponte_avviso"
 
 # Lo stato vivo, in memoria: un riavvio lo azzera, e costa al massimo
@@ -10270,6 +10329,21 @@ def _ponte_esito_cura(p: dict, vivo: bool, errore: str, adesso: float,
     return ""
 
 
+def _ponte_strada(tor_acceso: bool, tunnel_abilitato: bool) -> str:
+    """Quale strada curare, dalle due risposte di systemd. PURA. Il
+    piano B acceso VINCE sul tunnel abilitato (dopo un rollback il
+    tunnel resta abilitato: e' la strada spenta, non quella in piedi);
+    senza nessuno dei due vale il ponte di prima del trasloco. Una
+    domanda rimasta senza risposta vale «no»: si finisce sulla cura di
+    sempre, che riavvia comunque `lnd-ponte`, e l'avviso dice QUALE
+    strada ha scelto — una scelta sbagliata si legge."""
+    if tor_acceso:
+        return "tor"
+    if tunnel_abilitato:
+        return "wireguard"
+    return "tor_di_prima"
+
+
 def _ponte_avviso_permesso(timbro: str, adesso: float) -> bool:
     """Il freno degli avvisi: uno ogni PONTE_FRENO_S al massimo. Un
     timbro storto, o nel futuro (orologio tornato indietro), vale «mai
@@ -10298,17 +10372,37 @@ def _minuti_ponte(secondi: float) -> str:
     return f"{m} minut{'o' if m == 1 else 'i'}"
 
 
-def _testo_guasto_ponte(secondi: float, errore: str) -> str:
+def _testo_guasto_ponte(secondi: float, errore: str, strada: str) -> str:
     return (f"🌉⚠️ <b>Ponte verso LND giù</b> da almeno "
             f"{_minuti_ponte(secondi)}: LNbits non raggiunge il nodo, "
             "quindi chi compra si prende «errore nella creazione "
             "dell'invoice».\n"
             f"Ultimo errore: <code>{html.escape(errore[:200])}</code>\n"
-            f"Riavvio tor e lnd-ponte, e riguardo fra {PONTE_RIGUARDA_S} "
-            "secondi.")
+            f"Riavvio {PONTE_NOMI[strada]}, e riguardo fra "
+            f"{PONTE_RIGUARDA_S} secondi.")
 
 
-def _testo_esito_ponte(vivo: bool, esiti: list, errore: str) -> str:
+def _a_mano_ponte(strada: str) -> str:
+    """Dove guardare quando la cura non ha curato: dipende dalla strada.
+    Sul tunnel la riga che conta e' la stretta di mano — se e' fresca
+    (meno di tre minuti) il tunnel c'e', e il guasto sta sul nodo — e
+    l'avviso porta scritto il piano B, che e' UN comando."""
+    if strada == "wireguard":
+        return ("A mano: <code>wg show wg0 latest-handshakes</code> e "
+                "<code>journalctl -u wg-quick@wg0 -u lnd-ponte -n 30"
+                "</code> — se la stretta di mano è fresca il tunnel c'è, "
+                "e il guasto è dall'altra parte, sul nodo.\n"
+                "Il piano B, il ponte di prima via tor: "
+                f"<code>systemctl start {PONTE_UNIT_TOR}</code>")
+    unit = PONTE_UNIT_TOR if strada == "tor" else PONTE_UNIT
+    nome = unit.removesuffix(".service")
+    return (f"A mano: <code>journalctl -u tor -u {nome} -n 30</code> "
+            "— e se tor sta bene, il guasto è dall'altra parte, sul "
+            "nodo.")
+
+
+def _testo_esito_ponte(vivo: bool, esiti: list, errore: str,
+                       strada: str) -> str:
     if vivo:
         testa = ("🌉✅ <b>Ponte verso LND tornato</b> dopo il riavvio: "
                  "LND risponde, e gli acquisti ricevono di nuovo la "
@@ -10317,9 +10411,7 @@ def _testo_esito_ponte(vivo: bool, esiti: list, errore: str) -> str:
         testa = ("🌉❌ <b>Ponte ancora giù</b> dopo il riavvio: "
                  f"<code>{html.escape(errore[:200])}</code>\n"
                  f"Il prossimo tentativo fra {PONTE_FRENO_S // 60} minuti. "
-                 "A mano: <code>journalctl -u tor -u lnd-ponte -n 30</code> "
-                 "— e se tor sta bene, il guasto è dall'altra parte, sul "
-                 "nodo.")
+                 + _a_mano_ponte(strada))
     righe = [f"{'✅' if ok else '❌'} <code>{html.escape(' '.join(cmd))}</code>"
              + ("" if ok else f": {html.escape(msg)}")
              for cmd, ok, msg in esiti]
@@ -10347,33 +10439,54 @@ async def _sonda_ponte() -> tuple:
                        else type(e).__name__)[:300]
 
 
-async def _riavvia_ponte() -> list:
-    """La cura: i due comandi in fila, tor e poi il ponte, come la
-    mattina del 18 set. Torna [(comando, riuscito, messaggio)]. Il
-    secondo parte anche se il primo fallisce: riavviare il solo socat
-    non costa niente, e a volte basta."""
-    esiti = []
-    for cmd in PONTE_COMANDI:
+async def _systemctl_ponte(cmd: tuple) -> tuple:
+    """L'UNICA porta del server verso un sottoprocesso: UN comando
+    FISSO, senza shell. Torna (codice d'uscita, messaggio); il codice e'
+    None se il comando non e' mai arrivato in fondo (rifiutato, appeso,
+    systemctl assente). Rifiuta tutto quel che non sta in PONTE_STRADE o
+    in PONTE_DOMANDE: qui dentro non entra niente che non sia scritto
+    nel sorgente."""
+    if cmd not in _PONTE_AMMESSI:
+        return None, "comando non ammesso"
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd, stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE)
         try:
-            proc = await asyncio.create_subprocess_exec(
-                *cmd, stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE)
-            try:
-                _out, err = await asyncio.wait_for(proc.communicate(),
-                                                   PONTE_COMANDO_S)
-            except asyncio.TimeoutError:
-                proc.kill()
-                esiti.append((cmd, False,
-                              f"nessuna risposta in {PONTE_COMANDO_S} s"))
-                continue
-            if proc.returncode == 0:
-                esiti.append((cmd, True, ""))
-            else:
-                msg = (err or b"").decode("utf-8", "replace").strip()
-                esiti.append((cmd, False, msg[:200] or
-                              f"uscito con {proc.returncode}"))
-        except Exception as e:
-            esiti.append((cmd, False, f"{type(e).__name__}: {e}"[:200]))
+            _out, err = await asyncio.wait_for(proc.communicate(),
+                                               PONTE_COMANDO_S)
+        except asyncio.TimeoutError:
+            proc.kill()
+            return None, f"nessuna risposta in {PONTE_COMANDO_S} s"
+        msg = (err or b"").decode("utf-8", "replace").strip()
+        return proc.returncode, msg[:200]
+    except Exception as e:
+        return None, f"{type(e).__name__}: {e}"[:200]
+
+
+async def _quale_strada_ponte() -> str:
+    """Le due domande a systemd, e il giudice. Si chiede A OGNI CURA e
+    non si ricorda: il piano B si accende a mano, fra una cura e
+    l'altra."""
+    si = {}
+    for nome, cmd in PONTE_DOMANDE.items():
+        codice, _msg = await _systemctl_ponte(cmd)
+        si[nome] = codice == 0
+    return _ponte_strada(si["tor_acceso"], si["tunnel_abilitato"])
+
+
+async def _riavvia_ponte(strada: str) -> list:
+    """La cura: i due comandi della strada in fila — prima quel che
+    porta (il tunnel, o tor), poi il ponte. Torna [(comando, riuscito,
+    messaggio)]. Il secondo parte anche se il primo fallisce: riavviare
+    il solo socat non costa niente, e a volte basta."""
+    esiti = []
+    for cmd in PONTE_STRADE[strada]:
+        codice, msg = await _systemctl_ponte(cmd)
+        if codice == 0:
+            esiti.append((cmd, True, ""))
+        else:
+            esiti.append((cmd, False, msg or f"uscito con {codice}"))
     return esiti
 
 
@@ -10393,21 +10506,24 @@ async def _avvisa_ponte(testo: str):
 
 
 async def _cura_ponte(p: dict):
-    """Avviso (se il freno lo lascia), riavvio, 45 secondi, secondo
-    sguardo, esito. L'avviso del guasto parte PRIMA del riavvio: se la
-    cura si impianta, quello che sta succedendo si sa gia'."""
+    """La strada, l'avviso (se il freno lo lascia), il riavvio, 90
+    secondi, secondo sguardo, esito. L'avviso del guasto parte PRIMA del
+    riavvio: se la cura si impianta, quello che sta succedendo si sa
+    gia'."""
+    strada = await _quale_strada_ponte()
     adesso = time.time()
     giu = adesso - p["giu_da"]
     detto = _ponte_avviso_permesso(timbro_letto(TIMBRO_PONTE), adesso)
-    print(f"🌉 Ponte verso LND giù da {giu:.0f} s: riavvio tor e "
-          f"lnd-ponte{'' if detto else ' (avviso trattenuto dal freno)'}",
+    print(f"🌉 Ponte verso LND giù da {giu:.0f} s: riavvio "
+          f"{PONTE_NOMI[strada]}"
+          f"{'' if detto else ' (avviso trattenuto dal freno)'}",
           flush=True)
     if detto:
         # il timbro PRIMA dell'invio, il patto di `timbro_scrivi`: un
         # errore di rete puo' perdere un avviso, mai raddoppiarlo
         timbro_scrivi(TIMBRO_PONTE, str(int(adesso)))
-        await _avvisa_ponte(_testo_guasto_ponte(giu, p["errore"]))
-    esiti = await _riavvia_ponte()
+        await _avvisa_ponte(_testo_guasto_ponte(giu, p["errore"], strada))
+    esiti = await _riavvia_ponte(strada)
     for cmd, ok, msg in esiti:
         print(f"   🌉 {' '.join(cmd)}: {'ok' if ok else msg}", flush=True)
     await asyncio.sleep(PONTE_RIGUARDA_S)
@@ -10418,7 +10534,8 @@ async def _cura_ponte(p: dict):
     print(f"🌉 Ponte verso LND dopo la cura: "
           f"{'VIVO' if vivo else 'ancora giù — ' + errore}", flush=True)
     if fatto == "esito":
-        await _avvisa_ponte(_testo_esito_ponte(vivo, esiti, errore))
+        await _avvisa_ponte(_testo_esito_ponte(vivo, esiti, errore,
+                                               strada))
     elif fatto == "tornato":
         await _avvisa_ponte(_testo_tornato_ponte(giu))
 
@@ -10448,7 +10565,7 @@ async def guardiano_ponte():
     """Il ciclo: un giro al minuto contato da un INIZIO all'altro (un
     controllo che aspetta venti secondi non allunga il minuto), e i giri
     in fila — mai due domande insieme, e mai una domanda mentre la cura
-    sta ancora aspettando i suoi 45 secondi."""
+    sta ancora aspettando i suoi 90 secondi."""
     while True:
         inizio = time.monotonic()
         try:
@@ -10459,6 +10576,23 @@ async def guardiano_ponte():
                   flush=True)
         await asyncio.sleep(max(1.0, PONTE_OGNI_S
                                 - (time.monotonic() - inizio)))
+
+
+async def _guardiano_ponte_avviato():
+    """Quel che gira nel task: PRIMA la riga della strada che la cura
+    prenderebbe adesso — dopo il trasloco (o un rollback) si legge li'
+    se il guardiano ha capito, senza aspettare un guasto — e poi il
+    ciclo. Sta QUI e non nello startup, apposta: lo startup il deploy lo
+    cronometra (45 secondi, poi rollback), e un systemd lento non deve
+    poter far passare per rotta una versione sana. Una strada che non si
+    legge non ferma niente: e' una riga di cortesia."""
+    try:
+        print("🌉 La strada del ponte, vista da qui: "
+              f"{PONTE_NOMI[await _quale_strada_ponte()]}", flush=True)
+    except Exception as e:
+        print(f"⚠️ Guardiano del ponte: strada non leggibile ({e})",
+              flush=True)
+    await guardiano_ponte()
 
 
 @app.on_event("startup")
@@ -10475,7 +10609,7 @@ async def avvia_guardiano_ponte():
     print(f"🌉 Guardiano del ponte verso LND: acceso — un controllo al "
           f"minuto, avvisi a {_chi_avvisa_ponte()}", flush=True)
     global _TASK_PONTE
-    _TASK_PONTE = asyncio.create_task(guardiano_ponte())
+    _TASK_PONTE = asyncio.create_task(_guardiano_ponte_avviato())
 
 
 async def prezzo_da_payload(d: dict) -> tuple[str, int, float]:
@@ -17042,8 +17176,11 @@ def salute():
     chiuso (`_ponte_pubblico`: ok, giu, attesa, spento), mai l'errore,
     l'indirizzo o da quanto. E NON TOCCA IL CODICE: col ponte giu' la
     risposta resta 200, perche' il deploy guarda il codice per decidere
-    il rollback, e un guasto di tor non e' una ragione per buttare via
-    una versione sana."""
+    il rollback, e un guasto del ponte — del tunnel WireGuard dal 21 set
+    2026, di tor prima — non e' una ragione per buttare via una versione
+    sana. QUALE STRADA porta il ponte qui NON si dice, e resta cosi': da
+    fuori e' un pezzo di mappa della macchina, e sta nel journal (🌉) e
+    nel pannello delle leve, che sono di chi ha le chiavi."""
     try:
         con = db()
         con.execute("SELECT 1 FROM annunci LIMIT 1").fetchone()
@@ -20773,14 +20910,17 @@ def _leve_stato():
             _leva("Guardiano del ponte verso LND", "GUARDIANO_PONTE",
                   _guardiano_ponte_attivo(),
                   allarme=_nodo_configurato() and not GUARDIANO_PONTE,
-                  spento=("nessuno guarda il ponte: se tor lo rifiuta, gli "
+                  spento=("nessuno guarda il ponte: se il tunnel cade, gli "
                           "acquisti falliscono in silenzio finché qualcuno "
                           "se ne accorge" if _nodo_configurato() else
                           "non c'è un nodo, quindi non c'è un ponte da "
                           "guardare"),
                   acceso="ogni minuto bussa a LND attraverso il ponte; "
-                         "dopo due minuti di silenzio riavvia tor e "
-                         "lnd-ponte e lo dice a " + _chi_avvisa_ponte() +
+                         "dopo due minuti di silenzio riavvia la strada "
+                         "in piedi — il tunnel WireGuard e lnd-ponte, "
+                         "oppure tor se è acceso il piano B "
+                         "(lnd-ponte-tor) — e lo dice a "
+                         + _chi_avvisa_ponte() +
                          ". Lo stato di adesso: /api/salute, «ponte»"),
             _leva("Auto-sblocco dei sats", "AUTO_SBLOCCO_ATTIVO",
                   bool(AUTO_SBLOCCO_ATTIVO),

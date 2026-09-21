@@ -1,0 +1,34 @@
+# lnd-ponte.service - VPS di Barattolo (/etc/systemd/system/)
+# IL PONTE VERSO LA REST DI LND, VIA WIREGUARD (21 set 2026).
+# Stessa porta locale di sempre (127.0.0.1:18080): LNbits, la verita'
+# dei pagamenti e il guardiano non cambiano una riga. Cambia solo
+# l'altro capo: non piu' il SOCKS di tor verso l'onion del nodo, ma
+# l'IP WireGuard del nodo (10.77.0.1:18080), dove un socat gemello
+# (lnd-rest-wg.service) porta a LND. Il TLS resta END-TO-END col
+# tls.cert di LND: socat sposta byte e non apre niente, quindi il nome
+# che i client verificano resta 127.0.0.1 e il certificato NON si
+# rigenera.
+# IL PONTE DI PRIMA resta installato e SPENTO come lnd-ponte-tor.service
+# (il piano B). `Conflicts=` fa si' che accenderne uno spenga l'altro:
+# la porta 18080 e' una sola, e due socat in gara sarebbero un guasto
+# che si presenta come "a volte funziona".
+# keepalive: un flusso rimasto appeso dopo un buco del tunnel si chiude
+# in ~2 minuti invece di restare mezzo morto, e LNbits si riconnette.
+[Unit]
+Description=Ponte verso la REST di LND del nodo, via WireGuard (127.0.0.1:18080 -> 10.77.0.1:18080)
+Wants=wg-quick@wg0.service
+After=network-online.target wg-quick@wg0.service
+Conflicts=lnd-ponte-tor.service
+
+[Service]
+ExecStart=/usr/bin/socat TCP4-LISTEN:18080,bind=127.0.0.1,reuseaddr,fork,max-children=64 TCP4:10.77.0.1:18080,connect-timeout=10,keepalive,keepidle=60,keepintvl=20,keepcnt=3
+Restart=always
+RestartSec=5
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

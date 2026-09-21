@@ -38801,17 +38801,25 @@ class _BastaPonte(BaseException):
 
 
 def _mondo_ponte(risposte, ritorno=0, errore_cmd=None, timbro="",
-                 avvisa=(700000001,), attivo=True):
+                 avvisa=(700000001,), attivo=True, tor_acceso=False,
+                 tunnel=True):
     """Il guardiano del ponte in un mondo di cartone: un orologio che
     avanza solo coi `sleep`, un ponte che risponde a copione (True =
     LND ha risposto, False = il rifiuto di tor del 18 set), un
     systemctl che si registra e un Telegram che mette da parte.
     `ritorno` e' il codice d'uscita dei due systemctl, `errore_cmd`
-    un'eccezione da alzare al posto del processo (o «appeso»)."""
+    un'eccezione da alzare al posto del processo (o «appeso»).
+    DAL 21 SET 2026 systemd risponde anche a DUE DOMANDE: `tor_acceso`
+    (il piano B `lnd-ponte-tor` e' attivo? — un bool, o una funzione dei
+    secondi dall'avvio, per accenderlo FRA due cure) e `tunnel`
+    (`wg-quick@wg0` e' abilitato?). Di serie il mondo e' quello di dopo
+    il trasloco: tunnel abilitato, piano B spento. Le domande si
+    registrano in `m.chieste`, i riavvii restano in `m.comandi`."""
     import asyncio as _aio
     import html as _html
     import types
     m = types.SimpleNamespace(ora=1_000_000.0, domande=[], comandi=[],
+                              chieste=[], compiti=0,
                               messaggi=[], righe=[], client=[], uccisi=0,
                               timbri={"ponte_avviso": timbro} if timbro
                               else {}, copione=list(risposte))
@@ -38842,14 +38850,15 @@ def _mondo_ponte(risposte, ritorno=0, errore_cmd=None, timbro="",
                                "<18080>")
 
     class Proc:
-        returncode = ritorno
+        def __init__(self, uscita):
+            self.returncode = uscita
 
         async def communicate(self):
             # col `<` dentro: le parole di systemctl finiscono in un
             # messaggio HTML, e se non si scappano l'avviso non parte
             return b"", (b"Failed to restart tor.service: Interactive "
                          b"authentication required <polkit>."
-                         if ritorno else b"")
+                         if self.returncode else b"")
 
         def kill(self):
             m.uccisi += 1
@@ -38861,11 +38870,24 @@ def _mondo_ponte(risposte, ritorno=0, errore_cmd=None, timbro="",
         async def sleep(self, s):
             m.ora += s
 
+        def create_task(self, coro):
+            # l'avvio: il ciclo non si fa partire, si conta e basta
+            coro.close()
+            m.compiti += 1
+
         async def create_subprocess_exec(self, *argv, **kw):
-            m.comandi.append((m.ora, argv))
+            domanda = argv[1] in ("is-active", "is-enabled")
+            (m.chieste if domanda else m.comandi).append((m.ora, argv))
             if isinstance(errore_cmd, BaseException):
                 raise errore_cmd
-            return Proc()
+            if argv[1] == "is-active":
+                acceso = (tor_acceso(m.ora - m.inizio)
+                          if callable(tor_acceso) else tor_acceso)
+                # 3 e' il codice vero di systemctl per «inactive»
+                return Proc(0 if acceso else 3)
+            if argv[1] == "is-enabled":
+                return Proc(0 if tunnel else 1)
+            return Proc(ritorno)
 
         async def wait_for(self, coro, t):
             if errore_cmd == "appeso":
@@ -38894,15 +38916,19 @@ def _mondo_ponte(risposte, ritorno=0, errore_cmd=None, timbro="",
     exec(_SORGENTE[i:_SORGENTE.index("_TASK_PONTE = None", i)], amb)
     for f in ("_guardiano_ponte_attivo", "_destinatari_ponte",
               "_chi_avvisa_ponte", "_ponte_passo", "_ponte_esito_cura",
+              "_ponte_strada", "_a_mano_ponte",
               "_ponte_avviso_permesso", "_ponte_pubblico", "_minuti_ponte",
               "_testo_guasto_ponte", "_testo_esito_ponte",
               "_testo_tornato_ponte"):
         exec(pezzo(f), amb)
     # pezzo() taglia dalla parola `def`: alle coroutine il prefisso si
     # rimette a mano, il patto di `pezzo_async` qui sopra
-    for f in ("_sonda_ponte", "_riavvia_ponte", "_avvisa_ponte",
-              "_cura_ponte", "_giro_guardiano_ponte", "guardiano_ponte"):
+    for f in ("_sonda_ponte", "_systemctl_ponte", "_quale_strada_ponte",
+              "_riavvia_ponte", "_avvisa_ponte", "_cura_ponte",
+              "_giro_guardiano_ponte", "guardiano_ponte",
+              "_guardiano_ponte_avviato", "avvia_guardiano_ponte"):
         exec("async " + pezzo(f), amb)
+    amb["_TASK_PONTE"] = None
     m.amb = amb
     m.inizio = m.ora
 
@@ -38918,6 +38944,14 @@ def _mondo_ponte(risposte, ritorno=0, errore_cmd=None, timbro="",
     return m
 
 
+def _detto(m, i):
+    """Il testo dell'i-esimo avviso del mondo del ponte, o '' se non
+    c'e': una prova che cerca una frase in un avviso mai partito deve
+    ARROSSIRE, non far esplodere il giro con un IndexError — che
+    nasconderebbe tutte le prove dopo di lei."""
+    return m.messaggi[i][2] if len(m.messaggi) > i else ""
+
+
 def prove_guardiano_ponte():
     """IL GUARDIANO DEL PONTE VERSO LND (18 set 2026). Nove ore di
     acquisti falliti senza che nessuno lo sapesse: tor rifiutava il
@@ -38930,38 +38964,59 @@ def prove_guardiano_ponte():
     un mondo di cartone, e non i pezzi a mano: la lezione del «banco
     che non parte dove parte il dito» — i difetti che stanno FRA i
     pezzi, qui il ritmo del minuto e il freno fra due cure, un banco
-    che chiama i gesti a mano non li vede."""
+    che chiama i gesti a mano non li vede.
+
+    DAL 21 SET 2026 IL PONTE PASSA DA WIREGUARD: la cura chiede a
+    systemd quale strada e' in piedi (il tunnel, il piano B via tor, o
+    il ponte di prima del trasloco) e riavvia QUELLA; il secondo sguardo
+    arriva dopo 90 secondi e non piu' 45."""
     print("\n[il guardiano del ponte verso LND]")
     TOR = ("systemctl", "restart", "tor")
+    TUNNEL = ("systemctl", "restart", "wg-quick@wg0.service")
     PONTE = ("systemctl", "restart", "lnd-ponte.service")
+    PONTE_TOR = ("systemctl", "restart", "lnd-ponte-tor.service")
+    CHIEDE_TOR = ("systemctl", "is-active", "--quiet",
+                  "lnd-ponte-tor.service")
+    CHIEDE_TUNNEL = ("systemctl", "is-enabled", "--quiet",
+                     "wg-quick@wg0.service")
 
-    # --- 1) IL 18 SETTEMBRE, rifatto ---------------------------------
-    # tre NO di fila a un minuto l'uno dall'altro, la cura, e dopo 45
+    # --- 1) IL 18 SETTEMBRE, rifatto sul tunnel ----------------------
+    # tre NO di fila a un minuto l'uno dall'altro, la cura, e dopo 90
     # secondi LND risponde
     m = _mondo_ponte([False, False, False, True, True, True])
     m.gira()
     prova("tre no di fila: la cura arriva al TERZO controllo",
           [120, 120], m.quando(m.comandi))
-    prova("...e sono i due comandi della mattina, in quell'ordine",
-          [TOR, PONTE], [argv for _t, argv in m.comandi])
-    prova("il secondo sguardo arriva 45 secondi dopo la cura",
-          [0, 60, 120, 165, 180, 240], m.quando(m.domande))
-    prova("...e il minuto riparte dall'INIZIO del giro di prima", 180,
-          m.quando(m.domande)[4])
+    prova("...ed e' la cura del TUNNEL: wg-quick e poi il ponte",
+          [TUNNEL, PONTE], [argv for _t, argv in m.comandi])
+    prova("...scelta chiedendo a systemd, nell'istante della cura",
+          [(120, CHIEDE_TOR), (120, CHIEDE_TUNNEL)],
+          [(round(t - m.inizio), argv) for t, argv in m.chieste])
+    prova("il secondo sguardo arriva 90 secondi dopo la cura",
+          [0, 60, 120, 210, 211, 271], m.quando(m.domande))
+    # la cura dura piu' di un minuto: il giro dopo non si accoda a un
+    # minuto intero, parte subito (il pavimento di un secondo del ciclo)
+    prova("...e il giro dopo una cura lunga non aspetta un altro minuto",
+          211, m.quando(m.domande)[4])
     prova("due avvisi: il guasto PRIMA del riavvio, l'esito dopo",
-          [120, 165], m.quando(m.messaggi))
-    guasto, esito = m.messaggi[0][2], m.messaggi[1][2]
+          [120, 210], m.quando(m.messaggi))
+    guasto, esito = _detto(m, 0), _detto(m, 1)
     prova("...a chi dice la leva, e a nessun altro", [700000001] * 2,
           [c for _t, c, _x in m.messaggi])
     prova("il guasto dice da quanto, e cosa fa", True,
-          "almeno 2 minuti" in guasto and "Riavvio tor e lnd-ponte" in guasto)
+          "almeno 2 minuti" in guasto
+          and "Riavvio il tunnel WireGuard e lnd-ponte" in guasto)
+    prova("...e quando riguarda", True, "fra 90 secondi" in guasto)
     prova("...e l'errore di tor arriva SCAPPATO", True,
           "&lt;18080&gt;" in guasto and "<18080>" not in guasto)
     prova("l'esito dice che e' tornato", True,
           "tornato" in esito and "✅" in esito)
     prova("...e dice i due comandi riusciti", True,
-          "systemctl restart tor" in esito
-          and "systemctl restart lnd-ponte.service" in esito)
+          "✅ <code>systemctl restart wg-quick@wg0.service</code>" in esito
+          and "✅ <code>systemctl restart lnd-ponte.service</code>" in esito)
+    prova("...e il journal dice quale strada ha curato", True,
+          any("riavvio il tunnel WireGuard e lnd-ponte" in r
+              for r in m.righe))
     prova("il freno si timbra all'ora del guasto", str(int(m.inizio + 120)),
           m.timbri.get("ponte_avviso"))
     prova("alla fine il ponte e' ok, e la salute lo dice", "ok",
@@ -38994,7 +39049,7 @@ def prove_guardiano_ponte():
     m = _mondo_ponte([False, False, False, True, True],
                      timbro=str(int(1_000_000 - 300)))
     m.gira()
-    prova("col freno tirato la cura si fa lo stesso", [TOR, PONTE],
+    prova("col freno tirato la cura si fa lo stesso", [TUNNEL, PONTE],
           [argv for _t, argv in m.comandi])
     prova("...ma non si dice niente", [], m.messaggi)
     prova("...e il timbro resta quello di prima", str(int(1_000_000 - 300)),
@@ -39004,21 +39059,29 @@ def prove_guardiano_ponte():
 
     # --- 4) LA CURA CHE NON CURA non gira in tondo -------------------
     # il nodo e' spento: ogni sguardo dice no per venti minuti, poi LND
-    # torna da solo. Senza freno, tor si riavvierebbe ogni tre minuti.
+    # torna da solo. Senza freno, il tunnel si riavvierebbe ogni tre
+    # minuti. La cura fallisce al secondo sguardo (210 s): la prossima
+    # e' il primo giro a 900 secondi da LI', cioe' 1111.
     no = [False] * 21
     m = _mondo_ponte(no + [True, True])
     m.gira()
     cure = sorted({t for t in m.quando(m.comandi)})
     prova("una cura fallita non si ripete prima di 15 minuti",
-          [120, 1080], cure)
+          [120, 1111], cure)
     prova("...e ogni cura e' due comandi", 4, len(m.comandi))
+    prova("...e la strada si richiede a OGNI cura, non si ricorda",
+          [120, 120, 1111, 1111], m.quando(m.chieste))
     prova("guasto ed esito per OGNI cura, e il tornato alla fine",
-          [120, 165, 1080, 1125, 1140], m.quando(m.messaggi))
-    testi = [x for _t, _c, x in m.messaggi]
+          [120, 210, 1111, 1201, 1202], m.quando(m.messaggi))
+    testi = [x for _t, _c, x in m.messaggi] + [""] * 6
     prova("l'esito fallito dice che e' ancora giu'", True,
           "ancora giù" in testi[1] and "❌" in testi[1])
     prova("...quando si ritenta", True, "fra 15 minuti" in testi[1])
-    prova("...e dove guardare a mano", True, "journalctl -u tor" in testi[1])
+    prova("...dove guardare a mano: la stretta di mano del tunnel", True,
+          "wg show wg0 latest-handshakes" in testi[1]
+          and "journalctl -u wg-quick@wg0 -u lnd-ponte -n 30" in testi[1])
+    prova("...e porta scritto il piano B, che e' UN comando", True,
+          "<code>systemctl start lnd-ponte-tor.service</code>" in testi[1])
     prova("il tornato chiude la domanda rimasta aperta", True,
           "tornato" in testi[4] and "di guasto" in testi[4])
 
@@ -39028,24 +39091,31 @@ def prove_guardiano_ponte():
     m = _mondo_ponte([False, False, False, False, True], ritorno=1)
     m.gira()
     prova("systemctl rifiuta: si provano lo stesso tutti e due",
-          [TOR, PONTE], [argv for _t, argv in m.comandi])
+          [TUNNEL, PONTE], [argv for _t, argv in m.comandi])
     prova("...e l'esito porta le parole di systemctl", True,
-          "Interactive authentication required" in m.messaggi[1][2]
-          and "❌ <code>systemctl restart tor</code>" in m.messaggi[1][2])
+          "Interactive authentication required" in _detto(m, 1)
+          and "❌ <code>systemctl restart wg-quick@wg0.service</code>"
+          in _detto(m, 1))
     prova("...scappate, o il messaggio HTML non parte", True,
-          "&lt;polkit&gt;" in m.messaggi[1][2]
-          and "<polkit>" not in m.messaggi[1][2])
+          "&lt;polkit&gt;" in _detto(m, 1)
+          and "<polkit>" not in _detto(m, 1))
     m = _mondo_ponte([False, False, False, False, True],
                      errore_cmd=FileNotFoundError("systemctl"))
     m.gira()
     prova("senza systemctl si dice cosa manca", True,
-          "FileNotFoundError" in m.messaggi[1][2])
-    prova("...e il secondo comando si prova lo stesso", [TOR, PONTE],
+          "FileNotFoundError" in _detto(m, 1))
+    # le due domande restano senza risposta, e una domanda senza
+    # risposta vale «no»: si finisce sulla cura di sempre, e si DICE
+    prova("...le domande senza risposta portano alla cura di sempre, e il "
+          "secondo comando si prova lo stesso", [TOR, PONTE],
           [argv for _t, argv in m.comandi])
+    prova("...e il guasto dice quale strada ha scelto", True,
+          "Riavvio tor e lnd-ponte, e riguardo" in _detto(m, 0))
     m = _mondo_ponte([False, False, False, False, True], errore_cmd="appeso")
     m.gira()
-    prova("un systemctl appeso si uccide e si dice", (2, True),
-          (m.uccisi, "nessuna risposta in 90 s" in m.messaggi[1][2]))
+    # quattro: le due domande e i due riavvii, nessuno resta appeso
+    prova("un systemctl appeso si uccide e si dice", (4, True),
+          (m.uccisi, "nessuna risposta in 90 s" in _detto(m, 1)))
     prova("...e il guardiano va avanti lo stesso", 5, len(m.domande))
 
     # --- 6) I GIUDICI PURI, ai bordi ---------------------------------
@@ -39146,15 +39216,27 @@ def prove_guardiano_ponte():
           salute(True, "ok"))
 
     # --- 8) LE SENTINELLE ---------------------------------------------
-    prova("i comandi sono FISSI, e sono questi due", ((TOR, PONTE)),
-          a["PONTE_COMANDI"])
+    prova("i comandi sono FISSI: tre strade, due comandi l'una",
+          {"wireguard": (TUNNEL, PONTE), "tor": (TOR, PONTE_TOR),
+           "tor_di_prima": (TOR, PONTE)}, a["PONTE_STRADE"])
+    prova("...e due domande, di sola lettura",
+          {"tor_acceso": CHIEDE_TOR, "tunnel_abilitato": CHIEDE_TUNNEL},
+          a["PONTE_DOMANDE"])
+    prova("ogni strada ha il suo nome per gli avvisi",
+          sorted(a["PONTE_STRADE"]), sorted(a["PONTE_NOMI"]))
     # il primo sottoprocesso del server, e l'unico: senza shell e dentro
-    # la cura. Un secondo, domani, si guarda prima di lasciarlo passare.
+    # la porta del ponte. Un secondo, domani, si guarda prima di
+    # lasciarlo passare.
     cod = codice(_SORGENTE)
     prova("un solo sottoprocesso in tutto il server", 1,
           cod.count("create_subprocess"))
-    prova("...ed e' quello della cura", True,
-          "create_subprocess_exec(" in pezzo("_riavvia_ponte"))
+    prova("...ed e' la porta del ponte", True,
+          "create_subprocess_exec(" in pezzo("_systemctl_ponte"))
+    prova("...che usano in due soli, la strada e la cura", 2,
+          cod.count("await _systemctl_ponte("))
+    prova("...e nessun altro", True,
+          "await _systemctl_ponte(" in pezzo("_quale_strada_ponte")
+          and "await _systemctl_ponte(" in pezzo("_riavvia_ponte"))
     prova("...e nessuno passa da una shell", False,
           "shell=True" in cod or "os.system(" in cod
           or "create_subprocess_shell" in cod)
@@ -39169,8 +39251,13 @@ def prove_guardiano_ponte():
           '@app.on_event("startup")\nasync def avvia_guardiano_ponte'
           in _SORGENTE)
     prova("...e il ciclo gira dal task", True,
-          "asyncio.create_task(guardiano_ponte())"
-          in pezzo("avvia_guardiano_ponte"))
+          "asyncio.create_task(_guardiano_ponte_avviato())"
+          in pezzo("avvia_guardiano_ponte")
+          and "await guardiano_ponte()" in pezzo("_guardiano_ponte_avviato"))
+    # lo startup il deploy lo cronometra (45 s, poi rollback): li' dentro
+    # non si aspetta NIENTE, nemmeno systemd
+    prova("...e lo startup non aspetta nessuno", False,
+          "await " in codice(pezzo("avvia_guardiano_ponte")))
     prova("la salute dice il ponte col suo giudice", True,
           "_ponte_pubblico(" in pezzo("salute"))
     cfg = open("config_esempio.py", encoding="utf-8").read()
@@ -39205,6 +39292,193 @@ def prove_guardiano_ponte():
           (riga["valore"], riga.get("allarme", False)))
     prova("...e la nota dice cosa si rischia", True,
           "in silenzio" in riga["nota"])
+    _g, voci_on, _j = _censimento(True, col_nodo)
+    prova("il pannello dice le due strade della cura", True,
+          "il tunnel WireGuard e lnd-ponte" in voci_on["GUARDIANO_PONTE"]["nota"]
+          and "lnd-ponte-tor" in voci_on["GUARDIANO_PONTE"]["nota"])
+
+    # --- 10) LE TRE STRADE (21 set 2026) ------------------------------
+    # il giudice, puro: il piano B acceso VINCE sul tunnel abilitato
+    # (dopo un rollback il tunnel resta abilitato), e senza nessuno dei
+    # due vale il ponte di prima del trasloco
+    strada = a["_ponte_strada"]
+    prova("la strada, le quattro combinazioni",
+          ["wireguard", "tor", "tor", "tor_di_prima"],
+          [strada(False, True), strada(True, True), strada(True, False),
+           strada(False, False)])
+    # il ciclo VERO nei tre mondi
+    m = _mondo_ponte([False, False, False, True], tor_acceso=True)
+    m.gira()
+    prova("piano B acceso (col tunnel ancora abilitato): si cura TOR",
+          [TOR, PONTE_TOR], [argv for _t, argv in m.comandi])
+    prova("...e l'avviso lo dice", True,
+          "Riavvio tor e lnd-ponte-tor (il piano B)" in _detto(m, 0))
+    m = _mondo_ponte([False, False, False, True], tunnel=False)
+    m.gira()
+    prova("nessun tunnel su questa macchina: la cura di sempre",
+          [TOR, PONTE], [argv for _t, argv in m.comandi])
+    # IL PIANO B ACCESO A MANO FRA DUE CURE: la prima cura il tunnel e
+    # fallisce, Andrea accende lnd-ponte-tor al minuto 10, la seconda
+    # deve curare TOR — chi ricordasse la strada riavvierebbe per sempre
+    # un tunnel che nessuno usa piu'
+    m = _mondo_ponte([False] * 21 + [True],
+                     tor_acceso=lambda secondi: secondi > 600)
+    m.gira()
+    prova("il piano B acceso fra due cure: la seconda cura tor",
+          [TUNNEL, PONTE, TOR, PONTE_TOR], [argv for _t, argv in m.comandi])
+    testi = [x for _t, _c, x in m.messaggi] + [""] * 6
+    prova("...e l'esito fallito su tor dice dove guardare, senza piano B",
+          True, "journalctl -u tor -u lnd-ponte-tor -n 30" in testi[3]
+          and "systemctl start" not in testi[3])
+    a_mano = a["_a_mano_ponte"]
+    prova("sul ponte di prima si guarda lnd-ponte", True,
+          "journalctl -u tor -u lnd-ponte -n 30" in a_mano("tor_di_prima"))
+
+    # LA PORTA: solo i comandi scritti nel sorgente
+    import asyncio as _aio
+    m = _mondo_ponte([])
+    porta = m.amb["_systemctl_ponte"]
+    prova("la porta rifiuta un comando che non e' nell'elenco",
+          (None, "comando non ammesso"),
+          _aio.run(porta(("systemctl", "restart", "barattolo"))))
+    prova("...anche se somiglia a uno buono", (None, "comando non ammesso"),
+          _aio.run(porta(("systemctl", "restart", "tor", "; reboot"))))
+    prova("...e non fa partire NIENTE", ([], []), (m.comandi, m.chieste))
+    prova("un comando dell'elenco passa, col suo codice", (0, ""),
+          _aio.run(porta(TUNNEL)))
+    m = _mondo_ponte([], ritorno=5)
+    prova("...e un'uscita storta torna col codice e le parole", True,
+          _aio.run(m.amb["_systemctl_ponte"](PONTE))[0] == 5)
+    prova("ammessi: le tre strade e le due domande, e basta",
+          {TUNNEL, PONTE, TOR, PONTE_TOR, CHIEDE_TOR, CHIEDE_TUNNEL},
+          set(a["_PONTE_AMMESSI"]))
+    # ABILITATO e non ATTIVO: il drill e' `systemctl stop wg-quick@wg0`,
+    # e un tunnel fermo e' quel che la cura deve rimettere su
+    prova("il tunnel si chiede se e' ABILITATO, non se e' attivo",
+          "is-enabled", a["PONTE_DOMANDE"]["tunnel_abilitato"][1])
+    prova("...il piano B invece se e' ATTIVO", "is-active",
+          a["PONTE_DOMANDE"]["tor_acceso"][1])
+
+    # IL TASK dice la strada che vede, e poi gira: dopo il trasloco si
+    # legge li' se il guardiano ha capito, senza aspettare un guasto
+    def _avviato(m):
+        try:
+            _aio.run(m.amb["_guardiano_ponte_avviato"]())
+            return "finito"
+        except _BastaPonte:
+            return "nel ciclo"          # il copione e' finito: girava
+        except Exception as e:
+            return "esploso: %r" % (e,)
+
+    m = _mondo_ponte([True])
+    prova("il task arriva al ciclo", "nel ciclo", _avviato(m))
+    prova("...dopo aver detto la strada", True,
+          any("La strada del ponte, vista da qui: il tunnel WireGuard e "
+              "lnd-ponte" in r for r in m.righe))
+    prova("...chiesta PRIMA del primo controllo", True,
+          len(m.chieste) == 2 and len(m.domande) == 1
+          and m.chieste[-1][0] <= m.domande[0][0])
+    m = _mondo_ponte([True], tor_acceso=True)
+    _avviato(m)
+    prova("...e col piano B acceso dice tor", True,
+          any("vista da qui: tor e lnd-ponte-tor (il piano B)" in r
+              for r in m.righe))
+    # LA CINTURA: la strada e' una riga di cortesia, e se non si legge
+    # il guardiano gira lo stesso
+    m = _mondo_ponte([True])
+
+    async def _strada_che_esplode():
+        raise RuntimeError("systemd non risponde")
+    m.amb["_quale_strada_ponte"] = _strada_che_esplode
+    prova("una strada che esplode non ferma il guardiano",
+          ("nel ciclo", True, 1),
+          (_avviato(m), any("strada non leggibile" in r for r in m.righe),
+           len(m.domande)))
+    m = _mondo_ponte([])
+    _aio.run(m.amb["avvia_guardiano_ponte"]())
+    prova("lo startup fa partire UN task, e non chiede niente a systemd",
+          (1, []), (m.compiti, m.chieste))
+    m = _mondo_ponte([], attivo=False)
+    _aio.run(m.amb["avvia_guardiano_ponte"]())
+    prova("guardiano spento: nessuna domanda a systemd, nessun ciclo",
+          ([], 0), (m.chieste, m.compiti))
+
+    # --- 11) I FILE DEL PONTE, in deploy/ponte/ ------------------------
+    def _righe_vive(nome):
+        return [r.strip() for r in
+                open("deploy/ponte/" + nome, encoding="utf-8")
+                if r.strip() and not r.strip().startswith("#")]
+    unit = _righe_vive("lnd-ponte.service")
+    avvio = [r for r in unit if r.startswith("ExecStart=")]
+    prova("il ponte ascolta dove ascoltava: 127.0.0.1:18080, e basta",
+          True, len(avvio) == 1
+          and "TCP4-LISTEN:18080,bind=127.0.0.1," in avvio[0])
+    prova("...e bussa all'IP WireGuard del nodo", True,
+          " TCP4:10.77.0.1:18080," in avvio[0])
+    prova("...la stessa porta che guarda il guardiano", True,
+          a["PONTE_LND_URL"].startswith("https://127.0.0.1:18080/"))
+    prova("i due ponti non possono stare accesi insieme", True,
+          "Conflicts=lnd-ponte-tor.service" in unit)
+    nodo = _righe_vive("wg0-nodo.conf")
+    vps = _righe_vive("wg0-vps.conf")
+    # la chiave privata nasce sulla macchina e resta li': nei file che
+    # viaggiano (repo, scp, backup) non c'e' nemmeno il posto per lei
+    prova("nessuna chiave privata nei file che viaggiano", [],
+          [r for r in nodo + vps if r.lower().startswith("privatekey")
+           or r.lower().startswith("presharedkey")])
+    prova("...la carica il PostUp, da un file della macchina", (1, 1),
+          (sum("wg set %i private-key /etc/wireguard/privata.key" in r
+               for r in nodo),
+           sum("wg set %i private-key /etc/wireguard/privata.key" in r
+               for r in vps)))
+    post = [r for r in nodo if r.startswith("PostUp")]
+    prova("sul nodo la chiave si carica PER ULTIMA, dopo il firewall",
+          True, bool(post) and "private-key" in post[-1]
+          and not any("private-key" in r for r in post[:-1]))
+    regole = "\n".join(post)
+    prova("dal tunnel passa SOLO il VPS verso la sola REST", True,
+          "-A WG-PONTE -i %i -s 10.77.0.2 -d 10.77.0.1 -p tcp "
+          "--dport 18080 -j ACCEPT" in regole)
+    prova("...e tutto il resto del tunnel si butta", True,
+          "-A WG-PONTE -i %i -j DROP" in regole)
+    prova("...come chi cerca 10.77.0.1 da un'altra interfaccia", True,
+          "-A WG-PONTE -d 10.77.0.1 -j DROP" in regole)
+    # .find e non .index: una regola sparita deve far ROSSA la prova,
+    # non far esplodere il giro
+    prova("...nell'ordine giusto: prima il permesso, poi i due muri", True,
+          0 <= regole.find("--dport 18080 -j ACCEPT")
+          < regole.find("-A WG-PONTE -i %i -j DROP")
+          < regole.find("-A WG-PONTE -d 10.77.0.1 -j DROP"))
+    prova("la porta del tunnel risponde al solo IP del VPS", True,
+          0 <= regole.find("--dport 51820 -s 46.62.162.103 -j ACCEPT")
+          < regole.find("-A WG-PONTE -p udp --dport 51820 -j DROP"))
+    prova("niente si INOLTRA dal tunnel ne' verso il tunnel", True,
+          "-I FORWARD 1 -i %i -j DROP" in regole
+          and "-I FORWARD 1 -o %i -j DROP" in regole
+          and "-I DOCKER-USER 1 -i %i -j DROP" in regole)
+    prova("la catena sta in cima a INPUT", True,
+          "-I INPUT 1 -j WG-PONTE" in regole)
+    prova("una peer sola per capo, di un indirizzo solo", (1, 1, True, True),
+          (sum(r == "[Peer]" for r in nodo), sum(r == "[Peer]" for r in vps),
+           "AllowedIPs = 10.77.0.2/32" in nodo,
+           "AllowedIPs = 10.77.0.1/32" in vps))
+    prova("il VPS chiama e tiene aperta la strada; il nodo ascolta", True,
+          "PersistentKeepalive = 25" in vps
+          and "Endpoint = 185.18.221.96:51820" in vps
+          and "ListenPort = 51820" in nodo
+          and not any(r.startswith("ListenPort") for r in vps))
+    gemello = _righe_vive("lnd-rest-wg.service")
+    prova("sul nodo la REST si apre SOLO sull'indirizzo del tunnel", True,
+          any(r.startswith("ExecStart=")
+              and "TCP4-LISTEN:18080,bind=10.77.0.1," in r for r in gemello))
+    prova("...e il socat riparte col tunnel, nello stesso gesto", True,
+          "PartOf=wg-quick@wg0.service" in gemello
+          and "Requires=wg-quick@wg0.service" in gemello)
+    copia = open("deploy/backup-fuori.sh", encoding="utf-8").read()
+    prova("il backup porta il piano B e il tunnel, non la chiave", True,
+          "lnd-ponte-tor.service" in copia and "/etc/wireguard/wg0.conf"
+          in copia and "cp /etc/wireguard/privata.key" not in copia
+          and "cp -a /etc/wireguard" not in copia)
 
 
 def prove_strisce_web():

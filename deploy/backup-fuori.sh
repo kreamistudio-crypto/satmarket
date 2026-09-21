@@ -116,6 +116,14 @@ if [ -d "$DIR_LNBITS" ]; then
             ".backup '$TMP/lnbits/data/database.sqlite3'" ||           echo "ATTENZIONE: database LNbits NON copiato in modo atomico - i sats sul nodo restano senza nomi in questo archivio" >&2
     fi
     cp /etc/systemd/system/lnd-ponte.service "$TMP/sistema/" 2>/dev/null || true
+    # IL PONTE VIA WIREGUARD (21 set 2026): il piano B (il ponte di
+    # prima, via tor) e la configurazione del tunnel. wg0.conf NON
+    # porta segreti per costruzione: la chiave privata sta in
+    # /etc/wireguard/privata.key e NON si copia, apposta — a macchina
+    # rifatta si rigenera in cinque minuti (due chiavi pubbliche da
+    # scambiare), e nell'archivio c'e' un segreto in meno.
+    cp /etc/systemd/system/lnd-ponte-tor.service "$TMP/sistema/" 2>/dev/null || true
+    cp /etc/wireguard/wg0.conf "$TMP/sistema/wg0.conf" 2>/dev/null || true
 fi
 
 # 2d) LA CHIAVE DEL CLIENT VERSO IL NODO: il servizio nascosto che

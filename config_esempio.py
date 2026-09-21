@@ -60,9 +60,11 @@ CASSAFORTE_NUOVA = False    # True = i nuovi ordini nascono sul nodo
 
 # IL GUARDIANO DEL PONTE (set 2026): con le tre righe del nodo presenti,
 # ogni minuto il server bussa a LND attraverso il ponte (lnd-ponte,
-# 127.0.0.1:18080). Dopo due minuti di silenzio riavvia tor e il ponte,
-# riguarda dopo 45 secondi e lo dice su Telegram — al massimo un avviso
-# ogni 15 minuti. Lo stato esce anche in /api/salute («ponte»).
+# 127.0.0.1:18080). Dopo due minuti di silenzio riavvia la strada in
+# piedi — il tunnel WireGuard e il ponte dal 21 set 2026; tor solo se e'
+# acceso il piano B, lnd-ponte-tor — riguarda dopo 90 secondi e lo dice
+# su Telegram, al massimo un avviso ogni 15 minuti. Lo stato esce anche
+# in /api/salute («ponte»).
 GUARDIANO_PONTE = True       # False = nessun controllo e nessun riavvio
 GUARDIANO_PONTE_AVVISA = []  # a chi scrive, per id Telegram: es.
                              # [123456789]. Vuota = ai moderatori
