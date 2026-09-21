@@ -22784,3 +22784,196 @@ taglia il futuro, la cache no.
 che è l'unica prova del caso. Sul telefono e da PC: vedi il report
 della sessione. CLAUDE.md non è stato toccato: nessuna regola è
 cambiata.
+
+## Il deploy che si fida solo di main, e il servizio non root (21 set 2026)
+
+IL BUCO, dall'audit del 19 set (G2 e A1), deciso con Alan di chiuderlo
+subito. Il VPS eseguiva entro un minuto, DA ROOT, qualunque commit su
+cui stesse il ref `pronto`. La regola scritta dappertutto — CLAUDE.md,
+deploy.sh, il workflow — era «la CI è verde non è una domanda da fare a
+un'API: è il fatto stesso che il ref si sia mosso». Era vera finché a
+muovere il ref era la CI. Ma il repo è privato su un piano gratuito, i
+rami non si proteggono (403 dall'API dei ruleset), e chi ha scrittura
+fa `git push origin qualunque:pronto` senza che la CI giri nemmeno. E
+da root si leggono `config.py` (chiavi admin di LNbits, il segreto dei
+profili P2P), `/opt/lnbits/.env`, le chiavi onion. «Il VPS tira, non
+viene spinto» proteggeva le CHIAVI SSH, non il CODICE: il VPS esegue
+quel che tira.
+
+LA REGOLA ROVESCIATA, ed è l'unica di CLAUDE.md che questo cantiere
+tocca: `pronto` resta, ma è un CAMPANELLO e non una prova. Prima di
+tirare, `deploy.sh` GIUDICA il commit, in quattro controlli che vanno
+dal meno caro al più caro: a) sta su main (`merge-base --is-ancestor`
+contro `origin/main`, tirato con refspec ESPLICITI — un clone nato
+`--single-branch` tirerebbe main senza scrivere `origin/main`, e il
+metro resterebbe fermo al giorno del clone); b) va IN AVANTI rispetto
+a quel che gira; c) la punta è firmata; d) la CI è verde su di lui.
+Tutti PRIMA della copia del database e del reset: un commit rifiutato
+non muove niente.
+
+IL CONTROLLO b) NON ERA NELLA RICHIESTA, l'ho aggiunto io e Andrea lo
+può togliere: senza, chi sposta `pronto` INDIETRO su un vecchio commit
+di main — verde, firmato, antenato — rimette in produzione una
+versione con un difetto già curato. Costa due righe. Il prezzo: dopo
+una storia riscritta su main il deploy si ferma e si fa guardare, che
+è quel che il workflow già diceva di volere.
+
+COSA FERMA DAVVERO, scritto senza raccontarsela perché è la parte che
+fra sei mesi si dimentica. a), b) e d) fermano il push di lato, il
+ritorno indietro e il commit rosso. NON fermano chi scrive su MAIN:
+quello riscrive anche `prove.yml`, e la CI è verde quanto vuole.
+L'«autore fra gli account nostri» che la richiesta proponeva come
+minimo è PEGGIO di come suona: in git l'autore è testo libero, lo
+scrive chiunque — e chi ha bucato un account nostro È un account
+nostro. L'ho tenuto solo come ripiego DICHIARATO («cintura di
+cartone», e ogni deploy a firme spente scrive «⚠️ FIRME NON RICHIESTE»
+nel journal): ferma il bot e la action di terzi, nient'altro. Contro
+un GitHub compromesso regge SOLO la firma: la chiave vive sul PC, e
+l'elenco dei firmatari vive SUL VPS, fuori dal repo
+(`/etc/barattolo-deploy/firmatari`, formato `allowed_signers` di ssh).
+Dentro il repo lo riscriverebbe lo stesso commit che deve giudicare.
+
+SI FIRMA LA SOLA PUNTA, non ogni commit: chi firma la punta risponde
+di quel che c'è sotto. Pretenderle tutte romperebbe i merge dal sito
+di GitHub e i commit di Alan finché non ha la sua chiave. Il prezzo,
+scritto in PRODUZIONE: un merge fatto dal SITO lo firma GitHub, non
+noi, e viene rifiutato — ci si spinge sopra un commit firmato.
+LE FIRME SONO UNA LEVA SUL VPS (il file c'è / non c'è) e non un
+default, e non per timidezza: oggi nessun commit è firmato (`%G?` dà N
+su tutta la storia), quindi accenderle nel codice avrebbe fermato ogni
+deploy al primo push, compresi quelli delle altre sessioni. La leva
+sta dove chi ha in mano GitHub non arriva.
+
+IL GIUDICE È SEMPRE QUELLO DI PRIMA: a giudicare un commit è lo script
+già in produzione (la unit lo copia prima di eseguirlo, e il giudizio
+viene prima del reset), mai quello che il commit porta con sé.
+
+LA CI SI CHIEDE ALLE ACTIONS, NON AI CHECK. `giudice_deploy.py` chiede
+`actions/runs?head_sha=` e poi i lavori del giro: vale solo un giro di
+`prove.yml` nato da un PUSH SU MAIN (un verde su un ramo di lato non
+conta: il workflow di un ramo lo scrive chi ha il ramo), coi lavori
+`prove` e `segreti` in `success` — i due del `needs:` del semaforo, e
+una prova li tiene legati. I lavori e non l'esito del giro, perché
+quando `pronto` si muove il giro è ancora `in_progress` (il semaforo
+è un suo lavoro). Gli stati dei commit li scrive chiunque abbia
+scrittura, quindi non si guardano. TRE VERDETTI: sì, no, ASPETTA — e
+nel dubbio (GitHub muto, token che non apre, un crash del giudice) non
+si tira MAI. Ma un'attesa che non finisce è il `git fetch` muto
+dell'ago 2026: dopo dieci minuti «⏳ Deploy fermo» lo dice, una volta.
+Un rifiuto si timbra (`.deploy-rifiutato`) e si dice una volta, come
+il freno di `.deploy-bocciato`, un passo prima.
+IL TOKEN è quello con cui il VPS fa già `git fetch` (`git credential
+fill`, ripiego sull'URL): uno, in un posto. Non passa da argomenti né
+da variabili d'ambiente, e ogni riga stampata passa da `_senza_token`.
+
+IL SERVIZIO NON ROOT. Utente `barattolo`, di sistema, senza shell. IL
+GUARDIANO DEL PONTE era la ragione scritta per restare root: adesso
+`_argv_ponte` — puro — veste di `sudo -n /usr/bin/systemctl` i soli
+RIAVVII quando chi gira non è root (le due domande restano nude), e
+guarda chi è nell'ISTANTE del comando: il codice arriva col push, il
+cambio lo fa Andrea quando vuole, e un ritorno a root in emergenza
+non deve rompere la cura. La porta `_PONTE_AMMESSI` resta quella.
+Sudoers nomina i quattro comandi per intero, e una prova lo tiene
+uguale a `PONTE_STRADE`.
+LA STRADA SCARTATA, polkit: lascerebbe il guardiano intatto e
+permetterebbe `NoNewPrivileges` (con sudo è impossibile: con `User=`
+lo sottintendono anche `ProtectKernel*`, `SystemCallFilter`…, e sudo
+risponderebbe «no new privileges» — il ponte cadrebbe senza nessuno
+che lo rialzi; una prova difende il drop-in). Scartata perché una
+regola polkit sbagliata fallisce MUTA, mentre sudoers si verifica con
+`visudo -c` e `sudo -l -U barattolo`. È il prossimo gradino.
+
+LA REGOLA DEI PERMESSI, che è venuta fuori censendo e non era nella
+richiesta: **`barattolo` non scrive in NESSUN posto da cui root
+esegue.** Il deploy gira da root DENTRO la cartella (git, python,
+`from config import…` con la cartella in testa a `sys.path`): se il
+servizio potesse scriverci — un `json.py`, o `config.py` stesso — chi
+buca il servizio diventa root al deploy dopo, e il cambio d'utente
+sarebbe teatro. Da lì tre conseguenze: 1) il codice, `.git` e
+`config.py` (640 `root:barattolo`) sono di root; 2) IL DATABASE ESCE
+DALLA CARTELLA DEL CODICE — sqlite scrive il journal ACCANTO al file,
+quindi la sua cartella dev'essere scrivibile: va in `dati/`, e al
+posto di prima resta un collegamento (config, backup e i comandi di
+PRODUZIONE non cambiano); 3) la copia degli script di deploy e backup
+lascia `/tmp` per `/run` (`RuntimeDirectory=`, 0700): in `/tmp` il
+nome era fisso, `barattolo` poteva occuparlo prima, e root avrebbe
+eseguito un file suo — la BASSA dell'audit, che diventa vera proprio
+il giorno in cui nasce un utente non-root. E `/root/satmarket` trasloca
+in `/srv/barattolo` (in `/root`, 700, non si entra) lasciando un
+collegamento: le decine di `~/satmarket` di PRODUZIONE valgono uguali.
+LE STRADE SCARTATE: `chmod 711 /root` o una ACL (ogni 644 dentro /root
+diventa del servizio); la cartella col bit sticky (il servizio ci crea
+file, e root ci importa); cambiare `DB` nel config (un gesto a mano in
+più su un file che, rotto, spegne il sito — il collegamento fa lo
+stesso e l'ho verificato).
+
+IL CAMBIO LO FA UNO SCRIPT (`deploy/utente/cambio-utente.sh`), contro
+l'abitudine del «un comando alla volta»: per qualche secondo il sito è
+giù, e in quei secondi non si digita. Nudo GUARDA e basta (la
+fotografia: come gira la unit, dove stanno interprete e librerie —
+`pip install --user` da root le mette in `/root/.local`, dove
+`barattolo` non vede —, il disco, Caddy, il certificato di LND, che è
+l'unico file fuori cartella che il server legge) e dice ALT invece di
+indovinare; `--fai` fa tutto il possibile a sito acceso, e dopo lo
+stop ogni passo che fallisce TORNA A ROOT da solo; prima dello start
+prova DA `barattolo` una scrittura vera sul database (`/api/salute`
+LEGGE soltanto, e una lettura riesce anche dove il journal non può
+nascere) e che sul codice NON possa scrivere. Tornare a root sono due
+comandi, perché il cambio è un DROP-IN e non una unit nuova.
+
+COSA HO PROVATO DAL VIVO. 1) `deploy.sh` intero su un origin e un VPS
+di cartone: un commit finto su un ref finto (figlio di main, fuori da
+main) → «⛔ deploy RIFIUTATO», anche con `--forza`, e `--dimmi` lo
+racconta senza timbrare; il ritorno indietro; FIRME SSH VERE
+(`ssh-keygen`, `git commit -S`): firmato da chi sta nel file passa,
+da un estraneo e senza firma no; l'autore estraneo; la CI rossa, in
+corsa, solo su un ramo di lato, senza «segreti», il 403, GitHub muto
+(un GitHub di cartone in locale); i timbri (il secondo giro tace,
+l'attesa avvisa a dieci minuti una volta); il VPS che non si muove
+mai da c1; il token che arriva nell'intestazione e non compare in
+nessuna uscita. 21 su 21, su Windows e su UBUNTU 26.04 VERO (WSL, git
+2.53 — lo stesso sistema del VPS). 2) Il giudice contro GITHUB VERO,
+in sola lettura: la punta di main → sì; `a7963373`, un rosso vero
+della storia → «la CI e' rossa: «segreti» e' finito failure»; uno sha
+mai esistito → aspetta. E `giudice_deploy.py token` sul PC ha
+denunciato il token di `gh` come capace di scrivere, che è giusto.
+3) SQLITE DIETRO UN COLLEGAMENTO, su Ubuntu 26.04 (3.46): il journal
+nasce in `dati/` accanto al file vero con la cartella del codice
+chiusa, e la controprova — database dentro la cartella chiusa —
+fallisce con «attempt to write a readonly database»: è la ragione per
+cui `dati/` esiste. 4) `visudo -cf` sulla regola: «parsed OK».
+Prove: 12655/0 con PROVE_SEVERE. TORTURA: 55 mutazioni (giudice,
+guardiano, sudoers, drop-in, script del cambio, e deploy.sh col banco
+dal vivo), 55 uccise — al primo giro 53: vive lo sha corto e il token
+di forma sconosciuta (la regex lo copriva per caso), e una uccisa per
+ESPLOSIONE della sentinella (`index` su un'ancora sparita) invece che
+da una rossa; curate tutt'e tre.
+UNA ROSSA DEL BANCO, NON DEL CODICE, che ha lasciato una cura vera: su
+Windows il motivo usciva in cp1252; il giudice ora forza l'uscita in
+UTF-8, che vale anche sotto systemd senza LANG.
+
+**COSA NON HO PROVATO, e va detto per primo: IL VPS.** Niente di
+quanto sopra ha girato sulla macchina vera, che è fuori dal mio
+perimetro. In particolare: `cambio-utente.sh` NON HA MAI GIRATO DA
+ROOT — ne ho provato la sintassi (bash di Ubuntu) e i pezzi che non
+chiedono privilegi, non `useradd`, `chown`, il drop-in, `sudo -u`. La
+`barattolo.service` vera non l'ho mai vista (non è nel repo): lo
+script la fotografa e si ferma se non la capisce, ma è la prima cosa
+da incollarmi. NON PROVATI: che il token del VPS sappia leggere le
+Actions (se non sa, il primo push DOPO questo resta fermo e dopo dieci
+minuti arriva «⏳ … non puo' leggere le Actions»: il sito resta su, e
+la cura è il PASSO 1); che `git push --dry-run` risponda 403 con un
+token di sola lettura (me lo aspetto, non l'ho visto); `sudo -n` sotto
+systemd con quel drop-in; il guardiano vero da `barattolo` (il drill è
+in PRODUZIONE); `RuntimeDirectory=` sulle due unit.
+
+**RESTA DA FARE, tutto di Andrea**, in PRODUZIONE («IL DEPLOY CHE SI
+FIDA SOLO DI MAIN»): 1) il token; 2) le due unit; 3) il cambio
+d'utente (prima nudo, e l'uscita a me); 4) le firme — finché non sono
+accese G2 è chiusa a metà, e la metà aperta è quella dell'account
+bucato; 5) la verifica finale, col `pronto` spostato a mano. E Alan:
+la sua chiave pubblica.
+**QUEL CHE HO NOTATO E NON TOCCATO:** il backup che viaggia su
+Telegram porta `config.py` (cifrato con age): con G2 e A1 chiuse resta
+la voce A2 dell'audit, che ha la sua cura proposta. E `--workers`: lo
+script lo segnala se c'è, non lo cura.
