@@ -73,9 +73,26 @@
   Ci passano TRE posti: la cintura di `paga_venditore` (sotto
   `MARGINE_SCADENZA_PAYOUT_S`, 2 minuti, NON SI TENTA: niente rete,
   nessun hash sulla riga, nessuna riga `failed` su LNbits da chiarire
-  dopo), la porta del deposito a mano (`rifiuto_scadenza`: 10 minuti se
-  si paga subito, `FATTURA_ANTICIPATA_GIORNI` — 30, e 0 = spento — se i
-  sats partono alla conferma) e la scelta delle PAROLE. La cintura sta
+  dopo), la porta del deposito a mano (`rifiuto_scadenza`: 10 minuti,
+  perché da quella porta si paga SEMPRE subito) e la scelta delle
+  PAROLE.
+  LA FATTURA SI INCOLLA SOLO ALL'INCASSO (21 set 2026, deciso con
+  Alan). Il metodo d'incasso che si imposta IN ANTICIPO è uno solo, il
+  Lightning address, perché è l'unico che non scade: `deposita_invoice`
+  accetta il venditore SOLO a ordine 'confirmed' (prima risponde 400
+  con `MSG_FATTURA_PRESTO`, senza scomodare LNbits), e
+  `FATTURA_ANTICIPATA_GIORNI` col suo ramo è uscita insieme al caso che
+  giudicava. Nel client `payoutPanel` prima della conferma ha il solo
+  campo dell'address; quello della fattura compare a 'confirmed'. Gli
+  ordini che una fattura in colonna ce l'hanno GIÀ si pagano come
+  prima (`_sblocca_sats`: colonna, poi address), con la cintura qui
+  sopra a fermare quelle morte. NEL P2P la fattura NON si può chiedere
+  al pagamento — il coordinatore la vuole alla PRESA e la paga al
+  RILASCIO — quindi il foglio consiglia l'indirizzo e alla fattura
+  chiede di durare un giorno (`vitaMinimaFatturaP2P`, 23 ore di
+  soglia; dopo il rilascio basta la finestra del coordinatore), e il
+  motivo di un payout fallito si dice come un fatto solo quando la
+  scadenza della fattura data si sa (`percheFallitoP2P`). La cintura sta
   DOPO quella dell'importo (un importo storto è un allarme, e vince) e
   vale solo per una fattura che NOI non abbiamo mai tentato: se
   l'abbiamo già provata, a dire com'è finita sono le fonti

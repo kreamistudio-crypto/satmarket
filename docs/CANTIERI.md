@@ -23020,3 +23020,205 @@ COSA IL BANCO NON DICE, ancora: la `barattolo.service` VERA (con un
 venv dentro la cartella il ramo è un altro, e lì non è passato
 nessuno), le librerie vere, Caddy, le due unit con `RuntimeDirectory=`,
 il token. La fotografia nuda resta il primo gesto sul VPS.
+
+## Lightning address preferito, fattura solo all'incasso: mercatino e P2P (21 set 2026)
+
+**DA DOVE VIENE.** È il PUNTO 2 che il cantiere delle fatture scadute
+(20 set, ordine #152) aveva lasciato ad Andrea — «quando chiedere la
+fattura» — deciso con Alan sui numeri del censimento dello stesso
+giorno: su 61 pagamenti al venditore, 49 via Lightning address e 12 con
+fattura incollata, di cui 3 arrivate al payout vive per un pelo e 1
+scaduta (Pedro, #152). Le fatture dei wallet durano da un'ora a sette
+giorni; fra la vendita e la conferma passano giorni. Incollarle prima
+dell'incasso è sbagliato per costruzione, e «Invoice salvata» faceva
+pensare a un metodo che si riusa — che una fattura non è.
+
+**LA DECISIONE, MERCATINO: IN ANTICIPO SI IMPOSTA SOLO L'ADDRESS; LA
+FATTURA SI INCOLLA QUANDO TOCCA.** `deposita_invoice` accetta il
+venditore SOLO a ordine 'confirmed', dove il server paga all'istante;
+da 'locked', 'shipped' e 'delivered' risponde 400 con
+`MSG_FATTURA_PRESTO` — perché, cosa succederà («ti avvisiamo noi») e
+la strada che chiude il problema, l'address che non scade. Il no
+arriva PRIMA di chiedere l'importo a LNbits: un rifiuto che si sa già
+non scomoda il nodo. Nel client `payoutPanel` prima della conferma ha
+UN campo, l'address, con la ragione scritta («non scade mai, lo usiamo
+al momento del pagamento»); il campo della fattura compare a
+'confirmed', in evidenza se lo stadio «in pagamento» dice che serve un
+gesto. Spariscono «Salva invoice», «Incasso pronto», «Sostituisci
+invoice» e il toast «✓ Invoice salvata: incasso automatico alla
+conferma» — che, letto il codice, usciva ANCHE a ordine già confermato
+quando il pagamento non riusciva: l'ultimo `else` di
+`saveSellerInvoice` era il ramo «salvata per dopo», e ci finiva pure
+il payout fallito. Ora dice che non è riuscito e di guardare il motivo.
+
+**`FATTURA_ANTICIPATA_GIORNI` È USCITA, col suo ramo e il parametro
+`subito`.** Giudicava la fattura incollata prima della conferma: quel
+caso non si produce più, e un numero che giudica un caso che non si
+produce è un numero da togliere. `rifiuto_scadenza(bolt11, adesso)` fa
+una domanda sola, perché dalle sue tre porte (ordine confermato,
+rimborso, rimborso d'asta) si paga sempre subito. La prova che la
+teneva ferma è diventata la prova che non torni — e guarda i NOMI
+dell'albero sintattico, non il testo: commenti e docstring la nominano
+apposta per dire perché è uscita, e una ricerca sul testo avrebbe
+risposto per loro (è la lezione «il commento che spiega perché la cosa
+non c'è più», già pagata tre volte).
+
+**GLI ORDINI CHE UNA FATTURA IN COLONNA CE L'HANNO GIÀ NON SI
+TOCCANO.** `_sblocca_sats` resta com'era: colonna, poi address. Una
+fattura di ieri ancora viva si paga; una morta non si tenta (la
+cintura del 20 set), e se c'è l'address si paga da lì al giro dopo,
+sennò se ne chiede una nuova col motivo vero. Il foglio dell'ordine lo
+DICE subito: legge la scadenza dalla bolt11 e scrive «è già scaduta:
+non la useremo» o «alla conferma proviamo a pagarla» — senza un
+bottone per sostituirla, che prima dell'incasso non si incolla più
+niente. SCARTATO: svuotare le colonne con una scopa al deploy. Una
+fattura viva è un pagamento che può riuscire, e buttarla chiederebbe
+un gesto a chi l'ha già fatto; quante sono lo dice
+`censimento_scadenze.py`, ed è un numero che può solo scendere.
+SCARTATO anche rovesciare l'ordine al payout (address prima della
+colonna): a 'confirmed' una fattura in colonna è quella che chi vende
+ha appena incollato PERCHÉ l'address non andava — la resa dopo i
+cinque tentativi — e pagare l'address per primo la ignorerebbe.
+
+**QUEL CHE C'ERA GIÀ, VERIFICATO E NON RISCRITTO.** Chi alla conferma
+non ha né address né fattura: l'ordine va 'confirmed', stadio «in
+pagamento» con «serve un tuo gesto», e parte il messaggio — ritoccato
+in «Tocca a te: … incolla una fattura di esattamente quell'importo,
+fatta adesso (la paghiamo subito). Oppure imposta il tuo Lightning
+address: non scade mai». Il sollecito c'è (`sollecita_incassi`: ogni
+`SOLLECITO_INCASSO_GIORNI` = 7, quattro volte, poi i moderatori; tace
+finché la palla è nostra). Chi entra da Nostr riceve le stesse parole
+in DM cifrato: `notifica` sceglie il canale da sé (tg_id negativo →
+NIP-17), e nessuno di questi avvisi passa da un'altra strada.
+
+**P2P: LO STESSO PRINCIPIO, FIN DOVE IL PROTOCOLLO LO PERMETTE.** Qui
+la fattura NON si può chiedere al momento del pagamento, ed è il
+limite da scrivere chiaro: il coordinatore la vuole ALLA PRESA
+(`waiting-buyer-invoice`, o `add-invoice` a garanzia bloccata) e la
+paga AL RILASCIO, quando chi vende ha visto gli euro — minuti, o ore.
+Nel P2P non si salvava già niente in anticipo (`myLnAddress` è sempre
+un indirizzo, e il campo nasce vuoto dal 17 set). Quindi: 1) L'ORDINE
+DELLE DUE VIE SI ROVESCIA rispetto al 17 set. Allora la fattura era
+passata davanti perché l'indirizzo era «la via che si rompeva»; ma la
+fattura ha il suo modo di rompersi, e arriva TARDI — scade, e lo si
+scopre al rilascio — mentre l'indirizzo non scade e quando non passa
+la verifica lo si sa SUBITO, col campo ancora davanti. Torna primo,
+con l'avviso sui provider che dietro Tor non rispondono (Wallet of
+Satoshi) NELLA STESSA FRASE, e senza mai ridire «la via più semplice».
+2) LA FATTURA DEVE COPRIRE LO SCAMBIO: `vitaMinimaFatturaP2P` chiede
+un giorno, e accanto al campo sta scritto «fai una fattura che duri
+almeno un giorno». ⚠️ La soglia è 23 ORE e non 24: tanti wallet fanno
+fatture da 24 ore esatte e a incollarla passa un minuto — con 86400
+secchi la fattura «da un giorno» sarebbe rifiutata per sessanta
+secondi (le due scene del banco che mandano una fattura da un giorno
+esatto passano SOLO per questa tolleranza). La finestra del
+coordinatore (`invoice_expiration_window`, un'ora) resta il primo
+controllo, col suo messaggio; la durata viene DOPO. 3) DOPO IL
+RILASCIO NON VALE: la fattura nuova di un payout fallito si paga
+appena arriva, e lì resta la sola finestra del coordinatore. 4) LA
+REGOLA È NOSTRA, QUINDI HA UN'USCITA: la stessa fattura corta mandata
+una seconda volta parte (`P2P_FATTURA_CORTA_SI_MANDA`), con scritto
+cosa si rischia — un'attesa, non i sats. Andrea aveva chiesto una
+«scadenza minima accettata»; il blocco secco l'ho ammorbidito per un
+motivo solo: un wallet che la scadenza non la fa scegliere, col suo
+indirizzo che non passa la verifica, resterebbe in un vicolo cieco
+con quindici minuti di cronometro. La leva è una parola: a `false` il
+blocco torna secco, e c'è la scena che lo prova.
+
+**IL MOTIVO VERO DEL PAYOUT FALLITO, QUANDO È UN FATTO.** Il
+coordinatore il motivo non lo dice al client, e il 17 set Andrea aveva
+corretto un «quasi sempre scaduta» che non era vero. Ma la scadenza
+della fattura che abbiamo dato la sappiamo NOI: da oggi resta sulla
+riga (`fatturaScade`, 0 per un indirizzo) e `percheFallitoP2P` la
+confronta con l'orologio. Scaduta → foglio e pagina dello scambio
+dicono «la fattura che avevi dato è scaduta»; viva → il foglio
+ESCLUDE la scadenza; ignota (righe di prima, o un indirizzo) → restano
+le due cause del 17 set, e non si afferma niente. Il campo il
+compratore lo vede subito: toast, bottone «⚡ Dai una fattura nuova»
+nella pagina, e il foglio che si apre da solo se sta guardando quello
+scambio (c'era già, verificato). L'avviso del SERVER a chi ha l'app
+chiusa resta quello della patch 0007, col motivo di LND quando mostrod
+lo manda.
+
+**COSA NEL P2P NON SI PUÒ FARE, detto chiaro.** Non si può chiedere la
+fattura «al momento del pagamento»: il momento lo decide il
+coordinatore, ed è la presa. Non si può ripagare da soli senza mostro:
+i sats stanno nella hold invoice del SUO nodo, e né il nostro server
+né il client hanno un ruolo in quel pagamento — il solo gesto è dare a
+mostro una fattura nuova (`add-invoice` a `settled-hold-invoice`). Non
+si può sapere dal client PERCHÉ è fallito, se non per la scadenza. E
+non si può leggere la scadenza di quel che c'è dietro un indirizzo: è
+il provider a coniare la fattura, al rilascio.
+
+**COSA HA TROVATO IL GIRO.** 1) Il toast bugiardo di
+`saveSellerInvoice`, sopra. 2) Una prova verde per la ragione
+sbagliata, nata dal mio stesso cambio: «spedito, fattura da un'ora →
+rifiutata con le tre strade» cercava «Lightning address» nel rifiuto,
+e il rifiuto NUOVO lo contiene — sarebbe rimasta verde raccontando una
+regola che non c'è più. Riscritta. 3) Tre collaudi col server vero
+(`collaudo_lnbits_muto`, `collaudo_in_pagamento`,
+`collaudo_fatture_scadute`) usavano la porta a ordine 'locked' come
+PREPARAZIONE: ora la fattura «di ieri» si semina scrivendo la colonna
+(`fattura_di_ieri`), che è esattamente il caso che resta vivo in
+produzione. Non stanno in CI: senza rigirarli a mano sarebbero rimasti
+rotti in silenzio. 4) Nel foglio del payout fallito due «:» di fila.
+
+**PROVATO.** `prove_fattura_solo_incasso` (nuova): `payoutPanel` VERO fatto
+girare in node nei tre stati prima della conferma, a 'confirmed',
+con l'address, e sugli ordini di ieri con fattura viva, scaduta e
+illeggibile (che non si dà per morta). `prove_fatture_scadute`: la
+porta chiusa nei tre stati con una fattura BUONA da sette giorni —
+rifiutata con le sue parole, senza scomodare LNbits, senza scrivere
+la colonna, senza pagare —, chi compra che non incolla la fattura di
+chi vende, la fattura di ieri viva che si paga come sempre, la
+costante uscita (sui nomi dell'AST) e la domanda sola di
+`rifiuto_scadenza`. Nel banco del motore P2P, a casi indipendenti
+col loro try/catch: la fattura da sei ore fermata una volta, la
+regola e l'uscita nelle parole, la stessa rimandata che parte, il
+foglio riaperto che riavvisa, la leva spenta che blocca secco,
+l'indirizzo che non ricorda scadenze, il wallet NWC che risponde
+con sei ore e torna al foglio a mano, le due pure, e il payout
+fallito nei tre casi (scaduta, viva, ignota) su foglio E pagina.
+Suite intera verde in modalità severa: 12.708 passate, 0 fallite
+(erano 12.658). TORTURA, in una copia: 39 mutazioni. Al primo giro
+35 uccise, 2 VIVE e 2 che facevano ESPLODERE la sezione invece di
+farla fallire — due sentinelle mie con `.index()`: una mutazione che
+muore perché il banco esplode non è uccisa, e ora usano `find`. Delle
+vive, una era una prova che mancava (la fattura fatta dal wallet NWC
+non ricordava la sua scadenza sotto nessun occhio: aggiunta), l'altra
+è EQUIVALENTE e si dichiara: allargare il ramo di 'confirmed' non
+cambia niente finché il rifiuto scatta prima — la mutazione vera è
+quella che toglie ANCHE il rifiuto, ed è uccisa da undici prove. Alla
+fine: 38 uccise, 1 equivalente, 0 esplose. DAL VIVO, nel senso di
+casa: i tre collaudi col SERVER VERO su database usa-e-getta e nodo
+di cartone (`collaudo_fatture_scadute` 30/30, `collaudo_in_pagamento`
+44/44, `collaudo_lnbits_muto` 41/41), e il client guardato nel
+browser a 375px sugli ordini del DEMO: il foglio dell'incasso prima
+della conferma, a 'confirmed' e con una fattura scaduta in colonna
+(quella vera del 16 set); il foglio P2P alla presa, dopo un payout
+fallito a fattura scaduta, e l'avviso della fattura da sei ore.
+
+**NON PROVATO, e va detto.** Il telefono, dentro Telegram: niente di
+quel che sta qui sopra è stato visto su un dispositivo vero. LNbits e
+LND veri (le fatture dei banchi sono bolt11 sintatticamente vere, il
+nodo è di cartone). Nel P2P: uno scambio vero con una fattura corta
+lasciata scadere — cioè se mostrod, quando LND rifiuta una fattura
+SCADUTA (la rifiuta prima di aprire lo stream del pagamento, quindi
+senza `failure_reason`), arrivi davvero a `payment-failed` →
+`add-invoice` come fa su un NO_ROUTE: il 17 set si è visto il secondo
+caso, non il primo, e il sorgente di mostrod su quel ramo non l'ho
+letto. Se non ci arrivasse, il compratore ha la porta di riserva («i
+sats non arrivano?»), che manda lo stesso `add-invoice`. Quanto durano
+DAVVERO le fatture dei wallet dei nostri utenti: il «da un'ora a sette
+giorni» è del censimento, e la soglia delle 23 ore è tarata su
+quello. E il censimento dopo il deploy: quante fatture restano in
+colonna sugli ordini aperti.
+
+**FUORI TEMA, MA PICCOLO (PRODUZIONE).** Alla voce del certificato di
+LND (scade il 22 ott 2027) e a quella del servizio non root sta
+scritto che il server legge una COPIA del cert,
+`/etc/barattolo/lnd-tls.cert` (`LND_PONTE_CERT` nel config: l'utente
+`barattolo` non entra in `/opt/lnbits/data`), col comando per rifarla
+quando LND rigenera il suo; e lo stato al 21 set: servizio da
+`barattolo`, firme accese (firmatari andrea e alan), drill del deploy
+rifiutato riuscito.

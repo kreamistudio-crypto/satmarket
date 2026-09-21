@@ -550,7 +550,19 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   di LND copiato in `/opt/lnbits/data/tls.cert` (SAN `127.0.0.1`):
   SCADE IL 22 OTT 2027 — quel giorno LND lo rigenera e la copia sul
   VPS va rifatta, o LNbits smette di fidarsi del ponte con un errore
-  che sa di rete. Il macaroon (`LND_REST_MACAROON` nel `.env`, 600) e'
+  che sa di rete.
+  ⚠️ E LE COPIE SUL VPS SONO DUE, dal 21 set 2026: il SERVER di
+  Barattolo (i pagamenti in volo, che chiedono la verità a LND) non
+  legge quella di LNbits ma una copia SUA,
+  `/etc/barattolo/lnd-tls.cert`, dichiarata nel config come
+  `LND_PONTE_CERT` — perché da quel giorno il servizio gira da
+  `barattolo` e in `/opt/lnbits/data` quell'utente non entra. Quando
+  LND rigenera il suo cert, rifatta la copia di LNbits va rifatta
+  ANCHE questa, o è il server a non fidarsi più del ponte mentre
+  LNbits paga benissimo:
+  `install -m 644 -o root -g root /opt/lnbits/data/tls.cert /etc/barattolo/lnd-tls.cert && systemctl restart barattolo`
+  (644 e di root: un certificato è pubblico, `barattolo` lo deve
+  leggere e non lo deve poter cambiare.) Il macaroon (`LND_REST_MACAROON` nel `.env`, 600) e'
   dedicato, `root_key_id 1`: si revoca da solo con
   `lncli deletemacaroonid 1` sul nodo. Diagnosi in tre `curl` dal VPS:
   `-k` su `https://127.0.0.1:18080/v1/getinfo` (il ponte arriva?),
@@ -655,7 +667,11 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   del VPS:
   `LND_PONTE_MACAROON_LETTURA = "INCOLLA_QUI"`; `LND_PONTE_CERT` e
   `LND_PONTE_URL` hanno gia' i default giusti (`/opt/lnbits/data/tls.cert`
-  e `https://127.0.0.1:18080`). Poi si cancella il file sul nodo e si
+  e `https://127.0.0.1:18080`) — ⚠️ ma dal 21 set 2026 sul VPS
+  `LND_PONTE_CERT` È DICHIARATO nel config e punta alla copia del
+  server, `/etc/barattolo/lnd-tls.cert`: l'utente `barattolo` nel
+  default non entra (vedi «SCADE IL 22 OTT 2027», qui sopra, per
+  rifarla). Poi si cancella il file sul nodo e si
   riavvia `barattolo`. Si revoca da solo, senza toccare LNbits:
   `lncli deletemacaroonid 2`. Non passa MAI dal canale Telegram.
   Senza macaroon LND vale «spento»: decide LNbits da sola, come prima,
@@ -711,10 +727,15 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   paga da lì al giro dopo, da soli. Ai moderatori arriva «⌛ Pagamento
   in uscita NON TENTATO: fattura scaduta» — è un'informazione, non un
   allarme: non c'è NIENTE da fare. Alla porta: una fattura scaduta, o
-  troppo corta per quando partiranno i sats, si rifiuta SUBITO e si
-  dice perché (10 minuti se si paga all'istante; 30 giorni se i sats
-  partono alla conferma — `FATTURA_ANTICIPATA_GIORNI` in `server.py`,
-  0 = controllo spento).
+  che muore entro 10 minuti, si rifiuta SUBITO e si dice perché.
+  ⚠️ DAL 21 SET 2026 LA FATTURA SI INCOLLA SOLO ALL'INCASSO: prima
+  della conferma la porta risponde «si incolla solo al momento
+  dell'incasso… imposta il tuo Lightning address», e il foglio
+  dell'ordine ha il solo campo dell'address (`FATTURA_ANTICIPATA_GIORNI`
+  non esiste più). Le fatture già in colonna sugli ordini APERTI
+  restano e si pagano come prima — o, se sono morte, non si tentano e
+  se ne chiede una nuova: QUANTE sono lo dice il censimento qui sotto,
+  e dopo questo deploy è un numero che può solo scendere.
   DOVE SI LEGGE: `journalctl -u barattolo | grep "⌛"`. Il motivo di
   ogni payout mancato sta nella riga dell'ordine:
   `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT id,stato,payout_stato,payout_tentativi,payout_errore FROM ordini WHERE COALESCE(payout_errore,'')<>'' ORDER BY id DESC LIMIT 20;"`
@@ -1180,6 +1201,17 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   sta su GitHub e l'elenco dei firmatari non sta nel repo. Finché le
   firme sono spente ogni deploy lo dice nel journal («⚠️ FIRME NON
   RICHIESTE»).
+  ✅ LO STATO SUL VPS, AL 21 SET 2026 (lo dice Andrea, che l'ha fatto):
+  il servizio gira da `barattolo` dal 21 set; le FIRME dei commit sono
+  ACCESE dallo stesso giorno, coi firmatari `andrea` e `alan`; e il
+  drill del deploy RIFIUTATO è riuscito. Quindi la sequenza qui sotto
+  non è più «da fare»: è la procedura per rifarla, o per una macchina
+  nuova. ⚠️ UNA COSA CHE IL CAMBIO D'UTENTE SI È PORTATO DIETRO: il
+  server legge il cert di LND da una copia SUA,
+  `/etc/barattolo/lnd-tls.cert` (`LND_PONTE_CERT` nel config), perché
+  `barattolo` non entra in `/opt/lnbits/data` — e quando LND rigenera il
+  suo cert (22 ott 2027) va rifatta anche lei: il comando sta alla voce
+  del ponte, «SCADE IL 22 OTT 2027».
   LA SEQUENZA PER IL VPS, un passo alla volta. Si può fermare dopo
   ogni passo: ognuno lascia la macchina in uno stato che funziona.
   PASSO 1 — IL TOKEN DEL VPS, che deve saper LEGGERE e basta. Tre
