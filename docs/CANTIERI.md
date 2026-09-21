@@ -22977,3 +22977,46 @@ la sua chiave pubblica.
 Telegram porta `config.py` (cifrato con age): con G2 e A1 chiuse resta
 la voce A2 dell'audit, che ha la sua cura proposta. E `--workers`: lo
 script lo segnala se c'è, non lo cura.
+
+**IL BANCO DA ROOT, fatto lo stesso giorno col sì di Andrea** — e la
+riga qui sopra, «`cambio-utente.sh` NON HA MAI GIRATO DA ROOT», cade.
+Ha girato nel suo WSL, che è un Ubuntu 26.04 con systemd come PID 1,
+cioè il gemello del VPS: nomi FINTI (`barattolo-prova`,
+`/root/satmarket-prova` → `/srv/barattolo-prova`), un mercatino di
+cartone con la sua unit (un server che LEGGE il database, lo SCRIVE,
+prova il riavvio del guardiano con l'argv VERO, e prova tutto quel che
+non deve riuscirgli), e alla fine tolto tutto — utente, gruppo, unit,
+sudoers, cartelle: verificato due volte, `/etc/passwd` compreso.
+COSA SI È VISTO, otto scene: 1) nudo GUARDA e non tocca niente (dopo,
+né l'utente né la cartella esistono); 2) il certificato che l'utente
+non sa leggere dà ALT, e il sito resta su; 3) COL GUASTO A COMANDO — da
+non-root il server non parte — dopo 60 secondi di salute muta lo script
+TORNA A ROOT DA SOLO: drop-in via, servizio da root, esce 1; 4) `--fai`
+rilanciato SULLO STATO LASCIATO DAL TENTATIVO FALLITO (cartella già
+traslocata, utente già creato) va in fondo: sito giù 3 secondi; 5) il
+processo gira da `barattolo-prova`, HOME e cartella nuove, la
+`ExecStart` riscritta da sola perché quella di prima nominava `/root`;
+i permessi sono quelli scritti (750 `root:utente`, `.git` e `backup`
+700, config 640, `dati/` 700 suo); dal SERVIZIO VERO scrive sul
+database e nelle foto, e nella cartella del codice non resta nessun
+journal; **IL GUARDIANO: `sudo -n /usr/bin/systemctl restart` lanciato
+DAL DENTRO del servizio, con quel drop-in, riavvia davvero la unit (il
+pid cambia)**; e da lì dentro NON riesce: scrivere `server.py`,
+`config.py`, creare un `json.py` nel codice, leggere `.git`, `backup/`,
+`/root`, riavviare se stesso, fermare il ponte, aprire una shell con
+sudo; 6) LA CONTROPROVA di quel che il drop-in non ha: con
+`NoNewPrivileges=yes` lo stesso sudo risponde «The "no new privileges"
+flag is set» — la ragione scritta nel drop-in non era una deduzione;
+7) `--torna`: di nuovo root, e legge e scrive; 8) e di nuovo `--fai`
+dopo essere tornati: 2 secondi.
+DUE DIFETTI TROVATI, tutt'e due curati e rigirati al banco. 1) Lo
+script copiava il database col COMANDO `sqlite3`, che è un pacchetto a
+parte e lì non c'era: si sarebbe fermato (prima di toccare niente, ma
+fermato). Ora usa l'API dentro python, come `deploy.sh`. 2) DUE RIGHE
+CHE SI SMENTIVANO: a una unit mancava il permesso di sudo, usciva
+l'avviso, e subito sotto «i quattro riavvii si'». Ora il sì esce solo
+se è vero per tutte, e l'avviso dice che il cambio è fatto ma sudo no.
+COSA IL BANCO NON DICE, ancora: la `barattolo.service` VERA (con un
+venv dentro la cartella il ramo è un altro, e lì non è passato
+nessuno), le librerie vere, Caddy, le due unit con `RuntimeDirectory=`,
+il token. La fotografia nuda resta il primo gesto sul VPS.
