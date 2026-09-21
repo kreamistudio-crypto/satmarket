@@ -25637,11 +25637,22 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
 - IL GUARDIANO DEL PONTE VERSO LND (18 set 2026): un task asyncio del
   server (`guardiano_ponte`, avviato allo startup, SOLO dove le tre
   righe `LNBITS_NODO_*` ci sono) chiede ogni minuto
-  `https://127.0.0.1:18080/v1/state` — la strada di LNbits verso LND,
-  socat + tor + onion — e conta VIVO qualunque risposta HTTP. Tre no
-  di fila = cura: `PONTE_COMANDI`, i due systemctl FISSI, primo e
-  unico sottoprocesso del server (una sentinella lo tiene unico e
-  senza shell). I giudici sono puri e stanno uno per regola:
+  `https://127.0.0.1:18080/v1/state` — la strada di LNbits verso LND:
+  dal 21 set 2026 socat + tunnel WireGuard + socat sul nodo (prima
+  socat + tor + onion, che resta come piano B spento) — e conta VIVO
+  qualunque risposta HTTP. Tre no di fila = cura, e la cura SEGUE LA
+  STRADA: `_quale_strada_ponte` fa a systemd le due `PONTE_DOMANDE`
+  (piano B attivo? tunnel abilitato?), `_ponte_strada` — puro —
+  sceglie fra le tre `PONTE_STRADE`, due systemctl FISSI l'una. Tutto
+  passa da `_systemctl_ponte`, primo e unico sottoprocesso del server,
+  che RIFIUTA ogni comando fuori da quei due elenchi (una sentinella
+  lo tiene unico, senza shell, e chiamato da due soli posti). LE TRE
+  MACCHINE, dopo il trasloco: il VPS parla al nodo dal tunnel
+  (`10.77.0.2` → `10.77.0.1:18080`, solo la REST di LND), il nodo
+  parla al mondo — Lightning, relay, e il VPS stesso per mostro —
+  solo da tor, e il relay non c'entra. I file: `deploy/ponte/`; il
+  verbale: CANTIERI, «Il ponte via WireGuard». I giudici sono puri e
+  stanno uno per regola:
   `_ponte_passo` (quando curare), `_ponte_esito_cura` (cosa dire dopo),
   `_ponte_avviso_permesso` (il freno, sul timbro `ponte_avviso`),
   `_ponte_pubblico` (la parola di `/api/salute`, da un insieme

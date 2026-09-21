@@ -529,7 +529,12 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   apre dal PC con `ssh -N -L 5001:127.0.0.1:5001 root@VPS` e poi
   `http://127.0.0.1:5001` (login «LNbits nodo» in KeePass); creazione
   di nuovi utenti spenta, solo username/password.
-  IL PONTE VERSO LND: `lnd-ponte.service` (socat) ascolta su
+  IL PONTE VERSO LND — ⚠️ DAL 21 SET 2026 PASSA DA WIREGUARD (voce
+  sua più sotto, «IL PONTE VIA WIREGUARD»): quel che segue è il ponte
+  DI PRIMA, che dopo il trasloco resta installato e spento col nome
+  `lnd-ponte-tor.service`, il piano B. Il cert, il macaroon e i tre
+  `curl` valgono identici sulle due strade.
+  `lnd-ponte.service` (socat) ascolta su
   `127.0.0.1:18080` e infila tutto nel tor del VPS verso l'hidden
   service della REST di LND sul nodo, che ha il client-auth v3: la
   chiave privata sta in `/var/lib/tor/onion_auth/lnbits.auth_private`
@@ -548,8 +553,16 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   apre?); ognuno risponde a una domanda diversa.
   IL GUARDIANO DEL PONTE (18 set 2026, dopo nove ore di acquisti
   falliti senza che nessuno lo sapesse): il server fa da solo la PRIMA
-  delle tre domande, ogni minuto. Al terzo «no» di fila riavvia `tor` e poi `lnd-ponte.service`,
-  riguarda dopo 45 secondi e lo scrive su Telegram (il guasto prima
+  delle tre domande, ogni minuto. Al terzo «no» di fila riavvia LA
+  STRADA IN PIEDI (21 set 2026) — la chiede a systemd nell'istante
+  della cura: piano B acceso (`is-active lnd-ponte-tor`) → `tor` e
+  `lnd-ponte-tor`; sennò tunnel abilitato (`is-enabled wg-quick@wg0`)
+  → `wg-quick@wg0` e `lnd-ponte`; sennò, su una macchina senza tunnel,
+  `tor` e `lnd-ponte` come prima. Nessun ripiego automatico su tor:
+  l'avviso del fallimento porta scritto il comando del piano B.
+  Riguarda dopo 90 secondi (erano 45: a tor non bastavano, e l'esito
+  diceva «ancora giù» di un ponte vivo un minuto dopo) e lo scrive su
+  Telegram (il guasto prima
   del riavvio, l'esito dopo), al massimo un avviso ogni 15 minuti; una
   cura che non ha curato non si ripete prima di 15 minuti. Il perché
   di ogni numero sta in CANTIERI, «Il guardiano del ponte verso LND».
@@ -562,9 +575,12 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `GUARDIANO_PONTE = False` + riavvio lo spegne. IL RIAVVIO RICHIEDE
   ROOT: `systemctl show barattolo -p User` deve dire `User=` vuoto o
   `root`, o la cura fallisce (e l'avviso lo dice con le parole di
-  systemctl). IL DRILL, a mercatino fermo: `systemctl stop lnd-ponte`,
+  systemctl). IL DRILL, a mercatino fermo: `systemctl stop lnd-ponte`
+  (o, per il tunnel, `systemctl stop wg-quick@wg0`),
   e in circa tre minuti il guardiano lo deve rimettere su da solo,
-  con i due avvisi. Quello che NON vede: un cert scaduto, un macaroon
+  con i due avvisi. All'avvio il journal dice anche la strada che la
+  cura prenderebbe: «🌉 La strada del ponte, vista da qui: …».
+  Quello che NON vede: un cert scaduto, un macaroon
   che non apre, un LND bloccato che risponde — la seconda e la terza
   domanda restano a mano.
   LE LEVE DEL DOPPIO WALLET si AGGIUNGONO al config del VPS, come
@@ -763,6 +779,179 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   Prima di ogni `ufw enable` futuro: la porta SSH ammessa per prima e
   una seconda sessione gia' aperta, che le connessioni vive non
   vengono tagliate.
+- IL PONTE VIA WIREGUARD (21 set 2026): la strada di LNbits e del
+  server verso la REST di LND non passa più da tor. Il perché — tre
+  cadute in 24 ore, un singhiozzo di 40 secondi ogni ora, il tor del
+  nodo che serve LND, mostro e il ponte insieme — sta in CANTIERI, «Il
+  ponte via WireGuard». Tor resta per TUTTO il resto: LND verso la rete
+  Lightning, mostro verso i relay e verso il VPS.
+  IL DISEGNO. Il NODO ascolta (`185.18.221.96`, `51820/udp`), il VPS
+  chiama: in `ufw` sul VPS non si apre niente. Rete del tunnel: nodo
+  `10.77.0.1`, VPS `10.77.0.2`, una peer sola per capo e `AllowedIPs`
+  di UN indirizzo. `PersistentKeepalive = 25` sul VPS. Sul VPS
+  `lnd-ponte.service` resta un socat su `127.0.0.1:18080` — LNbits, la
+  verità dei pagamenti e il guardiano non cambiano una riga — ma bussa
+  a `10.77.0.1:18080`, dove sul nodo un socat gemello
+  (`lnd-rest-wg.service`, sull'HOST) porta alla REST di LND nel suo
+  container. I quattro file stanno in `deploy/ponte/`.
+  LE CHIAVI nascono su ciascuna macchina (`wg genkey`) in
+  `/etc/wireguard/privata.key` e NON ESCONO MAI: non stanno nemmeno in
+  `wg0.conf` (le carica un `PostUp`), quindi `wg0.conf` si può copiare,
+  confrontare e mettere nel backup. Si scambiano solo le PUBBLICHE, che
+  possono passare anche da una chat. Il backup del VPS porta `wg0.conf`
+  e il piano B, NON la chiave: a macchina rifatta si rigenera (passi 2,
+  4 e 5) e nell'archivio c'è un segreto in meno.
+  IL CERTIFICATO DI LND NON SI RIGENERA, ed era il passo che non si
+  disfa in due comandi: i due socat spostano byte e non aprono niente,
+  il TLS resta END-TO-END fra chi chiama e LND, e chi chiama bussa
+  ancora a `127.0.0.1` — il nome che il `tls.cert` porta già. Niente
+  `tlsextraip`, niente da ricopiare su VPS né su mostro. La scadenza
+  resta il 22 OTT 2027, con la procedura di sempre (voce «IL PONTE
+  VERSO LND», qui sopra). La prova è il secondo `curl` del passo 6.
+  IL FIREWALL DEL NODO VIVE IN `wg0.conf`, nei `PostUp`: nasce col
+  tunnel e muore con lui, nello stesso gesto (la lezione del namespace
+  prestato), e se una regola non entra `wg-quick` smonta l'interfaccia
+  — il tunnel senza firewall non esiste. La chiave si carica PER
+  ULTIMA, quindi non c'è un istante col tunnel vivo e le regole non
+  ancora montate. Catena `WG-PONTE` in cima a INPUT: dal tunnel passa
+  SOLO `10.77.0.2` verso la sola `18080/tcp`; il resto del tunnel si
+  butta; chi cerca `10.77.0.1` da un'ALTRA interfaccia si butta (Linux
+  risponde per ogni suo indirizzo su ogni interfaccia); la `51820/udp`
+  risponde al solo IP del VPS. E il FORWARD da e verso il tunnel è
+  DROP, anche in `DOCKER-USER`: l'host del nodo ha `ip_forward=1` (lo
+  vuole Docker), e senza quella riga chi prendesse il VPS potrebbe
+  farsi inoltrare verso i container. Con lei arriva alla sola REST, coi
+  due macaroon che aveva già: né più né meno di prima.
+  ⚠️ LA SEQUENZA, UN COMANDO ALLA VOLTA. A mercatino quieto; fino al
+  passo 6 il ponte via tor continua a lavorare e non si rompe niente.
+  Le PUBBLICHE si annotano: servono all'altra macchina.
+  PASSO 0 — SUL NODO, si guarda e basta (dalla cartella `~/nodo`):
+  `docker compose ps --format '{{.Service}} {{.Name}}'`
+  — il container di LND (atteso `nodo-lnd-1`; se ha un altro nome, quel
+  nome va al posto suo qui sotto).
+  `docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' nodo-lnd-1`
+  — l'IP di LND nella rete del compose (un `172.28.1.N`). Se esce
+  VUOTO, LND vive nel namespace di un altro: FERMATI e riferisci.
+  `grep -n "ipv4_address" ~/nodo/docker-compose.yml`
+  — quell'IP deve comparire fra gli indirizzi FISSI. Se non c'è, al
+  prossimo `up` potrebbe cambiare: FERMATI e riferisci.
+  `curl -sk --max-time 10 https://172.28.1.N:8080/v1/state`
+  — deve rispondere `{"state":"SERVER_ACTIVE"}`: dall'host a LND la
+  strada c'è. Se la porta della REST non è 8080 lo dice
+  `sudo grep -rIn "HiddenServicePort" ~/nodo/tor/ | grep -v /data/`,
+  che è l'indirizzo con cui la trova tor.
+  `sudo ss -lntu | grep -E ':(51820|18080) '`
+  — non deve stampare NIENTE: le due porte sono libere.
+  PASSO 1 — SUL NODO, il programma e la chiave:
+  `sudo apt-get update && sudo apt-get install -y wireguard-tools socat`
+  `sudo sh -c 'umask 077; set -C; wg genkey > /etc/wireguard/privata.key'`
+  — `set -C` rifiuta di riscrivere una chiave che c'è già. Non stampa
+  niente, ed è giusto: la privata non si guarda mai.
+  `sudo sh -c 'wg pubkey < /etc/wireguard/privata.key'`
+  — 44 caratteri che finiscono con `=`: è la PUBBLICA DEL NODO.
+  PASSO 2 — SUL VPS, lo stesso:
+  `apt-get update && apt-get install -y wireguard-tools socat`
+  `sh -c 'umask 077; set -C; wg genkey > /etc/wireguard/privata.key'`
+  `wg pubkey < /etc/wireguard/privata.key`
+  — la PUBBLICA DEL VPS.
+  PASSO 3 — DAL PC (PowerShell), i file verso il nodo, che la repo non
+  ce l'ha. `-c core.autocrlf=false` conta: senza, su Windows l'archivio
+  esce coi fine-riga di Windows e `wg-quick` non lo legge.
+  `git -C C:\Users\Andrea\Documents\GitHub\satmarket fetch origin`
+  `git -c core.autocrlf=false -C C:\Users\Andrea\Documents\GitHub\satmarket archive --format=tar -o "$env:TEMP\ponte.tar" origin/main deploy/ponte`
+  `scp "$env:TEMP\ponte.tar" UTENTE@185.18.221.96:/tmp/`
+  Poi SUL NODO: `tar -xf /tmp/ponte.tar -C /tmp && sha256sum /tmp/deploy/ponte/*`
+  e SUL VPS: `sha256sum ~/satmarket/deploy/ponte/*`
+  — le quattro impronte devono essere IDENTICHE sulle due macchine. Se
+  una differisce, il file è arrivato storto: non si va avanti.
+  PASSO 4 — SUL NODO, il tunnel e il socat:
+  `sudo install -m 600 /tmp/deploy/ponte/wg0-nodo.conf /etc/wireguard/wg0.conf`
+  `sudo sed -i 's|INCOLLA_QUI_LA_PUBBLICA_DEL_VPS|LA_PUBBLICA_DEL_VPS|' /etc/wireguard/wg0.conf`
+  — al posto di `LA_PUBBLICA_DEL_VPS` i 44 caratteri del passo 2.
+  `sudo grep -c INCOLLA_QUI /etc/wireguard/wg0.conf`
+  — deve dire `0`.
+  `sudo systemctl enable --now wg-quick@wg0`
+  `sudo iptables -S WG-PONTE`
+  — sei righe: la catena, un ACCEPT per `10.77.0.2` sulla 18080, due
+  DROP, l'ACCEPT della 51820 per `46.62.162.103`, il suo DROP.
+  `sudo iptables -S INPUT | head -2` — la prima regola è `-j WG-PONTE`.
+  `sudo iptables -S FORWARD | head -3` — in cima i due DROP di `wg0`.
+  `echo 'LND_REST=172.28.1.N:8080' | sudo tee /etc/default/lnd-rest-wg`
+  — con l'IP vero del passo 0.
+  `sudo install -m 644 /tmp/deploy/ponte/lnd-rest-wg.service /etc/systemd/system/`
+  `sudo systemctl daemon-reload && sudo systemctl enable --now lnd-rest-wg`
+  `sudo ss -lntp | grep 18080`
+  — UNA riga, e l'indirizzo è `10.77.0.1:18080`. Se dice `0.0.0.0` o
+  `*`: `sudo systemctl stop lnd-rest-wg` e riferisci.
+  PASSO 5 — SUL VPS, il tunnel, e la prova PRIMA di toccare il ponte:
+  `install -m 600 ~/satmarket/deploy/ponte/wg0-vps.conf /etc/wireguard/wg0.conf`
+  `sed -i 's|INCOLLA_QUI_LA_PUBBLICA_DEL_NODO|LA_PUBBLICA_DEL_NODO|' /etc/wireguard/wg0.conf`
+  `grep -c INCOLLA_QUI /etc/wireguard/wg0.conf` — `0`.
+  `systemctl enable --now wg-quick@wg0`
+  `wg show wg0`
+  — entro mezzo minuto compare `latest handshake: N seconds ago`. Se
+  non compare: l'UDP non passa (un firewall del provider) o una
+  pubblica è sbagliata. Ci si FERMA qui: il ponte via tor non è stato
+  toccato.
+  `curl -sk --max-time 10 https://10.77.0.1:18080/v1/state`
+  — `{"state":"SERVER_ACTIVE"}`: LND risponde dal tunnel. (`-k` perché
+  qui il nome è `10.77.0.1`, che il cert non porta: è atteso, e i
+  client non bussano mai a questo indirizzo.)
+  PASSO 6 — SUL VPS, LO SCAMBIO (un secondo di buco):
+  `cp -a /etc/systemd/system/lnd-ponte.service /etc/systemd/system/lnd-ponte-tor.service`
+  — il ponte di prima, salvato col nome del piano B. Non si abilita.
+  `install -m 644 ~/satmarket/deploy/ponte/lnd-ponte.service /etc/systemd/system/lnd-ponte.service`
+  `systemctl daemon-reload`
+  `systemctl restart lnd-ponte`
+  `systemctl status lnd-ponte --no-pager | head -12`
+  — `active (running)`, e nella riga di socat c'è `10.77.0.1:18080`.
+  Se dice `unknown option` o `failed`: il ROLLBACK qui sotto, subito.
+  `curl -sk --max-time 10 https://127.0.0.1:18080/v1/state`
+  — il ponte arriva.
+  `curl -s --max-time 10 --cacert /opt/lnbits/data/tls.cert https://127.0.0.1:18080/v1/state`
+  — la stessa risposta SENZA `-k`: il cert combacia, non c'era niente
+  da rigenerare. La terza domanda (il macaroon) è quella di sempre.
+  `docker logs --since 3m lnbits-lnbits-1 2>&1 | tail -5`
+  — LNbits si riaggancia da solo, come dopo ogni cura del guardiano; se
+  dopo un paio di minuti parla ancora di «Funding source»:
+  `cd /opt/lnbits && docker compose restart`.
+  PASSO 7 — LA CONTROPROVA DA FUORI, dal PC:
+  `Test-NetConnection 185.18.221.96 -Port 18080`
+  — `TcpTestSucceeded : False`. E SUL NODO `sudo iptables -L WG-PONTE -v -n`
+  mostra i contatori: l'ACCEPT cresce con l'uso, i DROP dicono cosa è
+  stato respinto.
+  PASSO 8 — SUL NODO, la ronda settimanale alzerà la SUPERFICIE: tre
+  righe nuove (`51820/udp` due volte, v4 e v6, e `10.77.0.1:18080`).
+  È atteso: si guarda che siano SOLO quelle, e poi `--impara`, col
+  comando che la ronda stessa scrive in fondo al messaggio.
+  I CONTROLLI FINALI. `curl -s https://barattolo.store/api/salute` →
+  `{"ok":true,"ponte":"ok"}`. Un acquisto di prova da pochi sats: la
+  fattura nasce e il «pagato» arriva. La strada che vede il guardiano
+  si legge al prossimo riavvio del servizio (ogni deploy lo fa):
+  `journalctl -u barattolo | grep "La strada del ponte"` deve dire «il
+  tunnel WireGuard e lnd-ponte».
+  IL DRILL NUOVO, a mercatino fermo, SUL VPS:
+  `systemctl stop wg-quick@wg0`
+  — al terzo controllo (2-3 minuti) arriva «🌉⚠️ Ponte verso LND giù…
+  Riavvio il tunnel WireGuard e lnd-ponte», e 90 secondi dopo «🌉✅
+  tornato». `wg show wg0` ha di nuovo la stretta di mano. Il drill di
+  prima (`systemctl stop lnd-ponte`) vale ancora, e prova l'altra metà
+  della cura.
+  IL ROLLBACK, DUE COMANDI SUL VPS (il nodo non si tocca: il suo hidden
+  service con client-auth è rimasto dov'era):
+  `systemctl disable --now lnd-ponte.service`
+  `systemctl enable --now lnd-ponte-tor.service`
+  Il guardiano se ne accorge da solo — a ogni cura chiede a systemd se
+  il piano B è acceso, e allora riavvia tor e `lnd-ponte-tor`. Di
+  corsa ne basta UNO, `systemctl start lnd-ponte-tor.service`
+  (`Conflicts=` spegne l'altro), ma dura fino al prossimo riavvio
+  della macchina. Per tornare sul tunnel: gli stessi due comandi coi
+  nomi scambiati. Il tunnel può restare su: spento il ponte, non porta
+  niente.
+  FRA UNA SETTIMANA (dal giorno del passo 6), e NON prima: si decide se
+  togliere il piano B — l'hidden service della REST e la sua
+  client-auth sul nodo, `lnd-ponte-tor.service` e `onion_auth` sul VPS.
+  Finché restano, sono una seconda porta verso LND, chiusa a chiave.
 - LO SCONTO FEDELTÀ DEL P2P, la messa in servizio (patch 0005 del
   fork; il perché sta in CANTIERI, «Le commissioni per persona»).
   ✅ FATTA il 18 set 2026 — immagine `-bar3`, con la 0006 nello stesso

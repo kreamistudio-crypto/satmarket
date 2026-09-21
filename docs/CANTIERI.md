@@ -22404,3 +22404,212 @@ gli spegnerebbe l'insegna, lasciando il link com'è. Stessa famiglia,
 stessa cura. 3) Il gemello `query_libro_mastro.sql` non ha né il
 controllo del link del 15 set né quello di oggi: nessuna prova lo
 pretende, ma chi lancia le query a mano non li vede.
+
+## Il ponte via WireGuard: tor resta per tutto, tranne che per la strada verso LND (21 set 2026)
+
+**IL FATTO CHE L'HA APERTO.** Il ponte `lnd-ponte` (socat sul VPS →
+tor → l'onion della REST di LND sul nodo) è caduto tre volte in 24 ore
+fra il 18 e il 19 set, e il 20 aveva un singhiozzo di una quarantina
+di secondi ogni ora. Il guardiano lo rimetteva su in 3-4 minuti, ma le
+cadute continuavano: il tor del NODO serve LND verso la rete
+Lightning, mostro verso i relay e il ponte, tutti insieme, e riavviare
+il tor NOSTRO curava il sintomo per qualche ora. Ogni caduta sono
+acquisti che si prendono «errore nella creazione dell'invoice».
+
+**LA DECISIONE** (Andrea con Alan): un tunnel WireGuard diretto fra
+VPS e nodo, e il ponte passa di lì. **Tor resta per tutto il resto** —
+LND verso Lightning, mostro verso relay e VPS. Il ponte di prima resta
+installato e SPENTO per una settimana, come piano B.
+**IL PREZZO, dichiarato:** fino a ieri il legame fra `barattolo.store`
+e il nodo lo nascondeva tor; da oggi chi guarda la rete da Hetzner, da
+LNVPS o in mezzo vede pacchetti UDP fra `46.62.162.103` e
+`185.18.221.96`. Non vede COSA (WireGuard fuori, il TLS di LND
+dentro), e non impara niente sull'identità Lightning del nodo, che
+verso la rete esce ancora solo da tor e annuncia solo l'onion. Ma che
+le due macchine si parlano, da oggi si vede.
+
+**IL DISEGNO, e il perché di ogni pezzo.**
+• IL NODO ASCOLTA, IL VPS CHIAMA (`185.18.221.96:51820/udp`): così sul
+VPS in `ufw` non si apre NIENTE — le risposte rientrano da sole, e
+`deny incoming` vale anche su `wg0`, quindi dal tunnel verso il VPS
+non entra nessuna connessione nuova. `PersistentKeepalive = 25` tiene
+aperta la strada di ritorno nei firewall a stati.
+• LA RETE è `10.77.0.1` (nodo) e `10.77.0.2` (VPS), una peer sola per
+capo e `AllowedIPs` di UN indirizzo: nel tunnel entra solo il traffico
+verso l'altro capo, tutto il resto delle due macchine esce da dove
+usciva — il nodo da tor.
+• LE CHIAVI NASCONO SULLA MACCHINA E NON STANNO NEMMENO NEL `wg0.conf`:
+`wg genkey` scrive `/etc/wireguard/privata.key` e la carica un
+`PostUp`. Quindi il conf si può tenere nel repo, confrontare con lo
+sha256 e mettere nel backup; si scambiano solo le PUBBLICHE. Il backup
+del VPS porta `wg0.conf` e il piano B, NON la chiave: rigenerarla
+costa cinque minuti, e nell'archivio c'è un segreto in meno.
+• DUE SOCAT, E LA STESSA PORTA LOCALE. Sul VPS `lnd-ponte.service`
+ascolta ancora su `127.0.0.1:18080`: LNbits, la verità dei pagamenti e
+la sonda del guardiano non cambiano una riga. Sul nodo un socat
+sull'HOST (`lnd-rest-wg.service`) ascolta SOLO su `10.77.0.1:18080` e
+porta alla REST di LND nel suo container (l'indirizzo sta in
+`/etc/default/lnd-rest-wg`, così l'unit resta identica al repo).
+• **IL CERTIFICATO DI LND NON SI RIGENERA**, ed era il passo su cui
+Andrea aveva chiesto di fermarsi: non serve. I socat spostano byte, il
+TLS resta END-TO-END fra chi chiama e LND, e chi chiama bussa ancora a
+`127.0.0.1`, il nome che il `tls.cert` porta già (è la stessa ragione
+per cui funzionava attraverso tor). Niente `tlsextraip`, niente da
+ricopiare su VPS, LNbits o mostro. La scadenza resta il 22 ott 2027.
+• **IL FIREWALL DEL NODO VIVE NEI `PostUp` DI `wg0.conf`**, e non in
+ufw o nftables. È la lezione del namespace prestato (15 set): regole
+tenute da un altro processo restano indietro in silenzio; queste
+nascono col tunnel e muoiono con lui, e se una non entra `wg-quick`
+smonta l'interfaccia — il tunnel senza firewall non esiste. La chiave
+si carica PER ULTIMA: finché non c'è il tunnel non porta un pacchetto,
+quindi non esiste un istante col tunnel vivo e le regole a metà.
+Catena `WG-PONTE` in cima a INPUT: dal tunnel passa SOLO `10.77.0.2`
+verso la sola `18080/tcp`; il resto del tunnel si butta; chi cerca
+`10.77.0.1` da un'ALTRA interfaccia si butta (Linux risponde per ogni
+suo indirizzo su ogni interfaccia: un vicino di rete avrebbe potuto
+bussare da eth0); la `51820` risponde al solo IP del VPS.
+• **E IL FORWARD DA E VERSO IL TUNNEL È DROP — la riga che conta**, ed
+è il gemello del difetto dell'audit del 2 set: l'host del nodo ha
+`ip_forward=1` (lo vuole Docker), e chi prendesse il VPS potrebbe
+allargarsi l'`AllowedIPs` e farsi inoltrare verso i container —
+bitcoind, il gRPC di LND, mostro. Con quella riga arriva alla sola
+REST, coi due macaroon che aveva già: **né più né meno di prima**. Sta
+anche in `DOCKER-USER`, perché a ogni riavvio Docker si rimette in
+cima a FORWARD e le nostre righe scivolano sotto le sue.
+
+**IL GUARDIANO SEGUE LA STRADA.** La cura non è più «tor e lnd-ponte»:
+chiede a systemd, NELL'ISTANTE della cura, quale strada è in piedi.
+• piano B ACCESO (`is-active lnd-ponte-tor`) → `tor` e
+`lnd-ponte-tor`. Vince anche col tunnel abilitato: dopo un rollback il
+tunnel resta abilitato, ed è la strada spenta.
+• sennò tunnel ABILITATO (`is-enabled wg-quick@wg0`) → il tunnel e
+`lnd-ponte`. **Abilitato e non attivo, apposta:** il drill è
+`systemctl stop wg-quick@wg0`, e un tunnel fermo è esattamente quel
+che la cura deve rimettere su — chi guardasse «attivo» lo scambierebbe
+per una macchina senza tunnel e riavvierebbe tor.
+• sennò → `tor` e `lnd-ponte`, la cura di sempre. **QUESTA STRADA NON
+ERA NELLA RICHIESTA, l'ho aggiunta io:** il codice arriva in
+produzione col push, il tunnel arriva quando lo monta Andrea, e in
+mezzo il ponte cade tre volte al giorno. Senza, in quei giorni la cura
+avrebbe riavviato un tunnel che non c'è e NON tor. Vale anche per un
+VPS rifatto dal backup.
+• **NESSUN RIPIEGO AUTOMATICO SU TOR**, come chiesto: due strade che si
+scambiano da sole sono due guasti da capire invece di uno. L'avviso
+del fallimento porta scritto il piano B, che è UN comando.
+• Si chiede A OGNI CURA e non si ricorda: il piano B si accende a
+mano, fra una cura e l'altra (c'è la prova: la prima cura il tunnel,
+la seconda tor).
+• IL SECONDO SGUARDO A 90 SECONDI (erano 45), ritocco già deciso: a
+tor 45 non bastavano, e l'esito diceva «ancora giù» di un ponte vivo
+un minuto dopo. Conseguenza misurata: la cura dura più di un minuto,
+quindi il giro dopo parte dopo UN secondo invece di accodarsi a un
+altro minuto — un controllo in più, innocuo.
+• `_systemctl_ponte` è l'UNICA porta verso un sottoprocesso, e
+**RIFIUTA ogni comando che non sta in `PONTE_STRADE` o in
+`PONTE_DOMANDE`**: i comandi erano due e adesso sono sei, e la
+promessa «niente che arrivi da fuori» passa da abitudine a regola
+provata.
+• ALL'AVVIO il journal dice la strada che la cura prenderebbe («🌉 La
+strada del ponte, vista da qui: …»): dopo il trasloco si legge lì se
+il guardiano ha capito, senza aspettare un guasto.
+• **`/api/salute` NON CAMBIA PAROLA, e «aggiornata» vuol dire questo:**
+resta `ok | giu | attesa | spento`. La strada NON si dice: la rotta è
+pubblica, e «il ponte passa da WireGuard» è un pezzo di mappa della
+macchina. Sta nel journal e nel pannello delle leve.
+
+**LE STRADE SCARTATE.** • Una `ports:` nel compose di LND legata
+all'IP del tunnel: un container che pubblica su un indirizzo che
+ancora non esiste NON PARTE, cioè un tunnel giù all'avvio avrebbe
+tenuto giù LND — e comunque voleva dire ricreare LND. Col socat
+sull'host è il contrario: senza tunnel cade solo il socat.
+• `restlisten` di LND sull'IP WireGuard: LND vive in un container, e
+avrebbe voluto il cert rigenerato. • Far bussare i client a
+`10.77.0.1` togliendo il socat del VPS: cert da rigenerare, e LNbits e
+server da riconfigurare, per risparmiare un processo. • Un DNAT al
+posto del socat del nodo: avrebbe chiesto di APRIRE il forward dal
+tunnel verso la rete dei container, cioè la riga che qui si chiude.
+• Le regole in ufw/nftables: vedi sopra, la lezione del 15 set. • Una
+PresharedKey: è un segreto da COPIARE fra le due macchine, contro «le
+chiavi non escono mai», e dentro c'è già il TLS. • Il ping nel
+tunnel: comodo, ma `wg show wg0 latest-handshakes` dice la stessa
+cosa, e una regola in meno è una regola in meno. • Dire la strada in
+`/api/salute`. • Il ripiego automatico su tor.
+
+**COSA È PROVATO.** `prove_guardiano_ponte` passa da 77 a 130 prove:
+il ciclo VERO nei tre mondi, il piano B acceso FRA due cure, la porta
+che rifiuta, l'avvio (anche con la strada che esplode), e i quattro
+file di `deploy/ponte/` letti riga per riga — il bind su 127.0.0.1,
+il `Conflicts=`, nessuna `PrivateKey` nei file che viaggiano, la
+chiave per ultima, l'ordine permesso-poi-muri, il FORWARD, una peer
+per capo, il backup che non porta la chiave. **Tortura: 81 mutazioni,
+81 uccise** al terzo giro. Al primo erano 71 uccise e 7 che facevano
+ESPLODERE il banco (`IndexError` su un avviso mai partito,
+`ValueError` di un `.index` su una regola sparita, l'eccezione
+dell'avvio non presa): rosse lo stesso in CI, ma un banco che esplode
+nasconde tutte le prove dopo — ora i messaggi si leggono con
+`_detto`, gli ordini con `.find`, e nessuna esplode. Giro intero nel
+worktree su `origin/main`, `PYTHONUTF8=1 PROVE_SEVERE=1`:
+12478 passate, 0 fallite.
+
+**COSA È PROVATO DAL VIVO** (21 set 2026, sul PC): uvicorn vero da una
+copia, un ponte HTTPS finto su 18080 che da «rotto» chiude in faccia,
+e un `systemctl.exe` finto che si registra e guarisce il ponte SOLO se
+la cura riavvia l'unit giusta — quindi una strada sbagliata si vede.
+Quattro episodi, ognuno col ponte rotto e UNA sola unit capace di
+guarirlo. 1) Tunnel abilitato, piano B spento: primo no alle 09:38,
+alle 09:40:15 le due domande a systemd e poi `restart
+wg-quick@wg0.service` e `restart lnd-ponte.service`, «riavvio il
+tunnel WireGuard e lnd-ponte» nel journal e nell'avviso, secondo
+sguardo 90 secondi dopo → VIVO, avviso ✅; la salute ha detto `giu`
+con HTTP 200 per tutto il tempo. 2) Piano B acceso COL TUNNEL ANCORA
+ABILITATO: `restart tor` e `restart lnd-ponte-tor.service`, «tor e
+lnd-ponte-tor (il piano B)». 3) Nessun tunnel e nessun piano B (il VPS
+di oggi, prima del trasloco): `restart tor` e `restart
+lnd-ponte.service`, la cura di sempre. 4) Il tunnel che non torna:
+cura, 90 secondi, «🌉❌ Ponte ancora giù» con `wg show wg0
+latest-handshakes`, il journalctl giusto e la riga del piano B
+(`systemctl start lnd-ponte-tor.service`); nessuna seconda cura nei
+minuti dopo; ponte rimesso a mano → «tornato dopo 7 minuti di guasto».
+Le domande sono partite a OGNI cura (si leggono nel registro del
+systemctl finto), con un sottoprocesso VERO e i codici d'uscita veri
+(3 per `is-active`, 1 per `is-enabled`). Poi l'avvio col codice
+definitivo: salute 200 dopo 4,1 secondi, e la riga «🌉 La strada del
+ponte, vista da qui: il tunnel WireGuard e lnd-ponte» detta dal task.
+⚠️ IL GIRO HA CORRETTO IL DISEGNO: la prima stesura chiedeva la strada
+nello STARTUP. Funzionava — ma lo startup il deploy lo cronometra (45
+secondi, poi rollback), e un systemd lento avrebbe fatto passare per
+rotta una versione sana. Ora la riga la dice il task, e una sentinella
+vieta ogni `await` nello startup del guardiano.
+⚠️ E UNA COSA CHE SI VEDE SOLO DAL VIVO: coi 90 secondi la salute dice
+`giu` fino al secondo sguardo anche se il ponte è tornato all'istante
+del riavvio. È la parola che ritarda, non il ponte: gli acquisti
+ripartono subito.
+
+**COSA NON È PROVATO, ed è quasi tutto quel che conta sul campo:**
+WireGuard vero (non ho nessuna delle due macchine: VPS e nodo sono
+fuori dal mio perimetro), `wg-quick` coi suoi `PostUp` e il
+fail-closed (verificato sul SORGENTE di `wg-quick`, `linux.bash`:
+`set -e`, e un `trap 'del_if; exit'` che resta armato fino a dopo i
+`PostUp` — ma mai visto girare: lo dimostra il passo 4 con
+`iptables -S WG-PONTE`), le regole iptables accanto a quelle di
+Docker sul nodo, systemd vero (`Conflicts=`, `PartOf=`,
+`DynamicUser`), le opzioni di socat (`keepalive`, `max-children`:
+se una non piacesse, `status` lo dice e c'è il rollback), l'UDP
+attraverso il provider del nodo, l'IP di LND nel compose (il passo 0
+lo guarda e si ferma se non è fisso), LNbits che si riaggancia dopo lo
+scambio. La sequenza di PRODUZIONE è scritta perché ogni passo abbia
+il suo «deve dire», e fino al passo 6 il ponte via tor non si tocca.
+
+**RESTA DA GUARDARE.** I passi sulle due macchine, e i controlli
+finali: la salute, un acquisto di prova, il drill col tunnel spento.
+LA SETTIMANA: dal giorno dello scambio, poi si decide se togliere il
+piano B (l'hidden service della REST e la client-auth sul nodo,
+`lnd-ponte-tor` e `onion_auth` sul VPS) — finché restano sono una
+seconda porta verso LND, chiusa a chiave. LA RONDA DEL NODO alzerà la
+superficie (tre righe nuove: si guarda che siano solo quelle, poi
+`--impara`), ma NON guarda la catena `WG-PONTE` né il DROP del
+FORWARD: un controllo gemello di quello di `ronda-tor.sh` sarebbe il
+suo posto, ed è un cantiere suo. CLAUDE.md non è stato toccato (nessuna
+regola è cambiata, e il tetto è pieno): il giorno che il piano B si
+toglie, la voce delle «sette cose aperte» che parla dell'hidden
+service con client-auth va riletta.
