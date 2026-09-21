@@ -6875,6 +6875,15 @@ def prove_altra_cassaforte():
           [c[4] for c in casi],
           [giudica({"verdetto": c[0], "lnbits": c[1], "lnd": c[2]},
                    c[3], ORA)[0] for c in casi])
+    # I MINUTI CHE MANCANO SI DICONO PER ECCESSO, e qui a orologio FERMO:
+    # la scena del #152 li leggeva da un orologio vero, e in CI — un
+    # secondo piu' lenta — «fra 50» diventava «fra 49». Rossa solo la'.
+    appeso = {"verdetto": "in_volo", "lnbits": "pending", "lnd": "spento"}
+    prova("...«riprova fra N» e' arrotondato per eccesso, al secondo",
+          [True, True, True],
+          ["riprova fra 50 (" in giudica(appeso, ORA - 630, ORA)[1],
+           "riprova fra 50 (" in giudica(appeso, ORA - 659, ORA)[1],
+           "riprova fra 1 (" in giudica(appeso, ORA - N + 1, ORA)[1]])
     prova("N e' un'ora, cioe' quattro volte il «mai partito»",
           (3600, True), (N, N >= 4 * K["MAI_PARTITO_DOPO_S"]))
     corpo_g = codice(pezzo("_giudica_origine"))

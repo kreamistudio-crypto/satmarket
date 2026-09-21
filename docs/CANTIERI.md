@@ -23353,8 +23353,14 @@ una riga che non c'è): ora i lettori dicono None e le rotte passano da
 `tenta`, che mangia ogni eccezione. 3) Tre volte l'heredoc della shell
 ha mangiato le escape (`\n` finiti come a-capo veri nel client, ancore
 che non combaciavano): gli script si scrivono su file. Era già a verbale.
+4) LA CI, una rossa che in locale non c'era: «riprova fra 50» letto da un
+orologio VERO, coi minuti contati per difetto — un secondo in più di
+giro e diventava 49. Era anche la semantica sbagliata (a 49 minuti e 59
+secondi non si dice «fra 49»): ora si arrotonda per eccesso, e la prova
+sta nel giudice, a orologio fermo. Il commit `4a5efc8` è rimasto rosso
+su main e in produzione non ci è arrivato: `pronto` non si è mosso.
 
-**PROVATO.** `prove_altra_cassaforte`, 125 prove: il #152 per intero
+**PROVATO.** `prove_altra_cassaforte`, 126 prove: il #152 per intero
 (troppo presto → presto → morto senza fattura → chiesta → incollata →
 pagato DAL NODO → nota, credito, «Arrivati ✓», libro mastro → il
 credito che rientra, o che è un doppio, o che si chiude a mano); il
@@ -23366,8 +23372,8 @@ riprova»; la stessa fattura da due cassaforti; l'address; il nodo che
 fallisce; il nodo che resta in volo (la ronda e la verifica chiedono AL
 NODO); l'ordine rimasto 'shipped'; il giudice in sedici righe; il client
 girato in node. Il mondo di cartone ha da oggi DUE LNbits distinte
-dall'URL e un orologio che si sposta. Suite intera verde. TORTURA: 58
-mutazioni, alla fine 58 uccise e nessuna esplosa. DAL VIVO, nel senso di
+dall'URL e un orologio che si sposta. Suite intera verde. TORTURA: 59
+mutazioni, alla fine 59 uccise e nessuna esplosa. DAL VIVO, nel senso di
 casa: `collaudo_altra_cassaforte.py`, il server VERO su database
 usa-e-getta (anche migrato da uno schema di ieri), 34 su 34; gli altri
 quattro collaudi dei pagamenti identici a prima.

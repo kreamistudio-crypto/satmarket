@@ -20678,7 +20678,12 @@ def _giudica_origine(v: dict, scade: int, adesso: int) -> tuple:
             f"la fattura di quel tentativo non è ancora scaduta: può "
             f"ancora saldarsi ({voci})")
     if adesso - scade < ALTRA_CASSAFORTE_DOPO_SCADENZA_S:
-        mancano = (ALTRA_CASSAFORTE_DOPO_SCADENZA_S - (adesso - scade)) // 60
+        # PER ECCESSO: «riprova fra 49» detto a 49 minuti e 59 secondi
+        # manderebbe a ritoccare un minuto troppo presto (e un banco piu'
+        # lento di un secondo leggeva 49 dove un altro leggeva 50: l'ha
+        # trovato la CI)
+        mancano = -(-(ALTRA_CASSAFORTE_DOPO_SCADENZA_S - (adesso - scade))
+                    // 60)
         return ORIGINE_PRESTO, (
             f"la fattura di quel tentativo è scaduta da meno di "
             f"{ALTRA_CASSAFORTE_DOPO_SCADENZA_S // 60} minuti: riprova fra "
