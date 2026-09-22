@@ -61300,6 +61300,334 @@ console.log(JSON.stringify(out));
     prova("e la lista di partenza non si tocca", True, o["nonMuta"])
 
 
+def prove_pallino_scambi():
+    """IL PALLINO SU «I MIEI SCAMBI» (22 set 2026, richiesta di Andrea):
+    sulla barra, un pallino che si accende da solo quando in almeno uno
+    dei miei scambi aperti tocca a me — sul tasto «P2P» nel mercatino, e
+    su «I miei scambi» dentro lo scambio. Il gemello del pallino degli
+    Ordini: stesso vestito, stesso posto, niente numero.
+
+    ⚠️ LE TRE COSE CHE QUESTE PROVE SORVEGLIANO: il giudice e' quello di
+    «Tocca a te» (`gruppoScambioP2P`, cioe' `azioniDisponibili`) e non
+    una lista di stati sua; il pallino segue l'ARCHIVIO — ognuna delle
+    cinque scritture lo ricalcola, e cosi' si accende quando arriva un
+    evento e si spegne quando il passo e' fatto; e non nasce nessun
+    polling — apertura e ritorno in primo piano sono canali che l'app
+    ascoltava gia'."""
+    print("\n[il pallino su «I miei scambi»]")
+    import json as _json
+    import os as _os
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    def nudo(js):
+        """via i commenti: il verbale che spiega il pallino nomina le
+        stesse cose che queste prove cercano nel codice"""
+        return re.sub(r"/\*[\s\S]*?\*/", "", js)
+
+    # --- 1) IL MARKUP: due pallini, il vestito degli Ordini ----------
+    barra = mini[mini.index("<nav>"):mini.index("</nav>")]
+    barra = re.sub(r"<!--.*?-->", "", barra, flags=re.S)
+
+    def tasto(ident):
+        i = barra.find('<button id="%s"' % ident)
+        return barra[i:barra.find("</button>", i)] if i >= 0 else ""
+    PALLINO = '<span class="off-dot scambi-dot"></span>'
+    prova("il tasto «P2P» porta il pallino degli scambi", 1,
+          tasto("nav-p2p").count(PALLINO))
+    prova("...e il suo gemello «I miei scambi» anche", 1,
+          tasto("nav-p2pmiei").count(PALLINO))
+    prova("...e nessun altro posto della barra", 2,
+          barra.count("scambi-dot"))
+    # PRIMA DELL'ETICHETTA: e' assoluto, il posto nel markup non lo
+    # sposta — e il tasto deve finire col suo nome, lo stesso del titolo
+    # della vista (lo pretende una sentinella di prove_p2p_vista_miei)
+    prova("...prima dell'etichetta, cosi' ogni tasto finisce col suo nome",
+          True, tasto("nav-p2pmiei").endswith(PALLINO + "I miei scambi")
+          and tasto("nav-p2p").endswith(PALLINO + "P2P"))
+    prova("il pallino degli Ordini resta com'era", True,
+          'Ordini<span class="off-dot" id="offDot"></span></button>' in barra)
+
+    # --- 2) IL VESTITO E' QUELLO DEGLI ORDINI ------------------------
+    css = mini[mini.index("<style>"):mini.index("</style>")]
+    prova("il pallino degli scambi non ha regole sue: veste .off-dot", 0,
+          css.count("scambi-dot"))
+    prova("...e .off-dot e' ancora il pallino degli Ordini", True,
+          ".off-dot{display:none;position:absolute;top:4px;right:26%;"
+          "width:9px;height:9px;" in css and ".off-dot.on{display:block}" in css)
+    # L'ANELLO E' IL FONDO DELLA BARRA che ritaglia il pallino
+    # dall'icona: sullo strato del P2P il fondo e' la banda scura, e
+    # quello del giorno sul bruno sarebbe un alone chiaro
+    prova("...solo l'anello, sullo strato del P2P, prende la banda scura", 1,
+          css.count("nav .strato-p2p .off-dot"
+                    "{box-shadow:0 0 0 2px var(--nav-bg-p2p)}"))
+
+    # --- 3) IL GIUDICE E' QUELLO DI «Tocca a te» ---------------------
+    q = nudo(pezzo_js(mini, "function quantiToccaAMeP2P(righe){", "\n}\n"))
+    prova("il pallino conta col giudice del gruppo «Tocca a te»", True,
+          "gruppoScambioP2P(o) === 'fare'" in q)
+    prova("...e non con una lista di stati sua", [],
+          re.findall(r"'[a-z_-]+'", q.replace("'fare'", "")))
+    pal = nudo(pezzo_js(mini, "function aggiornaPallinoScambiP2P(){", "\n}\n"))
+    prova("...e il pallino lo chiede a lei, sulle righe della vista", True,
+          "quantiToccaAMeP2P(mieiRigheP2P())" in pal)
+
+    # --- 4) SEGUE L'ARCHIVIO: ogni scrittura lo ricalcola ------------
+    # Il censimento guarda il file intero (un sesto posto che scrive
+    # l'archivio senza il gancio lascerebbe il pallino indietro in
+    # silenzio), il gancio si guarda DENTRO ognuno dei cinque.
+    GANCIO = ("if (typeof aggiornaPallinoScambiP2P === 'function') "
+              "aggiornaPallinoScambiP2P();")
+    prova("l'archivio degli scambi si scrive in cinque posti", 5,
+          mini.count("localStorage.setItem(chiaveP2P(MOSTRO_ORDINI_CHIAVE)"))
+    for firma in ("function rinominaOrdineP2P(o, nuovoId){",
+                  "function scriviOrdineP2P(o){",
+                  "function togliRitiratoP2P(id){",
+                  "function pulisciScambiP2P(){",
+                  "function togliScambioP2P(id, ev){"):
+        corpo = nudo(pezzo_js(mini, firma, "\n}\n"))
+        nome = firma[len("function "):firma.index("(")]
+        prova(f"...{nome} ricalcola il pallino subito dopo aver scritto", True,
+              re.search(r"setItem\(chiaveP2P\(MOSTRO_ORDINI_CHIAVE\), "
+                        r"JSON\.stringify\(\w+\)\); \} catch\(e\)\{\}\s*"
+                        + re.escape(GANCIO), corpo) is not None)
+
+    # --- 5) L'APERTURA E IL RITORNO: canali che l'app ascolta gia' ---
+    av = pezzo_js(mini, "async function avvia(){", "\n}\n")
+    # A INIZIO RIGA, e non `in`: un commento che nomina la chiamata
+    # risponderebbe per lei (la lezione di prove_timbri_visti)
+    _pal = re.search(r"^\s*aggiornaPallinoScambiP2P\(\);", av, re.M)
+    prova("all'apertura si accende, DOPO che conto e leva sono arrivati",
+          True, bool(_pal)
+          and 0 < av.find("myTgId = me.tg_id;") < _pal.start()
+          and 0 < av.find("p2pLeve = me.p2p_leve || null;") < _pal.start())
+    i_pp = mini.find("/* ---- L'APP CHE TORNA IN PRIMO PIANO")
+    i_asc = mini.find("document.addEventListener('visibilitychange'", i_pp)
+    ascolto = mini[i_asc:mini.find("});", i_asc)] if 0 < i_pp < i_asc else ""
+    prova("...e al ritorno in primo piano", True,
+          bool(re.search(r"^\s*aggiornaPallinoScambiP2P\(\);", ascolto, re.M)))
+    prova("...senza togliere il risveglio del motore, che resta primo", True,
+          0 < ascolto.find("risvegliaP2P(true);")
+          < ascolto.find("aggiornaPallinoScambiP2P();"))
+
+    # --- 6) NIENTE POLLING: nessun orologio, nessuna domanda nuova ---
+    prova("il pallino non chiede niente a nessuno", [],
+          [s for s in ("setInterval", "setTimeout", "fetch(", "subscribe(",
+                       "mostroRiascolta", "risvegliaP2P", "caricaNostrTools")
+           if s in pal])
+    prova("...e non scrive un numero: quello degli Ordini non ne porta", [],
+          [s for s in ("textContent", "innerHTML", "innerText") if s in pal])
+
+    # --- 7) IL BANCO: l'archivio vero, il giudice vero, due pallini --
+    node = _sh.which("node")
+    if not node:
+        salta("il banco del pallino degli scambi", "node non c'e'")
+        return
+    i_ch = mini.index("const MOSTRO_ORDINI_CHIAVE = ")
+    pezzi = [mini[i_ch:mini.index("\n", i_ch)]]
+    pezzi += [pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
+        "function chiaveP2P(base){",
+        "function ordiniP2P(){",
+        "function rinominaOrdineP2P(o, nuovoId){",
+        "function scriviOrdineP2P(o){",
+        "function mieiRigheP2P(){",
+        "function recapitoEuroArrivatoP2P(o){",
+        "function azioniDisponibili(o){",
+        "function gruppoScambioP2P(o){",
+        "function quantiToccaAMeP2P(righe){",
+        "function aggiornaPallinoScambiP2P(){")]
+    banco = "\n".join(pezzi) + r"""
+/* il cartone: la memoria del telefono, i due pallini, il conto e la leva */
+let store = new Map();
+const localStorage = {
+  getItem: k => store.has(k) ? store.get(k) : null,
+  setItem: (k, v) => { store.set(k, String(v)); },
+  removeItem: k => { store.delete(k); }
+};
+function pallino(){
+  const s = new Set();
+  return {classList: {toggle: (c, si) => { if (si) s.add(c); else s.delete(c); },
+                      contains: c => s.has(c)}};
+}
+let pallini = [pallino(), pallino()];
+let rotto = false;
+const document = {querySelectorAll: sel => {
+  if (rotto) throw new Error('DOM rotto');
+  return sel === '.scambi-dot' ? pallini : [];
+}};
+let DEMO = false, VETRINA = false, myTgId = 111, acceso = true;
+const p2pAcceso = () => acceso;
+let p2pOrdineAperto = '', p2pHoldOrdine = '', p2pIncassoOrdine = '';
+function reset(){
+  store = new Map(); pallini = [pallino(), pallino()]; rotto = false;
+  DEMO = false; VETRINA = false; myTgId = 111; acceso = true;
+}
+/* acceso = TUTT'E DUE i pallini accesi, spento = tutt'e due spenti:
+   uno si' e uno no e' un guasto, e si dice */
+function vista(){
+  const on = pallini.map(p => p.classList.contains('on'));
+  return on[0] && on[1] ? 'acceso' : (!on[0] && !on[1] ? 'spento' : 'a meta');
+}
+const scrivi = o => scriviOrdineP2P(Object.assign({creato: 100}, o));
+const RECAPITO = {euro: {id: 'r1', testo: 'IBAN'}};
+/* OGNI CASO E' SOLO: il suo reset, il suo try/catch (la lezione della
+   tortura: una catena lunga esplode tutta al primo anello rotto) */
+const CASI = {
+  /* i quattro di Andrea */
+  toccaAMe: () => { scrivi({id: 'a', lato: 'vendo', stato: 'attesa_mia_hold'}); return vista(); },
+  toccaAllAltro: () => { scrivi({id: 'a', lato: 'compro', stato: 'attesa_hold_venditore'}); return vista(); },
+  concluso: () => { scrivi({id: 'a', lato: 'vendo', stato: 'concluso'}); return vista(); },
+  dueUnoMio: () => {
+    scrivi({id: 'a', lato: 'compro', stato: 'attesa_hold_venditore'});
+    scrivi({id: 'b', lato: 'vendo', stato: 'euro_inviati'});
+    return [vista(), quantiToccaAMeP2P(mieiRigheP2P())];
+  },
+  /* i sei gesti del bottone pieno, uno per uno: ognuno lo accende da
+     solo — garanzia, dove ricevere i sats (e di nuovo, dopo un
+     pagamento fallito), dove ricevere gli euro, gli euro inviati,
+     controllare e liberare */
+  seiGesti: () => [
+    {lato: 'vendo', stato: 'attesa_mia_hold'},
+    {lato: 'compro', stato: 'attesa_mia_fattura'},
+    {lato: 'compro', stato: 'fattura_nuova'},
+    {lato: 'vendo', stato: 'attivo', peer: 'p'},
+    {lato: 'compro', stato: 'attivo', peer: 'p', campiLoro: RECAPITO},
+    {lato: 'vendo', stato: 'euro_inviati'}
+  ].map(o => { reset(); scrivi(Object.assign({id: 'a'}, o)); return vista(); }),
+  /* ...e l'attesa dell'altro, nelle sue forme: niente pallino */
+  attese: () => [
+    {lato: 'compro', stato: 'attesa_hold_venditore'},
+    {lato: 'vendo', stato: 'attesa_fattura_compratore'},
+    {lato: 'compro', stato: 'attivo', peer: 'p'},
+    {lato: 'vendo', stato: 'attivo', peer: 'p', campiMiei: RECAPITO},
+    {lato: 'compro', stato: 'euro_inviati'},
+    {lato: 'vendo', stato: 'pubblicato'},
+    {lato: 'compro', stato: 'rilasciato'},
+    {lato: 'vendo', stato: 'annullato'},
+    {lato: 'compro', stato: 'senza_risposta'}
+  ].map(o => { reset(); scrivi(Object.assign({id: 'a'}, o)); return vista(); }),
+  /* SI ACCENDE QUANDO ARRIVA: il recapito dell'altra parte entra
+     nell'archivio, e da li' il pallino */
+  arrivaIlRecapito: () => {
+    scrivi({id: 'a', lato: 'compro', stato: 'attivo', peer: 'p'});
+    const prima = vista();
+    scrivi({id: 'a', lato: 'compro', stato: 'attivo', peer: 'p', campiLoro: RECAPITO});
+    return [prima, vista()];
+  },
+  /* SI SPEGNE A PASSO FATTO: la mossa confermata riscrive la riga */
+  passoFatto: () => {
+    const esiti = [];
+    scrivi({id: 'a', lato: 'vendo', stato: 'euro_inviati'}); esiti.push(vista());
+    scrivi({id: 'a', lato: 'vendo', stato: 'rilasciato'}); esiti.push(vista());
+    reset();
+    scrivi({id: 'b', lato: 'vendo', stato: 'attivo', peer: 'p'}); esiti.push(vista());
+    scrivi({id: 'b', lato: 'vendo', stato: 'attivo', peer: 'p', campiMiei: RECAPITO}); esiti.push(vista());
+    return esiti;
+  },
+  /* due miei: resta acceso finche' ne resta uno */
+  dueMiei: () => {
+    const esiti = [];
+    const passo = () => esiti.push([vista(), quantiToccaAMeP2P(mieiRigheP2P())]);
+    scrivi({id: 'a', lato: 'vendo', stato: 'attesa_mia_hold'});
+    scrivi({id: 'b', lato: 'compro', stato: 'attesa_mia_fattura'}); passo();
+    scrivi({id: 'a', lato: 'vendo', stato: 'attesa_fattura_compratore'}); passo();
+    scrivi({id: 'b', lato: 'compro', stato: 'attesa_hold_venditore'}); passo();
+    return esiti;
+  },
+  /* il nome provvisorio che diventa vero passa dall'altra scrittura */
+  rinomina: () => {
+    rinominaOrdineP2P({id: 'nuovo:1', lato: 'vendo', stato: 'attesa_mia_hold', creato: 100}, 'u-1');
+    return [vista(), Object.keys(ordiniP2P())];
+  },
+  /* LE PORTE: in demo, in vetrina, senza conto e a leva spenta mai */
+  porte: () => ['demo', 'vetrina', 'conto', 'leva'].map(p => {
+    reset();
+    if (p === 'demo') DEMO = true;
+    if (p === 'vetrina') VETRINA = true;
+    if (p === 'conto') myTgId = 0;
+    if (p === 'leva') acceso = false;
+    scrivi({id: 'a', lato: 'vendo', stato: 'attesa_mia_hold'});
+    return vista();
+  }),
+  /* IL CONTO SUL DISPOSITIVO: l'archivio di un altro conto non accende
+     il mio pallino (e' quel che fa avvia a ogni /me) */
+  altroConto: () => {
+    scrivi({id: 'a', lato: 'vendo', stato: 'attesa_mia_hold'});
+    const mio = vista();
+    myTgId = 222; aggiornaPallinoScambiP2P();
+    const suo = vista();
+    myTgId = 111; aggiornaPallinoScambiP2P();
+    return [mio, suo, vista()];
+  },
+  /* LO STESSO GIUDICE DEL 👉: su righe miste conta esattamente quelle
+     col bottone pieno */
+  stessoGiudice: () => {
+    const righe = [
+      {id: 'a', lato: 'vendo', stato: 'attesa_mia_hold'},
+      {id: 'b', lato: 'compro', stato: 'attivo', peer: 'p'},
+      {id: 'c', lato: 'compro', stato: 'attivo', peer: 'p', recapitoAltrove: 1},
+      {id: 'd', lato: 'vendo', stato: 'concluso'},
+      {id: 'e', lato: 'vendo', stato: 'attivo', peer: 'p'},
+      {id: 'f', lato: 'compro', stato: 'annullato'}];
+    return [quantiToccaAMeP2P(righe), righe.filter(o => azioniDisponibili(o)).length];
+  },
+  /* NON ROMPE CHI SCRIVE: col DOM rotto la mossa si scrive lo stesso */
+  nonRompe: () => {
+    rotto = true;
+    const r = scrivi({id: 'a', lato: 'vendo', stato: 'attesa_mia_hold'});
+    return [r && r.id, Object.keys(ordiniP2P())];
+  },
+  /* l'archivio vuoto: zero, e spento */
+  vuoto: () => [aggiornaPallinoScambiP2P(), vista()]
+};
+const out = {};
+for (const k of Object.keys(CASI)) {
+  reset();
+  try { out[k] = CASI[k](); }
+  catch(e) { out[k] = 'ESPLOSO: ' + (e && e.message || e); }
+}
+console.log(JSON.stringify(out));
+"""
+    cart = _tf.mkdtemp()
+    p = _os.path.join(cart, "banco.js")
+    open(p, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, p], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco node del pallino gira", "", (r.stderr or "")[-600:])
+    if r.returncode:
+        return
+    o = _json.loads(r.stdout)
+    prova("tocca a me: il pallino si accende, sui due tasti", "acceso",
+          o["toccaAMe"])
+    prova("tocca all'altro: spento", "spento", o["toccaAllAltro"])
+    prova("scambio concluso: spento", "spento", o["concluso"])
+    prova("due scambi, uno mio: acceso, e ne conta uno", ["acceso", 1],
+          o["dueUnoMio"])
+    prova("i sei gesti del bottone pieno lo accendono, ognuno da solo",
+          ["acceso"] * 6, o["seiGesti"])
+    prova("...e l'attesa dell'altro, in tutte le sue forme, no",
+          ["spento"] * 9, o["attese"])
+    prova("si accende quando arriva il recapito dell'altra parte",
+          ["spento", "acceso"], o["arrivaIlRecapito"])
+    prova("si spegne appena il passo e' fatto (sats liberati, recapito dato)",
+          ["acceso", "spento", "acceso", "spento"], o["passoFatto"])
+    prova("con due miei resta acceso finche' ne resta uno",
+          [["acceso", 2], ["acceso", 1], ["spento", 0]], o["dueMiei"])
+    prova("anche la scrittura del nome vero lo ricalcola",
+          ["acceso", ["u-1"]], o["rinomina"])
+    prova("in demo, in vetrina, senza conto e a leva spenta non si accende",
+          ["spento"] * 4, o["porte"])
+    prova("l'archivio di un altro conto non accende il mio pallino",
+          ["acceso", "spento", "acceso"], o["altroConto"])
+    prova("conta esattamente gli scambi col bottone pieno", [3, 3],
+          o["stessoGiudice"])
+    prova("col DOM rotto la mossa si scrive lo stesso", ["a", ["a"]],
+          o["nonRompe"])
+    prova("archivio vuoto: zero, e spento", [0, "spento"], o["vuoto"])
+
+
+
 def prove_p2p_campanello():
     """IL CAMPANELLO GENERICO NON C'E' PIU' (patch 0007, 18 set 2026,
     decisione di Andrea con Alan).
@@ -76958,6 +77286,7 @@ def main():
     prove_p2p_chiavi,
     prove_p2p_card_scambio,
     prove_p2p_vista_miei,
+    prove_pallino_scambi,
     prove_p2p_campanello,
     prove_p2p_eventi, prove_p2p_riserva_libro,
     prove_p2p_avvisi_libro, prove_p2p_orologio, prove_p2p_tutti_i_relay, prove_p2p_ascolto, prove_p2p_esito_notifiche, prove_p2p_silenzi,

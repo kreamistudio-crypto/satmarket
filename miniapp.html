@@ -3612,6 +3612,12 @@
   .off-dot.on{display:block}
   /* sul tappo del Profilo (annunci da moderare): angolo in alto a destra */
   .avatar-btn .off-dot{top:-1px;right:-1px;box-shadow:0 0 0 2px var(--header-bg)}
+  /* IL PALLINO DEGLI SCAMBI (set 2026) e' questo stesso .off-dot, nello
+     stesso posto: nessuna regola sua. Cambia solo l'ANELLO sullo strato
+     del P2P, che vive sulla banda scura — l'anello e' il fondo della
+     barra che ritaglia il pallino dall'icona, e quello del giorno sul
+     bruno sarebbe un alone chiaro */
+  nav .strato-p2p .off-dot{box-shadow:0 0 0 2px var(--nav-bg-p2p)}
   /* Il "+" di Vendi: bottone-oggetto rialzato sopra la barra */
   nav button.sell .ic{
     width:54px;height:54px;border-radius:18px;background:var(--sats);color:#fff;
@@ -9154,7 +9160,7 @@ document.getElementById('cartello')?.remove();</script>
          selettore `nav button` li prende tutti (discendente), quindi
          CSS e spazzata di go() non cambiano. -->
     <div class="nav-cella nav-lato">
-    <button id="nav-p2p" onclick="vaiP2P()"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><g transform="rotate(13 12 12)"><path class="velo" d="M8.3 6h4.4a2.9 2.9 0 0 1 .1 5.8H8.3zM8.3 11.8h5.1a3.1 3.1 0 0 1 0 6.2H8.3z"/><path d="M8.3 6h4.4a2.9 2.9 0 0 1 .1 5.8H8.3"/><path d="M8.3 11.8h5.1a3.1 3.1 0 0 1 0 6.2H8.3"/><path d="M8.3 6v12"/><path d="M10.5 6V3.7"/><path d="M13.2 6V3.9"/><path d="M10.5 20.3V18"/><path d="M13.2 20.1V18"/></g></svg></span>P2P</button>
+    <button id="nav-p2p" onclick="vaiP2P()"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><g transform="rotate(13 12 12)"><path class="velo" d="M8.3 6h4.4a2.9 2.9 0 0 1 .1 5.8H8.3zM8.3 11.8h5.1a3.1 3.1 0 0 1 0 6.2H8.3z"/><path d="M8.3 6h4.4a2.9 2.9 0 0 1 .1 5.8H8.3"/><path d="M8.3 11.8h5.1a3.1 3.1 0 0 1 0 6.2H8.3"/><path d="M8.3 6v12"/><path d="M10.5 6V3.7"/><path d="M13.2 6V3.9"/><path d="M10.5 20.3V18"/><path d="M13.2 20.1V18"/></g></svg></span><span class="off-dot scambi-dot"></span>P2P</button>
     <!-- Libro ordini: il LIBRO APERTO, disegnato nella grammatica
          delle sorelle (griglia da 24 ritagliata a "2 2 20 20", tratto
          1.5 currentColor, velo al 12%, curve un pelo fuori squadra).
@@ -9179,7 +9185,14 @@ document.getElementById('cartello')?.remove();</script>
          niente velo perche' non c'e' una pancia da riempire, come
          non ce l'ha il tratto della lente. Dentro: gli ordini
          pubblicati da ME (la striscia di ieri, come vista sua). -->
-    <button id="nav-p2pmiei" class="strato-p2p" onclick="go('p2pmiei')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path d="M4.6 8.4h13.5"/><path d="M14.9 5.1l3.4 3.2-3.3 3.2"/><path d="M19.4 15.8H5.9"/><path d="M9.2 12.6l-3.4 3.1 3.3 3.2"/></svg></span>I miei scambi</button>
+    <!-- IL PALLINO (set 2026): quello degli Ordini, acceso quando in
+         uno dei miei scambi aperti tocca a me. C'e' anche sul tasto
+         «P2P», due celle prima, che e' la strada per arrivarci dal
+         mercatino; li accende tutt'e due aggiornaPallinoScambiP2P.
+         Sta PRIMA dell'etichetta e non dopo come negli Ordini: e'
+         assoluto, il posto nel markup non lo sposta, e il tasto deve
+         finire col suo nome — lo stesso del titolo della vista. -->
+    <button id="nav-p2pmiei" class="strato-p2p" onclick="go('p2pmiei')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path d="M4.6 8.4h13.5"/><path d="M14.9 5.1l3.4 3.2-3.3 3.2"/><path d="M19.4 15.8H5.9"/><path d="M9.2 12.6l-3.4 3.1 3.3 3.2"/></svg></span><span class="off-dot scambi-dot"></span>I miei scambi</button>
     </div>
     <!-- Ordini: il PACCO di tre quarti. La scatola PIATTA (quadro +
          riga del coperchio, la famiglia di tagliaSVG) e' stata
@@ -40979,6 +40992,7 @@ function rinominaOrdineP2P(o, nuovoId){
   o.id = String(nuovoId);
   m[o.id] = o;
   try { localStorage.setItem(chiaveP2P(MOSTRO_ORDINI_CHIAVE), JSON.stringify(m)); } catch(e){}
+  if (typeof aggiornaPallinoScambiP2P === 'function') aggiornaPallinoScambiP2P();
   if (p2pOrdineAperto === vecchio) p2pOrdineAperto = o.id;
   if (p2pHoldOrdine === vecchio) p2pHoldOrdine = o.id;
   if (p2pIncassoOrdine === vecchio) p2pIncassoOrdine = o.id;
@@ -40988,6 +41002,10 @@ function scriviOrdineP2P(o){
   const tutti = ordiniP2P();
   tutti[o.id] = o;
   try { localStorage.setItem(chiaveP2P(MOSTRO_ORDINI_CHIAVE), JSON.stringify(tutti)); } catch(e){}
+  /* IL PALLINO DEGLI SCAMBI SEGUE L'ARCHIVIO: ognuna delle cinque
+     scritture lo ricalcola (vedi «IL PALLINO SU I MIEI SCAMBI»). Vive
+     fuori dal motore, e nel banco del motore non c'e': da qui il typeof */
+  if (typeof aggiornaPallinoScambiP2P === 'function') aggiornaPallinoScambiP2P();
   return o;
 }
 /* ---- QUANDO UNO SCAMBIO SI PUO' TOGLIERE ----
@@ -41138,6 +41156,7 @@ function togliRitiratoP2P(id){
   const tutti = ordiniP2P();
   delete tutti[id];
   try { localStorage.setItem(chiaveP2P(MOSTRO_ORDINI_CHIAVE), JSON.stringify(tutti)); } catch(e){}
+  if (typeof aggiornaPallinoScambiP2P === 'function') aggiornaPallinoScambiP2P();
   if (p2pMieiOrdini && p2pMieiOrdini[id]) delete p2pMieiOrdini[id];
   if (p2pLibro && p2pLibro.ordini)
     p2pLibro.ordini = p2pLibro.ordini.filter(x => x.id !== id);
@@ -41162,6 +41181,7 @@ function pulisciScambiP2P(){
   }
   if (tolti) {
     try { localStorage.setItem(chiaveP2P(MOSTRO_ORDINI_CHIAVE), JSON.stringify(tutti)); } catch(e){}
+    if (typeof aggiornaPallinoScambiP2P === 'function') aggiornaPallinoScambiP2P();
   }
   return tolti;
 }
@@ -41193,6 +41213,7 @@ function togliScambioP2P(id, ev){
       const tutti = ordiniP2P();
       delete tutti[id];
       try { localStorage.setItem(chiaveP2P(MOSTRO_ORDINI_CHIAVE), JSON.stringify(tutti)); } catch(e){}
+      if (typeof aggiornaPallinoScambiP2P === 'function') aggiornaPallinoScambiP2P();
       if (p2pOrdineAperto === id) p2pOrdineAperto = '';
       toast('Scambio tolto');
       renderP2P();
@@ -47563,6 +47584,15 @@ function gruppoScambioP2P(o){
   if (o.stato === 'pubblicato' || o.stato === 'pubblico') return 'libro';
   return 'corso';
 }
+/* PURA: quanti dei miei scambi aspettano un MIO gesto, cioe' quanti
+   cadono in «Tocca a te». La chiede il pallino della nav
+   (`aggiornaPallinoScambiP2P`), e la conta con QUESTO giudice: il
+   numero accanto alla pillola del filtro, il 👉 sulle card e il
+   pallino sono la stessa domanda — una lista di stati sua si
+   scollerebbe dalle altre al primo gesto nuovo. */
+function quantiToccaAMeP2P(righe){
+  return (righe || []).filter(o => gruppoScambioP2P(o) === 'fare').length;
+}
 /* IL FILTRO SPENTO E' UN ARRAY VUOTO e non `null` come quello del
    libro, e la differenza ha un perche': la' il filtro e' un oggetto di
    sei campi, e «nessun filtro» andava distinto da «tutti i campi al
@@ -48637,7 +48667,12 @@ async function risvegliaP2P(sonda){
 }
 if (typeof document !== 'undefined' && document.addEventListener) {
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') risvegliaP2P(true);
+    if (document.visibilityState !== 'visible') return;
+    risvegliaP2P(true);
+    /* il pallino degli scambi dice SUBITO quel che l'archivio sa; le
+       notizie che il risveglio porta finiscono nell'archivio, e il
+       pallino le segue da se'. Dopo il risveglio, che non aspetta lui */
+    aggiornaPallinoScambiP2P();
   });
   setInterval(() => {
     if (document.visibilityState !== 'visible') return;
@@ -48646,6 +48681,45 @@ if (typeof document !== 'undefined' && document.addEventListener) {
     if (vistaAttivaP2P() !== 'view-p2pordine') return;
     risvegliaP2P(false);
   }, P2P_POLSO_MS);
+}
+
+/* ---- IL PALLINO SU «I MIEI SCAMBI» (22 set 2026) ----
+   Il gemello del pallino degli Ordini: si accende da solo quando in
+   almeno uno dei miei scambi aperti tocca a me — bloccare la garanzia,
+   dire dove ricevere i sats o gli euro, dire che gli euro sono partiti,
+   liberare i sats. Sta su DUE tasti perche' la cella cambia mestiere:
+   nel mercatino sul tasto «P2P», che e' la strada, e dentro lo scambio
+   su «I miei scambi», che e' il posto. E' il percorso che l'avviso su
+   Telegram scrive a parole: «Apri Barattolo → P2P → I miei scambi».
+   IL GIUDICE NON E' NUOVO: conta quel che `gruppoScambioP2P` mette in
+   «Tocca a te», cioe' gli scambi dove `azioniDisponibili` ha il bottone
+   pieno (vedi `quantiToccaAMeP2P`). E SENZA NUMERO, perche' quello
+   degli Ordini non ne porta.
+   SEGUE L'ARCHIVIO, E BASTA: lo ricalcola ogni scrittura degli scambi
+   (i cinque posti che scrivono `MOSTRO_ORDINI_CHIAVE`), e li' finisce
+   tutto quel che arriva — le mosse del coordinatore, il recapito
+   dell'altra parte, il libro, la restore — e anche il gesto fatto, che
+   quindi lo spegne appena il coordinatore lo conferma. In piu'
+   l'apertura (in `avvia`, dove arrivano conto e leva) e il ritorno in
+   primo piano. NIENTE POLLING: nessun orologio e nessuna domanda
+   nuova, solo i canali che l'app ascolta gia'.
+   ⚠️ IL LIMITE, DICHIARATO: nel mercatino il motore non ascolta i relay
+   finche' non si entra nel P2P (il bundle e' pigro), quindi li' il
+   pallino dice l'ultimo stato che l'archivio conosce. Una novita'
+   arrivata ad app chiusa la porta l'avviso su Telegram, e il pallino
+   la raggiunge appena il motore riascolta.
+   A LEVA SPENTA, IN VETRINA E SENZA CONTO NON SI ACCENDE: il tasto
+   porterebbe dove il gesto non si puo' fare. E non rompe mai chi
+   scrive l'archivio: un errore resta qui dentro. */
+function aggiornaPallinoScambiP2P(){
+  let n = 0;
+  try {
+    if (!DEMO && !VETRINA && myTgId && p2pAcceso())
+      n = quantiToccaAMeP2P(mieiRigheP2P());
+    document.querySelectorAll('.scambi-dot')
+      .forEach(d => d.classList.toggle('on', n > 0));
+  } catch(e) { }
+  return n;
 }
 
 /* ---- import in blocco da CSV: per i cataloghi grandi. Due fasi
@@ -49315,6 +49389,9 @@ async function avvia(){
        la card del barattolo la disegna il renderChips di loadListings,
        che da qui in poi gira con myTgId pieno */
     renderPodioTesta();
+    /* ...e il pallino degli scambi, qui dove conto e leva del P2P sono
+       arrivati tutt'e due: l'archivio si legge con la chiave del conto */
+    aggiornaPallinoScambiP2P();
     collaudo = !tg?.initData && !WEB;
     const b = el('demoBanner');
     if (collaudo) {
