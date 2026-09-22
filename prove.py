@@ -63232,7 +63232,7 @@ def prove_p2p_paycode():
             "function euroTabacchinoP2P(metodi){", "function satsTabacchinoP2P(importo, cambio, premio){",
             "function payCodeP2P(testo){", "function vitaLibroTabacchinoP2P(scade, adesso){",
             # le tre frasi di Barattozon: un posto solo per i due versi
-            "function testoBarattozonP2P(mio){",
+            "function testoBarattozonP2P(mio, senzaScontrino){",
             # il premio di Barattozon (23 set 2026), coi gemelli del
             # cursore e i due giudici che il libro usa per rileggerlo
             "function premioTabacchinoP2P(testo){", "function premioTestoP2P(n){",
@@ -63384,7 +63384,8 @@ DOM = null;
         # OTTO cifre, con e senza trattini: la tortura ha trovato che
         # nessun caso le provava, e una terzina «corta» passava
         "            '47986851', '47-868-518', '479-68-518'].map(payCodeP2P),\n"
-        "  testo: [testoBarattozonP2P(true), testoBarattozonP2P(false)],\n"
+        "  testo: [testoBarattozonP2P(true), testoBarattozonP2P(false),\n"
+        "          testoBarattozonP2P(false, true)],\n"
         "  vita: [vitaLibroTabacchinoP2P(ora + 48 * 3600, ora) - ora, vitaLibroTabacchinoP2P(ora + 72 * 3600, ora) - ora,\n"
         "         vitaLibroTabacchinoP2P(ora + 90 * 3600, ora) - ora, vitaLibroTabacchinoP2P(ora + 7200, ora) - ora,\n"
         "         vitaLibroTabacchinoP2P(ora + 3600, ora) - ora, vitaLibroTabacchinoP2P(ora + 5 * 3600, ora) - ora,\n"
@@ -63740,8 +63741,15 @@ DOM = null;
             "vende: ricevi cifrati codice, importo e scadenza appena i sats sono in "
             "garanzia, e non vedi nome, indirizzo né cosa ha comprato. Per pagare "
             "non serve alcun documento. Tieni lo scontrino in caso di disputa.")
-    prova("le parole di Barattozon, nei due versi, parola per parola",
-          [_MIO, _SUO], out["testo"])
+    # ⚠️ NEL RIQUADRO LA TERZA FRASE NON C'E' (24 set 2026, decisione di
+    # Andrea): lo scontrino lo dice gia' il terzo gesto della lista, due
+    # righe piu' su, e dirlo due volte nella stessa scatola e' insistenza.
+    # Il corto e' il lungo MENO quella frase, e a dirlo e' la
+    # DERIVAZIONE qui sotto: se la funzione la riscrivesse invece di
+    # toglierla — o ne togliesse un'altra — questa prova lo direbbe.
+    _CORTO = _SUO.replace(" Tieni lo scontrino in caso di disputa.", "")
+    prova("le parole di Barattozon, nei due versi e nel corto del riquadro, parola per parola",
+          [_MIO, _SUO, _CORTO], out["testo"])
     # ⚠️ I DUE VERSI NON SI MESCOLANO, ed e' il modo in cui un
     # copia-incolla si vede: ogni versione porta i suoi verbi e NON
     # quelli dell'altra. La frase del documento invece e' la stessa in
@@ -63756,13 +63764,22 @@ DOM = null;
           and "fai pagare in contanti" not in _per
           and "Prima genera su Amazon" not in mini)
     _rq = pezzo_js(mini, "function riquadroPayCodeP2P(o, adesso){", "\n}\n")
-    # ...e il riquadro le dice nel verso di chi paga, SENZA una seconda
-    # 🧾: quella la porta gia' il titolo sopra
-    prova("...e il riquadro di chi ha preso le chiama nel verso suo, senza una seconda 🧾", True,
-          "esc(testoBarattozonP2P(false))" in _rq
-          and "🧾 ' + esc(testoBarattozonP2P(false))" not in _rq
+    _rcq = out["riquadroCompro"]
+    # ⚠️ E NEL RIQUADRO STANNO IN FONDO, non in cima (24 set 2026,
+    # decisione di Andrea che rovescia la prima stesura): quella scatola
+    # e' uno STRUMENTO — la si riapre alla cassa per leggere il codice —
+    # e sei righe di spiegazione fra il titolo e il PayCode si pagano a
+    # ogni riapertura. Vanno dov'erano gia' le spiegazioni della
+    # scatola: dopo i quattro gesti e prima della nota del codice.
+    # Senza una seconda 🧾: quella la porta gia' il titolo sopra.
+    prova("...e il riquadro le dice IN FONDO, nel verso suo e senza la frase dello scontrino", True,
+          "esc(testoBarattozonP2P(false, true))" in _rq
+          and "🧾 ' + esc(testoBarattozonP2P(false" not in _rq
           and "non vedi nome" not in _rq
-          and _SUO in out["riquadroCompro"])
+          and _CORTO in _rcq
+          and "Tieni lo scontrino in caso di disputa" not in _rcq
+          and _rcq.index("Tieni lo scontrino: è la tua prova")
+              < _rcq.index(_CORTO) < _rcq.index("Il codice resta tuo"))
     # ⚠️ E «INFO P2P» LE RICOPIA, che il markup e' fermo: questa prova e'
     # l'unica cosa che impedisce alle due copie di scollarsi
     _sezTab = mini[mini.index('<h3 id="p2pinfo-tabacchino"'):mini.index("<h3>I tempi</h3>")]

@@ -44449,10 +44449,6 @@ function riquadroPayCodeP2P(o, adesso){
   const attivo = o.stato === 'attivo';
   return '<div class="p2p-paycode" data-fine="' + (scade || 0) + '">' +
     '<div class="p2p-paycode-tit">🧾 Il PayCode da pagare al tabacchino</div>' +
-    /* le stesse tre frasi del cappello di chi pubblica, dal verso di
-       chi paga: qui e' il momento in cui uno sta per uscire di casa, ed
-       e' l'ultimo posto utile per dirgli che il documento non serve */
-    '<div class="hint">' + esc(testoBarattozonP2P(false)) + '</div>' +
     '<div class="p2p-paycode-cod"><b>' + esc(pc) + '</b>' +
       '<button type="button" class="p2p-paycode-copia" data-pc="' + esc(pc) + '" ' +
         'onclick="copiaLink(this.dataset.pc, \'PayCode copiato 📋\')" aria-label="Copia il PayCode">📋</button></div>' +
@@ -44469,6 +44465,15 @@ function riquadroPayCodeP2P(o, adesso){
       '<li>Tieni lo scontrino: è la tua prova.</li>' +
       '<li>Torna qui e tocca <b>«Ho pagato al tabacchino»</b>' + (attivo ? '' : ' (quando i sats sono in garanzia)') + '.</li>' +
     '</ol>' +
+    /* LE PAROLE DEL CAPPELLO DI CHI PUBBLICA, nel verso di chi paga e
+       IN FONDO (24 set 2026, decisione di Andrea, che rovescia la prima
+       stesura): questa scatola e' uno STRUMENTO — la si riapre alla
+       cassa per leggere il codice — e sei righe di spiegazione fra il
+       titolo e il PayCode si pagano a ogni riapertura, mentre la
+       spiegazione si legge una volta. Va dov'erano gia' le spiegazioni
+       di questa scatola. Senza la frase dello scontrino: la dice il
+       terzo gesto qui sopra. */
+    '<div class="hint">' + esc(testoBarattozonP2P(false, true)) + '</div>' +
     '<div class="hint">Il codice resta tuo e di chi vende: viaggia cifrato, e Barattolo non lo legge.</div>' +
   '</div>';
 }
@@ -45527,11 +45532,22 @@ function vitaLibroTabacchinoP2P(scade, adesso){
    chiamarla, quindi li' la parola e' ricopiata e a tenerla in pari c'e'
    una prova che la confronta con questa, carattere per carattere.
    SENZA EMOJI: la 🧾 la mette chi la vuole (il cappello si', il
-   riquadro no — la porta gia' il suo titolo). */
-function testoBarattozonP2P(mio){
-  return mio
-    ? 'Con Barattozon fai pagare in contanti alla cassa del tabacchino un tuo ordine Amazon: chi lo paga riceve cifrati codice, importo e scadenza appena i sats sono in garanzia, e non vede nome, indirizzo né cosa hai comprato. Per pagare non serve alcun documento. Chi paga tiene lo scontrino in caso di disputa.'
-    : 'Paghi in contanti alla cassa del tabacchino un ordine Amazon di chi vende: ricevi cifrati codice, importo e scadenza appena i sats sono in garanzia, e non vedi nome, indirizzo né cosa ha comprato. Per pagare non serve alcun documento. Tieni lo scontrino in caso di disputa.';
+   riquadro no — la porta gia' il suo titolo).
+   ⚠️ E LA TERZA FRASE SI PUO' TOGLIERE (`senzaScontrino`, 24 set 2026,
+   decisione di Andrea), ma la toglie UN posto solo: il riquadro del
+   PayCode, dove lo scontrino lo dice gia' il terzo gesto della lista
+   («Tieni lo scontrino: è la tua prova») due righe piu' su. Dirlo due
+   volte nella stessa scatola non e' un promemoria, e' insistenza. */
+function testoBarattozonP2P(mio, senzaScontrino){
+  const cosa = mio
+    ? 'Con Barattozon fai pagare in contanti alla cassa del tabacchino un tuo ordine Amazon: chi lo paga riceve cifrati codice, importo e scadenza appena i sats sono in garanzia, e non vede nome, indirizzo né cosa hai comprato.'
+    : 'Paghi in contanti alla cassa del tabacchino un ordine Amazon di chi vende: ricevi cifrati codice, importo e scadenza appena i sats sono in garanzia, e non vedi nome, indirizzo né cosa ha comprato.';
+  /* questa non ha verso: e' la stessa parola per tutt'e due */
+  const documento = ' Per pagare non serve alcun documento.';
+  const scontrino = senzaScontrino ? ''
+    : mio ? ' Chi paga tiene lo scontrino in caso di disputa.'
+          : ' Tieni lo scontrino in caso di disputa.';
+  return cosa + documento + scontrino;
 }
 /* PURA: il premio scritto nel passo 4, col segno, da −20 a +20 e a
    numeri INTERI (il «−» tipografico compreso). {n, storto}: «2,5» e
