@@ -24750,3 +24750,153 @@ nel velo coi font veri di iPhone — se la levetta andasse a capo a 375
 la testata crescerebbe di una riga; il logo del libro a 3x e la sua
 sfumatura coi file nuovi; e il conto con un evento VERO del
 coordinatore.
+
+
+## Il premio di Barattozon: da −20 a +20, col cursore di casa (23 set 2026)
+
+LA RICHIESTA (Andrea, che rovescia lo sconto 0-15 di ieri): nel percorso
+Barattozon il passo 4 diventa «Il premio», con lo STESSO cursore del P2P
+normale — pillola col numero, campo a mano, stessa grafica — ma scala da
+−20 a +20 con una cifra decimale. Il segno decide il verso, e la riga
+viva lo dice in parole a ogni movimento. I sats seguono
+`importo × (1 − premio/100)` al cambio vivo, quindi premio negativo =
+PIÙ sats. Nella card del libro e nel foglio di chi prende il premio
+compare col segno. Sotto il cursore una riga di aiuto. Nessun cambio al
+P2P normale.
+
+**IL VERSO, E PERCHÉ È LO STESSO DEGLI ALTRI ORDINI.** Premio positivo:
+chi paga al tabacchino riceve meno sats del cambio, e la differenza
+resta a chi vende («risparmi tu»). Negativo: ne riceve di più, e quella
+differenza la paga chi vende per la comodità («lo paghi tu»). È la
+sottrazione uniforme di `get_market_quote` (`sats -= premium/100 *
+sats`) letta sui byte a suo tempo, quindi il GIUDIZIO e la TINTA si
+leggono dagli stessi giudici di tutti gli altri ordini — `affareP2P`,
+`fasciaPremioP2P` — senza una seconda tabella da tenere in pari: sul
+lato vendo un premio positivo è verde per chi pubblica, e nel libro è
+«meno conveniente» per chi legge. Lo sconto di ieri era lo stesso
+numero con un solo verso e un nome che a metà scala sarebbe diventato
+falso.
+
+**IL CURSORE SONO FUNZIONI GEMELLE, non le stesse, ed è una scelta.**
+`premioTabValP2P`, `premioTabModP2P`, `cambiaPremioTabP2P`,
+`chiudiPremioTabManoP2P`, `scriviPremioTabP2P` ricalcano una per una
+quelle del P2P normale, con le STESSE classi CSS (`p2p-premio`, la
+pillola `p2p-premio-cifra` con la matita, `Modifica` che diventa
+`Fatto`, i due capi in tinta) e le stesse due lezioni del 18 set — il
+campo a mano SEGUE il cursore, e chi muove da fuori lo CHIUDE, con `da`
+(chi ha mosso) come giudice e mai il fuoco, che su iOS non se ne va
+mentre si trascina. La ragione della copia invece del riuso: là il
+premio è un INTERO perché viaggia nel 38383 (`premium` è un i64), qui è
+un decimo perché si cuoce nei sats e sul filo resta zero; e «nessun
+cambio al P2P normale» non è una promessa ma un controllo — le dieci
+funzioni del cursore normale e le quattro ancore del suo markup sono
+IDENTICHE a `origin/main`, confrontate byte per byte.
+LA VARIABILE È IL TESTO SCRITTO (`p2pNuovoPremioTab`), non un numero, e
+serve a una cosa sola: poter RIFIUTARE «20,1» invece di tosarlo in
+silenzio, che è quel che fa il cursore normale coi suoi ±20. Un testo
+che non si legge — «20,1», «2,55», un «-» a metà battitura — non muove
+il pallino, che resta all'ultimo numero buono, e a dirlo è la riga viva.
+
+**LE TRE FRASI DELLA RIGA VIVA**, parola per parola come le ha scritte
+Andrea: «Chi paga al tabacchino riceve N sats, cioè il X% in meno del
+cambio: risparmi tu»; «…il X% in più del cambio: lo paghi tu per la
+comodità»; a zero «…riceve N sats, il cambio pieno per 23,47 €». Sotto,
+la riga di aiuto: «Premio più basso = più conveniente per chi paga = più
+probabile che qualcuno lo prenda in tempo». Il riepilogo prima di
+pubblicare CHIAMA la stessa funzione invece di riscriverla: due stesure
+della stessa frase divergono al primo ritocco, e lì si sta per premere
+«Pubblica».
+
+**NEL LIBRO IL PREMIO SI RILEGGE, e non si dichiara.** A prezzo fisso
+`premium` sul filo è zero — il premio è dentro i sats — e nel `pm`
+c'è già l'importo: metterci anche il premio vorrebbe dire cambiare di
+nuovo la forma che gli altri client leggono come nome del metodo, per
+un numero che l'`expires_at` e i sats raccontano già. Quindi
+`premioImplicitoTabacchinoP2P(euro, sats, cambio)` lo ricava
+all'indietro dal cambio di ADESSO, col segno e al decimo, e NON si tosa
+a ±20: il cambio si muove, e un ordine nato a +2 che oggi vale il 30%
+meno del mercato deve poterlo dire. È il numero su cui sta decidendo
+chi legge, e la pagina «Info P2P» lo dichiara: «se il mercato si muove,
+quel numero si muove con lui».
+DOVE COMPARE: il badge della card (`badgePremioP2P`, che per gli altri
+ordini a prezzo fisso resta muto — lì il mercato non c'entra) col segno
+e le parole di sempre, «+2,5% meno conveniente» / «−5% più conveniente»;
+e nel CONTO del foglio di chi prende, come per ogni altro ordine —
+Controvalore al mercato, la riga «Premio al venditore +2,5%» in tinta
+coi suoi sats, Subtotale alla cifra fissa, fee, «Ricevi». A cambio muto
+niente badge e niente riga: mai un numero inventato. E quando il
+coordinatore ha già detto la cifra (`satsDetti`) il premio NON si
+rilegge più: lo scambio è fatto, e un numero che continuasse a muoversi
+col mercato racconterebbe un affare chiuso — è la promessa di «Info
+P2P».
+⚠️ NEL CONTO LA PERCENTUALE PORTA IL SEGNO, che negli altri ordini non
+porta (là il verso lo dice la parola, «Premio» o «Sconto»): è la
+richiesta di Andrea, e qui ha una ragione sua — il numero è ricavato, e
+il segno lo dice in un carattere. La parola resta, e le due cose si
+confermano. Se dal vivo sembra di troppo, è una riga.
+E LA RIGA DELLO SCONTO NEL DETTAGLIO SE N'È ANDATA: diceva la stessa
+cosa del conto, tre centimetri più su. «Il giudizio non si ribatte» è
+già a verbale, ed era la seconda copia.
+
+**UN DIFETTO MIO DEL 22 SET, trovato riscrivendo il passo 4:** nel
+giudice del foglio i due tetti in sats del coordinatore si guardavano su
+`satsTabacchinoP2P(euro, v.cambio, v.premio)` — cioè col premio del
+cursore NORMALE, la sezione che col tabacchino non esiste nemmeno —
+invece che con lo sconto scelto. Con lo sconto 0-15 il danno era
+piccolo (i due numeri erano quasi sempre zero); col premio a ±20 no.
+Adesso legge il premio del percorso, e c'è una prova che lo inchioda:
+a −20 i sats crescono del 20% e un tetto a 50.000 li ferma.
+
+**LE STRADE SCARTATE.** Riusare le funzioni del cursore normale con un
+parametro (avrebbe toccato codice provato riga per riga, per risparmiare
+sessanta righe di gemelle). Mettere il premio nel `pm` (si rompe la
+forma che gli altri client leggono, per un numero che si ricava).
+Tosare «20,1» a 20 come fa il cursore normale (Andrea ha chiesto il
+rifiuto: il tetto muto cambia il numero sotto gli occhi). Clampare il
+premio riletto a ±20 (direbbe il falso quando il mercato si è mosso).
+Mostrare il premio riletto anche a scambio preso (numeri che ballano su
+un affare chiuso). Il badge sulla card dei PROPRI scambi: resta muto
+come per ogni prezzo fisso, e il numero scelto sta nella pagina dello
+scambio.
+
+**PROVATO.** `prove.py` 13182 verdi, 0 rosse. Le prove nuove: il parser
+sui venti casi (±20 dentro, ±20,1 e 2,55 fuori, il «−» tipografico, il
+«-» a metà battitura, «-0» che è zero), i sats dei cinque premi su
+23,47 € e su una cifra tonda (40.000 / 39.000 / 41.000 / 32.000 /
+48.000), il premio riletto col segno e fuori fascia, le tre frasi della
+riga viva, il riepilogo, il badge nei cinque casi, il conto nei cinque
+casi (premio, sconto, pieno, a cifra detta, a cambio muto), e IL BANCO
+DEL CURSORE — un DOM di cartone col fuoco inchiodato sul campo, dove il
+metro è «un foglio dove il campo non si è mai aperto»: trascinare dopo
+aver scritto deve tornare ESATTAMENTE lì, e ci torna.
+LA TORTURA: 24 mutazioni, 24 uccise. Una lezione vecchia ripresentata:
+la mutazione «il cursore non chiude più il campo» uccideva facendo
+ESPLODERE il banco (`cannot read properties of undefined`) invece di
+dire una riga sul comportamento — il caso della cintura leggeva un nodo
+che la mutazione aveva tolto. Curato come il 18 set: il gesto su un nodo
+assente torna `null`, e adesso quella mutazione muore su quattro
+asserzioni vere.
+DAL VIVO (Browser pane a 375, server del worktree, leva accesa e relay
+morto, identità Venditore): il cursore con la pillola e i due capi in
+tinta (−20% rosso, +20% verde: sul lato vendo il verso è quello); i
+cinque valori dal cursore con pillola, tinta e riga viva a ogni passo;
+il campo a mano che rifiuta «20,1» senza muovere il pallino e accetta
+«-2,5»; il trascinamento che CHIUDE il campo e riporta la pillola
+(«−5%» in rosso); il riepilogo coi sei fatti; due card nel libro col
+badge «+2,5% meno conveniente» e «−5% più conveniente»; il foglio di chi
+prende col conto «Controvalore ≈ 31.029 / Premio al venditore +2,5% ≈
+−776 / Subtotale 30.253»; «Info P2P». Nessun errore JS oltre a quelli
+attesi del relay morto.
+
+**NON PROVATO, e dichiarato.** Il telefono: il cursore col DITO (il
+passo di un decimo su un binario da trecento pixel), la tastiera
+decimale sul campo a mano, e soprattutto SE IL «−» SI PUÒ BATTERE — su
+iOS `inputmode="decimal"` non offre il segno meno, quindi il verso lo
+mette il cursore e il campo serve a rifinire. È lo stesso limite del
+cursore normale, e va guardato col dito. Nessun ordine pubblicato con un
+premio negativo: che il coordinatore accetti `amount` più alto del
+mercato è certo (è prezzo fisso, e `premium` sul filo resta zero), ma
+non l'ha visto nessuno. E la tinta della FASCIA colorata si muove a
+scatti di un punto — `fasciaPremioP2P` arrotonda all'intero, che è del
+cursore normale: il pallino scorre liscio, la banda no. Misurato, non
+curato.

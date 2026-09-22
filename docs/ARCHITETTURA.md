@@ -24418,13 +24418,33 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   numero d'ordine a 17 e' storto); l'importo coi centesimi (lo stesso
   campo `p2pNuovoEuro`); la scadenza del PayCode da un selettore, fra
   UN'ORA e 72 ORE (`P2P_PAYCODE_MIN_S`/`MAX_S`, prima della finestra
-  della garanzia, che parla solo se piu' stretta); lo SCONTO 0-15% con
-  una cifra decimale (`scontoTabacchinoP2P`, «2,55» e' storto), cotto
-  nei sats fissi da `satsTabacchinoP2P` che lo tosa al decimo. IL VERSO
-  DELLO SCONTO: chi vende consegna `importo × (1 − sconto)` in sats,
-  cioe' chi paga al tabacchino riceve un po' meno del cambio pieno — lo
-  stesso verso del premio positivo, e la ragione di «sconto piu' basso
-  = piu' probabile che qualcuno lo paghi in tempo». Prima di pubblicare
+  della garanzia, che parla solo se piu' stretta); il PREMIO da −20 a +20
+  con una cifra decimale (23 set 2026, `premioTabacchinoP2P`: «2,55» e
+  «20,1» sono storti e si RIFIUTANO, non si tosano), cotto nei sats
+  fissi da `satsTabacchinoP2P` che lo tosa al decimo. IL SEGNO DECIDE
+  IL VERSO: chi vende consegna `importo × (1 − premio/100)` in sats,
+  quindi col premio positivo chi paga al tabacchino riceve meno del
+  cambio pieno e la differenza resta a chi vende, col negativo ne
+  riceve di piu' e la differenza la paga chi vende — e' lo stesso verso
+  del premio di tutti gli altri ordini, quindi il giudizio e la tinta
+  escono dagli STESSI giudici (`affareP2P`, `fasciaPremioP2P`). Di qui
+  «premio piu' basso = piu' conveniente per chi paga = piu' probabile
+  che qualcuno lo prenda in tempo».
+  IL CURSORE E' QUELLO DEL P2P NORMALE, in funzioni GEMELLE
+  (`premioTabValP2P`, `premioTabModP2P`, `cambiaPremioTabP2P`,
+  `chiudiPremioTabManoP2P`, `scriviPremioTabP2P`): stesse classi CSS e
+  le stesse due lezioni del 18 set — il campo a mano segue il cursore,
+  e chi muove da fuori lo chiude, con `da` come giudice. Gemelle e non
+  le stesse perche' li' il premio e' un INTERO (viaggia nel 38383) e
+  qui e' un decimo (si cuoce nei sats): il P2P normale non si tocca, e
+  una prova confronta le sue funzioni con quelle di ieri.
+  NEL LIBRO IL PREMIO SI RILEGGE invece di viaggiare: sul filo e' zero,
+  e `premioImplicitoTabacchinoP2P` lo ricava dai sats contro il cambio
+  di ADESSO — col segno, al decimo, senza tosature. Lo mostrano il
+  badge della card (`badgePremioP2P`, muto sugli altri prezzi fissi) e
+  la riga del premio nel conto (`contoDettP2P`: Controvalore al
+  mercato, premio, Subtotale alla cifra fissa), e a cifra detta dal
+  coordinatore la riga sparisce: da li' lo scambio e' fatto. Prima di pubblicare
   il RIEPILOGO (`riepilogoTabacchinoP2P`, una `chiediConferma` col
   timbro `confermato`). LA VITA NEL LIBRO SEGUE IL PAYCODE e rovescia
   le 24 ore del 22 set: `expires_at` = scadenza meno DUE ORE, margine
