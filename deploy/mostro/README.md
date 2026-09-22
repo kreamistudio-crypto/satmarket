@@ -322,13 +322,16 @@ Il difetto ha due facce, e le patch le trattano in modo diverso.
 
 ## IN SERVIZIO
 
-Immagine `mostro:v0.18.7-bar4` dal 19 set 2026 (la prossima e'
-`mostro:v0.18.8-bar5`, con le sette patch di questa cartella sopra la
-0.18.8: la liturgia sta in PRODUZIONE, «LA SALITA A MOSTRO 0.18.8»), con tutte e sette le
-patch (la `-bar3` con le prime sei, la `-bar2` con le prime quattro e la
-`-bar1` con le prime tre sono restate sulla macchina, come tag di
-rollback), costruita sul nodo con
-`docker build -f docker/Dockerfile -t mostro:v0.18.7-bar4 .` dentro
+Immagine `mostro:v0.18.8-bar5` dal 22 set 2026: le sette patch di questa
+cartella sopra la `v0.18.8`, commit sul nodo `8a5eef9..1489f38` (la
+liturgia sta in PRODUZIONE, «LA SALITA A MOSTRO 0.18.8»); sul nodo 440
+test `cargo` passati, 15 migrazioni nel database, e il primo scambio
+Barattozon da 23,47 € (31.209 sats) riuscito lo stesso giorno. La
+`-bar4` (0.18.7, con tutte e sette le patch di allora) resta sulla
+macchina come tag di rollback, coi vincoli delle migrazioni detti sotto;
+la `-bar3` con le prime sei, la `-bar2` con le prime quattro e la
+`-bar1` con le prime tre sono restate anche loro. Costruita sul nodo con
+`docker build -f docker/Dockerfile -t mostro:v0.18.8-bar5 .` dentro
 `~/nodo/mostro-src`. Il `Dockerfile` fa `COPY . .`, cioè copia il
 sorgente LOCALE e non lo riscarica: è la ragione per cui le patch
 finiscono davvero nel binario, ed è la cosa da riverificare se un
@@ -430,6 +433,13 @@ tornerebbe identico.
   task), `PaymentFailureReason` di `lnrpc` con `fedimint-tonic-lnd`
   0.4.0, i nomi delle varianti di `ServiceError` nel classificatore
   pre-claim, e `MostroError` nel `match` (via `mostro_core::prelude`).
+- IN SERVIZIO DAL 22 SET 2026, lo stesso giorno: sul nodo i sette
+  patcher hanno detto le uscite attese, `cargo test` nello stadio
+  `builder` ha dato **440 passati, 0 falliti**, il database ha 15
+  migrazioni (le due della 0.18.8 comprese), e il primo scambio
+  Barattozon da **23,47 €** (31.209 sats) e' riuscito. I quattro punti
+  «da guardare per primi» qui sopra hanno compilato: restano scritti
+  per la prossima salita.
 
 **Quello che NON è provato**, ed è la parte onesta: che la dev fee ora
 passi davvero a circuito freddo. Si prova solo al prossimo scambio

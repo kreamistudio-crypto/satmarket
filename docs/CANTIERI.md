@@ -23814,19 +23814,19 @@ L'installazione sul nodo e' di Andrea.
 
 ## Mostro 0.18.8 e gli importi con i centesimi (22 set 2026)
 
-LA RICHIESTA, in due pezzi che si sono incrociati: Mostro `v0.18.8` Ã¨
+LA RICHIESTA, in due pezzi che si sono incrociati: Mostro `v0.18.8` è
 uscita il 18 set (#825 l'iniziatore della disputa validato prima del
-rimborso, #908 la contabilitÃ  dei payout falliti, #964 i bond, #882 gli
+rimborso, #908 la contabilità dei payout falliti, #964 i bond, #882 gli
 stati terminali, `fedimint-tonic-lnd` 0.4.0) e le sette patch del fork
 andavano risalite; e Barattozon ha bisogno di importi in euro CON I
-CENTESIMI, perchÃ© il codice Amazon da pagare al tabaccaio vale, per
-dirne uno, 23,47 â‚¬. Andrea ha chiesto prima l'indagine, poi la scelta,
+CENTESIMI, perché il codice Amazon da pagare al tabaccaio vale, per
+dirne uno, 23,47 €. Andrea ha chiesto prima l'indagine, poi la scelta,
 poi il cantiere. Tutto in un worktree da `origin/main`; niente compilato
-sul PC, che `cargo` non c'Ã¨.
+sul PC, che `cargo` non c'è.
 
 **L'INDAGINE, sola lettura.** Le sette `.patch` entrano PULITE con
 `git am` sul tag `e67676d`; i quattro patcher di allora (0004-0007)
-girano a secco e a scrittura senza cambiare un'ancora, e l'albero Ã¨
+girano a secco e a scrittura senza cambiare un'ancora, e l'albero è
 byte per byte quello di `git am`. Upstream tocca quattro dei nostri
 file e nessuno confligge: `release.rs` (#908 spacca `do_payment` in
 `do_payment` + `dispatch_payout`, e il nostro ramo `Failed` della 0006 e
@@ -23834,77 +23834,77 @@ file e nessuno confligge: `release.rs` (#908 spacca `do_payment` in
 `admin_cancel.rs` e `admin_settle.rs` (#825 sposta la validazione
 PRIMA del rimborso, i nostri agganci stanno dopo); `dev_fee.rs` (una
 riga, `Initiated`). #882 corregge gli stati terminali col trattino:
-la restore-session non riporta piÃ¹ `cooperatively-canceled` e
-`canceled-by-admin`, e per il client Ã¨ nulla o positivo. mostro-core
+la restore-session non riporta più `cooperatively-canceled` e
+`canceled-by-admin`, e per il client è nulla o positivo. mostro-core
 resta 0.14.6.
-E `fiat_amount` Ãˆ UN INTERO DA CIMA A FONDO, letto sui byte: `i64` in
+E `fiat_amount` È UN INTERO DA CIMA A FONDO, letto sui byte: `i64` in
 `SmallOrder` e in `Order`, `Option<i64>` i due capi, `type Amount = i64`
 l'importo del take, `integer not null` nel db, `i64.to_string()` nel tag
 `fa`, `as f64 / price` nella quote, `i64` in `Dispute` e nei bond;
 mostro-core 0.15.1 e il main di mostrod non hanno un commit sui
 decimali; mostro-cli fa `parse::<i64>()`. Un `23.47` in una busta lo
-rifiuta serde, e mostrod TACE â€” come il `null` del 10 set. Lato nostro
+rifiuta serde, e mostrod TACE — come il `null` del 10 set. Lato nostro
 l'intero era forzato in dieci posti (giudice, tasto, rete, `inputmode`,
 il costruttore dell'ordine, l'importo scelto nel range, il recapito lato
 compratore, `P2P_MAX_EURO`, il canale, la caption), e il 10 set c'era
-una DECISIONE a verbale, Â«solo cifreÂ»: Â«come Mostro: la virgola non si
-scrive proprioÂ».
+una DECISIONE a verbale, «solo cifre»: «come Mostro: la virgola non si
+scrive proprio».
 
 **LE TRE STRADE, e la scelta.** (1) Solo il nostro lato: non esiste.
-(2) Una patch 0008 Â«fiat_amount decimaleÂ»: non puÃ² essere minima â€”
+(2) Una patch 0008 «fiat_amount decimale»: non può essere minima —
 le struct stanno in mostro-core, che per regola non si forka; serde non
 converte `23.0` in `i64`, quindi senza un serializer su misura OGNI
 client altrui perderebbe TUTTE le buste, anche quelle intere; e sul `fa`
 decimale mostro-cli fallisce il parse. Un fork di due repo per una cosa
 che gli altri non vedrebbero comunque. Scartata, con la variante
-Â«centesimi nel campo interoÂ» (2347) che agli altri dice Â«2347 EURÂ».
-(3) Senza toccare Mostro: PREZZO FISSO piÃ¹ centesimi dichiarati. Il
-client calcola i sats esatti per 23,47 â‚¬ al cambio vivo e pubblica
-`amount` fisso, `premium` 0, `fiat_amount` = l'intero piÃ¹ vicino; il
+«centesimi nel campo intero» (2347) che agli altri dice «2347 EUR».
+(3) Senza toccare Mostro: PREZZO FISSO più centesimi dichiarati. Il
+client calcola i sats esatti per 23,47 € al cambio vivo e pubblica
+`amount` fisso, `premium` 0, `fiat_amount` = l'intero più vicino; il
 coordinatore non ricalcola niente, garanzia e payout nascono al
-satoshi, e i client altrui leggono Â«23 EUR per N satsÂ», senza rompersi.
-ANDREA HA SCELTO LA 3, sotto-scelta Â«bÂ»: l'importo esatto ENTRA NEL
-`pm` â€” Â«Contanti al tabacchino 23.47Â», col PUNTO perchÃ© la virgola
-separa i metodi nel tag â€” cosÃ¬ chi prende lo vede PRIMA di prendere,
+satoshi, e i client altrui leggono «23 EUR per N sats», senza rompersi.
+ANDREA HA SCELTO LA 3, sotto-scelta «b»: l'importo esatto ENTRA NEL
+`pm` — «Contanti al tabacchino 23.47», col PUNTO perché la virgola
+separa i metodi nel tag — così chi prende lo vede PRIMA di prendere,
 e i nostri giudici passano da uguaglianza a PREFISSO. E ha accolto le
 due proposte in coda: la vita nel libro a 24 ore, e il premio cotto nei
 sats, facoltativo.
 
-**LE DUE RIGHE CHE SI ROVESCIANO, e vanno dette.** La prima Ã¨ del 16
-set, nel catalogo dei vestiti: Â«IL TAG `pm` NON SI TOCCAÂ» â€” era scritta
-perchÃ© i giudici cercavano la stringa esatta e i client altrui leggono
+**LE DUE RIGHE CHE SI ROVESCIANO, e vanno dette.** La prima è del 16
+set, nel catalogo dei vestiti: «IL TAG `pm` NON SI TOCCA» — era scritta
+perché i giudici cercavano la stringa esatta e i client altrui leggono
 quella. Si rovescia per una ragione che quel giorno non c'era: il
-`fiat_amount` intero del protocollo non porta i centesimi, e il `pm` Ã¨
+`fiat_amount` intero del protocollo non porta i centesimi, e il `pm` è
 l'unico posto pubblico che il client scrive. I client altrui vedono il
-numero come parte del nome del metodo. La seconda Ã¨ del 10 set, Â«solo
-cifreÂ»: quella cura era DIRLO invece di accettare i decimali, e resta
-vera per gli euro del P2P â€” l'importo di un ordine Amazon Ã¨ l'ECCEZIONE
-dichiarata, perchÃ© quella cifra nasce coi centesimi e non la sceglie
+numero come parte del nome del metodo. La seconda è del 10 set, «solo
+cifre»: quella cura era DIRLO invece di accettare i decimali, e resta
+vera per gli euro del P2P — l'importo di un ordine Amazon è l'ECCEZIONE
+dichiarata, perché quella cifra nasce coi centesimi e non la sceglie
 chi pubblica. Solo quel campo, con lo stesso impianto: testo filtrato,
 `beforeinput`, la rete; un separatore al massimo, due decimali al
-massimo; tre decimali o due separatori sono STORTI, non Â«quasi giustiÂ».
-Con lei se ne vanno il secondo campo dell'importo, la nota Â«gli importi
-non combacianoÂ» e il dialogo CINQUANTANOVE: con una cifra sola e i sats
-fatti su quella non c'Ã¨ piÃ¹ niente da confrontare (e i gesti dalla
+massimo; tre decimali o due separatori sono STORTI, non «quasi giusti».
+Con lei se ne vanno il secondo campo dell'importo, la nota «gli importi
+non combaciano» e il dialogo CINQUANTANOVE: con una cifra sola e i sats
+fatti su quella non c'è più niente da confrontare (e i gesti dalla
 domanda unica scendono a sessantaquattro).
 
 **IL NODO.** Sette patcher ad ancore uniche con `--secco`, uno per
 patch: tre nuovi (0001 `lnurl-tor-freddo`, 0002 `dev-fee-zero`, 0003
 `dev-fee-cappelli`, fino a ieri solo `.patch` da ritocchi a mano), il
 `--secco` alla 0004 (provava un file alla volta e scriveva subito), e
-la 0007 con un aggancio in piÃ¹, il venticinquesimo: `payout-failed`
+la 0007 con un aggancio in più, il venticinquesimo: `payout-failed`
 PRIMA di arrivare a LND. Upstream #908 fa passare tutti i fallimenti
-pre-claim â€” indirizzo che non si risolve, fattura storta o scaduta, LND
-irraggiungibile â€” dal ramo `Err` di `do_payment`, quindi un aggancio
+pre-claim — indirizzo che non si risolve, fattura storta o scaduta, LND
+irraggiungibile — dal ramo `Err` di `do_payment`, quindi un aggancio
 solo li copre; il modulo classifica l'errore in una parola-macchina
-(`INVOICE_INVALID`, `ADDRESS_UNRESOLVED`, `LND_UNREACHABLE`â€¦) e mai il
+(`INVOICE_INVALID`, `ADDRESS_UNRESOLVED`, `LND_UNREACHABLE`…) e mai il
 testo, con un test suo. Fino alla `-bar4` quei fallimenti erano MUTI
-verso il server, ed era cosÃ¬ anche sulla 0.18.7. Le sette `.patch` sono
+verso il server, ed era così anche sulla 0.18.7. Le sette `.patch` sono
 state RIGENERATE sulla 0.18.8 dai patcher (un clone pulito, un commit
 per patch col messaggio di prima, `format-patch`), verificate contro
 `git am` (stesso albero) e messe nel repo coi nomi di sempre. Il README
 del fork dice tutto questo, e una cosa che prima non c'era: **il
-rollback dalla 0.18.8 non Ã¨ piÃ¹ una riga** â€” la 0.18.8 porta due
+rollback dalla 0.18.8 non è più una riga** — la 0.18.8 porta due
 migrazioni (una colonna nei bond) e un binario 0.18.7 su quel database
 si ferma con `VersionMissing`; la sequenza `-bar5` in PRODUZIONE ha il
 backup del database al punto 0 e le due strade al punto 9.
@@ -23918,28 +23918,28 @@ col numero dentro. I quattro dei centesimi accanto a quelli dell'intero:
 `centesimiP2P`, `centesimiTestoP2P`, `soloCentesimiP2P`,
 `ripuliCentesimiP2P`. `satsTabacchinoP2P` con la formula del
 coordinatore, sottrazione uniforme. Il foglio: col tabacchino il campo
-dell'importo Ãˆ l'importo Amazon (tastiera `decimal`, filtro dei
-centesimi, placeholder Â«23,47Â»), la sezione Amazon tiene numero e
+dell'importo È l'importo Amazon (tastiera `decimal`, filtro dei
+centesimi, placeholder «23,47»), la sezione Amazon tiene numero e
 scadenza, la leva del prezzo e i sats a mano spariscono, il premio resta
-con la riga Â«facoltativo, cotto nei satsÂ». `valeNuovoOrdineP2P`: giudice
-dei centesimi, Â«Aspetta un attimo: sto leggendo il cambioÂ» senza cambio
+con la riga «facoltativo, cotto nei sats». `valeNuovoOrdineP2P`: giudice
+dei centesimi, «Aspetta un attimo: sto leggendo il cambio» senza cambio
 vivo, i due tetti in sats del coordinatore guardati sui sats calcolati.
-`ordineDaCampiP2P`: `fiat_amount` arrotondato al piÃ¹ vicino (23,50 â†’ 24),
-`amount` esatto, `premium` 0, il metodo riscritto con l'importo â€” da una
-riga che lo porta giÃ  (il Â«RiprovaÂ») non si raddoppia â€”, `expires_at` =
+`ordineDaCampiP2P`: `fiat_amount` arrotondato al più vicino (23,50 → 24),
+`amount` esatto, `premium` 0, il metodo riscritto con l'importo — da una
+riga che lo porta già (il «Riprova») non si raddoppia —, `expires_at` =
 min(scadenza Amazon, adesso + 24 h). Il lettore del libro e la restore
 prendono l'esatto dal `pm` SOLO se combacia arrotondato con l'intero:
-un pm che dice 30 su un fa che dice 23 Ã¨ di un client che scrive a
+un pm che dice 30 su un fa che dice 23 è di un client che scrive a
 caso, e comanda il numero su cui il coordinatore ha fatto i conti. La
-riga locale porta l'esatto, il metodo com'Ã¨ nel libro e il premio
+riga locale porta l'esatto, il metodo com'è nel libro e il premio
 cotto; il canale riceve l'esatto e il metodo per nome; il recapito
-cifrato dice Â«Importo: 23,47 â‚¬Â»; il recapito a mano di chi vende accetta
-i centesimi. Il filtro del libro cercava giÃ  per sottostringa e non ha
+cifrato dice «Importo: 23,47 €»; il recapito a mano di chi vende accetta
+i centesimi. Il filtro del libro cercava già per sottostringa e non ha
 avuto bisogno di niente.
 
 **IL SERVER.** `/api/p2p/canale` accetta un decimale arrotondato al
-centesimo (era `int()`, che su 23.47 rispondeva Â«Importo stortoÂ»);
-`_euro_tabacchino` e `_metodi_libro` SENZA `re`, apposta, perchÃ© le
+centesimo (era `int()`, che su 23.47 rispondeva «Importo storto»);
+`_euro_tabacchino` e `_metodi_libro` SENZA `re`, apposta, perché le
 prove estraggono le funzioni una per una; `_euro_libro(valori, metodi)`
 con la stessa regola del client (l'esatto vince solo se combacia); le
 frasi del libro e di `_dati_frase_p2p` dicono il metodo per nome e la
@@ -23949,30 +23949,43 @@ cifra coi centesimi.
 Python e JS (una copia fresca, il sottoinsieme delle sezioni P2P):
 27 mutazioni su 27 uccise, zero vive, nessuna ancora mancante, in tre giri (23/26 al primo, 26/27 al secondo, 27/27 al terzo). Le tre vive del primo giro hanno detto tre cose vere:
 l'arrotondamento in `centesimiP2P` era codice MORTO (la forma ammette al
-piÃ¹ due decimali, `Number()` Ã¨ giÃ  al centesimo) ed Ã¨ uscito; un incolla
-Â«1,5,5Â» non era provato; e il `premium` a zero sul filo col tabacchino
-non era inchiodato â€” lo Ã¨. Sul lato nodo: le sette `.patch` entrano con
+più due decimali, `Number()` è già al centesimo) ed è uscito; un incolla
+«1,5,5» non era provato; e il `premium` a zero sul filo col tabacchino
+non era inchiodato — lo è. Sul lato nodo: le sette `.patch` entrano con
 `git am`, i sette patcher a secco e a scrittura, le due strade danno lo
 stesso albero, e `git am` delle `.patch` nuove lo riproduce.
 
-**NON PROVATO, e dichiarato.** Il Rust: nÃ© la 0.18.8 col fork nÃ© il
+**NON PROVATO, e dichiarato.** Il Rust: né la 0.18.8 col fork né il
 modulo degli eventi col classificatore pre-claim sono mai stati
-compilati â€” il primo `cargo` Ã¨ il punto 4 della liturgia `-bar5`, e i
+compilati — il primo `cargo` è il punto 4 della liturgia `-bar5`, e i
 quattro punti da guardare per primi stanno nel README del fork. Il
 telefono: il campo coi centesimi, la tastiera decimale, il foglio senza
-la leva del prezzo, la card con Â«23,47 â‚¬Â», il recapito cifrato â€” la
-prova a due telefoni con un ordine da 23,47 â‚¬ sta in PRODUZIONE. Un
-client Mostro altrui davanti a Â«Contanti al tabacchino 23.47Â» (letto sul
+la leva del prezzo, la card con «23,47 €», il recapito cifrato — la
+prova a due telefoni con un ordine da 23,47 € sta in PRODUZIONE. Un
+client Mostro altrui davanti a «Contanti al tabacchino 23.47» (letto sul
 codice di mostro-cli, mai fatto girare). E il libro dopo 24 ore: che il
-coordinatore scada l'ordine a `expires_at` Ã¨ verificato al secondo dal
-6 set, ma l'avviso Â«scadutoÂ» al venditore con l'ordine Amazon ancora
+coordinatore scada l'ordine a `expires_at` è verificato al secondo dal
+6 set, ma l'avviso «scaduto» al venditore con l'ordine Amazon ancora
 valido, e la ripubblicazione, non li ha visti nessuno.
 
-**COSA RESTA DA GUARDARE.** Il messaggio di Â«scadutoÂ» sulla pagina del
-venditore non dice ancora Â«l'ordine Amazon vale fino a X: ripubblica col
-cambio nuovoÂ» â€” lo dice il foglio, dove si sceglie; se dal vivo confonde,
-Ã¨ una riga. E i due segreti che non cambiano: le cinque variabili del
+**COSA RESTA DA GUARDARE.** Il messaggio di «scaduto» sulla pagina del
+venditore non dice ancora «l'ordine Amazon vale fino a X: ripubblica col
+cambio nuovo» — lo dice il foglio, dove si sceglie; se dal vivo confonde,
+è una riga. E i due segreti che non cambiano: le cinque variabili del
 compose restano com'erano, `settings.toml` non si tocca.
+
+**IN SERVIZIO, LO STESSO GIORNO.** La sera del 22 set Andrea ha fatto la
+liturgia `-bar5` sul nodo: i sette patcher hanno detto le uscite attese,
+il primo `cargo` del fork sulla 0.18.8 è passato al primo colpo — 440
+test verdi nello stadio `builder`, zero falliti, quindi i quattro punti
+«da guardare per primi» hanno compilato —, le migrazioni nel database
+sono 15 (le due nuove comprese), e `mostro:v0.18.8-bar5` è in servizio
+con i sette commit `8a5eef9..1489f38`. E il primo scambio Barattozon da
+**23,47 €** (31.209 sats) è riuscito lo stesso giorno: la prova a due
+telefoni che sopra era «da avere» ha dato il conto al satoshi. Restano
+non visti il libro dopo 24 ore e un client altrui davanti al `pm` col
+numero. (E il verbale stesso era arrivato su main con gli accenti
+doppiamente codificati — una pipe letta in cp1252 —: riscritto il 23 set.)
 
 ## Il pallino su «I miei scambi» (22 set 2026)
 
