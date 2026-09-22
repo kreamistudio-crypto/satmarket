@@ -10356,18 +10356,45 @@
   scambi».
   E LA STESSA DOMANDA SCRIVE IL CONTO DELL'INTESTAZIONE di «I miei
   scambi» (22 set 2026): «N scambi aperti · M tocca a te», dove M e'
-  `quantiToccaAMeP2P` e N sono gli scambi che lo stesso giudice non
-  mette in «Conclusi» ne' in «Annullati» — le tre pillole aperte del
-  foglio del filtro, sommate, e gli stessi di `P2P_FINALI`. «Tocca a
-  te» sta dentro gli aperti, quindi M non supera mai N. La prima
-  stesura contava il solo gruppo «In corso», e con uno scambio mio si
-  leggeva «0 in corso»: rovesciata la sera stessa. Lo dipinge
+  `quantiToccaAMeP2P` e N sono gli scambi PRESI — quelli con qualcuno
+  dall'altra parte. Li conta `presoP2P`, e li dice per ESCLUSIONE
+  sullo stesso giudice: dentro stanno i gruppi «Tocca a te» e «In
+  corso», fuori i due finiti, il gruppo «Nel libro» (un ordine
+  pubblicato aspetta che qualcuno lo prenda) e i due stati in cui si
+  aspetta il coordinatore prima che una presa sia confermata,
+  `prendo` e `senza_risposta` — l'unica lista di stati del giro, e
+  sta in una costante col suo nome (`P2P_PRIMA_DELLA_PRESA`). «Tocca
+  a te» sta sempre dentro i presi (`azioniDisponibili` risponde solo
+  su quegli stati), quindi M non supera mai N. DUE ROVESCIAMENTI IN
+  UN GIORNO, ed e' la strada: la prima stesura contava il solo gruppo
+  «In corso» e con uno scambio mio si leggeva «0 in corso»; la
+  seconda contava tutto il non-finito, e allora un ordine appeso nel
+  libro da solo diceva «1 scambio aperto» senza che ci fosse nessuno
+  dall'altra parte. Lo dipinge
   `intestaScambiP2P`, da `renderP2P`, DOPO il corpo dei miei; prima
   del libro l'immagine resta e il conto aspetta. L'intestazione (80px,
   col conto e la riga di strumenti sotto lo stesso velo) sta NEL blocco
   attaccato; senza scambi `.vuota` toglie velo e monete. I verbali:
   CANTIERI, «L'intestazione di I miei scambi» e «Il ritocco
   dell'intestazione».
+  LA CARD PRENDE LA TINTA DEL SUO STATO (22 set 2026, richiesta di
+  Andrea): in «I miei scambi» ogni card si vela del colore del suo
+  stato — arancio dove tocca a me, viola quando la palla e'
+  dall'altra parte, blu al pagamento, verde da conclusa, rossa in
+  disputa, grigia da annullata — e il riquadro tiene il colore pieno.
+  UNA CLASSE SOLA: `tonoCardP2P` non e' un giudice nuovo, e'
+  `tintaStatoP2P` — quella del riquadro — riscritta in `tinta
+  tono-<nome>`, quindi card e riquadro non possono dire due cose
+  diverse; e il COLORE NON E' L'UNICO SEGNO, la parola dello stato
+  resta dov'e'. Il velo lo fa `color-mix` fra l'inchiostro del
+  riquadro e la carta, con due percentuali (6% di giorno, 8% di sera:
+  `--tinta-card`) e il bordo piu' carico (`--tinta-bordo`), tutto
+  DENTRO un `@supports` — senza `color-mix` la dichiarazione cadrebbe
+  e la card resterebbe trasparente sul crema, non bianca. Il testo
+  piu' debole su ogni tinta sta a 4,59:1 di giorno e 4,62 di sera, e
+  la riga di servizio e' passata da `--muted` a `--ink-soft` apposta.
+  E' un colore fermo: «effetti ridotti» non ha niente da togliergli.
+  Il verbale: CANTIERI, «I ritocchi del P2P».
   IL LINK PORTA DOVE C'E' IL GESTO (ago 2026, dal campo): la notifica
   della controproposta diceva «Accetta o rifiuta dalla scheda Ordini» e
   allegava un link a `/annuncio/{id}` — il testo mandava in un posto e
@@ -21929,7 +21956,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Andrea): dopo il barattolo, terza della fila, una card come le
   altre — stesso `.cat-quad` bruno, stessa `.cat-fig`, stessa
   etichetta sotto — col LOGO COMPLETO del P2P
-  (`/assets/p2p-logo-completo.png`) al posto dell'illustrazione e
+  (`/assets/p2p-logo-grande.webp` dal 22 set 2026, prima il PNG da
+  152 che a 125px su un telefono a 3x usciva morbido) al posto
+  dell'illustrazione e
   «Scambio P2P» scritto sotto. È il SECONDO ingresso allo scambio,
   accanto al tab della nav: la fila delle categorie è il posto dove
   si guarda «cosa c'è qui dentro», e chi apre l'app dalla home il
@@ -25967,14 +25996,19 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    della sezione «Da scoprire», whitelist a tupla `FILE_SCOPRIRE`,
    ago 2026), `/assets/mascotte.jpeg`,
    `/assets/barattolo.jpeg`, `/assets/barattolo-hero.png`,
-   `/assets/p2p-logo-compra.png`, `/assets/p2p-logo-vendi.png`,
-   `/assets/p2p-logo-completo.png` (i tre del logo P2P, set 2026; dal
-   22 set i due gemelli del libro sono a 288px, rifatti dai sorgenti da
-   480 di Andrea, e il completo resta a 152 per i posti piccoli),
-   `/assets/p2p-logo-grande.webp` (il completo NITIDO di «Info P2P», 22
-   set 2026: 396x396, il 3x dei 132 a cui la pagina lo mostra, WebP con
-   trasparenza da 39 KB — vedi CANTIERI, «Il ritocco
-   dell'intestazione»),
+   `/assets/p2p-logo-compra.webp`, `/assets/p2p-logo-vendi.webp`
+   (i due gemelli del libro, set 2026; dal 22 set sera sono WebP da
+   360px — il 3x dei 120 a cui il logo arriva fra i tab — dai sorgenti
+   nuovi di Andrea: 33 KB l'uno invece degli 87 del PNG, e senza i
+   gradini che il PNG a 256 colori faceva sulle sfumature),
+   `/assets/p2p-logo-grande.webp` (il completo a 396x396, il 3x dei 132
+   di «Info P2P»; dal 22 set sera veste anche la card «Scambio P2P»
+   della home e il libro vuoto, che col PNG da 152 erano morbidi a 3x —
+   sei KB in piu' sulla prima pagina e un file in meno da tenere in
+   pari. I tre PNG della famiglia sono usciti con le loro rotte: chi ha
+   una pagina vecchia in cache prende un 404 e l'`onerror` toglie
+   l'immagine, che e' il ripiego gia' scritto nel markup. Vedi CANTIERI,
+   «Il ritocco dell'intestazione» e «I ritocchi del P2P»),
    `/assets/barattozon.webp` (il marchio del metodo «Contanti al
    tabacchino», 16 set 2026: WebP con trasparenza, 305x96, cartella
    sua e mai assets/categorie/ — vedi «IL VESTITO BARATTOZON»),

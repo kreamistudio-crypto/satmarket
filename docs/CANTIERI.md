@@ -24900,3 +24900,163 @@ non l'ha visto nessuno. E la tinta della FASCIA colorata si muove a
 scatti di un punto — `fasciaPremioP2P` arrotonda all'intero, che è del
 cursore normale: il pallino scorre liscio, la banda no. Misurato, non
 curato.
+## I ritocchi del P2P: il conto dei presi, i loghi nitidi, il velo del libro e le card colorate (22 set 2026, sera)
+
+Cinque richieste di Andrea in un giro solo, tutte sulla stessa pagina
+e tutte piccole — ma due rovesciano una decisione presa poche ore
+prima, ed e' la parte che vale la pena scrivere.
+
+**1) IL CONTO DICE I PRESI, E NON PIU' GLI APERTI.** La riga
+dell'intestazione diceva «N scambi aperti», dove N era tutto cio' che
+non fosse concluso o annullato. Con un ordine appeso nel libro e
+nessuno dall'altra parte, quella riga diceva «1 scambio aperto»: vero
+alla lettera e falso in bocca, perche' uno scambio con nessuno non e'
+uno scambio. Adesso N sono i PRESI — `presoP2P` —, e la richiesta di
+Andrea era esattamente questa: «contano solo gli scambi presi
+(qualcuno dall'altra parte c'e'); i miei ordini ancora nel libro senza
+controparte non entrano ne' in N ne' in M».
+IL GIUDICE RESTA UNO e la regola si dice per ESCLUSIONE, che e' la
+forma che non si scolla: dentro i due gruppi vivi («Tocca a te», «In
+corso»), fuori i due finiti, fuori il gruppo «Nel libro», e fuori i
+due stati in cui si aspetta il coordinatore PRIMA che una presa sia
+confermata — `prendo` (l'ho chiesta io) e `senza_risposta` (non ha
+risposto: l'ordine potrebbe essere ancora libero). Tutto il resto che
+non e' finito e' preso per costruzione: ci si arriva solo dopo una
+presa accettata.
+QUEI DUE STATI SONO L'UNICA LISTA DI STATI DEL GIRO, e sta FUORI dal
+giudice in una costante col suo nome (`P2P_PRIMA_DELLA_PRESA`): dentro
+`presoP2P` le sole parole fra apici sono nomi di GRUPPI, e c'e' una
+prova che lo verifica. Se un ritocco storpiasse uno dei due nomi, la
+funzione smetterebbe di escludere IN SILENZIO — quindi una prova
+guarda che i due stati esistano davvero nella macchina.
+DUE ROVESCIAMENTI IN UN GIORNO SULLA STESSA RIGA, ed e' il verbale che
+serve piu' del codice: la mattina contava il solo gruppo «In corso» e
+con uno scambio mio diceva «0 in corso»; il pomeriggio contava tutto
+il non-finito, e allora il libro entrava nel conto. La terza stesura
+e' la prima che risponde alla domanda che la riga fa davvero, cioe'
+«con quante persone sto scambiando».
+
+**2) I LOGHI NITIDI, E UN FILE IN MENO.** La card «Scambio P2P» della
+home e il libro vuoto usavano il PNG completo da 152px: a 125 e 76px
+su un telefono a 3x erano morbidi. Adesso usano il WebP grande da 396
+gia' fatto per «Info P2P» — sei KB in piu' sulla prima pagina, che e'
+il prezzo che avevo proposto, e un file in meno da tenere in pari. Il
+PNG e' uscito con la sua rotta.
+I DUE GEMELLI DEL LIBRO SONO WEBP DA 360 (i sorgenti nuovi di Andrea,
+`4.png` e `5.png`: la freccia VERDE accesa e' «compra», la ROSSA e'
+«vendi», ed e' il verso dei gemelli di ieri). 33 KB l'uno invece degli
+87 del PNG a 24 bit, e senza i gradini che il PNG a 256 colori faceva
+sulle sfumature del barattolo. 360 e' il 3x del tetto nuovo del logo.
+⚠️ I DUE NON SONO RITAGLIATI AL PIXEL UGUALI (la freccia accesa
+deborda di tre pixel su 360, cioe' uno scarso a schermo), e la prova
+lo dice con una TOLLERANZA di quattro pixel invece che con
+l'uguaglianza: chiedere l'esatto sarebbe stata una rossa per un
+disegno che va benissimo — ma senza nessuna prova, un gemello
+ritagliato davvero diverso farebbe saltare il logo di posto a meta'
+sfumatura, e non se ne accorgerebbe nessuno.
+
+**3) IL LOGO DEL LIBRO PIU' GRANDE, E I PIXEL VENGONO DAL VELO.** Il
+tetto passa da 96 a 120px e la formula da `100vw - 280` a
+`100vw - 265`: a 360 il logo e' 95 (era 80), a 375 e' 110 (era 95), da
+385 in su e' 120. I quindici pixel non sono stati tolti alle scritte —
+la richiesta era «senza fargli toccare le scritte» —: sono venuti dai
+margini del logo (6+6, che la trasparenza del disegno rende inutili) e
+dai tab, che adesso arrivano ai bordi del velo con un margine negativo
+di 8 per lato. Al tab restano SEMPRE 108,5px per i 102,2 di «Compra
+BTC», misurati dal vivo: la formula e' `100vw` meno una costante
+proprio perche' quello spazio non cambi mentre il logo cresce.
+MISURATO A 360, 375, 390, 412 E 430 con Chrome headless: «Compra BTC»
+e «Vendi BTC» stanno su UNA riga a tutte e cinque.
+⚠️ A 320 «COMPRA BTC» VA A CAPO, e ci andava anche prima: sotto la
+soglia il logo resta al suo minimo di 76 e i conti non tornano
+comunque (servirebbe un logo da 67). E' fuori dalla fascia che Andrea
+ha chiesto (360-430) e il ritocco l'ha migliorata di sei pixel, non
+peggiorata; si chiude abbassando il minimo del logo, ed e' una
+decisione sua.
+
+**4) IL VELO DEL LIBRO E' LA STESSA REGOLA DELLA SORELLA.** Dietro il
+logo e i due tab c'e' adesso il velo di «I miei scambi». «Identico»,
+ha chiesto Andrea: stesso colore nei due temi, stessa forma, stessi
+angoli — e la forma piu' forte di «identico» e' UNA REGOLA SOLA con
+due selettori (`.scambi-testa,.libro-testa`), cioe' gli stessi byte.
+Una copia che somiglia si scollerebbe al primo ritocco di uno dei due,
+e infatti c'e' una prova che la copia non nasca.
+
+**5) LE CARD PRENDONO LA TINTA DEL LORO STATO.** Il riquadro tiene il
+colore pieno, la card ne prende un velo: scorrendo la lista si vede a
+che punto sono gli scambi senza leggerli uno per uno.
+LA TINTA NON E' UNA SECONDA VERITA': esce dalla STESSA classe che
+veste il riquadro (`tintaStatoP2P` → `tonoCardP2P`), quindi card e
+riquadro non possono dire due cose diverse, e un colore nuovo si
+aggiunge in un posto solo. E IL COLORE NON E' L'UNICO SEGNO — la
+parola dello stato resta dov'e', per chi i colori non li distingue.
+LE DUE PERCENTUALI SONO UNA DECISIONE MISURATA, non un gusto: 6% di
+giorno e 8% di sera. Di giorno la carta e' bianca e una tinta piu'
+forte spegne la cifra arancio dei sats sotto la soglia AA — col 22%
+la prova diventa rossa, verificato torturandola. Il testo piu' debole
+su ogni tinta sta a 4,59:1 di giorno e 4,62 di sera, e per arrivarci
+la riga di servizio, la scatola del metodo e il premio sono passati da
+`--muted` (3,8:1 su bianco, gia' sotto la soglia PRIMA di ogni tinta)
+a `--ink-soft`.
+⚠️ IL `color-mix` STA DIETRO UN `@supports`, e non e' prudenza
+generica: senza, un browser che non lo conosce butterebbe la
+dichiarazione e la card resterebbe SENZA fondo — trasparente sul crema
+della pagina, non bianca. Dentro il supporto si tinge, fuori resta il
+mondo di ieri.
+⚠️ E LA TINTA NON E' IL GRUPPO, che e' la sola cosa che sorprende
+guardando la pagina: a euro ricevuti chi VENDE ha il gesto del
+rilascio — la card sta in «Tocca a te» — ma il riquadro li' e' viola e
+non arancio, e la card lo segue. E' la regola («una classe sola») che
+lo impone: il giorno che si volesse l'arancio anche li' si sposta la
+tinta del RIQUADRO, e la card viene dietro da sola. Scritto qui perche'
+non venga «curato» dalla parte sbagliata.
+IL RIQUADRO SULLA CARD TINTA NON HA UN RAPPORTO SUO da rispettare: il
+suo fondo e la tinta sono lo stesso colore a due forze (1,03-1,14 di
+rapporto), e chiedere 3:1 vorrebbe dire rifare i sei fondi dei
+riquadri. A staccarlo c'e' un filo del suo stesso inchiostro
+(`currentColor 30%`), e la ragione sta scritta accanto alla prova
+perche' un domani non si cerchi una prova che non c'e' per
+distrazione.
+
+**LE PROVE.** Sezione nuova `prove_card_tinte_stato` (21): la classe
+sola, il markup che la indossa, i sei toni e i loro inchiostri, il
+filo del riquadro, il censimento delle otto regole senza effetti, i
+contrasti RIFATTI sui token e sulle due percentuali (e una prova che
+LEGA i token misurati alle regole vere, senno' una riga che torna a
+`--muted` passerebbe il conto misurando un token che non veste piu'
+niente), la tinta che si stacca davvero dalla carta — una velatura a
+zero passerebbe ogni contrasto senza tingere — e il banco su TUTTI i
+19 stati della macchina, dai due lati. `prove_intestazione_scambi`
+rifatta sul conto nuovo, col banco che classifica ogni stato (gruppo +
+preso) e nomina i vivi che restano fuori. `prove_logo_p2p_nitido`
+rifatta sui WebP e sulla geometria nuova. Emendate le sentinelle del
+libro (la forma del blocco attaccato col velo in mezzo) e dei tre file
+del logo. `prove.py` intera: **13191/0** con `PROVE_SEVERE=1`, e gli
+otto collaudi senza rete verdi.
+TORTURA SU UNA COPIA: **26 mutazioni, 26 uccise**, e ognuna dalla
+prova che NOMINA la cosa rotta.
+⚠️ E LA TORTURA HA TROVATO UN DIFETTO DELLE PROVE, non del codice: tre
+ancore cercavano col `index` di Python, che quando non trova ALZA — e
+l'eccezione si porta via la sezione intera, banco compreso. Da fuori
+si legge un traceback al posto del nome della cosa rotta, e le prove
+dopo non le guarda piu' nessuno. Adesso si cerca con `find` e la
+rossa ha un nome. LE TRE ERANO LA STESSA RIGA SCRITTA IN TRE POSTI: la
+prima si e' vista subito, la terza solo rigirando la tortura DOPO aver
+curato le prime due. Quando se ne trova una si cercano tutte.
+
+**DAL VIVO**, sull'app servita dal worktree (collaudo 111, leva accesa,
+relay morto), a 375 px e a densita' 3 con Chrome headless via CDP:
+dodici scambi seminati che coprono i sei toni piu' i due stati senza
+tinta, chiaro e scuro; il conto dice «7 scambi aperti · 3 tocca a te»,
+cioe' i presi — con l'ordine nel libro, il `prendo` e il
+`senza_risposta` FUORI, e i conclusi e gli annullati fuori come prima;
+le card tinte, la testata ferma mentre ci scorrono sotto; la testata
+del libro col logo a 110px sul velo; e le scritte dei tab misurate a
+320, 360, 375, 390, 412 e 430 (una riga sola da 360 in su, due a 320).
+
+**NON PROVATO, E DA GUARDARE.** Sul telefono vero dentro Telegram: le
+tinte coi colori veri di uno schermo OLED (in chiaro sono velature da
+6%, e una calibrazione fredda le puo' spegnere quasi del tutto); il
+logo del libro a 3x coi file nuovi e la sua sfumatura al tocco; e il
+conto dei presi con un evento VERO del coordinatore — qui i dodici
+scambi sono seminati a mano.
