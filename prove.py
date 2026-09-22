@@ -54573,6 +54573,9 @@ def prove_p2p_pubblica():
         + "\n" + _intera("function scontoTestoTabP2P(n){")
         + "\n" + _intera("function scontoImplicitoTabacchinoP2P(euro, sats, cambio){")
         + "\n" + _intera("function passoTabacchinoP2P(v){")
+        # il tetto di Amazon (23 set 2026)
+        + "\n" + _intera("function giudiceImportoPayCodeP2P(euro){")
+        + "\n" + re.search(r"const P2P_PAYCODE_MAX_EURO = [^\n]*;", mini).group(0)
         + "\n" + re.search(r"const P2P_PAYCODE_MIN_S = [^\n]*;", mini).group(0)
         + "\n" + re.search(r"const P2P_PAYCODE_MAX_S = [^\n]*;", mini).group(0)
         + "\n" + re.search(r"const P2P_TABACCHINO_MARGINE_S = [^\n]*;", mini).group(0)
@@ -54738,6 +54741,10 @@ def prove_p2p_pubblica():
         "      storto: con({tab: tab({ordine: '123-4567890-1234567'})}).manca,\n"
         "      sconto: [con({sconto: '16'}).manca, con({sconto: '2,55'}).manca, con({sconto: '2,5'}).ok,\n"
         "               con({sconto: ''}).ok, con({sconto: 'abc'}).campo, con({sconto: '15'}).ok],\n"
+        # il tetto di Amazon nel giudice del foglio (23 set 2026): a
+        # tetti in sats spenti, che 999 € sono due milioni di sats
+        "      tetto999: [con({euro: '999', maxSats: 0}).ok, con({euro: '999,01', maxSats: 0}).manca,\n"
+        "                 con({euro: '999,01', maxSats: 0}).campo, con({euro: '0,50'}).ok],\n"
         "      campi: [con({lato: 'compro'}).campo, con({tab: tab({ordine: ''})}).campo,\n"
         "              con({euro: ''}).campo, con({tab: tab({scade: ''})}).campo,\n"
         "              con({cambio: 0}).campo],\n"
@@ -55101,6 +55108,9 @@ def prove_p2p_pubblica():
           "Troppo lontana: un PayCode vale al massimo 72 ore", tv["lontana"])
     prova("...la garanzia parla solo quando e' lei la piu' stretta",
           "Troppo lontana: la garanzia copre al massimo 10 ore da adesso", tv["lontanaGaranzia"])
+    prova("il tetto di Amazon nel foglio: 999,00 passa, 999,01 no (col campo dell'importo), 0,50 passa",
+          [True, "Amazon accetta il pagamento in contanti fino a 999 € per ordine", "p2pNuovoEuro", True],
+          tv["tetto999"])
     prova("lo sconto: 16 no, 2,55 no, 2,5 si', vuoto si' (zero), storto col suo campo, 15 al bordo si'",
           ["Lo sconto va da 0 a 15%, con una cifra decimale al massimo",
            "Lo sconto va da 0 a 15%, con una cifra decimale al massimo",
@@ -62294,7 +62304,7 @@ def prove_p2p_paycode():
         + "\n".join(_riga(n) for n in (
             "P2P_TABACCHINO", "P2P_TABACCHINO_PM", "P2P_TABACCHINO_VITA_S",
             "P2P_PAYCODE_MIN_S", "P2P_PAYCODE_MAX_S", "P2P_TABACCHINO_MARGINE_S",
-            "P2P_SCONTO_TAB_MAX", "P2P_TAB_ULTIMA_S", "P2P_TAB_CONTROLLO_S",
+            "P2P_SCONTO_TAB_MAX", "P2P_PAYCODE_MAX_EURO", "P2P_TAB_ULTIMA_S", "P2P_TAB_CONTROLLO_S",
             "P2P_TAB_AVVISO_S"))
         + "\n" + _forme + "\n" + _tappe + "\n"
         + "\n".join(_intera(f) for f in (
@@ -62306,6 +62316,7 @@ def prove_p2p_paycode():
             "function scontoTabacchinoP2P(testo){", "function scontoTestoTabP2P(n){",
             "function scontoImplicitoTabacchinoP2P(euro, sats, cambio){",
             "function passoTabacchinoP2P(v){", "function rigaScontoTabP2P(euro, cambio, sconto){",
+            "function giudiceImportoPayCodeP2P(euro){",
             "function testataPercorsoTabP2P(passo){", "function riepilogoTabacchinoP2P(v){",
             "function scadeDaCampoP2P(s){", "function campoDaScadeP2P(epoch){",
             "function dataTabacchinoP2P(epoch){", "function leggiDataTabacchinoP2P(testo){",
@@ -62338,6 +62349,9 @@ def prove_p2p_paycode():
         "  scontoTesto: [scontoTestoTabP2P(0), scontoTestoTabP2P(2.5), scontoTestoTabP2P(15), scontoTestoTabP2P(2.55)],\n"
         "  sats: [satsTabacchinoP2P(23.47, 0.0005, 0), satsTabacchinoP2P(23.47, 0.0005, 2.5),\n"
         "         satsTabacchinoP2P(23.47, 0.0005, 2.55), satsTabacchinoP2P(23.47, 0.0005, 15)],\n"
+        # I LIMITI DI AMAZON (23 set 2026): fino a 999,00 compresi, nessun
+        # minimo oltre lo zero; si confronta in centesimi
+        "  tetto: ['999', '999,00', '999,01', '0,50', '0,01', '0', '1000', '998,99', ''].map(x => giudiceImportoPayCodeP2P(centesimiP2P(x).n)),\n"
         "  implicito: [scontoImplicitoTabacchinoP2P(23.47, 45767, 0.0005), scontoImplicitoTabacchinoP2P(23.47, 46940, 0.0005),\n"
         "              scontoImplicitoTabacchinoP2P(23.47, 50000, 0.0005), scontoImplicitoTabacchinoP2P(23.47, 45767, 0),\n"
         "              scontoImplicitoTabacchinoP2P(0, 45767, 0.0005)],\n"
@@ -62404,6 +62418,19 @@ def prove_p2p_paycode():
           [True, True, True, True, True, False],
           [s["storto"] for s in out["sconto"][6:]])
     prova("...e si scrive con la virgola", ["0%", "2,5%", "15%", "2,6%"], out["scontoTesto"])
+    # --- I LIMITI DI AMAZON «Paga in contanti» (23 set 2026) -----------
+    _T = "Amazon accetta il pagamento in contanti fino a 999 € per ordine"
+    _Z = "Scrivi l'importo del PayCode, coi centesimi se servono"
+    prova("il tetto di Amazon: 999 e 999,00 passano, 999,01 e 1000 no; 0,50 e 0,01 passano (nessun minimo); zero e vuoto no",
+          ["", "", _T, "", "", _Z, _T, "", _Z], out["tetto"])
+    prova("...ed e' una costante sola, 999, letta dal giudice", True,
+          "const P2P_PAYCODE_MAX_EURO = 999;" in mini
+          and "Math.round(n * 100) > P2P_PAYCODE_MAX_EURO * 100" in _intera("function giudiceImportoPayCodeP2P(euro){"))
+    prova("...e il form a mano del recapito passa dallo stesso giudice", True,
+          "if (giudiceImportoPayCodeP2P(imp.n)) {" in pezzo_js(mini, "async function inviaCampoP2P(tipo, btn){", "\n}\n"))
+    prova("...mentre nessun minimo nostro esiste, ne' in client ne' in server: ne' P2P_MIN_EURO ne' un minimo in euro", True,
+          "P2P_MIN_EURO" not in mini and "P2P_MIN_EURO" not in src
+          and "MIN_EURO_P2P" not in src and "minEuro" not in mini)
     # 23,47 / 0,0005 = 46940 sats pieni; al 2,5% ne restano 45766,5 → 45767;
     # 2,55 si tosa al decimo (2,6 → 45720); al 15% 39899
     prova("i sats del PayCode: pieno, al 2,5%, al 2,55 tosato al decimo, al 15%",
@@ -62492,7 +62519,7 @@ def prove_p2p_paycode():
           "<b>479-868-518</b>" in _rc and "23.47 € in contanti" in _rc
           and 'id="p2pTabPayResta"' in _rc and 'data-fine="' + str(1800000000 + 30 * 3600) + '"' in _rc)
     prova("...coi quattro gesti nell'ordine: vai, dai il codice e paga, tieni lo scontrino, torna e segna", True,
-          _rc.index("Vai al tabaccaio") < _rc.index("Dai il PayCode alla cassa")
+          _rc.index("Vai in tabaccheria") < _rc.index("Dai il PayCode alla cassa")
           < _rc.index("Tieni lo scontrino") < _rc.index("«Ho pagato al tabacchino»"))
     prova("...e il bottone per copiare il codice", True,
           "copiaLink(this.dataset.pc, 'PayCode copiato 📋')" in _rc)
@@ -62567,6 +62594,20 @@ def prove_p2p_paycode():
           "scontoImplicitoTabacchinoP2P(o.euro, o.sats, cambio)" in _nd
           and "' sats</b> invece di ' + fmt(pieno)" in _nd
           and "Nessuno sconto" in _nd)
+    _per2 = pezzo_js(mini, "function percorsoTabacchinoP2P(val){", "\n}\n")
+    prova("il percorso dice le regole di Amazon: 72 ore dal checkout, 999 €, le esclusioni", True,
+          "Amazon dà 72 ore dal checkout: copia la scadenza dalla mail." in _per2
+          and "fino a <b>999 €</b> per ordine, senza minimo e senza commissione" in _per2
+          and "Non vale per Amazon Warehouse, contenuti digitali, oro, Prime, buoni regalo e acquisti 1-Click" in _per2
+          and "l\\'ordine non è pagabile con Barattozon" in _per2)
+    prova("...il riquadro di chi paga dice i quattro posti e «senza commissione»", True,
+          "Vai in tabaccheria, al bar, in edicola o alla posta" in out["riquadroCompro"]
+          and "senza commissione" in out["riquadroCompro"])
+    prova("...e «Info P2P» le ripete: posti, novecentonovantanove in lettere, le esclusioni", True,
+          "in tabaccheria, al bar, in edicola o alla posta" in _inf
+          and "novecentonovantanove euro" in _inf and "senza minimo e senza commissione" in _inf
+          and "Non vale per Amazon Warehouse, contenuti digitali, oro, Prime, buoni regalo e acquisti 1-Click" in _inf
+          and "settantadue ore dal checkout" in _inf)
     prova("le frasi del tempo dicono PayCode e l'avviso alla presa spiega le due ore", True,
           "Il PayCode scade fra meno di sei ore" in mini
           and "e il PayCode scade circa due ore dopo" in mini)
@@ -62586,6 +62627,19 @@ def prove_p2p_paycode():
           .replace("tabacchino", "").replace("metabase", ""))
     _rs = src[src.index('@app.post("/api/p2p/sveglia")'):]
     _rs = _rs[:_rs.index('@app.post("/api/p2p/sveglia/togli")')]
+    amb_e = {}
+    exec("PAYCODE_EURO_MAX = 999.0\n" + pezzo("_importo_paycode_valido"), amb_e)
+    _ip = amb_e["_importo_paycode_valido"]
+    prova("sul server lo stesso tetto: 999 e 999,00 si', 999,01 e 1000 no, 0,50 e 0,01 si', zero, negativo e storto no",
+          [True, True, False, False, True, True, False, False, False, False],
+          [_ip(999), _ip(999.0), _ip(999.01), _ip(1000), _ip(0.5), _ip(0.01), _ip(0), _ip(-1), _ip("x"), _ip(None)])
+    prova("...e la costante e' 999, in un posto solo", True, "PAYCODE_EURO_MAX = 999.0" in src)
+    _can_srv = src[src.index('@app.post("/api/p2p/canale")'):]
+    _can_srv = _can_srv[:_can_srv.index("\n\n\n")]
+    prova("...e la rotta del canale lo applica al SOLO Barattozon, dopo l'argine di tutti", True,
+          "if _tabacchino_libro([metodo]) and not _importo_paycode_valido(euro):" in _can_srv
+          and _can_srv.index("0 < euro <= MAX_EURO_P2P_CANALE") < _can_srv.index("_importo_paycode_valido(euro)")
+          and '"Amazon accetta il pagamento in contanti fino a 999 € per ordine"' in _can_srv)
     prova("la sveglia legge la sola scadenza, e l'orizzonte e' quello di un PayCode: 72 ore e un quarto", True,
           "PAYCODE_ORE_MAX = 72" in src
           and "SVEGLIA_P2P_ORIZZONTE_S = PAYCODE_ORE_MAX * 3600 + 900" in src

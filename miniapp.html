@@ -7884,10 +7884,10 @@ document.getElementById('cartello')?.remove();</script>
       <h3 id="p2pinfo-tabacchino">Barattozon: il PayCode al tabacchino, passo per passo</h3>
       <p>È il metodo per chi non vuole passare da una banca o da un'app: chi <b>vende</b> sats fa un <b>ordine Amazon da pagare in contanti nel punto vendita</b> e chi <b>compra</b> lo paga alla cassa del tabacchino col <b>PayCode</b>. Il tabacchino incassa i contanti, l'ordine Amazon risulta pagato, e i sats si liberano. Nel libro il metodo si chiama ancora «Contanti al tabacchino»: è la parola che leggono anche le altre app.</p>
       <ol class="sicu-passi">
-        <li><b>Chi vende fa l'ordine su Amazon</b> scegliendo «paga in contanti nel punto vendita». Amazon gli manda una mail con tre cose: il <b>PayCode</b> (nove cifre, come 479-868-518), l'<b>importo</b> esatto coi centesimi e una <b>scadenza</b>, di norma fra sessantanove e settantadue ore da quel momento.</li>
+        <li><b>Chi vende fa l'ordine su Amazon</b> scegliendo «paga in contanti nel punto vendita». Amazon gli manda una mail con tre cose: il <b>PayCode</b> (nove cifre, come 479-868-518), l'<b>importo</b> esatto coi centesimi e una <b>scadenza</b>, settantadue ore dal checkout. Vale fino a <b>novecentonovantanove euro</b> per ordine, senza minimo e senza commissione. <b>Non vale per Amazon Warehouse, contenuti digitali, oro, Prime, buoni regalo e acquisti 1-Click</b>: se la mail di Amazon non offre il pagamento in contanti, l'ordine non è pagabile con Barattozon.</li>
         <li><b>Chi vende pubblica qui</b>, con Barattozon come unico metodo, e il foglio lo porta per mano in <b>quattro passi</b>: il PayCode, l'importo, la scadenza (con un selettore di data e ora, fra un'ora e settantadue ore) e lo <b>sconto</b>, da zero a quindici per cento con una cifra decimale. Lo sconto è quanto in meno, in sats, consegna rispetto al cambio del momento: chi paga al tabacchino riceve un po' meno del cambio pieno, e il resto resta a chi vende. <b>Sconto più basso = più probabile che qualcuno lo paghi in tempo.</b> Prima di pubblicare c'è il riepilogo. Il cambio si fissa lì, e l'ordine resta nel libro fino a <b>due ore prima</b> della scadenza del PayCode (mai oltre settantadue ore): poi esce da solo.</li>
         <li><b>Chi compra prende l'ordine</b>, indica dove ricevere i sats, e chi vende li blocca in garanzia. A quel punto il PayCode, l'importo e la scadenza gli arrivano <b>qui dentro e cifrati</b>, in un riquadro col tempo che resta. Nel libro pubblico c'è solo l'importo: il PayCode non lo vede nessun altro, nemmeno Barattolo.</li>
-        <li><b>Chi compra va al tabacchino</b>, dà il PayCode alla cassa, paga in contanti l'importo esatto e <b>tiene lo scontrino</b>: è la sua prova. Poi torna qui e tocca «Ho pagato al tabacchino».</li>
+        <li><b>Chi compra va a pagare</b> — in tabaccheria, al bar, in edicola o alla posta, dove si accettano i pagamenti Amazon in contanti, senza commissione —, dà il PayCode alla cassa, paga in contanti l'importo esatto e <b>tiene lo scontrino</b>: è la sua prova. Poi torna qui e tocca «Ho pagato al tabacchino».</li>
         <li><b>Chi vende controlla su Amazon</b> che l'ordine risulti saldato, e sceglie fra due bottoni: <b>«Risulta pagato: libera i sats»</b> oppure <b>«Non risulta pagato: apri una disputa»</b>. Ha <b>ventiquattro ore</b> a vista, e Barattolo glielo ricorda su Telegram dopo un'ora, sei ore e venti ore. <b>Non esiste una conferma automatica</b>: Amazon non parla con Barattolo, e i sats non si liberano da soli. Se chi vende non fa nulla, i sats restano in garanzia e chi ha pagato può aprire lui la disputa: decide un moderatore, e lo scontrino è quel che guarda.</li>
       </ol>
       <p><b>Se scade.</b> Ci sono due scadenze, e vanno tenute distinte. Quella <b>del libro</b> cade due ore prima di quella del PayCode: se nessuno ha preso l'ordine, esce dalla vetrina e a chi vende arriva un avviso — il PayCode vale ancora per poche ore, ma nessuno può più prenderlo; quando scade anche lui, l'ordine Amazon va rifatto e ripubblicato con un PayCode nuovo. Quella <b>del PayCode</b> conta quando i sats sono già in garanzia: la pagina dello scambio lo dice, ti avvisa <b>sei ore prima e un'ora prima</b> (anche su Telegram o Nostr, secondo le tue impostazioni) e mette in evidenza l'<b>annullo d'accordo</b>, con cui i sats tornano a chi li ha bloccati. Nessuno annulla da solo: se hai pagato in tempo, lo scontrino lo dimostra e chi vende libera.</p>
@@ -44242,7 +44242,7 @@ function riquadroPayCodeP2P(o, adesso){
                      : '<b id="p2pTabPayResta">Scaduto: non si può più pagare</b>') + '</div>'
       : '') +
     '<ol class="p2p-paycode-passi">' +
-      '<li>Vai al tabaccaio o al punto vendita che accetta i pagamenti Amazon in contanti.</li>' +
+      '<li>Vai in tabaccheria, al bar, in edicola o alla posta: dove si accettano i pagamenti Amazon in contanti, senza commissione.</li>' +
       '<li>Dai il PayCode alla cassa' + (o.euro > 0 ? ' e paga <b>' + fmtEur(o.euro) + ' €</b> in contanti' : '') + '.</li>' +
       '<li>Tieni lo scontrino: è la tua prova.</li>' +
       '<li>Torna qui e tocca <b>«Ho pagato al tabacchino»</b>' + (attivo ? '' : ' (quando i sats sono in garanzia)') + '.</li>' +
@@ -45237,6 +45237,22 @@ const P2P_PAYCODE_MIN_S = 3600;            // sotto un'ora non si va al tabacchi
 const P2P_PAYCODE_MAX_S = 72 * 3600;       // un PayCode Amazon non vale di piu'
 const P2P_TABACCHINO_MARGINE_S = 2 * 3600; // il libro chiude prima del PayCode
 const P2P_SCONTO_TAB_MAX = 15;             // lo sconto di chi vende, in percento
+/* I LIMITI DI AMAZON «Paga in contanti» (23 set 2026, decisione di
+   Andrea): fino a 999 € per ordine, NESSUN minimo oltre lo zero, nessuna
+   commissione. Il tetto e' di Amazon e vale per il solo Barattozon: il
+   tetto in euro di Barattolo (P2P_MAX_EURO) e i due tetti in sats del
+   coordinatore restano quelli di tutti gli ordini e si guardano
+   altrove — qui non si tocca nessun limite del P2P normale. */
+const P2P_PAYCODE_MAX_EURO = 999;
+/* PURA: '' se l'importo di un PayCode e' pagabile in contanti, se no
+   la frase. Sopra lo zero qualunque cifra va bene: 0,50 € passa. */
+function giudiceImportoPayCodeP2P(euro){
+  const n = Number(euro) || 0;
+  if (!(n > 0)) return 'Scrivi l\'importo del PayCode, coi centesimi se servono';
+  if (Math.round(n * 100) > P2P_PAYCODE_MAX_EURO * 100)
+    return 'Amazon accetta il pagamento in contanti fino a 999 € per ordine';
+  return '';
+}
 /* PURA: il PayCode normalizzato («479-868-518»), o '' se non e' un
    PayCode. Nove cifre, coi trattini o gli spazi facoltativi fra le
    terzine — e SOLO cosi': un numero d'ordine Amazon (17 cifre) o un
@@ -45832,6 +45848,12 @@ function valeNuovoOrdineP2P(v){
     if (!x.vuoto)
       return {ok: false, manca: 'Col tabacchino l\'importo è uno solo, senza massimo',
               campo: 'p2pNuovoEuro'};
+    /* IL TETTO DI AMAZON (23 set 2026): 999 € per ordine, e nessun
+       minimo nostro — sotto restano solo i tetti in sats del
+       coordinatore, che non sono nostri e si guardano piu' giu' */
+    const oltreAmazon = giudiceImportoPayCodeP2P(euro);
+    if (oltreAmazon)
+      return {ok: false, manca: oltreAmazon, campo: 'p2pNuovoEuro'};
     /* IL PAYCODE (23 set 2026): nove cifre, o non e' un PayCode —
        la frase dice la forma, e il vuoto e lo storto hanno due frasi */
     if (!String(t.ordine || '').trim())
@@ -46466,7 +46488,10 @@ function percorsoTabacchinoP2P(val){
         'placeholder="479-868-518" value="' + esc(p2pNuovoTab.ordine) + '" ' +
         'autocomplete="off" autocapitalize="off" spellcheck="false" ' +
         'oninput="cambiaTabP2P()" aria-label="PayCode, nove cifre">',
-      '<div class="hint">Nove cifre, coi trattini o senza. È il codice che chi compra dà alla cassa del tabacchino: viaggia cifrato, e lo legge solo chi prende l\'ordine.</div>') +
+      '<div class="hint">Nove cifre, coi trattini o senza. È il codice che chi compra dà alla cassa del tabacchino: viaggia cifrato, e lo legge solo chi prende l\'ordine.</div>' +
+      /* LE ESCLUSIONI DI AMAZON (23 set 2026): se la mail non offre il
+         pagamento in contanti, l\'ordine non e' pagabile con Barattozon */
+      '<div class="hint">Non vale per Amazon Warehouse, contenuti digitali, oro, Prime, buoni regalo e acquisti 1-Click: se la mail di Amazon non offre il pagamento in contanti, l\'ordine non è pagabile con Barattozon.</div>') +
     tappa(2, P2P_TAPPE_TAB[1].t + ', in ' + esc(val.cod),
       '<input id="p2pNuovoEuro" type="text" inputmode="decimal" ' +
         'placeholder="23,47" value="' + esc(p2pNuovoEuro) + '" ' +
@@ -46474,14 +46499,14 @@ function percorsoTabacchinoP2P(val){
         'oninput="cambiaCampoNuovoP2P()" ' +
         'aria-label="Importo del PayCode in euro, coi centesimi">',
       (maxTestoP2P() ? '<div class="hint">Fase beta: max ' + maxTestoP2P() + '</div>' : '') +
-      '<div class="hint">Quello scritto sulla mail di Amazon, coi centesimi: al tabacchino si paga esattamente quella cifra. Con Barattozon l\'importo è uno solo, niente intervallo, e nessun altro metodo nello stesso ordine.</div>') +
+      '<div class="hint">Quello scritto sulla mail di Amazon, coi centesimi: al tabacchino si paga esattamente quella cifra. Amazon accetta i contanti fino a <b>999 €</b> per ordine, senza minimo e senza commissione. Con Barattozon l\'importo è uno solo, niente intervallo, e nessun altro metodo nello stesso ordine.</div>') +
     tappa(3, P2P_TAPPE_TAB[2].t,
       '<input id="p2pNuovoTabScade" type="datetime-local" ' +
         'value="' + esc(p2pNuovoTab.scade) + '" ' +
         'min="' + campoDaScadeP2P(adessoTab + P2P_PAYCODE_MIN_S) + '" ' +
         'max="' + campoDaScadeP2P(adessoTab + maxTab) + '" ' +
         'oninput="cambiaTabP2P()" aria-label="Quando scade il PayCode">',
-      '<div class="hint">⏳ Data e ora sono sulla mail di Amazon: di norma 69-72 ore da quando hai fatto l\'ordine. Deve stare fra un\'ora e 72 ore da adesso. Nel libro l\'ordine resta fino a <b>due ore prima</b> di quella scadenza, per lasciare a chi paga il tempo di andare al tabacchino; poi esce da solo.</div>') +
+      '<div class="hint">⏳ Amazon dà 72 ore dal checkout: copia la scadenza dalla mail. Deve stare fra un\'ora e 72 ore da adesso. Nel libro l\'ordine resta fino a <b>due ore prima</b> di quella scadenza, per lasciare a chi paga il tempo di andare al tabacchino; poi esce da solo.</div>') +
     tappa(4, P2P_TAPPE_TAB[3].t,
       '<div class="p2p-sconto-riga">' +
         '<input id="p2pNuovoSconto" type="text" inputmode="decimal" maxlength="4" ' +
@@ -47977,6 +48002,12 @@ async function inviaCampoP2P(tipo, btn){
       const imp = centesimiP2P(campi.importo);
       if (!(imp.n > 0)) {
         toast('L\'importo dell\'ordine e\' una cifra in euro, coi centesimi se servono (23,47)');
+        el('p2pCampoEuro_importo')?.focus();
+        return;
+      }
+      /* e il tetto di Amazon vale anche qui (23 set 2026) */
+      if (giudiceImportoPayCodeP2P(imp.n)) {
+        toast(giudiceImportoPayCodeP2P(imp.n));
         el('p2pCampoEuro_importo')?.focus();
         return;
       }

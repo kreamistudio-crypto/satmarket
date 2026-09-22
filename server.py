@@ -38491,6 +38491,25 @@ MAX_SVEGLIE_P2P = 20          # per persona: piu' di cosi' non e' un uso
 # (15 giorni), cioe' un tetto che non diceva niente sul metodo.
 PAYCODE_ORE_MAX = 72
 SVEGLIA_P2P_ORIZZONTE_S = PAYCODE_ORE_MAX * 3600 + 900
+# IL TETTO DI AMAZON «Paga in contanti» (23 set 2026): 999 euro per
+# ordine, nessun minimo oltre lo zero, nessuna commissione. Vale per il
+# solo Barattozon: il tetto di Barattolo (P2P_MAX_EURO) e i limiti del
+# P2P normale restano quelli che sono. Il gemello del client e'
+# `giudiceImportoPayCodeP2P`; qui lo guarda la rotta del canale, l'unico
+# posto in cui l'importo di un PayCode arriva al server.
+PAYCODE_EURO_MAX = 999.0
+
+
+def _importo_paycode_valido(euro) -> bool:
+    """PURA: l'importo di un PayCode e' pagabile in contanti? Sopra lo
+    zero e fino a 999,00 compresi: 0,50 passa, 999,01 no. Si confronta
+    in CENTESIMI, che 999.01 <= 999.0 sui float non ha sorprese ma
+    999.005 arrotondato si'."""
+    try:
+        cent = round(float(euro) * 100)
+    except (TypeError, ValueError):
+        return False
+    return 0 < cent <= round(PAYCODE_EURO_MAX * 100)
 SVEGLIA_P2P_TESTI = {
     1: "⏳ Un tuo scambio in contanti al tabacchino scade fra circa sei "
        "ore. Se l'ordine Amazon non è ancora pagato, è il momento di "
@@ -38693,6 +38712,10 @@ async def annuncia_ordine_p2p_canale(req: Request,
     metodo = str(d.get("metodo") or "").strip()
     if not metodo or len(metodo) > MAX_METODO_P2P_CANALE:
         raise HTTPException(400, "Metodo di pagamento storto")
+    # il tetto di Amazon, sul solo Barattozon (23 set 2026)
+    if _tabacchino_libro([metodo]) and not _importo_paycode_valido(euro):
+        raise HTTPException(
+            400, "Amazon accetta il pagamento in contanti fino a 999 € per ordine")
     postato = False
     if canale_id():
         try:
