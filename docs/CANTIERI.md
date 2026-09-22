@@ -25148,3 +25148,142 @@ di chi guarda. E la scatola del metodo (`--chip-bg`, beige) su una card
 viola o blu: a 15% si stacca piu' di prima — se stona, la cura e'
 tingere anche lei di un filo, ma e' una decisione di Andrea, non una
 cosa da fare di mia iniziativa.
+
+## Il premio di Barattozon torna intero, e il cursore scorre liscio (24 set 2026)
+
+LA CORREZIONE (Andrea, che rovescia il decimo del giorno prima): il
+premio di Barattozon è un NUMERO INTERO come quello del P2P normale —
+cursore a passo 1 da −20 a +20, niente decimali da nessuna parte — e
+sul telefono vero il cursore «va a scatti», mentre quello del P2P
+normale scorre. Il P2P normale non si tocca.
+
+**PERCHÉ IL DECIMO È RIENTRATO, e la ragione di ieri non era falsa.**
+Ieri il decimo aveva un motivo vero: qui il premio si CUOCE nei sats a
+prezzo fisso e sul filo resta zero, quindi nessun i64 lo vuole intero —
+mentre nel P2P normale `premium` viaggia nel 38383. Vero, e non
+bastava: **una ragione per cui una cosa È POSSIBILE non è una ragione
+per cui vada FATTA.** Il decimo non lo chiedeva nessuno e costava due
+cose — una scala diversa da quella di tutti gli altri ordini, cioè una
+cosa in più da tenere in testa, e **dieci volte gli eventi sotto il
+dito**, che è la metà del difetto qui sotto.
+
+**IL DECIMALE SI RIFIUTA, e il campo resta `type=text` APPOSTA.** È
+l'unico punto in cui il gemello si discosta dal cursore normale, e
+adesso ha una ragione sua: un `type=number` con dentro «2,5» risponde
+`value === ''` (la lezione dell'euro intero), quindi un decimale
+arriverebbe come VUOTO e passerebbe per zero — cioè proprio il caso che
+deve prendersi la frase. Di testo arriva com'è scritto, non muove il
+pallino, e la riga viva dice «Il premio va da −20 a +20%, a numeri
+interi». La tastiera invece passa da `decimal` a `numeric` e il campo
+da sei caratteri a tre, che «−20» ci sta.
+E `.replace(',', '.')` se n'è andato: senza decimali non c'è niente da
+separare, e la virgola deve arrivare intera alla regola per essere
+rifiutata.
+
+**IL TESTO DEL PREMIO NON È PIÙ UN GEMELLO, È LA STESSA.** Col decimale
+se n'è andata l'unica differenza che `premioTestoTabP2P` aveva da
+`premioTestoP2P`, e due stesure identiche della stessa regola divergono
+al primo ritocco: adesso la chiama. Il nome resta perché lo nominano sei
+posti e dice DI CHI è il premio che si sta scrivendo.
+I gemelli del CURSORE invece restano gemelli, e adesso la ragione è una
+sola e scritta: lo STATO: qui la variabile è il testo battuto, di là è
+già un numero che si tosa alla fascia.
+
+**IL PREMIO SI RILEGGE INTERO ANCHE DAL LIBRO**, e la scelta che conta è
+il sotto-mezzo-punto: `premioImplicitoTabacchinoP2P` arrotonda
+all'intero, quindi un ordine che oggi vale lo 0,25% meno del mercato non
+è «+0%» — è mercato, e il badge dice «al prezzo di mercato» mentre nel
+conto la riga del premio e il Subtotale **spariscono**. Un «+0%» in una
+riga di conto sarebbe peggio che tacere. Il resto della voce di ieri
+resta: NON si tosa a ±20, che il cambio si muove.
+⚠️ E nelle prove i casi tondi sono cambiati apposta: ±2,5 letti
+all'indietro cadono sul mezzo punto, dove `Math.round` è ASIMMETRICO
+(+2,5 → 3, −2,5 → −2). I casi adesso sono ±3, che è simmetrico e si
+legge a occhio.
+
+**GLI SCATTI ERANO DUE COSE, e una sola si vedeva.** `cambiaPremioTabP2P`
+chiudeva con `aggiornaPercorsoTabP2P()`, che a OGNI movimento rilegge i
+venti campi del foglio (`campiNuovoP2P`, con due parse di data dentro),
+ricalcola il passo e interroga il DOM con `querySelectorAll('.p2p-tappa')`
+per riscrivere quattro spuntine che, muovendo il premio, **non possono
+cambiare**: il passo si sposta solo su un premio storto, e dal cursore
+uno storto non esce. Col passo di un decimo erano quattrocento giri di
+quel lavoro per una trascinata sola.
+Adesso il cursore fa quel che fa il P2P normale, che chiude scrivendo la
+sola nota: riscrive la SOLA riga viva, in una funzione sua
+(`rigaVivaTabP2P`, chiamata anche da `aggiornaPercorsoTabP2P`, così la
+riga ha un posto solo). Il nodo del cursore si legge una volta invece
+che due.
+**LA GUARDIA È ESATTA, e non «di solito»:** `prima === g.storto`. Chi ha
+scritto «2,5» sta al passo 4, e afferrando il cursore lo chiude — quella
+prima trascinata il percorso lo rilegge lo stesso, le altre no. Costa
+una regex, e senza sarebbe una scorciatoia che mente in un caso vero.
+
+**LA MISURA, che è la parte che non si poteva dedurre.** Vetrina di
+cartone col `<style>` vero e 34 funzioni ritagliate da `miniapp.html`,
+Chrome headless via CDP a 375 px, eventi di MOUSE passo per passo (due
+pixel alla volta, più fitto di un punto percentuale), e un diario che
+per ogni `input` annota durata, pillola, i due bordi della banda, la
+tinta e la riga viva. Stessa trascinata da 0 a +20:
+
+| | eventi | riletture del foglio | query al DOM | passi all'indietro |
+|---|---|---|---|---|
+| prima | 57 | 56 | 56 | **4** |
+| adesso | 20 | 0 | 0 | 0 |
+
+Un aggiornamento: **0,1 ms di mediana, 0,4 ms il peggiore**. E pallino,
+banda, tinta e riga viva raccontano lo STESSO valore a ogni passo, nei
+due versi (giudice a parte, che ricalcola i bordi dal valore
+dell'evento). Nessuna transizione CSS sul pallino né sul binario:
+censito tutto il foglio, l'unica regola universale è quella di
+`html.fx-ridotti`, che le TOGLIE.
+⚠️ **I QUATTRO PASSI ALL'INDIETRO SONO IL DIFETTO CHE ANDREA VEDEVA, e
+non li avrei indovinati:** col passo di un decimo il numero TORNA
+INDIETRO mentre il dito va avanti — `0,3 → 0,1`, `2,8 → 2,6` — perché a
+5,78 px per punto percentuale ogni pixel vale più di un decimo, e
+l'arrotondamento non è monotono. Non è lentezza: è la cifra che
+sobbalza. A passo 1 non succede mai, nei due versi.
+
+**TRE TRAPPOLE DEL BANCO, tutte pagate in questo giro.**
+1. **`Input.dispatchTouchEvent` grezzo NON muove un `input[type=range]`**
+   (zero eventi): il trascinamento col dito passa dal riconoscitore di
+   gesti, che lì non c'è. Si guida col mouse, che via CDP è FIDATO
+   (quello sì muove il cursore; un `dispatchEvent` da JS no).
+2. **Il rect si misura DOPO lo scorrimento.** Il passo 4 sta in fondo a
+   un foglio alto mille pixel dentro una viewport di ottocento, quindi
+   il cursore nasce FUORI: misurato prima, il dito va nel vuoto — e
+   l'unico sintomo è zero eventi, che si legge come «il codice non
+   risponde». La sonda che l'ha preso in un secondo è
+   `elementFromPoint` sul centro del rect, ed è diventata una cintura
+   del banco.
+3. **`campiNuovoP2P` nel banco dev'essere QUELLA VERA.** Con uno stub il
+   «prima» usciva più leggero del vero, cioè il banco avrebbe detto che
+   il difetto era più piccolo di quel che è. Si rinomina e la si
+   avvolge: il corpo non si tocca, e si conta quante volte gira.
+
+**LE PROVE.** `prove_p2p_paycode` rifatta sul premio intero (i dieci
+buoni con «05», i nove storti col decimale in mezzo, il testo senza
+virgola, i sats, il premio riletto col caso del quarto di punto) più
+**tre casi nuovi del cursore**: `decimale` (un decimale battuto a mano
+non muove il pallino), `leggero` (trascinando: zero `campiNuovoP2P`,
+zero `querySelectorAll`, e la riga viva cambia lo stesso) e
+`dopoStorto` (la prima trascinata dopo uno storto rilegge, la seconda
+no). I due contatori vivono nel banco e sono la prova della via
+leggera, non un commento. Più la sentinella del passo, quella del campo
+`text/numeric/3`, e quella del giudice unico del testo. `prove.py`
+intera: **13226/0** con `PROVE_SEVERE=1`.
+TORTURA su una copia: **13 mutazioni, 12 uccise**, ognuna dalla prova
+che nomina la cosa rotta. ⚠️ **La tredicesima è EQUIVALENTE e si
+dichiara:** rimettere `.replace(',', '.')` non cambia niente, perché la
+regola non accetta né virgola né punto — quella riga era codice morto,
+e toglierla è pulizia, non comportamento. Una mutazione che sopravvive è
+una prova che manca, *tranne* quando è equivalente: e allora si scrive
+perché, o la prossima volta si va a cercare una prova che non può
+esistere.
+
+**NON PROVATO, E DA GUARDARE.** Il telefono vero dentro Telegram: la
+scorrevolezza col dito su una CPU da telefono (qui la misura è di un
+desktop, e il guadagno vero — 56 riletture e 56 query in meno per
+trascinata — lì pesa di più, non di meno), e il campo a mano con la
+tastiera `numeric`, che è l'unica cosa del cantiere che il banco non
+può vedere.
