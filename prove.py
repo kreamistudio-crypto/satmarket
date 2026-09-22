@@ -63231,6 +63231,8 @@ def prove_p2p_paycode():
             "function tabacchinoP2P(metodi){", "function metodoBaseP2P(m){",
             "function euroTabacchinoP2P(metodi){", "function satsTabacchinoP2P(importo, cambio, premio){",
             "function payCodeP2P(testo){", "function vitaLibroTabacchinoP2P(scade, adesso){",
+            # le tre frasi di Barattozon: un posto solo per i due versi
+            "function testoBarattozonP2P(mio){",
             # il premio di Barattozon (23 set 2026), coi gemelli del
             # cursore e i due giudici che il libro usa per rileggerlo
             "function premioTabacchinoP2P(testo){", "function premioTestoP2P(n){",
@@ -63382,6 +63384,7 @@ DOM = null;
         # OTTO cifre, con e senza trattini: la tortura ha trovato che
         # nessun caso le provava, e una terzina «corta» passava
         "            '47986851', '47-868-518', '479-68-518'].map(payCodeP2P),\n"
+        "  testo: [testoBarattozonP2P(true), testoBarattozonP2P(false)],\n"
         "  vita: [vitaLibroTabacchinoP2P(ora + 48 * 3600, ora) - ora, vitaLibroTabacchinoP2P(ora + 72 * 3600, ora) - ora,\n"
         "         vitaLibroTabacchinoP2P(ora + 90 * 3600, ora) - ora, vitaLibroTabacchinoP2P(ora + 7200, ora) - ora,\n"
         "         vitaLibroTabacchinoP2P(ora + 3600, ora) - ora, vitaLibroTabacchinoP2P(ora + 5 * 3600, ora) - ora,\n"
@@ -63722,14 +63725,63 @@ DOM = null;
           and "  p2pNuovoPremioTab = '';" in mini
           and "  p2pNuovoPremioTabMano = false;" in mini)
 
+    # --- 6 bis) LE PAROLE DI BARATTOZON (24 set 2026, parole di Andrea) ---
+    # Tre frasi, e le dicono TRE posti: il cappello del passo 4 (a chi
+    # pubblica), il riquadro del PayCode (a chi ha preso) e «Info P2P».
+    # Un giudice solo per i primi due, che sono markup scritto dal JS;
+    # il terzo e' markup FERMO e non puo' chiamare la funzione, quindi a
+    # tenerlo in pari c'e' la prova qui sotto, carattere per carattere.
+    _MIO = ("Con Barattozon fai pagare in contanti alla cassa del tabacchino un tuo "
+            "ordine Amazon: chi lo paga riceve cifrati codice, importo e scadenza "
+            "appena i sats sono in garanzia, e non vede nome, indirizzo né cosa hai "
+            "comprato. Per pagare non serve alcun documento. Chi paga tiene lo "
+            "scontrino in caso di disputa.")
+    _SUO = ("Paghi in contanti alla cassa del tabacchino un ordine Amazon di chi "
+            "vende: ricevi cifrati codice, importo e scadenza appena i sats sono in "
+            "garanzia, e non vedi nome, indirizzo né cosa ha comprato. Per pagare "
+            "non serve alcun documento. Tieni lo scontrino in caso di disputa.")
+    prova("le parole di Barattozon, nei due versi, parola per parola",
+          [_MIO, _SUO], out["testo"])
+    # ⚠️ I DUE VERSI NON SI MESCOLANO, ed e' il modo in cui un
+    # copia-incolla si vede: ogni versione porta i suoi verbi e NON
+    # quelli dell'altra. La frase del documento invece e' la stessa in
+    # tutt'e due, che non ha un verso.
+    prova("...e nessuna delle due porta i verbi dell'altra", True,
+          "non vedi" not in _MIO and "ha comprato" not in _MIO
+          and "non vede" not in _SUO and "hai comprato" not in _SUO
+          and "Per pagare non serve alcun documento." in _MIO
+          and "Per pagare non serve alcun documento." in _SUO)
+    prova("il cappello del passo 4 le CHIAMA, con la 🧾, e non le ribatte", True,
+          "🧾 ' + esc(testoBarattozonP2P(true))" in _per
+          and "fai pagare in contanti" not in _per
+          and "Prima genera su Amazon" not in mini)
+    _rq = pezzo_js(mini, "function riquadroPayCodeP2P(o, adesso){", "\n}\n")
+    # ...e il riquadro le dice nel verso di chi paga, SENZA una seconda
+    # 🧾: quella la porta gia' il titolo sopra
+    prova("...e il riquadro di chi ha preso le chiama nel verso suo, senza una seconda 🧾", True,
+          "esc(testoBarattozonP2P(false))" in _rq
+          and "🧾 ' + esc(testoBarattozonP2P(false))" not in _rq
+          and "non vedi nome" not in _rq
+          and _SUO in out["riquadroCompro"])
+    # ⚠️ E «INFO P2P» LE RICOPIA, che il markup e' fermo: questa prova e'
+    # l'unica cosa che impedisce alle due copie di scollarsi
+    _sezTab = mini[mini.index('<h3 id="p2pinfo-tabacchino"'):mini.index("<h3>I tempi</h3>")]
+    prova("«Info P2P» porta le stesse parole di chi paga, identiche a quelle del foglio", True,
+          ("<p>" + _SUO + "</p>") in _sezTab)
+
     # --- 7) A CHI COMPRA: il riquadro del PayCode ---------------------------
     _rc = out["riquadroCompro"]
     prova("a chi compra il riquadro porta il PayCode grande, l'importo, la scadenza e il tempo che resta", True,
           "<b>479-868-518</b>" in _rc and "23.47 € in contanti" in _rc
           and 'id="p2pTabPayResta"' in _rc and 'data-fine="' + str(1800000000 + 30 * 3600) + '"' in _rc)
+    # ⚠️ I QUATTRO GESTI SI CONTANO DENTRO LA LISTA, e non in tutto il
+    # riquadro: dal 24 set 2026 «tieni lo scontrino» lo dice anche il
+    # cappello, sopra, e un `index` sul riquadro intero prendeva QUELLO
+    # — l'ordine usciva storto su un riquadro sano.
+    _ol = _rc[_rc.index('<ol class="p2p-paycode-passi">'):]
     prova("...coi quattro gesti nell'ordine: vai, dai il codice e paga, tieni lo scontrino, torna e segna", True,
-          _rc.index("Vai in tabaccheria") < _rc.index("Dai il PayCode alla cassa")
-          < _rc.index("Tieni lo scontrino") < _rc.index("«Ho pagato al tabacchino»"))
+          _ol.index("Vai in tabaccheria") < _ol.index("Dai il PayCode alla cassa")
+          < _ol.index("Tieni lo scontrino") < _ol.index("«Ho pagato al tabacchino»"))
     prova("...e il bottone per copiare il codice", True,
           "copiaLink(this.dataset.pc, 'PayCode copiato 📋')" in _rc)
     prova("senza un PayCode nel testo il riquadro non c'e' (vale il recapito di sempre)", "", out["riquadroSenza"])

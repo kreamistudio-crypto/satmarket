@@ -8052,6 +8052,12 @@ document.getElementById('cartello')?.remove();</script>
 
       <h3 id="p2pinfo-tabacchino">Barattozon: il PayCode al tabacchino, passo per passo</h3>
       <p>È il metodo per chi non vuole passare da una banca o da un'app: chi <b>vende</b> sats fa un <b>ordine Amazon da pagare in contanti nel punto vendita</b> e chi <b>compra</b> lo paga alla cassa del tabacchino col <b>PayCode</b>. Il tabacchino incassa i contanti, l'ordine Amazon risulta pagato, e i sats si liberano. Nel libro il metodo si chiama ancora «Contanti al tabacchino»: è la parola che leggono anche le altre app.</p>
+      <!-- ⚠️ LE STESSE PAROLE DEL FOGLIO, e non una parafrasi: questo
+           paragrafo dev'essere IDENTICO a `testoBarattozonP2P(false)`,
+           e a dirlo c'e' una prova che li confronta carattere per
+           carattere. Qui il markup e' fermo e non puo' chiamare la
+           funzione, quindi la rete e' la prova. -->
+      <p>Paghi in contanti alla cassa del tabacchino un ordine Amazon di chi vende: ricevi cifrati codice, importo e scadenza appena i sats sono in garanzia, e non vedi nome, indirizzo né cosa ha comprato. Per pagare non serve alcun documento. Tieni lo scontrino in caso di disputa.</p>
       <ol class="sicu-passi">
         <li><b>Chi vende fa l'ordine su Amazon</b> scegliendo «paga in contanti nel punto vendita». Amazon gli manda una mail con tre cose: il <b>PayCode</b> (nove cifre, come 479-868-518), l'<b>importo</b> esatto coi centesimi e una <b>scadenza</b>, settantadue ore dal checkout. Vale fino a <b>novecentonovantanove euro</b> per ordine, senza minimo e senza commissione. <b>Non vale per Amazon Warehouse, contenuti digitali, oro, Prime, buoni regalo e acquisti 1-Click</b>: se la mail di Amazon non offre il pagamento in contanti, l'ordine non è pagabile con Barattozon.</li>
         <li><b>Chi vende pubblica qui</b>, con Barattozon come unico metodo, e il foglio lo porta per mano in <b>quattro passi</b>: il PayCode, l'importo, la scadenza (con un selettore di data e ora, fra un'ora e settantadue ore) e il <b>premio</b>, con lo stesso cursore degli altri ordini, da meno venti a più venti per cento, a numeri interi. <b>Il segno decide il verso:</b> col premio positivo chi paga al tabacchino riceve meno sats del cambio pieno e la differenza resta a chi vende; col premio negativo ne riceve di più, e quella differenza la paga chi vende per la comodità. A zero passa il cambio pieno. <b>Premio più basso = più conveniente per chi paga = più probabile che qualcuno lo prenda in tempo.</b> Prima di pubblicare c'è il riepilogo. Il cambio si fissa lì, e l'ordine resta nel libro fino a <b>due ore prima</b> della scadenza del PayCode (mai oltre settantadue ore): poi esce da solo.</li>
@@ -44443,6 +44449,10 @@ function riquadroPayCodeP2P(o, adesso){
   const attivo = o.stato === 'attivo';
   return '<div class="p2p-paycode" data-fine="' + (scade || 0) + '">' +
     '<div class="p2p-paycode-tit">🧾 Il PayCode da pagare al tabacchino</div>' +
+    /* le stesse tre frasi del cappello di chi pubblica, dal verso di
+       chi paga: qui e' il momento in cui uno sta per uscire di casa, ed
+       e' l'ultimo posto utile per dirgli che il documento non serve */
+    '<div class="hint">' + esc(testoBarattozonP2P(false)) + '</div>' +
     '<div class="p2p-paycode-cod"><b>' + esc(pc) + '</b>' +
       '<button type="button" class="p2p-paycode-copia" data-pc="' + esc(pc) + '" ' +
         'onclick="copiaLink(this.dataset.pc, \'PayCode copiato 📋\')" aria-label="Copia il PayCode">📋</button></div>' +
@@ -45499,6 +45509,29 @@ function vitaLibroTabacchinoP2P(scade, adesso){
   if (!(s > ora)) return 0;
   const margine = Math.min(P2P_TABACCHINO_MARGINE_S, Math.floor((s - ora) / 2));
   return Math.min(s - margine, ora + P2P_TABACCHINO_VITA_S);
+}
+/* PURA: COSA E' BARATTOZON, in tre frasi e in un posto solo (24 set
+   2026, parole di Andrea). Dette dal lato di chi legge: `mio` = sto
+   pubblicando io («fai pagare… chi lo paga riceve… non vede… cosa hai
+   comprato»), altrimenti sto per pagare io («paghi… ricevi… non vedi…
+   cosa ha comprato»).
+   LE TRE COSE CHE DICE, e sono le tre che qualcuno si chiede prima di
+   andare alla cassa: che l'altro riceve i dati CIFRATI e solo a sats
+   bloccati; che dell'ordine non vede ne' il nome, ne' l'indirizzo, ne'
+   la merce; e che per pagare non serve un documento. La terza frase e'
+   lo scontrino, che e' la prova nella disputa.
+   ⚠️ UN POSTO SOLO PERCHE' I POSTI SONO TRE — il cappello del passo 4,
+   il riquadro del PayCode e la pagina «Info P2P» —, e tre stesure
+   della stessa frase divergono al primo ritocco: e' la lezione delle
+   due copie del premio. La pagina Info e' markup FERMO e non puo'
+   chiamarla, quindi li' la parola e' ricopiata e a tenerla in pari c'e'
+   una prova che la confronta con questa, carattere per carattere.
+   SENZA EMOJI: la 🧾 la mette chi la vuole (il cappello si', il
+   riquadro no — la porta gia' il suo titolo). */
+function testoBarattozonP2P(mio){
+  return mio
+    ? 'Con Barattozon fai pagare in contanti alla cassa del tabacchino un tuo ordine Amazon: chi lo paga riceve cifrati codice, importo e scadenza appena i sats sono in garanzia, e non vede nome, indirizzo né cosa hai comprato. Per pagare non serve alcun documento. Chi paga tiene lo scontrino in caso di disputa.'
+    : 'Paghi in contanti alla cassa del tabacchino un ordine Amazon di chi vende: ricevi cifrati codice, importo e scadenza appena i sats sono in garanzia, e non vedi nome, indirizzo né cosa ha comprato. Per pagare non serve alcun documento. Tieni lo scontrino in caso di disputa.';
 }
 /* PURA: il premio scritto nel passo 4, col segno, da −20 a +20 e a
    numeri INTERI (il «−» tipografico compreso). {n, storto}: «2,5» e
@@ -46868,7 +46901,14 @@ function percorsoTabacchinoP2P(val){
       (sotto || '') + '</div>';
   return '<div class="p2p-percorso">' +
     '<div class="p2p-percorso-testa" id="p2pTabPasso">' + esc(testataPercorsoTabP2P(passo)) + '</div>' +
-    '<div class="hint">🧾 Prima genera su Amazon l\'ordine <b>da pagare in contanti nel punto vendita</b>: nella mail di Amazon trovi il PayCode, l\'importo e la scadenza. Copiali qui, uno per passo.</div>' +
+    /* ⚠️ IL CAPPELLO DICE COS'E' BARATTOZON, non dove stanno i tre dati
+       (24 set 2026, parole di Andrea): quelli li dice ogni tappa nella
+       sua riga di aiuto — «Quello scritto sulla mail di Amazon», «copia
+       la scadenza dalla mail», «Nove cifre» —, mentre qui in cima
+       serviva la cosa che nessun'altra riga diceva: che chi paga vede
+       il codice e basta, e che alla cassa non gli chiedono un
+       documento. */
+    '<div class="hint">🧾 ' + esc(testoBarattozonP2P(true)) + '</div>' +
     tappa(1, P2P_TAPPE_TAB[0].t,
       '<input id="p2pNuovoTabOrdine" type="text" inputmode="numeric" maxlength="11" ' +
         'placeholder="479-868-518" value="' + esc(p2pNuovoTab.ordine) + '" ' +
