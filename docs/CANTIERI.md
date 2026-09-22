@@ -25360,3 +25360,99 @@ tabacchino 23.47» in grassetto, e nelle pillole quando i metodi sono
 più d'uno. È lo stesso vestito che manca, un tocco più in là della card
 che invece ce l'ha: si chiude con le stesse due righe, ma è una
 decisione di Andrea.
+
+## Le parole di Barattozon, in un posto solo e nei due versi (24 set 2026)
+
+LA RICHIESTA (Andrea, parole sue): in cima al percorso del foglio
+«Pubblica» il testo di spiegazione diventa **esattamente** «🧾 Con
+Barattozon fai pagare in contanti alla cassa del tabacchino un tuo
+ordine Amazon: chi lo paga riceve cifrati codice, importo e scadenza
+appena i sats sono in garanzia, e non vede nome, indirizzo né cosa hai
+comprato. Per pagare non serve alcun documento. Chi paga tiene lo
+scontrino in caso di disputa.», e lo stesso testo **nel verso di chi
+paga** va nel riquadro di chi ha preso e nella pagina «Info P2P».
+
+**COSA DICE, E PERCHÉ IN CIMA.** Il cappello di prima diceva dove stanno
+i tre dati («nella mail di Amazon trovi il PayCode, l'importo e la
+scadenza. Copiali qui, uno per passo»), e quella cosa la dice **già ogni
+tappa nella sua riga di aiuto** — «Quello scritto sulla mail di Amazon»,
+«copia la scadenza dalla mail», «Nove cifre, coi trattini o senza».
+Quindi non si è perso niente, ed è entrata la cosa che **nessun'altra
+riga diceva**: che l'altro riceve i dati cifrati e solo a sats bloccati,
+che dell'ordine non vede né il nome né l'indirizzo né la merce, che alla
+cassa non serve un documento, e che lo scontrino è la prova nella
+disputa. Sono le tre domande che uno si fa prima di uscire di casa, e
+prima stavano sparse fra «Info P2P» e nessun posto.
+
+**UN GIUDICE SOLO PER I DUE VERSI.** `testoBarattozonP2P(mio)` le dice
+dal lato di chi legge: `true` = sto pubblicando io («fai pagare… chi lo
+paga riceve… non vede… cosa hai comprato… chi paga tiene»), `false` =
+sto per pagare io («paghi… ricevi… non vedi… cosa ha comprato… tieni»).
+La frase del documento non ha verso ed è identica nei due. **Senza
+emoji**: la 🧾 la mette il cappello, mentre il riquadro ne ha già una
+nel titolo e due nella stessa scatola sono rumore.
+Il verso di chi paga NON ripete «Con Barattozon»: nei suoi due posti il
+nome sta già nel titolo sopra (il riquadro) o nell'intestazione della
+sezione (Info), e ripeterlo sarebbe la terza volta in dieci righe.
+
+**LA COPIA FERMA DI «INFO P2P», e la prova che la tiene in pari.** Quel
+paragrafo vive nel markup della pagina, che è HTML statico e non può
+chiamare una funzione. Le due strade erano: scriverlo da JS con un
+segnaposto (come `p2pInfoFee`), oppure ricopiarlo e mettere una
+**prova** che lo confronta con `testoBarattozonP2P(false)` carattere per
+carattere. Ha vinto la seconda: `p2pInfoFee` è scritto da JS perché la
+commissione è **viva**, qui il testo è fermo, e una pagina che chi legge
+prende per il regolamento non deve avere un buco se il JS inciampa. La
+rete non è il commento accanto — è la prova, e la tortura dice che
+morde: cambiare **una parola sola** nella copia ferma la fa rossa.
+
+**DOV'È NEL RIQUADRO, e la scelta che si può rovesciare in una riga.**
+Sta **in cima**, sotto il titolo e sopra il PayCode, come nel foglio di
+chi pubblica — così i due lati hanno la stessa forma. Il costo è che il
+codice grande scende di sei righe, e la contropartita è che «non serve
+alcun documento» si legge *prima* di uscire di casa. L'altra sistemazione
+sensata era in fondo, accanto alla nota «il codice resta tuo e di chi
+vende: viaggia cifrato, e Barattolo non lo legge» — che resta dov'è,
+perché dice un'altra cosa (la piattaforma, non la controparte). Scartata
+perché lì «Tieni lo scontrino in caso di disputa» finirebbe **attaccata**
+al terzo gesto della lista, «Tieni lo scontrino: è la tua prova»; in
+cima le due restano a dieci righe di distanza e dicono due cose diverse
+(il *perché* e il *quando*).
+
+**IL QUARTO POSTO NON SI È TOCCATO, ed è dichiarato.**
+`notaTabacchinoDettP2P` — la riga del dettaglio, prima di prendere —
+porta una versione **più corta** della stessa frase di chi paga, e il
+suo commento dice perché: «qui c'è un bottone da premere, e una
+spiegazione lunga sopra un bottone è una spiegazione che nessuno legge».
+Allungarla rovescerebbe una decisione scritta che nessuno ha chiesto di
+rovesciare, quindi resta, e resta anche scritto che è una quinta copia
+più corta: il giorno che si allinea, si allinea chiamando la funzione.
+
+**LE PROVE.** Cinque nuove in `prove_p2p_paycode`: i due versi parola
+per parola; **i verbi che non si mescolano** (nessuna delle due versioni
+porta quelli dell'altra — è il modo in cui un copia-incolla si vede); il
+cappello che le CHIAMA invece di ribatterle, con la 🧾 e senza il testo
+vecchio; il riquadro nel verso suo, senza una seconda 🧾; e la copia
+ferma di «Info P2P» identica. `prove.py` intera: **13242/0** con
+`PROVE_SEVERE=1`. Tortura su una copia: **7 mutazioni, 7 uccise**.
+⚠️ **E UNA PROVA VECCHIA È STATA RIANCORATA**, ed è la lezione del giro:
+i quattro gesti del riquadro si contavano cercando «Tieni lo scontrino»
+**in tutto il riquadro**, e da oggi quella frase la dice anche il
+cappello, *sopra* la lista — quindi l'ordine usciva storto su un
+riquadro sano. Adesso si contano **dentro la lista**, ritagliata sul suo
+`<ol>`, che è quel che la prova voleva dire dall'inizio. È la famiglia
+già a verbale delle prove che rispondono per il vicino: un `index` su un
+contenitore più grande del soggetto risponde alla prima occorrenza, e il
+giorno che ne compare una nuova fallisce senza che il soggetto sia rotto.
+
+**DAL VIVO**, vetrina di cartone col `<style>` vero e 42 funzioni
+ritagliate, a 375 px e densità 2 via CDP: i tre posti uno sotto l'altro,
+zero errori in pagina. Il cappello sta in sei righe, il riquadro tiene il
+PayCode grande e leggibile sotto le sue sei, e il paragrafo di Info si
+veste come i suoi vicini.
+
+**NON PROVATO, E DA GUARDARE.** Sul telefono vero dentro Telegram: se le
+sei righe in cima al riquadro danno fastidio a chi lo riapre alla cassa
+(lì si vuole il codice e basta) — è l'unica cosa che decide l'uso, non la
+misura —, e se la ripetizione dello scontrino fra cappello e terzo gesto
+si legge come insistenza o come promemoria.
