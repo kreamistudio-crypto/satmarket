@@ -10354,6 +10354,14 @@
   l'anello prende `--nav-bg-p2p`. A leva spenta, in vetrina e senza
   conto resta spento. Il verbale: CANTIERI, «Il pallino su I miei
   scambi».
+  E LA STESSA DOMANDA SCRIVE IL CONTO DELL'INTESTAZIONE di «I miei
+  scambi» (22 set 2026): «N in corso · M tocca a te», dove M e'
+  `quantiToccaAMeP2P` e N il gruppo «In corso» dello stesso giudice —
+  cioe' i due numeri che il foglio del filtro scrive accanto alle sue
+  pillole (i gruppi sono una partizione: uno scambio sta in uno solo).
+  Lo dipinge `intestaScambiP2P`, da `renderP2P`, DOPO il corpo dei
+  miei; prima del libro l'immagine resta e il conto aspetta. Il
+  verbale: CANTIERI, «L'intestazione di I miei scambi».
   IL LINK PORTA DOVE C'E' IL GESTO (ago 2026, dal campo): la notifica
   della controproposta diceva «Accetta o rifiuta dalla scheda Ordini» e
   allegava un link a `/annuncio/{id}` — il testo mandava in un posto e
@@ -25886,6 +25894,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    stessa immagine con la sola metà bianca portata nell'inchiostro di
    casa, per quando il marchio sta in una frase su carta chiara —
    vedi CANTIERI, «E il marchio Barattozon è passato nel testo»),
+   `/assets/scambi-intestazione.webp` (l'intestazione di «I miei
+   scambi», 22 set 2026: le due monete, bitcoin e un euro, al posto
+   del titolo scritto e nello stato vuoto — WebP con trasparenza,
+   682x459, 46 KB, servita come file e mai incorporata nella pagina;
+   vedi CANTIERI, «L'intestazione di I miei scambi»),
    `/assets/tour-p2p/{nome}` (le sei illustrazioni del tour di
    benvenuto del P2P, 17 set 2026: whitelist a tupla
    `FILE_TOUR_P2P`, 756x360 WebP (21:10, la forma della scatola nel

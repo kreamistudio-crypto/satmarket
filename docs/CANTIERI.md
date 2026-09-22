@@ -24105,3 +24105,180 @@ ritorno dal wallet dopo aver pagato la garanzia — il primo piano dentro
 la Mini App lo vede solo il telefono. E la card di «I miei scambi» col
 👉 accanto al pallino: col relay morto la vista diceva «il libro non
 risponde», che e' il comportamento di prima e non di questo cantiere.
+
+## L'intestazione di «I miei scambi» (22 set 2026)
+
+**COSA.** «I miei scambi» somigliava troppo al libro ordini, che in
+cima ha gia' il logo P2P. Adesso la pagina comincia con
+un'intestazione sua: l'immagine di due monete che si scambiano di
+posto — una bitcoin e una da un euro, nello stile del logo P2P,
+scelta da Andrea — su un velo di colore tenue, e sotto, piccola, la
+riga viva del conto: «N in corso · M tocca a te». Il titolo scritto se
+ne va dalla pagina e resta nell'alt e nell'aria-label dell'immagine.
+Senza scambi la stessa immagine, piu' grande, fa lo stato vuoto:
+«Nessuno scambio in corso» e un bottone per il libro. Il resto della
+pagina e il libro non sono stati toccati.
+
+**I DUE NUMERI SONO QUELLI DEL FOGLIO DEL FILTRO**, ed e' la decisione
+da sapere. «In corso» e «Tocca a te» sono due dei cinque gruppi di
+`gruppoScambioP2P` — lo stesso giudice che accende il pallino — e il
+foglio del filtro scrive gia' accanto a ogni pillola quanti scambi ci
+cadono. I gruppi sono una PARTIZIONE: uno scambio dove tocca a me sta
+in «Tocca a te» e non anche in «In corso». Quindi con uno scambio solo,
+e la mossa mia, la riga dice «0 in corso · 1 tocca a te». La lettura
+alternativa — «in corso» come totale degli aperti, con «tocca a te»
+dentro — suona piu' naturale da sola, ma darebbe allo stesso nome due
+numeri sulla stessa pagina: la riga direbbe 3 e la pillola «In corso»
+del foglio 1. Se Andrea la vuole dell'altro verso, e' una riga sola:
+`contoScambiP2P`. «Tocca a te» lo conta `quantiToccaAMeP2P`, la
+funzione stessa del pallino: pallino, 👉 sulle card, conto nel foglio e
+questa riga sono una domanda sola, e nessuna ha una lista di stati
+sua. La riga conta TUTTI gli scambi anche col filtro acceso, come il
+pallino e come i numeri del foglio: la pillola dice quanti se ne
+vedono, l'intestazione come stanno.
+
+**VIVA SENZA NIENTE DI NUOVO.** La scrive `intestaScambiP2P`, chiamata
+da `renderP2P` a ogni giro, DOPO il corpo dei miei: cosi' conta anche
+le righe che `scambiP2P` ha appena adottato o pulito, cioe' le card
+che si vedono. E con la vista aperta ogni evento del coordinatore
+finisce in `renderP2P` — la riga c'era gia', in coda ad
+`applicaMessaggioP2P`. Nessun orologio, nessuna domanda. Prima del
+libro, o col libro che non risponde, l'immagine resta e il conto
+aspetta: e' la regola della riga di strumenti, che prima del libro non
+dice numeri perche' l'adozione non ha ancora ricostruito niente.
+
+**IL FILE E' SERVITO COME LE IMMAGINI DEL TOUR, E NON INCORPORATO.**
+La richiesta diceva «come le immagini del tour (WebP dentro
+miniapp.html)», ma quelle immagini dentro la pagina non ci sono mai
+state: sono file in `assets/tour-p2p/` con la loro rotta, e il verbale
+del tour dice perche' — in base64 peserebbero un terzo in piu' su una
+pagina che si riscarica a ogni apertura. Qui sarebbero stati una
+sessantina di KB a ogni avvio, per un'immagine che vive in una vista
+sola. Si e' seguito il meccanismo vero: `assets/scambi-intestazione.webp`
+con la rotta sua, esplicita (regola 3, mai un mount), e l'URL LETTERALE
+nel client, cosi' `_timbra_asset_pagina` lo timbra col `?v=` del
+contenuto. Due posti la mostrano, e il download e' uno.
+
+**IL FILE.** Dal PNG di Andrea (1280×714, sRGB, trasparente attorno
+alle monete; sul Desktop all'inizio non c'era, e la copia allegata in
+chat era identica byte per byte a quella arrivata dopo): ritaglio
+sull'alpha con 4 px d'aria, pixel invisibili azzerati, WebP con perdita
+a qualita' 80 e alpha intera — 682×459, 46.000 byte, e dentro solo
+VP8X, ALPH e VP8: niente ICC (e' sRGB, quel che il browser assume gia'),
+niente EXIF ne' XMP. La risoluzione e' quella piena del disegno: a
+schermo e' alta 120 px, cioe' 360 pixel veri su un telefono a 3×, e il
+file ne ha 459. La qualita' 85 superava i 50 KB (54,5); a 80, ingrandita
+al doppio accanto all'originale, non si distingue.
+
+**LE MISURE.** La scatola dell'immagine e' larga quanto la colonna e
+alta 120 px, con `object-fit:contain`: cosi' le tre richieste — larga
+quanto la colonna, circa 120 di altezza, proporzioni originali — stanno
+insieme, e il disegno (178×120 a schermo) sta al centro. Nello stato
+vuoto 160 px: a 3× e' un ingrandimento del 4%, che non si vede.
+
+**STA FUORI DAL BLOCCO ATTACCATO**, ed e' l'altra scelta da sapere. Il
+cappello di ieri restava a vista mentre si scorreva, ma era una riga da
+58 px: l'intestazione, col velo e il conto, ne misura 165, e attaccata
+insieme alla riga di strumenti terrebbe ferma una fascia di 230 px — su
+un telefono piccolo dentro Telegram, alle card resterebbe circa meta'
+schermo. Scorre via col dito, e in alto resta la riga di strumenti,
+come nel libro. Se la si vuole attaccata e' una riga di markup (dentro
+`.p2p-sticky`), ma costa quello spazio.
+⚠️ E TOGLIERE IL CAPPELLO HA SPOSTATO UN MARGINE. La riga di strumenti
+ha 13 px di margine sopra, tarati per stare in mezzo fra la linea del
+cappello e il bordo del blocco. Senza cappello e' diventata la prima
+cosa del blocco attaccato, e il suo margine sarebbe collassato FUORI
+(il blocco sopra non ha ne' bordo ne' padding): da attaccata sarebbe
+rimasta incollata al bordo in alto, coi tredici fuori dal fondo
+dipinto. `#view-p2pmiei .p2p-sticky{display:flow-root}` li tiene dentro
+— misurato dal vivo: blocco a 0, riga a 13.
+
+**IL VELO** e' `--sats-soft`, il tenue di casa, gia' tarato nei due
+temi — pesca di giorno (#FDEBD3), ambra scura di sera (#3E2B12) — in
+una scatola arrotondata come le card. Nessun token nuovo. E' un colore
+FERMO: niente sfocature, filtri, ombre o animazioni, quindi «effetti
+ridotti» non ha niente da togliergli — dal vivo, con la classe accesa e
+spenta, sfondo, altezze, animazioni, filtri e ombre dell'intestazione
+sono identici. Sul pesca il bordo crema delle monete si fa discreto; al
+buio stacca di piu'.
+
+**LA RIGA DEL CONTO** e' `--ink-soft` e non `--muted`: sul velo di
+giorno il muted scende a 3,3:1, sotto la soglia del testo piccolo;
+l'ink-soft sta a 6,4 di giorno e oltre 9 di sera. «Tocca a te» prende
+l'arancio del pallino (`--sats-text`) quando non e' zero. ⚠️ E' un
+`div` e non un `p`, e l'ha detto la misura: dentro una `.sicu` vale
+`.sicu p` (0,1,1), che veste ogni paragrafo da prosa — 15 px, peso 500
+— e batte la classe; al primo giro la riga usciva cosi'. Vuota si
+nasconde da sola (`:empty`).
+
+**IL NOME RESTA UN TITOLO.** L'immagine sta dentro un `h2`, con alt e
+aria-label «I miei scambi» — parola per parola la voce della nav: «due
+nomi per lo stesso posto sono due posti» vale anche per chi la pagina
+la ascolta. Se il file non arriva, `onerror="this.replaceWith(this.alt)"`
+rimette la parola: lo stesso alt, un nome solo, e in cima alla pagina
+non resta un buco. Nello stato vuoto l'intestazione piccola e' `hidden`
+e il titolo e' quello dell'immagine grande: di titoli ce n'e' sempre
+uno.
+
+**LO STATO VUOTO** porta al libro col gesto della voce «Libro ordini»,
+`go('p2p')`: «Vai al libro ordini», arancio come i bottoni degli stati
+vuoti di casa. L'invito al ＋ e' uscito con lui — la richiesta erano
+tre cose: immagine, frase, bottone — e il ＋ resta nella barra. Il
+marchio P2P ora veste due stati vuoti invece di tre: il libro vuoto e
+il filtro dei miei che non lascia passare niente, che NON sono stati
+toccati. In quel secondo, dentro «I miei scambi», c'e' ancora il logo:
+se si vuole anche li' la moneta, e' da decidere a parte.
+
+**LE STRADE SCARTATE.** 1) Il WebP in base64 dentro la pagina: vedi
+sopra, e il tour l'aveva gia' scartato col suo perche'. 2) Il logo P2P:
+escluso dalla richiesta. 3) «In corso» come totale degli aperti: vedi i
+due numeri. 4) L'intestazione attaccata in cima: lo spazio. 5) Una
+`drop-shadow` sulle monete, come il logo del libro: un filtro in piu'
+da spiegare a «effetti ridotti», e nessun bisogno — la moneta da un
+euro ha gia' la sua ombra dentro il disegno. 6) Alzare la specificita'
+della riga del conto per battere `.sicu p`: il `div` non entra proprio
+nella gara, e non dipende da come cambiera' quella regola.
+
+**PROVATO.** `prove_intestazione_scambi`, 57 prove: il file (peso,
+pezzi, trasparenza, misure, ritaglio), la rotta, il markup (h2, alt e
+aria-label presi dal tasto della nav, il ripiego, niente logo), il CSS
+(misure, velo nei due temi, nove regole senza effetti, contrasto
+calcolato dai token dei due temi), il giudice (gli stessi gruppi del
+foglio e del pallino, nessuna lista sua), i ganci in `renderP2P`, lo
+stato vuoto, il timbro `?v=`, e un banco node sul giudice vero con
+tredici casi indipendenti. Emendate cinque sentinelle che pretendevano
+il cappello, i suoi due gemelli invisibili, il nome nel titolo, i tre
+stati vuoti col marchio e il vecchio invito al ＋. Tortura su una
+copia: 37 mutazioni, 37 uccise. Una, quella che toglie il gancio,
+all'inizio moriva facendo ESPLODERE la sezione — una `index()` sul pezzo
+tolto — e con lei saltava il banco: adesso muore sulla prova giusta e
+il resto gira fino in fondo. `prove.py` intera su una copia senza
+`config.py`: 13048/0 con `PROVE_SEVERE=1` (12991 del pallino, piu' 57);
+gli otto collaudi senza rete verdi; nessuna forma di segreto nelle
+righe aggiunte.
+DAL VIVO, sull'app vera servita dal worktree (collaudo 111, leva
+accesa, relay puntato a un indirizzo morto perche' niente arrivasse al
+coordinator vero), a 375 px: l'intestazione col libro che non risponde
+(immagine, niente conto); quattro scambi seminati con
+`scriviOrdineP2P` → «2 in corso · 1 tocca a te», come il foglio del
+filtro, col pallino acceso; un `fiat-sent-ok` passato dalla porta vera
+(`applicaMessaggioP2P`) → la riga e' diventata da sola «1 in corso · 2
+tocca a te», con due card col 👉; scorrendo, la riga di strumenti
+attaccata a 13 px dal bordo e l'intestazione andata via; tema chiaro e
+scuro; «effetti ridotti» acceso e spento, identico; archivio vuoto →
+intestazione nascosta, monete a 160 px, frase e bottone, che porta
+davvero al libro; filtro che non lascia passare niente → intestazione
+col suo conto e sotto lo stato vuoto di prima, invariato; a 1100 px la
+colonna da 640 col disegno al centro (misurata: lo scatto del pannello
+a quella larghezza non componeva). E A DENSITA' 3, con Chrome headless
+via CDP sulla stessa app (il pannello e' a 2×): chiaro e scuro, con e
+senza scambi, e i ritagli 1:1 dell'intestazione — bordi netti,
+anche nello stato vuoto a 160 px.
+
+**NON PROVATO, E DA GUARDARE.** Il telefono vero dentro Telegram: il
+velo pesca sullo schermo vero (il bordo crema delle monete li' e'
+discreto; se si perde troppo, la leva e' il colore del velo), e la riga
+del conto con un evento VERO del coordinatore — dal vivo il relay era
+morto apposta, e l'evento l'ho fatto entrare io dalla porta del motore.
+E la lettura dei due numeri: se «0 in corso · 1 tocca a te» suona
+strano, e' la riga di `contoScambiP2P` da girare.
