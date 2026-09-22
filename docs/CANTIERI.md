@@ -23399,3 +23399,71 @@ tornare alla cassaforte d'origine; `collaudo_porta_timer.py` e
 ho toccati; e «payout fuori contratto» nel libro mastro non conosce
 `in_volo` — se la ronda quotidiana passa mentre un pagamento è in volo,
 suona. Segnalato, non curato.
+
+## L'archivio della patch 0007: il `.patch` torna dal nodo, coi 760 CR di un checkout Windows (22 set 2026)
+
+**IL CASO.** La 0007 è in servizio dal 19 set (`-bar4`, commit
+`9387493` sul nodo) e collaudata a due telefoni lo stesso giorno, ma
+in `deploy/mostro/` c'erano il patcher e `barattolo_eventi.rs` e NON il
+`.patch` esportato dal nodo — cioè la cartella che esiste «perché se
+quella macchina sparisse, il fork sparirebbe con lei» aveva sei
+salvagenti su sette. Il file stava nel worktree `bar4`, non committato.
+Questo cantiere lo porta su main, aggiorna il README del fork (immagine
+in servizio, i sette hash, le due variabili del compose, la ricetta per
+ricostruire da zero) e chiude il «DA FARE» della voce in PRODUZIONE.
+
+**COSA HA TROVATO IL CONTROLLO, e non era nella richiesta.** Il
+`.patch` aveva **760 CR dentro**, e non a caso: esattamente le 760
+righe aggiunte di `src/barattolo_eventi.rs`, e nessun'altra (le cinque
+righe di intestazione del file nuovo sono pulite, come le altre tredici
+sezioni). Il perché è già scritto nel `.gitattributes` della cartella
+per la sorella: `barattolo_fee.rs text eol=lf`, «va sul nodo così
+com'è: LF, o il format-patch si riempie di CR». La riga per
+`barattolo_eventi.rs` non c'era, il checkout Windows (`autocrlf=true`)
+l'ha dato in CRLF, lo `scp` l'ha portato così, e il commit `9387493`
+l'ha preso così. Nel repo il blob è LF (`e0b7e30`); sul nodo è un
+altro blob (`2e14403`), stesso codice.
+
+**LA DECISIONE: LA PATCH VA LF, E IL MODULO DEVE USCIRNE IDENTICO.** La
+richiesta chiedeva due cose che qui si tiravano una contro l'altra —
+«LF come le altre» e «il modulo dentro la patch identico a quello su
+main, se no fermati» — e la lettura è che la seconda parla di
+CONTENUTO: un modulo ritoccato sul nodo dopo il commit sarebbe stato
+un motivo per fermarsi, un fine-riga no. Quindi: CRLF→LF su tutta la
+patch (solo quelle 760 righe cambiano), e l'`index 0000000..2e14403`
+del file nuovo riscritto in `e0b7e30`, che è il blob che la patch ORA
+produce — così un `git apply --3way` di domani cerca un oggetto che
+esiste. Dopo la cura, il modulo estratto dalla patch e
+`barattolo_eventi.rs` su main sono uguali **byte per byte** (`cmp`, e
+la stessa sha256). E la riga mancante nel `.gitattributes` è stata
+aggiunta, perché la prossima copia sul nodo parta LF.
+LA STRADA SCARTATA: tenere la patch com'era, fedele al byte al commit
+del nodo. Sarebbe stata l'unica delle sette con CR dentro, avrebbe
+prodotto su un nodo ricostruito un file diverso da quello del repo, e
+la fedeltà al byte non vale niente: `git am` ricommitta comunque con
+hash nuovi, quindi quel che si conserva è il contenuto, non il commit.
+
+**PROVATO.** 1) La ricetta «ricostruire da zero» del README non è
+scritta a memoria: clone pulito di `MostroP2P/mostro`, checkout di
+`afc39a2` (che `git describe` chiama `v0.18.7`), `git am` delle sette
+`.patch` in fila — sette «Applying», zero conflitti, sette commit sopra
+il tag — e il `src/barattolo_eventi.rs` che ne esce ha zero CR e la
+sha256 del blob su main. 2) I due scanner della CI (le FORME e
+l'esadecimale nudo di 64) passati a mano sulla patch: puliti; dentro
+ci sono solo i NOMI delle variabili d'ambiente, mai un valore. 3) La
+suite `prove.py` intera, in locale con `PYTHONUTF8=1`.
+
+**NON PROVATO, e va detto.** I sette hash del nodo (`a9d387b … 9387493`)
+non li ho visti io: i primi sei vengono dal README com'era, il settimo
+dalla riga `From` della patch. Il conto dei test Rust della 0007 sul
+nodo non è a verbale da nessuna parte: nel README ho scritto quel che
+è a verbale (build verde, in servizio, due telefoni) e non un numero.
+E la ricetta da zero è provata fino al `git am`, non fino al `docker
+build`: sul PC non c'è `cargo`, e l'albero che compila sul nodo è per
+costruzione lo stesso.
+
+**RESTA DA FARE, di Andrea.** Cancellare il worktree `bar4`, che non
+contiene più niente che non sia su main. E il giorno che si tocca
+`barattolo_eventi.rs` nel repo, la copia sul nodo va rifatta da un
+checkout con la riga nuova del `.gitattributes`, o il prossimo
+`format-patch` si riempie di CR daccapo.
