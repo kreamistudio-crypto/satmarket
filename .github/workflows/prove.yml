@@ -87,7 +87,7 @@ jobs:
              marca_prove.py recupera_xp_ordini.py livelli_prova.py
              collaudo_offerta_carrello.py collaudo_punti_barattolo.py
              spoglia_foto_esistenti.py collaudo_verita_lnd.py
-             giudice_deploy.py
+             giudice_deploy.py collaudi_ci.py
 
       # Secondo scalino: il config d'esempio deve restare allineato,
       # perche' e' quello da cui Andrea copia quando mette mano al VPS.
@@ -108,6 +108,45 @@ jobs:
         env:
           PROVE_SEVERE: "1"
         run: python prove.py
+
+      # Quarto scalino (22 set 2026): i COLLAUDI, cioe' il server vero
+      # su un database usa-e-getta. `prove.py` guarda i pezzi estratti;
+      # qui si accorge di una colonna che manca o di un doppio con la
+      # firma vecchia — `collaudo_feedback_confermato` e' rimasto rosso
+      # tre giorni per il `riga=` di `paga_venditore` perche' non lo
+      # girava nessuno.
+      #
+      # LE DIPENDENZE DEL SERVER SI INSTALLANO QUI, DOPO LE PROVE, e
+      # non nello scalino di sopra: `prove.py` gira apposta senza
+      # httpx ne' fastapi (vedi collaudo_verita_lnd.py), e allargargli
+      # l'ambiente cambierebbe cosa prova senza che nessuno lo decida.
+      #
+      # L'ELENCO E' SCRITTO A MANO, uno per nome, e non e' un glob:
+      # entra solo un collaudo GUARDATO — config di cartone installato
+      # prima dell'import del server, niente rete, stesso esito a ogni
+      # giro. «Niente rete» non si prende sulla parola: `collaudi_ci.py`
+      # gira ognuno in una gabbia che ferma ogni connessione fuori da
+      # 127.0.0.1 e fa rosso chi ci prova (il perche' sta li').
+      #
+      # `!cancelled()` e non il default: i collaudi parlano anche se le
+      # prove sono rosse — la lezione del job dei segreti, un rosso
+      # prima non deve zittire le domande dopo. Il job resta rosso lo
+      # stesso, e con lui il semaforo del deploy.
+      - name: Le dipendenze del server, per i collaudi
+        if: ${{ !cancelled() }}
+        run: pip install --quiet fastapi httpx anthropic
+
+      - name: I collaudi, senza rete
+        if: ${{ !cancelled() }}
+        run: python collaudi_ci.py
+             collaudo_porta_timer
+             collaudo_sblocco_banner
+             collaudo_feedback_confermato
+             collaudo_verita_lnd
+             collaudo_altra_cassaforte
+             collaudo_in_pagamento
+             collaudo_lnbits_muto
+             collaudo_fatture_scadute
 
   # La regola ferrea numero 1, e vive in un JOB SUO — non in coda
   # all'altro, ed e' il pezzo da non rimettere com'era.

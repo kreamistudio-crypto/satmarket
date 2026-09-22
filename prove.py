@@ -22823,6 +22823,16 @@ def prove_libro_mastro():
         UPDATE utenti SET negozio_slug='vecchionome' WHERE tg_id=222;
         INSERT INTO pagamenti(id,tg_id,motivo,riferimento,importo_sats,stato)
           VALUES(5, 222, 'negozio_slug', 'vecchionome', 5000, 'pagato');
+        -- E I DUE RIMBORSI SANI DEL LINK (22 set 2026): 555 e' stato
+        -- rimborsato e il nome se n'e' andato; 666 e' stato rimborsato
+        -- e poi ha RIPAGATO lo stesso nome, che porta di diritto — il
+        -- caso che il NOT EXISTS del controllo esiste per non far
+        -- suonare.
+        INSERT INTO pagamenti(id,tg_id,motivo,riferimento,importo_sats,stato)
+          VALUES(6, 555, 'negozio_slug', 'bottega-cinque', 5000, 'rimborsato'),
+                (7, 666, 'negozio_slug', 'ritorno', 5000, 'rimborsato'),
+                (8, 666, 'negozio_slug', 'ritorno', 5000, 'pagato');
+        UPDATE utenti SET negozio_slug='ritorno' WHERE tg_id=666;
         """)
         return con
 
@@ -23118,6 +23128,20 @@ def prove_libro_mastro():
         ("UPDATE utenti SET negozio_slug='preso-da-un-altro' "
          "WHERE tg_id=222",
          "link del negozio pagato e non applicato", "5"),
+        # ...e il GEMELLO DEL RIMBORSO (22 set 2026): 555 e' stato
+        # rimborsato per «bottega-cinque» e il negozio porta ancora
+        # quel nome — `_disfa_slug_negozio` non l'ha tolto.
+        ("UPDATE utenti SET negozio_slug='bottega-cinque' WHERE tg_id=555",
+         "link del negozio rimborsato ma ancora scritto", "6"),
+        # ...e il pagato che lo scusa dev'essere per LO STESSO nome: un
+        # link pagato dopo per un ALTRO nome non rende legittimo quello
+        # rimborsato (senza questo caso, togliere `q.riferimento=` dal
+        # NOT EXISTS resta verde)
+        ("INSERT INTO pagamenti(id,tg_id,motivo,riferimento,importo_sats,"
+         "stato) VALUES(10, 555, 'negozio_slug', 'altro-nome', 5000, "
+         "'pagato'); UPDATE utenti SET negozio_slug='bottega-cinque' "
+         "WHERE tg_id=555",
+         "link del negozio rimborsato ma ancora scritto", "6"),
         # IL MOTIVO SENZA CASSA (set 2026): una riga che lo smistatore
         # dei due giri non riconosce resta ferma per sempre, pagata o
         # no — e questo e' l'unico posto che lo dice.
@@ -23181,6 +23205,20 @@ def prove_libro_mastro():
               id_atteso in trovati.get(atteso, []))
     prova("ogni controllo del catalogo ha il suo caso rotto",
           {c[0] for c in controlli}, {c[1] for c in casi})
+    # IL LINK RIMBORSATO nel gemello SQL (22 set 2026): la stessa WHERE,
+    # spazi e virgolette tolti — un'intestazione giusta sopra una WHERE
+    # storta farebbe tacere chi lancia le query a mano.
+    _sql_lm = open("query_libro_mastro.sql", encoding="utf-8").read()
+    _w = next(c[2] for c in controlli
+              if c[0] == "link del negozio rimborsato ma ancora scritto")
+    _w = _w[_w.index("WHERE"):]
+
+    def _nudo_lm(t):
+        return "".join(t.split()).replace('"', "")
+    prova("il gemello SQL conosce il link rimborsato, con la stessa WHERE",
+          (True, True),
+          ("17f) IL LINK DEL NEGOZIO RIMBORSATO" in _sql_lm,
+           _nudo_lm(_w) in _nudo_lm(_sql_lm)))
 
     # --- il patto della RONDA: silenzio, timbro, sola lettura -------
     corpo = pezzo("controlla_libro_mastro")
@@ -40313,6 +40351,64 @@ def prove_giudice_deploy():
                  - {"json", "os", "re", "subprocess", "sys", "urllib"}))
     wf = open(".github/workflows/prove.yml", encoding="utf-8").read()
     prova("il giudice si compila in CI", True, "giudice_deploy.py" in wf)
+
+
+def prove_collaudi_in_ci():
+    """I COLLAUDI IN CI (22 set 2026). Lo step che li gira sta nel job
+    `prove` — non in un job suo, perche' il giudice del VPS chiede il
+    verde di `prove` e `segreti` PER NOME, e un job terzo rosso non
+    fermerebbe nessun deploy. E la gabbia della rete si prova MORDERE,
+    non solo esistere: un sitecustomize che non si carica piu' lascia
+    passare tutto senza dire niente."""
+    print("\n[i collaudi in CI]")
+    import subprocess
+    import tempfile
+    wf = open(".github/workflows/prove.yml", encoding="utf-8").read()
+    job = wf[wf.index("\n  prove:"):wf.index("\n  segreti:")]
+    i = job.find("python collaudi_ci.py")
+    prova("lo step dei collaudi sta nel job `prove`", True, i > 0)
+    elenco = job[i:job.find("\n\n", i)].split()[2:] if i > 0 else []
+    prova("...con un elenco scritto a mano, non un glob", True,
+          len(elenco) >= 8 and not any("*" in n for n in elenco))
+    prova("...di collaudi che esistono tutti", [],
+          [n for n in elenco if not os.path.exists(n + ".py")])
+    prova("...e c'e' il feedback confermato, quello rimasto rosso tre "
+          "giorni", True, "collaudo_feedback_confermato" in elenco)
+    prova("...e parla anche quando le prove sono rosse", True,
+          "!cancelled()" in job[job.rfind("- name:", 0, i):i])
+
+    # la gabbia, fatta girare: un nome che non esiste per costruzione
+    # (.invalid non si risolve mai), quindi anche a gabbia rotta non
+    # esce niente di vero — ma deve finire SEGNATO
+    amb = {"__file__": "collaudi_ci.py"}
+    exec(open("collaudi_ci.py", encoding="utf-8").read()
+         .split("\ndef gira(")[0], amb)
+    cartella = tempfile.mkdtemp(prefix="gabbia-prova-")
+    with open(os.path.join(cartella, "sitecustomize.py"), "w",
+              encoding="utf-8") as f:
+        f.write(amb["GABBIA"])
+    segni = os.path.join(cartella, "segni")
+    sonda = ("import socket\n"
+             "try:\n    socket.getaddrinfo('gabbia.invalid', 443)\n"
+             "except OSError as e:\n    print('fermato', e.errno)\n"
+             "s = socket.socket()\ns.settimeout(2)\n"
+             "try:\n    s.connect(('192.0.2.1', 9))\n"
+             "except OSError as e:\n    print('fermato', e.errno)\n")
+    r = subprocess.run([sys.executable, "-c", sonda], capture_output=True,
+                       encoding="utf-8", errors="replace", timeout=60,
+                       env=dict(os.environ, PYTHONPATH=cartella,
+                                GABBIA_SEGNI=segni))
+    prova("la gabbia ferma il DNS e la connessione, come una rete staccata",
+          ["fermato 101", "fermato 101"], r.stdout.split("\n")[:2])
+    prova("...e le SEGNA tutte e due", 2,
+          len(open(segni, encoding="utf-8").read().splitlines())
+          if os.path.exists(segni) else 0)
+    # e un collaudo che non c'e' fa rosso lo step, subito
+    r = subprocess.run([sys.executable, "collaudi_ci.py",
+                        "collaudo_che_non_esiste"], capture_output=True,
+                       encoding="utf-8", errors="replace", timeout=60)
+    prova("un collaudo rosso fa uscire il lanciatore con 1", 1,
+          r.returncode)
 
 
 def prove_servizio_non_root():
@@ -76596,7 +76692,8 @@ def main():
               prove_cassa_strada_chiusa,
               prove_casa_vuota_gratis,
               prove_script_nel_workflow, prove_deploy,
-              prove_giudice_deploy, prove_servizio_non_root,
+              prove_giudice_deploy, prove_collaudi_in_ci,
+              prove_servizio_non_root,
               prove_guardiano_ponte,
               prove_bussola, prove_tetto_claude_md,
               prove_canale_comunita,

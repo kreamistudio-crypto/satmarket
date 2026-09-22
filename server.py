@@ -52844,6 +52844,24 @@ CONTROLLI_LIBRO_MASTRO = (
      "AND u.negozio_slug<>p.riferimento AND p.id=(SELECT MAX(p2.id) "
      "FROM pagamenti p2 WHERE p2.tg_id=p.tg_id "
      "AND p2.motivo='negozio_slug' AND p2.stato='pagato')"),
+    # Il gemello del quarto controllo del banner (22 set 2026): da
+    # quando `_rimborsa_sblocco` smista per motivo, il rimborso di un
+    # link toglie il SUO slug (`_disfa_slug_negozio`) — e se non l'ha
+    # tolto, i sats sono tornati e il nome e' rimasto. Il NOT EXISTS e'
+    # il caso sano da non far suonare: chi dopo il rimborso ha pagato
+    # di nuovo LO STESSO nome lo porta di diritto. Nessun'altra strada
+    # scrive `negozio_slug` (l'unica e' `_incassa_slug_negozio`), quindi
+    # un nome in colonna senza un pagato dietro non ha scuse.
+    ("link del negozio rimborsato ma ancora scritto",
+     "i sats del link sono tornati indietro ma il negozio porta ancora "
+     "quel nome: il rimborso disfa il pagamento, e questo non l'ha "
+     "disfatto",
+     "SELECT p.id FROM pagamenti p JOIN utenti u ON u.tg_id=p.tg_id "
+     "WHERE p.motivo='negozio_slug' AND p.stato='rimborsato' "
+     "AND u.negozio_slug<>'' AND u.negozio_slug=p.riferimento "
+     "AND NOT EXISTS (SELECT 1 FROM pagamenti q WHERE q.tg_id=p.tg_id "
+     "AND q.motivo='negozio_slug' AND q.stato='pagato' "
+     "AND q.riferimento=p.riferimento)"),
     # --- il motivo senza cassa (set 2026) ---------------------------
     # I due giri dell'orologio smistano per motivo
     # (`_incasso_del_motivo`) e una riga che non riconoscono NON la

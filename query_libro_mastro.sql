@@ -447,6 +447,19 @@ SELECT p.id, p.tg_id FROM pagamenti p JOIN utenti u ON u.tg_id = p.tg_id
    AND NOT EXISTS (SELECT 1 FROM pagamenti q WHERE q.tg_id = p.tg_id
      AND q.motivo = 'banner' AND q.stato = 'pagato');
 
+SELECT '17f) IL LINK DEL NEGOZIO RIMBORSATO' AS controllo;
+-- Il gemello della 4) qui sopra (22 set 2026): i sats del link sono
+-- tornati e il negozio porta ancora QUEL nome. Chi dopo il rimborso ha
+-- ripagato lo stesso nome lo porta di diritto, e non si stampa.
+-- Deve stampare "(nessuna riga)".
+SELECT p.id, p.tg_id, p.riferimento AS link
+  FROM pagamenti p JOIN utenti u ON u.tg_id = p.tg_id
+ WHERE p.motivo = 'negozio_slug' AND p.stato = 'rimborsato'
+   AND u.negozio_slug <> '' AND u.negozio_slug = p.riferimento
+   AND NOT EXISTS (SELECT 1 FROM pagamenti q WHERE q.tg_id = p.tg_id
+     AND q.motivo = 'negozio_slug' AND q.stato = 'pagato'
+     AND q.riferimento = p.riferimento);
+
 SELECT '21) IL POLSO DEGLI INCASSI NOSTRI (non e'' un allarme)' AS polso;
 -- Quanto ha incassato Barattolo per se', e in che stato sono le righe.
 -- E' anche la lista da incrociare col registro LNbits: il memo dice
