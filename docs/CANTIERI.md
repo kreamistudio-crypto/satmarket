@@ -26009,3 +26009,196 @@ nella startUrl — cioè una release nuova. Poi: che il barattolo sia lì
 dal primo fotogramma invece che dopo l'anello (è il difetto del video),
 e che in **Telegram** e nel **browser** l'apertura non lampeggi più
 d'arancio.
+
+## LE CARD DEGLI ORDINI DEL MERCATINO (22-23 set 2026)
+
+Richiesta di Andrea, in sei punti: la foto quasi del doppio e nitida a
+3×, la data sotto; accanto alla foto **solo** il titolo, il verbo e lo
+stato — via il numero d'ordine e il prezzo —; la card tinta del colore
+del suo stato **con lo stesso sistema di «I miei scambi»**; la foto più
+grande anche nel dettaglio; e i riquadri dei messaggi cifrati che a
+ordine concluso spariscono, con un link che li riapre se dentro c'era
+qualcosa. Il resto — gesti, stadi, feedback, timeline — non si tocca.
+
+**LA PRIMA COSA È STATA UNA DOMANDA, e valeva farla.** Nel dettaglio
+dell'ordine del mercatino **non c'è nessuna chat**: il «riquadro dei
+messaggi cifrati» poteva essere il blocco dei contatti in fondo
+(«✈️ Scrivi al venditore su Telegram», «🟣 …su Nostr») oppure i cinque
+riquadri in cui le due parti si passano davvero qualcosa di cifrato —
+il contenuto digitale, la nota, l'indirizzo di casa, l'email per il
+corriere, la busta di ritiro. Le due letture portano a due cantieri
+diversi, e solo la seconda dà un senso a «se dentro c'erano messaggi»:
+nei contatti non c'è niente di salvato da riaprire. Andrea ha
+confermato la seconda. **Un'ora di lavoro sbagliato costa più di una
+domanda.**
+
+### La foto, e la misura che sta su un nome suo
+
+56 → **100** in lista, 64 → **132** nel dettaglio, angoli a **16px** —
+quelli della carta, cioè di `.p2p-ord`, invece dei 12 del quadratino.
+Sotto la foto la data dell'ordine, piccola: `.ord-foto-col` è una
+colonna, non più il solo `<span>`.
+
+⚠️ **LA MISURA NON POTEVA STARE SU `.order-ic`**, ed è la trappola del
+giro: quel nome veste anche il quadratino delle **offerte**, che è
+un'emoji e non una foto — e in altri otto posti `.order` fa da carta a
+pannelli che con gli ordini non c'entrano. Allargare lì avrebbe gonfiato
+liste che nessuno ha chiesto di toccare. Il nome nuovo è `ord-foto`, e
+lo mette **solo** `fotoOrdine`; `.order-ic.grande` da solo non veste più
+niente ed è uscito. C'è una prova che rimisura il quadratino delle
+offerte a 56.
+
+**NITIDA A 3× SENZA TOCCARE LA CATENA DI RIPIEGO**, e il conto è
+verificabile invece che promesso: la miniatura del server ha il lato
+corto a `MINIATURA_LATO = 640`, e a 132 CSS per tre ne servono 396. La
+prova legge quel numero **dal server** e lo confronta col 132 del
+foglio: il giorno che qualcuno abbassasse la miniatura, la foto si
+sgranerebbe in silenzio e invece diventa una rossa.
+
+**LA STRADA SCARTATA NEL DETTAGLIO, perché Andrea l'aveva nominata:**
+la foto a **larghezza di colonna** (343px a 375) o una **galleria come
+nell'annuncio**. La galleria non è possibile senza toccare il server —
+`/api/orders` manda `foto0` e basta, una foto sola — e sarebbe uscita
+dal perimetro. La larghezza piena spingerebbe prezzo e stepper sotto la
+piega su una pagina che è già lunga: in un ordine la foto dice *quale
+oggetto*, non vende niente. 132 è il compromesso, e lascia il titolo
+accanto.
+
+### La riga: quattro cose, e due che se ne vanno
+
+Accanto alla foto restano **il titolo**, e sotto **il verbo** col
+**rettangolino dello stato sulla stessa riga** (`.ord-stato-riga`, con
+`flex-wrap`: a 320 la colonna è 147px e il badge va a capo invece di
+stringersi — le pillole non si stringono mai, è la lezione del titolo
+che si spezzava in verticale in «I tuoi annunci»).
+
+**IL NUMERO E IL PREZZO ESCONO**, e le due voci che li avevano messi lì
+non sono cadute, hanno cambiato posto. Il numero stava in testa alla
+riga meta perché «incolonnato sotto le foto fa una colonna di
+riferimenti che si scorre con l'occhio»: **quell'argomento adesso vale
+per le date**, e il numero vive nel dettaglio, dove porta anche la
+parola che dice cos'è. La cifra era il TOTALE a chi paga e il NETTO a
+chi incassa — due numeri diversi, ognuno vede il suo —: quella regola
+la tengono la testa dell'ordine e il pannello d'incasso, e
+`nettoVenditore` resta il giudice unico, adesso di **due** posti invece
+di tre (la sentinella che li conta è stata aggiornata, o sarebbe
+rimasta verde su un conto vecchio).
+
+⚠️ **IL TEMPO DEL VERBO NON SI È APPIATTITO SUL PASSATO.** La richiesta
+nominava «Hai comprato» / «Hai venduto», che sono le due forme della
+**chiusura**: su un ordine ancora in viaggio quella frase direbbe che
+una cosa in corso è finita, e la regola «i verbi seguono il tempo
+dell'affare» ha già la sua voce. Quindi il giudice resta com'era e a
+cambiare è solo la cifra che portava appresso. Detto ad Andrea nel
+riepilogo, perché è l'unico punto in cui la consegna non è alla
+lettera.
+
+### La tinta: una regola con due selettori, non una copia
+
+Andrea l'ha chiesto per nome — «riusa le classi e la regola del P2P,
+non una copia: una tinta sola per stato in tutta l'app» — e «stessa»
+qui vuol dire **una dichiarazione con due selettori**:
+`.p2p-scambio.tinta,.order.tinta{…}`. Stessi byte, stesse tre
+percentuali (`--tinta-card` 15%/8%, `--tinta-bordo`, `--tinta-testo`),
+stessi token: non possono scollarsi perché non esistono in due posti.
+Il doppio nome serve alla specificità da tutt'e due le parti — `.p2p-ord`
+e `.order` dichiarano il fondo della carta **più in basso** nel foglio.
+
+Il tono esce dalla **stessa classe del rettangolino**: `badgeOrdine(o)`
+→ `tonoCardOrdine(o)`, il gemello esatto di `tintaStatoP2P` →
+`tonoCardP2P`. Prima quella classe era un'espressione scritta a mano
+dentro il markup (`inPagamento(o) ? 'confirmed' : STATES[o.state].badge`):
+adesso è una funzione pura, e card e rettangolino non possono dire due
+cose diverse. `refunded` è **l'unico tono che il mercatino aggiunge** —
+grigio come l'annullato, cioè l'inchiostro del suo riquadro, come per
+gli altri sei.
+
+⚠️ **E LE DUE `findall` DELLA PROVA DELLE TINTE SI SONO ROTTE
+DIVERSAMENTE.** Passando da un selettore a un elenco, quella che legge
+i toni del P2P ha retto (`[^{]*` scavalca il fratello) e quella dei
+toni del mercatino no: `.order.tono-refunded` viveva appeso alla graffa
+dell'annullato e la regex, greedy, se lo **mangiava** — sei toni su
+sette, e il settimo spariva senza che niente protestasse. La cura non è
+una regex più furba: si legge la **dichiarazione intera** e si spoglia
+il suo elenco di selettori. È la stessa famiglia del «prefisso che
+contiene quello altrui».
+
+**IL CONTRASTO NON SI EREDITA, SI RIMISURA.** Il verbo e la data stanno
+sul fondo tinto a 12,5 e 11px, e `--muted` su carta bianca sta già a
+3,8:1 — sotto la soglia del testo piccolo. Vanno su `--ink-soft`, che è
+la cura già scelta per le card di «I miei scambi», e i due token sono
+già dentro il conto della prova delle tinte: una riga nuova li **lega**
+alla card degli ordini, o il conto resterebbe verde misurando un token
+che non veste più niente. Dal vivo, 72 letture sui colori calcolati dal
+browser nei due temi: il peggiore sta a **5,85:1**.
+
+### Le buste, e il link che si consuma
+
+I cinque riquadri passano da `busteOrdine(o)` — **una chiamata sola** al
+posto di cinque, o una resterebbe fuori dalla chiusura — e a ordine
+finito si chiudono. **Finito è `CONCLUSI`** (concluso, rimborsato,
+annullato), lo stesso giudice dei verbi e del filtro «solo attivi»: una
+seconda definizione un giorno direbbe qualcos'altro. **La disputa non è
+finita** e lì restano aperti — anzi, è il posto dove servono di più:
+sono la prova di cosa si erano detti.
+
+`display:none` **e non un ramo che non disegna**, ed è la scelta che fa
+funzionare tutto il resto: i pannelli restano nel DOM, quindi quel che
+gira dopo il disegno (le cifre, l'anello della busta, i campi che si
+aprono già pronti) li trova dove li cerca, e riaprirli è una riga
+invece di un secondo giro di `openOrder`. Il link si **consuma**: un
+bottone che non fa più niente non resta lì. E se le cinque buste non
+producono niente, il link non compare affatto — un invito ad aprire il
+vuoto è peggio del vuoto.
+
+### Le due cose che si sono viste solo a 320
+
+Il giro dal vivo (server vero nel worktree, dodici ordini seminati uno
+per stato, buyer e seller) ha trovato due cose che la lettura non
+vedeva.
+
+**IL TITOLO SI FERMA A TRE RIGHE.** Con la foto alta 100 la card è
+**149px per tutte** — la colonna della foto e quella del testo misurano
+uguale —, e un titolo lungo la portava a **193** a 320px: una card fuori
+riga in mezzo a una colonna regolare. Tre righe coi puntini sono una
+sessantina di caratteri, e il titolo intero sta nel dettaglio. Il nome
+sta sul **tag** (`.ord-titolo`) e non su un selettore furbo: `.order-main>b`
+veste anche la riga delle offerte, e `:has` per distinguerle sarebbe una
+scommessa sul browser dove `color-mix` ha voluto un `@supports`.
+
+**IL LINK SCENDE A 13px.** `.btn.link` nasce a 15 grassi e sottolineati:
+su una pagina chiusa è un **invito**, e questo è un ripensamento. Stessa
+taglia della riga del CSV, che è la cosa più vicina per mestiere.
+
+### Le prove
+
+`prove_card_ordini` nuova, **26 prove** con due banchi node. Il primo
+gira `tonoCardOrdine` su **tutti e dodici** gli stati nei due stadi
+(fermo, e col pagamento in volo) e confronta la tabella intera; poi
+controlla che **ogni tono prodotto abbia il suo colore nel foglio** —
+uno stato nuovo senza tono uscirebbe senza fondo, cioè una card bianca
+in mezzo a tutte colorate proprio quando è successo qualcosa. Il
+secondo sostituisce i cinque pannelli con dei segnaposto e prova il
+**gate** stato per stato: vuoto → niente, vivo → buste aperte, finito →
+nascoste col link.
+
+Le tre sezioni raddrizzate: i verbi senza cifre (con un `find` al posto
+di un `index`, che su un'ancora mancata faceva **esplodere la sezione**
+invece di dare una rossa col suo nome), il numero che nella lista non
+c'è più — con il conto dei bersagli preso **sulla card** e non su tutta
+la lista, che la coda porta «mostrali» e il CSV, bottoni della pagina —
+e le tinte con la regola appaiata.
+
+**13307/0** con `PROVE_SEVERE=1`, **otto collaudi** senza rete verdi,
+**tortura 23/23** (nessuna esplosa, baseline verde).
+
+### Da guardare sul telefono
+
+La lista degli ordini con più stati insieme, nei due temi: se a colpo
+d'occhio le card colorate si distinguono senza leggerle, e se le tinte
+non fanno confusione col P2P — sono le stesse, ed è voluto, ma le due
+liste vivono in posti diversi. Un ordine **concluso che aveva una
+busta** (istruzioni di ritiro, o un contenuto digitale): il link «Vedi i
+messaggi» deve leggersi come un ripensamento e non come un bottone, e
+quel che riapre deve comparire **dove stava il dito**. E un ordine con
+un titolo lungo: tre righe coi puntini devono bastare a riconoscerlo.
