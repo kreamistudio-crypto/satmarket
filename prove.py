@@ -56899,6 +56899,31 @@ def prove_p2p_barattozon():
     nuovo = pezzo_js(mini, "function renderNuovoOrdineP2P(){", "\n}\n")
     prova("il foglio Pubblica: il marchio ACCANTO al nome, non al suo posto", True,
           "marchioMetodoP2P(m, true)" in nuovo)
+    # ⚠️ E DAL 22 SET 2026 (sera) I POSTI SONO CINQUE, non tre: la card
+    # di «I miei scambi» e la riga del metodo nella pagina dello scambio
+    # dicevano ancora «Contanti al tabacchino», col numero del `pm`
+    # attaccato. Stessi due giudici, nessuna logica nuova — e chi
+    # aggiunge un sesto posto lo aggiunge qui, che e' il censimento.
+    scambio = pezzo_js(mini, "function rigaScambioP2P(o){", "\n}\n")
+    prova("la card dei miei scambi: lo stesso vestito della sorella", True,
+          "metodi.map(m => marchioMetodoP2P(m)).join(', ')" in scambio
+          and "const senzaNomi = metodi.length > 0 && iconaMetodiP2P(metodi) === '';"
+          in scambio
+          and "(senzaNomi ? ' p2p-paga-marchio' : '')" in scambio
+          and "(senzaNomi ? '' : iconaMetodiP2P(metodi))" in scambio)
+    prova("...e nemmeno lei scrive l'emoji a mano", 0,
+          scambio.count(chr(0x1F4B3)))
+    prova("...e il title resta il testo del tag, importo compreso", True,
+          "const met = metodi.join(', ');" in scambio
+          and "'\" title=\"'" in scambio
+          and "+ esc(met) + '\">'" in scambio)
+    campi = pezzo_js(mini, "function renderCampiP2P(", "\n}\n")
+    prova("la pagina dello scambio: il marchio nella riga e nelle pillole",
+          True,
+          "Il metodo dello scambio è <b>'\n                    + marchioMetodoP2P(scelto) + '</b>"
+          in campi
+          and "marchioMetodoP2P(m) + '</button>'" in campi
+          and "(vesteMetodoP2P(m) ? ' p2p-pill-marchio' : '')" in campi)
 
     # --- 4) LE TRE FUNZIONI GIRANO ---------------------------------
     import json as _js, shutil as _sh, subprocess as _sp, tempfile as _tf
@@ -60622,9 +60647,18 @@ def prove_p2p_card_scambio():
     # non resta nessun nome, aggiunge `p2p-paga-marchio`. Le DUE classi
     # di base restano le stesse, ed e' quello che questa riga
     # sorveglia — la card dello scambio non deve inventarsene di sue.
+    # ⚠️ E DAL 22 SET 2026 (sera) IL MODIFICATORE CE L'HANNO TUTT'E
+    # DUE: la card dei miei scambi diceva «Contanti al tabacchino
+    # 23.47» dove quella del libro diceva «Barattozon» — due nomi per
+    # la stessa cosa a uno scorrimento di distanza. Il vestito adesso
+    # e' lo stesso, e viene dagli stessi due giudici.
     prova("il metodo veste la scatola delle card del libro", True,
-          'class="p2p-box p2p-paga"' in rs
+          'class="p2p-box p2p-paga' in rs and "p2p-paga-marchio" in rs
           and 'class="p2p-box p2p-paga${' in riga)
+    prova("...e lo veste con i giudici del libro, non con una copia", [],
+          [x for x in ("iconaMetodiP2P(metodi)",
+                       "metodi.map(m => marchioMetodoP2P(m)).join(', ')")
+           if x not in rs])
 
     # --- 4) IL BANCO: le funzioni vere ------------------------------
     node = _sh.which("node")
@@ -60645,12 +60679,28 @@ def prove_p2p_card_scambio():
                       mini.index("\n", mini.index("const fmt = n =>"))])
     pezzi.append(mini[mini.index("const P2P_TINTA_STATO = {"):
                       mini.index("\n};", mini.index("const P2P_TINTA_STATO = {")) + 3])
+    # il catalogo dei vestiti e le due costanti del tabacchino: senza,
+    # il banco esplode invece di dipingere il marchio (la lezione della
+    # tortura — una mutazione «uccisa» da un banco che non parte)
+    for _c in ("const P2P_TABACCHINO = ", "const P2P_TABACCHINO_PM = "):
+        pezzi.append(mini[mini.index(_c):mini.index("\n", mini.index(_c))])
+    pezzi.append(mini[mini.index("const P2P_VESTE_METODI = {"):
+                      mini.index("\n};", mini.index("const P2P_VESTE_METODI = {")) + 3])
     pezzi += [pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
         "function verboLatoP2P(o){",
         "function fraseLatoP2P(o){",
         "function affareP2P(o){",
         "function premioTestoP2P(n){",
         "function premioMioP2P(o){",
+        "function metodoBaseP2P(m){",
+        # il giudice GEMELLO del tabacchino: nel banco non serve alla
+        # card, serve perche' una mutazione che lo usasse al posto di
+        # `iconaMetodiP2P` morisse sul COMPORTAMENTO e non su un
+        # ReferenceError (la lezione del banco che esplode)
+        "function tabacchinoP2P(metodi){",
+        "function vesteMetodoP2P(m){",
+        "function marchioMetodoP2P(m, conTesto){",
+        "function iconaMetodiP2P(metodi){",
         "function tintaStatoP2P(o){",
         # la card indossa la tinta del suo stato (22 set 2026): senza
         # questo pezzo il banco esplode invece di dipingere
@@ -60703,6 +60753,15 @@ out.metodoDeciso = rigaScambioP2P(riga({metodi: ['SEPA', 'Satispay'],
 out.metodoStorto = rigaScambioP2P(riga({metodi: ['SEPA'],
                                         metodoScelto: 'Contanti'}));
 out.senzaMetodo = rigaScambioP2P(riga({metodi: []}));
+/* IL TABACCHINO SI CHIAMA BARATTOZON ANCHE QUI (22 set 2026), col `pm`
+   che si porta dietro l'importo esatto e in tutti gli stati */
+const PM = 'Contanti al tabacchino 23.47';
+out.marchio = rigaScambioP2P(riga({metodi: [PM]}));
+out.marchioScelto = rigaScambioP2P(riga({metodi: ['SEPA', PM], metodoScelto: PM}));
+out.marchioMisto = rigaScambioP2P(riga({metodi: ['SEPA', PM]}));
+out.marchioStati = {};
+for (const st of ['attesa_mia_hold', 'attivo', 'concluso', 'annullato', 'in_disputa'])
+  out.marchioStati[st] = rigaScambioP2P(riga({stato: st, metodi: [PM]}));
 /* il piede: «tocca a te» sugli stati vivi, la ✕ sui finali, mai
    insieme — e senza nessuna delle due la riga non si scrive */
 out.tocca = rigaScambioP2P(riga({stato: 'attesa_mia_fattura'}));
@@ -60944,6 +61003,53 @@ console.log(JSON.stringify(out));
           and "Contanti" not in o["metodoStorto"])
     prova("...e senza metodi la scatola non si scrive", True,
           "p2p-paga" not in o["senzaMetodo"])
+
+    # IL TABACCHINO SI CHIAMA BARATTOZON ANCHE QUI (22 set 2026,
+    # ritocco di Andrea): la card del libro lo vestiva col marchio e
+    # questa no, quindi lo stesso ordine aveva due nomi a uno
+    # scorrimento di distanza.
+    # ⚠️ IL NUMERO DEL `pm` NON ENTRA NELLA SCATOLA: dal 22 set il tag
+    # porta l'importo esatto («Contanti al tabacchino 23.47»), che nella
+    # card e' gia' scritto nelle due righe qui sopra — una terza cifra
+    # direbbe la stessa cosa una volta di troppo. A toglierla non serve
+    # nessun taglio: col marchio li' dentro non resta nessun nome. Il
+    # `title` invece lo TIENE, che e' il testo del tag e serve a chi ci
+    # passa sopra — quindi qui si guarda la card senza i title.
+    def _senza_title(h):
+        return re.sub(r'title="[^"]*"', '', h)
+    marchio = _senza_title(o["marchio"])
+    prova("il tabacchino si veste da Barattozon anche nei miei scambi",
+          True, "/assets/barattozon.webp" in marchio
+          and "p2p-paga-marchio" in marchio)
+    prova("...e nella scatola non finiscono ne' la parola ne' l'importo",
+          [False, False, False],
+          ["Contanti al tabacchino" in marchio, "23.47" in marchio,
+           chr(0x1F4B3) in marchio])
+    prova("...ma il title resta il testo del tag, importo compreso", True,
+          'title="Contanti al tabacchino 23.47"' in o["marchio"])
+    prova("...e vale anche quando e' la SCELTA di chi ha preso", True,
+          "/assets/barattozon.webp" in _senza_title(o["marchioScelto"])
+          and "SEPA" not in _senza_title(o["marchioScelto"]))
+    # ⚠️ CON UN NOME ANCORA DENTRO L'INSEGNA NON SI ACCENDE: la scatola
+    # resta quella di sempre, l'emoji intesta il nome scritto e il
+    # marchio gli sta accanto. Oggi il tabacchino e' esclusivo
+    # nell'ordine, ma la card risponde al CASO e non alla regola di
+    # adesso, che sta scritta altrove e puo' cambiare senza passare di
+    # qua.
+    misto = _senza_title(o["marchioMisto"])
+    prova("...e con un metodo scritto accanto l'insegna non si accende",
+          [True, True, False],
+          ["SEPA" in misto, chr(0x1F4B3) in misto,
+           "p2p-paga-marchio" in misto])
+    # E IN TUTTI GLI STATI, che e' la richiesta letterale: la scatola
+    # del metodo non dipende dallo stato, ma una card che la scrive in
+    # un ramo e non nell'altro e' il difetto che si vede solo dal vivo.
+    prova("il marchio c'e' in tutti gli stati, coi numeri fuori",
+          {k: True for k in ("attesa_mia_hold", "attivo", "concluso",
+                             "annullato", "in_disputa")},
+          {k: ("/assets/barattozon.webp" in v
+               and "23.47" not in _senza_title(v))
+           for k, v in o["marchioStati"].items()})
 
     # ⚠️ «TOCCA A TE» STA DENTRO LA CASELLA, accanto allo stato: la
     # casella e' gia' tinta dal gesto da fare (arancio), e il gesto e'

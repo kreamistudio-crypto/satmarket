@@ -48312,10 +48312,13 @@ function renderCampiP2P(){
       (metodi.length > 1 && !deciso
         ? '<div class="field"><label>Con quale metodo ricevi gli euro</label>' +
           '<div class="p2p-metodi">' + metodi.map(m =>
-            '<button type="button" class="tema-pill' + (m === scelto ? ' active' : '') +
+            '<button type="button" class="tema-pill'
+            + (m === scelto ? ' active' : '')
+            + (vesteMetodoP2P(m) ? ' p2p-pill-marchio' : '') +
             '" data-m="' + esc(m) + '" onclick="scegliMetodoRecapito(this.dataset.m)">' +
-            esc(m) + '</button>').join('') + '</div></div>'
-        : (scelto ? '<div class="hint">💶 Il metodo dello scambio è <b>' + esc(scelto) + '</b>.</div>' : '')) +
+            marchioMetodoP2P(m) + '</button>').join('') + '</div></div>'
+        : (scelto ? '<div class="hint">💶 Il metodo dello scambio è <b>'
+                    + marchioMetodoP2P(scelto) + '</b>.</div>' : '')) +
       fr.campi.map(c =>
         '<div class="field"><label for="p2pCampoEuro_' + c.k + '">' + esc(c.et) + '</label>' +
         '<input type="text" id="p2pCampoEuro_' + c.k + '" maxlength="' + CAMPO_MAX_TESTO + '" ' +
@@ -48796,8 +48799,24 @@ function rigaScambioP2P(o){
   const l = comeLibroP2P(o);
   /* IL METODO DECISO PRENDE IL POSTO DELL'ELENCO, come nella pagina
      dello scambio: da quando chi prende sceglie, le altre voci non
-     sono piu' in gioco e scriverle direbbe una cosa non piu' vera. */
-  const met = metodoSceltoP2P(o) || (o.metodi || []).join(', ');
+     sono piu' in gioco e scriverle direbbe una cosa non piu' vera.
+     ⚠️ E IL VESTITO E' QUELLO DEL LIBRO (22 set 2026, ritocco di
+     Andrea): la stessa card, di la' e di qua, non puo' chiamare lo
+     stesso metodo con due nomi — nel libro «Barattozon», qui «Contanti
+     al tabacchino». Si chiede al CATALOGO con gli stessi giudici della
+     card del libro (`iconaMetodiP2P`, `marchioMetodoP2P`, che dentro
+     guardano il PREFISSO), e non nasce nessuna logica nuova.
+     ⚠️ E IL MARCHIO PORTA VIA ANCHE L'IMPORTO che il tag `pm` si
+     trascina dal 22 set («Contanti al tabacchino 23.47»): nella
+     scatola quella cifra non ci deve stare, e' gia' nelle due righe
+     qui sopra — e a toglierla non serve un taglio, basta che li' dentro
+     non resti nessun nome. L'ELENCO resta un ARRAY fino all'ultimo,
+     perche' i due giudici ragionano per voci e non su una stringa
+     incollata. */
+  const scelto = metodoSceltoP2P(o);
+  const metodi = scelto ? [scelto] : (o.metodi || []);
+  const met = metodi.join(', ');
+  const senzaNomi = metodi.length > 0 && iconaMetodiP2P(metodi) === '';
   const sats = satsScambioP2P(o);
   /* le due cifre, e il lato dice SOLO in quale riga vanno: `sell` nel
      vocabolario del libro vuol dire che chi legge riceve sats */
@@ -48857,8 +48876,11 @@ function rigaScambioP2P(o){
     + premioMioP2P(l)
     + '<div class="p2p-scambio-stato' + tintaStatoP2P(o) + '">'
     + '<span>' + esc(st.t) + '</span>' + agire + '</div>'
-    + (met ? '<div class="p2p-box p2p-paga" title="' + esc(met) + '">💳 '
-             + esc(met) + '</div>' : '')
+    + (metodi.length ? '<div class="p2p-box p2p-paga'
+             + (senzaNomi ? ' p2p-paga-marchio' : '') + '" title="'
+             + esc(met) + '">'
+             + (senzaNomi ? '' : iconaMetodiP2P(metodi))
+             + metodi.map(m => marchioMetodoP2P(m)).join(', ') + '</div>' : '')
     /* IL PIEDE E' RIMASTO ALLA SOLA ✕: «tocca a te» e' salito nella
        casella, e le due non potevano comunque coesistere — l'una vive
        sugli stati vivi, l'altra sui finali. Senza di lei la riga non
