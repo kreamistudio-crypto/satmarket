@@ -357,8 +357,10 @@ mosso, i campi di `Order` in mostro-core 0.14.6, `failure_reason` come
 corpo, cosa non esce MAI, un server HTTP di cartone per il retry (uno
 solo), il rifiuto non riprovato, il server morto che è un `false` e
 non un blocco — avevano come primo giro lo stadio `builder` sul nodo,
-punto 4 della liturgia in PRODUZIONE; il loro conto non è a verbale
-qui, quel che è a verbale è la build verde e il collaudo a due telefoni.
+punto 4 della liturgia in PRODUZIONE, e lì il 19 set 2026 hanno dato
+**310 passati, 0 falliti** (il conto lo ha riferito Andrea il 22 set,
+dal nodo). Con la build verde e il collaudo a due telefoni, è quel che
+è a verbale.
 IL `.PATCH` DELLA 0007 È ARRIVATO CON 760 CR DENTRO (22 set 2026), ed
 è la stessa lezione del `.gitattributes`: `barattolo_eventi.rs` era
 stato copiato sul nodo dal checkout Windows, in CRLF, e il commit

@@ -23467,3 +23467,69 @@ contiene più niente che non sia su main. E il giorno che si tocca
 `barattolo_eventi.rs` nel repo, la copia sul nodo va rifatta da un
 checkout con la riga nuova del `.gitattributes`, o il prossimo
 `format-patch` si riempie di CR daccapo.
+
+## La ronda della superficie nel repo, e il ponte che guarda (22 set 2026)
+
+**IL PUNTO DI PARTENZA.** `ronda-superficie.sh` cercava
+`nodo-tor-redirect-1`, il sidecar sparito il 15 set: Andrea l'ha
+corretta a mano sul nodo in `nodo-tor-1` il 22 set. La «copia nel
+repo» da allineare NON C'ERA: lo script viveva solo sul nodo, e nei
+documenti non c'era come funziona dentro. Non l'ho riscritta a memoria
+— la copia avrebbe detto il falso dal primo giorno — ma l'ho chiesta:
+Andrea l'ha incollata con la baseline vera (24 righe), e la copia in
+`deploy/nodo/` parte da quei byte.
+
+**IL DNS DI DOCKER.** Dentro il namespace di tor Docker monta il suo
+DNS interno con due regole DNAT/SNAT verso `127.0.0.11:<porta>`, e la
+porta cambia a OGNI avvio del container: ogni restart di tor era un
+allarme falso. La cura maschera il SOLO numero (`127.0.0.11:PORTA`,
+`--sport PORTA`), solo sulle righe `gw-nat -A DOCKER_OUTPUT|POSTROUTING`,
+e su TUTT'E DUE i lati del diff — la baseline vecchia si confronta
+mascherata, quindi niente `--impara` da fare. Resta un allarme se una
+di quelle regole sparisce, se ne compare una nuova, se cambia
+l'indirizzo. LA STRADA SCARTATA: togliere quelle righe dalla foto —
+una regola DNAT nel gateway di mostro che sparisce e' proprio una delle
+cose che la ronda deve vedere.
+
+**IL PONTE WIREGUARD, ACCESO DAL PRIMO GIRO** (in servizio dal 21 set,
+Andrea). La foto guardava solo `ss -tln`: la 51820/udp e `WG-PONTE` non
+li vedeva nessuno. LA DECISIONE: non si IMPARANO, si confrontano con
+`deploy/ponte/wg0-nodo.conf`, perche' una baseline impara anche una
+regola sbagliata, mentre il firewall del tunnel ha una forma sola
+giusta. Si guardano: `wg0` su, porta 51820, UNA peer; le cinque regole
+di WG-PONTE, trovate per COPPIE (`-i wg0`, `--dport 18080`) e non per
+stringa intera, perche' `iptables -S` ristampa le opzioni nel suo
+ordine; l'ordine che conta (l'ACCEPT della 18080 sopra il DROP di wg0,
+l'ACCEPT del VPS sopra il DROP della 51820); il conto esatto a 5 (una
+regola in piu' e' una porta in piu', e si elenca); WG-PONTE PRIMA regola
+di INPUT; i due DROP di wg0 in FORWARD e quello in DOCKER-USER; il DROP
+della 51820 in `ip6tables`. Ogni pezzo mancante ha il suo allarme col
+suo nome. SCARTATO: accendere il controllo solo se esiste
+`/etc/wireguard/wg0.conf` — col ponte in servizio, un file sparito deve
+suonare, non spegnere la sentinella.
+
+**PROVATO.** Un banco con `ss`/`iptables`/`ip6tables`/`nsenter`/`wg`/
+`ip` finti e la baseline VERA di Andrea, dodici casi: sano con le porte
+DNS cambiate e con quelle uguali (tace), regola UDP del DNS sparita
+(una riga, `<`), DROP della 51820 mancante, DROP di wg0 sopra l'ACCEPT,
+regola in piu', catena assente, WG-PONTE non in cima, FORWARD senza le
+due righe, v6 aperto, due peer + porta sbagliata, wg0 giu': ognuno col
+suo allarme e nessun altro. Poi `--impara` e giro: tace.
+La prima corsa del banco era tutta rossa per colpa del BANCO (il
+`nsenter` finto saltava un argomento di troppo): come sempre, prima di
+indagare lo script si guarda chi finge.
+
+**NON PROVATO.** L'`iptables -S` VERO del nodo: le forme delle righe
+sono quelle che `iptables` stampa di solito, ma il banco le ha scritte
+a mano. Per questo la procedura in PRODUZIONE dice che un allarme al
+primo giro NON si cura con `--impara`. E l'installazione sul nodo e'
+di Andrea.
+
+**A LATO, E NON TOCCATO.** `ronda-tor.sh` porta ancora il giudice del
+sidecar (`R=nodo-tor-redirect-1`): non fa danno, perche' senza il
+container il giudice non parte, e la copia sul nodo e' uguale. Il
+rischio del namespace prestato che RESTA e' `mostro` dentro
+`mostro-net`, che nessuna ronda confronta: giro suo, se si vuole.
+Il README del fork ha il conto dei test Rust della 0007 (19 set: 310
+passati, 0 falliti, riferito da Andrea), che la voce di prima
+dichiarava mancante.

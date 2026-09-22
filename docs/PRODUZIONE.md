@@ -395,6 +395,28 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   scp dei tre file, `sha256sum` da confrontare, poi
   `sudo install -m 755 ronda-tor.sh /usr/local/bin/ && sudo cp nodo-tor.service nodo-tor.timer /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now nodo-tor.timer && sudo /usr/local/bin/ronda-tor.sh --prova`.
   Il messaggio finisce con `--- fine ronda tor`, come le altre.
+- LA QUARTA DOMANDA, LA SUPERFICIE: `ronda-superficie.sh`, copia in
+  `deploy/nodo/` dal 22 set 2026 (prima viveva solo sul nodo). Foto di
+  quel che ascolta fuori dal loopback, dei DNAT di Docker e delle regole
+  dentro tor, confrontata con la baseline `/var/lib/ronda/superficie`;
+  `--impara` e' un gesto. La porta del DNS interno di Docker
+  (`127.0.0.11:<porta>` in DOCKER_OUTPUT/DOCKER_POSTROUTING) e' mascherata
+  come `PORTA` su tutt'e due i lati, quindi la baseline di prima NON va
+  rifatta. Il PONTE WIREGUARD non si impara: `WG-PONTE` in cima a INPUT
+  con le sue 5 regole nell'ordine giusto, i due DROP di `wg0` in FORWARD
+  e quello in DOCKER-USER, la 51820/udp chiusa su v6, `wg0` su con porta
+  51820 e UNA peer — ogni pezzo mancante ha il suo allarme. Installazione
+  (dal PC, cartella del repo):
+  `scp -i $env:USERPROFILE\.ssh\lnvps deploy/nodo/ronda-superficie.sh debian@vm-1937.lnvps.cloud:/tmp/`
+  poi SUL NODO `sha256sum /tmp/ronda-superficie.sh` contro quello del PC
+  (`Get-FileHash deploy/nodo/ronda-superficie.sh`, stesse cifre in
+  minuscolo), `sudo cp /usr/local/bin/ronda-superficie.sh /root/ronda-superficie.sh.prima-22set`,
+  `sudo install -m 755 /tmp/ronda-superficie.sh /usr/local/bin/` e
+  `sudo /usr/local/bin/ronda-superficie.sh` — deve dire
+  `superficie ok  24 righe invariate` e `ponte wg ok`. Un ALLARME al
+  primo giro NON si cura con `--impara`: o e' vero, o la ronda legge
+  male l'`iptables -S` vero (provata solo su un banco finto) — si
+  guarda prima. Rollback: il `.prima-22set` al suo posto.
 - I PROVIDER DI SCORTA DEL PREZZO (15 set 2026): `settings-price.toml`
   in `deploy/nodo/` e' la sezione `[price]` da appendere a
   `~/nodo/mostro/settings.toml` (yadio + CoinGecko + currency-api +
