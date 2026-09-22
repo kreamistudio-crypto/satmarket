@@ -79264,6 +79264,206 @@ console.log(JSON.stringify(out));
           "gli scambi già presi restano come erano" in dati)
 
 
+def prove_guscio_apertura():
+    """IL GUSCIO DI APERTURA (set 2026). Fra il tocco sull'icona e
+    l'app usabile c'e' un'attesa che nell'APK era coperta a META':
+    Android disegna il suo splash — il barattolo scontornato alto
+    160dp sul #F78F19 campionato dalla foto sorgente — e lo toglie al
+    PRIMO PAINT della pagina, che arriva con l'app ancora da montare.
+    Il guscio e' l'altra meta': stesso fondo, stesso barattolo, stessa
+    misura, e scende quando la vetrina ha i suoi primi dati.
+    LE DUE PROVE CHE CONTANO NON GUARDANO UNA COSTANTE SCRITTA A MANO,
+    ed e' per questo che valgono: il FONDO si ricalcola dalla foto
+    sorgente con la stessa ricetta di genera_icone_apk.py, la MISURA
+    si ricalcola dal PNG vero. Chi cambia l'una o l'altro trova rosso
+    qui col suo nome, invece di scoprire sul telefono che il barattolo
+    salta di taglia nell'istante della consegna — che e' esattamente
+    lo scatto per cui il guscio esiste."""
+    print("\n[Il guscio di apertura]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    i_fine = mini.index("</style>")
+    css = re.sub(r"/\*.*?\*/", "", mini[mini.index("<style>"):i_fine],
+                 flags=re.S)
+    js = mini[i_fine:]
+    corpo = mini[mini.index("<body>"):]
+    reg = {s.strip(): c for s, c in re.findall(r"([^{}]+)\{([^{}]*)\}", css)
+           if s.strip().startswith("#guscio")}
+
+    # --- 1) IL MARKUP: c'e', sta prima di tutto, e senza JS sparisce --
+    prova("il guscio c'e', una volta sola", 1, mini.count('id="guscio"'))
+    riga = corpo[corpo.index('<div id="guscio"'):]
+    riga = riga[:riga.index("\n")]
+    prova("...e sta PRIMA di #app: si dipinge appena il parser ci arriva",
+          True, corpo.index('<div id="guscio"') < corpo.index('<div id="app">'))
+    prova("...porta il barattolo di casa e l'anello di casa", [True, True],
+          ['src="/assets/barattolo-hero.png"' in riga,
+           'class="attesa-anello"' in riga])
+    prova("...e non lo legge nessuno a voce: e' decorazione",
+          True, 'aria-hidden="true"' in riga)
+    # Senza JS il gesto che lo toglie non arriva MAI, e il guscio si
+    # porterebbe via il cartello del pre-render — che esiste apposta
+    # per chi non esegue JavaScript. Il <noscript> e' la sola riga che
+    # lo impedisce, quindi e' la sola che va provata.
+    prova("senza JavaScript il guscio non compare affatto", 1,
+          mini.count("<noscript><style>#guscio{display:none}</style>"
+                     "</noscript>"))
+
+    # --- 2) IL FONDO E LA MISURA, RICALCOLATI ------------------------
+    try:
+        from PIL import Image
+        from genera_icone import SORGENTE, colore_fondo
+        from genera_icone_apk import SPLASH_DP
+    except Exception as e:
+        salta("il fondo e la misura del guscio combaciano col nativo",
+              f"{type(e).__name__}: {e}")
+    else:
+        atteso = "#%02X%02X%02X" % colore_fondo(
+            Image.open(SORGENTE).convert("RGB"))
+        prova("il fondo del guscio E' l'arancio campionato dalla foto "
+              "sorgente, lo stesso che genera_icone_apk.py scrive nello "
+              "splash nativo", True,
+              f"background:{atteso};" in reg.get("#guscio", ""))
+        alto = Image.open("assets/barattolo-hero.png").convert("RGBA")
+        bb = alto.split()[3].getbbox()
+        # il PNG e' piu' grande del barattolo (attorno c'e' trasparente):
+        # per renderlo alto SPLASH_DP come nello splash nativo, la misura
+        # dell'immagine e' quella del canvas riscalato in proporzione
+        misura = round(alto.size[1] * SPLASH_DP / (bb[3] - bb[1]))
+        prova(f"il barattolo del guscio e' alto {SPLASH_DP}px come quello "
+              f"dello splash nativo (immagine a {misura}px)",
+              f"width:{misura}px;height:{misura}px",
+              reg.get("#guscio img", ""))
+
+    # --- 3) LE DUE TRAPPOLE DEL DISEGNO ------------------------------
+    # a) l'anello si centra con `left`, MAI con una transform: `gira`
+    #    anima proprio transform e la sostituirebbe al primo fotogramma
+    #    — l'anello salterebbe a sinistra di meta' se stesso.
+    anello = reg.get("#guscio .attesa-anello", "")
+    prova("l'anello si centra con `left`, non con una transform "
+          "(gira anima transform e la sostituirebbe)", [True, False],
+          ["left:calc(50% - 12px)" in anello, "transform" in anello])
+    # b) e non ridichiara `animation`: la ridichiarazione batterebbe
+    #    per specificita' i due ripieghi fermi che l'anello ha gia'
+    #    (la riga reduced-motion e la regola universale di fx-ridotti),
+    #    e a «meno movimento» il guscio girerebbe lo stesso.
+    prova("nessuna regola del guscio ridichiara `animation`: i ripieghi "
+          "fermi dell'anello devono restare i suoi", [],
+          [s for s, c in reg.items() if "animation" in c])
+    # c) niente dissolvenza: si toglie in un colpo. Una transizione qui
+    #    sarebbe mezzo secondo di app vista in trasparenza.
+    prova("il guscio non ha nessuna transizione: se ne va di scatto", [],
+          [s for s, c in reg.items() if "transition" in c])
+    prova("...e infatti lo si toglie dal DOM, non si sfuma", True,
+          "document.getElementById('guscio')?.remove();" in js)
+
+    # --- 4) QUANDO SCENDE, E LE DUE RETI -----------------------------
+    # «usabile» e' la VETRINA DISEGNATA, non la fine di avvia(): dopo la
+    # griglia l'avvio chiede ancora preferiti, offerte e puntate, e
+    # aspettarli vorrebbe dire far aspettare al telefono dei giri di
+    # rete che non si vedono. Misurato in locale: 80 ms, dove la rete
+    # non c'e' nemmeno.
+    prova("scende alla vetrina DISEGNATA, non alla fine della coda di "
+          "avvia()", 1, js.count("Promise.race([guscioVetrina, avvia()])"))
+    prova("...e i font corrono insieme a lei", 1,
+          js.count("document.fonts?.ready])"))
+    prova("...con allSettled e non all: se una delle due si rompe, il "
+          "guscio scende lo stesso", [1, 0],
+          [js.count("Promise.allSettled([Promise.race("),
+           js.count("Promise.all([Promise.race(")])
+    rg = pezzo_js(mini, "function renderGrid(items){", "\n}\n")
+    prova("il segnale e' l'ULTIMA riga di renderGrid (la griglia c'e' "
+          "gia' quando lo scioglie)", True,
+          rg.rstrip().endswith("vetrinaDisegnata();"))
+    prova("...e lo scioglie lui solo", 1, js.count("vetrinaDisegnata();"))
+    prova("il tetto dei quattro secondi c'e'", 1,
+          js.count("setTimeout(togliGuscio, 4000);"))
+    tg_ = pezzo_js(mini, "function togliGuscio(){", "\n}\n")
+    prova("...e chi arriva primo comanda: il guscio si toglie UNA volta",
+          True, tg_.startswith("function togliGuscio(){\n"
+                               "  if (guscioVia) return;"))
+
+    # --- 5) IL PATTO CON TELEGRAM ------------------------------------
+    # `expand()` va chiesta prima del paint (la mini app si dipingerebbe
+    # corta e poi crescerebbe); `ready()` invece DICHIARA che l'app e'
+    # pronta, e Telegram a quel punto toglie il suo velo: dirlo col
+    # guscio ancora su vuol dire consegnare un fondo arancio chiamandolo
+    # «pronto». Erano sulla stessa riga, e adesso stanno agli antipodi.
+    prova("expand() si chiede subito", 1, js.count("if (tg) tg.expand();"))
+    prova("ready() NON si dice piu' all'avvio", 0, js.count("tg.ready();"))
+    prova("...si dice quando il guscio scende, e in nessun altro posto",
+          [True, 1], ["tg?.ready?.();" in tg_, js.count("ready?.()")])
+    # e il tema si ridice DOPO ready(): applicaTema() gira in cima al
+    # file, cioe' — da oggi — prima che Telegram sappia di noi
+    prova("il tema si ridice dopo ready(), che ora arriva dopo", True,
+          tg_.index("tg?.ready?.();") < tg_.index("applicaTema();"))
+    prova("...e i due colori che Telegram riceve sono il FONDO dell'app",
+          True, "const sfondo = scuro ? '#211A10' : '#FAF4E4';" in js
+          and "tg?.setHeaderColor?.(sfondo); tg?.setBackgroundColor?.(sfondo);"
+          in js)
+
+    # --- 6) IL LOGO NON PUO' ESSERE UN GIRO DI RETE ------------------
+    # Un guscio che aspetta la rete per disegnare il suo barattolo e'
+    # un guscio che sul 3G lento mostra un rettangolo vuoto: nella
+    # dispensa del service worker il file c'e' gia', e ci deve restare.
+    swjs = open("sw.js", encoding="utf-8").read()
+    prova("il barattolo del guscio sta nella dispensa del service worker",
+          True, "'/assets/barattolo-hero.png'," in swjs)
+    prova("...e ha la sua rotta esplicita (regola ferrea 3)", 1,
+          _SORGENTE.count('@app.get("/assets/barattolo-hero.png")'))
+
+
+def prove_app_android():
+    """L'APP ANDROID (TWA, set 2026). L'APK che sta su Zapstore e' un
+    INVOLUCRO: dentro non c'e' codice web, tutto arriva da
+    barattolo.store. A dire ad Android che quell'involucro puo' aprire
+    il dominio a tutto schermo — senza la barra del browser — c'e' una
+    riga di verita' sola, `.well-known/assetlinks.json` con l'impronta
+    del certificato di firma.
+    NON C'ERA NESSUNA PROVA SU DI LUI (censito il 22 set 2026), e il
+    modo in cui fallisce e' il peggiore: un refuso nell'impronta o una
+    rotta che sparisce non rompono niente di visibile qui: si vedono
+    solo sul telefono, solo da chi ha installato l'app, e sotto forma
+    di una barra del browser che ricompare. Il conto lo paga una
+    release.
+    L'IMPRONTA E' QUELLA DELL'APK IN SERVIZIO (v1.3, firmato col
+    keystore che vive fuori dal repo — vedi PRODUZIONE, «L'APP ANDROID
+    (TWA, ZAPSTORE)»): Android rifiuta un aggiornamento firmato con
+    un'altra chiave, quindi questa impronta non e' un dettaglio di
+    configurazione, e' l'identita' dell'app."""
+    print("\n[L'app Android: la stretta di mano col dominio]")
+    IMPRONTA = ("2F:3F:5E:68:94:AB:A0:B8:E4:39:B7:28:9D:55:50:D5:"
+                "0E:22:37:15:F3:A8:E6:4F:2C:49:38:BC:D5:A2:C2:3C")
+    dati = json.load(open(os.path.join(".well-known", "assetlinks.json"),
+                          encoding="utf-8"))
+    prova("il file dice UNA cosa sola", 1, len(dati))
+    voce = dati[0]
+    prova("...ed e' la delega di tutti gli URL del dominio",
+          ["delegate_permission/common.handle_all_urls"], voce["relation"])
+    prova("il bersaglio e' un'app Android", "android_app",
+          voce["target"]["namespace"])
+    prova("...ed e' il NOSTRO pacchetto", "store.barattolo.app",
+          voce["target"]["package_name"])
+    # l'impronta si scrive per esteso e si confronta per intero: un
+    # carattere diverso e' un'app che non apre piu' il dominio, e nessun
+    # confronto «comincia per» l'avrebbe preso
+    prova("l'impronta e' UNA, ed e' quella dell'APK in servizio",
+          [IMPRONTA], voce["target"]["sha256_cert_fingerprints"])
+
+    # --- LA ROTTA CHE LO SERVE ---------------------------------------
+    prova("la rotta esplicita c'e' (regola ferrea 3: mai una directory)",
+          1, _SORGENTE.count('@app.get("/.well-known/assetlinks.json")'))
+    i = _SORGENTE.index("def twa_assetlinks():")
+    j = _SORGENTE.find("@app.", i)
+    rotta = _SORGENTE[i:j if j > 0 else len(_SORGENTE)]
+    prova("...e serve proprio quel file, come JSON", [True, True],
+          ['FileResponse(".well-known/assetlinks.json"' in rotta,
+           'media_type="application/json"' in rotta])
+    # un anno di cache su questo file vorrebbe dire un anno per
+    # propagare un cambio d'impronta: Android lo rilegge di rado da se'
+    prova("...con la cache corta di un'ora", True,
+          '"public, max-age=3600"' in rotta)
+
+
 def prove_effetti_ridotti():
     """EFFETTI RIDOTTI (set 2026). Dal campo: su Mercurygram Desktop
     (Flatpak, Wayland/GNOME) la mini app si vedeva disegnata a pezzi —
@@ -79777,6 +79977,8 @@ def main():
               prove_tutorial,
               prove_timbri_visti,
               prove_effetti_ridotti,
+              prove_guscio_apertura,
+              prove_app_android,
               prove_bunker_muto,
               prove_login_qr,
               prove_profilo_sezioni,

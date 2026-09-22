@@ -5920,6 +5920,51 @@
   .attesa-clessidra{font-size:22px;animation:gira 1.6s linear infinite}
   @keyframes gira{to{transform:rotate(360deg)}}
   @keyframes scuoti{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
+  /* ══ IL GUSCIO DI APERTURA (set 2026) ═══════════════════════════
+     Quel che si vede fra il tocco sull'icona e l'app usabile.
+     Nell'APK (la TWA) Android disegna gia' il SUO splash — il
+     barattolo scontornato alto 160dp sul #F78F19 campionato dalla
+     foto sorgente — e lo toglie al primo paint della pagina: se
+     sotto trovasse la crema vuota dell'app non ancora montata si
+     vedrebbe un LAMPO, cioe' esattamente il difetto che uno splash
+     esiste per togliere. Qui sotto c'e' lo stesso fondo, lo stesso
+     barattolo, alla stessa misura: la consegna fra i due e'
+     invisibile per COSTRUZIONE, non per fortuna.
+     E VALE NEI TRE CONTENITORI — TWA, Telegram, browser — perche' il
+     guscio e' della PAGINA: dentro Telegram e nel browser lo splash
+     nativo non c'e' affatto, e quel che si copre e' lo stesso
+     montaggio dell'app. Un guscio solo, mai tre.
+     LA MISURA NON E' 160px MA 227, ed e' il conto da non perdere:
+     `barattolo-hero.png` e' 480x480 e il barattolo ci sta dentro alto
+     339 (il resto e' trasparente), quindi per renderlo alto 160 come
+     nello splash nativo l'immagine va a 480 x 160/339 = 227. Chi
+     cambia il PNG rifa' il conto, o il barattolo cambia taglia
+     nell'istante della consegna.
+     IL BARATTOLO STA AL CENTRO ESATTO E L'ANELLO NON LO SPOSTA: e'
+     appeso in assoluto sotto di lui invece di stargli accanto in una
+     colonna, perche' un centro che scivola di dodici pixel fra
+     nativo e pagina e' proprio lo scatto che questo guscio toglie.
+     ⚠️ E IL CENTRATURA DELL'ANELLO E' `left:calc(50% - 12px)` E NON
+     UNA `transform`: la `gira` anima proprio `transform`, e un
+     `translateX(-50%)` sarebbe SOSTITUITO al primo fotogramma —
+     l'anello salterebbe a sinistra di meta' se stesso appena parte.
+     L'ANELLO E' QUELLO DI CASA (`.attesa-anello`): stessa forma, e in
+     regalo i due ripieghi che ha gia' — la riga reduced-motion qui
+     sopra e la regola universale di `fx-ridotti` lo fermano senza che
+     qui si scriva niente (e per questo qui NON si ridichiara
+     `animation`: la ridichiarazione batterebbe i ripieghi per
+     specificita' e l'anello girerebbe anche a movimento spento).
+     A cambiare e' solo la TINTA: il grigio di `--line` sull'arancio
+     non si vedrebbe.
+     NIENTE DISSOLVENZA quando se ne va: `togliGuscio` lo toglie dal
+     DOM in un colpo. Una transizione qui sarebbe mezzo secondo di app
+     vista in trasparenza, cioe' il difetto al posto della cura. */
+  #guscio{position:fixed;inset:0;z-index:9999;background:#F78F19;
+    overflow:hidden;display:flex;align-items:center;justify-content:center}
+  #guscio img{width:227px;height:227px}
+  #guscio .attesa-anello{display:block;position:absolute;
+    top:calc(50% + 108px);left:calc(50% - 12px);
+    border-color:rgba(255,255,255,.45);border-top-color:#FFFFFF}
   .btn.primary{background:var(--trust);color:var(--on-trust);box-shadow:0 3px 0 var(--trust-deep)}
   .btn.orange{background:var(--sats);color:#fff;box-shadow:0 3px 0 var(--sats-deep)}
   /* il pieno dell'asta: stessa forma dell'orange, colore suo */
@@ -7408,6 +7453,23 @@
 </script>
 </head>
 <body>
+<!-- IL GUSCIO DI APERTURA (set 2026): il perche' per esteso sta nel
+     foglio di stile, a #guscio. Qui contano tre cose.
+     STA PRIMA DI TUTTO, fuori da #app e prima di qualunque JS: si
+     dipinge appena il parser arriva qui, senza aspettare il montaggio
+     dell'app — che e' l'unico modo perche' copra davvero quel che
+     deve coprire.
+     A TOGLIERLO E' `togliGuscio()`, e nessun altro. Il tetto dei
+     quattro secondi si arma piu' sotto, accanto alla stretta di mano
+     con Telegram: se il guscio restasse appeso a un giro di rete che
+     non torna, l'app sarebbe irraggiungibile dietro un fondo arancio.
+     ⚠️ E SENZA JAVASCRIPT NON DEVE COMPARIRE AFFATTO: chi non esegue
+     JS (i motori, le anteprime, i bot) non vedrebbe mai il gesto che
+     lo toglie, e si porterebbe via il cartello qui sotto — che esiste
+     proprio per loro. Il `<noscript>` e' la riga che lo impedisce, e
+     non e' cosmetica. -->
+<div id="guscio" aria-hidden="true"><img src="/assets/barattolo-hero.png" alt="" onerror="this.remove()"><span class="attesa-anello"></span></div>
+<noscript><style>#guscio{display:none}</style></noscript>
 <div id="app">
 <!-- IL CARTELLO (ago 2026): il server ci infila dentro titolo, prezzo,
      descrizione e foto della pagina richiesta. Non e' testo nascosto —
@@ -10363,7 +10425,55 @@ function baseCondivisione(){
 let relayNip46 = [];
 
 
-if (tg) { tg.ready(); tg.expand(); }
+/* ═══ IL GUSCIO DI APERTURA, E QUANDO SI TOGLIE (set 2026) ═══
+   Il disegno sta nel foglio di stile (a `#guscio`); qui c'e' il gesto
+   che lo toglie, e vale in tutti e tre i contenitori.
+   ⚠️ `expand()` SUBITO, `ready()` NO. Sono due cose diverse e le
+   avevamo sulla stessa riga: `expand()` chiede a Telegram tutta
+   l'altezza, e va chiesta prima del paint o la mini app si dipinge
+   corta e poi cresce. `ready()` invece DICHIARA che l'app e' pronta, e
+   Telegram a quel punto toglie il SUO velo di caricamento: dirlo col
+   guscio ancora su vuol dire consegnare all'utente un fondo arancio
+   chiamandolo «pronto» — e dirlo prima ancora, come si faceva, vuol
+   dire consegnargli la pagina vuota. Quindi `ready()` esce da qui e
+   va dentro `togliGuscio`, che e' il solo punto in cui l'app e'
+   davvero pronta.
+   IL TETTO SI ARMA QUI, ed e' la ragione per cui questo pezzo sta in
+   alto e non in fondo al file: se piu' sotto qualcosa esplodesse —
+   una riga nuova che non parsa, un giro di rete che non torna mai —
+   `avvia()` non arriverebbe mai in fondo e il guscio resterebbe li'
+   per sempre, con l'app viva ma irraggiungibile dietro un fondo
+   arancio. Quattro secondi e si alza comunque: un'app che si mostra
+   mezza montata e' un difetto, un'app che non si mostra e' un guasto.
+   `document.getElementById` e non `el()`: quello e' definito piu'
+   sotto, e qui la robustezza vale piu' della brevita'. */
+if (tg) tg.expand();
+/* IL SEGNALE CHE IL GUSCIO ASPETTA: lo scioglie il primo `renderGrid`,
+   cioe' la vetrina disegnata. Sta qui e non li' perche' chi lo aspetta
+   e' l'ultima riga del file, e una promessa dev'esistere prima che
+   qualcuno la aspetti — la funzione che la scioglie invece viene
+   chiamata molto dopo, e a quel punto questa riga e' gia' girata. */
+let vetrinaDisegnata;
+const guscioVetrina = new Promise(sciogli => { vetrinaDisegnata = sciogli; });
+let guscioVia = false;
+function togliGuscio(){
+  if (guscioVia) return;            /* il primo che arriva comanda */
+  guscioVia = true;
+  document.getElementById('guscio')?.remove();   /* in un colpo, mai in dissolvenza */
+  /* ...e SOLO adesso Telegram puo' togliere il suo velo. Protetto:
+     un client vecchio senza `ready` non deve portarsi via il resto. */
+  try { tg?.ready?.(); } catch(e){}
+  /* E IL TEMA SI RIDICE DOPO, ed e' una cintura che questo cantiere si
+     e' messo da solo: `applicaTema()` gira in cima al file, cioe' —
+     da oggi — PRIMA di `ready()`, mentre prima girava dopo. Se un
+     client di Telegram ignorasse `setHeaderColor` a mini app non
+     ancora dichiarata pronta, l'intestazione resterebbe del colore di
+     default e nessuno la rimetterebbe piu'. Ridirlo costa una riga e
+     non si vede (sono gli stessi due colori); non dirlo costa
+     un'intestazione storta per tutta la sessione. */
+  try { applicaTema(); } catch(e){}
+}
+setTimeout(togliGuscio, 4000);
 
 /* ---- COLLAUDO: due identità finte per provare dal browser ---- */
 let collaudo = false;
@@ -13974,6 +14084,19 @@ function renderGrid(items){
     scrollRepartoInAttesa = false;
     if (el('view-esplora').classList.contains('active')) scorriAlReparto();
   }
+  /* LA VETRINA E' DISEGNATA, ed e' questo che il guscio di apertura
+     aspetta: il PRIMO render della griglia — con le card, con lo
+     stato vuoto o coi dati finti della demo — e' il momento in cui
+     c'e' qualcosa da guardare.
+     ⚠️ E NON LA FINE DI `avvia()`, che era la prima stesura e che la
+     misura ha bocciato: dopo la griglia l'avvio continua a chiedere
+     preferiti, offerte e puntate, e il guscio restava su ad
+     aspettarli — 80 ms in locale, dove la rete non esiste, cioe' il
+     guscio AGGIUNGEVA attesa invece di coprirla. Quei giri non si
+     vedono: la vetrina e' gia' buona.
+     Sciogliere due volte la stessa promessa non fa niente — la prima
+     comanda — quindi qui non serve nessuna bandierina. */
+  vetrinaDisegnata();
 }
 
 /* «👥 54 pionieri»: la gente che è già entrata nel mercatino, sotto il
@@ -50947,7 +51070,29 @@ function fermaPaginaSotto(){
 tastieraSegue();
 fermaPaginaSotto();
 navMotore();   /* il gesto indietro, prima che parta qualunque vista */
-avvia();
+/* IL GUSCIO SCENDE QUANDO L'APP E' USABILE, e «usabile» ha una
+   definizione precisa invece di un timer a occhio: la VETRINA
+   DISEGNATA — il primo `renderGrid`, che arriva in tutti i rami (le
+   card, lo stato vuoto, la demo del backend muto) — e i FONT pronti.
+   E i font ci sono per una ragione sola: senza, l'app comparirebbe
+   col ripiego di sistema e si riscriverebbe tutta un istante dopo,
+   che e' lo scatto piu' visibile di tutti. Dove `document.fonts` non
+   esiste (browser molto vecchi) la voce vale «gia' pronto».
+   `avvia()` RESTA NELLA CORSA, ma come rete e non come misura: se
+   l'avvio finisse senza aver mai disegnato una griglia — un guasto
+   che oggi non ha strada, e proprio per questo va coperto — il
+   `race` lo prende lo stesso. Il contrario (aspettare la FINE di
+   avvia) e' quel che faceva la prima stesura, e la misura l'ha
+   bocciato: vedi il commento in fondo a `renderGrid`.
+   GLI STILI NON SONO NELL'ELENCO perche' non possono non esserlo: il
+   foglio e' INLINE nella pagina, quindi al primo paint c'e' gia'
+   tutto — se un giorno diventasse un `<link>`, va aggiunto qui.
+   `allSettled` e non `all`: se una delle due strade si rompe il
+   guscio deve scendere lo stesso. L'ultima rete e' il tetto dei
+   quattro secondi, armato molto piu' in alto. */
+Promise.allSettled([Promise.race([guscioVetrina, avvia()]),
+                    document.fonts?.ready])
+  .then(() => togliGuscio());
 /* Il calore delle illustrazioni delle categorie (vedi scaldaSfoglia): a
    riposo, DOPO che la vetrina ha avuto la rete per se'. Una volta per
    sessione — setCollaudo rilancia avvia(), non questo. */
