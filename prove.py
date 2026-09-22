@@ -57028,6 +57028,38 @@ def prove_p2p_barattozon():
     prova("...e il marchio non porta ne' alone ne' ombre, che li' non servono",
           [False, False],
           ["filter" in _insi, "shadow" in _insm])
+    # ---- LA SCATOLA SPENTA (22 set 2026) ----
+    # Spenta vuol dire UGUALE alle sorelle: il fondo torna il `--chip-bg`
+    # di casa, e non un grigio nuovo scritto qui.
+    _spe = pezzo_js(css, ".p2p-paga-marchio.p2p-paga-spenta{", "}")
+    prova("la scatola spenta prende il fondo delle sorelle, non un grigio suo",
+          True, "background:var(--chip-bg)" in _spe and "#" not in _spe)
+    # ⚠️ E L'ALTEZZA NON SI TOCCA: il respiro verticale resta quello della
+    # scatola accesa, o la card ballerebbe nell'istante in cui chiude.
+    prova("...e non tocca ne' il respiro ne' la forma", [False, False, False],
+          ["padding" in _spe, "border" in _spe, "height" in _spe])
+    # ⚠️ DI GIORNO IL MARCHIO SI ROVESCIA E DI SERA NO: la parola del
+    # marchio e' bianca, e sul chip crema un grigio la lascerebbe sparita
+    # — e' il difetto della coppia qui sopra, visto dall'altro lato. Di
+    # sera il chip e' gia' scuro e rovesciarla la farebbe sparire dal
+    # verso opposto: due regole, una per tema, e il giudice del tema e'
+    # quello unico.
+    # ⚠️ LE DUE SPAZIATURE DAVANTI ALL'ANCORA CHIARA NON SONO COSMESI:
+    # il selettore di sera CONTIENE quello di giorno, e senza i due spazi
+    # questa riga risponderebbe per il vicino il giorno che uno dei due
+    # cambiasse posto nel foglio.
+    _spg = pezzo_js(css, "  .p2p-paga-spenta .p2p-marca img{", "}")
+    _spn = pezzo_js(css,
+                    'html[data-tema="scuro"] .p2p-paga-spenta .p2p-marca img{',
+                    "}")
+    prova("di giorno il marchio spento si rovescia, di sera resta com'e'",
+          [True, True, False],
+          ["grayscale(1) invert(1)" in _spg, "grayscale(1)" in _spn,
+           "invert" in _spn])
+    # l'opacita' e' quella di casa — la foto di un annuncio esaurito — e
+    # vale nei due temi: nessun valore nuovo, solo un posto nuovo.
+    prova("...e tutt'e due portano l'opacita' di casa", [True, True],
+          ["opacity:.62" in _spg, "opacity:.62" in _spn])
     # la tessera e' NAVY e non piu' l'ambra di casa (16 set 2026): e'
     # l'unica cosa rimasta in piedi del giro dei sedici colori, e su di
     # lei il marchio legge 16,6:1 col bianco e 7,0:1 con l'arancio.
@@ -60811,7 +60843,8 @@ out.marchio = rigaScambioP2P(riga({metodi: [PM]}));
 out.marchioScelto = rigaScambioP2P(riga({metodi: ['SEPA', PM], metodoScelto: PM}));
 out.marchioMisto = rigaScambioP2P(riga({metodi: ['SEPA', PM]}));
 out.marchioStati = {};
-for (const st of ['attesa_mia_hold', 'attivo', 'concluso', 'annullato', 'in_disputa'])
+for (const st of ['attesa_mia_hold', 'attivo', 'concluso', 'annullato',
+                  'rifiutato', 'in_disputa'])
   out.marchioStati[st] = rigaScambioP2P(riga({stato: st, metodi: [PM]}));
 /* LE CARD CHIUSE (22 set 2026): la data nell'angolo e le frasi al
    passato. `ultimaMossa` e' l'ora della mossa che ha chiuso */
@@ -61128,10 +61161,35 @@ console.log(JSON.stringify(out));
     # un ramo e non nell'altro e' il difetto che si vede solo dal vivo.
     prova("il marchio c'e' in tutti gli stati, coi numeri fuori",
           {k: True for k in ("attesa_mia_hold", "attivo", "concluso",
-                             "annullato", "in_disputa")},
+                             "annullato", "rifiutato", "in_disputa")},
           {k: ("/assets/barattozon.webp" in v
                and "23.47" not in _senza_title(v))
            for k, v in o["marchioStati"].items()})
+
+    # ---- E SU UNO SCAMBIO FINITO L'INSEGNA SI SPEGNE (22 set 2026,
+    # richiesta di Andrea) ----
+    # La scatola resta dov'e' e si legge; a cambiare e' che non chiama
+    # piu': fondo grigio come la «SEPA» della card accanto, e il marchio
+    # dal filtro. Il giudice e' `P2P_FINALI`, quindi `rifiutato` — che
+    # per le PAROLE non e' «annullato» — qui si spegne con gli altri due.
+    prova("sugli scambi finiti l'insegna di Barattozon si spegne",
+          {"concluso": True, "annullato": True, "rifiutato": True},
+          {k: "p2p-paga-spenta" in o["marchioStati"][k]
+           for k in ("concluso", "annullato", "rifiutato")})
+    prova("...e su quelli in corso resta accesa",
+          {"attesa_mia_hold": False, "attivo": False, "in_disputa": False},
+          {k: "p2p-paga-spenta" in o["marchioStati"][k]
+           for k in ("attesa_mia_hold", "attivo", "in_disputa")})
+    # ⚠️ IL NOME SI AGGIUNGE, non prende il posto di quello di prima: a
+    # togliere il navy e a rovesciare il marchio e' il CSS, che li cerca
+    # tutt'e due.
+    prova("...e spenta e' sempre la scatola del marchio, non un'altra",
+          True,
+          "p2p-paga-marchio p2p-paga-spenta" in o["marchioStati"]["concluso"])
+    # LA SCATOLA SCRITTA NON HA NIENTE DA SPEGNERE: «SEPA» e' gia' grigia
+    # da viva, e appenderle il nome direbbe che li' dentro cambia qualcosa.
+    prova("...mentre la scatola scritta non lo prende, nemmeno da conclusa",
+          False, "p2p-paga-spenta" in o["conclusoVendo"])
 
     # QUEL CHE E' FATTO SI DICE AL PASSATO (22 set 2026, richiesta di
     # Andrea). Prima i due giudici, poi le quattro frasi.

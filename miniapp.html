@@ -2711,6 +2711,49 @@
   .p2p-paga-marchio .p2p-marca{background:none;padding:0;border-radius:0;
     margin-top:0}
   .p2p-paga-marchio .p2p-marca img{height:24px}
+  /* ---- E SU UNO SCAMBIO FINITO L'INSEGNA SI SPEGNE (22 set 2026,
+     richiesta di Andrea) ----
+     Barattozon e' l'unico metodo con un'INSEGNA: fondo navy e marchio
+     a colori, mentre le sorelle — «SEPA», «Revolut» — sono testo grigio
+     su carta grigia. Vivo, quel contrasto e' il suo mestiere; su una
+     card FINITA e' una vetrina accesa dentro un negozio chiuso, e
+     scorrendo i propri scambi vecchi chiama l'occhio piu' di quelli in
+     corso — cioe' il contrario di quel che serve.
+     SPENTA VUOL DIRE UGUALE ALLE SORELLE, non «un po' meno accesa»: il
+     fondo torna il `--chip-bg` di casa, lo stesso pixel della scatola
+     «SEPA» della card accanto — la tinta dello stato ce l'hanno
+     tutt'e due sotto, quindi si pareggiano anche li'. Angoli, colonna,
+     margini e ALTEZZA non si toccano: il respiro di 5 resta dov'e',
+     cosi' la scatola spenta e quella accesa sono alte uguali e la card
+     non si muove di un pixel quando lo scambio chiude.
+     ⚠️ E DI GIORNO IL MARCHIO SI ROVESCIA, che e' la riga da non
+     ammorbidire: la parola del marchio e' BIANCA — il fondo scuro glielo
+     dava il navy — e un `grayscale` sopra un chip crema la lascerebbe
+     bianca su chiaro, cioe' sparita. E' il difetto gia' VISTO sullo
+     schermo, scritto nel commento della coppia qui sopra e guardato da
+     un'altra parte. `invert(1)` dopo il grigio porta quel bianco a nero,
+     e va dove va `barattozon-scuro.webp` — il file col lettering scuro
+     che vive nel tour — con un gradino in piu': chiesti al motore dei
+     filtri, il rovescio da' 0 al lettering e 105 all'arancio, il file
+     dedicato 39 e 150. Dopo l'opacita' sul crema il tratto piu' scuro
+     atterra a 92, e la sorella «SEPA» e' scritta con `--ink-soft`, che
+     parte da 91: le due scatole si leggono con lo stesso inchiostro.
+     E si arriva li' senza mettere un secondo `<img>` in ogni card e un
+     quarto campo nel catalogo per una scatola che si spegne solo qui:
+     il file non lo puo' scegliere il JS, perche' il tema cambia senza
+     che questo elenco si ridisegni.
+     DI SERA NO: li' il chip e' gia' scuro e il bianco ci legge come ha
+     sempre fatto; rovesciarlo lo farebbe sparire dall'altro lato. Il
+     giudice del tema e' `html[data-tema="scuro"]`, quello unico.
+     L'OPACITA' E' QUELLA DI CASA (.62, la stessa della foto di un
+     annuncio esaurito): nessun valore nuovo, solo un posto nuovo. Ed e'
+     un colore FERMO — niente animazioni ne' sfocature — quindi «effetti
+     ridotti» non ha niente da togliergli. */
+  .p2p-paga-marchio.p2p-paga-spenta{background:var(--chip-bg)}
+  .p2p-paga-spenta .p2p-marca img{filter:grayscale(1) invert(1);
+    opacity:.62}
+  html[data-tema="scuro"] .p2p-paga-spenta .p2p-marca img{
+    filter:grayscale(1);opacity:.62}
   /* la reputazione e' UNA FRASE (set 2026, il ridisegno): niente piu'
      due pezzi ai bordi — si legge come si dice */
   .p2p-rep{font-size:12px}
@@ -48993,6 +49036,29 @@ function rigaScambioP2P(o){
         + (ricevoSats ? cifraSats : cifraEuro) + '</div>'
         + '<div class="p2p-scambio-euro">pagando '
         + (ricevoSats ? cifraEuro : cifraSats) + '</div>';
+  /* ---- L'INSEGNA DI BARATTOZON SI SPEGNE COI FINALI (22 set 2026,
+     richiesta di Andrea) ----
+     Finito lo scambio il metodo non chiama piu' nessuno: resta un dato,
+     e un dato si legge grigio come quello della card accanto. COME si
+     spegne sta tutto nel CSS, sotto il nome che la riga della scatola
+     appende: qui non c'e' nessun colore, solo un nome.
+     ⚠️ E QUEL NOME QUESTO COMMENTO NON LO SCRIVE INTERO, e non e'
+     pignoleria: una sentinella di casa controlla l'ORDINE dei pezzi della
+     card cercando la PRIMA volta che compare il nome della scatola, e
+     scritto quassu' lo troverebbe prima del markup — cioe' un commento
+     farebbe fallire una prova che parla d'altro. E' la lezione delle
+     prove che rispondono per il vicino, ripagata qui.
+     ⚠️ IL GIUDICE E' `P2P_FINALI` E NON I DUE QUI SOPRA: `chiuso` e
+     `annullato` scelgono le PAROLE, e li' `rifiutato` non e'
+     «annullato» apposta — quello scambio non e' mai cominciato. Qui si
+     sceglie l'INCHIOSTRO, e l'asse e' un'altra: «da qui non si torna»,
+     che in casa ha gia' la sua lista SOLA. Due elenchi di stati finali
+     scritti a mano si scollerebbero al primo stato nuovo, e a scollarsi
+     sarebbe quello che nessuno guarda.
+     E LA SCATOLA SCRITTA NON SE NE ACCORGE: il nome si appende solo
+     dove c'e' un'insegna da spegnere (`senzaNomi`), che e' la stessa
+     condizione con cui il navy si era acceso. */
+  const finita = P2P_FINALI.indexOf(o.stato) >= 0;
   const via = p2pTogliibile(o).si
     ? '<button class="order-x p2p-x" title="Togli" aria-label="Togli questo scambio" '
       + 'data-id="' + esc(o.id) + '" onclick="togliScambioP2P(this.dataset.id, event)">✕</button>'
@@ -49037,7 +49103,8 @@ function rigaScambioP2P(o){
     + '<div class="p2p-scambio-stato' + tintaStatoP2P(o) + '">'
     + '<span>' + esc(st.t) + '</span>' + agire + '</div>'
     + (metodi.length ? '<div class="p2p-box p2p-paga'
-             + (senzaNomi ? ' p2p-paga-marchio' : '') + '" title="'
+             + (senzaNomi ? ' p2p-paga-marchio' : '')
+             + (senzaNomi && finita ? ' p2p-paga-spenta' : '') + '" title="'
              + esc(met) + '">'
              + (senzaNomi ? '' : iconaMetodiP2P(metodi))
              + metodi.map(m => marchioMetodoP2P(m)).join(', ') + '</div>' : '')
