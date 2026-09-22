@@ -62515,8 +62515,19 @@ def prove_intestazione_scambi():
     firma = ("%s?v=%s" % (URL, _hl.sha1(raw).hexdigest()[:10])).encode()
     prova("i tre posti che la mostrano escono timbrati col suo hash", 3,
           timbrata.count(firma))
-    prova("...e la pagina non la incorpora: niente base64", 0,
-          mini.count("data:image/webp"))
+    # ⚠️ IL CONTENITORE ERA TROPPO GRANDE (22 set 2026, sera). Questa
+    # riga diceva «la pagina non incorpora NESSUNA webp» e voleva dire
+    # «non incorpora QUESTA»: dal guscio di apertura un data URI c'e'
+    # per forza — il barattolo dello splash, che deve stare nei byte
+    # della pagina o al primo disegno non c'e'. La riga giusta e' che
+    # l'unica incorporata sia quella, e che QUESTA resti timbrata (che
+    # e' la prova qui sopra, ed e' quella che difende il mestiere).
+    _inc = re.findall(r'src="(data:image/webp[^"]{40,})"', mini)
+    prova("...e l'unica webp incorporata e' il barattolo del guscio",
+          1, len(_inc))
+    prova("...che sta nel guscio, non qui", True,
+          bool(_inc) and _inc[0] in mini[mini.index('<div id="guscio"'):
+                                         mini.index('<div id="app">')])
 
     # --- 9) IL BANCO: il giudice vero, la frase vera, l'intestazione --
     node = _sh.which("node")
@@ -79287,30 +79298,77 @@ def prove_guscio_apertura():
     js = mini[i_fine:]
     corpo = mini[mini.index("<body>"):]
     reg = {s.strip(): c for s, c in re.findall(r"([^{}]+)\{([^{}]*)\}", css)
-           if s.strip().startswith("#guscio")}
+           if "#guscio" in s}
+    # IL FILE SENZA PROSA: queste prove CONTANO occorrenze, e i commenti
+    # che le spiegano nominano le stesse cose — `<noscript>` e
+    # `app-android` compaiono nei commenti di questo stesso cantiere.
+    # Contare sul testo nudo e' l'unico modo perche' la spiegazione non
+    # faccia rossa la prova che spiega.
+    nudo = re.sub(r"/\*.*?\*/", "",
+                  re.sub(r"<!--.*?-->", "", mini, flags=re.S), flags=re.S)
 
-    # --- 1) IL MARKUP: c'e', sta prima di tutto, e senza JS sparisce --
+    # --- 1) IL MARKUP: c'e', sta prima di tutto, e nasce SPENTO ------
     prova("il guscio c'e', una volta sola", 1, mini.count('id="guscio"'))
     riga = corpo[corpo.index('<div id="guscio"'):]
     riga = riga[:riga.index("\n")]
     prova("...e sta PRIMA di #app: si dipinge appena il parser ci arriva",
           True, corpo.index('<div id="guscio"') < corpo.index('<div id="app">'))
-    prova("...porta il barattolo di casa e l'anello di casa", [True, True],
-          ['src="/assets/barattolo-hero.png"' in riga,
-           'class="attesa-anello"' in riga])
+    prova("...porta il barattolo incorporato e l'anello di casa",
+          [True, True], ['src="data:image/webp;base64,' in riga,
+                         'class="attesa-anello"' in riga])
     prova("...e non lo legge nessuno a voce: e' decorazione",
           True, 'aria-hidden="true"' in riga)
-    # Senza JS il gesto che lo toglie non arriva MAI, e il guscio si
-    # porterebbe via il cartello del pre-render — che esiste apposta
-    # per chi non esegue JavaScript. Il <noscript> e' la sola riga che
-    # lo impedisce, quindi e' la sola che va provata.
-    prova("senza JavaScript il guscio non compare affatto", 1,
-          mini.count("<noscript><style>#guscio{display:none}</style>"
-                     "</noscript>"))
+    # ⚠️ IL GUSCIO NASCE SPENTO, ed e' la meta' che vale il ritocco del
+    # 22 set: copre lo splash nativo di Android, che esiste SOLO
+    # nell'APK — dentro Telegram e nel browser sarebbe un lampo arancio
+    # in piu'. Tre prove, e la prima e' la piu' importante: il
+    # `display:none` sta nella regola BASE, quindi chi non ha la classe
+    # non lo dipinge mai — compresi i motori e le anteprime, che non
+    # eseguono JS e per cui c'era il <noscript> (adesso inutile: una
+    # difesa sola invece di due).
+    prova("il guscio nasce SPENTO nella regola base", True,
+          reg.get("#guscio", "").startswith("display:none;"))
+    prova("...e lo accende solo la classe dell'APK", "display:flex",
+          reg.get("html.app-android #guscio", ""))
+    prova("...che il <noscript> non serve piu' a nessuno", 0,
+          nudo.count("<noscript"))
+    # LA CLASSE LA METTE L'HEAD, prima del primo paint: dopo, il lampo
+    # l'avresti gia' visto. E il giudice e' il referrer della TWA —
+    # `android-app://<pacchetto>`, che Chrome mette all'APERTURA di una
+    # Trusted Web Activity — perche' funziona sull'APK GIA' INSTALLATO,
+    # mentre un parametro nella startUrl vorrebbe una release nuova.
+    testa = mini[i_fine:mini.index("<body")]
+    prova("la classe dell'APK si mette nell'head, prima del paint", True,
+          "document.documentElement.classList.add('app-android');" in testa)
+    prova("...e il giudice e' il referrer della TWA, col NOSTRO pacchetto",
+          1, testa.count("(document.referrer || '')"
+                         ".indexOf('android-app://store.barattolo.app') === 0"))
+    # ⚠️ E NON SI RICORDA: una TWA gira dentro Chrome e ne CONDIVIDE lo
+    # storage per questa origine, quindi un timbro «sono l'app» se lo
+    # ritroverebbe il browser normale sullo stesso telefono — e il
+    # guscio comparirebbe proprio dove non deve.
+    # e l'head e' il SOLO posto che la nomina: l'app non la tocca, non
+    # la salva e non la rilegge — quindi non puo' sopravvivere a una
+    # sessione ne' passare al browser
+    prova("...e nell'app non la nomina nessuno: niente timbro che possa "
+          "passare al browser", 0,
+          nudo[nudo.index("<body"):].count("app-android"))
+    prova("la mano che la scrive e' una sola", 1,
+          testa.count("classList.add('app-android')"))
+    # E IL PACCHETTO E' LO STESSO DELL'ASSETLINKS, che e' l'unica cosa
+    # che lega le due meta': il client si fida di quel referrer, il
+    # dominio si fida di quell'APK. Scritte in due file, potevano
+    # divergere in silenzio — e il guscio sarebbe sparito senza che
+    # niente protestasse.
+    _pacco = json.load(open(os.path.join(".well-known", "assetlinks.json"),
+                            encoding="utf-8"))[0]["target"]["package_name"]
+    prova("...e il pacchetto e' quello dell'assetlinks", True,
+          f"android-app://{_pacco}'" in testa)
 
     # --- 2) IL FONDO E LA MISURA, RICALCOLATI ------------------------
     try:
-        from PIL import Image
+        import io
+        from PIL import Image, ImageChops
         from genera_icone import SORGENTE, colore_fondo
         from genera_icone_apk import SPLASH_DP
     except Exception as e:
@@ -79325,14 +79383,55 @@ def prove_guscio_apertura():
               f"background:{atteso};" in reg.get("#guscio", ""))
         alto = Image.open("assets/barattolo-hero.png").convert("RGBA")
         bb = alto.split()[3].getbbox()
-        # il PNG e' piu' grande del barattolo (attorno c'e' trasparente):
-        # per renderlo alto SPLASH_DP come nello splash nativo, la misura
-        # dell'immagine e' quella del canvas riscalato in proporzione
-        misura = round(alto.size[1] * SPLASH_DP / (bb[3] - bb[1]))
+        # l'immagine e' il barattolo RITAGLIATO sul suo bbox, quindi la
+        # misura a schermo e' la sua: alto SPLASH_DP come nello splash
+        # nativo, largo in proporzione al bbox
+        largo = round((bb[2] - bb[0]) * SPLASH_DP / (bb[3] - bb[1]))
         prova(f"il barattolo del guscio e' alto {SPLASH_DP}px come quello "
-              f"dello splash nativo (immagine a {misura}px)",
-              f"width:{misura}px;height:{misura}px",
+              f"dello splash nativo (e largo {largo} come il suo bbox)",
+              f"width:{largo}px;height:{SPLASH_DP}px",
               reg.get("#guscio img", ""))
+
+        # --- 2bis) IL BARATTOLO E' DENTRO LA PAGINA -----------------
+        # Dal campo (il video dell'apertura dell'APK): il guscio
+        # compariva arancio VUOTO col solo anello, e il barattolo
+        # arrivava qualche decimo dopo — perche' era un giro di rete
+        # come un altro, e alla prima apertura la dispensa del service
+        # worker e' vuota. Adesso sta nei byte della pagina.
+        import base64 as _b64
+        _u = riga[riga.index("data:image/webp;base64,"):]
+        _u = _u[len("data:image/webp;base64,"):_u.index('"')]
+        _b = _b64.b64decode(_u)
+        _im = Image.open(io.BytesIO(_b))
+        prova("il guscio non chiede NIENTE alla rete", [False, False],
+              ["src=\"/" in riga, "http" in riga])
+        prova("...e il barattolo incorporato e' un WebP con l'alfa",
+              ["WEBP", True], [_im.format, _im.mode in ("RGBA", "P")])
+        # 3x dei 160 CSS: il massimo che serve a un telefono. Le
+        # proporzioni sono quelle del bbox, o a schermo si schiaccia.
+        prova("...alla misura giusta per uno schermo 3x", (largo * 3, 480),
+              _im.size)
+        # IL PESO HA UN TETTO DICHIARATO: la pagina la scarica CHIUNQUE,
+        # anche chi il guscio non lo vedra' mai. 40 KB di data URI su
+        # 2,9 MB di pagina sono il patto; chi lo sfora se ne accorge qui
+        # invece che dal telefono di qualcun altro.
+        prova(f"...e pesa meno di 40 KB nel data URI ({len(_u) / 1024:.1f})",
+              True, len(_u) < 40 * 1024)
+        # e RESTA il barattolo di casa: si riscala il ritaglio della
+        # sorgente e si confronta alla RESA, con la soglia percettiva —
+        # un confronto esatto scatterebbe su due codifiche identiche
+        _rif = alto.crop(bb).resize(_im.size, Image.LANCZOS)
+        _a = Image.alpha_composite(
+            Image.new("RGBA", _im.size, (247, 143, 25, 255)),
+            _im.convert("RGBA")).convert("RGB")
+        _b2 = Image.alpha_composite(
+            Image.new("RGBA", _im.size, (247, 143, 25, 255)),
+            _rif).convert("RGB")
+        _d = ImageChops.difference(_a, _b2)
+        _medio = sum(sum(p) for p in _d.getdata()) / (3 * _im.size[0]
+                                                      * _im.size[1])
+        prova(f"...ed e' lo STESSO barattolo della sorgente "
+              f"(scarto medio {_medio:.2f}/255)", True, _medio < 8)
 
     # --- 3) LE DUE TRAPPOLE DEL DISEGNO ------------------------------
     # a) l'anello si centra con `left`, MAI con una transform: `gira`
@@ -79401,15 +79500,19 @@ def prove_guscio_apertura():
           and "tg?.setHeaderColor?.(sfondo); tg?.setBackgroundColor?.(sfondo);"
           in js)
 
-    # --- 6) IL LOGO NON PUO' ESSERE UN GIRO DI RETE ------------------
-    # Un guscio che aspetta la rete per disegnare il suo barattolo e'
-    # un guscio che sul 3G lento mostra un rettangolo vuoto: nella
-    # dispensa del service worker il file c'e' gia', e ci deve restare.
+    # --- 6) IL FILE SULLA RETE RESTA, MA NON E' PIU' DEL GUSCIO ------
+    # `/assets/barattolo-hero.png` lo usano ancora tre posti nella
+    # pagina (la vetrina vuota, il tour): la dispensa e la rotta
+    # servono a LORO, e il guscio non le riguarda piu'. Si provano
+    # perche' toglierle romperebbe quei tre, non perche' il guscio
+    # aspetti la rete — che e' proprio quel che non fa piu'.
     swjs = open("sw.js", encoding="utf-8").read()
-    prova("il barattolo del guscio sta nella dispensa del service worker",
-          True, "'/assets/barattolo-hero.png'," in swjs)
+    prova("il barattolo resta in dispensa per gli ALTRI tre usi", True,
+          "'/assets/barattolo-hero.png'," in swjs)
     prova("...e ha la sua rotta esplicita (regola ferrea 3)", 1,
           _SORGENTE.count('@app.get("/assets/barattolo-hero.png")'))
+    prova("...e il guscio non e' fra quei tre", 3,
+          mini.count('src="/assets/barattolo-hero.png"'))
 
 
 def prove_app_android():
@@ -79462,6 +79565,49 @@ def prove_app_android():
     # propagare un cambio d'impronta: Android lo rilegge di rado da se'
     prova("...con la cache corta di un'ora", True,
           '"public, max-age=3600"' in rotta)
+
+    # --- E RISPONDE ANCHE ALLA HEAD (set 2026) -----------------------
+    # Dal campo: la rotta dava 405 a HEAD. Starlette la regalerebbe a
+    # ogni GET, FastAPI no — le sue rotte tengono i soli metodi
+    # dichiarati. E chi verifica un dominio (Google, i validatori di
+    # Digital Asset Links, un monitor) bussa spesso in HEAD, dove un
+    # 405 si legge come «questo dominio non dichiara niente».
+    prova("la rotta dichiara anche la HEAD", 1,
+          _SORGENTE.count('@app.head("/.well-known/assetlinks.json")'))
+    # E NON BASTA LA RIGA: si fa girare. Un'app FastAPI di cartone con
+    # la STESSA coppia di decoratori risponde alle due domande in un
+    # colpo — la HEAD da' 200 e non 405, e gli header sono gli stessi
+    # del GET col corpo vuoto. Se un domani FastAPI cambiasse idea,
+    # questa prova lo direbbe; una sentinella sul testo no.
+    try:
+        from fastapi import FastAPI as _FA
+        from fastapi.responses import FileResponse as _FR
+        from fastapi.testclient import TestClient as _TC
+    except Exception as e:
+        salta("la HEAD sull'assetlinks risponde 200 come il GET",
+              f"{type(e).__name__}: {e}")
+    else:
+        _app = _FA()
+        _via = "/.well-known/assetlinks.json"
+
+        @_app.get(_via)
+        @_app.head(_via)
+        def _serve():
+            return _FR(".well-known/assetlinks.json",
+                       media_type="application/json",
+                       headers={"Cache-Control": "public, max-age=3600"})
+
+        _c = _TC(_app)
+        _g, _h = _c.get(_via), _c.head(_via)
+        prova("la HEAD risponde 200 (era 405)", 200, _h.status_code)
+        prova("...col corpo vuoto", 0, len(_h.content))
+        prova("...e con gli STESSI header del GET (Content-Length compreso)",
+              {k: v for k, v in _g.headers.items() if k != "date"},
+              {k: v for k, v in _h.headers.items() if k != "date"})
+        prova("...e il GET non e' cambiato: serve il file intero",
+              [200, os.path.getsize(os.path.join(".well-known",
+                                                 "assetlinks.json"))],
+              [_g.status_code, len(_g.content)])
 
 
 def prove_effetti_ridotti():

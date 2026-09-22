@@ -25890,3 +25890,110 @@ provata su un client vero. 3) **Il tempo percepito**: il guscio dura
 due o tre decimi di secondo in locale; su un telefono lento e in 4G
 durerà di più, e se durasse troppo la leva non è il tetto ma la
 domanda «cosa aspetta la griglia».
+
+## Il guscio solo nell'APK, e il barattolo dentro la pagina (22 set 2026, sera)
+
+Tre ritocchi al guscio, dal campo. **E ROVESCIANO TRE RIGHE DELLA VOCE
+QUI SOPRA**, che restano scritte perché sono la parte che serve.
+
+**1) IL GUSCIO SI VEDE SOLO NELL'APK.** «Vale nei tre contenitori» era
+la riga sbagliata: il guscio copre lo splash NATIVO, e quello esiste
+solo nell'APK — dentro Telegram e nel browser copriva il nulla, cioè
+era un lampo arancio in più. Adesso `#guscio` nasce `display:none` e lo
+accende la classe `app-android`, messa nell'head prima del primo paint.
+IL GIUDICE È IL REFERRER: Chrome apre una Trusted Web Activity con
+`document.referrer = android-app://<pacchetto>`. La strada scartata è
+il parametro nella `startUrl` del twa-manifest: è cotto nell'APK,
+quindi vorrebbe `bubblewrap update` + build + una release nuova firmata
+sui due canali, e varrebbe solo per chi aggiorna — mentre il referrer
+funziona sulla **v1.3 che la gente ha già installata**, con un deploy.
+⚠️ E NON SI RICORDA IN `localStorage`, che era la prima idea e sarebbe
+il difetto peggiore: una TWA gira DENTRO Chrome e ne condivide lo
+storage per questa origine, quindi il timbro se lo ritroverebbe il
+browser normale sullo stesso telefono. Si chiede a ogni documento.
+⚠️ IL LIMITE, scritto: il referrer lo mette la navigazione di APERTURA,
+quindi un ricaricamento dentro l'app lo perde e lì il guscio non
+compare — l'app si apre come faceva ieri, che è il modo giusto di
+sbagliare. E il `<noscript>` è sparito: col `display:none` di serie una
+difesa sola fa il mestiere di due.
+
+**2) IL BARATTOLO STA NEI BYTE DELLA PAGINA.** Nel video dell'apertura
+il guscio compariva arancio VUOTO col solo anello, e il barattolo
+arrivava qualche decimo dopo: `/assets/barattolo-hero.png` era un giro
+di rete come un altro, e alla PRIMA apertura la dispensa del service
+worker è vuota. Adesso è un `data:` URI, quindi c'è al primo disegno —
+verificato al banco: nell'istante in cui il guscio diventa visibile
+l'immagine è già `complete` con `naturalWidth > 0`, e in rete non parte
+niente per lui.
+IL PESO, misurato in LF come sul VPS: **+38,0 KB di data URI** (dentro,
+28,5 KB di WebP) più 3,6 KB fra commenti, CSS e JS — la pagina passa da
+953,5 a **985,9 KB gzip, +3,40%**. Il tetto è dichiarato in una prova
+(40 KB), perché quei byte li scarica CHIUNQUE, anche chi il guscio non
+lo vedrà mai.
+LE DUE SCELTE DI CODIFICA, coi numeri: **WebP e non PNG** (lo stesso
+ritaglio in PNG fa 234 KB contro 29: è un disegno con sfumature, e il
+PNG è il formato sbagliato); e **con l'ALFA e non appiattito
+sull'arancio**, che costerebbe il 25% in meno ma lascia sul bordo uno
+scarto fino a 11/255 dal fondo piatto — cioè un rettangolo più chiaro
+attorno al barattolo, su una tinta unita. Col trasparente quel
+rettangolo non può esistere.
+E IL RITAGLIO HA CAMBIATO LA MISURA, che era l'altra riga da rovesciare:
+l'immagine non è più il canvas 480×480 mostrato a 227px, è il barattolo
+ritagliato sul suo bbox, quindi **104×160** — i 160 dello splash nativo,
+e la larghezza del bbox. A schermo non si è mosso niente: i due scatti,
+prima e dopo, hanno il barattolo nello stesso rettangolo (x 288-492 in
+tutt'e due).
+
+**3) L'ASSETLINKS RISPONDE ANCHE ALLA HEAD.** Dava **405**, e la causa
+non è nostra: Starlette regalerebbe la HEAD a ogni GET, FastAPI no —
+le sue rotte tengono i soli metodi dichiarati. Un `@app.head` accanto
+al `@app.get` e basta; il corpo lo toglie Starlette da sé, con gli
+stessi header e `Content-Length` compreso. Chi verifica un dominio
+(Google, i validatori di Digital Asset Links, un monitor) bussa spesso
+in HEAD, e un 405 lì si legge come «questo dominio non dichiara
+niente».
+⚠️ IL CONTROLLO CHE VALE PIÙ DELLA CURA: sullo stesso server
+`/manifest.json` e `/assets/icona-512.png` rispondono **ancora 405**
+alla HEAD. Non è una svista — il perimetro chiesto era l'assetlinks —
+ma è la prova che la diagnosi è giusta, ed è anche l'elenco di quel che
+resta da decidere.
+
+**LE PROVE.** `prove_guscio_apertura` sale a 38 e `prove_app_android` a
+13. Le nuove: il guscio nasce spento e lo accende solo la classe; la
+classe si mette nell'head col referrer del NOSTRO pacchetto; l'app non
+la nomina mai (niente timbro che possa passare al browser); il data URI
+è un WebP con l'alfa, alla misura per il 3x, sotto i 40 KB, ed è lo
+STESSO barattolo della sorgente (confronto alla resa, scarto medio
+3,09/255); la HEAD gira DAVVERO su un'app FastAPI di cartone con la
+stessa coppia di decoratori, e il pacchetto del referrer è confrontato
+con quello dell'assetlinks (scritti in due file, potevano divergere in
+silenzio e il guscio sarebbe sparito senza che niente protestasse).
+Suite **13325/0** con `PROVE_SEVERE=1`, otto collaudi verdi, tortura
+**10 mutazioni / 10 uccise**.
+⚠️ E UNA SENTINELLA DEL VICINO È STATA RISTRETTA: `prove_intestazione_scambi`
+diceva «la pagina non incorpora NESSUNA webp» e voleva dire «non
+incorpora QUESTA» — un contenitore troppo grande, che il primo data URI
+della storia ha fatto scattare. Adesso dice che l'unica incorporata è il
+barattolo del guscio, e che sta nel guscio.
+
+**DAL VIVO**, tre giri sullo stesso server: **browser** (nessun
+referrer) e **Telegram** (stub dell'SDK) → il guscio non compare MAI,
+e la vetrina si disegna con le sue 30 card; **APK** (referrer forzato)
+→ compare, fondo `#F78F19`, immagine già pronta. Più la HEAD e il GET
+sul server vero: 200/200, corpo 0 contro 339 byte, header identici.
+⚠️ **E IL CASO APK È SIMULATO, non provato**: il parametro `referrer`
+di `Page.navigate` NON imposta un `android-app://` (giro fatto: il
+referrer esce vuoto e il guscio non compare), quindi a fare la prova è
+un getter su `document.referrer` installato prima del documento. Il
+CODICE è esercitato; il SEGNALE no. L'unica conferma possibile da qui è
+indiretta e vale quel che vale: la stringa `android-app://` c'è nel
+`classes.dex` dell'APK firmato in servizio.
+
+**DA GUARDARE SUL TELEFONO**, e stavolta la prima è un sì-o-no che
+decide tutto: **aprire l'app Zapstore e vedere se il guscio compare**.
+Se compare, il referrer arriva e i tre punti sono chiusi; se NON
+compare, il segnale non arriva e la strada che resta è il parametro
+nella startUrl — cioè una release nuova. Poi: che il barattolo sia lì
+dal primo fotogramma invece che dopo l'anello (è il difetto del video),
+e che in **Telegram** e nel **browser** l'apertura non lampeggi più
+d'arancio.

@@ -55622,6 +55622,7 @@ def icona_apple():
 
 # --- TWA (lug 2026): l'APK Android che incarta il sito --------------------
 @app.get("/.well-known/assetlinks.json")
+@app.head("/.well-known/assetlinks.json")
 def twa_assetlinks():
     """La stretta di mano tra il dominio e l'APK (Fase 2 della PWA):
     dice ad Android che l'app firmata con la NOSTRA chiave puo' aprire
@@ -55629,7 +55630,16 @@ def twa_assetlinks():
     c'e' solo l'impronta PUBBLICA del certificato di firma (la chiave
     vera vive fuori dal repo, coi suoi backup). Stesso patto di sempre:
     rotta esplicita per file singolo (regola ferrea 3). Cache di
-    un'ora come il manifest: un cambio d'impronta si propaga presto."""
+    un'ora come il manifest: un cambio d'impronta si propaga presto.
+
+    ⚠️ E RISPONDE ANCHE ALLA HEAD, con la sua riga apposta (set 2026):
+    Starlette la regalerebbe a ogni GET, ma FastAPI no — le sue rotte
+    tengono i soli metodi dichiarati, quindi una HEAD si prendeva
+    **405**. Non e' pedanteria da protocollo: chi verifica un dominio
+    (Google, i validatori di Digital Asset Links, un monitor) bussa
+    spesso in HEAD, e un 405 li' si legge come «questo dominio non
+    dichiara niente». Il corpo lo toglie Starlette da se': stessi
+    header, `Content-Length` compreso, e zero byte dietro."""
     return FileResponse(".well-known/assetlinks.json",
                         media_type="application/json",
                         headers={"Cache-Control": "public, max-age=3600"})
