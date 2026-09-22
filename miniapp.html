@@ -1859,12 +1859,20 @@
      per «Compra BTC», che a 19px ne misura 102 (dal vivo). Sotto i 352px
      di schermo resta 76, come prima; da 376 in su e' 96; in mezzo cresce
      un pixel per pixel, e il testo non va mai a capo.
-     Il disegno nel PNG lascia 13px trasparenti per lato su 152: la
-     distanza VISTA fra il logo e le scritte e' piu' larga di quella fra
-     le scatole. I PNG restano quelli da 152: a 96 su un telefono a 3x
-     sono ingranditi un po'. */
+     Il disegno lascia un decimo di trasparenza per lato: la distanza
+     VISTA fra il logo e le scritte e' piu' larga di quella fra le
+     scatole.
+     ⚠️ EMENDATA (22 set 2026, «piu' grande»): i due margini da 6px del
+     logo se ne sono andati — quella distanza la fa gia' la trasparenza
+     del disegno — e i tab arrivano ai bordi del velo, quindi la stessa
+     riga ha sedici pixel in piu' da dare al logo. Il numero della
+     formula scende da 280 a 265 e il tetto sale da 96 a 120: a 360 il
+     logo e' 95 (era 80), a 375 e' 110 (era 95), da 385 in su e' 120. Al
+     tab restano SEMPRE 108,5px per i 102 di «Compra BTC», che non va
+     a capo fino a 430 e oltre. I file sono WebP da 360, il 3x del
+     tetto. */
   .p2p-lati{display:flex;align-items:flex-end;margin:0 0 12px;
-    --logo-p2p:clamp(76px, calc(100vw - 280px), 96px)}
+    --logo-p2p:clamp(76px, calc(100vw - 265px), 120px)}
   /* ---- LA TESTATA RESTA IN ALTO (set 2026, ritocco di Andrea:
      «tab, logo e pillola attaccati in alto; scorrono solo le card»).
      UN SOLO STICKY per tutt'e due, e non due impilati: con due
@@ -1921,6 +1929,10 @@
      quello, e da attaccato sopra il velo resta una striscia di fondo
      pieno invece di una fessura da cui si vedono passare le card. */
   #view-p2pmiei .p2p-sticky{display:flow-root}
+  /* e il blocco del libro fa lo stesso, da quando ha il velo: il suo
+     margine di 4px resta dentro, e da attaccato sopra il velo c'e' una
+     striscia di fondo pieno invece di una fessura */
+  #view-p2p .p2p-sticky{display:flow-root}
   /* IL CAPPELLO DI «I MIEI SCAMBI» (set 2026, richiesta di Andrea) non
      ha piu' un vestito suo, ed e' la terza stesura di questo titolo:
      prima 19px come i due tab della sorella, poi la sola MISURA del
@@ -1969,13 +1981,23 @@
      niente sfocature, niente filtri, niente animazioni — quindi con
      «effetti ridotti» resta identico: la regola universale non ha
      niente da togliergli, e al compositore non chiede niente. */
-  .scambi-testa{margin:4px 0 0;padding:6px 8px;border-radius:22px;
-    background:var(--sats-soft);display:flow-root}
+  /* ⚠️ E IL VELO E' DI DUE PAGINE (22 set 2026, richiesta di Andrea:
+     «dietro il logo del Libro ordini lo stesso velo, identico»): una
+     regola sola per tutt'e due, che e' la forma piu' forte di
+     «identico» — colore, forma e angoli non possono scollarsi perche'
+     sono gli stessi byte. Di la' contiene le monete, il conto e gli
+     strumenti; di qua il logo, i due tab e gli strumenti. */
+  .scambi-testa,.libro-testa{margin:4px 0 0;padding:6px 8px;
+    border-radius:22px;background:var(--sats-soft);display:flow-root}
+  /* i tab arrivano ai bordi del velo: i sedici pixel del suo respiro
+     servono al logo, e il respiro dei tab ce l'hanno gia' loro */
+  .libro-testa .p2p-lati{margin-left:-8px;margin-right:-8px}
   .scambi-cima{text-align:center}
   /* sotto il velo la riga di strumenti tiene i suoi 13 sopra, e sotto
      ne lascia 4 piu' i 6 del velo: le pillole restano a dieci dal bordo
      come dal fondo del blocco di ieri */
-  .scambi-testa:not(.vuota) .p2p-testa-riga{margin-bottom:4px}
+  .scambi-testa:not(.vuota) .p2p-testa-riga,
+  .libro-testa .p2p-testa-riga{margin-bottom:4px}
   .scambi-testa.vuota{margin:0;padding:0;border-radius:0;background:none}
   .scambi-testa.vuota .scambi-cima{display:none}
   /* il titolo e' l'immagine; se l'immagine non arriva torna la parola,
@@ -2010,8 +2032,11 @@
      Andrea guardando la riga.
      E IL MARGINE SEGUE LA MISURA (22 set 2026): erano -8px su 76, cioe'
      il disegno appoggiato sulla linea dei tab; col logo che cresce la
-     stessa proporzione lo tiene appoggiato (a 76 fa ancora -8). */
-  .p2p-lati .p2p-logo-pila{margin:0 6px calc(var(--logo-p2p) * -.105)}
+     stessa proporzione lo tiene appoggiato (a 76 fa ancora -8).
+     ⚠️ E I DUE MARGINI DI FIANCO SONO ANDATI A ZERO (22 set 2026): il
+     disegno ha gia' un decimo di trasparenza per lato, che a 110px fa
+     dieci pixel — piu' dei sei che c'erano. */
+  .p2p-lati .p2p-logo-pila{margin:0 0 calc(var(--logo-p2p) * -.105)}
   /* ...e le due viste dello scambio stringono anche il respiro del
      contenitore: i tab devono stare in cima, non a meta' pagina */
   #view-p2p .sicu,#view-p2pmiei .sicu{padding-top:2px}
@@ -2481,6 +2506,66 @@
   .p2p-scambio-stato.badge{font-size:13px;font-weight:700;
     padding:6px 10px;border-radius:10px;white-space:normal;
     border-color:transparent}
+  /* ---- LA CARD PRENDE LA TINTA DEL SUO STATO (22 set 2026, richiesta
+     di Andrea) ----
+     Il riquadro tiene il colore PIENO, la card ne prende un velo: a
+     scorrere la lista si vede a che punto sono gli scambi senza
+     leggerli uno per uno.
+     LA TINTA NON E' UNA SECONDA VERITA': esce dalla STESSA classe che
+     veste il riquadro (`tintaStatoP2P` → `tonoCardP2P`), quindi card e
+     riquadro non possono dire due cose diverse. E IL COLORE NON E'
+     L'UNICO SEGNO: la parola dello stato resta dov'e', per chi i colori
+     non li distingue.
+     I COLORI NON SONO NUOVI: ogni tono prende l'INCHIOSTRO del suo
+     badge — l'arancio dei sats, il viola, il blu, il verde, il rosso,
+     il grigio — e lo stempera nella carta. Le due percentuali stanno in
+     due variabili, una per tema: di giorno il 6% (la carta e' bianca e
+     una tinta piu' forte spegnerebbe la cifra arancio sotto l'AA), di
+     sera l'8%. Misurato: il testo peggiore sta a 4,59:1 di giorno e
+     4,62 di sera, sopra la soglia del testo piccolo, e c'e' una prova
+     che rifa' il conto sui token.
+     ⚠️ `color-mix` DIETRO UN `@supports`, e non e' prudenza generica:
+     senza, un browser che non lo conosce butterebbe la dichiarazione e
+     la card resterebbe SENZA fondo — trasparente sul crema della
+     pagina. Dentro il supporto si tinge, fuori resta la carta di
+     sempre, che e' il mondo di ieri.
+     E' UN COLORE FERMO: niente sfocature, filtri o animazioni, quindi
+     «effetti ridotti» non ha niente da togliergli. */
+  :root{--tinta-card:6%;--tinta-bordo:24%}
+  html[data-tema="scuro"]{--tinta-card:8%;--tinta-bordo:34%}
+  @supports (background:color-mix(in srgb,red 50%,blue)){
+    .p2p-scambio.tinta{
+      background:color-mix(in srgb,var(--tinta) var(--tinta-card),var(--card));
+      border-color:color-mix(in srgb,var(--tinta) var(--tinta-bordo),var(--card))}
+    .p2p-scambio.tono-locked{--tinta:var(--sats-text)}
+    .p2p-scambio.tono-confirmed{--tinta:var(--nostr-text)}
+    .p2p-scambio.tono-shipped{--tinta:var(--ship-text)}
+    .p2p-scambio.tono-released{--tinta:var(--trust-text)}
+    .p2p-scambio.tono-dispute{--tinta:var(--danger)}
+    .p2p-scambio.tono-annullato{--tinta:var(--muted)}
+    /* il riquadro resta staccato dalla card tinta: al posto del bordo
+       trasparente, un filo del suo stesso inchiostro */
+    .p2p-scambio.tinta .p2p-scambio-stato.badge{
+      border-color:color-mix(in srgb,currentColor 30%,transparent)}
+  }
+  /* IL TESTO DELLA CARD PASSA L'AA SU OGNI TINTA (22 set 2026): la riga
+     di servizio, il premio e la scatola del metodo erano `--muted`, che
+     su carta BIANCA sta gia' a 3,8:1 — sotto la soglia del testo
+     piccolo, e su una tinta scenderebbe ancora. `--ink-soft` e' lo
+     stesso grigio di casa un gradino piu' scuro: 6,6:1 sulla tinta piu'
+     chiara. E il verde del premio passa a `--trust-text`, la variante
+     fatta per essere letta (il `--trust` pieno sta a 3,8 su bianco).
+     Solo nelle card degli scambi: il libro non l'ha chiesto nessuno.
+     ⚠️ E L'ORDINE DEI TRE SELETTORI NON E' A CASO: col nome della
+     scatola in fondo, questa regola finirebbe col nome attaccato alla
+     graffa — che e' l'ancora con cui due sentinelle di casa cercano la
+     scatola VERA, e stando piu' in alto nel foglio risponderebbe lei.
+     E' la trappola delle prove che rispondono per il vicino: nemmeno
+     un commento la puo' nominare per intero. */
+  .p2p-scambio .p2p-box,
+  .p2p-scambio .p2p-badge,
+  .p2p-scambio .p2p-scambio-euro{color:var(--ink-soft)}
+  .p2p-scambio .p2p-badge .p2p-affare{color:var(--trust-text)}
   /* il puntino fra il premio e i sats e' MORTO col terzo ridisegno
      (set 2026): le due cifre non stanno piu' sulla stessa riga, e non
      c'e' piu' niente da separare — niente CSS orfano */
@@ -7733,9 +7818,22 @@ document.getElementById('cartello')?.remove();</script>
            renderP2P — e' l'unica ragione per cui la pillola ha un
            contenitore suo invece di stare in cima a #p2pCorpo. -->
       <div class="p2p-sticky">
+        <!-- IL VELO DELLA SORELLA (22 set 2026, richiesta di Andrea):
+             la stessa scatola che in «I miei scambi» sta dietro le
+             monete — e' la STESSA regola CSS, quindi stesso colore nei
+             due temi, stessa forma, stessi angoli — qui dietro il logo,
+             i due tab e la riga di strumenti. I tab arrivano ai bordi
+             del velo (margine negativo): il respiro dei loro 4px basta,
+             e quei sedici pixel servono al logo, che senza andrebbe a
+             capo con «Compra BTC».
+             I DUE GEMELLI SONO IN WEBP (stesso disegno, frecce spente
+             rifatte da Andrea): 360px, il 3x dei 120 massimi a schermo,
+             33 KB l'uno invece degli 87 del PNG — e senza i gradini che
+             il PNG a 256 colori faceva sulle sfumature. -->
+        <div class="libro-testa">
         <div class="p2p-lati" role="tablist">
           <button class="p2p-lato compra attiva" id="p2pLatoCompro" role="tab" onclick="setLatoP2P('compro')">Compra BTC</button>
-          <span class="p2p-logo-pila" aria-hidden="true"><img class="p2p-logo compra" src="/assets/p2p-logo-compra.png" alt="" onerror="this.remove()"><img class="p2p-logo vendi" src="/assets/p2p-logo-vendi.png" alt="" onerror="this.remove()"></span>
+          <span class="p2p-logo-pila" aria-hidden="true"><img class="p2p-logo compra" src="/assets/p2p-logo-compra.webp" alt="" onerror="this.remove()"><img class="p2p-logo vendi" src="/assets/p2p-logo-vendi.webp" alt="" onerror="this.remove()"></span>
           <button class="p2p-lato vendi" id="p2pLatoVendo" role="tab" onclick="setLatoP2P('vendo')">Vendi BTC</button>
         </div>
         <!-- IL DEPOSITO DELL'ORDINAMENTO (set 2026): la `<select>` del
@@ -7762,6 +7860,7 @@ document.getElementById('cartello')?.remove();</script>
         <option value="imp-su" data-corta="Più piccoli">Importo: dal più piccolo</option>
       </select>
       <div id="p2pTesta"></div>
+      </div>
       </div>
       <div id="p2pCorpo"></div>
       <!-- IL BOTTONE DEL PROFILO NON C'E' PIU' (set 2026, fase 6):
@@ -12983,7 +13082,7 @@ function renderStriscia(){
        title="Scambio P2P" aria-label="Scambio P2P"
        onclick="vaiP2PDaTocco(event)">
       <span class="cat-quad"><span class="cat-fig"><img
-           src="/assets/p2p-logo-completo.png" alt="" loading="lazy"
+           src="/assets/p2p-logo-grande.webp" alt="" loading="lazy"
            decoding="async" onerror="this.remove()"><span class="cat-emoji"
            aria-hidden="true">₿</span></span></span>
       <span class="cat-eti">Scambio P2P</span>
@@ -39289,7 +39388,7 @@ function renderP2P(){
     + 'onclick="rivediTourP2P()">Come funziona</button></div>';
   box.innerHTML = avvisi
     + (mostrati.length ? mostrati.map(rigaOrdineP2P).join('')
-       : `<div class="empty"><img class="p2p-simbolo" src="/assets/p2p-logo-completo.png" alt="" onerror="this.remove()"><span class="empty-title">${
+       : `<div class="empty"><img class="p2p-simbolo" src="/assets/p2p-logo-grande.webp" alt="" onerror="this.remove()"><span class="empty-title">${
            vivi.length ? 'Nessun ordine col tuo filtro' : 'Nessun ordine aperto'}</span>${
            vivi.length
              ? 'Ci sono ' + vivi.length + ' offerte, ma nessuna passa il filtro. '
@@ -42661,6 +42760,18 @@ function tintaStatoP2P(o){
   if (aspettaRecapitoP2P(o)) return ' badge confirmed';
   const c = P2P_TINTA_STATO[o && o.stato];
   return c ? ' badge ' + c : '';
+}
+/* PURA: la tinta tenue della card, dalla STESSA classe con cui si
+   veste il riquadro (22 set 2026, richiesta di Andrea). Il riquadro
+   tiene il colore pieno, la card ne prende un velo — e il colore lo
+   decide una tabella sola, `P2P_TINTA_STATO` (piu' il viola di chi
+   aspetta il recapito), quindi non possono scollarsi.
+   `tinta` e' il marcatore: la porta ogni card tinta, e ci si appende la
+   regola del riquadro senza elencare i sei toni. Gli stati senza tinta
+   — quelli che vivono nel libro — restano sulla carta di sempre. */
+function tonoCardP2P(o){
+  const t = tintaStatoP2P(o).replace(' badge ', '');
+  return t ? ' tinta tono-' + t : '';
 }
 function statoTestoP2P(o){
   const s = STATI_P2P[o && o.stato] || {t: 'Scambio in corso', d: ''};
@@ -48382,18 +48493,38 @@ function quantiToccaAMeP2P(righe){
    aperto non si legge mai zero.
    IL GIUDICE RESTA UNO, `gruppoScambioP2P` — quello del foglio e del
    pallino: aperto e' cio' che non cade in «Conclusi» ne' in «Annullati».
-   Combacia con `P2P_FINALI` (concluso, annullato, rifiutato), il
-   giudice di chi riascolta i relay, e una prova li tiene insieme.
    «Tocca a te» lo conta `quantiToccaAMeP2P`, la stessa del pallino:
    pallino, 👉 sulle card, conto nel filtro e questa riga sono la stessa
-   domanda, e nessuna ha una lista di stati sua. */
+   domanda, e nessuna ha una lista di stati sua.
+   ⚠️ EMENDATA (22 set 2026, ritocco di Andrea): aperti sono gli scambi
+   PRESI, cioe' quelli con qualcuno dall'altra parte — un mio ordine che
+   aspetta nel libro non e' uno scambio aperto, e non entra ne' in N ne'
+   in M. Il giudice e' `presoP2P`, qui sotto. */
 function contoScambiP2P(righe){
   const r = righe || [];
-  return {aperti: r.filter(o => {
-            const g = gruppoScambioP2P(o);
-            return g !== 'fatti' && g !== 'morti';
-          }).length,
-          fare: quantiToccaAMeP2P(r)};
+  return {aperti: r.filter(presoP2P).length, fare: quantiToccaAMeP2P(r)};
+}
+/* PURA: c'e' qualcuno dall'altra parte? (22 set 2026, ritocco di
+   Andrea: «contano solo gli scambi presi»).
+   LO DICE LA MACCHINA A STATI, e per esclusione. Fuori restano i due
+   gruppi finiti («Conclusi», «Annullati»), il gruppo «Nel libro» — un
+   ordine pubblicato aspetta che QUALCUNO lo prenda, e finche' non
+   succede dall'altra parte non c'e' nessuno — e i due stati in cui si
+   aspetta il coordinatore PRIMA che una presa sia confermata: `prendo`
+   (l'ho chiesta io) e `senza_risposta` (non ha risposto: l'ordine
+   potrebbe essere ancora libero, e quello pubblicato potrebbe non
+   essere nemmeno nel libro). Tutto il resto che non e' finito e' preso
+   per costruzione: ci si arriva solo dopo una presa accettata.
+   ⚠️ IL GESTO PIENO STA SEMPRE DENTRO I PRESI: `azioniDisponibili`
+   risponde solo su quegli stati, quindi «tocca a te» non puo' contare
+   un ordine fermo nel libro. C'e' una prova che lo rifa' stato per
+   stato, su TUTTI quelli che la macchina conosce: uno stato nuovo che
+   non sia classificato la fa rossa. */
+const P2P_PRIMA_DELLA_PRESA = ['prendo', 'senza_risposta'];
+function presoP2P(o){
+  const g = gruppoScambioP2P(o);
+  return (g === 'fare' || g === 'corso')
+    && P2P_PRIMA_DELLA_PRESA.indexOf(o && o.stato) < 0;
 }
 /* PURA: la frase. Dentro ci sono solo due cifre — nessun testo che
    arrivi da fuori — quindi va in innerHTML senza esc(); il <b> accende
@@ -48632,7 +48763,7 @@ function rigaScambioP2P(o){
     ? '<button class="order-x p2p-x" title="Togli" aria-label="Togli questo scambio" '
       + 'data-id="' + esc(o.id) + '" onclick="togliScambioP2P(this.dataset.id, event)">✕</button>'
     : '';
-  return '<div class="p2p-ord p2p-scambio" role="button" tabindex="0" data-id="' + esc(o.id) + '" '
+  return '<div class="p2p-ord p2p-scambio' + tonoCardP2P(o) + '" role="button" tabindex="0" data-id="' + esc(o.id) + '" '
     + 'onclick="apriOrdineP2P(this.dataset.id)">'
     /* LA PRIMA RIGA PORTA I SATS, in evidenza: e' la cifra che si va a
        cercare scorrendo i propri scambi, e fino a stamattina stava in

@@ -44772,10 +44772,12 @@ def prove_p2p_libro():
           _css.count(".cella-p2p"))
     # IL MARCHIO E' UNO, il completo: i due gemelli del libro restano
     # dove servono a dire un LATO, che qui un lato non c'e'.
+    # EMENDATA (22 set 2026, sera): il completo della card e' il WebP
+    # grande — a 125px su un telefono a 3x il PNG da 152 era morbido.
     prova("il marchio e' uno solo, il logo completo", (1, 0, 0),
-          (_cp2p.count("/assets/p2p-logo-completo.png"),
-           _cp2p.count("/assets/p2p-logo-compra.png"),
-           _cp2p.count("/assets/p2p-logo-vendi.png")))
+          (_cp2p.count("/assets/p2p-logo-grande.webp"),
+           _cp2p.count("/assets/p2p-logo-compra.webp"),
+           _cp2p.count("/assets/p2p-logo-vendi.webp")))
     # NON E' UN REPARTO: l'anello `.attiva` dice «sei qui», e da questa
     # card si ESCE dalla home invece di filtrarla.
     prova("la card non si accende mai: non e' un filtro", False,
@@ -44844,13 +44846,15 @@ def prove_p2p_libro():
     # crossfade guidato da body.p2p-vendo. La .p2p-testata qui non
     # c'e' piu' (sopravvive nella vista dei MIEI, e la guarda
     # prove_nav_p2p col resto del logo reattivo).
+    # EMENDATA (22 set 2026, i gemelli nuovi): stesso posto e stesso
+    # mestiere, in WebP — i PNG sono usciti con le loro rotte.
     prova("il logo dedicato sta in mezzo ai due tab, a due strati",
-          True, '/assets/p2p-logo-compra.png' in fetta
-          and '/assets/p2p-logo-vendi.png' in fetta
+          True, '/assets/p2p-logo-compra.webp' in fetta
+          and '/assets/p2p-logo-vendi.webp' in fetta
           and 'class="p2p-testata"' not in fetta
           and "brand-jar" not in fetta and "lockup" not in fetta
           and fetta.index('id="p2pLatoCompro"')
-              < fetta.index('/assets/p2p-logo-compra.png')
+              < fetta.index('/assets/p2p-logo-compra.webp')
               < fetta.index('id="p2pLatoVendo"'))
     prova("il lato si sceglie coi due tab grandi, non piu' a pillole",
           True, senza_commenti.count("p2p-lato ") == 2
@@ -45075,11 +45079,30 @@ def prove_p2p_libro():
     # forma si guarda per quello che e': il blocco si apre sui tab, e si
     # CHIUDE dopo la pillola — cioe' fra la pillola e il corpo che scorre
     # c'e' la graffa del blocco.
+    # ⚠️ EMENDATA (22 set 2026, il velo del libro): fra il blocco
+    # attaccato e i tab c'e' adesso la scatola del velo, quindi fra la
+    # pillola e il corpo che scorre ci sono DUE graffe invece di una. La
+    # forma sorvegliata e' la stessa: il blocco si apre sui tab e si
+    # chiude DOPO la pillola.
     prova("...e tab e pillola stanno DENTRO il blocco, non dopo", True,
-          re.search(r'<div class="p2p-sticky">\s*<div class="p2p-lati"', mini)
-          is not None
-          and re.search(r'<div id="p2pTesta"></div>\s*</div>\s*'
+          re.search(r'<div class="p2p-sticky">\s*(?:<!--[\s\S]*?-->\s*)?'
+                    r'<div class="libro-testa">\s*<div class="p2p-lati"',
+                    mini) is not None
+          and re.search(r'<div id="p2pTesta"></div>\s*</div>\s*</div>\s*'
                         r'<div id="p2pCorpo">', mini) is not None)
+    # IL VELO E' LO STESSO DELLA SORELLA, e non una copia che le somiglia
+    # (22 set 2026, richiesta di Andrea: «identico»): una regola sola con
+    # due selettori, cioe' gli stessi byte — colore, forma e angoli non
+    # possono scollarsi. La prova guarda che di `.libro-testa` non nasca
+    # una regola tutta sua, che e' il modo in cui si scollerebbero.
+    # (`css`, qui, e' la sola fetta delle card: il velo si cerca nel
+    # foglio intero, che in questa sezione si chiama `_css`)
+    prova("...e il velo e' LA STESSA regola che veste «I miei scambi»",
+          (1, 0), (_css.count("  .scambi-testa,.libro-testa{"),
+                   len(re.findall(r"(?<![,\w-])\.libro-testa\{", _css))))
+    prova("...coi tab ai bordi del velo, per dare quei pixel al logo",
+          True, "  .libro-testa .p2p-lati{margin-left:-8px;"
+                "margin-right:-8px}" in _css)
     prova("le pillole vivono nella testata, fuori dal corpo che scorre",
           True, "if (testaBox) testaBox.innerHTML =" in _rp
           and "'<div class=\"p2p-testa-riga\">' + pillOrdina + pillola" in _rp
@@ -48376,9 +48399,9 @@ def prove_nav_p2p():
     prova("la pila del logo sta nel solo libro", 1,
           mini.count('class="p2p-logo-pila"'))
     prova("...coi due gemelli, compra prima", 1,
-          mini.count('class="p2p-logo compra" src="/assets/p2p-logo-compra.png"'))
+          mini.count('class="p2p-logo compra" src="/assets/p2p-logo-compra.webp"'))
     prova("...col vendi accanto", 1,
-          mini.count('class="p2p-logo vendi" src="/assets/p2p-logo-vendi.png"'))
+          mini.count('class="p2p-logo vendi" src="/assets/p2p-logo-vendi.webp"'))
     _fm = mini[mini.index('id="view-p2pmiei"'):]
     _fm = _fm[:_fm.index('id="p2pMieiCorpo"')]
     prova("i miei non hanno piu' testata ne' logo in cima", True,
@@ -48491,20 +48514,33 @@ def prove_nav_p2p():
               < mini.index("body .p2p-ord.p2p-scambio .p2p-sats{"))
     prova("del PNG singolo di ieri non resta niente", 0,
           mini.count('/assets/p2p-logo.png'))
+    # ⚠️ E LA FAMIGLIA E' TUTTA IN WEBP (22 set 2026, sera): i due
+    # gemelli nuovi e il completo grande. I tre PNG sono usciti con le
+    # loro rotte — chi ha in cache una pagina vecchia prende un 404 e
+    # l'`onerror` toglie l'immagine, che e' il ripiego gia' scritto.
     prova("...nemmeno nel server: le rotte sono i tre della famiglia",
-          True, '/assets/p2p-logo-compra.png' in _SORGENTE
-          and '/assets/p2p-logo-vendi.png' in _SORGENTE
-          and '/assets/p2p-logo-completo.png' in _SORGENTE
+          True, '"/assets/p2p-logo-compra.webp"' in _SORGENTE
+          and '"/assets/p2p-logo-vendi.webp"' in _SORGENTE
+          and '"/assets/p2p-logo-grande.webp"' in _SORGENTE
           and '"/assets/p2p-logo.png"' not in _SORGENTE)
-    # EMENDATA (22 set 2026, il logo che cresce): i due gemelli del libro
-    # sono a 288 — il logo fra i tab arriva a 96px, e a 3x ne servono 288
-    # — rifatti dai sorgenti da 480 di Andrea; il completo resta a 152,
-    # dove serve piccolo (la card della home e il libro vuoto).
-    prova("...e i tre file ci sono: i gemelli a 288, il completo a 152",
-          [(288, 288), (288, 288), (152, 152)],
-          [__import__("struct").unpack(
-              ">II", open(f"assets/p2p-logo-{n}.png", "rb").read()[16:24])
-           for n in ("compra", "vendi", "completo")])
+    prova("...e dei tre PNG non resta ne' rotta ne' file", [],
+          [n for n in ("compra", "vendi", "completo")
+           if ('/assets/p2p-logo-%s.png' % n) in _SORGENTE
+           or os.path.exists("assets/p2p-logo-%s.png" % n)])
+    # EMENDATA DUE VOLTE IN UN GIORNO (22 set 2026): i gemelli erano
+    # PNG a 152, poi a 288, e adesso sono WEBP a 360 — il logo fra i tab
+    # arriva a 120px e a 3x ne servono 360. Il completo grande e' 396
+    # (il 3x dei 132 di Info P2P) e veste anche la card della home e il
+    # libro vuoto. Le misure si leggono dal pezzo VP8X del WebP.
+    def _misure_webp(f):
+        raw = open(f, "rb").read()
+        assert raw[:4] == b"RIFF" and raw[8:12] == b"WEBP", f
+        return (1 + int.from_bytes(raw[24:27], "little"),
+                1 + int.from_bytes(raw[27:30], "little"))
+    prova("...e i tre file ci sono: i gemelli a 360, il grande a 396",
+          [(360, 360), (360, 360), (396, 396)],
+          [_misure_webp("assets/p2p-logo-%s.webp" % n)
+           for n in ("compra", "vendi", "grande")])
 
     # --- 2b) IL LOGO AL POSTO DELL'EMOJI (set 2026) ------------------
     # Dove il 🔁 faceva da SIMBOLO dello scambio ora c'e' il marchio
@@ -48538,7 +48574,7 @@ def prove_nav_p2p():
     # filtro vuoto dei miei porta le monete, in piccolo. Il marchio resta
     # al solo libro vuoto, che e' casa sua.
     prova("il simbolo veste il solo libro vuoto, e nessuna testata",
-          1, mini.count('class="p2p-simbolo" src="/assets/p2p-logo-completo.png"'))
+          1, mini.count('class="p2p-simbolo" src="/assets/p2p-logo-grande.webp"'))
     # EMENDATA DUE VOLTE. La prima (set 2026, il ridisegno): il bottone
     # non diceva piu' «Pubblica: compro sats» — il lato lo dice il
     # TITOLO del foglio — e in fondo restavano le due uscite di sempre,
@@ -49076,13 +49112,13 @@ def prove_timbro_asset():
     amb = {"os": _os, "re": _re2, "hashlib": _hl}
     exec(_SORGENTE[i:_SORGENTE.index("def _spezza_pagina")], amb)
     timbra = amb["_timbra_asset_pagina"]
-    t1 = timbra(b'<img src="/assets/p2p-logo-compra.png">')
+    t1 = timbra(b'<img src="/assets/p2p-logo-compra.webp">')
     prova("un asset vero esce timbrato con l'hash a 10 hex", True,
-          _re2.search(rb'/assets/p2p-logo-compra\.png\?v=[0-9a-f]{10}',
+          _re2.search(rb'/assets/p2p-logo-compra\.webp\?v=[0-9a-f]{10}',
                       t1) is not None)
     # ...e l'hash e' DAVVERO quello del file, non un numero qualunque
     atteso = _hl.sha1(
-        open("assets/p2p-logo-compra.png", "rb").read()).hexdigest()[:10]
+        open("assets/p2p-logo-compra.webp", "rb").read()).hexdigest()[:10]
     prova("...ed e' lo sha1 del file, accorciato", True,
           atteso.encode() in t1)
     prova("un file che non esiste resta intatto (mai un timbro su un 404)",
@@ -49110,9 +49146,9 @@ def prove_timbro_asset():
     timbrati = len(set(_re2.findall(
         rb'/(?:assets|vendor)/[A-Za-z0-9/_\-.]+\?v=[0-9a-f]{10}', pagina)))
     prova("i due loghi del P2P escono timbrati", True,
-          _re2.search(rb'p2p-logo-compra\.png\?v=[0-9a-f]{10}', pagina)
+          _re2.search(rb'p2p-logo-compra\.webp\?v=[0-9a-f]{10}', pagina)
           is not None
-          and _re2.search(rb'p2p-logo-vendi\.png\?v=[0-9a-f]{10}', pagina)
+          and _re2.search(rb'p2p-logo-vendi\.webp\?v=[0-9a-f]{10}', pagina)
           is not None)
     prova("...e con loro almeno una decina di asset di casa", True,
           timbrati >= 10)
@@ -60615,6 +60651,9 @@ def prove_p2p_card_scambio():
         "function premioTestoP2P(n){",
         "function premioMioP2P(o){",
         "function tintaStatoP2P(o){",
+        # la card indossa la tinta del suo stato (22 set 2026): senza
+        # questo pezzo il banco esplode invece di dipingere
+        "function tonoCardP2P(o){",
         "function commissioneVivaP2P(){",
         "function satsMercatoP2P(o){",
         "function feeMiaP2P(o){",
@@ -61837,7 +61876,15 @@ def prove_intestazione_scambi():
     (tutto cio' che non e' concluso ne' annullato, «tocca a te»
     compreso) invece del gruppo «In corso»; e il filtro vuoto porta le
     monete in piccolo al posto del logo P2P. Lo stato vuoto senza
-    scambi e' rimasto al pixel com'era."""
+    scambi e' rimasto al pixel com'era.
+
+    ⚠️ ED EMENDATE ANCORA (22 set 2026, sera): aperti sono gli scambi
+    PRESI — quelli con qualcuno dall'altra parte. Un ordine pubblicato
+    che aspetta nel libro non entra ne' in N ne' in M, e nemmeno i due
+    stati in cui si aspetta il coordinatore PRIMA che una presa sia
+    confermata (`prendo`, `senza_risposta`). La tabella del banco lo
+    rifa' su TUTTI gli stati della macchina, dai due lati: uno stato
+    nuovo che nessuno classifica la fa rossa."""
     print("\n[l'intestazione di «I miei scambi»]")
     import hashlib as _hl
     import json as _json
@@ -61961,7 +62008,17 @@ def prove_intestazione_scambi():
     prova("l'immagine e' larga quanto la colonna, alta 80px, in proporzione",
           [], [d for d in ("display:block", "width:100%", "height:80px",
                            "object-fit:contain") if d not in img_css])
-    velo = pezzo_js(css, "  .scambi-testa{", "}")
+    # ⚠️ L'ANCORA HA DUE NOMI (22 set 2026, sera): il velo del «Libro
+    # ordini» e' LA STESSA regola, con un secondo selettore — e' la
+    # forma piu' forte di «identico», e chi cerca il velo lo trova coi
+    # due nomi attaccati.
+    # ⚠️ `find` E NON `index` (la tortura del 22 set): se il velo
+    # tornasse due regole separate, un `index` alzerebbe ValueError e
+    # si porterebbe via il resto della sezione — banco compreso. Cosi'
+    # invece diventa rossa la riga che NOMINA la cosa rotta.
+    _iv = css.find("  .scambi-testa,.libro-testa{")
+    prova("il velo e' una regola sola per le due pagine", True, _iv >= 0)
+    velo = pezzo_js(css, "  .scambi-testa,.libro-testa{", "}") if _iv >= 0 else ""
     prova("il velo e' il tenue di casa, tarato nei due temi", True,
           "background:var(--sats-soft)" in velo
           and len(re.findall(r"--sats-soft:#", css)) == 2)
@@ -62017,8 +62074,8 @@ def prove_intestazione_scambi():
     # 375, e anche a 360 resta in fila), e sotto 4 + i 6 del velo
     prova("le pillole stanno nel velo, a dieci dal suo bordo", True,
           "padding:6px 8px;" in velo
-          and ".scambi-testa:not(.vuota) .p2p-testa-riga{margin-bottom:4px}"
-          in css)
+          and ".scambi-testa:not(.vuota) .p2p-testa-riga," in css
+          and ".libro-testa .p2p-testa-riga{margin-bottom:4px}" in css)
     prova("nel filtro vuoto le monete sono piccole", True,
           ".empty .scambi-mini{height:56px" in css)
     prova("senza scambi l'immagine e' piu' grande, sullo stesso velo", True,
@@ -62032,18 +62089,42 @@ def prove_intestazione_scambi():
 
     # --- 5) IL GIUDICE: quello del pallino e del foglio del filtro ---
     cf = nudo(pezzo_js(mini, "function contoScambiP2P(righe){", "\n}\n"))
-    prova("il conto chiede a gruppoScambioP2P e a quantiToccaAMeP2P", True,
-          "gruppoScambioP2P(o)" in cf and "quantiToccaAMeP2P(r)" in cf)
-    # ⚠️ EMENDATA (22 set 2026, sera): «aperti» e' cio' che non cade in
-    # «Conclusi» ne' in «Annullati». Le sole parole fra apici che la
-    # funzione puo' dire sono NOMI DI GRUPPI del giudice, mai stati: una
-    # lista di stati sua si scollerebbe dal foglio al primo stato nuovo
+    pre = nudo(pezzo_js(mini, "function presoP2P(o){", "\n}\n"))
+    # ⚠️ RIFATTA (22 set 2026, sera, «contano solo gli scambi presi»): il
+    # conto non sa piu' niente da solo — chiede a `presoP2P` e alla
+    # contatrice del pallino, e di stati non ne nomina nemmeno uno.
+    prova("il conto chiede a presoP2P e a quantiToccaAMeP2P", True,
+          "r.filter(presoP2P)" in cf and "quantiToccaAMeP2P(r)" in cf)
+    prova("...e non nomina niente per conto suo", [],
+          sorted(set(re.findall(r"'([a-z_-]+)'", cf))))
+    # «PRESO» LO DECIDE IL GIUDICE DEI GRUPPI: le sole parole fra apici
+    # dentro `presoP2P` sono NOMI DI GRUPPI, i due in cui lo scambio e'
+    # vivo. Una lista di stati dentro il giudice si scollerebbe dal
+    # foglio del filtro al primo stato nuovo.
     _gruppi = re.findall(r"\{k: '([a-z]+)', n: '",
                          mini[mini.index("const P2P_GRUPPI = ["):])[:5]
-    prova("...e dice solo nomi di gruppi: i due che chiudono uno scambio",
-          ["fatti", "morti"], sorted(set(re.findall(r"'([a-z_-]+)'", cf))))
+    prova("«preso» lo dice gruppoScambioP2P, e dice solo nomi di gruppi",
+          ["corso", "fare"],
+          sorted(set(re.findall(r"'([a-z_-]+)'", pre)))
+          if "gruppoScambioP2P(o)" in pre else ["il giudice non c'e' piu'"])
     prova("...che sono davvero due dei cinque gruppi del giudice", True,
-          len(_gruppi) == 5 and {"fatti", "morti"} <= set(_gruppi))
+          len(_gruppi) == 5 and {"fare", "corso"} <= set(_gruppi))
+    # I DUE STATI ESCLUSI SONO L'UNICA LISTA DI STATI del giro, e sta
+    # FUORI dal giudice, in una costante col suo nome: sono i due in cui
+    # si aspetta il coordinatore prima che una presa sia confermata. Se
+    # un ritocco ne storpia uno, qui diventa rosso invece di smettere di
+    # escludere in silenzio.
+    _prima = re.search(r"const P2P_PRIMA_DELLA_PRESA = \[([^\]]*)\];", mini)
+    prova("...e i due esclusi stanno in una costante loro",
+          ["prendo", "senza_risposta"],
+          sorted(re.findall(r"'([a-z_]+)'", _prima.group(1)))
+          if _prima else ["la costante non c'e'"])
+    _sm = mini.index("const STATI_P2P = {")
+    _stati = re.findall(r"^  ([a-z_]+): \{",
+                        mini[_sm:mini.index("\n};", _sm)], re.M)
+    prova("...e sono due stati che la macchina conosce davvero", True,
+          len(_stati) == 19
+          and {"prendo", "senza_risposta"} <= set(_stati))
     prova("...lo stesso giudice con cui il foglio del filtro conta i gruppi",
           True, "gruppoScambioP2P(o) === k" in
           pezzo_js(mini, "function renderFiltroMieiP2P(){", "\n}\n"))
@@ -62115,11 +62196,14 @@ def prove_intestazione_scambi():
         salta("il banco dell'intestazione", "node non c'e'")
         return
     i_fin = mini.index("const P2P_FINALI = ")
-    pezzi_js = [mini[i_fin:mini.index("\n", i_fin)]]
+    i_pre = mini.index("const P2P_PRIMA_DELLA_PRESA = ")
+    pezzi_js = [mini[i_fin:mini.index("\n", i_fin)],
+                mini[i_pre:mini.index("\n", i_pre)]]
     pezzi_js += [pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
         "function recapitoEuroArrivatoP2P(o){",
         "function azioniDisponibili(o){",
         "function gruppoScambioP2P(o){",
+        "function presoP2P(o){",
         "function quantiToccaAMeP2P(righe){",
         "function contoScambiP2P(righe){",
         "function fraseContoScambiP2P(c){",
@@ -62147,8 +62231,13 @@ const R = {
   euroPartiti: {id: 'e', lato: 'compro', stato: 'euro_inviati'},
   libro: {id: 'f', lato: 'vendo', stato: 'pubblicato'},
   fatto: {id: 'g', lato: 'compro', stato: 'concluso'},
-  morto: {id: 'h', lato: 'vendo', stato: 'annullato'}
+  morto: {id: 'h', lato: 'vendo', stato: 'annullato'},
+  /* i due dove la presa non e' ancora confermata: nessuno dall'altra
+     parte, quindi fuori dal conto (22 set 2026) */
+  chiesto: {id: 'i', lato: 'compro', stato: 'prendo'},
+  muto: {id: 'j', lato: 'compro', stato: 'senza_risposta'}
 };
+const STATI = __STATI__;
 const tutte = () => Object.keys(R).map(k => R[k]);
 /* OGNI CASO E' SOLO: il suo reset, il suo try (la lezione della tortura) */
 const CASI = {
@@ -62157,18 +62246,37 @@ const CASI = {
   toccaAMe: () => { intestaScambiP2P([R.mia]); return vista(); },
   inCorso: () => { intestaScambiP2P([R.altro]); return vista(); },
   misti: () => { intestaScambiP2P(tutte()); return [vista(), contoScambiP2P(tutte())]; },
-  /* la riga del foglio del filtro, cosi' com'e' in renderFiltroMieiP2P */
+  /* la riga del foglio del filtro, cosi' com'e' in renderFiltroMieiP2P.
+     Gli aperti sono un SOTTOINSIEME delle due pillole vive, e la
+     pillola del libro resta fuori tutta quanta */
   comeIlFiltro: () => {
     const righe = tutte();
     const quanti = k => righe.filter(o => gruppoScambioP2P(o) === k).length;
     const c = contoScambiP2P(righe);
-    return [c.aperti, quanti('fare') + quanti('corso') + quanti('libro'),
+    return [c.aperti, quanti('fare') + quanti('corso'), quanti('libro'),
             c.fare, quanti('fare')];
   },
+  /* OGNI STATO DELLA MACCHINA, dai due lati: dove cade e se e' preso.
+     Uno stato nuovo che nessuno classifica fa rossa questa */
+  tabella: () => {
+    const r = {};
+    STATI.forEach(s => {
+      r[s] = ['compro', 'vendo'].map(l => {
+        const o = {id: s + l, lato: l, stato: s};
+        return gruppoScambioP2P(o) + (presoP2P(o) ? ' preso' : ' no');
+      });
+    });
+    return r;
+  },
   comeIlPallino: () => [contoScambiP2P(tutte()).fare, quantiToccaAMeP2P(tutte())],
-  /* gli aperti del giudice sono gli aperti di chi riascolta i relay */
-  comeChiRiascolta: () => [contoScambiP2P(tutte()).aperti,
-                           tutte().filter(o => P2P_FINALI.indexOf(o.stato) < 0).length],
+  /* GLI APERTI SONO UN PEZZO DEI VIVI, e il banco NOMINA quali vivi
+     restano fuori: il conto dice «con qualcuno dall'altra parte», chi
+     riascolta i relay dice «non finito», e sono due domande diverse */
+  comeChiRiascolta: () => {
+    const vivi = tutte().filter(o => P2P_FINALI.indexOf(o.stato) < 0);
+    return [contoScambiP2P(tutte()).aperti, vivi.length,
+            vivi.filter(o => !presoP2P(o)).map(o => o.stato).sort()];
+  },
   /* uno scambio solo: se e' aperto la riga non dice mai zero, e
      «tocca a te» non supera mai gli aperti */
   unoPerUno: () => Object.keys(R).map(k => {
@@ -62210,6 +62318,7 @@ for (const k of Object.keys(CASI)) {
 }
 console.log(JSON.stringify(out));
 """
+    banco = banco.replace("__STATI__", _json.dumps(_stati))
     cart = _tf.mkdtemp()
     p = _os.path.join(cart, "banco.js")
     open(p, "w", encoding="utf-8").write(banco)
@@ -62229,27 +62338,61 @@ console.log(JSON.stringify(out));
     prova("tocca all'altro: uno scambio aperto, e niente arancio",
           {"vuota": False, "conto": "1 scambio aperto · 0 tocca a te"},
           o["inCorso"])
-    prova("righe miste: aperti tutti tranne conclusi e annullati",
-          [{"vuota": False, "conto": "6 scambi aperti · " + SI % 2},
-           {"aperti": 6, "fare": 2}], o["misti"])
-    prova("gli aperti sono le tre pillole aperte del foglio, sommate",
-          [6, 6, 2, 2], o["comeIlFiltro"])
+    prova("righe miste: aperti i soli presi, il libro e le attese fuori",
+          [{"vuota": False, "conto": "5 scambi aperti · " + SI % 2},
+           {"aperti": 5, "fare": 2}], o["misti"])
+    prova("gli aperti stanno DENTRO le due pillole vive, e il libro e' fuori",
+          [5, 7, 1, 2, 2], o["comeIlFiltro"])
     prova("...e «tocca a te» e' il numero del pallino", [2, 2],
           o["comeIlPallino"])
-    prova("...e gli aperti sono quelli di chi riascolta (P2P_FINALI)",
-          [6, 6], o["comeChiRiascolta"])
-    prova("uno scambio aperto non fa mai zero, e «tocca a te» sta dentro",
+    # ⚠️ E I VIVI NON SONO GLI APERTI (22 set 2026): chi riascolta i
+    # relay tiene in piedi tutto cio' che non e' finito, il conto mostra
+    # solo cio' che ha qualcuno dall'altra parte. I tre nomi che il banco
+    # riporta sono la differenza, in chiaro.
+    prova("...e dei vivi restano fuori l'ordine nel libro e le due attese",
+          [5, 8, ["prendo", "pubblicato", "senza_risposta"]],
+          o["comeChiRiascolta"])
+    prova("uno scambio preso non fa mai zero, e «tocca a te» sta dentro",
           [["mia", 1, 1], ["euroMiei", 1, 1], ["altro", 1, 0],
-           ["aspettoEuro", 1, 0], ["euroPartiti", 1, 0], ["libro", 1, 0],
-           ["fatto", 0, 0], ["morto", 0, 0]], o["unoPerUno"])
-    prova("i gruppi sono una partizione: otto righe, otto posti",
-          {"fare": 2, "corso": 3, "libro": 1, "fatti": 1, "morti": 1},
+           ["aspettoEuro", 1, 0], ["euroPartiti", 1, 0], ["libro", 0, 0],
+           ["fatto", 0, 0], ["morto", 0, 0], ["chiesto", 0, 0],
+           ["muto", 0, 0]], o["unoPerUno"])
+    prova("i gruppi sono una partizione: dieci righe, dieci posti",
+          {"fare": 2, "corso": 5, "libro": 1, "fatti": 1, "morti": 1},
           o["partizione"])
+    # LA TABELLA INTERA, dai due lati: e' il posto dove uno stato nuovo
+    # si fa vedere. «preso» sta solo dentro i due gruppi vivi, e dentro
+    # quelli mancano i tre che aspettano ancora qualcuno.
+    prova("ogni stato della macchina sa dove cade, e se e' preso",
+          {"prendo": ["corso no", "corso no"],
+           "pubblico": ["libro no", "libro no"],
+           "pubblicato": ["libro no", "libro no"],
+           "senza_risposta": ["corso no", "corso no"],
+           "rifiutato": ["morti no", "morti no"],
+           "attesa_mia_fattura": ["fare preso", "corso preso"],
+           "attesa_hold_venditore": ["corso preso", "corso preso"],
+           "attesa_fattura_compratore": ["corso preso", "corso preso"],
+           "attesa_mia_hold": ["corso preso", "fare preso"],
+           "attivo": ["corso preso", "corso preso"],
+           "euro_inviati": ["corso preso", "fare preso"],
+           "rilasciato": ["corso preso", "corso preso"],
+           "fattura_nuova": ["fare preso", "corso preso"],
+           "concluso": ["fatti no", "fatti no"],
+           "annullo_chiesto": ["corso preso", "corso preso"],
+           "annullo_proposto": ["corso preso", "corso preso"],
+           "in_disputa": ["corso preso", "corso preso"],
+           "annullato": ["morti no", "morti no"],
+           "pagamento_ritentato": ["corso preso", "corso preso"]},
+          o["tabella"])
     prova("solo scambi finiti: l'intestazione resta, coi suoi zeri",
           {"vuota": False, "conto": "0 scambi aperti · 0 tocca a te"},
           o["soloFiniti"])
-    prova("solo un ordine nel libro: e' aperto anche lui",
-          {"vuota": False, "conto": "1 scambio aperto · 0 tocca a te"},
+    # ⚠️ ROVESCIATA (22 set 2026, sera, richiesta di Andrea): un ordine
+    # nel libro senza controparte non e' uno scambio aperto. La riga
+    # resta, coi suoi zeri: l'ordine c'e' — si vede nella lista e nel
+    # filtro — ma non e' uno scambio con qualcuno.
+    prova("solo un ordine nel libro: la riga resta, ma non conta nessuno",
+          {"vuota": False, "conto": "0 scambi aperti · 0 tocca a te"},
           o["soloNelLibro"])
     prova("i passaggi: vuoto, uno mio, il libro che si rilegge, tre",
           [{"vuota": True, "conto": ""},
@@ -62264,43 +62407,79 @@ console.log(JSON.stringify(out));
 
 def prove_logo_p2p_nitido():
     """IL LOGO DEL P2P PIU' GRANDE E NITIDO (22 set 2026, richieste di
-    Andrea). Fra i due tab del libro il logo cresce fino a 96px senza
-    toccare «Compra BTC» e «Vendi BTC», e i suoi due gemelli sono rifatti
-    a 288 dai sorgenti da 480; in «Info P2P», dove il logo e' grande
-    132px e il PNG da 152 usciva sgranato, c'e' un WebP da 396.
+    Andrea). Fra i due tab del libro il logo cresce fino a 120px senza
+    far andare a capo «Compra BTC» e «Vendi BTC», e i suoi due gemelli
+    sono WebP da 360 rifatti dai sorgenti nuovi; in «Info P2P», dove il
+    logo e' grande 132px e il PNG da 152 usciva sgranato, c'e' un WebP
+    da 396 — lo stesso che adesso veste anche la card «Scambio P2P»
+    della home e il libro vuoto, morbidi anche loro.
 
     ⚠️ LA COSA DA SORVEGLIARE E' LA GEOMETRIA: il logo cresce con la
     larghezza dello schermo (`clamp` su 100vw), e il vincolo e' il tab —
     dove il logo e' cresciuto, il tab deve tenere lo spazio per «Compra
     BTC» su una riga. La prova rifa' il conto per le larghezze dei
-    telefoni veri, invece di credere al numero scritto nel CSS."""
+    telefoni veri, invece di credere al numero scritto nel CSS.
+    ⚠️ E IL CONTO E' CAMBIATO COL VELO (22 set 2026, sera): i tab
+    arrivano ai bordi del velo con un margine negativo, il logo ha perso
+    i suoi 6+6, e quei sedici pixel sono andati al logo. Chi ritocca il
+    velo ritocca la geometria, e questo e' l'unico posto dove le due
+    cose si guardano insieme."""
     print("\n[il logo del P2P, piu' grande e nitido]")
     import os as _os
     import struct as _st
     mini = open("miniapp.html", encoding="utf-8").read()
     css = mini[mini.index("<style>"):mini.index("</style>")]
 
-    # --- 1) I DUE GEMELLI A 288, dai sorgenti di Andrea -------------
-    def misure_png(f):
-        return _st.unpack(">II", open(f, "rb").read()[16:24])
-    prova("i due gemelli del libro sono a 288, il 3x dei 96", [(288, 288)] * 2,
-          [misure_png("assets/p2p-logo-%s.png" % n) for n in ("compra", "vendi")])
+    # --- 1) I DUE GEMELLI, WebP a 360 -------------------------------
+    def misure_webp(f):
+        raw = open(f, "rb").read()
+        assert raw[:4] == b"RIFF" and raw[8:12] == b"WEBP", f
+        return (1 + int.from_bytes(raw[24:27], "little"),
+                1 + int.from_bytes(raw[27:30], "little"))
+    prova("i due gemelli del libro sono a 360, il 3x dei 120",
+          [(360, 360)] * 2,
+          [misure_webp("assets/p2p-logo-%s.webp" % n)
+           for n in ("compra", "vendi")])
+    # IL FORMATO PIU' LEGGERO SENZA GRADINI (richiesta di Andrea): il
+    # PNG a 24 bit pesava 87 KB, e quello a 256 colori faceva scalini
+    # sulle sfumature del barattolo. Il WebP a qualita' 90 ne pesa 33 e
+    # le sfumature restano lisce.
+    prova("...e pesano meno di 40 KB l'uno", [True, True],
+          [_os.path.getsize("assets/p2p-logo-%s.webp" % n) < 40000
+           for n in ("compra", "vendi")])
+    prova("...e dei PNG di ieri non resta il file", [False, False],
+          [_os.path.exists("assets/p2p-logo-%s.png" % n)
+           for n in ("compra", "vendi")])
     try:
         from PIL import Image as _Im
 
-        def trasparente(f):
+        def alfa(f):
             with _Im.open(f) as im:
-                return im.mode == "RGBA" and im.getchannel("A").getextrema()[0] == 0
-        prova("...con la trasparenza, come prima", [True, True],
-              [trasparente("assets/p2p-logo-%s.png" % n)
+                return (im.mode, im.getchannel("A").getextrema()[0])
+        prova("...con la trasparenza, come prima", [("RGBA", 0)] * 2,
+              [alfa("assets/p2p-logo-%s.webp" % n)
                for n in ("compra", "vendi")])
+        # GEMELLI DAVVERO: stesso disegno, frecce scambiate. I due si
+        # sfumano l'uno sull'altro al tocco del tab, quindi un ritaglio
+        # diverso farebbe saltare il logo di posto a meta' sfumatura.
+        # ⚠️ NON SI CHIEDE L'UGUAGLIANZA ESATTA: nei sorgenti di Andrea
+        # la freccia accesa deborda di tre pixel su 360, cioe' UNO
+        # scarso a schermo — una prova esatta sarebbe rossa per un
+        # disegno che va benissimo. Quattro pixel di tolleranza fanno
+        # un pixel e mezzo a 120.
+        with _Im.open("assets/p2p-logo-compra.webp") as _a:
+            with _Im.open("assets/p2p-logo-vendi.webp") as _b:
+                _ba = _a.getchannel("A").getbbox()
+                _bb = _b.getchannel("A").getbbox()
+                prova("...e sono ritagliati uguali a meno di un pixel a schermo",
+                      [], [(k, _ba[k], _bb[k]) for k in range(4)
+                           if abs(_ba[k] - _bb[k]) > 4])
     except ImportError:
         salta("la trasparenza dei gemelli", "serve Pillow")
-    # STESSO NOME E STESSA ROTTA: la sfumatura e la scossa non si toccano,
-    # e il ?v= di _timbra_asset_pagina cambia da solo col contenuto
-    prova("...stesso nome e stessa rotta: sfumatura e scossa non si toccano",
-          True, 'class="p2p-logo compra" src="/assets/p2p-logo-compra.png"' in mini
-          and 'class="p2p-logo vendi" src="/assets/p2p-logo-vendi.png"' in mini
+    prova("...stesso posto e stesso mestiere: sfumatura e scossa non si toccano",
+          True, 'class="p2p-logo compra" src="/assets/p2p-logo-compra.webp"'
+          in mini
+          and 'class="p2p-logo vendi" src="/assets/p2p-logo-vendi.webp"' in mini
           and ".p2p-logo-pila.scossa{animation:logoScossa .35s ease}" in mini
           and "body.p2p-vendo .p2p-logo.vendi{opacity:1}" in mini)
 
@@ -62312,40 +62491,56 @@ def prove_logo_p2p_nitido():
     if not m:
         return
     minimo, meno, massimo = (int(x) for x in m.groups())
-    prova("...da 76 a 96px, e sotto la soglia resta quella di prima",
-          (76, 96), (minimo, massimo))
+    prova("...da 76 a 120px, e sotto la soglia resta quella di prima",
+          (76, 120), (minimo, massimo))
     prova("il logo la legge, e il margine negativo la segue", True,
           "width:var(--logo-p2p,76px);height:var(--logo-p2p,76px)"
           in pezzo_js(css, "  .p2p-logo{", "}")
-          and "margin:0 6px calc(var(--logo-p2p) * -.105)"
+          and "margin:0 0 calc(var(--logo-p2p) * -.105)"
           in pezzo_js(css, "  .p2p-lati .p2p-logo-pila{", "}"))
     prova("...che a 76 fa ancora -8px, come prima", -8, round(76 * -.105))
-    # LA GEOMETRIA, sulle larghezze dei telefoni veri: la colonna e' larga
-    # 100vw-32 (fino a 640), i tab si dividono quel che avanza dopo il
-    # logo e i suoi 6+6, e ognuno ha 4+4 di respiro. «Compra BTC» a 19px
-    # misura 102px (dal vivo): dove il logo e' cresciuto deve starci su
-    # una riga, con almeno 3px d'aria per lato.
+
+    # LA GEOMETRIA, sulle larghezze dei telefoni veri. La colonna e'
+    # larga 100vw-32 (fino a 640); il velo la stringe di 8 per lato e i
+    # tab se li riprendono col margine negativo, quindi la riga dei tab
+    # e' larga quanto la colonna. I due tab si dividono quel che avanza
+    # dopo il logo — che margini non ne ha piu' — e ognuno ha 4+4 di
+    # respiro. «Compra BTC» a 19px misura 102px (dal vivo): dove il logo
+    # e' cresciuto deve starci su una riga, con almeno 3px d'aria per
+    # lato.
     TESTO = 102.2
+
+    def spazio(vw, logo):
+        return (min(vw, 640) - 32 - logo) / 2 - 8
     rotti = []
     for vw in (320, 340, 352, 360, 375, 390, 393, 412, 414, 430):
         logo = max(minimo, min(massimo, vw - meno))
-        tab = (min(vw, 640) - 32 - logo - 12) / 2 - 8
-        if logo > minimo and tab < TESTO + 6:
-            rotti.append((vw, logo, round(tab, 1)))
+        if logo > minimo and spazio(vw, logo) < TESTO + 6:
+            rotti.append((vw, logo, round(spazio(vw, logo), 1)))
     prova("dove il logo cresce, «Compra BTC» sta su una riga, con l'aria",
           [], rotti)
     # ...e nella fascia in cui cresce, lo spazio del tab resta COSTANTE:
     # e' la ragione della formula, 100vw meno una costante
     prova("...e nella fascia in cui cresce lo spazio del tab non cambia", 1,
-          len({round((vw - 32 - (vw - meno) - 12) / 2 - 8, 3)
+          len({round(spazio(vw, vw - meno), 3)
                for vw in range(minimo + meno, massimo + meno + 1)}))
+    prova("...ed e' 108,5px: sei e mezzo piu' della scritta piu' lunga",
+          108.5, spazio(375, 375 - meno))
+    # (`find` e non `index`: se il velo tornasse due regole separate un
+    # `index` mancato si porterebbe via la sezione intera — la lezione
+    # della tortura, e questa e' la terza ancora della stessa famiglia)
+    _iv = css.find("  .scambi-testa,.libro-testa{")
+    _velo = (pezzo_js(css, "  .scambi-testa,.libro-testa{", "}")
+             if _iv >= 0 else "")
     prova("...e il tab e' quello che il conto suppone", True,
           "flex:1;padding:11px 4px"
           in pezzo_js(mini, ".p2p-lati .p2p-lato{", "}")
           and "font-size:19px" in pezzo_js(mini, ".p2p-lati .p2p-lato{", "}")
-          and "margin:0 6px" in pezzo_js(css, "  .p2p-lati .p2p-logo-pila{", "}"))
+          and "  .libro-testa .p2p-lati{margin-left:-8px;margin-right:-8px}"
+          in css
+          and "padding:6px 8px" in _velo)
 
-    # --- 3) INFO P2P: il logo grande, in WebP -----------------------
+    # --- 3) IL COMPLETO GRANDE: Info P2P, la home, il libro vuoto ---
     F = "assets/p2p-logo-grande.webp"
     raw = open(F, "rb").read()
     prova("il logo di Info P2P e' un WebP", (b"RIFF", b"WEBP"),
@@ -62375,13 +62570,267 @@ def prove_logo_p2p_nitido():
     prova("Info P2P mostra il logo grande", True,
           '<img src="/assets/p2p-logo-grande.webp" alt="" onerror="this.remove()">'
           in hero)
-    # IL COMPLETO PICCOLO RESTA DOVE E' PICCOLO: la card della home e il
-    # libro vuoto. Non si fa pagare al mercatino un'immagine grande dove
-    # si vede a 76px — ed e' una decisione di Andrea, se un giorno si vuole
-    prova("...e il completo piccolo resta ai suoi due posti", 2,
-          mini.count("/assets/p2p-logo-completo.png"))
-    prova("...e il grande sta nel solo Info P2P", 1,
-          mini.count("/assets/p2p-logo-grande.webp"))
+    # ⚠️ ROVESCIATA LA SERA STESSA (richiesta di Andrea): il completo
+    # piccolo da 152 restava sulla card della home e nel libro vuoto per
+    # non far pagare al mercatino un file grande dove si vede a 125 e a
+    # 76px — ma a 3x erano morbidi tutt'e due. Adesso il file e' UNO
+    # solo per tre posti: sei KB in piu' sulla prima pagina, e un file
+    # in meno da tenere in pari.
+    prova("...e il grande veste i tre posti: Info P2P, la home, il libro vuoto",
+          3, mini.count("/assets/p2p-logo-grande.webp"))
+    prova("...la card della home e il libro vuoto compresi", (1, 1),
+          (mini.count('src="/assets/p2p-logo-grande.webp" alt="" loading="lazy"'),
+           mini.count('class="p2p-simbolo" src="/assets/p2p-logo-grande.webp"')))
+    prova("...e del completo piccolo non resta ne' il nome ne' il file",
+          (0, False), (mini.count("/assets/p2p-logo-completo.png"),
+                       _os.path.exists("assets/p2p-logo-completo.png")))
+
+
+def prove_card_tinte_stato():
+    """LA CARD PRENDE LA TINTA DEL SUO STATO (22 set 2026, richiesta di
+    Andrea): in «I miei scambi» ogni card si vela del colore del suo
+    stato — verde da conclusa, arancio quando tocca a me, grigia da
+    annullata, rossa in disputa — e il riquadro tiene il colore pieno.
+
+    ⚠️ LE CINQUE COSE SORVEGLIATE QUI. La tinta esce dalla STESSA classe
+    che veste il riquadro (`tintaStatoP2P` → `tonoCardP2P`), quindi card
+    e riquadro non possono dire due cose diverse. Ogni stato della
+    macchina ha il suo tono, e la tabella del banco li rifa' tutti dai
+    due lati. Il testo piu' debole su ogni tinta passa il 4,5:1 del
+    testo piccolo nei due temi, col conto rifatto sui token e sulle due
+    percentuali — e la tinta si vede davvero, che una velatura a zero
+    passerebbe ogni contrasto senza tingere niente. La tinta sta dietro
+    un `@supports`, perche' senza `color-mix` la card resterebbe SENZA
+    fondo, trasparente sul crema della pagina. E il colore non e'
+    l'unico segno: la parola dello stato resta dov'e'."""
+    print("\n[le card colorate per stato]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    import os as _os
+    mini = open("miniapp.html", encoding="utf-8").read()
+    css = mini[mini.index("<style>"):mini.index("</style>")]
+
+    # --- 1) UNA CLASSE SOLA: quella del riquadro --------------------
+    tono = re.sub(r"/\*[\s\S]*?\*/", "",
+                  pezzo_js(mini, "function tonoCardP2P(o){", "\n}\n"))
+    prova("il tono esce dalla classe del riquadro", True,
+          "tintaStatoP2P(o)" in tono)
+    prova("...e non nomina nessuno stato per conto suo", [],
+          [x for x in re.findall(r"'([^']*)'", tono)
+           if x not in (" badge ", " tinta tono-", "")])
+    riga = pezzo_js(mini, "function rigaScambioP2P(o){", "\n}\n")
+    prova("la card lo indossa accanto alla classe di sempre", True,
+          """'<div class="p2p-ord p2p-scambio' + tonoCardP2P(o) + '"""
+          in riga)
+    # IL COLORE NON E' L'UNICO SEGNO (richiesta di Andrea): la parola
+    # dello stato resta nel riquadro, per chi i colori non li distingue
+    prova("il colore non e' l'unico segno: la parola dello stato resta", True,
+          """'<div class="p2p-scambio-stato' + tintaStatoP2P(o) + '">'"""
+          in riga and "+ '<span>' + esc(st.t) + '</span>'" in riga)
+
+    # --- 2) IL CSS: sei toni, due percentuali, un @supports ---------
+    # ⚠️ `find` E NON `index`, per la stessa ragione del velo: la
+    # mutazione che toglie il `@supports` deve dare una rossa col suo
+    # nome, non un traceback che spegne la sezione.
+    i_sup = css.find("  @supports (background:color-mix(in srgb,red 50%,blue)){")
+    sup = css[i_sup:css.index("\n  }\n", i_sup)] if i_sup >= 0 else ""
+    # ⚠️ IL `@supports` NON E' PRUDENZA GENERICA: senza, un browser che
+    # non conosce `color-mix` butterebbe la dichiarazione e la card
+    # resterebbe senza fondo — trasparente sul crema della pagina, non
+    # bianca. Dentro il supporto si tinge, fuori resta il mondo di ieri.
+    prova("la tinta sta dietro un @supports, o senza color-mix sparirebbe",
+          True, ".p2p-scambio.tinta{" in sup
+          and ".p2p-scambio.tinta{" not in css[:i_sup])
+    prova("il velo e il bordo escono dalla stessa tinta, mischiata alla carta",
+          True,
+          "background:color-mix(in srgb,var(--tinta) var(--tinta-card),"
+          "var(--card))" in sup
+          and "border-color:color-mix(in srgb,var(--tinta) var(--tinta-bordo),"
+              "var(--card))" in sup)
+    INCHIOSTRO = dict(re.findall(
+        r"\.p2p-scambio\.tono-([a-z]+)\{--tinta:var\((--[a-z-]+)\)\}", sup))
+    # I COLORI NON SONO NUOVI: ogni tono prende l'INCHIOSTRO del suo
+    # riquadro — l'arancio dei sats, il viola, il blu, il verde, il
+    # rosso, il grigio — e lo stempera nella carta
+    prova("i sei toni prendono l'inchiostro del loro riquadro",
+          {"locked": "--sats-text", "confirmed": "--nostr-text",
+           "shipped": "--ship-text", "released": "--trust-text",
+           "dispute": "--danger", "annullato": "--muted"}, INCHIOSTRO)
+    prova("...e il riquadro resta staccato dalla card, con un filo suo",
+          True, ".p2p-scambio.tinta .p2p-scambio-stato.badge{" in sup
+          and "border-color:color-mix(in srgb,currentColor 30%,transparent)"
+          in sup)
+    chiaro = re.search(r":root\{--tinta-card:(\d+)%;--tinta-bordo:(\d+)%\}", css)
+    scuro = re.search(r'html\[data-tema="scuro"\]\{--tinta-card:(\d+)%;'
+                      r'--tinta-bordo:(\d+)%\}', css)
+    prova("le percentuali sono due, una per tema: di sera si puo' calcare",
+          [("6", "24"), ("8", "34")],
+          [chiaro.groups() if chiaro else None,
+           scuro.groups() if scuro else None])
+    # «EFFETTI RIDOTTI» NON HA NIENTE DA TOGLIERE: e' un colore fermo,
+    # senza animazioni, sfocature o filtri — e il censimento conta le
+    # regole, cosi' una regola nuova entra nel conto e nel controllo
+    _nudo = re.sub(r"/\*[\s\S]*?\*/", "", css)
+    regole = [(m.group(1).strip(), m.group(2)) for m in re.finditer(
+        r"([^{}]*\.p2p-scambio\.(?:tinta|tono-)[^{}]*)\{([^}]*)\}", _nudo)]
+    prova("le regole della tinta sono otto", 8, len(regole))
+    prova("...e nessuna anima, sfuma o filtra", [],
+          [(sel, d) for sel, c in regole
+           for d in ("animation", "transition", "filter", "box-shadow",
+                     "opacity") if d in c])
+    prova("...ne' un ritocco loro sotto «effetti ridotti»", 0,
+          len(re.findall(r"html\.fx-ridotti[^{]*p2p-scambio\.", css)))
+
+    # --- 3) IL CONTRASTO, rifatto sui token e sulle percentuali -----
+    def tok(nome):
+        return re.findall(r"%s:(#[0-9A-Fa-f]{6})" % nome, css)[:2]
+
+    def rgb(h):
+        return [int(h[k:k + 2], 16) for k in (1, 3, 5)]
+
+    def mescola(a, b, p):
+        """color-mix(in srgb, a p%, b): la velatura del CSS, a mano"""
+        A, B = rgb(a), rgb(b)
+        return "#%02X%02X%02X" % tuple(
+            round(A[k] * p + B[k] * (1 - p)) for k in range(3))
+
+    def lum(h):
+        c = [x / 255 for x in rgb(h)]
+        c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4
+             for x in c]
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+    def contrasto(a, b):
+        la, lb = sorted((lum(a), lum(b)), reverse=True)
+        return (la + 0.05) / (lb + 0.05)
+    # i testi che stanno SUL FONDO DELLA CARD: il titolo, la riga di
+    # servizio e la scatola del metodo (`--ink-soft` dal ritocco), la
+    # cifra dei sats, e i due versi del premio
+    TESTI = ("--ink", "--ink-soft", "--sats-text", "--trust-text", "--danger")
+    prova("i token della tinta sono dichiarati due volte, uno per tema", [],
+          [n for n in TESTI + tuple(INCHIOSTRO.values()) + ("--card",)
+           if len(tok(n)) != 2])
+    deboli, spente = [], []
+    for k, (tema, p) in enumerate((("chiaro", int(chiaro.group(1)) / 100),
+                                   ("scuro", int(scuro.group(1)) / 100))):
+        carta = tok("--card")[k]
+        for t, ink in sorted(INCHIOSTRO.items()):
+            tinta = mescola(tok(ink)[k], carta, p)
+            if max(abs(x - y) for x, y in zip(rgb(tinta), rgb(carta))) < 5:
+                spente.append((tema, t))
+            for testo in TESTI:
+                c = contrasto(tok(testo)[k], tinta)
+                if c < 4.5:
+                    deboli.append((tema, t, testo, round(c, 2)))
+    prova("ogni testo della card passa l'AA su ogni tinta, nei due temi",
+          [], deboli)
+    # ⚠️ E IL CONTO QUI SOPRA MISURA DEI TOKEN: se domani la riga di
+    # servizio tornasse `--muted` — che su carta bianca sta gia' a
+    # 3,8:1 — il conto resterebbe verde misurando un token che non
+    # veste piu' niente. Questa riga lega le due cose: i testi misurati
+    # sono quelli che le regole mettono davvero nella card.
+    prova("...e i token misurati sono quelli che vestono la card", True,
+          ".p2p-scambio .p2p-box,\n  .p2p-scambio .p2p-badge,\n"
+          "  .p2p-scambio .p2p-scambio-euro{color:var(--ink-soft)}" in css
+          and ".p2p-scambio .p2p-badge .p2p-affare{color:var(--trust-text)}"
+          in css)
+    # ⚠️ E LA TINTA SI DEVE VEDERE: una velatura a zero passerebbe ogni
+    # contrasto senza tingere niente, e la prova qui sopra tacerebbe
+    prova("...e ogni tinta si stacca davvero dalla carta", [], spente)
+    # ⚠️ IL RIQUADRO SULLA CARD TINTA NON HA UN RAPPORTO SUO: il suo
+    # fondo e la tinta sono lo stesso colore a due forze (1,03-1,14 di
+    # rapporto), e chiedere 3:1 vorrebbe dire rifare i sei fondi dei
+    # riquadri. A staccarlo c'e' il filo del suo inchiostro, provato li'
+    # sopra — scritto qui perche' un domani non si cerchi una prova che
+    # non c'e' per distrazione.
+
+    # --- 4) IL BANCO: ogni stato, dai due lati ----------------------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco delle tinte", "node non c'e'")
+        return
+    _sm = mini.index("const STATI_P2P = {")
+    stati = re.findall(r"^  ([a-z_]+): \{",
+                       mini[_sm:mini.index("\n};", _sm)], re.M)
+    i_t = mini.index("const P2P_TINTA_STATO = {")
+    pezzi_js = [mini[i_t:mini.index("\n};", i_t) + 3]]
+    pezzi_js += [pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
+        "function recapitoEuroArrivatoP2P(o){",
+        "function aspettaRecapitoP2P(o){",
+        "function tintaStatoP2P(o){",
+        "function tonoCardP2P(o){")]
+    banco = "\n".join(pezzi_js) + """
+const STATI = __STATI__;
+const out = {};
+STATI.forEach(s => {
+  out[s] = ['compro', 'vendo'].map(l => {
+    try { return tonoCardP2P({id: s + l, lato: l, stato: s}); }
+    catch(e) { return 'ESPLOSO: ' + (e && e.message || e); }
+  });
+});
+console.log(JSON.stringify(out));
+"""
+    banco = banco.replace("__STATI__", _json.dumps(stati))
+    cart = _tf.mkdtemp()
+    p = _os.path.join(cart, "banco.js")
+    open(p, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, p], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco node delle tinte gira", "", (r.stderr or "")[-600:])
+    if r.returncode:
+        return
+    o = _json.loads(r.stdout)
+
+    def veste(t):
+        return (" tinta tono-" + t) if t else ""
+    # LA TABELLA INTERA, dai due lati. I tre stati senza tinta sono
+    # quelli di prima della presa — il riquadro li' e' grigio muto e non
+    # ha un colore da prestare — e la card resta la carta di sempre.
+    prova("ogni stato veste la card col tono del suo riquadro, dai due lati",
+          {s: [veste(a), veste(b)] for s, (a, b) in (
+              ("prendo", ("", "")),
+              ("pubblico", ("", "")),
+              ("pubblicato", ("", "")),
+              ("senza_risposta", ("annullato", "annullato")),
+              ("rifiutato", ("annullato", "annullato")),
+              ("attesa_mia_fattura", ("locked", "locked")),
+              ("attesa_hold_venditore", ("confirmed", "confirmed")),
+              ("attesa_fattura_compratore", ("confirmed", "confirmed")),
+              ("attesa_mia_hold", ("locked", "locked")),
+              ("attivo", ("confirmed", "locked")),
+              ("euro_inviati", ("confirmed", "confirmed")),
+              ("rilasciato", ("shipped", "shipped")),
+              ("fattura_nuova", ("locked", "locked")),
+              ("concluso", ("released", "released")),
+              ("annullo_chiesto", ("confirmed", "confirmed")),
+              ("annullo_proposto", ("confirmed", "confirmed")),
+              ("in_disputa", ("dispute", "dispute")),
+              ("annullato", ("annullato", "annullato")),
+              ("pagamento_ritentato", ("locked", "locked")))}, o)
+    prova("...e gli stati sono tutti quelli della macchina, nessuno escluso",
+          (19, []), (len(stati), [x for x in stati if x not in o]))
+
+    def colore(classe):
+        return INCHIOSTRO.get(classe.replace(" tinta tono-", ""), "senza tinta")
+    # LE QUATTRO CHE ANDREA HA CHIESTO PER NOME, dal lato che le vive:
+    # dalla card al token del colore, passando per la classe del
+    # riquadro — cioe' la catena intera, letta dal codice
+    prova("le quattro tinte chieste per nome arrivano fino al colore",
+          {"concluso": "--trust-text", "attesa_mia_hold": "--sats-text",
+           "annullato": "--muted", "in_disputa": "--danger"},
+          {"concluso": colore(o["concluso"][0]),
+           "attesa_mia_hold": colore(o["attesa_mia_hold"][1]),
+           "annullato": colore(o["annullato"][0]),
+           "in_disputa": colore(o["in_disputa"][0])})
+    # ⚠️ LA TINTA NON E' IL GRUPPO, ed e' la sola cosa che sorprende: a
+    # euro ricevuti chi VENDE ha il gesto del rilascio — la sua card sta
+    # nel gruppo «Tocca a te» — ma il riquadro li' e' viola e non
+    # arancio. La card segue il RIQUADRO, che e' la regola («una classe
+    # sola»): il giorno che si volesse l'arancio anche li' si sposta la
+    # tinta del riquadro, e la card viene dietro da sola.
+    prova("dove riquadro e gruppo direbbero cose diverse, vince il riquadro",
+          " tinta tono-confirmed", o["euro_inviati"][1])
 
 
 def prove_p2p_campanello():
@@ -78782,6 +79231,7 @@ def main():
     prove_pallino_scambi,
     prove_intestazione_scambi,
     prove_logo_p2p_nitido,
+    prove_card_tinte_stato,
     prove_p2p_campanello,
     prove_p2p_eventi, prove_p2p_riserva_libro,
     prove_p2p_avvisi_libro, prove_p2p_orologio, prove_p2p_tutti_i_relay, prove_p2p_ascolto, prove_p2p_esito_notifiche, prove_p2p_silenzi,

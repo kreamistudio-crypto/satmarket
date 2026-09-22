@@ -55170,38 +55170,30 @@ def asset_barattolo_hero():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
-@app.get("/assets/p2p-logo-compra.png")
+@app.get("/assets/p2p-logo-compra.webp")
 def asset_p2p_logo_compra():
     """Il logo dedicato del P2P, lato COMPRA (set 2026, scelto da
     Andrea): il barattolo col lucchetto, la freccia verde accesa e la
     rossa spenta. Il gemello qui sotto ha le frecce rovesciate, e il
     client li incrocia col tab attivo. Rotte esplicite come le
     sorelle: mai un mount (regola 3).
-    DAL 22 SET 2026 I DUE GEMELLI SONO A 288px, rifatti dai sorgenti
-    da 480 di Andrea: il logo fra i tab e' cresciuto fino a 96px, e a
-    3x ne servono 288. Stesso nome e stessa rotta — il ?v= di
-    _timbra_asset_pagina cambia col contenuto, e le cache cadono da
-    sole."""
-    return FileResponse("assets/p2p-logo-compra.png",
-                        media_type="image/png",
+    DAL 22 SET 2026 SONO WEBP DA 360px, dai sorgenti nuovi di Andrea
+    (le frecce spente rifatte): il logo fra i tab arriva a 120px, e a
+    3x ne servono 360. Il WebP a qualita' 90 pesa 33 KB dove il PNG ne
+    pesava 87 e il PNG a 256 colori faceva gradini sulle sfumature. I
+    tre PNG di ieri sono usciti con le loro rotte: chi ha una pagina
+    vecchia in cache prende un 404 e l'`onerror` toglie l'immagine,
+    che e' il ripiego gia' scritto nel markup."""
+    return FileResponse("assets/p2p-logo-compra.webp",
+                        media_type="image/webp",
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
-@app.get("/assets/p2p-logo-vendi.png")
+@app.get("/assets/p2p-logo-vendi.webp")
 def asset_p2p_logo_vendi():
     """Il gemello del lato VENDI: freccia rossa accesa, verde spenta."""
-    return FileResponse("assets/p2p-logo-vendi.png",
-                        media_type="image/png",
-                        headers={"Cache-Control": "public, max-age=86400"})
-
-
-@app.get("/assets/p2p-logo-completo.png")
-def asset_p2p_logo_completo():
-    """Il terzo della famiglia: ENTRAMBE le frecce accese. Veste i posti
-    dove un lato attivo non c'e' — la testata dei propri scambi, e ogni
-    posto dove il 🔁 faceva da simbolo dello scambio."""
-    return FileResponse("assets/p2p-logo-completo.png",
-                        media_type="image/png",
+    return FileResponse("assets/p2p-logo-vendi.webp",
+                        media_type="image/webp",
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
@@ -55212,10 +55204,11 @@ def asset_p2p_logo_grande():
     da 152 del completo, su un telefono a 3x, era ingrandito piu' del
     doppio. Questo nasce dal sorgente da 480 di Andrea, a 396 (3x dei
     132), WebP con trasparenza a qualita' 90: 39 KB, meno di un quarto
-    del PNG equivalente. Il completo piccolo resta dove e' piccolo — la
-    card della home e il libro vuoto — per non far pagare al mercatino
-    un'immagine grande dove si vede a 76px. Rotta esplicita come le
-    sorelle: mai un mount (regola 3); il ?v= lo mette
+    del PNG equivalente. DAL 22 SET 2026 (sera) E' L'UNICO COMPLETO che
+    resta: lo usano anche la card «Scambio P2P» della home e il libro
+    vuoto, che col PNG da 152 erano morbidi a 3x — sei KB in piu' sulla
+    prima pagina, e il PNG e' uscito con la sua rotta. Rotta esplicita
+    come le sorelle: mai un mount (regola 3); il ?v= lo mette
     _timbra_asset_pagina."""
     return FileResponse("assets/p2p-logo-grande.webp",
                         media_type="image/webp",
