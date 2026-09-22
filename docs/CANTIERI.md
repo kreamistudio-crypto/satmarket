@@ -23533,3 +23533,131 @@ rischio del namespace prestato che RESTA e' `mostro` dentro
 Il README del fork ha il conto dei test Rust della 0007 (19 set: 310
 passati, 0 falliti, riferito da Andrea), che la voce di prima
 dichiarava mancante.
+
+## Manutenzione pagamenti: LND=n/a, il rimborso per motivo, i collaudi di `riga=` e il libro mastro che conosce `in_volo` (22 set 2026)
+
+Quattro ritocchi piccoli, tutti nati da cose viste nei cantieri dei
+pagamenti di questa settimana. Nessuno cambia un verdetto: cambiano
+PAROLE che mentivano (1), una strada d'uscita che toglieva la cosa
+sbagliata (2), due collaudi che nessuno faceva girare (3) e un allarme
+che suonava sul normale (4).
+
+**1. «LND=n/a» NON È «LND=spento».** `_stato_lnd` diceva «spento» in
+due casi diversi: la riga è del NODO ma il macaroon di lettura manca
+(un guasto di configurazione, da guardare), e la riga è della
+cassaforte SaaS, dove un LND nostro non c'è (nessun guasto). Il 20 set,
+sull'ordine #152, la riga 🔎 del journal diceva `LND=spento` su un
+pagamento SaaS e ci ha fatto cercare un ponte rotto che non c'era.
+Adesso il SaaS (e una riga senza hash) dice `LND_NA = "n/a"`, e
+«spento» resta del solo nodo senza macaroon.
+LA DECISIONE CHE CONTA È L'ALTRA META': per il GIUDICE i due valgono
+uguale — nessuna voce da sentire, decide LNbits — e ogni confronto
+passa da `LND_SENZA_VOCE = (LND_SPENTO, LND_NA)`, mai da uno dei due
+soli. Il posto dove sarebbe costato è `_giudica_origine`: leggeva
+«≠ spento» come «c'è un LND nostro, si crede a lui e a nessun
+calendario», quindi un «n/a» lasciato fuori avrebbe reso l'origine del
+#152 «ignota» per sempre — la rotta di «paga da un'altra cassaforte»
+non si sarebbe più aperta. Toccati anche il ramo della scadenza da
+LNbits, i due «tacciono tutte le fonti» (ronda in volo e crediti) e le
+due righe del verdetto.
+IL PANNELLO 🧊 SPIEGA LA PAROLA: `_voce_lnd` scrive accanto a «n/a»
+«non è un pagamento del nodo» e accanto a «spento» «manca il macaroon
+di lettura», nelle risposte di «Verifica e riprova» e del giudice
+dell'origine. Il journal resta asciutto (`LND=n/a`), perché è quello
+che si cerca con grep. PRODUZIONE e ARCHITETTURA dicono la differenza.
+LA STRADA SCARTATA: chiamarlo «saas». Oggi è l'unica cassaforte senza
+LND, ma la parola deve dire «qui LND non si applica», non da dove
+viene la riga.
+
+**2. IL RIMBORSO DI UNO SBLOCCO SMISTA PER MOTIVO.** È il cugino che
+la voce del 20 set («il paracadute dei pagamenti per motivo») aveva
+lasciato indietro: `_rimborsa_sblocco` era nato col solo banner, e il
+suo ramo riuscito richiudeva SEMPRE la porta del banner e spegneva
+l'insegna. Rimborsare un `negozio_slug` (5.000 sats) toglieva quindi
+il banner pagato a parte (20.000) e lasciava il link al suo posto; e
+un motivo sconosciuto si rimborsava lo stesso, chiudendo il banner.
+Riprodotto sul codice di `origin/main` col rimborso VERO su un
+database vero: link rimborsato → slug ancora lì, porta 0, insegna
+«spento»; «sponsor» rimborsato → 7.000 sats usciti e banner chiuso.
+LA CURA è il gemello di `_incasso_del_motivo` dall'altra parte della
+cassa: `_rimborso_del_motivo(motivo)` → `(nome, disfa)`.
+`_disfa_banner` fa quel che si faceva prima; `_disfa_slug_negozio`
+toglie il link SOLO se è ancora quello comprato con QUEL pagamento
+(chi dopo ne ha pagato un altro tiene il suo) e il banner non lo
+guarda. Il motivo si chiede PRIMA di pagare: uno sconosciuto torna
+`motivo_ignoto`, riga di journal «⛔ Rimborso #N rifiutato», nessun
+sat esce, e la rotta del moderatore risponde 409 nominandolo. Il
+messaggio al venditore dice cosa si toglie (niente, se il link era già
+cambiato), e le etichette dicono «del link negozio» invece di «dello
+sblocco banner».
+`prove_rimborso_motivo`: censimento (ogni motivo che si incassa sa
+come si rimborsa, contro lo smistatore degli incassi), l'ordine
+«motivo prima di paga_venditore», il giro vero su sqlite con i due
+disfa veri, e la CONTROPROVA col rimborso di prima riscritto per
+intero (`_RIMBORSO_DI_PRIMA`), che il banco deve vedere rotto.
+LASCIATO FUORI, e va detto: un controllo del libro mastro «link
+rimborsato e ancora scritto», gemello di «sblocco rimborsato e porta
+ancora aperta». Ha senso, non era chiesto.
+
+**3. I DUE COLLAUDI DI `riga=`.** `collaudo_porta_timer.py` e
+`collaudo_sblocco_banner.py` esplodevano dal 19 set con `TypeError:
+... unexpected keyword argument 'riga'`: i loro pagatori finti avevano
+una firma loro, e `paga_venditore` aveva guadagnato `riga`. Adesso
+copiano la firma del vero parola per parola (`*, cassaforte, riga=()`,
+cassaforte senza default come lì). Verdi: 20/0 e 81/0 — il secondo
+con un giro nuovo, il rimborso del link sul SERVER VERO (incassi veri
+di banner e link, poi il rimborso del link: via il link, banner
+intatto; e «sponsor» rifiutato senza uscite).
+IN CI? Oggi sono solo compilati, come tutti i 31 `collaudo_*.py`. Si
+potrebbero far girare: 3 secondi l'uno, config di cartone installato
+prima dell'import, niente rete (LNbits a `127.0.0.1:1`), exit 1 sulle
+rosse. Il difetto di questo giro è esattamente quello che la CI
+avrebbe preso il 19 set. NON li ho messi: è una decisione sul
+contratto della CI («gira solo ciò che non ha bisogno di segreti»
+regge, ma un collaudo importa il server intero, e un giorno uno che
+parla con la rete la farebbe rossa per il raffreddore di un altro), e
+va presa per tutti i collaudi, non per due. Proposta: uno step che
+gira un ELENCO esplicito di collaudi dichiarati «senza rete», partendo
+da questi due e dai cinque dei pagamenti.
+
+**4. IL LIBRO MASTRO CONOSCE `in_volo`.** «payout fuori contratto»
+ammetteva `'' | incerto | uscito | da_riprovare`: `in_volo`, nato il 19
+set (`_prendi_la_mano` lo scrive PRIMA della POST, `_in_volo` quando
+LNbits non sa dire), mancava — una ronda passata mentre un pagamento
+era in viaggio suonava un'anomalia falsa. Censiti TUTTI i valori
+scritti in `payout_stato` (letterali nelle UPDATE e i ternari dopo
+`payout_stato=?`): sono cinque, e `incerto` e `da_riprovare` c'erano
+già. Aggiunto `in_volo` nelle tre tabelle, qui e nel gemello
+`query_libro_mastro.sql` (controllo 15).
+LA SENTINELLA NUOVA è il censimento stesso: i valori che il server
+SCRIVE contro quelli che il controllo ammette, nelle tre tabelle, e
+contro il gemello SQL. Un sesto stato che nasce senza passare di qui
+fa rossa la CI, non la ronda di produzione. E una prova di comportamento
+con una riga `in_volo` in ognuna delle tre tabelle (la tabella
+`pagamenti` del banco era vuota: la prima stesura provava il nulla).
+
+**PROVATO.** `prove.py` intera con `PROVE_SEVERE=1`: 12899/0. I due
+collaudi riparati (20/0, 81/0) e i cinque vicini ai pezzi toccati:
+`collaudo_verita_lnd` 18/0, `collaudo_altra_cassaforte` 34/0,
+`collaudo_in_pagamento` 44/0, `collaudo_lnbits_muto` 41/0,
+`collaudo_fatture_scadute` 30/0. Dal vivo, cioè sul server vero con
+LNbits di cartone: le righe 🔎 del journal dicono `LND=n/a` sulle righe
+SaaS e i verdetti non cambiano; la decisione del moderatore scrive
+«LND dice «n/a» (non è un pagamento del nodo…)». Tortura a mutazioni
+su una copia: 16 morte su 17. LA VIVA È EQUIVALENTE, e va detto perché:
+riportare il ramo `pending` del verdetto a «solo spento» non cambia
+niente, perché con LNbits «pending» e un LND senza voce la tabella
+arriva a `in_volo` comunque più sotto — era ridondante anche per
+«spento». Al primo giro erano vive DUE: la seconda era la voce nuda in
+`decidi_pagamento`, cioè il pannello 🧊 senza spiegazione, che nessuna
+prova guardava. Adesso c'è la scena: un tentativo sulla cassaforte SaaS,
+«Verifica e riprova» → 409 che dice «LND dice «n/a» (non è un pagamento
+del nodo…)» e mai «spento».
+
+**NON PROVATO.** Niente su LNbits o LND veri, e nessun pagamento vero
+rimborsato: il rimborso di un link non è mai successo in produzione.
+Il pannello 🧊 non l'ho guardato nel browser: le parole nuove stanno
+nel `detail` delle risposte, e che il client lo mostri intero l'ho
+dedotto, non visto. E la
+ronda del libro mastro sul VPS con un `in_volo` vero in corso non l'ha
+vista nessuno: si vede da sola il giorno che capita.
