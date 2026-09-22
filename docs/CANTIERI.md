@@ -25287,3 +25287,76 @@ desktop, e il guadagno vero — 56 riletture e 56 query in meno per
 trascinata — lì pesa di più, non di meno), e il campo a mano con la
 tastiera `numeric`, che è l'unica cosa del cantiere che il banco non
 può vedere.
+
+
+## Barattozon anche in «I miei scambi» (22 set 2026, sera tardi)
+
+LA RICHIESTA, guardando due schermate di fila: nel libro l'ordine col
+tabacchino mostra «Barattozon» e nei miei scambi lo stesso ordine
+mostra «Contanti al tabacchino» — due nomi per la stessa cosa a uno
+scorrimento di distanza. E dal 22 set il tag `pm` si porta dietro
+l'importo esatto, quindi lì si leggeva «Contanti al tabacchino 23.47»,
+con una cifra che la card scrive già nelle due righe sopra.
+
+LA CURA E' TUTTA IN PRESTITO, che era la richiesta letterale («riusa il
+giudice che il libro usa già, niente logica nuova»): la card dei miei
+scambi adesso chiede a `iconaMetodiP2P` — «qui dentro resta qualche
+nome?» — e a `marchioMetodoP2P`, esattamente come la card del libro, e
+il catalogo `P2P_VESTE_METODI` risponde per prefisso
+(`metodoBaseP2P`), quindi l'importo non c'entra. L'insegna navy si
+accende con lo STESSO giudice dell'emoji, che è la regola già scritta
+di là: due giudici sulla stessa domanda divergono al primo ritocco.
+⚠️ E L'IMPORTO SPARISCE SENZA NESSUN TAGLIO, che è la parte elegante:
+non c'è una riga che tolga il numero: col marchio dentro la scatola non
+resta nessun nome, quindi non resta nemmeno la cifra. Il `title` invece
+la TIENE — è il testo del tag, e serve a chi ci passa sopra.
+UNA COSA E' CAMBIATA DI FORMA: `met` era una stringa già incollata
+(`join(', ')`), e i due giudici ragionano per VOCI. Adesso l'elenco
+resta un array fino all'ultimo e la stringa si compone solo per il
+`title`. La regola di ieri — «il metodo deciso prende il posto
+dell'elenco» — è rimasta dov'era, e una prova la tiene.
+
+E I POSTI ERANO DUE, non uno. Nella PAGINA DELLO SCAMBIO (il foglio
+dei recapiti) la riga «💶 Il metodo dello scambio è …» e le pillole di
+scelta scrivevano anche loro la parola col numero: adesso portano il
+marchio, e le pillole la tessera `p2p-pill-marchio` — la stessa del
+filtro del libro. Il censimento dei posti che leggono il catalogo passa
+da TRE a CINQUE, e sta in `prove_p2p_barattozon`.
+⚠️ DOVE LA PAROLA RESTA, ed è una decisione già a verbale: nel tag `pm`
+del 38383 (è quel che leggono le altre app), nel post del canale
+Telegram (`_caption_canale_p2p`, che dice il metodo per nome e senza
+importo) e nel testo composto del recapito. Lì «Barattozon» sarebbe una
+parola che fuori di qui non vuol dire niente. Nessun AVVISO all'utente
+nomina il metodo: controllato, non dedotto.
+
+**LE PROVE.** La sentinella «il metodo veste la scatola delle card del
+libro» adesso chiede anche il modificatore e i due giudici; nel banco
+della card ci sono cinque casi nuovi — il tabacchino da solo, quello
+SCELTO fra due, quello misto con SEPA accanto, e tutti e cinque gli
+stati chiesti da Andrea —, e le attese guardano la card SENZA i
+`title`, perché è lì che l'importo deve non esserci. Suite intera
+**13237/0**, otto collaudi verdi, tortura **10 mutazioni / 10 uccise**.
+⚠️ E UNA MUTAZIONE ERA INCIAMPATA, non uccisa: «un secondo giudice per
+l'insegna» (`tabacchinoP2P` al posto di `iconaMetodiP2P`) faceva
+ESPLODERE il banco per un ReferenceError invece di morire sul
+comportamento. Dato al banco anche quel giudice, adesso muore sulla
+riga giusta: col misto SEPA + tabacchino l'insegna si accenderebbe
+quando non deve.
+
+**DAL VIVO** (375 px, chiaro e scuro, relay morto): sette scambi col
+tabacchino in sei stati più uno misto — insegna navy col marchio in
+tutti, `title` col testo del tag, e nel misto la scatola normale con
+«💳 SEPA,» e il marchio accanto. Nel foglio dei recapiti la riga «Il
+metodo dello scambio è [Barattozon].» e la pillola col marchio.
+
+**DA GUARDARE SUL TELEFONO.** Il marchio nella card a colori forti (la
+scatola è navy su una card tinta: nel libro sta su carta bianca); e il
+foglio dei recapiti con la riga del metodo, che è l'unico posto dove il
+marchio sta DENTRO una frase.
+⚠️ E UN POSTO L'HO VISTO E NON L'HO TOCCATO, perché non era nel
+perimetro: il FOGLIO DEL DETTAGLIO che si apre dal libro
+(`metodiDettP2P`) scrive ancora il metodo per nome — «Contanti al
+tabacchino 23.47» in grassetto, e nelle pillole quando i metodi sono
+più d'uno. È lo stesso vestito che manca, un tocco più in là della card
+che invece ce l'ha: si chiude con le stesse due righe, ma è una
+decisione di Andrea.

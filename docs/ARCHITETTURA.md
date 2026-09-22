@@ -24567,9 +24567,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   e i giudici (`tabacchinoP2P`, le forme di recapito, il filtro)
   cercano la stringa. Il vestito sta in UN catalogo, `P2P_VESTE_METODI`
   (nome, logo, classe della card, `soloMarchio`), letto da
-  `marchioMetodoP2P`, `classeVesteP2P` e `iconaMetodiP2P`: i tre posti
-  non sanno nulla del tabacchino, e una voce nuova con un marchio suo
-  si aggiunge lì e basta — anche l'emoji la decide il catalogo, e con
+  `marchioMetodoP2P`, `classeVesteP2P` e `iconaMetodiP2P`: i posti che
+  lo leggono non sanno nulla del tabacchino, e una voce nuova con un
+  marchio suo si aggiunge lì e basta.
+  ⚠️ I POSTI SONO CINQUE dal 22 set 2026 (sera), ed erano tre: la card
+  del libro, la pillola del filtro, la voce del foglio «Pubblica», e
+  adesso anche la CARD DI «I MIEI SCAMBI» e la riga del metodo nella
+  pagina dello scambio (la frase «Il metodo dello scambio è …» e le
+  pillole del recapito). Quei due dicevano ancora «Contanti al
+  tabacchino», col numero del `pm` attaccato dal 22 set: lo stesso
+  ordine aveva due nomi a uno scorrimento di distanza. Stessi due
+  giudici — `iconaMetodiP2P` per «qui dentro non resta nessun nome» e
+  `marchioMetodoP2P` per il vestito —, e il `title` della scatola resta
+  il testo del tag, importo compreso. Chi aggiunge un sesto posto lo
+  aggiunge al censimento di `prove_p2p_barattozon` — anche l'emoji la decide il catalogo, e con
   un metodo vestito e uno scritto RESTA, che lì c'è ancora del testo da
   intestare. La card scura
   RISCRIVE I TOKEN (`--ink`, `--muted`, `--trust`, `--danger`,
