@@ -23973,3 +23973,122 @@ venditore non dice ancora Â«l'ordine Amazon vale fino a X: ripubblica col
 cambio nuovoÂ» â€” lo dice il foglio, dove si sceglie; se dal vivo confonde,
 Ã¨ una riga. E i due segreti che non cambiano: le cinque variabili del
 compose restano com'erano, `settings.toml` non si tocca.
+
+## Il pallino su «I miei scambi» (22 set 2026)
+
+**COSA.** Sulla barra, un pallino che si accende da solo quando in
+almeno uno dei miei scambi aperti tocca a me — bloccare la garanzia,
+dire dove ricevere i sats (anche la fattura nuova dopo un pagamento
+fallito), dire dove ricevere gli euro, dire che gli euro sono partiti,
+controllare e liberare i sats. E' il gemello del pallino degli Ordini:
+lo stesso `.off-dot` — arancio `--sats`, 9 px, e lo stesso posto,
+misurato dal vivo: −5/+4 px dall'angolo in alto a destra dell'icona su
+tutt'e due i tasti. SENZA NUMERO, perche' quello degli Ordini non ne
+porta.
+
+**DUE TASTI, PERCHE' LA CELLA CAMBIA MESTIERE.** «I miei scambi» e' lo
+strato P2P della cella delle Aste: fuori dallo scambio non si vede.
+Quindi il pallino sta sul tasto «P2P» nel mercatino, che e' la strada,
+e su «I miei scambi» dentro lo scambio, che e' il posto — il percorso
+che l'avviso su Telegram scrive gia' a parole: «Apri Barattolo → P2P →
+I miei scambi». Nel markup sta PRIMA dell'etichetta, e non dopo come
+negli Ordini: e' assoluto, il posto nel markup non lo sposta, e una
+sentinella di `prove_p2p_vista_miei` vuole che il tasto finisca col suo
+nome.
+
+**IL GIUDICE NON E' NUOVO.** `quantiToccaAMeP2P` conta gli scambi che
+`gruppoScambioP2P` mette in «Tocca a te», cioe' quelli dove
+`azioniDisponibili` ha il bottone pieno: lo stesso giudice del 👉 sulla
+card, della frase della pagina e del numero accanto alla pillola del
+filtro. Nessuna lista di stati sua. Il giorno che «tocca a te» si
+allarga (il voto da dare, l'annullo proposto: oggi restano fuori, ed e'
+scritto sopra `gruppoScambioP2P`) si allarga li', e il pallino segue.
+
+**SEGUE L'ARCHIVIO, E BASTA.** La domanda vera era dove agganciarlo.
+Tutto quel che cambia di chi e' la mossa — le mosse del coordinatore
+(`applicaMessaggioP2P`), il recapito dell'altra parte (`campoArriva`),
+il libro (`statoPubblicoOrdini`), la restore, il gesto fatto — finisce
+nell'archivio degli scambi, `MOSTRO_ORDINI_CHIAVE`, che si scrive in
+CINQUE posti: `scriviOrdineP2P`, `rinominaOrdineP2P`,
+`togliRitiratoP2P`, `pulisciScambiP2P`, `togliScambioP2P`. Ognuno
+chiama `aggiornaPallinoScambiP2P` subito dopo aver scritto. Cosi' «si
+accende quando arriva» e «si spegne appena il passo e' fatto» sono la
+stessa riga — e il passo e' fatto quando il coordinatore lo conferma,
+come per la pagina. Tre delle cinque tolgono solo righe che il giudice
+non conta (finali, per le loro guardie), e il gancio ce l'hanno lo
+stesso: la regola e' «ogni scrittura», non «le scritture che oggi
+contano», e una sentinella conta i posti che scrivono. In piu'
+l'apertura (in `avvia`, dopo `renderPodioTesta`: li' conto e leva sono
+arrivati, e la chiave dell'archivio porta il conto) e il ritorno in
+primo piano (il `visibilitychange` che c'era gia', DOPO `risvegliaP2P`,
+che cosi' non aspetta lui). Il gancio porta un `typeof`, l'idioma di
+`avvisaRecapitoP2P`: la funzione vive fuori dal motore, e nel banco del
+motore non c'e'.
+
+**NIENTE POLLING, E IL LIMITE CHE NE VIENE.** Nessun orologio, nessuna
+domanda nuova — una sentinella lo vieta nel corpo della funzione. Il
+prezzo, detto: nel mercatino il motore NON ascolta i relay finche' non
+si entra nel P2P (il bundle e' pigro), quindi li' il pallino dice
+l'ultimo stato che l'archivio conosce. Una novita' arrivata ad app
+chiusa la porta l'avviso su Telegram, e il pallino la raggiunge appena
+il motore riascolta, cioe' entrando nel P2P.
+
+**LE STRADE SCARTATE.** 1) Il server che conta i «tocca a te» in
+`/api/me` (dalla patch 0007 sa a che punto e' ogni scambio): sarebbe la
+seconda logica — un secondo giudice, in un'altra lingua, che un giorno
+direbbe un'altra cosa — e il recapito ricevuto «altrove» vive solo sul
+telefono. 2) Accendere l'ascolto dei relay all'avvio per chi ha scambi
+aperti: renderebbe fresco il pallino anche nel mercatino, ma e' un
+canale nuovo (bundle e websocket a ogni apertura), e la richiesta era
+di agganciare quelli che l'app ascolta gia'. Si decide a parte, se il
+limite qui sopra si sente. 3) Il battito da un secondo della lampo:
+sarebbe polling su `localStorage`. 4) Agganciarlo a `renderP2P` o a
+`renderOrdineP2P`: nel mercatino nessuno li chiama, e un evento
+arrivato li' non accenderebbe niente.
+
+**LE PORTE.** In demo, in vetrina, senza conto e a leva P2P spenta non
+si accende mai: il tasto porterebbe dove il gesto non si puo' fare (a
+leva spenta, al coming soon). Il conto sul dispositivo vale anche qui:
+l'archivio di un altro conto non accende il mio. E il pallino non rompe
+mai chi scrive l'archivio: il suo corpo sta in un try, e col DOM rotto
+la mossa si scrive lo stesso.
+
+**L'ANELLO SULLA BANDA.** L'anello dell'`.off-dot` e' il fondo della
+barra che ritaglia il pallino dall'icona: sullo strato del P2P il fondo
+e' la banda scura, e quello del giorno sarebbe un alone chiaro sul
+bruno. Una regola sola, `nav .strato-p2p .off-dot`, con
+`--nav-bg-p2p` — misurato dal vivo, coincide al pixel col fondo della
+banda nei due temi. Nessun'altra regola: il pallino veste `.off-dot`.
+
+**PROVATO.** `prove_pallino_scambi`, 38 prove: markup, vestito,
+giudice, i cinque ganci, apertura e ritorno, niente polling, e il banco
+node sull'archivio vero — i quattro casi chiesti da Andrea (tocca a me,
+tocca all'altro, concluso, due scambi di cui uno mio), piu' i sei gesti
+uno per uno, nove forme dell'attesa, il recapito che arriva, il passo
+fatto, due miei che si spengono uno alla volta, il nome provvisorio, le
+quattro porte, l'altro conto, lo stesso giudice del 👉 e il DOM rotto,
+ogni caso col suo try. Tortura: 34 mutazioni, 33 uccise e una
+«inciampata» che e' uccisa sul caso giusto (togliere il try fa
+esplodere proprio il caso del DOM rotto, che e' quello che la
+sorveglia). `prove.py` intera, sopra il cantiere di Mostro 0.18.8
+appena arrivato: 12991/0 con `PROVE_SEVERE=1`.
+DAL VIVO, sull'app vera servita dal worktree (collaudo 111, leva
+accesa, relay puntato a un indirizzo morto perche' niente arrivasse al
+coordinator vero; la base era quella di prima del cantiere 0.18.8, con
+le mie righe identiche a quelle pushate): la mossa scritta
+nell'archivio accende i due
+pallini; garanzia pagata → spento, scambio attivo col recapito da dare
+→ riacceso; ricarico → acceso da `avvia` senza nessuna scrittura; conto
+222 → spento, di nuovo 111 → acceso; concluso → spento, anche dopo il
+ricarico; una scrittura «da fuori» senza gancio, poi `visibilitychange`
+→ si allinea. Tema chiaro e scuro, mobile e desktop, dentro e fuori dal
+P2P.
+
+**NON PROVATO, E DA GUARDARE.** Un evento VERO del coordinatore: la
+catena relay → `applicaMessaggioP2P` → archivio la provano i banchi del
+motore, ma sul telefono non l'ho vista (li' il relay era morto
+apposta). Dentro Telegram: il pallino dopo aver toccato un avviso, e al
+ritorno dal wallet dopo aver pagato la garanzia — il primo piano dentro
+la Mini App lo vede solo il telefono. E la card di «I miei scambi» col
+👉 accanto al pallino: col relay morto la vista diceva «il libro non
+risponde», che e' il comportamento di prima e non di questo cantiere.

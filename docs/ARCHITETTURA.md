@@ -10342,6 +10342,18 @@
   con l'accordo mostra il banner 🤝 e i totali pattuiti (`artStima`
   dentro totaleStima) — pillole consegna, NWC, nota EUR ereditati
   gratis; startBuy e compraSubito mandano `offerta_id` (0 = ignorato).
+  IL SUO GEMELLO NEL P2P (22 set 2026): lo stesso `.off-dot`, con la
+  classe `scambi-dot` e nessuna regola sua, sta sul tasto «P2P» (fuori
+  dallo scambio) e su «I miei scambi» (dentro), e si accende quando in
+  uno dei miei scambi aperti tocca a me. Conta `quantiToccaAMeP2P` —
+  gli scambi che `gruppoScambioP2P` mette in «Tocca a te», cioe' il
+  giudice del 👉 — e lo accende `aggiornaPallinoScambiP2P`, chiamata
+  dalle CINQUE scritture di `MOSTRO_ORDINI_CHIAVE` (col `typeof`: nel
+  banco del motore non c'e'), da `avvia` dopo conto e leva, e dal
+  `visibilitychange`. Senza numero, come questo; sullo strato del P2P
+  l'anello prende `--nav-bg-p2p`. A leva spenta, in vetrina e senza
+  conto resta spento. Il verbale: CANTIERI, «Il pallino su I miei
+  scambi».
   IL LINK PORTA DOVE C'E' IL GESTO (ago 2026, dal campo): la notifica
   della controproposta diceva «Accetta o rifiuta dalla scheda Ordini» e
   allegava un link a `/annuncio/{id}` — il testo mandava in un posto e
