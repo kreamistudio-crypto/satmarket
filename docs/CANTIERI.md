@@ -25406,18 +25406,35 @@ prende per il regolamento non deve avere un buco se il JS inciampa. La
 rete non è il commento accanto — è la prova, e la tortura dice che
 morde: cambiare **una parola sola** nella copia ferma la fa rossa.
 
-**DOV'È NEL RIQUADRO, e la scelta che si può rovesciare in una riga.**
-Sta **in cima**, sotto il titolo e sopra il PayCode, come nel foglio di
-chi pubblica — così i due lati hanno la stessa forma. Il costo è che il
-codice grande scende di sei righe, e la contropartita è che «non serve
-alcun documento» si legge *prima* di uscire di casa. L'altra sistemazione
-sensata era in fondo, accanto alla nota «il codice resta tuo e di chi
-vende: viaggia cifrato, e Barattolo non lo legge» — che resta dov'è,
-perché dice un'altra cosa (la piattaforma, non la controparte). Scartata
-perché lì «Tieni lo scontrino in caso di disputa» finirebbe **attaccata**
-al terzo gesto della lista, «Tieni lo scontrino: è la tua prova»; in
-cima le due restano a dieci righe di distanza e dicono due cose diverse
-(il *perché* e il *quando*).
+**DOV'È NEL RIQUADRO: IN FONDO — e la prima stesura era sbagliata.**
+Nella prima stesura stava **in cima**, sotto il titolo e sopra il
+PayCode, per dare ai due lati la stessa forma. Andrea l'ha rovesciata
+lo stesso giorno, e il motivo è la natura della scatola: **quel riquadro
+è uno STRUMENTO**, lo si riapre *alla cassa* per leggere il codice, e sei
+righe di spiegazione fra il titolo e il PayCode si pagano a **ogni**
+riapertura, mentre la spiegazione si legge una volta. Adesso sta dopo i
+quattro gesti e prima della nota «il codice resta tuo e di chi vende:
+viaggia cifrato, e Barattolo non lo legge», che resta l'ultima parola
+perché dice un'altra cosa — la piattaforma, non la controparte.
+⚠️ **LA SIMMETRIA FRA I DUE LATI NON ERA UN ARGOMENTO**, ed è l'errore
+da tenere: il foglio «Pubblica» è un modulo che si compila una volta, e
+lì la spiegazione in cima serve *prima* di scrivere; il riquadro è un
+biglietto che si riapre. Chiamarli «gli stessi tre posti» aveva reso
+invisibile la differenza fra un modulo e uno strumento, e da lì era
+uscita la stessa sistemazione per due oggetti che non si usano allo
+stesso modo.
+**E LÌ LA TERZA FRASE NON C'È** (decisione di Andrea): «Tieni lo
+scontrino in caso di disputa» cadrebbe **due righe** sotto il terzo gesto
+della lista, «Tieni lo scontrino: è la tua prova» — nella stessa scatola
+non è un promemoria, è insistenza. La toglie il parametro
+`senzaScontrino`, e la usa **un posto solo**: nel cappello e in «Info
+P2P» la frase resta.
+LA PROVA NON RISCRIVE IL CORTO A MANO, lo **DERIVA** dal lungo
+(`_SUO.replace(" Tieni lo scontrino in caso di disputa.", "")`): così se
+la funzione togliesse la frase *sbagliata*, o la riscrivesse invece di
+toglierla, la rossa arriva — e la tortura lo conferma, la mutazione che
+toglie il documento al posto dello scontrino muore. Un corto scritto a
+mano sarebbe stato una quarta copia da tenere in pari.
 
 **IL QUARTO POSTO NON SI È TOCCATO, ed è dichiarato.**
 `notaTabacchinoDettP2P` — la riga del dettaglio, prima di prendere —
@@ -25428,13 +25445,24 @@ Allungarla rovescerebbe una decisione scritta che nessuno ha chiesto di
 rovesciare, quindi resta, e resta anche scritto che è una quinta copia
 più corta: il giorno che si allinea, si allinea chiamando la funzione.
 
-**LE PROVE.** Cinque nuove in `prove_p2p_paycode`: i due versi parola
-per parola; **i verbi che non si mescolano** (nessuna delle due versioni
-porta quelli dell'altra — è il modo in cui un copia-incolla si vede); il
-cappello che le CHIAMA invece di ribatterle, con la 🧾 e senza il testo
-vecchio; il riquadro nel verso suo, senza una seconda 🧾; e la copia
-ferma di «Info P2P» identica. `prove.py` intera: **13242/0** con
-`PROVE_SEVERE=1`. Tortura su una copia: **7 mutazioni, 7 uccise**.
+**LE PROVE.** Cinque nuove in `prove_p2p_paycode`: i due versi **e il
+corto del riquadro** parola per parola; **i verbi che non si mescolano**
+(nessuna delle due versioni porta quelli dell'altra — è il modo in cui
+un copia-incolla si vede); il cappello che le CHIAMA invece di
+ribatterle, con la 🧾 e senza il testo vecchio; il riquadro nel verso
+suo, **in fondo** — dopo i quattro gesti e prima della nota del codice —
+e senza la frase dello scontrino; e la copia ferma di «Info P2P»
+identica. `prove.py` intera: **13242/0** con `PROVE_SEVERE=1`. Tortura su
+una copia: **13 mutazioni in due giri, 13 uccise**.
+⚠️ **E UNA FIRMA CHE CAMBIA FA ESPLODERE I BANCHI CHE LA NOMINANO:**
+aggiungendo `senzaScontrino` la sezione intera è morta con
+`ValueError: substring not found`, perché il banco ritaglia le funzioni
+per firma ESATTA. Da fuori si legge «prove_p2p_paycode è esplosa» e non
+il nome della cosa rotta — è la famiglia già a verbale dell'`index` che
+alza invece di dare una rossa col suo nome. Quando si cambia la firma di
+una funzione che un banco ritaglia, si cerca il suo nome in `prove.py`
+**prima** di girare: costa un `grep`, e il conto delle prove non mente
+(13133 invece di 13242 è una sezione intera che non è girata).
 ⚠️ **E UNA PROVA VECCHIA È STATA RIANCORATA**, ed è la lezione del giro:
 i quattro gesti del riquadro si contavano cercando «Tieni lo scontrino»
 **in tutto il riquadro**, e da oggi quella frase la dice anche il
@@ -25451,8 +25479,8 @@ zero errori in pagina. Il cappello sta in sei righe, il riquadro tiene il
 PayCode grande e leggibile sotto le sue sei, e il paragrafo di Info si
 veste come i suoi vicini.
 
-**NON PROVATO, E DA GUARDARE.** Sul telefono vero dentro Telegram: se le
-sei righe in cima al riquadro danno fastidio a chi lo riapre alla cassa
-(lì si vuole il codice e basta) — è l'unica cosa che decide l'uso, non la
-misura —, e se la ripetizione dello scontrino fra cappello e terzo gesto
-si legge come insistenza o come promemoria.
+**NON PROVATO, E DA GUARDARE.** Sul telefono vero dentro Telegram: se
+le sei righe in cima al foglio «Pubblica» si leggono o si scavalcano (lì
+restano in cima, ed è voluto: è un modulo), e se in fondo al riquadro le
+due note di chiusura — le tre frasi e «il codice resta tuo» — si leggono
+come due cose o come un muro.
