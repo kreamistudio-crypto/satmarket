@@ -1864,13 +1864,17 @@
      scatole.
      ⚠️ EMENDATA (22 set 2026, «piu' grande»): i due margini da 6px del
      logo se ne sono andati — quella distanza la fa gia' la trasparenza
-     del disegno — e i tab arrivano ai bordi del velo, quindi la stessa
-     riga ha sedici pixel in piu' da dare al logo. Il numero della
-     formula scende da 280 a 265 e il tetto sale da 96 a 120: a 360 il
-     logo e' 95 (era 80), a 375 e' 110 (era 95), da 385 in su e' 120. Al
-     tab restano SEMPRE 108,5px per i 102 di «Compra BTC», che non va
-     a capo fino a 430 e oltre. I file sono WebP da 360, il 3x del
-     tetto. */
+     del disegno —, e il numero della formula scende da 280 a 265 col
+     tetto che sale da 96 a 120: a 360 il logo e' 95 (era 80), a 375 e'
+     110 (era 95), da 385 in su e' 120. Al tab restano SEMPRE 108,5px
+     per i 102 di «Compra BTC», che non va a capo fino a 430 e oltre.
+     I file sono WebP da 360, il 3x del tetto.
+     ⚠️ E IL VELO NON C'ENTRAVA NIENTE, che la prima stesura di questa
+     voce diceva il falso: quando la testata aveva il velo, i suoi 8px
+     di respiro per lato erano annullati dal margine negativo dei tab —
+     la riga era larga quanto la colonna, esattamente com'e' adesso che
+     il velo non c'e' piu'. I dodici pixel del logo e uno e mezzo per
+     tab sono tutto quello che c'era da spostare. */
   .p2p-lati{display:flex;align-items:flex-end;margin:0 0 12px;
     --logo-p2p:clamp(76px, calc(100vw - 265px), 120px)}
   /* ---- LA TESTATA RESTA IN ALTO (set 2026, ritocco di Andrea:
@@ -1929,10 +1933,6 @@
      quello, e da attaccato sopra il velo resta una striscia di fondo
      pieno invece di una fessura da cui si vedono passare le card. */
   #view-p2pmiei .p2p-sticky{display:flow-root}
-  /* e il blocco del libro fa lo stesso, da quando ha il velo: il suo
-     margine di 4px resta dentro, e da attaccato sopra il velo c'e' una
-     striscia di fondo pieno invece di una fessura */
-  #view-p2p .p2p-sticky{display:flow-root}
   /* IL CAPPELLO DI «I MIEI SCAMBI» (set 2026, richiesta di Andrea) non
      ha piu' un vestito suo, ed e' la terza stesura di questo titolo:
      prima 19px come i due tab della sorella, poi la sola MISURA del
@@ -1981,23 +1981,19 @@
      niente sfocature, niente filtri, niente animazioni — quindi con
      «effetti ridotti» resta identico: la regola universale non ha
      niente da togliergli, e al compositore non chiede niente. */
-  /* ⚠️ E IL VELO E' DI DUE PAGINE (22 set 2026, richiesta di Andrea:
-     «dietro il logo del Libro ordini lo stesso velo, identico»): una
-     regola sola per tutt'e due, che e' la forma piu' forte di
-     «identico» — colore, forma e angoli non possono scollarsi perche'
-     sono gli stessi byte. Di la' contiene le monete, il conto e gli
-     strumenti; di qua il logo, i due tab e gli strumenti. */
-  .scambi-testa,.libro-testa{margin:4px 0 0;padding:6px 8px;
-    border-radius:22px;background:var(--sats-soft);display:flow-root}
-  /* i tab arrivano ai bordi del velo: i sedici pixel del suo respiro
-     servono al logo, e il respiro dei tab ce l'hanno gia' loro */
-  .libro-testa .p2p-lati{margin-left:-8px;margin-right:-8px}
+  /* ⚠️ IL VELO E' DI QUESTA PAGINA SOLA, ed e' una decisione presa e
+     disfatta in un pomeriggio (22 set 2026): per un'ora lo stesso velo
+     ha vestito anche la testata del «Libro ordini» — una regola con due
+     selettori —, e guardandolo Andrea ha detto che li' stava meglio
+     senza. Il libro tiene il logo grande e i tab; il velo resta qui, e
+     il selettore e' tornato uno. */
+  .scambi-testa{margin:4px 0 0;padding:6px 8px;border-radius:22px;
+    background:var(--sats-soft);display:flow-root}
   .scambi-cima{text-align:center}
   /* sotto il velo la riga di strumenti tiene i suoi 13 sopra, e sotto
      ne lascia 4 piu' i 6 del velo: le pillole restano a dieci dal bordo
      come dal fondo del blocco di ieri */
-  .scambi-testa:not(.vuota) .p2p-testa-riga,
-  .libro-testa .p2p-testa-riga{margin-bottom:4px}
+  .scambi-testa:not(.vuota) .p2p-testa-riga{margin-bottom:4px}
   .scambi-testa.vuota{margin:0;padding:0;border-radius:0;background:none}
   .scambi-testa.vuota .scambi-cima{display:none}
   /* il titolo e' l'immagine; se l'immagine non arriva torna la parola,
@@ -2518,12 +2514,21 @@
      non li distingue.
      I COLORI NON SONO NUOVI: ogni tono prende l'INCHIOSTRO del suo
      badge — l'arancio dei sats, il viola, il blu, il verde, il rosso,
-     il grigio — e lo stempera nella carta. Le due percentuali stanno in
-     due variabili, una per tema: di giorno il 6% (la carta e' bianca e
-     una tinta piu' forte spegnerebbe la cifra arancio sotto l'AA), di
-     sera l'8%. Misurato: il testo peggiore sta a 4,59:1 di giorno e
-     4,62 di sera, sopra la soglia del testo piccolo, e c'e' una prova
-     che rifa' il conto sui token.
+     il grigio — e lo stempera nella carta. Le percentuali stanno in
+     variabili, una terna per tema.
+     ⚠️ DI GIORNO SI E' SALITI DAL 6 AL 15% (22 set 2026, sera: «troppo
+     sbiadite»), col bordo dal 24 al 50% — e sotto ci sta una cosa che
+     al 6% non serviva. Al 6% la carta era quasi bianca e ogni testo
+     passava com'era; al 15% la cifra dei sats scendeva a 4,0:1 e il
+     premio in rosso a 4,1 — sotto la soglia del testo piccolo. La cura
+     non e' un colore nuovo: e' lo stesso inchiostro tirato di un
+     gradino verso quello di casa (`--tinta-testo`), e vale SOLO dove
+     la tinta c'e'. Misurato sui token: il peggiore sta a 4,67:1 di
+     giorno (il verde del premio su viola) e 4,62 di sera, e c'e' una
+     prova che rifa' il conto.
+     ⚠️ E LA SERA RESTA ALL'8%, per decisione di Andrea («ottimo
+     cosi'»): `--tinta-testo` li' vale 0%, quindi il tema scuro e'
+     identico a prima per costruzione, non per accordo.
      ⚠️ `color-mix` DIETRO UN `@supports`, e non e' prudenza generica:
      senza, un browser che non lo conosce butterebbe la dichiarazione e
      la card resterebbe SENZA fondo — trasparente sul crema della
@@ -2531,8 +2536,8 @@
      sempre, che e' il mondo di ieri.
      E' UN COLORE FERMO: niente sfocature, filtri o animazioni, quindi
      «effetti ridotti» non ha niente da togliergli. */
-  :root{--tinta-card:6%;--tinta-bordo:24%}
-  html[data-tema="scuro"]{--tinta-card:8%;--tinta-bordo:34%}
+  :root{--tinta-card:15%;--tinta-bordo:50%;--tinta-testo:22%}
+  html[data-tema="scuro"]{--tinta-card:8%;--tinta-bordo:34%;--tinta-testo:0%}
   @supports (background:color-mix(in srgb,red 50%,blue)){
     .p2p-scambio.tinta{
       background:color-mix(in srgb,var(--tinta) var(--tinta-card),var(--card));
@@ -2547,6 +2552,15 @@
        trasparente, un filo del suo stesso inchiostro */
     .p2p-scambio.tinta .p2p-scambio-stato.badge{
       border-color:color-mix(in srgb,currentColor 30%,transparent)}
+    /* LE DUE CIFRE CHE LA TINTA FORTE SPEGNEREBBE (22 set 2026, sera):
+       stanno sul fondo della card e non dentro una scatola loro, e col
+       velo al 15% scendono sotto il 4,5:1 del testo piccolo. Stesso
+       inchiostro, un gradino piu' scuro — e di sera la leva vale 0%,
+       cioe' li' non succede niente. */
+    .p2p-scambio.tinta .p2p-sats{
+      color:color-mix(in srgb,var(--ink) var(--tinta-testo),var(--sats-text))}
+    .p2p-scambio.tinta .p2p-badge .p2p-avviso{
+      color:color-mix(in srgb,var(--ink) var(--tinta-testo),var(--danger))}
   }
   /* IL TESTO DELLA CARD PASSA L'AA SU OGNI TINTA (22 set 2026): la riga
      di servizio, il premio e la scatola del metodo erano `--muted`, che
@@ -7818,19 +7832,15 @@ document.getElementById('cartello')?.remove();</script>
            renderP2P — e' l'unica ragione per cui la pillola ha un
            contenitore suo invece di stare in cima a #p2pCorpo. -->
       <div class="p2p-sticky">
-        <!-- IL VELO DELLA SORELLA (22 set 2026, richiesta di Andrea):
-             la stessa scatola che in «I miei scambi» sta dietro le
-             monete — e' la STESSA regola CSS, quindi stesso colore nei
-             due temi, stessa forma, stessi angoli — qui dietro il logo,
-             i due tab e la riga di strumenti. I tab arrivano ai bordi
-             del velo (margine negativo): il respiro dei loro 4px basta,
-             e quei sedici pixel servono al logo, che senza andrebbe a
-             capo con «Compra BTC».
+        <!-- IL VELO QUI NON C'E' (22 set 2026, sera): per un'ora la
+             testata ha avuto dietro lo stesso velo di «I miei scambi»,
+             e guardandola Andrea l'ha tolto — «era meglio senza». Del
+             giro resta il logo piu' grande, e i tab che si dividono
+             tutta la riga.
              I DUE GEMELLI SONO IN WEBP (stesso disegno, frecce spente
              rifatte da Andrea): 360px, il 3x dei 120 massimi a schermo,
              33 KB l'uno invece degli 87 del PNG — e senza i gradini che
              il PNG a 256 colori faceva sulle sfumature. -->
-        <div class="libro-testa">
         <div class="p2p-lati" role="tablist">
           <button class="p2p-lato compra attiva" id="p2pLatoCompro" role="tab" onclick="setLatoP2P('compro')">Compra BTC</button>
           <span class="p2p-logo-pila" aria-hidden="true"><img class="p2p-logo compra" src="/assets/p2p-logo-compra.webp" alt="" onerror="this.remove()"><img class="p2p-logo vendi" src="/assets/p2p-logo-vendi.webp" alt="" onerror="this.remove()"></span>
@@ -7860,7 +7870,6 @@ document.getElementById('cartello')?.remove();</script>
         <option value="imp-su" data-corta="Più piccoli">Importo: dal più piccolo</option>
       </select>
       <div id="p2pTesta"></div>
-      </div>
       </div>
       <div id="p2pCorpo"></div>
       <!-- IL BOTTONE DEL PROFILO NON C'E' PIU' (set 2026, fase 6):

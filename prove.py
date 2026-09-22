@@ -45079,30 +45079,26 @@ def prove_p2p_libro():
     # forma si guarda per quello che e': il blocco si apre sui tab, e si
     # CHIUDE dopo la pillola — cioe' fra la pillola e il corpo che scorre
     # c'e' la graffa del blocco.
-    # ⚠️ EMENDATA (22 set 2026, il velo del libro): fra il blocco
-    # attaccato e i tab c'e' adesso la scatola del velo, quindi fra la
-    # pillola e il corpo che scorre ci sono DUE graffe invece di una. La
-    # forma sorvegliata e' la stessa: il blocco si apre sui tab e si
+    # ⚠️ RIMESSA COM'ERA (22 set 2026, sera: il velo e' uscito dal
+    # libro): fra il blocco attaccato e i tab non c'e' piu' niente, e
+    # fra la pillola e il corpo che scorre torna UNA graffa sola. La
+    # forma sorvegliata e' sempre quella: il blocco si apre sui tab e si
     # chiude DOPO la pillola.
     prova("...e tab e pillola stanno DENTRO il blocco, non dopo", True,
           re.search(r'<div class="p2p-sticky">\s*(?:<!--[\s\S]*?-->\s*)?'
-                    r'<div class="libro-testa">\s*<div class="p2p-lati"',
-                    mini) is not None
-          and re.search(r'<div id="p2pTesta"></div>\s*</div>\s*</div>\s*'
+                    r'<div class="p2p-lati"', mini) is not None
+          and re.search(r'<div id="p2pTesta"></div>\s*</div>\s*'
                         r'<div id="p2pCorpo">', mini) is not None)
-    # IL VELO E' LO STESSO DELLA SORELLA, e non una copia che le somiglia
-    # (22 set 2026, richiesta di Andrea: «identico»): una regola sola con
-    # due selettori, cioe' gli stessi byte — colore, forma e angoli non
-    # possono scollarsi. La prova guarda che di `.libro-testa` non nasca
-    # una regola tutta sua, che e' il modo in cui si scollerebbero.
-    # (`css`, qui, e' la sola fetta delle card: il velo si cerca nel
-    # foglio intero, che in questa sezione si chiama `_css`)
-    prova("...e il velo e' LA STESSA regola che veste «I miei scambi»",
-          (1, 0), (_css.count("  .scambi-testa,.libro-testa{"),
-                   len(re.findall(r"(?<![,\w-])\.libro-testa\{", _css))))
-    prova("...coi tab ai bordi del velo, per dare quei pixel al logo",
-          True, "  .libro-testa .p2p-lati{margin-left:-8px;"
-                "margin-right:-8px}" in _css)
+    # ⚠️ IL LIBRO NON HA VELO, ed e' una decisione presa e disfatta in
+    # un pomeriggio (22 set 2026): per un'ora la testata ha avuto dietro
+    # lo stesso velo di «I miei scambi» — una regola con due selettori —
+    # e guardandola Andrea l'ha tolto. La spia sta dalla parte
+    # dell'ASSENZA: ne' la scatola nel markup, ne' una regola sua nel
+    # foglio. (Era «la copia non deve nascere»: adesso non deve nascere
+    # il velo.)
+    prova("il libro non ha velo dietro la testata", (0, 0),
+          (mini.count("libro-testa"),
+           _css.count("  .scambi-testa,.libro-testa{")))
     prova("le pillole vivono nella testata, fuori dal corpo che scorre",
           True, "if (testaBox) testaBox.innerHTML =" in _rp
           and "'<div class=\"p2p-testa-riga\">' + pillOrdina + pillola" in _rp
@@ -62008,17 +62004,15 @@ def prove_intestazione_scambi():
     prova("l'immagine e' larga quanto la colonna, alta 80px, in proporzione",
           [], [d for d in ("display:block", "width:100%", "height:80px",
                            "object-fit:contain") if d not in img_css])
-    # ⚠️ L'ANCORA HA DUE NOMI (22 set 2026, sera): il velo del «Libro
-    # ordini» e' LA STESSA regola, con un secondo selettore — e' la
-    # forma piu' forte di «identico», e chi cerca il velo lo trova coi
-    # due nomi attaccati.
-    # ⚠️ `find` E NON `index` (la tortura del 22 set): se il velo
-    # tornasse due regole separate, un `index` alzerebbe ValueError e
-    # si porterebbe via il resto della sezione — banco compreso. Cosi'
-    # invece diventa rossa la riga che NOMINA la cosa rotta.
-    _iv = css.find("  .scambi-testa,.libro-testa{")
-    prova("il velo e' una regola sola per le due pagine", True, _iv >= 0)
-    velo = pezzo_js(css, "  .scambi-testa,.libro-testa{", "}") if _iv >= 0 else ""
+    # ⚠️ E IL VELO E' TORNATO DI QUESTA PAGINA SOLA (22 set 2026, sera):
+    # per un'ora lo stesso byte vestiva anche la testata del libro, poi
+    # Andrea l'ha tolto di la'. L'ancora e' di nuovo il selettore
+    # singolo, e si cerca con `find` — un `index` mancato si
+    # porterebbe via la sezione intera (lezione della tortura).
+    _iv = css.find("  .scambi-testa{")
+    prova("il velo e' di questa pagina sola", (True, 0),
+          (_iv >= 0, css.count(".libro-testa")))
+    velo = pezzo_js(css, "  .scambi-testa{", "}") if _iv >= 0 else ""
     prova("il velo e' il tenue di casa, tarato nei due temi", True,
           "background:var(--sats-soft)" in velo
           and len(re.findall(r"--sats-soft:#", css)) == 2)
@@ -62074,8 +62068,8 @@ def prove_intestazione_scambi():
     # 375, e anche a 360 resta in fila), e sotto 4 + i 6 del velo
     prova("le pillole stanno nel velo, a dieci dal suo bordo", True,
           "padding:6px 8px;" in velo
-          and ".scambi-testa:not(.vuota) .p2p-testa-riga," in css
-          and ".libro-testa .p2p-testa-riga{margin-bottom:4px}" in css)
+          and ".scambi-testa:not(.vuota) .p2p-testa-riga{margin-bottom:4px}"
+          in css)
     prova("nel filtro vuoto le monete sono piccole", True,
           ".empty .scambi-mini{height:56px" in css)
     prova("senza scambi l'immagine e' piu' grande, sullo stesso velo", True,
@@ -62500,14 +62494,19 @@ def prove_logo_p2p_nitido():
           in pezzo_js(css, "  .p2p-lati .p2p-logo-pila{", "}"))
     prova("...che a 76 fa ancora -8px, come prima", -8, round(76 * -.105))
 
-    # LA GEOMETRIA, sulle larghezze dei telefoni veri. La colonna e'
-    # larga 100vw-32 (fino a 640); il velo la stringe di 8 per lato e i
-    # tab se li riprendono col margine negativo, quindi la riga dei tab
-    # e' larga quanto la colonna. I due tab si dividono quel che avanza
-    # dopo il logo — che margini non ne ha piu' — e ognuno ha 4+4 di
-    # respiro. «Compra BTC» a 19px misura 102px (dal vivo): dove il logo
-    # e' cresciuto deve starci su una riga, con almeno 3px d'aria per
-    # lato.
+    # LA GEOMETRIA, sulle larghezze dei telefoni veri. La riga dei tab
+    # e' larga quanto la colonna (100vw-32, fino a 640): sta attaccata
+    # al blocco, senza niente in mezzo. I due tab si dividono quel che
+    # avanza dopo il logo — che margini non ne ha piu' — e ognuno ha
+    # 4+4 di respiro. «Compra BTC» a 19px misura 102px (dal vivo): dove
+    # il logo e' cresciuto deve starci su una riga, con almeno 3px
+    # d'aria per lato.
+    # ⚠️ E IL VELO, FINCHE' C'E' STATO, NON CONTAVA: i suoi 8px di
+    # respiro per lato erano annullati dal margine negativo dei tab, e
+    # la riga era larga quanto la colonna esattamente com'e' adesso —
+    # il conto qui sotto non e' cambiato di un pixel quando il velo e'
+    # uscito, ed e' la prova che la voce di stamattina lo raccontava
+    # male.
     TESTO = 102.2
 
     def spazio(vw, logo):
@@ -62526,19 +62525,13 @@ def prove_logo_p2p_nitido():
                for vw in range(minimo + meno, massimo + meno + 1)}))
     prova("...ed e' 108,5px: sei e mezzo piu' della scritta piu' lunga",
           108.5, spazio(375, 375 - meno))
-    # (`find` e non `index`: se il velo tornasse due regole separate un
-    # `index` mancato si porterebbe via la sezione intera — la lezione
-    # della tortura, e questa e' la terza ancora della stessa famiglia)
-    _iv = css.find("  .scambi-testa,.libro-testa{")
-    _velo = (pezzo_js(css, "  .scambi-testa,.libro-testa{", "}")
-             if _iv >= 0 else "")
     prova("...e il tab e' quello che il conto suppone", True,
           "flex:1;padding:11px 4px"
           in pezzo_js(mini, ".p2p-lati .p2p-lato{", "}")
           and "font-size:19px" in pezzo_js(mini, ".p2p-lati .p2p-lato{", "}")
-          and "  .libro-testa .p2p-lati{margin-left:-8px;margin-right:-8px}"
-          in css
-          and "padding:6px 8px" in _velo)
+          and "margin:0 0 calc(var(--logo-p2p)"
+          in pezzo_js(css, "  .p2p-lati .p2p-logo-pila{", "}")
+          and ".libro-testa" not in css)
 
     # --- 3) IL COMPLETO GRANDE: Info P2P, la home, il libro vuoto ---
     F = "assets/p2p-logo-grande.webp"
@@ -62662,20 +62655,37 @@ def prove_card_tinte_stato():
           True, ".p2p-scambio.tinta .p2p-scambio-stato.badge{" in sup
           and "border-color:color-mix(in srgb,currentColor 30%,transparent)"
           in sup)
-    chiaro = re.search(r":root\{--tinta-card:(\d+)%;--tinta-bordo:(\d+)%\}", css)
+    # ⚠️ EMENDATE (22 set 2026, sera: «in chiaro troppo sbiadite»): di
+    # giorno il velo sale dal 6 al 15% e il bordo dal 24 al 50; la sera
+    # resta com'era, per decisione di Andrea. La TERZA percentuale e'
+    # nata con la seconda stesura: al 15% due cifre sul fondo della card
+    # scendono sotto l'AA, e `--tinta-testo` le tira di un gradino verso
+    # l'inchiostro di casa. Di sera vale 0%, quindi il tema scuro e'
+    # identico a prima PER COSTRUZIONE.
+    chiaro = re.search(r":root\{--tinta-card:(\d+)%;--tinta-bordo:(\d+)%;"
+                       r"--tinta-testo:(\d+)%\}", css)
     scuro = re.search(r'html\[data-tema="scuro"\]\{--tinta-card:(\d+)%;'
-                      r'--tinta-bordo:(\d+)%\}', css)
-    prova("le percentuali sono due, una per tema: di sera si puo' calcare",
-          [("6", "24"), ("8", "34")],
+                      r'--tinta-bordo:(\d+)%;--tinta-testo:(\d+)%\}', css)
+    prova("le tre percentuali sono per tema: di giorno si calca di piu'",
+          [("15", "50", "22"), ("8", "34", "0")],
           [chiaro.groups() if chiaro else None,
            scuro.groups() if scuro else None])
+    prova("...e di sera la leva del testo e' spenta: niente cambia li'",
+          "0", scuro.group(3) if scuro else None)
+    prova("...e le due cifre che scurisce sono quelle sul fondo della card",
+          True, ".p2p-scambio.tinta .p2p-sats{" in sup
+          and "color:color-mix(in srgb,var(--ink) var(--tinta-testo),"
+              "var(--sats-text))}" in sup
+          and ".p2p-scambio.tinta .p2p-badge .p2p-avviso{" in sup
+          and "color:color-mix(in srgb,var(--ink) var(--tinta-testo),"
+              "var(--danger))}" in sup)
     # «EFFETTI RIDOTTI» NON HA NIENTE DA TOGLIERE: e' un colore fermo,
     # senza animazioni, sfocature o filtri — e il censimento conta le
     # regole, cosi' una regola nuova entra nel conto e nel controllo
     _nudo = re.sub(r"/\*[\s\S]*?\*/", "", css)
     regole = [(m.group(1).strip(), m.group(2)) for m in re.finditer(
         r"([^{}]*\.p2p-scambio\.(?:tinta|tono-)[^{}]*)\{([^}]*)\}", _nudo)]
-    prova("le regole della tinta sono otto", 8, len(regole))
+    prova("le regole della tinta sono dieci", 10, len(regole))
     prova("...e nessuna anima, sfuma o filtra", [],
           [(sel, d) for sel, c in regole
            for d in ("animation", "transition", "filter", "box-shadow",
@@ -62712,16 +62722,33 @@ def prove_card_tinte_stato():
     prova("i token della tinta sono dichiarati due volte, uno per tema", [],
           [n for n in TESTI + tuple(INCHIOSTRO.values()) + ("--card",)
            if len(tok(n)) != 2])
-    deboli, spente = [], []
-    for k, (tema, p) in enumerate((("chiaro", int(chiaro.group(1)) / 100),
-                                   ("scuro", int(scuro.group(1)) / 100))):
-        carta = tok("--card")[k]
+    deboli, spente, pallide = [], [], []
+    for k, tema in enumerate(("chiaro", "scuro")):
+        m = chiaro if k == 0 else scuro
+        p, pt = int(m.group(1)) / 100, int(m.group(3)) / 100
+        carta, inchiostro = tok("--card")[k], tok("--ink")[k]
+        # ⚠️ LE DUE CIFRE SI MISURANO SCURITE, cioe' come la pagina le
+        # dipinge davvero: altrimenti il conto direbbe 4,0 su un colore
+        # che nessuno usa piu' — e al contrario, con la leva a zero
+        # (tema scuro) qui torna esattamente il token di sempre
+        vestiti = {t: tok(t)[k] for t in TESTI}
+        for t in ("--sats-text", "--danger"):
+            vestiti[t] = mescola(inchiostro, tok(t)[k], pt)
         for t, ink in sorted(INCHIOSTRO.items()):
             tinta = mescola(tok(ink)[k], carta, p)
-            if max(abs(x - y) for x, y in zip(rgb(tinta), rgb(carta))) < 5:
+            scarto = max(abs(x - y) for x, y in zip(rgb(tinta), rgb(carta)))
+            if scarto < 5:
                 spente.append((tema, t))
+            # ⚠️ E DI GIORNO SERVE UN PAVIMENTO VERO (22 set 2026, sera):
+            # il 6% della prima stesura passava la spia qui sopra — non
+            # era a zero — ed e' proprio quello che Andrea ha bocciato
+            # guardando lo schermo, «troppo sbiadite». Diciotto su 255
+            # e' sotto la piu' pallida delle sei di adesso (il grigio,
+            # 21) e sopra ogni tinta che si perde sulla carta bianca.
+            if tema == "chiaro" and scarto < 18:
+                pallide.append((t, scarto))
             for testo in TESTI:
-                c = contrasto(tok(testo)[k], tinta)
+                c = contrasto(vestiti[testo], tinta)
                 if c < 4.5:
                     deboli.append((tema, t, testo, round(c, 2)))
     prova("ogni testo della card passa l'AA su ogni tinta, nei due temi",
@@ -62735,10 +62762,16 @@ def prove_card_tinte_stato():
           ".p2p-scambio .p2p-box,\n  .p2p-scambio .p2p-badge,\n"
           "  .p2p-scambio .p2p-scambio-euro{color:var(--ink-soft)}" in css
           and ".p2p-scambio .p2p-badge .p2p-affare{color:var(--trust-text)}"
-          in css)
+          in css
+          and ".p2p-sats{font-family:'JetBrains Mono',monospace;"
+              "font-weight:700;font-size:14px;\n    color:var(--sats-text)"
+          in css
+          and ".p2p-badge .p2p-avviso{color:var(--danger)}" in css)
     # ⚠️ E LA TINTA SI DEVE VEDERE: una velatura a zero passerebbe ogni
     # contrasto senza tingere niente, e la prova qui sopra tacerebbe
     prova("...e ogni tinta si stacca davvero dalla carta", [], spente)
+    prova("...e di giorno nessuna e' cosi' pallida da non vedersi", [],
+          pallide)
     # ⚠️ IL RIQUADRO SULLA CARD TINTA NON HA UN RAPPORTO SUO: il suo
     # fondo e la tinta sono lo stesso colore a due forze (1,03-1,14 di
     # rapporto), e chiedere 3:1 vorrebbe dire rifare i sei fondi dei
