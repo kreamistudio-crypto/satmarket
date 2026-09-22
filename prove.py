@@ -45715,6 +45715,19 @@ def prove_p2p_libro():
         pezzi.append(mini[i_r:mini.index("\n", i_r)])
     for f in ("function metodoBaseP2P(m){", "function euroTabacchinoP2P(metodi){"):
         pezzi.append(pezzo_js(mini, f, "\n}\n") + "\n}")
+    # IL PREMIO DI BARATTOZON (23 set 2026): a prezzo fisso il premio e'
+    # cotto nei sats, e il badge della card lo RILEGGE dal cambio di
+    # adesso — quindi i suoi due giudici entrano qui.
+    # ⚠️ RITAGLIATI ALLA GRAFFA e non alla riga vuota: nel client, dopo
+    # di loro, non c'e' nessuna riga vuota prima del catalogo dei
+    # vestiti, e un ritaglio lungo lo porterebbe dentro due volte —
+    # node si ferma su «P2P_VESTE_METODI gia' dichiarata». Successo, ed
+    # e' la ragione per cui questa riga sta qui invece che nell'elenco.
+    for f in ("function premioImplicitoTabacchinoP2P(euro, sats, cambio){",
+              "function premioTestoTabP2P(n){",
+              "function tabacchinoP2P(metodi){"):
+        pezzi.append(pezzo_js(mini, f, "\n}\n") + "\n}")
+    pezzi.append(re.search(r"const P2P_PREMIO_TAB_MAX = [^\n]*;", mini).group(0))
     # IL VESTITO DEI METODI (16 set 2026): rigaOrdineP2P veste il metodo
     # col catalogo, quindi il banco porta il catalogo e TUTTE le sue
     # funzioni (col terminatore "\n}\n" e la graffa rimessa: fra loro
@@ -46988,6 +47001,10 @@ def prove_p2p_dettaglio():
         # lo scorporo del premio: il conto lo chiama quando la cifra
         # gliela detta il coordinatore, e senza il banco esplode
         "function scorporaPremioP2P(sats, premio){",
+        # il premio di Barattozon (23 set 2026): a prezzo fisso il conto
+        # lo RILEGGE dai sats contro il cambio, e lo scrive col segno
+        "function premioImplicitoTabacchinoP2P(euro, sats, cambio){",
+        "function premioTestoTabP2P(n){",
         "function contoDettP2P(o){",
         # ...e la traduzione del lato, che e' come il conto arriva
         # alla pagina di uno scambio PROPRIO
@@ -47106,6 +47123,23 @@ out.contoVendi = contoDettP2P(ordine({lato: 'buy', premium: 4}));
 out.contoSconto = contoDettP2P(ordine({premium: -2}));
 /* a prezzo fisso: sats esatti, ma il netto resta una stima */
 out.contoFisso = contoDettP2P(ordine({sats: 100000}));
+/* ---- IL PREMIO DI BARATTOZON (23 set 2026) ----
+   A prezzo fisso il premio sul filo e' zero — e' cotto nei sats — e
+   il conto lo rilegge dal cambio di adesso: 6 € a 0.0005 fanno 12000
+   sats pieni, quindi 11400 e' un +5% e 12600 un −5%. Il Controvalore
+   torna a essere il MERCATO e il Subtotale la cifra fissa. */
+const TAB = ['Contanti al tabacchino 6.00'];
+out.contoTabPremio = contoDettP2P(ordine({sats: 11400, metodi: TAB}));
+out.contoTabSconto = contoDettP2P(ordine({sats: 12600, metodi: TAB}));
+out.contoTabPieno = contoDettP2P(ordine({sats: 12000, metodi: TAB}));
+/* ...ma a cifra DETTA dal coordinatore lo scambio e' fatto: niente
+   riga del premio, che si muoverebbe col mercato su un affare chiuso */
+out.contoTabDetto = contoDettP2P(Object.assign(
+  ordine({sats: 11400, metodi: TAB}), {satsDetti: 11400}));
+/* e a cambio muto il premio non si inventa */
+cambioVivo = false;
+out.contoTabMuto = contoDettP2P(ordine({sats: 11400, metodi: TAB}));
+cambioVivo = true;
 /* l'intervallo: ogni riga porta i due capi */
 out.contoRange = contoDettP2P(ordine({euro: 20, euroMax: 100}));
 /* una valuta fuori dal catalogo porta la sigla e MAI una bandiera */
@@ -47560,6 +47594,38 @@ console.log(JSON.stringify(out));
           and "≈ −1000 sats" in o["contoFisso"]
           and "≈ 99000 sats" in o["contoFisso"]
           and "prezzo di mercato" not in o["contoFisso"])
+    # --- IL PREMIO DI BARATTOZON NEL CONTO (23 set 2026) --------------
+    # A prezzo fisso il premio e' cotto nei sats: il conto lo rilegge dal
+    # cambio di adesso e lo mette in riga come per ogni altro ordine —
+    # Controvalore al mercato, la riga del premio col SEGNO, Subtotale
+    # alla cifra fissa. 12000 pieni, 11400 fissi: +5%, 600 sats in meno.
+    prova("col premio di Barattozon il conto ha la sua riga, col segno e la tinta",
+          True, "Premio al venditore" in o["contoTabPremio"]
+          and 'p2p-avviso">+5%<' in o["contoTabPremio"]
+          and '<span class="num meno">≈ −600 sats</span>' in o["contoTabPremio"]
+          and "Subtotale" in o["contoTabPremio"]
+          and "≈ 12000 sats" in o["contoTabPremio"]
+          and ">11400 sats<" in o["contoTabPremio"])
+    # ...e un premio NEGATIVO cambia nome alla voce, come sempre: e'
+    # uno SCONTO, e quei sats si AGGIUNGONO al Controvalore
+    prova("...e col segno meno la voce e' uno sconto, in verde e col piu'",
+          True, "Sconto del venditore" in o["contoTabSconto"]
+          and 'p2p-affare">−5%<' in o["contoTabSconto"]
+          and '<span class="num piu">≈ +600 sats</span>' in o["contoTabSconto"]
+          and "Premio al venditore" not in o["contoTabSconto"])
+    prova("...a premio zero la riga non c'e' (come su ogni ordine)",
+          True, "Subtotale" not in o["contoTabPieno"]
+          and "Premio al venditore" not in o["contoTabPieno"]
+          and "Sconto del venditore" not in o["contoTabPieno"])
+    # ⚠️ QUANDO IL COORDINATORE HA DETTO LA CIFRA lo scambio e' fatto:
+    # un premio che continuasse a muoversi col mercato racconterebbe un
+    # affare chiuso, ed e' la promessa di «Info P2P»
+    prova("...e a cifra detta dal coordinatore il premio non si rilegge piu'",
+          True, "Premio al venditore" not in o["contoTabDetto"]
+          and "Subtotale" not in o["contoTabDetto"])
+    prova("...a cambio muto non si inventa nessun premio",
+          True, "Premio al venditore" not in o["contoTabMuto"]
+          and "Sconto del venditore" not in o["contoTabMuto"])
     prova("un intervallo porta i due capi su ogni riga", True,
           "≈ 40000–200000 sats" in o["contoRange"]
           and "≈ 39600–198000 sats" in o["contoRange"]
@@ -54574,12 +54640,12 @@ def prove_p2p_pubblica():
                        mini.index("\n};", mini.index("const P2P_VESTE_METODI = {")) + 3]
         + "\n" + _intera("function metodiPubblicabiliP2P(lato){")
         # il percorso Barattozon (23 set 2026): PayCode, vita nel libro,
-        # sconto con la cifra decimale, e il passo in cui si sta
+        # premio da −20 a +20 con la cifra decimale, e il passo
         + "\n" + _intera("function payCodeP2P(testo){")
         + "\n" + _intera("function vitaLibroTabacchinoP2P(scade, adesso){")
-        + "\n" + _intera("function scontoTabacchinoP2P(testo){")
-        + "\n" + _intera("function scontoTestoTabP2P(n){")
-        + "\n" + _intera("function scontoImplicitoTabacchinoP2P(euro, sats, cambio){")
+        + "\n" + _intera("function premioTabacchinoP2P(testo){")
+        + "\n" + _intera("function premioTestoTabP2P(n){")
+        + "\n" + _intera("function premioImplicitoTabacchinoP2P(euro, sats, cambio){")
         + "\n" + _intera("function passoTabacchinoP2P(v){")
         # il tetto di Amazon (23 set 2026)
         + "\n" + _intera("function giudiceImportoPayCodeP2P(euro){")
@@ -54587,7 +54653,7 @@ def prove_p2p_pubblica():
         + "\n" + re.search(r"const P2P_PAYCODE_MIN_S = [^\n]*;", mini).group(0)
         + "\n" + re.search(r"const P2P_PAYCODE_MAX_S = [^\n]*;", mini).group(0)
         + "\n" + re.search(r"const P2P_TABACCHINO_MARGINE_S = [^\n]*;", mini).group(0)
-        + "\n" + re.search(r"const P2P_SCONTO_TAB_MAX = [^\n]*;", mini).group(0)
+        + "\n" + re.search(r"const P2P_PREMIO_TAB_MAX = [^\n]*;", mini).group(0)
         # il tempo dei due lati (set 2026): il giudice unico della
         # scadenza, le fasce, il riquadro, l'avviso alla presa
         + "\n" + _intera("function scadenzaTabacchinoOrdineP2P(o){")
@@ -54721,7 +54787,7 @@ def prove_p2p_pubblica():
         # dell'importo, coi centesimi; il cambio vivo serve ai sats
         "    const ok = {euro: '23,47', euroMax: '', sats: '', fisso: false, metodi: [P2P_TABACCHINO],\n"
         "      maxSats: 100000, minSats: 100, lato: 'vendo', finestra: fin, adesso: ora,\n"
-        "      premio: 0, cambio: 0.0005,\n"
+        "      premio: 0, premioTab: '', cambio: 0.0005,\n"
         "      tab: {ordine: '479868518', scade: campoDaScadeP2P(ora + 48 * 3600)}};\n"
         "    const con = (agg) => valeNuovoOrdineP2P(Object.assign({}, ok, agg));\n"
         "    const tab = (agg) => Object.assign({}, ok.tab, agg);\n"
@@ -54747,8 +54813,24 @@ def prove_p2p_pubblica():
         "      alBordo: con({tab: tab({scade: campoDaScadeP2P(ora + P2P_PAYCODE_MAX_S - 60)})}).ok,\n"
         "      presto: con({tab: tab({scade: campoDaScadeP2P(ora + 1800)})}).manca,\n"
         "      storto: con({tab: tab({ordine: '123-4567890-1234567'})}).manca,\n"
-        "      sconto: [con({sconto: '16'}).manca, con({sconto: '2,55'}).manca, con({sconto: '2,5'}).ok,\n"
-        "               con({sconto: ''}).ok, con({sconto: 'abc'}).campo, con({sconto: '15'}).ok],\n"
+        # IL PREMIO (23 set 2026): ±20 passano, ±20,1 NO — e il «manca»
+        # si porta il campo del cursore, come ogni altro
+        "      premio: [con({premioTab: '20,1'}).manca, con({premioTab: '-20,1'}).manca,\n"
+        "               con({premioTab: '+20,1'}).manca, con({premioTab: '2,55'}).manca,\n"
+        "               con({premioTab: '20'}).ok, con({premioTab: '-20'}).ok,\n"
+        "               con({premioTab: '2,5'}).ok, con({premioTab: '-2,5'}).ok,\n"
+        "               con({premioTab: ''}).ok, con({premioTab: 'abc'}).campo],\n"
+        # ...e i SATS che ne escono, che e' la meta' che conta: il premio
+        # negativo ne fa passare di piu'
+        "      satsPremio: ['0', '2,5', '-2,5', '20', '-20'].map(p => ordineDaCampiP2P(\n"
+        "        {euro: '20', euroMax: '', sats: '', fisso: false, metodi: [P2P_TABACCHINO],\n"
+        "         premioTab: p, scade: ora + 48 * 3600, adesso: ora, cambio: 0.0005}, 'vendo').amount),\n"
+        # ⚠️ I TETTI IN SATS DEL COORDINATORE SI GUARDANO SUL PREMIO DEL
+        # PERCORSO, non su quello del cursore normale (difetto del 22 set,
+        # trovato riscrivendo il passo 4): a −20 i sats crescono del 20%,
+        # e un tetto a 45.000 li deve fermare
+        "      tettoCol: [con({premioTab: '-20', maxSats: 50000}).manca,\n"
+        "                 con({premioTab: '0', maxSats: 50000}).ok],\n"
         # il tetto di Amazon nel giudice del foglio (23 set 2026): a
         # tetti in sats spenti, che 999 € sono due milioni di sats
         "      tetto999: [con({euro: '999', maxSats: 0}).ok, con({euro: '999,01', maxSats: 0}).manca,\n"
@@ -55119,10 +55201,17 @@ def prove_p2p_pubblica():
     prova("il tetto di Amazon nel foglio: 999,00 passa, 999,01 no (col campo dell'importo), 0,50 passa",
           [True, "Amazon accetta il pagamento in contanti fino a 999 € per ordine", "p2pNuovoEuro", True],
           tv["tetto999"])
-    prova("lo sconto: 16 no, 2,55 no, 2,5 si', vuoto si' (zero), storto col suo campo, 15 al bordo si'",
-          ["Lo sconto va da 0 a 15%, con una cifra decimale al massimo",
-           "Lo sconto va da 0 a 15%, con una cifra decimale al massimo",
-           True, True, "p2pNuovoSconto", True], tv["sconto"])
+    _PR = "Il premio va da −20 a +20%, con una cifra decimale al massimo"
+    prova("il premio: 20,1 −20,1 +20,1 e 2,55 no; ±20, ±2,5 e il vuoto si'; storto col suo campo",
+          [_PR, _PR, _PR, _PR, True, True, True, True, True, "p2pTabPremioBox"],
+          tv["premio"])
+    prova("...e i sats seguono il segno: 20 € danno 40.000, 39.000, 41.000, 32.000, 48.000",
+          [40000, 39000, 41000, 32000, 48000], tv["satsPremio"])
+    # 23,47 € fanno 46.940 sats pieni: con un tetto a 50.000 il premio a
+    # zero passa, e il −20 (56.328 sats) no. Col premio sbagliato — quello
+    # del cursore normale, sempre zero qui — sarebbero passati tutt'e due.
+    prova("...e i tetti in sats si guardano sul premio del percorso, non su quello del cursore normale",
+          ["Troppi: il massimo è 50000 sats", True], tv["tettoCol"])
     # I SATS SONO NOSTRI: senza cambio vivo non si pubblica, e i due
     # tetti del coordinatore si guardano sul campo dell'importo
     prova("senza cambio vivo il tabacchino aspetta",
@@ -60438,8 +60527,11 @@ def prove_p2p_card_scambio():
     # fallire nessuna prova, lo legge solo chi sta per decidere.
     prova("il giudice dell'affare e' uno per tutti", 1,
           mini.count("(o.lato === 'buy') === (o.premium > 0)"))
+    # (23 set 2026) col premio di Barattozon il conto chiama lo stesso
+    # giudice su un premio RILETTO: la riga e' una sola, e il giudizio
+    # continua a non essere ribattuto
     prova("...e il conto del dettaglio lo chiama", True,
-          "const affare = affareP2P(o);"
+          "const affare = affareP2P(premioTab ? {lato: o.lato, premium: premioTab} : o);"
           in pezzo_js(mini, "function contoDettP2P(o){", "\n}\n"))
 
     # --- 3) IL VESTITO ----------------------------------------------
@@ -62512,14 +62604,29 @@ def prove_p2p_paycode():
     _tappe = mini[_i:mini.index("\n];", _i) + 3]
     _prog = (
         "const fmt = n => String(n);\nconst fmtEur = n => String(n);\n"
-        "const esc = s => String(s);\nconst el = () => null;\n"
+        "const esc = s => String(s);\n"
+        # ⚠️ `el` LEGGE DA UN DOM CHE PUO' NON ESSERCI: finche' `DOM` e'
+        # null vale «nessun nodo» — i giudici puri girano come prima — e
+        # il banco del cursore, in fondo, lo riempie quando tocca a lui
+        "let DOM = null;\n"
+        "const el = id => (DOM && DOM[id]) || null;\n"
         "const document = {querySelectorAll: () => []};\n"
         "let cambioVivo = true, eurPerSat = 0.0005;\n"
         "let p2pInfo = null;\n"
+        "let p2pNuovoEuro = '23,47', p2pNuovoPremioTab = '', p2pNuovoPremioTabMano = false;\n"
+        "let RENDER = 0, SFOCATI = 0;\n"
+        "function haptic(){}\n"
+        "function renderNuovoOrdineP2P(){ RENDER++; vesti(); }\n"
+        # il foglio vero legge venti campi: qui ne servono quattro, e
+        # sono quelli che il percorso guarda
+        "function campiNuovoP2P(){ return {euro: p2pNuovoEuro, cambio: 0.0005,\n"
+        "  premioTab: p2pNuovoPremioTab,\n"
+        "  tab: {ordine: '479868518', scade: campoDaScadeP2P(1800000000 + 48 * 3600)}}; }\n"
         + "\n".join(_riga(n) for n in (
             "P2P_TABACCHINO", "P2P_TABACCHINO_PM", "P2P_TABACCHINO_VITA_S",
             "P2P_PAYCODE_MIN_S", "P2P_PAYCODE_MAX_S", "P2P_TABACCHINO_MARGINE_S",
-            "P2P_SCONTO_TAB_MAX", "P2P_PAYCODE_MAX_EURO", "P2P_TAB_ULTIMA_S", "P2P_TAB_CONTROLLO_S",
+            "P2P_PREMIO_TAB_MAX", "P2P_PREMIO_MAX", "P2P_POLLICE",
+            "P2P_PAYCODE_MAX_EURO", "P2P_TAB_ULTIMA_S", "P2P_TAB_CONTROLLO_S",
             "P2P_TAB_AVVISO_S"))
         + "\n" + _forme + "\n" + _tappe + "\n"
         + "\n".join(_intera(f) for f in (
@@ -62528,9 +62635,18 @@ def prove_p2p_paycode():
             "function tabacchinoP2P(metodi){", "function metodoBaseP2P(m){",
             "function euroTabacchinoP2P(metodi){", "function satsTabacchinoP2P(importo, cambio, premio){",
             "function payCodeP2P(testo){", "function vitaLibroTabacchinoP2P(scade, adesso){",
-            "function scontoTabacchinoP2P(testo){", "function scontoTestoTabP2P(n){",
-            "function scontoImplicitoTabacchinoP2P(euro, sats, cambio){",
-            "function passoTabacchinoP2P(v){", "function rigaScontoTabP2P(euro, cambio, sconto){",
+            # il premio di Barattozon (23 set 2026), coi gemelli del
+            # cursore e i due giudici che il libro usa per rileggerlo
+            "function premioTabacchinoP2P(testo){", "function premioTestoTabP2P(n){",
+            "function premioImplicitoTabacchinoP2P(euro, sats, cambio){",
+            "function affareP2P(o){", "function comeLibroP2P(o){",
+            "function bordoPremioP2P(frazione){", "function fasciaPremioP2P(premio, lato){",
+            "function badgePremioP2P(o){",
+            "function premioTabP2P(){", "function premioTabModP2P(){",
+            "function premioTabValP2P(){", "function chiudiPremioTabManoP2P(){",
+            "function scriviPremioTabP2P(){", "function cambiaPremioTabP2P(v, da){",
+            "function aggiornaPercorsoTabP2P(){",
+            "function passoTabacchinoP2P(v){", "function rigaPremioTabP2P(euro, cambio, premio){",
             "function giudiceImportoPayCodeP2P(euro){",
             "function testataPercorsoTabP2P(passo){", "function riepilogoTabacchinoP2P(v){",
             "function scadeDaCampoP2P(s){", "function campoDaScadeP2P(epoch){",
@@ -62540,8 +62656,101 @@ def prove_p2p_paycode():
             "function statoPayCodeP2P(o){", "function inizioEuroInviatiP2P(o){",
             "function riquadroPayCodeP2P(o, adesso){",
             "function riquadroControlloTabP2P(o, adesso){"))
+        + """
+/* ---- IL BANCO DEL CURSORE (23 set 2026), gemello di quello del
+   premio normale: un DOM di cartone dove il riquadro riscritto PORTA
+   VIA i figli e fa nascere quelli del testo nuovo — letti dall'HTML
+   vero che rende `premioTabValP2P` — e il fuoco resta INCHIODATO sul
+   campo, come su un iPhone: cosi' «chi ha mosso» e' l'unico giudice
+   che puo' funzionare, e un giudice scritto sul fuoco morirebbe qui. */
+function nodoT(v){ return {value: v, textContent: '', innerHTML: '', classe: '',
+  style: {setProperty(k, x){ this[k] = x; }}, classList: {toggle(){}},
+  focus(){}, select(){}, blur(){ SFOCATI++; }}; }
+function riquadroT(){
+  let html = '', figli = [];
+  return {get innerHTML(){ return html; }, set innerHTML(t){
+    figli.forEach(k => { delete DOM[k]; });
+    html = t; figli = [];
+    for (const m of t.matchAll(/ id="([^"]+)"/g)) {
+      const n = nodoT('');
+      if (m[1] === 'p2pTabPremioMano') n.value = (t.match(/ value="([^"]*)"/) || [])[1];
+      if (m[1] === 'p2pTabPremioVal')
+        n.textContent = (t.match(/id="p2pTabPremioVal">([^<]*)</) || [])[1];
+      if (m[1] === 'p2pTabPremioPil') {
+        n.classe = (t.match(/class="([^"]*)" id="p2pTabPremioPil"/) || [])[1];
+        n.classList = {toggle(c, si){
+          const v = n.classe.split(' ').filter(x => x && x !== c);
+          if (si) v.push(c); n.classe = v.join(' '); }};
+      }
+      DOM[m[1]] = n; figli.push(m[1]);
+    } }};
+}
+function bottoneT(){ const b = {parola: ''};
+  Object.defineProperty(b, 'outerHTML', {set(t){
+    b.parola = (t.match(/>([^<]*)<\\/button>/) || [])[1]; }});
+  return b; }
+function vesti(){ DOM.p2pTabPremioBox.innerHTML = premioTabValP2P();
+  DOM.p2pTabPremioMod.outerHTML = premioTabModP2P(); }
+function foglioT(testo){
+  p2pNuovoPremioTab = testo; p2pNuovoPremioTabMano = false; RENDER = 0; SFOCATI = 0;
+  DOM = {p2pTabPremioCursore: nodoT(String(premioTabP2P())),
+         p2pTabPremioBox: riquadroT(), p2pTabPremioMod: bottoneT(),
+         p2pTabPasso: nodoT(''), p2pTabSatsRiga: nodoT('')};
+  vesti();
+}
+/* quel che si VEDE, in una riga: il testo scritto, il cursore, il
+   campo (null = non c'e'), la pillola e la sua classe, la parola del
+   bottone, lo stato e la riga viva */
+function vedoT(){
+  const m = DOM.p2pTabPremioMano, p = DOM.p2pTabPremioPil;
+  return [p2pNuovoPremioTab, DOM.p2pTabPremioCursore.value, m ? m.value : null,
+          p ? DOM.p2pTabPremioVal.textContent : null, p ? p.classe : null,
+          DOM.p2pTabPremioMod.parola, p2pNuovoPremioTabMano,
+          DOM.p2pTabSatsRiga.textContent];
+}
+function trascinaT(a){ const c = DOM.p2pTabPremioCursore;
+  c.value = String(a); cambiaPremioTabP2P(c.value, c); }
+function battiT(t){ const m = DOM.p2pTabPremioMano;
+  if (!m) return null;
+  m.value = t; cambiaPremioTabP2P(m.value, m); return true; }
+const CURSORE = {
+  /* IL METRO: un foglio dove il campo non si e' mai aperto, trascinato
+     a +2,5 — e' a questo che si deve tornare uguali */
+  mai(){ foglioT(''); trascinaT(2.5); return vedoT(); },
+  /* si scrive a mano: il cursore segue, il campo resta com'e' */
+  scritto(){ foglioT(''); scriviPremioTabP2P(); battiT('-2,5'); return vedoT(); },
+  /* ...e chi passa al cursore CHIUDE il campo: si deve tornare al metro */
+  segue(){ foglioT(''); scriviPremioTabP2P(); battiT('5'); trascinaT(2.5); return vedoT(); },
+  /* un testo storto non muove il pallino: resta l'ultimo buono */
+  storto(){ foglioT(''); scriviPremioTabP2P(); battiT('5'); battiT('20,1'); return vedoT(); },
+  mezzo(){ foglioT(''); scriviPremioTabP2P(); battiT('5'); battiT('-'); return vedoT(); },
+  /* «Fatto» torna alla pillola, e QUELLO si', ridisegna il foglio */
+  fatto(){ foglioT(''); scriviPremioTabP2P(); battiT('-7'); scriviPremioTabP2P();
+           return [vedoT(), RENDER]; },
+  /* la chiusura NON ridisegna (il dito e' sul cursore), e il blur e'
+     una pulizia sola */
+  render(){ foglioT(''); scriviPremioTabP2P(); const r = RENDER; trascinaT(3);
+            return [RENDER - r, SFOCATI]; },
+  /* e il terzo che chiama senza dire chi e': chiude, come il cursore */
+  terzo(){ foglioT(''); scriviPremioTabP2P(); battiT('5');
+           cambiaPremioTabP2P('-3.3'); return vedoT(); },
+  /* LA CINTURA: senza riquadro la chiusura non riesce, e allora il
+     campo si riscrive — un ramo di ripiego mai esercitato marcisce.
+     ⚠️ IL CAMPO SI LEGGE COL «SE C'E'», e non e' prudenza generica: la
+     tortura ha ucciso una mutazione facendo ESPLODERE il banco qui —
+     «cannot read properties of undefined» invece di una riga sul
+     comportamento. E' la famiglia gia' a verbale (18 set): un gesto su
+     un nodo che non c'e' torna `null`, e il caso lo racconta. */
+  cintura(){ foglioT(''); scriviPremioTabP2P(); battiT('5');
+             delete DOM.p2pTabPremioBox; cambiaPremioTabP2P('-3.3');
+             const m = DOM.p2pTabPremioMano;
+             return [m ? m.value : null, p2pNuovoPremioTabMano]; }
+};
+const CURSORI = {}; for (const k of Object.keys(CURSORE)) CURSORI[k] = CURSORE[k]();
+DOM = null;
+"""
         + "\nconst ora = 1800000000;\n"
-        "const base = {euro: '23,47', sconto: '', cambio: 0.0005, adesso: ora,\n"
+        "const base = {euro: '23,47', premioTab: '', cambio: 0.0005, adesso: ora,\n"
         "  tab: {ordine: '479-868-518', scade: campoDaScadeP2P(ora + 48 * 3600)}};\n"
         "const T = P2P_TABACCHINO;\n"
         "const testo = 'Contanti al tabacchino\\nPayCode: 479868518\\nImporto: 23,47 €\\nScade: '\n"
@@ -62560,26 +62769,46 @@ def prove_p2p_paycode():
         "         vitaLibroTabacchinoP2P(ora + 90 * 3600, ora) - ora, vitaLibroTabacchinoP2P(ora + 7200, ora) - ora,\n"
         "         vitaLibroTabacchinoP2P(ora + 3600, ora) - ora, vitaLibroTabacchinoP2P(ora + 5 * 3600, ora) - ora,\n"
         "         vitaLibroTabacchinoP2P(ora, ora), vitaLibroTabacchinoP2P(ora - 10, ora), vitaLibroTabacchinoP2P(0, ora)],\n"
-        "  sconto: ['', '0', '2,5', '2.5', '15', '15,0', '16', '2,55', '-1', 'abc', '1e1', null].map(scontoTabacchinoP2P),\n"
-        "  scontoTesto: [scontoTestoTabP2P(0), scontoTestoTabP2P(2.5), scontoTestoTabP2P(15), scontoTestoTabP2P(2.55)],\n"
+        # IL PREMIO (23 set 2026): −20..+20, una cifra decimale, col
+        # segno; «20,1» e «−20,1» sono STORTI, non tosati
+        "  premio: ['', '0', '2,5', '2.5', '-2,5', '−2,5', '+2,5', '20', '-20', '+20',\n"
+        "           '20,1', '-20,1', '+20,1', '2,55', '-', 'abc', '1e1', '100', '-0', null].map(premioTabacchinoP2P),\n"
+        "  premioTesto: [premioTestoTabP2P(0), premioTestoTabP2P(2.5), premioTestoTabP2P(-2.5),\n"
+        "                premioTestoTabP2P(20), premioTestoTabP2P(-20), premioTestoTabP2P(2.55)],\n"
+        # i sats dei cinque premi che Andrea ha chiesto, su 23,47 € e su
+        # una cifra tonda: premio negativo = PIU' sats
         "  sats: [satsTabacchinoP2P(23.47, 0.0005, 0), satsTabacchinoP2P(23.47, 0.0005, 2.5),\n"
-        "         satsTabacchinoP2P(23.47, 0.0005, 2.55), satsTabacchinoP2P(23.47, 0.0005, 15)],\n"
+        "         satsTabacchinoP2P(23.47, 0.0005, -2.5), satsTabacchinoP2P(23.47, 0.0005, 20),\n"
+        "         satsTabacchinoP2P(23.47, 0.0005, -20), satsTabacchinoP2P(23.47, 0.0005, 2.55)],\n"
+        "  satsTondi: [0, 2.5, -2.5, 20, -20].map(p => satsTabacchinoP2P(20, 0.0005, p)),\n"
+        # il badge della card: col segno, e le parole del giudizio
+        "  badge: [badgePremioP2P({lato: 'sell', euro: 20, sats: 39000, metodi: [T], premium: 0}),\n"
+        "          badgePremioP2P({lato: 'sell', euro: 20, sats: 41000, metodi: [T], premium: 0}),\n"
+        "          badgePremioP2P({lato: 'sell', euro: 20, sats: 40000, metodi: [T], premium: 0}),\n"
+        "          badgePremioP2P({lato: 'sell', euro: 20, sats: 39000, metodi: ['Revolut'], premium: 0}),\n"
+        "          badgePremioP2P({lato: 'sell', euro: 20, sats: 0, metodi: ['Revolut'], premium: 4}),\n"
+        "          (cambioVivo = false, badgePremioP2P({lato: 'sell', euro: 20, sats: 39000, metodi: [T], premium: 0}))],\n"
+        "  cursore: (cambioVivo = true, CURSORI),\n"
         # I LIMITI DI AMAZON (23 set 2026): fino a 999,00 compresi, nessun
         # minimo oltre lo zero; si confronta in centesimi
         "  tetto: ['999', '999,00', '999,01', '0,50', '0,01', '0', '1000', '998,99', ''].map(x => giudiceImportoPayCodeP2P(centesimiP2P(x).n)),\n"
-        "  implicito: [scontoImplicitoTabacchinoP2P(23.47, 45767, 0.0005), scontoImplicitoTabacchinoP2P(23.47, 46940, 0.0005),\n"
-        "              scontoImplicitoTabacchinoP2P(23.47, 50000, 0.0005), scontoImplicitoTabacchinoP2P(23.47, 45767, 0),\n"
-        "              scontoImplicitoTabacchinoP2P(0, 45767, 0.0005)],\n"
-        "  passo: [passoTabacchinoP2P({euro: '', sconto: '', tab: {ordine: '', scade: ''}}),\n"
-        "          passoTabacchinoP2P({euro: '', sconto: '', tab: {ordine: '479868518', scade: ''}}),\n"
-        "          passoTabacchinoP2P({euro: '23,47', sconto: '', tab: {ordine: '479868518', scade: ''}}),\n"
-        "          passoTabacchinoP2P({euro: '23,47', sconto: '99', tab: {ordine: '479868518', scade: campoDaScadeP2P(ora + 3600)}}),\n"
-        "          passoTabacchinoP2P({euro: '23,47', sconto: '', tab: {ordine: '479868518', scade: campoDaScadeP2P(ora + 3600)}}),\n"
-        "          passoTabacchinoP2P({euro: '23,47', sconto: '', tab: {ordine: '123', scade: campoDaScadeP2P(ora + 3600)}})],\n"
+        # il premio RILETTO dai sats fissi, col segno e SENZA tosature:
+        # il cambio si muove, e un ordine fuori fascia deve dirlo
+        "  implicito: [premioImplicitoTabacchinoP2P(20, 32000, 0.0005), premioImplicitoTabacchinoP2P(20, 48000, 0.0005),\n"
+        "              premioImplicitoTabacchinoP2P(20, 40000, 0.0005), premioImplicitoTabacchinoP2P(20, 39000, 0.0005),\n"
+        "              premioImplicitoTabacchinoP2P(20, 41000, 0.0005), premioImplicitoTabacchinoP2P(20, 60000, 0.0005),\n"
+        "              premioImplicitoTabacchinoP2P(20, 39000, 0), premioImplicitoTabacchinoP2P(0, 39000, 0.0005)],\n"
+        "  passo: [passoTabacchinoP2P({euro: '', premioTab: '', tab: {ordine: '', scade: ''}}),\n"
+        "          passoTabacchinoP2P({euro: '', premioTab: '', tab: {ordine: '479868518', scade: ''}}),\n"
+        "          passoTabacchinoP2P({euro: '23,47', premioTab: '', tab: {ordine: '479868518', scade: ''}}),\n"
+        "          passoTabacchinoP2P({euro: '23,47', premioTab: '99', tab: {ordine: '479868518', scade: campoDaScadeP2P(ora + 3600)}}),\n"
+        "          passoTabacchinoP2P({euro: '23,47', premioTab: '-2,5', tab: {ordine: '479868518', scade: campoDaScadeP2P(ora + 3600)}}),\n"
+        "          passoTabacchinoP2P({euro: '23,47', premioTab: '', tab: {ordine: '123', scade: campoDaScadeP2P(ora + 3600)}})],\n"
         "  testata: [testataPercorsoTabP2P(1), testataPercorsoTabP2P(4), testataPercorsoTabP2P(5)],\n"
-        "  riga: [rigaScontoTabP2P('', 0.0005, ''), rigaScontoTabP2P('23,47', 0, ''), rigaScontoTabP2P('23,47', 0.0005, '2,55'),\n"
-        "         rigaScontoTabP2P('23,47', 0.0005, ''), rigaScontoTabP2P('23,47', 0.0005, '2,5')],\n"
-        "  riepilogo: riepilogoTabacchinoP2P(Object.assign({}, base, {sconto: '2,5'})),\n"
+        "  riga: [rigaPremioTabP2P('', 0.0005, ''), rigaPremioTabP2P('23,47', 0, ''), rigaPremioTabP2P('23,47', 0.0005, '2,55'),\n"
+        "         rigaPremioTabP2P('23,47', 0.0005, ''), rigaPremioTabP2P('23,47', 0.0005, '2,5'),\n"
+        "         rigaPremioTabP2P('23,47', 0.0005, '-2,5')],\n"
+        "  riepilogo: riepilogoTabacchinoP2P(Object.assign({}, base, {premioTab: '2,5'})),\n"
         "  riepilogoZero: riepilogoTabacchinoP2P(base),\n"
         "  daTesto: [payCodeDaTestoP2P(testo), payCodeDaTestoP2P('Contanti al tabacchino\\nNumero ordine: 479-868-518\\nScade: x'),\n"
         "            payCodeDaTestoP2P('Contanti al tabacchino\\nNumero ordine: 123-4567890-1234567'), payCodeDaTestoP2P('PayCode: 479-868-518'),\n"
@@ -62625,14 +62854,24 @@ def prove_p2p_paycode():
     prova("...e su un PayCode gia' scaduto o assente vale zero", [0, 0, 0], out["vita"][6:])
 
     # --- 3) LO SCONTO: 0-15, una cifra decimale ---------------------------
-    prova("lo sconto: vuoto e 0 valgono zero; 2,5 e 2.5 sono la stessa cifra; 15 e 15,0 passano",
+    # --- IL PREMIO, DA −20 A +20 (23 set 2026) --------------------------
+    # I dieci buoni: vuoto e 0 valgono zero; 2,5 e 2.5 sono la stessa
+    # cifra; il «−» tipografico e il «+» esplicito passano; i due capi
+    # ci stanno per intero.
+    prova("il premio: vuoto e 0 sono zero, 2,5/2.5/+2,5 la stessa cifra, il meno porta il segno, ±20 passano",
           [{"n": 0, "storto": False}, {"n": 0, "storto": False}, {"n": 2.5, "storto": False},
-           {"n": 2.5, "storto": False}, {"n": 15, "storto": False}, {"n": 15, "storto": False}],
-          out["sconto"][:6])
-    prova("...16, 2,55, -1, abc, 1e1 e null sono STORTI (o nulli), mai «quasi giusti»",
-          [True, True, True, True, True, False],
-          [s["storto"] for s in out["sconto"][6:]])
-    prova("...e si scrive con la virgola", ["0%", "2,5%", "15%", "2,6%"], out["scontoTesto"])
+           {"n": 2.5, "storto": False}, {"n": -2.5, "storto": False}, {"n": -2.5, "storto": False},
+           {"n": 2.5, "storto": False}, {"n": 20, "storto": False}, {"n": -20, "storto": False},
+           {"n": 20, "storto": False}],
+          out["premio"][:10])
+    # ⚠️ FUORI FASCIA SI RIFIUTA, NON SI TOSA: chi scrive «20,1» voleva
+    # un numero, e un tetto muto glielo cambierebbe sotto gli occhi
+    prova("...e 20,1, −20,1, +20,1, 2,55, un «-» a meta', abc, 1e1 e 100 sono STORTI",
+          [True] * 8, [s["storto"] for s in out["premio"][10:18]])
+    prova("...«-0» e' zero, e il nulla vale zero senza essere storto",
+          [{"n": 0, "storto": False}, {"n": 0, "storto": False}], out["premio"][18:])
+    prova("...e si scrive col segno e la virgola, sempre",
+          ["0%", "+2,5%", "−2,5%", "+20%", "−20%", "+2,6%"], out["premioTesto"])
     # --- I LIMITI DI AMAZON «Paga in contanti» (23 set 2026) -----------
     _T = "Amazon accetta il pagamento in contanti fino a 999 € per ordine"
     _Z = "Scrivi l'importo del PayCode, coi centesimi se servono"
@@ -62646,35 +62885,102 @@ def prove_p2p_paycode():
     prova("...mentre nessun minimo nostro esiste, ne' in client ne' in server: ne' P2P_MIN_EURO ne' un minimo in euro", True,
           "P2P_MIN_EURO" not in mini and "P2P_MIN_EURO" not in src
           and "MIN_EURO_P2P" not in src and "minEuro" not in mini)
-    # 23,47 / 0,0005 = 46940 sats pieni; al 2,5% ne restano 45766,5 → 45767;
-    # 2,55 si tosa al decimo (2,6 → 45720); al 15% 39899
-    prova("i sats del PayCode: pieno, al 2,5%, al 2,55 tosato al decimo, al 15%",
-          [46940, 45767, 45720, 39899], out["sats"])
-    prova("lo sconto si rilegge all'indietro dai sats fissi: 45767 → 2,5%, pieno → 0, sopra il pieno → 0, senza cambio → 0",
-          [2.5, 0, 0, 0, 0], out["implicito"])
+    # 23,47 / 0,0005 = 46940 sats pieni. IL SEGNO DECIDE IL VERSO: col
+    # premio positivo chi paga ne riceve MENO, col negativo di PIU'.
+    # 2,55 si tosa al decimo (2,6 → 45720).
+    prova("i sats: pieno, +2,5, −2,5, +20, −20, e il 2,55 tosato al decimo",
+          [46940, 45767, 48113, 37552, 56328, 45720], out["sats"])
+    # ...e su una cifra tonda si legge a occhio che e' importo × (1 −
+    # premio/100): 20 € a 0,0005 fanno 40.000 sats pieni
+    prova("...su 20 € i cinque premi danno 40.000, 39.000, 41.000, 32.000, 48.000",
+          [40000, 39000, 41000, 32000, 48000], out["satsTondi"])
+    prova("il premio si rilegge all'indietro dai sats fissi, COL SEGNO: +20, −20, 0, +2,5, −2,5",
+          [20, -20, 0, 2.5, -2.5], out["implicito"][:5])
+    # ⚠️ E NON SI TOSA A ±20: il cambio si muove, e un ordine che oggi
+    # vale il 50% piu' del mercato deve poterlo dire
+    prova("...oltre la fascia dice il vero (−50), e senza cambio o senza euro vale zero",
+          [-50, 0, 0], out["implicito"][5:])
 
     # --- 4) IL PERCORSO: il passo in cui si sta, e la testata ----------
-    prova("il passo e' il primo che manca: 1, 2, 3, 4 (sconto storto), 5 (tutto fatto), 1 (PayCode storto)",
+    prova("il passo e' il primo che manca: 1, 2, 3, 4 (premio storto), 5 (tutto fatto), 1 (PayCode storto)",
           [1, 2, 3, 4, 5, 1], out["passo"])
     prova("la testata dice il passo, e a passi fatti invita a rileggere",
-          ["Passo 1 di 4 · Il PayCode", "Passo 4 di 4 · Lo sconto per chi paga",
+          ["Passo 1 di 4 · Il PayCode", "Passo 4 di 4 · Il premio",
            "Tutti e quattro i passi sono fatti: rileggi e pubblica."], out["testata"])
-    prova("la riga dei sats: senza importo, senza cambio, sconto storto, zero, e il conto vero",
+    # ⚠️ LA RIGA VIVA DICE IL VERSO IN PAROLE, ed e' la parte che un
+    # segno da solo non dice: chi risparmia e chi paga la comodita'
+    prova("la riga viva: senza importo, senza cambio, premio storto, zero, e i due versi",
           ["Scrivi prima l'importo: qui vedrai quanti sats riceve chi paga.",
            "Aspetta un attimo: sto leggendo il cambio.",
-           "Lo sconto va da 0 a 15%, con una cifra decimale al massimo.",
-           "Senza sconto chi paga al tabacchino riceve il cambio pieno: 46940 sats per 23,47 €.",
-           "Chi paga al tabacchino riceve 45767 sats invece di 46940 (il cambio pieno per 23,47 €): il 2,5% resta a te."],
+           "Il premio va da −20 a +20%, con una cifra decimale al massimo.",
+           "Chi paga al tabacchino riceve 46940 sats, il cambio pieno per 23,47 €.",
+           "Chi paga al tabacchino riceve 45767 sats, cioè il 2,5% in meno del cambio: risparmi tu.",
+           "Chi paga al tabacchino riceve 48113 sats, cioè il 2,5% in più del cambio: lo paghi tu per la comodità."],
           out["riga"])
     _rp = out["riepilogo"]
-    prova("il riepilogo: PayCode, importo, scadenza, sconto, i sats e fino a quando resta nel libro", True,
+    prova("il riepilogo: PayCode, importo, scadenza, premio COL SEGNO, i sats e fino a quando resta nel libro", True,
           _rp.startswith("PayCode: 479-868-518\nImporto: 23,47 €\nScade il: ")
-          and "\nSconto: 2,5%\n" in _rp
-          and "riceve 45767 sats invece di 46940: tu blocchi 45767 sats in garanzia" in _rp
+          and "\nPremio: +2,5%\n" in _rp
+          and "riceve 45767 sats, cioè il 2,5% in meno del cambio: risparmi tu." in _rp
+          and "Tu blocchi 45767 sats in garanzia" in _rp
           and bool(re.search(r"Nel libro fino alle \d\d:\d\d del \d\d/\d\d/\d{4}, poi esce da solo\.$", _rp)))
-    prova("...e a sconto zero dice «il cambio pieno»", True,
-          "Sconto: 0%\n" in out["riepilogoZero"]
-          and "riceve 46940 sats (il cambio pieno)" in out["riepilogoZero"])
+    prova("...e a premio zero dice «il cambio pieno»", True,
+          "Premio: 0%\n" in out["riepilogoZero"]
+          and "riceve 46940 sats, il cambio pieno per 23,47 €." in out["riepilogoZero"])
+    # --- IL BADGE DELLA CARD (23 set 2026) ------------------------------
+    # 20 € a 0,0005 fanno 40.000 pieni: 39.000 e' un +2,5% (chi compra
+    # ne riceve meno: MENO conveniente, in rosso), 41.000 un −2,5%.
+    prova("la card mostra il premio di Barattozon COL SEGNO, e le parole del giudizio",
+          ['<span class="p2p-badge"><b class="p2p-avviso">+2,5%</b> meno conveniente</span>',
+           '<span class="p2p-badge"><b class="p2p-affare">−2,5%</b> più conveniente</span>',
+           '<span class="p2p-badge">al prezzo di mercato</span>'], out["badge"][:3])
+    prova("...gli altri ordini a prezzo fisso restano muti, e quelli a mercato com'erano",
+          ["", '<span class="p2p-badge"><b class="p2p-avviso">4%</b> meno conveniente</span>'],
+          out["badge"][3:5])
+    prova("...e a cambio muto nessun badge: mai un numero inventato", "", out["badge"][5])
+    # --- IL CURSORE: le due lezioni del 18 set, gemelle ------------------
+    _cu = out["cursore"]
+    prova("il cursore muove il premio, la pillola e la riga viva",
+          ["2.5", "2.5", None, "+2,5%", "p2p-premio-cifra affare", "Modifica", False,
+           "Chi paga al tabacchino riceve 45767 sats, cioè il 2,5% in meno del cambio: risparmi tu."],
+          _cu["mai"])
+    # SI SCRIVE A MANO: il cursore segue, e il campo NON si riscrive
+    # sotto le dita (la lezione delle pillole)
+    prova("...si scrive a mano e il cursore segue, senza riscrivere il campo",
+          ["-2,5", "-2.5", "-2,5", None, None, "Fatto", True,
+           "Chi paga al tabacchino riceve 48113 sats, cioè il 2,5% in più del cambio: lo paghi tu per la comodità."],
+          _cu["scritto"])
+    # ⚠️ IL METRO: chi passa al cursore CHIUDE il campo, e da li' in poi
+    # il foglio deve essere IDENTICO a uno dove il campo non si e' mai
+    # aperto — non simile: identico
+    prova("...e chi trascina dopo aver scritto torna ESATTAMENTE al foglio mai aperto",
+          _cu["mai"], _cu["segue"])
+    prova("un testo storto non muove il pallino: resta l'ultimo buono, e lo dice la riga",
+          ["20,1", "5", "20,1", None, None, "Fatto", True,
+           "Il premio va da −20 a +20%, con una cifra decimale al massimo."],
+          _cu["storto"])
+    prova("...e nemmeno un «-» a meta' battitura", ["-", "5", "-", None, None, "Fatto", True,
+           "Il premio va da −20 a +20%, con una cifra decimale al massimo."], _cu["mezzo"])
+    prova("«Fatto» riporta la pillola col numero scritto, e QUELLO ridisegna il foglio",
+          [["-7", "-7", None, "−7%", "p2p-premio-cifra avviso", "Modifica", False,
+            "Chi paga al tabacchino riceve 50226 sats, cioè il 7% in più del cambio: lo paghi tu per la comodità."], 2],
+          _cu["fatto"])
+    # ⚠️ LA CHIUSURA NON RIDISEGNA IL FOGLIO: il render rifarebbe anche il
+    # cursore, cioe' lo toglierebbe da sotto il dito che lo trascina. E il
+    # blur e' una pulizia sola (la tastiera che resta su, su certe WebView).
+    prova("il cursore che chiude il campo non ridisegna il foglio, e sfoca una volta sola",
+          [0, 1], _cu["render"])
+    # ⚠️ UN TERZO CHE CHIAMA SENZA DIRE CHI E' E' «QUALCUN ALTRO», e
+    # quindi chiude il campo: la regola e' «chi muove da fuori chiude»,
+    # e il solo che resta dentro e' il campo stesso.
+    prova("...e un terzo che chiama senza dire chi e' chiude il campo, come il cursore",
+          ["-3.3", "-3.3", None, "−3,3%", "p2p-premio-cifra avviso", "Modifica", False,
+           "Chi paga al tabacchino riceve 48489 sats, cioè il 3,3% in più del cambio: lo paghi tu per la comodità."],
+          _cu["terzo"])
+    # ...e LA CINTURA, il ramo che oggi non gira mai: se la chiusura non
+    # riesce (il riquadro non si trova), il campo almeno non mente
+    prova("la cintura: chiusura mancata, e il campo si riscrive col numero vero",
+          ["-3.3", True], _cu["cintura"])
 
     # --- 5) IL RECAPITO CIFRATO: la riga «PayCode:», e chi la rilegge ---
     prova("dal testo cifrato il PayCode si rilegge dalla SOLA riga sua (o «Numero ordine:» di ieri), normalizzato",
@@ -62688,9 +62994,9 @@ def prove_p2p_paycode():
           "const pc = payCodeP2P(campi.ordine);" in _inv and "campi.ordine = pc;" in _inv
           and "toast('Il PayCode ha 9 cifre, come 479-868-518');" in _inv)
     _pub = pezzo_js(mini, "async function inviaNuovoOrdineP2P(confermato){", "\n}\n")
-    prova("chi pubblica scrive sulla riga il PayCode normalizzato e lo sconto col decimale", True,
+    prova("chi pubblica scrive sulla riga il PayCode normalizzato e il premio col decimale", True,
           "ordine: payCodeP2P(campi.tab.ordine) ||" in _pub
-          and "ord.premioCotto = scontoTabacchinoP2P(campi.sconto).n;" in _pub)
+          and "ord.premioCotto = premioTabacchinoP2P(campi.premioTab).n;" in _pub)
 
     # --- 6) IL RIEPILOGO PRIMA DI PUBBLICARE: la conferma, poi il gesto --
     prova("col tabacchino il tocco apre il riepilogo, e il si' richiama il gesto col timbro", True,
@@ -62709,24 +63015,48 @@ def prove_p2p_paycode():
           and "const importo = tab ? '' : sezioneNuovoP2P({" in _fog
           and "const premio = (p2pNuovoFisso || tab) ? '' : sezioneNuovoP2P({" in _fog)
     _per = pezzo_js(mini, "function percorsoTabacchinoP2P(val){", "\n}\n")
-    prova("il percorso ha quattro tappe numerate coi campi di sempre piu' lo sconto", True,
+    prova("il percorso ha quattro tappe numerate coi campi di sempre piu' il cursore del premio", True,
           all(x in _per for x in ('id="p2pTabPasso"', 'id="p2pNuovoTabOrdine"', 'id="p2pNuovoEuro"',
-                                  'id="p2pNuovoTabScade"', 'id="p2pNuovoSconto"', 'id="p2pTabSatsRiga"'))
-          and _per.count("tappa(") == 4
-          and "inputmode=\"decimal\" maxlength=\"4\"" in _per)
+                                  'id="p2pNuovoTabScade"', 'id="p2pTabPremioBox"',
+                                  'id="p2pTabPremioCursore"', 'id="p2pTabSatsRiga"'))
+          and _per.count("tappa(") == 4)
+    # ⚠️ E' LO STESSO CURSORE DEL P2P NORMALE, con le sue classi — ma il
+    # passo e' un DECIMO, che qui il premio non viaggia sul filo
+    prova("...ed e' il cursore di casa: stesse classi, scala ±20, passo di un decimo", True,
+          'class="p2p-premio"' in _per and 'class="p2p-premio-val"' in _per
+          and 'class="p2p-premio-pie"' in _per and 'class="p2p-premio-capi"' in _per
+          and 'min="-\' + P2P_PREMIO_TAB_MAX + \'"' in _per
+          and 'step="0.1"' in _per
+          and "const P2P_PREMIO_TAB_MAX = 20;" in mini)
+    prova("...la pillola e il campo a mano sono i gemelli, con la matita e il «Fatto»", True,
+          'class="p2p-premio-cifra' in pezzo_js(mini, "function premioTabValP2P(){", "\n}\n")
+          and 'id="p2pTabPremioMano"' in pezzo_js(mini, "function premioTabValP2P(){", "\n}\n")
+          and 'class="p2p-premio-matita"' in pezzo_js(mini, "function premioTabValP2P(){", "\n}\n")
+          and "p2pNuovoPremioTabMano ? 'Fatto' : 'Modifica'"
+          in pezzo_js(mini, "function premioTabModP2P(){", "\n}\n"))
+    # ⚠️ E IL P2P NORMALE NON SI E' MOSSO: il suo cursore resta a passo
+    # intero e non sa niente del tabacchino
+    prova("il cursore del P2P normale resta intero e non sa di Barattozon", True,
+          'step="1"' in pezzo_js(mini, "function premioValP2P(){", "\n}\n")
+          and "Tab" not in pezzo_js(mini, "function cambiaPremioP2P(v, da){", "\n}\n")
+          .replace("TABACCHINO", "")
+          and "p2pNuovoPremioTab" not in pezzo_js(mini, "function cambiaPremioP2P(v, da){", "\n}\n"))
     prova("...il campo data va da un'ora a 72 ore (o alla garanzia, se piu' stretta)", True,
           "min=\"' + campoDaScadeP2P(adessoTab + P2P_PAYCODE_MIN_S) + '\"" in _per
           and "Math.min(P2P_PAYCODE_MAX_S, finestraTab)" in _per)
-    prova("...e dice il verso dello sconto e la regola «piu' basso = piu' probabile»", True,
-          "Sconto più basso = più probabile che qualcuno lo paghi in tempo." in _per
-          and "quanto in meno, in sats, consegni rispetto al cambio di adesso" in _per)
-    prova("i pezzi vivi si riscrivono in place a ogni tasto: dal PayCode, dallo sconto e dall'importo", True,
+    prova("...e sotto il cursore c'e' la riga di aiuto, con la regola del verso", True,
+          "Premio più basso = più conveniente per chi paga = più probabile che qualcuno lo prenda in tempo."
+          in _per
+          and "Da −20 a +20%, con una cifra decimale: il segno decide il verso." in _per)
+    prova("i pezzi vivi si riscrivono in place a ogni tasto: dal PayCode, dal premio e dall'importo", True,
           "aggiornaPercorsoTabP2P();" in pezzo_js(mini, "function cambiaTabP2P(){", "\n}\n")
+          and "aggiornaPercorsoTabP2P();" in pezzo_js(mini, "function cambiaPremioTabP2P(v, da){", "\n}\n")
           and "if (tabacchinoP2P(p2pNuovoMetodi)) aggiornaPercorsoTabP2P();"
           in pezzo_js(mini, "function cambiaCampoNuovoP2P(){", "\n}\n"))
-    prova("lo sconto e' un campo del foglio, letto da campiNuovoP2P e azzerato con gli altri", True,
-          "sconto: p2pNuovoSconto," in pezzo_js(mini, "function campiNuovoP2P(){", "\n}\n")
-          and "  p2pNuovoSconto = '';" in mini)
+    prova("il premio e' un campo del foglio, letto da campiNuovoP2P e azzerato con gli altri", True,
+          "premioTab: p2pNuovoPremioTab," in pezzo_js(mini, "function campiNuovoP2P(){", "\n}\n")
+          and "  p2pNuovoPremioTab = '';" in mini
+          and "  p2pNuovoPremioTabMano = false;" in mini)
 
     # --- 7) A CHI COMPRA: il riquadro del PayCode ---------------------------
     _rc = out["riquadroCompro"]
@@ -62799,16 +63129,23 @@ def prove_p2p_paycode():
           and "479-868-518" in _inf and "quattro passi" in _inf
           and "Non esiste una conferma automatica" in _inf
           and "due ore prima" in _inf and "Ci sono due scadenze" in _inf
-          and "Sconto più basso = più probabile che qualcuno lo paghi in tempo." in _inf
+          and "Premio più basso = più conveniente per chi paga = più probabile che qualcuno lo prenda in tempo." in _inf
+          and "Il segno decide il verso:" in _inf
+          and "il premio è <b>ricavato</b>" in _inf
           and "Non risulta pagato: apri una disputa" in _inf)
     _cat = mini[mini.index("const TOUR_P2P = ["):] if "const TOUR_P2P = [" in mini else mini
     prova("la card del tour passa il PayCode, e a prepararlo e' sempre chi vende", True,
           "ti passa il PayCode. Tu '" in mini and "paghi quel PayCode dal tabaccaio" in mini)
+    # ⚠️ IL GIUDIZIO NON SI RIBATTE: la riga dello sconto nella nota del
+    # dettaglio se n'e' andata col premio — il conto qui sotto lo porta
+    # nella sua riga, col segno e la tinta, e due copie di un numero
+    # ricavato si scollano senza rompere niente
     _nd = pezzo_js(mini, "function notaTabacchinoDettP2P(o){", "\n}\n")
-    prova("il dettaglio di chi prende dice lo sconto letto all'indietro: «ricevi N sats invece di M»", True,
-          "scontoImplicitoTabacchinoP2P(o.euro, o.sats, cambio)" in _nd
-          and "' sats</b> invece di ' + fmt(pieno)" in _nd
-          and "Nessuno sconto" in _nd)
+    prova("il dettaglio non ribatte il premio: lo dice il conto, nella sua riga", True,
+          "premioImplicito" not in _nd and "💸" not in _nd
+          and "apriInfoTabacchinoP2P()" in _nd
+          and "premioImplicitoTabacchinoP2P(o.euro, o.sats, eurPerSat)"
+          in pezzo_js(mini, "function contoDettP2P(o){", "\n}\n"))
     _per2 = pezzo_js(mini, "function percorsoTabacchinoP2P(val){", "\n}\n")
     prova("il percorso dice le regole di Amazon: 72 ore dal checkout, 999 €, le esclusioni", True,
           "Amazon dà 72 ore dal checkout: copia la scadenza dalla mail." in _per2
