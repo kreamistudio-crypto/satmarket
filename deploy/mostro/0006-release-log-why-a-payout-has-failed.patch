@@ -1,17 +1,17 @@
-From 4f20e0488289cd8cdb88e5668de9a433dc77fa7f Mon Sep 17 00:00:00 2001
-From: kreamistudio-crypto <kreamistudio-crypto@users.noreply.github.com>
-Date: Fri, 18 Sep 2026 07:17:13 +0000
-Subject: [PATCH 6/6] release: log why a payout has failed
+From a795a1c833cee76ae901afaf1cc70348e80b7f4c Mon Sep 17 00:00:00 2001
+From: Barattolo <barattolo@barattolo.store>
+Date: Tue, 22 Sep 2026 13:40:11 +0200
+Subject: [PATCH 6/7] release: log why a payout has failed
 
 ---
  src/app/release.rs | 15 +++++++++++++--
  1 file changed, 13 insertions(+), 2 deletions(-)
 
 diff --git a/src/app/release.rs b/src/app/release.rs
-index f87114a..188c622 100644
+index 3e9886f..77d6a9f 100644
 --- a/src/app/release.rs
 +++ b/src/app/release.rs
-@@ -1025,9 +1025,20 @@ pub async fn do_payment(
+@@ -1074,9 +1074,20 @@ async fn dispatch_payout(
                                  }
                              }
                              PaymentStatus::Failed => {
@@ -35,5 +35,5 @@ index f87114a..188c622 100644
  
                                  // Release our own claim (scoped to this hash and
 -- 
-2.47.3
+2.55.0.windows.3
 

@@ -1,8 +1,8 @@
-From 2b713087f598dad232ec37f9fd77d3bbfd056914 Mon Sep 17 00:00:00 2001
-From: kreamistudio-crypto <kreamistudio-crypto@users.noreply.github.com>
-Date: Tue, 15 Sep 2026 19:52:49 +0000
-Subject: [PATCH] order/take: answer PriceTooStale when no price is cached yet,
- instead of a silent internal error
+From 07496427441fe56a0355c21c592312af7bb8a478 Mon Sep 17 00:00:00 2001
+From: Barattolo <barattolo@barattolo.store>
+Date: Tue, 22 Sep 2026 13:40:10 +0200
+Subject: [PATCH 4/7] order/take: answer PriceTooStale when no price is cached
+ yet, instead of a silent internal error
 
 With the in-memory price store, a market-priced order or take issued before the first successful provider tick (cold cache after a restart, all providers down) hit NoAPIResponse / WrongAmountError at the order boundary: an internal error that is logged and never answered. For the user this is the same situation as a stale price, so answer the same CantDoReason::PriceTooStale. The PriceManager keeps its internal distinction and logs.
 ---
@@ -82,5 +82,5 @@ index aa16fe7..8ebfdd1 100644
      } else {
          // Fixed price: only calculate dev_fee (amount/fee already set at creation)
 -- 
-2.47.3
+2.55.0.windows.3
 

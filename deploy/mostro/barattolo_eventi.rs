@@ -76,7 +76,11 @@ pub const PAYOUT_FAILED: &str = "payout-failed";
 //   canceled                cooperative | republished | pending | admin
 //   expired                 book | taker-timeout | maker-timeout | escrow-deadline
 //   released                admin (a moderator settled a dispute)
-//   payout-failed           LND's failure reason (NO_ROUTE, TIMEOUT, …)
+//   payout-failed           LND's failure reason (NO_ROUTE, TIMEOUT, …) when the
+//                           payment was sent; before the claim (upstream #908
+//                           routes every pre-claim failure through one point)
+//                           INVOICE_INVALID | INVOICE_EXPIRED | ADDRESS_UNRESOLVED |
+//                           LND_UNREACHABLE | INVALID_PUBKEY | DB_ERROR | PRE_CLAIM
 
 pub fn is_known_action(action: &str) -> bool {
     action == PAYOUT_FAILED || ACTIONS.contains(&action)
@@ -417,6 +421,30 @@ pub fn emit_payout_failed(order: &Order, reason_code: i32) {
     );
 }
 
+/// A payout that failed BEFORE anything reached LND: the destination did not
+/// resolve, the invoice did not decode or was expired, LND itself was
+/// unreachable. Upstream (#908, 0.18.8) funnels every such exit through the
+/// `Err` branch of `do_payment`, so one hook there covers them all; the word
+/// names the class, never the error text.
+pub fn pre_claim_failure_name(e: &MostroError) -> &'static str {
+    match e {
+        MostroInternalErr(ServiceError::InvoiceInvalidError)
+        | MostroInternalErr(ServiceError::ParsingInvoiceError) => "INVOICE_INVALID",
+        MostroInternalErr(ServiceError::InvoiceExpiredError) => "INVOICE_EXPIRED",
+        MostroInternalErr(ServiceError::LnAddressParseError)
+        | MostroInternalErr(ServiceError::LnAddressWrongAmount) => "ADDRESS_UNRESOLVED",
+        MostroInternalErr(ServiceError::LnNodeError(_)) => "LND_UNREACHABLE",
+        MostroInternalErr(ServiceError::InvalidPubkey) => "INVALID_PUBKEY",
+        MostroInternalErr(ServiceError::DbAccessError(_)) => "DB_ERROR",
+        _ => "PRE_CLAIM",
+    }
+}
+
+/// [`emit_payout_failed`] for the pre-claim exits of `do_payment`.
+pub fn emit_payout_failed_pre_claim(order: &Order, e: &MostroError) {
+    emit_detail(PAYOUT_FAILED, order, "mostro", pre_claim_failure_name(e));
+}
+
 fn fee_heartbeat_runs() -> bool {
     let set = |key: &str| {
         std::env::var(key)
@@ -651,6 +679,48 @@ mod tests {
         assert_eq!(failure_reason_name(4), "INCORRECT_PAYMENT_DETAILS");
         assert_eq!(failure_reason_name(99), "UNKNOWN");
         assert_eq!(failure_reason_name(-1), "UNKNOWN");
+    }
+
+    #[test]
+    fn pre_claim_failures_by_class() {
+        let of = pre_claim_failure_name;
+        assert_eq!(
+            of(&MostroInternalErr(ServiceError::InvoiceInvalidError)),
+            "INVOICE_INVALID"
+        );
+        assert_eq!(
+            of(&MostroInternalErr(ServiceError::InvoiceExpiredError)),
+            "INVOICE_EXPIRED"
+        );
+        assert_eq!(
+            of(&MostroInternalErr(ServiceError::LnAddressParseError)),
+            "ADDRESS_UNRESOLVED"
+        );
+        assert_eq!(
+            of(&MostroInternalErr(ServiceError::LnNodeError("down".into()))),
+            "LND_UNREACHABLE"
+        );
+        assert_eq!(
+            of(&MostroInternalErr(ServiceError::InvalidPubkey)),
+            "INVALID_PUBKEY"
+        );
+        assert_eq!(
+            of(&MostroInternalErr(ServiceError::DbAccessError("x".into()))),
+            "DB_ERROR"
+        );
+        assert_eq!(
+            of(&MostroCantDo(CantDoReason::InvalidAmount)),
+            "PRE_CLAIM"
+        );
+        // the word goes through the same cleaner as every detail
+        let o = order();
+        assert_eq!(
+            event_of(PAYOUT_FAILED, &o, "mostro", Some("LND_UNREACHABLE"))
+                .unwrap()
+                .detail
+                .as_deref(),
+            Some("LND_UNREACHABLE")
+        );
     }
 
     // ── the wire ─────────────────────────────────────────────────────────

@@ -3063,7 +3063,7 @@
   /* lo scontrino veste il colore dei metodi, di cui e' figlio (set
      2026, col tabacchino); e i suoi tre campi stanno in colonna */
   .p2p-sez-ico.ico-scontrino{background:var(--ship-bg);color:var(--ship-text)}
-  #p2pNuovoTabImporto,#p2pNuovoTabScade{margin-top:8px}
+  #p2pNuovoTabScade{margin-top:8px}
   .p2p-ico{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.5;
     stroke-linecap:round;stroke-linejoin:round}
   /* IL GLIFO STA NELLO STESSO TONDO e ne prende il colore, ma non la
@@ -7775,7 +7775,7 @@ document.getElementById('cartello')?.remove();</script>
       <p>È il metodo per chi non vuole passare da una banca o da un'app: chi <b>vende</b> sats genera un <b>ordine Amazon pagabile in contanti</b> (da Mooney, in tabaccheria) e chi <b>compra</b> lo paga alla cassa del tabacchino. Il tabacchino incassa i contanti, l'ordine Amazon risulta pagato, e i sats si liberano.</p>
       <ol class="sicu-passi">
         <li><b>Chi vende genera l'ordine Amazon</b>, per l'importo dello scambio, scegliendo il pagamento in contanti. Amazon gli dà tre cose: il <b>numero dell'ordine</b>, l'<b>importo</b> e una <b>scadenza</b>, settantadue ore da quel momento.</li>
-        <li><b>Chi vende pubblica qui</b>, con «Contanti al tabacchino» come unico metodo, e scrive i tre dati nel foglio. La scadenza dell'ordine Amazon diventa la <b>scadenza dell'ordine</b>: passata quella, sparisce dal libro da solo. L'importo è uno solo, niente intervallo.</li>
+        <li><b>Chi vende pubblica qui</b>, con «Contanti al tabacchino» come unico metodo, e scrive i tre dati nel foglio. L'importo è quello dell'ordine Amazon, <b>coi centesimi</b>, e i sats si fissano al cambio del momento: per questo l'ordine resta nel libro al massimo <b>ventiquattro ore</b>, e se nessuno lo prende si ripubblica col cambio nuovo finché l'ordine Amazon vale. Niente intervallo.</li>
         <li><b>Chi compra prende l'ordine</b>, indica dove ricevere i sats, e chi vende li blocca in garanzia. A quel punto i tre dati gli arrivano <b>qui dentro e cifrati</b>, con un conto alla rovescia.</li>
         <li><b>Chi compra va al tabacchino</b>, dà il numero dell'ordine, paga in contanti e <b>tiene lo scontrino</b>: è la sua prova. Poi tocca «Ho inviato gli euro».</li>
         <li><b>Chi vende controlla su Amazon</b> che l'ordine risulti pagato, e libera i sats. Se non li libera, c'è la disputa, e lo scontrino è quel che guarda chi decide.</li>
@@ -37635,15 +37635,22 @@ function ordineDaEvento(ev, adesso){
   if (fa.length === 2 && !(fa[1] > fa[0])) return null;
   const scade = Number(tagValore(ev, 'expires_at')) || Number(tagValore(ev, 'expiration')) || 0;
   if (scade && scade <= adesso) return null;
+  const metodi = tagValori(ev, 'pm').map(m => String(m).trim()).filter(Boolean);
+  /* L'ESATTO DAL `pm` (22 set 2026): «Contanti al tabacchino 23.47»
+     porta i centesimi che il `fa` intero non ha. Vale SOLO se combacia
+     con l'intero del libro: un pm che dice 30 su un fa che dice 23
+     e' di un client che scrive a caso, e comanda il numero su cui il
+     coordinatore ha fatto i conti. */
+  const esatto = euroTabacchinoP2P(metodi);
   return {
     id: String(id), lato,
     stato: String(tagValore(ev, 's') || ''),
     fiat: String(tagValore(ev, 'f') || '').toUpperCase(),
-    euro: fa[0],
+    euro: (fa.length === 1 && esatto > 0 && Math.round(esatto) === fa[0]) ? esatto : fa[0],
     euroMax: fa.length === 2 ? fa[1] : 0,
     sats: Math.max(0, Math.floor(Number(tagValore(ev, 'amt')) || 0)),
     premium: Number(tagValore(ev, 'premium')) || 0,
-    metodi: tagValori(ev, 'pm').map(m => String(m).trim()).filter(Boolean),
+    metodi,
     scade,
     creato: Number(ev.created_at) || 0
   };
@@ -38334,6 +38341,15 @@ function stellineP2P(f){
 function satsMercatoP2P(o){
   if (!cambioVivo || !(eurPerSat > 0)) return 0;
   return Math.round((o.euro / eurPerSat) * (1 - o.premium / 100));
+}
+/* I SATS DEL TABACCHINO (22 set 2026): l'importo esatto coi centesimi
+   al cambio del momento, col premio COTTO dentro — stessa formula del
+   coordinatore, sottrazione uniforme — perche' sul filo l'ordine parte
+   a PREZZO FISSO (`amount` > 0, `premium` 0) e il coordinatore non
+   ricalcola niente: la garanzia e il payout sono questi sats. */
+function satsTabacchinoP2P(importo, cambio, premio){
+  if (!(cambio > 0) || !(importo > 0)) return 0;
+  return Math.round((importo / cambio) * (1 - (Math.round(Number(premio) || 0)) / 100));
 }
 
 /* ---- LA COMMISSIONE DI BARATTOLO SUL P2P (set 2026) ----
@@ -42079,6 +42095,10 @@ function avanzaOrdineP2P(ordine, azione, payload){
     if (Array.isArray(pm)) o.metodi = pm.map(String).filter(Boolean);
     else if (typeof pm === 'string' && pm.trim())
       o.metodi = pm.split(',').map(s => s.trim()).filter(Boolean);
+    /* i centesimi del tabacchino tornano dal `pm` (22 set 2026), con la
+       stessa regola del lettore del libro: solo se combaciano */
+    const esattoPm = euroTabacchinoP2P(o.metodi);
+    if (esattoPm > 0 && Math.round(esattoPm) === Number(ord.fiat_amount)) o.euro = esattoPm;
     /* LA CONTROPARTE si raccoglie da QUI e non dal solo messaggio
        che la nomina: l'ordine porta le due chiavi dello scambio e
        una delle due e' la nostra -- si tiene l'altra. Chi aspettasse
@@ -42848,6 +42868,50 @@ function interoP2P(testo){
      ' 5 ' — e tutti e tre qui sono storti, non interi. */
   if (!/^[0-9]+$/.test(t)) return {vuoto: false, storto: true, n: 0};
   return {vuoto: false, storto: false, n: Number(t)};
+}
+/* ---- I CENTESIMI DEL TABACCHINO (22 set 2026) ----
+   La decisione «solo cifre» del 10 set resta per gli euro del P2P;
+   l'importo di un ordine Amazon e' l'eccezione dichiarata: nasce coi
+   centesimi (23,47 €) e si scrive come si scrive un prezzo qui, con
+   la virgola — o col punto, che una tastiera puo' offrire solo quello.
+   SOLO quel campo: stesso impianto (testo filtrato, `beforeinput`,
+   la rete), un separatore al massimo, due decimali al massimo. Tre
+   decimali o due separatori sono STORTI, non «quasi giusti». */
+function centesimiP2P(testo){
+  const t = String(testo == null ? '' : testo).trim();
+  if (!t) return {vuoto: true, storto: false, n: 0};
+  if (!/^[0-9]+(?:[.,][0-9]{1,2})?$/.test(t)) return {vuoto: false, storto: true, n: 0};
+  /* niente arrotondamento: la forma ammette al piu' due decimali,
+     quindi Number() e' gia' al centesimo (la tortura l'ha detto) */
+  return {vuoto: false, storto: false, n: Number(t.replace(',', '.'))};
+}
+/* la cifra come la si legge: virgola e due decimali, sempre */
+function centesimiTestoP2P(n){
+  return (Math.round(Number(n) * 100) / 100).toFixed(2).replace('.', ',');
+}
+/* il tasto: cifre, e UN separatore se non ce n'e' gia' uno */
+function soloCentesimiP2P(ev){
+  const d = ev && ev.data;
+  if (d == null) return;
+  const s = String(d);
+  if (/[^0-9.,]/.test(s) || (s.match(/[.,]/g) || []).length > 1) { ev.preventDefault(); return; }
+  const gia = String((ev.target && ev.target.value) || '');
+  if (/[.,]/.test(s) && /[.,]/.test(gia)) ev.preventDefault();
+}
+/* la rete: via tutto quel che non e' cifra o separatore, e del
+   separatore resta il primo */
+function ripuliCentesimiP2P(inp){
+  if (!inp) return '';
+  const v = String(inp.value || '');
+  let visto = false;
+  const pulito = v.replace(/[^0-9.,]/g, '').replace(/[.,]/g, c => visto ? '' : (visto = true, c));
+  if (pulito !== v) {
+    const dove = inp.selectionStart == null ? pulito.length : inp.selectionStart;
+    const tolti = v.slice(0, dove).length - pulito.slice(0, dove).length;
+    inp.value = pulito;
+    try { inp.setSelectionRange(dove - tolti, dove - tolti); } catch(e){}
+  }
+  return pulito;
 }
 /* IL TASTO CHE NON PRODUCE NULLA. `beforeinput` arriva PRIMA che il
    carattere entri, e `ev.data` porta quel che entrerebbe: se non sono
@@ -44843,17 +44907,55 @@ const P2P_METODI = ['SEPA', 'SEPA Instant', 'Revolut', 'Satispay', 'PayPal', 'Co
 /* la voce del tabacchino ha il suo nome in UN posto: i giudici la
    cercano per questo, mai per un testo ribattuto */
 const P2P_TABACCHINO = 'Contanti al tabacchino';
+/* L'IMPORTO ESATTO VIAGGIA NEL `pm` (22 set 2026, Barattozon coi
+   centesimi): un ordine Amazon vale 23,47 €, ma `fiat_amount` e' un
+   i64 del protocollo — struct, db, tag `fa`, quote — e nessun client
+   Mostro legge un decimale. Quindi nel libro il metodo diventa
+   «Contanti al tabacchino 23.47» (col PUNTO: la virgola separa i
+   metodi nel tag), `fiat_amount` porta l'intero arrotondato, e i sats
+   sono FISSI, calcolati qui sull'importo esatto — cosi' la garanzia e
+   il payout nascono al satoshi e nessuno paga la differenza. I client
+   altrui leggono il numero come parte del nome del metodo, e non si
+   rompono. I giudici cercano il PREFISSO, mai l'uguaglianza. */
+const P2P_TABACCHINO_PM = /^Contanti al tabacchino(?:\s+(\d+\.\d{2}))?$/;
+/* IL CAMBIO SI FISSA ALLA PUBBLICAZIONE, quindi l'ordine resta nel
+   libro al massimo 24 ore (proposta accolta da Andrea, 22 set 2026):
+   un ordine Amazon vive 72, e a cambio fermo per tre giorni chi prende
+   avrebbe un'opzione gratuita sul BTC/EUR. Scaduto dal libro si
+   ripubblica col cambio nuovo: l'ordine Amazon vale ancora. */
+const P2P_TABACCHINO_VITA_S = 24 * 3600;
+/* il metodo SENZA l'importo: e' la chiave del catalogo dei vestiti e
+   la parola che il filtro del libro e le forme di recapito cercano */
+function metodoBaseP2P(m){
+  return P2P_TABACCHINO_PM.test(String(m || '').trim()) ? P2P_TABACCHINO : String(m || '').trim();
+}
+/* l'importo esatto scritto nel metodo, 0 se non c'e' */
+function euroTabacchinoP2P(metodi){
+  for (const m of (metodi || [])) {
+    const r = P2P_TABACCHINO_PM.exec(String(m || '').trim());
+    if (r && r[1]) return Number(r[1]);
+  }
+  return 0;
+}
+/* il metodo come si SCRIVE nel libro: sempre due decimali, col punto */
+function metodoTabacchinoP2P(importo){
+  return P2P_TABACCHINO + ' ' + (Math.round(Number(importo) * 100) / 100).toFixed(2);
+}
 function tabacchinoP2P(metodi){
-  return (metodi || []).indexOf(P2P_TABACCHINO) >= 0;
+  return (metodi || []).some(m => metodoBaseP2P(m) === P2P_TABACCHINO);
 }
 /* IL VESTITO DEI METODI (16 set 2026, decisione di Andrea): «Contanti
    al tabacchino» si presenta come BARATTOZON — il marchio al posto del
    testo nella card del libro, piccolo nella pillola del filtro e
    accanto alla voce nel foglio «Pubblica».
-   ⚠️ IL TAG `pm` NON SI TOCCA: nel libro pubblico viaggia sempre la
-   stringa di P2P_TABACCHINO, e i client altrui leggono quella. Cambia
-   il vestito, non la parola — e i giudici (tabacchinoP2P, le forme di
-   recapito, il filtro) continuano a cercare la stringa.
+   ⚠️ IL TAG `pm` PORTA LA PAROLA E, DAL 22 SET 2026, L'IMPORTO: nel
+   libro pubblico viaggia «Contanti al tabacchino 23.47», e i client
+   altrui leggono quella riga come nome del metodo. La riga di prima
+   diceva «NON SI TOCCA»: si e' rovesciata per i centesimi, che il
+   `fiat_amount` intero del protocollo non porta (vedi
+   P2P_TABACCHINO_PM). Cambia il vestito, non la parola — e i giudici
+   (tabacchinoP2P, le forme di recapito, il filtro) cercano il
+   PREFISSO, mai l'uguaglianza.
    UN CATALOGO e non tre eccezioni scritte a mano nei tre posti: una
    voce che un domani volesse un marchio suo si aggiunge QUI e i tre
    posti la vestono da soli. `nome` e' l'alt del marchio, `soloMarchio`
@@ -44881,7 +44983,7 @@ const P2P_VESTE_METODI = {
    ragione che aveva bocciato la resa crema fra i sedici colori. Non
    si riapre senza una seconda versione del file col lettering scuro. */
 function vesteMetodoP2P(m){
-  return P2P_VESTE_METODI[m] || null;
+  return P2P_VESTE_METODI[metodoBaseP2P(m)] || null;
 }
 /* il metodo come si MOSTRA: il marchio per chi ce l'ha, il testo per
    gli altri. Con `conTesto` il marchio AFFIANCA la parola invece di
@@ -45018,7 +45120,6 @@ let p2pNuovoFisso = false;    // true = prezzo fisso in sats | false = prezzo di
 let p2pNuovoPremio = 0;       // il premio in percento, quando e' a mercato
 let p2pNuovoPremioMano = false;  // il premio si scrive invece di trascinarlo
 let p2pNuovoTab = {ordine: '', importo: '', scade: ''};  // i tre dati del tabacchino; `scade` come lo scrive il campo data
-let p2pNuovoTabConfermato = false;  // «gli importi non combaciano»: gia' chiesto e detto si'
 
 /* ====== LA MORFOSI DEL + (set 2026, richiesta di Andrea) ======
    Il + della barra e il bottone che pubblica SONO LA STESSA COSA: al
@@ -45249,7 +45350,6 @@ function apriNuovoOrdineP2P(){
   p2pNuovoPremio = 0;
   p2pNuovoPremioMano = false;
   p2pNuovoTab = {ordine: '', importo: '', scade: ''};
-  p2pNuovoTabConfermato = false;
   renderNuovoOrdineP2P();
   el('sheetBg').classList.add('open');
   /* LA MORFOSI APRE ANCHE IL FOGLIO (deve misurare il bottone d'arrivo
@@ -45309,8 +45409,13 @@ function premioTestoP2P(n){
    prova senza un browser. */
 function valeNuovoOrdineP2P(v){
   /* I SATS PASSANO DALLO STESSO GIUDICE degli euro (set 2026): sono
-     un intero anche loro, e il campo li filtra uguale. */
-  const e = interoP2P(v.euro), x = interoP2P(v.euroMax);
+     un intero anche loro, e il campo li filtra uguale.
+     COL TABACCHINO L'EURO HA I CENTESIMI (22 set 2026): e' l'importo
+     di un ordine Amazon, e passa dal giudice dei centesimi; sul filo
+     diventa l'intero arrotondato piu' i sats esatti a prezzo fisso
+     (vedi `ordineDaCampiP2P`). */
+  const tab = tabacchinoP2P(v.metodi);
+  const e = tab ? centesimiP2P(v.euro) : interoP2P(v.euro), x = interoP2P(v.euroMax);
   const euro = e.n, max = x.n;
   const sats = interoP2P(v.sats).n;
   /* IL GIUDICE DICE ANCHE DOVE (set 2026, col bottone sempre acceso):
@@ -45319,7 +45424,8 @@ function valeNuovoOrdineP2P(v){
      sono la stessa decisione — separati, il giorno che si aggiunge un
      controllo nuovo la frase arriva e il campo no, in silenzio. */
   if (!(euro > 0))
-    return {ok: false, manca: 'Scrivi l\'importo in euro', campo: 'p2pNuovoEuro'};
+    return {ok: false, manca: tab ? 'Scrivi l\'importo dell\'ordine Amazon, coi centesimi se servono'
+                                  : 'Scrivi l\'importo in euro', campo: 'p2pNuovoEuro'};
   if (!x.vuoto && !(max > euro))
     return {ok: false, manca: 'L\'importo massimo deve superare il primo',
             campo: 'p2pNuovoEuroMax'};
@@ -45359,9 +45465,6 @@ function valeNuovoOrdineP2P(v){
     if (!String(t.ordine || '').trim())
       return {ok: false, manca: 'Scrivi il numero dell\'ordine Amazon',
               campo: 'p2pNuovoTabOrdine'};
-    if (!(interoP2P(t.importo).n > 0))
-      return {ok: false, manca: 'Scrivi l\'importo dell\'ordine Amazon',
-              campo: 'p2pNuovoTabImporto'};
     const quando = scadeDaCampoP2P(t.scade);
     if (!quando)
       return {ok: false, manca: 'Scrivi quando scade l\'ordine Amazon',
@@ -45377,6 +45480,19 @@ function valeNuovoOrdineP2P(v){
       return {ok: false, manca: 'Troppo lontana: la garanzia copre al massimo '
                 + Math.floor(v.finestra / 3600) + ' ore da adesso',
               campo: 'p2pNuovoTabScade'};
+    /* I SATS SONO NOSTRI (22 set 2026): a prezzo fisso li calcola il
+       foglio sul cambio vivo, quindi senza cambio non si pubblica, e
+       i due tetti del coordinatore si guardano qui come per il fisso */
+    if (!(v.cambio > 0))
+      return {ok: false, manca: 'Aspetta un attimo: sto leggendo il cambio',
+              campo: 'p2pNuovoEuro'};
+    const satsTab = satsTabacchinoP2P(euro, v.cambio, v.premio);
+    if (v.maxSats > 0 && satsTab > v.maxSats)
+      return {ok: false, manca: 'Troppi: il massimo è ' + fmt(v.maxSats) + ' sats',
+              campo: 'p2pNuovoEuro'};
+    if (v.minSats > 0 && satsTab < v.minSats)
+      return {ok: false, manca: 'Troppo pochi: il minimo è ' + fmt(v.minSats) + ' sats',
+              campo: 'p2pNuovoEuro'};
   }
   if (v.fisso) {
     if (!(sats > 0))
@@ -45399,9 +45515,15 @@ function campiNuovoP2P(){
   return {
     euro: p2pNuovoEuro,
     euroMax: p2pNuovoFisso ? '' : p2pNuovoEuroMax,
-    sats: p2pNuovoFisso ? p2pNuovoSats : '',
-    fisso: p2pNuovoFisso,
+    /* col tabacchino la leva del prezzo non c'e': i sats li fa il
+       foglio dall'importo esatto (22 set 2026), quindi `fisso` e'
+       falso e `sats` vuoto anche se la leva era stata girata prima */
+    sats: (p2pNuovoFisso && !tabacchinoP2P(p2pNuovoMetodi)) ? p2pNuovoSats : '',
+    fisso: p2pNuovoFisso && !tabacchinoP2P(p2pNuovoMetodi),
     metodi: p2pNuovoMetodi,
+    premio: p2pNuovoPremio,
+    /* il cambio vivo, 0 = non lo so: serve ai sats del tabacchino */
+    cambio: (cambioVivo && eurPerSat > 0) ? eurPerSat : 0,
     maxSats: (p2pInfo && p2pInfo.maxSats) || 0,
     minSats: (p2pInfo && p2pInfo.minSats) || 0,
     /* il tetto in euro di Barattolo, dalla busta delle leve: 0 = spento */
@@ -45434,13 +45556,22 @@ function ordineDaCampiP2P(v, lato){
   /* DALLO STESSO GIUDICE del bottone, o quel che si vede acceso e
      quel che parte possono divergere — ed e' esattamente cosi' che
      «5,5» diventava 5 sul filo */
-  const euro = interoP2P(v.euro).n;
+  const tab = tabacchinoP2P(v.metodi);
+  /* IL TABACCHINO PORTA I CENTESIMI (22 set 2026, Barattozon): sul
+     filo `fiat_amount` e' l'intero piu' vicino — il protocollo non
+     porta decimali —, l'esatto sta nel metodo (`metodoTabacchinoP2P`)
+     e i sats sono FISSI, calcolati qui al cambio vivo col premio
+     cotto dentro: cosi' il coordinatore non ricalcola niente e la
+     garanzia vale l'importo giusto al satoshi. */
+  const esatto = tab ? centesimiP2P(v.euro).n : 0;
+  const euro = tab ? Math.round(esatto) : interoP2P(v.euro).n;
   const euroMax = interoP2P(v.euroMax).n;
-  const satsFissi = v.fisso ? interoP2P(v.sats).n : 0;
+  const satsFissi = tab ? satsTabacchinoP2P(esatto, v.cambio, v.premio)
+                        : v.fisso ? interoP2P(v.sats).n : 0;
   /* L'INTERVALLO E' UN FATTO DEI NUMERI e non della sezione aperta:
      due importi buoni e crescenti sono un range, uno solo e' un ordine
      normale. Lo stesso giudizio del lettore del libro. */
-  const range = !v.fisso && euroMax > euro;
+  const range = !v.fisso && !tab && euroMax > euro;
   const o = {
     kind: lato === 'compro' ? 'buy' : 'sell',
     status: 'pending',
@@ -45452,16 +45583,27 @@ function ordineDaCampiP2P(v, lato){
     max_amount: range ? euroMax : null,
     fiat_amount: range ? 0 : euro,
     payment_method: (v.metodi || []).join(','),
-    premium: v.fisso ? 0 : Math.round(Number(v.premio) || 0),
+    premium: (v.fisso || tab) ? 0 : Math.round(Number(v.premio) || 0),
     created_at: 0
   };
+  /* il metodo del tabacchino si RISCRIVE con l'importo esatto: da una
+     riga che lo porta gia' (il «Riprova») non si raddoppia */
+  if (tab) o.payment_method = (v.metodi || []).map(m =>
+    metodoBaseP2P(m) === P2P_TABACCHINO ? metodoTabacchinoP2P(esatto) : m).join(',');
   /* LA SCADENZA VIAGGIA SOLO COL TABACCHINO (set 2026): `expires_at`
      e' la scadenza dell'ordine Amazon, e il coordinatore la applica
      al secondo (la clampa a `max_expiration_days`, che 72 ore non
      toccano). Per gli altri metodi la chiave NON c'e' proprio: il
      payload resta byte per byte quello di ieri, e vale il ramo
      «now + expiration_hours» verificato sul campo il 6 set 2026. */
-  if (v.scade > 0) o.expires_at = Math.floor(v.scade);
+  if (v.scade > 0) {
+    /* e nel libro resta al massimo 24 ore (22 set 2026): a prezzo
+       fisso il cambio e' quello di adesso, e tre giorni sarebbero
+       un'opzione gratuita per chi prende. L'ordine Amazon vale fino
+       alla SUA scadenza, che resta sulla riga (`ord.scade`). */
+    const adesso = v.adesso || Math.floor(Date.now() / 1000);
+    o.expires_at = Math.min(Math.floor(v.scade), adesso + P2P_TABACCHINO_VITA_S);
+  }
   return o;
 }
 /* PURA: l'ordine da (ri)mandare, letto dalla RIGA locale con lo STESSO
@@ -45477,7 +45619,12 @@ function ordineDaRigaP2P(o){
     sats: o.sats ? String(o.sats) : '',
     fisso: (Number(o.sats) || 0) > 0,
     metodi: o.metodi || [],
-    premio: o.premium || 0
+    premio: o.premioCotto || o.premium || 0,
+    /* il tabacchino (22 set 2026): la scadenza Amazon dalla riga, e
+       i sats si RIFANNO al cambio di adesso — e' un ordine nuovo */
+    scade: o.scade || 0,
+    adesso: Math.floor(Date.now() / 1000),
+    cambio: (cambioVivo && eurPerSat > 0) ? eurPerSat : 0
   }, o.lato);
 }
 /* IL TETTO SOTTO IL CAMPO (17 set 2026, ritocco di Andrea): la
@@ -45647,7 +45794,8 @@ function renderNuovoOrdineP2P(){
 
   const importo = sezioneNuovoP2P({
     ico: 'importo',
-    titolo: 'Inserisci l\'importo in ' + esc(val.cod) + ' che vuoi ' +
+    titolo: tab ? 'Inserisci l\'importo dell\'ordine Amazon, in ' + esc(val.cod)
+                : 'Inserisci l\'importo in ' + esc(val.cod) + ' che vuoi ' +
       (compro ? 'inviare' : 'ricevere'),
     /* UN CAMPO SOLO, ALL'APERTURA (ritocco di Andrea): il secondo —
        e la riga che lo spiega — si fanno vedere quando si tocca il
@@ -45660,11 +45808,20 @@ function renderNuovoOrdineP2P(){
        Percio' `style="display:none"` e non l'attributo `hidden`: `.hint`
        potrebbe avere un `display` suo e vincerlo. */
     corpo: '<div class="p2p-duecampi">' +
-      '<input id="p2pNuovoEuro" type="text" inputmode="numeric" ' +
-        'placeholder="Importo" value="' + esc(p2pNuovoEuro) + '" ' +
-        'onbeforeinput="soloCifreP2P(event)" ' +
-        'onfocus="svelaSecondoImportoP2P()" oninput="cambiaCampoNuovoP2P()" ' +
-        'aria-label="Importo">' +
+      /* COL TABACCHINO IL CAMPO HA I CENTESIMI (22 set 2026): e'
+         l'importo dell'ordine Amazon, tastiera decimale e il filtro
+         dei centesimi; per tutti gli altri metodi resta solo cifre */
+      (tab
+        ? '<input id="p2pNuovoEuro" type="text" inputmode="decimal" ' +
+          'placeholder="Importo dell\'ordine Amazon, es. 23,47" value="' + esc(p2pNuovoEuro) + '" ' +
+          'onbeforeinput="soloCentesimiP2P(event)" ' +
+          'oninput="cambiaCampoNuovoP2P()" ' +
+          'aria-label="Importo dell\'ordine Amazon in euro">'
+        : '<input id="p2pNuovoEuro" type="text" inputmode="numeric" ' +
+          'placeholder="Importo" value="' + esc(p2pNuovoEuro) + '" ' +
+          'onbeforeinput="soloCifreP2P(event)" ' +
+          'onfocus="svelaSecondoImportoP2P()" oninput="cambiaCampoNuovoP2P()" ' +
+          'aria-label="Importo">') +
       ((p2pNuovoFisso || tab) ? '' :
         '<em id="p2pNuovoA"' + (p2pNuovoDue ? '' : ' style="display:none"') + '>a</em>' +
         '<input id="p2pNuovoEuroMax" type="text" inputmode="numeric" ' +
@@ -45686,7 +45843,7 @@ function renderNuovoOrdineP2P(){
       (maxTestoP2P()
         ? '<div class="hint">Fase beta: max ' + maxTestoP2P() + '</div>' : '') +
       (tab
-        ? '<div class="hint">Col tabacchino l\'importo è uno solo, quello dell\'ordine Amazon: niente intervallo.</div>'
+        ? '<div class="hint">Col tabacchino l\'importo è uno solo, quello scritto sull\'ordine Amazon, coi centesimi: niente intervallo.</div>'
         : p2pNuovoFisso
         ? '<div class="hint">A prezzo fisso l\'importo è uno solo: un ordine a intervallo non può fissare la quantità di sats.</div>'
         : '<div class="hint" id="p2pNuovoNotaDue"' + (p2pNuovoDue ? '' : ' style="display:none"') +
@@ -45739,26 +45896,24 @@ function renderNuovoOrdineP2P(){
         'placeholder="Numero dell\'ordine Amazon" value="' + esc(p2pNuovoTab.ordine) + '" ' +
         'autocomplete="off" autocapitalize="off" spellcheck="false" ' +
         'oninput="cambiaTabP2P()" aria-label="Numero dell\'ordine Amazon">' +
-      '<input id="p2pNuovoTabImporto" type="text" inputmode="numeric" ' +
-        'placeholder="Importo dell\'ordine, in euro" value="' + esc(p2pNuovoTab.importo) + '" ' +
-        'onbeforeinput="soloCifreP2P(event)" oninput="cambiaTabP2P()" ' +
-        'aria-label="Importo dell\'ordine Amazon in euro">' +
       '<input id="p2pNuovoTabScade" type="datetime-local" ' +
         'value="' + esc(p2pNuovoTab.scade) + '" ' +
         'min="' + campoDaScadeP2P(adessoTab) + '" ' +
         (finestraTab > 0 ? 'max="' + campoDaScadeP2P(adessoTab + finestraTab) + '" ' : '') +
-        'oninput="cambiaTabP2P()" aria-label="Quando scade l\'ordine Amazon">' +
-      '<div class="hint" id="p2pNuovoTabNota">' + esc(notaTabP2P()) + '</div>',
+        'oninput="cambiaTabP2P()" aria-label="Quando scade l\'ordine Amazon">',
     /* le tre note stanno nel «sotto», fuori dalla riga dell'icona:
        cosi' lo scontrino resta coi tre campi invece di galleggiare
        a meta' delle spiegazioni (visto nel giro visivo) */
     sotto:
-      '<div class="hint">🧾 Genera prima l\'ordine Amazon pagabile in contanti, poi copia qui i tre dati che ti dà. Chi compra li riceve cifrati appena prende l\'ordine, paga al tabacchino e tiene lo scontrino.</div>' +
-      '<div class="hint">⏳ La scadenza è quella scritta sull\'ordine Amazon, 72 ore da quando l\'hai generato. È anche la scadenza di questo ordine: passata quella, sparisce dal libro da solo.</div>' +
+      '<div class="hint">🧾 Genera prima l\'ordine Amazon pagabile in contanti, poi copia qui numero e scadenza: l\'importo, coi centesimi, l\'hai scritto sopra. Chi compra riceve i tre dati cifrati appena prende l\'ordine, paga al tabacchino e tiene lo scontrino.</div>' +
+      '<div class="hint">⏳ La scadenza è quella scritta sull\'ordine Amazon, 72 ore da quando l\'hai generato. Nel libro però l\'ordine resta al massimo 24 ore, perché il cambio si fissa adesso: se nessuno lo prende, lo ripubblichi col cambio nuovo finché l\'ordine Amazon vale.</div>' +
       '<div class="hint">Con questo metodo l\'importo è uno solo e nessun altro metodo entra nello stesso ordine: l\'ordine Amazon vale per quella cifra e per quello scambio.</div>'
   });
 
-  const tipo = sezioneNuovoP2P({
+  /* COL TABACCHINO NIENTE LEVA (22 set 2026): il prezzo e' fisso per
+     costruzione — i sats li fa il foglio dall'importo esatto — e i
+     sats a mano non hanno senso; il premio resta, cotto nei sats */
+  const tipo = tab ? '' : sezioneNuovoP2P({
     ico: 'prezzo',
     titolo: 'Tipo di prezzo', info: 'spiegaTipoPrezzoP2P()',
     corpo: '<div class="p2p-sez-riga">' +
@@ -45770,7 +45925,7 @@ function renderNuovoOrdineP2P(){
       '</div>'
   });
 
-  const quanti = !p2pNuovoFisso ? '' : sezioneNuovoP2P({
+  const quanti = (!p2pNuovoFisso || tab) ? '' : sezioneNuovoP2P({
     ico: 'sats',
     titolo: 'Inserisci la quantità di sats che vuoi ' + (compro ? 'comprare' : 'vendere'),
     corpo: '<input id="p2pNuovoSats" type="text" inputmode="numeric" ' +
@@ -45792,7 +45947,7 @@ function renderNuovoOrdineP2P(){
      una barra che vuole tutta la larghezza che trova, e il cerchio la
      accorciava di quaranta pixel per dire una cosa che il titolo
      «Premio (%)» dice gia'. */
-  const premio = p2pNuovoFisso ? '' : sezioneNuovoP2P({
+  const premio = (p2pNuovoFisso && !tab) ? '' : sezioneNuovoP2P({
     ico: '', titolo: 'Premio (%)', info: 'spiegaPremioP2P()',
     corpo: '<div class="p2p-premio">' +
       '<div class="p2p-premio-val" id="p2pNuovoPremioBox">' + premioValP2P() + '</div>' +
@@ -45810,7 +45965,10 @@ function renderNuovoOrdineP2P(){
       fasciaPremioP2P(-P2P_PREMIO_MAX, p2pLato).tinta + '">−' + P2P_PREMIO_MAX +
       '%</span><span style="color:' + fasciaPremioP2P(P2P_PREMIO_MAX, p2pLato).tinta +
       '">+' + P2P_PREMIO_MAX + '%</span></span></div>' +
-      '<div class="hint" id="p2pNuovoPremioNota">' + premioNotaP2P(compro, p2pNuovoPremio) + '</div>'
+      '<div class="hint" id="p2pNuovoPremioNota">' + premioNotaP2P(compro, p2pNuovoPremio) + '</div>' +
+      /* col tabacchino il premio si cuoce nei sats: il cambio e' fisso
+         da adesso, e la riga lo dice dove si sceglie */
+      (tab ? '<div class="hint">Facoltativo: col tabacchino il cambio si fissa adesso e il premio entra nei sats dell\'ordine, così chi prende vede la cifra già fatta.</div>' : '')
   });
 
   /* LA RIGA D'APERTURA NON C'E' PIU' (ritocco di Andrea): «Stai
@@ -45946,30 +46104,19 @@ function cambiaCampoNuovoP2P(){
   const e = el('p2pNuovoEuro'), x = el('p2pNuovoEuroMax'), s = el('p2pNuovoSats');
   /* LA RETE GIRA QUI, sui tre campi insieme: `beforeinput` ha gia'
      fermato il tasto, e quel che si legge e' cifre per costruzione */
-  if (e) p2pNuovoEuro = ripuliCifreP2P(e);
+  /* col tabacchino il primo campo ha i centesimi e la sua rete (22 set 2026) */
+  if (e) p2pNuovoEuro = tabacchinoP2P(p2pNuovoMetodi) ? ripuliCentesimiP2P(e) : ripuliCifreP2P(e);
   if (x) p2pNuovoEuroMax = ripuliCifreP2P(x);
   if (s) p2pNuovoSats = ripuliCifreP2P(s);
-  const n = el('p2pNuovoTabNota');
-  if (n) n.textContent = notaTabP2P();
 }
-/* la nota viva sotto i tre dati del tabacchino: dice quando l'importo
-   dell'ordine Amazon non combacia con quello dello scambio, e tace se
-   combacia o se uno dei due manca. Si riscrive IN PLACE mentre si
-   digita, da tutt'e due i campi — mai un render, per la lezione
-   delle pillole. */
-function notaTabP2P(){
-  const a = interoP2P(p2pNuovoTab.importo).n, b = interoP2P(p2pNuovoEuro).n;
-  if (!(a > 0) || !(b > 0) || a === b) return '';
-  return '⚠️ L\'ordine Amazon è di ' + fmt(a) + ' € ma lo scambio è di ' + fmt(b)
-    + ' €: chi compra pagherà ' + fmt(a) + ' € al tabacchino.';
-}
+/* L'IMPORTO DELL'ORDINE AMAZON E' UNO SOLO (22 set 2026): sta nel campo
+   dell'importo, coi centesimi. La nota «gli importi non combaciano» e
+   il secondo campo se ne sono andati con lui: con i sats calcolati
+   sull'importo esatto non c'e' piu' una seconda cifra da confrontare. */
 function cambiaTabP2P(){
-  const o = el('p2pNuovoTabOrdine'), i = el('p2pNuovoTabImporto'), s = el('p2pNuovoTabScade');
+  const o = el('p2pNuovoTabOrdine'), s = el('p2pNuovoTabScade');
   if (o) p2pNuovoTab.ordine = String(o.value || '');
-  if (i) p2pNuovoTab.importo = ripuliCifreP2P(i);
   if (s) p2pNuovoTab.scade = String(s.value || '');
-  const n = el('p2pNuovoTabNota');
-  if (n) n.textContent = notaTabP2P();
 }
 function apriTendinaMetodiP2P(){
   haptic();
@@ -45992,8 +46139,13 @@ function scegliMetodoP2P(m){
     p2pNuovoMetodi = [P2P_TABACCHINO];
     p2pNuovoEuroMax = ''; p2pNuovoDue = false;
   }
-  else p2pNuovoMetodi = P2P_METODI.filter(x =>
-    x !== P2P_TABACCHINO && (x === m || p2pNuovoMetodi.indexOf(x) >= 0));
+  else {
+    /* fuori dal tabacchino i centesimi non entrano: dell'importo
+       resta la parte intera (22 set 2026) */
+    if (tabacchinoP2P(p2pNuovoMetodi)) p2pNuovoEuro = String(p2pNuovoEuro || '').replace(/[.,].*$/, '');
+    p2pNuovoMetodi = P2P_METODI.filter(x =>
+      x !== P2P_TABACCHINO && (x === m || p2pNuovoMetodi.indexOf(x) >= 0));
+  }
   renderNuovoOrdineP2P();
 }
 /* LA LEVA E' UN BIVIO DEL PROTOCOLLO e non una preferenza: passando a
@@ -46266,25 +46418,9 @@ async function inviaNuovoOrdineP2P(){
   const campi = campiNuovoP2P();
   const g = valeNuovoOrdineP2P(campi);
   if (!g.ok) { avvisaMancaP2P(g); return; }
-  /* L'IMPORTO CHE DIVERGE AVVISA, NON FERMA (decisione di Andrea):
-     chi vende puo' volere un ordine Amazon diverso dallo scambio, ma
-     quasi sempre e' un errore di battitura — quindi si chiede, una
-     volta, e al si' si riparte da qui con la risposta in tasca. */
-  if (campi.scade > 0 && !p2pNuovoTabConfermato
-      && interoP2P(campi.tab.importo).n !== interoP2P(campi.euro).n) {
-    chiediConferma({
-      titolo: 'Gli importi non combaciano',
-      corpo: 'L\'ordine Amazon è di ' + fmt(interoP2P(campi.tab.importo).n)
-        + ' € e lo scambio di ' + fmt(interoP2P(campi.euro).n)
-        + ' €. Chi compra pagherà al tabacchino l\'importo dell\'ordine Amazon. Pubblico lo stesso?',
-      etichetta: 'Sì, pubblica',
-      /* la promessa si restituisce: vedi la nota in `euroInviatiP2P` */
-      poi: () => { p2pNuovoTabConfermato = true;
-                   return inviaNuovoOrdineP2P(); }
-    });
-    return;
-  }
-  p2pNuovoTabConfermato = false;
+  /* «GLI IMPORTI NON COMBACIANO» NON ESISTE PIU' (22 set 2026): con un
+     campo solo per l'importo, coi centesimi, e i sats fatti su quello,
+     non c'e' una seconda cifra che possa divergere. */
   const lato = p2pLato === 'compro' ? 'compro' : 'vendo';
   const metodi = p2pNuovoMetodi.slice();
   /* L'ORDINE SI COSTRUISCE UNA VOLTA SOLA, e la riga locale legge da
@@ -46293,7 +46429,10 @@ async function inviaNuovoOrdineP2P(){
   const ordine = ordineDaCampiP2P(
     {euro: campi.euro, euroMax: campi.euroMax, sats: campi.sats,
      fisso: campi.fisso, metodi: metodi, premio: p2pNuovoPremio,
-     scade: campi.scade}, lato);
+     scade: campi.scade, adesso: campi.adesso, cambio: campi.cambio}, lato);
+  /* i centesimi del tabacchino: sulla riga e nel canale sta l'esatto,
+     sul filo l'intero (22 set 2026) */
+  const esattoTab = campi.scade > 0 ? centesimiP2P(campi.euro).n : 0;
   chiudiFoglioP2P('p2pNuovoSheet');
   /* dice se l'ordine e' COMPARSO A SCHERMO: nel catch e' l'unica cosa
      che distingue «lo racconta la pagina» da «non lo racconta nessuno» */
@@ -46316,8 +46455,16 @@ async function inviaNuovoOrdineP2P(){
      data: l'anello la mostra subito, senza aspettare il libro. */
   if (campi.scade > 0) {
     ord.scade = campi.scade;
+    /* I CENTESIMI SULLA RIGA (22 set 2026): l'euro e' l'esatto, non
+       l'intero del filo; il metodo e' COME NEL LIBRO, con l'importo
+       dentro (e' quel che il lettore ritrova); e il premio cotto nei
+       sats resta qui, che il «Riprova» lo rifaccia uguale — sul filo
+       `premium` e' 0, e' prezzo fisso */
+    ord.euro = esattoTab;
+    ord.metodi = String(ordine.payment_method || '').split(',').filter(Boolean);
+    ord.premioCotto = Math.round(Number(p2pNuovoPremio) || 0);
     const t = {ordine: String(campi.tab.ordine || '').trim(),
-               importo: String(interoP2P(campi.tab.importo).n),
+               importo: centesimiTestoP2P(esattoTab),
                scade: campi.scade};
     t.testo = formaRecapito(P2P_TABACCHINO).componi(
       {ordine: t.ordine, importo: t.importo, scade: dataTabacchinoP2P(campi.scade)})
@@ -46335,7 +46482,8 @@ async function inviaNuovoOrdineP2P(){
      capo basso e' il prezzo d'ingresso, quindi non e' una bugia — ma
      racconta meno dell'ordine. Chi tocca quella rotta lo sistemi la'. */
   const euro = ord.euro;
-  const metodo = metodi.join(', ');
+  /* nel canale il metodo si dice per nome, senza l'importo dentro */
+  const metodo = metodi.map(metodoBaseP2P).join(', ');
   /* IL VELO DELLA PUBBLICAZIONE (18 set 2026, richiesta di Andrea): dal
      tocco alla risposta del coordinatore passano dieci-venti secondi
      via Tor, e la pagina dell'ordine che compare sotto con «Sto
@@ -46858,7 +47006,7 @@ const P2P_FORME_RECAPITO = [
      e' quella da cui chi compra rilegge il conto alla rovescia. */
   {forma: 'tabacchino', riconosce: /tabacch/i, ricorda: false,
    campi: [{k: 'ordine', et: 'Numero dell\'ordine Amazon', ph: '123-4567890-1234567'},
-           {k: 'importo', et: 'Importo dell\'ordine, in euro', ph: '100'},
+           {k: 'importo', et: 'Importo dell\'ordine, in euro', ph: '23,47'},
            {k: 'scade', et: 'Scade il (data e ora)', ph: '17/09/2026 alle 14:30'}],
    componi: c => 'Contanti al tabacchino\nNumero ordine: ' + c.ordine
      + '\nImporto: ' + c.importo + ' €\nScade: ' + c.scade},
@@ -47298,13 +47446,13 @@ async function inviaCampoP2P(tipo, btn){
         return;
       }
       campi.scade = dataTabacchinoP2P(quando);
-      const imp = interoP2P(campi.importo);
+      const imp = centesimiP2P(campi.importo);
       if (!(imp.n > 0)) {
-        toast('L\'importo dell\'ordine e\' una cifra intera in euro');
+        toast('L\'importo dell\'ordine e\' una cifra in euro, coi centesimi se servono (23,47)');
         el('p2pCampoEuro_importo')?.focus();
         return;
       }
-      campi.importo = String(imp.n);
+      campi.importo = centesimiTestoP2P(imp.n);
       tabRiga = {ordine: campi.ordine, importo: campi.importo, scade: quando};
     }
     testo = fr.componi(campi).slice(0, CAMPO_MAX_TESTO);

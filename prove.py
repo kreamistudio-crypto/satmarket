@@ -34002,6 +34002,8 @@ def prove_fogli_di_casa():
     # dicono due cifre diverse. Avvisa e non ferma (decisione di
     # Andrea): quasi sempre e' un errore di battitura, qualche volta
     # e' voluto, e la differenza la sa solo chi pubblica.
+    # ⚠️ TOLTO il 22 set 2026 (i centesimi del tabacchino): l'importo
+    # e' uno solo, coi centesimi, e i sats si fanno su quello.
     # SESSANTA (set 2026, le recensioni degli scambi P2P): una
     # recensione e' DEFINITIVA come il feedback del mercatino — «chiude
     # il ricatto "cambia il feedback o…"» — e il gemello di la' la
@@ -34025,8 +34027,12 @@ def prove_fogli_di_casa():
     # fonti e il rischio che resta. «Manca la fattura nuova» manda un
     # messaggio a chi vende e gli apre un campo: si chiede. «Da un'altra
     # cassaforte non si puo'» e' un AVVISO degenere: dice perche' no.
-    prova("i gesti che passano dalla domanda unica sono sessantacinque",
-          65, solo_codice(mini).count("chiediConferma({"))
+    # ...MENO UNO dal 22 set 2026: «gli importi non combaciano»
+    # (CINQUANTANOVE) se n'e' andato con il secondo campo dell'importo
+    # del tabacchino — con una cifra sola, coi centesimi, non c'e' piu'
+    # niente da confrontare
+    prova("i gesti che passano dalla domanda unica sono sessantaquattro",
+          64, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -45699,6 +45705,13 @@ def prove_p2p_libro():
     j_lap = mini.index("const MOSTRO_LAPIDI_CHIAVE = ")
     pezzi.append(mini[j_lap:mini.index(";", j_lap) + 1])
     pezzi.append("const P2P_LIBRO_FINESTRA_S = 16 * 86400;")
+    # i centesimi del tabacchino (22 set 2026): il prefisso del metodo
+    # e l'importo esatto nel pm, dal client come tutto il resto
+    for riga in ("const P2P_TABACCHINO = ", "const P2P_TABACCHINO_PM = "):
+        i_r = mini.index(riga)
+        pezzi.append(mini[i_r:mini.index("\n", i_r)])
+    for f in ("function metodoBaseP2P(m){", "function euroTabacchinoP2P(metodi){"):
+        pezzi.append(pezzo_js(mini, f, "\n}\n") + "\n}")
     # IL VESTITO DEI METODI (16 set 2026): rigaOrdineP2P veste il metodo
     # col catalogo, quindi il banco porta il catalogo e TUTTE le sue
     # funzioni (col terminatore "\n}\n" e la graffa rimessa: fra loro
@@ -45793,6 +45806,11 @@ out.rigaMercato = rigaOrdineP2P(out.mercato);
 /* SENZA premio: e' l'unico caso in cui il ramo del ripiego della meta
    si valuta davvero — con `premium` pieno il ternario non ci arriva. */
 out.mercatoZero = ordineDaEvento(ev(38383, [['d','ord-2z'],['k','buy'],['f','eur'],['s','pending'],['amt','0'],['fa','50'],['pm','Bonifico'],['expires_at', String(ora+90000)]]), ora);
+// i centesimi del tabacchino (22 set 2026): dal pm, solo se combaciano col fa
+out.tabEsatto = ordineDaEvento(ev(38383, [['d','tab-1'],['k','sell'],['f','EUR'],['s','pending'],['amt','46940'],['fa','23'],['pm','Contanti al tabacchino 23.47'],['expires_at', String(ora+3600)]]), ora);
+out.tabStorto = ordineDaEvento(ev(38383, [['d','tab-2'],['k','sell'],['f','EUR'],['s','pending'],['amt','46940'],['fa','30'],['pm','Contanti al tabacchino 23.47'],['expires_at', String(ora+3600)]]), ora);
+out.tabSenza = ordineDaEvento(ev(38383, [['d','tab-3'],['k','sell'],['f','EUR'],['s','pending'],['amt','0'],['fa','23'],['pm','Contanti al tabacchino'],['expires_at', String(ora+3600)]]), ora);
+out.tabVeste = [vesteMetodoP2P('Contanti al tabacchino 23.47'), vesteMetodoP2P('Contanti al tabacchino'), vesteMetodoP2P('SEPA')].map(v => v ? v.nome : null);
 out.rigaMercatoZeroVivo = rigaOrdineP2P(out.mercatoZero);
 /* UNA REPUTAZIONE SOLA, QUELLA DEL MERCATINO (set 2026, decisione di
    Andrea): quella del coordinatore non si legge nemmeno piu'. E LA
@@ -46070,6 +46088,17 @@ console.log(JSON.stringify(out));
         out = _json.loads(r.stdout.strip().splitlines()[-1])
     finally:
         _sh.rmtree(d, ignore_errors=True)
+    # I CENTESIMI DEL TABACCHINO (22 set 2026): il `fa` e' un intero del
+    # protocollo, l'esatto sta nel `pm` e vale solo se ci combacia; il
+    # metodo resta nella riga COM'E' nel libro (col numero), e il
+    # vestito lo riconosce dal prefisso
+    prova("dal pm del tabacchino la card legge i centesimi",
+          [23.47, 46940, ["Contanti al tabacchino 23.47"]],
+          [out["tabEsatto"]["euro"], out["tabEsatto"]["sats"], out["tabEsatto"]["metodi"]])
+    prova("...ma se non combacia col fa comanda il fa", 30, out["tabStorto"]["euro"])
+    prova("...e senza importo nel pm e' l'ordine di ieri", 23, out["tabSenza"]["euro"])
+    prova("il vestito Barattozon riconosce il metodo col numero dentro",
+          ["Barattozon", "Barattozon", None], out["tabVeste"])
     f = out["fisso"]
     prova("un ordine a sats fissi si legge intero", True,
           f is not None and f["id"] == "ord-1" and f["lato"] == "sell"
@@ -46932,6 +46961,7 @@ def prove_p2p_dettaglio():
         "function anelloneP2P(o, adesso){",
         # l'avviso alla presa col tabacchino (set 2026) e i suoi due giudici
         "function tabacchinoP2P(metodi){",
+        "function metodoBaseP2P(m){",
         "function fasciaTabacchinoP2P(scade, adesso){",
         "function avvisoPresaTabacchinoP2P(o, adesso){",
         "function notaTabacchinoDettP2P(o){",
@@ -46983,7 +47013,8 @@ def prove_p2p_dettaglio():
     for riga in ("const P2P_VALUTA = ", "const P2P_VALUTE = ",
                  "const P2P_GLIFI = ", "const P2P_ULTIMO_GIORNO_S = ",
                  "const P2P_ANELLO_VICINA_S = ", "const P2P_ANELLONE_TACCHE = ",
-                 "const P2P_TABACCHINO = ", "const P2P_TAB_AVVISO_S = ",
+                 "const P2P_TABACCHINO = ", "const P2P_TABACCHINO_PM = ",
+                 "const P2P_TAB_AVVISO_S = ",
                  "const P2P_TAB_ULTIMA_S = ",
                  "const p2pCoord = ",
                  "let p2pDettOrdine = ", "let p2pDettMetodo = "):
@@ -52896,7 +52927,10 @@ def prove_p2p_stati():
     i_fin = mini.index("const P2P_FINALI = [")
     riga_finali = mini[i_fin:mini.index("\n", i_fin)]
     avanza = (fn("function mossaDopoRilascioP2P(o, azione, ord){") + "\n"
-              + fn("function avanzaOrdineP2P(ordine, azione, payload){"))
+              + fn("function avanzaOrdineP2P(ordine, azione, payload){")
+              # i centesimi del tabacchino dal pm (22 set 2026)
+              + "\n" + fn("function euroTabacchinoP2P(metodi){")
+              + "\n" + re.search(r"const P2P_TABACCHINO_PM = [^\n]*;", mini).group(0))
     azioni = fn("function azioniDisponibili(o){")
     # le due funzioni della tappa 5 stanno su UNA riga: `fn` si ferma
     # alla graffa a colonna zero e qui non c'e'
@@ -54459,9 +54493,16 @@ def prove_p2p_pubblica():
         "const fmt = n => String(n);\n"
         "const fmtEur = n => String(n);\n"
         + _intera("function interoP2P(testo){")
+        # i centesimi del tabacchino (22 set 2026): il giudice, il tasto,
+        # la rete e la cifra come si legge
+        + "\n" + _intera("function centesimiP2P(testo){")
+        + "\n" + _intera("function centesimiTestoP2P(n){")
+        + "\n" + _intera("function soloCentesimiP2P(ev){")
+        + "\n" + _intera("function ripuliCentesimiP2P(inp){")
         + "\n" + _intera("function soloCifreP2P(ev){")
         + "\n" + _intera("function ripuliCifreP2P(inp){")
         + "\n" + _intera("function satsMercatoP2P(o){")
+        + "\n" + _intera("function satsTabacchinoP2P(importo, cambio, premio){")
         + "\n" + _intera("function commissioneVivaP2P(){")
         + "\n" + _intera("function feeMiaP2P(o){")
         + "\n" + _intera("function nettoLatoP2P(o, sats){")
@@ -54498,6 +54539,12 @@ def prove_p2p_pubblica():
         + "\n" + _intera("function scadeDaCampoP2P(s){")
         + "\n" + _intera("function campoDaScadeP2P(epoch){")
         + "\n" + _intera("function tabacchinoP2P(metodi){")
+        + "\n" + _intera("function metodoBaseP2P(m){")
+        + "\n" + _intera("function euroTabacchinoP2P(metodi){")
+        + "\n" + _intera("function metodoTabacchinoP2P(importo){")
+        + "\n" + _intera("function vesteMetodoP2P(m){")
+        + "\n" + mini[mini.index("const P2P_VESTE_METODI = {"):
+                       mini.index("\n};", mini.index("const P2P_VESTE_METODI = {")) + 3]
         + "\n" + _intera("function metodiPubblicabiliP2P(lato){")
         # il tempo dei due lati (set 2026): il giudice unico della
         # scadenza, le fasce, il riquadro, l'avviso alla presa
@@ -54511,6 +54558,8 @@ def prove_p2p_pubblica():
                        mini.index("];", mini.index("const P2P_TAB_IN_GARANZIA = ")) + 2]
         + "\n" + re.search(r"const P2P_METODI = \[[^\n]*\];", mini).group(0)
         + "\n" + re.search(r"const P2P_TABACCHINO = [^\n]*;", mini).group(0)
+        + "\n" + re.search(r"const P2P_TABACCHINO_PM = [^\n]*;", mini).group(0)
+        + "\n" + re.search(r"const P2P_TABACCHINO_VITA_S = [^\n]*;", mini).group(0)
         + "\nconst METODI = ['SEPA', 'SEPA Instant', 'Revolut',"
           " 'Satispay', 'PayPal', 'Contanti', 'Contanti al tabacchino'];\n"
         "const base = {metodi: ['SEPA', 'Revolut'], maxSats: 100000, minSats: 100};\n"
@@ -54626,9 +54675,12 @@ def prove_p2p_pubblica():
         # e torna
         "  tabVale: (() => {\n"
         "    const ora = 1800000000, fin = (576 - 24) * 600;\n"
-        "    const ok = {euro: '100', euroMax: '', sats: '', fisso: false, metodi: [P2P_TABACCHINO],\n"
+        # dal 22 set 2026 l'importo dell'ordine Amazon e' il campo
+        # dell'importo, coi centesimi; il cambio vivo serve ai sats
+        "    const ok = {euro: '23,47', euroMax: '', sats: '', fisso: false, metodi: [P2P_TABACCHINO],\n"
         "      maxSats: 100000, minSats: 100, lato: 'vendo', finestra: fin, adesso: ora,\n"
-        "      tab: {ordine: '123-4567890-1234567', importo: '100', scade: campoDaScadeP2P(ora + 48 * 3600)}};\n"
+        "      premio: 0, cambio: 0.0005,\n"
+        "      tab: {ordine: '123-4567890-1234567', scade: campoDaScadeP2P(ora + 48 * 3600)}};\n"
         "    const con = (agg) => valeNuovoOrdineP2P(Object.assign({}, ok, agg));\n"
         "    const tab = (agg) => Object.assign({}, ok.tab, agg);\n"
         "    return {\n"
@@ -54637,16 +54689,64 @@ def prove_p2p_pubblica():
         "      due: con({metodi: ['SEPA', P2P_TABACCHINO]}).manca,\n"
         "      massimo: con({euroMax: '200'}).manca,\n"
         "      ordine: con({tab: tab({ordine: ' '})}).manca,\n"
-        "      importo: con({tab: tab({importo: ''})}).manca,\n"
+        "      importo: con({euro: ''}).manca,\n"
+        "      importoStorto: con({euro: '23,475'}).manca,\n"
+        "      senzaCambio: con({cambio: 0}).manca,\n"
+        "      troppiSats: [con({maxSats: 10000}).manca, con({maxSats: 10000}).campo],\n"
+        "      pochiSats: con({minSats: 50000}).manca,\n"
         "      scade: con({tab: tab({scade: ''})}).manca,\n"
         "      passata: con({tab: tab({scade: campoDaScadeP2P(ora - 60)})}).manca,\n"
         "      senzaInfo: con({finestra: 0}).manca,\n"
         "      lontana: con({tab: tab({scade: campoDaScadeP2P(ora + fin + 3600)})}).manca,\n"
         "      alBordo: con({tab: tab({scade: campoDaScadeP2P(ora + fin - 60)})}).ok,\n"
         "      campi: [con({lato: 'compro'}).campo, con({tab: tab({ordine: ''})}).campo,\n"
-        "              con({tab: tab({importo: ''})}).campo, con({tab: tab({scade: ''})}).campo],\n"
-        "      payload: ordineDaCampiP2P({euro: '100', euroMax: '', sats: '', fisso: false,\n"
-        "        metodi: [P2P_TABACCHINO], premio: 2, scade: ora + 48 * 3600}, 'vendo'),\n"
+        "              con({euro: ''}).campo, con({tab: tab({scade: ''})}).campo,\n"
+        "              con({cambio: 0}).campo],\n"
+        # IL FILO (22 set 2026): intero arrotondato, sats esatti a prezzo
+        # fisso, l'importo nel metodo, premio 0, e nel libro 24 ore
+        "      payload: ordineDaCampiP2P({euro: '23,47', euroMax: '', sats: '', fisso: false,\n"
+        "        metodi: [P2P_TABACCHINO], premio: 0, scade: ora + 48 * 3600, adesso: ora, cambio: 0.0005}, 'vendo'),\n"
+        "      cotto: (o => [o.amount, o.premium])(ordineDaCampiP2P({euro: '23,47', euroMax: '', sats: '', fisso: false,\n"
+        "        metodi: [P2P_TABACCHINO], premio: 2, scade: ora + 48 * 3600, adesso: ora, cambio: 0.0005}, 'vendo')),\n"
+        "      punto: ordineDaCampiP2P({euro: '23.47', euroMax: '', sats: '', fisso: false,\n"
+        "        metodi: [P2P_TABACCHINO], premio: 0, scade: ora + 48 * 3600, adesso: ora, cambio: 0.0005}, 'vendo').amount,\n"
+        "      mezzo: (o => [o.fiat_amount, o.payment_method])(ordineDaCampiP2P({euro: '23,50', euroMax: '', sats: '',\n"
+        "        fisso: false, metodi: [P2P_TABACCHINO], premio: 0, scade: ora + 48 * 3600, adesso: ora, cambio: 0.0005}, 'vendo')),\n"
+        "      intero: (o => [o.fiat_amount, o.amount, o.payment_method])(ordineDaCampiP2P({euro: '25', euroMax: '', sats: '',\n"
+        "        fisso: false, metodi: [P2P_TABACCHINO], premio: 0, scade: ora + 48 * 3600, adesso: ora, cambio: 0.0005}, 'vendo')),\n"
+        "      vicina: ordineDaCampiP2P({euro: '25', euroMax: '', sats: '', fisso: false,\n"
+        "        metodi: [P2P_TABACCHINO], premio: 0, scade: ora + 7200, adesso: ora, cambio: 0.0005}, 'vendo').expires_at - ora,\n"
+        # la leva del prezzo girata prima non conta: col tabacchino
+        # `fisso` e' spento dal foglio, e qui il costruttore lo ignora
+        "      levaIgnorata: ordineDaCampiP2P({euro: '23,47', euroMax: '', sats: '999', fisso: true,\n"
+        "        metodi: [P2P_TABACCHINO], premio: 0, scade: ora + 48 * 3600, adesso: ora, cambio: 0.0005}, 'vendo').amount,\n"
+        # il «Riprova»: da una riga che porta gia' l'importo nel metodo
+        # il payload torna identico, senza raddoppiare il numero
+        "      giroRiga: JSON.stringify(ordineDaCampiP2P({euro: '23.47', euroMax: '', sats: '46940', fisso: true,\n"
+        "        metodi: ['Contanti al tabacchino 23.47'], premio: 0, scade: ora + 48 * 3600, adesso: ora, cambio: 0.0005}, 'vendo')),\n"
+        "      giudici: [tabacchinoP2P(['Contanti al tabacchino 23.47']), tabacchinoP2P(['Contanti al tabacchino']),\n"
+        "                tabacchinoP2P(['Contanti al tabacchinoX']), tabacchinoP2P(['SEPA', 'Contanti al tabacchino 5.00']),\n"
+        "                metodoBaseP2P('Contanti al tabacchino 23.47'), metodoBaseP2P(' SEPA '),\n"
+        "                euroTabacchinoP2P(['SEPA', 'Contanti al tabacchino 23.47']), euroTabacchinoP2P(['Contanti al tabacchino']),\n"
+        "                euroTabacchinoP2P(['Contanti al tabacchino 23.4']), euroTabacchinoP2P(['Contanti al tabacchino 23,47']),\n"
+        "                metodoTabacchinoP2P(23.47), metodoTabacchinoP2P(25), metodoTabacchinoP2P(0.1 + 0.2),\n"
+        "                (vesteMetodoP2P('Contanti al tabacchino 23.47') || {}).nome],\n"
+        "      centesimi: [centesimiP2P('23,47'), centesimiP2P('23.47'), centesimiP2P('23'), centesimiP2P('23,5'),\n"
+        "                  centesimiP2P('23,475'), centesimiP2P('1e3'), centesimiP2P(''), centesimiP2P(' 5 '),\n"
+        "                  centesimiP2P('5,5,5'), centesimiP2P(null)],\n"
+        "      testi: [centesimiTestoP2P(23.47), centesimiTestoP2P(25), centesimiTestoP2P(0.1 + 0.2)],\n"
+        "      satsTab: [satsTabacchinoP2P(23.47, 0.0005, 0), satsTabacchinoP2P(23.47, 0.0005, 2),\n"
+        "                satsTabacchinoP2P(23.47, 0.0005, -2), satsTabacchinoP2P(23.47, 0, 0), satsTabacchinoP2P(0, 0.0005, 0)],\n"
+        "      tastoCent: [['5', ''], ['.', ''], [',', ''], ['a', ''], ['1,5', ''], [',', '23,'], ['.', '23,'], ['7', '23,4'], [null, ''], ['1,5,5', ''], ['1.5,5', '']].map(([d, gia]) => {\n"
+        "        let fermato = false;\n"
+        "        soloCentesimiP2P({data: d, target: {value: gia}, preventDefault: () => { fermato = true; }});\n"
+        "        return fermato; }),\n"
+        "      reteCent: (() => {\n"
+        "        const campo = (v, dove) => { const i = {value: v, selectionStart: dove,\n"
+        "          setSelectionRange: (a) => { i.selectionStart = a; }}; return i; };\n"
+        "        const a = campo('2a3,4.5', 7), b = campo('23,47', 3), c = campo('', 0);\n"
+        "        return [ripuliCentesimiP2P(a), a.selectionStart, ripuliCentesimiP2P(b), b.selectionStart,\n"
+        "                ripuliCentesimiP2P(c), ripuliCentesimiP2P(null)]; })(),\n"
         "      senzaChiave: 'expires_at' in ordineDaCampiP2P({euro: '25', euroMax: '', sats: '',\n"
         "        fisso: false, metodi: ['SEPA'], premio: 0, scade: 0}, 'compro'),\n"
         "      giro: scadeDaCampoP2P(campoDaScadeP2P(ora + 48 * 3600)) === ora + 48 * 3600,\n"
@@ -54867,6 +54967,19 @@ def prove_p2p_pubblica():
         _i = mini.index('id="%s"' % _id)
         _dopo = mini.find("<input", _i)
         _tag = mini[_i:min(_dopo if _dopo > 0 else len(mini), _i + 400)]
+        if _id == "p2pNuovoEuro":
+            # DUE VESTI (22 set 2026): col tabacchino il campo ha i
+            # centesimi — tastiera decimale e il filtro dei centesimi —,
+            # per tutti gli altri metodi resta quello di ieri
+            _i2 = mini.index('id="%s"' % _id, _i + 1)
+            _dopo2 = mini.find("<input", _i2)
+            _tag2 = mini[_i2:min(_dopo2 if _dopo2 > 0 else len(mini), _i2 + 400)]
+            prova("il campo p2pNuovoEuro col tabacchino: testo, decimale, filtro dei centesimi", True,
+                  'type="text"' in _tag and 'inputmode="decimal"' in _tag
+                  and 'onbeforeinput="soloCentesimiP2P(event)"' in _tag)
+            prova("...e la seconda occorrenza e' la sola: non ce n'e' una terza", -1,
+                  mini.find('id="p2pNuovoEuro"', _i2 + 1))
+            _tag = _tag2
         prova("il campo %s e' testo filtrato, non un number" % _id, True,
               'type="text"' in _tag and 'type="number"' not in _tag
               and 'inputmode="numeric"' in _tag
@@ -54888,9 +55001,15 @@ def prove_p2p_pubblica():
     # tocca il loro `value`
     camb = pezzo_js(mini, "function cambiaCampoNuovoP2P(){", "\n}\n")
     prova("i tre campi del foglio si leggono dalla rete", True,
-          "p2pNuovoEuro = ripuliCifreP2P(e)" in camb
+          "p2pNuovoEuro = tabacchinoP2P(p2pNuovoMetodi) ? ripuliCentesimiP2P(e) : ripuliCifreP2P(e)" in camb
           and "p2pNuovoEuroMax = ripuliCifreP2P(x)" in camb
           and "p2pNuovoSats = ripuliCifreP2P(s)" in camb)
+    # E IL SECONDO CAMPO DELL'IMPORTO NON C'E' PIU' (22 set 2026): con
+    # lui se ne vanno la nota «non combaciano» e il dialogo, che con
+    # una cifra sola non hanno piu' niente da confrontare
+    prova("del secondo importo del tabacchino non resta niente", [0, 0, 0, 0],
+          [mini.count("p2pNuovoTabImporto"), mini.count("notaTabP2P"),
+           mini.count("p2pNuovoTabConfermato"), mini.count("Gli importi non combaciano")])
     prova("...e cosi' l'importo scelto", 2,
           mini.count("quantoValeP2P(riga, ripuliCifreP2P(inp))"))
     # IL BOTTONE SPENTO DICE PERCHE': un «Invia» che non risponde e
@@ -54922,10 +55041,21 @@ def prove_p2p_pubblica():
           "Col tabacchino nessun altro metodo nello stesso ordine", tv["due"])
     prova("...e senza intervallo",
           "Col tabacchino l'importo è uno solo, senza massimo", tv["massimo"])
+    # dal 22 set 2026 l'importo e' il campo dell'importo, coi centesimi:
+    # vuoto o storto (tre decimali) si ferma li', con la frase sua
     prova("i tre dati sono obbligatori, ognuno col suo nome",
-          ["Scrivi il numero dell'ordine Amazon", "Scrivi l'importo dell'ordine Amazon",
+          ["Scrivi il numero dell'ordine Amazon",
+           "Scrivi l'importo dell'ordine Amazon, coi centesimi se servono",
+           "Scrivi l'importo dell'ordine Amazon, coi centesimi se servono",
            "Scrivi quando scade l'ordine Amazon"],
-          [tv["ordine"], tv["importo"], tv["scade"]])
+          [tv["ordine"], tv["importo"], tv["importoStorto"], tv["scade"]])
+    # I SATS SONO NOSTRI: senza cambio vivo non si pubblica, e i due
+    # tetti del coordinatore si guardano sul campo dell'importo
+    prova("senza cambio vivo il tabacchino aspetta",
+          "Aspetta un attimo: sto leggendo il cambio", tv["senzaCambio"])
+    prova("...e i tetti in sats del coordinatore valgono sui sats calcolati",
+          [["Troppi: il massimo è 10000 sats", "p2pNuovoEuro"], "Troppo pochi: il minimo è 50000 sats"],
+          [tv["troppiSats"], tv["pochiSats"]])
     prova("una scadenza passata non si pubblica",
           "La scadenza è già passata: serve un ordine Amazon nuovo", tv["passata"])
     # SENZA 38385 NON SI SA quanto copre la garanzia, e il tabacchino
@@ -54937,16 +55067,68 @@ def prove_p2p_pubblica():
           "Troppo lontana: la garanzia copre al massimo 92 ore da adesso", tv["lontana"])
     prova("...e un minuto sotto il bordo passa", True, tv["alBordo"])
     prova("ogni «manca» del tabacchino si porta il suo campo",
-          ["p2pNuovoMetodiBtn", "p2pNuovoTabOrdine", "p2pNuovoTabImporto", "p2pNuovoTabScade"],
+          ["p2pNuovoMetodiBtn", "p2pNuovoTabOrdine", "p2pNuovoEuro", "p2pNuovoTabScade",
+           "p2pNuovoEuro"],
           tv["campi"])
     prova("...e i campi del tabacchino esistono davvero nel foglio", True,
           all(('id="%s"' % c) in mini for c in tv["campi"]))
-    prova("expires_at viaggia col tabacchino, ed e' la scadenza al secondo",
-          {"kind": "sell", "status": "pending", "amount": 0, "fiat_code": "EUR",
-           "min_amount": None, "max_amount": None, "fiat_amount": 100,
-           "payment_method": "Contanti al tabacchino", "premium": 2,
-           "created_at": 0, "expires_at": 1800000000 + 48 * 3600},
+    # IL FILO DEL TABACCHINO (22 set 2026, Barattozon coi centesimi):
+    # `fiat_amount` e' l'intero piu' vicino (il protocollo e' i64),
+    # l'esatto sta nel metodo col punto, i sats sono FISSI al cambio
+    # vivo (23,47 / 0.0005 = 46940) col premio a zero — il coordinatore
+    # rifiuta amount e premium insieme —, e nel libro resta 24 ore
+    # anche se l'ordine Amazon ne vale 48
+    prova("sul filo: intero arrotondato, sats esatti, l'importo nel metodo, 24 ore",
+          {"kind": "sell", "status": "pending", "amount": 46940, "fiat_code": "EUR",
+           "min_amount": None, "max_amount": None, "fiat_amount": 23,
+           "payment_method": "Contanti al tabacchino 23.47", "premium": 0,
+           "created_at": 0, "expires_at": 1800000000 + 24 * 3600},
           tv["payload"])
+    # ...e sul filo `premium` resta ZERO: amount e premium insieme il
+    # coordinatore li rifiuta (`check_zero_amount_with_premium`)
+    prova("...il premio si cuoce nei sats con la formula del coordinatore (46940 × 0,98), e sul filo è 0",
+          [46001, 0], tv["cotto"])
+    prova("...la virgola e il punto sono la stessa cifra", 46940, tv["punto"])
+    prova("...23,50 arrotonda a 24 sul filo, e il metodo dice 23.50",
+          [24, "Contanti al tabacchino 23.50"], tv["mezzo"])
+    prova("...un importo tondo viaggia con due decimali lo stesso",
+          [25, 50000, "Contanti al tabacchino 25.00"], tv["intero"])
+    prova("...e una scadenza Amazon piu' vicina delle 24 ore vince lei", 7200, tv["vicina"])
+    prova("...la leva del prezzo girata prima non conta: i sats sono quelli dell'importo",
+          46940, tv["levaIgnorata"])
+    prova("il «Riprova» da una riga col numero nel metodo non lo raddoppia", True,
+          tv["giroRiga"] == _js.dumps(tv["payload"], separators=(",", ":")))
+    # I GIUDICI DEL PREFISSO: il metodo col numero dentro e' il
+    # tabacchino, un suffisso qualunque no; l'importo si legge solo
+    # nella forma stretta (punto, due decimali); il vestito lo trova
+    prova("i giudici del metodo cercano il prefisso, e l'importo nella sua forma",
+          [True, True, False, True, "Contanti al tabacchino", "SEPA",
+           23.47, 0, 0, 0, "Contanti al tabacchino 23.47", "Contanti al tabacchino 25.00",
+           "Contanti al tabacchino 0.30", "Barattozon"],
+          tv["giudici"])
+    prova("il giudice dei centesimi: virgola o punto, due decimali al massimo",
+          [{"vuoto": False, "storto": False, "n": 23.47},
+           {"vuoto": False, "storto": False, "n": 23.47},
+           {"vuoto": False, "storto": False, "n": 23},
+           {"vuoto": False, "storto": False, "n": 23.5},
+           {"vuoto": False, "storto": True, "n": 0},
+           {"vuoto": False, "storto": True, "n": 0},
+           {"vuoto": True, "storto": False, "n": 0},
+           {"vuoto": False, "storto": False, "n": 5},
+           {"vuoto": False, "storto": True, "n": 0},
+           {"vuoto": True, "storto": False, "n": 0}],
+          tv["centesimi"])
+    prova("...e la cifra si legge con la virgola e due decimali, senza polvere",
+          ["23,47", "25,00", "0,30"], tv["testi"])
+    prova("i sats del tabacchino: la formula del coordinatore, e zero senza cambio",
+          [46940, 46001, 47879, 0, 0], tv["satsTab"])
+    # («1,5» incollato in un campo VUOTO qui e' una cifra buona — non e'
+    # il caso dell'intero, dove diventerebbe 15; con un separatore gia'
+    # nel campo, il secondo si ferma)
+    prova("il tasto dei centesimi: cifre e UN separatore, mai il secondo",
+          [False, False, False, True, False, True, True, False, False, True, True], tv["tastoCent"])
+    prova("la rete dei centesimi tiene il primo separatore e il cursore",
+          ["23,45", 5, "23,47", 3, "", ""], tv["reteCent"])
     prova("...e per gli altri metodi la chiave non c'e' proprio: il payload di ieri",
           False, tv["senzaChiave"])
     prova("il campo data va e torna, e a mano vale la forma delle gemelle",
@@ -56371,7 +56553,10 @@ async function giro(modo){
 """
     pezzi = "\n".join(pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
         "function bottoneInAttesa(btn, testo){", "function attesaP2P(testo, btn){",
-        "function spuntaAttesaP2P(testo, ms){", "async function inviaNuovoOrdineP2P(){"))
+        "function spuntaAttesaP2P(testo, ms){", "async function inviaNuovoOrdineP2P(){",
+        # il prefisso del metodo, che il canale usa (22 set 2026)
+        "function metodoBaseP2P(m){"))
+    pezzi += "\n" + re.search(r"const P2P_TABACCHINO_PM = [^\n]*;", mini).group(0)
     pezzi = "let P2P_SPUNTA_MS = 2500;\nfunction chiediConferma(){}\n" + pezzi
     d = _tf.mkdtemp()
     try:
@@ -56525,6 +56710,9 @@ def prove_p2p_barattozon():
             " '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;'}[c]));\n"
             + _cat + "\n};\n"
             + _intera("function vesteMetodoP2P(m){")
+            + _intera("function metodoBaseP2P(m){")
+            + re.search(r"const P2P_TABACCHINO = [^\n]*;", mini).group(0) + "\n"
+            + re.search(r"const P2P_TABACCHINO_PM = [^\n]*;", mini).group(0) + "\n"
             + _intera("function marchioMetodoP2P(m, conTesto){")
             + _intera("function iconaMetodiP2P(metodi){")
             + "const T = 'Contanti al tabacchino';\n"
@@ -56850,6 +57038,14 @@ def prove_p2p_canale():
           "25,00 €" in compra and "100,00 €" in vende)
     prova("il metodo e' quello scritto", True,
           "Satispay" in compra and "Revolut" in vende)
+    # I CENTESIMI DEL TABACCHINO (22 set 2026): la caption dice 23,47 €
+    # e la porta del canale accetta un decimale, arrotondato al
+    # centesimo (era `int()`, che su 23.47 rispondeva «Importo storto»)
+    prova("la caption porta i centesimi", True,
+          "23,47 €" in cap("vendo", 23.47, "Contanti al tabacchino", gino))
+    prova("...e la porta del canale li accetta, al centesimo", True,
+          'euro = round(float(d.get("euro")), 2)'
+          in pezzo("annuncia_ordine_p2p_canale"))
     prova("chi ha solo Telegram si legge con la sua menzione", True,
           "<b>@rosina</b>" in compra)
     prova("il nativo Nostr guadagna l'ancora njump", True,
@@ -61345,7 +61541,7 @@ def _banco_eventi_p2p(eventi_attivi=True):
         i = src.index("\n" + blocco) + 1
         exec(src[i:src.index(fine, i) + len(fine)], amb)
     for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_parti_recensione_p2p",
-              "_ordini_puliti_p2p", "_euro_libro", "_passaggio_libro_p2p",
+              "_ordini_puliti_p2p", "_euro_libro", "_euro_tabacchino", "_metodi_libro", "_passaggio_libro_p2p",
               "_testo_libro_p2p", "_avvisi_libro_p2p", "eventi_p2p_attivi",
               "_momento_evento_p2p", "_evento_p2p_pulito",
               "_registra_evento_p2p", "_destinatari_evento_p2p",
@@ -61771,6 +61967,14 @@ def prove_p2p_eventi():
     prova("un recapito gia' AVVISATO a chi compra vale come detto, anche senza "
           "la riga del telefono (gli scambi a cavallo del deploy)",
           True, amb["_dati_frase_p2p"](con, ORDV)["recapito_detto"])
+    # I CENTESIMI DEL TABACCHINO (22 set 2026): il libro scrive il metodo
+    # com'e' nel `pm`, con l'importo dentro; la frase lo dice SENZA, che
+    # la cifra sta gia' in `euro`
+    con.execute("UPDATE p2p_ordini SET metodi=?, euro=? WHERE ordine=?",
+                (json.dumps(["Contanti al tabacchino 23.47"]), "23,47 €", ORDV))
+    _dv = amb["_dati_frase_p2p"](con, ORDV)
+    prova("nella frase il tabacchino si dice senza l'importo, che sta gia' nella cifra",
+          ["Contanti al tabacchino", "23,47 €"], [_dv["metodi"], _dv["euro"]])
 
     # --- 6) IL GIRO: la seconda presa non e' il doppione della prima -
     ORD3 = "99999999-8888-4777-8666-555544443333"
@@ -62261,7 +62465,7 @@ def prove_p2p_avvisi_libro():
     exec(src[_m:src.index("}\n", _m) + 2], amb)
     for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
               "_parti_recensione_p2p",
-              "_euro_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
+              "_euro_libro", "_euro_tabacchino", "_metodi_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
               "_ordini_puliti_p2p", "_registra_ordini_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
     giud, reg = amb["_avvisi_libro_p2p"], amb["_registra_ordini_p2p"]
@@ -62290,6 +62494,30 @@ def prove_p2p_avvisi_libro():
             "ORDER BY id", (chi,))]
 
     # il giudice puro sui passaggi
+    # L'IMPORTO ESATTO DAL `pm` (22 set 2026, Barattozon coi centesimi):
+    # «Contanti al tabacchino 23.47» vince sul `fa` intero SOLO se ci
+    # combacia arrotondato; l'intervallo non si tocca; e nei metodi
+    # detti a parole l'importo si toglie, che sta gia' nella cifra
+    euro_tab, metodi_libro = amb["_euro_tabacchino"], amb["_metodi_libro"]
+    prova("il tabacchino col pm esatto dice i centesimi", "23,47 €",
+          euro(["23"], ["Contanti al tabacchino 23.47"]))
+    prova("...e senza combaciare comanda il fa", "30,00 €",
+          euro(["30"], ["Contanti al tabacchino 23.47"]))
+    prova("...l'arrotondamento e' al piu' vicino: 23,50 sta con 24", "23,50 €",
+          euro(["24"], ["Contanti al tabacchino 23.50"]))
+    prova("...su un intervallo il pm non conta", "da 20,00 a 100,00 €",
+          euro(["20", "100"], ["Contanti al tabacchino 23.47"]))
+    prova("...e senza metodi e' quella di ieri", "23,00 €", euro(["23"]))
+    prova("la forma e' stretta: cifre, punto, due decimali",
+          [23.47, 0.0, 0.0, 0.0, 0.0, 0.0],
+          [euro_tab("Contanti al tabacchino 23.47"),
+           euro_tab("Contanti al tabacchino 23.4"),
+           euro_tab("Contanti al tabacchino 23,47"),
+           euro_tab("Contanti al tabacchino"),
+           euro_tab("Contanti al tabacchinoX 23.47"), euro_tab(None)])
+    prova("nei metodi detti a parole l'importo si toglie",
+          ["Contanti al tabacchino", "SEPA", "Contanti al tabacchino x"],
+          metodi_libro(["Contanti al tabacchino 23.47", " SEPA", "Contanti al tabacchino x"]))
     prova("pending→in-progress e' «preso»", "preso", passaggio("pending", "in-progress", 1))
     prova("...anche da mai visto, se dichiarato pubblicato", "preso",
           passaggio("", "in-progress", 1))
@@ -62698,7 +62926,7 @@ def prove_p2p_orologio():
         exec(src[_m:src.index("}\n", _m) + 2], amb)
         for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
               "_parti_recensione_p2p",
-                  "_euro_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
+                  "_euro_libro", "_euro_tabacchino", "_metodi_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
                   "_ordini_puliti_p2p", "_registra_ordini_p2p",
                   "_relay_p2p_dice", "_esiti_p2p_dice", "_chiedi_relay_p2p",
                   "_chiedi_tutti_p2p", "_unisci_p2p", "_conto_relay_p2p",
@@ -62969,7 +63197,7 @@ def prove_p2p_tutti_i_relay():
     asincrone = ("_chiedi_relay_p2p", "_chiedi_tutti_p2p", "_giro_libro_p2p",
                  "_giro_attese_p2p")
     for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
-              "_parti_recensione_p2p", "_euro_libro", "_testo_libro_p2p",
+              "_parti_recensione_p2p", "_euro_libro", "_euro_tabacchino", "_metodi_libro", "_testo_libro_p2p",
               "_avvisi_libro_p2p", "_ordini_puliti_p2p", "_registra_ordini_p2p",
               "_relay_p2p_dice", "_esiti_p2p_dice", "_unisci_p2p",
               "_conto_relay_p2p", "_chiave_evento_p2p", "_ascolto_mancato_p2p",
@@ -63504,7 +63732,7 @@ def prove_p2p_ascolto():
                  "_giro_attese_p2p", "orologio_p2p")
     for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
               "_parti_recensione_p2p",
-              "_euro_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
+              "_euro_libro", "_euro_tabacchino", "_metodi_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
               "_ordini_puliti_p2p", "_registra_ordini_p2p",
               "_relay_p2p_dice", "_esiti_p2p_dice",
               "_unisci_p2p", "_conto_relay_p2p", "_chiave_evento_p2p",
@@ -63899,7 +64127,7 @@ def _schema_p2p_pieno(src):
 # campanello — il gate, la coda — sono cadute con la patch 0007)
 _FUNZIONI_LIBRO_P2P = (
     "_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
-    "_parti_recensione_p2p", "_euro_libro", "_testo_libro_p2p",
+    "_parti_recensione_p2p", "_euro_libro", "_euro_tabacchino", "_metodi_libro", "_testo_libro_p2p",
     "_fee_di_p2p", "_avvisi_libro_p2p", "_ordini_puliti_p2p",
     "_registra_ordini_p2p", "_facce_ordini_p2p", "_sconto_p2p",
     "_sconto_p2p_fatti", "_evento_libro_p2p", "eventi_p2p_attivi")
@@ -64583,6 +64811,9 @@ def prove_p2p_silenzi():
         fn("function holdVivaP2P(o){"),
         fn("function mossaDopoRilascioP2P(o, azione, ord){"),
         fn("function avanzaOrdineP2P(ordine, azione, payload){"),
+        # i centesimi del tabacchino dal pm (22 set 2026)
+        fn("function euroTabacchinoP2P(metodi){"),
+        re.search(r"const P2P_TABACCHINO_PM = [^\n]*;", mini).group(0),
         fn("function azioniDisponibili(o){"),
         "const FRESCA = " + _json.dumps(bolt11_finta(8302, 900, adesso - 30)) + ";",
         "const VECCHIA = " + _json.dumps(bolt11_finta(8302, 900, adesso - 1200)) + ";",
@@ -64624,6 +64855,13 @@ out.viva = [holdVivaP2P(chiesto),
             holdVivaP2P({hold: {bolt11: 'robaccia'}}), holdVivaP2P({})];
 p2pInfo = null;
 out.vivaSenzaInfo = holdVivaP2P(chiesto);
+/* i centesimi del tabacchino (22 set 2026): la risposta del coordinatore
+   porta `fiat_amount` intero e il metodo con l'esatto — l'esatto vince
+   solo se combacia arrotondato, altrimenti comanda l'intero */
+out.centesimi = [
+  avanzaOrdineP2P(mio, 'new-order', {order: {amount: 46940, fiat_amount: 23, payment_method: 'Contanti al tabacchino 23.47'}}).euro,
+  avanzaOrdineP2P(mio, 'new-order', {order: {amount: 46940, fiat_amount: 30, payment_method: 'Contanti al tabacchino 23.47'}}).euro,
+  avanzaOrdineP2P(mio, 'new-order', {order: {amount: 46940, fiat_amount: 23, payment_method: 'SEPA'}}).euro];
 process.stdout.write(JSON.stringify(out));
 """
     d = _tf.mkdtemp()
@@ -64647,6 +64885,8 @@ process.stdout.write(JSON.stringify(out));
     prova("...ma che la garanzia non e' stata bloccata e nessun sat si e' mosso", True,
           "senza che la garanzia venisse bloccata" in out["tornatoTesto"]["d"]
           and "nessun sat si è mosso" in out["tornatoTesto"]["d"])
+    prova("dalla risposta del coordinatore i centesimi tornano dal pm, solo se combaciano",
+          [23.47, 30, 23], out["centesimi"])
     prova("...mentre una vetrina qualunque resta «Ordine pubblicato»",
           "Ordine pubblicato", out["vetrinaTesto"])
     prova("la macchina resta pura: l'ordine di prima non e' toccato",
@@ -64694,6 +64934,9 @@ process.stdout.write(JSON.stringify(out));
         fn("function holdVivaP2P(o){"),
         fn("function mossaDopoRilascioP2P(o, azione, ord){"),
         fn("function avanzaOrdineP2P(ordine, azione, payload){"),
+        # i centesimi del tabacchino dal pm (22 set 2026)
+        fn("function euroTabacchinoP2P(metodi){"),
+        re.search(r"const P2P_TABACCHINO_PM = [^\n]*;", mini).group(0),
         # il pagamento fallito suona e apre il foglio: qui di cartone,
         # il suo banco vero e' quello del motore
         "const P2P_TOAST_FATTURA_NUOVA = 'FATTURA';",

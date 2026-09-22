@@ -38621,7 +38621,7 @@ MAX_EURO_P2P_CANALE = 100_000   # un argine, non il tetto degli ordini
 MAX_METODO_P2P_CANALE = 60      # il maxlength del campo nel foglio
 
 
-def _caption_canale_p2p(lato: str, euro: int, metodo: str, venditore: dict) -> str:
+def _caption_canale_p2p(lato: str, euro: float, metodo: str, venditore: dict) -> str:
     """La caption del post P2P nel canale «Barattolo Vetrina», gemella
     di `_caption_canale` ma per un ordine invece che per un annuncio
     (chiesto da Andrea, set 2026: il P2P deve vedersi in vetrina come
@@ -38676,8 +38676,10 @@ async def annuncia_ordine_p2p_canale(req: Request,
     lato = str(d.get("lato") or "")
     if lato not in ("compro", "vendo"):
         raise HTTPException(400, "Lato sconosciuto")
+    # coi centesimi (22 set 2026, il tabacchino): 23.47 e' un importo
+    # buono, e si arrotonda al centesimo; NaN e infinito sono storti
     try:
-        euro = int(d.get("euro"))
+        euro = round(float(d.get("euro")), 2)
     except (TypeError, ValueError):
         raise HTTPException(400, "Importo storto")
     if not (0 < euro <= MAX_EURO_P2P_CANALE):
@@ -39793,9 +39795,42 @@ def _passaggio_libro_p2p(prima: str, dopo: str, maker: int,
     return ""
 
 
-def _euro_libro(valori) -> str:
+# «Contanti al tabacchino 23.47» nel tag `pm` (22 set 2026, Barattozon coi
+# centesimi): il `fa` del protocollo e' un intero, e l'importo esatto
+# dell'ordine Amazon viaggia nel nome del metodo, col punto. Il client
+# lo scrive cosi' (`metodoTabacchinoP2P`), e qui si legge con la stessa
+# forma: la parola, uno spazio, cifre, punto, DUE decimali. Senza `re`
+# apposta: le prove estraggono queste funzioni una per una.
+
+
+def _euro_tabacchino(metodo) -> float:
+    """L'importo esatto scritto nel metodo del tabacchino, 0.0 se non c'e'
+    o se la forma non e' quella (cifre, punto, due decimali)."""
+    m = str(metodo or "").strip()
+    if not m.startswith("Contanti al tabacchino "):
+        return 0.0
+    resto = m[len("Contanti al tabacchino "):].strip()
+    pezzi = resto.split(".")
+    if (len(pezzi) != 2 or not pezzi[0].isdigit() or len(pezzi[1]) != 2
+            or not pezzi[1].isdigit()):
+        return 0.0
+    return float(resto)
+
+
+def _metodi_libro(metodi) -> list:
+    """I metodi come si DICONO: al tabacchino si toglie l'importo, che
+    negli avvisi sta gia' nella cifra («per 23,47 €»)."""
+    return ["Contanti al tabacchino" if _euro_tabacchino(m) > 0 else str(m).strip()
+            for m in metodi or []]
+
+
+def _euro_libro(valori, metodi=None) -> str:
     """Il tag `fa` come lo si legge: '32.5' -> '32,50 €', due numeri
-    -> 'da 20,00 a 100,00 €' (l'intervallo non ancora scelto)."""
+    -> 'da 20,00 a 100,00 €' (l'intervallo non ancora scelto).
+    Coi `metodi` (22 set 2026) l'importo esatto del tabacchino vince
+    sull'intero del `fa` — ma SOLO se ci combacia arrotondato: un pm
+    che dice 30 su un fa che dice 23 e' di un client che scrive a caso,
+    e comanda il numero su cui il coordinatore ha fatto i conti."""
     nums = []
     for v in valori or []:
         try:
@@ -39804,6 +39839,9 @@ def _euro_libro(valori) -> str:
             continue
         if n > 0:
             nums.append(n)
+    esatto = max([_euro_tabacchino(m) for m in metodi or []] + [0.0])
+    if len(nums) == 1 and esatto > 0 and round(esatto) == nums[0]:
+        nums = [esatto]
 
     def it(n):
         return f"{n:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
@@ -39857,8 +39895,8 @@ def _testo_libro_p2p(passaggio: str, ev: dict, fee, ore: int,
     taker = ruolo == "taker"
     vende = (ev.get("lato") == "sell") != taker
     sats = int(ev.get("sats") or 0)
-    euro = _euro_libro(ev.get("euro"))
-    metodi = ", ".join(html.escape(str(m)) for m in (ev.get("metodi") or []))
+    euro = _euro_libro(ev.get("euro"), ev.get("metodi"))
+    metodi = ", ".join(html.escape(str(m)) for m in _metodi_libro(ev.get("metodi")))
     quanto = (f"{_fmt_sats(sats)} sats" if sats > 0 else "bitcoin") + \
         (f" per {euro}" if euro else "") + (f" via {metodi}" if metodi else "")
     meta = (int(sats * float(fee) / 2 + 0.5)
@@ -40063,8 +40101,9 @@ def _avvisi_libro_p2p(con, eventi: list, adesso: int, fee, ore: int) -> list:
             "UPDATE p2p_ordini SET stato=?, lato=?, maker=?, visto=?, "
             "euro=?, preso_da=?, sats=?, metodi=?, tornati=? WHERE ordine=?",
             (dopo, ev.get("lato") or "", maker, int(ev.get("quando") or 0),
-             # la cifra del libro, per l'avviso del recapito (18 set 2026)
-             _euro_libro(ev.get("euro")),
+             # la cifra del libro, per l'avviso del recapito (18 set 2026);
+             # coi centesimi del tabacchino, se il pm li porta (22 set)
+             _euro_libro(ev.get("euro"), ev.get("metodi")),
              # un ordine in vetrina non ha un taker per definizione: la
              # presa si scollega a OGNI pending visto, anche se il giro
              # si fosse perso l'in-progress in mezzo — o la prossima
@@ -40674,9 +40713,11 @@ def _dati_frase_p2p(con, ordine: str) -> dict:
             metodi = json.loads(r["metodi"] or "[]")
         except ValueError:
             metodi = []
+        # i metodi si DICONO senza l'importo del tabacchino (22 set 2026):
+        # la cifra sta gia' in `euro`, coi centesimi
         dati.update(sats=int(r["sats"] or 0), euro=html.escape(str(r["euro"] or "")),
-                    metodi=", ".join(html.escape(str(m)) for m in metodi
-                                     if isinstance(m, str)),
+                    metodi=", ".join(html.escape(str(m)) for m in _metodi_libro(
+                        [m for m in metodi if isinstance(m, str)])),
                     maker=int(r["tg_id"] or 0), preso_da=int(r["preso_da"] or 0))
     s = con.execute("SELECT sats, sats_compratore, sats_venditore, giro "
                     "FROM p2p_scambi WHERE ordine=?", (ordine,)).fetchone()

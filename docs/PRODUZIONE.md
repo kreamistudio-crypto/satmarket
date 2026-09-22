@@ -1345,6 +1345,125 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `BARATTOLO_EVENTI_URL` dal compose e `up -d` (la patch diventa inerte,
   e sul VPS svuotare `P2P_EVENTI_SEGRETO` fa tornare il libro a parlare
   subito), oppure l'immagine a `-bar3`.
+- LA SALITA A MOSTRO 0.18.8, immagine `mostro:v0.18.8-bar5` (22 set
+  2026; il perché sta in CANTIERI, «Mostro 0.18.8 e gli importi con i
+  centesimi»). Le sette patch del fork stanno in `deploy/mostro/`
+  RIFATTE sopra la `v0.18.8` (commit `e67676d`), ognuna col suo patcher
+  a `--secco` (README, «I SETTE PATCHER»); la 0007 porta un aggancio in
+  più, il `payout-failed` pre-claim che la 0.18.8 rende possibile.
+  ⚠️ NIENTE È STATO COMPILATO SUL PC: il primo `cargo` è il punto 4.
+  ⚠️ E IL ROLLBACK NON È PIÙ UNA RIGA SOLA, perché la 0.18.8 porta due
+  MIGRAZIONI (una colonna nella tabella dei bond): vedi il punto 0 e il
+  punto 9. Per il resto è la liturgia della `-bar4`, un comando alla
+  volta, a libro fermo (nessuno scambio preso in corso).
+  0) IL BACKUP PRIMA, sul nodo: `cd ~/nodo && docker compose stop mostro`
+  è TROPPO (ferma il libro): basta copiare il database a caldo, che è
+  SQLite: `cp ~/nodo/mostro/mostro.db ~/nodo/mostro/mostro.db.prima-bar5`
+  (il percorso è quello che il compose monta sotto `/config`: si
+  controlla con `docker inspect nodo-mostro-1 | grep -A3 Binds` — se il
+  file ha un altro nome, vale quello). È la copia da cui si torna alla
+  0.18.7 se serve (punto 9).
+  1) SUL PC, i dieci file al nodo (dalla cartella della repo):
+  `scp deploy/mostro/patch-000*.py deploy/mostro/barattolo_fee.rs deploy/mostro/barattolo_eventi.rs UTENTE@NODO:nodo/patch-bar5/`
+  — cartella NUOVA e FUORI da `mostro-src` (`mkdir -p ~/nodo/patch-bar5`
+  prima). Poi sul nodo `sha256sum ~/nodo/patch-bar5/barattolo_eventi.rs`
+  contro `sha256sum deploy/mostro/barattolo_eventi.rs` sul PC (in Git
+  Bash; da PowerShell `Get-FileHash -Algorithm SHA256`): devono
+  combaciare — il file è LF da tutt'e due le parti.
+  2) SUL NODO, il sorgente nuovo: `cd ~/nodo/mostro-src && git status`
+  deve dire `barattolo/v0.18.7` e albero pulito (se non è pulito, NON si
+  va avanti: si guarda cosa c'è). Poi `git fetch --tags` e
+  `git switch -c barattolo/v0.18.8 v0.18.8`; `git log -1 --oneline` deve
+  dire `e67676d chore: Release mostro version 0.18.8`.
+  3) I SETTE PATCHER, in fila, ognuno PRIMA a secco e POI senza, con un
+  commit ciascuno. A secco devono dire, nell'ordine: «A SECCO: 3
+  sostituzioni in src/lnurl.rs», «2 sostituzioni in src/config/util.rs»,
+  «3 sostituzioni in src/app/dev_fee.rs», «4 sostituzioni in 3 file»,
+  «7 agganci in 6 file», «a secco: l'ancora c'e', UNA volta», «25 agganci
+  in 13 file, tutte le ancore uniche, 13 azioni note». Un FERMO qualunque
+  si incolla a Claude e non si tocca niente a mano.
+  `python3 ~/nodo/patch-bar5/patch-0001-lnurl-tor-freddo.py --secco`
+  `python3 ~/nodo/patch-bar5/patch-0001-lnurl-tor-freddo.py && git add -A && git commit -m "lnurl: raise HTTP timeouts so Tor-routed coordinators can resolve LNURL"`
+  `python3 ~/nodo/patch-bar5/patch-0002-dev-fee-zero.py --secco`
+  `python3 ~/nodo/patch-bar5/patch-0002-dev-fee-zero.py && git add -A && git commit -m "config: let dev_fee_percentage = 0 mean no dev fee, not an invalid value"`
+  `python3 ~/nodo/patch-bar5/patch-0003-dev-fee-cappelli.py --secco`
+  `python3 ~/nodo/patch-bar5/patch-0003-dev-fee-cappelli.py && git add -A && git commit -m "dev fee: raise the resolution timeouts that cap LNURL below its own budget"`
+  `python3 ~/nodo/patch-bar5/patch-0004-prezzo-mai-visto.py --secco`
+  `python3 ~/nodo/patch-bar5/patch-0004-prezzo-mai-visto.py && git add -A && git commit -m "order/take: answer PriceTooStale when no price is cached yet, instead of a silent internal error"`
+  `python3 ~/nodo/patch-bar5/patch-0005-fee-per-parte.py --secco`
+  `python3 ~/nodo/patch-bar5/patch-0005-fee-per-parte.py && git add -A && git commit -m "fee: per-party fees, with the loyalty discount applied at the source"`
+  `python3 ~/nodo/patch-bar5/patch-0006-perche-e-fallito.py --secco`
+  `python3 ~/nodo/patch-bar5/patch-0006-perche-e-fallito.py && git add -A && git commit -m "release: log why a payout has failed"`
+  `python3 ~/nodo/patch-bar5/patch-0007-eventi-al-server.py --secco`
+  `python3 ~/nodo/patch-bar5/patch-0007-eventi-al-server.py && git add -A && git commit -m "events: tell the marketplace server about every order transition"`
+  Alla fine `git log --oneline v0.18.8..HEAD` deve dire SETTE righe, la
+  0001 in fondo. (Strada equivalente, se i patcher dessero noia:
+  `git am ~/nodo/patch-bar5/000[1-7]-*.patch` con le sette `.patch`
+  copiate — stesso albero, verificato sul PC.)
+  4) I TEST PRIMA DELLA BUILD VERA, ed è il primo `cargo` di questo fork
+  sulla 0.18.8:
+  `docker build -f docker/Dockerfile --target builder -t mostro-test:bar5 .`
+  e poi, in UN comando solo:
+  `docker run --rm mostro-test:bar5 cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice barattolo_eventi app::fiat_sent app::release app::cancel app::dispute scheduler app::admin_cancel app::admin_settle`
+  Si guarda `pre_claim_failures_by_class` fra i verdi di `barattolo_eventi`
+  (è il test nuovo) e che `app::release` sia verde con i test nuovi di
+  upstream (`do_payment_records_the_failure_…`). Se la build o i test si
+  fermano, l'errore si incolla a Claude e si corregge NEL REPO, poi sul
+  nodo `git checkout -- . && rm -f src/barattolo_fee.rs src/barattolo_eventi.rs`
+  e si riparte dal commit giusto (`git reset --hard v0.18.8` per rifare
+  tutto). Niente ritocchi a mano sul nodo.
+  5) VERDI: `git format-patch v0.18.8..HEAD -o ~/nodo/patch-bar5/export`
+  e le sette tornano sul PC con `scp`, in `deploy/mostro/`, coi nomi di
+  sempre: `diff` contro quelle nel repo deve dire solo l'`index` e il
+  `From` (i blob e gli hash), MAI una riga di codice — se ne dice una,
+  il nodo ha un sorgente diverso dal repo e ci si ferma.
+  6) LA BUILD VERA: `docker build -f docker/Dockerfile -t mostro:v0.18.8-bar5 .`
+  — tag nuovo; `mostro:v0.18.7-bar4` resta sulla macchina.
+  7) IL COMPOSE (`cd ~/nodo`, copia prima: `cp docker-compose.yml
+  docker-compose.yml.prima-bar5`): la SOLA riga dell'immagine a
+  `mostro:v0.18.8-bar5`. Le cinque variabili d'ambiente (tre della 0005,
+  due della 0007) restano com'erano; `settings.toml` non si tocca.
+  8) A LIBRO FERMO: `docker compose up -d mostro` (`up -d`, non
+  `restart`). Poi: `docker inspect --format '{{.Config.Image}}' nodo-mostro-1`
+  dice `-bar5`; `docker compose logs mostro --since 2m` dice «Settings
+  correctly loaded», le DUE migrazioni applicate (righe con
+  `bond_payout_recipient`), `barattolo_eventi: order events go to …` e
+  `barattolo_fee` col suo battito; e il 38385 nuovo si annuncia
+  `mostro_version 0.18.8` (si legge dal client, «Info P2P», o dai relay).
+  9) IL ROLLBACK, se serve: la riga del compose a `mostro:v0.18.7-bar4`
+  NON BASTA — un binario 0.18.7 su un database che ha le due migrazioni
+  della 0.18.8 si ferma all'avvio con `VersionMissing`. Le due strade:
+  (a) `docker compose stop mostro`, il database dalla copia del punto 0
+  (`cp ~/nodo/mostro/mostro.db.prima-bar5 ~/nodo/mostro/mostro.db`),
+  la riga del compose a `-bar4`, `docker compose up -d mostro` — si
+  perde quel che il libro ha scritto fra il deploy e il rollback, ed è
+  la ragione del «a libro fermo»; oppure (b) senza toccare i dati:
+  `sqlite3 ~/nodo/mostro/mostro.db "DELETE FROM _sqlx_migrations WHERE version IN (20260913120000, 20260914120000)"`
+  e poi la riga a `-bar4` e `up -d` (la colonna in più nei bond resta e
+  non dà noia al vecchio binario). La (a) è quella pulita.
+  LA PROVA A DUE TELEFONI, dopo il deploy del client (stesso giorno o il
+  giorno dopo, con `barattolo.store` aggiornato): A vende sats e pubblica
+  col tabacchino un ordine da **23,47 €** (il campo accetta la virgola;
+  numero Amazon e scadenza a 48 ore), il foglio dice il premio
+  facoltativo e la riga delle 24 ore; nel libro di B la card dice
+  «23,47 €» e i sats FISSI (23,47 al cambio del momento); B prende, il
+  foglio «Stai comprando sats per 23,47 €»; A vede la garanzia chiesta e
+  la paga; B riceve i tre dati cifrati con «Importo: 23,47 €»; B segna
+  gli euro inviati, A rilascia, i sats arrivano: il conto al satoshi
+  deve combaciare con `amount` del 38383 (il client lo mostra in «Info
+  P2P»), e NIENTE deve dire «23 €» da nessuna parte — se una schermata
+  lo dice, è un posto che legge il `fa` senza il `pm`. Poi da un client
+  Mostro altrui, se c'è (mostro-cli): l'ordine si legge «23 EUR,
+  Contanti al tabacchino 23.47, N sats», senza errori. E il caso del
+  libro: un secondo ordine da 5,00 € lasciato LÌ, che deve sparire dal
+  libro dopo 24 ore (non 48) con l'avviso «scaduto» al venditore, che
+  lo ripubblica dal suo foglio. Il journal del VPS: `grep "Evento P2P"`
+  dice `taken`, `hold-invoice-paid`, `fiat-sent`, `released`, `success`
+  col conto in sats. E la parola di Andrea sui NUOVI avvisi: nessuno.
+  IL PRE-CLAIM si prova a parte, quando capita: B mette come recapito
+  un Lightning address che non esiste (`nessuno@example.com`); al
+  rilascio il nodo scrive `payout-failed` con `ADDRESS_UNRESOLVED` (o
+  `INVOICE_INVALID`) nel log di `barattolo_eventi`, e il VPS lo riceve.
 - IL DEPLOY CHE SI FIDA SOLO DI MAIN, E IL SERVIZIO NON ROOT (21 set
   2026, audit del 19 set: G2 e A1). IL BUCO: il VPS eseguiva entro un
   minuto, da root, qualunque commit su cui stesse il ref `pronto` — e

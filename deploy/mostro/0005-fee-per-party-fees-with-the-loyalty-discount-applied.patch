@@ -1,7 +1,7 @@
-From 3a7a1212430dd94ae63ac73948718b7e9610a87b Mon Sep 17 00:00:00 2001
-From: kreamistudio-crypto <kreamistudio-crypto@users.noreply.github.com>
-Date: Fri, 18 Sep 2026 07:17:13 +0000
-Subject: [PATCH 5/6] fee: per-party fees, with the loyalty discount applied at
+From 6bbd3d58bc05f98b89669479f638961f08219bf8 Mon Sep 17 00:00:00 2001
+From: Barattolo <barattolo@barattolo.store>
+Date: Tue, 22 Sep 2026 13:40:11 +0200
+Subject: [PATCH 5/7] fee: per-party fees, with the loyalty discount applied at
  the source
 
 ---
@@ -644,5 +644,5 @@ index caca191..dccc2c1 100644
      // Now we generate the hold invoice that seller should pay
      let (invoice_response, preimage, hash) = ln_client
 -- 
-2.47.3
+2.55.0.windows.3
 

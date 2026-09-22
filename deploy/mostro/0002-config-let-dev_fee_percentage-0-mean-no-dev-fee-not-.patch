@@ -1,7 +1,7 @@
-From 1d6652c5fa09e9e0e611ade6ef0f21a0d50bcdbb Mon Sep 17 00:00:00 2001
-From: kreamistudio-crypto <kreamistudio-crypto@users.noreply.github.com>
-Date: Tue, 8 Sep 2026 09:28:26 +0000
-Subject: [PATCH 2/3] config: let dev_fee_percentage = 0 mean no dev fee, not
+From 97c32afc1126c0cd77143c9c9b87fd610802730c Mon Sep 17 00:00:00 2001
+From: Barattolo <barattolo@barattolo.store>
+Date: Tue, 22 Sep 2026 13:40:09 +0200
+Subject: [PATCH 2/7] config: let dev_fee_percentage = 0 mean no dev fee, not
  an invalid value
 
 MIN_DEV_FEE_PERCENTAGE (0.10) rejected zero, so a coordinator that
@@ -56,5 +56,5 @@ index 635a5ce..381355f 100644
      fn dev_fee_above_maximum_is_rejected() {
          let mut settings = base_settings();
 -- 
-2.47.3
+2.55.0.windows.3
 

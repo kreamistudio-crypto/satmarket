@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Patch 0007 del fork — MOSTRO E' L'UNICA FONTE DEGLI AVVISI P2P.
 
-Si lancia SUL NODO, dentro ~/nodo/mostro-src sul branch barattolo/v0.18.7
+Si lancia SUL NODO, dentro ~/nodo/mostro-src sul branch barattolo/vX.Y.Z (0.18.8 o piu')
 (quindi SOPRA la 0005 e la 0006, che devono esserci gia'), con
 `barattolo_eventi.rs` nella STESSA cartella di questo script:
     python3 /percorso/patch-0007-eventi-al-server.py --secco  # prova e basta
@@ -198,6 +198,23 @@ AGGANCI = [
      "                                    &order,\n"
      "                                    msg.payment.failure_reason,\n"
      "                                );\n", "dopo"),
+    # 12b. (22 set 2026, con la 0.18.8) il payout fallito PRIMA di
+    #      arrivare a LND: indirizzo che non si risolve, fattura storta o
+    #      scaduta, LND irraggiungibile. Upstream #908 li fa passare TUTTI
+    #      dal ramo Err di `do_payment`, quindi un aggancio solo li copre;
+    #      il dettaglio nomina la classe (INVOICE_INVALID, LND_UNREACHABLE...),
+    #      mai il testo dell'errore.
+    ("src/app/release.rs",
+     "        Err(e) => {\n"
+     "            check_failure_retries_or_log(ctx, &order, request_id).await;\n"
+     "            Err(e)\n"
+     "        }\n",
+     "        Err(e) => {\n"
+     "            check_failure_retries_or_log(ctx, &order, request_id).await;\n"
+     "            // Barattolo fork (patch 0007): tell the marketplace server.\n"
+     "            " + E + "emit_payout_failed_pre_claim(&order, &e);\n"
+     "            Err(e)\n"
+     "        }\n", "al posto"),
     # 13-14. annullo cooperativo: la richiesta e l'accordo
     ("src/app/cancel.rs",
      "    // Notify both parties: initiator sees \"initiated by you\" and the counterparty sees\n",

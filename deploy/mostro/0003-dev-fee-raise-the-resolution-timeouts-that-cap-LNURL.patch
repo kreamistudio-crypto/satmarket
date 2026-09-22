@@ -1,7 +1,7 @@
-From 1d5f6349e91a294291ede4e8a6e4e8f2e57d934d Mon Sep 17 00:00:00 2001
-From: kreamistudio-crypto <kreamistudio-crypto@users.noreply.github.com>
-Date: Tue, 8 Sep 2026 09:30:40 +0000
-Subject: [PATCH 3/3] dev fee: raise the resolution timeouts that cap LNURL
+From a075d0c50e41e1992323ffbaff8085d70c866e76 Mon Sep 17 00:00:00 2001
+From: Barattolo <barattolo@barattolo.store>
+Date: Tue, 22 Sep 2026 13:40:10 +0200
+Subject: [PATCH 3/7] dev fee: raise the resolution timeouts that cap LNURL
  below its own budget
 
 Resolving the dev fee invoice is two HTTPS round-trips on two different
@@ -25,7 +25,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
  1 file changed, 10 insertions(+), 3 deletions(-)
 
 diff --git a/src/app/dev_fee.rs b/src/app/dev_fee.rs
-index 198e1a0..0b70f4c 100644
+index beeaf46..f749a76 100644
 --- a/src/app/dev_fee.rs
 +++ b/src/app/dev_fee.rs
 @@ -479,8 +479,10 @@ async fn process_new_dev_fee_payments(
@@ -65,5 +65,5 @@ index 198e1a0..0b70f4c 100644
              DEV_FEE_LIGHTNING_ADDRESS,
              order.dev_fee as u64,
 -- 
-2.47.3
+2.55.0.windows.3
 

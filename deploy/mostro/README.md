@@ -1,4 +1,4 @@
-# IL FORK DI MOSTRO — sette patch sopra il tag v0.18.7
+# IL FORK DI MOSTRO — sette patch sopra il tag v0.18.8
 
 Qui dentro non c'è codice in servizio: ci sono le patch che il nodo Mostro di
 Dublino applica sopra il sorgente upstream, prodotte con
@@ -13,12 +13,36 @@ tiene finché upstream non accoglie (o rifiuta) le tre modifiche. Tenere
 un fork pubblico vivo vorrebbe dire mantenerlo per sempre, ed è
 esattamente il lavoro che non vogliamo.
 
-Fatto l'8 settembre 2026. Upstream: `v0.18.7`, commit `afc39a2`. Sopra
-ci stanno **sette commit nostri**, uno per patch: `a9d387b`, `1d6652c`,
-`1d5f634`, `2b71308`, `3a7a121`, `4f20e04` e `9387493` (la 0007, l'ultimo
-sul nodo al 19 set 2026). Le sette `.patch` qui accanto sono la loro
-esportazione, e da sole ricostruiscono il fork: vedi «RICOSTRUIRE IL
-FORK DA ZERO», in fondo.
+Fatto l'8 settembre 2026 sulla `v0.18.7` (commit `afc39a2`; sul nodo il
+branch `barattolo/v0.18.7` porta i sette commit `a9d387b`, `1d6652c`,
+`1d5f634`, `2b71308`, `3a7a121`, `4f20e04` e `9387493`, ed e' quel che
+gira nella `-bar4`). **Dal 22 settembre 2026 le sette `.patch` qui accanto
+stanno sopra la `v0.18.8`** (commit `e67676d`, uscita il 18 set): sono
+state RIFATTE sul PC — ogni patch ha il suo patcher ad ancore uniche con
+`--secco` (vedi «I SETTE PATCHER»), i sette patcher sono stati fatti
+girare in fila su un clone pulito del tag, un commit per patch col
+messaggio di prima, e `git format-patch` le ha esportate. Verificato in
+due strade: le vecchie sette `.patch` entrano pulite sulla 0.18.8 con
+`git am`, e l'albero che ne esce e' **byte per byte** quello dei
+patcher — la sola differenza e' il ritocco alla 0007 (l'aggancio
+pre-claim, sotto). Da sole ricostruiscono il fork: vedi «RICOSTRUIRE IL
+FORK DA ZERO», in fondo. ⚠️ NIENTE E' STATO COMPILATO SUL PC (non c'e'
+`cargo`): il primo `cargo build` della 0.18.8 col fork e' quello del
+nodo, punto 4 della liturgia `-bar5` in PRODUZIONE.
+
+COSA CAMBIA DALLA 0.18.7 ALLA 0.18.8, letto sul diff: `#908` sposta la
+contabilita' dei payout falliti in un punto solo (`do_payment` si spacca
+in `do_payment` + `dispatch_payout`, e il nostro ramo `Failed` della 0006
+e 0007 vive ora dentro `dispatch_payout`, con `order` clonato per il task);
+`#825` valida l'iniziatore della disputa PRIMA del rimborso in
+`admin_cancel` e `admin_settle` (i nostri due agganci stanno dopo, e non
+si toccano); `#882` corregge gli stati terminali con il trattino in
+`db.rs`, quindi la restore-session non riporta piu' gli ordini
+`cooperatively-canceled` e `canceled-by-admin` (prima passavano per il
+refuso); `#964` e due migrazioni nuove sono dei bond, da noi spenti;
+`fedimint-tonic-lnd` sale alla 0.4.0 (lo stato `Initiated` di LND).
+mostro-core resta **0.14.6**: la ricetta che il client ricalca non si e'
+mossa.
 
 ## LE SETTE PATCH, cosa fanno e perché
 
@@ -159,7 +183,7 @@ SÌ è da proporre a monte: è un difetto di diagnosi di chiunque.
 quando un payout fallisce, e dal 18 set non ne è fallito nessuno.
 
 **0007 — gli EVENTI al server di Barattolo: `src/barattolo_eventi.rs`
-(nuovo) e ventiquattro agganci in tredici file.** IN SERVIZIO dal 19 set
+(nuovo) e venticinque agganci in tredici file.** IN SERVIZIO dal 19 set
 2026 (immagine `-bar4`, commit `9387493` sul nodo): scritta il 18 sul
 PC senza `cargo`, il suo primo `cargo build` è stato quello sul nodo, e
 lo stesso giorno è stata collaudata a due telefoni. Il `.patch` è
@@ -186,6 +210,20 @@ coordinate**: `event_of` è l'UNICO lettore di `Order` del modulo, un
 dettaglio è ripulito a 40 caratteri di `[A-Za-z0-9_-]`, una chiave che
 non sia 64 esadecimali esce `null` — e un test guarda che quei campi non
 escano, azione per azione.
+IL VENTICINQUESIMO AGGANCIO E' DEL 22 SET 2026, con la 0.18.8: il
+`payout-failed` PRIMA di arrivare a LND. Fino alla `-bar4` l'evento
+partiva solo dal ramo `Failed` dello stream di `SendPaymentV2` — cioe'
+quando LND aveva preso in carico il pagamento e l'aveva fallito lui;
+un indirizzo Lightning che non si risolve, una fattura storta o
+scaduta, LND irraggiungibile, restavano MUTI verso il server (era cosi'
+anche sulla 0.18.7). Upstream `#908` li fa passare tutti dal ramo `Err`
+di `do_payment`, quindi un aggancio solo li copre:
+`emit_payout_failed_pre_claim(&order, &e)`, col dettaglio che nomina la
+CLASSE del guasto (`INVOICE_INVALID`, `INVOICE_EXPIRED`,
+`ADDRESS_UNRESOLVED`, `LND_UNREACHABLE`, `INVALID_PUBKEY`, `DB_ERROR`,
+o `PRE_CLAIM` per il resto) e mai il testo dell'errore. Lo stream di LND
+continua a mandare il SUO motivo (`NO_ROUTE`…). Il server riceve la
+stessa azione con una parola in piu' nel vocabolario dei dettagli.
 LE TREDICI AZIONI: `taken`, `hold-invoice-requested`,
 `hold-invoice-paid`, `buyer-invoice-requested`, `buyer-invoice-added`,
 `fiat-sent`, `released`, `success`, `cancel-requested`, `canceled`,
@@ -242,6 +280,32 @@ dichiarato — e che nessun aggancio sia finito sotto `#[cfg(test)]`. I
 fine-riga sono quelli del file che trova (un `barattolo_fee.rs` arrivato
 in CRLF da un checkout Windows non fa cadere l'ancora).
 
+## I SETTE PATCHER
+
+Dal 22 set 2026 OGNI patch ha il suo script accanto, tutti con la stessa
+forma: si lanciano dalla radice di `mostro-src`, provano TUTTE le ancore
+su copie in memoria (ognuna deve comparire UNA volta, o si fermano senza
+scrivere niente), con `--secco` dicono quante ne hanno trovate e non
+scrivono, senza `--secco` scrivono e dicono cosa fare dopo. I fine-riga
+sono quelli del file che trovano. Se una patch e' gia' applicata si
+fermano («porta gia' questa modifica»).
+
+| patch | patcher | tocca |
+|---|---|---|
+| 0001 | `patch-0001-lnurl-tor-freddo.py` | `src/lnurl.rs`, 3 sostituzioni |
+| 0002 | `patch-0002-dev-fee-zero.py` | `src/config/util.rs`, 2 (guardia + test) |
+| 0003 | `patch-0003-dev-fee-cappelli.py` | `src/app/dev_fee.rs`, 3 |
+| 0004 | `patch-0004-prezzo-mai-visto.py` | `order.rs`, `take_buy.rs`, `take_sell.rs`, 4 |
+| 0005 | `patch-0005-fee-per-parte.py` + `barattolo_fee.rs` | 7 agganci in 6 file |
+| 0006 | `patch-0006-perche-e-fallito.py` | `src/app/release.rs`, 1 |
+| 0007 | `patch-0007-eventi-al-server.py` + `barattolo_eventi.rs` | 25 agganci in 13 file |
+
+I primi tre sono nati il 22 set 2026 (fino ad allora quelle patch
+esistevano solo come `.patch`, da ritocchi a mano sul nodo); la 0004 ha
+avuto `--secco` lo stesso giorno (prima scriveva e basta, un file alla
+volta). L'ordine e' quello: la 0007 pretende `src/barattolo_fee.rs`
+della 0005, e si ferma se non c'e'.
+
 ## COSA CURA, E COSA NO
 
 Il difetto ha due facce, e le patch le trattano in modo diverso.
@@ -258,7 +322,9 @@ Il difetto ha due facce, e le patch le trattano in modo diverso.
 
 ## IN SERVIZIO
 
-Immagine `mostro:v0.18.7-bar4` dal 19 set 2026, con tutte e sette le
+Immagine `mostro:v0.18.7-bar4` dal 19 set 2026 (la prossima e'
+`mostro:v0.18.8-bar5`, con le sette patch di questa cartella sopra la
+0.18.8: la liturgia sta in PRODUZIONE, «LA SALITA A MOSTRO 0.18.8»), con tutte e sette le
 patch (la `-bar3` con le prime sei, la `-bar2` con le prime quattro e la
 `-bar1` con le prime tre sono restate sulla macchina, come tag di
 rollback), costruita sul nodo con
@@ -283,6 +349,20 @@ inerte senza cambiare immagine. La 0007 ha lo stesso gradino: tolta
 `BARATTOLO_EVENTI_URL` e rifatto l'`up -d`, nessun POST parte più (e
 sul VPS, svuotato `P2P_EVENTI_SEGRETO`, il libro torna a parlare subito). La `fee` in `settings.toml` (0.03 dal
 18 set 2026) si rimette a mano: è config, non patch.
+
+⚠️ **IL ROLLBACK DALLA 0.18.8 ALLA 0.18.7 NON E' UNA RIGA SOLA.** La
+0.18.8 porta due migrazioni nuove (`20260913120000_bond_payout_recipient`
+e `20260914120000_bond_payout_recipient_repair`: una colonna in piu'
+nella tabella `bonds`, e una riparazione che da noi non tocca niente) e
+mostrod le applica al primo avvio, scrivendole in `_sqlx_migrations`.
+Un binario 0.18.7 che riparte su quel database si FERMA:
+`sqlx` rifiuta un database con una migrazione che il binario non
+conosce (`VersionMissing`; `ignore_missing` non e' acceso). Quindi
+tornare a `-bar4` vuol dire O ripristinare il database dal backup fatto
+prima del deploy, O togliere a mano le due righe da `_sqlx_migrations`
+(la colonna in piu' resta, ed e' innocua per il vecchio binario). La
+sequenza sta in PRODUZIONE. Da `-bar5` a una `-bar6` sulla stessa 0.18.8
+invece resta la riga del compose, come sempre.
 
 ⚠️ **`up -d`, non `restart`.** `docker compose restart mostro` riavvia
 il container ESISTENTE, che resta quello costruito sull'immagine
@@ -339,6 +419,18 @@ tornerebbe identico.
   18 set 2026), log con
   «Settings correctly loaded!», prezzi pubblicati su Nostr.
 
+- LA 0.18.8 (22 set 2026, sul PC): le sette entrano pulite con `git am`
+  sul tag; i sette patcher girano a secco e a scrittura su un clone
+  pulito con TUTTE le ancore uniche; le due strade danno lo stesso
+  albero byte per byte (prima del ritocco alla 0007); `git am` delle
+  sette `.patch` nuove riproduce l'albero dei patcher. **NON compilato,
+  NON testato in Rust**: il primo `cargo` e' quello del nodo — e sono
+  quattro i punti da guardare per primi se si ferma: `&order` nel ramo
+  `Failed` ora dentro `dispatch_payout` (upstream clona `order` per il
+  task), `PaymentFailureReason` di `lnrpc` con `fedimint-tonic-lnd`
+  0.4.0, i nomi delle varianti di `ServiceError` nel classificatore
+  pre-claim, e `MostroError` nel `match` (via `mostro_core::prelude`).
+
 **Quello che NON è provato**, ed è la parte onesta: che la dev fee ora
 passi davvero a circuito freddo. Si prova solo al prossimo scambio
 vero, senza scaldare il circuito prima — che è esattamente l'accidente
@@ -384,44 +476,54 @@ per il caso asimmetrico, e il caso asimmetrico dal vivo non c'è ancora.
 
 ## AGGIORNARE A UNA VERSIONE UPSTREAM NUOVA
 
+PRIMA sul PC, a secco, su un clone del tag nuovo: si fanno girare i
+sette patcher in fila (`--secco`, poi senza, un commit per patch) —
+un'ancora che compare zero o due volte e' la NOTIZIA BUONA: vuol dire
+che upstream ci ha messo mano, e la domanda diventa se la nostra patch
+serve ancora invece di come riapplicarla. Si guarda anche il diff
+upstream sui file che le patch toccano (`git diff --stat vVECCHIA vNUOVA`
+contro `git diff --stat vNUOVA HEAD`), che e' come il 22 set 2026 si e'
+visto `#908` sotto la 0006 e 0007. Poi si esportano le `.patch` nuove
+(`git format-patch vX.Y.Z..HEAD`) e si mettono qui, coi nomi di sempre.
+
+POI sul nodo, la liturgia della `-bar5` in PRODUZIONE:
+
 ```
 cd ~/nodo/mostro-src
 git fetch --tags
 git switch -c barattolo/vX.Y.Z vX.Y.Z
-git cherry-pick a9d387b 1d6652c 1d5f634 2b71308 3a7a121 4f20e04 9387493
-docker build -f docker/Dockerfile -t mostro:vX.Y.Z-bar1 .
-docker build -f docker/Dockerfile --target builder -t mostro-test:bar1 .
-docker run --rm mostro-test:bar1 cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice barattolo_eventi app::fiat_sent app::release app::cancel app::dispute scheduler app::admin_cancel app::admin_settle
+python3 ~/nodo/patch-barN/patch-0001-lnurl-tor-freddo.py --secco     # e cosi' per le sette, poi senza --secco, un commit ciascuna
+docker build -f docker/Dockerfile --target builder -t mostro-test:barN .
+docker run --rm mostro-test:barN cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice barattolo_eventi app::fiat_sent app::release app::cancel app::dispute scheduler app::admin_cancel app::admin_settle
+docker build -f docker/Dockerfile -t mostro:vX.Y.Z-barN .
 ```
 
 poi la riga dell'immagine nel compose e `docker compose up -d mostro`.
 I filtri vanno TUTTI dopo `--`, in un colpo solo: la forma vecchia
 (`sh -c "… && …"`) ha le virgolette annidate, e lanciata dal PC dentro
-`ssh "…"` PowerShell non le fa passare.
-
-**Un conflitto su `lnurl.rs` o su `dev_fee.rs` è la NOTIZIA BUONA**:
-vuol dire che upstream ci ha messo mano, e la domanda diventa se la
-nostra patch serve ancora invece di come riapplicarla.
+`ssh "…"` PowerShell non le fa passare. Anche `git am` delle sette
+`.patch` funziona, ed e' la strada di «RICOSTRUIRE DA ZERO»: i patcher
+sono quella che DICE dove un'ancora non regge piu'.
 
 ## RICOSTRUIRE IL FORK DA ZERO
 
 È il caso per cui questa cartella esiste: il nodo sparito, o un nodo
-nuovo. Non serve il branch `barattolo/v0.18.7` del vecchio: bastano il
-sorgente upstream e le sette `.patch`, applicate in fila con `git am`.
-La sequenza è stata provata il 22 set 2026 su un clone pulito di
-`MostroP2P/mostro` a `afc39a2`: le sette entrano una dopo l'altra senza
-un conflitto, e il `barattolo_eventi.rs` che ne esce è byte per byte
-quello di questa cartella.
+nuovo. Non serve il branch del vecchio nodo: bastano il sorgente upstream e le
+sette `.patch`, applicate in fila con `git am`. La sequenza e' stata
+provata il 22 set 2026 su un clone pulito di `MostroP2P/mostro` a
+`e67676d` (v0.18.8): le sette entrano una dopo l'altra senza un
+conflitto, l'albero e' byte per byte quello dei sette patcher, e il
+`barattolo_eventi.rs` che ne esce e' quello di questa cartella.
 
 ```
 git clone https://github.com/MostroP2P/mostro.git ~/nodo/mostro-src
 cd ~/nodo/mostro-src
-git switch -c barattolo/v0.18.7 v0.18.7        # afc39a2
-git am ~/nodo/patch-bar4/000[1-7]-*.patch      # le sette, copiate dal PC con scp
-git log --oneline v0.18.7..HEAD                 # sette righe, la 0001 in fondo
-docker build -f docker/Dockerfile --target builder -t mostro-test:bar4 .
-docker run --rm mostro-test:bar4 cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice barattolo_eventi app::fiat_sent app::release app::cancel app::dispute scheduler app::admin_cancel app::admin_settle
-docker build -f docker/Dockerfile -t mostro:v0.18.7-bar4 .
+git switch -c barattolo/v0.18.8 v0.18.8        # e67676d
+git am ~/nodo/patch-bar5/000[1-7]-*.patch      # le sette, copiate dal PC con scp
+git log --oneline v0.18.8..HEAD                 # sette righe, la 0001 in fondo
+docker build -f docker/Dockerfile --target builder -t mostro-test:bar5 .
+docker run --rm mostro-test:bar5 cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice barattolo_eventi app::fiat_sent app::release app::cancel app::dispute scheduler app::admin_cancel app::admin_settle
+docker build -f docker/Dockerfile -t mostro:v0.18.8-bar5 .
 ```
 
 Poi la riga dell'immagine nel compose, le cinque variabili d'ambiente
@@ -430,8 +532,10 @@ qui) e `docker compose up -d mostro`.
 
 Tre cose da sapere prima di fidarsi del risultato:
 - **gli hash cambiano**: `git am` ricommitta, quindi i sette commit
-  nuovi NON si chiameranno `a9d387b … 9387493`. Il contenuto sì: è
-  quello dei `.patch`, e il `.patch` è quello esportato dal nodo.
+  nuovi NON si chiameranno come quelli del nodo. Il contenuto si': e'
+  quello dei `.patch`, che dal 22 set 2026 sono l'esportazione dei
+  sette patcher sulla 0.18.8 fatta sul PC (fino ad allora erano
+  l'esportazione dal nodo: sulla 0.18.7 le due cose coincidevano).
 - **le `.patch` vanno sul nodo in LF**, com'è nel repo: il
   `.gitattributes` di questa cartella (`*.patch -text`) le tiene così
   anche su un checkout Windows, ma se passano da un editor o da uno

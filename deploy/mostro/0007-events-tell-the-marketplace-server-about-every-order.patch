@@ -1,25 +1,34 @@
-From 9387493a11627fa6fdfc6ed65db850eff042a515 Mon Sep 17 00:00:00 2001
-From: kreamistudio-crypto <kreamistudio-crypto@users.noreply.github.com>
-Date: Fri, 18 Sep 2026 22:34:06 +0000
-Subject: [PATCH] events: tell the marketplace server about every order
+From 05c43e333743724678c59352b1ca1fa2fc8877b9 Mon Sep 17 00:00:00 2001
+From: Barattolo <barattolo@barattolo.store>
+Date: Tue, 22 Sep 2026 13:40:11 +0200
+Subject: [PATCH 7/7] events: tell the marketplace server about every order
  transition
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
 
+Since 0.18.8 (#908) every pre-claim payout failure — destination that
+does not resolve, invoice that does not decode or is expired, LND
+unreachable — exits through the `Err` branch of `do_payment`, so one
+more hook there reports them as `payout-failed` with the class of the
+failure (INVOICE_INVALID, ADDRESS_UNRESOLVED, LND_UNREACHABLE, …) and
+never the error text. Streamed LND failures keep LND's own reason.
 ---
- src/app/add_invoice.rs  |  21 ++
+ src/app/add_invoice.rs  |  21 +
  src/app/admin_cancel.rs |   2 +
  src/app/admin_settle.rs |   3 +
  src/app/cancel.rs       |  29 ++
  src/app/dispute.rs      |   7 +
  src/app/fiat_sent.rs    |   3 +
- src/app/release.rs      |  11 +
+ src/app/release.rs      |  13 +
  src/app/take_sell.rs    |   7 +
- src/barattolo_eventi.rs | 760 ++++++++++++++++++++++++++++++++++++++++
+ src/barattolo_eventi.rs | 830 ++++++++++++++++++++++++++++++++++++++++
  src/barattolo_fee.rs    |   3 +-
  src/flow.rs             |  15 +
  src/main.rs             |   3 +
  src/scheduler.rs        |  25 ++
  src/util.rs             |  13 +
- 14 files changed, 901 insertions(+), 1 deletion(-)
+ 14 files changed, 973 insertions(+), 1 deletion(-)
  create mode 100644 src/barattolo_eventi.rs
 
 diff --git a/src/app/add_invoice.rs b/src/app/add_invoice.rs
@@ -69,10 +78,10 @@ index c0de3e8..8de0271 100644
  }
  
 diff --git a/src/app/admin_cancel.rs b/src/app/admin_cancel.rs
-index 9a5a780..954d2ae 100644
+index d9cd093..cee32a3 100644
 --- a/src/app/admin_cancel.rs
 +++ b/src/app/admin_cancel.rs
-@@ -197,6 +197,8 @@ pub async fn admin_cancel_action(
+@@ -242,6 +242,8 @@ pub async fn admin_cancel_action(
          .update(pool)
          .await
          .map_err(|e| MostroInternalErr(ServiceError::DbAccessError(e.to_string())))?;
@@ -82,10 +91,10 @@ index 9a5a780..954d2ae 100644
      let message = Message::new_order(
          Some(order.id),
 diff --git a/src/app/admin_settle.rs b/src/app/admin_settle.rs
-index 8a519c3..283e0d5 100644
+index 1df3b16..75afbb9 100644
 --- a/src/app/admin_settle.rs
 +++ b/src/app/admin_settle.rs
-@@ -119,6 +119,9 @@ pub async fn admin_settle_action(
+@@ -141,6 +141,9 @@ pub async fn admin_settle_action(
          return Ok(());
      }
  
@@ -196,10 +205,10 @@ index ba0c6db..45890bf 100644
  }
  
 diff --git a/src/app/release.rs b/src/app/release.rs
-index 188c622..b6efff8 100644
+index 77d6a9f..80044ab 100644
 --- a/src/app/release.rs
 +++ b/src/app/release.rs
-@@ -363,6 +363,9 @@ pub async fn release_action(
+@@ -372,6 +372,9 @@ pub async fn release_action(
      close_dispute_after_user_resolution(ctx, &order, DisputeStatus::Settled, my_keys, "release")
          .await;
  
@@ -209,7 +218,16 @@ index 188c622..b6efff8 100644
      enqueue_order_msg(
          None,
          Some(order.id),
-@@ -1040,6 +1043,11 @@ pub async fn do_payment(
+@@ -694,6 +697,8 @@ pub async fn do_payment(
+         Ok(()) => Ok(()),
+         Err(e) => {
+             check_failure_retries_or_log(ctx, &order, request_id).await;
++            // Barattolo fork (patch 0007): tell the marketplace server.
++            crate::barattolo_eventi::emit_payout_failed_pre_claim(&order, &e);
+             Err(e)
+         }
+     }
+@@ -1089,6 +1094,11 @@ async fn dispatch_payout(
                                      msg.payment.failure_reason,
                                      msg.payment.htlcs.len()
                                  );
@@ -221,7 +239,7 @@ index 188c622..b6efff8 100644
  
                                  // Release our own claim (scoped to this hash and
                                  // the per-claim timestamp) and re-arm retry. Only
-@@ -1237,6 +1245,9 @@ async fn payment_success(
+@@ -1290,6 +1300,9 @@ async fn payment_success(
          return Ok(true);
      }
  
@@ -251,10 +269,10 @@ index a4d4331..4deeb33 100644
                  Err(_) => Err(MostroInternalErr(ServiceError::UpdateOrderStatusError)),
 diff --git a/src/barattolo_eventi.rs b/src/barattolo_eventi.rs
 new file mode 100644
-index 0000000..e0b7e30
+index 0000000..841d1b2
 --- /dev/null
 +++ b/src/barattolo_eventi.rs
-@@ -0,0 +1,760 @@
+@@ -0,0 +1,830 @@
 +//! Barattolo fork, patch 0007: order events to the marketplace server.
 +//!
 +//! The marketplace used to GUESS what happened in a trade from encrypted gift
@@ -333,7 +351,11 @@ index 0000000..e0b7e30
 +//   canceled                cooperative | republished | pending | admin
 +//   expired                 book | taker-timeout | maker-timeout | escrow-deadline
 +//   released                admin (a moderator settled a dispute)
-+//   payout-failed           LND's failure reason (NO_ROUTE, TIMEOUT, …)
++//   payout-failed           LND's failure reason (NO_ROUTE, TIMEOUT, …) when the
++//                           payment was sent; before the claim (upstream #908
++//                           routes every pre-claim failure through one point)
++//                           INVOICE_INVALID | INVOICE_EXPIRED | ADDRESS_UNRESOLVED |
++//                           LND_UNREACHABLE | INVALID_PUBKEY | DB_ERROR | PRE_CLAIM
 +
 +pub fn is_known_action(action: &str) -> bool {
 +    action == PAYOUT_FAILED || ACTIONS.contains(&action)
@@ -674,6 +696,30 @@ index 0000000..e0b7e30
 +    );
 +}
 +
++/// A payout that failed BEFORE anything reached LND: the destination did not
++/// resolve, the invoice did not decode or was expired, LND itself was
++/// unreachable. Upstream (#908, 0.18.8) funnels every such exit through the
++/// `Err` branch of `do_payment`, so one hook there covers them all; the word
++/// names the class, never the error text.
++pub fn pre_claim_failure_name(e: &MostroError) -> &'static str {
++    match e {
++        MostroInternalErr(ServiceError::InvoiceInvalidError)
++        | MostroInternalErr(ServiceError::ParsingInvoiceError) => "INVOICE_INVALID",
++        MostroInternalErr(ServiceError::InvoiceExpiredError) => "INVOICE_EXPIRED",
++        MostroInternalErr(ServiceError::LnAddressParseError)
++        | MostroInternalErr(ServiceError::LnAddressWrongAmount) => "ADDRESS_UNRESOLVED",
++        MostroInternalErr(ServiceError::LnNodeError(_)) => "LND_UNREACHABLE",
++        MostroInternalErr(ServiceError::InvalidPubkey) => "INVALID_PUBKEY",
++        MostroInternalErr(ServiceError::DbAccessError(_)) => "DB_ERROR",
++        _ => "PRE_CLAIM",
++    }
++}
++
++/// [`emit_payout_failed`] for the pre-claim exits of `do_payment`.
++pub fn emit_payout_failed_pre_claim(order: &Order, e: &MostroError) {
++    emit_detail(PAYOUT_FAILED, order, "mostro", pre_claim_failure_name(e));
++}
++
 +fn fee_heartbeat_runs() -> bool {
 +    let set = |key: &str| {
 +        std::env::var(key)
@@ -908,6 +954,48 @@ index 0000000..e0b7e30
 +        assert_eq!(failure_reason_name(4), "INCORRECT_PAYMENT_DETAILS");
 +        assert_eq!(failure_reason_name(99), "UNKNOWN");
 +        assert_eq!(failure_reason_name(-1), "UNKNOWN");
++    }
++
++    #[test]
++    fn pre_claim_failures_by_class() {
++        let of = pre_claim_failure_name;
++        assert_eq!(
++            of(&MostroInternalErr(ServiceError::InvoiceInvalidError)),
++            "INVOICE_INVALID"
++        );
++        assert_eq!(
++            of(&MostroInternalErr(ServiceError::InvoiceExpiredError)),
++            "INVOICE_EXPIRED"
++        );
++        assert_eq!(
++            of(&MostroInternalErr(ServiceError::LnAddressParseError)),
++            "ADDRESS_UNRESOLVED"
++        );
++        assert_eq!(
++            of(&MostroInternalErr(ServiceError::LnNodeError("down".into()))),
++            "LND_UNREACHABLE"
++        );
++        assert_eq!(
++            of(&MostroInternalErr(ServiceError::InvalidPubkey)),
++            "INVALID_PUBKEY"
++        );
++        assert_eq!(
++            of(&MostroInternalErr(ServiceError::DbAccessError("x".into()))),
++            "DB_ERROR"
++        );
++        assert_eq!(
++            of(&MostroCantDo(CantDoReason::InvalidAmount)),
++            "PRE_CLAIM"
++        );
++        // the word goes through the same cleaner as every detail
++        let o = order();
++        assert_eq!(
++            event_of(PAYOUT_FAILED, &o, "mostro", Some("LND_UNREACHABLE"))
++                .unwrap()
++                .detail
++                .as_deref(),
++            Some("LND_UNREACHABLE")
++        );
 +    }
 +
 +    // ── the wire ─────────────────────────────────────────────────────────
@@ -1149,5 +1237,5 @@ index dccc2c1..d46b109 100644
  
      Ok(())
 -- 
-2.47.3
+2.55.0.windows.3
 
