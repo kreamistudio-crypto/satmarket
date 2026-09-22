@@ -521,7 +521,8 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   IL MINUTO SI CONTA DA QUANDO `pronto` SI MUOVE, NON DA QUANDO SI FA
   PUSH (set 2026, dal cantiere del conteggio visualizzazioni): prima
   del timer sul VPS c'è la CI remota — le prove di `prove.py`, che sono
-  9500+ e crescono — e quel giro ha il suo tempo, non incluso nel
+  9500+ e crescono, e dal 22 set 2026 i collaudi in gabbia, una
+  ventina di secondi — e quel giro ha il suo tempo, non incluso nel
   «minuto». Verificare un deploy subito dopo il push con una richiesta
   che tocca il codice nuovo (mai solo `/api/salute`, che risponde
   identica prima e dopo) può cadere nella finestra in cui `pronto` non

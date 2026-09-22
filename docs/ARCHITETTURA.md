@@ -7839,6 +7839,15 @@
   senza payment_hash» e «un 'creato' vecchio» — quest'ultimo è lo
   stato normale finché l'orologio non passa, cioè un allarme che
   suona sul normale.
+  E IL GEMELLO DEL LINK (22 set 2026, «link del negozio rimborsato ma
+  ancora scritto»): un rimborso `negozio_slug` e il negozio che porta
+  ancora QUEL nome. Non suona se dopo il rimborso lo stesso nome è
+  stato ripagato — il `pagato` che scusa dev'essere per lo STESSO
+  `riferimento`, e un link pagato per un altro nome non ne scusa uno
+  rimborsato. Regge perché `negozio_slug` lo scrive UNA strada sola,
+  `_incassa_slug_negozio`: nessun nome in colonna senza un pagamento
+  dietro. Gemello SQL: `17f)` in `query_libro_mastro.sql`, con la
+  WHERE confrontata nei due posti da una sentinella.
   IL paySHEET HA DUE TESTI (decisione di Andrea): «Blocca N sats a
   garanzia … finché non confermi di aver ricevuto l'oggetto» su una
   tassa sono due frasi false, dette nell'istante in cui qualcuno sta
@@ -24137,6 +24146,22 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   aggiunge una prova che dipende da un pacchetto usi `salta()`, mai
   un `print` o un `return` muto: è quello il modo in cui una prova
   smette di esistere senza che nessuno lo sappia.
+  I COLLAUDI IN CI, IN GABBIA (22 set 2026): dopo `prove.py`, nello
+  STESSO job `prove` — il giudice del VPS chiede il verde di `prove` e
+  `segreti` per nome, e un job terzo rosso non fermerebbe nessun
+  deploy — si installano fastapi/httpx/anthropic e `collaudi_ci.py`
+  gira un ELENCO scritto a mano nel workflow (mai un glob: entra solo
+  un collaudo guardato — config di cartone prima dell'import, stesso
+  esito a ogni giro). Ognuno in un processo suo con un `sitecustomize`
+  nel PYTHONPATH che ferma ogni connessione e ogni DNS fuori da
+  127.0.0.1 con l'OSError di una rete staccata e lo SEGNA: una bussata
+  fuori fa rosso il collaudo anche se lui, fail-open, è passato. Le
+  dipendenze del server stanno DOPO le prove apposta: `prove.py` gira
+  senza httpx né fastapi, e allargargli l'ambiente cambierebbe cosa
+  prova senza deciderlo. `prove_collaudi_in_ci` tiene lo step nel job
+  giusto e fa MORDERE la gabbia (un DNS e un connect, fermati e
+  segnati): un sitecustomize che non si carica lascerebbe passare
+  tutto in silenzio.
   IL PARSE DEL CLIENT È UNA PROVA (13 ago 2026, nata da un guasto
   VERO arrivato fino a main con la CI verde: un `*/` doppio in un
   commento JS — chiuso il commento a metà, la coda di prosa è

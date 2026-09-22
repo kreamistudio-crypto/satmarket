@@ -23661,3 +23661,84 @@ nel `detail` delle risposte, e che il client lo mostri intero l'ho
 dedotto, non visto. E la
 ronda del libro mastro sul VPS con un `in_volo` vero in corso non l'ha
 vista nessuno: si vede da sola il giorno che capita.
+
+## I collaudi in CI, in gabbia senza rete; e il link rimborsato nel libro mastro (22 set 2026)
+
+La proposta con cui chiudeva la voce di sopra, fatta: i collaudi del
+server vero ora li gira la CI, e un collaudo rosso ferma il deploy.
+
+**1. IL TERZO COLLAUDO DI `riga=`.** `collaudo_feedback_confermato.py`
+esplodeva come i due curati stamattina (`paga_finto() got an
+unexpected keyword argument 'riga'`), rosso dal 19 set senza che
+nessuno lo girasse. Stessa cura: la firma del vero parola per parola,
+`*, cassaforte, riga=()`. Verde 22/0.
+
+**2. LO STEP, E DOVE STA.** Nel job `prove`, dopo `prove.py`, e NON in
+un job suo: il giudice del VPS (`giudice_deploy.py`) chiede il verde di
+`prove` e `segreti` PER NOME, quindi un terzo job rosso lascerebbe
+passare il deploy. `if: !cancelled()` perché parlino anche a prove
+rosse — la lezione del job dei segreti: un rosso prima non zittisce le
+domande dopo. Le dipendenze del server (fastapi, httpx, anthropic) si
+installano in uno step PROPRIO, dopo le prove: `prove.py` gira apposta
+senza httpx né fastapi, e allargargli l'ambiente avrebbe cambiato cosa
+prova senza che nessuno lo decidesse.
+L'ELENCO È SCRITTO A MANO nel workflow, uno per nome, e non è un glob:
+porta_timer, sblocco_banner, feedback_confermato, verita_lnd,
+altra_cassaforte, in_pagamento, lnbits_muto, fatture_scadute. Tutti e
+otto dentro, nessuno lasciato fuori: config di cartone installato prima
+dell'import del server, uscita 1 sulle rosse, e verdi tre giri di fila.
+
+**3. LA GABBIA, ed è il pezzo da non togliere.** «Senza rete» a parole
+non regge: basta un `notifica` non sostituito o un cambio BTC/EUR
+chiesto davvero, e il collaudo passa o no secondo il raffreddore di un
+server altrui. `collaudi_ci.py` gira ogni collaudo in un processo suo
+con un `sitecustomize` nel PYTHONPATH (vale anche per i figli) che
+ferma ogni `connect`/`connect_ex`/`sendto` e ogni `getaddrinfo` fuori
+da loopback con l'OSError 101 di una rete staccata, e lo SEGNA in un
+file: una bussata fuori fa rosso il collaudo ANCHE se il collaudo,
+fail-open com'è giusto, è passato lo stesso. Provata su una sonda che
+chiama example.com (fermata al DNS, rossa), e gli otto: zero bussate.
+`prove_collaudi_in_ci` la fa MORDERE a ogni giro — un DNS su
+`gabbia.invalid` e un connect su 192.0.2.1, tutti e due fermati e
+segnati — perché un sitecustomize che smette di caricarsi lascerebbe
+passare tutto senza dire niente. Più: lo step sta nel job `prove`,
+l'elenco è a mano e i file esistono, c'è il feedback confermato, e un
+collaudo che non esiste fa uscire il lanciatore con 1.
+IMPERFEZIONE DICHIARATA: la gabbia guarda i socket di Python. Su
+Windows il loop proactor di asyncio si collega con `ConnectEx` e non
+passa da `socket.connect`, quindi un IP letterale lì sfuggirebbe (un
+NOME no: il DNS resta fermato). In CI il loop è quello a selettori e
+passa da `connect`; ed è la CI che conta.
+
+**4. IL LIBRO MASTRO: «link del negozio rimborsato ma ancora
+scritto».** Il gemello del quarto controllo del banner, figlio del
+rimborso per motivo di stamattina: un `negozio_slug` rimborsato e il
+negozio che porta ancora quel nome. Il `pagato` che lo scusa dev'essere
+per lo STESSO `riferimento` — chi dopo il rimborso ha ripagato lo
+stesso nome lo porta di diritto, e un link pagato per un ALTRO nome
+non scusa niente. Regge perché `negozio_slug` lo scrive una strada
+sola (`_incassa_slug_negozio`). Nel catalogo e nel gemello SQL
+(`17f)`), con la WHERE confrontata nei due posti. Il banco sano ha due
+rimborsi di link che devono tacere (nome tolto; nome ripagato), e due
+casi rotti.
+TORTURA 3/3, mutando server E gemello SQL insieme — sennò le avrebbe
+uccise il solo confronto delle WHERE, cioè per la ragione sbagliata:
+togliere `q.riferimento=` (la uccide il secondo caso rotto, aggiunto
+apposta: col solo primo sopravvivrebbe — ragionato, non misurato),
+`rimborsato` che non
+combacia mai (i due casi rotti), il `pagato` che non scusa più (il
+silenzio del banco sano).
+
+**PROVATO.** `prove.py` intera con `PROVE_SEVERE=1`: 12920/0, in
+locale e in CI. La CI vera sul ramo del cantiere (Linux, Python 3.12):
+«8 verdi, 0 rossi», un paio di secondi l'uno.
+
+**NON PROVATO, E DA GUARDARE.** Gli altri 23 `collaudo_*.py` restano
+solo compilati: nessuno è stato guardato, e non so dire quali
+parlerebbero con la rete. Entrano uno alla volta, guardati, e la
+gabbia dirà da sola chi bussa. Il
+controllo del link sulla ronda di produzione non ha mai suonato né
+taciuto su un caso vero: un rimborso di link in produzione non c'è
+ancora stato. E `query_libro_mastro.sql` continua a NON avere il
+gemello di «link del negozio pagato e non applicato», che manca da
+prima di oggi.
