@@ -1825,7 +1825,7 @@
   .p2p-simbolo{width:76px;height:76px}
   .empty .p2p-simbolo{display:block;margin:0 auto 10px}
   .p2p-logo-pila{display:grid}
-  .p2p-logo{grid-area:1/1;width:76px;height:76px;
+  .p2p-logo{grid-area:1/1;width:var(--logo-p2p,76px);height:var(--logo-p2p,76px);
     filter:drop-shadow(0 3px 6px rgba(60,45,10,.18));
     transition:opacity .3s ease}
   .p2p-logo.vendi{opacity:0}
@@ -1850,7 +1850,21 @@
   /* LA STRISCIA CONTINUA NON C'E' PIU' (set 2026, ritocco di Andrea):
      la linea vive sotto OGNI tab — grigia sul quieto, colorata
      sull'attivo — e sotto il logo non passa niente */
-  .p2p-lati{display:flex;align-items:flex-end;margin:0 0 12px}
+  /* ⚠️ IL LOGO CRESCE CON LO SPAZIO (22 set 2026, richiesta di Andrea:
+     «un po' piu' grande, senza toccare le scritte»). Da 76 a 96px, e la
+     misura la decide la LARGHEZZA dello schermo, perche' il vincolo e'
+     il tab: la colonna e' larga 100vw-32, i due tab si dividono quel che
+     avanza dopo il logo e i suoi 6+6 di margine, e ognuno ha 4+4 di
+     respiro — quindi con il logo a 100vw-280 al tab restano SEMPRE 110px
+     per «Compra BTC», che a 19px ne misura 102 (dal vivo). Sotto i 352px
+     di schermo resta 76, come prima; da 376 in su e' 96; in mezzo cresce
+     un pixel per pixel, e il testo non va mai a capo.
+     Il disegno nel PNG lascia 13px trasparenti per lato su 152: la
+     distanza VISTA fra il logo e le scritte e' piu' larga di quella fra
+     le scatole. I PNG restano quelli da 152: a 96 su un telefono a 3x
+     sono ingranditi un po'. */
+  .p2p-lati{display:flex;align-items:flex-end;margin:0 0 12px;
+    --logo-p2p:clamp(76px, calc(100vw - 280px), 96px)}
   /* ---- LA TESTATA RESTA IN ALTO (set 2026, ritocco di Andrea:
      «tab, logo e pillola attaccati in alto; scorrono solo le card»).
      UN SOLO STICKY per tutt'e due, e non due impilati: con due
@@ -1901,7 +1915,11 @@
      incollata al bordo in alto, coi suoi tredici fuori dal fondo
      dipinto — la fessura che il commento dello sticky racconta gia'.
      `flow-root` tiene il margine DENTRO: tredici sopra e tredici
-     sotto, tutti dipinti. */
+     sotto, tutti dipinti.
+     ⚠️ E LA SERA STESSA NEL BLOCCO E' ENTRATO IL VELO dell'intestazione,
+     col suo margine di 4px sopra: la stessa regola tiene dentro anche
+     quello, e da attaccato sopra il velo resta una striscia di fondo
+     pieno invece di una fessura da cui si vedono passare le card. */
   #view-p2pmiei .p2p-sticky{display:flow-root}
   /* IL CAPPELLO DI «I MIEI SCAMBI» (set 2026, richiesta di Andrea) non
      ha piu' un vestito suo, ed e' la terza stesura di questo titolo:
@@ -1927,23 +1945,44 @@
      riga da 58px — questa e' alta il triplo, e attaccata in cima a
      375px lascerebbe alle card poco piu' di meta' schermo. Scorre via
      col dito, e in alto resta la riga di strumenti, come nel libro.
-     LA SCATOLA E' LARGA QUANTO LA COLONNA, l'immagine alta 120px e
-     `contain`: le proporzioni restano quelle del disegno, e il disegno
-     sta al centro. Il file e' 682x459, cioe' 3,8 volte l'altezza a
-     schermo: i bordi restano netti anche a 3x.
+     ⚠️ EMENDATA LA SERA STESSA (22 set 2026, ritocco di Andrea): adesso
+     sta DENTRO il blocco attaccato, e sotto il suo velo ci sono anche la
+     riga del conto e quella degli strumenti — tutt'e tre ferme in cima,
+     con le card che ci scorrono sotto. Lo spazio che l'aveva tenuta fuori
+     l'ha pagato l'immagine, scesa da 120 a 80px: la parte ferma misura
+     174px, poco piu' di un quinto dei 812 di un telefono da 375 (misurato
+     dal vivo). Attorno al velo il blocco resta `--bg` pieno, quindi negli
+     angoli tondi le card non si vedono passare.
+     LA SCATOLA E' LARGA QUANTO LA COLONNA, l'immagine alta 80px (erano
+     120) e `contain`: le proporzioni restano quelle del disegno, e il
+     disegno sta al centro. Il file e' 682x459, cioe' 5,7 volte l'altezza
+     a schermo: i bordi restano netti anche a 3x.
+     LE PILLOLE STANNO NEL VELO con 8px d'aria per lato: la riga di
+     strumenti ne occupa 299 dei 343 di una colonna a 375, e anche a 360
+     resta in fila (312 disponibili); a 320 la levetta andava gia' a capo,
+     e ci va ancora.
+     SENZA SCAMBI il velo se ne va (`.vuota`) e resta la sola riga di
+     strumenti, al pixel com'era: lo stato vuoto e' l'intestazione in
+     grande, piu' giu', e non doveva cambiare.
      IL VELO E' `--sats-soft`, il tenue di casa, gia' tarato nei due
      temi: pesca di giorno, ambra scura di sera. E' un COLORE FERMO —
      niente sfocature, niente filtri, niente animazioni — quindi con
      «effetti ridotti» resta identico: la regola universale non ha
      niente da togliergli, e al compositore non chiede niente. */
-  .scambi-testa{margin:4px 0 0;padding:12px 12px 10px;border-radius:22px;
-    background:var(--sats-soft);text-align:center}
-  .scambi-testa[hidden]{display:none}
+  .scambi-testa{margin:4px 0 0;padding:6px 8px;border-radius:22px;
+    background:var(--sats-soft);display:flow-root}
+  .scambi-cima{text-align:center}
+  /* sotto il velo la riga di strumenti tiene i suoi 13 sopra, e sotto
+     ne lascia 4 piu' i 6 del velo: le pillole restano a dieci dal bordo
+     come dal fondo del blocco di ieri */
+  .scambi-testa:not(.vuota) .p2p-testa-riga{margin-bottom:4px}
+  .scambi-testa.vuota{margin:0;padding:0;border-radius:0;background:none}
+  .scambi-testa.vuota .scambi-cima{display:none}
   /* il titolo e' l'immagine; se l'immagine non arriva torna la parola,
      e allora si veste come il cappello di ieri */
   .scambi-tit{margin:0;font-family:'Baloo 2',sans-serif;font-weight:800;
     font-size:var(--tit-foglio);line-height:1.2;color:var(--ink)}
-  .scambi-img{display:block;width:100%;height:120px;object-fit:contain}
+  .scambi-img{display:block;width:100%;height:80px;object-fit:contain}
   /* LA RIGA DEL CONTO, piccola. `--ink-soft` e non `--muted`: sul velo
      di giorno il muted scende a 3,3:1, sotto la soglia del testo
      piccolo. «Tocca a te» prende l'arancio del pallino quando non e'
@@ -1952,7 +1991,7 @@
      vale `.sicu p` (una classe e un elemento, 0,1,1), che veste ogni
      paragrafo da prosa — 15px, peso 500, dieci di margine sotto — e
      batte questa classe per specificita'. La riga usciva cosi'. */
-  .scambi-conto{margin:6px 0 0;font-size:13px;font-weight:700;
+  .scambi-conto{margin:3px 0 0;font-size:13px;font-weight:700;
     line-height:1.3;color:var(--ink-soft)}
   .scambi-conto:empty{display:none}
   .scambi-conto b{color:var(--sats-text);font-weight:800}
@@ -1961,10 +2000,18 @@
      dell'`.empty`, la frase e il bottone per il libro. */
   .empty.scambi-vuoto{background:var(--sats-soft);border-color:transparent}
   .scambi-vuoto .scambi-img{height:160px;margin:0 auto 12px}
+  /* E NEL FILTRO CHE NON LASCIA PASSARE NIENTE le stesse monete, in
+     piccolo (22 set 2026, ritocco di Andrea), al posto del logo P2P:
+     in questa pagina il simbolo e' quello dell'intestazione. 56px, cioe'
+     quanto il logo di ieri in larghezza. */
+  .empty .scambi-mini{height:56px;margin:0 auto 10px}
   /* il logo siede all'altezza delle scritte (margine negativo): cosi'
      scende invece di galleggiare in alto — il ritocco chiesto da
-     Andrea guardando la riga */
-  .p2p-lati .p2p-logo-pila{margin:0 6px -8px}
+     Andrea guardando la riga.
+     E IL MARGINE SEGUE LA MISURA (22 set 2026): erano -8px su 76, cioe'
+     il disegno appoggiato sulla linea dei tab; col logo che cresce la
+     stessa proporzione lo tiene appoggiato (a 76 fa ancora -8). */
+  .p2p-lati .p2p-logo-pila{margin:0 6px calc(var(--logo-p2p) * -.105)}
   /* ...e le due viste dello scambio stringono anche il respiro del
      contenitore: i tab devono stare in cima, non a meta' pagina */
   #view-p2p .sicu,#view-p2pmiei .sicu{padding-top:2px}
@@ -7786,28 +7833,35 @@ document.getElementById('cartello')?.remove();</script>
            L'URL E' LETTERALE apposta: `_timbra_asset_pagina` lo timbra
            col ?v= del contenuto, come i disegni del tour.
            La riga del conto la scrive `intestaScambiP2P` a ogni giro di
-           renderP2P; vuota, si nasconde da sola (`:empty`). -->
-      <div class="scambi-testa" id="p2pMieiIntesta">
-        <h2 class="scambi-tit"><img class="scambi-img" src="/assets/scambi-intestazione.webp" width="682" height="459" alt="I miei scambi" aria-label="I miei scambi" onerror="this.replaceWith(this.alt)"></h2>
-        <div class="scambi-conto" id="p2pMieiConto"></div>
-      </div>
+           renderP2P; vuota, si nasconde da sola (`:empty`).
+           ⚠️ EMENDATA LA SERA STESSA (ritocco di Andrea): adesso sta
+           DENTRO il blocco attaccato, e sotto il suo velo c'e' anche la
+           riga di strumenti — immagine, conto e strumenti fermi in cima,
+           le card che ci scorrono sotto. Senza scambi `.vuota` toglie
+           velo e monete e lascia la sola riga, com'era. -->
       <div class="p2p-sticky">
-        <!-- IL DEPOSITO DELL'ORDINAMENTO, gemello di quello del
-             libro: la `<select>` di sistema non si veste, quindi sta
-             qui nascosta a tenere il VALORE e col dito parla la
-             pillola, che apre il #pickerSheet di casa. E sta nella
-             VISTA e non in #p2pMieiTesta, che renderP2P riscrive a
-             ogni giro: li' dentro il valore morirebbe.
-             OGNI VOCE HA DUE NOMI (`data-corta`): nel foglio quello
-             intero, che spiega; nella pillola quello corto, o la riga
-             va a capo pure a 375. -->
-        <select id="p2pMieiOrdinaSel" hidden>
-          <option value="recenti" data-corta="Recenti" selected>Più recenti</option>
-          <option value="fare" data-corta="Da fare">Prima quelli da fare</option>
-          <option value="imp-giu" data-corta="Più grandi">Importo: dal più grande</option>
-          <option value="imp-su" data-corta="Più piccoli">Importo: dal più piccolo</option>
-        </select>
-        <div id="p2pMieiTesta"></div>
+        <div class="scambi-testa" id="p2pMieiIntesta">
+          <div class="scambi-cima">
+            <h2 class="scambi-tit"><img class="scambi-img" src="/assets/scambi-intestazione.webp" width="682" height="459" alt="I miei scambi" aria-label="I miei scambi" onerror="this.replaceWith(this.alt)"></h2>
+            <div class="scambi-conto" id="p2pMieiConto"></div>
+          </div>
+          <!-- IL DEPOSITO DELL'ORDINAMENTO, gemello di quello del
+               libro: la `<select>` di sistema non si veste, quindi sta
+               qui nascosta a tenere il VALORE e col dito parla la
+               pillola, che apre il #pickerSheet di casa. E sta nella
+               VISTA e non in #p2pMieiTesta, che renderP2P riscrive a
+               ogni giro: li' dentro il valore morirebbe.
+               OGNI VOCE HA DUE NOMI (`data-corta`): nel foglio quello
+               intero, che spiega; nella pillola quello corto, o la riga
+               va a capo pure a 375. -->
+          <select id="p2pMieiOrdinaSel" hidden>
+            <option value="recenti" data-corta="Recenti" selected>Più recenti</option>
+            <option value="fare" data-corta="Da fare">Prima quelli da fare</option>
+            <option value="imp-giu" data-corta="Più grandi">Importo: dal più grande</option>
+            <option value="imp-su" data-corta="Più piccoli">Importo: dal più piccolo</option>
+          </select>
+          <div id="p2pMieiTesta"></div>
+        </div>
       </div>
       <div id="p2pMieiCorpo"></div>
     </div>
@@ -7840,7 +7894,13 @@ document.getElementById('cartello')?.remove();</script>
   <div class="view" id="view-p2pinfo">
     <div class="sicu">
       <div class="sicu-hero">
-        <img src="/assets/p2p-logo-completo.png" alt="" onerror="this.remove()">
+        <!-- IL LOGO NITIDO (22 set 2026, richiesta di Andrea: «quella
+             e' sgranata»): qui il logo e' grande 132px, e il PNG da 152
+             che serve la card della home e il libro vuoto su un telefono
+             a 3x era ingrandito piu' del doppio. Questo nasce dal
+             sorgente da 480 di Andrea, a 396 (3x dei 132), in WebP:
+             39 KB. Il PNG piccolo resta dove e' piccolo. -->
+        <img src="/assets/p2p-logo-grande.webp" alt="" onerror="this.remove()">
         <h2>Lo scambio P2P</h2>
         <p class="occhiello">Comprare e vendere bitcoin fra persone, coi sats fermi in garanzia finché non è tutto a posto.</p>
       </div>
@@ -48133,28 +48193,41 @@ function quantiToccaAMeP2P(righe){
 }
 /* ---- L'INTESTAZIONE DI «I MIEI SCAMBI»: la riga del conto (22 set
    2026, richiesta di Andrea) ----
-   Sotto le due monete, piccola: «N in corso · M tocca a te».
-   I DUE NUMERI SONO QUELLI DEL FOGLIO DEL FILTRO, e non per caso: «In
-   corso» e «Tocca a te» sono due dei cinque gruppi di
-   `gruppoScambioP2P`, e quel foglio scrive gia' accanto a ogni pillola
-   quanti scambi ci cadono. Un «in corso» che contasse anche quelli dove
-   tocca a me darebbe allo stesso nome due numeri sulla stessa pagina:
-   i gruppi sono una partizione, e ogni scambio sta in uno solo.
+   Sotto le due monete, piccola: «N scambi aperti · M tocca a te».
+   ⚠️ EMENDATA LA SERA STESSA (22 set 2026, ritocco di Andrea): la prima
+   stesura diceva «N in corso», col gruppo «In corso» del giudice — lo
+   stesso numero della sua pillola nel foglio del filtro — e con uno
+   scambio solo, e la mossa mia, si leggeva «0 in corso · 1 tocca a te».
+   Adesso N sono gli scambi APERTI: tutti quelli che non sono conclusi
+   ne' annullati, cioe' i gruppi «Tocca a te», «In corso» e «Nel libro»
+   del foglio messi insieme. Il nome non e' piu' quello di una pillola,
+   quindi non ci sono due numeri per lo stesso nome; e «tocca a te» sta
+   DENTRO gli aperti, quindi M non supera mai N, e con uno scambio
+   aperto non si legge mai zero.
+   IL GIUDICE RESTA UNO, `gruppoScambioP2P` — quello del foglio e del
+   pallino: aperto e' cio' che non cade in «Conclusi» ne' in «Annullati».
+   Combacia con `P2P_FINALI` (concluso, annullato, rifiutato), il
+   giudice di chi riascolta i relay, e una prova li tiene insieme.
    «Tocca a te» lo conta `quantiToccaAMeP2P`, la stessa del pallino:
    pallino, 👉 sulle card, conto nel filtro e questa riga sono la stessa
    domanda, e nessuna ha una lista di stati sua. */
 function contoScambiP2P(righe){
   const r = righe || [];
-  return {corso: r.filter(o => gruppoScambioP2P(o) === 'corso').length,
+  return {aperti: r.filter(o => {
+            const g = gruppoScambioP2P(o);
+            return g !== 'fatti' && g !== 'morti';
+          }).length,
           fare: quantiToccaAMeP2P(r)};
 }
 /* PURA: la frase. Dentro ci sono solo due cifre — nessun testo che
    arrivi da fuori — quindi va in innerHTML senza esc(); il <b> accende
    «tocca a te» dell'arancio del pallino quando c'e' qualcosa da fare,
-   che e' lo stesso segnale detto a parole. */
+   che e' lo stesso segnale detto a parole. Uno scambio aperto va al
+   singolare, come «1 scambio» nella pillola del filtro. */
 function fraseContoScambiP2P(c){
+  const aperti = c.aperti + (c.aperti === 1 ? ' scambio aperto' : ' scambi aperti');
   const fare = c.fare + ' tocca a te';
-  return c.corso + ' in corso · ' + (c.fare > 0 ? '<b>' + fare + '</b>' : fare);
+  return aperti + ' · ' + (c.fare > 0 ? '<b>' + fare + '</b>' : fare);
 }
 /* Chi la dipinge: renderP2P, a ogni giro — e con la vista aperta ogni
    evento del coordinatore ci passa. `righe` null = il libro non c'e'
@@ -48162,13 +48235,17 @@ function fraseContoScambiP2P(c){
    regola della riga di strumenti — prima del libro l'adozione non ha
    ricostruito niente, e un numero adesso sarebbe vero di una lista
    incompleta. Righe VUOTE = nessuno scambio: l'intestazione piccola si
-   toglie, perche' lo stato vuoto e' lei stessa in grande. */
+   toglie, perche' lo stato vuoto e' lei stessa in grande.
+   ⚠️ E NON PIU' CON `hidden` (22 set 2026, sera): l'intestazione sta nel
+   blocco attaccato, e sotto il suo velo c'e' la riga di strumenti, che
+   senza scambi deve restare dov'era. `.vuota` toglie velo e monete e
+   lascia la riga. */
 function intestaScambiP2P(righe){
   const testa = el('p2pMieiIntesta');
   const conto = el('p2pMieiConto');
   if (!testa || !conto) return;
   const ci = !!(righe && righe.length);
-  testa.hidden = !!righe && !ci;
+  testa.classList.toggle('vuota', !!righe && !ci);
   conto.innerHTML = ci ? fraseContoScambiP2P(contoScambiP2P(righe)) : '';
 }
 /* IL FILTRO SPENTO E' UN ARRAY VUOTO e non `null` come quello del
@@ -48717,8 +48794,12 @@ function scambiP2P(){
      e un titolo che ripete il nome della pagina che la nav dice gia'
      e' la seconda copia della stessa verita'. */
   const mostrati = mieiMostratiP2P(righe);
+  /* LE MONETE IN PICCOLO, e non piu' il logo P2P (22 set 2026, ritocco
+     di Andrea): in questa pagina il simbolo e' quello dell'intestazione,
+     che qui sopra c'e' — gli scambi ci sono, e' il filtro a nasconderli.
+     Decorative (alt vuoto): il titolo della pagina lo porta gia' lei. */
   if (!mostrati.length)
-    return '<div class="empty"><img class="p2p-simbolo" src="/assets/p2p-logo-completo.png" alt="" onerror="this.remove()">'
+    return '<div class="empty"><img class="scambi-img scambi-mini" src="/assets/scambi-intestazione.webp" width="682" height="459" alt="" onerror="this.remove()">'
       + '<span class="empty-title">Nessuno scambio col tuo filtro</span>'
       + 'Hai ' + righe.length + ' scambi, ma nessuno passa il filtro. '
       + '<button type="button" class="scopri-link" onclick="azzeraFiltroMieiP2P()">Togli il filtro</button></div>';

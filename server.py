@@ -55176,7 +55176,12 @@ def asset_p2p_logo_compra():
     Andrea): il barattolo col lucchetto, la freccia verde accesa e la
     rossa spenta. Il gemello qui sotto ha le frecce rovesciate, e il
     client li incrocia col tab attivo. Rotte esplicite come le
-    sorelle: mai un mount (regola 3)."""
+    sorelle: mai un mount (regola 3).
+    DAL 22 SET 2026 I DUE GEMELLI SONO A 288px, rifatti dai sorgenti
+    da 480 di Andrea: il logo fra i tab e' cresciuto fino a 96px, e a
+    3x ne servono 288. Stesso nome e stessa rotta — il ?v= di
+    _timbra_asset_pagina cambia col contenuto, e le cache cadono da
+    sole."""
     return FileResponse("assets/p2p-logo-compra.png",
                         media_type="image/png",
                         headers={"Cache-Control": "public, max-age=86400"})
@@ -55197,6 +55202,23 @@ def asset_p2p_logo_completo():
     posto dove il 🔁 faceva da simbolo dello scambio."""
     return FileResponse("assets/p2p-logo-completo.png",
                         media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/assets/p2p-logo-grande.webp")
+def asset_p2p_logo_grande():
+    """Il logo completo NITIDO (22 set 2026, richiesta di Andrea: quello
+    di «Info P2P» era sgranato). La' il logo e' grande 132px, e il PNG
+    da 152 del completo, su un telefono a 3x, era ingrandito piu' del
+    doppio. Questo nasce dal sorgente da 480 di Andrea, a 396 (3x dei
+    132), WebP con trasparenza a qualita' 90: 39 KB, meno di un quarto
+    del PNG equivalente. Il completo piccolo resta dove e' piccolo — la
+    card della home e il libro vuoto — per non far pagare al mercatino
+    un'immagine grande dove si vede a 76px. Rotta esplicita come le
+    sorelle: mai un mount (regola 3); il ?v= lo mette
+    _timbra_asset_pagina."""
+    return FileResponse("assets/p2p-logo-grande.webp",
+                        media_type="image/webp",
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
