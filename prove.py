@@ -48454,8 +48454,14 @@ def prove_nav_p2p():
     # nome, come le sorelle. I tre che restano sono tutti STATI VUOTI,
     # che e' l'unico posto dove il marchio fa da voce: li' non c'e'
     # niente da nominare.
-    prova("il simbolo veste i tre stati vuoti, e nessuna testata", 3,
-          mini.count('class="p2p-simbolo" src="/assets/p2p-logo-completo.png"'))
+    # ⚠️ E ADESSO SONO DUE (22 set 2026, l'intestazione di «I miei
+    # scambi», richiesta di Andrea): lo stato vuoto di quella pagina
+    # SENZA scambi non porta piu' il marchio ma le due monete
+    # dell'intestazione, in grande — la pagina doveva smettere di
+    # somigliare al libro. Restano il libro vuoto e il filtro dei miei
+    # che non lascia passare niente, che non sono stati toccati.
+    prova("il simbolo veste i due stati vuoti che restano, e nessuna testata",
+          2, mini.count('class="p2p-simbolo" src="/assets/p2p-logo-completo.png"'))
     # EMENDATA DUE VOLTE. La prima (set 2026, il ridisegno): il bottone
     # non diceva piu' «Pubblica: compro sats» — il lato lo dice il
     # TITOLO del foglio — e in fondo restavano le due uscite di sempre,
@@ -48505,8 +48511,13 @@ def prove_nav_p2p():
           "scambiP2P() + testa" in rp)
     prova("...e non ha piu' il bottone «Pubblica» in pagina", False,
           "apriNuovoOrdineP2P" in rp)
-    prova("lo stato vuoto dei miei invita al +", True,
-          "Nessuno scambio ancora" in rp)
+    # EMENDATA (22 set 2026, l'intestazione): lo stato vuoto non invita
+    # piu' al + ma porta al LIBRO — «Nessuno scambio in corso» e un
+    # bottone, richiesta di Andrea. Le prove sue stanno in
+    # prove_intestazione_scambi.
+    prova("lo stato vuoto dei miei porta al libro", True,
+          "Nessuno scambio in corso" in rp
+          and "Nessuno scambio ancora" not in rp)
     # il campanello dei messaggi ridisegna anche dai miei: il guard
     # sulla vista attiva copre entrambe le sorelle
     prova("applicaMessaggioP2P ridisegna da entrambe le viste", True,
@@ -60950,11 +60961,18 @@ def prove_p2p_vista_miei():
     # sotto e la stessa riga che lo stacca dal resto. Una copia che
     # somiglia si scolla al primo ritocco, e nessuno se ne accorge
     # finche' non si mettono le due pagine una accanto all'altra.
-    prova("...col titolo in cima, dentro il blocco attaccato", True,
-          "<h3>I miei scambi</h3>" in fetta
-          and 'class="foglio-testa"' in fetta
-          and fetta.index("foglio-testa") > fetta.index('class="p2p-sticky"')
-          and fetta.index("foglio-testa") < fetta.index('id="p2pMieiTesta"'))
+    # ⚠️ EMENDATA (22 set 2026, l'intestazione — richiesta di Andrea):
+    # il titolo scritto se n'e' andato, perche' la pagina somigliava
+    # troppo al libro. Al suo posto c'e' l'IMMAGINE delle due monete,
+    # FUORI dal blocco attaccato e sopra di lui, e il nome resta
+    # nell'alt. Le prove sue stanno in prove_intestazione_scambi; qui
+    # resta la domanda di questa vista: il cappello non c'e' piu', e nel
+    # blocco attaccato restano gli strumenti.
+    prova("...e il cappello scritto se n'e' andato: sopra c'e' l'intestazione",
+          True, "<h3>I miei scambi</h3>" not in fetta
+          and 'class="foglio-testa"' not in fetta
+          and 0 <= fetta.index('id="p2pMieiIntesta"')
+          < fetta.index('class="p2p-sticky"') < fetta.index('id="p2pMieiTesta"'))
     # ⚠️ E PORTA I DUE GEMELLI INVISIBILI, uno per lato: nel foglio il
     # cappello contiene la ✕ che lo chiude, e quel bottone e' PIU'
     # ALTO del testo — e' lui a dare l'altezza alla riga
@@ -60963,8 +60981,11 @@ def prove_p2p_vista_miei():
     # e' esattamente il difetto che una prova sul CSS non prende. Il
     # ghost e' quello che il foglio usa gia' a destra per tenere il
     # titolo in centro; qui ce ne vogliono due.
-    prova("...coi due gemelli invisibili che gli danno l'altezza", 2,
-          fetta.count('class="foglio-back vuoto" aria-hidden="true"'))
+    # EMENDATA con lei (22 set 2026): senza cappello i due gemelli non
+    # hanno piu' niente a cui dare l'altezza, e se ne sono andati — un
+    # fantasma che regge una riga che non c'e' e' markup morto.
+    prova("...e con lui i due gemelli invisibili che gli davano l'altezza", 0,
+          fetta.count('class="foglio-back vuoto"'))
     # ...e non e' rimasto in giro il vestito suo di ieri
     prova("...e il vestito di ieri non e' rimasto da morto", False,
           "p2p-miei-tit" in mini)
@@ -60973,11 +60994,15 @@ def prove_p2p_vista_miei():
     # regola con cui «Filtri» e' diventato «Filtro». Si confronta col
     # testo del TASTO, non con una stringa ribattuta qui: se un domani
     # la voce cambia nome, questa riga lo pretende anche dal titolo.
+    # EMENDATA (22 set 2026): il nome non si LEGGE piu', si ascolta — e'
+    # l'alt dell'immagine, col suo aria-label — e la regola vale uguale.
+    # Adesso il nome si prende davvero dal TASTO, invece di ribatterlo.
     _nav = mini[mini.index('id="nav-p2pmiei"'):]
     _nav = _nav[:_nav.index("</button>")]
+    _nome = _nav[_nav.rindex(">") + 1:]
     prova("...e si chiama come la voce che ci porta", True,
-          _nav.endswith("I miei scambi")
-          and '>I miei scambi</h3>' in fetta)
+          _nome == "I miei scambi"
+          and ('alt="%s" aria-label="%s"' % (_nome, _nome)) in fetta)
     # ⚠️ ED E' GRANDE ESATTAMENTE COME IL CAPPELLO DI UN FOGLIO
     # (richiesta di Andrea): e' lo stesso oggetto — il titolo che
     # presiede una pagina — quindi si veste come «Stai comprando
@@ -61626,6 +61651,372 @@ console.log(JSON.stringify(out));
           o["nonRompe"])
     prova("archivio vuoto: zero, e spento", [0, "spento"], o["vuoto"])
 
+
+
+def prove_intestazione_scambi():
+    """L'INTESTAZIONE DI «I MIEI SCAMBI» (22 set 2026, richiesta di
+    Andrea): la pagina somigliava troppo al libro, che in cima ha gia'
+    il logo P2P. Adesso comincia con un'immagine sua — due monete che si
+    scambiano di posto, bitcoin e un euro — su un velo tenue, e sotto la
+    riga viva del conto; il titolo scritto se ne va e resta nell'alt.
+    Senza scambi, la stessa immagine in grande fa lo stato vuoto.
+
+    ⚠️ LE QUATTRO COSE CHE QUESTE PROVE SORVEGLIANO: il conto viene dal
+    giudice del pallino (`gruppoScambioP2P`, `quantiToccaAMeP2P`) e non
+    da una lista di stati sua, e i suoi due numeri sono quelli che il
+    foglio del filtro scrive accanto alle pillole; il file e' servito
+    come le immagini del tour — rotta esplicita, URL letterale timbrato
+    — e mai incorporato nella pagina; il velo e' un colore fermo, che
+    «effetti ridotti» lascia identico; e il nome, nell'alt, e' quello
+    della voce della nav."""
+    print("\n[l'intestazione di «I miei scambi»]")
+    import hashlib as _hl
+    import json as _json
+    import os as _os
+    import shutil as _sh
+    import struct as _st
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    css = mini[mini.index("<style>"):mini.index("</style>")]
+    FILE = "assets/scambi-intestazione.webp"
+    URL = "/assets/scambi-intestazione.webp"
+
+    def nudo(js):
+        """via i commenti: il verbale nomina le stesse cose che queste
+        prove cercano nel codice"""
+        return re.sub(r"/\*[\s\S]*?\*/", "", js)
+
+    # --- 1) IL FILE: WebP con trasparenza, sotto i 50 KB, netto a 3x --
+    raw = open(FILE, "rb").read()
+    prova("l'intestazione e' un WebP", (b"RIFF", b"WEBP"),
+          (raw[:4], raw[8:12]))
+    prova("...sotto i 50 KB, come chiesto", True, len(raw) < 50000)
+    pezzi, i = [], 12
+    while i + 8 <= len(raw):
+        n = _st.unpack("<I", raw[i + 4:i + 8])[0]
+        pezzi.append(raw[i:i + 4].decode("ascii", "replace"))
+        i += 8 + n + (n & 1)
+    # VP8X col bit dell'alpha, poi l'alpha e l'immagine, e nient'altro:
+    # ne' ICC (e' sRGB, quel che il browser assume gia'), ne' EXIF, ne' XMP
+    prova("...coi soli tre pezzi che servono: niente ICC, EXIF o XMP",
+          ["VP8X", "ALPH", "VP8 "], pezzi)
+    prova("...e con la trasparenza dichiarata", True, bool(raw[20] & 0x10))
+    larg = 1 + int.from_bytes(raw[24:27], "little")
+    alt = 1 + int.from_bytes(raw[27:30], "little")
+    prova("...682x459, il disegno a piena risoluzione", (682, 459),
+          (larg, alt))
+    # BORDI NETTI A 3x: a schermo e' alta 120px, cioe' 360 pixel veri su
+    # un telefono a 3x — il file deve averne almeno tanti
+    prova("...alta abbastanza per i 120px di un telefono a 3x", True,
+          alt >= 3 * 120)
+    try:
+        from PIL import Image as _Im
+        with _Im.open(FILE) as _im:
+            _modo = _im.mode
+            _bbox = _im.getchannel("A").getbbox()
+        prova("...ritagliata sull'alpha: il disegno arriva a 4px dai bordi",
+              ("RGBA", True),
+              (_modo, _bbox is not None and _bbox[0] <= 6 and _bbox[1] <= 6
+               and larg - _bbox[2] <= 6 and alt - _bbox[3] <= 6))
+    except ImportError:
+        salta("il ritaglio dell'intestazione", "serve Pillow")
+    prova("...e non sta in assets/categorie/", False,
+          _os.path.exists(_os.path.join("assets", "categorie",
+                                        "scambi-intestazione.webp")))
+
+    # --- 2) LA ROTTA: esplicita, come le sorelle --------------------
+    rotta = pezzo("asset_scambi_intestazione")
+    prova("la rotta e' esplicita, mai un mount", True,
+          '@app.get("/assets/scambi-intestazione.webp")' in _SORGENTE
+          and 'FileResponse("assets/scambi-intestazione.webp",' in rotta
+          and 'media_type="image/webp"' in rotta)
+    prova("...con la cache delle sorelle: il ?v= la rende innocua", True,
+          '"Cache-Control": "public, max-age=86400"' in rotta)
+
+    # --- 3) IL MARKUP: l'intestazione sopra il blocco attaccato ------
+    j = mini.index('id="view-p2pmiei"')
+    fetta = re.sub(r"<!--.*?-->", "", mini[j:mini.index("============", j)],
+                   flags=re.S)
+    testa = fetta[fetta.index('<div class="scambi-testa"'):
+                  fetta.index('<div class="p2p-sticky">')]
+    prova("l'intestazione sta in cima alla vista, prima degli strumenti",
+          True, 0 <= fetta.index('id="p2pMieiIntesta"')
+          < fetta.index('class="p2p-sticky"'))
+    prova("...ed e' l'immagine e basta: nessun titolo scritto", True,
+          "<h3" not in testa and "I miei scambi</" not in testa)
+    IMG = ('<img class="scambi-img" src="%s" width="682" height="459" '
+           'alt="I miei scambi" aria-label="I miei scambi" '
+           'onerror="this.replaceWith(this.alt)">' % URL)
+    # IL TITOLO RESTA UN TITOLO per chi legge con la voce: l'h2 prende
+    # il nome dall'alt. E se il file non arriva torna la PAROLA — lo
+    # stesso alt, quindi un nome solo
+    prova("...dentro un h2, con alt e aria-label, e la parola se non arriva",
+          True, ('<h2 class="scambi-tit">' + IMG + '</h2>') in testa)
+    _nav = mini[mini.index('id="nav-p2pmiei"'):]
+    _nav = _nav[:_nav.index("</button>")]
+    nome = _nav[_nav.rindex(">") + 1:]
+    prova("...e il nome e' quello della voce che ci porta, letto dal tasto",
+          True, nome == "I miei scambi"
+          and ('alt="%s" aria-label="%s"' % (nome, nome)) in testa)
+    prova("...con le misure del file, cosi' il posto e' tenuto da subito",
+          True, ('width="%d" height="%d"' % (larg, alt)) in testa)
+    prova("...e senza il logo P2P", False, "p2p-logo" in testa)
+    # UN div E NON UN p: dentro .sicu vale `.sicu p` (0,1,1), che veste
+    # ogni paragrafo da prosa e batte la classe — misurato dal vivo
+    prova("la riga del conto e' un div, vuota nel markup", True,
+          '<div class="scambi-conto" id="p2pMieiConto"></div>' in testa)
+
+    # --- 4) IL CSS: 120px contain, il velo di casa, niente effetti ---
+    img_css = pezzo_js(css, "  .scambi-img{", "}")
+    prova("l'immagine e' larga quanto la colonna, alta 120px, in proporzione",
+          [], [d for d in ("display:block", "width:100%", "height:120px",
+                           "object-fit:contain") if d not in img_css])
+    velo = pezzo_js(css, "  .scambi-testa{", "}")
+    prova("il velo e' il tenue di casa, tarato nei due temi", True,
+          "background:var(--sats-soft)" in velo
+          and len(re.findall(r"--sats-soft:#", css)) == 2)
+    # «EFFETTI RIDOTTI» NON HA NIENTE DA TOGLIERE: nessuna regola
+    # dell'intestazione anima, sfuma, sfoca o filtra — e dal vivo le
+    # misure con la classe accesa e spenta sono uguali al pixel
+    regole = [(m.group(1).strip(), m.group(2)) for m in
+              re.finditer(r"([^{}]*scambi-(?:testa|tit|img|conto|vuoto)"
+                          r"[^{}]*)\{([^}]*)\}", css)]
+    # il conto dice che il censimento qui sotto non e' cieco: una regola
+    # nuova dell'intestazione entra nel conto e nel controllo insieme
+    prova("le regole dell'intestazione sono nove", 9, len(regole))
+    prova("...e nessuna ha effetti che «effetti ridotti» dovrebbe spegnere",
+          [], [(sel, d) for sel, c in regole
+               for d in ("animation", "transition", "filter", "box-shadow",
+                         "opacity") if d in c])
+    prova("...ne' un ritocco suo sotto la classe", 0,
+          len(re.findall(r"html\.fx-ridotti[^{]*scambi-", css)))
+    conto = pezzo_js(css, "  .scambi-conto{", "}")
+    prova("la riga del conto e' piccola", True,
+          "font-size:13px" in conto and "color:var(--ink-soft)" in conto)
+
+    def _lum(h):
+        c = [int(h[k:k + 2], 16) / 255 for k in (1, 3, 5)]
+        c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4
+             for x in c]
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+    def _contrasto(a, b):
+        la, lb = sorted((_lum(a), _lum(b)), reverse=True)
+        return (la + 0.05) / (lb + 0.05)
+    # ...E LEGGIBILE SUL VELO, di giorno e di sera: `--ink-soft` e non
+    # `--muted`, che di giorno sul pesca scende a 3,3:1
+    _ink = re.findall(r"--ink-soft:(#[0-9A-Fa-f]{6})", css)[:2]
+    _velo = re.findall(r"--sats-soft:(#[0-9A-Fa-f]{6})", css)[:2]
+    prova("...e sul velo passa il 4,5:1 del testo piccolo, nei due temi",
+          [True, True], [_contrasto(a, b) >= 4.5 for a, b in zip(_ink, _velo)])
+    prova("...vuota si toglie, e «tocca a te» prende l'arancio del pallino",
+          True, ".scambi-conto:empty{display:none}" in css
+          and ".scambi-conto b{color:var(--sats-text)" in css)
+    prova("l'intestazione nascosta sparisce davvero", True,
+          ".scambi-testa[hidden]{display:none}" in css)
+    prova("senza scambi l'immagine e' piu' grande, sullo stesso velo", True,
+          "  .scambi-vuoto .scambi-img{height:160px" in css
+          and ".empty.scambi-vuoto{background:var(--sats-soft)" in css)
+    # LA RIGA DI STRUMENTI TIENE L'ARIA DENTRO IL BLOCCO: senza cappello
+    # il suo margine collasserebbe fuori, e da attaccata starebbe
+    # incollata al bordo — misurato dal vivo: 13px sopra, dipinti
+    prova("la riga di strumenti tiene i suoi tredici dentro il blocco", True,
+          "  #view-p2pmiei .p2p-sticky{display:flow-root}" in css)
+
+    # --- 5) IL GIUDICE: quello del pallino e del foglio del filtro ---
+    cf = nudo(pezzo_js(mini, "function contoScambiP2P(righe){", "\n}\n"))
+    prova("il conto chiede a gruppoScambioP2P e a quantiToccaAMeP2P", True,
+          "gruppoScambioP2P(o) === 'corso'" in cf
+          and "quantiToccaAMeP2P(r)" in cf)
+    prova("...e non ha una lista di stati sua", [],
+          re.findall(r"'[a-z_-]+'", cf.replace("'corso'", "")))
+    prova("...lo stesso giudice con cui il foglio del filtro conta i gruppi",
+          True, "gruppoScambioP2P(o) === k" in
+          pezzo_js(mini, "function renderFiltroMieiP2P(){", "\n}\n"))
+    prova("...e i due nomi della riga sono quelli dei gruppi", True,
+          "{k: 'fare', n: 'Tocca a te'}" in mini
+          and "{k: 'corso', n: 'In corso'}" in mini)
+    fr = nudo(pezzo_js(mini, "function fraseContoScambiP2P(c){", "\n}\n"))
+    prova("la frase dice «in corso» e «tocca a te», col punto in mezzo",
+          True, "' in corso · '" in fr and "' tocca a te'" in fr)
+
+    # --- 6) IL GANCIO: renderP2P, e dopo il corpo --------------------
+    rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
+    rpn = nudo(rp)
+    prova("prima del libro l'immagine resta e il conto aspetta", True,
+          0 < rpn.find("if (mieiTesta) mieiTesta.innerHTML = '';")
+          < rpn.find("intestaScambiP2P(null);")
+          < rpn.find("caricaLibroP2P().then(renderP2P, renderP2P)"))
+    prova("...e col libro il conto si scrive DOPO il corpo dei miei", True,
+          0 < rpn.find("mieiBox.innerHTML = scambiP2P()")
+          < rpn.find("intestaScambiP2P(mieiRigheP2P());"))
+    prova("...e ogni evento, con la vista aperta, ridisegna", True,
+          "|| vistaP2P.id === 'view-p2pmiei')) renderP2P();" in mini)
+    ist = nudo(pezzo_js(mini, "function intestaScambiP2P(righe){", "\n}\n"))
+    prova("l'intestazione non chiede niente a nessuno", [],
+          [x for x in ("setInterval", "setTimeout", "fetch(", "subscribe(",
+                       "localStorage", "risvegliaP2P") if x in ist])
+
+    # --- 7) LO STATO VUOTO: l'intestazione in grande -----------------
+    # find e non index: se un ritocco toglie il gancio, la rossa giusta
+    # e' quella qui sopra — un'eccezione qui fermerebbe tutta la sezione,
+    # banco compreso (l'ha mostrato la tortura)
+    _da = max(rp.find("if (mieiBox) mieiBox.innerHTML = scambiP2P()"), 0)
+    _a = rp.find("intestaScambiP2P(mieiRigheP2P());", _da)
+    vuoto = rp[_da:(_a if _a > _da else len(rp))]
+    prova("senza scambi: le monete in grande, sul velo", True,
+          """'<div class="empty scambi-vuoto"><h2 class="scambi-tit">'"""
+          in vuoto and ('src="%s"' % URL) in vuoto
+          and 'alt="I miei scambi" aria-label="I miei scambi"' in vuoto)
+    prova("...«Nessuno scambio in corso»", True,
+          '<span class="empty-title">Nessuno scambio in corso</span>' in vuoto)
+    prova("...e il bottone per il libro, lo stesso gesto della voce della nav",
+          True, r"""onclick="go(\'p2p\')">Vai al libro ordini</button>"""
+          in vuoto
+          and '<button id="nav-p2plibro" class="strato-p2p" '
+              "onclick=\"go('p2p')\"" in mini)
+    prova("...niente logo P2P e niente invito al +", [False, False],
+          ["p2p-logo" in vuoto, "＋" in vuoto])
+
+    # --- 8) IL TIMBRO: come i disegni del tour, e mai incorporata ----
+    i = _SORGENTE.index("_ASSET_HASH_CACHE: dict = {}")
+    amb = {"os": _os, "re": re, "hashlib": _hl}
+    exec(_SORGENTE[i:_SORGENTE.index("def _spezza_pagina")], amb)
+    timbrata = amb["_timbra_asset_pagina"](mini.encode("utf-8"))
+    firma = ("%s?v=%s" % (URL, _hl.sha1(raw).hexdigest()[:10])).encode()
+    prova("i due posti che la mostrano escono timbrati col suo hash", 2,
+          timbrata.count(firma))
+    prova("...e la pagina non la incorpora: niente base64", 0,
+          mini.count("data:image/webp"))
+
+    # --- 9) IL BANCO: il giudice vero, la frase vera, l'intestazione --
+    node = _sh.which("node")
+    if not node:
+        salta("il banco dell'intestazione", "node non c'e'")
+        return
+    pezzi_js = [pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
+        "function recapitoEuroArrivatoP2P(o){",
+        "function azioniDisponibili(o){",
+        "function gruppoScambioP2P(o){",
+        "function quantiToccaAMeP2P(righe){",
+        "function contoScambiP2P(righe){",
+        "function fraseContoScambiP2P(c){",
+        "function intestaScambiP2P(righe){")]
+    banco = "\n".join(pezzi_js) + r"""
+/* il cartone: le due scatole dell'intestazione */
+const scatola = () => ({hidden: false, innerHTML: ''});
+let dom = {};
+const el = id => dom[id] || null;
+let p2pOrdineAperto = '', p2pHoldOrdine = '', p2pIncassoOrdine = '';
+function reset(){ dom = {p2pMieiIntesta: scatola(), p2pMieiConto: scatola()}; }
+const vista = () => ({nascosta: dom.p2pMieiIntesta.hidden,
+                      conto: dom.p2pMieiConto.innerHTML});
+const RECAPITO = {euro: {id: 'r1', testo: 'IBAN'}};
+/* una riga per gruppo, e i gruppi li dice il giudice, non il banco */
+const R = {
+  mia: {id: 'a', lato: 'vendo', stato: 'attesa_mia_hold'},
+  euroMiei: {id: 'b', lato: 'vendo', stato: 'euro_inviati'},
+  altro: {id: 'c', lato: 'compro', stato: 'attesa_hold_venditore'},
+  aspettoEuro: {id: 'd', lato: 'vendo', stato: 'attivo', peer: 'p', campiMiei: RECAPITO},
+  euroPartiti: {id: 'e', lato: 'compro', stato: 'euro_inviati'},
+  libro: {id: 'f', lato: 'vendo', stato: 'pubblicato'},
+  fatto: {id: 'g', lato: 'compro', stato: 'concluso'},
+  morto: {id: 'h', lato: 'vendo', stato: 'annullato'}
+};
+const tutte = () => Object.keys(R).map(k => R[k]);
+/* OGNI CASO E' SOLO: il suo reset, il suo try (la lezione della tortura) */
+const CASI = {
+  primaDelLibro: () => { intestaScambiP2P(null); return vista(); },
+  nessuno: () => { intestaScambiP2P([]); return vista(); },
+  toccaAMe: () => { intestaScambiP2P([R.mia]); return vista(); },
+  inCorso: () => { intestaScambiP2P([R.altro]); return vista(); },
+  misti: () => { intestaScambiP2P(tutte()); return [vista(), contoScambiP2P(tutte())]; },
+  /* la riga del foglio del filtro, cosi' com'e' in renderFiltroMieiP2P */
+  comeIlFiltro: () => {
+    const righe = tutte();
+    const quanti = k => righe.filter(o => gruppoScambioP2P(o) === k).length;
+    const c = contoScambiP2P(righe);
+    return [c.corso, quanti('corso'), c.fare, quanti('fare')];
+  },
+  comeIlPallino: () => [contoScambiP2P(tutte()).fare, quantiToccaAMeP2P(tutte())],
+  /* i gruppi sono una partizione: nessuno scambio contato due volte */
+  partizione: () => {
+    const g = {};
+    tutte().forEach(o => { const k = gruppoScambioP2P(o); g[k] = (g[k] || 0) + 1; });
+    return g;
+  },
+  soloFiniti: () => { intestaScambiP2P([R.fatto, R.morto]); return vista(); },
+  soloNelLibro: () => { intestaScambiP2P([R.libro]); return vista(); },
+  /* i passaggi: vuoto -> uno mio -> il libro che si rilegge */
+  passaggi: () => {
+    const esiti = [];
+    intestaScambiP2P([]); esiti.push(vista());
+    intestaScambiP2P([R.mia]); esiti.push(vista());
+    intestaScambiP2P(null); esiti.push(vista());
+    intestaScambiP2P([R.mia, R.euroMiei, R.altro]); esiti.push(vista());
+    return esiti;
+  },
+  /* dentro ci vanno solo cifre: niente di quel che una riga si porta */
+  soloCifre: () => {
+    const brutta = Object.assign({}, R.mia, {peer: '<img src=x onerror=alert(1)>',
+                                             nome: '<b>x</b>', euro: '<i>9</i>'});
+    intestaScambiP2P([brutta, R.altro]);
+    return vista().conto;
+  },
+  /* senza le scatole (un'altra pagina, un DOM a meta') non esplode */
+  senzaScatole: () => { dom = {}; intestaScambiP2P([R.mia]); return 'intera'; }
+};
+const out = {};
+for (const k of Object.keys(CASI)) {
+  reset();
+  try { out[k] = CASI[k](); }
+  catch(e) { out[k] = 'ESPLOSO: ' + (e && e.message || e); }
+}
+console.log(JSON.stringify(out));
+"""
+    cart = _tf.mkdtemp()
+    p = _os.path.join(cart, "banco.js")
+    open(p, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, p], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco node dell'intestazione gira", "", (r.stderr or "")[-600:])
+    if r.returncode:
+        return
+    o = _json.loads(r.stdout)
+    SI = "<b>%d tocca a te</b>"
+    prova("prima del libro: l'immagine resta, il conto aspetta",
+          {"nascosta": False, "conto": ""}, o["primaDelLibro"])
+    prova("nessuno scambio: l'intestazione piccola si toglie",
+          {"nascosta": True, "conto": ""}, o["nessuno"])
+    prova("tocca a me: «tocca a te» si accende d'arancio",
+          {"nascosta": False, "conto": "0 in corso · " + SI % 1}, o["toccaAMe"])
+    prova("tocca all'altro: in corso, e niente arancio",
+          {"nascosta": False, "conto": "1 in corso · 0 tocca a te"}, o["inCorso"])
+    prova("righe miste: contano solo i due gruppi, uno per scambio",
+          [{"nascosta": False, "conto": "3 in corso · " + SI % 2},
+           {"corso": 3, "fare": 2}], o["misti"])
+    prova("i numeri sono quelli del foglio del filtro", [3, 3, 2, 2],
+          o["comeIlFiltro"])
+    prova("...e «tocca a te» e' il numero del pallino", [2, 2],
+          o["comeIlPallino"])
+    prova("i gruppi sono una partizione: otto righe, otto posti",
+          {"fare": 2, "corso": 3, "libro": 1, "fatti": 1, "morti": 1},
+          o["partizione"])
+    prova("solo scambi finiti: l'intestazione resta, coi suoi zeri",
+          {"nascosta": False, "conto": "0 in corso · 0 tocca a te"},
+          o["soloFiniti"])
+    prova("solo un ordine nel libro: nessuno scambio in corso",
+          {"nascosta": False, "conto": "0 in corso · 0 tocca a te"},
+          o["soloNelLibro"])
+    prova("i passaggi: vuoto, uno mio, il libro che si rilegge, tre",
+          [{"nascosta": True, "conto": ""},
+           {"nascosta": False, "conto": "0 in corso · " + SI % 1},
+           {"nascosta": False, "conto": ""},
+           {"nascosta": False, "conto": "1 in corso · " + SI % 2}],
+          o["passaggi"])
+    prova("dentro la riga ci sono solo cifre", "1 in corso · " + SI % 1,
+          o["soloCifre"])
+    prova("senza le scatole non esplode", "intera", o["senzaScatole"])
 
 
 def prove_p2p_campanello():
@@ -77287,6 +77678,7 @@ def main():
     prove_p2p_card_scambio,
     prove_p2p_vista_miei,
     prove_pallino_scambi,
+    prove_intestazione_scambi,
     prove_p2p_campanello,
     prove_p2p_eventi, prove_p2p_riserva_libro,
     prove_p2p_avvisi_libro, prove_p2p_orologio, prove_p2p_tutti_i_relay, prove_p2p_ascolto, prove_p2p_esito_notifiche, prove_p2p_silenzi,

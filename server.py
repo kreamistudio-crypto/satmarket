@@ -55107,6 +55107,26 @@ def asset_barattozon_scuro():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
+@app.get("/assets/scambi-intestazione.webp")
+def asset_scambi_intestazione():
+    """L'INTESTAZIONE DI «I MIEI SCAMBI» (22 set 2026, scelta di Andrea):
+    le due monete che si scambiano di posto, bitcoin e un euro, nello
+    stile del logo P2P. Prende il posto del titolo scritto della
+    pagina — il nome resta nell'alt — e, piu' grande, fa lo stato vuoto.
+    WebP con trasparenza ritagliato sull'alpha dal PNG di Andrea:
+    682x459 (3,8 volte i 120px a schermo, bordi netti anche a 3x),
+    qualita' 80, 46 KB, niente ICC ne' EXIF. SERVITO COME FILE e non
+    incorporato in miniapp.html, la ragione del tour: in base64
+    peserebbe un terzo in piu' su una pagina che si riscarica a ogni
+    apertura. Cartella assets/ e mai assets/categorie/, che
+    ritaglia_categorie.py percorre col glob. Rotta esplicita come le
+    sorelle: mai un mount (regola 3). Il timbro ?v= lo mette
+    _timbra_asset_pagina, quindi il max-age e' innocuo."""
+    return FileResponse("assets/scambi-intestazione.webp",
+                        media_type="image/webp",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/assets/tappo.jpeg")
 def asset_tappo():
     """Il tappo del barattolo (128px, ritagliato sul diametro): e' il
