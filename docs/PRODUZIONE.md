@@ -385,9 +385,9 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `nodo-tor.timer` (09:20 UTC, Persistent), copie in `deploy/nodo/`.
   Tre giudici dal namespace di mostro: la curl a check.torproject.org
   (allarme su codice diverso da 200 o `IsTor` non true — il secondo e'
-  il caso peggiore, esce in chiaro), i namespace di tor e del sidecar
-  che devono coincidere finche' un sidecar esiste (oggi nessuno: il
-  giudice si spegne da solo), e il DROP del FORWARD nel namespace vivo
+  il caso peggiore, esce in chiaro), MOSTRO DENTRO MOSTRO-NET (dal 22
+  set 2026 al posto del giudice del sidecar, che non tornera'), e il
+  DROP del FORWARD nel namespace vivo
   di tor, letto con l'iptables DI TOR via `docker exec` (ripiego nsenter
   + iptables dell'host; senza, «non misurato»). Usa `curlimages/curl`
   con `--pull never`: e' gia' sul nodo dal 15 set e la ronda non deve
@@ -395,6 +395,44 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   scp dei tre file, `sha256sum` da confrontare, poi
   `sudo install -m 755 ronda-tor.sh /usr/local/bin/ && sudo cp nodo-tor.service nodo-tor.timer /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now nodo-tor.timer && sudo /usr/local/bin/ronda-tor.sh --prova`.
   Il messaggio finisce con `--- fine ronda tor`, come le altre.
+- MOSTRO DENTRO MOSTRO-NET, IL SECONDO GIUDICE DI `ronda-tor.sh` (22 set
+  2026). Le REDIRECT e il DROP di `tor-entrypoint.sh` valgono per
+  `172.28.1.5` e basta: un mostro ricreato FUORI dal namespace di
+  `mostro-net` uscirebbe da un'altra strada, e la superficie non lo
+  vede. Forma fissa, niente baseline: a) `nodo-mostro-1` e
+  `nodo-mostro-net-1` hanno lo stesso inode di `/proc/<pid>/ns/net`
+  (se no, `NetworkMode` dice quale guasto: `container:<id di mostro-net>`
+  = ORFANO di un restart di mostro-net, cura `up -d --force-recreate
+  mostro`; altro = FUORI, il compose e' cambiato); b) mostro vede su di
+  se' `172.28.1.5`; c) il `default via` di mostro-net e' un IP di
+  `nodo-tor-1` (letto da `docker inspect`, non scritto a mano). Mostro
+  FERMO si dice «FERMO» e salta curl e namespace; mostro-net fermo con
+  mostro vivo ha il suo allarme. I tre pezzi a mano, se un allarme va
+  guardato:
+  `for c in nodo-mostro-net-1 nodo-mostro-1; do printf '%-20s ' $c; sudo readlink /proc/$(docker inspect -f '{{.State.Pid}}' $c)/ns/net; done`
+  `sudo nsenter -t $(docker inspect -f '{{.State.Pid}}' nodo-mostro-1) -n ip -4 -o addr show`
+  `sudo nsenter -t $(docker inspect -f '{{.State.Pid}}' nodo-mostro-net-1) -n ip -4 route show default`
+  `docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' nodo-tor-1`.
+  INSTALLAZIONE (le unit non cambiano). Dal PC, in PowerShell — `cmd /c`
+  conta: il `>` di PowerShell 5.1 riscrive i byte in UTF-16 e lo
+  script non parte:
+  `git -C C:\Users\Andrea\Documents\GitHub\satmarket fetch origin`
+  `cmd /c "git -C C:\Users\Andrea\Documents\GitHub\satmarket show origin/main:deploy/nodo/ronda-tor.sh > %TEMP%\ronda-tor.sh"`
+  `(Get-FileHash $env:TEMP\ronda-tor.sh).Hash.ToLower()`
+  `scp -i $env:USERPROFILE\.ssh\lnvps $env:TEMP\ronda-tor.sh debian@vm-1937.lnvps.cloud:/tmp/`
+  Poi SUL NODO: `sed -i 's/\r$//' /tmp/ronda-tor.sh && sha256sum /tmp/ronda-tor.sh`
+  (stesse cifre del PC: `git show` da' i byte del repo, gia' LF, e il
+  `sed` e' la cintura), `bash -n /tmp/ronda-tor.sh && echo sintassi ok`,
+  `sudo cp /usr/local/bin/ronda-tor.sh /root/ronda-tor.sh.prima-22set`,
+  `sudo install -m 755 /tmp/ronda-tor.sh /usr/local/bin/` e il primo
+  giro `sudo /usr/local/bin/ronda-tor.sh --prova`: deve dire
+  `PROVA tor: esce da Tor (<un exit>);mostro nel namespace di mostro-net;IP 172.28.1.5;gateway 172.28.1.3 = tor;DROP del FORWARD al suo posto`
+  e lo stesso arriva su Telegram, chiuso da `--- fine ronda tor`. Poi
+  `sudo /usr/local/bin/ronda-tor.sh` senza `--prova`: `tor ok  ...` e
+  Telegram muto. Un ALLARME al primo giro non si zittisce: o e' vero, o
+  la ronda legge male l'`ip` vero (provata su un banco finto) — si
+  guarda coi quattro comandi qui sopra. Ritorno indietro:
+  `sudo install -m 755 /root/ronda-tor.sh.prima-22set /usr/local/bin/ronda-tor.sh`.
 - LA QUARTA DOMANDA, LA SUPERFICIE: `ronda-superficie.sh`, copia in
   `deploy/nodo/` dal 22 set 2026 (prima viveva solo sul nodo). Foto di
   quel che ascolta fuori dal loopback, dei DNAT di Docker e delle regole
