@@ -34031,8 +34031,11 @@ def prove_fogli_di_casa():
     # (CINQUANTANOVE) se n'e' andato con il secondo campo dell'importo
     # del tabacchino — con una cifra sola, coi centesimi, non c'e' piu'
     # niente da confrontare
-    prova("i gesti che passano dalla domanda unica sono sessantaquattro",
-          64, solo_codice(mini).count("chiediConferma({"))
+    # ...E PIU' UNO dal 23 set 2026, il SESSANTASEIESIMO: il riepilogo del
+    # PayCode nel percorso Barattozon — «Il tuo PayCode, in breve», che
+    # si rilegge PRIMA di pubblicare, e il cui si' richiama il gesto
+    prova("i gesti che passano dalla domanda unica sono sessantacinque",
+          65, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -48472,9 +48475,12 @@ def prove_nav_p2p():
     # il gemello del bottone del mercatino. Il divieto NON era sulle
     # emoji in generale: era sul MARCHIO dello scambio, che arancio su
     # arancio diventava una macchia — e quello vale ancora.
+    # (23 set 2026) col percorso Barattozon il bottone ha DUE etichette
+    # — «Rileggi e pubblica» col tabacchino, perche' prima c'e' il
+    # riepilogo — e il divieto del marchio vale per tutt'e due
     prova("...e il bottone che pubblica non porta il marchio", True,
-          '\'onclick="inviaNuovoOrdineP2P()">⚡ Pubblica ordine</button>\''
-          in mini
+          '\'onclick="inviaNuovoOrdineP2P()">\' +' in mini
+          and "(tab ? '🧾 Rileggi e pubblica' : '⚡ Pubblica ordine') + '</button>'" in mini
           and "🔁 Pubblica" not in mini
           and "🔁 Invia" not in mini)
     # e la seconda uscita non c'e' piu': dal foglio a pieno schermo si
@@ -54244,7 +54250,7 @@ def prove_p2p_pubblica():
     «al prezzo di mercato» invece di una cifra che invecchierebbe."""
     print("\n[pubblicare un ordine]")
     mini = open("miniapp.html", encoding="utf-8").read()
-    invia = pezzo_js(mini, "async function inviaNuovoOrdineP2P(){", "\n}\n")
+    invia = pezzo_js(mini, "async function inviaNuovoOrdineP2P(confermato){", "\n}\n")
     applica = pezzo_js(mini, "function applicaMessaggioP2P(ord, dentro){",
                        "\n}\n")
     rinomina = pezzo_js(mini, "function rinominaOrdineP2P(o, nuovoId){",
@@ -54411,8 +54417,10 @@ def prove_p2p_pubblica():
     # L'ORDINE DELLE SCATOLE STA IN UNA SENTINELLA SOLA, e dice tre
     # cose insieme: quali sono, in che ordine, e che sotto l'ultima
     # c'e' soltanto il bottone.
+    # (23 set 2026) la scatola dello scontrino e' diventata il PERCORSO
+    # Barattozon, nello stesso posto: dopo i metodi, prima del prezzo
     prova("l'ordine delle scatole, e il bottone sotto l'ultima", True,
-          "valuta + importo + metodi + scontrino + tipo + quanti + premio"
+          "valuta + importo + metodi + percorso + tipo + quanti + premio"
           " + riquadroLimitiP2P() + '<div class=\"foglio-piede sola\">'"
           in re.sub(r"\s+", " ", _foglio))
     _riq = pezzo_js(mini, "function riquadroLimitiP2P(){", "\n}\n")
@@ -54557,6 +54565,18 @@ def prove_p2p_pubblica():
         + "\n" + mini[mini.index("const P2P_VESTE_METODI = {"):
                        mini.index("\n};", mini.index("const P2P_VESTE_METODI = {")) + 3]
         + "\n" + _intera("function metodiPubblicabiliP2P(lato){")
+        # il percorso Barattozon (23 set 2026): PayCode, vita nel libro,
+        # sconto con la cifra decimale, e il passo in cui si sta
+        + "\n" + _intera("function payCodeP2P(testo){")
+        + "\n" + _intera("function vitaLibroTabacchinoP2P(scade, adesso){")
+        + "\n" + _intera("function scontoTabacchinoP2P(testo){")
+        + "\n" + _intera("function scontoTestoTabP2P(n){")
+        + "\n" + _intera("function scontoImplicitoTabacchinoP2P(euro, sats, cambio){")
+        + "\n" + _intera("function passoTabacchinoP2P(v){")
+        + "\n" + re.search(r"const P2P_PAYCODE_MIN_S = [^\n]*;", mini).group(0)
+        + "\n" + re.search(r"const P2P_PAYCODE_MAX_S = [^\n]*;", mini).group(0)
+        + "\n" + re.search(r"const P2P_TABACCHINO_MARGINE_S = [^\n]*;", mini).group(0)
+        + "\n" + re.search(r"const P2P_SCONTO_TAB_MAX = [^\n]*;", mini).group(0)
         # il tempo dei due lati (set 2026): il giudice unico della
         # scadenza, le fasce, il riquadro, l'avviso alla presa
         + "\n" + _intera("function scadenzaTabacchinoOrdineP2P(o){")
@@ -54691,7 +54711,7 @@ def prove_p2p_pubblica():
         "    const ok = {euro: '23,47', euroMax: '', sats: '', fisso: false, metodi: [P2P_TABACCHINO],\n"
         "      maxSats: 100000, minSats: 100, lato: 'vendo', finestra: fin, adesso: ora,\n"
         "      premio: 0, cambio: 0.0005,\n"
-        "      tab: {ordine: '123-4567890-1234567', scade: campoDaScadeP2P(ora + 48 * 3600)}};\n"
+        "      tab: {ordine: '479868518', scade: campoDaScadeP2P(ora + 48 * 3600)}};\n"
         "    const con = (agg) => valeNuovoOrdineP2P(Object.assign({}, ok, agg));\n"
         "    const tab = (agg) => Object.assign({}, ok.tab, agg);\n"
         "    return {\n"
@@ -54708,8 +54728,16 @@ def prove_p2p_pubblica():
         "      scade: con({tab: tab({scade: ''})}).manca,\n"
         "      passata: con({tab: tab({scade: campoDaScadeP2P(ora - 60)})}).manca,\n"
         "      senzaInfo: con({finestra: 0}).manca,\n"
+        # dal 23 set 2026 il PayCode vale al massimo 72 ore: oltre le
+        # 92 della garanzia si ferma PRIMA, sulle 72; la garanzia parla
+        # solo quando e' lei la piu' stretta
         "      lontana: con({tab: tab({scade: campoDaScadeP2P(ora + fin + 3600)})}).manca,\n"
-        "      alBordo: con({tab: tab({scade: campoDaScadeP2P(ora + fin - 60)})}).ok,\n"
+        "      lontanaGaranzia: con({finestra: 10 * 3600, tab: tab({scade: campoDaScadeP2P(ora + 20 * 3600)})}).manca,\n"
+        "      alBordo: con({tab: tab({scade: campoDaScadeP2P(ora + P2P_PAYCODE_MAX_S - 60)})}).ok,\n"
+        "      presto: con({tab: tab({scade: campoDaScadeP2P(ora + 1800)})}).manca,\n"
+        "      storto: con({tab: tab({ordine: '123-4567890-1234567'})}).manca,\n"
+        "      sconto: [con({sconto: '16'}).manca, con({sconto: '2,55'}).manca, con({sconto: '2,5'}).ok,\n"
+        "               con({sconto: ''}).ok, con({sconto: 'abc'}).campo, con({sconto: '15'}).ok],\n"
         "      campi: [con({lato: 'compro'}).campo, con({tab: tab({ordine: ''})}).campo,\n"
         "              con({euro: ''}).campo, con({tab: tab({scade: ''})}).campo,\n"
         "              con({cambio: 0}).campo],\n"
@@ -54806,7 +54834,7 @@ def prove_p2p_pubblica():
         # della data in andata e ritorno, e i silenzi del lettore
         "  tab: (() => {\n"
         "    const f = formaRecapito('Contanti al tabacchino');\n"
-        "    const t = f.componi({ordine: '123-4567890-1234567', importo: '100',\n"
+        "    const t = f.componi({ordine: '479-868-518', importo: '100',\n"
         "                         scade: '17/09/2026 alle 14:30'});\n"
         "    const atteso = Math.floor(new Date(2026, 8, 17, 14, 30).getTime() / 1000);\n"
         "    return {forma: f.forma, ricorda: f.ricorda, testo: t,\n"
@@ -54981,16 +55009,18 @@ def prove_p2p_pubblica():
         if _id == "p2pNuovoEuro":
             # DUE VESTI (22 set 2026): col tabacchino il campo ha i
             # centesimi — tastiera decimale e il filtro dei centesimi —,
-            # per tutti gli altri metodi resta quello di ieri
+            # per tutti gli altri metodi resta quello di ieri.
+            # DAL 23 SET 2026 L'ORDINE E' ROVESCIATO: la prima
+            # occorrenza e' la generica (la sezione dell'importo), la
+            # seconda sta nel passo 2 del percorso Barattozon
             _i2 = mini.index('id="%s"' % _id, _i + 1)
             _dopo2 = mini.find("<input", _i2)
             _tag2 = mini[_i2:min(_dopo2 if _dopo2 > 0 else len(mini), _i2 + 400)]
             prova("il campo p2pNuovoEuro col tabacchino: testo, decimale, filtro dei centesimi", True,
-                  'type="text"' in _tag and 'inputmode="decimal"' in _tag
-                  and 'onbeforeinput="soloCentesimiP2P(event)"' in _tag)
+                  'type="text"' in _tag2 and 'inputmode="decimal"' in _tag2
+                  and 'onbeforeinput="soloCentesimiP2P(event)"' in _tag2)
             prova("...e la seconda occorrenza e' la sola: non ce n'e' una terza", -1,
                   mini.find('id="p2pNuovoEuro"', _i2 + 1))
-            _tag = _tag2
         prova("il campo %s e' testo filtrato, non un number" % _id, True,
               'type="text"' in _tag and 'type="number"' not in _tag
               and 'inputmode="numeric"' in _tag
@@ -55055,11 +55085,26 @@ def prove_p2p_pubblica():
     # dal 22 set 2026 l'importo e' il campo dell'importo, coi centesimi:
     # vuoto o storto (tre decimali) si ferma li', con la frase sua
     prova("i tre dati sono obbligatori, ognuno col suo nome",
-          ["Scrivi il numero dell'ordine Amazon",
+          ["Scrivi il PayCode: 9 cifre, come 479-868-518",
            "Scrivi l'importo dell'ordine Amazon, coi centesimi se servono",
            "Scrivi l'importo dell'ordine Amazon, coi centesimi se servono",
-           "Scrivi quando scade l'ordine Amazon"],
+           "Scrivi quando scade il PayCode: data e ora sono sulla mail di Amazon"],
           [tv["ordine"], tv["importo"], tv["importoStorto"], tv["scade"]])
+    # IL PAYCODE HA NOVE CIFRE (23 set 2026): il numero d'ordine Amazon
+    # a 17 cifre e' STORTO, con la frase sua; la scadenza sta fra un'ora
+    # e 72 ore; lo sconto fra 0 e 15 con una cifra decimale
+    prova("un numero d'ordine Amazon non e' un PayCode, e la frase dice la forma",
+          "Il PayCode ha 9 cifre (479-868-518): controllalo sulla mail di Amazon", tv["storto"])
+    prova("una scadenza sotto l'ora non si pubblica",
+          "Scade troppo presto: serve almeno un'ora perché qualcuno vada al tabacchino", tv["presto"])
+    prova("...e oltre le 72 ore nemmeno, PRIMA della garanzia",
+          "Troppo lontana: un PayCode vale al massimo 72 ore", tv["lontana"])
+    prova("...la garanzia parla solo quando e' lei la piu' stretta",
+          "Troppo lontana: la garanzia copre al massimo 10 ore da adesso", tv["lontanaGaranzia"])
+    prova("lo sconto: 16 no, 2,55 no, 2,5 si', vuoto si' (zero), storto col suo campo, 15 al bordo si'",
+          ["Lo sconto va da 0 a 15%, con una cifra decimale al massimo",
+           "Lo sconto va da 0 a 15%, con una cifra decimale al massimo",
+           True, True, "p2pNuovoSconto", True], tv["sconto"])
     # I SATS SONO NOSTRI: senza cambio vivo non si pubblica, e i due
     # tetti del coordinatore si guardano sul campo dell'importo
     prova("senza cambio vivo il tabacchino aspetta",
@@ -55068,15 +55113,13 @@ def prove_p2p_pubblica():
           [["Troppi: il massimo è 10000 sats", "p2pNuovoEuro"], "Troppo pochi: il minimo è 50000 sats"],
           [tv["troppiSats"], tv["pochiSats"]])
     prova("una scadenza passata non si pubblica",
-          "La scadenza è già passata: serve un ordine Amazon nuovo", tv["passata"])
+          "La scadenza è già passata: serve un PayCode nuovo", tv["passata"])
     # SENZA 38385 NON SI SA quanto copre la garanzia, e il tabacchino
     # e' l'unico metodo in cui un numero ignoto puo' costare i sats:
     # aspetta, invece di cappare su un numero cablato
     prova("senza 38385 il tabacchino aspetta: la finestra non si inventa",
           "Aspetta un attimo: sto leggendo quanto dura la garanzia", tv["senzaInfo"])
-    prova("oltre la finestra letta viva non si pubblica, e la frase dice le ore",
-          "Troppo lontana: la garanzia copre al massimo 92 ore da adesso", tv["lontana"])
-    prova("...e un minuto sotto il bordo passa", True, tv["alBordo"])
+    prova("...e un minuto sotto il bordo delle 72 ore passa", True, tv["alBordo"])
     prova("ogni «manca» del tabacchino si porta il suo campo",
           ["p2pNuovoMetodiBtn", "p2pNuovoTabOrdine", "p2pNuovoEuro", "p2pNuovoTabScade",
            "p2pNuovoEuro"],
@@ -55087,13 +55130,13 @@ def prove_p2p_pubblica():
     # `fiat_amount` e' l'intero piu' vicino (il protocollo e' i64),
     # l'esatto sta nel metodo col punto, i sats sono FISSI al cambio
     # vivo (23,47 / 0.0005 = 46940) col premio a zero — il coordinatore
-    # rifiuta amount e premium insieme —, e nel libro resta 24 ore
-    # anche se l'ordine Amazon ne vale 48
-    prova("sul filo: intero arrotondato, sats esatti, l'importo nel metodo, 24 ore",
+    # rifiuta amount e premium insieme —, e nel libro resta fino al
+    # PayCode MENO DUE ORE (23 set 2026: 48 ore di PayCode = 46 nel libro)
+    prova("sul filo: intero arrotondato, sats esatti, l'importo nel metodo, il PayCode meno due ore",
           {"kind": "sell", "status": "pending", "amount": 46940, "fiat_code": "EUR",
            "min_amount": None, "max_amount": None, "fiat_amount": 23,
            "payment_method": "Contanti al tabacchino 23.47", "premium": 0,
-           "created_at": 0, "expires_at": 1800000000 + 24 * 3600},
+           "created_at": 0, "expires_at": 1800000000 + 46 * 3600},
           tv["payload"])
     # ...e sul filo `premium` resta ZERO: amount e premium insieme il
     # coordinatore li rifiuta (`check_zero_amount_with_premium`)
@@ -55104,7 +55147,9 @@ def prove_p2p_pubblica():
           [24, "Contanti al tabacchino 23.50"], tv["mezzo"])
     prova("...un importo tondo viaggia con due decimali lo stesso",
           [25, 50000, "Contanti al tabacchino 25.00"], tv["intero"])
-    prova("...e una scadenza Amazon piu' vicina delle 24 ore vince lei", 7200, tv["vicina"])
+    # un PayCode da due ore sta nel libro UN'ora: il margine si stringe
+    # a meta' del tempo che resta, mai «meno due ore» che sarebbe passato
+    prova("...e su un PayCode da due ore il margine si stringe a meta'", 3600, tv["vicina"])
     prova("...la leva del prezzo girata prima non conta: i sats sono quelli dell'importo",
           46940, tv["levaIgnorata"])
     prova("il «Riprova» da una riga col numero nel metodo non lo raddoppia", True,
@@ -55174,14 +55219,14 @@ def prove_p2p_pubblica():
     prova("le fasce: niente, vicina a sei ore, ultima a una, scaduta a zero",
           ["", "", "vicina", "ultima", "scaduta"], tt["fasce"])
     prova("il riquadro prevale solo in garanzia, con le tre frasi del tempo",
-          ["L'ordine Amazon è scaduto", "L'ordine Amazon scade fra meno di un'ora",
-           "L'ordine Amazon scade fra meno di sei ore", None, None, None], tt["stato"])
+          ["Il PayCode è scaduto", "Il PayCode scade fra meno di un'ora",
+           "Il PayCode scade fra meno di sei ore", None, None, None], tt["stato"])
     prova("l'avviso alla presa: sotto le sei ore, sotto l'ora, e a ordine scaduto — mai altrove",
           [True, True, "", "", True], tt["presa"])
     # le cuciture che il banco puro non vede
     _ro = pezzo_js(mini, "function renderOrdineP2P(){", "\n}\n")
     prova("nella pagina dello scambio il tempo prevale sul passo, con l'anello", True,
-          "statoTabacchinoP2P(o) || statoTestoP2P(o)" in _ro
+          "statoTabacchinoP2P(o) || statoPayCodeP2P(o) || statoTestoP2P(o)" in _ro
           and "anelloneTabacchinoP2P(o) +" in _ro
           and "SECONDARI_EVIDENZA_P2P[a]" in _ro)
     prova("...e l'annullo in evidenza e' lo stesso gesto, vestito d'arancio", True,
@@ -55292,8 +55337,8 @@ def prove_p2p_pubblica():
     prova("...e sta PRIMA dei contanti nella lista, o perderebbe", True,
           mini.index("{forma: 'tabacchino',") < mini.index("{forma: 'contanti',"))
     prova("...e non si ricorda: ogni ordine Amazon e' nuovo", False, tab["ricorda"])
-    prova("il testo composto ha le quattro righe fisse",
-          "Contanti al tabacchino\nNumero ordine: 123-4567890-1234567\n"
+    prova("il testo composto ha le quattro righe fisse, col PayCode",
+          "Contanti al tabacchino\nPayCode: 479-868-518\n"
           "Importo: 100 \u20ac\nScade: 17/09/2026 alle 14:30", tab["testo"])
     prova("la data va e torna: quel che la gemella scrive l'altra legge",
           [True, "17/09/2026 alle 14:30"], [tab["ritorno"], tab["andata"]])
@@ -55526,8 +55571,10 @@ def prove_p2p_pubblica():
     _sez = nuovo[:nuovo.index("    /* IL PIEDE HA UNA SOLA USCITA")]
     prova("...e nessuna emoji e' rimasta al posto loro", False,
           any(e in _sez for e in ("💶", "💳", "💲", "⚡", "🏳️")))
+    # (23 set 2026) l'etichetta e' un ternario — col tabacchino dice
+    # «Rileggi e pubblica» — e il ⚡ resta UNO, sul bottone
     prova("...e il ⚡ che arriva a schermo e' solo quello del bottone",
-          1, nuovo.count('">⚡ Pubblica ordine</button>'))
+          1, nuovo.count("'⚡ Pubblica ordine'"))
     prova("...e vestono come quelle della nav", True,
           'class="p2p-ico" viewBox="2 2 20 20"'
           in pezzo_js(mini, "function icoNuovoP2P(nome){", "\n}\n")
@@ -56173,7 +56220,7 @@ def prove_p2p_pubblica():
     #    vedere. La ragione e' che un bottone spento non dice MAI cosa
     #    si deve fare — dice solo cosa non si puo' fare, e a chi non ha
     #    chiesto niente.
-    invia = pezzo_js(mini, "async function inviaNuovoOrdineP2P(){", "\n}\n")
+    invia = pezzo_js(mini, "async function inviaNuovoOrdineP2P(confermato){", "\n}\n")
     avvisa = pezzo_js(mini, "function avvisaMancaP2P(g){", "\n}\n")
     prova("il bottone che pubblica non si spegne mai", True,
           "disabled" not in
@@ -56461,7 +56508,7 @@ def prove_p2p_velo_pubblica():
     import subprocess as _sp
     import tempfile as _tf
     mini = open("miniapp.html", encoding="utf-8").read()
-    invia = pezzo_js(mini, "async function inviaNuovoOrdineP2P(){", "\n}\n")
+    invia = pezzo_js(mini, "async function inviaNuovoOrdineP2P(confermato){", "\n}\n")
     nudo = re.sub(r"/\*[\s\S]*?\*/", "", invia)
 
     # --- 1) LE RIGHE ---------------------------------------------------
@@ -56506,7 +56553,7 @@ function haptic(){}
 let p2pNuovoTabConfermato = false, p2pLato = 'vendo', p2pNuovoMetodi = ['SEPA'],
     p2pNuovoPremio = 0, p2pOrdineAperto = '';
 const P2P_TABACCHINO = 'Contanti al tabacchino', CAMPO_MAX_TESTO = 300;
-function campiNuovoP2P(){ return {euro: '10', euroMax: '', sats: '', fisso: false, scade: 0, tab: {}}; }
+function campiNuovoP2P(){ return {euro: '10', euroMax: '', sats: '', fisso: false, scade: 0, tab: {}, metodi: ['SEPA']}; }
 function valeNuovoOrdineP2P(){ return {ok: true}; }
 function avvisaMancaP2P(){}
 function interoP2P(v){ return {n: parseInt(v, 10) || 0}; }
@@ -56564,9 +56611,10 @@ async function giro(modo){
 """
     pezzi = "\n".join(pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
         "function bottoneInAttesa(btn, testo){", "function attesaP2P(testo, btn){",
-        "function spuntaAttesaP2P(testo, ms){", "async function inviaNuovoOrdineP2P(){",
-        # il prefisso del metodo, che il canale usa (22 set 2026)
-        "function metodoBaseP2P(m){"))
+        "function spuntaAttesaP2P(testo, ms){", "async function inviaNuovoOrdineP2P(confermato){",
+        # il prefisso del metodo, che il canale usa (22 set 2026), e il
+        # giudice che decide se c'e' il riepilogo da rileggere (23 set)
+        "function metodoBaseP2P(m){", "function tabacchinoP2P(metodi){"))
     pezzi += "\n" + re.search(r"const P2P_TABACCHINO_PM = [^\n]*;", mini).group(0)
     pezzi = "let P2P_SPUNTA_MS = 2500;\nfunction chiediConferma(){}\n" + pezzi
     d = _tf.mkdtemp()
@@ -57112,7 +57160,7 @@ def prove_p2p_canale():
     prova("sta fuori dal motore dello scambio", True,
           mini.index("async function annunciaCanaleP2P")
           > mini.index("/* ============ fine del motore dello scambio"))
-    invia = pezzo_js(mini, "async function inviaNuovoOrdineP2P(){", "\n}\n")
+    invia = pezzo_js(mini, "async function inviaNuovoOrdineP2P(confermato){", "\n}\n")
     prova("si chiama da dentro il motore, ma non c'e' scritto niente",
           True, "fetch(" not in invia)
     prova("...e SOLO dopo che l'ordine e' partito davvero", True,
@@ -62207,6 +62255,449 @@ def prove_p2p_campanello():
     con.close()
 
 
+def prove_p2p_paycode():
+    """IL PERCORSO BARATTOZON (23 set 2026, decisione di Andrea): la
+    struttura del bot di riferimento, con le parole nostre. Il PayCode a
+    nove cifre, la scadenza fra un'ora e 72 ore da un selettore, lo
+    sconto 0-15 con una cifra decimale che si cuoce nei sats, il
+    riepilogo prima di pubblicare; la vita nel libro che segue il
+    PayCode meno due ore; a chi compra il riquadro col codice e i
+    quattro gesti; a chi vende, dopo «pagato», il controllo su Amazon
+    coi due bottoni e le 24 ore; gli avvisi col PayCode e i tre
+    solleciti dalle attese. E la regola che nessun dato Amazon passi
+    in chiaro: nel libro solo l'importo, PayCode e scadenza nel solo
+    recapito cifrato."""
+    print("\n--- IL PERCORSO BARATTOZON: PAYCODE, SCADENZA, SCONTO, CONTROLLO ---")
+    import shutil
+    import subprocess
+    import tempfile
+    import json as _js
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = _SORGENTE
+
+    def _intera(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}\n"
+
+    def _riga(nome):
+        return re.search(r"const " + nome + r" = [^\n]*;", mini).group(0)
+
+    _i = mini.index("const P2P_FORME_RECAPITO = [")
+    _forme = mini[_i:mini.index("\n];", _i) + 3]
+    _i = mini.index("const P2P_TAPPE_TAB = [")
+    _tappe = mini[_i:mini.index("\n];", _i) + 3]
+    _prog = (
+        "const fmt = n => String(n);\nconst fmtEur = n => String(n);\n"
+        "const esc = s => String(s);\nconst el = () => null;\n"
+        "const document = {querySelectorAll: () => []};\n"
+        "let cambioVivo = true, eurPerSat = 0.0005;\n"
+        "let p2pInfo = null;\n"
+        + "\n".join(_riga(n) for n in (
+            "P2P_TABACCHINO", "P2P_TABACCHINO_PM", "P2P_TABACCHINO_VITA_S",
+            "P2P_PAYCODE_MIN_S", "P2P_PAYCODE_MAX_S", "P2P_TABACCHINO_MARGINE_S",
+            "P2P_SCONTO_TAB_MAX", "P2P_TAB_ULTIMA_S", "P2P_TAB_CONTROLLO_S",
+            "P2P_TAB_AVVISO_S"))
+        + "\n" + _forme + "\n" + _tappe + "\n"
+        + "\n".join(_intera(f) for f in (
+            "function centesimiP2P(testo){", "function centesimiTestoP2P(n){",
+            "function contoRimastoP2P(sec){", "function formaRecapito(metodo){",
+            "function tabacchinoP2P(metodi){", "function metodoBaseP2P(m){",
+            "function euroTabacchinoP2P(metodi){", "function satsTabacchinoP2P(importo, cambio, premio){",
+            "function payCodeP2P(testo){", "function vitaLibroTabacchinoP2P(scade, adesso){",
+            "function scontoTabacchinoP2P(testo){", "function scontoTestoTabP2P(n){",
+            "function scontoImplicitoTabacchinoP2P(euro, sats, cambio){",
+            "function passoTabacchinoP2P(v){", "function rigaScontoTabP2P(euro, cambio, sconto){",
+            "function testataPercorsoTabP2P(passo){", "function riepilogoTabacchinoP2P(v){",
+            "function scadeDaCampoP2P(s){", "function campoDaScadeP2P(epoch){",
+            "function dataTabacchinoP2P(epoch){", "function leggiDataTabacchinoP2P(testo){",
+            "function payCodeDaTestoP2P(testo){", "function scadenzaTabacchinoP2P(testo){",
+            "function scadenzaTabacchinoOrdineP2P(o){",
+            "function statoPayCodeP2P(o){", "function inizioEuroInviatiP2P(o){",
+            "function riquadroPayCodeP2P(o, adesso){",
+            "function riquadroControlloTabP2P(o, adesso){"))
+        + "\nconst ora = 1800000000;\n"
+        "const base = {euro: '23,47', sconto: '', cambio: 0.0005, adesso: ora,\n"
+        "  tab: {ordine: '479-868-518', scade: campoDaScadeP2P(ora + 48 * 3600)}};\n"
+        "const T = P2P_TABACCHINO;\n"
+        "const testo = 'Contanti al tabacchino\\nPayCode: 479868518\\nImporto: 23,47 €\\nScade: '\n"
+        "  + dataTabacchinoP2P(ora + 30 * 3600);\n"
+        "const compro = {lato: 'compro', stato: 'attivo', euro: 23.47, metodi: [T],\n"
+        "  campiLoro: {euro: {testo: testo}}};\n"
+        "const vendo = {lato: 'vendo', stato: 'euro_inviati', euro: 23.47, metodi: [T],\n"
+        "  euroInviatiAt: ora - 3600};\n"
+        "console.log(JSON.stringify({\n"
+        "  paycode: ['479-868-518', '479868518', '479 868 518', ' 479-868-518 ', '479-868-51',\n"
+        "            '4798685189', '123-4567890-1234567', 'abc-def-ghi', '', null,\n"
+        # OTTO cifre, con e senza trattini: la tortura ha trovato che
+        # nessun caso le provava, e una terzina «corta» passava
+        "            '47986851', '47-868-518', '479-68-518'].map(payCodeP2P),\n"
+        "  vita: [vitaLibroTabacchinoP2P(ora + 48 * 3600, ora) - ora, vitaLibroTabacchinoP2P(ora + 72 * 3600, ora) - ora,\n"
+        "         vitaLibroTabacchinoP2P(ora + 90 * 3600, ora) - ora, vitaLibroTabacchinoP2P(ora + 7200, ora) - ora,\n"
+        "         vitaLibroTabacchinoP2P(ora + 3600, ora) - ora, vitaLibroTabacchinoP2P(ora + 5 * 3600, ora) - ora,\n"
+        "         vitaLibroTabacchinoP2P(ora, ora), vitaLibroTabacchinoP2P(ora - 10, ora), vitaLibroTabacchinoP2P(0, ora)],\n"
+        "  sconto: ['', '0', '2,5', '2.5', '15', '15,0', '16', '2,55', '-1', 'abc', '1e1', null].map(scontoTabacchinoP2P),\n"
+        "  scontoTesto: [scontoTestoTabP2P(0), scontoTestoTabP2P(2.5), scontoTestoTabP2P(15), scontoTestoTabP2P(2.55)],\n"
+        "  sats: [satsTabacchinoP2P(23.47, 0.0005, 0), satsTabacchinoP2P(23.47, 0.0005, 2.5),\n"
+        "         satsTabacchinoP2P(23.47, 0.0005, 2.55), satsTabacchinoP2P(23.47, 0.0005, 15)],\n"
+        "  implicito: [scontoImplicitoTabacchinoP2P(23.47, 45767, 0.0005), scontoImplicitoTabacchinoP2P(23.47, 46940, 0.0005),\n"
+        "              scontoImplicitoTabacchinoP2P(23.47, 50000, 0.0005), scontoImplicitoTabacchinoP2P(23.47, 45767, 0),\n"
+        "              scontoImplicitoTabacchinoP2P(0, 45767, 0.0005)],\n"
+        "  passo: [passoTabacchinoP2P({euro: '', sconto: '', tab: {ordine: '', scade: ''}}),\n"
+        "          passoTabacchinoP2P({euro: '', sconto: '', tab: {ordine: '479868518', scade: ''}}),\n"
+        "          passoTabacchinoP2P({euro: '23,47', sconto: '', tab: {ordine: '479868518', scade: ''}}),\n"
+        "          passoTabacchinoP2P({euro: '23,47', sconto: '99', tab: {ordine: '479868518', scade: campoDaScadeP2P(ora + 3600)}}),\n"
+        "          passoTabacchinoP2P({euro: '23,47', sconto: '', tab: {ordine: '479868518', scade: campoDaScadeP2P(ora + 3600)}}),\n"
+        "          passoTabacchinoP2P({euro: '23,47', sconto: '', tab: {ordine: '123', scade: campoDaScadeP2P(ora + 3600)}})],\n"
+        "  testata: [testataPercorsoTabP2P(1), testataPercorsoTabP2P(4), testataPercorsoTabP2P(5)],\n"
+        "  riga: [rigaScontoTabP2P('', 0.0005, ''), rigaScontoTabP2P('23,47', 0, ''), rigaScontoTabP2P('23,47', 0.0005, '2,55'),\n"
+        "         rigaScontoTabP2P('23,47', 0.0005, ''), rigaScontoTabP2P('23,47', 0.0005, '2,5')],\n"
+        "  riepilogo: riepilogoTabacchinoP2P(Object.assign({}, base, {sconto: '2,5'})),\n"
+        "  riepilogoZero: riepilogoTabacchinoP2P(base),\n"
+        "  daTesto: [payCodeDaTestoP2P(testo), payCodeDaTestoP2P('Contanti al tabacchino\\nNumero ordine: 479-868-518\\nScade: x'),\n"
+        "            payCodeDaTestoP2P('Contanti al tabacchino\\nNumero ordine: 123-4567890-1234567'), payCodeDaTestoP2P('PayCode: 479-868-518'),\n"
+        "            payCodeDaTestoP2P('Scade: 479-868-518'), payCodeDaTestoP2P('')],\n"
+        "  stato: [statoPayCodeP2P(compro), statoPayCodeP2P(Object.assign({}, compro, {stato: 'euro_inviati'})),\n"
+        "          statoPayCodeP2P(Object.assign({}, vendo, {stato: 'attivo'})), statoPayCodeP2P(vendo),\n"
+        "          statoPayCodeP2P(Object.assign({}, vendo, {stato: 'concluso'})), statoPayCodeP2P(Object.assign({}, vendo, {metodi: ['SEPA']}))],\n"
+        "  inizio: [inizioEuroInviatiP2P(vendo), inizioEuroInviatiP2P({ultimaMossa: 5, aggiornato: 9}), inizioEuroInviatiP2P({aggiornato: 9}),\n"
+        "           inizioEuroInviatiP2P({}), inizioEuroInviatiP2P(null)],\n"
+        "  riquadroCompro: riquadroPayCodeP2P(compro, ora),\n"
+        "  riquadroSenza: riquadroPayCodeP2P(Object.assign({}, compro, {campiLoro: {euro: {testo: 'Revolut: @x'}}}), ora),\n"
+        "  riquadroVendo: riquadroControlloTabP2P(vendo, ora),\n"
+        "  riquadroVendoMuto: riquadroControlloTabP2P({lato: 'vendo', stato: 'euro_inviati', metodi: [T]}, ora),\n"
+        "  riquadroVendoTardi: riquadroControlloTabP2P(Object.assign({}, vendo, {euroInviatiAt: ora - 25 * 3600}), ora)\n"
+        "}));\n")
+    node = shutil.which("node")
+    if not node:
+        salta("il percorso Barattozon", "serve node")
+        return
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(_prog)
+    try:
+        _r = subprocess.run([node, f.name], capture_output=True, text=True,
+                            encoding="utf-8", timeout=60)
+    finally:
+        os.unlink(f.name)
+    if _r.returncode != 0:
+        prova("i giudici del percorso Barattozon girano", "", _r.stderr[:400])
+        return
+    out = _js.loads(_r.stdout.strip())
+
+    # --- 1) IL PAYCODE: nove cifre, trattini o spazi facoltativi -------
+    prova("il PayCode: nove cifre, con trattini o spazi o niente, normalizzato; tutto il resto e' ''",
+          ["479-868-518", "479-868-518", "479-868-518", "479-868-518", "",
+           "", "", "", "", "", "", "", ""], out["paycode"])
+    prova("...e il numero d'ordine Amazon a 17 cifre NON e' un PayCode", "",
+          out["paycode"][6])
+
+    # --- 2) LA VITA NEL LIBRO: il PayCode meno due ore, mai oltre 72 ---
+    prova("la vita nel libro: 48h → 46h, 72h → 70h, 90h → 72h (il tetto), 2h → 1h, 1h → 30min, 5h → 3h",
+          [46 * 3600, 70 * 3600, 72 * 3600, 3600, 1800, 3 * 3600], out["vita"][:6])
+    prova("...e su un PayCode gia' scaduto o assente vale zero", [0, 0, 0], out["vita"][6:])
+
+    # --- 3) LO SCONTO: 0-15, una cifra decimale ---------------------------
+    prova("lo sconto: vuoto e 0 valgono zero; 2,5 e 2.5 sono la stessa cifra; 15 e 15,0 passano",
+          [{"n": 0, "storto": False}, {"n": 0, "storto": False}, {"n": 2.5, "storto": False},
+           {"n": 2.5, "storto": False}, {"n": 15, "storto": False}, {"n": 15, "storto": False}],
+          out["sconto"][:6])
+    prova("...16, 2,55, -1, abc, 1e1 e null sono STORTI (o nulli), mai «quasi giusti»",
+          [True, True, True, True, True, False],
+          [s["storto"] for s in out["sconto"][6:]])
+    prova("...e si scrive con la virgola", ["0%", "2,5%", "15%", "2,6%"], out["scontoTesto"])
+    # 23,47 / 0,0005 = 46940 sats pieni; al 2,5% ne restano 45766,5 → 45767;
+    # 2,55 si tosa al decimo (2,6 → 45720); al 15% 39899
+    prova("i sats del PayCode: pieno, al 2,5%, al 2,55 tosato al decimo, al 15%",
+          [46940, 45767, 45720, 39899], out["sats"])
+    prova("lo sconto si rilegge all'indietro dai sats fissi: 45767 → 2,5%, pieno → 0, sopra il pieno → 0, senza cambio → 0",
+          [2.5, 0, 0, 0, 0], out["implicito"])
+
+    # --- 4) IL PERCORSO: il passo in cui si sta, e la testata ----------
+    prova("il passo e' il primo che manca: 1, 2, 3, 4 (sconto storto), 5 (tutto fatto), 1 (PayCode storto)",
+          [1, 2, 3, 4, 5, 1], out["passo"])
+    prova("la testata dice il passo, e a passi fatti invita a rileggere",
+          ["Passo 1 di 4 · Il PayCode", "Passo 4 di 4 · Lo sconto per chi paga",
+           "Tutti e quattro i passi sono fatti: rileggi e pubblica."], out["testata"])
+    prova("la riga dei sats: senza importo, senza cambio, sconto storto, zero, e il conto vero",
+          ["Scrivi prima l'importo: qui vedrai quanti sats riceve chi paga.",
+           "Aspetta un attimo: sto leggendo il cambio.",
+           "Lo sconto va da 0 a 15%, con una cifra decimale al massimo.",
+           "Senza sconto chi paga al tabacchino riceve il cambio pieno: 46940 sats per 23,47 €.",
+           "Chi paga al tabacchino riceve 45767 sats invece di 46940 (il cambio pieno per 23,47 €): il 2,5% resta a te."],
+          out["riga"])
+    _rp = out["riepilogo"]
+    prova("il riepilogo: PayCode, importo, scadenza, sconto, i sats e fino a quando resta nel libro", True,
+          _rp.startswith("PayCode: 479-868-518\nImporto: 23,47 €\nScade il: ")
+          and "\nSconto: 2,5%\n" in _rp
+          and "riceve 45767 sats invece di 46940: tu blocchi 45767 sats in garanzia" in _rp
+          and bool(re.search(r"Nel libro fino alle \d\d:\d\d del \d\d/\d\d/\d{4}, poi esce da solo\.$", _rp)))
+    prova("...e a sconto zero dice «il cambio pieno»", True,
+          "Sconto: 0%\n" in out["riepilogoZero"]
+          and "riceve 46940 sats (il cambio pieno)" in out["riepilogoZero"])
+
+    # --- 5) IL RECAPITO CIFRATO: la riga «PayCode:», e chi la rilegge ---
+    prova("dal testo cifrato il PayCode si rilegge dalla SOLA riga sua (o «Numero ordine:» di ieri), normalizzato",
+          ["479-868-518", "479-868-518", "", "479-868-518", "", ""], out["daTesto"])
+    _fr = _forme
+    prova("la forma del recapito compone «PayCode:», con l'etichetta e il segnaposto a nove cifre", True,
+          "componi: c => 'Contanti al tabacchino\\nPayCode: ' + c.ordine" in _fr
+          and "{k: 'ordine', et: 'PayCode (9 cifre)', ph: '479-868-518'}" in _fr)
+    _inv = pezzo_js(mini, "async function inviaCampoP2P(tipo, btn){", "\n}\n")
+    prova("...e il form a mano normalizza il PayCode prima di partire, o si ferma", True,
+          "const pc = payCodeP2P(campi.ordine);" in _inv and "campi.ordine = pc;" in _inv
+          and "toast('Il PayCode ha 9 cifre, come 479-868-518');" in _inv)
+    _pub = pezzo_js(mini, "async function inviaNuovoOrdineP2P(confermato){", "\n}\n")
+    prova("chi pubblica scrive sulla riga il PayCode normalizzato e lo sconto col decimale", True,
+          "ordine: payCodeP2P(campi.tab.ordine) ||" in _pub
+          and "ord.premioCotto = scontoTabacchinoP2P(campi.sconto).n;" in _pub)
+
+    # --- 6) IL RIEPILOGO PRIMA DI PUBBLICARE: la conferma, poi il gesto --
+    prova("col tabacchino il tocco apre il riepilogo, e il si' richiama il gesto col timbro", True,
+          "if (tabacchinoP2P(campi.metodi) && !confermato) {" in _pub
+          and "corpo: riepilogoTabacchinoP2P(campi)," in _pub
+          and "poi: () => inviaNuovoOrdineP2P(true)" in _pub)
+    prova("...e il riepilogo sta DOPO il giudice e PRIMA del velo", True,
+          _pub.index("if (!g.ok) { avvisaMancaP2P(g); return; }")
+          < _pub.index("riepilogoTabacchinoP2P(campi)")
+          < _pub.index("attesaP2P('Sto pubblicando…')"))
+    _fog = pezzo_js(mini, "function renderNuovoOrdineP2P(){", "\n}\n")
+    prova("il foglio col tabacchino monta il percorso al posto dello scontrino, e il bottone dice «Rileggi e pubblica»", True,
+          "const percorso = !tab ? '' : percorsoTabacchinoP2P(val);" in _fog
+          and "valuta + importo + metodi + percorso + tipo" in _fog
+          and "(tab ? '🧾 Rileggi e pubblica' : '⚡ Pubblica ordine')" in _fog
+          and "const importo = tab ? '' : sezioneNuovoP2P({" in _fog
+          and "const premio = (p2pNuovoFisso || tab) ? '' : sezioneNuovoP2P({" in _fog)
+    _per = pezzo_js(mini, "function percorsoTabacchinoP2P(val){", "\n}\n")
+    prova("il percorso ha quattro tappe numerate coi campi di sempre piu' lo sconto", True,
+          all(x in _per for x in ('id="p2pTabPasso"', 'id="p2pNuovoTabOrdine"', 'id="p2pNuovoEuro"',
+                                  'id="p2pNuovoTabScade"', 'id="p2pNuovoSconto"', 'id="p2pTabSatsRiga"'))
+          and _per.count("tappa(") == 4
+          and "inputmode=\"decimal\" maxlength=\"4\"" in _per)
+    prova("...il campo data va da un'ora a 72 ore (o alla garanzia, se piu' stretta)", True,
+          "min=\"' + campoDaScadeP2P(adessoTab + P2P_PAYCODE_MIN_S) + '\"" in _per
+          and "Math.min(P2P_PAYCODE_MAX_S, finestraTab)" in _per)
+    prova("...e dice il verso dello sconto e la regola «piu' basso = piu' probabile»", True,
+          "Sconto più basso = più probabile che qualcuno lo paghi in tempo." in _per
+          and "quanto in meno, in sats, consegni rispetto al cambio di adesso" in _per)
+    prova("i pezzi vivi si riscrivono in place a ogni tasto: dal PayCode, dallo sconto e dall'importo", True,
+          "aggiornaPercorsoTabP2P();" in pezzo_js(mini, "function cambiaTabP2P(){", "\n}\n")
+          and "if (tabacchinoP2P(p2pNuovoMetodi)) aggiornaPercorsoTabP2P();"
+          in pezzo_js(mini, "function cambiaCampoNuovoP2P(){", "\n}\n"))
+    prova("lo sconto e' un campo del foglio, letto da campiNuovoP2P e azzerato con gli altri", True,
+          "sconto: p2pNuovoSconto," in pezzo_js(mini, "function campiNuovoP2P(){", "\n}\n")
+          and "  p2pNuovoSconto = '';" in mini)
+
+    # --- 7) A CHI COMPRA: il riquadro del PayCode ---------------------------
+    _rc = out["riquadroCompro"]
+    prova("a chi compra il riquadro porta il PayCode grande, l'importo, la scadenza e il tempo che resta", True,
+          "<b>479-868-518</b>" in _rc and "23.47 € in contanti" in _rc
+          and 'id="p2pTabPayResta"' in _rc and 'data-fine="' + str(1800000000 + 30 * 3600) + '"' in _rc)
+    prova("...coi quattro gesti nell'ordine: vai, dai il codice e paga, tieni lo scontrino, torna e segna", True,
+          _rc.index("Vai al tabaccaio") < _rc.index("Dai il PayCode alla cassa")
+          < _rc.index("Tieni lo scontrino") < _rc.index("«Ho pagato al tabacchino»"))
+    prova("...e il bottone per copiare il codice", True,
+          "copiaLink(this.dataset.pc, 'PayCode copiato 📋')" in _rc)
+    prova("senza un PayCode nel testo il riquadro non c'e' (vale il recapito di sempre)", "", out["riquadroSenza"])
+    _co = pezzo_js(mini, "function campiOrdineP2P(o){", "\n}\n")
+    prova("la pagina monta il riquadro solo a chi compra, col tabacchino e un PayCode nel testo", True,
+          "if (o.lato === 'compro' && loro.euro && tabacchinoP2P(o.metodi) && payCodeDaTestoP2P(loro.euro.testo))" in _co
+          and "fuori += riquadroPayCodeP2P(o);" in _co)
+    _ro = pezzo_js(mini, "function renderOrdineP2P(){", "\n}\n")
+    prova("il bottone di chi compra dice «Ho pagato al tabacchino», e il passo «PayCode pagato»", True,
+          "✅ Ho pagato al tabacchino</button>" in _ro
+          and "if (tabOrd) passi[2] = {t: 'PayCode pagato'," in _ro)
+    prova("...e la conferma chiede del PayCode, non degli euro", True,
+          "titolo: tab ? 'Hai pagato il PayCode al tabacchino?' : 'Hai inviato gli euro?'"
+          in pezzo_js(mini, "function euroInviatiP2P(){", "\n}\n"))
+    prova("le frasi di stato col PayCode: in garanzia e a «pagato», per i due lati; altrove null",
+          ["Sats in garanzia", "PayCode pagato", "Sats in garanzia",
+           "PayCode pagato: controlla su Amazon", None, None],
+          [s and s["t"] for s in out["stato"]])
+
+    # --- 8) A CHI VENDE: il controllo su Amazon, due bottoni, 24 ore ---
+    _rv = out["riquadroVendo"]
+    prova("a chi vende, dopo «pagato», il riquadro con i due bottoni grandi, libera e disputa", True,
+          'onclick="rilasciaP2P()">✅ Risulta pagato: libera i sats</button>' in _rv
+          and 'class="btn allarme" onclick="apriDisputaP2P()">🚨 Non risulta pagato: apri una disputa</button>' in _rv
+          and _rv.index("libera i sats") < _rv.index("apri una disputa"))
+    prova("...dice che non esiste una conferma automatica, e cosa succede se non fa niente", True,
+          "Non esiste una conferma automatica" in _rv
+          and "chi ha pagato può aprire lui la disputa" in _rv
+          and "dopo un'ora, sei ore e venti ore" in _rv)
+    prova("...col tempo: 24 ore da «pagato», un'ora gia' passata → 23 ore a vista",
+          True, 'id="p2pTabControlloResta">23:00:00</b>' in _rv
+          and 'data-fine="' + str(1800000000 - 3600 + 24 * 3600) + '"' in _rv)
+    prova("...senza l'ora di «pagato» dice «decidi appena puoi», e a 24 ore passate «decidi adesso»", True,
+          "Decidi appena puoi: hai 24 ore" in out["riquadroVendoMuto"]
+          and "Le 24 ore sono passate: decidi adesso" in out["riquadroVendoTardi"])
+    prova("l'ora di «pagato» decorre dal timbro, poi dall'ultima mossa, poi dall'aggiornamento",
+          [1800000000 - 3600, 5, 9, 0, 0], out["inizio"])
+    prova("la pagina mette il riquadro al posto di «Libera i sats» e non ripete la disputa in fondo", True,
+          "rilascia: tabOrd ? riquadroControlloTabP2P(o)" in _ro
+          and ".filter(a => !(a === 'disputa' && tabOrd && azione === 'rilascia'))" in _ro
+          and "statoTabacchinoP2P(o) || statoPayCodeP2P(o) || statoTestoP2P(o)" in _ro)
+    _ap = pezzo_js(mini, "function applicaMessaggioP2P(ord, dentro){", "\n}\n")
+    prova("l'ora di «pagato» si timbra entrando nello stato, una volta sola", True,
+          "if (nuovo.stato === 'euro_inviati' && ord.stato !== 'euro_inviati' && !nuovo.euroInviatiAt)" in _ap
+          and "nuovo.euroInviatiAt = quando || Math.floor(Date.now() / 1000);" in _ap)
+    _iv = mini[mini.index("setInterval(() => {\n  const adesso = Date.now();"):]
+    _iv = _iv[:_iv.index("}, 1000)") if "}, 1000)" in _iv else 4000]
+    prova("i due conti alla rovescia battono nell'unico interval, in place", True,
+          "battitoControlloTabP2P();" in _iv
+          and "b.textContent = manca > 0 ? contoRimastoP2P(manca) : fine;"
+          in pezzo_js(mini, "function battitoControlloTabP2P(){", "\n}\n"))
+    prova("la conferma del rilascio chiede di Amazon, col tabacchino", True,
+          "Fallo solo se su Amazon il tuo ordine da ' + fmtEur(o.euro) + ' € risulta pagato davvero."
+          in pezzo_js(mini, "function rilasciaP2P(){", "\n}\n"))
+
+    # --- 9) LE PAROLE: Info P2P, il tour, il dettaglio ---------------------
+    _inf = mini[mini.index('id="view-p2pinfo"'):]
+    _inf = _inf[:_inf.index('id="p2pinfo-storto"')]
+    prova("«Info P2P» racconta il percorso col PayCode: i cinque passi, le due scadenze, nessuna conferma automatica", True,
+          "Barattozon: il PayCode al tabacchino, passo per passo" in _inf
+          and "479-868-518" in _inf and "quattro passi" in _inf
+          and "Non esiste una conferma automatica" in _inf
+          and "due ore prima" in _inf and "Ci sono due scadenze" in _inf
+          and "Sconto più basso = più probabile che qualcuno lo paghi in tempo." in _inf
+          and "Non risulta pagato: apri una disputa" in _inf)
+    _cat = mini[mini.index("const TOUR_P2P = ["):] if "const TOUR_P2P = [" in mini else mini
+    prova("la card del tour passa il PayCode, e a prepararlo e' sempre chi vende", True,
+          "ti passa il PayCode. Tu '" in mini and "paghi quel PayCode dal tabaccaio" in mini)
+    _nd = pezzo_js(mini, "function notaTabacchinoDettP2P(o){", "\n}\n")
+    prova("il dettaglio di chi prende dice lo sconto letto all'indietro: «ricevi N sats invece di M»", True,
+          "scontoImplicitoTabacchinoP2P(o.euro, o.sats, cambio)" in _nd
+          and "' sats</b> invece di ' + fmt(pieno)" in _nd
+          and "Nessuno sconto" in _nd)
+    prova("le frasi del tempo dicono PayCode e l'avviso alla presa spiega le due ore", True,
+          "Il PayCode scade fra meno di sei ore" in mini
+          and "e il PayCode scade circa due ore dopo" in mini)
+
+    # --- 10) NESSUN DATO AMAZON IN CHIARO -----------------------------------
+    _od = pezzo_js(mini, "function ordineDaCampiP2P(v, lato){", "\n}\n")
+    prova("il payload pubblico non conosce il PayCode: il costruttore non lo legge nemmeno", False,
+          "ordine" in re.sub(r"/\*[\s\S]*?\*/", "", _od).replace("ordineDaCampiP2P", "")
+          .replace("ordine da spedire", "").lower())
+    prova("...e il tag `pm` porta la parola e l'importo, mai una data o un codice", True,
+          "/^Contanti al tabacchino(?:\\s+(\\d+\\.\\d{2}))?$/" in _riga("P2P_TABACCHINO_PM"))
+    _can = pezzo_js(mini, "async function annunciaCanaleP2P(lato, euro, metodo){", "\n}\n") \
+        if "async function annunciaCanaleP2P(lato, euro, metodo){" in mini \
+        else pezzo_js(mini, "function annunciaCanaleP2P(lato, euro, metodo){", "\n}\n")
+    prova("il canale riceve importo e metodo per nome: niente PayCode, niente scadenza", True,
+          "PayCode" not in _can and "tab" not in re.sub(r"/\*[\s\S]*?\*/", "", _can).lower()
+          .replace("tabacchino", "").replace("metabase", ""))
+    _rs = src[src.index('@app.post("/api/p2p/sveglia")'):]
+    _rs = _rs[:_rs.index('@app.post("/api/p2p/sveglia/togli")')]
+    prova("la sveglia legge la sola scadenza, e l'orizzonte e' quello di un PayCode: 72 ore e un quarto", True,
+          "PAYCODE_ORE_MAX = 72" in src
+          and "SVEGLIA_P2P_ORIZZONTE_S = PAYCODE_ORE_MAX * 3600 + 900" in src
+          and "adesso < quando <= adesso + SVEGLIA_P2P_ORIZZONTE_S" in _rs)
+
+    # --- 11) IL SERVER: le frasi col PayCode e i tre solleciti -------------
+    amb_t = {}
+    exec(pezzo("_tabacchino_libro"), {"_metodi_libro": lambda m: [
+        "Contanti al tabacchino" if str(x).startswith("Contanti al tabacchino ") else str(x)
+        for x in m or []]}, amb_t)
+    prova("il timbro Barattozon: la parola del libro, con o senza l'importo", [True, True, False, False],
+          [amb_t["_tabacchino_libro"](m) for m in (["Contanti al tabacchino 23.47"],
+                                                    ["Contanti al tabacchino"], ["SEPA"], [])])
+    amb_v = {}
+    _i = src.index("\nP2P_MOMENTI_CHIUDONO_FIAT = (") + 1
+    exec(src[_i:src.index(")\n", _i) + 2], amb_v)
+    exec(pezzo("_sollecito_p2p_vivo"), amb_v)
+    _vivo = amb_v["_sollecito_p2p_vivo"]
+    prova("il sollecito e' vivo finche' dal «pagato» in poi nessuno ha chiuso",
+          [True, True, False, False, False, True],
+          [_vivo([], 100), _vivo([{"momento": "fiat", "quando": 100}, {"momento": "fiat", "quando": 150}], 100),
+           _vivo([{"momento": "rilasciato", "quando": 200}], 100),
+           _vivo([{"momento": "disputa", "quando": 100}], 100),
+           _vivo([{"momento": "annullato", "quando": 300}], 100),
+           _vivo([{"momento": "rilasciato", "quando": 50}], 100)])
+    con, amb = _banco_eventi_p2p()
+    ORA = 1_790_000_000
+    ORD = "0f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc99"
+    KA, KB = "a" * 64, "b" * 64
+    A, B = 111, 222        # A compra, B vende (e ha pubblicato)
+    for chi, pub in ((A, KA), (B, KB)):
+        con.execute("INSERT INTO utenti VALUES(?,1)", (chi,))
+        con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)", (pub, chi))
+    amb["_NOMI"].update({A: "Anna", B: "Bruno"})
+    con.execute(
+        "INSERT OR REPLACE INTO p2p_ordini(ordine, tg_id, creato, stato, lato, maker, "
+        "preso_da, euro, sats, metodi) VALUES(?,?,0,'in-progress','sell',1,?,'23,47 €',31209,?)",
+        (ORD, B, A, '["Contanti al tabacchino 23.47"]'))
+    prova("i dati della frase portano il timbro Barattozon, letto dal libro", True,
+          amb["_dati_frase_p2p"](con, ORD)["tabacchino"])
+    testo = amb["_testo_evento_p2p"]
+    dati = {"sats": 31209, "euro": "23,47 €", "metodi": "Contanti al tabacchino",
+            "tabacchino": True, "netto": 30800, "totale": 31500}
+    prova("«preso» a chi vende dice PayCode, col nome e i numeri", True,
+          testo("preso", "invoice-next", "vende", dati, nome="Anna")
+          .startswith("🧾 <b>Il tuo PayCode è stato preso da Anna!</b> Vendi 31.209 sats per 23,47 € via Contanti al tabacchino."))
+    prova("...ma a chi compra la presa resta quella di sempre", True,
+          testo("preso", "hold-next", "compra", dati).startswith("⚡ <b>Il tuo ordine è stato preso!</b>"))
+    _fi = testo("fiat", "", "vende", dati, nome="Anna")
+    prova("«pagato» a chi vende: controlla su Amazon, libera o disputa, nessuna conferma automatica, 24 ore", True,
+          _fi.startswith("🧾 <b>PayCode pagato: controlla su Amazon.</b> Anna dice di aver pagato 23,47 € in contanti al tabacchino.")
+          and "se risulta saldato libera i sats, se no apri una disputa" in _fi
+          and "Non esiste una conferma automatica" in _fi and "Hai 24 ore a vista" in _fi)
+    prova("...e senza il timbro la frase e' quella degli euro", True,
+          testo("fiat", "", "vende", dict(dati, tabacchino=False), nome="Anna")
+          .startswith("💶 <b>Anna dice di aver inviato 23,47 €:</b>"))
+    prova("«concluso» a chi compra dice «Sats rilasciati», coi sats in arrivo", True,
+          testo("concluso", "", "compra", dati).startswith("✅ <b>Sats rilasciati!</b> 30.800 sats in arrivo al tuo recapito."))
+    _sc = testo("scaduto", "book", "vende", dati, maker=True)
+    prova("«scaduto» a chi vende spiega le due scadenze: il libro chiude due ore prima, il PayCode vale ancora, poi si rifa'", True,
+          _sc.startswith("⏰ <b>Nessuno ha pagato il tuo PayCode entro la scadenza del libro:</b> l'ordine è uscito dalla vetrina")
+          and "due ore prima di quella Amazon" in _sc
+          and "l'ordine Amazon va rifatto e ripubblicato con un PayCode nuovo" in _sc)
+    prova("...e a chi compra lo scaduto resta quello di sempre", True,
+          testo("scaduto", "book", "compra", dati).startswith("⏰ <b>Il tuo ordine è scaduto</b>"))
+    # LO SCAMBIO INTERO: la presa, il «pagato», i tre solleciti che
+    # nascono, il primo che parte, e gli altri due che muoiono al rilascio
+    pulisci, registra, avvisi = amb["_evento_p2p_pulito"], amb["_registra_evento_p2p"], amb["_avvisi_evento_p2p"]
+
+    def arriva(azione, attore, dettaglio, quando):
+        d = {"v": 1, "order": ORD, "action": azione, "ts": quando,
+             "buyer": KA, "seller": KB, "actor": attore}
+        if dettaglio:
+            d["detail"] = dettaglio
+        e = pulisci(d, quando)
+        fatto = registra(con, e, quando)
+        return [(t, re.sub(r"</?[bi]>", "", x)) for t, x in avvisi(con, e, fatto, quando)]
+
+    arriva("taken", "buyer", "invoice-next", ORA)
+    detti = arriva("fiat-sent", "buyer", "", ORA + 100)
+    prova("il «pagato» avvisa chi vende con le parole del PayCode", True,
+          len(detti) == 1 and detti[0][0] == B and detti[0][1].startswith("🧾 PayCode pagato: controlla su Amazon."))
+    righe = con.execute("SELECT momento, tg_id, scade, fonte FROM p2p_attese WHERE fonte='sollecito' "
+                        "ORDER BY scade").fetchall()
+    prova("...e mette in attesa i tre solleciti a chi vende: un'ora, sei ore, venti ore",
+          [("fiat_sollecito1", B, ORA + 100 + 3600, "sollecito"),
+           ("fiat_sollecito2", B, ORA + 100 + 6 * 3600, "sollecito"),
+           ("fiat_sollecito3", B, ORA + 100 + 20 * 3600, "sollecito")],
+          [tuple(r) for r in righe])
+    scarica = amb["_scarica_attese_p2p"]
+    fuori, _ = scarica(con, ORA + 100 + 3600)
+    prova("un'ora dopo parte il primo sollecito, e dice di controllare su Amazon", True,
+          [t for t, _, f in fuori if f == "sollecito"] == [B]
+          and "Controlla su Amazon che l'ordine risulti saldato" in fuori[0][1])
+    arriva("released", "seller", "", ORA + 200 + 3600)
+    fuori2, _ = scarica(con, ORA + 100 + 21 * 3600)
+    prova("dopo il rilascio gli altri due solleciti NON partono (e le righe se ne vanno)",
+          ([], 0),
+          ([t for t, _, f in fuori2 if f == "sollecito"],
+           con.execute("SELECT COUNT(*) FROM p2p_attese WHERE fonte='sollecito'").fetchone()[0]))
+    prova("...e il rilascio lo timbra la cronaca, non un secondo giudice", True,
+          bool(con.execute("SELECT 1 FROM p2p_momenti WHERE ordine=? AND momento='rilasciato'",
+                           (ORD,)).fetchone()))
+    prova("i testi dei solleciti non portano importi ne' id", [False] * 3,
+          ["€" in t or ORD[:8] in t for t in amb["SOLLECITO_PAYCODE_TESTI"].values()])
+    prova("...su un ordine SENZA tabacchino il «pagato» non mette solleciti", 0, (lambda: (
+        con.execute("UPDATE p2p_ordini SET metodi='[\"SEPA\"]' WHERE ordine=?", (ORD,)),
+        arriva("taken", "buyer", "invoice-next", ORA + 40000),
+        arriva("fiat-sent", "buyer", "", ORA + 40100),
+        con.execute("SELECT COUNT(*) FROM p2p_attese WHERE fonte='sollecito'").fetchone()[0])[-1])())
+
+
 def _banco_eventi_p2p(eventi_attivi=True):
     """IL BANCO DEGLI AVVISI P2P: sqlite in memoria con lo schema VERO
     delle sei tabelle, e dentro i giudici VERI — nessuno stub che imiti
@@ -62256,11 +62747,16 @@ def _banco_eventi_p2p(eventi_attivi=True):
                          ("P2P_MOMENTI_FINALI = (", ")\n"),
                          ("P2P_MOMENTI_IN_CORSO = (", ")\n"),
                          ("MOMENTI_DEL_LIBRO_P2P = {", "}\n"),
-                         ("MOTIVI_PAYOUT_P2P = {", "}\n")):
+                         ("MOTIVI_PAYOUT_P2P = {", "}\n"),
+                         # i solleciti del PayCode (23 set 2026)
+                         ("SOLLECITI_PAYCODE_S = (", ")\n"),
+                         ("SOLLECITO_PAYCODE_TESTI = {", "}\n"),
+                         ("P2P_MOMENTI_CHIUDONO_FIAT = (", ")\n")):
         i = src.index("\n" + blocco) + 1
         exec(src[i:src.index(fine, i) + len(fine)], amb)
     for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_parti_recensione_p2p",
-              "_ordini_puliti_p2p", "_euro_libro", "_euro_tabacchino", "_metodi_libro", "_passaggio_libro_p2p",
+              "_ordini_puliti_p2p", "_euro_libro", "_euro_tabacchino", "_metodi_libro",
+              "_tabacchino_libro", "_sollecito_p2p_vivo", "_passaggio_libro_p2p",
               "_testo_libro_p2p", "_avvisi_libro_p2p", "eventi_p2p_attivi",
               "_momento_evento_p2p", "_evento_p2p_pulito",
               "_registra_evento_p2p", "_destinatari_evento_p2p",
@@ -77690,6 +78186,7 @@ def main():
     prove_p2p_pubblica,
     prove_p2p_velo_pubblica,
     prove_p2p_barattozon,
+    prove_p2p_paycode,
     prove_p2p_canale,
     prove_p2p_canonico,
     prove_p2p_bundle,

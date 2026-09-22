@@ -38484,7 +38484,13 @@ def seme_profilo_p2p(x_tg_init_data: str = Header(""),
 # ignora» perche' chi chiude da un altro dispositivo non toglie la
 # sveglia. La riga muore alla scadenza.
 MAX_SVEGLIE_P2P = 20          # per persona: piu' di cosi' non e' un uso
-SVEGLIA_P2P_ORIZZONTE_S = 15 * 86400   # `max_expiration_days` del coordinatore
+# L'ORIZZONTE E' QUELLO DI UN PAYCODE (23 set 2026, percorso Barattozon):
+# la sveglia si mette sulla scadenza del PayCode, che Amazon da' a 72
+# ore al massimo; il client rifiuta gia' oltre le 72, e qui resta un
+# quarto d'ora di respiro per gli orologi. Era `max_expiration_days`
+# (15 giorni), cioe' un tetto che non diceva niente sul metodo.
+PAYCODE_ORE_MAX = 72
+SVEGLIA_P2P_ORIZZONTE_S = PAYCODE_ORE_MAX * 3600 + 900
 SVEGLIA_P2P_TESTI = {
     1: "⏳ Un tuo scambio in contanti al tabacchino scade fra circa sei "
        "ore. Se l'ordine Amazon non è ancora pagato, è il momento di "
@@ -39283,6 +39289,44 @@ def eventi_p2p_attivi() -> bool:
                 and not P2P_EVENTI_SEGRETO.startswith("INCOLLA"))
 
 
+# I SOLLECITI DEL PAYCODE (23 set 2026): dopo «pagato», a chi vende, a
+# un'ora, sei ore e venti ore — dentro le 24 che la pagina gli mostra.
+# Testi senza numeri ne' id, come le sveglie; il «se e' gia' chiuso»
+# non serve: un sollecito su uno scambio mosso non parte proprio.
+SOLLECITI_PAYCODE_S = (3600, 6 * 3600, 20 * 3600)
+SOLLECITO_PAYCODE_TESTI = {
+    1: "🧾 Promemoria: un'ora fa chi compra ha detto di aver pagato il tuo "
+       "PayCode al tabacchino. Controlla su Amazon che l'ordine risulti "
+       "saldato: se sì libera i sats, se no apri una disputa. Nessuno lo "
+       "fa al posto tuo.",
+    2: "🧾 Sono passate sei ore da quando chi compra ha detto di aver pagato "
+       "il tuo PayCode, e i sats sono ancora in garanzia. Apri Amazon e "
+       "decidi dalla pagina dello scambio: libera, o apri una disputa.",
+    3: "⏰ Venti ore da quando chi compra ha detto di aver pagato il tuo "
+       "PayCode: le 24 ore stanno finendo. Controlla su Amazon e decidi — "
+       "libera, o disputa. Se non fai niente, i sats restano in garanzia e "
+       "chi ha pagato può aprire lui la disputa: a decidere sarà un "
+       "moderatore.",
+}
+# i momenti dopo i quali un sollecito non ha piu' senso: chi vende ha
+# gia' deciso, o ha deciso qualcun altro
+P2P_MOMENTI_CHIUDONO_FIAT = ("rilasciato", "concluso", "disputa", "annullato",
+                             "tornato")
+
+
+def _sollecito_p2p_vivo(momenti, quando_fiat: int) -> bool:
+    """PURA: il sollecito parte solo se dal «pagato» in poi lo scambio
+    non si e' mosso. `momenti` sono le righe della cronaca di quel giro
+    (momento, quando); un momento che chiude, timbrato dal «pagato» in
+    poi, lo spegne. Un secondo «pagato» non lo spegne: e' lo stesso
+    dovere."""
+    for m in momenti or []:
+        if (str(m.get("momento")) in P2P_MOMENTI_CHIUDONO_FIAT
+                and int(m.get("quando") or 0) >= int(quando_fiat or 0)):
+            return False
+    return True
+
+
 def _scarica_attese_p2p(con, adesso: int) -> tuple:
     """Le attese SCADUTE: chi avvisare adesso, e con che frase. Pura
     sulla connessione. Torna `(avvisi, prossima)`: la lista di
@@ -39303,6 +39347,14 @@ def _scarica_attese_p2p(con, adesso: int) -> tuple:
     for r in righe:
         con.execute("DELETE FROM p2p_attese WHERE id=?", (r["id"],))
         corto = str(r["ordine"])[:8]
+        if r["fonte"] == "sollecito" and not _sollecito_p2p_vivo(
+                [dict(m) for m in con.execute(
+                    "SELECT momento, quando FROM p2p_momenti WHERE ordine=? "
+                    "AND giro=?", (r["ordine"], int(r["giro"] or 0))).fetchall()],
+                int(r["quando"] or 0)):
+            print(f"· Sollecito PayCode: {corto} «{r['momento']}» lo scambio "
+                  "si è già mosso: non parte", flush=True)
+            continue
         if r["fonte"] == "libro" and con.execute(
                 "SELECT 1 FROM p2p_momenti WHERE ordine=? AND momento=? "
                 "AND fonte='mostro' AND ABS(quando-?)<=?",
@@ -39822,6 +39874,13 @@ def _metodi_libro(metodi) -> list:
     negli avvisi sta gia' nella cifra («per 23,47 €»)."""
     return ["Contanti al tabacchino" if _euro_tabacchino(m) > 0 else str(m).strip()
             for m in metodi or []]
+
+
+def _tabacchino_libro(metodi) -> bool:
+    """PURA: e' un ordine Barattozon? La parola del libro, con o senza
+    l'importo dentro (23 set 2026): e' il timbro con cui gli avvisi
+    scelgono le parole del PayCode."""
+    return "Contanti al tabacchino" in _metodi_libro(metodi)
 
 
 def _euro_libro(valori, metodi=None) -> str:
@@ -40552,8 +40611,14 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
     metodi = str(dati.get("metodi") or "")
     quanto = (f"{_fmt_sats(sats)} sats" if sats > 0 else "bitcoin") + \
         (f" per {euro}" if euro else "") + (f" via {metodi}" if metodi else "")
+    # LE PAROLE DI BARATTOZON (23 set 2026): sullo stesso momento la
+    # frase dice PayCode dove il gesto e' quello — la presa, il
+    # «pagato», il rilascio, lo scaduto del libro — e resta quella di
+    # tutti dove il gesto e' lo stesso per tutti i metodi
+    paycode = bool(dati.get("tabacchino"))
     if momento == "preso":
-        testa = ("⚡ <b>Il tuo ordine è stato preso"
+        testa = (("🧾 <b>Il tuo PayCode è stato preso" if paycode and vende
+                  else "⚡ <b>Il tuo ordine è stato preso")
                  + (f" da {nome}" if nome else "") + "!</b> "
                  + ("Vendi " if vende else "Compri ") + quanto + ".\n\n")
         if vende and dettaglio == "hold-next":
@@ -40603,6 +40668,14 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
                     "aspetta gli euro.")
         return (f"⚡ <b>{altro} ha indicato dove ricevere i sats.</b> Se non "
                 "l'hai ancora fatto, indica dove ricevere gli euro.")
+    if momento == "fiat" and paycode:
+        return (f"🧾 <b>PayCode pagato: controlla su Amazon.</b> {altro} dice di "
+                f"aver pagato {cifra or 'il tuo PayCode'} in contanti al "
+                "tabacchino. Apri il tuo ordine su Amazon: se risulta saldato "
+                "libera i sats, se no apri una disputa — dalla pagina dello "
+                "scambio.\n\n<i>Non esiste una conferma automatica e i sats "
+                "non si liberano da soli. Hai 24 ore a vista: te lo ricordiamo "
+                "qui.</i>")
     if momento == "fiat":
         return (f"💶 <b>{altro} dice di aver inviato {cifra or 'gli euro'}:</b> "
                 "controlla il conto e rilascia i sats.\n\n"
@@ -40624,6 +40697,8 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
         netto = int(dati.get("netto") or 0)
         fatto = (f"{_fmt_sats(netto)} sats in arrivo al tuo recapito"
                  if netto > 0 else "I sats sono in arrivo al tuo recapito")
+        if paycode:
+            return f"✅ <b>Sats rilasciati!</b> {fatto}.{invito}"
         return f"✅ <b>Scambio concluso!</b> {fatto}.{invito}"
     if momento == "rilasciato":
         # solo il moderatore arriva qui: il rilascio di chi vende non
@@ -40660,6 +40735,18 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
                     "È tornato in vetrina: non devi fare niente.")
         return ("🔄 <b>Non hai proseguito in tempo:</b> l'ordine è tornato "
                 "in vetrina. Se ti interessa ancora, puoi riprenderlo.")
+    if momento == "scaduto" and paycode and vende:
+        # LE DUE SCADENZE, dette (23 set 2026): il libro chiude due ore
+        # prima del PayCode — e' il margine per chi deve andare al
+        # tabacchino — quindi «scaduto» qui e' il libro, non Amazon
+        return ("⏰ <b>Nessuno ha pagato il tuo PayCode entro la scadenza del "
+                "libro:</b> l'ordine è uscito dalla vetrina"
+                + (f" ({quanto})" if sats > 0 or euro else "") + ".\n\n"
+                "La scadenza del libro cade due ore prima di quella Amazon, per "
+                "lasciare a chi paga il tempo di andare al tabacchino: il "
+                "PayCode vale ancora per poco, ma nessuno può più prenderlo. "
+                "Quando scade anche lui, l'ordine Amazon va rifatto e "
+                "ripubblicato con un PayCode nuovo.")
     if momento == "scaduto":
         return ("⏰ <b>Il tuo ordine è scaduto</b> senza che la presa fosse "
                 f"completata: {'vendevi' if vende else 'compravi'} {quanto}. "
@@ -40705,7 +40792,8 @@ def _dati_frase_p2p(con, ordine: str) -> dict:
     ordine che il libro non segue da' un dizionario vuoto, e la frase
     esce senza cifre."""
     dati = {"sats": 0, "euro": "", "metodi": "", "netto": 0, "totale": 0,
-            "maker": 0, "preso_da": 0, "recapito_detto": False}
+            "maker": 0, "preso_da": 0, "recapito_detto": False,
+            "tabacchino": False}
     r = con.execute("SELECT tg_id, preso_da, sats, euro, metodi FROM p2p_ordini "
                     "WHERE ordine=?", (ordine,)).fetchone()
     if r:
@@ -40718,7 +40806,10 @@ def _dati_frase_p2p(con, ordine: str) -> dict:
         dati.update(sats=int(r["sats"] or 0), euro=html.escape(str(r["euro"] or "")),
                     metodi=", ".join(html.escape(str(m)) for m in _metodi_libro(
                         [m for m in metodi if isinstance(m, str)])),
-                    maker=int(r["tg_id"] or 0), preso_da=int(r["preso_da"] or 0))
+                    maker=int(r["tg_id"] or 0), preso_da=int(r["preso_da"] or 0),
+                    # Barattozon: le frasi col PayCode (23 set 2026)
+                    tabacchino=_tabacchino_libro(
+                        [m for m in metodi if isinstance(m, str)]))
     s = con.execute("SELECT sats, sats_compratore, sats_venditore, giro "
                     "FROM p2p_scambi WHERE ordine=?", (ordine,)).fetchone()
     if s and int(s["sats"] or 0) > 0:
@@ -40760,6 +40851,18 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
         altro, perche = _parti_recensione_p2p(dati["maker"], dati["preso_da"], chi)
         return bool(altro) and not perche
 
+    if momento == "fiat" and dati.get("tabacchino") and fatto["venditore"]:
+        # I SOLLECITI DEL PAYCODE (23 set 2026): dopo «pagato» chi vende
+        # deve controllare su Amazon e decidere, e nessuno lo fa al
+        # posto suo. Tre attese, una per intervallo, con la loro frase;
+        # `_scarica_attese_p2p` le lascia cadere se intanto lo scambio
+        # si e' mosso (rilascio, disputa, annullo).
+        for livello, fra in enumerate(SOLLECITI_PAYCODE_S, 1):
+            con.execute(
+                "INSERT INTO p2p_attese(ordine, momento, giro, tg_id, testo, "
+                "quando, scade, fonte) VALUES(?,?,?,?,?,?,?,'sollecito')",
+                (ordine, f"fiat_sollecito{livello}", giro, fatto["venditore"],
+                 SOLLECITO_PAYCODE_TESTI[livello], ev["ts"], adesso + fra))
     if momento == "rilasciato" and ev["attore"] == "seller" and fatto["venditore"]:
         # L'ATTESA DI CHI VENDE: se «concluso» non arriva entro il
         # minuto, il suo «hai venduto» parte lo stesso

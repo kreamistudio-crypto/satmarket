@@ -3089,6 +3089,38 @@
     font-variant-numeric:tabular-nums}
   /* ---- il riquadro di una sezione ---- */
   .p2p-sez{background:var(--chip-bg);border-radius:16px;padding:13px 14px;margin:12px 0}
+  /* IL PERCORSO BARATTOZON (23 set 2026): la testata dice il passo,
+     ogni tappa porta il suo numero in un tondo che si spegne in
+     verde a passo fatto; i due riquadri del PayCode (chi compra) e
+     del controllo (chi vende) hanno lo stesso vestito del recapito */
+  .p2p-percorso-testa{font-size:13px;font-weight:800;color:var(--sats-text);
+    background:var(--sats-soft);border-radius:12px;padding:9px 12px;margin:12px 0 4px}
+  .p2p-tappa-n{display:inline-flex;align-items:center;justify-content:center;
+    width:22px;height:22px;border-radius:50%;margin-right:8px;font-size:12px;
+    background:var(--sats-soft);color:var(--sats-text);flex:0 0 auto}
+  .p2p-tappa[data-fatto="1"] .p2p-tappa-n{background:var(--trust-soft);color:var(--trust-text)}
+  .p2p-tappa[data-fatto="1"] .p2p-tappa-n::before{content:'✓'}
+  .p2p-tappa[data-fatto="1"] .p2p-tappa-n{font-size:0}
+  .p2p-tappa[data-fatto="1"] .p2p-tappa-n::before{font-size:12px}
+  .p2p-sconto-riga{display:flex;align-items:center;gap:8px}
+  .p2p-sconto-riga input{max-width:110px}
+  .p2p-sconto-pc{font-weight:800;color:var(--muted)}
+  .p2p-paycode,.p2p-controllo{background:var(--chip-bg);border-radius:16px;padding:14px;margin:12px 0}
+  .p2p-paycode-tit{font-weight:800;font-size:14px;margin-bottom:8px}
+  .p2p-paycode-cod{display:flex;align-items:center;gap:10px;margin:6px 0 10px}
+  .p2p-paycode-cod b{font-size:28px;letter-spacing:2px;font-variant-numeric:tabular-nums}
+  .p2p-paycode-copia{border:0;background:var(--sats-soft);border-radius:10px;
+    font-size:18px;padding:6px 10px;cursor:pointer}
+  .p2p-paycode-riga{display:flex;justify-content:space-between;gap:10px;font-size:13px;
+    color:var(--muted);padding:3px 0}
+  .p2p-paycode-riga b{color:var(--ink)}
+  .p2p-paycode-resta{font-size:13px;font-weight:700;color:var(--sats-text);
+    background:var(--sats-soft);border-radius:10px;padding:8px 10px;margin:8px 0}
+  .p2p-paycode-resta.ultima{color:var(--danger);background:var(--warn-bg)}
+  .p2p-paycode-resta.scaduto{color:var(--danger);background:var(--warn-bg)}
+  .p2p-paycode-passi{margin:8px 0 6px 18px;padding:0;font-size:13.5px;line-height:1.45}
+  .p2p-paycode-passi li{margin:4px 0}
+  .p2p-controllo .btn{margin-top:10px}
   .p2p-sez-tit{display:flex;align-items:center;gap:8px;font-size:12.5px;
     font-weight:700;color:var(--muted);line-height:1.35;margin-bottom:10px}
   .p2p-sez-tit span{flex:1;min-width:0}
@@ -7849,17 +7881,17 @@ document.getElementById('cartello')?.remove();</script>
       <p><b>Gli euro non passano da Barattolo.</b> Viaggiano fra te e l'altra persona sul circuito che avete scelto, come se vi foste messi d'accordo per strada. Il recapito che serve — l'IBAN, il RevTag, il numero — ve lo scambiate <b>qui dentro e cifrato</b>: lo legge solo chi deve pagare.</p>
       <p>Per questo la garanzia protegge <b>i sats e non gli euro</b>: se dici di aver pagato e non hai pagato, chi vende semplicemente non libera. E se hai pagato e non liberano, c'è la disputa.</p>
 
-      <h3 id="p2pinfo-tabacchino">Contanti al tabacchino, passo per passo</h3>
-      <p>È il metodo per chi non vuole passare da una banca o da un'app: chi <b>vende</b> sats genera un <b>ordine Amazon pagabile in contanti</b> (da Mooney, in tabaccheria) e chi <b>compra</b> lo paga alla cassa del tabacchino. Il tabacchino incassa i contanti, l'ordine Amazon risulta pagato, e i sats si liberano.</p>
+      <h3 id="p2pinfo-tabacchino">Barattozon: il PayCode al tabacchino, passo per passo</h3>
+      <p>È il metodo per chi non vuole passare da una banca o da un'app: chi <b>vende</b> sats fa un <b>ordine Amazon da pagare in contanti nel punto vendita</b> e chi <b>compra</b> lo paga alla cassa del tabacchino col <b>PayCode</b>. Il tabacchino incassa i contanti, l'ordine Amazon risulta pagato, e i sats si liberano. Nel libro il metodo si chiama ancora «Contanti al tabacchino»: è la parola che leggono anche le altre app.</p>
       <ol class="sicu-passi">
-        <li><b>Chi vende genera l'ordine Amazon</b>, per l'importo dello scambio, scegliendo il pagamento in contanti. Amazon gli dà tre cose: il <b>numero dell'ordine</b>, l'<b>importo</b> e una <b>scadenza</b>, settantadue ore da quel momento.</li>
-        <li><b>Chi vende pubblica qui</b>, con «Contanti al tabacchino» come unico metodo, e scrive i tre dati nel foglio. L'importo è quello dell'ordine Amazon, <b>coi centesimi</b>, e i sats si fissano al cambio del momento: per questo l'ordine resta nel libro al massimo <b>ventiquattro ore</b>, e se nessuno lo prende si ripubblica col cambio nuovo finché l'ordine Amazon vale. Niente intervallo.</li>
-        <li><b>Chi compra prende l'ordine</b>, indica dove ricevere i sats, e chi vende li blocca in garanzia. A quel punto i tre dati gli arrivano <b>qui dentro e cifrati</b>, con un conto alla rovescia.</li>
-        <li><b>Chi compra va al tabacchino</b>, dà il numero dell'ordine, paga in contanti e <b>tiene lo scontrino</b>: è la sua prova. Poi tocca «Ho inviato gli euro».</li>
-        <li><b>Chi vende controlla su Amazon</b> che l'ordine risulti pagato, e libera i sats. Se non li libera, c'è la disputa, e lo scontrino è quel che guarda chi decide.</li>
+        <li><b>Chi vende fa l'ordine su Amazon</b> scegliendo «paga in contanti nel punto vendita». Amazon gli manda una mail con tre cose: il <b>PayCode</b> (nove cifre, come 479-868-518), l'<b>importo</b> esatto coi centesimi e una <b>scadenza</b>, di norma fra sessantanove e settantadue ore da quel momento.</li>
+        <li><b>Chi vende pubblica qui</b>, con Barattozon come unico metodo, e il foglio lo porta per mano in <b>quattro passi</b>: il PayCode, l'importo, la scadenza (con un selettore di data e ora, fra un'ora e settantadue ore) e lo <b>sconto</b>, da zero a quindici per cento con una cifra decimale. Lo sconto è quanto in meno, in sats, consegna rispetto al cambio del momento: chi paga al tabacchino riceve un po' meno del cambio pieno, e il resto resta a chi vende. <b>Sconto più basso = più probabile che qualcuno lo paghi in tempo.</b> Prima di pubblicare c'è il riepilogo. Il cambio si fissa lì, e l'ordine resta nel libro fino a <b>due ore prima</b> della scadenza del PayCode (mai oltre settantadue ore): poi esce da solo.</li>
+        <li><b>Chi compra prende l'ordine</b>, indica dove ricevere i sats, e chi vende li blocca in garanzia. A quel punto il PayCode, l'importo e la scadenza gli arrivano <b>qui dentro e cifrati</b>, in un riquadro col tempo che resta. Nel libro pubblico c'è solo l'importo: il PayCode non lo vede nessun altro, nemmeno Barattolo.</li>
+        <li><b>Chi compra va al tabacchino</b>, dà il PayCode alla cassa, paga in contanti l'importo esatto e <b>tiene lo scontrino</b>: è la sua prova. Poi torna qui e tocca «Ho pagato al tabacchino».</li>
+        <li><b>Chi vende controlla su Amazon</b> che l'ordine risulti saldato, e sceglie fra due bottoni: <b>«Risulta pagato: libera i sats»</b> oppure <b>«Non risulta pagato: apri una disputa»</b>. Ha <b>ventiquattro ore</b> a vista, e Barattolo glielo ricorda su Telegram dopo un'ora, sei ore e venti ore. <b>Non esiste una conferma automatica</b>: Amazon non parla con Barattolo, e i sats non si liberano da soli. Se chi vende non fa nulla, i sats restano in garanzia e chi ha pagato può aprire lui la disputa: decide un moderatore, e lo scontrino è quel che guarda.</li>
       </ol>
-      <p><b>Se scade.</b> Prima che qualcuno prenda l'ordine, sparisce dal libro e non è successo niente. Con i sats già in garanzia l'ordine Amazon non si può più pagare: la pagina dello scambio lo dice, ti avvisa <b>sei ore prima e un'ora prima</b> (anche su Telegram o Nostr, secondo le tue impostazioni) e mette in evidenza l'<b>annullo d'accordo</b>, con cui i sats tornano a chi li ha bloccati. Nessuno annulla da solo: se hai pagato in tempo, lo scontrino lo dimostra e chi vende libera.</p>
-      <p class="sicu-nota">Prendi un ordine col tabacchino solo se fai in tempo ad andarci: quando mancano meno di sei ore, il dettaglio te lo ricorda prima di prenderlo.</p>
+      <p><b>Se scade.</b> Ci sono due scadenze, e vanno tenute distinte. Quella <b>del libro</b> cade due ore prima di quella del PayCode: se nessuno ha preso l'ordine, esce dalla vetrina e a chi vende arriva un avviso — il PayCode vale ancora per poche ore, ma nessuno può più prenderlo; quando scade anche lui, l'ordine Amazon va rifatto e ripubblicato con un PayCode nuovo. Quella <b>del PayCode</b> conta quando i sats sono già in garanzia: la pagina dello scambio lo dice, ti avvisa <b>sei ore prima e un'ora prima</b> (anche su Telegram o Nostr, secondo le tue impostazioni) e mette in evidenza l'<b>annullo d'accordo</b>, con cui i sats tornano a chi li ha bloccati. Nessuno annulla da solo: se hai pagato in tempo, lo scontrino lo dimostra e chi vende libera.</p>
+      <p class="sicu-nota">Prendi un ordine Barattozon solo se fai in tempo ad andare al tabacchino: quando mancano meno di sei ore, il dettaglio te lo ricorda prima di prenderlo.</p>
 
       <h3>I tempi</h3>
       <!-- gli stessi segnaposto, per la stessa ragione: le finestre
@@ -15346,6 +15378,7 @@ setInterval(() => {
      pagina non e' aperta — vedi «L'ANELLO GRANDE DEL TEMPO». */
   battitoAnelloneP2P();
   battitoTabacchinoP2P();
+  battitoControlloTabP2P();
   document.querySelectorAll('.lampo-count').forEach(n => {
     const fine = +n.dataset.fine || 0;
     n.textContent = lampoResta(fine);
@@ -38434,7 +38467,10 @@ function satsMercatoP2P(o){
    ricalcola niente: la garanzia e il payout sono questi sats. */
 function satsTabacchinoP2P(importo, cambio, premio){
   if (!(cambio > 0) || !(importo > 0)) return 0;
-  return Math.round((importo / cambio) * (1 - (Math.round(Number(premio) || 0)) / 100));
+  /* LO SCONTO HA UNA CIFRA DECIMALE (23 set 2026, Barattozon): sul
+     filo non viaggia — e' cotto nei sats — quindi non c'e' nessun
+     i64 che lo voglia intero; si tosa al decimo, mai all'intero */
+  return Math.round((importo / cambio) * (1 - (Math.round((Number(premio) || 0) * 10) / 10) / 100));
 }
 
 /* ---- LA COMMISSIONE DI BARATTOLO SUL P2P (set 2026) ----
@@ -40830,8 +40866,8 @@ const TAPPE_TOUR_P2P = [
      lei, quindi il marchio ci sta nudo (vedi il CSS di `.giro-marchio`) */
   {fig: '/assets/tour-p2p/tabacchino.webp', marchio: true,
    testo: 'Con Barattozon chi vende sats prepara il suo ordine Amazon '
-        + 'da pagare in contanti alla cassa e ne indica il codice. Tu '
-        + 'paghi quel codice dal tabaccaio, e i sats in garanzia si '
+        + 'da pagare in contanti alla cassa e ti passa il PayCode. Tu '
+        + 'paghi quel PayCode dal tabaccaio, e i sats in garanzia si '
         + 'sbloccano verso di te.'},
 ];
 let tourP2PInCorso = false;
@@ -42801,6 +42837,11 @@ function applicaMessaggioP2P(ord, dentro){
   }
   const nuovo = avanzaOrdineP2P(ord, azione, dentro.payload || null);
   if (quando > 0 && AVANZA_P2P[azione]) nuovo.ultimaMossa = quando;
+  /* L'ORA DI «PAGATO» SI TIMBRA QUI (23 set 2026): e' da li' che
+     decorrono le 24 ore del controllo di chi vende. Una volta sola,
+     entrando nello stato; l'eco ripetuta non la sposta. */
+  if (nuovo.stato === 'euro_inviati' && ord.stato !== 'euro_inviati' && !nuovo.euroInviatiAt)
+    nuovo.euroInviatiAt = quando || Math.floor(Date.now() / 1000);
   diarioP2P('msg ' + String(ord.id).slice(0, 8) + ' ' + azione + ' t=' + quando
             + ' ' + prima + '→' + nuovo.stato
             + (nuovo.cantDo ? ' no=«' + nuovo.cantDo + '»' : ''));
@@ -43719,7 +43760,20 @@ function metodiDettP2P(o){
    sopra un bottone e' una spiegazione che nessuno legge */
 function notaTabacchinoDettP2P(o){
   if (!o || !tabacchinoP2P(o.metodi)) return '';
-  return '<div class="hint">🧾 Con <b>Contanti al tabacchino</b> paghi in contanti, in tabaccheria, un ordine Amazon che chi vende ha già generato: numero, importo e scadenza ti arrivano cifrati appena i sats sono in garanzia. Tieni lo scontrino.</div>'
+  /* LO SCONTO SI LEGGE ALL'INDIETRO (23 set 2026): sul filo non c'e',
+     e' cotto nei sats fissi; contro il cambio di adesso si ricava, e
+     si dice come fatto — «ricevi N invece di M» — con la riga dello
+     sconto solo quando c'e' un cambio vivo da confrontare */
+  const cambio = (typeof cambioVivo !== 'undefined' && cambioVivo && eurPerSat > 0) ? eurPerSat : 0;
+  const sc = scontoImplicitoTabacchinoP2P(o.euro, o.sats, cambio);
+  const pieno = cambio > 0 ? satsTabacchinoP2P(o.euro, cambio, 0) : 0;
+  return '<div class="hint">🧾 Con <b>Barattozon</b> paghi in contanti, alla cassa del tabacchino, un ordine Amazon che chi vende ha già fatto: il <b>PayCode</b>, l\'importo e la scadenza ti arrivano cifrati appena i sats sono in garanzia. Tieni lo scontrino.</div>'
+    + (pieno > 0 && o.sats > 0
+      ? '<div class="hint">' + (sc > 0
+          ? '💸 Sconto per chi vende: <b>' + esc(scontoTestoTabP2P(sc)) + '</b> → ricevi <b>' + fmt(o.sats) + ' sats</b> invece di ' + fmt(pieno) + ' (il cambio pieno di adesso per ' + fmtEur(o.euro) + ' €).'
+          : '💸 Nessuno sconto: ricevi <b>' + fmt(o.sats) + ' sats</b>, il cambio pieno di adesso per ' + fmtEur(o.euro) + ' €.')
+        + '</div>'
+      : '')
     + '<button type="button" class="btn ghost" onclick="apriInfoTabacchinoP2P()">📖 Come funziona, passo per passo</button>';
 }
 function apriInfoTabacchinoP2P(){
@@ -44138,7 +44192,13 @@ const SECONDARI_EVIDENZA_P2P = {
 function campiOrdineP2P(o){
   const miei = o.campiMiei || {}, loro = o.campiLoro || {};
   let fuori = '';
-  if (o.lato === 'compro' && loro.euro)
+  /* COL PAYCODE IL RECAPITO E' UN RIQUADRO SUO (23 set 2026): il
+     codice grande da dare alla cassa, l'importo, quanto manca, e i
+     quattro gesti nell'ordine in cui si fanno — al posto del testo
+     nudo, che qui non basta a chi sta per uscire di casa */
+  if (o.lato === 'compro' && loro.euro && tabacchinoP2P(o.metodi) && payCodeDaTestoP2P(loro.euro.testo))
+    fuori += riquadroPayCodeP2P(o);
+  else if (o.lato === 'compro' && loro.euro)
     fuori += '<div class="trust-note nota-scambio"><span>💶</span><span><b>Dove mandare gli euro:</b><br>'
       + esc(loro.euro.testo).replace(/\n/g, '<br>') + '</span></div>'
       /* IL RECAPITO PUO' ARRIVARE PRIMA DELLA GARANZIA (i dati del
@@ -44153,6 +44213,109 @@ function campiOrdineP2P(o){
   fuori += '<button class="btn ghost" onclick="apriCampiP2P()">🤝 I vostri recapiti'
     + (o.campiNuovi ? ' <b>(novità)</b>' : '') + '</button>';
   return fuori;
+}
+/* ---- IL RIQUADRO DEL PAYCODE, a chi compra (23 set 2026) ----
+   Dal testo cifrato arrivato: PayCode (normalizzato), importo (quello
+   della riga, coi centesimi), scadenza (dalla riga «Scade:», il
+   giudice unico) e il tempo che resta, riscritto ogni secondo in
+   place da `battitoControlloTabP2P`. Le istruzioni sono i quattro
+   gesti, nell'ordine; il bottone «Ho pagato al tabacchino» sta sotto,
+   dov'era «Ho inviato gli euro» — qui si dice solo che c'e'. */
+function riquadroPayCodeP2P(o, adesso){
+  const testo = (((o || {}).campiLoro || {}).euro || {}).testo || '';
+  const pc = payCodeDaTestoP2P(testo);
+  if (!pc) return '';
+  const ora = adesso || Math.floor(Date.now() / 1000);
+  const scade = scadenzaTabacchinoOrdineP2P(o);
+  const manca = scade > 0 ? Math.max(0, scade - ora) : 0;
+  const attivo = o.stato === 'attivo';
+  return '<div class="p2p-paycode" data-fine="' + (scade || 0) + '">' +
+    '<div class="p2p-paycode-tit">🧾 Il PayCode da pagare al tabacchino</div>' +
+    '<div class="p2p-paycode-cod"><b>' + esc(pc) + '</b>' +
+      '<button type="button" class="p2p-paycode-copia" data-pc="' + esc(pc) + '" ' +
+        'onclick="copiaLink(this.dataset.pc, \'PayCode copiato 📋\')" aria-label="Copia il PayCode">📋</button></div>' +
+    '<div class="p2p-paycode-riga"><span>Importo</span><b>' + fmtEur(o.euro) + ' € in contanti</b></div>' +
+    (scade > 0
+      ? '<div class="p2p-paycode-riga"><span>Scade il</span><b>' + esc(dataTabacchinoP2P(scade)) + '</b></div>' +
+        '<div class="p2p-paycode-resta' + (manca <= 0 ? ' scaduto' : manca <= P2P_TAB_ULTIMA_S ? ' ultima' : '') + '">' +
+          (manca > 0 ? 'Tempo che resta: <b id="p2pTabPayResta">' + esc(contoRimastoP2P(manca)) + '</b>'
+                     : '<b id="p2pTabPayResta">Scaduto: non si può più pagare</b>') + '</div>'
+      : '') +
+    '<ol class="p2p-paycode-passi">' +
+      '<li>Vai al tabaccaio o al punto vendita che accetta i pagamenti Amazon in contanti.</li>' +
+      '<li>Dai il PayCode alla cassa' + (o.euro > 0 ? ' e paga <b>' + fmtEur(o.euro) + ' €</b> in contanti' : '') + '.</li>' +
+      '<li>Tieni lo scontrino: è la tua prova.</li>' +
+      '<li>Torna qui e tocca <b>«Ho pagato al tabacchino»</b>' + (attivo ? '' : ' (quando i sats sono in garanzia)') + '.</li>' +
+    '</ol>' +
+    '<div class="hint">Il codice resta tuo e di chi vende: viaggia cifrato, e Barattolo non lo legge.</div>' +
+  '</div>';
+}
+/* ---- IL CONTROLLO SU AMAZON, a chi vende (23 set 2026) ----
+   Dopo «pagato» chi vende ha UN mestiere: aprire Amazon e guardare se
+   l'ordine risulta saldato. Non esiste una conferma automatica —
+   Amazon non parla con Barattolo — quindi la pagina lo dice, mette i
+   due gesti grandi uno sotto l'altro (libera / disputa), e un tempo:
+   24 ore da quando chi compra ha segnato «pagato», riscritto ogni
+   secondo. Il tempo NON fa scattare niente da solo (la regola del
+   tabacchino): se chi vende non fa nulla, i sats restano in garanzia
+   e chi ha pagato puo' aprire lui la disputa; i solleciti su Telegram
+   li manda il server (`fiat_sollecito`). */
+const P2P_TAB_CONTROLLO_S = 24 * 3600;
+/* PURA: da quando decorre il controllo — l'ora della mossa «pagato»
+   se la riga l'ha timbrata, altrimenti l'ultima mossa, altrimenti
+   l'ultimo aggiornamento della riga (una riga ripresa dalla restore
+   non ha di meglio). 0 se non si sa niente. */
+function inizioEuroInviatiP2P(o){
+  if (!o) return 0;
+  return Math.floor(Number(o.euroInviatiAt) || Number(o.ultimaMossa) || Number(o.aggiornato) || 0);
+}
+function riquadroControlloTabP2P(o, adesso){
+  const ora = adesso || Math.floor(Date.now() / 1000);
+  const inizio = inizioEuroInviatiP2P(o);
+  const fine = inizio > 0 ? inizio + P2P_TAB_CONTROLLO_S : 0;
+  const manca = fine > 0 ? Math.max(0, fine - ora) : 0;
+  return '<div class="p2p-controllo" data-fine="' + fine + '">' +
+    '<div class="p2p-paycode-tit">🔎 Controlla su Amazon che l\'ordine risulti pagato</div>' +
+    '<div class="hint">Chi compra dice di aver pagato il PayCode alla cassa. Apri il tuo ordine su Amazon: se risulta <b>saldato</b>, libera i sats; se <b>non risulta pagato</b>, apri una disputa. Non esiste una conferma automatica, e i sats non si liberano da soli.</div>' +
+    (fine > 0
+      ? '<div class="p2p-paycode-resta' + (manca <= 0 ? ' scaduto' : manca <= 3600 ? ' ultima' : '') + '">' +
+          (manca > 0 ? 'Decidi entro le ' + esc(dataTabacchinoP2P(fine).replace(/^.* alle /, '')) + ' del ' + esc(dataTabacchinoP2P(fine).replace(/ alle .*$/, ''))
+                       + ': <b id="p2pTabControlloResta">' + esc(contoRimastoP2P(manca)) + '</b>'
+                     : '<b id="p2pTabControlloResta">Le 24 ore sono passate: decidi adesso</b>') + '</div>'
+      : '<div class="p2p-paycode-resta">Decidi appena puoi: hai 24 ore da quando chi compra ha segnato «pagato».</div>') +
+    '<button class="btn orange" onclick="rilasciaP2P()">✅ Risulta pagato: libera i sats</button>' +
+    '<button class="btn allarme" onclick="apriDisputaP2P()">🚨 Non risulta pagato: apri una disputa</button>' +
+    '<div class="hint">Se non fai niente, i sats restano in garanzia e chi ha pagato può aprire lui la disputa: a decidere sarà un moderatore, e lo scontrino conta. Ti ricordiamo su Telegram dopo un\'ora, sei ore e venti ore.</div>' +
+  '</div>';
+}
+/* ogni secondo, IN PLACE, i due conti alla rovescia del percorso
+   Barattozon (il PayCode di chi compra, il controllo di chi vende):
+   stesso battito dell'anello, mai un render */
+function battitoControlloTabP2P(){
+  const adesso = Math.floor(Date.now() / 1000);
+  [['.view.active .p2p-paycode', 'p2pTabPayResta', 'Scaduto: non si può più pagare'],
+   ['.view.active .p2p-controllo', 'p2pTabControlloResta', 'Le 24 ore sono passate: decidi adesso']]
+  .forEach(([sel, id, fine]) => {
+    const box = document.querySelector(sel), b = el(id);
+    if (!box || !b) return;
+    const manca = (Number(box.dataset.fine) || 0) - adesso;
+    b.textContent = manca > 0 ? contoRimastoP2P(manca) : fine;
+  });
+}
+/* PURA: le frasi del riquadro di stato COL PAYCODE, dove il passo ha
+   un nome suo: a garanzia bloccata e a «pagato». Null altrove, e allora
+   vale la tabella degli stati. Sta DOPO `statoTabacchinoP2P`, che parla
+   del tempo e vince. */
+function statoPayCodeP2P(o){
+  if (!o || !tabacchinoP2P(o.metodi)) return null;
+  const compro = o.lato === 'compro';
+  if (o.stato === 'attivo') return compro
+    ? {t: 'Sats in garanzia', d: 'I sats sono al sicuro in garanzia. Vai al tabacchino col PayCode qui sotto, paga in contanti alla cassa, tieni lo scontrino e poi torna qui a segnare «pagato».'}
+    : {t: 'Sats in garanzia', d: 'I tuoi sats sono bloccati. Chi compra ha il PayCode: aspetta che vada al tabacchino e segni «pagato».'};
+  if (o.stato === 'euro_inviati') return compro
+    ? {t: 'PayCode pagato', d: 'Hai detto di aver pagato al tabacchino. Chi vende controlla su Amazon che l\'ordine risulti saldato e libera i sats: tieni lo scontrino, è la tua prova.'}
+    : {t: 'PayCode pagato: controlla su Amazon', d: 'Chi compra dice di aver pagato alla cassa. Apri Amazon e guarda se l\'ordine risulta saldato: nessuno lo controlla al posto tuo, e i sats non si liberano da soli.'};
+  return null;
 }
 
 /* ---- la pagina di uno scambio ---- */
@@ -44192,7 +44355,8 @@ function renderOrdineP2P(){
   /* IL TEMPO PREVALE SUL PASSO (set 2026, col tabacchino): a
      scadenza vicina o passata il riquadro dice quello, e la tabella
      degli stati resta per tutto il resto */
-  const st = statoTabacchinoP2P(o) || statoTestoP2P(o);
+  const st = statoTabacchinoP2P(o) || statoPayCodeP2P(o) || statoTestoP2P(o);
+  const tabOrd = tabacchinoP2P(o.metodi);
   /* ⚠️ I QUATTRO PASSI PARLANO A CHI L'ORDINE CE L'HA (set 2026,
      richiesta di Andrea), e prima parlavano di lui in terza persona:
      «Al recapito indicato da chi vende» lo leggeva anche IL
@@ -44233,6 +44397,9 @@ function renderOrdineP2P(){
      scambio. */
   if (o.mio) passi[0] = {t: 'Ordine pubblicato',
     d: o.lato === 'compro' ? 'Aspetta chi ti vende i sats' : 'Aspetta chi ti compra i sats'};
+  /* col PayCode il terzo passo ha il suo nome (23 set 2026) */
+  if (tabOrd) passi[2] = {t: 'PayCode pagato',
+    d: o.lato === 'compro' ? 'Alla cassa del tabacchino, in contanti' : 'Chi compra l\'ha pagato alla cassa'};
   const prog = P2P_PROGRESSO[o.stato] === undefined ? 0 : P2P_PROGRESSO[o.stato];
   const tog = p2pTogliibile(o);
   /* IL CONTO E' QUELLO DEL LIBRO, tradotto al verso di chi l'ordine
@@ -44264,10 +44431,15 @@ function renderOrdineP2P(){
     fattura: '<button class="btn orange" onclick="apriIncassoP2P()">💸 Dove ricevere i sats</button>',
     'fattura-nuova': '<button class="btn orange" onclick="apriIncassoP2P()">⚡ Dai una fattura nuova</button>',
     hold: '<button class="btn orange" onclick="apriHoldP2P()">🔒 Blocca i sats</button>',
-    'euro-inviati': '<button class="btn orange" onclick="euroInviatiP2P()">✅ Ho inviato gli euro</button>',
+    'euro-inviati': tabOrd
+      ? '<button class="btn orange" onclick="euroInviatiP2P()">✅ Ho pagato al tabacchino</button>'
+      : '<button class="btn orange" onclick="euroInviatiP2P()">✅ Ho inviato gli euro</button>',
     /* il gesto di chi vende a garanzia bloccata (18 set 2026) */
     recapito: '<button class="btn orange" onclick="apriCampiP2P()">💶 Indica dove ricevere gli euro</button>',
-    rilascia: '<button class="btn orange" onclick="rilasciaP2P()">🔓 Libera i sats</button>'
+    /* col PayCode il rilascio e' un riquadro con i due gesti e il
+       tempo (23 set 2026): libera o disputa, mai un bottone solo */
+    rilascia: tabOrd ? riquadroControlloTabP2P(o)
+      : '<button class="btn orange" onclick="rilasciaP2P()">🔓 Libera i sats</button>'
   };
   /* LA DOMANDA PARTE DA QUI, una sola volta per scambio: «c'e' un
      posto per la recensione, e l'ho gia' lasciata?». Non blocca il
@@ -44275,7 +44447,10 @@ function renderOrdineP2P(){
      risposta arriva (il patto dei volti sul libro). */
   if (o.stato === 'concluso') chiediRecensibileP2P(o.id);
   const rec = p2pRecensioni[o.id];
-  const secondarie = azioniSecondarieP2P(o, rec);
+  /* la disputa col PayCode a «pagato» sta gia' nel riquadro del
+     controllo, grande: non si ripete piccola in fondo */
+  const secondarie = azioniSecondarieP2P(o, rec)
+    .filter(a => !(a === 'disputa' && tabOrd && azione === 'rilascia'));
   /* a ordine Amazon scaduto coi sats in garanzia l'annullo
      d'accordo si veste d'arancio: e' il gesto che risolve */
   const scadutoTab = P2P_TAB_IN_GARANZIA.indexOf(o.stato) >= 0
@@ -44904,10 +45079,13 @@ function recapitoAltroveP2P(){
 function euroInviatiP2P(){
   const o = ordiniP2P()[p2pOrdineAperto];
   if (!o) return;
+  const tab = tabacchinoP2P(o.metodi);
   chiediConferma({
-    titolo: 'Hai inviato gli euro?',
-    corpo: 'Dillo solo dopo aver davvero mandato ' + fmtEur(o.euro) + ' € con il metodo concordato. Chi vende lo vedrà e libererà i sats.',
-    etichetta: 'Sì, li ho inviati',
+    titolo: tab ? 'Hai pagato il PayCode al tabacchino?' : 'Hai inviato gli euro?',
+    corpo: tab
+      ? 'Dillo solo dopo aver pagato davvero ' + fmtEur(o.euro) + ' € in contanti alla cassa. Tieni lo scontrino: chi vende controlla su Amazon che l\'ordine risulti saldato e libera i sats.'
+      : 'Dillo solo dopo aver davvero mandato ' + fmtEur(o.euro) + ' € con il metodo concordato. Chi vende lo vedrà e libererà i sats.',
+    etichetta: tab ? 'Sì, ho pagato' : 'Sì, li ho inviati',
     /* ⚠️ LA PROMESSA SI RESTITUISCE, e non e' stile: `eseguiConferma`
        ASPETTA `poi()` e nel suo `finally` rimette giu' il velo. Col
        corpo a blocco e nessun `return` qui tornava `undefined`, quindi
@@ -44925,7 +45103,9 @@ function rilasciaP2P(){
   if (!o) return;
   chiediConferma({
     titolo: 'Liberi i sats?',
-    corpo: 'Fallo solo se hai ricevuto ' + fmtEur(o.euro) + ' € davvero. I sats partono verso chi compra e non tornano indietro.',
+    corpo: tabacchinoP2P(o.metodi)
+      ? 'Fallo solo se su Amazon il tuo ordine da ' + fmtEur(o.euro) + ' € risulta pagato davvero. I sats partono verso chi compra e non tornano indietro.'
+      : 'Fallo solo se hai ricevuto ' + fmtEur(o.euro) + ' € davvero. I sats partono verso chi compra e non tornano indietro.',
     etichetta: 'Sì, libero i sats',
     /* la promessa si restituisce: vedi la nota in `euroInviatiP2P` */
     poi: () => mossaOrdineP2P(o.id, 'release', 'Sats liberati ✅',
@@ -45028,12 +45208,90 @@ const P2P_TABACCHINO = 'Contanti al tabacchino';
    altrui leggono il numero come parte del nome del metodo, e non si
    rompono. I giudici cercano il PREFISSO, mai l'uguaglianza. */
 const P2P_TABACCHINO_PM = /^Contanti al tabacchino(?:\s+(\d+\.\d{2}))?$/;
-/* IL CAMBIO SI FISSA ALLA PUBBLICAZIONE, quindi l'ordine resta nel
-   libro al massimo 24 ore (proposta accolta da Andrea, 22 set 2026):
-   un ordine Amazon vive 72, e a cambio fermo per tre giorni chi prende
-   avrebbe un'opzione gratuita sul BTC/EUR. Scaduto dal libro si
-   ripubblica col cambio nuovo: l'ordine Amazon vale ancora. */
-const P2P_TABACCHINO_VITA_S = 24 * 3600;
+/* ---- IL PERCORSO BARATTOZON (23 set 2026, decisione di Andrea) ----
+   La struttura e' quella del bot di riferimento, non i testi: il
+   PAYCODE a 9 cifre della mail Amazon «paga in contanti nel punto
+   vendita» (479-868-518), l'importo esatto coi centesimi, la
+   scadenza del PayCode (data e ora, di norma 69-72 ore dall'ordine),
+   lo SCONTO scelto da chi vende sats (0-15%, una cifra decimale), il
+   riepilogo, e dopo la presa: pagato al negozio → chi vende controlla
+   su Amazon → libera o disputa.
+   IL VERSO DELLO SCONTO, scritto una volta per tutte: chi VENDE sats
+   ha un ordine Amazon da far pagare in contanti; lo sconto e' quanto
+   in MENO in sats consegna rispetto al cambio del momento, cioe' chi
+   paga al tabacchino riceve `importo × (1 − sconto)` in sats. E' lo
+   stesso verso del premio positivo di tutti gli altri ordini
+   (sottrazione uniforme sui sats), e la ragione per cui «sconto piu'
+   basso = piu' probabile che qualcuno lo paghi in tempo»: a sconto
+   zero chi paga riceve il cambio pieno.
+   LA VITA NEL LIBRO SEGUE IL PAYCODE (rovescia le 24 ore del 22 set,
+   decisione di Andrea): `expires_at` = scadenza del PayCode MENO un
+   margine, e comunque mai oltre 72 ore. Il margine e' di due ore, e
+   si STRINGE sui PayCode corti (mai piu' di meta' del tempo che
+   resta): un PayCode che vale un'ora sta nel libro mezz'ora, non
+   «meno due ore» che sarebbe gia' passato. Il costo dichiarato: a
+   prezzo fisso per tre giorni chi prende ha un'opzione sul BTC/EUR,
+   ed e' il prezzo di non far ripubblicare l'ordine tre volte. */
+const P2P_TABACCHINO_VITA_S = 72 * 3600;
+const P2P_PAYCODE_MIN_S = 3600;            // sotto un'ora non si va al tabacchino in tempo
+const P2P_PAYCODE_MAX_S = 72 * 3600;       // un PayCode Amazon non vale di piu'
+const P2P_TABACCHINO_MARGINE_S = 2 * 3600; // il libro chiude prima del PayCode
+const P2P_SCONTO_TAB_MAX = 15;             // lo sconto di chi vende, in percento
+/* PURA: il PayCode normalizzato («479-868-518»), o '' se non e' un
+   PayCode. Nove cifre, coi trattini o gli spazi facoltativi fra le
+   terzine — e SOLO cosi': un numero d'ordine Amazon (17 cifre) o un
+   codice a 8 cifre e' STORTO, non «quasi giusto». */
+function payCodeP2P(testo){
+  const m = /^(\d{3})[-\s]?(\d{3})[-\s]?(\d{3})$/.exec(String(testo || '').trim());
+  return m ? m[1] + '-' + m[2] + '-' + m[3] : '';
+}
+/* PURA: quanto resta nel libro (l'`expires_at`) per un PayCode che
+   scade a `scade`: la scadenza meno il margine, tosato a meta' del
+   tempo che resta, e mai oltre P2P_TABACCHINO_VITA_S. Zero se il
+   PayCode e' gia' scaduto. */
+function vitaLibroTabacchinoP2P(scade, adesso){
+  const s = Math.floor(Number(scade) || 0), ora = Math.floor(Number(adesso) || 0);
+  if (!(s > ora)) return 0;
+  const margine = Math.min(P2P_TABACCHINO_MARGINE_S, Math.floor((s - ora) / 2));
+  return Math.min(s - margine, ora + P2P_TABACCHINO_VITA_S);
+}
+/* PURA: lo sconto scritto nel foglio, 0-15 con una cifra decimale al
+   massimo (virgola o punto). {n, storto}: «2,55» e' storto, non 2,5. */
+function scontoTabacchinoP2P(testo){
+  const t = String(testo == null ? '' : testo).trim().replace(',', '.');
+  if (t === '') return {n: 0, storto: false};
+  if (!/^\d{1,2}(\.\d)?$/.test(t)) return {n: 0, storto: true};
+  const n = Number(t);
+  if (!(n >= 0 && n <= P2P_SCONTO_TAB_MAX)) return {n: 0, storto: true};
+  return {n: n, storto: false};
+}
+/* lo sconto come si scrive: «3,5%», «0%» */
+function scontoTestoTabP2P(n){
+  const v = Math.round((Number(n) || 0) * 10) / 10;
+  return String(v).replace('.', ',') + '%';
+}
+/* PURA: lo sconto che un ordine gia' nel libro PORTA DENTRO, letto
+   all'indietro dai suoi sats fissi contro il cambio di adesso — sul
+   filo `premium` e' 0 e nessuno lo dichiara, quindi per chi legge il
+   libro e' un fatto ricavato, al decimo. 0 se non si sa. */
+function scontoImplicitoTabacchinoP2P(euro, sats, cambio){
+  if (!(euro > 0) || !(sats > 0) || !(cambio > 0)) return 0;
+  const pieno = euro / cambio;
+  return Math.max(0, Math.round((1 - sats / pieno) * 1000) / 10);
+}
+/* PURA: il passo del percorso in cui si sta (1 PayCode, 2 importo,
+   3 scadenza, 4 sconto), o 5 quando i quattro sono buoni: e' il
+   primo che manca, nell'ordine in cui il foglio li mostra. Guarda i
+   CAMPI, non il giudice del filo: dice DOVE si e', non se si puo'
+   pubblicare (quello e' `valeNuovoOrdineP2P`). */
+function passoTabacchinoP2P(v){
+  const t = v.tab || {};
+  if (!payCodeP2P(t.ordine)) return 1;
+  if (!(centesimiP2P(v.euro).n > 0)) return 2;
+  if (!(scadeDaCampoP2P(t.scade) > 0)) return 3;
+  if (scontoTabacchinoP2P(v.sconto).storto) return 4;
+  return 5;
+}
 /* il metodo SENZA l'importo: e' la chiave del catalogo dei vestiti e
    la parola che il filtro del libro e le forme di recapito cercano */
 function metodoBaseP2P(m){
@@ -45230,6 +45488,7 @@ let p2pNuovoFisso = false;    // true = prezzo fisso in sats | false = prezzo di
 let p2pNuovoPremio = 0;       // il premio in percento, quando e' a mercato
 let p2pNuovoPremioMano = false;  // il premio si scrive invece di trascinarlo
 let p2pNuovoTab = {ordine: '', importo: '', scade: ''};  // i tre dati del tabacchino; `scade` come lo scrive il campo data
+let p2pNuovoSconto = '';      // lo sconto di chi vende col tabacchino, come lo scrive il campo (0-15, una cifra decimale)
 
 /* ====== LA MORFOSI DEL + (set 2026, richiesta di Andrea) ======
    Il + della barra e il bottone che pubblica SONO LA STESSA COSA: al
@@ -45460,6 +45719,7 @@ function apriNuovoOrdineP2P(){
   p2pNuovoPremio = 0;
   p2pNuovoPremioMano = false;
   p2pNuovoTab = {ordine: '', importo: '', scade: ''};
+  p2pNuovoSconto = '';
   renderNuovoOrdineP2P();
   el('sheetBg').classList.add('open');
   /* LA MORFOSI APRE ANCHE IL FOGLIO (deve misurare il bottone d'arrivo
@@ -45572,16 +45832,29 @@ function valeNuovoOrdineP2P(v){
     if (!x.vuoto)
       return {ok: false, manca: 'Col tabacchino l\'importo è uno solo, senza massimo',
               campo: 'p2pNuovoEuro'};
+    /* IL PAYCODE (23 set 2026): nove cifre, o non e' un PayCode —
+       la frase dice la forma, e il vuoto e lo storto hanno due frasi */
     if (!String(t.ordine || '').trim())
-      return {ok: false, manca: 'Scrivi il numero dell\'ordine Amazon',
+      return {ok: false, manca: 'Scrivi il PayCode: 9 cifre, come 479-868-518',
+              campo: 'p2pNuovoTabOrdine'};
+    if (!payCodeP2P(t.ordine))
+      return {ok: false, manca: 'Il PayCode ha 9 cifre (479-868-518): controllalo sulla mail di Amazon',
               campo: 'p2pNuovoTabOrdine'};
     const quando = scadeDaCampoP2P(t.scade);
     if (!quando)
-      return {ok: false, manca: 'Scrivi quando scade l\'ordine Amazon',
+      return {ok: false, manca: 'Scrivi quando scade il PayCode: data e ora sono sulla mail di Amazon',
               campo: 'p2pNuovoTabScade'};
     const adesso = v.adesso || Math.floor(Date.now() / 1000);
     if (quando <= adesso)
-      return {ok: false, manca: 'La scadenza è già passata: serve un ordine Amazon nuovo',
+      return {ok: false, manca: 'La scadenza è già passata: serve un PayCode nuovo',
+              campo: 'p2pNuovoTabScade'};
+    /* FRA UN'ORA E 72 ORE (23 set 2026): sotto l'ora nessuno fa in
+       tempo ad andare al tabacchino, sopra le 72 non e' un PayCode */
+    if (quando < adesso + P2P_PAYCODE_MIN_S)
+      return {ok: false, manca: 'Scade troppo presto: serve almeno un\'ora perché qualcuno vada al tabacchino',
+              campo: 'p2pNuovoTabScade'};
+    if (quando > adesso + P2P_PAYCODE_MAX_S)
+      return {ok: false, manca: 'Troppo lontana: un PayCode vale al massimo 72 ore',
               campo: 'p2pNuovoTabScade'};
     if (!(v.finestra > 0))
       return {ok: false, manca: 'Aspetta un attimo: sto leggendo quanto dura la garanzia',
@@ -45590,6 +45863,10 @@ function valeNuovoOrdineP2P(v){
       return {ok: false, manca: 'Troppo lontana: la garanzia copre al massimo '
                 + Math.floor(v.finestra / 3600) + ' ore da adesso',
               campo: 'p2pNuovoTabScade'};
+    /* LO SCONTO (23 set 2026): 0-15, una cifra decimale; vuoto = 0 */
+    if (scontoTabacchinoP2P(v.sconto).storto)
+      return {ok: false, manca: 'Lo sconto va da 0 a 15%, con una cifra decimale al massimo',
+              campo: 'p2pNuovoSconto'};
     /* I SATS SONO NOSTRI (22 set 2026): a prezzo fisso li calcola il
        foglio sul cambio vivo, quindi senza cambio non si pubblica, e
        i due tetti del coordinatore si guardano qui come per il fisso */
@@ -45632,6 +45909,8 @@ function campiNuovoP2P(){
     fisso: p2pNuovoFisso && !tabacchinoP2P(p2pNuovoMetodi),
     metodi: p2pNuovoMetodi,
     premio: p2pNuovoPremio,
+    /* lo sconto del percorso Barattozon, come scritto (23 set 2026) */
+    sconto: p2pNuovoSconto,
     /* il cambio vivo, 0 = non lo so: serve ai sats del tabacchino */
     cambio: (cambioVivo && eurPerSat > 0) ? eurPerSat : 0,
     maxSats: (p2pInfo && p2pInfo.maxSats) || 0,
@@ -45676,7 +45955,12 @@ function ordineDaCampiP2P(v, lato){
   const esatto = tab ? centesimiP2P(v.euro).n : 0;
   const euro = tab ? Math.round(esatto) : interoP2P(v.euro).n;
   const euroMax = interoP2P(v.euroMax).n;
-  const satsFissi = tab ? satsTabacchinoP2P(esatto, v.cambio, v.premio)
+  /* col tabacchino il «premio» e' lo SCONTO del foglio (0-15, una
+     cifra decimale), e passa da `sconto` se c'e', da `premio` per le
+     righe di prima (il «Riprova» porta `premioCotto`) */
+  const scontoTab = tab ? (v.sconto !== undefined ? scontoTabacchinoP2P(v.sconto).n
+                                                  : (Number(v.premio) || 0)) : 0;
+  const satsFissi = tab ? satsTabacchinoP2P(esatto, v.cambio, scontoTab)
                         : v.fisso ? interoP2P(v.sats).n : 0;
   /* L'INTERVALLO E' UN FATTO DEI NUMERI e non della sezione aperta:
      due importi buoni e crescenti sono un range, uno solo e' un ordine
@@ -45707,12 +45991,13 @@ function ordineDaCampiP2P(v, lato){
      payload resta byte per byte quello di ieri, e vale il ramo
      «now + expiration_hours» verificato sul campo il 6 set 2026. */
   if (v.scade > 0) {
-    /* e nel libro resta al massimo 24 ore (22 set 2026): a prezzo
-       fisso il cambio e' quello di adesso, e tre giorni sarebbero
-       un'opzione gratuita per chi prende. L'ordine Amazon vale fino
-       alla SUA scadenza, che resta sulla riga (`ord.scade`). */
+    /* E NEL LIBRO RESTA FINO AL PAYCODE MENO IL MARGINE (23 set 2026,
+       decisione di Andrea, che rovescia le 24 ore del 22): il giudice
+       e' `vitaLibroTabacchinoP2P`, e la scadenza VERA del PayCode
+       resta sulla riga (`ord.scade`), che e' quella che chi compra
+       rilegge dal recapito cifrato. */
     const adesso = v.adesso || Math.floor(Date.now() / 1000);
-    o.expires_at = Math.min(Math.floor(v.scade), adesso + P2P_TABACCHINO_VITA_S);
+    o.expires_at = vitaLibroTabacchinoP2P(v.scade, adesso);
   }
   return o;
 }
@@ -45902,10 +46187,12 @@ function renderNuovoOrdineP2P(){
       '<i aria-hidden="true">▾</i></button>'
   });
 
-  const importo = sezioneNuovoP2P({
+  /* COL TABACCHINO L'IMPORTO STA NEL PERCORSO (23 set 2026): e' il
+     passo 2 di `percorsoTabacchinoP2P`, con lo stesso `id` del campo,
+     cosi' la rete dei centesimi e l'avviso «manca» lo trovano uguale */
+  const importo = tab ? '' : sezioneNuovoP2P({
     ico: 'importo',
-    titolo: tab ? 'Inserisci l\'importo dell\'ordine Amazon, in ' + esc(val.cod)
-                : 'Inserisci l\'importo in ' + esc(val.cod) + ' che vuoi ' +
+    titolo: 'Inserisci l\'importo in ' + esc(val.cod) + ' che vuoi ' +
       (compro ? 'inviare' : 'ricevere'),
     /* UN CAMPO SOLO, ALL'APERTURA (ritocco di Andrea): il secondo —
        e la riga che lo spiega — si fanno vedere quando si tocca il
@@ -45918,21 +46205,12 @@ function renderNuovoOrdineP2P(){
        Percio' `style="display:none"` e non l'attributo `hidden`: `.hint`
        potrebbe avere un `display` suo e vincerlo. */
     corpo: '<div class="p2p-duecampi">' +
-      /* COL TABACCHINO IL CAMPO HA I CENTESIMI (22 set 2026): e'
-         l'importo dell'ordine Amazon, tastiera decimale e il filtro
-         dei centesimi; per tutti gli altri metodi resta solo cifre */
-      (tab
-        ? '<input id="p2pNuovoEuro" type="text" inputmode="decimal" ' +
-          'placeholder="Importo dell\'ordine Amazon, es. 23,47" value="' + esc(p2pNuovoEuro) + '" ' +
-          'onbeforeinput="soloCentesimiP2P(event)" ' +
-          'oninput="cambiaCampoNuovoP2P()" ' +
-          'aria-label="Importo dell\'ordine Amazon in euro">'
-        : '<input id="p2pNuovoEuro" type="text" inputmode="numeric" ' +
+      '<input id="p2pNuovoEuro" type="text" inputmode="numeric" ' +
           'placeholder="Importo" value="' + esc(p2pNuovoEuro) + '" ' +
           'onbeforeinput="soloCifreP2P(event)" ' +
           'onfocus="svelaSecondoImportoP2P()" oninput="cambiaCampoNuovoP2P()" ' +
-          'aria-label="Importo">') +
-      ((p2pNuovoFisso || tab) ? '' :
+          'aria-label="Importo">' +
+      (p2pNuovoFisso ? '' :
         '<em id="p2pNuovoA"' + (p2pNuovoDue ? '' : ' style="display:none"') + '>a</em>' +
         '<input id="p2pNuovoEuroMax" type="text" inputmode="numeric" ' +
         'placeholder="Importo massimo" value="' + esc(p2pNuovoEuroMax) + '" ' +
@@ -45952,9 +46230,7 @@ function renderNuovoOrdineP2P(){
          non una regola per sempre. Il numero resta vivo. */
       (maxTestoP2P()
         ? '<div class="hint">Fase beta: max ' + maxTestoP2P() + '</div>' : '') +
-      (tab
-        ? '<div class="hint">Col tabacchino l\'importo è uno solo, quello scritto sull\'ordine Amazon, coi centesimi: niente intervallo.</div>'
-        : p2pNuovoFisso
+      (p2pNuovoFisso
         ? '<div class="hint">A prezzo fisso l\'importo è uno solo: un ordine a intervallo non può fissare la quantità di sats.</div>'
         : '<div class="hint" id="p2pNuovoNotaDue"' + (p2pNuovoDue ? '' : ' style="display:none"') +
           '>💡 Tocca il secondo campo solo se vuoi creare un ordine a intervallo</div>')
@@ -45996,29 +46272,12 @@ function renderNuovoOrdineP2P(){
      SCADENZA NON SI PROPONE (decisione di Andrea): la sa la ricevuta
      Amazon, e proporne una sarebbe una cifra plausibile al posto di
      quella vera. */
-  const adessoTab = Math.floor(Date.now() / 1000);
-  const finestraTab = finestraGaranziaP2P(p2pInfo);
-  const scontrino = !tab ? '' : sezioneNuovoP2P({
-    ico: 'scontrino',
-    titolo: 'L\'ordine Amazon da pagare al tabacchino',
-    corpo:
-      '<input id="p2pNuovoTabOrdine" type="text" ' +
-        'placeholder="Numero dell\'ordine Amazon" value="' + esc(p2pNuovoTab.ordine) + '" ' +
-        'autocomplete="off" autocapitalize="off" spellcheck="false" ' +
-        'oninput="cambiaTabP2P()" aria-label="Numero dell\'ordine Amazon">' +
-      '<input id="p2pNuovoTabScade" type="datetime-local" ' +
-        'value="' + esc(p2pNuovoTab.scade) + '" ' +
-        'min="' + campoDaScadeP2P(adessoTab) + '" ' +
-        (finestraTab > 0 ? 'max="' + campoDaScadeP2P(adessoTab + finestraTab) + '" ' : '') +
-        'oninput="cambiaTabP2P()" aria-label="Quando scade l\'ordine Amazon">',
-    /* le tre note stanno nel «sotto», fuori dalla riga dell'icona:
-       cosi' lo scontrino resta coi tre campi invece di galleggiare
-       a meta' delle spiegazioni (visto nel giro visivo) */
-    sotto:
-      '<div class="hint">🧾 Genera prima l\'ordine Amazon pagabile in contanti, poi copia qui numero e scadenza: l\'importo, coi centesimi, l\'hai scritto sopra. Chi compra riceve i tre dati cifrati appena prende l\'ordine, paga al tabacchino e tiene lo scontrino.</div>' +
-      '<div class="hint">⏳ La scadenza è quella scritta sull\'ordine Amazon, 72 ore da quando l\'hai generato. Nel libro però l\'ordine resta al massimo 24 ore, perché il cambio si fissa adesso: se nessuno lo prende, lo ripubblichi col cambio nuovo finché l\'ordine Amazon vale.</div>' +
-      '<div class="hint">Con questo metodo l\'importo è uno solo e nessun altro metodo entra nello stesso ordine: l\'ordine Amazon vale per quella cifra e per quello scambio.</div>'
-  });
+  /* IL PERCORSO BARATTOZON (23 set 2026): al posto della sezione
+     unica dello scontrino, quattro passi numerati nello stesso foglio
+     — PayCode, importo, scadenza, sconto — con la testata che dice a
+     che passo si e' e il riepilogo prima di pubblicare. Vedi
+     `percorsoTabacchinoP2P`. */
+  const percorso = !tab ? '' : percorsoTabacchinoP2P(val);
 
   /* COL TABACCHINO NIENTE LEVA (22 set 2026): il prezzo e' fisso per
      costruzione — i sats li fa il foglio dall'importo esatto — e i
@@ -46057,7 +46316,7 @@ function renderNuovoOrdineP2P(){
      una barra che vuole tutta la larghezza che trova, e il cerchio la
      accorciava di quaranta pixel per dire una cosa che il titolo
      «Premio (%)» dice gia'. */
-  const premio = (p2pNuovoFisso && !tab) ? '' : sezioneNuovoP2P({
+  const premio = (p2pNuovoFisso || tab) ? '' : sezioneNuovoP2P({
     ico: '', titolo: 'Premio (%)', info: 'spiegaPremioP2P()',
     corpo: '<div class="p2p-premio">' +
       '<div class="p2p-premio-val" id="p2pNuovoPremioBox">' + premioValP2P() + '</div>' +
@@ -46075,10 +46334,7 @@ function renderNuovoOrdineP2P(){
       fasciaPremioP2P(-P2P_PREMIO_MAX, p2pLato).tinta + '">−' + P2P_PREMIO_MAX +
       '%</span><span style="color:' + fasciaPremioP2P(P2P_PREMIO_MAX, p2pLato).tinta +
       '">+' + P2P_PREMIO_MAX + '%</span></span></div>' +
-      '<div class="hint" id="p2pNuovoPremioNota">' + premioNotaP2P(compro, p2pNuovoPremio) + '</div>' +
-      /* col tabacchino il premio si cuoce nei sats: il cambio e' fisso
-         da adesso, e la riga lo dice dove si sceglie */
-      (tab ? '<div class="hint">Facoltativo: col tabacchino il cambio si fissa adesso e il premio entra nei sats dell\'ordine, così chi prende vede la cifra già fatta.</div>' : '')
+      '<div class="hint" id="p2pNuovoPremioNota">' + premioNotaP2P(compro, p2pNuovoPremio) + '</div>'
   });
 
   /* LA RIGA D'APERTURA NON C'E' PIU' (ritocco di Andrea): «Stai
@@ -46109,7 +46365,7 @@ function renderNuovoOrdineP2P(){
        vecchia diceva la fee INTERA del coordinatore, cioe' il doppio
        di quel che paga chi legge — «per parte» non e' una precisazione
        ma la correzione di un numero che diceva il doppio. */
-    valuta + importo + metodi + scontrino + tipo
+    valuta + importo + metodi + percorso + tipo
     + quanti + premio + riquadroLimitiP2P() +
     /* ⚠️ SOTTO LE SCATOLE NON C'E' PIU' NIENTE (17 set 2026,
        decisione di Andrea): qui stavano due righe sciolte — «Finche'
@@ -46147,8 +46403,129 @@ function renderNuovoOrdineP2P(){
        rossa (successo, due volte di fila). */
     '<div class="foglio-piede sola">' +
       '<button type="button" class="btn orange" id="p2pNuovoInvia" ' +
-        'onclick="inviaNuovoOrdineP2P()">⚡ Pubblica ordine</button>' +
+        'onclick="inviaNuovoOrdineP2P()">' +
+        /* col percorso Barattozon il bottone dice che prima c'e' il
+           riepilogo: e' l'ultimo passo, non un salto nel vuoto */
+        (tab ? '🧾 Rileggi e pubblica' : '⚡ Pubblica ordine') + '</button>' +
     '</div>';
+}
+/* ---- IL PERCORSO BARATTOZON NEL FOGLIO «PUBBLICA» (23 set 2026) ----
+   Quattro passi numerati, uno sotto l'altro nello stesso foglio (e non
+   quattro schermate: la tastiera dell'iPhone e i fogli dal basso
+   hanno gia' pagato abbastanza, e un foglio che si scorre e' quello
+   che l'app sa gia' tenere in piedi). La testata dice A CHE PASSO SI
+   E' (`passoTabacchinoP2P`, il primo che manca), ogni passo fatto
+   porta la spunta, e lo sconto mostra vivi i sats che chi paga
+   riceve. Il riepilogo arriva al tocco del bottone, prima di
+   pubblicare (`riepilogoTabacchinoP2P`).
+   I CAMPI HANNO GLI STESSI ID DI PRIMA (p2pNuovoTabOrdine,
+   p2pNuovoEuro, p2pNuovoTabScade) piu' p2pNuovoSconto: cosi' ogni
+   «manca» del giudice trova ancora il suo campo. */
+const P2P_TAPPE_TAB = [
+  {n: 1, t: 'Il PayCode'},
+  {n: 2, t: 'L\'importo esatto'},
+  {n: 3, t: 'Quando scade il PayCode'},
+  {n: 4, t: 'Lo sconto per chi paga'}
+];
+/* PURA: la riga dei sats, dallo sconto e dal cambio: «Chi paga al
+   tabacchino riceve N sats invece di M» — M e' il cambio pieno, N
+   quello scontato. Senza cambio o importo dice che aspetta. */
+function rigaScontoTabP2P(euro, cambio, sconto){
+  const e = centesimiP2P(euro).n, s = scontoTabacchinoP2P(sconto);
+  if (!(e > 0)) return 'Scrivi prima l\'importo: qui vedrai quanti sats riceve chi paga.';
+  if (!(cambio > 0)) return 'Aspetta un attimo: sto leggendo il cambio.';
+  if (s.storto) return 'Lo sconto va da 0 a 15%, con una cifra decimale al massimo.';
+  const pieno = satsTabacchinoP2P(e, cambio, 0), netto = satsTabacchinoP2P(e, cambio, s.n);
+  if (!(s.n > 0)) return 'Senza sconto chi paga al tabacchino riceve il cambio pieno: ' + fmt(pieno) + ' sats per ' + centesimiTestoP2P(e) + ' €.';
+  return 'Chi paga al tabacchino riceve ' + fmt(netto) + ' sats invece di ' + fmt(pieno)
+    + ' (il cambio pieno per ' + centesimiTestoP2P(e) + ' €): il ' + scontoTestoTabP2P(s.n) + ' resta a te.';
+}
+/* PURA: la testata del percorso, dal passo in cui si sta */
+function testataPercorsoTabP2P(passo){
+  if (passo >= 5) return 'Tutti e quattro i passi sono fatti: rileggi e pubblica.';
+  return 'Passo ' + passo + ' di 4 · ' + P2P_TAPPE_TAB[passo - 1].t;
+}
+function percorsoTabacchinoP2P(val){
+  const adessoTab = Math.floor(Date.now() / 1000);
+  const finestraTab = finestraGaranziaP2P(p2pInfo);
+  /* il campo data va da un'ora a 72 ore, e comunque non oltre la
+     garanzia letta viva (che con 576 blocchi e' piu' larga) */
+  const maxTab = finestraTab > 0 ? Math.min(P2P_PAYCODE_MAX_S, finestraTab) : P2P_PAYCODE_MAX_S;
+  const campi = campiNuovoP2P();
+  const passo = passoTabacchinoP2P(campi);
+  const tappa = (n, titolo, corpo, sotto) =>
+    '<div class="p2p-sez p2p-tappa" data-tappa="' + n + '" data-fatto="' + (n < passo ? '1' : '0') + '">' +
+      '<div class="p2p-sez-tit"><span><b class="p2p-tappa-n" aria-hidden="true">' + n + '</b>' + titolo + '</span></div>' +
+      '<div class="p2p-sez-riga"><div class="p2p-sez-corpo">' + corpo + '</div></div>' +
+      (sotto || '') + '</div>';
+  return '<div class="p2p-percorso">' +
+    '<div class="p2p-percorso-testa" id="p2pTabPasso">' + esc(testataPercorsoTabP2P(passo)) + '</div>' +
+    '<div class="hint">🧾 Prima genera su Amazon l\'ordine <b>da pagare in contanti nel punto vendita</b>: nella mail di Amazon trovi il PayCode, l\'importo e la scadenza. Copiali qui, uno per passo.</div>' +
+    tappa(1, P2P_TAPPE_TAB[0].t,
+      '<input id="p2pNuovoTabOrdine" type="text" inputmode="numeric" maxlength="11" ' +
+        'placeholder="479-868-518" value="' + esc(p2pNuovoTab.ordine) + '" ' +
+        'autocomplete="off" autocapitalize="off" spellcheck="false" ' +
+        'oninput="cambiaTabP2P()" aria-label="PayCode, nove cifre">',
+      '<div class="hint">Nove cifre, coi trattini o senza. È il codice che chi compra dà alla cassa del tabacchino: viaggia cifrato, e lo legge solo chi prende l\'ordine.</div>') +
+    tappa(2, P2P_TAPPE_TAB[1].t + ', in ' + esc(val.cod),
+      '<input id="p2pNuovoEuro" type="text" inputmode="decimal" ' +
+        'placeholder="23,47" value="' + esc(p2pNuovoEuro) + '" ' +
+        'onbeforeinput="soloCentesimiP2P(event)" ' +
+        'oninput="cambiaCampoNuovoP2P()" ' +
+        'aria-label="Importo del PayCode in euro, coi centesimi">',
+      (maxTestoP2P() ? '<div class="hint">Fase beta: max ' + maxTestoP2P() + '</div>' : '') +
+      '<div class="hint">Quello scritto sulla mail di Amazon, coi centesimi: al tabacchino si paga esattamente quella cifra. Con Barattozon l\'importo è uno solo, niente intervallo, e nessun altro metodo nello stesso ordine.</div>') +
+    tappa(3, P2P_TAPPE_TAB[2].t,
+      '<input id="p2pNuovoTabScade" type="datetime-local" ' +
+        'value="' + esc(p2pNuovoTab.scade) + '" ' +
+        'min="' + campoDaScadeP2P(adessoTab + P2P_PAYCODE_MIN_S) + '" ' +
+        'max="' + campoDaScadeP2P(adessoTab + maxTab) + '" ' +
+        'oninput="cambiaTabP2P()" aria-label="Quando scade il PayCode">',
+      '<div class="hint">⏳ Data e ora sono sulla mail di Amazon: di norma 69-72 ore da quando hai fatto l\'ordine. Deve stare fra un\'ora e 72 ore da adesso. Nel libro l\'ordine resta fino a <b>due ore prima</b> di quella scadenza, per lasciare a chi paga il tempo di andare al tabacchino; poi esce da solo.</div>') +
+    tappa(4, P2P_TAPPE_TAB[3].t,
+      '<div class="p2p-sconto-riga">' +
+        '<input id="p2pNuovoSconto" type="text" inputmode="decimal" maxlength="4" ' +
+          'placeholder="0" value="' + esc(p2pNuovoSconto) + '" ' +
+          'oninput="cambiaTabP2P()" aria-label="Sconto in percento, da 0 a 15">' +
+        '<span class="p2p-sconto-pc" aria-hidden="true">%</span>' +
+      '</div>',
+      '<div class="hint" id="p2pTabSatsRiga">' + esc(rigaScontoTabP2P(p2pNuovoEuro, campi.cambio, p2pNuovoSconto)) + '</div>' +
+      '<div class="hint">Da 0 a 15%, con una cifra decimale. È quanto in meno, in sats, consegni rispetto al cambio di adesso. <b>Sconto più basso = più probabile che qualcuno lo paghi in tempo.</b> Il cambio si fissa adesso.</div>') +
+  '</div>';
+}
+/* PURA: il riepilogo che si rilegge prima di pubblicare, dai campi del
+   foglio: PayCode, importo, scadenza, sconto, i sats, e fino a quando
+   resta nel libro. Testo nudo, a righe: `confCorpo` lo scrive col
+   textContent e tiene gli a capo. */
+function riepilogoTabacchinoP2P(v){
+  const e = centesimiP2P(v.euro).n, sc = scontoTabacchinoP2P(v.sconto).n;
+  const scade = scadeDaCampoP2P((v.tab || {}).scade);
+  const adesso = v.adesso || Math.floor(Date.now() / 1000);
+  const pieno = satsTabacchinoP2P(e, v.cambio, 0), netto = satsTabacchinoP2P(e, v.cambio, sc);
+  const libro = vitaLibroTabacchinoP2P(scade, adesso);
+  return 'PayCode: ' + payCodeP2P((v.tab || {}).ordine)
+    + '\nImporto: ' + centesimiTestoP2P(e) + ' €'
+    + '\nScade il: ' + dataTabacchinoP2P(scade)
+    + '\nSconto: ' + scontoTestoTabP2P(sc)
+    + '\n\nChi paga al tabacchino riceve ' + fmt(netto) + ' sats'
+    + (sc > 0 ? ' invece di ' + fmt(pieno) : ' (il cambio pieno)')
+    + ': tu blocchi ' + fmt(netto) + ' sats in garanzia e l\'ordine Amazon lo paga chi li riceve.'
+    + '\nNel libro fino alle ' + dataTabacchinoP2P(libro).replace(/^.* alle /, '') + ' del '
+    + dataTabacchinoP2P(libro).replace(/ alle .*$/, '') + ', poi esce da solo.';
+}
+/* i pezzi vivi del percorso si riscrivono IN PLACE mentre si digita:
+   mai un render, che porterebbe via il cursore (la lezione delle
+   pillole). Testata, spunte, e la riga dei sats. */
+function aggiornaPercorsoTabP2P(){
+  const campi = campiNuovoP2P();
+  const passo = passoTabacchinoP2P(campi);
+  const testa = el('p2pTabPasso');
+  if (testa) testa.textContent = testataPercorsoTabP2P(passo);
+  document.querySelectorAll('.p2p-tappa').forEach(t => {
+    t.dataset.fatto = (Number(t.dataset.tappa) < passo) ? '1' : '0';
+  });
+  const riga = el('p2pTabSatsRiga');
+  if (riga) riga.textContent = rigaScontoTabP2P(p2pNuovoEuro, campi.cambio, p2pNuovoSconto);
 }
 /* la nota del premio: cosa cambia PER CHI STA LEGGENDO, col lato che
    ha scelto.
@@ -46218,15 +46595,19 @@ function cambiaCampoNuovoP2P(){
   if (e) p2pNuovoEuro = tabacchinoP2P(p2pNuovoMetodi) ? ripuliCentesimiP2P(e) : ripuliCifreP2P(e);
   if (x) p2pNuovoEuroMax = ripuliCifreP2P(x);
   if (s) p2pNuovoSats = ripuliCifreP2P(s);
+  /* col percorso Barattozon l'importo muove la riga dei sats e la spunta del passo 2 */
+  if (tabacchinoP2P(p2pNuovoMetodi)) aggiornaPercorsoTabP2P();
 }
 /* L'IMPORTO DELL'ORDINE AMAZON E' UNO SOLO (22 set 2026): sta nel campo
    dell'importo, coi centesimi. La nota «gli importi non combaciano» e
    il secondo campo se ne sono andati con lui: con i sats calcolati
    sull'importo esatto non c'e' piu' una seconda cifra da confrontare. */
 function cambiaTabP2P(){
-  const o = el('p2pNuovoTabOrdine'), s = el('p2pNuovoTabScade');
+  const o = el('p2pNuovoTabOrdine'), s = el('p2pNuovoTabScade'), sc = el('p2pNuovoSconto');
   if (o) p2pNuovoTab.ordine = String(o.value || '');
   if (s) p2pNuovoTab.scade = String(s.value || '');
+  if (sc) p2pNuovoSconto = String(sc.value || '');
+  aggiornaPercorsoTabP2P();
 }
 function apriTendinaMetodiP2P(){
   haptic();
@@ -46524,10 +46905,25 @@ function spiegaPremioP2P(){
     etichetta: 'Ho capito', avviso: true
   });
 }
-async function inviaNuovoOrdineP2P(){
+async function inviaNuovoOrdineP2P(confermato){
   const campi = campiNuovoP2P();
   const g = valeNuovoOrdineP2P(campi);
   if (!g.ok) { avvisaMancaP2P(g); return; }
+  /* IL RIEPILOGO PRIMA DI PUBBLICARE (23 set 2026, percorso
+     Barattozon): PayCode, importo, scadenza, sconto e i sats, da
+     rileggere; il si' richiama QUESTA funzione col timbro, e da li'
+     in poi e' il gesto di sempre. `eseguiConferma` chiude il suo
+     foglio prima di eseguire, e aspetta la promessa: il velo si
+     alza e si spegne dentro. */
+  if (tabacchinoP2P(campi.metodi) && !confermato) {
+    chiediConferma({
+      titolo: 'Il tuo PayCode, in breve',
+      corpo: riepilogoTabacchinoP2P(campi),
+      etichetta: '⚡ Pubblica',
+      poi: () => inviaNuovoOrdineP2P(true)
+    });
+    return;
+  }
   /* «GLI IMPORTI NON COMBACIANO» NON ESISTE PIU' (22 set 2026): con un
      campo solo per l'importo, coi centesimi, e i sats fatti su quello,
      non c'e' una seconda cifra che possa divergere. */
@@ -46539,6 +46935,7 @@ async function inviaNuovoOrdineP2P(){
   const ordine = ordineDaCampiP2P(
     {euro: campi.euro, euroMax: campi.euroMax, sats: campi.sats,
      fisso: campi.fisso, metodi: metodi, premio: p2pNuovoPremio,
+     sconto: campi.sconto,
      scade: campi.scade, adesso: campi.adesso, cambio: campi.cambio}, lato);
   /* i centesimi del tabacchino: sulla riga e nel canale sta l'esatto,
      sul filo l'intero (22 set 2026) */
@@ -46572,8 +46969,10 @@ async function inviaNuovoOrdineP2P(){
        `premium` e' 0, e' prezzo fisso */
     ord.euro = esattoTab;
     ord.metodi = String(ordine.payment_method || '').split(',').filter(Boolean);
-    ord.premioCotto = Math.round(Number(p2pNuovoPremio) || 0);
-    const t = {ordine: String(campi.tab.ordine || '').trim(),
+    /* lo sconto, con la sua cifra decimale, e il PayCode normalizzato
+       (23 set 2026): sulla riga vanno come li rilegge chi compra */
+    ord.premioCotto = scontoTabacchinoP2P(campi.sconto).n;
+    const t = {ordine: payCodeP2P(campi.tab.ordine) || String(campi.tab.ordine || '').trim(),
                importo: centesimiTestoP2P(esattoTab),
                scade: campi.scade};
     t.testo = formaRecapito(P2P_TABACCHINO).componi(
@@ -47115,10 +47514,15 @@ const P2P_FORME_RECAPITO = [
      `dataTabacchinoP2P`): sul filo va sempre la stessa riga, che
      e' quella da cui chi compra rilegge il conto alla rovescia. */
   {forma: 'tabacchino', riconosce: /tabacch/i, ricorda: false,
-   campi: [{k: 'ordine', et: 'Numero dell\'ordine Amazon', ph: '123-4567890-1234567'},
-           {k: 'importo', et: 'Importo dell\'ordine, in euro', ph: '23,47'},
+   /* IL PAYCODE (23 set 2026): le nove cifre della mail Amazon «paga
+      in contanti nel punto vendita», normalizzate prima di partire
+      (`payCodeP2P`); la riga si chiama «PayCode:» e chi compra la
+      rilegge con `payCodeDaTestoP2P`, che accetta ancora la riga
+      vecchia («Numero ordine:») delle righe di prima */
+   campi: [{k: 'ordine', et: 'PayCode (9 cifre)', ph: '479-868-518'},
+           {k: 'importo', et: 'Importo del PayCode, in euro', ph: '23,47'},
            {k: 'scade', et: 'Scade il (data e ora)', ph: '17/09/2026 alle 14:30'}],
-   componi: c => 'Contanti al tabacchino\nNumero ordine: ' + c.ordine
+   componi: c => 'Contanti al tabacchino\nPayCode: ' + c.ordine
      + '\nImporto: ' + c.importo + ' €\nScade: ' + c.scade},
   {forma: 'contanti', riconosce: /contant|di persona|a mano|cash/i,
    campi: [{k: 'luogo', et: 'Dove proponi di vedervi', ph: 'Bar Sport, piazza Garibaldi…'}],
@@ -47171,6 +47575,13 @@ function leggiDataTabacchinoP2P(testo){
   if (d.getFullYear() !== a || d.getMonth() !== me - 1 || d.getDate() !== g
       || d.getHours() !== h || d.getMinutes() !== mi) return 0;
   return Math.floor(d.getTime() / 1000);
+}
+/* dal TESTO COMPOSTO che viaggia: la sola riga «PayCode:» (o «Numero
+   ordine:» delle righe di prima del 23 set 2026), normalizzata; ''
+   se non c'e' o non e' un PayCode */
+function payCodeDaTestoP2P(testo){
+  const m = /(?:^|\n)(?:PayCode|Numero ordine):\s*([^\n]+)/.exec(String(testo || ''));
+  return m ? payCodeP2P(m[1]) : '';
 }
 /* dal TESTO COMPOSTO che viaggia: guarda la sola riga «Scade:», mai
    una data qualunque nel resto del recapito */
@@ -47227,13 +47638,13 @@ function statoTabacchinoP2P(o, adesso){
                                 adesso || Math.floor(Date.now() / 1000));
   if (!f) return null;
   const compro = o.lato === 'compro';
-  if (f === 'scaduta') return {t: 'L\'ordine Amazon è scaduto', d: compro
-    ? 'Non si può più pagare al tabacchino. Se non l\'hai pagato in tempo, chiedi di annullare: i sats tornano a chi li ha bloccati. Se l\'hai pagato prima della scadenza, tieni lo scontrino: chi vende lo vede pagato e libera.'
-    : 'Chi compra non può più pagarlo. Guarda su Amazon: se risulta pagato, libera i sats; se no, annullate d\'accordo e i sats tornano a te.'};
-  if (f === 'ultima') return {t: 'L\'ordine Amazon scade fra meno di un\'ora', d: compro
-    ? 'Se non hai ancora pagato al tabacchino, è adesso: scaduto l\'ordine Amazon non si paga più.'
-    : 'Se chi compra non fa in tempo, l\'ordine Amazon scade e resta solo annullare d\'accordo.'};
-  return {t: 'L\'ordine Amazon scade fra meno di sei ore', d: compro
+  if (f === 'scaduta') return {t: 'Il PayCode è scaduto', d: compro
+    ? 'Non si può più pagare al tabacchino. Se non l\'hai pagato in tempo, chiedi di annullare: i sats tornano a chi li ha bloccati. Se l\'hai pagato prima della scadenza, tieni lo scontrino: chi vende lo vede pagato su Amazon e libera.'
+    : 'Chi compra non può più pagarlo. Guarda su Amazon: se l\'ordine risulta pagato, libera i sats; se no, annullate d\'accordo e i sats tornano a te.'};
+  if (f === 'ultima') return {t: 'Il PayCode scade fra meno di un\'ora', d: compro
+    ? 'Se non hai ancora pagato al tabacchino, è adesso: scaduto il PayCode non si paga più.'
+    : 'Se chi compra non fa in tempo, il PayCode scade e resta solo annullare d\'accordo.'};
+  return {t: 'Il PayCode scade fra meno di sei ore', d: compro
     ? 'Se non hai ancora pagato al tabacchino, non aspettare: dopo la scadenza non si paga più.'
     : 'Chi compra ha ancora poche ore per pagare al tabacchino.'};
 }
@@ -47248,10 +47659,10 @@ function avvisoPresaTabacchinoP2P(o, adesso){
   if (!f) return '';
   return '<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span>'
     + (f === 'scaduta'
-      ? 'Questo ordine è scaduto: l\'ordine Amazon non si può più pagare.'
-      : 'Occhio al tempo: l\'ordine Amazon scade '
+      ? 'Questo ordine è scaduto: il PayCode non si può più pagare.'
+      : 'Occhio al tempo: questo ordine esce dal libro '
         + (f === 'ultima' ? 'fra meno di un\'ora' : 'fra meno di sei ore')
-        + '. Devi fare in tempo ad andare al tabacchino e pagare, o i sats tornano indietro.')
+        + ', e il PayCode scade circa due ore dopo. Devi fare in tempo ad andare al tabacchino e pagare, o i sats tornano indietro.')
     + '</span></div>';
 }
 /* l'anello del tempo nello scambio preso: solo col tabacchino, che
@@ -47413,7 +47824,7 @@ function pianificaAutoRecapito(id){
     if (!r || !chiaviChatOrdine(o)) return;
     try {
       await campoInvia(o, 'euro', r.testo);
-      toast('🧾 I dati dell\'ordine Amazon sono partiti verso chi compra ✓');
+      toast('🧾 PayCode, importo e scadenza sono partiti verso chi compra ✓');
     } catch(e) { }
   }, P2P_AUTOINVIO_MS);
 }
@@ -47549,6 +47960,13 @@ async function inviaCampoP2P(tipo, btn){
        rilegge e si riscrive nella forma che chi compra sa leggere,
        e l'importo passa dallo stesso giudice degli euro del foglio */
     if (fr.forma === 'tabacchino') {
+      const pc = payCodeP2P(campi.ordine);
+      if (!pc) {
+        toast('Il PayCode ha 9 cifre, come 479-868-518');
+        el('p2pCampoEuro_ordine')?.focus();
+        return;
+      }
+      campi.ordine = pc;
       const quando = leggiDataTabacchinoP2P(campi.scade);
       if (!quando) {
         toast('Scrivi la scadenza come 17/09/2026 alle 14:30');
