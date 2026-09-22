@@ -47035,6 +47035,12 @@ def prove_p2p_dettaglio():
         # con lei: e' la trappola dei DUE RITAGLI, e senza questa
         # riga il banco esplode su `titoloMetodiP2P is not defined`
         "function titoloMetodiP2P(o){",
+        # il catalogo dei vestiti (22 set 2026): da quando il foglio
+        # mostra il marchio invece del nome, senza queste tre righe il
+        # banco esplode su `marchioMetodoP2P is not defined`
+        "function metodoBaseP2P(m){",
+        "function vesteMetodoP2P(m){",
+        "function marchioMetodoP2P(m, conTesto){",
         "function metodiDettP2P(o){",
         "function apriNegozioDettP2P(ev, chi){",
         "function scegliMetodoDettP2P(m){",
@@ -47064,6 +47070,10 @@ def prove_p2p_dettaglio():
         pezzi.append(mini[i_a:mini.index("\n", i_a)])
     i_ic = mini.index("const P2P_ICONE = ")
     pezzi.append(mini[i_ic:mini.index("\n};", i_ic) + 3])
+    # il catalogo dei vestiti (22 set 2026): il foglio mostra il
+    # marchio al posto del nome, e senza il banco esplode
+    i_ve = mini.index("const P2P_VESTE_METODI = {")
+    pezzi.append(mini[i_ve:mini.index("\n};", i_ve) + 3])
     banco = "\n".join(pezzi) + r"""
 const esc = s => String(s == null ? '' : s)
   .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -56917,6 +56927,16 @@ def prove_p2p_barattozon():
           "const met = metodi.join(', ');" in scambio
           and "'\" title=\"'" in scambio
           and "+ esc(met) + '\">'" in scambio)
+    # ⚠️ E IL SESTO E' IL FOGLIO DEL DETTAGLIO (22 set 2026, sera): si
+    # apre dalla card del libro — che il marchio ce l'aveva — e diceva
+    # ancora il nome col numero attaccato. Stesse due righe.
+    dett = pezzo_js(mini, "function metodiDettP2P(o){", "\n}\n")
+    prova("il foglio del dettaglio: il marchio al posto del nome", True,
+          "marchioMetodoP2P(metodi[0])" in dett
+          and "marchioMetodoP2P(m) + '</button>'" in dett
+          and "(vesteMetodoP2P(m) ? ' p2p-pill-marchio' : '')" in dett)
+    prova("...e il nome col numero resta nel title, per chi ci passa sopra",
+          True, "title=\"' + esc(metodi[0]) + '\">" in dett)
     campi = pezzo_js(mini, "function renderCampiP2P(", "\n}\n")
     prova("la pagina dello scambio: il marchio nella riga e nelle pillole",
           True,
@@ -60660,6 +60680,33 @@ def prove_p2p_card_scambio():
                        "metodi.map(m => marchioMetodoP2P(m)).join(', ')")
            if x not in rs])
 
+    # --- 3bis) QUEL CHE E' FATTO SI DICE AL PASSATO -----------------
+    # (22 set 2026, richiesta di Andrea) Le card VIVE non si toccano: la
+    # frase al futuro e' giusta finche' la cosa deve succedere. Qui si
+    # sorveglia che le tre cose nuove restino dove sono — i due giudici
+    # PURI, la data che e' un float e non una posizione assoluta, e
+    # l'inchiostro che sulle card tinte passa l'AA.
+    _ch = pezzo_js(mini, "function chiusuraP2P(o){", "\n}\n")
+    _db = pezzo_js(mini, "function dataBreveP2P(ts){", "\n}\n")
+    prova("la chiusura ha una scala sola: mossa, aggiornamento, nascita",
+          True, "Number(o.ultimaMossa) || Number(o.aggiornato)" in _ch
+          and "|| Number(o.creato) || 0" in _ch)
+    prova("...e i due giudici sono puri: niente DOM, niente orologi", [],
+          [x for x in ("document", "el(", "localStorage", "setTimeout")
+           if x in _ch or x in _db])
+    prova("la data breve chiede l'anno solo quando non e' questo", True,
+          "d.getFullYear() === ora.getFullYear()" in _db
+          and "{day: 'numeric', month: 'short'}" in _db
+          and "{day: 'numeric', month: 'short', year: 'numeric'}" in _db)
+    _dt = pezzo_js(mini, "  .p2p-scambio-chiuso{", "}")
+    prova("la data sta nell'angolo con un float, non con una posizione",
+          True, "float:right" in _dt and "position:" not in _dt)
+    # ⚠️ `--ink-soft` E NON `--muted`: sulle card tinte il grigio muto
+    # sta sotto il 4,5:1 del testo piccolo (vedi prove_card_tinte_stato,
+    # che misura proprio quei token).
+    prova("...e col grigio leggibile, quello delle altre righe di servizio",
+          True, "color:var(--ink-soft)" in _dt and "font-size:11.5px" in _dt)
+
     # --- 4) IL BANCO: le funzioni vere ------------------------------
     node = _sh.which("node")
     if not node:
@@ -60679,6 +60726,10 @@ def prove_p2p_card_scambio():
                       mini.index("\n", mini.index("const fmt = n =>"))])
     pezzi.append(mini[mini.index("const P2P_TINTA_STATO = {"):
                       mini.index("\n};", mini.index("const P2P_TINTA_STATO = {")) + 3])
+    # i due giudici della chiusura (22 set 2026): la card li chiama su
+    # ogni riga, e senza il banco esplode invece di dipingere
+    pezzi += [pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
+        "function chiusuraP2P(o){", "function dataBreveP2P(ts){")]
     # il catalogo dei vestiti e le due costanti del tabacchino: senza,
     # il banco esplode invece di dipingere il marchio (la lezione della
     # tortura — una mutazione «uccisa» da un banco che non parte)
@@ -60762,6 +60813,37 @@ out.marchioMisto = rigaScambioP2P(riga({metodi: ['SEPA', PM]}));
 out.marchioStati = {};
 for (const st of ['attesa_mia_hold', 'attivo', 'concluso', 'annullato', 'in_disputa'])
   out.marchioStati[st] = rigaScambioP2P(riga({stato: st, metodi: [PM]}));
+/* LE CARD CHIUSE (22 set 2026): la data nell'angolo e le frasi al
+   passato. `ultimaMossa` e' l'ora della mossa che ha chiuso */
+const ORA = Math.floor(Date.now() / 1000);
+out.dataOggi = dataBreveP2P(ORA);
+out.dataVecchia = dataBreveP2P(ORA - 400 * 86400);
+out.dataZero = dataBreveP2P(0);
+out.chiusuraScala = [chiusuraP2P({ultimaMossa: 5, aggiornato: 7, creato: 9}),
+                     chiusuraP2P({aggiornato: 7, creato: 9}),
+                     chiusuraP2P({creato: 9}), chiusuraP2P({}),
+                     chiusuraP2P(null)];
+out.conclusoVendo = rigaScambioP2P(riga({lato: 'vendo', stato: 'concluso',
+                                         sats: 31209, ultimaMossa: ORA}));
+out.conclusoCompro = rigaScambioP2P(riga({lato: 'compro', stato: 'concluso',
+                                          sats: 31209, ultimaMossa: ORA}));
+out.conclusoTabCompro = rigaScambioP2P(riga({lato: 'compro', stato: 'concluso',
+                                             sats: 31209, ultimaMossa: ORA,
+                                             metodi: [PM]}));
+out.conclusoTabVendo = rigaScambioP2P(riga({lato: 'vendo', stato: 'concluso',
+                                            sats: 31209, ultimaMossa: ORA,
+                                            metodi: [PM]}));
+/* il tabacchino SCELTO da chi ha preso fra due metodi: la coda «al
+   tabacchino» segue la scelta, non l'elenco */
+out.conclusoTabScelto = rigaScambioP2P(riga({lato: 'compro', stato: 'concluso',
+                                             sats: 31209, ultimaMossa: ORA,
+                                             metodi: ['SEPA', PM],
+                                             metodoScelto: 'SEPA'}));
+out.annullatoData = rigaScambioP2P(riga({stato: 'annullato', ultimaMossa: ORA}));
+out.annullatoSenzaData = rigaScambioP2P(riga({stato: 'annullato', creato: 0}));
+out.rifiutato = rigaScambioP2P(riga({stato: 'rifiutato', ultimaMossa: ORA}));
+out.vivoResta = rigaScambioP2P(riga({lato: 'vendo', stato: 'attivo',
+                                     ultimaMossa: ORA}));
 /* il piede: «tocca a te» sugli stati vivi, la ✕ sui finali, mai
    insieme — e senza nessuna delle due la riga non si scrive */
 out.tocca = rigaScambioP2P(riga({stato: 'attesa_mia_fattura'}));
@@ -61050,6 +61132,75 @@ console.log(JSON.stringify(out));
           {k: ("/assets/barattozon.webp" in v
                and "23.47" not in _senza_title(v))
            for k, v in o["marchioStati"].items()})
+
+    # QUEL CHE E' FATTO SI DICE AL PASSATO (22 set 2026, richiesta di
+    # Andrea). Prima i due giudici, poi le quattro frasi.
+    prova("la chiusura prende la mossa, poi l'aggiornamento, poi la nascita",
+          [5, 7, 9, 0, 0], o["chiusuraScala"])
+    _anno = str(__import__("datetime").date.today().year)
+    prova("la data di quest'anno non porta l'anno", False,
+          _anno in o["dataOggi"])
+    prova("...quella di un anno fa si'", True, o["dataVecchia"][-4:].isdigit())
+    prova("...e senza data non si inventa niente", "", o["dataZero"])
+    # ⚠️ LE FRASI SI GUARDANO SUL TESTO, non sui pezzi di markup: e'
+    # quel che legge chi apre la pagina, ed e' la cosa che Andrea ha
+    # chiesto («coniugata come cosa fatta»).
+    def _parole(h):
+        return re.sub(r"\s+", " ", re.sub(r"<[^>]*>", " ", h)).strip()
+    prova("chi ha VENDUTO sats: «Hai ricevuto <euro> pagando <sats>»",
+          [True, True, False],
+          ['Hai ricevuto <span class="p2p-euro">5,00 €</span>'
+           in o["conclusoVendo"],
+           'pagando <span class="p2p-sats">' in o["conclusoVendo"],
+           "Vuoi ricevere" in o["conclusoVendo"]])
+    prova("chi ha COMPRATO sats: le due cifre si scambiano di posto",
+          [True, True],
+          ['Hai ricevuto <span class="p2p-sats">' in o["conclusoCompro"],
+           'pagando <span class="p2p-euro">5,00 €</span>'
+           in o["conclusoCompro"]])
+    # ⚠️ IL TABACCHINO E' L'UNICO METODO IN CUI LE DUE PARTI FANNO COSE
+    # DIVERSE: chi paga il PayCode alla cassa, e chi si vede pagare la
+    # spesa su Amazon. Due frasi, non una con un pezzo appiccicato.
+    prova("col tabacchino, chi ha pagato il PayCode dice dove", True,
+          'Hai ricevuto <span class="p2p-sats">' in o["conclusoTabCompro"]
+          and re.search(r'pagando <span class="p2p-euro">[^<]*</span>'
+                        r' al tabacchino</div>',
+                        o["conclusoTabCompro"]) is not None)
+    prova("...e chi l'ha fatto pagare parla del suo ordine Amazon", True,
+          'Il tuo ordine Amazon da <span class="p2p-euro">5,00 €</span>'
+          in o["conclusoTabVendo"]
+          and 'è stato pagato con <span class="p2p-sats">'
+          in o["conclusoTabVendo"])
+    prova("...e la coda segue la SCELTA di chi ha preso, non l'elenco",
+          False, "al tabacchino" in _parole(o["conclusoTabScelto"]))
+    # GLI ANNULLATI NON PORTANO CIFRE: quell'importo non e' mai passato
+    # di mano, e scriverlo sembrerebbe un conto da fare.
+    prova("l'annullato dice solo quando, senza cifre", True,
+          _parole(o["annullatoData"]).startswith("Annullato il ")
+          and "p2p-scambio-euro" not in o["annullatoData"]
+          and "p2p-sats" not in o["annullatoData"]
+          and "p2p-euro" not in o["annullatoData"])
+    prova("...e senza una data si ferma alla parola", True,
+          _parole(o["annullatoSenzaData"]).startswith("Annullato ")
+          and "Annullato il" not in o["annullatoSenzaData"])
+    # LA DATA NELL'ANGOLO STA SOLO SULLE CONCLUSE: sull'annullato e'
+    # gia' nella frase, e sulle vive non c'e' niente da datare.
+    prova("la data nell'angolo e' delle sole concluse",
+          [True, False, False],
+          ["p2p-scambio-chiuso" in o["conclusoVendo"],
+           "p2p-scambio-chiuso" in o["annullatoData"],
+           "p2p-scambio-chiuso" in o["vivoResta"]])
+    prova("...ed e' la data breve, la stessa che scrive il giudice", True,
+          ('<span class="p2p-scambio-chiuso">' + o["dataOggi"] + '</span>')
+          in o["conclusoVendo"])
+    # ⚠️ `rifiutato` NON E' «annullato»: il suo stato dice «Ordine non
+    # preso», cioe' lo scambio non e' mai cominciato.
+    prova("l'ordine non preso resta com'era, che «annullato» sarebbe falso",
+          True, "Vuoi ricevere" in o["rifiutato"]
+          and "Annullato" not in o["rifiutato"])
+    prova("e le card vive non cambiano di una parola", True,
+          "Vuoi ricevere" in o["vivoResta"]
+          and "Hai ricevuto" not in o["vivoResta"])
 
     # ⚠️ «TOCCA A TE» STA DENTRO LA CASELLA, accanto allo stato: la
     # casella e' gia' tinta dal gesto da fare (arancio), e il gesto e'

@@ -2410,6 +2410,17 @@
      ROVESCIA la domanda e certifica che la cifra non ci sia. */
   .p2p-scambio-lato{font-family:'Baloo 2',sans-serif;font-weight:800;
     font-size:17px;color:var(--ink)}
+  /* LA DATA DELLE CARD CONCLUSE (22 set 2026, richiesta di Andrea):
+     piccola e discreta nell'angolo in alto a destra. `float` e non
+     `position:absolute`, cosi' la frase le gira attorno invece di
+     passarci sotto — e il › della card, che e' assoluto a meta'
+     altezza, non la incontra.
+     ⚠️ L'INCHIOSTRO E' `--ink-soft` E NON `--muted`, che su una card
+     tinta scenderebbe sotto il 4,5:1 del testo piccolo: e' la stessa
+     taratura delle altre righe di servizio di questa card (vedi
+     CANTIERI, «Il velo esce dal libro»). */
+  .p2p-scambio-chiuso{float:right;margin:2px 0 0 10px;font-size:11.5px;
+    font-weight:700;color:var(--ink-soft)}
   /* LA FRECCETTA DEL TOCCO (set 2026, richiesta di Andrea): il › di
      casa, quello della riga della classifica (`.cl-fr`) — stesso
      glifo, stesso corpo, stesso `--muted`. Non e' un bottone e non ha
@@ -43968,15 +43979,23 @@ function metodiDettP2P(o){
     return sezioneNuovoP2P({ico: 'metodi', titolo: titolo,
       corpo: '<div class="hint">Chi ha pubblicato non l\'ha indicato: '
         + 'mettetevi d\'accordo prima di mandare gli euro.</div>'});
+  /* ⚠️ E IL METODO SI VESTE COME NELLE CARD (22 set 2026, ritocco di
+     Andrea): la card del libro diceva «Barattozon» e questo foglio, che
+     si apre da quella card, diceva ancora «Contanti al tabacchino
+     23.47». Stessi due giudici del catalogo, nessuna logica nuova — e
+     col marchio l'importo del `pm` non compare, che nel foglio sta gia'
+     nella riga dell'importo. */
   if (metodi.length === 1)
     return sezioneNuovoP2P({ico: 'metodi', titolo: titolo,
-      corpo: '<b class="p2p-dett-uno">' + esc(metodi[0]) + '</b>'});
+      corpo: '<b class="p2p-dett-uno" title="' + esc(metodi[0]) + '">'
+        + marchioMetodoP2P(metodi[0]) + '</b>'});
   return sezioneNuovoP2P({
     ico: 'metodi', titolo: titolo,
     corpo: '<div class="p2p-metodi">' + metodi.map(m =>
       '<button type="button" class="tema-pill' + (m === p2pDettMetodo ? ' active' : '')
+      + (vesteMetodoP2P(m) ? ' p2p-pill-marchio' : '')
       + '" data-m="' + esc(m) + '" onclick="scegliMetodoDettP2P(this.dataset.m)">'
-      + esc(m) + '</button>').join('') + '</div>'
+      + marchioMetodoP2P(m) + '</button>').join('') + '</div>'
   });
 }
 /* la riga del dettaglio che dice cos'e' il tabacchino a chi lo
@@ -48850,6 +48869,33 @@ function premioMioP2P(o){
    non possono coesistere (l'uno vive sugli stati vivi, l'altra sui
    finali), quindi li' dentro c'e' al massimo UNA cosa — e una riga
    vuota lascerebbe un respiro che non separa niente. */
+/* PURA: QUANDO LO SCAMBIO SI E' CHIUSO (22 set 2026, richiesta di
+   Andrea). L'ora buona e' quella della MOSSA del coordinatore che l'ha
+   chiuso — `ultimaMossa`, che `applicaMessaggioP2P` timbra col
+   `created_at` dell'evento su ogni azione di `AVANZA_P2P`, e
+   `concluso` e `annullato` ci sono tutt'e due —; poi l'ultimo
+   aggiornamento della riga, che e' quando l'abbiamo applicata noi; poi
+   la nascita. 0 se non si sa niente, e allora la data non si scrive.
+   E' la stessa scala di `inizioEuroInviatiP2P`, che e' il posto dove
+   questa domanda era gia' stata fatta. */
+function chiusuraP2P(o){
+  if (!o) return 0;
+  return Math.floor(Number(o.ultimaMossa) || Number(o.aggiornato)
+                    || Number(o.creato) || 0);
+}
+/* PURA: la data breve — giorno e mese, e l'ANNO solo se non e' questo
+   (richiesta di Andrea: «anno solo se non è questo»). Un'altra data di
+   casa la scrive per esteso, ma qui sta in un angolo di card e i
+   quattro numeri dell'anno, uguali su tutte, non direbbero niente. */
+function dataBreveP2P(ts){
+  const n = Number(ts) || 0;
+  if (!n) return '';
+  const d = new Date(n * 1000);
+  const ora = new Date();
+  return d.toLocaleDateString('it-IT', d.getFullYear() === ora.getFullYear()
+    ? {day: 'numeric', month: 'short'}
+    : {day: 'numeric', month: 'short', year: 'numeric'});
+}
 function rigaScambioP2P(o){
   const st = statoTestoP2P(o);
   const l = comeLibroP2P(o);
@@ -48894,12 +48940,68 @@ function rigaScambioP2P(o){
   const agire = azioniDisponibili(o)
     ? '<span class="p2p-tocca"><span class="p2p-manina" aria-hidden="true">👉</span>'
       + ' tocca a te</span>' : '';
+  /* ---- QUEL CHE E' FATTO SI DICE AL PASSATO (22 set 2026, richiesta
+     di Andrea) ----
+     Le card VIVE restano come sono: li' «Vuoi ricevere … pagando …»
+     racconta una cosa che deve ancora succedere, ed e' giusta. Su uno
+     scambio CONCLUSO quella stessa frase e' una promessa su una cosa
+     gia' finita, e chi riguarda i suoi scambi vecchi si chiede se manchi
+     qualcosa.
+     LE QUATTRO FRASI SONO DUE PIU' DUE: il verso normale — «Hai
+     ricevuto <quel che e' arrivato> pagando <quel che e' uscito>», e il
+     lato lo dice `ricevoSats` come nelle righe vive — e i due del
+     tabacchino, che e' l'unico metodo in cui le due parti fanno cose
+     DIVERSE: chi ha pagato il PayCode alla cassa aggiunge «al
+     tabacchino», e chi ha fatto pagare il suo ordine Amazon ha una
+     frase sua, perche' li' non ha «ricevuto euro»: gli hanno pagato la
+     spesa.
+     ⚠️ IL GIUDICE DEL TABACCHINO E' QUELLO DI CASA (`tabacchinoP2P`,
+     che guarda il prefisso) e riceve l'elenco GIA' ristretto al metodo
+     deciso: se chi ha preso ha scelto un altro metodo, la frase non
+     parla di tabacchino.
+     GLI ANNULLATI NON PORTANO CIFRE: «Annullato il …» e basta. Le due
+     righe direbbero un importo che non e' mai passato di mano, e la
+     ✕ per togliere la riga sta li' sotto. Senza data — una riga
+     ripresa da un'altra app puo' non averla — resta «Annullato».
+     ⚠️ `rifiutato` NON E' «annullato» e resta com'era: il suo stato
+     dice «Ordine non preso», cioe' lo scambio non e' mai cominciato, e
+     scriverci «Annullato» sarebbe una parola falsa. */
+  const chiuso = o.stato === 'concluso';
+  const annullato = o.stato === 'annullato';
+  const tab = tabacchinoP2P(metodi);
+  const dataChiusa = (chiuso || annullato) ? dataBreveP2P(chiusuraP2P(o)) : '';
+  const righe = annullato
+    ? '<div class="p2p-scambio-lato">Annullato'
+      + (dataChiusa ? ' il ' + esc(dataChiusa) : '') + '</div>'
+    : chiuso
+      ? (tab && !ricevoSats
+          ? '<div class="p2p-scambio-lato">Il tuo ordine Amazon da '
+            + cifraEuro + '</div>'
+            + '<div class="p2p-scambio-euro">è stato pagato con '
+            + cifraSats + '</div>'
+          : '<div class="p2p-scambio-lato">Hai ricevuto '
+            + (ricevoSats ? cifraSats : cifraEuro) + '</div>'
+            + '<div class="p2p-scambio-euro">pagando '
+            + (ricevoSats ? cifraEuro : cifraSats)
+            + (tab ? ' al tabacchino' : '') + '</div>')
+      : '<div class="p2p-scambio-lato">Vuoi ricevere '
+        + (ricevoSats ? cifraSats : cifraEuro) + '</div>'
+        + '<div class="p2p-scambio-euro">pagando '
+        + (ricevoSats ? cifraEuro : cifraSats) + '</div>';
   const via = p2pTogliibile(o).si
     ? '<button class="order-x p2p-x" title="Togli" aria-label="Togli questo scambio" '
       + 'data-id="' + esc(o.id) + '" onclick="togliScambioP2P(this.dataset.id, event)">✕</button>'
     : '';
   return '<div class="p2p-ord p2p-scambio' + tonoCardP2P(o) + '" role="button" tabindex="0" data-id="' + esc(o.id) + '" '
     + 'onclick="apriOrdineP2P(this.dataset.id)">'
+    /* LA DATA DI CHIUSURA STA NELL'ANGOLO (22 set 2026, richiesta di
+       Andrea): piccola e discreta, e solo sulle card CONCLUSE — sugli
+       annullati la data sta nella frase, e sulle vive non c'e' niente
+       da datare. E' un `float`, non una posizione assoluta: cosi' la
+       frase le gira attorno invece di passarci sotto, e non serve
+       tenere in pari nessun numero. */
+    + (chiuso && dataChiusa
+        ? '<span class="p2p-scambio-chiuso">' + esc(dataChiusa) + '</span>' : '')
     /* LA PRIMA RIGA PORTA I SATS, in evidenza: e' la cifra che si va a
        cercare scorrendo i propri scambi, e fino a stamattina stava in
        coda alla riga dell'euro.
@@ -48925,10 +49027,7 @@ function rigaScambioP2P(o){
        resta la parola «sats» — «Vuoi ricevere sats», «pagando sats» —
        che e' un ripiego che non sembra un ripiego. Mai un numero
        inventato. */
-    + '<div class="p2p-scambio-lato">Vuoi ricevere '
-    + (ricevoSats ? cifraSats : cifraEuro) + '</div>'
-    + '<div class="p2p-scambio-euro">pagando '
-    + (ricevoSats ? cifraEuro : cifraSats) + '</div>'
+    + righe
     + premioMioP2P(l)
     + '<div class="p2p-scambio-stato' + tintaStatoP2P(o) + '">'
     + '<span>' + esc(st.t) + '</span>' + agire + '</div>'

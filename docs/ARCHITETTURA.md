@@ -10354,6 +10354,24 @@
   l'anello prende `--nav-bg-p2p`. A leva spenta, in vetrina e senza
   conto resta spento. Il verbale: CANTIERI, «Il pallino su I miei
   scambi».
+  QUEL CHE È FATTO SI DICE AL PASSATO (22 set 2026, richiesta di
+  Andrea): le card di «I miei scambi» CHIUSE non promettono più. Una
+  conclusa porta la data della chiusura in alto a destra — piccola,
+  `float:right` così la frase le gira attorno — e la riga coniugata:
+  «Hai ricevuto <quel che è arrivato> pagando <quel che è uscito>», col
+  lato deciso da `ricevoSats` come nelle righe vive. Col tabacchino le
+  due parti fanno cose diverse e le frasi sono due: chi ha pagato il
+  PayCode alla cassa aggiunge «al tabacchino», chi si è visto pagare
+  l'ordine Amazon legge «Il tuo ordine Amazon da … è stato pagato con
+  …». Un ANNULLATO dice solo «Annullato il <data>», senza cifre: quel
+  denaro non è mai passato di mano. `rifiutato` resta com'era — il suo
+  stato dice «Ordine non preso», e «annullato» lì sarebbe una parola
+  falsa. Le card VIVE non cambiano di una parola.
+  I DUE GIUDICI SONO PURI E PICCOLI: `chiusuraP2P` (la mossa del
+  coordinatore, poi l'ultimo aggiornamento, poi la nascita — la stessa
+  scala di `inizioEuroInviatiP2P`) e `dataBreveP2P` (giorno e mese, e
+  l'anno solo se non è questo; stringa vuota se non si sa). Il verbale:
+  CANTIERI, «Quel che è fatto si dice al passato».
   E LA STESSA DOMANDA SCRIVE IL CONTO DELL'INTESTAZIONE di «I miei
   scambi» (22 set 2026): «N scambi aperti · M tocca a te», dove M e'
   `quantiToccaAMeP2P` e N sono gli scambi PRESI — quelli con qualcuno
@@ -24570,11 +24588,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `marchioMetodoP2P`, `classeVesteP2P` e `iconaMetodiP2P`: i posti che
   lo leggono non sanno nulla del tabacchino, e una voce nuova con un
   marchio suo si aggiunge lì e basta.
-  ⚠️ I POSTI SONO CINQUE dal 22 set 2026 (sera), ed erano tre: la card
+  ⚠️ I POSTI SONO SEI dal 22 set 2026 (sera), ed erano tre: la card
   del libro, la pillola del filtro, la voce del foglio «Pubblica», e
-  adesso anche la CARD DI «I MIEI SCAMBI» e la riga del metodo nella
+  adesso anche la CARD DI «I MIEI SCAMBI», la riga del metodo nella
   pagina dello scambio (la frase «Il metodo dello scambio è …» e le
-  pillole del recapito). Quei due dicevano ancora «Contanti al
+  pillole del recapito) e il FOGLIO DEL DETTAGLIO che si apre dalla
+  card del libro (`metodiDettP2P`: il nome grande quando il metodo è
+  uno, le pillole quando sono più d'uno). Quei due dicevano ancora «Contanti al
   tabacchino», col numero del `pm` attaccato dal 22 set: lo stesso
   ordine aveva due nomi a uno scorrimento di distanza. Stessi due
   giudici — `iconaMetodiP2P` per «qui dentro non resta nessun nome» e

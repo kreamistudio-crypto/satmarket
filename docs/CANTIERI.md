@@ -25484,3 +25484,93 @@ le sei righe in cima al foglio «Pubblica» si leggono o si scavalcano (lì
 restano in cima, ed è voluto: è un modulo), e se in fondo al riquadro le
 due note di chiusura — le tre frasi e «il codice resta tuo» — si leggono
 come due cose o come un muro.
+**NON PROVATO, E DA GUARDARE.** Sul telefono vero dentro Telegram: se le
+sei righe in cima al riquadro danno fastidio a chi lo riapre alla cassa
+(lì si vuole il codice e basta) — è l'unica cosa che decide l'uso, non la
+misura —, e se la ripetizione dello scontrino fra cappello e terzo gesto
+si legge come insistenza o come promemoria.
+
+## Quel che è fatto si dice al passato, e il sesto posto del marchio (22 set 2026, notte)
+
+**1) IL FOGLIO DEL DETTAGLIO, CHIUSO IL GIRO DI PRIMA.** Era il posto
+«visto e non toccato» della voce qui sopra: si apre dalla card del
+libro — che il marchio ce l'aveva — e diceva ancora «Contanti al
+tabacchino 23.47», in grassetto col metodo unico e nelle pillole con
+più metodi. Stesse due righe delle altre volte (`marchioMetodoP2P` +
+la tessera `p2p-pill-marchio`), e il nome col numero resta nel `title`.
+⚠️ IL `data-m` DELLE PILLOLE TIENE LA STRINGA ESATTA, ed è giusto così:
+è il valore che `scegliMetodoDettP2P` rimanda indietro, non una cosa
+che si legge. Guardando il solo HTML sembra che il numero sia rimasto;
+guardando il TESTO che esce a schermo non c'è — ed è la differenza fra
+una prova che misura il markup e una che misura quel che si legge.
+
+**2) LE CARD CHIUSE NON PROMETTONO PIÙ.** «Vuoi ricevere 23,47 €
+pagando 31 209 sats» su uno scambio finito è una promessa su una cosa
+già successa: chi riguarda i suoi scambi vecchi si chiede se manchi
+qualcosa. Adesso una conclusa dice «Hai ricevuto … pagando …», con la
+data della chiusura in alto a destra.
+LE FRASI SONO QUATTRO, E SONO DUE PIÙ DUE: il verso normale (le due
+monete si scambiano di posto col lato, come nelle righe vive) e i due
+del tabacchino, che è l'unico metodo in cui le due parti fanno cose
+DIVERSE — chi paga il PayCode alla cassa aggiunge «al tabacchino», chi
+si vede pagare l'ordine Amazon ha una frase sua, perché lui gli euro
+non li ha «ricevuti»: gli hanno pagato la spesa.
+⚠️ E LA CODA SEGUE LA SCELTA, non l'elenco: il giudice del tabacchino
+(`tabacchinoP2P`, per prefisso) riceve l'elenco già ristretto al metodo
+deciso, quindi un ordine che offriva anche il tabacchino ma è stato
+preso in SEPA non lo nomina. C'è una prova apposta.
+GLI ANNULLATI NON PORTANO CIFRE — «Annullato il 22 set» e basta —
+perché quell'importo non è mai passato di mano, e scriverlo sembra un
+conto da fare. Senza data (una riga ripresa da un'altra app può non
+averla) resta «Annullato».
+⚠️ `rifiutato` NON DIVENTA «annullato», ed è la sola cosa che ho fatto
+diversa da come suonava la richiesta: il suo stato dice «Ordine non
+preso», cioè lo scambio non è mai cominciato, e scriverci «Annullato»
+sarebbe una parola falsa. Resta com'era, e se va cambiato vuole una
+parola sua.
+
+**LA DATA È UN FLOAT, NON UNA POSIZIONE ASSOLUTA**, e non è un
+dettaglio: con `position:absolute` la prima riga le sarebbe passata
+sotto — «Il tuo ordine Amazon da 23,47 €» è la più lunga delle quattro
+— e avrei dovuto tenere in pari un `padding-right` a mano. Col float la
+frase le gira attorno da sola. L'inchiostro è `--ink-soft` e non
+`--muted`: sulle card tinte il grigio muto sta sotto il 4,5:1, ed è la
+stessa taratura delle altre righe di servizio.
+I DUE GIUDICI SONO PICCOLI E PURI: `chiusuraP2P` prende la mossa del
+coordinatore (`ultimaMossa`, che `applicaMessaggioP2P` timbra col
+`created_at`), poi l'ultimo aggiornamento, poi la nascita — la stessa
+scala di `inizioEuroInviatiP2P`, che è il posto dove questa domanda era
+già stata fatta —, e `dataBreveP2P` chiede l'anno solo quando non è
+questo.
+
+**LE PROVE.** Nella sezione della card: i due giudici (puri, e la scala
+verificata a valori scelti), la data breve nei tre casi (quest'anno,
+un anno fa, ignota), le quattro frasi sul markup e gli annullati sul
+TESTO, la data che sta solo sulle concluse, e il `rifiutato` che non si
+muove. Nella sezione del marchio, il sesto posto. Suite intera
+**13259/0**, otto collaudi verdi, tortura **14 mutazioni / 14 uccise**.
+⚠️ E UNA MUTAZIONE ERA EQUIVALENTE, il che è una terza cosa rispetto a
+«uccisa» e «sopravvissuta»: togliere la guardia dal CALCOLO della data
+(`const dataChiusa = dataBreveP2P(...)` per tutte le righe) non si vede
+da nessuna parte, perché i due posti che la usano hanno già la loro
+guardia — è lavoro sprecato, non un comportamento diverso. La
+mutazione che MORDE è togliere la guardia dallo SPAN, e quella muore
+su due prove. Un mutante equivalente non è un buco nelle prove: è una
+mutazione scritta male, e si riscrive.
+
+**DAL VIVO** (375 px, chiaro e scuro, relay morto): sette scambi —
+concluso da chi vende e da chi compra, i due del tabacchino, un
+annullato con la data e uno senza, un concluso dell'anno scorso
+(«18 ago 2025», con l'anno) e uno vivo che non è cambiato. E il foglio
+del dettaglio col marchio, sia col metodo unico sia nelle pillole.
+⚠️ UN INCIAMPO DEL BANCO DAL VIVO, da ricordare: un `annullato` senza
+`hold` e senza `satsNetti` è un RITIRO, e la scopa lo porta via appena
+si dipinge la pagina — la card non si vedeva e sembrava un difetto
+delle frasi nuove. Un annullato VERO (sats bloccati e poi tornati
+indietro) resta, ed è quello da seminare.
+
+**DA GUARDARE SUL TELEFONO.** La data nell'angolo coi font veri: a 375
+px sta larga, ma «18 ago 2025» accanto a una prima riga lunga è il caso
+stretto. E «Annullato il 22 set» con sotto il riquadro «Scambio
+annullato»: dicono la stessa cosa due volte, ed era già così prima —
+se dà fastidio, la cura è il riquadro, non la frase.
