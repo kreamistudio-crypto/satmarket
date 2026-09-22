@@ -10355,13 +10355,19 @@
   conto resta spento. Il verbale: CANTIERI, «Il pallino su I miei
   scambi».
   E LA STESSA DOMANDA SCRIVE IL CONTO DELL'INTESTAZIONE di «I miei
-  scambi» (22 set 2026): «N in corso · M tocca a te», dove M e'
-  `quantiToccaAMeP2P` e N il gruppo «In corso» dello stesso giudice —
-  cioe' i due numeri che il foglio del filtro scrive accanto alle sue
-  pillole (i gruppi sono una partizione: uno scambio sta in uno solo).
-  Lo dipinge `intestaScambiP2P`, da `renderP2P`, DOPO il corpo dei
-  miei; prima del libro l'immagine resta e il conto aspetta. Il
-  verbale: CANTIERI, «L'intestazione di I miei scambi».
+  scambi» (22 set 2026): «N scambi aperti · M tocca a te», dove M e'
+  `quantiToccaAMeP2P` e N sono gli scambi che lo stesso giudice non
+  mette in «Conclusi» ne' in «Annullati» — le tre pillole aperte del
+  foglio del filtro, sommate, e gli stessi di `P2P_FINALI`. «Tocca a
+  te» sta dentro gli aperti, quindi M non supera mai N. La prima
+  stesura contava il solo gruppo «In corso», e con uno scambio mio si
+  leggeva «0 in corso»: rovesciata la sera stessa. Lo dipinge
+  `intestaScambiP2P`, da `renderP2P`, DOPO il corpo dei miei; prima
+  del libro l'immagine resta e il conto aspetta. L'intestazione (80px,
+  col conto e la riga di strumenti sotto lo stesso velo) sta NEL blocco
+  attaccato; senza scambi `.vuota` toglie velo e monete. I verbali:
+  CANTIERI, «L'intestazione di I miei scambi» e «Il ritocco
+  dell'intestazione».
   IL LINK PORTA DOVE C'E' IL GESTO (ago 2026, dal campo): la notifica
   della controproposta diceva «Accetta o rifiuta dalla scheda Ordini» e
   allegava un link a `/annuncio/{id}` — il testo mandava in un posto e
@@ -25942,7 +25948,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    ago 2026), `/assets/mascotte.jpeg`,
    `/assets/barattolo.jpeg`, `/assets/barattolo-hero.png`,
    `/assets/p2p-logo-compra.png`, `/assets/p2p-logo-vendi.png`,
-   `/assets/p2p-logo-completo.png` (i tre del logo P2P, set 2026),
+   `/assets/p2p-logo-completo.png` (i tre del logo P2P, set 2026; dal
+   22 set i due gemelli del libro sono a 288px, rifatti dai sorgenti da
+   480 di Andrea, e il completo resta a 152 per i posti piccoli),
+   `/assets/p2p-logo-grande.webp` (il completo NITIDO di «Info P2P», 22
+   set 2026: 396x396, il 3x dei 132 a cui la pagina lo mostra, WebP con
+   trasparenza da 39 KB — vedi CANTIERI, «Il ritocco
+   dell'intestazione»),
    `/assets/barattozon.webp` (il marchio del metodo «Contanti al
    tabacchino», 16 set 2026: WebP con trasparenza, 305x96, cartella
    sua e mai assets/categorie/ — vedi «IL VESTITO BARATTOZON»),

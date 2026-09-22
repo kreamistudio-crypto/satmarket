@@ -24597,3 +24597,156 @@ vivo: vuole l'utente, e il giudice sotto e' provato sui numeri.
 fuori misura (il 400 e' nel banco, non su Telegram); e che Amazon
 applichi davvero 999 e non un altro numero — e' la regola come Andrea
 l'ha letta, e sta in una costante sola per lato.
+
+## Il ritocco dell'intestazione di «I miei scambi», e il logo del P2P nitido (22 set 2026)
+
+**COSA.** Quattro ritocchi chiesti da Andrea la sera stessa del
+cantiere dell'intestazione (la sua voce e' piu' su, «L'intestazione di
+«I miei scambi»»), piu' due arrivati durante il giro. 1) Le due monete sono
+scese da 120 a 80 px, e l'intestazione — immagine, riga del conto e
+riga degli strumenti — e' entrata nel blocco attaccato: resta ferma in
+cima mentre le card ci scorrono sotto. 2) La riga del conto dice «N
+scambi aperti · M tocca a te» invece di «N in corso». 3) Nel filtro che
+non lascia passare niente, al posto del logo P2P ci sono le monete in
+piccolo. 4) Lo stato vuoto senza scambi e' rimasto com'era, al pixel.
+Poi, a lavoro in corso: 5) il logo P2P fra i due tab del libro «un po'
+piu' grande, senza toccare le scritte», coi due gemelli rifatti dai
+sorgenti di Andrea; 6) l'immagine di «Info P2P», che era sgranata,
+sostituita con quella nitida.
+
+**DUE DECISIONI DELLA VOCE DI IERI SONO ROVESCIATE, e le aveva lasciate
+aperte lei.** L'intestazione stava fuori dal blocco attaccato perche',
+con 120 px di immagine, attaccata avrebbe tenuto ferma una fascia di
+230 px. A 80 px la parte ferma misura **172,7 px, il 21% dei 812 di un
+telefono da 375** — misurato dal vivo, sotto il quarto chiesto da
+Andrea. E il conto contava il gruppo «In corso», per non dare allo
+stesso nome due numeri sulla stessa pagina: adesso il nome e' un altro
+(«scambi aperti» non e' il nome di nessuna pillola del foglio), quindi
+quel conflitto non c'e' piu'.
+
+**GLI APERTI SONO TUTTO CIO' CHE NON E' CHIUSO.** N conta gli scambi che
+`gruppoScambioP2P` — lo stesso giudice del pallino e del foglio — non
+mette in «Conclusi» ne' in «Annullati»: cioe' le pillole «Tocca a te»,
+«In corso» e «Nel libro» del foglio, sommate. Combacia con
+`P2P_FINALI` (concluso, annullato, rifiutato), il giudice di chi
+riascolta i relay, e una prova del banco li tiene insieme. «Tocca a
+te» sta DENTRO gli aperti: M non supera mai N, e con uno scambio aperto
+non si legge mai zero. Anche un ordine mio ancora nel libro e' aperto,
+come dice la definizione di Andrea («non conclusi e non annullati»).
+Uno scambio solo va al singolare: «1 scambio aperto», come «1 scambio»
+nella pillola del filtro.
+
+**IL VELO C'E' DIETRO TUTTA L'INTESTAZIONE, pillole comprese**, che e'
+la lettura della richiesta («l'intestazione — immagine, conto e
+strumenti — col velo di colore dietro»). La scatola resta arrotondata,
+e attorno il blocco attaccato e' `--bg` pieno: negli angoli le card non
+si vedono passare. Verificato dal vivo con la pagina scorsa e due card
+sotto la testata: `elementFromPoint` nei quattro angoli del velo, al
+centro, sulle strisce sopra e sotto e su una pillola risponde sempre
+la testata, mai una card. Le pillole stanno nel velo con 8 px d'aria
+per lato: la riga ne occupa 299 dei 343 della colonna a 375, e anche a
+360 resta in fila (312 disponibili); a 320 la levetta andava gia' a
+capo, e ci va ancora. Sotto le pillole 4 px piu' i 6 del velo, cioe'
+dieci dal bordo come dal fondo del blocco di ieri.
+⚠️ **E SENZA SCAMBI NON SI NASCONDE PIU' CON `hidden`.** Sotto il velo
+adesso c'e' la riga di strumenti, che nello stato vuoto deve restare
+dov'era: `intestaScambiP2P` mette `.vuota`, che toglie velo, margini e
+monete e lascia la sola riga. Verificato al pixel contro le misure del
+giro di ieri: blocco alto 63,5, riga a 13 dal bordo e larga 343, card
+vuota a 145 e immagine grande a 181,6 — gli stessi numeri.
+Il `flow-root` del blocco (voce di ieri, «il margine che collassava»)
+adesso tiene dentro anche il margine di 4 px sopra il velo: da
+attaccato, sopra il velo c'e' una striscia di fondo pieno e non una
+fessura.
+
+**IL FILTRO VUOTO** porta le monete a 56 px (quanto il logo di ieri in
+larghezza), decorative — alt vuoto: il titolo della pagina lo porta
+l'intestazione, che li' sopra c'e'. Il logo P2P veste ormai il solo
+libro vuoto, che e' casa sua.
+
+**IL LOGO DEL LIBRO CRESCE CON LO SPAZIO.** Il vincolo non era il logo
+ma il tab: «Compra BTC» a 19 px misura 102 px (dal vivo), il tab ha 4
+px di respiro per lato e il logo 6 di margine, e a 360 px con un logo
+fisso da 96 il testo sarebbe andato a capo. Quindi la misura e'
+`clamp(76px, calc(100vw - 280px), 96px)`: sotto i 352 px di schermo
+resta 76, da 376 in su e' 96, e in mezzo cresce un pixel per pixel —
+con una proprieta' che vale la formula: nella fascia in cui cresce, al
+tab restano SEMPRE 110 px per i 102 di «Compra BTC». Misurato: a 360 il
+logo e' 80 px, a 375 e' 95, a 390 e' 96; fra le scatole ci sono 13,9 px
+a sinistra e 22,7 a destra (costanti fra 360 e 375, come dice il
+conto), e fra il disegno e le scritte 20-25 px, perche' nel PNG il
+disegno lascia un margine trasparente. Il margine negativo che lo fa
+«sedere» sulla linea dei tab segue la misura (-.105 × lato: a 76 fa
+ancora -8). ⚠️ A 320 px il logo resta 76 e «Compra BTC» va su due
+righe — succedeva gia' prima, con lo stesso logo e lo stesso tab: non
+e' di questo cantiere, e resta da decidere se merita un ritocco suo.
+
+**I DUE GEMELLI SONO RIFATTI DAI SORGENTI DI ANDREA** (Desktop `2.png`
+compra, `3.png` vendi, 480×480, lo stesso taglio dei file da 152 che
+c'erano): 288×288, il 3x dei 96, ridotti con l'alpha premoltiplicata e
+senza profilo colore (era sRGB). Stesso nome e stessa rotta, quindi la
+sfumatura fra i due e la scossa al tocco del tab restano quelle di
+sempre, e il `?v=` di `_timbra_asset_pagina` cambia col contenuto: le
+cache dei telefoni cadono da sole (visto nel log: hash nuovi). Il
+prezzo e' il peso: 87 e 90 KB invece di ~30. `p2p-logo.png`, quello coi
+fulmini che stava sul Desktop, e' un altro disegno: scartato come ha
+detto Andrea.
+
+**«INFO P2P» HA UN FILE SUO**: `1.png` (il completo, tutt'e due le
+frecce accese) ridotto a 396×396 — il 3x dei 132 px a cui la pagina lo
+mostra — in WebP a qualita' 90: 38,6 KB, con dentro solo VP8X, ALPH e
+VP8. Rotta esplicita `/assets/p2p-logo-grande.webp`. Prima c'era il
+completo da 152, che a 3x usciva ingrandito piu' del doppio: sgranato,
+come aveva visto Andrea. **Il completo piccolo resta dove e' piccolo**
+— la card «Scambio P2P» della home e il libro vuoto, a 76 px — e non e'
+stato toccato: in PNG a 396 peserebbe 167 KB su ogni primo avvio del
+mercatino. Anche li', a 3x, e' un po' morbido: se Andrea lo vuole
+nitido, lo stesso WebP lo fa con 6 KB in piu'. E' una decisione sua.
+
+**LE STRADE SCARTATE.** 1) Il velo dietro le sole monete, con la riga
+di strumenti fuori sul fondo della pagina: le card non trasparivano lo
+stesso, ma la richiesta metteva il velo dietro tutt'e tre. 2) `hidden`
+sull'intestazione nello stato vuoto: avrebbe nascosto anche la riga di
+strumenti. 3) Il logo del libro fisso a 96: a 360 «Compra BTC» andava a
+capo. 4) I gemelli in PNG a 256 colori (20 KB): a ingrandimento doppio
+si vedevano i gradini sulla freccia verde e sul vetro — `libimagequant`
+qui non c'e'. 5) I gemelli in WebP (24 KB): voleva dire rinominare file
+e rotte e riscrivere le sentinelle della famiglia, per un peso che il
+libro paga una volta sola e poi tiene in cache. 6) Sostituire il
+completo PNG ovunque col grande: 134 KB in piu' sulla home.
+
+**PROVATO.** `prove_intestazione_scambi`, 64 prove (erano 57) —
+emendate le misure, il blocco attaccato (un piccolo lettore di `<div>`
+annidati che guarda che velo, conto e strumenti stiano davvero dentro),
+`.vuota`, il conto degli aperti col banco node (anche contro
+`P2P_FINALI`, e «uno scambio aperto non fa mai zero»), il filtro
+vuoto, i tre posti timbrati. `prove_logo_p2p_nitido`, 19 prove nuove:
+i gemelli a 288, la formula, e la GEOMETRIA rifatta per le larghezze
+dei telefoni veri, piu' il file di Info P2P, la sua rotta e i posti
+dove resta il completo piccolo. Emendate le sentinelle del blocco
+attaccato (`prove_p2p_vista_miei`), del logo negli stati vuoti e dei
+tre file del logo (`prove_nav_p2p`). Tortura su una copia: 24 mutazioni, 24 uccise,
+nessuna esplosione. `prove.py` intera su una copia senza `config.py`:
+13157/0 con `PROVE_SEVERE=1`, e gli otto collaudi senza rete verdi.
+DAL VIVO, sull'app servita dal worktree (collaudo 111, leva accesa,
+relay morto), a 375 px: quattordici scambi seminati, dodici card a
+schermo, «10 scambi aperti · 3 tocca a te»; la pagina scorsa di 700 e
+760 px con la testata ferma a 0, alta 172,7 e opaca in ogni punto
+sondato; lo stato vuoto identico al pixel; il filtro vuoto con le
+monete piccole; il libro a 320, 360, 375 e 390; Info P2P col file da
+396. E A DENSITA' 3, con Chrome headless via CDP sulla stessa app (il
+pannello e' a 2x, e a meta' giro ha ricominciato a ritagliare gli
+scatti): «I miei scambi» in cima e scorsa, chiaro e scuro, il filtro
+vuoto, la testata del libro e Info P2P — bordi netti.
+⚠️ E UN INCIAMPO DEL GIRO, da non ripetere: il server di prova era
+partito prima della rotta nuova, quindi Info P2P riceveva un 404 e
+l'`onerror` toglieva l'immagine in silenzio. Le rotte si leggono
+all'avvio: dopo aver toccato `server.py` il server si riavvia.
+
+**NON PROVATO, E DA GUARDARE.** Sul telefono vero dentro Telegram: la
+testata ferma scorrendo col dito (e su uno schermo piu' basso di 812 la
+fetta ferma pesa di piu': su 667 e' un quarto abbondante); le pillole
+nel velo coi font veri di iPhone — se la levetta andasse a capo a 375
+la testata crescerebbe di una riga; il logo del libro a 3x e la sua
+sfumatura coi file nuovi; e il conto con un evento VERO del
+coordinatore.
