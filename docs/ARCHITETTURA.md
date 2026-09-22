@@ -10387,12 +10387,23 @@
   tono-<nome>`, quindi card e riquadro non possono dire due cose
   diverse; e il COLORE NON E' L'UNICO SEGNO, la parola dello stato
   resta dov'e'. Il velo lo fa `color-mix` fra l'inchiostro del
-  riquadro e la carta, con due percentuali (6% di giorno, 8% di sera:
-  `--tinta-card`) e il bordo piu' carico (`--tinta-bordo`), tutto
-  DENTRO un `@supports` — senza `color-mix` la dichiarazione cadrebbe
-  e la card resterebbe trasparente sul crema, non bianca. Il testo
-  piu' debole su ogni tinta sta a 4,59:1 di giorno e 4,62 di sera, e
-  la riga di servizio e' passata da `--muted` a `--ink-soft` apposta.
+  riquadro e la carta, con una terna di percentuali per tema — di
+  giorno 15% sul fondo e 50% sul bordo, di sera 8% e 34%
+  (`--tinta-card`, `--tinta-bordo`) —, tutto DENTRO un `@supports`:
+  senza `color-mix` la dichiarazione cadrebbe e la card resterebbe
+  trasparente sul crema, non bianca.
+  ⚠️ IL GIORNO E' SALITO DAL 6 AL 15% la sera stessa («troppo
+  sbiadite», guardando lo schermo), e la terza percentuale nasce di
+  li': `--tinta-testo` (22% di giorno, 0% di sera) tira di un gradino
+  verso l'inchiostro di casa le DUE cifre che stanno sul fondo della
+  card — quella dei sats e il premio in rosso —, che al 15% scendevano
+  a 4,0:1. Con la leva a zero il tema scuro e' identico a prima per
+  costruzione, non per accordo. Il testo piu' debole sta a 4,67:1 di
+  giorno (il verde del premio sul viola) e 4,62 di sera; la riga di
+  servizio era gia' passata da `--muted` a `--ink-soft`. Due prove lo
+  rifanno sui token: una sul 4,5:1, l'altra su un PAVIMENTO di
+  visibilita' (di giorno ogni tinta si stacca dalla carta di almeno 18
+  su 255 — il 6% bocciato ne faceva 14).
   E' un colore fermo: «effetti ridotti» non ha niente da togliergli.
   Il verbale: CANTIERI, «I ritocchi del P2P».
   IL LINK PORTA DOVE C'E' IL GESTO (ago 2026, dal campo): la notifica

@@ -24900,7 +24900,7 @@ non l'ha visto nessuno. E la tinta della FASCIA colorata si muove a
 scatti di un punto — `fasciaPremioP2P` arrotonda all'intero, che è del
 cursore normale: il pallino scorre liscio, la banda no. Misurato, non
 curato.
-## I ritocchi del P2P: il conto dei presi, i loghi nitidi, il velo del libro e le card colorate (22 set 2026, sera)
+## I ritocchi del P2P: il conto dei presi, i loghi nitidi, il velo del libro (poi disfatto) e le card colorate (22 set 2026, sera)
 
 Cinque richieste di Andrea in un giro solo, tutte sulla stessa pagina
 e tutte piccole — ma due rovesciano una decisione presa poche ore
@@ -24955,7 +24955,8 @@ disegno che va benissimo — ma senza nessuna prova, un gemello
 ritagliato davvero diverso farebbe saltare il logo di posto a meta'
 sfumatura, e non se ne accorgerebbe nessuno.
 
-**3) IL LOGO DEL LIBRO PIU' GRANDE, E I PIXEL VENGONO DAL VELO.** Il
+**3) IL LOGO DEL LIBRO PIU' GRANDE.** (Il titolo diceva «e i pixel
+vengono dal velo», ed era FALSO: vedi l'emenda in fondo al punto.) Il
 tetto passa da 96 a 120px e la formula da `100vw - 280` a
 `100vw - 265`: a 360 il logo e' 95 (era 80), a 375 e' 110 (era 95), da
 385 in su e' 120. I quindici pixel non sono stati tolti alle scritte —
@@ -24967,6 +24968,16 @@ BTC», misurati dal vivo: la formula e' `100vw` meno una costante
 proprio perche' quello spazio non cambi mentre il logo cresce.
 MISURATO A 360, 375, 390, 412 E 430 con Chrome headless: «Compra BTC»
 e «Vendi BTC» stanno su UNA riga a tutte e cinque.
+⚠️ EMENDA (la sera stessa, quando il velo e' uscito dal libro): la
+frase qui sopra sul margine negativo DICEVA IL FALSO. Gli 8px di
+respiro del velo per lato erano annullati esattamente dal margine
+negativo dei tab, quindi la riga era larga quanto la colonna — come
+adesso che il velo non c'e' piu'. I quindici pixel venivano dai dodici
+dei margini del logo e da uno e mezzo per tab (la costante della
+formula da 280 a 265), e il velo non c'entrava niente. Provato invece
+che ragionato: tolto il velo, a 375 il logo misura ancora 110, la riga
+343, il tab 116,5 e «Compra BTC» 102,2 su una riga — gli stessi numeri
+al decimo.
 ⚠️ A 320 «COMPRA BTC» VA A CAPO, e ci andava anche prima: sotto la
 soglia il logo resta al suo minimo di 76 e i conti non tornano
 comunque (servirebbe un logo da 67). E' fuori dalla fascia che Andrea
@@ -24974,7 +24985,11 @@ ha chiesto (360-430) e il ritocco l'ha migliorata di sei pixel, non
 peggiorata; si chiude abbassando il minimo del logo, ed e' una
 decisione sua.
 
-**4) IL VELO DEL LIBRO E' LA STESSA REGOLA DELLA SORELLA.** Dietro il
+**4) IL VELO DEL LIBRO E' LA STESSA REGOLA DELLA SORELLA.**
+⚠️ DISFATTO LA SERA STESSA: Andrea l'ha guardato e ha detto che li'
+stava meglio senza. Il punto resta a verbale perche' la decisione e'
+sua e il modo di farlo — una regola, due selettori — vale ancora il
+giorno che si volesse un velo in due posti. Dietro il
 logo e i due tab c'e' adesso il velo di «I miei scambi». «Identico»,
 ha chiesto Andrea: stesso colore nei due temi, stessa forma, stessi
 angoli — e la forma piu' forte di «identico» e' UNA REGOLA SOLA con
@@ -24991,7 +25006,9 @@ riquadro non possono dire due cose diverse, e un colore nuovo si
 aggiunge in un posto solo. E IL COLORE NON E' L'UNICO SEGNO — la
 parola dello stato resta dov'e', per chi i colori non li distingue.
 LE DUE PERCENTUALI SONO UNA DECISIONE MISURATA, non un gusto: 6% di
-giorno e 8% di sera. Di giorno la carta e' bianca e una tinta piu'
+giorno e 8% di sera. (⚠️ Il giorno e' salito al 15% la sera stessa:
+vedi la voce dopo. La misura qui sotto resta giusta — e' proprio
+quella che ha reso necessaria una leva in piu'.) Di giorno la carta e' bianca e una tinta piu'
 forte spegne la cifra arancio dei sats sotto la soglia AA — col 22%
 la prova diventa rossa, verificato torturandola. Il testo piu' debole
 su ogni tinta sta a 4,59:1 di giorno e 4,62 di sera, e per arrivarci
@@ -25060,3 +25077,74 @@ tinte coi colori veri di uno schermo OLED (in chiaro sono velature da
 logo del libro a 3x coi file nuovi e la sua sfumatura al tocco; e il
 conto dei presi con un evento VERO del coordinatore — qui i dodici
 scambi sono seminati a mano.
+
+
+## La correzione dei ritocchi P2P: il velo esce dal libro, e in chiaro le card si vedono davvero (22 set 2026, sera tardi)
+
+Due correzioni di Andrea guardando lo schermo, e tutt'e due dicono
+qualcosa che dal codice non si sarebbe potuto sapere.
+
+**1) IL VELO ESCE DAL LIBRO.** «Era meglio senza»: la testata del
+«Libro ordini» torna com'era, col logo grande nuovo e i tab che si
+dividono tutta la riga. Il velo resta di «I miei scambi» e il selettore
+torna uno. Del giro di poche ore prima resta quel che serviva: il logo
+piu' grande.
+⚠️ E TOGLIENDOLO E' VENUTO FUORI CHE LA VOCE DI STAMATTINA DICEVA IL
+FALSO, che e' la parte da tenere: «i sedici pixel del velo servono al
+logo» non stava in piedi, perche' gli 8px di respiro per lato erano
+annullati dal margine negativo dei tab. La riga era larga quanto la
+colonna col velo, ed e' larga uguale senza. I quindici pixel venivano
+dai dodici dei margini del logo e da uno e mezzo per tab. **Provato
+invece che ragionato**: a 375, tolto il velo, il logo misura ancora
+110, la riga 343, il tab 116,5 e «Compra BTC» 102,2 su una riga — gli
+stessi numeri al decimo. Una spiegazione che «suona bene» e non e'
+stata misurata e' un debito: qui si e' pagato con un'emenda, e la
+prossima volta la si misura quando la si scrive.
+LA SENTINELLA CAMBIA SEGNO, e anche questo e' il verbale: era «la copia
+non deve nascere» (il velo del libro doveva restare LA STESSA regola),
+adesso e' «il libro non ha velo» — ne' la scatola nel markup, ne' una
+regola sua nel foglio.
+
+**2) IN CHIARO LE TINTE SALGONO DAL 6 AL 15%**, col bordo dal 24 al
+50%. Al 6% erano «troppo sbiadite», e la cosa da scrivere e' che le
+PROVE NON POTEVANO ACCORGERSENE: la spia diceva «la tinta non e' a
+zero» (5 su 255) e il 6% ne faceva 14, quindi passava. Adesso di giorno
+c'e' un PAVIMENTO — almeno 18 su 255 — e il 6% lo fa rosso. Un numero
+che viene da un occhio non si indovina; una volta che l'occhio l'ha
+detto, si inchioda.
+LA TERZA PERCENTUALE E' NATA QUI, ed e' la ragione per cui non si
+poteva salire e basta: al 15% due cifre che stanno sul FONDO della card
+— quella dei sats (`--sats-text`) e il premio in rosso (`--danger`) —
+scendono a 4,0:1 e 4,1, sotto la soglia del testo piccolo. Non e' un
+colore nuovo: `--tinta-testo` (22%) tira lo stesso inchiostro di un
+gradino verso quello di casa, e vale solo dove la tinta c'e'. Col
+15%/22% il testo piu' debole e' il VERDE DEL PREMIO sul viola, a
+4,67:1 — e il conto delle prove lo rifa' sui colori DIPINTI, non sui
+token nudi, che senno' misurerebbe un colore che la pagina non usa.
+⚠️ IL TEMA SCURO NON SI TOCCA («ottimo cosi'», decisione di Andrea), e
+il modo di garantirlo e' una leva a zero: di sera `--tinta-testo` vale
+0%, quindi `color-mix(in srgb, var(--ink) 0%, var(--sats-text))` e'
+esattamente il token di sempre. Identico PER COSTRUZIONE invece che per
+accordo — e una prova guarda proprio quello zero.
+
+**LE PROVE.** Emendate le sentinelle del velo (in `prove_p2p_libro` e
+in `prove_intestazione_scambi`) e la geometria del libro, che adesso
+guarda la riga senza niente in mezzo. In `prove_card_tinte_stato`: la
+terna di percentuali per tema, la leva spenta di sera, le due regole
+che scuriscono le cifre, il conto dell'AA rifatto sui colori dipinti e
+il pavimento di visibilita'. Suite intera **13218/0** con
+`PROVE_SEVERE=1`, otto collaudi senza rete verdi, tortura **15
+mutazioni / 15 uccise** — compresa «il chiaro torna al 6%», che adesso
+muore su due prove invece che su una, e la seconda dice PERCHE'.
+
+**DAL VIVO**, a 375 px e densita' 3, chiaro e scuro: le sei tinte piu'
+i due stati senza, la testata del libro senza velo (e le misure che
+combaciano al decimo con quelle di prima), il conto dei presi
+invariato.
+
+**DA GUARDARE SUL TELEFONO.** Le tinte al 15% su uno schermo vero:
+qui si vedono bene, ma il salto dal 6 e' grosso e la parola finale e'
+di chi guarda. E la scatola del metodo (`--chip-bg`, beige) su una card
+viola o blu: a 15% si stacca piu' di prima — se stona, la cura e'
+tingere anche lei di un filo, ma e' una decisione di Andrea, non una
+cosa da fare di mia iniziativa.
