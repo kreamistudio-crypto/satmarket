@@ -24524,3 +24524,76 @@ il margine di due ore, che e' una proposta; la riga dello sconto nel
 dettaglio di chi prende, che cambia col cambio (e' dichiarata «di
 adesso»); e `apriDisputaP2P`, la cui frase resta generica anche col
 PayCode («quasi sempre e' un ritardo»), che qui e' meno vero.
+
+
+## I limiti di Amazon «Paga in contanti» dentro Barattozon (23 set 2026)
+
+LA RICHIESTA (Andrea), con le regole vere di Amazon: al checkout si
+riceve il PayCode e si hanno 72 ore per pagare in tabaccheria, bar,
+edicola o posta; 999 € per ordine; nessuna commissione; esclusi Amazon
+Warehouse, contenuti digitali, oro, abbonamenti (Prime), buoni regalo e
+acquisti 1-Click. Da fare sopra il percorso guidato di ieri, in un
+worktree da `origin/main`.
+
+**IL TETTO, E NESSUN MINIMO.** `P2P_PAYCODE_MAX_EURO = 999` e il giudice
+puro `giudiceImportoPayCodeP2P(euro)`: '' se pagabile, altrimenti «Amazon
+accetta il pagamento in contanti fino a 999 € per ordine» (o «Scrivi
+l'importo del PayCode…» a zero). Si confronta IN CENTESIMI, che 999,01
+contro 999 sui float non fa sorprese ma 998,999 arrotondato si'. Lo
+chiama `valeNuovoOrdineP2P` nel ramo del tabacchino, subito dopo
+«l'importo e' uno solo», e il form a mano del recapito (`inviaCampoP2P`).
+NESSUN MINIMO NOSTRO ESISTE, ed e' un censimento e non una promessa: in
+client e in server non c'e' `P2P_MIN_EURO` ne' un minimo in euro (una
+prova lo cerca per nome), e 0,50 € passa. Sotto restano solo i due
+tetti in sats DEL COORDINATORE (`min_order_amount`/`max_order_amount`
+del 38385), che non sono nostri e che mostrod applicherebbe comunque:
+toglierli dal foglio farebbe solo rispondere «no» al coordinatore un
+minuto dopo. Il tetto in euro di Barattolo (`P2P_MAX_EURO`, la leva) e
+i limiti del P2P normale non si toccano: 999 e' il tetto di Amazon, si
+somma agli altri e vale per il solo Barattozon.
+
+**LO STESSO CONTROLLO SUL SERVER**, nell'unico posto in cui l'importo
+di un PayCode gli arriva: `/api/p2p/canale`. `PAYCODE_EURO_MAX = 999.0`
+e il giudice puro `_importo_paycode_valido(euro)` (centesimi, 0 escluso,
+999,00 compreso), applicato dopo l'argine di tutti e SOLO se il metodo
+e' il tabacchino (`_tabacchino_libro`), con la stessa frase in un 400.
+Il payload verso il coordinatore non passa dal server, quindi questo e'
+il solo punto — e vale anche per un client di ieri che scrivesse un
+importo fuori misura nel post di vetrina.
+
+**LE PAROLE.** Tappa 1: la riga delle esclusioni («Non vale per Amazon
+Warehouse, contenuti digitali, oro, Prime, buoni regalo e acquisti
+1-Click: se la mail di Amazon non offre il pagamento in contanti,
+l'ordine non e' pagabile con Barattozon»). Tappa 2: «Amazon accetta i
+contanti fino a 999 € per ordine, senza minimo e senza commissione».
+Tappa 3: «Amazon da' 72 ore dal checkout: copia la scadenza dalla mail»,
+poi la finestra e le due ore di margine come ieri. Riquadro di chi
+paga: «Vai in tabaccheria, al bar, in edicola o alla posta: dove si
+accettano i pagamenti Amazon in contanti, senza commissione». «Info
+P2P»: i posti, «novecentonovantanove euro» in lettere (la sentinella
+della pagina non vuole cifre battute a mano), senza minimo e senza
+commissione, le esclusioni, «settantadue ore dal checkout».
+
+**LE STRADE SCARTATE.** Togliere i tetti in sats del coordinatore per il
+tabacchino (non sono nostri, e il rifiuto arriverebbe comunque). Un
+minimo «di prudenza» (Amazon non ne ha, e la regola dice zero). Mettere
+il tetto nel giudice dei centesimi (`centesimiP2P` e' la forma del
+numero, non la regola di Amazon: due mestieri).
+
+**PROVATO.** `prove.py` 13131 verdi, 0 rosse (+11 sui giudici dei due
+lati, sulla rotta e sui testi: 999 e 999,00 passano, 999,01 e 1000 no,
+0,50 e 0,01 passano, zero e vuoto no; il form a mano chiama lo stesso
+giudice; nessun `P2P_MIN_EURO`). Tortura: 8 mutazioni su 8 uccise (i
+due `<=`, il tetto a 9999, il foglio e la rotta che non guardano, due
+minimi finti). Dal vivo nel Browser pane col server del worktree (leva
+accesa, relay morto, tetti in sats di cartone a zero): il giudice del
+foglio dice «fino a 999 €» su 999,01 e passa 999 e 0,50 (la tappa 2 si
+accende d'arancio sul manca), la riga dei sats a 0,50 € («649 sats
+invece di 665»), le tre righe nuove nelle tappe, il riquadro con i
+quattro posti, «Info P2P». La rotta del canale non l'ho chiamata dal
+vivo: vuole l'utente, e il giudice sotto e' provato sui numeri.
+
+**NON PROVATO.** Il telefono; un post di vetrina vero con un importo
+fuori misura (il 400 e' nel banco, non su Telegram); e che Amazon
+applichi davvero 999 e non un altro numero — e' la regola come Andrea
+l'ha letta, e sta in una costante sola per lato.

@@ -24448,6 +24448,16 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   il PayCode o lo sconto al server, quindi nessun giudice lato server
   su di loro: e' scritto, non dimenticato. Il verbale: CANTIERI, «Il
   percorso guidato di Barattozon».
+  I LIMITI DI AMAZON (23 set 2026): 999 € per ordine e NESSUN minimo
+  oltre lo zero, nessuna commissione — `P2P_PAYCODE_MAX_EURO` col
+  giudice puro `giudiceImportoPayCodeP2P` (in centesimi) nel foglio e
+  nel form a mano, e sul server `PAYCODE_EURO_MAX` con
+  `_importo_paycode_valido` nella rotta del canale, sul solo
+  tabacchino. Il tetto di Barattolo (`P2P_MAX_EURO`) e i tetti in sats
+  del coordinatore restano quelli di tutti. Le esclusioni (Warehouse,
+  digitale, oro, Prime, buoni regalo, 1-Click) e i posti (tabaccheria,
+  bar, edicola, posta) stanno nelle parole: tappe, riquadro, Info. Il
+  verbale: CANTIERI, «I limiti di Amazon».
   LA SVEGLIA DEL TABACCHINO è l'emenda alla fase 6 (decisione di
   Andrea): il server impara UNA cosa — «questo account ha una scadenza
   a quest'ora» — nella tabella `p2p_sveglie` (quattro colonne, PK
