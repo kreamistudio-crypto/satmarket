@@ -25606,3 +25606,104 @@ due nuove: la frase lunga che torna, e i sats che cadono dalla riga di
 servizio).
 DAL VIVO a 375 px: le due card del tabacchino una sopra l'altra, e la
 nuova sta su due righe come le sorelle.
+
+## L'insegna di Barattozon si spegne sugli scambi finiti (22 set 2026, notte)
+
+**IL DIFETTO ERA UN CONFRONTO, non una scatola.** In «I miei scambi»
+ogni card porta in fondo la scatola del metodo. Per quasi tutti è testo
+grigio su carta grigia — «💳 SEPA», «💳 Revolut» —; per Barattozon è
+un'INSEGNA: rettangolo navy e marchio a colori, l'unico pezzo colorato
+di quella card. Viva, quell'insegna fa il suo mestiere. Su uno scambio
+CONCLUSO faceva il contrario di quel che serve: scorrendo i propri
+scambi vecchi chiamava l'occhio più di quelli in corso, e accanto alla
+«SEPA» della card vicina — spenta da sempre, perché è solo testo —
+sembrava che lì ci fosse ancora qualcosa da fare. Richiesta di Andrea:
+«negli scambi conclusi e annullati la scatola si vede ma è spenta, in
+grigio come quella SEPA, nei due temi».
+
+**SPENTA VUOL DIRE UGUALE ALLE SORELLE**, e non «un po' meno accesa»:
+il fondo torna il `--chip-bg` di casa — lo STESSO pixel della scatola
+«SEPA» (misurato dal vivo: `rgb(243,236,218)` di giorno e
+`rgb(55,48,31)` di sera, identico nelle due scatole) — e il marchio
+passa dal filtro. Angoli, colonna, margini e ALTEZZA non si toccano: il
+respiro di 5 resta dov'è, quindi accesa e spenta misurano tutt'e due
+**34 px** e la card non si muove di un pixel nell'istante in cui lo
+scambio chiude.
+
+**⚠️ E DI GIORNO IL MARCHIO SI ROVESCIA, che è la parte che dal foglio
+di stile non si sarebbe dedotta.** La parola del marchio è BIANCA: il
+fondo scuro glielo dava il navy, ed è scritto nel commento della coppia
+«fondo navy + marchio nudo» che le due cose stanno insieme o non
+stanno. Togliere il navy e mettere un `grayscale` lasciava la parola
+bianca su un chip crema, cioè **sparita** — lo stesso difetto già VISTO
+sullo schermo il 16 set, ripreso dall'altro lato. `invert(1)` dopo il
+grigio la porta a nero, e va dove va `barattozon-scuro.webp` (il file
+col lettering scuro che vive nel tour) **con un gradino in più**:
+chiesti al motore dei filtri del browser, il rovescio dà **0** al
+lettering e **105** all'arancio, il file dedicato **39** e **150**.
+Dopo l'opacità sul crema il tratto più scuro atterra a **92**, e la
+«SEPA» della sorella è scritta con `--ink-soft`, che parte da **91** —
+cioè le due scatole si leggono con lo stesso inchiostro, per conto e
+non per accordo. Di sera no: lì il chip è già scuro e il bianco legge
+come ha sempre fatto — rovesciarlo lo farebbe sparire dal verso
+opposto. Due regole, una per tema, col giudice unico
+`html[data-tema="scuro"]`.
+
+**LA STRADA SCARTATA, e va scritta perché è quella che sembra più
+pulita:** usare davvero `barattozon-scuro.webp`. Il file c'è, la sua
+rotta c'è, e nel tour i due vestiti si scambiano già con
+`giro-m-chiaro`/`giro-m-scuro`. Ma il tema può cambiare senza che «I
+miei scambi» si ridisegni, quindi il file non lo può scegliere il JS:
+servirebbero **due `<img>` in ogni card** e un quarto campo nel
+catalogo dei vestiti — che di campi ne ha tre apposta, dopo un
+pomeriggio in cui ne ha avuti il doppio — per una scatola che si spegne
+in un posto solo. Il filtro arriva più vicino alla sorella senza
+toccare né il markup né il catalogo. Il giorno che i vestiti servissero
+spenti anche altrove, la strada giusta torna a essere il file.
+
+**⚠️ IL GIUDICE È `P2P_FINALI`, E NON I DUE CHE STANNO LÌ SOPRA.**
+Nella card ci sono già `chiuso` e `annullato`, ma quelli scelgono le
+PAROLE — e proprio lì `rifiutato` NON è «annullato», apposta: quello
+scambio non è mai cominciato. Qui si sceglie l'INCHIOSTRO, e l'asse è
+un'altra: «da qui non si torna», che in casa ha già la sua lista sola
+(`concluso`, `annullato`, `rifiutato`). Quindi anche un `rifiutato` si
+spegne — più di quel che la richiesta nominava, e meno di quel che
+costerebbe un secondo elenco di stati finali scritto a mano: due
+elenchi si scollano al primo stato nuovo, e a scollarsi sarebbe quello
+che nessuno guarda. Detto ad Andrea nel riepilogo.
+
+**⚠️ E IL COMMENTO DEL JS NON PUÒ SCRIVERE IL NOME DELLA CLASSE.**
+Costato una rossa che non c'entrava niente col cantiere:
+`prove_p2p_card_scambio` controlla l'ORDINE dei pezzi della card
+cercando la **prima volta** che compare il nome della scatola, e il mio
+commento lo nominava per intero — quassù, cioè PRIMA del markup. Una
+prova sull'impaginazione fatta fallire da un commento. È la lezione
+delle prove che rispondono per il vicino, e questa volta l'ha pagata un
+commento: adesso c'è scritto lì perché quel nome non si scrive, o
+qualcuno lo rimette per chiarezza.
+
+**LE PROVE.** Nel banco della card: finito → spenta e in corso →
+accesa (gli stati del giro del banco, più `rifiutato`, aggiunto qui),
+il nome che si AGGIUNGE invece di prendere il posto di quello di prima,
+e la scatola scritta che non lo prende nemmeno da conclusa. Nel CSS: il
+fondo che è quello delle sorelle e non un grigio scritto lì, il respiro
+e la forma che non si toccano, il rovescio che c'è di giorno e non di
+sera, e l'opacità di casa nei due temi. ⚠️ L'ancora della regola chiara
+porta **due spazi davanti**, e non è cosmesi: il selettore di sera
+CONTIENE quello di giorno, e senza i due spazi quella sentinella
+risponderebbe per il vicino il giorno che uno dei due cambiasse posto
+nel foglio. Suite intera **13272/0** con `PROVE_SEVERE=1`.
+
+**DAL VIVO** (vetrina di cartone a 420 px, col `<style>` vero e le card
+prodotte dal banco, nei due temi): misurato che la scatola spenta e la
+«SEPA» hanno lo stesso fondo, che la spenta e l'accesa sono alte
+uguali, e che il filtro è `grayscale(1) invert(1)` di giorno e
+`grayscale(1)` di sera, con `opacity 0.62` — quella della foto di un
+annuncio esaurito, cioè nessun valore nuovo.
+
+**DA GUARDARE SUL TELEFONO.** Uno scambio Barattozon concluso accanto a
+uno in corso, nei due temi: di giorno il marchio spento deve LEGGERSI
+(è il caso che il rovescio cura, ed è l'unico che può uscire storto),
+di sera deve stare in riga con la «SEPA» della card vicina. E lo
+scorrimento dell'elenco: se l'occhio cade ancora prima sulle card
+finite che su quelle in corso, la cura non era abbastanza.
