@@ -25959,16 +25959,28 @@ ma è la prova che la diagnosi è giusta, ed è anche l'elenco di quel che
 resta da decidere.
 
 **LE PROVE.** `prove_guscio_apertura` sale a 38 e `prove_app_android` a
-13. Le nuove: il guscio nasce spento e lo accende solo la classe; la
+9, più le 8 del collaudo nuovo. Le nuove: il guscio nasce spento e lo accende solo la classe; la
 classe si mette nell'head col referrer del NOSTRO pacchetto; l'app non
 la nomina mai (niente timbro che possa passare al browser); il data URI
 è un WebP con l'alfa, alla misura per il 3x, sotto i 40 KB, ed è lo
 STESSO barattolo della sorgente (confronto alla resa, scarto medio
-3,09/255); la HEAD gira DAVVERO su un'app FastAPI di cartone con la
-stessa coppia di decoratori, e il pacchetto del referrer è confrontato
-con quello dell'assetlinks (scritti in due file, potevano divergere in
-silenzio e il guscio sarebbe sparito senza che niente protestasse).
-Suite **13325/0** con `PROVE_SEVERE=1`, otto collaudi verdi, tortura
+3,09/255); e il pacchetto del referrer è confrontato con quello
+dell'assetlinks (scritti in due file, potevano divergere in silenzio e
+il guscio sarebbe sparito senza che niente protestasse).
+⚠️ **E LA PROVA ESEGUIBILE DELLA HEAD È NATA NEL POSTO SBAGLIATO**, che
+è la lezione del giro: la prima stesura faceva girare un'app FastAPI di
+cartone dentro `prove.py`, ed è uscita ROSSA in CI — lì fastapi non c'è,
+la prova è finita in `salta()`, e con `PROVE_SEVERE=1` una saltata vale
+una fallita. La cura NON è installare fastapi: sta scritto nel workflow
+che `prove.py` gira **apposta** senza httpx né fastapi, «perché
+allargargli l'ambiente cambierebbe cosa prova senza che nessuno lo
+decida». Il posto giusto per una domanda che vuole il server VERO sono i
+COLLAUDI, dove fastapi c'è perché lo installa il passo apposta: è nato
+`collaudo_rotte_metodi.py` (8 verifiche, nell'elenco del workflow), e in
+`prove.py` resta la sentinella sul testo. I due si guardano le spalle —
+la sentinella prende chi cancella il decoratore, il collaudo chi lo
+rende inutile.
+Suite **13321/0** con `PROVE_SEVERE=1`, nove collaudi verdi, tortura
 **10 mutazioni / 10 uccise**.
 ⚠️ E UNA SENTINELLA DEL VICINO È STATA RISTRETTA: `prove_intestazione_scambi`
 diceva «la pagina non incorpora NESSUNA webp» e voleva dire «non

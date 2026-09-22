@@ -58,6 +58,7 @@ jobs:
              genera_icone.py genera_icone_apk.py censimento_nostr.py
              censimento_spedizione.py censimento_payout.py capitale_cassa.py orfani.py
              censimento_scadenze.py collaudo_fatture_scadute.py
+             collaudo_rotte_metodi.py
              collaudo_in_pagamento.py collaudo_altra_cassaforte.py
              ripulisci_anello_nostr.py
              ricategorizza.py sposta_a_mano.py ritaglia_categorie.py
@@ -147,6 +148,7 @@ jobs:
              collaudo_in_pagamento
              collaudo_lnbits_muto
              collaudo_fatture_scadute
+             collaudo_rotte_metodi
 
   # La regola ferrea numero 1, e vive in un JOB SUO — non in coda
   # all'altro, ed e' il pezzo da non rimettere com'era.

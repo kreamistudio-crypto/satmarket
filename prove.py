@@ -79574,40 +79574,18 @@ def prove_app_android():
     # 405 si legge come «questo dominio non dichiara niente».
     prova("la rotta dichiara anche la HEAD", 1,
           _SORGENTE.count('@app.head("/.well-known/assetlinks.json")'))
-    # E NON BASTA LA RIGA: si fa girare. Un'app FastAPI di cartone con
-    # la STESSA coppia di decoratori risponde alle due domande in un
-    # colpo — la HEAD da' 200 e non 405, e gli header sono gli stessi
-    # del GET col corpo vuoto. Se un domani FastAPI cambiasse idea,
-    # questa prova lo direbbe; una sentinella sul testo no.
-    try:
-        from fastapi import FastAPI as _FA
-        from fastapi.responses import FileResponse as _FR
-        from fastapi.testclient import TestClient as _TC
-    except Exception as e:
-        salta("la HEAD sull'assetlinks risponde 200 come il GET",
-              f"{type(e).__name__}: {e}")
-    else:
-        _app = _FA()
-        _via = "/.well-known/assetlinks.json"
-
-        @_app.get(_via)
-        @_app.head(_via)
-        def _serve():
-            return _FR(".well-known/assetlinks.json",
-                       media_type="application/json",
-                       headers={"Cache-Control": "public, max-age=3600"})
-
-        _c = _TC(_app)
-        _g, _h = _c.get(_via), _c.head(_via)
-        prova("la HEAD risponde 200 (era 405)", 200, _h.status_code)
-        prova("...col corpo vuoto", 0, len(_h.content))
-        prova("...e con gli STESSI header del GET (Content-Length compreso)",
-              {k: v for k, v in _g.headers.items() if k != "date"},
-              {k: v for k, v in _h.headers.items() if k != "date"})
-        prova("...e il GET non e' cambiato: serve il file intero",
-              [200, os.path.getsize(os.path.join(".well-known",
-                                                 "assetlinks.json"))],
-              [_g.status_code, len(_g.content)])
+    # E NON BASTA LA RIGA, ma il resto NON PUO' STARE QUI. La domanda
+    # vera — «che cosa risponde il server a una HEAD?» — si fa solo
+    # facendogli rispondere, e `prove.py` gira APPOSTA senza fastapi
+    # (sta scritto nel workflow: allargargli l'ambiente cambierebbe
+    # cosa prova senza che nessuno lo decida). La prima stesura ci
+    # provo' lo stesso, con un'app di cartone e un `salta()` per
+    # quando fastapi non c'e': in CI e' finita SALTATA, e con
+    # PROVE_SEVERE=1 una saltata vale una fallita — rosso, e deploy
+    # fermo. Adesso la meta' eseguibile vive in
+    # `collaudo_rotte_metodi.py`, che gira il server VERO, e questa
+    # riga tiene l'altra meta': i due si guardano le spalle — qui si
+    # prende chi cancella il decoratore, la' chi lo rende inutile.
 
 
 def prove_effetti_ridotti():
