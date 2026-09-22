@@ -24402,6 +24402,52 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (92 ore col nodo a 576, erano 68 a 432) è il coordinatore a muoversi:
   in `active` cancella la hold, in `fiat-sent` apre la disputa
   (`enforce_escrow_deadline_pass`, letto sulla v0.18.7).
+  IL PERCORSO BARATTOZON (23 set 2026, decisione di Andrea, sopra il
+  prezzo fisso del 22): nel foglio «Pubblica» il tabacchino e' un
+  percorso a QUATTRO TAPPE numerate nello stesso foglio
+  (`percorsoTabacchinoP2P`, la testata da `passoTabacchinoP2P` = il
+  primo passo che manca): il PAYCODE a nove cifre della mail Amazon
+  «paga in contanti nel punto vendita», normalizzato a «479-868-518»
+  da `payCodeP2P` (trattini o spazi facoltativi, e SOLO nove cifre: il
+  numero d'ordine a 17 e' storto); l'importo coi centesimi (lo stesso
+  campo `p2pNuovoEuro`); la scadenza del PayCode da un selettore, fra
+  UN'ORA e 72 ORE (`P2P_PAYCODE_MIN_S`/`MAX_S`, prima della finestra
+  della garanzia, che parla solo se piu' stretta); lo SCONTO 0-15% con
+  una cifra decimale (`scontoTabacchinoP2P`, «2,55» e' storto), cotto
+  nei sats fissi da `satsTabacchinoP2P` che lo tosa al decimo. IL VERSO
+  DELLO SCONTO: chi vende consegna `importo × (1 − sconto)` in sats,
+  cioe' chi paga al tabacchino riceve un po' meno del cambio pieno — lo
+  stesso verso del premio positivo, e la ragione di «sconto piu' basso
+  = piu' probabile che qualcuno lo paghi in tempo». Prima di pubblicare
+  il RIEPILOGO (`riepilogoTabacchinoP2P`, una `chiediConferma` col
+  timbro `confermato`). LA VITA NEL LIBRO SEGUE IL PAYCODE e rovescia
+  le 24 ore del 22 set: `expires_at` = scadenza meno DUE ORE, margine
+  che si stringe a meta' del tempo che resta sui PayCode corti, mai
+  oltre 72 ore (`vitaLibroTabacchinoP2P`); il costo — l'opzione sul
+  cambio per chi prende — e' dichiarato. LA SCADENZA NON VA NEL `pm`:
+  l'`expires_at` pubblico dice gia' la stessa cosa meno due ore, e nel
+  libro resta il solo importo; PayCode e scadenza viaggiano SOLO nel
+  recapito cifrato (riga «PayCode:», riletta da `payCodeDaTestoP2P`,
+  che accetta ancora «Numero ordine:» delle righe di prima). A chi
+  compra il riquadro del PayCode (`riquadroPayCodeP2P`: codice grande,
+  importo, scadenza, tempo che resta, i quattro gesti) e il bottone «Ho
+  pagato al tabacchino»; a chi vende dopo «pagato» il riquadro del
+  CONTROLLO SU AMAZON (`riquadroControlloTabP2P`): nessuna conferma
+  automatica, 24 ore a vista da `euroInviatiAt` (timbrato in
+  `applicaMessaggioP2P` entrando nello stato; ripieghi in
+  `inizioEuroInviatiP2P`), i due bottoni «Risulta pagato: libera i
+  sats» / «Non risulta pagato: apri una disputa», e NESSUN gesto
+  automatico allo scadere (la regola del tabacchino). Sul server:
+  `_tabacchino_libro` timbra i dati della frase e `_testo_evento_p2p`
+  dice PayCode dove il gesto e' quello (preso, pagato, sats rilasciati,
+  e lo scaduto del libro con le DUE scadenze spiegate); i tre SOLLECITI
+  a chi vende (un'ora, sei, venti) sono attese in `p2p_attese` con
+  fonte `sollecito`, nate al momento `fiat` e lasciate cadere da
+  `_sollecito_p2p_vivo` se lo scambio si e' mosso; la sveglia ha
+  l'orizzonte di un PayCode (72 ore e un quarto). Nessun campo porta
+  il PayCode o lo sconto al server, quindi nessun giudice lato server
+  su di loro: e' scritto, non dimenticato. Il verbale: CANTIERI, «Il
+  percorso guidato di Barattozon».
   LA SVEGLIA DEL TABACCHINO è l'emenda alla fase 6 (decisione di
   Andrea): il server impara UNA cosa — «questo account ha una scadenza
   a quest'ora» — nella tabella `p2p_sveglie` (quattro colonne, PK

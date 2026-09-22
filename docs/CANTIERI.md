@@ -24282,3 +24282,245 @@ del conto con un evento VERO del coordinatore — dal vivo il relay era
 morto apposta, e l'evento l'ho fatto entrare io dalla porta del motore.
 E la lettura dei due numeri: se «0 in corso · 1 tocca a te» suona
 strano, e' la riga di `contoScambiP2P` da girare.
+
+
+## Il percorso guidato di Barattozon: PayCode, scadenza, sconto, e il controllo su Amazon (23 set 2026)
+
+LA RICHIESTA (Andrea): copiare dal bot di riferimento (Bitzon, custodial
+su Telegram) la STRUTTURA del flusso e non i testi. Sei pezzi: 1) il
+PayCode di nove cifre della mail Amazon «paga in contanti nel punto
+vendita» (479-868-518); 2) l'importo esatto coi centesimi; 3) la
+scadenza del PayCode, data e ora, di norma 69-72 ore dall'ordine; 4) lo
+sconto scelto da chi vende sats, 0-15% con una cifra decimale, «sconto
+piu' basso = piu' probabile che qualcuno lo paghi in tempo»; 5) il
+riepilogo prima di pubblicare; 6) preso → pagato al negozio → chi vende
+controlla su Amazon → libera o disputa. Tutto sopra il prezzo fisso del
+22 set, lato app e server; mostro e mostro-core non si toccano. In un
+worktree da `origin/main`, come da ricetta delle sessioni parallele.
+
+**IL VERSO DELLO SCONTO, deciso e scritto perche' la richiesta lo
+diceva in due modi.** La consegna diceva insieme «e' il compenso di chi
+va al tabaccaio» e «quanto in meno in sats riceve rispetto al cambio»,
+che sono due versi opposti. Vale il secondo, per due ragioni che stanno
+in piedi da sole: e' il verso di Bitzon — se lo sconto fosse un premio
+per chi paga, uno sconto PIU' BASSO renderebbe il PayCode MENO
+appetibile, e la frase di riferimento dice il contrario — ed e' lo
+stesso verso del premio positivo di tutti gli altri ordini (sottrazione
+uniforme sui sats, `get_market_amount_and_fee`). Quindi: chi VENDE sats
+ha un ordine Amazon da far pagare in contanti, lo sconto e' quanto in
+meno in sats consegna rispetto al cambio del momento, e chi paga al
+tabacchino riceve `importo × (1 − sconto)`. Chi compra sats in contanti
+senza banca e senza nome paga quel premio, che e' il prezzo di mercato
+di quella privacy. Il foglio lo dice come FATTO e non come etichetta:
+«Chi paga al tabacchino riceve 30.423 sats invece di 31.203 (il cambio
+pieno per 23,47 €): il 2,5% resta a te», e il titolo della tappa e'
+«Lo sconto per chi paga» perche' e' la cifra che chi paga vede. Se
+Andrea legge il verso al contrario, si rovescia UNA formula
+(`satsTabacchinoP2P`) e tre frasi: e' scritto in testa a
+`P2P_TABACCHINO_VITA_S`.
+
+**LA VITA NEL LIBRO SEGUE IL PAYCODE, e rovescia le 24 ore del 22 set
+(decisione di Andrea).** `expires_at` = scadenza del PayCode MENO un
+margine, mai oltre 72 ore (`vitaLibroTabacchinoP2P`). Il margine e' di
+DUE ORE — il tempo di andare al tabacchino per chi prende all'ultimo —
+e SI STRINGE sui PayCode corti, a meta' del tempo che resta: un PayCode
+da un'ora sta nel libro mezz'ora, non «meno due ore» che sarebbe gia'
+passato e che il coordinatore rifiuterebbe. Il costo si dichiara, come
+il 22 set lo dichiarava la scelta opposta: a prezzo fisso per tre
+giorni chi prende ha un'opzione gratuita sul BTC/EUR. E' il prezzo di
+non far ripubblicare l'ordine tre volte, e Andrea l'ha scelto.
+
+**LA SCADENZA NON VA NEL `pm`, e la ragione e' scritta.** Il tag e'
+pubblico e i client altrui lo leggono come NOME del metodo: gia' oggi
+vedono «Contanti al tabacchino 23.47». Una seconda cifra — una data —
+sarebbe un nome ancora piu' strano, e `P2P_TABACCHINO_PM` cambierebbe
+forma per niente: l'`expires_at` dell'ordine e' gia' nel libro
+pubblico e dice la stessa cosa meno due ore, quindi chi prende sa
+quanto ha (l'anello della card e il dettaglio lo mostrano da ieri). Nel
+libro resta il solo importo; il PayCode e la scadenza viaggiano SOLO nel
+recapito cifrato. Chi legge il database del server sa quello che sapeva
+dal 15 set (la sveglia combacia con l'`expires_at`): niente di nuovo.
+
+**IL PERCORSO NEL FOGLIO «PUBBLICA»**, `percorsoTabacchinoP2P`: quattro
+tappe numerate nello STESSO foglio, non quattro schermate — la tastiera
+dell'iPhone e i fogli dal basso hanno gia' pagato abbastanza, e un
+foglio che si scorre e' quello che l'app sa tenere in piedi. La testata
+dice a che passo si e' (`passoTabacchinoP2P`, il PRIMO che manca:
+PayCode, importo, scadenza, sconto, poi «tutti e quattro i passi sono
+fatti: rileggi e pubblica»), ogni tappa fatta porta la spunta verde nel
+suo tondo, e la tappa dello sconto mostra viva la riga dei sats
+(`rigaScontoTabP2P`). Le tre cose si riscrivono IN PLACE a ogni tasto
+(`aggiornaPercorsoTabP2P`), mai con un render: la lezione delle pillole.
+I campi tengono gli id di prima (`p2pNuovoTabOrdine`, `p2pNuovoEuro`,
+`p2pNuovoTabScade`) piu' `p2pNuovoSconto`, cosi' ogni «manca» del giudice
+trova ancora il suo campo; la sezione generica dell'importo col
+tabacchino non si monta (l'importo E' la tappa 2) e il premio ±20
+nemmeno (lo sconto ha la sua tappa, 0-15 con una cifra decimale,
+`scontoTabacchinoP2P`: «2,55» e' STORTO, non 2,5; vuoto vale zero). Il
+selettore della data ha `min` a un'ora e `max` a 72 ore (o alla
+garanzia, se piu' stretta). Il bottone dice «🧾 Rileggi e pubblica» e
+apre il RIEPILOGO — la sessantacinquesima domanda di `chiediConferma`:
+PayCode, importo, scade il, sconto, «chi paga riceve N sats invece di M:
+tu blocchi N sats in garanzia», fino a quando resta nel libro — e il si'
+richiama `inviaNuovoOrdineP2P(true)` col timbro `confermato`, da cui in
+poi e' il gesto di sempre (`eseguiConferma` chiude il suo foglio e
+aspetta la promessa: il velo si alza e si spegne dentro). Il giudice del
+filo (`valeNuovoOrdineP2P`) ha tre controlli nuovi con la frase e il
+campo: PayCode vuoto o storto («9 cifre, come 479-868-518»), scadenza
+sotto l'ora («serve almeno un'ora perche' qualcuno vada al tabacchino»)
+o oltre le 72 («un PayCode vale al massimo 72 ore», PRIMA della
+garanzia, che parla solo quando e' lei la piu' stretta), sconto fuori
+forma. `satsTabacchinoP2P` tosa lo sconto al decimo invece che
+all'intero: sul filo non viaggia (e' cotto nei sats), quindi non c'e'
+nessun i64 che lo voglia intero.
+
+**IL PAYCODE**: `payCodeP2P` normalizza le nove cifre a «479-868-518»
+— trattini o spazi facoltativi fra le terzine, e SOLO cosi': il numero
+d'ordine Amazon a 17 cifre e' storto, non «quasi giusto». La riga del
+recapito cifrato si chiama «PayCode:» (era «Numero ordine:»), il form a
+mano lo normalizza prima di partire, e chi compra lo rilegge con
+`payCodeDaTestoP2P` dalla sola riga sua — o da «Numero ordine:» delle
+righe di prima, che non vanno perse. Sulla riga di chi pubblica ci va
+gia' normalizzato, e lo sconto con la sua cifra decimale
+(`premioCotto`), che il «Riprova» lo rifaccia uguale.
+
+**A CHI COMPRA**, `riquadroPayCodeP2P`, al posto del testo nudo del
+recapito: il codice grande con «copia», l'importo «in contanti», la
+scadenza e il tempo che resta riscritto ogni secondo nell'unico
+interval (`battitoControlloTabP2P`), i quattro gesti nell'ordine — vai
+al tabaccaio, dai il PayCode e paga, tieni lo scontrino, torna qui e
+tocca — e la riga che il codice viaggia cifrato. Il bottone del passo
+dice «✅ Ho pagato al tabacchino», la conferma chiede del PayCode e
+dello scontrino, il terzo passo dello stepper e' «PayCode pagato», e
+le frasi di stato col PayCode (`statoPayCodeP2P`, dopo
+`statoTabacchinoP2P` che parla del tempo e vince) dicono cosa fare a
+garanzia bloccata e a «pagato», per i due lati.
+
+**A CHI VENDE, dopo «pagato»**, `riquadroControlloTabP2P` al posto del
+solo «Libera i sats»: «Controlla su Amazon che l'ordine risulti
+pagato», la frase che NON esiste una conferma automatica (Amazon non
+parla con Barattolo) e i sats non si liberano da soli, il tempo — 24
+ore da quando chi compra ha segnato «pagato», riscritte ogni secondo —
+e i due bottoni grandi uno sotto l'altro, «✅ Risulta pagato: libera i
+sats» e «🚨 Non risulta pagato: apri una disputa» (la disputa piccola
+in fondo non si ripete). Sotto, cosa succede se non fa niente: i sats
+restano in garanzia, chi ha pagato puo' aprire lui la disputa, decide
+un moderatore e lo scontrino conta. L'ORA DI «PAGATO» SI TIMBRA in
+`applicaMessaggioP2P` entrando nello stato (`euroInviatiAt`, una volta
+sola: l'eco ripetuta non la sposta); `inizioEuroInviatiP2P` ripiega
+sull'ultima mossa e poi sull'aggiornamento della riga, per le righe
+riprese dalla restore; senza niente il riquadro dice «decidi appena
+puoi». IL TEMPO NON FA SCATTARE NIENTE: e' la regola del tabacchino
+(nessun gesto automatico), e a 24 ore passate il riquadro dice «decidi
+adesso».
+
+**IL SERVER.** La sveglia ha l'orizzonte di un PayCode
+(`SVEGLIA_P2P_ORIZZONTE_S` = 72 ore + un quarto d'ora per gli orologi;
+era `max_expiration_days`, 15 giorni, un tetto che non diceva niente
+sul metodo). `_tabacchino_libro` e' il timbro Barattozon letto dal
+libro (la parola con o senza l'importo), entra in `_dati_frase_p2p`, e
+`_testo_evento_p2p` sceglie le parole del PayCode dove il gesto e'
+quello: «🧾 Il tuo PayCode e' stato preso», «🧾 PayCode pagato:
+controlla su Amazon» (libera o disputa, nessuna conferma automatica, 24
+ore), «✅ Sats rilasciati!» a chi compra, e lo scaduto del libro a chi
+vende con le DUE SCADENZE spiegate: il libro chiude due ore prima del
+PayCode, che vale ancora per poco ma nessuno puo' piu' prendere; quando
+scade anche lui, l'ordine Amazon va rifatto e ripubblicato con un
+PayCode nuovo. I SOLLECITI a chi vende — un'ora, sei ore, venti ore
+dopo «pagato», dentro le 24 che la pagina mostra — passano dalle
+ATTESE gia' in casa (`p2p_attese`, fonte `sollecito`): tre righe nate
+al momento `fiat` sugli ordini Barattozon, e `_scarica_attese_p2p` le
+lascia cadere se intanto lo scambio si e' mosso
+(`_sollecito_p2p_vivo`: rilasciato, concluso, disputa, annullato,
+tornato, timbrati dal «pagato» in poi). Niente tabella nuova, niente
+timer nuovo, l'anti-doppione di sempre. NESSUN DATO AMAZON IN CHIARO,
+verificato per censimento: il payload pubblico non riceve nemmeno il
+PayCode (`ordineDaCampiP2P` non lo legge), il canale riceve importo e
+metodo per nome, la sveglia legge la sola scadenza; e NESSUNA
+validazione lato server del PayCode o dello sconto, detto onesto:
+nessun campo li porta al server, e un giudice senza chiamanti sarebbe
+codice morto travestito da difesa.
+
+**LE PAROLE.** «Info P2P» ha la sezione riscritta col percorso
+(«Barattozon: il PayCode al tabacchino, passo per passo»: i cinque
+passi, il verso dello sconto, le due scadenze, nessuna conferma
+automatica, i numeri in lettere perche' la sentinella della pagina non
+vuole cifre battute a mano); la card del tour dice «ti passa il
+PayCode»; il dettaglio di chi prende legge lo sconto ALL'INDIETRO dai
+sats fissi contro il cambio di adesso (`scontoImplicitoTabacchinoP2P`:
+«ricevi N sats invece di M») perche' sul filo non c'e'; le frasi del
+tempo dicono PayCode.
+
+**LE STRADE SCARTATE.** Quattro schermate al posto di quattro tappe
+(vedi sopra). La scadenza corta nel `pm` (vedi sopra). Un giudice del
+PayCode sul server senza un campo che lo chiami. Il cursore del premio
+±20 riusato per lo sconto (segno e fascia sbagliati: 0-15, un decimale).
+Un rilascio o una disputa AUTOMATICI allo scadere delle 24 ore: e'
+esattamente il gesto che la regola del tabacchino vieta, e il timer e'
+a vista, non un grilletto. Una tabella o un orologio nuovi per i
+solleciti: le attese fanno gia' quel mestiere.
+
+**PROVATO.** `prove.py` 13063 verdi, 0 rosse (erano 12718 su
+`origin/main`): +68 in `prove_p2p_paycode` (i giudici in node, il
+riepilogo, i due riquadri, le frasi del server, il banco degli eventi
+con lo scambio intero — presa, «pagato», i tre solleciti che nascono,
+il primo che parte, gli altri due che muoiono al rilascio, e nessun
+sollecito senza tabacchino), piu' le prove del foglio riscritte sul
+PayCode e sulla vita nel libro. La tortura a mutazioni, su una copia
+fresca della cartella e coi tre banchi del cantiere: 31 mutazioni su 31 uccise, in due giri (30 su 31 al primo). Le
+mutazioni vive del primo giro hanno detto una cosa vera: nessun caso
+provava un PayCode a OTTO cifre, e una terzina corta passava — aggiunti
+tre casi. Dal vivo, nel Browser pane a larghezza telefono col server
+del worktree (leva accesa, relay morto, identita' Venditore 222): il
+foglio col percorso — testata «Passo 1 di 4», le quattro tappe, i tre
+campi e lo sconto, le spunte che si accendono, la riga «Chi paga al
+tabacchino riceve 30.423 sats invece di 31.203» al cambio vivo, il
+giudice che senza 38385 dice «sto leggendo quanto dura la garanzia», e
+con la finestra di cartone il riepilogo «Il tuo PayCode, in breve» coi
+sei fatti; la pagina di chi compra con una riga seminata (stato
+«Sats in garanzia», stepper «PayCode pagato», il riquadro col codice
+grande, «Tempo che resta: 1g 05:58», i quattro gesti, il bottone «Ho
+pagato al tabacchino» e la sua conferma); la pagina di chi vende a
+«pagato» (stato «PayCode pagato: controlla su Amazon», il riquadro con
+«Decidi entro le …: 23:00:00» e i due bottoni); «Info P2P». Nessun
+errore JS oltre a quelli del relay morto.
+
+**NON PROVATO, e dichiarato.** Il telefono vero: la tastiera decimale
+sullo sconto, il selettore della data sull'iPhone, i tondi delle tappe.
+Il riquadro di chi compra dal vivo l'ho visto con `chiaviChatOrdine`
+STUBBATO in pagina (la riga seminata non ha il mazzo): il pezzo che
+compone il riquadro e' provato in node, la cucitura e' una riga. I
+solleciti in produzione: provati nel banco, mai su Telegram. Lo scaduto
+del libro con le due scadenze: la frase e' provata, l'evento vero no. Un
+client Mostro altrui davanti al `pm` invariato: niente di nuovo da ieri.
+E la restore di una riga a «pagato» su un altro dispositivo, dove
+`euroInviatiAt` non c'e' e le 24 ore decorrono dall'aggiornamento della
+riga: dichiarato nel giudice.
+
+**LA PROVA A DUE TELEFONI DA FARE, con un PayCode FINTO** (nessun
+ordine Amazon vero: il coordinator non lo sa e non lo controlla).
+Venditore (telefono A): P2P → Vendo → + → metodo Barattozon → PayCode
+`479-868-518`, importo `23,47`, scadenza domani alla stessa ora, sconto
+`2,5` → «Rileggi e pubblica» → leggere il riepilogo (i sats, «nel libro
+fino alle … di …», cioe' due ore prima) → «⚡ Pubblica». Da guardare:
+la card nel libro dice 23,47 € e i sats scontati; su Telegram a A
+arriva «Il tuo PayCode e' stato preso» quando B prende. Compratore
+(telefono B): prendere, dare la fattura, aspettare la garanzia; nella
+pagina dello scambio il riquadro col PayCode, l'importo, la scadenza e
+il conto alla rovescia; toccare «Ho pagato al tabacchino» → «Si', ho
+pagato». Su A: Telegram dice «PayCode pagato: controlla su Amazon», la
+pagina mostra il riquadro del controllo col tempo e i due bottoni; dopo
+un'ora deve arrivare il primo sollecito (poi sei e venti, se non si
+tocca niente). Toccare «Risulta pagato: libera i sats» → B riceve
+«Sats rilasciati!» e i sats. Poi, con un secondo PayCode finto e una
+scadenza a tre ore: NON prendere e aspettare che il libro lo tolga
+un'ora dopo (tre ore meno il margine di due) — ad A deve arrivare lo
+scaduto con le due scadenze spiegate. Se una frase confonde, si tocca
+la frase: il giudice sotto e' provato.
+
+**COSA RESTA DA GUARDARE.** Il verso dello sconto, che Andrea legga
+sul telefono la riga della tappa 4 e dica se e' quello che intendeva;
+il margine di due ore, che e' una proposta; la riga dello sconto nel
+dettaglio di chi prende, che cambia col cambio (e' dichiarata «di
+adesso»); e `apriDisputaP2P`, la cui frase resta generica anche col
+PayCode («quasi sempre e' un ritardo»), che qui e' meno vero.
