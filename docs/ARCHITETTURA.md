@@ -10362,8 +10362,10 @@
   lato deciso da `ricevoSats` come nelle righe vive. Col tabacchino le
   due parti fanno cose diverse e le frasi sono due: chi ha pagato il
   PayCode alla cassa aggiunge «al tabacchino», chi si è visto pagare
-  l'ordine Amazon legge «Il tuo ordine Amazon da … è stato pagato con
-  …». Un ANNULLATO dice solo «Annullato il <data>», senza cifre: quel
+  l'ordine Amazon legge «Amazon pagato: … per …» (la prima stesura
+  diceva «Il tuo ordine Amazon da … è stato pagato con …», accorciata
+  la notte stessa: in una lista che si scorre era l'unica frase che si
+  leggeva per intero invece di guardarsi). Un ANNULLATO dice solo «Annullato il <data>», senza cifre: quel
   denaro non è mai passato di mano. `rifiutato` resta com'era — il suo
   stato dice «Ordine non preso», e «annullato» lì sarebbe una parola
   falsa. Le card VIVE non cambiano di una parola.

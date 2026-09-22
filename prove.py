@@ -61166,11 +61166,25 @@ console.log(JSON.stringify(out));
           and re.search(r'pagando <span class="p2p-euro">[^<]*</span>'
                         r' al tabacchino</div>',
                         o["conclusoTabCompro"]) is not None)
-    prova("...e chi l'ha fatto pagare parla del suo ordine Amazon", True,
-          'Il tuo ordine Amazon da <span class="p2p-euro">5,00 €</span>'
+    # ⚠️ ACCORCIATA la notte stessa (ritocco di Andrea): «Il tuo ordine
+    # Amazon da X e' stato pagato con Y» e' diventato «Amazon pagato: X
+    # per Y» — stessa struttura delle altre tre, due parole invece di
+    # nove. La sentinella guarda anche che la frase lunga non resti in
+    # giro: mezza riga vecchia in un ramo e' il modo in cui due card
+    # dicono la stessa cosa in due lingue.
+    prova("...e chi l'ha fatto pagare lo dice in due parole", True,
+          'Amazon pagato: <span class="p2p-euro">5,00 €</span>'
           in o["conclusoTabVendo"]
-          and 'è stato pagato con <span class="p2p-sats">'
-          in o["conclusoTabVendo"])
+          and 'per <span class="p2p-sats">' in o["conclusoTabVendo"])
+    # ⚠️ E I COMMENTI SI TOLGONO PRIMA DI GUARDARE: il verbale accanto
+    # alla frase nuova NOMINA quella vecchia per dire cos'era, e una
+    # spia sul testo nudo sarebbe rossa per colpa della spiegazione
+    # (e' la trappola delle prove che rispondono per il vicino).
+    _nudo_mini = re.sub(r"/\*[\s\S]*?\*/", "", mini)
+    prova("...e la frase lunga di ieri non e' rimasta da nessuna parte",
+          [False, False],
+          ["Il tuo ordine Amazon" in _nudo_mini,
+           "è stato pagato con" in _nudo_mini])
     prova("...e la coda segue la SCELTA di chi ha preso, non l'elenco",
           False, "al tabacchino" in _parole(o["conclusoTabScelto"]))
     # GLI ANNULLATI NON PORTANO CIFRE: quell'importo non e' mai passato

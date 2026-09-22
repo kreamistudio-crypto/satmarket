@@ -25574,3 +25574,35 @@ px sta larga, ma «18 ago 2025» accanto a una prima riga lunga è il caso
 stretto. E «Annullato il 22 set» con sotto il riquadro «Scambio
 annullato»: dicono la stessa cosa due volte, ed era già così prima —
 se dà fastidio, la cura è il riquadro, non la frase.
+
+
+## «Amazon pagato: X per Y» (22 set 2026, notte)
+
+Ritocco da una riga sulla frase nata poche ore prima. Sulle card
+concluse di Barattozon, per chi ha FATTO pagare il PayCode, «Il tuo
+ordine Amazon da 23,47 € è stato pagato con 31.209 sats» diventa
+**«Amazon pagato: 23,47 € per 31.209 sats»**.
+
+IL PERCHÉ STA NELLA LISTA, non nella frase: le altre tre sono «Hai
+ricevuto X / pagando Y» — due parole e due cifre —, e quella era di
+nove parole. In una lista che si scorre, una card che si LEGGE in mezzo
+a tre che si GUARDANO rallenta tutto il resto.
+LA STRUTTURA RESTA QUELLA DELLE SORELLE, ed è la ragione per cui si
+spezza in due righe come le altre: «Amazon pagato: 23,47 €» sulla riga
+grande, «per 31.209 sats» su quella di servizio. Letta di fila è la
+frase che Andrea ha chiesto; guardata, è la stessa forma delle altre
+card — cifra grande sopra, resto sotto.
+Nient'altro è cambiato: l'altro lato del tabacchino («… pagando 23,47 €
+al tabacchino»), le due frasi normali, gli annullati e le card vive
+stanno esattamente com'erano.
+
+**LE PROVE.** L'attesa della frase e una spia NUOVA: che la frase lunga
+non resti da nessuna parte. ⚠️ E quella spia guarda il sorgente SENZA i
+commenti, perché il verbale qui accanto nomina la frase vecchia per
+dire cos'era — è la trappola delle prove che rispondono per il vicino,
+e il commento che spiega un'assenza è il modo più insidioso di
+cascarci. Suite **13265/0**, tortura **16 mutazioni / 16 uccise** (le
+due nuove: la frase lunga che torna, e i sats che cadono dalla riga di
+servizio).
+DAL VIVO a 375 px: le due card del tabacchino una sopra l'altra, e la
+nuova sta su due righe come le sorelle.

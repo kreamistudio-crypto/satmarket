@@ -48955,6 +48955,12 @@ function rigaScambioP2P(o){
      tabacchino», e chi ha fatto pagare il suo ordine Amazon ha una
      frase sua, perche' li' non ha «ricevuto euro»: gli hanno pagato la
      spesa.
+     ⚠️ E QUELLA FRASE E' STATA ACCORCIATA la notte stessa (ritocco di
+     Andrea): «Il tuo ordine Amazon da X e' stato pagato con Y» ->
+     «Amazon pagato: X per Y». Stessa struttura delle altre — la cifra
+     grande sopra, il resto sulla riga di servizio — e due parole al
+     posto di nove: in una lista che si scorre la frase lunga era
+     l'unica che si leggeva per intero invece di guardarsi.
      ⚠️ IL GIUDICE DEL TABACCHINO E' QUELLO DI CASA (`tabacchinoP2P`,
      che guarda il prefisso) e riceve l'elenco GIA' ristretto al metodo
      deciso: se chi ha preso ha scelto un altro metodo, la frase non
@@ -48975,10 +48981,9 @@ function rigaScambioP2P(o){
       + (dataChiusa ? ' il ' + esc(dataChiusa) : '') + '</div>'
     : chiuso
       ? (tab && !ricevoSats
-          ? '<div class="p2p-scambio-lato">Il tuo ordine Amazon da '
+          ? '<div class="p2p-scambio-lato">Amazon pagato: '
             + cifraEuro + '</div>'
-            + '<div class="p2p-scambio-euro">è stato pagato con '
-            + cifraSats + '</div>'
+            + '<div class="p2p-scambio-euro">per ' + cifraSats + '</div>'
           : '<div class="p2p-scambio-lato">Hai ricevuto '
             + (ricevoSats ? cifraSats : cifraEuro) + '</div>'
             + '<div class="p2p-scambio-euro">pagando '
