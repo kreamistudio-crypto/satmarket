@@ -1666,3 +1666,65 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `git -C C:\Users\Andrea\Documents\GitHub\satmarket worktree remove --force $env:TEMP\prova-pronto`
   (rimettere `pronto` sulla punta di main non è un rischio: da oggi il
   VPS la CI la chiede da sé, e una punta non ancora verde aspetta.)
+- L'APP ANDROID (TWA, ZAPSTORE) — la procedura viveva solo in
+  `ARCHITETTURA.md`, che racconta com'è fatta; qui c'è cosa si BATTE, e
+  in che ordine. L'app è un **involucro** (Trusted Web Activity) fatto
+  con **Bubblewrap** (`@bubblewrap/cli`, 1.24.1): dentro non c'è codice
+  web, tutto arriva vivo da barattolo.store — quindi un cambio al sito
+  NON richiede una release, e una release serve solo per l'involucro
+  (icona, splash, colori, versione).
+  IL PROGETTO STA FUORI DAL REPO, in
+  `C:\Users\Andrea\Documents\barattolo-twa`, e ci resta (un percorso
+  spezzato a metà non si cerca più): lì dentro c'è il **keystore**
+  (`barattolo.keystore`, alias `barattolo`, password battute a mano da
+  Andrea nel suo terminale — mai in uno script, mai in chat). Nella
+  stessa cartella vivono `genera_chiave_release.py` e
+  `profilo_release.py`, che non scrivono segreti su disco.
+  ⚠️ **STESSO KEYSTORE O L'AGGIORNAMENTO È RIFIUTATO**, ed è la riga
+  che costa di più a scoprirla tardi: Android rifiuta un APK firmato
+  con una chiave diversa da quella installata, e non c'è rimedio se non
+  far disinstallare e reinstallare a ogni utente. Perso il keystore,
+  l'app è persa. La sua impronta —
+  `2F:3F:5E:68:94:AB:A0:B8:E4:39:B7:28:9D:55:50:D5:0E:22:37:15:F3:A8:E6:4F:2C:49:38:BC:D5:A2:C2:3C`
+  — è la stessa scritta in `.well-known/assetlinks.json`, ed è ciò che
+  dice ad Android che l'app può aprire il dominio a tutto schermo:
+  dal 22 set 2026 la coppia (pacchetto + impronta + rotta che la serve)
+  ha la sua sentinella in `prove.py` (`prove_app_android`), perché un
+  refuso lì non rompe niente di visibile — si vede solo sul telefono,
+  come una barra del browser che ricompare.
+  L'ORDINE È FERREO, e non è pignoleria: `bubblewrap update` cancella e
+  riscrive proprio i file che lo script patcha.
+  1. `bubblewrap update --appVersionName=X.Y` (il versionCode lo alza
+     lui) — dalla cartella del progetto, con `node` nel PATH;
+  2. `python genera_icone_apk.py` — DAL REPO, e rifà icona adattiva,
+     monochrome e splash (vedi ARCHITETTURA, «Icona adattiva
+     dell'APK»);
+  3. `bubblewrap build` — le password le batte Andrea.
+  ⚠️ Se il build chiede di applicare il **web manifest** cambiato
+  (lo chiede ogni volta che `manifest.json` del sito si è mosso):
+  **rispondere `n`**. Rispondendo `y` sovrascrive gli splash appena
+  generati, e allora il passo 2 va rifatto PRIMA di ribuildare.
+  LA RELEASE, due canali, e la release GitHub è la fonte unica di
+  verità. Prima GitHub, poi Zapstore, sempre.
+  1. `barattolo-X.Y.apk` (copia rinominata di `app-release-signed.apk`)
+     + il suo `.sha256`, e `gh release create vX.Y` sul repo pubblico
+     `kreamistudio-crypto/barattolo-releases` (satmarket resta privato:
+     Obtainium e Zapstore esigono download anonimi). Obtainium segue
+     quel repo da solo;
+  2. in **WSL Ubuntu** (`zsp` è solo Linux/macOS, vive in `/root/bin/zsp`
+     e vuole root): `read -rs SIGN_WITH && export SIGN_WITH` col prompt
+     nascosto, `zsp publish`, poi `unset SIGN_WITH`. La chiave è quella
+     **dedicata e fredda** delle release
+     (`npub1yjkuma9cenrzde7duj222gp44raqa88uj352z0akrtw0mvvfrhhsx8g68u`,
+     nsec su due foglietti + Bitwarden «Barattolo release Nostr»): mai
+     sul VPS, mai su disco, mai in chat, e **non è la chiave della
+     piattaforma** — i due destini restano separati apposta.
+  ⚠️ `zsp` cambia in fretta: prima di ogni publish si riguarda il README
+  di `github.com/zapstore/zsp`, e la scheda è `zapstore.yaml` nella root
+  di barattolo-releases.
+  ⚠️ **LA PROVA NIP-C1 SCADE DOPO UN ANNO**, cioè intorno a **luglio
+  2027**: è il kind 30509 che lega il certificato Android alla npub
+  (`zsp identity --link-key`, col rito del `.p12` temporaneo da
+  cancellare subito). Scaduta non blocca niente — le release escono lo
+  stesso — ma il legame smette di essere dimostrabile. Il perché e il
+  rito per esteso stanno in ARCHITETTURA, «Distribuzione dell'APK».

@@ -25707,3 +25707,186 @@ uno in corso, nei due temi: di giorno il marchio spento deve LEGGERSI
 di sera deve stare in riga con la «SEPA» della card vicina. E lo
 scorrimento dell'elenco: se l'occhio cade ancora prima sulle card
 finite che su quelle in corso, la cura non era abbastanza.
+
+## Il guscio di apertura, e la misura che ha rovesciato il disegno (22 set 2026)
+
+Fra il tocco sull'icona e l'app che si può usare c'è un'attesa, e
+nell'APK era coperta a METÀ. Android disegna il suo splash — il
+barattolo scontornato alto 160dp sull'arancio `#F78F19` — e lo toglie
+al PRIMO PAINT della pagina: che arriva con l'app ancora da montare.
+Cioè lo splash nativo se ne va proprio nell'istante in cui servirebbe,
+e quel che consegna è una pagina a metà. Il guscio è l'altra metà:
+stesso fondo, stesso barattolo, stessa misura, e sta lì finché non
+c'è qualcosa da guardare davvero.
+
+**LA CONSEGNA È INVISIBILE PER COSTRUZIONE, e non è una frase: ogni
+numero del guscio è RICALCOLATO dagli stessi file da cui lo prende lo
+splash nativo.** L'arancio non è scritto a mano, è quello che
+`colore_fondo()` campiona dai quattro angoli di
+`barattolo-icona-sorgente.jpeg` — la stessa funzione che
+`genera_icone_apk.py` importa per scrivere `iconBackground` e il fondo
+dello splash. E la misura non è 160px ma **227**, che è il conto da non
+perdere: `barattolo-hero.png` è 480×480 col barattolo alto 339 dentro,
+quindi per renderlo alto 160 come nel nativo l'immagine va a
+480 × 160/339. Tutt'e due i numeri hanno la loro prova, e la prova li
+RICALCOLA invece di confrontarli con una costante: chi cambia la foto
+sorgente o il PNG trova rosso col suo nome, invece di scoprire sul
+telefono che il barattolo salta di taglia nella consegna.
+
+**IL BARATTOLO STA AL CENTRO ESATTO E L'ANELLO NON LO SPOSTA.** L'anello
+è appeso in assoluto sotto di lui (`top:calc(50% + 108px)`) invece di
+stargli accanto in una colonna, perché una colonna sposterebbe il
+centro del barattolo di una dozzina di pixel — ed è proprio quello
+scatto che il guscio esiste per togliere. Verificato dal vivo: lo
+scarto fra il centro del barattolo e il centro dello schermo è **0**
+in tutte e sei le combinazioni provate.
+⚠️ **E SI CENTRA CON `left`, MAI CON UNA `transform`**: la `gira`
+anima proprio `transform`, e un `translateX(-50%)` verrebbe
+SOSTITUITO al primo fotogramma — l'anello salterebbe a sinistra di
+metà se stesso appena parte. `left:calc(50% - 12px)` non ha quel
+problema e costa uguale.
+
+**L'ANELLO È QUELLO DI CASA, e questo regala i due ripieghi.**
+`.attesa-anello` è la stessa classe dei veli P2P: porta con sé la riga
+`@media (prefers-reduced-motion:reduce)` che già c'era e ricade sotto
+la regola universale di `fx-ridotti`, quindi a «meno movimento» si
+ferma senza che il guscio scriva una riga sua. ⚠️ E PER QUESTO NON
+RIDICHIARA `animation`: una ridichiarazione sotto `#guscio` batterebbe
+per specificità tutt'e due i ripieghi, e l'anello girerebbe anche a
+movimento spento — il difetto più silenzioso di tutto il cantiere, e
+c'è una prova che lo aspetta.
+
+**LA MISURA HA ROVESCIATO IL DISEGNO, ed è la parte che vale il
+cantiere.** La prima stesura toglieva il guscio quando la promessa di
+`avvia()` si scioglieva: sembra la definizione giusta di «l'avvio è
+finito», e il banco ha detto di no. Col cronometro alla mano il guscio
+scendeva a **341 ms** mentre la griglia era disegnata a **256** — 85 ms
+in cui il guscio AGGIUNGEVA attesa invece di coprirla. Il motivo è che
+dopo `renderGrid()` l'avvio continua a chiedere preferiti, offerte e
+puntate: giri di rete che non si vedono, e che in locale non esistono
+nemmeno — su un telefono in 4G sarebbero stati mezzo secondo o più.
+Adesso il segnale è la VETRINA DISEGNATA: una promessa che scioglie
+l'ultima riga di `renderGrid`, cioè il primo render qualunque esso sia
+— le card, lo stato vuoto, la demo del backend muto. Rimisurato:
+guscio via a **263 ms** contro i **273** dell'app senza guscio. Cioè
+zero, dentro il rumore.
+`avvia()` resta nella corsa, ma come RETE e non come misura: se un
+giorno l'avvio finisse senza aver mai disegnato una griglia, il `race`
+lo prende lo stesso.
+**E I FONT SONO NELLA CORSA PER UNA RAGIONE SOLA**: senza, l'app
+comparirebbe col ripiego di sistema e si riscriverebbe tutta un
+istante dopo, che è lo scatto più visibile di tutti. Misurati a
+**220 ms**, cioè PRIMA della griglia: oggi non ritardano niente, e
+sono lì per il giorno in cui la dispensa è fredda.
+
+**IL PATTO CON TELEGRAM, che erano due cose su una riga sola.**
+`tg.ready()` e `tg.expand()` stavano insieme in cima al file, e fanno
+mestieri opposti: `expand()` chiede tutta l'altezza e va chiesta PRIMA
+del paint, o la mini app si dipinge corta e poi cresce; `ready()`
+invece DICHIARA che l'app è pronta, e Telegram a quel punto toglie il
+SUO velo di caricamento. Dirlo all'avvio voleva dire consegnare una
+pagina vuota chiamandola «pronta». Adesso `expand()` resta in cima e
+`ready()` scende dentro `togliGuscio`. Cronometrato con uno stub al
+posto dell'SDK: **expand a 41 ms, ready a 228**, e il guscio via
+nello stesso istante.
+⚠️ **E IL TEMA SI RIDICE DOPO `ready()`**, che è una cintura che il
+cantiere si è messo da solo: `applicaTema()` gira in cima al file,
+cioè — da oggi — PRIMA che Telegram sappia di noi. Se un client
+ignorasse `setHeaderColor` a mini app non ancora dichiarata pronta,
+l'intestazione resterebbe del colore di default e nessuno la
+rimetterebbe più. Ridirlo costa una riga e non si vede (sono gli
+stessi due colori). I colori, verificati, sono già quelli giusti: il
+FONDO dell'app, `#FAF4E4` e `#211A10`, gli stessi del `<meta
+name="theme-color">`.
+
+**LE DUE RETI, provate invece che raccontate.** 1) **Il tetto dei
+quattro secondi**, armato in cima al file e non in fondo: se più sotto
+qualcosa esplodesse, `avvia()` non arriverebbe mai in fondo e l'app
+resterebbe viva ma irraggiungibile dietro un fondo arancio. Per
+provarlo si rompe la strada normale — una riga prima del documento che
+rende `Promise.allSettled` una promessa che non si scioglie — e il
+guscio se n'è andato a **4281 ms**: è stato il tetto.
+2) **Il `<noscript>`**, che non è cosmetica: senza JavaScript il gesto
+che toglie il guscio non arriva MAI, e il guscio si porterebbe via il
+cartello del pre-render — che esiste apposta per i motori e le
+anteprime. Provato spegnendo gli script dal motore: il guscio è nel
+DOM con `display:none`, e il cartello c'è.
+⚠️ E IL TERZO CASO NON È UNA RETE MA LA STRADA NORMALE, ed è bene
+saperlo: col **backend muto** (ogni `/api` bloccata) l'avvio cade nel
+suo catch, la demo disegna otto card e il guscio scende a **245 ms**.
+Non tocca il tetto. Cioè «lo stato vuoto o l'errore» conta davvero
+come vetrina pronta, invece di essere una frase nel commento.
+
+**IL BANCO HA MENTITO DUE VOLTE, e sono due trappole da tenere.**
+1) La prima misura del tetto diceva «il guscio se n'è andato a **14
+ms**»: a 14 ms il guscio non era ancora NATO — la pagina è 2,9 MB e il
+parser non aveva toccato il `<body>`. Un «non c'è» letto troppo presto
+si legge come «già tolto», ed è la stessa famiglia di bugie del banco
+dal vivo. La cura è aspettare che nasca PRIMA di aspettare che se ne
+vada. 2) Lo stub di Telegram usciva senza nessun gesto registrato: la
+pagina tira giù l'SDK VERO da telegram.org (riga 7) e quello riscrive
+`window.Telegram` sopra lo stub. Si blocca quel dominio e i gesti
+ricompaiono.
+E una terza, già a verbale altrove ma pagata di nuovo: Chrome headless
+emula `prefers-reduced-motion: reduce` di serie, quindi senza
+rimetterlo a `no-preference` si fotograferebbe l'anello FERMO credendo
+che sia rotto. Nello stesso banco il `localStorage` è sopravvissuto fra
+un giro e l'altro (stesso profilo), e due casi «effetti pieni» sono
+usciti ridotti: si scrive il valore SEMPRE, esplicitamente, invece di
+«non scriverlo».
+
+**LA SENTINELLA DELL'ASSETLINKS, che non c'era.** `.well-known/
+assetlinks.json` è la riga di verità che dice ad Android che l'APK può
+aprire barattolo.store a tutto schermo, e in `prove.py` non era nominato
+nemmeno una volta. Il modo in cui fallisce è il peggiore: un refuso
+nell'impronta o una rotta che cambia nome non rompono niente di
+visibile qui — si vedono solo sul telefono, solo da chi ha installato
+l'app, e sotto forma di una barra del browser che ricompare. Adesso ci
+sono il pacchetto (`store.barattolo.app`), l'impronta per intero
+(quella dell'APK v1.3 in servizio, confrontata carattere per
+carattere), la delega, la rotta esplicita che lo serve e la sua cache
+di un'ora. E la procedura dell'app Android — progetto, keystore,
+l'ordine ferreo `update → genera_icone_apk.py → build`, la release sui
+due canali, la chiave fredda e la scadenza NIP-C1 di luglio 2027 — è
+entrata in `PRODUZIONE.md`, dove non c'era: fino a ieri viveva solo in
+`ARCHITETTURA.md`, che racconta com'è fatta e non cosa si batte.
+
+**LE PROVE.** Due sezioni nuove. `prove_guscio_apertura` (22) guarda il
+markup e il suo posto, il `<noscript>`, il fondo e la misura
+RICALCOLATI, le tre trappole del disegno (la transform, l'`animation`
+ridichiarata, la dissolvenza), quando scende e le sue due reti, il
+patto con Telegram e il barattolo in dispensa. `prove_app_android` (8)
+è la sentinella dell'assetlinks. Suite intera **13306/0** con
+`PROVE_SEVERE=1` (sul rebasato, cioè col cantiere della scatola spenta
+già sotto), otto collaudi senza rete verdi, tortura **19 mutazioni /
+19 uccise**.
+⚠️ E TRE MUTAZIONI ERANO SCAPPATE AL PRIMO GIRO PER COLPA MIA, non
+delle prove: le ancore non erano UNICHE — `src="/assets/barattolo-hero.
+png"` compare quattro volte nella pagina, ` aria-hidden="true"`
+settantasette, e la riga della cache quattro. Lo script lo dice invece
+di tirare avanti (conta le occorrenze e si ferma a `!= 1`), che è la
+stessa regola degli hunk: una mutazione che non si applica non è una
+mutazione sopravvissuta, ma se lo script tace le due cose si
+confondono.
+
+**DAL VIVO**, col server vero su un database usa-e-getta e Chrome
+guidato da CDP: sei combinazioni (chiaro e scuro, effetti pieni e
+ridotti, 320×568, 390×844 e 430×932) con fondo `#F78F19` in tutte —
+il tema non ci entra, ed è giusto — immagine 227×227, barattolo
+centrato allo zero, nessuno scorrimento laterale, e l'anello che
+`gira` a effetti pieni e sta FERMO (`animation-name: none`) sia col
+sistema in reduced-motion sia con l'interruttore a mano. Più i tre
+casi delle reti, i due cronometri e lo scatto del guscio e dell'app
+subito dopo.
+
+**DA GUARDARE SUL TELEFONO**, e sono tre cose che da qui non si
+possono avere. 1) **Nell'app Zapstore**: la consegna vera fra splash
+nativo e guscio — è l'unico posto dove i due esistono insieme, e
+l'unico modo di vedere se il barattolo resta fermo o fa un saltino.
+2) **In Telegram**: che l'intestazione sia del colore giusto. È il
+punto che questo cantiere ha toccato — `setHeaderColor` ora parte
+prima di `ready()` — e la cintura che lo ridice dopo è scritta ma non
+provata su un client vero. 3) **Il tempo percepito**: il guscio dura
+due o tre decimi di secondo in locale; su un telefono lento e in 4G
+durerà di più, e se durasse troppo la leva non è il tetto ma la
+domanda «cosa aspetta la griglia».
