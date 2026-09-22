@@ -13,7 +13,12 @@ tiene finché upstream non accoglie (o rifiuta) le tre modifiche. Tenere
 un fork pubblico vivo vorrebbe dire mantenerlo per sempre, ed è
 esattamente il lavoro che non vogliamo.
 
-Fatto l'8 settembre 2026. Upstream: `v0.18.7`, commit `afc39a2`.
+Fatto l'8 settembre 2026. Upstream: `v0.18.7`, commit `afc39a2`. Sopra
+ci stanno **sette commit nostri**, uno per patch: `a9d387b`, `1d6652c`,
+`1d5f634`, `2b71308`, `3a7a121`, `4f20e04` e `9387493` (la 0007, l'ultimo
+sul nodo al 19 set 2026). Le sette `.patch` qui accanto sono la loro
+esportazione, e da sole ricostruiscono il fork: vedi «RICOSTRUIRE IL
+FORK DA ZERO», in fondo.
 
 ## LE SETTE PATCH, cosa fanno e perché
 
@@ -154,12 +159,13 @@ SÌ è da proporre a monte: è un difetto di diagnosi di chiunque.
 quando un payout fallisce, e dal 18 set non ne è fallito nessuno.
 
 **0007 — gli EVENTI al server di Barattolo: `src/barattolo_eventi.rs`
-(nuovo) e ventiquattro agganci in tredici file.** ⚠️ SCRITTA il 18 set
-2026 e **MAI COMPILATA**: sul PC non c'è `cargo`, e il primo
-`cargo build` è quello sul nodo. NON è in servizio, e in questa cartella
-non c'è ancora il suo `.patch`: nasce dal nodo, a test verdi, come le
-sorelle. Come la 0005 NON va proposta a monte: è l'integrazione di
-Barattolo, non un difetto di Mostro.
+(nuovo) e ventiquattro agganci in tredici file.** IN SERVIZIO dal 19 set
+2026 (immagine `-bar4`, commit `9387493` sul nodo): scritta il 18 sul
+PC senza `cargo`, il suo primo `cargo build` è stato quello sul nodo, e
+lo stesso giorno è stata collaudata a due telefoni. Il `.patch` è
+arrivato in questa cartella il 22 set, esportato dal nodo il 19 con
+`git format-patch`. Come la 0005 NON va proposta a monte: è
+l'integrazione di Barattolo, non un difetto di Mostro.
 IL PERCHÉ: il server di Barattolo deduceva cosa succede in uno scambio
 dalle buste cifrate che non può leggere — da lì gli avvisi generici
 «Novità in un tuo scambio» e, dal vivo il 18 set, avvisi a caso. mostrod
@@ -205,7 +211,13 @@ come upstream. UNA riga di log per POST, con l'esito.
 richiesta. Il segreto è `BARATTOLO_EVENTI_SEGRETO`; se manca vale
 `BARATTOLO_SCONTO_SEGRETO`. Consigliato uno SUO — lo stesso di
 `P2P_EVENTI_SEGRETO` sul VPS: quello dello sconto fa una domanda, questo
-fa partire avvisi, e due porte si ruotano una alla volta.
+fa partire avvisi, e due porte si ruotano una alla volta. Le due
+variabili stanno nel compose del nodo, sotto `environment:` del servizio
+`mostro`, accanto alle tre della 0005:
+`BARATTOLO_EVENTI_URL=https://barattolo.store/api/p2p/evento` e
+`BARATTOLO_EVENTI_SEGRETO=<lo stesso di P2P_EVENTI_SEGRETO sul VPS>`.
+⚠️ Anche questo segreto entra nel backup age col compose, e mai nel
+canale Telegram del nodo.
 DOVE SI AGGANCIA, in breve: `show_hold_invoice` e `update_order_status`
 (la presa e quel che apre), `hold_invoice_paid`, `add_invoice_action` e
 `pay_new_invoice`, `fiat_sent_action`, `release_action`,
@@ -246,10 +258,11 @@ Il difetto ha due facce, e le patch le trattano in modo diverso.
 
 ## IN SERVIZIO
 
-Immagine `mostro:v0.18.7-bar3` dal 18 set 2026 (la `-bar2` con le prime
-quattro patch e la `-bar1` con le prime tre sono restate sulla macchina,
-come tag di rollback), costruita
-sul nodo con `docker build -f docker/Dockerfile -t mostro:v0.18.7-bar3 .` dentro
+Immagine `mostro:v0.18.7-bar4` dal 19 set 2026, con tutte e sette le
+patch (la `-bar3` con le prime sei, la `-bar2` con le prime quattro e la
+`-bar1` con le prime tre sono restate sulla macchina, come tag di
+rollback), costruita sul nodo con
+`docker build -f docker/Dockerfile -t mostro:v0.18.7-bar4 .` dentro
 `~/nodo/mostro-src`. Il `Dockerfile` fa `COPY . .`, cioè copia il
 sorgente LOCALE e non lo riscarica: è la ragione per cui le patch
 finiscono davvero nel binario, ed è la cosa da riverificare se un
@@ -266,7 +279,9 @@ rimessa a `v0.18.6` e rifatto l'`up -d`, si torna indietro. Copie di
 sicurezza sul nodo: `docker-compose.yml.prima-bar1`.
 La 0005 ha un gradino di rollback PRIMA di quello: tolte dal compose le
 tre variabili `BARATTOLO_SCONTO_*` e rifatto l'`up -d`, la patch è
-inerte senza cambiare immagine. La `fee` in `settings.toml` (0.03 dal
+inerte senza cambiare immagine. La 0007 ha lo stesso gradino: tolta
+`BARATTOLO_EVENTI_URL` e rifatto l'`up -d`, nessun POST parte più (e
+sul VPS, svuotato `P2P_EVENTI_SEGRETO`, il libro torna a parlare subito). La `fee` in `settings.toml` (0.03 dal
 18 set 2026) si rimette a mano: è config, non patch.
 
 ⚠️ **`up -d`, non `restart`.** `docker compose restart mostro` riavvia
@@ -297,8 +312,8 @@ tornerebbe identico.
 
 ## PROVATO
 
-- I tre commit sopra il tag, uno per file, nessun altro tocco:
-  `git log --oneline v0.18.7..HEAD`.
+- I sette commit sopra il tag, uno per patch, nessun altro tocco:
+  `git log --oneline v0.18.7..HEAD` (i primi tre erano uno per file).
 - `cargo test` nello stadio `builder` dell'immagine, sui tre moduli
   toccati: **27 test in `lnurl`, 24 in `config::util`, 58 in
   `dev_fee`**, zero falliti. Compreso il test nuovo
@@ -329,16 +344,32 @@ passi davvero a circuito freddo. Si prova solo al prossimo scambio
 vero, senza scaldare il circuito prima — che è esattamente l'accidente
 che il 7 settembre 2026 aveva fatto sembrare risolto un problema che
 non lo era.
-DELLA 0007 NON È PROVATO NIENTE SUL CAMPO, e sul PC nemmeno compilata:
-verificate sul clone del tag (con le sei patch applicate) le ANCORE —
-ventiquattro, tutte uniche, e il patcher rilanciato si ferma — e LETTE
-le firme che ogni aggancio usa (il tipo di `order` in quel punto, se è
-ancora vivo o già mosso, i campi di `Order` in mostro-core 0.14.6,
-`failure_reason` come `i32`, `HoldInvoiceOrigin: PartialEq`). I test
-Rust sono scritti — la forma del corpo, cosa non esce MAI, un server
-HTTP di cartone per il retry (uno solo), il rifiuto non riprovato, il
-server morto che è un `false` e non un blocco — e il loro primo giro è
-`cargo test` sul nodo.
+LA 0007 È IN SERVIZIO DAL 19 SET 2026 (`-bar4`, commit `9387493` sul
+nodo) E COLLAUDATA A DUE TELEFONI lo stesso giorno — vedi CANTIERI,
+«Mostro è l'unica fonte degli avvisi P2P» e «La garanzia pagata la
+sente anche chi vende», che è il ritocco nato da quel collaudo. Prima
+del nodo, sul PC senza `cargo`, erano state verificate sul clone del
+tag (con le sei patch applicate) le ANCORE — ventiquattro, tutte
+uniche, e il patcher rilanciato si ferma — e LETTE le firme che ogni
+aggancio usa (il tipo di `order` in quel punto, se è ancora vivo o già
+mosso, i campi di `Order` in mostro-core 0.14.6, `failure_reason` come
+`i32`, `HoldInvoiceOrigin: PartialEq`). I test Rust — la forma del
+corpo, cosa non esce MAI, un server HTTP di cartone per il retry (uno
+solo), il rifiuto non riprovato, il server morto che è un `false` e
+non un blocco — avevano come primo giro lo stadio `builder` sul nodo,
+punto 4 della liturgia in PRODUZIONE; il loro conto non è a verbale
+qui, quel che è a verbale è la build verde e il collaudo a due telefoni.
+IL `.PATCH` DELLA 0007 È ARRIVATO CON 760 CR DENTRO (22 set 2026), ed
+è la stessa lezione del `.gitattributes`: `barattolo_eventi.rs` era
+stato copiato sul nodo dal checkout Windows, in CRLF, e il commit
+`9387493` l'ha preso così — quindi `git format-patch` l'ha esportato
+con un CR in fondo a ognuna delle 760 righe del modulo (e solo a
+quelle). Nel repo il file è LF: la patch è stata normalizzata a LF e
+l'`index` del file nuovo riscritto sul blob LF (`e0b7e30`, quello di
+questa cartella), e da lei il modulo esce **byte per byte identico** a
+`barattolo_eventi.rs` qui accanto. Sul nodo il file resta CRLF: stesso
+codice, blob diverso (`2e14403`). Da oggi `barattolo_eventi.rs` ha la
+sua riga nel `.gitattributes`, come la sorella.
 E DELLA 0005, tre cose: 1) **il caso fail-closed** — server muto o
 segreto sbagliato, fee piena per tutt'e due e la riga `discount NOT
 verified` nel log; 2) **il caso senza sconto** con la patch accesa;
@@ -355,10 +386,10 @@ per il caso asimmetrico, e il caso asimmetrico dal vivo non c'è ancora.
 cd ~/nodo/mostro-src
 git fetch --tags
 git switch -c barattolo/vX.Y.Z vX.Y.Z
-git cherry-pick a9d387b 1d6652c 1d5f634 2b71308 3a7a121 4f20e04   # + il commit della 0007, quando c'è
+git cherry-pick a9d387b 1d6652c 1d5f634 2b71308 3a7a121 4f20e04 9387493
 docker build -f docker/Dockerfile -t mostro:vX.Y.Z-bar1 .
 docker build -f docker/Dockerfile --target builder -t mostro-test:bar1 .
-docker run --rm mostro-test:bar1 cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice
+docker run --rm mostro-test:bar1 cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice barattolo_eventi app::fiat_sent app::release app::cancel app::dispute scheduler app::admin_cancel app::admin_settle
 ```
 
 poi la riga dell'immagine nel compose e `docker compose up -d mostro`.
@@ -370,7 +401,43 @@ I filtri vanno TUTTI dopo `--`, in un colpo solo: la forma vecchia
 vuol dire che upstream ci ha messo mano, e la domanda diventa se la
 nostra patch serve ancora invece di come riapplicarla.
 
-## A MONTE
+## RICOSTRUIRE IL FORK DA ZERO
+
+È il caso per cui questa cartella esiste: il nodo sparito, o un nodo
+nuovo. Non serve il branch `barattolo/v0.18.7` del vecchio: bastano il
+sorgente upstream e le sette `.patch`, applicate in fila con `git am`.
+La sequenza è stata provata il 22 set 2026 su un clone pulito di
+`MostroP2P/mostro` a `afc39a2`: le sette entrano una dopo l'altra senza
+un conflitto, e il `barattolo_eventi.rs` che ne esce è byte per byte
+quello di questa cartella.
+
+```
+git clone https://github.com/MostroP2P/mostro.git ~/nodo/mostro-src
+cd ~/nodo/mostro-src
+git switch -c barattolo/v0.18.7 v0.18.7        # afc39a2
+git am ~/nodo/patch-bar4/000[1-7]-*.patch      # le sette, copiate dal PC con scp
+git log --oneline v0.18.7..HEAD                 # sette righe, la 0001 in fondo
+docker build -f docker/Dockerfile --target builder -t mostro-test:bar4 .
+docker run --rm mostro-test:bar4 cargo test --release -- lnurl config::util dev_fee app::order app::take_buy app::take_sell barattolo_fee flow app::add_invoice barattolo_eventi app::fiat_sent app::release app::cancel app::dispute scheduler app::admin_cancel app::admin_settle
+docker build -f docker/Dockerfile -t mostro:v0.18.7-bar4 .
+```
+
+Poi la riga dell'immagine nel compose, le cinque variabili d'ambiente
+(tre della 0005, due della 0007: i valori stanno nel backup age, non
+qui) e `docker compose up -d mostro`.
+
+Tre cose da sapere prima di fidarsi del risultato:
+- **gli hash cambiano**: `git am` ricommitta, quindi i sette commit
+  nuovi NON si chiameranno `a9d387b … 9387493`. Il contenuto sì: è
+  quello dei `.patch`, e il `.patch` è quello esportato dal nodo.
+- **le `.patch` vanno sul nodo in LF**, com'è nel repo: il
+  `.gitattributes` di questa cartella (`*.patch -text`) le tiene così
+  anche su un checkout Windows, ma se passano da un editor o da uno
+  strumento che «aggiusta» i fine-riga, `git am` fallisce sui contesti.
+  Lo stesso vale per i due `.rs` accanto, che hanno `eol=lf` per la
+  stessa ragione.
+- **`git am` vuole un nome**: su una macchina nuova
+  `git config user.name` e `user.email` prima, o si ferma.
 
 Le tre modifiche vanno proposte a `MostroP2P/mostro`. I messaggi di
 commit sono scritti in inglese e contengono le misure apposta: sono

@@ -1164,8 +1164,12 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   l'immagine a `-bar2`. La `fee` e il listino si rimettono a mano.
 - GLI AVVISI P2P DAL COORDINATORE, la messa in servizio (patch 0007 del
   fork; il perché sta in CANTIERI, «Mostro è l'unica fonte degli avvisi
-  P2P»). ⚠️ DA FARE: al 18 set 2026 il codice del server è su main e in
-  servizio, la patch sul nodo NO — e finché non c'è valgono i soli
+  P2P»). ✅ IN SERVIZIO dal 19 set 2026: immagine `mostro:v0.18.7-bar4`,
+  commit `9387493` sul nodo, collaudata a due telefoni lo stesso giorno;
+  il `.patch` sta in `deploy/mostro/` dal 22 set (README, «RICOSTRUIRE
+  IL FORK DA ZERO»). Quel che segue è la liturgia com'era al 18 set,
+  buona per la prossima patch. Al 18 set il codice del server era su
+  main e in servizio, la patch sul nodo NO — e finché non c'è valgono i soli
   avvisi del libro (presa, concluso, annullato, scaduto, tornato), che a
   porta chiusa partono SUBITO com'era. **Garanzia chiesta e bloccata,
   fattura data, euro inviati, disputa e pagamento fallito in quella

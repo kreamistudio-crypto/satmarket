@@ -1,3 +1,4 @@
 *.patch -text
 # va sul nodo cosi' com'e': LF, o il format-patch si riempie di CR
 barattolo_fee.rs text eol=lf
+barattolo_eventi.rs text eol=lf
