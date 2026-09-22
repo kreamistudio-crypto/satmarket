@@ -8054,7 +8054,7 @@ document.getElementById('cartello')?.remove();</script>
       <p>È il metodo per chi non vuole passare da una banca o da un'app: chi <b>vende</b> sats fa un <b>ordine Amazon da pagare in contanti nel punto vendita</b> e chi <b>compra</b> lo paga alla cassa del tabacchino col <b>PayCode</b>. Il tabacchino incassa i contanti, l'ordine Amazon risulta pagato, e i sats si liberano. Nel libro il metodo si chiama ancora «Contanti al tabacchino»: è la parola che leggono anche le altre app.</p>
       <ol class="sicu-passi">
         <li><b>Chi vende fa l'ordine su Amazon</b> scegliendo «paga in contanti nel punto vendita». Amazon gli manda una mail con tre cose: il <b>PayCode</b> (nove cifre, come 479-868-518), l'<b>importo</b> esatto coi centesimi e una <b>scadenza</b>, settantadue ore dal checkout. Vale fino a <b>novecentonovantanove euro</b> per ordine, senza minimo e senza commissione. <b>Non vale per Amazon Warehouse, contenuti digitali, oro, Prime, buoni regalo e acquisti 1-Click</b>: se la mail di Amazon non offre il pagamento in contanti, l'ordine non è pagabile con Barattozon.</li>
-        <li><b>Chi vende pubblica qui</b>, con Barattozon come unico metodo, e il foglio lo porta per mano in <b>quattro passi</b>: il PayCode, l'importo, la scadenza (con un selettore di data e ora, fra un'ora e settantadue ore) e il <b>premio</b>, con lo stesso cursore degli altri ordini, da meno venti a più venti per cento e con una cifra decimale. <b>Il segno decide il verso:</b> col premio positivo chi paga al tabacchino riceve meno sats del cambio pieno e la differenza resta a chi vende; col premio negativo ne riceve di più, e quella differenza la paga chi vende per la comodità. A zero passa il cambio pieno. <b>Premio più basso = più conveniente per chi paga = più probabile che qualcuno lo prenda in tempo.</b> Prima di pubblicare c'è il riepilogo. Il cambio si fissa lì, e l'ordine resta nel libro fino a <b>due ore prima</b> della scadenza del PayCode (mai oltre settantadue ore): poi esce da solo.</li>
+        <li><b>Chi vende pubblica qui</b>, con Barattozon come unico metodo, e il foglio lo porta per mano in <b>quattro passi</b>: il PayCode, l'importo, la scadenza (con un selettore di data e ora, fra un'ora e settantadue ore) e il <b>premio</b>, con lo stesso cursore degli altri ordini, da meno venti a più venti per cento, a numeri interi. <b>Il segno decide il verso:</b> col premio positivo chi paga al tabacchino riceve meno sats del cambio pieno e la differenza resta a chi vende; col premio negativo ne riceve di più, e quella differenza la paga chi vende per la comodità. A zero passa il cambio pieno. <b>Premio più basso = più conveniente per chi paga = più probabile che qualcuno lo prenda in tempo.</b> Prima di pubblicare c'è il riepilogo. Il cambio si fissa lì, e l'ordine resta nel libro fino a <b>due ore prima</b> della scadenza del PayCode (mai oltre settantadue ore): poi esce da solo.</li>
         <li><b>Nel libro quel premio si vede col segno</b>, sulla card e nel conto dell'ordine, accanto alle altre offerte. Qui però non è una cifra dichiarata: i sats sono fissi dalla pubblicazione, e il premio è <b>ricavato</b> confrontandoli col cambio del momento — se il mercato si muove, quel numero si muove con lui, e dice quanto conviene <i>adesso</i>.</li>
         <li><b>Chi compra prende l'ordine</b>, indica dove ricevere i sats, e chi vende li blocca in garanzia. A quel punto il PayCode, l'importo e la scadenza gli arrivano <b>qui dentro e cifrati</b>, in un riquadro col tempo che resta. Nel libro pubblico c'è solo l'importo: il PayCode non lo vede nessun altro, nemmeno Barattolo.</li>
         <li><b>Chi compra va a pagare</b> — in tabaccheria, al bar, in edicola o alla posta, dove si accettano i pagamenti Amazon in contanti, senza commissione —, dà il PayCode alla cassa, paga in contanti l'importo esatto e <b>tiene lo scontrino</b>: è la sua prova. Poi torna qui e tocca «Ho pagato al tabacchino».</li>
@@ -38637,10 +38637,13 @@ function satsMercatoP2P(o){
    ricalcola niente: la garanzia e il payout sono questi sats. */
 function satsTabacchinoP2P(importo, cambio, premio){
   if (!(cambio > 0) || !(importo > 0)) return 0;
-  /* LO SCONTO HA UNA CIFRA DECIMALE (23 set 2026, Barattozon): sul
-     filo non viaggia — e' cotto nei sats — quindi non c'e' nessun
-     i64 che lo voglia intero; si tosa al decimo, mai all'intero */
-  return Math.round((importo / cambio) * (1 - (Math.round((Number(premio) || 0) * 10) / 10) / 100));
+  /* IL PREMIO E' UN INTERO (24 set 2026, correzione di Andrea): la
+     stessa scala del P2P normale, dove `premium` viaggia nel 38383 ed
+     e' un i64. Qui sul filo non viaggia — e' cotto nei sats, quindi
+     nessun i64 lo vuole intero — ma due scale diverse per la stessa
+     cosa sono due cose da tenere in testa, e il decimo non lo
+     chiedeva nessuno: si tosa all'intero. */
+  return Math.round((importo / cambio) * (1 - Math.round(Number(premio) || 0) / 100));
 }
 
 /* ---- LA COMMISSIONE DI BARATTOLO SUL P2P (set 2026) ----
@@ -45422,7 +45425,7 @@ const P2P_TABACCHINO_PM = /^Contanti al tabacchino(?:\s+(\d+\.\d{2}))?$/;
    PAYCODE a 9 cifre della mail Amazon «paga in contanti nel punto
    vendita» (479-868-518), l'importo esatto coi centesimi, la
    scadenza del PayCode (data e ora, di norma 69-72 ore dall'ordine),
-   lo SCONTO scelto da chi vende sats (0-15%, una cifra decimale), il
+   il PREMIO scelto da chi vende sats (da −20 a +20, intero), il
    riepilogo, e dopo la presa: pagato al negozio → chi vende controlla
    su Amazon → libera o disputa.
    IL VERSO DELLO SCONTO, scritto una volta per tutte: chi VENDE sats
@@ -45454,10 +45457,14 @@ const P2P_TABACCHINO_MARGINE_S = 2 * 3600; // il libro chiude prima del PayCode
    altri ordini (`sats -= premium/100 * sats`, sottrazione uniforme),
    quindi il giudizio («piu'/meno conveniente») e la tinta si leggono
    dagli STESSI giudici: `affareP2P`, `fasciaPremioP2P`.
-   ⚠️ QUI IL PASSO E' UN DECIMO E NEL P2P NORMALE E' UN INTERO, e la
-   ragione e' del protocollo: la' `premium` viaggia nel 38383 ed e' un
-   i64, qui il premio si CUOCE nei sats a prezzo fisso e sul filo resta
-   zero — il decimale non lo vede nessuno tranne chi pubblica. */
+   ⚠️ IL PASSO E' UN INTERO, COME NEL P2P NORMALE (24 set 2026,
+   correzione di Andrea, che ROVESCIA il decimo del giorno prima). La
+   ragione del decimo era vera ma non bastava: qui il premio si CUOCE
+   nei sats a prezzo fisso e sul filo resta zero, quindi nessun i64 lo
+   vuole intero. Solo che il decimo non serviva a nessuno e costava due
+   cose — una scala diversa da quella di tutti gli altri ordini, e
+   DIECI VOLTE gli eventi sotto il dito, che sul telefono si vedevano
+   come scatti. */
 const P2P_PREMIO_TAB_MAX = 20;             // il premio di chi vende, in percento
 /* I LIMITI DI AMAZON «Paga in contanti» (23 set 2026, decisione di
    Andrea): fino a 999 € per ordine, NESSUN minimo oltre lo zero, nessuna
@@ -45493,35 +45500,37 @@ function vitaLibroTabacchinoP2P(scade, adesso){
   const margine = Math.min(P2P_TABACCHINO_MARGINE_S, Math.floor((s - ora) / 2));
   return Math.min(s - margine, ora + P2P_TABACCHINO_VITA_S);
 }
-/* PURA: il premio scritto nel passo 4, col segno, da −20 a +20 e con
-   UNA cifra decimale al massimo (virgola o punto, «−» tipografico
-   compreso). {n, storto}: «2,55» e «20,1» sono STORTI e non «quasi
-   giusti» — la lezione dei centesimi —, il vuoto vale zero, e un «-»
-   a meta' battitura e' storto anche lui: non muove il cursore, e a
-   dirlo e' la riga viva. */
+/* PURA: il premio scritto nel passo 4, col segno, da −20 a +20 e a
+   numeri INTERI (il «−» tipografico compreso). {n, storto}: «2,5» e
+   «20,1» sono STORTI e non «quasi giusti» — la lezione dei centesimi
+   —, il vuoto vale zero, e un «-» a meta' battitura e' storto anche
+   lui: non muove il cursore, e a dirlo e' la riga viva.
+   ⚠️ LA VIRGOLA NON SI TRADUCE PIU' IN PUNTO (24 set 2026): senza
+   decimali non c'e' niente da separare, e «2,5» deve arrivare com'e'
+   scritto alla regola per essere RIFIUTATO con la sua frase, invece
+   che tosato in silenzio a un numero che nessuno ha scelto. */
 function premioTabacchinoP2P(testo){
-  const t = String(testo == null ? '' : testo).trim()
-    .replace('−', '-').replace(',', '.');
+  const t = String(testo == null ? '' : testo).trim().replace('−', '-');
   if (t === '') return {n: 0, storto: false};
-  if (!/^[+-]?\d{1,2}(\.\d)?$/.test(t)) return {n: 0, storto: true};
+  if (!/^[+-]?\d{1,2}$/.test(t)) return {n: 0, storto: true};
   const n = Number(t);
   if (!(n >= -P2P_PREMIO_TAB_MAX && n <= P2P_PREMIO_TAB_MAX))
     return {n: 0, storto: true};
   /* «-0» e' zero: il segno su uno zero non vuol dire niente */
   return {n: n === 0 ? 0 : n, storto: false};
 }
-/* il premio come si scrive, col segno SEMPRE (la regola di
-   `premioTestoP2P`, qui col decimale): «+2,5%», «−2,5%», «0%» */
-function premioTestoTabP2P(n){
-  const v = Math.round((Number(n) || 0) * 10) / 10;
-  return (v > 0 ? '+' : v < 0 ? '−' : '')
-    + String(Math.abs(v)).replace('.', ',') + '%';
-}
+/* il premio come si scrive, col segno SEMPRE: «+3%», «−5%», «0%».
+   ⚠️ NON E' PIU' UN GEMELLO, E' LA STESSA (24 set 2026): col decimale
+   se n'e' andata l'unica differenza che aveva da `premioTestoP2P`, e
+   due stesure identiche della stessa regola divergono al primo
+   ritocco. Il nome resta — lo chiamano sei posti, e dice DI CHI e' il
+   premio che stanno scrivendo — ma la regola e' una sola. */
+function premioTestoTabP2P(n){ return premioTestoP2P(n); }
 /* PURA: il premio che un ordine Barattozon gia' nel libro PORTA
    DENTRO, letto all'indietro dai suoi sats fissi contro il cambio di
    ADESSO — sul filo `premium` e' 0 e nessuno lo dichiara, quindi per
-   chi legge il libro e' un fatto RICAVATO, al decimo e col segno.
-   0 se non si sa.
+   chi legge il libro e' un fatto RICAVATO, intero e col segno (era
+   al decimo fino al 24 set 2026). 0 se non si sa.
    ⚠️ NON SI TOSA A ±20, ed e' voluto: il premio scelto sta in fascia,
    ma il cambio si muove — e un ordine nato a +2 che oggi vale il 30%
    meno del mercato deve DIRLO, non fermarsi al bordo del cursore. Chi
@@ -45529,7 +45538,7 @@ function premioTestoTabP2P(n){
 function premioImplicitoTabacchinoP2P(euro, sats, cambio){
   if (!(euro > 0) || !(sats > 0) || !(cambio > 0)) return 0;
   const pieno = euro / cambio;
-  const p = Math.round((1 - sats / pieno) * 1000) / 10;
+  const p = Math.round((1 - sats / pieno) * 100);
   return p === 0 ? 0 : p;
 }
 /* PURA: il passo del percorso in cui si sta (1 PayCode, 2 importo,
@@ -46124,12 +46133,12 @@ function valeNuovoOrdineP2P(v){
       return {ok: false, manca: 'Troppo lontana: la garanzia copre al massimo '
                 + Math.floor(v.finestra / 3600) + ' ore da adesso',
               campo: 'p2pNuovoTabScade'};
-    /* IL PREMIO (23 set 2026): da −20 a +20, una cifra decimale;
-       vuoto = 0. Fuori misura si RIFIUTA e non si tosa: chi ha scritto
-       «20,1» voleva un numero, e un tetto muto glielo cambierebbe. */
+    /* IL PREMIO (23 set 2026, intero dal 24): da −20 a +20, a numeri
+       interi; vuoto = 0. Fuori misura si RIFIUTA e non si tosa: chi ha
+       scritto «20,1» voleva un numero, e un tetto muto glielo cambierebbe. */
     const pr = premioTabacchinoP2P(v.premioTab);
     if (pr.storto)
-      return {ok: false, manca: 'Il premio va da −20 a +20%, con una cifra decimale al massimo',
+      return {ok: false, manca: 'Il premio va da −20 a +20%, a numeri interi',
               campo: 'p2pTabPremioBox'};
     /* I SATS SONO NOSTRI (22 set 2026): a prezzo fisso li calcola il
        foglio sul cambio vivo, quindi senza cambio non si pubblica, e
@@ -46225,8 +46234,8 @@ function ordineDaCampiP2P(v, lato){
   const esatto = tab ? centesimiP2P(v.euro).n : 0;
   const euro = tab ? Math.round(esatto) : interoP2P(v.euro).n;
   const euroMax = interoP2P(v.euroMax).n;
-  /* col tabacchino il premio e' quello del PERCORSO (−20..+20, una
-     cifra decimale), e passa da `premioTab` se c'e', da `premio` per
+  /* col tabacchino il premio e' quello del PERCORSO (−20..+20,
+     intero), e passa da `premioTab` se c'e', da `premio` per
      le righe gia' scritte (il «Riprova» porta `premioCotto`) */
   const premioTab = tab ? (v.premioTab !== undefined ? premioTabacchinoP2P(v.premioTab).n
                                                      : (Number(v.premio) || 0)) : 0;
@@ -46706,11 +46715,11 @@ function rigaPremioTabP2P(euro, cambio, premio){
   const e = centesimiP2P(euro).n, p = premioTabacchinoP2P(premio);
   if (!(e > 0)) return 'Scrivi prima l\'importo: qui vedrai quanti sats riceve chi paga.';
   if (!(cambio > 0)) return 'Aspetta un attimo: sto leggendo il cambio.';
-  if (p.storto) return 'Il premio va da −20 a +20%, con una cifra decimale al massimo.';
+  if (p.storto) return 'Il premio va da −20 a +20%, a numeri interi.';
   const netto = satsTabacchinoP2P(e, cambio, p.n);
   if (!p.n) return 'Chi paga al tabacchino riceve ' + fmt(netto)
     + ' sats, il cambio pieno per ' + centesimiTestoP2P(e) + ' €.';
-  const quanto = String(Math.abs(p.n)).replace('.', ',') + '%';
+  const quanto = Math.abs(p.n) + '%';
   return 'Chi paga al tabacchino riceve ' + fmt(netto) + ' sats, cioè il ' + quanto
     + (p.n > 0 ? ' in meno del cambio: risparmi tu.'
                : ' in più del cambio: lo paghi tu per la comodità.');
@@ -46723,10 +46732,11 @@ function rigaPremioTabP2P(euro, cambio, premio){
    da fuori LO CHIUDE, con `da` (chi ha mosso) come giudice e mai il
    fuoco, che su iOS non se ne va mentre si trascina.
    ⚠️ SONO FUNZIONI GEMELLE E NON LE STESSE, ed e' una scelta: quelle
-   del P2P normale non si toccano — la' il premio e' un intero perche'
-   viaggia nel 38383 — e qui il passo e' un decimo. Stessa grafica, due
-   stati diversi; la variabile e' il TESTO scritto, cosi' «20,1» si
-   puo' RIFIUTARE invece che tosarlo in silenzio.
+   del P2P normale non si toccano. Dal 24 set 2026 la scala e' la
+   STESSA — interi da −20 a +20, passo 1 — e l'unica differenza rimasta
+   e' lo STATO: qui la variabile e' il TESTO scritto, cosi' «2,5» si
+   puo' RIFIUTARE con la sua frase invece che tosarlo in silenzio,
+   mentre di la' il premio e' gia' un numero e si tosa alla fascia.
    ⚠️ IL LATO E' SEMPRE 'vendo': Barattozon lo offre solo chi vende
    sats (`metodiPubblicabiliP2P`), e la tinta della fascia e' quella di
    chi pubblica — un premio positivo gli fa consegnare meno sats. */
@@ -46737,12 +46747,17 @@ function premioTabModP2P(){
     (p2pNuovoPremioTabMano ? 'Fatto' : 'Modifica') + '</button>';
 }
 function premioTabValP2P(){
-  /* il campo e' TESTO con la tastiera decimale, non un `number`: con
-     dentro «2,5» un `type=number` risponde `value === ''` (la lezione
-     dell'euro intero), e il segno lo porta il valore che ci nasce
-     dentro — il cursore lo mette, la tastiera del telefono no. */
+  /* IL CAMPO RESTA TESTO, e qui si DISCOSTA apposta dal `type=number`
+     del P2P normale: con dentro «2,5» un `type=number` risponde
+     `value === ''` (la lezione dell'euro intero), cioe' un decimale
+     arriverebbe come VUOTO e passerebbe per zero — proprio il caso che
+     va RIFIUTATO con la sua frase. Di testo arriva com'e' scritto.
+     La tastiera invece e' quella dei numeri, che di decimali non ce ne
+     sono piu', e tre caratteri bastano per «−20»; il segno lo porta il
+     valore che ci nasce dentro — il cursore lo mette, la tastiera del
+     telefono no. */
   if (p2pNuovoPremioTabMano)
-    return '<input id="p2pTabPremioMano" type="text" inputmode="decimal" maxlength="6" ' +
+    return '<input id="p2pTabPremioMano" type="text" inputmode="numeric" maxlength="3" ' +
       'value="' + esc(p2pNuovoPremioTab) + '" style="width:64px;text-align:center" ' +
       'oninput="cambiaPremioTabP2P(this.value, this)" ' +
       'aria-label="Premio in percento, da meno venti a piu\' venti">';
@@ -46781,6 +46796,13 @@ function scriviPremioTabP2P(){
 }
 function cambiaPremioTabP2P(v, da){
   const g = premioTabacchinoP2P(v);
+  /* il nodo del cursore si legge UNA volta: serve due volte, per
+     seguirlo e per riconoscere CHI ha mosso */
+  const cur = el('p2pTabPremioCursore');
+  /* il passo del percorso cambia SOLO quando il premio passa da storto
+     a buono o viceversa — e' l'unica cosa che `passoTabacchinoP2P`
+     guarda qui dentro —, quindi si segna com'era PRIMA di riscrivere */
+  const prima = premioTabacchinoP2P(p2pNuovoPremioTab).storto;
   p2pNuovoPremioTab = String(v == null ? '' : v).trim();
   /* il campo a mano segue chi muove da fuori, e chi muove da fuori lo
      CHIUDE; la riscrittura resta come CINTURA se la chiusura non
@@ -46793,7 +46815,6 @@ function cambiaPremioTabP2P(v, da){
   if (!g.storto) {
     const c = el('p2pTabPremioVal');
     if (c) c.textContent = premioTestoTabP2P(g.n);
-    const cur = el('p2pTabPremioCursore');
     if (cur && String(cur.value) !== String(g.n)) cur.value = String(g.n);
     const f = fasciaPremioP2P(g.n, 'vendo');
     if (cur) {
@@ -46807,7 +46828,25 @@ function cambiaPremioTabP2P(v, da){
       pil.classList.toggle('avviso', f.giudizio === 'avviso');
     }
   }
-  aggiornaPercorsoTabP2P();
+  /* ⚠️ SOTTO IL DITO SI SCRIVE LA SOLA RIGA VIVA (24 set 2026,
+     correzione di Andrea). Qui c'era `aggiornaPercorsoTabP2P()` e
+     basta, che a OGNI movimento rilegge i venti campi del foglio
+     (`campiNuovoP2P`, con due parse di data dentro), ricalcola il
+     passo e interroga il DOM con `querySelectorAll('.p2p-tappa')` per
+     riscrivere quattro spuntine che, muovendo il premio, NON POSSONO
+     cambiare: il passo si sposta solo su un premio storto, e dal
+     cursore uno storto non esce mai. Col passo di un decimo erano
+     quattrocento giri di quel lavoro per una trascinata sola, e sul
+     telefono si vedevano come scatti.
+     Adesso e' come nel P2P normale, che chiude scrivendo la SOLA nota:
+     il cursore riscrive la sola riga viva, e il resto del percorso lo
+     rifa' chi scrive a mano — l'unico che puo' cambiare il passo.
+     ⚠️ E LA PRIMA TRASCINATA DOPO UNO STORTO LO RIFA' LO STESSO: chi
+     ha scritto «2,5» sta al passo 4, e afferrando il cursore lo chiude
+     — il `prima === g.storto` e' la sola condizione in cui il passo
+     non puo' essersi mosso, e costa una regex. */
+  if (cur && da === cur && prima === g.storto) rigaVivaTabP2P();
+  else aggiornaPercorsoTabP2P();
 }
 /* PURA: la testata del percorso, dal passo in cui si sta */
 function testataPercorsoTabP2P(passo){
@@ -46858,7 +46897,7 @@ function percorsoTabacchinoP2P(val){
       '<div class="p2p-premio">' +
         '<div class="p2p-premio-val" id="p2pTabPremioBox">' + premioTabValP2P() + '</div>' +
         '<input type="range" id="p2pTabPremioCursore" min="-' + P2P_PREMIO_TAB_MAX + '" ' +
-          'max="' + P2P_PREMIO_TAB_MAX + '" step="0.1" value="' + premioTabP2P() + '" ' +
+          'max="' + P2P_PREMIO_TAB_MAX + '" step="1" value="' + premioTabP2P() + '" ' +
           'style="' + stilePremioP2P(premioTabP2P(), 'vendo') + '" ' +
           'oninput="cambiaPremioTabP2P(this.value, this)" aria-label="Premio in percento">' +
       '</div>' +
@@ -46868,7 +46907,7 @@ function percorsoTabacchinoP2P(val){
         '%</span><span style="color:' + fasciaPremioP2P(P2P_PREMIO_TAB_MAX, 'vendo').tinta +
         '">+' + P2P_PREMIO_TAB_MAX + '%</span></span></div>',
       '<div class="hint" id="p2pTabSatsRiga">' + esc(rigaPremioTabP2P(p2pNuovoEuro, campi.cambio, p2pNuovoPremioTab)) + '</div>' +
-      '<div class="hint">Da −20 a +20%, con una cifra decimale: il segno decide il verso. <b>Premio più basso = più conveniente per chi paga = più probabile che qualcuno lo prenda in tempo.</b> Il cambio si fissa adesso.</div>') +
+      '<div class="hint">Da −20 a +20%, a numeri interi: il segno decide il verso. <b>Premio più basso = più conveniente per chi paga = più probabile che qualcuno lo prenda in tempo.</b> Il cambio si fissa adesso.</div>') +
   '</div>';
 }
 /* PURA: il riepilogo che si rilegge prima di pubblicare, dai campi del
@@ -46893,9 +46932,22 @@ function riepilogoTabacchinoP2P(v){
     + '\nNel libro fino alle ' + dataTabacchinoP2P(libro).replace(/^.* alle /, '') + ' del '
     + dataTabacchinoP2P(libro).replace(/ alle .*$/, '') + ', poi esce da solo.';
 }
+/* LA SOLA RIGA VIVA, riscritta in place: e' il solo pezzo del
+   percorso che cambia sotto il dito mentre il cursore corre, e per
+   riscriverlo non serve rileggere il foglio — il cambio si legge dalle
+   due variabili di casa, le stesse che `campiNuovoP2P` mette in
+   `cambio`, e i sats si calcolano UNA volta per evento. Niente rete:
+   il cambio qui e' gia' in mano, e una fetch sotto il dito sarebbe la
+   cosa peggiore di tutte. */
+function rigaVivaTabP2P(){
+  const riga = el('p2pTabSatsRiga');
+  if (riga) riga.textContent = rigaPremioTabP2P(p2pNuovoEuro,
+    (cambioVivo && eurPerSat > 0) ? eurPerSat : 0, p2pNuovoPremioTab);
+}
 /* i pezzi vivi del percorso si riscrivono IN PLACE mentre si digita:
    mai un render, che porterebbe via il cursore (la lezione delle
-   pillole). Testata, spunte, e la riga dei sats. */
+   pillole). Testata, spunte, e la riga dei sats — che pero' ha una
+   funzione sua, perche' il cursore scrive SOLO quella. */
 function aggiornaPercorsoTabP2P(){
   const campi = campiNuovoP2P();
   const passo = passoTabacchinoP2P(campi);
@@ -46904,8 +46956,7 @@ function aggiornaPercorsoTabP2P(){
   document.querySelectorAll('.p2p-tappa').forEach(t => {
     t.dataset.fatto = (Number(t.dataset.tappa) < passo) ? '1' : '0';
   });
-  const riga = el('p2pTabSatsRiga');
-  if (riga) riga.textContent = rigaPremioTabP2P(p2pNuovoEuro, campi.cambio, p2pNuovoPremioTab);
+  rigaVivaTabP2P();
 }
 /* la nota del premio: cosa cambia PER CHI STA LEGGENDO, col lato che
    ha scelto.
@@ -47350,8 +47401,8 @@ async function inviaNuovoOrdineP2P(confermato){
        `premium` e' 0, e' prezzo fisso */
     ord.euro = esattoTab;
     ord.metodi = String(ordine.payment_method || '').split(',').filter(Boolean);
-    /* lo sconto, con la sua cifra decimale, e il PayCode normalizzato
-       (23 set 2026): sulla riga vanno come li rilegge chi compra */
+    /* il premio intero e il PayCode normalizzato (23 set 2026):
+       sulla riga vanno come li rilegge chi compra */
     ord.premioCotto = premioTabacchinoP2P(campi.premioTab).n;
     const t = {ordine: payCodeP2P(campi.tab.ordine) || String(campi.tab.ordine || '').trim(),
                importo: centesimiTestoP2P(esattoTab),
