@@ -98,7 +98,8 @@ async def _muta(*a, **k):
 ESITO = ["non_pagato"]
 
 
-async def _finta_uscita(bolt11, atteso_sats, diario=None, cassaforte=""):
+async def _finta_uscita(bolt11, atteso_sats, diario=None, *, cassaforte,
+                        riga=()):
     """Il gemello di `paga_venditore`. Prende `atteso_sats` senza
     default come l'originale: se un domani la cintura sparisse dal
     chiamante, qui esploderebbe invece di pagare a caso.
@@ -106,7 +107,12 @@ async def _finta_uscita(bolt11, atteso_sats, diario=None, cassaforte=""):
     E dal set 2026 prende anche il TACCUINO, e lo riempie come il vero:
     l'hash di quel pagamento e' l'unica traccia che resta di un payout
     riuscito, e un doppio che non lo scrivesse farebbe passare per
-    verde una strada che nella riga non lascia niente."""
+    verde una strada che nella riga non lascia niente.
+
+    E LA FIRMA E' QUELLA DEL VERO (22 set 2026): `cassaforte` solo per
+    nome e senza default, e `riga` — dal 19 set `paga_venditore` la
+    vuole, e un doppio con la firma sua e' esploso qui per tre giorni
+    senza che nessuno lo facesse girare."""
     USCITE.append((bolt11, atteso_sats))
     if diario is not None:
         diario["hash"] = "hash-di-cartone"
@@ -457,6 +463,76 @@ def main():
             rotti3.append(nome)
         con.close()
     prova("...e la ronda tace anche dopo il rimborso", [], rotti3)
+
+    # --- IL RIMBORSO DEL LINK NON TOCCA IL BANNER (22 set 2026) ---
+    # Fino a ieri `_rimborsa_sblocco` disfaceva SEMPRE il banner: un
+    # link del negozio rimborsato richiudeva la porta pagata a parte e
+    # spegneva l'insegna, e il link restava dov'era. Qui il venditore
+    # ha TUTT'E DUE, incassati dalle casse vere.
+    print("\n[il rimborso del link non tocca il banner]")
+    utente(7, "gg99")
+    come(7)
+    r9 = asyncio.run(server.sblocca_banner(None, "", ""))
+    paga(r9["payment_hash"])
+    asyncio.run(server.verifica_pagamento_sblocco(r9["pagamento_id"],
+                                                  "", ""))
+    con = db()
+    con.execute("UPDATE utenti SET banner_stato='attivo', "
+                "banner_foto='ban_y.jpg', ln_address='sette@wallet.it' "
+                "WHERE tg_id=7")
+    ora = int(server.time.time())
+    cur = con.execute(
+        "INSERT INTO pagamenti(tg_id,motivo,riferimento,importo_sats,"
+        "payment_hash,invoice,stato,creato,aggiornato,cassaforte) "
+        "VALUES(7,'negozio_slug','bottega-sette',5000,'hash-link',"
+        "'lnbc-link','creato',?,?,'saas')", (ora, ora))
+    pid_link = cur.lastrowid
+    con.commit()
+    con.close()
+    asyncio.run(server._incassa_slug_negozio(pid_link))
+    prova("prima: il link c'e', la porta e' aperta, l'insegna in vetrina",
+          ("bottega-sette", True, "attivo"),
+          (campo(7, "negozio_slug"),
+           (campo(7, "banner_sbloccato_il") or 0) > 0,
+           campo(7, "banner_stato")))
+    ESITO[0] = server.PAGATO
+    esito = asyncio.run(server._rimborsa_sblocco(pid_link, 999))
+    prova("il rimborso del link riesce, e paga i SUOI sats", (True, 5_000),
+          (esito["ok"], USCITE[-1][1]))
+    prova("...il link se ne va", "", campo(7, "negozio_slug"))
+    prova("...e il banner resta: porta aperta, insegna in vetrina",
+          (True, "attivo"),
+          ((campo(7, "banner_sbloccato_il") or 0) > 0,
+           campo(7, "banner_stato")))
+    prova("...e il pagamento del banner resta 'pagato'", "pagato",
+          db().execute("SELECT stato FROM pagamenti WHERE id=?",
+                       (r9["pagamento_id"],)).fetchone()["stato"])
+
+    # --- e un motivo che nessuno sa disfare non si rimborsa -------
+    con = db()
+    cur = con.execute(
+        "INSERT INTO pagamenti(tg_id,motivo,riferimento,importo_sats,"
+        "payment_hash,invoice,stato,creato,aggiornato,cassaforte) "
+        "VALUES(7,'sponsor','',7000,'hash-sponsor','lnbc-sponsor',"
+        "'pagato',?,?,'saas')", (ora, ora))
+    pid_ignoto = cur.lastrowid
+    con.commit()
+    con.close()
+    quante = len(USCITE)
+    esito = asyncio.run(server._rimborsa_sblocco(pid_ignoto, 999))
+    prova("motivo sconosciuto: rifiutato, e nessun sat esce",
+          ("sponsor", quante, "pagato", True),
+          (esito.get("motivo_ignoto"), len(USCITE),
+           db().execute("SELECT stato FROM pagamenti WHERE id=?",
+                        (pid_ignoto,)).fetchone()["stato"],
+           (campo(7, "banner_sbloccato_il") or 0) > 0))
+    # la riga di cartone se ne va: la ronda qui sotto ha un controllo
+    # apposta per i motivi senza cassa, e deve restare zitta per le
+    # righe VERE
+    con = db()
+    con.execute("DELETE FROM pagamenti WHERE id=?", (pid_ignoto,))
+    con.commit()
+    con.close()
     ESITO[0] = "non_pagato"
 
     print("\n[la regressione: chi ha il livello]")
@@ -473,8 +549,10 @@ def main():
     # l'unica uscita e' quella chiesta da un moderatore, per
     # l'importo esatto: incassare non fa uscire un sat da nessuna
     # parte, e a farne uscire uno e' solo un gesto di una persona.
-    prova("l'unico sat uscito e' il rimborso, e all'importo esatto",
-          [20_000], [q for _, q in USCITE])
+    # Dal 22 set i gesti sono DUE: il rimborso del banner e quello del
+    # link, ognuno col suo importo — e il motivo sconosciuto nessuno.
+    prova("gli unici sats usciti sono i due rimborsi, all'importo esatto",
+          [20_000, 5_000], [q for _, q in USCITE])
 
     print("\n[la promozione che non morde]")
     # IL PIENO E' UN ORNAMENTO, e queste tre righe sono la prova che

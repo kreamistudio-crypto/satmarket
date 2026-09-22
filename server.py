@@ -7670,8 +7670,9 @@ async def _stato_pagamento(payment_hash: str, cassaforte: str) -> str:
 # contro il `tls.cert` di LND, lo stesso file di cui si fida LNbits: un
 # macaroon non si manda a un certificato che non si e' guardato.
 #
-# SOLO LA CASSAFORTE «nodo» HA UN LND NOSTRO. Per il SaaS, e finche' il
-# macaroon non e' nel config, LND vale «spento» e decide LNbits da sola
+# SOLO LA CASSAFORTE «nodo» HA UN LND NOSTRO. Per il SaaS LND vale
+# «n/a», e finche' il macaroon non e' nel config «spento»: nei due casi
+# decide LNbits da sola
 # — con la regola che c'era gia' (pending = fermo) e una in piu': la
 # traccia che manca non vale «mai partito» prima di
 # `MAI_PARTITO_DOPO_S`.
@@ -7690,6 +7691,16 @@ except ImportError:
 
 LND_SUCCEEDED, LND_IN_FLIGHT, LND_FAILED = "SUCCEEDED", "IN_FLIGHT", "FAILED"
 LND_ASSENTE, LND_MUTO, LND_SPENTO = "assente", "muto", "spento"
+# «n/a» NON E' «spento», e la differenza l'ha pagata l'ordine #152 (20
+# set 2026). «spento» vuol dire «un LND ci sarebbe, ma non gli so
+# chiedere» (manca il macaroon di lettura): un guasto di configurazione.
+# «n/a» vuol dire «questa riga non passa da un LND nostro» (la cassaforte
+# SaaS): nessun guasto. Scritti uguali nel journal, un pagamento del SaaS
+# si leggeva come un ponte rotto. PER IL GIUDICE VALGONO UGUALE — nessuna
+# voce da sentire, decide LNbits — e ogni confronto passa da
+# LND_SENZA_VOCE, mai da uno dei due soli.
+LND_NA = "n/a"
+LND_SENZA_VOCE = (LND_SPENTO, LND_NA)
 LND_ATTESA_S = 30
 
 # N = 15 MINUTI, e il numero ha una ragione. Fra la nostra richiesta a
@@ -7837,10 +7848,11 @@ async def _lnd_ci_vede() -> bool:
 async def _stato_lnd(payment_hash: str, cassaforte: str) -> str:
     """Com'e' finito questo hash SECONDO LND. Uno fra SUCCEEDED,
     IN_FLIGHT, FAILED, 'assente' (LND non l'ha mai visto — creduto solo
-    a canarino vivo), 'muto' (non si e' potuto sapere) e 'spento' (non
-    e' una riga del nodo, o il macaroon di lettura non c'e')."""
+    a canarino vivo), 'muto' (non si e' potuto sapere), 'n/a' (non e' una
+    riga del nodo: li' un LND nostro non c'e', e non e' un guasto) e
+    'spento' (e' del nodo, ma il macaroon di lettura non c'e')."""
     if cassaforte != CASSAFORTE_NODO or not payment_hash:
-        return LND_SPENTO
+        return LND_NA
     stato = await _chiedi_lnd(payment_hash)
     if stato == LND_SUCCEEDED:
         # ogni SUCCEEDED e' un canarino fresco, gratis
@@ -7850,6 +7862,20 @@ async def _stato_lnd(payment_hash: str, cassaforte: str) -> str:
     if stato == LND_ASSENTE and not await _lnd_ci_vede():
         return LND_MUTO
     return stato
+
+
+def _voce_lnd(lnd: str) -> str:
+    """LND come lo legge una PERSONA nel pannello 🧊: la stessa parola
+    del journal, e accanto — solo per i due che non sono una risposta —
+    perche' non ha parlato. Un moderatore che legge «spento» su un
+    pagamento del SaaS cerca un guasto che non c'e'."""
+    if lnd == LND_NA:
+        return ("LND dice «n/a» (non è un pagamento del nodo: lì un LND "
+                "nostro da sentire non c'è)")
+    if lnd == LND_SPENTO:
+        return ("LND dice «spento» (manca il macaroon di lettura nel "
+                "config)")
+    return f"LND dice «{lnd}»"
 
 
 print("🔎 Verità dei pagamenti: LND "
@@ -7888,7 +7914,7 @@ def _verdetto_pagamento(lnbits: str, lnd: str, eta_s) -> str:
         return IGNOTO if lnd == LND_FAILED else USCITO
     if lnd == LND_FAILED:
         return FALLITO
-    if lnbits == "pending" and lnd in (LND_MUTO, LND_SPENTO):
+    if lnbits == "pending" and (lnd == LND_MUTO or lnd in LND_SENZA_VOCE):
         return IN_VOLO
     if eta_s is None and lnbits == "assente":
         # MAI TENTATO da noi e mai visto da LNbits: non c'e' niente che
@@ -7899,8 +7925,9 @@ def _verdetto_pagamento(lnbits: str, lnd: str, eta_s) -> str:
         return MAI_PARTITO
     if lnbits == "muto" or lnd == LND_MUTO:
         return IGNOTO
-    # da qui: LND 'assente' o 'spento', LNbits pending / failed / assente
-    if lnbits == "failed" and lnd == LND_SPENTO:
+    # da qui: LND 'assente', 'spento' o 'n/a', LNbits pending / failed /
+    # assente
+    if lnbits == "failed" and lnd in LND_SENZA_VOCE:
         # senza un LND da sentire, il «fallito» di LNbits e' tutto quel
         # che c'e', ed e' la regola di sempre: non si aspetta
         return FALLITO
@@ -20466,7 +20493,7 @@ async def decidi_pagamento(req: Request, x_tg_init_data: str = Header(""),
     verita = await _verita_riga(tabella, riga_id, cf)
     v = verita["verdetto"]
     voci = ("; ".join(f"{e['hash'][:12]}…: LNbits dice «{e['lnbits']}», "
-                      f"LND dice «{e['lnd']}»" for e in verita["esiti"])
+                      f"{_voce_lnd(e['lnd'])}" for e in verita["esiti"])
             or ("gli hash tentati erano già chiusi come falliti o mai partiti"
                 if verita["hash_noti"] else
                 "questa riga non ha nessun payment hash, quindi non c'è "
@@ -20647,14 +20674,14 @@ def _giudica_origine(v: dict, scade: int, adesso: int) -> tuple:
     fonte, poi LND, e il calendario PER ULTIMO e solo dove LND non
     esiste — mai come scorciatoia dove LND c'e' ma tace."""
     verdetto, lnbits, lnd = v["verdetto"], v["lnbits"], v["lnd"]
-    voci = f"LNbits dice «{lnbits}», LND dice «{lnd}»"
+    voci = f"LNbits dice «{lnbits}», {_voce_lnd(lnd)}"
     if verdetto == USCITO:
         return ORIGINE_USCITA, f"risulta USCITO ({voci})"
     if lnd == LND_IN_FLIGHT:
         return ORIGINE_VIVA, f"è ancora IN VOLO sul nodo ({voci})"
     if verdetto in (FALLITO, MAI_PARTITO):
         return ORIGINE_MORTA, voci
-    if lnd != LND_SPENTO:
+    if lnd not in LND_SENZA_VOCE:
         # c'e' un LND nostro: si crede a lui, e a nessun calendario
         if lnd == LND_ASSENTE:
             return ORIGINE_PRESTO, (
@@ -20822,7 +20849,7 @@ async def _esamina_altra_cassaforte(ordine_id: int) -> dict:
             v = await _verita_pagamento(
                 h, cf_h, (adesso - quando) if quando else None,
                 f"ordini#{ordine_id} (origine)")
-            if (not scade and v["lnd"] == LND_SPENTO
+            if (not scade and v["lnd"] in LND_SENZA_VOCE
                     and v["lnbits"] == "pending"):
                 scade = await _scadenza_da_lnbits(h, cf_h)
                 if scade:
@@ -21180,7 +21207,8 @@ async def sorveglia_crediti():
         v = await _verita_pagamento(
             c["hash"], c["cassaforte"], adesso - (c["deciso_il"] or adesso),
             f"credito#{c['id']} ({c['tabella']}#{c['riga_id']})")
-        if v["lnbits"] == "muto" and v["lnd"] in (LND_MUTO, LND_SPENTO):
+        if v["lnbits"] == "muto" and (v["lnd"] == LND_MUTO
+                                      or v["lnd"] in LND_SENZA_VOCE):
             print("🔁 Crediti: tacciono tutte le fonti, si riguarda fra "
                   "un'ora.")
             break
@@ -21255,6 +21283,11 @@ async def rimborsa_sblocco_admin(pagamento_id: int, req: Request,
                                      "stato «pagato»")
     esito = await _rimborsa_sblocco(pagamento_id, user["id"])
     if not esito.get("ok"):
+        if esito.get("motivo_ignoto") is not None:
+            raise HTTPException(409, "Questo pagamento è per "
+                                     f"«{esito['motivo_ignoto']}», che "
+                                     "non so come disfare: il rimborso "
+                                     "non è partito, va fatto a mano")
         if esito.get("incerto"):
             raise HTTPException(409, "Questo pagamento è congelato: "
                                      "decidilo dalla coda «🧊 "
@@ -35113,6 +35146,56 @@ async def _incassa_sblocco(pagamento_id: int) -> dict:
 _lucchetti_sblocco = defaultdict(asyncio.Lock)
 
 
+def _disfa_banner(con, p) -> str:
+    """Il rimborso di uno sblocco del BANNER: la porta si richiude e
+    l'insegna si spegne. Torna la frase per chi riceve i sats."""
+    con.execute("UPDATE utenti SET banner_sbloccato_il=0 "
+                "WHERE tg_id=?", (p["tg_id"],))
+    con.execute(
+        "UPDATE utenti SET banner_stato='spento' "
+        "WHERE tg_id=? AND banner_stato IN "
+        "('attivo','revisione')", (p["tg_id"],))
+    return ("La porta del banner si richiude e l'insegna esce dalla "
+            "vetrina.")
+
+
+def _disfa_slug_negozio(con, p) -> str:
+    """Il rimborso di un LINK del negozio: si toglie il link, e SOLO se
+    e' ancora quello comprato con QUESTO pagamento — chi dopo ne ha
+    pagato un altro tiene il suo. Il banner non si guarda nemmeno: e'
+    un'altra porta, pagata a parte."""
+    slug = p["riferimento"] or ""
+    cur = con.execute("UPDATE utenti SET negozio_slug='' WHERE tg_id=? "
+                      "AND negozio_slug=? AND negozio_slug<>''",
+                      (p["tg_id"], slug))
+    return (f"Il link «{slug}» del negozio viene tolto."
+            if cur.rowcount else "")
+
+
+def _rimborso_del_motivo(motivo: str):
+    """COSA DISFA UN RIMBORSO (22 set 2026): il gemello di
+    `_incasso_del_motivo`, dall'altra parte della cassa — ogni `motivo`
+    della tabella `pagamenti` ha il SUO modo di tornare indietro, e
+    `_rimborsa_sblocco` lo chiede qui. Torna `(nome, disfa)`: il nome,
+    con l'articolo, per le etichette e gli avvisi, e la funzione che
+    scrive, nella STESSA transazione dei sats restituiti, cosa si perde
+    col rimborso.
+    IL DIFETTO CHE L'HA FATTO NASCERE: `_rimborsa_sblocco` era nato col
+    solo banner e disfaceva sempre il banner — rimborsare un link del
+    negozio richiudeva la porta del BANNER, pagata a parte, e spegneva
+    l'insegna, lasciando il link al suo posto. E' lo stesso difetto che
+    il 20 set aveva gia' curato nei due giri dell'orologio: il cugino
+    era rimasto indietro.
+    UN MOTIVO SCONOSCIUTO TORNA None e il rimborso si RIFIUTA prima di
+    muovere un sat: rimborsare una cosa che non si sa disfare vorrebbe
+    dire restituire i soldi e lasciare in mano il bene, o togliere
+    quello sbagliato. Una sentinella di `prove.py` tiene questo elenco
+    uguale a quello dello smistatore degli incassi."""
+    return {"banner": ("dello sblocco banner", _disfa_banner),
+            "negozio_slug": ("del link negozio", _disfa_slug_negozio)
+            }.get(motivo)
+
+
 async def _rimborsa_sblocco(pagamento_id: int,
                             moderatore_id: int = 0) -> dict:
     """Il calco di `_paga_rimborso`, e le tre righe che condivide
@@ -35128,9 +35211,13 @@ async def _rimborsa_sblocco(pagamento_id: int,
     parametro e' senza default.
 
     E IL RIMBORSO DISFA TUTTO IN UN GESTO (decisione di Andrea): i
-    sats tornano, la porta si richiude e il banner si spegne — SEMPRE
-    (set 2026: da quando la porta ha una chiave sola, il pagamento, non
-    c'e' piu' un livello da cui potrebbe restare aperta da solo)."""
+    sats tornano e quel che avevano comprato si toglie — SEMPRE (set
+    2026: da quando la porta ha una chiave sola, il pagamento, non c'e'
+    piu' un livello da cui potrebbe restare aperta da solo).
+    COSA SI TOGLIE LO DICE IL MOTIVO (22 set 2026, `_rimborso_del_motivo`):
+    il banner richiude la porta e spegne l'insegna, il link del negozio
+    toglie il link e il banner non lo tocca, e un motivo che non si sa
+    disfare non si rimborsa affatto."""
     async with _lucchetti_sblocco[pagamento_id]:
         con = db()
         p = con.execute("SELECT * FROM pagamenti WHERE id=?",
@@ -35145,11 +35232,19 @@ async def _rimborsa_sblocco(pagamento_id: int,
         if p["payout_stato"] in ("incerto", "in_volo"):
             con.close()
             return {"ok": False, "stato": p["stato"], "incerto": True}
+        voce = _rimborso_del_motivo(p["motivo"])
+        if voce is None:
+            con.close()
+            print(f"⛔ Rimborso #{pagamento_id} rifiutato: il motivo "
+                  f"«{p['motivo']}» non ha un modo di disfarsi", flush=True)
+            return {"ok": False, "stato": p["stato"],
+                    "motivo_ignoto": p["motivo"]}
+        nome, disfa = voce
         u = con.execute("SELECT * FROM utenti WHERE tg_id=?",
                         (p["tg_id"],)).fetchone()
         importo = p["importo_sats"]      # integrale, al sat
         bolt11 = ""
-        taccuino = {"etichetta": f"Rimborso dello sblocco banner "
+        taccuino = {"etichetta": f"Rimborso {nome} "
                                  f"#{pagamento_id}"}
         try:
             if p["payout_stato"] != "uscito":
@@ -35178,7 +35273,7 @@ async def _rimborsa_sblocco(pagamento_id: int,
                 return {"ok": False, "stato": p["stato"], "in_volo": True}
             await _congela_pagamento(
                 con, "pagamenti", pagamento_id, bolt11, "pagante",
-                f"Rimborso dello sblocco banner #{pagamento_id} "
+                f"Rimborso {nome} #{pagamento_id} "
                 f"a #{p['tg_id']}: "
                 f"<b>{_fmt_sats(importo)} sats</b>.",
                 cassaforte=p["cassaforte"])
@@ -35199,28 +35294,25 @@ async def _rimborsa_sblocco(pagamento_id: int,
                 "rimborso_il=?, rimborso_da=?, aggiornato=? "
                 "WHERE id=? AND stato='pagato'",
                 (adesso, moderatore_id, adesso, pagamento_id))
-            # la porta si richiude e l'insegna si spegne, nella
-            # stessa transazione dei sats restituiti: un gesto solo
-            con.execute("UPDATE utenti SET banner_sbloccato_il=0 "
-                        "WHERE tg_id=?", (p["tg_id"],))
-            con.execute(
-                "UPDATE utenti SET banner_stato='spento' "
-                "WHERE tg_id=? AND banner_stato IN "
-                "('attivo','revisione')", (p["tg_id"],))
+            # quel che i sats avevano comprato si toglie, nella stessa
+            # transazione dei sats restituiti: un gesto solo — e COSA
+            # si toglie lo dice il motivo, mai un nome fisso
+            tolto = disfa(con, p)
             con.commit()
             con.close()
             registra_moderazione("admin", "rimborso_sblocco",
-                                 f"pagamento #{pagamento_id}, "
+                                 f"pagamento #{pagamento_id}, rimborso "
+                                 f"{nome}, "
                                  f"{_fmt_sats(importo)} sats",
                                  venditore_id=p["tg_id"],
                                  deciso_da=moderatore_id)
             await notifica(
                 p["tg_id"],
-                f"↩️ <b>Sblocco rimborsato:</b> "
+                f"↩️ <b>Pagamento rimborsato:</b> "
                 f"{_fmt_sats(importo)} sats stanno tornando sul tuo "
-                "wallet. ⚡\n\nLa porta del banner si richiude e "
-                "l'insegna esce dalla vetrina. Se pensi che sia un "
-                "errore, scrivici.")
+                "wallet. ⚡"
+                + (f"\n\n{tolto}" if tolto else "")
+                + " Se pensi che sia un errore, scrivici.")
             return {"ok": True, "stato": "rimborsato"}
 
         # NON pagato: la invoice depositata si azzera e lo stato
@@ -35239,7 +35331,7 @@ async def _rimborsa_sblocco(pagamento_id: int,
             # partito ed era FALLITO: sono due guasti diversi, e chi
             # modera deve poterli distinguere al primo sguardo.
             await notifica_admin(
-                f"⚠️ <b>Rimborso dello sblocco non riuscito</b> "
+                f"⚠️ <b>Rimborso {nome} non riuscito</b> "
                 f"(pagamento #{pagamento_id}, "
                 f"{_fmt_sats(importo)} sats): il pagamento automatico "
                 "non è andato a buon fine e i sats non sono usciti. "
@@ -48342,7 +48434,8 @@ async def risolvi_pagamenti_in_volo(solo_in_volo: bool = False):
         v = await _verita_pagamento(
             phash, cf, (adesso - quando) if quando else None,
             f"{tab}#{riga_id}")
-        if v["lnbits"] == "muto" and v["lnd"] in (LND_MUTO, LND_SPENTO):
+        if v["lnbits"] == "muto" and (v["lnd"] == LND_MUTO
+                                      or v["lnd"] in LND_SENZA_VOCE):
             print("🔁 In volo, tacciono tutte le fonti: si riguarda al "
                   "battito dopo.")
             break
@@ -52419,18 +52512,24 @@ CONTROLLI_LIBRO_MASTRO = (
      "SELECT id FROM offerte "
      "WHERE (contro_sats>0 AND importo_sats>=contro_sats) "
      "OR (contro_eur>0 AND importo_eur>=contro_eur)"),
+    # 'in_volo' (22 set 2026) c'e' dal 19 set — `_prendi_la_mano` lo
+    # scrive PRIMA di pagare, `_in_volo` quando LNbits non ha saputo
+    # dire — e questo controllo non lo conosceva: passando mentre un
+    # pagamento era in viaggio suonava un'anomalia falsa. E' uno stato
+    # transitorio legittimo quanto 'incerto'. L'elenco lo tiene uguale
+    # ai valori che il server SCRIVE una sentinella di prove.py.
     ("payout fuori contratto",
      "payout_stato con un valore che non esiste "
-     "('' | incerto | uscito | da_riprovare)",
+     "('' | incerto | uscito | da_riprovare | in_volo)",
      "SELECT id FROM ordini "
-     "WHERE payout_stato NOT IN ('','incerto','uscito','da_riprovare') "
+     "WHERE payout_stato NOT IN ('','incerto','uscito','da_riprovare','in_volo') "
      "UNION ALL SELECT id FROM rimborsi_asta "
-     "WHERE payout_stato NOT IN ('','incerto','uscito','da_riprovare') "
+     "WHERE payout_stato NOT IN ('','incerto','uscito','da_riprovare','in_volo') "
      # La terza tabella mancava da quando il banner le ha dato la
      # colonna (ago 2026): buco preesistente, tre righe, e non ha
      # stati transitori legittimi come non li hanno le due sorelle.
      "UNION ALL SELECT id FROM pagamenti "
-     "WHERE payout_stato NOT IN ('','incerto','uscito','da_riprovare')"),
+     "WHERE payout_stato NOT IN ('','incerto','uscito','da_riprovare','in_volo')"),
     # --- paga da un'altra cassaforte (21 set 2026) ------------------
     # La domanda che decide («esiste uno stato TRANSITORIO LEGITTIMO in
     # cui e' falsa?») qui ha una risposta strana e va detta: SI', un

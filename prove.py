@@ -3725,7 +3725,7 @@ def prove_esito_pagamento():
             avvisi.append(t)
 
         async def _lnd_spento(_h, _cf=""):
-            return "spento"
+            return "n/a"      # la riga del SaaS: dal 22 set non e' «spento»
 
         amb = {"db": Con, "time": __import__("time"),
                "_stato_pagamento": _stato, "_riprendi_uscita": _riprendi,
@@ -3910,6 +3910,7 @@ def costanti_verita():
     amb = {}
     for inizio in ("LND_SUCCEEDED, LND_IN_FLIGHT, LND_FAILED = ",
                    "LND_ASSENTE, LND_MUTO, LND_SPENTO = ",
+                   "LND_NA = ", "LND_SENZA_VOCE = ",
                    "MAI_PARTITO_DOPO_S = ", "LND_CANARINO_VALE_S = ",
                    "TIMBRO_CANARINO = ",
                    "USCITO, IN_VOLO, FALLITO, MAI_PARTITO, IGNOTO = ("):
@@ -4299,7 +4300,8 @@ def prove_pagamenti_in_volo(attrezzi=False):
         for nome, asincrona in (
                 ("_esito_lnbits", 0), ("_stato_pagamento", 1),
                 ("_avvisa_payout_fallito", 1), ("_lnd_ci_vede", 1),
-                ("_stato_lnd", 1), ("_verdetto_pagamento", 0),
+                ("_stato_lnd", 1), ("_voce_lnd", 0),
+                ("_verdetto_pagamento", 0),
                 ("_verita_pagamento", 1), ("_hash_tentati", 0),
                 ("_verita_riga", 1), ("_prendi_la_mano", 0),
                 ("paga_venditore", 1), ("_timbra_pagamento", 0),
@@ -4427,6 +4429,9 @@ def prove_pagamenti_in_volo(attrezzi=False):
             ("muto", "muto", None, "ignoto")):
         prova(f"giudice: LNbits {lnbits}, LND {lnd}, eta {eta} → {atteso}",
               atteso, giudice(lnbits, lnd, eta))
+        if lnd == "spento":
+            prova(f"giudice: ...e con LND n/a (il SaaS) e' lo stesso",
+                  atteso, giudice(lnbits, "n/a", eta))
     prova("N e' almeno un battito dell'orologio (600 s)", True, N >= 600)
 
     # --- 3. IL LETTORE DI LND ---------------------------------------
@@ -4462,8 +4467,28 @@ def prove_pagamenti_in_volo(attrezzi=False):
     m.nodo.lnd.pop("hash-di-ieri")          # LND ripristinato senza storia
     prova("...e se LND non riconosce piu' nemmeno il canarino, di nuovo no",
           "muto", gira(m.amb["_stato_lnd"]("hash-mai-visto", "nodo")))
-    prova("una riga del SaaS non ha un LND nostro: spento", "spento",
+    # LND=n/a (22 set 2026): il 20 set, sull'ordine #152, la riga del
+    # SaaS diceva «LND=spento» nel journal — la stessa parola del
+    # macaroon che manca — e ci ha fatto cercare un guasto che non c'era
+    prova("una riga del SaaS non ha un LND nostro: n/a, NON spento", "n/a",
           gira(m.amb["_stato_lnd"]("hash-mai-visto", "saas")))
+    prova("...e una senza hash nemmeno", "n/a",
+          gira(m.amb["_stato_lnd"]("", "nodo")))
+    _amb_chiedi = {**K, "_lnd_configurato": lambda: False}
+    exec("async " + pezzo("_chiedi_lnd"), _amb_chiedi)
+    _chiedi_vero = _amb_chiedi["_chiedi_lnd"]
+    prova("...mentre «spento» resta del NODO senza macaroon di lettura",
+          "spento", gira(_chiedi_vero("ab" * 32)))
+    _amb_spento = dict(m.amb)
+    _amb_spento["_chiedi_lnd"] = _chiedi_vero
+    exec("async " + pezzo("_stato_lnd"), _amb_spento)
+    prova("...cioe' una riga del nodo, a macaroon mancante, dice spento",
+          "spento", gira(_amb_spento["_stato_lnd"]("ab" * 32, "nodo")))
+    voce = m.amb["_voce_lnd"]
+    prova("il pannello 🧊 dice PERCHE' LND non ha parlato, nei due casi",
+          [True, True, "LND dice «FAILED»"],
+          ["non è un pagamento del nodo" in voce("n/a"),
+           "manca il macaroon" in voce("spento"), voce("FAILED")])
 
     # --- 5. LNBITS MUTO, LND CHE SA (l'ordine #163 del 18 set) ------
     m = mondo()
@@ -4571,6 +4596,23 @@ def prove_pagamenti_in_volo(attrezzi=False):
     prova("...e con la conferma la parola della persona vale",
           ("chiuso", "released", 1),
           (campo(esito, "esito"), riga(m)[0], len(m.nodo.partiti)))
+
+    # LND=n/a NEL PANNELLO 🧊 (22 set 2026): un tentativo sulla
+    # cassaforte SaaS, appena partito. LND li' non si applica, e chi
+    # modera deve leggere che non e' un guasto del ponte — non un
+    # «spento» nudo, che il 20 set sul #152 ha fatto cercare quello
+    m = congelato("hold")
+    m.amb["_cassaforte_riga"] = lambda con, tab, rid: "saas"
+    m.vero.execute("UPDATE payout_tentati SET cassaforte='saas'")
+    m.vero.execute("UPDATE ordini SET cassaforte='saas'")
+    m.vero.commit()
+    esito = gira(prova_a(m.decidi("verifica")))
+    prova("tentativo sul SaaS: il pannello dice «n/a» e PERCHE', mai "
+          "«spento»", (409, True, False),
+          (getattr(esito, "status_code", None),
+           "LND dice «n/a» (non è un pagamento del nodo"
+           in str(getattr(esito, "detail", "")),
+           "spento" in str(getattr(esito, "detail", ""))))
 
     m = congelato("hold")
     m.nodo.muto = True
@@ -6441,7 +6483,7 @@ def prove_altra_cassaforte():
            campo(r, "sats"), campo(r, "fattura"),
            len(campo(r, "crediti") or [])))
     prova("...con le voci delle fonti da mostrare a chi conferma", True,
-          "LNbits dice «pending», LND dice «spento»"
+          "LNbits dice «pending», LND dice «n/a»"
           in " ".join(campo(r, "voci") or []))
     prova("senza la conferma esplicita: 400", 400,
           codice_http(paga(m, cassaforte="nodo")))
@@ -6875,6 +6917,13 @@ def prove_altra_cassaforte():
           [c[4] for c in casi],
           [giudica({"verdetto": c[0], "lnbits": c[1], "lnd": c[2]},
                    c[3], ORA)[0] for c in casi])
+    # IL #152 ERA DEL SAAS, e dal 22 set il SaaS dice «n/a»: se il giudice
+    # lo leggesse come «c'e' un LND nostro» il calendario non conterebbe
+    # piu' e l'origine resterebbe «ignota» per sempre
+    prova("...e con LND «n/a» ogni riga «spento» giudica uguale",
+          [c[4] for c in casi if c[2] == "spento"],
+          [giudica({"verdetto": c[0], "lnbits": c[1], "lnd": "n/a"},
+                   c[3], ORA)[0] for c in casi if c[2] == "spento"])
     # I MINUTI CHE MANCANO SI DICONO PER ECCESSO, e qui a orologio FERMO:
     # la scena del #152 li leggeva da un orologio vero, e in CI — un
     # secondo piu' lenta — «fra 50» diventava «fra 49». Rossa solo la'.
@@ -22809,6 +22858,43 @@ def prove_libro_mastro():
     prova("«da riprovare» non e' un valore fuori contratto",
           {}, gira(con))
     con.close()
+    import re as _re_lm
+    # ...NE' «in volo» (22 set 2026): e' il pagamento in viaggio, scritto
+    # da `_prendi_la_mano` prima della POST — la ronda che passava in
+    # quel momento suonava un'anomalia falsa. Le tre tabelle, una riga
+    # ciascuna: un NOT IN aggiornato in due posti su tre resta rosso.
+    con = db_sano()
+    con.executescript("UPDATE ordini SET payout_stato='in_volo' "
+                      "WHERE id=1;"
+                      "UPDATE rimborsi_asta SET payout_stato='in_volo' "
+                      "WHERE id=1;"
+                      "INSERT INTO pagamenti(tg_id,motivo,importo_sats,"
+                      "payout_stato) VALUES(1,'banner',20000,'in_volo');")
+    prova("«in volo» non e' un valore fuori contratto, in nessuna delle "
+          "tre tabelle", {}, gira(con))
+    con.close()
+    # IL CENSIMENTO: i valori che il server SCRIVE in payout_stato contro
+    # quelli che il controllo ammette — un sesto stato che nasce senza
+    # passare di qui fa rossa questa riga, non la ronda di produzione
+    _scritti = {""} | set(_re_lm.findall(
+        r"SET payout_stato='([a-z_]*)'", _SORGENTE))
+    for _m in _re_lm.finditer(r"payout_stato=\?", _SORGENTE):
+        _scritti |= set(_re_lm.findall(
+            r'"([a-z_]+)" if ', _SORGENTE[_m.end():_m.end() + 400]))
+    _voce = _SORGENTE[_SORGENTE.index('("payout fuori contratto",'):]
+    _voce = _voce[:_voce.index('"),') + 3]
+    _ammessi = [set(_re_lm.findall(r"'([a-z_]*)'", g)) for g in
+                _re_lm.findall(r"NOT IN \(([^)]*)\)", _voce)]
+    prova("il censimento vede almeno i cinque stati del payout", True,
+          {"", "incerto", "uscito", "da_riprovare", "in_volo"} <= _scritti)
+    prova("...e il controllo ammette ESATTAMENTE quelli, nelle tre "
+          "tabelle", [_scritti] * 3, _ammessi)
+    _gem = open("query_libro_mastro.sql", encoding="utf-8").read()
+    _gem = _gem[_gem.index("15) PAYOUT FUORI CONTRATTO"):]
+    _gem = _gem[:_gem.index(";\n", _gem.index("FROM pagamenti"))]
+    prova("...e cosi' il gemello query_libro_mastro.sql", [_scritti] * 3,
+          [set(_re_lm.findall(r"'([a-z_]*)'", g)) for g in
+           _re_lm.findall(r"NOT IN \(([^)]*)\)", _gem)])
 
     # --- GIRO 2: una riga rotta alla volta --------------------------
     # (sql da eseguire, nome del controllo che DEVE svegliarsi, id atteso)
@@ -67496,11 +67582,16 @@ def prove_banner_negozio():
           and 'importo = p["importo_sats"]' in _rim)
     # IL RIMBORSO DISFA TUTTO IN UN GESTO (decisione di Andrea), e
     # nella STESSA transazione dei sats restituiti.
+    # Dal 22 set 2026 COSA si disfa lo dice il motivo: il ramo riuscito
+    # chiama il `disfa` avuto da `_rimborso_del_motivo`, e la porta la
+    # chiude `_disfa_banner` (il giro vero sta in prove_rimborso_motivo)
     _ok = _rim[_rim.index("if esito == PAGATO:"):
                _rim.index("# NON pagato")]
+    _dban = pezzo("_disfa_banner")
     prova("il rimborso richiude la porta e spegne l'insegna", True,
-          "banner_sbloccato_il=0" in _ok
-          and "banner_stato='spento'" in _ok)
+          "disfa(con, p)" in _ok
+          and "banner_sbloccato_il=0" in _dban
+          and "banner_stato='spento'" in _dban)
     # ...E IL RAMO CHE NON PAGA NON TOCCA NIENTE: chiudere una
     # porta gia' pagata per un rimborso che non e' partito
     # toglierebbe il diritto senza restituire i sats — il modo
@@ -70638,6 +70729,207 @@ def prove_paracadute_motivo():
     prova("CODICE DI PRIMA, annullati: stesso difetto (porta aperta, "
           "link non scritto)", ("pagato", ("", 1)),
           (riga(vero, 7), utente(vero, 7)))
+
+
+# Il rimborso di PRIMA del 22 set 2026, com'era: il ramo riuscito
+# disfaceva SEMPRE il banner, qualunque cosa dicesse il motivo. Serve a
+# una cosa sola — la controprova che il banco qui sotto il difetto lo
+# vede — e sta scritto per intero perche' «come era» non si ricostruisce
+# da un flag.
+_RIMBORSO_DI_PRIMA = """
+def _rimborso_del_motivo(motivo):
+    def _sempre_il_banner(con, p):
+        con.execute("UPDATE utenti SET banner_sbloccato_il=0 "
+                    "WHERE tg_id=?", (p["tg_id"],))
+        con.execute("UPDATE utenti SET banner_stato='spento' "
+                    "WHERE tg_id=? AND banner_stato IN "
+                    "('attivo','revisione')", (p["tg_id"],))
+        return "La porta del banner si richiude"
+    return ("dello sblocco banner", _sempre_il_banner)
+"""
+
+
+def prove_rimborso_motivo():
+    """IL RIMBORSO DI UNO SBLOCCO SMISTA PER MOTIVO (22 set 2026).
+    `_rimborsa_sblocco` era nato col solo banner, e il suo ramo riuscito
+    richiudeva SEMPRE la porta del banner e spegneva l'insegna: rimborsare
+    un `negozio_slug` (5.000 sats) toglieva al venditore il banner
+    PAGATO A PARTE (20.000) e gli lasciava il link. E' il cugino del
+    difetto dei due giri dell'orologio (prove_paracadute_motivo): la
+    cura di allora non l'aveva raggiunto. Qui si gira il rimborso VERO,
+    su un database vero, e si guarda cosa c'e' scritto dopo."""
+    print("\n[il rimborso dello sblocco smista per motivo]")
+    import asyncio
+    import re as _re
+    import sqlite3
+    import time as _t
+
+    def gira(coro):
+        return asyncio.new_event_loop().run_until_complete(coro)
+
+    # ---- 1. IL CENSIMENTO: un motivo nuovo non nasce senza rimborso --
+    incassi = set(_re.findall(r'"([a-z_]+)": _incassa',
+                              pezzo("_incasso_del_motivo")))
+    rimborsi = set(_re.findall(r'"([a-z_]+)": \("',
+                               pezzo("_rimborso_del_motivo")))
+    prova("ogni motivo che si incassa sa anche come si rimborsa",
+          incassi, rimborsi)
+    prova("...e il censimento vede almeno i due del set 2026", True,
+          {"banner", "negozio_slug"} <= rimborsi)
+    _rim = codice(pezzo("_rimborsa_sblocco"))
+    prova("il motivo si chiede PRIMA di pagare, mai dopo", True,
+          0 < _rim.find('_rimborso_del_motivo(p["motivo"])')
+          < _rim.find("paga_venditore("))
+    prova("...e il ramo riuscito non nomina piu' il banner a mano", [],
+          [x for x in ("banner_sbloccato_il", "banner_stato")
+           if x in _rim])
+
+    # ---- 2. IL GIRO VERO ---------------------------------------------
+    def mondo(prima=False):
+        vero = sqlite3.connect(":memory:")
+        vero.row_factory = sqlite3.Row
+        vero.executescript("""
+          CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY,
+            ln_address TEXT DEFAULT '', negozio_slug TEXT DEFAULT '',
+            banner_sbloccato_il INT DEFAULT 0,
+            banner_stato TEXT DEFAULT '');
+          CREATE TABLE pagamenti(id INTEGER PRIMARY KEY,
+            tg_id INT, motivo TEXT, riferimento TEXT DEFAULT '',
+            importo_sats INT, stato TEXT DEFAULT 'pagato',
+            payout_stato TEXT DEFAULT '', payout_tentativi INT DEFAULT 0,
+            invoice_rimborso TEXT DEFAULT 'lnbc-rimborso',
+            rimborso_il INT DEFAULT 0, rimborso_da INT DEFAULT 0,
+            aggiornato INT DEFAULT 0, cassaforte TEXT DEFAULT 'nodo');
+          -- 1: banner E link, rimborsa il LINK (il caso del difetto)
+          -- 2: banner E link, rimborsa il BANNER
+          -- 3: ha comprato un link, poi un altro: rimborsa il VECCHIO
+          -- 4: un motivo che nessuno sa disfare
+          INSERT INTO utenti VALUES
+            (1,'','untempoperte',1700000000,'attivo'),
+            (2,'','bottega',1700000000,'attivo'),
+            (3,'','nome-nuovo',0,''),
+            (4,'','',1700000000,'attivo');
+          INSERT INTO pagamenti(id,tg_id,motivo,riferimento,importo_sats)
+            VALUES (10,1,'banner','',20000),
+                   (11,1,'negozio_slug','untempoperte',5000),
+                   (20,2,'banner','',20000),
+                   (21,2,'negozio_slug','bottega',5000),
+                   (30,3,'negozio_slug','nome-vecchio',5000),
+                   (31,3,'negozio_slug','nome-nuovo',5000),
+                   (40,4,'sponsor','',7000);
+        """)
+        vero.commit()
+
+        class Con:
+            def execute(self, *a):
+                return vero.execute(*a)
+
+            def commit(self):
+                vero.commit()
+
+            def close(self):
+                pass
+
+        detti, pagati, journal = [], [], []
+
+        async def _paga(bolt11, importo, taccuino, **k):
+            pagati.append((importo, taccuino.get("etichetta")))
+            return "pagato"
+
+        async def _notifica(tg, testo):
+            detti.append((tg, testo))
+
+        async def _notifica_admin(testo):
+            detti.append(("admin", testo))
+
+        async def _mai(*a, **k):
+            raise AssertionError("qui il rimborso riesce sempre")
+
+        amb = {"db": Con, "time": _t, "asyncio": asyncio,
+               "defaultdict": __import__("collections").defaultdict,
+               "paga_venditore": _paga, "invoice_da_ln_address": _mai,
+               "_congela_pagamento": _mai,
+               "_timbra_pagamento": lambda *a: None,
+               "_in_volo": _mai, "_sospendi_pagamento": _mai,
+               "registra_moderazione": lambda *a, **k: None,
+               "notifica": _notifica, "notifica_admin": _notifica_admin,
+               "_fmt_sats": lambda n: str(n),
+               "print": lambda *a, **k: journal.append(
+                   " ".join(map(str, a))),
+               "LnbitsMuto": type("LnbitsMuto", (Exception,), {}),
+               "PAGATO": "pagato", "NON_PAGATO": "non_pagato",
+               "INCERTO": "incerto", "NON_CHIESTO": "non_chiesto",
+               "OCCUPATO": "occupato", "MAX_TENTATIVI_PAYOUT": 5}
+        amb["_lucchetti_sblocco"] = amb["defaultdict"](asyncio.Lock)
+        for nome in ("_disfa_banner", "_disfa_slug_negozio",
+                     "_rimborso_del_motivo"):
+            exec(pezzo(nome), amb)
+        if prima:
+            exec(_RIMBORSO_DI_PRIMA, amb)
+        exec("async " + pezzo("_rimborsa_sblocco"), amb)
+        return amb, vero, detti, pagati, journal
+
+    def utente(vero, tg):
+        r = vero.execute("SELECT negozio_slug, banner_sbloccato_il>0 AS "
+                         "porta, banner_stato FROM utenti WHERE tg_id=?",
+                         (tg,)).fetchone()
+        return (r["negozio_slug"], r["porta"], r["banner_stato"])
+
+    def stato(vero, pid):
+        return vero.execute("SELECT stato FROM pagamenti WHERE id=?",
+                            (pid,)).fetchone()["stato"]
+
+    # ---- 2a. LA CONTROPROVA: il banco vede il difetto ----------------
+    amb, vero, detti, pagati, journal = mondo(prima=True)
+    gira(amb["_rimborsa_sblocco"](11, 999))
+    prova("CODICE DI PRIMA: rimborsare il LINK chiude la porta del "
+          "banner, spegne l'insegna e lascia il link (il difetto)",
+          ("rimborsato", ("untempoperte", 0, "spento")),
+          (stato(vero, 11), utente(vero, 1)))
+
+    # ---- 2b. IL CODICE DI ADESSO -------------------------------------
+    amb, vero, detti, pagati, journal = mondo()
+    r = gira(amb["_rimborsa_sblocco"](11, 999))
+    prova("rimborso del LINK: via il link, il banner resta com'era",
+          (True, "rimborsato", ("", 1, "attivo")),
+          (r.get("ok"), stato(vero, 11), utente(vero, 1)))
+    prova("...il pagamento del banner non si tocca", "pagato",
+          stato(vero, 10))
+    prova("...e al venditore si dice il link, mai la porta",
+          (True, False),
+          (any(t == 1 and "«untempoperte»" in x for t, x in detti),
+           any(t == 1 and "banner" in x for t, x in detti)))
+    prova("...l'etichetta del pagamento dice cosa si rimborsa",
+          [(5000, "Rimborso del link negozio #11")], pagati)
+
+    r = gira(amb["_rimborsa_sblocco"](20, 999))
+    prova("rimborso del BANNER: porta chiusa e insegna spenta, il "
+          "link resta", (True, ("bottega", 0, "spento")),
+          (r.get("ok"), utente(vero, 2)))
+    prova("...e il pagamento del link non si tocca", "pagato",
+          stato(vero, 21))
+
+    gira(amb["_rimborsa_sblocco"](30, 999))
+    prova("rimborso di un link VECCHIO: quello nuovo, pagato dopo, "
+          "resta al suo posto", ("rimborsato", ("nome-nuovo", 0, "")),
+          (stato(vero, 30), utente(vero, 3)))
+    prova("...e nessuno gli annuncia di aver perso un link", False,
+          any(t == 3 and "viene tolto" in x for t, x in detti))
+
+    n = len(pagati)
+    r = gira(amb["_rimborsa_sblocco"](40, 999))
+    prova("MOTIVO SCONOSCIUTO: rifiutato PRIMA di muovere un sat",
+          ({"ok": False, "stato": "pagato", "motivo_ignoto": "sponsor"},
+           n, "pagato", ("", 1, "attivo")),
+          (r, len(pagati), stato(vero, 40), utente(vero, 4)))
+    prova("...e il journal dice perche'", True,
+          any("#40 rifiutato" in x and "sponsor" in x for x in journal))
+
+    # ---- 3. LA ROTTA DEL MODERATORE DICE PERCHE' ---------------------
+    ep = codice(pezzo("rimborsa_sblocco_admin"))
+    prova("la rotta risponde al motivo ignoto con un 409 che lo nomina",
+          True, 'esito.get("motivo_ignoto") is not None' in ep
+          and "non so come disfare" in ep)
 
 
 def prove_slug_negozio():
@@ -76351,6 +76643,7 @@ def main():
               prove_servizi,
               prove_sintassi_client,
               prove_banner_negozio, prove_paracadute_motivo,
+              prove_rimborso_motivo,
               prove_slug_negozio, prove_link_descrizione,
               prove_foto_vuota, prove_foto_metadati,
               prove_connettori, prove_connettori_sync,

@@ -698,6 +698,13 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `lncli deletemacaroonid 2`. Non passa MAI dal canale Telegram.
   Senza macaroon LND vale «spento»: decide LNbits da sola, come prima,
   ma con le regole nuove (pending = fermo, e i 15 minuti).
+  ⚠️ «LND=n/a» NON è «LND=spento» (dal 22 set 2026): nelle righe 🔎 del
+  journal e nel pannello 🧊, «n/a» vuol dire che quel pagamento è della
+  cassaforte SaaS, dove un LND nostro non c'è — nessun guasto, niente
+  da fare. «spento» su una riga del NODO vuol dire invece che il
+  macaroon di lettura manca: quello sì si guarda. Il 20 set, sull'ordine
+  #152, le due cose si scrivevano uguali e hanno fatto cercare un
+  guasto che non c'era.
   IL CANARINO: un «LND non l'ha mai visto» si crede solo se, nello
   stesso giro, LND riconosce un hash che conosce di sicuro — uno per
   cui lui stesso ha gia' detto SUCCEEDED (timbro `lnd_canarino`, o gli

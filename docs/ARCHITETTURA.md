@@ -228,7 +228,8 @@
   rotta stessa. 1) L'origine è MORTA: giudice puro `_giudica_origine`
   (voci di `_verita_pagamento` + scadenza della fattura di quel
   tentativo). Dove c'è LND decide LND e il calendario non conta; dove
-  LND è «spento» (il SaaS) serve LNbits che risponde senza dire
+  LND non ha voce — «n/a» (il SaaS, dal 22 set 2026) o «spento» (il
+  macaroon che manca), `LND_SENZA_VOCE` — serve LNbits che risponde senza dire
   «success» E la fattura scaduta da `ALTRA_CASSAFORTE_DOPO_SCADENZA_S`
   (un'ora). Solo `morta` apre; `uscita`, `viva`, `presto` rispondono
   409, `ignota` 503. 2) C'è un modo NUOVO di pagare
@@ -7811,7 +7812,13 @@
   pagato». LA CINTURA DELL'IMPORTO SI EREDITA (`paga_venditore` vuole
   `atteso_sats` senza default), ed è esattamente ciò per cui quel
   parametro è obbligatorio: la strada d'uscita nata oggi non può far
-  partire una cifra diversa da quella incassata. Le uscite del denaro
+  partire una cifra diversa da quella incassata. COSA SI DISFA LO DICE
+  IL MOTIVO (22 set 2026): `_rimborso_del_motivo`, gemello di
+  `_incasso_del_motivo`, dà a ogni `motivo` il suo `disfa` —
+  `_disfa_banner` richiude la porta e spegne l'insegna,
+  `_disfa_slug_negozio` toglie il link SOLO se è ancora quello di quel
+  pagamento e il banner non lo guarda — e un motivo sconosciuto si
+  RIFIUTA prima di muovere un sat (409 dalla rotta). Le uscite del denaro
   diventano QUATTRO, e il censimento delle guardie sull'INCERTO
   cresce a mano come quello delle leve-lista: se quel numero CALA,
   qualcuno ha tolto una guardia.

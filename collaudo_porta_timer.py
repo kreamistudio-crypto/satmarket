@@ -107,7 +107,11 @@ def avvio():
     async def notifica_finta(chi, testo, *a, **k):
         DETTO.append((chi, testo))
 
-    async def paga_finto(bolt11, atteso_sats, diario=None, cassaforte=""):
+    # la FIRMA del vero, parola per parola: `cassaforte` solo per nome e
+    # senza default, e `riga` (dal 19 set 2026) — un doppio con una
+    # firma sua esplode al primo parametro nuovo, ed e' successo
+    async def paga_finto(bolt11, atteso_sats, diario=None, *, cassaforte,
+                         riga=()):
         return SRV.PAGATO
 
     async def invoice_da_address(addr, sats):

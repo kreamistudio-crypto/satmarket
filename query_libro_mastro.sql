@@ -182,14 +182,20 @@ SELECT id, venditore_id, stato, contatto_nostr, nostr_event_id
   FROM annunci WHERE contatto_nostr <> '' AND nostr_event_id <> '';
 
 SELECT '15) PAYOUT FUORI CONTRATTO (deve essere vuoto)' AS controllo;
+-- 'in_volo' (dal 19 set 2026) è un pagamento in viaggio: stato
+-- transitorio legittimo quanto 'incerto', e fino al 22 set questa
+-- query lo segnalava come anomalia
 SELECT id, payout_stato FROM ordini
- WHERE payout_stato NOT IN ('', 'incerto', 'uscito', 'da_riprovare')
+ WHERE payout_stato NOT IN ('', 'incerto', 'uscito', 'da_riprovare',
+                           'in_volo')
  UNION ALL
 SELECT id, payout_stato FROM rimborsi_asta
- WHERE payout_stato NOT IN ('', 'incerto', 'uscito', 'da_riprovare')
+ WHERE payout_stato NOT IN ('', 'incerto', 'uscito', 'da_riprovare',
+                           'in_volo')
  UNION ALL
 SELECT id, payout_stato FROM pagamenti
- WHERE payout_stato NOT IN ('', 'incerto', 'uscito', 'da_riprovare');
+ WHERE payout_stato NOT IN ('', 'incerto', 'uscito', 'da_riprovare',
+                           'in_volo');
 
 SELECT '16) PROMESSE DI SCONTO CHE NON POSSONO SCATTARE (vuoto)' AS controllo;
 -- Qui non si perdono sats: si perde una vendita, e in silenzio. Un
