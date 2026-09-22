@@ -2549,16 +2549,29 @@
      «effetti ridotti» non ha niente da togliergli. */
   :root{--tinta-card:15%;--tinta-bordo:50%;--tinta-testo:22%}
   html[data-tema="scuro"]{--tinta-card:8%;--tinta-bordo:34%;--tinta-testo:0%}
+  /* ⚠️ E LA TINTA NON E' PIU' SOLO DEL P2P (22 set 2026, richiesta
+     di Andrea): le card della lista «Ordini» prendono la stessa
+     velatura, e «stessa» qui vuol dire UNA regola con due selettori —
+     stessi byte, stesse tre percentuali, stessi token. Una tinta sola
+     per stato in tutta l'app, che non puo' scollarsi perche' non
+     esiste in due posti.
+     Il doppio nome serve alla specificita' da tutt'e due le parti:
+     `.p2p-ord` e `.order` dichiarano il fondo della carta PIU' IN
+     BASSO nel foglio, e a parita' vincerebbero loro.
+     `refunded` e' l'unico tono che il mercatino aggiunge, e vale il
+     grigio dell'annullato: e' l'inchiostro del suo riquadro, come per
+     gli altri sei. */
   @supports (background:color-mix(in srgb,red 50%,blue)){
-    .p2p-scambio.tinta{
+    .p2p-scambio.tinta,.order.tinta{
       background:color-mix(in srgb,var(--tinta) var(--tinta-card),var(--card));
       border-color:color-mix(in srgb,var(--tinta) var(--tinta-bordo),var(--card))}
-    .p2p-scambio.tono-locked{--tinta:var(--sats-text)}
-    .p2p-scambio.tono-confirmed{--tinta:var(--nostr-text)}
-    .p2p-scambio.tono-shipped{--tinta:var(--ship-text)}
-    .p2p-scambio.tono-released{--tinta:var(--trust-text)}
-    .p2p-scambio.tono-dispute{--tinta:var(--danger)}
-    .p2p-scambio.tono-annullato{--tinta:var(--muted)}
+    .p2p-scambio.tono-locked,.order.tono-locked{--tinta:var(--sats-text)}
+    .p2p-scambio.tono-confirmed,.order.tono-confirmed{--tinta:var(--nostr-text)}
+    .p2p-scambio.tono-shipped,.order.tono-shipped{--tinta:var(--ship-text)}
+    .p2p-scambio.tono-released,.order.tono-released{--tinta:var(--trust-text)}
+    .p2p-scambio.tono-dispute,.order.tono-dispute{--tinta:var(--danger)}
+    .p2p-scambio.tono-annullato,.order.tono-annullato,
+    .order.tono-refunded{--tinta:var(--muted)}
     /* il riquadro resta staccato dalla card tinta: al posto del bordo
        trasparente, un filo del suo stesso inchiostro */
     .p2p-scambio.tinta .p2p-scambio-stato.badge{
@@ -6284,11 +6297,67 @@
   .order-left{display:flex;align-items:center;gap:12px;min-width:0;flex:1}
   .order-ic{width:56px;height:56px;border-radius:12px;background:var(--chip-bg);
     display:flex;align-items:center;justify-content:center;font-size:24px;flex:0 0 auto}
-  /* il gemello grande, in testa al dettaglio dell'ordine.
-     MISURE (ago 2026, chieste da Andrea: le foto erano francobolli):
-     56 in lista e 64 nel dettaglio — verificate a 320/360/375, a
-     cedere coi puntini resta sempre il titolo, mai badge e X. */
-  .order-ic.grande{width:64px;height:64px;font-size:28px}
+  /* LA FOTO DELL'ORDINE E' QUASI RADDOPPIATA (22 set 2026, richiesta
+     di Andrea): 56 in lista e 64 nel dettaglio restavano francobolli
+     anche dopo il primo ingrandimento, e in una lista che si scorre la
+     foto e' il modo piu' veloce di riconoscere un ordine. Adesso 100 e
+     132, con gli angoli della carta — 16px, gli stessi di `.p2p-ord`
+     e della card che la contiene — invece dei 12 del quadratino.
+     ⚠️ LA MISURA STA SU UN NOME SUO, e non e' pignoleria: `.order-ic`
+     veste anche il quadratino delle OFFERTE, che e' un'emoji e non una
+     foto — allargare li' avrebbe gonfiato una lista che nessuno ha
+     chiesto di toccare. `ord-foto` la mette solo `fotoOrdine`, e
+     `grande` da sola non veste piu' niente.
+     NITIDA A 3x: la miniatura del server ha il lato corto a 640
+     (`MINIATURA_LATO`), e a 132 CSS per tre ne servono 396 — ce ne
+     sono 640. La catena di ripiego non si tocca.
+     Verificate a 320/360/375: a cedere coi puntini resta il titolo. */
+  .order-ic.ord-foto{width:100px;height:100px;border-radius:16px;
+    font-size:44px}
+  .order-ic.ord-foto.grande{width:132px;height:132px;font-size:56px}
+  /* LA COLONNA DELLA FOTO: l'immagine e, sotto, la data dell'ordine —
+     piccola, che e' un riferimento e non una notizia. Sta sotto la
+     foto e non in fondo alla riga del titolo perche' li' rubava lo
+     spazio allo stato, e perche' incolonnata sotto le foto si scorre
+     con l'occhio (e' l'argomento con cui il numero d'ordine, che da
+     oggi la card non porta piu', era arrivato in testa alla riga). */
+  .ord-foto-col{display:flex;flex-direction:column;align-items:center;
+    gap:5px;flex:0 0 auto}
+  .ord-foto-data{font-size:11px;font-weight:700;color:var(--ink-soft);
+    white-space:nowrap}
+  /* il verbo e lo stato sulla stessa riga, e a capo quando non ci
+     stanno: a 320 la colonna che resta accanto alla foto e' 136px, e
+     «Stai comprando» con «Sats depositati» non ci entrano. Il wrap e'
+     la rete che evita di stringere il badge — le pillole non si
+     stringono mai, ed e' la lezione del titolo che si spezzava in
+     verticale nella riga di «I tuoi annunci». */
+  .ord-stato-riga{display:flex;align-items:center;flex-wrap:wrap;
+    gap:8px;margin-top:5px}
+  /* INCHIOSTRO E NON --muted: il verbo sta sul fondo TINTO della card
+     e a 12,5px vuole il 4,5:1, mentre `--muted` su carta bianca sta
+     gia' a 3,8. E' la stessa cura delle card di «I miei scambi», e i
+     due token li misura la prova delle tinte. */
+  .ord-verbo{font-size:12.5px;font-weight:700;color:var(--ink-soft)}
+  /* IL TITOLO SI FERMA A TRE RIGHE (22 set 2026, visto a 320 nel giro
+     dal vivo): con la foto alta 100 la card e' 148px per TUTTI — la
+     colonna della foto e quella del testo misurano uguale — e un
+     titolo lungo la faceva crescere a 193, una card fuori riga in
+     mezzo a una colonna regolare. Tre righe a 320 sono una sessantina
+     di caratteri, e i puntini dicono che c'e' dell'altro: il titolo
+     intero sta nel dettaglio, un tocco piu' in la'.
+     Il nome sul TAG e non un selettore furbo: `.order-main>b` veste
+     anche la riga delle offerte, e `:has` per distinguerle sarebbe
+     una scommessa sul browser dove `color-mix` ha voluto un
+     `@supports`. */
+  .ord-titolo{display:-webkit-box;-webkit-line-clamp:3;
+    -webkit-box-orient:vertical;overflow:hidden}
+  /* LA ✕ IN ALTO A DESTRA: con la foto alta 100 una ✕ centrata
+     galleggerebbe a meta' card, lontana dall'angolo dove il pollice
+     la cerca. Il selettore nomina il fratello invece di toccare
+     `.order .row`, che veste anche le offerte, i pannelli dell'admin
+     e «I tuoi annunci» — e la ✕ del P2P, che non ha un `.order-left`
+     davanti, resta dov'era. */
+  .order-left + .order-x{align-self:flex-start}
   /* La testa del dettaglio: foto e titolo in riga. `min-width:0` non
      e' cosmesi — un figlio flex non scende mai sotto il proprio
      contenuto, e una parola lunga senza spazi allargherebbe la PAGINA
@@ -6312,6 +6381,15 @@
   .order-main{min-width:0}
   .order-main .sub{margin-top:2px}
   .csv-line{text-align:center;font-size:12px;color:var(--muted);font-weight:700;padding:6px var(--pad) 2px}
+  /* il link che riapre le buste di un ordine finito: centrato e
+     DISCRETO come la riga dei nascosti e quella del CSV — `.btn.link`
+     nasce a 15px grassi e sottolineati, che su una pagina chiusa e'
+     un invito, mentre questo e' un ripensamento. Stessa taglia della
+     riga del CSV, e il margine del bottone si azzera qui invece che
+     nel markup. */
+  .ord-buste-link{text-align:center;margin:10px 0 2px}
+  .ord-buste-link .btn.link{margin:0;font-size:13px;font-weight:700;
+    padding:8px 14px}
   .badge{font-size:11px;font-weight:800;padding:5px 10px;border-radius:999px;white-space:nowrap}
   .badge.locked{background:var(--sats-soft);color:var(--sats-text)}
   .badge.shipped{background:var(--ship-bg);color:var(--ship-text)}
@@ -15378,10 +15456,12 @@ function pontiContatto(username, npub, chi, cls){
    sparito o lista vuota = '' e resta il 📦. In DEMO non ci sono nomi
    di foto e resta l'emoji del listing.
    Il raggio dell'immagine è `inherit`: così la stessa fabbrica serve
-   il quadratino da 38 della lista e quello da 48 del dettaglio senza
-   una seconda misura da tenere in pari. */
+   la foto della lista e quella del dettaglio senza una seconda misura
+   da tenere in pari — e le due misure stanno nel foglio, su
+   `.order-ic.ord-foto`, che è il nome che questa fabbrica mette
+   sempre: `.order-ic` da solo veste il quadratino delle offerte. */
 function fotoOrdine(o, grande){
-  const c = 'order-ic' + (grande ? ' grande' : '');
+  const c = 'order-ic ord-foto' + (grande ? ' grande' : '');
   if (!o.foto0) return `<span class="${c}">${o.listing.emoji || '📦'}</span>`;
   return `<span class="${c}"><img src="${esc(fotoUrl(fotoMini(o.foto0)))}" `
        + `data-full="${esc(fotoUrl(o.foto0))}" loading="lazy" decoding="async" `
@@ -24478,10 +24558,11 @@ function setOrdiniRuolo(r){
 function toggleNascosti(){ ordiniMostraNascosti = !ordiniMostraNascosti; renderOrders(); }
 /* Quanto incassa DAVVERO chi vende: il totale in cassaforte meno la
    protezione acquisti, che e' della piattaforma (la commissione resta
-   sospesa, a 0). Giudice unico — la stessa cifra la dicono la riga
-   della lista, la testa dell'ordine e il pannello d'incasso, e il
-   giorno che la commissione si accendera' ci sara' UN posto solo da
-   correggere invece di tre. */
+   sospesa, a 0). Giudice unico — la stessa cifra la dicono la testa
+   dell'ordine e il pannello d'incasso, e il giorno che la commissione
+   si accendera' ci sara' UN posto solo da correggere invece di due.
+   (Erano tre fino al 22 set 2026: la riga della lista non porta piu'
+   nessuna cifra.) */
 function nettoVenditore(o){ return o.listing.price - (o.protSats||0); }
 /* IL CONTROVALORE DI UN ORDINE E' QUELLO DEL SUO GIORNO (ago 2026):
    un affare di luglio dice quanto valeva a luglio, e non cambia piu'.
@@ -24602,33 +24683,51 @@ async function copiaNumeroOrdine(id){
   } catch(e) { toast(`Il numero di quest'ordine è #${id}`); }
 }
 /* I VERBI SEGUONO IL TEMPO DELL'AFFARE (ago 2026): mentre e' vivo si
-   sta facendo qualcosa, quando e' finito si e' fatta. La CIFRA della
-   chiusura e' quella che ognuno ha davvero mosso — il TOTALE pagato
-   per chi compra, il NETTO incassato per chi vende: sono numeri
-   diversi e ognuno vede il suo, che e' gia' la regola della testa
-   dell'ordine. Sul rimborso (e sulla lapide dell'annullato, che in
-   lista non si vede) NON si porta nessuna cifra: li' nessuno ha
-   comprato e nessuno ha venduto, e un numero sarebbe l'unica bugia
-   possibile in questa riga. «Non conclusa» invece del «Rimborsato»
-   del badge, che e' li' accanto: si aggiunge, non si ripete.
+   sta facendo qualcosa, quando e' finito si e' fatta. «Non conclusa»
+   invece del «Rimborsato» del badge, che e' li' accanto: si aggiunge,
+   non si ripete.
    Il concluso e' CONCLUSI, la stessa definizione del filtro «solo
    attivi» — una seconda lista che dice la stessa cosa un giorno
-   direbbe qualcos'altro. */
+   direbbe qualcos'altro.
+   ⚠️ E LA CIFRA E' USCITA DI QUI (22 set 2026, richiesta di Andrea:
+   «via dalla card il numero d'ordine e il prezzo»). Restava il
+   TOTALE a chi paga e il NETTO a chi incassa, che sono numeri
+   diversi e ognuno vedeva il suo: quella regola non e' caduta, si e'
+   trasferita — la dicono la testa dell'ordine e il pannello
+   d'incasso, e `nettoVenditore` resta il giudice unico di tutt'e
+   due. La card adesso dice il solo verbo, ed e' quel che fa stare il
+   rettangolino dello stato sulla stessa riga.
+   ⚠️ E IL TEMPO NON SI E' APPIATTITO SUL PASSATO: la richiesta
+   nominava «Hai comprato» / «Hai venduto», che sono le due forme
+   della CHIUSURA — su un ordine ancora in viaggio resta «Stai
+   comprando», o la riga direbbe che una cosa in corso e' finita. */
 function verboOrdine(o){
   if (o.role === 'admin') return '⚖️ Da moderare';
   const compra = o.role === 'buyer';
-  /* la cifra dal giudice unico, col colore addosso al solo NUMERO:
-     l'unita' resta muted da se' — `.unit` ha il suo colore e vince
-     sull'ereditarieta', ed e' la regola «l'unita' non si colora mai»
-     che qui arriva gratis (prima «sats» era testo nudo dentro un
-     `.sub` gia' muted: stesso grigio, stesso posto) */
-  const cifra = n => `<span class="mono" style="color:var(--sats-deep)">${cifraOrdine(o, n)}</span>`;
-  if (o.state === 'released')
-    return compra ? `Hai comprato per ${cifra(o.listing.price)}`
-                  : `Hai venduto per ${cifra(nettoVenditore(o))}`;
+  if (o.state === 'released') return compra ? 'Hai comprato' : 'Hai venduto';
   if (CONCLUSI.includes(o.state))
     return compra ? 'Acquisto non concluso' : 'Vendita non conclusa';
-  return `${compra ? 'Stai comprando' : 'Stai vendendo'} · ${cifra(o.listing.price)}`;
+  return compra ? 'Stai comprando' : 'Stai vendendo';
+}
+/* PURA: la classe con cui si veste lo stato di un ordine — la stessa
+   per il rettangolino e per la tinta della card, cosi' i due non
+   possono dire due cose diverse. E' il gemello di `tintaStatoP2P` →
+   `tonoCardP2P` (22 set 2026), con la stessa ragione: il colore esce
+   da UNA classe e non da due tabelle.
+   IN PAGAMENTO e' uno stadio DERIVATO — lo stato resta quello di
+   prima — e vale viola come il «da incassare» che sostituisce: senza
+   questa riga un ordine gia' confermato si vestirebbe ancora da
+   «Spedito». */
+function badgeOrdine(o){
+  return inPagamento(o) ? 'confirmed' : STATES[o.state].badge;
+}
+/* PURA: la tinta tenue della card, dalla STESSA classe del
+   rettangolino. Il rettangolino tiene il colore pieno, la card ne
+   prende un velo — e la regola del foglio e' UNA con due selettori,
+   quella di «I miei scambi»: una tinta sola per stato in tutta l'app.
+   `tinta` e' il marcatore, `tono-<classe>` il colore. */
+function tonoCardOrdine(o){
+  return ' tinta tono-' + badgeOrdine(o);
 }
 /* Nascondere non e' cancellare: il server tiene la riga e accende il
    flag della MIA parte, solo su released/refunded. Il toast dice dove
@@ -24704,30 +24803,39 @@ function renderOrders(){
         ? `<button class="order-x" title="Rimetti in vista" onclick="nascondiOrdine(${o.id},0,event)">↩</button>`
         : `<button class="order-x" title="Nascondi" onclick="nascondiOrdine(${o.id},1,event)">✕</button>`;
     return `
-    <div class="order${o.nascosto?' nascosta':''}" onclick="openOrder(${o.id})">
+    ${/* LA CARD DICE QUATTRO COSE E BASTA (22 set 2026, richiesta di
+         Andrea): la foto con la sua data, il titolo, il verbo e lo
+         stato. IL NUMERO D'ORDINE E IL PREZZO SONO USCITI, e restano
+         nel dettaglio — dove il numero porta anche la parola che dice
+         cos'e', e la cifra sta grande sotto il titolo.
+         La voce di ieri diceva perche' il numero stava IN TESTA alla
+         riga meta («una colonna di riferimenti che si scorre con
+         l'occhio»): quell'argomento non e' caduto, ha cambiato
+         oggetto — adesso sotto le foto si incolonnano le DATE. E la
+         card resta a due bersagli, il tocco che apre e la ✕. */''}
+    <div class="order${tonoCardOrdine(o)}${o.nascosto?' nascosta':''}" onclick="openOrder(${o.id})">
       <div class="row">
         <div class="order-left">
-          ${fotoOrdine(o)}
-          <div class="order-main">
-            <b>${esc(o.listing.title)}</b>
-            ${/* IL NUMERO IN TESTA alla riga meta, e nudo: incolonnato
-                 sotto le foto fa una colonna di riferimenti che si
-                 scorre con l'occhio, che e' il gesto di chi un numero
-                 lo sta cercando. Qui NON si tocca — quel che agisce
-                 vive dentro l'ordine, e la riga ha gia' il suo tocco
-                 (apri) e la sua ✕: un terzo bersaglio su una card
-                 alta 85px si sbaglia e basta. */''}
-            <div class="sub"><span class="mono">#${o.id}</span> · ${verboOrdine(o)} · ${o.when}</div>
+          <div class="ord-foto-col">
+            ${fotoOrdine(o)}
+            <div class="ord-foto-data">${o.when}</div>
           </div>
-        </div>
-        ${/* IN PAGAMENTO si dice anche qui (set 2026): e' uno stadio
-               DERIVATO — lo stato resta quello di prima — quindi senza
-               questa riga un ordine gia' confermato direbbe ancora
-               «Spedito». A chi vende e deve un gesto resta «Da
-               incassare», che e' il suo verbo. */''}
-        <span class="badge ${inPagamento(o) ? 'confirmed' : STATES[o.state].badge}">${
-          inPagamento(o) && !(o.role==='seller' && o.pagamento.gesto_venditore)
-            ? '💸 In pagamento' : inPagamento(o) ? STATES.confirmed.label : STATES[o.state].label}</span>${x}
+          <div class="order-main">
+            <b class="ord-titolo">${esc(o.listing.title)}</b>
+            ${/* IN PAGAMENTO si dice anche qui (set 2026): e' uno stadio
+                 DERIVATO — lo stato resta quello di prima — quindi senza
+                 questa riga un ordine gia' confermato direbbe ancora
+                 «Spedito». A chi vende e deve un gesto resta «Da
+                 incassare», che e' il suo verbo. La CLASSE invece la
+                 dice `badgeOrdine`, che e' anche quella della tinta. */''}
+            <div class="ord-stato-riga">
+              <span class="ord-verbo">${verboOrdine(o)}</span>
+              <span class="badge ${badgeOrdine(o)}">${
+                inPagamento(o) && !(o.role==='seller' && o.pagamento.gesto_venditore)
+                  ? '💸 In pagamento' : inPagamento(o) ? STATES.confirmed.label : STATES[o.state].label}</span>
+            </div>
+          </div>
+        </div>${x}
       </div>
     </div>`;}).join('')
     + rigaNascosti
@@ -25183,11 +25291,7 @@ function openOrder(id){
           <div class="hint avviso-tracking" id="shipAvviso" style="display:none"></div>
           <button class="btn orange" onclick="markShipped()">📦 Segna come spedito</button>
         </div>`):''}
-      ${pannelloContenutoDigitale(o)}
-      ${pannelloNota(o)}
-      ${pannelloIndirizzoCasa(o)}
-      ${pannelloEmailCorriere(o)}
-      ${pannelloBustaRitiro(o)}
+      ${busteOrdine(o)}
       ${pannelloServizioCompratore(o)}
       ${o.role==='buyer' && s==='creato' ? `<button class="btn primary" onclick="verificaOrdine(currentOrder.id)">🔄 Ho pagato la invoice — verifica</button>
       <button class="btn danger-ghost" onclick="annullaOrdine()">✖️ Annulla questo ordine</button>`:''}
@@ -31620,6 +31724,44 @@ function pannelloNota(o){
     ${o.role==='admin'
       ? `<div class="hint" style="margin-top:6px">Questa la leggi: l'indirizzo di casa e la busta di ritiro no.</div>`
       : `<div class="hint" style="margin-top:6px">Leggila prima di preparare la consegna: se ti chiede qualcosa che non puoi fare, dillo in chat prima di spedire.</div>`}</div>`;
+}
+/* ---- I RIQUADRI DI QUEL CHE VI SIETE DETTI (22 set 2026, richiesta
+   di Andrea) ----
+   I cinque riquadri in cui le due parti si passano qualcosa di
+   cifrato — il contenuto digitale, la nota, l'indirizzo di casa,
+   l'email per il corriere, la busta di ritiro — stanno insieme, e a
+   ordine FINITO si chiudono: non c'e' piu' niente da dirsi, e su una
+   pagina che si riapre mesi dopo sono cinque scatole di rumore sopra
+   la sola cosa che si cerca (com'e' andata).
+   NIENTE VA PERSO, ed e' la meta' che conta: se dentro c'era
+   qualcosa, al loro posto resta un link discreto che le riapre — e
+   se non c'era niente non compare nemmeno quello, che un invito ad
+   aprire il vuoto e' peggio del vuoto.
+   FINITO E' `CONCLUSI` (concluso, rimborsato, annullato), lo stesso
+   giudice del filtro «solo attivi» e dei verbi della lista: una
+   seconda definizione un giorno direbbe qualcos'altro. La DISPUTA
+   non e' finita e resta aperta — anzi, e' il posto dove quei
+   riquadri servono di piu': sono la prova di cosa si erano detti.
+   `display:none` E NON UN RAMO CHE NON DISEGNA: i pannelli restano
+   nel DOM, quindi tutto quel che gira DOPO il disegno (le cifre,
+   l'anello della busta, i campi che si aprono gia' pronti) li trova
+   dove li cerca — e riaprirli e' una riga, non un secondo giro. */
+function busteOrdine(o){
+  const buste = [pannelloContenutoDigitale(o), pannelloNota(o),
+                 pannelloIndirizzoCasa(o), pannelloEmailCorriere(o),
+                 pannelloBustaRitiro(o)].join('');
+  if (!buste || !CONCLUSI.includes(o.state)) return buste;
+  return `<div id="ordBuste" style="display:none">${buste}</div>
+    <div class="ord-buste-link"><button class="btn link"
+      onclick="apriBusteOrdine(this)">Vedi i messaggi</button></div>`;
+}
+/* il link si consuma: riaperte le buste non c'e' piu' niente da
+   aprire, e lasciarlo li' sarebbe un bottone che non fa nulla */
+function apriBusteOrdine(b){
+  haptic();
+  const d = el('ordBuste');
+  if (d) d.style.display = '';
+  b.closest('.ord-buste-link')?.remove();
 }
 /* Il calco di salvaPuntoRitiro, con UNA differenza: il vuoto si manda.
    La nota e' facoltativa, e toglierla e' un gesto legittimo — il

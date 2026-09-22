@@ -11478,31 +11478,44 @@ def prove_lista_ordini():
     prova("il concluso e' CONCLUSI, non una seconda lista", True,
           "CONCLUSI.includes(o.state)" in vo
           and "'released'," not in vo)
-    prova("chi compra legge il TOTALE in cassaforte", True,
-          "Hai comprato per ${cifra(o.listing.price)}" in vo)
-    prova("chi vende legge il NETTO, che e' un altro numero", True,
-          "Hai venduto per ${cifra(nettoVenditore(o))}" in vo)
-    # il rimborso (e la lapide, che in lista non si vede) non porta
-    # cifra: li' nessuno ha comprato e nessuno ha venduto
-    ramo = vo[vo.index("if (CONCLUSI.includes"):
-              vo.index("return `${compra")]
-    prova("il non-concluso NON porta nessuna cifra", False,
-          "cifra(" in ramo)
+    # ⚠️ LE CIFRE SONO USCITE DAL VERBO (22 set 2026, richiesta di
+    # Andrea: «via dalla card il numero d'ordine e il prezzo»). Le due
+    # righe che stavano qui chiedevano il TOTALE a chi paga e il NETTO
+    # a chi incassa: quella regola non e' caduta, si e' trasferita —
+    # la guardano adesso le due sentinelle del netto, qui sotto, che
+    # contano i posti dove la formula vive. La card non porta NESSUNA
+    # cifra, ed e' la cosa da sorvegliare al loro posto.
+    prova("nessun ramo del verbo porta una cifra", [],
+          [r for r in ("cifra(", "cifraOrdine(", "listing.price",
+                       "nettoVenditore(") if r in vo])
+    # il ramo del non-concluso: «non conclusa» e non il «Rimborsato»
+    # del badge, che e' li' accanto — si aggiunge, non si ripete.
+    # `find` e non `index`: una mutazione che lo toglie dev'essere una
+    # rossa col suo nome, non un traceback che spegne la sezione.
+    i_c = vo.find("if (CONCLUSI.includes")
+    i_v = vo.find("return compra ? 'Stai comprando'")
+    ramo = vo[i_c:i_v] if 0 <= i_c < i_v else ""
     prova("...e non ripete il «Rimborsato» del badge accanto", True,
           "non conclus" in ramo and "imborsat" not in ramo)
-    prova("finche' e' vivo il verbo e' al presente, con la sua cifra",
-          True, "'Stai comprando' : 'Stai vendendo'" in vo
-          and "cifra(o.listing.price)}`" in vo)
+    # ⚠️ E IL TEMPO NON SI E' APPIATTITO SUL PASSATO: la richiesta
+    # nominava «Hai comprato» / «Hai venduto», che sono le due forme
+    # della CHIUSURA — su un ordine in viaggio resta «Stai comprando»,
+    # o la riga direbbe che una cosa in corso e' finita.
+    prova("finito si dice al passato...", True,
+          "return compra ? 'Hai comprato' : 'Hai venduto'" in vo)
+    prova("...e finche' e' vivo, al presente", True,
+          "return compra ? 'Stai comprando' : 'Stai vendendo'" in vo)
     prova("il moderatore non compra e non vende", True,
           "'⚖️ Da moderare'" in vo)
     prova("la riga della lista passa dal giudice", True,
-          "${verboOrdine(o)} · ${o.when}" in ro)
+          '<span class="ord-verbo">${verboOrdine(o)}</span>' in ro)
 
     # ---- 15-16: il netto e' UNO (il giorno della commissione) ----
     prova("nettoVenditore e' definito una volta sola", 1,
           mini.count("function nettoVenditore(o)"))
-    prova("...e la formula del netto non ha copie: la dicono la riga, "
-          "la testa dell'ordine e il pannello d'incasso", (1, 3),
+    prova("...e la formula del netto non ha copie: la dicono la testa "
+          "dell'ordine e il pannello d'incasso (la riga della lista "
+          "non porta piu' cifre)", (1, 2),
           (mini.count("o.listing.price - (o.protSats||0)"),
            mini.count("nettoVenditore(o)") - 1))
 
@@ -11890,6 +11903,262 @@ def prove_dettaglio_ordine():
           "L\\'acquirente deve rispedire l\\'oggetto al venditore" in det
           and "Il reso è in viaggio verso il venditore" in det)
 
+
+def prove_card_ordini():
+    """LA CARD DELL'ORDINE DICE QUATTRO COSE, E SI TINGE (22 set 2026,
+    richiesta di Andrea). La foto quasi raddoppiata con la data sotto,
+    il titolo, il verbo e il rettangolino dello stato: il NUMERO
+    D'ORDINE e il PREZZO sono usciti e restano nel dettaglio.
+
+    E la card prende la velatura del suo stato, con LA STESSA regola di
+    «I miei scambi» — non una copia: una tinta sola per stato in tutta
+    l'app. Qui si prova che il tono esce dalla STESSA classe del
+    rettangolino (quindi non possono dire due cose diverse), che ogni
+    stato che la macchina sa produrre ha il suo colore nel foglio, e
+    che la misura della foto sta su un nome che solo `fotoOrdine`
+    mette — `.order-ic` da solo veste anche il quadratino delle
+    offerte, e allargare li' avrebbe gonfiato una lista che nessuno ha
+    chiesto di toccare.
+
+    L'ULTIMO PEZZO E' LA CHIUSURA DELLE BUSTE: i cinque riquadri in cui
+    le due parti si passano qualcosa di cifrato si chiudono a ordine
+    finito — non c'e' piu' niente da dirsi — e restano aperti sugli
+    ordini vivi e IN DISPUTA, dove sono la prova di cosa si erano
+    detti. Se dentro c'era qualcosa resta un link che le riapre; se non
+    c'era niente non compare nemmeno quello."""
+    print("\n[le card degli ordini]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    css = mini[mini.index("<style>"):mini.index("</style>")]
+
+    def solo_codice(js):
+        js = re.sub(r"/\*[\s\S]*?\*/", "", js)
+        return "\n".join(r for r in js.split("\n")
+                         if not r.strip().startswith("//"))
+
+    ro = solo_codice(pezzo_js(mini, "function renderOrders(){"))
+    i_a = ro.find('<div class="order${tonoCardOrdine(o)}')
+    i_b = ro.find("`;}).join('')", i_a)
+    card = ro[i_a:i_b] if 0 <= i_a < i_b else ""
+
+    # ---- 1-6: QUEL CHE LA CARD DICE, E QUEL CHE NON DICE PIU' ----
+    prova("la card c'e', e si apre con un tocco", True,
+          bool(card) and 'onclick="openOrder(${o.id})"' in card)
+    prova("la foto porta sotto la data dell'ordine", True,
+          '<div class="ord-foto-col">' in card
+          and "${fotoOrdine(o)}" in card
+          and '<div class="ord-foto-data">${o.when}</div>' in card)
+    prova("accanto alla foto c'e' il titolo...", True,
+          '<b class="ord-titolo">${esc(o.listing.title)}</b>' in card)
+    # ⚠️ E SI FERMA A TRE RIGHE (visto a 320 nel giro dal vivo): con
+    # la foto alta 100 la card e' 148px per tutti, e un titolo lungo la
+    # faceva crescere a 193 — una card fuori riga in mezzo a una colonna
+    # regolare. Il titolo intero sta nel dettaglio, un tocco piu' in la'.
+    prova("...e si ferma a tre righe, coi puntini", True,
+          ".ord-titolo{display:-webkit-box;-webkit-line-clamp:3;" in css
+          and "-webkit-box-orient:vertical;overflow:hidden}" in css)
+    prova("...e sotto il verbo, col rettangolino sulla stessa riga",
+          True, '<div class="ord-stato-riga">' in card
+          and '<span class="ord-verbo">${verboOrdine(o)}</span>' in card
+          and '<span class="badge ${badgeOrdine(o)}">' in card)
+    # ⚠️ IL NUMERO E IL PREZZO SONO USCITI e restano nel dettaglio: il
+    # numero li' porta anche la parola che dice cos'e', e la cifra sta
+    # grande sotto il titolo. In lista rubavano la riga allo stato.
+    prova("via il numero d'ordine dalla card", False, "#${o.id}" in card)
+    prova("...e via ogni cifra", [],
+          [r for r in ("cifraOrdine(", "listing.price", "nettoVenditore(",
+                       "fmt(", "eur(") if r in card])
+
+    # ---- 7-10: LA TINTA ESCE DALLA CLASSE DEL RETTANGOLINO ----
+    tono = solo_codice(pezzo_js(mini, "function tonoCardOrdine(o){",
+                                "\n}\n"))
+    bdg = solo_codice(pezzo_js(mini, "function badgeOrdine(o){", "\n}\n"))
+    prova("il tono esce dalla classe del rettangolino", True,
+          "badgeOrdine(o)" in tono)
+    prova("...e non nomina nessuno stato per conto suo", [],
+          [x for x in re.findall(r"'([^']*)'", tono)
+           if x != " tinta tono-"])
+    prova("...e la classe del rettangolino e' un giudice solo: la "
+          "dicono il badge e la tinta, mai due tabelle",
+          (1, 1, 0),
+          (card.count("badgeOrdine(o)"), tono.count("badgeOrdine(o)"),
+           card.count("STATES[o.state].badge")))
+    # IN PAGAMENTO e' uno stadio DERIVATO — lo stato resta quello di
+    # prima — e vale viola come il «da incassare» che sostituisce
+    prova("...e lo stadio derivato lo conosce anche la tinta", True,
+          "inPagamento(o) ? 'confirmed'" in bdg)
+    # IL COLORE NON E' L'UNICO SEGNO: la parola dello stato resta
+    prova("il colore non e' l'unico segno: la parola resta nel "
+          "rettangolino", True, "STATES[o.state].label}</span>" in card)
+
+    # ---- 11-14: LA FOTO ----
+    # LA MISURA STA SU UN NOME SUO: `.order-ic` veste anche il
+    # quadratino delle OFFERTE (un'emoji, non una foto), e allargare
+    # li' avrebbe gonfiato una lista che nessuno ha chiesto di toccare
+    prova("la foto della lista e' quasi il doppio di prima", True,
+          ".order-ic.ord-foto{width:100px;height:100px;"
+          "border-radius:16px;" in css)
+    prova("...e nel dettaglio e' piu' grande ancora", True,
+          ".order-ic.ord-foto.grande{width:132px;height:132px;" in css)
+    prova("...con gli angoli della carta, gli stessi delle card P2P",
+          True, ".p2p-ord{background:var(--card);border:1px solid "
+          "var(--line-soft);border-radius:16px;" in css)
+    prova("...e la misura la porta solo chi la fabbrica: il "
+          "quadratino delle offerte resta 56", (True, True, 1),
+          (".order-ic{width:56px;height:56px;border-radius:12px;" in css,
+           "const c = 'order-ic ord-foto' + (grande ? ' grande' : '');"
+           in mini,
+           mini.count('class="order-ic"')))
+    # NITIDA A 3x: la miniatura del server ha il lato corto a 640, e a
+    # 132 CSS per tre ne servono 396 — il numero si legge dal server,
+    # o il giorno che cala la foto si sgranerebbe in silenzio
+    lato = int(re.search(r"MINIATURA_LATO = (\d+)", _SORGENTE).group(1))
+    prova("...e la miniatura del server ne ha abbastanza per il 3x",
+          True, lato >= 132 * 3)
+
+    # ---- 15-17: OGNI STATO HA IL SUO TONO (banco node) ----
+    node = _sh.which("node")
+    if not node:
+        salta("il banco dei toni e delle buste", "node non c'e'")
+        return
+    i_s = mini.index("const STATES = {")
+    tabella = mini[i_s:mini.index("\n};", i_s) + 3]
+    stati = re.findall(r"^  ([a-z_]+): *\{", tabella, re.M)
+    prova("la tabella degli stati e' quella di casa, tutt'e dodici",
+          12, len(stati))
+    banco = "\n".join([
+        tabella,
+        pezzo_js(mini, "const inPagamento = o =>", "\n"),
+        pezzo_js(mini, "function badgeOrdine(o){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function tonoCardOrdine(o){", "\n}\n") + "\n}",
+        """
+const STATI = __STATI__;
+const out = {};
+STATI.forEach(s => {
+  out[s] = [null, {}].map(p => {
+    try { return tonoCardOrdine({state: s, role: 'buyer', pagamento: p}); }
+    catch(e) { return 'ESPLOSO: ' + (e && e.message || e); }
+  });
+});
+console.log(JSON.stringify(out));
+"""]).replace("__STATI__", _json.dumps(stati))
+    cart = _tf.mkdtemp()
+    p = os.path.join(cart, "toni.js")
+    open(p, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, p], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco node dei toni gira", "", (r.stderr or "")[-600:])
+    if r.returncode:
+        return
+    tab = _json.loads(r.stdout)
+    # LA TABELLA INTERA, coi due stadi: fermo, e col pagamento in volo.
+    # IN PAGAMENTO e' viola per tutti tranne il concluso, dove il
+    # pagamento c'e' ma la corsa e' finita — e' il giudice di casa.
+    prova("ogni stato veste la card col tono del suo rettangolino, e "
+          "in pagamento passa al viola",
+          {s: [" tinta tono-" + a, " tinta tono-" + b] for s, (a, b) in (
+              ("creato", ("locked", "confirmed")),
+              ("locked", ("locked", "confirmed")),
+              ("shipped", ("shipped", "confirmed")),
+              ("delivered", ("confirmed", "confirmed")),
+              ("confirmed", ("confirmed", "confirmed")),
+              ("released", ("released", "released")),
+              ("dispute", ("dispute", "confirmed")),
+              ("return_pending", ("confirmed", "confirmed")),
+              ("return_shipped", ("shipped", "confirmed")),
+              ("refund", ("confirmed", "confirmed")),
+              ("refunded", ("refunded", "confirmed")),
+              ("annullato", ("annullato", "confirmed")))}, tab)
+    # ⚠️ E OGNI TONO CHE LA MACCHINA PRODUCE DEV'AVERE IL SUO COLORE
+    # NEL FOGLIO: uno stato nuovo senza tono uscirebbe SENZA fondo —
+    # una card bianca in mezzo a tutte colorate, cioe' «non e'
+    # successo niente» proprio quando e' successo qualcosa
+    prova("...e ogni tono prodotto ha il suo colore nel foglio", [],
+          sorted({t.split("tono-")[1] for v in tab.values() for t in v
+                  if ".order.tono-" + t.split("tono-")[1] not in css}))
+
+    # ---- 18-24: LE BUSTE SI CHIUDONO A ORDINE FINITO ----
+    bu = solo_codice(pezzo_js(mini, "function busteOrdine(o){", "\n}\n"))
+    BUSTE = ["pannelloContenutoDigitale", "pannelloNota",
+             "pannelloIndirizzoCasa", "pannelloEmailCorriere",
+             "pannelloBustaRitiro"]
+    prova("le cinque buste passano tutte di qui", BUSTE,
+          re.findall(r"(pannello[A-Za-z]+)\(o\)", bu))
+    # ...e il dettaglio non le chiama piu' una per una: una sola
+    # chiamata, o una busta resterebbe fuori dalla chiusura
+    prova("...e il dettaglio ne chiama UNA, il gruppo", (1, [1] * 5),
+          (mini.count("${busteOrdine(o)}"),
+           [mini.count(b + "(o)") - mini.count("function " + b + "(o){")
+            for b in BUSTE]))
+    prova("finito e' CONCLUSI, lo stesso giudice dei verbi e del "
+          "filtro «solo attivi»", True,
+          "CONCLUSI.includes(o.state)" in bu)
+    # LA DISPUTA NON E' FINITA, ed e' il posto dove quei riquadri
+    # servono di piu': sono la prova di cosa si erano detti
+    prova("...quindi in disputa non si chiude niente", [],
+          [x for x in ("dispute", "released", "annullato", "refunded")
+           if "'" + x + "'" in bu])
+    prova("se non c'era niente, non compare nemmeno il link", True,
+          "if (!buste || !CONCLUSI.includes(o.state)) return buste;" in bu)
+    prova("...e se c'era, resta un link che le riapre", True,
+          'onclick="apriBusteOrdine(this)">Vedi i messaggi</button>' in bu
+          and 'id="ordBuste" style="display:none"' in bu)
+    # DISCRETO, che e' la parola della richiesta: `.btn.link` nasce a
+    # 15px grassi e sottolineati — su una pagina chiusa sarebbe un
+    # invito, mentre questo e' un ripensamento. Taglia della riga CSV.
+    prova("...e il link e' discreto, non un invito", True,
+          ".ord-buste-link .btn.link{margin:0;font-size:13px;" in css)
+    # `display:none` E NON UN RAMO CHE NON DISEGNA: i pannelli restano
+    # nel DOM, quindi tutto quel che gira DOPO il disegno li trova
+    ap = solo_codice(pezzo_js(mini, "function apriBusteOrdine(b){",
+                              "\n}\n"))
+    prova("il link le riapre senza ridisegnare l'ordine", True,
+          "d.style.display = ''" in ap and "openOrder" not in ap)
+    prova("...e si consuma: un bottone che non fa piu' niente non "
+          "resta li'", True, "'.ord-buste-link')?.remove()" in ap)
+
+    # ---- 25-26: IL BANCO DELLE BUSTE, stato per stato ----
+    # le cinque buste diventano segnaposto: quel che si prova qui e' il
+    # GATE, e con le vere servirebbe mezzo client
+    finte = "\n".join(
+        "function %s(o){ return o.dentro ? '<%d>' : ''; }" % (b, k)
+        for k, b in enumerate(BUSTE))
+    banco2 = "\n".join([
+        "const CONCLUSI = " + _json.dumps(["released", "refunded",
+                                           "annullato"]) + ";",
+        finte,
+        pezzo_js(mini, "function busteOrdine(o){", "\n}\n") + "\n}",
+        """
+const STATI = __STATI__;
+const out = {};
+STATI.forEach(s => {
+  out[s] = [false, true].map(d => {
+    try {
+      const h = busteOrdine({state: s, dentro: d});
+      return [h.indexOf('<0>') >= 0, h.indexOf('Vedi i messaggi') >= 0,
+              h.indexOf('display:none') >= 0].join('');
+    } catch(e) { return 'ESPLOSO: ' + (e && e.message || e); }
+  });
+});
+console.log(JSON.stringify(out));
+"""]).replace("__STATI__", _json.dumps(stati))
+    p2 = os.path.join(cart, "buste.js")
+    open(p2, "w", encoding="utf-8").write(banco2)
+    r2 = _sp.run([node, p2], capture_output=True, text=True,
+                 encoding="utf-8")
+    prova("il banco node delle buste gira", "", (r2.stderr or "")[-600:])
+    if r2.returncode:
+        return
+    b2 = _json.loads(r2.stdout)
+    VUOTO = "falsefalsefalse"      # niente dentro: niente riquadri
+    APERTE = "truefalsefalse"      # ordine vivo: le buste, e basta
+    CHIUSE = "truetruetrue"        # finito: nascoste, col link
+    prova("a ordine finito le buste si chiudono col link, e su tutti "
+          "gli altri stati restano aperte",
+          {s: [VUOTO, CHIUSE if s in ("released", "refunded", "annullato")
+                      else APERTE] for s in stati}, b2)
 
 def _notifica_admin_spia(avvisi):
     async def _n(testo):
@@ -35624,17 +35893,29 @@ def prove_numero_ordine():
     prova("il dettaglio lo chiede alla fabbrica, una volta sola", 1,
           mini.count("${numeroOrdine(o)}"))
 
-    # --- 4) NELLA LISTA SI LEGGE, NON SI TOCCA ----------------------
-    # La riga ha gia' il suo tocco (apri l'ordine) e la sua ✕: un
-    # terzo bersaglio su una card alta 60px si sbaglia e basta — cio'
-    # che AGISCE vive dentro l'ordine, dove c'e' il contesto.
+    # --- 4) NELLA LISTA IL NUMERO NON C'E' PIU' ---------------------
+    # ⚠️ ROVESCIATA IL 22 SET 2026 (richiesta di Andrea: «via dalla
+    # card il numero d'ordine e il prezzo»). Qui c'erano due righe che
+    # chiedevano il numero NELLA riga e lo volevano non toccabile; la
+    # seconda meta' di quell'argomento regge ancora — la card ha due
+    # bersagli, il tocco che apre e la ✕, e un terzo si sbaglia — ma
+    # adesso si ottiene togliendo il numero invece che spegnendolo.
+    # L'IDENTITA' NON SI PERDE: il numero vive nel DETTAGLIO, dove
+    # porta anche la parola che dice cos'e', e la sentinella che lo
+    # chiede una volta sola sta qui sopra.
     ro = solo_codice(pezzo_js(mini, "function renderOrders(){"))
-    riga_sub = ro[ro.index('<div class="sub">'):]
-    riga_sub = riga_sub[:riga_sub.index("</div>")]
-    prova("nella riga il numero c'e'...", True,
-          '<span class="mono">#${o.id}</span>' in riga_sub)
-    prova("...e non si tocca", True,
-          "onclick" not in riga_sub and "ordine-num" not in riga_sub)
+    prova("nella card il numero non c'e' piu'", True,
+          "#${o.id}" not in ro)
+    # i bersagli si contano sulla CARD e non su tutta la lista: la
+    # coda porta «mostrali» e il CSV, che sono bottoni della PAGINA
+    i_a = ro.find("const puoNascondere")
+    i_b = ro.find("`;}).join('')", i_a)
+    card = ro[i_a:i_b] if 0 <= i_a < i_b else ""
+    prova("...e nemmeno un secondo bersaglio da toccare: restano la "
+          "card e la ✕",
+          ["nascondiOrdine(${o.id},0,event)",
+           "nascondiOrdine(${o.id},1,event)", "openOrder(${o.id})"],
+          re.findall(r'onclick="([^"]*)"', card))
 
 
 def prove_promesse_badge():
@@ -62979,16 +63260,39 @@ def prove_card_tinte_stato():
     # resterebbe senza fondo — trasparente sul crema della pagina, non
     # bianca. Dentro il supporto si tinge, fuori resta il mondo di ieri.
     prova("la tinta sta dietro un @supports, o senza color-mix sparirebbe",
-          True, ".p2p-scambio.tinta{" in sup
-          and ".p2p-scambio.tinta{" not in css[:i_sup])
+          True, ".p2p-scambio.tinta,.order.tinta{" in sup
+          and ".p2p-scambio.tinta," not in css[:i_sup])
+    # ⚠️ E DAL 22 SET 2026 LA REGOLA E' DI DUE CASE (richiesta di
+    # Andrea): le card della lista «Ordini» prendono la stessa
+    # velatura, e «stessa» vuol dire UNA regola con due selettori —
+    # stessi byte, stesse percentuali, stessi token. Questa riga e' il
+    # motivo per cui non puo' nascere una seconda tabella di colori:
+    # se qualcuno copiasse la regola invece di allargarla, il
+    # mercatino comparirebbe in un blocco suo e qui si vedrebbe.
+    prova("...e la stessa regola veste tutt'e due le case, mai una copia",
+          (1, 0),
+          (css.count(".p2p-scambio.tinta,.order.tinta{"),
+           len(re.findall(r"(?<!\.p2p-scambio\.tinta,)\.order\.tinta\{",
+                          css))))
     prova("il velo e il bordo escono dalla stessa tinta, mischiata alla carta",
           True,
           "background:color-mix(in srgb,var(--tinta) var(--tinta-card),"
           "var(--card))" in sup
           and "border-color:color-mix(in srgb,var(--tinta) var(--tinta-bordo),"
               "var(--card))" in sup)
-    INCHIOSTRO = dict(re.findall(
-        r"\.p2p-scambio\.tono-([a-z]+)\{--tinta:var\((--[a-z-]+)\)\}", sup))
+    # i toni si leggono dai selettori del P2P; quelli del mercatino
+    # stanno nella stessa dichiarazione e si controllano appaiati, che
+    # e' l'unico modo perche' un giorno non si scollino
+    def toni(prefisso):
+        fuori = {}
+        for sel, ink in re.findall(
+                r"([^{}]*)\{--tinta:var\((--[a-z-]+)\)\}", sup):
+            for t in re.findall(re.escape(prefisso) + r"\.tono-([a-z]+)",
+                                sel):
+                fuori[t] = ink
+        return fuori
+
+    INCHIOSTRO = toni(".p2p-scambio")
     # I COLORI NON SONO NUOVI: ogni tono prende l'INCHIOSTRO del suo
     # riquadro — l'arancio dei sats, il viola, il blu, il verde, il
     # rosso, il grigio — e lo stempera nella carta
@@ -62996,6 +63300,16 @@ def prove_card_tinte_stato():
           {"locked": "--sats-text", "confirmed": "--nostr-text",
            "shipped": "--ship-text", "released": "--trust-text",
            "dispute": "--danger", "annullato": "--muted"}, INCHIOSTRO)
+    # ⚠️ OGNI TONO DEL P2P HA IL SUO GEMELLO NEL MERCATINO, nella
+    # STESSA dichiarazione: se qualcuno ne aggiungesse uno da una
+    # parte sola, le due liste si separerebbero senza che niente
+    # rompa — una card resterebbe bianca dove la sorella si tinge.
+    # `refunded` e' l'unico che il mercatino aggiunge (grigio come
+    # l'annullato: lo stesso inchiostro del suo riquadro), e il P2P
+    # non ha quello stato.
+    ORD = toni(".order")
+    prova("...e ogni tono ha il suo gemello nel mercatino, con lo "
+          "stesso inchiostro", dict(INCHIOSTRO, refunded="--muted"), ORD)
     prova("...e il riquadro resta staccato dalla card, con un filo suo",
           True, ".p2p-scambio.tinta .p2p-scambio-stato.badge{" in sup
           and "border-color:color-mix(in srgb,currentColor 30%,transparent)"
@@ -63103,6 +63417,18 @@ def prove_card_tinte_stato():
     # 3,8:1 — il conto resterebbe verde misurando un token che non
     # veste piu' niente. Questa riga lega le due cose: i testi misurati
     # sono quelli che le regole mettono davvero nella card.
+    # ⚠️ E I TESTI DELLA CARD DEGLI ORDINI SONO GLI STESSI DUE TOKEN
+    # (22 set 2026): il titolo sta su `--ink`, il verbo e la data su
+    # `--ink-soft` — due token gia' dentro TESTI, quindi il conto del
+    # contrasto qui sopra li copre senza aggiungere una riga. Questa
+    # li lega: se domani il verbo tornasse `--muted` (3,8:1 su carta
+    # bianca) il conto resterebbe verde misurando un token che non
+    # veste piu' niente.
+    prova("...e il verbo e la data della card ordini stanno sugli "
+          "stessi token misurati", True,
+          ".ord-verbo{font-size:12.5px;font-weight:700;"
+          "color:var(--ink-soft)}" in css
+          and "color:var(--ink-soft);\n    white-space:nowrap}" in css)
     prova("...e i token misurati sono quelli che vestono la card", True,
           ".p2p-scambio .p2p-box,\n  .p2p-scambio .p2p-badge,\n"
           "  .p2p-scambio .p2p-scambio-euro{color:var(--ink-soft)}" in css
@@ -79976,7 +80302,7 @@ def main():
               prove_email_corriere,
               prove_nota_compratore,
               prove_nascondi_ordine,
-              prove_lista_ordini, prove_dettaglio_ordine,
+              prove_lista_ordini, prove_dettaglio_ordine, prove_card_ordini,
               prove_ssrf_redirect, prove_niente_ai_nella_ricerca,
               prove_tracking_corretto, prove_barattolo,
               prove_savers_proprietario, prove_visualizzazioni,
