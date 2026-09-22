@@ -23742,3 +23742,71 @@ taciuto su un caso vero: un rimborso di link in produzione non c'è
 ancora stato. E `query_libro_mastro.sql` continua a NON avere il
 gemello di «link del negozio pagato e non applicato», che manca da
 prima di oggi.
+
+## La ronda tor guarda mostro dentro mostro-net (22 set 2026)
+
+**IL RISCHIO.** Dal 15 set le regole del proxy trasparente vivono in
+`tor-entrypoint.sh`, nel namespace di tor stesso: il sidecar prestato
+non c'e' piu'. Ma un namespace PRESTATO resta, ed e' quello di mostro,
+che vive in quello di `mostro-net` (`network_mode: "service:mostro-net"`).
+Le tre REDIRECT e il DROP del FORWARD sono scritti per `172.28.1.5` e
+basta: un mostro ricreato fuori da li' (compose cambiato, un `up` con
+altre opzioni, mostro-net ricreato e mostro no) esce da un'altra strada.
+La superficie non lo vede — guarda le regole del gateway, non chi c'e'
+dietro — e nemmeno la voce di stamattina lo confrontava.
+
+**DOVE, E PERCHE' NON NELLA SUPERFICIE.** In `ronda-tor.sh`: e' la stessa
+domanda («mostro esce, e da Tor?») letta alla radice invece che
+all'effetto, prende il posto esatto del giudice del sidecar, che era la
+stessa idea (due namespace che devono coincidere) sul container
+sbagliato, e gira dal punto di vista di mostro. La superficie e' una foto
+confrontata con una baseline imparata, e questa e' una forma fissa: come
+il ponte WireGuard, una baseline imparerebbe anche la forma sbagliata.
+
+**LA FORMA.** a) Stesso inode di `/proc/<pid>/ns/net` per `nodo-mostro-1`
+e `nodo-mostro-net-1`: e' la prova che decide. `NetworkMode` non decide
+— dopo un `restart mostro-net` l'id non cambia e il namespace si' — ma
+dice QUALE guasto e': `container:<id di mostro-net>` con inode diversi e'
+l'ORFANO (cura: `up -d --force-recreate mostro`), altro e' FUORI (il
+compose e' cambiato). b) L'IP che mostro vede su di se' e' `172.28.1.5`,
+confrontato a parola intera (`172.28.1.50` non passa). c) Il `default
+via` di mostro-net e' un IP di `nodo-tor-1`, letto da `docker inspect` e
+non scritto a mano. Ogni pezzo ha il suo allarme col suo nome.
+
+**MOSTRO FERMO NON E' «FUORI».** Prima un mostro fermo faceva suonare il
+giudice 1 come «mostro NON ESCE» (il `docker run --network container:`
+su un container fermo fallisce): adesso lo stato si guarda PRIMA, e un
+mostro fermo si dice «FERMO (stato: exited)» e salta curl e namespace.
+Il DROP del FORWARD, che e' di tor, si misura comunque. Mostro-net fermo
+con mostro vivo e' un caso a parte, con la sua cura.
+
+**VIA IL SIDECAR.** Il giudice di `nodo-tor-redirect-1` e la sua
+variabile `R` sono usciti: il servizio non esiste dal 15 set e non
+tornera'.
+
+**QUEL CHE LA CURL VEDEVA GIA', detto onesto.** In quasi tutti i casi di
+«fuori dal namespace» il giudice 1 avrebbe suonato lo stesso (`IsTor`
+false se esce in chiaro, 000 se orfano): la premessa «nessuna ronda se
+ne accorgerebbe» valeva per la superficie, non per la curl. Quel che
+cambia e' che la curl vede l'EFFETTO e non dice il perche', e dipende da
+check.torproject.org: il giudice nuovo vede la CAUSA, ne nomina la cura,
+e non ha bisogno della rete.
+
+**PROVATO.** Un banco con `docker`, `readlink`, `nsenter`, `ip` e
+`iptables` finti, quindici casi indipendenti: sano (tace), sano
+`--prova` (i tre pezzi nel quadro), mostro fermo, mostro sparito,
+namespace diverso con NetworkMode altrui (FUORI), namespace diverso con
+NetworkMode giusto (ORFANO), IP diverso, `172.28.1.50`, gateway del
+bridge, gateway assente, mostro-net fermo, mostro-net sparito, IP di tor
+illeggibile, esce in chiaro, niente sidecar nel quadro: 15 verdi. La
+stessa batteria contro la ronda VECCHIA di `origin/main`: 11 rosse, cioe'
+il banco vede davvero il giudice nuovo. L'unica rossa del primo giro era
+del banco (una parola vietata, «gateway», che sta anche nel quadro
+sano). `prove.py` 12920/0.
+
+**NON PROVATO.** L'output VERO di `ip -4 -o addr show` e di `ip route`
+dentro i namespace del nodo, e il `NetworkMode` che compose scrive
+davvero: il banco li ha scritti nella forma che Debian stampa di solito.
+Per questo un allarme al primo giro si guarda coi quattro comandi di
+PRODUZIONE («MOSTRO DENTRO MOSTRO-NET») prima di toccare niente.
+L'installazione sul nodo e' di Andrea.
