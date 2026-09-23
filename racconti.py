@@ -7,15 +7,17 @@ foto — con la STESSA FORMA del catalogo `RACCONTI` di miniapp.html,
 quello di To The Mooon, e disegnato dallo STESSO renderer
 (`raccontoNegozio`). Cambia una cosa sola, ed e' quella che decide
 dove vive: queste pagine nascono in BOZZA, e una bozza la vedono i
-moderatori e nessun altro.
+moderatori e il venditore della pagina — nessun altro.
 
 PERCHE' QUI E NON ACCANTO A TO THE MOOON. Il catalogo del client
 viaggia DENTRO la pagina, a chiunque la apra: una bozza scritta li'
 sarebbe leggibile nel sorgente da tutti — invisibile solo a chi non
 guarda, che non e' «invisibile». Questo file invece non lo serve
-nessuna rotta, e il testo ne esce da due porte sole:
+nessuna rotta, e il testo ne esce da tre porte sole:
   - `/api/negozio/{chi}`, e SOLO a pagina pubblicata;
-  - `/api/admin/racconti`, che risponde 403 a chi non e' moderatore.
+  - `/api/admin/racconti`, che risponde 403 a chi non e' moderatore;
+  - `/api/me/racconti`, che al venditore da' le pagine del SUO negozio
+    e a chiunque altro una lista vuota.
 To The Mooon resta dov'e': lo accende lo spazio sponsorizzato, e
 traslocarlo vorrebbe dire rifare la card di «Da scoprire» con le sue
 prove — un altro cantiere (vedi Cantieri, «Una Garlanda in bozza»).
@@ -29,8 +31,9 @@ Il catalogo porta solo l'EMOJI che le sta davanti.
 LE CHIAVI SONO QUELLE DEL CLIENT, apposta: `t` il tipo del blocco,
 `h` il titoletto, `p` la prosa, `voci` gli elementi, `e` l'emoji di
 una scheda, `n` il numero della foto. In piu', per queste pagine:
-  - `etichetta`: che foto va li' — la dice il SEGNAPOSTO che i
-    moderatori vedono in anteprima finche' le foto non arrivano;
+  - `etichetta`: che foto va li' — la dice il SEGNAPOSTO che
+    l'anteprima (dei moderatori e del venditore) mostra finche' le foto
+    non arrivano;
   - `piccola`: logo e QR non vanno a colonna piena;
   - il blocco `firma`: la chiusura, `h` in grassetto e `p` sotto.
 
@@ -41,14 +44,26 @@ c'e' scritto, mai SE si vede.
 
 RACCONTI_NEGOZI = {
     "una-garlanda": {
-        # ⚠️ DA COLLEGARE: il CODICE NEGOZIO dell'account di Manuele
-        # (otto caratteri, es. "1b9a53e6"). VUOTO la pagina esiste solo
-        # nell'anteprima dei moderatori e NON si puo' pubblicare: senza
-        # codice non ha un negozio su cui uscire (fail-closed, il patto
-        # del codice di To The Mooon). E' il legame pagina→venditore, e
-        # non esce nessun tg_id dal repo: il codice e' pubblico per
-        # costruzione.
+        # IL LEGAME PAGINA → VENDITORE ha due forme, e la PRIMA VINCE:
+        #  - `negozio`: il CODICE del suo negozio (otto caratteri, es.
+        #    "1b9a53e6") — pubblico e stabile per costruzione, la forma
+        #    di casa (il patto di SLUG_SPONSOR e dei punti di ritiro:
+        #    «nessun tg_id entra nel repo»);
+        #  - `venditore_tg`: il tg_id del suo account, che il server
+        #    risolve nel codice da solo.
+        # ⚠️ QUI C'E' LA SECONDA, ED E' UN'ECCEZIONE DICHIARATA (23 set
+        # 2026, decisione di Andrea): il codice di Manuele (@Manumussa,
+        # «Manuele M.») si legge solo dal database del VPS, che da qui
+        # non si tocca, e Andrea ha scelto il tg_id per chiudere il
+        # cantiere invece di fermarlo. Il tg_id NON ESCE DAL SERVER: non
+        # e' fra i CAMPI_RACCONTO e nessuna risposta lo porta (c'e' la
+        # prova). LA STRADA DEL RITORNO e' una riga: letto il codice
+        # (il cassetto del pannello lo mostra accanto al nome), lo si
+        # scrive in `negozio` e si toglie `venditore_tg`.
+        # Senza nessuna delle due la pagina esiste solo nell'anteprima
+        # dei moderatori e NON si puo' pubblicare (fail-closed).
         "negozio": "",
+        "venditore_tg": 525073888,
         "emoji": "🌾",
         "titolo": "Una Garlanda",
         "sottotitolo": "Riso biodiverso. Custodito, non prodotto.",
@@ -64,8 +79,8 @@ RACCONTI_NEGOZI = {
         # quelle di To The Mooon) e `foto` passa a True. Nient'altro:
         # la rotta li serve gia' (FORMA_RACCONTO + questo catalogo) e il
         # renderer sa gia' dove metterli.
-        # Finche' e' False i moderatori vedono in anteprima un
-        # segnaposto con l'etichetta, e chi arriva sulla pagina
+        # Finche' e' False l'anteprima (dei moderatori e del venditore)
+        # mostra un segnaposto con l'etichetta, e chi arriva sulla pagina
         # pubblicata non vede nessun riquadro: la storia esce senza
         # immagini invece che con dei buchi.
         #   una-garlanda-cop.webp  la copertina, 21:9 come l'hero di To The Mooon

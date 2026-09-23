@@ -41131,33 +41131,79 @@ def prove_racconti_bozza():
     prova("...e logo e QR sono le piccole", ["QR EcoOasi", "logo"],
           sorted(b.get("etichetta", "") for b in _ug.get("blocchi", [])
                  if b.get("piccola")))
+    # IL LEGAME COL VENDITORE (23 set 2026): Una Garlanda ne ha uno, in
+    # una delle due forme — il codice del negozio o il tg_id. Non si
+    # inchioda QUALE: il giorno che al posto del tg_id si scrive il
+    # codice, questa riga resta vera, ed e' giusto che resti vera.
+    prova("Una Garlanda ha il suo venditore collegato", True,
+          bool(_ug.get("negozio") or _ug.get("venditore_tg")))
+    # ...E IL TG_ID E' UN NUMERO: scritto fra virgolette non combacerebbe
+    # MAI col tg_id del negozio, e la pagina non uscirebbe senza che
+    # niente lo dica. (bool no, anche se Python lo conta fra gli int.)
+    for slug, r in CAT.items():
+        if "venditore_tg" in r:
+            prova(f"«{slug}»: il tg_id del venditore e' un numero", True,
+                  isinstance(r["venditore_tg"], int)
+                  and not isinstance(r["venditore_tg"], bool))
+    # ...E NON ESCE: fra le chiavi che viaggiano verso il client non c'e'
+    # — e' quel che rende l'eccezione al patto «nessun tg_id nel repo» un
+    # riferimento del SERVER e non un dato che gira
+    _campi = {}
+    exec(re.search(r"^CAMPI_RACCONTO = \([^)]*\)", src, re.M).group(), _campi)
+    prova("il tg_id del venditore non e' fra le chiavi che escono", False,
+          "venditore_tg" in _campi["CAMPI_RACCONTO"])
 
     # ---- 3. IL GIUDICE, GIRATO ------------------------------------
     tavola = {}
     finto = {"negozio": "ab12cd34", "emoji": "x", "titolo": "T",
              "sottotitolo": "S", "intro": "I", "foto": False,
-             "blocchi": [], "nota_nostra": "non deve uscire"}
+             "blocchi": [], "nota_nostra": "non deve uscire",
+             # un tg_id ACCANTO al codice: la precedenza dice che qui non
+             # conta, e c'e' la prova piu' sotto
+             "venditore_tg": 111}
     amb = {"impostazione": lambda k, d="": tavola.get(k, d),
            "RACCONTI_NEGOZI": {"pagina": finto,
-                               "orfana": dict(finto, negozio="")}}
+                               "orfana": dict(finto, negozio="",
+                                              venditore_tg=0),
+                               "per_tg": dict(finto, negozio="",
+                                              venditore_tg=525)}}
     exec(re.search(r"^CAMPI_RACCONTO = \([^)]*\)", src, re.M).group(), amb)
-    for nome in ("racconto_stato", "_racconto_dati", "racconto_pubblico"):
+    for nome in ("racconto_stato", "_racconto_dati", "_e_suo",
+                 "racconto_pubblico"):
         exec(pezzo(nome), amb)
     pub = amb["racconto_pubblico"]
-    prova("in bozza il negozio non la riceve", None, pub("ab12cd34"))
+    prova("in bozza il negozio non la riceve", None, pub("ab12cd34", 1))
     prova("...e il giudice dice bozza", "bozza",
           amb["racconto_stato"]("pagina"))
     tavola["racconto_pubblicato:pagina"] = "1790000000"
-    _p = pub("ab12cd34") or {}
+    _p = pub("ab12cd34", 1) or {}
     prova("pubblicata, il suo negozio la riceve", "pagina", _p.get("slug"))
-    prova("...con le SOLE chiavi dichiarate (la nota nostra resta a casa)",
+    prova("...con le SOLE chiavi dichiarate (la nota nostra e il tg_id "
+          "restano a casa)",
           sorted(amb["CAMPI_RACCONTO"] + ("slug",)), sorted(_p))
-    prova("...e un altro negozio no", None, pub("ff99ee88"))
-    prova("...e un codice vuoto non combacia con niente", None, pub(""))
-    # FAIL-CLOSED: pubblicata ma senza codice non esce da nessuna parte
+    prova("...e un altro negozio no", None, pub("ff99ee88", 2))
+    # LA PRECEDENZA: col codice nel catalogo il tg_id non conta, nemmeno
+    # quando e' proprio quello del negozio servito — due riferimenti a
+    # due negozi diversi non accendono la pagina su tutt'e due
+    prova("...nemmeno col tg_id scritto accanto al codice", None,
+          pub("ff99ee88", 111))
+    prova("...e un codice vuoto non combacia con niente", None, pub("", 1))
+    # LA PAGINA LEGATA COL TG_ID (la forma di Una Garlanda): esce sul
+    # negozio di quel tg_id, col CODICE di quel negozio, e il tg_id resta
+    # a casa
+    tavola["racconto_pubblicato:per_tg"] = "1790000000"
+    _t = pub("cc33dd44", 525) or {}
+    prova("legata col tg_id, esce sul negozio di quel tg_id",
+          ("per_tg", "cc33dd44"), (_t.get("slug"), _t.get("negozio")))
+    prova("...e il tg_id non viaggia", False, "venditore_tg" in _t)
+    prova("...e sul negozio di un altro tg_id no", None,
+          pub("cc33dd44", 526))
+    prova("...ne' su un negozio senza codice", None, pub("", 525))
+    # FAIL-CLOSED: pubblicata ma senza riferimento non esce da nessuna
+    # parte
     tavola["racconto_pubblicato:orfana"] = "1790000000"
     prova("una pagina senza venditore non esce nemmeno pubblicata", None,
-          pub(""))
+          pub("dd44ee55", 0))
     # e una riga storta vale bozza, mai «pubblicata»
     for storta in ("domani", "0", "", "-5"):
         tavola["racconto_pubblicato:pagina"] = storta
@@ -41166,8 +41212,10 @@ def prove_racconti_bozza():
 
     # ---- 4. LE PORTE ----------------------------------------------
     _neg = codice(pezzo("negozio"))
+    # (col tg_id del NEGOZIO servito dal set 2026, per le pagine legate
+    # col tg_id: `v` e' la riga del negozio, mai chi guarda)
     prova("la rotta del negozio passa dal giudice del pubblicato", True,
-          'racconto_pubblico(v["negozio"])' in _neg)
+          'racconto_pubblico(v["negozio"], v["tg_id"])' in _neg)
     # ...E NON SA CHI BUSSA: una rotta pubblica che rispondesse diverso
     # a un moderatore sarebbe un secondo giudice della bozza
     prova("...e non guarda ne' il catalogo ne' chi bussa", (False, False),
@@ -41200,12 +41248,70 @@ def prove_racconti_bozza():
           {"decidi_racconto_admin"}, _scr)
     prova("la rotta delle foto conosce i due cataloghi", True,
           "not in RACCONTI_NEGOZI" in pezzo("asset_racconto"))
+    # LA PORTA DEL VENDITORE (set 2026): chiede chi e' (l'anonimo prende
+    # il 401 di verifica_utente), legge il negozio per il tg_id di CHI
+    # BUSSA — mai da un parametro, o chiunque potrebbe chiedere la bozza
+    # di un altro scrivendone il codice — e lo confronta col giudice del
+    # legame. Non e' una porta da moderatore e non scrive niente.
+    _mr = _senza_prosa(codice(pezzo("miei_racconti")))
+    prova("la porta del venditore chiede chi e'", True,
+          "verifica_utente(x_tg_init_data, barattolo_sessione)" in _mr)
+    prova("...e il negozio lo legge per il tg_id di chi bussa", True,
+          '(user["id"],)' in _mr and "WHERE tg_id=?" in _mr)
+    prova("...e il legame lo giudica _e_suo", True, "_e_suo(" in _mr)
+    prova("...e non e' da moderatore, ne' scrive niente",
+          (False, False, False, False),
+          ("e_admin(" in _mr, "scrivi_impostazione(" in _mr,
+           "INSERT" in _mr.upper(), "UPDATE " in _mr.upper()))
+    # IL LEGAME HA UN GIUDICE SOLO PER DOMANDA: `_e_suo` dove si
+    # confronta in memoria (la rotta pubblica e la porta del venditore),
+    # `_venditore_racconto` dove serve la riga del negozio (le due porte
+    # admin). Una precedenza scritta due volte un giorno direbbe due cose.
+    prova("il confronto in memoria e' uno", (True, True),
+          ("_e_suo(" in codice(pezzo("racconto_pubblico")),
+           "_e_suo(" in _mr))
+    prova("...e la risoluzione nel database anche", (True, True),
+          ("_venditore_racconto(" in codice(pezzo("lista_racconti_admin")),
+           "_venditore_racconto(" in codice(pezzo("decidi_racconto_admin"))))
 
     # ---- 4b. LE PORTE DEL CLIENT ----------------------------------
     _car = pezzo_js(mini, "async function caricaRaccontiAdmin(){")
     _ant = pezzo_js(mini, "async function apriAnteprimaRacconto(slug){")
     prova("l'anteprima chiede il testo alla porta admin", (True, True),
           ("/admin/racconti`" in _car, "caricaRaccontiAdmin()" in _ant))
+    # ...O A QUELLA DEL VENDITORE (set 2026): e la sua e' /api/me
+    _cm = pezzo_js(mini, "async function caricaRaccontiMiei(){")
+    prova("...o alla porta del venditore, che e' la sua", (True, True),
+          ("caricaRaccontiMiei()" in _ant, "/me/racconti`" in _cm))
+    # L'AVVISO DEL VENDITORE: le parole di Andrea, il bottone della chat
+    # privata con noi, e NESSUN gesto da moderatore — pubblicare resta
+    # dei soli moderatori, e un «Pubblica» qui sarebbe una porta aperta
+    # anche se il server poi dicesse 403.
+    _avv = pezzo_js(mini, "function avvisoBozzaRacconto(r){")
+    _ven = _avv[:_avv.index("const slug")]
+    prova("al venditore l'avviso con le parole di Andrea", (True, True),
+          ("Anteprima: questa pagina la vedi solo tu." in _ven,
+           "Se va bene, scrivici e la pubblichiamo." in _ven))
+    prova("...col bottone della chat con Barattolo", True,
+          'onclick="apriContattoDati()"' in _ven)
+    prova("...e nessun gesto da moderatore", False, "decidiRacconto" in _ven)
+    # SUL SUO NEGOZIO la bozza la vede sempre: se il negozio aperto e'
+    # il suo, prima di disegnare si chiede alla porta sua — e solo le
+    # BOZZE, che una pubblicata la porta gia' il negozio a tutti
+    _an = pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima){")
+    prova("sul suo negozio il venditore chiede la sua bozza", True,
+          "d.venditore.negozio === myNegozio" in _an
+          and "anteprima = await bozzaDelVenditore(myNegozio);" in _an)
+    prova("...e solo le bozze", True,
+          "x.stato !== 'pubblicato'" in pezzo_js(
+              mini, "async function bozzaDelVenditore(codice){"))
+    # IL CASSETTO DEL PANNELLO ha il messaggio pronto per lui, finche' la
+    # pagina e' in bozza e il venditore c'e' davvero
+    _box = pezzo_js(mini, "function boxRacconti(lista){")
+    prova("il cassetto ha il messaggio per il venditore", True,
+          "Copia il link per il venditore" in _box
+          and "copiaMessaggioVenditore('${slug}')" in _box
+          and "trovato && !pubblicata" in _box)
     # UN POSTO SOLO appende una pagina a un negozio nel client, ed e'
     # l'anteprima: il resto la riceve dal server gia' decisa. Si conta
     # sul CODICE, senza la prosa che lo racconta.
@@ -41236,11 +41342,13 @@ def prove_racconti_bozza():
         return mini[i:j + len(fine)]
 
     js = ("let raccontoAperto = false, sponsorVivo = '';\n"
+          + "let admRacconti = [];\n"
           + pezzo_js(mini, "const esc = ", "\nconst el =") + "\n"
           + _fetta("const RACCONTI = {", "\n};") + "\n"
           + _fetta("function raccontoDi(v){", "\n}") + "\n"
           + _fetta("function raccontoNegozio(v){", "\n}") + "\n"
           + _fetta("function avvisoBozzaRacconto(r){", "\n}") + "\n"
+          + _fetta("function copiaMessaggioVenditore(slug){", "\n}") + "\n"
           + "const CAT = " + _json.dumps(CAT, ensure_ascii=False) + ";\n"
           + _BANCO_BOZZA)
     with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
@@ -41314,6 +41422,24 @@ for (const slug of Object.keys(CAT)) {
        raccontoNegozio({negozio: '', racconto: Object.assign({}, r,
          {negozio: ''})}) === '' ? '' : 'uscita');
 
+  // 3b. IL VENDITORE, sul suo negozio (set 2026): l avviso suo, con le
+  // parole di Andrea e la chat con noi, i segnaposto delle foto (sono
+  // lui a doverle mandare) e NESSUN gesto da moderatore
+  const ven = raccontoNegozio(mio({foto: false, anteprima: 'venditore',
+                                   stato: 'bozza'}));
+  dice('al venditore il suo avviso, con le parole di Andrea', [1, 1],
+       [conta(ven, 'Anteprima: questa pagina la vedi solo tu.'),
+        conta(ven, 'Se va bene, scrivici e la pubblichiamo.')]);
+  dice('...col bottone della chat con Barattolo', 1,
+       conta(ven, 'onclick="apriContattoDati()"'));
+  dice('...e nessun gesto da moderatore', [0, 0],
+       [conta(ven, 'decidiRacconto('), conta(ven, 'la vedono i moderatori')]);
+  dice('...ma coi segnaposto delle foto', foto.length + 1,
+       conta(ven, 'class="rac-segnaposto'));
+  dice('...e l avviso sta in cima, prima della testa', true,
+       ven.indexOf('class="rac-bozza"') >= 0
+       && ven.indexOf('class="rac-bozza"') < ven.indexOf('class="rac-testa"'));
+
   // 4. PUBBLICATA, in anteprima: il gesto si rovescia
   const pb = raccontoNegozio(mio({anteprima: true, stato: 'pubblicato'}));
   dice('pubblicata, l anteprima offre di rimetterla in bozza', [1, 0],
@@ -41359,6 +41485,30 @@ dice('lo spazio sponsorizzato esce ancora dal catalogo di casa', true,
      tm.includes('<span class="rac-pill">📣 Consigliato</span>'));
 dice('...con le sue foto dalla sua cartella', true,
      tm.includes('/assets/racconti/' + s0 + '-cop.webp'));
+
+// 9. IL MESSAGGIO PRONTO PER IL VENDITORE, composto davvero: il primo
+// nome, il link della leva, le due strade (il browser e l app) e la
+// chiusa di Andrea. Gli appunti sono un cartone che tiene il testo.
+let preso = '';
+function copiaLink(t){ preso = t; }
+function baseCondivisione(){ return 'https://barattolo.store'; }
+const s1 = Object.keys(CAT)[0];
+admRacconti = [{slug: s1, titolo: CAT[s1].titolo, emoji: CAT[s1].emoji,
+                venditore: {trovato: true, nome: 'Mario R.'}}];
+copiaMessaggioVenditore(s1);
+dice('il messaggio saluta col primo nome e dice la pagina', true,
+     preso.startsWith('Ciao Mario! ' + CAT[s1].emoji + ' La pagina di '
+                      + CAT[s1].titolo + ' su Barattolo'));
+dice('...porta il link della leva', true,
+     preso.includes('https://barattolo.store/?bozza=' + s1));
+dice('...dice le due strade e chiude con le parole di Andrea',
+     [true, true, true],
+     [preso.includes('entra con Telegram'), preso.includes('sul tuo negozio'),
+      preso.endsWith('Se va bene, scrivici e la pubblichiamo!')]);
+admRacconti[0].venditore.nome = '';
+copiaMessaggioVenditore(s1);
+dice('...e senza un nome non se ne inventa uno', true,
+     preso.startsWith('Ciao! ' + CAT[s1].emoji + ' La pagina'));
 """
 
 

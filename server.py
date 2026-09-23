@@ -1892,16 +1892,26 @@ def imposta_sponsor(slug: str, fino: int) -> str:
 # ======== LE PAGINE DEI NEGOZI CONSIGLIATI, IN BOZZA (set 2026) ========
 # La gemella dello spazio sponsorizzato, con una differenza sola che
 # decide tutto il resto: queste pagine NASCONO IN BOZZA, e una bozza la
-# vedono i moderatori e nessun altro — fuori da vetrina, ricerca, link
-# condivisi e anteprime finche' un moderatore non la pubblica.
+# vedono i moderatori e il VENDITORE della pagina (sul suo negozio) —
+# nessun altro, e fuori da vetrina, ricerca, link condivisi e anteprime
+# finche' un moderatore non la pubblica.
 #
 # IL TESTO VIVE IN `racconti.py`, NON NEL CLIENT, ed e' la riga da non
 # «semplificare» riportandolo accanto a To The Mooon: il catalogo
 # `RACCONTI` di miniapp.html viaggia dentro la pagina a CHIUNQUE la
 # apra, quindi una bozza scritta li' sarebbe leggibile nel sorgente da
-# tutti. Da qui il testo esce da DUE porte sole: `/api/negozio`, e
-# solo a pagina pubblicata (`racconto_pubblico`); e
-# `/api/admin/racconti`, che risponde 403 a chi non e' moderatore.
+# tutti. Da qui il testo esce da TRE porte sole: `/api/negozio`, e
+# solo a pagina pubblicata (`racconto_pubblico`); `/api/admin/racconti`,
+# che risponde 403 a chi non e' moderatore; e `/api/me/racconti`, che al
+# venditore da' le pagine del SUO negozio e a chiunque altro niente.
+# Ognuna sa di chi e': quella pubblica non guarda chi bussa, le altre
+# due guardano SOLO quello.
+#
+# IL LEGAME PAGINA → NEGOZIO ha due forme nel catalogo, e la prima vince
+# sempre: il CODICE negozio (pubblico, la forma di casa) o il tg_id del
+# venditore (`venditore_tg`, l'eccezione dichiarata in `racconti.py`).
+# Il tg_id si usa per trovare il negozio e NON ESCE MAI: non e' fra i
+# CAMPI_RACCONTO, e le risposte portano il CODICE risolto.
 #
 # LO STATO VIVE IN `impostazioni` — `racconto_pubblicato:<slug>` e' il
 # momento della pubblicazione, vuoto vuol dire bozza — e il recinto lo
@@ -1942,27 +1952,106 @@ def _racconto_dati(slug: str, r: dict) -> dict:
     return d
 
 
-def racconto_pubblico(codice: str) -> dict | None:
-    """IL RACCONTO CHE ESCE COL NEGOZIO, A CHIUNQUE: solo PUBBLICATO, e
-    solo sul negozio del suo codice.
+def _e_suo(r: dict, codice: str, tg_id) -> bool:
+    """LA PAGINA E' DEL NEGOZIO (codice, tg_id)? In memoria, senza query,
+    con la precedenza del catalogo: se la pagina porta un CODICE conta
+    SOLO quello, e il tg_id si guarda soltanto quando il codice manca —
+    due riferimenti che puntassero a due negozi diversi non devono poter
+    accendere la pagina su tutt'e due.
+    Fail-closed: un negozio senza codice non combacia con niente."""
+    if not codice:
+        return False
+    if r.get("negozio"):
+        return r["negozio"] == codice
+    try:
+        return bool(r.get("venditore_tg")) and tg_id is not None \
+            and int(r["venditore_tg"]) == int(tg_id)
+    except (TypeError, ValueError):
+        return False
 
-    LA BOZZA DA QUI NON ESCE MAI, nemmeno per un moderatore — lui la
-    guarda dalla porta sua, `/api/admin/racconti`. Questa funzione non
-    sa chi sta chiedendo e non deve saperlo: una rotta pubblica che
+
+def _venditore_racconto(con, r: dict):
+    """IL NEGOZIO DI UNA PAGINA, dal suo riferimento nel catalogo: la
+    riga di `utenti` (tg_id, negozio, nome), o None se il riferimento
+    manca o non e' di nessuno. Stessa precedenza di `_e_suo`: col codice
+    si cerca il codice, e il tg_id solo quando il codice manca."""
+    if r.get("negozio"):
+        return con.execute("SELECT tg_id, negozio, nome FROM utenti "
+                           "WHERE negozio=? LIMIT 1",
+                           (r["negozio"],)).fetchone()
+    try:
+        tg = int(r.get("venditore_tg") or 0)
+    except (TypeError, ValueError):
+        tg = 0
+    if not tg:
+        return None
+    return con.execute("SELECT tg_id, negozio, nome FROM utenti "
+                       "WHERE tg_id=? LIMIT 1", (tg,)).fetchone()
+
+
+def racconto_pubblico(codice: str, tg_id=None) -> dict | None:
+    """IL RACCONTO CHE ESCE COL NEGOZIO, A CHIUNQUE: solo PUBBLICATO, e
+    solo sul negozio suo (`_e_suo`: il codice, o il tg_id quando il
+    catalogo non ha il codice).
+
+    LA BOZZA DA QUI NON ESCE MAI, nemmeno per un moderatore o per il
+    venditore stesso — la guardano dalle porte loro,
+    `/api/admin/racconti` e `/api/me/racconti`. Questa funzione non sa
+    chi sta chiedendo e non deve saperlo: una rotta pubblica che
     rispondesse diverso a seconda di chi bussa sarebbe un secondo
-    giudice della bozza da tenere in pari col primo.
+    giudice della bozza da tenere in pari col primo. Il tg_id che riceve
+    e' quello del NEGOZIO servito, mai di chi guarda.
+
+    Il `negozio` che esce e' il CODICE del negozio servito: e' quello che
+    il client riconfronta, e per una pagina legata col tg_id il catalogo
+    un codice non ce l'ha.
 
     Fail-closed: un codice vuoto non combacia con niente, e un racconto
-    senza codice nel catalogo non esce da nessuna parte. Lo stato si
-    legge solo per il negozio che combacia: per tutti gli altri negozi
+    senza riferimento nel catalogo non esce da nessuna parte. Lo stato
+    si legge solo per il negozio che combacia: per tutti gli altri
     questa e' una scorsa del dizionario, nessuna query."""
     if not codice:
         return None
     for slug, r in RACCONTI_NEGOZI.items():
-        if r.get("negozio") and r["negozio"] == codice \
-                and racconto_stato(slug) == "pubblicato":
-            return _racconto_dati(slug, r)
+        if _e_suo(r, codice, tg_id) and racconto_stato(slug) == "pubblicato":
+            d = _racconto_dati(slug, r)
+            d["negozio"] = codice
+            return d
     return None
+
+
+@app.get("/api/me/racconti")
+def miei_racconti(x_tg_init_data: str = Header(""),
+                  barattolo_sessione: str = Cookie("")):
+    """LA PORTA DEL VENDITORE (set 2026): le pagine che parlano del SUO
+    negozio, bozze comprese, col testo intero — cosi' la bozza la vede
+    anche lui, sul suo negozio e dal link della leva, PRIMA che un
+    moderatore la pubblichi. Pubblicare resta un gesto dei soli
+    moderatori: da qui non si scrive niente.
+
+    A CHIUNQUE ALTRO UNA LISTA VUOTA, e non un 403: la domanda e' «cosa
+    c'e' di mio?», e a chi non ha niente la risposta giusta e' niente —
+    senza dire se altrove esiste una bozza. L'anonimo prende il 401 di
+    `verifica_utente`, come in tutte le porte `/api/me`.
+    Il negozio si legge dal database per il tg_id di CHI BUSSA — mai da
+    un parametro — e `_e_suo` lo confronta col catalogo; ne esce il
+    codice risolto, mai il tg_id."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        io = con.execute("SELECT tg_id, negozio FROM utenti WHERE tg_id=?",
+                         (user["id"],)).fetchone()
+    finally:
+        con.close()
+    fuori = []
+    if io and io["negozio"]:
+        for slug, r in RACCONTI_NEGOZI.items():
+            if _e_suo(r, io["negozio"], io["tg_id"]):
+                d = _racconto_dati(slug, r)
+                d["negozio"] = io["negozio"]
+                d["stato"] = racconto_stato(slug)
+                fuori.append(d)
+    return {"racconti": fuori}
 
 
 @app.get("/api/admin/racconti")
@@ -1974,9 +2063,12 @@ def lista_racconti_admin(x_tg_init_data: str = Header(""),
     `/?bozza=<slug>`, che la pagina gira qui).
     Il 403 sta PRIMA di guardare il catalogo: a chi non e' moderatore
     non si dice nemmeno se una bozza esiste.
-    Col venditore collegato esce anche il suo nome, o `trovato: False`
-    se il codice scritto nel catalogo non e' di nessun negozio — che e'
-    il refuso da vedere PRIMA di pubblicare, non dopo."""
+    Col venditore collegato esce anche il suo nome, e il `negozio` e' il
+    CODICE RISOLTO — anche quando il catalogo lo lega col tg_id, che da
+    qui non esce: e' il codice che l'anteprima apre, e quello che il
+    cassetto mostra perche' lo si possa scrivere nel catalogo al posto
+    del tg_id. `trovato: False` se il riferimento non porta a nessun
+    negozio — il refuso da vedere PRIMA di pubblicare, non dopo."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not e_admin(user["id"]):
         raise HTTPException(403, "Riservato ai moderatori")
@@ -1992,11 +2084,14 @@ def lista_racconti_admin(x_tg_init_data: str = Header(""),
             except ValueError:
                 d["pubblicato_il"] = 0
             d["venditore"] = None
-            if r.get("negozio"):
-                v = con.execute("SELECT nome FROM utenti WHERE negozio=? "
-                                "LIMIT 1", (r["negozio"],)).fetchone()
-                d["venditore"] = ({"trovato": True, "nome": v["nome"] or ""}
-                                  if v else {"trovato": False, "nome": ""})
+            if r.get("negozio") or r.get("venditore_tg"):
+                v = _venditore_racconto(con, r)
+                if v and v["negozio"]:
+                    d["negozio"] = v["negozio"]
+                    d["venditore"] = {"trovato": True, "nome": v["nome"] or ""}
+                else:
+                    d["negozio"] = ""
+                    d["venditore"] = {"trovato": False, "nome": ""}
             fuori.append(d)
     finally:
         con.close()
@@ -2031,17 +2126,17 @@ async def decidi_racconto_admin(slug: str, req: Request,
         raise HTTPException(404, "Pagina non trovata")
     titolo = html.escape(r.get("titolo") or slug)
     if esito == "pubblica":
-        if not r.get("negozio"):
-            raise HTTPException(409, "Manca il venditore: senza il codice "
-                                     "del suo negozio la pagina non ha "
-                                     "dove uscire")
+        if not (r.get("negozio") or r.get("venditore_tg")):
+            raise HTTPException(409, "Manca il venditore: senza il suo "
+                                     "negozio la pagina non ha dove uscire")
         con = db()
-        v = con.execute("SELECT 1 FROM utenti WHERE negozio=? LIMIT 1",
-                        (r["negozio"],)).fetchone()
-        con.close()
-        if not v:
-            raise HTTPException(409, "Il codice negozio scritto per questa "
-                                     "pagina non è di nessun negozio")
+        try:
+            v = _venditore_racconto(con, r)
+        finally:
+            con.close()
+        if not (v and v["negozio"]):
+            raise HTTPException(409, "Il venditore scritto per questa "
+                                     "pagina non ha un negozio su Barattolo")
         scrivi_impostazione(f"racconto_pubblicato:{slug}",
                             str(int(time.time())))
         await notifica_admin(f"📖 Pagina «{titolo}» pubblicata "
@@ -2052,7 +2147,8 @@ async def decidi_racconto_admin(slug: str, req: Request,
     await notifica_admin(f"📝 Pagina «{titolo}» rimessa in bozza "
                          f"(da tg {user['id']})")
     return {"ok": True, "stato": "bozza",
-            "detto": "📝 Rimessa in bozza: la vedono solo i moderatori"}
+            "detto": "📝 Rimessa in bozza: la vedono solo i moderatori "
+                     "e il venditore"}
 
 
 def nuovo_codice_negozio(con) -> str:
@@ -19645,12 +19741,15 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
         bool(annunci))
     # LA PAGINA DI UN NEGOZIO CONSIGLIATO (set 2026), dal suo giudice:
     # SOLO PUBBLICATA. La bozza da questa rotta non esce mai, nemmeno
-    # per un moderatore che bussa col suo initData — la guarda dalla
-    # porta sua, `/api/admin/racconti` (vedi `racconto_pubblico`).
+    # per un moderatore o per il venditore che bussano col loro initData
+    # — la guardano dalle porte loro, `/api/admin/racconti` e
+    # `/api/me/racconti` (vedi `racconto_pubblico`). Il tg_id che passa
+    # e' quello del NEGOZIO servito, per le pagine legate col tg_id:
+    # chi guarda non entra in questa riga.
     # In prima pagina come l'insegna, e la chiave c'e' SEMPRE: `None`
     # quando non c'e' niente da mostrare.
     venditore["racconto"] = (None if cursore
-                             else racconto_pubblico(v["negozio"]))
+                             else racconto_pubblico(v["negozio"], v["tg_id"]))
     # e i campi grezzi non escono MAI: un banner in revisione o spento
     # non ha nessun motivo di far sapere in giro dove punterebbe
     del venditore["banner_stato"], venditore["banner_foto"]

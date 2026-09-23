@@ -15676,7 +15676,11 @@ function renderClassifica(){
    renderPrivacy() non esiste piu'.
    La stringa vive QUI e mai dentro un onclick (il patto di
    linkCanaleTest); dentro Telegram apre il client, fuori una scheda
-   nuova — la scala di apriCanaleTest, che il t.me lo sa gestire. */
+   nuova — la scala di apriCanaleTest, che il t.me lo sa gestire.
+   IL SECONDO CHIAMANTE (set 2026) e' l'anteprima del venditore di una
+   pagina consigliata («Se va bene, scrivici e la pubblichiamo»): stessa
+   ragione, si parla di UNA persona e della SUA pagina, e la risposta e'
+   privata. */
 const CONTATTO_DATI = 'https://t.me/barattolostore?direct';
 function apriContattoDati(){
   if (tg?.initData && tg.openTelegramLink) {
@@ -15724,7 +15728,13 @@ let raccontoAperto = false;
    profilo del negozio appena arrivato, e vale per QUESTO disegno e
    basta — nessuna variabile la ricorda, quindi il giro dopo (un
    ridisegno, il tasto indietro, un altro negozio) torna a mostrare
-   quel che vedono tutti. */
+   quel che vedono tutti.
+   IL VENDITORE SUL SUO NEGOZIO la bozza la vede SEMPRE (set 2026,
+   decisione di Andrea): se la pagina aperta e' la sua, prima di
+   disegnare si chiede alla porta sua (`bozzaDelVenditore`) se c'e' una
+   pagina in bozza che parla di lui. Si guarda il CODICE del negozio,
+   che e' l'identita' vera — e a dire se la bozza e' sua e' comunque il
+   server, che gliela manda solo se lo e'. */
 async function apriNegozio(chi, aperto, anteprima){
   if (!chi) { toast('Questo venditore non ha ancora un negozio'); return; }
   raccontoAperto = !!aperto;
@@ -15739,6 +15749,9 @@ async function apriNegozio(chi, aperto, anteprima){
     /* Gli annunci del negozio entrano anche nel catalogo in memoria:
        cosi' openDetail li trova pure arrivando dal link diretto */
     inCatalogo(annunci);
+    if (!anteprima && !DEMO && !VETRINA && myNegozio && d.venditore
+        && d.venditore.negozio === myNegozio)
+      anteprima = await bozzaDelVenditore(myNegozio);
     if (anteprima && d.venditore) d.venditore.racconto = anteprima;
     renderNegozio(d.venditore, annunci, d.feedback||[], d.esauriti||[]);
   } catch(e) { toast('Negozio non trovato'); }
@@ -16122,8 +16135,22 @@ function raccontoNegozio(v){
    bottone non c'e': il server rifiuterebbe comunque, e un bottone che
    porta a un muro e' peggio di un bottone che non c'e'.
    Lo slug finisce in un onclick: passa dal filtro-alfabeto della sua
-   forma, anche se e' roba nostra. */
+   forma, anche se e' roba nostra.
+   L'AVVISO DEL VENDITORE (set 2026) e' un altro, e viene per primo:
+   la sua anteprima, sul suo negozio. Le parole sono quelle di Andrea, e
+   il gesto e' UNO — la chat privata con noi, la stessa di «Scrivici per
+   i tuoi dati» (`apriContattoDati`), dove risponde una persona.
+   Pubblicare resta dei soli moderatori: in questo ramo un «Pubblica»
+   non c'e', e c'e' la prova che non ci arrivi. */
 function avvisoBozzaRacconto(r){
+  if (r.anteprima === 'venditore')
+    return `
+      <div class="rac-bozza">
+        <b>Anteprima: questa pagina la vedi solo tu.</b>
+        <span>Se va bene, scrivici e la pubblichiamo.</span>
+        <button class="btn orange rac-bozza-gesto"
+                onclick="apriContattoDati()">💬 Scrivi a Barattolo</button>
+      </div>`;
   const slug = String(r.slug || '').replace(/[^a-z0-9-]/g, '');
   const pubblicata = r.stato === 'pubblicato';
   const gesto = pubblicata
@@ -16136,6 +16163,7 @@ function avvisoBozzaRacconto(r){
   return `
       <div class="rac-bozza">
         <b>${pubblicata ? '✅ Pubblicata · la vede chi apre il negozio'
+                        : r.negozio ? '📝 Bozza · la vedono i moderatori e il venditore'
                         : '📝 Bozza · la vedono solo i moderatori'}</b>
         ${pubblicata ? '' : `<span>Fuori da qui non esiste: niente vetrina,
           ricerca, link condivisi né anteprime.</span>`}
@@ -16181,7 +16209,12 @@ function acquistaDalRacconto(){
    sopra la merce (`apriNegozio`, terzo argomento); senza, la pagina si
    mostra da sola, con un segnaposto dove andra' il negozio.
    Ci si arriva da due porte: il cassetto del pannello e il link
-   `/?bozza=<slug>` (la leva, `apriBozzaDaUrl`). */
+   `/?bozza=<slug>` (la leva, `apriBozzaDaUrl`).
+   E IL VENDITORE HA LA SUA (set 2026): `/api/me/racconti`, che gli da'
+   le pagine del SUO negozio e a chiunque altro una lista vuota. Il
+   client sceglie quale porta chiedere con `isAdmin`, che e' solo un
+   indirizzo: se sbagliasse, la porta sbagliata risponderebbe 403 o
+   niente — a decidere chi vede cosa resta il server. */
 let admRacconti = [];
 async function caricaRaccontiAdmin(){
   const r = await fetch(`${API_BASE}/admin/racconti`,
@@ -16191,18 +16224,49 @@ async function caricaRaccontiAdmin(){
   return admRacconti;
 }
 
+async function caricaRaccontiMiei(){
+  const r = await fetch(`${API_BASE}/me/racconti`,
+    {headers:{'X-Tg-Init-Data': authHdr()}});
+  if (!r.ok) { const e = new Error('racconti'); e.stato = r.status; throw e; }
+  return (await r.json()).racconti || [];
+}
+
+/* La bozza che parla del venditore, per il SUO negozio: vestita da
+   anteprima sua, o null. Solo le BOZZE — una pagina pubblicata la
+   porta gia' il negozio a tutti. Fail-open: se la porta non risponde
+   il negozio si apre lo stesso, senza la bozza sopra. */
+async function bozzaDelVenditore(codice){
+  try {
+    const b = (await caricaRaccontiMiei()).find(
+      x => x.stato !== 'pubblicato' && x.negozio === codice);
+    return b ? Object.assign({}, b, {anteprima: 'venditore'}) : null;
+  } catch(e) { return null; }
+}
+
 async function apriAnteprimaRacconto(slug){
   let lista;
-  try { lista = await caricaRaccontiAdmin(); }
+  try { lista = isAdmin ? await caricaRaccontiAdmin()
+                        : await caricaRaccontiMiei(); }
   catch(e) {
-    toast(e.stato === 401 ? 'Entra col tuo account da moderatore per vedere l\'anteprima'
-        : e.stato === 403 ? 'Questa anteprima la vedono solo i moderatori'
+    toast(e.stato === 401 ? 'Entra col tuo account per vedere l\'anteprima'
+        : e.stato === 403 ? 'Questa anteprima la vedono solo i moderatori e il venditore'
         : 'Rete assente: riprova');
     return;
   }
   const d = lista.find(x => x.slug === slug);
-  if (!d) { toast('Questa pagina non esiste'); return; }
-  const bozza = Object.assign({}, d, {anteprima: true});
+  if (!d) {
+    toast(isAdmin ? 'Questa pagina non esiste'
+                  : 'Questa anteprima la vedono solo i moderatori e il venditore');
+    return;
+  }
+  if (!isAdmin) {
+    /* il venditore: sul SUO negozio, col suo avviso — e se la pagina e'
+       gia' pubblicata, il negozio di sempre, che la porta a tutti */
+    if (d.stato === 'pubblicato') return apriNegozio(d.negozio, true);
+    return apriNegozio(d.negozio, true,
+                       Object.assign({}, d, {anteprima: 'venditore'}));
+  }
+  const bozza = Object.assign({}, d, {anteprima: 'moderatore'});
   if (d.negozio) return apriNegozio(d.negozio, true, bozza);
   renderAnteprimaSenzaNegozio(bozza);
 }
@@ -16248,7 +16312,7 @@ function decidiRacconto(slug, esito){
            + 'la pagina esce senza immagini.' : '')
         + '\n\nSi rimette in bozza quando vuoi.'
       : 'Sparisce subito dal negozio: da qui in poi la vedono solo i '
-        + 'moderatori.',
+        + 'moderatori e il venditore.',
     etichetta: pubblica ? '✅ Pubblica' : '📝 Rimetti in bozza',
     poi: async () => {
       try {
@@ -16270,10 +16334,35 @@ function decidiRacconto(slug, esito){
 
 /* Il link della leva, da girare a un altro moderatore: sulla HOME e non
    sul negozio, cosi' funziona anche prima che il venditore sia
-   collegato — e chi non e' moderatore, aprendolo, resta sulla home. */
+   collegato — e chi non e' moderatore ne' il venditore, aprendolo,
+   resta sulla home. */
 function copiaLinkAnteprima(slug){
   copiaLink(`${baseCondivisione()}/?bozza=${encodeURIComponent(slug)}`,
-            '📋 Link dell\'anteprima copiato: si apre solo ai moderatori');
+            '📋 Link dell\'anteprima copiato: si apre solo ai moderatori '
+            + 'e al venditore');
+}
+
+/* IL MESSAGGIO PRONTO PER IL VENDITORE (set 2026, chiesto da Andrea):
+   lo stesso link della leva, dentro una frase da incollargli in chat.
+   Dice le DUE strade, perche' una sola non basta: il link si apre nel
+   browser di Telegram, dove si entra col bottone di Telegram in alto;
+   dentro l'app la bozza gli compare da sola sul suo negozio. Il nome e'
+   il primo del suo profilo, e un nome vuoto fa solo «Ciao!». Testo
+   nudo verso gli appunti, niente markup. */
+function copiaMessaggioVenditore(slug){
+  const r = admRacconti.find(x => x.slug === slug) || {};
+  const nome = String((r.venditore && r.venditore.nome) || '').trim()
+    .split(/\s+/)[0] || '';
+  const link = `${baseCondivisione()}/?bozza=${encodeURIComponent(slug)}`;
+  const saluto = `Ciao${nome ? ' ' + nome : ''}!` + (r.emoji ? ` ${r.emoji}` : '');
+  const testo = `${saluto} La pagina di ${r.titolo || slug} su Barattolo `
+    + `è pronta in anteprima: per ora la vedi solo tu.\n`
+    + `Aprila da qui: ${link}\n`
+    + `(se te lo chiede, entra con Telegram). La trovi anche nell'app, `
+    + `sul tuo negozio: Profilo → «Guarda il tuo negozio come lo vedono `
+    + `tutti».\n`
+    + `Se va bene, scrivici e la pubblichiamo!`;
+  copiaLink(testo, '📋 Messaggio per il venditore copiato');
 }
 
 function renderNegozio(v, annunci, feedback=[], esauriti=[]){
@@ -35710,17 +35799,27 @@ const cassettoAdm = (id, em, titolo, conta, dentro) => `
    link da moderatore, pubblicarla o rimetterla in bozza. Senza
    venditore il «Pubblica» non c'e': il server rifiuterebbe, e un
    bottone che porta a un muro e' peggio di uno che non c'e'.
-   Gli slug finiscono negli onclick: filtro-alfabeto sulla loro forma. */
+   Gli slug finiscono negli onclick: filtro-alfabeto sulla loro forma.
+   IL VENDITORE COLLEGATO (set 2026) si legge col CODICE del suo negozio
+   accanto al nome — e' quello che il server ha risolto, ed e' anche la
+   riga da scrivere nel catalogo il giorno che al posto del tg_id si
+   vuole il codice. E per lui c'e' il messaggio pronto da mandargli
+   finche' la pagina e' in bozza (`copiaMessaggioVenditore`). */
 function boxRacconti(lista){
   if (!lista || !lista.length) return '';
   const bozze = lista.filter(r => r.stato !== 'pubblicato').length;
   const righe = lista.map(r => {
     const slug = String(r.slug || '').replace(/[^a-z0-9-]/g, '');
     const pubblicata = r.stato === 'pubblicato';
-    const vend = !r.negozio ? '🔗 Venditore da collegare'
-      : (r.venditore && r.venditore.trovato)
-      ? `🏪 ${esc(r.venditore.nome || r.negozio)}`
-      : `⚠️ Il codice ${esc(r.negozio)} non è di nessun negozio`;
+    const trovato = !!(r.venditore && r.venditore.trovato && r.negozio);
+    const vend = !r.venditore ? '🔗 Venditore da collegare'
+      : trovato
+      ? `🏪 ${esc(r.venditore.nome || '—')} · <span class="mono">${esc(r.negozio)}</span>`
+      : '⚠️ Il venditore scritto per questa pagina non ha un negozio su Barattolo';
+    const perLui = trovato && !pubblicata
+      ? `<button class="btn ghost" style="margin-top:8px"
+           onclick="copiaMessaggioVenditore('${slug}')">🔗 Copia il link per il venditore</button>`
+      : '';
     const gesto = pubblicata
       ? `<button class="btn ghost" style="margin-top:8px"
            onclick="decidiRacconto('${slug}','bozza')">📝 Rimetti in bozza</button>`
@@ -35739,12 +35838,13 @@ function boxRacconti(lista){
           <button class="btn ghost" onclick="apriAnteprimaRacconto('${slug}')">👁 Anteprima</button>
           <button class="btn ghost" onclick="copiaLinkAnteprima('${slug}')">🔗 Copia il link</button>
         </div>
+        ${perLui}
         ${gesto}
       </div>`;
   }).join('');
   return cassettoAdm('accAdmRacconti', '📖', 'Negozi consigliati',
     bozze ? `${bozze} in bozza` : `${lista.length} pubblicat${lista.length === 1 ? 'a' : 'e'}`, `
-    <div class="sub">Una pagina in bozza la vedete solo voi moderatori: fuori da vetrina, ricerca, link condivisi e anteprime finché non la pubblicate. Il link dell'anteprima si apre solo a chi è moderatore.</div>
+    <div class="sub">Una pagina in bozza la vedete voi moderatori e, sul suo negozio, il suo venditore: fuori da vetrina, ricerca, link condivisi e anteprime finché non la pubblicate. Il link dell'anteprima si apre solo a voi e a lui.</div>
     <div style="margin-top:10px">${righe}</div>`);
 }
 
@@ -52490,9 +52590,11 @@ async function apriBarattoloDaUrl(){
    voluto: sta sulla home, che ha la sua anteprima generica, quindi un
    link girato a chiunque non mostra niente della bozza — ne' qui ne'
    nelle anteprime dei social, che il parametro non lo leggono.
-   A decidere se si apre e' la rotta admin, non questa riga: chi non e'
-   moderatore resta sulla home con un avviso. Lo slug passa dalla sua
-   FORMA (quella di `FORMA_RACCONTO`) prima di andare da qualche parte. */
+   A decidere se si apre sono le porte del server, non questa riga: ai
+   moderatori la loro, al venditore della pagina la sua (set 2026), e
+   chiunque altro resta sulla home con un avviso. Lo slug passa dalla
+   sua FORMA (quella di `FORMA_RACCONTO`) prima di andare da qualche
+   parte. */
 const BOZZA_URL = (location.search.match(/[?&]bozza=([a-z0-9-]{2,40})(?:&|$)/) || [])[1] || '';
 let bozzaAperta = false;
 function apriBozzaDaUrl(){
