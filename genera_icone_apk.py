@@ -37,7 +37,14 @@
 #      sotto ce lo mette gia' backgroundColor;
 #   7. rimette org.gradle.jvmargs=-Xmx1024m in gradle.properties
 #      (bubblewrap update lo toglie, e il VPS-di-casa di Andrea ne
-#      ha bisogno per non affogare il build).
+#      ha bisogno per non affogare il build);
+#   8. rimette in LauncherActivity.java il PERMESSO DELLO SPLASH (set
+#      2026), la cura del difetto di Chrome 152+: senza, lo splash non
+#      arriva a Chrome e la sua finestra entra da destra SCURA per mezzo
+#      secondo prima della pagina (android-browser-helper#623). E' il
+#      primo passo, e se l'ancora non c'e' lo script si FERMA prima di
+#      toccare qualunque file: un APK uscito senza la cura sembrerebbe
+#      giusto in tutto, tranne che sul telefono.
 #
 # Uso (dalla cartella del repo):
 #   python genera_icone_apk.py [percorso-progetto-twa]
@@ -80,6 +87,54 @@ IC_LAUNCHER_XML = """<!--
     <monochrome android:drawable="@mipmap/ic_launcher_monochrome" />
 </adaptive-icon>
 """
+
+# IL PERMESSO DELLO SPLASH (set 2026). La libreria dello splash
+# (androidbrowserhelper 2.6.2, TrustedWebUtils.transferSplashImage) da'
+# a CHROME il permesso di leggere il PNG dello splash e poi gli chiede
+# di prenderlo. Da Chrome 152 (stabile il 25 ago 2026) receiveFile()
+# controlla anche che CHI CONSEGNA abbia il permesso su quell'URI — e il
+# proprietario del FileProvider non ha un record esplicito, perche'
+# Android non lo scrive a chi possiede gia' la cassetta. Chrome dice no,
+# la libreria scrive «Failed to transfer splash image.», lancia Chrome
+# SENZA i parametri dello splash e SENZA spegnere l'animazione: la
+# finestra entra da destra, scura, finche' la pagina non disegna.
+# La cura (android-browser-helper#623): ce lo diamo da soli, col flag
+# PERSISTABLE che costringe il sistema a scrivere il record, PRIMA di
+# super.onCreate() — che e' il gesto che avvia la consegna.
+# ⚠️ I due nomi del file sono costanti della LIBRERIA (FOLDER_NAME e
+# FILE_NAME di SplashImageTransferTask, lette col javap sul 2.6.2): se
+# un aggiornamento li cambia, il permesso finisce su un URI che nessuno
+# usa e il difetto torna in silenzio. L'autorita' invece si legge dalla
+# stessa risorsa da cui la legge la libreria (@string/providerAuthority,
+# via il meta-data FILE_PROVIDER_AUTHORITY), quindi non puo' divergere.
+MARCATORE_PERMESSO = "Barattolo: permesso dello splash"
+PERMESSO_SPLASH = f"""\
+// {MARCATORE_PERMESSO} (Chrome 152+, android-browser-helper#623).
+// Chrome pretende che ANCHE chi consegna il file abbia il permesso
+// sull'URI, e il proprietario del FileProvider non ha un record
+// esplicito: receiveFile() dice no e la finestra di Chrome entra scura.
+// Il permesso ce lo diamo da soli; PERSISTABLE e' il flag che costringe
+// il sistema a scriverlo. PRIMA di super.onCreate(), che avvia la
+// consegna; il file puo' non esserci ancora. Rimesso a ogni build da
+// genera_icone_apk.py (repo satmarket): bubblewrap update lo cancella.
+try {{
+    java.io.File splash = new java.io.File(
+            new java.io.File(getFilesDir(), "twa_splash"), "splash_image.png");
+    android.net.Uri uriSplash = androidx.core.content.FileProvider.getUriForFile(
+            this, getString(R.string.providerAuthority), splash);
+    grantUriPermission(getPackageName(), uriSplash,
+            android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    | android.content.Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+}} catch (RuntimeException e) {{
+    // senza il permesso si torna al difetto di prima, non si rompe niente
+    android.util.Log.w("Barattolo", "permesso dello splash non concesso", e);
+}}
+"""
+# l'ancora: la PRIMA riga del corpo di onCreate, com'e' nel modello di
+# Bubblewrap 1.24.1 (template_project/app/src/main/java/LauncherActivity.java)
+ANCORA_ONCREATE = re.compile(
+    r"(protected void onCreate\(Bundle savedInstanceState\) \{\r?\n)"
+    r"([ \t]*)(super\.onCreate\(savedInstanceState\);)")
 
 
 def scontorna(img, fondo):
@@ -194,6 +249,47 @@ def patch_gradle(progetto):
         print("🐘 gradle.properties: rimesso -Xmx1024m")
 
 
+def patch_launcher(progetto):
+    # il permesso dello splash (vedi PERMESSO_SPLASH, qui sopra). Si
+    # FERMA con sys.exit in ogni caso dubbio, mai un salto in silenzio:
+    # l'APK senza la cura compila, si firma e si installa benissimo, e il
+    # difetto si vede solo aprendolo sul telefono — cioe' a release fatta
+    radice = progetto / "app" / "src" / "main" / "java"
+    trovati = sorted(radice.rglob("LauncherActivity.java"))
+    if len(trovati) != 1:
+        sys.exit(f"⛔ LauncherActivity.java: attesi 1 sotto {radice}, "
+                 f"trovati {len(trovati)}.\n   NON lanciare `bubblewrap "
+                 f"build`: l'APK uscirebbe senza il permesso dello splash "
+                 f"(Chrome 152+). Guarda il progetto prima di andare avanti.")
+    percorso = trovati[0]
+    # byte in, byte out: il file resta identico fuori dal blocco, a-capo
+    # compresi (Bubblewrap lo scrive in LF anche su Windows)
+    testo = percorso.read_bytes().decode("utf-8")
+    if MARCATORE_PERMESSO in testo:
+        print("🔑 LauncherActivity: il permesso dello splash c'e' gia'")
+        return
+    ancore = ANCORA_ONCREATE.findall(testo)
+    if len(ancore) != 1:
+        sys.exit(f"⛔ {percorso.name}: l'ancora del permesso dello splash "
+                 f"(la prima riga di onCreate, `super.onCreate("
+                 f"savedInstanceState);`) compare {len(ancore)} volte "
+                 f"invece di 1 — Bubblewrap ha cambiato il modello.\n"
+                 f"   NON lanciare `bubblewrap build`: l'APK uscirebbe "
+                 f"senza la cura dello splash (Chrome 152+). Guarda il "
+                 f"file e aggiorna ANCORA_ONCREATE in genera_icone_apk.py.")
+    a_capo = "\r\n" if "\r\n" in testo else "\n"
+
+    def innesta(m):
+        rientro = m.group(2)
+        blocco = "".join(rientro + riga + a_capo if riga else a_capo
+                         for riga in PERMESSO_SPLASH.splitlines())
+        return m.group(1) + blocco + rientro + m.group(3)
+
+    percorso.write_bytes(ANCORA_ONCREATE.sub(innesta, testo).encode("utf-8"))
+    print(f"🔑 {percorso.name}: permesso dello splash prima di "
+          f"super.onCreate() (Chrome 152+)")
+
+
 def genera():
     base = Path(__file__).resolve().parent
     progetto = Path(sys.argv[1]) if len(sys.argv) > 1 \
@@ -201,6 +297,10 @@ def genera():
     res = progetto / "app" / "src" / "main" / "res"
     if not (res / "mipmap-anydpi-v26").is_dir():
         sys.exit(f"Progetto TWA non trovato in {progetto}")
+
+    # PRIMA di tutto il resto: se l'ancora manca si ferma qui, e nessun
+    # file del progetto e' stato ancora toccato
+    patch_launcher(progetto)
 
     img = Image.open(base / SORGENTE).convert("RGB")
     fondo = colore_fondo(img)

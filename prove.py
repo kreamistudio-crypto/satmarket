@@ -79914,6 +79914,138 @@ def prove_app_android():
     # prende chi cancella il decoratore, la' chi lo rende inutile.
 
 
+def prove_permesso_splash_apk():
+    """IL PERMESSO DELLO SPLASH NELL'APK (set 2026). Dal video del 22
+    set: splash nativo arancio, poi da destra una finestra SCURA di
+    Chrome per mezzo secondo, poi la pagina. La configurazione era
+    giusta in ogni riga: a cambiare e' stato Chrome 152, che in
+    receiveFile() pretende che anche CHI CONSEGNA lo splash abbia il
+    permesso sull'URI (android-browser-helper#623) — e la libreria,
+    quando la consegna fallisce, lancia Chrome senza splash e senza
+    spegnere l'animazione. La cura e' un grantUriPermission a noi stessi
+    prima di super.onCreate(), e la rimette genera_icone_apk.py dopo
+    ogni `bubblewrap update`, che la cancella.
+    QUESTA SEZIONE GIRA LA FUNZIONE VERA su un progetto di cartone,
+    perche' il modo in cui fallisce e' il peggiore: un APK senza la
+    cura compila, si firma e si installa, e il difetto si vede solo
+    aprendolo sul telefono — cioe' a release fatta. Quindi quel che si
+    prova e' soprattutto il FERMARSI: senza ancora, con l'ancora doppia
+    o con due file, lo script esce urlando e senza aver scritto niente."""
+    print("\n[L'app Android: il permesso dello splash]")
+    try:
+        import contextlib
+        import io
+        import tempfile
+        from pathlib import Path
+        import genera_icone_apk as g
+    except Exception as e:
+        salta("il permesso dello splash si innesta e si ferma quando deve",
+              f"{type(e).__name__}: {e}")
+        return
+    # il corpo di onCreate com'e' nel modello di Bubblewrap 1.24.1
+    # (template_project/app/src/main/java/LauncherActivity.java)
+    MODELLO = "\n".join([
+        "package store.barattolo.app;",
+        "",
+        "import android.os.Bundle;",
+        "",
+        "public class LauncherActivity",
+        "        extends com.google.androidbrowserhelper.trusted.LauncherActivity {",
+        "    @Override",
+        "    protected void onCreate(Bundle savedInstanceState) {",
+        "        super.onCreate(savedInstanceState);",
+        "        setRequestedOrientation(-1);",
+        "    }",
+        "}",
+        ""])
+
+    def progetto_finto(cartella, testo, quanti=1):
+        for n in range(quanti):
+            d = Path(cartella, "app", "src", "main", "java", "store",
+                     "barattolo", f"app{n or ''}")
+            d.mkdir(parents=True)
+            (d / "LauncherActivity.java").write_bytes(testo.encode("utf-8"))
+        return Path(cartella)
+
+    def gira(progetto):
+        """(uscito con sys.exit?, il suo messaggio, il file dopo)"""
+        f = next(Path(progetto, "app").rglob("LauncherActivity.java"))
+        with contextlib.redirect_stdout(io.StringIO()):
+            try:
+                g.patch_launcher(progetto)
+                return False, "", f.read_bytes().decode("utf-8")
+            except SystemExit as e:
+                return True, str(e.code), f.read_bytes().decode("utf-8")
+
+    with tempfile.TemporaryDirectory() as t:
+        p = progetto_finto(t, MODELLO)
+        uscito, _, dopo = gira(p)
+        prova("sul modello di Bubblewrap il permesso si innesta, una volta",
+              [False, 1], [uscito, dopo.count(g.MARCATORE_PERMESSO)])
+        i_corpo = dopo.index(
+            "protected void onCreate(Bundle savedInstanceState) {")
+        i_grant = dopo.index("grantUriPermission(getPackageName(), ")
+        i_super = dopo.index("super.onCreate(savedInstanceState);")
+        prova("...DENTRO onCreate e PRIMA di super.onCreate(), che e' il "
+              "gesto che avvia la consegna", True, i_corpo < i_grant < i_super)
+        prova("...col flag di lettura e con PERSISTABLE, che e' quello che "
+              "costringe il sistema a scrivere il record", [True, True],
+              ["FLAG_GRANT_READ_URI_PERMISSION" in dopo,
+               "FLAG_GRANT_PERSISTABLE_URI_PERMISSION" in dopo])
+        # i due nomi sono costanti della LIBRERIA (SplashImageTransferTask);
+        # l'autorita' si legge dalla risorsa da cui la legge la libreria
+        prova("...sull'URI che la libreria usa davvero", [True, True],
+              ['"twa_splash"), "splash_image.png"' in dopo,
+               "getString(R.string.providerAuthority)" in dopo])
+        prova("...e un guasto non chiude l'app: si torna al difetto di prima",
+              True, "} catch (RuntimeException e) {" in dopo)
+        # fuori dal blocco il file resta IDENTICO, a-capo compresi
+        i_blocco = dopo.index("        // " + g.MARCATORE_PERMESSO)
+        blocco = dopo[i_blocco:dopo.rindex("\n", 0, i_super) + 1]
+        prova("fuori dal blocco il file resta identico, e in LF",
+              [MODELLO, 0], [dopo.replace(blocco, "", 1), dopo.count("\r")])
+        uscito, _, ancora = gira(p)
+        prova("rilanciato non innesta due volte: il file non si muove",
+              [False, dopo], [uscito, ancora])
+
+    with tempfile.TemporaryDirectory() as t:
+        _, _, dopo = gira(progetto_finto(t, MODELLO.replace("\n", "\r\n")))
+        prova("un file in CRLF resta in CRLF, senza un a-capo spaiato",
+              [1, 0], [dopo.count(g.MARCATORE_PERMESSO),
+                       dopo.replace("\r\n", "").count("\n")])
+
+    # --- IL FERMARSI, che e' la meta' che vale ------------------------
+    senza = MODELLO.replace("        super.onCreate(savedInstanceState);\n",
+                            "")
+    with tempfile.TemporaryDirectory() as t:
+        uscito, msg, dopo = gira(progetto_finto(t, senza))
+        prova("senza l'ancora si FERMA, e senza aver scritto niente",
+              [True, senza], [uscito, dopo])
+        prova("...e dice di NON lanciare il build", True,
+              "NON lanciare `bubblewrap build`" in msg)
+    doppia = MODELLO.replace(
+        "    }\n}\n",
+        "    }\n    @Override\n"
+        "    protected void onCreate(Bundle savedInstanceState) {\n"
+        "        super.onCreate(savedInstanceState);\n    }\n}\n")
+    with tempfile.TemporaryDirectory() as t:
+        uscito, _, dopo = gira(progetto_finto(t, doppia))
+        prova("con l'ancora DOPPIA si ferma: non sceglie a caso",
+              [True, doppia], [uscito, dopo])
+    with tempfile.TemporaryDirectory() as t:
+        uscito, msg, _ = gira(progetto_finto(t, MODELLO, quanti=2))
+        prova("con due LauncherActivity.java si ferma", [True, True],
+              [uscito, "NON lanciare `bubblewrap build`" in msg])
+
+    # e in genera() e' il PRIMO passo che scrive: se si ferma, nessun
+    # file del progetto e' stato ancora toccato
+    corpo = open("genera_icone_apk.py", encoding="utf-8").read()
+    corpo = corpo[corpo.index("def genera():"):]
+    prova("in genera() il permesso viene PRIMA di ogni scrittura", True,
+          0 < corpo.index("patch_launcher(progetto)")
+          < corpo.index("Image.open(base / SORGENTE)"))
+
+
 def prove_effetti_ridotti():
     """EFFETTI RIDOTTI (set 2026). Dal campo: su Mercurygram Desktop
     (Flatpak, Wayland/GNOME) la mini app si vedeva disegnata a pezzi —
@@ -80429,6 +80561,7 @@ def main():
               prove_effetti_ridotti,
               prove_guscio_apertura,
               prove_app_android,
+              prove_permesso_splash_apk,
               prove_bunker_muto,
               prove_login_qr,
               prove_profilo_sezioni,
