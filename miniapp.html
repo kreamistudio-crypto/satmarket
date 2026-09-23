@@ -3312,7 +3312,7 @@
      P2P normale (`.p2p-premio*`), qui basta dare aria al campo a mano,
      che col segno e il decimale e' piu' lungo di un intero */
   .p2p-tappa .p2p-premio-val{min-width:64px}
-  .p2p-paycode,.p2p-controllo{background:var(--chip-bg);border-radius:16px;padding:14px;margin:12px 0}
+  .p2p-paycode,.p2p-controllo,.p2p-recapito{background:var(--chip-bg);border-radius:16px;padding:14px;margin:12px 0}
   .p2p-paycode-tit{font-weight:800;font-size:14px;margin-bottom:8px}
   .p2p-paycode-cod{display:flex;align-items:center;gap:10px;margin:6px 0 10px}
   .p2p-paycode-cod b{font-size:28px;letter-spacing:2px;font-variant-numeric:tabular-nums}
@@ -3328,6 +3328,28 @@
   .p2p-paycode-passi{margin:8px 0 6px 18px;padding:0;font-size:13.5px;line-height:1.45}
   .p2p-paycode-passi li{margin:4px 0}
   .p2p-controllo .btn{margin-top:10px}
+  /* IL RECAPITO A CHI COMPRA (23 set 2026, «Ritocchi allo scambio
+     P2P»): il gemello del riquadro del PayCode — stessa carta, stesso
+     titolo — con un rigo per dato e il suo tocco «Copia». Il testo si
+     SELEZIONA, detto invece che lasciato al caso: e' l'unico posto
+     dell'app dove si copia un conto di un altro. Il «Copia» e' velato
+     d'arancio come il 📋 del PayCode, con l'inchiostro pieno e non
+     --sats-text, che sul velato a 13px non arriva al 4,5 dell'AA.
+     LE ETICHETTE SONO --ink-soft e non --muted, MISURATO: a 12px sulla
+     carta del riquadro il --muted di giorno fa 3,23:1, sotto l'AA; il
+     --ink-soft fa 6,21. */
+  .p2p-recapito{user-select:text;-webkit-user-select:text}
+  .p2p-recapito-testa{font-size:13px;font-weight:700;color:var(--ink-soft);margin:-2px 0 4px}
+  .p2p-recapito-riga{display:flex;align-items:center;gap:10px;padding:8px 0;
+    border-top:1px solid var(--line-soft)}
+  .p2p-recapito-dato{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+  .p2p-recapito-dato span{font-size:12px;font-weight:700;color:var(--ink-soft)}
+  .p2p-recapito-dato b{font-size:15px;font-weight:800;color:var(--ink);line-height:1.35;
+    overflow-wrap:anywhere;user-select:text;-webkit-user-select:text}
+  .p2p-recapito-dato b.mono{font-size:14px;letter-spacing:.02em}
+  .p2p-recapito-copia{flex:0 0 auto;border:0;background:var(--sats-soft);color:var(--ink);
+    border-radius:10px;font:inherit;font-size:13px;font-weight:800;padding:8px 11px;
+    cursor:pointer;user-select:none;-webkit-user-select:none}
   .p2p-sez-tit{display:flex;align-items:center;gap:8px;font-size:12.5px;
     font-weight:700;color:var(--muted);line-height:1.35;margin-bottom:10px}
   .p2p-sez-tit span{flex:1;min-width:0}
@@ -6559,6 +6581,24 @@
     resize:vertical;outline:none;margin:12px 0 10px;word-break:break-all;
   }
   .payout textarea:focus{border-color:var(--sats)}
+  /* IL MODULO DEL VOTO, UNO PER DUE POSTI (23 set 2026, «Ritocchi allo
+     scambio P2P», richiesta di Andrea): la riga delle stelle, la casella
+     del commento, il bottone e la riga che viene dopo del riquadro
+     «⭐ Lascia un feedback» del mercatino, che la recensione di uno
+     scambio P2P RIUSA invece di copiare. Erano stili scritti IN LINEA
+     nel riquadro del mercatino — e quel che e' in linea si puo' solo
+     ricopiare, cioe' far divergere al primo ritocco senza che nessuno
+     se ne accorga. Adesso stanno qui, e li portano tutt'e due: i valori
+     sono gli stessi di prima, al pixel.
+     LE STELLE DEL P2P SONO BOTTONI (ognuna col suo nome letto a voce),
+     quelle del mercatino no: la seconda regola le spoglia del vestito
+     da bottone, cosi' a schermo sono le stesse stelle. */
+  .fb-stelle{font-size:30px;letter-spacing:6px;margin:10px 0;cursor:pointer;user-select:none}
+  .fb-stelle button{background:none;border:0;padding:0;margin:0;font:inherit;
+    letter-spacing:inherit;line-height:inherit;color:inherit;cursor:pointer}
+  .payout .fb-commento{min-height:52px}
+  .payout .fb-invia{margin-top:10px}
+  .payout .fb-dopo{margin-top:8px}
   /* I campi dell'indirizzo dentro l'ordine (ago 2026): dentro .payout
      le label non sono vestite da nessuno — sono nate INLINE, coi
      campi sfasati a meta' riga (visto a schermo, non leggendo il
@@ -16574,6 +16614,7 @@ setInterval(() => {
   battitoAnelloneP2P();
   battitoTabacchinoP2P();
   battitoControlloTabP2P();
+  battitoPagamentiP2P();
   document.querySelectorAll('.lampo-count').forEach(n => {
     const fine = +n.dataset.fine || 0;
     n.textContent = lampoResta(fine);
@@ -26092,24 +26133,28 @@ function openOrder(id){
 /* ---- feedback reciproco a affare concluso ---- */
 let stellaScelta = 0;   // il voto scelto ma non ancora inviato
 
+/* LE CLASSI DEL MODULO (`fb-stelle`, `fb-commento`, `fb-invia`,
+   `fb-dopo`) erano stili in linea fino al 23 set 2026: sono uscite nel
+   foglio di stile perche' la recensione degli scambi P2P le riusa (vedi
+   «IL MODULO DEL VOTO, UNO PER DUE POSTI»). Stessi valori, al pixel. */
 function feedbackPanel(o){
   const chi = o.role==='buyer' ? 'il venditore' : "l'acquirente";
   if (o.mioVoto) return `
     <div class="payout">
       <h4>⭐ Feedback lasciato</h4>
       <div class="hint"><span class="stars">${'★'.repeat(o.mioVoto)}</span>${o.mioCommento?` — ${esc(o.mioCommento)}`:''}</div>
-      ${o.suoVoto?`<div class="hint" style="margin-top:8px"><b>Feedback ricevuto:</b> <span class="stars">${'★'.repeat(o.suoVoto)}</span>${o.suoCommento?` — ${esc(o.suoCommento)}`:''}</div>`:''}
+      ${o.suoVoto?`<div class="hint fb-dopo"><b>Feedback ricevuto:</b> <span class="stars">${'★'.repeat(o.suoVoto)}</span>${o.suoCommento?` — ${esc(o.suoCommento)}`:''}</div>`:''}
     </div>`;
   return `
     <div class="payout">
       <h4>⭐ Lascia un feedback</h4>
       <div class="hint">Com'è andata con ${chi}? Il voto è definitivo e resta legato a questo affare.</div>
-      <div style="font-size:30px;letter-spacing:6px;margin:10px 0;cursor:pointer;user-select:none">
+      <div class="fb-stelle">
         ${[1,2,3,4,5].map(n=>`<span id="fbStella${n}" onclick="setStella(${n})">☆</span>`).join('')}
       </div>
-      <textarea id="fbCommento" maxlength="200" style="min-height:52px" placeholder="Commento (facoltativo, max 200 caratteri)"></textarea>
-      <button class="btn primary" style="margin-top:10px" onclick="inviaFeedback(this)">⭐ Invia il feedback</button>
-      ${o.suoVoto?`<div class="hint" style="margin-top:8px"><b>Feedback ricevuto:</b> <span class="stars">${'★'.repeat(o.suoVoto)}</span>${o.suoCommento?` — ${esc(o.suoCommento)}`:''}</div>`:''}
+      <textarea id="fbCommento" class="fb-commento" maxlength="200" placeholder="Commento (facoltativo, max 200 caratteri)"></textarea>
+      <button class="btn primary fb-invia" onclick="inviaFeedback(this)">⭐ Invia il feedback</button>
+      ${o.suoVoto?`<div class="hint fb-dopo"><b>Feedback ricevuto:</b> <span class="stars">${'★'.repeat(o.suoVoto)}</span>${o.suoCommento?` — ${esc(o.suoCommento)}`:''}</div>`:''}
     </div>`;
 }
 
@@ -43498,7 +43543,52 @@ function mossaDopoRilascioP2P(o, azione, ord){
   const detto = !!ord && String(ord.status || '').trim().toLowerCase() === 'settled-hold-invoice';
   if (azione === 'add-invoice' && (dopo || detto)) return 'fattura_nuova';
   if (azione === 'invoice-updated' && (dopo || detto)) return 'rilasciato';
+  /* ═══ A CHI VENDE, LA GARANZIA INCASSATA NON E' LO SCAMBIO CONCLUSO
+     (23 set 2026, «Ritocchi allo scambio P2P», dalla prova vera a due
+     telefoni) ═══
+     Chi vende libera, e il coordinatore gli risponde SUBITO che la
+     garanzia e' incassata: e' quel messaggio, e non il pagamento a chi
+     compra, e la tabella lo leggeva «concluso». Quel giorno il pagamento
+     non e' passato (la fattura di chi comprava era scaduta): chi
+     comprava leggeva, giustamente, «serve una fattura nuova», e chi
+     vendeva «Scambio concluso» su sats che non erano arrivati a nessuno.
+     Adesso a chi vende quel messaggio porta a «Sats in pagamento», e a
+     «concluso» ci si arriva solo a pagamento RIUSCITO: lo dice il server,
+     che dal coordinatore lo sa (patch 0007 — vedi
+     `applicaPagamentoP2P`), oppure il libro, oppure la restore. A chi
+     compra la tabella resta quella di sempre. */
+  if (azione === 'hold-invoice-payment-settled' && o && o.lato === 'vendo') return 'rilasciato';
   return '';
+}
+/* PURA: la riga di chi VENDE dopo la risposta del server sul pagamento
+   a chi compra (`/api/p2p/pagamenti`, il giudice e' `_pagamenti_p2p`),
+   o null se non cambia niente. Copia, non muta: e' la regola del motore.
+   Solo a sats liberati: prima non c'e' niente da pagare, e dopo — un
+   finale — non si torna indietro.
+   • 'riuscito' — la riga va a `concluso`, e l'ora della chiusura e'
+     quella del pagamento riuscito (la dice mostrod): e' la MOSSA che
+     l'ha chiusa, cioe' quel che `chiusuraP2P` scrive sulla card.
+   • 'fallito'  — resta «Sats in pagamento», con la riga che dice che
+     tocca a chi compra dare una fattura nuova (`payoutFallito`).
+   • 'in_corso' — resta «Sats in pagamento», senza quella riga: la
+     fattura nuova e' arrivata, il pagamento e' ripartito.
+   Uno stato che non si conosce non muove niente. */
+function applicaPagamentoP2P(o, esito){
+  if (!o || o.lato !== 'vendo' || o.stato !== 'rilasciato' || !esito) return null;
+  const r = Object.assign({}, o);
+  if (esito.stato === 'riuscito') {
+    r.stato = 'concluso';
+    delete r.payoutFallito;
+    const q = Math.floor(Number(esito.quando) || 0);
+    if (q > (Number(r.ultimaMossa) || 0)) r.ultimaMossa = q;
+    r.aggiornato = Math.floor(Date.now() / 1000);
+    return r;
+  }
+  if (esito.stato !== 'fallito' && esito.stato !== 'in_corso') return null;
+  const fallito = esito.stato === 'fallito';
+  if (!!r.payoutFallito === fallito) return null;
+  if (fallito) r.payoutFallito = true; else delete r.payoutFallito;
+  return r;
 }
 /* PURA: copia, non muta. Cosi' si prova senza un browser e senza un
    coordinatore, ed e' l'unica cosa che decide cosa si vede. */
@@ -43742,8 +43832,10 @@ function azioniSecondarieP2P(o, rec){
      quindi offrirla non puo' fare danni. */
   if (o.lato === 'compro' && (o.stato === 'rilasciato' || o.stato === 'pagamento_ritentato'))
     fuori.push('non-arrivano');
+  /* la recensione e' un riquadro della pagina e non un bottone di qui
+     (23 set 2026): nella colonna entra il solo voto del circuito */
   const gesto = gestoRecensioneP2P(o, rec);
-  if (gesto) fuori.push(gesto);
+  if (gesto === 'vota') fuori.push(gesto);
   if (P2P_DISPUTABILI.indexOf(o.stato) >= 0) fuori.push('disputa');
   return fuori;
 }
@@ -43826,7 +43918,13 @@ const STATI_P2P = {
      promessa su un pagamento che puo' fallire, e a chi aveva i sats
      fermi la ripeteva a ogni apertura. Si dice quel che e' vero: sono
      IN PAGAMENTO, e se non riesce c'e' una strada. */
+  /* A CHI VENDE IL TITOLO E' «Sats in pagamento» (23 set 2026,
+     «Ritocchi allo scambio P2P»): ci arriva appena libera, e ci resta
+     finche' il pagamento a chi compra non e' riuscito davvero — vedi
+     `mossaDopoRilascioP2P`. Se il pagamento non passa, la riga di sotto
+     la cambia `statoTestoP2P`: tocca a chi compra, non a lui. */
   rilasciato: {t: 'Sats liberati: in pagamento', d_compro: 'Chi vende ha liberato i sats e il pagamento verso il tuo wallet è in corso. Se non riesce te lo diciamo qui, e potrai dare una fattura nuova.',
+               t_vendo: 'Sats in pagamento',
                d_vendo: 'Hai liberato i sats: sono in pagamento verso chi compra.',
                d: 'I sats sono stati liberati e sono in pagamento verso chi compra.'},
   fattura_nuova: {t: 'Serve una fattura nuova', d_compro: 'Il pagamento dei tuoi sats non è riuscito: la richiesta che avevi dato può essere scaduta, o il pagamento non ha trovato una strada fino al tuo wallet. I sats non sono persi: sono fermi al sicuro e restano tuoi. Dai una fattura nuova e ripartono.',
@@ -43935,14 +44033,22 @@ function statoTestoP2P(o){
     return {t: s.t, d: 'La fattura che avevi dato è scaduta prima che i sats venissero liberati, '
       + 'quindi il pagamento non è riuscito. I sats non sono persi: sono fermi al sicuro e restano tuoi. '
       + 'Dai una fattura nuova e ripartono.'};
+  /* IL PAGAMENTO NON PASSATO, DETTO A CHI VENDE (23 set 2026): lo sa
+     dal server (`payoutFallito`, vedi `applicaPagamentoP2P`), e la
+     riga dice le due cose che contano — il gesto e' di chi compra, e
+     lui non deve fare niente */
+  const vende = !!(o && o.lato === 'vendo');
+  if (vende && o.stato === 'rilasciato' && o.payoutFallito)
+    return {t: s.t_vendo || s.t, d: 'Il pagamento verso chi compra non è passato. '
+      + 'Chi compra deve dare una fattura nuova: non devi fare niente.'};
   /* il verso di chi ha PUBBLICATO vince sul lato: e' la stessa riga
      letta da un'altra parte del banco, e la sua frase e' un'altra */
   const mio = !!(o && o.mio);
   const d = (mio && s.d_mio) ? s.d_mio
           : (o && o.lato === 'compro' && s.d_compro) ? s.d_compro
-          : (o && o.lato === 'vendo' && s.d_vendo) ? s.d_vendo
+          : (vende && s.d_vendo) ? s.d_vendo
           : (s.d || '');
-  return {t: (mio && s.t_mio) || s.t, d};
+  return {t: (mio && s.t_mio) || (vende && s.t_vendo) || s.t, d};
 }
 
 /* ---- quanto chiede una richiesta di pagamento ----
@@ -45495,14 +45601,18 @@ const SECONDARI_P2P = {
   'accetta-annullo': '<button class="btn ghost" onclick="accettaAnnulloP2P()">🤝 Accetta di annullare</button>',
   'non-arrivano': '<button class="btn ghost" onclick="apriIncassoP2P()">⚡ I sats non arrivano? Dai una fattura nuova</button>',
   /* A SCAMBIO CONCLUSO I GESTI SONO DUE E SI ESCLUDONO (set 2026, le
-     recensioni degli scambi): `recensisci` e' la recensione di casa —
-     stelle E commento, sul profilo Barattolo dell'altra persona, nella
-     STESSA media del mercatino — e compare quando il server sa chi era
+     recensioni degli scambi): la recensione di casa — stelle E
+     commento, sul profilo Barattolo dell'altra persona, nella STESSA
+     media del mercatino — compare quando il server sa chi era
      dall'altra parte. `vota` e' quel che resta quando non lo sa: le
      sole stelle sul circuito degli scambi, che per chi non e' di
      Barattolo sono l'unica reputazione che ha. A decidere e'
-     `gestoRecensioneP2P`, mai il chiamante. */
-  recensisci: '<button class="btn ghost" onclick="apriRecensioneP2P()">⭐ Lascia una recensione</button>',
+     `gestoRecensioneP2P`, mai il chiamante.
+     ⚠️ LA RECENSIONE NON E' PIU' UN BOTTONE DI QUESTA COLONNA (23 set
+     2026, «Ritocchi allo scambio P2P»): e' il riquadro del mercatino,
+     nella pagina (`riquadroRecensioneP2P`), e il foglio che il bottone
+     apriva non c'e' piu'. Qui resta il solo voto del circuito, col suo
+     foglio. */
   vota: '<button class="btn ghost" onclick="apriVotoP2P()">⭐ Vota chi ha scambiato con te</button>',
   /* l'uscita, e sta in fondo come nell'ordine di Barattolo: prima
      il passo da fare, poi il modo di parlarsi, e per ultima la
@@ -45519,35 +45629,104 @@ const SECONDARI_EVIDENZA_P2P = {
   'accetta-annullo': '<button class="btn orange" onclick="accettaAnnulloP2P()">🤝 Accetta di annullare</button>'
 };
 
-/* I RECAPITI NELLA PAGINA DELLO SCAMBIO (fase 6): quel che e'
-   ARRIVATO si mostra, quel che MANCA si chiede — e per chi vende il
-   recapito degli euro e' il pezzo senza il quale l'altra persona non
-   puo' pagare: la riga insiste finche' non e' partito. Il testo
-   dell'altra persona passa da esc(), come ovunque. */
+/* I RECAPITI NELLA PAGINA DELLO SCAMBIO (fase 6): qui sta la porta
+   del foglio «I vostri recapiti», dove i due si scambiano i dati.
+   ⚠️ E QUI NON STANNO PIU' LE DUE RIGHE DI PRIMA (23 set 2026,
+   «Ritocchi allo scambio P2P», dalla prova vera a due telefoni):
+   • il recapito ARRIVATO a chi compra e' salito sotto il suo bottone —
+     vedi `recapitoCompratoreP2P`, che e' dove serve;
+   • la riga che a chi vende diceva di indicare dove ricevere gli euro,
+     sotto il bottone del contatto Telegram, se n'e' andata: lo dicono
+     gia' il riquadro di stato e il bottone arancio in cima («Indica
+     dove ricevere gli euro»), e la terza copia della stessa frase, in
+     fondo alla pagina, era rumore. */
 function campiOrdineP2P(o){
-  const miei = o.campiMiei || {}, loro = o.campiLoro || {};
-  let fuori = '';
-  /* COL PAYCODE IL RECAPITO E' UN RIQUADRO SUO (23 set 2026): il
-     codice grande da dare alla cassa, l'importo, quanto manca, e i
-     quattro gesti nell'ordine in cui si fanno — al posto del testo
-     nudo, che qui non basta a chi sta per uscire di casa */
-  if (o.lato === 'compro' && loro.euro && tabacchinoP2P(o.metodi) && payCodeDaTestoP2P(loro.euro.testo))
-    fuori += riquadroPayCodeP2P(o);
-  else if (o.lato === 'compro' && loro.euro)
-    fuori += '<div class="trust-note nota-scambio"><span>💶</span><span><b>Dove mandare gli euro:</b><br>'
-      + esc(loro.euro.testo).replace(/\n/g, '<br>') + '</span></div>'
-      /* IL RECAPITO PUO' ARRIVARE PRIMA DELLA GARANZIA (i dati del
-         tabacchino partono alla presa, e un'app di ieri — o un altro
-         client — manda ancora il recapito ricordato): finche' la pagina non
-         dice «Sats in garanzia» non si manda niente, e si scrive QUI,
-         sotto l'IBAN, che e' dove l'occhio sta (18 set 2026) */
-      + ((P2P_PROGRESSO[o.stato] || 0) < P2P_PROGRESSO.attivo && P2P_FINALI.indexOf(o.stato) < 0
-         ? '<div class="hint">⚠️ <b>Non inviare ancora niente:</b> aspetta che questa pagina dica «Sats in garanzia».</div>' : '');
-  if (o.lato === 'vendo' && !miei.euro)
-    fuori += '<div class="hint">💶 Di\' a chi compra <b>dove mandarti gli euro</b>: senza, non può pagarti.</div>';
-  fuori += '<button class="btn ghost" onclick="apriCampiP2P()">🤝 I vostri recapiti'
+  return '<button class="btn ghost" onclick="apriCampiP2P()">🤝 I vostri recapiti'
     + (o.campiNuovi ? ' <b>(novità)</b>' : '') + '</button>';
-  return fuori;
+}
+/* ---- IL RECAPITO A CHI COMPRA, SOTTO IL SUO BOTTONE (23 set 2026,
+   «Ritocchi allo scambio P2P», dalla prova vera a due telefoni) ----
+   Stava in fondo, sotto il profilo e il bottone del contatto Telegram,
+   mentre serve ALL'ALTEZZA DEL GESTO: chi compra legge l'IBAN, fa il
+   bonifico e torna a toccare «Ho inviato gli euro». Adesso sta subito
+   sotto quel bottone — o dove il bottone starebbe, quando non c'e'
+   ancora o non c'e' piu' — e ogni dato ha il suo tocco «Copia»: un
+   IBAN ricopiato a mano e' il modo in cui un bonifico parte verso il
+   conto sbagliato.
+   NON DIPENDE PIU' DALLE CHIAVI DELLA CONVERSAZIONE, come la porta dei
+   recapiti: il testo e' gia' nella riga, decifrato e verificato quando
+   e' arrivato, e mostrarlo non chiede niente a nessuno.
+   COL PAYCODE IL RECAPITO E' UN RIQUADRO SUO (23 set 2026): il codice
+   grande da dare alla cassa, l'importo, quanto manca, e i quattro
+   gesti nell'ordine in cui si fanno — il tocco per copiare il codice
+   ce l'ha gia'. Il testo dell'altra persona passa da esc(), come
+   ovunque. */
+function recapitoCompratoreP2P(o){
+  const loro = (o && o.campiLoro) || {};
+  if (!o || o.lato !== 'compro' || !loro.euro) return '';
+  if (tabacchinoP2P(o.metodi) && payCodeDaTestoP2P(loro.euro.testo))
+    return riquadroPayCodeP2P(o);
+  return riquadroRecapitoP2P(loro.euro.testo)
+    /* IL RECAPITO PUO' ARRIVARE PRIMA DELLA GARANZIA (i dati del
+       tabacchino partono alla presa, e un'app di ieri — o un altro
+       client — manda ancora il recapito ricordato): finche' la pagina non
+       dice «Sats in garanzia» non si manda niente, e si scrive QUI,
+       sotto l'IBAN, che e' dove l'occhio sta (18 set 2026) */
+    + ((P2P_PROGRESSO[o.stato] || 0) < P2P_PROGRESSO.attivo && P2P_FINALI.indexOf(o.stato) < 0
+       ? '<div class="hint">⚠️ <b>Non inviare ancora niente:</b> aspetta che questa pagina dica «Sats in garanzia».</div>' : '');
+}
+/* PURA: il testo composto del recapito, riga per riga, in dati da
+   mostrare e da copiare.
+   ⚠️ NON E' UN PARSER DEL FILO, e la regola 2 dell'identita' di
+   pagamento resta in piedi («chi riceve mostra quel che legge,
+   qualunque versione abbia»): ogni riga si mostra INTERA com'e'
+   arrivata, e il taglio serve solo a dare al tocco «Copia» il VALORE
+   senza la sua etichetta — «IBAN: IT60…» copia «IT60…». Una riga che
+   non ha la forma «Etichetta: valore» si copia intera; la PRIMA riga
+   senza i due punti e SENZA CIFRE, quando ne seguono altre, e' il nome
+   del metodo («Bonifico SEPA», «Contanti al tabacchino») e non un dato
+   da incollare — con una cifra dentro e' un dato (un IBAN nudo scritto
+   da un altro client) e il suo «Copia» ce l'ha. I due punti vogliono
+   uno spazio dopo, o un indirizzo (`https://…`) passerebbe per
+   un'etichetta. Righe vuote via. */
+function righeRecapitoP2P(testo){
+  const righe = String(testo || '').split('\n').map(r => r.trim()).filter(Boolean);
+  return righe.map((r, i) => {
+    const m = /^([^:]{1,60}):\s+(\S.*)$/.exec(r);
+    if (m) return {et: m[1].trim(), v: m[2].trim()};
+    if (i === 0 && righe.length > 1 && !/[0-9]/.test(r)) return {testa: r};
+    return {et: '', v: r};
+  });
+}
+/* il riquadro: un rigo per dato, col valore che si SELEZIONA (chi
+   preferisce tenere premuto deve poterlo fare) e il suo «Copia». Il
+   valore viaggia nel `data-v` e mai dentro l'onclick: e' testo scritto
+   dall'altra persona, e dentro una stringa JS l'esc() dell'HTML non
+   basta — il parser dell'attributo gli ridarebbe gli apici. L'IBAN
+   (per etichetta o per forma) va in monospazio, che distingue lo 0
+   dalla O; e se HA la forma di un IBAN si mostra a gruppi di quattro,
+   come nelle app delle banche — a 375 px le ventisette cifre di fila
+   lasciavano l'ultima da sola a capo (visto dal vivo). Il «Copia»
+   prende il valore COM'E' ARRIVATO, senza gli spazi della vista. */
+function riquadroRecapitoP2P(testo){
+  const righe = righeRecapitoP2P(testo);
+  if (!righe.length) return '';
+  const FORMA_IBAN = /^[A-Z]{2}[0-9]{2}[A-Z0-9]{8,30}$/;
+  return '<div class="p2p-recapito">'
+    + '<div class="p2p-paycode-tit">💶 Dove mandare gli euro</div>'
+    + righe.map(r => {
+        if (r.testa) return '<div class="p2p-recapito-testa">' + esc(r.testa) + '</div>';
+        const nudo = r.v.replace(/\s+/g, '');
+        const iban = FORMA_IBAN.test(nudo);
+        const vista = iban ? nudo.replace(/(.{4})(?=.)/g, '$1 ') : r.v;
+        return '<div class="p2p-recapito-riga"><div class="p2p-recapito-dato">'
+          + (r.et ? '<span>' + esc(r.et) + '</span>' : '')
+          + '<b' + (iban || /^iban$/i.test(r.et) ? ' class="mono"' : '') + '>' + esc(vista) + '</b></div>'
+          + '<button type="button" class="p2p-recapito-copia" data-v="' + esc(r.v) + '" '
+          + 'onclick="copiaLink(this.dataset.v, \'Copiato 📋\')" '
+          + 'aria-label="Copia ' + esc(r.et || r.v) + '">📋 Copia</button></div>';
+      }).join('')
+    + '</div>';
 }
 /* ---- IL RIQUADRO DEL PAYCODE, a chi compra (23 set 2026) ----
    Dal testo cifrato arrivato: PayCode (normalizzato), importo (quello
@@ -45666,6 +45845,9 @@ function statoPayCodeP2P(o){
 function apriOrdineP2P(id){
   const o = ordiniP2P()[id];
   if (!o) { go('p2pmiei'); return; }
+  /* le stelle scelte e non mandate sono di QUELLO scambio: aprendone un
+     altro ripartono da zero (la bozza del commento guarda il suo id) */
+  if (p2pOrdineAperto !== id) p2pStellaScelta = 0;
   p2pOrdineAperto = id;
   renderOrdineP2P();
   go('p2pordine');
@@ -45790,6 +45972,12 @@ function renderOrdineP2P(){
      render — la pagina si disegna e il gesto compare quando la
      risposta arriva (il patto dei volti sul libro). */
   if (o.stato === 'concluso') chiediRecensibileP2P(o.id);
+  /* SATS IN PAGAMENTO, A CHI VENDE (23 set 2026): la domanda al server
+     parte anche da qui — «il pagamento a chi compra e' passato?» — e
+     quando la risposta muove la riga la pagina si ridisegna da se'. Il
+     freno sta dentro `chiediPagamentiP2P`, non qui. */
+  if (o.lato === 'vendo' && o.stato === 'rilasciato' && typeof chiediPagamentiP2P === 'function')
+    chiediPagamentiP2P([o.id]);
   const rec = p2pRecensioni[o.id];
   /* la disputa col PayCode a «pagato» sta gia' nel riquadro del
      controllo, grande: non si ripete piccola in fondo */
@@ -45801,6 +45989,9 @@ function renderOrdineP2P(){
     && fasciaTabacchinoP2P(scadenzaTabacchinoOrdineP2P(o),
                            Math.floor(Date.now() / 1000)) === 'scaduta';
   const avviso = o.cantDo || o.errore;
+  /* il commento a meta' della recensione si rimette dopo il ridisegno
+     (vedi «LA BOZZA SOPRAVVIVE AL RIDISEGNO») */
+  const bozza = bozzaRecensioneP2P(o.id);
   box.innerHTML =
     /* ⚠️ SOTTO IL CONTO NON C'E' PIU' LA RIGA DI SERVIZIO (set 2026,
        decisione di Andrea): portava il metodo di pagamento e il lato
@@ -45823,6 +46014,9 @@ function renderOrdineP2P(){
     '<div class="trust-note nota-scambio"><span><b>' + esc(st.t) + '</b><br>' + esc(st.d) + '</span></div>' +
     (avviso ? '<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⚠️ <span>' + esc(avviso) + '</span></div>' : '') +
     (bottoni[azione] || '') +
+    /* IL RECAPITO STA SOTTO IL SUO GESTO (23 set 2026): subito dopo «Ho
+       inviato gli euro», che e' dove l'IBAN si legge e si copia */
+    recapitoCompratoreP2P(o) +
     /* IL BOTTONE SPENTO DI CHI ASPETTA IL RECAPITO (18 set 2026): si
        vede, cosi' si sa qual e' il passo dopo, e non si tocca. Sotto,
        l'uscita per chi il recapito l'ha avuto per un'altra strada —
@@ -45881,14 +46075,28 @@ function renderOrdineP2P(){
        sopra il niente. La garanzia la dice il conto qui sopra con le
        sue cifre, e la spiega per intero «Info P2P», dove c'e' lo
        spazio anche per il perche'. */
-    rigaRecensioneP2P(o, rec) +
+    riquadroRecensioneP2P(o, rec) +
     secondarie.map(a => (scadutoTab && SECONDARI_EVIDENZA_P2P[a])
                         || SECONDARI_P2P[a] || '').join('');
+  rimettiBozzaRecensioneP2P(bozza);
 }
-/* PURA: quel che resta scritto quando il gesto non c'e' piu' — la
-   recensione lasciata (con le sue stelle) o la ragione per cui qui non
-   se ne puo' lasciare. A scambio non concluso: niente. */
-function rigaRecensioneP2P(o, rec){
+/* ---- IL RIQUADRO DELLA RECENSIONE (23 set 2026, «Ritocchi allo
+   scambio P2P», richiesta di Andrea) ----
+   Era un foglio che si apriva da un bottone, con le stelle grigie anche
+   da scelte e una casella del commento senza vestito — stretta, e
+   chiara anche di sera. Adesso e' il riquadro del mercatino, «⭐ Lascia
+   un feedback», con le SUE classi (`.payout`, `.fb-stelle`,
+   `.fb-commento`, `.fb-invia`, `.fb-dopo`): stesse stelle, stesso
+   testo, stesso bottone, stesse spaziature, e i due temi li porta il
+   vestito di casa. E sta NELLA PAGINA come la', al posto del bottone
+   che apriva il foglio: il gesto e' uno, e stava a un tocco di
+   distanza da se stesso. Lasciata, diventa «⭐ Recensione lasciata»,
+   che e' il «⭐ Feedback lasciato» di la'.
+   PURA: il riquadro da compilare, quello compilato (con le sue
+   stelle), o la ragione per cui qui un posto non c'e'. A scambio non
+   concluso: niente. A decidere se offrirlo e' `gestoRecensioneP2P`,
+   che resta il giudice unico. */
+function riquadroRecensioneP2P(o, rec){
   if (!o || o.stato !== 'concluso') return '';
   const mia = (rec && rec.gia) ? rec : (o.recensione === 'fatta' ? {voto: o.recVoto} : null);
   /* ⚠️ IL VOTO SI CLAMPA PRIMA DI `repeat()`, ed e' la famiglia del
@@ -45899,12 +46107,53 @@ function rigaRecensioneP2P(o, rec){
      via la pagina intera. */
   const stelle = Math.max(0, Math.min(5, (mia && mia.voto) | 0));
   if (mia)
-    return '<div class="trust-note nota-scambio"><span>⭐</span><span><b>Recensione lasciata</b>'
-      + (stelle ? '<br><span class="stars">' + '★'.repeat(stelle) + '</span>' : '')
-      + (mia.commento ? ' ' + esc(mia.commento) : '') + '</span></div>';
+    return '<div class="payout"><h4>⭐ Recensione lasciata</h4>'
+      + (stelle || mia.commento
+         ? '<div class="hint">' + (stelle ? '<span class="stars">' + '★'.repeat(stelle) + '</span>' : '')
+           + (mia.commento ? (stelle ? ' — ' : '') + esc(mia.commento) : '') + '</div>'
+         : '')
+      + '</div>';
+  if (gestoRecensioneP2P(o, rec) === 'recensisci') return moduloRecensioneP2P(o);
   if (rec && !rec.si && rec.motivo === 'ignota' && !(o.votabile && !o.votato))
     return '<div class="hint">Questa persona non ha un profilo su Barattolo: non c\'è un posto dove lasciarle una recensione.</div>';
   return '';
+}
+/* il riquadro da compilare: le parole dicono dove va la recensione, che
+   e' definitiva, e — quando e' vero — che le stelle partono anche verso
+   il circuito degli scambi. Il nome dell'altra persona, se la pagina lo
+   mostra gia' (`LE PARTI SI VEDONO`); se no «chi ha scambiato con te». */
+function moduloRecensioneP2P(o){
+  const anche = o.votabile && !o.votato;
+  return '<div class="payout">'
+    + '<h4>⭐ Lascia una recensione</h4>'
+    + '<div class="hint">Com\'è andata con ' + esc(nomeControparteP2P(o, 'chi ha scambiato con te'))
+    + '? Le stelle e il commento vanno sul suo profilo di Barattolo, nella stessa media del mercatino. È definitiva: non potrà essere modificata.</div>'
+    + stelleSceltaP2P()
+    + '<textarea id="p2pRecCommento" class="fb-commento" maxlength="200" data-id="' + esc(o.id) + '" '
+    + 'placeholder="Commento (facoltativo, max 200 caratteri)"></textarea>'
+    + '<button class="btn primary fb-invia" onclick="inviaRecensioneP2P(this)">⭐ Invia la recensione</button>'
+    + (anche ? '<div class="hint fb-dopo">Le stelle viaggiano anche sul circuito degli scambi, che è la reputazione di chi scambia fuori da Barattolo; il commento resta qui.</div>' : '')
+    + '</div>';
+}
+/* LA BOZZA SOPRAVVIVE AL RIDISEGNO (23 set 2026): il riquadro sta nella
+   pagina, e la pagina si ridisegna a ogni evento — un commento a meta'
+   non deve sparire sotto le dita, ne' la tastiera chiudersi. Le stelle
+   se le ricorda `p2pStellaScelta`; il testo e il fuoco li prende questa
+   coppia, e SOLO per lo stesso scambio: la bozza di un altro non passa
+   di qui (il `data-id` della casella). */
+function bozzaRecensioneP2P(id){
+  const t = el('p2pRecCommento');
+  if (!t || !t.dataset || t.dataset.id !== String(id)) return null;
+  return {v: t.value, fuoco: document.activeElement === t,
+          da: t.selectionStart, a: t.selectionEnd};
+}
+function rimettiBozzaRecensioneP2P(b){
+  const t = el('p2pRecCommento');
+  if (!t || !b) return;
+  t.value = b.v;
+  if (b.fuoco) {
+    try { t.focus({preventScroll: true}); t.setSelectionRange(b.da, b.a); } catch(e) {}
+  }
 }
 
 /* ---- il foglio del pagamento da bloccare ----
@@ -48863,34 +49112,17 @@ let p2pStellaScelta = 0;       // le stelle scelte e non ancora mandate
    da Barattolo si vede tutto in un posto solo. Da qui si chiamano, e
    basta (come fa la presa con `registraOrdiniP2P`). */
 
-function apriRecensioneP2P(){
-  const o = ordiniP2P()[p2pOrdineAperto];
-  if (!o) return;
-  haptic();
-  p2pStellaScelta = 0;
-  renderRecensioneP2P();
-  el('sheetBg').classList.add('open');
-  el('p2pVotoSheet').classList.add('open');
-}
-function renderRecensioneP2P(){
-  const box = el('p2pVotoCorpo');
-  const o = ordiniP2P()[p2pOrdineAperto];
-  if (!box || !o) return;
-  const anche = o.votabile && !o.votato;
-  box.innerHTML =
-    '<div class="hint">Com\'è andata con chi ha scambiato con te? Le stelle e il commento vanno sul suo profilo di Barattolo, nella stessa media del mercatino.</div>' +
-    stelleSceltaP2P() +
-    '<textarea id="p2pRecCommento" maxlength="200" style="min-height:52px" placeholder="Commento (facoltativo, max 200 caratteri)"></textarea>' +
-    '<button class="btn primary" style="margin-top:10px" onclick="inviaRecensioneP2P(this)">⭐ Invia la recensione</button>' +
-    '<div class="hint">È definitiva: non potrà essere modificata.' +
-    (anche ? ' Le stelle viaggiano anche sul circuito degli scambi, che è la reputazione di chi scambia fuori da Barattolo; il commento resta qui.' : '') +
-    '</div>';
-}
-/* le cinque stelle da scegliere, gemelle di quelle del mercatino: si
-   accendono e basta, e a mandarle e' il bottone */
+/* ⚠️ IL FOGLIO DELLA RECENSIONE NON C'E' PIU' (23 set 2026, «Ritocchi
+   allo scambio P2P»): la recensione si lascia nel riquadro della pagina
+   (`riquadroRecensioneP2P`), come il feedback nel mercatino. Il foglio
+   `p2pVotoSheet` resta al solo voto del circuito, qui sotto. */
+/* le cinque stelle da scegliere, LE STESSE del mercatino — la sua riga
+   `.fb-stelle` — ma bottoni, ognuno col suo nome letto a voce: si
+   accendono e basta, e a mandarle e' il bottone. Nascono da
+   `p2pStellaScelta`, cosi' un ridisegno della pagina non le spegne. */
 function stelleSceltaP2P(){
-  return '<div class="p2p-stelle">' + [1, 2, 3, 4, 5].map(n =>
-    '<button type="button" class="p2p-stella" id="p2pStella' + n + '" data-n="' + n + '" ' +
+  return '<div class="fb-stelle">' + [1, 2, 3, 4, 5].map(n =>
+    '<button type="button" id="p2pStella' + n + '" data-n="' + n + '" ' +
     'aria-label="' + n + ' su 5" onclick="sceltaStellaP2P(Number(this.dataset.n))">' +
     (n <= p2pStellaScelta ? '★' : '☆') + '</button>').join('') + '</div>';
 }
@@ -50564,6 +50796,12 @@ function scambiP2P(){
       statoPubblicoOrdini(aperti.map(o => o.id))
         .then(n => { if (n) renderP2P(); }).catch(() => {});
     }
+    /* SATS IN PAGAMENTO (23 set 2026): chi vende chiede al server se il
+       pagamento a chi compra e' passato — UNA domanda per tutte le sue
+       righe a sats liberati, col freno dentro `chiediPagamentiP2P` */
+    const inPagamento = aperti.filter(o => o.lato === 'vendo' && o.stato === 'rilasciato');
+    if (inPagamento.length && typeof chiediPagamentiP2P === 'function')
+      chiediPagamentiP2P(inPagamento.map(o => o.id));
   }
   /* IL NAG DEL BACKUP E' USCITO (fase 6): nella vista P2P il profilo
      non si nomina — il codice segreto vive in «I tuoi dati». */
@@ -50649,7 +50887,19 @@ async function registraOrdiniP2P(ids, pubblicati, presi){
   } catch(e){ return false; }
 }
 let p2pRecensioni = {};        // ordine -> {si, motivo, gia, voto, commento}
-let p2pRecChieste = new Set(); // mai due volte nella stessa sessione
+let p2pRecChieste = new Set(); // mai due volte nella stessa sessione...
+let p2pRecRiprove = {};        // ...salvo i «non ancora»: id -> quante riprove
+/* ⚠️ «NON ANCORA» NON E' «NO» (23 set 2026, «Ritocchi allo scambio P2P»,
+   dalla prova vera a due telefoni: chi aveva VENDUTO non vedeva «Lascia
+   una recensione», chi aveva comprato si'). La domanda partiva una volta
+   per sessione, e se partiva prima che il server sapesse lo scambio
+   concluso — chi vende lo sapeva al rilascio, e quel giorno il pagamento
+   a chi comprava e' passato solo dopo — il `non_conclusa` restava li'
+   fino alla sessione dopo. Adesso un `non_conclusa` (e un server muto)
+   si RICHIEDE da solo, a intervalli che si allungano e per un numero
+   finito di volte: un posto che arriva dopo, arriva. Gli altri motivi
+   sono definitivi, e restano risposti una volta. */
+const P2P_REC_RIPROVE_MS = [5000, 15000, 30000, 60000, 120000];
 
 /* «Su questo scambio posso recensire, e l'ho gia' fatto?» — in
    sottofondo, mai bloccante, e MAI due volte per lo stesso id.
@@ -50679,6 +50929,19 @@ async function chiediRecensibileP2P(id){
     else if (!esito.si && esito.motivo && esito.motivo !== 'muto'
              && esito.motivo !== 'non_conclusa') o.recensione = 'senza';
     if (o.recensione !== prima) scriviOrdineP2P(o);
+  }
+  /* il «non ancora» si richiede da solo (vedi P2P_REC_RIPROVE_MS): la
+     porta si riapre, e se la pagina e' ancora quella si bussa subito —
+     se no bussera' il prossimo render */
+  const n = p2pRecRiprove[id] || 0;
+  if ((esito.motivo === 'non_conclusa' || esito.motivo === 'muto')
+      && !esito.si && !esito.gia && n < P2P_REC_RIPROVE_MS.length) {
+    p2pRecRiprove[id] = n + 1;
+    setTimeout(() => {
+      p2pRecChieste.delete(id);
+      if (p2pOrdineAperto === id && vistaAttivaP2P() === 'view-p2pordine')
+        chiediRecensibileP2P(id);
+    }, P2P_REC_RIPROVE_MS[n]);
   }
   if (p2pOrdineAperto === id && vistaAttivaP2P() === 'view-p2pordine')
     renderOrdineP2P();
@@ -50728,7 +50991,6 @@ async function inviaRecensioneP2P(btn){
         if (p2pOrdineAperto === id) renderOrdineP2P();
         return;
       }
-      chiudiFoglioP2P('p2pVotoSheet');
       agg.recensione = 'fatta';
       agg.recVoto = voto;
       scriviOrdineP2P(agg);
@@ -50932,6 +51194,92 @@ function profiloControparteP2P(o){
           + 'parlarvi restano i recapiti qui sotto, cifrati fra voi due.</div>');
 }
 /* ============ fine delle parti che si vedono ============ */
+
+/* ============ IL PAGAMENTO DETTO A CHI VENDE (23 set 2026) =========
+   «Ritocchi allo scambio P2P», dalla prova vera a due telefoni. Chi
+   vende, a sats liberati, legge «Sats in pagamento» finche' il
+   pagamento a chi compra non e' riuscito davvero — e questo, dal
+   coordinatore, lui non lo viene a sapere: mostrod gli dice «garanzia
+   incassata» e poi tace fino al voto. Lo sa il SERVER, che mostrod
+   tiene informato a ogni passo (patch 0007: il rilascio, il pagamento
+   non passato, la fattura nuova, il pagamento riuscito), e qui glielo
+   si chiede. Il giudice di la' e' `_pagamenti_p2p`.
+   UN BLOCCO SUO, fuori dal motore e dagli altri due: il motore non ha
+   dentro nessuna `fetch` (c'e' la sentinella), e i volti e le parti
+   contano le loro — una infilata la' li farebbe mentire su una cosa
+   che non e' cambiata. Le regole sono le loro: il cancello
+   dell'anonimo, gli id in POST e mai nell'indirizzo, e nel corpo la
+   sola lista degli ordini.
+   IL FRENO E' UN ORARIO PER ID, non un «gia' chiesto»: la risposta
+   CAMBIA (il pagamento riesce un'ora dopo, con la fattura nuova), e un
+   si'/no per sessione congelerebbe la prima. Si chiede al piu' ogni
+   `P2P_PAGAMENTI_OGNI_MS`, e una domanda sola alla volta.
+   CHI RISPONDE MUOVE LA RIGA col giudice puro del motore
+   (`applicaPagamentoP2P`), e la pagina aperta si ridisegna. */
+const P2P_PAGAMENTI_OGNI_MS = 20000;
+let p2pPagamentiChiesti = {};     // id -> quando l'ho chiesto (ms)
+let p2pPagamentiGiro = null;      // la domanda in volo
+let p2pPagamentiBattito = 0;      // l'ultimo giro del battito (ms)
+async function chiediPagamentiP2P(ids){
+  if (DEMO || VETRINA || !myTgId) return false;
+  const adesso = Date.now();
+  const lista = (ids || []).filter(id => id && !provvisorioP2P(id)
+    && !(adesso - (p2pPagamentiChiesti[id] || 0) < P2P_PAGAMENTI_OGNI_MS));
+  if (!lista.length || p2pPagamentiGiro) return false;
+  lista.forEach(id => { p2pPagamentiChiesti[id] = adesso; });
+  p2pPagamentiGiro = (async () => {
+    try {
+      const r = await fetch(`${API_BASE}/p2p/pagamenti`, {method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+        body: JSON.stringify({ordini: lista})});
+      if (!r.ok) return false;
+      const d = await r.json();
+      const esiti = (d && d.pagamenti) || {};
+      let mossi = 0, conclusi = 0;
+      for (const id of lista) {
+        const nuova = applicaPagamentoP2P(ordiniP2P()[id], esiti[id]);
+        if (!nuova) continue;
+        scriviOrdineP2P(nuova);
+        mossi++;
+        if (nuova.stato === 'concluso') conclusi++;
+      }
+      if (!mossi) return false;
+      /* la festa del messaggio che conclude (vedi applicaMessaggioP2P):
+         a chi vende arriva ADESSO, a pagamento riuscito, e non piu' al
+         rilascio; e uno scambio finito esce dall'ascolto */
+      if (conclusi) {
+        toast('Scambio concluso 🎉');
+        mostroRiascolta().catch(() => {});
+      }
+      if (lista.indexOf(p2pOrdineAperto) >= 0 && vistaAttivaP2P() === 'view-p2pordine')
+        renderOrdineP2P();
+      const v = vistaAttivaP2P();
+      if (v === 'view-p2p' || v === 'view-p2pmiei') renderP2P();
+      return true;
+    } catch(e) { return false; }
+    finally { p2pPagamentiGiro = null; }
+  })();
+  return p2pPagamentiGiro;
+}
+/* IL BATTITO: dentro l'unico interval dell'app, ma un giro al piu'
+   ogni `P2P_PAGAMENTI_OGNI_MS`, solo a pagina VISIBILE e solo con
+   righe a sats liberati — senza niente da chiedere non parte niente.
+   E' quel che porta «Scambio concluso» a chi ha la pagina aperta e
+   non tocca niente. */
+function battitoPagamentiP2P(){
+  const adesso = Date.now();
+  if (adesso - p2pPagamentiBattito < P2P_PAGAMENTI_OGNI_MS) return;
+  p2pPagamentiBattito = adesso;
+  if (document.visibilityState === 'hidden') return;
+  let tutti;
+  try { tutti = ordiniP2P(); } catch(e) { return; }
+  const ids = Object.keys(tutti).filter(id => {
+    const o = tutti[id];
+    return !!o && o.lato === 'vendo' && o.stato === 'rilasciato';
+  });
+  if (ids.length) chiediPagamentiP2P(ids);
+}
+/* ============ fine del pagamento detto a chi vende ============ */
 
 /* Racconta un ordine appena pubblicato nel canale «Barattolo Vetrina»,
    come per un annuncio normale (chiesto da Andrea, set 2026). STA QUI

@@ -45873,14 +45873,17 @@ def prove_p2p_libro():
     prova("la stella della card non usa la classe dei bottoni del voto", True,
           'class="p2p-rep-stella"' in mini
           and 'class="p2p-stella"' not in pezzo_js(mini, "function stellaP2P(media){", "\n}\n"))
-    # DUE USI, UN MESTIERE (set 2026): i bottoni sono due gruppi — le
+    # DUE USI, UN MESTIERE (set 2026): i bottoni erano due gruppi — le
     # stelle che si SCELGONO nella recensione e quelle che si premono
-    # nel voto del circuito — e la classe e' la stessa perche' la cosa
-    # e' la stessa (un bottone-stella dentro un foglio). Quel che la
-    # sentinella difende resta: la stella della CARD, che si chiama
-    # `p2p-rep-stella`, non entra in questa famiglia.
+    # nel voto del circuito. Quel che la sentinella difende resta: la
+    # stella della CARD, che si chiama `p2p-rep-stella`, non entra in
+    # questa famiglia.
+    # ⚠️ EMENDATA (23 set 2026, «Ritocchi allo scambio P2P»): le stelle
+    # della recensione sono uscite dalla famiglia — il riquadro e' quello
+    # del mercatino e ne porta la riga, `.fb-stelle` — e qui resta il
+    # solo foglio del voto del circuito.
     prova("...e i `p2p-stella` sono solo bottoni di un foglio del voto",
-          2, mini.count('class="p2p-stella"'))
+          1, mini.count('class="p2p-stella"'))
     # ⚠️ LA TAGLIA DELLA STELLA STA IN UNA VARIABILE SOLA, e questa
     # sentinella nasce da un difetto VERO (11 set 2026, visto da
     # Andrea: «a 5,0 una striscia verticale più chiara in mezzo»).
@@ -53944,11 +53947,15 @@ process.stdout.write(JSON.stringify(out));
           ["Revolut", "Satispay"], out["comproMetodi"])
     prova("...e la trade key dell'altra persona si tiene", "cc" * 32,
           out["comproPeer"])
+    # ⚠️ EMENDATA (23 set 2026, «Ritocchi allo scambio P2P», dalla prova
+    # vera a due telefoni): la garanzia incassata NON e' lo scambio
+    # concluso — a chi vende porta a «Sats in pagamento», e «concluso»
+    # arriva dal server a pagamento riuscito (prove_ritocchi_scambio).
     prova("chi VENDE: blocca i sats, poi li libera, e basta",
           [["attesa_mia_hold", "hold"],
            ["attivo", ""],
            ["euro_inviati", "rilascia"],
-           ["concluso", ""]], out["giroVendo"])
+           ["rilasciato", ""]], out["giroVendo"])
     prova("la richiesta da bloccare si legge, importo compreso", 80000,
           out["holdLetta"])
     prova("...e la hold E' il mio lato di chi vende", 80000, out["vendoMiei"])
@@ -54041,12 +54048,14 @@ process.stdout.write(JSON.stringify(out));
           out["attivoMio"] == out["attivoCompro"])
 
     # --- 4) TAPPA 5: chi pubblica, chi ritira, chi vota --------------
+    # ⚠️ EMENDATA (23 set 2026): come chiunque venda, anche chi ha
+    # pubblicato resta a «Sats in pagamento» dopo il rilascio
     prova("chi PUBBLICA aspetta, poi blocca i sats come chiunque venda",
           [["pubblicato", ""],
            ["attesa_mia_hold", "hold"],
            ["attivo", ""],
            ["euro_inviati", "rilascia"],
-           ["concluso", ""]], out["giroPubblico"])
+           ["rilasciato", ""]], out["giroPubblico"])
     prova("un ordine appena pubblicato non chiede niente a chi l'ha messo",
           True, out["pubblicatoSenzaPieno"])
     # L'INTERVALLO, DALLE DUE PARTI DELLA PRESA (set 2026): finche' e'
@@ -54077,8 +54086,11 @@ process.stdout.write(JSON.stringify(out));
     # arriva non si offre niente (il bottone cambierebbe sotto il dito).
     prova("a scambio concluso, finche' il server tace, nessun gesto",
           [], out["secConcluso"])
-    prova("...c'e' un posto per la recensione: si recensisce",
-          ["recensisci"], out["secRecensisce"])
+    # ⚠️ EMENDATA (23 set 2026, «Ritocchi allo scambio P2P»): la
+    # recensione non e' piu' un bottone della colonna ma il riquadro del
+    # mercatino, nella pagina — nella colonna non entra niente
+    prova("...c'e' un posto per la recensione: nella colonna niente, e' il riquadro",
+          [], out["secRecensisce"])
     prova("...non c'e', e restano le stelle del circuito",
           ["vota"], out["secVota"])
     prova("...e il voto sparisce quando e' partito", [], out["secVotato"])
@@ -54669,12 +54681,23 @@ def prove_p2p_chat():
     # partito: senza, chi compra non puo' pagare — e' l'«obbligatorio»
     # della decisione, detto dove serve invece che bloccando un timer.
     co = pezzo_js(mini, "function campiOrdineP2P(", "\n}\n")
-    prova("a chi vende senza recapito la riga insiste", True,
-          "o.lato === 'vendo' && !miei.euro" in co
-          and "dove mandarti gli euro" in co)
-    prova("...e a chi compra il recapito arrivato si mostra", True,
-          "o.lato === 'compro' && loro.euro" in co
-          and "esc(loro.euro.testo)" in co)
+    # ⚠️ EMENDATA (23 set 2026, «Ritocchi allo scambio P2P», dalla prova
+    # vera a due telefoni): la riga che insisteva stava SOTTO il bottone
+    # del contatto Telegram, e diceva per la terza volta quel che dicono
+    # gia' il riquadro di stato e il bottone arancio in cima. Se n'e'
+    # andata; l'insistenza resta in quei due posti, e si guarda li'.
+    _co_nudo = re.sub(r"/\*[\s\S]*?\*/", "", co)
+    prova("a chi vende senza recapito insistono lo stato e il bottone, non piu' una riga in fondo", True,
+          "dove mandarti gli euro" not in _co_nudo and "Di\\' a chi compra" not in _co_nudo
+          and "dove mandarti gli euro: senza, non può pagarti" in pezzo_js(mini, "function statoTestoP2P(o){", "\n}\n")
+          and "recapito: '<button class=\"btn orange\" onclick=\"apriCampiP2P()\">💶 Indica dove ricevere gli euro</button>'" in mini)
+    # ⚠️ EMENDATA (stesso giorno): il recapito ARRIVATO a chi compra non
+    # sta piu' qui ma sotto il suo bottone (`recapitoCompratoreP2P`)
+    _rcp = pezzo_js(mini, "function recapitoCompratoreP2P(o){", "\n}\n")
+    prova("...e a chi compra il recapito arrivato si mostra, sotto il suo bottone", True,
+          "o.lato !== 'compro' || !loro.euro" in _rcp
+          and "riquadroRecapitoP2P(loro.euro.testo)" in _rcp
+          and "esc(r.v)" in pezzo_js(mini, "function riquadroRecapitoP2P(testo){", "\n}\n"))
 
     # --- 7b) L'IDENTITA' DI PAGAMENTO (set 2026) ---------------------
     # Il metodo sceglie il form, il ricordo sta sul dispositivo, e il
@@ -54729,9 +54752,13 @@ def prove_p2p_chat():
     prova("...e il ricordo PRECOMPILA il form (e' da li' che chi vende lo manda)", True,
           "(recapitiMiei()[fr.forma] || null)" in rc
           and "(salvato && salvato.campi && salvato.campi[c.k]) || ''" in rc)
+    # ⚠️ EMENDATA (23 set 2026, «Ritocchi allo scambio P2P»): nella
+    # PAGINA il recapito non e' piu' un testo con gli a-capo ma un rigo
+    # per dato (`riquadroRecapitoP2P`, provato in prove_ritocchi_scambio),
+    # e l'a-capo lo fa lo split sulle righe; nel FOGLIO resta com'era.
     prova("...e il recapito arrivato mostra anche gli a-capo", True,
           "esc(loro.euro.testo).replace(/\\n/g, '<br>')" in rc
-          and "esc(loro.euro.testo).replace(/\\n/g, '<br>')" in co)
+          and ".split('\\n')" in pezzo_js(mini, "function righeRecapitoP2P(testo){", "\n}\n"))
 
     # --- 8) IL BANCO: il blocco gira col bundle VERO ------------------
     node = _sh.which("node")
@@ -64553,10 +64580,13 @@ DOM = null;
     prova("...e il bottone per copiare il codice", True,
           "copiaLink(this.dataset.pc, 'PayCode copiato 📋')" in _rc)
     prova("senza un PayCode nel testo il riquadro non c'e' (vale il recapito di sempre)", "", out["riquadroSenza"])
-    _co = pezzo_js(mini, "function campiOrdineP2P(o){", "\n}\n")
+    # ⚠️ EMENDATA (23 set 2026, «Ritocchi allo scambio P2P»): il
+    # recapito di chi compra — il riquadro del PayCode compreso — e'
+    # salito sotto il suo bottone, e lo monta `recapitoCompratoreP2P`
+    _co = pezzo_js(mini, "function recapitoCompratoreP2P(o){", "\n}\n")
     prova("la pagina monta il riquadro solo a chi compra, col tabacchino e un PayCode nel testo", True,
-          "if (o.lato === 'compro' && loro.euro && tabacchinoP2P(o.metodi) && payCodeDaTestoP2P(loro.euro.testo))" in _co
-          and "fuori += riquadroPayCodeP2P(o);" in _co)
+          "if (!o || o.lato !== 'compro' || !loro.euro) return '';" in _co
+          and "if (tabacchinoP2P(o.metodi) && payCodeDaTestoP2P(loro.euro.testo))\n    return riquadroPayCodeP2P(o);" in _co)
     _ro = pezzo_js(mini, "function renderOrdineP2P(){", "\n}\n")
     prova("il bottone di chi compra dice «Ho pagato al tabacchino», e il passo «PayCode pagato»", True,
           "✅ Ho pagato al tabacchino</button>" in _ro
@@ -80254,6 +80284,674 @@ def prove_nip89_handler():
     vero2.close()
 
 
+def prove_ritocchi_scambio():
+    """RITOCCHI ALLO SCAMBIO P2P (23 set 2026, dalla prova vera a due
+    telefoni: uno scambio completo, fattura scaduta compresa). Cinque
+    punti, e le prove li seguono in ordine:
+    1. a chi vende, sotto il bottone del contatto Telegram, la riga
+       «Di' a chi compra dove mandarti gli euro» se ne va: lo dicono gia'
+       il riquadro di stato e il bottone arancio in cima;
+    2. a chi compra il recapito sale SUBITO SOTTO «Ho inviato gli euro»,
+       un rigo per dato col suo «Copia», e il testo si seleziona;
+    3. a chi vende, finche' il pagamento a chi compra non e' riuscito
+       DAVVERO, la card e la pagina dicono «Sats in pagamento» (e, se
+       non e' passato, «chi compra deve dare una fattura nuova: non devi
+       fare niente»): lo sa il server, dagli eventi della patch 0007;
+    4. la recensione a tutt'e due le parti, una volta sola: il «non
+       ancora» non chiude piu' la porta per tutta la sessione, e il
+       server sa lo scambio concluso anche dal coordinatore, non solo
+       dal libro;
+    5. il riquadro della recensione e' quello del «Lascia un feedback»
+       del mercatino, con le SUE classi.
+    Il giro sul server vero (rotte e database) sta in
+    `collaudo_pagamento_p2p.py`, che gira in CI."""
+    print("\n[ritocchi allo scambio P2P]")
+    import json as _js
+    import shutil as _sh
+    import sqlite3 as _sq
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    css = mini[:mini.index("</style>")]
+    nudo = lambda js: re.sub(r"/\*[\s\S]*?\*/", "", js)
+
+    def fn(firma):
+        """la funzione per intero: il `fine` esplicito e la graffa
+        rimessa a mano, o il taglio si porterebbe dentro le vicine"""
+        return pezzo_js(mini, firma, "\n}\n") + "\n}"
+
+    def gira(nome, js):
+        """UN banco, SOLO: il suo stato di partenza, e un'esplosione torna
+        come rossa col suo nome invece di portarsi via la sezione (la
+        lezione della tortura)."""
+        node = _sh.which("node")
+        if not node:
+            salta(nome, "node non c'e'")
+            return {}
+        f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                   encoding="utf-8")
+        f.write(js)
+        f.close()
+        try:
+            r = _sp.run([node, f.name], capture_output=True, timeout=60,
+                        encoding="utf-8", errors="replace")
+        finally:
+            os.unlink(f.name)
+        try:
+            out = _js.loads(r.stdout.strip().splitlines()[-1])
+        except Exception:
+            out = None
+        if r.returncode != 0 or not isinstance(out, dict):
+            prova(f"il banco «{nome}» gira", "", (r.stderr or r.stdout or "")[-600:])
+            return {}
+        return out
+
+    esc_js = mini[mini.index("const esc = s =>"):mini.index("const el = id =>")]
+
+    # --- 1) LA RIGA SOTTO IL CONTATTO TELEGRAM SE NE E' ANDATA ---------
+    co = nudo(fn("function campiOrdineP2P(o){"))
+    prova("1) la riga «Di' a chi compra» non c'e' piu' sotto il contatto", True,
+          "dove mandarti" not in co and "Di\\' a chi compra" not in co)
+    prova("...e in nessun altro posto del client", False,
+          "Di\\' a chi compra" in nudo(mini))
+    prova("...mentre il riquadro di stato e il bottone in cima lo dicono ancora", True,
+          "dove mandarti gli euro: senza, non può pagarti"
+          in fn("function statoTestoP2P(o){")
+          and "recapito: '<button class=\"btn orange\" onclick=\"apriCampiP2P()\">"
+              "💶 Indica dove ricevere gli euro</button>'" in mini)
+    prova("...e la porta dei recapiti e' il suo bottone e basta", True,
+          co.split("{", 1)[1].strip().startswith(
+              "return '<button class=\"btn ghost\" onclick=\"apriCampiP2P()\">"
+              "🤝 I vostri recapiti'"))
+
+    # --- 2) IL RECAPITO SOTTO IL SUO BOTTONE, COL SUO «COPIA» ----------
+    ren = fn("function renderOrdineP2P(){")
+    i_bot = ren.find("(bottoni[azione] || '') +")
+    i_rec = ren.find("recapitoCompratoreP2P(o) +")
+    prova("2) il recapito di chi compra sta SUBITO sotto il bottone del passo", True,
+          0 <= i_bot < i_rec
+          and nudo(ren[i_bot:i_rec]).split() == ["(bottoni[azione]", "||", "'')", "+"])
+    prova("...sopra il profilo col contatto Telegram, e sopra la porta dei recapiti", True,
+          0 <= i_rec < ren.find("profiloControparteP2P(o)")
+          < ren.find("campiOrdineP2P(o)"))
+    prova("...e non aspetta le chiavi della conversazione: il testo e' gia' nella riga", True,
+          ren.count("recapitoCompratoreP2P(") == 1
+          and "chiaviChatOrdine(o) ? recapitoCompratoreP2P" not in ren)
+    prova("...il suo testo si SELEZIONA, detto e non lasciato al caso", True,
+          ".p2p-recapito{user-select:text;-webkit-user-select:text}" in css
+          and "overflow-wrap:anywhere;user-select:text;-webkit-user-select:text}" in css)
+    prova("...con la carta del riquadro del PayCode, che e' il suo gemello", True,
+          ".p2p-paycode,.p2p-controllo,.p2p-recapito{background:var(--chip-bg)" in css)
+    # MISURATO dal vivo (23 set 2026): a 12px sulla carta il --muted di
+    # giorno fa 3,23:1, sotto l'AA; il --ink-soft 6,21 (e 7,57 di sera)
+    prova("...le etichette dei dati in --ink-soft, che sulla carta passa l'AA", True,
+          ".p2p-recapito-dato span{font-size:12px;font-weight:700;color:var(--ink-soft)}" in css
+          and ".p2p-recapito-testa{font-size:13px;font-weight:700;color:var(--ink-soft);" in css
+          and ".p2p-recapito-copia{flex:0 0 auto;border:0;background:var(--sats-soft);color:var(--ink);" in css)
+    out = gira("il recapito di chi compra", "\n".join([
+        esc_js,
+        fn("function righeRecapitoP2P(testo){"),
+        fn("function riquadroRecapitoP2P(testo){"),
+        fn("function recapitoCompratoreP2P(o){"),
+        re.search(r"const P2P_FINALI = [^\n]*;", mini).group(0),
+        mini[mini.index("const P2P_PROGRESSO = {"):
+             mini.index("\n};", mini.index("const P2P_PROGRESSO = {")) + 3],
+    ]) + r"""
+function tabacchinoP2P(m){ return (m || []).some(x => /tabacch/i.test(x)); }
+function payCodeDaTestoP2P(t){ return /PayCode:/.test(t || '') ? '479-868-518' : ''; }
+function riquadroPayCodeP2P(o){ return '<div class="p2p-paycode">PAYCODE</div>'; }
+const out = {};
+const R = righeRecapitoP2P;
+out.sepa = R('Bonifico SEPA\nIntestatario: Mario Rossi\nIBAN: IT60X0542811101000000123456');
+out.revolut = R('Revolut: @mariorossi');
+out.paypal = R('PayPal: https://paypal.me/mario');
+out.url = R('https://paypal.me/mario');
+out.contanti = R('Contanti alla mano — propongo di vederci: Bar Sport, piazza Garibaldi');
+out.nudoConCifre = R('IT60X0542811101000000123456\nMario Rossi');
+out.vuoto = R('  \n\n ');
+out.nulla = R(null);
+out.righeVuote = R('Revolut: @a\n\n\nSatispay: 333');
+out.etichettaLunga = R('Questa e una etichetta lunghissima che supera i sessanta caratteri: valore');
+const box = riquadroRecapitoP2P('Bonifico SEPA\nIntestatario: Mario Rossi\nIBAN: IT60X0542811101000000123456');
+out.copie = (box.match(/class="p2p-recapito-copia"/g) || []).length;
+out.titolo = box.indexOf('<div class="p2p-recapito"><div class="p2p-paycode-tit">💶 Dove mandare gli euro</div>') === 0;
+out.testaSenzaCopia = box.indexOf('<div class="p2p-recapito-testa">Bonifico SEPA</div><div class="p2p-recapito-riga">') >= 0;
+out.ibanMono = box.indexOf('<b class="mono">IT60 X054 2811 1010 0000 0123 456</b>') >= 0;
+/* a gruppi di quattro SOLO se ha la forma di un IBAN; il «Copia» prende
+   sempre il valore com'e' arrivato */
+const strano = riquadroRecapitoP2P('IBAN: da chiedere al telefono\nIBAN2: it60x0542811101000000123456');
+out.ibanStrano = strano.indexOf('<b class="mono">da chiedere al telefono</b>') >= 0
+  && strano.indexOf('<b>it60x0542811101000000123456</b>') >= 0;
+const conSpazi = riquadroRecapitoP2P('IBAN: IT60 X054 2811 1010 0000 0123 456');
+out.ibanConSpazi = conSpazi.indexOf('<b class="mono">IT60 X054 2811 1010 0000 0123 456</b>') >= 0
+  && conSpazi.indexOf('data-v="IT60 X054 2811 1010 0000 0123 456"') >= 0;
+out.nomeNonMono = box.indexOf('<span>Intestatario</span><b>Mario Rossi</b>') >= 0;
+out.copiaDalDataset = (box.match(/data-v="[^"]*" onclick="copiaLink\(this\.dataset\.v, 'Copiato 📋'\)"/g) || []).length;
+out.copiaIban = box.indexOf('data-v="IT60X0542811101000000123456"') >= 0;
+const cattivo = riquadroRecapitoP2P('IBAN: "><img src=x onerror=alert(1)>\nNota: \'); alert(1); //');
+out.cattivoSenzaTag = cattivo.indexOf('<img') < 0;
+out.cattivoNelDataset = cattivo.indexOf('data-v="&quot;&gt;&lt;img src=x onerror=alert(1)&gt;"') >= 0;
+out.cattivoOnclickFermo = (cattivo.match(/onclick="copiaLink\(this\.dataset\.v, 'Copiato 📋'\)"/g) || []).length;
+out.vende = recapitoCompratoreP2P({lato: 'vendo', stato: 'attivo', campiLoro: {euro: {testo: 'IBAN: X1'}}});
+out.senza = recapitoCompratoreP2P({lato: 'compro', stato: 'attivo', campiLoro: {}});
+const conIban = s => ({lato: 'compro', stato: s, metodi: ['SEPA'],
+                       campiLoro: {euro: {testo: 'IBAN: IT60X0542811101000000123456'}}});
+out.attivo = recapitoCompratoreP2P(conIban('attivo'));
+out.presto = recapitoCompratoreP2P(conIban('attesa_hold_venditore'));
+out.concluso = recapitoCompratoreP2P(conIban('concluso'));
+out.paycode = recapitoCompratoreP2P({lato: 'compro', stato: 'attivo', metodi: ['Contanti al tabacchino'],
+  campiLoro: {euro: {testo: 'Contanti al tabacchino\nPayCode: 479-868-518'}}});
+console.log(JSON.stringify(out));
+""")
+    if out:
+        prova("il testo SEPA: il nome del metodo in testa, poi un dato per rigo",
+              [{"testa": "Bonifico SEPA"}, {"et": "Intestatario", "v": "Mario Rossi"},
+               {"et": "IBAN", "v": "IT60X0542811101000000123456"}], out.get("sepa"))
+        prova("...Revolut, e PayPal col suo indirizzo (i due punti dell'URL non tagliano)",
+              [[{"et": "Revolut", "v": "@mariorossi"}],
+               [{"et": "PayPal", "v": "https://paypal.me/mario"}],
+               [{"et": "", "v": "https://paypal.me/mario"}]],
+              [out.get("revolut"), out.get("paypal"), out.get("url")])
+        prova("...il luogo dei contanti si copia senza la sua frase",
+              [{"et": "Contanti alla mano — propongo di vederci",
+                "v": "Bar Sport, piazza Garibaldi"}], out.get("contanti"))
+        prova("...una prima riga con le cifre e' un dato, non il nome del metodo",
+              [{"et": "", "v": "IT60X0542811101000000123456"},
+               {"et": "", "v": "Mario Rossi"}], out.get("nudoConCifre"))
+        prova("...righe vuote via, e il vuoto non inventa niente",
+              [[], [], [{"et": "Revolut", "v": "@a"}, {"et": "Satispay", "v": "333"}]],
+              [out.get("vuoto"), out.get("nulla"), out.get("righeVuote")])
+        prova("...e un'etichetta troppo lunga non taglia: la riga si copia intera",
+              [{"et": "", "v": "Questa e una etichetta lunghissima che supera i "
+                                "sessanta caratteri: valore"}], out.get("etichettaLunga"))
+        prova("il riquadro: il titolo, e un «Copia» per DATO (il nome del metodo no)",
+              [True, 2, True], [out.get("titolo"), out.get("copie"),
+                                out.get("testaSenzaCopia")])
+        prova("...l'IBAN in monospazio e a gruppi di quattro, il nome no", [True, True],
+              [out.get("ibanMono"), out.get("nomeNonMono")])
+        prova("...a gruppi SOLO se ha la forma di un IBAN, e il «Copia» prende il valore arrivato",
+              [True, True], [out.get("ibanStrano"), out.get("ibanConSpazi")])
+        prova("...e ogni «Copia» prende il VALORE dal dataset, senza l'etichetta",
+              [2, True], [out.get("copiaDalDataset"), out.get("copiaIban")])
+        prova("il testo dell'altra persona non diventa markup ne' codice", [True, True, 2],
+              [out.get("cattivoSenzaTag"), out.get("cattivoNelDataset"),
+               out.get("cattivoOnclickFermo")])
+        prova("a chi vende e senza recapito il riquadro non c'e'", ["", ""],
+              [out.get("vende"), out.get("senza")])
+        prova("a sats in garanzia: il riquadro, senza l'avviso di aspettare", True,
+              (out.get("attivo") or "").startswith('<div class="p2p-recapito">')
+              and "Non inviare ancora" not in out.get("attivo", ""))
+        prova("...prima della garanzia, l'avviso sotto l'IBAN resta", True,
+              (out.get("presto") or "").startswith('<div class="p2p-recapito">')
+              and "⚠️ <b>Non inviare ancora niente:</b>" in out.get("presto", ""))
+        prova("...a scambio finito il riquadro resta, senza avviso", True,
+              (out.get("concluso") or "").startswith('<div class="p2p-recapito">')
+              and "Non inviare ancora" not in out.get("concluso", ""))
+        prova("...e col PayCode il recapito e' il suo riquadro", '<div class="p2p-paycode">PAYCODE</div>',
+              out.get("paycode"))
+
+    # --- 3a) IL SERVER: il giudice del pagamento a chi compra ----------
+    def tabella(nome):
+        i = _SORGENTE.index("CREATE TABLE IF NOT EXISTS " + nome + "(")
+        return _SORGENTE[i:_SORGENTE.index("\n    );", i) + 7]
+    amb = {"re": re}
+    for riga in ("FORMA_ORDINE_P2P = ", "MAX_ORDINI_P2P = ", "_DOPO_RILASCIO_P2P = ",
+                 "STATI_RECENSIONE_P2P = "):
+        i = _SORGENTE.index(riga)
+        exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+    for nome in ("_ordini_puliti_p2p", "_pagamenti_p2p", "_ammette_recensione_p2p",
+                 "_scambio_concluso_p2p"):
+        exec(pezzo(nome), amb)
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    con.executescript(tabella("p2p_momenti") + "\n" + tabella("p2p_scambi"))
+    O1 = "5a1e0000-aaaa-4a2b-9c3d-000000000001"
+    O2 = "5a1e0000-bbbb-4a2b-9c3d-000000000002"
+    O3 = "5a1e0000-cccc-4a2b-9c3d-000000000003"
+    O4 = "5a1e0000-dddd-4a2b-9c3d-000000000004"
+
+    def ev(o, momento, quando, dettaglio="", fonte="mostro"):
+        con.execute("INSERT INTO p2p_momenti(ordine, momento, quando, fonte, "
+                    "dettaglio) VALUES(?,?,?,?,?)",
+                    (o, momento, quando, fonte, dettaglio))
+    for o in (O1, O3):
+        con.execute("INSERT INTO p2p_scambi(ordine, compratore, venditore, "
+                    "aggiornato) VALUES(?,?,?,1)", (o, 222, 111))
+    def P(io, lista=None):
+        """il giudice, e un'eccezione torna come VALORE: una rossa col
+        suo nome, non la sezione che esplode portandosi via le sorelle
+        (visto con la tortura)"""
+        try:
+            return amb["_pagamenti_p2p"](con, lista or [O1], io)
+        except Exception as e:
+            return {"ESPLOSO": f"{type(e).__name__}: {e}"}
+    fasi = [P(111)]
+    ev(O1, "fattura_data", 100, "active")
+    fasi.append(P(111))
+    ev(O1, "rilasciato", 200)
+    fasi.append(P(111))
+    ev(O1, "payout_fallito", 210, "INVOICE_EXPIRED")
+    fasi.append(P(111))
+    ev(O1, "fattura_data", 300, "new-invoice")
+    fasi.append(P(111))
+    ev(O1, "payout_fallito", 300, "NO_ROUTE")
+    fasi.append(P(111))
+    ev(O1, "concluso", 400)
+    fasi.append(P(111))
+    prova("3) il pagamento a chi compra, fase per fase: niente prima del rilascio "
+          "(la fattura della presa non conta), in corso, non passato, ripartito, "
+          "non passato nello stesso secondo della fattura nuova, riuscito",
+          [{}, {},
+           {O1: {"stato": "in_corso", "quando": 200}},
+           {O1: {"stato": "fallito", "quando": 210}},
+           {O1: {"stato": "in_corso", "quando": 300}},
+           {O1: {"stato": "fallito", "quando": 300}},
+           {O1: {"stato": "riuscito", "quando": 400}}], fasi)
+    prova("...lo dice anche a chi compra, che e' l'altra parte", "riuscito",
+          P(222).get(O1, {}).get("stato"))
+    prova("...all'estraneo, a nessuno e a un ordine senza parti non dice niente",
+          [{}, {}, {}], [P(333), P(0), P(111, [O2])])
+    ev(O3, "rilasciato", 500)
+    ev(O3, "concluso", 510, fonte="libro")
+    prova("...e il riuscito vale anche dalla riserva del libro", "riuscito",
+          P(111, [O3]).get(O3, {}).get("stato"))
+    prova("...una domanda sola per piu' scambi", [O1, O3],
+          sorted(P(111, [O1, O2, O3]).keys()))
+    errori = []
+    for storto in ([], ["../../etc"], "x", None):
+        try:
+            amb["_pagamenti_p2p"](con, storto, 111)
+            errori.append("passato")
+        except ValueError:
+            errori.append("400")
+    prova("...e una lista storta e' un ValueError (la rotta ne fa un 400)",
+          ["400"] * 4, errori)
+    rot = codice(pezzo("pagamenti_p2p"))
+    prova("la rotta: POST, sessione, corpo da leggi_json, il giudice, niente cache", True,
+          '@app.post("/api/p2p/pagamenti")' in _SORGENTE
+          and "verifica_utente(x_tg_init_data, barattolo_sessione)" in rot
+          and "await leggi_json(req)" in rot
+          and "_pagamenti_p2p(con, d.get(\"ordini\"), user[\"id\"])" in rot
+          and '"Cache-Control": "no-store"' in rot)
+    prova("...e niente gate sulla leva: qui non si scrive niente", False,
+          "_p2p_per(" in rot)
+
+    # --- 3b) IL CLIENT: la garanzia incassata non e' lo scambio concluso
+    def blocco_const(nome):
+        i = mini.index("const " + nome + " = {")
+        return mini[i:mini.index("\n};", i) + 3]
+    liste = "\n".join(re.findall(r"^const P2P_[A-Z_]+ = \[[^\]]*\];", mini, re.M))
+    motore = "\n".join([
+        blocco_const("AVANZA_P2P"), blocco_const("STATI_P2P"),
+        blocco_const("P2P_PROGRESSO"), blocco_const("MOTIVI_CANTDO"), liste,
+        fn("function chiaveCantDo(payload){"), fn("function motivoCantDo(payload){"),
+        fn("function importoBolt11(pr){"),
+        "let p2pInfo = {fee: 0.02};",
+        fn("function commissioneVivaP2P(){"), fn("function feeMiaP2P(o){"),
+        fn("function nettoLatoP2P(o, sats){"), fn("function scontoMancatoP2P(o, miei){"),
+        fn("function lordoDaMieiP2P(o, miei){"),
+        fn("function recapitoEuroArrivatoP2P(o){"), fn("function aspettaRecapitoP2P(o){"),
+        fn("function nomeControparteP2P(o, ripiego){"), fn("function statoTestoP2P(o){"),
+        fn("function mossaDopoRilascioP2P(o, azione, ord){"),
+        fn("function avanzaOrdineP2P(ordine, azione, payload){"),
+        fn("function euroTabacchinoP2P(metodi){"),
+        re.search(r"const P2P_TABACCHINO_PM = [^\n]*;", mini).group(0),
+        fn("function azioniDisponibili(o){"), fn("function gestoRecensioneP2P(o, rec){"),
+        fn("function gruppoScambioP2P(o){"), fn("function applicaPagamentoP2P(o, esito){"),
+    ])
+    out = gira("il pagamento a chi compra, nel motore", motore + r"""
+const out = {};
+function cammina(inizio, passi){
+  let o = inizio; const tappe = [];
+  for (const [azione, payload] of passi) {
+    o = avanzaOrdineP2P(o, azione, payload || null);
+    tappe.push([o.stato, azioniDisponibili(o)]);
+  }
+  return {ord: o, tappe};
+}
+const base = {euro: 50, sats: 80000, satsNetti: 0, metodi: [], cantDo: '', errore: '', peer: 'p'};
+const vendo = Object.assign({id: 'b', lato: 'vendo', stato: 'euro_inviati'}, base);
+const compro = Object.assign({id: 'a', lato: 'compro', stato: 'euro_inviati'}, base);
+out.rilascioVende = cammina(vendo, [['hold-invoice-payment-settled', null]]).tappe;
+out.rilascioCompra = cammina(compro, [['released', null], ['purchase-completed', null]]).tappe;
+out.conclusoNonRiapre = avanzaOrdineP2P(Object.assign({}, vendo, {stato: 'concluso'}),
+                                        'hold-invoice-payment-settled', null).stato;
+out.moderatore = avanzaOrdineP2P(vendo, 'admin-settled', null).stato;
+const ril = cammina(vendo, [['hold-invoice-payment-settled', null]]).ord;
+const A = applicaPagamentoP2P;
+out.inCorsoPrimo = A(ril, {stato: 'in_corso', quando: 200});
+const f1 = A(ril, {stato: 'fallito', quando: 210});
+out.fallito = [f1 && f1.stato, f1 && f1.payoutFallito];
+out.fallitoDiNuovo = A(f1, {stato: 'fallito', quando: 250});
+const f2 = A(f1, {stato: 'in_corso', quando: 300});
+out.ripartito = [f2 && f2.stato, f2 && ('payoutFallito' in f2)];
+const r1 = A(Object.assign({}, f1, {ultimaMossa: 190}), {stato: 'riuscito', quando: 400});
+out.riuscito = [r1 && r1.stato, r1 && r1.ultimaMossa, r1 && ('payoutFallito' in r1)];
+const r2 = A(Object.assign({}, ril, {ultimaMossa: 500}), {stato: 'riuscito', quando: 400});
+out.orologioNonScende = r2 && r2.ultimaMossa;
+out.nonMuta = ril.stato === 'rilasciato' && !('payoutFallito' in ril);
+out.ignora = [A(Object.assign({}, compro, {stato: 'rilasciato'}), {stato: 'riuscito', quando: 1}),
+              A(vendo, {stato: 'riuscito', quando: 1}),
+              A(Object.assign({}, vendo, {stato: 'concluso'}), {stato: 'fallito', quando: 1}),
+              A(ril, {stato: 'boh'}), A(ril, undefined), A(null, {stato: 'riuscito'})];
+out.tVende = statoTestoP2P(ril);
+out.tVendeFallito = statoTestoP2P(f1);
+out.tCompra = statoTestoP2P(Object.assign({}, compro, {stato: 'rilasciato'})).t;
+out.tConcluso = statoTestoP2P(r1).t;
+out.gruppo = [gruppoScambioP2P(ril), gruppoScambioP2P(f1), gruppoScambioP2P(r1)];
+out.gesto = [azioniDisponibili(ril), azioniDisponibili(f1)];
+out.recensione = [gestoRecensioneP2P(ril, {si: true}), gestoRecensioneP2P(r1, {si: true})];
+console.log(JSON.stringify(out));
+""")
+    if out:
+        prova("3) chi vende libera: «Sats in pagamento», non «concluso», e niente da fare",
+              [["rilasciato", ""]], out.get("rilascioVende"))
+        prova("...chi compra resta sul giro di sempre",
+              [["rilasciato", ""], ["concluso", ""]], out.get("rilascioCompra"))
+        prova("...uno scambio gia' concluso non si riapre, e il moderatore resta com'era",
+              ["concluso", "concluso"], [out.get("conclusoNonRiapre"), out.get("moderatore")])
+        prova("la risposta del server: «in corso» a riga ferma non muove niente", None,
+              out.get("inCorsoPrimo"))
+        prova("...«fallito» accende la riga di chi compra, e ripetuto non muove",
+              [["rilasciato", True], None], [out.get("fallito"), out.get("fallitoDiNuovo")])
+        prova("...la fattura nuova la spegne", ["rilasciato", False], out.get("ripartito"))
+        prova("...«riuscito» e' lo scambio concluso, all'ora del pagamento", ["concluso", 400, False],
+              out.get("riuscito"))
+        prova("...e l'orologio delle mosse non torna indietro", 500, out.get("orologioNonScende"))
+        prova("...copia e non muta", True, out.get("nonMuta"))
+        prova("...e non tocca chi compra, ne' prima del rilascio, ne' un finale, "
+              "ne' una parola sconosciuta", [None] * 6, out.get("ignora"))
+        prova("la pagina a chi vende: «Sats in pagamento», e il pagamento in corso",
+              {"t": "Sats in pagamento",
+               "d": "Hai liberato i sats: sono in pagamento verso chi compra."},
+              out.get("tVende"))
+        prova("...e se non e' passato, la riga di Andrea", {"t": "Sats in pagamento",
+              "d": "Il pagamento verso chi compra non è passato. Chi compra deve dare "
+                   "una fattura nuova: non devi fare niente."}, out.get("tVendeFallito"))
+        prova("...a chi compra il titolo resta il suo, e «concluso» e' concluso",
+              ["Sats liberati: in pagamento", "Scambio concluso"],
+              [out.get("tCompra"), out.get("tConcluso")])
+        prova("la card sta «in corso» finche' il pagamento non riesce, poi fra i conclusi",
+              ["corso", "corso", "fatti"], out.get("gruppo"))
+        prova("...senza un gesto per chi vende", ["", ""], out.get("gesto"))
+        prova("...e la recensione arriva col concluso", ["", "recensisci"], out.get("recensione"))
+    rs = fn("function rigaScambioP2P(o){")
+    prova("la card dice lo stato col giudice della pagina, e «Hai ricevuto» solo a concluso", True,
+          "const st = statoTestoP2P(o);" in rs and "'<span>' + esc(st.t) + '</span>'" in rs
+          and "const chiuso = o.stato === 'concluso';" in rs)
+    prova("il messaggio della garanzia incassata porta chi vende a «rilasciato»", True,
+          "if (azione === 'hold-invoice-payment-settled' && o && o.lato === 'vendo') return 'rilasciato';"
+          in fn("function mossaDopoRilascioP2P(o, azione, ord){"))
+
+    # --- 3c) IL CLIENT CHIEDE, e il blocco suo ------------------------
+    i_pag = mini.index("/* ============ IL PAGAMENTO DETTO A CHI VENDE")
+    blocco = mini[i_pag:mini.index("/* ============ fine del pagamento detto a chi vende")]
+    cod = nudo(blocco)
+    prova("il blocco che chiede sta fuori dal motore, dopo quello delle parti", True,
+          i_pag > mini.index("/* ============ fine delle parti che si vedono")
+          > mini.index("/* ============ fine del motore dello scambio"))
+    prova("...UNA fetch, in POST, e nel corpo la sola lista degli ordini",
+          [1, 1, ["ordini"]], [cod.count("fetch("), cod.count("method: 'POST'"),
+                               sorted(set(re.findall(r"JSON\.stringify\(\{(\w+):", cod)))])
+    prova("...alla sua rotta, col cancello dell'anonimo e senza i provvisori", True,
+          "/p2p/pagamenti`" in cod and "if (DEMO || VETRINA || !myTgId) return false;" in cod
+          and "!provvisorioP2P(id)" in cod)
+    prova("...e la riga la muove il giudice puro, che sta nel motore", True,
+          "applicaPagamentoP2P(ordiniP2P()[id], esiti[id])" in cod
+          and "function applicaPagamentoP2P(o, esito){"
+              in mini[:mini.index("/* ============ fine del motore dello scambio")])
+    prova("chiedono la pagina, l'elenco e il battito dell'unico interval", [True, True, True], [
+        "if (o.lato === 'vendo' && o.stato === 'rilasciato' && typeof chiediPagamentiP2P === 'function')\n"
+        "    chiediPagamentiP2P([o.id]);" in ren,
+        "chiediPagamentiP2P(inPagamento.map(o => o.id));" in fn("function scambiP2P(){")
+        and "aperti.filter(o => o.lato === 'vendo' && o.stato === 'rilasciato')"
+            in fn("function scambiP2P(){"),
+        "  battitoControlloTabP2P();\n  battitoPagamentiP2P();" in mini])
+    out = gira("la domanda del pagamento", blocco + "\n"
+               + fn("function applicaPagamentoP2P(o, esito){") + r"""
+let DEMO = false, VETRINA = false, myTgId = 111;
+const API_BASE = '/api';
+function authHdr(){ return 'x'; }
+function provvisorioP2P(id){ return String(id || '').indexOf('nuovo:') === 0; }
+let righe = {b: {id: 'b', lato: 'vendo', stato: 'rilasciato', ultimaMossa: 150},
+             c: {id: 'c', lato: 'compro', stato: 'rilasciato'}};
+function ordiniP2P(){ return righe; }
+function scriviOrdineP2P(o){ righe[o.id] = o; return o; }
+const detti = []; function toast(t){ detti.push(t); }
+let riascolti = 0; function mostroRiascolta(){ riascolti++; return Promise.resolve(); }
+let vista = 'view-p2pordine', p2pOrdineAperto = 'b', disegni = [];
+function vistaAttivaP2P(){ return vista; }
+function renderOrdineP2P(){ disegni.push('pagina'); }
+function renderP2P(){ disegni.push('elenco'); }
+let risposta = {}, ok = true; const chieste = [];
+async function fetch(url, opz){
+  chieste.push([url, opz.method, JSON.parse(opz.body)]);
+  return {ok: ok, json: async () => risposta};
+}
+let ora = 1000000;
+Date.now = () => ora;
+globalThis.document = {visibilityState: 'visible'};
+const flush = () => new Promise(r => setImmediate(r));
+(async () => {
+  const out = {};
+  risposta = {pagamenti: {b: {stato: 'fallito', quando: 210}}};
+  await chiediPagamentiP2P(['b']);
+  out.fallito = [righe.b.stato, righe.b.payoutFallito, chieste.length, chieste[0], disegni.slice()];
+  out.frenata = [await chiediPagamentiP2P(['b']), chieste.length];
+  ora += 20000;
+  risposta = {pagamenti: {b: {stato: 'riuscito', quando: 400}}};
+  await chiediPagamentiP2P(['b', 'nuovo:3', '']);
+  out.riuscito = [righe.b.stato, righe.b.ultimaMossa, 'payoutFallito' in righe.b,
+                  detti, riascolti, chieste[1][2]];
+  /* il battito: un giro ogni 20 s, solo a pagina visibile, solo con
+     righe di chi vende a sats liberati */
+  righe.d = {id: 'd', lato: 'vendo', stato: 'rilasciato'};
+  risposta = {pagamenti: {}};
+  ora += 20000; battitoPagamentiP2P(); await flush(); await flush();
+  out.battito = chieste.length === 3 ? chieste[2][2] : chieste.length;
+  /* IL FRENO DEL BATTITO E' SUO, e si isola con una riga MAI chiesta:
+     quella il freno per id la lascerebbe passare — se parte, a non
+     frenare e' stato il battito (lo ha chiesto la tortura) */
+  righe.g = {id: 'g', lato: 'vendo', stato: 'rilasciato'};
+  battitoPagamentiP2P(); await flush();
+  out.battitoFrenato = chieste.length;
+  delete righe.g;
+  ora += 20000; document.visibilityState = 'hidden'; battitoPagamentiP2P(); await flush();
+  out.nascosto = chieste.length;
+  document.visibilityState = 'visible'; delete righe.d; ora += 20000;
+  battitoPagamentiP2P(); await flush();
+  out.senzaRighe = chieste.length;
+  /* un server che dice di no non muove niente; l'anonimo non chiede */
+  righe.e = {id: 'e', lato: 'vendo', stato: 'rilasciato'}; ok = false; ora += 20000;
+  risposta = {pagamenti: {e: {stato: 'riuscito', quando: 9}}};
+  await chiediPagamentiP2P(['e']);
+  out.rifiuto = righe.e.stato;
+  myTgId = 0; ok = true; ora += 20000;
+  out.anonimo = [await chiediPagamentiP2P(['e']), righe.e.stato];
+  console.log(JSON.stringify(out));
+})();
+""")
+    if out:
+        prova("la risposta «fallito» accende la riga e ridisegna la pagina aperta",
+              ["rilasciato", True, 1, ["/api/p2p/pagamenti", "POST", {"ordini": ["b"]}], ["pagina"]],
+              out.get("fallito"))
+        prova("...una seconda domanda dentro i 20 secondi non parte", [False, 1],
+              out.get("frenata"))
+        prova("...«riuscito» conclude, fa festa, e toglie la chiave dall'ascolto; "
+              "provvisori e vuoti non si chiedono",
+              ["concluso", 400, False, ["Scambio concluso \U0001f389"], 1, {"ordini": ["b"]}],
+              out.get("riuscito"))
+        prova("il battito chiede le righe di chi vende a sats liberati", {"ordini": ["d"]},
+              out.get("battito"))
+        prova("...una volta ogni 20 secondi, solo a pagina visibile, e solo se c'e' da chiedere",
+              [3, 3, 3], [out.get("battitoFrenato"), out.get("nascosto"), out.get("senzaRighe")])
+        prova("un server che risponde male non muove niente, e l'anonimo non chiede",
+              ["rilasciato", [False, "rilasciato"]], [out.get("rifiuto"), out.get("anonimo")])
+
+    # --- 4) LA RECENSIONE A TUTT'E DUE, UNA VOLTA SOLA -------------------
+    SC = amb["_scambio_concluso_p2p"]
+    ev(O2, "concluso", 600)
+    ev(O4, "rilasciato", 700)
+    prova("4) il server sa lo scambio concluso dal libro, dal coordinatore o dalla riserva",
+          [True, True, True], [SC(con, "5a1e0000-eeee-4a2b-9c3d-000000000005", "success"),
+                               SC(con, O2, "in-progress"), SC(con, O3, "")])
+    prova("...e non se non lo dice nessuno, ne' per il concluso di un altro scambio",
+          [False, False], [SC(con, O4, "in-progress"),
+                           SC(con, "5a1e0000-ffff-4a2b-9c3d-000000000006", "in-progress")])
+    con.close()
+    rb = mini[mini.index("let p2pRecensioni = {};"):mini.index("async function chiediRecensibileP2P(id){")]
+    out = gira("la domanda della recensione che si richiede", rb
+               + fn("async function chiediRecensibileP2P(id){") + r"""
+let DEMO = false, VETRINA = false, myTgId = 111;
+const API_BASE = '/api';
+function authHdr(){ return 'x'; }
+let righe = {s: {id: 's', stato: 'concluso', lato: 'vendo'}};
+function ordiniP2P(){ return righe; }
+function scriviOrdineP2P(o){ righe[o.id] = o; }
+let p2pOrdineAperto = 's', disegni = 0;
+function vistaAttivaP2P(){ return 'view-p2pordine'; }
+function renderOrdineP2P(){ disegni++; }
+const timer = [];
+globalThis.setTimeout = (f, ms) => { timer.push([f, ms]); return timer.length; };
+let risposte = [{si: false, motivo: 'non_conclusa', gia: false},
+                {si: true, motivo: '', gia: false}];
+let chieste = 0;
+async function fetch(){
+  chieste++;
+  const r = risposte.length ? risposte.shift() : {si: false, motivo: 'ignota', gia: false};
+  return {ok: true, json: async () => r};
+}
+const flush = () => new Promise(r => setImmediate(r));
+(async () => {
+  const out = {};
+  await chiediRecensibileP2P('s');
+  out.primo = [p2pRecensioni.s.motivo, timer.length, timer[0] && timer[0][1], chieste];
+  out.doppia = await chiediRecensibileP2P('s');
+  /* ogni passo regge anche se il precedente non c'e' (la lezione della
+     tortura: un banco che esplode non dice cosa si e' rotto) */
+  const t1 = timer.shift(); if (t1) t1[0](); await flush(); await flush();
+  out.secondo = [p2pRecensioni.s.si, chieste, timer.length, righe.s.recensione || ''];
+  /* un «no» definitivo non si richiede, e si timbra sulla riga */
+  risposte = [{si: false, motivo: 'ignota', gia: false}];
+  righe.t = {id: 't', stato: 'concluso'}; p2pOrdineAperto = 't';
+  await chiediRecensibileP2P('t');
+  out.definitivo = [timer.length, righe.t.recensione];
+  /* il muto si richiede come il «non ancora» */
+  risposte = [];
+  fetch = async () => { chieste++; throw new Error('rete'); };
+  righe.m = {id: 'm', stato: 'concluso'}; p2pOrdineAperto = 'm';
+  await chiediRecensibileP2P('m');
+  out.muto = [p2pRecensioni.m.motivo, timer.length];
+  timer.length = 0;
+  /* e le riprove finiscono: cinque, a intervalli che si allungano */
+  fetch = async () => { chieste++; return {ok: true, json: async () =>
+    ({si: false, motivo: 'non_conclusa', gia: false})}; };
+  righe.u = {id: 'u', stato: 'concluso'}; p2pOrdineAperto = 'u';
+  await chiediRecensibileP2P('u');
+  const attese = [];
+  let giri = 0;
+  while (timer.length && giri < 20) {
+    const [f, ms] = timer.shift(); attese.push(ms); f();
+    await flush(); await flush(); giri++;
+  }
+  out.finite = [giri, p2pRecRiprove.u, attese];
+  console.log(JSON.stringify(out));
+})();
+""")
+    if out:
+        prova("il «non ancora» si richiede da solo, cinque secondi dopo",
+              ["non_conclusa", 1, 5000, 1], out.get("primo"))
+        prova("...e nel frattempo la domanda non parte due volte", False, out.get("doppia"))
+        prova("...alla riprova il posto c'e', e la riga non si timbra", [True, 2, 0, ""],
+              out.get("secondo"))
+        prova("un «no» definitivo non si richiede, e si timbra", [0, "senza"],
+              out.get("definitivo"))
+        prova("un server muto si richiede come il «non ancora»", ["muto", 1], out.get("muto"))
+        prova("...e le riprove finiscono: cinque, a intervalli che si allungano",
+              [5, 5, [5000, 15000, 30000, 60000, 120000]], out.get("finite"))
+
+    # --- 5) IL RIQUADRO DELLA RECENSIONE E' QUELLO DEL MERCATINO ---------
+    fb = fn("function feedbackPanel(o){")
+    mod = fn("function moduloRecensioneP2P(o){")
+    riq = fn("function riquadroRecensioneP2P(o, rec){")
+    stl = fn("function stelleSceltaP2P(){")
+    prova("5) le classi del modulo stanno nel foglio di stile, una volta ciascuna",
+          [1, 1, 1, 1, 1], [
+              css.count(".fb-stelle{font-size:30px;letter-spacing:6px;margin:10px 0;"
+                        "cursor:pointer;user-select:none}"),
+              css.count(".fb-stelle button{"),
+              css.count(".payout .fb-commento{min-height:52px}"),
+              css.count(".payout .fb-invia{margin-top:10px}"),
+              css.count(".payout .fb-dopo{margin-top:8px}")])
+    prova("...il mercatino le porta al posto dei suoi stili in linea", True,
+          '<div class="fb-stelle">' in fb and 'class="fb-commento"' in fb
+          and 'class="btn primary fb-invia"' in fb
+          and fb.count('class="hint fb-dopo"') == 2 and "style=" not in fb)
+    prova("...e la recensione degli scambi le RIUSA, senza uno stile suo", True,
+          "stelleSceltaP2P()" in mod and 'class="fb-commento"' in mod
+          and 'class="btn primary fb-invia"' in mod and 'class="hint fb-dopo"' in mod
+          and "'<div class=\"fb-stelle\">'" in stl
+          and "style=" not in mod and "style=" not in stl and "style=" not in riq)
+    prova("...dentro lo stesso riquadro del mercatino, coi suoi due titoli", True,
+          "'<div class=\"payout\">'" in mod and "'<h4>⭐ Lascia una recensione</h4>'" in mod
+          and "'<div class=\"payout\"><h4>⭐ Recensione lasciata</h4>'" in riq)
+    prova("il foglio della recensione e il suo bottone se ne sono andati",
+          [False, False, False, False],
+          ["function apriRecensioneP2P(" in mini, "function renderRecensioneP2P(" in mini,
+           "recensisci: '<button" in mini, "rigaRecensioneP2P" in mini])
+    prova("...e nella colonna dei gesti entra il solo voto del circuito", True,
+          "if (gesto === 'vota') fuori.push(gesto);"
+          in fn("function azioniSecondarieP2P(o, rec){"))
+    # il `box.innerHTML =` che conta e' quello DOPO la bozza: in cima alla
+    # funzione ce n'e' un altro, la pagina dello scambio che non c'e' piu'
+    _i_bz = ren.find("const bozza = bozzaRecensioneP2P(o.id);")
+    prova("la pagina disegna il riquadro, e la bozza del commento sopravvive al ridisegno", True,
+          "riquadroRecensioneP2P(o, rec) +" in ren
+          and 0 <= _i_bz < ren.find("box.innerHTML =", _i_bz)
+          < ren.find("rimettiBozzaRecensioneP2P(bozza);")
+          and ren.count("rimettiBozzaRecensioneP2P(bozza);") == 1)
+    ap = fn("function apriOrdineP2P(id){")
+    prova("...e le stelle scelte ripartono da zero aprendo un altro scambio", True,
+          "if (p2pOrdineAperto !== id) p2pStellaScelta = 0;" in ap
+          and ap.index("if (p2pOrdineAperto !== id) p2pStellaScelta = 0;")
+          < ap.index("p2pOrdineAperto = id;"))
+    out = gira("la bozza della recensione", "\n".join([
+        fn("function bozzaRecensioneP2P(id){"),
+        fn("function rimettiBozzaRecensioneP2P(b){")]) + r"""
+const nodi = {};
+function el(id){ return nodi[id] || null; }
+globalThis.document = {activeElement: null};
+const out = {};
+const t = {dataset: {id: 'x'}, value: 'meta commento', selectionStart: 4, selectionEnd: 7};
+nodi.p2pRecCommento = t; document.activeElement = t;
+const b = bozzaRecensioneP2P('x');
+out.presa = b;
+const t2 = {dataset: {id: 'x'}, value: '',
+            focus(o){ this.fuocoPreso = o; }, setSelectionRange(a, z){ this.sel = [a, z]; }};
+nodi.p2pRecCommento = t2;
+rimettiBozzaRecensioneP2P(b);
+out.rimessa = [t2.value, t2.fuocoPreso, t2.sel];
+nodi.p2pRecCommento = t;
+out.altroScambio = bozzaRecensioneP2P('y');
+nodi.p2pRecCommento = {innerHTML: ''};
+out.senzaDataset = bozzaRecensioneP2P('x');
+delete nodi.p2pRecCommento;
+out.senzaCasella = bozzaRecensioneP2P('x');
+rimettiBozzaRecensioneP2P(null);
+out.nienteDaRimettere = true;
+console.log(JSON.stringify(out));
+""")
+    if out:
+        prova("la bozza si prende: testo, fuoco e selezione",
+              {"v": "meta commento", "fuoco": True, "da": 4, "a": 7}, out.get("presa"))
+        prova("...e si rimette dopo il ridisegno, col fuoco e senza scatto di pagina",
+              ["meta commento", {"preventScroll": True}, [4, 7]], out.get("rimessa"))
+        prova("...ma mai sulla casella di un altro scambio, ne' su un nodo finto",
+              [None, None, None, True],
+              [out.get("altroScambio"), out.get("senzaDataset"),
+               out.get("senzaCasella"), out.get("nienteDaRimettere")])
+
+
 def prove_recensione_p2p():
     """UNA RECENSIONE PER SCAMBIO, NELLA MEDIA DI SEMPRE (set 2026).
 
@@ -80391,9 +81089,22 @@ def prove_recensione_p2p():
 
     # --- 4) LA ROTTA CHE SCRIVE -------------------------------------
     rec = codice(pezzo("recensione_p2p"))
+    # ⚠️ EMENDATA (23 set 2026, «Ritocchi allo scambio P2P»): il giudice
+    # dello stato ha due fonti — il libro E il pagamento riuscito detto
+    # da mostrod (patch 0007) — e le due rotte chiedono a lui
     prova("il gate passa dai due giudici", True,
           "_parti_recensione_p2p(r[\"tg_id\"], r[\"preso_da\"]," in rec
-          and "_ammette_recensione_p2p(r[\"stato\"])" in rec)
+          and "_scambio_concluso_p2p(con, ordine, r[\"stato\"])" in rec
+          and "_ammette_recensione_p2p(" not in rec)
+    prova("...e la domanda che apre il riquadro chiede allo stesso", True,
+          "_scambio_concluso_p2p(con, ordine, r[\"stato\"])"
+          in codice(pezzo("recensibile_p2p"))
+          and "_ammette_recensione_p2p(" not in codice(pezzo("recensibile_p2p")))
+    _sc = codice(pezzo("_scambio_concluso_p2p"))
+    prova("...che guarda il libro E la cronaca di mostrod", True,
+          "if _ammette_recensione_p2p(stato_libro):" in _sc
+          and "FROM p2p_momenti WHERE ordine=?" in _sc
+          and "momento='concluso'" in _sc)
     prova("...e il posto dell'ordine dal suo", True,
           "_numero_scambio_p2p(ordine)" in rec)
     prova("la riga porta lo scambio da cui viene", True,
@@ -80498,7 +81209,8 @@ def prove_recensione_p2p():
     # IL VOTO SI CLAMPA PRIMA DI repeat(), la famiglia del
     # filtro-alfabeto: quel numero puo' venire da localStorage, dove
     # chiunque scrive, e un -1 dentro repeat() porta via la pagina
-    _riga = pezzo_js(mini, "function rigaRecensioneP2P(o, rec){", "\n}\n")
+    # (23 set 2026) la riga e' diventata il riquadro del mercatino
+    _riga = pezzo_js(mini, "function riquadroRecensioneP2P(o, rec){", "\n}\n")
     prova("le stelle della riga passano da un clamp", True,
           "Math.max(0, Math.min(5," in _riga)
     prova("...e non da una repeat() sul numero nudo", False,
@@ -80511,9 +81223,12 @@ def prove_recensione_p2p():
     prova("...e il foglio del solo circuito ci passa", True,
           "stelleCircuitoP2P(o, n)" in _voto)
 
-    # --- 9) LE PAROLE DEI DUE FOGLI --------------------------------
-    _rr = pezzo_js(mini, "function renderRecensioneP2P(){", "\n}\n")
-    prova("il foglio dice dove va la recensione", True,
+    # --- 9) LE PAROLE DEL RIQUADRO E DEL FOGLIO ----------------------
+    # ⚠️ EMENDATA (23 set 2026, «Ritocchi allo scambio P2P»): la
+    # recensione non ha piu' un foglio suo — e' il riquadro del
+    # mercatino, nella pagina — e le parole stanno in `moduloRecensioneP2P`
+    _rr = pezzo_js(mini, "function moduloRecensioneP2P(o){", "\n}\n")
+    prova("il riquadro dice dove va la recensione", True,
           "profilo di Barattolo" in _rr
           and "stessa media del mercatino" in _rr)
     prova("...e che e' definitiva", True, "definitiva" in _rr)
@@ -80593,26 +81308,34 @@ console.log(JSON.stringify(out));
         "sospesaFatta": ("...lasciata, la riga invecchia", False),
         "sospesaSenza": ("...e senza posto pure", False),
         "sospesaAperto": ("...e uno scambio aperto non c'entra", False),
-        "colonna": ("il gesto entra nella colonna dei secondari",
-                    ["recensisci"]),
+        # ⚠️ EMENDATA (23 set 2026, «Ritocchi allo scambio P2P»): il
+        # gesto resta `recensisci`, ma e' il riquadro della pagina e
+        # nella colonna dei secondari non entra piu'
+        "colonna": ("il gesto e' il riquadro, e nella colonna non entra",
+                    []),
     }
     for k, (nome, atteso) in attesi.items():
         prova(nome, atteso, out.get(k))
 
-    # --- 11) E IL FOGLIO SI DISEGNA DAVVERO ------------------------
+    # --- 11) E IL RIQUADRO SI DISEGNA DAVVERO ----------------------
     # Le sentinelle qui sopra dicono che le parole ci sono. Che il
-    # foglio ESCA — le cinque stelle, la casella del commento, il
+    # riquadro ESCA — le cinque stelle, la casella del commento, il
     # bottone che chiama l'invio — lo dice solo facendolo girare: e'
     # la lezione del banco che non parte dove parte il dito.
+    # ⚠️ EMENDATA (23 set 2026, «Ritocchi allo scambio P2P»): era un
+    # foglio che si scriveva da se' in `p2pVotoCorpo`; adesso e' il
+    # riquadro del mercatino (le sue classi, nella pagina), e il banco
+    # guarda la STRINGA che la pagina incolla.
     banco2 = "\n".join([
-        pezzo_js(mini, "function renderRecensioneP2P(){", "\n}\n") + "\n}",
+        mini[mini.index("const esc = s =>"):mini.index("const el = id =>")],
+        pezzo_js(mini, "function riquadroRecensioneP2P(o, rec){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function moduloRecensioneP2P(o){", "\n}\n") + "\n}",
+        pezzo_js(mini, "function gestoRecensioneP2P(o, rec){", "\n}\n") + "\n}",
         pezzo_js(mini, "function stelleSceltaP2P(){", "\n}\n") + "\n}",
         pezzo_js(mini, "function sceltaStellaP2P(n){", "\n}\n") + "\n}",
     ]) + r"""
 let p2pStellaScelta = 0;
-let p2pOrdineAperto = 'x';
-const scambi = {x: {id: 'x', stato: 'concluso', votabile: true, votato: false}};
-function ordiniP2P(){ return scambi; }
+function nomeControparteP2P(o, ripiego){ return (o && o.nome) || ripiego; }
 const nodi = {};
 function el(id){
   if (!nodi[id]) nodi[id] = {id: id, innerHTML: '', textContent: ''};
@@ -80620,23 +81343,36 @@ function el(id){
 }
 function haptic(){}
 const out = {};
-renderRecensioneP2P();
-const html = nodi['p2pVotoCorpo'].innerHTML;
-out.cinqueStelle = (html.match(/class="p2p-stella"/g) || []).length;
-out.vuoteAllInizio = (html.match(/\u2606/g) || []).length;
-out.casellaDelCommento = html.indexOf('id="p2pRecCommento"') >= 0
-  && html.indexOf('maxlength="200"') >= 0;
-out.bottoneChiamaInvio = html.indexOf('inviaRecensioneP2P(this)') >= 0;
+const o = {id: 'x', stato: 'concluso', votabile: true, votato: false};
+const html = riquadroRecensioneP2P(o, {si: true});
+out.riquadroDelMercatino = html.indexOf('<div class="payout"><h4>⭐ Lascia una recensione</h4>') === 0;
+out.cinqueStelle = (html.match(/id="p2pStella\d"/g) || []).length;
+out.nellaRigaDelMercatino = html.indexOf('<div class="fb-stelle">') >= 0
+  && html.indexOf('p2p-stella') < 0;
+out.vuoteAllInizio = (html.match(/☆/g) || []).length;
+out.casellaDelCommento = html.indexOf('<textarea id="p2pRecCommento" class="fb-commento" maxlength="200"') >= 0;
+out.bottoneChiamaInvio = html.indexOf('<button class="btn primary fb-invia" onclick="inviaRecensioneP2P(this)">') >= 0;
 out.diceDoveVa = html.indexOf('profilo di Barattolo') >= 0;
-out.diceDelCircuito = html.indexOf('circuito degli scambi') >= 0;
+out.diceDelCircuito = html.indexOf('<div class="hint fb-dopo">Le stelle viaggiano anche sul circuito degli scambi') >= 0;
+out.chiamaPerNome = riquadroRecensioneP2P(Object.assign({}, o, {nome: 'Ada'}), {si: true})
+  .indexOf("Com'è andata con Ada?") >= 0;
 sceltaStellaP2P(3);
 out.treAccese = [1,2,3,4,5].map(n => el('p2pStella' + n).textContent).join('');
 out.scelta = p2pStellaScelta;
+/* un ridisegno della pagina non spegne le stelle scelte: nascono da
+   p2pStellaScelta */
+out.ridisegnoTiene = (riquadroRecensioneP2P(o, {si: true}).match(/★/g) || []).length;
 /* ...e a voto gia' partito la riga del circuito non si scrive: quelle
    stelle sono gia' andate */
-scambi.x.votato = true;
-renderRecensioneP2P();
-out.senzaCircuito = nodi['p2pVotoCorpo'].innerHTML.indexOf('circuito degli scambi') < 0;
+o.votato = true;
+out.senzaCircuito = riquadroRecensioneP2P(o, {si: true}).indexOf('circuito degli scambi') < 0;
+/* LASCIATA: il «Feedback lasciato» di la', con le stelle clampate e il
+   commento che passa da esc() */
+out.lasciata = riquadroRecensioneP2P(o, {si: false, gia: true, voto: 4, commento: 'ok <b>'});
+out.lasciataRiga = riquadroRecensioneP2P({id: 'y', stato: 'concluso', recensione: 'fatta', recVoto: 9}, undefined);
+out.apertoNiente = riquadroRecensioneP2P({id: 'z', stato: 'attivo'}, {si: true});
+out.senzaRisposta = riquadroRecensioneP2P({id: 'v', stato: 'concluso'}, undefined);
+out.senzaPosto = riquadroRecensioneP2P({id: 'w', stato: 'concluso'}, {si: false, motivo: 'ignota'});
 console.log(JSON.stringify(out));
 """
     f2 = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
@@ -80648,22 +81384,42 @@ console.log(JSON.stringify(out));
     os.unlink(f2.name)
     o2 = (_js.loads(r2.stdout.strip()) if r2.returncode == 0
           else {"ERRORE": (r2.stderr or "")[:300]})
-    prova("il foglio disegna le cinque stelle", 5, o2.get("cinqueStelle"))
+    prova("il riquadro e' quello del mercatino: .payout col suo titolo", True,
+          o2.get("riquadroDelMercatino"))
+    prova("...disegna le cinque stelle", 5, o2.get("cinqueStelle"))
+    prova("...nella riga delle stelle del mercatino, e non piu' nei bottoni del voto", True,
+          o2.get("nellaRigaDelMercatino"))
     prova("...e nascono VUOTE (si scelgono, non si premono)", 5,
           o2.get("vuoteAllInizio"))
-    prova("...con la casella del commento e il suo tetto", True,
+    prova("...con la casella del commento del mercatino e il suo tetto", True,
           o2.get("casellaDelCommento"))
-    prova("...e il bottone che chiama l'invio", True,
+    prova("...e il bottone del mercatino, che chiama l'invio", True,
           o2.get("bottoneChiamaInvio"))
     prova("...e dice dove va la recensione", True, o2.get("diceDoveVa"))
-    prova("a tre stelle se ne accendono tre", "\u2605\u2605\u2605\u2606\u2606",
+    prova("...e chiama l'altra persona per nome, quando la pagina lo mostra", True,
+          o2.get("chiamaPerNome"))
+    prova("a tre stelle se ne accendono tre", "★★★☆☆",
           o2.get("treAccese"))
     prova("...e il numero se lo ricorda", 3, o2.get("scelta"))
+    prova("...e un ridisegno della pagina non le spegne", 3,
+          o2.get("ridisegnoTiene"))
     prova("la riga del circuito c'e' quando il voto puo' ancora partire",
           True, o2.get("diceDelCircuito"))
     prova("...e non c'e' quando e' gia' partito", True,
           o2.get("senzaCircuito"))
-
+    prova("lasciata: il riquadro «Recensione lasciata», stelle e commento ripulito",
+          '<div class="payout"><h4>⭐ Recensione lasciata</h4><div class="hint">'
+          '<span class="stars">★★★★</span> — ok &lt;b&gt;</div></div>',
+          o2.get("lasciata"))
+    prova("...e dalla riga di questo telefono, col voto clampato a cinque",
+          '<div class="payout"><h4>⭐ Recensione lasciata</h4><div class="hint">'
+          '<span class="stars">★★★★★</span></div></div>',
+          o2.get("lasciataRiga"))
+    prova("a scambio aperto niente riquadro", "", o2.get("apertoNiente"))
+    prova("...e finche' il server non risponde, niente (il gesto non cambia sotto il dito)",
+          "", o2.get("senzaRisposta"))
+    prova("senza un posto, la riga che dice perche'", True,
+          "non ha un profilo su Barattolo" in (o2.get("senzaPosto") or ""))
     # --- 12) L'INTERRUTTORE DEL RICONOSCIMENTO (17 set 2026) --------
     # «Fatti riconoscere negli scambi»: chi entra da Nostr non viene
     # annotato quando PRENDE, e senza quell'annotazione una recensione
@@ -82667,6 +83423,7 @@ def main():
               prove_font,
               prove_porta_timer, prove_feedback_confermato,
               prove_recensione_p2p,
+              prove_ritocchi_scambio,
               prove_foglio_tastiera_iphone,
               prove_servizi,
               prove_sintassi_client,

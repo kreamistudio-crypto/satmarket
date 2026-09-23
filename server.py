@@ -37796,6 +37796,27 @@ def _ammette_recensione_p2p(stato) -> bool:
     return str(stato or "") in STATI_RECENSIONE_P2P
 
 
+def _scambio_concluso_p2p(con, ordine: str, stato_libro) -> bool:
+    """IL GIUDICE DELLE DUE ROTTE DELLA RECENSIONE (23 set 2026,
+    «Ritocchi allo scambio P2P»): lo scambio e' in porto se lo dice il
+    libro pubblico (`_ammette_recensione_p2p`) OPPURE se il pagamento a
+    chi compra e' riuscito nella cronaca che mostrod racconta al server
+    (patch 0007: `success` e' il momento `concluso` di `p2p_momenti`).
+    ERANO DUE OROLOGI, ed era scritto come la prima cosa da guardare
+    (CANTIERI, «Le recensioni degli scambi»): il client sa «concluso»
+    dai messaggi privati del coordinatore, questa rotta lo sapeva solo
+    dal giro del libro — e chi chiedeva nel mezzo si prendeva
+    `non_conclusa` su uno scambio finito. Dal 19 set 2026 il fatto
+    arriva qui da chi lo fa, e il libro resta la seconda strada.
+    UNO SOLO PER LE DUE ROTTE, come `_parti_recensione_p2p`: il bottone
+    non puo' comparire dove l'invio verrebbe rifiutato."""
+    if _ammette_recensione_p2p(stato_libro):
+        return True
+    return con.execute("SELECT 1 FROM p2p_momenti WHERE ordine=? "
+                       "AND momento='concluso' LIMIT 1",
+                       (ordine,)).fetchone() is not None
+
+
 def _parti_recensione_p2p(maker_id, preso_da, chi) -> tuple:
     """PURA: (chi riceve la recensione, motivo per cui non si puo').
     Prende i CAMPI e non la riga, il patto di `in_ferie`: cosi' si fa
@@ -37891,6 +37912,7 @@ async def recensibile_p2p(req: Request, x_tg_init_data: str = Header(""),
         r = con.execute("SELECT tg_id, preso_da, stato FROM p2p_ordini "
                         "WHERE ordine=?", (ordine,)).fetchone()
         mia = _mia_recensione_p2p(con, ordine, user["id"])
+        concluso = bool(r) and _scambio_concluso_p2p(con, ordine, r["stato"])
     finally:
         con.close()
     # UNA RIGA CHE NON C'E' NON E' UN ERRORE: e' lo scambio di un altro
@@ -37908,7 +37930,7 @@ async def recensibile_p2p(req: Request, x_tg_init_data: str = Header(""),
     # di un altro client resta dov'era.
     if motivo == "estraneo":
         return {"si": False, "motivo": "ignota", "gia": False}
-    if not _ammette_recensione_p2p(r["stato"]) and not mia:
+    if not concluso and not mia:
         motivo = motivo or "non_conclusa"
     fuori = {"si": bool(per) and not motivo and not mia,
              "motivo": motivo, "gia": bool(mia)}
@@ -37976,7 +37998,7 @@ async def recensione_p2p(req: Request, x_tg_init_data: str = Header(""),
         if motivo == "estraneo":
             con.rollback()
             raise HTTPException(403, "Operazione non permessa")
-        if not _ammette_recensione_p2p(r["stato"]):
+        if not _scambio_concluso_p2p(con, ordine, r["stato"]):
             con.rollback()
             raise HTTPException(400, "La recensione si lascia a scambio "
                                      "concluso")
@@ -41057,6 +41079,109 @@ async def evento_p2p(req: Request):
         _TASK_EVENTI_P2P.add(t)
         t.add_done_callback(_TASK_EVENTI_P2P.discard)
     return JSONResponse({"ok": True, "nuovo": fatto is not None},
+                        headers={"Cache-Control": "no-store"})
+
+
+# ---------- IL PAGAMENTO A CHI COMPRA, DETTO A CHI VENDE -------------
+# (23 set 2026, «Ritocchi allo scambio P2P», dalla prova vera a due
+# telefoni). Chi vende tocca «Libera i sats» e mostrod gli risponde
+# SUBITO che la sua garanzia e' stata incassata — il messaggio che il
+# client leggeva come «Scambio concluso» — ma i sats a chi compra
+# partono DOPO, e possono non passare: quel giorno la fattura di chi
+# comprava era scaduta. Chi compra lo sa dal coordinatore (il pagamento
+# fallito, poi «dammi una fattura nuova»); chi vende NO — a lui mostrod
+# non scrive piu' niente fino al voto — e leggeva «concluso» su uno
+# scambio fermo.
+# IL SERVER LO SA, ed e' la ragione per cui la domanda viene qui: dal
+# 19 set 2026 mostrod gli racconta ogni passo (patch 0007) — il
+# rilascio, ogni pagamento non passato, la fattura nuova, e il
+# pagamento RIUSCITO (`success`, il momento `concluso`). La cronaca sta
+# in `p2p_momenti`; qui si legge e basta.
+# IL PESO DEI FATTI CHE CADONO NELLO STESSO SECONDO: un pagamento non
+# passato e' sempre la conseguenza di un tentativo — il rilascio, o la
+# fattura nuova — quindi a parita' d'ora viene DOPO, e vince.
+_DOPO_RILASCIO_P2P = {"rilasciato": 0, "fattura_data": 1, "payout_fallito": 2}
+
+
+def _pagamenti_p2p(con, ordini, io: int) -> dict:
+    """PURA sulla connessione: dove sta il pagamento a chi compra, per
+    ogni scambio della lista di cui `io` e' una delle due parti. Torna
+    `{ordine: {"stato": ..., "quando": ...}}`, con stato
+    • 'riuscito' — il pagamento e' passato: i sats sono arrivati;
+    • 'fallito'  — l'ultimo fatto dopo il rilascio e' un pagamento non
+      passato: si aspetta la fattura nuova di chi compra;
+    • 'in_corso' — liberati, e il pagamento e' in volo (o e' ripartito
+      con la fattura nuova).
+    `quando` e' l'ora di MOSTROD del fatto che decide, e al client serve
+    a datare la chiusura.
+    LE PARTI SONO QUELLE DETTE DA MOSTROD (`p2p_scambi`), non quelle
+    dichiarate dai telefoni: e' lo stesso giudice degli avvisi.
+    CHI NON E' DELLA PARTITA NON RICEVE LA RIGA — e nemmeno un errore:
+    come per un ordine che non esiste, e i due casi non si distinguono
+    (la lezione di Q3). E UNO SCAMBIO DI CUI IL SERVER NON HA SENTITO
+    NIENTE DOPO IL RILASCIO resta fuori allo stesso modo: «non lo so»
+    non si serve come «in corso».
+    `concluso` VALE DA TUTT'E DUE LE FONTI: e' il `success` di mostrod,
+    o quello del libro quando la sua riserva e' partita (`fonte`
+    'libro') — il pagamento riuscito e' l'unico fatto di qui che il
+    libro pubblico veda. Gli altri tre li racconta solo mostrod.
+    Alza ValueError sulla forma storta della lista (via
+    `_ordini_puliti_p2p`), mai un 400 diretto: la prova non ha bisogno
+    di FastAPI."""
+    pulite = _ordini_puliti_p2p(ordini)
+    io = int(io or 0)
+    if not io:
+        return {}
+    segni = ",".join("?" * len(pulite))
+    miei = [r["ordine"] for r in con.execute(
+        f"SELECT ordine, compratore, venditore FROM p2p_scambi "
+        f"WHERE ordine IN ({segni})", pulite).fetchall()
+        if io in (int(r["compratore"] or 0), int(r["venditore"] or 0))]
+    fuori = {}
+    for ordine in miei:
+        righe = con.execute(
+            "SELECT momento, quando, dettaglio FROM p2p_momenti "
+            "WHERE ordine=? AND momento IN ('rilasciato', 'payout_fallito', "
+            "'fattura_data', 'concluso')", (ordine,)).fetchall()
+        riuscito = [int(r["quando"]) for r in righe if r["momento"] == "concluso"]
+        if riuscito:
+            fuori[ordine] = {"stato": "riuscito", "quando": max(riuscito)}
+            continue
+        # la fattura data PRIMA del rilascio e' un'altra storia — la
+        # presa, lo scambio che si apre —: conta solo quella NUOVA
+        fatti = [(int(r["quando"]), _DOPO_RILASCIO_P2P[r["momento"]], r["momento"])
+                 for r in righe if r["momento"] != "fattura_data"
+                 or (r["dettaglio"] or "") == "new-invoice"]
+        if not fatti:
+            continue
+        quando, _peso, momento = max(fatti)
+        fuori[ordine] = {"stato": "fallito" if momento == "payout_fallito"
+                         else "in_corso", "quando": quando}
+    return fuori
+
+
+@app.post("/api/p2p/pagamenti")
+async def pagamenti_p2p(req: Request, x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """«Su questi scambi, il pagamento a chi compra e' passato?» — la
+    domanda di chi vende a sats liberati, che dal coordinatore non lo
+    viene a sapere. Il giudice e' `_pagamenti_p2p`.
+    Le regole delle sorelle `controparte` e `recensibile`: la SESSIONE
+    serve (chi ha preso un ordine non e' un fatto pubblico, e nemmeno
+    come e' andato il suo pagamento), NIENTE ID NELL'URL (un log e' un
+    posto dove le cose restano), e NESSUN GATE SULLA LEVA — qui non si
+    scrive niente, e un 409 colpirebbe proprio chi ha uno scambio a
+    meta' il giorno che la leva si spegne."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    con = db()
+    try:
+        esiti = _pagamenti_p2p(con, d.get("ordini"), user["id"])
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    finally:
+        con.close()
+    return JSONResponse({"pagamenti": esiti},
                         headers={"Cache-Control": "no-store"})
 
 
