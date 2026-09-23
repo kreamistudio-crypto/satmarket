@@ -2023,6 +2023,12 @@
      in questa pagina il simbolo e' quello dell'intestazione. 56px, cioe'
      quanto il logo di ieri in larghezza. */
   .empty .scambi-mini{height:56px;margin:0 auto 10px}
+  /* ...e NEL LIBRO VUOTO le stesse monete al posto del logo P2P (23 set
+     2026, ritocco di Andrea), alte quanto il logo di prima: 76px, col
+     suo stesso margine sotto, quindi la scatola non cambia misura. Il
+     file e' 682×459, cioe' piu' del triplo dei 113×76 a cui si vede:
+     nitido anche a 3x. */
+  .empty .scambi-libro{height:76px;margin:0 auto 10px}
   /* il logo siede all'altezza delle scritte (margine negativo): cosi'
      scende invece di galleggiare in alto — il ritocco chiesto da
      Andrea guardando la riga.
@@ -8497,7 +8503,7 @@ document.getElementById('cartello')?.remove();</script>
            funzione, quindi la rete e' la prova. -->
       <p>Paghi in contanti alla cassa del tabacchino un ordine Amazon di chi vende: ricevi cifrati codice, importo e scadenza appena i sats sono in garanzia, e non vedi nome, indirizzo né cosa ha comprato. Per pagare non serve alcun documento. Tieni lo scontrino in caso di disputa.</p>
       <ol class="sicu-passi">
-        <li><b>Chi vende fa l'ordine su Amazon</b> scegliendo «paga in contanti nel punto vendita». Amazon gli manda una mail con tre cose: il <b>PayCode</b> (nove cifre, come 479-868-518), l'<b>importo</b> esatto coi centesimi e una <b>scadenza</b>, settantadue ore dal checkout. Vale fino a <b>novecentonovantanove euro</b> per ordine, senza minimo e senza commissione. <b>Non vale per Amazon Warehouse, contenuti digitali, oro, Prime, buoni regalo e acquisti 1-Click</b>: se la mail di Amazon non offre il pagamento in contanti, l'ordine non è pagabile con Barattozon.</li>
+        <li><b>Chi vende fa l'ordine su Amazon</b> scegliendo «paga in contanti nel punto vendita». Amazon gli manda una mail con tre cose: il <b>PayCode</b> (nove cifre, come 479-868-518), l'<b>importo</b> esatto coi centesimi e una <b>scadenza</b>, settantadue ore dal checkout. Vale fino a <b>novecentonovantanove euro</b> per ordine, senza minimo e senza commissione. <b>Non vale per Amazon Warehouse, contenuti digitali, oro, abbonamenti a Prime, buoni regalo e acquisti 1-Click</b>: se la mail di Amazon non offre il pagamento in contanti, l'ordine non è pagabile con Barattozon.</li>
         <li><b>Chi vende pubblica qui</b>, con Barattozon come unico metodo, e il foglio lo porta per mano in <b>quattro passi</b>: il PayCode, l'importo, la scadenza (con un selettore di data e ora, fra un'ora e settantadue ore) e il <b>premio</b>, con lo stesso cursore degli altri ordini, da meno venti a più venti per cento, a numeri interi. <b>Il segno decide il verso:</b> col premio positivo chi paga al tabacchino riceve meno sats del cambio pieno e la differenza resta a chi vende; col premio negativo ne riceve di più, e quella differenza la paga chi vende per la comodità. A zero passa il cambio pieno. <b>Premio più basso = più conveniente per chi paga = più probabile che qualcuno lo prenda in tempo.</b> Prima di pubblicare c'è il riepilogo. Il cambio si fissa lì, e l'ordine resta nel libro fino a <b>due ore prima</b> della scadenza del PayCode (mai oltre settantadue ore): poi esce da solo.</li>
         <li><b>Nel libro quel premio si vede col segno</b>, sulla card e nel conto dell'ordine, accanto alle altre offerte. Qui però non è una cifra dichiarata: i sats sono fissi dalla pubblicazione, e il premio è <b>ricavato</b> confrontandoli col cambio del momento — se il mercato si muove, quel numero si muove con lui, e dice quanto conviene <i>adesso</i>.</li>
         <li><b>Chi compra prende l'ordine</b>, indica dove ricevere i sats, e chi vende li blocca in garanzia. A quel punto il PayCode, l'importo e la scadenza gli arrivano <b>qui dentro e cifrati</b>, in un riquadro col tempo che resta. Nel libro pubblico c'è solo l'importo: il PayCode non lo vede nessun altro, nemmeno Barattolo.</li>
@@ -12644,6 +12650,65 @@ let uscitaDopoAnnullo = false;
    protocollo del service worker. */
 const STORIA = location.protocol.startsWith('http');
 let navUltimo = 0;        /* la serratura contro il doppio canale */
+/* ---- DENTRO IL P2P SI PASSA DAL LIBRO (23 set 2026, ritocco di
+   Andrea) ----
+   Le tre voci della nav del P2P restano radici sorelle — fra loro si
+   SOSTITUISCE, come fra i tab di sempre —, ma il libro e' la madre
+   delle altre due: da «I miei scambi» e da «Info P2P» l'indietro passa
+   dal libro, e solo dal libro si esce al mercatino. E' il patto della
+   radice madre, un piano piu' in giu'.
+   LA CRONOLOGIA NON CAMBIA FORMA, ed e' la scelta: un gradino del libro
+   spinto sotto le figlie andrebbe smontato a mano a ogni uscita da un
+   altro tab (il mercatino, il profilo), o l'indietro dopo ci
+   riporterebbe dentro il P2P. A decidere e' il passo INDIETRO, in
+   `navApplica`, col giudice `passoIndietroP2P`: da li' passano lo
+   swipe e il tasto di sistema (popstate) e il tasto di Telegram
+   (navIndietro chiede un history.back()), quindi una regola sola li
+   copre tutti. */
+const MADRE_P2P = 'p2p';
+const FIGLIE_P2P = new Set(['p2pmiei', 'p2pinfo']);
+/* PURA: il passo indietro dentro il P2P. `qui` e' la vista a schermo
+   (dopo aver chiuso gli strati), `la` quella della entry d'arrivo; e
+   `o.indietro` dice che il cursore e' sceso (non un avanti del browser,
+   non il tocco sul mercatino di vaiEsplora), `o.puro` che non c'era
+   nessuno strato aperto, `o.sotto` che sotto l'arrivo c'e' ancora una
+   entry nostra.
+   · 'libro': si sta uscendo dal P2P da una figlia — si atterra sul
+     libro invece che fuori;
+   · 'oltre': l'arrivo e' un gradino del P2P che da qui non si deve
+     rivedere — DAL LIBRO nessuno (un indietro dal libro esce), DA UNA
+     FIGLIA tutti tranne il libro (le sorelle, uno scambio, la stessa
+     voce). Sono gradini rimasti sotto da un cambio di voce fatto dalla
+     pagina di uno scambio o da un foglio chiuso a mano: rivisti
+     farebbero il giro libro ↔ miei, o un indietro che non fa niente.
+     Si prosegue indietro senza disegnarli (lo ha trovato il giro a
+     caso di prove.py: libro → scambio → libro → home);
+   · '': il passo di sempre.
+   IL FOGLIO APERTO SI CHIUDE PRIMA, e non e' una regola nuova: e' uno
+   strato, e `navApplica` smonta gli strati prima di toccare la vista.
+   Per questo 'oltre' vuole `puro`: chiudendo un foglio si atterra
+   sulla stessa voce, ed e' giusto restarci. E vuole `sotto`: senza una
+   entry nostra piu' giu' non c'e' dove proseguire. */
+function passoIndietroP2P(qui, la, o){
+  if (!o || !o.indietro) return '';
+  if (qui !== MADRE_P2P && !FIGLIE_P2P.has(qui)) return '';
+  const dentro = VISTE_NAV_P2P.has(la);
+  /* da una figlia il libro e' l'approdo giusto: si atterra */
+  if (dentro && !(la === MADRE_P2P && qui !== MADRE_P2P))
+    return o.puro && o.sotto ? 'oltre' : '';
+  if (!dentro && FIGLIE_P2P.has(qui)) return 'libro';
+  return '';
+}
+/* La profondita' della entry che si ha davanti, cioe' l'ultima scritta
+   o riapplicata: dice se un popstate va INDIETRO (arrivo piu' basso)
+   o in avanti. Serve al passo del P2P, che vale solo all'indietro. */
+let navDVisto = 0;
+/* L'ora in cui vaiEsplora torna alla madre consumando un gradino:
+   quel passo indietro e' un TOCCO sul mercatino, non un gesto, e il
+   passaggio dal libro non gli si applica. Vale un secondo, e si
+   consuma al primo approdo: se la serratura dei 350ms ha fermato il
+   passo, non resta accesa a scaricarsi su un indietro vero. */
+let navVersoMadre = 0;
 
 function navVista(){
   const v = (document.querySelector('.view.active')?.id || 'view-esplora').replace('view-','');
@@ -12806,6 +12871,7 @@ function navRiflette(){
   const giu = history.state?.d || 0;
   const scrivi = (come, d) => {
     try { history[come]({app:'brt', pila: ora, d}, '', location.href); } catch(e){}
+    navDVisto = d;
   };
   if (!st || ora.length < st.length) scrivi('replaceState', giu);
   else if (ora.length > st.length)   scrivi('pushState', giu + 1);
@@ -12846,8 +12912,16 @@ function navRiflette(){
    ci sono — e ci pensa il riflette successivo a rimettere la entry in
    pari con la realta'. Sistema auto-guarente. */
 function navApplica(s){
-  const bersaglio = (s && s.app==='brt' && s.pila)
+  let bersaglio = (s && s.app==='brt' && s.pila)
                   ? s.pila : [{t:'v', v:'esplora', k:'esplora|Tutto'}];
+  /* IL PASSO DEL P2P (23 set 2026): si guarda solo all'INDIETRO — un
+     avanti del browser va dove dice la sua entry — e mai sul tocco del
+     mercatino di vaiEsplora, che torna alla madre apposta */
+  const dArrivo = (s && s.app==='brt' && s.d) || 0;
+  const indietro = dArrivo < navDVisto && Date.now() - navVersoMadre > 1000;
+  navVersoMadre = 0;
+  const puro = navPila().length === 1;
+  let passo = '';
   navApplicando = true;
   try {
     let ora = navPila(), giri = 0;
@@ -12855,13 +12929,27 @@ function navApplica(s){
       navChiudiStrato(ora[ora.length - 1]);
       ora = navPila();
     }
-    if (!navStesso(ora[0], bersaglio[0])) navRendiVista(bersaglio[0]);
+    passo = passoIndietroP2P(
+      ora.length === 1 && ora[0].t === 'v' ? ora[0].v : '',
+      bersaglio[0] && bersaglio[0].t === 'v' ? bersaglio[0].v : '',
+      {indietro, puro, sotto: dArrivo > 0});
+    /* uscendo dal P2P da una figlia si atterra sul libro: la sua entry
+       si scrive qui sotto, sopra quella d'arrivo */
+    if (passo === 'libro') bersaglio = [{t:'v', v: MADRE_P2P, k: 0}];
+    if (passo !== 'oltre' && !navStesso(ora[0], bersaglio[0])) navRendiVista(bersaglio[0]);
   } finally {
     /* si spegne DOPO il microtask dell'osservatore, che e' stato messo
        in coda dalle classi cambiate qui dentro: e' l'ultimo giro di
        ricostruzione, e nemmeno lui deve scrivere */
     queueMicrotask(() => { navApplicando = false; });
   }
+  /* un gradino da non rivedere: si prosegue indietro, e la pagina
+     resta quella che si ha davanti finche' non si arriva */
+  if (passo === 'oltre') { history.back(); return; }
+  if (passo === 'libro') {
+    try { history.pushState({app:'brt', pila: bersaglio, d: dArrivo + 1}, '', location.href); } catch(e){}
+    navDVisto = dArrivo + 1;
+  } else navDVisto = dArrivo;
   navFreccia(bersaglio);
   /* L'USCITA DALL'ANNULLO COSTA DUE GRADINI, non uno: il foglio della
      conferma e' uno STRATO, quindi ha una entry sua, e il primo passo
@@ -14385,8 +14473,13 @@ function vaiEsplora(){
      Non e' un contatore di debito: e' un passo solo, sincrono, chiesto
      da un tocco dell'utente, come ogni altra affordance di ritorno. */
   const p = navPila();
+  /* ...e quel passo indietro e' il TOCCO sul mercatino, non un gesto:
+     da «I miei scambi» o da «Info P2P» si va alla madre e basta, senza
+     il passaggio dal libro che vale per l'indietro (navVersoMadre) */
   if (STORIA && history.state?.d === 1 && p.length === 1
-      && p[0].t === 'v' && p[0].v !== RADICE_MADRE) { navIndietro(); return; }
+      && p[0].t === 'v' && p[0].v !== RADICE_MADRE) {
+    navVersoMadre = Date.now(); navIndietro(); return;
+  }
   go('esplora');
 }
 
@@ -40133,9 +40226,18 @@ function renderP2P(){
   const comeFunziona = '<div class="giro-porta">'
     + '<button type="button" class="scopri-link" '
     + 'onclick="rivediTourP2P()">Come funziona</button></div>';
+  /* IL LIBRO VUOTO PORTA LE DUE MONETE (23 set 2026, ritocco di
+     Andrea), quelle di «I miei scambi», al posto del logo P2P: alte
+     76px come il logo di prima, quindi la scatola resta della stessa
+     misura e la frase non si sposta. Decorative (alt vuoto): a dire
+     cosa succede e' la frase. Il vuoto DA FILTRO tiene il logo: li' il
+     libro non e' vuoto, e' il filtro a non lasciar passare niente. */
   box.innerHTML = avvisi
     + (mostrati.length ? mostrati.map(rigaOrdineP2P).join('')
-       : `<div class="empty"><img class="p2p-simbolo" src="/assets/p2p-logo-grande.webp" alt="" onerror="this.remove()"><span class="empty-title">${
+       : `<div class="empty">${vivi.length
+           ? '<img class="p2p-simbolo" src="/assets/p2p-logo-grande.webp" alt="" onerror="this.remove()">'
+           : '<img class="scambi-img scambi-libro" src="/assets/scambi-intestazione.webp" width="682" height="459" alt="" onerror="this.remove()">'
+         }<span class="empty-title">${
            vivi.length ? 'Nessun ordine col tuo filtro' : 'Nessun ordine aperto'}</span>${
            vivi.length
              ? 'Ci sono ' + vivi.length + ' offerte, ma nessuna passa il filtro. '
@@ -46538,6 +46640,7 @@ let p2pNuovoPremioMano = false;  // il premio si scrive invece di trascinarlo
 let p2pNuovoTab = {ordine: '', importo: '', scade: ''};  // i tre dati del tabacchino; `scade` come lo scrive il campo data
 let p2pNuovoPremioTab = '';   // il premio di Barattozon, COME LO SCRIVE il campo (o il cursore): il testo, perche' «20,1» si deve poter rifiutare invece che tosare
 let p2pNuovoPremioTabMano = false;  // il premio di Barattozon si scrive invece di trascinarlo
+let p2pNuovoEuroVia = '';     // la frase del cambio di metodo che ha svuotato l'importo («23,47 → gli ordini SEPA sono in euro interi»): resta finche' non si riscrive la cifra
 
 /* ====== LA MORFOSI DEL + (set 2026, richiesta di Andrea) ======
    Il + della barra e il bottone che pubblica SONO LA STESSA COSA: al
@@ -46770,6 +46873,7 @@ function apriNuovoOrdineP2P(){
   p2pNuovoTab = {ordine: '', importo: '', scade: ''};
   p2pNuovoPremioTab = '';
   p2pNuovoPremioTabMano = false;
+  p2pNuovoEuroVia = '';
   renderNuovoOrdineP2P();
   el('sheetBg').classList.add('open');
   /* LA MORFOSI APRE ANCHE IL FOGLIO (deve misurare il bottone d'arrivo
@@ -47226,6 +47330,25 @@ function riquadroLimitiP2P(){
   return riga ? sezioneNuovoP2P({
     ico: '', titolo: 'Quanto si può, e quanto costa', corpo: riga}) : '';
 }
+/* ---- IL NOME DEL CAMPO DEI METODI SEGUE IL VERSO (23 set 2026,
+   ritocco di Andrea) ----
+   Chi vende sats riceve gli euro e legge «Come vuoi farti pagare»; chi
+   ne compra li paga e legge «Come vuoi pagare». «Metodi di pagamento»
+   non diceva da che parte viaggiano gli euro, e il foglio e' gia' tutto
+   detto dal lato di chi scrive («la valuta con cui pagherai /
+   riceverai»). UN POSTO SOLO per il nome: il riepilogo prima di
+   pubblicare oggi il metodo non lo scrive, e il giorno che lo scrivera'
+   chiama questa invece di battere una terza stesura. */
+function nomeMetodiP2P(lato){
+  return lato === 'compro' ? 'Come vuoi pagare' : 'Come vuoi farti pagare';
+}
+/* la riga che dice perche' l'importo si e' svuotato cambiando metodo
+   (vedi `importoDopoMetodoP2P`): sotto il campo, nei due posti in cui
+   il campo vive — la sezione dell'importo e il passo 2 di Barattozon */
+function rigaEuroViaP2P(){
+  return p2pNuovoEuroVia
+    ? '<div class="hint" id="p2pNuovoEuroVia">' + esc(p2pNuovoEuroVia) + '</div>' : '';
+}
 function renderNuovoOrdineP2P(){
   const box = el('p2pNuovoCorpo');
   if (!box) return;
@@ -47283,6 +47406,9 @@ function renderNuovoOrdineP2P(){
         'onbeforeinput="soloCifreP2P(event)" ' +
         'oninput="cambiaCampoNuovoP2P()" aria-label="Importo massimo">') +
       '</div>' +
+      /* perche' il campo e' vuoto, se a svuotarlo e' stato un cambio
+         di metodo: attaccata al campo, prima di ogni altra riga */
+      rigaEuroViaP2P() +
       /* IL TETTO SOTTO IL CAMPO (17 set 2026, ritocco di Andrea): la
          scritta piccola sta qui e non nel riquadro in fondo, perche'
          serve MENTRE si scrive la cifra. Il riquadro in fondo lo
@@ -47303,8 +47429,10 @@ function renderNuovoOrdineP2P(){
 
   const metodi = sezioneNuovoP2P({
     ico: 'metodi',
-    titolo: tab ? 'Metodo di pagamento — col tabacchino, uno solo'
-                : 'Metodi di pagamento — puoi sceglierne più di uno',
+    /* il nome segue il verso (`nomeMetodiP2P`); la coda dopo il
+       trattino resta quella di prima, parola per parola */
+    titolo: nomeMetodiP2P(p2pLato) + (tab ? ' — col tabacchino, uno solo'
+                                          : ' — puoi sceglierne più di uno'),
     /* l'id serve all'avviso, che deve poter far vedere ANCHE questo
        campo: un metodo non si «scrive», si sceglie, ma il posto dove
        si sceglie e' un campo come gli altri */
@@ -47430,7 +47558,15 @@ function renderNuovoOrdineP2P(){
        vecchia diceva la fee INTERA del coordinatore, cioe' il doppio
        di quel che paga chi legge — «per parte» non e' una precisazione
        ma la correzione di un numero che diceva il doppio. */
-    valuta + importo + metodi + percorso + tipo
+    /* ⚠️ IL METODO VIENE PRIMA DELL'IMPORTO (23 set 2026, ritocco di
+       Andrea): e' il metodo a decidere che campo e' l'importo — con
+       Barattozon ha i centesimi e il foglio diventa il percorso —, e
+       chi scriveva prima la cifra non capiva perche' la virgola non
+       entrava. Se il metodo cambia DOPO, l'importo resta se vale anche
+       per il nuovo e se no si svuota dicendo perche'
+       (`importoDopoMetodoP2P`). Col tabacchino `importo` e' vuoto e il
+       percorso segue i metodi come prima. */
+    valuta + metodi + importo + percorso + tipo
     + quanti + premio + riquadroLimitiP2P() +
     /* ⚠️ SOTTO LE SCATOLE NON C'E' PIU' NIENTE (17 set 2026,
        decisione di Andrea): qui stavano due righe sciolte — «Finche'
@@ -47670,15 +47806,16 @@ function percorsoTabacchinoP2P(val){
       '<div class="hint">Nove cifre, coi trattini o senza. È il codice che chi compra dà alla cassa del tabacchino: viaggia cifrato, e lo legge solo chi prende l\'ordine.</div>' +
       /* LE ESCLUSIONI DI AMAZON (23 set 2026): se la mail non offre il
          pagamento in contanti, l\'ordine non e' pagabile con Barattozon */
-      '<div class="hint">Non vale per Amazon Warehouse, contenuti digitali, oro, Prime, buoni regalo e acquisti 1-Click: se la mail di Amazon non offre il pagamento in contanti, l\'ordine non è pagabile con Barattozon.</div>') +
+      '<div class="hint">Non vale per Amazon Warehouse, contenuti digitali, oro, abbonamenti a Prime, buoni regalo e acquisti 1-Click: se la mail di Amazon non offre il pagamento in contanti, l\'ordine non è pagabile con Barattozon.</div>') +
     tappa(2, P2P_TAPPE_TAB[1].t + ', in ' + esc(val.cod),
       '<input id="p2pNuovoEuro" type="text" inputmode="decimal" ' +
         'placeholder="23,47" value="' + esc(p2pNuovoEuro) + '" ' +
         'onbeforeinput="soloCentesimiP2P(event)" ' +
         'oninput="cambiaCampoNuovoP2P()" ' +
         'aria-label="Importo del PayCode in euro, coi centesimi">',
+      rigaEuroViaP2P() +
       (maxTestoP2P() ? '<div class="hint">Fase beta: max ' + maxTestoP2P() + '</div>' : '') +
-      '<div class="hint">Quello scritto sulla mail di Amazon, coi centesimi: al tabacchino si paga esattamente quella cifra. Amazon accetta i contanti fino a <b>999 €</b> per ordine, senza minimo e senza commissione. Con Barattozon l\'importo è uno solo, niente intervallo, e nessun altro metodo nello stesso ordine.</div>') +
+      '<div class="hint">Quello scritto sulla mail di Amazon, coi centesimi: al tabacchino si paga esattamente quella cifra. Amazon accetta i contanti fino a <b>999 €</b> per ordine, senza minimo e senza commissione.</div>') +
     tappa(3, P2P_TAPPE_TAB[2].t,
       '<input id="p2pNuovoTabScade" type="datetime-local" ' +
         'value="' + esc(p2pNuovoTab.scade) + '" ' +
@@ -47821,6 +47958,14 @@ function cambiaCampoNuovoP2P(){
   if (s) p2pNuovoSats = ripuliCifreP2P(s);
   /* col percorso Barattozon l'importo muove la riga dei sats e la spunta del passo 2 */
   if (tabacchinoP2P(p2pNuovoMetodi)) aggiornaPercorsoTabP2P();
+  /* LA FRASE DEL CAMBIO DI METODO SE NE VA appena si riscrive la cifra
+     (23 set 2026): il campo non e' piu' vuoto per quella ragione. Si
+     toglie la sola riga, mai un render — il dito e' sul campo. */
+  if (p2pNuovoEuroVia && (p2pNuovoEuro || p2pNuovoEuroMax)) {
+    p2pNuovoEuroVia = '';
+    const via = el('p2pNuovoEuroVia');
+    if (via) via.remove();
+  }
 }
 /* L'IMPORTO DELL'ORDINE AMAZON E' UNO SOLO (22 set 2026): sta nel campo
    dell'importo, coi centesimi. La nota «gli importi non combaciano» e
@@ -47839,29 +47984,88 @@ function apriTendinaMetodiP2P(){
   p2pNuovoAperta = !p2pNuovoAperta;
   renderNuovoOrdineP2P();
 }
+/* ---- L'IMPORTO QUANDO CAMBIA IL METODO (23 set 2026, ritocco di
+   Andrea) ----
+   Il metodo si sceglie prima dell'importo, ma chi torna su dopo aver
+   scritto la cifra deve ritrovarla com'era — o sapere perche' non c'e'
+   piu'. LA REGOLA E' UNA: l'importo resta se vale anche per il metodo
+   nuovo, e se no SI SVUOTA con la frase che lo dice, mai tosato in
+   silenzio (qui c'era un troncamento muto: da 23,47 restava 23, una
+   cifra che nessuno aveva scritto — la lezione dei centesimi, letta
+   dall'altro lato).
+   Le regole che cambiano col metodo sono due, e vivono gia' altrove:
+   • ENTRANDO in Barattozon l'importo e' uno solo, senza intervallo, e
+     sta sotto il tetto di Amazon — la frase e' quella del suo giudice,
+     `giudiceImportoPayCodeP2P`, chiamato e non ribattuto;
+   • USCENDO da Barattozon gli euro sono interi (`fiat_amount` e' un
+     i64 del protocollo): «23,00» e' ventitre' e resta, «23,47» no.
+   Fra due metodi normali non cambia niente. Il tetto in euro di
+   Barattolo e quelli in sats del coordinatore valgono per tutti i
+   metodi: un cambio di metodo non li sposta, e li dice il giudice del
+   bottone, come sempre.
+   PURA: i due campi come stanno, i metodi di prima e di dopo; torna
+   {euro, euroMax, perche}, dove `perche` e' '' se non si svuota niente. */
+function importoDopoMetodoP2P(v, prima, dopo){
+  const euro = String((v && v.euro) == null ? '' : v.euro).trim();
+  const max = String((v && v.euroMax) == null ? '' : v.euroMax).trim();
+  const resta = {euro: euro, euroMax: max, perche: ''};
+  const eraTab = tabacchinoP2P(prima), eTab = tabacchinoP2P(dopo);
+  if ((!euro && !max) || eraTab === eTab) return resta;
+  const via = perche => ({euro: '', euroMax: '', perche: perche});
+  if (eTab) {
+    /* un intervallo per Barattozon non esiste: si dicono i due capi */
+    if (max) return via([euro, max].filter(Boolean).join('–')
+      + ' → con Barattozon l\'importo è uno solo, senza intervallo');
+    const n = interoP2P(euro).n;
+    const oltre = n > 0 ? giudiceImportoPayCodeP2P(n) : '';
+    return oltre ? via(euro + ' → ' + oltre) : resta;
+  }
+  /* «23», «23,» e «23,00» sono euro interi: restano, come intero */
+  const intero = /^([0-9]+)(?:[.,]0*)?$/.exec(euro);
+  if (intero) return {euro: intero[1], euroMax: max, perche: ''};
+  /* il metodo nuovo si nomina quando e' uno (uscendo da Barattozon lo
+     e' sempre: sceglierne un altro toglie lui); i Contanti si dicono
+     come si dicono, «in contanti» */
+  const m = (dopo || []).length === 1 ? dopo[0] : '';
+  return via(euro + ' → ' + (m
+    ? 'gli ordini ' + (m === 'Contanti' ? 'in contanti' : m)
+    : 'senza Barattozon gli ordini') + ' sono in euro interi');
+}
 /* la scelta e' MULTIPLA e la tendina resta aperta: chi ne vuole tre
    li tocca tre volte senza riaprire niente. L'ordine e' quello del
    vocabolario e non quello dei tocchi — cosi' due ordini con gli
    stessi metodi si leggono uguali nel libro. */
 function scegliMetodoP2P(m){
   haptic();
+  /* i metodi di PRIMA, in copia: lo `splice` qui sotto cambia la lista
+     sul posto, e il giudice dell'importo deve sapere da dove si parte */
+  const prima = p2pNuovoMetodi.slice();
   const i = p2pNuovoMetodi.indexOf(m);
   if (i >= 0) p2pNuovoMetodi.splice(i, 1);
   /* IL TABACCHINO STA DA SOLO (decisione di Andrea, set 2026):
      sceglierlo toglie gli altri, scegliere un altro toglie lui — e
      con lui se ne va l'intervallo, che quel metodo non ammette:
-     l'ordine Amazon e' una cifra sola. */
+     l'ordine Amazon e' una cifra sola (a svuotarlo, dal 23 set 2026,
+     e' il giudice qui sotto, con la sua frase). */
   else if (m === P2P_TABACCHINO) {
     p2pNuovoMetodi = [P2P_TABACCHINO];
-    p2pNuovoEuroMax = ''; p2pNuovoDue = false;
+    p2pNuovoDue = false;
   }
   else {
-    /* fuori dal tabacchino i centesimi non entrano: dell'importo
-       resta la parte intera (22 set 2026) */
-    if (tabacchinoP2P(p2pNuovoMetodi)) p2pNuovoEuro = String(p2pNuovoEuro || '').replace(/[.,].*$/, '');
     p2pNuovoMetodi = P2P_METODI.filter(x =>
       x !== P2P_TABACCHINO && (x === m || p2pNuovoMetodi.indexOf(x) >= 0));
   }
+  /* L'IMPORTO DAVANTI AL METODO NUOVO (23 set 2026): resta se vale, e
+     se no si svuota dicendo perche' — nell'avviso, che si vede anche
+     con la tendina aperta sopra il campo, e sotto il campo, dove la
+     frase resta finche' non si riscrive la cifra. Ogni cambio di metodo
+     la riscrive: una frase di due cambi fa direbbe una cosa vecchia. */
+  const r = importoDopoMetodoP2P({euro: p2pNuovoEuro, euroMax: p2pNuovoEuroMax},
+                                 prima, p2pNuovoMetodi);
+  p2pNuovoEuro = r.euro;
+  p2pNuovoEuroMax = r.euroMax;
+  p2pNuovoEuroVia = r.perche;
+  if (r.perche) toast(r.perche);
   renderNuovoOrdineP2P();
 }
 /* LA LEVA E' UN BIVIO DEL PROTOCOLLO e non una preferenza: passando a

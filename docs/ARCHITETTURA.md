@@ -15876,6 +15876,26 @@
   il mercatino INTERO: senza il ritorno a «Tutto» si atterrerebbe su
   una vetrina ancora filtrata con la nav accesa su Sfoglia, che è
   esattamente la bugia che `ramoVetrina` esiste per non dire.
+  IL LIBRO È LA MADRE DEL P2P (23 set 2026, ritocco di Andrea): da «I
+  miei scambi» e da «Info P2P» l'indietro passa dal libro ordini, e dal
+  libro alla home come sempre. Le tre voci restano radici sorelle (si
+  SOSTITUISCONO) e la cronologia non cambia forma: la regola è un
+  giudice puro sul passo INDIETRO, `passoIndietroP2P`, chiamato da
+  `navApplica` — cioè dall'ascoltatore di popstate, dove arrivano anche
+  i gesti di SISTEMA della PWA e dell'APK, e non da `navIndietro`, che
+  quelli non chiamano (la lezione dei DUE CONTESTI qui sopra). Uscendo
+  dal P2P da una figlia (`'libro'`) si disegna il libro e se ne SPINGE
+  la entry sopra quella d'arrivo: regge perché sotto una figlia c'è
+  sempre una entry nostra — nel P2P si entra spingendo dalla madre. I
+  gradini del P2P rimasti sotto da un cambio di voce fatto dalla pagina
+  di uno scambio, o da un foglio chiuso a mano (`'oltre'`), si saltano
+  senza disegnarli: dal libro tutti, da una figlia tutti tranne il
+  libro. Vale solo all'indietro (`navDVisto`, la `d` della entry a
+  schermo: un avanti del browser va dove dice la sua entry) e mai sul
+  tocco del mercatino (`navVersoMadre`, che `vaiEsplora` alza quando
+  consuma il gradino). Il foglio aperto si chiude prima, perché è uno
+  strato. Perché e prove: CANTIERI, «Il metodo prima dell'importo, e
+  l'indietro che passa dal libro».
   Telegram: `navFreccia` mostra il `BackButton` (Bot API 6.1) solo
   quando c'è dove tornare — ed è la STESSA domanda di `navIndietro`,
   quindi un giudice solo, o la freccia e il gesto divergono. Resta
@@ -24570,7 +24590,7 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `_importo_paycode_valido` nella rotta del canale, sul solo
   tabacchino. Il tetto di Barattolo (`P2P_MAX_EURO`) e i tetti in sats
   del coordinatore restano quelli di tutti. Le esclusioni (Warehouse,
-  digitale, oro, Prime, buoni regalo, 1-Click) e i posti (tabaccheria,
+  digitale, oro, abbonamenti a Prime, buoni regalo, 1-Click) e i posti (tabaccheria,
   bar, edicola, posta) stanno nelle parole: tappe, riquadro, Info. Il
   verbale: CANTIERI, «I limiti di Amazon».
   LA SVEGLIA DEL TABACCHINO è l'emenda alla fase 6 (decisione di

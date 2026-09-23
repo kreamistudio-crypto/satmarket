@@ -49084,7 +49084,11 @@ def prove_nav_p2p():
     # ⚠️ E LA SERA STESSA E' RIMASTO UNO (ritocco di Andrea): anche il
     # filtro vuoto dei miei porta le monete, in piccolo. Il marchio resta
     # al solo libro vuoto, che e' casa sua.
-    prova("il simbolo veste il solo libro vuoto, e nessuna testata",
+    # ⚠️ E DAL 23 SET 2026 NEMMENO LI' (ritocco di Andrea): il libro
+    # SENZA ordini porta le due monete di «I miei scambi». Il marchio
+    # resta al libro vuoto DA FILTRO — ordini ce ne sono, e' il filtro a
+    # non lasciarli passare — e il conto qui sotto e' ancora uno.
+    prova("il simbolo veste il solo libro vuoto da filtro, e nessuna testata",
           1, mini.count('class="p2p-simbolo" src="/assets/p2p-logo-grande.webp"'))
     # EMENDATA DUE VOLTE. La prima (set 2026, il ridisegno): il bottone
     # non diceva piu' «Pubblica: compro sats» — il lato lo dice il
@@ -49109,8 +49113,12 @@ def prove_nav_p2p():
     prova("...e in fondo non c'e' piu' nessun «Annulla»", False,
           '<button type="button" class="btn ghost" onclick="navIndietro()">'
           'Annulla</button>\' +\n      /*' in mini)
+    # (23 set 2026) nel libro la scatola vuota sceglie l'immagine col
+    # ramo del filtro: il marchio sta sul ramo «ci sono offerte, ma
+    # nessuna passa», le monete sull'altro
     prova("...e negli stati vuoti prende il posto del glifo", True,
-          '<div class="empty"><img class="p2p-simbolo"' in mini
+          "<div class=\"empty\">${vivi.length\n"
+          "           ? '<img class=\"p2p-simbolo\"" in mini
           and '<span class="big">🔁</span>' not in mini)
     prova("l'emoji dei doppioni su Nostr non si tocca: dice altro",
           True, '<span class="em">🔁</span>Doppioni su Nostr' in mini)
@@ -55040,8 +55048,10 @@ def prove_p2p_pubblica():
     # c'e' soltanto il bottone.
     # (23 set 2026) la scatola dello scontrino e' diventata il PERCORSO
     # Barattozon, nello stesso posto: dopo i metodi, prima del prezzo
+    # (23 set 2026, piu' tardi) e il METODO e' salito sopra l'importo:
+    # e' lui a decidere che campo e' l'importo (ritocco di Andrea)
     prova("l'ordine delle scatole, e il bottone sotto l'ultima", True,
-          "valuta + importo + metodi + percorso + tipo + quanti + premio"
+          "valuta + metodi + importo + percorso + tipo + quanti + premio"
           " + riquadroLimitiP2P() + '<div class=\"foglio-piede sola\">'"
           in re.sub(r"\s+", " ", _foglio))
     _riq = pezzo_js(mini, "function riquadroLimitiP2P(){", "\n}\n")
@@ -63015,7 +63025,9 @@ def prove_intestazione_scambi():
     exec(_SORGENTE[i:_SORGENTE.index("def _spezza_pagina")], amb)
     timbrata = amb["_timbra_asset_pagina"](mini.encode("utf-8"))
     firma = ("%s?v=%s" % (URL, _hl.sha1(raw).hexdigest()[:10])).encode()
-    prova("i tre posti che la mostrano escono timbrati col suo hash", 3,
+    # ⚠️ I POSTI SONO QUATTRO dal 23 set 2026: le monete stanno anche
+    # nel libro vuoto, al posto del logo P2P (ritocco di Andrea)
+    prova("i quattro posti che la mostrano escono timbrati col suo hash", 4,
           timbrata.count(firma))
     # ⚠️ IL CONTENITORE ERA TROPPO GRANDE (22 set 2026, sera). Questa
     # riga diceva «la pagina non incorpora NESSUNA webp» e voleva dire
@@ -64395,7 +64407,7 @@ DOM = null;
     _fog = pezzo_js(mini, "function renderNuovoOrdineP2P(){", "\n}\n")
     prova("il foglio col tabacchino monta il percorso al posto dello scontrino, e il bottone dice «Rileggi e pubblica»", True,
           "const percorso = !tab ? '' : percorsoTabacchinoP2P(val);" in _fog
-          and "valuta + importo + metodi + percorso + tipo" in _fog
+          and "valuta + metodi + importo + percorso + tipo" in _fog
           and "(tab ? '🧾 Rileggi e pubblica' : '⚡ Pubblica ordine')" in _fog
           and "const importo = tab ? '' : sezioneNuovoP2P({" in _fog
           and "const premio = (p2pNuovoFisso || tab) ? '' : sezioneNuovoP2P({" in _fog)
@@ -64616,18 +64628,35 @@ DOM = null;
           and "premioImplicitoTabacchinoP2P(o.euro, o.sats, eurPerSat)"
           in pezzo_js(mini, "function contoDettP2P(o){", "\n}\n"))
     _per2 = pezzo_js(mini, "function percorsoTabacchinoP2P(val){", "\n}\n")
+    # (23 set 2026, ritocco di Andrea) «Prime» da solo diceva poco: gli
+    # esclusi sono gli ABBONAMENTI a Prime, e la lista lo dice cosi' in
+    # tutt'e due i posti in cui c'e' — il passo 1 e «Info P2P»
     prova("il percorso dice le regole di Amazon: 72 ore dal checkout, 999 €, le esclusioni", True,
           "Amazon dà 72 ore dal checkout: copia la scadenza dalla mail." in _per2
           and "fino a <b>999 €</b> per ordine, senza minimo e senza commissione" in _per2
-          and "Non vale per Amazon Warehouse, contenuti digitali, oro, Prime, buoni regalo e acquisti 1-Click" in _per2
+          and "Non vale per Amazon Warehouse, contenuti digitali, oro, abbonamenti a Prime, buoni regalo e acquisti 1-Click" in _per2
           and "l\\'ordine non è pagabile con Barattozon" in _per2)
+    prova("...e «Prime» da solo non resta in nessuna copia della lista", 0,
+          mini.count("oro, Prime,"))
+    # (23 set 2026, ritocco di Andrea) nel passo 2 la frase «Con
+    # Barattozon l'importo è uno solo, niente intervallo, e nessun altro
+    # metodo nello stesso ordine.» se n'e' andata: il passo ha un campo
+    # solo, e il metodo esclusivo lo dice gia' il titolo dei metodi.
+    # Il resto della riga resta com'era, parola per parola.
+    prova("il passo 2 non dice piu' «uno solo, niente intervallo»: il resto della riga e' quello di prima", True,
+          "Con Barattozon l\\'importo è uno solo, niente intervallo" not in _per2
+          and "Quello scritto sulla mail di Amazon, coi centesimi: al tabacchino si paga "
+              "esattamente quella cifra. Amazon accetta i contanti fino a <b>999 €</b> per "
+              "ordine, senza minimo e senza commissione.</div>" in _per2)
+    prova("...e non la dice piu' nessun altro posto", 0,
+          mini.count("uno solo, niente intervallo"))
     prova("...il riquadro di chi paga dice i quattro posti e «senza commissione»", True,
           "Vai in tabaccheria, al bar, in edicola o alla posta" in out["riquadroCompro"]
           and "senza commissione" in out["riquadroCompro"])
     prova("...e «Info P2P» le ripete: posti, novecentonovantanove in lettere, le esclusioni", True,
           "in tabaccheria, al bar, in edicola o alla posta" in _inf
           and "novecentonovantanove euro" in _inf and "senza minimo e senza commissione" in _inf
-          and "Non vale per Amazon Warehouse, contenuti digitali, oro, Prime, buoni regalo e acquisti 1-Click" in _inf
+          and "Non vale per Amazon Warehouse, contenuti digitali, oro, abbonamenti a Prime, buoni regalo e acquisti 1-Click" in _inf
           and "settantadue ore dal checkout" in _inf)
     prova("le frasi del tempo dicono PayCode e l'avviso alla presa spiega le due ore", True,
           "Il PayCode scade fra meno di sei ore" in mini
@@ -64771,6 +64800,650 @@ DOM = null;
         arriva("taken", "buyer", "invoice-next", ORA + 40000),
         arriva("fiat-sent", "buyer", "", ORA + 40100),
         con.execute("SELECT COUNT(*) FROM p2p_attese WHERE fonte='sollecito'").fetchone()[0])[-1])())
+
+
+def prove_pubblica_metodo_prima():
+    """IL METODO PRIMA DELL'IMPORTO (23 set 2026, ritocco di Andrea). Nel
+    foglio «Pubblica» del P2P la scelta del metodo sta SOPRA il campo
+    dell'importo, perche' e' il metodo a decidere che campo e' — con
+    Barattozon ha i centesimi e il foglio diventa il percorso —; il nome
+    del campo segue il verso («Come vuoi farti pagare» a chi vende sats,
+    «Come vuoi pagare» a chi li compra); e cambiando metodo DOPO aver
+    scritto la cifra l'importo resta se vale anche per il metodo nuovo,
+    e se no si svuota con la frase che dice perche'. Il banco fa girare
+    le funzioni VERE del foglio sotto node, con un DOM di cartone che
+    trova i campi LEGGENDO il markup che il render ha appena scritto."""
+    print("\n--- IL METODO PRIMA DELL'IMPORTO, NEL FOGLIO «PUBBLICA» ---")
+    import shutil
+    import subprocess
+    import tempfile
+    import json as _js
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    def _una(firma):
+        """una funzione intera: la riga sola se si chiude li', se no
+        fino alla graffa in colonna zero (rimessa, che pezzo_js la toglie)"""
+        i = mini.index(firma)
+        riga = mini[i:mini.index("\n", i)]
+        if riga.rstrip().endswith("}"):
+            return riga + "\n"
+        return mini[i:mini.index("\n}\n", i)] + "\n}\n"
+
+    def _riga(nome):
+        return re.search(r"const " + nome + r" = [^\n]*;", mini).group(0)
+
+    def _blocco(inizio, fine):
+        i = mini.index(inizio)
+        return mini[i:mini.index(fine, i) + len(fine)]
+
+    # --- 1) SUL TESTO: un nome solo, e niente troncamento muto --------
+    _sc = pezzo_js(mini, "function scegliMetodoP2P(m){", "\n}\n")
+    prova("il nome del campo dei metodi ha un posto solo, coi due versi", [1, 1],
+          [mini.count("'Come vuoi farti pagare'"), mini.count("'Come vuoi pagare'")])
+    prova("...e i due titoli di ieri non ci sono piu'", [False, False],
+          ["'Metodi di pagamento — puoi sceglierne più di uno'" in mini,
+           "'Metodo di pagamento — col tabacchino, uno solo'" in mini])
+    prova("cambiando metodo l'importo passa dal giudice, e il troncamento muto non c'e' piu'",
+          True,
+          "importoDopoMetodoP2P({euro: p2pNuovoEuro, euroMax: p2pNuovoEuroMax}," in _sc
+          and "replace(/[.,].*$/, '')" not in _sc)
+    # il riepilogo prima di pubblicare (Barattozon) il metodo oggi non lo
+    # scrive: se un giorno lo scrivera', non col nome di ieri
+    _rie = pezzo_js(mini, "function riepilogoTabacchinoP2P(v){", "\n}\n")
+    prova("il riepilogo prima di pubblicare non nomina il metodo col nome di ieri",
+          [False, False], ["etodo di pagamento" in _rie, "etodi di pagamento" in _rie])
+
+    node = shutil.which("node")
+    if not node:
+        salta("il banco del foglio «Pubblica»", "serve node")
+        return
+    _funz = (
+        "function interoP2P(testo){", "function centesimiP2P(testo){",
+        "function centesimiTestoP2P(n){", "function ripuliCentesimiP2P(inp){",
+        "function ripuliCifreP2P(inp){",
+        "function satsTabacchinoP2P(importo, cambio, premio){",
+        "function premioTabacchinoP2P(testo){", "function premioTestoP2P(n){",
+        "function premioTestoTabP2P(n){", "function premioTabP2P(){",
+        "function premioTabModP2P(){", "function premioTabValP2P(){",
+        "function rigaPremioTabP2P(euro, cambio, premio){",
+        "function testataPercorsoTabP2P(passo){", "function passoTabacchinoP2P(v){",
+        "function payCodeP2P(testo){", "function scadeDaCampoP2P(s){",
+        "function leggiDataTabacchinoP2P(testo){", "function campoDaScadeP2P(epoch){",
+        "function finestraGaranziaP2P(info){",
+        "function testoBarattozonP2P(mio, senzaScontrino){",
+        "function percorsoTabacchinoP2P(val){", "function rigaVivaTabP2P(){",
+        "function aggiornaPercorsoTabP2P(){", "function tabacchinoP2P(metodi){",
+        "function metodoBaseP2P(m){", "function vesteMetodoP2P(m){",
+        "function marchioMetodoP2P(m, conTesto){", "function metodiPubblicabiliP2P(lato){",
+        "function sezioneNuovoP2P(o){", "function maxEuroP2P(){",
+        "function maxSatsTestoP2P(){", "function maxTestoP2P(){",
+        "function rigaTettoFeeP2P(){", "function articoloPercentoP2P(testo){",
+        "function riquadroLimitiP2P(){", "function commissioneVivaP2P(){",
+        "function commissioneListinoP2P(){", "function feeMiaP2P(o){",
+        "function cartelloFeeP2P(o){", "function mezzaCommissioneP2P(fee){",
+        "function affareP2P(o){", "function comeLibroP2P(o){",
+        "function bordoPremioP2P(frazione){", "function fasciaPremioP2P(premio, lato){",
+        "function stilePremioP2P(premio, lato){", "function premioValP2P(){",
+        "function premioModP2P(){", "function premioNotaP2P(compro, premio){",
+        "function giudiceImportoPayCodeP2P(euro){", "function campiNuovoP2P(){",
+        "function nomeMetodiP2P(lato){", "function rigaEuroViaP2P(){",
+        "function importoDopoMetodoP2P(v, prima, dopo){",
+        "function renderNuovoOrdineP2P(){", "function scegliMetodoP2P(m){",
+        "function cambiaCampoNuovoP2P(){", "function apriNuovoOrdineP2P(){")
+    _prog = (
+        _blocco("const esc = ", "}[c]));") + "\n"
+        + "\n".join(_riga(n) for n in (
+            "P2P_VALUTE", "P2P_METODI", "P2P_TABACCHINO", "P2P_TABACCHINO_PM",
+            "P2P_PREMIO_MAX", "P2P_POLLICE", "P2P_PREMIO_TAB_MAX", "P2P_PAYCODE_MAX_EURO",
+            "P2P_PAYCODE_MIN_S", "P2P_PAYCODE_MAX_S", "P2P_TABACCHINO_VITA_S",
+            "P2P_TABACCHINO_MARGINE_S", "P2P_MARGINE_HOLD_BLOCCHI", "P2P_SEC_PER_BLOCCO",
+            "p2pCoord")) + "\n"
+        + _blocco("const P2P_VESTE_METODI = {", "\n};") + "\n"
+        + _blocco("const P2P_TAPPE_TAB = [", "\n];") + "\n"
+        + _blocco("let p2pNuovoEuro = '';", "let p2pNuovoEuroVia = '';")
+        + "\n"
+        + "".join(_una(f) for f in _funz)
+        + r"""
+const fmt = n => String(n);
+let TOAST = [], RENDER = 0;
+function toast(m){ TOAST.push(m); }
+function haptic(){}
+const DEMO = false, VETRINA = false, myTgId = 111;
+function apriMorfoP2P(){ return false; }
+/* le icone non sono in prova: il loro catalogo vive altrove */
+function icoNuovoP2P(){ return ''; }
+/* ---- IL DOM DI CARTONE: il corpo del foglio tiene il markup che il
+   render scrive, e `el` trova i nodi LEGGENDOLO — valore compreso. Un
+   nodo tolto si porta via il suo <div> fino alla chiusura. ---- */
+let HTML = '', NODI = {};
+const TIT = {textContent: ''};
+const CORPO = {get innerHTML(){ return HTML; }, set innerHTML(t){ HTML = t; NODI = {}; }};
+const FERMO = {classList: {add(){}, remove(){}, contains(){ return false; }}};
+function el(id){
+  if (id === 'p2pNuovoCorpo') return CORPO;
+  if (id === 'p2pNuovoTit') return TIT;
+  if (id === 'sheetBg' || id === 'p2pNuovoSheet') return FERMO;
+  const i = HTML.indexOf(' id="' + id + '"');
+  if (i < 0) return null;
+  if (!NODI[id]) {
+    const a = HTML.lastIndexOf('<', i);
+    const tag = HTML.slice(a, HTML.indexOf('>', i) + 1);
+    const v = / value="([^"]*)"/.exec(tag);
+    NODI[id] = {value: v ? v[1] : '', selectionStart: null, setSelectionRange(){},
+      remove(){ const b = HTML.indexOf('</div>', i) + 6;
+                HTML = HTML.slice(0, a) + HTML.slice(b); NODI = {}; }};
+  }
+  return NODI[id];
+}
+const document = {querySelectorAll: () => []};
+let cambioVivo = true, eurPerSat = 0.0005;
+let p2pInfo = {maxSats: 500000, fee: 0.03}, p2pLeve = null, p2pLevaPubblica = null, p2pSconto = null;
+let p2pLato = 'compro';
+const T = P2P_TABACCHINO;
+/* il render si conta: chi scrive nel campo non deve ridisegnare */
+const _render = renderNuovoOrdineP2P;
+renderNuovoOrdineP2P = function(){ RENDER++; return _render(); };
+function titoli(){
+  return [...HTML.matchAll(/<div class="p2p-sez-tit"><span>([\s\S]*?)<\/span>/g)].map(m =>
+    m[1].replace(/<b class="p2p-tappa-n"[^>]*>\d+<\/b>/, '').replace(/<[^>]+>/g, '').trim());
+}
+function apri(lato){ p2pLato = lato; TOAST = []; apriNuovoOrdineP2P(); }
+/* si scrive NEL CAMPO e passa dalla rete, come col dito */
+function scrivi(id, testo){ const n = el(id); if (!n) return null;
+  n.value = testo; cambiaCampoNuovoP2P(); return true; }
+function campo(id){ const n = el(id); return n ? n.value : null; }
+const riga = () => HTML.includes('id="p2pNuovoEuroVia"');
+function daTab(lato, cifra){ apri(lato); scegliMetodoP2P(T); scrivi('p2pNuovoEuro', cifra); TOAST = []; }
+function daSepa(lato, cifra){ apri(lato); scegliMetodoP2P('SEPA'); scrivi('p2pNuovoEuro', cifra); TOAST = []; }
+function ordineId(){ return ['id="p2pNuovoValutaBtn"', 'id="p2pNuovoMetodiBtn"', 'class="p2p-voci"',
+  'id="p2pNuovoEuro"', 'id="p2pNuovoInvia"'].map(x => HTML.indexOf(x)); }
+const CASI = {
+  compro(){ apri('compro'); return titoli(); },
+  vendo(){ apri('vendo'); return titoli(); },
+  tab(){ apri('vendo'); scegliMetodoP2P(T); return titoli(); },
+  /* coi nodi veri, e la tendina APERTA: le voci stanno sopra il campo */
+  idCompro(){ apri('compro'); p2pNuovoAperta = true; renderNuovoOrdineP2P(); return ordineId(); },
+  idVendo(){ apri('vendo'); p2pNuovoAperta = true; renderNuovoOrdineP2P(); return ordineId(); },
+  decimale(){ daTab('vendo', '23,47'); scegliMetodoP2P('SEPA');
+    return [p2pNuovoMetodi.join(','), p2pNuovoEuro, p2pNuovoEuroVia, TOAST, campo('p2pNuovoEuro'),
+            HTML.includes('<div class="hint" id="p2pNuovoEuroVia">23,47 → gli ordini SEPA sono in euro interi</div>')]; },
+  intero(){ daTab('vendo', '23'); scegliMetodoP2P('Revolut');
+    return [p2pNuovoMetodi.join(','), p2pNuovoEuro, p2pNuovoEuroVia, TOAST, campo('p2pNuovoEuro'), riga()]; },
+  zeri(){ daTab('vendo', '23,00'); scegliMetodoP2P('SEPA');
+    return [p2pNuovoEuro, p2pNuovoEuroVia, campo('p2pNuovoEuro')]; },
+  tolto(){ daTab('vendo', '23,47'); scegliMetodoP2P(T);
+    return [p2pNuovoMetodi.join(','), p2pNuovoEuro, p2pNuovoEuroVia]; },
+  contanti(){ daTab('vendo', '23,47'); scegliMetodoP2P('Contanti');
+    return [p2pNuovoMetodi.join(','), p2pNuovoEuro, p2pNuovoEuroVia]; },
+  entra(){ daSepa('vendo', '25'); scegliMetodoP2P(T);
+    return [p2pNuovoMetodi.join(','), p2pNuovoEuro, p2pNuovoEuroVia, TOAST, campo('p2pNuovoEuro'),
+            HTML.includes('inputmode="decimal"')]; },
+  oltre(){ daSepa('vendo', '1500'); scegliMetodoP2P(T);
+    const i = HTML.indexOf('id="p2pNuovoEuroVia"');
+    return [p2pNuovoEuro, p2pNuovoEuroVia, TOAST,
+            i > HTML.indexOf('id="p2pNuovoEuro"') && i < HTML.indexOf('Quello scritto sulla mail di Amazon')]; },
+  intervallo(){ daSepa('vendo', '20'); scrivi('p2pNuovoEuroMax', '50'); TOAST = [];
+    scegliMetodoP2P(T); return [p2pNuovoEuro, p2pNuovoEuroMax, p2pNuovoEuroVia, TOAST.length]; },
+  normali(){ daSepa('compro', '25'); scegliMetodoP2P('Revolut');
+    return [p2pNuovoMetodi.join(','), p2pNuovoEuro, p2pNuovoEuroVia, TOAST]; },
+  /* la riga se ne va appena si riscrive la cifra, SENZA ridisegnare */
+  riscrive(){ daTab('vendo', '23,47'); scegliMetodoP2P('SEPA'); const r0 = RENDER;
+    const s = scrivi('p2pNuovoEuro', '3');
+    return [s, p2pNuovoEuroVia, riga(), RENDER - r0, p2pNuovoEuro]; },
+  /* ...e il cambio dopo la riscrive (qui: niente da dire) */
+  prossimo(){ daTab('vendo', '23,47'); scegliMetodoP2P('SEPA'); scegliMetodoP2P('Revolut');
+    return [p2pNuovoEuroVia, riga()]; },
+  riapre(){ daTab('vendo', '23,47'); scegliMetodoP2P('SEPA'); apri('vendo');
+    return [p2pNuovoEuroVia, riga()]; },
+  giudice(){ return [
+    importoDopoMetodoP2P({euro: '23,', euroMax: ''}, [T], ['SEPA']),
+    importoDopoMetodoP2P({euro: '23.47', euroMax: ''}, [T], ['SEPA']),
+    importoDopoMetodoP2P({euro: '', euroMax: ''}, [T], ['SEPA']),
+    importoDopoMetodoP2P({euro: '25', euroMax: ''}, ['SEPA'], ['SEPA', 'Revolut']),
+    importoDopoMetodoP2P({euro: '999', euroMax: ''}, ['SEPA'], [T]),
+    importoDopoMetodoP2P({euro: '1000', euroMax: ''}, ['SEPA'], [T]),
+    importoDopoMetodoP2P({euro: '0', euroMax: ''}, ['SEPA'], [T]),
+    importoDopoMetodoP2P({euro: '1500,50', euroMax: ''}, [T], []),
+    importoDopoMetodoP2P({euro: '', euroMax: '50'}, ['SEPA'], [T]),
+    importoDopoMetodoP2P(null, [T], ['SEPA'])]; }
+};
+const R = {};
+for (const k of Object.keys(CASI)) {
+  try { R[k] = CASI[k](); } catch(e) { R[k] = 'ESPLOSO: ' + (e && e.message); }
+}
+console.log(JSON.stringify(R));
+""")
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(_prog)
+    try:
+        _r = subprocess.run([node, f.name], capture_output=True, text=True,
+                            encoding="utf-8", errors="replace", timeout=60)
+    finally:
+        os.unlink(f.name)
+    if _r.returncode != 0:
+        prova("il banco del foglio «Pubblica» gira", "", _r.stderr[:600])
+        return
+    out = _js.loads(_r.stdout.strip())
+
+    # --- 2) L'ORDINE DEI CAMPI, NEI DUE VERSI ---------------------------
+    # i titoli delle scatole come si leggono dall'alto: la valuta, poi
+    # COME si paga, poi QUANTO — e il nome del campo dice il verso
+    _LIM = "Quanto si può, e quanto costa"
+    prova("chi compra sats: valuta, «Come vuoi pagare», poi l'importo",
+          ["Seleziona la valuta con cui pagherai",
+           "Come vuoi pagare — puoi sceglierne più di uno",
+           "Inserisci l'importo in EUR che vuoi inviare",
+           "Tipo di prezzo", "Premio (%)", _LIM], out["compro"])
+    prova("chi vende sats: valuta, «Come vuoi farti pagare», poi l'importo",
+          ["Seleziona la valuta con cui riceverai",
+           "Come vuoi farti pagare — puoi sceglierne più di uno",
+           "Inserisci l'importo in EUR che vuoi ricevere",
+           "Tipo di prezzo", "Premio (%)", _LIM], out["vendo"])
+    prova("...e con Barattozon i metodi stanno sopra il percorso, col nome di chi vende",
+          ["Seleziona la valuta con cui riceverai",
+           "Come vuoi farti pagare — col tabacchino, uno solo",
+           "Il PayCode", "L'importo esatto, in EUR", "Quando scade il PayCode",
+           "Il premio", _LIM], out["tab"])
+    # sui nodi, con la tendina aperta: valuta, bottone dei metodi, le
+    # voci, il campo dell'importo, il bottone che pubblica — in fila
+    for lato in ("Compro", "Vendo"):
+        _p = out["id" + lato]
+        prova("i campi in fila coi nodi veri, tendina aperta (%s)" % lato.lower(),
+              True, isinstance(_p, list) and all(x >= 0 for x in _p)
+              and all(_p[k] > _p[k - 1] for k in range(1, len(_p))))
+
+    # --- 3) IL CAMBIO DI METODO DOPO LA CIFRA ---------------------------
+    _SEPA = "23,47 → gli ordini SEPA sono in euro interi"
+    prova("23,47 con Barattozon, poi SEPA: si svuota, e la frase lo dice nell'avviso e sotto il campo",
+          ["SEPA", "", _SEPA, [_SEPA], "", True], out["decimale"])
+    prova("23 con Barattozon, poi Revolut: resta 23, e nessuno dice niente",
+          ["Revolut", "23", "", [], "23", False], out["intero"])
+    prova("...«23,00» sono euro interi: resta 23", ["23", "", "23"], out["zeri"])
+    prova("23,47 e Barattozon tolto: si svuota, senza metodo da nominare",
+          ["", "", "23,47 → senza Barattozon gli ordini sono in euro interi"], out["tolto"])
+    prova("...e i Contanti si dicono «in contanti»",
+          ["Contanti", "", "23,47 → gli ordini in contanti sono in euro interi"],
+          out["contanti"])
+    prova("25 con SEPA, poi Barattozon: vale anche li' e resta, nel campo coi centesimi",
+          ["Contanti al tabacchino", "25", "", [], "25", True], out["entra"])
+    _OLTRE = "1500 → Amazon accetta il pagamento in contanti fino a 999 € per ordine"
+    prova("1500 con SEPA, poi Barattozon: oltre il tetto di Amazon, con la frase del suo giudice, sotto il campo del passo 2",
+          ["", _OLTRE, [_OLTRE], True], out["oltre"])
+    prova("20–50 con SEPA, poi Barattozon: un intervallo li' non esiste, e si svuotano tutt'e due",
+          ["", "", "20–50 → con Barattozon l'importo è uno solo, senza intervallo", 1],
+          out["intervallo"])
+    prova("fra due metodi normali l'importo resta e nessuno dice niente",
+          ["SEPA,Revolut", "25", "", []], out["normali"])
+    prova("la frase se ne va appena si riscrive la cifra, senza ridisegnare il foglio",
+          [True, "", False, 0, "3"], out["riscrive"])
+    prova("...il cambio di metodo dopo la riscrive (qui: niente da dire)", ["", False],
+          out["prossimo"])
+    prova("...e il foglio riaperto parte senza", ["", False], out["riapre"])
+    prova("il giudice: «23,» e' 23; «23.47» si dice com'e' scritto; vuoto, normali, 999 e 0 restano; 1000, 1500,50 e un massimo solo no",
+          [{"euro": "23", "euroMax": "", "perche": ""},
+           {"euro": "", "euroMax": "", "perche": "23.47 → gli ordini SEPA sono in euro interi"},
+           {"euro": "", "euroMax": "", "perche": ""},
+           {"euro": "25", "euroMax": "", "perche": ""},
+           {"euro": "999", "euroMax": "", "perche": ""},
+           {"euro": "", "euroMax": "",
+            "perche": "1000 → Amazon accetta il pagamento in contanti fino a 999 € per ordine"},
+           {"euro": "0", "euroMax": "", "perche": ""},
+           {"euro": "", "euroMax": "",
+            "perche": "1500,50 → senza Barattozon gli ordini sono in euro interi"},
+           {"euro": "", "euroMax": "",
+            "perche": "50 → con Barattozon l'importo è uno solo, senza intervallo"},
+           {"euro": "", "euroMax": "", "perche": ""}],
+          out["giudice"])
+
+
+def prove_libro_vuoto_monete():
+    """IL LIBRO VUOTO PORTA LE DUE MONETE (23 set 2026, ritocco di Andrea):
+    quando nel libro ordini non c'e' nessun ordine, al posto del logo P2P
+    c'e' l'immagine delle due monete di «I miei scambi», con la frase di
+    sempre, alta quanto il logo di prima e nitida a 3x. Il vuoto DA
+    FILTRO — offerte ce ne sono, e' il filtro a non lasciarle passare —
+    tiene il logo."""
+    print("\n--- IL LIBRO VUOTO, CON LE DUE MONETE ---")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    css = mini[mini.index("<style>"):mini.index("</style>")]
+    rp = re.sub(r"/\*[\s\S]*?\*/", "",
+                pezzo_js(mini, "function renderP2P(){", "\n}\n"))
+    MONETE = ('<img class="scambi-img scambi-libro" src="/assets/scambi-intestazione.webp" '
+              'width="682" height="459" alt="" onerror="this.remove()">')
+    i_ramo = rp.find("${vivi.length")
+    i_logo = rp.find('<img class="p2p-simbolo"', max(i_ramo, 0))
+    i_mon = rp.find(MONETE, max(i_ramo, 0))
+    prova("il libro senza ordini porta le monete: decorative, con le misure del file e il ripiego che le toglie",
+          True, i_mon >= 0)
+    prova("...sul ramo senza offerte, e il logo resta su quello del filtro",
+          True, 0 <= i_ramo < i_logo < i_mon)
+    prova("...e la frase di sempre", True,
+          "vivi.length ? 'Nessun ordine col tuo filtro' : 'Nessun ordine aperto'" in rp
+          and "'In questo momento nessuno sta vendendo sats in euro.'" in rp
+          and "'In questo momento nessuno sta comprando sats in euro.'" in rp)
+    _lib = pezzo_js(css, ".empty .scambi-libro{", "}")
+    _sim = pezzo_js(css, ".p2p-simbolo{", "}")
+    _sime = pezzo_js(css, ".empty .p2p-simbolo{", "}")
+    _h_lib = re.search(r"height:(\d+)px", _lib)
+    _h_sim = re.search(r"height:(\d+)px", _sim)
+    prova("...alte quanto il logo di prima, col suo stesso margine: la scatola non cambia misura",
+          True, bool(_h_lib and _h_sim) and _h_lib.group(1) == _h_sim.group(1)
+          and "margin:0 auto 10px" in _lib and "margin:0 auto 10px" in _sime)
+    # la classe di casa le tiene intere e in centro: larghe quanto la
+    # scatola, e il disegno dentro «contain»
+    prova("...e intere, in centro: la classe di casa col suo «contain»", True,
+          "object-fit:contain" in pezzo_js(css, "  .scambi-img{", "}"))
+    try:
+        from PIL import Image as _Im
+        with _Im.open("assets/scambi-intestazione.webp") as _im:
+            _w, _h = _im.size
+        _alto = int(_h_lib.group(1)) if _h_lib else 0
+        _largo = _alto * _w / _h if _h else 0
+        prova("...nitide a 3x: il file ha almeno il triplo dei pixel a cui si vedono",
+              True, _alto > 0 and _w >= 3 * _largo and _h >= 3 * _alto)
+    except ImportError:
+        salta("la nitidezza a 3x delle monete del libro", "serve Pillow")
+
+
+def prove_indietro_dal_libro():
+    """DENTRO IL P2P SI PASSA DAL LIBRO (23 set 2026, ritocco di Andrea):
+    lo swipe e il tasto indietro — di sistema, cioe' la cronologia, o di
+    Telegram, cioe' `navIndietro` — da «I miei scambi» e da «Info P2P»
+    portano al libro ordini, e dal libro alla home del mercatino come
+    prima. Senza giri (libro ↔ miei), e col foglio aperto che si chiude
+    PRIMA di cambiare pagina. Il banco fa girare il MOTORE VERO della
+    cronologia sotto node — navRiflette, navApplica, navIndietro,
+    navMotore, vaiEsplora — con una cronologia di cartone che consegna i
+    popstate come il browser: dopo, in un giro suo."""
+    print("\n--- L'INDIETRO DEL P2P PASSA DAL LIBRO ---")
+    import shutil
+    import subprocess
+    import tempfile
+    import json as _js
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    def _intera(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}\n"
+
+    def _blocco(inizio, fine):
+        i = mini.index(inizio)
+        return mini[i:mini.index(fine, i) + len(fine)]
+
+    # --- 1) SUL TESTO: una regola sola, nel posto da cui passano tutti ---
+    _ap = pezzo_js(mini, "function navApplica(s){", "\n}\n")
+    prova("la regola sta in navApplica, da cui passano swipe, tasto di sistema e tasto di Telegram",
+          True, "passo = passoIndietroP2P(" in _ap
+          and "if (passo === 'oltre') { history.back(); return; }" in _ap
+          and "history.pushState({app:'brt', pila: bersaglio, d: dArrivo + 1}" in _ap)
+    prova("...e il tocco sul mercatino non ci passa: vaiEsplora lo dice", True,
+          "navVersoMadre = Date.now(); navIndietro(); return;"
+          in pezzo_js(mini, "function vaiEsplora(){", "\n}\n"))
+    prova("le tre voci del P2P restano radici sorelle, e il libro e' la madre delle altre due", True,
+          "const MADRE_P2P = 'p2p';" in mini
+          and "const FIGLIE_P2P = new Set(['p2pmiei', 'p2pinfo']);" in mini
+          and all("'%s'" % v in _blocco("const RADICI = new Set([", "]);")
+                  for v in ("p2p", "p2pmiei", "p2pinfo")))
+
+    node = shutil.which("node")
+    if not node:
+        salta("il banco dell'indietro del P2P", "serve node")
+        return
+    _funz = ("function navVista(){", "function navPila(){", "function navChiudiStrato(s){",
+             "function navRendiVista(b){", "function navRiflette(){",
+             "function navApplica(s){", "function navIndietro(){", "function navFreccia(pila){",
+             "function navMotore(){", "function passoIndietroP2P(qui, la, o){",
+             "function vaiEsplora(){", "function consumaGradinoReparto(){",
+             "function tornaATutto(){")
+    _prog = (
+        _blocco("const RADICI = new Set([", "]);") + "\n"
+        + "\n".join(re.search(r"const " + n + r" = [^\n]*;", mini).group(0) for n in (
+            "RADICE_MADRE", "VISTE_NAV_P2P", "MADRE_P2P", "FIGLIE_P2P", "chiaveVetrina",
+            "navStesso")) + "\n"
+        + _blocco("const navUguali = ", "));") + "\n"
+        + "".join(_intera(f) for f in _funz)
+        + r"""
+let CUR = 'esplora', APERTI = [], CHIUSO = 0, USCITO = 0, CODA = [];
+let currentListing = null, currentOrder = null, negozioPag = {chi: ''}, paccoDati = null, acqDati = null;
+let p2pOrdineAperto = '', ramoVetrina = 'esplora', activeCat = 'Tutto';
+let tourInCorso = false, tourP2PInCorso = false, testModaleInCorso = false;
+let vistaBarattolo = false, filtroAsta = false, pollTimer = null;
+const DEMO = false, STORIA = true;
+let navSpingi = false, navGradinoReparto = 0, navApplicando = false, uscitaDopoAnnullo = false;
+let navUltimo = 0, navDVisto = 0, navVersoMadre = 0;
+const location = {href: 'https://barattolo.store/', protocol: 'https:'};
+const tg = {initData: 'x', close(){ CHIUSO++; }, BackButton: {show(){}, hide(){}},
+  isVersionAtLeast: () => true, disableVerticalSwipes(){}, onEvent(){}};
+function addEventListener(){}
+class MutationObserver { observe(){} }
+/* l'osservatore delle classi: un microtask, come quello vero */
+function osserva(){ queueMicrotask(() => navRiflette()); }
+const document = {
+  querySelector(s){ if (s === '.view.active') return {id: 'view-' + CUR};
+    if (s === '.sheet.open') return APERTI.length ? {id: APERTI[0]} : null; return null; },
+  querySelectorAll(s){ return s === '.sheet.open' ? APERTI.map(id => ({id})) : []; }
+};
+function el(id){
+  return {children: [], classList: {contains: () => false, add(){},
+    remove(c){ if (c === 'open' && APERTI.includes(id)) { APERTI = APERTI.filter(x => x !== id); osserva(); } }}};
+}
+function go(v){ CUR = v; osserva(); }
+function setCat(c){ activeCat = c; }
+function ordiniP2P(){ return {x1: {}}; }
+function apriOrdineP2P(id){ p2pOrdineAperto = id; go('p2pordine'); }
+function chiudiPicker(){} function chiudiLightbox(){} function chiudiTour(){}
+function chiudiTourP2P(){} function chiudiModaleTest(){}
+function aggiornaPicker(){} function renderGrid(){} function alternaBarattolo(){}
+function loadListings(){ return Promise.resolve(); }
+/* ---- LA CRONOLOGIA DI CARTONE: push, replace, e i popstate
+   consegnati DOPO, in un giro loro, come fa il browser ---- */
+const history = {
+  voci: [], i: -1, scrollRestoration: 'auto',
+  get state(){ return this.i >= 0 ? this.voci[this.i] : null; },
+  pushState(s){ this.voci = this.voci.slice(0, this.i + 1);
+    this.voci.push(JSON.parse(JSON.stringify(s))); this.i++; },
+  replaceState(s){ const c = JSON.parse(JSON.stringify(s));
+    if (this.i < 0) { this.voci = [c]; this.i = 0; } else this.voci[this.i] = c; },
+  back(){ CODA.push(() => { if (this.i > 0) { this.i--; navApplica(this.state); } else USCITO++; }); },
+  forward(){ CODA.push(() => { if (this.i < this.voci.length - 1) { this.i++; navApplica(this.state); } }); }
+};
+const pausa = () => new Promise(r => setImmediate(r));
+async function scorri(){ await pausa(); let g = 0;
+  while (CODA.length && g++ < 60) { CODA.shift()(); await pausa(); } }
+const vista = () => CUR + (APERTI.length ? '+' + APERTI.join('+') : '');
+function azzera(){
+  CUR = 'esplora'; APERTI = []; CHIUSO = 0; USCITO = 0; CODA = []; p2pOrdineAperto = '';
+  history.voci = []; history.i = -1; navDVisto = 0; navVersoMadre = 0; navUltimo = 0;
+  navMotore();
+}
+/* l'indietro nelle sue due strade: il tasto di Telegram (e la freccia
+   in pagina) chiedono navIndietro; lo swipe e il tasto di sistema
+   parlano dritti con la cronologia */
+function indietro(via){ if (via === 'tg') { navUltimo = 0; navIndietro(); } else history.back(); }
+function passo(p, via){
+  if (p === '<') indietro(via);
+  else if (p === '>') history.forward();
+  else if (p === 'mercatino') { navUltimo = 0; vaiEsplora(); }
+  else if (p === 'ordine') apriOrdineP2P('x1');
+  else if (p[0] === '+') { APERTI.push(p.slice(1)); osserva(); }
+  else if (p[0] === '-') el(p.slice(1)).classList.remove('open');
+  else go(p);
+}
+async function giro(passi, via){
+  azzera(); await scorri();
+  const visti = [];
+  let massimo = history.voci.length;
+  for (const p of passi) {
+    passo(p, via); await scorri(); visti.push(vista());
+    massimo = Math.max(massimo, history.voci.length);
+  }
+  return {visti, fondo: history.i, massimo, chiuso: CHIUSO, uscito: USCITO};
+}
+const SCENARI = {
+  miei: ['p2p', 'p2pmiei', '<', '<', '<'],
+  info: ['p2p', 'p2pinfo', '<', '<'],
+  mieiInfo: ['p2p', 'p2pmiei', 'p2pinfo', '<', '<'],
+  giri: ['p2p', 'p2pmiei', 'p2p', 'p2pmiei', 'p2p', 'p2pmiei', '<', '<'],
+  foglio: ['p2p', 'p2pmiei', '+p2pFiltroMieiSheet', '<', '<', '<'],
+  ordineInfo: ['p2p', 'p2pmiei', 'ordine', 'p2pinfo', '<', '<'],
+  ordineLibro: ['p2p', 'p2pmiei', 'ordine', 'p2p', '<'],
+  libro: ['p2p', '<'],
+  mercatino: ['p2p', 'p2pmiei', 'mercatino', '<'],
+  pubblica: ['p2p', '+p2pNuovoSheet', '-p2pNuovoSheet', 'ordine', '<', '<'],
+  dettInfo: ['p2p', '+p2pDettSheet', '-p2pDettSheet', 'p2pinfo', '<', '<']
+};
+/* IL GIRO A CASO: una strada qualunque dentro il P2P — voci della nav,
+   scambi aperti, fogli aperti e chiusi a mano, il mercatino e ritorno —
+   e poi SOLO INDIETRO finche' non si esce. Quattro cose devono valere
+   sempre: si finisce; dal P2P si esce SOLO dal libro; dal libro non si
+   torna mai dentro il P2P (il giro libro ↔ miei); e da «I miei scambi»
+   o da «Info P2P» l'indietro va al libro, mai a una sorella o a uno
+   scambio. Il seme e' fisso: un rosso si rifa' identico. */
+async function aCaso(n, via){
+  let seme = 20260923;
+  const caso = k => { seme = (seme * 1103515245 + 12345) % 2147483648; return seme % k; };
+  const P2P = new Set(['p2p', 'p2pmiei', 'p2pinfo', 'p2pordine']);
+  const base = s => s.split('+')[0];
+  const guasti = [];
+  let indietroTot = 0;
+  for (let g = 0; g < n; g++) {
+    azzera(); await scorri();
+    passo('p2p', via); await scorri();
+    const fatti = ['p2p'];
+    const lung = 1 + caso(9);
+    for (let k = 0; k < lung; k++) {
+      let mosse;
+      if (APERTI.length) mosse = ['chiudi', '<'];
+      else if (CUR === 'esplora') mosse = ['p2p'];
+      else mosse = ['p2p', 'p2pmiei', 'p2pinfo', 'foglio', 'mercatino']
+        .concat(CUR === 'p2p' || CUR === 'p2pmiei' ? ['ordine', 'ordine'] : []);
+      const m = mosse[caso(mosse.length)];
+      fatti.push(m);
+      if (m === 'chiudi') passo('-' + APERTI[APERTI.length - 1], via);
+      else if (m === 'foglio') passo('+p2pFoglio', via);
+      else passo(m, via);
+      await scorri();
+    }
+    const strada = [vista()];
+    let volte = 0;
+    while (!CHIUSO && !USCITO && volte++ < 40) { indietro(via); await scorri(); strada.push(vista()); }
+    indietroTot += volte;
+    let male = volte >= 40 ? 'non finisce' : '';
+    for (let k = 1; k < strada.length && !male; k++) {
+      const a = base(strada[k - 1]), b = base(strada[k]);
+      if (P2P.has(a) && !P2P.has(b) && a !== 'p2p') male = 'esce dal P2P da ' + a;
+      if (a === 'p2p' && P2P.has(b) && b !== 'p2p') male = 'dal libro torna a ' + b;
+      if ((a === 'p2pmiei' || a === 'p2pinfo') && P2P.has(b) && b !== 'p2p' && b !== a)
+        male = 'da ' + a + ' torna a ' + b;
+    }
+    if (!male && base(strada[strada.length - 1]) !== 'esplora') male = 'non esce dalla home';
+    if (male) guasti.push({fatti, strada, male});
+  }
+  return {guasti: guasti.slice(0, 3), quanti: guasti.length, giri: n, indietro: indietroTot};
+}
+(async () => {
+  const R = {};
+  for (const via of ['tg', 'sistema']) {
+    R[via] = {};
+    for (const k of Object.keys(SCENARI)) {
+      try { R[via][k] = await giro(SCENARI[k], via); }
+      catch(e) { R[via][k] = 'ESPLOSO: ' + (e && e.message); }
+    }
+    try { R[via].aCaso = await aCaso(150, via); }
+    catch(e) { R[via].aCaso = 'ESPLOSO: ' + (e && e.message); }
+  }
+  /* L'AVANTI DEL BROWSER va dove dice la sua entry: il passo del P2P
+     vale solo all'indietro */
+  try { R.avanti = await giro(['p2p', 'ordine', 'p2pmiei', '<', '>'], 'sistema'); }
+  catch(e) { R.avanti = 'ESPLOSO: ' + (e && e.message); }
+  R.giudice = [
+    passoIndietroP2P('p2pmiei', 'esplora', {indietro: true, puro: true, sotto: false}),
+    passoIndietroP2P('p2pinfo', 'profilo', {indietro: true, puro: false, sotto: true}),
+    passoIndietroP2P('p2pmiei', 'p2p', {indietro: true, puro: true, sotto: true}),
+    passoIndietroP2P('p2p', 'p2pmiei', {indietro: true, puro: true, sotto: true}),
+    passoIndietroP2P('p2p', 'p2p', {indietro: true, puro: true, sotto: true}),
+    passoIndietroP2P('p2pmiei', 'p2pmiei', {indietro: true, puro: false, sotto: true}),
+    passoIndietroP2P('p2p', 'p2pmiei', {indietro: true, puro: true, sotto: false}),
+    passoIndietroP2P('p2pmiei', 'esplora', {indietro: false, puro: true, sotto: true}),
+    passoIndietroP2P('p2pordine', 'p2pmiei', {indietro: true, puro: true, sotto: true}),
+    passoIndietroP2P('p2p', 'esplora', {indietro: true, puro: true, sotto: false}),
+    passoIndietroP2P('p2pmiei', 'esplora', null),
+    passoIndietroP2P('p2p', 'p2pordine', {indietro: true, puro: true, sotto: true}),
+    passoIndietroP2P('p2pinfo', 'p2pordine', {indietro: true, puro: true, sotto: true})];
+  console.log(JSON.stringify(R));
+})();
+""")
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(_prog)
+    try:
+        _r = subprocess.run([node, f.name], capture_output=True, text=True,
+                            encoding="utf-8", errors="replace", timeout=120)
+    finally:
+        os.unlink(f.name)
+    if _r.returncode != 0:
+        prova("il banco dell'indietro del P2P gira", "", _r.stderr[:600])
+        return
+    out = _js.loads(_r.stdout.strip())
+
+    # --- 2) IL GIUDICE, PURO ---------------------------------------------
+    # (il giro a caso qui sotto ha trovato il caso degli ultimi due: un
+    # foglio chiuso a mano sopra uno scambio, poi il libro dalla nav, e
+    # l'indietro dal libro atterrava sullo scambio)
+    prova("il giudice: dalla figlia verso fuori il libro; dal libro ogni gradino del P2P si salta, dalla figlia tutti tranne il libro; fuori dall'indietro niente",
+          ["libro", "libro", "", "oltre", "oltre", "", "", "", "", "", "", "oltre", "oltre"],
+          out["giudice"])
+
+    # --- 3) LE STRADE, NELLE DUE VIE --------------------------------------
+    # 'tg' = il tasto di Telegram e la freccia in pagina (navIndietro);
+    # 'sistema' = lo swipe e il tasto di Android, cioe' la cronologia
+    _ATTESI = {
+        "miei": (["p2p", "p2pmiei", "p2p", "esplora", "esplora"],
+                 "da «I miei scambi»: libro, poi la home, poi fuori"),
+        "info": (["p2p", "p2pinfo", "p2p", "esplora"],
+                 "da «Info P2P»: libro, poi la home"),
+        "mieiInfo": (["p2p", "p2pmiei", "p2pinfo", "p2p", "esplora"],
+                     "miei poi info (sorelle): l'indietro va al libro, non ai miei"),
+        "giri": (["p2p", "p2pmiei", "p2p", "p2pmiei", "p2p", "p2pmiei", "p2p", "esplora"],
+                 "libro ↔ miei tre volte: due indietro bastano, nessun giro"),
+        "foglio": (["p2p", "p2pmiei", "p2pmiei+p2pFiltroMieiSheet", "p2pmiei", "p2p", "esplora"],
+                   "col foglio aperto: prima si chiude il foglio, poi il libro, poi la home"),
+        "ordineInfo": (["p2p", "p2pmiei", "p2pordine", "p2pinfo", "p2p", "esplora"],
+                       "da uno scambio a «Info P2P» con la nav: l'indietro va al libro, non ai miei"),
+        "ordineLibro": (["p2p", "p2pmiei", "p2pordine", "p2p", "esplora"],
+                        "da uno scambio al libro con la nav: l'indietro esce, non torna ai miei"),
+        "libro": (["p2p", "esplora"], "dal libro l'indietro porta alla home, come prima"),
+        "mercatino": (["p2p", "p2pmiei", "esplora", "esplora"],
+                      "il tocco sul mercatino da «I miei scambi» va alla home, e l'indietro dopo esce"),
+        "pubblica": (["p2p", "p2p+p2pNuovoSheet", "p2p", "p2pordine", "p2p", "esplora"],
+                     "dopo aver pubblicato: lo scambio, il libro, la home — senza un indietro a vuoto"),
+        "dettInfo": (["p2p", "p2p+p2pDettSheet", "p2p", "p2pinfo", "p2p", "esplora"],
+                     "«Info P2P» aperta dal dettaglio: libro, poi la home"),
+    }
+    for via in ("tg", "sistema"):
+        for k, (atteso, nome) in _ATTESI.items():
+            r = out[via][k]
+            prova("%s (%s)" % (nome, "tasto di Telegram" if via == "tg" else "swipe di sistema"),
+                  atteso, r["visti"] if isinstance(r, dict) else r)
+        # si esce SOLO dalla home, e dalla sua entry in fondo
+        _m = out[via]["miei"]
+        prova("...e l'ultimo indietro chiude dalla home (%s)" % via, True,
+              isinstance(_m, dict) and _m["fondo"] == 0
+              and (_m["chiuso"] == 1 if via == "tg" else _m["uscito"] == 1))
+        # fra le voci del P2P si SOSTITUISCE: tre giri libro ↔ miei non
+        # allungano la cronologia, che resta la home e una voce sopra
+        _g = out[via]["giri"]
+        prova("...e i giri libro ↔ miei non allungano la cronologia: la home e una voce (%s)" % via,
+              [2, 0], [_g["massimo"], _g["fondo"]] if isinstance(_g, dict) else _g)
+        _c = out[via]["aCaso"]
+        prova("%d strade a caso, solo indietro fino all'uscita: si finisce, dalle figlie si va al libro, si esce dal libro e dal libro non si torna dentro (%s)"
+              % (_c.get("giri", 0) if isinstance(_c, dict) else 0, via),
+              0, _c["quanti"] if isinstance(_c, dict) else _c)
+        if isinstance(_c, dict) and _c["quanti"]:
+            print("      ", _c["guasti"])
+    prova("l'avanti del browser va dove dice la sua entry",
+          ["p2p", "p2pordine", "p2pmiei", "p2p", "p2pmiei"],
+          out["avanti"]["visti"] if isinstance(out["avanti"], dict) else out["avanti"])
 
 
 def _banco_eventi_p2p(eventi_attivi=True):
@@ -81350,6 +82023,9 @@ def main():
     prove_p2p_velo_pubblica,
     prove_p2p_barattozon,
     prove_p2p_paycode,
+    prove_pubblica_metodo_prima,
+    prove_libro_vuoto_monete,
+    prove_indietro_dal_libro,
     prove_p2p_canale,
     prove_p2p_canonico,
     prove_p2p_bundle,

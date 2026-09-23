@@ -26713,3 +26713,112 @@ sulla strada `app`. E `/sicurezza#app` aperto dal telefono: nel pannello
 del banco il salto all'ancora al primo caricamento non andava nemmeno
 per `#limiti`, che c'era già — col pannello nascosto; sul telefono si
 guarda.
+
+
+## Il metodo prima dell'importo, e l'indietro che passa dal libro (23 set 2026)
+
+Quattro ritocchi del P2P chiesti da Andrea nello stesso giro, in un
+worktree da `origin/main`.
+
+**1) NEL FOGLIO «PUBBLICA» IL METODO VIENE PRIMA DELL'IMPORTO.** È il
+metodo a decidere che campo è l'importo: con Barattozon ha i centesimi
+e il foglio diventa il percorso, e chi scriveva prima la cifra non
+capiva perché la virgola non entrava. L'ordine è valuta, metodo,
+importo (o il percorso), tipo di prezzo, premio, limiti. IL NOME DEL
+CAMPO SEGUE IL VERSO (`nomeMetodiP2P`): «Come vuoi farti pagare» a chi
+vende sats, «Come vuoi pagare» a chi li compra; la coda dopo il
+trattino («puoi sceglierne più di uno», «col tabacchino, uno solo») è
+rimasta parola per parola. Il riepilogo prima di pubblicare (c'è solo
+con Barattozon) il metodo non lo scrive, quindi lì non c'era niente da
+rinominare: se un giorno lo scriverà, chiama la stessa funzione.
+CAMBIANDO METODO DOPO LA CIFRA, `importoDopoMetodoP2P` (pura) tiene
+l'importo se vale anche per il metodo nuovo e se no lo svuota con la
+frase che dice perché — «23,47 → gli ordini SEPA sono in euro interi»
+— nell'avviso e in una riga sotto il campo (`rigaEuroViaP2P`, nei due
+posti in cui il campo vive). La riga se ne va appena si riscrive la
+cifra, SENZA ridisegnare (il dito è sul campo); ogni cambio di metodo
+la riscrive, e il foglio riaperto parte senza. Le regole che cambiano
+col metodo sono due e vivevano già: entrando in Barattozon niente
+intervallo («20–50 → con Barattozon l'importo è uno solo, senza
+intervallo») e il tetto di Amazon, con la frase del suo giudice;
+uscendone gli euro sono interi, e «23,00» resta 23. Se n'è andato il
+troncamento muto di prima: da 23,47 restava 23, una cifra che nessuno
+aveva scritto.
+⚠️ QUATTRO SCELTE MIE, da far leggere ad Andrea: l'intervallo entrando
+in Barattozon si svuota TUTTO (la regola letta alla lettera: non vale,
+quindi si svuota) invece di tenere il capo basso, che con l'importo di
+una mail Amazon non c'entrerebbe comunque; la frase va nell'avviso E
+sotto il campo, perché con la tendina aperta il campo può stare sotto
+il bordo dello schermo; i Contanti si dicono «in contanti»; e la coda
+dopo il trattino è rimasta com'era — se «Come vuoi pagare — puoi
+sceglierne più di uno» suona storta, è una riga.
+
+**2) DUE PAROLE DI BARATTOZON.** Nelle esclusioni «Prime» è diventato
+«abbonamenti a Prime» nei due posti in cui c'è la lista: il passo 1 e
+«Info P2P» (il riquadro di chi paga la lista non ce l'ha). Dal passo 2
+è uscita «Con Barattozon l'importo è uno solo, niente intervallo, e
+nessun altro metodo nello stesso ordine.»; il resto della riga è
+quello di prima.
+
+**3) IL LIBRO VUOTO PORTA LE DUE MONETE** di «I miei scambi» al posto del
+logo P2P, con la frase di sempre: alte 76 px come il logo, col suo
+margine, quindi la scatola non cambia misura. Il file è 682×459, più del
+triplo dei 113×76 a cui si vede: nitido a 3x (scatto CDP a densità 3).
+Il vuoto DA FILTRO tiene il logo, ed è la richiesta letta alla lettera
+(«quando non c'è nessun ordine»): lì ordini ce ne sono, è il filtro a
+nasconderli. Se va cambiato anche lui, è una riga.
+
+**4) DENTRO IL P2P L'INDIETRO PASSA DAL LIBRO.** Da «I miei scambi» e da
+«Info P2P» lo swipe e il tasto indietro portano al libro, e dal libro
+alla home come prima. LA CRONOLOGIA NON CAMBIA FORMA, ed è la strada
+scelta: spingere un gradino del libro sotto le figlie voleva dire
+smontarlo a mano a ogni uscita da un altro tab (il mercatino, il
+profilo), o l'indietro dopo ci avrebbe riportati dentro il P2P. A
+decidere è un giudice puro sul passo INDIETRO, `passoIndietroP2P`,
+chiamato da `navApplica`: lì arrivano i gesti di sistema della PWA e
+dell'APK e il tasto di Telegram, quindi una regola sola li copre tutti
+(`navIndietro` i primi non li vede: è la lezione dei DUE CONTESTI in
+ARCHITETTURA). Uscendo dal P2P da una figlia si disegna il libro e se
+ne spinge la entry; i gradini del P2P rimasti sotto si saltano senza
+disegnarli. Solo all'indietro (`navDVisto`) e mai sul tocco del
+mercatino (`navVersoMadre`): da «I miei scambi» il tab Esplora va alla
+home, e l'indietro dopo esce.
+⚠️ IL GIRO A CASO HA TROVATO UN CASO VERO, che la prima stesura del
+giudice lasciava passare: un foglio chiuso a mano sopra uno scambio, poi
+il libro dalla nav, e l'indietro dal libro atterrava sullo scambio
+(libro → scambio → libro → home). La regola si è allargata: dal libro si
+salta OGNI gradino del P2P, da una figlia tutti tranne il libro. E per
+lo stesso meccanismo si è chiuso un indietro a vuoto che c'era già:
+dopo aver pubblicato, dal libro servivano due gesti per uscire.
+
+**PROVE**: tre funzioni nuove — `prove_pubblica_metodo_prima` (22: le
+funzioni vere del foglio sotto node, con un DOM di cartone che trova i
+campi leggendo il markup), `prove_libro_vuoto_monete` (6),
+`prove_indietro_dal_libro` (33: il motore VERO della cronologia con una
+cronologia di cartone che consegna i popstate dopo, come il browser;
+undici strade nelle due vie — tasto di Telegram e swipe di sistema — e
+300 strade a caso col seme fisso) — più le prove di sempre aggiornate
+(l'ordine delle scatole, le esclusioni, il simbolo del libro, e le
+monete timbrate che sono diventate quattro). **13527 passate, 0
+fallite** con `PROVE_SEVERE=1` sull'albero rebasato sopra l'APK 1.5
+(+64 di questo giro), e i nove collaudi della CI verdi. Tortura
+**34/35**: la viva è
+`navDVisto = dArrivo + 1` dopo l'atterraggio sul libro, contabilità
+giusta ma non osservabile — il passo dopo la ricalcola comunque.
+**DAL VIVO** a 375 px, sull'app vera col relay morto: le strade nel
+Browser pane (`history.back()` è quel che fa lo swipe di sistema,
+`navIndietro()` il tasto di Telegram), la virgola battuta nel passo 2 e
+SEPA toccato nella tendina; gli scatti via Chrome headless a densità 3,
+nei due temi.
+
+### Da guardare sul telefono
+
+Il foglio «Pubblica» nei due versi (Compra e Vendi BTC), che il nome del
+metodo dica il verso giusto e stia su una riga; poi Vendi → Barattozon,
+«23,47» nel passo 2, e SEPA dalla tendina: il campo si svuota, l'avviso
+e la riga sotto il campo dicono perché. Il libro con zero ordini, nei
+due temi. E il gesto vero, che nel pane non si fa: da «I miei scambi» e
+da «Info P2P» lo swipe da sinistra (iPhone) e il tasto indietro
+(Android, in Telegram e nell'APK) portano al libro, e il secondo alla
+home; con un foglio aperto (il Filtro dei miei) il primo chiude il
+foglio.
