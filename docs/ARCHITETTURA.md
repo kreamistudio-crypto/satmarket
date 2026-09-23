@@ -24961,9 +24961,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   riserva è `p2p_ordini.tornati + 1` (lo scaduto: `tornati`), che
   combacia col conto delle prese. La presa NON si dice più a chi ha
   preso, nemmeno dalla riserva. IL RILASCIO usa la stessa tabella: al
-  `released` di chi vende il suo «hai venduto» va in attesa un minuto,
-  e parte se `success` non arriva (il 18 set il «concluso» a chi
-  vendeva non era arrivato MAI: il payout era fallito).
+  `released` di chi vende il suo «Sats in pagamento» va in attesa un
+  minuto, sul momento SUO (`sats_in_pagamento`), e alla scadenza tace se il
+  pagamento è passato — il «concluso» gliel'ha detto il `success`, che
+  va a tutti e due — se no parte con la riga che il giudice del
+  pagamento sceglie in quel momento (vedi «SATS IN PAGAMENTO, DETTO A
+  CHI VENDE»). Fino al 23 set 2026 era un «hai venduto… per te lo
+  scambio è concluso» sul momento `concluso`: diceva concluso a uno
+  scambio fermo, e partito lui il concluso vero era «già detto».
   L'OROLOGIO ha tre sveglie: il minuto (libro dai relay + attese), il
   lampo dell'ascolto (libro dal mazzetto + attese) e la scadenza di
   un'attesa (SOLE attese, nessuna domanda ai relay). L'ascolto sullo
@@ -26110,7 +26115,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   /api/p2p/pagamenti` (corpo `{ordini: [...]}`, sessione, niente gate
   sulla leva, `no-store`) risponde col giudice `_pagamenti_p2p`, PURO
   sulla connessione: per gli scambi di cui chi chiede è una delle due
-  parti in `p2p_scambi` (le dice mostrod) legge `p2p_momenti` —
+  parti in `p2p_scambi` (le dice mostrod) chiede a
+  `_pagamento_ordine_p2p`, che legge `p2p_momenti` —
   `concluso` (da mostrod o dalla riserva del libro) = 'riuscito';
   altrimenti l'ULTIMO fra `rilasciato`, `payout_fallito` e la fattura
   NUOVA (`fattura_data`/`new-invoice`) decide 'fallito' o 'in_corso',
@@ -26129,6 +26135,23 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   pagina visibile. Le altre due strade verso `concluso` restano: il
   libro (`statoPubblicoOrdini`, `success`) e la restore. Il «Scambio
   concluso 🎉» a chi vende suona adesso, e non più al rilascio.
+  E SU TELEGRAM LO STESSO (23 set 2026, secondo giro): il messaggio a
+  chi vende dopo il rilascio è l'attesa della patch 0007, che ha il
+  momento SUO (`sats_in_pagamento`, non più `concluso`) e sceglie la frase
+  ALLA SCADENZA, in `_scarica_attese_p2p`, chiedendo allo STESSO
+  giudice della card — `_pagamento_ordine_p2p`, estratto da
+  `_pagamenti_p2p` apposta: 'riuscito' → tace (il concluso l'ha detto
+  il `success`, a tutti e due); 'fallito' → «⏳ Sats in pagamento. Il
+  pagamento verso chi compra non è passato. Chi compra deve dare una
+  fattura nuova: non devi fare niente.»; altrimenti → «⏳ Sats in
+  pagamento. Hai liberato i sats: sono in pagamento verso chi
+  compra.»; tutt'e due chiudono con «Quando il pagamento passa, te lo
+  diciamo qui.». Le frasi sono `P2P_IN_PAGAMENTO_TESTI`, senza numeri
+  né nomi come i solleciti del PayCode, e una prova le lega parola per
+  parola alle righe della card (`t_vendo`, `d_vendo`, la riga di
+  `statoTestoP2P`). Il «concluso» a chi vende è solo quello del
+  `success`: «✅ Scambio concluso! Hai venduto…», e il ramo
+  «rilasciato_vende» di `_testo_evento_p2p` non c'è più.
 - LA QUOTA DI CHI LEGGE HA UN GIUDICE SOLO (17 set 2026):
   `mezzaCommissioneP2P(fee)` — la fee del coordinatore si spartisce
   metà a testa, quindi la percentuale da mostrare a una persona è la

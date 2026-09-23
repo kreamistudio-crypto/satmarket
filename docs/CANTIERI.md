@@ -27544,6 +27544,8 @@ arrivato, dice ancora «Hai rilasciato i sats: per te lo scambio è
 concluso» (l'attesa della patch 0007) — coerente col «non devi fare
 niente», ma usa la parola «concluso»; e la chiusura del MODERATORE
 (`admin-settled`) porta chi vende a «concluso» subito, come prima.
+(Il primo l'ha chiesto Andrea lo stesso giorno: vedi «Il messaggio
+Telegram a chi vende dopo il rilascio», qui sotto.)
 
 **4) LA RECENSIONE A TUTT'E DUE LE PARTI, UNA VOLTA SOLA.** Erano i «due
 orologi» già scritti come prima cosa da guardare («Le recensioni degli
@@ -27640,3 +27642,121 @@ rifiuta il server. 5) Il riquadro della recensione accanto al «Lascia un
 feedback» di un ordine del mercatino, di giorno e di sera: stesse stelle,
 stessa casella, stesso bottone. 6) Con la tastiera su, scrivendo il
 commento, la pagina non deve perdere il testo se arriva un evento.
+
+## Il messaggio Telegram a chi vende dopo il rilascio: «Sats in pagamento», e il «concluso» col success (23 set 2026)
+
+**LA RICHIESTA** (Andrea, visto il riquadro della recensione nella
+pagina: quello va bene). Il messaggio Telegram che arriva a chi vende
+dopo il rilascio non deve dire «concluso» finché il pagamento a chi
+compra non è riuscito: va allineato a «Sats in pagamento», e il
+«concluso» arriva con l'evento `success`. Il resto dei ritocchi di
+stamattina resta com'era.
+
+**COM'ERA, E I DIFETTI ERANO DUE.** L'attesa del rilascio (patch 0007,
+18 set 2026): al `released` di chi vende, in `p2p_attese` per un minuto,
+«✅ Hai rilasciato i sats: per te lo scambio è concluso. Hai venduto…»,
+sul momento `concluso` dell'anti-doppione — così, se il `success`
+arrivava prima, la fermava lui. Se non arrivava — il caso della prova
+vera: la fattura di chi comprava era scaduta, e un pagamento così non
+passa in pochi secondi — partiva lei, e diceva «concluso» a uno scambio
+fermo. IL SECONDO DIFETTO dalla sola parola non si vede: partita lei, la
+riga `concluso` di chi vende restava timbrata, e il `success` vero,
+arrivato dopo la fattura nuova, per lui trovava «già detto» e non
+partiva. Chi vendeva leggeva «concluso» quando non lo era, e non lo
+leggeva più quando lo diventava. (Per costruzione del codice: il
+journal di quel giorno non l'ho visto.)
+
+**COSA C'È ADESSO.** L'attesa ha il momento SUO, `sats_in_pagamento`:
+partita lei, il `concluso` vero passa lo stesso. (Non `in_pagamento`,
+che era il primo nome: quella stringa nel server la vieta la sentinella
+dello stadio «in pagamento» del mercatino — che non deve diventare uno
+stato, regola 4 — ed è giusto così: due cose diverse, due nomi.)
+LA FRASE SI SCEGLIE ALLA SCADENZA, in `_scarica_attese_p2p`, e non più
+al rilascio: in un minuto
+il pagamento può essere passato, non passato o ancora in volo, e lo sa
+solo chi guarda allora. A dirlo è LO STESSO GIUDICE DELLA CARD,
+`_pagamento_ordine_p2p`, estratto da `_pagamenti_p2p` (che adesso lo
+chiama per ogni scambio della lista): la card e il bot non possono più
+dire due cose diverse. Passato → l'attesa tace, la riga se ne va, e il
+journal dice «a chi vende parla il concluso»; non passato → «⏳ Sats in
+pagamento. Il pagamento verso chi compra non è passato. Chi compra deve
+dare una fattura nuova: non devi fare niente.»; in volo → «⏳ Sats in
+pagamento. Hai liberato i sats: sono in pagamento verso chi compra.».
+Tutt'e due chiudono con «Quando il pagamento passa, te lo diciamo qui.»,
+che è la promessa che il `success` mantiene.
+LE FRASI SONO COSTANTI, `P2P_IN_PAGAMENTO_TESTI`, come quelle dei
+solleciti del PayCode: senza numeri né nomi — è il seguito di un gesto
+fatto un minuto prima, e i numeri li porta il concluso — e con le righe
+della card parola per parola. Una prova le LEGA alla card (`t_vendo` e
+`d_vendo` di `STATI_P2P.rilasciato`, la riga del pagamento non passato
+in `statoTestoP2P`): se una cambia senza l'altra, la prova lo dice.
+IL «CONCLUSO» A CHI VENDE È SOLO QUELLO DEL `success`, che
+`_destinatari_evento_p2p` mandava già a tutti e due: «✅ Scambio
+concluso! Hai venduto 15.000 sats per 10,00 €, in tutto 15.225 sats
+commissione compresa.», più l'invito a recensire dove il posto c'è. Il
+ramo «rilasciato_vende» di `_testo_evento_p2p` non esiste più.
+INVARIATI: chi compra (il pagamento non passato lo sente solo lui, col
+motivo in parole; il concluso col suo netto), il rilascio del
+MODERATORE (avvisa tutti e due subito e non mette attese), la sveglia
+dell'orologio un minuto dopo il rilascio.
+
+⚠️ LE STRADE SCARTATE. Cambiare solo le parole della frase scritta al
+rilascio: restava il «già detto» sul concluso vero, e la riga del
+pagamento non passato — proprio il caso della prova — non l'avrebbe
+detta mai. Un avviso a chi vende a OGNI pagamento non passato: la
+richiesta era allineare il messaggio, non aggiungerne, e «non devi fare
+niente» ripetuto a ogni tentativo è rumore — la card lo dice sempre.
+Una query sua dentro lo scarico: sarebbe stata un secondo giudice del
+pagamento, e il giorno che uno dei due cambiasse, card e bot si
+smentirebbero. I numeri nella frase, come nel vecchio «hai venduto»:
+servono a riconoscere lo scambio, ma chi la riceve ha rilasciato un
+minuto prima.
+⚠️ IMPERFEZIONE DICHIARATA, e non curata: un'attesa già in tabella al
+deploy (un rilascio nel minuto prima del riavvio) ha il momento vecchio,
+`concluso`. Parte con la frase nuova — la frase ormai si sceglie alla
+scadenza — ma timbra `concluso`, quindi se quel pagamento passa DOPO, a
+quel venditore il concluso su Telegram non arriva (l'app lo mostra). Una
+finestra di un minuto, una volta sola.
+
+**PROVE.** In `prove_p2p_riserva_libro` la sezione 5 («L'attesa del
+rilascio») riscritta a quattro casi — in volo e poi passato (a chi vende
+«Sats in pagamento», poi il concluso a TUTTI E DUE, coi suoi numeri e
+l'invito), non passato (la riga di chi compra), non passato e ripartito
+dentro il minuto (di nuovo in volo), passato nel minuto (tace, e la riga
+se ne va) — più il rilascio del MODERATORE, che avvisa tutti e due
+subito e a chi vende non mette l'attesa, la parità con la card, «mai
+conclu- né il protocollo» nelle due frasi, e il ramo vecchio sparito.
+Emendate col perché scritto: lo scambio intero di `prove_p2p_eventi`
+(il momento dell'attesa, e il
+suo tacere spiegato dal giudice e non più dall'anti-doppione) e la
+sveglia delle attese di `prove_p2p_ascolto`; i banchi che montano lo
+scarico delle attese coi rilasci, e quello della rotta dei pagamenti,
+montano anche `_pagamento_ordine_p2p`.
+`collaudo_pagamento_p2p.py` ha un giro 9: il server VERO e il giro delle
+attese VERO (`_giro_attese_p2p`, con la notifica finta al posto di
+Telegram), i tre casi — 42 verdi (erano 32). **13724 passate,
+0 fallite** con `PROVE_SEVERE=1`; i dieci collaudi della CI verdi.
+**TORTURA 16/16** su una copia (sette sezioni più il collaudo): la
+chiave tornata `concluso`, l'attesa che non tace, la riga non scelta, la
+frase scelta al rilascio, «concluso» rimesso nella frase, la riga della
+card cambiata, il concluso di chi vende tornato «per te», il concluso
+tolto a chi vende, l'attesa a chi compra, i quattro pezzi del giudice,
+la rotta che serve «non lo so», niente attesa, l'attesa anche al
+moderatore. Il primo giro ne ha lasciata viva UNA, e proprio
+quest'ultima: nessuna prova diceva che il rilascio del moderatore non
+mette l'attesa — la condizione sull'attore c'era già il 18 set, e si
+poteva togliere in silenzio — e con lei chi vende leggerebbe «Hai
+liberato i sats» su sats che non ha liberato lui. Adesso la prova c'è,
+e la mutazione muore.
+NON PROVATO DAL VIVO: il messaggio è Telegram, e nel pane non si vede;
+il collaudo fa girare il pezzo vero che lo manda, con la notifica finta.
+
+**COSA GUARDARE SUL TELEFONO, A DUE TELEFONI.** 1) Uno scambio normale: a
+chi vende, dopo il rilascio, UN solo messaggio — «✅ Scambio concluso!»
+coi numeri — e nessun «Sats in pagamento». 2) Il pagamento fallito
+provocato apposta (una fattura da pochi minuti): a chi vende, un minuto
+dopo il rilascio, «⏳ Sats in pagamento» con «Chi compra deve dare una
+fattura nuova: non devi fare niente»; poi, data la fattura nuova e
+passato il pagamento, «✅ Scambio concluso!» coi numeri e l'invito a
+recensire — il messaggio che prima non sarebbe arrivato. 3) Se capita un
+pagamento lento: prima la frase in volo, poi il concluso.
