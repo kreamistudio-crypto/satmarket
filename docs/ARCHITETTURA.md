@@ -8933,7 +8933,9 @@
   un evento, e se non lo scrivi quando succede è perso per sempre.
   Quindi la verità è la tabella `xp_eventi` (append-only: tg_id, tipo,
   punti, riferimento, creato) e `utenti.xp` è solo la sua somma
-  (cache, `_ricalcola_xp`). La `UNIQUE(tg_id, tipo, riferimento)` è il
+  (cache, `_ricalcola_xp`; dal set 2026 una somma col tetto delle
+  quote d'invito, `xp_contati` — vedi «I CODICI INVITO» più sotto).
+  La `UNIQUE(tg_id, tipo, riferimento)` è il
   GIUDICE dell'idempotenza: non si chiede a chi scrive un gancio di
   ricordarsi «gliel'ho già dato?» — retry, doppio gancio e riavvio a
   metà ci sbattono contro. Lo stesso vincolo fa da TETTO GIORNALIERO
@@ -9093,6 +9095,74 @@
   banco estrae `esc` VERO dal client invece di darsene uno di cartone:
   quello proverebbe sé stesso, e la mutazione che lascia il nome del
   gradino nudo passerebbe liscia (l'ha chiesta la tortura).
+  I CODICI INVITO (set 2026; il perché in Cantieri, «I codici invito
+  con gli XP»). Ognuno ha UN codice — sei caratteri da
+  `INVITO_ALFABETO`, niente 0/O/1/I/L e niente vocali — nato la prima
+  volta che serve (`codice_invito`, dentro `/api/me`) e poi FERMO,
+  perché è stampato nei link già condivisi; e un link
+  `LINK_BOT?start=<codice>` che compone il server. DUE TABELLE e non
+  colonne su `utenti` (nessun SELECT * le può servire per sbaglio):
+  `inviti_codici` (PK tg_id, UNIQUE codice) e `inviti` — PK
+  sull'invitato, che È la regola «una volta sola», e `CHECK (invitato
+  <> invitante)`, che è «non da soli» scritto dove nessun codice lo
+  scavalca. DUE PORTE, UN GIUDICE (`collega_invito`): il `/start
+  <codice>` del bot (`gestisci_update` separa l'invito dalla fusione
+  per FORMA — il lasciapassare è un esadecimale da 32 — e
+  `riga_invito_bot` accoda la riga al benvenuto, che resta uno) e il
+  campo a mano del Profilo (`POST /api/me/invito`). La finestra è
+  `registrato` + `INVITO_GIORNI` (7) per tutt'e due le porte, zero per
+  chi c'era prima del timbro; il giro in tondo, anche lungo, lo dice
+  una CTE ricorsiva (`invito_circolare`), con UNION perché finisca
+  anche su una catena storta. L'ORDINE DEI NO è quello di chi legge:
+  forma, codice che non c'è, il proprio, già collegato (anche a
+  finestra chiusa), finestra, giro in tondo.
+  LA QUOTA: il perimetro degli XP ha DUE METÀ — `XP_PROPRI` (il
+  commercio tuo) e `XP_INVITO` — e `XP_COMMERCIO` le tiene tutt'e due,
+  perché il numero che si vede è quello che conta: Profilo, livelli (e
+  quindi le porte che il livello apre, compreso lo sconto P2P del
+  quinto gradino) e classifica leggono lo stesso numero. A ogni
+  accredito PROPRIO `assegna_xp` chiama `quota_invito`: il 5%
+  (`INVITO_PERCENTO`) per difetto, all'invitante, per la stessa porta
+  (`assegna_xp` col tipo della quota: stessa UNIQUE, stesso ricalcolo)
+  e col riferimento che porta dentro l'accredito
+  (`invito:{invitato}:{riferimento}`). Siccome la quota non è fra i
+  propri, NON ne fa nascere un'altra: niente catena. GUARDIA 2 —
+  niente quota da un affare con l'invitante — col giudice delle parti
+  `parti_affare_xp`, che sa leggere `ordine:{id}:{ruolo}` e per il
+  resto torna None, e None non paga (il P2P XP non ne dà: il suo ramo
+  si scrive il giorno che ne darà). GUARDIA 1 — mai sopra i propri —
+  in DUE posti: allo scrivere si taglia allo spazio che resta, e al
+  leggere `xp_contati(propri, inviti)` = propri + min(inviti, propri) È
+  la definizione di `utenti.xp`. La leggono `_ricalcola_xp`,
+  `riallinea_xp_commercio` (diventato un giro in Python per non
+  ricopiarla in SQL), `_dati_classifica` e il terzo lato di
+  `xp_per_ruolo` (`inviti`, solo quando non è zero); `somme_xp` è
+  l'unico lettore del registro e passa da `sql_xp_commercio`.
+  `assegna_xp` non somma più: ricalcola, e gli scrittori della cache
+  sono due. FAIL-OPEN: un intoppo nella quota non tocca l'accredito
+  che l'ha fatta nascere. `ruolo_xp` torna '' su un riferimento di
+  quota, o leggerebbe il ruolo di un ALTRO. `marca_prove.py`,
+  `recupera_xp_ordini.py` e `classifica_prova.py` ricopiano la regola
+  (girano da soli), e una prova li tiene in pari.
+  IN `/api/me`, la chiave `inviti`: codice, link, `persone`, `xp`,
+  `invitato`, `campo_fino` (0 = campo chiuso), `percento`, `giorni` —
+  i CONTI e mai i nomi. Letta prima del commit, perché il codice può
+  nascere lì. Nel client il cassetto «💌 I tuoi inviti» sta nella
+  sezione dell'account dopo «Livello e titolo» (`renderInviti`,
+  `contoInviti`, `regolaInviti`, `inserisciInvito`, e il link che
+  passa da `condividiLink`/`copiaLink` senza mai entrare in un
+  onclick); `fraseXp` elenca il terzo lato «da chi hai invitato». «I
+  tuoi dati» dichiara il legame e il suo limite onesto.
+  LA FUSIONE fa la liturgia dei vicini sul codice (vince la metà
+  Telegram, quella che muore lo cede solo se l'altra non ce l'ha) e sui
+  collegamenti, in un ordine che non è libero: PRIMA muore il legame
+  fra le due metà (il CHECK farebbe cadere la fusione), poi si
+  migrano, poi si spezza il giro in tondo che fondendo può chiudersi,
+  poi si tolgono le quote rese storte (auto-invito, o affare diventato
+  «con l'invitante») col giudice della quota.
+  L'AZZERAMENTO degli XP (all'accensione della commissione) si fa su
+  tutto `XP_COMMERCIO` e NON tocca `inviti`: la regola riparte da zero
+  da sola, perché non c'è un contatore a parte.
   Da quante PERSONE arrivano i feedback (ago 2026): sul negozio
   pubblico i voti escono senza nomi, di proposito — mostrare chi ha
   comprato rivelerebbe gli acquisti altrui —, ma senza un secondo

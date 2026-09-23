@@ -28133,3 +28133,225 @@ la pubblicazione, il negozio da un telefono qualunque, e il link del
 negozio incollato in una chat: l'anteprima resta quella del brand. 4)
 La card in «Da scoprire» NON nasce da sola: se la si vuole, è lo spazio
 sponsorizzato (uno alla volta, `SLUG_SPONSOR`) e vuole la sua immagine.
+
+## I codici invito con gli XP (23 set 2026)
+
+**COSA SI È DECISO (Andrea).** Ogni persona ha un codice invito, corto
+e senza caratteri ambigui, e un link `t.me/ilbarattolobot?start=<codice>`:
+chi arriva dal link si collega da solo a chi l'ha invitato; chi arriva da
+un'altra parte ha un campo nel Profilo per scriverlo a mano, entro 7
+giorni dall'iscrizione e una volta sola. Non ci si invita da soli, né in
+tondo (A invita B, B invita A). Chi ha invitato riceve il **5%** degli XP
+che l'invitato guadagna, a vita, a ogni accredito, per difetto, con due
+guardie: gli XP da inviti non superano MAI quelli guadagnati in proprio,
+e non contano quelli che l'invitato prende da scambi o ordini con
+l'invitante stesso. Nel Profilo «I tuoi inviti» col codice, il link, il
+Condividi, quante persone e quanti XP — mai i nomi — e nel dettaglio dei
+punti la riga «da chi hai invitato». Se un giorno gli XP si azzerano
+(avvio commissioni), i collegamenti restano e la regola riparte da zero.
+
+**COME ERANO GLI XP PRIMA, perché è la base di tutto.** Li dà UN solo
+gancio: `_sblocca_sats`, sugli ordini del mercatino arrivati a
+`released`, due righe `ordine:{id}:{ruolo}` a testa. **Il P2P XP non ne
+dà** — verificato, nessun `premia_xp` nei rami dello scambio. I livelli
+sono a due chiavi (XP e affari conclusi) e aprono porte vere: il prezzo
+scontato del banner, il link del negozio, lo sconto P2P del quinto
+gradino. E la prova che ha fatto il cantiere del perimetro diceva: il
+numero del Profilo e quello della classifica sono LO STESSO NUMERO. La
+regola dell'azzeramento all'accensione della commissione (ago 2026)
+stava a verbale solo come decisione di Andrea: adesso è scritta anche
+nel codice, accanto alla quota e nel DDL di `inviti`.
+
+**LA DECISIONE CHE HO PRESO IO, ed è la prima da rileggere: le quote
+d'invito entrano nel PERIMETRO.** `XP_COMMERCIO` ha due metà —
+`XP_PROPRI` (il commercio tuo) e `XP_INVITO` — e Profilo, livelli e
+classifica leggono lo stesso numero. Il perché è la prova qui sopra: la
+riga «da chi hai invitato» nel dettaglio dei punti vuol dire che le
+quote fanno parte del totale, e un totale del Profilo diverso da quello
+della classifica è esattamente il 244 contro 123 che il cantiere del
+perimetro aveva chiuso — con in più la coda «È lo stesso numero che pesa
+in classifica», che diventerebbe falsa. LA CONSEGUENZA, dichiarata: le
+quote alzano anche il livello, e quindi le porte che il livello apre —
+fino allo sconto P2P del quinto gradino. È un effetto CON UN TETTO:
+al massimo raddoppiano i propri, e il livello vuole comunque gli affari
+conclusi, che le quote non danno. Se Andrea le vuole fuori dalla
+classifica è una riga in `_dati_classifica`, ma allora il Profilo e il
+rank tornano a dire due numeri e la coda di `fraseXp` va riscritta:
+per questo non l'ho fatto da me.
+
+**IL «MAI» È UNA DEFINIZIONE, NON UN CONTROLLO.** La prima guardia si fa
+rispettare in due posti: allo scrivere la quota si taglia allo spazio
+che resta, e al leggere `xp_contati(propri, inviti)` = propri +
+min(inviti, propri) È `utenti.xp`. Il primo basterebbe finché i propri
+salgono e basta; il secondo regge anche quando scendono — un ordine
+marcato come prova, un azzeramento fatto a metà — e allora niente può
+far dire al numero ciò che la regola vieta. Il prezzo: `utenti.xp` non è
+più una somma nuda, quindi i quattro lettori passano da `somme_xp` e da
+`xp_contati` (la cache, il riallineamento d'avvio diventato un giro in
+Python, la classifica, il terzo lato della scomposizione), e
+`assegna_xp` non somma più: ricalcola. Gli scrittori della cache
+passano da tre a due, e le due strade sono la stessa funzione.
+
+**LA QUOTA NON È UN SALVADANAIO.** Quel che non ci sta sotto il tetto si
+PERDE, non resta «in attesa» di quando i propri saliranno. È la lettura
+letterale di «a ogni accredito, con due guardie», ed è la più semplice
+da dire in una riga; l'altra — il registro che tiene la quota intera e
+il tetto che la «libera» dopo — avrebbe premiato il contrario di quel
+che si voleva (inviti tanti, commerci poco) e avrebbe fatto salire il
+numero di qualcuno senza un suo gesto. Da confermare.
+
+**NIENTE CATENA, PER COSTRUZIONE.** La quota passa dalla stessa porta
+degli XP (`assegna_xp` col suo tipo: stessa UNIQUE, stesso ricalcolo) e
+la fa nascere solo un accredito PROPRIO: la quota di B non paga chi ha
+invitato B. Senza questo, i punti salirebbero a piramide.
+
+**LA SECONDA GUARDIA SA LEGGERE GLI ORDINI, E BASTA.** `parti_affare_xp`
+legge `ordine:{id}:{ruolo}` e torna le due parti; tutto il resto torna
+None, e None NON paga. Il giorno che il P2P darà XP, il suo ramo si
+scrive lì (le parti stanno in `p2p_ordini`: chi ha pubblicato e chi ha
+preso), e fino a quel giorno meglio un 5% perso che un 5% pagato su uno
+scambio fatto proprio con l'invitante. La prova estrae la f-string dal
+gancio e la dà in pasto al giudice delle parti, come già per `ruolo_xp`.
+E `ruolo_xp` torna '' su un riferimento di quota: il riferimento porta
+dentro l'accredito (`invito:42:ordine:7:venditore`), e letto nudo
+metterebbe gli XP portati da un amico fra le TUE vendite.
+
+**LE DUE PORTE PASSANO DA UN GIUDICE (`collega_invito`), e la porta del
+link usa la stessa finestra.** «In automatico all'iscrizione» si legge
+così: il `/start` del bot è anche l'iscrizione di chi arriva nuovo, e lì
+la finestra è aperta per costruzione; chi era già iscritto da meno di 7
+giorni è collegato lo stesso (il link è il campo compilato per lui), e
+chi c'è da più tempo sente perché no. Il `/start` separa l'invito dalla
+fusione per FORMA — il lasciapassare della fusione è un esadecimale da
+32 — e l'invito si ACCODA al benvenuto, che resta un messaggio solo col
+bottone della Mini App davanti. Il bot non nomina chi ha invitato. L'ORDINE
+DEI NO è quello di chi legge: forma, codice che non c'è, il proprio,
+già collegato (anche a finestra chiusa: la PK lo fermerebbe comunque, ma
+con la frase sbagliata), finestra, giro in tondo — anche lungo, con una
+CTE ricorsiva che finisce anche su una catena storta.
+
+**IL CODICE.** Sei caratteri da un alfabeto senza 0/O/1/I/L e SENZA
+VOCALI: un codice estratto a caso non può comporre una parola, e una
+parolaccia sul Profilo di qualcuno sarebbe un guaio nostro. Casuale da
+`secrets`, mai derivato dal tg_id o dal negozio, nato la prima volta che
+serve e poi fermo (è stampato nei link già condivisi). Niente freno sui
+tentativi: indovinare un codice non fa vincere niente — collegarsi a uno
+sconosciuto regala a LUI il 5% dei propri XP.
+
+**IL LIMITE ONESTO, scritto in «I tuoi dati».** Chi invita vede quanti
+XP gli hanno portato i suoi inviti TUTTI INSIEME; se ha invitato una
+persona sola, da quel numero (circa un ventesimo dei suoi XP) può farsi
+un'idea di quanto commercia. È la stessa franchezza della riga sulla
+classifica, e va detta prima che qualcuno se ne accorga da sé. E la riga
+«gli XP contano una cosa sola» non era più vera: adesso dice il commercio
+tuo più una piccola parte di quello di chi hai invitato.
+
+**«INFO/AIUTO».** Nel mercatino una pagina d'aiuto generica non c'è (le
+pagine lunghe sono «Il pagamento protetto» e «I tuoi dati»): cosa si
+guadagna e le due regole stanno nel cassetto stesso, dove si agisce, e
+«I tuoi dati» dichiara il dato nuovo. Se Andrea pensava a un altro posto,
+la frase è `regolaInviti` e si sposta intera.
+
+**LA FUSIONE DI DUE ACCOUNT, in un ordine che non è libero.** Il codice
+fa la liturgia del barattolo condiviso (vince la metà Telegram; quella
+che muore lo cede se l'altra non ce l'ha, così i link già condivisi
+restano vivi). Poi PRIMA muore il legame fra le due metà — altrimenti
+l'UPDATE degli invitanti lo riscriverebbe in un auto-invito e il CHECK
+farebbe cadere la fusione intera: il collaudo ha un caso per ciascuno
+dei due versi, perché uno dei due lo salvava per caso l'`OR IGNORE`.
+Poi si migrano i legami, si spezza il giro in tondo che fondendo può
+chiudersi, e si tolgono le quote rese storte (auto-invito, o affare
+diventato «con l'invitante») col giudice della quota.
+
+**LE STRADE SCARTATE.** Le quote fuori dal numero (un numero di vanità, o
+due numeri diversi fra Profilo e classifica). Il codice come colonna di
+`utenti`: il `SELECT *` di `/api/me` e dei suoi vicini l'avrebbe servito
+dappertutto, e il legame avrebbe portato il tg_id dell'invitante nel
+profilo dell'invitato. Il salvadanaio. La piramide. Un freno sui
+tentativi. Un contatore a parte per il tetto (avrebbe voluto un
+azzeramento suo). La somma incrementale in `assegna_xp`.
+
+**L'AZZERAMENTO, perché è scritto.** Si cancellano le righe di TUTTO
+`XP_COMMERCIO` — le quote comprese, non i soli 'ordine' — e `inviti` non
+si tocca: i collegamenti restano, e la regola riparte da zero da sola,
+perché non c'è niente da rimettere a zero oltre al registro. Chi
+cancellasse i soli 'ordine' lascerebbe quote orfane: il numero le terrebbe
+a zero (il tetto), ma il registro direbbe il falso. Il collaudo e le
+prove lo simulano, collegamenti intatti e quota che riparte appena chi
+invita guadagna in proprio.
+
+**GLI SCRIPT A MANO.** `marca_prove.py` toglie anche le quote nate dagli
+ordini di prova e rifà la cache di chi le perde; lui,
+`recupera_xp_ordini.py` e il misuratore `classifica_prova.py` contano con
+la regola del server, ricopiata perché girano da soli, e una prova li
+tiene in pari. Il pregresso NON fa nascere quote.
+
+**PROVATO.** `prove_inviti` (nuova) fa girare i pezzi veri su un
+database di cartone con lo SCHEMA VERO delle due tabelle estratto da
+`init_db`: alfabeto e forma, il codice fermo e le collisioni, i no del
+giudice uno per uno, la finestra a 6g23h e a 7g+1', il giro in tondo
+lungo, il CHECK, la PK e la UNIQUE, la quota (tetto, per difetto,
+guardia 2, retry, niente catena, i riferimenti che non si sanno
+leggere), lo stesso numero da quattro strade, il «mai» quando i propri
+spariscono, l'azzeramento, il fail-open, e nel banco node il dettaglio
+dei punti e il cassetto. Cambiate COL PERCHÉ SCRITTO le sentinelle che
+descrivevano il perimetro di ieri: la tupla, i tre lettori (ora da
+`somme_xp`), i tre scrittori (ora due). `marca_prove` ha il suo caso con
+le quote e col tetto. `collaudo_inviti.py` gira il SERVER VERO — il
+`/start` dalla rotta del campanello, il campo a mano, `/api/me`, la
+quota dal gancio vero, quattro fusioni, l'azzeramento — ed entra
+nell'elenco dei collaudi della CI.
+Sull'albero rebasato su `d4128f2` (la Garlanda in bozza): **13970
+passate, 0 fallite** con `PROVE_SEVERE=1` e `PYTHONUTF8=1`;
+`collaudo_inviti.py` **86 verdi**, i dodici collaudi della CI verdi nella
+gabbia senza rete, e `collaudo_classifica.py` (27, non è in CI ma legge
+`_dati_classifica`) verde. **TORTURA 58/59** su una copia, una mutazione
+per volta sulle quattro famiglie toccate più il collaudo: il tetto nei
+due posti, la guardia 2 e le parti ignote, il per difetto, la catena,
+la somma incrementale, le metà scambiate, il ruolo di un altro, il terzo
+lato perso o grezzo, la forma del codice, il codice altrui sovrascritto,
+la finestra (lo zero, un giorno di troppo), il giro in tondo (tolto o
+solo diretto), i no del giudice, il cassetto grezzo o sempre aperto, la
+chiave di `/api/me`, il `/start` (sempre fusione, riga persa, porta
+sbagliata), le quattro righe della fusione, i tre lettori a somma nuda,
+lo schema senza CHECK o senza PK, `marca_prove` (quote, tetto, chi le
+perde), gli altri due script, e dodici del client. INERTE, dichiarata:
+la cintura `invitante == invitato` dentro la quota, che il CHECK dello
+schema rende irraggiungibile — resta perché si legge come si pensa.
+DUE PUNTI SCOPERTI trovati ripassando le mutazioni PRIMA di lanciarle, e
+coperti prima del giro: il «già collegato» detto anche a finestra chiusa
+(la PK lo fermava comunque, ma con la frase sbagliata) e la fusione nel
+verso in cui la metà Telegram era stata invitata dalla sua metà Nostr —
+l'altro verso lo salvava per caso l'`OR IGNORE`. Una sola mutazione non
+è girata al primo colpo, perché la sua ancora compariva due volte (la
+stessa espressione vive in un'altra funzione del client): ristretta, è
+morta al secondo.
+**DAL VIVO** (server di una copia su 8127, collaudo acceso, 375 px): il
+cassetto col codice, il conto e le due regole; «150 dalle vendite e 12
+da chi hai invitato» nella riga del livello; il campo a mano che rifiuta
+«ciao!» con la sua frase e accetta il codice ricopiato in minuscolo col
+trattino, poi sparisce e dice «Sei arrivato su Barattolo con un invito»;
+il campanello del bot suonato come fa Telegram, che collega una persona
+nuova e risponde col benvenuto più la riga, e al secondo `/start` dice
+«una volta sola»; il Condividi che nel pannello scende all'ultimo gradino
+(il link nel toast); «I tuoi dati» con le due righe nuove.
+
+**COSA GUARDARE SUL TELEFONO.** 1) Da un account NUOVO, aprire il link di
+un altro (`t.me/ilbarattolobot?start=…`): il bot deve mostrare START, e
+dopo il tocco UN messaggio — il benvenuto con in coda «Sei arrivato con
+un invito». 2) Nel Profilo di chi ha invitato, «💌 I tuoi inviti»: il
+conto sale di uno, e il nome non c'è da nessuna parte. 3) Il bottone
+«Condividi il tuo invito» DENTRO Telegram: deve aprire il selettore
+delle chat col testo e il link (nel pannello del PC si vede solo
+l'ultimo gradino, il link nel toast). 4) Il campo a mano su iPhone: la
+tastiera in maiuscolo, e il codice ricopiato a mano, anche col
+trattino. 5) Dopo il primo affare vero di un invitato, la riga del
+livello: «… e N da chi hai invitato».
+
+**COSA RESTA APERTO.** Il kind 30382 (NIP-85) di chi invita porta il
+numero vecchio finché non conclude un affare suo (la stessa attesa già
+accettata per la fusione; il bottone admin lo rimette in pari). Chi
+invita non viene avvisato di niente: gli XP si guardano nel Profilo,
+come sempre. Tre scelte mie da confermare: le quote dentro la classifica
+e i livelli, la quota persa oltre il tetto, e la finestra dei 7 giorni
+anche per chi arriva dal link essendo già iscritto.
