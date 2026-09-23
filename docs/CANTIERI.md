@@ -26865,6 +26865,10 @@ sistema l'animazione d'ingresso di LauncherActivity dura di più, e la
 libreria, se quando lo splash è consegnato l'animazione non è finita,
 fa precaricare la pagina a Chrome (`mayLaunchUrl`), che cambia quando
 finisce il caricamento rispetto a quando se ne va lo splash.
+⚠️ CORRETTO LA SERA STESSA, ed era sbagliato: il precaricamento non
+c'entra, e la linea è la barra di caricamento di Chrome 153 nelle TWA,
+che Chrome 154 non disegna più. Il perché sta in fondo al terzo giro,
+«La linea di Chrome è la barra di caricamento di Chrome 153».
 
 **3) LA BARRA SCURA 2 FOTOGRAMMI PRIMA CHE IL GUSCIO SCENDA.**
 `togliGuscio` toglieva il guscio e subito dopo richiamava
@@ -26948,6 +26952,9 @@ saltare, o `barre` resterebbe senza la densità, in silenzio.
 Chrome (se resta, la domanda passa al tempo del precaricamento), la
 barra durante lo splash di sistema su telefoni che la disegnano in
 altro modo, e Telegram, dove il velo lo toglie il client.
+⚠️ CORRETTO LA SERA STESSA: la linea non chiedeva il tempo del
+precaricamento — vedi, in fondo al terzo giro,
+«La linea di Chrome è la barra di caricamento di Chrome 153».
 
 ### Da guardare sul telefono
 
@@ -27190,6 +27197,70 @@ decisione di Andrea. La pista per quando si riapre è quella scritta nel
 secondo giro, e non sta nella pagina: il precaricamento che la libreria
 chiede a Chrome durante lo splash (`mayLaunchUrl`) e i tempi del
 caricamento della TWA.
+⚠️ CORRETTO LA SERA STESSA, ed era sbagliato: vedi la voce qui sotto.
+
+### La linea di Chrome è la barra di caricamento di Chrome 153, e Chrome 154 non la disegna più (23 set 2026, sera)
+
+**IL PRECARICAMENTO NON REGGE**, ed era la pista scritta tre volte qui
+sopra. `mayLaunchUrl` a un'app come la nostra non carica la pagina:
+Chrome la apre in una scheda nascosta solo per le sessioni con
+`getCanUseHiddenTab`, falso di serie (`ClientManager.java`), e l'unico
+che lo accende è un metodo `@VisibleForTesting`
+(`CustomTabsConnection.java`). Per noi fa la preconnessione e prepara
+un renderer di scorta, e basta: non può spostare la fine del
+caricamento rispetto allo splash. Letto nel sorgente di Chromium ai tag
+`153.0.8010.55` (il ramo del Chrome del telefono), `154.0.8037.61` e
+`155.0.8059.18`, e in android-browser-helper 2.6.2.
+
+**LA CAUSA È CHROME 153, in tutte le TWA.** La TWA non toglie la barra
+degli strumenti: la spinge sopra il bordo alto dello schermo. Ma in 153
+la copia che ne disegna il compositore resta accesa anche fuori
+schermo («show the composited view even if the controls are
+offscreen», `TopToolbarOverlayMediator.updateVisibility`) e non ritaglia
+quel che sporge, e la barra del caricamento è appesa al suo bordo basso
+(`main.xml`, ancorata al control container). Quindi spunta in cima alla
+pagina, sotto la barra di stato: una tenda arrotolata sopra la
+finestra, di cui si vede ancora l'orlo.
+SI ACCENDE all'inizio della navigazione, prima ancora che il server
+risponda (`LoadProgressMediator`), e SI SPEGNE al primo fra il 100% di
+Blink e la fine del caricamento; poi resta ferma 100 ms e svanisce in
+140 (`ToolbarProgressBar`). Il 100% arriva di solito PRIMA del `load`:
+pagina letta tutta, primo disegno con contenuto, e finite le richieste
+ad alta priorità partite prima (`progress_tracker.cc`). In Barattolo
+sono il documento da ~3 MB, che gli header anti-cache fanno riscaricare
+a ogni apertura, e le due `fetch` che `avvia()` lancia subito, `/me` e
+`/banner-test`. Le immagini no: hanno priorità bassa, e sono già
+`lazy`. Finché c'è, lo splash di Chrome la copre, e se ne va al primo
+disegno «non vuoto» della pagina (`SplashController`), cioè al
+barattolo del guscio: per questo la linea si vede DURANTE il guscio, e
+quanto dura lo decide la rete — una prova veloce può non vederla.
+
+**E LA TOGLIE CHROME 154, da solo.** Il commit `330dd74` («[TWA] Avoid
+showing browser controls when hidden is expected», main #1686514: dopo
+il taglio del 153, #1681091, e prima di quello del 154, #1689415) spegne
+tutta quella copia, barra del caricamento compresa, finché la TWA tiene
+la barra degli strumenti nascosta — flag `BrowserControlsHidingToken`,
+acceso di serie. Nel 155 `024e2ee` lo restringe alle sole TWA, che per
+noi non cambia niente. Il 154 è in distribuzione stabile su Android dal
+16 set 2026. Quindi NIENTE DA CURARE, né nell'APK né nel sito: la linea
+se ne va per tutti con l'aggiornamento di Chrome.
+LE STRADE SCARTATE, lette nello stesso giro: un extra dell'intent che la
+spenga non esiste; la modalità immersive nasconde solo le barre di
+sistema e la lascerebbe sul bordo alto dello schermo; la libreria non ha
+opzioni per lei, e un `splashScreenFadeOutDuration` più lungo la farebbe
+solo emergere piano; il `theme-color` non la mimetizza (la parte vuota è
+il colore più il 20% di bianco, quella piena è bianca o il colore
+scurito); una WebView al posto della TWA la toglierebbe, ma sarebbe
+un'altra app.
+⚠️ UN RISCHIO DICHIARATO: il flag si può spegnere a distanza, e nel 154
+aveva un effetto collaterale fuori dalle TWA curato solo nel 155. Se con
+Chrome 154 la linea restasse, la leva più economica sta nel sito:
+`priority:'low'` sulle due `fetch` di `avvia()`, che il 100% smetterebbe
+di aspettare — da misurare prima.
+
+**NON PROVATO: il telefono con Chrome 154**, che su quello di Andrea non
+è ancora arrivato. Da guardare: Chrome aggiornato, l'app chiusa dalle
+recenti e riaperta a freddo, nessuna linea durante il guscio.
 
 ## L'indietro del P2P: la pila giusta da subito (23 set 2026)
 
