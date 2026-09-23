@@ -12232,6 +12232,154 @@ console.log(JSON.stringify(out));
                       else APERTE] for s in stati}, b2)
 
 
+def prove_righe_ordine():
+    """I PEZZI DI UN ORDINE A RIGHE, IN ELENCO (23 set 2026, ritocco di
+    Andrea). Sotto il prezzo totale i pezzi di un ordine a set stavano
+    tutti attaccati: una riga di prosa dopo l'altra, subito sotto
+    l'inciso della spedizione, e un titolo lungo che andava a capo si
+    confondeva col pezzo dopo. Adesso: una riga vuota di stacco, poi un
+    elenco puntato — «• Titolo × quantita'», la quantita' solo sopra 1 —
+    col prezzo di ognuno allineato a destra, se la riga ce l'ha.
+
+    Qui si prova la fabbrica sui tre casi della richiesta (l'ordine a
+    una riga che non cambia, quello a tre righe con le quantita', il
+    titolo lungo) con un banco node sulle funzioni VERE, e il foglio che
+    fa andare a capo il titolo sotto il proprio testo e non sotto il
+    puntino. Nient'altro del dettaglio cambia: la riga «N pezzi ×
+    unitario» dell'ordine di un pezzo solo resta quella di prima."""
+    print("\n[i pezzi di un ordine a righe]")
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    css = mini[mini.index("<style>"):mini.index("</style>")]
+    nudo = re.sub(r"/\*[\s\S]*?\*/", "", css)
+
+    def regola(selettore):
+        """`find` e non `index`: una mutazione che toglie la regola
+        deve dare una rossa col suo nome, non far esplodere la sezione."""
+        i = nudo.find(selettore + "{")
+        return nudo[i:nudo.find("}", i) + 1] if i >= 0 else ""
+
+    # ---- 1-3: IL DETTAGLIO LA CHIAMA, UNA VOLTA ----
+    i_d = mini.find("function openOrder(id){")
+    det = mini[i_d:mini.find("\n  go('ordine');", i_d)] if i_d >= 0 else ""
+    prova("il dettaglio disegna i pezzi dalla fabbrica, una volta sola",
+          (1, 1), (det.count("${righeOrdine(o)}"),
+                   mini.count("${righeOrdine(o)}")))
+    prova("...e la prosa attaccata di prima non c'e' piu'", [],
+          [x for x in ("join('<br>')", "o.righe.map(")
+           if x in re.sub(r"/\*[\s\S]*?\*/", "", det)])
+    # L'ORDINE DI UN PEZZO SOLO NON CAMBIA: le righe arrivano solo per i
+    # set, e la sua riga «N pezzi × unitario» resta quella di prima —
+    # con la divisione che riaggiunge lo sconto, contata dal censimento
+    prova("l'ordine di un pezzo solo tiene la sua riga, identica", True,
+          "(o.qta>1 && !o.righe.length) ? `<div class=\"eur-hint\" "
+          "style=\"margin-top:-6px\">${fmt(o.qta)} pezzi × ${cifraOrdine(o, "
+          "(o.listing.price-(o.spedSats||0)-(o.protSats||0)"
+          "+(o.scontoSats||0))/o.qta)}</div>` : ''" in det)
+
+    # ---- 4-10: IL FOGLIO ----
+    el_ = regola(".ord-righe")
+    prova("una riga vuota di stacco dal prezzo, e niente puntini del "
+          "browser", True,
+          "list-style:none;margin:16px 0 14px;padding:0;" in el_)
+    # IL PUNTINO HA UNA COLONNA SUA: la riga e' una griglia (puntino,
+    # titolo, prezzo), quindi il titolo che va a capo ricomincia sotto
+    # il PROPRIO testo e non sotto il puntino
+    riga = regola(".ord-righe li")
+    prova("ogni pezzo e' una griglia: puntino, titolo, prezzo", True,
+          "display:grid;grid-template-columns:auto minmax(0,1fr) auto;"
+          in riga)
+    prova("...col prezzo sulla prima riga del titolo", True,
+          "align-items:baseline" in riga)
+    prova("...e il puntino e' il primo pezzo della griglia", True,
+          "content:'\\2022'" in regola(".ord-righe li::before"))
+    cifra = regola(".ord-riga-cifra")
+    prova("il prezzo sta a destra, e non va mai a capo", True,
+          "white-space:nowrap;text-align:right" in cifra)
+    prova("...e nemmeno «× 2» si spezza a meta'", True,
+          "white-space:nowrap" in regola(".ord-riga-qta"))
+    # INCHIOSTRO E NON --muted: a 13px il 4,5:1 sulla pagina lo da'
+    # `--ink-soft`, non il grigio degli incisi
+    prova("l'elenco sta sull'inchiostro che passa l'AA", True,
+          "color:var(--ink-soft)" in el_ and "--muted" not in el_)
+    # UN TEMA SOLO PER DUE: nessuna regola sua sotto il tema scuro, i
+    # colori li cambiano i token
+    prova("...e nessun ritocco per il tema scuro: bastano i token", [],
+          re.findall(r'data-tema="scuro"\][^{]*\.ord-riga', nudo))
+
+    # ---- 11-18: IL BANCO, sulle funzioni vere ----
+    node = _sh.which("node")
+    if not node:
+        salta("il banco dei pezzi dell'ordine", "node non c'e'")
+        return
+    pezzi = [pezzo_js(mini, "const fmt = n =>", "\n"),
+             pezzo_js(mini, "const esc = s =>", "));") + "));",
+             pezzo_js(mini, "function righeOrdine(o){", "\n}\n") + "\n}"]
+    banco = "\n".join(pezzi) + r"""
+// la cifra vera la scrive _resaCifraOrdine, che qui non serve: il
+// banco guarda QUALI sats arrivano e in che posto, non come si leggono
+function cifraOrdine(o, sats){ return '<span class="cifra-ord" data-sats="' + sats + '">C</span>'; }
+const LUNGO = 'Set di sottobicchieri in sughero naturale con portabicchieri in legno di castagno, confezione regalo';
+const casi = {
+  vuoto: {righe: []},
+  senza_campo: {},
+  tre: {righe: [
+    {titolo: 'Tazza in ceramica', quantita: 1, unitario_sats: 18000},
+    {titolo: LUNGO, quantita: 2, unitario_sats: 6500},
+    {titolo: 'Candela', quantita: 3, unitario_sats: 4200}]},
+  senza_prezzo: {righe: [{titolo: 'Pezzo', quantita: 2}]},
+  cattivo: {righe: [{titolo: '<img src=x onerror=alert(1)>', quantita: 1, unitario_sats: 1}]},
+};
+const out = {};
+for (const [k, o] of Object.entries(casi)) {
+  try { out[k] = righeOrdine(o); } catch(e) { out[k] = 'ESPLOSO: ' + (e && e.message || e); }
+}
+console.log(JSON.stringify(out));
+"""
+    cart = _tf.mkdtemp()
+    p = os.path.join(cart, "righe.js")
+    open(p, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, p], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco node dei pezzi gira", "", (r.stderr or "")[-600:])
+    if r.returncode:
+        return
+    b = _json.loads(r.stdout)
+    # L'ORDINE A UNA RIGA NON CAMBIA: senza righe la fabbrica tace
+    prova("senza righe — l'ordine di un pezzo solo — non disegna niente",
+          ("", ""), (b["vuoto"], b["senza_campo"]))
+    tre = b["tre"]
+    voci = re.findall(r"<li>([\s\S]*?)</li>", tre)
+    prova("tre righe, tre voci d'elenco, in un elenco vero", (3, True),
+          (len(voci), tre.startswith('<ul class="ord-righe" role="list">')))
+    prova("ogni voce: il titolo, e poi il suo prezzo a parte",
+          [True] * 3,
+          [v.startswith('<span class="ord-riga-tit">')
+           and '</span><span class="ord-riga-cifra">' in v for v in voci])
+    # LA QUANTITA' SOLO SOPRA 1, e dentro il titolo: va a capo con lui
+    prova("la quantita' compare solo sopra 1", ["", "× 2", "× 3"],
+          [(re.search(r'<span class="ord-riga-qta">([^<]*)</span>', v)
+            or [None, ""])[1] for v in voci])
+    # IL PREZZO E' QUELLO DELLA RIGA: unitario fotografato × quantita'
+    prova("il prezzo di ognuno e' unitario × quantita'",
+          ["18000", "13000", "12600"],
+          re.findall(r'data-sats="(\d+)"', tre))
+    # IL TITOLO LUNGO resta intero, nel suo posto: a farlo andare a capo
+    # sotto il proprio testo ci pensa la griglia qui sopra
+    prova("il titolo lungo resta intero, nella colonna del titolo", True,
+          voci[1].startswith('<span class="ord-riga-tit">Set di '
+                             'sottobicchieri in sughero naturale con '
+                             'portabicchieri in legno di castagno, '
+                             'confezione regalo <span class="ord-riga-qta">'))
+    # SE LA RIGA NON HA IL PREZZO non se ne inventa uno
+    prova("senza prezzo nella riga, niente cifra inventata", False,
+          "ord-riga-cifra" in b["senza_prezzo"])
+    prova("...e il titolo scritto da una persona passa da esc()", True,
+          "&lt;img" in b["cattivo"] and "<img" not in b["cattivo"])
+
+
 def _notifica_admin_spia(avvisi):
     async def _n(testo):
         avvisi.append(("admin", testo))
@@ -80620,7 +80768,7 @@ def main():
               prove_email_corriere,
               prove_nota_compratore,
               prove_nascondi_ordine,
-              prove_lista_ordini, prove_dettaglio_ordine, prove_card_ordini,
+              prove_lista_ordini, prove_dettaglio_ordine, prove_card_ordini, prove_righe_ordine,
               prove_ssrf_redirect, prove_niente_ai_nella_ricerca,
               prove_tracking_corretto, prove_barattolo,
               prove_savers_proprietario, prove_visualizzazioni,

@@ -26505,3 +26505,47 @@ Barattolo chiuso dalle app recenti, in Chrome sul telefono
 `barattolo.store/?diagnosi=1`, «Apri nell'app», e uno screenshot. Se lo
 scattino resta, quello screenshot dice di quanto è sbagliata la barra
 dei gesti presunta.
+
+
+## I pezzi di un ordine a righe, in elenco (23 set 2026)
+
+Richiesta di Andrea: nel dettaglio di un ordine con più prodotti dello
+stesso negozio i pezzi stavano **tutti attaccati** sotto il prezzo — una
+riga di prosa dopo l'altra, subito sotto l'inciso «di cui … di
+protezione», e un titolo lungo che andava a capo si confondeva col pezzo
+dopo. Il motivo era di geometria: il prezzo ha 2px di margine sotto, e il
+blocco dei pezzi risaliva di 6.
+
+**Adesso** `righeOrdine(o)` scrive un elenco vero (`<ul role="list">`):
+una riga vuota di stacco (16px), poi «• Titolo × quantità» — la
+quantità solo sopra 1 — col prezzo del pezzo **a destra**, che è quello
+fotografato nella riga (`unitario_sats × quantità`) e compare solo se la
+riga ce l'ha. **Il puntino ha una colonna sua**: ogni pezzo è una
+griglia (puntino, titolo, prezzo), quindi un titolo lungo va a capo
+sotto il proprio testo e non sotto il puntino, e il prezzo sta sulla sua
+prima riga come in uno scontrino. Fra un pezzo e l'altro 8px più
+dell'interlinea, o il titolo a capo e il pezzo dopo stavano alla stessa
+distanza (visto negli scatti, era 6). Il testo è su `--ink-soft`: è
+l'elenco di quel che si è comprato, e il grigio degli incisi a 13px non
+passa l'AA. Le cifre passano da `cifraOrdine`, quindi il toggle €/sats le
+riscrive con le altre; `role="list"` perché con `list-style:none`
+Safari toglie all'elenco la sua natura di elenco.
+
+**L'ordine di un pezzo solo non cambia**, e non per una guardia scritta
+qui: le righe il server le allega solo agli ordini a set, quindi lì la
+fabbrica non disegna niente e resta la riga «N pezzi × unitario». Lo
+dicono gli scatti: stesso ordine prima e dopo, **identico al pixel** a
+375 e 320 nei due temi, con uno e con due pezzi.
+
+**Prove**: `prove_righe_ordine` nuova (20), col banco node sulle
+funzioni vere — l'ordine senza righe, quello a tre righe con quantità
+1-2-3, il titolo lungo, la riga senza prezzo, il titolo da scappare.
+13398/0, nove collaudi verdi, tortura 12/12. **Dal vivo**, via Chrome
+headless, tre ordini a righe in tre stati (spedito, concluso, in
+disputa) a 375 e 320 nei due temi: ogni riga del titolo parte dallo
+stesso punto (31px, col puntino a 16), i prezzi a filo del bordo
+destro, stacco di 16px, niente sbordi nemmeno in sats.
+
+**Da guardare sul telefono**: un ordine a set con un titolo lungo, nei
+due temi — che l'elenco si legga come una lista e non come un paragrafo,
+e che il toggle €/sats cambi anche i prezzi dei pezzi.

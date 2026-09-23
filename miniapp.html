@@ -5143,6 +5143,34 @@
      stato normale). */
   .detail-price .unit.eur{font-size:20px;font-weight:700;margin-left:2px}
   .eur-hint{font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:14px}
+  /* I PEZZI DI UN ORDINE A RIGHE (23 set 2026, ritocco di Andrea): sotto
+     il prezzo totale stavano tutti attaccati — una riga di prosa dopo
+     l'altra, subito sotto l'inciso della spedizione, e un titolo lungo
+     che andava a capo si confondeva col pezzo dopo. Adesso sono un
+     ELENCO: una riga vuota di stacco dal prezzo, un puntino per pezzo,
+     e il prezzo di ognuno allineato a destra.
+     IL PUNTINO HA UNA COLONNA SUA, ed e' tutto il trucco del titolo
+     lungo: la riga e' una griglia (puntino, titolo, prezzo), quindi il
+     titolo che va a capo ricomincia sotto il PROPRIO testo e non sotto
+     il puntino. Il prezzo si allinea alla prima riga del titolo
+     (`baseline`), come in uno scontrino.
+     Fra un pezzo e l'altro 8px in piu' dell'interlinea: senza, il
+     titolo che va a capo e il pezzo dopo stavano alla stessa distanza.
+     INCHIOSTRO E NON --muted: e' l'elenco di quel che si e' comprato, e
+     a 13px vuole il 4,5:1 che `--muted` sulla pagina non da'. Il
+     puntino invece resta grigio: e' un segno, non un testo.
+     `role="list"` nel markup: con `list-style:none` Safari toglie
+     all'elenco la sua natura di elenco, e chi usa il lettore di
+     schermo non sentirebbe piu' «elenco, tre elementi». */
+  .ord-righe{list-style:none;margin:16px 0 14px;padding:0;font-size:13px;
+    font-weight:600;line-height:1.4;color:var(--ink-soft)}
+  .ord-righe li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;
+    column-gap:8px;align-items:baseline}
+  .ord-righe li+li{margin-top:8px}
+  .ord-righe li::before{content:'\2022';color:var(--muted)}
+  .ord-riga-qta{white-space:nowrap}
+  .ord-riga-cifra{font-family:'JetBrains Mono',monospace;font-size:12.5px;
+    white-space:nowrap;text-align:right;padding-left:4px}
   /* Il nuovo ordine del dettaglio (lug 2026): data discreta sotto la
      foto, titolo con la condizione accanto, luogo come testo nudo,
      prezzo col badge spedizione evidenziato di fianco. */
@@ -24835,6 +24863,27 @@ function zonaOrdine(o){
   const dove = 'in ' + (etichettaZona(z, o.domesticoSped) || '');
   return dove + (nome ? ` (${esc(nome)})` : '');
 }
+/* I PEZZI DI UN ORDINE A RIGHE, in elenco (23 set 2026, ritocco di
+   Andrea): «• Titolo × quantita'» — la quantita' solo sopra 1 — e il
+   prezzo del pezzo a destra. Il prezzo e' quello FOTOGRAFATO nella riga
+   (`unitario_sats` × quantita'), e si scrive solo se la riga ce l'ha:
+   un elenco senza cifre e' meglio di una cifra inventata.
+   Le righe arrivano solo per gli ordini a SET: un ordine di un pezzo
+   solo ha l'elenco vuoto, e qui non disegna niente — li' parla gia'
+   il titolo, e la riga «N pezzi × unitario» quando i pezzi sono piu'
+   di uno. Le cifre passano da `cifraOrdine`, quindi il toggle €/sats
+   le riscrive insieme alle altre. */
+function righeOrdine(o){
+  const righe = (o && o.righe) || [];
+  if (!righe.length) return '';
+  return `<ul class="ord-righe" role="list">${righe.map(r => {
+    const q = r.quantita || 1;
+    const qta = q > 1 ? ` <span class="ord-riga-qta">× ${fmt(q)}</span>` : '';
+    const cifra = Number.isFinite(r.unitario_sats)
+      ? `<span class="ord-riga-cifra">${cifraOrdine(o, r.unitario_sats * q)}</span>` : '';
+    return `<li><span class="ord-riga-tit">${esc(r.titolo || '?')}${qta}</span>${cifra}</li>`;
+  }).join('')}</ul>`;
+}
 function incisoConto(o){
   /* cifre NUDE: l'unita' e il «≈» li ha gia' detti il prezzo grande
      un centimetro sopra, e ripeterli qui farebbe «≈ 8,50 € · di cui
@@ -25257,10 +25306,10 @@ function openOrder(id){
            produzione non c'e' piu': resta per i rari ordini nati con
            CoinGecko muto, ed e' li' che uno se lo chiede. */''}
       <div class="eur-hint" id="ordineSenzaCambio" style="margin-top:-6px;display:none">Di questo giorno non abbiamo il cambio: qui restano i sats.</div>
-      ${o.righe.length ? `<div class="eur-hint" style="margin-top:-6px">${
-        /* il SET: l'elenco dei pezzi con gli unitari fotografati —
-           qui la media «pezzi × unitario» mentirebbe */
-        o.righe.map(r=>`${esc(r.titolo)}${r.quantita>1?` × ${fmt(r.quantita)}`:''} — ${cifraOrdine(o, r.unitario_sats*r.quantita)}`).join('<br>')}</div>` : ''}
+      ${/* il SET: l'elenco dei pezzi con gli unitari fotografati —
+           qui la media «pezzi × unitario» mentirebbe. Dal 23 set 2026
+           e' un elenco puntato staccato dal prezzo: `righeOrdine` */''}
+      ${righeOrdine(o)}
       ${o.scontoSats>0 ? `<div class="eur-hint" style="margin-top:-6px">🎁 Sconto sugli articoli${o.scontoPct?` −${o.scontoPct}%`:''}: <b>−${cifraOrdine(o, o.scontoSats)}</b> sul prezzo qui sopra</div>` : ''}
       ${/* la tariffa che il negozio ha offerto: il conto quadra anche
             senza dirlo (la riga qui sotto non nomina nessuna
