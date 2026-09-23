@@ -27160,6 +27160,37 @@ stesso, dopo il deploy e senza bisogno dell'APK: prima il fondo della
 pagina, poi la home tutta insieme; 4) che l'apertura non sembri più
 lenta — il cancello aspetta al massimo due secondi.
 
+### Dal telefono (23 set 2026): chiuso
+
+**LA BARRA NERA È SPARITA**, sul telefono di Andrea (OPPO CPH2791,
+ColorOS 16, Android 16): quindi veniva dal tema, cioè dalla regola di
+Android e dalla nostra finestra, e non da ColorOS — l'unico dubbio che
+il sorgente pubblico non poteva sciogliere l'ha sciolto il telefono.
+Dallo stesso telefono, il resto del giro: il barattolo fermo dallo
+splash al guscio, la home COMPLETA quando il guscio scende, e la mini
+app in Telegram «perfetta» — la copertura e `ready()` nel gesto che
+scopre fanno quel che il banco diceva.
+PUBBLICATA SUI DUE CANALI, prima GitHub e poi Zapstore come da
+liturgia: release `v1.5` su barattolo-releases (versionCode 7, sha256
+`90ebb2b3…374227d7`: per intero sta nelle note della release, perché
+64 esadecimali nudi qui farebbero scattare la guardia dei segreti) e
+`zsp publish` con la chiave fredda. È la TERZA build della 1.5 e la
+prima uscita dal telefono di Andrea: le due di prima, con la stessa
+versione, non sono mai state pubblicate — ed è per questo che la
+liturgia ha adesso il controllo che le distingue (`0x01010450=true`, due
+righe). Sul file pubblicato c'è: verificato su `barattolo-1.5.apk`, che
+ha la stessa impronta delle note.
+RESTA UNA COSA, e c'era GIÀ nella 1.4: la **linea sottile del
+caricamento di Chrome** sotto la barra di stato, mentre c'è il guscio.
+Stava SOTTO il rettangolo nero, e tolto il rettangolo si vede. Quindi non
+è un difetto della 1.5, e il `replaceState` tolto nel secondo giro non
+c'entrava (lo diceva già il sorgente di Chromium: una navigazione nella
+stessa pagina quella linea non la accende). NON SI CURA ADESSO,
+decisione di Andrea. La pista per quando si riapre è quella scritta nel
+secondo giro, e non sta nella pagina: il precaricamento che la libreria
+chiede a Chrome durante lo splash (`mayLaunchUrl`) e i tempi del
+caricamento della TWA.
+
 ## L'indietro del P2P: la pila giusta da subito (23 set 2026)
 
 Correzione di Andrea a b61b310, dal telefono: la regola funzionava ma
