@@ -5821,6 +5821,16 @@
   .sicu-cose li{padding-left:30px}
   .sicu-cose li::before{content:none}
   .sicu-cose .em{position:absolute;left:0;top:0;font-size:15px}
+  /* LE DUE RIGHE PER APPVERIFIER (set 2026): si copiano cosi' come sono,
+     quindi un <pre> — gli a-capo sono solo quelli che mette lo schermo
+     stretto (pre-wrap, e break-all perche' l'impronta e' una parola sola
+     da 95 caratteri). Un tocco le seleziona tutte, per chi non usa il
+     bottone. */
+  .sicu-verifica{font-family:'JetBrains Mono',monospace;font-size:12.5px;
+    line-height:1.55;color:var(--ink);background:var(--card);
+    border:1px solid var(--line);border-radius:14px;padding:12px 14px;
+    margin:4px 0 0;white-space:pre-wrap;word-break:break-all;
+    user-select:all}
   .sicu-piede{margin-top:26px;padding:12px 14px;background:var(--card);
     border:1px solid var(--line);border-radius:14px;
     font-size:13.5px;font-weight:600;color:var(--ink-soft);text-align:center}
@@ -6020,7 +6030,8 @@
      comprese; la pagina centra nel suo riquadro, che comincia SOTTO la
      barra di stato e finisce SOPRA quella dei gesti. Il conto e'
      (sopra − sotto)/2, lo fa `scartoGuscio` nell'head e lo scrive in
-     `--guscio-su` prima del primo paint (il perche' della stima sta li').
+     `--guscio-su` prima del primo paint (il perche' della stima, e delle
+     barre vere che dalla 1.5 dice l'APK, sta li').
      Qui barattolo e anello salgono INSIEME e della stessa misura, cosi'
      l'anello resta appeso alla stessa distanza. `top` relativo per
      l'immagine e `margin-top` per l'anello, che e' assoluto: tutt'e due
@@ -7620,6 +7631,13 @@
      non compare — l'app si apre come faceva ieri, che e' il modo
      giusto di sbagliare. Il caso che conta e' l'avvio a freddo, e
      quello ce l'ha. */
+  /* LE BARRE VERE, DALL'APK 1.5 (set 2026): l'app le mette nel
+     parametro `barre` della URL di avvio, e qui si leggono e si
+     TOLGONO dall'indirizzo — per tutti, non solo nel ramo dell'APK,
+     perche' un parametro rimasto finirebbe in ogni voce della storia
+     (la pagina spinge `location.href`) e in ogni link copiato. Il
+     perche' e i conti stanno in `barreDellApp`, fuori da qui. */
+  const barre = barreDellApp();
   if ((document.referrer || '').indexOf('android-app://store.barattolo.app') === 0) {
     document.documentElement.classList.add('app-android');
     /* LA BARRA DI STATO E' DEL GUSCIO (set 2026). Dal video: durante lo
@@ -7640,11 +7658,14 @@
        assegnazione, non costa niente). Il conto sta in `scartoGuscio`,
        fuori da questa funzione, perche' la diagnosi dell'apertura lo
        rifa' coi numeri di adesso; la prima misura resta scritta in
-       `data-guscio-apertura` perche' la diagnosi possa confrontarle. */
+       `data-guscio-apertura` perche' la diagnosi possa confrontarle.
+       Le barre dell'APK restano in `data-barre-app` per la stessa
+       ragione: dall'indirizzo se ne sono gia' andate. */
     const radice = document.documentElement;
+    if (barre) radice.dataset.barreApp = barre.join(' ');
     const scarto = () => {
       const r = scartoGuscio(screen.height, screen.width, innerHeight,
-                             screen.availTop, screen.availHeight);
+                             screen.availTop, screen.availHeight, barre);
       radice.style.setProperty('--guscio-su', r[0] + 'px');
       if (!radice.dataset.guscioApertura)
         radice.dataset.guscioApertura = [r[0], r[1], screen.width,
@@ -7672,30 +7693,74 @@
    su Android `screenY` e' sempre 0 (la vista riporta l'origine 0,0) e
    `outerHeight` e' la pagina stessa; `screen.availTop/availHeight`
    direbbero dove stanno le barre solo col flag
-   AndroidUseCorrectDisplayWorkArea, che e' SPENTO di serie. Quindi due
+   AndroidUseCorrectDisplayWorkArea, che e' SPENTO di serie. Quindi tre
    strade, in quest'ordine:
-   1) ESATTA, se il browser dice dove stanno le barre (availTop > 0, e
+   1) DALL'APP (v1.5): l'APK dice le due barre vere (`barreDellApp`, qui
+      sotto), e se spiegano il riquadro della pagina — che comincia sotto
+      la barra di stato e finisce sopra quella di navigazione, o arriva
+      fino in fondo — il conto e' esatto: il centro della pagina sta a
+      sopra + pagina/2, quello dello schermo a alto/2. Se non lo
+      spiegano non si indovina: si passa alla strada dopo.
+   2) ESATTA, se il browser dice dove stanno le barre (availTop > 0, e
       l'area disponibile e' alta quanto la pagina): nessuna stima.
-   2) STIMA, se le barre sommate stanno fra 40 e 72 px: e' il telefono
-      coi GESTI, e la barra di sotto si prende di GESTI px. L'errore e'
-      ESATTAMENTE (barra dei gesti vera − GESTI): zero a 16, che e' il
-      valore che annulla lo scatto misurato nel video di Andrea, 8 px di
-      troppo a 24 (il valore AOSP di oggi, i Pixel).
+   3) STIMA, SOLO per chi non ha le barre dall'app (l'APK 1.4): se le
+      barre sommate stanno fra 40 e 72 px e' il telefono coi GESTI, e la
+      barra di sotto si prende di GESTI px. L'errore e' ESATTAMENTE
+      (barra dei gesti vera − GESTI): zero a 16, che e' il valore che
+      annulla lo scatto misurato nel video di Andrea, 8 px di troppo a
+      24 (il valore AOSP di oggi, i Pixel). Chi le barre vere le ha, e
+      non spiegano la pagina, dalla stima non avrebbe niente di meglio.
    Fuori da quella forbice niente spostamento, cioe' il guscio di prima:
    da 72 in su c'e' la barra a tre tasti (48 sotto, e li' il guscio
    dovrebbe SCENDERE — ma la somma non basta a distinguerla da una tacca
    alta coi gesti, e nel dubbio non si peggiora), sotto 40 la pagina e'
    gia' quasi a tutto schermo. Sdraiato non si sposta niente.
    Restituisce [px, strada]: la strada la mostra ?diagnosi=1. */
-function scartoGuscio(alto, largo, pagina, availTop, availAlto){
+function scartoGuscio(alto, largo, pagina, availTop, availAlto, barre){
   const GESTI = 16;
   if (!(alto > largo) || !(pagina > 0) || !(pagina <= alto))
     return [0, 'nessuno'];
+  if (barre) {
+    const [sopra, sotto] = barre;
+    if (Math.abs(alto - sopra - sotto - pagina) <= 2
+        || Math.abs(alto - sopra - pagina) <= 2)
+      return [sopra + (pagina - alto) / 2, 'app'];
+  }
   if (availTop > 0 && Math.abs(availAlto - pagina) <= 2)
     return [(2 * availTop + availAlto - alto) / 2, 'esatto'];
-  const barre = alto - pagina;
-  if (barre >= 40 && barre < 72) return [barre / 2 - GESTI, 'stima'];
+  const somma = alto - pagina;
+  if (!barre && somma >= 40 && somma < 72) return [somma / 2 - GESTI, 'stima'];
   return [0, 'nessuno'];
+}
+/* LE BARRE VERE, DALL'APK (v1.5, set 2026). L'APK dalla 1.5 le mette
+   nel parametro `barre` della URL di avvio: in pixel VERI, «sopra,sotto»
+   (LauncherActivity, e a scriverla e' genera_icone_apk.py). Qui
+   diventano px CSS dividendo per devicePixelRatio, che e' quanti pixel
+   veri fa un px CSS — anche con lo zoom della pagina, dove una misura
+   in dp sbaglierebbe.
+   IL PARAMETRO SI TOGLIE SEMPRE, anche quando il valore non si legge: un
+   indirizzo con `barre=` finirebbe in ogni voce della storia (la pagina
+   spinge `location.href`) e in ogni link condiviso. Si toglie quella
+   coppia sola, e le altre restano BYTE PER BYTE com'erano: un giro da
+   URLSearchParams le ricodificherebbe. Un parametro e non il frammento,
+   perche' `/sicurezza#…` e `/privacy#…` il frammento lo usano gia'.
+   Restituisce [sopra, sotto] in px CSS, o null: browser, Telegram, APK
+   1.4, Android prima dell'11, o un valore che non torna. */
+function barreDellApp(){
+  const coppie = location.search.slice(1).split('&');
+  const nostra = coppie.find(c => c.indexOf('barre=') === 0);
+  if (nostra === undefined) return null;
+  const resto = coppie.filter(c => c.indexOf('barre=') !== 0).join('&');
+  try {
+    history.replaceState(history.state, '',
+      location.pathname + (resto ? '?' + resto : '') + location.hash);
+  } catch(e){}
+  let valore = '';
+  try { valore = decodeURIComponent(nostra.slice(6)); } catch(e){}
+  const m = /^(\d{1,4}),(\d{1,4})$/.exec(valore);
+  const dpr = window.devicePixelRatio;
+  if (!m || !(dpr > 0)) return null;
+  return [m[1] / dpr, m[2] / dpr];
 }
 </script>
 </head>
@@ -8737,6 +8802,24 @@ document.getElementById('cartello')?.remove();</script>
         <li><span class="em">📖</span><b>Il codice.</b> È la cosa più facile da rimettere in piedi altrove.</li>
         <li><span class="em">💾</span><b>Lo storico degli ordini</b> e la reputazione che ci avete costruito. Vivono in un posto solo, ma sono salvati ogni giorno, con copie cifrate anche fuori dal server.</li>
       </ul>
+
+      <!-- L'APP ANDROID, E COME SI CONTROLLA (set 2026, decisione di
+           Andrea: il posto e' questo, la pagina di chi si chiede se
+           fidarsi). Le due righe sono quelle che AppVerifier sa leggere
+           — il pacchetto, a capo, l'impronta SHA-256 del certificato
+           con cui firmiamo l'APK — e le stesse stanno nelle note di ogni
+           release e nel README di barattolo-releases. Qui sono scritte a
+           mano, e a tenerle in pari con `.well-known/assetlinks.json`,
+           che e' l'impronta che Android stesso verifica, c'e' una prova:
+           un carattere diverso direbbe a chi controlla che l'app vera e'
+           falsa. Si copiano dal riquadro (copiaVerificaApp), mai da una
+           seconda copia nel JS. -->
+      <h3 id="sicu-app">L'app Android: controlla che sia nostra</h3>
+      <p>Barattolo si installa anche come <b>app per Android</b>, da <button type="button" class="scopri-link" onclick="apriLinkApp('zapstore')">Zapstore</button> o dalle <button type="button" class="scopri-link" onclick="apriLinkApp('release')">release su GitHub</button> (con <b>Obtainium</b> si aggiorna da sola). Dentro non c'è niente di diverso dal sito: è una finestra su barattolo.store.</p>
+      <p>Per essere sicuro che quella che hai sia <b>proprio la nostra</b>, e non una copia che le somiglia, controllala con <button type="button" class="scopri-link" onclick="apriLinkApp('appverifier')">AppVerifier</button>: incolla queste due righe, il nome tecnico dell'app e l'impronta del certificato con cui la firmiamo. Se non combaciano, non aprirla e scrivici.</p>
+      <pre class="sicu-verifica" id="sicuVerifica">store.barattolo.app
+2F:3F:5E:68:94:AB:A0:B8:E4:39:B7:28:9D:55:50:D5:0E:22:37:15:F3:A8:E6:4F:2C:49:38:BC:D5:A2:C2:3C</pre>
+      <button class="btn ghost" onclick="copiaVerificaApp()">📋 Copia le due righe</button>
 
       <!-- Il link della pagina si poteva raggiungere ma non PRENDERE:
            chi voleva mandarla a qualcuno doveva ricordarsi l'indirizzo
@@ -10777,8 +10860,12 @@ function mostraDiagnosiApertura(){
   const sicuroGiu = parseFloat(sicuro.paddingBottom) || 0;
   sonda.remove();
   const dpr = window.devicePixelRatio || 1;
+  /* le barre dell'APK 1.5: dall'indirizzo se ne sono gia' andate
+     (barreDellApp), e le ha tenute l'head in `data-barre-app` */
+  const b = (radice.dataset.barreApp || '').split(' ').map(Number);
+  const barreApp = b.length === 2 && b.every(x => x >= 0) ? b : null;
   const ora = scartoGuscio(screen.height, screen.width, innerHeight,
-                           screen.availTop, screen.availHeight);
+                           screen.availTop, screen.availHeight, barreApp);
   const img = document.querySelector('#guscio img');
   const r = diagnosiTieneGuscio && img ? img.getBoundingClientRect() : null;
   const centro = r ? r.top + r.height / 2 : null;
@@ -10793,6 +10880,8 @@ function mostraDiagnosiApertura(){
     'availTop ' + screen.availTop + ' · availHeight ' + screen.availHeight +
       ' · screenY ' + window.screenY + ' · outerHeight ' + window.outerHeight,
     'safe-area sopra ' + n(sicuroSu) + ' · sotto ' + n(sicuroGiu),
+    barreApp ? "barre dall'app sopra " + n(barreApp[0]) + ' · sotto ' +
+      n(barreApp[1]) : "barre dall'app — (APK 1.4, browser o Telegram)",
     'scarto adesso ' + n(ora[0]) + ' px (' + ora[1] + ') · in uso ' +
       (radice.style.getPropertyValue('--guscio-su') || '0px'),
     centro === null ? "guscio non in vista: non sei nell'APK, o non all'apertura"
@@ -14897,6 +14986,30 @@ function apriSicurezza(ancora){
    in un posto solo. */
 function tornaDaSicurezza(){ navIndietro(); }
 function tornaDalNegozio(){ navIndietro(); }
+/* L'APP ANDROID, in fondo a questa pagina (set 2026). Le due righe per
+   AppVerifier si copiano DAL RIQUADRO, e non da una seconda copia qui:
+   il riquadro e' quello che una prova confronta con assetlinks.json.
+   copiaLink e' il giudice unico della copia: senza appunti, le due
+   righe finiscono nel toast invece di sparire in silenzio. */
+function copiaVerificaApp(){
+  const righe = el('sicuVerifica')?.textContent;
+  if (righe) copiaLink(righe, 'Copiate: incollale in AppVerifier');
+}
+/* I TRE LINK DELLA SEZIONE sono nostri (scritti qui, non da un utente):
+   niente foglio di conferma, e la scala di casa — dentro Telegram il
+   browser del client, fuori una scheda nuova con noopener. La gemella
+   e' apriLinkGuida. */
+const LINK_APP = {
+  zapstore:    'https://zapstore.dev',
+  release:     'https://github.com/kreamistudio-crypto/barattolo-releases/releases',
+  appverifier: 'https://github.com/soupslurpr/AppVerifier',
+};
+function apriLinkApp(quale){
+  const url = LINK_APP[quale];
+  if (!url) return;
+  if (tg?.initData && tg.openLink) { try { tg.openLink(url); return; } catch(e){} }
+  window.open(url, '_blank', 'noopener');
+}
 
 /* ---------------- la pagina «I tuoi dati» ----------------
    La sorella di qui sopra, stessa liturgia: markup fisso, nessun dato

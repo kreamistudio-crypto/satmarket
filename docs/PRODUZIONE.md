@@ -1674,8 +1674,10 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   NON richiede una release, e una release serve solo per l'involucro
   (icona, splash, colori, versione).
   IN SERVIZIO: la **v1.4** (versionCode 6), pubblicata il 23 set 2026
-  sui due canali — quella col permesso dello splash. La prossima sarà la
-  1.5 col versionCode 7, che alza `bubblewrap update` da solo.
+  sui due canali — quella col permesso dello splash. La **v1.5**
+  (versionCode 7, che alza `bubblewrap update` da solo) è PRONTA nel
+  repo dal 23 set 2026 — il tema dell'avvio e le barre vere, qui sotto
+  — ed è in servizio quando esce sui due canali.
   IL PROGETTO STA FUORI DAL REPO, in
   `C:\Users\Andrea\Documents\barattolo-twa`, e ci resta (un percorso
   spezzato a metà non si cerca più): lì dentro c'è il **keystore**
@@ -1699,20 +1701,34 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   riscrive proprio i file che lo script patcha.
   1. `bubblewrap update --appVersionName=X.Y` (il versionCode lo alza
      lui) — dalla cartella del progetto, con `node` nel PATH;
-  2. `python genera_icone_apk.py` — DAL REPO, e rifà icona adattiva,
+  2. `python genera_icone_apk.py` — DAL REPO (aggiornato: `git pull`
+     prima, o gira lo script di ieri), e rifà icona adattiva,
      monochrome e splash (vedi ARCHITETTURA, «Icona adattiva
-     dell'APK») e, come PRIMO passo, rimette in `LauncherActivity.java`
-     il **permesso dello splash** (qui sotto). Se esce con «⛔ … NON
-     lanciare `bubblewrap build`» il modello di Bubblewrap è cambiato:
-     non si builda, si guarda il file;
+     dell'APK»). PRIMA di scrivere qualunque file prepara in memoria i
+     due che Bubblewrap rigenera: in `LauncherActivity.java` il
+     **permesso dello splash**, l'**uscita dello splash di sistema** e
+     le **barre vere**; nel manifest il **tema dell'avvio** (qui
+     sotto). Se esce con «⛔ … NON lanciare `bubblewrap build`» il
+     modello di Bubblewrap è cambiato: non si builda, si guarda il file;
   3. `bubblewrap build` — le password le batte Andrea;
-  4. due controlli sull'APK firmato, dalla cartella del progetto, e
+  4. tre controlli sull'APK firmato, dalla cartella del progetto, e
      PRIMA della release, che dopo non si ritira. L'**impronta**:
      `& "$env:USERPROFILE\.bubblewrap\jdk\jdk-17.0.11+9\bin\keytool.exe" -printcert -jarfile app-release-signed.apk`
      deve dire `SHA256: 2F:3F:5E:68:…:C2:3C`, quella scritta qui sopra.
-     E la **cura dentro il dex**: il conto di `permesso dello splash non
-     concesso` nei `.dex` dell'APK deve dire **1** (sulla v1.3 dice 0,
-     verificato) — il comando sta nel verbale di CANTIERI.
+     Le **cure dentro il dex**:
+     `python -c "import zipfile; z=zipfile.ZipFile('app-release-signed.apk'); d=b''.join(z.read(n) for n in z.namelist() if n.endswith('.dex')); print('permesso:', d.count(b'permesso dello splash non concesso'), '| uscita:', d.count(b'uscita dello splash non presa'), '| barre:', d.count(b'barre non passate alla pagina'), '| libreria:', d.count(b'Failed to transfer splash image.'))"`
+     deve dire **1 | 1 | 1 | 1** (sulla v1.4 dice 1 | 0 | 0 | 1). E il
+     **tema nel manifest**:
+     `& "$env:USERPROFILE\.bubblewrap\android_sdk\build-tools\35.0.0\aapt2.exe" dump xmltree --file AndroidManifest.xml app-release-signed.apk | Select-String "theme"`
+     deve dare DUE righe: `=@0x01030010` (l'app intera, il traslucido
+     di Bubblewrap, com'era) e `=@0x7f…` (LauncherActivity, il nostro);
+     sulla v1.4 ne dà una sola;
+  5. la **prova sul telefono**, PRIMA della release: USB con il debug
+     attivo,
+     `& "$env:USERPROFILE\.bubblewrap\android_sdk\platform-tools\adb.exe" install -r app-release-signed.apk`
+     («Success»: stessa chiave, versionCode più alto, e l'app si
+     aggiorna tenendo i dati). Cosa si guarda sta nel verbale del
+     cantiere in CANTIERI.
   ⚠️ LA DOMANDA DEL BUILD NON RIGUARDA IL SITO, e qui era scritta male:
   «There are changes in twa-manifest.json. Would you like to apply
   them…» scatta quando `twa-manifest.json` non combacia più con
@@ -1752,13 +1768,39 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `splashScreenFadeOutDuration` è **0**: dallo splash di Chrome al
   guscio della pagina si passa di taglio, e il guscio è disegnato
   apposta uguale allo splash.
+  IL TEMA DELL'AVVIO (set 2026, v1.5). LauncherActivity ha un tema
+  SUO, `BarattoloAvvio`, OPACO: col traslucido di Bubblewrap Android
+  non preparava nessuna finestra di partenza, e la finestra che
+  cresceva dall'icona era NERA per un fotogramma. Da Android 12 la
+  finestra di partenza è lo splash del sistema, e il tema lo veste
+  dello stesso arancio e dello stesso barattolo di `splash.png`; prima
+  di Android 12 è il fondo della finestra, uguale. Il resto dell'app
+  resta traslucido. Il PREZZO, deciso da Andrea: aprendo un link a
+  barattolo.store da un'altra app mentre Barattolo è già aperta, fra
+  la pagina di prima e quella del link passa un lampo arancio col
+  barattolo — la libreria il tema trasparente lo raccomanda proprio
+  per quel caso. Il perché per intero sta in CANTIERI, «Il nero
+  all'avvio dell'APK».
+  LE BARRE VERE (v1.5): da Android 11 l'APK mette nella URL di avvio
+  il parametro `barre=sopra,sotto` in pixel, e la pagina lo usa per il
+  guscio e lo toglie dall'indirizzo (`barreDellApp`). Nei log del
+  server le aperture dall'app si riconoscono da lì.
+  LE DUE RIGHE PER APPVERIFIER, uguali in tre posti: le note di OGNI
+  release, il README di barattolo-releases e la pagina Sicurezza del
+  sito (`/sicurezza#app`). Si copiano da qui, identiche — una prova
+  confronta questo blocco e quello della pagina con `assetlinks.json`:
+  ```
+  store.barattolo.app
+  2F:3F:5E:68:94:AB:A0:B8:E4:39:B7:28:9D:55:50:D5:0E:22:37:15:F3:A8:E6:4F:2C:49:38:BC:D5:A2:C2:3C
+  ```
   LA RELEASE, due canali, e la release GitHub è la fonte unica di
   verità. Prima GitHub, poi Zapstore, sempre.
   1. `barattolo-X.Y.apk` (copia rinominata di `app-release-signed.apk`)
      + il suo `.sha256`, e `gh release create vX.Y` sul repo pubblico
      `kreamistudio-crypto/barattolo-releases` (satmarket resta privato:
-     Obtainium e Zapstore esigono download anonimi). Obtainium segue
-     quel repo da solo;
+     Obtainium e Zapstore esigono download anonimi), con le note in
+     `note-vX.Y.md` accanto al progetto: l'hash dell'APK e le due righe
+     per AppVerifier qui sopra. Obtainium segue quel repo da solo;
   2. in **WSL Ubuntu** (`zsp` è solo Linux/macOS, vive in `/root/bin/zsp`
      e vuole root): `read -rs SIGN_WITH && export SIGN_WITH` col prompt
      nascosto, `zsp publish`, poi `unset SIGN_WITH`. La chiave è quella

@@ -1,4 +1,5 @@
-# genera_icone_apk.py — i due livelli dell'icona adattiva per l'APK (TWA).
+# genera_icone_apk.py — i due livelli dell'icona adattiva per l'APK (TWA),
+# e dalla v1.5 anche il tema con cui l'app si apre.
 #
 # Bubblewrap (verificato sulla 1.24.1) NON sa fare l'icona adattiva vera:
 # il suo ic_launcher.xml mette l'INTERA maskable nel layer background
@@ -41,10 +42,28 @@
 #   8. rimette in LauncherActivity.java il PERMESSO DELLO SPLASH (set
 #      2026), la cura del difetto di Chrome 152+: senza, lo splash non
 #      arriva a Chrome e la sua finestra entra da destra SCURA per mezzo
-#      secondo prima della pagina (android-browser-helper#623). E' il
-#      primo passo, e se l'ancora non c'e' lo script si FERMA prima di
-#      toccare qualunque file: un APK uscito senza la cura sembrerebbe
-#      giusto in tutto, tranne che sul telefono.
+#      secondo prima della pagina (android-browser-helper#623);
+#   9. da' a LauncherActivity un TEMA SUO, OPACO (v1.5, set 2026): quello
+#      traslucido di Bubblewrap spegne la finestra di partenza — a
+#      un'attivita' traslucida Android non ne prepara nessuna — e la
+#      finestra che cresceva dall'icona restava NERA per un fotogramma.
+#      Scrive i due stili (values/ e values-v31/, il secondo con lo
+#      splash del SISTEMA di Android 12+), il fondo della finestra
+#      (l'arancio col barattolo di splash.png) e l'icona dello splash di
+#      sistema (drawable-*/barattolo_avvio_icona.png), e nel manifest
+#      mette il tema sulla SOLA LauncherActivity. Nel Java, lo splash di
+#      sistema esce di taglio: sotto c'e' lo stesso barattolo;
+#  10. nel Java, LE BARRE VERE (v1.5): l'altezza della barra di stato e
+#      di quella di navigazione, in pixel, nel parametro `barre` della
+#      URL di avvio. La pagina ne sa solo la somma; con la divisione
+#      rimette il barattolo del guscio dove stava nello splash, e poi
+#      toglie il parametro dall'indirizzo.
+#
+# I DUE FILE DI TESTO CHE BUBBLEWRAP RIGENERA (LauncherActivity.java e
+# AndroidManifest.xml) SI PREPARANO PER PRIMI, IN MEMORIA: se un'ancora
+# manca lo script si ferma prima di scrivere qualunque file, e dice di
+# non buildare — un APK uscito senza queste cure compila, si firma e si
+# installa benissimo, e il difetto si vede solo sul telefono.
 #
 # Uso (dalla cartella del repo):
 #   python genera_icone_apk.py [percorso-progetto-twa]
@@ -75,6 +94,27 @@ MIPMAP = [("mdpi", 108), ("hdpi", 162), ("xhdpi", 216),
 SPLASH_DP = 160
 SPLASH_DENSITA = [("mdpi", 1.0), ("hdpi", 1.5), ("xhdpi", 2.0),
                   ("xxhdpi", 3.0), ("xxxhdpi", 4.0)]
+
+# L'ICONA DELLO SPLASH DI SISTEMA (Android 12+, v1.5). Il sistema non la
+# disegna alla sua misura: la ridipinge su una tela di 108dp e poi la
+# ingrandisce a 192dp, che e' il cerchio visibile quando l'icona non ha
+# un fondo suo — e la tela dell'icona SBORDA dal cerchio di mezzo lato
+# per parte, quindi sullo schermo vale 288dp (letto nel sorgente di WM
+# Shell, SplashscreenIconDrawableFactory: AdaptiveForegroundDrawable).
+# Perche' il barattolo esca a 160dp, la misura di splash.png — cosi'
+# quando lo splash del sistema lascia il posto a quello della libreria
+# non cresce e non cala —, deve occupare 160/288 del lato. La tela in
+# pixel e' di 162dp perche' e' la misura a cui il sistema la ridipinge
+# (108 × 1,5): di piu' sarebbe peso morto nell'APK.
+# ⚠️ E NEL CERCHIO CI STA DI UN SOFFIO: fuori dalla forma delle icone
+# il sistema taglia (e quella forma il cerchio lo contiene sempre). Il
+# RIQUADRO del barattolo, 110×160dp sullo schermo, ne uscirebbe — mezza
+# diagonale 97dp contro 96 di raggio —, ma i suoi angoli sono vuoti: il
+# barattolo e' tondo, e i pixel veri stanno fra il 96 e il 99% del
+# raggio, misurati sulle cinque densita'. Lo tiene fermo una prova: un
+# barattolo piu' grande qui verrebbe tagliato in silenzio.
+ICONA_AVVIO_TELA_DP = 162
+ICONA_AVVIO_QUOTA = SPLASH_DP / 288
 
 IC_LAUNCHER_XML = """<!--
     Riscritto da genera_icone_apk.py (repo satmarket): icona adattiva
@@ -135,6 +175,153 @@ try {{
 ANCORA_ONCREATE = re.compile(
     r"(protected void onCreate\(Bundle savedInstanceState\) \{\r?\n)"
     r"([ \t]*)(super\.onCreate\(savedInstanceState\);)")
+
+# L'USCITA DELLO SPLASH DI SISTEMA (Android 12+, v1.5). Col tema opaco
+# il tocco sull'icona apre lo splash del SISTEMA (fondo arancio, e il
+# barattolo di barattolo_avvio_icona.png alla misura di splash.png). Al
+# primo disegno dell'attivita' il sistema lo toglierebbe con la sua
+# animazione — l'icona che sfuma e la finestra che sale di 20dp
+# (starting_surface_exit_animation_window_shift_length): un barattolo
+# che si muove. Sotto c'e' gia' lo splash della libreria, arancio e con
+# lo stesso barattolo: si toglie di taglio.
+MARCATORE_USCITA = "Barattolo: l'uscita dello splash di sistema"
+USCITA_SPLASH = f"""\
+// {MARCATORE_USCITA} (Android 12+, v1.5).
+// Col tema opaco il tocco sull'icona apre lo splash DEL SISTEMA,
+// arancio col barattolo, e al primo disegno di questa attivita' il
+// sistema lo toglierebbe con la sua animazione: l'icona che sfuma e la
+// finestra che sale di 20dp, cioe' un barattolo che si muove. Sotto c'e'
+// lo splash della libreria, con lo stesso barattolo della stessa misura:
+// si toglie di taglio. Rimesso a ogni build da genera_icone_apk.py
+// (repo satmarket): bubblewrap update lo cancella.
+if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {{
+    try {{
+        getSplashScreen().setOnExitAnimationListener(vista -> vista.remove());
+    }} catch (RuntimeException e) {{
+        android.util.Log.w("Barattolo", "uscita dello splash non presa", e);
+    }}
+}}
+"""
+# l'ancora: la riga di super.onCreate, UNA nel file; il blocco le va
+# subito sopra, dopo quello del permesso
+ANCORA_SUPER = re.compile(
+    r"^([ \t]*)(super\.onCreate\(savedInstanceState\);)", re.M)
+
+# LE BARRE VERE (v1.5). La pagina sa quanto sono alte la barra di stato
+# e quella di navigazione INSIEME (schermo meno pagina), non come si
+# dividono — e per rimettere il barattolo del guscio dove stava nello
+# splash le serve proprio la divisione (miniapp.html, `scartoGuscio`).
+# Qui si sanno: in pixel veri, nel parametro `barre` della URL di avvio,
+# e la pagina lo toglie dall'indirizzo appena letto. Un parametro e non
+# un frammento: `/sicurezza#…` e `/privacy#…` il frammento lo usano
+# gia'. Solo da Android 11, che le dice (WindowMetrics) quando la
+# finestra non esiste ancora: prima la pagina resta alla sua stima.
+MARCATORE_BARRE = "Barattolo: le barre vere alla pagina"
+BARRE_VERE = f"""\
+// {MARCATORE_BARRE} (Android 11+, v1.5).
+// La pagina sa quanto sono alte la barra di stato e quella di
+// navigazione INSIEME, non come si dividono — e per rimettere il
+// barattolo del guscio dove stava nello splash le serve la divisione.
+// Qui si sanno: vanno in pixel veri nel parametro `barre` (sopra,sotto),
+// e la pagina lo toglie dall'indirizzo appena letto. Rimesso a ogni
+// build da genera_icone_apk.py (repo satmarket).
+if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {{
+    try {{
+        android.view.WindowInsets riquadri =
+                getWindowManager().getCurrentWindowMetrics().getWindowInsets();
+        int sopra = riquadri.getInsetsIgnoringVisibility(
+                android.view.WindowInsets.Type.statusBars()
+                        | android.view.WindowInsets.Type.displayCutout()).top;
+        int sotto = riquadri.getInsetsIgnoringVisibility(
+                android.view.WindowInsets.Type.navigationBars()).bottom;
+        uri = uri.buildUpon()
+                .appendQueryParameter("barre", sopra + "," + sotto)
+                .build();
+    }} catch (RuntimeException e) {{
+        android.util.Log.w("Barattolo", "barre non passate alla pagina", e);
+    }}
+}}
+"""
+# l'ancora: la prima riga di getLaunchingUrl() nel modello di Bubblewrap
+# 1.24.1, quella che prende l'indirizzo della libreria; il blocco le va
+# subito sotto, e il `return` del modello restituisce quello nuovo
+ANCORA_URL = re.compile(
+    r"^([ \t]*)Uri uri = super\.getLaunchingUrl\(\);[ \t]*\r?\n", re.M)
+
+# IL TEMA DELL'AVVIO (v1.5). Sulla SOLA LauncherActivity: le altre
+# attivita' della libreria (dati del sito, fallback, permessi delle
+# notifiche) restano col tema traslucido di Bubblewrap, com'erano.
+TEMA_AVVIO = "BarattoloAvvio"
+ATTRIBUTO_TEMA = f'android:theme="@style/{TEMA_AVVIO}"'
+# l'ancora: l'apertura dell'elemento com'e' nel modello di Bubblewrap
+# 1.24.1 (template_project/app/src/main/AndroidManifest.xml)
+ANCORA_MANIFEST = '<activity android:name="LauncherActivity"'
+# i due stili e il fondo usano il colore dello splash com'e' GIA' nel
+# progetto: @color/backgroundColor nasce da questa riga di app/build.gradle
+RIGA_COLORE_SPLASH = re.compile(r'resValue\s+"color",\s*"backgroundColor"')
+
+TEMA_AVVIO_XML = f"""\
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Scritto da genera_icone_apk.py (repo satmarket), v1.5: il tema di
+    LauncherActivity, e lo mette il manifest solo a lei. OPACO apposta:
+    a un'attivita' traslucida Android non prepara nessuna finestra di
+    partenza (ne' lo splash di Android 12+, ne' l'anteprima dei telefoni
+    piu' vecchi), e la finestra che cresceva dall'icona restava nera per
+    un fotogramma. Il gemello opaco del Theme.Translucent.NoTitleBar di
+    Bubblewrap: stessa famiglia, stesse barre, niente ombra sotto il
+    titolo che non c'e', e nessuna animazione di finestra sua, come
+    @style/Animation del traslucido.
+-->
+<resources>
+    <style name="{TEMA_AVVIO}Base" parent="@android:style/Theme.NoTitleBar">
+        <item name="android:windowBackground">@drawable/barattolo_avvio_fondo</item>
+        <item name="android:colorBackground">@color/backgroundColor</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation</item>
+    </style>
+    <style name="{TEMA_AVVIO}" parent="@style/{TEMA_AVVIO}Base" />
+</resources>
+"""
+
+TEMA_AVVIO_V31_XML = f"""\
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Scritto da genera_icone_apk.py (repo satmarket), v1.5: da Android 12
+    la finestra di partenza e' lo splash DEL SISTEMA, e si veste con
+    questi due attributi — lo stesso arancio dello splash e il barattolo
+    alla misura di splash.png, cosi' la finestra che cresce dall'icona
+    e' gia' lo splash, e il passaggio a quello della libreria non si vede.
+-->
+<resources>
+    <style name="{TEMA_AVVIO}" parent="@style/{TEMA_AVVIO}Base">
+        <item name="android:windowSplashScreenBackground">@color/backgroundColor</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/barattolo_avvio_icona</item>
+    </style>
+</resources>
+"""
+
+FONDO_AVVIO_XML = """\
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Scritto da genera_icone_apk.py (repo satmarket), v1.5: il fondo della
+    finestra di LauncherActivity — l'arancio dello splash col barattolo
+    di splash.png al centro, alla sua misura. E' la finestra di partenza
+    dei telefoni prima di Android 12.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/backgroundColor" />
+    <item>
+        <bitmap android:gravity="center" android:src="@drawable/splash" />
+    </item>
+</layer-list>
+"""
+
+# il messaggio di chi si ferma: lo stesso per tutti i casi, perche' la
+# cosa da NON fare e' una sola
+NON_BUILDARE = ("   NON lanciare `bubblewrap build`: l'APK uscirebbe senza "
+                "le cure dell'avvio (il permesso dello splash di Chrome "
+                "152+, il tema opaco, le barre vere).")
 
 
 def scontorna(img, fondo):
@@ -220,6 +407,43 @@ def genera_splash(res, barattolo):
               f"({SPLASH_DP}dp)")
 
 
+def genera_icona_avvio(res, barattolo):
+    # lo stesso barattolo di splash.png, a ICONA_AVVIO_QUOTA della tela:
+    # il sistema lo riporta a 160dp (vedi ICONA_AVVIO_TELA_DP, qui sopra)
+    for dpi, scala in SPLASH_DENSITA:
+        lato = round(ICONA_AVVIO_TELA_DP * scala)
+        rapporto = round(lato * ICONA_AVVIO_QUOTA) / max(barattolo.size)
+        misure = (round(barattolo.width * rapporto),
+                  round(barattolo.height * rapporto))
+        tela = Image.new("RGBA", (lato, lato), (0, 0, 0, 0))
+        # SENZA maschera: la tela e' vuota, e con la maschera Pillow
+        # moltiplicherebbe l'alpha per se stessa — bordi piu' sottili di
+        # quelli di splash.png, cioe' due barattoli un po' diversi
+        tela.paste(barattolo.resize(misure, Image.LANCZOS),
+                   ((lato - misure[0]) // 2, (lato - misure[1]) // 2))
+        cartella = res / f"drawable-{dpi}"
+        cartella.mkdir(exist_ok=True)
+        tela.save(cartella / "barattolo_avvio_icona.png", "PNG",
+                  optimize=True)
+        print(f"🫙 drawable-{dpi}: icona dello splash di sistema "
+              f"{lato}x{lato}px (barattolo {misure[0]}x{misure[1]})")
+
+
+def scrivi_tema_avvio(res):
+    # file NOSTRI, coi nomi nostri: Bubblewrap non li conosce e l'update
+    # non li tocca, ma si riscrivono lo stesso a ogni giro — cosi' un
+    # ritocco qui arriva nel progetto senza pensarci
+    for cartella, nome, testo in [
+            ("values", "barattolo_avvio.xml", TEMA_AVVIO_XML),
+            ("values-v31", "barattolo_avvio.xml", TEMA_AVVIO_V31_XML),
+            ("drawable", "barattolo_avvio_fondo.xml", FONDO_AVVIO_XML)]:
+        (res / cartella).mkdir(exist_ok=True)
+        (res / cartella / nome).write_text(testo, encoding="utf-8")
+    print(f"🎭 tema dell'avvio: {TEMA_AVVIO} in values/ e values-v31/ "
+          f"(splash di sistema arancio col barattolo), fondo "
+          f"drawable/barattolo_avvio_fondo.xml")
+
+
 def patch_splash(progetto, esadecimale):
     # il fondo dello splash deve essere LO STESSO arancio campionato
     # della tessera, o il quadrato dell'icona ci galleggia sopra come
@@ -249,45 +473,153 @@ def patch_gradle(progetto):
         print("🐘 gradle.properties: rimesso -Xmx1024m")
 
 
-def patch_launcher(progetto):
-    # il permesso dello splash (vedi PERMESSO_SPLASH, qui sopra). Si
-    # FERMA con sys.exit in ogni caso dubbio, mai un salto in silenzio:
-    # l'APK senza la cura compila, si firma e si installa benissimo, e il
-    # difetto si vede solo aprendolo sul telefono — cioe' a release fatta
+def _innesta(blocco, rientro, a_capo):
+    # il blocco col rientro dell'ancora, riga per riga, e gli a-capo del
+    # file (Bubblewrap lo scrive in LF anche su Windows)
+    return "".join(rientro + riga + a_capo if riga else a_capo
+                   for riga in blocco.splitlines())
+
+
+def _ancora_una(schema, testo, percorso, cosa, come_rimediare):
+    """L'ancora dev'esserci UNA volta: zero vuol dire che Bubblewrap ha
+    cambiato il modello, due che si sceglierebbe a caso. In tutt'e due i
+    casi si ferma, e senza aver scritto niente."""
+    quante = len(schema.findall(testo))
+    if quante != 1:
+        sys.exit(f"⛔ {percorso.name}: l'ancora {cosa} compare {quante} "
+                 f"volte invece di 1 — Bubblewrap ha cambiato il "
+                 f"modello.\n{NON_BUILDARE} Guarda il file e "
+                 f"{come_rimediare} in genera_icone_apk.py.")
+
+
+def prepara_launcher(progetto):
+    """I tre blocchi di LauncherActivity.java, preparati in MEMORIA:
+    restituisce (percorso, testo nuovo, righe da stampare). Non scrive
+    niente, e si FERMA con sys.exit in ogni caso dubbio, mai un salto in
+    silenzio: l'APK senza le cure compila, si firma e si installa
+    benissimo, e il difetto si vede solo aprendolo sul telefono — cioe'
+    a release fatta. Ogni blocco ha il suo marcatore: se c'e' gia' non si
+    rimette, quindi rilanciato non si muove niente."""
     radice = progetto / "app" / "src" / "main" / "java"
     trovati = sorted(radice.rglob("LauncherActivity.java"))
     if len(trovati) != 1:
         sys.exit(f"⛔ LauncherActivity.java: attesi 1 sotto {radice}, "
-                 f"trovati {len(trovati)}.\n   NON lanciare `bubblewrap "
-                 f"build`: l'APK uscirebbe senza il permesso dello splash "
-                 f"(Chrome 152+). Guarda il progetto prima di andare avanti.")
+                 f"trovati {len(trovati)}.\n{NON_BUILDARE} Guarda il "
+                 f"progetto prima di andare avanti.")
     percorso = trovati[0]
-    # byte in, byte out: il file resta identico fuori dal blocco, a-capo
-    # compresi (Bubblewrap lo scrive in LF anche su Windows)
+    # byte in, byte out: il file resta identico fuori dai blocchi,
+    # a-capo compresi
     testo = percorso.read_bytes().decode("utf-8")
-    if MARCATORE_PERMESSO in testo:
-        print("🔑 LauncherActivity: il permesso dello splash c'e' gia'")
-        return
-    ancore = ANCORA_ONCREATE.findall(testo)
-    if len(ancore) != 1:
-        sys.exit(f"⛔ {percorso.name}: l'ancora del permesso dello splash "
-                 f"(la prima riga di onCreate, `super.onCreate("
-                 f"savedInstanceState);`) compare {len(ancore)} volte "
-                 f"invece di 1 — Bubblewrap ha cambiato il modello.\n"
-                 f"   NON lanciare `bubblewrap build`: l'APK uscirebbe "
-                 f"senza la cura dello splash (Chrome 152+). Guarda il "
-                 f"file e aggiorna ANCORA_ONCREATE in genera_icone_apk.py.")
     a_capo = "\r\n" if "\r\n" in testo else "\n"
+    righe = []
 
-    def innesta(m):
-        rientro = m.group(2)
-        blocco = "".join(rientro + riga + a_capo if riga else a_capo
-                         for riga in PERMESSO_SPLASH.splitlines())
-        return m.group(1) + blocco + rientro + m.group(3)
+    # 1) il permesso dello splash (v1.4): la prima cosa di onCreate
+    if MARCATORE_PERMESSO in testo:
+        righe.append("🔑 LauncherActivity: il permesso dello splash "
+                     "c'e' gia'")
+    else:
+        _ancora_una(ANCORA_ONCREATE, testo, percorso,
+                    "del permesso dello splash (la prima riga di "
+                    "onCreate, `super.onCreate(savedInstanceState);`)",
+                    "aggiorna ANCORA_ONCREATE")
+        testo = ANCORA_ONCREATE.sub(
+            lambda m: (m.group(1) + _innesta(PERMESSO_SPLASH, m.group(2),
+                                             a_capo)
+                       + m.group(2) + m.group(3)), testo)
+        righe.append("🔑 LauncherActivity.java: permesso dello splash "
+                     "prima di super.onCreate() (Chrome 152+)")
 
-    percorso.write_bytes(ANCORA_ONCREATE.sub(innesta, testo).encode("utf-8"))
-    print(f"🔑 {percorso.name}: permesso dello splash prima di "
-          f"super.onCreate() (Chrome 152+)")
+    # 2) l'uscita dello splash di sistema (v1.5): subito sopra
+    #    super.onCreate, cioe' dopo il permesso
+    if MARCATORE_USCITA in testo:
+        righe.append("🚪 LauncherActivity: l'uscita dello splash di "
+                     "sistema c'e' gia'")
+    else:
+        _ancora_una(ANCORA_SUPER, testo, percorso,
+                    "dell'uscita dello splash (la riga "
+                    "`super.onCreate(savedInstanceState);`)",
+                    "aggiorna ANCORA_SUPER")
+        testo = ANCORA_SUPER.sub(
+            lambda m: (_innesta(USCITA_SPLASH, m.group(1), a_capo)
+                       + m.group(1) + m.group(2)), testo)
+        righe.append("🚪 LauncherActivity.java: lo splash di sistema "
+                     "esce di taglio (Android 12+)")
+
+    # 3) le barre vere (v1.5): subito sotto la riga che prende la URL
+    if MARCATORE_BARRE in testo:
+        righe.append("📏 LauncherActivity: le barre vere c'erano gia'")
+    else:
+        _ancora_una(ANCORA_URL, testo, percorso,
+                    "delle barre vere (in getLaunchingUrl, la riga "
+                    "`Uri uri = super.getLaunchingUrl();`)",
+                    "aggiorna ANCORA_URL")
+        testo = ANCORA_URL.sub(
+            lambda m: m.group(0) + _innesta(BARRE_VERE, m.group(1), a_capo),
+            testo)
+        righe.append("📏 LauncherActivity.java: le barre vere nella URL "
+                     "di avvio (Android 11+)")
+    return percorso, testo, righe
+
+
+def prepara_manifest(progetto):
+    """Il tema dell'avvio sulla SOLA LauncherActivity (v1.5), preparato
+    in MEMORIA come prepara_launcher: stessa forma di ritorno, stesso
+    fermarsi."""
+    gradle = progetto / "app" / "build.gradle"
+    if not (gradle.is_file() and RIGA_COLORE_SPLASH.search(
+            gradle.read_text(encoding="utf-8"))):
+        sys.exit(f"⛔ {gradle}: manca la riga che crea "
+                 f"@color/backgroundColor, il colore dello splash che il "
+                 f"tema dell'avvio usa — Bubblewrap ha cambiato il "
+                 f"modello.\n{NON_BUILDARE} Guarda il file e aggiorna "
+                 f"RIGA_COLORE_SPLASH in genera_icone_apk.py.")
+    percorso = progetto / "app" / "src" / "main" / "AndroidManifest.xml"
+    if not percorso.is_file():
+        sys.exit(f"⛔ {percorso}: il manifest non c'e'.\n{NON_BUILDARE}")
+    testo = percorso.read_bytes().decode("utf-8")
+    quante = testo.count(ANCORA_MANIFEST)
+    if quante != 1:
+        sys.exit(f"⛔ {percorso.name}: l'ancora del tema dell'avvio "
+                 f"(`{ANCORA_MANIFEST}`) compare {quante} volte invece "
+                 f"di 1 — Bubblewrap ha cambiato il modello.\n"
+                 f"{NON_BUILDARE} Guarda il file e aggiorna "
+                 f"ANCORA_MANIFEST in genera_icone_apk.py.")
+    dopo = testo.index(ANCORA_MANIFEST) + len(ANCORA_MANIFEST)
+    apertura = testo[dopo:testo.index(">", dopo)]
+    if ATTRIBUTO_TEMA in apertura:
+        return percorso, testo, ["🎭 AndroidManifest: il tema dell'avvio "
+                                 "c'e' gia'"]
+    if "android:theme" in apertura:
+        # un tema che non e' il nostro: Bubblewrap ne da' uno suo, e
+        # scegliere fra i due non e' un mestiere da script
+        sys.exit(f"⛔ {percorso.name}: LauncherActivity ha gia' un tema "
+                 f"suo, e non e' {TEMA_AVVIO}.\n{NON_BUILDARE} Guarda il "
+                 f"file: il modello di Bubblewrap e' cambiato.")
+    # sulla riga sua, col rientro dell'attributo che segue; se l'elemento
+    # fosse scritto su una riga sola, uno spazio e basta
+    m = re.match(r"(\r?\n)([ \t]+)android:", testo[dopo:])
+    giunta = m.group(1) + m.group(2) if m else " "
+    nuovo = testo[:dopo] + giunta + ATTRIBUTO_TEMA + testo[dopo:]
+    return percorso, nuovo, [f"🎭 AndroidManifest.xml: LauncherActivity "
+                             f"col tema {TEMA_AVVIO} (opaco, splash "
+                             f"arancio col barattolo)"]
+
+
+def _scrivi(percorso, testo, righe):
+    if percorso.read_bytes() != testo.encode("utf-8"):
+        percorso.write_bytes(testo.encode("utf-8"))
+    for riga in righe:
+        print(riga)
+
+
+def patch_launcher(progetto):
+    # prepara e scrive i soli blocchi del Java (le prove la girano da sola)
+    _scrivi(*prepara_launcher(progetto))
+
+
+def patch_manifest(progetto):
+    # prepara e scrive il solo tema nel manifest (idem)
+    _scrivi(*prepara_manifest(progetto))
 
 
 def genera():
@@ -298,9 +630,12 @@ def genera():
     if not (res / "mipmap-anydpi-v26").is_dir():
         sys.exit(f"Progetto TWA non trovato in {progetto}")
 
-    # PRIMA di tutto il resto: se l'ancora manca si ferma qui, e nessun
-    # file del progetto e' stato ancora toccato
-    patch_launcher(progetto)
+    # PRIMA di tutto il resto, e SENZA scrivere: i due file di testo che
+    # Bubblewrap rigenera si preparano in memoria, e se un'ancora manca
+    # lo script si ferma qui — con nessun file del progetto ancora toccato
+    ritocchi = [prepara_launcher(progetto), prepara_manifest(progetto)]
+    for ritocco in ritocchi:
+        _scrivi(*ritocco)
 
     img = Image.open(base / SORGENTE).convert("RGB")
     fondo = colore_fondo(img)
@@ -320,9 +655,11 @@ def genera():
     patch_colors(res, esadecimale)
     patch_splash(progetto, esadecimale)
     genera_splash(res, barattolo)
+    genera_icona_avvio(res, barattolo)
+    scrivi_tema_avvio(res)
     patch_gradle(progetto)
     print(f"🎨 sfondo iconBackground = {esadecimale} (campionato dagli angoli)")
-    print("✅ Icona adattiva a due livelli pronta: ora `bubblewrap build`.")
+    print("✅ Icone, splash e tema dell'avvio pronti: ora `bubblewrap build`.")
 
 
 if __name__ == "__main__":

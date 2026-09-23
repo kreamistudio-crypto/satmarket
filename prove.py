@@ -80096,9 +80096,22 @@ def prove_guscio_barra_e_scarto():
     prova("lo scarto si scrive nell'head, nel ramo dell'APK: prima del "
           "primo paint", True,
           "radice.style.setProperty('--guscio-su', r[0] + 'px');" in ramo)
-    prova("...coi numeri che la pagina ha davvero", True, bool(re.search(
-        r"scartoGuscio\(screen\.height, screen\.width, innerHeight,\s+"
-        r"screen\.availTop, screen\.availHeight\)", ramo)))
+    prova("...coi numeri che la pagina ha davvero, e le barre dell'APK",
+          True, bool(re.search(
+              r"scartoGuscio\(screen\.height, screen\.width, innerHeight,\s+"
+              r"screen\.availTop, screen\.availHeight, barre\)", ramo)))
+    # LE BARRE VERE DELL'APK 1.5: si leggono (e si tolgono
+    # dall'indirizzo) PRIMA del ramo dell'APK, cioe' per tutti — un
+    # parametro rimasto finirebbe nella storia e nei link copiati
+    _legge = "  const barre = barreDellApp();\n"
+    prova("le barre dell'APK si leggono una volta, PRIMA del ramo "
+          "dell'APK: il parametro si toglie per tutti", [1, True],
+          [testa.count(_legge), 0 <= testa.find(_legge) < testa.index(SE)])
+    prova("...e il ramo le lascia alla diagnosi in data-barre-app", True,
+          "if (barre) radice.dataset.barreApp = barre.join(' ');" in ramo)
+    prova("...e barreDellApp sta fuori dalla funzione dell'head, come "
+          "scartoGuscio", True,
+          testa.index("})();") < testa.index("function barreDellApp("))
     prova("...e si rifa' a ogni resize, se il riquadro all'apertura non "
           "fosse ancora quello vero", True,
           "addEventListener('resize', scarto);" in ramo)
@@ -80124,6 +80137,16 @@ def prove_guscio_barra_e_scarto():
             [784, 360, 784, 0, 784],   # pagina a tutto schermo
             [784, 360, 0, 0, 784],     # pagina senza misura
             [784, 360, 800, 0, 784],   # pagina piu' alta dello schermo
+            # DALL'APK 1.5, col sesto numero: le barre vere [sopra, sotto]
+            [784, 360, 726, 0, 784, [42, 16]],  # come la stima: 13
+            [784, 360, 726, 0, 784, [34, 24]],  # la stima direbbe 13: e' 5
+            [800, 360, 760, 0, 800, [40, 24]],  # pagina fino in fondo
+            [784, 360, 726, 0, 784, [42.5, 15.5]],  # a meta' pixel
+            [784, 360, 726, 0, 784, [30, 10]],  # non spiegano: e niente stima
+            [800, 360, 736, 40, 736, [30, 10]],  # ...ma l'esatta si'
+            [784, 360, 723, 0, 784, [42, 16]],  # 3px fuori tolleranza
+            [360, 800, 300, 0, 360, [24, 16]],  # sdraiato
+            [784, 360, 726, 0, 784, None],      # la 1.4: la stima di sempre
         ]
         js = (pezzo_js(mini, "function scartoGuscio(", "\n}\n") + "\n}\n"
               + "console.log(JSON.stringify(" + json.dumps(casi)
@@ -80145,7 +80168,68 @@ def prove_guscio_barra_e_scarto():
                   [13, "stima"], [4, "stima"], [8, "stima"],
                   [8, "esatto"], [0, "nessuno"], [0, "nessuno"],
                   [0, "nessuno"], [0, "nessuno"], [0, "nessuno"],
-                  [0, "nessuno"]], avuto)
+                  [0, "nessuno"]],
+              avuto[:10] if isinstance(avuto, list) else avuto)
+        # le barre dell'APK: il conto esatto quando spiegano il riquadro
+        # della pagina, e nessuna stima quando non lo spiegano — la stima
+        # resta di chi ha la 1.4
+        prova("...e con le barre vere dell'APK 1.5: esatto se spiegano "
+              "la pagina, e la stima solo per chi non le ha", [
+                  [13, "app"], [5, "app"], [20, "app"], [13.5, "app"],
+                  [0, "nessuno"], [8, "esatto"], [0, "nessuno"],
+                  [0, "nessuno"], [13, "stima"]],
+              avuto[10:] if isinstance(avuto, list) else avuto)
+
+        # barreDellApp sotto node, con location/history/window di
+        # cartone: il valore in px CSS, e l'indirizzo senza il parametro
+        casi_b = [
+            # [search, pathname, hash, devicePixelRatio]
+            ["?barre=110%2C40", "/", "", 2.5],
+            ["?diagnosi=1&barre=110%2C40&v=2", "/", "", 2.5],
+            ["?barre=110,40", "/annuncio/12", "#foto", 2.5],
+            ["?q=a%20b&barre=1%2C2", "/", "", 1],
+            ["?barre=abc", "/", "", 2.5],
+            ["?barre=%E0%A4%A", "/", "", 2.5],
+            ["?barre=99999%2C1", "/", "", 2],
+            ["?barre=110%2C40", "/", "", 0],
+            ["", "/", "", 2.5],
+            ["?xbarre=1&v=2", "/", "", 2.5],
+        ]
+        js = (pezzo_js(mini, "function barreDellApp(", "\n}\n") + "\n}\n"
+              + "console.log(JSON.stringify(" + json.dumps(casi_b)
+              + ".map(([search, pathname, hash, dpr]) => {\n"
+              + "  let dove = null;\n"
+              + "  globalThis.location = {search, pathname, hash};\n"
+              + "  globalThis.history = {state: {pila: 1}, replaceState(s, t, u)"
+              + " { dove = [s, u]; }};\n"
+              + "  globalThis.window = {devicePixelRatio: dpr};\n"
+              + "  return [barreDellApp(), dove];\n"
+              + "})));\n")
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                         encoding="utf-8") as f:
+            f.write(js)
+        try:
+            out = subprocess.run([node, f.name], capture_output=True,
+                                 encoding="utf-8", timeout=60)
+            avuto = json.loads(out.stdout or "null")
+        except Exception as e:
+            avuto = f"node e' esploso: {e}"
+        finally:
+            os.unlink(f.name)
+        S = {"pila": 1}
+        prova("barreDellApp: pixel veri diviso devicePixelRatio, e il "
+              "parametro TOLTO — anche quando non si legge —, con lo stato "
+              "della storia e le altre coppie intatte (byte per byte)", [
+                  [[44, 16], [S, "/"]],
+                  [[44, 16], [S, "/?diagnosi=1&v=2"]],
+                  [[44, 16], [S, "/annuncio/12#foto"]],
+                  [[1, 2], [S, "/?q=a%20b"]],
+                  [None, [S, "/"]],
+                  [None, [S, "/"]],
+                  [None, [S, "/"]],
+                  [None, [S, "/"]],
+                  [None, None],
+                  [None, None]], avuto)
 
     # --- 4) LA DIAGNOSI (?diagnosi=1) --------------------------------
     prova("la diagnosi esiste solo col parametro", [1, 1], [
@@ -80169,6 +80253,11 @@ def prove_guscio_barra_e_scarto():
           ["innerHTML" in md, "pannello.textContent = righe.join" in md])
     prova("...rifa' lo stesso conto di chi sposta il guscio", True,
           "scartoGuscio(screen.height, screen.width, innerHeight," in md)
+    prova("...con le barre dell'APK, riprese da data-barre-app (la URL "
+          "non le ha piu')", [True, True], [
+              "const b = (radice.dataset.barreApp || '').split(' ')"
+              ".map(Number);" in md,
+              "screen.availTop, screen.availHeight, barreApp);" in md])
     _pacco = json.load(open(os.path.join(".well-known", "assetlinks.json"),
                             encoding="utf-8"))[0]["target"]["package_name"]
     prova("...e il suo «Apri nell'app» apre il NOSTRO pacchetto", True,
@@ -80247,6 +80336,132 @@ def prove_app_android():
     # riga tiene l'altra meta': i due si guardano le spalle — qui si
     # prende chi cancella il decoratore, la' chi lo rende inutile.
 
+    # --- LE DUE RIGHE PER APPVERIFIER (set 2026) ----------------------
+    # Chi ha l'APK lo controlla con AppVerifier incollando due righe: il
+    # pacchetto e, a capo, l'impronta SHA-256 del certificato di firma.
+    # Le scriviamo in tre posti — la pagina Sicurezza, le note di ogni
+    # release, il README di barattolo-releases — e le ultime due le
+    # copiamo da PRODUZIONE, quindi qui si tengono in pari le due che
+    # stanno nel repo con la sola verita' che Android stesso verifica.
+    # Un carattere diverso direbbe a chi controlla che l'app vera e'
+    # falsa: il guasto piu' silenzioso che ci sia, perche' qui dentro
+    # non rompe niente.
+    impronta = voce["target"]["sha256_cert_fingerprints"][0]
+    righe_vere = [voce["target"]["package_name"], impronta]
+    prova("l'impronta e' nella forma che AppVerifier legge: maiuscole, "
+          "trentadue coppie coi due punti", True,
+          bool(re.fullmatch(r"(?:[0-9A-F]{2}:){31}[0-9A-F]{2}", impronta)))
+    mini = open("miniapp.html", encoding="utf-8").read()
+    sicu = mini[mini.index('<div class="view" id="view-sicurezza">'):
+                mini.index('<div class="view" id="view-privacy">')]
+    prova("le due righe stanno nella pagina Sicurezza, una volta sola in "
+          "tutto il file", [1, 1],
+          [sicu.count('id="sicuVerifica"'), mini.count('id="sicuVerifica"')])
+    m = re.search(r'<pre class="sicu-verifica" id="sicuVerifica">([^<]*)'
+                  r'</pre>', sicu)
+    prova("...e sono le DUE di assetlinks.json: il pacchetto e l'impronta, "
+          "senza un carattere in piu'", righe_vere,
+          m.group(1).split("\n") if m else None)
+    prova("...sotto il loro titolo, che /sicurezza#app apre", True,
+          '<h3 id="sicu-app">' in sicu and sicu.index('<h3 id="sicu-app">')
+          < sicu.index('id="sicuVerifica"'))
+    copia = pezzo_js(mini, "function copiaVerificaApp(){", "\n}\n")
+    prova("...e il bottone copia il RIQUADRO, dal giudice unico della "
+          "copia (niente seconda copia nel JS)", [True, True, False],
+          ["el('sicuVerifica')?.textContent" in copia,
+           "copiaLink(righe, " in copia, impronta in copia])
+    prod = open(os.path.join("docs", "PRODUZIONE.md"),
+                encoding="utf-8").read()
+    blocchi = re.findall(r"^[ \t]*```\n[ \t]*(store\.barattolo\.app)\n"
+                         r"[ \t]*(\S+)\n[ \t]*```$", prod, re.M)
+    prova("...e il blocco da copiare nelle note delle release, in "
+          "PRODUZIONE, e' lo stesso", [righe_vere],
+          [list(b) for b in blocchi])
+
+
+# I DUE MODELLI DI BUBBLEWRAP 1.24.1 su cui le sezioni dell'APK girano
+# le funzioni VERE di genera_icone_apk.py: le righe che contano sono
+# quelle del modello (template_project), il resto e' asciugato. Stanno
+# qui fuori perche' li usano due sezioni.
+_MODELLO_LAUNCHER = "\n".join([
+    "package store.barattolo.app;",
+    "",
+    "import android.content.pm.ActivityInfo;",
+    "import android.net.Uri;",
+    "import android.os.Build;",
+    "import android.os.Bundle;",
+    "",
+    "public class LauncherActivity",
+    "        extends com.google.androidbrowserhelper.trusted.LauncherActivity {",
+    "    @Override",
+    "    protected void onCreate(Bundle savedInstanceState) {",
+    "        super.onCreate(savedInstanceState);",
+    "        setRequestedOrientation(-1);",
+    "    }",
+    "",
+    "    @Override",
+    "    protected Uri getLaunchingUrl() {",
+    "        // Get the original launch Url.",
+    "        Uri uri = super.getLaunchingUrl();",
+    "",
+    "        return uri;",
+    "    }",
+    "}",
+    ""])
+
+_MODELLO_MANIFEST = "\n".join([
+    '<manifest xmlns:android="http://schemas.android.com/apk/res/android"',
+    '    package="store.barattolo.app">',
+    '    <application',
+    '        android:name="Application"',
+    '        android:theme="@android:style/Theme.Translucent.NoTitleBar">',
+    '        <activity android:name="com.google.androidbrowserhelper'
+    '.trusted.ManageDataLauncherActivity"',
+    '            android:exported="false">',
+    '        </activity>',
+    '        <activity android:name="LauncherActivity"',
+    '            android:alwaysRetainTaskState="true"',
+    '            android:label="@string/launcherName"',
+    '            android:exported="true">',
+    '        </activity>',
+    '        <activity android:name="com.google.androidbrowserhelper'
+    '.trusted.FocusActivity" />',
+    '    </application>',
+    '</manifest>',
+    ""])
+
+# e la riga di app/build.gradle da cui nasce @color/backgroundColor
+_MODELLO_GRADLE = ('        resValue "color", "backgroundColor", '
+                   'twaManifest.backgroundColor\n')
+
+
+def _progetto_apk(cartella, java=_MODELLO_LAUNCHER, manifest=_MODELLO_MANIFEST,
+                  gradle=_MODELLO_GRADLE, quanti=1):
+    """Un progetto TWA di cartone: il Java, il manifest e la riga del
+    colore, come li lascia `bubblewrap update`."""
+    from pathlib import Path
+    for n in range(quanti):
+        d = Path(cartella, "app", "src", "main", "java", "store",
+                 "barattolo", f"app{n or ''}")
+        d.mkdir(parents=True)
+        (d / "LauncherActivity.java").write_bytes(java.encode("utf-8"))
+    Path(cartella, "app", "src", "main", "AndroidManifest.xml").write_bytes(
+        manifest.encode("utf-8"))
+    Path(cartella, "app", "build.gradle").write_bytes(gradle.encode("utf-8"))
+    return Path(cartella)
+
+
+def _gira_apk(funzione, progetto, file):
+    """(uscito con sys.exit?, il suo messaggio, il file dopo)"""
+    import contextlib
+    import io
+    with contextlib.redirect_stdout(io.StringIO()):
+        try:
+            funzione(progetto)
+            return False, "", file.read_bytes().decode("utf-8")
+        except SystemExit as e:
+            return True, str(e.code), file.read_bytes().decode("utf-8")
+
 
 def prove_permesso_splash_apk():
     """IL PERMESSO DELLO SPLASH NELL'APK (set 2026). Dal video del 22
@@ -80264,11 +80479,12 @@ def prove_permesso_splash_apk():
     cura compila, si firma e si installa, e il difetto si vede solo
     aprendolo sul telefono — cioe' a release fatta. Quindi quel che si
     prova e' soprattutto il FERMARSI: senza ancora, con l'ancora doppia
-    o con due file, lo script esce urlando e senza aver scritto niente."""
+    o con due file, lo script esce urlando e senza aver scritto niente.
+    DALLA v1.5 nel Java i blocchi sono TRE (il permesso, l'uscita dello
+    splash di sistema, le barre vere): qui si tiene fermo il primo e la
+    forma del file intero, gli altri due li guarda prove_avvio_apk."""
     print("\n[L'app Android: il permesso dello splash]")
     try:
-        import contextlib
-        import io
         import tempfile
         from pathlib import Path
         import genera_icone_apk as g
@@ -80276,43 +80492,14 @@ def prove_permesso_splash_apk():
         salta("il permesso dello splash si innesta e si ferma quando deve",
               f"{type(e).__name__}: {e}")
         return
-    # il corpo di onCreate com'e' nel modello di Bubblewrap 1.24.1
-    # (template_project/app/src/main/java/LauncherActivity.java)
-    MODELLO = "\n".join([
-        "package store.barattolo.app;",
-        "",
-        "import android.os.Bundle;",
-        "",
-        "public class LauncherActivity",
-        "        extends com.google.androidbrowserhelper.trusted.LauncherActivity {",
-        "    @Override",
-        "    protected void onCreate(Bundle savedInstanceState) {",
-        "        super.onCreate(savedInstanceState);",
-        "        setRequestedOrientation(-1);",
-        "    }",
-        "}",
-        ""])
-
-    def progetto_finto(cartella, testo, quanti=1):
-        for n in range(quanti):
-            d = Path(cartella, "app", "src", "main", "java", "store",
-                     "barattolo", f"app{n or ''}")
-            d.mkdir(parents=True)
-            (d / "LauncherActivity.java").write_bytes(testo.encode("utf-8"))
-        return Path(cartella)
+    MODELLO = _MODELLO_LAUNCHER
 
     def gira(progetto):
-        """(uscito con sys.exit?, il suo messaggio, il file dopo)"""
         f = next(Path(progetto, "app").rglob("LauncherActivity.java"))
-        with contextlib.redirect_stdout(io.StringIO()):
-            try:
-                g.patch_launcher(progetto)
-                return False, "", f.read_bytes().decode("utf-8")
-            except SystemExit as e:
-                return True, str(e.code), f.read_bytes().decode("utf-8")
+        return _gira_apk(g.patch_launcher, progetto, f)
 
     with tempfile.TemporaryDirectory() as t:
-        p = progetto_finto(t, MODELLO)
+        p = _progetto_apk(t)
         uscito, _, dopo = gira(p)
         prova("sul modello di Bubblewrap il permesso si innesta, una volta",
               [False, 1], [uscito, dopo.count(g.MARCATORE_PERMESSO)])
@@ -80332,52 +80519,348 @@ def prove_permesso_splash_apk():
               ['"twa_splash"), "splash_image.png"' in dopo,
                "getString(R.string.providerAuthority)" in dopo])
         prova("...e un guasto non chiude l'app: si torna al difetto di prima",
-              True, "} catch (RuntimeException e) {" in dopo)
-        # fuori dal blocco il file resta IDENTICO, a-capo compresi
-        i_blocco = dopo.index("        // " + g.MARCATORE_PERMESSO)
-        blocco = dopo[i_blocco:dopo.rindex("\n", 0, i_super) + 1]
-        prova("fuori dal blocco il file resta identico, e in LF",
-              [MODELLO, 0], [dopo.replace(blocco, "", 1), dopo.count("\r")])
+              True, "        } catch (RuntimeException e) {\n            "
+              "// senza il permesso si torna al difetto di prima" in dopo)
+        # fuori dai TRE blocchi il file resta IDENTICO, a-capo compresi:
+        # si tolgono esattamente come lo script li innesta, una volta
+        # ciascuno, e deve restare il modello
+        blocchi = [g._innesta(g.PERMESSO_SPLASH, "        ", "\n"),
+                   g._innesta(g.USCITA_SPLASH, "        ", "\n"),
+                   g._innesta(g.BARRE_VERE, "        ", "\n")]
+        resto = dopo
+        for b in blocchi:
+            resto = resto.replace(b, "", 1)
+        prova("fuori dai tre blocchi il file resta identico, e in LF",
+              [[1, 1, 1], MODELLO, 0],
+              [[dopo.count(b) for b in blocchi], resto, dopo.count("\r")])
         uscito, _, ancora = gira(p)
         prova("rilanciato non innesta due volte: il file non si muove",
               [False, dopo], [uscito, ancora])
 
     with tempfile.TemporaryDirectory() as t:
-        _, _, dopo = gira(progetto_finto(t, MODELLO.replace("\n", "\r\n")))
+        _, _, dopo = gira(_progetto_apk(t, java=MODELLO.replace("\n", "\r\n")))
         prova("un file in CRLF resta in CRLF, senza un a-capo spaiato",
-              [1, 0], [dopo.count(g.MARCATORE_PERMESSO),
-                       dopo.replace("\r\n", "").count("\n")])
+              [[1, 1, 1], 0],
+              [[dopo.count(g.MARCATORE_PERMESSO),
+                dopo.count(g.MARCATORE_USCITA),
+                dopo.count(g.MARCATORE_BARRE)],
+               dopo.replace("\r\n", "").count("\n")])
+
+    with tempfile.TemporaryDirectory() as t:
+        # il progetto della 1.4 com'e' oggi sul disco di Andrea: il
+        # permesso c'e' gia', e se lo script gira senza un update prima
+        # deve aggiungere i due blocchi nuovi senza raddoppiarlo
+        with_14 = MODELLO.replace(
+            "        super.onCreate(savedInstanceState);\n",
+            g._innesta(g.PERMESSO_SPLASH, "        ", "\n")
+            + "        super.onCreate(savedInstanceState);\n", 1)
+        uscito, _, dopo = gira(_progetto_apk(t, java=with_14))
+        prova("sul progetto della 1.4 (permesso gia' dentro) aggiunge i "
+              "due blocchi nuovi e non raddoppia il vecchio",
+              [False, 1, 1, 1],
+              [uscito, dopo.count(g.MARCATORE_PERMESSO),
+               dopo.count(g.MARCATORE_USCITA), dopo.count(g.MARCATORE_BARRE)])
 
     # --- IL FERMARSI, che e' la meta' che vale ------------------------
     senza = MODELLO.replace("        super.onCreate(savedInstanceState);\n",
                             "")
     with tempfile.TemporaryDirectory() as t:
-        uscito, msg, dopo = gira(progetto_finto(t, senza))
+        uscito, msg, dopo = gira(_progetto_apk(t, java=senza))
         prova("senza l'ancora si FERMA, e senza aver scritto niente",
               [True, senza], [uscito, dopo])
         prova("...e dice di NON lanciare il build", True,
               "NON lanciare `bubblewrap build`" in msg)
     doppia = MODELLO.replace(
-        "    }\n}\n",
+        "    }\n\n    @Override\n    protected Uri",
         "    }\n    @Override\n"
         "    protected void onCreate(Bundle savedInstanceState) {\n"
-        "        super.onCreate(savedInstanceState);\n    }\n}\n")
+        "        super.onCreate(savedInstanceState);\n    }\n\n"
+        "    @Override\n    protected Uri", 1)
     with tempfile.TemporaryDirectory() as t:
-        uscito, _, dopo = gira(progetto_finto(t, doppia))
+        uscito, _, dopo = gira(_progetto_apk(t, java=doppia))
         prova("con l'ancora DOPPIA si ferma: non sceglie a caso",
               [True, doppia], [uscito, dopo])
     with tempfile.TemporaryDirectory() as t:
-        uscito, msg, _ = gira(progetto_finto(t, MODELLO, quanti=2))
+        uscito, msg, _ = gira(_progetto_apk(t, quanti=2))
         prova("con due LauncherActivity.java si ferma", [True, True],
               [uscito, "NON lanciare `bubblewrap build`" in msg])
 
-    # e in genera() e' il PRIMO passo che scrive: se si ferma, nessun
-    # file del progetto e' stato ancora toccato
+    # e in genera() i due file di testo si preparano PRIMA di ogni
+    # scrittura: se uno si ferma, nessun file del progetto e' toccato
     corpo = open("genera_icone_apk.py", encoding="utf-8").read()
     corpo = corpo[corpo.index("def genera():"):]
-    prova("in genera() il permesso viene PRIMA di ogni scrittura", True,
-          0 < corpo.index("patch_launcher(progetto)")
-          < corpo.index("Image.open(base / SORGENTE)"))
+    prova("in genera() Java e manifest si preparano PRIMA di ogni "
+          "scrittura", True,
+          0 < corpo.find("ritocchi = [prepara_launcher(progetto), "
+                         "prepara_manifest(progetto)]")
+          < corpo.find("_scrivi(*ritocco)")
+          < corpo.find("Image.open(base / SORGENTE)"))
+
+
+def prove_avvio_apk():
+    """L'AVVIO DELL'APK, v1.5 (set 2026). Dal video del 23 set a 20
+    fotogrammi: al tocco sull'icona, per un fotogramma la finestra che
+    cresceva dall'icona era NERA, e poi lo splash arancio. La causa, letta
+    nel sorgente di Android: LauncherActivity aveva il tema TRASLUCIDO di
+    Bubblewrap, e a un'attivita' traslucida il sistema non prepara nessuna
+    finestra di partenza (ActivityRecord.validateStartingWindowTheme) —
+    ne' lo splash di Android 12+, ne' l'anteprima dei telefoni vecchi —,
+    e il launcher, senza lo splash, non ha un colore con cui riempire la
+    finestra che cresce. La cura (decisa da Andrea fra tre strade) e' un
+    tema OPACO per la sola LauncherActivity, con lo splash del sistema
+    dello stesso arancio e lo stesso barattolo; nel Java lo splash del
+    sistema esce di taglio, e la URL di avvio porta le barre vere.
+    Come per il permesso, si girano le funzioni VERE su un progetto di
+    cartone, e la meta' che vale e' il FERMARSI."""
+    print("\n[L'app Android: il tema dell'avvio e le barre vere]")
+    try:
+        import math
+        import tempfile
+        import xml.etree.ElementTree as ET
+        from pathlib import Path
+        import genera_icone_apk as g
+    except Exception as e:
+        salta("il tema dell'avvio, l'icona e le barre vere",
+              f"{type(e).__name__}: {e}")
+        return
+
+    # --- 1) IL JAVA: L'USCITA DELLO SPLASH E LE BARRE -----------------
+    with tempfile.TemporaryDirectory() as t:
+        p = _progetto_apk(t)
+        f = next(Path(p, "app").rglob("LauncherActivity.java"))
+        uscito, _, dopo = _gira_apk(g.patch_launcher, p, f)
+        # `find` e non `index`: un blocco che manca esce rosso col suo
+        # nome, e non si porta via la sezione
+        i_grant = dopo.find("grantUriPermission(getPackageName(), ")
+        i_uscita = dopo.find("getSplashScreen().setOnExitAnimationListener(")
+        i_super = dopo.find("super.onCreate(savedInstanceState);")
+        prova("l'uscita dello splash di sistema sta in onCreate, DOPO il "
+              "permesso e PRIMA di super.onCreate", [False, True],
+              [uscito, 0 <= i_grant < i_uscita < i_super])
+        i_m = dopo.find("// " + g.MARCATORE_USCITA)
+        uscita = dopo[i_m:i_super] if 0 <= i_m < i_super else ""
+        prova("...solo da Android 12 (lo splash di sistema nasce li'), e "
+              "lo toglie di taglio", [True, True],
+              ["android.os.Build.VERSION.SDK_INT >= "
+               "android.os.Build.VERSION_CODES.S" in uscita,
+               "setOnExitAnimationListener(vista -> vista.remove());"
+               in uscita])
+        prova("...e un guasto non chiude l'app", True,
+              '"uscita dello splash non presa", e);' in uscita)
+        i_url = dopo.find("Uri uri = super.getLaunchingUrl();")
+        i_ritorno = dopo.find("return uri;")
+        i_b = dopo.find("// " + g.MARCATORE_BARRE)
+        barre = dopo[i_b:i_ritorno] if 0 <= i_b < i_ritorno else ""
+        prova("le barre vere stanno fra la riga che prende la URL e il "
+              "return", True, 0 <= i_url < i_b < i_ritorno)
+        prova("...solo da Android 11 (WindowMetrics prima della finestra)",
+              True, "android.os.Build.VERSION.SDK_INT >= "
+              "android.os.Build.VERSION_CODES.R" in barre)
+        # sopra: la barra di stato (o la tacca, se piu' alta); sotto: la
+        # barra di navigazione — le misure che servono a scartoGuscio
+        prova("...sopra la barra di stato, sotto quella di navigazione, "
+              "anche nascoste", [True, True], [
+                  bool(re.search(
+                      r"int sopra = riquadri\.getInsetsIgnoringVisibility\("
+                      r"\s+android\.view\.WindowInsets\.Type\.statusBars\(\)"
+                      r"\s+\| android\.view\.WindowInsets\.Type"
+                      r"\.displayCutout\(\)\)\.top;", barre)),
+                  bool(re.search(
+                      r"int sotto = riquadri\.getInsetsIgnoringVisibility\("
+                      r"\s+android\.view\.WindowInsets\.Type"
+                      r"\.navigationBars\(\)\)\.bottom;", barre))])
+        # un PARAMETRO aggiunto alla URL della libreria: il dominio
+        # verificato non si tocca, e i deep link tengono il loro
+        prova("...nel parametro `barre`, sopra,sotto, aggiunto alla URL "
+              "della libreria", True,
+              '.appendQueryParameter("barre", sopra + "," + sotto)' in barre
+              and "uri = uri.buildUpon()" in barre)
+        prova("...e un guasto non chiude l'app", True,
+              '"barre non passate alla pagina", e);' in barre)
+        # il nome del parametro e' un contratto con la pagina
+        mini = open("miniapp.html", encoding="utf-8").read()
+        prova("...ed e' il parametro che la pagina legge e toglie", True,
+              "const nostra = coppie.find(c => c.indexOf('barre=') === 0);"
+              in pezzo_js(mini, "function barreDellApp(", "\n}\n"))
+
+    senza_url = _MODELLO_LAUNCHER.replace(
+        "        Uri uri = super.getLaunchingUrl();\n", "")
+    with tempfile.TemporaryDirectory() as t:
+        p = _progetto_apk(t, java=senza_url)
+        f = next(Path(p, "app").rglob("LauncherActivity.java"))
+        uscito, msg, dopo = _gira_apk(g.patch_launcher, p, f)
+        # e' l'ultima ancora del file: i due blocchi prima erano gia'
+        # pronti in memoria, e NON si scrivono
+        prova("senza la riga della URL si FERMA, e non scrive nemmeno i "
+              "blocchi che aveva gia' pronti", [True, senza_url, True],
+              [uscito, dopo, "NON lanciare `bubblewrap build`" in msg])
+
+    # --- 2) IL MANIFEST: IL TEMA SULLA SOLA LauncherActivity ---------
+    def gira_man(testo_manifest=_MODELLO_MANIFEST, gradle=_MODELLO_GRADLE,
+                 volte=1):
+        with tempfile.TemporaryDirectory() as t:
+            p = _progetto_apk(t, manifest=testo_manifest, gradle=gradle)
+            man = Path(p, "app", "src", "main", "AndroidManifest.xml")
+            for _ in range(volte - 1):
+                _gira_apk(g.patch_manifest, p, man)
+            return _gira_apk(g.patch_manifest, p, man)
+
+    uscito, _, dopo = gira_man()
+    riga = "            " + g.ATTRIBUTO_TEMA + "\n"
+    prova("il tema dell'avvio entra nel manifest una volta, su una riga "
+          "sua col rientro degli altri attributi", [False, 1, 1],
+          [uscito, dopo.count(g.ATTRIBUTO_TEMA), dopo.count(riga)])
+    apertura = dopo[dopo.index('<activity android:name="LauncherActivity"'):]
+    apertura = apertura[:apertura.index(">")]
+    prova("...DENTRO l'apertura di LauncherActivity", True,
+          g.ATTRIBUTO_TEMA in apertura)
+    prova("...e il resto dell'app resta traslucido com'era: fuori da "
+          "quella riga il file e' identico", _MODELLO_MANIFEST,
+          dopo.replace(riga, "", 1))
+    prova("...ed e' il tema che lo script scrive nelle risorse", True,
+          f'<style name="{g.TEMA_AVVIO}" ' in g.TEMA_AVVIO_XML
+          and f'<style name="{g.TEMA_AVVIO}" ' in g.TEMA_AVVIO_V31_XML)
+    uscito, _, dopo = gira_man(_MODELLO_MANIFEST.replace("\n", "\r\n"),
+                               volte=2)
+    prova("in CRLF resta CRLF, e rilanciato non lo rimette", [False, 1, 0],
+          [uscito, dopo.count(g.ATTRIBUTO_TEMA),
+           dopo.replace("\r\n", "").count("\n")])
+
+    # il fermarsi: senza l'ancora, con due, con un tema che non e' il
+    # nostro, e senza la riga del colore che il tema usa
+    casi = [
+        ("senza LauncherActivity", _MODELLO_MANIFEST.replace(
+            'android:name="LauncherActivity"', 'android:name="Altro"'),
+         _MODELLO_GRADLE),
+        ("con due LauncherActivity", _MODELLO_MANIFEST.replace(
+            "    </application>",
+            '        <activity android:name="LauncherActivity" />\n'
+            "    </application>"), _MODELLO_GRADLE),
+        ("con un tema suo su LauncherActivity", _MODELLO_MANIFEST.replace(
+            '<activity android:name="LauncherActivity"',
+            '<activity android:name="LauncherActivity"\n'
+            '            android:theme="@style/Altro"'), _MODELLO_GRADLE),
+        ("senza la riga di @color/backgroundColor", _MODELLO_MANIFEST,
+         "        resValue \"color\", \"colorPrimary\", "
+         "twaManifest.themeColor\n"),
+    ]
+    for nome, man_testo, gradle_testo in casi:
+        uscito, msg, dopo = gira_man(man_testo, gradle_testo)
+        prova(f"{nome} si FERMA, senza scrivere e dicendo di non buildare",
+              [True, man_testo, True],
+              [uscito, dopo, "NON lanciare `bubblewrap build`" in msg])
+
+    # --- 3) LE RISORSE DEL TEMA ---------------------------------------
+    with tempfile.TemporaryDirectory() as t:
+        res = Path(t)
+        import contextlib
+        import io
+        with contextlib.redirect_stdout(io.StringIO()):
+            g.scrivi_tema_avvio(res)
+        A = "{http://schemas.android.com/apk/res/android}"
+        tre = [res / "values" / "barattolo_avvio.xml",
+               res / "values-v31" / "barattolo_avvio.xml",
+               res / "drawable" / "barattolo_avvio_fondo.xml"]
+        prova("i tre file del tema ci sono: i due stili e il fondo",
+              [True] * 3, [f.is_file() for f in tre])
+
+        def stili(percorso):
+            # un file che manca o non si legge e' un tema vuoto: le prove
+            # qui sotto escono rosse col loro nome, e non si porta via la
+            # sezione
+            try:
+                radice = ET.parse(percorso).getroot()
+            except (OSError, ET.ParseError):
+                return {}
+            return {s.get("name"): (s.get("parent"),
+                                    {i.get("name"): i.text
+                                     for i in s.findall("item")})
+                    for s in radice.findall("style")}
+        base = stili(tre[0])
+        v31 = stili(tre[1])
+        B = g.TEMA_AVVIO + "Base"
+        base.setdefault(B, (None, {}))
+        prova("il tema di base e' il GEMELLO OPACO del traslucido di "
+              "Bubblewrap (Theme.NoTitleBar), e di traslucido non ha niente",
+              ["@android:style/Theme.NoTitleBar", False],
+              [base[B][0], any("Translucent" in (v or "") or
+                               "Translucent" in k
+                               for k, v in base[B][1].items())])
+        prova("...col fondo arancio col barattolo, senza l'ombra del titolo "
+              "e senza animazioni di finestra sue", {
+                  "android:windowBackground": "@drawable/barattolo_avvio_fondo",
+                  "android:colorBackground": "@color/backgroundColor",
+                  "android:windowContentOverlay": "@null",
+                  "android:windowAnimationStyle": "@android:style/Animation"},
+              base[B][1])
+        prova("il tema dell'avvio figlio di quello di base, vuoto prima di "
+              "Android 12", (f"@style/{B}", {}), base.get(g.TEMA_AVVIO))
+        prova("...e da Android 12 lo splash del SISTEMA: lo stesso arancio "
+              "e il barattolo", (f"@style/{B}", {
+                  "android:windowSplashScreenBackground":
+                      "@color/backgroundColor",
+                  "android:windowSplashScreenAnimatedIcon":
+                      "@drawable/barattolo_avvio_icona"}),
+              v31.get(g.TEMA_AVVIO))
+        try:
+            voci = ET.parse(tre[2]).getroot().findall("item")
+        except (OSError, ET.ParseError):
+            voci = []
+        bitmap = voci[1].find("bitmap") if len(voci) == 2 else None
+        prova("il fondo della finestra: l'arancio dello splash e sopra "
+              "splash.png al centro, alla sua misura", [
+                  "@color/backgroundColor", "center", "@drawable/splash"],
+              [voci[0].get(A + "drawable") if voci else None,
+               bitmap.get(A + "gravity") if bitmap is not None else None,
+               bitmap.get(A + "src") if bitmap is not None else None])
+
+    # --- 4) L'ICONA DELLO SPLASH DI SISTEMA ---------------------------
+    # il barattolo VERO, com'e' nello script: il sistema la ridipinge su
+    # 108dp e la ingrandisce a 192, cioe' la tela vale 288dp sullo
+    # schermo e il barattolo deve uscirne a 160, come splash.png
+    try:
+        from PIL import Image
+        img = Image.open(g.SORGENTE).convert("RGB")
+        barattolo = g.scontorna(img, g.colore_fondo(img))
+    except Exception as e:
+        salta("l'icona dello splash di sistema", f"{type(e).__name__}: {e}")
+        return
+    with tempfile.TemporaryDirectory() as t:
+        res = Path(t)
+        import contextlib
+        import io
+        with contextlib.redirect_stdout(io.StringIO()):
+            g.genera_icona_avvio(res, barattolo)
+        misure, alti, centrati, dentro = [], [], [], []
+        for dpi, scala in g.SPLASH_DENSITA:
+            icona = Image.open(res / f"drawable-{dpi}"
+                               / "barattolo_avvio_icona.png")
+            lato = icona.width
+            misure.append([icona.width, icona.height])
+            alfa = icona.getchannel("A")
+            x0, y0, x1, y1 = alfa.getbbox()
+            # l'altezza del barattolo sullo schermo, in dp: tela = 288
+            alti.append(round((y1 - y0) / lato * 288))
+            centrati.append(abs((x0 + x1) - lato) <= 1
+                            and abs((y0 + y1) - lato) <= 1)
+            # la forma delle icone del telefono contiene sempre il cerchio
+            # di raggio lato/3: nessun pixel del barattolo ne deve uscire,
+            # o il sistema lo taglia in silenzio
+            r = lato / 3
+            px = alfa.load()
+            lontano = max(math.hypot(x + 0.5 - lato / 2, y + 0.5 - lato / 2)
+                          for y in range(y0, y1) for x in range(x0, x1)
+                          if px[x, y] > 0)
+            dentro.append(lontano < r)
+        prova("l'icona e' una tela quadrata di 162dp per densita' (la "
+              "misura a cui il sistema la ridipinge)",
+              [[round(162 * s)] * 2 for _, s in g.SPLASH_DENSITA], misure)
+        prova("...col barattolo che sullo schermo esce a 160dp, come "
+              "splash.png: al passaggio non cresce e non cala",
+              [160] * 5, alti)
+        prova("...centrato", [True] * 5, centrati)
+        prova("...e dentro il cerchio visibile: il sistema non lo taglia",
+              [True] * 5, dentro)
 
 
 def prove_effetti_ridotti():
@@ -80897,6 +81380,7 @@ def main():
               prove_guscio_barra_e_scarto,
               prove_app_android,
               prove_permesso_splash_apk,
+              prove_avvio_apk,
               prove_bunker_muto,
               prove_login_qr,
               prove_profilo_sezioni,
