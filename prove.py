@@ -11508,7 +11508,7 @@ def prove_lista_ordini():
     prova("il moderatore non compra e non vende", True,
           "'⚖️ Da moderare'" in vo)
     prova("la riga della lista passa dal giudice", True,
-          '<span class="ord-verbo">${verboOrdine(o)}</span>' in ro)
+          '<div class="ord-verbo">${verboOrdine(o)}</div>' in ro)
 
     # ---- 15-16: il netto e' UNO (il giorno della commissione) ----
     prova("nettoVenditore e' definito una volta sola", 1,
@@ -11905,20 +11905,21 @@ def prove_dettaglio_ordine():
 
 
 def prove_card_ordini():
-    """LA CARD DELL'ORDINE DICE QUATTRO COSE, E SI TINGE (22 set 2026,
-    richiesta di Andrea). La foto quasi raddoppiata con la data sotto,
-    il titolo, il verbo e il rettangolino dello stato: il NUMERO
-    D'ORDINE e il PREZZO sono usciti e restano nel dettaglio.
+    """LA CARD DELL'ORDINE DICE QUATTRO COSE (22 set 2026, richiesta di
+    Andrea, ritoccata il 23). La foto quasi raddoppiata con la data
+    sotto, accanto il titolo e il verbo, e il rettangolino dello stato
+    IN BASSO A DESTRA, col fondo in riga con quello della foto. Il
+    NUMERO D'ORDINE e il PREZZO sono usciti e restano nel dettaglio.
 
-    E la card prende la velatura del suo stato, con LA STESSA regola di
-    «I miei scambi» — non una copia: una tinta sola per stato in tutta
-    l'app. Qui si prova che il tono esce dalla STESSA classe del
-    rettangolino (quindi non possono dire due cose diverse), che ogni
-    stato che la macchina sa produrre ha il suo colore nel foglio, e
-    che la misura della foto sta su un nome che solo `fotoOrdine`
-    mette — `.order-ic` da solo veste anche il quadratino delle
-    offerte, e allargare li' avrebbe gonfiato una lista che nessuno ha
-    chiesto di toccare.
+    ⚠️ LA CARD NON SI TINGE: per un giorno aveva preso la velatura del
+    suo stato con la regola di «I miei scambi», e il 23 e' tornata la
+    carta di sempre. Qui si prova che non ne resta niente — ne' la
+    classe sulla card, ne' un selettore del mercatino nella regola del
+    P2P, ne' il tono `refunded` nato solo per lui — mentre le tinte del
+    P2P le guarda la loro sezione, tornata com'era.
+
+    La misura della foto sta su un nome che solo `fotoOrdine` mette:
+    `.order-ic` da solo veste anche il quadratino delle offerte.
 
     L'ULTIMO PEZZO E' LA CHIUSURA DELLE BUSTE: i cinque riquadri in cui
     le due parti si passano qualcosa di cifrato si chiudono a ordine
@@ -11933,68 +11934,141 @@ def prove_card_ordini():
     import tempfile as _tf
     mini = open("miniapp.html", encoding="utf-8").read()
     css = mini[mini.index("<style>"):mini.index("</style>")]
+    nudo = re.sub(r"/\*[\s\S]*?\*/", "", css)
 
     def solo_codice(js):
         js = re.sub(r"/\*[\s\S]*?\*/", "", js)
         return "\n".join(r for r in js.split("\n")
                          if not r.strip().startswith("//"))
 
+    def regola(selettore):
+        """La dichiarazione di un selettore, senza commenti: `find` e
+        non `index`, o una mutazione che la toglie farebbe esplodere
+        la sezione invece di dare una rossa col suo nome."""
+        i = nudo.find(selettore + "{")
+        return nudo[i:nudo.find("}", i) + 1] if i >= 0 else ""
+
     ro = solo_codice(pezzo_js(mini, "function renderOrders(){"))
-    i_a = ro.find('<div class="order${tonoCardOrdine(o)}')
+    i_a = ro.find('<div class="order${o.nascosto')
     i_b = ro.find("`;}).join('')", i_a)
     card = ro[i_a:i_b] if 0 <= i_a < i_b else ""
+    i_m = card.find('<div class="order-main">')
+    i_s = card.find('<span class="badge ')
+    testo = card[i_m:i_s] if 0 <= i_m < i_s else ""
 
-    # ---- 1-6: QUEL CHE LA CARD DICE, E QUEL CHE NON DICE PIU' ----
+    # ---- 1-7: QUEL CHE LA CARD DICE, E QUEL CHE NON DICE PIU' ----
     prova("la card c'e', e si apre con un tocco", True,
           bool(card) and 'onclick="openOrder(${o.id})"' in card)
     prova("la foto porta sotto la data dell'ordine", True,
-          '<div class="ord-foto-col">' in card
-          and "${fotoOrdine(o)}" in card
+          "${fotoOrdine(o)}" in card
           and '<div class="ord-foto-data">${o.when}</div>' in card)
     prova("accanto alla foto c'e' il titolo...", True,
-          '<b class="ord-titolo">${esc(o.listing.title)}</b>' in card)
-    # ⚠️ E SI FERMA A TRE RIGHE (visto a 320 nel giro dal vivo): con
-    # la foto alta 100 la card e' 148px per tutti, e un titolo lungo la
-    # faceva crescere a 193 — una card fuori riga in mezzo a una colonna
-    # regolare. Il titolo intero sta nel dettaglio, un tocco piu' in la'.
-    prova("...e si ferma a tre righe, coi puntini", True,
-          ".ord-titolo{display:-webkit-box;-webkit-line-clamp:3;" in css
+          '<b class="ord-titolo">${esc(o.listing.title)}</b>' in testo)
+    # ⚠️ E SI FERMA A DUE RIGHE (23 set 2026, erano tre): da quando lo
+    # stato sta in basso a destra, in riga col fondo della foto, il
+    # testo deve starci dentro i 100px della foto. Tre righe, il verbo
+    # e il rettangolino ne chiedevano 115: a 375 lo stato scendeva di
+    # 15px e la data si staccava dalla foto. Due righe stanno in 95.
+    prova("...e si ferma a due righe, coi puntini, cosi' il testo sta "
+          "dentro l'altezza della foto", True,
+          ".ord-titolo{display:-webkit-box;-webkit-line-clamp:2;" in css
           and "-webkit-box-orient:vertical;overflow:hidden}" in css)
-    prova("...e sotto il verbo, col rettangolino sulla stessa riga",
-          True, '<div class="ord-stato-riga">' in card
-          and '<span class="ord-verbo">${verboOrdine(o)}</span>' in card
-          and '<span class="badge ${badgeOrdine(o)}">' in card)
+    prova("...e sotto il titolo il verbo, da solo", True,
+          '<div class="ord-verbo">${verboOrdine(o)}</div>' in testo)
     # ⚠️ IL NUMERO E IL PREZZO SONO USCITI e restano nel dettaglio: il
     # numero li' porta anche la parola che dice cos'e', e la cifra sta
-    # grande sotto il titolo. In lista rubavano la riga allo stato.
+    # grande sotto il titolo.
     prova("via il numero d'ordine dalla card", False, "#${o.id}" in card)
     prova("...e via ogni cifra", [],
           [r for r in ("cifraOrdine(", "listing.price", "nettoVenditore(",
                        "fmt(", "eur(") if r in card])
 
-    # ---- 7-10: LA TINTA ESCE DALLA CLASSE DEL RETTANGOLINO ----
-    tono = solo_codice(pezzo_js(mini, "function tonoCardOrdine(o){",
-                                "\n}\n"))
+    # ---- 8-14: LA CARD NON SI TINGE PIU' (23 set 2026) ----
+    # Per un giorno la card ha preso la velatura del suo stato con la
+    # regola di «I miei scambi», allargata a due selettori. Andrea l'ha
+    # tolta: la carta e' quella di sempre, e la tinta resta del P2P.
+    prova("la card porta la sola classe di sempre, e la sua ombra da "
+          "nascosta", True,
+          """<div class="order${o.nascosto?' nascosta':''}" """
+          """onclick="openOrder(${o.id})">""" in card)
+    prova("...e la fabbrica del tono non c'e' piu'", 0,
+          mini.count("tonoCardOrdine"))
+    prova("...ne' un selettore del mercatino nella regola delle tinte",
+          [], re.findall(r"\.order\.(?:tinta|tono-[a-z]+)", nudo))
+    # il tono `refunded` era nato SOLO per il mercatino: il P2P quello
+    # stato non ce l'ha, e lasciarlo sarebbe una regola che non veste
+    # niente
+    prova("...ne' il tono che era nato solo per lui", False,
+          "tono-refunded" in nudo)
+    # e la regola del P2P torna a UN selettore: ogni dichiarazione di
+    # tono ne nomina uno solo, ed e' quello del P2P
+    toni = re.findall(r"([^{}]*\.tono-[a-z]+[^{}]*)\{--tinta:", nudo)
+    prova("la regola delle tinte ha di nuovo un selettore solo", [],
+          [t.strip() for t in toni
+           if not re.fullmatch(r"\s*\.p2p-scambio\.tono-[a-z]+\s*", t)])
+    # il RETTANGOLINO resta vestito da un giudice solo: prima di
+    # `badgeOrdine` era un'espressione scritta dentro il markup
     bdg = solo_codice(pezzo_js(mini, "function badgeOrdine(o){", "\n}\n"))
-    prova("il tono esce dalla classe del rettangolino", True,
-          "badgeOrdine(o)" in tono)
-    prova("...e non nomina nessuno stato per conto suo", [],
-          [x for x in re.findall(r"'([^']*)'", tono)
-           if x != " tinta tono-"])
-    prova("...e la classe del rettangolino e' un giudice solo: la "
-          "dicono il badge e la tinta, mai due tabelle",
-          (1, 1, 0),
-          (card.count("badgeOrdine(o)"), tono.count("badgeOrdine(o)"),
-           card.count("STATES[o.state].badge")))
+    prova("il rettangolino esce da un giudice solo, e non da una "
+          "seconda tabella", (1, 0),
+          (card.count("badgeOrdine(o)"), card.count("STATES[o.state].badge")))
     # IN PAGAMENTO e' uno stadio DERIVATO — lo stato resta quello di
     # prima — e vale viola come il «da incassare» che sostituisce
-    prova("...e lo stadio derivato lo conosce anche la tinta", True,
+    prova("...e lo stadio derivato lo conosce", True,
           "inPagamento(o) ? 'confirmed'" in bdg)
-    # IL COLORE NON E' L'UNICO SEGNO: la parola dello stato resta
-    prova("il colore non e' l'unico segno: la parola resta nel "
-          "rettangolino", True, "STATES[o.state].label}</span>" in card)
+    prova("la parola dello stato resta nel rettangolino", True,
+          "STATES[o.state].label}</span>" in card)
 
-    # ---- 11-14: LA FOTO ----
+    # ---- 15-22: LO STATO IN BASSO A DESTRA (23 set 2026) ----
+    # LA CARD E' UNA GRIGLIA: tre colonne (foto, testo, ✕) e tre righe
+    # (testo, stato, data). La foto abbraccia le prime due, quindi la
+    # seconda finisce dove finisce lei: lo stato appoggiato al fondo di
+    # quella riga sta in riga col fondo della foto senza misurare niente.
+    griglia = regola(".ord-card")
+    prova("la card e' una griglia a tre colonne: foto, testo, ✕", True,
+          "display:grid;grid-template-columns:auto minmax(0,1fr) auto;"
+          in griglia)
+    # ⚠️ NIENTE `column-gap`: la terza colonna c'e' solo con la ✕, e
+    # un gap fisso ruberebbe 12px al titolo in tutte le altre card
+    prova("...senza un gap fisso, che ruberebbe spazio al titolo dove "
+          "la ✕ non c'e'", False, "gap" in griglia)
+    prova("la foto abbraccia le prime due righe", True,
+          "grid-column:1;grid-row:1/3;" in regola(".ord-card>.ord-foto"))
+    stato = regola(".ord-card>.badge")
+    prova("lo stato sta nella seconda riga, in basso a destra", True,
+          "grid-row:2;" in stato and "justify-self:end;" in stato
+          and "align-self:end;" in stato)
+    # ...e ABBRACCIA TESTO E ✕: il suo bordo destro e' quello della
+    # card in TUTTE le card, con la ✕ o senza
+    prova("...e abbraccia testo e ✕, cosi' sta dritto in tutte le card",
+          True, "grid-column:2/4;" in stato)
+    prova("il testo e la ✕ stanno nella prima riga", True,
+          "grid-row:1" in regola(".ord-card>.order-main")
+          and "grid-column:3;grid-row:1;" in regola(".ord-card>.order-x"))
+    # ⚠️ IL TESTO PASSA SOTTO LA ✕ (visto a 320): una colonna sua la
+    # toglieva a tutto il testo, e su un rimborsato «Acquisto non
+    # concluso» andava a capo spingendo lo stato 13px sotto la foto.
+    # Adesso il testo abbraccia la colonna della ✕ e solo il titolo le
+    # fa posto — e la classe la mette la card che la ✕ ce l'ha.
+    prova("...e il testo passa sotto la ✕: solo il titolo le fa posto",
+          (True, True, True),
+          ("grid-column:2/4;" in regola(".ord-card>.order-main"),
+           "padding-right:32px" in regola(".ord-card.con-x .ord-titolo"),
+           """<div class="ord-card${x ? ' con-x' : ''}">""" in card))
+    prova("la data sta nella terza, sotto la foto e centrata", True,
+          "grid-column:1;grid-row:3;justify-self:center;"
+          in regola(".ord-card>.ord-foto-data"))
+    # e NEL MARKUP lo stato e' fuori dalla colonna del testo, o la
+    # griglia non avrebbe niente da mettere in basso a destra
+    prova("...e nel markup lo stato non sta piu' accanto al verbo",
+          (True, False), (bool(testo), "badge" in testo))
+    # INCHIOSTRO E NON --muted: il verbo sta a 12,5px e vuole il 4,5:1,
+    # mentre `--muted` su carta bianca sta a 3,8
+    prova("il verbo e la data restano sull'inchiostro che passa l'AA",
+          True, "color:var(--ink-soft)" in regola(".ord-verbo")
+          and "color:var(--ink-soft)" in regola(".ord-card>.ord-foto-data"))
+
+    # ---- 23-27: LA FOTO ----
     # LA MISURA STA SU UN NOME SUO: `.order-ic` veste anche il
     # quadratino delle OFFERTE (un'emoji, non una foto), e allargare
     # li' avrebbe gonfiato una lista che nessuno ha chiesto di toccare
@@ -12019,10 +12093,10 @@ def prove_card_ordini():
     prova("...e la miniatura del server ne ha abbastanza per il 3x",
           True, lato >= 132 * 3)
 
-    # ---- 15-17: OGNI STATO HA IL SUO TONO (banco node) ----
+    # ---- 28-31: OGNI STATO HA IL SUO RETTANGOLINO (banco node) ----
     node = _sh.which("node")
     if not node:
-        salta("il banco dei toni e delle buste", "node non c'e'")
+        salta("il banco dei rettangolini e delle buste", "node non c'e'")
         return
     i_s = mini.index("const STATES = {")
     tabella = mini[i_s:mini.index("\n};", i_s) + 3]
@@ -12033,53 +12107,50 @@ def prove_card_ordini():
         tabella,
         pezzo_js(mini, "const inPagamento = o =>", "\n"),
         pezzo_js(mini, "function badgeOrdine(o){", "\n}\n") + "\n}",
-        pezzo_js(mini, "function tonoCardOrdine(o){", "\n}\n") + "\n}",
         """
 const STATI = __STATI__;
 const out = {};
 STATI.forEach(s => {
   out[s] = [null, {}].map(p => {
-    try { return tonoCardOrdine({state: s, role: 'buyer', pagamento: p}); }
+    try { return badgeOrdine({state: s, role: 'buyer', pagamento: p}); }
     catch(e) { return 'ESPLOSO: ' + (e && e.message || e); }
   });
 });
 console.log(JSON.stringify(out));
 """]).replace("__STATI__", _json.dumps(stati))
     cart = _tf.mkdtemp()
-    p = os.path.join(cart, "toni.js")
+    p = os.path.join(cart, "rettangolini.js")
     open(p, "w", encoding="utf-8").write(banco)
     r = _sp.run([node, p], capture_output=True, text=True, encoding="utf-8")
-    prova("il banco node dei toni gira", "", (r.stderr or "")[-600:])
+    prova("il banco node dei rettangolini gira", "",
+          (r.stderr or "")[-600:])
     if r.returncode:
         return
     tab = _json.loads(r.stdout)
     # LA TABELLA INTERA, coi due stadi: fermo, e col pagamento in volo.
     # IN PAGAMENTO e' viola per tutti tranne il concluso, dove il
     # pagamento c'e' ma la corsa e' finita — e' il giudice di casa.
-    prova("ogni stato veste la card col tono del suo rettangolino, e "
-          "in pagamento passa al viola",
-          {s: [" tinta tono-" + a, " tinta tono-" + b] for s, (a, b) in (
-              ("creato", ("locked", "confirmed")),
-              ("locked", ("locked", "confirmed")),
-              ("shipped", ("shipped", "confirmed")),
-              ("delivered", ("confirmed", "confirmed")),
-              ("confirmed", ("confirmed", "confirmed")),
-              ("released", ("released", "released")),
-              ("dispute", ("dispute", "confirmed")),
-              ("return_pending", ("confirmed", "confirmed")),
-              ("return_shipped", ("shipped", "confirmed")),
-              ("refund", ("confirmed", "confirmed")),
-              ("refunded", ("refunded", "confirmed")),
-              ("annullato", ("annullato", "confirmed")))}, tab)
-    # ⚠️ E OGNI TONO CHE LA MACCHINA PRODUCE DEV'AVERE IL SUO COLORE
-    # NEL FOGLIO: uno stato nuovo senza tono uscirebbe SENZA fondo —
-    # una card bianca in mezzo a tutte colorate, cioe' «non e'
-    # successo niente» proprio quando e' successo qualcosa
-    prova("...e ogni tono prodotto ha il suo colore nel foglio", [],
-          sorted({t.split("tono-")[1] for v in tab.values() for t in v
-                  if ".order.tono-" + t.split("tono-")[1] not in css}))
+    prova("ogni stato veste il suo rettangolino, e in pagamento passa "
+          "al viola",
+          {"creato": ["locked", "confirmed"],
+           "locked": ["locked", "confirmed"],
+           "shipped": ["shipped", "confirmed"],
+           "delivered": ["confirmed", "confirmed"],
+           "confirmed": ["confirmed", "confirmed"],
+           "released": ["released", "released"],
+           "dispute": ["dispute", "confirmed"],
+           "return_pending": ["confirmed", "confirmed"],
+           "return_shipped": ["shipped", "confirmed"],
+           "refund": ["confirmed", "confirmed"],
+           "refunded": ["refunded", "confirmed"],
+           "annullato": ["annullato", "confirmed"]}, tab)
+    # ...e ogni classe prodotta ha il suo vestito nel foglio: senza, il
+    # rettangolino uscirebbe nudo proprio sullo stato nuovo
+    prova("...e ogni classe prodotta ha il suo vestito nel foglio", [],
+          sorted({c for v in tab.values() for c in v
+                  if ".badge.%s{" % c not in nudo}))
 
-    # ---- 18-24: LE BUSTE SI CHIUDONO A ORDINE FINITO ----
+    # ---- 32-40: LE BUSTE SI CHIUDONO A ORDINE FINITO ----
     bu = solo_codice(pezzo_js(mini, "function busteOrdine(o){", "\n}\n"))
     BUSTE = ["pannelloContenutoDigitale", "pannelloNota",
              "pannelloIndirizzoCasa", "pannelloEmailCorriere",
@@ -12119,7 +12190,7 @@ console.log(JSON.stringify(out));
     prova("...e si consuma: un bottone che non fa piu' niente non "
           "resta li'", True, "'.ord-buste-link')?.remove()" in ap)
 
-    # ---- 25-26: IL BANCO DELLE BUSTE, stato per stato ----
+    # ---- 41-42: IL BANCO DELLE BUSTE, stato per stato ----
     # le cinque buste diventano segnaposto: quel che si prova qui e' il
     # GATE, e con le vere servirebbe mezzo client
     finte = "\n".join(
@@ -12159,6 +12230,7 @@ console.log(JSON.stringify(out));
           "gli altri stati restano aperte",
           {s: [VUOTO, CHIUSE if s in ("released", "refunded", "annullato")
                       else APERTE] for s in stati}, b2)
+
 
 def _notifica_admin_spia(avvisi):
     async def _n(testo):
@@ -63260,39 +63332,16 @@ def prove_card_tinte_stato():
     # resterebbe senza fondo — trasparente sul crema della pagina, non
     # bianca. Dentro il supporto si tinge, fuori resta il mondo di ieri.
     prova("la tinta sta dietro un @supports, o senza color-mix sparirebbe",
-          True, ".p2p-scambio.tinta,.order.tinta{" in sup
-          and ".p2p-scambio.tinta," not in css[:i_sup])
-    # ⚠️ E DAL 22 SET 2026 LA REGOLA E' DI DUE CASE (richiesta di
-    # Andrea): le card della lista «Ordini» prendono la stessa
-    # velatura, e «stessa» vuol dire UNA regola con due selettori —
-    # stessi byte, stesse percentuali, stessi token. Questa riga e' il
-    # motivo per cui non puo' nascere una seconda tabella di colori:
-    # se qualcuno copiasse la regola invece di allargarla, il
-    # mercatino comparirebbe in un blocco suo e qui si vedrebbe.
-    prova("...e la stessa regola veste tutt'e due le case, mai una copia",
-          (1, 0),
-          (css.count(".p2p-scambio.tinta,.order.tinta{"),
-           len(re.findall(r"(?<!\.p2p-scambio\.tinta,)\.order\.tinta\{",
-                          css))))
+          True, ".p2p-scambio.tinta{" in sup
+          and ".p2p-scambio.tinta{" not in css[:i_sup])
     prova("il velo e il bordo escono dalla stessa tinta, mischiata alla carta",
           True,
           "background:color-mix(in srgb,var(--tinta) var(--tinta-card),"
           "var(--card))" in sup
           and "border-color:color-mix(in srgb,var(--tinta) var(--tinta-bordo),"
               "var(--card))" in sup)
-    # i toni si leggono dai selettori del P2P; quelli del mercatino
-    # stanno nella stessa dichiarazione e si controllano appaiati, che
-    # e' l'unico modo perche' un giorno non si scollino
-    def toni(prefisso):
-        fuori = {}
-        for sel, ink in re.findall(
-                r"([^{}]*)\{--tinta:var\((--[a-z-]+)\)\}", sup):
-            for t in re.findall(re.escape(prefisso) + r"\.tono-([a-z]+)",
-                                sel):
-                fuori[t] = ink
-        return fuori
-
-    INCHIOSTRO = toni(".p2p-scambio")
+    INCHIOSTRO = dict(re.findall(
+        r"\.p2p-scambio\.tono-([a-z]+)\{--tinta:var\((--[a-z-]+)\)\}", sup))
     # I COLORI NON SONO NUOVI: ogni tono prende l'INCHIOSTRO del suo
     # riquadro — l'arancio dei sats, il viola, il blu, il verde, il
     # rosso, il grigio — e lo stempera nella carta
@@ -63300,16 +63349,6 @@ def prove_card_tinte_stato():
           {"locked": "--sats-text", "confirmed": "--nostr-text",
            "shipped": "--ship-text", "released": "--trust-text",
            "dispute": "--danger", "annullato": "--muted"}, INCHIOSTRO)
-    # ⚠️ OGNI TONO DEL P2P HA IL SUO GEMELLO NEL MERCATINO, nella
-    # STESSA dichiarazione: se qualcuno ne aggiungesse uno da una
-    # parte sola, le due liste si separerebbero senza che niente
-    # rompa — una card resterebbe bianca dove la sorella si tinge.
-    # `refunded` e' l'unico che il mercatino aggiunge (grigio come
-    # l'annullato: lo stesso inchiostro del suo riquadro), e il P2P
-    # non ha quello stato.
-    ORD = toni(".order")
-    prova("...e ogni tono ha il suo gemello nel mercatino, con lo "
-          "stesso inchiostro", dict(INCHIOSTRO, refunded="--muted"), ORD)
     prova("...e il riquadro resta staccato dalla card, con un filo suo",
           True, ".p2p-scambio.tinta .p2p-scambio-stato.badge{" in sup
           and "border-color:color-mix(in srgb,currentColor 30%,transparent)"
@@ -63417,18 +63456,6 @@ def prove_card_tinte_stato():
     # 3,8:1 — il conto resterebbe verde misurando un token che non
     # veste piu' niente. Questa riga lega le due cose: i testi misurati
     # sono quelli che le regole mettono davvero nella card.
-    # ⚠️ E I TESTI DELLA CARD DEGLI ORDINI SONO GLI STESSI DUE TOKEN
-    # (22 set 2026): il titolo sta su `--ink`, il verbo e la data su
-    # `--ink-soft` — due token gia' dentro TESTI, quindi il conto del
-    # contrasto qui sopra li copre senza aggiungere una riga. Questa
-    # li lega: se domani il verbo tornasse `--muted` (3,8:1 su carta
-    # bianca) il conto resterebbe verde misurando un token che non
-    # veste piu' niente.
-    prova("...e il verbo e la data della card ordini stanno sugli "
-          "stessi token misurati", True,
-          ".ord-verbo{font-size:12.5px;font-weight:700;"
-          "color:var(--ink-soft)}" in css
-          and "color:var(--ink-soft);\n    white-space:nowrap}" in css)
     prova("...e i token misurati sono quelli che vestono la card", True,
           ".p2p-scambio .p2p-box,\n  .p2p-scambio .p2p-badge,\n"
           "  .p2p-scambio .p2p-scambio-euro{color:var(--ink-soft)}" in css

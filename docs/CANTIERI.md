@@ -26203,6 +26203,66 @@ messaggi» deve leggersi come un ripensamento e non come un bottone, e
 quel che riapre deve comparire **dove stava il dito**. E un ordine con
 un titolo lungo: tre righe coi puntini devono bastare a riconoscerlo.
 
+### Il ritocco del 23 set 2026: via la tinta, lo stato in basso a destra
+
+Andrea, il giorno dopo: le card del mercatino **tornano alla carta di
+sempre**, e il rettangolino dello stato va **in basso a destra**, in riga
+col fondo della foto. Accanto alla foto restano titolo e verbo, la data
+resta sotto la foto; foto a 100, niente numero né prezzo, dettaglio e
+«Vedi i messaggi» non si toccano.
+
+**LA TINTA È TORNATA DEL SOLO P2P, E TORNATA COM'ERA.** Il blocco delle
+tinte non è stato riscritto a mano: è stato **ritagliato da 141417b**,
+cioè dal commit prima del cantiere di ieri, e rimesso byte per byte —
+così «le card di I miei scambi non cambiano di un pixel» è un fatto di
+`git diff` (nessuna riga di CSS con `tinta` diversa da prima) e non una
+promessa. Stessa cosa per `prove_card_tinte_stato`, rimessa identica.
+Via `tonoCardOrdine` e il tono `refunded`, che esistevano solo per il
+mercatino. **`badgeOrdine` resta**: è il giudice del rettangolino, e da
+funzione si prova stato per stato. Dal vivo i tre toni P2P misurati
+danno gli stessi numeri di ieri, e un `.order` con le vecchie classi
+addosso resta carta bianca.
+
+**LA CARD È UNA GRIGLIA** (`.ord-card`): tre colonne — foto, testo, ✕ —
+e tre righe — testo, stato, data. La foto abbraccia le prime due righe,
+quindi la seconda finisce dove finisce lei: lo stato appoggiato al fondo
+di quella riga sta in riga col fondo della foto **senza misurare
+niente**. Lo stato abbraccia le colonne del testo e della ✕, così il
+suo bordo destro è quello della card in tutte le card, con la ✕ o
+senza. Niente `column-gap`: la terza colonna esiste solo con la ✕, e un
+gap fisso ruberebbe 12px al titolo in tutte le altre.
+
+**DUE COSE LE HA TROVATE SOLO IL GIRO DAL VIVO, e tutt'e due erano il
+testo che usciva dall'altezza della foto:**
+- **il titolo scende da tre righe a due.** Tre righe, il verbo e il
+  rettangolino chiedono 115px contro i 100 della foto: a 375 la card
+  col titolo lungo metteva lo stato 15px sotto la foto e staccava la
+  data di 20. Due righe stanno in 95 a ogni larghezza. La clausola a
+  tre righe l'avevo scelta io ieri per tenere la card uniforme: lo
+  scopo è lo stesso, è cambiato quanto spazio resta al testo.
+- **il testo passa sotto la ✕.** Una colonna tutta sua la toglieva
+  anche al verbo, e su un rimborsato a 320 «Acquisto non concluso»
+  andava a capo in 115px, spingendo lo stato 13px sotto. La ✕ sta in
+  alto ed è alta 22: adesso il testo abbraccia la sua colonna e solo il
+  titolo le fa posto (`con-x`, messa dalla card che la ✕ ce l'ha, perché
+  il titolo viene prima e un fratello dopo non si nomina senza `:has`).
+
+**PROVE**: `prove_card_ordini` riscritta sul ritocco (niente tinta in
+nessuna forma, la griglia pezzo per pezzo, il banco node che ora
+controlla i rettangolini di tutt'e dodici gli stati invece dei toni);
+**13365/0**, nove collaudi senza rete verdi, **tortura 25/25** — sette
+rotture sono il ritorno della tinta o un pixel mosso nel P2P. **Dal
+vivo**, 375 e 320 nei due temi: dodici card su dodici a 149px, lo stato
+a 0px dal fondo della foto e dal bordo destro, la data 5px sotto la foto
+e centrata, fondo e bordo quelli della carta. Scatti via Chrome headless:
+il pannello del browser, a metà giro, ha smesso di comporre.
+
+**DA GUARDARE SUL TELEFONO**: la lista con qualche ordine concluso (la ✕)
+accanto a uno vivo — i rettangolini devono fare una colonna dritta sul
+bordo destro — e un titolo lungo, che due righe coi puntini bastino a
+riconoscerlo.
+
+
 ## Lo splash che Chrome 152 non prende più (23 set 2026, APK v1.4)
 
 Dal video del 22 set, aprendo l'app Zapstore: splash nativo arancio col
