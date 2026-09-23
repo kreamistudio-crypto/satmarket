@@ -102,6 +102,19 @@ a mano descritte sopra.
 
 ## A1 — Il posto del taker (e del maker) in `p2p_ordini` si prende con una POST
 
+> ✅ **CURATA lo stesso giorno** dal cantiere «La presa la dice mostrod»
+> (vedi `docs/CANTIERI.md`): il posto di chi ha preso si scrive SOLO se
+> `p2p_scambi` — cioè gli eventi del coordinatore — nomina quella persona;
+> una dichiarazione arrivata prima dell'evento resta in attesa in
+> `preso_dichiarato`, che nessuna rotta legge per servire l'altra parte, e
+> l'evento la conferma o la butta; a mostrod già parlato una dichiarazione
+> che non combacia è un 403 col suo journal; a ogni evento i due posti si
+> riconciliano (la riga avvelenata si azzera, l'intestazione dell'impostore
+> si corregge o si toglie). La riproduzione qui sotto è diventata una prova
+> di `prove.py` (rossa sul codice di prima, verde adesso) e la sonda dal
+> vivo l'ha rifatta sul server di collaudo. Il testo che segue resta
+> com'era, perché descrive il codice di PRIMA.
+
 **Chi ci rimette:** chi scambia — la sua controparte vera, e la sua
 reputazione. **Serve:** una sessione qualunque (anche un account nato un
 minuto prima) e l'id di un ordine, che sta nel libro pubblico. **Riprodotto
@@ -228,6 +241,14 @@ se è già successo in produzione.
 # MEDIA
 
 ## M1 — «Paga da un'altra cassaforte» sulla cassaforte SaaS: il calendario come giudice contro una hold invoice
+
+> ✅ **CURATA lo stesso giorno**, stesso cantiere: sul SaaS un «pending» di
+> LNbits vale «viva» e basta — `_giudica_origine` non ha più né una
+> scadenza né un'ora fra gli argomenti, la costante dell'ora e il ripiego
+> che leggeva la scadenza da LNbits sono spariti — e la porta si apre solo
+> con un «failed» esplicito (o, sul nodo, con LND che dice FAILED). Il
+> bottone resta acceso e a decidere è LNbits al tocco. Il testo che segue
+> resta com'era.
 
 `_giudica_origine` (`server.py:20662`) apre la porta con `ORIGINE_MORTA` in
 due modi: LNbits/LND dicono `failed`/mai partito (buono), oppure — SOLO dove

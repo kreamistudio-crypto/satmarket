@@ -27760,3 +27760,135 @@ fattura nuova: non devi fare niente»; poi, data la fattura nuova e
 passato il pagamento, «✅ Scambio concluso!» coi numeri e l'invito a
 recensire — il messaggio che prima non sarebbe arrivato. 3) Se capita un
 pagamento lento: prima la frase in volo, poi il concluso.
+
+
+## La presa la dice mostrod: la cura di A1 e M1 dell'audit 2 (23 set 2026)
+
+**LA RICHIESTA** (Andrea, subito dopo l'audit 2): la rotta con cui il
+telefono dichiara «sono maker/taker di questo ordine» non deve più
+fidarsi del telefono. Le parti di uno scambio le dice `p2p_scambi`, cioè
+gli eventi di mostrod (patch 0007): il server accetta la dichiarazione
+solo se combacia con quello che mostrod ha già detto, altrimenti 403 col
+journal; se il gesto del telefono arriva prima dell'evento, la
+dichiarazione resta in attesa e si conferma quando l'evento arriva, senza
+mostrare dati dell'altra parte prima. Nello stesso giro M1: sulla
+cassaforte SaaS un pagamento «pending» vale «vivo», senza scadenze che lo
+dichiarino morto.
+
+**LA FALLA, RIPRODOTTA PRIMA DI TOCCARE** (la sonda dell'audit, server di
+collaudo su 8125, db usa-e-getta): 333 si dichiara taker dell'ordine di
+111 con una POST a mostrod ancora muto, e diventa la controparte di 111 —
+contatti compresi — anche DOPO che l'evento `taken` di mostrod ha nominato
+444; 444 che dichiara dopo trova il posto preso; a scambio concluso la
+recensione di 111 finisce a 333 e 444 è «ignota».
+
+**LA CURA, IN TRE RIGHE.** Una colonna nuova, `p2p_ordini.preso_dichiarato`
+(la dichiarazione che ASPETTA), e due giudici puri sulla connessione:
+- `_parti_mostro_p2p(con, ordine)`: chi ha pubblicato e chi ha preso
+  secondo `p2p_scambi` — `preso_dal` dice il lato di chi ha preso, e se
+  manca vale il lato del libro; senza riga i posti sono 0 e `detto` è
+  falso. Una tabella che non c'è (i banchi di ieri, un db mai migrato) è
+  un coordinatore che non ha mai parlato, mai un'esplosione.
+- `_registra_ordini_p2p` con `presi`: se mostrod ha parlato, `preso_da` si
+  scrive solo se nomina questo account come chi ha preso (le due guardie
+  di prima — la prima dichiarazione vince, a cose fatte non si prende —
+  restano sotto quella nuova); altrimenti è `rifiutate`, col journal. Se
+  mostrod non ha parlato, la dichiarazione va in `preso_dichiarato`
+  (`in_attesa`). Con `pubblicati` su un ordine di cui mostrod conosce un
+  ALTRO maker: rifiutato; chi rimette la sua lista dalla restore senza
+  dichiararsi maker non intesta niente, in silenzio. Torna
+  `{registrati, confermate, in_attesa, rifiutate}`; la rotta risponde 403
+  «Non risulti fra le due parti di questo scambio» solo se NIENTE è
+  passato (il client manda liste).
+- `_riconcilia_parti_p2p(con, ordine, adesso)`, chiamata da
+  `_registra_evento_p2p` a OGNI evento dopo la scrittura di `p2p_scambi`:
+  la dichiarazione in attesa diventa `preso_da` se mostrod nomina proprio
+  quella persona, se no cade; una `preso_da` che mostrod smentisce si
+  azzera (la riga avvelenata di prima della cura); l'intestazione di chi
+  ha pubblicato si corregge se mostrod ne conosce un altro e si TOGLIE se
+  non lo riconosce affatto (la chiave di chi pubblica si registra prima
+  di pubblicare: un maker nostro mostrod lo riconosce sempre, chi resta è
+  l'impostore o un ordine di un altro client con una faccia sopra). Ogni
+  correzione è una riga di journal.
+Il giro del libro azzera anche `preso_dichiarato` a ogni `pending`;
+«dimentica il profilo» e la fusione la portano con sé.
+
+**PERCHÉ NON SCRIVE MAI `preso_da` DA SOLA.** La dichiarazione è il
+CONSENSO: chi entra da Nostr può non farsi riconoscere («Fatti riconoscere
+negli scambi», 17 set), e mostrod sa comunque che chiave ha preso. Senza
+dichiarazione il posto resta vuoto anche se mostrod sa chi è — e le rotte
+che servono l'altra parte (`_controparti_p2p`, `_parti_recensione_p2p`, il
+ripiego del recapito) NON sono cambiate di una riga: leggono `tg_id` e
+`preso_da` come prima, che adesso sono scritti solo con la parola di
+mostrod. È la strada scelta al posto di «le parti si leggono da
+`p2p_scambi` direttamente»: quella avrebbe recensito e mostrato anche chi
+aveva scelto di non farsi riconoscere.
+
+**COSA CAMBIA PER GLI UTENTI: NIENTE, nel flusso normale.** Chi prende
+dichiara la presa quando mostrod gli ha già risposto, e l'evento `taken`
+(fire-and-forget, due tentativi) di norma è già arrivato: confermata al
+volo. Se arriva dopo, la dichiarazione aspetta e il primo evento
+(`taken`, o la garanzia pagata, o qualunque altro) la promuove. Il client
+chiede la controparte ogni 30 secondi finché è vuota (già così dal 19
+set): compare quando mostrod ha parlato, cioè subito. Presa, garanzia,
+recapito, euro inviati, rilascio passano tutti dal coordinatore e non si
+sono mossi: il collaudo degli eventi (`collaudo_pagamento_p2p`) è verde
+identico. **UNA cosa cambia, e si dichiara:** a eventi SPENTI
+(`P2P_EVENTI_SEGRETO` assente) nessuna presa si conferma più, quindi le
+frasi del libro a chi ha preso non partono e la controparte non si vede —
+è il mondo di prima della 0007, e la produzione non ci vive dal 19 set.
+Non si è messo un ripiego «a eventi spenti si crede al telefono»: sarebbe
+la falla con un interruttore davanti.
+
+**LA STRADA ROVESCIATA NELLE PROVE**, di proposito: «chi ha pubblicato
+che si presenta dopo intesta la riga» (il banco del libro, caso I) era
+l'impostore sull'ordine di un altro client — adesso NON la intesta, e la
+prova lo dice.
+
+**M1, NELLO STESSO GIRO.** `_giudica_origine(v)` non ha più né una
+scadenza né un'ora fra gli argomenti: sul SaaS un «pending» di LNbits è
+`ORIGINE_VIVA` e la frase dice perché («resta vivo finché LNbits non dice
+"failed", anche a fattura scaduta»); la costante `ALTRA_CASSAFORTE_DOPO_SCADENZA_S`
+e il ripiego `_scadenza_da_lnbits` sono spariti (una prova pretende che
+non tornino), `_trascrivi_scadenza` resta come fatto. Il bottone senza
+rete (`_altra_cassaforte_forse`) sul SaaS è acceso con «si chiede a LNbits
+al tocco», come dove c'è LND. Il caso #152 nel banco e nel collaudo: viva
+a 10 minuti, viva a 70, si apre solo con `failed` — e allora senza credito
+(i sats sono già rientrati); la sorveglianza dei crediti si prova su un
+credito scritto a mano (nasce dove LND vede un FAILED che LNbits non ha
+recepito, scena 3).
+
+**PROVATO.** `prove.py`: 13.748 verdi, 0 rosse (PROVE_SEVERE=1, nel
+worktree senza config): la riproduzione dell'audit come prova — in attesa
+prima dell'evento, buttata all'evento che nomina 444, confermata quando
+444 dichiara, RIFIUTATA a 333 che riprova, una lista con una riga buona
+passa, la corsa giusta (444 prima dell'evento) si conferma da sola, la
+riga avvelenata si azzera, l'impostore maker si corregge o si toglie, il
+`pending` del libro azzera l'attesa, le sentinelle su «dimentica» e
+fusione, e il giudice dell'origine a tredici righe. I tre collaudi col
+server vero (`collaudo_recensione_p2p` col 403 dalla rotta,
+`collaudo_altra_cassaforte`, `collaudo_pagamento_p2p`) verdi nella gabbia
+di `collaudi_ci.py`. **LA TORTURA: 13 mutazioni, 13 uccise** — dodici dal
+banco ridotto (i sei gruppi toccati), la tredicesima (il `False` davanti
+al 403 della rotta, che `prove.py` non esegue) dal collaudo col server
+vero: due giudici, e ognuno prende quel che l'altro non vede. **DAL
+VIVO**, sul server di collaudo con la stessa sonda dell'audit: in attesa,
+`{}` per tutti prima di mostrod, buttata, confermata, 403, controparti
+giuste, recensione a 444 — e il journal con le sue righe «⛔ Libro P2P» e
+«⛔ P2P … rifiutato».
+
+**COSA GUARDARE CON DUE TELEFONI.** 1) Uno scambio normale: chi ha
+pubblicato vede la faccia dell'altro appena la presa è accettata (al più
+mezzo minuto dopo, se l'evento di mostrod è arrivato tardi), e i due
+bottoni «Scrivi su Telegram/Nostr» portano alla persona giusta. 2) Il
+journal del VPS durante quella presa: una sola riga «✅ Libro P2P: la
+presa dichiarata da … combacia con mostrod: confermata» (o nessuna, se
+la dichiarazione è arrivata dopo l'evento), e nessun «⛔». 3) La
+recensione a scambio concluso: a tutt'e due, e sul profilo giusto. 4) Con
+un terzo telefono (o `curl` con una sessione qualunque):
+`POST /api/p2p/ordini {"ordini":[<id di un ordine altrui>],"presi":true}`
+deve rispondere 403 se mostrod ha già parlato, 200 con `in_attesa: 1` se
+l'ordine è ancora in vetrina — e in quel caso la faccia dell'estraneo non
+deve comparire a nessuno, mai. 5) Un pagamento SaaS «pending» nel
+pannello 🧊: il bottone «Paga da un'altra cassaforte» è acceso ma la
+rotta dice «viva» finché LNbits non dice `failed`.
