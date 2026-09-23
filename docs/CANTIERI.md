@@ -28484,3 +28484,59 @@ caratteri — se il cassetto dice che quel venditore non ha un negozio,
 il tg_id è sbagliato o quell'account non è mai entrato in Barattolo. 3)
 Quel codice, il giorno che si vuole tornare al patto: una riga in
 `racconti.py`.
+
+## I «Copia» per riga se ne vanno: il testo si prende col dito, restano «Copia tutto l'indirizzo» e l'IBAN (23 set 2026)
+
+Secondo giro di «Dati di spedizione che si copiano», ritocco di Andrea: un
+«📋 Copia» accanto a OGNI riga faceva confusione. Worktree da
+`origin/main`, commit firmato.
+
+**COSA CAMBIA.** La riga condivisa diventa `rigaDato` (era `rigaCopia`):
+etichetta e valore, testo che si seleziona con la pressione lunga, e il
+bottone solo a chi lo chiede. Nel dettaglio dell'ordine del mercatino —
+indirizzo, email per il corriere, punto nel «Spedisci», banner del pacco,
+email di chi compra — nessun «Copia» per riga; sotto l'indirizzo resta
+«📋 Copia tutto l'indirizzo». Nel recapito P2P il «Copia» resta sulla sola
+riga dell'IBAN, che si mostra a gruppi di quattro e ora si copia SENZA
+SPAZI anche quando è arrivato con gli spazi (prima copiava il valore
+com'era arrivato). L'invito «+ Ricevi il codice direttamente dal
+corriere» prende l'inchiostro del «Cambia» (`email-link`): col `--muted`
+faceva 3,81:1 di giorno, ora 14,88 (12,46 di sera). A 320 px sta ancora
+su una riga dentro il suo pannello: le misure sono quelle di prima.
+
+**LA PRESSIONE LUNGA, VERIFICATA.** Non c'era niente da togliere: nessun
+antenato delle righe ha `user-select:none` o `touch-callout:none`,
+nessuno script spegne la selezione, il `contextmenu` lo ascolta solo la
+fila dei reparti, e l'unico `touchstart` (il «tira per aggiornare») è
+passivo e non guarda le pagine di un ordine. Adesso lo dice una prova, un
+censimento che si fa rosso al primo nome nuovo. DAL VIVO, Chrome headless
+da telefono Android nei tre ambienti — il browser, l'app Android (il
+referrer `android-app://` che accende `html.app-android`) e dentro
+Telegram (lo stub con l'initData di collaudo): 27 righe su 27 col dito
+che atterra sul valore, niente sopra che blocchi, e la selezione nativa
+(doppio clic) che prende una parola del valore senza che il nodo venga
+sostituito. ⚠️ Il TOCCO LUNGO VERO il banco non lo sa fare: in Chrome
+desktop il dito sintetico non seleziona nemmeno il paragrafo di
+controllo, che è lì apposta per dirlo — il gesto vero si guarda sul
+telefono. E il banco ha mentito due volte, smascherato: il riquadro di un
+grassetto che va a capo copre le parole attorno (si punta al primo
+rettangolo del testo), e la pagina di uno scambio si ridisegna UNA volta
+quando arriva il pacchetto Nostr caricato pigro (si aspetta; una
+selezione fatta in quel secondo si perderebbe anche sul telefono, non
+curato).
+
+**PROVE E TORTURA.** `prove_dati_spedizione_copia` riscritta per il
+secondo giro; emendate col perché le due prove del recapito P2P e il
+banco del motore (che porta dentro `rigaDato`). **TORTURA 22/22** su una
+copia: la prima passata ne ha lasciata viva UNA, l'`esc()`
+dell'ETICHETTA — che nel recapito P2P scrive l'altra persona — e adesso
+ha la sua prova, sulla riga e sul percorso P2P vero. Foto a 375 px nei
+due temi.
+
+**LA LEZIONE DEL GIRO DAL VIVO, che non è del cantiere.** Il primo giro
+aveva letto il profilo kind-0 dell'identità 222 da quattro relay VERI (il
+config locale non ha `RELAY_NOSTR`, e quella lettura non guarda la
+modalità collaudo); niente pubblicato. Da qui il config copiato nel
+worktree si neutralizza prima di avviare — relay Nostr e P2P su
+`127.0.0.1:9`, nsec al segnaposto — e si guarda che il server parli solo
+con `127.0.0.1`. La guardia nel codice la fa un'altra sessione.

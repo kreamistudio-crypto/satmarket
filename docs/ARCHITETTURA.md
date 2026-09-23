@@ -19534,13 +19534,14 @@
   la classe `.ind-campi`, che ricalca `.field`: dentro `.payout` le
   label non sono vestite da nessuno e nascevano INLINE, coi campi
   sfasati a metà riga (visto a schermo, non leggendo il foglio).
-  ⚠️ EMENDATA (23 set 2026, «Dati di spedizione che si copiano»): il
-  blocco `user-select:all` non c'è più. Il venditore legge l'indirizzo
-  a RIGHE, una per dato col suo «📋 Copia» (`righeIndirizzo`), e
-  «📋 Copia tutto l'indirizzo» copia le righe di
-  `indirizzoPerEtichetta` — che adesso scrive anche il paese, sotto la
-  città, quando la zona dell'ordine esce dai confini (`spedEstero`).
-  Vedi «IL RIGO COL "COPIA" È UNO».
+  ⚠️ EMENDATA (23 set 2026, «Dati di spedizione che si copiano», due
+  giri): il blocco `user-select:all` non c'è più. Il venditore legge
+  l'indirizzo a RIGHE, una per dato (`righeIndirizzo`), di testo che si
+  prende con la pressione lunga — il «📋 Copia» per riga del primo giro
+  è uscito, faceva confusione — e «📋 Copia tutto l'indirizzo» copia le
+  righe di `indirizzoPerEtichetta`, che adesso scrive anche il paese,
+  sotto la città, quando la zona dell'ordine esce dai confini
+  (`spedEstero`). Vedi «LA RIGA DI UN DATO È UNA».
   IL NUMERO DEI GIORNI VIENE DAL SERVER (`giorni_indirizzo` nella
   busta di prima pagina) e NON è uno specchio a mano come i tempi di
   `TEMPI`: quelli decidono se un bottone ha senso, questo È la frase
@@ -26212,30 +26213,50 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   copia il valore com'è arrivato. Il testo si seleziona (`user-select:
   text` detto nel foglio di stile) e le etichette sono `--ink-soft`,
   misurato: il `--muted` sulla carta del riquadro faceva 3,23:1.
+  ⚠️ EMENDATA (23 set 2026, secondo giro di «Dati di spedizione che si
+  copiano»): un «Copia» per riga faceva confusione. Il bottone resta
+  sulla SOLA riga dell'IBAN, e copia il valore SENZA SPAZI anche quando
+  è arrivato con gli spazi; le altre righe si prendono con la pressione
+  lunga, come un testo. Vedi «LA RIGA DI UN DATO È UNA».
   A chi VENDE, sotto il contatto Telegram, non c'è più la riga «Di' a
   chi compra dove mandarti gli euro»: lo dicono il riquadro di stato e
   il bottone arancio in cima, e `campiOrdineP2P` è diventata la sola
   porta del foglio «I vostri recapiti». Il foglio mostra il recapito
   come prima (testo intero): lì non è cambiato niente.
-- IL RIGO COL «COPIA» È UNO (23 set 2026, «Dati di spedizione che si
-  copiano»): `rigaCopia(et, v, {vista, mono, aria})` — l'etichetta
-  sopra, il valore che si seleziona, il «📋 Copia» accanto — e il suo
-  bottone da solo, `bottoneCopia(v, aria)`, stanno accanto a
-  `copiaLink`. Li portano il recapito P2P (`riquadroRecapitoP2P`, al
-  byte di prima) e le buste dell'ordine del mercatino: l'indirizzo di
-  spedizione (`righeIndirizzo`), l'email per il corriere, il punto di
-  ritiro nel «Spedisci» e nel banner del pacco. Il valore sta nel
-  `data-v`, mai nell'onclick; il tocco copia il VALORE senza
-  l'etichetta e passa da `copiaLink` — «Copiato 📋», o il valore nel
-  toast se gli appunti dicono di no. Dentro un `.payout` i righi
-  stanno in `.dati-copia`, senza la carta del riquadro P2P.
+- LA RIGA DI UN DATO È UNA (23 set 2026, «Dati di spedizione che si
+  copiano», due giri): `rigaDato(et, v, {vista, mono, copia})` —
+  l'etichetta sopra, il valore che si SELEZIONA — sta accanto a
+  `copiaLink`, e la portano il recapito P2P (`riquadroRecapitoP2P`) e
+  le buste dell'ordine del mercatino: l'indirizzo di spedizione
+  (`righeIndirizzo`), l'email per il corriere, il punto di ritiro nel
+  «Spedisci»; il banner del pacco resta la sua frase. Il valore si
+  prende con la PRESSIONE LUNGA, come qualunque testo: il primo giro
+  aveva un «📋 Copia» accanto a ogni riga, e sette bottoni uguali in
+  colonna facevano confusione. Il bottone (`bottoneCopia`: il valore
+  nel `data-v` e mai nell'onclick, «Copiato 📋», o il valore nel toast
+  se gli appunti dicono di no) resta solo dove il gesto non basta —
+  la riga dell'IBAN, che si mostra a gruppi di quattro e si copia
+  SENZA SPAZI — e sotto l'indirizzo c'è «📋 Copia tutto l'indirizzo».
+  Dentro un `.payout` le righe stanno in `.dati-copia`, senza la carta
+  del riquadro P2P.
+  NIENTE SOPRA LA RIGA SPEGNE LA SELEZIONE, e una prova lo censisce: i
+  `user-select:none` del foglio stanno solo su bottoni, stelle, foto e
+  card dei reparti, il `touch-callout:none` sulla sola card del
+  reparto, nessuno script tocca `userSelect` o `selectstart`, il
+  `contextmenu` lo ascolta solo la fila dei reparti, e l'unico
+  `touchstart` (il «tira per aggiornare») è passivo e non guarda le
+  pagine di un ordine. Un nome nuovo in quegli elenchi si guarda prima
+  di accettarlo.
   I DATI RESTANO NELLE BUSTE: i valori letti dalle rotte cifrate
   (`indirizzoLetto`, `emailLetta`) li toccano solo le funzioni della
   loro busta, e il «Spedisci» porta i cartelli — una prova lo conta.
-  A CHI COMPRA il rigo va dove il suo dato si LEGGE: l'email appena
+  A CHI COMPRA la riga va dove il suo dato si LEGGE: l'email appena
   salvata (sotto, «✏️ Cambia l'email» riapre il campo precompilato) e
   il punto nel banner del pacco. Dove il dato si SCRIVE — il modulo
-  dell'indirizzo, la casella del punto — resta il campo.
+  dell'indirizzo, la casella del punto — resta il campo. I due link
+  del pannello dell'email, l'invito «+ Ricevi il codice…» e il
+  «Cambia», hanno l'inchiostro del pannello (`email-link`): col grigio
+  di `nota-aggiungi` facevano 3,81:1 di giorno.
 - SATS IN PAGAMENTO, DETTO A CHI VENDE (23 set 2026, «Ritocchi allo
   scambio P2P»): a chi vende, «Scambio concluso» arriva solo a
   pagamento RIUSCITO verso chi compra. Il messaggio con cui mostrod
