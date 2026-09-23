@@ -286,8 +286,7 @@ CANTIERI, «Il passo 3 delle commissioni per persona»).
 col premio GIA' applicato. Quindi la base dell'aliquota non e' il
 controvalore a mercato puro ma l'importo scontato o caricato dal
 premio — l'ordine in cui il conto del client mostra le righe
-(Controvalore, premio, Subtotale, fee) e' quello, e non e'
-impaginazione.
+(Controvalore, premio, Subtotale, fee) e' quello, e non e' impaginazione.
 E LA LEZIONE DEL GIRO VALE OLTRE LA SONDA: il lettore del quadro
 agganciava la risposta con UN criterio solo — il `request_id` — e da
 quell'aggancio dipendevano a cascata quattro risposte, che sono uscite
@@ -316,8 +315,7 @@ si rende robusto il lettore invece di scommettere sul campo.**
 rispondere ad Alan, che proponeva di allungare «i 15 minuti» a un
 giorno e la vita dell'ordine a 7). Il commento del `settings.tpl.toml`
 su questo punto DICE IL FALSO, ed è la ragione per cui si legge il
-codice: attribuisce il mestiere a una voce inerte e lo nega a quella
-viva.
+codice: attribuisce il mestiere a una voce inerte e lo nega a quella viva.
 • `expiration_seconds` (900) è il tempo per COMPLETARE la presa in
 carico: `find_order_by_seconds` in `src/db.rs` filtra
 `WHERE taken_at < now − expiration_seconds` sui SOLI stati
@@ -499,6 +497,8 @@ il codice, e la discrepanza è nell'issue.
    (max 1 ogni 24h).
 6. Testare sempre in locale (MODALITA_COLLAUDO=True, tre identità finte:
    Compratore 111, Venditore 222, Admin 999) prima del deploy.
+   In collaudo e nei giri dal vivo mai relay veri: il server lo impedisce
+   da sé, il browser va puntato al relay morto.
    In produzione MODALITA_COLLAUDO deve restare False.
 7. Stile del codice esistente: commenti e nomi in italiano, tono caldo,
    niente refactoring di massa non richiesti, diff piccoli e verificabili.
