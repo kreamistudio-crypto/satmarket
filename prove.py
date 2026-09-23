@@ -6332,11 +6332,11 @@ def prove_altra_cassaforte():
         m.nodo.hash_di = lambda bolt: (
             (leggi(bolt, con_hash=True) or {}).get("hash")
             or ("hash-di-" + bolt)[:100])
-        i = _SORGENTE.index("\nALTRA_CASSAFORTE_DOPO_SCADENZA_S = ") + 1
+        i = _SORGENTE.index("\nTIMBRO_CREDITI = ") + 1
         exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
         for nome, asincrona in (
                 ("_giudica_origine", 0), ("_trascrivi_scadenza", 0),
-                ("_scadenza_da_lnbits", 1), ("_fattura_nuova_pronta", 0),
+                ("_fattura_nuova_pronta", 0),
                 ("_esamina_altra_cassaforte", 1),
                 ("_altra_cassaforte_forse", 0),
                 ("posso_altra_cassaforte", 1),
@@ -6424,27 +6424,37 @@ def prove_altra_cassaforte():
           "incerto", riga(m)[1])
     forse = m.amb["_altra_cassaforte_forse"]
     o = m.vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
-    prova("il bottone e' SPENTO: la fattura d'origine non e' ancora scaduta",
-          False, forse(m.amb["db"](), o, int(m.orologio.time()))["forse"])
+    # M1 DELL'AUDIT 2 (23 set 2026): sul SaaS non c'e' piu' un calendario
+    # da guardare — un «pending» e' vivo finche' LNbits non dice «failed»,
+    # qualunque cosa dica la scadenza della fattura (un HTLC accettato si
+    # salda fino al suo CLTV). Il bottone e' ACCESO, e a decidere e' la
+    # rotta al tocco, come dove c'e' LND.
+    prova("il bottone e' ACCESO: senza LND si chiede a LNbits al tocco",
+          (True, "si chiede a LNbits al tocco"),
+          (lambda f: (f["forse"], f["perche"]))(
+              forse(m.amb["db"](), o, int(m.orologio.time()))))
     r = posso(m)
-    prova("troppo presto (fattura viva): la porta e' chiusa, e dice «viva»",
+    prova("fattura viva e LNbits «pending»: la porta e' chiusa, e dice «viva»",
           (False, "viva"), (campo(r, "ok"), campo(r, "codice")))
     r = paga(m, cassaforte="nodo", conferma=True)
     prova("...e la rotta RIFIUTA con un 409", 409, codice_http(r))
-    prova("...con la frase chiara", True,
-          "non è ancora scaduta" in str(getattr(r, "detail", "")))
+    prova("...con la frase chiara: resta vivo finche' LNbits non dice «failed»",
+          True, "resta vivo" in str(getattr(r, "detail", "")))
     m.orologio.avanti = 70 * MINUTI         # scaduta da dieci minuti
-    r = posso(m)
-    prova("scaduta da 10 minuti: e' «presto», e dice fra quanto",
-          ("presto", True),
-          (campo(r, "codice"), "riprova fra 50" in (campo(r, "perche") or "")))
+    prova("scaduta da 10 minuti: ANCORA «viva» (il calendario non e' un giudice)",
+          "viva", campo(posso(m), "codice"))
     m.orologio.avanti = 130 * MINUTI        # scaduta da settanta
-    o = m.vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
-    prova("scaduta da 70 minuti: il bottone si ACCENDE", True,
-          forse(m.amb["db"](), o, int(m.orologio.time()))["forse"])
     r = posso(m)
-    prova("l'origine e' morta, ma MANCA la fattura nuova (in colonna c'e' "
-          "la vecchia)", ("manca_fattura", True, True),
+    prova("scaduta da 70 minuti: ANCORA «viva» — era la porta del doppio "
+          "pagamento con una hold invoice (M1)", ("viva", True),
+          (campo(r, "codice"), "anche a fattura scaduta" in (campo(r, "perche") or "")))
+    prova("...e non si paga: 409, niente mosso", (409, 1),
+          (codice_http(paga(m, cassaforte="nodo", conferma=True)),
+           len(m.nodo.pagati_da)))
+    m.nodo.saas[h(1)] = "failed"
+    r = posso(m)
+    prova("LNbits dice «failed»: l'origine e' morta, ma MANCA la fattura nuova "
+          "(in colonna c'e' la vecchia)", ("manca_fattura", True, True),
           (campo(r, "codice"), campo(r, "origine_morta"),
            campo(r, "fattura_vecchia")))
     r = paga(m, cassaforte="nodo", conferma=True)
@@ -6477,13 +6487,14 @@ def prove_altra_cassaforte():
     prova("...e il gesto di chi vende si spegne", False,
           stadio(m).get("gesto_venditore"))
     r = posso(m)
-    prova("adesso SI PUO': origine, destinazioni, cifra, e un credito",
-          (True, "saas", ["nodo"], 1000, "fattura", 1),
+    prova("adesso SI PUO': origine, destinazioni, cifra, e NESSUN credito "
+          "(LNbits ha detto «failed»: quei sats sono gia' rientrati)",
+          (True, "saas", ["nodo"], 1000, "fattura", 0),
           (campo(r, "ok"), campo(r, "origine"), campo(r, "destinazioni"),
            campo(r, "sats"), campo(r, "fattura"),
            len(campo(r, "crediti") or [])))
     prova("...con le voci delle fonti da mostrare a chi conferma", True,
-          "LNbits dice «pending», LND dice «n/a»"
+          "LNbits dice «failed», LND dice «n/a»"
           in " ".join(campo(r, "voci") or []))
     prova("senza la conferma esplicita: 400", 400,
           codice_http(paga(m, cassaforte="nodo")))
@@ -6505,20 +6516,19 @@ def prove_altra_cassaforte():
     prova("...la nota dice da dove, invece di dove, chi, e perche'",
           [True] * 4,
           [x in nota for x in ("pagato dalla cassaforte nodo invece di saas",
-                               "deciso da 999", "motivo:", "pending")])
+                               "deciso da 999", "motivo:", "failed")])
     c = m.vero.execute("SELECT cassaforte, hash, sats, pagato_da, deciso_da, "
                        "stato FROM crediti_cassaforte").fetchall()
-    prova("...sul SaaS resta UN credito da recuperare, col suo hash",
-          [("saas", h(1), 1000, "nodo", 999, "aperto")],
-          [tuple(x) for x in c])
+    prova("...sul SaaS NON resta nessun credito: l'origine era «failed»",
+          [], [tuple(x) for x in c])
     prova("...l'hash d'origine e' «deviato» e ricorda la sua cassaforte",
           ("deviato", "saas"),
           tuple(m.vero.execute("SELECT esito, cassaforte FROM payout_tentati "
                                "WHERE hash=?", (h(1),)).fetchone() or ()))
     prova("...chi vende riceve «Arrivati ✓», come sempre", True,
           any(chi == 222 and "Arrivati ✓" in t for chi, t in m.detto_a))
-    prova("...i moderatori leggono il verbale, col credito", True,
-          any("🔀" in a and "credito da recuperare" in a for a in m.avvisi))
+    prova("...i moderatori leggono il verbale, senza credito", True,
+          any("🔀" in a and "non resta niente di appeso" in a for a in m.avvisi))
     prova("...il journal ha la riga della decisione", True,
           any("⚖️ Altra cassaforte" in d and "DEVIATO da saas a nodo" in d
               for d in m.detto))
@@ -6534,11 +6544,24 @@ def prove_altra_cassaforte():
                       "CONTROLLI_LIBRO_MASTRO = (")) + 2])
         if c[0] in ("credito da recuperare su un'altra cassaforte",
                     "incasso deviato senza verbale")]
-    prova("il libro mastro grida il credito, e NON la deviazione (ha il "
-          "suo verbale)", [[1], []],
+    prova("il libro mastro non grida niente: ne' credito ne' deviazione (ha il "
+          "suo verbale)", [[], []],
           [[x[0] for x in m.vero.execute(c[2]).fetchall()] for c in ctrl])
 
     # ---- il credito, dopo: rientra da solo, o e' un doppio -----------
+    # Un credito nasce dove LND vede un FAILED che LNbits non ha ancora
+    # recepito (scena 3): qui lo si scrive a mano sul SaaS, con l'hash
+    # d'origine ancora «pending», per provare la SORVEGLIANZA — che e' la
+    # stessa dovunque il credito sia nato.
+    m.vero.execute(
+        "INSERT INTO crediti_cassaforte(tabella, riga_id, cassaforte, hash, "
+        "sats, pagato_da, motivo, deciso_da, deciso_il) "
+        "VALUES('ordini',1,'saas',?,1000,'nodo','prova',999,?)",
+        (h(1), int(m.orologio.time())))
+    m.vero.commit()
+    m.nodo.saas[h(1)] = "pending"
+    prova("il libro mastro adesso grida il credito", [[1], []],
+          [[x[0] for x in m.vero.execute(c[2]).fetchall()] for c in ctrl])
     m.orologio.avanti += 3600
     gira(m.amb["sorveglia_crediti"]())
     prova("credito ancora appeso: resta aperto, in silenzio",
@@ -6657,11 +6680,12 @@ def prove_altra_cassaforte():
           "gia' rientrati)", (True, 0),
           (campo(r, "ok"), len(campo(r, "crediti") or [])))
 
-    # ================= 5. LA SCADENZA CHE NON SI SA ==================
+    # ================= 5. LA SCADENZA NON E' PIU' UN GIUDICE (M1) ======
     def senza_scadenza():
         m = mondo2()
         fino_al_congelato(m)
         m.orologio.avanti = 130 * MINUTI
+        m.nodo.saas[h(1)] = "pending"
         # chi vende ha GIA' coperto la vecchia fattura, e la memoria e'
         # quella di una riga di ieri: la scadenza non la sa nessuno
         m.vero.execute("UPDATE ordini SET invoice_venditore=?", (m.F(2),))
@@ -6670,23 +6694,17 @@ def prove_altra_cassaforte():
 
     m = senza_scadenza()
     r = posso(m)
-    prova("scadenza ignota e LNbits non la dice: ignota, porta chiusa",
-          ("ignota", True),
-          (campo(r, "codice"), "non conosco la scadenza"
-           in (campo(r, "perche") or "")))
-    m = senza_scadenza()
-    m.nodo.bolt11_di[h(1)] = bolt11_finta(
-        1000, 3600, int(_time.time()) - 60, phash=9)
-    prova("LNbits rende la bolt11 di UN ALTRO pagamento: non le si crede",
-          "ignota", campo(posso(m), "codice"))
+    prova("scadenza ignota e LNbits «pending»: viva (fino al 23 set era "
+          "«ignota», e con la scadenza letta da LNbits si APRIVA)",
+          ("viva", True),
+          (campo(r, "codice"), "resta vivo" in (campo(r, "perche") or "")))
     m = senza_scadenza()
     m.nodo.bolt11_di[h(1)] = bolt11_finta(1000, 3600, int(_time.time()),
                                           phash=1)
-    r = posso(m)
-    prova("LNbits rende QUELLA bolt11 (l'hash combacia): la scadenza si "
-          "legge da li'", True, campo(r, "ok"))
-    prova("...e si trascrive, cosi' non si richiede", True,
-          (primo(m, "SELECT scade FROM payout_tentati") or 0) > 0)
+    prova("...e nemmeno la bolt11 resa da LNbits apre niente: la scadenza "
+          "non si chiede piu' a nessuno", ("viva", 0),
+          (campo(posso(m), "codice"),
+           primo(m, "SELECT scade FROM payout_tentati") or 0))
     # la riga DI IERI: nessuna memoria, il solo payout_hash, e in colonna
     # ancora la fattura di quel tentativo (e' il #152 com'e' sul VPS)
     m = mondo2()
@@ -6694,12 +6712,13 @@ def prove_altra_cassaforte():
     m.vero.execute("DELETE FROM payout_tentati")
     m.orologio.avanti = 130 * MINUTI
     r = posso(m)
-    prova("riga di ieri: l'hash entra in memoria e la scadenza si legge "
-          "dalla fattura in colonna",
-          ("manca_fattura", (h(1), True)),
+    prova("riga di ieri: l'hash entra in memoria, la scadenza si trascrive "
+          "dalla fattura in colonna (un fatto, non un giudice), e resta «viva»",
+          ("viva", (h(1), True)),
           (campo(r, "codice"), (lambda x: (x[0], x[1] > 0))(
               m.vero.execute("SELECT hash, scade FROM payout_tentati")
               .fetchone() or ("", 0))))
+    m.nodo.saas[h(1)] = "failed"
     m.vero.execute("UPDATE ordini SET invoice_venditore=?", (m.F(2),))
     r = paga(m, cassaforte="nodo", conferma=True)
     prova("...si paga dal nodo, e l'hash di ieri — che una cassaforte non "
@@ -6714,6 +6733,7 @@ def prove_altra_cassaforte():
         m = mondo2()
         fino_al_congelato(m)
         m.orologio.avanti = 130 * MINUTI
+        m.nodo.saas[h(1)] = "failed"       # M1: si apre solo cosi'
         m.vero.execute("UPDATE ordini SET invoice_venditore=?", (m.F(2),))
         return m
 
@@ -6733,8 +6753,9 @@ def prove_altra_cassaforte():
     m2 = mondo2(condiviso=m)
     esiti = gira(insieme(m.amb["paga_da_altra_cassaforte"](dict(corpo)),
                          m2.amb["paga_da_altra_cassaforte"](dict(corpo))))
-    prova("due moderatori da due PROCESSI (lucchetti separati): uno solo",
-          ([409, None], 1, 1),
+    prova("due moderatori da due PROCESSI (lucchetti separati): uno solo, e "
+          "nessun credito (l'origine era «failed»)",
+          ([409, None], 1, 0),
           (sorted((codice_http(e) for e in esiti), key=str),
            len([x for x in m.nodo.pagati_da if x[0] == "nodo"]),
            primo(m, "SELECT COUNT(*) FROM crediti_cassaforte")))
@@ -6766,6 +6787,7 @@ def prove_altra_cassaforte():
     m = mondo2()
     fino_al_congelato(m)
     m.orologio.avanti = 130 * MINUTI
+    m.nodo.saas[h(1)] = "failed"
     m.vero.execute("UPDATE ordini SET invoice_venditore='lnbc-cartone'")
     r = posso(m)
     prova("una fattura in colonna che non si legge NON vale come nuova "
@@ -6791,6 +6813,7 @@ def prove_altra_cassaforte():
     m = mondo2(address="pedro@wallet.tld")
     fino_al_congelato(m)
     m.orologio.avanti = 130 * MINUTI
+    m.nodo.saas[h(1)] = "failed"
     r = posso(m)
     prova("chi vende ha un address: si puo' senza incollare niente",
           (True, "address", True),
@@ -6811,7 +6834,7 @@ def prove_altra_cassaforte():
           (True, False, ("confirmed", "", "nodo")),
           (campo(r, "ok") is True, "Pagato" in (campo(r, "messaggio") or ""),
            (riga(m)[0], riga(m)[1], riga(m)[4])))
-    prova("...il credito sul SaaS resta aperto", "aperto",
+    prova("...e sul SaaS non c'e' nessun credito: l'origine era «failed»", None,
           primo(m, "SELECT stato FROM crediti_cassaforte"))
     r = incolla(m, m.F(3))
     prova("...e la fattura dopo si paga DA SOLA, dal nodo, senza moderatori",
@@ -6860,6 +6883,7 @@ def prove_altra_cassaforte():
     m = mondo2(stato="shipped")
     fino_al_congelato(m)
     m.orologio.avanti = 130 * MINUTI
+    m.nodo.saas[h(1)] = "failed"
     r = incolla(m, m.F(2))
     prova("'shipped' e congelato, ma NESSUNO ha chiesto la fattura: la "
           "porta resta quella di ieri (400)", 400, codice_http(r))
@@ -6876,6 +6900,7 @@ def prove_altra_cassaforte():
     m = mondo2(stato="shipped")
     fino_al_congelato(m)
     m.orologio.avanti = 130 * MINUTI
+    m.nodo.saas[h(1)] = "failed"
     paga(m, azione="chiedi_fattura")
     m.vero.execute("UPDATE ordini SET payout_stato=''")
     prova("...una richiesta VECCHIA su un payout non piu' congelato non "
@@ -6883,6 +6908,7 @@ def prove_altra_cassaforte():
     m = mondo2(stato="shipped")
     fino_al_congelato(m)
     m.orologio.avanti = 130 * MINUTI
+    m.nodo.saas[h(1)] = "failed"
     paga(m, azione="chiedi_fattura")
     m.amb["verifica_utente"] = lambda *a: {"id": 111}
     r = gira(prova_a(m.amb["deposita_invoice"](1, {"invoice": m.F(2)})))
@@ -6892,52 +6918,50 @@ def prove_altra_cassaforte():
 
     # ================= 10. IL GIUDICE, RIGA PER RIGA =================
     giudica = m.amb["_giudica_origine"]
-    N = m.amb["ALTRA_CASSAFORTE_DOPO_SCADENZA_S"]
-    ORA = 1_000_000
     casi = [
-        # verdetto, lnbits, lnd, scade, atteso
-        ("uscito", "success", "spento", ORA - 9 * N, "uscita"),
-        ("uscito", "pending", "SUCCEEDED", ORA - 9 * N, "uscita"),
-        ("in_volo", "pending", "IN_FLIGHT", ORA - 9 * N, "viva"),
-        ("ignoto", "muto", "IN_FLIGHT", ORA - 9 * N, "viva"),
-        ("fallito", "pending", "FAILED", 0, "morta"),
-        ("fallito", "failed", "spento", 0, "morta"),
-        ("mai_partito", "pending", "assente", 0, "morta"),
-        ("in_volo", "pending", "assente", ORA - 9 * N, "presto"),
-        ("in_volo", "pending", "muto", ORA - 9 * N, "ignota"),
-        ("ignoto", "success", "FAILED", ORA - 9 * N, "ignota"),
-        ("ignoto", "muto", "spento", ORA - 9 * N, "ignota"),
-        ("in_volo", "assente", "spento", ORA - 9 * N, "presto"),
-        ("in_volo", "pending", "spento", 0, "ignota"),
-        ("in_volo", "pending", "spento", ORA + 1, "viva"),
-        ("in_volo", "pending", "spento", ORA - N + 1, "presto"),
-        ("in_volo", "pending", "spento", ORA - N, "morta"),
+        # verdetto, lnbits, lnd, atteso
+        ("uscito", "success", "spento", "uscita"),
+        ("uscito", "pending", "SUCCEEDED", "uscita"),
+        ("in_volo", "pending", "IN_FLIGHT", "viva"),
+        ("ignoto", "muto", "IN_FLIGHT", "viva"),
+        ("fallito", "pending", "FAILED", "morta"),
+        ("fallito", "failed", "spento", "morta"),
+        ("mai_partito", "pending", "assente", "morta"),
+        ("in_volo", "pending", "assente", "presto"),
+        ("in_volo", "pending", "muto", "ignota"),
+        ("ignoto", "success", "FAILED", "ignota"),
+        ("ignoto", "muto", "spento", "ignota"),
+        ("in_volo", "assente", "spento", "presto"),
+        # M1 (23 set 2026): «pending» senza un LND da sentire e' VIVO,
+        # punto — prima qui c'erano quattro righe di calendario
+        # (scadenza ignota, viva, presto, morta), e l'ultima era la
+        # porta del doppio pagamento con una hold invoice
+        ("in_volo", "pending", "spento", "viva"),
     ]
-    prova("il giudice dell'origine, sedici righe",
-          [c[4] for c in casi],
-          [giudica({"verdetto": c[0], "lnbits": c[1], "lnd": c[2]},
-                   c[3], ORA)[0] for c in casi])
+    prova("il giudice dell'origine, tredici righe",
+          [c[3] for c in casi],
+          [giudica({"verdetto": c[0], "lnbits": c[1], "lnd": c[2]})[0]
+           for c in casi])
     # IL #152 ERA DEL SAAS, e dal 22 set il SaaS dice «n/a»: se il giudice
-    # lo leggesse come «c'e' un LND nostro» il calendario non conterebbe
-    # piu' e l'origine resterebbe «ignota» per sempre
+    # lo leggesse come «c'e' un LND nostro» l'origine resterebbe «ignota»
+    # per sempre
     prova("...e con LND «n/a» ogni riga «spento» giudica uguale",
-          [c[4] for c in casi if c[2] == "spento"],
-          [giudica({"verdetto": c[0], "lnbits": c[1], "lnd": "n/a"},
-                   c[3], ORA)[0] for c in casi if c[2] == "spento"])
-    # I MINUTI CHE MANCANO SI DICONO PER ECCESSO, e qui a orologio FERMO:
-    # la scena del #152 li leggeva da un orologio vero, e in CI — un
-    # secondo piu' lenta — «fra 50» diventava «fra 49». Rossa solo la'.
+          [c[3] for c in casi if c[2] == "spento"],
+          [giudica({"verdetto": c[0], "lnbits": c[1], "lnd": "n/a"})[0]
+           for c in casi if c[2] == "spento"])
     appeso = {"verdetto": "in_volo", "lnbits": "pending", "lnd": "spento"}
-    prova("...«riprova fra N» e' arrotondato per eccesso, al secondo",
-          [True, True, True],
-          ["riprova fra 50 (" in giudica(appeso, ORA - 630, ORA)[1],
-           "riprova fra 50 (" in giudica(appeso, ORA - 659, ORA)[1],
-           "riprova fra 1 (" in giudica(appeso, ORA - N + 1, ORA)[1]])
-    prova("N e' un'ora, cioe' quattro volte il «mai partito»",
-          (3600, True), (N, N >= 4 * K["MAI_PARTITO_DOPO_S"]))
+    prova("...e il «pending» sul SaaS dice perche' resta vivo", True,
+          "finché LNbits non dice «failed»" in giudica(appeso)[1])
     corpo_g = codice(pezzo("_giudica_origine"))
     prova("il giudice e' PURO: niente rete, niente database", False,
           any(x in corpo_g for x in ("await ", "db(", "httpx", "time.time")))
+    prova("...e NON HA PIU' un calendario: ne' una scadenza ne' un'ora fra "
+          "gli argomenti, ne' un'ora da guardare dentro (M1)", False,
+          any(x in corpo_g for x in ("scade", "adesso", "ALTRA_CASSAFORTE")))
+    prova("...la costante dell'ora e' sparita dal sorgente, col ripiego che "
+          "leggeva la scadenza da LNbits", (False, False),
+          ("ALTRA_CASSAFORTE_DOPO_SCADENZA_S" in _SORGENTE,
+           "_scadenza_da_lnbits" in _SORGENTE))
 
     # ================= 11. I PEZZI, UNO PER UNO ======================
     ALF = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
@@ -6959,6 +6983,7 @@ def prove_altra_cassaforte():
           [pronta("nodo"), pronta("saas"), pronta("luna")])
     m = pronto()
     m.nodo.pronte = ["saas"]
+    forse = m.amb["_altra_cassaforte_forse"]     # quello di QUESTO mondo
     o = m.vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
     prova("senza un'altra cassaforte configurata: bottone spento, e 409",
           (False, "nessuna"),
@@ -49507,8 +49532,11 @@ def prove_volti_libro():
         "INSERT INTO utenti VALUES(222,'Bruno','av_b.jpg',0,0,"
         " 'nessuna','bruno_tg','', 0);")
     amb = {"FORMA_ORDINE_P2P": re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
-           "MAX_ORDINI_P2P": 200}
-    for f in ("_ordini_puliti_p2p", "_registra_ordini_p2p",
+           "MAX_ORDINI_P2P": 200,
+           # (A1) il giudice delle parti chiede a `p2p_scambi`, che qui non
+           # c'e': nomina sqlite3 per dire «nessuna tabella = nessuno»
+           "sqlite3": sqlite3}
+    for f in ("_ordini_puliti_p2p", "_registra_ordini_p2p", "_parti_mostro_p2p", "_riconcilia_parti_p2p",
               "_facce_ordini_p2p"):
         exec(pezzo(f), amb)
     reg, facce_di = amb["_registra_ordini_p2p"], amb["_facce_ordini_p2p"]
@@ -65866,7 +65894,7 @@ def _banco_eventi_p2p(eventi_attivi=True):
               "_tabacchino_libro", "_sollecito_p2p_vivo", "_passaggio_libro_p2p",
               "_testo_libro_p2p", "_avvisi_libro_p2p", "eventi_p2p_attivi",
               "_momento_evento_p2p", "_evento_p2p_pulito",
-              "_registra_evento_p2p", "_destinatari_evento_p2p",
+              "_registra_evento_p2p", "_parti_mostro_p2p", "_riconcilia_parti_p2p", "_destinatari_evento_p2p",
               "_testo_evento_p2p", "_nome_altro_p2p", "_dati_frase_p2p",
               "_avvisi_evento_p2p", "_scarica_attese_p2p",
               "_pagamento_ordine_p2p",
@@ -66866,8 +66894,13 @@ def prove_p2p_avvisi_libro():
     a_i = src.index("CREATE TABLE IF NOT EXISTS p2p_attese(")
     con.executescript(src[a_i:src.index("ON p2p_attese(scade);", a_i)
                           + len("ON p2p_attese(scade);")])
+    # ...e la parola del coordinatore (23 set 2026, A1): senza `p2p_scambi`
+    # una presa dichiarata resta in attesa, e qui si prova proprio la presa
+    s_i = src.index("CREATE TABLE IF NOT EXISTS p2p_scambi(")
+    con.executescript(src[s_i:src.index("\n    );\n", s_i) + len("\n    );\n")])
     import json as _json
     amb = {"html": _html, "json": _json, "print": lambda *a, **k: None,
+           "sqlite3": __import__("sqlite3"),
            "FORMA_ORDINE_P2P": _re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
            "MAX_ORDINI_P2P": 200, "P2P_RISERVA_S": 60,
            "eventi_p2p_attivi": lambda: True,
@@ -66879,7 +66912,7 @@ def prove_p2p_avvisi_libro():
     for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
               "_parti_recensione_p2p",
               "_euro_libro", "_euro_tabacchino", "_metodi_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
-              "_ordini_puliti_p2p", "_registra_ordini_p2p"):
+              "_ordini_puliti_p2p", "_registra_ordini_p2p", "_parti_mostro_p2p", "_riconcilia_parti_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
     giud, reg = amb["_avvisi_libro_p2p"], amb["_registra_ordini_p2p"]
     passaggio, euro = amb["_passaggio_libro_p2p"], amb["_euro_libro"]
@@ -67100,9 +67133,19 @@ def prove_p2p_avvisi_libro():
         return (r["tg_id"], r["preso_da"], r["maker"], r["stato"])
 
     H, I, J, K, L = ("ordine-%s" % x for x in "hijkl")
+
+    # (23 set 2026, A1) LA PRESA VALE SOLO SE MOSTROD LA DICE: `detta` e'
+    # la sua parola in `p2p_scambi` — chi compra, chi vende, da che lato
+    # e' arrivata la presa — scritta prima che il telefono dichiari
+    def detta(oid, compra, vende, lato="buyer"):
+        con.execute("INSERT OR REPLACE INTO p2p_scambi(ordine, compratore, "
+                    "venditore, preso_dal, giro, aggiornato) VALUES(?,?,?,?,1,0)",
+                    (oid, compra, vende, lato))
+
     # H: 111 pubblica, 222 prende — due frasi per passaggio, ognuno dal suo lato
     reg(con, 111, [H], 10000, True)
     giud(con, [ev(H, "pending", 10000)], 10000, 0.02, 168)
+    detta(H, 222, 111)
     reg(con, 222, [H], 10050, False, True)
     prova("la presa si scrive accanto a chi ha pubblicato, senza toccarlo",
           (111, 222, 1, "pending"), riga(H))
@@ -67125,6 +67168,7 @@ def prove_p2p_avvisi_libro():
           and "Non hai proseguito in tempo" in testi.get(222, "")
           and "puoi riprenderlo" in testi.get(222, ""))
     prova("...e chi aveva preso viene scollegato dalla riga", (111, 0, 1, "pending"), riga(H))
+    detta(H, 444, 111)
     reg(con, 444, [H], 11000, False, True)
     fuori = giud(con, [ev(H, "in-progress", 11100, sats=50000)], 11100, 0.02, 168)
     prova("la presa nuova e' di un altro: a chi ha pubblicato si ridice (e' un giro nuovo), al primo no",
@@ -67143,6 +67187,7 @@ def prove_p2p_avvisi_libro():
                     "scambio." in testi.get(k, "") for k in (111, 444)))
 
     # I: chi ha pubblicato non e' di Barattolo — la riga nasce dalla presa
+    detta(I, 0, 222, "seller")            # un BUY altrui: 222 prende, e vende
     reg(con, 222, [I], 20000, False, True)
     prova("la presa di un ordine altrui fa nascere la riga a intestatario ignoto",
           (0, 222, 0, ""), riga(I))
@@ -67157,13 +67202,18 @@ def prove_p2p_avvisi_libro():
     prova("annullato: la frase arriva anche a chi ha preso", True,
           [t for t, _ in fuori] == [222] and "annullato" in fuori[0][1])
     reg(con, 555, [I], 20300)
-    prova("chi ha pubblicato che si presenta dopo intesta la riga", (555, 222), riga(I)[:2])
+    # (23 set 2026, A1) ROVESCIATA: prima «chi si presenta dopo intesta la
+    # riga» — era la porta dell'impostore sull'ordine di un altro client.
+    # Mostrod non lo riconosce come chi ha pubblicato: la riga non e' sua.
+    prova("chi si presenta dopo come maker NON intesta la riga: mostrod non lo conosce",
+          (0, 222), riga(I)[:2])
     reg(con, 222, [I], 20400)
-    prova("...ma chi l'ha presa no, mai", (555, 222), riga(I)[:2])
+    prova("...e chi l'ha presa nemmeno, mai", (0, 222), riga(I)[:2])
 
     # J: la vecchia intestazione dalla restore di un ordine altrui si corregge
     reg(con, 222, [J], 30000)
     prova("(prima) la restore intesta l'ordine altrui a chi lo prendera'", (222, 0), riga(J)[:2])
+    detta(J, 222, 0)
     reg(con, 222, [J], 30100, False, True)
     prova("la presa corregge: intestatario ignoto, presa scritta dove va", (0, 222, 0), riga(J)[:3])
 
@@ -67175,6 +67225,7 @@ def prove_p2p_avvisi_libro():
     # L: chi ha preso e ha spento gli avvisi non legge niente
     reg(con, 111, [L], 50000, True)
     giud(con, [ev(L, "pending", 50000)], 50000, 0.02, 168)
+    detta(L, 333, 111)
     reg(con, 333, [L], 50050, False, True)
     fuori = giud(con, [ev(L, "in-progress", 50100, sats=100)], 50100, 0.02, 168)
     prova("l'interruttore vale anche per chi ha preso", [111], [t for t, _ in fuori])
@@ -67340,7 +67391,7 @@ def prove_p2p_orologio():
         for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
               "_parti_recensione_p2p",
                   "_euro_libro", "_euro_tabacchino", "_metodi_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
-                  "_ordini_puliti_p2p", "_registra_ordini_p2p",
+                  "_ordini_puliti_p2p", "_registra_ordini_p2p", "_parti_mostro_p2p", "_riconcilia_parti_p2p",
                   "_relay_p2p_dice", "_esiti_p2p_dice", "_chiedi_relay_p2p",
                   "_chiedi_tutti_p2p", "_unisci_p2p", "_conto_relay_p2p",
                   "_chiave_evento_p2p", "_ascolto_porta", "_mazzetto_sveglia",
@@ -67611,7 +67662,7 @@ def prove_p2p_tutti_i_relay():
                  "_giro_attese_p2p")
     for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
               "_parti_recensione_p2p", "_euro_libro", "_euro_tabacchino", "_metodi_libro", "_testo_libro_p2p",
-              "_avvisi_libro_p2p", "_ordini_puliti_p2p", "_registra_ordini_p2p",
+              "_avvisi_libro_p2p", "_ordini_puliti_p2p", "_registra_ordini_p2p", "_parti_mostro_p2p", "_riconcilia_parti_p2p",
               "_relay_p2p_dice", "_esiti_p2p_dice", "_unisci_p2p",
               "_conto_relay_p2p", "_chiave_evento_p2p", "_ascolto_mancato_p2p",
               "eventi_p2p_attivi", "_scarica_attese_p2p",
@@ -68150,7 +68201,7 @@ def prove_p2p_ascolto():
     for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
               "_parti_recensione_p2p",
               "_euro_libro", "_euro_tabacchino", "_metodi_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
-              "_ordini_puliti_p2p", "_registra_ordini_p2p",
+              "_ordini_puliti_p2p", "_registra_ordini_p2p", "_parti_mostro_p2p", "_riconcilia_parti_p2p",
               "_relay_p2p_dice", "_esiti_p2p_dice",
               "_unisci_p2p", "_conto_relay_p2p", "_chiave_evento_p2p",
               "_ascolto_porta", "_mazzetto_sveglia", "_mazzetto_prendi",
@@ -68550,7 +68601,7 @@ _FUNZIONI_LIBRO_P2P = (
     "_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
     "_parti_recensione_p2p", "_euro_libro", "_euro_tabacchino", "_metodi_libro", "_testo_libro_p2p",
     "_fee_di_p2p", "_avvisi_libro_p2p", "_ordini_puliti_p2p",
-    "_registra_ordini_p2p", "_facce_ordini_p2p", "_sconto_p2p",
+    "_registra_ordini_p2p", "_parti_mostro_p2p", "_riconcilia_parti_p2p", "_facce_ordini_p2p", "_sconto_p2p",
     "_sconto_p2p_fatti", "_evento_libro_p2p", "eventi_p2p_attivi")
 
 
@@ -68560,7 +68611,8 @@ def _ambiente_libro_p2p(detto):
     degli eventi qui e' CHIUSA: il giudice del libro mette in attesa a
     scadenza zero, e i banchi guardano le frasi che prepara."""
     import html as _html
-    amb = {"json": json, "P2P_EVENTI_SEGRETO": "", "P2P_RISERVA_S": 60}
+    amb = {"json": json, "P2P_EVENTI_SEGRETO": "", "P2P_RISERVA_S": 60,
+           "sqlite3": __import__("sqlite3")}
     _m = _SORGENTE.index("\nMOMENTI_DEL_LIBRO_P2P = {") + 1
     exec(_SORGENTE[_m:_SORGENTE.index("}\n", _m) + 2], amb)
     return {**amb, "html": _html,
@@ -68675,6 +68727,13 @@ def prove_p2p_avvisi_precisi():
     reg(con, 111, [O], 1000, True)
     giud(con, [{"id": O, "stato": "pending", "lato": "sell", "sats": 0, "euro": ["10"],
                 "metodi": ["SEPA"], "quando": 1000, "scade": 700000}], 1000, 0.03, 168)
+    # (23 set 2026, A1) LA PRESA VALE SOLO SE MOSTROD LA DICE: qui e' come
+    # se il suo evento fosse arrivato — compra 222, vende 111
+    def presa_detta(oid):
+        con.execute("INSERT OR REPLACE INTO p2p_scambi(ordine, compratore, "
+                    "venditore, preso_dal, giro, aggiornato) VALUES(?,222,111,'buyer',1,0)",
+                    (oid,))
+    presa_detta(O)
     reg(con, 222, [O], 1090, False, True)
 
     def ev(st, quando):
@@ -68704,6 +68763,7 @@ def prove_p2p_avvisi_precisi():
     O6 = "anna-annulla"
     reg(con, 111, [O6], 3000, True)
     giud(con, [dict(ev("pending", 3000), id=O6)], 3000, 0.03, 168)
+    presa_detta(O6)
     reg(con, 222, [O6], 3050, False, True)
     giud(con, [dict(ev("in-progress", 3100), id=O6)], 3100, 0.03, 168)
     testi = dict(giud(con, [dict(ev("canceled", 3200), id=O6)], 3200, 0.03, 168))
@@ -68734,6 +68794,7 @@ def prove_p2p_avvisi_precisi():
     O8 = "4ed69365-cartone"
     reg(con, 111, [O8], 5000, True)
     giud(con, [dict(ev("pending", 5000), id=O8, sats=0)], 5000, 0.03, 168)
+    presa_detta(O8)
     reg(con, 222, [O8], 5050, False, True)
     giud(con, [dict(ev("in-progress", 5100), id=O8, sats=7388)], 5100, 0.03, 168)
     testi = dict(giud(con, [dict(ev("success", 5200), id=O8, sats=7388)], 5200, 0.03, 168))
@@ -68744,6 +68805,7 @@ def prove_p2p_avvisi_precisi():
     O9 = "asimmetrico-cartone"
     reg(con, 111, [O9], 6000, True)
     giud(con, [dict(ev("pending", 6000), id=O9, sats=0)], 6000, 0.03, 168)
+    presa_detta(O9)
     reg(con, 222, [O9], 6050, False, True)
     giud(con, [dict(ev("in-progress", 6100), id=O9, sats=7388)], 6100, 0.03, 168)
     testi = dict(giud(con, [dict(ev("success", 6200), id=O9, sats=7388)], 6200, 0.03, 168))
@@ -68795,8 +68857,11 @@ def prove_p2p_recapito_passo():
           # e un contatore: `sats`, `metodi`, `tornati`. Il freno dell'avviso
           # non sta piu' nelle due `recapito_*` (restano, morte): sta
           # nell'anti-doppione di tutti, `p2p_avvisi`
+          # ...e `preso_dichiarato` (23 set 2026, A1): la presa che aspetta
+          # la parola di mostrod prima di diventare `preso_da`
           ["creato", "euro", "lato", "maker", "metodi", "ordine", "preso_da",
-           "recapito_avviso", "recapito_n", "sats", "stato", "tg_id", "tornati", "visto"],
+           "preso_dichiarato", "recapito_avviso", "recapito_n", "sats", "stato",
+           "tg_id", "tornati", "visto"],
           sorted(re.findall(r"^\s+(\w+) (?:TEXT|INTEGER)", ddl, re.M)))
     prova("...e le tre colonne stanno nell'ALTER per i database di ieri", True,
           all(c in src for c in ('"euro TEXT DEFAULT \'\'"', '"recapito_avviso INTEGER DEFAULT 0"',
@@ -68853,10 +68918,10 @@ def prove_p2p_recapito_passo():
     for f in _FUNZIONI_LIBRO_P2P + ("_controparti_p2p", "_nome_altro_p2p",
                                     "_parti_scambio_p2p", "_avviso_recapito_p2p",
                                     "_momento_evento_p2p", "_evento_p2p_pulito",
-                                    "_registra_evento_p2p"):
+                                    "_registra_evento_p2p", "_parti_mostro_p2p", "_riconcilia_parti_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
     giud, reg, libro = amb["_avviso_recapito_p2p"], amb["_registra_ordini_p2p"], amb["_avvisi_libro_p2p"]
-    for chi, nome in ((111, "Anna Verdi"), (222, "Bruno <b>Neri</b>"), (333, "Carla")):
+    for chi, nome in ((111, "Anna Verdi"), (222, "Bruno <b>Neri</b>"), (333, "Carla"), (444, "Dario")):
         con.execute("INSERT INTO utenti(tg_id, nome) VALUES(?,?)", (chi, nome))
     T = 1789740000
 
@@ -68864,19 +68929,32 @@ def prove_p2p_recapito_passo():
         return {"id": oid, "stato": st, "lato": lato, "sats": 15000, "euro": list(euro),
                 "metodi": ["SEPA"], "quando": quando, "scade": quando + 600000}
 
+    # LE CHIAVI DI SCAMBIO e il coordinatore di cartone: dal 23 set 2026
+    # (A1) una presa dichiarata dal telefono vale solo se mostrod la
+    # conferma, quindi ogni scena qui passa dal suo evento `taken`
+    for chi, pub in ((111, "a" * 64), (222, "b" * 64), (333, "c" * 64), (444, "d" * 64)):
+        con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)", (pub, chi))
+
+    def mostro(oid, azione, attore, quando, compra, vende, dettaglio=""):
+        e = amb["_evento_p2p_pulito"](
+            {"order": oid, "action": azione, "ts": quando, "actor": attore,
+             "detail": dettaglio, "buyer": compra, "seller": vende}, quando)
+        return amb["_registra_evento_p2p"](con, e, quando)
+
     # Anna COMPRA (ordine buy), Bruno lo prende: a vendere e' chi ha PRESO
     O = "ordine-di-anna-buy"
     reg(con, 111, [O], T - 600, True)
     libro(con, [ev(O, "pending", T - 600, "buy")], T - 600, 0.03, 168)
     prova("a ordine in vetrina non c'e' nessuno a cui dirlo", 0, giud(con, O, 111, T - 500)[0])
     reg(con, 222, [O], T - 5, False, True)
+    mostro(O, "taken", "seller", T - 4, "a" * 64, "b" * 64, "hold-next")
     libro(con, [ev(O, "in-progress", T, "buy")], T + 1, 0.03, 168)
     prova("il giudice del libro ha scritto la cifra come si legge", "10,00 €",
           con.execute("SELECT euro FROM p2p_ordini WHERE ordine=?", (O,)).fetchone()[0])
     prova("chi COMPRA non puo' chiederlo (non e' lui a indicare dove ricevere)",
           (0, "non e' chi vende"), giud(con, O, 111, T + 10))
     prova("un estraneo nemmeno — e il journal dice CHI ha detto chi sono le parti",
-          (0, "non e' una delle due parti (secondo i due telefoni)"),
+          (0, "non e' una delle due parti (secondo il coordinatore)"),
           giud(con, O, 333, T + 10))
     prova("un ordine mai sentito: niente", (0, "ordine sconosciuto"),
           giud(con, "ordine-mai-visto", 222, T + 10))
@@ -68902,6 +68980,7 @@ def prove_p2p_recapito_passo():
     reg(con, 333, [S], T - 600, True)
     libro(con, [ev(S, "pending", T - 600, "sell", ("20", "100"))], T - 600, 0.03, 168)
     reg(con, 111, [S], T - 5, False, True)
+    mostro(S, "taken", "buyer", T - 4, "a" * 64, "c" * 64, "hold-next")
     libro(con, [ev(S, "in-progress", T, "sell", ("20", "100"))], T + 1, 0.03, 168)
     a_chi, testo = giud(con, S, 333, T + 10)
     prova("su un ordine `sell` vende chi ha pubblicato, e l'avviso va a chi ha preso",
@@ -68917,6 +68996,7 @@ def prove_p2p_recapito_passo():
                    con.execute("SELECT COUNT(*) FROM p2p_avvisi WHERE ordine=?", (S,)).fetchone()[0]])
     con.execute("UPDATE utenti SET avvisi_p2p=1 WHERE tg_id=111")
     # a scambio concluso non c'e' piu' niente da pagare
+    mostro(S, "success", "mostro", T + 900, "a" * 64, "c" * 64)
     libro(con, [ev(S, "success", T + 900, "sell", ("50",))], T + 901, 0.03, 168)
     prova("a scambio concluso non parte piu' niente", 0, giud(con, S, 333, T + 1000)[0])
     # chi ha preso entrando da Nostr non e' annotato: non c'e' a chi dirlo
@@ -68933,15 +69013,6 @@ def prove_p2p_recapito_passo():
     # dichiarazione del suo telefono (`preso_da`) non era ancora arrivata,
     # e per il server su quell'ordine lui non c'era. Adesso le parti le
     # dice il coordinatore, con le trade key dello scambio IN CORSO.
-    for chi, pub in ((111, "a" * 64), (222, "b" * 64), (333, "c" * 64)):
-        con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)", (pub, chi))
-
-    def mostro(oid, azione, attore, quando, compra, vende, dettaglio=""):
-        e = amb["_evento_p2p_pulito"](
-            {"order": oid, "action": azione, "ts": quando, "actor": attore,
-             "detail": dettaglio, "buyer": compra, "seller": vende}, quando)
-        return amb["_registra_evento_p2p"](con, e, quando)
-
     D = "0f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc22"
     reg(con, 111, [D], T - 600, True)              # Anna pubblica un BUY...
     libro(con, [ev(D, "pending", T - 600, "buy")], T - 600, 0.03, 168)
@@ -68985,12 +69056,106 @@ def prove_p2p_recapito_passo():
           giud(con, D, 333, T + 1000)[0])
     # CHI ENTRA DA NOSTR ha un id negativo, ed e' un destinatario come gli
     # altri: prima «non era annotato», e non c'era a chi dirlo
-    con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)", ("d" * 64, -7))
+    con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,?,0)", ("e" * 64, -7))
     E = "11111111-2222-4333-8444-555566667777"
     reg(con, 333, [E], T, True)
-    mostro(E, "taken", "buyer", T, "d" * 64, "c" * 64, "invoice-next")
+    mostro(E, "taken", "buyer", T, "e" * 64, "c" * 64, "invoice-next")
     prova("chi compra entrando da Nostr lo viene a sapere: il coordinatore sa che chiave e'",
           -7, giud(con, E, 333, T + 10)[0])
+
+    # --- 2c) IL POSTO DEL TAKER NON SI PRENDE CON UNA POST (A1, audit 2) ---
+    # LA RIPRODUZIONE DELL'AUDIT (23 set 2026), che qui deve FALLIRE: 333
+    # si dichiara taker di un ordine di 111 ancora in vetrina, e prima
+    # della cura da li' riceveva i contatti di 111, gli compariva in
+    # pagina come controparte e si prendeva la sua recensione.
+    contro = amb["_controparti_p2p"]
+    riga = lambda oid: tuple(con.execute(
+        "SELECT tg_id, preso_da, preso_dichiarato FROM p2p_ordini WHERE ordine=?",
+        (oid,)).fetchone())
+    A1 = "a1a1a1a1-0000-4000-8000-000000000001"
+    reg(con, 111, [A1], T, True)
+    libro(con, [ev(A1, "pending", T, "sell")], T, 0.03, 168)
+    esito = reg(con, 333, [A1], T + 1, False, True)
+    prova("la presa dichiarata PRIMA che mostrod parli resta in attesa: "
+          "`preso_da` non si tocca", ((111, 0, 333), {"registrati": 0, "confermate": 0,
+                                                     "in_attesa": 1, "rifiutate": 0}),
+          (riga(A1), esito))
+    prova("...e finche' aspetta NESSUNO vede l'altra parte: ne' 111 ne' 333",
+          ({}, {}), (contro(con, [A1], 111, T + 2), contro(con, [A1], 333, T + 2)))
+    prova("...nemmeno il recapito trova una parte", 0, giud(con, A1, 333, T + 2)[0])
+    # 444 prende davvero (mostrod lo dice), e il suo telefono e' in ritardo
+    mostro(A1, "taken", "buyer", T + 10, "d" * 64, "a" * 64, "hold-next")
+    prova("mostrod dice che ha preso 444: la dichiarazione di 333 CADE, e il "
+          "posto resta vuoto finche' 444 non lo dichiara (e' il suo consenso)",
+          (111, 0, 0), riga(A1))
+    prova("...e 333 non e' controparte di nessuno", {}, contro(con, [A1], 333, T + 11))
+    esito = reg(con, 444, [A1], T + 12, False, True)
+    prova("444 dichiara: combacia con mostrod, confermata",
+          ((111, 444, 0), 1), (riga(A1), esito["confermate"]))
+    prova("...e adesso le due parti si vedono, e solo loro",
+          ("Anna Verdi", "", 1),
+          (contro(con, [A1], 444, T + 13).get(A1, {}).get("nome"),
+           contro(con, [A1], 333, T + 13).get(A1, {}).get("nome", ""),
+           len(contro(con, [A1], 111, T + 13))))
+    esito = reg(con, 333, [A1], T + 14, False, True)
+    prova("333 riprova a mostrod gia' parlato: RIFIUTATA, e il posto non si muove",
+          ((111, 444, 0), {"registrati": 0, "confermate": 0, "in_attesa": 0, "rifiutate": 1}),
+          (riga(A1), esito))
+    prova("...la rotta ne fa un 403", True,
+          'raise HTTPException(403, "Non risulti fra le due parti di questo scambio")'
+          in pezzo("registra_ordini_p2p"))
+    prova("...ma una lista con UNA riga buona passa (il client manda liste)",
+          {"registrati": 0, "confermate": 1, "in_attesa": 0, "rifiutate": 1},
+          reg(con, 444, [A1, S], T + 15, False, True))
+    # la corsa giusta: il telefono del taker vero arriva PRIMA di mostrod
+    A2 = "a1a1a1a1-0000-4000-8000-000000000002"
+    reg(con, 111, [A2], T, True)
+    esito = reg(con, 444, [A2], T + 1, False, True)
+    prova("il taker vero dichiara prima dell'evento: in attesa", ((111, 0, 444), 1),
+          (riga(A2), esito["in_attesa"]))
+    mostro(A2, "taken", "buyer", T + 5, "d" * 64, "a" * 64, "hold-next")
+    prova("...e l'evento la conferma da solo", (111, 444, 0), riga(A2))
+    prova("...un secondo taker dichiarato nel frattempo NON scalza il primo in attesa",
+          True, reg(con, 333, [A2], T + 6, False, True)["rifiutate"] == 1)
+    # la riga AVVELENATA di prima della cura: mostrod la ripulisce
+    A3 = "a1a1a1a1-0000-4000-8000-000000000003"
+    reg(con, 111, [A3], T, True)
+    con.execute("UPDATE p2p_ordini SET preso_da=333 WHERE ordine=?", (A3,))
+    mostro(A3, "taken", "buyer", T + 5, "d" * 64, "a" * 64, "hold-next")
+    prova("una `preso_da` scritta prima della cura che mostrod smentisce si azzera",
+          (111, 0, 0), riga(A3))
+    # ...e il MAKER: chi si intesta l'ordine di un altro
+    A4 = "a1a1a1a1-0000-4000-8000-000000000004"
+    reg(con, 333, [A4], T, True)          # 333 mette la faccia sull'ordine di 111
+    mostro(A4, "taken", "buyer", T + 5, "d" * 64, "a" * 64, "hold-next")
+    prova("l'intestazione di un impostore si corregge al primo evento: l'ha "
+          "pubblicato 111", (111, 0, 0), riga(A4))
+    prova("...e a mostrod gia' parlato l'impostore non si intesta piu' niente "
+          "(rifiutato)", ({"registrati": 0, "rifiutate": 1}, (111, 0, 0)),
+          (reg(con, 333, [A4], T + 6, True), riga(A4)))
+    A5 = "a1a1a1a1-0000-4000-8000-000000000005"
+    reg(con, 333, [A5], T, True)          # ...su un ordine di un ALTRO client
+    mostro(A5, "taken", "buyer", T + 5, "d" * 64, "f" * 64, "hold-next")
+    prova("...e su un ordine di un altro client (chiave ignota) la faccia si TOGLIE",
+          (0, 0, 0), riga(A5))
+    # il ritorno in vetrina azzera anche la dichiarazione in attesa
+    A6 = "a1a1a1a1-0000-4000-8000-000000000006"
+    reg(con, 111, [A6], T, True)
+    reg(con, 333, [A6], T + 1, False, True)
+    libro(con, [ev(A6, "pending", T + 2, "sell")], T + 2, 0.03, 168)
+    prova("un `pending` del libro azzera anche la presa in attesa", (111, 0, 0), riga(A6))
+    # e «dimentica il profilo», come il resto, porta via la dichiarazione
+    prova("«dimentica» azzera anche `preso_dichiarato`", True,
+          'con.execute("UPDATE p2p_ordini SET preso_dichiarato=0 WHERE preso_dichiarato=?",'
+          in pezzo("dimentica_chiavi_p2p"))
+    prova("...e la fusione la sposta", True,
+          'con.execute("UPDATE p2p_ordini SET preso_dichiarato=? "' in pezzo("esegui_fusione"))
+    prova("la riconciliazione gira a OGNI evento, dopo che `p2p_scambi` e' scritto", True,
+          codice(pezzo("_registra_evento_p2p")).index("ON CONFLICT(ordine) DO UPDATE")
+          < codice(pezzo("_registra_evento_p2p")).index("_riconcilia_parti_p2p(con, ev[\"ordine\"], adesso)"))
+    prova("...e non scrive mai `preso_da` senza una dichiarazione (il consenso)", True,
+          "SET preso_da=?, preso_dichiarato=0" in pezzo("_riconcilia_parti_p2p")
+          and "WHERE ordine=? AND preso_dichiarato=?" in pezzo("_riconcilia_parti_p2p"))
 
     for storto in (None, "", [], ["a", "b"], 7):
         try:
@@ -81256,6 +81421,10 @@ def prove_recensione_p2p():
     _reg = codice(pezzo("_registra_ordini_p2p"))
     prova("la presa si dichiara una volta, e la prima vince", True,
           '"AND (preso_da=0 OR preso_da=?) "' in _reg)
+    prova("...e dal 23 set 2026 (A1) il posto lo scrive solo chi mostrod ha nominato",
+          True, "parti = _parti_mostro_p2p(con, o)" in _reg
+          and 'if tg_id != parti["taker"]:' in _reg
+          and '"UPDATE p2p_ordini SET preso_dichiarato=? "' in _reg)
     prova("...e a scambio chiuso quel posto non si prende piu'", True,
           '"AND stato NOT IN (\'success\',\'canceled\',\'expired\')"' in _reg)
 

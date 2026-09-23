@@ -3883,6 +3883,14 @@ def init_db():
         maker INTEGER DEFAULT 0,
         visto INTEGER DEFAULT 0,
         preso_da INTEGER DEFAULT 0,
+        -- E LA PRESA DICHIARATA MA NON ANCORA CONFERMATA (23 set 2026,
+        -- la cura di A1 dell'audit 2): il telefono dice «l'ho preso io»
+        -- e il posto vero (`preso_da`) lo prende SOLO quando mostrod ha
+        -- nominato quella persona fra le due parti (`p2p_scambi`). Se
+        -- mostrod non ha ancora parlato la dichiarazione aspetta qui, e
+        -- l'evento che arriva la promuove o la butta. Nessuna rotta
+        -- legge questa colonna per servire l'altra parte a qualcuno.
+        preso_dichiarato INTEGER DEFAULT 0,
         -- «DOVE RICEVERE GLI EURO» (18 set 2026, terzo giro): `euro` e'
         -- la cifra del libro gia' scritta come si legge («10,00 €»,
         -- pubblica: e' il tag `fa` del 38383), per dirla nell'avviso a
@@ -5072,6 +5080,8 @@ def init_db():
     for colonna in ("stato TEXT DEFAULT ''", "lato TEXT DEFAULT ''",
                     "maker INTEGER DEFAULT 0", "visto INTEGER DEFAULT 0",
                     "preso_da INTEGER DEFAULT 0",
+                    # la presa in attesa di mostrod (23 set 2026, A1)
+                    "preso_dichiarato INTEGER DEFAULT 0",
                     "euro TEXT DEFAULT ''",
                     "recapito_avviso INTEGER DEFAULT 0",
                     "recapito_n INTEGER DEFAULT 0",
@@ -12080,6 +12090,8 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
                     (id_telegram, id_nostr))
         con.execute("UPDATE p2p_ordini SET preso_da=? WHERE preso_da=?",
                     (id_telegram, id_nostr))
+        con.execute("UPDATE p2p_ordini SET preso_dichiarato=? "
+                    "WHERE preso_dichiarato=?", (id_telegram, id_nostr))
         # ...e le tre tabelle degli avvisi del coordinatore (patch 0007,
         # set 2026). Le PARTI dello scambio in corso seguono l'utente
         # con l'UPDATE secco (la PK e' l'ordine). L'ANTI-DOPPIONE ha il
@@ -20620,26 +20632,26 @@ async def decidi_pagamento(req: Request, x_tg_init_data: str = Header(""),
 #    lo dice LND — FAILED, o `payment isn't initiated` a canarino vivo e
 #    dopo `MAI_PARTITO_DOPO_S`. Li' il calendario NON conta: IN_FLIGHT
 #    vuol dire vivo anche a fattura scaduta da un mese.
-# 2) Dove LND non c'e' (il SaaS): LNbits risponde, NON dice «success», e
-#    la fattura di quel tentativo e' scaduta da almeno
-#    `ALTRA_CASSAFORTE_DOPO_SCADENZA_S`.
+# 2) Dove LND non c'e' (il SaaS): lo dice LNbits, e SOLO con un «failed»
+#    (o un hash che non conosce piu', dopo `MAI_PARTITO_DOPO_S`). Un
+#    «pending» e' VIVO, punto — qualunque cosa dica la scadenza della
+#    fattura.
 #
-# N = 60 MINUTI, E QUEL CHE NON COPRE SI DICHIARA. Dopo la scadenza chi
-# riceve rifiuta gli HTLC che arrivano (LND annulla la fattura scaduta),
-# e chi paga smette di tentare entro un minuto o due: un'ora e' quattro
-# volte il nostro «mai partito», e sono sei battiti dell'orologio in cui
-# la ronda ha richiesto quell'hash senza sentirsi dire «success».
-# ⚠️ NON E' UNA PROVA CONTRO UNA HOLD INVOICE: un HTLC gia' ACCETTATO da
-# chi riceve si puo' saldare fino al suo CLTV — giorni — qualunque cosa
-# dica la scadenza della fattura. E' la ragione per cui il cantiere del
-# 20 set ha SCARTATO il calendario come giudice AUTOMATICO, e qui resta
-# scartato: nessun giro usa questa regola. La usa UNA PERSONA, con le
-# voci delle fonti davanti e la cifra scritta, e il rischio che resta —
-# pagare due volte QUESTO importo — e' sorvegliato: `sorveglia_crediti`
-# continua a chiedere l'hash d'origine, e se un giorno si salda lo
-# grida («doppio»). L'alternativa era un venditore non pagato per
-# settimane a causa di un guasto non suo.
-ALTRA_CASSAFORTE_DOPO_SCADENZA_S = 3600
+# IL CALENDARIO NON E' PIU' UN GIUDICE (23 set 2026, M1 dell'audit 2).
+# Dal 21 al 23 set qui c'era una terza porta: sul SaaS, «pending» con
+# la fattura scaduta da piu' di un'ora valeva «morta», per una persona
+# con le voci davanti. Il commento stesso diceva che NON era una prova
+# contro una hold invoice — un HTLC gia' accettato si salda fino al
+# suo CLTV, giorni — e affidava il rischio del doppio pagamento a
+# `sorveglia_crediti`, che lo GRIDA a cose fatte. Era il residuo di G1
+# del primo audit spostato in un bottone: un venditore con un Lightning
+# address che conia hold invoice aspettava un'ora dopo la scadenza,
+# faceva pagare dal nodo, e saldava anche l'HTLC. Adesso sul SaaS un
+# «pending» tiene la porta chiusa finche' LNbits non dice «failed»; il
+# prezzo dichiarato e' un venditore che aspetta di piu' quando l'HTLC
+# resta appeso davvero — e quel caso si chiude a mano su LNbits, non
+# pagando due volte. `sorveglia_crediti` resta per i crediti che nascono
+# dove LND vede un FAILED che LNbits non ha ancora recepito.
 TIMBRO_CREDITI = "sorveglia_crediti"     # l'ora dell'ultimo giro
 (ORIGINE_MORTA, ORIGINE_VIVA, ORIGINE_USCITA, ORIGINE_IGNOTA,
  ORIGINE_PRESTO, ORIGINE_NIENTE) = (
@@ -20659,10 +20671,9 @@ def _cassaforte_pronta(nome: str) -> bool:
     return False
 
 
-def _giudica_origine(v: dict, scade: int, adesso: int) -> tuple:
+def _giudica_origine(v: dict) -> tuple:
     """IL GIUDICE DEL PAGAMENTO D'ORIGINE, ed e' una tabella PURA: le
-    voci delle due fonti (un dizionario di `_verita_pagamento`), la
-    scadenza della fattura di quel tentativo (0 = ignota), l'ora. Torna
+    voci delle due fonti (un dizionario di `_verita_pagamento`). Torna
     `(esito, perche)`.
 
     SOLO 'morta' APRE LA PORTA. Tutto il resto la tiene chiusa, e dice
@@ -20671,8 +20682,9 @@ def _giudica_origine(v: dict, scade: int, adesso: int) -> tuple:
     'presto' (aspetta, e quanto), 'ignota' (non si e' potuto sapere).
 
     L'ORDINE E' QUELLO DI CHI HA RAGIONE: prima un «uscito» da qualunque
-    fonte, poi LND, e il calendario PER ULTIMO e solo dove LND non
-    esiste — mai come scorciatoia dove LND c'e' ma tace."""
+    fonte, poi LND, poi LNbits — e NESSUN calendario (23 set 2026, M1
+    dell'audit 2): dove LND non c'e', un «pending» di LNbits e' vivo
+    finche' LNbits stessa non dice «failed»."""
     verdetto, lnbits, lnd = v["verdetto"], v["lnbits"], v["lnd"]
     voci = f"LNbits dice «{lnbits}», {_voce_lnd(lnd)}"
     if verdetto == USCITO:
@@ -20696,28 +20708,13 @@ def _giudica_origine(v: dict, scade: int, adesso: int) -> tuple:
         return ORIGINE_PRESTO, (
             f"il tentativo ha meno di {MAI_PARTITO_DOPO_S // 60} minuti "
             f"({voci})")
-    if not scade:
-        return ORIGINE_IGNOTA, (
-            f"non conosco la scadenza della fattura di quel tentativo, e "
-            f"senza un LND da sentire è l'unica prova che ho ({voci})")
-    if adesso < scade:
-        return ORIGINE_VIVA, (
-            f"la fattura di quel tentativo non è ancora scaduta: può "
-            f"ancora saldarsi ({voci})")
-    if adesso - scade < ALTRA_CASSAFORTE_DOPO_SCADENZA_S:
-        # PER ECCESSO: «riprova fra 49» detto a 49 minuti e 59 secondi
-        # manderebbe a ritoccare un minuto troppo presto (e un banco piu'
-        # lento di un secondo leggeva 49 dove un altro leggeva 50: l'ha
-        # trovato la CI)
-        mancano = -(-(ALTRA_CASSAFORTE_DOPO_SCADENZA_S - (adesso - scade))
-                    // 60)
-        return ORIGINE_PRESTO, (
-            f"la fattura di quel tentativo è scaduta da meno di "
-            f"{ALTRA_CASSAFORTE_DOPO_SCADENZA_S // 60} minuti: riprova fra "
-            f"{max(1, mancano)} ({voci})")
-    return ORIGINE_MORTA, (
-        f"{voci}; la fattura di quel tentativo è scaduta da "
-        f"{_durata_a_parole(adesso - scade)}")
+    # «pending» SENZA un LND da sentire: VIVO, qualunque cosa dica la
+    # scadenza della fattura (un HTLC accettato si salda fino al suo
+    # CLTV). Si riapre solo con un «failed» di LNbits.
+    return ORIGINE_VIVA, (
+        f"LNbits lo tiene «pending» e per questa cassaforte non c'è un LND "
+        f"da sentire: resta vivo finché LNbits non dice «failed», anche a "
+        f"fattura scaduta ({voci})")
 
 
 def _trascrivi_scadenza(con, ordine_id: int) -> str:
@@ -20740,32 +20737,6 @@ def _trascrivi_scadenza(con, ordine_id: int) -> str:
         "SELECT 1 FROM payout_tentati WHERE tabella='ordini' AND riga_id=? "
         "AND lower(hash)=?", (ordine_id, letta["hash"])).fetchone()
     return letta["hash"] if (cur.rowcount or gia) else ""
-
-
-async def _scadenza_da_lnbits(payment_hash: str, cassaforte: str) -> int:
-    """IL RIPIEGO, quando la fattura d'origine in colonna non c'e' piu':
-    si chiede a LNbits la bolt11 di quel pagamento. La FORMA della
-    risposta l'ho scritta a memoria (`details.bolt11`, o `bolt11`), e
-    per questo NON LE SI CREDE SULLA PAROLA: la bolt11 che torna si
-    rilegge col NOSTRO lettore, e vale solo se il suo payment hash e'
-    quello chiesto. Una forma diversa, un hash che non combacia, un
-    silenzio: zero, cioe' «scadenza ignota», che tiene la porta chiusa.
-    NON ALZA MAI."""
-    try:
-        cf = _chiavi_cassaforte(cassaforte)
-        async with httpx.AsyncClient(timeout=15) as c:
-            r = await c.get(f"{cf.LNBITS_URL}/api/v1/payments/{payment_hash}",
-                            headers={"X-Api-Key": cf.LNBITS_INVOICE_KEY})
-        d = r.json() if r.status_code < 300 else {}
-        dett = d.get("details") if isinstance(d.get("details"), dict) else {}
-        for bolt in (dett.get("bolt11"), d.get("bolt11")):
-            letta = leggi_bolt11(str(bolt or ""), con_hash=True)
-            if letta and letta.get("hash") == str(payment_hash).lower():
-                return int(letta["scade"])
-    except Exception as e:
-        print(f"🔎 Scadenza da LNbits non letta ({type(e).__name__})",
-              flush=True)
-    return 0
 
 
 def _fattura_nuova_pronta(o, venditore, hash_tentati) -> tuple:
@@ -20823,7 +20794,7 @@ async def _esamina_altra_cassaforte(ordine_id: int) -> dict:
     base = {"ok": False, "id": ordine_id, "origine": origine, "sats": netto,
             "destinazioni": [c for c in CASSAFORTI
                              if c != origine and _cassaforte_pronta(c)],
-            "voci": [], "minuti": ALTRA_CASSAFORTE_DOPO_SCADENZA_S // 60}
+            "voci": []}
     if o["payout_stato"] != "incerto" or (o["payout_verso"] or "") != "venditore":
         return {**base, "codice": "non_congelato", "perche": (
             "Questo incasso non è (più) fra i pagamenti da verificare: "
@@ -20840,8 +20811,7 @@ async def _esamina_altra_cassaforte(ordine_id: int) -> dict:
     for h, quando, esito in tentati:
         if esito in (FALLITO, MAI_PARTITO, DEVIATO):
             continue
-        cf_h, scade = dove.get(h) or ("", 0)
-        cf_h = cf_h or origine
+        cf_h = (dove.get(h) or ("", 0))[0] or origine
         if esito == USCITO:
             giudizio = (ORIGINE_USCITA, "risulta già USCITO")
             v = {"lnbits": "", "lnd": ""}
@@ -20849,18 +20819,7 @@ async def _esamina_altra_cassaforte(ordine_id: int) -> dict:
             v = await _verita_pagamento(
                 h, cf_h, (adesso - quando) if quando else None,
                 f"ordini#{ordine_id} (origine)")
-            if (not scade and v["lnd"] in LND_SENZA_VOCE
-                    and v["lnbits"] == "pending"):
-                scade = await _scadenza_da_lnbits(h, cf_h)
-                if scade:
-                    con = db()
-                    con.execute(
-                        "UPDATE payout_tentati SET scade=? WHERE "
-                        "tabella='ordini' AND riga_id=? AND hash=? AND scade=0",
-                        (scade, ordine_id, h))
-                    con.commit()
-                    con.close()
-            giudizio = _giudica_origine(v, scade, adesso)
+            giudizio = _giudica_origine(v)
         base["voci"].append(f"{h[:12]}… sulla cassaforte «{cf_h}»: "
                             f"{giudizio[1]}")
         if giudizio[0] != ORIGINE_MORTA:
@@ -20908,17 +20867,9 @@ def _altra_cassaforte_forse(con, o, adesso: int) -> dict:
         return {"forse": False, "perche": "non c'è un'altra cassaforte"}
     if origine == CASSAFORTE_NODO and _lnd_configurato():
         return {"forse": True, "perche": "si chiede a LND al tocco"}
-    scadenze = [s for cf, s in _dove_tentati(con, "ordini", o["id"]).values()]
-    letta = leggi_bolt11(_campo(o, "invoice_venditore"))
-    if letta:
-        scadenze.append(letta["scade"])
-    vive = [s for s in scadenze
-            if s and adesso - s < ALTRA_CASSAFORTE_DOPO_SCADENZA_S]
-    if vive:
-        return {"forse": False, "perche": (
-            f"la fattura del tentativo d'origine non è scaduta da almeno "
-            f"{ALTRA_CASSAFORTE_DOPO_SCADENZA_S // 60} minuti")}
-    return {"forse": True, "perche": ""}
+    # senza LND decide LNbits, al tocco: un «pending» e' vivo e la rotta
+    # lo dice, un «failed» apre (23 set 2026, M1: niente piu' calendario)
+    return {"forse": True, "perche": "si chiede a LNbits al tocco"}
 
 
 @app.get("/api/admin/pagamenti/altra-cassaforte")
@@ -37433,6 +37384,96 @@ def _ordini_puliti_p2p(ordini) -> list:
     return pulite
 
 
+def _parti_mostro_p2p(con, ordine: str) -> dict:
+    """CHI HA PUBBLICATO E CHI HA PRESO SECONDO IL COORDINATORE, cioe'
+    da `p2p_scambi` (patch 0007): `{maker, taker, detto}`. `detto` e'
+    falso se mostrod non ha ancora nominato nessuno per quell'ordine —
+    un ordine ancora in vetrina, o gli eventi spenti — e allora i due
+    posti sono 0. Pura sulla connessione.
+    IL LATO DI CHI HA PRESO lo dice `preso_dal` ('buyer' | 'seller');
+    se manca (un evento arrivato senza la presa davanti) vale il lato
+    del libro: su un `sell` ha pubblicato chi vende, su un `buy` chi
+    compra. Senza nemmeno quello i posti non si indovinano: 0."""
+    try:
+        s = con.execute("SELECT compratore, venditore, preso_dal FROM p2p_scambi "
+                        "WHERE ordine=?", (ordine,)).fetchone()
+    except sqlite3.OperationalError:
+        # un database senza la tabella (i banchi di ieri, un db mai
+        # migrato) e' un coordinatore che non ha mai parlato: nessuno
+        s = None
+    compra = int(s["compratore"] or 0) if s else 0
+    vende = int(s["venditore"] or 0) if s else 0
+    if not s or not (compra or vende):
+        return {"maker": 0, "taker": 0, "detto": False}
+    lato = (s["preso_dal"] or "")
+    if lato not in ("buyer", "seller"):
+        r = con.execute("SELECT lato FROM p2p_ordini WHERE ordine=?",
+                        (ordine,)).fetchone()
+        libro = (r["lato"] if r else "") or ""
+        lato = "buyer" if libro == "sell" else ("seller" if libro == "buy" else "")
+    if lato == "buyer":
+        return {"maker": vende, "taker": compra, "detto": True}
+    if lato == "seller":
+        return {"maker": compra, "taker": vende, "detto": True}
+    return {"maker": 0, "taker": 0, "detto": True}
+
+
+def _riconcilia_parti_p2p(con, ordine: str, adesso: int) -> list:
+    """I DUE POSTI DI `p2p_ordini` SI ALLINEANO A QUEL CHE DICE MOSTROD
+    (23 set 2026, la cura di A1 dell'audit 2). Si chiama a ogni evento
+    del coordinatore, dopo che `p2p_scambi` e' stato scritto. Torna le
+    righe di journal (una per correzione), che chi chiama stampa.
+    LA REGOLA, in tre righe:
+    - la presa DICHIARATA (`preso_dichiarato`) diventa `preso_da` se
+      mostrod nomina proprio quella persona come chi ha preso; se ne
+      nomina un'altra, la dichiarazione cade e si dice;
+    - una `preso_da` gia' scritta che mostrod smentisce si azzera: e' la
+      riga avvelenata dall'attaccante dell'audit, o un giro vecchio;
+    - chi ha PUBBLICATO (`tg_id`) si corregge se mostrod ne conosce un
+      altro, e si toglie se mostrod non lo riconosce affatto (la chiave
+      di chi pubblica si registra PRIMA di pubblicare, quindi un maker
+      nostro mostrod lo riconosce sempre: chi resta e' l'impostore o un
+      ordine di un altro client su cui qualcuno ha messo la faccia).
+    NON scrive mai `preso_da` da sola: la dichiarazione e' il consenso
+    (chi entra da Nostr puo' non darlo), e senza dichiarazione il posto
+    resta vuoto anche se mostrod sa chi e'. NON COMMITTA."""
+    parti = _parti_mostro_p2p(con, ordine)
+    if not parti["detto"]:
+        return []
+    r = con.execute("SELECT tg_id, preso_da, preso_dichiarato, stato "
+                    "FROM p2p_ordini WHERE ordine=?", (ordine,)).fetchone()
+    if not r:
+        return []
+    maker, taker = parti["maker"], parti["taker"]
+    tg_id, preso, dich = (int(r["tg_id"] or 0), int(r["preso_da"] or 0),
+                          int(r["preso_dichiarato"] or 0))
+    righe = []
+    if preso and preso != taker:
+        con.execute("UPDATE p2p_ordini SET preso_da=0 WHERE ordine=? AND preso_da=?",
+                    (ordine, preso))
+        righe.append(f"⛔ Libro P2P: {preso} risultava aver preso {ordine[:8]} ma "
+                     f"mostrod dice {taker or 'un altro client'}: posto tolto")
+    if dich:
+        if dich == taker and (r["stato"] or "") not in ("success", "canceled", "expired"):
+            con.execute("UPDATE p2p_ordini SET preso_da=?, preso_dichiarato=0 "
+                        "WHERE ordine=? AND preso_dichiarato=?", (dich, ordine, dich))
+            righe.append(f"✅ Libro P2P: la presa dichiarata da {dich} su "
+                         f"{ordine[:8]} combacia con mostrod: confermata")
+        else:
+            con.execute("UPDATE p2p_ordini SET preso_dichiarato=0 "
+                        "WHERE ordine=? AND preso_dichiarato=?", (ordine, dich))
+            righe.append(f"⛔ Libro P2P: {dich} si era dichiarato taker di "
+                         f"{ordine[:8]} ma mostrod dice {taker or 'un altro client'}: "
+                         f"dichiarazione buttata")
+    if tg_id != maker:
+        con.execute("UPDATE p2p_ordini SET tg_id=?, maker=? WHERE ordine=? AND tg_id=?",
+                    (maker, 1 if maker else 0, ordine, tg_id))
+        righe.append(f"⛔ Libro P2P: {ordine[:8]} era intestato a {tg_id} ma per mostrod "
+                     f"l'ha pubblicato {maker or 'un altro client'}: intestazione "
+                     f"{'corretta' if maker else 'tolta'}")
+    return righe
+
+
 def _registra_ordini_p2p(con, tg_id: int, ordini, adesso: int,
                          pubblicati: bool = False,
                          presi: bool = False) -> dict:
@@ -37454,43 +37495,86 @@ def _registra_ordini_p2p(con, tg_id: int, ordini, adesso: int,
     libro (un primo stato `pending`).
     `presi` (16 set 2026, l'emenda): «questi li ho PRESI io». La riga
     resta di chi ha pubblicato — o nasce con tg_id 0 se lui non e' di
-    Barattolo — e `preso_da` diventa questo account. Un ordine non si
-    prende da soli (mostrod lo rifiuta), quindi una riga che porta
-    gia' questo tg_id come intestatario SENZA `maker` e' la vecchia
-    intestazione dalla restore di un ordine altrui: si corregge,
-    l'intestatario torna ignoto e la presa si scrive dove va. Chi arriva
-    dalla restore su una riga a tg_id 0 la intesta (e' chi ha
-    pubblicato che si presenta), mai chi l'ha presa."""
+    Barattolo — e `preso_da` diventa questo account.
+
+    ⚠️ IL TELEFONO NON BASTA PIU' (23 set 2026, la cura di A1 dell'audit
+    2: chiunque con una sessione si dichiarava taker di un ordine
+    altrui con una POST, e da li' riceveva i contatti dell'altra parte,
+    le compariva in pagina come controparte e si prendeva la sua
+    recensione). LE PARTI LE DICE MOSTROD (`p2p_scambi`, patch 0007):
+    - se mostrod ha gia' parlato di quell'ordine, «l'ho preso io» passa
+      SOLO se nomina questo account come chi ha preso; altrimenti si
+      RIFIUTA (la rotta risponde 403) e il journal dice chi ha provato;
+    - se mostrod non ha ancora parlato (la corsa: il gesto del telefono
+      arriva prima dell'evento) la dichiarazione resta IN ATTESA in
+      `preso_dichiarato`, che nessuna rotta legge per servire l'altra
+      parte, e la conferma o la butta `_riconcilia_parti_p2p` al primo
+      evento;
+    - «l'ho pubblicato io» su un ordine di cui mostrod conosce un ALTRO
+      maker si rifiuta uguale; su un ordine ancora in vetrina resta la
+      dichiarazione di sempre (la faccia sulla card), che il primo
+      evento poi corregge o toglie.
+    IL POSTO CONFERMATO NON SI SPOSTA e a cose fatte non si prende: le
+    due guardie di prima (`preso_da=0 OR preso_da=?`, gli stati finali)
+    restano, sotto quella nuova.
+    Torna `{registrati}` e, con `presi`, anche `confermate`,
+    `in_attesa` e `rifiutate`: la rotta ne fa un 403 quando non e'
+    passato niente. Le righe di journal delle rifiutate si stampano
+    qui, che la prova non ha bisogno di FastAPI."""
     pulite = _ordini_puliti_p2p(ordini)
-    scritti = 0
+    scritti = confermate = in_attesa = rifiutate = 0
+    finali = ("success", "canceled", "expired")
     for o in pulite:
+        parti = _parti_mostro_p2p(con, o)
         if presi:
             scritti += con.execute(
                 "INSERT OR IGNORE INTO p2p_ordini(ordine, tg_id, creato, "
-                "preso_da) VALUES(?,0,?,?)", (o, adesso, tg_id)).rowcount
+                "preso_dichiarato) VALUES(?,0,?,?)", (o, adesso, tg_id)).rowcount
             con.execute("UPDATE p2p_ordini SET tg_id=0, maker=0 "
                         "WHERE ordine=? AND tg_id=? AND maker=0", (o, tg_id))
-            # ⚠️ LA PRIMA DICHIARAZIONE VINCE, E A COSE FATTE QUEL
-            # POSTO NON SI PRENDE PIU' (set 2026, con le recensioni):
-            # da qui passa ora anche il DESTINATARIO di una recensione,
-            # e un posto che si sovrascrive sarebbe una reputazione che
-            # si dirotta — gli id del libro li legge chiunque, e con
-            # l'ULTIMA parola bastava intestarsi lo scambio di un altro
-            # a scambio finito per prendersi la sua recensione e
-            # lasciarne una a chi ha pubblicato, senza aver scambiato
-            # niente. E' la stessa prudenza del posto di chi pubblica
-            # («un ordine gia' di un altro non si ruba»), e favorisce
-            # chi e' onesto: la presa vera la dichiara il coordinatore
-            # in privato, cioe' PRIMA che il libro dica «in-progress».
-            # IDEMPOTENTE (`preso_da=?` fra le condizioni): il client
-            # la rimanda, e una seconda dichiarazione uguale non e' un
-            # doppione. E il ritorno in vetrina rimette il posto a zero
-            # (`_avvisi_libro_p2p`), quindi la prossima presa entra.
-            con.execute("UPDATE p2p_ordini SET preso_da=? "
-                        "WHERE ordine=? AND tg_id<>? "
-                        "AND (preso_da=0 OR preso_da=?) "
-                        "AND stato NOT IN ('success','canceled','expired')",
-                        (tg_id, o, tg_id, tg_id))
+            if parti["detto"]:
+                if tg_id != parti["taker"]:
+                    rifiutate += 1
+                    print(f"⛔ P2P: {tg_id} si dichiara taker di {o[:8]} ma per "
+                          f"mostrod l'ha preso {parti['taker'] or 'un altro client'}: "
+                          f"rifiutato", flush=True)
+                    continue
+                # LA PRIMA DICHIARAZIONE VINCE, E A COSE FATTE QUEL POSTO
+                # NON SI PRENDE PIU' (set 2026, con le recensioni): da qui
+                # passa anche il DESTINATARIO di una recensione.
+                # IDEMPOTENTE (`preso_da=?` fra le condizioni): il client
+                # la rimanda, e una seconda dichiarazione uguale non e' un
+                # doppione. E il ritorno in vetrina rimette il posto a
+                # zero (`_avvisi_libro_p2p`), quindi la prossima presa entra.
+                n = con.execute(
+                    "UPDATE p2p_ordini SET preso_da=?, preso_dichiarato=0 "
+                    "WHERE ordine=? AND tg_id<>? "
+                    "AND (preso_da=0 OR preso_da=?) "
+                    "AND stato NOT IN ('success','canceled','expired')",
+                    (tg_id, o, tg_id, tg_id)).rowcount
+                confermate += n
+                continue
+            # mostrod non ha ancora parlato: la dichiarazione ASPETTA
+            n = con.execute(
+                "UPDATE p2p_ordini SET preso_dichiarato=? "
+                "WHERE ordine=? AND tg_id<>? "
+                "AND (preso_dichiarato=0 OR preso_dichiarato=?) "
+                "AND stato NOT IN ('success','canceled','expired')",
+                (tg_id, o, tg_id, tg_id)).rowcount
+            in_attesa += n
+            continue
+        if parti["detto"] and parti["maker"] != tg_id:
+            # MOSTROD HA PARLATO E NON E' LUI CHI HA PUBBLICATO: non si
+            # intesta niente — ne' chi si dichiara maker (rifiutato, e il
+            # journal lo dice), ne' chi rimette la sua lista dalla restore
+            # (e' chi ha preso, o un ordine di un altro client: si tace),
+            # ne' nessuno su un ordine il cui maker mostrod non riconosce
+            # (`maker` 0: un altro client, e la faccia non ci va).
+            if pubblicati:
+                rifiutate += 1
+                print(f"⛔ P2P: {tg_id} si intesta {o[:8]} ma per mostrod l'ha "
+                      f"pubblicato {parti['maker'] or 'un altro client'}: "
+                      f"rifiutato", flush=True)
             continue
         scritti += con.execute(
             "INSERT OR IGNORE INTO p2p_ordini(ordine, tg_id, creato) "
@@ -37502,7 +37586,11 @@ def _registra_ordini_p2p(con, tg_id: int, ordini, adesso: int,
             con.execute("UPDATE p2p_ordini SET maker=1 "
                         "WHERE ordine=? AND tg_id=?", (o, tg_id))
     con.commit()
-    return {"registrati": scritti}
+    if not presi:
+        return {"registrati": scritti, "rifiutate": rifiutate} if rifiutate \
+            else {"registrati": scritti}
+    return {"registrati": scritti, "confermate": confermate,
+            "in_attesa": in_attesa, "rifiutate": rifiutate}
 
 
 def _facce_ordini_p2p(con, ordini, adesso) -> dict:
@@ -37692,6 +37780,15 @@ async def registra_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
         raise HTTPException(400, str(e))
     finally:
         con.close()
+    # NON E' UNA DELLE DUE PARTI, e mostrod lo sa (23 set 2026, A1): se
+    # OGNI dichiarazione e' stata rifiutata la rotta lo dice con un 403.
+    # Una che sia passata (registrata, confermata, in attesa) vale un ok:
+    # il client manda liste, e una riga storta non deve far cadere le
+    # altre.
+    if esito.get("rifiutate") and not (esito.get("registrati")
+                                       or esito.get("confermate")
+                                       or esito.get("in_attesa")):
+        raise HTTPException(403, "Non risulti fra le due parti di questo scambio")
     return {"ok": True, **esito}
 
 
@@ -38109,6 +38206,8 @@ def dimentica_chiavi_p2p(x_tg_init_data: str = Header(""),
     # ...e le prese: la riga resta a chi ha pubblicato, ma di me non
     # deve restare nemmeno «l'ha preso lui»
     con.execute("UPDATE p2p_ordini SET preso_da=0 WHERE preso_da=?",
+                (user["id"],))
+    con.execute("UPDATE p2p_ordini SET preso_dichiarato=0 WHERE preso_dichiarato=?",
                 (user["id"],))
     # ...e quel che il COORDINATORE ha detto di me (patch 0007, 18 set
     # 2026): il mio posto negli scambi in corso, gli avvisi che ho gia'
@@ -40252,6 +40351,11 @@ def _avvisi_libro_p2p(con, eventi: list, adesso: int, fee, ore: int) -> list:
              json.dumps([str(m) for m in (ev.get("metodi") or [])][:12],
                         ensure_ascii=False),
              tornati + (1 if torna else 0), ev["id"]))
+        # ...e con lui la presa DICHIARATA e non ancora confermata (23
+        # set 2026, A1): in vetrina non c'e' nessuno che abbia preso
+        if dopo == "pending":
+            con.execute("UPDATE p2p_ordini SET preso_dichiarato=0 WHERE ordine=?",
+                        (ev["id"],))
         if prima and dopo != prima and dopo not in STATI_LIBRO_PRESO + (
                 "pending", "success", "canceled", "expired", "dispute"):
             print(f"📖 Libro P2P: stato mai visto «{dopo}» "
@@ -40579,6 +40683,12 @@ def _registra_evento_p2p(con, ev: dict, adesso: int):
         "giro=excluded.giro, aggiornato=excluded.aggiornato",
         (ev["ordine"], parti["compratore"], parti["venditore"], preso_dal,
          giro, adesso))
+    # I DUE POSTI DEL LIBRO SI ALLINEANO A QUEL CHE HA DETTO (23 set
+    # 2026, A1): la presa dichiarata dal telefono si conferma o cade, e
+    # un'intestazione che mostrod smentisce si corregge. Il journal lo
+    # dice riga per riga.
+    for riga in _riconcilia_parti_p2p(con, ev["ordine"], adesso):
+        print(riga, flush=True)
     if ev["sats"] > 0:
         con.execute("UPDATE p2p_scambi SET sats=?, sats_compratore=?, "
                     "sats_venditore=? WHERE ordine=?",

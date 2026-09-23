@@ -231,8 +231,10 @@ def main():
     asyncio.run(SRV.risolvi_pagamenti_in_volo())
     prova("dopo mezz'ora: 🧊", "incerto", banco.riga(oid)["payout_stato"])
     c = coda(oid)
-    prova("la coda vera dice da dove esce, e il bottone e' SPENTO",
-          ("saas", False),
+    # M1 (23 set 2026): senza LND il bottone e' acceso, e a decidere e'
+    # LNbits al tocco — «pending» e' vivo, si apre solo con un «failed»
+    prova("la coda vera dice da dove esce, e il bottone e' ACCESO",
+          ("saas", True),
           (c.get("cassaforte"), (c.get("altra_cassaforte") or {}).get("forse")))
     r = posso(oid)
     prova("troppo presto: «viva», la fattura non e' ancora scaduta",
@@ -243,7 +245,14 @@ def main():
     prova("scaduta da 70 minuti: il bottone si accende", True,
           (coda(oid).get("altra_cassaforte") or {}).get("forse"))
     r = posso(oid)
-    prova("morta, ma manca la fattura nuova", "manca_fattura", r.get("codice"))
+    prova("scaduta da 70 minuti e ancora «pending»: VIVA (M1, niente calendario)",
+          ("viva", True), (r.get("codice"), "resta vivo" in (r.get("perche") or "")))
+    prova("...e la rotta rifiuta: 409", 409, getattr(
+        paga(oid, cassaforte="nodo", conferma=True), "status_code", None))
+    BANCHE["saas"][h(1)] = "failed"
+    r = posso(oid)
+    prova("LNbits dice «failed»: morta, ma manca la fattura nuova",
+          "manca_fattura", r.get("codice"))
     r = paga(oid, azione="chiedi_fattura")
     prova("la si chiede a chi vende", "chiesta", r.get("esito"))
     prova("...che riceve UN messaggio", 1, sum(
@@ -265,8 +274,8 @@ def main():
     prova("...e ai moderatori arriva l'avviso", 1, sum(
         1 for a in banco.AVVISI if "📥" in a))
     r = posso(oid)
-    prova("adesso si puo': da saas a nodo, con un credito",
-          (True, "saas", ["nodo"], 50_000, 1),
+    prova("adesso si puo': da saas a nodo, e SENZA credito (l'origine e' «failed»)",
+          (True, "saas", ["nodo"], 50_000, 0),
           (r.get("ok"), r.get("origine"), r.get("destinazioni"),
            r.get("sats"), len(r.get("crediti") or [])))
     prova("senza conferma esplicita: 400", 400, getattr(
@@ -289,8 +298,8 @@ def main():
         1 for chi, t in banco.DETTO if chi == 222 and "Arrivati ✓" in t))
     moderatore()
     crediti = SRV.lista_crediti("", "")
-    prova("...e nel pannello c'e' il credito da recuperare",
-          [("saas", h(1), 50_000, "nodo", "aperto")],
+    prova("...e nel pannello non c'e' nessun credito",
+          [],
           [(c["cassaforte"], c["hash"], c["sats"], c["pagato_da"], c["stato"])
            for c in crediti])
     prova("secondo click: 409, nessun pagamento in piu'", (409, 2),
@@ -298,8 +307,8 @@ def main():
                    "status_code", None), len(POSTE)))
     banco.AVVISI.clear()
     asyncio.run(SRV.controlla_libro_mastro())
-    prova("il libro mastro VERO grida il credito, e solo quello",
-          (1, True, False),
+    prova("il libro mastro VERO non grida niente: ne' credito ne' deviazione",
+          (0, False, False),
           (len(banco.AVVISI),
            "credito da recuperare su un'altra cassaforte"
            in " ".join(banco.AVVISI),
@@ -307,6 +316,14 @@ def main():
 
     # ---- 3) il credito rientra -------------------------------------
     print("\n[il credito]")
+    # un credito nasce dove LND vede un FAILED che LNbits non ha ancora
+    # recepito: qui lo si scrive a mano, con l'origine ancora «pending»,
+    # per provare la SORVEGLIANZA
+    esegui("INSERT INTO crediti_cassaforte(tabella, riga_id, cassaforte, hash, "
+           "sats, pagato_da, motivo, deciso_da, deciso_il) "
+           "VALUES('ordini',?,'saas',?,50000,'nodo','prova',999,?)",
+           oid, h(1), int(orologio.time()))
+    BANCHE["saas"][h(1)] = "pending"
     banco.AVVISI.clear()
     orologio.avanti += 3600
     asyncio.run(SRV.sorveglia_crediti())

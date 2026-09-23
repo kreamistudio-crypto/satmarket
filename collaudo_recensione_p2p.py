@@ -251,6 +251,16 @@ def semina():
         con.execute("INSERT INTO p2p_ordini(ordine,tg_id,creato,stato,"
                     "lato,maker,visto,preso_da) VALUES(?,?,?,?,'sell',1,?,?)",
                     (ordine, tg_id, adesso, stato, adesso, preso_da))
+    # LE PARTI LE DICE MOSTROD (23 set 2026, la cura di A1): senza la sua
+    # riga in `p2p_scambi` una presa dichiarata resta in attesa e nessuno
+    # vede l'altra parte. Qui e' come se avesse gia' parlato di ogni
+    # scambio: ordini `sell`, ha preso chi compra. IGNOTO resta senza
+    # riga (un altro client, mai una parola).
+    for ordine, compra in ((SCAMBIO, 222), (SCAMBIO2, 222), (APERTO, 222),
+                           (FUSO, -77), (DA_NOSTR, -77), (DA_NOSTR2, -77)):
+        con.execute("INSERT OR REPLACE INTO p2p_scambi(ordine, compratore, "
+                    "venditore, preso_dal, giro, aggiornato) "
+                    "VALUES(?,?,111,'buyer',1,?)", (ordine, compra, adesso))
     con.commit()
     con.close()
 
@@ -382,13 +392,15 @@ def main():
 
     print("\n[8. il posto di chi ha preso non si ruba]")
     con = con_db()
-    SRV._registra_ordini_p2p(con, 333, [SCAMBIO], int(time.time()),
-                             presi=True)
+    esito = SRV._registra_ordini_p2p(con, 333, [SCAMBIO], int(time.time()),
+                                     presi=True)
     preso = con.execute("SELECT preso_da FROM p2p_ordini WHERE ordine=?",
                         (SCAMBIO,)).fetchone()[0]
     con.close()
     prova("a scambio concluso l'intestazione della presa non si sposta",
           222, preso)
+    prova("...e la dichiarazione dell'estraneo e' RIFIUTATA: mostrod dice 222 "
+          "(23 set 2026, A1)", 1, esito["rifiutate"])
     con = con_db()
     SRV._registra_ordini_p2p(con, 333, [APERTO], int(time.time()), presi=True)
     preso = con.execute("SELECT preso_da FROM p2p_ordini WHERE ordine=?",
@@ -396,6 +408,11 @@ def main():
     con.close()
     prova("...e nemmeno su uno scambio vivo che ha gia' chi l'ha preso",
           222, preso)
+    # ...e dalla ROTTA, con la sessione dell'estraneo, e' un 403 (A1)
+    come(333)
+    e = errore(SRV.registra_ordini_p2p, {"ordini": [APERTO], "presi": True})
+    prova("...e la rotta risponde 403 a chi non e' una delle due parti",
+          (403, "Non risulti fra le due parti di questo scambio"), e)
 
     print("\n[9. l'invito nella notifica]")
     ev = {"id": SCAMBIO, "stato": "success", "lato": "sell",
