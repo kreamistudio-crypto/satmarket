@@ -1677,7 +1677,9 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   sui due canali — quella col permesso dello splash. La **v1.5**
   (versionCode 7, che alza `bubblewrap update` da solo) è PRONTA nel
   repo dal 23 set 2026 — il tema dell'avvio e le barre vere, qui sotto
-  — ed è in servizio quando esce sui due canali.
+  — ed è in servizio quando esce sui due canali. La prima build non è
+  stata pubblicata: la prova sul telefono ha chiesto un secondo giro, e
+  si rifà con la STESSA versione (`--skipVersionUpgrade`, qui sotto).
   IL PROGETTO STA FUORI DAL REPO, in
   `C:\Users\Andrea\Documents\barattolo-twa`, e ci resta (un percorso
   spezzato a metà non si cerca più): lì dentro c'è il **keystore**
@@ -1700,7 +1702,13 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   L'ORDINE È FERREO, e non è pignoleria: `bubblewrap update` cancella e
   riscrive proprio i file che lo script patcha.
   1. `bubblewrap update --appVersionName=X.Y` (il versionCode lo alza
-     lui) — dalla cartella del progetto, con `node` nel PATH;
+     lui) — dalla cartella del progetto, con `node` nel PATH. Per
+     RIFARE una versione mai pubblicata, `bubblewrap update
+     --skipVersionUpgrade`: rigenera il progetto e lascia versione e
+     versionCode come sono. ⚠️ E L'UPDATE NON SI SALTA MAI, nemmeno per
+     rifare: lo script riconosce i suoi blocchi dal marcatore e quelli
+     che trova già li SALTA, quindi su un progetto già patchato un
+     blocco cambiato nel repo resterebbe quello vecchio, in silenzio;
   2. `python genera_icone_apk.py` — DAL REPO (aggiornato: `git pull`
      prima, o gira lo script di ieri), e rifà icona adattiva,
      monochrome e splash (vedi ARCHITETTURA, «Icona adattiva
@@ -1774,16 +1782,22 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   cresceva dall'icona era NERA per un fotogramma. Da Android 12 la
   finestra di partenza è lo splash del sistema, e il tema lo veste
   dello stesso arancio e dello stesso barattolo di `splash.png`; prima
-  di Android 12 è il fondo della finestra, uguale. Il resto dell'app
-  resta traslucido. Il PREZZO, deciso da Andrea: aprendo un link a
+  di Android 12 è il fondo della finestra, uguale. Le barre di sistema
+  sono dello stesso arancio con le icone chiare (il `Theme.NoTitleBar`
+  le voleva nere, e sopra lo splash di sistema si vedeva una barra
+  nera per ~150 ms). Il resto dell'app resta traslucido. Il PREZZO,
+  deciso da Andrea: aprendo un link a
   barattolo.store da un'altra app mentre Barattolo è già aperta, fra
   la pagina di prima e quella del link passa un lampo arancio col
   barattolo — la libreria il tema trasparente lo raccomanda proprio
   per quel caso. Il perché per intero sta in CANTIERI, «Il nero
   all'avvio dell'APK».
   LE BARRE VERE (v1.5): da Android 11 l'APK mette nella URL di avvio
-  il parametro `barre=sopra,sotto` in pixel, e la pagina lo usa per il
-  guscio e lo toglie dall'indirizzo (`barreDellApp`). Nei log del
+  il parametro `barre=sopra,sotto,densità` — le due barre in pixel e la
+  `densityDpi` dello schermo —, e la pagina lo usa per il guscio
+  (`barreDellApp`). L'indirizzo NON lo ripulisce: il primo giro lo
+  faceva con un `replaceState`, e dentro l'APK la barra dell'indirizzo
+  non c'è e nessuna condivisione copia `location.href`. Nei log del
   server le aperture dall'app si riconoscono da lì.
   LE DUE RIGHE PER APPVERIFIER, uguali in tre posti: le note di OGNI
   release, il README di barattolo-releases e la pagina Sicurezza del

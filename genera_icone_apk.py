@@ -48,16 +48,18 @@
 #      un'attivita' traslucida Android non ne prepara nessuna — e la
 #      finestra che cresceva dall'icona restava NERA per un fotogramma.
 #      Scrive i due stili (values/ e values-v31/, il secondo con lo
-#      splash del SISTEMA di Android 12+), il fondo della finestra
-#      (l'arancio col barattolo di splash.png) e l'icona dello splash di
-#      sistema (drawable-*/barattolo_avvio_icona.png), e nel manifest
-#      mette il tema sulla SOLA LauncherActivity. Nel Java, lo splash di
-#      sistema esce di taglio: sotto c'e' lo stesso barattolo;
+#      splash del SISTEMA di Android 12+; le barre dell'arancio dello
+#      splash con le icone chiare, che il Theme.NoTitleBar le voleva
+#      nere), il fondo della finestra (l'arancio col barattolo di
+#      splash.png) e l'icona dello splash di sistema
+#      (drawable-*/barattolo_avvio_icona.png), e nel manifest mette il
+#      tema sulla SOLA LauncherActivity. Nel Java, lo splash di sistema
+#      esce di taglio: sotto c'e' lo stesso barattolo;
 #  10. nel Java, LE BARRE VERE (v1.5): l'altezza della barra di stato e
-#      di quella di navigazione, in pixel, nel parametro `barre` della
-#      URL di avvio. La pagina ne sa solo la somma; con la divisione
-#      rimette il barattolo del guscio dove stava nello splash, e poi
-#      toglie il parametro dall'indirizzo.
+#      di quella di navigazione in pixel, e la densita' dello schermo,
+#      nel parametro `barre` della URL di avvio. La pagina ne sa solo la
+#      somma; con la divisione rimette il barattolo del guscio dove
+#      stava nello splash, e con la densita' lo misura in dp come lui.
 #
 # I DUE FILE DI TESTO CHE BUBBLEWRAP RIGENERA (LauncherActivity.java e
 # AndroidManifest.xml) SI PREPARANO PER PRIMI, IN MEMORIA: se un'ancora
@@ -211,20 +213,26 @@ ANCORA_SUPER = re.compile(
 # e quella di navigazione INSIEME (schermo meno pagina), non come si
 # dividono — e per rimettere il barattolo del guscio dove stava nello
 # splash le serve proprio la divisione (miniapp.html, `scartoGuscio`).
-# Qui si sanno: in pixel veri, nel parametro `barre` della URL di avvio,
-# e la pagina lo toglie dall'indirizzo appena letto. Un parametro e non
-# un frammento: `/sicurezza#…` e `/privacy#…` il frammento lo usano
-# gia'. Solo da Android 11, che le dice (WindowMetrics) quando la
-# finestra non esiste ancora: prima la pagina resta alla sua stima.
+# Qui si sanno: in pixel veri, nel parametro `barre` della URL di avvio.
+# Col terzo numero, la DENSITA' dello schermo (densityDpi): lo splash
+# misura il barattolo in dp e la pagina in px CSS, che sono la stessa
+# cosa solo finche' lo zoom di Chrome sta al 100% — con lei la pagina
+# lo rifa' esatto comunque. Un parametro e non un frammento:
+# `/sicurezza#…` e `/privacy#…` il frammento lo usano gia'. E la pagina
+# NON lo toglie piu' dall'indirizzo (secondo giro della 1.5): toglierlo
+# era un replaceState proprio mentre Chrome apre la pagina. Solo da
+# Android 11, che le dice (WindowMetrics) quando la finestra non esiste
+# ancora: prima la pagina resta alla sua stima.
 MARCATORE_BARRE = "Barattolo: le barre vere alla pagina"
 BARRE_VERE = f"""\
 // {MARCATORE_BARRE} (Android 11+, v1.5).
 // La pagina sa quanto sono alte la barra di stato e quella di
 // navigazione INSIEME, non come si dividono — e per rimettere il
 // barattolo del guscio dove stava nello splash le serve la divisione.
-// Qui si sanno: vanno in pixel veri nel parametro `barre` (sopra,sotto),
-// e la pagina lo toglie dall'indirizzo appena letto. Rimesso a ogni
-// build da genera_icone_apk.py (repo satmarket).
+// Qui si sanno: vanno in pixel veri nel parametro `barre`
+// (sopra,sotto,densita'), e la densita' fa misurare il barattolo della
+// pagina in dp come lo splash. Rimesso a ogni build da
+// genera_icone_apk.py (repo satmarket).
 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {{
     try {{
         android.view.WindowInsets riquadri =
@@ -234,8 +242,9 @@ if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {{
                         | android.view.WindowInsets.Type.displayCutout()).top;
         int sotto = riquadri.getInsetsIgnoringVisibility(
                 android.view.WindowInsets.Type.navigationBars()).bottom;
+        int densita = getResources().getDisplayMetrics().densityDpi;
         uri = uri.buildUpon()
-                .appendQueryParameter("barre", sopra + "," + sotto)
+                .appendQueryParameter("barre", sopra + "," + sotto + "," + densita)
                 .build();
     }} catch (RuntimeException e) {{
         android.util.Log.w("Barattolo", "barre non passate alla pagina", e);
@@ -269,9 +278,14 @@ TEMA_AVVIO_XML = f"""\
     partenza (ne' lo splash di Android 12+, ne' l'anteprima dei telefoni
     piu' vecchi), e la finestra che cresceva dall'icona restava nera per
     un fotogramma. Il gemello opaco del Theme.Translucent.NoTitleBar di
-    Bubblewrap: stessa famiglia, stesse barre, niente ombra sotto il
-    titolo che non c'e', e nessuna animazione di finestra sua, come
-    @style/Animation del traslucido.
+    Bubblewrap: stessa famiglia, niente ombra sotto il titolo che non
+    c'e', e nessuna animazione di finestra sua, come @style/Animation
+    del traslucido.
+    LE BARRE SONO DELL'ARANCIO DELLO SPLASH, con le icone chiare
+    (secondo giro della 1.5, dal video): il Theme.NoTitleBar le vuole
+    NERE, e la finestra di partenza le dipingeva cosi' — ~150 ms di
+    barra nera sopra lo splash arancio. Da qui in poi la barra e'
+    arancio finche' non arriva il colore della pagina.
 -->
 <resources>
     <style name="{TEMA_AVVIO}Base" parent="@android:style/Theme.NoTitleBar">
@@ -279,6 +293,10 @@ TEMA_AVVIO_XML = f"""\
         <item name="android:colorBackground">@color/backgroundColor</item>
         <item name="android:windowContentOverlay">@null</item>
         <item name="android:windowAnimationStyle">@android:style/Animation</item>
+        <item name="android:statusBarColor">@color/backgroundColor</item>
+        <item name="android:navigationBarColor">@color/backgroundColor</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
     </style>
     <style name="{TEMA_AVVIO}" parent="@style/{TEMA_AVVIO}Base" />
 </resources>

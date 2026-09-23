@@ -63036,8 +63036,11 @@ def prove_intestazione_scambi():
     # della pagina o al primo disegno non c'e'. La riga giusta e' che
     # l'unica incorporata sia quella, e che QUESTA resti timbrata (che
     # e' la prova qui sopra, ed e' quella che difende il mestiere).
-    _inc = re.findall(r'src="(data:image/webp[^"]{40,})"', mini)
-    prova("...e l'unica webp incorporata e' il barattolo del guscio",
+    # (dal secondo giro della 1.5 il barattolo del guscio e' AVIF e non
+    # piu' WebP: e' quello dello splash, una foto che in WebP pesava il
+    # doppio del tetto — il conto guarda tutt'e due le forme)
+    _inc = re.findall(r'src="(data:image/(?:webp|avif)[^"]{40,})"', mini)
+    prova("...e l'unica immagine incorporata e' il barattolo del guscio",
           1, len(_inc))
     prova("...che sta nel guscio, non qui", True,
           bool(_inc) and _inc[0] in mini[mini.index('<div id="guscio"'):
@@ -80489,7 +80492,7 @@ def prove_guscio_apertura():
     prova("...e sta PRIMA di #app: si dipinge appena il parser ci arriva",
           True, corpo.index('<div id="guscio"') < corpo.index('<div id="app">'))
     prova("...porta il barattolo incorporato e l'anello di casa",
-          [True, True], ['src="data:image/webp;base64,' in riga,
+          [True, True], ['src="data:image/avif;base64,' in riga,
                          'class="attesa-anello"' in riga])
     prova("...e non lo legge nessuno a voce: e' decorazione",
           True, 'aria-hidden="true"' in riga)
@@ -80545,26 +80548,31 @@ def prove_guscio_apertura():
         import io
         from PIL import Image, ImageChops
         from genera_icone import SORGENTE, colore_fondo
-        from genera_icone_apk import SPLASH_DP
+        from genera_icone_apk import SPLASH_DP, scontorna
     except Exception as e:
         salta("il fondo e la misura del guscio combaciano col nativo",
               f"{type(e).__name__}: {e}")
     else:
-        atteso = "#%02X%02X%02X" % colore_fondo(
-            Image.open(SORGENTE).convert("RGB"))
+        _foto = Image.open(SORGENTE).convert("RGB")
+        atteso = "#%02X%02X%02X" % colore_fondo(_foto)
         prova("il fondo del guscio E' l'arancio campionato dalla foto "
               "sorgente, lo stesso che genera_icone_apk.py scrive nello "
               "splash nativo", True,
               f"background:{atteso};" in reg.get("#guscio", ""))
-        alto = Image.open("assets/barattolo-hero.png").convert("RGBA")
-        bb = alto.split()[3].getbbox()
-        # l'immagine e' il barattolo RITAGLIATO sul suo bbox, quindi la
-        # misura a schermo e' la sua: alto SPLASH_DP come nello splash
-        # nativo, largo in proporzione al bbox
-        largo = round((bb[2] - bb[0]) * SPLASH_DP / (bb[3] - bb[1]))
+        # IL BARATTOLO E' QUELLO DELLO SPLASH (secondo giro della 1.5): la
+        # STESSA ricetta di splash.png — la foto, lo scontorno, il
+        # riquadro — alla misura dell'xxhdpi, cioe' 3x dei 160 CSS. Fino
+        # al primo giro era quello di barattolo-hero.png, un altro
+        # disegno: nel video stava 3px piu' in basso ed era 3px piu' alto
+        splash = scontorna(_foto, colore_fondo(_foto))
+        tre_x = (round(splash.width * SPLASH_DP * 3 / splash.height),
+                 SPLASH_DP * 3)
+        largo = f"{tre_x[0] / 3:.2f}"
         prova(f"il barattolo del guscio e' alto {SPLASH_DP}px come quello "
-              f"dello splash nativo (e largo {largo} come il suo bbox)",
-              f"width:{largo}px;height:{SPLASH_DP}px",
+              f"dello splash nativo (e largo {largo} come il suo riquadro), "
+              f"per la scala che lo porta in dp",
+              f"width:calc({largo}px * var(--guscio-scala, 1));"
+              f"height:calc({SPLASH_DP}px * var(--guscio-scala, 1))",
               reg.get("#guscio img", ""))
 
         # --- 2bis) IL BARATTOLO E' DENTRO LA PAGINA -----------------
@@ -80574,28 +80582,38 @@ def prove_guscio_apertura():
         # come un altro, e alla prima apertura la dispensa del service
         # worker e' vuota. Adesso sta nei byte della pagina.
         import base64 as _b64
-        _u = riga[riga.index("data:image/webp;base64,"):]
-        _u = _u[len("data:image/webp;base64,"):_u.index('"')]
+        _pre = "data:image/avif;base64,"
+        _u = riga[riga.find(_pre):] if _pre in riga else ""
+        _u = _u[len(_pre):_u.find('"')] if _u else ""
         _b = _b64.b64decode(_u)
-        _im = Image.open(io.BytesIO(_b))
+        try:
+            _im = Image.open(io.BytesIO(_b))
+            _im.load()
+        except Exception as e:
+            _im = Image.new("RGBA", (1, 1))
+            prova("il barattolo incorporato si legge", "", f"{e}")
         prova("il guscio non chiede NIENTE alla rete", [False, False],
               ["src=\"/" in riga, "http" in riga])
-        prova("...e il barattolo incorporato e' un WebP con l'alfa",
-              ["WEBP", True], [_im.format, _im.mode in ("RGBA", "P")])
+        # AVIF E NON PIU' WebP: il barattolo della foto e' un disegno
+        # pieno di sfumature, e in WebP pesava fra 76 e 100 KB — due volte
+        # e mezzo il tetto qui sotto. Il guscio lo vede solo l'APK, cioe'
+        # Chrome, che l'AVIF lo legge dall'85.
+        prova("...e il barattolo incorporato e' un AVIF con l'alfa",
+              ["AVIF", True], [_im.format, _im.mode in ("RGBA", "LA")])
         # 3x dei 160 CSS: il massimo che serve a un telefono. Le
-        # proporzioni sono quelle del bbox, o a schermo si schiaccia.
-        prova("...alla misura giusta per uno schermo 3x", (largo * 3, 480),
-              _im.size)
+        # proporzioni sono quelle del riquadro, o a schermo si schiaccia.
+        prova("...alla misura giusta per uno schermo 3x, quella dello "
+              "splash.png xxhdpi", tre_x, _im.size)
         # IL PESO HA UN TETTO DICHIARATO: la pagina la scarica CHIUNQUE,
         # anche chi il guscio non lo vedra' mai. 40 KB di data URI su
         # 2,9 MB di pagina sono il patto; chi lo sfora se ne accorge qui
         # invece che dal telefono di qualcun altro.
         prova(f"...e pesa meno di 40 KB nel data URI ({len(_u) / 1024:.1f})",
-              True, len(_u) < 40 * 1024)
-        # e RESTA il barattolo di casa: si riscala il ritaglio della
-        # sorgente e si confronta alla RESA, con la soglia percettiva —
-        # un confronto esatto scatterebbe su due codifiche identiche
-        _rif = alto.crop(bb).resize(_im.size, Image.LANCZOS)
+              True, 0 < len(_u) < 40 * 1024)
+        # e RESTA il barattolo dello splash: si riscala il suo ritaglio e
+        # si confronta alla RESA, con la soglia percettiva — un confronto
+        # esatto scatterebbe su due codifiche identiche
+        _rif = splash.resize(_im.size, Image.LANCZOS)
         _a = Image.alpha_composite(
             Image.new("RGBA", _im.size, (247, 143, 25, 255)),
             _im.convert("RGBA")).convert("RGB")
@@ -80605,7 +80623,7 @@ def prove_guscio_apertura():
         _d = ImageChops.difference(_a, _b2)
         _medio = sum(sum(p) for p in _d.getdata()) / (3 * _im.size[0]
                                                       * _im.size[1])
-        prova(f"...ed e' lo STESSO barattolo della sorgente "
+        prova(f"...ed e' lo STESSO barattolo dello splash nativo "
               f"(scarto medio {_medio:.2f}/255)", True, _medio < 8)
 
     # --- 3) LE DUE TRAPPOLE DEL DISEGNO ------------------------------
@@ -80658,18 +80676,20 @@ def prove_guscio_apertura():
 
     # --- 5) IL PATTO CON TELEGRAM ------------------------------------
     # `expand()` va chiesta prima del paint (la mini app si dipingerebbe
-    # corta e poi crescerebbe); `ready()` invece DICHIARA che l'app e'
-    # pronta, e Telegram a quel punto toglie il suo velo: dirlo col
-    # guscio ancora su vuol dire consegnare un fondo arancio chiamandolo
-    # «pronto». Erano sulla stessa riga, e adesso stanno agli antipodi.
-    prova("expand() si chiede subito", 1, js.count("if (tg) tg.expand();"))
-    prova("ready() NON si dice piu' all'avvio", 0, js.count("tg.ready();"))
-    prova("...si dice quando il guscio scende, e in nessun altro posto",
-          [True, 1], ["tg?.ready?.();" in tg_, js.count("ready?.()")])
-    # e il tema si ridice DOPO ready(): applicaTema() gira in cima al
-    # file, cioe' — da oggi — prima che Telegram sappia di noi
-    prova("il tema si ridice dopo ready(), che ora arriva dopo", True,
-          tg_.index("tg?.ready?.();") < tg_.index("applicaTema();"))
+    # corta e poi crescerebbe). `ready()` il guscio l'aveva spostato
+    # dentro togliGuscio, per non chiamare «pronta» una pagina coperta
+    # dall'arancio; ma dal giorno dopo il guscio in Telegram non c'e'
+    # piu' (lo accende solo l'APK), e il ritardo faceva togliere a
+    # Telegram il suo velo a pagina CARICATA, sulla home a meta' — la
+    # card P2P da sola, che poi si spostava (dal telefono di Andrea,
+    # secondo giro della 1.5). E' tornato dov'era prima del guscio.
+    # Si conta sul testo SENZA commenti: la spiegazione nomina ready().
+    nudo_js = nudo[nudo.index("</style>"):]
+    prova("ready() ed expand() si dicono subito, insieme, com'era prima "
+          "del guscio", 1, nudo_js.count("if (tg) { tg.ready(); tg.expand(); }"))
+    tg_nudo = re.sub(r"/\*.*?\*/", "", tg_, flags=re.S)
+    prova("...e ready() in nessun altro posto: togliGuscio non lo dice piu'",
+          [1, False], [nudo_js.count(".ready("), "ready" in tg_nudo])
     prova("...e i due colori che Telegram riceve sono il FONDO dell'app",
           True, "const sfondo = scuro ? '#211A10' : '#FAF4E4';" in js
           and "tg?.setHeaderColor?.(sfondo); tg?.setBackgroundColor?.(sfondo);"
@@ -80773,15 +80793,18 @@ def prove_guscio_barra_e_scarto():
           True, bool(re.search(
               r"scartoGuscio\(screen\.height, screen\.width, innerHeight,\s+"
               r"screen\.availTop, screen\.availHeight, barre\)", ramo)))
-    # LE BARRE VERE DELL'APK 1.5: si leggono (e si tolgono
-    # dall'indirizzo) PRIMA del ramo dell'APK, cioe' per tutti — un
-    # parametro rimasto finirebbe nella storia e nei link copiati
+    # LE BARRE VERE DELL'APK 1.5: si leggono una volta, PRIMA del ramo
+    # dell'APK — e dal secondo giro SOLO si leggono: l'indirizzo non si
+    # tocca piu' (la prova di barreDellApp, qui sotto, lo tiene fermo)
     _legge = "  const barre = barreDellApp();\n"
     prova("le barre dell'APK si leggono una volta, PRIMA del ramo "
-          "dell'APK: il parametro si toglie per tutti", [1, True],
+          "dell'APK", [1, True],
           [testa.count(_legge), 0 <= testa.find(_legge) < testa.index(SE)])
-    prova("...e il ramo le lascia alla diagnosi in data-barre-app", True,
-          "if (barre) radice.dataset.barreApp = barre.join(' ');" in ramo)
+    prova("...e il ramo le lascia alla diagnosi in data-barre-app, e la "
+          "scala del barattolo in --guscio-scala", [True, True], [
+              "radice.dataset.barreApp = barre.join(' ');" in ramo,
+              "if (barre.length > 2) radice.style.setProperty("
+              "'--guscio-scala', barre[2]);" in ramo])
     prova("...e barreDellApp sta fuori dalla funzione dell'head, come "
           "scartoGuscio", True,
           testa.index("})();") < testa.index("function barreDellApp("))
@@ -80854,13 +80877,20 @@ def prove_guscio_barra_e_scarto():
               avuto[10:] if isinstance(avuto, list) else avuto)
 
         # barreDellApp sotto node, con location/history/window di
-        # cartone: il valore in px CSS, e l'indirizzo senza il parametro
+        # cartone: il valore in px CSS, la scala dalla densita', e
+        # l'indirizzo che NON si tocca — il replaceState del primo giro
+        # era l'unico gesto nuovo della 1.5 lato pagina, e nel video dal
+        # telefono sotto la barra di stato passava la linea del
+        # caricamento di Chrome
         casi_b = [
             # [search, pathname, hash, devicePixelRatio]
             ["?barre=110%2C40", "/", "", 2.5],
             ["?diagnosi=1&barre=110%2C40&v=2", "/", "", 2.5],
             ["?barre=110,40", "/annuncio/12", "#foto", 2.5],
-            ["?q=a%20b&barre=1%2C2", "/", "", 1],
+            ["?barre=110%2C40%2C400", "/", "", 2.5],   # densita' 2,5: scala 1
+            ["?barre=110%2C40%2C440", "/", "", 2.5],   # zoom di Chrome: 1.1
+            ["?barre=110%2C40%2C9999", "/", "", 2.5],  # scala assurda: niente
+            ["?barre=110%2C40%2C1", "/", "", 2.5],     # densita' storta: null
             ["?barre=abc", "/", "", 2.5],
             ["?barre=%E0%A4%A", "/", "", 2.5],
             ["?barre=99999%2C1", "/", "", 2],
@@ -80889,20 +80919,55 @@ def prove_guscio_barra_e_scarto():
             avuto = f"node e' esploso: {e}"
         finally:
             os.unlink(f.name)
-        S = {"pila": 1}
-        prova("barreDellApp: pixel veri diviso devicePixelRatio, e il "
-              "parametro TOLTO — anche quando non si legge —, con lo stato "
-              "della storia e le altre coppie intatte (byte per byte)", [
-                  [[44, 16], [S, "/"]],
-                  [[44, 16], [S, "/?diagnosi=1&v=2"]],
-                  [[44, 16], [S, "/annuncio/12#foto"]],
-                  [[1, 2], [S, "/?q=a%20b"]],
-                  [None, [S, "/"]],
-                  [None, [S, "/"]],
-                  [None, [S, "/"]],
-                  [None, [S, "/"]],
+        prova("barreDellApp: pixel veri diviso devicePixelRatio, la scala "
+              "dalla densita' solo se sta fra 0,5 e 2, e l'indirizzo che "
+              "non si tocca mai", [
+                  [[44, 16], None],
+                  [[44, 16], None],
+                  [[44, 16], None],
+                  [[44, 16, 1], None],
+                  [[44, 16, 1.1], None],
+                  [[44, 16], None],
+                  [None, None],
+                  [None, None],
+                  [None, None],
+                  [None, None],
+                  [None, None],
                   [None, None],
                   [None, None]], avuto)
+
+        # E IL COLORE DEL TEMA ARRIVA DUE FOTOGRAMMI DOPO CHE IL GUSCIO
+        # E' SCESO: togliGuscio VERA sotto node, col DOM e i fotogrammi
+        # di cartone — dal video, il primo giro la dava subito e la barra
+        # diventava scura sopra il guscio ancora arancio
+        js = ("let guscioVia = false, diagnosiTieneGuscio = false;\n"
+              "const fatti = [];\nlet coda = [];\n"
+              "globalThis.requestAnimationFrame = f => coda.push(f);\n"
+              "globalThis.applicaTema = () => fatti.push('tema');\n"
+              "globalThis.document = {getElementById: id => id === 'guscio'"
+              " ? {remove(){ fatti.push('via'); }} : null};\n"
+              + pezzo_js(mini, "function togliGuscio(){", "\n}\n") + "\n}\n"
+              + "const passo = () => { const c = coda; coda = [];"
+              " c.forEach(f => f()); return [...fatti]; };\n"
+              + "togliGuscio(); const a = [...fatti];\n"
+              + "const b = passo(); const c = passo();\n"
+              + "togliGuscio(); const d = passo();\n"
+              + "console.log(JSON.stringify([a, b, c, d]));\n")
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                         encoding="utf-8") as f:
+            f.write(js)
+        try:
+            out = subprocess.run([node, f.name], capture_output=True,
+                                 encoding="utf-8", timeout=60)
+            avuto = json.loads(out.stdout or "null")
+        except Exception as e:
+            avuto = f"node e' esploso: {e}"
+        finally:
+            os.unlink(f.name)
+        prova("togliGuscio: il guscio scende subito, il colore del tema "
+              "al SECONDO fotogramma dopo, e una volta sola", [
+                  ["via"], ["via"], ["via", "tema"], ["via", "tema"]],
+              avuto)
 
     # --- 4) LA DIAGNOSI (?diagnosi=1) --------------------------------
     prova("la diagnosi esiste solo col parametro", [1, 1], [
@@ -80910,8 +80975,10 @@ def prove_guscio_barra_e_scarto():
                    ".test(location.search);"),
         mini.count("if (diagnosiApertura) mostraDiagnosiApertura();")])
     md = pezzo_js(mini, "function mostraDiagnosiApertura(){", "\n}\n")
-    # SOLO se in vista: dentro Telegram `ready()` vive in togliGuscio, e
-    # un guscio trattenuto li' lascerebbe il velo di Telegram su per sempre
+    # SOLO se in vista: fuori dall'APK il guscio non si vede, e
+    # trattenerlo terrebbe ferma togliGuscio — e con lei il colore del
+    # tema — fino al Chiudi (il primo giro diceva «il velo di Telegram»:
+    # da quando ready() e' tornato all'avvio, quello non c'entra piu')
     prova("...tiene su il guscio SOLO se si vede", True, md.startswith(
         "function mostraDiagnosiApertura(){\n"
         "  diagnosiTieneGuscio = guscioInVista();"))
@@ -80926,11 +80993,16 @@ def prove_guscio_barra_e_scarto():
           ["innerHTML" in md, "pannello.textContent = righe.join" in md])
     prova("...rifa' lo stesso conto di chi sposta il guscio", True,
           "scartoGuscio(screen.height, screen.width, innerHeight," in md)
-    prova("...con le barre dell'APK, riprese da data-barre-app (la URL "
-          "non le ha piu')", [True, True], [
-              "const b = (radice.dataset.barreApp || '').split(' ')"
-              ".map(Number);" in md,
-              "screen.availTop, screen.availHeight, barreApp);" in md])
+    prova("...con le barre dell'APK, riprese da data-barre-app", [True, True],
+          ["const b = (radice.dataset.barreApp || '').split(' ')"
+           ".map(Number);" in md,
+           "screen.availTop, screen.availHeight, barreApp);" in md])
+    # coi due numeri dell'APK senza densita' E coi tre di quella che la
+    # dice: se ne leggesse solo due, la 1.5 comparirebbe «senza barre»
+    prova("...che siano due numeri o tre (la scala), e la scala si mostra",
+          [True, True], [
+              "const barreApp = (b.length === 2 || b.length === 3)" in md,
+              "' · scala ' + (barreApp.length > 2" in md])
     _pacco = json.load(open(os.path.join(".well-known", "assetlinks.json"),
                             encoding="utf-8"))[0]["target"]["package_name"]
     prova("...e il suo «Apri nell'app» apre il NOSTRO pacchetto", True,
@@ -81344,17 +81416,22 @@ def prove_avvio_apk():
                       r"\.navigationBars\(\)\)\.bottom;", barre))])
         # un PARAMETRO aggiunto alla URL della libreria: il dominio
         # verificato non si tocca, e i deep link tengono il loro
-        prova("...nel parametro `barre`, sopra,sotto, aggiunto alla URL "
-              "della libreria", True,
-              '.appendQueryParameter("barre", sopra + "," + sotto)' in barre
-              and "uri = uri.buildUpon()" in barre)
+        prova("...nel parametro `barre`, sopra,sotto,densita', aggiunto "
+              "alla URL della libreria", [True, True], [
+                  '.appendQueryParameter("barre", sopra + "," + sotto + ","'
+                  ' + densita)' in barre and "uri = uri.buildUpon()" in barre,
+                  "int densita = getResources().getDisplayMetrics()"
+                  ".densityDpi;" in barre])
         prova("...e un guasto non chiude l'app", True,
               '"barre non passate alla pagina", e);' in barre)
-        # il nome del parametro e' un contratto con la pagina
+        # il nome del parametro e la sua forma sono un contratto con la
+        # pagina, che dal secondo giro lo LEGGE e basta
         mini = open("miniapp.html", encoding="utf-8").read()
-        prova("...ed e' il parametro che la pagina legge e toglie", True,
-              "const nostra = coppie.find(c => c.indexOf('barre=') === 0);"
-              in pezzo_js(mini, "function barreDellApp(", "\n}\n"))
+        _bda = pezzo_js(mini, "function barreDellApp(", "\n}\n")
+        prova("...ed e' il parametro che la pagina legge, coi tre numeri",
+              [True, True], [
+                  ".find(c => c.indexOf('barre=') === 0);" in _bda,
+                  r"/^(\d{1,4}),(\d{1,4})(?:,(\d{2,4}))?$/" in _bda])
 
     senza_url = _MODELLO_LAUNCHER.replace(
         "        Uri uri = super.getLaunchingUrl();\n", "")
@@ -81459,12 +81536,20 @@ def prove_avvio_apk():
               [base[B][0], any("Translucent" in (v or "") or
                                "Translucent" in k
                                for k, v in base[B][1].items())])
-        prova("...col fondo arancio col barattolo, senza l'ombra del titolo "
-              "e senza animazioni di finestra sue", {
+        # le barre DELL'ARANCIO DELLO SPLASH con le icone chiare (secondo
+        # giro, dal video: il Theme.NoTitleBar le vuole nere, e la finestra
+        # di partenza dipingeva ~150 ms di barra nera sopra lo splash)
+        prova("...col fondo arancio col barattolo, le barre dello stesso "
+              "arancio con le icone chiare, senza l'ombra del titolo e senza "
+              "animazioni di finestra sue", {
                   "android:windowBackground": "@drawable/barattolo_avvio_fondo",
                   "android:colorBackground": "@color/backgroundColor",
                   "android:windowContentOverlay": "@null",
-                  "android:windowAnimationStyle": "@android:style/Animation"},
+                  "android:windowAnimationStyle": "@android:style/Animation",
+                  "android:statusBarColor": "@color/backgroundColor",
+                  "android:navigationBarColor": "@color/backgroundColor",
+                  "android:windowLightStatusBar": "false",
+                  "android:windowLightNavigationBar": "false"},
               base[B][1])
         prova("il tema dell'avvio figlio di quello di base, vuoto prima di "
               "Android 12", (f"@style/{B}", {}), base.get(g.TEMA_AVVIO))
@@ -81703,13 +81788,16 @@ def prove_effetti_ridotti():
     #   barreCorri: il FLIP delle barre — idem, la transizione e' del CSS
     #   lbApplica: segue il DITO nel lightbox, non e' un'animazione
     #   passo: le monete di festaSats, che il giudice ferma alla porta
+    #   togliGuscio: due fotogrammi di ATTESA prima del colore del tema
+    #     (secondo giro della 1.5: la barra di stato non deve cambiare
+    #     sopra il guscio ancora in vista) — non anima niente
     chi = collections.Counter()
     for m in re.finditer(r"requestAnimationFrame", js):
         nomi = re.findall(r"function\s+(\w+)\s*\(", js[:m.start()])
         chi[nomi[-1] if nomi else "?"] += 1
     prova("chi chiama requestAnimationFrame e' censito, col suo perche'",
-          {"tourBenvenuto": 2, "mostraTappa": 2, "barreCorri": 2,
-           "lbApplica": 1, "passo": 2}, dict(chi))
+          {"togliGuscio": 2, "tourBenvenuto": 2, "mostraTappa": 2,
+           "barreCorri": 2, "lbApplica": 1, "passo": 2}, dict(chi))
 
     # --- 5) PRIMA DEL PRIMO PAINT, E DOPO /me -----------------------
     testa = mini[i_fine:mini.index("<body")]
