@@ -65214,12 +65214,13 @@ def prove_indietro_dal_libro():
              "function navApplica(s){", "function navIndietro(){", "function navFreccia(pila){",
              "function navMotore(){", "function passoPilaP2P(ora, st, sotto){",
              "function navGiu(){", "function vaiEsplora(){",
+             "function navArmaGesto(dentro){", "function navArrivoSecco(){",
              "function consumaGradinoReparto(){", "function tornaATutto(){")
     _prog = (
         _blocco("const RADICI = new Set([", "]);") + "\n"
         + "\n".join(re.search(r"const " + n + r" = [^\n]*;", mini).group(0) for n in (
             "RADICE_MADRE", "VISTE_NAV_P2P", "MADRE_P2P", "FIGLIE_P2P", "chiaveVetrina",
-            "navStesso")) + "\n"
+            "navStesso", "mqApp")) + "\n"
         + _blocco("const navUguali = ", "));") + "\n"
         + "".join(_intera(f) for f in _funz)
         + r"""
@@ -65227,6 +65228,26 @@ let CUR = 'esplora', APERTI = [], CHIUSO = 0, USCITO = 0, CODA = [], LOG = [];
 /* PERDI: il popstate del prossimo indietro non arriva mai; SPOSTA: di
    quanto l'orologio e' andato avanti (il tetto del passo in volo) */
 let PERDI = 0, SPOSTA = 0;
+/* LE TRE VIE: 'tg' la Mini App (il tasto di Telegram), 'sistema' il
+   browser normale (lo swipe con l'istantanea di Chrome), 'apk' l'app
+   Android (la TWA: il gesto lo prende il guardiano, se c'e') */
+let MODO = 'tg';
+function matchMedia(q){ return {get matches(){ return MODO === 'apk'; }}; }
+const navigator = {get userAgent(){
+  return MODO === 'tg' ? 'Telegram' : 'Mozilla/5.0 (Linux; Android 16) Chrome/153'; }};
+/* il CloseWatcher di cartone: vive finche' non lo chiudono o lo
+   distruggono, e chiudendosi chiama il suo `onclose` */
+let GUARDIANI = [], ARMATI = 0;
+class CloseWatcher {
+  constructor(){ GUARDIANI.push(this); ARMATI++; }
+  destroy(){ GUARDIANI = GUARDIANI.filter(x => x !== this); }
+  close(){ if (!GUARDIANI.includes(this)) return; this.destroy(); if (this.onclose) this.onclose(); }
+}
+const CLASSI = new Set();
+function requestAnimationFrame(f){ setImmediate(f); }
+/* SECCHI: gli arrivi secchi chiesti; SECCHI_VISTI: le viste cambiate con
+   la classe addosso; UA: le transizioni di Chrome andate a segno */
+let SECCHI = 0, SECCHI_VISTI = 0, UA = 0;
 const _adesso = Date.now;
 Date.now = () => _adesso() + SPOSTA;
 let currentListing = null, currentOrder = null, negozioPag = {chi: ''}, paccoDati = null, acqDati = null;
@@ -65235,15 +65256,22 @@ let tourInCorso = false, tourP2PInCorso = false, testModaleInCorso = false;
 let vistaBarattolo = false, filtroAsta = false, pollTimer = null;
 const DEMO = false, STORIA = true;
 let navSpingi = false, navGradinoReparto = 0, navApplicando = false, uscitaDopoAnnullo = false;
-let navUltimo = 0, navGiuInVolo = 0;
+let navUltimo = 0, navGiuInVolo = 0, navGuardiano = null;
 const location = {href: 'https://barattolo.store/', protocol: 'https:'};
-const tg = {initData: 'x', close(){ CHIUSO++; }, BackButton: {show(){}, hide(){}},
+const tg = {get initData(){ return MODO === 'tg' ? 'x' : ''; }, close(){ CHIUSO++; },
+  BackButton: {show(){}, hide(){}},
   isVersionAtLeast: () => true, disableVerticalSwipes(){}, onEvent(){}};
-function addEventListener(){}
+/* gli ascoltatori veri: quello del popstate e' di navMotore */
+const ASCOLTI = {};
+function addEventListener(t, f){ (ASCOLTI[t] = ASCOLTI[t] || []).push(f); }
+function popstate(state, ua){
+  (ASCOLTI.popstate || []).forEach(f => f({state, hasUAVisualTransition: ua})); }
 class MutationObserver { observe(){} }
 /* l'osservatore delle classi: un microtask, come quello vero */
 function osserva(){ queueMicrotask(() => navRiflette()); }
 const document = {
+  documentElement: {classList: {add: c => CLASSI.add(c), remove: c => CLASSI.delete(c),
+                                contains: c => CLASSI.has(c)}},
   querySelector(s){ if (s === '.view.active') return {id: 'view-' + CUR};
     if (s === '.sheet.open') return APERTI.length ? {id: APERTI[0]} : null; return null; },
   querySelectorAll(s){ return s === '.sheet.open' ? APERTI.map(id => ({id})) : []; }
@@ -65252,7 +65280,7 @@ function el(id){
   return {children: [], classList: {contains: () => false, add(){},
     remove(c){ if (c === 'open' && APERTI.includes(id)) { APERTI = APERTI.filter(x => x !== id); osserva(); } }}};
 }
-function go(v){ CUR = v; osserva(); }
+function go(v){ if (CLASSI.has('arrivo-secco')) SECCHI_VISTI++; CUR = v; osserva(); }
 function setCat(c){ activeCat = c; }
 function ordiniP2P(){ return {x1: {}}; }
 function apriOrdineP2P(id){ p2pOrdineAperto = id; go('p2pordine'); }
@@ -65265,6 +65293,8 @@ function loadListings(){ return Promise.resolve(); }
    devono essere (niente deviazioni al popstate) */
 const _navGiu = navGiu;
 navGiu = function(){ LOG.push('giu'); return _navGiu(); };
+const _navArrivoSecco = navArrivoSecco;
+navArrivoSecco = function(){ SECCHI++; return _navArrivoSecco(); };
 /* ---- LA CRONOLOGIA DI CARTONE: push, replace, e i popstate
    consegnati DOPO, in un giro loro, come fa il browser ---- */
 const history = {
@@ -65275,12 +65305,23 @@ const history = {
   replaceState(s){ LOG.push('replace'); const c = JSON.parse(JSON.stringify(s));
     if (this.i < 0) { this.voci = [c]; this.i = 0; } else this.voci[this.i] = c; },
   back(){ LOG.push('back'); if (PERDI) { PERDI--; return; }
-    CODA.push(() => { if (this.i > 0) { this.i--; navApplica(this.state); } else USCITO++; }); },
-  forward(){ LOG.push('avanti'); CODA.push(() => { if (this.i < this.voci.length - 1) { this.i++; navApplica(this.state); } }); }
+    CODA.push(() => { if (this.i > 0) { this.i--; popstate(this.state, false); } else USCITO++; }); },
+  /* lo swipe di Chrome: la sua transizione, e il popstate che lo dice */
+  indietroChrome(){ LOG.push('back');
+    CODA.push(() => { if (this.i > 0) { this.i--; UA++; popstate(this.state, true); } else USCITO++; }); },
+  forward(){ LOG.push('avanti'); CODA.push(() => { if (this.i < this.voci.length - 1) { this.i++; popstate(this.state, false); } }); }
 };
 const pausa = () => new Promise(r => setImmediate(r));
 async function scorri(){ await pausa(); let g = 0;
-  while (CODA.length && g++ < 80) { CODA.shift()(); await pausa(); } }
+  while (CODA.length && g++ < 80) { CODA.shift()(); await pausa(); }
+  /* i due fotogrammi dell'arrivo secco */
+  await pausa(); await pausa(); }
+/* la domanda di navFreccia: c'e' dove tornare? */
+function dentroOra(){
+  const p = navPila();
+  return p.length > 1 || !!(history.state && history.state.d)
+      || !(p[0].t === 'v' && p[0].v === RADICE_MADRE);
+}
 const vista = () => CUR + (APERTI.length ? '+' + APERTI.join('+') : '');
 const base = p => (p && p[0] && p[0].t === 'v') ? p[0].v : '?';
 /* la FORMA della pila fino alla entry corrente: le viste, dal fondo */
@@ -65294,12 +65335,18 @@ const sottoGiusto = () => history.voci.slice(0, history.i + 1).every((v, k) =>
 function azzera(){
   CUR = 'esplora'; APERTI = []; CHIUSO = 0; USCITO = 0; CODA = []; LOG = []; p2pOrdineAperto = ''; PERDI = 0;
   history.voci = []; history.i = -1; navGiuInVolo = 0; navUltimo = 0; activeCat = 'Tutto';
+  ASCOLTI.popstate = []; GUARDIANI = []; navGuardiano = null; CLASSI.clear();
   navMotore();
 }
 /* l'indietro nelle sue due strade: il tasto di Telegram (e la freccia
    in pagina) chiedono navIndietro; lo swipe e il tasto di sistema
    parlano dritti con la cronologia */
-function indietro(via){ if (via === 'tg') { navUltimo = 0; navIndietro(); } else history.back(); }
+function indietro(via){
+  if (via === 'tg') { navUltimo = 0; navIndietro(); }
+  /* nell'app il gesto lo prende il guardiano, se c'e'; se no e' di Chrome */
+  else if (via === 'apk' && GUARDIANI.length) { navUltimo = 0; GUARDIANI[GUARDIANI.length - 1].close(); }
+  else history.indietroChrome();
+}
 function passo(p, via){
   if (p === '<') indietro(via);
   else if (p === '>') history.forward();
@@ -65326,9 +65373,10 @@ function passo(p, via){
   else go(p);
 }
 async function giro(passi, via){
-  azzera(); await scorri();
+  MODO = via; azzera(); await scorri();
+  SECCHI = 0; SECCHI_VISTI = 0; UA = 0; ARMATI = 0;
   const visti = [], forme = [], mosse = [], chiavi = [];
-  let massimo = history.voci.length, registro = true;
+  let massimo = history.voci.length, registro = true, guardia = true;
   for (const p of passi) {
     const l0 = LOG.length;
     passo(p, via); await scorri();
@@ -65338,9 +65386,13 @@ async function giro(passi, via){
     if (p === '<') mosse.push(LOG.slice(l0).filter(x => x !== 'back').length);
     massimo = Math.max(massimo, history.voci.length);
     registro = registro && sottoGiusto();
+    /* il guardiano c'e' esattamente quando c'e' dove tornare, e solo nell'app */
+    guardia = guardia && GUARDIANI.length === ((MODO === 'apk' && dentroOra()) ? 1 : 0);
   }
   return {visti, forme, chiavi, mosse: mosse.reduce((a, b) => a + b, 0), massimo,
-          fondo: history.i, chiuso: CHIUSO, uscito: USCITO, registro};
+          fondo: history.i, chiuso: CHIUSO, uscito: USCITO, registro, guardia,
+          secchi: SECCHI, secchiVisti: SECCHI_VISTI, ua: UA, armati: ARMATI,
+          classe: CLASSI.has('arrivo-secco')};
 }
 const SCENARI = {
   miei: ['p2p', 'p2pmiei', '<', '<', '<'],
@@ -65387,6 +65439,17 @@ async function aCaso(n, via){
   const P2P = new Set(['p2p', 'p2pmiei', 'p2pinfo', 'p2pordine']);
   const guasti = [], conta = {};
   let indietroTot = 0;
+  /* nell'app: il guardiano segue la freccia, e Chrome non anima mai un
+     indietro che ha dove andare; nel browser: ogni arrivo dopo la sua
+     transizione e' secco, e la classe non resta addosso */
+  const nellApp = (ua0, s0) => {
+    if (MODO === 'apk' && GUARDIANI.length !== (dentroOra() ? 1 : 0)) return 'il guardiano non segue la freccia';
+    if (MODO === 'apk' && UA > ua0) return 'Chrome ha fatto la sua transizione dentro l\'app';
+    if (MODO !== 'apk' && GUARDIANI.length) return 'un guardiano fuori dall\'app';
+    if ((UA - ua0) !== (SECCHI - s0)) return 'un arrivo dopo la transizione di Chrome non era secco';
+    if (CLASSI.has('arrivo-secco')) return 'la classe dell\'arrivo secco e\' rimasta addosso';
+    return '';
+  };
   const giusta = () => {
     const f = history.voci.slice(0, history.i + 1);
     const qui = f[f.length - 1], sotto1 = f[f.length - 2], sotto2 = f[f.length - 3];
@@ -65403,7 +65466,8 @@ async function aCaso(n, via){
     return '';
   };
   for (let g = 0; g < n; g++) {
-    azzera(); await scorri();
+    MODO = via; azzera(); await scorri();
+    ARMATI = 0;
     passo('p2p', via); await scorri();
     const fatti = ['p2p'];
     const lung = 1 + caso(10);
@@ -65420,26 +65484,26 @@ async function aCaso(n, via){
       const m = mosse[caso(mosse.length)];
       fatti.push(m);
       conta[m] = (conta[m] || 0) + 1;
-      const l0 = LOG.length;
+      const l0 = LOG.length, ua0 = UA, s0 = SECCHI;
       if (m === 'chiudi') passo('-' + APERTI[APERTI.length - 1], via);
       else if (m === 'foglio') passo('+p2pFoglio', via);
       else if (m === 'tour') passo('p2p+p2pTour', via);
       else passo(m, via);
       await scorri();
       if (m === '<' && LOG.slice(l0).some(x => x !== 'back')) male = 'durante un indietro il codice ha mosso la pila';
-      else male = giusta();
+      else male = giusta() || nellApp(ua0, s0);
     }
     const strada = [vista()];
     let volte = 0;
     while (!male && !CHIUSO && !USCITO && volte++ < 40) {
       /* a vuoto = NIENTE cambia: ne' la vista, ne' i fogli, ne' la
          categoria (da un reparto alla home cambia solo quella) */
-      const prima = JSON.stringify([CUR, APERTI, activeCat]), l0 = LOG.length;
+      const prima = JSON.stringify([CUR, APERTI, activeCat]), l0 = LOG.length, ua0 = UA, s0 = SECCHI;
       indietro(via); await scorri();
       strada.push(vista());
       if (LOG.slice(l0).some(x => x !== 'back')) male = 'durante un indietro il codice ha mosso la pila';
       else if (!CHIUSO && !USCITO && JSON.stringify([CUR, APERTI, activeCat]) === prima) male = 'un indietro a vuoto';
-      else if (!CHIUSO && !USCITO) male = giusta();
+      else if (!CHIUSO && !USCITO) male = giusta() || nellApp(ua0, s0);
     }
     indietroTot += volte;
     if (!male && volte >= 40) male = 'non finisce';
@@ -65452,13 +65516,14 @@ async function aCaso(n, via){
         male = 'da ' + a + ' torna a ' + c;
     }
     if (!male && b(strada[strada.length - 1]) !== 'esplora') male = 'non esce dalla home';
+    if (!male && MODO !== 'apk' && ARMATI) male = 'un guardiano fuori dall\'app';
     if (male) guasti.push({fatti, strada, male, forma: forma()});
   }
   return {guasti: guasti.slice(0, 3), quanti: guasti.length, giri: n, indietro: indietroTot, conta};
 }
 (async () => {
   const R = {};
-  for (const via of ['tg', 'sistema']) {
+  for (const via of ['tg', 'sistema', 'apk']) {
     R[via] = {};
     for (const k of Object.keys(SCENARI)) {
       try { R[via][k] = await giro(SCENARI[k], via); }
@@ -65467,6 +65532,24 @@ async function aCaso(n, via){
     try { R[via].aCaso = await aCaso(150, via); }
     catch(e) { R[via].aCaso = 'ESPLOSO: ' + (e && e.message); }
   }
+  /* IL DOPPIO CANALE NELL'APP: Esc (o la freccia) e il guardiano nello
+     stesso giro fanno UN passo solo, e il guardiano si riarma */
+  try {
+    MODO = 'apk'; azzera(); await scorri();
+    passo('p2p', 'apk'); await scorri(); passo('p2pmiei', 'apk'); await scorri();
+    const l0 = LOG.length;
+    navUltimo = 0; navIndietro(); GUARDIANI[GUARDIANI.length - 1].close(); await scorri();
+    R.doppio = {indietro: LOG.slice(l0).filter(x => x === 'back').length, vista: vista(),
+                guardiani: GUARDIANI.length};
+  } catch(e) { R.doppio = 'ESPLOSO: ' + (e && e.message); }
+  /* IL GESTO CHE NON ATTERRA: il popstate dell'indietro si perde, quindi
+     nessun approdo riarmera' il guardiano — lo riarma il suo `close` */
+  try {
+    MODO = 'apk'; azzera(); await scorri();
+    passo('p2p', 'apk'); await scorri(); passo('p2pmiei', 'apk'); await scorri();
+    PERDI = 1; indietro('apk'); await scorri();
+    R.perso = {guardiani: GUARDIANI.length, vista: vista()};
+  } catch(e) { R.perso = 'ESPLOSO: ' + (e && e.message); }
   /* L'AVANTI DEL BROWSER va dove dice la sua entry */
   try { R.avanti = await giro(['p2p', 'ordine', 'p2pmiei', '<', '>'], 'sistema'); }
   catch(e) { R.avanti = 'ESPLOSO: ' + (e && e.message); }
@@ -65577,8 +65660,10 @@ async function aCaso(n, via){
                        "p2pmiei", "p2pinfo", "p2p", "esplora"], 6, "esplora p2p p2pinfo",
                       "un passo nostro il cui popstate non arriva non ammutolisce il motore: passato il secondo e mezzo si riscrive, e la pila torna giusta"),
     }
-    for via in ("tg", "sistema"):
-        _v = "tasto di Telegram" if via == "tg" else "swipe di sistema"
+    _VIE = {"tg": "tasto di Telegram", "sistema": "swipe del browser, con l'istantanea di Chrome",
+            "apk": "swipe nell'app Android, col guardiano"}
+    for via in ("tg", "sistema", "apk"):
+        _v = _VIE[via]
         for k, (atteso, dove, forma, nome) in _ATTESI.items():
             r = out[via][k]
             if not isinstance(r, dict):
@@ -65591,6 +65676,22 @@ async function aCaso(n, via){
         _tutti = [out[via][k] for k in _ATTESI if isinstance(out[via][k], dict)]
         prova("in nessuna strada un indietro fa muovere il codice, e il registro di sotto dice sempre il vero (%s)" % via,
               [0, True], [sum(r["mosse"] for r in _tutti), all(r["registro"] for r in _tutti)])
+        if via == "apk":
+            prova("nell'app il guardiano c'e' esattamente quando c'e' dove tornare, ogni gesto lo prende lui "
+                  "(Chrome non anima mai dentro l'app) e niente arriva secco",
+                  [True, 0, 0], [all(r["guardia"] for r in _tutti), sum(r["ua"] for r in _tutti),
+                                 sum(r["secchi"] for r in _tutti)])
+        elif via == "tg":
+            prova("in Telegram niente cambia: nessun guardiano, nessun arrivo secco",
+                  [0, 0], [sum(r["armati"] for r in _tutti), sum(r["secchi"] for r in _tutti)])
+        else:
+            prova("nel browser lo swipe e' di Chrome: ogni suo arrivo e' secco (la classe c'e' quando la vista "
+                  "cambia) e se ne va da sola, e nessun guardiano",
+                  [True, True, True, 0, 0],
+                  [sum(r["ua"] for r in _tutti) > 0,
+                   sum(r["secchi"] for r in _tutti) == sum(r["ua"] for r in _tutti),
+                   sum(r["secchiVisti"] for r in _tutti) > 0,
+                   sum(1 for r in _tutti if r["classe"]), sum(r["armati"] for r in _tutti)])
         _rp = out[via]["reparto"]
         prova("...ed e' il reparto sopra la home, non la home due volte (%s)" % via,
               "esplora|Tutto esplora|Casa", _rp["chiavi"][2] if isinstance(_rp, dict) else _rp)
@@ -65611,9 +65712,63 @@ async function aCaso(n, via){
                   "tour", "<", "mercatino", "profilo", "reparto")
         prova("...e ci passano davvero: ogni mossa del giro almeno dieci volte (%s)" % via, [],
               [m for m in _mosse if (_c.get("conta", {}).get(m, 0) if isinstance(_c, dict) else 0) < 10])
+    prova("nell'app Esc (o la freccia) e il guardiano nello stesso giro fanno UN passo solo, "
+          "e il guardiano si riarma sul libro",
+          {"indietro": 1, "vista": "p2p", "guardiani": 1}, out["doppio"])
+    prova("...e un gesto il cui popstate non arriva non lascia l'app senza guardiano: lo riarma il suo close",
+          {"guardiani": 1, "vista": "p2pmiei"}, out["perso"])
     prova("l'avanti del browser va dove dice la sua entry",
           ["p2p", "p2pordine", "p2pmiei", "p2p", "p2pmiei"],
           out["avanti"]["visti"] if isinstance(out["avanti"], dict) else out["avanti"])
+
+
+def prove_indietro_app_android():
+    """NELL'APP ANDROID L'INDIETRO LO PRENDIAMO NOI (23 set 2026). Nella
+    TWA lo swipe e' di Chrome: un'istantanea di tutta la pagina, barra
+    compresa, che scorre sotto il dito, e al rilascio una dissolvenza di
+    100 ms sulla pagina che ripartiva ad animare la barra. Letto nel
+    sorgente di Chromium, la pagina non ne riceve l'avanzamento; un
+    `CloseWatcher` attivo pero' passa prima della cronologia. Andrea ha
+    scelto: il gesto lo prende il guardiano, che chiama navIndietro — la
+    strada del tasto di Telegram e di «Esplora». Queste sono le
+    sentinelle sul testo; il banco vero sta in prove_indietro_dal_libro,
+    via «apk»."""
+    print("\n--- NELL'APP ANDROID L'INDIETRO LO PRENDIAMO NOI ---")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    _fr = pezzo_js(mini, "function navFreccia(pila){", "\n}\n")
+    _ag = pezzo_js(mini, "function navArmaGesto(dentro){", "\n}\n")
+    _mo = pezzo_js(mini, "function navMotore(){", "\n}\n")
+    _ve = pezzo_js(mini, "function vaiEsplora(){", "\n}\n")
+    prova("il guardiano chiede a navFreccia, la stessa domanda della freccia di Telegram, "
+          "e glielo chiede PRIMA che l'uscita per chi non e' in Telegram la salti", True,
+          "navArmaGesto(dentro);" in _fr
+          and _fr.index("navArmaGesto(dentro);") < _fr.index("if (!tg?.initData) return;"))
+    prova("si arma solo fuori da Telegram, su Android, in modalita' app, e dove CloseWatcher c'e'",
+          [True, True, True, True],
+          ["!tg?.initData" in _ag, "typeof CloseWatcher === 'function'" in _ag,
+           "/Android/i.test(navigator.userAgent)" in _ag, "mqApp.matches" in _ag])
+    prova("...e la modalita' app e' quella che Chrome da' alla TWA: standalone, o fullscreen se immersiva",
+          1, mini.count("const mqApp = matchMedia('(display-mode: standalone), "
+                        "(display-mode: fullscreen)');"))
+    prova("al rilascio il guardiano chiama navIndietro — la strada del tasto di Telegram e di "
+          "«Esplora» — e si riarma subito", True,
+          "g.onclose = () => {" in _ag
+          and "navIndietro();" in _ag and "navFreccia(navPila());" in _ag
+          and _ag.index("navIndietro();") < _ag.index("navFreccia(navPila());"))
+    prova("...ed e' davvero la strada di «Esplora»: dal libro il tab torna con navIndietro", True,
+          "{ navIndietro(); return; }" in _ve)
+    prova("dove non c'e' dove tornare il guardiano si distrugge: dalla home il gesto chiude l'app come prima",
+          True, "} else if (!serve && navGuardiano) {" in _ag and "g.destroy();" in _ag)
+    prova("il popstate con la transizione di Chrome arriva secco, prima di riapplicare, e mai in Telegram",
+          True, "if (e.hasUAVisualTransition && !tg?.initData) navArrivoSecco();" in _mo
+          and _mo.index("navArrivoSecco();") < _mo.index("navApplica(e.state);"))
+    css = mini[mini.index("<style>"):mini.index("</style>")]
+    _regola = ("html.arrivo-secco *,html.arrivo-secco *::before,html.arrivo-secco *::after{\n"
+               "    transition:none!important}")
+    prova("la regola dell'arrivo secco c'e' una volta, spegne solo le TRANSIZIONI (un'animazione "
+          "spenta e riaccesa ripartirebbe) e sta dopo quella degli effetti ridotti", [1, True],
+          [css.replace("\r\n", "\n").count(_regola),
+           css.find("html.fx-ridotti *,html.fx-ridotti *::before") < css.find("html.arrivo-secco *")])
 
 
 def _banco_eventi_p2p(eventi_attivi=True):
@@ -82174,13 +82329,17 @@ def prove_effetti_ridotti():
     #   togliGuscio: due fotogrammi di ATTESA prima del colore del tema
     #     (secondo giro della 1.5: la barra di stato non deve cambiare
     #     sopra il guscio ancora in vista) — non anima niente
+    #   navArrivoSecco: due fotogrammi di ATTESA prima di ridare le
+    #     transizioni (lo swipe di Chrome ha gia' mostrato l'arrivo) —
+    #     non anima niente, le SPEGNE
     chi = collections.Counter()
     for m in re.finditer(r"requestAnimationFrame", js):
         nomi = re.findall(r"function\s+(\w+)\s*\(", js[:m.start()])
         chi[nomi[-1] if nomi else "?"] += 1
     prova("chi chiama requestAnimationFrame e' censito, col suo perche'",
-          {"togliGuscio": 2, "tourBenvenuto": 2, "mostraTappa": 2,
-           "barreCorri": 2, "lbApplica": 1, "passo": 2}, dict(chi))
+          {"togliGuscio": 2, "navArrivoSecco": 2, "tourBenvenuto": 2,
+           "mostraTappa": 2, "barreCorri": 2, "lbApplica": 1, "passo": 2},
+          dict(chi))
 
     # --- 5) PRIMA DEL PRIMO PAINT, E DOPO /me -----------------------
     testa = mini[i_fine:mini.index("<body")]
@@ -82497,6 +82656,7 @@ def main():
     prove_pubblica_metodo_prima,
     prove_libro_vuoto_monete,
     prove_indietro_dal_libro,
+    prove_indietro_app_android,
     prove_p2p_canale,
     prove_p2p_canonico,
     prove_p2p_bundle,

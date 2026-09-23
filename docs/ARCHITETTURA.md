@@ -15941,6 +15941,33 @@
   falsa e il motore resta spento: `navIndietro` smonta lo strato in
   cima e, se non ce n'è, torna al mercatino — che è la stessa regola
   della radice madre, detta a mano perché lì la cronologia non c'è.
+  NELL'APP ANDROID L'INDIETRO LO PRENDIAMO NOI (23 set 2026, scelta di
+  Andrea). Nella TWA lo swipe è di Chrome: su Android 14+ coi gesti, dal
+  bordo sinistro, la pagina viva scorre via e sotto c'è un'ISTANTANEA
+  della entry d'arrivo — tutta la pagina, barra compresa, scattata
+  quando la si è lasciata (a ogni `pushState` la chiede la pagina
+  stessa, e non la si può saltare). La pagina non riceve l'avanzamento
+  del gesto, solo il popstate al rilascio; poi Chrome aspetta il primo
+  fotogramma nuovo e dissolve in 100 ms. Letto nel sorgente di Chromium
+  (`BackForwardTransitionAnimator`, `navigation_transition_utils.cc`,
+  `history.cc`). Un `CloseWatcher` attivo però passa PRIMA della
+  cronologia (`CloseListenerManager`, priorità 17 contro 20), non anima
+  niente e al rilascio chiama `close`: `navArmaGesto` lo arma quando
+  `navFreccia` dice che c'è dove tornare, e il suo `close` chiama
+  `navIndietro` — la strada del tasto di Telegram e di «Esplora», quindi
+  la barra non si muove e la voce d'arrivo si accende con l'animazione di
+  sempre. Consumato, si riarma subito (Blink concede sempre un gruppo
+  senza tocchi); sulla home nuda non c'è, e il gesto chiude l'app. Vale
+  fuori da Telegram, su Android, in `display-mode` standalone o
+  fullscreen — quella che Chrome dà alla TWA e alla PWA installata —,
+  e non col referrer dell'apertura, che un ricaricamento perde. Dove il
+  guardiano non c'era (il browser normale, un gesto più svelto del
+  riarmo) il popstate porta `hasUAVisualTransition` e `navArrivoSecco`
+  spegne le transizioni per due fotogrammi (`html.arrivo-secco`, in
+  fondo al foglio accanto agli effetti ridotti): Chrome ha già mostrato
+  l'arrivo, e rianimarlo era lo scatto. In Telegram niente cambia: la
+  WebView di Android quella transizione non la fa. Perché e prove:
+  CANTIERI, «Lo scivolo indietro nell'app Android: il gesto è nostro».
   IMPERFEZIONI DICHIARATE:
   dopo un pagamento riuscito resta un gradino morto (`closeSheet`
   programmatico sostituisce, non cancella la entry gemella); l'avanti

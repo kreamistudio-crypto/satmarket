@@ -27282,3 +27282,88 @@ mai la home; da «Info P2P», arrivati da «I miei scambi», il libro e non
 primo indietro chiude solo il foglio. Uno scambio aperto da «I miei
 scambi», poi «Info P2P», poi indietro: il libro. E dopo «Applica» o
 dopo aver pubblicato, nessun indietro a vuoto.
+
+## Lo scivolo indietro nell'app Android: il gesto è nostro (23 set 2026)
+
+Dal telefono di Andrea, SOLO nell'APK (TWA da Zapstore, Chrome 153,
+Android 16 coi gesti; in Telegram era perfetto): lo swipe indietro
+faceva scorrere tutta la schermata, barra compresa, e dal libro alla
+home la barra andava a scatti, mentre il tocco su «Esplora» la
+animava bene. Nessuno «scivolo» nostro: il gesto è di Chrome.
+
+**LETTO NEL SORGENTE DI CHROMIUM** (main `d7bd2de3cb`, 23 set 2026).
+Su Android 14+ coi gesti, dal bordo sinistro, `ToolbarManager` passa
+il gesto a `BackForwardTransitionAnimationManagerAndroid`: la pagina
+viva scorre via sotto il dito e sotto c'è un'ISTANTANEA della entry
+d'arrivo. Per le entry della stessa pagina la chiede il renderer a ogni
+`pushState` (`history.cc`: `constexpr bool should_skip_screenshot =
+false`), cioè la pagina non può evitarla, ed è tutta la pagina, barra
+compresa. Il sito non riceve l'avanzamento, solo il popstate al
+rilascio, con `hasUAVisualTransition` vero (lo dice il test
+`HasUaVisualTransitionSameDocument`); poi Chrome aspetta il primo
+fotogramma e dissolve in 100 ms (`kCrossfadeDuration`) sulla pagina,
+dove la nostra barra ripartiva con la sua corsa di 0,4 s: gli scatti.
+La transizione non c'è con «rimuovi animazioni» di sistema, dal bordo
+destro, coi tre tasti, e nella WebView di Android
+(`AwContentBrowserClient` risponde false): per questo Telegram era
+perfetto. Nessuna opzione della TWA la spegne.
+
+**COSA SI POTEVA, E LA SCELTA.** Dal sito: 1) prendersi il gesto con un
+`CloseWatcher`, che in Chrome passa PRIMA della cronologia
+(`CloseListenerManager`, registrato in `ChromeActivity` — la base anche
+della TWA — con priorità 17 contro i 20 della cronologia), durante il
+trascinamento non anima niente e al rilascio chiama `close`; 2) usare
+`hasUAVisualTransition` per non rianimare sopra Chrome. Dall'APK: un
+contenuto che scorre sotto il dito con la barra ferma vuole
+l'avanzamento del gesto, cioè un'app che il gesto lo possiede — una
+WebView al posto della TWA, che è un'altra app. Non controllabile:
+cosa fotografa Chrome e come la fa scorrere. ANDREA HA SCELTO LA 1,
+con la 2 come rete: sotto il dito non scorre più niente.
+
+**COME.** `navArmaGesto`, chiamato da `navFreccia` con la sua domanda
+(«c'è dove tornare?»), arma il guardiano e lo toglie sulla home nuda,
+dove il gesto chiude l'app come prima. Il suo `close` chiama
+`navIndietro`, la strada del tasto di Telegram e di «Esplora», e si
+riarma subito (Blink lascia sempre un gruppo senza tocchi,
+`allowed_groups_` non scende sotto 1). Vale fuori da Telegram, su
+Android, in `display-mode` standalone o fullscreen, che è quel che
+Chrome dà alla TWA (`resolveDisplayMode`) e alla PWA installata.
+⚠️ NON il referrer dell'apertura, che è il giudice del guscio: un
+ricaricamento dentro l'app (il login) lo perde, e il guscio può
+permetterselo, il gesto no. Dove il guardiano non c'è (il browser, un
+gesto più svelto del riarmo) `navArrivoSecco` spegne le TRANSIZIONI per
+due fotogrammi (`html.arrivo-secco`, in fondo al foglio dopo la regola
+degli effetti ridotti: prima di lei una prova vieta l'`!important`).
+Le animazioni no, perché spente e riaccese ripartirebbero. Esc e la
+freccia passano dalla serratura dei 350 ms: un passo solo.
+EFFETTI RIDOTTI: al rilascio l'animazione è quella di «Esplora», che
+già li rispetta; l'arrivo secco spegne e basta.
+
+**PROVE.** `prove_indietro_dal_libro` gira ora in tre vie: Telegram, il
+browser (istantanea di Chrome) e l'app (CloseWatcher di cartone), con le
+24 strade e i 300 percorsi a caso in ognuna. Nell'app il guardiano c'è
+esattamente dove c'è dove tornare, Chrome non anima mai un indietro, e
+niente arriva secco; nel browser ogni arrivo di Chrome è secco e la
+classe se ne va; in Telegram nessun guardiano. Più il doppio canale
+(Esc + guardiano = un passo) e il gesto il cui popstate si perde (il
+guardiano si riarma lo stesso). `prove_indietro_app_android` (8)
+inchioda il testo, e il censimento di `requestAnimationFrame` ha il suo
+perché nuovo. Suite **13622 passate, 0 fallite** con `PROVE_SEVERE=1`,
+collaudi della CI verdi, tortura **20/20** (due sezioni esplodevano su
+un `.index` mancato: ora danno una rossa col loro nome). DAL VIVO a 375
+px, profilo mobile Android e modalità app forzata nella copia: Esc è una
+vera richiesta di chiusura del CloseWatcher, e dal libro alla home il
+gesto fa lo stesso passo del tocco su «Esplora» (un `back`, popstate
+senza il segnale di Chrome, arrivo non secco) e sulla home il guardiano
+si toglie. Il pane non ha il gesto di sistema e simula «riduci
+movimento»: l'animazione vera la vede il telefono.
+
+### Da guardare sul telefono
+
+Nell'APK, swipe dal bordo sinistro da «I miei scambi»: durante il
+trascinamento non scorre niente, al rilascio si accende «Libro ordini»
+e la barra resta dov'è; dal libro, al rilascio la barra passa a quella
+del mercatino con la stessa animazione del tocco su «Esplora»; dalla
+home lo swipe chiude l'app. Con un foglio aperto, il primo gesto lo
+chiude. Dopo un ricaricamento (per esempio il login) deve valere lo
+stesso. In Telegram, tutto come prima.

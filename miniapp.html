@@ -7597,6 +7597,24 @@
   html.fx-ridotti .p2p-manca{box-shadow:0 0 0 3px rgba(194,65,12,.55)}
   html.fx-ridotti .btn.orange.in-evidenza{
     box-shadow:0 3px 0 var(--sats-deep),0 0 0 4px rgba(247,147,26,.35)}
+
+  /* ---------- L'ARRIVO SECCO (23 set 2026) ----------
+     Quando Chrome ha gia' fatto vedere la pagina d'arrivo con la sua
+     transizione indietro/avanti — un'istantanea della pagina, scattata
+     quando la si e' lasciata, che scorre sotto il dito — alla fine
+     dissolve in 100 ms dall'istantanea alla pagina viva. Se la pagina
+     ci arriva animando (la barra che torna del mercatino, un foglio che
+     scende) si vede ripartire da capo quel che l'istantanea mostrava
+     gia' a posto: gli scatti del telefono. Allora ci si arriva senza
+     transizioni: la classe la mette l'ascoltatore del popstate quando
+     `hasUAVisualTransition` e' vero, e la toglie due fotogrammi dopo.
+     Solo le TRANSIZIONI: rispente e riaccese non ripartono, mentre
+     un'animazione spenta e riaccesa ricomincerebbe da capo. Sta qui in
+     fondo, dopo la regola degli effetti ridotti, perche' e' l'unico
+     altro `!important` sulle transizioni: prima di lei una prova lo
+     vieta, e a ragione. */
+  html.arrivo-secco *,html.arrivo-secco *::before,html.arrivo-secco *::after{
+    transition:none!important}
 </style>
 <script>
 /* Anti-flash: il tema giusto PRIMA del primo paint. La logica completa
@@ -13216,12 +13234,81 @@ function navFreccia(pila){
   const dentro = pila.length > 1                       /* uno strato da chiudere */
               || !!(history.state?.d)                  /* un gradino nostro sotto */
               || !(pila[0].t==='v' && pila[0].v===RADICE_MADRE);  /* non e' la madre */
+  /* ...ed e' la stessa domanda del guardiano dell'app Android */
+  navArmaGesto(dentro);
   if (!tg?.initData) return;
   try {
     if (tg.BackButton && tg.isVersionAtLeast?.('6.1'))
       dentro ? tg.BackButton.show() : tg.BackButton.hide();
     if (tg.isVersionAtLeast?.('7.7')) tg.disableVerticalSwipes?.();
   } catch(e){}
+}
+
+/* ---- NELL'APP ANDROID L'INDIETRO LO PRENDIAMO NOI (23 set 2026) ----
+   Dal telefono: nell'APK (una Trusted Web Activity, cioe' Chrome) lo
+   swipe indietro faceva scorrere TUTTA la schermata, barra compresa,
+   e dal libro alla home la barra andava a scatti; in Telegram no.
+   LETTO NEL SORGENTE DI CHROMIUM: su Android 14+ coi gesti, dal bordo
+   sinistro, Chrome fa la sua transizione indietro/avanti — la pagina
+   viva scorre via sotto il dito e sotto c'e' un'ISTANTANEA della entry
+   d'arrivo, scattata quando la si e' lasciata (a ogni pushState la
+   chiede la pagina stessa, e non la si puo' saltare). L'istantanea e'
+   tutta la pagina, barra compresa, e del trascinamento la pagina non
+   sa niente: solo al rilascio arriva il popstate. Poi Chrome aspetta il
+   primo fotogramma nuovo e dissolve dall'istantanea alla pagina in
+   100 ms — e li' la nostra barra ripartiva da capo con la sua corsa di
+   0,4 s: gli scatti. In Telegram non succede perche' la WebView di
+   Android quella transizione non la fa.
+   LA STRADA SCELTA DA ANDREA: il gesto lo prendiamo noi. In Chrome un
+   `CloseWatcher` attivo passa PRIMA della cronologia, durante il
+   trascinamento non anima niente e al rilascio chiama il suo `close`:
+   qui `navIndietro`, la STESSA strada del tasto di Telegram e di
+   «Esplora» — la barra non si muove mai, e la voce d'arrivo si accende
+   con l'animazione di sempre. Il prezzo, scelto: sotto il dito non
+   scorre piu' niente, niente anteprima della pagina di prima.
+   SI ARMA SOLO DOVE C'E' DOVE TORNARE, la domanda di `navFreccia`: sulla
+   home senza gradini sotto non c'e' guardiano, e il gesto chiude l'app
+   come prima. Ogni `close` lo consuma, e si riarma subito — Blink lo
+   concede senza un tocco dell'utente, un gruppo e' sempre permesso.
+   DOVE: fuori da Telegram, su Android, in modalita' app — la
+   `display-mode` che Chrome da' alla TWA (standalone, o fullscreen se
+   immersiva) e alla PWA installata, che per Chrome sono la stessa
+   cosa. Non il referrer dell'apertura: un ricaricamento dentro l'app
+   (il login) lo perde, e la `display-mode` no. */
+const mqApp = matchMedia('(display-mode: standalone), (display-mode: fullscreen)');
+let navGuardiano = null;
+function navArmaGesto(dentro){
+  const serve = dentro && STORIA && !tg?.initData
+             && typeof CloseWatcher === 'function'
+             && /Android/i.test(navigator.userAgent) && mqApp.matches;
+  if (serve && !navGuardiano) {
+    try {
+      const g = new CloseWatcher();
+      g.onclose = () => {
+        if (navGuardiano === g) navGuardiano = null;
+        navIndietro();
+        /* consumato: si riarma subito, e l'approdo decide di nuovo */
+        navFreccia(navPila());
+      };
+      navGuardiano = g;
+    } catch(e) { navGuardiano = null; }
+  } else if (!serve && navGuardiano) {
+    const g = navGuardiano;
+    navGuardiano = null;
+    try { g.destroy(); } catch(e){}
+  }
+}
+/* L'ARRIVO SECCO: se Chrome ha gia' fatto vedere la pagina d'arrivo con
+   la sua transizione (`hasUAVisualTransition` del popstate, dove il
+   guardiano non c'era: il browser normale, o un gesto piu' svelto del
+   riarmo), ci si arriva SENZA le nostre transizioni, o si rianimerebbe
+   sopra un'istantanea gia' a posto. Due fotogrammi, poi tutto torna
+   come prima — il perche' della regola sta nel CSS, accanto a lei. */
+function navArrivoSecco(){
+  const r = document.documentElement;
+  r.classList.add('arrivo-secco');
+  requestAnimationFrame(() => requestAnimationFrame(() =>
+    r.classList.remove('arrivo-secco')));
 }
 
 /* Si accende una volta sola, subito prima di avvia(): prima non si puo'
@@ -13247,7 +13334,12 @@ function navMotore(){
   [...document.querySelectorAll('.view, .sheet'),
    el('lightbox'), el('tour'), el('tourP2P'), el('testModale')].forEach(n =>
     n && occhio.observe(n, {attributes:true, attributeFilter:['class']}));
-  addEventListener('popstate', e => navApplica(e.state));
+  addEventListener('popstate', e => {
+    /* Chrome ha gia' mostrato la pagina d'arrivo: si arriva secchi. In
+       Telegram quel segnale non e' mai vero, e la guardia lo dice */
+    if (e.hasUAVisualTransition && !tg?.initData) navArrivoSecco();
+    navApplica(e.state);
+  });
   /* Dentro Telegram il gesto lo intercetta il CLIENT, non la WebView:
      con la freccia visibile lo instrada qui, con la freccia nascosta
      chiude la Mini App. Un solo cammino: anche il tasto di Telegram
