@@ -1698,12 +1698,57 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
      lui) — dalla cartella del progetto, con `node` nel PATH;
   2. `python genera_icone_apk.py` — DAL REPO, e rifà icona adattiva,
      monochrome e splash (vedi ARCHITETTURA, «Icona adattiva
-     dell'APK»);
-  3. `bubblewrap build` — le password le batte Andrea.
-  ⚠️ Se il build chiede di applicare il **web manifest** cambiato
-  (lo chiede ogni volta che `manifest.json` del sito si è mosso):
-  **rispondere `n`**. Rispondendo `y` sovrascrive gli splash appena
-  generati, e allora il passo 2 va rifatto PRIMA di ribuildare.
+     dell'APK») e, come PRIMO passo, rimette in `LauncherActivity.java`
+     il **permesso dello splash** (qui sotto). Se esce con «⛔ … NON
+     lanciare `bubblewrap build`» il modello di Bubblewrap è cambiato:
+     non si builda, si guarda il file;
+  3. `bubblewrap build` — le password le batte Andrea;
+  4. due controlli sull'APK firmato, dalla cartella del progetto, e
+     PRIMA della release, che dopo non si ritira. L'**impronta**:
+     `& "$env:USERPROFILE\.bubblewrap\jdk\jdk-17.0.11+9\bin\keytool.exe" -printcert -jarfile app-release-signed.apk`
+     deve dire `SHA256: 2F:3F:5E:68:…:C2:3C`, quella scritta qui sopra.
+     E la **cura dentro il dex**: il conto di `permesso dello splash non
+     concesso` nei `.dex` dell'APK deve dire **1** (sulla v1.3 dice 0,
+     verificato) — il comando sta nel verbale di CANTIERI.
+  ⚠️ LA DOMANDA DEL BUILD NON RIGUARDA IL SITO, e qui era scritta male:
+  «There are changes in twa-manifest.json. Would you like to apply
+  them…» scatta quando `twa-manifest.json` non combacia più con
+  `manifest-checksum.txt`, cioè col file dell'ultimo `update` (letto nel
+  sorgente, `cmds/build.js`, `hasManifestChanged`) — il `manifest.json`
+  del sito non lo guarda nessuno. A luglio l'aveva fatta scattare lo
+  script, che riscriveva `backgroundColor` dal crema all'arancio.
+  **Si risponde `n` lo stesso**, e dalla v1.4 con una ragione in più:
+  `y` lancia un update, che cancella `app/` e con lei icone, splash E il
+  permesso dello splash; se è scappato un `y`, si rifà il passo 2 PRIMA
+  di ribuildare. Nel giro normale la domanda non arriva più: lo script
+  riscrive `backgroundColor` solo se l'arancio campionato cambia.
+  IL PERMESSO DELLO SPLASH (set 2026, v1.4). Da Chrome 152 (stabile il
+  25 ago 2026) lo splash non arrivava più a Chrome: la libreria gli
+  consegna il PNG con `receiveFile()`, Chrome adesso esige che anche CHI
+  CONSEGNA abbia il permesso sull'URI, e chi possiede il FileProvider
+  non ha un record esplicito. Risultato: «Failed to transfer splash
+  image.» nel log, Chrome parte senza splash e senza spegnere
+  l'animazione, e la sua finestra entra da destra SCURA per mezzo
+  secondo prima della pagina. Non è un errore di configurazione
+  (android-browser-helper #623, aperto): la cura è un
+  `grantUriPermission` a noi stessi, READ + PERSISTABLE, prima di
+  `super.onCreate()`, e la rimette lo script a ogni build. Il perché
+  per intero sta in CANTIERI, «Lo splash che Chrome 152 non prende più».
+  Se sul telefono la finestra scura tornasse, la domanda si fa al log
+  col telefono attaccato in USB (debug USB acceso):
+  `& "$env:USERPROFILE\.bubblewrap\android_sdk\platform-tools\adb.exe" logcat -s SplashScreenStrategy Barattolo`
+  e si apre l'app: «Failed to transfer splash image.» vuol dire che
+  Chrome rifiuta ancora, «permesso dello splash non concesso» che il
+  permesso non è partito.
+  I COLORI DELL'INVOLUCRO, dalla v1.4: `themeColor`, `navigationColor`
+  e i divisori sono il FONDO DELLA PAGINA — `#FAF4E4` di giorno,
+  `#211A10` di sera, gli stessi che `applicaTema()` scrive nel
+  `theme-color` — così le barre non cambiano colore quando la pagina
+  arriva. `backgroundColor` resta l'arancio CAMPIONATO `#F78F19`: è il
+  fondo dello splash, e lo riscrive lo script. E
+  `splashScreenFadeOutDuration` è **0**: dallo splash di Chrome al
+  guscio della pagina si passa di taglio, e il guscio è disegnato
+  apposta uguale allo splash.
   LA RELEASE, due canali, e la release GitHub è la fonte unica di
   verità. Prima GitHub, poi Zapstore, sempre.
   1. `barattolo-X.Y.apk` (copia rinominata di `app-release-signed.apk`)

@@ -26202,3 +26202,158 @@ busta** (istruzioni di ritiro, o un contenuto digitale): il link «Vedi i
 messaggi» deve leggersi come un ripensamento e non come un bottone, e
 quel che riapre deve comparire **dove stava il dito**. E un ordine con
 un titolo lungo: tre righe coi puntini devono bastare a riconoscerlo.
+
+## Lo splash che Chrome 152 non prende più (23 set 2026, APK v1.4)
+
+Dal video del 22 set, aprendo l'app Zapstore: splash nativo arancio col
+barattolo — bene — poi **da destra entra una finestra scura di Chrome**
+per circa mezzo secondo, poi il guscio arancio della pagina, poi la
+vetrina. Chrome avrebbe dovuto tenere lo splash dentro la sua finestra
+fino al primo disegno della pagina, e non lo faceva. La verifica Digital
+Asset Links era a posto: la barra del dominio non c'era.
+
+**LA CONFIGURAZIONE ERA GIUSTA IN OGNI RIGA, e la prima metà del
+cantiere è stata dimostrarlo invece di ritoccarla.** Nel manifest
+IMPACCHETTATO della v1.3 — non solo nel sorgente — ci sono i quattro
+meta-data dello splash (immagine, fondo `#F78F19`, dissolvenza, autorità
+del FileProvider), il `<provider>` con `filepaths.xml` che espone proprio
+`twa_splash/`, e i cinque `splash.png`. androidbrowserhelper 2.6.2, AGP
+8.9.1, Gradle 8.11.1, compileSdk 36, targetSdk 35: confrontati riga per
+riga col `template_project` di Bubblewrap 1.24.1, **il progetto è
+esattamente quello che il generatore produrrebbe oggi** — e il 2.6.2 non
+è una svista nostra, è il pin `stable` di Bubblewrap (`FeatureManager.js`,
+accanto a un `alpha` 2.7.0-alpha02). Il tema `Theme.Translucent.NoTitleBar`
+non ridefinisce nessuna animazione di finestra.
+
+**LA TENDINA DA DESTRA È LA FIRMA DEL GUASTO, e l'ha detto il
+bytecode.** Letto con `javap` dall'AAR nella cache di Gradle,
+`PwaWrapperSplashScreenStrategy.onSplashImageTransferred` ha due strade:
+se la consegna dello splash riesce mette i parametri nell'intent e poi
+chiama `overridePendingTransition(0, 0)` — animazione spenta, Chrome
+compare già col barattolo; se fallisce scrive «Failed to transfer splash
+image.», lancia Chrome e basta. Quindi con lo splash funzionante **la
+tendina non ci sarebbe proprio**: vederla vuol dire che la consegna
+fallisce, e il mezzo secondo scuro è la finestra di Chrome nuda prima
+del primo disegno.
+
+**IL PERCHÉ È CHROME 152, e non è nostro.** `TrustedWebUtils.
+transferSplashImage` (androidx.browser 1.9.0-alpha04, stesso giro di
+`javap`) fa tre mosse: l'URI dal FileProvider, il permesso di lettura
+dato a CHROME, `session.receiveFile()`. Chrome 152 (stabile il 25 ago
+2026) ha aggiunto dentro `receiveFile()` un controllo che anche CHI
+CHIAMA abbia il permesso sull'URI — e chi possiede il FileProvider non
+ha un record esplicito, perché Android non lo scrive a chi possiede già
+la cassetta. Chrome dice no. È pubblico e aperto: android-browser-helper
+**#623**, riprodotto proprio sul 2.6.2, col fratello #624 (la barra
+dell'URL che lampeggia, stessa release). Le date tornano al giorno: la
+v1.3 è del 22 lug, con Chrome ancora sotto la 152, e il video del 22
+set; **l'APK non era cambiato, era cambiato Chrome**. Sul telefono di
+Andrea: Chrome **153.0.8010.52**.
+
+**LA CURA È UNA RIGA, e il posto dove vive è la parte difficile.** Il
+permesso ce lo diamo da soli, `grantUriPermission(getPackageName(), uri,
+READ | PERSISTABLE)`: PERSISTABLE è il flag che costringe il sistema a
+scrivere il record che Chrome cerca. Prima di `super.onCreate()`, che è
+il gesto che avvia la consegna; il file può non esserci ancora. Ma
+`LauncherActivity.java` lo rigenera `bubblewrap update`, quindi la cura
+vive in `genera_icone_apk.py` (`patch_launcher`, passo 8) come icone e
+splash — ed è il **PRIMO** passo: se l'ancora (la prima riga di
+`onCreate` del modello) manca, è doppia, o i file sono due, lo script
+esce con «⛔ … NON lanciare `bubblewrap build`» **prima di toccare
+qualunque file**. È la richiesta di Andrea, e la ragione è il modo in
+cui questo difetto fallisce: un APK senza la cura compila, si firma e si
+installa benissimo, e si vede solo sul telefono, cioè a release fatta.
+L'AUTORITÀ si legge da `R.string.providerAuthority`, la stessa risorsa
+da cui la legge la libreria (via il meta-data `FILE_PROVIDER_AUTHORITY`):
+le due non possono divergere. ⚠️ **I DUE NOMI DEL FILE SÌ**: `twa_splash`
+e `splash_image.png` sono costanti private della libreria
+(`SplashImageTransferTask`, lette con `javap -constants`), e se un
+aggiornamento le cambia il permesso finisce su un URI che nessuno usa —
+e il difetto torna in silenzio. Si ricontrollano a ogni salto di
+androidbrowserhelper.
+
+**LE STRADE SCARTATE.** Salire ad androidbrowserhelper **2.7.3**: il
+#623 si riproduce anche lì. Bubblewrap **1.25.0**: porta targetSdk 36 e
+nessuna riga sullo splash — un cambio di comportamento in mezzo al
+cantiere per zero guadagno sul difetto; merita un giro suo. Spegnere noi
+l'animazione con un `overridePendingTransition` nostro: toglierebbe la
+tendina ma non il buio, cioè nasconderebbe la firma lasciando il guasto.
+Toccare `backgroundColor`: è l'arancio campionato, e il francobollo
+dell'icona è già costato un giro.
+
+**I COLORI SONO UNA DECISIONE DI ANDREA, e combaciano con la pagina.**
+`themeColor`, `navigationColor` e i divisori passano a `#FAF4E4`, i loro
+gemelli scuri a `#211A10`: sono i fondi che `applicaTema()` già scrive
+nel `theme-color` (miniapp.html, riga 11 e dentro `applicaTema`), quindi
+le barre non cambiano più colore quando la pagina arriva — finora
+facevano arancio→crema. I divisori li ho proposti io (sotto una barra
+crema resterebbe un filo nero), Andrea ha detto sì. E
+`splashScreenFadeOutDuration` passa a **0**: con lo splash rotto non si
+vedeva né 300 né 0, e da adesso lo splash di Chrome lascia il posto al
+guscio di taglio. Controllato nel sorgente che lo 0 resti 0:
+`TwaManifest.js` lo assegna senza `||`, e il 300 è solo il default dei
+progetti nuovi. Versione **1.4**, versionCode **6**, che alza
+`bubblewrap update`.
+
+**UNA RIGA DI PRODUZIONE ERA SBAGLIATA, e il sorgente l'ha corretta.**
+La liturgia diceva che il build chiede di applicare il **web manifest**
+«ogni volta che `manifest.json` del sito si è mosso». No: la domanda è
+«There are changes in twa-manifest.json», e scatta quando
+`twa-manifest.json` non combacia con `manifest-checksum.txt`
+(`cmds/build.js`, `hasManifestChanged`). A luglio l'aveva fatta scattare
+lo script stesso, che riscriveva `backgroundColor` dal crema
+all'arancio. La regola «si risponde `n`» resta, e ha una ragione in più:
+un `y` rigenera `app/` e si porta via anche il permesso dello splash.
+
+**E IL GUSCIO HA AVUTO LA SUA RISPOSTA.** La prima domanda del cantiere
+di ieri — «aprire l'app Zapstore e vedere se il guscio compare» — l'ha
+chiusa lo stesso video: dopo la finestra scura c'è il guscio arancio,
+quindi il referrer `android-app://` arriva e il guscio si accende. La
+consegna vera fra splash e guscio invece si potrà guardare solo con la
+v1.4: finora in mezzo c'era il buio.
+
+**LE PROVE.** Sezione nuova `prove_permesso_splash_apk` (13): gira la
+`patch_launcher` VERA su un progetto di cartone — si innesta una volta,
+dentro `onCreate` e prima di `super.onCreate()`, coi due flag, sull'URI
+della libreria, col `catch` che non chiude l'app; fuori dal blocco il
+file resta identico, in LF come in CRLF; rilanciata non si muove — e
+soprattutto **si ferma** senza ancora, con l'ancora doppia e con due
+file, senza aver scritto niente e dicendo di non buildare; e in
+`genera()` viene prima di ogni scrittura. Tortura **11 mutazioni / 11
+uccise**, su copie, baseline verde, nessuna uccisa per esplosione. Suite
+intera **13368/0** con `PROVE_SEVERE=1`, sul commit, in un worktree senza
+`config.py`.
+IL JAVA SI È COMPILATO QUI, prima del build di Andrea: il
+`LauncherActivity.java` patchato passa `javac` contro `android.jar`
+(android-36) e le librerie vere della cache (androidbrowserhelper 2.6.2,
+androidx.core 1.13.0, androidx.browser 1.9.0-alpha04), e il bytecode
+dice l'ordine giusto: `grantUriPermission(…, 65)` — READ 1 +
+PERSISTABLE 64 — e POI `super.onCreate`.
+IL CONTROLLO SULL'APK FIRMATO, provato sulla v1.3, dalla cartella del
+progetto:
+`python -c "import zipfile; z=zipfile.ZipFile('app-release-signed.apk'); d=b''.join(z.read(n) for n in z.namelist() if n.endswith('.dex')); print('cura dello splash:', d.count(b'permesso dello splash non concesso'), '| ramo del difetto nella libreria:', d.count(b'Failed to transfer splash image.'))"`
+Sulla v1.3 dice **0 | 1**; sulla v1.4 deve dire **1 | 1**.
+
+**⚠️ QUEL CHE NON È PROVATO, e va detto per primo.** La cura viene dal
+thread del #623, non da Google: confermata lì su androidbrowserhelper
+2.6.2, Chrome 152, Galaxy S24 Ultra con Android 16 — splash dal primo
+fotogramma su tre aperture a freddo. Io ne ho verificato le due metà nel
+bytecode (il permesso che la libreria dà a Chrome, e il ramo che fallisce
+senza spegnere l'animazione), e il Java compila; ma **non l'ho vista
+funzionare**, qui non c'è un telefono. Se non funzionasse si torna al
+difetto di prima: non si rompe niente.
+
+### Da guardare sul telefono
+
+Con la v1.4 installata, **a freddo** (l'app tolta dalle recenti):
+niente finestra che entra da destra, niente mezzo secondo scuro —
+splash, poi guscio, poi vetrina, senza che il barattolo salti di posto
+o di taglia fra uno e l'altro. La **barra di stato** sopra lo splash
+arancio adesso dovrebbe essere crema (era arancio): è il prezzo del non
+farla cambiare dopo, e va guardato se stona. Lo stesso **col tema scuro
+del telefono** (`#211A10` sopra l'arancio). E se la finestra scura
+tornasse, la domanda si fa al log con `adb logcat -s
+SplashScreenStrategy Barattolo` (il comando per intero sta in
+PRODUZIONE): «Failed to transfer splash image.» vuol dire che Chrome
+rifiuta ancora, «permesso dello splash non concesso» che il permesso non
+è partito.
