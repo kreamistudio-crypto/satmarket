@@ -9065,7 +9065,13 @@ document.getElementById('cartello')?.remove();</script>
         <li>I tuoi <b>ordini</b>: cosa hai comprato o venduto, quanto, quando, e come è andata.</li>
         <li>Il tuo <b>Lightning address</b>, se lo imposti per incassare da solo: è un <span class="mono">nome@dominio</span>, come una mail, e ce l'abbiamo <b>in chiaro</b> — è lì che ti mandiamo i sats quando un affare si chiude, quindi dobbiamo poterlo leggere. Non esce da nessuna parte: non lo vede chi compra, non lo vedono i moderatori.</li>
         <li>La <b>fattura</b> che incolli per incassare, se l'address non lo usi: si incolla <b>solo al momento dell'incasso</b> — nel Profilo non se ne salva nessuna, perché una fattura scade e vale per un pagamento solo — e resta scritta in quell'ordine, come ricevuta di dove sono andati i sats.</li>
-        <li>La tua <b>reputazione</b>: voti ricevuti, distintivi, il livello, e gli <b>XP</b>, che contano una cosa sola — quanto hai comprato e venduto.</li>
+        <li>La tua <b>reputazione</b>: voti ricevuti, distintivi, il livello, e gli <b>XP</b>, che contano il commercio — quanto hai comprato e venduto, più una piccola parte di quello delle persone che hai invitato.</li>
+        <!-- GLI INVITI (set 2026): un dato nuovo — un legame fra due
+             persone — e si dichiara come gli altri, col suo limite
+             onesto: il conto degli XP portati, con un invitato solo,
+             lascia intuire quanto commercia. E' la stessa franchezza
+             della riga sulla classifica qui sotto. -->
+        <li>Gli <b>inviti</b>: il tuo codice e, se sei arrivato con un invito, chi ti ha invitato. A chi ti ha invitato non diciamo mai chi sei: vede solo <b>quante</b> persone ha portato e <b>quanti</b> XP gli hanno fruttato tutte insieme. Un limite onesto: se ha invitato soltanto te, da quel numero può farsi un'idea di quanto commerci.</li>
         <li>La tua posizione in <b>classifica</b>, se ci entri: lì di te si vedono nome, foto, titolo, media dei voti, da quante persone, quanti affari e il <b>punteggio</b>. Il punteggio mette insieme la media e il commercio, quindi da lì si può <b>ricavare quanto hai commerciato</b> — è una scelta presa sapendolo, perché senza quel numero l'ordine della lista non si legge. Gli XP in chiaro invece non escono mai, e nemmeno il tuo identificativo.</li>
         <li>Il tuo <b>barattolo</b>, cioè gli annunci che hai messo da parte. Di questi si vede <b>quanti</b> l'hanno salvato, mai <b>chi</b>: nemmeno chi vende sa che sei stato tu — a meno che tu non condivida il barattolo col suo link, che è un gesto tuo: la voce qui sotto dice cosa comporta.</li>
         <li>I tuoi <b>avvisi di ricerca</b>, se ne crei: cosa cerchi, dove, entro che prezzo.</li>
@@ -9903,6 +9909,18 @@ document.getElementById('cartello')?.remove();</script>
       <div class="acc" id="accLivello">
         <button class="acc-h" onclick="toggleAcc('accLivello')"><span class="em">🎖</span>Livello e titolo <span class="conta" id="livelloConta"></span><span class="fr">▾</span></button>
         <div class="acc-b"><div id="livelloBlocco"></div></div>
+      </div>
+
+      <!-- I TUOI INVITI (set 2026): il codice, il link da condividere e
+           due CONTI — quante persone, quanti punti, mai chi. Sta accanto
+           a «Livello e titolo» perche' e' la stessa moneta: gli XP da
+           inviti entrano nello stesso numero. Il campo a mano, per chi e'
+           arrivato senza il link, vive qui dentro e c'e' solo finche' la
+           sua finestra e' aperta. Nasce SPENTO: in DEMO e in vetrina non
+           c'e' un codice vero da mostrare, il patto del wallet. -->
+      <div class="acc" id="accInviti" style="display:none">
+        <button class="acc-h" onclick="toggleAcc('accInviti')"><span class="em">💌</span>I tuoi inviti <span class="conta" id="invitiConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="invitiBlocco"></div></div>
       </div>
 
       <div class="acc" id="accDistintivi">
@@ -27011,6 +27029,7 @@ let myAvatar = '', myAvatarScelta = '';
 let myDistintivi = [];   // il catalogo da /api/me, con date per i guadagnati
 let myXp = 0, myAffari = 0;      // punti e affari conclusi (vendite+acquisti)
 let myXpRuoli = null;            // {vendite, acquisti}, o null se i conti non tornano
+let myInviti = null;             // il cassetto «I tuoi inviti» dal server (null = niente)
 let myLivello = null;            // il grado DERIVATO dal server
 let myClassifica = false;        // la leva della classifica, dal server
 let myTitoli = [], myTitolo = '';  // catalogo dei titoli + quello indossato
@@ -27104,6 +27123,7 @@ function renderProfilo(){
     hintAttivi() ? '' : 'none';
   renderLnAddress();
   renderLivello();
+  renderInviti();
   renderDistintivi();
   renderDoppioni();
   renderPreferiti();
@@ -27258,13 +27278,30 @@ const SOGLIE_LIV = [0, 50, 200, 800, 3000];
    (decisione di Andrea) — e chi non ha una scomposizione che torni
    (server di ieri, oppure i due lati che non fanno il totale). Le due
    coincidono apposta: il ripiego atterra su una frase gia' giusta per
-   chi vende, che e' il caso piu' probabile. */
+   chi vende, che e' il caso piu' probabile.
+   IL TERZO LATO, «da chi hai invitato» (set 2026): gli XP che ti ha
+   portato chi hai invitato, e la chiave arriva SOLO quando non e' zero.
+   Con lui i pezzi si ELENCANO sempre con le cifre — «i tuoi vengono
+   tutti dagli acquisti» diventerebbe falsa, e il terzo lato una frase
+   senza numero non ce l'ha. Lo zero resta fuori come negli altri rami,
+   e la nota sul peso c'e' solo se c'e' un acquisto: la regola di chi ha
+   soltanto vendite. La coda resta vera, perche' in classifica pesano
+   anche loro. */
 const XP_PESO = "Una vendita pesa un po' più di un acquisto dello stesso valore.";
 const XP_CODA = "È lo stesso numero che pesa in classifica.";
 function fraseXp(r){
   const v = (r && r.vendite) || 0, a = (r && r.acquisti) || 0;
+  const i = (r && r.inviti) || 0;
   let m;
-  if (v && a) m = `${fmt(v)} dalle vendite, ${fmt(a)} dagli acquisti. ` + XP_PESO;
+  if (i) {
+    const pezzi = [];
+    if (v) pezzi.push(`${fmt(v)} dalle vendite`);
+    if (a) pezzi.push(`${fmt(a)} dagli acquisti`);
+    pezzi.push(`${fmt(i)} da chi hai invitato`);
+    const ultimo = pezzi.pop();
+    m = (pezzi.length ? pezzi.join(', ') + ' e ' : '') + ultimo + '.'
+      + (a ? ' ' + XP_PESO : '');
+  } else if (v && a) m = `${fmt(v)} dalle vendite, ${fmt(a)} dagli acquisti. ` + XP_PESO;
   else if (a) m = "i tuoi vengono tutti dagli acquisti. " + XP_PESO;
   else m = "comprare e vendere.";
   return "Gli XP contano il commercio: " + m + " " + XP_CODA;
@@ -27300,6 +27337,115 @@ function fraseManca(liv, xp, affari){
   if (!pezzi.length) return grado + "ci sei.";
   const solo_uno = pezzi.length === 1 && (dx === 1 || da === 1);
   return grado + (solo_uno ? "manca " : "mancano ") + pezzi.join(" e ");
+}
+
+/* ---- 💌 I tuoi inviti (set 2026). Il codice, il link e due CONTI:
+   quante persone hai invitato e quanti XP ti hanno portato — MAI chi,
+   nemmeno qui (decisione di Andrea): il server manda i numeri e
+   nient'altro, quindi un nome in questo cassetto non puo' comparire
+   nemmeno per sbaglio.
+   LE CIFRE DELLA REGOLA (il 5%) ARRIVANO DAL SERVER e qui non si
+   scrivono: il patto di max_barattolo.
+   IL CAMPO A MANO c'e' solo finche' la sua finestra e' aperta e non e'
+   gia' stato usato (`campo_fino`); a decidere resta il server, che
+   fuori tempo lo rifiuta comunque.
+   I TESTI SI VESTONO IN LINEA come quelli di «Incassi e pagamenti»:
+   `.hint` una regola base non ce l'ha. ---- */
+function renderInviti(){
+  const box = el('invitiBlocco'), sez = el('accInviti');
+  if (!box) return;
+  const inv = myInviti;
+  if (DEMO || VETRINA || !inv || !inv.codice) {
+    if (sez) sez.style.display = 'none';
+    box.innerHTML = ''; return;
+  }
+  if (sez) sez.style.display = '';
+  const conta = el('invitiConta');
+  if (conta) conta.textContent = inv.persone ? `(${fmt(inv.persone)})` : '';
+  const nota = 'font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45';
+  const adesso = Date.now() / 1000;
+  const aperto = !inv.invitato && (inv.campo_fino || 0) > adesso;
+  const giorni = Math.max(1, Math.ceil(((inv.campo_fino || 0) - adesso) / 86400));
+  const campo = aperto ? `
+    <div class="field" style="margin-top:16px"><label>Ti ha invitato qualcuno? Scrivi il suo codice</label>
+      <input id="invitoCodice" maxlength="12" autocomplete="off" autocapitalize="characters"
+             spellcheck="false" placeholder="Il codice di chi ti ha invitato"></div>
+    <button class="btn ghost" style="margin-top:0" onclick="inserisciInvito(this)">🎟 Conferma il codice</button>
+    <div style="margin-top:6px;${nota}">Si fa una volta sola, e ${giorni === 1
+      ? 'ti resta 1 giorno' : `ti restano ${giorni} giorni`} per farlo.</div>` : '';
+  box.innerHTML = `
+    <div class="grado-xp" style="margin-top:4px">Il tuo codice: <b class="mono">${esc(inv.codice)}</b></div>
+    <div style="margin-top:6px;${nota}">${contoInviti(inv)}</div>
+    <button class="btn orange" onclick="condividiInvito()">🔗 Condividi il tuo invito</button>
+    <button class="btn ghost" onclick="copiaInvito()">📋 Copia il link</button>
+    <div style="margin-top:12px;${nota}">${regolaInviti(inv)}</div>
+    ${inv.invitato ? `<div style="margin-top:10px;${nota}">✓ Sei arrivato su Barattolo con un invito.</div>` : ''}
+    ${campo}`;
+}
+
+/* Quante persone e quanti punti, in UNA riga. LO ZERO NON SI SCRIVE (la
+   regola di fraseXp): a chi non ha ancora invitato nessuno si dice cosa
+   fare, non «0 persone»; e i punti si nominano solo quando ci sono — chi
+   ha invitato qualcuno che non ha ancora comprato niente non deve
+   leggere «ti hanno portato 0 XP». */
+function contoInviti(inv){
+  const n = (inv && inv.persone) || 0, xp = (inv && inv.xp) || 0;
+  if (!n) return 'Non hai ancora invitato nessuno: condividi il tuo link.';
+  return `Hai invitato <b>${fmt(n)} ${n === 1 ? 'persona' : 'persone'}</b>`
+    + (xp ? ` · ti hanno portato <b>${fmt(xp)} XP</b>` : '') + '.';
+}
+
+/* Cosa si guadagna, e le due regole: qui dove si agisce, e «I tuoi
+   dati» lo riassume. La percentuale e' del server. */
+function regolaInviti(inv){
+  return 'Ogni volta che una persona che hai invitato guadagna XP comprando '
+    + `o vendendo, a te ne arriva il <b>${fmt(Number(inv.percento) || 0)}%</b>, per sempre. `
+    + 'Due regole: gli XP da inviti <b>non superano mai</b> quelli che '
+    + 'guadagni tu, e gli affari fatti <b>fra voi due</b> non contano.';
+}
+
+/* Il link vive in una funzione e MAI interpolato negli onclick (il
+   patto di jarShareLinkUrl): arriva dal server ed e' fatto di lettere e
+   cifre per costruzione, ma la regola non fa eccezioni. */
+const invitoLinkUrl = () => (myInviti && myInviti.link) || '';
+function condividiInvito(){
+  const l = invitoLinkUrl(); if (!l) return;
+  condividiLink(l, 'Ti invito su Barattolo, il mercatino dove si paga in satoshi 🫙⚡', 'Barattolo');
+}
+function copiaInvito(){
+  const l = invitoLinkUrl(); if (!l) return;
+  copiaLink(l, 'Link copiato 🔗');
+}
+
+/* Il codice a mano, per chi e' arrivato senza il link. Il velo
+   IMMEDIATO di bottoneInAttesa (si scrive, e il doppio tocco non deve
+   chiedere due volte), e lo stato nuovo lo dice il SERVER: myInviti si
+   riscrive dalla risposta, mai dedotto. Il rifiuto arriva con la sua
+   frase gentile — codice storto, il proprio, fuori tempo, gia'
+   collegato, un giro in tondo — e si mostra cosi' com'e'. */
+async function inserisciInvito(btn){
+  haptic();
+  const codice = (el('invitoCodice')?.value || '').trim();
+  if (!codice) { toast('Scrivi il codice di chi ti ha invitato'); return; }
+  if (DEMO) { toast('In demo gli inviti non si salvano 🙂'); return; }
+  const ripristina = bottoneInAttesa(btn, 'Controllo il codice…');
+  let r, d;
+  try {
+    r = await fetch(`${API_BASE}/me/invito`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({codice})});
+    d = await r.json().catch(()=>({}));
+  } catch(e) {
+    ripristina();
+    toast('Non riesco a raggiungere Barattolo: riprova fra poco');
+    return;
+  }
+  ripristina();
+  if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+  myInviti = d.inviti || myInviti;
+  renderInviti();
+  toast('🎟 Fatto: sei collegato a chi ti ha invitato');
 }
 
 async function setTitolo(id){
@@ -52565,6 +52711,9 @@ async function avvia(){
     myNegozio = me.negozio || ''; myDistintivi = me.distintivi || [];
     myXp = me.xp || 0; myLivello = me.livello || null;
     myXpRuoli = me.xp_ruoli || null;
+    /* il cassetto degli inviti: un server di ieri non manda la chiave,
+       e il cassetto resta spento invece di mostrare un codice vuoto */
+    myInviti = me.inviti || null;
     myClassifica = !!me.classifica_attiva;
     myAffari = (me.vendite_ok || 0) + (me.acquisti_ok || 0);
     myTitoli = me.titoli || []; myTitolo = me.titolo || '';

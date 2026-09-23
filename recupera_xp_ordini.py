@@ -117,10 +117,17 @@ def recupera(con, attesi, cost):
         # li ritoglierebbe. Il perimetro vero e' XP_COMMERCIO in
         # server.py; qui si ricopia perche' lo script gira da solo,
         # e a tenerli in pari c'e' una prova.
-        con.execute(
-            "UPDATE utenti SET xp=(SELECT COALESCE(SUM(punti),0) "
-            "FROM xp_eventi WHERE tg_id=? AND tipo IN ('ordine')) "
-            "WHERE tg_id=?", (tg, tg))
+        # E DAL SET 2026 CON LA REGOLA DEGLI INVITI (`xp_contati`): i
+        # propri piu' le quote, queste mai oltre i propri. Il pregresso
+        # NON fa nascere quote — erano accrediti di prima degli inviti —
+        # ma chi ne ha gia' non deve vedersele sparire dalla cache.
+        propri, inviti = con.execute(
+            "SELECT COALESCE(SUM(CASE WHEN tipo IN ('ordine') "
+            "THEN punti END),0), COALESCE(SUM(CASE WHEN tipo='invito' "
+            "THEN punti END),0) FROM xp_eventi WHERE tg_id=?",
+            (tg,)).fetchone()
+        con.execute("UPDATE utenti SET xp=? WHERE tg_id=?",
+                    (propri + min(inviti, propri), tg))
     return rapporto
 
 

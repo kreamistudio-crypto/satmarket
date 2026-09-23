@@ -2389,7 +2389,19 @@ XP_RUOLO = {"venditore": 1.0, "compratore": 0.6}
 # passare DI QUI e prendere una decisione che ha un nome sopra — e non
 # aggiungerlo e' la scelta sicura di serie. In piu' `grep XP_COMMERCIO`
 # da' tutto l'invariante in un colpo.
-XP_COMMERCIO = ("ordine",)
+# DAL SET 2026 IL PERIMETRO HA DUE META' (i codici invito): il commercio
+# TUO (`XP_PROPRI`: comprare e vendere) e la quota di quello che hai
+# PORTATO (`XP_INVITO`: il 5% degli XP propri di chi hai invitato).
+# Stanno dentro TUTT'E DUE, ed e' la riga del cantiere del perimetro
+# presa alla lettera — il numero che si vede e' il numero che conta:
+# Profilo, livelli e classifica leggono LO STESSO numero, o si
+# tornerebbe al 244 contro 123. Ma le due meta' NON si equivalgono, e le
+# due differenze sono le regole del cantiere: la quota non genera altra
+# quota (niente catena: la fa scattare solo un accredito PROPRIO, vedi
+# `assegna_xp`) e non supera mai la meta' tua (vedi `xp_contati`).
+XP_PROPRI = ("ordine",)
+XP_INVITO = "invito"
+XP_COMMERCIO = (*XP_PROPRI, XP_INVITO)
 
 
 def sql_xp_commercio(colonna: str = "tipo") -> tuple:
@@ -2422,8 +2434,18 @@ def ruolo_xp(riferimento: str) -> str:
     fuori dal server, per una garanzia che il fail-safe della somma da'
     gia'. C'e' la prova che questo parser legga quel che QUEL gancio
     scrive: una sentinella direbbe che il parser esiste, mai che
-    combaci col formato dall'altra parte."""
-    r = (riferimento or "").rsplit(":", 1)[-1]
+    combaci col formato dall'altra parte.
+    LA QUOTA DI UN INVITO NON HA UN LATO SUO (set 2026), e la riga
+    qui sotto e' quella che lo garantisce: il suo riferimento porta
+    DENTRO quello dell'accredito che l'ha fatta nascere
+    (`invito:42:ordine:7:venditore`), quindi l'ultimo pezzo e' un
+    ruolo vero — ma e' il ruolo di UN ALTRO. Letto nudo, metterebbe
+    gli XP portati da un amico fra le TUE vendite: la bugia che questo
+    giudice esiste per non dire."""
+    rif = riferimento or ""
+    if rif.startswith(XP_INVITO + ":"):
+        return ""
+    r = rif.rsplit(":", 1)[-1]
     return r if r in XP_RUOLO else ""
 
 
@@ -2442,9 +2464,21 @@ def xp_per_ruolo(righe, totale: int):
     si legge come un difetto**, e la frase generica e' vera comunque.
     Lo ZERO non e' un caso speciale qui: a registro vuoto escono due
     zeri, che sono la verita' — a non scriverli e' chi rende la riga.
+    IL TERZO LATO, 'inviti' (set 2026): gli XP che ti ha portato chi
+    hai invitato, e la chiave c'e' SOLO quando non e' zero — a chi non
+    ha inviti la risposta resta quella di ieri. Si riconoscono dal
+    riferimento, che comincia col suo tipo come tutti, e si CONTANO col
+    tetto del numero (`xp_contati`) e non grezzi: se la riga dicesse la
+    somma del registro mentre la cache ne tiene di meno, i tre lati non
+    farebbero il totale e la scomposizione tacerebbe proprio a chi ha
+    invitato di piu'.
     """
     per = {"vendite": 0, "acquisti": 0}
+    portati = 0
     for rif, punti in righe:
+        if (rif or "").startswith(XP_INVITO + ":"):
+            portati += int(punti)
+            continue
         r = ruolo_xp(rif)
         if r == "venditore":
             per["vendite"] += int(punti)
@@ -2452,7 +2486,136 @@ def xp_per_ruolo(righe, totale: int):
             per["acquisti"] += int(punti)
         # una riga che non si sa leggere non entra in NESSUNO dei due
         # lati: e' cosi' che la somma qui sotto se ne accorge
-    return per if per["vendite"] + per["acquisti"] == int(totale) else None
+    propri = per["vendite"] + per["acquisti"]
+    contati = xp_contati(propri, portati) - propri
+    if contati:
+        per["inviti"] = contati
+    return per if propri + contati == int(totale) else None
+
+
+# ------------------ LA QUOTA DEGLI INVITI (set 2026) -----------------
+# Chi ha invitato riceve il 5% degli XP che l'invitato guadagna IN
+# PROPRIO, a vita, a OGNI accredito, arrotondato per difetto — con due
+# guardie, che sono tutto il disegno:
+#   1) gli XP da inviti di una persona non superano MAI quelli che ha
+#      guadagnato in proprio;
+#   2) non contano gli XP che l'invitato prende da un affare con chi
+#      l'ha invitato: comprare dal proprio padrino e' il modo piu' corto
+#      di far girare punti fra due persone.
+# IL «MAI» DELLA PRIMA E' UNA DEFINIZIONE E NON UN CONTROLLO, e si fa
+# rispettare in DUE posti: allo scrivere la quota si taglia allo spazio
+# che resta (`quota_invito`), e al leggere il numero conta gli inviti
+# fino ai propri e non oltre (`xp_contati`). Il primo basterebbe finche'
+# i propri salgono e basta; il secondo regge anche il giorno che
+# scendono — un ordine marcato come prova, un azzeramento fatto a meta' —
+# e allora niente puo' far dire al numero una cosa che la regola vieta.
+# ⚠️ L'AZZERAMENTO DEGLI XP (il giorno che si accende la commissione:
+# decisione di Andrea, ago 2026 — la classifica riparte da zero) SI FA
+# SULLE RIGHE DI TUTTO IL PERIMETRO, `XP_COMMERCIO`, cioe' quote
+# comprese, e NON TOCCA LA TABELLA `inviti`: i collegamenti
+# invitante↔invitato restano e la regola riparte da zero da sola,
+# perche' qui non c'e' nessun contatore a parte da ricordarsi di
+# rimettere a zero — tetto e quote si ricalcolano dal registro. Chi
+# cancellasse i soli 'ordine' lascerebbe le quote vecchie orfane nel
+# registro: `xp_contati` le terrebbe comunque sotto i propri (cioe' a
+# zero), ma il registro direbbe il falso a chiunque lo rilegga.
+INVITO_PERCENTO = 5
+
+
+def xp_contati(propri: int, inviti: int) -> int:
+    """IL NUMERO, scritto una volta sola: i punti tuoi piu' quelli da
+    inviti, questi mai oltre i tuoi. E' la definizione di `utenti.xp` —
+    la usano la cache, il riallineamento d'avvio, la classifica e la
+    scomposizione del Profilo, e un secondo posto che la riscrivesse
+    sarebbe quello che un giorno dice un altro numero.
+    I negativi valgono zero: il registro non ne ha, ma il tetto di un
+    numero pubblico non deve poter diventare un meno."""
+    propri = max(0, int(propri or 0))
+    return propri + min(max(0, int(inviti or 0)), propri)
+
+
+def somme_xp(con, tg_id=None) -> dict:
+    """{tg_id: (propri, inviti)} dal registro, dentro il perimetro — di
+    una persona sola o di tutti. Legge e basta, e passa dal giudice
+    del perimetro come ogni lettore: vive in un posto solo."""
+    dove, par = sql_xp_commercio()
+    q = ("SELECT tg_id, tipo, COALESCE(SUM(punti),0) AS s "
+         f"FROM xp_eventi WHERE {dove}")
+    if tg_id is not None:
+        q += " AND tg_id=?"
+        par = par + [tg_id]
+    fuori = {}
+    for r in con.execute(q + " GROUP BY tg_id, tipo", par):
+        p, i = fuori.get(r["tg_id"], (0, 0))
+        if r["tipo"] == XP_INVITO:
+            i += r["s"]
+        else:
+            p += r["s"]
+        fuori[r["tg_id"]] = (p, i)
+    return fuori
+
+
+def parti_affare_xp(con, riferimento: str):
+    """Chi stava nell'affare che ha fruttato quegli XP: l'insieme delle
+    due parti, oppure None quando non si sa.
+    IL FORMATO LO SCRIVE IL GANCIO in `_sblocca_sats`
+    (`ordine:{id}:{ruolo}`) e qui si legge soltanto: la prova estrae la
+    f-string dal gancio e la da' in pasto a questa funzione, come fa per
+    `ruolo_xp`.
+    UN RIFERIMENTO CHE QUI NON SI SA LEGGERE TORNA None, e None NON
+    PAGA. Il giorno che anche gli scambi P2P daranno XP (oggi non ne
+    danno), il loro ramo si scrive qui — le parti stanno in `p2p_ordini`:
+    chi l'ha pubblicato e chi l'ha preso — e finche' non c'e', meglio un
+    5% perso che un 5% pagato su uno scambio fatto proprio con chi ti ha
+    invitato."""
+    pezzi = (riferimento or "").split(":")
+    if len(pezzi) == 3 and pezzi[0] == "ordine" and pezzi[1].isdigit():
+        o = con.execute("SELECT venditore_id, compratore_id FROM ordini "
+                        "WHERE id=?", (int(pezzi[1]),)).fetchone()
+        if o:
+            return {o["venditore_id"], o["compratore_id"]}
+    return None
+
+
+def quota_invito(con, invitato: int, riferimento: str, punti: int) -> int:
+    """La quota di chi ha invitato, per UN accredito proprio
+    dell'invitato. Ritorna i punti davvero scritti (0 = niente). Niente
+    commit: e' della transazione di `assegna_xp`, che la chiama.
+    FAIL-OPEN, e non e' un vezzo: gira DENTRO la scrittura degli XP
+    propri dell'invitato, e un intoppo qui non deve poterli toccare — si
+    perde al piu' la quota, mai l'accredito che l'ha fatta nascere.
+    LA UNIQUE E' IL GIUDICE anche qui: il riferimento della quota porta
+    dentro quello dell'accredito (`invito:{invitato}:{riferimento}`),
+    quindi un retry ci sbatte contro come per gli XP propri.
+    E NON SI SCRIVE A MANO: passa da `assegna_xp` col suo tipo, cioe'
+    dalla stessa porta, dalla stessa UNIQUE e dallo stesso ricalcolo
+    della cache — e siccome il suo tipo non e' fra i propri, li' non ne
+    fa nascere un'altra: niente catena, per costruzione."""
+    try:
+        r = con.execute("SELECT invitante FROM inviti WHERE invitato=?",
+                        (invitato,)).fetchone()
+        invitante = r["invitante"] if r else 0
+        if not invitante or invitante == invitato:
+            return 0
+        # GUARDIA 2: un affare con chi ti ha invitato non paga — e
+        # nemmeno uno di cui non si sanno le parti (None).
+        parti = parti_affare_xp(con, riferimento)
+        if parti is None or invitante in parti:
+            return 0
+        quota = int(punti) * INVITO_PERCENTO // 100      # per difetto
+        # GUARDIA 1: mai sopra i propri. Si taglia allo spazio che
+        # resta, e quel che non ci sta e' PERSO, non «in attesa»: e' un
+        # tetto, non un salvadanaio.
+        propri, inviti = somme_xp(con, invitante).get(invitante, (0, 0))
+        quota = min(quota, propri - inviti)
+        if quota <= 0:
+            return 0
+        return assegna_xp(con, invitante, XP_INVITO, quota,
+                          f"{XP_INVITO}:{invitato}:{riferimento}")
+    except Exception as e:
+        print(f"⚠️ Quota d'invito saltata per {invitato} "
+              f"({riferimento}): {e}")
+        return 0
 
 
 # LAPIDE (ago 2026). Qui viveva il tariffario delle azioni di
@@ -2476,11 +2639,12 @@ def xp_per_ruolo(righe, totale: int):
 def _ricalcola_xp(con, tg_id: int):
     """Rifa' utenti.xp dal registro. Nessun commit: e' del chiamante.
     E' cio' che rende la fusione un caso NON speciale — si migrano le
-    righe e si ricalcola, come per rating e feedback."""
-    dove, par = sql_xp_commercio()
-    n = con.execute("SELECT COALESCE(SUM(punti),0) AS s FROM xp_eventi "
-                    f"WHERE tg_id=? AND {dove}",
-                    [tg_id] + par).fetchone()["s"]
+    righe e si ricalcola, come per rating e feedback.
+    DAL SET 2026 IL NUMERO NON E' PIU' UNA SOMMA NUDA: e' `xp_contati`
+    sulle due meta' del perimetro, che `somme_xp` legge passando dal
+    giudice come prima."""
+    propri, inviti = somme_xp(con, tg_id).get(tg_id, (0, 0))
+    n = xp_contati(propri, inviti)
     con.execute("UPDATE utenti SET xp=? WHERE tg_id=?", (n, tg_id))
     return n
 
@@ -2506,9 +2670,20 @@ def assegna_xp(con, tg_id: int, tipo: str, punti: int,
     # chiama _ricalcola_xp e glieli toglie). Un numero che oscilla,
     # non riproducibile e invisibile: il guasto di oggi, aggravato.
     # Con la guardia sono la stessa strada PER COSTRUZIONE.
+    # E DAL SET 2026 SONO LA STESSA FUNZIONE: col tetto degli inviti il
+    # numero non e' piu' una somma (vedi `xp_contati`), quindi un
+    # `xp=xp+punti` direbbe il vero solo finche' le quote stanno sotto
+    # i propri — e il giorno che non ci stanno, la cache e il ricalcolo
+    # tornerebbero a dire due numeri. Costa una SELECT per accredito,
+    # sull'indice della UNIQUE che comincia col tg_id.
     if tipo in XP_COMMERCIO:
-        con.execute("UPDATE utenti SET xp=xp+? WHERE tg_id=?",
-                    (int(punti), tg_id))
+        _ricalcola_xp(con, tg_id)
+    # LA QUOTA DI CHI TI HA INVITATO, a ogni accredito PROPRIO: la fa
+    # scattare questa riga e nessun'altra, cosi' il gancio nuovo di
+    # domani la paga senza doversene ricordare. E una quota non ne fa
+    # nascere un'altra, perche' il suo tipo non e' fra i propri.
+    if tipo in XP_PROPRI:
+        quota_invito(con, tg_id, riferimento, int(punti))
     return int(punti)
 
 
@@ -2540,6 +2715,191 @@ def xp_ordine(prezzo_sats: int, cambio_eur: float, ruolo: str) -> int:
     euro = (prezzo_sats / 100_000_000 * cambio_eur) if cambio_eur > 0 else 0.0
     return int((FISSO_XP_ORDINE + euro * XP_PER_EURO)
                * XP_RUOLO.get(ruolo, 1.0))
+
+
+# ------------------- I CODICI INVITO (set 2026) ----------------------
+# Ogni persona ha UN codice, e un link t.me/<bot>?start=<codice>: chi
+# arriva da li' si collega da solo a chi l'ha invitato, al primo /start
+# del bot — che e' anche la sua iscrizione. Chi e' arrivato da un'altra
+# parte ha un campo nel Profilo per scriverlo a mano, ENTRO
+# `INVITO_GIORNI` dall'iscrizione e UNA volta sola. Le due porte passano
+# dallo STESSO giudice (`collega_invito`): il link e' soltanto il campo
+# compilato per te, e due giudici un giorno direbbero due cose diverse.
+# Quel che il collegamento frutta sta un piano piu' su, con gli XP: vedi
+# «LA QUOTA DEGLI INVITI».
+# IL CODICE E' CORTO E SENZA TRANELLI: sei caratteri da un alfabeto
+# senza 0 e O, senza 1, I ed L — quelli che dettati o ricopiati da uno
+# screenshot si scambiano — e SENZA VOCALI, cosi' un codice estratto a
+# caso non puo' comporre una parola (e una parolaccia stampata sul
+# Profilo di qualcuno sarebbe un guaio nostro, non suo). Ventotto
+# simboli alla sesta fanno quasi mezzo miliardo di codici, e indovinarne
+# uno non fa vincere niente — collegarsi al codice di uno sconosciuto
+# regala a LUI il 5% dei propri XP — quindi non serve un freno sui
+# tentativi.
+INVITO_ALFABETO = "23456789BCDFGHJKMNPQRSTVWXYZ"
+INVITO_LUNGHEZZA = 6
+INVITO_GIORNI = 7        # la finestra del campo a mano, dall'iscrizione
+
+
+def normalizza_codice_invito(testo) -> str:
+    """Il codice nella sua forma canonica, oppure '' se non lo e'.
+    Perdona quel che fa chi lo ricopia — le minuscole, uno spazio, un
+    trattino in mezzo — e niente di piu'.
+    E' ANCHE IL GIUDICE CHE SEPARA LE DUE PORTE DEL /start: il
+    lasciapassare della fusione e' un esadecimale da 32 caratteri, e
+    sei caratteri di questo alfabeto non lo possono sembrare."""
+    t = re.sub(r"[\s-]", "", str(testo or "")).upper()
+    if len(t) == INVITO_LUNGHEZZA and all(c in INVITO_ALFABETO for c in t):
+        return t
+    return ""
+
+
+def codice_invito(con, tg_id: int) -> str:
+    """Il codice di questa persona, creato la prima volta che serve e
+    poi FERMO: e' stampato nei link che ha gia' condiviso, e cambiarlo
+    li ucciderebbe. Niente commit: e' del chiamante.
+    Casuale da `secrets` e MAI derivato dal tg_id o dal codice negozio
+    (il patto del barattolo condiviso): dal codice non si risale alla
+    persona, e dalla persona non si indovina il codice.
+    Le due UNIQUE fanno da giudice, come sempre qui: un codice gia' di
+    un altro non si scrive, e due richieste in volo per la stessa
+    persona non gliene fanno nascere due. '' solo se venti estrazioni
+    di fila cadono su codici presi, cioe' mai — ma il Profilo non deve
+    cadere per questo."""
+    for _ in range(20):
+        r = con.execute("SELECT codice FROM inviti_codici WHERE tg_id=?",
+                        (tg_id,)).fetchone()
+        if r:
+            return r["codice"]
+        c = "".join(secrets.choice(INVITO_ALFABETO)
+                    for _ in range(INVITO_LUNGHEZZA))
+        con.execute("INSERT OR IGNORE INTO inviti_codici(tg_id, codice, "
+                    "creato) VALUES(?,?,?)", (tg_id, c, int(time.time())))
+    r = con.execute("SELECT codice FROM inviti_codici WHERE tg_id=?",
+                    (tg_id,)).fetchone()
+    return r["codice"] if r else ""
+
+
+def finestra_invito(registrato) -> int:
+    """Fino a quando si puo' scrivere il codice a mano: l'iscrizione piu'
+    `INVITO_GIORNI`. Zero = mai: chi c'era prima che l'iscrizione si
+    timbrasse ha `registrato` a zero, e per lui la finestra e' chiusa da
+    sempre — gli inviti sono per chi ARRIVA."""
+    r = int(registrato or 0)
+    return r + INVITO_GIORNI * 86400 if r > 0 else 0
+
+
+def invito_circolare(con, invitante: int, invitato: int) -> bool:
+    """Vero se `invitato` sta gia' SOPRA `invitante` nella catena degli
+    inviti: A ha invitato B, e adesso B vorrebbe risultare invitato da
+    A — o A da qualcuno che e' arrivato, a qualunque distanza, grazie a
+    lui. UNA query, ricorsiva: la UNION (e non UNION ALL) scarta i giri
+    gia' visti, quindi anche una catena storta finisce invece di girare
+    per sempre."""
+    return con.execute(
+        "WITH RECURSIVE su(t) AS ("
+        " SELECT invitante FROM inviti WHERE invitato=?"
+        " UNION SELECT i.invitante FROM inviti i JOIN su ON i.invitato=su.t)"
+        " SELECT 1 FROM su WHERE t=? LIMIT 1",
+        (invitante, invitato)).fetchone() is not None
+
+
+def collega_invito(con, invitato: int, codice, via: str):
+    """IL GIUDICE UNICO delle due porte, il link del bot e il campo a
+    mano. None = collegato; altrimenti la frase gentile del rifiuto, che
+    le due porte mostrano cosi' com'e'. Niente commit: e' del chiamante.
+    L'ORDINE DEI NO E' QUELLO DI CHI LEGGE: prima quel che si corregge
+    (un codice scritto male, uno che non esiste), poi quel che non si
+    cambia — e a chi e' gia' collegato si dice QUELLO anche a finestra
+    chiusa, perche' e' la cosa vera piu' utile da sapere.
+    «UNA VOLTA SOLA» NON E' UN CONTROLLO: e' la PK di `inviti`, e il
+    SELECT qui sotto serve solo a dirlo con garbo. Due richieste in volo
+    si pestano sulla PK, e la seconda riceve la stessa frase.
+    E «NON DA SOLI» STA ANCHE NELLO SCHEMA (il CHECK della tabella):
+    questa riga lo dice con garbo, il vincolo lo impedisce comunque."""
+    c = normalizza_codice_invito(codice)
+    if not c:
+        return (f"Questo non sembra un codice invito: sono "
+                f"{INVITO_LUNGHEZZA} caratteri fra lettere e numeri.")
+    r = con.execute("SELECT tg_id FROM inviti_codici WHERE codice=?",
+                    (c,)).fetchone()
+    if not r:
+        return "Non trovo questo codice: controlla di averlo scritto giusto."
+    invitante = r["tg_id"]
+    if invitante == invitato:
+        return ("Questo è il tuo codice 🙂 Condividilo con chi vuoi "
+                "invitare: non ci si può invitare da soli.")
+    gia = ("Sei già arrivato con un invito, e resta quello: il codice si "
+           "inserisce una volta sola.")
+    if con.execute("SELECT 1 FROM inviti WHERE invitato=?",
+                   (invitato,)).fetchone():
+        return gia
+    u = con.execute("SELECT registrato FROM utenti WHERE tg_id=?",
+                    (invitato,)).fetchone()
+    if not u or time.time() >= finestra_invito(u["registrato"]):
+        return (f"Il codice si inserisce entro {INVITO_GIORNI} giorni "
+                "dall'iscrizione, e per te quel tempo è passato.")
+    if invito_circolare(con, invitante, invitato):
+        return ("Non si può: questa persona è arrivata su Barattolo "
+                "seguendo un tuo invito, e gli inviti non girano in tondo.")
+    r = con.execute("INSERT OR IGNORE INTO inviti(invitato, invitante, "
+                    "creato, via) VALUES(?,?,?,?)",
+                    (invitato, invitante, int(time.time()), via))
+    return None if r.rowcount else gia
+
+
+def stato_inviti(con, tg_id: int, registrato) -> dict:
+    """Quel che il cassetto «I tuoi inviti» deve sapere, e NIENT'ALTRO:
+    il codice e il suo link, QUANTE persone e QUANTI punti — mai chi.
+    I NOMI DEGLI INVITATI NON ESCONO DA NESSUNA PARTE (decisione di
+    Andrea): chi invita vede un conto. `campo_fino` e' la finestra del
+    campo a mano, zero quando e' chiusa o gia' usata: la guarda il
+    client per mostrarlo, ma a decidere resta `collega_invito`.
+    Il link lo compone il server (il client non hardcoda mai il bot).
+    Puo' SCRIVERE, perche' il codice nasce la prima volta che serve: il
+    commit e' del chiamante."""
+    codice = codice_invito(con, tg_id)
+    persone = con.execute("SELECT COUNT(*) FROM inviti WHERE invitante=?",
+                          (tg_id,)).fetchone()[0]
+    propri, inviti = somme_xp(con, tg_id).get(tg_id, (0, 0))
+    invitato = con.execute("SELECT 1 FROM inviti WHERE invitato=?",
+                           (tg_id,)).fetchone() is not None
+    fino = finestra_invito(registrato)
+    return {"codice": codice,
+            "link": f"{LINK_BOT}?start={codice}" if codice else "",
+            "persone": persone,
+            # gli XP che gli inviti gli hanno portato, CONTATI: la stessa
+            # cifra che la scomposizione del livello mette nel totale
+            "xp": xp_contati(propri, inviti) - propri,
+            "invitato": invitato,
+            "campo_fino": fino if (not invitato and time.time() < fino) else 0,
+            "percento": INVITO_PERCENTO,
+            "giorni": INVITO_GIORNI}
+
+
+def riga_invito_bot(tg_id: int, codice: str) -> str:
+    """Il /start col codice di qualcuno: collega, e ritorna la riga da
+    mettere IN CODA al benvenuto — un messaggio solo, col bottone della
+    Mini App davanti come vuole la regola del primo sguardo.
+    Chi apre il link e' appena arrivato (`gestisci_update` l'ha appena
+    messo in anagrafe), quindi e' dentro la finestra per costruzione;
+    chi c'era gia' passa dallo stesso giudice del campo a mano, e se la
+    sua finestra e' chiusa lo sente dire.
+    IL RIFIUTO SI DICE, non si tace: chi ha aperto un link si aspetta
+    che sia successo qualcosa, e se non e' successo deve sapere perche'.
+    Chi l'ha invitato NON SI NOMINA: la riga dice che il collegamento
+    c'e', e il nome e' roba di chi il link l'ha condiviso."""
+    con = db()
+    try:
+        no = collega_invito(con, tg_id, codice, "link")
+        con.commit()
+    finally:
+        con.close()
+    if no is None:
+        return ("\n\n🎟 <b>Sei arrivato con un invito.</b> Quando "
+                "comincerai a comprare e vendere, chi ti ha invitato "
+                "riceverà un piccolo grazie in XP: a te non costa niente.")
+    return "\n\n🎟 " + html.escape(no)
 
 
 # ---------------------- I LIVELLI (ago 2026) -------------------------
@@ -3291,17 +3651,24 @@ def riallinea_xp_commercio(con):
     PARLA, e le gemelle no: questa toglie punti a persone vere, e un
     numero che cala in silenzio e' il modo peggiore di presentarsi —
     la riga nel journal e' quel che permette di dire, guardando, se e
-    quanto e' successo."""
-    dove, par = sql_xp_commercio()
-    r = con.execute(
-        "UPDATE utenti SET xp=COALESCE((SELECT SUM(punti) FROM xp_eventi "
-        f"WHERE xp_eventi.tg_id=utenti.tg_id AND {dove}),0) "
-        "WHERE xp<>COALESCE((SELECT SUM(punti) FROM xp_eventi "
-        f"WHERE xp_eventi.tg_id=utenti.tg_id AND {dove}),0)", par + par)
-    if r.rowcount:
-        print(f"🧮 XP riallineati al commercio: {r.rowcount} utenti",
+    quanto e' successo.
+    DAL SET 2026 E' UN GIRO E NON UN UPDATE SOLO: col tetto degli
+    inviti il numero giusto e' `xp_contati` sulle due meta', e
+    riscriverlo in SQL vorrebbe dire una seconda copia della regola —
+    quella che un giorno direbbe un altro numero. Il verso resta lo
+    stesso: si tocca solo chi non combacia, in su o in giu'."""
+    somme = somme_xp(con)
+    toccati = 0
+    for u in con.execute("SELECT tg_id, xp FROM utenti").fetchall():
+        giusto = xp_contati(*somme.get(u["tg_id"], (0, 0)))
+        if (u["xp"] or 0) != giusto:
+            con.execute("UPDATE utenti SET xp=? WHERE tg_id=?",
+                        (giusto, u["tg_id"]))
+            toccati += 1
+    if toccati:
+        print(f"🧮 XP riallineati al commercio: {toccati} utenti",
               flush=True)
-    return r.rowcount
+    return toccati
 
 
 def riallinea_titoli_decaduti(con):
@@ -3758,6 +4125,39 @@ def init_db():
         UNIQUE(tg_id, tipo, riferimento)
     );
     CREATE INDEX IF NOT EXISTS idx_xp_utente ON xp_eventi(tg_id, creato DESC);
+    CREATE TABLE IF NOT EXISTS inviti_codici(
+        -- IL CODICE INVITO di ogni persona (set 2026): nasce la prima
+        -- volta che serve (`codice_invito`) e poi non cambia piu' — e'
+        -- stampato nei link gia' condivisi. UNA TABELLA E NON UNA
+        -- COLONNA SU `utenti`, il patto di `punti_ritiro`: nessuna rotta
+        -- che fa SELECT * sull'anagrafe lo puo' servire per sbaglio. Le
+        -- due UNIQUE sono il giudice: un codice a testa, e mai lo stesso
+        -- codice a due persone.
+        tg_id INTEGER PRIMARY KEY,
+        codice TEXT NOT NULL UNIQUE,
+        creato INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS inviti(
+        -- CHI HA INVITATO CHI (set 2026), una riga per invitato: la PK E'
+        -- la regola «una volta sola», e il CHECK e' «non ci si invita da
+        -- soli» scritto dove nessun codice lo puo' scavalcare. `via`
+        -- dice da quale porta e' arrivato: 'link' (il /start del bot) o
+        -- 'codice' (il campo a mano del Profilo).
+        -- I NOMI NON ESCONO DA QUI: chi invita vede quante persone e
+        -- quanti punti, mai chi (vedi `stato_inviti`).
+        -- ⚠️ L'AZZERAMENTO DEGLI XP NON LA TOCCA: il giorno che la
+        -- classifica riparte da zero (all'accensione della commissione)
+        -- i collegamenti restano, e la quota riparte da zero da sola —
+        -- vedi «LA QUOTA DEGLI INVITI».
+        invitato INTEGER PRIMARY KEY,
+        invitante INTEGER NOT NULL,
+        creato INTEGER,
+        via TEXT NOT NULL DEFAULT '',
+        CHECK (invitato <> invitante)
+    );
+    -- «quante persone hai invitato» si conta per INVITANTE, che nella PK
+    -- non c'e': senza indice sarebbe una scansione a ogni Profilo.
+    CREATE INDEX IF NOT EXISTS idx_inviti_invitante ON inviti(invitante);
     CREATE TABLE IF NOT EXISTS doppioni_ignorati(
         -- «non e' un doppione»: la coppia archiviata non si ripropone
         -- mai piu', su nessun dispositivo (per questo vive nel DB e
@@ -12490,6 +12890,59 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         con.execute("UPDATE OR IGNORE xp_eventi SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
         con.execute("DELETE FROM xp_eventi WHERE tg_id=?", (id_nostr,))
+        # I CODICI INVITO E I COLLEGAMENTI seguono l'utente (set 2026).
+        # IL CODICE fa la liturgia del barattolo condiviso: la PK e' il
+        # tg_id, quindi se le due meta' ne hanno uno tutt'e due vince
+        # quello della meta' Telegram, che sopravvive, e il link della
+        # meta' che muore si spegne — due codici della stessa persona non
+        # restano in giro.
+        con.execute("UPDATE OR IGNORE inviti_codici SET tg_id=? "
+                    "WHERE tg_id=?", (id_telegram, id_nostr))
+        con.execute("DELETE FROM inviti_codici WHERE tg_id=?", (id_nostr,))
+        # I COLLEGAMENTI, in quest'ordine e per una ragione. PRIMA muore
+        # quello FRA le due meta': diventerebbe un auto-invito, e il
+        # CHECK della tabella farebbe cadere la fusione intera. POI chi
+        # e' stato invitato dalla meta' che muore passa a quella che
+        # resta — e' la stessa persona. L'INVITANTE della meta' che muore
+        # passa solo se quella che resta non ne ha gia' uno: la PK dice
+        # «una volta sola», e vince chi sopravvive, come per il codice.
+        con.execute("DELETE FROM inviti WHERE (invitato=? AND invitante=?) "
+                    "OR (invitato=? AND invitante=?)",
+                    (id_nostr, id_telegram, id_telegram, id_nostr))
+        con.execute("UPDATE inviti SET invitante=? WHERE invitante=?",
+                    (id_telegram, id_nostr))
+        con.execute("UPDATE OR IGNORE inviti SET invitato=? WHERE invitato=?",
+                    (id_telegram, id_nostr))
+        con.execute("DELETE FROM inviti WHERE invitato=?", (id_nostr,))
+        # E UN GIRO IN TONDO NATO DALLA FUSIONE SI SPEZZA: le due meta'
+        # possono aver invitato ciascuna chi stava sopra l'altra, e
+        # fondendole la catena si chiude su se stessa. Cade l'invito DELLA
+        # PERSONA FUSA, che e' il collegamento che il giudice non avrebbe
+        # mai lasciato nascere.
+        _su = con.execute("SELECT invitante FROM inviti WHERE invitato=?",
+                          (id_telegram,)).fetchone()
+        if _su and invito_circolare(con, _su["invitante"], id_telegram):
+            con.execute("DELETE FROM inviti WHERE invitato=?",
+                        (id_telegram,))
+        # LE QUOTE CHE LA FUSIONE HA RESO STORTE: quelle nate dagli XP di
+        # una delle due meta' — adesso sarebbero un invito a se stessi —
+        # e quelle nate da un affare che, migrati gli ordini qui sopra,
+        # risulta fatto con chi le incassa: la guardia 2 di
+        # `quota_invito`, riapplicata col SUO giudice (`parti_affare_xp`),
+        # o la fusione avrebbe un'idea sua di cosa sia un affare con
+        # l'invitante. Un affare di cui non si sanno le parti RESTA:
+        # all'accredito era buono, e qui si toglie solo cio' che la
+        # fusione ha reso storto. Il numero lo rifa' `_ricalcola_xp`, in
+        # fondo, dalle righe rimaste.
+        for _q in con.execute("SELECT id, riferimento FROM xp_eventi "
+                              "WHERE tg_id=? AND tipo=?",
+                              (id_telegram, XP_INVITO)).fetchall():
+            _pz = _q["riferimento"].split(":", 2)
+            _da, _fonte = (_pz[1], _pz[2]) if len(_pz) == 3 else ("", "")
+            _parti = parti_affare_xp(con, _fonte)
+            if (_da in (str(id_telegram), str(id_nostr))
+                    or (_parti and id_telegram in _parti)):
+                con.execute("DELETE FROM xp_eventi WHERE id=?", (_q["id"],))
         # PRIMA muore la riga Nostr, POI la chiave si accende su quella
         # Telegram: l'indice unico su npub_accesso non ammette il
         # doppio valore nemmeno per un istante.
@@ -13421,8 +13874,17 @@ async def gestisci_update(update: dict):
     chat = mittente["id"]
     if testo.startswith("/start"):
         parti = testo.split(maxsplit=1)
+        coda = ""
         if len(parti) == 2:
-            return await avvia_fusione(chat, parti[1].strip())
+            carico = parti[1].strip()
+            # DUE PORTE SULLO STESSO /start (set 2026), e le separa la
+            # FORMA: il lasciapassare della fusione e' un esadecimale da
+            # 32, il codice invito sei caratteri del suo alfabeto. E
+            # l'invito NON prende il posto del benvenuto: gli si accoda,
+            # cosi' chi arriva da un link vede la stessa porta di tutti.
+            if not normalizza_codice_invito(carico):
+                return await avvia_fusione(chat, carico)
+            coda = riga_invito_bot(chat, carico)
         # IL PRIMO SGUARDO E' TUTTO PER LA MINI APP: niente elenco di
         # comandi, un invito solo e il bottone che lo esaudisce. I
         # bottoni dello sfoglia arrivano dopo, a chi li cerca — e
@@ -13435,7 +13897,7 @@ async def gestisci_update(update: dict):
                     "confermi di aver ricevuto la roba.\n\n"
                     "Da questa chat ti avviso quando succede qualcosa "
                     "nei tuoi ordini. Per tutto il resto, apri "
-                    "Barattolo 👇",
+                    "Barattolo 👇" + coda,
             "parse_mode": "HTML", "reply_markup": tastiera_bot()})
     if testo.startswith("/anteprima"):
         return await comando_anteprima(mittente, testo)
@@ -19246,10 +19708,12 @@ def _dati_classifica(con):
                 "SELECT per_tg_id, da_tg_id, voto FROM feedback "
                 "WHERE ordine_id NOT IN "
                 "(SELECT id FROM ordini WHERE prova=1)")]
-    dove, par = sql_xp_commercio()
-    xp = {r["tg_id"]: r["p"] for r in con.execute(
-        "SELECT tg_id, COALESCE(SUM(punti),0) AS p FROM xp_eventi "
-        f"WHERE {dove} GROUP BY tg_id", par)}
+    # Gli XP sono IL NUMERO del Profilo, dalla stessa definizione
+    # (`xp_contati` sulle due meta' del perimetro, set 2026): il
+    # Profilo e il rank devono dire lo stesso numero, ed e' la prova
+    # che e' il cantiere del perimetro — con gli inviti dentro tutt'e
+    # due, o fuori da tutt'e due.
+    xp = {t: xp_contati(p, i) for t, (p, i) in somme_xp(con).items()}
     return voti, controparti, xp, affari
 
 
@@ -33626,8 +34090,13 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
         if user["id"] in FONDATORI and not u["titolo"]:
             con.execute("UPDATE utenti SET titolo='t_fondatore' "
                         "WHERE tg_id=?", (user["id"],))
+        # Il cassetto «I tuoi inviti» (set 2026), letto QUI e non piu'
+        # in basso coi suoi vicini: il codice nasce la prima volta che
+        # serve, cioe' e' una scrittura, e deve stare prima del commit.
+        inviti_miei = stato_inviti(con, user["id"], u["registrato"])
         # (Qui si timbrava la visita del giorno. Il commit RESTA: serve
-        # ad assegna_coorte e al titolo dei fondatori, qui sopra.)
+        # ad assegna_coorte, al titolo dei fondatori e al codice invito,
+        # qui sopra.)
         con.commit()
     presi = {r["badge_id"]: r["ottenuto_il"] for r in con.execute(
         "SELECT badge_id, ottenuto_il FROM badge_utente WHERE tg_id=?",
@@ -33973,6 +34442,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # escono i NUMERI e mai la prosa: la riga la scrive il client, che
     # e' l'unico posto che la mostra.
     profilo["xp_ruoli"] = xp_ruoli
+    # I SUOI INVITI (set 2026): il codice, il link, e due CONTI — mai i
+    # nomi di chi ha invitato. Letto piu' su, prima del commit (il
+    # codice puo' nascere adesso); null a chi non e' in anagrafe.
+    profilo["inviti"] = inviti_miei if u else None
     # La porta della classifica: il client non deve mostrare un
     # bottone che porta a una pagina spenta. Esce il FATTO e non le
     # tarature — K, RIF e il peso sono roba del giudice, e un
@@ -36266,6 +36739,33 @@ async def scegli_titolo(req: Request,
     finally:
         con.close()
     return {"ok": True, "titolo": scelto}
+
+
+@app.post("/api/me/invito")
+async def inserisci_invito(req: Request,
+                           x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """Il campo a mano del cassetto «I tuoi inviti» (set 2026): chi e'
+    arrivato senza il link scrive il codice di chi l'ha invitato, entro
+    `INVITO_GIORNI` dall'iscrizione e una volta sola. Il giudice e'
+    `collega_invito`, lo STESSO del link del bot: due porte, una regola.
+    La risposta porta lo stato INTERO del cassetto, riletto dal
+    database: il client ridisegna quel che il server sa, non quel che
+    crede sia successo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    con = db()
+    try:
+        no = collega_invito(con, user["id"], d.get("codice"), "codice")
+        if no:
+            raise HTTPException(400, no)
+        u = con.execute("SELECT registrato FROM utenti WHERE tg_id=?",
+                        (user["id"],)).fetchone()
+        stato = stato_inviti(con, user["id"], u["registrato"] if u else 0)
+        con.commit()
+    finally:
+        con.close()
+    return {"ok": True, "inviti": stato}
 
 
 @app.post("/api/me/avatar-scelta")

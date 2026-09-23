@@ -86,6 +86,7 @@ jobs:
              collaudo_punto_concordato.py collaudo_lnbits_muto.py
              classifica_prova.py collaudo_classifica.py
              marca_prove.py recupera_xp_ordini.py livelli_prova.py
+             collaudo_inviti.py
              collaudo_offerta_carrello.py collaudo_punti_barattolo.py
              spoglia_foto_esistenti.py collaudo_verita_lnd.py
              giudice_deploy.py collaudi_ci.py
@@ -152,6 +153,7 @@ jobs:
              collaudo_rotte_metodi
              collaudo_pagamento_p2p
              collaudo_racconti_bozza
+             collaudo_inviti
 
   # La regola ferrea numero 1, e vive in un JOB SUO — non in coda
   # all'altro, ed e' il pezzo da non rimettere com'era.

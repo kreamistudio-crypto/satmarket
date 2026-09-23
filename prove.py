@@ -24785,8 +24785,11 @@ def prove_classifica():
     # si guarda che questo lettore ci passi, invece di ricopiarsi la
     # condizione — o il giorno che il perimetro cambia, uno dei tre
     # resta indietro in silenzio.
+    # (Dal set 2026 ci si passa per `somme_xp`, che passa dal giudice,
+    # e il numero si conta con `xp_contati`: lo stesso del Profilo.)
     prova("in classifica entrano i SOLI XP del commercio", True,
-          "sql_xp_commercio(" in letture and "tipo='ordine'" not in letture)
+          "somme_xp(con)" in letture and "xp_contati(" in letture
+          and "tipo='ordine'" not in letture)
     prova("...e gli affari si contano dagli ordini released", True,
           "stato='released'" in letture)
     # LEGGE E BASTA, come controlla_libro_mastro: nessuna scrittura in
@@ -25021,6 +25024,11 @@ def prove_xp():
       tg_id INTEGER NOT NULL, tipo TEXT NOT NULL, punti INTEGER NOT NULL,
       riferimento TEXT NOT NULL DEFAULT '', creato INTEGER,
       UNIQUE(tg_id, tipo, riferimento));
+    -- vuota: qui nessuno e' stato invitato (set 2026). Senza la tabella
+    -- la quota di ogni accredito proprio salterebbe col suo avviso, che
+    -- e' il fail-open giusto ma qui sarebbe solo rumore.
+    CREATE TABLE inviti(invitato INTEGER PRIMARY KEY,
+      invitante INTEGER NOT NULL);
     INSERT INTO utenti(tg_id) VALUES(900),(901);
     """)
 
@@ -25043,8 +25051,14 @@ def prove_xp():
     # sua riga nel registro — e' storia, e la UNIQUE fa il suo mestiere
     # come sempre — ma NON muove la cache. Le due cose si guardano
     # separate apposta: e' la distinzione fra il registro e la somma.
-    prova("il perimetro e' il solo commercio", ("ordine",),
-          amb["XP_COMMERCIO"])
+    # ⚠️ HA CAMBIATO LATO (set 2026, i codici invito): il perimetro era
+    # il solo commercio, e adesso ha DUE meta' — il tuo e la quota di
+    # quello che hai portato. Il commercio tuo resta una tupla sua
+    # (`XP_PROPRI`), ed e' quella che si guarda qui sotto.
+    prova("il perimetro: il commercio tuo e le quote d'invito",
+          ("ordine", "invito"), amb["XP_COMMERCIO"])
+    prova("...e i PROPRI sono il solo commercio", ("ordine",),
+          amb["XP_PROPRI"])
     prima = somma(901)
     prova("un tipo fuori perimetro scrive la sua riga", 1,
           assegna_xp(con, 901, "visita", 1, "giorno:2026-08-05"))
@@ -25253,9 +25267,16 @@ def prove_xp():
     src = codice(_SORGENTE)
     prova("il perimetro si dichiara UNA volta sola", 1,
           src.count("XP_COMMERCIO = ("))
+    # DAL SET 2026 I TRE LETTORI PASSANO DA `somme_xp`, e `somme_xp` dal
+    # giudice: il perimetro resta in un posto solo, con un gradino in
+    # piu'. E ognuno conta con `xp_contati`, la definizione del numero —
+    # una somma nuda li' sarebbe la seconda copia della regola del tetto.
+    prova("somme_xp passa dal giudice del perimetro", True,
+          "sql_xp_commercio(" in codice(pezzo("somme_xp")))
     for f in ("_ricalcola_xp", "_dati_classifica", "riallinea_xp_commercio"):
-        prova(f"{f} passa dal giudice del perimetro", True,
-              "sql_xp_commercio(" in codice(pezzo(f)))
+        _c = codice(pezzo(f))
+        prova(f"{f} legge da somme_xp e conta con xp_contati", True,
+              "somme_xp(con" in _c and "xp_contati(" in _c)
     prova("...e assegna_xp guarda la costante", True,
           "in XP_COMMERCIO" in codice(pezzo("assegna_xp")))
     # Nessuno riscrive la condizione a mano: e' il modo in cui i tre
@@ -25263,8 +25284,12 @@ def prove_xp():
     prova("nessun tipo='ordine' scritto a mano", 0,
           src.count("tipo='ordine'") + src.count('tipo="ordine"'))
 
-    # `utenti.xp` si scrive dai TRE posti dichiarati e da nessun altro.
-    prova("la cache degli XP ha tre scrittori", 3,
+    # `utenti.xp` si scrive dai posti dichiarati e da nessun altro. Erano
+    # TRE fino al set 2026 — c'era anche la somma incrementale di
+    # `assegna_xp` — e sono DUE (il ricalcolo e il riallineamento
+    # d'avvio): col tetto degli inviti il numero non e' piu' una somma, e
+    # anche `assegna_xp` ricalcola.
+    prova("la cache degli XP ha due scrittori", 2,
           src.count("UPDATE utenti SET xp="))
 
     # UN SOLO GANCIO, ed e' quello degli ordini: gli altri otto sono
@@ -25318,6 +25343,537 @@ def prove_xp():
         prova(f"{nome} non ri-gonfia la cache", True,
               "UPDATE utenti SET xp=" not in t
               or "tipo IN ('ordine')" in t)
+    # ...E CONTANO COME IL SERVER (set 2026): i propri piu' le quote
+    # d'invito, queste mai oltre i propri. Una somma nuda direbbe un
+    # altro numero, e il riavvio dopo lo correggerebbe — un numero che
+    # oscilla attraverso un reboot. Il misuratore della classifica
+    # pure: la sua lettura deve dire quella di `_dati_classifica`. Che
+    # marca_prove RISPONDA giusto lo dice il suo banco, piu' giu'.
+    for nome in ("marca_prove.py", "recupera_xp_ordini.py",
+                 "classifica_prova.py"):
+        with open(nome, encoding="utf-8") as fh:
+            t = codice(fh.read())
+        prova(f"{nome} conta le quote col tetto, come il server", True,
+              "tipo='invito'" in t and "min(" in t)
+
+
+# ====================================================================
+def prove_inviti():
+    """I CODICI INVITO (set 2026). Chi ha invitato riceve il 5% degli XP
+    che l'invitato guadagna IN PROPRIO, a vita, a ogni accredito, per
+    difetto — con due guardie: gli XP da inviti non superano MAI quelli
+    propri, e un affare con chi ha invitato non paga. Il collegamento
+    nasce da due porte, il link del bot e il campo a mano del Profilo
+    (entro 7 giorni, una volta sola), che passano da UN giudice.
+    Qui GIRANO i pezzi veri su un database di cartone, e lo schema delle
+    due tabelle nuove e' quello VERO, estratto da init_db: il CHECK e le
+    PK che si provano sono quelle di produzione. Il server intero — il
+    campanello del bot, la rotta, la fusione — lo gira collaudo_inviti.py,
+    che in CI sta nell'elenco dei collaudi."""
+    print("\n[i codici invito]")
+    import contextlib
+    import io
+    import secrets as _sec
+    import shutil
+    import sqlite3
+    import subprocess as _sp
+    import tempfile as _tf
+
+    amb = {"time": time, "re": re, "sqlite3": sqlite3, "secrets": _sec}
+    i = _SORGENTE.index("FISSO_XP_ORDINE = ")
+    exec(_SORGENTE[i:_SORGENTE.index("def _ricalcola_xp", i)], amb)
+    for f in ("_ricalcola_xp", "assegna_xp", "riallinea_xp_commercio",
+              "_dati_classifica"):
+        exec(pezzo(f), amb)
+    j = _SORGENTE.index("INVITO_ALFABETO = ")
+    exec(_SORGENTE[j:_SORGENTE.index("# ---------------------- I LIVELLI",
+                                     j)], amb)
+    amb["LINK_BOT"] = "https://t.me/bot_di_cartone"
+    zitto = lambda: contextlib.redirect_stdout(io.StringIO())
+
+    def ddl(nome):
+        m = re.search(r"CREATE TABLE IF NOT EXISTS " + nome
+                      + r"\(.*?\n    \);", _SORGENTE, re.S)
+        return m.group(0) if m else ""
+
+    prova("lo schema delle due tabelle si trova in init_db", True,
+          bool(ddl("inviti")) and bool(ddl("inviti_codici")))
+    ADESSO = time.time()
+
+    def banco():
+        con = sqlite3.connect(":memory:")
+        con.row_factory = sqlite3.Row
+        con.executescript("""
+        CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, xp INTEGER DEFAULT 0,
+          registrato INTEGER DEFAULT 0);
+        CREATE TABLE xp_eventi(id INTEGER PRIMARY KEY AUTOINCREMENT,
+          tg_id INTEGER NOT NULL, tipo TEXT NOT NULL, punti INTEGER NOT NULL,
+          riferimento TEXT NOT NULL DEFAULT '', creato INTEGER,
+          UNIQUE(tg_id, tipo, riferimento));
+        CREATE TABLE ordini(id INTEGER PRIMARY KEY, venditore_id INTEGER,
+          compratore_id INTEGER, stato TEXT DEFAULT 'released',
+          prova INTEGER DEFAULT 0);
+        CREATE TABLE feedback(ordine_id INTEGER, da_tg_id INTEGER,
+          per_tg_id INTEGER, voto INTEGER);
+        """ + ddl("inviti") + "\n" + ddl("inviti_codici") + "\n")
+        return con
+
+    def persona(con, t, giorni_fa=0.0, registrato=None):
+        reg = (int(ADESSO - giorni_fa * 86400) if registrato is None
+               else registrato)
+        con.execute("INSERT OR REPLACE INTO utenti(tg_id, registrato) "
+                    "VALUES(?,?)", (t, reg))
+
+    def ordine(con, oid, venditore, compratore):
+        con.execute("INSERT INTO ordini(id, venditore_id, compratore_id) "
+                    "VALUES(?,?,?)", (oid, venditore, compratore))
+
+    def xp(con, t):
+        r = con.execute("SELECT xp FROM utenti WHERE tg_id=?",
+                        (t,)).fetchone()
+        return r["xp"] if r else None
+
+    def quote(con, t):
+        return [r["punti"] for r in con.execute(
+            "SELECT punti FROM xp_eventi WHERE tg_id=? AND tipo='invito' "
+            "ORDER BY id", (t,))]
+
+    def invitante(con, t):
+        r = con.execute("SELECT invitante FROM inviti WHERE invitato=?",
+                        (t,)).fetchone()
+        return r["invitante"] if r else None
+
+    # --- 1) IL CODICE: corto, senza tranelli, e una porta sua --------
+    ALF, L = amb["INVITO_ALFABETO"], amb["INVITO_LUNGHEZZA"]
+    norma = amb["normalizza_codice_invito"]
+    prova("nell'alfabeto non ci sono i caratteri che si scambiano "
+          "(0 O 1 I L)", "", "".join(c for c in "0O1IL" if c in ALF))
+    prova("...ne' vocali: un codice a caso non compone parole", "",
+          "".join(c for c in "AEIOU" if c in ALF))
+    prova("...ne' doppioni, ne' minuscole", (len(ALF), ALF.upper()),
+          (len(set(ALF)), ALF))
+    prova("il codice e' corto: sei caratteri", 6, L)
+    prova("la forma canonica passa", "K7M4QX", norma("K7M4QX"))
+    prova("...minuscole, spazi e un trattino si perdonano", "K7M4QX",
+          norma(" k7m-4qx "))
+    prova("...un carattere ambiguo no", "", norma("K7M4QO"))
+    prova("...ne' una lunghezza diversa", ("", ""),
+          (norma("K7M4Q"), norma("K7M4QXX")))
+    prova("...ne' il vuoto o un None", ("", ""), (norma(""), norma(None)))
+    # LE DUE PORTE DEL /start si separano per FORMA: il lasciapassare
+    # della fusione e' token_hex(16), e nessuno deve sembrare un codice.
+    prova("il lasciapassare della fusione non sembra MAI un codice", [],
+          [c for c in (_sec.token_hex(16) for _ in range(300)) if norma(c)])
+    prova("...e il /start chiede la forma PRIMA di andare alla fusione",
+          True, 0 <= codice(pezzo("gestisci_update")).find(
+              "normalizza_codice_invito(carico)")
+          < codice(pezzo("gestisci_update")).find(
+              "avvia_fusione(chat, carico)"))
+    prova("...e l'invito si accoda al benvenuto, non lo sostituisce", True,
+          'Barattolo 👇" + coda' in codice(pezzo("gestisci_update")))
+
+    con = banco()
+    for t in (1, 2, 3, 4):
+        persona(con, t, 400)
+    cod = amb["codice_invito"]
+    c1 = cod(con, 1)
+    prova("il codice nasce nella sua forma", c1, norma(c1))
+    prova("...ed e' FERMO: chiesto di nuovo e' lo stesso", c1, cod(con, 1))
+    prova("persone diverse, codici diversi", True, cod(con, 2) != c1)
+
+    class _Estratto:
+        """secrets.choice di cartone: estrae in fila da una stringa."""
+        def __init__(self, s):
+            self.s = list(s)
+
+        def choice(self, _alfabeto):
+            return self.s.pop(0)
+
+    altro = "BCDFGH" if c1 != "BCDFGH" else "CDFGHJ"
+    amb["secrets"] = _Estratto(c1 + altro)
+    prova("un codice gia' preso non si ripete: si estrae di nuovo", altro,
+          cod(con, 3))
+    amb["secrets"] = _Estratto(c1 * 20)
+    prova("venti estrazioni tutte prese: '' e non un'eccezione (il "
+          "Profilo non cade)", "", cod(con, 4))
+    amb["secrets"] = _sec
+
+    # --- 2) IL GIUDICE DELLE DUE PORTE -------------------------------
+    colleg = amb["collega_invito"]
+    persona(con, 10, 1)
+    prova("il giro buono: nessun no", None, colleg(con, 10, c1, "codice"))
+    prova("...scrive chi e da quale porta", (1, "codice"), tuple(
+        con.execute("SELECT invitante, via FROM inviti WHERE invitato=10"
+                    ).fetchone()))
+    prova("UNA VOLTA SOLA: il secondo codice si dice", True,
+          "una volta sola" in (colleg(con, 10, cod(con, 2), "link") or ""))
+    prova("...e resta il primo", 1, invitante(con, 10))
+    # L'ORDINE DEI NO: a chi e' gia' collegato si dice QUELLO anche a
+    # finestra chiusa — la PK lo fermerebbe comunque, ma con la frase
+    # sbagliata («il tempo e' passato» a chi ha gia' usato il suo).
+    persona(con, 15, 30)
+    con.execute("INSERT INTO inviti(invitato, invitante) VALUES(15, 2)")
+    prova("...e a chi e' gia' collegato si dice quello, anche a finestra "
+          "chiusa", True,
+          "una volta sola" in (colleg(con, 15, c1, "codice") or ""))
+    persona(con, 11, 1)
+    prova("il proprio codice no", True,
+          "tuo codice" in (colleg(con, 11, cod(con, 11), "codice") or ""))
+    prova("una forma storta si dice", True,
+          "caratteri" in (colleg(con, 11, "ciao!", "codice") or ""))
+    libero = next(x for x in ("BBBBBB", "CCCCCC", "DDDDDD") if not
+                  con.execute("SELECT 1 FROM inviti_codici WHERE codice=?",
+                              (x,)).fetchone())
+    prova("...e un codice che non c'e'", True,
+          "Non trovo" in (colleg(con, 11, libero, "codice") or ""))
+    prova("...e nessuno dei no ha scritto niente", None, invitante(con, 11))
+    fin = amb["finestra_invito"]
+    prova("la finestra: l'iscrizione piu' sette giorni", 1000 + 7 * 86400,
+          fin(1000))
+    prova("...e chi c'era prima del timbro non ce l'ha", 0, fin(0))
+    persona(con, 12, 6.99)
+    prova("a 6 giorni e 23 ore il campo e' aperto", None,
+          colleg(con, 12, c1, "codice"))
+    persona(con, 13, 7.001)
+    prova("...a 7 giorni e un minuto e' chiuso", True,
+          "7 giorni" in (colleg(con, 13, c1, "codice") or ""))
+    persona(con, 14, registrato=0)
+    prova("...e per chi c'era prima del timbro non si apre mai", True,
+          "7 giorni" in (colleg(con, 14, c1, "codice") or ""))
+    for t in (20, 21, 22):
+        persona(con, t, 1)
+    prova("B entra col codice di A", None,
+          colleg(con, 21, cod(con, 20), "codice"))
+    prova("A col codice di B: in tondo, no", True,
+          "in tondo" in (colleg(con, 20, cod(con, 21), "codice") or ""))
+    prova("C entra col codice di B", None,
+          colleg(con, 22, cod(con, 21), "codice"))
+    prova("A col codice di C: il giro LUNGO e' chiuso lo stesso", True,
+          "in tondo" in (colleg(con, 20, cod(con, 22), "codice") or ""))
+    prova("...e A resta libero", None, invitante(con, 20))
+    # Una catena gia' storta (la fusione potrebbe lasciarne una a meta'
+    # strada) non deve far girare la domanda per sempre.
+    con.execute("INSERT INTO inviti(invitato, invitante) VALUES(30, 31)")
+    con.execute("INSERT INTO inviti(invitato, invitante) VALUES(31, 30)")
+    prova("su una catena gia' storta la domanda finisce", False,
+          amb["invito_circolare"](con, 30, 99))
+
+    def rifiuta(sql, par=()):
+        try:
+            con.execute(sql, par)
+            return False
+        except sqlite3.IntegrityError:
+            return True
+
+    prova("lo SCHEMA rifiuta l'auto-invito (il CHECK)", True,
+          rifiuta("INSERT INTO inviti(invitato, invitante) VALUES(40, 40)"))
+    prova("...e il secondo invito della stessa persona (la PK)", True,
+          rifiuta("INSERT INTO inviti(invitato, invitante) VALUES(10, 2)"))
+    prova("...e lo stesso codice a due persone", True,
+          rifiuta("INSERT INTO inviti_codici(tg_id, codice) VALUES(99, ?)",
+                  (c1,)))
+    st = amb["stato_inviti"](con, 1, int(ADESSO - 400 * 86400))
+    prova("il cassetto porta i CONTI e nient'altro: mai chi",
+          {"codice", "link", "persone", "xp", "invitato", "campo_fino",
+           "percento", "giorni"}, set(st))
+    prova("...il link e' quello del bot col codice",
+          f"https://t.me/bot_di_cartone?start={c1}", st["link"])
+    prova("...e le persone sono quelle collegate al suo codice", 2,
+          st["persone"])
+    prova("a chi e' gia' collegato il campo non si apre", 0,
+          amb["stato_inviti"](con, 10, int(ADESSO - 86400))["campo_fino"])
+    prova("...a chi e' appena arrivato si'", True,
+          amb["stato_inviti"](con, 11, int(ADESSO - 86400))["campo_fino"]
+          > ADESSO)
+    con.close()
+
+    # --- 3) LA QUOTA, a ogni accredito --------------------------------
+    cont = amb["xp_contati"]
+    prova("il numero: i propri piu' le quote", 15, cont(10, 5))
+    prova("...le quote mai oltre i propri", 20, cont(10, 50))
+    prova("...senza propri le quote non contano", 0, cont(0, 50))
+    prova("...e un negativo vale zero", (0, 10), (cont(-5, 3), cont(10, -4)))
+    con = banco()
+    for t in (1, 2, 5):
+        persona(con, t, 400)
+    persona(con, 4, 1)
+    # 4 e' stata invitata da 1, e 1 dal «nonno» 5
+    con.execute("INSERT INTO inviti(invitato, invitante) VALUES(4, 1)")
+    con.execute("INSERT INTO inviti(invitato, invitante) VALUES(1, 5)")
+    ass = amb["assegna_xp"]
+    ordine(con, 90, 5, 2)
+    ass(con, 5, "ordine", 1000, "ordine:90:venditore")
+    ordine(con, 100, 2, 4)
+    ass(con, 4, "ordine", 100, "ordine:100:compratore")
+    prova("con zero propri chi invita non prende niente (il tetto)", [],
+          quote(con, 1))
+    prova("...ma l'accredito dell'invitata c'e' intero", 100, xp(con, 4))
+    ordine(con, 101, 1, 2)
+    ass(con, 1, "ordine", 10, "ordine:101:venditore")
+    ordine(con, 102, 2, 4)
+    ass(con, 4, "ordine", 100, "ordine:102:compratore")
+    prova("il 5% di 100 e' 5", [5], quote(con, 1))
+    prova("...col riferimento che porta dentro l'accredito", 1,
+          con.execute("SELECT COUNT(*) FROM xp_eventi WHERE tg_id=1 AND "
+                      "riferimento='invito:4:ordine:102:compratore'"
+                      ).fetchone()[0])
+    prova("...e il numero di chi invita e' 10 + 5", 15, xp(con, 1))
+    ordine(con, 103, 2, 4)
+    ass(con, 4, "ordine", 1000, "ordine:103:compratore")
+    prova("il tetto taglia allo spazio: 50 teorici, ne entrano 5", [5, 5],
+          quote(con, 1))
+    prova("...e il numero e' il doppio dei propri, non di piu'", 20,
+          xp(con, 1))
+    ordine(con, 104, 1, 4)                 # 4 compra DA chi l'ha invitata
+    ass(con, 1, "ordine", 200, "ordine:104:venditore")   # spazio: 210-10
+    ass(con, 4, "ordine", 100, "ordine:104:compratore")
+    prova("un affare con chi ha invitato non paga (lo spazio c'era)",
+          [5, 5], quote(con, 1))
+    ordine(con, 107, 2, 4)
+    ass(con, 4, "ordine", 1000, "ordine:107:compratore")
+    prova("con lo spazio la quota piena: 50", [5, 5, 50], quote(con, 1))
+    # NIENTE CATENA: il nonno prende il 5% dei PROPRI di 1 (10 e 200: 0
+    # per difetto e 10), mai delle sue quote — che qui sarebbero 2,
+    # abbastanza da vedersi.
+    prova("NIENTE CATENA: le quote non pagano chi sta sopra", [10],
+          quote(con, 5))
+    ordine(con, 105, 2, 4)
+    ass(con, 4, "ordine", 39, "ordine:105:compratore")
+    prova("per difetto: 39 -> 1", 1, quote(con, 1)[-1])
+    ordine(con, 106, 2, 4)
+    ass(con, 4, "ordine", 19, "ordine:106:compratore")
+    prova("...e 19 -> niente", 4, len(quote(con, 1)))
+    prova("il retry non paga", 0,
+          ass(con, 4, "ordine", 39, "ordine:105:compratore"))
+    prova("...e la quota non raddoppia", 4, len(quote(con, 1)))
+    qi = amb["quota_invito"]
+    prova("un riferimento che non si sa leggere NON paga (le parti: None)",
+          0, qi(con, 4, "scambio:ab12:compratore", 1000))
+    prova("...e nemmeno un ordine che non c'e'", 0,
+          qi(con, 4, "ordine:999:compratore", 1000))
+    prova("chi non e' stato invitato non fa quote", 0,
+          qi(con, 2, "ordine:102:venditore", 1000))
+    # LA PROVA REGINA delle parti: il parser legge il riferimento che il
+    # GANCIO scrive, estratto dal gancio e non ricopiato qui.
+    _k = _SORGENTE.index('premia_xp(chi, "ordine",')
+    _rif = re.search(r'f"(ordine:[^"]*)"', _SORGENTE[_k:_k + 400]).group(1)
+    ordine(con, 555, 7, 8)
+    prova("le parti si leggono dal riferimento che il gancio scrive",
+          {7, 8}, amb["parti_affare_xp"](con, _rif.replace(
+              "{ordine_id}", "555").replace("{ruolo}", "venditore")))
+
+    # IL NUMERO E' UNO, dalle quattro strade
+    _, _, xp_rank, _ = amb["_dati_classifica"](con)
+    prova("il Profilo e il rank dicono lo stesso numero, quote comprese",
+          [xp(con, t) for t in (1, 4, 5)],
+          [xp_rank.get(t, 0) for t in (1, 4, 5)])
+    prova("...e non e' la somma nuda (le quote contano)", True,
+          xp(con, 1) > 210)
+    righe = [(r["riferimento"], r["punti"]) for r in con.execute(
+        "SELECT riferimento, punti FROM xp_eventi WHERE tg_id=1 "
+        "AND tipo IN ('ordine','invito')")]
+    per = amb["xp_per_ruolo"](righe, xp(con, 1))
+    prova("la scomposizione ha il terzo lato, e fa il totale", xp(con, 1),
+          sum(per.values()) if per else None)
+    prova("...e le quote non finiscono fra le vendite", 210,
+          (per or {}).get("vendite"))
+    prova("ruolo_xp non legge il ruolo di un altro dentro una quota", "",
+          amb["ruolo_xp"]("invito:42:ordine:7:venditore"))
+    prova("senza quote la risposta di ieri, senza la chiave",
+          {"vendite": 5, "acquisti": 0},
+          amb["xp_per_ruolo"]([("ordine:1:venditore", 5)], 5))
+    prova("le quote si contano col TETTO, non grezze",
+          {"vendite": 5, "acquisti": 0, "inviti": 5},
+          amb["xp_per_ruolo"]([("ordine:1:venditore", 5),
+                               ("invito:9:ordine:2:compratore", 40)], 10))
+    con.execute("UPDATE utenti SET xp=999 WHERE tg_id=5")
+    with zitto():
+        n = amb["riallinea_xp_commercio"](con)
+    prova("il riallineamento d'avvio rimette il numero storto", 1, n)
+    prova("...con la stessa regola: xp_contati sulle due meta'",
+          cont(*amb["somme_xp"](con, 5)[5]), xp(con, 5))
+    # IL «MAI» REGGE ANCHE SE I PROPRI SPARISCONO (un ordine marcato come
+    # prova): le quote restano nel registro, ma nel numero non contano
+    # piu' dei propri che restano.
+    con.execute("DELETE FROM xp_eventi WHERE tg_id=1 AND tipo='ordine'")
+    prova("senza piu' propri, le quote vecchie non tengono su il numero", 0,
+          amb["_ricalcola_xp"](con, 1))
+    prova("...ne' il cassetto le conta", 0,
+          amb["stato_inviti"](con, 1, int(ADESSO - 400 * 86400))["xp"])
+    con.execute("UPDATE utenti SET xp=77 WHERE tg_id=1")
+    with zitto():
+        amb["riallinea_xp_commercio"](con)
+    prova("...ne' il riallineamento d'avvio le rimette dentro", 0,
+          xp(con, 1))
+
+    # L'AZZERAMENTO, come lo dice il codice: il perimetro intero via, i
+    # collegamenti restano, e la regola riparte da zero da sola.
+    prova("la regola dell'azzeramento e' scritta nel codice", True,
+          "NON TOCCA LA TABELLA `inviti`" in _SORGENTE)
+    legami = con.execute("SELECT COUNT(*) FROM inviti").fetchone()[0]
+    dove, par = amb["sql_xp_commercio"]()
+    con.execute(f"DELETE FROM xp_eventi WHERE {dove}", par)
+    with zitto():
+        amb["riallinea_xp_commercio"](con)
+    prova("azzerati gli XP, i collegamenti restano", legami,
+          con.execute("SELECT COUNT(*) FROM inviti").fetchone()[0])
+    ordine(con, 200, 2, 4)
+    ass(con, 4, "ordine", 100, "ordine:200:compratore")
+    prova("...e chi invita riparte dal tetto a zero", [], quote(con, 1))
+    ordine(con, 201, 1, 2)
+    ass(con, 1, "ordine", 10, "ordine:201:venditore")
+    ordine(con, 202, 2, 4)
+    ass(con, 4, "ordine", 100, "ordine:202:compratore")
+    prova("...e riprende appena guadagna in proprio", [5], quote(con, 1))
+
+    # FAIL-OPEN: un intoppo nella quota non tocca l'accredito PROPRIO
+    con.execute("DROP TABLE inviti")
+    ordine(con, 300, 2, 4)
+    uscita = io.StringIO()
+    with contextlib.redirect_stdout(uscita):
+        dato = ass(con, 4, "ordine", 100, "ordine:300:compratore")
+    prova("senza la tabella degli inviti l'accredito proprio passa", 100,
+          dato)
+    prova("...e la quota saltata lo dice nel journal", True,
+          "Quota d'invito saltata" in uscita.getvalue())
+    con.close()
+
+    # --- 4) LE SENTINELLE -------------------------------------------
+    ax = codice(pezzo("assegna_xp"))
+    prova("la quota scatta dai SOLI accrediti propri", True,
+          "if tipo in XP_PROPRI:" in ax and "quota_invito(" in ax)
+    prova("...e la cache si RICALCOLA, non si somma", True,
+          "_ricalcola_xp(con, tg_id)" in ax and "xp=xp+" not in ax)
+    q_src = codice(pezzo("quota_invito"))
+    prova("la quota passa dalla stessa porta degli XP", True,
+          "assegna_xp(" in q_src and "INSERT" not in q_src)
+    prova("...col tipo della quota, dentro il perimetro e fuori dai "
+          "propri", (True, False),
+          (amb["XP_INVITO"] in amb["XP_COMMERCIO"],
+           amb["XP_INVITO"] in amb["XP_PROPRI"]))
+    me = codice(pezzo("mio_profilo"))
+    prova("/api/me legge il cassetto PRIMA del commit (il codice puo' "
+          "nascere li')", True,
+          0 <= me.find("stato_inviti(con,") < me.find("con.commit()"))
+    prova("...ed esce nel payload", True,
+          'profilo["inviti"] = inviti_miei' in me)
+    prova("il campo a mano passa dallo STESSO giudice del link", True,
+          'collega_invito(con, user["id"], d.get("codice"), "codice")'
+          in codice(pezzo("inserisci_invito"))
+          and 'collega_invito(con, tg_id, codice, "link")'
+          in codice(pezzo("riga_invito_bot")))
+    prova("la rotta del campo e' dichiarata", True,
+          '@app.post("/api/me/invito")' in _SORGENTE)
+    fu = codice(pezzo("esegui_fusione"))
+    prova("fusione: PRIMA muore l'invito fra le due meta' (il CHECK), "
+          "POI si migra", True,
+          0 <= fu.find("DELETE FROM inviti WHERE (invitato=? AND "
+                       "invitante=?)") < fu.find(
+              "UPDATE inviti SET invitante=?"))
+    prova("...e le quote rese storte si tolgono col giudice della quota",
+          True, "parti_affare_xp(con, _fonte)" in fu)
+
+    # --- 5) IL CLIENT ------------------------------------------------
+    mini = open("miniapp.html", encoding="utf-8").read()
+    node = shutil.which("node")
+    if not node:
+        salta("le righe del cassetto inviti rispondono giusto",
+              "node non installato")
+    else:
+        pezzi = (pezzo_js(mini, "const esc = ", "\nconst el =") + "\n"
+                 + pezzo_js(mini, "const XP_PESO = ", "\n}\n") + "\n}\n"
+                 + pezzo_js(mini, "function contoInviti(", "\n}\n")
+                 + "\n}\n"
+                 + pezzo_js(mini, "function regolaInviti(", "\n}\n")
+                 + "\n}\n")
+        banco_js = "const fmt = n => n.toLocaleString('it-IT')" \
+                   ".replace(/\\./g,'\\u202F');\n" + pezzi + r"""
+const rosse = [];
+function att(nome, cond){ if (!cond) rosse.push(nome); }
+const tre  = fraseXp({vendite: 46, acquisti: 30, inviti: 12});
+const vi   = fraseXp({vendite: 46, acquisti: 0, inviti: 12});
+const ai   = fraseXp({vendite: 0, acquisti: 30, inviti: 12});
+const soli = fraseXp({vendite: 0, acquisti: 0, inviti: 12});
+att('tre lati: tutti coi numeri, e la riga «da chi hai invitato»',
+    tre.includes('46 dalle vendite, 30 dagli acquisti e 12 da chi hai invitato.'));
+att('...e la nota sul peso, perche\u0027 c\u0027e\u0027 un acquisto',
+    tre.includes('Una vendita pesa'));
+att('vendite e inviti: senza la nota sul peso',
+    vi.includes('46 dalle vendite e 12 da chi hai invitato.')
+    && !vi.includes('Una vendita pesa'));
+att('acquisti e inviti: i numeri, mai «tutti dagli acquisti»',
+    ai.includes('30 dagli acquisti e 12 da chi hai invitato.')
+    && !ai.includes('tutti dagli acquisti'));
+att('solo inviti (la cintura): una riga intera',
+    soli.includes('commercio: 12 da chi hai invitato.'));
+att('LO ZERO NON SI SCRIVE nemmeno col terzo lato',
+    ![tre, vi, ai, soli].some(f => /\b0 d(alle|agli|a chi)/.test(f)));
+att('testa e coda restano', [tre, vi, ai, soli].every(f =>
+    f.startsWith('Gli XP contano il commercio: ')
+    && f.includes('pesa in classifica')));
+att('senza inviti la riga di ieri, identica',
+    fraseXp({vendite: 46, acquisti: 30})
+    === fraseXp({vendite: 46, acquisti: 30, inviti: 0}));
+const c0 = contoInviti({persone: 0, xp: 0});
+const c1 = contoInviti({persone: 1, xp: 0});
+const c2 = contoInviti({persone: 2, xp: 7});
+att('nessuno invitato: cosa fare, mai «0 persone»',
+    !/\b0\b/.test(c0) && c0.includes('condividi'));
+att('1 persona al singolare', c1.includes('1 persona</b>'));
+att('...e i punti non si nominano finche\u0027 sono zero', !c1.includes('XP'));
+att('2 persone al plurale, e i punti quando ci sono',
+    c2.includes('2 persone</b>') && c2.includes('7 XP'));
+att('la chiave assente non esplode', contoInviti(null) === c0);
+const r5 = regolaInviti({percento: 5});
+att('la regola porta la percentuale del SERVER',
+    r5.includes('<b>5%</b>') && regolaInviti({percento: 7}).includes('<b>7%</b>'));
+att('...e le due regole', r5.includes('non superano mai')
+    && r5.includes('fra voi due'));
+console.log(JSON.stringify(rosse));
+"""
+        with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                    encoding="utf-8") as fh:
+            fh.write(banco_js)
+            percorso = fh.name
+        r = _sp.run([node, percorso], capture_output=True, text=True,
+                    encoding="utf-8", errors="replace")
+        os.unlink(percorso)
+        try:
+            rosse = json.loads(r.stdout or "null")
+        except ValueError:
+            rosse = None
+        prova("le righe del cassetto e del dettaglio punti rispondono "
+              "giusto", [], rosse if rosse is not None
+              else "IL BANCO NON GIRA: " + (r.stderr or r.stdout)[:300])
+    rend = pezzo_js(mini, "function renderInviti(", "\n}\n")
+    prova("in DEMO e in vetrina il cassetto non c'e'", True,
+          "if (DEMO || VETRINA || !inv || !inv.codice)" in rend)
+    prova("il codice passa da esc", True, "${esc(inv.codice)}" in rend)
+    prova("il link non entra mai in un onclick", True,
+          'onclick="condividiInvito()"' in rend and "inv.link" not in rend)
+    prova("...e nel cassetto un nome non c'e' da nessuna parte", False,
+          bool(re.search(r"\bnome", rend)))
+    prova("il cassetto si disegna col Profilo", True,
+          "renderInviti();" in pezzo_js(mini, "function renderProfilo(",
+                                        "\n}\n"))
+    prova("...e sta nella sezione dell'account, dopo il livello", True,
+          mini.find('id="accLivello"') < mini.find('id="accInviti"')
+          < mini.find('id="accDistintivi"'))
+    ins = pezzo_js(mini, "async function inserisciInvito(", "\n}\n")
+    prova("il campo a mano parla con la sua rotta", True,
+          "${API_BASE}/me/invito" in ins)
+    prova("...e ridisegna quel che dice il SERVER", True,
+          "myInviti = d.inviti" in ins)
+    prova("il cassetto legge la chiave del server", True,
+          "myInviti = me.inviti || null;" in mini)
+    priv = mini[mini.find('id="view-privacy"'):
+                mini.find('<!-- ============ VISTA: LA CLASSIFICA')]
+    prova("«I tuoi dati» dichiara gli inviti", True,
+          "Gli <b>inviti</b>" in priv)
+    prova("...col limite onesto del conto", True,
+          "se ha invitato soltanto te" in priv)
+    prova("...e non dice piu' che gli XP contano una cosa sola", False,
+          "contano una cosa sola" in priv)
 
 
 # ====================================================================
@@ -74753,6 +75309,44 @@ def prove_ordini_prova():
               "SELECT acquisti_ok FROM utenti WHERE tg_id=2")
               .fetchone()[0]))
 
+    # LE QUOTE D'INVITO (set 2026): chi aveva invitato una delle parti ha
+    # preso il 5% di quegli accrediti, e un collaudo non e' commercio
+    # nemmeno di riflesso. La quota se ne va con l'evento, e la cache di
+    # chi la perde si rifa' con la regola del server — i propri piu' le
+    # quote, queste mai oltre i propri: il secondo giro la mette alla
+    # prova, perche' li' spariscono anche i propri di chi ha invitato.
+    con.execute("INSERT INTO utenti VALUES(6, 'I', 1, 0, 9)")
+    con.executemany(
+        "INSERT INTO ordini(id, compratore_id, venditore_id, "
+        "prezzo_sats, stato, creato, aggiornato) VALUES(?,?,?,?,?,?,?)", [
+            (84, 2, 1, 100, "released", 120, 220),
+            (85, 1, 6, 100, "released", 130, 230)])
+    con.executemany(
+        "INSERT INTO xp_eventi(tg_id, tipo, punti, riferimento, "
+        "creato) VALUES(?,?,?,?,?)", [
+            (1, "ordine", 10, "ordine:84:venditore", 220),
+            (2, "ordine", 60, "ordine:84:compratore", 220),
+            (6, "ordine", 4, "ordine:85:venditore", 230),
+            (1, "ordine", 2, "ordine:85:compratore", 230),
+            (6, "invito", 3, "invito:2:ordine:84:compratore", 220),
+            (6, "invito", 2, "invito:2:ordine:91:compratore", 260)])
+    with zitto():
+        r3 = marca_prove.marca(con, [84])
+    prova("marcando l'ordine se ne va la quota che ne era nata, e "
+          "solo lei", ["invito:2:ordine:91:compratore"],
+          [x[0] for x in con.execute(
+              "SELECT riferimento FROM xp_eventi WHERE tg_id=6 "
+              "AND tipo='invito'")])
+    prova("...e la cache di chi l'ha persa si rifa': 4 propri + 2", 6,
+          con.execute("SELECT xp FROM utenti WHERE tg_id=6").fetchone()[0])
+    prova("...e il rapporto conta anche la quota fra gli eventi tolti", 3,
+          r3["xp_tolti"])
+    with zitto():
+        marca_prove.marca(con, [85])
+    prova("spariti anche i propri, la quota che resta non tiene su il "
+          "numero (il tetto)", 0,
+          con.execute("SELECT xp FROM utenti WHERE tg_id=6").fetchone()[0])
+
     # recupera_xp_ordini: le costanti dal SERVER, mai a memoria
     cost = rec.estrai_costanti(_SORGENTE)
     prova("le costanti XP si leggono dal server", (10, 1, 1.0, 0.6),
@@ -84349,7 +84943,8 @@ def main():
               prove_conta_feedback,
               prove_classifica,
               prove_ferie, prove_stock_raccontato, prove_pausa,
-              prove_xp, prove_coorti_titoli, prove_conto_acquisto,
+              prove_xp, prove_inviti, prove_coorti_titoli,
+              prove_conto_acquisto,
               prove_zone_spedizione,
               prove_supplemento_spedizione,
               prove_sconto_pacco, prove_forma_sconto_pacco,

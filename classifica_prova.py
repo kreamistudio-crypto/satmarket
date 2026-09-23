@@ -179,9 +179,15 @@ def leggi(con):
 
     xp = {}
     try:
-        xp = {r["tg_id"]: r["p"] for r in con.execute(
-            "SELECT tg_id, COALESCE(SUM(punti),0) AS p FROM xp_eventi "
-            "WHERE tipo='ordine' GROUP BY tg_id")}
+        # IL NUMERO DEL SERVER (set 2026, i codici invito): i propri
+        # piu' le quote d'invito, queste mai oltre i propri — la regola
+        # di `xp_contati`, ricopiata perche' lo script gira da solo. La
+        # classifica li legge cosi', e la misura deve dire lo stesso.
+        xp = {r["tg_id"]: r["p"] + min(r["i"], r["p"]) for r in con.execute(
+            "SELECT tg_id, "
+            "COALESCE(SUM(CASE WHEN tipo='ordine' THEN punti END),0) AS p, "
+            "COALESCE(SUM(CASE WHEN tipo='invito' THEN punti END),0) AS i "
+            "FROM xp_eventi GROUP BY tg_id")}
     except sqlite3.OperationalError:
         print("   (nessuna tabella xp_eventi: il commercio vale 0 per "
               "tutti, e la formula si riduce alla sola media)")

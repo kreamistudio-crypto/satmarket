@@ -15,8 +15,10 @@ distintivi), che dal deploy guardano `prova=0`.
 Cosa fa, per ogni id passato IN LISTA ESPLICITA (mai un'euristica sui
 titoli — a decidere cos'e' una prova e' Andrea, non una regex):
   1. timbra `prova=1` (solo su `released`: altro si ferma dicendolo);
-  2. toglie gli eventi XP `ordine:{id}:{ruolo}` e ricalcola la cache
-     `utenti.xp` dei coinvolti;
+  2. toglie gli eventi XP `ordine:{id}:{ruolo}` — e dal set 2026 le
+     quote d'invito nate da loro, `invito:{chi}:ordine:{id}:{ruolo}` —
+     e ricalcola la cache `utenti.xp` dei coinvolti e di chi ha perso
+     una quota;
   3. decrementa `vendite_ok`/`acquisti_ok` delle due parti — sono
      contatori INCREMENTALI, nessun ricalcolo li rimette in pari da
      solo — mai sotto zero, e SOLO quando il timbro passa davvero da
@@ -58,7 +60,7 @@ def marca(con, ids):
     rapporto; su un id fuori perimetro ritorna None SENZA aver
     scritto niente — si ferma dicendolo, mai a meta'."""
     rapporto = {"marcati": [], "saltati": [], "xp_tolti": 0,
-                "feedback": [], "utenti": set()}
+                "feedback": [], "utenti": set(), "invitanti": set()}
     ordini = []
     for oid in ids:
         o = con.execute("SELECT * FROM ordini WHERE id=?",
@@ -85,6 +87,16 @@ def marca(con, ids):
         eventi = list(con.execute(
             "SELECT tg_id, punti, riferimento FROM xp_eventi "
             "WHERE tipo='ordine' AND riferimento IN (?,?)", refs))
+        # LE QUOTE NATE DA QUESTI XP (set 2026, i codici invito): chi
+        # aveva invitato una delle due parti ha preso il 5% di questi
+        # accrediti, e un collaudo non e' commercio nemmeno di riflesso.
+        # Il riferimento della quota porta dentro quello dell'accredito
+        # (`invito:{chi}:ordine:{id}:{ruolo}`), quindi si trovano per
+        # nome esatto, senza LIKE.
+        refs_quote = (f"invito:{v}:{refs[0]}", f"invito:{c}:{refs[1]}")
+        quote = list(con.execute(
+            "SELECT tg_id, punti, riferimento FROM xp_eventi "
+            "WHERE tipo='invito' AND riferimento IN (?,?)", refs_quote))
         fb = list(con.execute(
             "SELECT id, da_tg_id, per_tg_id, voto FROM feedback "
             "WHERE ordine_id=?", (oid,)))
@@ -95,6 +107,9 @@ def marca(con, ids):
         for e in eventi:
             print(f"    − XP: {e['punti']} a {_nome(con, e['tg_id'])} "
                   f"({e['riferimento']})")
+        for q in quote:
+            print(f"    − quota d'invito: {q['punti']} a "
+                  f"{_nome(con, q['tg_id'])} ({q['riferimento']})")
         for f in fb:
             print(f"    ⭐ feedback #{f['id']}: {f['voto']}/5 da "
                   f"{_nome(con, f['da_tg_id'])} a "
@@ -104,6 +119,9 @@ def marca(con, ids):
         con.execute("UPDATE ordini SET prova=1 WHERE id=?", (oid,))
         con.execute("DELETE FROM xp_eventi WHERE tipo='ordine' "
                     "AND riferimento IN (?,?)", refs)
+        con.execute("DELETE FROM xp_eventi WHERE tipo='invito' "
+                    "AND riferimento IN (?,?)", refs_quote)
+        rapporto["invitanti"].update(q["tg_id"] for q in quote)
         # Il decremento vive SOLO nel giro in cui il timbro passa
         # 0→1: cosi' il secondo lancio non toglie due volte.
         con.execute("UPDATE utenti SET vendite_ok=MAX(0, vendite_ok-1) "
@@ -111,21 +129,29 @@ def marca(con, ids):
         con.execute("UPDATE utenti SET acquisti_ok=MAX(0, acquisti_ok-1) "
                     "WHERE tg_id=?", (c,))
         rapporto["marcati"].append(oid)
-        rapporto["xp_tolti"] += len(eventi)
+        rapporto["xp_tolti"] += len(eventi) + len(quote)
 
     # La cache degli XP si RIFA' dal registro (la ricetta di
-    # _ricalcola_xp: mai un -=, che a meta' strada mentirebbe).
-    for tg in sorted(rapporto["utenti"]):
+    # _ricalcola_xp: mai un -=, che a meta' strada mentirebbe) — per le
+    # parti E per chi ha perso una quota.
+    for tg in sorted(rapporto["utenti"] | rapporto["invitanti"]):
         # SOLO IL COMMERCIO, come `_ricalcola_xp` e come il
         # riallineamento d'avvio: senza il filtro questo UPDATE
         # rimetterebbe dentro i punti di presenza, e il riavvio dopo
         # li ritoglierebbe. Il perimetro vero e' XP_COMMERCIO in
         # server.py; qui si ricopia perche' lo script gira da solo,
         # e a tenerli in pari c'e' una prova.
-        con.execute(
-            "UPDATE utenti SET xp=(SELECT COALESCE(SUM(punti),0) "
-            "FROM xp_eventi WHERE tg_id=? AND tipo IN ('ordine')) "
-            "WHERE tg_id=?", (tg, tg))
+        # E DAL SET 2026 CON LA REGOLA DEGLI INVITI (`xp_contati`): i
+        # propri piu' le quote, queste mai oltre i propri. Una somma nuda
+        # direbbe un altro numero da quello del server, e il riavvio dopo
+        # lo correggerebbe — un numero che oscilla attraverso un reboot.
+        propri, inviti = con.execute(
+            "SELECT COALESCE(SUM(CASE WHEN tipo IN ('ordine') "
+            "THEN punti END),0), COALESCE(SUM(CASE WHEN tipo='invito' "
+            "THEN punti END),0) FROM xp_eventi WHERE tg_id=?",
+            (tg,)).fetchone()
+        con.execute("UPDATE utenti SET xp=? WHERE tg_id=?",
+                    (propri + min(inviti, propri), tg))
 
     # I distintivi sono append-only («non si revocano mai»): qui i
     # NUMERI rifatti senza le prove, la decisione resta a mano.
