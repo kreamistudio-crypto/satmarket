@@ -3457,6 +3457,29 @@
   pubblica del progetto, con la sua moderazione), e qualunque metrica
   oltre le aperture — niente clic sui link, niente tempo di lettura,
   niente chi.
+  LE PAGINE DEI NEGOZI CONSIGLIATI, IN BOZZA (set 2026; la prima e'
+  «Una Garlanda»): la stessa forma di `RACCONTI` e lo STESSO renderer,
+  ma i DATI vivono sul server, in `racconti.py` — una bozza nel
+  catalogo del client sarebbe leggibile nel sorgente da chiunque apra
+  la pagina. Il testo esce da DUE porte: `/api/negozio` (la chiave
+  `venditore.racconto`, SOLO a pagina pubblicata, dal giudice
+  `racconto_pubblico`, che non sa chi bussa: nemmeno un moderatore ci
+  vede la bozza) e `/api/admin/racconti` (403 prima di guardare il
+  catalogo). LO STATO vive in `impostazioni` —
+  `racconto_pubblicato:<slug>`, vuoto o storto = bozza — e lo scrive
+  il solo gesto `decidi_racconto_admin`, che senza un negozio vero nel
+  catalogo rifiuta di pubblicare. Nel client `raccontoDi` guarda PRIMA
+  `v.racconto` (riconfrontando il codice; senza codice esce solo in
+  anteprima) e poi lo spazio sponsorizzato; l'anteprima del moderatore
+  appende la bozza al profilo appena arrivato (`apriNegozio(chi,
+  aperto, anteprima)`, per quel disegno e basta), dal cassetto
+  «📖 Negozi consigliati» o dalla leva `/?bozza=<slug>`, che sta sulla
+  home e NON e' una rotta. `foto: false` = segnaposto con l'etichetta
+  in anteprima e nessun riquadro in pubblico; `rac-piccola` per marchio
+  e QR (stretti e fermi); `/assets/racconti/` conosce i due cataloghi.
+  L'anteprima social del negozio resta quella del brand anche a pagina
+  pubblicata, come per To The Mooon. Il perche' di ogni pezzo e le
+  strade scartate: Cantieri, «Una Garlanda in bozza».
 
   LE CATEGORIE IN HOME (ago 2026, decisione di Andrea): sotto l'header
   di Esplora una fila di CARD QUADRATE ILLUSTRATE che scorre di lato —

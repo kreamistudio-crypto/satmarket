@@ -27955,3 +27955,181 @@ headless, il pane non componeva): etichette 7,32/8,78, «Copia»
 no in modi che il PC non riproduce: il tocco su un rigo deve dire
 «Copiato 📋» e incollarsi nel sito del corriere. Se compare il valore
 nel toast, è il ripiego che fa il suo mestiere — e vale la pena saperlo.
+
+## Una Garlanda in bozza: la pagina di un negozio consigliato che vedono solo i moderatori (23 set 2026)
+
+**LA RICHIESTA.** La pagina del negozio «Una Garlanda» (Famiglia Stocchi,
+Rovasenda, riso biodiverso) costruita come quella di To The Mooon —
+storia in apertura, «Cos'è», tre schede, l'elenco a pallini, «Com'è
+fatto», poi profilo del venditore, feedback e vetrina — ma IN BOZZA: la
+vedono i moderatori, dal pannello o da un link con la leva, e nessun
+altro; fuori da vetrina, ricerca, link condivisi e anteprime finché un
+moderatore non la pubblica. Le foto non ci sono ancora (segnaposto con
+l'etichetta), e il venditore è l'account di Manuele.
+
+**LA STRUTTURA RIUSABILE C'ERA GIÀ, E NON SI È COPIATO NIENTE.** To The
+Mooon non è scritta a mano: è un catalogo di DATI (`RACCONTI` in
+miniapp.html) disegnato da un renderer solo (`raccontoNegozio`), fatto
+così apposta ad agosto («il secondo progetto scrive testi e non HTML»).
+Una Garlanda è una pagina in più con la stessa forma, e la disegna lo
+stesso renderer. Tre ritocchi, nessuna funzione gemella: l'EMOJI della
+pastiglia viene dal catalogo (🌾) mentre la PAROLA «Consigliato» resta
+nel renderer — la dichiarazione non deve dipendere da chi la riceve, e
+c'è la prova che nei dati non compaia; il titoletto FACOLTATIVO delle
+schede («IL VALORE DELLE ORIGINI»); e un blocco nuovo, `firma`, per la
+chiusura («Custodi di Natura e Biodiversità — Famiglia Stocchi,
+Rovasenda (VC)»).
+
+**MA LA BOZZA HA DECISO DOVE VIVONO I DATI: SUL SERVER.** Il catalogo
+del client viaggia DENTRO la pagina, a chiunque la apra: una bozza
+scritta lì sarebbe leggibile nel sorgente da tutti, cioè invisibile solo
+a chi non guarda. Il testo di Una Garlanda sta quindi in `racconti.py`,
+che nessuna rotta serve, ed esce da DUE porte sole: `/api/negozio` (la
+chiave `venditore.racconto`), e solo a pagina PUBBLICATA — il giudice
+`racconto_pubblico` non sa chi bussa, quindi nemmeno un moderatore ci
+vede la bozza: una rotta pubblica che rispondesse diverso a seconda di
+chi chiede sarebbe un secondo giudice da tenere in pari col primo; e
+`/api/admin/racconti`, che risponde 403 prima di guardare il catalogo
+(a chi non è moderatore non si dice nemmeno se una bozza esiste). Il
+client la disegna come DATI passati da esc(), emoji comprese — cioè il
+giorno che l'architettura aveva dichiarato possibile: «il giorno che la
+lista arrivasse dal server non ci sarebbe da riscrivere niente».
+⚠️ E UNA PROVA PRETENDE CHE NESSUNA FRASE LUNGA delle pagine del server
+stia in miniapp.html, commenti compresi. Non è pignoleria: la prima
+stesura del renderer citava «IL VALORE DELLE ORIGINI» come esempio in un
+commento, e «per il riso» accanto alla pastiglia — due frammenti della
+bozza nel file che scarica chiunque. Visti rileggendo, tolti, e da lì la
+prova (la tortura la fa morire con quel commento rimesso).
+
+**TO THE MOOON RESTA DOV'È, e il giudice è uno.** Lo accende lo spazio
+sponsorizzato, e la card di «Da scoprire» legge titolo e codice dal
+catalogo del client appena arriva la busta: traslocarlo vorrebbe dire
+rifare la card e le sue prove, un altro cantiere. `raccontoDi` guarda
+PRIMA la pagina arrivata dal server (riconfrontando il codice del
+negozio, per cintura) e poi lo spazio sponsorizzato come sempre: due
+sorgenti, un giudice, un renderer. Il trasloco ha il suo giorno, quello
+della categoria «Consigliati».
+
+**LO STATO IN `impostazioni`, IL GESTO NEL PANNELLO.**
+`racconto_pubblicato:<slug>` è il momento della pubblicazione; vuota,
+assente o storta vale BOZZA (il dubbio non pubblica niente). La scrive
+SOLO `decidi_racconto_admin` — c'è il censimento, e un orologio che
+pubblicasse o spegnesse da solo sarebbe uno stato in più. PUBBLICARE SI
+RIFIUTA (409) senza codice negozio nel catalogo, o con un codice che non
+è di nessun negozio: il moderatore vedrebbe «pubblicata» su una pagina
+che nessuno vedrebbe mai. Le FOTO invece non fermano niente — se mancano
+la pagina esce senza immagini, e il foglio della conferma lo dice prima
+del tocco. Tornare in bozza non chiede condizioni: è il lato che
+protegge. Gli altri moderatori ricevono l'avviso nei due versi.
+
+**COME LA VEDE UN MODERATORE.** Profilo → «👑 Amministrazione» → il
+cassetto «📖 Negozi consigliati» → «👁 Anteprima»; oppure il link della
+leva, `/?bozza=una-garlanda` («🔗 Copia il link» nello stesso cassetto).
+LA LEVA STA SULLA HOME E NON È UNA ROTTA, apposta: funziona anche prima
+che il venditore sia collegato (una pagina che non ha ancora un negozio
+non ha un indirizzo di negozio), chi non è moderatore resta sulla home
+con «Questa anteprima la vedono solo i moderatori», e l'anteprima
+social di quel link è quella generica della home. Col venditore
+collegato l'anteprima apre il SUO negozio vero con la bozza sopra la
+merce (`apriNegozio`, terzo argomento: vale per quel disegno e basta,
+nessuna variabile la ricorda, quindi un ridisegno o il tasto indietro
+tornano a mostrare quel che vedono tutti); senza, la pagina da sola,
+con due segnaposto dove andranno profilo e vetrina — niente profilo
+finto, che è proprio la cosa da non confondere con uno vero. In cima
+l'avviso della bozza: cosa manca (il venditore, le foto) e il bottone
+«✅ Pubblica la pagina», che c'è solo col venditore collegato — un
+bottone che porta a un 409 è peggio di un bottone che non c'è.
+
+**LE FOTO: `foto: False`, E IL CANTIERE DI UNA RIGA.** Sette segnaposto
+con l'etichetta — copertina (21:9 come l'hero di To The Mooon);
+varietà, ecosistema, pileria e persone (3:2); QR EcoOasi e logo
+(quadrati, piccoli) — visibili SOLO in anteprima: la pagina pubblicata
+senza foto non mostra riquadri vuoti, la storia esce senza immagini.
+Quando arrivano: i sette file in `assets/racconti/` coi nomi scritti
+accanto a `foto` in `racconti.py`, e `foto: True`. Niente altro da
+toccare: la rotta li serve già (`FORMA_RACCONTO` e i due cataloghi),
+logo e QR hanno già il loro modificatore (`rac-piccola`: 200 px e
+FERMI — il respiro è per le fotografie, e un QR che pulsa si inquadra
+peggio), e una prova pretende che con `foto: True` i file ci siano
+davvero.
+IMPERFEZIONE DICHIARATA: le foto di una bozza si servono a chi indovina
+il nome esatto del file. Un `<img>` non porta l'initData, quindi la
+rotta non sa chi chiede, e l'anteprima deve poterle vedere prima di
+pubblicare. Nessuna pagina pubblica le linka finché la pagina è in
+bozza, e il TESTO invece non esce mai.
+
+**IL VENDITORE È DA COLLEGARE.** Nel catalogo `negozio` è vuoto: quale
+sia l'account di Manuele non lo so. Serve il suo CODICE NEGOZIO (otto
+caratteri): lo si legge dal pannello («💬 Scrivi a un utente», cercando
+«Manuele»: la riga mostra `#tg_id · codice`) o dal VPS in sola lettura
+(`sqlite3 -readonly ~/satmarket/satmarket.db "SELECT tg_id, nome,
+username, negozio FROM utenti WHERE nome LIKE '%Manuele%' OR username
+LIKE '%manuele%';"`), e poi è una riga in `racconti.py`. Il cassetto dice subito se il codice scritto non è di
+nessun negozio.
+
+**LE STRADE SCARTATE.** 1) La pagina nel catalogo del client con un
+`bozza: true` e il cancello nel client: la bozza sarebbe stata nel
+sorgente pubblico. 2) Una rotta sua (`/racconto/{slug}`): una
+rotta-pagina in più da sorvegliare, un'anteprima social da decidere, e
+uno slug coi trattini che `/negozio/{chi}` spaccherebbe. 3) La bozza su
+`/api/negozio` per chi è moderatore: un secondo giudice della bozza,
+su una rotta pubblica. 4) La pubblicazione legata allo spazio
+sponsorizzato (`/sponsor una-garlanda`): quello è a tempo, uno alla
+volta, e vuole la card disegnata col nome dentro — la pagina pubblicata
+invece resta, e la card in «Da scoprire» è un gesto a parte, da fare il
+giorno che c'è l'immagine. 5) Un profilo finto nell'anteprima senza
+venditore.
+
+**IL TESTO.** Usato com'era: nessun refuso trovato. Una sola
+correzione di impaginazione, e si dichiara: le quattro tappe di «COME
+SI COLTIVA» arrivavano come «Il suolo vivo — rotazioni, …» sulla stessa
+riga, e nel layout la prosa va a capo sotto il titolo, quindi comincia
+con la maiuscola. La voce «EcoOasi: custodi di natura e biodiversità»
+chiude «COM'È FATTO», e il QR le sta subito sotto.
+
+**PROVATO.** `prove.py` nel worktree, senza config e con PROVE_SEVERE:
+13.812 verdi e 0 rosse sulla base di partenza, 13.852 e 0 rosse dopo il
+rebase sopra il cantiere della spedizione (le sue 40) — 62 nuove in
+`prove_racconti_bozza` (il testo fuori dal
+client, la forma del catalogo, il giudice GIRATO su un'impostazione di
+cartone, le porte, e il renderer girato col catalogo VERO: in pubblico,
+in anteprima, senza venditore, pubblicata, con le foto, sul negozio
+sbagliato, il markup piantato in emoji, schede e titolo, e lo spazio
+sponsorizzato intatto), più tre sentinelle vecchie aggiornate (i gesti
+della domanda unica 65 → 66, l'ancora di `apriNegozio`, la leva fra i
+link diretti dei due avvii). `collaudo_racconti_bozza` (nuovo, in CI
+nella gabbia di `collaudi_ci.py`): 34 verdi — 401, 403 e 200 sulla
+porta admin; il 409 senza venditore e con un codice di nessuno; il
+negozio senza la bozza all'anonimo, a chi compra, al moderatore e al
+venditore stesso; la pagina coi meta, la home con la leva e la mappa
+del sito senza una frase della bozza; pubblicata e visibile a chiunque
+apra QUEL negozio (anche dallo username) e a nessun altro; rimessa in
+bozza e sparita. Gli altri dieci collaudi della CI verdi nella stessa
+gabbia. **LA TORTURA: 17 mutazioni, 17 uccise**, su una copia
+dell'albero — il giudice che ignora lo stato, il negozio che consegna
+il catalogo, l'elenco admin senza guardia, pubblicare senza venditore,
+la rotta delle foto che scorda il catalogo nuovo, un secondo scrittore
+dello stato, il client senza fail-closed o senza il confronto del
+codice, il segnaposto in pubblico, le due emoji nude, la bozza citata
+in un commento, la parola nei dati, la bozza appesa da un secondo
+posto, la leva senza forma, la firma e il QR che respira. **DAL VIVO** a
+375 px nei due temi (Chrome headless, densità 2): la bozza senza
+venditore, la bozza collegata a un negozio di collaudo, la pagina come
+esce pubblicata, il cassetto del pannello e il foglio della conferma;
+nessuno sbordo orizzontale; la leva aperta da chi compra resta sulla
+home con l'avviso.
+
+**VISTO E NON TOCCATO.** «Acquista», nella testa del racconto, esce a
+tutta larghezza (343 px su 375): `.rac-acquista{width:auto}` sta PRIMA
+di `.btn{width:100%}` nel foglio e a parità di specificità perde. Vale
+anche per To The Mooon, è così su origin/main, e il commento accanto
+dice che doveva essere stretto. Segnalato ad Andrea, non sistemato.
+
+**DA GUARDARE.** 1) Dal telefono di un moderatore: il cassetto e
+l'anteprima dentro Telegram, e il link della leva dal browser col login
+web. 2) Collegato Manuele (una riga) e arrivate le foto (sette file e
+una riga), la pagina rivista in anteprima PRIMA del «Pubblica». 3) Dopo
+la pubblicazione, il negozio da un telefono qualunque, e il link del
+negozio incollato in una chat: l'anteprima resta quella del brand. 4)
+La card in «Da scoprire» NON nasce da sola: se la si vuole, è lo spazio
+sponsorizzato (uno alla volta, `SLUG_SPONSOR`) e vuole la sua immagine.
