@@ -4084,32 +4084,30 @@
     box-shadow:0 4px 0 var(--trust-deep),0 8px 20px rgba(27,139,84,.35)}
   body.nav-p2p.p2p-vendo nav button.sell .ic{background:var(--danger);
     box-shadow:0 4px 0 var(--danger-deep),0 8px 20px rgba(194,65,12,.35)}
-  /* IL + GRIGIO (23 set 2026, richiesta di Andrea): fuori dal libro
-     non si pubblica — in «I miei scambi», in «Info P2P» e nella pagina
-     di uno scambio, che accende «I miei scambi» — quindi il tondo
-     SCENDE al livello della barra, perde il rilievo e si fa grigio; al
-     tocco porta al libro su «Compra BTC» (toccaPiu). Tornando nel
-     libro riprende forma e colore del lato con la stessa corsa: sono
-     transform, fondo e ombra, le tre che il tondo sa gia' far correre.
+  /* IL + FUORI DAL LIBRO (23 set 2026, richiesta di Andrea): in «I miei
+     scambi», in «Info P2P» e nella pagina di uno scambio, che accende «I
+     miei scambi», non si pubblica, e al tocco il + porta al libro su
+     «Compra BTC» (toccaPiu). Li' veste l'ARANCIO del + del mercatino e
+     sta alla SUA altezza, col suo stesso rilievo (niente −15px: quel
+     sollevamento e' del libro), restando un tondo grande come il verde e
+     il rosso. Tornando nel libro risale e riprende il colore del lato con la
+     stessa corsa: transform, fondo e ombra, le tre che il tondo sa gia'
+     far correre — e DUE ombre da tutt'e due le parti, o l'ombra non
+     correrebbe.
+     ⚠️ ROVESCIA IL PRIMO GIRO dello stesso giorno, e non si ripropone: il
+     tondo GRIGIO stretto a 42px e sceso nella barra sembrava un tasto
+     spento, non la strada per il libro.
      La classe la scrive go() dalla VISTA, come nav-p2p, e sta DOPO il
-     rosso a pari catena: con tutt'e due sul body vince lei, che il
-     lato in «I miei scambi» non c'e'.
-     LA MISURA E' UNA SOTTRAZIONE: a riposo il centro del tondo sta 5px
-     sotto il bordo della barra (8 di padding, −30 di margine, 27 di
-     raggio) e il centro delle voci a 30 (8 + 44,2/2), quindi scende di
-     25; e a 54px nella fila da 44 non ci starebbe, quindi si stringe a
-     42 (.78) — il tondo di una voce, non un oggetto appoggiato sopra.
-     Il grigio e' fisso come tutto sulla banda: #7A7262 stacca 3,3:1 dal
-     bruno del giorno e 4,1:1 da quello della sera, e il + bianco gli
-     sta sopra a 4,8:1.
+     rosso a pari catena: con tutt'e due sul body vince lei, che il lato
+     in «I miei scambi» non c'e'.
      SOLO IL TONDO: da desktop il + e' la pillola «Pubblica» della
      topbar, una linguetta sempre uguale come «Vendi» nel mercatino, e
      resta com'era — per questo la regola vive sotto i 768px, e il JS
      chiede la stessa larghezza (piuNeutroP2P). */
   @media (max-width:767px){
     body.nav-p2p.p2p-piu-neutro nav button.sell .ic{
-      transform:translateY(25px) scale(.78);background:#7A7262;
-      box-shadow:0 0 0 #5E5648,0 0 0 rgba(0,0,0,0)}
+      transform:none;background:var(--sats);
+      box-shadow:0 4px 0 var(--sats-deep),0 8px 20px rgba(247,147,26,.35)}
   }
   @media (prefers-reduced-motion:reduce){
     nav .nav-cella>.strato-p2p,
@@ -4117,59 +4115,98 @@
     nav button.sell .eti-pila>span{transition:none}
   }
 
-  /* ====== IL TASTO BARATTOZON (23 set 2026, richiesta di Andrea) ======
-     Nel libro, sul lato «Vendi BTC», SOTTO il + rosso scende un secondo
-     tondo, piu' piccolo, col marchio di Barattozon: al tocco apre il
-     foglio «Vuoi vendere Bitcoin» col tabacchino gia' scelto, cioe'
-     dritto al passo 1 del percorso (apriBarattozonP2P). Rientra
-     passando a «Compra BTC», uscendo dal libro e mentre il + si apre
-     nel foglio (la barra che si apre, body.barra-via).
+  /* ====== IL TASTO BARATTOZON: LA CAPSULA (23 set 2026, richiesta di
+     Andrea) ======
+     Nel libro, sul lato «Vendi BTC», dal fondo del + rosso scende A
+     TENDINA la sua continuazione: larga ESATTAMENTE come lui (54px), coi
+     bordi dritti che proseguono quelli del cerchio e arrotondata in
+     fondo, cosi' che + e tendina facciano una capsula sola, «a supposta».
+     Sopra resta il + (il suo tocco apre il foglio di sempre), sotto la
+     tendina col marchio: al tocco apre «Vuoi vendere Bitcoin» col
+     tabacchino gia' scelto, cioe' dritto al passo 1 del percorso
+     (apriBarattozonP2P). Rientra passando a «Compra BTC», uscendo dal
+     libro e mentre il + si apre nel foglio (body.barra-via).
+     ⚠️ ROVESCIA IL PRIMO GIRO dello stesso giorno: un tondo blu da 36px
+     sotto il + — troppo piccolo, e sembrava un oggetto a parte.
+     LA TENDINA E' DEL BLU DELLA FOTO (#191D29, misurato ai bordi del
+     sorgente) e la freccia ci sta sopra NUDA, com'e' nel logo (decisione
+     di Andrea, che ha rovesciato la finestrella blu dentro una tendina
+     rossa del primo passaggio): sul blu la freccia arancio (#FE8402)
+     stacca 6,8:1, sul rosso sparirebbe (1,1:1 la sera). IL CONTORNO E' UN
+     FILO DEL COLORE DEL + (2,5px dentro il bordo), ed e' quel che la tiene
+     capsula: sulla banda bruna quel blu da solo non stacca (1,07:1 di
+     giorno) e la tendina diventava un oggetto a parte — il filo prosegue
+     il bordo del cerchio.
      QUANDO C'E' LO DICONO LE CLASSI CHE C'ERANO GIA' — nav-p2p,
      p2p-vendo, p2p-piu-neutro, barra-via — e nessuna sua: le scrivono
      go() dalla vista e setLatoP2P dal tab, quindi indietro, cronologia
-     e gesto dell'app Android lo rimettono giusto da soli.
-     E' UNA TENDINA: il tondo si SROTOLA — il bordo di sotto del
-     ritaglio scende e lo scopre dall'alto, mentre lui scivola degli
-     ultimi 8px — e rientrando risale. Non scivola fuori da SOTTO il +,
-     che era la prima idea: servirebbe un + fermo a fargli da coperchio,
-     e il + non sta fermo — uscendo dal libro scende nella barra proprio
-     mentre questo rientra, e i due si incrocerebbero a mezz'aria. Col
-     ritaglio il tondo resta al suo posto, e il + che scende gli passa
-     DAVANTI: sta dopo nel markup, quindi si dipinge sopra.
+     e gesto dell'app Android la rimettono giusta da soli.
+     LA GEOMETRIA: parte dal CENTRO del cerchio (−10 dal bordo della
+     barra: il cerchio va da −37 a 17), cosi' i fianchi dritti escono
+     esattamente dove il cerchio smette di esserlo, e finisce a 56,
+     quattro pixel sopra il fondo dello schermo. Sta PRIMA del + nel
+     markup: il cerchio le si dipinge sopra e ne copre la cima.
+     E' UNA TENDINA: si SROTOLA — il bordo di sotto del ritaglio scende e
+     la scopre da sotto il +, e rientrando risale sotto di lui. Il
+     ritaglio lascia fuori la cima (sta sotto il cerchio) e 24px di
+     fianco e di sotto, per l'ombra.
+     ⚠️ LA CIMA NON SI DEVE MAI VEDERE, e i fotogrammi a meta' corsa hanno
+     detto dove scappava: la cima e' dritta, e nasce all'equatore del
+     cerchio, dove lui e' largo 54 come lei — un pixel piu' su o piu' giu'
+     e i suoi angoli sporgono. Quindi 1) nessuno scivolo (la prima stesura
+     saliva di 8px rientrando: angoli rossi accanto al cerchio); 2) il
+     FILO ha sempre il colore del +, con la sua stessa dissolvenza —
+     verde, rosso, arancio —, cosi' mentre il + cambia colore la capsula
+     cambia con lui; 3) fuori dal libro SCENDE DI 15px COL +, con la sua
+     stessa curva: il + lascia il libro abbassandosi, e la cima della
+     tendina resta sotto il suo equatore mentre si arrotola.
      UN <div> E NON UN <button>, la ragione del logo in topbar: `nav
      button` e' il selettore delle VOCI (CSS, spazzata di go(), conta
-     delle celle) e questo tondo non e' una voce. Role, tabindex e tasti
-     glieli da' il markup.
-     LA MISURA E' QUELLA CHE CI STA, misurata sulla barra vera: il +
-     finisce 21px sotto il bordo di sopra (17 il tondo, piu' i 4 del suo
-     gradino) e sotto restano 60 — 36px partendo da 20, cioe' un pixel
-     sotto il gradino e quattro sopra il fondo dello schermo. A 40 (la
-     prima prova) toccava il fondo, a 34 il marchio si perdeva. Il
-     fondo e' il blu del marchio (#191D29), e sulla banda bruna quel blu
-     non stacca: il bordo lo disegna un filo chiaro, piu' l'ombra che lo
-     alza come il +. */
-  #navBarattozon{position:absolute;left:0;right:0;top:20px;
-    width:36px;height:36px;margin:0 auto;border-radius:50%;
+     delle celle) e la tendina non e' una voce. Role, tabindex e tasti
+     glieli da' il markup. */
+  #navBarattozon{position:absolute;left:0;right:0;top:-10px;
+    width:54px;height:66px;margin:0 auto;border-radius:0 0 27px 27px;
     background:#191D29;cursor:pointer;-webkit-tap-highlight-color:transparent;
-    box-shadow:0 0 0 1.5px rgba(241,232,213,.32),0 4px 10px rgba(0,0,0,.45);
-    clip-path:inset(-10px -10px 100% -10px);transform:translateY(-8px);
+    box-shadow:inset 0 0 0 2.5px var(--trust),0 4px 0 var(--trust-deep),
+      0 8px 20px rgba(27,139,84,.35);
+    clip-path:inset(0 -24px 100% -24px);
     visibility:hidden;pointer-events:none;
     transition:clip-path .4s cubic-bezier(.2,.7,.2,1),
-      transform .4s cubic-bezier(.2,.7,.2,1),visibility 0s linear .4s}
-  #navBarattozon img{display:block;width:100%;height:100%;border-radius:50%}
+      transform .4s cubic-bezier(.2,.7,.2,1),visibility 0s linear .4s,
+      box-shadow .4s ease}
+  /* il filo e il gradino hanno il colore del +, lato per lato: le stesse
+     coppie delle sue regole, e TRE ombre in ogni stato, o non correrebbero */
+  body.p2p-vendo #navBarattozon{
+    box-shadow:inset 0 0 0 2.5px var(--danger),0 4px 0 var(--danger-deep),
+      0 8px 20px rgba(194,65,12,.35)}
+  @media (max-width:767px){
+    body.p2p-piu-neutro #navBarattozon{transform:translateY(15px);
+      box-shadow:inset 0 0 0 2.5px var(--sats),0 4px 0 var(--sats-deep),
+        0 8px 20px rgba(247,147,26,.35)}
+  }
+  /* la freccia, nuda sul blu: larga quanto ci sta dentro il filo (46 dei
+     49) e centrata nel blu che il + lascia scoperto (dal suo gradino, a
+     21, al filo del fondo, a 53,5): va da 31 a 42,7. E' un sorriso — le
+     punte stanno in alto, dove la tendina e' ancora larga 49, e in basso
+     c'e' solo la pancia, che la curva del fondo contiene */
+  #navBarattozon img{position:absolute;left:4px;top:41px;
+    width:46px;height:auto;display:block}
   #navBarattozon:focus-visible{outline:2px solid #FFB25C;outline-offset:3px}
+  /* srotolata: il ritaglio parte .1s dopo (la scala della barra), ma la
+     corsa verticale e i colori no — devono andare col + */
   body.nav-p2p.p2p-vendo:not(.p2p-piu-neutro):not(.barra-via) #navBarattozon{
-    clip-path:inset(-10px -10px -16px -10px);transform:none;
-    visibility:visible;pointer-events:auto;transition-delay:.1s,.1s,0s}
+    clip-path:inset(0 -24px -28px -24px);
+    visibility:visible;pointer-events:auto;transition-delay:.1s,0s,0s,0s}
   /* ⚠️ IL DITO, CHE IL CLICK DA JS NON VEDE: il + e' una cella della
      barra, e la sua SCATOLA (72px per 44, vuota: la scritta e' scesa)
-     copre il tondo — sta dopo nel markup, quindi sopra anche per il
+     copre la tendina — sta dopo nel markup, quindi sopra anche per il
      tocco, e il dito sul marchio apriva il foglio SENZA tabacchino.
      Visto col tocco vero nel pane: `element.click()` non passa dal
-     bersaglio e diceva che andava. Mentre il tondo c'e' la scatola
+     bersaglio e diceva che andava. Mentre la tendina c'e' la scatola
      lascia passare il dito, e il + lo prende col solo suo cerchio, che
-     e' tutto quel che di lui si vede. Solo sotto i 768px: da desktop il
-     tondo non c'e' e la pillola si tocca tutta. */
+     e' tutto quel che di lui si vede: sopra il +, sotto la tendina. Solo
+     sotto i 768px: da desktop la tendina non c'e' e la pillola si tocca
+     tutta. */
   @media (max-width:767px){
     body.nav-p2p.p2p-vendo:not(.p2p-piu-neutro):not(.barra-via) #nav-vendi{
       pointer-events:none}
@@ -7575,9 +7612,10 @@
     body.nav-p2p nav button.active{background:rgba(255,178,92,.16)}
     body.nav-p2p nav #nav-p2plibro.active{background:rgba(52,180,122,.14)}
     body.nav-p2p.p2p-vendo nav #nav-p2plibro.active{background:rgba(240,122,71,.15)}
-    /* il tasto Barattozon e' una tendina SOTTO il tondo, e da desktop
-       il tondo non c'e': sotto la pillola della topbar penderebbe sulla
-       pagina. Il tabacchino resta a un tocco nel foglio, fra i metodi */
+    /* il tasto Barattozon e' la tendina che prosegue il tondo del + in
+       una capsula, e da desktop il tondo non c'e': sotto la pillola della
+       topbar penderebbe sulla pagina. Il tabacchino resta a un tocco nel
+       foglio, fra i metodi */
     #navBarattozon{display:none}
     header{top:60px}
     header .brand{display:none}   /* il logo ora sta nella topbar */
@@ -10226,17 +10264,17 @@ document.getElementById('cartello')?.remove();</script>
          Dentro: gli ordini di TUTTI, il libro del coordinatore. -->
     <button id="nav-p2plibro" class="strato-p2p" onclick="go('p2p')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M12 6.1C10.2 4.9 7.7 4.6 5.1 5.2v12.5c2.6-.6 5.1-.3 6.9 1 1.8-1.3 4.3-1.6 6.9-1V5.1c-2.6-.5-5.1-.2-6.9 1z"/><path d="M12 6.1C10.2 4.9 7.7 4.6 5.1 5.2v12.5c2.6-.6 5.1-.3 6.9 1"/><path d="M12 6.1c1.8-1.2 4.3-1.5 6.9-1v12.6c-2.6-.6-5.1-.3-6.9 1"/><path d="M12 6.1v12.6"/></svg></span>Libro ordini</button>
     </div>
-    <!-- IL TASTO BARATTOZON (23 set 2026): il tondo col marchio che
-         nel libro, su «Vendi BTC», scende sotto il + e apre il foglio
-         col tabacchino gia' scelto. Sta PRIMA del + apposta: si dipinge
-         sotto di lui, e il + che scende nella barra gli passa davanti.
-         Nascosto finche' le classi non lo chiamano (vedi il suo CSS),
-         e da nascosto non si tocca e non si raggiunge col Tab. -->
+    <!-- IL TASTO BARATTOZON (23 set 2026): la tendina col marchio che
+         nel libro, su «Vendi BTC», scende dal fondo del + e con lui fa
+         una capsula sola; apre il foglio col tabacchino gia' scelto. Sta
+         PRIMA del + apposta: il cerchio le si dipinge sopra e ne copre la
+         cima. Nascosta finche' le classi non la chiamano (vedi il suo
+         CSS), e da nascosta non si tocca e non si raggiunge col Tab. -->
     <div id="navBarattozon" role="button" tabindex="0"
          aria-label="Vendi con Barattozon: contanti al tabacchino"
          title="Vendi con Barattozon"
          onclick="apriBarattozonP2P()"
-         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();apriBarattozonP2P()}"><img src="/assets/barattozon-tasto.webp" width="36" height="36" alt="" onerror="this.remove()"></div>
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();apriBarattozonP2P()}"><img src="/assets/barattozon-tasto.webp" width="46" height="12" alt="" onerror="this.remove()"></div>
     <!-- Il + di Vendi: nel P2P la scritta scende e il tondo si
          trasforma (vedi il CSS della nav trasformata). Le DUE
          etichette stanno impilate in .eti-pila: «Pubblica» esiste
@@ -12840,6 +12878,10 @@ function go(view){
      cronologia, e da vaiP2P non si passa. renderP2P dipinge ENTRAMBI
      i corpi (libro e miei), quindi le due viste chiamano lo stesso. */
   if (view==='p2p' || view==='p2pmiei') renderP2P();
+  /* la PRIMA apertura del libro in questa sessione saluta col dondolio
+     del logo, poi dondola solo al cambio fra Compra e Vendi: tornando
+     nel libro non piu' (scuotiLogoP2P toglie la classe a fine giro) */
+  if (view==='p2p' && !p2pLogoSalutato) { p2pLogoSalutato = true; scuotiLogoP2P(); }
   if (view==='p2pordine') renderOrdineP2P();
   /* «Info P2P»: i numeri vengono dal 38385, e QUI e' l'unico
      posto da cui passano tutte le strade — il tasto della nav, il
@@ -40313,16 +40355,33 @@ const P2P_LATO_K = {compro: 'sell', vendo: 'buy'};
    una volta. Togli-e-rimetti col reflow in mezzo, o un secondo tocco
    nella stessa mezza secondo non riavvierebbe niente; parte anche sul
    tab GIA' attivo, apposta — e' la risposta al dito, non al cambio. */
+/* ⚠️ E A FINE GIRO LA CLASSE SE NE VA (23 set 2026, ritocco di Andrea):
+   dal 9 set restava appesa, e ogni volta che la vista del libro tornava
+   visibile — da «I miei scambi», da «Info P2P», da Esplora — il browser
+   ripartiva da capo con l'animazione: il logo dondolava a OGNI ritorno.
+   Un tempo e non `animationend`: col libro nascosto a meta' corsa quel
+   segnale non arriva (arriva `animationcancel`, che scatterebbe anche
+   sul togli-e-rimetti qui sotto e toglierebbe la classe al giro nuovo),
+   e con gli effetti ridotti l'animazione non c'e' proprio. 400ms, un
+   soffio oltre i 350 del dondolio; un tocco nuovo riparte da zero. */
+let p2pScossaTimer = null;
 function scuotiLogoP2P(){
   document.querySelectorAll('.p2p-logo-pila').forEach(p => {
     p.classList.remove('scossa');
     void p.offsetWidth;
     p.classList.add('scossa');
   });
+  clearTimeout(p2pScossaTimer);
+  p2pScossaTimer = setTimeout(() => document.querySelectorAll('.p2p-logo-pila')
+    .forEach(p => p.classList.remove('scossa')), 400);
 }
+/* ...e la PRIMA apertura del libro in questa sessione saluta con un
+   dondolio (ritocco di Andrea: «solo alla prima apertura o al cambio fra
+   Compra e Vendi»). Lo chiede go(), da cui passano tutte le strade. */
+let p2pLogoSalutato = false;
 /* `senzaScossa` (23 set 2026): chi mette il lato SENZA un dito sul tab —
-   il + grigio che riporta al libro su «Compra BTC» — non scuote il logo
-   e non vibra: la vibrazione la da' gia' go(), e la scossa e' la
+   il + fuori dal libro che riporta al libro su «Compra BTC» — non scuote
+   il logo e non vibra: la vibrazione la da' gia' go(), e la scossa e' la
    risposta al tab. */
 function setLatoP2P(lato, senzaScossa){
   if (!P2P_LATO_K[lato]) return;
@@ -48252,8 +48311,9 @@ function apriNuovoOrdineP2P(metodo){
      sezioni, e la prima cosa da leggere e' la valuta — non da
      scrivere. Si tocca il campo quando ci si arriva. */
 }
-/* IL TASTO BARATTOZON (23 set 2026, richiesta di Andrea): il tondo che
-   scende sotto il + nel libro, su «Vendi BTC». Apre lo STESSO foglio del
+/* IL TASTO BARATTOZON (23 set 2026, richiesta di Andrea): la tendina che
+   scende dal fondo del + nel libro, su «Vendi BTC», e con lui fa una
+   capsula sola. Apre lo STESSO foglio del
    + — stesse guardie, stessa morfosi dal +, che e' il bottone che
    pubblica — col tabacchino gia' scelto: il titolo e' «Vuoi vendere
    Bitcoin» e si parte dal passo 1 del percorso, il PayCode. Senza fuoco

@@ -28800,3 +28800,81 @@ davvero anche in collaudo.
   copre, ma la gabbia li ha visti.
 - L'intestazione «Verifica della npub con una nota pubblica» in server.py
   nomina una funzione che non c'è più.
+
+## La capsula di Barattozon, il + arancio fuori dal libro e il logo che dondola una volta (23 set 2026, notte)
+
+Ritocco di Andrea al giro di poche ore prima (2c23f2e). Un worktree da
+`origin/main`, commit firmato.
+
+**COSA C'È.** 1) IL TASTO È UNA CAPSULA: su «Vendi BTC» dal fondo del +
+rosso scende a tendina la sua continuazione, larga esattamente come lui
+(54px), coi fianchi dritti che nascono all'equatore del cerchio e il fondo
+arrotondato, fino a 4px dal fondo dello schermo. La tendina è del BLU DELLA
+FOTO (#191D29, misurato ai bordi del sorgente) con sopra la SOLA freccia
+arancio del logo, senza la B (WebP 138×35 con alfa, presa per colore),
+centrata nel blu che il + lascia scoperto; un filo di 2,5px del colore del
++ fa il contorno. Sopra il + apre il foglio di sempre, sotto la tendina il
+percorso Barattozon al passo 1. 2) FUORI DAL LIBRO IL + È ARANCIO (#F7931A,
+il + del mercatino), tondo e grande come il verde e il rosso, alla quota e
+col rilievo del «Vendi» di casa. 3) IL LOGO DEL LIBRO dondola alla prima
+apertura della sessione e al tocco dei tab, non più a ogni ritorno.
+
+**I PERCHÉ E LE STRADE SCARTATE.** Il tondo da 36px del primo giro era
+«troppo piccolo e sembrava un oggetto a parte», il + grigio a 42px sceso
+nella barra sembrava un tasto spento. Cinque colori della tendina provati
+sulla barra vera nei due temi: tutta rossa (capsula perfetta, ma la freccia
+arancio sul rosso fa 2,1:1 di giorno e 1,1:1 la sera), rossa con una
+finestrella blu (la mia scelta del primo passaggio, ROVESCIATA da Andrea:
+«lo sfondo dietro la freccia va blu come nella foto»), tutta blu (freccia a
+6,8:1, ma sulla banda bruna quel blu non stacca, 1,07:1, e tornavano due
+oggetti), blu con un filo chiaro (un oggetto dietro il +), e BLU COL FILO
+DEL COLORE DEL +, rimasta: il filo prosegue il bordo del cerchio. LA SCOSSA:
+dal 9 set la classe restava appesa, e ogni volta che il libro tornava
+visibile il browser ripartiva da capo; ora `scuotiLogoP2P` la toglie dopo
+400ms (un tempo e non `animationend`, che col libro nascosto a metà non
+arriva, mentre `animationcancel` scatterebbe anche sul togli-e-rimetti), e
+la prima apertura la chiede `go()` (`p2pLogoSalutato`). All'apertura il
+logo non aveva mai dondolato di proposito: l'ha chiesto Andrea.
+
+**TRE DIFETTI VISTI NEI FOTOGRAMMI A METÀ CORSA, e curati.** La cima della
+tendina è dritta e nasce all'equatore del cerchio, dove lui è largo quanto
+lei: un pixel più su o più giù e gli angoli sporgono. 1) Lo scivolo di 8px
+del primo giro, rientrando, li faceva sporgere: via. 2) La tendina restava
+rossa mentre il + sfumava fra verde, rosso e arancio: adesso filo e gradino
+hanno sempre il colore del + e sfumano con lui. 3) Uscendo dal libro il +
+scende di 15px mentre la tendina si arrotola, e ne scopriva la cima:
+adesso la tendina scende di 15px con lui, con la stessa curva.
+
+**PROVATO.** `prove_tasto_barattozon` riscritta (41): il file con l'alfa e
+senza la B; la capsula MISURATA sul + — la cima all'equatore calcolata da
+padding, margine, sollevamento e raggio letti dalle sue regole, la
+larghezza sua, la discesa uguale al suo sollevamento —; filo e gradino
+uguali ai suoi nei tre stati; le otto regole della tendina e l'unica che la
+accende; il dito; il banco dell'apertura e quello della scossa coi tempi
+finti. `prove_nav_p2p` emendata: il + arancio letto dalla regola del + di
+casa, la scossa che se ne va, la prima apertura. **TORTURA 28/28** su una
+copia, e ha trovato un difetto del BANCO del giro prima: una firma di
+`prove_nav_p2p` portava dentro il valore `translateY(-15px)`, quindi un
+ritocco al sollevamento faceva ESPLODERE la sezione intera invece di dare
+una rossa col suo nome. Ora le regole si cercano per selettore e con la
+guardia, e al secondo giro nessuna rossa era un'esplosione.
+DAL VIVO col server del worktree: config da `config_esempio.py`, collaudo
+acceso, nsec al segnaposto (Nostr spento), relay Nostr e P2P a una porta
+morta, e il server che parlava solo con 127.0.0.1. Col TOCCO VERO (CDP,
+`Input.dispatchMouseEvent`) a 320/375/430 nei due temi: sopra il foglio
+normale, sotto (freccia e fondo) Barattozon al passo 1; la capsula larga
+54 coi bordi allineati al +, a 6/17px dalle scritte a 320 (dove «I miei
+scambi» va a capo, come prima), 17/13,5 a 375, 28/24,5 a 430; il +
+arancio porta al libro su «Compra BTC»; il logo dondola 1 volta
+all'apertura, 0 al ritorno, 1 al tab. I fotogrammi a metà corsa nei due
+temi: tendina, colori, discesa, morfosi. Con gli effetti ridotti compare
+ferma; da desktop niente tendina e la pillola «Pubblica».
+
+**DA GUARDARE SUL TELEFONO.** Su «Vendi BTC» la capsula: + rosso sopra,
+tendina blu con la freccia sotto, che scende e risale a tendina, e che la
+barra dei gesti non tagli (sta a 4px dal fondo senza margine di sistema);
+il tocco sulla parte sopra (foglio normale) e su quella sotto (Barattozon);
+in «I miei scambi», «Info P2P» e in uno scambio il + arancio all'altezza del
+«Vendi» del mercatino; il gesto indietro dell'app fra libro e miei, senza
+scatti; il logo che dondola all'apertura e al cambio di tab, e non tornando
+nel libro.

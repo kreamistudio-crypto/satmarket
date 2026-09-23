@@ -50042,6 +50042,21 @@ def prove_nav_p2p():
           ".p2p-logo-pila.scossa{animation:logoScossa .35s ease}" in mini
           and "@keyframes logoScossa{" in mini
           and ".p2p-logo-pila.scossa{animation:none}" in mini)
+    # ⚠️ E A FINE GIRO LA CLASSE SE NE VA (23 set 2026, ritocco di
+    # Andrea): dal 9 set restava appesa, e ogni volta che la vista del
+    # libro tornava visibile il browser ripartiva da capo — il logo
+    # dondolava a OGNI ritorno. Un tempo e non `animationend` (il perche'
+    # sta nel commento); il banco di prove_tasto_barattozon lo fa girare.
+    prova("...e a fine giro la classe se ne va, col suo tempo", True,
+          "clearTimeout(p2pScossaTimer);" in _sc
+          and "p2pScossaTimer = setTimeout(" in _sc
+          and ".forEach(p => p.classList.remove('scossa')), 400);" in _sc)
+    _dur = re.search(r"\.p2p-logo-pila\.scossa\{animation:logoScossa \.(\d+)s", mini)
+    prova("...un soffio DOPO il dondolio: tolta prima, lo taglierebbe", True,
+          bool(_dur) and float("0." + _dur.group(1)) * 1000 < 400)
+    prova("...e la prima apertura del libro saluta, una volta per sessione",
+          True, "if (view==='p2p' && !p2pLogoSalutato) { p2pLogoSalutato = true; scuotiLogoP2P(); }"
+          in pezzo_js(mini, "function go(view){"))
     # LA LINEA VIVE SOTTO OGNI TAB, mai sotto il logo: il contenitore
     # non porta piu' la striscia continua, i tab si' — grigia sul
     # quieto, colorata sull'attivo (le regole .attiva gia' sorvegliate
@@ -50442,22 +50457,38 @@ def prove_nav_p2p():
           True, "body.nav-p2p nav button.sell .ic{" in css
           and "body.nav-p2p.p2p-vendo nav button.sell .ic{background:var(--danger)"
           in css)
-    # IL + GRIGIO (23 set 2026): solo sotto i 768px (da desktop il + e'
-    # la pillola «Pubblica» e resta com'era), DOPO il rosso a pari
+    # IL + FUORI DAL LIBRO (23 set 2026): solo sotto i 768px (da desktop
+    # il + e' la pillola «Pubblica» e resta com'era), DOPO il rosso a pari
     # catena — con p2p-vendo e p2p-piu-neutro insieme sul body vince
     # lui —, e con DUE ombre come le sorelle colorate, o l'ombra non
     # correrebbe: fra liste di lunghezza diversa il browser salta.
+    # ⚠️ EMENDATA LO STESSO GIORNO (ritocco di Andrea): era GRIGIO, stretto
+    # a 42px e sceso nella barra — sembrava un tasto spento. Adesso e'
+    # l'ARANCIO del + del mercatino, alla sua altezza e col suo rilievo,
+    # tondo e grande come il verde e il rosso: nessuna scala.
     _gr = ("@media (max-width:767px){\n"
            "    body.nav-p2p.p2p-piu-neutro nav button.sell .ic{")
-    prova("il + grigio sta sotto i 768px, dopo il rosso", True,
+    prova("il + fuori dal libro sta sotto i 768px, dopo il rosso", True,
           _gr in css and css.index(_gr)
           > css.index("body.nav-p2p.p2p-vendo nav button.sell .ic{"))
     _gs = css[css.index(_gr) + len(_gr):] if _gr in css else ""
     _gs = _gs[:_gs.find("}")]
-    prova("...scende nella barra, si stringe, perde il rilievo", True,
-          "transform:translateY(25px) scale(.78)" in _gs
-          and "background:#7A7262" in _gs
-          and "box-shadow:0 0 0 #5E5648,0 0 0 rgba(0,0,0,0)" in _gs)
+    prova("...arancio come il + del mercatino, alla sua altezza, col suo "
+          "rilievo", [True, True, True],
+          ["transform:none;" in _gs, "background:var(--sats);" in _gs,
+           "box-shadow:0 4px 0 var(--sats-deep),0 8px 20px rgba(247,147,26,.35)"
+           in _gs])
+    # l'altezza e il rilievo del mercatino si leggono dalla SUA regola,
+    # non da un numero ricopiato: quella del + di casa non si sposta
+    # (margine e ombra, niente transform) e questa ne ricopia l'ombra
+    _casa = pezzo_js(mini, "  nav button.sell .ic{\n", "}")
+    prova("...che e' proprio quella del + di casa: stessa ombra, nessuno "
+          "spostamento", [True, False],
+          ["box-shadow:0 4px 0 var(--sats-deep), 0 8px 20px rgba(247,147,26,.35)"
+           in _casa, "transform" in _casa])
+    prova("...tondo e intero: nessuna scala, e del grigio non resta niente",
+          [False, False, 0],
+          ["scale(" in _gs, "border-radius" in _gs, mini.count("#7A7262")])
     def _ombre(regola):
         """quante ombre porta il box-shadow della regola: le virgole di
         primo livello, fuori dalle parentesi dei colori"""
@@ -50475,11 +50506,14 @@ def prove_nav_p2p():
             elif c == "," and fondo == 0:
                 n += 1
         return n
+    # le sorelle si cercano per selettore e senza i VALORI: un ritocco al
+    # sollevamento o al colore da' una rossa col suo nome, non l'esplosione
+    # di tutta la sezione (la tortura del 23 set 2026 l'ha fatta saltare)
+    _sorelle = ("body.nav-p2p nav button.sell .ic{transform:translateY(",
+                "body.nav-p2p.p2p-vendo nav button.sell .ic{")
     prova("...con due ombre come le sorelle colorate, che corrono", [2, 2, 2],
-          [_ombre(x) for x in (
-              _gs,
-              pezzo_js(mini, "body.nav-p2p nav button.sell .ic{transform:translateY(-15px);", "}"),
-              pezzo_js(mini, "body.nav-p2p.p2p-vendo nav button.sell .ic{background:var(--danger);", "}"))])
+          [_ombre(x) for x in [_gs] + [pezzo_js(mini, f, "}") if f in mini else ""
+                                      for f in _sorelle]])
 
     # --- 6) IL BANCO: voceNav e toccaPiu GIRANO -----------------------
     node = _sh.which("node")
@@ -50561,18 +50595,22 @@ console.log(JSON.stringify(out));
 
 def prove_tasto_barattozon():
     """IL TASTO BARATTOZON E IL + NEUTRO NEL P2P (23 set 2026, richiesta
-    di Andrea). Nella barra trasformata:
-    1) nel libro, su «Vendi BTC», sotto il + rosso scende A TENDINA un
-       tondo col marchio di Barattozon, e al tocco apre il foglio «Vuoi
-       vendere Bitcoin» col tabacchino gia' scelto — il passo 1 del
-       percorso, il PayCode;
-    2) fuori dal libro il + scende nella barra, grigio, e riporta al
-       libro su «Compra BTC»;
-    3) «I miei scambi» e «Info P2P» accese parlano l'arancio di casa.
-    Qui il tondo: il file, la rotta, il markup, il CSS che lo accende
-    dalle SOLE classi che c'erano gia', e il banco che fa girare
-    l'apertura del foglio con le funzioni vere. Il + grigio, i colori
-    delle voci e toccaPiu li sorveglia prove_nav_p2p."""
+    di Andrea, due giri lo stesso giorno). Nella barra trasformata:
+    1) nel libro, su «Vendi BTC», dal fondo del + rosso scende A TENDINA
+       la sua continuazione, larga come lui e arrotondata in fondo — una
+       capsula sola, «a supposta» —, del blu della foto con la sola
+       freccia arancio del logo; al tocco apre il foglio «Vuoi vendere
+       Bitcoin» col tabacchino gia' scelto, al passo 1 (il PayCode);
+    2) fuori dal libro il + e' arancio come quello del mercatino, alla
+       sua altezza, e riporta al libro su «Compra BTC»;
+    3) «I miei scambi» e «Info P2P» accese parlano l'arancio di casa;
+    4) il logo del libro dondola alla prima apertura e al cambio di tab,
+       mai piu' a ogni ritorno.
+    Qui la tendina: il file, la rotta, il markup, il CSS che la accende
+    dalle SOLE classi che c'erano gia' e la tiene incollata al +, il banco
+    che fa girare l'apertura del foglio con le funzioni vere, e quello
+    della scossa coi tempi finti. Il + fuori dal libro, i colori delle
+    voci e toccaPiu li sorveglia prove_nav_p2p."""
     print("\n[il tasto Barattozon e il + neutro nel P2P]")
     import json as _json
     import shutil as _sh
@@ -50596,19 +50634,29 @@ def prove_tasto_barattozon():
             j += 1
         return css[i:j]
 
-    # --- 1) IL FILE: WebP opaco, 108x108 (il 3x dei 36px), pulito ------
+    def _regola(testo, firma, fine="}"):
+        """una regola CSS per firma, o niente: una firma che non c'e' piu'
+        da' le rosse col loro nome, e non l'esplosione della sezione"""
+        return pezzo_js(testo, firma, fine) if firma in testo else ""
+
+    # --- 1) IL FILE: la SOLA freccia, su trasparente, 138x35 (3x di 46) --
+    # EMENDATA (23 set 2026, secondo giro): era un tondo 108x108 col
+    # marchio intero sul blu. Adesso e' la freccia arancio senza la B, su
+    # fondo TRASPARENTE: il blu della foto lo mette il CSS alla tendina.
     raw = open(FILE, "rb").read()
-    prova("il tondo e' un WebP", (b"RIFF", b"WEBP"), (raw[:4], raw[8:12]))
+    prova("la freccia e' un WebP", (b"RIFF", b"WEBP"), (raw[:4], raw[8:12]))
     pezzi, i = [], 12
     while i + 8 <= len(raw):
         n = _st.unpack("<I", raw[i + 4:i + 8])[0]
         pezzi.append(raw[i:i + 4].decode("ascii", "replace"))
         i += 8 + n + (n & 1)
-    # il tondo lo fa il CSS: niente alpha da portarsi dietro, e niente
+    # VP8X col bit dell'alfa, l'alfa e l'immagine, e nient'altro: niente
     # ICC (e' sRGB, quel che il browser assume gia'), EXIF o XMP
-    prova("...opaco e nudo: un pezzo solo, niente ICC, EXIF o XMP",
-          ["VP8 "], pezzi)
-    prova("...e leggero, meno di 3 KB", True, len(raw) < 3000)
+    prova("...con l'alfa, e nuda: niente ICC, EXIF o XMP",
+          ["VP8X", "ALPH", "VP8 "], pezzi)
+    prova("...e la trasparenza dichiarata", True,
+          len(raw) > 20 and bool(raw[20] & 0x10))
+    prova("...e leggera, meno di 4 KB", True, len(raw) < 4000)
     prova("...fuori da assets/categorie/, che ritaglia_categorie.py "
           "percorre col glob", False,
           os.path.exists(os.path.join("assets", "categorie",
@@ -50616,30 +50664,34 @@ def prove_tasto_barattozon():
     try:
         from PIL import Image as _Im
         with _Im.open(FILE) as _im:
-            _rgb = _im.convert("RGB")
-        prova("...108x108, il 3x dei 36px a schermo", (108, 108), _rgb.size)
-        # IL FONDO E' IL BLU DEL MARCHIO PIENO FINO AI BORDI: i quattro
-        # angoli stanno fuori dal tondo e devono essere #191D29 (il
-        # lossy ci balla di qualche unita', non di piu')
-        _ang = [_rgb.getpixel(p) for p in ((0, 0), (107, 0), (0, 107),
-                                           (107, 107), (54, 1), (1, 54))]
-        prova("...col blu del marchio pieno fino ai bordi (#191D29)", [],
-              [a for a in _ang
-               if max(abs(a[k] - (25, 29, 41)[k]) for k in range(3)) > 6])
-        # E IL SIMBOLO C'E' DAVVERO, dentro il tondo: la B bianca e la
-        # freccia arancio, e niente dei due oltre il cerchio inscritto
-        _px = list(_rgb.getdata())
-        _bianchi = sum(1 for r, g, b in _px if min(r, g, b) > 200)
-        _arancio = sum(1 for r, g, b in _px if r > 200 and 90 < g < 190 and b < 90)
-        prova("...con la B bianca e la freccia arancio dentro", [True, True],
-              [_bianchi > 0.08 * len(_px), _arancio > 0.02 * len(_px)])
-        _fuori = sum(1 for y in range(108) for x in range(108)
-                     if (x - 53.5) ** 2 + (y - 53.5) ** 2 > 53.5 ** 2
-                     and max(_rgb.getpixel((x, y))) > 90)
-        prova("...e niente del simbolo oltre il cerchio che il CSS ritaglia",
-              0, _fuori)
+            _rgba = _im.convert("RGBA")
+        prova("...138x35, il 3x dei 46px a schermo", (138, 35), _rgba.size)
+        _w, _h = _rgba.size
+        _px = list(_rgba.getdata())
+        _pieni = [(r, g, b) for r, g, b, a in _px if a > 200]
+        # QUEL CHE SI VEDE E' ARANCIO, e SOLO arancio: la B era bianca, e
+        # un solo pixel quasi bianco vorrebbe dire che e' tornata dentro
+        prova("...e quel che si vede e' la freccia arancio, senza la B",
+              [True, 0],
+              [len(_pieni) > 0.15 * len(_px)
+               and all(r > 200 and 80 < g < 190 and b < 90 for r, g, b in _pieni),
+               sum(1 for r, g, b, a in _px if a > 60 and g > 150 and b > 150)])
+        # i quattro angoli sono vuoti: sono il blu della tendina
+        _ang = [_rgba.getpixel((x, y))[3] for x, y in
+                ((0, _h - 1), (_w - 1, _h - 1), (_w // 2, 0))
+                if 0 <= x < _w and 0 <= y < _h]
+        prova("...su fondo trasparente, dove il blu lo mette la tendina",
+              [0, 0, 0], _ang)
+        # E' UN SORRISO: le punte in alto, la pancia in basso al centro —
+        # e' questo che la fa stare nella curva del fondo della capsula
+        _alto = [x for x in range(_w) if _rgba.getpixel((x, 1))[3] > 128]
+        _basso = [x for x in range(_w) if _rgba.getpixel((x, _h - 3))[3] > 128]
+        prova("...un sorriso: le punte in alto ai due capi, la pancia in basso",
+              [True, True],
+              [bool(_alto) and min(_alto) < _w * .2 and max(_alto) > _w * .8,
+               bool(_basso) and _w * .2 < min(_basso) and max(_basso) < _w * .9])
     except ImportError:
-        salta("le misure del tondo di Barattozon", "serve Pillow")
+        salta("le misure della freccia di Barattozon", "serve Pillow")
 
     # --- 2) LA ROTTA: esplicita, come le sorelle -----------------------
     rotta = pezzo("asset_barattozon_tasto")
@@ -50653,7 +50705,7 @@ def prove_tasto_barattozon():
     # --- 3) IL MARKUP: un <div> PRIMA del +, nella barra ---------------
     barra = mini[mini.index("<nav>"):mini.index("</nav>")]
     i_bz = barra.find('<div id="navBarattozon"')
-    prova("il tondo sta nella barra, uno solo", [True, 1],
+    prova("la tendina sta nella barra, una sola", [True, 1],
           [i_bz >= 0, mini.count('id="navBarattozon"')])
     prova("...PRIMA del +: si dipinge sotto di lui, e il + che scende nella "
           "barra gli passa davanti", True,
@@ -50669,8 +50721,8 @@ def prove_tasto_barattozon():
            'onclick="apriBarattozonP2P()"' in _tag,
            "if(event.key==='Enter'||event.key===' ')"
            "{event.preventDefault();apriBarattozonP2P()}" in _tag])
-    prova("...col marchio a 36px, e l'immagine che manca si toglie", True,
-          '<img src="/assets/barattozon-tasto.webp" width="36" height="36" '
+    prova("...con la freccia a 46px, e l'immagine che manca si toglie", True,
+          '<img src="/assets/barattozon-tasto.webp" width="46" height="12" '
           'alt="" onerror="this.remove()"></div>' in barra)
 
     # --- 4) IL CSS: lo accendono le classi che c'erano gia' -------------
@@ -50680,31 +50732,95 @@ def prove_tasto_barattozon():
                   if "navBarattozon" in s)
     VISTO = ("body.nav-p2p.p2p-vendo:not(.p2p-piu-neutro):not(.barra-via) "
              "#navBarattozon")
-    # sei regole e nessuna di piu': chi ne aggiunge una la scrive qui, e
-    # soprattutto nessun'altra lo ACCENDE — il giudice e' uno
-    prova("le regole del tondo sono queste sei", sorted([
-        "#navBarattozon", "#navBarattozon img",
+    # otto regole e nessuna di piu': chi ne aggiunge una la scrive qui, e
+    # soprattutto nessun'altra la ACCENDE — il giudice e' uno
+    prova("le regole della tendina sono queste otto", sorted([
+        "#navBarattozon", "body.p2p-vendo #navBarattozon",
+        "body.p2p-piu-neutro #navBarattozon", "#navBarattozon img",
         "#navBarattozon:focus-visible", VISTO,
         "#navBarattozon", "#navBarattozon"]), _sel)
-    prova("...e una sola lo fa vedere: libro, «Vendi BTC», barra ferma", 1,
+    prova("...e una sola la fa vedere: libro, «Vendi BTC», barra ferma", 1,
           len([1 for s, c in re.findall(r"([^{}]+)\{([^{}]*)\}", senza)
                if "navBarattozon" in s and "visibility:visible" in c]))
-    _base = pezzo_js(css, "  #navBarattozon{position:absolute;", "}")
-    prova("da nascosto e' arrotolato, invisibile e intoccabile", [True] * 4,
-          ["clip-path:inset(-10px -10px 100% -10px)" in _base,
-           "transform:translateY(-8px)" in _base,
-           "visibility:hidden" in _base, "pointer-events:none" in _base])
-    prova("...e corre col solo ritaglio e lo scivolo, mai la geometria",
-          True, "transition:clip-path .4s cubic-bezier(.2,.7,.2,1),\n"
-          "      transform .4s cubic-bezier(.2,.7,.2,1),"
-          "visibility 0s linear .4s}" in _base + "}")
-    _vis = pezzo_js(css, VISTO + "{", "}")
-    prova("...srotolato entra .1s dopo chi esce, la scala della barra", True,
-          "clip-path:inset(-10px -10px -16px -10px);transform:none;" in _vis
-          and "visibility:visible;pointer-events:auto;"
-              "transition-delay:.1s,.1s,0s" in _vis)
-    prova("...e 36px dal bordo della barra, venti sotto il suo filo", True,
-          "top:20px;" in _base and "width:36px;height:36px;" in _base)
+    _base = _regola(css, "  #navBarattozon{position:absolute;", "}")
+    prova("da nascosta e' arrotolata, invisibile e intoccabile", [True] * 3,
+          ["clip-path:inset(0 -24px 100% -24px);" in _base,
+           "visibility:hidden;" in _base, "pointer-events:none;" in _base])
+    # ⚠️ NESSUNO SCIVOLO (emendata: la prima capsula saliva di 8px
+    # rientrando, e gli angoli dritti della cima sporgevano accanto al
+    # cerchio): la tendina si sposta SOLO quando si sposta il +
+    prova("...senza scivolo: nessuna transform sua, da ferma", False,
+          "transform:" in _base)
+    prova("...e corre col ritaglio, lo spostamento del + e il colore, mai "
+          "la geometria", True,
+          "transition:clip-path .4s cubic-bezier(.2,.7,.2,1),\n"
+          "      transform .4s cubic-bezier(.2,.7,.2,1),visibility 0s linear .4s,\n"
+          "      box-shadow .4s ease}" in _base + "}")
+    _vis = _regola(css, VISTO + "{", "}") + "}"
+    prova("...srotolata: il ritaglio .1s dopo (la scala), lo spostamento e i "
+          "colori col +", [True, True, False],
+          ["clip-path:inset(0 -24px -28px -24px);" in _vis,
+           "visibility:visible;pointer-events:auto;"
+           "transition-delay:.1s,0s,0s,0s}" in _vis,
+           "transform" in _vis])
+
+    # LA CAPSULA SI MISURA SUL +, E NON SU NUMERI RICOPIATI: la cima della
+    # tendina deve cadere all'EQUATORE del cerchio (li' e' largo quanto
+    # lei, e i fianchi dritti proseguono i suoi), la larghezza e' la sua,
+    # e fuori dal libro scende quanto scende lui. I numeri si leggono
+    # dalle regole del + — un ritocco a lui che dimentica lei esce qui.
+    def _px(testo, proprieta):
+        m = re.search(re.escape(proprieta) + r":\s*(-?[\d.]+)px", testo)
+        return float(m.group(1)) if m else None
+    _casa = _regola(mini, "  nav button.sell .ic{\n", "}")
+    _nav = _regola(mini, "  nav{\n    position:fixed;bottom:0;", "}")
+    _su = _regola(mini, "  body.nav-p2p nav button.sell .ic{transform:translateY(", "}")
+    _m_su = re.search(r"translateY\((-?[\d.]+)px\)", _su)
+    _m_pad = re.search(r"padding:\s*([\d.]+)px", _nav)
+    _lato = _px(_casa, "width")
+    _equatore = (float(_m_pad.group(1)) + _px(_casa, "margin-top")
+                 + float(_m_su.group(1)) + _lato / 2
+                 if _m_pad and _m_su and _lato and _px(_casa, "margin-top") is not None
+                 else None)
+    prova("la cima della tendina cade all'equatore del + (padding, margine, "
+          "sollevamento e raggio letti da lui)", _equatore, _px(_base, "top"))
+    prova("...larga quanto lui, alta fino a 4px dal fondo, arrotondata col "
+          "suo raggio", [_lato, 66.0, True],
+          [_px(_base, "width"), _px(_base, "height"),
+           ("border-radius:0 0 %gpx %gpx;" % (_lato / 2, _lato / 2)) in _base
+           if _lato else False])
+    _neu = blocco_media("@media (max-width:767px){\n"
+                        "    body.p2p-piu-neutro #navBarattozon{")
+    _m_giu = re.search(r"translateY\((-?[\d.]+)px\)", _neu)
+    prova("...e fuori dal libro scende quanto il + (che li' perde il "
+          "sollevamento), solo sotto i 768px", True,
+          bool(_m_giu and _m_su) and float(_m_giu.group(1)) == -float(_m_su.group(1)))
+    # IL FILO E IL GRADINO SONO QUELLI DEL +, stato per stato: l'ombra
+    # della tendina e' «filo del colore del +» piu' l'ombra del +, e
+    # cambiano insieme con la stessa dissolvenza
+    def _dichiarazione(testo, proprieta):
+        m = re.search(r"(?<![-\w])" + re.escape(proprieta) + r":([^;}]*)", testo)
+        return re.sub(r"\s+", " ", m.group(1)).replace(", ", ",").strip() if m else None
+    _piu = {"compra": _su,
+            "vendo": _regola(mini, "  body.nav-p2p.p2p-vendo nav button.sell .ic{", "}"),
+            "fuori": blocco_media("@media (max-width:767px){\n"
+                                  "    body.nav-p2p.p2p-piu-neutro nav button.sell .ic{")}
+    _tend = {"compra": _base,
+             "vendo": _regola(css, "  body.p2p-vendo #navBarattozon{", "}"),
+             "fuori": _neu}
+    prova("il filo e il gradino della tendina sono quelli del +, nei tre stati",
+          {k: True for k in _piu},
+          {k: (_dichiarazione(_tend[k], "box-shadow")
+               == "inset 0 0 0 2.5px %s,%s" % (_dichiarazione(_piu[k], "background"),
+                                                _dichiarazione(_piu[k], "box-shadow")))
+           for k in _piu})
+    prova("...e il fondo e' il blu della foto, sempre", ["#191D29", None, None],
+          [_dichiarazione(_base, "background"), _dichiarazione(_tend["vendo"], "background"),
+           _dichiarazione(_neu, "background")])
+    _img = _regola(css, "  #navBarattozon img{", "}")
+    prova("la freccia nuda sul blu, 46px, centrata nel blu scoperto", [True, False],
+          ["left:4px;top:41px;\n    width:46px;height:auto;display:block" in _img,
+           "border-radius" in _img])
     prova("reduced-motion lo fa comparire senza corsa", True,
           "@media (prefers-reduced-motion:reduce){\n"
           "    #navBarattozon{transition:none}\n  }" in css)
@@ -50715,12 +50831,12 @@ def prove_tasto_barattozon():
     # scatola del + copre il tondo e sta dopo nel markup, quindi il dito
     # sul marchio apriva il foglio SENZA tabacchino — mentre
     # `element.click()`, che non passa dal bersaglio, diceva che andava.
-    # Mentre il tondo c'e' la scatola lascia passare il dito e il + lo
+    # Mentre la tendina c'e' la scatola lascia passare il dito e il + lo
     # prende col suo cerchio; solo sotto i 768px, che da desktop la
     # pillola si tocca tutta.
     _dito = blocco_media("@media (max-width:767px){\n    " + VISTO.replace(
         "#navBarattozon", "#nav-vendi{"))
-    prova("il dito sul tondo arriva al tondo: la scatola del + lo lascia "
+    prova("il dito sulla tendina arriva alla tendina: la scatola del + lo lascia "
           "passare, il suo cerchio no", [True, True],
           [VISTO.replace("#navBarattozon", "#nav-vendi{\n      pointer-events:none}")
            in _dito,
@@ -50735,7 +50851,7 @@ def prove_tasto_barattozon():
     prova("...solo se il lato lo puo' pubblicare (il giudice dei metodi)",
           True, "if (metodo && metodiPubblicabiliP2P(p2pLato).indexOf(metodo) >= 0)"
           in _ap)
-    prova("il tondo apre il foglio del + col tabacchino", True,
+    prova("la tendina apre il foglio del + col tabacchino", True,
           "apriNuovoOrdineP2P(P2P_TABACCHINO);"
           in pezzo_js(mini, "function apriBarattozonP2P(){", "\n}\n"))
 
@@ -50809,8 +50925,8 @@ console.log(JSON.stringify(out));
               (r.stderr or "")[-600:])
         return
     T = "Contanti al tabacchino"
-    prova("il tondo apre il foglio col tabacchino gia' scelto, e lo trovano "
-          "gia' il disegno e la morfosi", {
+    prova("la tendina apre il foglio col tabacchino gia' scelto, e lo "
+          "trovano gia' il disegno e la morfosi", {
               "passi": ["disegno:" + T, "sheetBg open", "morfosi:" + T,
                         "p2pNuovoSheet open"],
               "metodi": [T], "passo": 1}, out["tondo"])
@@ -50820,8 +50936,62 @@ console.log(JSON.stringify(out));
     prova("il + apre lo stesso foglio senza metodo, come sempre", {
               "passi": ["disegno:", "sheetBg open", "morfosi:",
                         "p2pNuovoSheet open"], "metodi": []}, out["piu"])
-    prova("...e le guardie del + valgono anche per il tondo",
+    prova("...e le guardie del + valgono anche per la tendina",
           [["toast"], ["invito"]], [out["demo"], out["vetrina"]])
+
+    # --- 6) LA SCOSSA DEL LOGO: la classe se ne va, e il saluto e' uno --
+    # (23 set 2026, ritocco di Andrea) Il banco fa girare scuotiLogoP2P
+    # VERA e la riga VERA di go() con un orologio finto: la classe c'e'
+    # durante il dondolio e se ne va col suo tempo; due tocchi di fila
+    # lasciano un solo ritiro in coda; e aprendo il libro quattro volte
+    # si saluta una volta sola.
+    _go = pezzo_js(mini, "function go(view){")
+    _riga_saluto = next((r.strip() for r in _go.splitlines()
+                         if "p2pLogoSalutato = true" in r), "")
+    banco2 = (mini[mini.index("let p2pScossaTimer = null;"):
+                   mini.index("let p2pLogoSalutato = false;")
+                   + len("let p2pLogoSalutato = false;")]
+              + "\nfunction apertura(view){ " + _riga_saluto + " }\n" + r"""
+const pila = {cls: new Set(), get offsetWidth(){ return 1; },
+  classList: {remove(c){ pila.cls.delete(c); }, add(c){ pila.cls.add(c); },
+              contains(c){ return pila.cls.has(c); }}};
+const document = {querySelectorAll: s => s === '.p2p-logo-pila' ? [pila] : []};
+let coda = [], nid = 1;
+function setTimeout(f, ms){ const id = nid++; coda.push({id, f, ms}); return id; }
+function clearTimeout(id){ coda = coda.filter(t => t.id !== id); }
+function scorri(){ const t = coda; coda = []; t.forEach(x => x.f()); }
+const vera = scuotiLogoP2P;
+let scosse = 0;
+scuotiLogoP2P = function(){ scosse++; return vera(); };
+const out = {};
+function caso(nome, f){ try { out[nome] = f(); } catch(e) { out[nome] = 'ESPLOSO: ' + e.message; } }
+caso('giro', () => { vera(); const durante = pila.classList.contains('scossa');
+  const tempi = coda.map(t => t.ms); scorri();
+  return [durante, tempi, pila.classList.contains('scossa')]; });
+caso('dueTocchi', () => { vera(); vera(); const n = coda.length; scorri();
+  return [n, pila.classList.contains('scossa')]; });
+caso('saluto', () => { scosse = 0; apertura('p2p'); apertura('p2pmiei');
+  apertura('p2p'); apertura('p2pinfo'); apertura('p2p'); return scosse; });
+console.log(JSON.stringify(out));
+""")
+    d2 = _tf.mkdtemp()
+    try:
+        p2 = os.path.join(d2, "banco_scossa_logo.js")
+        open(p2, "w", encoding="utf-8").write(banco2)
+        r2 = _sp.run([node, p2], capture_output=True, encoding="utf-8", timeout=60)
+        out2 = (_json.loads(r2.stdout.strip().splitlines()[-1])
+                if r2.returncode == 0 else None)
+    finally:
+        _sh.rmtree(d2, ignore_errors=True)
+    if out2 is None:
+        prova("il banco della scossa del logo gira", "", (r2.stderr or "")[-600:])
+        return
+    prova("il logo dondola, e a fine giro la classe se ne va (400ms)",
+          [True, [400], False], out2["giro"])
+    prova("...due tocchi di fila: un solo ritiro in coda, e poi via", [1, False],
+          out2["dueTocchi"])
+    prova("...e aprendo il libro piu' volte si saluta una volta sola", 1,
+          out2["saluto"])
 
 
 def prove_volti_libro():
