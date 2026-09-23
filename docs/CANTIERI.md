@@ -26822,3 +26822,137 @@ da «Info P2P» lo swipe da sinistra (iPhone) e il tasto indietro
 (Android, in Telegram e nell'APK) portano al libro, e il secondo alla
 home; con un foglio aperto (il Filtro dei miei) il primo chiude il
 foglio.
+
+## La 1.5 rifatta dopo il telefono: la barra nera, la linea di Chrome, il colore in anticipo, il barattolo vero e l'apertura in Telegram (23 set 2026)
+
+La prima 1.5 sul telefono di Andrea (video a 20 fps, 588×1280): **il
+nero dall'icona è sparito**, ma non la pubblica, e i difetti sono
+cinque. Si rifà la STESSA versione (1.5, versionCode 7, mai uscita).
+
+**1) LA BARRA NERA SOPRA LO SPLASH DI SISTEMA**, ~150 ms, ed era nuova
+della 1.5. `Theme.NoTitleBar`, il gemello opaco scelto per il tema
+dell'avvio, vuole `statusBarColor` NERO, e la finestra di partenza del
+telefono di Andrea dipinge le barre dal tema (in AOSP main la finestra
+dello splash è un FrameLayout senza barre sue, quindi il colore lo mette
+chi costruisce Android). La cura è quella che ha scritto Andrea: nel tema
+`statusBarColor` e `navigationBarColor` dell'arancio dello splash
+(`@color/backgroundColor`, #F78F19) e le icone chiare
+(`windowLightStatusBar` e `windowLightNavigationBar` a false). Stanno
+nello stile di base, e lo stile di Android 12 ne è figlio: nell'APK
+compilato aapt2 ha fatto da solo la copia per Android 6+, dove quei due
+attributi esistono.
+
+**2) LA LINEA BIANCA CHE CRESCE SOTTO LA BARRA DI STATO** durante il
+guscio, ~250 ms. È la barra del caricamento di Chrome, che in una TWA,
+con la barra degli strumenti nascosta, resta disegnata in cima quando la
+pagina carica ancora. Andrea sospettava il `replaceState` che toglieva
+`barre` dall'indirizzo, e il sorgente di Chromium dice un'altra cosa,
+che va scritta: in `LoadProgressMediator` una navigazione nella stessa
+pagina esce SUBITO (`if (navigation.isSameDocument()) return;`), e
+`ToolbarManager` non simula niente per lei. Quindi il `replaceState`
+quella linea non l'ACCENDE: la linea è il completamento del caricamento
+vero, visibile se la pagina finisce di caricarsi dopo che lo splash di
+Chrome se n'è andato. Ma il `replaceState` era l'UNICO gesto nuovo della
+1.5 lato pagina, e toglierlo costa niente: dentro l'APK la barra
+dell'indirizzo non c'è, la storia ripete l'indirizzo così com'è, e
+nessuna condivisione copia `location.href` (censite: le leggono solo la
+storia e la diagnosi). Adesso `barreDellApp` LEGGE e basta. Se la linea
+restasse, la prossima cosa da guardare è il TEMPO: con lo splash di
+sistema l'animazione d'ingresso di LauncherActivity dura di più, e la
+libreria, se quando lo splash è consegnato l'animazione non è finita,
+fa precaricare la pagina a Chrome (`mayLaunchUrl`), che cambia quando
+finisce il caricamento rispetto a quando se ne va lo splash.
+
+**3) LA BARRA SCURA 2 FOTOGRAMMI PRIMA CHE IL GUSCIO SCENDA.**
+`togliGuscio` toglieva il guscio e subito dopo richiamava
+`applicaTema`: il `theme-color` passa a Chrome appena lo stile si
+ricalcola, mentre la pagina senza guscio — la vetrina appena montata,
+il fotogramma più pesante dell'apertura — deve ancora essere disegnata.
+Adesso il colore arriva dopo due `requestAnimationFrame` di fila: il
+primo gira all'inizio del fotogramma che toglie il guscio, il secondo a
+quello dopo. Una prova sotto node gira `togliGuscio` vera coi
+fotogrammi di cartone (il guscio va via subito, il colore al secondo
+fotogramma, una volta sola), e il censimento di chi chiama
+`requestAnimationFrame` (sezione degli effetti ridotti) lo nomina col
+suo perché: è un'attesa, non anima niente.
+
+**4) IL BARATTOLO 3 PX PIÙ IN BASSO E 3 PX PIÙ ALTO**, e i numeri si
+spiegavano da soli appena messi i due barattoli uno accanto all'altro:
+**erano due disegni diversi.** Lo splash mostra il vaso della foto
+sorgente dell'icona (più largo, lucchetto più grande, e un'OMBRA sotto
+che sta dentro il suo riquadro); il guscio mostrava quello di
+`barattolo-hero.png`, che riempie tutto il suo. A pari riquadro, il vaso
+vero dello splash è più piccolo e più in alto: esattamente quel che dice
+il video. Il calcolo dello scarto invece era giusto, e ora è provato dal
+vivo: col guscio trattenuto dalla diagnosi, il centro del barattolo cade
+al pixel sul centro dello SCHERMO. La cura è mettere nel guscio lo
+STESSO barattolo: la ricetta di `splash.png` (la foto, lo scontorno, il
+riquadro) a 3x, 331×480, cioè 110,33×160 px CSS.
+⚠️ IL PESO HA DECISO IL FORMATO: in WebP la foto pesa 76-100 KB, due volte
+e mezzo il tetto di 40 KB di data URI che la voce del guscio ha messo in
+una prova (quei byte li scarica chiunque, anche in Telegram). In
+**AVIF a qualità 50** sono 38,3 KB contro i 38,0 di prima, con uno scarto
+medio di 3,5/255 dalla resa senza perdite — a due ingrandimenti quasi
+indistinguibile. Il guscio lo vede solo l'APK, cioè Chrome, che l'AVIF
+lo legge dall'85.
+E LA MISURA IN dp, che era l'altra metà della domanda di Andrea (il
+guscio in px CSS, lo splash in dp): coincidono solo finché lo zoom di
+Chrome sta al 100%. Adesso l'APK passa anche la densità dello schermo
+(`barre=sopra,sotto,densità`, la `densityDpi`), e la pagina scrive
+`--guscio-scala` = densità / `devicePixelRatio`: 1 di solito, e il
+barattolo segue lo zoom quando c'è. Un valore fuori da 0,5-2 non si
+crede. La diagnosi mostra la scala, e il `devicePixelRatio` con tre
+decimali invece di uno.
+
+**5) IN TELEGRAM LA CARD P2P DA SOLA, E POI LA HOME CHE SI SISTEMA.** Il
+commit è `38bb0a7`, il primo del guscio: la riga
+`if (tg) { tg.ready(); tg.expand(); }` diventò `if (tg) tg.expand();`, e
+`ready()` scese dentro `togliGuscio`, per non chiamare «pronta» una
+pagina coperta dall'arancio. Il giorno dopo `c11234b` ha spento il guscio
+fuori dall'APK, e il ritardo è rimasto senza più niente da coprire. In
+Telegram però costava: senza `ready()` il client toglie il suo velo solo
+a pagina caricata (lo dice la documentazione delle Mini App), e a quel
+punto «Da scoprire» è già disegnata con la sola card P2P — le altre
+(la sponsorizzata, che le passa davanti, e le due delle occasioni)
+arrivano con la busta del server. Controllato che nessun altro commit
+recente abbia toccato l'ordine dell'avvio: `renderScoprire` e lo spazio
+sponsorizzato non si muovono dal 1° settembre. `ready()` è tornato dove
+stava, accanto a `expand()`, e da `togliGuscio` è sparito.
+
+**PROVATO QUI.** L'APK rifatto su una copia del progetto di oggi:
+`bubblewrap update --skipVersionUpgrade` (versione e versionCode
+fermi a 1.5/7, e il Java di nuovo pulito), lo script, Gradle offline.
+Nell'APK: gli stili coi colori delle barre (base e copia per Android
+6+), il manifest come prima, nel dex le tre cure e, nel bytecode,
+`getDisplayMetrics().densityDpi` nella stringa di `barre`. Dal vivo,
+Chrome headless via CDP a 360×784 (pagina 726, densità 3) col
+referrer dell'APK: l'indirizzo resta com'era, `--guscio-su` 13 px
+(strada `app`), il guscio scende al fotogramma 4 e il colore scuro
+arriva al 6; il barattolo trattenuto è 331×480 decodificato, 110,33×160
+col centro a 350 = centro dello schermo meno la barra di stato, e con
+la densità 504 cresce a 115,84×168 sullo stesso centro. Prove: le
+sezioni del guscio, delle barre e dell'avvio aggiornate, più la prova
+del colore in ritardo e quella della diagnosi coi tre numeri; suite
+**13527/0** con `PROVE_SEVERE=1`, nove collaudi verdi, tortura
+**18/18** senza inciampate (una mutazione era partita a vuoto su
+un'ancora LF in un file CRLF, e si è rifatta a parte).
+⚠️ **UNA TRAPPOLA DELLA LITURGIA, trovata qui e scritta in
+PRODUZIONE**: lo script riconosce i suoi blocchi dal marcatore e quelli
+che trova li SALTA — quindi per rifare la 1.5 l'`update` non si può
+saltare, o `barre` resterebbe senza la densità, in silenzio.
+
+**NON PROVATO: il telefono**, di nuovo. In particolare la linea di
+Chrome (se resta, la domanda passa al tempo del precaricamento), la
+barra durante lo splash di sistema su telefoni che la disegnano in
+altro modo, e Telegram, dove il velo lo toglie il client.
+
+### Da guardare sul telefono
+
+Con la 1.5 rifatta, a freddo e con un video a 20 fps: 1) la barra di
+stato arancio dallo splash di sistema alla vetrina, con le icone chiare;
+2) nessuna linea bianca sotto la barra durante il guscio; 3) la barra
+che diventa scura INSIEME al guscio che scende, non prima; 4) il
+barattolo identico e fermo dallo splash al guscio (stessa forma, stessa
+misura, stesso posto); 5) in Telegram, l'apertura della mini app senza la
+card P2P che compare da sola; 6) `?diagnosi=1` → «Apri nell'app»: la
+riga delle barre con la scala (1 di solito).

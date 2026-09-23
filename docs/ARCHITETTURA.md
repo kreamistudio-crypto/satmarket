@@ -22572,7 +22572,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (`ActivityRecord.validateStartingWindowTheme`) e la finestra che
   cresceva dall'icona era nera per un fotogramma. È il gemello opaco
   di quello (`Theme.NoTitleBar`, nessuna ombra né animazione di
-  finestra sua), il fondo è l'arancio col barattolo di `splash.png`, e
+  finestra sua, ma le barre dell'arancio dello splash con le icone
+  chiare, che quel tema voleva nere), il fondo è l'arancio col
+  barattolo di `splash.png`, e
   in `values-v31` veste lo splash del SISTEMA con lo stesso arancio e
   `barattolo_avvio_icona.png` (tela da 162dp col barattolo a 160/288
   del lato: il sistema la ridipinge a 108dp e la ingrandisce a 192, e
@@ -22580,10 +22582,18 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `splash.png`). Il resto dell'app resta traslucido. Nel Java, lo
   splash di sistema esce di taglio (`setOnExitAnimationListener` →
   `remove()`), e `getLaunchingUrl()` aggiunge alla URL della libreria
-  `barre=sopra,sotto` in pixel veri (da Android 11, `WindowMetrics`):
-  è il CONTRATTO con la pagina, che lo legge e lo toglie nell'head
-  (`barreDellApp`) e lo passa a `scartoGuscio` (strada `app`; la stima
-  dei 16 px resta per la 1.4). I due file di testo che Bubblewrap
+  `barre=sopra,sotto,densità` — le barre in pixel veri e la
+  `densityDpi` (da Android 11, `WindowMetrics`): è il CONTRATTO con la
+  pagina, che nell'head lo LEGGE soltanto (`barreDellApp`, l'indirizzo
+  non si tocca), lo passa a `scartoGuscio` (strada `app`; la stima dei
+  16 px resta per la 1.4) e ne ricava `--guscio-scala`, che porta i
+  160 px CSS del barattolo del guscio ai 160 dp dello splash anche con
+  lo zoom di Chrome. E il barattolo del guscio È quello dello splash:
+  stessa ricetta di `splash.png`, incorporata in AVIF (in WebP la foto
+  pesava il doppio del tetto di 40 KB). Nello stesso giro `ready()` di
+  Telegram è tornato all'avvio accanto a `expand()`, com'era prima del
+  guscio, e `togliGuscio` porta il colore del tema due fotogrammi dopo
+  aver tolto il guscio. I due file di testo che Bubblewrap
   rigenera si preparano in memoria e si scrivono solo se tutte le
   ancore ci sono. Il prezzo scelto da Andrea: un lampo arancio quando
   un link arriva ad app già aperta. Il perché per intero sta in
