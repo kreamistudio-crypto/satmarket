@@ -15876,26 +15876,40 @@
   il mercatino INTERO: senza il ritorno a «Tutto» si atterrerebbe su
   una vetrina ancora filtrata con la nav accesa su Sfoglia, che è
   esattamente la bugia che `ramoVetrina` esiste per non dire.
-  IL LIBRO È LA MADRE DEL P2P (23 set 2026, ritocco di Andrea): da «I
-  miei scambi» e da «Info P2P» l'indietro passa dal libro ordini, e dal
-  libro alla home come sempre. Le tre voci restano radici sorelle (si
-  SOSTITUISCONO) e la cronologia non cambia forma: la regola è un
-  giudice puro sul passo INDIETRO, `passoIndietroP2P`, chiamato da
-  `navApplica` — cioè dall'ascoltatore di popstate, dove arrivano anche
-  i gesti di SISTEMA della PWA e dell'APK, e non da `navIndietro`, che
-  quelli non chiamano (la lezione dei DUE CONTESTI qui sopra). Uscendo
-  dal P2P da una figlia (`'libro'`) si disegna il libro e se ne SPINGE
-  la entry sopra quella d'arrivo: regge perché sotto una figlia c'è
-  sempre una entry nostra — nel P2P si entra spingendo dalla madre. I
-  gradini del P2P rimasti sotto da un cambio di voce fatto dalla pagina
-  di uno scambio, o da un foglio chiuso a mano (`'oltre'`), si saltano
-  senza disegnarli: dal libro tutti, da una figlia tutti tranne il
-  libro. Vale solo all'indietro (`navDVisto`, la `d` della entry a
-  schermo: un avanti del browser va dove dice la sua entry) e mai sul
-  tocco del mercatino (`navVersoMadre`, che `vaiEsplora` alza quando
-  consuma il gradino). Il foglio aperto si chiude prima, perché è uno
-  strato. Perché e prove: CANTIERI, «Il metodo prima dell'importo, e
-  l'indietro che passa dal libro».
+  IL LIBRO È LA MADRE DEL P2P, E LA PILA LO SA GIÀ (23 set 2026,
+  ritocco di Andrea, rifatto la sera stessa): da «I miei scambi» e da
+  «Info P2P» l'indietro porta al libro ordini, e dal libro alla home
+  come sempre — perché la cronologia VERA è già quella: sotto una
+  figlia c'è la entry del libro, sotto il libro quella del mercatino.
+  Si sistema quando si ENTRA, mai al popstate: lo swipe di iOS e
+  l'indietro predittivo di Android mostrano, mentre il dito scorre,
+  l'istantanea della entry che sta davvero sotto (il browser la scatta
+  quando la si lascia), e una deviazione fatta dopo si vede — è la
+  prima stesura di quel giorno, tolta. OGNI ENTRY PORTA LE PILE DI
+  QUELLE CHE HA SOTTO (`sotto`, dal fondo; `d` ne è la lunghezza,
+  seminata a `[]` da `navMotore`), e `navRiflette` le legge prima di
+  scrivere col giudice puro `passoPilaP2P`: dal libro a una figlia si
+  SPINGE, fra le due figlie e sopra uno scambio aperto dal libro si
+  SOSTITUISCE, e un gradino che la pila giusta non ha (uno scambio
+  aperto da una figlia, un foglio chiuso a mano, la sezione del P2P
+  quando si va a un'altra radice) si CONSUMA con `navGiu`, un
+  `history.back()` nostro: finché è in volo non si scrive, e
+  all'approdo `navApplica` non ridisegna niente e richiama
+  `navRiflette`, che decide di nuovo — un gradino alla volta. Si scende
+  solo verso entry già fotografate col loro contenuto, e una radice che
+  lascia il P2P prende il posto del libro: l'istantanea del mercatino
+  sotto resta quella vera. Il popstate dell'utente riapplica e basta.
+  Uno strato NATO INSIEME a un cambio di pagina (il tour del P2P, che
+  la prima volta si apre sul libro nello stesso tocco in cui ci si
+  torna) decide per la pagina che porta: si scende al libro e lo strato
+  gli va sopra. Nato con l'ingresso dal mercatino resta invece dentro
+  la entry del libro, com'era: due entry scritte nello stesso giro
+  darebbero al libro l'istantanea della home.
+  Resta da sapere per gesto vero: una figlia aperta da FUORI dal P2P
+  (nessuna strada dell'interfaccia oggi) scrive il libro senza averlo
+  mai disegnato, quindi la sua istantanea sarebbe la pagina di prima.
+  Perché e prove: CANTIERI, «L'indietro del P2P: la pila giusta da
+  subito».
   Telegram: `navFreccia` mostra il `BackButton` (Bot API 6.1) solo
   quando c'è dove tornare — ed è la STESSA domanda di `navIndietro`,
   quindi un giudice solo, o la freccia e il gesto divergono. Resta

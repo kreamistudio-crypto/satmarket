@@ -65150,16 +65150,20 @@ def prove_libro_vuoto_monete():
 
 
 def prove_indietro_dal_libro():
-    """DENTRO IL P2P SI PASSA DAL LIBRO (23 set 2026, ritocco di Andrea):
-    lo swipe e il tasto indietro — di sistema, cioe' la cronologia, o di
-    Telegram, cioe' `navIndietro` — da «I miei scambi» e da «Info P2P»
-    portano al libro ordini, e dal libro alla home del mercatino come
-    prima. Senza giri (libro ↔ miei), e col foglio aperto che si chiude
-    PRIMA di cambiare pagina. Il banco fa girare il MOTORE VERO della
-    cronologia sotto node — navRiflette, navApplica, navIndietro,
-    navMotore, vaiEsplora — con una cronologia di cartone che consegna i
-    popstate come il browser: dopo, in un giro suo."""
-    print("\n--- L'INDIETRO DEL P2P PASSA DAL LIBRO ---")
+    """DENTRO IL P2P SI PASSA DAL LIBRO, E LA CRONOLOGIA LO SA GIA' (23 set
+    2026, rifatto la sera stessa). Da «I miei scambi» e da «Info P2P»
+    l'indietro porta al libro, e dal libro al mercatino — ma non piu'
+    deviando al popstate: la pila VERA e' gia' quella giusta, sistemata
+    nel momento in cui si entra. Lo swipe di iOS e l'indietro predittivo
+    di Android mostrano l'istantanea della entry che sta davvero sotto:
+    con la deviazione si vedeva lampeggiare la home, o «I miei scambi».
+    Il banco fa girare il MOTORE VERO della cronologia sotto node —
+    navRiflette, navApplica, navIndietro, navMotore, vaiEsplora e il
+    giudice passoPilaP2P — con una cronologia di cartone che consegna i
+    popstate come il browser, dopo, in un giro loro. E guarda tre cose a
+    ogni passo: quel che si vede, la FORMA della pila, e che durante un
+    indietro il codice non faccia nessuna mossa sua."""
+    print("\n--- L'INDIETRO DEL P2P: LA PILA GIUSTA DA SUBITO ---")
     import shutil
     import subprocess
     import tempfile
@@ -65173,15 +65177,28 @@ def prove_indietro_dal_libro():
         i = mini.index(inizio)
         return mini[i:mini.index(fine, i) + len(fine)]
 
-    # --- 1) SUL TESTO: una regola sola, nel posto da cui passano tutti ---
+    # --- 1) SUL TESTO: la regola sta dove si SCRIVE, non dove si arriva ---
+    _rf = pezzo_js(mini, "function navRiflette(){", "\n}\n")
     _ap = pezzo_js(mini, "function navApplica(s){", "\n}\n")
-    prova("la regola sta in navApplica, da cui passano swipe, tasto di sistema e tasto di Telegram",
-          True, "passo = passoIndietroP2P(" in _ap
-          and "if (passo === 'oltre') { history.back(); return; }" in _ap
-          and "history.pushState({app:'brt', pila: bersaglio, d: dArrivo + 1}" in _ap)
-    prova("...e il tocco sul mercatino non ci passa: vaiEsplora lo dice", True,
-          "navVersoMadre = Date.now(); navIndietro(); return;"
-          in pezzo_js(mini, "function vaiEsplora(){", "\n}\n"))
+    prova("il giudice del P2P sta in navRiflette, prima dei rami di sempre", True,
+          "const passo = passoPilaP2P(ora, st, sotto);" in _rf
+          and "if (passo === 'giu') { navGiu(); return; }" in _rf
+          and _rf.index("passoPilaP2P(") < _rf.index("primoPassoViaDaCasa"))
+    prova("...e ogni entry si porta le pile che ha sotto, dalla prima in poi", True,
+          "{app:'brt', pila, d, sotto: sottoNuovo}" in _rf
+          and "{app:'brt', pila: navPila(), d:0, sotto: []}"
+          in pezzo_js(mini, "function navMotore(){", "\n}\n"))
+    # ⚠️ NESSUNA DEVIAZIONE AL POPSTATE: navApplica riapplica la entry
+    # d'arrivo e basta — l'unica riga sua nuova e' l'approdo di un passo
+    # NOSTRO (navGiu), dove non ridisegna niente
+    prova("navApplica non devia piu': nessuna spinta, nessun passo in piu', solo l'approdo di navGiu",
+          [False, False, True],
+          ["pushState" in _ap,
+           re.search(r"history\.back\(\)", _ap.split("if (uscitaDopoAnnullo)")[0]) is not None,
+           "if (navGiuInVolo) { navGiuInVolo = 0; navRiflette(); return; }" in _ap])
+    prova("...e della prima stesura non resta niente: ne' il giudice all'uscita ne' le sue due bandierine",
+          [0, 0, 0], [mini.count("passoIndietroP2P"), mini.count("navDVisto"),
+                      mini.count("navVersoMadre")])
     prova("le tre voci del P2P restano radici sorelle, e il libro e' la madre delle altre due", True,
           "const MADRE_P2P = 'p2p';" in mini
           and "const FIGLIE_P2P = new Set(['p2pmiei', 'p2pinfo']);" in mini
@@ -65190,14 +65207,14 @@ def prove_indietro_dal_libro():
 
     node = shutil.which("node")
     if not node:
-        salta("il banco dell'indietro del P2P", "serve node")
+        salta("il banco della pila del P2P", "serve node")
         return
     _funz = ("function navVista(){", "function navPila(){", "function navChiudiStrato(s){",
              "function navRendiVista(b){", "function navRiflette(){",
              "function navApplica(s){", "function navIndietro(){", "function navFreccia(pila){",
-             "function navMotore(){", "function passoIndietroP2P(qui, la, o){",
-             "function vaiEsplora(){", "function consumaGradinoReparto(){",
-             "function tornaATutto(){")
+             "function navMotore(){", "function passoPilaP2P(ora, st, sotto){",
+             "function navGiu(){", "function vaiEsplora(){",
+             "function consumaGradinoReparto(){", "function tornaATutto(){")
     _prog = (
         _blocco("const RADICI = new Set([", "]);") + "\n"
         + "\n".join(re.search(r"const " + n + r" = [^\n]*;", mini).group(0) for n in (
@@ -65206,14 +65223,19 @@ def prove_indietro_dal_libro():
         + _blocco("const navUguali = ", "));") + "\n"
         + "".join(_intera(f) for f in _funz)
         + r"""
-let CUR = 'esplora', APERTI = [], CHIUSO = 0, USCITO = 0, CODA = [];
+let CUR = 'esplora', APERTI = [], CHIUSO = 0, USCITO = 0, CODA = [], LOG = [];
+/* PERDI: il popstate del prossimo indietro non arriva mai; SPOSTA: di
+   quanto l'orologio e' andato avanti (il tetto del passo in volo) */
+let PERDI = 0, SPOSTA = 0;
+const _adesso = Date.now;
+Date.now = () => _adesso() + SPOSTA;
 let currentListing = null, currentOrder = null, negozioPag = {chi: ''}, paccoDati = null, acqDati = null;
-let p2pOrdineAperto = '', ramoVetrina = 'esplora', activeCat = 'Tutto';
+let p2pOrdineAperto = '', ramoVetrina = 'esplora', activeCat = 'Tutto', negozioCorrente = null;
 let tourInCorso = false, tourP2PInCorso = false, testModaleInCorso = false;
 let vistaBarattolo = false, filtroAsta = false, pollTimer = null;
 const DEMO = false, STORIA = true;
 let navSpingi = false, navGradinoReparto = 0, navApplicando = false, uscitaDopoAnnullo = false;
-let navUltimo = 0, navDVisto = 0, navVersoMadre = 0;
+let navUltimo = 0, navGiuInVolo = 0;
 const location = {href: 'https://barattolo.store/', protocol: 'https:'};
 const tg = {initData: 'x', close(){ CHIUSO++; }, BackButton: {show(){}, hide(){}},
   isVersionAtLeast: () => true, disableVerticalSwipes(){}, onEvent(){}};
@@ -65234,29 +65256,44 @@ function go(v){ CUR = v; osserva(); }
 function setCat(c){ activeCat = c; }
 function ordiniP2P(){ return {x1: {}}; }
 function apriOrdineP2P(id){ p2pOrdineAperto = id; go('p2pordine'); }
+function apriNegozio(){ go('negozio'); return Promise.resolve(); }
 function chiudiPicker(){} function chiudiLightbox(){} function chiudiTour(){}
 function chiudiTourP2P(){} function chiudiModaleTest(){}
 function aggiornaPicker(){} function renderGrid(){} function alternaBarattolo(){}
 function loadListings(){ return Promise.resolve(); }
+/* i passi NOSTRI si contano: durante un indietro dell'utente non ce ne
+   devono essere (niente deviazioni al popstate) */
+const _navGiu = navGiu;
+navGiu = function(){ LOG.push('giu'); return _navGiu(); };
 /* ---- LA CRONOLOGIA DI CARTONE: push, replace, e i popstate
    consegnati DOPO, in un giro loro, come fa il browser ---- */
 const history = {
   voci: [], i: -1, scrollRestoration: 'auto',
   get state(){ return this.i >= 0 ? this.voci[this.i] : null; },
-  pushState(s){ this.voci = this.voci.slice(0, this.i + 1);
+  pushState(s){ LOG.push('push'); this.voci = this.voci.slice(0, this.i + 1);
     this.voci.push(JSON.parse(JSON.stringify(s))); this.i++; },
-  replaceState(s){ const c = JSON.parse(JSON.stringify(s));
+  replaceState(s){ LOG.push('replace'); const c = JSON.parse(JSON.stringify(s));
     if (this.i < 0) { this.voci = [c]; this.i = 0; } else this.voci[this.i] = c; },
-  back(){ CODA.push(() => { if (this.i > 0) { this.i--; navApplica(this.state); } else USCITO++; }); },
-  forward(){ CODA.push(() => { if (this.i < this.voci.length - 1) { this.i++; navApplica(this.state); } }); }
+  back(){ LOG.push('back'); if (PERDI) { PERDI--; return; }
+    CODA.push(() => { if (this.i > 0) { this.i--; navApplica(this.state); } else USCITO++; }); },
+  forward(){ LOG.push('avanti'); CODA.push(() => { if (this.i < this.voci.length - 1) { this.i++; navApplica(this.state); } }); }
 };
 const pausa = () => new Promise(r => setImmediate(r));
 async function scorri(){ await pausa(); let g = 0;
-  while (CODA.length && g++ < 60) { CODA.shift()(); await pausa(); } }
+  while (CODA.length && g++ < 80) { CODA.shift()(); await pausa(); } }
 const vista = () => CUR + (APERTI.length ? '+' + APERTI.join('+') : '');
+const base = p => (p && p[0] && p[0].t === 'v') ? p[0].v : '?';
+/* la FORMA della pila fino alla entry corrente: le viste, dal fondo */
+const forma = () => history.voci.slice(0, history.i + 1).map(v => base(v.pila)
+  + (v.pila.length > 1 ? '+' + v.pila.slice(1).map(x => x.k).join('+') : ''));
+/* il registro di `sotto` dice il vero? ogni entry deve portare
+   ESATTAMENTE le pile di quelle che ha sotto */
+const sottoGiusto = () => history.voci.slice(0, history.i + 1).every((v, k) =>
+  Array.isArray(v.sotto) && v.d === k
+  && JSON.stringify(v.sotto) === JSON.stringify(history.voci.slice(0, k).map(x => x.pila)));
 function azzera(){
-  CUR = 'esplora'; APERTI = []; CHIUSO = 0; USCITO = 0; CODA = []; p2pOrdineAperto = '';
-  history.voci = []; history.i = -1; navDVisto = 0; navVersoMadre = 0; navUltimo = 0;
+  CUR = 'esplora'; APERTI = []; CHIUSO = 0; USCITO = 0; CODA = []; LOG = []; p2pOrdineAperto = ''; PERDI = 0;
+  history.voci = []; history.i = -1; navGiuInVolo = 0; navUltimo = 0; activeCat = 'Tutto';
   navMotore();
 }
 /* l'indietro nelle sue due strade: il tasto di Telegram (e la freccia
@@ -65268,19 +65305,42 @@ function passo(p, via){
   else if (p === '>') history.forward();
   else if (p === 'mercatino') { navUltimo = 0; vaiEsplora(); }
   else if (p === 'ordine') apriOrdineP2P('x1');
+  else if (p === 'ritirato') { p2pOrdineAperto = ''; go('p2pmiei'); }
+  /* la discesa in un reparto, con la bandierina di apriCategoria */
+  else if (p === 'reparto') { navSpingi = true; activeCat = 'Casa'; go('esplora'); }
+  /* un foglio chiuso a mano, e la vista dopo nel microtask seguente:
+     il passo nostro e' ancora in volo quando il DOM si muove di nuovo */
+  else if (p[0] === '-' && p.indexOf('~') > 0) { const [f, dopo] = p.slice(1).split('~');
+    el(f).classList.remove('open'); Promise.resolve().then(() => passo(dopo, via)); }
+  /* chiuso a mano E cambiato di vista nello stesso giro, come fa
+     apriInfoTabacchinoP2P: l'osservatore vede le due cose insieme */
+  else if (p.indexOf('>') > 0) { const [f, v] = p.split('>');
+    APERTI = APERTI.filter(x => x !== f); go(v); }
+  /* una vista e uno strato NATI INSIEME, come il tour del P2P che la
+     prima volta si apre sul libro nello stesso tocco in cui ci si torna */
+  else if (p.indexOf('+') > 0) { const [v, f] = p.split('+'); APERTI.push(f); go(v); }
+  else if (p === 'perso') PERDI = 1;
+  else if (p === 'tardi') SPOSTA += 1600;
   else if (p[0] === '+') { APERTI.push(p.slice(1)); osserva(); }
   else if (p[0] === '-') el(p.slice(1)).classList.remove('open');
   else go(p);
 }
 async function giro(passi, via){
   azzera(); await scorri();
-  const visti = [];
-  let massimo = history.voci.length;
+  const visti = [], forme = [], mosse = [], chiavi = [];
+  let massimo = history.voci.length, registro = true;
   for (const p of passi) {
-    passo(p, via); await scorri(); visti.push(vista());
+    const l0 = LOG.length;
+    passo(p, via); await scorri();
+    visti.push(vista()); forme.push(forma().join(' '));
+    chiavi.push(history.voci.slice(0, history.i + 1).map(v => String(v.pila[0].k)).join(' '));
+    /* durante un indietro: solo l'indietro, nessuna mossa del codice */
+    if (p === '<') mosse.push(LOG.slice(l0).filter(x => x !== 'back').length);
     massimo = Math.max(massimo, history.voci.length);
+    registro = registro && sottoGiusto();
   }
-  return {visti, fondo: history.i, massimo, chiuso: CHIUSO, uscito: USCITO};
+  return {visti, forme, chiavi, mosse: mosse.reduce((a, b) => a + b, 0), massimo,
+          fondo: history.i, chiuso: CHIUSO, uscito: USCITO, registro};
 }
 const SCENARI = {
   miei: ['p2p', 'p2pmiei', '<', '<', '<'],
@@ -65288,61 +65348,113 @@ const SCENARI = {
   mieiInfo: ['p2p', 'p2pmiei', 'p2pinfo', '<', '<'],
   giri: ['p2p', 'p2pmiei', 'p2p', 'p2pmiei', 'p2p', 'p2pmiei', '<', '<'],
   foglio: ['p2p', 'p2pmiei', '+p2pFiltroMieiSheet', '<', '<', '<'],
+  foglioAMano: ['p2p', 'p2pmiei', '+p2pFiltroMieiSheet', '-p2pFiltroMieiSheet', '<', '<'],
   ordineInfo: ['p2p', 'p2pmiei', 'ordine', 'p2pinfo', '<', '<'],
   ordineLibro: ['p2p', 'p2pmiei', 'ordine', 'p2p', '<'],
+  ritirato: ['p2p', 'p2pmiei', 'ordine', 'ritirato', '<', '<'],
   libro: ['p2p', '<'],
   mercatino: ['p2p', 'p2pmiei', 'mercatino', '<'],
+  profilo: ['p2p', 'p2pmiei', 'profilo', '<', '<'],
   pubblica: ['p2p', '+p2pNuovoSheet', '-p2pNuovoSheet', 'ordine', '<', '<'],
-  dettInfo: ['p2p', '+p2pDettSheet', '-p2pDettSheet', 'p2pinfo', '<', '<']
+  pubblicaSubito: ['p2p', '+p2pNuovoSheet', '-p2pNuovoSheet~ordine', '<', '<'],
+  reparto: ['p2p', 'p2pmiei', 'reparto', '<'],
+  dettInfo: ['p2p', '+p2pDettSheet', 'p2pDettSheet>p2pinfo', '<', '<'],
+  negozio: ['p2p', '+p2pDettSheet', 'p2pDettSheet>negozio', 'p2p', '<'],
+  fuori: ['p2pmiei', '<', '<'],
+  fuoriProfilo: ['profilo', 'p2pmiei', '<', '<'],
+  negozioClassifica: ['p2p', '+p2pDettSheet', 'p2pDettSheet>negozio', 'classifica', 'mercatino', '<'],
+  tourLibro: ['p2p', 'p2pmiei', 'p2p+p2pTour', '<', '<'],
+  tourCasa: ['p2p+p2pTour', '<'],
+  ordineFoglio: ['p2p', 'p2pmiei', 'ordine', '+p2pVotoSheet', '-p2pVotoSheet', '<', '<', '<'],
+  voloPerso: ['p2p', 'p2pmiei', '+p2pFiltroMieiSheet', 'perso', '-p2pFiltroMieiSheet', 'tardi', 'p2pinfo', '<', '<']
 };
 /* IL GIRO A CASO: una strada qualunque dentro il P2P — voci della nav,
-   scambi aperti, fogli aperti e chiusi a mano, il mercatino e ritorno —
-   e poi SOLO INDIETRO finche' non si esce. Quattro cose devono valere
-   sempre: si finisce; dal P2P si esce SOLO dal libro; dal libro non si
-   torna mai dentro il P2P (il giro libro ↔ miei); e da «I miei scambi»
-   o da «Info P2P» l'indietro va al libro, mai a una sorella o a uno
-   scambio. Il seme e' fisso: un rosso si rifa' identico. */
+   scambi aperti, fogli aperti e chiusi a mano, il profilo e il
+   mercatino e ritorno — e poi SOLO INDIETRO finche' non si esce. Dopo
+   OGNI mossa la pila dev'essere giusta (sotto una figlia il libro,
+   sotto il libro fuori dal P2P, e il registro di `sotto` fedele), e
+   durante gli indietro il codice non deve muovere niente di suo; poi
+   si finisce, da una figlia si va al libro, dal libro si esce, ogni
+   indietro cambia qualcosa, e l'ultimo parte dalla home. Il seme e'
+   fisso: un rosso si rifa' identico. */
 async function aCaso(n, via){
   let seme = 20260923;
-  const caso = k => { seme = (seme * 1103515245 + 12345) % 2147483648; return seme % k; };
+  /* Park-Miller: il prodotto resta sotto 2^53, cioe' intero ESATTO in
+     un double, e si sceglie coi bit ALTI. Il generatore di prima
+     moltiplicava per 1103515245: oltre 2^53 i bit bassi si perdevano, e
+     con due mosse possibili sceglieva sempre la stessa. */
+  const caso = k => { seme = (seme * 48271) % 2147483647; return Math.floor(seme * k / 2147483647); };
   const P2P = new Set(['p2p', 'p2pmiei', 'p2pinfo', 'p2pordine']);
-  const base = s => s.split('+')[0];
-  const guasti = [];
+  const guasti = [], conta = {};
   let indietroTot = 0;
+  const giusta = () => {
+    const f = history.voci.slice(0, history.i + 1);
+    const qui = f[f.length - 1], sotto1 = f[f.length - 2], sotto2 = f[f.length - 3];
+    if (!sottoGiusto()) return 'il registro di sotto non dice il vero';
+    if (!APERTI.length && (CUR === 'p2pmiei' || CUR === 'p2pinfo')) {
+      if (!sotto1 || base(sotto1.pila) !== 'p2p' || sotto1.pila.length !== 1) return 'sotto ' + CUR + ' non c\'e\' il libro';
+      if (sotto2 && P2P.has(base(sotto2.pila))) return 'sotto il libro c\'e\' ' + base(sotto2.pila);
+    }
+    if (!APERTI.length && CUR === 'p2p' && sotto1 && P2P.has(base(sotto1.pila)))
+      return 'sotto il libro c\'e\' ' + base(sotto1.pila);
+    if (qui && base(qui.pila) !== CUR) return 'la entry dice ' + base(qui.pila) + ' e si vede ' + CUR;
+    /* uno strato sta sopra la SUA pagina: il primo indietro chiude lui */
+    if (APERTI.length && sotto1 && base(sotto1.pila) !== CUR) return 'sotto lo strato c\'e\' ' + base(sotto1.pila);
+    return '';
+  };
   for (let g = 0; g < n; g++) {
     azzera(); await scorri();
     passo('p2p', via); await scorri();
     const fatti = ['p2p'];
-    const lung = 1 + caso(9);
-    for (let k = 0; k < lung; k++) {
+    const lung = 1 + caso(10);
+    let male = '';
+    for (let k = 0; k < lung && !male; k++) {
       let mosse;
       if (APERTI.length) mosse = ['chiudi', '<'];
-      else if (CUR === 'esplora') mosse = ['p2p'];
-      else mosse = ['p2p', 'p2pmiei', 'p2pinfo', 'foglio', 'mercatino']
-        .concat(CUR === 'p2p' || CUR === 'p2pmiei' ? ['ordine', 'ordine'] : []);
+      else if (CUR === 'esplora' || CUR === 'profilo') mosse = ['p2p'];
+      else mosse = ['p2p', 'p2pmiei', 'p2pinfo', 'foglio', 'mercatino', 'profilo', 'reparto']
+        .concat(CUR === 'p2p' || CUR === 'p2pmiei' ? ['ordine', 'ordine'] : [])
+        .concat(CUR === 'p2pordine' ? ['ritirato', 'ritirato'] : [])
+        /* il tour che nasce col ritorno al libro, e un indietro a meta' strada */
+        .concat(CUR !== 'p2p' ? ['tour'] : [], ['<']);
       const m = mosse[caso(mosse.length)];
       fatti.push(m);
+      conta[m] = (conta[m] || 0) + 1;
+      const l0 = LOG.length;
       if (m === 'chiudi') passo('-' + APERTI[APERTI.length - 1], via);
       else if (m === 'foglio') passo('+p2pFoglio', via);
+      else if (m === 'tour') passo('p2p+p2pTour', via);
       else passo(m, via);
       await scorri();
+      if (m === '<' && LOG.slice(l0).some(x => x !== 'back')) male = 'durante un indietro il codice ha mosso la pila';
+      else male = giusta();
     }
     const strada = [vista()];
     let volte = 0;
-    while (!CHIUSO && !USCITO && volte++ < 40) { indietro(via); await scorri(); strada.push(vista()); }
-    indietroTot += volte;
-    let male = volte >= 40 ? 'non finisce' : '';
-    for (let k = 1; k < strada.length && !male; k++) {
-      const a = base(strada[k - 1]), b = base(strada[k]);
-      if (P2P.has(a) && !P2P.has(b) && a !== 'p2p') male = 'esce dal P2P da ' + a;
-      if (a === 'p2p' && P2P.has(b) && b !== 'p2p') male = 'dal libro torna a ' + b;
-      if ((a === 'p2pmiei' || a === 'p2pinfo') && P2P.has(b) && b !== 'p2p' && b !== a)
-        male = 'da ' + a + ' torna a ' + b;
+    while (!male && !CHIUSO && !USCITO && volte++ < 40) {
+      /* a vuoto = NIENTE cambia: ne' la vista, ne' i fogli, ne' la
+         categoria (da un reparto alla home cambia solo quella) */
+      const prima = JSON.stringify([CUR, APERTI, activeCat]), l0 = LOG.length;
+      indietro(via); await scorri();
+      strada.push(vista());
+      if (LOG.slice(l0).some(x => x !== 'back')) male = 'durante un indietro il codice ha mosso la pila';
+      else if (!CHIUSO && !USCITO && JSON.stringify([CUR, APERTI, activeCat]) === prima) male = 'un indietro a vuoto';
+      else if (!CHIUSO && !USCITO) male = giusta();
     }
-    if (!male && base(strada[strada.length - 1]) !== 'esplora') male = 'non esce dalla home';
-    if (male) guasti.push({fatti, strada, male});
+    indietroTot += volte;
+    if (!male && volte >= 40) male = 'non finisce';
+    const b = s => s.split('+')[0];
+    for (let k = 1; k < strada.length && !male; k++) {
+      const a = b(strada[k - 1]), c = b(strada[k]);
+      if (P2P.has(a) && !P2P.has(c) && a !== 'p2p') male = 'esce dal P2P da ' + a;
+      if (a === 'p2p' && P2P.has(c) && c !== 'p2p') male = 'dal libro torna a ' + c;
+      if ((a === 'p2pmiei' || a === 'p2pinfo') && P2P.has(c) && c !== 'p2p' && c !== a)
+        male = 'da ' + a + ' torna a ' + c;
+    }
+    if (!male && b(strada[strada.length - 1]) !== 'esplora') male = 'non esce dalla home';
+    if (male) guasti.push({fatti, strada, male, forma: forma()});
   }
-  return {guasti: guasti.slice(0, 3), quanti: guasti.length, giri: n, indietro: indietroTot};
+  return {guasti: guasti.slice(0, 3), quanti: guasti.length, giri: n, indietro: indietroTot, conta};
 }
 (async () => {
   const R = {};
@@ -65355,24 +65467,33 @@ async function aCaso(n, via){
     try { R[via].aCaso = await aCaso(150, via); }
     catch(e) { R[via].aCaso = 'ESPLOSO: ' + (e && e.message); }
   }
-  /* L'AVANTI DEL BROWSER va dove dice la sua entry: il passo del P2P
-     vale solo all'indietro */
+  /* L'AVANTI DEL BROWSER va dove dice la sua entry */
   try { R.avanti = await giro(['p2p', 'ordine', 'p2pmiei', '<', '>'], 'sistema'); }
   catch(e) { R.avanti = 'ESPLOSO: ' + (e && e.message); }
+  const L = [{t:'v', v:'p2p', k:0}], M = [{t:'v', v:'p2pmiei', k:0}], I = [{t:'v', v:'p2pinfo', k:0}];
+  const O = [{t:'v', v:'p2pordine', k:'x1'}], E = [{t:'v', v:'esplora', k:'esplora|Tutto'}];
+  const P = [{t:'v', v:'profilo', k:0}], F = {t:'f', k:'p2pFoglio'};
+  const G = {t:'f', k:'p2pAltro'}, T = {t:'f', k:'p2pTour'};
   R.giudice = [
-    passoIndietroP2P('p2pmiei', 'esplora', {indietro: true, puro: true, sotto: false}),
-    passoIndietroP2P('p2pinfo', 'profilo', {indietro: true, puro: false, sotto: true}),
-    passoIndietroP2P('p2pmiei', 'p2p', {indietro: true, puro: true, sotto: true}),
-    passoIndietroP2P('p2p', 'p2pmiei', {indietro: true, puro: true, sotto: true}),
-    passoIndietroP2P('p2p', 'p2p', {indietro: true, puro: true, sotto: true}),
-    passoIndietroP2P('p2pmiei', 'p2pmiei', {indietro: true, puro: false, sotto: true}),
-    passoIndietroP2P('p2p', 'p2pmiei', {indietro: true, puro: true, sotto: false}),
-    passoIndietroP2P('p2pmiei', 'esplora', {indietro: false, puro: true, sotto: true}),
-    passoIndietroP2P('p2pordine', 'p2pmiei', {indietro: true, puro: true, sotto: true}),
-    passoIndietroP2P('p2p', 'esplora', {indietro: true, puro: true, sotto: false}),
-    passoIndietroP2P('p2pmiei', 'esplora', null),
-    passoIndietroP2P('p2p', 'p2pordine', {indietro: true, puro: true, sotto: true}),
-    passoIndietroP2P('p2pinfo', 'p2pordine', {indietro: true, puro: true, sotto: true})];
+    passoPilaP2P(M, L, [E]),                 // dal libro a una figlia: spingi
+    passoPilaP2P(I, M, [E, L]),              // fra le figlie: come sempre (sostituisce)
+    passoPilaP2P(L, M, [E, L]),              // alla madre: il gradino di sotto
+    passoPilaP2P(M, O, [E, L]),              // da uno scambio aperto dal libro: come sempre
+    passoPilaP2P(I, O, [E, L, M]),           // da uno scambio aperto dai miei: prima giu
+    passoPilaP2P(M, [M[0], F], [E, L, M]),   // un foglio chiuso a mano
+    passoPilaP2P(I, [L[0], F], [E, L]),      // il foglio del libro e Info insieme
+    passoPilaP2P(M, E, []),                  // una figlia da fuori, senza libro
+    passoPilaP2P(P, M, [E, L]),              // verso un'altra radice: si smonta
+    passoPilaP2P(P, L, [E]),                 // ...fino al libro, che la radice sostituisce SEMPRE
+    passoPilaP2P(E, L, [E]),                 // il tab Esplora dal libro: la madre e' sotto
+    passoPilaP2P(L, E, []),                  // il tasto «P2P» dal mercatino: come sempre
+    passoPilaP2P(O, L, [E]),                 // uno scambio: come sempre (si spinge)
+    passoPilaP2P(M, L, null),                // entry senza registro: come sempre
+    passoPilaP2P(M, [L[0], F, G], [E, L, [L[0], F]]),  // sotto, un libro col foglio non e' il libro: al nudo
+    passoPilaP2P([L[0], T], M, [E, L]),      // il tour nato col ritorno al libro: prima giu al libro
+    passoPilaP2P([L[0], T], L, [E]),         // ...e all'approdo lo strato gli va sopra, come sempre
+    passoPilaP2P([M[0], F], [M[0], G], [E, L, M]),   // un foglio al posto di un altro: come sempre
+    passoPilaP2P([L[0], G], [L[0], F], [E, L])];     // ...anche sul libro, senza scendere a cercarlo
   console.log(JSON.stringify(R));
 })();
 """)
@@ -65381,69 +65502,115 @@ async function aCaso(n, via){
         f.write(_prog)
     try:
         _r = subprocess.run([node, f.name], capture_output=True, text=True,
-                            encoding="utf-8", errors="replace", timeout=120)
+                            encoding="utf-8", errors="replace", timeout=180)
     finally:
         os.unlink(f.name)
     if _r.returncode != 0:
-        prova("il banco dell'indietro del P2P gira", "", _r.stderr[:600])
+        prova("il banco della pila del P2P gira", "", _r.stderr[:600])
         return
     out = _js.loads(_r.stdout.strip())
 
     # --- 2) IL GIUDICE, PURO ---------------------------------------------
-    # (il giro a caso qui sotto ha trovato il caso degli ultimi due: un
-    # foglio chiuso a mano sopra uno scambio, poi il libro dalla nav, e
-    # l'indietro dal libro atterrava sullo scambio)
-    prova("il giudice: dalla figlia verso fuori il libro; dal libro ogni gradino del P2P si salta, dalla figlia tutti tranne il libro; fuori dall'indietro niente",
-          ["libro", "libro", "", "oltre", "oltre", "", "", "", "", "", "", "oltre", "oltre"],
-          out["giudice"])
+    prova("il giudice: spingi dal libro, giu per i gradini di troppo, libro se manca, la radice che lascia il P2P sostituisce il libro, e il resto come sempre",
+          ["spingi", "", "giu", "", "giu", "giu", "",
+           "libro", "giu", "sostituisci", "giu", "", "", "",
+           "giu", "giu", "", "", ""], out["giudice"])
 
     # --- 3) LE STRADE, NELLE DUE VIE --------------------------------------
     # 'tg' = il tasto di Telegram e la freccia in pagina (navIndietro);
-    # 'sistema' = lo swipe e il tasto di Android, cioe' la cronologia
+    # 'sistema' = lo swipe e il tasto di Android, cioe' la cronologia.
+    # Per ognuna: quel che si vede, e la FORMA della pila dopo il passo
+    # che conta (la pila vera, quella che lo swipe fotografa)
     _ATTESI = {
-        "miei": (["p2p", "p2pmiei", "p2p", "esplora", "esplora"],
-                 "da «I miei scambi»: libro, poi la home, poi fuori"),
-        "info": (["p2p", "p2pinfo", "p2p", "esplora"],
-                 "da «Info P2P»: libro, poi la home"),
-        "mieiInfo": (["p2p", "p2pmiei", "p2pinfo", "p2p", "esplora"],
-                     "miei poi info (sorelle): l'indietro va al libro, non ai miei"),
-        "giri": (["p2p", "p2pmiei", "p2p", "p2pmiei", "p2p", "p2pmiei", "p2p", "esplora"],
-                 "libro ↔ miei tre volte: due indietro bastano, nessun giro"),
-        "foglio": (["p2p", "p2pmiei", "p2pmiei+p2pFiltroMieiSheet", "p2pmiei", "p2p", "esplora"],
-                   "col foglio aperto: prima si chiude il foglio, poi il libro, poi la home"),
-        "ordineInfo": (["p2p", "p2pmiei", "p2pordine", "p2pinfo", "p2p", "esplora"],
-                       "da uno scambio a «Info P2P» con la nav: l'indietro va al libro, non ai miei"),
-        "ordineLibro": (["p2p", "p2pmiei", "p2pordine", "p2p", "esplora"],
-                        "da uno scambio al libro con la nav: l'indietro esce, non torna ai miei"),
-        "libro": (["p2p", "esplora"], "dal libro l'indietro porta alla home, come prima"),
-        "mercatino": (["p2p", "p2pmiei", "esplora", "esplora"],
-                      "il tocco sul mercatino da «I miei scambi» va alla home, e l'indietro dopo esce"),
-        "pubblica": (["p2p", "p2p+p2pNuovoSheet", "p2p", "p2pordine", "p2p", "esplora"],
-                     "dopo aver pubblicato: lo scambio, il libro, la home — senza un indietro a vuoto"),
-        "dettInfo": (["p2p", "p2p+p2pDettSheet", "p2p", "p2pinfo", "p2p", "esplora"],
-                     "«Info P2P» aperta dal dettaglio: libro, poi la home"),
+        "miei": (["p2p", "p2pmiei", "p2p", "esplora", "esplora"], 1,
+                 "esplora p2p p2pmiei", "da «I miei scambi»: sotto c'e' gia' il libro, poi la home, poi fuori"),
+        "info": (["p2p", "p2pinfo", "p2p", "esplora"], 1,
+                 "esplora p2p p2pinfo", "da «Info P2P»: sotto c'e' gia' il libro, poi la home"),
+        "mieiInfo": (["p2p", "p2pmiei", "p2pinfo", "p2p", "esplora"], 2,
+                     "esplora p2p p2pinfo", "fra miei e info si sostituisce: sotto resta il libro"),
+        "giri": (["p2p", "p2pmiei", "p2p", "p2pmiei", "p2p", "p2pmiei", "p2p", "esplora"], 5,
+                 "esplora p2p p2pmiei", "libro ↔ miei tre volte: la pila resta di tre, nessun giro"),
+        "foglio": (["p2p", "p2pmiei", "p2pmiei+p2pFiltroMieiSheet", "p2pmiei", "p2p", "esplora"], 2,
+                   "esplora p2p p2pmiei p2pmiei+p2pFiltroMieiSheet",
+                   "col foglio aperto: il foglio e' una entry sua, e il primo indietro lo chiude"),
+        "foglioAMano": (["p2p", "p2pmiei", "p2pmiei+p2pFiltroMieiSheet", "p2pmiei", "p2p", "esplora"], 3,
+                        "esplora p2p p2pmiei",
+                        "il foglio chiuso a mano consuma la sua entry: l'indietro dopo va al libro, non a vuoto"),
+        "ordineInfo": (["p2p", "p2pmiei", "p2pordine", "p2pinfo", "p2p", "esplora"], 3,
+                       "esplora p2p p2pinfo",
+                       "da uno scambio aperto dai miei a «Info P2P»: la pila scende e Info sta sopra il libro"),
+        "ordineLibro": (["p2p", "p2pmiei", "p2pordine", "p2p", "esplora"], 3,
+                        "esplora p2p", "da uno scambio al libro con la nav: si scende al libro che c'e'"),
+        "ritirato": (["p2p", "p2pmiei", "p2pordine", "p2pmiei", "p2p", "esplora"], 3,
+                     "esplora p2p p2pmiei", "uno scambio ritirato riporta ai miei: si consuma il gradino"),
+        "libro": (["p2p", "esplora"], 0, "esplora p2p", "dal libro l'indietro porta alla home, come prima"),
+        "mercatino": (["p2p", "p2pmiei", "esplora", "esplora"], 2, "esplora",
+                      "il tab Esplora da «I miei scambi» smonta il P2P fino alla home"),
+        "profilo": (["p2p", "p2pmiei", "profilo", "esplora", "esplora"], 2, "esplora profilo",
+                    "il profilo da «I miei scambi»: prende il posto del libro, e l'indietro va alla home"),
+        "pubblica": (["p2p", "p2p+p2pNuovoSheet", "p2p", "p2pordine", "p2p", "esplora"], 3,
+                     "esplora p2p p2pordine", "dopo aver pubblicato: lo scambio sopra il libro, niente doppioni"),
+        "pubblicaSubito": (["p2p", "p2p+p2pNuovoSheet", "p2pordine", "p2p", "esplora"], 2,
+                           "esplora p2p p2pordine",
+                           "il foglio chiuso e lo scambio aperto mentre il passo e' in volo: si scrive all'approdo, sopra il libro"),
+        "reparto": (["p2p", "p2pmiei", "esplora", "esplora"], 2, "esplora esplora",
+                    "un reparto aperto da dentro il P2P prende il posto del libro, sopra la home"),
+        "dettInfo": (["p2p", "p2p+p2pDettSheet", "p2pinfo", "p2p", "esplora"], 2,
+                     "esplora p2p p2pinfo", "«Info P2P» dal dettaglio del libro: sopra il libro"),
+        "negozio": (["p2p", "p2p+p2pDettSheet", "negozio", "p2p", "esplora"], 3,
+                    "esplora p2p", "dal negozio aperto dal dettaglio, il tasto «P2P» torna al libro che c'e'"),
+        "fuori": (["p2pmiei", "p2p", "esplora"], 0, "esplora p2p p2pmiei",
+                  "una figlia aperta da fuori: il libro si scrive prima di lei"),
+        "fuoriProfilo": (["profilo", "p2pmiei", "p2p", "esplora"], 1, "esplora p2p p2pmiei",
+                         "...anche dal profilo: il libro ne prende il posto, e la figlia sopra"),
+        "negozioClassifica": (["p2p", "p2p+p2pDettSheet", "negozio", "classifica", "esplora", "esplora"], 4,
+                              "esplora",
+                              "due discese aperte dal P2P (negozio, poi classifica), e il tab Esplora le smonta tutte fino alla home"),
+        "tourLibro": (["p2p", "p2pmiei", "p2p+p2pTour", "p2p", "esplora"], 2, "esplora p2p p2p+p2pTour",
+                      "il tour nato col ritorno al libro da «I miei scambi» sta sopra il libro: il primo indietro chiude lui"),
+        "tourCasa": (["p2p+p2pTour", "esplora"], 0, "esplora p2p+p2pTour",
+                     "...ma nato con l'ingresso dal mercatino e' parte della entry del libro, com'era: due entry scritte nello stesso giro darebbero al libro l'istantanea della home"),
+        "ordineFoglio": (["p2p", "p2pmiei", "p2pordine", "p2pordine+p2pVotoSheet", "p2pordine", "p2pmiei", "p2p", "esplora"], 4,
+                         "esplora p2p p2pmiei p2pordine",
+                         "un foglio chiuso a mano sulla pagina di uno scambio consuma la sua entry: l'indietro dopo torna ai miei, non a vuoto"),
+        "voloPerso": (["p2p", "p2pmiei", "p2pmiei+p2pFiltroMieiSheet", "p2pmiei+p2pFiltroMieiSheet", "p2pmiei",
+                       "p2pmiei", "p2pinfo", "p2p", "esplora"], 6, "esplora p2p p2pinfo",
+                      "un passo nostro il cui popstate non arriva non ammutolisce il motore: passato il secondo e mezzo si riscrive, e la pila torna giusta"),
     }
     for via in ("tg", "sistema"):
-        for k, (atteso, nome) in _ATTESI.items():
+        _v = "tasto di Telegram" if via == "tg" else "swipe di sistema"
+        for k, (atteso, dove, forma, nome) in _ATTESI.items():
             r = out[via][k]
-            prova("%s (%s)" % (nome, "tasto di Telegram" if via == "tg" else "swipe di sistema"),
-                  atteso, r["visti"] if isinstance(r, dict) else r)
-        # si esce SOLO dalla home, e dalla sua entry in fondo
+            if not isinstance(r, dict):
+                prova("%s (%s)" % (nome, _v), atteso, r)
+                continue
+            prova("%s (%s)" % (nome, _v), [atteso, forma],
+                  [r["visti"], r["forme"][dove]])
+        # durante TUTTI gli indietro di tutte le strade: nessuna mossa del
+        # codice, e il registro di `sotto` sempre fedele
+        _tutti = [out[via][k] for k in _ATTESI if isinstance(out[via][k], dict)]
+        prova("in nessuna strada un indietro fa muovere il codice, e il registro di sotto dice sempre il vero (%s)" % via,
+              [0, True], [sum(r["mosse"] for r in _tutti), all(r["registro"] for r in _tutti)])
+        _rp = out[via]["reparto"]
+        prova("...ed e' il reparto sopra la home, non la home due volte (%s)" % via,
+              "esplora|Tutto esplora|Casa", _rp["chiavi"][2] if isinstance(_rp, dict) else _rp)
         _m = out[via]["miei"]
         prova("...e l'ultimo indietro chiude dalla home (%s)" % via, True,
               isinstance(_m, dict) and _m["fondo"] == 0
               and (_m["chiuso"] == 1 if via == "tg" else _m["uscito"] == 1))
-        # fra le voci del P2P si SOSTITUISCE: tre giri libro ↔ miei non
-        # allungano la cronologia, che resta la home e una voce sopra
         _g = out[via]["giri"]
-        prova("...e i giri libro ↔ miei non allungano la cronologia: la home e una voce (%s)" % via,
-              [2, 0], [_g["massimo"], _g["fondo"]] if isinstance(_g, dict) else _g)
+        prova("...e i giri libro ↔ miei non allungano la cronologia: home, libro, miei (%s)" % via,
+              [3, 0], [_g["massimo"], _g["fondo"]] if isinstance(_g, dict) else _g)
         _c = out[via]["aCaso"]
-        prova("%d strade a caso, solo indietro fino all'uscita: si finisce, dalle figlie si va al libro, si esce dal libro e dal libro non si torna dentro (%s)"
+        prova("%d strade a caso: la pila giusta dopo ogni mossa (anche col tour e con gli indietro a meta' strada), nessuna mossa del codice durante gli indietro, e fino all'uscita dalle figlie al libro e dal libro fuori (%s)"
               % (_c.get("giri", 0) if isinstance(_c, dict) else 0, via),
               0, _c["quanti"] if isinstance(_c, dict) else _c)
         if isinstance(_c, dict) and _c["quanti"]:
             print("      ", _c["guasti"])
+        _mosse = ("p2p", "p2pmiei", "p2pinfo", "ordine", "ritirato", "foglio", "chiudi",
+                  "tour", "<", "mercatino", "profilo", "reparto")
+        prova("...e ci passano davvero: ogni mossa del giro almeno dieci volte (%s)" % via, [],
+              [m for m in _mosse if (_c.get("conta", {}).get(m, 0) if isinstance(_c, dict) else 0) < 10])
     prova("l'avanti del browser va dove dice la sua entry",
           ["p2p", "p2pordine", "p2pmiei", "p2p", "p2pmiei"],
           out["avanti"]["visti"] if isinstance(out["avanti"], dict) else out["avanti"])

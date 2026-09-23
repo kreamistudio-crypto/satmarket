@@ -26790,6 +26790,9 @@ il libro dalla nav, e l'indietro dal libro atterrava sullo scambio
 salta OGNI gradino del P2P, da una figlia tutti tranne il libro. E per
 lo stesso meccanismo si è chiuso un indietro a vuoto che c'era già:
 dopo aver pubblicato, dal libro servivano due gesti per uscire.
+⚠️ ROVESCIATO LA SERA STESSA: sul telefono la deviazione al popstate si
+vedeva. Il meccanismo di oggi sta in «L'indietro del P2P: la pila
+giusta da subito», più giù.
 
 **PROVE**: tre funzioni nuove — `prove_pubblica_metodo_prima` (22: le
 funzioni vere del foglio sotto node, con un DOM di cartone che trova i
@@ -27156,3 +27159,95 @@ le figure, le foto delle card piene; 3) in Telegram e nel browser lo
 stesso, dopo il deploy e senza bisogno dell'APK: prima il fondo della
 pagina, poi la home tutta insieme; 4) che l'apertura non sembri più
 lenta — il cancello aspetta al massimo due secondi.
+
+## L'indietro del P2P: la pila giusta da subito (23 set 2026)
+
+Correzione di Andrea a b61b310, dal telefono: la regola funzionava ma
+SI VEDEVA. Con lo swipe da «I miei scambi» per un attimo compariva la
+home e poi il libro; da «Info P2P» compariva «I miei scambi». IL
+PERCHÉ: lo swipe di iOS (e l'indietro predittivo di Android) mostra,
+mentre il dito scorre, l'ISTANTANEA della entry che sta davvero sotto
+— il browser la scatta quando la si lascia — e solo dopo il codice
+deviava. Sotto «Info P2P» c'era la entry della home, fotografata
+durante una deviazione con la figlia ancora a schermo. Un gesto non si
+intercetta: si prepara.
+
+**LA CURA: LA CRONOLOGIA VERA È GIÀ QUELLA GIUSTA, E SI SISTEMA
+ENTRANDO.** Ogni entry porta `sotto`, le pile delle entry nostre che ha
+sotto (dal fondo; `d` ne è la lunghezza), e `navRiflette` le legge
+PRIMA di scrivere col giudice puro `passoPilaP2P`. Dal libro a una
+figlia si SPINGE; fra le due figlie si SOSTITUISCE; una figlia che
+arriva senza nessun libro sotto scrive prima il libro e poi se stessa;
+un gradino che la pila giusta non ha (lo scambio aperto da una figlia,
+il foglio chiuso a mano, la voce da cui si era scesi) si CONSUMA
+scendendo con `navGiu` — un `history.back()` nostro, un gradino alla
+volta — e all'approdo si riscrive. Uscendo dal P2P verso un'altra
+radice (il tab Esplora della barra, il profilo) si smonta la sezione e
+la radice prende il posto del libro SOSTITUENDO sempre, anche dove la
+regola di sempre spingerebbe (la discesa in un reparto): così sotto
+resta la home con la sua istantanea vera. Il popstate fa solo il suo
+mestiere, riapplicare la entry: `passoIndietroP2P`, `navDVisto` e
+`navVersoMadre` non ci sono più.
+LE ISTANTANEE SONO VERE PERCHÉ si scrive nel microtask
+dell'osservatore, prima che il browser dipinga: la entry che si lascia
+viene fotografata con quel che mostra davvero. E si scende solo verso
+entry già fotografate col loro contenuto.
+IL VOLO: mentre un `navGiu` è in viaggio `navRiflette` non scrive (la
+entry sotto i piedi sta per cambiare; tetto di 1,5 s, perché un
+popstate perso non ammutolisca il motore), e all'approdo `navApplica`
+non ridisegna — il DOM è già giusto — e richiama `navRiflette`.
+⚠️ LA TORTURA HA TROVATO UN CASO VERO: il tour del P2P, la prima volta,
+si apre sul libro nello stesso tocco in cui ci si torna (libro arrivato
+mentre si stava in «I miei scambi»), e la prima stesura lo scriveva
+SOPRA «I miei scambi»: l'indietro dal tour riportava lì. Ora uno strato
+nato insieme a un cambio di pagina decide per la pagina che porta — si
+scende al libro e il tour gli va sopra —, mentre un foglio aperto sulla
+pagina di sempre si scrive come sempre.
+⚠️ QUATTRO IMPERFEZIONI DICHIARATE. 1) Il tour nato con l'INGRESSO dal
+mercatino resta dentro la entry del libro, com'era: il primo indietro
+lo chiude e torna alla home. Spezzarlo vorrebbe due entry scritte nello
+stesso giro, e la prima prenderebbe l'istantanea della home — il lampo
+di oggi. 2) Una figlia aperta da FUORI senza libro sotto scrive un
+libro mai dipinto, con lo stesso difetto; nessun tocco oggi ci porta
+(le figlie si aprono dalla barra o da pagine del P2P, e gli avvisi del
+bot aprono la home). 3) Il foglio chiuso a mano consuma la sua entry
+solo dentro il P2P; nel resto dell'app è com'era. 4) Una sessione
+aperta PRIMA dell'aggiornamento ha entry senza `sotto`, e lì si scrive
+come sempre finché non si riapre la Mini App.
+
+**PROVE**: `prove_indietro_dal_libro` riscritta (67): il motore VERO
+sotto node con una cronologia di cartone che consegna i popstate dopo
+(e sa perderne uno) e registra ogni scrittura; ventiquattro strade
+nelle due vie (tasto di Telegram e swipe di sistema) con la forma della
+pila controllata ENTRANDO; 300 strade a caso che dopo ogni mossa
+confrontano `sotto` con la cronologia vera, vogliono ogni strato sopra
+la SUA pagina, a ogni indietro dell'utente ZERO mosse del codice, e
+contano le mosse fatte — che è come si è scoperto che il generatore a
+caso di b61b310 non girava: moltiplicava oltre 2^53, perdeva i bit
+bassi, e con due mosse possibili sceglieva sempre la stessa. Ora è un
+Park–Miller, esatto e letto dai bit alti. Suite intera **13579
+passate, 0 fallite** con `PROVE_SEVERE=1` sull'albero rebasato sopra
+il terzo giro della 1.5, i nove collaudi della CI
+verdi, tortura **32/33**: la viva cerca il libro dal fondo invece che
+dall'alto, ed è equivalente — due entry del libro nudo nella stessa
+pila non possono esistere, le regole 2 e 3 le consumano prima.
+DAL VIVO a 375 px sull'app vera col relay morto, registrando ogni
+push, replace e back: la barra, Info ↔ miei, il filtro chiuso col
+gesto e con «Applica», scambio → Info, «Pubblica» chiuso a mano con lo
+scambio aperto mentre il passo era in volo, Esplora dalla barra, il
+tour nato col ritorno al libro. A ogni indietro dell'utente è successo
+solo il popstate.
+QUEL CHE SENZA IL GESTO VERO NON SI VEDE: l'istantanea che il telefono
+mostra sotto il dito. Il pane dice la forma della pila e che al
+popstate il codice sta fermo, non cosa ha fotografato WebKit.
+
+### Da guardare sul telefono
+
+Chiudere e riaprire la Mini App dopo il deploy (vedi il punto 4). Poi,
+con lo swipe su iPhone e col tasto indietro su Android (in Telegram e
+nell'APK): da «I miei scambi» sotto il dito deve comparire il libro,
+mai la home; da «Info P2P», arrivati da «I miei scambi», il libro e non
+«I miei scambi»; dal libro la home. Col filtro dei miei aperto, il
+primo indietro chiude solo il foglio. Uno scambio aperto da «I miei
+scambi», poi «Info P2P», poi indietro: il libro. E dopo «Applica» o
+dopo aver pubblicato, nessun indietro a vuoto.

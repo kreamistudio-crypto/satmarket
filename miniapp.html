@@ -12777,65 +12777,111 @@ let uscitaDopoAnnullo = false;
    protocollo del service worker. */
 const STORIA = location.protocol.startsWith('http');
 let navUltimo = 0;        /* la serratura contro il doppio canale */
-/* ---- DENTRO IL P2P SI PASSA DAL LIBRO (23 set 2026, ritocco di
-   Andrea) ----
-   Le tre voci della nav del P2P restano radici sorelle — fra loro si
-   SOSTITUISCE, come fra i tab di sempre —, ma il libro e' la madre
-   delle altre due: da «I miei scambi» e da «Info P2P» l'indietro passa
-   dal libro, e solo dal libro si esce al mercatino. E' il patto della
-   radice madre, un piano piu' in giu'.
-   LA CRONOLOGIA NON CAMBIA FORMA, ed e' la scelta: un gradino del libro
-   spinto sotto le figlie andrebbe smontato a mano a ogni uscita da un
-   altro tab (il mercatino, il profilo), o l'indietro dopo ci
-   riporterebbe dentro il P2P. A decidere e' il passo INDIETRO, in
-   `navApplica`, col giudice `passoIndietroP2P`: da li' passano lo
-   swipe e il tasto di sistema (popstate) e il tasto di Telegram
-   (navIndietro chiede un history.back()), quindi una regola sola li
-   copre tutti. */
+/* ---- DENTRO IL P2P SI PASSA DAL LIBRO, E LA CRONOLOGIA LO SA GIA'
+   (23 set 2026, ritocco di Andrea; rifatto la sera stessa) ----
+   Le tre voci della nav del P2P: il libro e' la madre delle altre due.
+   Da «I miei scambi» e da «Info P2P» l'indietro porta al libro, e dal
+   libro al mercatino. LA PILA VERA E' GIA' QUELLA GIUSTA: sotto una
+   figlia c'e' la entry del libro, sotto il libro quella del mercatino,
+   e la si SISTEMA NEL MOMENTO IN CUI SI ENTRA — mai all'uscita.
+   ⚠️ E' IL ROVESCIO DELLA PRIMA STESURA (b61b310), che lasciava la
+   cronologia com'era e deviava al popstate: sul telefono si vedeva. Lo
+   swipe di iOS (e l'indietro predittivo di Android) mostra l'istantanea
+   della entry che sta DAVVERO sotto mentre il dito scorre — il browser
+   la scatta quando si lascia quella entry — e solo dopo il codice
+   deviava: da «I miei scambi» lampeggiava la home, da «Info P2P» «I miei
+   scambi» (l'istantanea della home era stata presa DURANTE una
+   deviazione, con la figlia ancora a schermo). Un gesto non si
+   intercetta: si prepara.
+   COME: ogni entry porta le pile delle entry nostre che ha sotto
+   (`sotto`, dal fondo; `d` ne e' la lunghezza), e `navRiflette` le
+   legge PRIMA di scrivere, col giudice puro `passoPilaP2P`. Dal libro a
+   una figlia si SPINGE; fra le due figlie si SOSTITUISCE; se sotto c'e'
+   un gradino di troppo (uno scambio aperto da una figlia, un foglio
+   chiuso a mano) si SCENDE un gradino alla volta con `navGiu` e si
+   riscrive all'approdo. Il popstate fa solo il suo mestiere: riapplica
+   la entry d'arrivo, che e' gia' quella giusta. */
 const MADRE_P2P = 'p2p';
 const FIGLIE_P2P = new Set(['p2pmiei', 'p2pinfo']);
-/* PURA: il passo indietro dentro il P2P. `qui` e' la vista a schermo
-   (dopo aver chiuso gli strati), `la` quella della entry d'arrivo; e
-   `o.indietro` dice che il cursore e' sceso (non un avanti del browser,
-   non il tocco sul mercatino di vaiEsplora), `o.puro` che non c'era
-   nessuno strato aperto, `o.sotto` che sotto l'arrivo c'e' ancora una
-   entry nostra.
-   · 'libro': si sta uscendo dal P2P da una figlia — si atterra sul
-     libro invece che fuori;
-   · 'oltre': l'arrivo e' un gradino del P2P che da qui non si deve
-     rivedere — DAL LIBRO nessuno (un indietro dal libro esce), DA UNA
-     FIGLIA tutti tranne il libro (le sorelle, uno scambio, la stessa
-     voce). Sono gradini rimasti sotto da un cambio di voce fatto dalla
-     pagina di uno scambio o da un foglio chiuso a mano: rivisti
-     farebbero il giro libro ↔ miei, o un indietro che non fa niente.
-     Si prosegue indietro senza disegnarli (lo ha trovato il giro a
-     caso di prove.py: libro → scambio → libro → home);
-   · '': il passo di sempre.
-   IL FOGLIO APERTO SI CHIUDE PRIMA, e non e' una regola nuova: e' uno
-   strato, e `navApplica` smonta gli strati prima di toccare la vista.
-   Per questo 'oltre' vuole `puro`: chiudendo un foglio si atterra
-   sulla stessa voce, ed e' giusto restarci. E vuole `sotto`: senza una
-   entry nostra piu' giu' non c'e' dove proseguire. */
-function passoIndietroP2P(qui, la, o){
-  if (!o || !o.indietro) return '';
-  if (qui !== MADRE_P2P && !FIGLIE_P2P.has(qui)) return '';
-  const dentro = VISTE_NAV_P2P.has(la);
-  /* da una figlia il libro e' l'approdo giusto: si atterra */
-  if (dentro && !(la === MADRE_P2P && qui !== MADRE_P2P))
-    return o.puro && o.sotto ? 'oltre' : '';
-  if (!dentro && FIGLIE_P2P.has(qui)) return 'libro';
+/* PURA: come scrivere la cronologia quando il DOM passa da `st` (la
+   pila della entry su cui si sta) a `ora`, sapendo le pile di `sotto`
+   (le entry nostre sotto questa, dal fondo). Risponde solo per il P2P:
+   '' vuol dire «come si e' sempre scritto».
+   · 'giu': si scende di un gradino (`navGiu`) e all'approdo si decide
+     di nuovo — un gradino alla volta, finche' la pila e' giusta;
+   · 'spingi': dal libro a una figlia, sopra di lui;
+   · 'sostituisci': uscendo dal P2P verso un'altra radice, arrivati al
+     libro: la radice prende il suo posto, SEMPRE — anche quando la
+     regola di sempre spingerebbe (la discesa in un reparto);
+   · 'libro': una figlia senza nessun libro sotto — si scrive prima il
+     libro, come lo scriverebbe il tasto «P2P» da qui, e sopra la figlia.
+   Una figlia che sta gia' subito sopra il libro (l'altra figlia, uno
+   scambio aperto dal libro) si scrive come sempre, cioe' sostituendo:
+   li' il giudice risponde ''.
+   Si scende SOLO per consumare gradini che la pila giusta non ha, e
+   sempre verso una entry che il browser ha gia' fotografato col suo
+   contenuto: per questo lo swipe mostra quel che poi si vede. */
+function passoPilaP2P(ora, st, sotto){
+  if (!Array.isArray(sotto) || !Array.isArray(ora) || !ora.length
+      || !Array.isArray(st) || !st.length) return '';
+  const base = p => (p && p[0] && p[0].t === 'v') ? p[0].v : '';
+  const p2p = v => VISTE_NAV_P2P.has(v);
+  const pura = p => Array.isArray(p) && p.length === 1 && p[0].t === 'v';
+  const nuovo = base(ora), prima = base(st), qui = sotto.length;
+  /* la SEZIONE del P2P: le sue voci, e le discese aperte da li' (un
+     negozio dal dettaglio, la classifica) finche' non si torna a una
+     radice. Per ogni entry di sotto, e per quella corrente. */
+  const sez = [];
+  for (let i = 0; i < qui; i++) {
+    const v = base(sotto[i]);
+    sez[i] = p2p(v) || (!RADICI.has(v) && i > 0 && sez[i - 1]);
+  }
+  const quiSez = p2p(prima) || (!RADICI.has(prima) && qui > 0 && sez[qui - 1]);
+  /* 1) DAL P2P A UN'ALTRA RADICE (il mercatino, gli Ordini, il
+        profilo): si smonta la sezione fino alla sua entry piu' bassa, e
+        li' la radice prende il posto del libro — sostituendo SEMPRE,
+        anche dove la regola di sempre spingerebbe (la discesa in un
+        reparto) —, cosi' l'istantanea del mercatino sotto resta quella
+        vera. Se la radice E' la entry di sotto (il tab Esplora), si
+        scende anche su quella. */
+  if (!p2p(nuovo) && RADICI.has(nuovo) && pura(ora) && quiSez && qui)
+    return (sez[qui - 1] || navUguali(ora, sotto[qui - 1])) ? 'giu' : 'sostituisci';
+  if (!p2p(nuovo) && !p2p(prima)) return '';
+  /* 2) quel che si ha davanti E' la entry di sotto — un foglio chiuso a
+        mano, il ritorno alla voce da cui si era scesi: si consuma il
+        gradino, invece di scriverne un doppione che l'indietro dopo
+        farebbe a vuoto */
+  if (qui && navUguali(ora, sotto[qui - 1])) return 'giu';
+  /* uno strato aperto sulla pagina di sempre (un foglio) si scrive come
+     sempre, sopra di lei. Ma uno strato NATO INSIEME a un cambio di
+     pagina — il tour del P2P, che la prima volta si apre sul libro nello
+     stesso tocco in cui ci si torna — decide per la pagina che porta: si
+     scende prima al libro, e lo strato gli va sopra all'approdo, cosi'
+     il primo indietro chiude lui e basta */
+  if (!pura(ora) && nuovo === prima) return '';
+  let iL = -1;
+  for (let i = qui - 1; i >= 0; i--)
+    if (pura(sotto[i]) && base(sotto[i]) === MADRE_P2P) { iL = i; break; }
+  /* 3) al libro: quello che c'e' gia' sotto, se c'e' */
+  if (nuovo === MADRE_P2P) return iL >= 0 ? 'giu' : '';
+  /* 4) a una figlia: subito sopra il libro */
+  if (FIGLIE_P2P.has(nuovo)) {
+    if (pura(st) && prima === MADRE_P2P) return 'spingi';
+    if (iL < 0) return 'libro';
+    return qui > iL + 1 ? 'giu' : '';
+  }
   return '';
 }
-/* La profondita' della entry che si ha davanti, cioe' l'ultima scritta
-   o riapplicata: dice se un popstate va INDIETRO (arrivo piu' basso)
-   o in avanti. Serve al passo del P2P, che vale solo all'indietro. */
-let navDVisto = 0;
-/* L'ora in cui vaiEsplora torna alla madre consumando un gradino:
-   quel passo indietro e' un TOCCO sul mercatino, non un gesto, e il
-   passaggio dal libro non gli si applica. Vale un secondo, e si
-   consuma al primo approdo: se la serratura dei 350ms ha fermato il
-   passo, non resta accesa a scaricarsi su un indietro vero. */
-let navVersoMadre = 0;
+/* UN PASSO INDIETRO NOSTRO, per consumare un gradino: l'ora in cui e'
+   partito (0 = nessuno). Finche' e' in volo non si scrive — la entry
+   su cui si sta per atterrare e' un'altra —, e all'approdo `navApplica`
+   non ridisegna niente: il DOM e' gia' dove deve stare, e `navRiflette`
+   lo riscrive sulla entry giusta. */
+let navGiuInVolo = 0;
+function navGiu(){
+  navGiuInVolo = Date.now();
+  history.back();
+}
 
 function navVista(){
   const v = (document.querySelector('.view.active')?.id || 'view-esplora').replace('view-','');
@@ -12985,6 +13031,13 @@ function navRiflette(){
      leggeva un cambio di radice che nessuno aveva chiesto: tornando
      indietro si spingeva un gradino nuovo invece di consumarne uno. */
   if (!STORIA || navApplicando) return;
+  /* UN PASSO NOSTRO E' IN VOLO (`navGiu`): la entry su cui si sta per
+     atterrare e' quella di sotto, e scrivere adesso scriverebbe su
+     quella che sta per andarsene. Si aspetta l'approdo, dove
+     `navApplica` richiama questa. Con un tetto di un secondo e mezzo,
+     che un popstate che non arriva non lasci il motore muto. */
+  if (navGiuInVolo && Date.now() - navGiuInVolo < 1500) return;
+  navGiuInVolo = 0;
   /* letta e azzerata SUBITO, prima di ogni via d'uscita: una
      bandierina lasciata accesa perderebbe il suo giro e si
      scaricherebbe su una navigazione che non l'ha chiesta */
@@ -12996,12 +13049,35 @@ function navRiflette(){
      Serve a navIndietro per sapere se «indietro» ha davvero dove
      andare — dentro Telegram la WebView nasce con una entry sola. */
   const giu = history.state?.d || 0;
-  const scrivi = (come, d) => {
-    try { history[come]({app:'brt', pila: ora, d}, '', location.href); } catch(e){}
-    navDVisto = d;
+  /* ...e QUALI gradini (23 set 2026, il P2P): le pile delle entry
+     nostre sotto questa, dal fondo — `d` ne e' la lunghezza. Chi scrive
+     le legge PRIMA di scrivere (`passoPilaP2P`), invece di scoprire al
+     popstate cosa c'era sotto. Una entry di una versione di prima non
+     le ha: allora non si sa, e si scrive come sempre. */
+  const sotto = Array.isArray(history.state?.sotto) ? history.state.sotto : null;
+  const scrivi = (come, d, pila = ora, sottoNuovo) => {
+    try { history[come]({app:'brt', pila, d, sotto: sottoNuovo}, '', location.href); } catch(e){}
   };
-  if (!st || ora.length < st.length) scrivi('replaceState', giu);
-  else if (ora.length > st.length)   scrivi('pushState', giu + 1);
+  const sopra = extra => sotto ? sotto.concat(extra) : null;
+  const passo = passoPilaP2P(ora, st, sotto);
+  if (passo === 'giu') { navGiu(); return; }
+  if (passo === 'spingi') scrivi('pushState', giu + 1, ora, sopra([st]));
+  else if (passo === 'sostituisci') scrivi('replaceState', giu, ora, sotto);
+  else if (passo === 'libro') {
+    /* nessun libro sotto: prima lui, come lo scriverebbe il tasto «P2P»
+       da qui (dalla madre si spinge, altrove si sostituisce), poi la
+       figlia sopra */
+    const libro = [{t:'v', v: MADRE_P2P, k: 0}];
+    if (giu === 0) {
+      scrivi('pushState', 1, libro, sopra([st]));
+      scrivi('pushState', 2, ora, sopra([st, libro]));
+    } else {
+      scrivi('replaceState', giu, libro, sotto);
+      scrivi('pushState', giu + 1, ora, sopra([libro]));
+    }
+  }
+  else if (!st || ora.length < st.length) scrivi('replaceState', giu, ora, sotto);
+  else if (ora.length > st.length)   scrivi('pushState', giu + 1, ora, sopra([st]));
   else {
     /* Stessa profondita': o e' cambiata la vista, o un foglio ha preso
        il posto di un altro (invitoSheet → nostrSheet). Si SPINGE solo
@@ -13027,7 +13103,8 @@ function navRiflette(){
                              && a.v !== RADICE_MADRE && giu === 0;
     const spinge = a.t === 'v'
                 && (!RADICI.has(a.v) || forza || primoPassoViaDaCasa);
-    scrivi(spinge ? 'pushState' : 'replaceState', spinge ? giu + 1 : giu);
+    if (spinge) scrivi('pushState', giu + 1, ora, sopra([st]));
+    else scrivi('replaceState', giu, ora, sotto);
   }
   navFreccia(ora);
 }
@@ -13039,16 +13116,14 @@ function navRiflette(){
    ci sono — e ci pensa il riflette successivo a rimettere la entry in
    pari con la realta'. Sistema auto-guarente. */
 function navApplica(s){
-  let bersaglio = (s && s.app==='brt' && s.pila)
+  /* L'APPRODO DI UN PASSO NOSTRO (`navGiu`, il P2P): il DOM e' gia'
+     dove deve stare — il foglio chiuso a mano, la voce toccata nella
+     barra — e la entry d'arrivo e' quella su cui scriverlo. Niente da
+     ridisegnare: si rilegge il DOM e si scrive, con le regole di sempre
+     (che possono chiedere un altro gradino). */
+  if (navGiuInVolo) { navGiuInVolo = 0; navRiflette(); return; }
+  const bersaglio = (s && s.app==='brt' && s.pila)
                   ? s.pila : [{t:'v', v:'esplora', k:'esplora|Tutto'}];
-  /* IL PASSO DEL P2P (23 set 2026): si guarda solo all'INDIETRO — un
-     avanti del browser va dove dice la sua entry — e mai sul tocco del
-     mercatino di vaiEsplora, che torna alla madre apposta */
-  const dArrivo = (s && s.app==='brt' && s.d) || 0;
-  const indietro = dArrivo < navDVisto && Date.now() - navVersoMadre > 1000;
-  navVersoMadre = 0;
-  const puro = navPila().length === 1;
-  let passo = '';
   navApplicando = true;
   try {
     let ora = navPila(), giri = 0;
@@ -13056,27 +13131,13 @@ function navApplica(s){
       navChiudiStrato(ora[ora.length - 1]);
       ora = navPila();
     }
-    passo = passoIndietroP2P(
-      ora.length === 1 && ora[0].t === 'v' ? ora[0].v : '',
-      bersaglio[0] && bersaglio[0].t === 'v' ? bersaglio[0].v : '',
-      {indietro, puro, sotto: dArrivo > 0});
-    /* uscendo dal P2P da una figlia si atterra sul libro: la sua entry
-       si scrive qui sotto, sopra quella d'arrivo */
-    if (passo === 'libro') bersaglio = [{t:'v', v: MADRE_P2P, k: 0}];
-    if (passo !== 'oltre' && !navStesso(ora[0], bersaglio[0])) navRendiVista(bersaglio[0]);
+    if (!navStesso(ora[0], bersaglio[0])) navRendiVista(bersaglio[0]);
   } finally {
     /* si spegne DOPO il microtask dell'osservatore, che e' stato messo
        in coda dalle classi cambiate qui dentro: e' l'ultimo giro di
        ricostruzione, e nemmeno lui deve scrivere */
     queueMicrotask(() => { navApplicando = false; });
   }
-  /* un gradino da non rivedere: si prosegue indietro, e la pagina
-     resta quella che si ha davanti finche' non si arriva */
-  if (passo === 'oltre') { history.back(); return; }
-  if (passo === 'libro') {
-    try { history.pushState({app:'brt', pila: bersaglio, d: dArrivo + 1}, '', location.href); } catch(e){}
-    navDVisto = dArrivo + 1;
-  } else navDVisto = dArrivo;
   navFreccia(bersaglio);
   /* L'USCITA DALL'ANNULLO COSTA DUE GRADINI, non uno: il foglio della
      conferma e' uno STRATO, quindi ha una entry sua, e il primo passo
@@ -13177,7 +13238,7 @@ function navMotore(){
      dove dice lui invece che dove eravamo — un comportamento diverso
      da un browser all'altro proprio dove serve che sia uguale. */
   try { history.scrollRestoration = 'manual'; } catch(e){}
-  try { history.replaceState({app:'brt', pila: navPila(), d:0}, '', location.href); } catch(e){}
+  try { history.replaceState({app:'brt', pila: navPila(), d:0, sotto: []}, '', location.href); } catch(e){}
   /* Il callback e' un microtask: gira ancora dentro il task del gesto
      dell'utente (l'entry non viene marcata saltabile) e COALESCE i piu'
      cambi dello stesso giro — per questo il passaggio foglio→foglio
@@ -14600,13 +14661,11 @@ function vaiEsplora(){
      Non e' un contatore di debito: e' un passo solo, sincrono, chiesto
      da un tocco dell'utente, come ogni altra affordance di ritorno. */
   const p = navPila();
-  /* ...e quel passo indietro e' il TOCCO sul mercatino, non un gesto:
-     da «I miei scambi» o da «Info P2P» si va alla madre e basta, senza
-     il passaggio dal libro che vale per l'indietro (navVersoMadre) */
   if (STORIA && history.state?.d === 1 && p.length === 1
-      && p[0].t === 'v' && p[0].v !== RADICE_MADRE) {
-    navVersoMadre = Date.now(); navIndietro(); return;
-  }
+      && p[0].t === 'v' && p[0].v !== RADICE_MADRE) { navIndietro(); return; }
+  /* piu' in su (dal P2P, «I miei scambi» sopra il libro) si va col
+     `go`, e a smontare la sezione del P2P fino alla madre ci pensa chi
+     scrive la cronologia (`passoPilaP2P`, la regola 1) */
   go('esplora');
 }
 
