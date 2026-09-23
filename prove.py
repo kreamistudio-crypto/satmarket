@@ -46149,6 +46149,359 @@ def prove_pagina_dati():
           and 'class="priv-cantiere"' in vista)
 
 
+# ---------- IL GIUDICE DELLA CASCATA (24 set 2026) ------------------
+# Pochi pezzi piccoli per la domanda a cui una ricerca di stringhe non
+# sa rispondere: «su QUESTO elemento, quale regola vince?». Sono nati
+# dalle note delle pagine lunghe, che per otto settimane hanno avuto
+# la loro regola scritta giusta e mai applicata: la stringa c'era, e
+# ogni sentinella che l'avesse cercata sarebbe stata verde.
+# NEL DUBBIO VALE: un `:hover`, un `:first-child`, un `+` di cui non si
+# conosce il fratello, un gruppo @media — quel che FORSE prende
+# l'elemento si da' per preso, cosi' il giudice puo' sbagliare solo
+# dalla parte che arrossisce.
+
+_PEZZO_CSS = re.compile(
+    r"(?P<tipo>\*|[a-zA-Z][\w-]*)|#(?P<id>[\w-]+)|\.(?P<classe>[\w-]+)"
+    r"|\[(?P<attr>[^\]]*)\]"
+    r"|::?(?P<pseudo>[\w-]+)(?:\((?P<arg>(?:[^()]|\([^()]*\))*)\))?")
+
+
+def _regole_css(css):
+    """Le regole di stile del foglio, in ordine: (selettori, corpo,
+    gruppi), dove i gruppi sono le @media/@supports che le contengono.
+    @font-face e @keyframes non vestono elementi e restano fuori. Torna
+    anche lo SQUILIBRIO delle graffe: zero, se il foglio si chiude."""
+    css = re.sub(r"/\*[\s\S]*?\*/", "", css)
+    regole, pila, ultimo, orfane = [], [], 0, 0
+    for k, c in enumerate(css):
+        if c == "{":
+            testa = css[ultimo:k].strip()
+            if re.match(r"@(media|supports|layer|container)\b", testa):
+                tipo = "gruppo"
+            elif testa.startswith("@") or (pila and pila[-1][0] == "altro"):
+                tipo = "altro"
+            else:
+                tipo = "regola"
+            pila.append((tipo, testa, k + 1))
+            ultimo = k + 1
+        elif c == "}":
+            if not pila:
+                orfane += 1
+            else:
+                tipo, testa, dal = pila.pop()
+                if tipo == "regola":
+                    regole.append((testa, css[dal:k],
+                                   [t for g, t, _ in pila if g == "gruppo"]))
+            ultimo = k + 1
+        elif c == ";" and not (pila and pila[-1][0] == "regola"):
+            ultimo = k + 1
+    return regole, len(pila) + orfane
+
+
+def _dividi_css(s):
+    """Divide sulle virgole a profondita' zero: dentro [] e () e fra
+    virgolette una virgola non separa niente."""
+    parti, prof, q, buf = [], 0, None, ""
+    for c in s:
+        if q or c in "\"'":
+            q = None if c == q else (q or c)
+        elif c in "[(":
+            prof += 1
+        elif c in "])":
+            prof -= 1
+        elif c == "," and prof == 0:
+            parti.append(buf)
+            buf = ""
+            continue
+        buf += c
+    return parti + [buf]
+
+
+def _composti(sel):
+    """«a > b c» diventa [(None, 'a'), ('>', 'b'), (' ', 'c')]: i
+    composti da sinistra, ognuno col combinatore che lo lega a quello
+    prima."""
+    out, prof, q, buf, comb = [], 0, None, "", None
+    s, i = sel.strip(), 0
+    while i < len(s):
+        c = s[i]
+        if prof == 0 and not q and (c.isspace() or c in ">+~"):
+            j = i
+            while j < len(s) and (s[j].isspace() or s[j] in ">+~"):
+                j += 1
+            if buf:
+                out.append((comb, buf))
+                buf = ""
+            comb, i = s[i:j].strip() or " ", j
+            continue
+        if q or c in "\"'":
+            q = None if c == q else (q or c)
+        elif c in "[(":
+            prof += 1
+        elif c in "])":
+            prof -= 1
+        buf += c
+        i += 1
+    return out + [(comb, buf)] if buf else out
+
+
+def _specificita(sel):
+    """(id, classi, elementi): `:not()` e `:is()` pesano quanto il loro
+    argomento piu' pesante, `:where()` niente."""
+    a = b = c = 0
+    for _, comp in _composti(sel):
+        for m in _PEZZO_CSS.finditer(comp):
+            if m["id"]:
+                a += 1
+            elif m["classe"] or m["attr"] is not None:
+                b += 1
+            elif m["pseudo"] in ("not", "is", "has", "matches"):
+                x = max(_specificita(t) for t in _dividi_css(m["arg"] or ""))
+                a, b, c = a + x[0], b + x[1], c + x[2]
+            elif m["pseudo"] and m["pseudo"] != "where":
+                b += 1
+            elif m["tipo"] and m["tipo"] != "*":
+                c += 1
+    return (a, b, c)
+
+
+def _attr_css(testo, el):
+    """[nome], [nome=v], [nome^=v]... contro gli attributi veri."""
+    m = re.match(r"\s*([\w-]+)\s*(?:([~|^$*]?=)\s*(\"[^\"]*\"|'[^']*'"
+                 r"|[^\s\]]+))?", testo)
+    if not m:
+        return True                 # una forma che non so leggere: vale
+    if m.group(1) not in el["attr"]:
+        return False
+    if not m.group(2):
+        return True
+    v, x = el["attr"][m.group(1)], m.group(3).strip("\"'")
+    return {"=": v == x, "~=": x in v.split(), "^=": v.startswith(x),
+            "$=": v.endswith(x), "*=": x in v,
+            "|=": v == x or v.startswith(x + "-")}[m.group(2)]
+
+
+def _composto_ok(comp, el):
+    """Il composto prende l'elemento? Nel dubbio si'."""
+    for m in _PEZZO_CSS.finditer(comp):
+        if m["tipo"]:
+            if m["tipo"] != "*" and m["tipo"].lower() != el["tag"]:
+                return False
+        elif m["id"]:
+            if el["attr"].get("id") != m["id"]:
+                return False
+        elif m["classe"]:
+            if m["classe"] not in el["classi"]:
+                return False
+        elif m["attr"] is not None:
+            if not _attr_css(m["attr"], el):
+                return False
+        elif m["pseudo"] == "root":
+            if el["tag"] != "html":
+                return False
+        elif m["pseudo"] in ("not", "is", "where", "matches"):
+            dentro = _dividi_css(m["arg"] or "")
+            if all(len(_composti(t)) == 1 for t in dentro):
+                preso = any(_composto_ok(t.strip(), el) for t in dentro)
+                if preso == (m["pseudo"] == "not"):
+                    return False
+    return True
+
+
+def _combacia(sel, catena):
+    """Il selettore prende l'ULTIMO anello della catena (la radice sta
+    in testa)? Da destra a sinistra, come fa il browser. Un selettore
+    che finisce su un pseudo-elemento veste un'altra cosa."""
+    parti = _composti(sel)
+    if not parti or re.search(r"::|:(?:before|after|first-letter|"
+                              r"first-line)\b", sel):
+        return False
+
+    def qui(i, j):
+        return _composto_ok(parti[i][1], catena[j]) and (i == 0 or su(i, j))
+
+    def su(i, j):
+        if parti[i][0] == ">":
+            return j > 0 and qui(i - 1, j - 1)
+        if parti[i][0] == " ":
+            return any(qui(i - 1, k) for k in range(j - 1, -1, -1))
+        return i == 1 or su(i - 1, j)   # `+` e `~`: il fratello c'e'
+    return qui(len(parti) - 1, len(catena) - 1)
+
+
+def _vince_css(regole, catena, proprieta):
+    """Per ogni proprieta', la dichiarazione che la cascata sceglie per
+    l'ultimo anello della catena: prima `!important`, poi la
+    specificita', poi chi sta scritto dopo. La scorciatoia `font:`
+    porta anche taglia e peso. Torna {proprieta: (valore, selettore,
+    gruppi)}."""
+    vinte = {}
+    for n, (lista, corpo, gruppi) in enumerate(regole):
+        dich = {}
+        for d in corpo.split(";"):
+            k, due, v = d.partition(":")
+            k, v = k.strip(), v.strip()
+            if k == "font":
+                dich.update({"font-size": "font:" + v,
+                             "font-weight": "font:" + v})
+            elif due:
+                dich[k] = v
+        tocca = [p for p in proprieta if p in dich]
+        for sel in (_dividi_css(lista) if tocca else ()):
+            if not _combacia(sel, catena):
+                continue
+            for p in tocca:
+                imp = bool(re.search(r"!\s*important$", dich[p]))
+                chiave = (imp, _specificita(sel), n)
+                if p not in vinte or chiave > vinte[p][0]:
+                    vinte[p] = (chiave,
+                                re.sub(r"\s*!\s*important$", "", dich[p]),
+                                sel.strip(), gruppi)
+    return {p: v[1:] for p, v in vinte.items()}
+
+
+def _catene_html(markup, scegli):
+    """Le catene di antenati (radice in testa) degli elementi che
+    `scegli` vuole, lette dal markup vero: {tag, attr, classi}."""
+    from html.parser import HTMLParser
+    VUOTI = {"area", "base", "br", "col", "embed", "hr", "img", "input",
+             "link", "meta", "source", "track", "wbr"}
+
+    class Lettore(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.pila, self.prese = [], []
+
+        def handle_starttag(self, tag, attrs):
+            if tag in VUOTI:
+                return
+            a = {k: v or "" for k, v in attrs}
+            self.pila.append({"tag": tag, "attr": a,
+                              "classi": set(a.get("class", "").split())})
+            if scegli(self.pila):
+                self.prese.append(list(self.pila))
+
+        def handle_endtag(self, tag):
+            for k in range(len(self.pila) - 1, -1, -1):
+                if self.pila[k]["tag"] == tag:
+                    del self.pila[k:]
+                    break
+    lettore = Lettore()
+    lettore.feed(markup)
+    return lettore.prese
+
+
+def prove_note_piccole():
+    """LE NOTE PICCOLE DELLE PAGINE LUNGHE (24 set 2026, decisione di
+    Andrea). I paragrafi `sicu-nota` di «Il pagamento protetto», «I
+    tuoi dati» e «Info P2P» avevano la loro regola dal 1 ago 2026 —
+    piccola, grigia, a 600 — e non e' MAI stata applicata: `.sicu p`,
+    una classe e un elemento, batteva la classe nuda, e le note
+    uscivano identiche alla prosa. L'ha visto la misura dal vivo e non
+    la lettura: il selettore c'era e il valore era giusto.
+
+    QUESTA NON CERCA LA REGOLA: chiede alla cascata CHI VINCE, su ogni
+    nota vera del markup, nei due temi, con la vista aperta e addosso a
+    <html> e <body> tutte le classi che il JS sa accendere."""
+    mini = open("miniapp.html", encoding="utf-8").read()
+    i0 = mini.find("<style>")
+    css = mini[i0 + 7:mini.find("</style>", i0)] if i0 >= 0 else ""
+    regole, squilibrio = _regole_css(css)
+    prova("note: il foglio si legge fino in fondo (graffe in pari, e "
+          "c'e' `.sicu p`, la regola da battere)", (0, True),
+          (squilibrio, any(s == ".sicu p" for s, _, _ in regole)))
+
+    corpo = mini[mini.find("<body>"):]
+    note = _catene_html(corpo, lambda p: "sicu-nota" in p[-1]["classi"])
+    prosa = _catene_html(corpo, lambda p: p[-1]["tag"] == "p"
+                         and not p[-1]["classi"] and len(p) > 1
+                         and "sicu" in p[-2]["classi"])
+
+    def vista(catena):
+        return next((e["attr"].get("id") for e in catena
+                     if "view" in e["classi"]), None)
+    TRE = {"view-sicurezza", "view-privacy", "view-p2pinfo"}
+    prova("note: ci sono nelle tre pagine lunghe (e la prosa pure)",
+          (True, True), (TRE <= {vista(c) for c in note},
+                         TRE <= {vista(c) for c in prosa}))
+
+    # LA PAGINA COM'E' APERTA: la vista `active` (`go()`), il tema
+    # scuro come lo accende il JS su <html>, e le classi che il JS sa
+    # mettere su <html> e <body> — lette dal sorgente, tutte insieme.
+    # Una regola che le usa per battere la nota deve arrossire.
+    su_html = set(re.findall(
+        r"documentElement\.classList\.(?:add|toggle)\('([\w-]+)'", mini))
+    su_body = set(re.findall(
+        r"document\.body\.classList\.(?:add|toggle)\('([\w-]+)'", mini))
+
+    def aperta(catena, tema):
+        html = {"tag": "html", "attr": {"lang": "it"}, "classi": set(su_html)}
+        if tema == "scuro":
+            html["attr"]["data-tema"] = "scuro"
+        out = [html]
+        for e in catena:
+            e = dict(e, classi=set(e["classi"]))
+            if e["tag"] == "body":
+                e["classi"] |= su_body
+            if "view" in e["classi"]:
+                e["classi"].add("active")
+            out.append(e)
+        return out
+
+    def storte(catene, attese):
+        """Le (pagina, tema, proprieta, valore, selettore, gruppi) che
+        la cascata sceglie diverse dall'atteso. Il vincitore deve anche
+        stare FUORI da ogni gruppo: dentro una @media varrebbe solo a
+        volte, e a volte non e' la regola."""
+        fuori, viste = [], set()
+        for c in catene:
+            firma = tuple((e["tag"], tuple(sorted(e["attr"].items())))
+                          for e in c)
+            for tema in ("chiaro", "scuro"):
+                if (firma, tema) in viste:
+                    continue
+                viste.add((firma, tema))
+                vinte = _vince_css(regole, aperta(c, tema), tuple(attese))
+                for p, atteso in attese.items():
+                    v, sel, gruppi = vinte.get(p, (None, None, []))
+                    if v != atteso or gruppi:
+                        fuori.append((vista(c), tema, p, v, sel, gruppi))
+        return fuori
+
+    # IL CUORE: su ogni nota vince la regola piccola, nei due temi. Il
+    # colore e' l'inchiostro morbido e non `--muted` (scelta di Andrea):
+    # a 13,5px il testo vuole il 4,5:1, e `--muted` di giorno sulla
+    # pagina sta a 3,5.
+    prova("note: su ogni nota vince la regola piccola — 13,5px, "
+          "--ink-soft, 600 — nei due temi e fuori da ogni @media", [],
+          storte(note, {"font-size": "13.5px", "color": "var(--ink-soft)",
+                        "font-weight": "600"}))
+    # ...e la prosa resta la prosa: la cura alza la nota, e `.sicu p`
+    # non si tocca
+    prova("...e la prosa accanto resta com'era: 15px, --desc, 500", [],
+          storte(prosa, {"font-size": "15px", "color": "var(--desc)",
+                         "font-weight": "500"}))
+
+    def lum(h):
+        c = [int(h[k:k + 2], 16) / 255 for k in (1, 3, 5)]
+        c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4
+             for x in c]
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+    def contrasto(a, b):
+        la, lb = sorted((lum(a), lum(b)), reverse=True)
+        return (la + 0.05) / (lb + 0.05)
+
+    def tok(nome):
+        return re.findall(r"%s:(#[0-9A-Fa-f]{6})" % nome, css)[:2]
+    # ...e quell'inchiostro sulla pagina si legge: le pagine lunghe non
+    # hanno un fondo loro, stanno sul `--bg` del corpo
+    prova("...e l'inchiostro delle note regge il 4,5:1 sulla pagina, "
+          "nei due temi", [True, True],
+          [contrasto(a, b) >= 4.5
+           for a, b in zip(tok("--ink-soft"), tok("--bg"))])
+
+
 def prove_font():
     """I font serviti da casa (ago 2026). Il cantiere ha tolto l'ultima
     terza parte dal foglio: finche' la pagina li chiedeva a
@@ -87613,6 +87966,7 @@ def main():
               prove_esclusioni_relay,
               prove_letture_relay_collaudo,
               prove_pagina_dati,
+              prove_note_piccole,
               prove_font,
               prove_porta_timer, prove_feedback_confermato,
               prove_recensione_p2p,

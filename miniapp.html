@@ -6070,7 +6070,19 @@
     margin:26px 0 8px;line-height:1.2}
   .sicu p{font-size:15px;line-height:1.6;color:var(--desc);
     font-weight:500;margin:0 0 10px}
-  .sicu-nota{font-size:13.5px;color:var(--muted);font-weight:600}
+  /* LE NOTE SONO PICCOLE DAVVERO (24 set 2026, decisione di Andrea).
+     Fino a ieri la regola era la classe nuda, e non vinceva MAI:
+     dentro una `.sicu` vale anche `.sicu p` (una classe e un
+     elemento, 0,1,1), che batte una classe sola (0,1,0) ovunque
+     stia scritta. Dal 1 ago 2026, quando sono nate insieme, le note
+     di «Il pagamento protetto», «I tuoi dati» e «Info P2P» uscivano
+     a 15px, peso 500 e colore della prosa: identiche ai paragrafi.
+     Adesso il selettore porta anche l'elemento (0,2,1) e vince per
+     specificita', non per posizione; `.sicu p` non si tocca.
+     INCHIOSTRO E NON --muted: a 13,5px il testo vuole il 4,5:1, e
+     `--muted` sulla pagina di giorno sta a 3,5. Il colore e' quello
+     del piede della pagina: 6,7:1 di giorno, 10:1 di sera. */
+  .sicu p.sicu-nota{font-size:13.5px;color:var(--ink-soft);font-weight:600}
   .sicu ol,.sicu ul{margin:0;padding-left:0;list-style:none}
   .sicu li{font-size:15px;line-height:1.55;color:var(--desc);
     font-weight:500;margin-bottom:11px}

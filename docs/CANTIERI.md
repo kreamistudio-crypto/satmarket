@@ -29149,3 +29149,54 @@ intatta, riprova fra 3594 secondi.
   e tiene la foto vecchia: scelto, un'immagine che non arriva non è un
   «non ce l'ha».
 - Il telefono: la selezione dell'IBAN col dito vero, dentro Telegram.
+
+## Le note delle pagine lunghe, piccole davvero (24 set 2026)
+
+È il difetto lasciato «visto e non toccato» dal verbale dei Consigliati,
+più su. I paragrafi `.sicu-nota` — tre in «Il pagamento protetto», tre in
+«I tuoi dati», quattro in «Info P2P» — avevano la loro regola dal 1 ago
+2026 (13,5px, peso 600, `--muted`) e non è MAI stata applicata: `.sicu p`,
+una classe e un elemento (0,1,1), batte una classe nuda (0,1,0) dovunque
+stia scritta. Nate insieme nello stesso commit, le note sono sempre
+uscite a 15px, peso 500 e col colore della prosa: identiche ai paragrafi.
+
+**LA DOMANDA, PRIMA DI TOCCARE.** Piccole come dice la classe, o come le
+vedono gli utenti da agosto? Andrea: piccole, ma con un grigio che si
+legge. `--muted` sulla pagina di giorno sta a 3,5:1, sotto il 4,5:1 che
+vuole il testo piccolo (la regola «inchiostro e non --muted», già pagata
+altrove); `--ink-soft`, quello del piede della pagina, fa 6,7:1 di giorno
+e 10:1 di sera. Quindi `.sicu p.sicu-nota` (0,2,1: vince per
+specificità, non per posizione) col colore cambiato, e `.sicu p` non si
+tocca.
+
+**LA SENTINELLA NON CERCA LA REGOLA, CHIEDE CHI VINCE.** Il difetto era
+invisibile proprio a una ricerca di stringhe: il selettore c'era e il
+valore era giusto. `prove_note_piccole` usa un giudice della cascata
+piccolo, in `prove.py` e riusabile (`_regole_css`, `_combacia`,
+`_specificita`, `_vince_css`, `_catene_html`): le catene di antenati di
+ogni nota VERA lette dal markup, tutte le regole del foglio, poi
+`!important`, specificità e ordine — nei due temi, con la vista `active`
+e addosso a `<html>` e `<body>` tutte le classi che il JS sa accendere.
+Nel dubbio vale (un `:hover`, un `+` col fratello ignoto, un gruppo
+@media), così sbaglia solo dalla parte che arrossisce; e chi vince deve
+stare fuori da ogni @media. La stessa domanda per la prosa accanto (15px,
+`--desc`, 500), più il 4,5:1 dell'inchiostro sul `--bg` nei due temi.
+
+**PROVATO.** Cinque prove nuove: la suite fa 14276/0 contro le 14271/0 di
+`origin/main` (`a20fc2d`), cioè le sole cinque. Tortura 19/19 su una
+copia, tutte prese dalla prova col loro nome: la classe nuda di ieri; il
+colore o la taglia rimessi; `--ink-soft` sbiadito, o sparito di sera; un
+concorrente per id, del solo tema scuro, con `!important`, dentro una
+@media, con la scorciatoia `font:`, su una classe del body, col fratello,
+con un `:not()` che passa; un `:not()` che salva le note e sporca la
+prosa; la regola chiusa in una @media; la prosa a 16px; una nota
+diventata div; una graffa mangiata; le note sparite da una pagina. DAL
+VIVO a 375 nei due temi, col server da una copia e i relay al relay
+morto: nel pane le 10 note a 13,5px/600/`--ink-soft` (`#5B5648` di
+giorno, `#CFC4AD` di sera) e i 64 paragrafi di prosa a 15px/500/`--desc`;
+poi una coppia prosa+nota per pagina rimisurata in Chrome headless, con
+gli scatti prima/dopo (il «prima» è il file di `origin/main` servito
+dalla stessa copia).
+
+**COSA RESTA DA GUARDARE.** Il telefono: le note dentro Telegram, nei
+due temi.
