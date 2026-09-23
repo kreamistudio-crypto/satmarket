@@ -27892,3 +27892,66 @@ l'ordine è ancora in vetrina — e in quel caso la faccia dell'estraneo non
 deve comparire a nessuno, mai. 5) Un pagamento SaaS «pending» nel
 pannello 🧊: il bottone «Paga da un'altra cassaforte» è acceso ma la
 rotta dice «viva» finché LNbits non dice `failed`.
+
+## Dati di spedizione che si copiano: un rigo per dato col suo «Copia», e «Copia tutto l'indirizzo» (23 set 2026)
+
+Ritocco chiesto da Andrea. Nel dettaglio di un ordine del mercatino chi
+vende legge indirizzo, email per il corriere e punto di ritiro per
+comprare l'etichetta, e il sito del corriere li chiede in caselle
+SEPARATE. L'indirizzo era un blocco `user-select:all` — tutto o niente —
+col «Copia» nella forma MUTA (`clipboard?.`: senza appunti non succedeva
+niente); l'email un grassetto e basta; il punto un grassetto dentro una
+frase. Un worktree da `origin/main`, commit firmato.
+
+**COSA C'È.** Il rigo del recapito P2P è uscito dal suo riquadro:
+`rigaCopia` (+ `bottoneCopia`), accanto a `copiaLink` — il recapito P2P lo
+disegna al byte di prima, e lo portano le buste. CHI VENDE: l'indirizzo a
+righe (nome, via, CAP, città, provincia, paese fuori dai confini,
+telefono se c'è, note per il corriere), ognuna col suo «📋 Copia», e
+sotto «📋 Copia tutto l'indirizzo» con le righe dell'etichetta; l'email
+in un rigo (monospazio, come prima); il punto nel «Spedisci» in un rigo
+sotto «L'acquirente ha scelto Punto InPost:». Il BANNER DEL PACCO, a
+spedizione fatta, ha il suo «Copia» per tutt'e due le parti. CHI COMPRA:
+l'email appena salvata è il rigo col «Copia», e sotto «✏️ Cambia
+l'email» riapre il campo precompilato; senza il valore in pagina resta
+la riga compatta di sempre. Ogni «Copia» prende il valore SENZA
+l'etichetta e dice «Copiato 📋» («Indirizzo copiato 📋» il «Copia
+tutto»); se gli appunti dicono di no, il valore finisce nel toast.
+
+**I PERCHÉ, E LE STRADE SCARTATE.** `righeRecapitoP2P` non si riusa come
+parser: l'indirizzo arriva già a campi, e ricomporlo in «Etichetta:
+valore» per ritagliarlo sarebbe un giro a vuoto — si riusa il RIGO, che
+copiato avrebbe divergito al primo ritocco. IL PAESE: dal cantiere delle
+zone l'etichetta non lo scriveva, cioè un pacco per Lisbona si copiava
+senza Portogallo, e «pronte per un'etichetta» non sarebbe stato vero;
+va sotto la città e solo se la zona dell'ordine esce dai confini
+(`spedEstero`) — «Italia» su un pacco per Pavia è rumore, la regola di
+`zonaOrdine`. A CHI COMPRA il modulo dell'indirizzo e la casella del
+punto restano campi (lì il dato si scrive, ed è già selezionabile), e a
+pacco partito l'indirizzo per lui non si mostra, come prima: sarebbe un
+«Mostra» nuovo, non chiesto. Il «Cambia» ha l'inchiostro del pannello e
+non il grigio dell'invito accanto: MISURATO, il `--muted` di giorno
+faceva 3,81:1. NESSUN DATO FUORI DALLE BUSTE: il «Spedisci» porta solo i
+cartelli, `/api/orders` e il server non sono stati toccati, e una prova
+conta chi legge i valori in chiaro (solo le funzioni della busta).
+
+**PROVATO.** `prove_dati_spedizione_copia`, 40 prove: sentinelle sul
+codice e un banco node con le funzioni VERE, un caso per volta — righe,
+ordine, etichette, valori, paese, vuoti, testo cattivo, il rigo P2P al
+byte, i due pannelli nei loro stati, i tre esiti degli appunti per rigo
+e per «Copia tutto». Emendate col perché le due prove P2P che guardavano
+dentro il riquadro, e il banco del motore P2P porta dentro il rigo vero.
+**TORTURA 35/35** su una copia (le tre sezioni, 527 verdi di baseline),
+nessuna inciampata. DAL VIVO, col server del worktree e quattro ordini
+seminati nella sua copia del database: «Mostra» → rotta cifrata → sette
+righe; il tocco sul CAP ha messo «27100» negli appunti, e con gli
+appunti negati il valore è comparso nel toast; «Copia tutto» →
+l'etichetta; chi compra: «Cambia» riapre precompilato, «Aggiorna» torna
+al rigo; il banner copia il punto. A 375 px nei due temi (Chrome
+headless, il pane non componeva): etichette 7,32/8,78, «Copia»
+12,75/11,06, «Cambia» 14,88/12,46.
+
+**DA GUARDARE SUL TELEFONO.** Dentro Telegram gli appunti possono dire di
+no in modi che il PC non riproduce: il tocco su un rigo deve dire
+«Copiato 📋» e incollarsi nel sito del corriere. Se compare il valore
+nel toast, è il ripiego che fa il suo mestiere — e vale la pena saperlo.

@@ -19424,6 +19424,13 @@
   la classe `.ind-campi`, che ricalca `.field`: dentro `.payout` le
   label non sono vestite da nessuno e nascevano INLINE, coi campi
   sfasati a metà riga (visto a schermo, non leggendo il foglio).
+  ⚠️ EMENDATA (23 set 2026, «Dati di spedizione che si copiano»): il
+  blocco `user-select:all` non c'è più. Il venditore legge l'indirizzo
+  a RIGHE, una per dato col suo «📋 Copia» (`righeIndirizzo`), e
+  «📋 Copia tutto l'indirizzo» copia le righe di
+  `indirizzoPerEtichetta` — che adesso scrive anche il paese, sotto la
+  città, quando la zona dell'ordine esce dai confini (`spedEstero`).
+  Vedi «IL RIGO COL "COPIA" È UNO».
   IL NUMERO DEI GIORNI VIENE DAL SERVER (`giorni_indirizzo` nella
   busta di prima pagina) e NON è uno specchio a mano come i tempi di
   `TEMPI`: quelli decidono se un bottone ha senso, questo È la frase
@@ -26100,6 +26107,25 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   il bottone arancio in cima, e `campiOrdineP2P` è diventata la sola
   porta del foglio «I vostri recapiti». Il foglio mostra il recapito
   come prima (testo intero): lì non è cambiato niente.
+- IL RIGO COL «COPIA» È UNO (23 set 2026, «Dati di spedizione che si
+  copiano»): `rigaCopia(et, v, {vista, mono, aria})` — l'etichetta
+  sopra, il valore che si seleziona, il «📋 Copia» accanto — e il suo
+  bottone da solo, `bottoneCopia(v, aria)`, stanno accanto a
+  `copiaLink`. Li portano il recapito P2P (`riquadroRecapitoP2P`, al
+  byte di prima) e le buste dell'ordine del mercatino: l'indirizzo di
+  spedizione (`righeIndirizzo`), l'email per il corriere, il punto di
+  ritiro nel «Spedisci» e nel banner del pacco. Il valore sta nel
+  `data-v`, mai nell'onclick; il tocco copia il VALORE senza
+  l'etichetta e passa da `copiaLink` — «Copiato 📋», o il valore nel
+  toast se gli appunti dicono di no. Dentro un `.payout` i righi
+  stanno in `.dati-copia`, senza la carta del riquadro P2P.
+  I DATI RESTANO NELLE BUSTE: i valori letti dalle rotte cifrate
+  (`indirizzoLetto`, `emailLetta`) li toccano solo le funzioni della
+  loro busta, e il «Spedisci» porta i cartelli — una prova lo conta.
+  A CHI COMPRA il rigo va dove il suo dato si LEGGE: l'email appena
+  salvata (sotto, «✏️ Cambia l'email» riapre il campo precompilato) e
+  il punto nel banner del pacco. Dove il dato si SCRIVE — il modulo
+  dell'indirizzo, la casella del punto — resta il campo.
 - SATS IN PAGAMENTO, DETTO A CHI VENDE (23 set 2026, «Ritocchi allo
   scambio P2P»): a chi vende, «Scambio concluso» arriva solo a
   pagamento RIUSCITO verso chi compra. Il messaggio con cui mostrod

@@ -3350,6 +3350,17 @@
   .p2p-recapito-copia{flex:0 0 auto;border:0;background:var(--sats-soft);color:var(--ink);
     border-radius:10px;font:inherit;font-size:13px;font-weight:800;padding:8px 11px;
     cursor:pointer;user-select:none;-webkit-user-select:none}
+  /* GLI STESSI RIGHI NELLE BUSTE DEL MERCATINO (23 set 2026, «Dati di
+     spedizione che si copiano»): l'indirizzo, l'email per il corriere e
+     il punto di ritiro, dentro il loro .payout e SENZA la carta del
+     riquadro P2P — una scatola nella scatola. Il contenitore dice la
+     selezione come la dice la carta, e stacca il primo rigo dal testo
+     sopra. */
+  .dati-copia{margin-top:8px;user-select:text;-webkit-user-select:text}
+  /* il punto nel banner del pacco: la frase prende la riga, e il
+     «Copia» resta al centro in altezza anche quando lei va a capo */
+  .nota-punto > span{flex:1;min-width:0}
+  .nota-punto .p2p-recapito-copia{align-self:center}
   .p2p-sez-tit{display:flex;align-items:center;gap:8px;font-size:12.5px;
     font-weight:700;color:var(--muted);line-height:1.35;margin-bottom:10px}
   .p2p-sez-tit span{flex:1;min-width:0}
@@ -25934,7 +25945,11 @@ function openOrder(id){
             bivio davanti a chi aspetta un pacco. La traccia della
             correzione del moderatore ha seguito il codice: sta nel
             passo, dove la vedono ENTRAMBE le parti come prima. */''}
-      ${(['shipped','delivered'].includes(s) && o.puntoRitiro) ? `<div class="trust-note nota-punto">📍 <span>${puntoBanner(o)}</span></div>`:''}
+      ${/* E IL PUNTO SI COPIA ANCHE QUI (23 set 2026, «Dati di
+            spedizione che si copiano»): a chi ha comprato serve per
+            trovarlo sulla mappa, ed e' il solo posto dove lo ritrova
+            a pacco partito. */''}
+      ${(['shipped','delivered'].includes(s) && o.puntoRitiro) ? `<div class="trust-note nota-punto">📍 <span>${puntoBanner(o)}</span>${bottoneCopia(o.puntoRitiro, 'Copia il punto di ritiro')}</div>`:''}
       ${bottoneNotifichePacco(o, s)}
       ${pannelloTrackingAdmin(o, s)}
       ${/* IL CASO INCAGLIATO (ago 2026): quando lo sblocco o il
@@ -26020,8 +26035,13 @@ function openOrder(id){
                 Tipo e rete davanti, dal giudice unico `nomePunto`, e il
                 punto dopo — cosi' la prima parola dice gia' che tipo di
                 spedizione comprare. Gli ordini di ieri non hanno il
-                tipo e ricadono sulla forma di prima. */''}
-          ${o.puntoRitiro ? `<div class="hint">📦 L'acquirente ha scelto <b>${esc(nomePunto(o.tipoPunto, o.retePunto))}</b> — <b>${esc(o.puntoRitiro)}</b>${o.tipoPunto ? '' : ' <span class="eur-hint">(tipo non indicato)</span>'}</div>` : ''}
+                tipo e ricadono sulla forma di prima.
+                IL PUNTO E' UN RIGO COL SUO «COPIA» (23 set 2026, «Dati
+                di spedizione che si copiano»): va incollato nel sito
+                del corriere, e il grassetto dentro la frase si prendeva
+                insieme alle parole attorno. */''}
+          ${o.puntoRitiro ? `<div class="hint">📦 L'acquirente ha scelto <b>${esc(nomePunto(o.tipoPunto, o.retePunto))}</b>${o.tipoPunto ? '' : ' <span class="eur-hint">(tipo non indicato)</span>'}:</div>
+          <div class="dati-copia">${rigaCopia('', o.puntoRitiro, {aria: 'Copia il punto di ritiro'})}</div>` : ''}
           ${obiezioneVenditore(o)}
           ${(o.viaPunto && !o.puntoRitiro) ? `<div class="hint">⏳ L'acquirente vuole la spedizione a un <b>locker/punto di ritiro</b>${o.retePunto ? ` <b>${esc(o.retePunto)}</b>` : ''} ma non l'ha ancora indicato: appena lo scrive nell'ordine potrai segnare la spedizione${o.retePunto ? '.' : ' — se serve, accordatevi in chat sul corriere.'}</div>` : ''}
           ${o.viaPunto ? `<div class="hint">📮 ${RIGA_CODICE_CORRIERE}</div>` : ''}
@@ -27234,6 +27254,40 @@ function copiaLink(link, fatto){
     .then(()=>toast(fatto))
     .catch(()=>toast(link, 5000));
   toast(link, 5000);
+}
+
+/* ---- IL DATO CHE SI COPIA, UN RIGO (23 set 2026) ----
+   Nato col recapito dello scambio P2P («Ritocchi allo scambio P2P»:
+   l'etichetta sopra, il valore che si SELEZIONA, il suo «📋 Copia»
+   accanto) e tirato fuori dal suo riquadro quando i posti sono
+   diventati due: lo portano anche le buste dell'ordine del mercatino —
+   l'indirizzo di spedizione, l'email per il corriere, il punto di
+   ritiro («Dati di spedizione che si copiano»). Un rigo solo per
+   tutti: due copie dello stesso markup divergono al primo ritocco, e
+   nessuno se ne accorge.
+   Il «Copia» prende il VALORE senza l'etichetta — «27100» finisce
+   negli appunti, «CAP» no — e passa dall'ultimo gradino qui sopra:
+   «Copiato 📋», o il valore scritto nel toast se gli appunti dicono
+   di no.
+   IL VALORE VIAGGIA NEL `data-v` E MAI DENTRO L'ONCLICK: e' testo
+   scritto dall'altra persona, e dentro una stringa JS l'esc()
+   dell'HTML non basta — il parser dell'attributo gli ridarebbe gli
+   apici. `vista` e' quel che si MOSTRA quando non e' quel che si
+   copia (l'IBAN a gruppi di quattro); `mono` il monospazio, che
+   distingue lo 0 dalla O. */
+function rigaCopia(et, v, op){
+  const o = op || {};
+  return '<div class="p2p-recapito-riga"><div class="p2p-recapito-dato">'
+    + (et ? '<span>' + esc(et) + '</span>' : '')
+    + '<b' + (o.mono ? ' class="mono"' : '') + '>' + esc(o.vista || v) + '</b></div>'
+    + bottoneCopia(v, o.aria || 'Copia ' + (et || v)) + '</div>';
+}
+/* il bottone da solo, per chi il dato lo scrive gia' a modo suo: il
+   punto di ritiro nel banner del pacco */
+function bottoneCopia(v, aria){
+  return '<button type="button" class="p2p-recapito-copia" data-v="' + esc(v) + '" '
+    + 'onclick="copiaLink(this.dataset.v, \'Copiato 📋\')" '
+    + 'aria-label="' + esc(aria) + '">📋 Copia</button>';
 }
 
 function condividiAnnuncio(){
@@ -32169,11 +32223,25 @@ function pannelloEmailCorriere(o){
         <div class="hint avviso-tracking" id="emailAvviso" style="display:none"></div>
         <button class="btn orange" onclick="salvaEmailCorriere()">${o.emailCorriereIl ? "Aggiorna l'email" : "Salva l'email"}</button>
         ${o.emailCorriereIl ? `<button class="btn ghost" onclick="togliEmailCorriere()">🗑 Togli l'email</button>` : ''}`;
-      const chiusa = o.emailCorriereIl
-        ? `<button type="button" class="via-riga punto-riga" aria-expanded="false"
-            onclick="apriEmailCorriere(this)"><span class="punto-testo">📧 ${esc(scritta || 'Email per il corriere')}</span><span class="punto-cambia">Cambia</span></button>`
-        : `<button type="button" class="scopri-link nota-aggiungi" aria-expanded="false"
-            onclick="apriEmailCorriere(this)">${invitoEmail()}</button>`;
+      /* LA TUA EMAIL SI COPIA DOVE LA LEGGI (23 set 2026, «Dati di
+         spedizione che si copiano»): appena salvata, la riga compatta
+         la mostrava DENTRO un bottone, dove il testo non si seleziona.
+         Adesso e' il rigo col suo «📋 Copia», e sotto il «Cambia» che
+         riapre il campo precompilato. Senza il valore in pagina — si
+         legge dalla sua rotta solo aprendo il cassetto — resta la riga
+         compatta di sempre: li' non c'e' niente da copiare.
+         Il «Cambia» ha l'inchiostro del pannello e non il grigio
+         dell'invito qui sotto: MISURATO, il --muted di giorno faceva
+         3,81:1, sotto l'AA per un testo da 13,5 px. */
+      const chiusa = !o.emailCorriereIl
+        ? `<button type="button" class="scopri-link nota-aggiungi" aria-expanded="false"
+            onclick="apriEmailCorriere(this)">${invitoEmail()}</button>`
+        : scritta
+        ? `<div class="dati-copia">${rigaCopia('La tua email', scritta, {mono: true, aria: 'Copia la tua email'})}</div>
+          <button type="button" class="scopri-link" aria-expanded="false" style="margin-top:8px;font-size:13.5px"
+            onclick="apriEmailCorriere(this)">✏️ Cambia l'email</button>`
+        : `<button type="button" class="via-riga punto-riga" aria-expanded="false"
+            onclick="apriEmailCorriere(this)"><span class="punto-testo">📧 Email per il corriere</span><span class="punto-cambia">Cambia</span></button>`;
       return `<div class="payout" id="emailPannello">
         <h4>📧 La tua email per il corriere</h4>
         ${aperta ? campo : chiusa}
@@ -32201,7 +32269,10 @@ function pannelloEmailCorriere(o){
   }
   /* IL VENDITORE la legge quando gli serve: al momento di comprare
      l'etichetta. Il valore passa dalla sua rotta e non da /api/orders,
-     quindi c'e' il bottone che lo rivela — il calco della busta. */
+     quindi c'e' il bottone che lo rivela — il calco della busta. Letta,
+     e' un rigo col suo «📋 Copia» (23 set 2026, «Dati di spedizione
+     che si copiano»): va incollata nel sito del corriere, e un tocco
+     che la seleziona tutta non la mette negli appunti. */
   if (o.role==='seller' && ['locked','shipped'].includes(o.state)){
     if (!o.emailCorriereIl || o.emailCorrierePurgataIl) return '';
     const mail = emailLetta[o.id] || '';
@@ -32209,7 +32280,7 @@ function pannelloEmailCorriere(o){
       <h4>📧 Email dell'acquirente per il corriere</h4>
       <div class="hint">L'acquirente ha lasciato un'email perché il <b>codice di ritiro</b> gli arrivi direttamente dal corriere. Se la metti come destinatario sull'etichetta, il codice non passa da qui — e nel pannello della spedizione spunta «il codice arriva direttamente a lui».</div>
       ${mail
-        ? `<div class="hint" style="margin-top:8px"><b class="mono" style="user-select:all">${esc(mail)}</b></div>`
+        ? `<div class="dati-copia">${rigaCopia('Email', mail, {mono: true, aria: "Copia l'email"})}</div>`
         : `<button class="btn ghost" style="margin-top:10px" onclick="mostraEmailCorriere(this)">👁 Mostra l'email</button>`}
     </div>`;
   }
@@ -32626,16 +32697,19 @@ function pannelloIndirizzoCasa(o){
       </div>`;
   }
   /* il VENDITORE: lo legge quando gli serve, cioe' mentre compila
-     l'etichetta — un tocco, e il testo resta selezionabile tutto
-     insieme come il nome della busta */
+     l'etichetta. UN RIGO PER DATO COL SUO «COPIA» (23 set 2026, «Dati
+     di spedizione che si copiano»): il sito del corriere chiede nome,
+     via, CAP e citta' in caselle SEPARATE, e il blocco unico di prima
+     — `user-select:all` — si prendeva tutto o niente. Per l'etichetta
+     scritta a mano, o la casella unica, c'e' «Copia tutto». */
   if (!o.indirizzoIl) return `
     <div class="trust-note">🏠 <span><b>In attesa dell'indirizzo.</b> L'acquirente ha scelto la spedizione a casa e lo scriverà qui nell'ordine: ti avviseremo appena lo fa.</span></div>`;
   if (i) return `
     <div class="payout">
       <h4>🏠 Indirizzo di spedizione</h4>
       <div class="hint">Indicato dall'acquirente il ${data(o.indirizzoIl)}${corr}:</div>
-      <div class="hint mono" style="user-select:all;white-space:pre-wrap;word-break:break-word">${esc(indirizzoPerEtichetta(i))}</div>
-      <button class="btn ghost" style="margin-top:10px" onclick="copiaIndirizzo()">📋 Copia l'indirizzo</button>
+      ${righeIndirizzo(i, spedEstero(o))}
+      <button class="btn ghost" style="margin-top:10px" onclick="copiaIndirizzo()">📋 Copia tutto l'indirizzo</button>
     </div>`;
   return `
     <div class="payout">
@@ -32646,15 +32720,51 @@ function pannelloIndirizzoCasa(o){
 }
 
 /* Come si scrive su un pacco, non come sta nel database: e' il testo
-   che il venditore copia sull'etichetta. */
-function indirizzoPerEtichetta(i){
+   che il venditore copia sull'etichetta — o incolla nella casella
+   unica del sito del corriere.
+   IL PAESE SOLO FUORI DAI CONFINI (23 set 2026, «Dati di spedizione
+   che si copiano»): il campo esiste dal cantiere delle zone e fin qui
+   l'etichetta non lo scriveva, cioe' un pacco per Lisbona si copiava
+   senza Portogallo. Sta sotto la citta', dove lo vuole la posta; e
+   sull'Italia tace, la regola di `zonaOrdine` — «Italia» su un pacco
+   per Pavia e' rumore. */
+function indirizzoPerEtichetta(i, estero){
   const p = (i.provincia||'').trim();
   const righe = [(i.nome||'').trim(), (i.via||'').trim(),
     [(i.cap||'').trim(), (i.citta||'').trim()].filter(Boolean).join(' ')
       + (p ? ` (${p})` : '')];
+  if (estero && (i.paese||'').trim()) righe.push(i.paese.trim());
   if ((i.telefono||'').trim()) righe.push('tel. ' + i.telefono.trim());
   if ((i.note||'').trim()) righe.push(i.note.trim());
   return righe.filter(r => r && r.trim()).join('\n');
+}
+
+/* La spedizione esce dal paese di casa? Lo dice la ZONA dell'ordine,
+   fotografata alla nascita — '' vale casa, come in `zonaOrdine`. */
+function spedEstero(o){
+  return !!o && (o.zonaSped || 'dom') !== 'dom';
+}
+
+/* L'INDIRIZZO A RIGHE, una per dato col suo «📋 Copia» (23 set 2026,
+   «Dati di spedizione che si copiano»). L'ORDINE e' quello
+   dell'etichetta qui sopra, le PAROLE quelle del modulo di chi compra
+   (`CAMPI_IND`) senza la parentesi che al modulo serve per spiegarsi
+   — «Note per il corriere», non «(citofono, scala, orari)». Un campo
+   vuoto non ha riga: il telefono c'e' solo se l'ha scritto. Il paese
+   solo fuori dai confini, come sull'etichetta.
+   L'elenco e' scritto a mano e una prova lo tiene in pari col
+   catalogo: un campo nuovo in `CAMPI_IND` senza il suo posto qui
+   sarebbe un dato che chi vende non vede. */
+function righeIndirizzo(i, estero){
+  const ORDINE = ['nome', 'via', 'cap', 'citta', 'provincia',
+                  'paese', 'telefono', 'note'];
+  const righe = ORDINE
+    .filter(k => (k !== 'paese' || estero) && String(i[k] || '').trim())
+    .map(k => {
+      const c = CAMPI_IND.find(x => x.k === k);
+      return rigaCopia(c ? c.et.replace(/ \(.*\)$/, '') : k, String(i[k]).trim());
+    });
+  return righe.length ? '<div class="dati-copia">' + righe.join('') + '</div>' : '';
 }
 
 async function caricaIndirizzo(){
@@ -32699,13 +32809,17 @@ async function salvaIndirizzo(btn){
   loadOrders().then(()=> openOrder(currentOrder.id));
 }
 
+/* «Copia tutto l'indirizzo»: le righe dell'etichetta, dall'ultimo
+   gradino — che se gli appunti dicono di no scrive il testo nel
+   toast. La forma di prima (`clipboard?.writeText(...).then(...)`)
+   era la forma MUTA che il commento di `copiaLink` racconta: senza
+   appunti non succedeva niente, nemmeno il suo «tieni premuto». */
 function copiaIndirizzo(){
   haptic();
-  const i = indirizzoLetto[currentOrder?.id];
+  const o = currentOrder;
+  const i = indirizzoLetto[o?.id];
   if (!i) return;
-  navigator.clipboard?.writeText(indirizzoPerEtichetta(i))
-    .then(()=>toast('📋 Indirizzo copiato'))
-    .catch(()=>toast('Tieni premuto sul testo per copiarlo'));
+  copiaLink(indirizzoPerEtichetta(i, spedEstero(o)), 'Indirizzo copiato 📋');
 }
 
 /* ---- il documento di ritiro (ago 2026): un PIN si trascrive, un QR
@@ -45700,14 +45814,13 @@ function righeRecapitoP2P(testo){
 }
 /* il riquadro: un rigo per dato, col valore che si SELEZIONA (chi
    preferisce tenere premuto deve poterlo fare) e il suo «Copia». Il
-   valore viaggia nel `data-v` e mai dentro l'onclick: e' testo scritto
-   dall'altra persona, e dentro una stringa JS l'esc() dell'HTML non
-   basta — il parser dell'attributo gli ridarebbe gli apici. L'IBAN
-   (per etichetta o per forma) va in monospazio, che distingue lo 0
-   dalla O; e se HA la forma di un IBAN si mostra a gruppi di quattro,
-   come nelle app delle banche — a 375 px le ventisette cifre di fila
-   lasciavano l'ultima da sola a capo (visto dal vivo). Il «Copia»
-   prende il valore COM'E' ARRIVATO, senza gli spazi della vista. */
+   rigo e' `rigaCopia` (23 set 2026), che le buste del mercatino
+   condividono: il perche' del `data-v` sta li'. L'IBAN (per etichetta
+   o per forma) va in monospazio, che distingue lo 0 dalla O; e se HA
+   la forma di un IBAN si mostra a gruppi di quattro, come nelle app
+   delle banche — a 375 px le ventisette cifre di fila lasciavano
+   l'ultima da sola a capo (visto dal vivo). Il «Copia» prende il
+   valore COM'E' ARRIVATO, senza gli spazi della vista. */
 function riquadroRecapitoP2P(testo){
   const righe = righeRecapitoP2P(testo);
   if (!righe.length) return '';
@@ -45718,13 +45831,9 @@ function riquadroRecapitoP2P(testo){
         if (r.testa) return '<div class="p2p-recapito-testa">' + esc(r.testa) + '</div>';
         const nudo = r.v.replace(/\s+/g, '');
         const iban = FORMA_IBAN.test(nudo);
-        const vista = iban ? nudo.replace(/(.{4})(?=.)/g, '$1 ') : r.v;
-        return '<div class="p2p-recapito-riga"><div class="p2p-recapito-dato">'
-          + (r.et ? '<span>' + esc(r.et) + '</span>' : '')
-          + '<b' + (iban || /^iban$/i.test(r.et) ? ' class="mono"' : '') + '>' + esc(vista) + '</b></div>'
-          + '<button type="button" class="p2p-recapito-copia" data-v="' + esc(r.v) + '" '
-          + 'onclick="copiaLink(this.dataset.v, \'Copiato 📋\')" '
-          + 'aria-label="Copia ' + esc(r.et || r.v) + '">📋 Copia</button></div>';
+        return rigaCopia(r.et, r.v, {
+          vista: iban ? nudo.replace(/(.{4})(?=.)/g, '$1 ') : r.v,
+          mono: iban || /^iban$/i.test(r.et)});
       }).join('')
     + '</div>';
 }
