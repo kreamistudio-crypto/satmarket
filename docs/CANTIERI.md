@@ -26549,3 +26549,167 @@ destro, stacco di 16px, niente sbordi nemmeno in sats.
 **Da guardare sul telefono**: un ordine a set con un titolo lungo, nei
 due temi — che l'elenco si legga come una lista e non come un paragrafo,
 e che il toggle €/sats cambi anche i prezzi dei pezzi.
+
+## Il nero all'avvio dell'APK, le barre vere e le due righe per AppVerifier (23 set 2026, APK v1.5)
+
+Dal video del 23 set a 20 fotogrammi: tocco sull'icona, e per **un
+fotogramma la finestra che cresce dall'icona è NERA**, poi lo splash
+arancio col barattolo. Nello stesso giro altre due richieste: il guscio
+con le barre di sistema **vere** al posto della stima dei 16 px, e (a
+metà cantiere) le due righe per **AppVerifier** dappertutto.
+
+**LA DIAGNOSI, sui sorgenti e prima di scrivere.** Nel manifest
+IMPACCHETTATO della 1.4 (`aapt2 dump xmltree`) l'app intera ha
+`@0x01030010`, cioè `Theme.Translucent.NoTitleBar` (risolto sul
+`public-final.xml` della piattaforma), e LauncherActivity non ha un tema
+suo. L'ipotesi di Andrea era giusta per metà: il fondo c'è, trasparente,
+ma a decidere è `windowIsTranslucent`. Nel sorgente di Android,
+`ActivityRecord.validateStartingWindowTheme` dice no a un tema
+traslucido — **nessuna finestra di partenza**: né lo splash di Android
+12+, né l'anteprima dei telefoni vecchi —, e il tema sostitutivo passa
+dallo stesso controllo (`evaluateStartingWindowTheme` guarda PRIMA
+l'originale). Il launcher, il colore con cui riempire la finestra che
+cresce, lo riceve dal sistema SOLO se c'è uno splash
+(`StartingWindowController`: `onTaskLaunching` solo per i tipi splash):
+senza, la riempie di quel che ha, e sul telefono di Andrea è nero. Il
+primo disegno di LauncherActivity invece è già arancio (lo splash della
+libreria nasce in `onCreate`): il nero sta PRIMA. Per questo un
+`windowBackground` arancio col tema traslucido non avrebbe curato
+niente.
+
+**IL CONFLITTO, portato ad Andrea prima di scrivere**, come chiedeva. Lo
+splash di Android 12+ esiste solo per le attività OPACHE; la libreria
+(javadoc di `LauncherActivity`, androidbrowserhelper 2.6.2) raccomanda il
+tema trasparente anche con lo splash acceso, per due casi: il browser
+senza splash (con l'opaco migliora: arancio invece del vuoto) e la TWA
+già aperta a cui arriva un intent, dove LauncherActivity fa solo da
+passacarte. Letto nel sorgente: al passacarte AOSP dà la FOTO del task
+(il caso del trampolino in `getStartingWindowType`), ma lui non è
+radice, lo splash della libreria non parte, e il suo primo disegno è il
+`windowBackground` — **un lampo arancio col barattolo** fra la pagina di
+prima e quella del link. Tre strade: A opaca e basta; B opaca con una
+guardia (`setTheme` traslucido + `setTranslucent(true)` sulle istanze
+non radice, da Android 11), che al banco non si prova e che sbagliando
+darebbe un lampo NERO; C restare trasparenti, col nero. **Andrea ha
+scelto A**; B resta per una 1.6, se il lampo dà fastidio. Le notifiche
+non creano passacarte: il sito non ne manda (`sw.js` senza push).
+Scartata anche l'attività d'ingresso opaca davanti a LauncherActivity:
+le toglierebbe la radice del task, e con lei lo splash della libreria.
+
+**IL TEMA.** `BarattoloAvvio` sulla SOLA LauncherActivity — le altre
+attività della libreria restano col traslucido. È il gemello opaco di
+quello di prima, `Theme.NoTitleBar`, con `windowContentOverlay` a null e
+`windowAnimationStyle` a `@android:style/Animation` come il traslucido
+(nessuna animazione di finestra sua); il fondo è l'arancio con
+`splash.png` al centro (la finestra di partenza prima di Android 12), e
+`colorBackground` è arancio. In `values-v31` lo splash del SISTEMA:
+`windowSplashScreenBackground` = `@color/backgroundColor` (lo stesso
+arancio campionato) e `windowSplashScreenAnimatedIcon` = il barattolo.
+**LA MISURA DELL'ICONA si è letta nel sorgente di WM Shell**
+(`SplashscreenIconDrawableFactory`): senza un fondo suo l'icona si
+ridipinge su 108dp e si ingrandisce a 192dp, e la sua tela sborda di
+mezzo lato per parte, quindi sullo schermo vale 288dp. Tela da 162dp
+(quella a cui si ridipinge: di più sarebbe peso morto) col barattolo a
+160/288 del lato, cioè **160dp sullo schermo, come `splash.png`**.
+⚠️ Nel cerchio visibile ci sta di un soffio: il RIQUADRO del barattolo è
+110×160dp (non 104×160 come dice il CSS del guscio) e ne uscirebbe, ma
+gli angoli sono vuoti e i pixel veri stanno fra il 96 e il 99% del
+raggio — una prova lo tiene fermo. **E lo splash di sistema esce di
+taglio** (`getSplashScreen().setOnExitAnimationListener(v ->
+v.remove())`): quello di serie fa sfumare l'icona e salire la finestra
+di 20dp, e sotto c'è già lo stesso barattolo della libreria. UN LIMITE
+DICHIARATO: la ridipintura a 108dp è di Android, quindi nei pochi decimi
+dello splash di sistema il barattolo è un filo più morbido; poi arriva
+quello nitido della libreria, allo stesso posto.
+
+**LE BARRE VERE.** In `getLaunchingUrl()`, subito sotto la riga del
+modello che prende la URL, da Android 11 `WindowMetrics` le dice prima
+che la finestra esista: sopra `statusBars() | displayCutout()`, sotto
+`navigationBars()`, in pixel veri, nel parametro **`barre=sopra,sotto`**
+aggiunto alla URL della libreria (i deep link tengono il loro). Un
+PARAMETRO e non un frammento, perché `/sicurezza#…` e `/privacy#…` il
+frammento lo usano già; il dominio verificato non si tocca. La pagina
+(`barreDellApp`, nell'head, per TUTTI e non solo nel ramo dell'APK) lo
+legge, lo divide per `devicePixelRatio` — che con lo zoom della pagina
+resta giusto dove i dp sbaglierebbero — e **lo toglie dall'indirizzo**
+con `replaceState`, lasciando le altre coppie byte per byte (un giro da
+`URLSearchParams` le ricodificherebbe): rimasto lì, finirebbe in ogni
+voce della storia (la pagina spinge `location.href`) e nei link
+condivisi. `scartoGuscio` ha la strada **`app`**: se le barre spiegano
+il riquadro della pagina — fra le due barre, o dalla barra di stato fino
+in fondo — lo scarto è `sopra + (pagina − alto)/2`; se non lo spiegano
+non si indovina. **La stima dei 16 px resta solo per chi non ha le
+barre**, cioè la 1.4. La diagnosi (`?diagnosi=1`) mostra le barre
+ricevute, che l'head lascia in `data-barre-app`.
+
+**LO SCRIPT PREPARA PRIMA DI SCRIVERE.** Con tre blocchi nel Java e uno
+nel manifest, `genera()` prepara in MEMORIA i due file di testo che
+Bubblewrap rigenera (`prepara_launcher`, `prepara_manifest`) e scrive
+solo se tutte le ancore ci sono: una che manca dà «⛔ … NON lanciare
+`bubblewrap build`» e nessun file toccato. Si ferma anche davanti a un
+tema già messo su LauncherActivity che non è il nostro, e senza la riga
+di `app/build.gradle` da cui nasce `@color/backgroundColor`. Sul
+progetto della 1.4 che è oggi sul disco (il permesso già dentro)
+aggiunge i due blocchi nuovi senza raddoppiare il vecchio.
+
+**LE DUE RIGHE PER APPVERIFIER**, chieste da Andrea a metà giro. Il
+formato l'ho letto nel README di AppVerifier: il pacchetto, a capo,
+l'impronta SHA-256 maiuscola coi due punti. Tre posti. La pagina
+**Sicurezza**, in fondo, `/sicurezza#app`: la «pagina Info» chiesta non
+esiste (l'unica col nome è «Info P2P», che parla d'altro) e oggi
+nessuna pagina nominava l'app, quindi Andrea ha scelto questa — con due
+righe su dove si scarica e un bottone che copia DAL RIQUADRO tramite
+`copiaLink`, niente seconda copia nel JS. Il **README** di
+barattolo-releases. Le **note di ogni release**: la v1.4 e la v1.3
+riscritte con `gh release edit` e rilette da GitHub uguali al file. Che
+la v1.3 abbia la stessa impronta non l'ho dedotto: `apksigner` la dà
+identica sulla 1.1 di luglio e sulla 1.4, e la 1.4 si è installata sopra
+la 1.3 sul telefono, cosa che Android fa solo con la stessa chiave. Il
+blocco da copiare sta in PRODUZIONE, e `prove_app_android` tiene in pari
+quello e la pagina con `assetlinks.json`.
+
+**PROVATO QUI.** `bubblewrap update --appVersionName=1.5` su una COPIA
+del progetto (versionCode 7 da sé), lo script nuovo, e il **build di
+Gradle offline** sulla copia (14 s, senza keystore: APK non firmato).
+Dentro l'APK: il manifest con l'app a `@0x01030010` e LauncherActivity
+al nostro stile; le risorse con `BarattoloAvvio` vuoto di base e coi due
+attributi dello splash in `v31`; nel dex le tre stringhe (permesso,
+uscita, barre) e, nel bytecode, l'ordine giusto —
+`grantUriPermission(…, 65)`, poi da SDK 31 l'uscita, poi
+`super.onCreate`; in `getLaunchingUrl` da SDK 30
+`appendQueryParameter("barre", …)`. Prove: `prove_avvio_apk` nuova, la
+sezione del permesso rifatta sul modello VERO di Bubblewrap (col
+`getLaunchingUrl` che prima non c'era), `scartoGuscio` e `barreDellApp`
+sotto node, le due righe per AppVerifier. Suite **13463/0** con
+`PROVE_SEVERE=1` in un worktree senza `config.py`, nove collaudi verdi,
+tortura **34/34** senza inciampate. Dal vivo su una copia (8125): il
+parametro tolto con `?v=2&x=a%20b#ancora` intatto, la diagnosi con la
+riga delle barre, la sezione a 375 nei due temi, e il Copia che senza
+appunti mette le due righe nel toast.
+
+**NON PROVATO, e va detto per primo: il telefono.** Su Android 15+ — con
+ogni probabilità il telefono di Andrea: la barra sopra lo splash della
+libreria era arancio, cioè il contenuto ci passa sotto — splash di
+sistema, splash della libreria e splash di Chrome stanno tutti a tutto
+schermo, e il barattolo dovrebbe restare fermo. Su Android 12-14 la
+libreria disegna fra le barre, quindi al passaggio dallo splash di
+sistema il barattolo può spostarsi di qualche dp e la barra di stato
+cambiare colore: non curato, perché qui non si vede. E ogni produttore
+disegna l'animazione dall'icona a modo suo.
+
+### Da guardare sul telefono
+
+Con la 1.5 installata via `adb install -r` (PRODUZIONE, passo 5),
+**a freddo** (l'app tolta dalle recenti): 1) il tocco sull'icona — la
+finestra che cresce è ARANCIO col barattolo dal primo fotogramma (un
+video a 20 fps come quello del 23 lo dice); 2) il barattolo fermo dallo
+splash al guscio, e la barra arancio fino alla vetrina; 3) lo stesso col
+tema scuro del telefono; 4) **il lampo scelto**: con Barattolo aperta
+dietro, un link a barattolo.store toccato in Telegram — fra le due pagine
+passa l'arancio col barattolo; se dà fastidio, la strada B; 5) il tasto
+indietro dalla vetrina: si esce senza lampi; 6) `barattolo.store/?diagnosi=1`
+→ «Apri nell'app»: la riga «barre dall'app» con due numeri e lo scarto
+sulla strada `app`. E `/sicurezza#app` aperto dal telefono: nel pannello
+del banco il salto all'ancora al primo caricamento non andava nemmeno
+per `#limiti`, che c'era già — col pannello nascosto; sul telefono si
+guarda.

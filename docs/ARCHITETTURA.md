@@ -22545,6 +22545,29 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   con aapt2: tre livelli, alpha vera, adattiva per tutte le densità;
   il medaglione residuo sul telefono è lo stile icone del launcher
   Oppo, non l'APK.
+  Il tema dell'avvio e le barre vere (set 2026, APK v1.5): la stessa
+  `genera_icone_apk.py` dà a LauncherActivity un tema SUO,
+  `BarattoloAvvio`, OPACO — col `Theme.Translucent.NoTitleBar` di
+  Bubblewrap Android non preparava nessuna finestra di partenza
+  (`ActivityRecord.validateStartingWindowTheme`) e la finestra che
+  cresceva dall'icona era nera per un fotogramma. È il gemello opaco
+  di quello (`Theme.NoTitleBar`, nessuna ombra né animazione di
+  finestra sua), il fondo è l'arancio col barattolo di `splash.png`, e
+  in `values-v31` veste lo splash del SISTEMA con lo stesso arancio e
+  `barattolo_avvio_icona.png` (tela da 162dp col barattolo a 160/288
+  del lato: il sistema la ridipinge a 108dp e la ingrandisce a 192, e
+  la tela ne vale 288 — così il barattolo esce a 160dp, come
+  `splash.png`). Il resto dell'app resta traslucido. Nel Java, lo
+  splash di sistema esce di taglio (`setOnExitAnimationListener` →
+  `remove()`), e `getLaunchingUrl()` aggiunge alla URL della libreria
+  `barre=sopra,sotto` in pixel veri (da Android 11, `WindowMetrics`):
+  è il CONTRATTO con la pagina, che lo legge e lo toglie nell'head
+  (`barreDellApp`) e lo passa a `scartoGuscio` (strada `app`; la stima
+  dei 16 px resta per la 1.4). I due file di testo che Bubblewrap
+  rigenera si preparano in memoria e si scrivono solo se tutte le
+  ancore ci sono. Il prezzo scelto da Andrea: un lampo arancio quando
+  un link arriva ad app già aperta. Il perché per intero sta in
+  CANTIERI, «Il nero all'avvio dell'APK».
   Distribuzione dell'APK (lug 2026, Fase 3 del percorso PWA→APK→
   Zapstore): due canali, la release GitHub è la FONTE UNICA di verità.
   Repo pubblico `kreamistudio-crypto/barattolo-releases` (satmarket
@@ -22553,7 +22576,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   tag `vX.Y`, UN solo APK per release (`barattolo-X.Y.apk`, copia
   rinominata di app-release-signed.apk) + `.sha256` + note scritte a
   mano con l'hash. Obtainium segue il repo da solo; Zapstore ci pesca
-  l'APK. CLI `zsp` (github.com/zapstore/zsp, SOLO Linux/macOS → vive
+  l'APK. LE DUE RIGHE PER APPVERIFIER (set 2026) — il pacchetto e,
+  a capo, l'impronta SHA-256 del certificato — stanno nelle note di
+  OGNI release (anche la v1.3 e la v1.4, riscritte con `gh release
+  edit`), nel README del repo e in fondo alla pagina Sicurezza
+  (`/sicurezza#app`); il blocco da copiare sta in PRODUZIONE, e
+  `prove_app_android` tiene in pari quello e la pagina con
+  `assetlinks.json`. CLI `zsp` (github.com/zapstore/zsp, SOLO Linux/macOS → vive
   in WSL Ubuntu, `~/bin/zsp`; il progetto corre, ricontrollare il
   README a ogni uso) pubblica gli eventi NIP-82 (32267 app, 30063
   release, 3063 asset) su `relay.zapstore.dev` e carica i file sul suo
