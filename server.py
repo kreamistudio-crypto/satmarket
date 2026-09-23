@@ -1889,6 +1889,172 @@ def imposta_sponsor(slug: str, fino: int) -> str:
     return slug
 
 
+# ======== LE PAGINE DEI NEGOZI CONSIGLIATI, IN BOZZA (set 2026) ========
+# La gemella dello spazio sponsorizzato, con una differenza sola che
+# decide tutto il resto: queste pagine NASCONO IN BOZZA, e una bozza la
+# vedono i moderatori e nessun altro — fuori da vetrina, ricerca, link
+# condivisi e anteprime finche' un moderatore non la pubblica.
+#
+# IL TESTO VIVE IN `racconti.py`, NON NEL CLIENT, ed e' la riga da non
+# «semplificare» riportandolo accanto a To The Mooon: il catalogo
+# `RACCONTI` di miniapp.html viaggia dentro la pagina a CHIUNQUE la
+# apra, quindi una bozza scritta li' sarebbe leggibile nel sorgente da
+# tutti. Da qui il testo esce da DUE porte sole: `/api/negozio`, e
+# solo a pagina pubblicata (`racconto_pubblico`); e
+# `/api/admin/racconti`, che risponde 403 a chi non e' moderatore.
+#
+# LO STATO VIVE IN `impostazioni` — `racconto_pubblicato:<slug>` e' il
+# momento della pubblicazione, vuoto vuol dire bozza — e il recinto lo
+# ammette per la ragione di `sponsor_slug`: non muove denaro, non e' un
+# segreto, e sbagliarlo si vede subito. A scriverlo e' SOLO il gesto
+# del moderatore (`decidi_racconto_admin`): nessun orologio pubblica o
+# spegne niente da solo.
+#
+# IL RENDERER E' QUELLO DI TO THE MOOON (`raccontoNegozio`): il racconto
+# arriva come DATI con la stessa forma del catalogo del client, e passa
+# da esc() come il testo di chiunque altro.
+from racconti import RACCONTI_NEGOZI
+
+# le chiavi che escono verso il client, e nessun'altra: il catalogo
+# puo' crescere di note nostre senza che finiscano in una risposta
+CAMPI_RACCONTO = ("negozio", "emoji", "titolo", "sottotitolo", "intro",
+                  "foto", "blocchi")
+
+
+def racconto_stato(slug: str) -> str:
+    """«pubblicato» o «bozza». BOZZA e' anche il verdetto su una riga
+    che non si sa leggere — assente, vuota o scritta a mano storta: il
+    dubbio non pubblica niente (fail-closed, il patto di
+    `sponsor_vivo`)."""
+    try:
+        quando = int(impostazione(f"racconto_pubblicato:{slug}", "") or 0)
+    except ValueError:
+        quando = 0
+    return "pubblicato" if quando > 0 else "bozza"
+
+
+def _racconto_dati(slug: str, r: dict) -> dict:
+    """Il racconto nella forma che il client disegna: una COPIA delle
+    sole chiavi di CAMPI_RACCONTO, con lo slug dentro — serve alle foto,
+    che si chiamano `/assets/racconti/{slug}-N.webp`."""
+    d = {k: r.get(k) for k in CAMPI_RACCONTO}
+    d["slug"] = slug
+    return d
+
+
+def racconto_pubblico(codice: str) -> dict | None:
+    """IL RACCONTO CHE ESCE COL NEGOZIO, A CHIUNQUE: solo PUBBLICATO, e
+    solo sul negozio del suo codice.
+
+    LA BOZZA DA QUI NON ESCE MAI, nemmeno per un moderatore — lui la
+    guarda dalla porta sua, `/api/admin/racconti`. Questa funzione non
+    sa chi sta chiedendo e non deve saperlo: una rotta pubblica che
+    rispondesse diverso a seconda di chi bussa sarebbe un secondo
+    giudice della bozza da tenere in pari col primo.
+
+    Fail-closed: un codice vuoto non combacia con niente, e un racconto
+    senza codice nel catalogo non esce da nessuna parte. Lo stato si
+    legge solo per il negozio che combacia: per tutti gli altri negozi
+    questa e' una scorsa del dizionario, nessuna query."""
+    if not codice:
+        return None
+    for slug, r in RACCONTI_NEGOZI.items():
+        if r.get("negozio") and r["negozio"] == codice \
+                and racconto_stato(slug) == "pubblicato":
+            return _racconto_dati(slug, r)
+    return None
+
+
+@app.get("/api/admin/racconti")
+def lista_racconti_admin(x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: le pagine dei negozi consigliati, bozze comprese, col
+    testo INTERO — e' l'unica porta da cui una bozza esce, e serve sia
+    al cassetto del pannello sia all'anteprima (dal pannello o dal link
+    `/?bozza=<slug>`, che la pagina gira qui).
+    Il 403 sta PRIMA di guardare il catalogo: a chi non e' moderatore
+    non si dice nemmeno se una bozza esiste.
+    Col venditore collegato esce anche il suo nome, o `trovato: False`
+    se il codice scritto nel catalogo non e' di nessun negozio — che e'
+    il refuso da vedere PRIMA di pubblicare, non dopo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    con = db()
+    fuori = []
+    try:
+        for slug, r in RACCONTI_NEGOZI.items():
+            d = _racconto_dati(slug, r)
+            d["stato"] = racconto_stato(slug)
+            try:
+                d["pubblicato_il"] = int(impostazione(
+                    f"racconto_pubblicato:{slug}", "") or 0)
+            except ValueError:
+                d["pubblicato_il"] = 0
+            d["venditore"] = None
+            if r.get("negozio"):
+                v = con.execute("SELECT nome FROM utenti WHERE negozio=? "
+                                "LIMIT 1", (r["negozio"],)).fetchone()
+                d["venditore"] = ({"trovato": True, "nome": v["nome"] or ""}
+                                  if v else {"trovato": False, "nome": ""})
+            fuori.append(d)
+    finally:
+        con.close()
+    return {"racconti": fuori}
+
+
+@app.post("/api/admin/racconti/{slug}")
+async def decidi_racconto_admin(slug: str, req: Request,
+                                x_tg_init_data: str = Header(""),
+                                barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: il gesto che pubblica una pagina, o la rimette in
+    bozza. Il 403 sta PRIMA di leggere il body, come nelle sorelle.
+
+    PUBBLICARE CHIEDE UN NEGOZIO VERO, e si rifiuta invece di fidarsi:
+    senza codice nel catalogo la pagina non ha dove uscire, e con un
+    codice che non e' di nessuno uscirebbe sul nulla — in tutt'e due i
+    casi il moderatore vedrebbe «pubblicata» e nessuno la vedrebbe mai.
+    Le FOTO invece non fermano niente: se mancano la pagina esce senza
+    immagini, e il pannello lo dice prima del tocco.
+
+    Tornare in bozza non chiede niente: e' il lato che protegge, e
+    dev'essere sempre possibile."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    d = await leggi_json(req)
+    esito = (d.get("esito") or "").strip()
+    if esito not in ("pubblica", "bozza"):
+        raise HTTPException(400, "Esito sconosciuto")
+    r = RACCONTI_NEGOZI.get(slug)
+    if not r:
+        raise HTTPException(404, "Pagina non trovata")
+    titolo = html.escape(r.get("titolo") or slug)
+    if esito == "pubblica":
+        if not r.get("negozio"):
+            raise HTTPException(409, "Manca il venditore: senza il codice "
+                                     "del suo negozio la pagina non ha "
+                                     "dove uscire")
+        con = db()
+        v = con.execute("SELECT 1 FROM utenti WHERE negozio=? LIMIT 1",
+                        (r["negozio"],)).fetchone()
+        con.close()
+        if not v:
+            raise HTTPException(409, "Il codice negozio scritto per questa "
+                                     "pagina non è di nessun negozio")
+        scrivi_impostazione(f"racconto_pubblicato:{slug}",
+                            str(int(time.time())))
+        await notifica_admin(f"📖 Pagina «{titolo}» pubblicata "
+                             f"(da tg {user['id']})")
+        return {"ok": True, "stato": "pubblicato",
+                "detto": "✅ Pubblicata: ora la vede chi apre il negozio"}
+    scrivi_impostazione(f"racconto_pubblicato:{slug}", "")
+    await notifica_admin(f"📝 Pagina «{titolo}» rimessa in bozza "
+                         f"(da tg {user['id']})")
+    return {"ok": True, "stato": "bozza",
+            "detto": "📝 Rimessa in bozza: la vedono solo i moderatori"}
+
+
 def nuovo_codice_negozio(con) -> str:
     """Codice pubblico del negozio: 8 caratteri casuali, assegnati una
     volta e stabili per sempre. Non deriva dal tg_id, quindi si puo'
@@ -19015,6 +19181,14 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     venditore["banner"] = None if cursore else _banner_pubblico(
         v["banner_stato"], v["banner_foto"], v["banner_link"],
         bool(annunci))
+    # LA PAGINA DI UN NEGOZIO CONSIGLIATO (set 2026), dal suo giudice:
+    # SOLO PUBBLICATA. La bozza da questa rotta non esce mai, nemmeno
+    # per un moderatore che bussa col suo initData — la guarda dalla
+    # porta sua, `/api/admin/racconti` (vedi `racconto_pubblico`).
+    # In prima pagina come l'insegna, e la chiave c'e' SEMPRE: `None`
+    # quando non c'e' niente da mostrare.
+    venditore["racconto"] = (None if cursore
+                             else racconto_pubblico(v["negozio"]))
     # e i campi grezzi non escono MAI: un banner in revisione o spento
     # non ha nessun motivo di far sapere in giro dove punterebbe
     del venditore["banner_stato"], venditore["banner_foto"]
@@ -55684,13 +55858,22 @@ def asset_og(nome: str, if_none_match: str = Header("")):
 # slug del catalogo — `{slug}-cop.webp` per la copertina e
 # `{slug}-1..9.webp` per le altre — quindi lo sponsor di domani porta
 # i suoi file e non tocca questa riga.
+# ⚠️ GLI SLUG SONO DI DUE CATALOGHI dal set 2026: quelli dello spazio
+# sponsorizzato e quelli delle pagine dei negozi consigliati
+# (`racconti.py`). Una pagina IN BOZZA le sue foto le serve lo stesso,
+# ed e' voluto: l'anteprima del moderatore deve poterle vedere prima
+# di pubblicare, e un <img> non porta l'initData — questa rotta non sa
+# chi chiede. IMPERFEZIONE DICHIARATA: chi indovinasse il nome esatto
+# di un file vedrebbe quella foto; nessuna pagina pubblica la linka
+# finche' la pagina e' in bozza, e il TESTO invece non esce mai.
 FORMA_RACCONTO = re.compile(r"^([a-z0-9-]{2,40})-(?:cop|[1-9])\.webp$")
 
 
 @app.get("/assets/racconti/{nome}")
 def asset_racconto(nome: str, if_none_match: str = Header("")):
     m = FORMA_RACCONTO.match(nome)
-    if not m or m.group(1) not in SLUG_SPONSOR:
+    if not m or (m.group(1) not in SLUG_SPONSOR
+                 and m.group(1) not in RACCONTI_NEGOZI):
         raise HTTPException(404, "immagine non trovata")
     percorso = os.path.join("assets", "racconti", nome)
     if not os.path.exists(percorso):

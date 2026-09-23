@@ -31157,7 +31157,10 @@ def prove_seo():
                           "\n}\n")
     for f in ("apriNegozioDaUrl", "apriAnnuncioDaUrl", "apriSicurezzaDaUrl",
               "apriPrivacyDaUrl", "apriCategoriaDaUrl",
-              "apriOffertaDaUrl", "apriBarattoloDaUrl"):
+              "apriOffertaDaUrl", "apriBarattoloDaUrl",
+              # la leva dei moderatori (set 2026): in vetrina anonima
+              # non apre niente, ma deve poter DIRE perche'
+              "apriBozzaDaUrl"):
         prova(f"{f} si chiama da avvia()", True,
               f"{f}();" in corpo_avvia)
         prova(f"...e da avviaVetrina()", True,
@@ -34548,8 +34551,13 @@ def prove_fogli_di_casa():
     # ...E PIU' UNO dal 23 set 2026, il SESSANTASEIESIMO: il riepilogo del
     # PayCode nel percorso Barattozon — «Il tuo PayCode, in breve», che
     # si rilegge PRIMA di pubblicare, e il cui si' richiama il gesto
-    prova("i gesti che passano dalla domanda unica sono sessantacinque",
-          65, solo_codice(mini).count("chiediConferma({"))
+    # ...E PIU' UNO ANCORA (23 set 2026, le pagine dei negozi
+    # consigliati in bozza): pubblicare una pagina, o rimetterla in
+    # bozza — i due versi in UNA chiamata, il pattern di decidiBanner.
+    # Pubblicare mette una pagina davanti a tutti, e tornare indietro la
+    # toglie a chi magari la sta leggendo: si chiede tutt'e due le volte.
+    prova("i gesti che passano dalla domanda unica sono sessantasei",
+          66, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -40306,7 +40314,10 @@ def prove_sponsor():
     # scrive l'uno nell'altro — e senza, il cassetto nasce sempre
     # chiuso mentre le due meta' restano verdi. L'ha trovata la
     # tortura, non la rilettura.
-    _an = pezzo_js(mini, "async function apriNegozio(chi, aperto){")
+    # (la firma ha preso un terzo argomento a set 2026 — l'anteprima
+    # delle pagine in bozza, vedi prove_racconti_bozza — e l'ancora
+    # la segue: e' la stessa funzione)
+    _an = pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima){")
     prova("apriNegozio scrive l'apertura che riceve", True,
           "raccontoAperto = !!aperto;" in _an)
     # ⚠️ IL GIUDIZIO VIVE IN `raccontoDi` (ago 2026): il renderer non
@@ -40452,6 +40463,346 @@ dice('il testo del catalogo esce scappato', false,
 dice('...e i grassetti restano pari', true,
      (cattivo.match(/<b>/g) || []).length ===
      (cattivo.match(/<\\/b>/g) || []).length);
+"""
+
+
+def prove_racconti_bozza():
+    """LE PAGINE DEI NEGOZI CONSIGLIATI, IN BOZZA (set 2026).
+
+    Una pagina come quella di To The Mooon — lo stesso renderer, la
+    stessa forma dei dati — che nasce in BOZZA: la vedono i moderatori
+    e nessun altro finche' uno di loro non la pubblica. Il testo vive in
+    `racconti.py` e non nel client, ed esce da due porte sole.
+
+    Qui si prova quel che si rompe in SILENZIO, senza il server vero (il
+    giro con le rotte vere sta in `collaudo_racconti_bozza.py`, in CI):
+    1) il testo non viaggia nel client — che lo scarica chiunque;
+    2) il catalogo ha la forma che il renderer sa disegnare, e la
+       parola della pastiglia NON sta nei dati;
+    3) il giudice del pubblicato, GIRATO su un'impostazione di cartone;
+    4) le porte: la rotta pubblica del negozio passa solo da lui, la
+       admin chiude prima di guardare, lo stato lo scrive il solo gesto;
+    5) il renderer, girato col catalogo VERO: segnaposto in anteprima,
+       nessun buco in pubblico, la pastiglia con la sua emoji."""
+    import importlib
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    print("\n[le pagine dei negozi consigliati, in bozza]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    import racconti as _rac
+    CAT = importlib.reload(_rac).RACCONTI_NEGOZI
+    prova("il catalogo del server ha almeno una pagina", True, len(CAT) > 0)
+    _rn = pezzo_js(mini, "function raccontoNegozio(v){")
+
+    # ---- 1. IL TESTO NON VIAGGIA NEL CLIENT ------------------------
+    # E' la ragione per cui il catalogo sta sul server: miniapp.html lo
+    # scarica chiunque apra la pagina, quindi una frase della bozza
+    # finita li' dentro — nel catalogo di casa, in un commento, in un
+    # esempio — e' una bozza leggibile da tutti. Si guardano le frasi
+    # LUNGHE: quelle corte («Oggi») stanno nell'app per ragioni loro.
+    def _frasi(r):
+        fuori = [r.get("titolo", ""), r.get("sottotitolo", ""),
+                 r.get("intro", "")]
+        for b in r.get("blocchi", []):
+            fuori += [b.get("h", ""), b.get("p", ""), b.get("alt", "")]
+            for v in b.get("voci", []):
+                fuori += [v] if isinstance(v, str) else [v.get("h", ""),
+                                                         v.get("p", "")]
+        return [t for t in fuori if len(t) >= 20]
+    for slug, r in CAT.items():
+        prova(f"il testo di «{slug}» non viaggia nel client", [],
+              [t[:40] for t in _frasi(r) if t in mini])
+        prova("...e nemmeno il suo nome o il suo slug", (False, False),
+              (r.get("titolo", "?") in mini, slug in mini))
+
+    # ---- 2. LA FORMA DEL CATALOGO ----------------------------------
+    _f = re.search(r'FORMA_RACCONTO = re\.compile\(r"([^"]+)"\)', src)
+    FORMA = re.compile(_f.group(1)) if _f else re.compile("$^")
+    _amb_sp = {}
+    exec(re.search(r"^SLUG_SPONSOR = \([^)]*\)", src, re.M).group(), _amb_sp)
+    tipi_renderer = set(re.findall(r"x\.t === '(\w+)'", _rn))
+    for slug, r in CAT.items():
+        prova(f"«{slug}»: lo slug passa dalla forma delle foto", True,
+              bool(FORMA.match(slug + "-cop.webp")))
+        # due cataloghi, due vite: uno slug che stesse in tutt'e due
+        # si accenderebbe da due leve diverse
+        prova("...e non e' anche uno spazio sponsorizzato", False,
+              slug in _amb_sp["SLUG_SPONSOR"])
+        prova("...ogni suo blocco ha il suo ramo nel renderer", [],
+              [b["t"] for b in r["blocchi"] if b["t"] not in tipi_renderer])
+        foto = [b for b in r["blocchi"] if b["t"] == "foto"]
+        ns = [b.get("n") for b in foto]
+        prova("...le foto sono numerate 1..9, una volta sola", True,
+              all(isinstance(n, int) and 1 <= n <= 9 for n in ns)
+              and len(set(ns)) == len(ns))
+        prova("...e ogni file passa dalla forma della rotta", [],
+              [n for n in ns if not FORMA.match(f"{slug}-{n}.webp")])
+        prova("...e ogni foto dice cosa ci va (l'etichetta del segnaposto)",
+              [], [b.get("n") for b in foto if not b.get("etichetta")])
+        # LA RIGA DEL CANTIERE DI UNA RIGA: `foto` e' un vero booleano,
+        # e quando passa a True i file ci devono essere DAVVERO — o la
+        # pagina uscirebbe coi segnaposto tolti e le foto mancanti, cioe'
+        # senza niente, e a dirlo non sarebbe nessuno.
+        prova("...le foto sono dichiarate (vero o falso)", True,
+              isinstance(r.get("foto"), bool))
+        if r.get("foto") is True:
+            nomi = [f"{slug}-cop.webp"] + [f"{slug}-{n}.webp" for n in ns]
+            prova("...e con le foto dichiarate, i file ci sono", [],
+                  [x for x in nomi if not os.path.exists(
+                      os.path.join("assets", "racconti", x))])
+        # LA DICHIARAZIONE E' DEL RENDERER, la regola del catalogo
+        # gemello: se la parola stesse nei dati, la pagina di domani
+        # potrebbe nascere senza
+        _val = _json.dumps(r, ensure_ascii=False)
+        prova("...e la parola della pastiglia NON sta nei dati", False,
+              "Consigliato" in _val)
+        prova("...e nei dati non c'e' markup", [],
+              re.findall(r"<[A-Za-z/]", _val))
+    # IL CASO CHIESTO (23 set 2026): i sette segnaposto di Una Garlanda.
+    # La copertina e' dell'hero, e il suo segnaposto lo scrive il
+    # renderer; le altre sei stanno nel catalogo.
+    _ug = CAT.get("una-garlanda", {})
+    prova("Una Garlanda ha i suoi sei segnaposto nel catalogo",
+          sorted(["varietà", "ecosistema", "pileria", "persone", "logo",
+                  "QR EcoOasi"]),
+          sorted(b.get("etichetta", "") for b in _ug.get("blocchi", [])
+                 if b.get("t") == "foto"))
+    prova("...piu' la copertina, dal renderer", True,
+          "segnaposto('copertina'" in _rn)
+    prova("...e logo e QR sono le piccole", ["QR EcoOasi", "logo"],
+          sorted(b.get("etichetta", "") for b in _ug.get("blocchi", [])
+                 if b.get("piccola")))
+
+    # ---- 3. IL GIUDICE, GIRATO ------------------------------------
+    tavola = {}
+    finto = {"negozio": "ab12cd34", "emoji": "x", "titolo": "T",
+             "sottotitolo": "S", "intro": "I", "foto": False,
+             "blocchi": [], "nota_nostra": "non deve uscire"}
+    amb = {"impostazione": lambda k, d="": tavola.get(k, d),
+           "RACCONTI_NEGOZI": {"pagina": finto,
+                               "orfana": dict(finto, negozio="")}}
+    exec(re.search(r"^CAMPI_RACCONTO = \([^)]*\)", src, re.M).group(), amb)
+    for nome in ("racconto_stato", "_racconto_dati", "racconto_pubblico"):
+        exec(pezzo(nome), amb)
+    pub = amb["racconto_pubblico"]
+    prova("in bozza il negozio non la riceve", None, pub("ab12cd34"))
+    prova("...e il giudice dice bozza", "bozza",
+          amb["racconto_stato"]("pagina"))
+    tavola["racconto_pubblicato:pagina"] = "1790000000"
+    _p = pub("ab12cd34") or {}
+    prova("pubblicata, il suo negozio la riceve", "pagina", _p.get("slug"))
+    prova("...con le SOLE chiavi dichiarate (la nota nostra resta a casa)",
+          sorted(amb["CAMPI_RACCONTO"] + ("slug",)), sorted(_p))
+    prova("...e un altro negozio no", None, pub("ff99ee88"))
+    prova("...e un codice vuoto non combacia con niente", None, pub(""))
+    # FAIL-CLOSED: pubblicata ma senza codice non esce da nessuna parte
+    tavola["racconto_pubblicato:orfana"] = "1790000000"
+    prova("una pagina senza venditore non esce nemmeno pubblicata", None,
+          pub(""))
+    # e una riga storta vale bozza, mai «pubblicata»
+    for storta in ("domani", "0", "", "-5"):
+        tavola["racconto_pubblicato:pagina"] = storta
+        prova(f"la riga «{storta}» vale bozza", "bozza",
+              amb["racconto_stato"]("pagina"))
+
+    # ---- 4. LE PORTE ----------------------------------------------
+    _neg = codice(pezzo("negozio"))
+    prova("la rotta del negozio passa dal giudice del pubblicato", True,
+          'racconto_pubblico(v["negozio"])' in _neg)
+    # ...E NON SA CHI BUSSA: una rotta pubblica che rispondesse diverso
+    # a un moderatore sarebbe un secondo giudice della bozza
+    prova("...e non guarda ne' il catalogo ne' chi bussa", (False, False),
+          ("RACCONTI_NEGOZI" in _neg, "e_admin(" in _neg))
+    # L'ANTEPRIMA SOCIAL resta quella del brand, la scelta di To The
+    # Mooon: il giudice dei meta del negozio non sa dei racconti
+    prova("i meta del negozio non sanno dei racconti", False,
+          "racconto" in pezzo("_seo_negozio").lower())
+    for nome in ("lista_racconti_admin", "decidi_racconto_admin"):
+        _a = codice(pezzo(nome))
+        prova(f"{nome}: la guardia e' quella delle sorelle", True,
+              'if not e_admin(user["id"])' in _a
+              and 'HTTPException(403, "Riservato ai moderatori")' in _a)
+    _d = codice(pezzo("decidi_racconto_admin"))
+    prova("...il 403 del gesto sta prima del body", True,
+          _d.index("HTTPException(403") < _d.index("leggi_json("))
+    _l = codice(pezzo("lista_racconti_admin"))
+    prova("...e quello dell'elenco prima di guardare il catalogo", True,
+          _l.index("HTTPException(403") < _l.index("RACCONTI_NEGOZI"))
+    # A SCRIVERE LO STATO E' IL SOLO GESTO: un orologio che pubblicasse
+    # o spegnesse sarebbe uno stato in piu' da tenere in pari
+    _fn, _scr = "", set()
+    for _r in src.split("\n"):
+        _m = re.match(r"(?:async )?def (\w+)\(", _r)
+        if _m:
+            _fn = _m.group(1)
+        elif "scrivi_impostazione(" in _r and "racconto_pubblicato:" in _r:
+            _scr.add(_fn)
+    prova("a scrivere lo stato e' il solo gesto del moderatore",
+          {"decidi_racconto_admin"}, _scr)
+    prova("la rotta delle foto conosce i due cataloghi", True,
+          "not in RACCONTI_NEGOZI" in pezzo("asset_racconto"))
+
+    # ---- 4b. LE PORTE DEL CLIENT ----------------------------------
+    _car = pezzo_js(mini, "async function caricaRaccontiAdmin(){")
+    _ant = pezzo_js(mini, "async function apriAnteprimaRacconto(slug){")
+    prova("l'anteprima chiede il testo alla porta admin", (True, True),
+          ("/admin/racconti`" in _car, "caricaRaccontiAdmin()" in _ant))
+    # UN POSTO SOLO appende una pagina a un negozio nel client, ed e'
+    # l'anteprima: il resto la riceve dal server gia' decisa. Si conta
+    # sul CODICE, senza la prosa che lo racconta.
+    def _solo_codice_js(js):
+        js = re.sub(r"/\*[\s\S]*?\*/", "", js)
+        return "\n".join(x for x in js.split("\n")
+                         if not x.strip().startswith("//"))
+    prova("un posto solo appende la bozza a un negozio", 1,
+          _solo_codice_js(mini).count(".racconto = "))
+    prova("...ed e' quello dell'anteprima, con la sua guardia", True,
+          "if (anteprima && d.venditore) d.venditore.racconto = anteprima;"
+          in mini)
+    prova("il giudice riconfronta il negozio anche per le pagine del server",
+          True, "s.negozio === (v.negozio || '')"
+          in pezzo_js(mini, "function raccontoDi(v){"))
+    prova("la leva legge lo slug con la sua forma", True,
+          "bozza=([a-z0-9-]{2,40})" in mini)
+
+    # ---- 5. IL RENDERER, GIRATO COL CATALOGO VERO ------------------
+    node = _sh.which("node")
+    if not node:
+        salta("il renderer delle pagine in bozza", "node non installato")
+        return
+
+    def _fetta(inizio, fine):
+        i = mini.index(inizio)
+        j = mini.index(fine, i)
+        return mini[i:j + len(fine)]
+
+    js = ("let raccontoAperto = false, sponsorVivo = '';\n"
+          + pezzo_js(mini, "const esc = ", "\nconst el =") + "\n"
+          + _fetta("const RACCONTI = {", "\n};") + "\n"
+          + _fetta("function raccontoDi(v){", "\n}") + "\n"
+          + _fetta("function raccontoNegozio(v){", "\n}") + "\n"
+          + _fetta("function avvisoBozzaRacconto(r){", "\n}") + "\n"
+          + "const CAT = " + _json.dumps(CAT, ensure_ascii=False) + ";\n"
+          + _BANCO_BOZZA)
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8") as f:
+        f.write(js)
+        percorso = f.name
+    r = _sp.run([node, percorso], capture_output=True, text=True,
+                encoding="utf-8")
+    os.unlink(percorso)
+    esiti = dict(l.split("|", 1)[::-1] for l in
+                 (r.stdout or "").splitlines() if "|" in l)
+    # UN BANCO MUTO E' ROSSO, il patto dei suoi gemelli
+    if not esiti:
+        prova("il banco delle pagine in bozza gira", "",
+              (r.stderr or "nessuna uscita")[:300])
+        return
+    for che, avuto in esiti.items():
+        prova(che, "ok", avuto)
+
+
+_BANCO_BOZZA = """
+function dice(che, atteso, avuto){
+  const ok = JSON.stringify(atteso) === JSON.stringify(avuto);
+  console.log((ok ? 'ok' : 'atteso ' + JSON.stringify(atteso)
+    + ', avuto ' + JSON.stringify(avuto)) + '|' + che);
+}
+const conta = (s, pezzo) => s.split(pezzo).length - 1;
+for (const slug of Object.keys(CAT)) {
+  const r = Object.assign({}, CAT[slug], {slug, negozio: 'ab12cd34'});
+  const foto = r.blocchi.filter(b => b.t === 'foto');
+  const mio = x => ({negozio: 'ab12cd34', racconto: Object.assign({}, r, x)});
+  raccontoAperto = true;
+
+  // 1. IN PUBBLICO, com'e' oggi il catalogo (le foto possono mancare)
+  const pub = raccontoNegozio(mio({foto: false}));
+  dice(slug + ': in pubblico la pagina esce', true, pub.length > 500);
+  dice('...con la pastiglia e la SUA emoji', 1,
+       conta(pub, '<span class="rac-pill">' + esc(r.emoji) + ' Consigliato</span>'));
+  dice('...e col titolo che si legge', true,
+       pub.includes('<h3 class="rac-titolo">' + esc(r.sottotitolo) + '</h3>'));
+  dice('...senza nessun segnaposto e senza avviso', [0, 0],
+       [conta(pub, 'rac-segnaposto'), conta(pub, 'rac-bozza')]);
+  dice('...e senza foto finche non arrivano: nessun buco', 0,
+       conta(pub, '<img'));
+  dice('...ogni blocco disegnato, firma compresa', true,
+       r.blocchi.every(b => b.t === 'foto'
+         || pub.includes(esc(b.h || b.p || ''))));
+
+  // 2. IN ANTEPRIMA: i segnaposto, uno per foto piu la copertina
+  const ant = raccontoNegozio(mio({foto: false, anteprima: true,
+                                   stato: 'bozza'}));
+  const etichette = [...ant.matchAll(/📷 ([^<]+)<[/]b>/g)].map(m => m[1]);
+  dice('in anteprima un segnaposto per foto, piu la copertina',
+       ['copertina'].concat(foto.map(b => esc(b.etichetta))), etichette);
+  dice('...le piccole piccole', foto.filter(b => b.piccola).length,
+       conta(ant, 'rac-segnaposto-piccolo'));
+  dice('...e l avviso della bozza in cima, prima della testa', true,
+       ant.indexOf('class="rac-bozza"') >= 0
+       && ant.indexOf('class="rac-bozza"') < ant.indexOf('class="rac-testa"'));
+  dice('...col gesto che pubblica', 1,
+       conta(ant, "decidiRacconto('" + slug + "','pubblica')"));
+
+  // 3. SENZA VENDITORE: l anteprima si legge, il gesto non c e'
+  const sv = raccontoNegozio({negozio: '', racconto: Object.assign({}, r,
+    {negozio: '', foto: false, anteprima: true, stato: 'bozza'})});
+  dice('senza venditore l anteprima esce', true, sv.includes('rac-bozza'));
+  dice('...ma senza il gesto che pubblica', 0, conta(sv, "'pubblica'"));
+  // ...e SOLO in anteprima: la stessa pagina senza venditore, fuori
+  // dall anteprima, non esce su un negozio senza codice
+  dice('...che fuori dall anteprima non esce', '',
+       raccontoNegozio({negozio: '', racconto: Object.assign({}, r,
+         {negozio: ''})}) === '' ? '' : 'uscita');
+
+  // 4. PUBBLICATA, in anteprima: il gesto si rovescia
+  const pb = raccontoNegozio(mio({anteprima: true, stato: 'pubblicato'}));
+  dice('pubblicata, l anteprima offre di rimetterla in bozza', [1, 0],
+       [conta(pb, "decidiRacconto('" + slug + "','bozza')"),
+        conta(pb, "'pubblica'")]);
+
+  // 5. CON LE FOTO: il cantiere di una riga
+  const cf = raccontoNegozio(mio({foto: true}));
+  dice('con le foto: una per blocco piu la copertina', foto.length + 1,
+       conta(cf, '<img'));
+  dice('...dalla cartella del suo slug', true,
+       cf.includes('/assets/racconti/' + slug + '-cop.webp'));
+  dice('...le piccole col loro modificatore', foto.filter(b => b.piccola).length,
+       conta(cf, ' rac-piccola"'));
+  dice('...e nessun segnaposto', 0, conta(cf, 'rac-segnaposto'));
+
+  // 6. SUL NEGOZIO SBAGLIATO NON ESCE, anche se il server sbagliasse
+  dice('su un altro negozio non esce', '',
+       raccontoNegozio({negozio: 'ff99ee88', racconto: r}));
+
+  // 7. IL TESTO DEL SERVER PASSA DA esc(), le DUE emoji comprese: quella
+  // della pastiglia e quelle delle schede, che nel catalogo di casa
+  // entravano nude perche' erano roba nostra scritta qui
+  const cattivi = r.blocchi.map(b => b.t !== 'punti' ? b
+    : Object.assign({}, b, {voci: b.voci.map(v =>
+        Object.assign({}, v, {e: '<i>x</i>'}))}));
+  const cattivo = raccontoNegozio(mio({emoji: '<img src=x onerror=alert(1)>',
+                                        sottotitolo: '<b>AKG</b>',
+                                        blocchi: cattivi}));
+  dice('l emoji, le schede e il testo del server escono scappati',
+       [false, false, false],
+       [cattivo.includes('<img src=x'), cattivo.includes('<b>AKG</b>'),
+        cattivo.includes('<i>x</i>')]);
+}
+
+// 8. E LO SPAZIO SPONSORIZZATO RESTA QUELLO DI SEMPRE: senza pagina
+// del server il giudice ricade sul catalogo di casa, pastiglia 📣
+const s0 = Object.keys(RACCONTI)[0];
+sponsorVivo = s0;
+RACCONTI[s0].negozio = 'cc11dd22';
+const tm = raccontoNegozio({negozio: 'cc11dd22'});
+dice('lo spazio sponsorizzato esce ancora dal catalogo di casa', true,
+     tm.includes('<span class="rac-pill">📣 Consigliato</span>'));
+dice('...con le sue foto dalla sua cartella', true,
+     tm.includes('/assets/racconti/' + s0 + '-cop.webp'));
 """
 
 
@@ -84037,6 +84388,7 @@ def main():
               prove_scoprire_p2p,
               prove_sponsor,
               prove_racconto_girato,
+              prove_racconti_bozza,
               prove_guardia_is_bot,
               prove_altri_scorrimento, prove_widget, prove_ricerca,
               prove_condivisione_venditore,
