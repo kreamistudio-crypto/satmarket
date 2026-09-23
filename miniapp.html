@@ -988,6 +988,18 @@
      pieno delle sorelle illustrate. */
   .cella-barattolo .cat-quad{display:flex;align-items:center;
     justify-content:center;color:var(--cat-ink,#F4F1EA)}
+  /* LA CARD DEI CONSIGLIATI (set 2026): i loghi dei negozi consigliati
+     uno sopra l'altro nel quadrato bruno, e si vede quello `attivo`.
+     IL RIQUADRO E' QUELLO DELLA CARD DELLO SCAMBIO, e per la stessa
+     ragione: sono MARCHI e non illustrazioni pareggiate, e alla misura
+     delle sorelle peserebbero meno.
+     LA DISSOLVENZA LA FA L'OPACITA' e mai il `display`: da nascosto a
+     visibile non si transiziona niente. Con gli effetti ridotti la regola
+     universale in fondo al foglio spegne la transizione, e il giro in JS
+     non parte nemmeno (resta il primo logo). */
+  .cella-consigliati .cat-fig{inset:5%}
+  .cons-logo{opacity:0;transition:opacity .6s ease}
+  .cons-logo.attivo{opacity:1}
   /* La card «Tutto» in TESTA alla fila (ago 2026, decisione di Andrea
      che ROVESCIA il «nessuna card Tutto in piu'» del primo giro) non
      ha regole sue: veste .cat-cella, .cat-quad e l'anello .attiva come
@@ -1209,6 +1221,24 @@
     background:#FFF8EA;color:#23282C;border-radius:999px;
     padding:3px 9px;font-size:10.5px;font-weight:800;
     letter-spacing:.02em;box-shadow:0 1px 3px rgba(0,0,0,.28)}
+  /* LA PAGINA DEI CONSIGLIATI (set 2026): le card di «Da scoprire» una
+     sotto l'altra, larghe quanto la colonna della pagina — la STESSA
+     card, qui solo allargata. L'id batte anche la misura del web (520px
+     da 768 in su), che nella fila ha senso e qui no: la colonna c'e' gia'
+     (`.sicu`, 640 al massimo), e la card la riempie col suo rapporto. */
+  #consigliatiLista{display:flex;flex-direction:column;gap:12px;
+    margin-top:18px}
+  #consigliatiLista .scoprire-card{width:100%}
+  /* LA RISERVA COL LOGO, per il negozio che un banner suo non ce l'ha: il
+     marchio sopra e il nome sotto, sul bruno. La regola delle immagini
+     della card (a tutto campo, ritagliate) qui non vale — e' un marchio,
+     e va intero e centrato. Il nome cresce di un gradino: qui e' il
+     titolo della card, non il ripiego di un banner che non arriva. */
+  #consigliatiLista .cons-riserva{gap:8px;font-size:15px}
+  #consigliatiLista .cons-riserva img{position:static;width:auto;
+    height:auto;max-width:62%;max-height:52%;object-fit:contain}
+  .cons-vuoto{text-align:center;padding:28px 8px;font-size:14px;
+    font-weight:600;line-height:1.5;color:var(--muted)}
   /* ---------- offerta lampo ---------- */
   /* Il badge vive SULLA foto: colori fissi nei due temi, come tutto
      cio' che sta sulla foto. ROSSO caldo (#C0392B, bianco sopra =
@@ -9482,6 +9512,25 @@ document.getElementById('cartello')?.remove();</script>
     </div>
   </div>
 
+  <!-- ============ VISTA: I CONSIGLIATI ============ -->
+  <!-- I negozi che ci piacciono (set 2026). Vista INTERNA come la
+       classifica: fuori da RADICI, quindi navRiflette la spinge e il
+       gesto indietro funziona gratis; voceNav la fa ricadere su
+       «esplora». Il markup e' un GUSCIO: l'elenco lo scrive
+       renderConsigliati() da go(), con esc() su ogni testo. La testa
+       veste quella delle pagine sorelle (sicu-hero), senza immagine:
+       qui le immagini sono le card. -->
+  <div class="view" id="view-consigliati">
+    <button class="back" onclick="navIndietro()">← Torna</button>
+    <div class="sicu">
+      <div class="sicu-hero">
+        <h2>Consigliati</h2>
+        <p class="occhiello">I negozi che ci piacciono, raccontati da chi li fa</p>
+      </div>
+      <div id="consigliatiLista"></div>
+    </div>
+  </div>
+
   <!-- ============ VISTA: VENDI ============ -->
   <div class="view" id="view-vendi">
     <div class="form">
@@ -12107,6 +12156,13 @@ let regioniServer = null;    // {regione: quanti} dal server, per i Filtri
    scopa passi (il patto di ferie e lampo). Chiave assente = server
    di ieri = niente spazio, che un'assenza non e' una bugia. */
 let sponsorVivo = '';
+/* LE PAGINE DEI NEGOZI CONSIGLIATI che il server dice PUBBLICATE e col
+   logo (set 2026), dalla stessa busta: [{slug, titolo, emoji, negozio}].
+   La scrive SOLO loadListings, e sempre per intero — una lista che non
+   arriva vale vuota, come lo slug qui sopra. Una bozza qui non entra da
+   nessuna strada: il server non la mette nella busta, e l'anteprima del
+   moderatore la appende al negozio che ha aperto, mai a questa lista. */
+let consigliatiServer = [];
 let occasioniServer = null;  // {lampo:0|1, sconto:0|1} — le card «Da
                              // scoprire»: null = server vecchio o busta
                              // mai arrivata, e la sezione non si disegna
@@ -12442,6 +12498,7 @@ async function loadListings(anonimo){
   if (j.regioni) regioniServer = j.regioni;
   if (j.occasioni) occasioniServer = j.occasioni;
   sponsorVivo = j.sponsor || '';
+  consigliatiServer = Array.isArray(j.consigliati) ? j.consigliati : [];
   if (j.pionieri !== undefined) pionieri = Number(j.pionieri) || 0;
   /* i totali del like: arrivano di qui perche' e' l'unico canale che
      tocca anche gli anonimi. Si ridisegna subito — la pagina puo'
@@ -12540,6 +12597,9 @@ const CATS = ["Tutto","Elettronica","Informatica","Telefonia","Audio e video",
    bandierine) senza diventare un reparto da nessun'altra parte.
    Lo leggono in due: il template della striscia e condividiCategoria. */
 const CAT_P2P = 'p2p';
+/* ...e la sua gemella per la card dei Consigliati (set 2026): stessa
+   ragione, stesso minuscolo, stessi due lettori. */
+const CAT_CONSIGLIATI = 'consigliati';
 let listings = [
   /* consegna: come dai dati vivi — 'spedizione'/'ritiro'/'entrambe'
      con sped/spedEur/taglia; chi non ce l'ha mostra il ripiego storico */
@@ -12692,7 +12752,7 @@ function voceNav(view){
      entry vecchie della cronologia non arrivano qui — le degrada
      navRendiVista prima di rendere qualunque cosa. */
   if (['dettaglio','negozio','sicurezza','privacy','pacco',
-       'acquisto','classifica'].includes(view)) view = 'esplora';
+       'acquisto','classifica','consigliati'].includes(view)) view = 'esplora';
   else if (view === 'ordine') view = 'affari';
   /* il «coming soon» delle aste e' la voce Aste a tutti gli effetti:
      ci si e' arrivati da li' e la nav deve dirlo */
@@ -12889,6 +12949,10 @@ function go(view){
      la stessa ragione delle due sorelle: fra un giro e l'altro una
      leva del coordinatore puo' essere girata. */
   if (view==='p2pinfo') renderP2PInfo();
+  /* la pagina dei Consigliati (set 2026), per la stessa ragione: ci si
+     arriva dalla card, dall'indirizzo, dal gesto indietro e dalla
+     cronologia, e l'elenco lo dice la busta dell'ultimo giro */
+  if (view==='consigliati') renderConsigliati();
   if (view==='vendi') {
     aggiornaContattoHint();
     /* e le due righe delle politiche, per la stessa ragione: fra un
@@ -14291,6 +14355,9 @@ function renderStriscia(){
      quel giudice lo chiama `ordineSfoglia` e non questa funzione. */
   if (!(DEMO || datiVivi || conteggiServer)) return;
   const voci = ordineSfoglia();
+  /* i negozi consigliati, dal loro giudice unico (vedi il blocco dei
+     Consigliati): la card nasce solo se ce n'e' almeno uno */
+  const cons = consigliatiPubblicati();
   /* La card del barattolo porta la guardia di bottoneJar, LETTERALE:
      in DEMO e in VETRINA il barattolo non esiste affatto, e una card
      che filtra il nulla e' un bottone che porta a un muro. */
@@ -14306,8 +14373,13 @@ function renderStriscia(){
      stato del barattolo, e in nessun altro caso: le figure non
      lampeggiano. Il LIVELLO del vetro invece non entra: a livellarlo
      in place e' aggiornaBarattolo, senza un giro di render. */
+  /* ...e dice QUALI negozi consigliati ci sono (set 2026): lo spazio in
+     vetrina e le pagine pubblicate arrivano con una busta che puo'
+     cambiare fra un giro e l'altro, e senza questa coda la card non
+     nascerebbe (o non morirebbe) finche' non si cambia reparto. */
   const firma = voci.join('|') + '#' + activeCat
-    + '#' + (jarCard ? 'J' : '') + (vistaBarattolo ? 'B' : '');
+    + '#' + (jarCard ? 'J' : '') + (vistaBarattolo ? 'B' : '')
+    + '#' + cons.map(v => v.slug).join(',');
   if (firma === strisciaFirma) return;
   strisciaFirma = firma;
   /* La card accesa si porta in vista, che illuminata fuori schermo
@@ -14372,6 +14444,17 @@ function renderStriscia(){
      coming soon, che e' markup fisso e la risposta e' una sola.
      Per la stessa ragione non entra nella `firma`: e' sempre uguale
      a se' stessa. */
+  /* E SUBITO DOPO «TUTTO» LA CARD DEI CONSIGLIATI (set 2026, la
+     posizione proposta da Andrea): la seconda della fila, cioe' nel
+     tratto che a 320px si vede senza scorrere — lo stesso ragionamento
+     dello spazio in vetrina, che in «Da scoprire» sta in testa. Il
+     prezzo e' dichiarato: le card del barattolo e dello scambio scalano
+     di un posto, e a 375px lo scambio resta quarto e quasi intero.
+     Nasce solo con almeno un negozio (una card che porta a un elenco
+     vuoto e' un bottone che porta a un muro), NON si accende mai —
+     porta a una pagina, come lo scambio — e la sua fabbrica e'
+     cardConsigliati. Il giro dei loghi si riarma a ogni ridisegno: la
+     card e' nuova, e il primo logo si deve vedere per il suo tempo. */
   el('catStrip').innerHTML = `
     <a class="cat-cella${activeCat === 'Tutto' && !vistaBarattolo ? ' attiva' : ''}" href="/"
        onclick="tornaATuttoDaTocco(event)">
@@ -14380,7 +14463,7 @@ function renderStriscia(){
            onload="this.dataset.ok=1" onerror="this.remove()"
         ><span class="cat-emoji" aria-hidden="true">🛍️</span></span></span>
       <span class="cat-eti">Tutto</span>
-    </a>` + (jarCard ? `
+    </a>` + (cons.length ? cardConsigliati(cons) : '') + (jarCard ? `
     <a class="cat-cella cella-barattolo${vistaBarattolo ? ' attiva' : ''}" role="button"
        tabindex="0" title="Nel tuo barattolo" aria-label="Nel tuo barattolo"
        aria-pressed="${vistaBarattolo}" onclick="alternaBarattolo()"
@@ -14406,6 +14489,7 @@ function renderStriscia(){
         ><span class="cat-emoji" aria-hidden="true">${EMOJI_CAT[c]||'📦'}</span></span></span>
       <span class="cat-eti">${esc(c)}</span>
     </a>`).join('');
+  armaGiroConsigliati(cons.length);
   /* le frecce seguono il contenuto: cambiando le celle cambia quanto
      c'e' da scorrere, e a fila corta si spengono da sole */
   aggiornaFrecce('catStrip');
@@ -14457,6 +14541,12 @@ function renderStriscia(){
 const RACCONTI = {
   'to-the-moon': {
     negozio: '1b9a53e6',   /* il codice negozio del venditore */
+    /* IL LOGO DELLA CARD «CONSIGLIATI» (set 2026): il file e'
+       assets/consigliati/to-the-moon.webp, preparato da
+       prepara_logo_consigliato.py. Senza, lo spazio vive in «Da
+       scoprire» e nel negozio come sempre, ma fra i Consigliati non
+       entra: la card fa girare i marchi, e lui non ne avrebbe uno. */
+    logo: true,
     /* ⚠️ TRE «O» APPOSTA (confermato da Andrea): e' il nome
        stilizzato del gioco, non un refuso — ed e' la parola piu'
        visibile dello spazio che abbiamo venduto. Chi passa di
@@ -14697,6 +14787,173 @@ function renderScoprire(){
     </div>`;
   }).join('');
   aggiornaFrecce('scoprireStrip');
+}
+
+/* ================ I CONSIGLIATI (set 2026) ========================
+   L'idea annunciata da Andrea col primo spazio in vetrina — «piu'
+   avanti una categoria Consigliati dove finiscono i progetti e i negozi
+   che segnaliamo noi» — diventa una CARD nella fila delle categorie,
+   subito dopo «Tutto», e una PAGINA. La card fa girare i loghi dei
+   negozi consigliati; la pagina li mette in fila con le card di «Da
+   scoprire», e il tocco porta al negozio con la storia aperta, come la
+   card dello spazio in vetrina.
+   DUE FONTI, UN GIUDICE: lo spazio sponsorizzato (il catalogo di casa,
+   acceso dalla busta) e le pagine del server pubblicate col logo (dalla
+   stessa busta). Card e pagina chiedono a `consigliatiPubblicati` e a
+   nessun altro: due letture della stessa lista, un giorno, direbbero
+   due elenchi diversi a un tocco di distanza.
+   LA BOZZA NON HA STRADE PER ARRIVARE QUI: il server la lascia fuori
+   dalla busta, e l'anteprima del moderatore la appende al negozio che
+   ha aperto, mai a questa lista. */
+function consigliatiPubblicati(){
+  const fuori = [];
+  /* LO SPAZIO IN VETRINA ENTRA FINCHE' E' VIVO, e non oltre: la sua
+     storia nel negozio la accende la stessa busta (`raccontoDi`), quindi
+     dopo la scadenza la card porterebbe a un negozio senza racconto —
+     il contrario di quel che promette. Codice negozio e logo, tutt'e due
+     fail-closed come la card di «Da scoprire». Il banner e' il suo di
+     «Da scoprire», col nome dentro: e' la card che si e' gia' vista. */
+  const r = sponsorVivo ? RACCONTI[sponsorVivo] : null;
+  if (r && r.negozio && r.logo === true)
+    fuori.push({slug: sponsorVivo, titolo: r.titolo || '',
+                emoji: r.emoji || '📣', negozio: r.negozio,
+                banner: sponsorVivo + '.webp'});
+  /* LE PAGINE DEL SERVER: la busta porta solo le pubblicate col logo, e
+     qui si ripassano dalla forma per cintura — lo slug finisce in un
+     indirizzo e in un attributo, il codice in una richiesta. */
+  (Array.isArray(consigliatiServer) ? consigliatiServer : []).forEach(s => {
+    const slug = String((s && s.slug) || '');
+    if (!/^[a-z0-9-]{2,40}$/.test(slug) || !s.negozio) return;
+    if (fuori.some(x => x.slug === slug)) return;
+    fuori.push({slug, titolo: String(s.titolo || ''),
+                emoji: String(s.emoji || '📣'), negozio: String(s.negozio),
+                banner: ''});
+  });
+  return fuori;
+}
+const urlLogoConsigliato = slug => `/assets/consigliati/${slug}.webp`;
+
+/* LA CARD NELLA FILA (la chiama renderStriscia): il quadrato bruno e
+   l'etichetta delle sorelle, e dentro i LOGHI uno sopra l'altro — si
+   vede quello `attivo`, la dissolvenza la fa il CSS.
+   SOLO IL PRIMO HA IL SUO `src`: gli altri portano l'indirizzo in
+   `data-src` e si chiedono un giro prima del loro turno, quindi la
+   prima apertura della home paga UN logo solo, e a priorita' bassa —
+   quel momento e' delle foto della vetrina.
+   E' UN <a> VERO con href e data-cat, il patto della card dello
+   scambio: /consigliati e' una rotta del server, e il tocco lungo la
+   condivide col gesto delle sorelle. L'emoji di ripiego sta dopo
+   l'ultimo logo, fratella adiacente: si accende solo quando gli onerror
+   li hanno tolti tutti. */
+function cardConsigliati(loghi){
+  return `
+    <a class="cat-cella cella-consigliati" data-cat="${CAT_CONSIGLIATI}" href="/consigliati"
+       title="Consigliati" aria-label="Consigliati"
+       onclick="apriConsigliatiDaTocco(event)">
+      <span class="cat-quad"><span class="cat-fig">${loghi.map((v, k) => `<img
+           class="cons-logo${k ? '' : ' attivo'}" ${k ? 'data-src' : 'src'}="${urlLogoConsigliato(v.slug)}"
+           alt="" loading="lazy" decoding="async" fetchpriority="low"
+           onerror="this.remove()">`).join('')}<span class="cat-emoji"
+           aria-hidden="true">📣</span></span></span>
+      <span class="cat-eti">Consigliati</span>
+    </a>`;
+}
+
+/* IL GIRO DEI LOGHI, uno ogni tre secondi circa (richiesta di Andrea).
+   ⚠️ LA FILA DELLE CATEGORIE AVEVA UNA REGOLA: niente che si muova — il
+   viraggio della card dello scambio fu tolto (set 2026) perche' tirava
+   l'occhio via dalle sorelle. Questa dissolvenza e' una richiesta
+   esplicita che la supera per QUESTA card, e con un logo solo la card
+   resta ferma come le altre: si muove dal secondo negozio in poi, e il
+   timer con un logo non nasce nemmeno.
+   IL PRIMO RESTA SEI SECONDI e non tre, ed e' il prezzo della prima
+   apertura leggera: il secondo logo si chiede al primo giro, non
+   all'avvio. Da li' ognuno si chiede quando si accende il precedente, e
+   il ritmo torna quello chiesto. Un logo che non e' ancora arrivato non
+   si accende a meta': si aspetta il giro dopo.
+   EFFETTI RIDOTTI: niente dissolvenza e niente giro, resta il PRIMO. Il
+   giudice e' `effettiRidotti()`, chiesto a OGNI giro: la scelta si cambia
+   da «🌗 Aspetto» senza ridisegnare la fila, e al giro dopo la card torna
+   al primo e si ferma. Sotto quella classe gli altri loghi non si
+   chiedono nemmeno.
+   E SI FERMA DOVE NON SI VEDE: a pagina nascosta, o fuori dalla home, un
+   giro non cambia niente e non chiede niente. */
+const CONSIGLIATI_MS = 3000;
+let consigliatiGiro = 0;
+function armaGiroConsigliati(quanti){
+  clearInterval(consigliatiGiro);
+  consigliatiGiro = quanti > 1 ? setInterval(giraConsigliati, CONSIGLIATI_MS) : 0;
+}
+function giraConsigliati(){
+  const loghi = [...document.querySelectorAll('#catStrip .cella-consigliati img')];
+  if (loghi.length < 2) return;
+  const ora = Math.max(0, loghi.findIndex(x => x.classList.contains('attivo')));
+  if (effettiRidotti()) { if (ora) accendiLogoConsigliato(loghi, 0); return; }
+  if (document.hidden || !el('view-esplora').classList.contains('active')) return;
+  const k = (ora + 1) % loghi.length, dopo = loghi[k];
+  if (!dopo.getAttribute('src')) { dopo.src = dopo.dataset.src; return; }
+  if (!(dopo.complete && dopo.naturalWidth > 0)) return;
+  accendiLogoConsigliato(loghi, k);
+  const poi = loghi[(k + 1) % loghi.length];
+  if (!poi.getAttribute('src')) poi.src = poi.dataset.src;
+}
+function accendiLogoConsigliato(loghi, k){
+  loghi.forEach((x, j) => x.classList.toggle('attivo', j === k));
+}
+
+/* IL TOCCO DELLA CARD, il calco esatto di vaiP2PDaTocco: il click si
+   ferma (o il browser seguirebbe /consigliati e ricaricherebbe la pagina
+   intera), la bandierina del tocco lungo si consuma, e i click
+   modificati restano al browser — ctrl+click apre /consigliati in una
+   scheda nuova. */
+function apriConsigliatiDaTocco(e){
+  if (!clickNostro(e)) return;
+  e.preventDefault();
+  if (premutaFatta) { premutaFatta = false; return; }
+  apriConsigliati();
+}
+/* la vista si disegna in go(), che e' dove passano tutte le strade */
+function apriConsigliati(){ go('consigliati'); }
+
+/* LA PAGINA «Consigliati»: in cima il titolo e la riga di Andrea, sotto
+   le card di «Da scoprire» una sotto l'altra — la STESSA card (le sue
+   classi, la riserva, la pastiglia «Consigliato»), non una gemella da
+   tenere in pari. La chiama go(), l'unico posto da cui passano tutte le
+   strade: la card, l'indirizzo /consigliati, il gesto indietro dal
+   negozio e la cronologia.
+   L'IMMAGINE E' IL BANNER quando c'e' (lo spazio sponsorizzato ha il suo,
+   col nome dentro), altrimenti la riserva col LOGO e il nome sul bruno:
+   il logo c'e' per costruzione, e' la condizione per stare qui.
+   SENZA NEGOZI la pagina lo dice invece di restare muta: ci si arriva
+   anche dall'indirizzo, e uno spazio scaduto la puo' svuotare. */
+function renderConsigliati(){
+  const box = el('consigliatiLista');
+  if (!box) return;
+  const voci = consigliatiPubblicati();
+  if (!voci.length) {
+    box.innerHTML = `<div class="cons-vuoto">Per ora qui non c'è nessun
+      negozio consigliato: torna a trovarci.</div>`;
+    return;
+  }
+  box.innerHTML = voci.map(v => `
+    <div class="scoprire-card" role="button" tabindex="0" data-slug="${v.slug}"
+         aria-label="${esc(v.titolo)}" onclick="apriConsigliato(this.dataset.slug)"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();apriConsigliato(this.dataset.slug);}">
+      ${v.banner ? `<img src="/assets/scoprire/${v.banner}" alt="" loading="lazy"
+           decoding="async" onerror="this.remove()"
+      ><span class="sc-riserva" aria-hidden="true"><span class="sc-emoji">${esc(v.emoji)}</span>${esc(v.titolo)}</span
+      >` : `<span class="sc-riserva cons-riserva" aria-hidden="true"><img
+           src="${urlLogoConsigliato(v.slug)}" alt="" loading="lazy"
+           decoding="async" onerror="this.remove()">${esc(v.titolo)}</span
+      >`}<span class="sc-sponsor" aria-hidden="true">Consigliato</span>
+    </div>`).join('');
+}
+/* il tocco: il negozio col racconto APERTO, come la card dello spazio in
+   vetrina — chi tocca ha toccato per la storia. Il codice si ripesca
+   dalla lista e non viaggia mai dentro l'onclick. */
+function apriConsigliato(slug){
+  const v = consigliatiPubblicati().find(x => x.slug === slug);
+  if (v) apriNegozio(v.negozio, true);
 }
 
 /* LE DUE STRISCE SI SCORRONO COL MOUSE (ago 2026, dal campo: «col dito
@@ -28088,6 +28345,12 @@ function condividiCategoria(c){
   if (c === CAT_P2P)
     return condividiLink(`${baseCondivisione()}/p2p`,
       'Scambia sats a mano su Barattolo ⚡', 'Scambio P2P');
+  /* ...e la card dei CONSIGLIATI, stessa strada e stessa ragione (set
+     2026): il suo link e' /consigliati, servito coi suoi meta, e anche
+     lei passa PRIMA della guardia su CATS. */
+  if (c === CAT_CONSIGLIATI)
+    return condividiLink(`${baseCondivisione()}/consigliati`,
+      'I negozi che ci piacciono, su Barattolo 🫙', 'Consigliati');
   if (c === 'Tutto' || !CATS.includes(c)) return;
   return condividiLink(`${baseCondivisione()}/categoria/${slugCat(c)}`,
     `${c} in vendita su Barattolo 🫙`, c);
@@ -52698,6 +52961,20 @@ function apriP2PDaUrl(){
   vaiP2P();
 }
 
+/* /consigliati — la pagina dei negozi consigliati (set 2026): l'indirizzo
+   che esce dal tocco lungo sulla sua card. Sta in CODA ai due avvii, come
+   /p2p, e non fra le viste anticipate: l'elenco arriva con la busta di
+   prima pagina, e aprirla prima vorrebbe dire dire «non c'e' nessun
+   negozio» proprio a chi sta per vederne. Una volta sola, come le
+   sorelle. */
+const CONSIGLIATI_URL = location.pathname.match(/^\/consigliati\/?$/);
+let consigliatiApertiDaUrl = false;
+function apriConsigliatiDaUrl(){
+  if (!CONSIGLIATI_URL || consigliatiApertiDaUrl) return;
+  consigliatiApertiDaUrl = true;
+  apriConsigliati();
+}
+
 const CATEGORIA_URL = location.pathname.match(/^\/categoria\/([a-z0-9-]+)\/?$/);
 const CATEGORIA_DA_URL = CATEGORIA_URL
   && CATS.find(c => slugCat(c) === CATEGORIA_URL[1]);
@@ -52896,6 +53173,7 @@ async function avviaVetrina(){
     apriPrivacyDaUrl();
     apriCategoriaDaUrl();
     apriP2PDaUrl();
+    apriConsigliatiDaUrl();
     apriOffertaDaUrl();
     apriBarattoloDaUrl();
     apriBozzaDaUrl();
@@ -53198,6 +53476,7 @@ async function avvia(){
     apriPrivacyDaUrl();
     apriCategoriaDaUrl();
     apriP2PDaUrl();
+    apriConsigliatiDaUrl();
     apriOffertaDaUrl();
     apriBarattoloDaUrl();
     apriBozzaDaUrl();

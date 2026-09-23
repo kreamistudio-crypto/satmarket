@@ -35,7 +35,14 @@ una scheda, `n` il numero della foto. In piu', per queste pagine:
     l'anteprima (dei moderatori e del venditore) mostra finche' le foto
     non arrivano;
   - `piccola`: logo e QR non vanno a colonna piena;
-  - il blocco `firma`: la chiusura, `h` in grassetto e `p` sotto.
+  - il blocco `firma`: la chiusura, `h` in grassetto e `p` sotto;
+  - `logo` (set 2026): il marchio che gira nella card «Consigliati»
+    della home, in `assets/consigliati/<slug>.webp` — lo prepara
+    `prepara_logo_consigliato.py`. E' la SECONDA condizione per entrare
+    fra i Consigliati, accanto alla pubblicazione: finche' e' False la
+    pagina, anche pubblicata, si apre dal suo negozio e basta. Non esce
+    verso il client (non e' fra i CAMPI_RACCONTO): lo legge il solo
+    `consigliati_pubblici`.
 
 LO STATO (bozza o pubblicata) NON STA QUI: vive in `impostazioni`, e
 lo cambia il gesto del moderatore dal pannello. Questo file dice COSA
@@ -91,6 +98,13 @@ RACCONTI_NEGOZI = {
         #   una-garlanda-5.webp    le persone
         #   una-garlanda-6.webp    il logo (piccola)
         "foto": False,
+        # IL LOGO DELLA CARD «CONSIGLIATI» NON C'E' ANCORA: quando c'e',
+        #   python prepara_logo_consigliato.py <il PNG> una-garlanda
+        # e qui True. Puo' essere lo stesso disegno della foto 6 (il logo
+        # dentro la storia), ma e' un altro file: quella e' una foto del
+        # racconto, questo gira nella card sul bruno delle categorie e
+        # vuole la trasparenza.
+        "logo": False,
         "blocchi": [
             {"t": "testo", "h": "COS'È",
              "p": ("Riso di varietà storiche, coltivato senza nessun "

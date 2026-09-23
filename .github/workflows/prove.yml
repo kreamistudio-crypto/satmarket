@@ -92,6 +92,7 @@ jobs:
              giudice_deploy.py collaudi_ci.py
              racconti.py collaudo_racconti_bozza.py
              collaudo_letture_relay.py
+             prepara_logo_consigliato.py
 
       # Secondo scalino: il config d'esempio deve restare allineato,
       # perche' e' quello da cui Andrea copia quando mette mano al VPS.

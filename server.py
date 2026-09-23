@@ -2020,6 +2020,49 @@ def racconto_pubblico(codice: str, tg_id=None) -> dict | None:
     return None
 
 
+def consigliati_pubblici(con) -> list:
+    """LE PAGINE CHE ENTRANO FRA I CONSIGLIATI (set 2026): la card della
+    home e la pagina /consigliati, per chiunque — anche l'anonimo in
+    vetrina. Viaggia nella busta di PRIMA PAGINA accanto allo spazio
+    sponsorizzato, che il client aggiunge da se' dal suo catalogo.
+
+    DUE CONDIZIONI, tutt'e due necessarie: PUBBLICATA (il giudice e'
+    `racconto_stato`, lo stesso del negozio) e col LOGO nel catalogo —
+    la card fa girare i marchi, e un negozio senza il suo non avrebbe
+    niente da mostrare li'. Il logo si guarda PRIMA, perche' e' gratis:
+    la lettura dello stato costa una domanda al database, e cosi' la
+    paga solo chi puo' davvero entrare.
+
+    LA BOZZA DA QUI NON ESCE MAI, per nessuno: questa busta la riceve
+    chiunque apra la home, e come `racconto_pubblico` non sa (e non deve
+    sapere) chi bussa. Il moderatore la bozza la guarda dalla porta sua.
+
+    Escono quattro chiavi e nessun'altra: lo slug (per il logo), il
+    titolo, l'emoji e il CODICE del negozio RISOLTO — mai il tg_id
+    con cui il catalogo puo' legare la pagina, il patto dei CAMPI_RACCONTO.
+    Senza un negozio vero la pagina non entra (fail-closed: meglio
+    nessuna card che una che porta al vuoto).
+    Fail-closed anche sul guasto: un ornamento della home non deve poter
+    rompere la vetrina, e senza lista la card semplicemente non nasce."""
+    fuori = []
+    try:
+        for slug, r in RACCONTI_NEGOZI.items():
+            if r.get("logo") is not True:
+                continue
+            if racconto_stato(slug) != "pubblicato":
+                continue
+            v = _venditore_racconto(con, r)
+            if not (v and v["negozio"]):
+                continue
+            fuori.append({"slug": slug, "titolo": r.get("titolo") or "",
+                          "emoji": r.get("emoji") or "",
+                          "negozio": v["negozio"]})
+    except Exception as e:
+        print(f"⚠️ [consigliati] la lista non si legge: {e}")
+        return []
+    return fuori
+
+
 @app.get("/api/me/racconti")
 def miei_racconti(x_tg_init_data: str = Header(""),
                   barattolo_sessione: str = Cookie("")):
@@ -2172,7 +2215,8 @@ MAX_SLUG_NEGOZIO = 30
 # piu' `admin` di difesa: non e' una rotta pubblica ma resta il primo
 # nome che chi vuole confondere proverebbe a prendere.
 SLUG_NEGOZIO_RISERVATI = frozenset((
-    "annuncio", "api", "assets", "barattolo", "categoria", "e", "foto",
+    "annuncio", "api", "assets", "barattolo", "categoria", "consigliati",
+    "e", "foto",
     "manifest.json", "miniapp.html", "negozio", "offerta",
     "offline.html", "p2p", "privacy", "robots.txt", "sicurezza",
     "sitemap.xml", "sw.js", "vendor", "widget", "admin"))
@@ -18627,6 +18671,15 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # server di ieri) = nessuno sponsor, cioe' un'assenza e mai una
         # bugia.
         risposta["sponsor"] = sponsor_vivo(_ora)
+        # ...E I NEGOZI CONSIGLIATI PUBBLICATI (set 2026), per la card
+        # «Consigliati» della fila delle categorie e per la sua pagina:
+        # nella busta e non in un giro di rete loro, per la ragione dello
+        # sponsor — e perche' la card deve nascere col PRIMO disegno della
+        # fila, o comparirebbe dopo spingendo di lato le sorelle. Solo le
+        # pagine pubblicate e col logo (vedi il giudice); lo spazio
+        # sponsorizzato lo aggiunge il client dal suo catalogo. La chiave
+        # assente (un server di ieri) = nessuno, come per lo sponsor.
+        risposta["consigliati"] = consigliati_pubblici(con)
         # I pionieri viaggiano insieme (niente giro di rete in piu');
         # a interruttore spento la chiave non c'e' e il frontend non
         # disegna la riga.
@@ -54823,6 +54876,17 @@ META_TESTO_P2P = (
     "Scambia sats a mano, da persona a persona: gli ordini aperti, il "
     "prezzo e il metodo di pagamento, dentro Barattolo.")
 
+# La quarta pagina-vista (set 2026): «Consigliati», l'elenco dei negozi
+# raccontati — l'indirizzo che esce dal tocco lungo sulla sua card nella
+# striscia delle categorie. Titolo e descrizione dicono quel che la
+# pagina dice in cima; l'anteprima e' quella del brand, come per le
+# sorelle: la pagina parla di piu' negozi, e nessuno di loro e' il volto
+# dell'indirizzo.
+TITOLO_CONSIGLIATI = "Consigliati — Barattolo"
+META_TESTO_CONSIGLIATI = (
+    "I negozi che ci piacciono, raccontati da chi li fa: la loro storia "
+    "e quello che vendono, in sats.")
+
 TITOLO_PRIVACY = "I tuoi dati — Barattolo"
 META_TESTO_PRIVACY = (
     "Cosa sappiamo di te, per quanto tempo e chi lo legge. E cosa non "
@@ -55284,6 +55348,18 @@ TESTA_PRIVACY = _testa_seo(TITOLO_PRIVACY, META_TESTO_PRIVACY,
 # la sitemap e' un segnale contro l'altro.
 TESTA_P2P = _testa_seo(TITOLO_P2P, META_TESTO_P2P,
                        f"{URL_PUBBLICO}/p2p", indicizza=False)
+
+# E NEMMENO LA QUARTA, e per una ragione sua: la pagina dei Consigliati
+# puo' restare VUOTA — lo spazio sponsorizzato scade da solo, e una
+# pagina senza logo non entra — e un risultato di ricerca che porta a un
+# elenco vuoto e' il danno che il noindex esiste per evitare. Quel che
+# conta per i motori ci arriva comunque: i NEGOZI dell'elenco hanno il
+# loro indirizzo, gia' indicizzato e in sitemap. I meta ci sono e sono
+# suoi, perche' questo indirizzo si MANDA. La leva, il giorno che la si
+# volesse trovare: via `indicizza=False` e la riga in sitemap.
+TESTA_CONSIGLIATI = _testa_seo(TITOLO_CONSIGLIATI, META_TESTO_CONSIGLIATI,
+                               f"{URL_PUBBLICO}/consigliati",
+                               indicizza=False)
 
 
 # Quante schede entrano nel cartello di una pagina-elenco. Non e' una
@@ -56247,6 +56323,21 @@ def pagina_p2p():
     return _pagina_con_meta(TESTA_P2P, TITOLO_P2P)
 
 
+@app.get("/consigliati")
+def pagina_consigliati():
+    """Link condivisibile della pagina «Consigliati» (set 2026): la
+    quarta sorella di /sicurezza, /privacy e /p2p, stessa liturgia —
+    stessa Mini App, il JS legge /consigliati dall'URL e apre la vista.
+
+    L'ELENCO NON PASSA DA QUI: la pagina lo prende dalla busta di prima
+    pagina (lo spazio sponsorizzato e le pagine pubblicate col logo),
+    quindi questa testa non legge il database e non sa chi bussa — una
+    bozza non puo' finire nei meta nemmeno per sbaglio.
+    Nessun `{parametro}`: la pagina e' UNA, e la sua testa e' una
+    costante. Che sia NOINDEX lo dice la voce di TESTA_CONSIGLIATI."""
+    return _pagina_con_meta(TESTA_CONSIGLIATI, TITOLO_CONSIGLIATI)
+
+
 @app.get("/vendor/nostr.js")
 def vendor_nostr():
     """La libreria nostr-tools, servita da casa nostra e mai da una CDN:
@@ -56611,6 +56702,41 @@ def asset_racconto(nome: str, if_none_match: str = Header("")):
         raise HTTPException(404, "immagine non trovata")
     # Revalidazione come le sorelle: i file si ridisegnano sotto lo
     # stesso nome, e un racconto si corregge senza rinominare niente.
+    return _file_con_etag(percorso, "image/webp", "public, no-cache",
+                          if_none_match)
+
+
+# I LOGHI DELLA CARD «CONSIGLIATI» (set 2026): il marchio di ogni negozio
+# consigliato, che gira nella card della fila delle categorie. Cartella
+# SUA e mai assets/categorie/ (il glob del pareggio) ne' assets/racconti/
+# (li' la forma e' quella delle foto di una storia, e il `logo` ne e'
+# uscito apposta: vedi FORMA_RACCONTO). Il nome e' lo slug: `{slug}.webp`,
+# preparato da prepara_logo_consigliato.py.
+# LA WHITELIST E' LA FORMA PIU' I DUE CATALOGHI, come per le foto — ma
+# qui con una stretta in piu', ed e' la differenza da non «uniformare»:
+# la foto di una pagina IN BOZZA si serve perche' l'anteprima del
+# moderatore deve vederla, il LOGO di una bozza non serve a nessuno —
+# la card non lo chiede finche' la pagina non e' pubblicata col suo
+# `logo` vero. Quindi per le pagine del server si serve solo quello di
+# una pagina che nella card ci puo' stare; per lo spazio sponsorizzato
+# sempre (il suo catalogo viaggia gia' dentro la pagina, a chiunque).
+FORMA_LOGO_CONSIGLIATO = re.compile(r"^([a-z0-9-]{2,40})\.webp$")
+
+
+@app.get("/assets/consigliati/{nome}")
+def asset_consigliato(nome: str, if_none_match: str = Header("")):
+    m = FORMA_LOGO_CONSIGLIATO.match(nome)
+    slug = m.group(1) if m else ""
+    pagina = RACCONTI_NEGOZI.get(slug)
+    if not (slug in SLUG_SPONSOR
+            or (pagina and pagina.get("logo") is True
+                and racconto_stato(slug) == "pubblicato")):
+        raise HTTPException(404, "immagine non trovata")
+    percorso = os.path.join("assets", "consigliati", slug + ".webp")
+    if not os.path.exists(percorso):
+        raise HTTPException(404, "immagine non trovata")
+    # revalidazione come le sorelle: un logo si ridisegna sotto lo
+    # stesso nome, e al ritocco deve arrivare quello nuovo
     return _file_con_etag(percorso, "image/webp", "public, no-cache",
                           if_none_match)
 

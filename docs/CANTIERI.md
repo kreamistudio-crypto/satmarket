@@ -28878,3 +28878,175 @@ in «I miei scambi», «Info P2P» e in uno scambio il + arancio all'altezza del
 «Vendi» del mercatino; il gesto indietro dell'app fra libro e miei, senza
 scatti; il logo che dondola all'apertura e al cambio di tab, e non tornando
 nel libro.
+
+## I Consigliati: la card coi loghi e la pagina (24 set 2026)
+
+**LA RICHIESTA.** Una card quadrata «Consigliati» nella fila di «Esplora
+per categorie», con dentro i loghi dei negozi consigliati PUBBLICATI che
+si alternano in dissolvenza ogni tre secondi circa — ferma con un logo
+solo, senza dissolvenza con gli effetti ridotti, e senza pesare sulla
+prima apertura della home. Al tocco una pagina nuova «Consigliati», coi
+negozi in fila fatti con le card di «Da scoprire», e il tocco su una card
+apre il negozio con la storia; indietro e gesto indietro come le altre
+pagine, link condivisibile /consigliati con l'anteprima di Barattolo. Le
+bozze mai, né card né pagina, a chi non è moderatore.
+
+**LE DECISIONI, COI PERCHÉ.**
+- LA POSIZIONE è quella proposta da Andrea, subito dopo «Tutto»: la
+  seconda della fila, cioè nel tratto che a 320 px si vede senza
+  scorrere — lo stesso ragionamento dello spazio in vetrina, che in «Da
+  scoprire» sta in testa. Il prezzo: barattolo e scambio scalano di un
+  posto, e a 375 px lo scambio resta quarto, visibile per 83 px su 84.
+- DUE FONTI, UN GIUDICE (`consigliatiPubblicati`): lo spazio
+  sponsorizzato del catalogo di casa e le pagine del server. Per To The
+  Mooon «pubblicato» vuol dire lo spazio VIVO: la sua storia nel negozio
+  la accende la busta (`raccontoDi`), quindi a spazio scaduto la card
+  porterebbe a un negozio senza racconto, il contrario del «si apre con
+  la storia» chiesto. Tenerlo fra i Consigliati anche dopo è il trasloco
+  già annunciato (la sua pagina in `racconti.py`, pubblicata), non una
+  riga qui.
+- IL LOGO È LA SECONDA CONDIZIONE, nei due cataloghi (`logo` vero e il
+  file). Una pagina pubblicata senza logo si apre dal suo negozio e
+  basta: fra i Consigliati non entra.
+- LA LISTA DEL SERVER VIAGGIA NELLA BUSTA DI PRIMA PAGINA (`consigliati`,
+  dal giudice `consigliati_pubblici`): la card deve nascere col primo
+  disegno della fila, o comparirebbe dopo spingendo di lato le sorelle.
+  Quattro chiavi — slug, titolo, emoji, CODICE del negozio risolto — e
+  mai il tg_id; il logo si guarda prima dello stato, che costa una
+  domanda al database; un guasto dà una lista vuota, mai una vetrina
+  rotta.
+- LA BOZZA NON HA STRADE, per nessuno: la busta la riceve chiunque apra
+  la home e non sa chi bussa (la regola di `racconto_pubblico`), e
+  l'anteprima del moderatore la appende al negozio, mai alla lista. Il
+  moderatore la bozza la guarda dal cassetto di sempre. Letto «a chi non
+  è moderatore» come il minimo da garantire: se Andrea la vuole vedere
+  anche nella pagina, con la sua pastiglia, è un ramo in più da una
+  porta dei moderatori.
+- LA PRIMA APERTURA PAGA UN LOGO SOLO: il primo ha il suo `src` (pigro,
+  `fetchpriority="low"`: quel momento è delle foto della vetrina), gli
+  altri `data-src`, chiesti un giro prima del loro turno — per questo il
+  primo resta sei secondi, poi il ritmo è quello chiesto. Il timer nasce
+  con due loghi, si riarma a ogni ridisegno della fila (nella cui firma
+  entrano gli slug, così la card nasce e muore con la busta), e a pagina
+  nascosta o fuori dalla home non fa niente.
+- EFFETTI RIDOTTI: resta il PRIMO, fra le due strade che Andrea lasciava
+  aperte. La fila delle categorie è una mappa, e il viraggio della card
+  dello scambio fu tolto (set 2026) proprio perché tirava l'occhio; sotto
+  quella classe gli altri loghi non si chiedono nemmeno. La dissolvenza
+  stessa è una richiesta esplicita che supera quella regola per QUESTA
+  card — e oggi, con un logo solo, la card è ferma come le sorelle.
+- LA PAGINA è la STESSA card di «Da scoprire», allargata alla colonna
+  (343×164 a 375 px): col banner quando c'è (lo spazio sponsorizzato ha
+  il suo, col nome dentro), senza la riserva col logo e il nome sul
+  bruno, e la pastiglia «Consigliato» su ognuna. Senza negozi lo dice.
+- LE PORTE: vista interna come la classifica (fuori da RADICI, «Esplora»
+  accesa, la disegna `go()`); /consigliati è una rotta vera, NOINDEX e
+  fuori dalla sitemap perché può restare vuota, con l'anteprima del
+  brand; il nome `consigliati` entra fra gli SLUG_NEGOZIO_RISERVATI; il
+  tocco lungo sulla card la condivide come le sorelle (`CAT_CONSIGLIATI`).
+- LA ROTTA DEI LOGHI serve lo spazio sempre e le pagine del server solo
+  pubblicate col logo: al contrario delle foto, il logo di una bozza non
+  serve all'anteprima di nessuno.
+- UNO SCRIPT, `prepara_logo_consigliato.py`, perché il trattamento sia lo
+  stesso a ogni negozio: ritaglio sopra la soglia 8 (quella delle
+  categorie: il PNG di To The Mooon aveva una velatura su tutta la
+  tela), 432 px che sono il 3x dei 144 della card più grande, WebP q90
+  con la trasparenza, nessun metadato. To The Mooon: dal PNG 900×1350 al
+  WebP 432×266, 38 KB — l'ordine del logo grande del P2P.
+
+**LE STRADE SCARTATE.** To The Mooon sempre fra i Consigliati (a spazio
+scaduto porterebbe a un negozio senza storia); una rotta o un giro di
+rete per la lista (la card nascerebbe dopo la fila, spingendola); tutti
+i loghi all'avvio a priorità bassa (pesano lo stesso); il logo fra le
+foto del racconto (`-logo` era uscito da FORMA_RACCONTO apposta);
+indicizzare la pagina.
+
+**COME SI AGGIUNGE IL LOGO DI UN NEGOZIO NUOVO.** 1) `python
+prepara_logo_consigliato.py <il PNG scontornato> <slug>`, che scrive
+`assets/consigliati/<slug>.webp`; 2) nel catalogo il `logo` vero —
+`"logo": True` in `racconti.py`, o `logo: true` in `RACCONTI` del client
+per lo spazio sponsorizzato; 3) commit e push. La pagina del server
+entra quando è anche pubblicata; `prove.py` pretende un file per ogni
+logo dichiarato e nessun file orfano.
+
+**PROVATO.**
+- `prove_consigliati` (nuova, 88): il giudice del server girato su un
+  catalogo di cartone (la bozza col logo fuori, la pubblicata senza logo
+  fuori, un logo scritto come stringa fuori, la riga storta vale bozza,
+  senza negozio fuori, lo stato non chiesto senza logo, un guasto dà la
+  lista vuota, quattro chiavi e niente tg_id); la rotta dei loghi girata
+  sulla whitelist; i file; le porte del client; e un banco node che fa
+  girare davvero la fila, il giro e la pagina: la card con UNO, DUE e TRE
+  negozi, il secondo logo non chiesto all'apertura, il giro che aspetta
+  l'arrivo (guardato a ogni giro), il prossimo chiesto nell'istante in
+  cui si accende il precedente, fermo fuori dalla home e a pagina
+  nascosta, gli EFFETTI
+  RIDOTTI (fermo sul primo, e riaccesi a metà giro torna al primo), la
+  firma che segue la busta, la pagina coi banner, le riserve, le
+  pastiglie e i testi scappati, il tocco, il ctrl+click, il tocco lungo.
+- `collaudo_racconti_bozza.py` (in CI), undici in più sul server vero: la
+  busta senza la bozza anche col logo, pubblicata senza logo fuori, col
+  logo dentro col codice risolto e senza tg_id né testo della storia,
+  rimessa in bozza fuori; il logo di una bozza a 404; /consigliati coi
+  suoi meta, noindex, fuori dalla sitemap. 53/0 nella gabbia senza rete.
+- TORTURA 43/43 su una copia fresca, baseline verde (le 826 prove delle
+  famiglie toccate, più il collaudo): la busta che ignora stato, logo o
+  negozio, che porta il tg_id o che non porta la lista; la rotta dei
+  loghi che serve le bozze; la pagina indicizzata o coi meta generici;
+  il nome non riservato; il giudice del client senza logo, senza codice,
+  senza forma o coi doppioni; tutti i loghi all'apertura o a priorità
+  piena; il giro con un logo solo, cieco agli effetti ridotti, che non
+  torna al primo, che gira dove non si vede, che accende prima
+  dell'arrivo o non prepara il prossimo; la card fuori dalla fila, la
+  firma muta, il giro non armato; la pagina senza banner, pastiglia,
+  scappatura o stato vuoto, il negozio a storia chiusa; il tocco lungo,
+  la barra, `go()`, la radice, l'indirizzo dalla vetrina, la
+  dissolvenza, la card stretta, i due `logo`. IL PRIMO GIRO (39/43) HA
+  TROVATO TRE DIFETTI DEL BANCO, non del codice: due mutazioni vive — il
+  logo acceso prima di arrivare, che il caso guardava solo al terzo
+  giro, dove col guasto si torna al primo per conto proprio; il prossimo
+  non preparato, invisibile con due soli negozi — e una inciampata, che
+  toglieva la riga su cui il banco ritagliava i suoi pezzi e si portava
+  via la famiglia intera. Curati col caso guardato a ogni giro, col caso
+  dei tre negozi, coi ritagli sicuri che danno una rossa col nome e con
+  le sezioni che non si trascinano a vicenda.
+- DAL VIVO, sulla copia col config di cartone e i relay morti, a 375 px
+  nei due temi (Chrome headless a densità 3, e il pane col tocco vero
+  passato dal bersaglio): con lo spazio vivo e una pagina finta
+  pubblicata col logo, la card seconda della fila; col movimento pieno a
+  1 s il primo logo, a 3,6 s il secondo chiesto ma spento, a 6,25 s la
+  dissolvenza a metà (opacità 0,17 e 0,83), a 7,5 s acceso il secondo;
+  col movimento ridotto dopo 8 s ancora il primo, il secondo mai chiesto,
+  transizione a 0 s. La pagina: due card 343×164, nessuno sbordo; il
+  tocco apre il negozio di To The Mooon col racconto aperto, l'indietro
+  torna alla pagina e poi alla home; /consigliati a freddo atterra sulla
+  pagina con titolo, anteprima del brand e noindex. Rimessa in bozza la
+  pagina finta: busta vuota, un logo, nessun giro, la pagina col solo
+  To The Mooon.
+- I CONTI, sull'albero rebasato su `37fd154` (la capsula di Barattozon)
+  ed estratto in LF come lo vede la CI, senza config.py: **14203
+  passate, 0 fallite** con `PROVE_SEVERE=1` e `PYTHONUTF8=1`; i tredici
+  collaudi della CI verdi nella gabbia senza rete. Il rebase ha avuto un
+  conflitto solo, le due voci in fondo a questo file, tenute tutt'e due;
+  e la home rebasata, dal vivo nel tema scuro, ha la card al suo posto
+  accanto alla capsula nuova.
+
+**VISTO E NON TOCCATO.** Nella pagina «Il pagamento protetto» i
+paragrafi `.sicu-nota` escono come il testo normale (15 px, il colore
+della prosa): `.sicu p` li batte per specificità, quindi i 13,5 px
+grigi della loro regola non arrivano mai. Misurato dal vivo, ed è così
+su origin/main. Segnalato ad Andrea.
+
+**DA GUARDARE SUL TELEFONO.**
+- Che la card ci sia: nasce solo con lo spazio di To The Mooon ACCESO
+  (`/sponsor` dal bot dice fino a quando). Se è scaduto, oggi la card non
+  c'è, ed è giusto: la card compare quando c'è almeno un negozio.
+- Il logo di To The Mooon nel quadrato a 3x, nei due temi; il tocco che
+  apre la pagina; il tocco su «To The Mooon!» che apre il negozio con la
+  storia aperta; l'indietro (freccia di Telegram, gesto su Android e su
+  iPhone) che torna alla pagina e poi alla home.
+- Il tocco lungo sulla card, che condivide /consigliati, e il link
+  incollato in una chat: l'anteprima dev'essere quella di Barattolo.
+- La dissolvenza si vedrà solo col secondo negozio (la pagina del server
+  pubblicata E col logo): lì, sei secondi il primo e poi tre per logo.
+- Gli effetti ridotti da «🌗 Aspetto»: la card torna al primo e resta.

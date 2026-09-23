@@ -3497,6 +3497,37 @@
   Il cassetto mostra nome e codice del venditore e «🔗 Copia il link per
   il venditore» (`copiaMessaggioVenditore`). Il perche': Cantieri,
   «Una Garlanda: il venditore la vede».
+  I CONSIGLIATI: LA CARD E LA PAGINA (set 2026). La categoria annunciata
+  qui sopra («UNO ALLA VOLTA» E' LA TAPPA) e' nata come una CARD nella
+  fila delle categorie, subito dopo «Tutto», che fa girare i loghi dei
+  negozi consigliati, e una PAGINA (`view-consigliati`, indirizzo
+  /consigliati) con le card di «Da scoprire» una sotto l'altra; il tocco
+  apre il negozio col racconto aperto (`apriNegozio(codice, true)`).
+  DUE FONTI, UN GIUDICE, `consigliatiPubblicati()`: lo spazio
+  sponsorizzato del catalogo di casa FINCHE' E' VIVO (la sua storia la
+  accende la stessa busta: scaduto, porterebbe a un negozio senza
+  racconto) e le pagine del server PUBBLICATE, che arrivano nella busta
+  di prima pagina (`consigliati`, dal giudice `consigliati_pubblici`:
+  slug, titolo, emoji e il CODICE risolto, mai il tg_id). Per entrare
+  serve anche il LOGO: `logo: true` nel catalogo e il file in
+  `assets/consigliati/<slug>.webp`, preparato da
+  `prepara_logo_consigliato.py` (ritaglio sopra la soglia 8, 432px che
+  sono il 3x dei 144 della card piu' grande, WebP q90 con la
+  trasparenza). La rotta `/assets/consigliati/{slug}.webp` serve lo
+  spazio sempre e le pagine del server solo pubblicate col logo — al
+  contrario delle foto, il logo di una bozza non serve all'anteprima.
+  LA BOZZA NON HA STRADE: la busta la lascia fuori per chiunque, e
+  l'anteprima del moderatore la appende al negozio, mai alla lista.
+  IL GIRO: solo il primo logo ha il suo `src` (gli altri `data-src`,
+  chiesti un giro prima del loro turno) e a `fetchpriority="low"`; il
+  timer nasce con due loghi, si riarma a ogni ridisegno della fila
+  (nella cui firma entrano gli slug), e a pagina nascosta o fuori dalla
+  home non fa niente. Con gli EFFETTI RIDOTTI (`effettiRidotti()`,
+  chiesto a ogni giro) resta il primo e gli altri non si chiedono.
+  La pagina e' NOINDEX e fuori dalla sitemap (puo' restare vuota) con
+  l'anteprima del brand; il nome `consigliati` e' fra gli
+  SLUG_NEGOZIO_RISERVATI. Il perche' di ogni pezzo: Cantieri,
+  «I Consigliati: la card coi loghi e la pagina».
 
   LE CATEGORIE IN HOME (ago 2026, decisione di Andrea): sotto l'header
   di Esplora una fila di CARD QUADRATE ILLUSTRATE che scorre di lato —
@@ -21964,7 +21995,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   2026, decisione di Andrea): il barattolino di testata era un
   cerchietto da 34px, e col filtro acceso la striscia spariva del
   tutto — adesso è una CARD grande come le altre, seconda della fila
-  ACCANTO a «Tutto», col vetro che continua a riempirsi; il posto in
+  ACCANTO a «Tutto» (dal set 2026 terza, quando fra le due c'è la card
+  dei Consigliati), col vetro che continua a riempirsi; il posto in
   testata l'ha preso il PODIO della classifica (la voce sua, sotto
   «LA CLASSIFICA DEL MERCATINO»).
   IL RIEMPIMENTO COSTA QUASI ZERO, ed è ciò che ha deciso la forma:
@@ -22164,7 +22196,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   sentinelle dicono che esiste, mai che risponda giusto) e la tortura
   a 17 mutazioni, tutte uccise una per una.
   LA CARD DELLO SCAMBIO NELLA STRISCIA (set 2026, decisione di
-  Andrea): dopo il barattolo, terza della fila, una card come le
+  Andrea): dopo il barattolo, terza della fila (quarta con la card dei
+  Consigliati, che dal set 2026 sta subito dopo «Tutto»), una card come le
   altre — stesso `.cat-quad` bruno, stessa `.cat-fig`, stessa
   etichetta sotto — col LOGO COMPLETO del P2P
   (`/assets/p2p-logo-grande.webp` dal 22 set 2026, prima il PNG da
@@ -26450,7 +26483,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    sorella, set 2026: lo scambio come pagina vera, l'indirizzo che
    esce dal tocco lungo sulla card nella striscia — NOINDEX finché la
    leva è una fase di prova, e fuori dalla sitemap per la stessa
-   ragione), `/barattolo/{token}` (la
+   ragione), `/consigliati` (la quarta sorella, set 2026: la pagina
+   dei negozi consigliati, l'indirizzo che esce dal tocco lungo sulla
+   sua card — NOINDEX perché può restare vuota, fuori dalla sitemap,
+   e la testa non legge il database), `/barattolo/{token}` (la
    fotografia del barattolo condiviso, ago 2026: noindex, e la rotta
    NON legge mai il database — la garanzia della revoca),
    `/robots.txt` e `/sitemap.xml` (ago 2026, cantiere «farsi
@@ -26468,7 +26504,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    il nome arriva dal client, quindi whitelist — `SLUG_CATEGORIE`,
    calcolata dal catalogo), `/assets/scoprire/{nome}` (i due banner
    della sezione «Da scoprire», whitelist a tupla `FILE_SCOPRIRE`,
-   ago 2026), `/assets/mascotte.jpeg`,
+   ago 2026), `/assets/consigliati/{slug}.webp` (i loghi della card
+   «Consigliati», set 2026: whitelist di FORMA più i due cataloghi, e
+   delle pagine del server solo quelle pubblicate col logo — vedi «I
+   CONSIGLIATI: LA CARD E LA PAGINA»), `/assets/mascotte.jpeg`,
    `/assets/barattolo.jpeg`, `/assets/barattolo-hero.png`,
    `/assets/p2p-logo-compra.webp`, `/assets/p2p-logo-vendi.webp`
    (i due gemelli del libro, set 2026; dal 22 set sera sono WebP da

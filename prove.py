@@ -29801,7 +29801,7 @@ def prove_onion():
     prova("...che un middleware segna su ogni richiesta", True,
           '_HOST_RICHIESTA.set(request.headers.get("host", ""))' in mw)
     # IL CONTEXTVAR e non un argomento passato a mano alle rotte: le
-    # rotte-pagina sono undici, e la dodicesima di domani eredita la
+    # rotte-pagina sono dodici, e la tredicesima di domani eredita la
     # cura per costruzione invece di doversene ricordare.
     prova("il contextvar nasce vuoto (fail-closed)", True,
           '_HOST_RICHIESTA = contextvars.ContextVar("host_richiesta",'
@@ -31136,6 +31136,7 @@ def prove_anteprime():
                     '@app.get("/sicurezza")',
                     '@app.get("/privacy")',
                     '@app.get("/p2p")',
+                    '@app.get("/consigliati")',
                     '@app.get("/offerta/{oid}")',
                     '@app.get("/barattolo/{token}")',
                     '@app.get("/e/{bech32}")')
@@ -86116,6 +86117,718 @@ def prove_effetti_ridotti():
           "memoria dell'apertura", False, d["muto"])
 
 
+def prove_consigliati():
+    """LA CARD «CONSIGLIATI» E LA SUA PAGINA (set 2026).
+
+    L'idea annunciata da Andrea col primo spazio in vetrina — una
+    categoria dove finiscono i negozi che segnaliamo noi — diventa una
+    card nella fila delle categorie, subito dopo «Tutto», che fa girare
+    i loghi dei negozi consigliati PUBBLICATI, e una pagina che li mette
+    in fila con le card di «Da scoprire».
+
+    Qui si prova quel che si rompe in silenzio:
+    1) la BOZZA non entra mai: il giudice del server GIRATO su un
+       catalogo e un'impostazione di cartone (il giro col server vero
+       sta in `collaudo_racconti_bozza.py`, in CI);
+    2) la rotta dei loghi, girata anche lei: serve i soli loghi che la
+       card puo' chiedere;
+    3) i file dei loghi, uno per ogni `logo` vero e nessuno in piu';
+    4) le porte del client — la fila, la busta, l'indirizzo, la barra,
+       il tocco lungo — con le sentinelle;
+    5) la card con UNO, DUE e TRE negozi, il giro dei loghi, gli EFFETTI
+       RIDOTTI e la pagina: renderStriscia, il giro e la pagina VERI in
+       un banco node, su un DOM di cartone, ogni caso per conto suo.
+
+    LE SEZIONI NON SI TRASCINANO A VICENDA, e i ritagli sono SICURI: la
+    tortura ha tolto una riga su cui il banco ritagliava i suoi pezzi, e
+    l'eccezione si portava via tutta la famiglia — una mutazione «morta»
+    senza aver provato niente. Adesso un'ancora che manca e' una rossa col
+    suo nome, e una sezione che esplode lo dice senza zittire le altre."""
+    print("\n[i Consigliati: la card, il giro dei loghi, la pagina]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    mancano = []
+
+    def _pz(testo, inizio, fine="\n\n", dentro=False):
+        """il ritaglio SICURO, calco di pezzo/pezzo_js: dall'inizio alla
+        fine esclusa (compresa con `dentro`); un'ancora che manca finisce
+        nell'elenco dei `mancano` e il ritaglio e' vuoto"""
+        i = testo.find(inizio)
+        j = testo.find(fine, i + len(inizio)) if i >= 0 else -1
+        if i < 0 or j < 0:
+            mancano.append((inizio if i < 0 else fine)[:60])
+            return ""
+        return testo[i:j + (len(fine) if dentro else 0)]
+
+    for nome, f in (("il giudice del server", _consigliati_giudice),
+                    ("le rotte del server", _consigliati_rotte),
+                    ("i file dei loghi", _consigliati_file),
+                    ("le porte del client", _consigliati_porte),
+                    ("il banco della fila e della pagina",
+                     _consigliati_banco)):
+        try:
+            f(src, mini, _pz)
+        except Exception as e:
+            # «gira» nel nome: la tortura la legge come un banco che
+            # inciampa, mai come una mutazione presa
+            prova(f"{nome}: la sezione gira", "",
+                  f"{type(e).__name__}: {e}"[:300])
+    prova("le ancore delle prove dei Consigliati ci sono tutte", [], mancano)
+
+
+def _consigliati_giudice(src, mini, _pz):
+    """1. IL GIUDICE DEL SERVER, GIRATO: non una sentinella, il giudice
+    VERO su un catalogo e su un'impostazione di cartone — una sentinella
+    direbbe che il controllo c'e', mai che risponda giusto, e qui la
+    risposta e' l'unica cosa che tiene una bozza fuori dalla home."""
+    import json as _json
+    import types as _ty
+    tavola, chieste = {}, []
+    righe = {"ab12cd34": {"tg_id": 525, "negozio": "ab12cd34", "nome": "X"}}
+
+    class _Con:
+        """il database del giudice: la riga del negozio, per codice o
+        per tg_id, come la cercano `_venditore_racconto` e le sorelle"""
+        def execute(self, q, p):
+            k = p[0]
+            trovata = (righe.get(k) if "WHERE negozio=?" in q
+                       else next((r for r in righe.values()
+                                  if r["tg_id"] == k), None))
+            return _ty.SimpleNamespace(fetchone=lambda: trovata)
+
+    finta = {"titolo": "Bottega di prova", "emoji": "🌾", "sottotitolo": "S",
+             "intro": "I", "foto": False, "blocchi": [], "logo": True,
+             "negozio": "", "venditore_tg": 525}
+    cat = {"pubblicata": dict(finta),
+           "bozza": dict(finta),
+           "senza-logo": dict(finta, logo=False),
+           # il logo e' un VERO booleano: una stringa non accende niente
+           "logo-scritto": dict(finta, logo="si"),
+           "orfana": dict(finta, venditore_tg=0),
+           "per-codice": dict(finta, negozio="ab12cd34", venditore_tg=0)}
+
+    def _imp(k, d=""):
+        chieste.append(k)
+        return tavola.get(k, d)
+
+    amb = {"impostazione": _imp, "RACCONTI_NEGOZI": cat}
+    for nome in ("racconto_stato", "_venditore_racconto",
+                 "consigliati_pubblici"):
+        exec(_pz(src, f"def {nome}(", "\n\n\n"), amb)
+    cons = amb["consigliati_pubblici"]
+    for s in ("pubblicata", "senza-logo", "logo-scritto", "orfana",
+              "per-codice"):
+        tavola[f"racconto_pubblicato:{s}"] = "1790000000"
+    fuori = cons(_Con())
+    prova("fra i Consigliati entrano le sole pagine PUBBLICATE col logo e "
+          "un negozio vero", ["pubblicata", "per-codice"],
+          [x["slug"] for x in fuori])
+    prova("...e la BOZZA col suo logo resta fuori", False,
+          any(x["slug"] == "bozza" for x in fuori))
+    prova("...con quattro chiavi e nessun'altra",
+          [["emoji", "negozio", "slug", "titolo"]] * 2,
+          [sorted(x) for x in fuori])
+    prova("...col codice del negozio RISOLTO, e il tg_id a casa",
+          ("ab12cd34", False),
+          ((fuori[0] if fuori else {}).get("negozio"),
+           "525" in _json.dumps(fuori)))
+    # IL LOGO SI GUARDA PRIMA, ed e' la meta' che costa: lo stato e' una
+    # domanda al database, e la paga solo chi puo' davvero entrare
+    chieste.clear()
+    amb["RACCONTI_NEGOZI"] = {"senza-logo": cat["senza-logo"]}
+    cons(_Con())
+    prova("...e senza logo lo stato non si chiede nemmeno", [], chieste)
+    amb["RACCONTI_NEGOZI"] = cat
+    # una riga scritta a mano e storta vale bozza, anche qui
+    tavola["racconto_pubblicato:pubblicata"] = "domani"
+    prova("una riga storta vale bozza anche fra i Consigliati",
+          ["per-codice"], [x["slug"] for x in cons(_Con())])
+    tavola["racconto_pubblicato:pubblicata"] = "1790000000"
+
+    class _Rotto:
+        def execute(self, *a):
+            raise RuntimeError("database giu'")
+    prova("un guasto non rompe la busta: la lista esce vuota", [],
+          cons(_Rotto()))
+
+    # ...E VIAGGIA NELLA BUSTA DI PRIMA PAGINA, accanto allo sponsor: la
+    # card deve nascere col primo disegno della fila
+    _i_sp = src.find('risposta["sponsor"] = sponsor_vivo(_ora)')
+    _i_co = src.find('risposta["consigliati"] = consigliati_pubblici(con)')
+    _i_pi = src.find('risposta["pionieri"] = conta_pionieri(con)')
+    prova("la lista viaggia nella busta di prima pagina, accanto allo "
+          "sponsor", True, 0 <= _i_sp < _i_co < _i_pi)
+    # ...E NON E' IL RACCONTO: le chiavi le sceglie il giudice, non
+    # `_racconto_dati` — il testo della pagina qui non passa
+    _cp = _pz(src, "def consigliati_pubblici(", "\n\n\n")
+    prova("...e non porta il racconto, ne' i campi che il catalogo ha in "
+          "piu'", (False, False),
+          ("_racconto_dati(" in _cp,
+           "venditore_tg" in codice(_senza_prosa(_cp))))
+
+
+def _consigliati_rotte(src, mini, _pz):
+    """2. LE ROTTE DEL SERVER: la pagina, e quella dei loghi GIRATA."""
+    import types as _ty
+    prova("la pagina ha la sua rotta, coi suoi meta", True,
+          '@app.get("/consigliati")' in src
+          and "return _pagina_con_meta(TESTA_CONSIGLIATI, TITOLO_CONSIGLIATI)"
+          in src)
+    # NOINDEX: la pagina puo' restare vuota (lo spazio scade da solo), e
+    # un risultato che porta a un elenco vuoto e' il danno che il noindex
+    # evita. Fuori dalla sitemap per la stessa ragione.
+    prova("...non si indicizza, e resta fuori dalla sitemap", True,
+          bool(re.search(r"TESTA_CONSIGLIATI = _testa_seo\([^)]*"
+                         r"indicizza=False\)", src))
+          and '_riga_sitemap(f"{URL_PUBBLICO}/consigliati"' not in src)
+    prova("...con l'anteprima del brand e il titolo della pagina", True,
+          'TITOLO_CONSIGLIATI = "Consigliati — Barattolo"' in src
+          and "TESTA_CONSIGLIATI = _testa_seo(TITOLO_CONSIGLIATI, "
+              "META_TESTO_CONSIGLIATI," in src)
+    prova("...e il suo nome e' riservato ai link dei negozi", True,
+          '"consigliati"' in _pz(src, "SLUG_NEGOZIO_RISERVATI = frozenset((",
+                                 "))"))
+    # LA ROTTA DEI LOGHI, GIRATA: la forma, i due cataloghi, e la stretta
+    # che le foto non hanno — il logo di una bozza non serve a nessuno.
+    # I file si fingono presenti tutti: qui si prova la WHITELIST.
+
+    class _NonC(Exception):
+        pass
+    cat = {"pubblicata": {"logo": True}, "bozza": {"logo": True},
+           "senza-logo": {"logo": False}, "logo-scritto": {"logo": "si"}}
+    tavola = {"racconto_pubblicato:pubblicata": "1790000000",
+              "racconto_pubblicato:senza-logo": "1790000000",
+              "racconto_pubblicato:logo-scritto": "1790000000"}
+    amb_s = {"impostazione": lambda k, d="": tavola.get(k, d)}
+    exec(_pz(src, "def racconto_stato(", "\n\n\n"), amb_s)
+    amb_a = {"re": re, "Header": lambda d="": d,
+             "os": _ty.SimpleNamespace(path=_ty.SimpleNamespace(
+                 join=os.path.join, exists=lambda p: True)),
+             "HTTPException": lambda cod, msg="": _NonC(cod),
+             "SLUG_SPONSOR": ("to-the-moon",), "RACCONTI_NEGOZI": cat,
+             "racconto_stato": amb_s["racconto_stato"],
+             "_file_con_etag": lambda p, *a: "servito"}
+    _forma = re.search(r"^FORMA_LOGO_CONSIGLIATO = .*$", src, re.M)
+    exec(_forma.group() if _forma else "", amb_a)
+    _rotta = _pz(src, "def asset_consigliato(", "\n\n\n")
+    exec(_rotta, amb_a)
+
+    def _chiedi(nome):
+        try:
+            return amb_a["asset_consigliato"](nome, "")
+        except _NonC:
+            return 404
+    prova("la rotta dei loghi serve lo spazio e la pagina pubblicata col "
+          "logo", ["servito", "servito"],
+          [_chiedi(n) for n in ("to-the-moon.webp", "pubblicata.webp")])
+    prova("...e MAI il logo di una bozza, di una pagina senza logo o di "
+          "uno slug inventato", [404, 404, 404, 404],
+          [_chiedi(n) for n in ("bozza.webp", "senza-logo.webp",
+                                "logo-scritto.webp", "mai-visto.webp")])
+    prova("...ne' un nome fuori forma", [404, 404, 404, 404],
+          [_chiedi(n) for n in ("../config.py", "to-the-moon.png",
+                                "TO-THE-MOON.webp", "to-the-moon.webp/..")])
+    prova("...e la cartella e' sua, fuori dal glob del pareggio", True,
+          'os.path.join("assets", "consigliati", slug + ".webp")' in _rotta)
+
+
+def _consigliati_file(src, mini, _pz):
+    """3. I FILE DEI LOGHI: uno per ogni `logo` vero, nei due cataloghi, e
+    nessun file orfano — un logo dichiarato senza file e' una card che
+    gira sul vuoto, un file senza dichiarazione e' una cosa servita che
+    nessuno chiede."""
+    import importlib
+    import racconti as _rac
+    CAT = importlib.reload(_rac).RACCONTI_NEGOZI
+    prova("il logo del catalogo del server e' un vero booleano", [],
+          [s for s, r in CAT.items() if not isinstance(r.get("logo"), bool)])
+    _cc = _pz(mini, "const RACCONTI = {", "\n};")
+    _voci = list(re.finditer(r"^  '([a-z0-9-]+)': \{", _cc, re.M))
+    loghi_client = []
+    for n, m in enumerate(_voci):
+        fine = _voci[n + 1].start() if n + 1 < len(_voci) else len(_cc)
+        if re.search(r"^    logo: true,", _cc[m.start():fine], re.M):
+            loghi_client.append(m.group(1))
+    loghi_server = [s for s, r in CAT.items() if r.get("logo") is True]
+    cartella = os.path.join("assets", "consigliati")
+    presenti = sorted(f[:-5] for f in os.listdir(cartella)
+                      if f.endswith(".webp")) if os.path.isdir(cartella) else []
+    prova("a ogni logo dichiarato il suo file, e nessun file orfano",
+          sorted(loghi_client + loghi_server), presenti)
+    prova("...e lo spazio di To The Mooon il suo logo ce l'ha", True,
+          "to-the-moon" in loghi_client)
+    for s in presenti:
+        raw = open(os.path.join(cartella, s + ".webp"), "rb").read()
+        pezzi, i = [], 12
+        while raw[:4] == b"RIFF" and i + 8 <= len(raw):
+            n = int.from_bytes(raw[i + 4:i + 8], "little")
+            pezzi.append(raw[i:i + 4].decode("ascii", "replace"))
+            i += 8 + n + (n & 1)
+        lato = (max(1 + int.from_bytes(raw[24:27], "little"),
+                    1 + int.from_bytes(raw[27:30], "little"))
+                if pezzi[:1] == ["VP8X"] else 0)
+        # la ricetta di prepara_logo_consigliato.py: trasparenza e
+        # nient'altro dentro, nitido a 3x dei 144px della card piu'
+        # grande, e leggero come il logo grande del P2P
+        prova(f"«{s}»: WebP scontornato, senza metadati, al massimo "
+              f"432px e sotto i 50 KB", (["VP8X", "ALPH", "VP8 "], True,
+                                         True),
+              (pezzi, 0 < lato <= 432, len(raw) < 50000))
+    # LO SPAZIO SPONSORIZZATO nella pagina porta il banner di «Da
+    # scoprire»: deve esistere, e la rotta deve servirlo
+    _fs = re.search(r"^FILE_SCOPRIRE = \(([^)]*)\)", src, re.M)
+    for s in loghi_client:
+        prova(f"«{s}»: il banner della sua card c'e', ed e' quello di "
+              f"«Da scoprire»", True,
+              bool(_fs) and f'"{s}.webp"' in _fs.group(1)
+              and os.path.exists(os.path.join("assets", "scoprire",
+                                              s + ".webp")))
+
+
+def _consigliati_porte(src, mini, _pz):
+    """4. LE PORTE DEL CLIENT, con le sentinelle."""
+    st = _pz(mini, "function renderStriscia(){", "\n}\n")
+    prova("la card sta subito dopo «Tutto», prima del barattolo e dello "
+          "scambio", True,
+          0 <= st.find("urlIllustrazione('Tutto')")
+          < st.find("cardConsigliati(cons)") < st.find("cella-barattolo")
+          < st.find("cella-p2p"))
+    prova("...la lista viene dal giudice unico, e la card nasce solo con "
+          "un negozio", (True, True),
+          ("const cons = consigliatiPubblicati();" in st,
+           "(cons.length ? cardConsigliati(cons) : '')" in st))
+    prova("...la firma della fila dice QUALI negozi ci sono", True,
+          "+ '#' + cons.map(v => v.slug).join(',')" in st)
+    prova("...e il giro si riarma DOPO il disegno", True,
+          0 <= st.find("el('catStrip').innerHTML = `")
+          < st.find("armaGiroConsigliati(cons.length);"))
+    _js = _senza_commenti_js(mini[mini.find("</style>"):]
+                             .replace("image/*", "image/STELLA"))
+    prova("la lista del server ha due scrittori soli: la nascita e la "
+          "busta", 2, len(re.findall(r"consigliatiServer\s*=(?!=)", _js)))
+    prova("...e la busta la scrive intera, vuota se non arriva", True,
+          "consigliatiServer = Array.isArray(j.consigliati) ? "
+          "j.consigliati : [];"
+          in _pz(mini, "async function loadListings(anonimo){", "\n}\n"))
+    _ant = _pz(mini, "async function apriAnteprimaRacconto(slug){", "\n}\n")
+    prova("...e l'anteprima di una bozza non la tocca", (True, False),
+          (bool(_ant), "consigliatiServer" in _ant))
+    av = _pz(mini, "async function avvia(){", "\n}\n")
+    avv = _pz(mini, "async function avviaVetrina(){", "\n}\n")
+    prova("l'indirizzo /consigliati atterra dai due avvii, DOPO la busta",
+          (True, True, 2),
+          (0 <= av.find("await loadListings();")
+           < av.find("apriConsigliatiDaUrl();"),
+           0 <= avv.find("await loadListings(true);")
+           < avv.find("apriConsigliatiDaUrl();"),
+           mini.count("apriConsigliatiDaUrl();")))
+    _du = _pz(mini, "function apriConsigliatiDaUrl(){", "\n}\n")
+    prova("...una volta sola, e dalla stessa porta della card", True,
+          "consigliatiApertiDaUrl = true;" in _du
+          and "apriConsigliati();" in _du
+          and "location.pathname.match(/^\\/consigliati\\/?$/)" in mini)
+    prova("la pagina accende «Esplora» nella barra", True,
+          "'consigliati'].includes(view)) view = 'esplora'"
+          in _pz(mini, "function voceNav(view){", "\n}\n"))
+    prova("...ed e' una vista INTERNA: l'indietro la smonta", (True, False),
+          (bool(_pz(mini, "const RADICI = ", "]);")),
+           "'consigliati'" in _pz(mini, "const RADICI = ", "]);")))
+    prova("...e la disegna go(), da ogni strada", True,
+          "if (view==='consigliati') renderConsigliati();"
+          in _pz(mini, "function go(view){", "\n}\n"))
+    vista = _pz(mini, '<div class="view" id="view-consigliati">',
+                "<!-- ============ VISTA:")
+    prova("la pagina ha il suo ritorno, il titolo, la riga di Andrea e la "
+          "lista", (True, True, True, True),
+          ('<button class="back" onclick="navIndietro()">' in vista,
+           "<h2>Consigliati</h2>" in vista,
+           "I negozi che ci piacciono, raccontati da chi li fa" in vista,
+           '<div id="consigliatiLista"></div>' in vista))
+    _cd = _pz(mini, "function condividiCategoria(c){", "\n}\n")
+    prova("il tocco lungo la condivide: dopo la DEMO e prima della guardia "
+          "sui reparti", True,
+          0 <= _cd.find("if (DEMO) return;") < _cd.find("c === CAT_CONSIGLIATI")
+          < _cd.find("CATS.includes(c)") and "/consigliati`" in _cd)
+    prova("...e il suo nome, minuscolo, in CATS non ci puo' entrare", False,
+          '"consigliati"' in _pz(mini, "const CATS = [", '"Altro"];'))
+    _gc = _pz(mini, "function giraConsigliati(){", "\n}\n")
+    prova("il giro chiede agli effetti ridotti PRIMA di chiedere un logo",
+          True, 0 <= _gc.find("effettiRidotti()") < _gc.find("dataset.src"))
+    css = mini[mini.find("<style"):mini.find("</style>")]
+    prova("la dissolvenza la fa l'opacita' dei loghi, nel riquadro dei "
+          "marchi", (True, True, True),
+          (".cons-logo{opacity:0;transition:opacity .6s ease}" in css,
+           ".cons-logo.attivo{opacity:1}" in css,
+           ".cella-consigliati .cat-fig{inset:5%}" in css))
+    prova("la pagina allarga la card di «Da scoprire», non ne fa una "
+          "gemella", True, "#consigliatiLista .scoprire-card{width:100%}" in css)
+
+
+def _consigliati_banco(src, mini, _pz):
+    """5. IL BANCO: la card, il giro, gli effetti ridotti, la pagina — i
+    PEZZI VERI, non copie: il catalogo di casa intero, la fila, il blocco
+    dei Consigliati, la condivisione e il loro esc. Il blocco si ritaglia
+    fino alla sezione che lo SEGUE nel file, e non su una sua riga: una
+    mutazione su quella riga non deve poter smontare il banco."""
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    node = _sh.which("node")
+    if not node:
+        salta("il banco dei Consigliati", "serve node")
+        return
+    pezzi = [
+        _pz(mini, "const esc = s =>", "[c]));", dentro=True),
+        _pz(mini, "const CATS = [", '"Altro"];', dentro=True),
+        _pz(mini, "const CAT_P2P = 'p2p';",
+            "const CAT_CONSIGLIATI = 'consigliati';", dentro=True),
+        _pz(mini, "const RACCONTI = {", "\n};", dentro=True),
+        _pz(mini, "let strisciaFirma = '';",
+            "\n  aggiornaFrecce('catStrip');\n}", dentro=True),
+        _pz(mini, "function consigliatiPubblicati(){",
+            "\n/* LE DUE STRISCE SI SCORRONO COL MOUSE"),
+        _pz(mini, "function condividiCategoria(c){", "\n}", dentro=True)]
+    if not all(pezzi):
+        prova("il banco dei Consigliati trova i suoi pezzi", True, False)
+        return
+    js = _CARTONE_CONSIGLIATI + "\n".join(pezzi) + _BANCO_CONSIGLIATI
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8") as f:
+        f.write(js)
+        percorso = f.name
+    r = _sp.run([node, percorso], capture_output=True, text=True,
+                encoding="utf-8", errors="replace")
+    os.unlink(percorso)
+    esiti = [l.split("|", 1) for l in (r.stdout or "").splitlines()
+             if "|" in l]
+    # UN BANCO MUTO E' ROSSO: se il pezzo esplode prima dei casi, node
+    # esce 1 e stdout resta vuoto — passare oltre in silenzio vorrebbe
+    # dire scambiare un banco che non gira per un banco verde
+    if r.returncode != 0 or not esiti:
+        prova("il banco dei Consigliati gira", "",
+              ((r.stderr or "") or "nessuna uscita")[:400])
+        return
+    for avuto, che in esiti:
+        prova(che, "ok", avuto)
+
+
+# Il DOM di cartone del banco: solo quel che i pezzi toccano. Le IMMAGINI
+# della card sono oggetti con uno stato — classe, src, arrivata — che
+# sopravvive fra un giro e l'altro come nel DOM vero, e che si RIFA' da
+# capo quando la fila si ridisegna (un innerHTML nuovo = nodi nuovi).
+_CARTONE_CONSIGLIATI = r"""
+const nodi = {};
+const nodo = id => nodi[id] || (nodi[id] = {id, innerHTML: '',
+  style: {display: ''}, classList: {contains: () => false,
+  toggle(){}, add(){}, remove(){}}, querySelector: () => null});
+let homeAttiva = true;
+nodo('view-esplora').classList.contains = c => c === 'active' && homeAttiva;
+const el = id => nodo(id);
+let richieste = [], scritte = [];
+let immagini = [], htmlVisto = null;
+function nuovaImg(attr){
+  const cls = (attr.match(/class="([^"]*)"/) || [])[1] || '';
+  const src = (attr.match(/\ssrc="([^"]*)"/) || [])[1] || '';
+  const im = {_cls: new Set(cls.split(/\s+/).filter(Boolean)), _src: src,
+    dataset: {src: (attr.match(/data-src="([^"]*)"/) || [])[1] || ''},
+    arrivata: !!src, attr};
+  im.classList = {contains: c => im._cls.has(c),
+    toggle: (c, si) => { if (si) im._cls.add(c); else im._cls.delete(c); }};
+  im.getAttribute = n => n === 'src' ? (im._src || null) : null;
+  Object.defineProperty(im, 'src', {get: () => im._src,
+    set: v => { im._src = v; richieste.push(v); }});
+  Object.defineProperty(im, 'complete', {get: () => !im._src || im.arrivata});
+  Object.defineProperty(im, 'naturalWidth', {get: () => im.arrivata ? 432 : 0});
+  return im;
+}
+function immaginiCard(){
+  const h = nodi['catStrip'] ? nodi['catStrip'].innerHTML : '';
+  if (h !== htmlVisto) {
+    htmlVisto = h;
+    const i = h.indexOf('cella-consigliati');
+    const card = i < 0 ? '' : h.slice(i, h.indexOf('</a>', i));
+    immagini = [...card.matchAll(/<img([\s\S]*?)>/g)].map(m => nuovaImg(m[1]));
+  }
+  return immagini;
+}
+const document = {hidden: false,
+  querySelectorAll: sel => sel === '#catStrip .cella-consigliati img'
+    ? immaginiCard() : []};
+const timer = new Map();
+let idTimer = 0;
+function setInterval(f, ms){ timer.set(++idTimer, {f, ms}); return idTimer; }
+function clearInterval(id){ timer.delete(id); }
+function setTimeout(){ return 0; }
+let DEMO = false, VETRINA = false, datiVivi = true, conteggiServer = {};
+let myTgId = 111, activeCat = 'Tutto', vistaBarattolo = false;
+let sponsorVivo = '', consigliatiServer = [];
+let ridotti = false, premutaFatta = false;
+const effettiRidotti = () => ridotti;
+const ordineSfoglia = () => ['Bitcoin', 'Libri e media'];
+const urlIllustrazione = c => '/assets/categorie/' + c + '.webp';
+const caldaOk = () => '';
+const jarSVG = () => '<svg></svg>';
+const livelloBarattolo = () => 0, contaBarattolo = () => 0;
+const slugCat = c => c.toLowerCase().replace(/ /g, '-');
+const EMOJI_CAT = {};
+function centraNellaFila(){}
+function aggiornaFrecce(){}
+const clickNostro = e => !(e.ctrlKey || e.metaKey || e.shiftKey || e.button);
+function go(v){ scritte.push('go:' + v); }
+function apriNegozio(chi, aperto){
+  scritte.push('negozio:' + chi + (aperto ? ':aperto' : ':chiuso')); }
+function condividiLink(link){ scritte.push('condividi:' + link); }
+const baseCondivisione = () => 'https://barattolo.store';
+"""
+
+_BANCO_CONSIGLIATI = r"""
+function dice(che, atteso, avuto){
+  const ok = JSON.stringify(atteso) === JSON.stringify(avuto);
+  console.log((ok ? 'ok' : 'atteso ' + JSON.stringify(atteso)
+    + ', avuto ' + JSON.stringify(avuto)) + '|' + che);
+}
+/* OGNI CASO E' SOLO: il suo stato di partenza, e un'esplosione diventa
+   una riga col suo nome invece di portarsi via le sorelle */
+function caso(nome, f){
+  sponsorVivo = ''; consigliatiServer = []; ridotti = false;
+  homeAttiva = true; document.hidden = false; DEMO = false;
+  premutaFatta = false; richieste = []; scritte = [];
+  timer.clear(); htmlVisto = null;
+  try { f(); } catch (e) { console.log('ESPLOSO: ' + e.message + '|' + nome); }
+}
+const rifai = () => { strisciaFirma = ''; renderStriscia(); };
+const ordine = () => [...nodi['catStrip'].innerHTML
+  .matchAll(/href="([^"]*)"|cella-barattolo/g)]
+  .map(m => m[1] !== undefined ? m[1] : 'barattolo');
+const accesi = () => immaginiCard().map(x => x.classList.contains('attivo'));
+const conSrc = () => immaginiCard().map(x => !!x.getAttribute('src'));
+const giro = () => { for (const t of timer.values()) t.f(); };
+const arrivano = () => immaginiCard().forEach(x => { if (x._src) x.arrivata = true; });
+const BOTTEGA = {slug: 'bottega-di-prova', titolo: 'Bottega di prova',
+                 emoji: '🌾', negozio: 'cd34ef56'};
+const TERZA = {slug: 'terza-bottega', titolo: 'Terza bottega',
+               emoji: '🧀', negozio: 'ef56ab12'};
+const CODICE_TTM = RACCONTI['to-the-moon'].negozio;
+
+caso('senza negozi consigliati la card non nasce', () => {
+  rifai();
+  dice('senza negozi consigliati la card non nasce',
+       ['/', 'barattolo', '/p2p', '/categoria/bitcoin',
+        '/categoria/libri-e-media'], ordine());
+  dice('...e nessun giro parte', 0, timer.size);
+});
+
+caso('un negozio', () => {
+  sponsorVivo = 'to-the-moon';
+  rifai();
+  dice('con UN negozio la card e la seconda della fila, subito dopo Tutto',
+       ['/', '/consigliati', 'barattolo', '/p2p', '/categoria/bitcoin',
+        '/categoria/libri-e-media'], ordine());
+  const c = nodi['catStrip'].innerHTML.split('cella-consigliati')[1]
+    .split('</a>')[0];
+  dice('...col suo data-cat per il tocco lungo e l etichetta', [true, true],
+       [c.includes('data-cat="consigliati"'),
+        c.includes('<span class="cat-eti">Consigliati</span>')]);
+  dice('...un logo solo, acceso, dal suo file', [[true], [true]],
+       [accesi(), conSrc()]);
+  dice('...pigro e a priorita bassa: la prima apertura e delle foto',
+       [true, true], [immaginiCard()[0].attr.includes('loading="lazy"'),
+                      immaginiCard()[0].attr.includes('fetchpriority="low"')]);
+  dice('...e con un logo solo resta ferma: nessun giro', 0, timer.size);
+  dice('...e l emoji di ripiego segue il logo, adiacente', true,
+       /onerror="this\.remove\(\)">\s*<span class="cat-emoji"/.test(c));
+});
+
+caso('due negozi', () => {
+  sponsorVivo = 'to-the-moon'; consigliatiServer = [BOTTEGA];
+  rifai();
+  dice('con DUE negozi i loghi sono due, il primo acceso',
+       [true, false], accesi());
+  dice('...e alla prima apertura si chiede solo il primo',
+       [[true, false], []], [conSrc(), richieste]);
+  dice('...e il giro parte, ogni tre secondi', [1, 3000],
+       [timer.size, [...timer.values()][0].ms]);
+  giro();
+  dice('al primo giro il secondo logo si CHIEDE, ma non si accende a meta',
+       [['/assets/consigliati/bottega-di-prova.webp'], [true, false]],
+       [richieste, accesi()]);
+  arrivano(); giro();
+  dice('...arrivato, al giro dopo si accende e il primo si spegne',
+       [false, true], accesi());
+  giro();
+  dice('...e il giro torna al primo', [true, false], accesi());
+  dice('...senza chiedere niente due volte', 1, richieste.length);
+});
+
+/* IL LOGO CHE NON ARRIVA si guarda a OGNI giro, e il secondo e' quello
+   che conta: col guasto (acceso senza aspettare) e' li' che il logo
+   vuoto si accende — al terzo il giro tornerebbe al primo per conto suo,
+   e una prova guardata solo in fondo passerebbe per caso (la tortura
+   l'ha presa cosi'). */
+caso('il logo che non arriva', () => {
+  sponsorVivo = 'to-the-moon'; consigliatiServer = [BOTTEGA];
+  rifai();
+  const visti = [];
+  for (let n = 0; n < 3; n++) { giro(); visti.push(accesi()); }
+  dice('un logo che non e ancora arrivato non si accende, a nessun giro',
+       [[true, false], [true, false], [true, false]], visti);
+});
+
+/* CON TRE NEGOZI si vede quel che con due non si puo' vedere: il logo
+   DOPO quello che si accende si chiede nell'istante in cui si accende,
+   cosi' al giro dopo e' pronto e il ritmo resta di tre secondi. */
+caso('tre negozi', () => {
+  sponsorVivo = 'to-the-moon'; consigliatiServer = [BOTTEGA, TERZA];
+  rifai();
+  dice('con TRE negozi i loghi sono tre, e se ne chiede solo il primo',
+       [[true, false, false], [true, false, false]], [accesi(), conSrc()]);
+  giro(); arrivano(); giro();
+  dice('acceso il secondo, il terzo si chiede SUBITO: e il prossimo',
+       [[false, true, false], ['/assets/consigliati/bottega-di-prova.webp',
+        '/assets/consigliati/terza-bottega.webp']], [accesi(), richieste]);
+  arrivano(); giro();
+  dice('...e al giro dopo si accende, senza un giro di attesa',
+       [false, false, true], accesi());
+  giro();
+  dice('...e il giro ricomincia dal primo', [true, false, false], accesi());
+});
+
+caso('fuori dalla home', () => {
+  sponsorVivo = 'to-the-moon'; consigliatiServer = [BOTTEGA];
+  rifai();
+  homeAttiva = false; giro(); giro();
+  dice('fuori dalla home il giro non cambia e non chiede niente',
+       [[true, false], []], [accesi(), richieste]);
+  homeAttiva = true; document.hidden = true; giro(); giro();
+  dice('...e nemmeno a pagina nascosta', [[true, false], []],
+       [accesi(), richieste]);
+});
+
+caso('effetti ridotti', () => {
+  sponsorVivo = 'to-the-moon'; consigliatiServer = [BOTTEGA];
+  ridotti = true;
+  rifai(); giro(); giro(); giro();
+  dice('EFFETTI RIDOTTI: resta il primo, e gli altri loghi non si chiedono',
+       [[true, false], []], [accesi(), richieste]);
+  ridotti = false; giro(); arrivano(); giro();
+  dice('...spenti, il giro riparte', [false, true], accesi());
+  ridotti = true; giro();
+  dice('...e riaccesi a meta giro, la card torna al primo', [true, false],
+       accesi());
+  giro(); giro();
+  dice('...e li resta ferma', [true, false], accesi());
+});
+
+caso('la fila segue la busta', () => {
+  sponsorVivo = 'to-the-moon';
+  rifai();
+  sponsorVivo = ''; renderStriscia();
+  dice('allo spazio scaduto la card se ne va, senza cambiare reparto',
+       false, ordine().includes('/consigliati'));
+  consigliatiServer = [BOTTEGA]; renderStriscia();
+  dice('...e alla pagina pubblicata torna', true,
+       ordine().includes('/consigliati'));
+  dice('...e con un logo solo il giro non c e', 0, timer.size);
+});
+
+caso('le fonti', () => {
+  sponsorVivo = 'to-the-moon';
+  RACCONTI['to-the-moon'].logo = false;
+  dice('lo spazio vivo SENZA logo non entra', [],
+       consigliatiPubblicati().map(v => v.slug));
+  RACCONTI['to-the-moon'].logo = true;
+  RACCONTI['to-the-moon'].negozio = '';
+  dice('...ne senza il codice del negozio', [],
+       consigliatiPubblicati().map(v => v.slug));
+  RACCONTI['to-the-moon'].negozio = CODICE_TTM;
+  sponsorVivo = '';
+  dice('...e scaduto nemmeno: la sua storia se ne va con lui', [],
+       consigliatiPubblicati().map(v => v.slug));
+  consigliatiServer = [{slug: '../fuori', negozio: 'a'},
+                       {slug: 'Maiuscole', negozio: 'a'},
+                       {slug: 'senza-codice', titolo: 'x'},
+                       BOTTEGA, Object.assign({}, BOTTEGA, {negozio: 'zz'}),
+                       null];
+  dice('dalla busta entra solo quel che ha la forma, un codice, una volta',
+       [['bottega-di-prova'], ['cd34ef56']],
+       [consigliatiPubblicati().map(v => v.slug),
+        consigliatiPubblicati().map(v => v.negozio)]);
+  sponsorVivo = 'to-the-moon';
+  dice('...e lo spazio sponsorizzato viene per primo',
+       ['to-the-moon', 'bottega-di-prova'],
+       consigliatiPubblicati().map(v => v.slug));
+});
+
+caso('la pagina', () => {
+  sponsorVivo = 'to-the-moon'; consigliatiServer = [BOTTEGA];
+  renderConsigliati();
+  const h = nodi['consigliatiLista'].innerHTML;
+  const carte = h.split('class="scoprire-card"').slice(1);
+  dice('la pagina mette in fila le card di Da scoprire, una per negozio',
+       ['to-the-moon', 'bottega-di-prova'],
+       carte.map(c => (c.match(/data-slug="([^"]+)"/) || [])[1]));
+  dice('...lo spazio col SUO banner di Da scoprire', true,
+       carte[0].includes('src="/assets/scoprire/to-the-moon.webp"'));
+  dice('...la pagina del server col suo LOGO nella riserva, e il nome',
+       [true, true],
+       [carte[1].includes('class="sc-riserva cons-riserva"')
+        && carte[1].includes('src="/assets/consigliati/bottega-di-prova.webp"'),
+        carte[1].includes('Bottega di prova</span')]);
+  dice('...e su ognuna la pastiglia Consigliato', [true, true],
+       carte.map(c => c.includes('<span class="sc-sponsor" aria-hidden="true">Consigliato</span>')));
+  dice('...coi nomi nell aria-label', [true, true],
+       [carte[0].includes('aria-label="To The Mooon!"'),
+        carte[1].includes('aria-label="Bottega di prova"')]);
+  apriConsigliato('bottega-di-prova'); apriConsigliato('to-the-moon');
+  apriConsigliato('mai-visto');
+  dice('il tocco apre il SUO negozio con la storia aperta, e uno sconosciuto '
+       + 'non apre niente',
+       ['negozio:cd34ef56:aperto', 'negozio:' + CODICE_TTM + ':aperto'],
+       scritte);
+});
+
+caso('la pagina scappa i testi', () => {
+  consigliatiServer = [Object.assign({}, BOTTEGA,
+    {titolo: '<b>x</b>"', emoji: '<i>'})];
+  renderConsigliati();
+  const h = nodi['consigliatiLista'].innerHTML;
+  dice('un titolo col markup esce scappato, ovunque', [false, false, true],
+       [h.includes('<b>'), h.includes('<i>'), h.includes('&lt;b&gt;x&lt;/b&gt;&quot;')]);
+});
+
+caso('la pagina vuota', () => {
+  renderConsigliati();
+  const h = nodi['consigliatiLista'].innerHTML;
+  dice('senza negozi la pagina lo dice invece di restare muta', [true, false],
+       [h.includes('class="cons-vuoto"'), h.includes('scoprire-card')]);
+});
+
+caso('il tocco della card', () => {
+  let fermato = 0;
+  const ev = extra => Object.assign({preventDefault(){ fermato++; }}, extra);
+  apriConsigliatiDaTocco(ev({}));
+  dice('il tocco della card apre la pagina, e il browser non segue il link',
+       [['go:consigliati'], 1], [scritte, fermato]);
+  scritte = []; fermato = 0; premutaFatta = true;
+  apriConsigliatiDaTocco(ev({}));
+  dice('...dopo un tocco lungo il click si consuma e basta',
+       [[], 1, false], [scritte, fermato, premutaFatta]);
+  scritte = []; fermato = 0;
+  apriConsigliatiDaTocco(ev({ctrlKey: true}));
+  dice('...e il ctrl+click resta al browser', [[], 0], [scritte, fermato]);
+});
+
+caso('il tocco lungo', () => {
+  condividiCategoria('consigliati');
+  dice('il tocco lungo condivide /consigliati',
+       ['condividi:https://barattolo.store/consigliati'], scritte);
+  scritte = []; DEMO = true;
+  condividiCategoria('consigliati');
+  dice('...e in DEMO niente, come le sorelle', [], scritte);
+});
+"""
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -86205,6 +86918,7 @@ def main():
               prove_sponsor,
               prove_racconto_girato,
               prove_racconti_bozza,
+              prove_consigliati,
               prove_guardia_is_bot,
               prove_altri_scorrimento, prove_widget, prove_ricerca,
               prove_condivisione_venditore,

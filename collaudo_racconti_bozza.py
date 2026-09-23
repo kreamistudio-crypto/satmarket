@@ -31,7 +31,13 @@ LE PORTE CHE SI BUSSANO, e il verso di ognuna:
     per To The Mooon);
   - il gesto: pubblicare lo fa solo il moderatore e chiede un venditore
     vero; dopo, il racconto esce a chiunque apra QUEL negozio e a
-    nessun altro; tornare in bozza lo toglie di nuovo.
+    nessun altro; tornare in bozza lo toglie di nuovo;
+  - I CONSIGLIATI (set 2026): la busta di prima pagina — quella che
+    riceve chiunque apra la home — porta la pagina solo PUBBLICATA e col
+    LOGO nel catalogo, col codice del negozio risolto e mai il tg_id;
+    in bozza no, nemmeno col logo; e la rotta del logo di una bozza
+    risponde 404. La pagina /consigliati risponde coi suoi meta, senza
+    indicizzarsi e fuori dalla mappa del sito.
 
 IL VENDITORE E' QUELLO VERO DEL CATALOGO, legato col tg_id: l'utente
 nasce qui, sul database usa-e-getta, alla sua prima richiesta, con
@@ -81,6 +87,19 @@ def main():
     def elenco_admin():
         r = c.get("/api/admin/racconti", headers=MODERATORE)
         return {x["slug"]: x for x in r.json()["racconti"]}, r.text
+
+    def consigliati():
+        """la lista dei Consigliati come la riceve chiunque apra la home:
+        la busta di prima pagina, da anonimo, col `limit` che il client
+        manda sempre (senza, la rotta risponde la lista nuda dei client
+        di ieri, e la busta non c'e'); le sole voci di QUESTA pagina, e
+        il testo intero della risposta per le spie"""
+        r = c.get("/api/listings?limit=12", headers=ANONIMO)
+        lista = r.json().get("consigliati")
+        return (r.status_code, isinstance(lista, list),
+                [x for x in (lista or []) if x.get("slug") == SLUG], r.text)
+
+    logo_salvato = cat.get("logo")
 
     print("\n[la porta admin: chi la puo' aprire]")
     prova("l'anonimo prende 401", 401,
@@ -178,6 +197,35 @@ def main():
           (codice, {"trovato": True, "nome": "Manuele"}),
           (lista[SLUG].get("negozio"), lista[SLUG].get("venditore")))
 
+    print("\n[fra i Consigliati: la bozza no]")
+    st, e_lista, mia, testo = consigliati()
+    prova("la busta di prima pagina porta la lista dei Consigliati, e la "
+          "bozza non c'e'", (200, True, [], []),
+          (st, e_lista, mia, trovate(testo)))
+    # IL CASO CHE CONTA: la bozza col suo LOGO gia' nel catalogo — cioe'
+    # pronta in tutto tranne che nella pubblicazione. Resta fuori.
+    cat["logo"] = True
+    st, e_lista, mia, testo = consigliati()
+    prova("...nemmeno col logo nel catalogo: in bozza non entra", ([], []),
+          (mia, trovate(testo)))
+    prova("...e il suo logo non si serve a nessuno", 404,
+          c.get(f"/assets/consigliati/{SLUG}.webp").status_code)
+    cat["logo"] = logo_salvato
+    r = c.get("/assets/consigliati/to-the-moon.webp")
+    prova("il logo dello spazio in vetrina si serve, WebP", (200, True),
+          (r.status_code, r.headers.get("content-type", "").startswith(
+              "image/webp")))
+    prova("...e un nome fuori forma o inventato no", [404, 404],
+          [c.get(f"/assets/consigliati/{n}").status_code
+           for n in ("to-the-moon.png", "mai-visto.webp")])
+    r = c.get("/consigliati")
+    prova("la pagina /consigliati risponde coi suoi meta, e non si "
+          "indicizza", (200, True, True, []),
+          (r.status_code, "Consigliati — Barattolo" in r.text,
+           'content="noindex,follow"' in r.text, trovate(r.text)))
+    prova("...e sta fuori dalla mappa del sito", False,
+          "/consigliati" in c.get("/sitemap.xml").text)
+
     print("\n[il gesto: pubblica]")
     prima = len(banco.AVVISI)
     r = c.post(f"/api/admin/racconti/{SLUG}", headers=MODERATORE,
@@ -213,6 +261,17 @@ def main():
     prova("l'anteprima social del negozio resta quella del brand", [],
           trovate(r.text))
 
+    print("\n[fra i Consigliati: pubblicata, e col logo]")
+    st, e_lista, mia, testo = consigliati()
+    prova("pubblicata ma SENZA logo, fra i Consigliati non entra", [], mia)
+    cat["logo"] = True
+    st, e_lista, mia, testo = consigliati()
+    prova("...col logo si': col codice del negozio risolto, il nome e "
+          "l'emoji", [{"slug": SLUG, "titolo": cat["titolo"],
+                       "emoji": cat["emoji"], "negozio": codice}], mia)
+    prova("...e ne' il tg_id ne' il testo della storia viaggiano", (False, []),
+          (str(TG) in testo, trovate(testo)))
+
     print("\n[il gesto: rimetti in bozza]")
     r = c.post(f"/api/admin/racconti/{SLUG}", headers=MODERATORE,
                json={"esito": "bozza"})
@@ -224,6 +283,9 @@ def main():
     r = c.get("/api/me/racconti", headers=VENDITORE)
     prova("...mentre il venditore la ritrova in bozza dalla sua porta",
           ["bozza"], [x.get("stato") for x in r.json().get("racconti") or []])
+    st, e_lista, mia, testo = consigliati()
+    prova("...e dai Consigliati esce subito, anche col logo", [], mia)
+    cat["logo"] = logo_salvato
 
     print("\n[la precedenza: col codice nel catalogo il tg_id non conta]")
     cat["negozio"] = "00000000"
