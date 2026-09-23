@@ -3373,9 +3373,14 @@
   IL GATE E' IN LETTURA e NESSUNA SCOPA SPEGNE NIENTE — il patto di
   `ferie_fino` e di `lampo_scadenza`: alla scadenza il server smette
   di mandare lo slug nella busta di prima pagina, e la card sparisce
-  da sola, il racconto pure, il banner torna se c'era. Nessuna lapide
-  e nessun 404: chi ha il link `/negozio/{codice}` continua a vedere
-  il negozio, senza racconto. C'e' il censimento che a scrivere sia il
+  da sola. ⚠️ SOLO LEI, dal set 2026 (decisione di Andrea che ROVESCIA
+  «il racconto pure»): la storia in cima al negozio e il posto fra i
+  Consigliati li decide `consigliato` nel catalogo `RACCONTI`, e restano
+  finche' non lo si toglie a mano — vedi «I CONSIGLIATI: LA CARD E LA
+  PAGINA». (Il «banner torna se c'era» che stava qui era gia' falso
+  dall'ago 2026: il banner resta sempre, voce qui sopra; i messaggi del
+  bot che lo ripetevano sono stati riallineati insieme.) Nessuna lapide
+  e nessun 404. C'e' il censimento che a scrivere sia il
   solo comando del bot — un orologio che spegnesse sarebbe uno stato
   in piu' da tenere in pari con la lettura.
   LO STATO VIVE IN `impostazioni` (`sponsor_slug`, `sponsor_fino`), e
@@ -3499,17 +3504,33 @@
   «Una Garlanda: il venditore la vede».
   I CONSIGLIATI: LA CARD E LA PAGINA (set 2026). La categoria annunciata
   qui sopra («UNO ALLA VOLTA» E' LA TAPPA) e' nata come una CARD nella
-  fila delle categorie, subito dopo «Tutto», che fa girare i loghi dei
-  negozi consigliati, e una PAGINA (`view-consigliati`, indirizzo
-  /consigliati) con le card di «Da scoprire» una sotto l'altra; il tocco
-  apre il negozio col racconto aperto (`apriNegozio(codice, true)`).
-  DUE FONTI, UN GIUDICE, `consigliatiPubblicati()`: lo spazio
-  sponsorizzato del catalogo di casa FINCHE' E' VIVO (la sua storia la
-  accende la stessa busta: scaduto, porterebbe a un negozio senza
-  racconto) e le pagine del server PUBBLICATE, che arrivano nella busta
-  di prima pagina (`consigliati`, dal giudice `consigliati_pubblici`:
-  slug, titolo, emoji e il CODICE risolto, mai il tg_id). Per entrare
-  serve anche il LOGO: `logo: true` nel catalogo e il file in
+  fila delle categorie, dopo quella del barattolo e prima dello scambio
+  (ritocco di set 2026: nel primo giro stava subito dopo «Tutto»; senza
+  il barattolo resta seconda), che fa girare i loghi dei negozi
+  consigliati, e una PAGINA (`view-consigliati`, indirizzo
+  /consigliati) con le card di «Da scoprire» una sotto l'altra, SENZA
+  la pastiglia «Consigliato» — la pagina si chiama cosi', e la parola
+  resta dove dichiara, in «Da scoprire»; il tocco apre il negozio col
+  racconto aperto (`apriNegozio(codice, true)`).
+  DUE FONTI, UN GIUDICE, `consigliatiPubblicati()`: le voci del catalogo
+  di casa con `consigliato: true` (col codice negozio e il logo,
+  fail-closed) e le pagine del server PUBBLICATE, che arrivano nella
+  busta di prima pagina (`consigliati`, dal giudice
+  `consigliati_pubblici`: slug, titolo, emoji, il CODICE risolto — mai
+  il tg_id — e `logo_giu`).
+  ⚠️ LO SPAZIO IN VETRINA NON C'ENTRA (set 2026, decisione di Andrea che
+  ROVESCIA il primo giro, dove entrava solo lo spazio vivo): un negozio
+  consigliato resta fra i Consigliati, card e pagina, e con la sua
+  STORIA in cima al negozio — `raccontoDi` non legge piu' `sponsorVivo`,
+  e lo slug per le foto lo porta la voce stessa — finche' non lo si
+  toglie a mano; lo spazio decide solo la card in «Da scoprire».
+  TOGLIERE UN NEGOZIO: per il catalogo di casa `consigliato: false` in
+  `RACCONTI` e un push (esce da card, pagina e storia; la card in «Da
+  scoprire», se lo spazio e' vivo, la spegne `/sponsor spento`); per
+  una pagina del server «📝 Rimetti in bozza» dal pannello — nessuna
+  leva di visibilita' in `racconti.py`, che dice COSA c'e' scritto e
+  mai SE si vede.
+  Per entrare serve anche il LOGO: `logo: true` nel catalogo e il file in
   `assets/consigliati/<slug>.webp`, preparato da
   `prepara_logo_consigliato.py` (ritaglio sopra la soglia 8, 432px che
   sono il 3x dei 144 della card piu' grande, WebP q90 con la
@@ -3518,10 +3539,18 @@
   contrario delle foto, il logo di una bozza non serve all'anteprima.
   LA BOZZA NON HA STRADE: la busta la lascia fuori per chiunque, e
   l'anteprima del moderatore la appende al negozio, mai alla lista.
+  IL RITOCCO DI OGNI LOGO: `logo_giu` nei due cataloghi, in pixel della
+  card del telefono (84px), negativo per salire, clampato a ±12 da tutti
+  e due i lati (un valore che non e' un numero vale zero); il client lo
+  scrive sull'immagine come `--giu` in percento del riquadro del logo
+  (75,6px: sul computer scala con la card) e una regola sola lo applica
+  con `translateY`, fuori dalla transizione. To The Mooon ha 4: il peso
+  del suo disegno sta al 39% dell'altezza, ~5px sopra il centro.
   IL GIRO: solo il primo logo ha il suo `src` (gli altri `data-src`,
   chiesti un giro prima del loro turno) e a `fetchpriority="low"`; il
   timer nasce con due loghi, si riarma a ogni ridisegno della fila
-  (nella cui firma entrano gli slug), e a pagina nascosta o fuori dalla
+  (nella cui firma entrano gli slug e il ritocco di ogni logo — la
+  POSIZIONE no, la scrive il template), e a pagina nascosta o fuori dalla
   home non fa niente. Con gli EFFETTI RIDOTTI (`effettiRidotti()`,
   chiesto a ogni giro) resta il primo e gli altri non si chiedono.
   La pagina e' NOINDEX e fuori dalla sitemap (puo' restare vuota) con
@@ -22019,8 +22048,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   2026, decisione di Andrea): il barattolino di testata era un
   cerchietto da 34px, e col filtro acceso la striscia spariva del
   tutto — adesso è una CARD grande come le altre, seconda della fila
-  ACCANTO a «Tutto» (dal set 2026 terza, quando fra le due c'è la card
-  dei Consigliati), col vetro che continua a riempirsi; il posto in
+  ACCANTO a «Tutto» (nel primo giro dei Consigliati, set 2026, era
+  scesa terza; col loro ritocco è tornata seconda, e i Consigliati
+  vengono dopo di lei), col vetro che continua a riempirsi; il posto in
   testata l'ha preso il PODIO della classifica (la voce sua, sotto
   «LA CLASSIFICA DEL MERCATINO»).
   IL RIEMPIMENTO COSTA QUASI ZERO, ed è ciò che ha deciso la forma:
@@ -22221,7 +22251,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   a 17 mutazioni, tutte uccise una per una.
   LA CARD DELLO SCAMBIO NELLA STRISCIA (set 2026, decisione di
   Andrea): dopo il barattolo, terza della fila (quarta con la card dei
-  Consigliati, che dal set 2026 sta subito dopo «Tutto»), una card come le
+  Consigliati, che dal loro ritocco di set 2026 sta fra il barattolo e
+  lei), una card come le
   altre — stesso `.cat-quad` bruno, stessa `.cat-fig`, stessa
   etichetta sotto — col LOGO COMPLETO del P2P
   (`/assets/p2p-logo-grande.webp` dal 22 set 2026, prima il PNG da

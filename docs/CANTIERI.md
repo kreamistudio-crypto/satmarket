@@ -29200,3 +29200,133 @@ dalla stessa copia).
 
 **COSA RESTA DA GUARDARE.** Il telefono: le note dentro Telegram, nei
 due temi.
+
+## Il ritocco dei Consigliati: dopo il barattolo, il logo al centro, la pagina senza pastiglia, e lo spazio che non decide più (24 set 2026)
+
+**LA RICHIESTA.** Quattro ritocchi a 4f147c7. La card «Consigliati» subito
+dopo «Nel tuo barattolo»; il logo di To The Mooon un poco più giù, perché
+sembri centrato nel quadrato, con una leva per logo nel catalogo; nella
+pagina «Consigliati» niente pastiglia «Consigliato»; e i negozi restano fra
+i Consigliati — card, pagina e storia nel negozio — anche quando la
+sponsorizzazione in «Da scoprire» è finita, con una leva per toglierli a
+mano.
+
+**LE DECISIONI, COI PERCHÉ.**
+- LA POSIZIONE: fra il barattolo e lo scambio. Senza la card del barattolo
+  (DEMO, vetrina anonima, prima di /me) i Consigliati restano secondi: il
+  loro posto è «dopo quel che c'è prima», non un indice. LA FIRMA DELLA
+  FILA non doveva imparare la posizione — la scrive il template, che fra
+  un giro e l'altro non cambia — ma ha imparato il RITOCCO di ogni logo
+  (`slug:giu`): arriva con la busta, può cambiare, ed è markup.
+- IL RITOCCO DEL LOGO è `logo_giu`, nei due cataloghi: pixel della card
+  del telefono (84 px), negativo per salire, tetto ±12, e un valore che
+  non è un numero vale zero (anche un "4" fra virgolette, e un booleano:
+  lo stesso giudice ai due lati, `_logo_giu_consigliato` e
+  `giuLogoConsigliato`). Il client lo scrive sull'immagine come `--giu` in
+  PERCENTO del riquadro del logo (75,6 px), così sul computer scala con la
+  card da 160 invece di restare un ritocco da telefono; una regola sola
+  lo applica con `translateY`, fuori dalla transizione — si muove solo la
+  dissolvenza. TO THE MOOON HA 4, e non a occhio: il baricentro del suo
+  disegno sta al 39% dell'altezza, ~5 px sopra il centro del quadrato.
+  Misurato sullo scatto a densità 3: da 3,8 px sopra il centro a 0,3.
+- LA PAGINA SENZA PASTIGLIA: si chiama «Consigliati», e la parola su ogni
+  card la ripeteva. Resta dove dichiara: in «Da scoprire» (lo spazio) e
+  sulla storia nel negozio.
+- LO SPAZIO IN VETRINA NON DECIDE PIÙ NIENTE QUI, e rovescia due righe del
+  primo giro. La lista (`consigliatiPubblicati`) prende dal catalogo di
+  casa le voci con `consigliato: true` — vero booleano, fail-closed come
+  il codice negozio e il logo — e il giudice della storia (`raccontoDi`)
+  cerca la voce del SUO negozio senza guardare `sponsorVivo`, e le attacca
+  lo slug: serve alle foto, e prima lo prestava lo spazio vivo — a spazio
+  spento sarebbero uscite da `/assets/racconti/-cop.webp`. Lo spazio
+  decide solo la card in «Da scoprire», e quella resta com'era.
+- TOGLIERE UN NEGOZIO DAI CONSIGLIATI: per il catalogo di casa
+  `consigliato: false` nella sua voce di `RACCONTI` e un push — esce dalla
+  card, dalla pagina e dal negozio insieme (la card in «Da scoprire», se
+  lo spazio è vivo, la spegne `/sponsor spento`). Per una pagina del
+  server «📝 Rimetti in bozza» dal pannello, che c'era già: nessuna leva
+  nuova in `racconti.py`, che per regola dice COSA c'è scritto e mai SE si
+  vede — una seconda leva di visibilità sarebbe un secondo giudice da
+  tenere in pari col primo.
+- QUATTRO MESSAGGI DEL BOT — lo stato di `/sponsor`, la conferma,
+  `/sponsor spento` e il preavviso della scadenza — promettevano il
+  contrario («alla scadenza sparisce… il racconto in cima al negozio», «il
+  negozio torna quello di sempre»), e tre portavano anche il banner del
+  venditore «nascosto» o «che torna», falso già dall'ago 2026 (il banner
+  resta sempre). Riscritti tutti e quattro col vero: la card in «Da
+  scoprire» se ne va, storia e posto fra i Consigliati restano.
+
+**LE STRADE SCARTATE.** Una leva `consigliato` anche in `racconti.py`
+(secondo giudice della visibilità); il ritocco in pixel fissi (sul
+computer sarebbe stato mezzo ritocco); animare lo spostamento; una firma
+che porti la posizione della card; lasciare il catalogo di casa legato
+allo spazio vivo per la sola storia (la card avrebbe portato a un negozio
+senza racconto, il difetto che il primo giro evitava tenendolo fuori).
+
+**PROVATO.**
+- `prove_consigliati` (107): la card dopo il barattolo, seconda senza di
+  lui; ogni logo col SUO `--giu` (4 → 5,29%, −3 → −3,97%, 40 → tetto),
+  senza ritocco o con un non-numero al centro; la firma che ridisegna a un
+  ritocco arrivato con la busta; lo spazio che scade senza toccare la
+  fila; le fonti (a spazio acceso e spento uguali, `consigliato` falso o
+  scritto come stringa fuori, senza logo o codice fuori, il catalogo di
+  casa per primo, nessun doppione); la pagina senza pastiglia; il giudice
+  del server con cinque chiavi e il tetto (stringa, booleano, NaN a zero);
+  la leva in ogni voce del catalogo di casa; il verso del logo di To The
+  Mooon; le sentinelle sul codice senza `sponsorVivo`.
+- `prove_racconto_girato`: TRE CASI HANNO CAMBIATO LATO, col perché
+  scritto — la storia a spazio spento c'è, con le foto dalla sua
+  cartella, uguale a spazio acceso; tolta a mano no, e la leva vuole il
+  vero booleano; senza codice negozio non esce da nessuna parte.
+- `prove_sponsor`: i messaggi del bot letti col parser (le stringhe
+  spezzate su più righe le ricuce lui) — i tre che parlano della scadenza
+  dicono che storia e Consigliati restano, e nessuno nomina più il
+  racconto che sparisce né il banner.
+- `collaudo_racconti_bozza.py`: il ritocco viaggia nella busta del server
+  vero (3 → 3).
+- TORTURA 32/32 su una copia fresca, baseline verde (le 1266 prove delle
+  dieci famiglie toccate, più il collaudo): la card che torna dopo «Tutto»
+  o finisce dopo lo scambio, la firma senza ritocco; la lista che rilegge
+  lo spazio, che prende la leva per vera qualunque o la ignora, senza logo
+  o senza codice; la storia che segue lo spazio, ignora la leva, perde lo
+  slug delle foto o esce su un negozio senza codice; il ritocco perso dal
+  catalogo o dalla busta, senza tetto, fidato di una stringa, in pixel
+  invece che in percento, non scritto sull'immagine, non applicato dal CSS
+  o animato; la pastiglia tornata nella pagina; To The Mooon tolto, senza
+  leva o col logo che sale; il server che perde il ritocco, senza tetto,
+  fidato dei booleani o del NaN, o fra virgolette nel catalogo; i due
+  messaggi del bot riportati al testo vecchio. IL PRIMO GIRO HA TROVATO UN DIFETTO DEL BANCO,
+  non del codice: quando una mutazione toglieva la card, il caso che la
+  ritagliava con `[1].split` esplodeva invece di dare le sue rosse — e lo
+  script di tortura non se ne accorgeva, perché l'esplosione sta nella riga
+  «avuto» sotto la prova e non nel suo nome. Curati tutt'e due: i gesti
+  del banco su nodi assenti tornano vuoti (`primaImg`, i ritagli con la
+  guardia) e il classificatore legge anche l'«avuto». Secondo giro: 32/32,
+  zero botti.
+- DAL VIVO sulla copia col config di cartone e i relay morti, lo spazio in
+  vetrina SPENTO e una pagina finta pubblicata col logo: a 375 px la fila è
+  Tutto, Nel tuo barattolo, Consigliati, Scambio P2P nei due temi (Chrome
+  headless a densità 3); il logo di To The Mooon con `--giu:5.29%`, cioè
+  un `translateY` di 4,0 px, e quello della pagina finta a zero; il tocco
+  vero del pane sulla card apre la pagina, due card 343×164 senza
+  pastiglia e nessuno sbordo; il tocco su To The Mooon apre il suo negozio
+  con la storia APERTA e le foto dalla sua cartella, a spazio spento;
+  «← Torna» riporta alla pagina e poi alla home. Acceso lo spazio nel
+  client, la card con la pastiglia torna in «Da scoprire», e fila e lista
+  restano identiche.
+- I CONTI sull'albero rebasato su `8ae33ab` (le note piccole) ed estratto
+  in LF come lo vede la CI, senza config.py: **14299 passate, 0 fallite**
+  con `PROVE_SEVERE=1` e `PYTHONUTF8=1` — le 14271 della base, le 5 delle
+  note e le 23 di qui —; i tredici collaudi della CI verdi nella gabbia
+  senza rete. Il rebase ha avuto un conflitto solo, le due voci in fondo a
+  questo file, tenute tutt'e due.
+
+**DA GUARDARE SUL TELEFONO.**
+- La fila: Tutto, Nel tuo barattolo, Consigliati, Scambio P2P.
+- Il logo di To The Mooon nel quadrato, nei due temi: se ancora sembra
+  alto o già basso, `logo_giu` nella sua voce di `RACCONTI` (3 o 5) e un
+  push — è la leva nata per questo.
+- La pagina «Consigliati» senza pastiglia sulle card.
+- Allo spazio scaduto (o con `/sponsor spento`): To The Mooon resta nella
+  card e nella pagina, e il suo negozio si apre con la storia; in «Da
+  scoprire» la sua card non c'è più.

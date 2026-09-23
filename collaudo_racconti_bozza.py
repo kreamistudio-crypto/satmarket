@@ -265,10 +265,16 @@ def main():
     st, e_lista, mia, testo = consigliati()
     prova("pubblicata ma SENZA logo, fra i Consigliati non entra", [], mia)
     cat["logo"] = True
+    # IL RITOCCO DEL LOGO VIAGGIA CON LUI (set 2026): un valore diverso
+    # dallo zero del catalogo, o la prova non saprebbe dire se esce
+    giu_salvato = cat.get("logo_giu", 0)
+    cat["logo_giu"] = 3
     st, e_lista, mia, testo = consigliati()
-    prova("...col logo si': col codice del negozio risolto, il nome e "
-          "l'emoji", [{"slug": SLUG, "titolo": cat["titolo"],
-                       "emoji": cat["emoji"], "negozio": codice}], mia)
+    prova("...col logo si': col codice del negozio risolto, il nome, "
+          "l'emoji e il ritocco del logo",
+          [{"slug": SLUG, "titolo": cat["titolo"], "emoji": cat["emoji"],
+            "negozio": codice, "logo_giu": 3}], mia)
+    cat["logo_giu"] = giu_salvato
     prova("...e ne' il tg_id ne' il testo della storia viaggiano", (False, []),
           (str(TG) in testo, trovate(testo)))
 

@@ -1850,9 +1850,11 @@ def sponsor_vivo(adesso: int | None = None) -> str:
     """LO SLUG VIVO, o '' — ed e' un GATE IN LETTURA e non un
     interruttore che qualcuno spegne: il pattern di `in_ferie` e delle
     lampo, «la lettura gatea su scadenza, l'orologio fa solo pulizia».
-    Alla scadenza la card sparisce dalla home, il racconto sparisce dal
-    negozio e il banner del venditore torna — SENZA che giri niente, e
-    quindi anche a server fermo per una settimana.
+    Alla scadenza la card sparisce da «Da scoprire» — SENZA che giri
+    niente, e quindi anche a server fermo per una settimana.
+    ⚠️ E SPARISCE SOLO LEI (set 2026, decisione di Andrea): la storia in
+    cima al negozio e il posto fra i Consigliati non seguono piu' lo
+    spazio, li decide `consigliato` nel catalogo `RACCONTI` del client.
 
     LA CACHE TIENE I DUE VALORI, MAI IL VERDETTO: la scadenza si
     confronta a ogni chiamata, o il giudizio resterebbe quello del
@@ -2020,11 +2022,23 @@ def racconto_pubblico(codice: str, tg_id=None) -> dict | None:
     return None
 
 
+def _logo_giu_consigliato(g) -> float:
+    """QUANTO SCENDE UN LOGO nella card «Consigliati» (set 2026), in
+    pixel della card del telefono, negativo per salire: un numero fra
+    -12 e 12, e qualunque altra cosa vale zero — un booleano compreso,
+    che per Python e' un intero ma nel catalogo e' un errore di
+    battitura. Il client lo riclampa per conto suo: diventa markup, e
+    di una busta non ci si fida."""
+    if isinstance(g, bool) or not isinstance(g, (int, float)) or g != g:
+        return 0
+    return max(-12, min(12, g))
+
+
 def consigliati_pubblici(con) -> list:
     """LE PAGINE CHE ENTRANO FRA I CONSIGLIATI (set 2026): la card della
     home e la pagina /consigliati, per chiunque — anche l'anonimo in
-    vetrina. Viaggia nella busta di PRIMA PAGINA accanto allo spazio
-    sponsorizzato, che il client aggiunge da se' dal suo catalogo.
+    vetrina. Viaggia nella busta di PRIMA PAGINA; i negozi del catalogo
+    di casa (To The Mooon) il client li aggiunge da se'.
 
     DUE CONDIZIONI, tutt'e due necessarie: PUBBLICATA (il giudice e'
     `racconto_stato`, lo stesso del negozio) e col LOGO nel catalogo —
@@ -2037,9 +2051,14 @@ def consigliati_pubblici(con) -> list:
     chiunque apra la home, e come `racconto_pubblico` non sa (e non deve
     sapere) chi bussa. Il moderatore la bozza la guarda dalla porta sua.
 
-    Escono quattro chiavi e nessun'altra: lo slug (per il logo), il
-    titolo, l'emoji e il CODICE del negozio RISOLTO — mai il tg_id
-    con cui il catalogo puo' legare la pagina, il patto dei CAMPI_RACCONTO.
+    Escono cinque chiavi e nessun'altra: lo slug (per il logo), il
+    titolo, l'emoji, il CODICE del negozio RISOLTO — mai il tg_id
+    con cui il catalogo puo' legare la pagina, il patto dei CAMPI_RACCONTO
+    — e `logo_giu`, il ritocco del suo logo nel quadrato (set 2026).
+    TOGLIERE UNA PAGINA DAI CONSIGLIATI e' il gesto del moderatore,
+    «📝 Rimetti in bozza»: questo file dice COSA c'e' scritto, lo stato
+    dice SE si vede — e una leva di visibilita' nel catalogo sarebbe un
+    secondo giudice da tenere in pari col primo.
     Senza un negozio vero la pagina non entra (fail-closed: meglio
     nessuna card che una che porta al vuoto).
     Fail-closed anche sul guasto: un ornamento della home non deve poter
@@ -2056,7 +2075,9 @@ def consigliati_pubblici(con) -> list:
                 continue
             fuori.append({"slug": slug, "titolo": r.get("titolo") or "",
                           "emoji": r.get("emoji") or "",
-                          "negozio": v["negozio"]})
+                          "negozio": v["negozio"],
+                          "logo_giu": _logo_giu_consigliato(
+                              r.get("logo_giu"))})
     except Exception as e:
         print(f"⚠️ [consigliati] la lista non si legge: {e}")
         return []
@@ -13773,16 +13794,17 @@ async def comando_sponsor(mittente: dict, testo: str):
         return await bot_api("sendMessage", {"chat_id": chat,
             "text": f"📣 <b>Spazio in vetrina</b>\n{stato}\n\n{voci}\n"
                     "<code>/sponsor spento</code> — lo toglie subito.\n\n"
-                    "Alla scadenza sparisce da solo: la card, il "
-                    "racconto in cima al negozio, e il banner del "
-                    "venditore torna se ce l'aveva.",
+                    "Alla scadenza sparisce da sola la card in «Da "
+                    "scoprire»: la storia in cima al negozio e il "
+                    "posto fra i Consigliati restano.",
             "parse_mode": "HTML", "reply_markup": tastiera_bot()})
     if arg in ("spento", "no", "off"):
         imposta_sponsor("", 0)
         await notifica_admin(f"📣 Spazio in vetrina tolto (da tg {chat})")
         return await bot_api("sendMessage", {"chat_id": chat,
-            "text": "✅ Tolto. In home la card non c'e' piu', e il "
-                    "negozio torna quello di sempre.",
+            "text": "✅ Tolto. La card in «Da scoprire» non c'e' piu'; "
+                    "la storia del negozio e il suo posto fra i "
+                    "Consigliati restano.",
             "reply_markup": tastiera_bot()})
     if arg not in SLUG_SPONSOR:
         return await bot_api("sendMessage", {"chat_id": chat,
@@ -13805,9 +13827,8 @@ async def comando_sponsor(mittente: dict, testo: str):
     await bot_api("sendMessage", {"chat_id": chat,
         "text": f"✅ <b>{arg}</b> e' in vetrina per <b>{giorni}</b> "
                 f"giorni, fino al <b>{_data_sponsor(fino)}</b>.\n"
-                "La card e' in testa a «Da scoprire» e il racconto in "
-                "cima al suo negozio. Il banner del venditore resta "
-                "nascosto finche' dura.",
+                "La card e' in testa a «Da scoprire» e porta al suo "
+                "negozio, con la storia aperta.",
         "parse_mode": "HTML", "reply_markup": tastiera_bot()})
 
 
@@ -52823,9 +52844,9 @@ async def avvisa_scadenza_sponsor():
         f"📣 <b>Lo spazio in vetrina scade {_quando_scade(fino)}.</b>\n"
         f"In vetrina: <b>{slug}</b> — aperto {aperte} volte negli "
         f"ultimi 30 giorni.\n\n"
-        f"Alla scadenza sparisce da solo: la card in «Da scoprire», il "
-        f"racconto in cima al negozio, e il banner del venditore torna "
-        f"se ce l'aveva. Per rinnovare: <code>/sponsor {slug} 30</code>")
+        f"Alla scadenza sparisce da sola la card in «Da scoprire»: la "
+        f"storia in cima al negozio e il posto fra i Consigliati "
+        f"restano. Per rinnovare: <code>/sponsor {slug} 30</code>")
 
 
 async def avvisa_rientro_ferie():

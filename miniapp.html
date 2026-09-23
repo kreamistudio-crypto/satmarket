@@ -1000,6 +1000,14 @@
   .cella-consigliati .cat-fig{inset:5%}
   .cons-logo{opacity:0;transition:opacity .6s ease}
   .cons-logo.attivo{opacity:1}
+  /* IL CENTRO OTTICO DI OGNI LOGO (set 2026): un marchio centrato a
+     riquadro puo' sembrare alto o basso — To The Mooon ha il peso in
+     alto, e nel quadrato pareva salito. Ogni logo porta il suo `--giu`
+     (in percento della SUA altezza, che e' il riquadro: lo scrive
+     cardConsigliati da `logo_giu` del catalogo), e la regola e' una per
+     tutti. Lo spostamento non si anima: la dissolvenza resta la sola
+     cosa che si muove. */
+  .cella-consigliati .cons-logo{transform:translateY(var(--giu,0%))}
   /* La card «Tutto» in TESTA alla fila (ago 2026, decisione di Andrea
      che ROVESCIA il «nessuna card Tutto in piu'» del primo giro) non
      ha regole sue: veste .cat-cella, .cat-quad e l'anello .attiva come
@@ -14388,13 +14396,19 @@ function renderStriscia(){
      stato del barattolo, e in nessun altro caso: le figure non
      lampeggiano. Il LIVELLO del vetro invece non entra: a livellarlo
      in place e' aggiornaBarattolo, senza un giro di render. */
-  /* ...e dice QUALI negozi consigliati ci sono (set 2026): lo spazio in
-     vetrina e le pagine pubblicate arrivano con una busta che puo'
-     cambiare fra un giro e l'altro, e senza questa coda la card non
-     nascerebbe (o non morirebbe) finche' non si cambia reparto. */
+  /* ...e dice QUALI negozi consigliati ci sono (set 2026): le pagine
+     pubblicate arrivano con una busta che puo' cambiare fra un giro e
+     l'altro, e senza questa coda la card non nascerebbe (o non
+     morirebbe) finche' non si cambia reparto. E DOVE STA OGNI LOGO,
+     dal ritocco di set 2026: `logo_giu` di una pagina del server puo'
+     cambiare con la busta, e anche lui e' markup.
+     IL POSTO DELLA CARD NELLA FILA NON C'E', ed e' giusto: lo scrive il
+     template, che fra un giro e l'altro non cambia — quando la card si
+     e' spostata dopo il barattolo, la firma ha dovuto imparare il logo,
+     non la posizione. */
   const firma = voci.join('|') + '#' + activeCat
     + '#' + (jarCard ? 'J' : '') + (vistaBarattolo ? 'B' : '')
-    + '#' + cons.map(v => v.slug).join(',');
+    + '#' + cons.map(v => v.slug + ':' + giuLogoConsigliato(v.giu)).join(',');
   if (firma === strisciaFirma) return;
   strisciaFirma = firma;
   /* La card accesa si porta in vista, che illuminata fuori schermo
@@ -14459,12 +14473,12 @@ function renderStriscia(){
      coming soon, che e' markup fisso e la risposta e' una sola.
      Per la stessa ragione non entra nella `firma`: e' sempre uguale
      a se' stessa. */
-  /* E SUBITO DOPO «TUTTO» LA CARD DEI CONSIGLIATI (set 2026, la
-     posizione proposta da Andrea): la seconda della fila, cioe' nel
-     tratto che a 320px si vede senza scorrere — lo stesso ragionamento
-     dello spazio in vetrina, che in «Da scoprire» sta in testa. Il
-     prezzo e' dichiarato: le card del barattolo e dello scambio scalano
-     di un posto, e a 375px lo scambio resta quarto e quasi intero.
+  /* E FRA IL BARATTOLO E LO SCAMBIO LA CARD DEI CONSIGLIATI (set 2026,
+     ritocco di Andrea che ROVESCIA il «subito dopo Tutto» del primo
+     giro): il barattolo torna accanto a «Tutto», dove stava da agosto —
+     sono le due card che dicono «il mercatino, tutto o solo il tuo» —, e
+     i Consigliati vengono dopo. Senza barattolo (DEMO, vetrina anonima)
+     restano secondi, e a 375px si vedono lo stesso senza scorrere.
      Nasce solo con almeno un negozio (una card che porta a un elenco
      vuoto e' un bottone che porta a un muro), NON si accende mai —
      porta a una pagina, come lo scambio — e la sua fabbrica e'
@@ -14478,14 +14492,14 @@ function renderStriscia(){
            onload="this.dataset.ok=1" onerror="this.remove()"
         ><span class="cat-emoji" aria-hidden="true">🛍️</span></span></span>
       <span class="cat-eti">Tutto</span>
-    </a>` + (cons.length ? cardConsigliati(cons) : '') + (jarCard ? `
+    </a>` + (jarCard ? `
     <a class="cat-cella cella-barattolo${vistaBarattolo ? ' attiva' : ''}" role="button"
        tabindex="0" title="Nel tuo barattolo" aria-label="Nel tuo barattolo"
        aria-pressed="${vistaBarattolo}" onclick="alternaBarattolo()"
        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();alternaBarattolo()}">
       <span class="cat-quad">${jarSVG(livelloBarattolo(contaBarattolo()), 56, 1.15)}</span>
       <span class="cat-eti">Nel tuo barattolo</span>
-    </a>` : '') + `
+    </a>` : '') + (cons.length ? cardConsigliati(cons) : '') + `
     <a class="cat-cella cella-p2p" data-cat="${CAT_P2P}" href="/p2p"
        title="Scambio P2P" aria-label="Scambio P2P"
        onclick="vaiP2PDaTocco(event)">
@@ -14552,16 +14566,38 @@ function renderStriscia(){
    IL CODICE NEGOZIO E' IL LEGAME, e senza non nasce niente: la card
    non compare (`vivo` lo guarda) e il racconto nemmeno. E'
    fail-closed apposta — meglio nessuna card che una card che porta
-   al negozio sbagliato. */
+   al negozio sbagliato.
+   ⚠️ E LA STORIA NON SEGUE PIU' LO SPAZIO (set 2026, decisione di
+   Andrea che ROVESCIA «alla scadenza il racconto sparisce»): ogni voce
+   di qui e' un negozio CONSIGLIATO, che tiene la sua storia e il suo
+   posto fra i Consigliati PER SEMPRE, finche' non lo si toglie a mano
+   con `consigliato: false`. Lo spazio in vetrina (lo slug vivo della
+   busta) decide una cosa sola: la card in «Da scoprire». Il giudice
+   della storia e' `raccontoDi`, quello della lista
+   `consigliatiPubblicati`. */
 const RACCONTI = {
   'to-the-moon': {
     negozio: '1b9a53e6',   /* il codice negozio del venditore */
+    /* CONSIGLIATO (set 2026): true = fra i Consigliati (card e
+       pagina) e con la storia sul suo negozio, a spazio in vetrina
+       acceso o spento. false = TOLTO A MANO: esce dalla card e dalla
+       pagina, e il negozio torna senza storia. La card in «Da scoprire»
+       non lo guarda — la spegne `/sponsor spento` dal bot. Un vero
+       booleano: una voce senza, per il giudice, non e' consigliata. */
+    consigliato: true,
     /* IL LOGO DELLA CARD «CONSIGLIATI» (set 2026): il file e'
        assets/consigliati/to-the-moon.webp, preparato da
        prepara_logo_consigliato.py. Senza, lo spazio vive in «Da
        scoprire» e nel negozio come sempre, ma fra i Consigliati non
        entra: la card fa girare i marchi, e lui non ne avrebbe uno. */
     logo: true,
+    /* QUANTO SCENDE IL LOGO NEL QUADRATO, in pixel della card del
+       telefono (84px; sul computer scala con la card), negativo per
+       salire. Qui 4 e non a occhio: il peso del disegno sta al 39%
+       della sua altezza — la «M» lunga in basso allarga il riquadro
+       senza portare peso —, cioe' 5px sopra il centro, e 4 lo lasciano
+       a un pixel sopra, dove l'occhio mette il centro. */
+    logo_giu: 4,
     /* ⚠️ TRE «O» APPOSTA (confermato da Andrea): e' il nome
        stilizzato del gioco, non un refuso — ed e' la parola piu'
        visibile dello spazio che abbiamo venduto. Chi passa di
@@ -14808,31 +14844,37 @@ function renderScoprire(){
    L'idea annunciata da Andrea col primo spazio in vetrina — «piu'
    avanti una categoria Consigliati dove finiscono i progetti e i negozi
    che segnaliamo noi» — diventa una CARD nella fila delle categorie,
-   subito dopo «Tutto», e una PAGINA. La card fa girare i loghi dei
+   dopo quella del barattolo, e una PAGINA. La card fa girare i loghi dei
    negozi consigliati; la pagina li mette in fila con le card di «Da
    scoprire», e il tocco porta al negozio con la storia aperta, come la
    card dello spazio in vetrina.
-   DUE FONTI, UN GIUDICE: lo spazio sponsorizzato (il catalogo di casa,
-   acceso dalla busta) e le pagine del server pubblicate col logo (dalla
-   stessa busta). Card e pagina chiedono a `consigliatiPubblicati` e a
-   nessun altro: due letture della stessa lista, un giorno, direbbero
-   due elenchi diversi a un tocco di distanza.
+   DUE FONTI, UN GIUDICE: il catalogo di casa (`RACCONTI`, le voci con
+   `consigliato: true`) e le pagine del server pubblicate col logo (dalla
+   busta di prima pagina). Card e pagina chiedono a
+   `consigliatiPubblicati` e a nessun altro: due letture della stessa
+   lista, un giorno, direbbero due elenchi diversi a un tocco di
+   distanza.
+   ⚠️ LO SPAZIO IN VETRINA NON C'ENTRA PIU' (set 2026, decisione di
+   Andrea che ROVESCIA il primo giro, dove qui entrava solo lo spazio
+   vivo): un negozio consigliato resta fra i Consigliati — e con la sua
+   storia, vedi `raccontoDi` — finche' non lo si toglie a mano; lo
+   spazio decide solo la card in «Da scoprire».
    LA BOZZA NON HA STRADE PER ARRIVARE QUI: il server la lascia fuori
    dalla busta, e l'anteprima del moderatore la appende al negozio che
    ha aperto, mai a questa lista. */
 function consigliatiPubblicati(){
   const fuori = [];
-  /* LO SPAZIO IN VETRINA ENTRA FINCHE' E' VIVO, e non oltre: la sua
-     storia nel negozio la accende la stessa busta (`raccontoDi`), quindi
-     dopo la scadenza la card porterebbe a un negozio senza racconto —
-     il contrario di quel che promette. Codice negozio e logo, tutt'e due
-     fail-closed come la card di «Da scoprire». Il banner e' il suo di
-     «Da scoprire», col nome dentro: e' la card che si e' gia' vista. */
-  const r = sponsorVivo ? RACCONTI[sponsorVivo] : null;
-  if (r && r.negozio && r.logo === true)
-    fuori.push({slug: sponsorVivo, titolo: r.titolo || '',
-                emoji: r.emoji || '📣', negozio: r.negozio,
-                banner: sponsorVivo + '.webp'});
+  /* IL CATALOGO DI CASA: ogni voce CONSIGLIATA col suo codice negozio e
+     il suo logo, a spazio in vetrina acceso o spento. Fail-closed come la
+     card di «Da scoprire»: senza codice o senza logo non entra, e
+     `consigliato` vuole il vero booleano. Il banner e' il suo di «Da
+     scoprire», col nome dentro: e' la card che si e' gia' vista in home. */
+  Object.entries(RACCONTI).forEach(([slug, r]) => {
+    if (r.consigliato === true && r.negozio && r.logo === true)
+      fuori.push({slug, titolo: r.titolo || '', emoji: r.emoji || '📣',
+                  negozio: r.negozio, banner: slug + '.webp',
+                  giu: r.logo_giu});
+  });
   /* LE PAGINE DEL SERVER: la busta porta solo le pubblicate col logo, e
      qui si ripassano dalla forma per cintura — lo slug finisce in un
      indirizzo e in un attributo, il codice in una richiesta. */
@@ -14842,11 +14884,25 @@ function consigliatiPubblicati(){
     if (fuori.some(x => x.slug === slug)) return;
     fuori.push({slug, titolo: String(s.titolo || ''),
                 emoji: String(s.emoji || '📣'), negozio: String(s.negozio),
-                banner: ''});
+                banner: '', giu: s.logo_giu});
   });
   return fuori;
 }
 const urlLogoConsigliato = slug => `/assets/consigliati/${slug}.webp`;
+/* QUANTO SCENDE UN LOGO NEL QUADRATO (set 2026): `logo_giu` nel catalogo,
+   in PIXEL DELLA CARD DEL TELEFONO — 84px di quadrato, e il riquadro del
+   logo ne e' il 90% (`inset:5%`), cioe' 75,6 —, negativo per salire. Si
+   scrive in PERCENTO di quel riquadro, cosi' sul computer (card da 160)
+   scala con la card invece di restare un ritocco da telefono. Il tetto
+   di ±12 e' quello di un aggiustamento: oltre non si centra un marchio,
+   lo si spinge fuori. Un valore che non e' un numero vale zero — anche
+   un "4" fra virgolette, come per il giudice del server. */
+const LATO_LOGO_TELEFONO = 75.6;
+const giuLogoConsigliato = px => {
+  const n = (typeof px === 'number' && isFinite(px))
+    ? Math.max(-12, Math.min(12, px)) : 0;
+  return +(n / LATO_LOGO_TELEFONO * 100).toFixed(2);
+};
 
 /* LA CARD NELLA FILA (la chiama renderStriscia): il quadrato bruno e
    l'etichetta delle sorelle, e dentro i LOGHI uno sopra l'altro — si
@@ -14859,7 +14915,8 @@ const urlLogoConsigliato = slug => `/assets/consigliati/${slug}.webp`;
    scambio: /consigliati e' una rotta del server, e il tocco lungo la
    condivide col gesto delle sorelle. L'emoji di ripiego sta dopo
    l'ultimo logo, fratella adiacente: si accende solo quando gli onerror
-   li hanno tolti tutti. */
+   li hanno tolti tutti. Ogni logo porta il SUO `--giu`, che il CSS
+   traduce in uno spostamento: girando, ognuno sta dove gli sta bene. */
 function cardConsigliati(loghi){
   return `
     <a class="cat-cella cella-consigliati" data-cat="${CAT_CONSIGLIATI}" href="/consigliati"
@@ -14867,6 +14924,7 @@ function cardConsigliati(loghi){
        onclick="apriConsigliatiDaTocco(event)">
       <span class="cat-quad"><span class="cat-fig">${loghi.map((v, k) => `<img
            class="cons-logo${k ? '' : ' attivo'}" ${k ? 'data-src' : 'src'}="${urlLogoConsigliato(v.slug)}"
+           style="--giu:${giuLogoConsigliato(v.giu)}%"
            alt="" loading="lazy" decoding="async" fetchpriority="low"
            onerror="this.remove()">`).join('')}<span class="cat-emoji"
            aria-hidden="true">📣</span></span></span>
@@ -14932,15 +14990,19 @@ function apriConsigliati(){ go('consigliati'); }
 
 /* LA PAGINA «Consigliati»: in cima il titolo e la riga di Andrea, sotto
    le card di «Da scoprire» una sotto l'altra — la STESSA card (le sue
-   classi, la riserva, la pastiglia «Consigliato»), non una gemella da
-   tenere in pari. La chiama go(), l'unico posto da cui passano tutte le
-   strade: la card, l'indirizzo /consigliati, il gesto indietro dal
-   negozio e la cronologia.
-   L'IMMAGINE E' IL BANNER quando c'e' (lo spazio sponsorizzato ha il suo,
-   col nome dentro), altrimenti la riserva col LOGO e il nome sul bruno:
-   il logo c'e' per costruzione, e' la condizione per stare qui.
+   classi, la riserva), non una gemella da tenere in pari. La chiama
+   go(), l'unico posto da cui passano tutte le strade: la card,
+   l'indirizzo /consigliati, il gesto indietro dal negozio e la
+   cronologia.
+   ⚠️ SENZA LA PASTIGLIA «Consigliato» (set 2026, decisione di Andrea):
+   qui e' ridondante — la pagina SI CHIAMA cosi', e ogni card la
+   ripeteva. Resta in «Da scoprire», dove la card dello spazio sta in
+   mezzo alle occasioni e la parola e' l'unica che la dichiara.
+   L'IMMAGINE E' IL BANNER quando c'e' (le voci del catalogo di casa hanno
+   il loro, col nome dentro), altrimenti la riserva col LOGO e il nome sul
+   bruno: il logo c'e' per costruzione, e' la condizione per stare qui.
    SENZA NEGOZI la pagina lo dice invece di restare muta: ci si arriva
-   anche dall'indirizzo, e uno spazio scaduto la puo' svuotare. */
+   anche dall'indirizzo, e un negozio tolto a mano la puo' svuotare. */
 function renderConsigliati(){
   const box = el('consigliatiLista');
   if (!box) return;
@@ -14960,7 +15022,7 @@ function renderConsigliati(){
       >` : `<span class="sc-riserva cons-riserva" aria-hidden="true"><img
            src="${urlLogoConsigliato(v.slug)}" alt="" loading="lazy"
            decoding="async" onerror="this.remove()">${esc(v.titolo)}</span
-      >`}<span class="sc-sponsor" aria-hidden="true">Consigliato</span>
+      >`}
     </div>`).join('');
 }
 /* il tocco: il negozio col racconto APERTO, come la card dello spazio in
@@ -16451,20 +16513,30 @@ function apriLinkDescrizione(i){
    (Il razzo se n'e' andato ad ago 2026, decisione di Andrea: non
    piaceva come veniva. Con lui il fumo e il logo che ci saliva.)
    LE PAGINE DEI NEGOZI CONSIGLIATI (set 2026) arrivano DAL SERVER,
-   dentro il profilo del negozio (`v.racconto`), e vengono PRIMA dello
-   spazio sponsorizzato: il server le manda solo pubblicate, e l'unica
+   dentro il profilo del negozio (`v.racconto`), e vengono PRIMA del
+   catalogo di casa: il server le manda solo pubblicate, e l'unica
    bozza che puo' finire qui e' quella che l'anteprima del moderatore
    ci appende a mano, presa dalla porta admin. Il codice si riconfronta
    anche qui, per cintura: se un giorno il server sbagliasse negozio, il
    racconto non uscirebbe su quello di un altro. E SENZA CODICE esce
    SOLO nell'anteprima (la pagina che aspetta il suo venditore): fuori
-   di li' vale il fail-closed dello spazio sponsorizzato. */
+   di li' vale il fail-closed del catalogo di casa.
+   ⚠️ IL CATALOGO DI CASA NON GUARDA PIU' LO SPAZIO VIVO (set 2026,
+   decisione di Andrea): un negozio CONSIGLIATO tiene la storia per
+   sempre, finche' non lo si toglie a mano (`consigliato: false`), e lo
+   spazio in vetrina decide solo la card in «Da scoprire». Prima qui si
+   leggeva `RACCONTI[sponsorVivo]`, e a spazio scaduto la card dei
+   Consigliati avrebbe portato a un negozio senza storia. Si cerca la
+   voce del SUO negozio — il codice resta il legame, fail-closed — e
+   la si restituisce con lo slug dentro, che serve alle foto: prima lo
+   prestava `sponsorVivo`, che a spazio spento e' vuoto. */
 function raccontoDi(v){
   const s = v && v.racconto;
   if (s && (s.negozio || s.anteprima)
         && s.negozio === (v.negozio || '')) return s;
-  const r = sponsorVivo ? RACCONTI[sponsorVivo] : null;
-  return (r && r.negozio && v && r.negozio === v.negozio) ? r : null;
+  const voce = (v && v.negozio) ? Object.entries(RACCONTI).find(([, r]) =>
+    r.negozio && r.consigliato === true && r.negozio === v.negozio) : null;
+  return voce ? Object.assign({slug: voce[0]}, voce[1]) : null;
 }
 
 function raccontoNegozio(v){
@@ -16473,11 +16545,12 @@ function raccontoNegozio(v){
   /* `q` e non `n`: la forma della whitelist del server ammette
      `{slug}-cop` accanto a `{slug}-1..9`, e la copertina passa di
      qui come le altre invece di costruirsi un secondo URL.
-     LO SLUG E' QUELLO DEL RACCONTO quando ce l'ha (set 2026): le
-     pagine dei negozi consigliati arrivano dal server col loro, e non
-     sono lo spazio sponsorizzato. `sponsorVivo` resta per il catalogo
-     di casa, dove la chiave E' lo slug. */
-  const slug = r.slug || sponsorVivo;
+     LO SLUG E' QUELLO DEL RACCONTO (set 2026): le pagine del server
+     arrivano col loro, e quelle del catalogo di casa lo ricevono dal
+     giudice, che lo prende dalla chiave della voce. Prima lo prestava
+     `sponsorVivo`, che da quando la storia non segue lo spazio puo'
+     essere vuoto: le foto sarebbero uscite senza cartella. */
+  const slug = r.slug;
   const foto = q => `/assets/racconti/${slug}-${q}.webp`;
   /* LE FOTO CHE NON SONO ANCORA ARRIVATE (set 2026): `foto: false`
      nel racconto. Chi guarda non vede nessun riquadro — la storia esce

@@ -40749,6 +40749,23 @@ def prove_sponsor():
     prova("il preavviso resta relativo", (2, 0),
           (_pre.count("_quando_scade(fino)"),
            _pre.count("_data_sponsor(")))
+    # ...E I MESSAGGI DEL BOT DICONO QUEL CHE SUCCEDE (set 2026): dal
+    # ritocco dei Consigliati allo spazio che scade se ne va SOLO la card
+    # in «Da scoprire» — la storia e il posto fra i Consigliati restano —
+    # e il banner del venditore non sparisce da ago 2026. Tre messaggi lo
+    # promettevano, e un messaggio che promette il falso a chi decide di
+    # rinnovare e' peggio di nessun messaggio. Si leggono i TESTI veri,
+    # col parser: le stringhe spezzate su piu' righe il parser le ricuce.
+    import ast as _ast
+    _testi = " ".join(
+        n.value for nome in ("comando_sponsor", "avvisa_scadenza_sponsor")
+        for n in _ast.walk(_ast.parse(pezzo(nome)))
+        if isinstance(n, _ast.Constant) and isinstance(n.value, str))
+    prova("i messaggi dello spazio dicono che storia e Consigliati restano",
+          (3, False, False, False),
+          (_testi.count("posto fra i Consigliati restano"),
+           "racconto in cima" in _testi, "quello di sempre" in _testi,
+           "banner del venditore" in _testi))
     # IL TETTO AMMETTE UN BIMESTRE (chiesto da Andrea: «vorrei poter
     # mettere 60»). Non e' un numero da ribattere qui — si legge dal
     # server — ma la domanda va fatta: un tetto che scendesse sotto i
@@ -41453,23 +41470,42 @@ const slug = Object.keys(RACCONTI)[0];
 const mio = {negozio: 'ab12cd34'};
 const altro = {negozio: 'ff99ee88'};
 
-// 1. IL GATE: senza spazio venduto non esce niente, su nessun
-// negozio. E' la stessa domanda della card, dall'altro lato.
+// 1. ⚠️ LA STORIA NON SEGUE LO SPAZIO (set 2026, decisione di Andrea
+// che ROVESCIA il gate di ago 2026, dove qui c'era «senza spazio
+// venduto il negozio e quello di sempre»): a spazio in vetrina SPENTO
+// il negozio consigliato ha la sua storia, con le foto dalla SUA
+// cartella — lo slug prima lo prestava lo spazio vivo, e a spazio
+// spento le foto sarebbero uscite senza nome.
+RACCONTI[slug].negozio = 'ab12cd34';
 sponsorVivo = '';
-dice('senza spazio venduto il negozio e quello di sempre', '',
-     raccontoNegozio(mio));
-
-// 2. FAIL-CLOSED: lo slug c'e' ma il catalogo non ha ancora il
-// codice negozio (si riempie a mano quando lo spazio si vende).
-// Qui il catalogo e' quello VERO: e' lui a dirlo.
+const r = raccontoNegozio(mio);
+dice('a spazio in vetrina spento il negozio consigliato ha la sua storia',
+     true, r.length > 200);
+dice('...con le foto dalla sua cartella', [true, false],
+     [r.includes('/assets/racconti/' + slug + '-cop.webp'),
+      r.includes('/assets/racconti/-')]);
 sponsorVivo = slug;
-dice('...e senza codice negozio nemmeno', '', raccontoNegozio(mio));
+dice('...e a spazio acceso la stessa, parola per parola', true,
+     raccontoNegozio(mio) === r);
+sponsorVivo = '';
 
-// 3. ...e col codice esce SOLO sul suo negozio.
+// 2. TOLTO A MANO: `consigliato: false` spegne la storia, e la leva
+// vuole il vero booleano — una stringa non accende niente.
+RACCONTI[slug].consigliato = false;
+dice('tolto dai Consigliati, il negozio e quello di sempre', '',
+     raccontoNegozio(mio));
+RACCONTI[slug].consigliato = 'true';
+dice('...e la leva vuole il vero booleano', '', raccontoNegozio(mio));
+RACCONTI[slug].consigliato = true;
+
+// 3. FAIL-CLOSED: senza codice negozio non esce da nessuna parte —
+// nemmeno su un negozio che il codice non ce l'ha — e col codice SOLO
+// sul suo. Qui il catalogo e' quello VERO: e' lui a dirlo.
+RACCONTI[slug].negozio = '';
+dice('senza codice negozio non esce', ['', ''],
+     [raccontoNegozio(mio), raccontoNegozio({negozio: ''})]);
 RACCONTI[slug].negozio = 'ab12cd34';
 dice('su un altro negozio non esce', '', raccontoNegozio(altro));
-const r = raccontoNegozio(mio);
-dice('sul suo negozio esce', true, r.length > 200);
 
 // 4. LA DICHIARAZIONE C'E', ed e' la PASTIGLIA e basta. ⚠️ La riga
 // in chiaro se n'e' andata (ago 2026, decisione di Andrea) e la
@@ -41966,13 +42002,14 @@ for (const slug of Object.keys(CAT)) {
         cattivo.includes('<i>x</i>')]);
 }
 
-// 8. E LO SPAZIO SPONSORIZZATO RESTA QUELLO DI SEMPRE: senza pagina
-// del server il giudice ricade sul catalogo di casa, pastiglia 📣
+// 8. E IL CATALOGO DI CASA RESTA QUELLO DI SEMPRE: senza pagina del
+// server il giudice ricade su di lui, pastiglia 📣 — a spazio in
+// vetrina SPENTO, che dal set 2026 la storia non la decide piu'
 const s0 = Object.keys(RACCONTI)[0];
-sponsorVivo = s0;
+sponsorVivo = '';
 RACCONTI[s0].negozio = 'cc11dd22';
 const tm = raccontoNegozio({negozio: 'cc11dd22'});
-dice('lo spazio sponsorizzato esce ancora dal catalogo di casa', true,
+dice('il negozio consigliato esce ancora dal catalogo di casa', true,
      tm.includes('<span class="rac-pill">📣 Consigliato</span>'));
 dice('...con le sue foto dalla sua cartella', true,
      tm.includes('/assets/racconti/' + s0 + '-cop.webp'));
@@ -87110,9 +87147,13 @@ def prove_consigliati():
 
     L'idea annunciata da Andrea col primo spazio in vetrina — una
     categoria dove finiscono i negozi che segnaliamo noi — diventa una
-    card nella fila delle categorie, subito dopo «Tutto», che fa girare
-    i loghi dei negozi consigliati PUBBLICATI, e una pagina che li mette
-    in fila con le card di «Da scoprire».
+    card nella fila delle categorie, dopo quella del barattolo, che fa
+    girare i loghi dei negozi consigliati PUBBLICATI, e una pagina che li
+    mette in fila con le card di «Da scoprire».
+    IL RITOCCO (set 2026): la card si sposta dopo il barattolo, ogni logo
+    ha il suo `logo_giu`, la pagina perde la pastiglia, e lo spazio in
+    vetrina non decide piu' niente qui — un negozio consigliato resta fra
+    i Consigliati, con la sua storia, finche' non lo si toglie a mano.
 
     Qui si prova quel che si rompe in silenzio:
     1) la BOZZA non entra mai: il giudice del server GIRATO su un
@@ -87187,7 +87228,7 @@ def _consigliati_giudice(src, mini, _pz):
     finta = {"titolo": "Bottega di prova", "emoji": "🌾", "sottotitolo": "S",
              "intro": "I", "foto": False, "blocchi": [], "logo": True,
              "negozio": "", "venditore_tg": 525}
-    cat = {"pubblicata": dict(finta),
+    cat = {"pubblicata": dict(finta, logo_giu=3),
            "bozza": dict(finta),
            "senza-logo": dict(finta, logo=False),
            # il logo e' un VERO booleano: una stringa non accende niente
@@ -87201,7 +87242,7 @@ def _consigliati_giudice(src, mini, _pz):
 
     amb = {"impostazione": _imp, "RACCONTI_NEGOZI": cat}
     for nome in ("racconto_stato", "_venditore_racconto",
-                 "consigliati_pubblici"):
+                 "_logo_giu_consigliato", "consigliati_pubblici"):
         exec(_pz(src, f"def {nome}(", "\n\n\n"), amb)
     cons = amb["consigliati_pubblici"]
     for s in ("pubblicata", "senza-logo", "logo-scritto", "orfana",
@@ -87213,9 +87254,21 @@ def _consigliati_giudice(src, mini, _pz):
           [x["slug"] for x in fuori])
     prova("...e la BOZZA col suo logo resta fuori", False,
           any(x["slug"] == "bozza" for x in fuori))
-    prova("...con quattro chiavi e nessun'altra",
-          [["emoji", "negozio", "slug", "titolo"]] * 2,
+    prova("...con cinque chiavi e nessun'altra",
+          [["emoji", "logo_giu", "negozio", "slug", "titolo"]] * 2,
           [sorted(x) for x in fuori])
+    # IL RITOCCO DEL LOGO (set 2026): esce quel che il catalogo dice, e
+    # senza la chiave vale zero — il logo sta dove lo mette il riquadro
+    prova("...col ritocco del logo dal catalogo, zero se non c'e'", [3, 0],
+          [x.get("logo_giu") for x in fuori])
+    # ...E SI FIDA SOLO DI UN NUMERO, e con un tetto: una stringa, un
+    # booleano (che per Python e' un intero) e un NaN valgono zero, e un
+    # numero oltre ±12 si ferma li'
+    _giu = amb["_logo_giu_consigliato"]
+    prova("...un numero fra -12 e 12, e qualunque altra cosa zero",
+          [3, -2.5, 12, -12, 0, 0, 0, 0],
+          [_giu(3), _giu(-2.5), _giu(40), _giu(-99), _giu("4"), _giu(True),
+           _giu(None), _giu(float("nan"))])
     prova("...col codice del negozio RISOLTO, e il tg_id a casa",
           ("ab12cd34", False),
           ((fuori[0] if fuori else {}).get("negozio"),
@@ -87262,9 +87315,9 @@ def _consigliati_rotte(src, mini, _pz):
           '@app.get("/consigliati")' in src
           and "return _pagina_con_meta(TESTA_CONSIGLIATI, TITOLO_CONSIGLIATI)"
           in src)
-    # NOINDEX: la pagina puo' restare vuota (lo spazio scade da solo), e
-    # un risultato che porta a un elenco vuoto e' il danno che il noindex
-    # evita. Fuori dalla sitemap per la stessa ragione.
+    # NOINDEX: la pagina puo' restare vuota (un negozio tolto a mano la
+    # svuota), e un risultato che porta a un elenco vuoto e' il danno che
+    # il noindex evita. Fuori dalla sitemap per la stessa ragione.
     prova("...non si indicizza, e resta fuori dalla sitemap", True,
           bool(re.search(r"TESTA_CONSIGLIATI = _testa_seo\([^)]*"
                          r"indicizza=False\)", src))
@@ -87330,13 +87383,40 @@ def _consigliati_file(src, mini, _pz):
     CAT = importlib.reload(_rac).RACCONTI_NEGOZI
     prova("il logo del catalogo del server e' un vero booleano", [],
           [s for s, r in CAT.items() if not isinstance(r.get("logo"), bool)])
+    # IL RITOCCO DEL LOGO (set 2026) e' un NUMERO dentro il suo tetto: fra
+    # virgolette o fuori misura il giudice lo butterebbe a zero, e il logo
+    # tornerebbe al centro del riquadro senza che niente lo dica
+    prova("...e il suo ritocco, se c'e', un numero fra -12 e 12", [],
+          [s for s, r in CAT.items() if "logo_giu" in r
+           and (isinstance(r["logo_giu"], bool)
+                or not isinstance(r["logo_giu"], (int, float))
+                or not -12 <= r["logo_giu"] <= 12)])
     _cc = _pz(mini, "const RACCONTI = {", "\n};")
     _voci = list(re.finditer(r"^  '([a-z0-9-]+)': \{", _cc, re.M))
-    loghi_client = []
+    loghi_client, consigliate, giu_client = [], {}, {}
     for n, m in enumerate(_voci):
         fine = _voci[n + 1].start() if n + 1 < len(_voci) else len(_cc)
-        if re.search(r"^    logo: true,", _cc[m.start():fine], re.M):
+        _vc = _cc[m.start():fine]
+        if re.search(r"^    logo: true,", _vc, re.M):
             loghi_client.append(m.group(1))
+        _m = re.search(r"^    consigliato: (\w+),", _vc, re.M)
+        consigliate[m.group(1)] = _m.group(1) if _m else None
+        _g = re.search(r"^    logo_giu: (-?\d+(?:\.\d+)?),", _vc, re.M)
+        giu_client[m.group(1)] = float(_g.group(1)) if _g else None
+    # LA LEVA PER TOGLIERE UN NEGOZIO DAI CONSIGLIATI (set 2026) e' scritta
+    # in OGNI voce del catalogo di casa, col vero booleano: una voce senza,
+    # per il giudice, non e' consigliata — e sparirebbe dalla card, dalla
+    # pagina e dal suo negozio senza che nessuno l'abbia deciso
+    prova("ogni voce del catalogo di casa dice se e' consigliata, col vero "
+          "booleano", [], [s for s, v in consigliate.items()
+                           if v not in ("true", "false")])
+    prova("...e To The Mooon lo e'", "true", consigliate.get("to-the-moon"))
+    # ...E IL LOGO DI TO THE MOOON SCENDE (chiesto da Andrea): il suo peso
+    # sta in alto, e centrato a riquadro nel quadrato pareva salito. Non si
+    # inchioda QUANTO — e' una taratura — ma il verso e il tetto si'
+    _gt = giu_client.get("to-the-moon")
+    prova("...col logo che scende nel quadrato, dentro il tetto", True,
+          _gt is not None and 0 < _gt <= 12)
     loghi_server = [s for s, r in CAT.items() if r.get("logo") is True]
     cartella = os.path.join("assets", "consigliati")
     presenti = sorted(f[:-5] for f in os.listdir(cartella)
@@ -87362,7 +87442,7 @@ def _consigliati_file(src, mini, _pz):
               f"432px e sotto i 50 KB", (["VP8X", "ALPH", "VP8 "], True,
                                          True),
               (pezzi, 0 < lato <= 432, len(raw) < 50000))
-    # LO SPAZIO SPONSORIZZATO nella pagina porta il banner di «Da
+    # LE VOCI DEL CATALOGO DI CASA nella pagina portano il banner di «Da
     # scoprire»: deve esistere, e la rotta deve servirlo
     _fs = re.search(r"^FILE_SCOPRIRE = \(([^)]*)\)", src, re.M)
     for s in loghi_client:
@@ -87376,20 +87456,38 @@ def _consigliati_file(src, mini, _pz):
 def _consigliati_porte(src, mini, _pz):
     """4. LE PORTE DEL CLIENT, con le sentinelle."""
     st = _pz(mini, "function renderStriscia(){", "\n}\n")
-    prova("la card sta subito dopo «Tutto», prima del barattolo e dello "
-          "scambio", True,
-          0 <= st.find("urlIllustrazione('Tutto')")
-          < st.find("cardConsigliati(cons)") < st.find("cella-barattolo")
-          < st.find("cella-p2p"))
+    # ⚠️ PROVA CHE HA CAMBIATO POSTO (set 2026, ritocco di Andrea): chiedeva
+    # la card subito dopo «Tutto», adesso la vuole dopo il barattolo — che
+    # torna accanto a «Tutto» — e prima dello scambio. L'ordine VERO lo
+    # dice il banco, che legge la fila disegnata; questa guarda il template
+    st_tpl = st[st.find("el('catStrip').innerHTML = `"):]
+    prova("la card sta dopo il barattolo e prima dello scambio", True,
+          0 <= st_tpl.find("urlIllustrazione('Tutto')")
+          < st_tpl.find("cella-barattolo") < st_tpl.find("cardConsigliati(cons)")
+          < st_tpl.find("cella-p2p"))
     prova("...la lista viene dal giudice unico, e la card nasce solo con "
           "un negozio", (True, True),
           ("const cons = consigliatiPubblicati();" in st,
            "(cons.length ? cardConsigliati(cons) : '')" in st))
-    prova("...la firma della fila dice QUALI negozi ci sono", True,
-          "+ '#' + cons.map(v => v.slug).join(',')" in st)
+    # LA FIRMA DICE QUALI NEGOZI E DOVE STA OGNI LOGO: un `logo_giu`
+    # cambiato con la busta e' markup, e con la firma di ieri la card
+    # resterebbe col logo al posto vecchio finche' non si cambia reparto
+    prova("...la firma della fila dice QUALI negozi ci sono, e dove sta "
+          "ogni logo", True,
+          "+ '#' + cons.map(v => v.slug + ':' + giuLogoConsigliato(v.giu))"
+          ".join(',')" in st)
     prova("...e il giro si riarma DOPO il disegno", True,
           0 <= st.find("el('catStrip').innerHTML = `")
           < st.find("armaGiroConsigliati(cons.length);"))
+    # ...E LO SPAZIO IN VETRINA NON C'ENTRA (set 2026, decisione di
+    # Andrea): il giudice della lista e quello della storia non lo leggono
+    # piu', nel CODICE — la prosa che racconta il rovescio lo puo' nominare
+    prova("il giudice della lista e quello della storia non guardano lo "
+          "spazio in vetrina", (False, False),
+          ("sponsorVivo" in _senza_commenti_js(
+              _pz(mini, "function consigliatiPubblicati(){", "\n}\n")),
+           "sponsorVivo" in _senza_commenti_js(
+              _pz(mini, "function raccontoDi(v){", "\n}\n"))))
     _js = _senza_commenti_js(mini[mini.find("</style>"):]
                              .replace("image/*", "image/STELLA"))
     prova("la lista del server ha due scrittori soli: la nascita e la "
@@ -87448,6 +87546,16 @@ def _consigliati_porte(src, mini, _pz):
           (".cons-logo{opacity:0;transition:opacity .6s ease}" in css,
            ".cons-logo.attivo{opacity:1}" in css,
            ".cella-consigliati .cat-fig{inset:5%}" in css))
+    # IL RITOCCO DI OGNI LOGO LO APPLICA UNA REGOLA SOLA, dalla variabile
+    # che cardConsigliati scrive sull'immagine; e lo spostamento non entra
+    # nella transizione, che resta della sola opacita': un logo che scivola
+    # mentre compare si leggerebbe come un'animazione in piu' nella fila
+    _rc = _pz(css, ".cons-logo{", "}")
+    _rg = _pz(css, ".cella-consigliati .cons-logo{", "}")
+    prova("...e lo spostamento di ogni logo viene dalla sua variabile, e non "
+          "si anima", (True, False, False),
+          (".cella-consigliati .cons-logo{transform:translateY(var(--giu,0%))}"
+           in css, "transform" in _rc, "transition" in _rg))
     prova("la pagina allarga la card di «Da scoprire», non ne fa una "
           "gemella", True, "#consigliatiLista .scoprire-card{width:100%}" in css)
 
@@ -87576,10 +87684,13 @@ function dice(che, atteso, avuto){
     + ', avuto ' + JSON.stringify(avuto)) + '|' + che);
 }
 /* OGNI CASO E' SOLO: il suo stato di partenza, e un'esplosione diventa
-   una riga col suo nome invece di portarsi via le sorelle */
+   una riga col suo nome invece di portarsi via le sorelle. La voce di
+   To The Mooon si rimette com'e' nel catalogo VERO: i casi la toccano */
+const TTM0 = JSON.stringify(RACCONTI['to-the-moon']);
 function caso(nome, f){
   sponsorVivo = ''; consigliatiServer = []; ridotti = false;
-  homeAttiva = true; document.hidden = false; DEMO = false;
+  RACCONTI['to-the-moon'] = JSON.parse(TTM0);
+  homeAttiva = true; document.hidden = false; DEMO = false; myTgId = 111;
   premutaFatta = false; richieste = []; scritte = [];
   timer.clear(); htmlVisto = null;
   try { f(); } catch (e) { console.log('ESPLOSO: ' + e.message + '|' + nome); }
@@ -87592,6 +87703,9 @@ const accesi = () => immaginiCard().map(x => x.classList.contains('attivo'));
 const conSrc = () => immaginiCard().map(x => !!x.getAttribute('src'));
 const giro = () => { for (const t of timer.values()) t.f(); };
 const arrivano = () => immaginiCard().forEach(x => { if (x._src) x.arrivata = true; });
+/* i gesti su nodi assenti tornano vuoti: una card che una mutazione toglie
+   deve dare una rossa col suo nome, non far esplodere il caso */
+const primaImg = () => immaginiCard()[0] || {attr: ''};
 const BOTTEGA = {slug: 'bottega-di-prova', titolo: 'Bottega di prova',
                  emoji: '🌾', negozio: 'cd34ef56'};
 const TERZA = {slug: 'terza-bottega', titolo: 'Terza bottega',
@@ -87599,6 +87713,7 @@ const TERZA = {slug: 'terza-bottega', titolo: 'Terza bottega',
 const CODICE_TTM = RACCONTI['to-the-moon'].negozio;
 
 caso('senza negozi consigliati la card non nasce', () => {
+  RACCONTI['to-the-moon'].consigliato = false;
   rifai();
   dice('senza negozi consigliati la card non nasce',
        ['/', 'barattolo', '/p2p', '/categoria/bitcoin',
@@ -87606,13 +87721,17 @@ caso('senza negozi consigliati la card non nasce', () => {
   dice('...e nessun giro parte', 0, timer.size);
 });
 
+/* ⚠️ IL POSTO HA CAMBIATO (set 2026, ritocco di Andrea): la card era la
+   seconda, subito dopo Tutto; adesso viene DOPO IL BARATTOLO, che torna
+   accanto a Tutto, e prima dello scambio. E il caso gira a spazio in
+   vetrina SPENTO: To The Mooon c'e' perche' e' consigliato, non perche'
+   lo spazio e' vivo. */
 caso('un negozio', () => {
-  sponsorVivo = 'to-the-moon';
   rifai();
-  dice('con UN negozio la card e la seconda della fila, subito dopo Tutto',
-       ['/', '/consigliati', 'barattolo', '/p2p', '/categoria/bitcoin',
+  dice('con UN negozio la card viene dopo il barattolo e prima dello scambio',
+       ['/', 'barattolo', '/consigliati', '/p2p', '/categoria/bitcoin',
         '/categoria/libri-e-media'], ordine());
-  const c = nodi['catStrip'].innerHTML.split('cella-consigliati')[1]
+  const c = (nodi['catStrip'].innerHTML.split('cella-consigliati')[1] || '')
     .split('</a>')[0];
   dice('...col suo data-cat per il tocco lungo e l etichetta', [true, true],
        [c.includes('data-cat="consigliati"'),
@@ -87620,22 +87739,55 @@ caso('un negozio', () => {
   dice('...un logo solo, acceso, dal suo file', [[true], [true]],
        [accesi(), conSrc()]);
   dice('...pigro e a priorita bassa: la prima apertura e delle foto',
-       [true, true], [immaginiCard()[0].attr.includes('loading="lazy"'),
-                      immaginiCard()[0].attr.includes('fetchpriority="low"')]);
+       [true, true], [primaImg().attr.includes('loading="lazy"'),
+                      primaImg().attr.includes('fetchpriority="low"')]);
   dice('...e con un logo solo resta ferma: nessun giro', 0, timer.size);
   dice('...e l emoji di ripiego segue il logo, adiacente', true,
        /onerror="this\.remove\(\)">\s*<span class="cat-emoji"/.test(c));
 });
 
+/* SENZA LA CARD DEL BARATTOLO (DEMO, vetrina anonima, prima di /me) i
+   Consigliati restano secondi: il loro posto e' «dopo quel che c'e'
+   prima», non un indice. */
+caso('senza il barattolo', () => {
+  myTgId = 0;
+  rifai();
+  dice('senza la card del barattolo la card resta seconda, subito dopo Tutto',
+       ['/', '/consigliati', '/p2p', '/categoria/bitcoin',
+        '/categoria/libri-e-media'], ordine());
+});
+
+/* IL RITOCCO DI OGNI LOGO: `logo_giu` in pixel della card del telefono
+   diventa un percento del riquadro del logo (75,6px), scritto sulla SUA
+   immagine. I valori si fissano qui e non si leggono dal catalogo: la
+   taratura di To The Mooon puo' cambiare, la regola no. */
+caso('il logo scende', () => {
+  RACCONTI['to-the-moon'].logo_giu = 4;
+  consigliatiServer = [Object.assign({}, BOTTEGA, {logo_giu: -3}),
+                       Object.assign({}, TERZA, {logo_giu: 40})];
+  rifai();
+  const stili = () => immaginiCard().map(x =>
+    (x.attr.match(/style="([^"]*)"/) || [])[1]);
+  dice('ogni logo porta il SUO spostamento, in percento del riquadro, col '
+       + 'tetto di 12px', ['--giu:5.29%', '--giu:-3.97%', '--giu:15.87%'],
+       stili());
+  delete RACCONTI['to-the-moon'].logo_giu;
+  consigliatiServer = [Object.assign({}, BOTTEGA, {logo_giu: '4'}),
+                       Object.assign({}, TERZA, {logo_giu: true})];
+  rifai();
+  dice('...e senza ritocco, o con uno che non e un numero, sta al centro',
+       ['--giu:0%', '--giu:0%', '--giu:0%'], stili());
+});
+
 caso('due negozi', () => {
-  sponsorVivo = 'to-the-moon'; consigliatiServer = [BOTTEGA];
+  consigliatiServer = [BOTTEGA];
   rifai();
   dice('con DUE negozi i loghi sono due, il primo acceso',
        [true, false], accesi());
   dice('...e alla prima apertura si chiede solo il primo',
        [[true, false], []], [conSrc(), richieste]);
   dice('...e il giro parte, ogni tre secondi', [1, 3000],
-       [timer.size, [...timer.values()][0].ms]);
+       [timer.size, ([...timer.values()][0] || {}).ms]);
   giro();
   dice('al primo giro il secondo logo si CHIEDE, ma non si accende a meta',
        [['/assets/consigliati/bottega-di-prova.webp'], [true, false]],
@@ -87654,7 +87806,7 @@ caso('due negozi', () => {
    e una prova guardata solo in fondo passerebbe per caso (la tortura
    l'ha presa cosi'). */
 caso('il logo che non arriva', () => {
-  sponsorVivo = 'to-the-moon'; consigliatiServer = [BOTTEGA];
+  consigliatiServer = [BOTTEGA];
   rifai();
   const visti = [];
   for (let n = 0; n < 3; n++) { giro(); visti.push(accesi()); }
@@ -87666,7 +87818,7 @@ caso('il logo che non arriva', () => {
    DOPO quello che si accende si chiede nell'istante in cui si accende,
    cosi' al giro dopo e' pronto e il ritmo resta di tre secondi. */
 caso('tre negozi', () => {
-  sponsorVivo = 'to-the-moon'; consigliatiServer = [BOTTEGA, TERZA];
+  consigliatiServer = [BOTTEGA, TERZA];
   rifai();
   dice('con TRE negozi i loghi sono tre, e se ne chiede solo il primo',
        [[true, false, false], [true, false, false]], [accesi(), conSrc()]);
@@ -87682,7 +87834,7 @@ caso('tre negozi', () => {
 });
 
 caso('fuori dalla home', () => {
-  sponsorVivo = 'to-the-moon'; consigliatiServer = [BOTTEGA];
+  consigliatiServer = [BOTTEGA];
   rifai();
   homeAttiva = false; giro(); giro();
   dice('fuori dalla home il giro non cambia e non chiede niente',
@@ -87693,7 +87845,7 @@ caso('fuori dalla home', () => {
 });
 
 caso('effetti ridotti', () => {
-  sponsorVivo = 'to-the-moon'; consigliatiServer = [BOTTEGA];
+  consigliatiServer = [BOTTEGA];
   ridotti = true;
   rifai(); giro(); giro(); giro();
   dice('EFFETTI RIDOTTI: resta il primo, e gli altri loghi non si chiedono',
@@ -87707,66 +87859,107 @@ caso('effetti ridotti', () => {
   dice('...e li resta ferma', [true, false], accesi());
 });
 
+/* LA FILA SEGUE LA BUSTA: una pagina del server rimessa in bozza esce
+   dalla busta, e la card con lei — senza aspettare un cambio di reparto.
+   Il catalogo di casa qui e' spento, o la card non se ne andrebbe mai. */
 caso('la fila segue la busta', () => {
-  sponsorVivo = 'to-the-moon';
+  RACCONTI['to-the-moon'].consigliato = false;
+  consigliatiServer = [BOTTEGA];
   rifai();
-  sponsorVivo = ''; renderStriscia();
-  dice('allo spazio scaduto la card se ne va, senza cambiare reparto',
+  dice('con la sola pagina del server la card c e', true,
+       ordine().includes('/consigliati'));
+  consigliatiServer = []; renderStriscia();
+  dice('...e alla pagina rimessa in bozza se ne va, senza cambiare reparto',
        false, ordine().includes('/consigliati'));
   consigliatiServer = [BOTTEGA]; renderStriscia();
-  dice('...e alla pagina pubblicata torna', true,
+  dice('...e alla pagina ripubblicata torna', true,
        ordine().includes('/consigliati'));
   dice('...e con un logo solo il giro non c e', 0, timer.size);
+  consigliatiServer = [Object.assign({}, BOTTEGA, {logo_giu: 3})];
+  renderStriscia();
+  dice('...e un ritocco del logo arrivato con la busta ridisegna la card',
+       '--giu:3.97%', (primaImg().attr.match(/--giu:[^"]*/) || [])[0]);
+});
+
+/* ⚠️ LO SPAZIO IN VETRINA NON DECIDE PIU' NIENTE QUI (set 2026, decisione
+   di Andrea che ROVESCIA il primo giro, dove qui c'era «allo spazio
+   scaduto la card se ne va»): acceso o spento, To The Mooon resta fra i
+   Consigliati, e quando scade la fila non si ridisegna nemmeno. */
+caso('lo spazio non decide', () => {
+  sponsorVivo = 'to-the-moon';
+  rifai();
+  const prima = nodi['catStrip'].innerHTML;
+  sponsorVivo = ''; renderStriscia();
+  dice('allo spazio scaduto la card resta, e la fila non si tocca',
+       [true, true], [ordine().includes('/consigliati'),
+                      nodi['catStrip'].innerHTML === prima]);
 });
 
 caso('le fonti', () => {
+  const casa = () => consigliatiPubblicati().map(v => v.slug);
+  dice('il negozio consigliato del catalogo entra a spazio in vetrina spento',
+       ['to-the-moon'], casa());
   sponsorVivo = 'to-the-moon';
+  dice('...e acceso uguale: lo spazio decide solo Da scoprire',
+       ['to-the-moon'], casa());
+  sponsorVivo = '';
+  RACCONTI['to-the-moon'].consigliato = false;
+  dice('TOLTO A MANO non entra', [], casa());
+  RACCONTI['to-the-moon'].consigliato = 'true';
+  dice('...e la leva vuole il vero booleano', [], casa());
+  RACCONTI['to-the-moon'].consigliato = true;
   RACCONTI['to-the-moon'].logo = false;
-  dice('lo spazio vivo SENZA logo non entra', [],
-       consigliatiPubblicati().map(v => v.slug));
+  dice('una voce consigliata SENZA logo non entra', [], casa());
   RACCONTI['to-the-moon'].logo = true;
   RACCONTI['to-the-moon'].negozio = '';
-  dice('...ne senza il codice del negozio', [],
-       consigliatiPubblicati().map(v => v.slug));
+  dice('...ne senza il codice del negozio', [], casa());
   RACCONTI['to-the-moon'].negozio = CODICE_TTM;
-  sponsorVivo = '';
-  dice('...e scaduto nemmeno: la sua storia se ne va con lui', [],
-       consigliatiPubblicati().map(v => v.slug));
+  dice('...e porta con se il suo ritocco del logo', [RACCONTI['to-the-moon'].logo_giu],
+       consigliatiPubblicati().map(v => v.giu));
+  RACCONTI['to-the-moon'].consigliato = false;
   consigliatiServer = [{slug: '../fuori', negozio: 'a'},
                        {slug: 'Maiuscole', negozio: 'a'},
                        {slug: 'senza-codice', titolo: 'x'},
-                       BOTTEGA, Object.assign({}, BOTTEGA, {negozio: 'zz'}),
+                       Object.assign({}, BOTTEGA, {logo_giu: -2}),
+                       Object.assign({}, BOTTEGA, {negozio: 'zz'}),
                        null];
-  dice('dalla busta entra solo quel che ha la forma, un codice, una volta',
-       [['bottega-di-prova'], ['cd34ef56']],
-       [consigliatiPubblicati().map(v => v.slug),
-        consigliatiPubblicati().map(v => v.negozio)]);
-  sponsorVivo = 'to-the-moon';
-  dice('...e lo spazio sponsorizzato viene per primo',
-       ['to-the-moon', 'bottega-di-prova'],
-       consigliatiPubblicati().map(v => v.slug));
+  dice('dalla busta entra solo quel che ha la forma, un codice, una volta, '
+       + 'col suo ritocco', [['bottega-di-prova'], ['cd34ef56'], [-2]],
+       [casa(), consigliatiPubblicati().map(v => v.negozio),
+        consigliatiPubblicati().map(v => v.giu)]);
+  RACCONTI['to-the-moon'].consigliato = true;
+  dice('...e il catalogo di casa viene per primo',
+       ['to-the-moon', 'bottega-di-prova'], casa());
+  consigliatiServer = [{slug: 'to-the-moon', titolo: 'doppione', negozio: 'zz'}];
+  dice('...e una pagina del server con lo stesso nome non lo raddoppia',
+       [['to-the-moon'], [CODICE_TTM]],
+       [casa(), consigliatiPubblicati().map(v => v.negozio)]);
 });
 
 caso('la pagina', () => {
-  sponsorVivo = 'to-the-moon'; consigliatiServer = [BOTTEGA];
+  consigliatiServer = [BOTTEGA];
   renderConsigliati();
   const h = nodi['consigliatiLista'].innerHTML;
   const carte = h.split('class="scoprire-card"').slice(1);
-  dice('la pagina mette in fila le card di Da scoprire, una per negozio',
-       ['to-the-moon', 'bottega-di-prova'],
+  dice('la pagina mette in fila le card di Da scoprire, una per negozio, a '
+       + 'spazio in vetrina spento', ['to-the-moon', 'bottega-di-prova'],
        carte.map(c => (c.match(/data-slug="([^"]+)"/) || [])[1]));
-  dice('...lo spazio col SUO banner di Da scoprire', true,
-       carte[0].includes('src="/assets/scoprire/to-the-moon.webp"'));
+  dice('...il negozio di casa col SUO banner di Da scoprire', true,
+       (carte[0] || '').includes('src="/assets/scoprire/to-the-moon.webp"'));
   dice('...la pagina del server col suo LOGO nella riserva, e il nome',
        [true, true],
-       [carte[1].includes('class="sc-riserva cons-riserva"')
-        && carte[1].includes('src="/assets/consigliati/bottega-di-prova.webp"'),
-        carte[1].includes('Bottega di prova</span')]);
-  dice('...e su ognuna la pastiglia Consigliato', [true, true],
-       carte.map(c => c.includes('<span class="sc-sponsor" aria-hidden="true">Consigliato</span>')));
+       [(carte[1] || '').includes('class="sc-riserva cons-riserva"')
+        && (carte[1] || '').includes('src="/assets/consigliati/bottega-di-prova.webp"'),
+        (carte[1] || '').includes('Bottega di prova</span')]);
+  /* ⚠️ PROVA CHE HA CAMBIATO LATO (set 2026, decisione di Andrea): la
+     pastiglia qui c'era su ogni card, e in una pagina che SI CHIAMA
+     Consigliati era ridondante. Resta in Da scoprire, e la sua prova
+     sta in prove_sponsor. */
+  dice('...e nessuna porta la pastiglia Consigliato', [false, false],
+       carte.map(c => c.includes('sc-sponsor') || c.includes('>Consigliato<')));
   dice('...coi nomi nell aria-label', [true, true],
-       [carte[0].includes('aria-label="To The Mooon!"'),
-        carte[1].includes('aria-label="Bottega di prova"')]);
+       [(carte[0] || '').includes('aria-label="To The Mooon!"'),
+        (carte[1] || '').includes('aria-label="Bottega di prova"')]);
   apriConsigliato('bottega-di-prova'); apriConsigliato('to-the-moon');
   apriConsigliato('mai-visto');
   dice('il tocco apre il SUO negozio con la storia aperta, e uno sconosciuto '
@@ -87776,6 +87969,7 @@ caso('la pagina', () => {
 });
 
 caso('la pagina scappa i testi', () => {
+  RACCONTI['to-the-moon'].consigliato = false;
   consigliatiServer = [Object.assign({}, BOTTEGA,
     {titolo: '<b>x</b>"', emoji: '<i>'})];
   renderConsigliati();
@@ -87784,7 +87978,10 @@ caso('la pagina scappa i testi', () => {
        [h.includes('<b>'), h.includes('<i>'), h.includes('&lt;b&gt;x&lt;/b&gt;&quot;')]);
 });
 
+/* VUOTA vuol dire TOLTI A MANO tutti: lo spazio in vetrina scaduto non
+   la svuota piu' */
 caso('la pagina vuota', () => {
+  RACCONTI['to-the-moon'].consigliato = false;
   renderConsigliati();
   const h = nodi['consigliatiLista'].innerHTML;
   dice('senza negozi la pagina lo dice invece di restare muta', [true, false],

@@ -18,8 +18,8 @@ nessuna rotta, e il testo ne esce da tre porte sole:
   - `/api/admin/racconti`, che risponde 403 a chi non e' moderatore;
   - `/api/me/racconti`, che al venditore da' le pagine del SUO negozio
     e a chiunque altro una lista vuota.
-To The Mooon resta dov'e': lo accende lo spazio sponsorizzato, e
-traslocarlo vorrebbe dire rifare la card di «Da scoprire» con le sue
+To The Mooon resta dov'e': la sua card in «Da scoprire» la accende lo
+spazio sponsorizzato, e traslocarlo vorrebbe dire rifarla con le sue
 prove — un altro cantiere (vedi Cantieri, «Una Garlanda in bozza»).
 
 SONO DATI E NON MARKUP, il patto del catalogo gemello: testi nudi,
@@ -43,10 +43,19 @@ una scheda, `n` il numero della foto. In piu', per queste pagine:
     pagina, anche pubblicata, si apre dal suo negozio e basta. Non esce
     verso il client (non e' fra i CAMPI_RACCONTO): lo legge il solo
     `consigliati_pubblici`.
+  - `logo_giu` (set 2026): quanto scende quel logo nel quadrato della
+    card, in pixel della card del telefono (84px; sul computer scala
+    con lei), negativo per salire, da -12 a 12. Serve ai marchi col
+    peso tutto in alto o in basso, che centrati a riquadro sembrano
+    fuori centro. Esce nella busta dei Consigliati accanto al logo.
 
 LO STATO (bozza o pubblicata) NON STA QUI: vive in `impostazioni`, e
 lo cambia il gesto del moderatore dal pannello. Questo file dice COSA
-c'e' scritto, mai SE si vede.
+c'e' scritto, mai SE si vede. Quindi anche TOGLIERE UNA PAGINA DAI
+CONSIGLIATI non si fa da qui: si fa col «📝 Rimetti in bozza» del
+pannello, che la toglie dalla card, dalla pagina e dal negozio
+insieme — mentre per le voci del catalogo di casa la leva e'
+`consigliato: false` nel client, che dal server non si puo' spegnere.
 """
 
 RACCONTI_NEGOZI = {
@@ -105,6 +114,9 @@ RACCONTI_NEGOZI = {
         # racconto, questo gira nella card sul bruno delle categorie e
         # vuole la trasparenza.
         "logo": False,
+        # E QUANTO SCENDE NEL QUADRATO, in pixel della card del telefono
+        # (negativo per salire): zero finche' il logo non si e' visto li'.
+        "logo_giu": 0,
         "blocchi": [
             {"t": "testo", "h": "COS'È",
              "p": ("Riso di varietà storiche, coltivato senza nessun "
