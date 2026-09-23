@@ -28619,3 +28619,184 @@ tondo (tabacchino al passo 1) e sul + subito sopra (foglio normale); in
 arancio; il + grigio che porta al libro su «Compra BTC»; il gesto
 indietro dell'app da «I miei scambi», senza scatti; e con gli effetti
 ridotti il tondo che compare fermo.
+
+## Nessun relay vero in collaudo: le letture si fermano prima della rete (23 set 2026)
+
+**LA RICHIESTA** (Andrea, 23 set 2026, la sera in cui l'antivirus ha
+fermato un python.exe diretto a nostr.mom, partito da un server locale):
+nei giri dal vivo e nei collaudi non ci si collega MAI a relay Nostr veri
+e non si pubblica niente. Le pubblicazioni passano già da
+`_spedisci_ai_relay`, che in collaudo stampa «🟣 [nostr simulato]» ed
+esce: quelle non si toccano. Le letture no: in collaudo ogni lettura
+verso un relay pubblico deve fermarsi prima della rete, con un ripiego
+dichiarato e una riga nel log, e una sentinella deve censire le
+create_connection( del server chiedendo a ognuna la sua guardia o il suo
+perché. Più una riga in Architettura sugli script a mano con nostr.mom in
+lista: non sono per i collaudi.
+
+**IL CENSIMENTO, PRIMA DI TOCCARE.** Sei create_connection( in server.py,
+e una porta in più che nell'elenco di partenza non c'era:
+- `_kind0_profilo` — il profilo, chiesto da `_profilo_nostr` per
+  `aggiorna_profilo_social`, cioè da /api/me e dal rinfresco orario dei
+  nativi: senza guardia. È la sera del 23 set.
+- `chiedi_relay_dm` — il kind 10050 dei DM: in collaudo NON veniva
+  raggiunto, perché `manda_dm_nostr` esce prima. Protetto dalla sola
+  posizione di una riga in un'altra funzione.
+- `eventi_libro_da_relay`, `info_libro_da_relay`, `_ascolto_p2p_filo` —
+  il P2P: senza guardia. Li salvava l'abitudine di puntare `MOSTRO_RELAY`
+  al relay morto nel config del giro, cioè una convenzione: esattamente
+  quel che il 23 set non ha retto per i relay di serie.
+- `invia_evento_relay` — PUBBLICA, e i suoi due chiamanti in collaudo
+  escono prima. Non si tocca.
+- LA SETTIMA, FUORI ELENCO: l'import orario e la scoperta leggono con
+  `interroga` e `interroga_aperto` di importa_nostr.py. Le connessioni
+  sono dello script, ma la domanda la fa il server, e la accende la sola
+  `IMPORT_NOSTR_APERTO`, non il collaudo: un config del VPS copiato in
+  locale l'avrebbe fatta partire al primo giro dell'orologio.
+- LA VERIFICA CON LA NOTA PUBBLICA (kind 1) non c'è più: è andata via a
+  settembre con «Entra anche con Nostr». L'intestazione di quel blocco in
+  server.py la nomina ancora, il codice no.
+
+**LA CURA.** Un giudice solo, `lettura_simulata(relay, cosa)`, accanto
+alle liste dei relay: vero in collaudo verso un relay che non è di casa.
+OGNI LETTORE LO CHIEDE PER CONTO SUO, nel corpo e prima della rete, e
+torna il ripiego che aveva già per un relay che non risponde (None):
+profilo vuoto, nessun relay DM dichiarato, relay «muto» per il giro del
+libro. L'ascolto ha due guardie, quella del filo e quella del guardiano:
+senza la seconda il filo uscirebbe e il guardiano lo farebbe ripartire a
+ogni sguardo, con un «MORTO» nel journal ogni volta. Lo stato diventa
+`simulato`, e la riga della passata dice «spento: in collaudo lo specchio
+non è di casa» invece di «nessuno specchio nel config», che sarebbe
+falso. L'import: la scoperta salta il relay che non è di casa, e il giro
+orario filtra la lista UNA volta e la passa a `importa_venditore(...,
+relays=)` — un parametro nuovo, che a mano vale None e lascia lo script
+com'era; lista vuota vuol dire che il giro non gira.
+
+**DI CASA È SOLO IL LOOPBACK** (`relay_di_casa`: localhost, 127/8, ::1, e
+senza risolvere niente — un DNS è già una domanda fatta fuori), che è il
+criterio della gabbia dei collaudi in CI. È la scelta che tiene in piedi
+il resto: il relay morto dei giri dal vivo (ws://127.0.0.1:9) e un relay
+di cartone acceso sulla macchina restano raggiungibili, quindi la regola
+non toglie il modo di provare un lettore con un relay — toglie quello di
+provarlo coi relay degli altri. Una LAN, un .onion, un nome che sembra
+locale (`127.0.0.1.nip.io`, `localhost.example.com`): fuori.
+
+**UNA RIGA PER LETTURA DIVERSA** — (cosa, relay) — e non a ogni giro: il
+libro P2P si rilegge ogni minuto, e sessanta righe uguali in un'ora
+affogherebbero quella che conta (la regola di `_relay_p2p_dice`). La
+riga: «🟣 [nostr simulato] lettura del profilo (kind 0) di cdcdcdcd… da
+wss://nostr.mom: in collaudo non esce dal computer». Fuori collaudo il
+giudice dice sempre «leggi» e sta zitto: il mondo di ieri, byte per byte.
+
+**LE STRADE SCARTATE.**
+- Avvolgere `create_connection` una volta sola, all'import: avrebbe preso
+  anche le pubblicazioni, che non si toccano, e `ripubblica_tag_client.py
+  --relay`, che spedisce apposta; il ripiego sarebbe stato un'eccezione
+  invece di quello dichiarato di ogni lettore; e le connessioni di
+  importa_nostr.py restavano fuori comunque.
+- La guardia nei soli chiamanti (`_profilo_nostr`, `relay_dm_di`): è la
+  forma che aveva il kind 10050, cioè quella che regge finché nessuno
+  chiama il lettore da un'altra parte.
+- Fermare in collaudo TUTTE le letture, loopback compreso: via il relay
+  morto e quello di cartone, cioè il modo di provare.
+- Una leva «relay veri in collaudo»: la regola dice MAI, e una leva è il
+  modo in cui un mai diventa «quasi mai».
+- Per l'import, «in collaudo non gira se nella lista c'è un relay
+  pubblico»: più corta e senza toccare lo script, ma una lista mista non
+  avrebbe letto nemmeno il relay di casa. Il filtro è quello di tutti gli
+  altri lettori.
+- Scrivere per i lettori P2P il perché «puntano a MOSTRO_RELAY, che nei
+  giri dal vivo è il relay morto»: è una convenzione del config, ed è
+  quella che il 23 set non ha retto.
+
+**GLI SCRIPT A MANO** stanno in Architettura, nella voce nuova: sono gesti
+da VPS o da fare apposta, e la guardia del server non li copre.
+`importa_nostr.py` a mano legge dai suoi RELAYS qualunque cosa dica
+MODALITA_COLLAUDO; `censimento_nostr.py` interroga sei relay pubblici
+scritti nel file; `presenta_release.py` in collaudo LEGGE davvero e
+pubblica per finta; `ripubblica_tag_client.py` con `--relay` spedisce
+davvero anche in collaudo.
+
+**PROVATO.**
+- `prove_letture_relay_collaudo` (nuova): il CENSIMENTO con l'albero
+  sintattico — le sei connessioni di oggi, ognuna col giudice sullo
+  STESSO relay, nel corpo e prima della rete, oppure col perché che si fa
+  girare (`invia_evento_relay`: ogni suo uso sta in una funzione che in
+  collaudo esce prima); le porte verso importa_nostr.py, con le funzioni
+  di rete contate dall'albero dello script; nessuna seconda strada da
+  websocket-client. Poi il giudice (loopback e basta, una riga per
+  lettura diversa, zitto fuori collaudo), i quattro lettori nei tre mondi
+  — collaudo e relay vero, collaudo e relay di casa, produzione — e il
+  23 set rifatto: in collaudo zero bussate e il profilo vuoto, fuori
+  collaudo le quattro bussate di quella sera. E l'import con uno script
+  di cartone: la scoperta setaccia il solo relay di casa, l'import a
+  testa lo riceve da solo, coi soli relay veri il giro non gira, e fuori
+  collaudo si legge da tutti.
+- `prove_p2p_ascolto` ha il suo 4b: lo specchio pubblico in collaudo non
+  si ascolta, lo dice una volta a due sguardi, il filo fatto partire a
+  mano esce subito, e uno specchio di casa si ascolta.
+- CAMBIATE COL PERCHÉ SCRITTO due sentinelle di ieri: i `return None` del
+  lettore del libro sono tre, e la chiamata a `importa_venditore` porta
+  `relays=relays`.
+- `collaudo_letture_relay.py` (nuovo, nell'elenco della CI): il server
+  vero, la /api/me di 222 con la npub verificata e i relay di serie, un
+  REGISTRO sulle connessioni del server e dello script — rosso anche
+  fuori dalla gabbia, sul portatile — e l'altra metà del patto: verso il
+  relay morto si bussa ancora. 16 verdi.
+- LA CONTROPROVA, SOLO IN GABBIA: tolta la guardia del kind 0 da una
+  copia, il collaudo è rosso con tre prove e la gabbia segna le quattro
+  bussate DNS di quella sera — damus, nos.lol, primal, nostr.mom —
+  fermate prima di uscire. (Il primo tentativo era rosso per la ragione
+  sbagliata: la mutazione lasciava un rientro orfano e il server non si
+  importava. Rifatta pulita.)
+- TORTURA 27/27 su una copia, baseline verde: le sette guardie tolte una
+  per volta, la guardia che giudica la chiave invece del relay o che sta
+  dentro un ramo, lo stato e la riga dell'ascolto, il loopback tolto o
+  allargato alla LAN o a un nome che contiene «localhost», il giudice che
+  ignora il collaudo o che dice sempre leggi, che ripete la riga o che
+  tace, la scoperta e l'import che non filtrano o non passano la lista o
+  girano a lista vuota, lo script che ignora `relays`, una connessione
+  nuova senza guardia, la pubblicazione che perde il suo `if
+  MODALITA_COLLAUDO`, una seconda strada da websocket-client, una
+  funzione di rete dello script importata per nome. LA TORTURA HA
+  TROVATO UN DIFETTO DEL BANCO, non del codice: col filo senza guardia
+  il mio caso «filo fatto partire a mano» lo chiamava nel thread della
+  prova, che si appendeva per sempre invece di diventare rossa. Adesso
+  gira in un thread col suo tetto, e la tortura sa dire «APPESA».
+- IL GIRO DAL VIVO, IN GABBIA E SENZA BROWSER (la pagina aprirebbe i suoi
+  relay fuori dalla gabbia): il server vero acceso novanta secondi coi
+  suoi orologi, collaudo acceso e tutte le leve che leggono dai relay
+  accese su relay pubblici — i relay di serie, il P2P col libro e lo
+  specchio, l'import aperto — più 222 con la npub verificata, un nativo
+  Nostr da rinfrescare e un ordine P2P vivo. Zero connessioni tentate ai
+  relay; venti letture simulate dette una volta ciascuna (import, ascolto,
+  i due profili, le due passate del P2P), /api/me a 200, e la seconda
+  passata del P2P muta. La gabbia ha segnato solo tre DNS verso
+  api.coingecko.com: il cambio e lo storico della fee dinamica
+  all'avvio, che non sono relay.
+- I CONTI, sull'albero rebasato su `2c23f2e` (il tasto Barattozon) ed
+  estratto in LF come lo vede la CI, senza config.py: **14099 passate,
+  0 fallite** con `PROVE_SEVERE=1` e `PYTHONUTF8=1`; i tredici collaudi
+  della CI verdi nella gabbia senza rete, `collaudo_letture_relay.py`
+  compreso; e `collaudo_due_teste.py`, che chiama `importa_venditore` e
+  non è in CI, verde anche lui.
+
+**COSA RESTA DA GUARDARE.**
+- IL BROWSER È UN'ALTRA STRADA: in un giro dal vivo la pagina apre i suoi
+  relay da sé (il libro e i messaggi del P2P, la stanza del login NIP-46,
+  il wallet NWC). Questa guardia è del server: per il browser vale il
+  config del giro e il gesto di chi prova.
+- IL PROFILO VUOTO FA QUEL CHE FA UN PROFILO VUOTO: in una copia del
+  database, al primo /api/me, la faccia Nostr di chi ha la npub si spegne
+  — come già si spegne quella Telegram col bot simulato. E in PRODUZIONE
+  c'è lo stesso difetto, fuori da questo cantiere: se i quattro relay
+  tacciono per un nativo Nostr, `aggiorna_profilo_social` prende il
+  profilo vuoto per «non ha una foto» e cancella quella che c'era, e la
+  rimette solo al rinfresco della settimana dopo. Il None del «non si sa»,
+  che `_foto_profilo_telegram` distingue da set 2026, alla gamba Nostr
+  manca. Segnalato, non curato.
+- In collaudo il server bussa ancora ad api.coingecko.com, per il cambio
+  e per lo storico della fee dinamica: non sono relay e la regola non li
+  copre, ma la gabbia li ha visti.
+- L'intestazione «Verifica della npub con una nota pubblica» in server.py
+  nomina una funzione che non c'è più.

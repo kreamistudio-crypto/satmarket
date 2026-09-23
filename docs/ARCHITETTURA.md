@@ -6543,7 +6543,8 @@
   importati (contatto_nostr pieno) restano fuori. Tutto in
   `asyncio.create_task`: mai errori né attese per l'utente. In
   collaudo gli eventi si firmano ma si stampano soltanto
-  (`🟣 [nostr simulato]`).
+  (`🟣 [nostr simulato]`), e dal 23 set 2026 anche le LETTURE si
+  fermano prima della rete: vedi «LE LETTURE DAI RELAY IN COLLAUDO».
   MA LA CHIAVE DELLA PIATTAFORMA È IL RIPIEGO, NON LA REGOLA (ago 2026,
   «IL BIVIO» dentro `annuncio_su_nostr`, ed è la riga che si legge per
   ultima e andrebbe letta per prima): se il venditore ha una chiave
@@ -22847,7 +22848,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   non verifica le firme: la fiducia sta tutta nella npub scritta nel
   config, il che va bene per un amico e non per uno sconosciuto.
   Chiamato dal SERVER riceve invece il `vaglio` (vedi «Import aperto»
-  più sotto), che è il pezzo che chiude quel buco.
+  più sotto), che è il pezzo che chiude quel buco — e dal 23 set 2026
+  anche la lista da cui leggere (`relays=`), già passata dal giudice
+  delle letture: in collaudo i soli relay di casa, vedi
+  «LE LETTURE DAI RELAY IN COLLAUDO». A mano non ha niente di tutto
+  questo, e per questo non è un banco da collaudo.
   `interroga()` fa DUE REQ separate sullo stesso websocket, annunci e
   cancellazioni kind 5, con `limit` propri (`LIMITE_ANNUNCI` /
   `LIMITE_CANCELLAZIONI`, 500) e aspetta ENTRAMBI gli EOSE — più il
@@ -26540,6 +26545,76 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    dell'utente, mai sul server) →
    mai custodia di segreti altrui, mai firme che richiedano di
    consegnare chiavi al server.
+- LE LETTURE DAI RELAY IN COLLAUDO (23 set 2026, regola di Andrea: nei
+  collaudi e nei giri dal vivo non ci si collega MAI a un relay vero, e
+  non si pubblica niente). Le PUBBLICAZIONI erano a posto da sempre —
+  `_spedisci_ai_relay` e `manda_dm_nostr` in collaudo stampano
+  «🟣 [nostr simulato]» ed escono, e nel browser la coda delle firme e
+  la modifica firmata fanno lo stesso — mentre le LETTURE uscivano: la
+  sera del 23 set l'antivirus ha fermato un python.exe diretto a
+  nostr.mom, ed era un server di prova che al primo /api/me di
+  un'identità con la npub verificata aveva chiesto il suo kind 0 ai
+  quattro relay di serie.
+  UN GIUDICE SOLO, `lettura_simulata(relay, cosa)` in server.py accanto
+  alle liste dei relay, e OGNI LETTORE LO CHIEDE PER CONTO SUO, prima
+  della rete: `_kind0_profilo` (il profilo, per `_profilo_nostr`),
+  `chiedi_relay_dm` (il kind 10050 dei DM: in collaudo `manda_dm_nostr`
+  esce prima di arrivarci, ma una guardia nel solo chiamante regge
+  finché nessuno lo chiama da un'altra parte), `eventi_libro_da_relay`
+  e `info_libro_da_relay` (il libro P2P e il 38385), `_ascolto_p2p_filo`
+  più `_guardia_ascolto_p2p` (senza la seconda il filo uscirebbe e la
+  guardia lo farebbe ripartire a ogni sguardo, un «MORTO» nel journal
+  ogni volta: lo stato diventa `simulato`, e la riga della passata dice
+  «spento: in collaudo lo specchio non è di casa»), e l'import orario
+  con la sua scoperta, che leggono con le funzioni di importa_nostr.py:
+  la scoperta salta il relay che non è di casa, e l'import a testa
+  riceve la lista già filtrata (`relays=` di `importa_venditore`;
+  vuota = il giro non gira).
+  IL RIPIEGO È QUELLO DI UN RELAY CHE NON RISPONDE, che ogni lettore
+  aveva già: None, quindi il profilo vuoto, nessun relay DM dichiarato,
+  il relay «muto» per il giro del libro. E il profilo vuoto fa quel che
+  fa un profilo vuoto: in una copia del database la faccia Nostr di chi
+  ha la npub si spegne, come già si spegne quella Telegram col bot
+  simulato.
+  DI CASA È SOLO IL LOOPBACK (`relay_di_casa`: `localhost`, 127/8, ::1,
+  e mai un nome da risolvere — un DNS è già una domanda fatta fuori), il
+  criterio della gabbia dei collaudi in CI. Così il relay morto dei giri
+  dal vivo (ws://127.0.0.1:9) e un relay di cartone acceso sulla
+  macchina restano raggiungibili: la guardia non toglie il modo di
+  provare con un relay, toglie quello di provare coi relay degli altri.
+  Una LAN, un .onion, un nome che sembra locale: fuori.
+  UNA RIGA PER LETTURA DIVERSA — (cosa, relay) — e non a ogni giro: il
+  libro P2P si rilegge ogni minuto, e la regola è quella di
+  `_relay_p2p_dice`. Fuori collaudo il giudice dice sempre «leggi»: il
+  mondo di ieri, byte per byte.
+  LE SENTINELLE: `prove_letture_relay_collaudo` CENSISCE con l'albero
+  sintattico ogni create_connection( del server e chiede a ognuna il
+  giudice sullo STESSO relay, nel corpo e prima della rete — oppure un
+  perché scritto, che si fa girare: l'unico è `invia_evento_relay`, che
+  PUBBLICA, e il suo perché è che chi la usa in collaudo esce prima. Lo
+  stesso per le porte del server verso le funzioni di rete di
+  importa_nostr.py, che si contano dall'albero dello script invece di
+  scriverle a mano. `collaudo_letture_relay.py` rifà la sera del 23 set
+  col server vero, in gabbia e con un registro sulle connessioni (rosso
+  anche fuori dalla CI), e prova l'altra metà del patto: verso il relay
+  di casa si bussa ancora.
+  ⚠️ GLI SCRIPT A MANO NON SONO PER I COLLAUDI: parlano coi relay veri, e
+  la guardia del server non li copre. `importa_nostr.py` lanciato a
+  mano legge dai suoi RELAYS (quelli del config o di serie, nostr.mom
+  compreso) qualunque cosa dica MODALITA_COLLAUDO: la guardia vale solo
+  quando è il server a chiamarlo. `censimento_nostr.py` interroga sei
+  relay pubblici scritti nel file, senza config. `presenta_release.py`
+  in collaudo LEGGE davvero (la lista follow e la nota di
+  presentazione) e pubblica per finta. `ripubblica_tag_client.py` in
+  collaudo stampa soltanto, ma con `--relay` spedisce al relay indicato:
+  un relay di casa è la prova generale, uno pubblico è una
+  pubblicazione vera. Sono gesti da VPS o da fare apposta, mai il banco
+  di un giro dal vivo.
+  ⚠️ E IL BROWSER È UN'ALTRA STRADA: in un giro dal vivo la pagina apre i
+  suoi relay da sé — il libro e i messaggi del P2P sui `MOSTRO_RELAY`,
+  la stanza del login NIP-46, il wallet NWC. Questa guardia è del
+  server; per il browser vale il config del giro (il relay morto per il
+  P2P), e un gesto che apre un relay è un gesto di chi prova.
 - IL BADGE NIP-58 DELLE LIVE (set 2026, il perché intero — e perché
   NON c'è nessuna challenge, nonostante NIP-58 la renderebbe possibile
   — stanno in `docs/CANTIERI.md`, alla voce omonima). Vive dentro
