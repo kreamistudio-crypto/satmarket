@@ -25324,6 +25324,14 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   DENTRO, a differenza del mercatino — là un `confirmed` disputato
   resta ridecidibile da un moderatore e il voto è chiuso, qui decide
   il coordinatore e non c'è appello.
+  ⚠️ DAL 23 SET 2026 IL GIUDICE HA DUE FONTI (`_scambio_concluso_p2p`,
+  uno per le due rotte): il libro a `success`, OPPURE il pagamento
+  riuscito nella cronaca che mostrod racconta al server (patch 0007:
+  il momento `concluso` in `p2p_momenti`). Erano i «due orologi» della
+  voce qui sotto: chi vende sapeva «concluso» al rilascio, il server
+  solo dal giro del libro, e nel mezzo la domanda rispondeva
+  `non_conclusa` — a chi vendeva, quel giorno, il riquadro non è mai
+  comparso. Vedi CANTIERI, «Ritocchi allo scambio P2P».
   DUE ROTTE, E L'ID STA NEL CORPO (la regola dei volti: una GET lo
   metterebbe nei log del web server). `POST /api/p2p/recensibile`
   risponde alla domanda che il foglio fa PRIMA di aprirsi — «c'è un
@@ -25361,6 +25369,25 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `gestoRecensioneP2P(o, rec)`, PURA — mai il chiamante — e finché la
   risposta del server non arriva NON SI OFFRE NIENTE: il bottone
   cambierebbe sotto il dito.
+  ⚠️ EMENDATO (23 set 2026, «Ritocchi allo scambio P2P», richiesta di
+  Andrea): la RECENSIONE non sta più nel foglio. È il riquadro del
+  mercatino, «⭐ Lascia un feedback», NELLA PAGINA dello scambio
+  (`riquadroRecensioneP2P` → `moduloRecensioneP2P`), con le SUE classi:
+  `.payout`, e le quattro nate dagli stili in linea del mercatino —
+  `.fb-stelle`, `.fb-commento`, `.fb-invia`, `.fb-dopo` — che adesso le
+  portano tutt'e due («IL MODULO DEL VOTO, UNO PER DUE POSTI» nel
+  foglio di stile). Lasciata, diventa «⭐ Recensione lasciata», il
+  gemello di «Feedback lasciato». Il bottone ghost che apriva il foglio
+  non c'è più (`azioniSecondarieP2P` mette in colonna il solo `vota`);
+  il foglio resta al VOTO DEL SOLO CIRCUITO. Il gesto lo decide sempre
+  `gestoRecensioneP2P`. LA BOZZA SOPRAVVIVE AL RIDISEGNO
+  (`bozzaRecensioneP2P` / `rimettiBozzaRecensioneP2P`: testo, fuoco e
+  selezione, solo per lo stesso scambio; le stelle nascono da
+  `p2pStellaScelta`, che si azzera aprendo un altro scambio).
+  E LA DOMANDA NON SI CHIUDE SUL «NON ANCORA»: `chiediRecensibileP2P`
+  richiede da sola un `non_conclusa` o un server muto dopo 5, 15, 30,
+  60 e 120 secondi (`P2P_REC_RIPROVE_MS`); i motivi definitivi restano
+  risposti una volta.
   DUE DESTINAZIONI, UN GESTO SOLO: le stelle — non il commento, che il
   protocollo non porta — partono ANCHE verso il coordinatore
   (`rate-user`, un posto solo: `stelleCircuitoP2P`) quando è stato lui
@@ -26041,6 +26068,67 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `campoArriva` accetta un `contatto` da un'app di ieri; a cambiare è
   `inviaCampoP2P`, che scrive il solo `euro`. Il verbale: CANTIERI,
   «Le parti si vedono».
+- IL RECAPITO A CHI COMPRA STA SOTTO IL SUO BOTTONE (23 set 2026,
+  «Ritocchi allo scambio P2P»): nella pagina dello scambio il recapito
+  arrivato (`campiLoro.euro`) si disegna SUBITO dopo il bottone del
+  passo — «✅ Ho inviato gli euro» — o dove il bottone starebbe, prima
+  del profilo e del contatto Telegram (`recapitoCompratoreP2P`,
+  chiamata in `renderOrdineP2P` fra `bottoni[azione]` e il resto). Col
+  PayCode è il suo riquadro (`riquadroPayCodeP2P`), che si è spostato
+  con lui. NON DIPENDE DALLE CHIAVI DELLA CONVERSAZIONE: il testo è già
+  nella riga, decifrato e verificato all'arrivo.
+  UN RIGO PER DATO COL SUO «COPIA» (`riquadroRecapitoP2P`): il testo
+  composto si taglia per righe (`righeRecapitoP2P`, PURA) e una riga
+  «Etichetta: valore» dà al tocco il VALORE senza l'etichetta. ⚠️ NON È
+  UN PARSER DEL FILO — la regola 2 dell'identità di pagamento resta
+  («chi riceve mostra quel che legge»): ogni riga si mostra intera, una
+  riga senza quella forma si copia intera, e la prima senza «:» e senza
+  cifre (seguita da altre) è il nome del metodo, senza «Copia». Il
+  valore viaggia nel `data-v` e mai nell'onclick (è testo dell'altra
+  persona). L'IBAN — per etichetta o per forma — è in monospazio, e se
+  ha la forma di un IBAN si MOSTRA a gruppi di quattro; il «Copia»
+  copia il valore com'è arrivato. Il testo si seleziona (`user-select:
+  text` detto nel foglio di stile) e le etichette sono `--ink-soft`,
+  misurato: il `--muted` sulla carta del riquadro faceva 3,23:1.
+  A chi VENDE, sotto il contatto Telegram, non c'è più la riga «Di' a
+  chi compra dove mandarti gli euro»: lo dicono il riquadro di stato e
+  il bottone arancio in cima, e `campiOrdineP2P` è diventata la sola
+  porta del foglio «I vostri recapiti». Il foglio mostra il recapito
+  come prima (testo intero): lì non è cambiato niente.
+- SATS IN PAGAMENTO, DETTO A CHI VENDE (23 set 2026, «Ritocchi allo
+  scambio P2P»): a chi vende, «Scambio concluso» arriva solo a
+  pagamento RIUSCITO verso chi compra. Il messaggio con cui mostrod
+  risponde al rilascio (`hold-invoice-payment-settled`: la SUA garanzia
+  incassata) porta chi vende a `rilasciato` — `mossaDopoRilascioP2P`,
+  e la tabella di chi compra non cambia — col titolo «Sats in
+  pagamento» (`t_vendo` in `STATI_P2P`) nella pagina e nella card. Se
+  il pagamento non passa, la riga è «Il pagamento verso chi compra non
+  è passato. Chi compra deve dare una fattura nuova: non devi fare
+  niente.» (`payoutFallito` sulla riga, letto da `statoTestoP2P`).
+  CHI LO DICE: il SERVER, che dal coordinatore sa tutto (patch 0007) e
+  a chi vende mostrod non scrive niente fino al voto. `POST
+  /api/p2p/pagamenti` (corpo `{ordini: [...]}`, sessione, niente gate
+  sulla leva, `no-store`) risponde col giudice `_pagamenti_p2p`, PURO
+  sulla connessione: per gli scambi di cui chi chiede è una delle due
+  parti in `p2p_scambi` (le dice mostrod) legge `p2p_momenti` —
+  `concluso` (da mostrod o dalla riserva del libro) = 'riuscito';
+  altrimenti l'ULTIMO fra `rilasciato`, `payout_fallito` e la fattura
+  NUOVA (`fattura_data`/`new-invoice`) decide 'fallito' o 'in_corso',
+  e a pari secondo vince il fallimento (`_DOPO_RILASCIO_P2P`: è sempre
+  la conseguenza di un tentativo). Chi non è della partita e lo scambio
+  di cui il server non ha sentito niente dopo il rilascio non ricevono
+  la riga: «non lo so» non si serve come «in corso».
+  NEL CLIENT la domanda sta in un BLOCCO SUO dopo quello delle parti
+  («IL PAGAMENTO DETTO A CHI VENDE»: una fetch, in POST, il cancello
+  dell'anonimo, niente provvisori) e la riga la muove il giudice puro
+  del motore, `applicaPagamentoP2P` (solo chi vende, solo a
+  `rilasciato`; 'riuscito' = `concluso` con l'ora di mostrod in
+  `ultimaMossa`, che è la data sulla card chiusa). Chiedono la pagina,
+  l'elenco e il battito dell'unico interval (`battitoPagamentiP2P`), col
+  freno di un ORARIO per id (`P2P_PAGAMENTI_OGNI_MS`, 20 s) e solo a
+  pagina visibile. Le altre due strade verso `concluso` restano: il
+  libro (`statoPubblicoOrdini`, `success`) e la restore. Il «Scambio
+  concluso 🎉» a chi vende suona adesso, e non più al rilascio.
 - LA QUOTA DI CHI LEGGE HA UN GIUDICE SOLO (17 set 2026):
   `mezzaCommissioneP2P(fee)` — la fee del coordinatore si spartisce
   metà a testa, quindi la percentuale da mostrare a una persona è la

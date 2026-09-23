@@ -27438,3 +27438,205 @@ del mercatino con la stessa animazione del tocco su «Esplora»; dalla
 home lo swipe chiude l'app. Con un foglio aperto, il primo gesto lo
 chiude. Dopo un ricaricamento (per esempio il login) deve valere lo
 stesso. In Telegram, tutto come prima.
+
+## Ritocchi allo scambio P2P dopo la prova a due telefoni: la frase sotto il contatto, il recapito sotto il suo bottone, «Sats in pagamento» a chi vende, la recensione ai due lati e il riquadro del mercatino (23 set 2026)
+
+Cinque ritocchi chiesti da Andrea dopo la prova vera di oggi — uno
+scambio completo fra due telefoni, con la fattura di chi comprava
+scaduta al momento del pagamento. Un worktree da `origin/main`, rebasato
+al push sopra l'APK 1.5, l'indietro del P2P (`abb08df`) e lo scivolo
+indietro dell'app Android (`6286f2a`): toccano la navigazione, non le
+stesse funzioni.
+
+**1) LA FRASE SOTTO IL CONTATTO TELEGRAM SE N'È ANDATA.** A chi vende, a
+garanzia bloccata e senza recapito, la pagina diceva la stessa cosa TRE
+volte: nel riquadro di stato («Ora indica a X dove mandarti gli euro»),
+nel bottone arancio in cima («💶 Indica dove ricevere gli euro») e in
+una riga in fondo, sotto il profilo e il contatto Telegram («💶 Di' a chi
+compra dove mandarti gli euro: senza, non può pagarti»). Quest'ultima è
+uscita; `campiOrdineP2P` è rimasta la sola porta del foglio «I vostri
+recapiti». La sentinella che la pretendeva è emendata con scritto
+perché: l'insistenza ora si prova nei due posti dove vive.
+
+**2) IL RECAPITO A CHI COMPRA STA SOTTO IL SUO BOTTONE, E OGNI DATO SI
+COPIA.** Stava in fondo, sotto il contatto Telegram, mentre serve
+all'altezza del gesto: si legge l'IBAN, si fa il bonifico, si torna a
+toccare «Ho inviato gli euro». Adesso `recapitoCompratoreP2P` lo disegna
+SUBITO dopo il bottone del passo — o dove il bottone starebbe, quando non
+c'è ancora o non c'è più — e col PayCode è il suo riquadro, che si è
+spostato con lui. Non dipende più dalle chiavi della conversazione: il
+testo è già nella riga, decifrato e verificato quando è arrivato.
+UN RIGO PER DATO COL SUO «📋 Copia» (`riquadroRecapitoP2P`): il testo
+composto si taglia per righe (`righeRecapitoP2P`, pura) e una riga
+«Etichetta: valore» dà al tocco il VALORE senza l'etichetta. ⚠️ NON È UN
+PARSER DEL FILO, e la regola 2 dell'identità di pagamento resta in piedi:
+ogni riga si mostra intera com'è arrivata, una riga senza quella forma si
+copia intera, la prima riga senza «:» e senza cifre è il nome del metodo
+(«Bonifico SEPA») e non ha il «Copia». I due punti vogliono uno spazio
+dopo, o un indirizzo `https://…` passerebbe per un'etichetta; un'etichetta
+oltre i 60 caratteri non taglia niente.
+IL VALORE VIAGGIA NEL `data-v` E MAI NELL'ONCLICK: è testo scritto
+dall'altra persona, e dentro una stringa JS l'`esc()` dell'HTML non basta
+— il parser dell'attributo gli ridarebbe gli apici. C'è la prova col
+testo cattivo (`"><img …>` e `'); alert(1); //`).
+L'IBAN VA IN MONOSPAZIO E, SE NE HA LA FORMA, A GRUPPI DI QUATTRO: a
+375 px le ventisette cifre di fila lasciavano l'ultima da sola a capo
+(visto dal vivo). Il «Copia» copia il valore com'è arrivato, senza gli
+spazi della vista. Il testo si SELEZIONA — `user-select: text` detto nel
+foglio di stile, non lasciato al caso — e le etichette sono `--ink-soft`:
+MISURATO, il `--muted` sulla carta del riquadro faceva 3,23:1 di giorno,
+sotto l'AA per un testo da 12 px; `--ink-soft` fa 6,21 di giorno e 7,57
+di sera, il «Copia» 12,75 e 11,06, il valore 12,63 e 10,74.
+⚠️ LA «CAUSALE» NON ESISTE: la richiesta la nominava, ma il foglio di chi
+vende per il SEPA chiede intestatario e IBAN e basta. Se un giorno ci
+sarà (o arriva da un altro client), la sua riga «Causale: …» avrà il suo
+«Copia» come le altre, senza toccare niente. Il foglio «I vostri
+recapiti» mostra il recapito come prima, testo intero: non è stato
+chiesto e non l'ho toccato.
+
+**3) «SATS IN PAGAMENTO» A CHI VENDE, FINCHÉ IL PAGAMENTO NON È
+RIUSCITO.** La diagnosi è sul filo: chi vende libera, e mostrod gli
+risponde SUBITO `hold-invoice-payment-settled` — la SUA garanzia
+incassata — che la tabella leggeva «concluso». Il pagamento a chi compra
+parte dopo, e quel giorno non è passato: chi comprava leggeva,
+giustamente, «serve una fattura nuova», chi vendeva «Scambio concluso» su
+sats che non erano arrivati a nessuno. E dal coordinatore chi vende non
+può saperlo: fino al voto mostrod a lui non scrive più niente.
+LA CURA: a chi vende quel messaggio porta a `rilasciato`
+(`mossaDopoRilascioP2P`; la tabella di chi compra non cambia), col titolo
+«Sats in pagamento» (`t_vendo`) nella pagina E nella card, tinta azzurra
+del «qualcosa è in viaggio» e gruppo «In corso». Se il pagamento non
+passa, la riga è quella di Andrea: «Il pagamento verso chi compra non è
+passato. Chi compra deve dare una fattura nuova: non devi fare niente.»
+«Scambio concluso» (e la sua festa, e la data sulla card, che è l'ora del
+pagamento riuscito) arriva solo a pagamento RIUSCITO.
+LO DICE IL SERVER, dagli eventi della patch 0007 che riceve già:
+`POST /api/p2p/pagamenti` col giudice `_pagamenti_p2p`, puro sulla
+connessione. Legge `p2p_momenti` per gli scambi di cui chi chiede è una
+delle due parti in `p2p_scambi` (le dice mostrod): `concluso` (da mostrod
+o dalla riserva del libro) è «riuscito»; se no decide l'ULTIMO fra
+`rilasciato`, `payout_fallito` e la fattura NUOVA (`new-invoice`: quella
+della presa non conta), e nello stesso secondo vince il fallimento, che è
+sempre la conseguenza di un tentativo. All'estraneo, a un ordine che non
+c'è e a uno scambio di cui il server non ha sentito niente dopo il
+rilascio la risposta è la stessa — nessuna riga — e i casi non si
+distinguono (la lezione di Q3). Niente gate sulla leva, `no-store`.
+NEL CLIENT la domanda sta in un BLOCCO SUO dopo quello delle parti (il
+motore non ha fetch, i volti e le parti contano le loro): una fetch, in
+POST, il cancello dell'anonimo, niente provvisori. La riga la muove il
+giudice puro del motore, `applicaPagamentoP2P` (solo chi vende, solo a
+`rilasciato`, l'orologio delle mosse che non torna indietro). Chiedono la
+pagina, l'elenco e il battito dell'unico interval, con un freno per id
+(20 s) — un ORARIO e non un «già chiesto», perché la risposta cambia — e
+il battito ha il suo, e gira solo a pagina visibile. Le altre due strade
+verso `concluso` restano: il libro (`success`) e la restore.
+⚠️ LE STRADE SCARTATE. Il `rate` che mostrod manda alle due parti a
+pagamento riuscito sarebbe stato un segnale senza server: non è
+verificato sul nostro nodo e la richiesta diceva gli eventi della 0007 —
+resta una seconda fonte possibile, da mettere solo dopo averlo visto
+arrivare. Uno «stadio derivato» sopra `concluso` avrebbe mostrato
+«Scambio concluso» finché la risposta non arriva, cioè proprio quel che
+non doveva succedere. E una spinta dal server all'app non esiste: la
+domanda è limitata alle sole righe di chi vende a sats liberati.
+⚠️ DUE COSE VISTE E NON TOCCATE, da far leggere ad Andrea: il messaggio
+TELEGRAM a chi vende, un minuto dopo il rilascio se `success` non è
+arrivato, dice ancora «Hai rilasciato i sats: per te lo scambio è
+concluso» (l'attesa della patch 0007) — coerente col «non devi fare
+niente», ma usa la parola «concluso»; e la chiusura del MODERATORE
+(`admin-settled`) porta chi vende a «concluso» subito, come prima.
+
+**4) LA RECENSIONE A TUTT'E DUE LE PARTI, UNA VOLTA SOLA.** Erano i «due
+orologi» già scritti come prima cosa da guardare («Le recensioni degli
+scambi»): la domanda partiva una volta per sessione, e a chi vendeva
+partiva al rilascio — col libro non ancora a `success`, e quel giorno col
+pagamento passato solo più tardi — quindi `non_conclusa` restava lì per
+tutta la sessione, e il gesto non compariva. DUE CURE, una per orologio:
+sul server le due rotte chiedono a `_scambio_concluso_p2p` (il libro a
+`success` OPPURE il pagamento riuscito nella cronaca di mostrod) — la
+frase del 17 set «solo `success` del libro» è di prima che la 0007
+esistesse, e il giudice resta uno per le due rotte; nel client un
+`non_conclusa` o un server muto si RICHIEDONO da soli dopo 5, 15, 30, 60
+e 120 secondi, mentre un motivo definitivo resta risposto una volta. «Una
+volta sola» lo tiene il database come prima (l'indice gemello della
+UNIQUE): dal vivo, il secondo invio della stessa parte è un 400.
+
+**5) IL RIQUADRO DELLA RECENSIONE È QUELLO DEL MERCATINO.** Il foglio di
+prima aveva le stelle grigie anche da scelte (`.p2p-stella`, colore
+spento, il pieno solo al passaggio del dito) e una casella del commento
+senza vestito — stretta e chiara anche di sera. Adesso la recensione è
+«⭐ Lascia una recensione» NELLA PAGINA, con le classi del «⭐ Lascia un
+feedback»: `.payout`, `.hint`, `.btn.primary`, `.stars` e le quattro nate
+dai suoi stili in linea — `.fb-stelle`, `.fb-commento`, `.fb-invia`,
+`.fb-dopo` — che adesso il mercatino e lo scambio portano tutt'e due
+(«IL MODULO DEL VOTO, UNO PER DUE POSTI»). Lasciata, diventa «⭐
+Recensione lasciata ★★★★ — commento», il gemello di «Feedback lasciato».
+MISURATO dal vivo col riquadro del mercatino accanto: stili calcolati
+identici pezzo per pezzo, stelle allo stesso passo (31 px), casella
+310×52 e bottone 310×50,5 in tutt'e due; cambia solo la lunghezza del
+testo, che qui dice anche dove va la recensione. Le stelle del P2P sono
+BOTTONI (ognuna col suo nome letto a voce) spogliati del vestito da
+bottone, quelle del mercatino restano span.
+⚠️ UNA SCELTA MIA, da far leggere: «riquadro» l'ho letto come nel
+mercatino — nella pagina, al posto del bottone ghost che apriva il
+foglio — e non come il contenuto del foglio rivestito. Il foglio resta al
+solo voto del circuito. Se la recensione deve tornare in un foglio, il
+riquadro ci entra com'è.
+LA BOZZA SOPRAVVIVE AL RIDISEGNO, che nella pagina dello scambio arriva a
+ogni evento: testo, fuoco e selezione si rimettono dopo l'`innerHTML`
+(solo per lo stesso scambio, col `data-id` della casella), le stelle
+nascono da `p2pStellaScelta`, che si azzera aprendo un altro scambio.
+
+**PROVE.** `prove_ritocchi_scambio` nuova (82 prove: sentinelle e
+banchi node, ognuno SOLO — una sezione che esplode si porta via le
+sorelle) e tredici sentinelle emendate con scritto perché: i due giri di
+chi vende (ora finiscono a `rilasciato`), la colonna dei gesti senza
+`recensisci`, i `p2p-stella` da due a uno, la riga che insisteva, il
+recapito e il riquadro del PayCode che salgono in `recapitoCompratoreP2P`,
+l'a-capo del recapito, il gate delle recensioni, e le sezioni 9 e 11 della
+recensione (il foglio è diventato il riquadro). **13715 passate, 0
+fallite** con `PROVE_SEVERE=1` sull'albero rebasato. Il collaudo nuovo,
+`collaudo_pagamento_p2p.py` (32 verdi: il server VERO su un
+database usa-e-getta, gli eventi dalla porta vera, rilascio → fallito →
+fattura nuova → fallito → riuscito, la recensione dei due lati col libro
+ancora indietro, la leva spenta, i corpi storti), è entrato nel job
+`prove` della CI per nome, nei due elenchi, verde nella gabbia senza rete;
+i dieci collaudi della CI verdi, e `collaudo_recensione_p2p` 55/55.
+**TORTURA 53/53** su una copia, nel sottoinsieme delle otto sezioni
+che toccano questi pezzi più il collaudo per le mutazioni del server. Il
+primo giro ne ha lasciate quattro, e nessuna era codice rotto: due ancore
+doppie nel banco, e due prove molli — il banco della recensione che
+ESPLODEVA su un timer mancante invece di dire rosso (ogni passo ora regge
+da solo), e il freno del battito coperto da quello per id (lo isola una
+riga mai chiesta). Nello stesso giro una sezione esplodeva sul giudice
+mutato chiamato nudo: le chiamate ora tornano l'eccezione come valore.
+**DAL VIVO**, a 375 px nei due temi, sull'app vera dal worktree col relay
+morto e gli eventi mandati alla rotta VERA `/api/p2p/evento` con un
+segreto di collaudo: chi vende a garanzia bloccata (niente frase fra il
+contatto e «I vostri recapiti»); il rilascio con la garanzia incassata
+fatta entrare dalla porta dei messaggi → «Sats in pagamento» subito, e la
+pagina che chiede al server; il pagamento fallito → dopo il battito, da
+sola, la riga di Andrea, in pagina e card; la fattura nuova → di nuovo in
+corso; il pagamento riuscito → «Scambio concluso 🎉», la data giusta, e a
+chi vende il riquadro della recensione col libro ancora `in-progress`;
+recensione lasciata dai due lati (4★ col commento, 5★), il secondo invio
+respinto, le medie mosse; il recapito SEPA di chi compra sotto «Ho inviato
+gli euro», l'IBAN a gruppi, i due «Copia» (con gli appunti veri vietati
+nel pane il toast mostra il valore senza spazi; con gli appunti finti,
+«Copiato 📋» e i due valori giusti).
+
+**COSA GUARDARE SUL TELEFONO, A DUE TELEFONI.** 1) Chi vende, a garanzia
+bloccata: sotto «Scrivi a … su Telegram» viene subito «I vostri
+recapiti». 2) Chi compra, col recapito arrivato: il riquadro «Dove
+mandare gli euro» subito sotto «Ho inviato gli euro»; tenere premuto
+l'IBAN lo seleziona; «📋 Copia» lo mette negli appunti SENZA spazi, e
+incollato nell'app della banca è quello giusto. 3) Il giro del pagamento
+fallito, provocato apposta (una fattura da pochi minuti, o un wallet che
+non si raggiunge): a chi vende «Sats in pagamento» con la riga «Chi
+compra deve dare una fattura nuova: non devi fare niente», in pagina e
+card, SENZA toccare niente (arriva entro una ventina di secondi); poi la
+fattura nuova e il pagamento riuscito: «Scambio concluso 🎉». 4) A
+scambio concluso la recensione a TUTT'E DUE, e una sola: la seconda la
+rifiuta il server. 5) Il riquadro della recensione accanto al «Lascia un
+feedback» di un ordine del mercatino, di giorno e di sera: stesse stelle,
+stessa casella, stesso bottone. 6) Con la tastiera su, scrivendo il
+commento, la pagina non deve perdere il testo se arriva un evento.
