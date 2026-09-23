@@ -5984,6 +5984,23 @@
   #guscio .attesa-anello{display:block;position:absolute;
     top:calc(50% + 108px);left:calc(50% - 12px);
     border-color:rgba(255,255,255,.45);border-top-color:#FFFFFF}
+  /* LO SCARTO FRA LE DUE FINESTRE (set 2026). Dal video dell'apertura a
+     15 fotogrammi: nello splash di Chrome il barattolo stava a y 509-763,
+     nel guscio a 530-787 — stessa misura, ~22px PIU' IN BASSO su 1280.
+     Non e' un errore di disegno: sono due finestre diverse. Lo splash di
+     Chrome centra l'immagine sullo schermo INTERO, barre di sistema
+     comprese; la pagina centra nel suo riquadro, che comincia SOTTO la
+     barra di stato e finisce SOPRA quella dei gesti. Il conto e'
+     (sopra − sotto)/2, lo fa `scartoGuscio` nell'head e lo scrive in
+     `--guscio-su` prima del primo paint (il perche' della stima sta li').
+     Qui barattolo e anello salgono INSIEME e della stessa misura, cosi'
+     l'anello resta appeso alla stessa distanza. `top` relativo per
+     l'immagine e `margin-top` per l'anello, che e' assoluto: tutt'e due
+     spostano senza toccare l'impaginazione, e nessuno dei due e' una
+     `transform` — quella l'anello la presta a `gira`. Senza la
+     variabile valgono 0px, cioe' il guscio di prima. */
+  html.app-android #guscio img{position:relative;top:calc(-1 * var(--guscio-su, 0px))}
+  html.app-android #guscio .attesa-anello{margin-top:calc(-1 * var(--guscio-su, 0px))}
   .btn.primary{background:var(--trust);color:var(--on-trust);box-shadow:0 3px 0 var(--trust-deep)}
   .btn.orange{background:var(--sats);color:#fff;box-shadow:0 3px 0 var(--sats-deep)}
   /* il pieno dell'asta: stessa forma dell'orange, colore suo */
@@ -7575,8 +7592,39 @@
      non compare — l'app si apre come faceva ieri, che e' il modo
      giusto di sbagliare. Il caso che conta e' l'avvio a freddo, e
      quello ce l'ha. */
-  if ((document.referrer || '').indexOf('android-app://store.barattolo.app') === 0)
+  if ((document.referrer || '').indexOf('android-app://store.barattolo.app') === 0) {
     document.documentElement.classList.add('app-android');
+    /* LA BARRA DI STATO E' DEL GUSCIO (set 2026). Dal video: durante lo
+       splash la barra era arancio; al primo disegno del guscio diventava
+       crema per un fotogramma (il `theme-color` scritto in cima al file)
+       e poi scura (`applicaTema` col tema scuro) — una striscia chiara
+       sopra un guscio ancora arancio. Nell'APK allora il meta nasce
+       dell'ARANCIO DEL GUSCIO, prima del primo paint, e resta cosi'
+       finche' il guscio e' in vista: `applicaTema` non lo tocca, e il
+       colore del tema arriva da `togliGuscio`, nel gesto stesso che
+       toglie il guscio. Dentro Telegram e nel browser questo ramo non
+       gira, e la barra fa quel che faceva. */
+    document.getElementById('metaTema')?.setAttribute('content', '#F78F19');
+    /* E LO SCARTO FRA LE DUE FINESTRE, qui per la stessa ragione di
+       tutto il resto: una misura decisa dopo il primo paint si vedrebbe
+       scattare. Si rifa' a ogni resize, nel caso il riquadro della
+       pagina all'apertura non fosse ancora quello vero (e' una
+       assegnazione, non costa niente). Il conto sta in `scartoGuscio`,
+       fuori da questa funzione, perche' la diagnosi dell'apertura lo
+       rifa' coi numeri di adesso; la prima misura resta scritta in
+       `data-guscio-apertura` perche' la diagnosi possa confrontarle. */
+    const radice = document.documentElement;
+    const scarto = () => {
+      const r = scartoGuscio(screen.height, screen.width, innerHeight,
+                             screen.availTop, screen.availHeight);
+      radice.style.setProperty('--guscio-su', r[0] + 'px');
+      if (!radice.dataset.guscioApertura)
+        radice.dataset.guscioApertura = [r[0], r[1], screen.width,
+          screen.height, innerWidth, innerHeight].join(' ');
+    };
+    scarto();
+    addEventListener('resize', scarto);
+  }
   /* e la misura del testo, per la stessa ragione: se la scala
      arrivasse dopo il primo paint, l'app comparirebbe piccola e poi
      scatterebbe. La logica completa vive in applicaFont(). */
@@ -7585,6 +7633,42 @@
           document.documentElement.style.setProperty('--fs-zoom', f / 100);
   } catch(e){}
 })();
+/* LO SCARTO FRA LE DUE FINESTRE (set 2026): di quanti px CSS il
+   barattolo del guscio deve SALIRE per stare dov'era nello splash.
+   Lo splash di Chrome lo centra sullo SCHERMO, cioe' a alto/2 dal bordo
+   di sopra; il guscio lo centra nella PAGINA, cioe' a sopra + pagina/2,
+   dove «sopra» e' la barra di stato. Con sotto = alto − sopra − pagina
+   la differenza e' (sopra − sotto)/2.
+   ⚠️ LA PAGINA SA LA SOMMA DELLE DUE BARRE, NON COME SI DIVIDE, ed e' il
+   nodo di tutto il conto. Letto nel sorgente di Chromium (set 2026):
+   su Android `screenY` e' sempre 0 (la vista riporta l'origine 0,0) e
+   `outerHeight` e' la pagina stessa; `screen.availTop/availHeight`
+   direbbero dove stanno le barre solo col flag
+   AndroidUseCorrectDisplayWorkArea, che e' SPENTO di serie. Quindi due
+   strade, in quest'ordine:
+   1) ESATTA, se il browser dice dove stanno le barre (availTop > 0, e
+      l'area disponibile e' alta quanto la pagina): nessuna stima.
+   2) STIMA, se le barre sommate stanno fra 40 e 72 px: e' il telefono
+      coi GESTI, e la barra di sotto si prende di GESTI px. L'errore e'
+      ESATTAMENTE (barra dei gesti vera − GESTI): zero a 16, che e' il
+      valore che annulla lo scatto misurato nel video di Andrea, 8 px di
+      troppo a 24 (il valore AOSP di oggi, i Pixel).
+   Fuori da quella forbice niente spostamento, cioe' il guscio di prima:
+   da 72 in su c'e' la barra a tre tasti (48 sotto, e li' il guscio
+   dovrebbe SCENDERE — ma la somma non basta a distinguerla da una tacca
+   alta coi gesti, e nel dubbio non si peggiora), sotto 40 la pagina e'
+   gia' quasi a tutto schermo. Sdraiato non si sposta niente.
+   Restituisce [px, strada]: la strada la mostra ?diagnosi=1. */
+function scartoGuscio(alto, largo, pagina, availTop, availAlto){
+  const GESTI = 16;
+  if (!(alto > largo) || !(pagina > 0) || !(pagina <= alto))
+    return [0, 'nessuno'];
+  if (availTop > 0 && Math.abs(availAlto - pagina) <= 2)
+    return [(2 * availTop + availAlto - alto) / 2, 'esatto'];
+  const barre = alto - pagina;
+  if (barre >= 40 && barre < 72) return [barre / 2 - GESTI, 'stima'];
+  return [0, 'nessuno'];
+}
 </script>
 </head>
 <body>
@@ -10601,8 +10685,26 @@ if (tg) tg.expand();
 let vetrinaDisegnata;
 const guscioVetrina = new Promise(sciogli => { vetrinaDisegnata = sciogli; });
 let guscioVia = false;
+/* IL GUSCIO E' IN VISTA? (set 2026) Lo chiede `applicaTema`, che
+   finche' c'e' il guscio lascia la barra di stato del suo arancio (il
+   perche' sta nell'head, accanto alla riga che la accende). Si chiede
+   al DISEGNO e non alla classe dell'APK: e' la domanda giusta — la
+   barra segue quel che si vede — e tiene quel nome fuori dal corpo
+   della pagina. `getClientRects` e non `offsetParent`: il guscio e'
+   `position:fixed`, e per un fixed `offsetParent` e' null SEMPRE, cioe'
+   la risposta sarebbe «no» anche col guscio a tutto schermo. */
+function guscioInVista(){
+  const g = document.getElementById('guscio');
+  return !!g && g.getClientRects().length > 0;
+}
+/* ?diagnosi=1 tiene su il guscio per lo scatto (vedi
+   `mostraDiagnosiApertura`, qui sotto): a toglierlo e' il suo «Chiudi».
+   Senza il parametro questa riga vale sempre false. */
+const diagnosiApertura = /[?&]diagnosi=1(&|$)/.test(location.search);
+let diagnosiTieneGuscio = false;
 function togliGuscio(){
   if (guscioVia) return;            /* il primo che arriva comanda */
+  if (diagnosiTieneGuscio) return;  /* ?diagnosi=1: resta per lo scatto */
   guscioVia = true;
   document.getElementById('guscio')?.remove();   /* in un colpo, mai in dissolvenza */
   /* ...e SOLO adesso Telegram puo' togliere il suo velo. Protetto:
@@ -10619,6 +10721,87 @@ function togliGuscio(){
   try { applicaTema(); } catch(e){}
 }
 setTimeout(togliGuscio, 4000);
+
+/* LA DIAGNOSI DELL'APERTURA (set 2026). Il conto dello scarto (vedi
+   `scartoGuscio`, nell'head) ha UNA cosa che da qui non si sa: come si
+   dividono le due barre di sistema su un telefono vero. Con ?diagnosi=1
+   la pagina scrive in alto i numeri che il browser le da', e
+   nell'APK tiene su il guscio con una riga bianca sul centro del
+   barattolo: uno screenshot di QUELLO schermo dice quanto sono alte le
+   barre in pixel veri, e se il centro del barattolo cade sul centro
+   dello schermo, cioe' dove lo mette lo splash. «Chiudi» toglie tutto e
+   fa partire l'app. Fuori dall'APK c'e' anche «Apri nell'app»: un
+   link intent:// che apre l'APK proprio su questo indirizzo — a
+   freddo, che il guscio c'e' solo all'apertura.
+   Non scrive niente da nessuna parte e senza il parametro non esiste.
+   `textContent` e mai innerHTML: dentro ci sono il referrer e lo
+   user-agent, che non si fidano. */
+function mostraDiagnosiApertura(){
+  diagnosiTieneGuscio = guscioInVista();
+  const radice = document.documentElement;
+  const n = x => typeof x === 'number' ? String(Math.round(x * 10) / 10) : String(x);
+  const sonda = document.createElement('div');
+  sonda.style.cssText = 'position:fixed;left:0;top:0;width:0;visibility:hidden;' +
+    'padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)';
+  document.body.appendChild(sonda);
+  const sicuro = getComputedStyle(sonda);
+  const sicuroSu = parseFloat(sicuro.paddingTop) || 0;
+  const sicuroGiu = parseFloat(sicuro.paddingBottom) || 0;
+  sonda.remove();
+  const dpr = window.devicePixelRatio || 1;
+  const ora = scartoGuscio(screen.height, screen.width, innerHeight,
+                           screen.availTop, screen.availHeight);
+  const img = document.querySelector('#guscio img');
+  const r = diagnosiTieneGuscio && img ? img.getBoundingClientRect() : null;
+  const centro = r ? r.top + r.height / 2 : null;
+  const chrome = (navigator.userAgent.match(/Chrome\/[\d.]+/) || ['—'])[0];
+  const righe = [
+    "🩺 DIAGNOSI DELL'APERTURA",
+    'schermo ' + screen.width + '×' + screen.height + ' · dpr ' + n(dpr) +
+      ' = ' + Math.round(screen.width * dpr) + '×' + Math.round(screen.height * dpr) + ' px',
+    'pagina ' + innerWidth + '×' + innerHeight + ' · barre in tutto ' +
+      (screen.height - innerHeight),
+    "all'apertura: " + (radice.dataset.guscioApertura || '—'),
+    'availTop ' + screen.availTop + ' · availHeight ' + screen.availHeight +
+      ' · screenY ' + window.screenY + ' · outerHeight ' + window.outerHeight,
+    'safe-area sopra ' + n(sicuroSu) + ' · sotto ' + n(sicuroGiu),
+    'scarto adesso ' + n(ora[0]) + ' px (' + ora[1] + ') · in uso ' +
+      (radice.style.getPropertyValue('--guscio-su') || '0px'),
+    centro === null ? "guscio non in vista: non sei nell'APK, o non all'apertura"
+      : 'centro del barattolo a y ' + n(centro) + ' della pagina: la riga bianca',
+    'referrer ' + (document.referrer || '—') + ' · ' + chrome
+  ];
+  const pannello = document.createElement('div');
+  pannello.id = 'diagnosiApertura';
+  pannello.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:10001;' +
+    'background:#221B11;color:#FFFFFF;font:12px/1.45 monospace;' +
+    'padding:8px 10px;white-space:pre-wrap;word-break:break-all';
+  pannello.textContent = righe.join('\n') + '\n';
+  const riga = document.createElement('div');
+  if (centro !== null) {
+    riga.style.cssText = 'position:fixed;left:0;right:0;height:1px;' +
+      'background:#FFFFFF;z-index:10000;pointer-events:none;top:' + (centro - 0.5) + 'px';
+    document.body.appendChild(riga);
+  } else {
+    const apri = document.createElement('a');
+    apri.href = 'intent://barattolo.store/?diagnosi=1#Intent;scheme=https;package=store.barattolo.app;end';
+    apri.textContent = "📱 Apri nell'app";
+    apri.style.cssText = 'color:#FFFFFF;margin-right:18px';
+    pannello.appendChild(apri);
+  }
+  const chiudi = document.createElement('button');
+  chiudi.type = 'button';
+  chiudi.textContent = '✕ Chiudi';
+  chiudi.style.cssText = 'font:inherit;color:#FFFFFF;background:none;' +
+    'border:1px solid #FFFFFF;border-radius:6px;padding:2px 10px';
+  chiudi.onclick = () => {
+    pannello.remove(); riga.remove();
+    if (diagnosiTieneGuscio) { diagnosiTieneGuscio = false; togliGuscio(); }
+  };
+  pannello.appendChild(chiudi);
+  document.body.appendChild(pannello);
+}
+if (diagnosiApertura) mostraDiagnosiApertura();
 
 /* ---- COLLAUDO: due identità finte per provare dal browser ---- */
 let collaudo = false;
@@ -16554,7 +16737,13 @@ function applicaTema(){
   else delete document.documentElement.dataset.tema;
   /* la barra del browser e l'header di Telegram seguono il fondo */
   const sfondo = scuro ? '#211A10' : '#FAF4E4';
-  document.getElementById('metaTema')?.setAttribute('content', sfondo);
+  /* ...ma nell'APK, finche' il guscio e' in vista, la barra resta del
+     SUO arancio (l'ha accesa l'head): questo colore glielo porta
+     `togliGuscio`, che richiama questa funzione subito dopo averlo tolto.
+     Dentro Telegram e nel browser il guscio non si vede mai, e la riga
+     scrive come ha sempre scritto. */
+  if (!guscioInVista())
+    document.getElementById('metaTema')?.setAttribute('content', sfondo);
   try { tg?.setHeaderColor?.(sfondo); tg?.setBackgroundColor?.(sfondo); } catch(e){}
   el('temaAuto')?.classList.toggle('active', temaScelto==='auto');
   el('temaChiaro')?.classList.toggle('active', temaScelto==='chiaro');

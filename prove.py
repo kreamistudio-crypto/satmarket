@@ -44062,6 +44062,7 @@ def prove_avvio_client(mini=None, node=None):
       querySelectorAll:()=>[elFinto()],
       closest:()=>null, insertAdjacentHTML:noop, scrollIntoView:noop,
       getBoundingClientRect:()=>({top:0,left:0,width:0,height:0}),
+      getClientRects:()=>[],
       play:noop, click:noop, submit:noop, reset:noop, checked:false,
       files:[], options:[], selectedIndex:0, disabled:false,
     }, {get:(t,k)=> k in t ? t[k] : undefined, set:()=>true});
@@ -79868,6 +79869,164 @@ def prove_guscio_apertura():
           mini.count('src="/assets/barattolo-hero.png"'))
 
 
+def prove_guscio_barra_e_scarto():
+    """IL GUSCIO NELL'APK, DUE RITOCCHI (set 2026, dal video a 15
+    fotogrammi dopo la v1.4). 1) LA BARRA DI STATO: arancio durante lo
+    splash, poi al primo disegno del guscio crema per un fotogramma (il
+    theme-color fisso dell'head) e poi scura (applicaTema), col guscio
+    ancora arancio sotto — una striscia chiara in alto. 2) LA POSIZIONE:
+    il barattolo del guscio stava ~22px (su 1280) sotto quello dello
+    splash, perche' lo splash centra sullo SCHERMO e la pagina nel SUO
+    riquadro, fra le due barre di sistema.
+    La prima meta' si prova sul testo: dove si scrive il meta, chi lo
+    aspetta, e che Telegram e il browser restino come prima. La seconda
+    si prova sui NUMERI, facendo girare `scartoGuscio` VERA sotto node:
+    il conto e' tutto li', e un segno sbagliato sul testo non si vede.
+    Il giro dal vivo (Chrome via CDP, rete a 4 Mbps, un fotogramma alla
+    volta) sta in CANTIERI: questa sezione tiene ferma la forma."""
+    print("\n[Il guscio nell'APK: la barra di stato e lo scarto]")
+    import shutil
+    import subprocess
+    import tempfile
+    mini = open("miniapp.html", encoding="utf-8").read()
+    i_fine = mini.index("</style>")
+    css = re.sub(r"/\*.*?\*/", "", mini[mini.index("<style>"):i_fine],
+                 flags=re.S)
+    reg = {s.strip(): c for s, c in re.findall(r"([^{}]+)\{([^{}]*)\}", css)
+           if "#guscio" in s}
+    testa = mini[i_fine:mini.index("<body")]
+    corpo = mini[mini.index("<body"):]
+
+    # --- 1) LA BARRA DI STATO ----------------------------------------
+    SE = ("if ((document.referrer || '').indexOf("
+          "'android-app://store.barattolo.app') === 0) {")
+    prova("il ramo dell'APK nell'head e' un blocco", 1, testa.count(SE))
+    ramo = testa[testa.index(SE):]
+    ramo = ramo[:ramo.index("\n  }\n")]
+    prova("nell'APK la barra nasce ARANCIO nell'head, cioe' prima del "
+          "primo paint", True,
+          "document.getElementById('metaTema')?.setAttribute('content', "
+          "'#F78F19');" in ramo)
+    # e SOLO li': Telegram e il browser partono dal crema del meta e
+    # seguono applicaTema come prima (il banco dal vivo li ha girati
+    # tutt'e due prima/dopo: stessa sequenza)
+    prova("...e SOLO nell'APK: fuori da quel ramo l'head non tocca la barra",
+          [1, 1], [testa.count("metaTema"), ramo.count("metaTema")])
+    _arancio = re.search(r"setAttribute\('content', '(#[0-9A-F]{6})'\);",
+                         ramo).group(1)
+    prova("...ed e' l'arancio del GUSCIO (lo stesso della regola #guscio, "
+          "che l'altra sezione lega al campione della foto)", True,
+          f"background:{_arancio};" in reg.get("#guscio", ""))
+    at = pezzo_js(mini, "function applicaTema(){", "\n}\n")
+    prova("applicaTema lascia stare la barra finche' il guscio e' in vista",
+          True, "if (!guscioInVista())\n    document.getElementById("
+          "'metaTema')?.setAttribute('content', sfondo);" in at)
+    prova("...ed e' l'unica mano che la scrive dal corpo della pagina", 1,
+          corpo.count("getElementById('metaTema')"))
+    giv = pezzo_js(mini, "function guscioInVista(){", "\n}\n")
+    # getClientRects e non offsetParent: il guscio e' position:fixed, e
+    # per un fixed offsetParent e' null sempre — «no» anche a schermo
+    prova("guscioInVista chiede al DISEGNO, e non con offsetParent (null "
+          "sempre per un fixed)", [True, False],
+          ["getClientRects().length > 0" in giv, "offsetParent" in giv])
+    tg_ = pezzo_js(mini, "function togliGuscio(){", "\n}\n")
+    prova("il colore del tema arriva quando il guscio SCENDE: togliGuscio "
+          "lo toglie PRIMA di richiamare applicaTema", True,
+          tg_.index("document.getElementById('guscio')?.remove();")
+          < tg_.index("applicaTema();"))
+
+    # --- 2) LO SCARTO: IL CSS E L'HEAD -------------------------------
+    su_img = reg.get("html.app-android #guscio img", "")
+    su_anello = reg.get("html.app-android #guscio .attesa-anello", "")
+    prova("il barattolo sale di --guscio-su, con un top relativo",
+          "position:relative;top:calc(-1 * var(--guscio-su, 0px))", su_img)
+    prova("...e l'anello della STESSA misura, col margine (e' assoluto)",
+          "margin-top:calc(-1 * var(--guscio-su, 0px))", su_anello)
+    prova("...e nessuna delle due e' una transform (l'anello la presta a "
+          "`gira`)", [False, False],
+          ["transform" in su_img, "transform" in su_anello])
+    prova("lo scarto si scrive nell'head, nel ramo dell'APK: prima del "
+          "primo paint", True,
+          "radice.style.setProperty('--guscio-su', r[0] + 'px');" in ramo)
+    prova("...coi numeri che la pagina ha davvero", True, bool(re.search(
+        r"scartoGuscio\(screen\.height, screen\.width, innerHeight,\s+"
+        r"screen\.availTop, screen\.availHeight\)", ramo)))
+    prova("...e si rifa' a ogni resize, se il riquadro all'apertura non "
+          "fosse ancora quello vero", True,
+          "addEventListener('resize', scarto);" in ramo)
+    # fuori dalla IIFE, o la diagnosi (nel corpo) non potrebbe rifarlo
+    prova("il conto sta FUORI dalla funzione dell'head: la diagnosi lo "
+          "rifa' con gli stessi numeri", True,
+          testa.index("})();") < testa.index("function scartoGuscio("))
+
+    # --- 3) IL CONTO, SOTTO NODE -------------------------------------
+    node = shutil.which("node")
+    if not node:
+        salta("scartoGuscio fa il conto giusto", "node non c'e'")
+    else:
+        casi = [
+            # [alto, largo, pagina, availTop, availAlto] — px CSS
+            [784, 360, 726, 0, 784],   # il telefono di Andrea: 58 di barre
+            [800, 360, 760, 0, 800],   # 24 sopra + 16 di gesti: la stima e' esatta
+            [800, 360, 752, 0, 800],   # 24 + 24 (i Pixel): sbaglia di 8, scritto
+            [800, 360, 736, 40, 736],  # il browser DICE le barre: 40 su, 24 giu'
+            [800, 360, 728, 0, 800],   # tre tasti, 24 + 48 = 72: niente
+            [800, 360, 776, 24, 736],  # availTop che non torna con la pagina
+            [360, 800, 300, 0, 360],   # sdraiato
+            [784, 360, 784, 0, 784],   # pagina a tutto schermo
+            [784, 360, 0, 0, 784],     # pagina senza misura
+            [784, 360, 800, 0, 784],   # pagina piu' alta dello schermo
+        ]
+        js = (pezzo_js(mini, "function scartoGuscio(", "\n}\n") + "\n}\n"
+              + "console.log(JSON.stringify(" + json.dumps(casi)
+              + ".map(c => scartoGuscio(...c))));\n")
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                         encoding="utf-8") as f:
+            f.write(js)
+        try:
+            out = subprocess.run([node, f.name], capture_output=True,
+                                 encoding="utf-8", timeout=60)
+            avuto = json.loads(out.stdout or "null")
+        except Exception as e:
+            avuto = f"node e' esploso: {e}"
+        finally:
+            os.unlink(f.name)
+        prova("scartoGuscio: la stima sul telefono coi gesti, la strada "
+              "esatta quando il browser la dice, e niente dove la somma "
+              "delle barre non basta", [
+                  [13, "stima"], [4, "stima"], [8, "stima"],
+                  [8, "esatto"], [0, "nessuno"], [0, "nessuno"],
+                  [0, "nessuno"], [0, "nessuno"], [0, "nessuno"],
+                  [0, "nessuno"]], avuto)
+
+    # --- 4) LA DIAGNOSI (?diagnosi=1) --------------------------------
+    prova("la diagnosi esiste solo col parametro", [1, 1], [
+        mini.count("const diagnosiApertura = /[?&]diagnosi=1(&|$)/"
+                   ".test(location.search);"),
+        mini.count("if (diagnosiApertura) mostraDiagnosiApertura();")])
+    md = pezzo_js(mini, "function mostraDiagnosiApertura(){", "\n}\n")
+    # SOLO se in vista: dentro Telegram `ready()` vive in togliGuscio, e
+    # un guscio trattenuto li' lascerebbe il velo di Telegram su per sempre
+    prova("...tiene su il guscio SOLO se si vede", True, md.startswith(
+        "function mostraDiagnosiApertura(){\n"
+        "  diagnosiTieneGuscio = guscioInVista();"))
+    prova("...e togliGuscio lo rispetta, subito dopo «il primo che arriva»",
+          True, tg_.split("\n")[2].strip().startswith(
+              "if (diagnosiTieneGuscio) return;"))
+    prova("...e il suo Chiudi lo rilascia PRIMA di chiamare togliGuscio",
+          True, "if (diagnosiTieneGuscio) { diagnosiTieneGuscio = false; "
+          "togliGuscio(); }" in md)
+    prova("...scrive coi textContent e mai con innerHTML (dentro ci sono "
+          "referrer e user-agent)", [False, True],
+          ["innerHTML" in md, "pannello.textContent = righe.join" in md])
+    prova("...rifa' lo stesso conto di chi sposta il guscio", True,
+          "scartoGuscio(screen.height, screen.width, innerHeight," in md)
+    _pacco = json.load(open(os.path.join(".well-known", "assetlinks.json"),
+                            encoding="utf-8"))[0]["target"]["package_name"]
+    prova("...e il suo «Apri nell'app» apre il NOSTRO pacchetto", True,
+          f"package={_pacco};end'" in md)
+
+
 def prove_app_android():
     """L'APP ANDROID (TWA, set 2026). L'APK che sta su Zapstore e' un
     INVOLUCRO: dentro non c'e' codice web, tutto arriva da
@@ -80587,6 +80746,7 @@ def main():
               prove_timbri_visti,
               prove_effetti_ridotti,
               prove_guscio_apertura,
+              prove_guscio_barra_e_scarto,
               prove_app_android,
               prove_permesso_splash_apk,
               prove_bunker_muto,

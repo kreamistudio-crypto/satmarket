@@ -26441,3 +26441,67 @@ RESTANO DUE COSE, e tutt'e due sono della PAGINA, non dell'APK: una
 **striscia chiara in alto** quando compare il guscio, e uno **scattino
 del barattolo** fra lo splash e il guscio. Le cura il ritocco al guscio,
 nella voce qui sotto: niente release, basta un deploy.
+
+## La barra e il barattolo nel guscio dell'APK (23 set 2026)
+
+Le due cose rimaste dal video della v1.4 (15 fotogrammi al secondo),
+tutt'e due della pagina.
+
+**LA BARRA DI STATO.** Arancio durante lo splash; al primo disegno del
+guscio crema per un fotogramma (il `theme-color` fisso in cima al file)
+e poi scura (`applicaTema` col tema scuro), col guscio ancora arancio
+sotto. Adesso nell'APK il meta nasce dell'arancio del guscio, nello
+stesso ramo dell'head che accende `app-android`, prima del primo paint;
+`applicaTema` non lo tocca finché il guscio si vede (`guscioInVista`
+chiede al DISEGNO con `getClientRects`: per un `position:fixed`
+`offsetParent` è null sempre); e il colore del tema lo porta
+`togliGuscio`, che già richiamava `applicaTema` subito DOPO il
+`remove()`. Telegram e browser non passano da quel ramo.
+
+**IL BARATTOLO.** Nel video stava a y 509-763 nello splash e 530-787 nel
+guscio: stessa misura, ~22px più in basso. Lo splash di Chrome centra
+sullo SCHERMO intero, la pagina nel suo riquadro fra le due barre di
+sistema, e lo scarto è (sopra − sotto)/2. ⚠️ IL NODO: **la pagina sa la
+SOMMA delle due barre, non come si divide.** Letto nel sorgente di
+Chromium: su Android `screenY` è sempre 0 (`GetViewBounds` riporta
+l'origine 0,0), `outerHeight` è la pagina, e `screen.availTop` direbbe
+le barre solo col flag `AndroidUseCorrectDisplayWorkArea`, spento di
+serie. Quindi `scartoGuscio` ha una strada ESATTA per quando il browser
+le dice, e una STIMA per i telefoni coi gesti (somma fra 40 e 72): la
+barra di sotto vale 16 — il valore che annulla lo scatto misurato — e
+l'errore è ESATTAMENTE (barra vera − 16), 8px di troppo sui Pixel, che
+di serie ne hanno 24. Fuori dalla forbice niente spostamento: con la
+barra a tre tasti il guscio dovrebbe SCENDERE, ma la somma non basta a
+distinguerla da una tacca alta, e nel dubbio non si peggiora.
+La strada certa per tutti esiste ed è un'altra: l'APK conosce le barre
+vere e potrebbe dirle alla pagina, ma vuole una 1.5. Qui non serviva.
+
+**LA DIAGNOSI, per il dato che da qui non si sa.** `?diagnosi=1` scrive
+in alto i numeri che il browser dà, e nell'APK tiene su il guscio con
+una riga bianca sul centro del barattolo finché non si tocca «Chiudi»:
+uno screenshot di quello schermo dice le due barre in pixel veri. Dal
+browser, «Apri nell'app» è un `intent://` verso il nostro pacchetto.
+
+**PROVATO DAL VIVO** (Chrome via CDP, schermo 360×784 e pagina 360×726 a
+dpr 3, rete strozzata a 4 Mbps perché il difetto vive solo quando la
+pagina arriva a pezzi, un diario in pagina a ogni fotogramma): PRIMA 365
+fotogrammi di barra crema e 16 di scura col guscio su, cioè il video;
+DOPO 381 fotogrammi tutti arancio, e il tema che arriva nello stesso
+millisecondo in cui il guscio scende, in scuro e in chiaro. Nel browser
+le due sequenze sono identiche. Il barattolo passa dal centro 363 al
+350, l'anello sale con lui; con 72 di barre resta a 364.
+LE PROVE: `prove_guscio_barra_e_scarto` (23), con `scartoGuscio` fatta
+girare sotto node su dieci casi; tortura **20/20**. E il DOM di cartone
+di `prove_sintassi_client` ha imparato `getClientRects`: lo script si
+fermava lì per colpa del cartone, non del codice. Suite intera
+**13401/0** con `PROVE_SEVERE=1`.
+
+### Da guardare sul telefono
+
+Aprendo l'app a freddo: la barra resta arancio fino alla vetrina, senza
+strisce, e il barattolo non si muove fra splash e guscio (un video a 15
+fotogrammi come quello di ieri lo dice al pixel). Poi la diagnosi:
+Barattolo chiuso dalle app recenti, in Chrome sul telefono
+`barattolo.store/?diagnosi=1`, «Apri nell'app», e uno screenshot. Se lo
+scattino resta, quello screenshot dice di quanto è sbagliata la barra
+dei gesti presunta.
