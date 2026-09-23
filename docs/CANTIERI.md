@@ -28355,3 +28355,132 @@ invita non viene avvisato di niente: gli XP si guardano nel Profilo,
 come sempre. Tre scelte mie da confermare: le quote dentro la classifica
 e i livelli, la quota persa oltre il tetto, e la finestra dei 7 giorni
 anche per chi arriva dal link essendo già iscritto.
+
+## Una Garlanda: il venditore la vede (collegamento e anteprima per chi vende) (23 set 2026)
+
+**LA RICHIESTA.** Tre cose, sulla pagina in bozza della stessa sera
+(«Una Garlanda in bozza», qui sopra): COLLEGARLA al venditore —
+l'account Telegram di Manuele, @Manumussa, «Manuele M.» —; fargliela
+VEDERE, a lui e ai moderatori, sul suo negozio e dal link
+`/?bozza=una-garlanda`, con in cima «Anteprima: questa pagina la vedi
+solo tu. Se va bene, scrivici e la pubblichiamo.» e un bottone per la
+chat con noi, SENZA «Pubblica»; e nel cassetto del pannello un
+«🔗 Copia il link per il venditore» con una frase pronta da mandargli.
+
+**IL COLLEGAMENTO È IL TG_ID, ED È UN'ECCEZIONE DICHIARATA.** Il codice
+negozio di Manuele si legge solo dal database del VPS, che da qui non si
+tocca, e delle due strade che Andrea aveva scritto si è presa quella che
+non ferma il cantiere: il tg_id in `racconti.py` (`venditore_tg`), che il
+server risolve nel codice da solo. Rompe per una riga il patto di casa
+«nessun tg_id entra nel repo» (quello di SLUG_SPONSOR e dei punti di
+ritiro), e lo si scrive invece di lasciarlo passare: il tg_id NON ESCE
+DAL SERVER — non è fra i CAMPI_RACCONTO, e nessuna risposta lo porta (il
+collaudo lo cerca nel testo intero di ogni porta, la tortura lo rimette
+fra le chiavi e muore). LA STRADA DEL RITORNO è una riga: il cassetto del
+pannello adesso mostra il codice risolto accanto al nome, e basta
+scriverlo in `negozio` e togliere `venditore_tg`.
+LA PRIMA FORMA VINCE: col codice nel catalogo il tg_id non conta
+nemmeno quando è quello giusto — due riferimenti che puntassero a due
+negozi diversi non devono poter accendere la pagina su tutt'e due. Due
+funzioni, una per domanda: `_e_suo` confronta in memoria (la rotta
+pubblica e la porta del venditore: per i negozi che non c'entrano
+nessuna query) e `_venditore_racconto` risolve nel database (le due
+porte admin).
+
+**LA TERZA PORTA, E LA PUBBLICA RESTA SORDA.** Il venditore la bozza la
+riceve da `/api/me/racconti`. Il negozio si legge per il tg_id di CHI
+BUSSA e mai da un parametro — o chiunque potrebbe chiedere la bozza di
+un altro scrivendone il codice —; all'anonimo il 401 di tutte le porte
+`/api/me`; a un altro utente una lista VUOTA e non un 403, perché la
+domanda è «cosa c'è di mio?» e a chi non ha niente non si dice se
+altrove esiste una bozza. `/api/negozio` continua a non portarla a
+NESSUNO, lui compreso: il tg_id che adesso passa al giudice è quello del
+NEGOZIO servito, mai di chi guarda, e la sentinella «non guarda chi
+bussa» resta vera.
+
+**NEL CLIENT.** Se il negozio aperto è il suo (`myNegozio`),
+`apriNegozio` chiede la sua porta prima di disegnare
+(`bozzaDelVenditore`: solo le bozze, che una pubblicata la porta già il
+negozio a tutti; fail-open, se la porta tace il negozio si apre lo
+stesso). La leva sceglie la porta con `isAdmin`, che è un indirizzo e
+non un giudice: se sbagliasse, la porta sbagliata risponderebbe 403 o
+niente. L'avviso del venditore ha le parole di Andrea e UN gesto,
+«💬 Scrivi a Barattolo»: la chat privata già usata per «Scrivici per i
+tuoi dati» (`CONTATTO_DATI`, `t.me/barattolostore?direct`), dove
+risponde una persona e si parla di UNA persona e della SUA pagina.
+Nessun «Pubblica», e c'è la prova che non ci arrivi. I segnaposto delle
+foto li vede anche lui, che è quello che le deve mandare. Dal suo
+profilo la storia arriva CHIUSA, col «Leggi la storia ›», come per
+chiunque arrivi al negozio (il patto del cassetto); dal link si apre
+aperta.
+I TESTI DEI MODERATORI si sono adeguati a una bozza che adesso vede
+anche lui: «📝 Bozza · la vedono i moderatori e il venditore» («solo i
+moderatori» quando un venditore non c'è), la conferma del ritorno in
+bozza, il cassetto, il toast del link.
+
+**IL MESSAGGIO PRONTO.** «🔗 Copia il link per il venditore» compare
+quando il venditore c'è davvero e la pagina è in bozza: il primo nome
+dal suo profilo, il link della leva e le DUE strade — il link si apre
+nel browser di Telegram, dove si entra col bottone di Telegram (il login
+web ricarica la STESSA pagina, quindi `?bozza=` sopravvive all'accesso),
+e dentro l'app la bozza gli compare da sola sul suo negozio, dal
+profilo.
+
+**LA SICUREZZA DEL BANCO, e non è un dettaglio.** Il giro dal vivo NON
+ha mai usato il tg_id vero: il config locale può avere il token vero del
+bot, e `_manda_telegram` simula solo gli id piccoli — un'identità di
+collaudo col tg_id di Manuele avrebbe potuto scrivergli davvero. Si è
+girato su una COPIA dell'albero col catalogo legato al venditore di
+collaudo 222, senza mai premere «Pubblica» (che avvisa gli ADMIN_IDS del
+config). Il collaudo invece usa il tg_id VERO del catalogo, ed è lecito:
+gira nel banco (config finto, nodo finto, notifiche raccolte) e in CI
+nella gabbia senza rete, dove è verde.
+
+**LE STRADE SCARTATE.** 1) Lo username nel catalogo: si cambia e si
+riassegna, e la pagina finirebbe sul negozio di un altro. 2) Fermarsi
+col comando per il VPS: era l'altra strada di Andrea, e lasciava il
+cantiere a metà. 3) La bozza nella rotta pubblica per il proprietario:
+un secondo giudice della bozza su una rotta che oggi non sa chi bussa.
+4) Un 403 dalla porta del venditore a chi non lo è: direbbe che una
+bozza esiste. 5) Un «Pubblica» disabilitato per lui: un bottone che non
+si può premere è una promessa.
+
+**PROVATO.** `prove.py` nel worktree, senza config e con PROVE_SEVERE:
+14.000 verdi, 0 rosse; nella famiglia `prove_racconti_bozza` 92 prove
+(erano 62): il legame nel catalogo e il tg_id che non è fra le chiavi
+che escono, il giudice GIRATO con la pagina legata col tg_id e la
+precedenza del codice, le sentinelle della porta del venditore (chiede
+chi è, legge per il tg_id di chi bussa, non scrive), l'avviso del
+venditore con le parole esatte e senza gesti da moderatore, la bozza
+sul suo negozio, e nel banco del renderer l'anteprima del venditore e
+il messaggio composto davvero (primo nome, link, le due strade, e
+«Ciao!» quando il nome manca). `collaudo_racconti_bozza` riscritto sul
+catalogo vero: 42 verdi — la porta admin (401, 403 anche al venditore,
+il testo al moderatore), il venditore scritto che non ha un negozio
+(409, e il pannello lo dice), la porta del venditore (401 all'anonimo,
+vuota a un altro, la SUA bozza a lui col codice risolto), la bozza da
+nessun'altra parte (il negozio a quattro figure, i meta, la home con la
+leva, la mappa), pubblica e rimetti in bozza, e la precedenza del codice
+sul tg_id; il tg_id cercato in ogni risposta, e mai trovato. I dodici
+collaudi della CI verdi nella gabbia. **LA TORTURA: 15 mutazioni, 15
+uccise** — il legame che accetta qualunque tg_id, la precedenza sparita,
+la porta del venditore aperta a tutti o senza chiedere chi è, la rotta
+pubblica che guarda chi bussa, il tg_id fra le chiavi o nel pannello,
+pubblicare senza un negozio vero, un «Pubblica» al venditore, le sue
+parole cambiate, la bozza sul suo negozio che non si chiede più o che
+prende anche le pubblicate, la leva che bussa sempre agli admin, il
+messaggio senza link o senza venditore. **DAL VIVO** a 375 px nei due
+temi (Chrome headless, densità 2): il venditore sul suo negozio e dalla
+leva, un altro utente che resta sulla home con l'avviso e sul negozio
+del venditore non vede niente, il cassetto col nome, il codice e il
+bottone nuovo, il messaggio catturato dagli appunti, e l'anteprima del
+moderatore col titolo nuovo; niente sbordo orizzontale.
+
+**DA GUARDARE.** 1) Il messaggio mandato a Manuele, e cosa vede lui: dal
+browser di Telegram dopo «Log in with Telegram», e nell'app dal profilo
+(«Guarda il tuo negozio come lo vedono tutti»). 2) In produzione, nel
+cassetto: accanto a «Manuele M.» deve comparire un codice di otto
+caratteri — se il cassetto dice che quel venditore non ha un negozio,
+il tg_id è sbagliato o quell'account non è mai entrato in Barattolo. 3)
+Quel codice, il giorno che si vuole tornare al patto: una riga in
+`racconti.py`.

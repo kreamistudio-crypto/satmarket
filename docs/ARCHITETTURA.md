@@ -3480,6 +3480,23 @@
   L'anteprima social del negozio resta quella del brand anche a pagina
   pubblicata, come per To The Mooon. Il perche' di ogni pezzo e le
   strade scartate: Cantieri, «Una Garlanda in bozza».
+  ⚠️ E LE PORTE SONO TRE, e la bozza la vede anche il VENDITORE (set
+  2026, stesso giorno): `/api/me/racconti` gli da' le pagine del SUO
+  negozio (letto per il tg_id di chi bussa, mai da un parametro) e a
+  chiunque altro una lista vuota; `/api/negozio` continua a non
+  portarla a nessuno, lui compreso. Nel client, se il negozio aperto
+  e' il suo (`myNegozio`), `apriNegozio` chiede quella porta prima di
+  disegnare (`bozzaDelVenditore`), e l'avviso in cima e' il suo:
+  «Anteprima: questa pagina la vedi solo tu. Se va bene, scrivici e la
+  pubblichiamo.» col bottone di `apriContattoDati` e NESSUN
+  «Pubblica». IL LEGAME pagina → negozio ha due forme e la prima vince:
+  il CODICE (`negozio`) o il tg_id (`venditore_tg`, un'eccezione
+  dichiarata al patto «nessun tg_id nel repo»); lo giudicano
+  `_e_suo` in memoria e `_venditore_racconto` nel database, e il tg_id
+  non esce da nessuna risposta — le porte portano il codice risolto.
+  Il cassetto mostra nome e codice del venditore e «🔗 Copia il link per
+  il venditore» (`copiaMessaggioVenditore`). Il perche': Cantieri,
+  «Una Garlanda: il venditore la vede».
 
   LE CATEGORIE IN HOME (ago 2026, decisione di Andrea): sotto l'header
   di Esplora una fila di CARD QUADRATE ILLUSTRATE che scorre di lato —
