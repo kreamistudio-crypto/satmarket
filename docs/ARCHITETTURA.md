@@ -6358,13 +6358,19 @@
   con telegram/nostr espliciti SOLO quella gamba senza ripiego (la
   scelta si rispetta: social senza foto = iniziale), con 'nessuna'
   non si scarica proprio; senza nulla la colonna si svuota e torna
-  l'iniziale (foto sparita dal social = sparita anche da noi;
-  imperfezione dichiarata: anche l'errore transitorio di rete svuota,
-  ripara il rinfresco successivo). Rinfresco opportunistico in
+  l'iniziale (foto sparita dal social = sparita anche da noi). MA IL
+  «NON SI SA» NON SVUOTA: la gamba Telegram distingue b'' da None dal
+  set 2026, e dai ritocchi piccoli anche quella Nostr — `_kind0_profilo`
+  dice {} solo a EOSE, `_profilo_nostr` dà il vuoto solo se hanno
+  risposto TUTTI (il nostro relay risponde sempre vuoto) e None se
+  qualcuno ha taciuto, `_foto_profilo_nostr` dà None se la foto non si
+  scarica; col None foto e nome restano e `_riprova_avatar_presto`
+  timbra «sette giorni meno un'ora fa», cioè il giro si riprova fra
+  un'ora, in coda a chi aspetta da più tempo. Rinfresco opportunistico in
   `/api/me` (diventato async per questo): al più ogni `GIORNI_AVATAR`
   (7), mai con 'nessuna', in create_task fail-open con anti-valanga
-  `_AVATAR_IN_CORSO`; in collaudo la gamba Telegram esce None da
-  bot_api simulato, quella Nostr legge i relay veri. Selettore «La
+  `_AVATAR_IN_CORSO`; in collaudo nessuna delle due gambe esce dal
+  computer (bot simulato, `lettura_simulata`). Selettore «La
   tua foto» nel cassetto Identità (`POST /api/me/avatar-scelta`,
   pattern canale-notifiche: si accetta solo una sorgente che esiste,
   e ogni cambio ≠ nessuna rifà subito il francobollo): pillole solo
@@ -9202,6 +9208,24 @@
   passa da `condividiLink`/`copiaLink` senza mai entrare in un
   onclick); `fraseXp` elenca il terzo lato «da chi hai invitato». «I
   tuoi dati» dichiara il legame e il suo limite onesto.
+  LA SOGLIA DEGLI INVITATI ATTIVI (set 2026, ritocchi piccoli): sotto
+  `INVITO_ATTIVI_MIN` (3) persone diverse che ti hanno portato almeno
+  un punto (`invitati_attivi`, dal riferimento delle quote) la cifra
+  NON ESCE DAL SERVER — `stato_inviti` manda `xp: null` e `attivi_min`,
+  e il cassetto dice «I punti degli inviti compaiono da 3 invitati
+  attivi in su»; `xp_per_ruolo` manda `{accorpati, attivi_min}` e
+  nessuna cifra per nessun lato (con vendite e acquisti a schermo, la
+  terza la darebbe la sottrazione dal totale). Il conto degli attivi
+  non esce mai. Il TOTALE invece le quote le contiene ancora (Profilo,
+  classifica, `xp` del 30382): è il limite che «I tuoi dati» dichiara.
+  «NON MOSTRARMI IN CLASSIFICA» (set 2026, ritocchi piccoli): colonna
+  `utenti.classifica_nascosta` (0 di serie), `POST
+  /api/me/classifica-nascosta` che butta la cache di un minuto, e
+  `classifica_ora` che toglie chi si nasconde DOPO il giudice puro —
+  i voti che ha dato restano, e chi gli stava dietro sale. Il livello
+  resta sul profilo (serve a chi scambia). Nel client la riga sta in
+  fondo al cassetto «Livello e titolo» (`rigaClassificaNascosta`,
+  `setClassificaNascosta`), solo a classifica accesa.
   LA FUSIONE fa la liturgia dei vicini sul codice (vince la metà
   Telegram, quella che muore lo cede solo se l'altra non ce l'ha) e sui
   collegamenti, in un ordine che non è libero: PRIMA muore il legame
@@ -25584,6 +25608,16 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (`bozzaRecensioneP2P` / `rimettiBozzaRecensioneP2P`: testo, fuoco e
   selezione, solo per lo stesso scambio; le stelle nascono da
   `p2pStellaScelta`, che si azzera aprendo un altro scambio).
+  E LA PAGINA SI RIDISEGNA SOLO DOVE CAMBIA (set 2026, ritocchi
+  piccoli): `renderOrdineP2P` scrive con `ridisegnaSeCambiaP2P`, che
+  confronta i pezzi di primo livello col loro HTML e tiene gli STESSI
+  nodi di quelli ritrovati — la sottosequenza comune più lunga,
+  `pezziCheRestanoP2P`, non il solo tratto uguale in testa, perché
+  l'anello del tabacchino cambia ogni secondo e sta in alto — senza
+  mai spostarli (`posaPezziP2P`, dal fondo). Così una selezione fatta
+  nel primo secondo (l'IBAN, l'importo) sopravvive al profilo
+  dell'altra persona o al bundle che arrivano dopo; se non cambia
+  niente non si tocca niente. Il ripiego è l'innerHTML di sempre.
   E LA DOMANDA NON SI CHIUDE SUL «NON ANCORA»: `chiediRecensibileP2P`
   richiede da sola un `non_conclusa` o un server muto dopo 5, 15, 30,
   60 e 120 secondi (`P2P_REC_RIPROVE_MS`); i motivi definitivi restano

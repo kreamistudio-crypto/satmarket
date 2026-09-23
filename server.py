@@ -2612,7 +2612,12 @@ def xp_per_ruolo(righe, totale: int):
     somma del registro mentre la cache ne tiene di meno, i tre lati non
     farebbero il totale e la scomposizione tacerebbe proprio a chi ha
     invitato di piu'.
+    E SOTTO LA SOGLIA SI ACCORPA (set 2026, ritocchi piccoli): con punti
+    da inviti e meno di INVITO_ATTIVI_MIN invitati attivi esce
+    {'accorpati': True, 'attivi_min': N} e NESSUNA cifra — vedi la riga
+    in fondo.
     """
+    righe = list(righe)             # si leggono due volte: qui e in `invitati_attivi`
     per = {"vendite": 0, "acquisti": 0}
     portati = 0
     for rif, punti in righe:
@@ -2628,9 +2633,19 @@ def xp_per_ruolo(righe, totale: int):
         # lati: e' cosi' che la somma qui sotto se ne accorge
     propri = per["vendite"] + per["acquisti"]
     contati = xp_contati(propri, portati) - propri
+    if propri + contati != int(totale):
+        return None
+    if contati and invitati_attivi(righe) < INVITO_ATTIVI_MIN:
+        # I PUNTI DEGLI INVITI SI ACCORPANO (set 2026, ritocchi piccoli,
+        # decisione di Andrea): sotto la soglia degli invitati attivi la
+        # riga non dice NESSUNA cifra — non solo quella degli inviti: con
+        # le vendite e gli acquisti a schermo, la terza la darebbe la
+        # sottrazione dal totale. Dice solo che il numero e' fatto di
+        # commercio e di inviti, e da quanti attivi tornano le cifre.
+        return {"accorpati": True, "attivi_min": INVITO_ATTIVI_MIN}
     if contati:
         per["inviti"] = contati
-    return per if propri + contati == int(totale) else None
+    return per
 
 
 # ------------------ LA QUOTA DEGLI INVITI (set 2026) -----------------
@@ -2660,6 +2675,28 @@ def xp_per_ruolo(righe, totale: int):
 # registro: `xp_contati` le terrebbe comunque sotto i propri (cioe' a
 # zero), ma il registro direbbe il falso a chiunque lo rilegga.
 INVITO_PERCENTO = 5
+# DA QUANTI INVITATI ATTIVI SI VEDONO I PUNTI DEGLI INVITI (set 2026,
+# ritocchi piccoli, decisione di Andrea). Con uno o due, la cifra che
+# ti hanno portato e' il commercio di una persona che conosci — sei tu
+# che le hai dato il link — e nel cassetto la si leggerebbe crescere a
+# ogni suo affare. Da tre in su una crescita non dice di chi e'. ATTIVO
+# = ti ha portato almeno un punto (`invitati_attivi`): chi si e'
+# iscritto e basta non nasconde nessuno.
+INVITO_ATTIVI_MIN = 3
+
+
+def invitati_attivi(righe) -> int:
+    """Quante persone DIVERSE ti hanno portato almeno un punto: si
+    leggono dal riferimento delle quote, `invito:{invitato}:{...}`, che
+    scrive `quota_invito`. `righe` sono le (riferimento, punti) del
+    registro, dentro il perimetro come per ogni lettore: il riferimento
+    di un altro tipo qui non conta niente."""
+    chi = set()
+    for rif, punti in righe:
+        pezzi = (rif or "").split(":")
+        if len(pezzi) >= 3 and pezzi[0] == XP_INVITO and int(punti or 0) > 0:
+            chi.add(pezzi[1])
+    return len(chi)
 
 
 def xp_contati(propri: int, inviti: int) -> int:
@@ -3002,6 +3039,10 @@ def stato_inviti(con, tg_id: int, registrato) -> dict:
     persone = con.execute("SELECT COUNT(*) FROM inviti WHERE invitante=?",
                           (tg_id,)).fetchone()[0]
     propri, inviti = somme_xp(con, tg_id).get(tg_id, (0, 0))
+    dove, par = sql_xp_commercio()
+    attivi = invitati_attivi(con.execute(
+        "SELECT riferimento, punti FROM xp_eventi WHERE tg_id=? AND tipo=? "
+        f"AND {dove}", [tg_id, XP_INVITO] + par).fetchall())
     invitato = con.execute("SELECT 1 FROM inviti WHERE invitato=?",
                            (tg_id,)).fetchone() is not None
     fino = finestra_invito(registrato)
@@ -3009,8 +3050,15 @@ def stato_inviti(con, tg_id: int, registrato) -> dict:
             "link": f"{LINK_BOT}?start={codice}" if codice else "",
             "persone": persone,
             # gli XP che gli inviti gli hanno portato, CONTATI: la stessa
-            # cifra che la scomposizione del livello mette nel totale
-            "xp": xp_contati(propri, inviti) - propri,
+            # cifra che la scomposizione del livello mette nel totale.
+            # None sotto la soglia degli invitati attivi (set 2026,
+            # ritocchi piccoli): la cifra NON ESCE dal server, e il
+            # cassetto dice da quanti attivi compare — `attivi_min`. Il
+            # conto degli attivi non esce mai: anche lui direbbe quando
+            # uno dei tuoi ha cominciato a commerciare.
+            "xp": (xp_contati(propri, inviti) - propri
+                   if attivi >= INVITO_ATTIVI_MIN else None),
+            "attivi_min": INVITO_ATTIVI_MIN,
             "invitato": invitato,
             "campo_fino": fino if (not invitato and time.time() < fino) else 0,
             "percento": INVITO_PERCENTO,
@@ -5775,7 +5823,14 @@ def init_db():
                     # qui il silenzio PROTEGGE — e un default acceso
                     # regalerebbe un'identita' che nessuno ha chiesto
                     # di dare. Giudice unico: `_p2p_riconosciuto`.
-                    "riconosci_p2p INTEGER DEFAULT 0"):
+                    "riconosci_p2p INTEGER DEFAULT 0",
+                    # «NON MOSTRARMI IN CLASSIFICA» (set 2026, ritocchi
+                    # piccoli, decisione di Andrea): 1 = il suo nome non
+                    # esce dalla classifica pubblica. Il LIVELLO invece
+                    # resta sul profilo, perche' serve alla fiducia
+                    # negli scambi. Di serie 0, come la classifica e'
+                    # sempre stata. Lo legge `classifica_ora`.
+                    "classifica_nascosta INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -19878,6 +19933,15 @@ def classifica_ora(con) -> tuple:
         return _classifica_cache["righe"], _classifica_cache["piene"]
     voti, controparti, xp, affari = _dati_classifica(con)
     righe = _classifica_utenti(voti, controparti, xp, affari)
+    # CHI HA DETTO «NON MOSTRARMI IN CLASSIFICA» (set 2026, ritocchi
+    # piccoli) esce DOPO il giudice e non prima: la sua riga non c'e' e
+    # chi gli stava dietro sale di un posto, ma i voti che ha DATO agli
+    # altri restano — e' una persona vera che ha commerciato, e il freno
+    # dei recensori reali lo conta come prima. Fuori dal giudice PURO,
+    # che resta quello di `classifica_prova.py`.
+    nascosti = {r[0] for r in con.execute(
+        "SELECT tg_id FROM utenti WHERE classifica_nascosta=1")}
+    righe = [r for r in righe if r["id"] not in nascosti]
     # Sulla fetta VISIBILE e non su tutta la classifica: la riga spiega
     # quel che chi guarda ha davanti (vedi `_medie_tutte_piene`).
     piene = _medie_tutte_piene(righe[:CLASSIFICA_TOP])
@@ -33840,6 +33904,7 @@ def trova_doppioni_nostr(con, tg_id: int) -> list:
 AVATAR_LATO = 128
 AVATAR_QUALITA = 85
 GIORNI_AVATAR = 7                    # rinfresco opportunistico
+SECONDI_RIPROVA_AVATAR = 3600        # ...ma a relay muti si riprova fra un'ora
 _AVATAR_IN_CORSO: set[int] = set()   # anti-valanga: un fetch per utente
 
 
@@ -33958,6 +34023,28 @@ def _scrivi_avatar(tg_id: int, nome_nuovo: str):
                 pass
 
 
+def _riprova_avatar_presto(tg_id: int):
+    """IL GIRO NON HA SAPUTO (set 2026, ritocchi piccoli): i relay hanno
+    taciuto, o la foto non si e' scaricata. Foto e nome restano come
+    sono — non si tocca la colonna, e il file non si spazza — e il timbro
+    si scrive in modo che il prossimo tentativo cada fra
+    SECONDI_RIPROVA_AVATAR e non fra GIORNI_AVATAR: il timbro dice «come
+    se il giro buono fosse di sette giorni meno un'ora fa».
+    Un timbro e NON l'assenza di timbro, come fa la gamba Telegram
+    esplicita: il rinfresco orario (`rinfresca_profili_nostr`) prende i
+    piu' vecchi per primi, e chi non si timbrasse mai resterebbe in
+    testa per sempre — basterebbero venti nativi senza profilo e un
+    relay morto per fermare il giro di tutti gli altri. Cosi' chi
+    riprova si rimette in coda dietro a chi aspetta da piu' tempo, e
+    /api/me non ribussa ai relay a ogni apertura."""
+    con = db()
+    con.execute("UPDATE utenti SET avatar_aggiornato=? WHERE tg_id=?",
+                (int(time.time()) - GIORNI_AVATAR * 86400
+                 + SECONDI_RIPROVA_AVATAR, tg_id))
+    con.commit()
+    con.close()
+
+
 async def _foto_profilo_telegram(tg_id: int) -> bytes | None:
     """La foto profilo che il bot vede (se l'utente la nasconde ai
     non-contatti, il bot non vede nulla: e' il suo modo di dire no).
@@ -33999,9 +34086,13 @@ def _kind0_profilo(relay: str, hexkey: str):
     """Chiede a UN relay il profilo kind-0 e ne restituisce il content
     gia' letto (name, display_name, picture...). Sincrona: va in
     asyncio.to_thread (pattern chiedi_relay_dm).
+    TRE RISPOSTE E NON DUE (set 2026, ritocchi piccoli): il profilo; {}
+    = il relay HA RISPOSTO (EOSE) e un profilo non ce l'ha; None = non
+    ha risposto — rete, tempo scaduto, nessun EOSE. Prima i due ultimi
+    erano lo stesso None, e il chiamante non poteva distinguere «non ce
+    l'ha» da «non si sa».
     In collaudo verso un relay che non e' di casa non chiede niente
-    (vedi `lettura_simulata`): None, come un relay che tace — e se
-    tacciono tutti, `_profilo_nostr` torna il profilo vuoto."""
+    (vedi `lettura_simulata`): None, come un relay che tace."""
     if lettura_simulata(relay, f"del profilo (kind 0) di {hexkey[:16]}…"):
         return None
     try:
@@ -34009,7 +34100,7 @@ def _kind0_profilo(relay: str, hexkey: str):
                                sslopt={"cert_reqs": ssl.CERT_NONE})
         ws.send(json.dumps(["REQ", "av", {
             "kinds": [0], "authors": [hexkey], "limit": 1}]))
-        profilo, inizio = None, time.time()
+        profilo, inizio, finito = None, time.time(), False
         while time.time() - inizio < 6:
             msg = json.loads(ws.recv())
             if msg[0] == "EVENT" and msg[1] == "av":
@@ -34017,19 +34108,31 @@ def _kind0_profilo(relay: str, hexkey: str):
                 if isinstance(letto, dict) and letto:
                     profilo = letto
             elif msg[0] == "EOSE":
+                finito = True
                 break
         ws.close()
+        if profilo is None and finito:
+            return {}
         return profilo
     except Exception:
         return None
 
 
-async def _profilo_nostr(npub: str) -> dict:
+async def _profilo_nostr(npub: str) -> dict | None:
     """Il kind-0 dai relay: si tiene il primo che risponde con
     qualcosa. Un giro solo per tutto — la faccia e il nome stanno
-    nello stesso evento e non vale la pena chiederlo due volte."""
+    nello stesso evento e non vale la pena chiederlo due volte.
+    None = NON SI SA (set 2026, ritocchi piccoli): nessuno ha portato
+    un profilo e almeno un relay ha taciuto, quindi il profilo poteva
+    stare proprio li'. Il profilo vuoto {} esce solo quando hanno
+    risposto TUTTI, e nessuno ce l'ha. «Ha risposto qualcuno» non
+    bastava: il nostro relay risponde SEMPRE, e sempre vuoto (i kind-0
+    li' non li pubblica nessuno), quindi coi quattro relay pubblici muti
+    il vuoto del nostro si sarebbe letto come «non ha una foto» — il
+    difetto che questa riga esiste per chiudere. Il patto e' quello di
+    `_foto_profilo_telegram`."""
     if not create_connection:
-        return {}
+        return None                 # un server che non sa chiedere non sa
     try:
         hexkey = npub_to_hex(npub)
     except Exception:
@@ -34037,16 +34140,23 @@ async def _profilo_nostr(npub: str) -> dict:
     risposte = await asyncio.gather(*[
         asyncio.to_thread(_kind0_profilo, r, hexkey)
         for r in RELAYS_VERIFICA])
-    return next((p for p in risposte if p), None) or {}
+    trovato = next((p for p in risposte if p), None)
+    if trovato:
+        return trovato
+    return {} if all(p is not None for p in risposte) else None
 
 
 async def _foto_profilo_nostr(profilo: dict) -> bytes | None:
     """La picture del kind-0, scaricata con le stesse guardie delle
     foto da URL dell'import (anti-SSRF + tetto 8MB): l'URL lo scrive
-    l'utente nel suo profilo, non un fidato."""
+    l'utente nel suo profilo, non un fidato.
+    b'' = il profilo non ha una foto che si possa usare (nessuna
+    picture, o un indirizzo che le guardie non ammettono): e' quel che
+    l'utente ha scritto, cioe' un fatto. None = lo scaricamento non e'
+    riuscito, e allora non si sa — il patto di `_foto_profilo_telegram`."""
     url = (profilo.get("picture") or "").strip()
     if not url or not url_foto_ammesso(url):
-        return None
+        return b""
     return await asyncio.to_thread(scarica_foto_import, url)
 
 
@@ -34130,7 +34240,9 @@ async def aggiorna_profilo_social(tg_id: int):
         scelta = u["avatar_scelta"]
         npub = u["npub_accesso"] or \
             (u["npub"] if u["npub_verificata"] else "")
-        # Un solo giro sui relay per il nome e per la faccia
+        # Un solo giro sui relay per il nome e per la faccia. None = i
+        # relay hanno taciuto e NON SI SA (vedi `_profilo_nostr`), che e'
+        # un'altra cosa dal profilo vuoto
         profilo = {}
         if npub and (tg_id < 0 or scelta in ("", "nostr")):
             profilo = await _profilo_nostr(npub)
@@ -34141,11 +34253,16 @@ async def aggiorna_profilo_social(tg_id: int):
         # turno, un giro sì e un giro no secondo chi ha girato per
         # ultimo (`_upsert_da_telegram` protegge solo 'nostr').
         if tg_id < 0 or scelta == "nostr":
-            _scrivi_nome_nostr(tg_id, nome_da_profilo(profilo))
+            _scrivi_nome_nostr(tg_id, nome_da_profilo(profilo or {}))
         if scelta == "nessuna":
             # niente da scaricare, ma il giro e' fatto: si timbra lo
-            # stesso, o il kind-0 si richiederebbe a ogni battito
-            _scrivi_avatar(tg_id, u["avatar"] or "")
+            # stesso, o il kind-0 si richiederebbe a ogni battito —
+            # tranne quando i relay hanno taciuto, e il nome e' rimasto
+            # quello di prima: allora il giro si riprova presto
+            if profilo is None:
+                _riprova_avatar_presto(tg_id)
+            else:
+                _scrivi_avatar(tg_id, u["avatar"] or "")
             return
         raw = None
         if tg_id > 0 and scelta in ("", "telegram"):
@@ -34159,8 +34276,23 @@ async def aggiorna_profilo_social(tg_id: int):
                 # foto buona per un intoppo di un istante. Ci si
                 # riprova al prossimo tocco o al rinfresco settimanale.
                 return
-        if not raw and profilo and scelta in ("", "nostr"):
-            raw = await _foto_profilo_nostr(profilo)
+        if not raw and npub and scelta in ("", "nostr"):
+            # LA GAMBA NOSTR HA TRE RISPOSTE, come quella Telegram (set
+            # 2026, ritocchi piccoli): la foto; b'' = il profilo dice che
+            # non c'e'; None = non si sa — relay muti, o la foto che non
+            # si scarica. Col None la foto che c'e' RESTA e il giro si
+            # riprova presto: prima i relay muti si leggevano come «non
+            # ha una foto», la colonna si svuotava e la faccia tornava
+            # solo al rinfresco della settimana dopo.
+            if profilo is None:
+                raw = None
+            elif profilo:
+                raw = await _foto_profilo_nostr(profilo)
+            else:
+                raw = b""
+            if raw is None:
+                _riprova_avatar_presto(tg_id)
+                return
         _scrivi_avatar(tg_id, _salva_avatar(u["negozio"], raw))
     except Exception as e:
         print(f"⚠️ Profilo social non aggiornato ({tg_id}): {e}")
@@ -36644,6 +36776,30 @@ async def scegli_riconoscimi_p2p(req: Request, x_tg_init_data: str = Header(""),
     con.commit()
     con.close()
     return {"ok": True, "attivo": bool(attivo)}
+
+
+@app.post("/api/me/classifica-nascosta")
+async def scegli_classifica_nascosta(req: Request,
+                                     x_tg_init_data: str = Header(""),
+                                     barattolo_sessione: str = Cookie("")):
+    """«Non mostrarmi in classifica» (set 2026, ritocchi piccoli,
+    decisione di Andrea): un si' o un no, come gli avvisi. Nascosto, il
+    nome esce dalla classifica pubblica — e anche dalla riga «la tua
+    posizione», che senza una classifica in cui stare non ha niente da
+    dire. Il LIVELLO resta sul profilo: serve a chi scambia con lui per
+    fidarsi, ed e' un'altra cosa dalla gara.
+    Vale SUBITO: la cache di un minuto della classifica si butta, o chi
+    si nasconde si rivedrebbe li' ancora per sessanta secondi."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    nascosta = 1 if d.get("nascosta") else 0
+    con = db()
+    con.execute("UPDATE utenti SET classifica_nascosta=? WHERE tg_id=?",
+                (nascosta, user["id"]))
+    con.commit()
+    con.close()
+    _classifica_cache["quando"] = 0.0
+    return {"ok": True, "nascosta": bool(nascosta)}
 
 
 @app.post("/api/me/avviso-trasporto")

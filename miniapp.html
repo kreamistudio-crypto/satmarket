@@ -5024,12 +5024,15 @@
      in fondo», non il nome di una promessa. */
   #acqNotaCampo{margin-top:14px}
   #acqNotaCampo .btn{margin-top:0}
-  /* il toggle discreto della nota: la lingua di scopri-link, spento
-     sul grigio — e' un invito facoltativo, non una via */
-  .scopri-link.nota-aggiungi{font-size:13.5px;color:var(--muted)}
+  /* il toggle discreto della nota: la lingua di scopri-link, piccolo
+     perche' e' un invito facoltativo e non una via. Era spento sul
+     grigio (--muted), e di giorno quel grigio sta sotto l'AA per un
+     testo da 13,5 px: dal set 2026 (ritocchi piccoli) prende
+     l'inchiostro del testo attorno, come «Cambia l'email» qui sotto. */
+  .scopri-link.nota-aggiungi{font-size:13.5px}
   /* I DUE LINK DELL'EMAIL PER IL CORRIERE, nell'ordine (23 set 2026):
      l'invito «+ Ricevi il codice…» e «✏️ Cambia l'email». Stessa misura
-     del toggle qui sopra, ma l'inchiostro del pannello e non il grigio:
+     e stesso inchiostro del toggle qui sopra, quello del pannello:
      MISURATO sul fondo del .payout, il --muted di giorno fa 3,81:1,
      sotto l'AA per un testo da 13,5 px. */
   .scopri-link.email-link{font-size:13.5px}
@@ -9257,8 +9260,8 @@ document.getElementById('cartello')?.remove();</script>
              onesto: il conto degli XP portati, con un invitato solo,
              lascia intuire quanto commercia. E' la stessa franchezza
              della riga sulla classifica qui sotto. -->
-        <li>Gli <b>inviti</b>: il tuo codice e, se sei arrivato con un invito, chi ti ha invitato. A chi ti ha invitato non diciamo mai chi sei: vede solo <b>quante</b> persone ha portato e <b>quanti</b> XP gli hanno fruttato tutte insieme. Un limite onesto: se ha invitato soltanto te, da quel numero può farsi un'idea di quanto commerci.</li>
-        <li>La tua posizione in <b>classifica</b>, se ci entri: lì di te si vedono nome, foto, titolo, media dei voti, da quante persone, quanti affari e il <b>punteggio</b>. Il punteggio mette insieme la media e il commercio, quindi da lì si può <b>ricavare quanto hai commerciato</b> — è una scelta presa sapendolo, perché senza quel numero l'ordine della lista non si legge. Gli XP in chiaro invece non escono mai, e nemmeno il tuo identificativo.</li>
+        <li>Gli <b>inviti</b>: il tuo codice e, se sei arrivato con un invito, chi ti ha invitato. A chi ti ha invitato non diciamo mai chi sei: vede <b>quante</b> persone ha portato, e <b>quanti</b> XP gli hanno fruttato tutte insieme solo quando quelle che commerciano sono almeno tre — prima quel numero sarebbe il commercio di qualcuno che conosce. Un limite onesto: quei punti entrano comunque nel suo totale, quindi se ha invitato soltanto te e tiene d'occhio il suo numero può accorgersi di quando commerci.</li>
+        <li>La tua posizione in <b>classifica</b>, se ci entri: lì di te si vedono nome, foto, titolo, media dei voti, da quante persone, quanti affari e il <b>punteggio</b>. Il punteggio mette insieme la media e il commercio, quindi da lì si può <b>ricavare quanto hai commerciato</b> — è una scelta presa sapendolo, perché senza quel numero l'ordine della lista non si legge. Gli XP in chiaro invece non escono mai, e nemmeno il tuo identificativo. Se non vuoi comparire, nel Profilo («Livello e titolo») c'è <b>Non mostrarmi in classifica</b>: il tuo livello resta sul profilo, perché a chi scambia con te serve per fidarsi.</li>
         <li>Il tuo <b>barattolo</b>, cioè gli annunci che hai messo da parte. Di questi si vede <b>quanti</b> l'hanno salvato, mai <b>chi</b>: nemmeno chi vende sa che sei stato tu — a meno che tu non condivida il barattolo col suo link, che è un gesto tuo: la voce qui sotto dice cosa comporta.</li>
         <li>I tuoi <b>avvisi di ricerca</b>, se ne crei: cosa cerchi, dove, entro che prezzo.</li>
       </ul>
@@ -27580,6 +27583,7 @@ let myXpRuoli = null;            // {vendite, acquisti}, o null se i conti non t
 let myInviti = null;             // il cassetto «I tuoi inviti» dal server (null = niente)
 let myLivello = null;            // il grado DERIVATO dal server
 let myClassifica = false;        // la leva della classifica, dal server
+let myClassificaNascosta = false; // «Non mostrarmi in classifica», dal server
 let myTitoli = [], myTitolo = '';  // catalogo dei titoli + quello indossato
 let myDoppioni = [];     // coppie importato/nativo sospette, da /api/me
 
@@ -27799,7 +27803,51 @@ function renderLivello(){
                 data-tit="${esc(t.id)}"
                 onclick="setTitolo(this.dataset.tit)">${esc(t.nome)}</button>`
       ).join('')}
+    </div>
+    ${rigaClassificaNascosta()}`;
+}
+
+/* «🏆 Non mostrarmi in classifica» (set 2026, ritocchi piccoli,
+   decisione di Andrea): il nome esce dalla classifica pubblica, il
+   LIVELLO resta — sul profilo, dove chi scambia lo guarda per fidarsi.
+   Sta qui perche' qui ci sono gli XP e la riga che dice «pesa in
+   classifica». A classifica spenta la riga non c'e': un interruttore
+   che non cambia niente e' un interruttore che mente (il patto di
+   «Fatti riconoscere negli scambi»). La pillola e' la sua: Attivo =
+   nascosto, e la frase sotto dice cosa comporta. Una function e non
+   una const: `renderLivello`, che la chiama, sta piu' su. */
+function rigaClassificaNascosta(){
+  if (!myClassifica) return '';
+  return `
+    <div style="display:flex;align-items:center;gap:10px;margin-top:16px;padding-top:12px;border-top:1px solid var(--line)">
+      <div style="min-width:0;flex:1">
+        <div style="font-size:13.5px;font-weight:800">🏆 Non mostrarmi in classifica</div>
+        <div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">
+          Se lo accendi il tuo nome esce dalla classifica. Il livello resta
+          sul tuo profilo: a chi scambia con te serve per fidarsi.</div>
+      </div>
+      <button onclick="setClassificaNascosta(${myClassificaNascosta ? 'false' : 'true'})"
+        aria-pressed="${myClassificaNascosta ? 'true' : 'false'}"
+        style="flex:none;font:inherit;font-size:12.5px;font-weight:800;border:1px solid ${myClassificaNascosta?'var(--sats)':'var(--line)'};background:${myClassificaNascosta?'var(--sats)':'transparent'};color:${myClassificaNascosta?'#fff':'var(--muted)'};border-radius:99px;padding:6px 14px;cursor:pointer">
+        ${myClassificaNascosta ? 'Attivo' : 'Spento'}</button>
     </div>`;
+}
+
+async function setClassificaNascosta(nascosta){
+  haptic();
+  if (DEMO) { toast('In demo la classifica non è quella vera 🙂'); return; }
+  try {
+    const r = await fetch(`${API_BASE}/me/classifica-nascosta`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({nascosta})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+    myClassificaNascosta = !!d.nascosta;
+  } catch(e) { toast('Rete assente: riprova'); return; }
+  renderLivello();
+  toast(myClassificaNascosta
+    ? '🏆 Non compari più in classifica: il livello resta sul tuo profilo'
+    : '🏆 Da ora compari in classifica, se ci entri');
 }
 
 /* Le soglie XP dei gradini, per disegnare la barra DENTRO il gradino.
@@ -27841,7 +27889,15 @@ function fraseXp(r){
   const v = (r && r.vendite) || 0, a = (r && r.acquisti) || 0;
   const i = (r && r.inviti) || 0;
   let m;
-  if (i) {
+  /* SOTTO LA SOGLIA DEGLI INVITATI ATTIVI SI ACCORPA (set 2026, ritocchi
+     piccoli): il server non manda NESSUNA cifra — con vendite e acquisti
+     a schermo, quella degli inviti la darebbe la sottrazione dal totale —
+     e la riga dice di cosa e' fatto il numero, e da quanti attivi tornano
+     le cifre. Il quanti e' del server, come la percentuale. */
+  if (r && r.accorpati)
+    m = "quel che compri e vendi, più una piccola parte di quello di chi hai invitato."
+      + ` Le cifre per lato compaiono da ${fmt(Number(r.attivi_min) || 0)} invitati attivi in su.`;
+  else if (i) {
     const pezzi = [];
     if (v) pezzi.push(`${fmt(v)} dalle vendite`);
     if (a) pezzi.push(`${fmt(a)} dagli acquisti`);
@@ -27939,8 +27995,14 @@ function renderInviti(){
 function contoInviti(inv){
   const n = (inv && inv.persone) || 0, xp = (inv && inv.xp) || 0;
   if (!n) return 'Non hai ancora invitato nessuno: condividi il tuo link.';
+  /* I PUNTI SOTTO LA SOGLIA NON ARRIVANO NEMMENO (set 2026, ritocchi
+     piccoli): con meno di tre invitati attivi il server manda `xp: null`,
+     perche' quella cifra sarebbe il commercio di una persona che conosci.
+     Il cassetto lo dice, col numero del server; lo zero resta muto. */
+  const nascosti = inv && inv.xp === null;
   return `Hai invitato <b>${fmt(n)} ${n === 1 ? 'persona' : 'persone'}</b>`
-    + (xp ? ` · ti hanno portato <b>${fmt(xp)} XP</b>` : '') + '.';
+    + (xp ? ` · ti hanno portato <b>${fmt(xp)} XP</b>` : '') + '.'
+    + (nascosti ? ` I punti degli inviti compaiono da ${fmt(Number(inv.attivi_min) || 0)} invitati attivi in su.` : '');
 }
 
 /* Cosa si guadagna, e le due regole: qui dove si agisce, e «I tuoi
@@ -47026,6 +47088,70 @@ function seguibileP2P(id){
   return p2pOrdineAperto === id && vistaAttivaP2P() === 'view-p2pordine'
     && !altroFoglioAperto();
 }
+/* LA PAGINA SI RIDISEGNA SOLO DOVE CAMBIA (set 2026, ritocchi piccoli).
+   Aprendo uno scambio, a caricamento finito — il profilo dell'altra
+   persona, il bundle dei messaggi, la risposta sulla recensione — la
+   pagina si riscriveva INTERA, e una selezione di testo fatta nel primo
+   secondo (l'importo, l'IBAN) spariva sotto il dito. Adesso i pezzi di
+   primo livello si confrontano col loro HTML: quelli che si ritrovano
+   restano gli STESSI nodi, mai spostati — con la selezione, il fuoco e
+   quel che c'e' scritto dentro — e si cambiano solo gli altri. Se non
+   cambia niente non si tocca niente.
+   Il confronto e' sull'HTML SERIALIZZATO: un pezzo toccato sul posto
+   (il conto alla rovescia dell'anello, un bottone spento dal velo)
+   risulta diverso e si riscrive come prima. Si tiene solo cio' che e'
+   uguale per davvero.
+   IL RIPIEGO E' LA PAGINA DI SEMPRE: se il confronto non si puo' fare
+   (un banco senza un DOM vero) o si rompe a meta', si riscrive tutto —
+   la pagina di uno scambio non deve mai restare a meta'. */
+function ridisegnaSeCambiaP2P(box, html){
+  try {
+    const t = document.createElement('template');
+    t.innerHTML = html;
+    posaPezziP2P(box, Array.from(t.content.childNodes));
+  } catch(e) {
+    box.innerHTML = html;
+  }
+}
+function posaPezziP2P(box, nuovi){
+  const firma = n => n.nodeType === 1 ? n.outerHTML : n.nodeType + ':' + n.nodeValue;
+  const vecchi = Array.from(box.childNodes);
+  const restano = pezziCheRestanoP2P(vecchi.map(firma), nuovi.map(firma));
+  if (restano.length === vecchi.length && restano.length === nuovi.length) return;
+  const tenuti = new Set(restano.map(c => c[0]));
+  vecchi.forEach((n, i) => { if (!tenuti.has(i)) n.remove(); });
+  /* dal fondo: ogni pezzo va subito prima di quello che lo segue. Chi
+     resta ci si trova GIA' (sono nello stesso ordine), quindi non si
+     sposta — ed e' quel che salva la selezione: un nodo spostato perde
+     il segno anche se torna nello stesso posto */
+  const alPosto = new Map(restano.map(c => [c[1], vecchi[c[0]]]));
+  let dopo = null;
+  for (let j = nuovi.length - 1; j >= 0; j--) {
+    const n = alPosto.get(j) || nuovi[j];
+    if (n.parentNode !== box || n.nextSibling !== dopo) box.insertBefore(n, dopo);
+    dopo = n;
+  }
+}
+/* PURA: i pezzi che restano, cioe' la sottosequenza comune piu' lunga
+   fra le firme di adesso e quelle nuove — coppie [vecchio, nuovo] in
+   ordine. La piu' lunga e non il solo tratto uguale in testa e in coda:
+   l'anello del tabacchino cambia a ogni secondo e sta in alto, e da li'
+   in giu' non si terrebbe piu' niente. */
+function pezziCheRestanoP2P(vecchi, nuovi){
+  const n = vecchi.length, m = nuovi.length;
+  const L = Array.from({length: n + 1}, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--)
+    for (let j = m - 1; j >= 0; j--)
+      L[i][j] = vecchi[i] === nuovi[j] ? L[i + 1][j + 1] + 1
+                                       : Math.max(L[i + 1][j], L[i][j + 1]);
+  const coppie = [];
+  for (let i = 0, j = 0; i < n && j < m; ) {
+    if (vecchi[i] === nuovi[j]) { coppie.push([i, j]); i++; j++; }
+    else if (L[i + 1][j] >= L[i][j + 1]) i++;
+    else j++;
+  }
+  return coppie;
+}
 function renderOrdineP2P(){
   const box = el('p2pOrdineCorpo');
   if (!box) return;
@@ -47145,7 +47271,8 @@ function renderOrdineP2P(){
   /* il commento a meta' della recensione si rimette dopo il ridisegno
      (vedi «LA BOZZA SOPRAVVIVE AL RIDISEGNO») */
   const bozza = bozzaRecensioneP2P(o.id);
-  box.innerHTML =
+  /* si ridisegna solo dove cambia: vedi `ridisegnaSeCambiaP2P` */
+  ridisegnaSeCambiaP2P(box,
     /* ⚠️ SOTTO IL CONTO NON C'E' PIU' LA RIGA DI SERVIZIO (set 2026,
        decisione di Andrea): portava il metodo di pagamento e il lato
        («💳 SEPA · ⬆️ Vendi sats»), e tutt'e due lo dicono gia' altri
@@ -47230,7 +47357,7 @@ function renderOrdineP2P(){
        spazio anche per il perche'. */
     riquadroRecensioneP2P(o, rec) +
     secondarie.map(a => (scadutoTab && SECONDARI_EVIDENZA_P2P[a])
-                        || SECONDARI_P2P[a] || '').join('');
+                        || SECONDARI_P2P[a] || '').join(''));
   rimettiBozzaRecensioneP2P(bozza);
 }
 /* ---- IL RIQUADRO DELLA RECENSIONE (23 set 2026, «Ritocchi allo
@@ -53348,6 +53475,7 @@ async function avvia(){
        e il cassetto resta spento invece di mostrare un codice vuoto */
     myInviti = me.inviti || null;
     myClassifica = !!me.classifica_attiva;
+    myClassificaNascosta = !!me.classifica_nascosta;
     myAffari = (me.vendite_ok || 0) + (me.acquisti_ok || 0);
     myTitoli = me.titoli || []; myTitolo = me.titolo || '';
     myAvatar = me.avatar || ''; myAvatarScelta = me.avatar_scelta || '';

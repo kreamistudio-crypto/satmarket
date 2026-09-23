@@ -28794,7 +28794,8 @@ davvero anche in collaudo.
   profilo vuoto per «non ha una foto» e cancella quella che c'era, e la
   rimette solo al rinfresco della settimana dopo. Il None del «non si sa»,
   che `_foto_profilo_telegram` distingue da set 2026, alla gamba Nostr
-  manca. Segnalato, non curato.
+  manca. Segnalato, non curato. [CURATO il 24 set 2026: vedi «Ritocchi
+  piccoli», qui sotto.]
 - In collaudo il server bussa ancora ad api.coingecko.com, per il cambio
   e per lo storico della fee dinamica: non sono relay e la regola non li
   copre, ma la gabbia li ha visti.
@@ -29050,3 +29051,101 @@ su origin/main. Segnalato ad Andrea.
 - La dissolvenza si vedrà solo col secondo negozio (la pagina del server
   pubblicata E col logo): lì, sei secondi il primo e poi tre per logo.
 - Gli effetti ridotti da «🌗 Aspetto»: la card torna al primo e resta.
+
+## Ritocchi piccoli: la foto coi relay muti, la selezione nello scambio, la nota leggibile, la privacy di inviti e classifica (24 set 2026)
+
+Cinque punti chiesti da Andrea in un giro; il quarto (la regola 6 di
+CLAUDE.md) sta in un commit suo.
+
+**1. I RELAY MUTI NON CANCELLANO PIÙ LA FOTO** (il difetto lasciato
+«segnalato, non curato» dal verbale qui sopra). La gamba Nostr ha le tre
+risposte della gamba Telegram: `_kind0_profilo` dice {} solo quando il
+relay chiude con EOSE senza profilo, None quando non risponde;
+`_profilo_nostr` dà il vuoto solo se hanno risposto TUTTI, None se
+qualcuno ha taciuto; `_foto_profilo_nostr` dà b'' per «il profilo non ha
+una foto usabile» e None per lo scaricamento fallito. «Ha risposto
+qualcuno» non bastava, ed era il caso vero: il nostro relay risponde
+SEMPRE, e sempre vuoto, quindi coi quattro pubblici muti il suo vuoto era
+il «non ha una foto» del difetto. Col None `aggiorna_profilo_social` non
+tocca foto né nome e `_riprova_avatar_presto` timbra «sette giorni meno
+un'ora fa»: il giro si riprova fra un'ora. Vale anche per 'nostr'
+esplicito e per l'automatico con Telegram senza foto (quella che c'è può
+essere la Nostr), e per «Nessuna» (il nome si richiede presto).
+SCARTATA: non timbrare, come fa la gamba Telegram esplicita — il
+rinfresco orario prende i più vecchi per primi, e chi non si timbra mai
+resterebbe in testa per sempre: venti nativi senza profilo e un relay
+morto fermerebbero il giro di tutti. Col timbro chi riprova si rimette in
+coda, e /api/me non ribussa a ogni apertura.
+
+**2. LA PAGINA DELLO SCAMBIO SI RIDISEGNA SOLO DOVE CAMBIA.** A
+caricamento finito (il profilo dell'altra persona, il bundle, la risposta
+sulla recensione) `renderOrdineP2P` riscriveva tutto e una selezione
+fatta nel primo secondo spariva. Adesso scrive con `ridisegnaSeCambiaP2P`:
+i pezzi di primo livello si confrontano col loro HTML, quelli ritrovati
+restano gli STESSI nodi e non si spostano mai (un nodo spostato perde la
+selezione anche se torna al suo posto), gli altri si cambiano; se non
+cambia niente non si tocca niente. La sottosequenza comune più lunga e
+non il solo tratto uguale in testa e in coda: l'anello del tabacchino
+cambia ogni secondo e sta in alto. Il ripiego è l'innerHTML di sempre.
+SCARTATE: conservare la selezione a offset di testo (si sposta appena
+cambia qualcosa sopra), e rimandare il ridisegno finché la selezione è
+viva — il tocco su un bottone scioglie la selezione, e il ridisegno
+cadrebbe fra la pressione e il click, sotto il dito.
+
+**3. «+ AGGIUNGI UNA NOTA» HA L'INCHIOSTRO DEL TESTO ATTORNO**, come
+«Cambia l'email»: di giorno da 3,47:1 a 13,55:1, di sera 14,14:1.
+
+**5. LA PRIVACY DEGLI INVITI E DELLA CLASSIFICA** (decisione di Andrea).
+a) Sotto i tre invitati attivi (`INVITO_ATTIVI_MIN`; attivo = ti ha
+portato almeno un punto, contato per persona dal riferimento delle quote,
+`invitati_attivi`) la cifra NON ESCE DAL SERVER: il cassetto riceve
+`xp: null` e dice «I punti degli inviti compaiono da 3 invitati attivi in
+su»; la scomposizione riceve `{accorpati, attivi_min}` e la riga non dice
+NESSUNA cifra — non solo quella degli inviti: con vendite e acquisti a
+schermo, la terza la darebbe la sottrazione dal totale. Il conto degli
+attivi non esce mai (direbbe quando uno dei tuoi ha cominciato). b) «🏆
+Non mostrarmi in classifica» in fondo al cassetto «Livello e titolo»,
+solo a classifica accesa: colonna `classifica_nascosta`, rotta che butta
+la cache di un minuto, e `classifica_ora` che toglie chi si nasconde DOPO
+il giudice puro — i voti che ha dato restano, chi gli stava dietro sale.
+Il livello resta sul profilo. «I tuoi dati» dice tutt'e due.
+IL 30382, la domanda di Andrea: lo firma la piattaforma, solo per chi ha
+la npub verificata, e porta `d` (la sua pubkey), `rank` (0-100 dal
+gradino), `livello`, `xp`, `affari`, `r` e il tag client, content vuoto.
+`xp` è `utenti.xp`: le quote degli inviti ci sono, accorpate nel numero e
+col tetto. Si ripubblica quando cambia la terna livello/xp/affari, al suo
+prossimo affare concluso (o alla verifica della npub, o dal bottone
+admin).
+
+**PROVATO.** `prove_foto_nostr_relay_muti` (29),
+`prove_pagina_scambio_ridisegno` (10, un banco node col DOM di cartone:
+chi resta, chi si muove, l'ordine), `prove_classifica_nascosta` (17, la strada vera della
+classifica su sqlite, cache compresa), la soglia in `prove_inviti` e la
+nota in `prove_nota_compratore`. EMENDATE col perché: il profilo muto è
+None in `prove_letture_relay_collaudo`, la scrittura passa da
+`ridisegnaSeCambiaP2P` in `prove_ritocchi_scambio`, quattro di
+`prove_inviti` e tre di `collaudo_inviti.py` (sotto soglia si accorpa, il
+terzo lato si prova da tre attivi: una passava per la ragione sbagliata,
+None contro None). Tortura 22/23: sopravvive solo il `return` anticipato
+di `posaPezziP2P`, equivalente — senza, il giro dal fondo non sposta
+comunque niente. DAL VIVO a 375 nei due temi, server da una copia col
+relay morto: la nota; l'IBAN selezionato col doppio click che resta
+all'arrivo del profilo (3 mutazioni, 0 al ridisegno uguale, pagina
+identica a quella riscritta intera) e la controprova col ridisegno di
+ieri che la perde; l'interruttore col click vero che toglie e rimette il
+nome subito; cassetto e riga dei punti con un invitato attivo; e il
+Venditore con la npub verificata e la connessione rifiutata vera: foto
+intatta, riprova fra 3594 secondi.
+
+**COSA RESTA DA GUARDARE.**
+- IL TOTALE PARLA ANCORA: le quote restano nel numero del Profilo, della
+  classifica e del 30382, quindi chi ha un solo invitato attivo vede il
+  suo totale salire a ogni affare di lui. Chiuderla vuol dire contare le
+  quote solo da tre attivi in su, che cambia livelli e classifica:
+  decisione di Andrea. «I tuoi dati» lo dichiara.
+- L'automatico con Telegram muto e Nostr che conferma «nessuna foto»
+  svuota ancora: è la gamba Telegram, fuori da questo giro.
+- Una picture che non si scarica per sempre (un 404) si ritenta ogni ora
+  e tiene la foto vecchia: scelto, un'immagine che non arriva non è un
+  «non ce l'ha».
+- Il telefono: la selezione dell'IBAN col dito vero, dentro Telegram.

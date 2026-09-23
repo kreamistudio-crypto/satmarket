@@ -10821,6 +10821,17 @@ def prove_nota_compratore():
     cset = pezzo("_compra_set")
     mini = open("miniapp.html", encoding="utf-8").read()
 
+    # --- L'INVITO «+ Aggiungi una nota» HA L'INCHIOSTRO PIENO (set 2026,
+    #     ritocchi piccoli): sul grigio --muted stava sotto l'AA di
+    #     giorno, come «Cambia l'email» prima di lui. La regola porta la
+    #     sola misura, e il colore lo prende dal testo attorno.
+    css_nota = mini[:mini.index("</style>")]
+    prova("«+ Aggiungi una nota» non e' piu' grigio: la sua regola ha la "
+          "sola misura, come «Cambia l'email»", (1, [], 1),
+          (css_nota.count(".scopri-link.nota-aggiungi{font-size:13.5px}"),
+           re.findall(r"\.nota-aggiungi\{[^}]*color[^}]*\}", css_nota),
+           mini.count('class="scopri-link nota-aggiungi"')))
+
     # --- il giudice: una riga, un tetto con un nome ------------------
     prova("il tetto ha un nome e non un letterale", True,
           "MAX_NOTA = 200" in src and "MAX_NOTA" in giu)
@@ -13931,6 +13942,9 @@ def prove_nome_da_nostr():
                "_foto_profilo_telegram": _foto_tg,
                "_foto_profilo_nostr": _foto_ns,
                "_scrivi_avatar": lambda tg_id, nome: None,
+               # la foto che non si scarica (None) adesso si riprova
+               # presto: vedi prove_foto_nostr_relay_muti
+               "_riprova_avatar_presto": lambda tg_id: None,
                "_salva_avatar": lambda negozio, raw: "",
                "print": lambda *a, **k: None}
         exec("async " + pezzo("aggiorna_profilo_social"), amb)
@@ -13952,6 +13966,250 @@ def prove_nome_da_nostr():
     prova("il client avvisa SOLO quando Nostr governa anche il nome",
           True, "Anche il tuo nome viene da lì." in mini
           and "attivaFoto === 'nostr' && tgFotoOk" in mini)
+
+
+def prove_foto_nostr_relay_muti():
+    """I RELAY MUTI NON CANCELLANO LA FOTO (set 2026, ritocchi piccoli,
+    segnalato dal verbale di «Nessun relay vero in collaudo»): se i relay
+    tacevano al rinfresco di un nativo Nostr, `_profilo_nostr` tornava il
+    profilo vuoto, `aggiorna_profilo_social` lo leggeva come «non ha una
+    foto», svuotava la colonna e timbrava il giro — e la faccia tornava
+    solo al rinfresco della settimana dopo.
+
+    LA CURA e' il patto che la gamba Telegram ha dal set 2026: tre
+    risposte e non due. Il profilo; {} = hanno risposto TUTTI e nessuno
+    ce l'ha; None = non si sa. E «ha risposto qualcuno» non basta, ed e'
+    il caso vero: il nostro relay risponde sempre, e sempre vuoto. Col
+    None la foto resta e il giro si riprova fra un'ora, con un timbro
+    che rimette in coda invece di passare davanti a tutti."""
+    import asyncio
+    import sqlite3
+    import ssl as _ssl
+    import types
+    print("\n[i relay muti non cancellano la foto di un nativo Nostr]")
+
+    # --- 1) _kind0_profilo: tre risposte ----------------------------------
+    class _Ws:
+        def __init__(self, messaggi):
+            self.m = list(messaggi)
+
+        def send(self, dati):
+            pass
+
+        def recv(self):
+            if not self.m:
+                raise TimeoutError("banco: il relay tace")
+            return json.dumps(self.m.pop(0))
+
+        def close(self):
+            pass
+
+    PROF = {"name": "Ada", "picture": "https://foto.example/ada.jpg"}
+    COPIONI = {
+        "wss://ha": [["EVENT", "av", {"content": json.dumps(PROF)}],
+                     ["EOSE", "av"]],
+        "wss://vuoto": [["EOSE", "av"]],
+        "wss://vuoto-strano": [["EVENT", "av", {"content": "{}"}],
+                               ["EOSE", "av"]],
+        "wss://parla-e-tace": [["NOTICE", "ciao"]],
+        "wss://chiuso": [["CLOSED", "av", "auth-required: chi sei?"]],
+    }
+
+    def _connetti(relay, timeout=0, sslopt=None):
+        if relay not in COPIONI:
+            raise ConnectionRefusedError("banco: relay spento")
+        return _Ws(COPIONI[relay])
+
+    amb = {"lettura_simulata": lambda r, cosa: False,
+           "create_connection": _connetti, "json": json, "time": time,
+           "ssl": _ssl}
+    exec(pezzo("_kind0_profilo"), amb)
+    k0 = amb["_kind0_profilo"]
+    CH = "ab" * 32
+    prova("un relay che ha il profilo lo porta", PROF, k0("wss://ha", CH))
+    prova("un relay che risponde senza profilo (EOSE) dice {}: «non ce "
+          "l'ha», un fatto", {}, k0("wss://vuoto", CH))
+    prova("...anche quando manda un evento col contenuto vuoto", {},
+          k0("wss://vuoto-strano", CH))
+    prova("un relay spento: None, non si sa", None, k0("wss://spento", CH))
+    prova("un relay che parla ma non chiude (niente EOSE): None", None,
+          k0("wss://parla-e-tace", CH))
+    prova("un relay che rifiuta la domanda (CLOSED): None", None,
+          k0("wss://chiuso", CH))
+
+    # --- 2) _profilo_nostr: il vuoto solo se hanno risposto TUTTI ---------
+    def profilo_da(esiti, connessione=True, npub_ok=True):
+        def _hex(npub):
+            if not npub_ok:
+                raise ValueError("npub storta")
+            return CH
+        amb = {"create_connection": _connetti if connessione else None,
+               "npub_to_hex": _hex, "asyncio": asyncio,
+               "RELAYS_VERIFICA": [f"wss://r{i}" for i in range(len(esiti))],
+               "_kind0_profilo": lambda r, h: esiti[int(r[len("wss://r"):])]}
+        exec("async " + pezzo("_profilo_nostr"), amb)
+        return asyncio.new_event_loop().run_until_complete(
+            amb["_profilo_nostr"]("npub1x"))
+
+    prova("IL CASO VERO: i quattro pubblici muti e il nostro che risponde "
+          "vuoto — None, non {}", None,
+          profilo_da([None, None, None, None, {}]))
+    prova("tutti muti: None", None, profilo_da([None, None]))
+    prova("tutti hanno risposto e nessuno ce l'ha: {} (ed e' un fatto)",
+          {}, profilo_da([{}, {}]))
+    prova("uno lo porta: vince lui, anche se un altro tace", PROF,
+          profilo_da([None, {}, PROF]))
+    prova("senza la libreria dei websocket non si sa: None", None,
+          profilo_da([{}], connessione=False))
+    prova("una npub che non si legge non ha un profilo leggibile: {}", {},
+          profilo_da([PROF], npub_ok=False))
+
+    # --- 3) _foto_profilo_nostr: b'' e' un fatto, None un intoppo ---------
+    def foto_da(profilo, scaricata):
+        amb = {"url_foto_ammesso": lambda u: u.startswith("https://"),
+               "scarica_foto_import": lambda u: scaricata,
+               "asyncio": asyncio}
+        exec("async " + pezzo("_foto_profilo_nostr"), amb)
+        return asyncio.new_event_loop().run_until_complete(
+            amb["_foto_profilo_nostr"](profilo))
+
+    prova("profilo senza picture: b'' (non c'e')", b"",
+          foto_da({"name": "Ada"}, b"x"))
+    prova("picture a un indirizzo che le guardie non ammettono: b''", b"",
+          foto_da({"picture": "http://192.168.1.1/a.jpg"}, b"x"))
+    prova("picture che non si scarica: None, non si sa", None,
+          foto_da(PROF, None))
+    prova("picture scaricata: i suoi byte", b"jpeg", foto_da(PROF, b"jpeg"))
+
+    # --- 4) aggiorna_profilo_social: col None la foto resta ---------------
+    def mondo(tg_id, scelta, profilo, foto_ns=None, foto_tg=None):
+        riga = {"negozio": "ab12cd34", "avatar": "av_ab12cd34_100.jpg",
+                "npub": "npub1x", "npub_verificata": 1, "npub_accesso": "",
+                "avatar_scelta": scelta}
+
+        class _Con:
+            def execute(self, q, p=()):
+                return self
+
+            def fetchone(self):
+                return dict(riga)
+
+            def close(self):
+                pass
+
+        fatti = []
+
+        async def _prof_ns(npub):
+            return profilo
+
+        async def _foto_tg(t):
+            return foto_tg
+
+        async def _foto_ns(p):
+            return foto_ns
+
+        def _nome(t, nome):
+            if nome:
+                fatti.append(("nome", nome))
+
+        amb = {"db": lambda: _Con(), "_AVATAR_IN_CORSO": set(),
+               "_profilo_nostr": _prof_ns, "_scrivi_nome_nostr": _nome,
+               "nome_da_profilo": lambda p: p.get("name", ""),
+               "_foto_profilo_telegram": _foto_tg,
+               "_foto_profilo_nostr": _foto_ns,
+               "_scrivi_avatar": lambda t, nome: fatti.append(("avatar", nome)),
+               "_riprova_avatar_presto": lambda t: fatti.append(("riprova", t)),
+               "_salva_avatar": lambda negozio, raw:
+                   ("av_ab12cd34_NUOVA.jpg" if raw else ""),
+               # un'eccezione qui la inghiottirebbe il fail-open: si segna,
+               # cosi' una prova che esplode non passa per verde
+               "print": lambda *a, **k: fatti.append(("errore", a))}
+        exec("async " + pezzo("aggiorna_profilo_social"), amb)
+        asyncio.new_event_loop().run_until_complete(
+            amb["aggiorna_profilo_social"](tg_id))
+        return fatti
+
+    prova("IL DIFETTO: nativo coi relay muti — la foto NON si tocca, il "
+          "giro si riprova presto", [("riprova", -5)], mondo(-5, "", None))
+    prova("nativo, hanno risposto tutti e il profilo non c'e': la foto se "
+          "ne va (e' un fatto)", [("avatar", "")], mondo(-5, "", {}))
+    prova("nativo, profilo col nome e la foto che non si scarica: il nome "
+          "si scrive, la foto resta", [("nome", "Ada"), ("riprova", -5)],
+          mondo(-5, "", PROF, foto_ns=None))
+    prova("nativo, profilo senza foto: la foto se ne va",
+          [("nome", "Ada"), ("avatar", "")],
+          mondo(-5, "", {"name": "Ada"}, foto_ns=b""))
+    prova("nativo, profilo con la foto: quella nuova",
+          [("nome", "Ada"), ("avatar", "av_ab12cd34_NUOVA.jpg")],
+          mondo(-5, "", PROF, foto_ns=b"jpeg"))
+    prova("«Nessuna» coi relay muti: niente timbro della settimana, il nome "
+          "si richiede presto", [("riprova", -5)], mondo(-5, "nessuna", None))
+    prova("«Nessuna» coi relay che rispondono: il giro e' fatto, si timbra",
+          [("nome", "Ada"), ("avatar", "av_ab12cd34_100.jpg")],
+          mondo(-5, "nessuna", {"name": "Ada"}))
+    prova("doppio cittadino in automatico: Telegram dice «nessuna foto», "
+          "Nostr non si sa — la foto (che puo' essere di Nostr) resta",
+          [("riprova", 111)], mondo(111, "", None, foto_tg=b""))
+    prova("...e se Telegram la porta, i relay muti non contano",
+          [("avatar", "av_ab12cd34_NUOVA.jpg")],
+          mondo(111, "", None, foto_tg=b"jpeg"))
+    prova("scelta 'nostr' esplicita coi relay muti: la foto resta",
+          [("riprova", 111)], mondo(111, "nostr", None))
+
+    # --- 5) il timbro della riprova: fra un'ora, e in coda ----------------
+    c = sqlite3.connect(":memory:")
+    c.row_factory = sqlite3.Row
+    ADESSO = 1_790_000_000
+    c.executescript(f"""
+        CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, negozio TEXT,
+          avatar TEXT, avatar_aggiornato INTEGER DEFAULT 0);
+        INSERT INTO utenti VALUES(-5, 'n5', 'av_n5_1.jpg', {ADESSO - 8 * 86400});
+        INSERT INTO utenti VALUES(-6, 'n6', '', {ADESSO - 9 * 86400});
+        INSERT INTO utenti VALUES(-7, 'n7', '', {ADESSO});
+    """)
+
+    class _SenzaClose:
+        def __init__(self, con):
+            self._c = con
+
+        def __getattr__(self, n):
+            return getattr(self._c, n)
+
+        def close(self):
+            pass
+
+    def orologio(t):
+        return types.SimpleNamespace(time=lambda: t)
+
+    amb = {"db": lambda: _SenzaClose(c), "time": orologio(ADESSO),
+           "GIORNI_AVATAR": 7, "SECONDI_RIPROVA_AVATAR": 3600}
+    exec(pezzo("_riprova_avatar_presto"), amb)
+    amb["_riprova_avatar_presto"](-5)
+    r = c.execute("SELECT avatar, avatar_aggiornato FROM utenti "
+                  "WHERE tg_id=-5").fetchone()
+    prova("la riprova non tocca la foto, e timbra «sette giorni meno "
+          "un'ora fa»", ("av_n5_1.jpg", ADESSO - 7 * 86400 + 3600),
+          (r["avatar"], r["avatar_aggiornato"]))
+
+    def giro_orario(quando):
+        visti = []
+
+        async def _agg(t):
+            visti.append(t)
+
+        amb = {"db": lambda: _SenzaClose(c), "time": orologio(quando),
+               "SECONDI_RINFRESCO_NOSTR": 3600, "MAX_RINFRESCHI_GIRO": 20,
+               "GIORNI_AVATAR": 7, "_prossimo_rinfresco_nostr": 0.0,
+               "aggiorna_profilo_social": _agg}
+        exec("async " + pezzo("rinfresca_profili_nostr"), amb)
+        asyncio.new_event_loop().run_until_complete(
+            amb["rinfresca_profili_nostr"]())
+        return visti
+
+    prova("il giro orario VERO, subito dopo: chi riprova non passa davanti",
+          [-6], giro_orario(ADESSO))
+    prova("...un'ora dopo c'e' anche lui, ma DIETRO a chi aspetta da piu' "
+          "tempo", [-6, -5], giro_orario(ADESSO + 3601))
 
 
 def prove_duplica_annuncio():
@@ -24523,6 +24781,132 @@ def _amb_classifica():
     return amb
 
 
+def prove_classifica_nascosta():
+    """«NON MOSTRARMI IN CLASSIFICA» (set 2026, ritocchi piccoli,
+    decisione di Andrea): un interruttore nel Profilo che toglie il nome
+    dalla classifica pubblica. Il LIVELLO resta sul profilo, perche'
+    serve alla fiducia negli scambi. Chi si nasconde esce DOPO il giudice:
+    chi gli stava dietro sale, e i voti che ha dato agli altri restano.
+    Qui gira la strada vera della classifica — le letture, il giudice, la
+    cache — su un mercatino di cartone."""
+    print("\n[non mostrarmi in classifica]")
+    import shutil
+    import sqlite3
+    amb = _amb_classifica()
+    amb.update({"XP_INVITO": "invito", "XP_COMMERCIO": ("ordine", "invito"),
+                "CACHE_CLASSIFICA": 60, "CLASSIFICA_TOP": 20,
+                "_classifica_cache": {"quando": 0.0, "righe": [], "piene": False},
+                "time": time})
+    for f in ("sql_xp_commercio", "somme_xp", "xp_contati",
+              "_dati_classifica", "classifica_ora"):
+        exec(pezzo(f), amb)
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript("""
+    CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY,
+      classifica_nascosta INTEGER DEFAULT 0);
+    CREATE TABLE ordini(id INTEGER PRIMARY KEY, venditore_id INTEGER,
+      compratore_id INTEGER, stato TEXT DEFAULT 'released',
+      prova INTEGER DEFAULT 0);
+    CREATE TABLE feedback(ordine_id INTEGER, da_tg_id INTEGER,
+      per_tg_id INTEGER, voto INTEGER);
+    CREATE TABLE xp_eventi(tg_id INTEGER, tipo TEXT, punti INTEGER,
+      riferimento TEXT DEFAULT '');
+    INSERT INTO utenti(tg_id) VALUES (1),(2),(3),(10),(11),(12);
+    -- tre venditori, ognuno votato da chi ha commerciato anche altrove;
+    -- e il 3 ha votato l'1 (quel voto deve restare quando il 3 si nasconde)
+    INSERT INTO ordini(id, venditore_id, compratore_id) VALUES
+      (1, 1, 10), (2, 2, 11), (3, 3, 12), (4, 10, 11), (5, 12, 10),
+      (6, 1, 3);
+    INSERT INTO feedback VALUES (1, 10, 1, 5), (2, 11, 2, 5), (3, 12, 3, 5),
+      (6, 3, 1, 4);
+    """)
+    righe, _ = amb["classifica_ora"](con)
+    prova("di serie ci sono tutti e tre", [1, 2, 3], sorted(r["id"] for r in righe))
+    con.execute("UPDATE utenti SET classifica_nascosta=1 WHERE tg_id=3")
+    prova("...la cache di un minuto li terrebbe ancora (e la rotta la butta)",
+          [1, 2, 3], sorted(r["id"] for r in amb["classifica_ora"](con)[0]))
+    amb["_classifica_cache"]["quando"] = 0.0
+    righe, _ = amb["classifica_ora"](con)
+    prova("chi si nasconde esce dalla classifica", [1, 2],
+          sorted(r["id"] for r in righe))
+    prova("...ma il voto che ha DATO all'1 resta: e' una persona vera",
+          (2, 2), next(((r["voti"], r["persone"]) for r in righe
+                        if r["id"] == 1), None))
+    prova("...e i posti si ricontano senza di lui (nessun buco)", 2, len(righe))
+
+    # --- le sentinelle: colonna, rotta, cache, /api/me ----------------
+    prova("la colonna nasce spenta, con le sue sorelle", True,
+          '"classifica_nascosta INTEGER DEFAULT 0"' in _SORGENTE)
+    rotta = codice(pezzo("scegli_classifica_nascosta"))
+    prova("la rotta c'e', scrive la sua colonna e butta la cache", True,
+          '@app.post("/api/me/classifica-nascosta")' in _SORGENTE
+          and "UPDATE utenti SET classifica_nascosta=?" in rotta
+          and '_classifica_cache["quando"] = 0.0' in rotta)
+    prova("...e risponde col valore scritto", True,
+          'return {"ok": True, "nascosta": bool(nascosta)}' in rotta)
+    prova("/api/me la porta al client con tutta la riga", True,
+          '"SELECT * FROM utenti WHERE tg_id=?"' in codice(pezzo("mio_profilo")))
+    prova("il filtro sta FUORI dal giudice puro (quello di classifica_prova.py)",
+          (False, True), ("classifica_nascosta" in pezzo("_classifica_utenti"),
+                          "classifica_nascosta=1" in pezzo("classifica_ora")))
+
+    # --- il client: la riga nel Profilo, solo a classifica accesa -----
+    mini = open("miniapp.html", encoding="utf-8").read()
+    liv = pezzo_js(mini, "function renderLivello(", "\n}\n")
+    prova("la riga sta nel cassetto «Livello e titolo»", True,
+          "${rigaClassificaNascosta()}" in liv)
+    prova("il client legge la chiave del server", True,
+          "myClassificaNascosta = !!me.classifica_nascosta;" in mini)
+    se = pezzo_js(mini, "async function setClassificaNascosta(", "\n}\n")
+    prova("il gesto parla con la sua rotta e ridisegna col valore del server",
+          True, "${API_BASE}/me/classifica-nascosta" in se
+          and "myClassificaNascosta = !!d.nascosta;" in se
+          and "renderLivello();" in se)
+    node = shutil.which("node")
+    if not node:
+        salta("la riga dell'interruttore risponde giusto", "node non c'e'")
+    else:
+        js = pezzo_js(mini, "function rigaClassificaNascosta(", "\n}\n") + "\n}\n" + r"""
+const out = {};
+let myClassifica = false, myClassificaNascosta = false;
+out.spenta = rigaClassificaNascosta();
+myClassifica = true;
+out.visibile = rigaClassificaNascosta();
+myClassificaNascosta = true;
+out.nascosto = rigaClassificaNascosta();
+console.log(JSON.stringify(out));
+"""
+        import subprocess as _sp
+        import tempfile as _tf
+        with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                    encoding="utf-8") as fh:
+            fh.write(js)
+            percorso = fh.name
+        r = _sp.run([node, percorso], capture_output=True, text=True,
+                    encoding="utf-8", errors="replace")
+        os.unlink(percorso)
+        try:
+            out = json.loads(r.stdout.strip().splitlines()[-1])
+        except Exception:
+            out = {}
+        prova("a classifica spenta la riga non c'e' (un interruttore che non "
+              "cambia niente mente)", "", out.get("spenta"))
+        v, n = out.get("visibile", ""), out.get("nascosto", "")
+        prova("accesa: il titolo, il perche' del livello e la pillola Spento",
+              True, "🏆 Non mostrarmi in classifica" in v
+              and "Il livello resta" in v and "Spento</button>" in v
+              and "setClassificaNascosta(true)" in v)
+        prova("...nascosto: Attivo, e il tocco la rimette", True,
+              "Attivo</button>" in n and "setClassificaNascosta(false)" in n
+              and 'aria-pressed="true"' in n)
+    priv = mini[mini.find('id="view-privacy"'):
+                mini.find('<!-- ============ VISTA: LA CLASSIFICA')]
+    prova("«I tuoi dati» dice dov'e' l'interruttore, e che il livello resta",
+          True, "<b>Non mostrarmi in classifica</b>" in priv
+          and "il tuo livello resta sul profilo" in priv)
+
+
 def prove_classifica():
     """LA CLASSIFICA (ago 2026).
 
@@ -25576,9 +25960,12 @@ def prove_inviti():
           rifiuta("INSERT INTO inviti_codici(tg_id, codice) VALUES(99, ?)",
                   (c1,)))
     st = amb["stato_inviti"](con, 1, int(ADESSO - 400 * 86400))
+    # EMENDATA (set 2026, ritocchi piccoli): c'e' anche `attivi_min`, la
+    # soglia da cui i punti compaiono — una regola, non una persona. Il
+    # CONTO degli attivi invece non c'e', ed e' quel che qui si guarda
     prova("il cassetto porta i CONTI e nient'altro: mai chi",
-          {"codice", "link", "persone", "xp", "invitato", "campo_fino",
-           "percento", "giorni"}, set(st))
+          {"codice", "link", "persone", "xp", "attivi_min", "invitato",
+           "campo_fino", "percento", "giorni"}, set(st))
     prova("...il link e' quello del bot col codice",
           f"https://t.me/bot_di_cartone?start={c1}", st["link"])
     prova("...e le persone sono quelle collegate al suo codice", 2,
@@ -25675,9 +26062,20 @@ def prove_inviti():
     righe = [(r["riferimento"], r["punti"]) for r in con.execute(
         "SELECT riferimento, punti FROM xp_eventi WHERE tg_id=1 "
         "AND tipo IN ('ordine','invito')")]
-    per = amb["xp_per_ruolo"](righe, xp(con, 1))
-    prova("la scomposizione ha il terzo lato, e fa il totale", xp(con, 1),
-          sum(per.values()) if per else None)
+    # EMENDATE (set 2026, ritocchi piccoli): qui 1 ha UNA sola invitata
+    # attiva, la 4, e sotto la soglia la scomposizione ACCORPA — nessuna
+    # cifra. Il terzo lato si prova con due quote in piu', di due persone
+    # diverse: da tre attivi le cifre tornano, e devono fare il totale
+    prova("con una sola invitata attiva la scomposizione accorpa: nessuna "
+          "cifra", {"accorpati": True, "attivi_min": 3},
+          amb["xp_per_ruolo"](righe, xp(con, 1)))
+    righe3 = righe + [("invito:60:ordine:61:compratore", 3),
+                      ("invito:62:ordine:63:venditore", 2)]
+    tot3 = cont(sum(p for r, p in righe3 if not r.startswith("invito:")),
+                sum(p for r, p in righe3 if r.startswith("invito:")))
+    per = amb["xp_per_ruolo"](righe3, tot3)
+    prova("da tre attivi la scomposizione ha il terzo lato, e fa il totale",
+          tot3, sum(per.values()) if per else None)
     prova("...e le quote non finiscono fra le vendite", 210,
           (per or {}).get("vendite"))
     prova("ruolo_xp non legge il ruolo di un altro dentro una quota", "",
@@ -25685,10 +26083,15 @@ def prove_inviti():
     prova("senza quote la risposta di ieri, senza la chiave",
           {"vendite": 5, "acquisti": 0},
           amb["xp_per_ruolo"]([("ordine:1:venditore", 5)], 5))
+    # EMENDATA (set 2026, ritocchi piccoli): le quote vengono da TRE
+    # persone, o sotto la soglia la risposta accorperebbe e il tetto non
+    # si vedrebbe
     prova("le quote si contano col TETTO, non grezze",
           {"vendite": 5, "acquisti": 0, "inviti": 5},
           amb["xp_per_ruolo"]([("ordine:1:venditore", 5),
-                               ("invito:9:ordine:2:compratore", 40)], 10))
+                               ("invito:9:ordine:2:compratore", 20),
+                               ("invito:10:ordine:3:compratore", 10),
+                               ("invito:11:ordine:4:venditore", 10)], 10))
     con.execute("UPDATE utenti SET xp=999 WHERE tg_id=5")
     with zitto():
         n = amb["riallinea_xp_commercio"](con)
@@ -25701,6 +26104,15 @@ def prove_inviti():
     con.execute("DELETE FROM xp_eventi WHERE tg_id=1 AND tipo='ordine'")
     prova("senza piu' propri, le quote vecchie non tengono su il numero", 0,
           amb["_ricalcola_xp"](con, 1))
+    # EMENDATA (set 2026, ritocchi piccoli): con la sola 4 attiva il
+    # cassetto non direbbe NESSUNA cifra (None), e la prova passerebbe per
+    # la ragione sbagliata. Due quote di altre due persone portano 1 alla
+    # soglia: la cifra esce, ed e' il tetto a tenerla a zero. (Le righe se
+    # ne vanno con l'azzeramento qui sotto, che toglie tutto il perimetro.)
+    for _chi, _p in ((60, 3), (62, 2)):
+        con.execute("INSERT INTO xp_eventi(tg_id, tipo, punti, riferimento, "
+                    "creato) VALUES(1, 'invito', ?, ?, 0)",
+                    (_p, f"invito:{_chi}:ordine:{_chi + 1}:compratore"))
     prova("...ne' il cassetto le conta", 0,
           amb["stato_inviti"](con, 1, int(ADESSO - 400 * 86400))["xp"])
     con.execute("UPDATE utenti SET xp=77 WHERE tg_id=1")
@@ -25739,6 +26151,54 @@ def prove_inviti():
           dato)
     prova("...e la quota saltata lo dice nel journal", True,
           "Quota d'invito saltata" in uscita.getvalue())
+    con.close()
+
+    # --- 3b) LA SOGLIA DEGLI INVITATI ATTIVI (set 2026, ritocchi piccoli,
+    #     decisione di Andrea): con uno o due invitati attivi la cifra che
+    #     ti hanno portato e' il commercio di qualcuno che conosci — non
+    #     esce dal server, ne' nel cassetto ne' nella scomposizione. ------
+    att = amb["invitati_attivi"]
+    prova("gli invitati attivi si contano per PERSONA, dal riferimento "
+          "delle quote", 2,
+          att([("invito:4:ordine:1:compratore", 5),
+               ("invito:4:ordine:2:compratore", 3),
+               ("invito:7:ordine:3:venditore", 1),
+               ("ordine:9:venditore", 100)]))
+    prova("...e una riga d'altro tipo, o a zero punti, non fa un attivo", 0,
+          att([("ordine:4:venditore", 5), ("invito:8:ordine:5:compratore", 0),
+               ("", 3), ("invito:9", 2)]))
+    prova("la soglia e' tre", 3, amb["INVITO_ATTIVI_MIN"])
+    q1 = [("ordine:1:venditore", 50), ("invito:9:ordine:2:compratore", 5)]
+    q2 = q1 + [("invito:10:ordine:3:compratore", 5)]
+    q3 = q2 + [("invito:11:ordine:4:compratore", 5)]
+    prova("sotto la soglia la scomposizione accorpa, con uno e con due: "
+          "nessuna cifra", [{"accorpati": True, "attivi_min": 3}] * 2,
+          [amb["xp_per_ruolo"](q1, 55), amb["xp_per_ruolo"](q2, 60)])
+    prova("...e dal terzo le cifre tornano",
+          {"vendite": 50, "acquisti": 0, "inviti": 15},
+          amb["xp_per_ruolo"](q3, 65))
+    prova("...senza punti da inviti nessuna soglia: la risposta di sempre",
+          {"vendite": 50, "acquisti": 0},
+          amb["xp_per_ruolo"]([("ordine:1:venditore", 50)], 50))
+    prova("...e se i conti non tornano si tace comunque (None)", None,
+          amb["xp_per_ruolo"](q1, 999))
+    con = banco()
+    persona(con, 1, 400)
+
+    def riga_xp(t, tipo, punti, rif):
+        con.execute("INSERT INTO xp_eventi(tg_id, tipo, punti, riferimento, "
+                    "creato) VALUES(?,?,?,?,0)", (t, tipo, punti, rif))
+
+    riga_xp(1, "ordine", 100, "ordine:1:venditore")
+    riga_xp(1, "invito", 4, "invito:20:ordine:2:compratore")
+    riga_xp(1, "invito", 6, "invito:21:ordine:3:compratore")
+    st2 = amb["stato_inviti"](con, 1, int(ADESSO - 400 * 86400))
+    prova("nel cassetto, con due invitati attivi, la cifra NON esce dal "
+          "server — e la soglia si'", (None, 3), (st2["xp"], st2["attivi_min"]))
+    riga_xp(1, "invito", 5, "invito:22:ordine:4:venditore")
+    riga_xp(1, "invito", 1, "invito:20:ordine:5:compratore")
+    prova("...dal terzo la cifra c'e', contata col tetto come sempre", 16,
+          amb["stato_inviti"](con, 1, int(ADESSO - 400 * 86400))["xp"])
     con.close()
 
     # --- 4) LE SENTINELLE -------------------------------------------
@@ -25827,6 +26287,27 @@ att('...e i punti non si nominano finche\u0027 sono zero', !c1.includes('XP'));
 att('2 persone al plurale, e i punti quando ci sono',
     c2.includes('2 persone</b>') && c2.includes('7 XP'));
 att('la chiave assente non esplode', contoInviti(null) === c0);
+/* LA SOGLIA DEGLI INVITATI ATTIVI (set 2026, ritocchi piccoli): sotto,
+   il server manda xp null e la soglia; il cassetto dice da quanti */
+const cn = contoInviti({persone: 2, xp: null, attivi_min: 3});
+att('sotto la soglia il cassetto lo dice, e nessun XP',
+    cn.includes('2 persone</b>')
+    && cn.includes('I punti degli inviti compaiono da 3 invitati attivi in su.')
+    && !cn.includes('XP'));
+att('...col numero del SERVER',
+    contoInviti({persone: 1, xp: null, attivi_min: 5}).includes('da 5 invitati attivi'));
+att('...mentre con la cifra, anche zero, la frase non compare',
+    !contoInviti({persone: 2, xp: 0, attivi_min: 3}).includes('compaiono')
+    && !contoInviti({persone: 4, xp: 9, attivi_min: 3}).includes('compaiono'));
+att('...e a chi non ha invitato nessuno si dice solo cosa fare',
+    contoInviti({persone: 0, xp: null, attivi_min: 3}) === c0);
+const acc = fraseXp({accorpati: true, attivi_min: 3});
+att('la riga dei punti ACCORPA: nessuna cifra, fuori dalla soglia',
+    acc.replace('da 3 invitati', '').search(/[0-9]/) < 0
+    && acc.includes('chi hai invitato')
+    && acc.includes('Le cifre per lato compaiono da 3 invitati attivi in su.'));
+att('...con la testa e la coda di sempre',
+    acc.startsWith('Gli XP contano il commercio: ') && acc.includes('pesa in classifica'));
 const r5 = regolaInviti({percento: 5});
 att('la regola porta la percentuale del SERVER',
     r5.includes('<b>5%</b>') && regolaInviti({percento: 7}).includes('<b>7%</b>'));
@@ -25875,6 +26356,12 @@ console.log(JSON.stringify(rosse));
           "Gli <b>inviti</b>" in priv)
     prova("...col limite onesto del conto", True,
           "se ha invitato soltanto te" in priv)
+    # la soglia scritta in prosa e quella del codice dicono lo stesso
+    # numero (set 2026, ritocchi piccoli): chi la cambia di la', qui si
+    # ferma — e riscrive la frase che la dichiara
+    prova("...e la soglia dei punti che dichiara e' quella del codice", True,
+          "solo quando quelle che commerciano sono almeno tre" in priv
+          and amb["INVITO_ATTIVI_MIN"] == 3)
     prova("...e non dice piu' che gli XP contano una cosa sola", False,
           "contano una cosa sola" in priv)
 
@@ -70325,9 +70812,13 @@ def prove_letture_relay_collaudo():
     amb, detto, bussate = _mondo(True)
     npub = amb["hex_to_npub"](CHIAVE)
     profilo = _aio.run(amb["_profilo_nostr"](npub))
+    # EMENDATA (set 2026, ritocchi piccoli): qui si aspettava il profilo
+    # VUOTO, {}. Relay che tacciono non sono un profilo vuoto ma un «non
+    # si sa», None — ed e' quel che tiene la foto al suo posto: col {} il
+    # rinfresco la cancellava (vedi prove_foto_nostr_relay_muti)
     prova("IL 23 SET RIFATTO: il profilo di una npub verificata, in collaudo "
-          "coi relay di serie — nessuna bussata, e il profilo vuoto",
-          [[], {}], [list(bussate), profilo])
+          "coi relay di serie — nessuna bussata, e il profilo che non si sa",
+          [[], None], [list(bussate), profilo])
     prova("...con una riga per ognuno dei relay di serie, nostr.mom compreso",
           sorted(SERIE), sorted(
               r.split(" da ", 1)[1].split(": in collaudo")[0] for r in detto
@@ -83278,12 +83769,15 @@ const flush = () => new Promise(r => setImmediate(r));
     prova("...e nella colonna dei gesti entra il solo voto del circuito", True,
           "if (gesto === 'vota') fuori.push(gesto);"
           in fn("function azioniSecondarieP2P(o, rec){"))
-    # il `box.innerHTML =` che conta e' quello DOPO la bozza: in cima alla
-    # funzione ce n'e' un altro, la pagina dello scambio che non c'e' piu'
+    # la scrittura che conta e' quella DOPO la bozza: in cima alla
+    # funzione c'e' l'innerHTML della pagina dello scambio che non c'e'
+    # piu'. EMENDATA (set 2026, ritocchi piccoli): era `box.innerHTML =`,
+    # e da quando la pagina si ridisegna solo dove cambia la scrittura
+    # passa da `ridisegnaSeCambiaP2P` (vedi prove_pagina_scambio_ridisegno)
     _i_bz = ren.find("const bozza = bozzaRecensioneP2P(o.id);")
     prova("la pagina disegna il riquadro, e la bozza del commento sopravvive al ridisegno", True,
           "riquadroRecensioneP2P(o, rec) +" in ren
-          and 0 <= _i_bz < ren.find("box.innerHTML =", _i_bz)
+          and 0 <= _i_bz < ren.find("ridisegnaSeCambiaP2P(box,", _i_bz)
           < ren.find("rimettiBozzaRecensioneP2P(bozza);")
           and ren.count("rimettiBozzaRecensioneP2P(bozza);") == 1)
     ap = fn("function apriOrdineP2P(id){")
@@ -83326,6 +83820,147 @@ console.log(JSON.stringify(out));
               [None, None, None, True],
               [out.get("altroScambio"), out.get("senzaDataset"),
                out.get("senzaCasella"), out.get("nienteDaRimettere")])
+
+
+def prove_pagina_scambio_ridisegno():
+    """LA PAGINA DELLO SCAMBIO SI RIDISEGNA SOLO DOVE CAMBIA (set 2026,
+    ritocchi piccoli): aprendo uno scambio, a caricamento finito — il
+    profilo dell'altra persona, il bundle dei messaggi — `renderOrdineP2P`
+    riscriveva la pagina INTERA, e una selezione di testo fatta nel primo
+    secondo spariva. Adesso i pezzi di primo livello uguali restano gli
+    STESSI nodi, mai spostati (un nodo spostato perde la selezione anche
+    se torna al suo posto), e si cambiano solo gli altri; se non cambia
+    niente non si tocca niente.
+    Qui si prova la meccanica su un DOM di cartone — chi resta, chi si
+    muove, l'ordine finale — e il ripiego; la selezione vera, col DOM
+    vero, l'ha provata il giro dal vivo."""
+    print("\n[la pagina dello scambio si ridisegna solo dove cambia]")
+    import json as _js
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    nudo = lambda js: re.sub(r"/\*[\s\S]*?\*/", "", js)
+
+    def fn(firma):
+        """la funzione per intero; '' se non c'e' — una rossa col suo
+        nome, non la sezione che esplode"""
+        if firma not in mini:
+            return ""
+        return pezzo_js(mini, firma, "\n}\n") + "\n}"
+
+    FIRME = ["function ridisegnaSeCambiaP2P(box, html){",
+             "function posaPezziP2P(box, nuovi){",
+             "function pezziCheRestanoP2P(vecchi, nuovi){"]
+    prova("le tre funzioni ci sono, una volta sola", [1, 1, 1],
+          [mini.count(f) for f in FIRME])
+    ren = nudo(fn("function renderOrdineP2P(){"))
+    prova("la pagina dello scambio passa da ridisegnaSeCambiaP2P, e "
+          "l'innerHTML resta al solo «questo scambio non c'e' piu'»", (1, 1),
+          (ren.count("ridisegnaSeCambiaP2P(box,"), ren.count("box.innerHTML =")))
+
+    node = _sh.which("node")
+    if not node:
+        salta("il banco della pagina che si ridisegna", "node non c'e'")
+        return
+    banco = "\n".join(fn(f) for f in FIRME) + r"""
+class Nodo {
+  constructor(html){ this.nodeType = 1; this.outerHTML = html;
+                     this.parentNode = null; this.mosse = 0; }
+  get nextSibling(){
+    if (!this.parentNode) return null;
+    const f = this.parentNode.childNodes;
+    return f[f.indexOf(this) + 1] || null;
+  }
+  remove(){
+    if (!this.parentNode) return;
+    const f = this.parentNode.childNodes;
+    f.splice(f.indexOf(this), 1);
+    this.parentNode = null;
+  }
+}
+class Scatola {
+  constructor(pezzi){
+    this.childNodes = [];
+    pezzi.forEach(p => this.insertBefore(new Nodo(p), null));
+    this.childNodes.forEach(n => { n.mosse = 0; });
+  }
+  insertBefore(n, rif){
+    if (n.parentNode) n.remove();
+    const i = rif ? this.childNodes.indexOf(rif) : this.childNodes.length;
+    this.childNodes.splice(i, 0, n);
+    n.parentNode = this;
+    n.mosse++;
+    return n;
+  }
+}
+function giro(prima, dopo){
+  const box = new Scatola(prima);
+  const originali = box.childNodes.slice();
+  posaPezziP2P(box, dopo.map(p => new Nodo(p)));
+  return {html: box.childNodes.map(n => n.outerHTML),
+          tenuti: originali.filter(n => n.parentNode === box).map(n => n.outerHTML),
+          spostati: originali.filter(n => n.parentNode === box && n.mosse > 0).length};
+}
+const out = {};
+out.uguale = giro(['<conto>', '<passi>', '<esci>'], ['<conto>', '<passi>', '<esci>']);
+out.profilo = giro(['<conto>', '<anello 10s>', '<passi>', '<iban>', '<profilo ?>', '<esci>'],
+                   ['<conto>', '<anello 9s>', '<passi>', '<iban>', '<profilo Ada>', '<esci>']);
+out.entra = giro(['<a>', '<b>'], ['<a>', '<x>', '<b>']);
+out.esce = giro(['<a>', '<x>', '<b>'], ['<a>', '<b>']);
+out.tutto = giro(['<a>', '<b>'], ['<c>', '<d>']);
+out.vuota = giro([], ['<a>', '<b>']);
+out.coppie = [pezziCheRestanoP2P(['a', 'b', 'c'], ['a', 'x', 'c']),
+              pezziCheRestanoP2P(['r1', 'a', 'b'], ['r2', 'a', 'b']),
+              pezziCheRestanoP2P([], ['a']),
+              pezziCheRestanoP2P(['a', 'a'], ['a'])];
+const finta = {innerHTML: 'vecchio'};
+ridisegnaSeCambiaP2P(finta, '<p>nuovo</p>');
+out.ripiego = finta.innerHTML;
+console.log(JSON.stringify(out));
+"""
+    f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8")
+    f.write(banco)
+    f.close()
+    try:
+        r = _sp.run([node, f.name], capture_output=True, timeout=60,
+                    encoding="utf-8", errors="replace")
+    finally:
+        os.unlink(f.name)
+    try:
+        out = _js.loads(r.stdout.strip().splitlines()[-1])
+    except Exception:
+        out = None
+    if r.returncode != 0 or not isinstance(out, dict):
+        prova("il banco della pagina che si ridisegna gira", "",
+              (r.stderr or r.stdout or "")[-600:])
+        return
+    prova("se non cambia niente non si tocca niente: stessi nodi, nessuno "
+          "spostato", {"html": ["<conto>", "<passi>", "<esci>"],
+                       "tenuti": ["<conto>", "<passi>", "<esci>"], "spostati": 0},
+          out["uguale"])
+    prova("IL CASO VERO: arriva il profilo dell'altra persona — il conto, i "
+          "passi, l'IBAN e le uscite restano gli STESSI nodi, anche con "
+          "l'anello che cambia sopra di loro",
+          {"html": ["<conto>", "<anello 9s>", "<passi>", "<iban>",
+                    "<profilo Ada>", "<esci>"],
+           "tenuti": ["<conto>", "<passi>", "<iban>", "<esci>"], "spostati": 0},
+          out["profilo"])
+    prova("un pezzo che entra in mezzo: gli altri non si muovono",
+          {"html": ["<a>", "<x>", "<b>"], "tenuti": ["<a>", "<b>"], "spostati": 0},
+          out["entra"])
+    prova("un pezzo che esce: gli altri non si muovono",
+          {"html": ["<a>", "<b>"], "tenuti": ["<a>", "<b>"], "spostati": 0},
+          out["esce"])
+    prova("tutto diverso: la pagina nuova, intera e in ordine",
+          {"html": ["<c>", "<d>"], "tenuti": [], "spostati": 0}, out["tutto"])
+    prova("la prima volta (scatola vuota): si scrive tutto",
+          {"html": ["<a>", "<b>"], "tenuti": [], "spostati": 0}, out["vuota"])
+    prova("PURA: la sottosequenza comune piu' lunga, e non il solo tratto "
+          "uguale in testa (l'anello in alto non ferma chi sta sotto)",
+          [[[0, 0], [2, 2]], [[1, 1], [2, 2]], [], [[0, 0]]], out["coppie"])
+    prova("il ripiego senza un DOM vero e' la pagina di sempre, intera",
+          "<p>nuovo</p>", out["ripiego"])
 
 
 def prove_dati_spedizione_copia():
@@ -86849,7 +87484,7 @@ def main():
               prove_foto, prove_foto_scarti,
               prove_duplica_annuncio, prove_avatar,
               prove_foto_spenta, prove_foto_telegram_fallita,
-              prove_nome_da_nostr,
+              prove_nome_da_nostr, prove_foto_nostr_relay_muti,
               prove_pagamento_incerto, prove_esito_pagamento,
               prove_pagamenti_in_volo, prove_fatture_scadute,
               prove_fattura_solo_incasso,
@@ -86875,7 +87510,7 @@ def main():
               prove_forma_tracking, prove_bip353, prove_firme_nostr,
               prove_trasloco_nostr, prove_collega_npub_firma,
               prove_conta_feedback,
-              prove_classifica,
+              prove_classifica, prove_classifica_nascosta,
               prove_ferie, prove_stock_raccontato, prove_pausa,
               prove_xp, prove_inviti, prove_coorti_titoli,
               prove_conto_acquisto,
@@ -86982,6 +87617,7 @@ def main():
               prove_porta_timer, prove_feedback_confermato,
               prove_recensione_p2p,
               prove_ritocchi_scambio,
+              prove_pagina_scambio_ridisegno,
               prove_dati_spedizione_copia,
               prove_foglio_tastiera_iphone,
               prove_servizi,

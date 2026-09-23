@@ -21,7 +21,8 @@ config.
   4. la quota a ogni accredito, dal gancio VERO (`premia_xp`): il tetto
      sui propri, il 5% per difetto, l'affare con chi ha invitato che non
      paga, il retry, niente catena, «a vita» — e il numero che resta UNO
-     fra cache, riallineamento d'avvio, classifica e scomposizione;
+     fra cache, riallineamento d'avvio, classifica e scomposizione, che
+     sotto i tre invitati attivi non dice nessuna cifra;
   5. la fusione di due account: l'auto-invito, il giro in tondo e
      l'affare diventato «con chi ha invitato» che nascerebbero fondendo
      si sciolgono, e il CHECK non fa cadere la fusione;
@@ -397,10 +398,22 @@ def main():
     prova("il Profilo e il rank dicono lo stesso numero, quote comprese",
           xp_di(222), xp_rank.get(222))
     me = profilo(222)
+    # LA SOGLIA DEGLI INVITATI ATTIVI (set 2026, ritocchi piccoli): qui
+    # Ermenegildo ne ha DUE, Zefirina e Anselma, e sotto la soglia il
+    # server non dice nessuna cifra — ne' la scomposizione ne' il
+    # cassetto. Poi compra Cesira, e dalla terza le cifre tornano: le tre
+    # prove di sotto, EMENDATE, guardano quel momento (prima l'ultima
+    # passava per la ragione sbagliata, None contro None).
+    prova("con due invitati attivi la scomposizione accorpa: nessuna "
+          "cifra", {"accorpati": True, "attivi_min": 3}, me.get("xp_ruoli"))
+    prova("...e il cassetto non la dice nemmeno lui", None,
+          (me.get("inviti") or {}).get("xp"))
+    accredita(342, 100, ordine(111, 342), "compratore")
+    me = profilo(222)
     ruoli = me.get("xp_ruoli") or {}
     prova("la scomposizione ha il terzo lato, e fa il totale", me["xp"],
           sum(ruoli.values()))
-    prova("...il terzo lato e' quello degli inviti", 5 + 95 + 1 + 5,
+    prova("...il terzo lato e' quello degli inviti", 5 + 95 + 1 + 5 + 5,
           ruoli.get("inviti"))
     prova("...e il cassetto dice gli stessi punti", ruoli.get("inviti"),
           (me.get("inviti") or {}).get("xp"))
