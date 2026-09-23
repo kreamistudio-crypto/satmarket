@@ -93,10 +93,14 @@ def marca(con, ids):
         # Il riferimento della quota porta dentro quello dell'accredito
         # (`invito:{chi}:ordine:{id}:{ruolo}`), quindi si trovano per
         # nome esatto, senza LIKE.
+        # E DAL SET 2026 ANCHE LE ACCANTONATE ('invito_attesa'), le quote
+        # in attesa dei tre invitati attivi: un collaudo non deve poter
+        # arrivare nemmeno il giorno del rilascio.
         refs_quote = (f"invito:{v}:{refs[0]}", f"invito:{c}:{refs[1]}")
         quote = list(con.execute(
             "SELECT tg_id, punti, riferimento FROM xp_eventi "
-            "WHERE tipo='invito' AND riferimento IN (?,?)", refs_quote))
+            "WHERE tipo IN ('invito','invito_attesa') "
+            "AND riferimento IN (?,?)", refs_quote))
         fb = list(con.execute(
             "SELECT id, da_tg_id, per_tg_id, voto FROM feedback "
             "WHERE ordine_id=?", (oid,)))
@@ -119,8 +123,9 @@ def marca(con, ids):
         con.execute("UPDATE ordini SET prova=1 WHERE id=?", (oid,))
         con.execute("DELETE FROM xp_eventi WHERE tipo='ordine' "
                     "AND riferimento IN (?,?)", refs)
-        con.execute("DELETE FROM xp_eventi WHERE tipo='invito' "
-                    "AND riferimento IN (?,?)", refs_quote)
+        con.execute("DELETE FROM xp_eventi WHERE tipo IN "
+                    "('invito','invito_attesa') AND riferimento IN (?,?)",
+                    refs_quote)
         rapporto["invitanti"].update(q["tg_id"] for q in quote)
         # Il decremento vive SOLO nel giro in cui il timbro passa
         # 0→1: cosi' il secondo lancio non toglie due volte.

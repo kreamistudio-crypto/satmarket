@@ -27,8 +27,13 @@ config.
      l'affare diventato «con chi ha invitato» che nascerebbero fondendo
      si sciolgono, e il CHECK non fa cadere la fusione;
   6. l'azzeramento degli XP, simulato come lo dice il codice: si
-     cancellano le righe del perimetro, i collegamenti restano, e la
-     regola riparte da zero da sola.
+     cancellano le righe del perimetro e le accantonate, i collegamenti
+     restano, e la regola riparte da zero da sola;
+  7. il secondo giro della privacy: sotto i tre invitati attivi le quote
+     si accantonano (lungo tutto il punto 4) e alla terza arrivano
+     insieme; la migrazione timbrata all'avvio; e «Non mostrarmi in
+     classifica» che dalla sua rotta ritira il 30382 con una NIP-09, non
+     lo ripubblica a un gancio dopo, e lo ripubblica riacceso.
 
 NON TOCCA NIENTE DI VERO: il `config` di cartone lo installa `avvio()`
 del banco dei pagamenti, PRIMA dell'import del server. Nessuna rete: il
@@ -134,12 +139,26 @@ def xp_di(tg_id):
 
 
 def quote_di(tg_id):
+    """Le quote di una persona nei DUE stati, accreditate e accantonate
+    (EMENDATA al secondo giro della privacy degli inviti): qui si guarda
+    QUANTO vale una quota, e sotto i tre invitati attivi il quanto si
+    scrive accantonato. Lo stato lo guarda `stati_di`."""
     con = _db()
     rr = [(r["punti"], r["riferimento"]) for r in con.execute(
         "SELECT punti, riferimento FROM xp_eventi WHERE tg_id=? "
-        "AND tipo=? ORDER BY id", (tg_id, banco.SRV.XP_INVITO))]
+        "AND tipo IN (?,?) ORDER BY id", (tg_id, *banco.SRV.XP_QUOTE))]
     con.close()
     return rr
+
+
+def stati_di(tg_id):
+    """(accreditate, accantonate) di una persona, in punti."""
+    con = _db()
+    fuori = tuple([r["punti"] for r in con.execute(
+        "SELECT punti FROM xp_eventi WHERE tg_id=? AND tipo=? ORDER BY id",
+        (tg_id, t))] for t in banco.SRV.XP_QUOTE)
+    con.close()
+    return fuori
 
 
 def ordine(venditore, compratore):
@@ -358,14 +377,19 @@ def main():
     accredita(333, 100, o, "compratore")
     prova("il 5% di 100 e' 5, col riferimento che porta l'accredito",
           [(5, f"invito:333:ordine:{o}:compratore")], quote_di(222))
-    prova("...e chi invita ha 100 propri + 5", 105, xp_di(222))
+    # EMENDATA (secondo giro): Ermenegildo ha UNA invitata attiva, e la
+    # sua quota si ACCANTONA — nel numero non c'e' (era 100 + 5)
+    prova("...ed e' accantonata: chi invita resta ai suoi 100 propri",
+          ([], [5], 100), (*stati_di(222), xp_di(222)))
     prova("NIENTE CATENA: la quota di Ermenegildo non paga il Nonno", [5],
           [q[0] for q in quote_di(350)])
     accredita(333, 2000, ordine(111, 333), "compratore")
     prova("il tetto taglia allo spazio che resta: 100 teorici, ne "
           "entrano 95", 95, quote_di(222)[-1][0])
-    prova("...e il numero e' il doppio dei propri, non di piu'", 200,
-          xp_di(222))
+    # EMENDATA (secondo giro): il tetto ha tagliato — 5 + 95, il doppio
+    # dei propri — ma e' tutto accantonato, e il numero resta ai propri
+    prova("...e il numero resta ai propri: 5 + 95 aspettano la terza "
+          "invitata attiva", ([], [5, 95], 100), (*stati_di(222), xp_di(222)))
     accredita(333, 2000, ordine(111, 333), "compratore")
     prova("a tetto pieno non entra piu' niente", 2, len(quote_di(222)))
     o6 = ordine(222, 333)                  # Zefirina compra DA Ermenegildo
@@ -398,18 +422,27 @@ def main():
     prova("il Profilo e il rank dicono lo stesso numero, quote comprese",
           xp_di(222), xp_rank.get(222))
     me = profilo(222)
-    # LA SOGLIA DEGLI INVITATI ATTIVI (set 2026, ritocchi piccoli): qui
-    # Ermenegildo ne ha DUE, Zefirina e Anselma, e sotto la soglia il
-    # server non dice nessuna cifra — ne' la scomposizione ne' il
-    # cassetto. Poi compra Cesira, e dalla terza le cifre tornano: le tre
-    # prove di sotto, EMENDATE, guardano quel momento (prima l'ultima
-    # passava per la ragione sbagliata, None contro None).
-    prova("con due invitati attivi la scomposizione accorpa: nessuna "
-          "cifra", {"accorpati": True, "attivi_min": 3}, me.get("xp_ruoli"))
-    prova("...e il cassetto non la dice nemmeno lui", None,
-          (me.get("inviti") or {}).get("xp"))
+    # LA SOGLIA DEGLI INVITATI ATTIVI (set 2026, ritocchi piccoli, e poi il
+    # secondo giro): qui Ermenegildo ne ha DUE, Zefirina e Anselma. Al
+    # primo giro la scomposizione accorpava; dal secondo le quote sono
+    # ACCANTONATE, quindi il numero sono i soli propri, la scomposizione
+    # non ha il lato degli inviti e il cassetto dice «in attesa» senza
+    # cifra. Poi compra Cesira, e alla terza arrivano tutte insieme: le
+    # prove di sotto guardano quel momento.
+    prova("con due invitati attivi il numero e' dei soli propri: 150 "
+          "dalle vendite, nessun lato degli inviti",
+          (150, {"vendite": 150, "acquisti": 0}),
+          (me["xp"], me.get("xp_ruoli")))
+    prova("...e il cassetto dice «in attesa», senza cifra",
+          (None, True), ((me.get("inviti") or {}).get("xp"),
+                         (me.get("inviti") or {}).get("in_attesa")))
     accredita(342, 100, ordine(111, 342), "compratore")
+    prova("ALLA TERZA INVITATA ATTIVA ARRIVANO TUTTE INSIEME",
+          ([5, 95, 1, 5, 5], [], 150 + 111),
+          (*stati_di(222), xp_di(222)))
     me = profilo(222)
+    prova("...e il cassetto non dice piu' «in attesa»", False,
+          (me.get("inviti") or {}).get("in_attesa"))
     ruoli = me.get("xp_ruoli") or {}
     prova("la scomposizione ha il terzo lato, e fa il totale", me["xp"],
           sum(ruoli.values()))
@@ -500,7 +533,9 @@ def main():
     print("\n[l'azzeramento degli XP]")
     con = _db()
     collegamenti = con.execute("SELECT COUNT(*) FROM inviti").fetchone()[0]
-    dove, par = SRV.sql_xp_commercio()
+    # EMENDATA (secondo giro): l'azzeramento toglie anche le accantonate
+    # — il Nonno ne ha, e col solo perimetro resterebbero
+    dove, par = SRV.sql_xp_azzeramento()
     con.execute(f"DELETE FROM xp_eventi WHERE {dove}", par)
     SRV.riallinea_xp_commercio(con)
     con.commit()
@@ -518,6 +553,66 @@ def main():
     accredita(333, 100, ordine(111, 333), "compratore")
     prova("...e riprende appena guadagna in proprio", [5],
           [q[0] for q in quote_di(222)])
+
+    # ---- 7) il secondo giro della privacy, sul server vero ----------
+    print("\n[la migrazione e il 30382 con l'interruttore]")
+    con = _db()
+    timbro = con.execute("SELECT valore FROM impostazioni WHERE chiave=?",
+                         (SRV.MIGRAZIONE_QUOTE_ACCANTONATE,)).fetchone()
+    con.close()
+    prova("la migrazione delle quote e' passata all'avvio, e s'e' timbrata "
+          "per non ripassare", True, bool(timbro))
+    # IL 30382 SI FERMA E SI RITIRA DALLA ROTTA VERA. Di finto c'e' la
+    # sola firma — nessuna chiave in gioco, e in CI coincurve non c'e' —
+    # e il relay, che in collaudo non esce comunque: si registra cosa
+    # partirebbe.
+    SRV._NOSTR = (None, "ee" * 32)
+    spediti = []
+
+    def firma_finta(kind, tags, content):
+        return {"kind": kind, "tags": tags, "content": content,
+                "id": f"ev{len(spediti) + 1}"}
+
+    async def spedisci_finto(evento, relays=None):
+        spediti.append(evento)
+        return 1
+
+    SRV.firma_evento = firma_finta
+    SRV._spedisci_ai_relay = spedisci_finto
+    persona(700, "Reputata", 30)
+    con = _db()
+    con.execute("UPDATE utenti SET npub=?, npub_verificata=1, xp=120, "
+                "vendite_ok=3 WHERE tg_id=700",
+                (SRV.hex_to_npub("cd" * 32),))
+    con.commit()
+    con.close()
+
+    def reputazione():
+        c = _db()
+        r = c.execute("SELECT evento_id FROM nostr_reputazione WHERE "
+                      "tg_id=700").fetchone()
+        c.close()
+        return r["evento_id"] if r else None
+
+    asyncio.run(SRV.premia_reputazione_nostr(700))
+    prova("visibile: il 30382 esce", ([30382], "ev1"),
+          ([e["kind"] for e in spediti], reputazione()))
+    banco.come(700)
+    esito = banco.chiama(SRV.scegli_classifica_nascosta, None,
+                         corpo={"nascosta": True})
+    prova("NASCOSTO dalla rotta: la NIP-09 parte, col suo e, a e k", (
+        True, 5, [["e", "ev1"], ["a", "30382:" + "ee" * 32 + ":" + "cd" * 32],
+                  ["k", "30382"]], None),
+        (esito["nascosta"], spediti[-1]["kind"], spediti[-1]["tags"],
+         reputazione()))
+    asyncio.run(SRV.premia_reputazione_nostr(700))
+    prova("...e un gancio dopo (un affare, la verifica della npub) non lo "
+          "ripubblica", 2, len(spediti))
+    banco.come(700)
+    banco.chiama(SRV.scegli_classifica_nascosta, None,
+                 corpo={"nascosta": False})
+    prova("RIACCESO dalla rotta: il 30382 torna", ([30382, 5, 30382], True),
+          ([e["kind"] for e in spediti], reputazione() is not None))
 
     print("\n" + "=" * 58)
     print(f"  {banco.PASSATE} passate, {banco.FALLITE} fallite")

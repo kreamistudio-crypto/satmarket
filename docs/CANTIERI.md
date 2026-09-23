@@ -29142,7 +29142,8 @@ intatta, riprova fra 3594 secondi.
   classifica e del 30382, quindi chi ha un solo invitato attivo vede il
   suo totale salire a ogni affare di lui. Chiuderla vuol dire contare le
   quote solo da tre attivi in su, che cambia livelli e classifica:
-  decisione di Andrea. «I tuoi dati» lo dichiara.
+  decisione di Andrea. «I tuoi dati» lo dichiara. [CURATO il 24 set
+  2026: vedi «Privacy degli inviti, secondo giro», qui sotto.]
 - L'automatico con Telegram muto e Nostr che conferma «nessuna foto»
   svuota ancora: è la gamba Telegram, fuori da questo giro.
 - Una picture che non si scarica per sempre (un 404) si ritenta ogni ora
@@ -29330,3 +29331,114 @@ senza racconto, il difetto che il primo giro evitava tenendolo fuori).
 - Allo spazio scaduto (o con `/sponsor spento`): To The Mooon resta nella
   card e nella pagina, e il suo negozio si apre con la storia; in «Da
   scoprire» la sua card non c'è più.
+
+## Privacy degli inviti, secondo giro: le quote da parte fino a tre attivi, e il 30382 che si ritira (24 set 2026)
+
+Chiude «il totale parla ancora», lasciato aperto qui sopra. Due punti,
+decisi da Andrea.
+
+**1. SOTTO TRE INVITATI ATTIVI LE QUOTE SI METTONO DA PARTE.** Una quota
+nata sotto la soglia si scrive col tipo `invito_attesa`
+(`XP_INVITO_ATTESA`), che sta FUORI da `XP_COMMERCIO`: il totale, il
+livello, la classifica e l'`xp` del 30382 non la vedono. Un TIPO e non una
+colonna: stessa UNIQUE del registro, gli script che contano
+`tipo='invito'` restano giusti, e il rilascio è un `UPDATE OR IGNORE` del
+tipo. ATTIVO resta quello del primo giro — una persona che ti ha portato
+almeno un punto — contato sulle quote nei due stati. Quando una quota
+nuova porta gli attivi a tre, `rilascia_quote` le accredita TUTTE e il
+numero si rifà; da lì `quota_invito` scrive dritto.
+SE GLI ATTIVI TORNANO SOTTO TRE (una fusione, un ordine marcato come
+prova), l'accreditato resta e le quote NUOVE tornano da parte:
+`inviti_sbloccati` si rilegge dal registro a ogni quota, e non è un
+timbro. SCARTATO lo sblocco per sempre, che era la prima stesura: dopo
+il calo il totale ricomincerebbe a crescere a ogni affare di una o due
+persone, cioè proprio quel che la soglia esiste per non dire. La
+tortura distingue le due stesure.
+IL TETTO conta anche il da parte (spazio = propri − accreditate −
+accantonate), e quel che non ci sta è perso, non accantonato. Un tetto
+pieno non fa nascere un attivo: chi non ti ha portato un punto non ha
+una riga.
+IL CASSETTO: `stato_inviti` manda `xp: null` da non sbloccato e
+`in_attesa` quando c'è almeno un punto da parte, e la riga dice «punti in
+attesa: arrivano da 3 invitati attivi in su», senza cifra. Il suo limite
+onesto, scritto in «I tuoi dati»: con un solo invitato quella riga dice
+che ha cominciato a commerciare — non quanto.
+LA MIGRAZIONE, UNA VOLTA SOLA (`migra_quote_accantonate`, timbro in
+`impostazioni`): le quote già accreditate dalla regola di ieri a chi ha
+meno di tre attivi tornano da parte, e il numero scende (lo dice nel
+journal). Una volta sola perché da oggi una quota accreditata sotto
+soglia è legittima: è di chi la soglia l'ha passata ed è sceso. I
+toccati hanno un 30382 col numero di ieri, e lo riallinea
+`ripubblica_reputazione_migrata` all'avvio, in sottofondo: il bottone
+admin di riallineamento non ha un posto nel pannello. A ogni avvio
+`rilascia_quote_mature` consegna quel che è maturo (una quota rimasta
+indietro per un intoppo, due metà fuse che insieme fanno tre). La
+fusione pulisce i due tipi e poi rilascia, `marca_prove.py` toglie anche
+le accantonate, l'azzeramento passa da `sql_xp_azzeramento()`.
+
+**2. «NON MOSTRARMI IN CLASSIFICA» FERMA ANCHE IL 30382, E LO RITIRA CON
+UNA NIP-09.** Scelta la NIP-09, e non un 30382 vuoto sopra: un evento
+sostituito resta un'ASSERZIONE firmata da noi su quella pubkey — un
+client di Web of Trust può leggerlo «rank assente» o «rank zero», e il
+`d` continua a dire che Barattolo la conosce. La NIP-09 è il ritiro del
+protocollo: `_lapide_reputazione`, gemella di `_lapide_nostra` e
+`_lapide_badge` (`e` sull'ultimo evento, `a` =
+`30382:<piattaforma>:<soggetto>`, `k`); la `a` chiede di togliere tutte le
+versioni fino al suo secondo. Il limite è quello degli annunci: un relay
+che non la rispetta tiene la copia, e «I tuoi dati» lo dice.
+DOVE: dentro `premia_reputazione_nostr`, il giudice di tutti i ganci
+(affare concluso, verifica della npub, bottone admin, e adesso la rotta
+dell'interruttore), così l'interruttore vale per tutti senza ripeterlo in
+ognuno. Nascosto e con una riga in `nostr_reputazione`: lapide alla
+pubkey scritta nella riga, e la riga se ne va solo dopo l'OK di un relay
+(se no riprova il prossimo gancio: la regola di `_seppellisci_vecchio`).
+Nascosto e senza riga: niente, nemmeno una bussata. Riacceso: un 30382
+nuovo, nato almeno un secondo dopo la lapide
+(`_REPUTAZIONE_RITIRATA_IL`), o un relay lo butterebbe insieme alle
+vecchie. IL DOPPIO TOCCO: un giro per persona alla volta
+(`_REPUTAZIONE_IN_CORSO`); chi arriva mentre uno è in volo lo segna da
+rifare, e il giro rilegge lo stato — converge sull'ultima scelta. La
+rotta aspetta il giro come la verifica della npub, e la pillola dice
+«…» e non si ritocca. Il bottone admin passa anche da chi ha una riga ma
+non più la npub.
+
+**PROVATO.** `prove_inviti`: da parte sotto tre, il rilascio al terzo,
+dritte dopo, sotto tre dopo il rilascio (l'accreditato resta, il nuovo
+torna da parte, il cassetto torna «in attesa», e al nuovo terzo arrivano
+di nuovo insieme), il tetto sul da parte, il doppione che non resta
+appeso, la migrazione una volta sola con la lista del 30382, il rilascio
+d'avvio, le sentinelle (perimetro, tetto, fusione, ordine dell'avvio,
+`marca_prove`). `prove_reputazione_nostr`: la lapide, il nascosto che
+non bussa, il relay che rifiuta e la riga che resta, il riacceso un
+secondo dopo, il doppio tocco che finisce su `[5, 30382]`.
+`prove_classifica_nascosta` e `prove_ordini_prova` emendate.
+`collaudo_inviti.py` sul server vero, nella gabbia: 95 verdi, sezione
+nuova per la migrazione timbrata e l'interruttore dalla rotta vera
+(NIP-09 con `e`/`a`/`k`, un gancio dopo che non ripubblica, il riacceso
+che torna). EMENDATE col perché le prove di ieri che volevano le quote
+accreditate sotto soglia. Tortura 35/35: l'ultima a cadere è stata la
+cintura del doppione, che non aveva una prova e adesso ce l'ha. Suite
+intera sull'albero LF e i 13 collaudi della CI, verdi. DAL VIVO a 375
+nei due temi, server da una copia col relay morto e il database locale,
+col Compratore che aveva una quota accreditata alla maniera di ieri:
+all'avvio la migrazione l'ha detto nel journal e l'ha rimessa da parte;
+il cassetto dice «Hai invitato 1 persona · punti in attesa…» e il totale
+resta 100, i soli propri; la pillola dice «…» mentre la risposta tarda
+(rallentata apposta nel browser), poi «Attivo» col suo avviso, e torna
+«Spento».
+
+**COSA RESTA DA GUARDARE.**
+- Un invitato FUSO può contare due volte fra gli attivi, se le due metà
+  avevano ognuna le sue quote verso la stessa persona: il riferimento
+  porta il tg_id di allora. Raro, e sbaglia solo verso un rilascio
+  anticipato.
+- Dopo il deploy, nel journal del VPS: la riga «🫙 Quote d'invito
+  accantonate» (o nessuna, se nessuno era sotto soglia) e, per i
+  toccati con la npub verificata, il 30382 ripubblicato.
+- Il telefono: la riga «in attesa» nel cassetto, e la pillola col suo
+  «…» mentre il server parla coi relay.
+- `collaudo_punti_barattolo.py` è ROSSO anche su origin/main, fuori da
+  questo giro e fuori dalla CI: il suo `paga_finta` non accetta il
+  `riga=` che `paga_venditore` passa dal 19 set (lo stesso difetto che
+  aveva tenuto rosso `collaudo_feedback_confermato`). Segnalato, non
+  curato.

@@ -2563,6 +2563,18 @@ XP_RUOLO = {"venditore": 1.0, "compratore": 0.6}
 XP_PROPRI = ("ordine",)
 XP_INVITO = "invito"
 XP_COMMERCIO = (*XP_PROPRI, XP_INVITO)
+# LA QUOTA ACCANTONATA (set 2026, secondo giro della privacy degli
+# inviti, decisione di Andrea): finche' chi invita non ha
+# INVITO_ATTIVI_MIN invitati attivi, le sue quote si scrivono nel
+# registro con QUESTO tipo, e il numero non le vede — ne' il totale, ne'
+# il livello, ne' la classifica, ne' il 30382. Al terzo attivo diventano
+# tutte `XP_INVITO` insieme (`rilascia_quote`). Sta FUORI da
+# XP_COMMERCIO apposta: il perimetro resta «quel che fa il numero», e
+# nessun lettore di ieri deve imparare un tipo nuovo per non sbagliare.
+# ⚠️ Il prezzo e' uno solo, e sta scritto sull'azzeramento: toglie
+# `sql_xp_azzeramento()`, il perimetro PIU' le accantonate.
+XP_INVITO_ATTESA = "invito_attesa"
+XP_QUOTE = (XP_INVITO, XP_INVITO_ATTESA)     # i due stati di una quota
 
 
 def sql_xp_commercio(colonna: str = "tipo") -> tuple:
@@ -2571,6 +2583,15 @@ def sql_xp_commercio(colonna: str = "tipo") -> tuple:
     che il perimetro si allarga uno dei tre resta indietro."""
     segni = ",".join("?" for _ in XP_COMMERCIO)
     return (f"{colonna} IN ({segni})", list(XP_COMMERCIO))
+
+
+def sql_xp_azzeramento() -> tuple:
+    """Le righe che l'AZZERAMENTO toglie: il perimetro e le quote
+    accantonate. Un azzeramento fatto col solo perimetro lascerebbe le
+    accantonate di ieri nel registro, e al primo terzo attivo di domani
+    arriverebbero con quelle nuove — punti di prima dell'azzeramento."""
+    tipi = (*XP_COMMERCIO, XP_INVITO_ATTESA)
+    return (f"tipo IN ({','.join('?' for _ in tipi)})", list(tipi))
 
 
 # DA CHE LATO VENGONO GLI XP (ago 2026). Chi legge «76 XP» non sa che
@@ -2636,7 +2657,9 @@ def xp_per_ruolo(righe, totale: int):
     E SOTTO LA SOGLIA SI ACCORPA (set 2026, ritocchi piccoli): con punti
     da inviti e meno di INVITO_ATTIVI_MIN invitati attivi esce
     {'accorpati': True, 'attivi_min': N} e NESSUNA cifra — vedi la riga
-    in fondo.
+    in fondo. Dal secondo giro capita solo DOPO UN CALO sotto i tre (una
+    fusione, un ordine marcato come prova): prima della soglia le quote
+    sono accantonate, e qui non arrivano proprio.
     """
     righe = list(righe)             # si leggono due volte: qui e in `invitati_attivi`
     per = {"vendite": 0, "acquisti": 0}
@@ -2687,8 +2710,9 @@ def xp_per_ruolo(righe, totale: int):
 # e allora niente puo' far dire al numero una cosa che la regola vieta.
 # ⚠️ L'AZZERAMENTO DEGLI XP (il giorno che si accende la commissione:
 # decisione di Andrea, ago 2026 — la classifica riparte da zero) SI FA
-# SULLE RIGHE DI TUTTO IL PERIMETRO, `XP_COMMERCIO`, cioe' quote
-# comprese, e NON TOCCA LA TABELLA `inviti`: i collegamenti
+# SULLE RIGHE DI `sql_xp_azzeramento()` — il perimetro, quote comprese,
+# e dal set 2026 anche le quote ACCANTONATE —
+# e NON TOCCA LA TABELLA `inviti`: i collegamenti
 # invitante↔invitato restano e la regola riparte da zero da sola,
 # perche' qui non c'e' nessun contatore a parte da ricordarsi di
 # rimettere a zero — tetto e quote si ricalcolano dal registro. Chi
@@ -2696,13 +2720,18 @@ def xp_per_ruolo(righe, totale: int):
 # registro: `xp_contati` le terrebbe comunque sotto i propri (cioe' a
 # zero), ma il registro direbbe il falso a chiunque lo rilegga.
 INVITO_PERCENTO = 5
-# DA QUANTI INVITATI ATTIVI SI VEDONO I PUNTI DEGLI INVITI (set 2026,
-# ritocchi piccoli, decisione di Andrea). Con uno o due, la cifra che
-# ti hanno portato e' il commercio di una persona che conosci — sei tu
-# che le hai dato il link — e nel cassetto la si leggerebbe crescere a
-# ogni suo affare. Da tre in su una crescita non dice di chi e'. ATTIVO
-# = ti ha portato almeno un punto (`invitati_attivi`): chi si e'
-# iscritto e basta non nasconde nessuno.
+# DA QUANTI INVITATI ATTIVI LE QUOTE CONTANO (set 2026, decisione di
+# Andrea, in due giri). Con uno o due, la cifra che ti hanno portato e'
+# il commercio di una persona che conosci — sei tu che le hai dato il
+# link — e la si leggerebbe crescere a ogni suo affare: prima nel
+# cassetto (il primo giro ha tolto la cifra), poi nel TOTALE, nel
+# livello, in classifica e nel 30382. Dal secondo giro sotto la soglia
+# le quote si ACCANTONANO (`XP_INVITO_ATTESA`) e il numero non le vede
+# affatto; al terzo attivo arrivano tutte insieme, e da li' in poi si
+# accreditano come sempre. Se gli attivi tornano sotto tre, quel che e'
+# arrivato resta e le nuove tornano da parte (`inviti_sbloccati`).
+# ATTIVO = ti ha portato almeno un punto, accantonato o no
+# (`invitati_attivi`): chi si e' iscritto e basta non nasconde nessuno.
 INVITO_ATTIVI_MIN = 3
 
 
@@ -2788,7 +2817,12 @@ def quota_invito(con, invitato: int, riferimento: str, punti: int) -> int:
     E NON SI SCRIVE A MANO: passa da `assegna_xp` col suo tipo, cioe'
     dalla stessa porta, dalla stessa UNIQUE e dallo stesso ricalcolo
     della cache — e siccome il suo tipo non e' fra i propri, li' non ne
-    fa nascere un'altra: niente catena, per costruzione."""
+    fa nascere un'altra: niente catena, per costruzione.
+    SOTTO LA SOGLIA SI ACCANTONA (set 2026, secondo giro): finche' chi
+    invita non e' SBLOCCATO la quota si scrive `XP_INVITO_ATTESA`, e se
+    con lei gli attivi arrivano a INVITO_ATTIVI_MIN si rilasciano tutte
+    (`rilascia_quote`). Il riferimento e' lo stesso nei due stati, quindi
+    la UNIQUE fa da giudice anche fra una e l'altra."""
     try:
         r = con.execute("SELECT invitante FROM inviti WHERE invitato=?",
                         (invitato,)).fetchone()
@@ -2801,19 +2835,78 @@ def quota_invito(con, invitato: int, riferimento: str, punti: int) -> int:
         if parti is None or invitante in parti:
             return 0
         quota = int(punti) * INVITO_PERCENTO // 100      # per difetto
-        # GUARDIA 1: mai sopra i propri. Si taglia allo spazio che
-        # resta, e quel che non ci sta e' PERSO, non «in attesa»: e' un
-        # tetto, non un salvadanaio.
+        # GUARDIA 1: mai sopra i propri, e l'ACCANTONATO ci sta dentro
+        # (set 2026): accreditate piu' accantonate non superano i propri,
+        # o al rilascio arriverebbe in un colpo piu' di quel che il tetto
+        # permette. Si taglia allo spazio che resta, e quel che non ci
+        # sta e' PERSO, nemmeno accantonato: e' un tetto, non un
+        # salvadanaio.
         propri, inviti = somme_xp(con, invitante).get(invitante, (0, 0))
-        quota = min(quota, propri - inviti)
+        quota = min(quota, propri - inviti - quote_accantonate(con, invitante))
         if quota <= 0:
             return 0
-        return assegna_xp(con, invitante, XP_INVITO, quota,
-                          f"{XP_INVITO}:{invitato}:{riferimento}")
+        sbloccato = inviti_sbloccati(con, invitante)
+        scritti = assegna_xp(con, invitante,
+                             XP_INVITO if sbloccato else XP_INVITO_ATTESA,
+                             quota, f"{XP_INVITO}:{invitato}:{riferimento}")
+        if scritti and not sbloccato:
+            rilascia_quote(con, invitante)
+        return scritti
     except Exception as e:
         print(f"⚠️ Quota d'invito saltata per {invitato} "
               f"({riferimento}): {e}")
         return 0
+
+
+def quote_accantonate(con, tg_id: int) -> int:
+    """I punti d'invito in attesa della soglia: nel registro, fuori dal
+    numero. Contano solo per il tetto e per il rilascio."""
+    r = con.execute("SELECT COALESCE(SUM(punti),0) FROM xp_eventi "
+                    "WHERE tg_id=? AND tipo=?",
+                    (tg_id, XP_INVITO_ATTESA)).fetchone()
+    return int(r[0] or 0)
+
+
+def inviti_sbloccati(con, tg_id: int) -> bool:
+    """SBLOCCATO = ADESSO ha almeno INVITO_ATTIVI_MIN invitati attivi,
+    contati sulle quote nei DUE stati. Si rilegge dal REGISTRO a ogni
+    domanda, e non e' un timbro: e' cosi' che regge le due cose che la
+    regola chiede. Se gli attivi tornano sotto tre (una fusione, un
+    ordine marcato come prova) quel che e' accreditato RESTA — qui non
+    lo tocca nessuno — e le quote NUOVE tornano da parte finche' i tre
+    non ci sono di nuovo: con uno sblocco per sempre, il totale
+    ricomincerebbe a crescere a ogni affare di una o due persone, cioe'
+    proprio quel che la soglia esiste per non dire. E l'azzeramento, che
+    toglie le righe, lo riporta a zero da solo."""
+    righe = con.execute("SELECT riferimento, punti FROM xp_eventi "
+                        "WHERE tg_id=? AND tipo IN (?,?)",
+                        (tg_id, *XP_QUOTE)).fetchall()
+    return invitati_attivi([(r["riferimento"], r["punti"])
+                            for r in righe]) >= INVITO_ATTIVI_MIN
+
+
+def rilascia_quote(con, tg_id: int) -> int:
+    """AL TERZO ATTIVO ARRIVANO TUTTE INSIEME: quando chi invita, contando
+    le accreditate E le accantonate, ha INVITO_ATTIVI_MIN persone diverse
+    (`inviti_sbloccati`), le sue quote accantonate diventano accreditate
+    in un colpo solo e il numero si rifa'. Ritorna quante righe ha
+    rilasciato. Niente commit: e' del chiamante (la quota, la fusione,
+    l'avvio).
+    Una riga che non si puo' rilasciare perche' il suo riferimento e'
+    GIA' accreditato e' un doppione, e se ne va: contarla due volte
+    sarebbe peggio che perderla."""
+    if not con.execute("SELECT 1 FROM xp_eventi WHERE tg_id=? AND tipo=? "
+                       "LIMIT 1", (tg_id, XP_INVITO_ATTESA)).fetchone():
+        return 0
+    if not inviti_sbloccati(con, tg_id):
+        return 0
+    n = con.execute("UPDATE OR IGNORE xp_eventi SET tipo=? "
+                    "WHERE tg_id=? AND tipo=?",
+                    (XP_INVITO, tg_id, XP_INVITO_ATTESA)).rowcount
+    con.execute("DELETE FROM xp_eventi WHERE tg_id=? AND tipo=?",
+                (tg_id, XP_INVITO_ATTESA))
+    _ricalcola_xp(con, tg_id)
+    return n
 
 
 # LAPIDE (ago 2026). Qui viveva il tariffario delle azioni di
@@ -3060,10 +3153,7 @@ def stato_inviti(con, tg_id: int, registrato) -> dict:
     persone = con.execute("SELECT COUNT(*) FROM inviti WHERE invitante=?",
                           (tg_id,)).fetchone()[0]
     propri, inviti = somme_xp(con, tg_id).get(tg_id, (0, 0))
-    dove, par = sql_xp_commercio()
-    attivi = invitati_attivi(con.execute(
-        "SELECT riferimento, punti FROM xp_eventi WHERE tg_id=? AND tipo=? "
-        f"AND {dove}", [tg_id, XP_INVITO] + par).fetchall())
+    sbloccato = inviti_sbloccati(con, tg_id)
     invitato = con.execute("SELECT 1 FROM inviti WHERE invitato=?",
                            (tg_id,)).fetchone() is not None
     fino = finestra_invito(registrato)
@@ -3072,13 +3162,18 @@ def stato_inviti(con, tg_id: int, registrato) -> dict:
             "persone": persone,
             # gli XP che gli inviti gli hanno portato, CONTATI: la stessa
             # cifra che la scomposizione del livello mette nel totale.
-            # None sotto la soglia degli invitati attivi (set 2026,
-            # ritocchi piccoli): la cifra NON ESCE dal server, e il
-            # cassetto dice da quanti attivi compare — `attivi_min`. Il
-            # conto degli attivi non esce mai: anche lui direbbe quando
-            # uno dei tuoi ha cominciato a commerciare.
+            # None quando chi invita non e' SBLOCCATO, cioe' non ha tre
+            # invitati attivi (set 2026, in due giri): la cifra non esce
+            # dal server, e le quote nuove nel totale non ci sono nemmeno —
+            # sono accantonate.
             "xp": (xp_contati(propri, inviti) - propri
-                   if attivi >= INVITO_ATTIVI_MIN else None),
+                   if sbloccato else None),
+            # CI SONO PUNTI IN ATTESA, sì o no, e MAI quanti (secondo
+            # giro): la riga «punti in attesa» del cassetto. Il conto
+            # degli attivi non esce mai: direbbe quando e quanti dei tuoi
+            # hanno cominciato a commerciare.
+            "in_attesa": (not sbloccato
+                          and quote_accantonate(con, tg_id) > 0),
             "attivi_min": INVITO_ATTIVI_MIN,
             "invitato": invitato,
             "campo_fino": fino if (not invitato and time.time() < fino) else 0,
@@ -3844,6 +3939,75 @@ def riallinea_quantita_max(con):
     le righe salite sopra il massimo, e nessun giro puo' abbassarlo."""
     con.execute("UPDATE annunci SET quantita_max=quantita "
                 "WHERE quantita>quantita_max")
+
+
+MIGRAZIONE_QUOTE_ACCANTONATE = "migrazione:quote_accantonate"
+# chi la migrazione ha toccato: il suo 30382 dice ancora il numero di
+# ieri, e lo riallinea `ripubblica_reputazione_migrata` all'avvio
+_REPUTAZIONE_DOPO_MIGRAZIONE: list[int] = []
+
+
+def migra_quote_accantonate(con):
+    """UNA VOLTA SOLA (set 2026, secondo giro della privacy degli
+    inviti): le quote che la regola di ieri aveva gia' ACCREDITATO a chi
+    ha meno di INVITO_ATTIVI_MIN invitati attivi tornano accantonate, o
+    la regola nuova varrebbe solo da oggi in avanti — e chi aveva un
+    invitato solo continuerebbe a vedere il suo commercio nel proprio
+    totale per sempre.
+    PERCHE' UNA VOLTA SOLA, e non a ogni avvio come le gemelle: da oggi
+    una quota accreditata sotto la soglia e' legittima — e' di chi l'ha
+    passata e poi e' sceso (una fusione, un ordine marcato come prova),
+    e per la regola quel che e' accreditato RESTA. Ripassare di qui a
+    ogni avvio glielo toglierebbe. Il timbro sta in `impostazioni`.
+    PARLA, come il riallineamento: toglie punti a persone vere."""
+    try:
+        if con.execute("SELECT 1 FROM impostazioni WHERE chiave=?",
+                       (MIGRAZIONE_QUOTE_ACCANTONATE,)).fetchone():
+            return 0
+    except sqlite3.OperationalError:
+        return 0
+    persone, punti = 0, 0
+    for r in con.execute("SELECT DISTINCT tg_id FROM xp_eventi WHERE tipo=?",
+                         (XP_INVITO,)).fetchall():
+        righe = [(q["riferimento"], q["punti"]) for q in con.execute(
+            "SELECT riferimento, punti FROM xp_eventi WHERE tg_id=? "
+            "AND tipo IN (?,?)", (r["tg_id"], *XP_QUOTE))]
+        if invitati_attivi(righe) >= INVITO_ATTIVI_MIN:
+            continue
+        punti += sum(int(p) for _, p in righe)
+        con.execute("UPDATE xp_eventi SET tipo=? WHERE tg_id=? AND tipo=?",
+                    (XP_INVITO_ATTESA, r["tg_id"], XP_INVITO))
+        _ricalcola_xp(con, r["tg_id"])
+        _REPUTAZIONE_DOPO_MIGRAZIONE.append(r["tg_id"])
+        persone += 1
+    con.execute("INSERT OR IGNORE INTO impostazioni(chiave, valore) "
+                "VALUES(?,?)",
+                (MIGRAZIONE_QUOTE_ACCANTONATE, str(int(time.time()))))
+    if persone:
+        print(f"🫙 Quote d'invito accantonate (meno di {INVITO_ATTIVI_MIN} "
+              f"invitati attivi): {persone} "
+              f"{'persona' if persone == 1 else 'persone'}, {punti} punti",
+              flush=True)
+    return persone
+
+
+def rilascia_quote_mature(con):
+    """A OGNI AVVIO, e idempotente: chi ha quote accantonate e, contando
+    le accreditate e le accantonate, ha gia' tre invitati attivi, le
+    riceve. Serve a due casi che la strada normale (il rilascio dentro
+    `quota_invito`) non copre: una quota scritta e poi rimasta indietro
+    per un intoppo (la quota e' fail-open), e una fusione che ha unito
+    due meta' con attivi diversi, che insieme fanno tre. Tace se non
+    tocca niente."""
+    n = 0
+    for r in con.execute("SELECT DISTINCT tg_id FROM xp_eventi WHERE tipo=?",
+                         (XP_INVITO_ATTESA,)).fetchall():
+        if rilascia_quote(con, r["tg_id"]):
+            n += 1
+    if n:
+        print(f"🫙 Quote d'invito rilasciate all'avvio: {n} "
+              f"{'persona' if n == 1 else 'persone'}", flush=True)
+    return n
 
 
 def riallinea_xp_commercio(con):
@@ -7358,6 +7522,11 @@ def init_db():
     # PRIMA gli XP e POI i titoli: il secondo giudica sul numero che
     # il primo ha appena rimesso in pari, e all'incontrario toglierebbe
     # (o lascerebbe) i gradi guardando la cache di ieri.
+    # E ANCORA PRIMA LE QUOTE D'INVITO (set 2026): la migrazione una
+    # volta sola e il rilascio di chi e' maturo cambiano quali righe il
+    # numero vede, quindi vengono prima di chi il numero lo rifa'.
+    migra_quote_accantonate(con)
+    rilascia_quote_mature(con)
     riallinea_xp_commercio(con)
     riallinea_titoli_decaduti(con)
     # La prenotazione dello stock (lug 2026) conta gli ordini 'creato'
@@ -13150,15 +13319,21 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # all'accredito era buono, e qui si toglie solo cio' che la
         # fusione ha reso storto. Il numero lo rifa' `_ricalcola_xp`, in
         # fondo, dalle righe rimaste.
+        # (Dal set 2026 anche le ACCANTONATE: sono quote come le altre,
+        # solo in attesa della soglia.)
         for _q in con.execute("SELECT id, riferimento FROM xp_eventi "
-                              "WHERE tg_id=? AND tipo=?",
-                              (id_telegram, XP_INVITO)).fetchall():
+                              "WHERE tg_id=? AND tipo IN (?,?)",
+                              (id_telegram, *XP_QUOTE)).fetchall():
             _pz = _q["riferimento"].split(":", 2)
             _da, _fonte = (_pz[1], _pz[2]) if len(_pz) == 3 else ("", "")
             _parti = parti_affare_xp(con, _fonte)
             if (_da in (str(id_telegram), str(id_nostr))
                     or (_parti and id_telegram in _parti)):
                 con.execute("DELETE FROM xp_eventi WHERE id=?", (_q["id"],))
+        # LE DUE META' CONTANO INSIEME: se con le quote di tutt'e due gli
+        # attivi sono tre — perche' una la soglia l'aveva gia' passata, o
+        # perche' la passano insieme — le accantonate arrivano ora.
+        rilascia_quote(con, id_telegram)
         # PRIMA muore la riga Nostr, POI la chiave si accende su quella
         # Telegram: l'indice unico su npub_accesso non ammette il
         # doppio valore nemmeno per un istante.
@@ -36810,7 +36985,13 @@ async def scegli_classifica_nascosta(req: Request,
     dire. Il LIVELLO resta sul profilo: serve a chi scambia con lui per
     fidarsi, ed e' un'altra cosa dalla gara.
     Vale SUBITO: la cache di un minuto della classifica si butta, o chi
-    si nasconde si rivedrebbe li' ancora per sessanta secondi."""
+    si nasconde si rivedrebbe li' ancora per sessanta secondi.
+    E VALE ANCHE SU NOSTR (secondo giro, set 2026): nascosto, il suo
+    30382 si ritira e non si pubblica piu'; riacceso, torna. Lo fa il
+    giudice di tutti i ganci, `premia_reputazione_nostr`, e qui si
+    ASPETTA come alla verifica della npub: il client ha il suo velo, e
+    quando risponde il giro e' fatto (fail-open: se i relay tacciono, la
+    scelta e' salvata lo stesso e il prossimo gancio riprova)."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
     nascosta = 1 if d.get("nascosta") else 0
@@ -36820,6 +37001,7 @@ async def scegli_classifica_nascosta(req: Request,
     con.commit()
     con.close()
     _classifica_cache["quando"] = 0.0
+    await premia_reputazione_nostr(user["id"])
     return {"ok": True, "nascosta": bool(nascosta)}
 
 
@@ -43871,6 +44053,36 @@ def evento_reputazione(pubkey_hex: str, liv: dict, xp: int, affari: int) -> dict
     return firma_evento(30382, _tags_reputazione(pubkey_hex, liv, xp, affari), "")
 
 
+def _lapide_reputazione(pubkey_hex: str, evento_id: str) -> dict:
+    """La NIP-09 (kind 5) che RITIRA il 30382 di una persona — gemella di
+    `_lapide_nostra` per gli annunci e di `_lapide_badge`, stessa forma:
+    `e` sull'ultimo evento che conosciamo (se lo conosciamo), `a` sulla
+    coordinata — che per un evento sostituibile vale per TUTTE le sue
+    versioni fino a questa — e `k`.
+    NIP-09 E NON UN 30382 VUOTO SOPRA (set 2026, «Non mostrarmi in
+    classifica»): un 30382 senza rank resta un'ASSERZIONE nostra su di
+    lui, e un client di Web of Trust puo' leggerla «rank assente» o
+    peggio «rank zero»; la NIP-09 invece e' il gesto del protocollo per
+    ritirare, e i relay che la rispettano tolgono tutte le versioni.
+    Riaccendendo si ripubblica un 30382 NUOVO, piu' recente della
+    richiesta, che la NIP-09 non tocca."""
+    tags = [["a", f"30382:{_NOSTR[1]}:{pubkey_hex}"], ["k", "30382"]]
+    if evento_id:
+        tags.insert(0, ["e", evento_id])
+    return firma_evento(5, tags, "Reputazione ritirata da Barattolo")
+
+
+# UN GIRO PER PERSONA ALLA VOLTA (set 2026): l'interruttore della
+# classifica si puo' toccare due volte di fila, e due giri in parallelo
+# — un ritiro e una pubblicazione — arriverebbero ai relay nell'ordine
+# che capita. Chi arriva mentre un giro e' in volo lo segna da rifare e
+# se ne va: il giro in volo, finito, rilegge lo stato e rifa'. Come
+# `_AVATAR_IN_CORSO`, in memoria: al riavvio non c'e' niente in volo.
+_REPUTAZIONE_IN_CORSO: set[int] = set()
+_REPUTAZIONE_DA_RIFARE: set[int] = set()
+_REPUTAZIONE_RITIRATA_IL: dict[int, int] = {}
+
+
 async def premia_reputazione_nostr(tg_id: int):
     """Il gancio standard della reputazione Nostr, gemello di
     premia_distintivi/premia_xp: connessione propria, fail-open totale
@@ -43880,12 +44092,61 @@ async def premia_reputazione_nostr(tg_id: int):
     indirizzare l'evento, come per i badge. NON ripubblica se
     livello/xp/affari sono gia' quelli dell'ultima pubblicazione — un
     evento sostituibile identico non direbbe niente di nuovo ai relay,
-    solo traffico ripetuto a ogni gancio."""
+    solo traffico ripetuto a ogni gancio.
+    DAL SET 2026 ALLINEA E NON SOLO PUBBLICA: chi ha scelto «Non
+    mostrarmi in classifica» non ha un 30382, e quello gia' uscito si
+    ritira (`_lapide_reputazione`); riaccendendo, torna. Tutti i ganci
+    passano di qui, quindi l'interruttore vale per tutti senza doverlo
+    ripetere in ognuno."""
+    if tg_id in _REPUTAZIONE_IN_CORSO:
+        _REPUTAZIONE_DA_RIFARE.add(tg_id)
+        return
+    _REPUTAZIONE_IN_CORSO.add(tg_id)
+    try:
+        for _ in range(3):
+            _REPUTAZIONE_DA_RIFARE.discard(tg_id)
+            await _allinea_reputazione_nostr(tg_id)
+            if tg_id not in _REPUTAZIONE_DA_RIFARE:
+                break
+    finally:
+        _REPUTAZIONE_IN_CORSO.discard(tg_id)
+
+
+async def _allinea_reputazione_nostr(tg_id: int):
+    """Un giro: ritira se la persona e' nascosta e un 30382 c'e', se no
+    pubblica se qualcosa e' cambiato. Il corpo di `premia_reputazione_
+    nostr`, che ci mette davanti la guardia del giro in volo."""
     try:
         con = db()
         u = con.execute(
-            "SELECT npub, npub_verificata, xp, vendite_ok, acquisti_ok "
-            "FROM utenti WHERE tg_id=?", (tg_id,)).fetchone()
+            "SELECT npub, npub_verificata, xp, vendite_ok, acquisti_ok, "
+            "classifica_nascosta FROM utenti WHERE tg_id=?",
+            (tg_id,)).fetchone()
+        if u and u["classifica_nascosta"]:
+            # NASCOSTO: niente 30382, e quello gia' uscito si RITIRA —
+            # sulla pubkey a cui era indirizzato (la riga lo sa), anche
+            # se nel frattempo la npub e' cambiata o non e' piu'
+            # verificata. La riga se ne va solo se un relay ha accettato:
+            # se no resta, e il prossimo gancio riprova.
+            gia = con.execute(
+                "SELECT pubkey, evento_id FROM nostr_reputazione "
+                "WHERE tg_id=?", (tg_id,)).fetchone()
+            con.close()
+            if not gia:
+                return
+            ok = await _spedisci_ai_relay(
+                _lapide_reputazione(gia["pubkey"], gia["evento_id"] or ""))
+            if not ok:
+                return
+            _REPUTAZIONE_RITIRATA_IL[tg_id] = int(time.time())
+            con = db()
+            con.execute("DELETE FROM nostr_reputazione WHERE tg_id=?",
+                        (tg_id,))
+            con.commit()
+            con.close()
+            print(f"🟣 Reputazione ritirata da Nostr per {tg_id} "
+                  f"({ok}/{len(RELAYS_VERIFICA)} relay)")
+            return
         if not u or not u["npub_verificata"] or not u["npub"]:
             con.close()
             return
@@ -43904,6 +44165,12 @@ async def premia_reputazione_nostr(tg_id: int):
         if (prec and prec["livello"] == liv["id"] and prec["xp"] == xp
                 and prec["affari"] == affari):
             return
+        # RIACCESO SUBITO DOPO UN RITIRO: la NIP-09 vale per le versioni
+        # fino al SUO secondo, quindi il 30382 nuovo deve nascere almeno
+        # un secondo dopo, o un relay lo butterebbe insieme alle vecchie.
+        _rit = _REPUTAZIONE_RITIRATA_IL.get(tg_id, 0)
+        if _rit and time.time() < _rit + 1:
+            await asyncio.sleep(_rit + 1 - time.time())
         evento = evento_reputazione(pubkey, liv, xp, affari)
         if not await _spedisci_ai_relay(evento):
             return
@@ -43923,6 +44190,28 @@ async def premia_reputazione_nostr(tg_id: int):
         print(f"⚠️ Reputazione Nostr saltata per {tg_id}: {e}")
 
 
+@app.on_event("startup")
+async def ripubblica_reputazione_migrata():
+    """DOPO LA MIGRAZIONE DELLE QUOTE (set 2026, secondo giro): chi ha
+    avuto le quote rimesse da parte ha un 30382 sui relay che dice ancora
+    il numero di ieri, quote comprese — e la regola vuole che li' non ci
+    siano. Si riallinea qui, in sottofondo, una persona alla volta, dallo
+    stesso gancio di sempre (fail-open). Il bottone admin di
+    riallineamento non ha un posto nel pannello: senza questo giro il
+    30382 aspetterebbe il prossimo affare di ognuno. Vuoto a ogni avvio
+    tranne quello della migrazione, che passa una volta sola."""
+    if not _REPUTAZIONE_DOPO_MIGRAZIONE:
+        return
+
+    async def _giro():
+        for t in list(_REPUTAZIONE_DOPO_MIGRAZIONE):
+            await premia_reputazione_nostr(t)
+            await asyncio.sleep(0.3)
+        _REPUTAZIONE_DOPO_MIGRAZIONE.clear()
+
+    asyncio.create_task(_giro())
+
+
 @app.post("/api/admin/reputazione/sincronizza")
 async def sincronizza_reputazione_nostr(x_tg_init_data: str = Header(""),
                                         barattolo_sessione: str = Cookie("")):
@@ -43931,7 +44220,11 @@ async def sincronizza_reputazione_nostr(x_tg_init_data: str = Header(""),
     riallineamento, gemello di sincronizza_badge_distintivi. Serve a chi
     aveva gia' un livello PRIMA che questo cantiere esistesse, e si puo'
     rilanciare quando si vuole: mai un doppione, vedi premia_reputazione_
-    nostr."""
+    nostr.
+    DAL SET 2026 ALLINEA ANCHE ALL'INGIU': chi si e' nascosto dalla
+    classifica ha il suo 30382 ritirato. Fra i candidati entra anche chi
+    un 30382 ce l'ha e la npub nel frattempo l'ha tolta: se si e'
+    nascosto, il ritiro va alla pubkey a cui quel 30382 era indirizzato."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     if not e_admin(user["id"]):
         raise HTTPException(403, "Riservato ai moderatori")
@@ -43939,7 +44232,8 @@ async def sincronizza_reputazione_nostr(x_tg_init_data: str = Header(""),
         raise HTTPException(503, "Nostr è spento sul server")
     con = db()
     candidati = con.execute(
-        "SELECT tg_id FROM utenti WHERE npub_verificata=1 AND npub!=''"
+        "SELECT tg_id FROM utenti WHERE npub_verificata=1 AND npub!='' "
+        "UNION SELECT tg_id FROM nostr_reputazione"
     ).fetchall()
     con.close()
     for r in candidati:

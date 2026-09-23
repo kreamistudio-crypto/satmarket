@@ -9237,16 +9237,28 @@
   passa da `condividiLink`/`copiaLink` senza mai entrare in un
   onclick); `fraseXp` elenca il terzo lato «da chi hai invitato». «I
   tuoi dati» dichiara il legame e il suo limite onesto.
-  LA SOGLIA DEGLI INVITATI ATTIVI (set 2026, ritocchi piccoli): sotto
+  LA SOGLIA DEGLI INVITATI ATTIVI (set 2026, in due giri): sotto
   `INVITO_ATTIVI_MIN` (3) persone diverse che ti hanno portato almeno
-  un punto (`invitati_attivi`, dal riferimento delle quote) la cifra
-  NON ESCE DAL SERVER — `stato_inviti` manda `xp: null` e `attivi_min`,
-  e il cassetto dice «I punti degli inviti compaiono da 3 invitati
-  attivi in su»; `xp_per_ruolo` manda `{accorpati, attivi_min}` e
-  nessuna cifra per nessun lato (con vendite e acquisti a schermo, la
-  terza la darebbe la sottrazione dal totale). Il conto degli attivi
-  non esce mai. Il TOTALE invece le quote le contiene ancora (Profilo,
-  classifica, `xp` del 30382): è il limite che «I tuoi dati» dichiara.
+  un punto (`invitati_attivi`, dal riferimento delle quote nei due
+  stati) le quote si scrivono ACCANTONATE — tipo `invito_attesa`
+  (`XP_INVITO_ATTESA`), FUORI da `XP_COMMERCIO` — e il numero non le
+  vede: né il totale, né il livello, né la classifica, né l'`xp` del
+  30382. In `quota_invito` decide `inviti_sbloccati` (tre attivi
+  ADESSO, riletto dal registro: non è un timbro), e `rilascia_quote` le
+  accredita tutte insieme al terzo — dentro la quota, nella fusione e
+  all'avvio (`rilascia_quote_mature`). Se gli attivi tornano sotto tre
+  l'accreditato resta e le nuove tornano da parte. Il tetto conta anche
+  il da parte: spazio = propri − accreditate − accantonate.
+  `stato_inviti` manda `xp: null` da non sbloccato e `in_attesa` (un sì
+  o un no, mai quanto): il cassetto dice «punti in attesa: arrivano da
+  3 invitati attivi in su». `xp_per_ruolo` accorpa (`{accorpati,
+  attivi_min}`, nessuna cifra per nessun lato: la terza la darebbe la
+  sottrazione dal totale) solo dopo un calo sotto i tre. Il conto degli
+  attivi non esce mai. `migra_quote_accantonate` è passata UNA volta
+  (timbro `migrazione:quote_accantonate` in `impostazioni`): ha rimesso
+  da parte le quote già accreditate a chi era sotto soglia, e i toccati
+  li riallinea sul 30382 `ripubblica_reputazione_migrata`, all'avvio.
+  `marca_prove.py` toglie le quote nei due stati.
   «NON MOSTRARMI IN CLASSIFICA» (set 2026, ritocchi piccoli): colonna
   `utenti.classifica_nascosta` (0 di serie), `POST
   /api/me/classifica-nascosta` che butta la cache di un minuto, e
@@ -9255,6 +9267,20 @@
   resta sul profilo (serve a chi scambia). Nel client la riga sta in
   fondo al cassetto «Livello e titolo» (`rigaClassificaNascosta`,
   `setClassificaNascosta`), solo a classifica accesa.
+  E FERMA IL 30382 (secondo giro): `premia_reputazione_nostr`, il
+  giudice di tutti i ganci, a chi è nascosto non pubblica niente e
+  ritira quel che c'era con una NIP-09 (`_lapide_reputazione`: `e`
+  sull'ultimo evento, `a` = `30382:<piattaforma>:<soggetto>`, `k`),
+  alla pubkey scritta in `nostr_reputazione` — e la riga se ne va solo
+  dopo l'OK di un relay. NIP-09 e non un 30382 vuoto sopra: quello
+  resterebbe un'asserzione nostra su di lui («rank assente», o zero).
+  Riacceso, un 30382 nuovo almeno un secondo dopo la lapide
+  (`_REPUTAZIONE_RITIRATA_IL`), o la `a` lo toglierebbe con le vecchie.
+  Un giro per persona alla volta (`_REPUTAZIONE_IN_CORSO`, `_DA_RIFARE`:
+  il doppio tocco converge sull'ultima scelta). La rotta aspetta il
+  giro, come la verifica della npub, e la pillola ha il suo velo. Il
+  bottone admin di riallineamento passa anche da chi ha una riga in
+  `nostr_reputazione` ma non più la npub.
   LA FUSIONE fa la liturgia dei vicini sul codice (vince la metà
   Telegram, quella che muore lo cede solo se l'altra non ce l'ha) e sui
   collegamenti, in un ordine che non è libero: PRIMA muore il legame
@@ -9263,8 +9289,9 @@
   poi si tolgono le quote rese storte (auto-invito, o affare diventato
   «con l'invitante») col giudice della quota.
   L'AZZERAMENTO degli XP (all'accensione della commissione) si fa su
-  tutto `XP_COMMERCIO` e NON tocca `inviti`: la regola riparte da zero
-  da sola, perché non c'è un contatore a parte.
+  `sql_xp_azzeramento()` — tutto `XP_COMMERCIO` più le accantonate — e
+  NON tocca `inviti`: la regola riparte da zero da sola, perché non c'è
+  un contatore a parte.
   Da quante PERSONE arrivano i feedback (ago 2026): sul negozio
   pubblico i voti escono senza nomi, di proposito — mostrare chi ha
   comprato rivelerebbe gli acquisti altrui —, ma senza un secondo

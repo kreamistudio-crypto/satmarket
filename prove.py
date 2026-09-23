@@ -24893,18 +24893,31 @@ console.log(JSON.stringify(out));
         prova("a classifica spenta la riga non c'e' (un interruttore che non "
               "cambia niente mente)", "", out.get("spenta"))
         v, n = out.get("visibile", ""), out.get("nascosto", "")
-        prova("accesa: il titolo, il perche' del livello e la pillola Spento",
-              True, "🏆 Non mostrarmi in classifica" in v
+        # EMENDATE (secondo giro): il tocco passa anche il bottone
+        # (`this`), che fa da velo mentre il server aspetta Nostr; e la
+        # frase dice che la reputazione non esce piu' nemmeno li'
+        prova("accesa: il titolo, il perche' del livello, Nostr e la pillola "
+              "Spento", True, "🏆 Non mostrarmi in classifica" in v
               and "Il livello resta" in v and "Spento</button>" in v
-              and "setClassificaNascosta(true)" in v)
+              and "non si pubblica più su Nostr" in v
+              and "setClassificaNascosta(true, this)" in v)
         prova("...nascosto: Attivo, e il tocco la rimette", True,
-              "Attivo</button>" in n and "setClassificaNascosta(false)" in n
+              "Attivo</button>" in n and "setClassificaNascosta(false, this)" in n
               and 'aria-pressed="true"' in n)
+    se = pezzo_js(mini, "async function setClassificaNascosta(", "\n}\n")
+    prova("il gesto ha il suo velo sulla pillola, e a qualunque esito la "
+          "riga si ridisegna com'e' davvero", True,
+          "btn.disabled = true" in se and "finally { renderLivello(); }" in se)
     priv = mini[mini.find('id="view-privacy"'):
                 mini.find('<!-- ============ VISTA: LA CLASSIFICA')]
     prova("«I tuoi dati» dice dov'e' l'interruttore, e che il livello resta",
           True, "<b>Non mostrarmi in classifica</b>" in priv
           and "il tuo livello resta sul profilo" in priv)
+    prova("...e che la reputazione su Nostr (il 30382) si smette di "
+          "pubblicarla e si chiede di ritirarla", True,
+          "smettiamo e chiediamo ai relay di ritirarla" in priv
+          and "(è il kind 30382)" in priv
+          and "smettiamo di pubblicarla e chiediamo di ritirarla" in priv)
 
 
 def prove_classifica():
@@ -25821,9 +25834,13 @@ def prove_inviti():
         return r["xp"] if r else None
 
     def quote(con, t):
+        # EMENDATA (set 2026, secondo giro della privacy): le quote si
+        # guardano nei DUE stati, accreditate e accantonate — qui si prova
+        # QUANTO vale una quota (il 5%, il tetto, la catena), e sotto i tre
+        # invitati attivi il quanto si scrive accantonato
         return [r["punti"] for r in con.execute(
-            "SELECT punti FROM xp_eventi WHERE tg_id=? AND tipo='invito' "
-            "ORDER BY id", (t,))]
+            "SELECT punti FROM xp_eventi WHERE tg_id=? AND tipo IN "
+            "('invito','invito_attesa') ORDER BY id", (t,))]
 
     def invitante(con, t):
         r = con.execute("SELECT invitante FROM inviti WHERE invitato=?",
@@ -25960,12 +25977,14 @@ def prove_inviti():
           rifiuta("INSERT INTO inviti_codici(tg_id, codice) VALUES(99, ?)",
                   (c1,)))
     st = amb["stato_inviti"](con, 1, int(ADESSO - 400 * 86400))
-    # EMENDATA (set 2026, ritocchi piccoli): c'e' anche `attivi_min`, la
-    # soglia da cui i punti compaiono — una regola, non una persona. Il
-    # CONTO degli attivi invece non c'e', ed e' quel che qui si guarda
+    # EMENDATA (set 2026, ritocchi piccoli, e poi il secondo giro): c'e'
+    # anche `attivi_min`, la soglia da cui i punti compaiono — una regola,
+    # non una persona — e `in_attesa`, un si' o un no. Il CONTO degli
+    # attivi invece non c'e', e nemmeno quanti punti aspettano: e' quel
+    # che qui si guarda
     prova("il cassetto porta i CONTI e nient'altro: mai chi",
-          {"codice", "link", "persone", "xp", "attivi_min", "invitato",
-           "campo_fino", "percento", "giorni"}, set(st))
+          {"codice", "link", "persone", "xp", "in_attesa", "attivi_min",
+           "invitato", "campo_fino", "percento", "giorni"}, set(st))
     prova("...il link e' quello del bot col codice",
           f"https://t.me/bot_di_cartone?start={c1}", st["link"])
     prova("...e le persone sono quelle collegate al suo codice", 2,
@@ -26007,12 +26026,18 @@ def prove_inviti():
           con.execute("SELECT COUNT(*) FROM xp_eventi WHERE tg_id=1 AND "
                       "riferimento='invito:4:ordine:102:compratore'"
                       ).fetchone()[0])
-    prova("...e il numero di chi invita e' 10 + 5", 15, xp(con, 1))
+    # EMENDATE (set 2026, secondo giro della privacy): 1 ha UNA sola
+    # invitata attiva, la 4, quindi le sue quote si accantonano e il
+    # numero non le vede — era 10 + 5, poi il doppio dei propri. Il numero
+    # con le quote dentro, e il suo tetto, si provano nella 3c qui sotto,
+    # dove gli attivi arrivano a tre.
+    prova("...e il numero di chi invita resta 10: con UNA invitata attiva "
+          "la quota e' accantonata", 10, xp(con, 1))
     ordine(con, 103, 2, 4)
     ass(con, 4, "ordine", 1000, "ordine:103:compratore")
     prova("il tetto taglia allo spazio: 50 teorici, ne entrano 5", [5, 5],
           quote(con, 1))
-    prova("...e il numero e' il doppio dei propri, non di piu'", 20,
+    prova("...e il numero resta ai propri: tutto accantonato", 10,
           xp(con, 1))
     ordine(con, 104, 1, 4)                 # 4 compra DA chi l'ha invitata
     ass(con, 1, "ordine", 200, "ordine:104:venditore")   # spazio: 210-10
@@ -26057,20 +26082,27 @@ def prove_inviti():
     prova("il Profilo e il rank dicono lo stesso numero, quote comprese",
           [xp(con, t) for t in (1, 4, 5)],
           [xp_rank.get(t, 0) for t in (1, 4, 5)])
-    prova("...e non e' la somma nuda (le quote contano)", True,
-          xp(con, 1) > 210)
+    # EMENDATA (secondo giro): era «non e' la somma nuda, le quote
+    # contano» — con UNA invitata attiva sono accantonate, e il numero sono
+    # i soli propri
+    prova("...e le accantonate non contano: il numero sono i propri, 10 + "
+          "200", 210, xp(con, 1))
     righe = [(r["riferimento"], r["punti"]) for r in con.execute(
         "SELECT riferimento, punti FROM xp_eventi WHERE tg_id=1 "
         "AND tipo IN ('ordine','invito')")]
-    # EMENDATE (set 2026, ritocchi piccoli): qui 1 ha UNA sola invitata
-    # attiva, la 4, e sotto la soglia la scomposizione ACCORPA — nessuna
-    # cifra. Il terzo lato si prova con due quote in piu', di due persone
-    # diverse: da tre attivi le cifre tornano, e devono fare il totale
-    prova("con una sola invitata attiva la scomposizione accorpa: nessuna "
-          "cifra", {"accorpati": True, "attivi_min": 3},
+    # EMENDATE (set 2026, ritocchi piccoli, e poi il secondo giro): qui 1
+    # ha UNA sola invitata attiva. Al primo giro la scomposizione
+    # accorpava; dal secondo le quote sono accantonate, quindi nel numero
+    # non ci sono e la scomposizione non ha nemmeno il lato degli inviti.
+    # Il terzo lato si prova con tre quote di tre persone diverse: da tre
+    # attivi le cifre tornano, e devono fare il totale
+    prova("con una sola invitata attiva le quote sono accantonate: la "
+          "scomposizione non ha il lato degli inviti",
+          {"vendite": 210, "acquisti": 0},
           amb["xp_per_ruolo"](righe, xp(con, 1)))
     righe3 = righe + [("invito:60:ordine:61:compratore", 3),
-                      ("invito:62:ordine:63:venditore", 2)]
+                      ("invito:62:ordine:63:venditore", 2),
+                      ("invito:64:ordine:65:compratore", 1)]
     tot3 = cont(sum(p for r, p in righe3 if not r.startswith("invito:")),
                 sum(p for r, p in righe3 if r.startswith("invito:")))
     per = amb["xp_per_ruolo"](righe3, tot3)
@@ -26104,11 +26136,13 @@ def prove_inviti():
     con.execute("DELETE FROM xp_eventi WHERE tg_id=1 AND tipo='ordine'")
     prova("senza piu' propri, le quote vecchie non tengono su il numero", 0,
           amb["_ricalcola_xp"](con, 1))
-    # EMENDATA (set 2026, ritocchi piccoli): con la sola 4 attiva il
-    # cassetto non direbbe NESSUNA cifra (None), e la prova passerebbe per
-    # la ragione sbagliata. Due quote di altre due persone portano 1 alla
-    # soglia: la cifra esce, ed e' il tetto a tenerla a zero. (Le righe se
-    # ne vanno con l'azzeramento qui sotto, che toglie tutto il perimetro.)
+    # EMENDATA (set 2026, ritocchi piccoli, e poi il secondo giro): con la
+    # sola 4 attiva il cassetto non direbbe NESSUNA cifra (None), e la
+    # prova passerebbe per la ragione sbagliata. Due quote ACCREDITATE di
+    # altre due persone, con la 4 accantonata, fanno tre attivi: 1 e'
+    # sbloccato, la cifra esce, ed e' il tetto a tenerla a zero. (Le righe
+    # se ne vanno con l'azzeramento qui sotto, che toglie tutto il
+    # perimetro e le accantonate.)
     for _chi, _p in ((60, 3), (62, 2)):
         con.execute("INSERT INTO xp_eventi(tg_id, tipo, punti, riferimento, "
                     "creato) VALUES(1, 'invito', ?, ?, 0)",
@@ -26126,12 +26160,23 @@ def prove_inviti():
     prova("la regola dell'azzeramento e' scritta nel codice", True,
           "NON TOCCA LA TABELLA `inviti`" in _SORGENTE)
     legami = con.execute("SELECT COUNT(*) FROM inviti").fetchone()[0]
-    dove, par = amb["sql_xp_commercio"]()
+    # EMENDATA (secondo giro): l'azzeramento si fa con
+    # `sql_xp_azzeramento()`, il perimetro PIU' le accantonate — col solo
+    # perimetro le accantonate di 1 (quelle della 4) resterebbero, e al
+    # primo terzo attivo di domani arriverebbero punti di prima
+    accantonate_prima = con.execute(
+        "SELECT COUNT(*) FROM xp_eventi WHERE tipo='invito_attesa'"
+    ).fetchone()[0]
+    dove, par = amb["sql_xp_azzeramento"]()
     con.execute(f"DELETE FROM xp_eventi WHERE {dove}", par)
     with zitto():
         amb["riallinea_xp_commercio"](con)
     prova("azzerati gli XP, i collegamenti restano", legami,
           con.execute("SELECT COUNT(*) FROM inviti").fetchone()[0])
+    prova("...e se ne vanno anche le accantonate (c'erano)", (True, 0),
+          (accantonate_prima > 0, con.execute(
+              "SELECT COUNT(*) FROM xp_eventi WHERE tipo='invito_attesa'"
+          ).fetchone()[0]))
     ordine(con, 200, 2, 4)
     ass(con, 4, "ordine", 100, "ordine:200:compratore")
     prova("...e chi invita riparte dal tetto a zero", [], quote(con, 1))
@@ -26189,19 +26234,246 @@ def prove_inviti():
         con.execute("INSERT INTO xp_eventi(tg_id, tipo, punti, riferimento, "
                     "creato) VALUES(?,?,?,?,0)", (t, tipo, punti, rif))
 
+    # EMENDATE (secondo giro): sotto la soglia le quote stanno nel registro
+    # ACCANTONATE, e a far uscire la cifra non e' piu' il conto degli
+    # attivi al momento della lettura ma il rilascio — che qui si chiama
+    # come lo chiamerebbe la quota (la strada intera e' nella 3c)
     riga_xp(1, "ordine", 100, "ordine:1:venditore")
-    riga_xp(1, "invito", 4, "invito:20:ordine:2:compratore")
-    riga_xp(1, "invito", 6, "invito:21:ordine:3:compratore")
+    riga_xp(1, "invito_attesa", 4, "invito:20:ordine:2:compratore")
+    riga_xp(1, "invito_attesa", 6, "invito:21:ordine:3:compratore")
     st2 = amb["stato_inviti"](con, 1, int(ADESSO - 400 * 86400))
     prova("nel cassetto, con due invitati attivi, la cifra NON esce dal "
-          "server — e la soglia si'", (None, 3), (st2["xp"], st2["attivi_min"]))
-    riga_xp(1, "invito", 5, "invito:22:ordine:4:venditore")
-    riga_xp(1, "invito", 1, "invito:20:ordine:5:compratore")
-    prova("...dal terzo la cifra c'e', contata col tetto come sempre", 16,
-          amb["stato_inviti"](con, 1, int(ADESSO - 400 * 86400))["xp"])
+          "server — esce che ci sono punti in attesa, e la soglia",
+          (None, True, 3), (st2["xp"], st2["in_attesa"], st2["attivi_min"]))
+    prova("...e con due attivi il rilascio non scatta", 0,
+          amb["rilascia_quote"](con, 1))
+    riga_xp(1, "invito_attesa", 5, "invito:22:ordine:4:venditore")
+    riga_xp(1, "invito_attesa", 1, "invito:20:ordine:5:compratore")
+    prova("dal terzo il rilascio porta tutte e quattro", 4,
+          amb["rilascia_quote"](con, 1))
+    st3 = amb["stato_inviti"](con, 1, int(ADESSO - 400 * 86400))
+    prova("...e la cifra c'e', contata col tetto come sempre, senza piu' "
+          "«in attesa»", (16, False), (st3["xp"], st3["in_attesa"]))
+    # UN DOPPIONE NON RESTA APPESO: un'accantonata col riferimento di
+    # un'accreditata (oggi nessuna strada la scrive: e' la cintura) se ne
+    # va al rilascio. Rimasta, non arriverebbe mai e mangerebbe per sempre
+    # spazio al tetto.
+    riga_xp(1, "invito_attesa", 6, "invito:21:ordine:3:compratore")
+    prova("un'accantonata doppione di un'accreditata non si conta due "
+          "volte, e non resta appesa", (0, 0, 16),
+          (amb["rilascia_quote"](con, 1), amb["quote_accantonate"](con, 1),
+           amb["stato_inviti"](con, 1, int(ADESSO - 400 * 86400))["xp"]))
+    con.close()
+
+    # --- 3c) L'ACCANTONAMENTO, SULLA STRADA VERA (set 2026, secondo giro
+    #     della privacy, decisione di Andrea): la quota nasce dal gancio
+    #     di sempre (`assegna_xp` → `quota_invito`), e sotto i tre invitati
+    #     attivi non entra nel numero; al terzo arrivano tutte insieme; da
+    #     li' si accreditano subito; se gli attivi tornano sotto tre quel
+    #     che e' accreditato resta e le nuove tornano da parte; e il tetto
+    #     vale anche sull'accantonato. ------------------------------------
+    con = banco()
+    for t in (1, 2, 60, 61, 62):
+        persona(con, t, 400)
+    for inv in (60, 61, 62):
+        con.execute("INSERT INTO inviti(invitato, invitante) VALUES(?, 1)",
+                    (inv,))
+
+    def tipo_quote(t, tipo):
+        return [r["punti"] for r in con.execute(
+            "SELECT punti FROM xp_eventi WHERE tg_id=? AND tipo=? "
+            "ORDER BY id", (t, tipo))]
+
+    def cassetto(t=1):
+        s = amb["stato_inviti"](con, t, int(ADESSO - 400 * 86400))
+        return (s["xp"], s["in_attesa"])
+
+    ordine(con, 500, 1, 2)
+    ass(con, 1, "ordine", 100, "ordine:500:venditore")
+    ordine(con, 501, 2, 60)
+    ass(con, 60, "ordine", 100, "ordine:501:compratore")        # quota 5
+    prova("SOTTO SOGLIA la quota si scrive, ma accantonata",
+          ([5], []), (tipo_quote(1, "invito_attesa"), tipo_quote(1, "invito")))
+    prova("...il numero non la vede: 100, i soli propri", 100, xp(con, 1))
+    prova("...ne' la classifica", 100,
+          amb["_dati_classifica"](con)[2].get(1))
+    prova("...e il cassetto dice «in attesa», senza cifra", (None, True),
+          cassetto())
+    ordine(con, 502, 2, 61)
+    ass(con, 61, "ordine", 200, "ordine:502:compratore")        # quota 10
+    prova("il secondo attivo: ancora accantonata, e il numero fermo",
+          ([5, 10], 100), (tipo_quote(1, "invito_attesa"), xp(con, 1)))
+    ordine(con, 503, 2, 62)
+    ass(con, 62, "ordine", 60, "ordine:503:compratore")         # quota 3
+    prova("AL TERZO ATTIVO ARRIVANO TUTTE INSIEME", ([], [5, 10, 3]),
+          (tipo_quote(1, "invito_attesa"), tipo_quote(1, "invito")))
+    prova("...il numero le conta, 100 + 18", 118, xp(con, 1))
+    prova("...anche la classifica", 118, amb["_dati_classifica"](con)[2].get(1))
+    prova("...e il cassetto dice la cifra, senza piu' «in attesa»",
+          (18, False), cassetto())
+    ordine(con, 504, 2, 60)
+    ass(con, 60, "ordine", 40, "ordine:504:compratore")         # quota 2
+    prova("da li' in poi si accreditano subito", ([5, 10, 3, 2], [], 120),
+          (tipo_quote(1, "invito"), tipo_quote(1, "invito_attesa"), xp(con, 1)))
+    # GLI ATTIVI TORNANO SOTTO TRE (una fusione, un ordine marcato come
+    # prova): quel che e' accreditato resta, e il nuovo torna da parte —
+    # con uno sblocco per sempre il totale ricomincerebbe a crescere a ogni
+    # affare della sola 60, cioe' a raccontarla
+    con.execute("DELETE FROM xp_eventi WHERE tg_id=1 AND riferimento IN "
+                "('invito:61:ordine:502:compratore', "
+                "'invito:62:ordine:503:compratore')")
+    amb["_ricalcola_xp"](con, 1)
+    ordine(con, 505, 2, 60)
+    ass(con, 60, "ordine", 20, "ordine:505:compratore")         # quota 1
+    prova("SOTTO TRE DOPO IL RILASCIO: l'accreditato resta, e il nuovo "
+          "torna da parte", ([5, 2], [1], 107),
+          (tipo_quote(1, "invito"), tipo_quote(1, "invito_attesa"), xp(con, 1)))
+    prova("...e il cassetto torna a «in attesa», senza cifra", (None, True),
+          cassetto())
+    prova("...e la scomposizione accorpa quel che e' rimasto",
+          {"accorpati": True, "attivi_min": 3},
+          amb["xp_per_ruolo"]([(r["riferimento"], r["punti"])
+                               for r in con.execute(
+                                   "SELECT riferimento, punti FROM xp_eventi "
+                                   "WHERE tg_id=1 AND tipo IN "
+                                   "('ordine','invito')")], xp(con, 1)))
+    ordine(con, 506, 2, 61)
+    ass(con, 61, "ordine", 80, "ordine:506:compratore")         # quota 4
+    ordine(con, 507, 2, 62)
+    ass(con, 62, "ordine", 100, "ordine:507:compratore")        # quota 5
+    prova("...finche' i tre non tornano: e allora arrivano di nuovo tutte "
+          "insieme", ([5, 2, 1, 4, 5], [], 117, (17, False)),
+          (tipo_quote(1, "invito"), tipo_quote(1, "invito_attesa"), xp(con, 1),
+           cassetto()))
+    con.close()
+
+    # IL TETTO VALE ANCHE SULL'ACCANTONATO
+    con = banco()
+    for t in (1, 2, 70, 71, 72):
+        persona(con, t, 400)
+    for inv in (70, 71, 72):
+        con.execute("INSERT INTO inviti(invitato, invitante) VALUES(?, 1)",
+                    (inv,))
+    ordine(con, 600, 1, 2)
+    ass(con, 1, "ordine", 10, "ordine:600:venditore")           # 10 propri
+    ordine(con, 601, 2, 70)
+    ass(con, 70, "ordine", 1000, "ordine:601:compratore")       # 50 teorici
+    prova("IL TETTO VALE SULL'ACCANTONATO: 50 teorici, ne entrano 10",
+          [10], tipo_quote(1, "invito_attesa"))
+    ordine(con, 602, 2, 71)
+    ass(con, 71, "ordine", 1000, "ordine:602:compratore")
+    prova("...a tetto pieno di accantonate non entra niente, e chi non "
+          "porta punti non diventa attivo", ([10], None),
+          (tipo_quote(1, "invito_attesa"), cassetto()[0]))
+    ordine(con, 603, 1, 2)
+    ass(con, 1, "ordine", 40, "ordine:603:venditore")           # 50 propri
+    ordine(con, 604, 2, 71)
+    ass(con, 71, "ordine", 200, "ordine:604:compratore")        # quota 10
+    ordine(con, 605, 2, 72)
+    ass(con, 72, "ordine", 100, "ordine:605:compratore")        # quota 5
+    prova("...e col terzo attivo il rilascio, tutto dentro il tetto",
+          ([10, 10, 5], 75), (tipo_quote(1, "invito"), xp(con, 1)))
+    con.close()
+
+    # LA MIGRAZIONE, UNA VOLTA SOLA, E IL RILASCIO D'AVVIO
+    con = banco()
+    con.execute("CREATE TABLE impostazioni(chiave TEXT PRIMARY KEY, "
+                "valore TEXT)")
+    for t in (1, 3, 4, 5):
+        persona(con, t, 400)
+
+    def riga_xp(t, tipo, punti, rif):
+        con.execute("INSERT INTO xp_eventi(tg_id, tipo, punti, riferimento, "
+                    "creato) VALUES(?,?,?,?,0)", (t, tipo, punti, rif))
+
+    # 1: quote accreditate dalla regola di ieri, UNA sola persona
+    riga_xp(1, "ordine", 100, "ordine:1:venditore")
+    riga_xp(1, "invito", 5, "invito:80:ordine:2:compratore")
+    # 3: tre persone diverse, la soglia l'aveva gia' passata
+    riga_xp(3, "ordine", 100, "ordine:3:venditore")
+    for k, inv in enumerate((81, 82, 83)):
+        riga_xp(3, "invito", 4, f"invito:{inv}:ordine:{10 + k}:compratore")
+    con.execute("UPDATE utenti SET xp=105 WHERE tg_id=1")
+    con.execute("UPDATE utenti SET xp=112 WHERE tg_id=3")
+    for f in ("migra_quote_accantonate", "rilascia_quote_mature"):
+        exec(pezzo(f), amb)
+    amb["MIGRAZIONE_QUOTE_ACCANTONATE"] = re.search(
+        r'^MIGRAZIONE_QUOTE_ACCANTONATE = "([^"]+)"', _SORGENTE,
+        re.M).group(1)
+    amb["_REPUTAZIONE_DOPO_MIGRAZIONE"] = []
+    uscita = io.StringIO()
+    with contextlib.redirect_stdout(uscita):
+        n = amb["migra_quote_accantonate"](con)
+    prova("LA MIGRAZIONE accantona le quote di chi ha meno di tre attivi, "
+          "e il numero scende", (1, [5], [], 100),
+          (n, tipo_quote(1, "invito_attesa"), tipo_quote(1, "invito"),
+           xp(con, 1)))
+    prova("...e annota chi ha toccato, per riallinearne il 30382 all'avvio",
+          [1], amb["_REPUTAZIONE_DOPO_MIGRAZIONE"])
+    _rip = codice(pezzo("ripubblica_reputazione_migrata"))
+    prova("...dal gancio di sempre, in sottofondo, e poi la lista si "
+          "svuota", True, "await premia_reputazione_nostr(t)" in _rip
+          and "asyncio.create_task(_giro())" in _rip
+          and "_REPUTAZIONE_DOPO_MIGRAZIONE.clear()" in _rip)
+    prova("...non tocca chi la soglia l'aveva passata", ([4, 4, 4], 112),
+          (tipo_quote(3, "invito"), xp(con, 3)))
+    prova("...e lo dice nel journal, perche' toglie punti a persone vere",
+          True, "Quote d'invito accantonate" in uscita.getvalue())
+    # dopo la migrazione una quota accreditata sotto soglia e' legittima
+    # (chi ha passato la soglia ed e' sceso): il secondo avvio non la tocca
+    riga_xp(4, "invito", 7, "invito:84:ordine:20:compratore")
+    with zitto():
+        n2 = amb["migra_quote_accantonate"](con)
+    prova("...UNA volta sola: al secondo avvio non tocca niente", (0, [7]),
+          (n2, tipo_quote(4, "invito")))
+    # IL RILASCIO D'AVVIO: chi a contare le accreditate E le accantonate
+    # arriva a tre attivi riceve quelle rimaste indietro (una fusione, una
+    # quota a meta'); chi arriva a due no — anche se un'accreditata ce
+    # l'ha: e' di chi ha passato la soglia ed e' sceso, e resta dov'e'
+    persona(con, 6, 400)
+    riga_xp(4, "invito_attesa", 2, "invito:85:ordine:21:compratore")
+    for k, inv in enumerate((86, 87, 88)):
+        riga_xp(5, "invito_attesa", 1, f"invito:{inv}:ordine:{30 + k}:compratore")
+    riga_xp(1, "invito_attesa", 3, "invito:89:ordine:40:compratore")
+    riga_xp(6, "ordine", 100, "ordine:50:venditore")
+    riga_xp(6, "invito", 2, "invito:90:ordine:51:compratore")
+    riga_xp(6, "invito", 2, "invito:91:ordine:52:compratore")
+    riga_xp(6, "invito_attesa", 3, "invito:92:ordine:53:compratore")
+    with zitto():
+        m = amb["rilascia_quote_mature"](con)
+    prova("IL RILASCIO D'AVVIO: chi e' a tre si' (tutte accantonate, o due "
+          "accreditate e una no), chi e' a due no",
+          (2, [1, 1, 1], [2, 2, 3], [7], [2], [5, 3]),
+          (m, tipo_quote(5, "invito"), tipo_quote(6, "invito"),
+           tipo_quote(4, "invito"), tipo_quote(4, "invito_attesa"),
+           tipo_quote(1, "invito_attesa")))
     con.close()
 
     # --- 4) LE SENTINELLE -------------------------------------------
+    # (secondo giro) le accantonate stanno FUORI dal perimetro che fa il
+    # numero, e DENTRO quello dell'azzeramento
+    prova("le accantonate: fuori dal perimetro del numero, dentro "
+          "l'azzeramento", (False, True),
+          (amb["XP_INVITO_ATTESA"] in amb["XP_COMMERCIO"],
+           amb["XP_INVITO_ATTESA"] in amb["sql_xp_azzeramento"]()[1]))
+    qsrc = codice(pezzo("quota_invito"))
+    prova("il tetto conta anche l'accantonato, e il rilascio parte dalla "
+          "quota", True,
+          "propri - inviti - quote_accantonate(con, invitante)" in qsrc
+          and "rilascia_quote(con, invitante)" in qsrc)
+    fus = codice(pezzo("esegui_fusione"))
+    prova("la fusione pulisce le quote nei DUE stati, e poi rilascia", True,
+          "tipo IN (?,?)" in fus and "*XP_QUOTE" in fus
+          and "rilascia_quote(con, id_telegram)" in fus)
+    _init = codice(pezzo("init_db"))
+    prova("all'avvio: la migrazione, poi il rilascio, POI gli XP", True,
+          0 <= _init.find("migra_quote_accantonate(con)")
+          < _init.find("rilascia_quote_mature(con)")
+          < _init.find("riallinea_xp_commercio(con)"))
+    with open("marca_prove.py", encoding="utf-8") as _fh:
+        _mp = codice(_fh.read())
+    prova("marca_prove toglie anche le accantonate nate da un collaudo",
+          2, _mp.count("('invito','invito_attesa')"))
     ax = codice(pezzo("assegna_xp"))
     prova("la quota scatta dai SOLI accrediti propri", True,
           "if tipo in XP_PROPRI:" in ax and "quota_invito(" in ax)
@@ -26287,20 +26559,30 @@ att('...e i punti non si nominano finche\u0027 sono zero', !c1.includes('XP'));
 att('2 persone al plurale, e i punti quando ci sono',
     c2.includes('2 persone</b>') && c2.includes('7 XP'));
 att('la chiave assente non esplode', contoInviti(null) === c0);
-/* LA SOGLIA DEGLI INVITATI ATTIVI (set 2026, ritocchi piccoli): sotto,
-   il server manda xp null e la soglia; il cassetto dice da quanti */
-const cn = contoInviti({persone: 2, xp: null, attivi_min: 3});
-att('sotto la soglia il cassetto lo dice, e nessun XP',
-    cn.includes('2 persone</b>')
-    && cn.includes('I punti degli inviti compaiono da 3 invitati attivi in su.')
-    && !cn.includes('XP'));
+/* I PUNTI IN ATTESA (set 2026; EMENDATE al secondo giro): sotto la
+   soglia il server manda xp null, in_attesa (un si' o un no) e la
+   soglia; il cassetto dice che ci sono e da quanti attivi arrivano, mai
+   quanti. La frase del primo giro («compaiono da...») non c'e' piu' */
+const cn = contoInviti({persone: 2, xp: null, in_attesa: true, attivi_min: 3});
+att('punti in attesa: la riga lo dice, senza cifra e senza XP',
+    cn === 'Hai invitato <b>2 persone</b> · punti in attesa: arrivano da 3 invitati attivi in su.');
 att('...col numero del SERVER',
-    contoInviti({persone: 1, xp: null, attivi_min: 5}).includes('da 5 invitati attivi'));
-att('...mentre con la cifra, anche zero, la frase non compare',
-    !contoInviti({persone: 2, xp: 0, attivi_min: 3}).includes('compaiono')
-    && !contoInviti({persone: 4, xp: 9, attivi_min: 3}).includes('compaiono'));
+    contoInviti({persone: 1, xp: null, in_attesa: true, attivi_min: 5}).includes('da 5 invitati attivi'));
+att('...senza punti in attesa niente riga (lo zero resta muto)',
+    contoInviti({persone: 2, xp: null, in_attesa: false, attivi_min: 3}) === 'Hai invitato <b>2 persone</b>.');
+att('...e con la cifra (sbloccato) niente «in attesa»',
+    !contoInviti({persone: 4, xp: 9, in_attesa: false, attivi_min: 3}).includes('attesa')
+    && contoInviti({persone: 4, xp: 9, in_attesa: false, attivi_min: 3}).includes('9 XP'));
+att('...e la frase del primo giro non compare piu',
+    !cn.includes('compaiono'));
 att('...e a chi non ha invitato nessuno si dice solo cosa fare',
-    contoInviti({persone: 0, xp: null, attivi_min: 3}) === c0);
+    contoInviti({persone: 0, xp: null, in_attesa: true, attivi_min: 3}) === c0);
+const rs = regolaInviti({percento: 5, attivi_min: 3});
+att('la regola dice la soglia, col numero del SERVER, e che il tetto vale anche sui punti da parte',
+    rs.includes('I primi restano da parte, e arrivano tutti insieme quando le persone che commerciano sono almeno <b>3</b>.')
+    && rs.includes('anche quelli da parte'));
+att('...e un server di ieri, senza la soglia, non fa dire «almeno 0»',
+    !regolaInviti({percento: 5}).includes('almeno'));
 const acc = fraseXp({accorpati: true, attivi_min: 3});
 att('la riga dei punti ACCORPA: nessuna cifra, fuori dalla soglia',
     acc.replace('da 3 invitati', '').search(/[0-9]/) < 0
@@ -77356,6 +77638,25 @@ def prove_ordini_prova():
     prova("spariti anche i propri, la quota che resta non tiene su il "
           "numero (il tetto)", 0,
           con.execute("SELECT xp FROM utenti WHERE tg_id=6").fetchone()[0])
+    # E LE ACCANTONATE (set 2026, secondo giro della privacy degli
+    # inviti): una quota in attesa dei tre invitati attivi, nata da un
+    # collaudo, se ne va come le altre — o il giorno del rilascio
+    # arriverebbe insieme a quelle vere
+    con.execute("INSERT INTO ordini(id, compratore_id, venditore_id, "
+                "prezzo_sats, stato, creato, aggiornato) VALUES(86, 2, 1, "
+                "100, 'released', 140, 240)")
+    con.executemany(
+        "INSERT INTO xp_eventi(tg_id, tipo, punti, riferimento, "
+        "creato) VALUES(?,?,?,?,?)", [
+            (2, "ordine", 60, "ordine:86:compratore", 240),
+            (6, "invito_attesa", 3, "invito:2:ordine:86:compratore", 240)])
+    with zitto():
+        r4 = marca_prove.marca(con, [86])
+    prova("...e marcando un ordine se ne va anche la quota ACCANTONATA che "
+          "ne era nata", (0, 2), (con.execute(
+              "SELECT COUNT(*) FROM xp_eventi WHERE "
+              "riferimento='invito:2:ordine:86:compratore'").fetchone()[0],
+              r4["xp_tolti"]))
 
     # recupera_xp_ordini: le costanti dal SERVER, mai a memoria
     cost = rec.estrai_costanti(_SORGENTE)
@@ -83046,15 +83347,16 @@ def prove_reputazione_nostr():
     vero.execute("CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, "
                 "npub TEXT DEFAULT '', npub_verificata INTEGER DEFAULT 0, "
                 "xp INTEGER DEFAULT 0, vendite_ok INTEGER DEFAULT 0, "
-                "acquisti_ok INTEGER DEFAULT 0)")
+                "acquisti_ok INTEGER DEFAULT 0, "
+                "classifica_nascosta INTEGER DEFAULT 0)")
     vero.execute("CREATE TABLE nostr_reputazione(tg_id INTEGER PRIMARY "
                 "KEY, pubkey TEXT, livello TEXT, xp INTEGER, "
                 "affari INTEGER, evento_id TEXT DEFAULT '', "
                 "pubblicato_il INTEGER DEFAULT 0)")
     pk_rep = "cd" * 32
     npub_rep = hex_to_npub_f(pk_rep)
-    vero.execute("INSERT INTO utenti VALUES(111,?,1,250,4,2)", (npub_rep,))
-    vero.execute("INSERT INTO utenti VALUES(222,'',0,999,9,9)")  # niente npub verificata
+    vero.execute("INSERT INTO utenti VALUES(111,?,1,250,4,2,0)", (npub_rep,))
+    vero.execute("INSERT INTO utenti VALUES(222,'',0,999,9,9,0)")  # niente npub verificata
     vero.commit()
 
     class _ConVivaRep:
@@ -83079,13 +83381,21 @@ def prove_reputazione_nostr():
         chiamate_evento["n"] += 1
         return {"id": f"evrep-{chiamate_evento['n']}", "kind": 30382}
 
-    amb2 = {"db": lambda: _ConVivaRep(), "time": time,
+    # (set 2026, secondo giro della privacy: il corpo sta in
+    # `_allinea_reputazione_nostr`, e `premia_reputazione_nostr` ci mette
+    # davanti la guardia del giro in volo — si montano tutt'e due, con la
+    # colonna dell'interruttore della classifica nella tabella qui sopra)
+    amb2 = {"db": lambda: _ConVivaRep(), "time": time, "asyncio": asyncio,
             "npub_to_hex": npub_to_hex_f,
             "livello_utente": lambda xp, affari: {
                 "id": "pratico", "numero": 3},
             "evento_reputazione": _evento_finto,
             "_spedisci_ai_relay": lambda ev: _corout(
-                1 if esito_relay["ok"] else 0)}
+                1 if esito_relay["ok"] else 0),
+            "_REPUTAZIONE_IN_CORSO": set(), "_REPUTAZIONE_DA_RIFARE": set(),
+            "_REPUTAZIONE_RITIRATA_IL": {}, "RELAYS_VERIFICA": ["wss://uno"],
+            "print": lambda *a, **k: None}
+    exec("async " + pezzo("_allinea_reputazione_nostr"), amb2)
     exec("async " + pezzo("premia_reputazione_nostr"), amb2)
 
     asyncio.new_event_loop().run_until_complete(
@@ -83124,6 +83434,148 @@ def prove_reputazione_nostr():
           "successo (mai un successo finto)", (250, 7),
           (riga2["xp"], riga2["affari"]))
     vero.close()
+
+    # --- 2b) «NON MOSTRARMI IN CLASSIFICA» FERMA E RITIRA IL 30382 (set
+    #     2026, secondo giro della privacy): nascosto, niente 30382 e
+    #     quello uscito si ritira con una NIP-09; riacceso, torna — un
+    #     secondo DOPO il ritiro, o la NIP-09 lo porterebbe via ------------
+    amb_l = {"_NOSTR": (None, "ee" * 32),
+             "firma_evento": lambda kind, tags, content: {
+                 "kind": kind, "tags": tags, "content": content}}
+    exec(pezzo("_lapide_reputazione"), amb_l)
+    lap = amb_l["_lapide_reputazione"]("cd" * 32, "ev-vecchio")
+    prova("il ritiro e' una NIP-09 (kind 5) con e, a e k — la forma delle "
+          "lapidi di annunci e badge", (5, [["e", "ev-vecchio"],
+          ["a", "30382:" + "ee" * 32 + ":" + "cd" * 32], ["k", "30382"]]),
+          (lap["kind"], lap["tags"]))
+    prova("...e senza l'id dell'ultimo evento basta la coordinata (vale "
+          "per tutte le versioni)", [["a", "30382:" + "ee" * 32 + ":"
+          + "cd" * 32], ["k", "30382"]],
+          amb_l["_lapide_reputazione"]("cd" * 32, "")["tags"])
+
+    rep = sqlite3.connect(":memory:")
+    rep.row_factory = sqlite3.Row
+    rep.execute("CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, "
+                "npub TEXT DEFAULT '', npub_verificata INTEGER DEFAULT 0, "
+                "xp INTEGER DEFAULT 0, vendite_ok INTEGER DEFAULT 0, "
+                "acquisti_ok INTEGER DEFAULT 0, "
+                "classifica_nascosta INTEGER DEFAULT 0)")
+    rep.execute("CREATE TABLE nostr_reputazione(tg_id INTEGER PRIMARY "
+                "KEY, pubkey TEXT, livello TEXT, xp INTEGER, "
+                "affari INTEGER, evento_id TEXT DEFAULT '', "
+                "pubblicato_il INTEGER DEFAULT 0)")
+    rep.execute("INSERT INTO utenti VALUES(111,?,1,250,4,2,0)", (npub_rep,))
+    rep.execute("INSERT INTO utenti VALUES(333,'',0,10,1,0,1)")
+    rep.commit()
+
+    class _ConRep:
+        def execute(self, *a):
+            return rep.execute(*a)
+
+        def commit(self):
+            rep.commit()
+
+        def close(self):
+            pass
+
+    mandati, dormite = [], []
+    accetta = {"n": 1}
+    su_lapide = {"f": None}
+
+    async def _spedisci(ev):
+        mandati.append(ev["kind"])
+        if ev["kind"] == 5 and su_lapide["f"]:
+            await su_lapide["f"]()
+        return accetta["n"]
+
+    async def _dormi(s):
+        dormite.append(s)
+
+    n_ev = {"n": 0}
+
+    def _ev30382(pk, liv, xp, affari):
+        n_ev["n"] += 1
+        return {"id": f"ev-{n_ev['n']}", "kind": 30382}
+
+    # un orologio FERMO: il ritiro e la ripubblicazione cadono nello
+    # stesso secondo apposta, o la prova dell'attesa dipenderebbe da
+    # quando scatta il secondo mentre gira
+    orologio = type("T", (), {"time": staticmethod(lambda: 1_790_000_000.25)})
+    amb_r = {"db": lambda: _ConRep(), "time": orologio,
+             "asyncio": type("A", (), {"sleep": staticmethod(_dormi)}),
+             "npub_to_hex": npub_to_hex_f,
+             "livello_utente": lambda xp, affari: {"id": "pratico",
+                                                   "numero": 3},
+             "evento_reputazione": _ev30382, "_spedisci_ai_relay": _spedisci,
+             "_lapide_reputazione": lambda pk, eid: {
+                 "kind": 5, "pk": pk, "e": eid},
+             "_REPUTAZIONE_IN_CORSO": set(), "_REPUTAZIONE_DA_RIFARE": set(),
+             "_REPUTAZIONE_RITIRATA_IL": {}, "RELAYS_VERIFICA": ["wss://uno"],
+             "print": lambda *a, **k: None}
+    exec("async " + pezzo("_allinea_reputazione_nostr"), amb_r)
+    exec("async " + pezzo("premia_reputazione_nostr"), amb_r)
+    giro = lambda t: asyncio.new_event_loop().run_until_complete(
+        amb_r["premia_reputazione_nostr"](t))
+    pubblicato = lambda t: rep.execute(
+        "SELECT evento_id FROM nostr_reputazione WHERE tg_id=?",
+        (t,)).fetchone()
+
+    giro(111)
+    prova("visibile: il 30382 esce", ([30382], "ev-1"),
+          (mandati[:], pubblicato(111)["evento_id"]))
+    giro(333)
+    prova("nascosto e senza niente di pubblicato: nessun evento", [30382],
+          mandati[:])
+    rep.execute("UPDATE utenti SET classifica_nascosta=1 WHERE tg_id=111")
+    accetta["n"] = 0
+    giro(111)
+    prova("nascosto, ma nessun relay accetta il ritiro: la riga resta, e "
+          "il prossimo gancio riprova", ([30382, 5], True),
+          (mandati[:], pubblicato(111) is not None))
+    accetta["n"] = 1
+    giro(111)
+    prova("NASCOSTO: il 30382 si ritira (NIP-09 sulla pubkey e sull'ultimo "
+          "evento) e la riga se ne va", ([30382, 5, 5], None),
+          (mandati[:], pubblicato(111)))
+    rep.execute("UPDATE utenti SET vendite_ok=9 WHERE tg_id=111")
+    giro(111)
+    prova("...e da nascosto un affare nuovo NON lo ripubblica", 3,
+          len(mandati))
+    rep.execute("UPDATE utenti SET classifica_nascosta=0 WHERE tg_id=111")
+    giro(111)
+    prova("RIACCESO: torna, nuovo — e un secondo dopo il ritiro, o la "
+          "NIP-09 lo prenderebbe con le versioni vecchie",
+          ([30382, 5, 5, 30382], [0.75], "ev-2"),
+          (mandati[:], dormite[:], pubblicato(111)["evento_id"]))
+
+    # IL DOPPIO TOCCO: mentre il ritiro e' in volo la persona si riaccende
+    # e il suo giro arriva — trova il giro in volo, lo segna da rifare e
+    # se ne va; il giro in volo rilegge lo stato e ripubblica
+    rep.execute("UPDATE utenti SET classifica_nascosta=1 WHERE tg_id=111")
+    del mandati[:]
+
+    async def _riaccende():
+        su_lapide["f"] = None
+        rep.execute("UPDATE utenti SET classifica_nascosta=0 WHERE tg_id=111")
+        await amb_r["premia_reputazione_nostr"](111)
+
+    su_lapide["f"] = _riaccende
+    giro(111)
+    prova("IL DOPPIO TOCCO converge sull'ultima scelta: ritiro, poi di "
+          "nuovo pubblicato", ([5, 30382], True, set()),
+          (mandati[:], pubblicato(111) is not None,
+           amb_r["_REPUTAZIONE_IN_CORSO"]))
+    rep.close()
+
+    rotta = pezzo("scegli_classifica_nascosta")
+    prova("la rotta dell'interruttore allinea subito il 30382, dallo "
+          "stesso gancio di tutti", True,
+          'await premia_reputazione_nostr(user["id"])' in rotta
+          and rotta.index('_classifica_cache["quando"] = 0.0')
+          < rotta.index("await premia_reputazione_nostr("))
+    prova("...e il riallineamento admin guarda anche chi un 30382 ce l'ha "
+          "gia'", True, "UNION SELECT tg_id FROM nostr_reputazione"
+          in pezzo("sincronizza_reputazione_nostr"))
 
     # --- 3) i due ganci nei punti giusti -------------------------------
     # (set 2026: il gancio era in verifica_npub_controlla, sparita col

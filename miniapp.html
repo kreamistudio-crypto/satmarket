@@ -9274,14 +9274,14 @@ document.getElementById('cartello')?.remove();</script>
         <li>I tuoi <b>ordini</b>: cosa hai comprato o venduto, quanto, quando, e come è andata.</li>
         <li>Il tuo <b>Lightning address</b>, se lo imposti per incassare da solo: è un <span class="mono">nome@dominio</span>, come una mail, e ce l'abbiamo <b>in chiaro</b> — è lì che ti mandiamo i sats quando un affare si chiude, quindi dobbiamo poterlo leggere. Non esce da nessuna parte: non lo vede chi compra, non lo vedono i moderatori.</li>
         <li>La <b>fattura</b> che incolli per incassare, se l'address non lo usi: si incolla <b>solo al momento dell'incasso</b> — nel Profilo non se ne salva nessuna, perché una fattura scade e vale per un pagamento solo — e resta scritta in quell'ordine, come ricevuta di dove sono andati i sats.</li>
-        <li>La tua <b>reputazione</b>: voti ricevuti, distintivi, il livello, e gli <b>XP</b>, che contano il commercio — quanto hai comprato e venduto, più una piccola parte di quello delle persone che hai invitato.</li>
+        <li>La tua <b>reputazione</b>: voti ricevuti, distintivi, il livello, e gli <b>XP</b>, che contano il commercio — quanto hai comprato e venduto, più una piccola parte di quello delle persone che hai invitato, da quando quelle che commerciano sono almeno tre.</li>
         <!-- GLI INVITI (set 2026): un dato nuovo — un legame fra due
              persone — e si dichiara come gli altri, col suo limite
              onesto: il conto degli XP portati, con un invitato solo,
              lascia intuire quanto commercia. E' la stessa franchezza
              della riga sulla classifica qui sotto. -->
-        <li>Gli <b>inviti</b>: il tuo codice e, se sei arrivato con un invito, chi ti ha invitato. A chi ti ha invitato non diciamo mai chi sei: vede <b>quante</b> persone ha portato, e <b>quanti</b> XP gli hanno fruttato tutte insieme solo quando quelle che commerciano sono almeno tre — prima quel numero sarebbe il commercio di qualcuno che conosce. Un limite onesto: quei punti entrano comunque nel suo totale, quindi se ha invitato soltanto te e tiene d'occhio il suo numero può accorgersi di quando commerci.</li>
-        <li>La tua posizione in <b>classifica</b>, se ci entri: lì di te si vedono nome, foto, titolo, media dei voti, da quante persone, quanti affari e il <b>punteggio</b>. Il punteggio mette insieme la media e il commercio, quindi da lì si può <b>ricavare quanto hai commerciato</b> — è una scelta presa sapendolo, perché senza quel numero l'ordine della lista non si legge. Gli XP in chiaro invece non escono mai, e nemmeno il tuo identificativo. Se non vuoi comparire, nel Profilo («Livello e titolo») c'è <b>Non mostrarmi in classifica</b>: il tuo livello resta sul profilo, perché a chi scambia con te serve per fidarsi.</li>
+        <li>Gli <b>inviti</b>: il tuo codice e, se sei arrivato con un invito, chi ti ha invitato. A chi ti ha invitato non diciamo mai chi sei: vede <b>quante</b> persone ha portato, e i <b>punti</b> che gli hanno fruttato tutte insieme gli arrivano — nel cassetto, nel suo totale, nel livello e in classifica — solo quando quelle che commerciano sono almeno tre: prima restano da parte, e lui vede soltanto che ci sono, senza la cifra. Un limite onesto: se ha invitato soltanto te, la riga «punti in attesa» gli dice che hai cominciato a commerciare — non quanto.</li>
+        <li>La tua posizione in <b>classifica</b>, se ci entri: lì di te si vedono nome, foto, titolo, media dei voti, da quante persone, quanti affari e il <b>punteggio</b>. Il punteggio mette insieme la media e il commercio, quindi da lì si può <b>ricavare quanto hai commerciato</b> — è una scelta presa sapendolo, perché senza quel numero l'ordine della lista non si legge. Gli XP in chiaro invece non escono mai, e nemmeno il tuo identificativo. Se non vuoi comparire, nel Profilo («Livello e titolo») c'è <b>Non mostrarmi in classifica</b>: il tuo livello resta sul profilo, perché a chi scambia con te serve per fidarsi. E se la tua reputazione la pubblichiamo su Nostr (vedi sotto), smettiamo e chiediamo ai relay di ritirarla.</li>
         <li>Il tuo <b>barattolo</b>, cioè gli annunci che hai messo da parte. Di questi si vede <b>quanti</b> l'hanno salvato, mai <b>chi</b>: nemmeno chi vende sa che sei stato tu — a meno che tu non condivida il barattolo col suo link, che è un gesto tuo: la voce qui sotto dice cosa comporta.</li>
         <li>I tuoi <b>avvisi di ricerca</b>, se ne crei: cosa cerchi, dove, entro che prezzo.</li>
       </ul>
@@ -9408,7 +9408,7 @@ document.getElementById('cartello')?.remove();</script>
       <h3 id="priv-fuori">Cosa esce da qui</h3>
       <ul class="sicu-lista sicu-cose">
         <li><span class="em">✈️</span><b>Telegram.</b> Gli avvisi te li mandiamo col bot, quindi Telegram vede che ti abbiamo scritto e cosa c'è nel messaggio. Per questo gli avvisi su indirizzo, busta e codici sono scritti <b>vuoti apposta</b>: dicono «apri l'ordine», mai il contenuto. E i bottoni per scrivere alla controparte ti portano <b>fuori</b>, in una chat di Telegram: quella conversazione è vostra e di Telegram, non nostra — non la leggiamo, non ce l'abbiamo, e in una disputa non possiamo usarla.</li>
-        <li><span class="em">🟣</span><b>Nostr.</b> Gli annunci vanno sui <b>relay</b>, che in gran parte sono di altri — e <b>uno è nostro</b>, <span class="mono">relay.barattolo.store</span>: lì la copia degli annunci ce l'abbiamo anche noi, ma non è un privilegio, perché quella copia <b>ce l'ha chiunque</b> apra uno qualsiasi degli altri relay. Da noi <b>leggere è aperto a tutti</b>; scrivere no, e possono farlo solo Barattolo e chi ci ha dimostrato la propria chiave Nostr. Ritirare un annuncio manda anche la richiesta di cancellarlo, e i relay che la rispettano lo tolgono — ma nessuno può garantire che l'abbiano fatto tutti, <b>il nostro compreso</b>: nemmeno sul relay di casa possiamo promettere quello che sugli altri non possiamo. <b>Quello che finisce su Nostr non torna indietro.</b> È il prezzo della piazza aperta, ed è la stessa proprietà che rende il tuo annuncio <i>tuo</i> anche il giorno che Barattolo non ci fosse più.</li>
+        <li><span class="em">🟣</span><b>Nostr.</b> Gli annunci vanno sui <b>relay</b>, che in gran parte sono di altri — e <b>uno è nostro</b>, <span class="mono">relay.barattolo.store</span>: lì la copia degli annunci ce l'abbiamo anche noi, ma non è un privilegio, perché quella copia <b>ce l'ha chiunque</b> apra uno qualsiasi degli altri relay. Da noi <b>leggere è aperto a tutti</b>; scrivere no, e possono farlo solo Barattolo e chi ci ha dimostrato la propria chiave Nostr. Ritirare un annuncio manda anche la richiesta di cancellarlo, e i relay che la rispettano lo tolgono — ma nessuno può garantire che l'abbiano fatto tutti, <b>il nostro compreso</b>: nemmeno sul relay di casa possiamo promettere quello che sugli altri non possiamo. Se hai verificato la tua chiave, sui relay va anche la tua <b>reputazione</b> — livello, XP e affari conclusi — firmata da noi (è il kind 30382): con «Non mostrarmi in classifica» smettiamo di pubblicarla e chiediamo di ritirarla, con lo stesso limite degli annunci. <b>Quello che finisce su Nostr non torna indietro.</b> È il prezzo della piazza aperta, ed è la stessa proprietà che rende il tuo annuncio <i>tuo</i> anche il giorno che Barattolo non ci fosse più.</li>
         <li><span class="em">⚡</span><b>Il nodo dei pagamenti.</b> Quando paghi, la fattura porta il numero dell'annuncio e il suo titolo — mai chi sei.</li>
         <li><span class="em">🤖</span><b>L'intelligenza artificiale</b> che controlla gli annunci: le arriva il testo dell'annuncio — titolo e descrizione — e <b>mai chi l'ha scritto</b>. Quello che scrivi nella <b>barra di ricerca</b> non le arriva mai: la ricerca è un indice di casa, e la tua domanda non esce da qui.</li>
         <li><span class="em">💱</span><b>Il cambio euro/bitcoin</b>, che chiediamo noi una volta al minuto e non il tuo browser: così nessun terzo sa che stai guardando un prezzo.</li>
@@ -27908,19 +27908,26 @@ function rigaClassificaNascosta(){
       <div style="min-width:0;flex:1">
         <div style="font-size:13.5px;font-weight:800">🏆 Non mostrarmi in classifica</div>
         <div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">
-          Se lo accendi il tuo nome esce dalla classifica. Il livello resta
-          sul tuo profilo: a chi scambia con te serve per fidarsi.</div>
+          Se lo accendi il tuo nome esce dalla classifica, e la tua
+          reputazione non si pubblica più su Nostr. Il livello resta sul
+          tuo profilo: a chi scambia con te serve per fidarsi.</div>
       </div>
-      <button onclick="setClassificaNascosta(${myClassificaNascosta ? 'false' : 'true'})"
+      <button onclick="setClassificaNascosta(${myClassificaNascosta ? 'false' : 'true'}, this)"
         aria-pressed="${myClassificaNascosta ? 'true' : 'false'}"
         style="flex:none;font:inherit;font-size:12.5px;font-weight:800;border:1px solid ${myClassificaNascosta?'var(--sats)':'var(--line)'};background:${myClassificaNascosta?'var(--sats)':'transparent'};color:${myClassificaNascosta?'#fff':'var(--muted)'};border-radius:99px;padding:6px 14px;cursor:pointer">
         ${myClassificaNascosta ? 'Attivo' : 'Spento'}</button>
     </div>`;
 }
 
-async function setClassificaNascosta(nascosta){
+async function setClassificaNascosta(nascosta, btn){
   haptic();
   if (DEMO) { toast('In demo la classifica non è quella vera 🙂'); return; }
+  /* IL SERVER ASPETTA NOSTR (secondo giro, set 2026): risponde quando la
+     reputazione e' ritirata o ripubblicata, quindi la pillola dice che
+     sta lavorando e non si tocca due volte. Il velo di tutta l'app
+     sarebbe troppo per un gesto che non muove un sat; e a qualunque
+     esito la riga si ridisegna com'e' davvero (`renderLivello`). */
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
   try {
     const r = await fetch(`${API_BASE}/me/classifica-nascosta`,
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
@@ -27929,9 +27936,9 @@ async function setClassificaNascosta(nascosta){
     if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
     myClassificaNascosta = !!d.nascosta;
   } catch(e) { toast('Rete assente: riprova'); return; }
-  renderLivello();
+  finally { renderLivello(); }
   toast(myClassificaNascosta
-    ? '🏆 Non compari più in classifica: il livello resta sul tuo profilo'
+    ? '🏆 Non compari più in classifica né su Nostr: il livello resta sul tuo profilo'
     : '🏆 Da ora compari in classifica, se ci entri');
 }
 
@@ -28080,22 +28087,30 @@ function renderInviti(){
 function contoInviti(inv){
   const n = (inv && inv.persone) || 0, xp = (inv && inv.xp) || 0;
   if (!n) return 'Non hai ancora invitato nessuno: condividi il tuo link.';
-  /* I PUNTI SOTTO LA SOGLIA NON ARRIVANO NEMMENO (set 2026, ritocchi
-     piccoli): con meno di tre invitati attivi il server manda `xp: null`,
-     perche' quella cifra sarebbe il commercio di una persona che conosci.
-     Il cassetto lo dice, col numero del server; lo zero resta muto. */
-  const nascosti = inv && inv.xp === null;
+  /* I PUNTI IN ATTESA (set 2026, secondo giro della privacy degli
+     inviti): sotto i tre invitati attivi le quote si ACCANTONANO — nel
+     totale non ci sono — e il server manda `xp: null` e `in_attesa`, un
+     si' o un no. La riga dice che ci sono e da quanti attivi arrivano,
+     MAI quanti sono: il quanto sarebbe il commercio di una persona che
+     conosci. Senza punti, niente riga — lo zero resta muto. */
+  const attesa = !!(inv && inv.in_attesa);
   return `Hai invitato <b>${fmt(n)} ${n === 1 ? 'persona' : 'persone'}</b>`
-    + (xp ? ` · ti hanno portato <b>${fmt(xp)} XP</b>` : '') + '.'
-    + (nascosti ? ` I punti degli inviti compaiono da ${fmt(Number(inv.attivi_min) || 0)} invitati attivi in su.` : '');
+    + (xp ? ` · ti hanno portato <b>${fmt(xp)} XP</b>` : '')
+    + (attesa ? ` · punti in attesa: arrivano da ${fmt(Number(inv.attivi_min) || 0)} invitati attivi in su` : '')
+    + '.';
 }
 
 /* Cosa si guadagna, e le due regole: qui dove si agisce, e «I tuoi
    dati» lo riassume. La percentuale e' del server. */
 function regolaInviti(inv){
+  /* LA SOGLIA E' UNA REGOLA, e sta con le altre (secondo giro): i primi
+     punti si mettono da parte e arrivano insieme. Il numero e' del
+     server; un server di ieri non lo manda, e allora la frase non c'e'. */
+  const soglia = Number(inv.attivi_min) || 0;
   return 'Ogni volta che una persona che hai invitato guadagna XP comprando '
     + `o vendendo, a te ne arriva il <b>${fmt(Number(inv.percento) || 0)}%</b>, per sempre. `
-    + 'Due regole: gli XP da inviti <b>non superano mai</b> quelli che '
+    + (soglia ? `I primi restano da parte, e arrivano tutti insieme quando le persone che commerciano sono almeno <b>${fmt(soglia)}</b>. ` : '')
+    + 'Due regole: gli XP da inviti — anche quelli da parte — <b>non superano mai</b> quelli che '
     + 'guadagni tu, e gli affari fatti <b>fra voi due</b> non contano.';
 }
 
