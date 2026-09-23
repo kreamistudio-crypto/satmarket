@@ -1673,6 +1673,9 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   web, tutto arriva vivo da barattolo.store — quindi un cambio al sito
   NON richiede una release, e una release serve solo per l'involucro
   (icona, splash, colori, versione).
+  IN SERVIZIO: la **v1.4** (versionCode 6), pubblicata il 23 set 2026
+  sui due canali — quella col permesso dello splash. La prossima sarà la
+  1.5 col versionCode 7, che alza `bubblewrap update` da solo.
   IL PROGETTO STA FUORI DAL REPO, in
   `C:\Users\Andrea\Documents\barattolo-twa`, e ci resta (un percorso
   spezzato a metà non si cerca più): lì dentro c'è il **keystore**

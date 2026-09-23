@@ -26417,3 +26417,27 @@ SplashScreenStrategy Barattolo` (il comando per intero sta in
 PRODUZIONE): «Failed to transfer splash image.» vuol dire che Chrome
 rifiuta ancora, «permesso dello splash non concesso» che il permesso non
 è partito.
+
+### Dal telefono (23 set 2026): chiuso
+
+**LA TENDINA E LA SCHERMATA SCURA SONO SPARITE**, con la v1.4 aperta a
+freddo sul telefono di Andrea (Chrome 153): lo splash arriva a Chrome,
+cioè il permesso che `patch_launcher` rimette ha fatto il suo mestiere.
+È la conferma che al banco mancava — il bytecode diceva che la cura era
+giusta, il telefono dice che funziona — e il `adb logcat` preparato per
+il caso contrario non è servito.
+PUBBLICATA SUI DUE CANALI, prima GitHub e poi Zapstore come da
+liturgia: release `v1.4` su barattolo-releases (versionCode 6, sha256
+`bf6a36e9…bad97a8d`: per intero sta nelle note della release, perché
+64 esadecimali nudi qui farebbero scattare la guardia dei segreti) e
+`zsp publish` con la chiave fredda. È la prima release della catena
+nuova: `update` → lo script che si ferma se l'ancora manca → `build` →
+impronta e dex controllati PRIMA di pubblicare.
+⚠️ UNA PREVISIONE ERA SBAGLIATA, e va detto: avevo scritto che sopra lo
+splash la barra di stato «dovrebbe essere crema». È rimasta ARANCIO — lo
+splash la dipinge lui — e il crema compare solo al primo disegno della
+pagina. Che è proprio una delle due cose rimaste.
+RESTANO DUE COSE, e tutt'e due sono della PAGINA, non dell'APK: una
+**striscia chiara in alto** quando compare il guscio, e uno **scattino
+del barattolo** fra lo splash e il guscio. Le cura il ritocco al guscio,
+nella voce qui sotto: niente release, basta un deploy.
