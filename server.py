@@ -3986,10 +3986,10 @@ def init_db():
         -- tornato si leggono anche dal 38383, e se l'evento di mostrod
         -- non e' arrivato entro `P2P_RISERVA_S` parte la frase del
         -- libro; se e' arrivato, la riga si butta e il libro tace — e
-        -- il RILASCIO: chi vende ha finito quando rilascia, ma
-        -- «concluso» mostrod lo dice solo a pagamento riuscito. Se in
-        -- un minuto non lo dice, a chi vende il suo «hai venduto»
-        -- arriva lo stesso (il 18 set 2026 non gli era arrivato MAI).
+        -- il RILASCIO: «concluso» mostrod lo dice solo a pagamento
+        -- riuscito, e se in un minuto non l'ha detto a chi vende arriva
+        -- «Sats in pagamento» — mai «concluso», che resta del `success`
+        -- (23 set 2026; fino ad allora partiva un «hai venduto»).
         -- STA IN TABELLA e non in memoria: un deploy in quel minuto
         -- non si porta via l'avviso.
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39315,11 +39315,15 @@ def _guardia_ascolto_p2p():
 #   di `P2P_STESSO_MOMENTO_S`), la frase si butta — il libro tace. Se
 #   no parte lei: un evento perso costa un minuto, non un avviso.
 # • IL RILASCIO. «Concluso» mostrod lo dice a pagamento RIUSCITO, e chi
-#   vende ha finito prima, quando rilascia. Se il pagamento a chi compra
-#   si impianta (il 17 set 2026: tre tentativi, NO_ROUTE), a chi vende
-#   il suo «hai venduto» non arrivava mai. Al rilascio la sua frase va
-#   in attesa: se entro il minuto arriva «concluso» gliela dice lui (e
-#   l'anti-doppione ferma questa), se no parte questa.
+#   vende ha finito il suo prima, quando rilascia. Se il pagamento a chi
+#   compra si impianta (il 17 set 2026: tre tentativi, NO_ROUTE), a chi
+#   vende non arrivava niente. Al rilascio gli si mette in attesa
+#   «Sats in pagamento», la voce della sua card: se entro il minuto il
+#   pagamento e' passato tace — «concluso» gliel'ha gia' detto il
+#   `success` — se no parte, con la riga del pagamento non passato se
+#   e' quello il caso. «Concluso» da qui NON parte piu' (23 set 2026):
+#   finche' si diceva «per te e' concluso», chi vendeva lo leggeva su
+#   uno scambio fermo per una fattura scaduta.
 # L'ANTI-DOPPIONE E' UNO, e sta all'ULTIMO passo prima dell'invio: la
 # riga in `p2p_avvisi` — stesso ordine, stesso momento, stessa persona,
 # stesso giro — si scrive con INSERT OR IGNORE, e chi non riesce a
@@ -39357,6 +39361,22 @@ SOLLECITO_PAYCODE_TESTI = {
 # gia' deciso, o ha deciso qualcun altro
 P2P_MOMENTI_CHIUDONO_FIAT = ("rilasciato", "concluso", "disputa", "annullato",
                              "tornato")
+# «SATS IN PAGAMENTO», A CHI VENDE ANCHE SU TELEGRAM (23 set 2026): la
+# frase dell'attesa del rilascio. Le righe sono quelle della sua card
+# (`STATI_P2P.rilasciato` e `statoTestoP2P` nel client), e quale delle
+# due parte lo decide ALLA SCADENZA il giudice del pagamento — in un
+# minuto il pagamento puo' essere passato (allora l'attesa tace), non
+# passato, o ancora in volo. MAI «concluso» qui dentro: chi vende lo
+# legge dal `success`, a pagamento riuscito.
+P2P_IN_PAGAMENTO_TESTI = {
+    "in_corso": "⏳ <b>Sats in pagamento.</b> Hai liberato i sats: sono in "
+                "pagamento verso chi compra.\n\n<i>Quando il pagamento passa, "
+                "te lo diciamo qui.</i>",
+    "fallito": "⏳ <b>Sats in pagamento.</b> Il pagamento verso chi compra non "
+               "è passato. Chi compra deve dare una fattura nuova: non devi "
+               "fare niente.\n\n<i>Quando il pagamento passa, te lo diciamo "
+               "qui.</i>",
+}
 
 
 def _sollecito_p2p_vivo(momenti, quando_fiat: int) -> bool:
@@ -39408,6 +39428,19 @@ def _scarica_attese_p2p(con, adesso: int) -> tuple:
             print(f"· Riserva P2P: {corto} «{r['momento']}» l'ha gia' "
                   "raccontato il coordinatore: il libro tace", flush=True)
             continue
+        testo = r["testo"]
+        if r["fonte"] == "rilascio":
+            # IL PAGAMENTO A CHI COMPRA si chiede al SUO giudice, lo
+            # stesso della card di chi vende, e la frase si sceglie ADESSO
+            # e non al rilascio: passato, e l'attesa tace; non passato, e
+            # dice di chi e' il gesto; in volo, e dice che e' in volo
+            stato = _pagamento_ordine_p2p(con, r["ordine"]).get("stato")
+            if stato == "riuscito":
+                print(f"· Attese P2P: {corto} il pagamento a chi compra e' "
+                      "gia' passato: a chi vende parla il concluso", flush=True)
+                continue
+            testo = P2P_IN_PAGAMENTO_TESTI[
+                "fallito" if stato == "fallito" else "in_corso"]
         if not _avvisi_p2p_accesi(con, r["tg_id"]):
             print(f"🔕 Attese P2P: {r['tg_id']} ha gli avvisi P2P SPENTI "
                   f"(cassetto Avvisi): «{r['momento']}» non parte", flush=True)
@@ -39433,7 +39466,7 @@ def _scarica_attese_p2p(con, adesso: int) -> tuple:
                       f"coordinatore NON l'ha raccontato in {P2P_RISERVA_S}s: "
                       "parla il libro (nel log del nodo: barattolo_eventi)",
                       flush=True)
-        fuori.append((r["tg_id"], r["testo"], r["fonte"]))
+        fuori.append((r["tg_id"], testo, r["fonte"]))
     q = con.execute("SELECT MIN(scade) FROM p2p_attese").fetchone()
     con.commit()
     return fuori, int((q and q[0]) or 0)
@@ -40583,10 +40616,11 @@ def _destinatari_evento_p2p(momento: str, attore: str, dettaglio: str,
     LA GARANZIA PAGATA e' l'unica eccezione al «mai a chi ha fatto il
     gesto»: la si paga da un wallet esterno, e chi vende torna nell'app
     senza sapere com'e' andata (vedi il ramo, qui sotto).
-    IL RILASCIO di chi vende non avvisa nessuno ADESSO: chi compra
-    sentira' «concluso» a pagamento riuscito, e a chi vende ci pensa
-    l'attesa (vedi «LE ATTESE»). Quello di un moderatore si' — non
-    l'ha fatto nessuno dei due."""
+    IL RILASCIO di chi vende non avvisa nessuno ADESSO: «concluso» lo
+    sentono tutti e due a pagamento riuscito, e se in un minuto non
+    e' passato a chi vende arriva «Sats in pagamento» (l'attesa, vedi
+    «LE ATTESE»). Quello di un moderatore si' — non l'ha fatto nessuno
+    dei due."""
     parti = {"compra": int(compratore or 0), "vende": int(venditore or 0)}
     chi_ha_fatto = {"buyer": "compra", "seller": "vende"}.get(attore, "")
     altri = [r for r in ("compra", "vende") if r != chi_ha_fatto]
@@ -40725,20 +40759,17 @@ def _testo_evento_p2p(momento: str, dettaglio: str, ruolo: str, dati: dict,
         return (f"💶 <b>{altro} dice di aver inviato {cifra or 'gli euro'}:</b> "
                 "controlla il conto e rilascia i sats.\n\n"
                 "<i>Rilascia solo quando gli euro sono arrivati davvero.</i>")
-    if momento in ("concluso", "rilasciato_vende"):
+    if momento == "concluso":
         invito = ("\n\nLascia una recensione: la trovi nella pagina dello "
                   "scambio." if recensibile else "")
         if vende:
-            testa = ("✅ <b>Hai rilasciato i sats: per te lo scambio è "
-                     "concluso.</b> " if momento == "rilasciato_vende"
-                     else "✅ <b>Scambio concluso!</b> ")
             fatto = (f"Hai venduto {_fmt_sats(sats)} sats" if sats > 0
                      else "Hai venduto bitcoin") + (f" per {euro}" if euro else "")
             totale = int(dati.get("totale") or 0)
             if totale > sats > 0:
                 fatto += (f", in tutto {_fmt_sats(totale)} sats commissione "
                           "compresa")
-            return f"{testa}{fatto}.{invito}"
+            return f"✅ <b>Scambio concluso!</b> {fatto}.{invito}"
         netto = int(dati.get("netto") or 0)
         fatto = (f"{_fmt_sats(netto)} sats in arrivo al tuo recapito"
                  if netto > 0 else "I sats sono in arrivo al tuo recapito")
@@ -40909,15 +40940,15 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
                 (ordine, f"fiat_sollecito{livello}", giro, fatto["venditore"],
                  SOLLECITO_PAYCODE_TESTI[livello], ev["ts"], adesso + fra))
     if momento == "rilasciato" and ev["attore"] == "seller" and fatto["venditore"]:
-        # L'ATTESA DI CHI VENDE: se «concluso» non arriva entro il
-        # minuto, il suo «hai venduto» parte lo stesso
-        chi = fatto["venditore"]
-        testo = _testo_evento_p2p("rilasciato_vende", "", "vende", dati,
-                                  recensibile=recensibile(chi))
+        # L'ATTESA DI CHI VENDE: se in un minuto il pagamento a chi
+        # compra non e' passato, gli arriva «Sats in pagamento». Ha il
+        # suo momento e non quello di «concluso» (23 set 2026): se no,
+        # partita lei, l'anti-doppione fermerebbe il «concluso» vero
         con.execute(
             "INSERT INTO p2p_attese(ordine, momento, giro, tg_id, testo, "
             "quando, scade, fonte) VALUES(?,?,?,?,?,?,?,'rilascio')",
-            (ordine, "concluso", giro, chi, testo, ev["ts"],
+            (ordine, "sats_in_pagamento", giro, fatto["venditore"],
+             P2P_IN_PAGAMENTO_TESTI["in_corso"], ev["ts"],
              adesso + P2P_RISERVA_S))
     attore = ev["attore"]
     if momento == "preso" and attore == "mostro" and dati["maker"]:
@@ -41096,7 +41127,9 @@ async def evento_p2p(req: Request):
 # 19 set 2026 mostrod gli racconta ogni passo (patch 0007) — il
 # rilascio, ogni pagamento non passato, la fattura nuova, e il
 # pagamento RIUSCITO (`success`, il momento `concluso`). La cronaca sta
-# in `p2p_momenti`; qui si legge e basta.
+# in `p2p_momenti`; qui si legge e basta. Lo stesso giudice decide
+# anche il messaggio Telegram di chi vende (l'attesa del rilascio, in
+# `_scarica_attese_p2p`): la card e il bot dicono la stessa cosa.
 # IL PESO DEI FATTI CHE CADONO NELLO STESSO SECONDO: un pagamento non
 # passato e' sempre la conseguenza di un tentativo — il rilascio, o la
 # fattura nuova — quindi a parita' d'ora viene DOPO, e vince.
@@ -41127,7 +41160,7 @@ def _pagamenti_p2p(con, ordini, io: int) -> dict:
     libro pubblico veda. Gli altri tre li racconta solo mostrod.
     Alza ValueError sulla forma storta della lista (via
     `_ordini_puliti_p2p`), mai un 400 diretto: la prova non ha bisogno
-    di FastAPI."""
+    di FastAPI. Il giudizio di ogni scambio e' `_pagamento_ordine_p2p`."""
     pulite = _ordini_puliti_p2p(ordini)
     io = int(io or 0)
     if not io:
@@ -41139,25 +41172,39 @@ def _pagamenti_p2p(con, ordini, io: int) -> dict:
         if io in (int(r["compratore"] or 0), int(r["venditore"] or 0))]
     fuori = {}
     for ordine in miei:
-        righe = con.execute(
-            "SELECT momento, quando, dettaglio FROM p2p_momenti "
-            "WHERE ordine=? AND momento IN ('rilasciato', 'payout_fallito', "
-            "'fattura_data', 'concluso')", (ordine,)).fetchall()
-        riuscito = [int(r["quando"]) for r in righe if r["momento"] == "concluso"]
-        if riuscito:
-            fuori[ordine] = {"stato": "riuscito", "quando": max(riuscito)}
-            continue
-        # la fattura data PRIMA del rilascio e' un'altra storia — la
-        # presa, lo scambio che si apre —: conta solo quella NUOVA
-        fatti = [(int(r["quando"]), _DOPO_RILASCIO_P2P[r["momento"]], r["momento"])
-                 for r in righe if r["momento"] != "fattura_data"
-                 or (r["dettaglio"] or "") == "new-invoice"]
-        if not fatti:
-            continue
-        quando, _peso, momento = max(fatti)
-        fuori[ordine] = {"stato": "fallito" if momento == "payout_fallito"
-                         else "in_corso", "quando": quando}
+        esito = _pagamento_ordine_p2p(con, ordine)
+        if esito:
+            fuori[ordine] = esito
     return fuori
+
+
+def _pagamento_ordine_p2p(con, ordine: str) -> dict:
+    """PURA sulla connessione: dove sta il pagamento a chi compra su
+    QUELL'ordine, dalla sola cronaca — `{"stato": ..., "quando": ...}`
+    con gli stati di `_pagamenti_p2p`, o un dizionario vuoto se dopo il
+    rilascio il server non ha sentito niente.
+    E' IL GIUDICE UNICO DEL PAGAMENTO (23 set 2026): lo chiedono la
+    rotta, per la card e la pagina di chi vende, e l'attesa del
+    rilascio, per il suo messaggio Telegram — cosi' le due voci non si
+    contraddicono mai. Le parti NON le guarda: chi puo' chiedere lo
+    decide chi chiama."""
+    righe = con.execute(
+        "SELECT momento, quando, dettaglio FROM p2p_momenti "
+        "WHERE ordine=? AND momento IN ('rilasciato', 'payout_fallito', "
+        "'fattura_data', 'concluso')", (ordine,)).fetchall()
+    riuscito = [int(r["quando"]) for r in righe if r["momento"] == "concluso"]
+    if riuscito:
+        return {"stato": "riuscito", "quando": max(riuscito)}
+    # la fattura data PRIMA del rilascio e' un'altra storia — la
+    # presa, lo scambio che si apre —: conta solo quella NUOVA
+    fatti = [(int(r["quando"]), _DOPO_RILASCIO_P2P[r["momento"]], r["momento"])
+             for r in righe if r["momento"] != "fattura_data"
+             or (r["dettaglio"] or "") == "new-invoice"]
+    if not fatti:
+        return {}
+    quando, _peso, momento = max(fatti)
+    return {"stato": "fallito" if momento == "payout_fallito" else "in_corso",
+            "quando": quando}
 
 
 @app.post("/api/p2p/pagamenti")

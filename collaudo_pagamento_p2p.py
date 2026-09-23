@@ -35,7 +35,13 @@ gira il SERVER VERO su un database usa-e-getta, e si cammina:
      come prima;
   8. la rotta non guarda la leva del P2P (un 409 colpirebbe chi ha uno
      scambio a meta' il giorno che si spegne), e un corpo storto e' un
-     400, mai un 500.
+     400, mai un 500;
+  9. E SU TELEGRAM LO STESSO (23 set 2026, secondo giro): un minuto
+     dopo il rilascio, col giro delle attese VERO, a chi vende arriva
+     «Sats in pagamento» — con la riga del pagamento non passato se e'
+     quello il caso — e MAI «concluso»; se il pagamento e' passato nel
+     minuto l'attesa tace; e il «Scambio concluso!» gli arriva col
+     success, anche dopo che l'attesa e' partita.
 
 NON TOCCA NIENTE DI VERO: il modulo `config` viene sostituito PRIMA
 dell'import di server, o si aprirebbe il database di casa. Nessuna
@@ -62,6 +68,11 @@ DETTO = []          # (destinatario, testo) di ogni notifica
 SCAMBIO = "5a1e0000-1111-4a2b-9c3d-000000000001"
 SOLO_LIBRO = "5a1e0000-2222-4a2b-9c3d-000000000002"
 MAI_VISTO = "5a1e0000-3333-4a2b-9c3d-000000000003"
+# i tre scambi del messaggio Telegram (9): in volo, non passato, passato
+IN_VOLO = "5a1e0000-4444-4a2b-9c3d-000000000004"
+NON_PASSATO = "5a1e0000-5555-4a2b-9c3d-000000000005"
+PASSATO = "5a1e0000-6666-4a2b-9c3d-000000000006"
+NUMERI = {"sats": 7300, "sats_buyer": 7228, "sats_seller": 7372}
 VENDE, COMPRA, ESTRANEO = 111, 222, 333
 CHIAVE_VENDE = "a1" * 32
 CHIAVE_COMPRA = "b2" * 32
@@ -199,10 +210,12 @@ def semina():
     # libro, da cui passa il destinatario di una recensione. Il libro
     # dello SCAMBIO resta indietro (`in-progress`) apposta: e' il caso
     # dei due orologi.
-    for ordine, stato in ((SCAMBIO, "in-progress"), (SOLO_LIBRO, "success")):
+    for ordine, stato in ((SCAMBIO, "in-progress"), (SOLO_LIBRO, "success"),
+                          (IN_VOLO, "in-progress"), (NON_PASSATO, "in-progress"),
+                          (PASSATO, "in-progress")):
         con.execute("INSERT INTO p2p_ordini(ordine,tg_id,creato,stato,lato,"
-                    "maker,visto,preso_da) VALUES(?,?,?,?,'sell',1,?,?)",
-                    (ordine, VENDE, adesso, stato, adesso, COMPRA))
+                    "maker,visto,preso_da,euro) VALUES(?,?,?,?,'sell',1,?,?,"
+                    "'5,00 €')", (ordine, VENDE, adesso, stato, adesso, COMPRA))
     con.commit()
     con.close()
 
@@ -221,6 +234,35 @@ def evento(ordine, azione, ts, attore="mostro", dettaglio=None, **extra):
         return SRV._registra_evento_p2p(con, ev, int(time.time()))
     finally:
         con.close()
+
+
+def avvisi(ordine, azione, adesso, attore="mostro", dettaglio=None, **extra):
+    """Come `evento`, e in piu' gli avvisi che la rotta farebbe partire:
+    `_avvisi_evento_p2p`, che al rilascio scrive anche l'attesa di chi
+    vende. L'ora del server e' `adesso`, e l'evento e' di quell'ora: un
+    minuto e un secondo fa, e l'attesa e' gia' scaduta quando il giro
+    la guarda. Torna la lista `(chi, testo)` — che qui NON si manda —
+    o None se l'evento era gia' registrato."""
+    d = {"v": 1, "order": ordine, "action": azione, "ts": adesso,
+         "buyer": CHIAVE_COMPRA, "seller": CHIAVE_VENDE, "actor": attore,
+         "detail": dettaglio}
+    d.update(extra)
+    con = con_db()
+    try:
+        ev = SRV._evento_p2p_pulito(d, adesso)
+        fatto = SRV._registra_evento_p2p(con, ev, adesso)
+        return None if fatto is None else SRV._avvisi_evento_p2p(
+            con, ev, fatto, adesso)
+    finally:
+        con.close()
+
+
+def giro_attese():
+    """Un battito VERO delle attese (`_giro_attese_p2p`: scarica, sceglie
+    e manda, con la notifica finta): torna quel che e' partito."""
+    prima = len(DETTO)
+    asyncio.run(SRV._giro_attese_p2p())
+    return DETTO[prima:]
 
 
 def pagamento(chi, ordini=None):
@@ -374,6 +416,50 @@ def main():
           errore(rotta, ["x"]))
     prova("nessuna notifica partita da queste rotte, salvo le due recensioni ricevute",
           sorted([COMPRA, VENDE]), sorted(chi for chi, _ in DETTO))
+
+    print("\n9) e su Telegram, a chi vende, un minuto dopo il rilascio")
+    # il giro delle attese gira solo a P2P acceso: qui basta la leva
+    SRV._p2p_leve = lambda *a, **k: {"attivo": True}
+    testi = SRV.P2P_IN_PAGAMENTO_TESTI
+    ora = int(time.time())
+    for ordine in (IN_VOLO, NON_PASSATO, PASSATO):
+        avvisi(ordine, "taken", ora - 300, attore="buyer", dettaglio="invoice-next")
+    prova("il rilascio non avvisa nessuno SUBITO", [],
+          avvisi(IN_VOLO, "released", ora - 61, attore="seller", **NUMERI))
+    detto = giro_attese()
+    prova("un minuto dopo, col pagamento in volo: «Sats in pagamento» a chi "
+          "vende, e a nessun altro", [(VENDE, testi["in_corso"])], detto)
+    prova("...che e' la riga della sua card, e non dice «concluso»",
+          (True, False),
+          ("Sats in pagamento.</b> Hai liberato i sats: sono in pagamento "
+           "verso chi compra." in (detto[0][1] if detto else ""),
+           "conclu" in (detto[0][1] if detto else "").lower()))
+    prova("...e un secondo giro non la ripete", [], giro_attese())
+    detti = avvisi(IN_VOLO, "success", ora - 5, **NUMERI) or []
+    prova("il pagamento passa: «Scambio concluso!» a tutti e due, chi vende "
+          "compreso", sorted([COMPRA, VENDE]), sorted(chi for chi, _ in detti))
+    prova("...e a chi vende coi suoi numeri", True, dict(detti).get(VENDE, "")
+          .startswith("✅ <b>Scambio concluso!</b> Hai venduto 7.300 sats per "
+                      "5,00 €, in tutto 7.372 sats commissione compresa."))
+
+    avvisi(NON_PASSATO, "released", ora - 61, attore="seller", **NUMERI)
+    prova("il pagamento non passa (la fattura scaduta): lo sente chi compra",
+          [COMPRA], [chi for chi, _ in avvisi(
+              NON_PASSATO, "payout-failed", ora - 58,
+              dettaglio="INVOICE_EXPIRED") or []])
+    prova("...e a chi vende, al minuto, la riga del pagamento non passato",
+          [(VENDE, testi["fallito"])], giro_attese())
+
+    avvisi(PASSATO, "released", ora - 61, attore="seller", **NUMERI)
+    prova("passato dentro il minuto: il concluso a tutti e due...",
+          sorted([COMPRA, VENDE]), sorted(chi for chi, _ in avvisi(
+              PASSATO, "success", ora - 58, **NUMERI) or []))
+    partiti = giro_attese()
+    con = con_db()
+    rimaste = con.execute("SELECT COUNT(*) FROM p2p_attese").fetchone()[0]
+    con.close()
+    prova("...e l'attesa di chi vende tace, e se ne va", ([], 0),
+          (partiti, rimaste))
 
     print(f"\n{PASSATE} passate, {FALLITE} fallite")
     return 1 if FALLITE else 0

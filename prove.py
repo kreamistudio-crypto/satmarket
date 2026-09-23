@@ -65841,7 +65841,9 @@ def _banco_eventi_p2p(eventi_attivi=True):
                  "P2P_RISERVA_S = ", "P2P_STESSO_MOMENTO_S = ",
                  "P2P_EVENTO_OROLOGIO_S = ", "P2P_SATS_MAX_EVENTO = ",
                  "P2P_RECAPITO_MAX = ", "P2P_RECAPITO_PAUSA_S = ",
-                 "P2P_LIBRO_MEMORIA_S = ", "FORMA_DETTAGLIO_P2P = "):
+                 "P2P_LIBRO_MEMORIA_S = ", "FORMA_DETTAGLIO_P2P = ",
+                 # il giudice del pagamento, per l'attesa del rilascio
+                 "_DOPO_RILASCIO_P2P = "):
         i = src.index("\n" + riga) + 1
         exec(src[i:src.index("\n", i)].split("  #")[0], amb)
     for blocco, fine in (("STATI_LIBRO_PRESO = (", ")\n"),
@@ -65854,7 +65856,9 @@ def _banco_eventi_p2p(eventi_attivi=True):
                          # i solleciti del PayCode (23 set 2026)
                          ("SOLLECITI_PAYCODE_S = (", ")\n"),
                          ("SOLLECITO_PAYCODE_TESTI = {", "}\n"),
-                         ("P2P_MOMENTI_CHIUDONO_FIAT = (", ")\n")):
+                         ("P2P_MOMENTI_CHIUDONO_FIAT = (", ")\n"),
+                         # «Sats in pagamento» a chi vende (23 set 2026)
+                         ("P2P_IN_PAGAMENTO_TESTI = {", "}\n")):
         i = src.index("\n" + blocco) + 1
         exec(src[i:src.index(fine, i) + len(fine)], amb)
     for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_parti_recensione_p2p",
@@ -65865,6 +65869,7 @@ def _banco_eventi_p2p(eventi_attivi=True):
               "_registra_evento_p2p", "_destinatari_evento_p2p",
               "_testo_evento_p2p", "_nome_altro_p2p", "_dati_frase_p2p",
               "_avvisi_evento_p2p", "_scarica_attese_p2p",
+              "_pagamento_ordine_p2p",
               "_pulisci_memoria_p2p", "_parti_scambio_p2p",
               "_avviso_recapito_p2p"):
         exec(_senza_prosa(pezzo(f)), amb)
@@ -66149,8 +66154,10 @@ def prove_p2p_eventi():
     prova("il rilascio di chi vende non avvisa nessuno ADESSO", [],
           arriva("released", "seller", "", ORA + 900, sats=15000,
                  sats_buyer=14775, sats_seller=15225))
-    prova("...ma mette in attesa il suo «hai venduto», per un minuto",
-          [(B, "concluso", "rilascio", ORA + 900 + amb["P2P_RISERVA_S"])],
+    prova("...ma mette in attesa il suo «Sats in pagamento», per un minuto, "
+          "col SUO momento: con quello di «concluso» il concluso vero non "
+          "gli arriverebbe piu'",
+          [(B, "sats_in_pagamento", "rilascio", ORA + 900 + amb["P2P_RISERVA_S"])],
           [(r["tg_id"], r["momento"], r["fonte"], r["scade"]) for r in
            con.execute("SELECT * FROM p2p_attese")])
     detti = arriva("success", "mostro", "", ORA + 905, sats=15000,
@@ -66163,8 +66170,8 @@ def prove_p2p_eventi():
                "recensione: la trovi nella pagina dello scambio.")], detti)
     scarica = amb["_scarica_attese_p2p"]
     fuori, _ = scarica(con, ORA + 1000)
-    prova("...e l'attesa del rilascio, scaduta, NON ridice il concluso a chi vende",
-          [], fuori)
+    prova("...e l'attesa del rilascio, scaduta a pagamento passato, tace: il "
+          "concluso a chi vende l'ha gia' detto il success", [], fuori)
 
     # L'IDEMPOTENZA: il retry di mostrod porta lo stesso corpo, con la
     # stessa ora
@@ -66542,34 +66549,122 @@ def prove_p2p_riserva_libro():
               "await asyncio.wait_for(_giro_attese_p2p(), P2P_PASSATA_MAX_S)"))
 
     # --- 5) L'ATTESA DEL RILASCIO ------------------------------------
-    # «concluso» mostrod lo dice a pagamento RIUSCITO. Se il pagamento
-    # si impianta, a chi vende il suo «hai venduto» arriva lo stesso.
+    # «concluso» mostrod lo dice a pagamento RIUSCITO. Se in un minuto
+    # il pagamento a chi compra non e' passato, a chi vende arriva «Sats
+    # in pagamento» — la voce della sua card, e MAI «concluso»: fino al
+    # 23 set 2026 gli si diceva «per te lo scambio e' concluso», e lo
+    # leggeva su uno scambio fermo per una fattura scaduta. Il concluso
+    # vero gli arriva col success, quando arriva.
+    NUMERI = {"sats": 15000, "sats_buyer": 14775, "sats_seller": 15225}
+
+    def evento(con, amb, azione, attore, quando, dettaglio="", **extra):
+        d = {"order": ORD, "action": azione, "ts": quando, "actor": attore,
+             "buyer": "a" * 64, "seller": "b" * 64, **extra}
+        if dettaglio:
+            d["detail"] = dettaglio
+        e = amb["_evento_p2p_pulito"](d, quando)
+        return amb["_avvisi_evento_p2p"](
+            con, e, amb["_registra_evento_p2p"](con, e, quando), quando)
+
+    def rilasciato():
+        con, amb = monta(True)
+        con.execute("UPDATE p2p_ordini SET sats=15000, euro='10,00 €', "
+                    "preso_da=?, stato='in-progress' WHERE ordine=?", (A, ORD))
+        mostro(con, amb, "taken", "buyer", "invoice-next", ORA)
+        evento(con, amb, "released", "seller", ORA + 900, **NUMERI)
+        return con, amb
+
+    # 5a) il pagamento e' ancora in volo allo scadere del minuto
+    con, amb = rilasciato()
+    testi = amb["P2P_IN_PAGAMENTO_TESTI"]
+    fuori, _ = amb["_scarica_attese_p2p"](con, ORA + 961)
+    prova("il pagamento a chi compra non e' passato in un minuto: a chi vende "
+          "arriva «Sats in pagamento», quella del pagamento in volo",
+          [(B, testi["in_corso"], "rilascio")], fuori)
+    detti = evento(con, amb, "success", "mostro", ORA + 5000, **NUMERI)
+    prova("...e quando poi passa, il concluso lo sentono TUTTI E DUE: a chi "
+          "vende arriva adesso", [A, B], sorted(t for t, _ in detti))
+    prova("...ed e' il concluso vero, coi suoi numeri e l'invito a recensire",
+          True, dict(detti).get(B, "").startswith(
+              "✅ <b>Scambio concluso!</b> Hai venduto 15.000 sats per 10,00 €, "
+              "in tutto 15.225 sats commissione compresa.")
+          and "Lascia una recensione" in dict(detti).get(B, ""))
+    con.close()
+
+    # 5b) il pagamento NON passa prima dello scadere (la fattura scaduta:
+    # il caso della prova a due telefoni)
+    con, amb = rilasciato()
+    prova("il pagamento non passato lo sente chi compra, e solo lui", [A],
+          [t for t, _ in evento(con, amb, "payout-failed", "mostro", ORA + 905,
+                                "INVOICE_EXPIRED")])
+    fuori, _ = amb["_scarica_attese_p2p"](con, ORA + 961)
+    prova("...e al minuto chi vende legge la riga del pagamento non passato: "
+          "tocca a chi compra, lui non deve fare niente",
+          [(B, testi["fallito"], "rilascio")], fuori)
+    evento(con, amb, "buyer-invoice-added", "buyer", ORA + 1500, "new-invoice")
+    prova("...e con la fattura nuova il pagamento passa: il concluso a tutti e due",
+          [A, B], sorted(t for t, _ in evento(con, amb, "success", "mostro",
+                                               ORA + 1510, **NUMERI)))
+    con.close()
+
+    # 5c) non passato e gia' ripartito, tutto dentro il minuto
+    con, amb = rilasciato()
+    evento(con, amb, "payout-failed", "mostro", ORA + 905, "NO_ROUTE")
+    evento(con, amb, "buyer-invoice-added", "buyer", ORA + 930, "new-invoice")
+    fuori, _ = amb["_scarica_attese_p2p"](con, ORA + 961)
+    prova("fallito e poi la fattura nuova, dentro il minuto: e' di nuovo in volo",
+          [(B, testi["in_corso"], "rilascio")], fuori)
+    con.close()
+
+    # 5d) passato dentro il minuto: l'attesa tace, e la sua riga se ne va
+    con, amb = rilasciato()
+    detti = evento(con, amb, "success", "mostro", ORA + 905, **NUMERI)
+    fuori, prossima = amb["_scarica_attese_p2p"](con, ORA + 961)
+    prova("passato dentro il minuto: il concluso a tutti e due, e l'attesa "
+          "tace", ([A, B], [], 0, 0),
+          (sorted(t for t, _ in detti), fuori, prossima,
+           con.execute("SELECT COUNT(*) FROM p2p_attese").fetchone()[0]))
+    con.close()
+
+    # 5e) il rilascio del MODERATORE lo sentono subito tutti e due, e a
+    # chi vende non mette l'attesa: i sats non li ha liberati lui, e
+    # «Hai liberato i sats» sarebbe falso (la tortura del 23 set 2026:
+    # senza questa prova la condizione sull'attore si poteva togliere)
     con, amb = monta(True)
-    scarica = amb["_scarica_attese_p2p"]
     con.execute("UPDATE p2p_ordini SET sats=15000, euro='10,00 €', "
                 "preso_da=?, stato='in-progress' WHERE ordine=?", (A, ORD))
     mostro(con, amb, "taken", "buyer", "invoice-next", ORA)
-    e = amb["_evento_p2p_pulito"](
-        {"order": ORD, "action": "released", "ts": ORA + 900, "actor": "seller",
-         "buyer": "a" * 64, "seller": "b" * 64, "sats": 15000,
-         "sats_buyer": 14775, "sats_seller": 15225}, ORA + 900)
-    amb["_avvisi_evento_p2p"](con, e, amb["_registra_evento_p2p"](con, e, ORA + 900),
-                              ORA + 900)
-    fuori, _ = scarica(con, ORA + 961)
-    prova("il pagamento a chi compra si e' impiantato: a chi vende il suo concluso arriva lo stesso",
-          [(B, "rilascio")], [(t, f) for t, _, f in fuori])
-    prova("...e dice che PER LUI lo scambio e' concluso, coi suoi numeri", True,
-          "Hai rilasciato i sats: per te lo scambio è concluso" in fuori[0][1]
-          and "in tutto 15.225 sats commissione compresa" in fuori[0][1])
-    e = amb["_evento_p2p_pulito"](
-        {"order": ORD, "action": "success", "ts": ORA + 5000, "actor": "mostro",
-         "buyer": "a" * 64, "seller": "b" * 64, "sats": 15000,
-         "sats_buyer": 14775, "sats_seller": 15225}, ORA + 5000)
-    detti = amb["_avvisi_evento_p2p"](
-        con, e, amb["_registra_evento_p2p"](con, e, ORA + 5000), ORA + 5000)
-    prova("...e quando il pagamento poi passa, il concluso lo sente SOLO chi compra",
-          [A], [t for t, _ in detti])
+    detti = evento(con, amb, "released", "mostro", ORA + 900, "admin", **NUMERI)
+    prova("il rilascio del moderatore: tutti e due subito, e nessuna attesa "
+          "a chi vende", ([A, B], 0),
+          (sorted(t for t, _ in detti), con.execute(
+              "SELECT COUNT(*) FROM p2p_attese WHERE fonte='rilascio'")
+           .fetchone()[0]))
     con.close()
+
+    # LE PAROLE: sono quelle della card, e non dicono mai «concluso»
+    _mini = open("miniapp.html", encoding="utf-8").read()
+    prova("le frasi di Telegram portano le righe della card di chi vende "
+          "(se la card cambia, la prova lo dice)", [True, True, True],
+          ["t_vendo: 'Sats in pagamento'," in _mini
+           and all(t.startswith("⏳ <b>Sats in pagamento.</b> ")
+                   for t in testi.values()),
+           "d_vendo: 'Hai liberato i sats: sono in pagamento verso chi compra.'"
+           in _mini and "Hai liberato i sats: sono in pagamento verso chi "
+           "compra." in testi["in_corso"],
+           "'Il pagamento verso chi compra non è passato. '" in _mini
+           and "'Chi compra deve dare una fattura nuova: non devi fare niente.'"
+           in _mini and "Il pagamento verso chi compra non è passato. Chi "
+           "compra deve dare una fattura nuova: non devi fare niente."
+           in testi["fallito"]])
+    prova("...non dicono «concluso» (nemmeno «si conclude»), ne' il protocollo",
+          [], [s for s in ("conclu", "hold", "invoice", "escrow", "mostro",
+                           "relay", "nostr")
+               if s in " ".join(testi.values()).lower()])
+    prova("...e la frase del concluso non ha piu' la variante «per te e' "
+          "concluso» del rilascio", (False, False),
+          ("rilasciato_vende" in pezzo("_testo_evento_p2p"),
+           "per te lo scambio" in pezzo("_testo_evento_p2p")))
 
 
 def prove_p2p_avvisi_libro():
@@ -68044,8 +68139,12 @@ def prove_p2p_ascolto():
             "P2P_EVENTI_SEGRETO": "", "P2P_RISERVA_S": 60,
             "P2P_STESSO_MOMENTO_S": 30, "_P2P_ATTESE": {"scade": 0},
             "_fee_di_p2p": lambda c, chi, fee: fee}
-    _m = src.index("\nMOMENTI_DEL_LIBRO_P2P = {") + 1
-    exec(src[_m:src.index("}\n", _m) + 2], amb6)
+    # (l'attesa del rilascio chiede al giudice del pagamento, e sceglie
+    # fra le sue due frasi: 23 set 2026)
+    for _blocco in ("\nMOMENTI_DEL_LIBRO_P2P = {", "\n_DOPO_RILASCIO_P2P = {",
+                    "\nP2P_IN_PAGAMENTO_TESTI = {"):
+        _m = src.index(_blocco) + 1
+        exec(src[_m:src.index("}\n", _m) + 2], amb6)
     asincrone = ("_chiedi_relay_p2p", "_chiedi_tutti_p2p", "_giro_libro_p2p",
                  "_giro_attese_p2p", "orologio_p2p")
     for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
@@ -68057,6 +68156,7 @@ def prove_p2p_ascolto():
               "_ascolto_porta", "_mazzetto_sveglia", "_mazzetto_prendi",
               "_ascolto_mancato_p2p", "_stato_ascolto_p2p",
               "eventi_p2p_attivi", "_scarica_attese_p2p",
+              "_pagamento_ordine_p2p",
               "_pulisci_memoria_p2p") + asincrone:
         exec(("async " if f in asincrone else "") + _senza_prosa(pezzo(f)), amb6)
 
@@ -68136,12 +68236,15 @@ def prove_p2p_ascolto():
             1 for r in detto6 if r.startswith("· P2P passata "))
         c = _db()
         c.execute("INSERT INTO p2p_attese(ordine, momento, giro, tg_id, testo, quando, "
-                  "scade, fonte) VALUES('ordine-in-attesa','concluso',1,111,"
-                  "'il tuo concluso',0,?,'rilascio')", (int(time.time()) - 1,))
+                  "scade, fonte) VALUES('ordine-in-attesa','sats_in_pagamento',1,111,"
+                  "'in pagamento',0,?,'rilascio')", (int(time.time()) - 1,))
         c.commit()
         c.close()
         amb6["_P2P_SVEGLIA"]["ev"].set()       # e' quel che fa la call_later del rilascio
-        ok = await _fino_a(lambda: any(t_ == "il tuo concluso" for _, t_ in mandati), 2.0)
+        # (la frase la sceglie il giudice del pagamento: di quest'ordine
+        # non sa niente, quindi e' quella del pagamento in volo)
+        in_volo = amb6["P2P_IN_PAGAMENTO_TESTI"]["in_corso"]
+        ok = await _fino_a(lambda: any(t_ == in_volo for _, t_ in mandati), 2.0)
         prova("la sveglia di un'attesa la fa partire SUBITO, senza aspettare il minuto",
               True, ok)
         prova("...senza chiedere niente ai relay, e senza contarsi come passata",
@@ -80499,8 +80602,8 @@ console.log(JSON.stringify(out));
                  "STATI_RECENSIONE_P2P = "):
         i = _SORGENTE.index(riga)
         exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
-    for nome in ("_ordini_puliti_p2p", "_pagamenti_p2p", "_ammette_recensione_p2p",
-                 "_scambio_concluso_p2p"):
+    for nome in ("_ordini_puliti_p2p", "_pagamenti_p2p", "_pagamento_ordine_p2p",
+                 "_ammette_recensione_p2p", "_scambio_concluso_p2p"):
         exec(pezzo(nome), amb)
     con = _sq.connect(":memory:")
     con.row_factory = _sq.Row
