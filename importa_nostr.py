@@ -722,7 +722,7 @@ def e_riflesso(riga, pubkey: str) -> bool:
 
 def importa_venditore(npub_venditore: str, venditore_id: int,
                       db: str = DB, vaglio=None, scarica=None,
-                      cambio=None, pulisci=None):
+                      cambio=None, pulisci=None, relays=None):
     """Il cuore dell'import, in forma riusabile: lo chiama lo script
     manuale (main, qui sotto) e ogni ora l'orologio del server.
     Ritorna la terna (importati, aggiornati, saltati).
@@ -756,12 +756,19 @@ def importa_venditore(npub_venditore: str, venditore_id: int,
     foto scaricate portano i metadati che il venditore ci ha messo,
     come sempre: la fiducia sta tutta nella npub scritta a mano nel
     config, non in uno sconosciuto sui relay.
+
+    `relays` (23 set 2026) e' la lista da cui leggere, quando il
+    chiamante ne ha una sua: il SERVER la passa gia' filtrata — in
+    collaudo i soli relay di casa, vedi `lettura_simulata` in
+    server.py. Senza (script a mano) valgono i RELAYS di qui, come
+    sempre: e lo script a mano NON e' per i collaudi, legge dai relay
+    veri qualunque cosa dica il config.
     """
     hexkey = npub_to_hex(npub_venditore)
     os.makedirs(FOTO_DIR, exist_ok=True)
     print(f"Cerco gli annunci di {npub_venditore[:20]}… sui relay:\n")
     eventi = []
-    for r in RELAYS:
+    for r in (RELAYS if relays is None else relays):
         eventi += interroga(r, hexkey)
 
     # CHI HA FIRMATO DAVVERO (lug 2026). Fin qui si e' creduto sulla

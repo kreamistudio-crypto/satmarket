@@ -12555,10 +12555,13 @@ def prove_ssrf_redirect():
           True, "url_foto_ammesso(url)" in pezzo("scarica_foto_url"))
     # e l'import da Nostr lo riceve: il patto del `vaglio` — insieme al
     # cambio, che dall'ago 2026 viaggia sulla stessa strada, e dal set
-    # 2026 anche il ripulitore (vedi piu' sotto, «la QUARTA porta»)
+    # 2026 anche il ripulitore (vedi piu' sotto, «la QUARTA porta»). Dal
+    # 23 set 2026 in coda c'e' anche la lista dei relay da cui leggere,
+    # gia' passata dal giudice delle letture: prove_letture_relay_collaudo
     prova("sentinella: l'import orario riceve lo scaricatore del server",
           True, "vaglio, scarica_foto_url, cambio_import,\n"
-          "                pulisci=spoglia_metadati)" in _SORGENTE)
+          "                pulisci=spoglia_metadati, relays=relays)"
+          in _SORGENTE)
     imp = open("importa_nostr.py", encoding="utf-8").read()
     prova("sentinella: e l'import lo usa quando ce l'ha", True,
           "def scarica_foto(url: str, annuncio_id: int, indice: int, "
@@ -68178,8 +68181,11 @@ def prove_p2p_avvisi_libro():
           '"#d": list(ids)' in lettore)
     prova("...e non legge mai il content", False,
           "content" in codice(_senza_prosa(lettore)))
+    # TRE None e non piu' due (23 set 2026): il terzo e' la lettura che
+    # in collaudo non si fa verso un relay che non e' di casa — lo stesso
+    # ripiego di un relay muto, vedi prove_letture_relay_collaudo
     prova("il relay muto e' None e non una lista vuota", True,
-          codice(lettore).count("return None") == 2 and "return fuori" in lettore)
+          codice(lettore).count("return None") == 3 and "return fuori" in lettore)
     prova("il 38385 si legge per la fee e le ore di vita", True,
           '"kinds": [38385]' in info and '"fee"' in info
           and '"expiration_hours"' in info)
@@ -69243,12 +69249,14 @@ def prove_p2p_ascolto():
     print("\n[l'ascolto P2P: le notifiche istantanee, e la connessione che non muore zitta]")
     import asyncio as _aio
     import html as _html
+    import ipaddress as _ipaddress
     import queue as _queue
     import re as _re
     import socket as _socket
     import sqlite3
     import ssl as _ssl
     import tempfile as _tf
+    from urllib.parse import urlparse as _urlparse
     import threading as _th
     src = _SORGENTE
     MOSTRO = "m" * 64
@@ -69362,8 +69370,15 @@ def prove_p2p_ascolto():
                "_P2P_MAZZETTO": {"libro": [], "timer": None},
                "_P2P_SVEGLIA": {"ev": None}, "_P2P_LAMPI": {"n": 0},
                "_p2p_leve": lambda: {"attivo": True, "mostro": MOSTRO, "relay": [],
-                                     "specchio": piu.get("specchio", [SPECCHIO])}}
-        for f in ("_evento_libro_p2p", "_chiave_evento_p2p",
+                                     "specchio": piu.get("specchio", [SPECCHIO])},
+               # IL GIUDICE DELLE LETTURE (23 set 2026), quello VERO: fuori
+               # collaudo dice sempre «leggi», e il banco qui sotto e' il
+               # mondo di ieri byte per byte; col collaudo acceso e' il 4b
+               "MODALITA_COLLAUDO": piu.get("collaudo", False),
+               "_LETTURE_SIMULATE": set(), "urlparse": _urlparse,
+               "ipaddress": _ipaddress}
+        for f in ("relay_di_casa", "lettura_simulata",
+                  "_evento_libro_p2p", "_chiave_evento_p2p",
                   "_ascolto_porta", "_mazzetto_sveglia", "_mazzetto_prendi",
                   "_ascolto_mancato_p2p", "_stato_ascolto_p2p",
                   "_ascolto_p2p_filo", "_guardia_ascolto_p2p"):
@@ -69560,6 +69575,67 @@ def prove_p2p_ascolto():
                       amb5["_P2P_ASCOLTO"]["filo"]])
     prova("...e la riga dello stato dice spento, non «giu'»", True,
           amb5["_stato_ascolto_p2p"]().startswith("spento"))
+
+    # --- 4b) IN COLLAUDO LO SPECCHIO CHE NON E' DI CASA NON SI ASCOLTA --
+    # (23 set 2026, la regola dei relay veri: il resto delle letture sta
+    # in prove_letture_relay_collaudo). Qui la guardia VERA col giudice
+    # VERO e il collaudo acceso: SPECCHIO e' un relay che non sta sulla
+    # macchina, e quindi non si tocca.
+    conn_c = []
+    amb_c, detto_c = _ambiente(conn_c, _copione_buono, collaudo=True)
+
+    async def _giro_collaudo():
+        amb_c["_guardia_ascolto_p2p"]()
+        amb_c["_guardia_ascolto_p2p"]()
+        # e il filo fatto partire a mano, da chi non ha chiesto: ha la sua
+        # guardia, e deve uscire SUBITO. In un thread e col suo tetto,
+        # perche' senza la guardia resterebbe connesso per sempre — e la
+        # prova si appenderebbe invece di dire che e' rossa (l'ha trovato
+        # la tortura)
+        ferma_c = _th.Event()
+        t = _th.Thread(target=amb_c["_ascolto_p2p_filo"], daemon=True,
+                       args=(SPECCHIO, MOSTRO, _aio.get_running_loop(),
+                             ferma_c))
+        t.start()
+        uscito = await _fino_a(lambda: not t.is_alive(), 1.0)
+        ferma_c.set()
+        return uscito
+
+    uscito_c = _aio.run(_giro_collaudo())
+    prova("in collaudo lo specchio che non e' di casa non si ascolta: nessun "
+          "filo, nessuna connessione, e il filo fatto partire a mano esce "
+          "subito", [None, 0, True],
+          [amb_c["_P2P_ASCOLTO"]["filo"], len(conn_c), uscito_c])
+    prova("...lo dice il giudice UNA volta, a due sguardi e al filo fatto "
+          "partire a mano", 1,
+          sum(1 for r in detto_c if "[nostr simulato] lettura dell'ascolto "
+              "P2P (38383) da " + SPECCHIO + ":" in r))
+    prova("...e per la guardia e' come non averlo: niente «parte», niente "
+          "«MORTO» a ogni sguardo", [],
+          [r for r in detto_c if "parte su" in r or "MORTO" in r])
+    prova("...e la riga dello stato dice perche' e' spento",
+          "spento: in collaudo lo specchio non e' di casa",
+          amb_c["_stato_ascolto_p2p"]())
+    CASA = "ws://127.0.0.1:7777"
+    conn_casa = []
+    amb_casa, detto_casa = _ambiente(conn_casa, _copione_buono,
+                                     collaudo=True, specchio=[CASA])
+
+    async def _giro_di_casa():
+        amb_casa["_guardia_ascolto_p2p"]()
+        ok = await _fino_a(
+            lambda: amb_casa["_P2P_ASCOLTO"]["stato"] == "connesso")
+        prova("...mentre uno specchio DI CASA si ascolta anche in collaudo "
+              "(il relay di cartone sulla macchina)", [True, True, []],
+              [ok, len(conn_casa) >= 1,
+               [r for r in detto_casa if "simulato" in r]])
+        amb_casa["_P2P_ASCOLTO"]["ferma"].set()
+
+    try:
+        _aio.run(_giro_di_casa())
+    finally:
+        if amb_casa["_P2P_ASCOLTO"].get("ferma"):
+            amb_casa["_P2P_ASCOLTO"]["ferma"].set()
 
     # --- 5) L'OROLOGIO COI LAMPI: i giri VERI, il database vero ---------
     dir_db = _tf.mkdtemp()
@@ -69809,6 +69885,365 @@ def prove_p2p_ascolto():
     finally:
         import shutil as _sh
         _sh.rmtree(dir_db, ignore_errors=True)
+
+
+def prove_letture_relay_collaudo():
+    """IN COLLAUDO IL SERVER NON LEGGE DAI RELAY VERI (23 set 2026).
+
+    Le pubblicazioni in collaudo si stampano e basta da sempre; le
+    LETTURE no. Il 23 set l'antivirus ha fermato un python.exe diretto a
+    nostr.mom: un server di prova, al primo /api/me di un'identita' con
+    la npub verificata, aveva chiesto il suo kind 0 ai quattro relay di
+    serie. La regola di Andrea: nei collaudi e nei giri dal vivo MAI un
+    relay vero.
+
+    1) IL CENSIMENTO, la sentinella chiesta: ogni create_connection( del
+    server sta in una funzione che chiede il giudice PRIMA della rete,
+    sullo STESSO relay e nel corpo — non dentro un ramo, che potrebbe
+    non girare — oppure ha qui un perche' scritto, e il perche' si FA
+    GIRARE invece di crederci. Lo stesso per le porte del server verso
+    le funzioni di rete di importa_nostr.py, che si contano dall'albero
+    dello script invece di scriverle a mano.
+    2) IL GIUDICE: il loopback e basta, e una riga per lettura diversa.
+    3) I LETTORI VERI nei tre mondi — collaudo e relay vero (nessuna
+    bussata, il ripiego di un relay muto), collaudo e relay di casa (si
+    bussa: il relay morto dei giri dal vivo resta raggiungibile),
+    produzione (il mondo di ieri) — e il 23 set rifatto per intero.
+    4) L'IMPORT ORARIO e la scoperta: allo script i soli relay di casa.
+    L'ascolto dello specchio sta in prove_p2p_ascolto (il 4b), dove il
+    suo banco c'e' gia'; il giro col server VERO, dentro la gabbia, e'
+    collaudo_letture_relay.py."""
+    print("\n[in collaudo il server non legge dai relay veri]")
+    import asyncio as _aio
+    import ipaddress as _ipaddress
+    import ssl as _ssl
+    import types as _types
+    from urllib.parse import urlparse as _urlparse
+    albero = ast.parse(_SORGENTE)
+
+    def _dentro(radice, trova):
+        """[(funzione, nodo)] per ogni nodo che `trova` accetta, con la
+        funzione che lo CONTIENE davvero: una chiamata dentro una
+        funzione annidata (la `spazzata` della scoperta) e' sua, e non
+        di chi la definisce."""
+        fuori = []
+
+        def giro(nodo, fn):
+            for figlio in ast.iter_child_nodes(nodo):
+                if trova(figlio):
+                    fuori.append((fn, figlio))
+                giro(figlio, figlio if isinstance(
+                    figlio, (ast.FunctionDef, ast.AsyncFunctionDef)) else fn)
+        giro(radice, None)
+        return fuori
+
+    def _chiama(nodo, nome):
+        return (isinstance(nodo, ast.Call) and isinstance(nodo.func, ast.Name)
+                and nodo.func.id == nome)
+
+    # --- 1) IL CENSIMENTO: ogni create_connection( del server ----------
+    per_funzione = {}
+    for fn, c in _dentro(albero, lambda n: _chiama(n, "create_connection")):
+        per_funzione.setdefault(fn.name if fn else "(fuori da ogni funzione)",
+                                (fn, []))[1].append(c)
+    # se ne trovasse meno, a essere rotto sarebbe il censimento — e
+    # tutto quel che segue passerebbe a vuoto, verde per niente
+    prova("il censimento trova le sei connessioni di oggi", True,
+          {"_kind0_profilo", "chiedi_relay_dm", "eventi_libro_da_relay",
+           "info_libro_da_relay", "_ascolto_p2p_filo",
+           "invia_evento_relay"} <= set(per_funzione))
+
+    def _guardia_sua(fn, conn):
+        """`if lettura_simulata(<lo stesso relay>, ...): return` nel
+        CORPO della funzione, prima della connessione."""
+        relay = conn.args[0].id if conn.args and isinstance(
+            conn.args[0], ast.Name) else None
+        return relay is not None and any(
+            isinstance(st, ast.If) and _chiama(st.test, "lettura_simulata")
+            and st.test.args and isinstance(st.test.args[0], ast.Name)
+            and st.test.args[0].id == relay and st.lineno < conn.lineno
+            and len(st.body) == 1 and isinstance(st.body[0], ast.Return)
+            for st in fn.body)
+
+    def _chi_la_usa_esce_prima(nome):
+        """Il perche' di chi PUBBLICA: ogni suo uso sta in una funzione
+        che, PRIMA di quell'uso, in collaudo esce — un `if
+        MODALITA_COLLAUDO:` che finisce in un return. Le pubblicazioni
+        non si toccano: qui si guarda che restino come sono."""
+        usi = _dentro(albero, lambda n: isinstance(n, ast.Name)
+                      and n.id == nome)
+        return bool(usi) and all(
+            fn is not None and any(
+                isinstance(st, ast.If) and isinstance(st.test, ast.Name)
+                and st.test.id == "MODALITA_COLLAUDO"
+                and isinstance(st.body[-1], ast.Return)
+                and st.lineno < uso.lineno for st in ast.walk(fn))
+            for fn, uso in usi)
+
+    # I PERCHE' SCRITTI: senza una guardia sua si passa solo da qui, e il
+    # perche' non basta scriverlo — lo si fa girare
+    PERCHE = {"invia_evento_relay": (
+        "PUBBLICA e non legge: la guardia sta in chi la chiama "
+        "(_spedisci_ai_relay, manda_dm_nostr), che in collaudo stampa ed "
+        "esce prima", _chi_la_usa_esce_prima)}
+    for nome, (fn, conns) in sorted(per_funzione.items()):
+        if nome in PERCHE:
+            perche, verifica = PERCHE[nome]
+            prova(f"{nome}: nessuna guardia sua, e il perche' regge — "
+                  f"{perche}", True, verifica(nome))
+        else:
+            prova(f"{nome}: chiede il giudice sullo stesso relay, nel "
+                  f"corpo, PRIMA della rete", True,
+                  fn is not None and all(_guardia_sua(fn, c) for c in conns))
+    prova("...e ogni perche' scritto ha ancora la sua connessione", [],
+          [n for n in PERCHE if n not in per_funzione])
+    prova("da websocket-client il server prende la sola create_connection: "
+          "nessuna seconda strada verso i relay, da censire a parte",
+          ["create_connection"],
+          [a.name for n in ast.walk(albero) if isinstance(n, ast.ImportFrom)
+           and (n.module or "").split(".")[0] in ("websocket", "websockets")
+           for a in n.names])
+    prova("...e non ne importa il modulo intero", [],
+          [a.name for n in ast.walk(albero) if isinstance(n, ast.Import)
+           for a in n.names
+           if a.name.split(".")[0] in ("websocket", "websockets")])
+
+    # LE PORTE VERSO LA RETE DI importa_nostr.py: la scoperta e l'import
+    # orario leggono con le funzioni dello script, che il server chiama —
+    # le connessioni stanno la', ma la domanda la fa il server. Le
+    # funzioni di rete dello script si CONTANO dal suo albero: chi apre
+    # una connessione, e chi chiama loro, a catena.
+    imp_albero = ast.parse(open("importa_nostr.py", encoding="utf-8").read())
+    rete = {fn.name for fn, _ in _dentro(
+        imp_albero, lambda n: _chiama(n, "create_connection")) if fn}
+    while True:
+        altre = {fn.name for fn, _ in _dentro(
+            imp_albero, lambda n: isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Name) and n.func.id in rete)
+            if fn} - rete
+        if not altre:
+            break
+        rete |= altre
+    prova("le funzioni di rete di importa_nostr.py si contano dal suo albero",
+          True, {"interroga", "interroga_aperto", "importa_venditore"} <= rete)
+    porte = _dentro(albero, lambda n: isinstance(n, ast.Attribute)
+                    and isinstance(n.value, ast.Name)
+                    and n.value.id == "importa_nostr" and n.attr in rete)
+    prova("il server ci passa dalla scoperta e dall'import a testa", True,
+          {"interroga_aperto", "importa_venditore"}
+          <= {p.attr for _, p in porte})
+    for fn, p in porte:
+        dove = fn.name if fn else "(fuori da ogni funzione)"
+        prova(f"la porta verso importa_nostr.{p.attr} (in {dove}) chiede il "
+              f"giudice prima di passare", True, fn is not None and any(
+                  _chiama(n, "lettura_simulata") and n.lineno <= p.lineno
+                  for n in ast.walk(fn)))
+        if p.attr == "importa_venditore":
+            chiamate = [c for c in ast.walk(fn) if isinstance(c, ast.Call)
+                        and any(a is p for a in c.args)]
+            prova("...e l'import a testa riceve la lista filtrata "
+                  "(`relays=`), non i RELAYS dello script", True,
+                  bool(chiamate) and all(
+                      any(k.arg == "relays" for k in c.keywords)
+                      for c in chiamate))
+    prova("...e nessuno le prende per nome, girando attorno alle porte", [],
+          [a.name for n in ast.walk(albero) if isinstance(n, ast.ImportFrom)
+           and n.module == "importa_nostr" for a in n.names
+           if a.name in rete])
+    imp = open("importa_nostr.py", encoding="utf-8").read()
+    prova("lo script legge dalla lista che gli si passa, e senza dai suoi "
+          "RELAYS: lo script a mano resta identico", True,
+          "cambio=None, pulisci=None, relays=None):" in imp
+          and "for r in (RELAYS if relays is None else relays):" in imp)
+
+    # --- 2) IL GIUDICE -------------------------------------------------
+    i = _SORGENTE.index("RELAY_DI_SERIE = [")
+    SERIE = ast.literal_eval(_SORGENTE[i + len("RELAY_DI_SERIE = "):
+                                       _SORGENTE.index("]", i) + 1])
+
+    def _mondo(collaudo, **piu):
+        """Il giudice e i lettori VERI, con una create_connection di
+        cartone che segna a chi si bussa e non risponde mai — come il
+        relay morto dei giri dal vivo."""
+        detto, bussate = [], []
+
+        def _connetti(relay, timeout=0, sslopt=None):
+            bussate.append(relay)
+            raise ConnectionRefusedError("banco: qui non c'e' nessun relay")
+
+        amb = {"MODALITA_COLLAUDO": collaudo, "_LETTURE_SIMULATE": set(),
+               "urlparse": _urlparse, "ipaddress": _ipaddress,
+               "create_connection": _connetti, "ssl": _ssl, "json": json,
+               "time": time, "asyncio": _aio, "RELAYS_VERIFICA": list(SERIE),
+               "print": lambda *a, **k: detto.append(
+                   " ".join(str(x) for x in a))}
+        amb.update(piu)
+        j = _SORGENTE.index("CHARSET_BECH32 = ")
+        exec(_SORGENTE[j:_SORGENTE.index("\n", j)], amb)
+        for f in ("relay_di_casa", "lettura_simulata", "_bech32_polymod",
+                  "npub_to_hex", "hex_to_npub", "_kind0_profilo",
+                  "chiedi_relay_dm", "eventi_libro_da_relay",
+                  "info_libro_da_relay"):
+            exec(pezzo(f), amb)
+        exec("async " + pezzo("_profilo_nostr"), amb)
+        return amb, detto, bussate
+
+    amb, detto, _ = _mondo(True)
+    casa, giudice = amb["relay_di_casa"], amb["lettura_simulata"]
+    DI_CASA = ["ws://127.0.0.1:9", "wss://localhost:7777",
+               "WS://LOCALHOST:7777", "ws://[::1]:7777", "ws://127.8.9.10"]
+    FUORI = ["wss://nostr.mom", "wss://relay.damus.io",
+             "ws://192.168.1.20:7777", "ws://10.0.0.5",
+             "ws://abcdefghijklmnop.onion", "ws://127.0.0.1.nip.io",
+             "ws://localhost.example.com", "relay.damus.io", "ws://[::1",
+             ""]
+    prova("di casa e' il loopback: il relay morto dei giri dal vivo, "
+          "localhost, ::1, tutto il 127/8", [],
+          [r for r in DI_CASA if not casa(r)])
+    prova("...e nient'altro: i relay veri, una LAN, un .onion, un nome che "
+          "SEMBRA locale, un indirizzo che non si sa leggere", [],
+          [r for r in FUORI if casa(r)])
+    prova("in collaudo un relay vero e' una lettura simulata, quello di "
+          "casa no", [True, False],
+          [giudice("wss://nostr.mom", "del banco"),
+           giudice("ws://127.0.0.1:9", "del banco")])
+    giudice("wss://nostr.mom", "del banco")
+    giudice("wss://nostr.mom", "d'altro")
+    prova("...e lo dice UNA volta per lettura diversa — cosa e relay — e non "
+          "a ogni giro", ["lettura del banco da wss://nostr.mom: in collaudo "
+                          "non esce dal computer",
+                          "lettura d'altro da wss://nostr.mom: in collaudo "
+                          "non esce dal computer"],
+          [r.split("[nostr simulato] ", 1)[1] for r in detto
+           if "[nostr simulato] " in r])
+    amb_p, detto_p, _ = _mondo(False)
+    prova("fuori collaudo il giudice dice sempre «leggi», e sta zitto",
+          [False, []],
+          [amb_p["lettura_simulata"]("wss://nostr.mom", "del banco"), detto_p])
+
+    # --- 3) I LETTORI VERI, NEI TRE MONDI -------------------------------
+    CHIAVE = "ab" * 32
+    VERO, MORTO = "wss://nostr.mom", "ws://127.0.0.1:9"
+    for nome, resto, cosa in (
+            ("_kind0_profilo", (CHIAVE,),
+             "del profilo (kind 0) di " + CHIAVE[:16] + "…"),
+            ("chiedi_relay_dm", (CHIAVE,),
+             "dei relay DM (kind 10050) di " + CHIAVE[:16] + "…"),
+            ("eventi_libro_da_relay", (["ordine-1"], 0, "m" * 64),
+             "del libro P2P (38383)"),
+            ("info_libro_da_relay", ("m" * 64,),
+             "delle impostazioni del coordinatore (38385)")):
+        amb, detto, bussate = _mondo(True)
+        esito = amb[nome](VERO, *resto)
+        prova(f"{nome}: in collaudo non bussa a un relay vero, e torna il "
+              f"ripiego di un relay muto", [[], None], [list(bussate), esito])
+        prova(f"...e lo dice: «lettura {cosa} da {VERO}»", 1,
+              sum(1 for r in detto
+                  if f"[nostr simulato] lettura {cosa} da {VERO}:" in r))
+        prova("...al relay di casa invece bussa (e quello morto non "
+              "risponde)", [None, [MORTO]],
+              [amb[nome](MORTO, *resto), list(bussate)])
+        amb, detto, bussate = _mondo(False)
+        amb[nome](VERO, *resto)
+        prova("...e fuori collaudo bussa al relay vero senza dire niente: il "
+              "mondo di ieri", [[VERO], []],
+              [list(bussate), [r for r in detto if "simulato" in r]])
+
+    # IL 23 SET, RIFATTO: il kind 0 di una npub verificata chiesto dal
+    # rinfresco del francobollo, col collaudo acceso e i relay di serie
+    amb, detto, bussate = _mondo(True)
+    npub = amb["hex_to_npub"](CHIAVE)
+    profilo = _aio.run(amb["_profilo_nostr"](npub))
+    prova("IL 23 SET RIFATTO: il profilo di una npub verificata, in collaudo "
+          "coi relay di serie — nessuna bussata, e il profilo vuoto",
+          [[], {}], [list(bussate), profilo])
+    prova("...con una riga per ognuno dei relay di serie, nostr.mom compreso",
+          sorted(SERIE), sorted(
+              r.split(" da ", 1)[1].split(": in collaudo")[0] for r in detto
+              if "lettura del profilo (kind 0) di " + CHIAVE[:16] in r))
+    amb, _, bussate = _mondo(False)
+    _aio.run(amb["_profilo_nostr"](npub))
+    prova("...mentre fuori collaudo sono le bussate di quella sera, una per "
+          "relay", sorted(SERIE), sorted(bussate))
+
+    # --- 4) L'IMPORT ORARIO E LA SCOPERTA: allo script i soli relay di casa
+    def _giro_import(collaudo, relays_script):
+        """importa_nostr_periodico e scopri_venditori_nostr VERI, con uno
+        script di cartone al posto di importa_nostr: segna a chi la
+        scoperta chiede la spazzata, e quale lista riceve l'import a
+        testa. Il database e' chiuso apposta: la scoperta si ferma dopo
+        la spazzata (e lo dice), il dopo-import pure."""
+        chiesti = {"spazzata": [], "import": []}
+        finto = _types.ModuleType("importa_nostr")
+        finto.RELAYS = list(relays_script)
+
+        def _spazza(relay, limite=500):
+            chiesti["spazzata"].append(relay)
+            return []
+
+        def _importa(npub, venditore_id, db, vaglio=None, scarica=None,
+                     cambio=None, pulisci=None, relays=None):
+            chiesti["import"].append(relays)
+            return 0, 0, 0
+        finto.interroga_aperto, finto.importa_venditore = _spazza, _importa
+        detto = []
+
+        def _db_chiuso():
+            raise RuntimeError("banco: nessun database")
+
+        async def _niente(*a, **k):
+            return None
+        amb = {"MODALITA_COLLAUDO": collaudo, "_LETTURE_SIMULATE": set(),
+               "urlparse": _urlparse, "ipaddress": _ipaddress,
+               "asyncio": _aio, "time": time, "db": _db_chiuso,
+               "print": lambda *a, **k: detto.append(
+                   " ".join(str(x) for x in a)),
+               "IMPORT_NOSTR_APERTO": True, "_prossimo_import_nostr": 0.0,
+               "SECONDI_IMPORT_NOSTR": 3600, "_prossima_scoperta_nostr": 0.0,
+               "SECONDI_SCOPERTA_NOSTR": 6 * 3600, "_MOTIVI_REVISIONE": {},
+               "cambio_per_import": lambda: {},
+               "venditori_nostr_attivi": lambda: [("npub1banco", -5)],
+               "_vaglio_nostr": lambda loop, npub, venditore_id: None,
+               "scarica_foto_url": None, "spoglia_metadati": None,
+               "DB": "banco.db", "_apri_revisioni": _niente,
+               "_chiedi_completamento": _niente,
+               "ricategorizza_automatico": _niente}
+        for f in ("relay_di_casa", "lettura_simulata"):
+            exec(pezzo(f), amb)
+        for f in ("scopri_venditori_nostr", "importa_nostr_periodico"):
+            exec("async " + pezzo(f), amb)
+        prima = sys.modules.get("importa_nostr")
+        sys.modules["importa_nostr"] = finto
+        try:
+            _aio.run(amb["importa_nostr_periodico"]())
+        finally:
+            if prima is None:
+                sys.modules.pop("importa_nostr", None)
+            else:
+                sys.modules["importa_nostr"] = prima
+        return chiesti, detto
+
+    MISTI = ["wss://nos.lol", MORTO, "wss://21milionidinostr.duckdns.org"]
+    chiesti, detto = _giro_import(True, MISTI)
+    prova("in collaudo la scoperta setaccia il solo relay di casa, e l'import "
+          "a testa riceve la lista col solo relay di casa",
+          {"spazzata": [MORTO], "import": [[MORTO]]}, chiesti)
+    prova("...e i due relay veri li dice il giudice, una riga per lettura: "
+          "l'import e la scoperta", sorted(
+              f"{cosa} da {r}"
+              for cosa in ("dell'import Nostr (annunci e cancellazioni)",
+                           "della scoperta Nostr (annunci di chiunque)")
+              for r in ("wss://nos.lol", "wss://21milionidinostr.duckdns.org")),
+          sorted(r.split("[nostr simulato] lettura ", 1)[1]
+                 .split(": in collaudo")[0] for r in detto
+                 if "[nostr simulato] " in r))
+    chiesti, _ = _giro_import(True, ["wss://nos.lol", "wss://nostr.mom"])
+    prova("in collaudo coi soli relay veri il giro non gira: ne' la scoperta "
+          "ne' l'import", {"spazzata": [], "import": []}, chiesti)
+    chiesti, detto = _giro_import(False, MISTI)
+    prova("fuori collaudo leggono da tutti, e nessuno dice niente: il mondo "
+          "di ieri", [{"spazzata": MISTI, "import": [MISTI]}, []],
+          [chiesti, [r for r in detto if "simulato" in r]])
 
 
 def prove_p2p_esito_notifiche():
@@ -85657,6 +86092,7 @@ def main():
     prove_p2p_nuvola,
     prove_p2p_conto_dispositivo,
               prove_esclusioni_relay,
+              prove_letture_relay_collaudo,
               prove_pagina_dati,
               prove_font,
               prove_porta_timer, prove_feedback_confermato,

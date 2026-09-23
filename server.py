@@ -33945,7 +33945,12 @@ async def _foto_profilo_telegram(tg_id: int) -> bytes | None:
 def _kind0_profilo(relay: str, hexkey: str):
     """Chiede a UN relay il profilo kind-0 e ne restituisce il content
     gia' letto (name, display_name, picture...). Sincrona: va in
-    asyncio.to_thread (pattern chiedi_relay_dm)."""
+    asyncio.to_thread (pattern chiedi_relay_dm).
+    In collaudo verso un relay che non e' di casa non chiede niente
+    (vedi `lettura_simulata`): None, come un relay che tace — e se
+    tacciono tutti, `_profilo_nostr` torna il profilo vuoto."""
+    if lettura_simulata(relay, f"del profilo (kind 0) di {hexkey[:16]}…"):
+        return None
     try:
         ws = create_connection(relay, timeout=5,
                                sslopt={"cert_reqs": ssl.CERT_NONE})
@@ -37510,6 +37515,71 @@ def npub_to_hex(npub: str) -> str:
     return hexkey
 
 
+# --- LE LETTURE DAI RELAY IN COLLAUDO (23 set 2026) ------------------
+# Le PUBBLICAZIONI in collaudo non escono da sempre: `_spedisci_ai_relay`
+# stampa «🟣 [nostr simulato]» e `manda_dm_nostr` fa lo stesso. Le
+# LETTURE invece uscivano: il 23 set 2026 l'antivirus ha fermato un
+# python.exe diretto a nostr.mom, ed era un server di prova che al primo
+# /api/me di un'identita' con la npub verificata aveva chiesto il suo
+# kind 0 ai quattro relay di serie. Niente di pubblicato, ma una domanda
+# — il nostro IP e una chiave — fatta a un relay VERO da un giro che non
+# doveva uscire. La regola di Andrea: nei collaudi e nei giri dal vivo
+# non ci si collega MAI a un relay vero.
+# UN GIUDICE SOLO, E OGNI LETTORE LO CHIEDE PER CONTO SUO, prima della
+# rete: una guardia messa nel chiamante regge finche' nessuno chiama il
+# lettore da un'altra parte (il kind 10050 era protetto cosi', dal solo
+# ritorno anticipato di `manda_dm_nostr`). `prove_letture_relay_collaudo`
+# censisce le create_connection( di questo file, e le porte verso quelle
+# di importa_nostr.py, e chiede a ognuna la sua guardia o il suo perche'.
+# DI CASA E' SOLO IL LOOPBACK — localhost, 127.0.0.0/8, ::1 — che e' il
+# criterio della gabbia dei collaudi in CI: il relay morto dei giri dal
+# vivo (ws://127.0.0.1:9) e un relay di cartone acceso sulla macchina
+# restano raggiungibili, tutto il resto no. Una LAN, un .onion, un nome
+# che «sembra» locale: fuori. E senza risolvere niente, che un DNS e'
+# gia' una domanda fatta al mondo.
+# IL RIPIEGO E' QUELLO DI UN RELAY CHE NON RISPONDE, e ogni lettore ha
+# gia' il suo: profilo vuoto, nessun relay DM dichiarato, relay muto per
+# il libro P2P. Fuori collaudo il giudice dice sempre «leggi»: il mondo
+# di ieri, byte per byte.
+_LETTURE_SIMULATE = set()     # le (cosa, relay) gia' dette nel journal
+
+
+def relay_di_casa(relay: str) -> bool:
+    """PURA: il relay sta su QUESTA macchina? Solo un host letterale di
+    loopback — `localhost`, 127.x.x.x, ::1 — e mai un nome da risolvere.
+    Un indirizzo che non si sa leggere NON e' di casa: nel dubbio, fuori."""
+    try:
+        host = (urlparse(str(relay or "").strip()).hostname or "").lower()
+    except ValueError:
+        return False
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def lettura_simulata(relay: str, cosa: str) -> bool:
+    """IL GIUDICE DELLE LETTURE DAI RELAY: True = questa lettura non si
+    fa, e il lettore torna il ripiego di un relay che non risponde.
+    Succede in collaudo, e solo verso un relay che non e' di casa.
+    LO DICE UNA VOLTA PER LETTURA DIVERSA — (cosa, relay) — e non a ogni
+    giro: il libro P2P si rilegge ogni minuto, e sessanta righe uguali in
+    un'ora affogherebbero quella che conta (la regola di
+    `_relay_p2p_dice`). Il tetto delle righe gia' dette e' quello dei
+    `detti` dell'ascolto."""
+    if not MODALITA_COLLAUDO or relay_di_casa(relay):
+        return False
+    if (cosa, relay) not in _LETTURE_SIMULATE:
+        if len(_LETTURE_SIMULATE) > 5000:
+            _LETTURE_SIMULATE.clear()
+        _LETTURE_SIMULATE.add((cosa, relay))
+        print(f"🟣 [nostr simulato] lettura {cosa} da {relay}: in collaudo "
+              "non esce dal computer", flush=True)
+    return True
+
+
 # LO SCAMBIO P2P (set 2026): Barattolo diventa un CLIENT del coordinator
 # Mostro — un servizio indipendente, su una macchina di Andrea, che
 # custodisce i sats degli scambi euro<->bitcoin fra utenti in una hold
@@ -40041,6 +40111,8 @@ def _stato_ascolto_p2p() -> str:
                 f"{A['perche']}")
     if A["stato"] == "parte":
         return "in partenza"
+    if A["stato"] == "simulato":
+        return "spento: in collaudo lo specchio non e' di casa"
     return "spento (nessuno specchio nel config)"
 
 
@@ -40055,8 +40127,14 @@ def _ascolto_p2p_filo(relay: str, mostro: str, loop, ferma):
     partire «scambio concluso». (La firma non si verifica, come non la
     verificano i lettori al minuto: il relay e' il nostro.)
     `ferma` e' di QUESTO filo: quando il guardiano lo abbandona lo
-    alza, e il filo non tocca piu' lo stato condiviso."""
+    alza, e il filo non tocca piu' lo stato condiviso.
+    In collaudo verso uno specchio che non e' di casa non parte
+    nemmeno (vedi `lettura_simulata`): la guardia ha gia' chiesto
+    prima di farlo nascere, e questa e' la sua, per chi lo facesse
+    partire da un'altra parte."""
     A = _P2P_ASCOLTO
+    if lettura_simulata(relay, "dell'ascolto P2P (38383)"):
+        return
     while not ferma.is_set():
         ws = None
         try:
@@ -40154,6 +40232,14 @@ def _guardia_ascolto_p2p():
             print("👂 Ascolto P2P: nessuno specchio nel config "
                   "(MOSTRO_RELAY_SPECCHIO): resta il solo giro al minuto",
                   flush=True)
+        return
+    # IN COLLAUDO UNO SPECCHIO CHE NON E' DI CASA NON SI ASCOLTA (23 set
+    # 2026, vedi `lettura_simulata`): e' come non averlo, e lo dice il
+    # giudice, una volta. Il filo ha la sua guardia, ma e' questa che
+    # conta: senza, la guardia vedrebbe il filo uscire e lo farebbe
+    # ripartire a ogni sguardo, con un «MORTO» nel journal ogni volta.
+    if lettura_simulata(leve["specchio"][0], "dell'ascolto P2P (38383)"):
+        A["stato"] = "simulato"
         return
     adesso = time.time()
     filo = A["filo"]
@@ -40628,8 +40714,12 @@ def eventi_libro_da_relay(relay: str, ids: list, since: int, mostro: str):
     IL FILTRO PORTA `authors`: senza, chiunque potrebbe pubblicare un
     38383 con il `d` di un nostro ordine e far partire «scambio
     concluso» a chi vuole. Parla solo il coordinatore.
-    None = «non ho potuto chiedere», che e' un'altra cosa da `[]`."""
+    None = «non ho potuto chiedere», che e' un'altra cosa da `[]`: e'
+    anche quel che torna in collaudo verso un relay che non e' di casa
+    (vedi `lettura_simulata`), cioe' un relay muto."""
     if not create_connection:
+        return None
+    if lettura_simulata(relay, "del libro P2P (38383)"):
         return None
     filtro = {"kinds": [38383], "authors": [mostro], "#d": list(ids),
               "limit": 500}
@@ -40659,8 +40749,11 @@ def info_libro_da_relay(relay: str, mostro: str):
     """Il 38385 del coordinatore — le sue impostazioni — ridotto a
     quel che serve alle frasi: la `fee` (spartita meta' a testa, il
     conto del client) e `expiration_hours` (i giorni di vita di un
-    ordine). SINCRONA, in to_thread. None = relay muto."""
+    ordine). SINCRONA, in to_thread. None = relay muto — anche in
+    collaudo verso un relay che non e' di casa (`lettura_simulata`)."""
     if not create_connection:
+        return None
+    if lettura_simulata(relay, "delle impostazioni del coordinatore (38385)"):
         return None
     try:
         ws = create_connection(relay, timeout=5,
@@ -42922,7 +43015,13 @@ def impacchetta_dm(dest_hex: str, testo: str) -> dict:
 
 def chiedi_relay_dm(relay: str, hexkey: str):
     """Chiede a UN relay dove il destinatario vuole ricevere i DM
-    (kind 10050, NIP-17). E' SINCRONA: va in asyncio.to_thread."""
+    (kind 10050, NIP-17). E' SINCRONA: va in asyncio.to_thread.
+    La sua guardia sta QUI e non solo nel chiamante (23 set 2026): in
+    collaudo `manda_dm_nostr` esce prima di arrivarci, ma la lettura
+    resterebbe aperta al primo che la chiamasse da un'altra parte. Verso
+    un relay che non e' di casa torna None, «nessun relay DM»."""
+    if lettura_simulata(relay, f"dei relay DM (kind 10050) di {hexkey[:16]}…"):
+        return None
     try:
         ws = create_connection(relay, timeout=5,
                                sslopt={"cert_reqs": ssl.CERT_NONE})
@@ -50802,6 +50901,9 @@ async def scopri_venditori_nostr():
     def spazzata():
         eventi = []
         for relay in importa_nostr.RELAYS:
+            # in collaudo si setaccia solo da casa (vedi lettura_simulata)
+            if lettura_simulata(relay, "della scoperta Nostr (annunci di chiunque)"):
+                continue
             eventi += importa_nostr.interroga_aperto(relay)
         return eventi
 
@@ -50888,6 +50990,15 @@ async def importa_nostr_periodico():
     _prossimo_import_nostr = time.time() + SECONDI_IMPORT_NOSTR
     import importa_nostr         # qui e non in cima: se manca
     #                              websocket-client il server vive lo stesso
+    # IN COLLAUDO SI LEGGE SOLO DA CASA (23 set 2026, vedi
+    # `lettura_simulata`): la lista si filtra QUI, una volta per giro, e
+    # l'import a testa legge da questa e non dai RELAYS dello script.
+    # Vuota vuol dire che non c'e' niente da leggere, e il giro non gira:
+    # ne' la scoperta ne' l'import (la scoperta ha comunque la sua).
+    relays = [r for r in importa_nostr.RELAYS
+              if not lettura_simulata(r, "dell'import Nostr (annunci e cancellazioni)")]
+    if not relays:
+        return
     t0 = int(time.time())
     # Prima si guarda se c'e' gente nuova, poi si importa: cosi' un
     # venditore scoperto oggi entra in vetrina nello stesso giro.
@@ -50928,7 +51039,7 @@ async def importa_nostr_periodico():
             i, a, s = await asyncio.to_thread(
                 importa_nostr.importa_venditore, npub, venditore_id, DB,
                 vaglio, scarica_foto_url, cambio_import,
-                pulisci=spoglia_metadati)
+                pulisci=spoglia_metadati, relays=relays)
             importati, aggiornati, saltati = (importati + i, aggiornati + a,
                                               saltati + s)
             await _apri_revisioni(npub, venditore_id)
