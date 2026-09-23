@@ -80667,8 +80667,22 @@ def prove_guscio_apertura():
           "gia' quando lo scioglie)", True,
           rg.rstrip().endswith("vetrinaDisegnata();"))
     prova("...e lo scioglie lui solo", 1, js.count("vetrinaDisegnata();"))
-    prova("il tetto dei quattro secondi c'e'", 1,
-          js.count("setTimeout(togliGuscio, 4000);"))
+    # IL TETTO E' DI DUE SECONDI (terzo giro della 1.5): erano quattro
+    # quando si aspettava la sola vetrina; adesso copre l'attesa della
+    # home FINITA, e Andrea l'ha voluto al massimo di due
+    prova("il tetto dei due secondi c'e', ed e' l'unico del guscio",
+          [1, 1, 0], [js.count("const TETTO_APERTURA = 2000;"),
+                      js.count("setTimeout(togliGuscio, TETTO_APERTURA);"),
+                      js.count("setTimeout(togliGuscio, 4000);")])
+    # E DOPO LA VETRINA, LE IMMAGINI IN VISTA: la griglia disegnata dice
+    # che le card ci sono, non che si vedono. `finally`: se l'attesa
+    # esplodesse, il guscio (o la copertura) scende lo stesso
+    prova("...e il cancello aspetta le immagini in vista DOPO la vetrina, "
+          "e scende anche se l'attesa esplode", [1, 0], [
+              js.count("                    document.fonts?.ready])\n"
+                       "  .then(() => immaginiPronte())\n"
+                       "  .finally(() => togliGuscio());"),
+              js.count(".then(() => togliGuscio());")])
     tg_ = pezzo_js(mini, "function togliGuscio(){", "\n}\n")
     prova("...e chi arriva primo comanda: il guscio si toglie UNA volta",
           True, tg_.startswith("function togliGuscio(){\n"
@@ -80676,20 +80690,31 @@ def prove_guscio_apertura():
 
     # --- 5) IL PATTO CON TELEGRAM ------------------------------------
     # `expand()` va chiesta prima del paint (la mini app si dipingerebbe
-    # corta e poi crescerebbe). `ready()` il guscio l'aveva spostato
-    # dentro togliGuscio, per non chiamare «pronta» una pagina coperta
-    # dall'arancio; ma dal giorno dopo il guscio in Telegram non c'e'
-    # piu' (lo accende solo l'APK), e il ritardo faceva togliere a
-    # Telegram il suo velo a pagina CARICATA, sulla home a meta' — la
-    # card P2P da sola, che poi si spostava (dal telefono di Andrea,
-    # secondo giro della 1.5). E' tornato dov'era prima del guscio.
-    # Si conta sul testo SENZA commenti: la spiegazione nomina ready().
+    # corta e poi crescerebbe). `ready()` invece sta nel gesto che scopre
+    # la pagina (terzo giro della 1.5), e la storia e' la lezione: il
+    # secondo giro l'aveva riportato all'avvio per la card P2P che in
+    # Telegram compariva da sola — e il telefono ha risposto che si vedeva
+    # LO STESSO. `ready()` non decide cosa si vede, decide CHI copre
+    # l'attesa: la cura e' la copertura che scende a home finita, e
+    # `ready()` va nello stesso gesto, cosi' il velo di Telegram resta
+    # finche' puo'. Si conta sul testo SENZA commenti: la spiegazione
+    # nomina ready().
     nudo_js = nudo[nudo.index("</style>"):]
-    prova("ready() ed expand() si dicono subito, insieme, com'era prima "
-          "del guscio", 1, nudo_js.count("if (tg) { tg.ready(); tg.expand(); }"))
+    prova("expand() si dice subito, e da solo", [1, 0],
+          [nudo_js.count("if (tg) tg.expand();"),
+           nudo_js.count("if (tg) { tg.ready(); tg.expand(); }")])
     tg_nudo = re.sub(r"/\*.*?\*/", "", tg_, flags=re.S)
-    prova("...e ready() in nessun altro posto: togliGuscio non lo dice piu'",
-          [1, False], [nudo_js.count(".ready("), "ready" in tg_nudo])
+    prova("...e ready() sta nel gesto che scopre la pagina, e in nessun "
+          "altro posto", [1, True],
+          [nudo_js.count(".ready("), "try { tg?.ready(); } catch(e){}" in tg_nudo])
+    # e DOPO che guscio e copertura sono giu': detto prima, Telegram
+    # toglierebbe il suo velo su un fotogramma di copertura ancora su
+    _i = {k: tg_nudo.find(k) for k in (
+        "document.getElementById('guscio')?.remove();",
+        "document.getElementById('copertura')?.remove();",
+        "tg?.ready();")}
+    prova("...detto DOPO aver tolto guscio e copertura", True,
+          -1 not in _i.values() and sorted(_i.values()) == list(_i.values()))
     prova("...e i due colori che Telegram riceve sono il FONDO dell'app",
           True, "const sfondo = scuro ? '#211A10' : '#FAF4E4';" in js
           and "tg?.setHeaderColor?.(sfondo); tg?.setBackgroundColor?.(sfondo);"
@@ -80743,7 +80768,9 @@ def prove_guscio_barra_e_scarto():
           "'android-app://store.barattolo.app') === 0) {")
     prova("il ramo dell'APK nell'head e' un blocco", 1, testa.count(SE))
     ramo = testa[testa.index(SE):]
-    ramo = ramo[:ramo.index("\n  }\n")]
+    # il ramo finisce alla sua graffa: dal terzo giro della 1.5 dopo di
+    # lei c'e' l'«else» della copertura, che non e' dell'APK
+    ramo = ramo[:ramo.index("\n  } else {\n")]
     prova("nell'APK la barra nasce ARANCIO nell'head, cioe' prima del "
           "primo paint", True,
           "document.getElementById('metaTema')?.setAttribute('content', "
@@ -80977,8 +81004,8 @@ def prove_guscio_barra_e_scarto():
     md = pezzo_js(mini, "function mostraDiagnosiApertura(){", "\n}\n")
     # SOLO se in vista: fuori dall'APK il guscio non si vede, e
     # trattenerlo terrebbe ferma togliGuscio — e con lei il colore del
-    # tema — fino al Chiudi (il primo giro diceva «il velo di Telegram»:
-    # da quando ready() e' tornato all'avvio, quello non c'entra piu')
+    # tema, la copertura e il velo di Telegram (dal terzo giro ready()
+    # sta li' dentro) — fino al Chiudi
     prova("...tiene su il guscio SOLO se si vede", True, md.startswith(
         "function mostraDiagnosiApertura(){\n"
         "  diagnosiTieneGuscio = guscioInVista();"))
@@ -81007,6 +81034,187 @@ def prove_guscio_barra_e_scarto():
                             encoding="utf-8"))[0]["target"]["package_name"]
     prova("...e il suo «Apri nell'app» apre il NOSTRO pacchetto", True,
           f"package={_pacco};end'" in md)
+
+
+def prove_copertura_home():
+    """LA COPERTURA E LA HOME FINITA (set 2026, terzo giro della 1.5).
+    Dal telefono di Andrea, in tutti e tre i contenitori: quando il
+    guscio scendeva (e in Telegram quando la pagina si mostrava) la home
+    non era finita — per ~250 ms «Da scoprire» con la sola card P2P e le
+    foto delle card vuote, poi arrivavano sponsorizzata, offerte e
+    immagini. La cura ha tre pezzi, e ognuno ha qui le sue prove:
+    1) FUORI DALL'APK UNA COPERTURA, col fondo della pagina e niente
+       logo, accesa dall'head prima del paint e con una rete sua;
+    2) IL CANCELLO della home finita: dopo la vetrina disegnata, le
+       immagini che stanno nello schermo, decodificate — due giri, con
+       `allSettled` — e un tetto di due secondi;
+    3) `ready()` nel gesto che toglie guscio e copertura.
+    Le due funzioni dell'attesa girano VERE sotto node, su un DOM di
+    cartone: quali immagini contano, che un 404 non tiene su niente, che
+    il secondo giro prende un'immagine nata durante il primo. Il giro dal
+    vivo (Chrome via CDP, tre contenitori, due reti) sta in CANTIERI."""
+    print("\n[La copertura e la home finita]")
+    import shutil
+    import subprocess
+    import tempfile
+    mini = open("miniapp.html", encoding="utf-8").read()
+    i_fine = mini.index("</style>")
+    css = re.sub(r"/\*.*?\*/", "", mini[mini.index("<style>"):i_fine],
+                 flags=re.S)
+    reg = {s.strip(): c for s, c in re.findall(r"([^{}]+)\{([^{}]*)\}", css)
+           if "#copertura" in s}
+    nudo = re.sub(r"/\*.*?\*/", "",
+                  re.sub(r"<!--.*?-->", "", mini, flags=re.S), flags=re.S)
+    testa = nudo[nudo.index("</style>"):nudo.index("<body")]
+    corpo = mini[mini.index("<body>"):]
+
+    # --- 1) LA COPERTURA ----------------------------------------------
+    riga = '<div id="copertura" aria-hidden="true"></div>'
+    prova("la copertura c'e', una volta sola, VUOTA (niente logo) e muta "
+          "per chi legge a voce", [1, 1],
+          [mini.count('id="copertura"'), corpo.count(riga)])
+    prova("...e sta PRIMA di #app, come il guscio: si dipinge appena il "
+          "parser ci arriva", True,
+          0 <= corpo.find(riga) < corpo.index('<div id="app">'))
+    prova("nasce SPENTA nella regola base: senza JS non compare mai",
+          True, reg.get("#copertura", "").startswith("display:none;"))
+    prova("...e la accende solo la sua classe", "display:block",
+          reg.get("html.copertura #copertura", ""))
+    # la regola di body e' quella col selettore NUDO: non un «html.x body»
+    _body = re.search(r"(?:^|\})\s*body\{([^{}]*)\}", css)
+    prova("...ha il FONDO della pagina, lo stesso di body: quando se ne "
+          "va la home compare sul suo stesso colore", [True, True],
+          ["background:var(--bg)" in reg.get("#copertura", ""),
+           bool(_body) and "background:var(--bg);" in _body.group(1)])
+    prova("...copre tutto e sta sotto il guscio (che nell'APK c'e' al posto "
+          "suo)", [True, True],
+          ["position:fixed;inset:0;z-index:9998;" in reg.get("#copertura", ""),
+           "z-index:9999;" in re.sub(r"\s", "", css[css.index("#guscio{"):])])
+    prova("...e se ne va di scatto: niente transizioni, niente animazioni",
+          [], [k for k, v in reg.items() if "transition" in v or "animation" in v])
+    # LA CLASSE LA METTE L'HEAD, nell'«else» del ramo dell'APK: dentro
+    # Telegram e nel browser si, nell'APK no (li' c'e' il guscio)
+    SE = ("if ((document.referrer || '').indexOf("
+          "'android-app://store.barattolo.app') === 0) {")
+    ramo_apk = testa[testa.index(SE):]
+    altrimenti = ramo_apk[ramo_apk.index("\n  } else {\n"):]
+    altrimenti = altrimenti[:altrimenti.index("\n  }\n")]
+    prova("la classe la mette l'head, SOLO fuori dall'APK", [1, 1, 0], [
+        testa.count("document.documentElement.classList.add('copertura');"),
+        altrimenti.count("classList.add('copertura')"),
+        ramo_apk[:ramo_apk.index("\n  } else {\n")].count("copertura")])
+    prova("...e nel corpo della pagina non la accende nessuno",
+          0, nudo[nudo.index("<body"):].count("classList.add('copertura')"))
+    # LA RETE CHE NON DIPENDE DALL'APP: a pagina letta tutta, quattro
+    # secondi — il doppio del tetto dell'app, che arriva sempre prima
+    prova("...con la sua rete nell'head, a pagina letta, oltre il tetto "
+          "dell'app", True,
+          "addEventListener('DOMContentLoaded', () => setTimeout(() =>\n"
+          "      document.getElementById('copertura')?.remove(), 4000));"
+          in altrimenti)
+    tg_ = re.sub(r"/\*.*?\*/", "",
+                 pezzo_js(mini, "function togliGuscio(){", "\n}\n"), flags=re.S)
+    prova("togliGuscio toglie anche la copertura, nello stesso gesto", 1,
+          tg_.count("document.getElementById('copertura')?.remove();"))
+
+    # --- 2) L'ATTESA DELLE IMMAGINI, VERA SOTTO NODE ------------------
+    fun = (pezzo_js(mini, "function immaginiInVista(){", "\n}\n") + "\n}\n"
+           + pezzo_js(mini, "async function immaginiPronte(){", "\n}\n")
+           + "\n}\n")
+    prova("contano solo le immagini nel riquadro dello schermo, e non il "
+          "guscio", [True, True, True], [
+              "if (img.closest('#guscio')) return false;" in fun,
+              "r.top < innerHeight && r.right > 0 && r.left < innerWidth;" in fun,
+              "r.width > 0 && r.height > 0 && r.bottom > 0" in fun])
+    prova("...si aspettano DECODIFICATE, con allSettled, in due giri",
+          [True, True, True], [
+              "img.decode ? img.decode() : Promise.resolve()" in fun,
+              "await Promise.allSettled(attese);" in fun,
+              "for (let giro = 0; giro < 2; giro++) {" in fun])
+    node = shutil.which("node")
+    if not node:
+        salta("l'attesa delle immagini sotto node", "node non c'e'")
+        return
+    js = ("const fatti = [];\n"
+          "globalThis.innerHeight = 700; globalThis.innerWidth = 360;\n"
+          "const R = (top, left, w, h) => ({top, left, width: w, height: h,"
+          " bottom: top + h, right: left + w});\n"
+          "const immagini = [];\n"
+          "const img = (nome, r, buona, guscio, poi) => ({nome,"
+          " closest: () => guscio ? {} : null, getBoundingClientRect: () => r,"
+          " decode: () => new Promise((si, no) => setTimeout(() => {"
+          " fatti.push(nome); if (poi) { poi(); poi = null; }"
+          " buona ? si() : no(new Error('404')); }, 5))});\n"
+          "immagini.push(img('vista', R(100, 10, 100, 100), true, false,"
+          " () => immagini.push(img('nata', R(40, 10, 50, 50), true))));\n"
+          "immagini.push(img('sotto', R(800, 10, 100, 100), true));\n"
+          "immagini.push(img('destra', R(100, 400, 100, 100), true));\n"
+          "immagini.push(img('spenta', R(0, 0, 0, 0), true));\n"
+          "immagini.push(img('barattolo', R(300, 100, 110, 160), true, true));\n"
+          "immagini.push(img('rotta', R(200, 200, 100, 100), false));\n"
+          "immagini.push(img('cavallo', R(650, 10, 100, 100), true));\n"
+          "globalThis.document = {get images(){ return immagini; }};\n"
+          + fun +
+          "const primi = immaginiInVista().map(i => i.nome);\n"
+          "immaginiPronte().then(() => {\n"
+          "  globalThis.document = {images: []};\n"
+          "  return immaginiPronte().then(() => console.log(JSON.stringify("
+          "[primi, fatti.slice().sort()])));\n"
+          "}, e => console.log(JSON.stringify(['esplosa', String(e)])));\n")
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(js)
+    try:
+        out = subprocess.run([node, f.name], capture_output=True,
+                             encoding="utf-8", timeout=60)
+        avuto = json.loads(out.stdout or "null")
+    except Exception as e:
+        avuto = f"node e' esploso: {e}"
+    finally:
+        os.unlink(f.name)
+    # contano la vista, la rotta e quella a cavallo della piega; il primo
+    # giro le decodifica tutte e tre (la rotta rifiuta, e non ferma
+    # niente), e durante il primo nasce «nata»: la prende il secondo giro,
+    # che rifa' anche le tre di prima. A pagina senza immagini si esce
+    # subito.
+    prova("l'attesa sotto node: quali contano, il 404 che non ferma, e "
+          "l'immagine nata a meta' che la prende il secondo giro", [
+              ["vista", "rotta", "cavallo"],
+              ["cavallo", "cavallo", "nata", "rotta", "rotta", "vista",
+               "vista"]], avuto)
+
+    # --- 3) togliGuscio, VERA sotto node: l'ordine del gesto ----------
+    js2 = ("let guscioVia = false, diagnosiTieneGuscio = false;\n"
+           "const fatti = [];\nlet coda = [];\n"
+           "globalThis.requestAnimationFrame = f => coda.push(f);\n"
+           "globalThis.applicaTema = () => fatti.push('tema');\n"
+           "globalThis.tg = {ready(){ fatti.push('ready'); }};\n"
+           "globalThis.document = {getElementById: id =>"
+           " ({guscio: {remove(){ fatti.push('guscio'); }},"
+           " copertura: {remove(){ fatti.push('copertura'); }}})[id] || null};\n"
+           + pezzo_js(mini, "function togliGuscio(){", "\n}\n") + "\n}\n"
+           + "const passo = () => { const c = coda; coda = [];"
+           " c.forEach(f => f()); return [...fatti]; };\n"
+           + "togliGuscio(); const a = [...fatti];\n"
+           + "passo(); const c = passo();\n"
+           + "togliGuscio(); const d = passo();\n"
+           + "console.log(JSON.stringify([a, c, d]));\n")
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(js2)
+    try:
+        out = subprocess.run([node, f.name], capture_output=True,
+                             encoding="utf-8", timeout=60)
+        avuto = json.loads(out.stdout or "null")
+    except Exception as e:
+        avuto = f"node e' esploso: {e}"
+    finally:
+        os.unlink(f.name)
+    prova("togliGuscio sotto node: guscio, copertura, POI il velo di "
+          "Telegram, il colore due fotogrammi dopo, e una volta sola", [
+              ["guscio", "copertura", "ready"],
+              ["guscio", "copertura", "ready", "tema"],
+              ["guscio", "copertura", "ready", "tema"]], avuto)
 
 
 def prove_app_android():
@@ -81536,9 +81744,16 @@ def prove_avvio_apk():
               [base[B][0], any("Translucent" in (v or "") or
                                "Translucent" in k
                                for k, v in base[B][1].items())])
-        # le barre DELL'ARANCIO DELLO SPLASH con le icone chiare (secondo
-        # giro, dal video: il Theme.NoTitleBar le vuole nere, e la finestra
-        # di partenza dipingeva ~150 ms di barra nera sopra lo splash)
+        # LE BARRE LE DISEGNA LA FINESTRA (terzo giro della 1.5, letto
+        # nel sorgente di Android 15 e 16): il Theme.NoTitleBar dice
+        # windowDrawsSystemBarBackgrounds=false, e a una finestra che non
+        # se le disegna Android le dipinge NERE dalla sua DecorView —
+        # qualunque cosa dica statusBarColor, che per questo nel secondo
+        # giro non aveva curato niente. La riga ha una prova tutta sua,
+        # col suo nome, perche' e' quella che una pulizia toglierebbe
+        prova("il tema dell'avvio dichiara di disegnare le barre da se': "
+              "senza, Android le dipinge NERE (la barra nera dei 150 ms)",
+              "true", base[B][1].get("android:windowDrawsSystemBarBackgrounds"))
         prova("...col fondo arancio col barattolo, le barre dello stesso "
               "arancio con le icone chiare, senza l'ombra del titolo e senza "
               "animazioni di finestra sue", {
@@ -81546,6 +81761,7 @@ def prove_avvio_apk():
                   "android:colorBackground": "@color/backgroundColor",
                   "android:windowContentOverlay": "@null",
                   "android:windowAnimationStyle": "@android:style/Animation",
+                  "android:windowDrawsSystemBarBackgrounds": "true",
                   "android:statusBarColor": "@color/backgroundColor",
                   "android:navigationBarColor": "@color/backgroundColor",
                   "android:windowLightStatusBar": "false",
@@ -82142,6 +82358,7 @@ def main():
               prove_effetti_ridotti,
               prove_guscio_apertura,
               prove_guscio_barra_e_scarto,
+              prove_copertura_home,
               prove_app_android,
               prove_permesso_splash_apk,
               prove_avvio_apk,

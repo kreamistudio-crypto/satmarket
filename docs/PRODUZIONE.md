@@ -1677,9 +1677,10 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   sui due canali — quella col permesso dello splash. La **v1.5**
   (versionCode 7, che alza `bubblewrap update` da solo) è PRONTA nel
   repo dal 23 set 2026 — il tema dell'avvio e le barre vere, qui sotto
-  — ed è in servizio quando esce sui due canali. La prima build non è
-  stata pubblicata: la prova sul telefono ha chiesto un secondo giro, e
-  si rifà con la STESSA versione (`--skipVersionUpgrade`, qui sotto).
+  — ed è in servizio quando esce sui due canali. Le prime DUE build non
+  sono state pubblicate: le prove sul telefono hanno chiesto un secondo
+  e un terzo giro, e si rifà con la STESSA versione
+  (`--skipVersionUpgrade`, qui sotto).
   IL PROGETTO STA FUORI DAL REPO, in
   `C:\Users\Andrea\Documents\barattolo-twa`, e ci resta (un percorso
   spezzato a metà non si cerca più): lì dentro c'è il **keystore**
@@ -1730,7 +1731,13 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
      `& "$env:USERPROFILE\.bubblewrap\android_sdk\build-tools\35.0.0\aapt2.exe" dump xmltree --file AndroidManifest.xml app-release-signed.apk | Select-String "theme"`
      deve dare DUE righe: `=@0x01030010` (l'app intera, il traslucido
      di Bubblewrap, com'era) e `=@0x7f…` (LauncherActivity, il nostro);
-     sulla v1.4 ne dà una sola;
+     sulla v1.4 ne dà una sola. E le **barre disegnate dalla
+     finestra**, l'unico controllo che distingue una build di oggi da
+     quelle di prima con la STESSA versione:
+     `& "$env:USERPROFILE\.bubblewrap\android_sdk\build-tools\35.0.0\aapt2.exe" dump resources app-release-signed.apk | Select-String "0x01010450=true"`
+     deve dare DUE righe (il tema di base e la sua copia per Android
+     6+): è `windowDrawsSystemBarBackgrounds`, qui sotto. Se non esce
+     niente, lo script che ha girato era quello di prima;
   5. la **prova sul telefono**, PRIMA della release: USB con il debug
      attivo,
      `& "$env:USERPROFILE\.bubblewrap\android_sdk\platform-tools\adb.exe" install -r app-release-signed.apk`
@@ -1782,10 +1789,15 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   cresceva dall'icona era NERA per un fotogramma. Da Android 12 la
   finestra di partenza è lo splash del sistema, e il tema lo veste
   dello stesso arancio e dello stesso barattolo di `splash.png`; prima
-  di Android 12 è il fondo della finestra, uguale. Le barre di sistema
-  sono dello stesso arancio con le icone chiare (il `Theme.NoTitleBar`
-  le voleva nere, e sopra lo splash di sistema si vedeva una barra
-  nera per ~150 ms). Il resto dell'app resta traslucido. Il PREZZO,
+  di Android 12 è il fondo della finestra, uguale. E la finestra le
+  barre se le DISEGNA DA SÉ (`windowDrawsSystemBarBackgrounds`, terzo
+  giro): il `Theme.NoTitleBar` dice di no, e a una finestra così
+  Android le dipinge NERE, qualunque colore si scriva — era la barra
+  nera di ~150 ms, dipinta da LauncherActivity fra lo splash del
+  sistema e Chrome, e i colori messi nel secondo giro da soli non
+  potevano curarla. Da Android 15 la barra è trasparente sull'arancio
+  della finestra; prima prende il colore che le dà la libreria della
+  TWA, quello che avrà Chrome. Il resto dell'app resta traslucido. Il PREZZO,
   deciso da Andrea: aprendo un link a
   barattolo.store da un'altra app mentre Barattolo è già aperta, fra
   la pagina di prima e quella del link passa un lampo arancio col

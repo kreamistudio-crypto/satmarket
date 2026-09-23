@@ -281,11 +281,20 @@ TEMA_AVVIO_XML = f"""\
     Bubblewrap: stessa famiglia, niente ombra sotto il titolo che non
     c'e', e nessuna animazione di finestra sua, come @style/Animation
     del traslucido.
-    LE BARRE SONO DELL'ARANCIO DELLO SPLASH, con le icone chiare
-    (secondo giro della 1.5, dal video): il Theme.NoTitleBar le vuole
-    NERE, e la finestra di partenza le dipingeva cosi' — ~150 ms di
-    barra nera sopra lo splash arancio. Da qui in poi la barra e'
-    arancio finche' non arriva il colore della pagina.
+    LE BARRE LE DISEGNA LA FINESTRA, ed e' windowDrawsSystemBarBackgrounds
+    (terzo giro della 1.5, letto nel sorgente di Android 15 e 16). Il
+    Theme.NoTitleBar dice false, e a una finestra che non dichiara di
+    disegnarsele Android le dipinge NERE dalla sua stessa DecorView
+    (calculateBarColor; la forza config_forceWindowDrawsStatusBarBackground,
+    vero di serie) — qualunque colore dica statusBarColor, che per questo
+    nel secondo giro non aveva curato niente. Era la barra nera di
+    ~150 ms: non lo splash del sistema, che le barre le disegna sempre,
+    ma LauncherActivity, fra lo splash e Chrome. Con questa riga da
+    Android 15 la barra e' trasparente sull'arancio della finestra
+    (l'edge-to-edge ignora statusBarColor); prima di 15 il colore glielo
+    da' la libreria della TWA in onCreate, quello che avra' Chrome.
+    I colori e le icone chiare qui sotto restano: sono quelli della
+    finestra di partenza dei telefoni prima di Android 12.
 -->
 <resources>
     <style name="{TEMA_AVVIO}Base" parent="@android:style/Theme.NoTitleBar">
@@ -293,6 +302,7 @@ TEMA_AVVIO_XML = f"""\
         <item name="android:colorBackground">@color/backgroundColor</item>
         <item name="android:windowContentOverlay">@null</item>
         <item name="android:windowAnimationStyle">@android:style/Animation</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
         <item name="android:statusBarColor">@color/backgroundColor</item>
         <item name="android:navigationBarColor">@color/backgroundColor</item>
         <item name="android:windowLightStatusBar">false</item>
