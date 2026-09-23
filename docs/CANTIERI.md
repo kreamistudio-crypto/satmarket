@@ -26956,3 +26956,203 @@ barattolo identico e fermo dallo splash al guscio (stessa forma, stessa
 misura, stesso posto); 5) in Telegram, l'apertura della mini app senza la
 card P2P che compare da sola; 6) `?diagnosi=1` → «Apri nell'app»: la
 riga delle barre con la scala (1 di solito).
+
+## La 1.5, terzo giro: la barra nera era la nostra finestra, e la home si scopre finita (23 set 2026)
+
+Seconda prova sul telefono della 1.5 rifatta (video a 20 fps, schermo
+588×1280, **OPPO CPH2791 con ColorOS 16, cioè Android 16**): risolti la
+linea bianca, il barattolo fermo (splash y 509-763, guscio 510-765) e la
+barra che cambia col guscio. Restavano due difetti, e la 1.5 non si
+pubblica ancora.
+
+**1) LA BARRA NERA DI ~150 MS LA DIPINGEVA LA NOSTRA FINESTRA — non lo
+splash del sistema, e non il launcher di OPPO.** Letto nel sorgente di
+Android 16 (`android-16.0.0_r4`) e ricontrollato sul 15
+(`android-15.0.0_r36`), tre fatti in fila:
+- lo SPLASH DEL SISTEMA, la finestra che cresce dall'icona, le barre le
+  disegna SEMPRE: `SplashscreenContentDrawer.createLayoutParameters` gli
+  dà `FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS` per ogni splash che non sia il
+  «legacy», e la sua vista scende sotto la barra (fit insets a zero) —
+  lì sotto c'è il suo arancio;
+- la finestra di LAUNCHERACTIVITY quel flag lo prende SOLO se il tema
+  dice `windowDrawsSystemBarBackgrounds=true` (`PhoneWindow.generateLayout`),
+  e l'edge-to-edge di Android 15+ NON glielo accende: rende la barra
+  trasparente e la finestra a tutto schermo, e basta. Il nostro tema
+  discende da `Theme.NoTitleBar`, cioè da `Theme`, che in `themes.xml`
+  dice **false**;
+- e a una finestra senza flag la DecorView lo sfondo delle barre lo
+  dipinge lo stesso — lo forza `config_forceWindowDrawsStatusBarBackground`,
+  vero di serie per chi ha targetSdk da 24 in su — ma **NERO**:
+  `DecorView.calculateBarColor` risponde `Color.BLACK` appena vede il
+  flag assente, PRIMA ancora di guardare `statusBarColor`. Vale anche
+  per la barra di navigazione.
+Quindi la sequenza del video: lo splash del sistema arancio fino in
+cima; appena LauncherActivity ha disegnato, il nostro
+`setOnExitAnimationListener(v -> v.remove())` lo toglie — mentre la
+finestra cresce ancora, gli angoli arrotondati si vedono —, e resta la
+nostra finestra, arancio con una barra dipinta nera sopra; poi arriva
+Chrome col `theme-color` arancio del guscio, e la barra torna arancio.
+**L'IPOTESI DI ANDREA ERA GIUSTA A METÀ, ed è la metà che spiega il
+secondo giro**: su Android 15+ con targetSdk 35 `statusBarColor` è
+davvero ignorato (`mStatusBarColor` forzato a trasparente, e
+`setStatusBarColor` esce subito) — per questo i colori messi nel secondo
+giro non potevano curare niente, e l'APK li conteneva senza effetto. Ma
+il nero non era «la barra trasparente sopra un fondo nero»: era un
+rettangolo nero dipinto SOPRA il nostro fondo arancio, da una regola più
+vecchia dell'edge-to-edge. Il secondo giro aveva dato la colpa alla
+finestra di partenza, senza leggere quale finestra fosse sullo schermo
+in quei 150 ms: è la lezione.
+**E LA LIBRERIA NON AIUTAVA**: in `onCreate` la
+`PwaWrapperSplashScreenStrategy` di androidbrowserhelper 2.6.2 dà alla
+finestra il colore che avrà la TWA (`setStatusBarColor`) — da 15 in su
+non fa niente, e senza il flag sarebbe nero comunque.
+**NON VIENE DA OPPO, per quanto dice il sorgente pubblico**: la regola
+che dipinge il nero sta nel framework, gira nel processo della nostra
+app, e scatta esattamente nella finestra di tempo del video. ColorOS
+modifica il sistema e i suoi sorgenti non sono pubblici, quindi la prova
+vera la fa il telefono: se con questa build la barra resta nera, allora
+è ColorOS, e dall'app non si cura.
+**LA CURA È UNA RIGA**, `windowDrawsSystemBarBackgrounds=true` nel tema
+di base, e vale su Android 15 E 16 (stessa regola, stesso rimedio): da
+15 la barra diventa trasparente e sotto c'è l'arancio della finestra;
+prima di 15 il colore glielo dà la libreria della TWA, quello che avrà
+Chrome. Niente nero in nessun caso. Le ICONE della barra: bianche sullo
+splash del sistema (lo decide Android dalla luminosità dell'arancio),
+scure da LauncherActivity in poi (le chiede la libreria, col criterio di
+contrasto di Chrome) — un cambio di icone, non di barra, e non si evita:
+la prima scelta è del sistema, la seconda di Chrome.
+**STRADA SCARTATA**: `windowOptOutEdgeToEdgeEnforcement`, che avrebbe
+ridato vita a `statusBarColor` finché il targetSdk resta 35. Ma in
+`onCreate` la libreria ci scriverebbe sopra il colore della TWA (crema
+di giorno, scuro di sera): la barra passerebbe dal nero al crema, invece
+che all'arancio. Con la finestra che si disegna le barre la barra è
+trasparente, e l'arancio sotto è già quello giusto.
+
+**2) LA HOME A PEZZI, E LA COPERTURA.** In tutti e tre i contenitori:
+quando il guscio scendeva (e in Telegram quando la pagina si mostrava)
+per ~250 ms «Da scoprire» aveva la sola card P2P accesa e le foto delle
+card erano vuote, poi arrivavano sponsorizzata, offerte e immagini. LA
+DIAGNOSI, dal codice e dal banco: il guscio scendeva alla vetrina
+DISEGNATA — il primo `renderGrid` — che arriva dopo la busta del server
+(quindi le card di «Da scoprire» c'erano già); ma le loro IMMAGINI no:
+sono tutte `loading="lazy"`, partono solo quando la fila si disegna, e
+le figure delle categorie rispondono `no-cache`. La card P2P sembrava
+l'unica perché è l'unica disegnata all'avvio, prima della busta: la sua
+figura era già arrivata. In Telegram peggio: col `ready()` all'avvio la
+pagina si mostrava ANCORA PRIMA, a vetrina vuota. Nel browser si vedeva
+tutto il montaggio, dal primo paint in poi.
+LA CURA, tre pezzi:
+- **fuori dall'APK una COPERTURA** (`#copertura`), il gemello del
+  guscio: il fondo della pagina e nient'altro — niente logo, niente
+  anello (decisione di Andrea) —, accesa dall'head con la classe
+  `copertura` prima del primo paint, spenta di serie (senza JS non
+  compare), tolta da `togliGuscio` nello stesso gesto del guscio. Ha una
+  rete sua NELL'HEAD, che non dipende dallo script grande: a pagina
+  letta (`DOMContentLoaded`) più quattro secondi, il doppio del tetto
+  dell'app — se lo script morisse prima di armare il suo, la copertura
+  resterebbe su per sempre;
+- **il cancello della HOME FINITA**: dopo la vetrina disegnata e i
+  font, le immagini che stanno nel riquadro dello schermo, DECODIFICATE
+  (`immaginiPronte`: `decode()`, due giri perché una fila può
+  ridisegnarsi mentre si aspetta, `allSettled` perché un 404 non tenga
+  su niente), e `finally` perché se l'attesa esplodesse la copertura
+  scenda lo stesso;
+- **il tetto a DUE SECONDI** dall'avvio dell'app (`TETTO_APERTURA`, era
+  di quattro quando si aspettava la sola vetrina): il massimo che Andrea
+  ha concesso, e la misura dice che basta — la home finita arriva fra
+  0,4 e 1,4 s dopo l'avvio dello script anche a cache fredda in 4G.
+  Si contano dall'avvio dello script e non dall'apertura: prima la
+  pagina si sta ancora scaricando, e non c'è niente da mostrare.
+**`ready()` DI TELEGRAM VA NEL GESTO CHE SCOPRE, e la storia è la
+lezione.** Il guscio l'aveva messo in `togliGuscio`; il secondo giro
+l'aveva riportato all'avvio per la card P2P; il telefono ha risposto che
+la card si vedeva LO STESSO. Giusto così: `ready()` non decide COSA si
+vede, decide solo CHI copre l'attesa — il velo di Telegram o la pagina.
+Detto all'avvio, scopriva prima una home ancora a pezzi; detto dopo, la
+scopriva il `load`, perché senza `ready()` Telegram toglie il velo da sé
+a pagina caricata, e la busta del server arriva dopo. Adesso la
+copertura si toglie solo a home finita, e `ready()` sta nello stesso
+gesto: il velo di Telegram resta finché può, e se il `load` arriva
+prima, quel che Telegram scopre è la copertura — il fondo della pagina —
+e non la home a metà. È anche quel che chiede la documentazione:
+dirlo quando gli elementi essenziali sono caricati. `expand()` resta
+all'avvio, o la mini app si dipingerebbe corta e poi crescerebbe.
+**LE MISURE, PRIMA E DOPO** (Chrome headless via CDP, CPU a 1/4, tre
+giri per caso e la mediana; «usabile» = la home finita E scoperta, «a
+pezzi» = quanto la si vede incompleta; i tempi partono dall'inizio della
+pagina, prima c'è l'avvio di Android e di Chrome, che non cambia):
+
+| contenitore | rete, cache | prima: usabile · a pezzi | dopo: usabile · a pezzi |
+|---|---|---|---|
+| APK | Wi-Fi, calda | 1263 · **97** | 1288 · **0** |
+| APK | 4G, calda | 3719 · **212** | 3703 · **0** |
+| APK | Wi-Fi, fredda | 2043 · **192** | 1528 · **0** |
+| APK | 4G, fredda | 4277 · **767** | 4352 · **0** |
+| Telegram | Wi-Fi, calda | 1289 · **536** | 1218 · **0** |
+| Telegram | 4G, calda | 3603 · **764** | 3644 · **0** |
+| Telegram | Wi-Fi, fredda | 1427 · **650** | 1433 · **0** |
+| Telegram | 4G, fredda | 4209 · **1352** | 4229 · **0** |
+| browser | Wi-Fi, calda | 1349 · **1017** | 1263 · **0** |
+| browser | 4G, calda | 3701 · **2949** | 3715 · **0** |
+| browser | Wi-Fi, fredda | 1412 · **1084** | 1422 · **0** |
+| browser | 4G, fredda | 4299 · **3583** | 4285 · **0** |
+
+(millisecondi dall'inizio della pagina; «Wi-Fi» = 50 Mbps e 20 ms,
+«4G» = 9 Mbps e 70 ms; cache calda = un'apertura intera prima, fredda
+= profilo nuovo; schermo 360×784 a densità 3.) **La home a pezzi va a
+zero in tutti e dodici i casi, e il tempo alla home usabile resta lo
+stesso**: le differenze stanno dentro i 50-100 ms che un giro singolo
+balla da solo — l'unico scarto grosso, l'APK in Wi-Fi a cache fredda
+(2043 → 1528), non va letto come un guadagno: nel «prima» il guscio
+aspettava i font a freddo e i tre giri sono usciti lenti. Nel 4G di
+prima l'APK stava a pezzi 212 ms, lo stesso ordine dei ~250 del video.
+Il cancello nuovo aspetta cose che arrivavano COMUNQUE: sposta il
+momento in cui si scopre, non quello in cui la home è pronta. E il
+tetto non è mai scattato: la home finita arriva fra 0,4 e 1,4 s dopo
+l'avvio dello script, anche a cache fredda in 4G. Il tetto si è
+provato a parte, rompendo la strada normale (`Promise.allSettled` che
+non risponde mai): la copertura resta su e se ne va a due secondi, nel
+browser, in Telegram e nell'APK.
+**IL PREZZO, detto**: nel browser il primo paint non mostra più
+l'intelaiatura mentre la pagina (2,9 MB) si scarica — si vede il fondo
+fino alla home finita. A rete lenta sono secondi di fondo pieno invece
+che secondi di intelaiatura; l'intelaiatura però non era usabile (i
+bottoni vogliono lo script, che arriva in fondo al file), e la home
+completa arriva allo stesso momento di prima.
+
+**PROVATO QUI.** Il sorgente: `SplashscreenContentDrawer`, `SplashscreenWindowCreator`,
+`SplashScreenView`, `PhoneWindow`, `DecorView`, `DisplayPolicy`,
+`themes.xml` e `config.xml` di `android-16.0.0_r4`, e le righe
+decisive ricontrollate su `android-15.0.0_r36`; la libreria della TWA
+sul tag `android-browser-helper-2.6.2`. L'APK rifatto su una copia del
+progetto, come nel secondo giro (`--skipVersionUpgrade`, lo script
+nuovo, Gradle offline): versione 1.5 e versionCode 7, i due temi nel
+manifest, nel dex 1 | 1 | 1 | 1, e `0x01010450=true` in DUE righe (il
+tema di base e la sua copia per Android 6+) — e sul framework di
+Android 16 quell'id è proprio `windowDrawsSystemBarBackgrounds`. È il
+controllo nuovo della liturgia in PRODUZIONE: l'unico che distingue
+questa build dalle due di prima con la stessa versione. La pagina dal
+vivo col banco nuovo dell'apertura (la tabella qui sopra) e un giro a
+parte sui colori: la copertura crema di giorno e scura di sera, nel
+browser e in Telegram, assente nell'APK. Prove: la sezione nuova «La
+copertura e la home finita» — le due funzioni dell'attesa e
+`togliGuscio` VERE sotto node —, il tetto, `ready()`, il ramo dell'APK
+nell'head col suo `else`, il tema che si disegna le barre; suite
+**13545/0** con `PROVE_SEVERE=1`, nove collaudi verdi, tortura
+**22/22** senza inciampate.
+
+**NON PROVATO**: il telefono. In particolare la barra: se resta nera, è
+ColorOS; e Android 12-14, dove la barra di LauncherActivity prende il
+colore della TWA (crema di giorno), che non è mai stato guardato. E
+Telegram vero: il velo lo toglie il client, e sul banco è uno stub.
+
+### Da guardare sul telefono
+
+Con la 1.5 rifatta, a freddo e col video a 20 fps: 1) la barra di stato
+mai nera, dallo splash del sistema alla vetrina (le icone possono
+passare da bianche a scure: è Chrome, non la barra); 2) la home che
+compare FINITA quando scende il guscio — «Da scoprire» con le sue card e
+le figure, le foto delle card piene; 3) in Telegram e nel browser lo
+stesso, dopo il deploy e senza bisogno dell'APK: prima il fondo della
+pagina, poi la home tutta insieme; 4) che l'apertura non sembri più
+lenta — il cancello aspetta al massimo due secondi.

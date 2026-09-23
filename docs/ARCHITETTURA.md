@@ -22572,9 +22572,17 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (`ActivityRecord.validateStartingWindowTheme`) e la finestra che
   cresceva dall'icona era nera per un fotogramma. È il gemello opaco
   di quello (`Theme.NoTitleBar`, nessuna ombra né animazione di
-  finestra sua, ma le barre dell'arancio dello splash con le icone
-  chiare, che quel tema voleva nere), il fondo è l'arancio col
-  barattolo di `splash.png`, e
+  finestra sua) con UNA differenza che conta:
+  `windowDrawsSystemBarBackgrounds=true`. Quel tema dice false, e a una
+  finestra che non si disegna le barre Android le dipinge NERE dalla
+  sua DecorView — `calculateBarColor`, forzata da
+  `config_forceWindowDrawsStatusBarBackground` — qualunque colore dica
+  `statusBarColor`: era la barra nera di ~150 ms, dipinta da
+  LauncherActivity fra lo splash del sistema (che le barre le disegna
+  sempre) e Chrome. Da Android 15 la barra è trasparente sull'arancio
+  della finestra; prima prende il colore che la libreria della TWA le
+  dà in `onCreate`. Il fondo è l'arancio col barattolo di
+  `splash.png`, e
   in `values-v31` veste lo splash del SISTEMA con lo stesso arancio e
   `barattolo_avvio_icona.png` (tela da 162dp col barattolo a 160/288
   del lato: il sistema la ridipinge a 108dp e la ingrandisce a 192, e
@@ -22590,10 +22598,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   160 px CSS del barattolo del guscio ai 160 dp dello splash anche con
   lo zoom di Chrome. E il barattolo del guscio È quello dello splash:
   stessa ricetta di `splash.png`, incorporata in AVIF (in WebP la foto
-  pesava il doppio del tetto di 40 KB). Nello stesso giro `ready()` di
-  Telegram è tornato all'avvio accanto a `expand()`, com'era prima del
-  guscio, e `togliGuscio` porta il colore del tema due fotogrammi dopo
-  aver tolto il guscio. I due file di testo che Bubblewrap
+  pesava il doppio del tetto di 40 KB). `togliGuscio` porta il colore
+  del tema due fotogrammi dopo aver tolto il guscio. E il guscio ha un
+  GEMELLO FUORI DALL'APK, la COPERTURA (`#copertura`, terzo giro): il
+  fondo della pagina e nient'altro, niente logo, accesa dall'head con
+  la classe `copertura` dentro Telegram e nel browser, con una rete sua
+  nell'head (a pagina letta, quattro secondi). Tutt'e due scendono a
+  HOME FINITA: vetrina disegnata e font, poi le immagini nel riquadro
+  dello schermo DECODIFICATE (`immaginiPronte`: due giri, `allSettled`)
+  — il primo render della griglia arriva sempre dopo la busta del
+  server, quindi a quel punto «Da scoprire» ha già la sponsorizzata e
+  le offerte. Il tetto è di due secondi dall'avvio dell'app
+  (`TETTO_APERTURA`), e `ready()` di Telegram sta nello stesso gesto:
+  decide solo CHI copre l'attesa, il velo di Telegram o la copertura, e
+  chiamato all'avvio scopriva una home a pezzi. I due file di testo che Bubblewrap
   rigenera si preparano in memoria e si scrivono solo se tutte le
   ancore ci sono. Il prezzo scelto da Andrea: un lampo arancio quando
   un link arriva ad app già aperta. Il perché per intero sta in
