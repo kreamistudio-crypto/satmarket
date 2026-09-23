@@ -56303,6 +56303,23 @@ def asset_barattozon_scuro():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
+@app.get("/assets/barattozon-tasto.webp")
+def asset_barattozon_tasto():
+    """IL TONDO DI BARATTOZON (23 set 2026, richiesta di Andrea): il
+    tasto che nel libro P2P, su «Vendi BTC», scende sotto il + e apre il
+    foglio col tabacchino gia' scelto. Nasce dal sorgente di Andrea
+    (barattozon-icona.jpeg, 16:9): quadrato ritagliato attorno al
+    simbolo — la B e la freccia —, centrato sul cerchio piu' piccolo che
+    lo contiene e col punto piu' lontano all'82% del raggio, il fondo blu
+    del marchio (#191D29) pieno fino ai bordi. 108x108, il 3x dei 36px a
+    schermo; WebP opaco, niente ICC ne' EXIF, meno di 2 KB: il tondo lo
+    fa il CSS. Rotta esplicita come le sorelle: mai un mount (regola 3);
+    il timbro ?v= lo mette _timbra_asset_pagina."""
+    return FileResponse("assets/barattozon-tasto.webp",
+                        media_type="image/webp",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/assets/scambi-intestazione.webp")
 def asset_scambi_intestazione():
     """L'INTESTAZIONE DI «I MIEI SCAMBI» (22 set 2026, scelta di Andrea):

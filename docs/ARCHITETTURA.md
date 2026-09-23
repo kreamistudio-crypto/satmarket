@@ -24780,6 +24780,32 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   digitale, oro, abbonamenti a Prime, buoni regalo, 1-Click) e i posti (tabaccheria,
   bar, edicola, posta) stanno nelle parole: tappe, riquadro, Info. Il
   verbale: CANTIERI, «I limiti di Amazon».
+  IL TASTO BARATTOZON (23 set 2026, richiesta di Andrea): nel libro, su
+  «Vendi BTC», sotto il + rosso della barra scende A TENDINA un tondo da
+  36px col marchio (`#navBarattozon`, `/assets/barattozon-tasto.webp`) e
+  apre il foglio col tabacchino gia' scelto: `apriBarattozonP2P` chiama
+  `apriNuovoOrdineP2P(P2P_TABACCHINO)`, che sceglie il metodo PRIMA del
+  disegno e della morfosi (il fantasma copia la scritta del bottone
+  d'arrivo, «Rileggi e pubblica») e solo se `metodiPubblicabiliP2P` lo
+  concede al lato. Quando c'e' lo dicono le classi che c'erano gia' —
+  `nav-p2p`, `p2p-vendo`, `p2p-piu-neutro`, `barra-via` —, quindi
+  indietro, cronologia e gesto dell'app lo rimettono giusto da soli; e'
+  un `<div role="button">` e non un `<button>` (la ragione del logo in
+  topbar), sta PRIMA del + nel markup (il + gli si dipinge sopra), e
+  mentre c'e' la scatola del + lascia passare il dito (`pointer-events`,
+  sotto i 768px): senza, il tocco sul marchio lo prendeva il +. Da
+  desktop non c'e'. FUORI DAL LIBRO IL + E' GRIGIO: `p2p-piu-neutro`,
+  scritta da `go()` dalla vista (tutte le viste del P2P tranne il
+  libro), lo fa scendere nella barra a 42px senza rilievo, e
+  `toccaPiu` (col giudice `piuNeutroP2P`, che chiede anche la
+  larghezza) porta al libro su «Compra BTC» con `setLatoP2P('compro',
+  true)` — il secondo argomento salta la scossa e la vibrazione del tab
+  — e poi `go('p2p')`, la strada della voce «Libro ordini». Da desktop
+  la pillola resta «Pubblica». E LA VOCE ATTIVA VESTE IL LATO SOLO NEL
+  LIBRO: la regola di base sulla banda e' l'arancio (#FFB25C, il velo
+  caldo da desktop), il verde e il rosso sono un'eccezione col nome di
+  `#nav-p2plibro`; gli strati sfumano anche il colore. Il verbale:
+  CANTIERI, «Il tasto Barattozon e il + neutro nel P2P».
   LA SVEGLIA DEL TABACCHINO è l'emenda alla fase 6 (decisione di
   Andrea): il server impara UNA cosa — «questo account ha una scadenza
   a quest'ora» — nella tabella `p2p_sveglie` (quattro colonne, PK
@@ -26446,6 +26472,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    stessa immagine con la sola metà bianca portata nell'inchiostro di
    casa, per quando il marchio sta in una frase su carta chiara —
    vedi CANTIERI, «E il marchio Barattozon è passato nel testo»),
+   `/assets/barattozon-tasto.webp` (il tondo del tasto Barattozon nella
+   barra del P2P, 23 set 2026: 108x108, il 3x dei 36px, WebP opaco col
+   blu del marchio pieno — il tondo lo fa il CSS; vedi CANTIERI, «Il
+   tasto Barattozon e il + neutro nel P2P»),
    `/assets/scambi-intestazione.webp` (l'intestazione di «I miei
    scambi», 22 set 2026: le due monete, bitcoin e un euro, al posto
    del titolo scritto e nello stato vuoto — WebP con trasparenza,

@@ -3994,13 +3994,21 @@
      solo al cambio di stato, quindi a riposo quel delay non fa nulla,
      e al RITORNO e' proprio lui la scala che mancava. */
   nav .nav-cella>button:not(.strato-p2p){transition-delay:.1s,.1s,0s}
+  /* ⚠️ GLI STRATI SFUMANO ANCHE IL COLORE (23 set 2026, col lato del
+     solo libro): la riga qui sopra, che e' di tutte le celle, non lo
+     nomina, e fin qui «Libro ordini» e «I miei scambi» cambiavano
+     colore DI SCATTO — verde, rosso o arancio al tocco, mentre il + e
+     la banda correvano .4s e Esplora (che non vive in una cella)
+     sfumava. Solo sugli strati: le voci del mercatino restano com'erano. */
   nav .nav-cella>.strato-p2p{transform:translateY(110%);opacity:0;
-    visibility:hidden;pointer-events:none}
+    visibility:hidden;pointer-events:none;
+    transition:transform .4s cubic-bezier(.2,.7,.2,1),opacity .3s ease,
+      visibility 0s linear .4s,color .4s ease,background-color .4s ease}
   body.nav-p2p nav .nav-cella>button:not(.strato-p2p){
     transform:translateY(110%);opacity:0;visibility:hidden;
     pointer-events:none;transition-delay:0s,0s,.4s}
   body.nav-p2p nav .nav-cella>.strato-p2p{transform:none;opacity:1;
-    visibility:visible;pointer-events:auto;transition-delay:.1s,.1s,0s}
+    visibility:visible;pointer-events:auto;transition-delay:.1s,.1s,0s,0s,0s}
   /* lo SFONDO E' UNA BANDA SCURA INCASSATA (scelta di Andrea fra due
      varianti): la barra diventa bruna anche di giorno, con l'ombra
      interna dall'alto e il bordo di sopra spento. Un contesto diverso
@@ -4022,9 +4030,17 @@
   /* LA VOCE ATTIVA VESTE IL LATO (set 2026, ritocco di Andrea): verde
      a comprare, rosso a vendere — lo stesso giudice del + e del logo.
      Toni della sera fissi, come tutto sulla banda: i chiari del tema
-     scuro, che sul bruno rendono dove i pieni del giorno affogano. */
-  body.nav-p2p nav button.active{color:#34B47A}
-  body.nav-p2p.p2p-vendo nav button.active{color:#F07A47}
+     scuro, che sul bruno rendono dove i pieni del giorno affogano.
+     ⚠️ IL LATO E' DEL SOLO LIBRO (23 set 2026, richiesta di Andrea):
+     «I miei scambi» e «Info P2P» non hanno un lato — i miei sono di
+     tutt'e due i versi, e la pagina che spiega non compra ne' vende —
+     quindi accese parlano l'ARANCIO di casa, il neutro del mercatino,
+     e mai il verde o il rosso del tab che si e' guardato per ultimo.
+     La regola di base e' l'arancio per tutte; il lato e' un'eccezione
+     che porta il NOME della voce che ce l'ha. */
+  body.nav-p2p nav button.active{color:#FFB25C}
+  body.nav-p2p nav #nav-p2plibro.active{color:#34B47A}
+  body.nav-p2p.p2p-vendo nav #nav-p2plibro.active{color:#F07A47}
   /* il lockup della topbar eredita l'inchiostro della pagina, che
      sulla banda scura affoga: qui si schiarisce (il ₿ e il lampo
      restano arancio da soli, --sats non si tocca) */
@@ -4068,9 +4084,100 @@
     box-shadow:0 4px 0 var(--trust-deep),0 8px 20px rgba(27,139,84,.35)}
   body.nav-p2p.p2p-vendo nav button.sell .ic{background:var(--danger);
     box-shadow:0 4px 0 var(--danger-deep),0 8px 20px rgba(194,65,12,.35)}
+  /* IL + GRIGIO (23 set 2026, richiesta di Andrea): fuori dal libro
+     non si pubblica — in «I miei scambi», in «Info P2P» e nella pagina
+     di uno scambio, che accende «I miei scambi» — quindi il tondo
+     SCENDE al livello della barra, perde il rilievo e si fa grigio; al
+     tocco porta al libro su «Compra BTC» (toccaPiu). Tornando nel
+     libro riprende forma e colore del lato con la stessa corsa: sono
+     transform, fondo e ombra, le tre che il tondo sa gia' far correre.
+     La classe la scrive go() dalla VISTA, come nav-p2p, e sta DOPO il
+     rosso a pari catena: con tutt'e due sul body vince lei, che il
+     lato in «I miei scambi» non c'e'.
+     LA MISURA E' UNA SOTTRAZIONE: a riposo il centro del tondo sta 5px
+     sotto il bordo della barra (8 di padding, −30 di margine, 27 di
+     raggio) e il centro delle voci a 30 (8 + 44,2/2), quindi scende di
+     25; e a 54px nella fila da 44 non ci starebbe, quindi si stringe a
+     42 (.78) — il tondo di una voce, non un oggetto appoggiato sopra.
+     Il grigio e' fisso come tutto sulla banda: #7A7262 stacca 3,3:1 dal
+     bruno del giorno e 4,1:1 da quello della sera, e il + bianco gli
+     sta sopra a 4,8:1.
+     SOLO IL TONDO: da desktop il + e' la pillola «Pubblica» della
+     topbar, una linguetta sempre uguale come «Vendi» nel mercatino, e
+     resta com'era — per questo la regola vive sotto i 768px, e il JS
+     chiede la stessa larghezza (piuNeutroP2P). */
+  @media (max-width:767px){
+    body.nav-p2p.p2p-piu-neutro nav button.sell .ic{
+      transform:translateY(25px) scale(.78);background:#7A7262;
+      box-shadow:0 0 0 #5E5648,0 0 0 rgba(0,0,0,0)}
+  }
   @media (prefers-reduced-motion:reduce){
+    nav .nav-cella>.strato-p2p,
     nav button,nav,nav .nav-cella>button,nav button.sell .ic,
     nav button.sell .eti-pila>span{transition:none}
+  }
+
+  /* ====== IL TASTO BARATTOZON (23 set 2026, richiesta di Andrea) ======
+     Nel libro, sul lato «Vendi BTC», SOTTO il + rosso scende un secondo
+     tondo, piu' piccolo, col marchio di Barattozon: al tocco apre il
+     foglio «Vuoi vendere Bitcoin» col tabacchino gia' scelto, cioe'
+     dritto al passo 1 del percorso (apriBarattozonP2P). Rientra
+     passando a «Compra BTC», uscendo dal libro e mentre il + si apre
+     nel foglio (la barra che si apre, body.barra-via).
+     QUANDO C'E' LO DICONO LE CLASSI CHE C'ERANO GIA' — nav-p2p,
+     p2p-vendo, p2p-piu-neutro, barra-via — e nessuna sua: le scrivono
+     go() dalla vista e setLatoP2P dal tab, quindi indietro, cronologia
+     e gesto dell'app Android lo rimettono giusto da soli.
+     E' UNA TENDINA: il tondo si SROTOLA — il bordo di sotto del
+     ritaglio scende e lo scopre dall'alto, mentre lui scivola degli
+     ultimi 8px — e rientrando risale. Non scivola fuori da SOTTO il +,
+     che era la prima idea: servirebbe un + fermo a fargli da coperchio,
+     e il + non sta fermo — uscendo dal libro scende nella barra proprio
+     mentre questo rientra, e i due si incrocerebbero a mezz'aria. Col
+     ritaglio il tondo resta al suo posto, e il + che scende gli passa
+     DAVANTI: sta dopo nel markup, quindi si dipinge sopra.
+     UN <div> E NON UN <button>, la ragione del logo in topbar: `nav
+     button` e' il selettore delle VOCI (CSS, spazzata di go(), conta
+     delle celle) e questo tondo non e' una voce. Role, tabindex e tasti
+     glieli da' il markup.
+     LA MISURA E' QUELLA CHE CI STA, misurata sulla barra vera: il +
+     finisce 21px sotto il bordo di sopra (17 il tondo, piu' i 4 del suo
+     gradino) e sotto restano 60 — 36px partendo da 20, cioe' un pixel
+     sotto il gradino e quattro sopra il fondo dello schermo. A 40 (la
+     prima prova) toccava il fondo, a 34 il marchio si perdeva. Il
+     fondo e' il blu del marchio (#191D29), e sulla banda bruna quel blu
+     non stacca: il bordo lo disegna un filo chiaro, piu' l'ombra che lo
+     alza come il +. */
+  #navBarattozon{position:absolute;left:0;right:0;top:20px;
+    width:36px;height:36px;margin:0 auto;border-radius:50%;
+    background:#191D29;cursor:pointer;-webkit-tap-highlight-color:transparent;
+    box-shadow:0 0 0 1.5px rgba(241,232,213,.32),0 4px 10px rgba(0,0,0,.45);
+    clip-path:inset(-10px -10px 100% -10px);transform:translateY(-8px);
+    visibility:hidden;pointer-events:none;
+    transition:clip-path .4s cubic-bezier(.2,.7,.2,1),
+      transform .4s cubic-bezier(.2,.7,.2,1),visibility 0s linear .4s}
+  #navBarattozon img{display:block;width:100%;height:100%;border-radius:50%}
+  #navBarattozon:focus-visible{outline:2px solid #FFB25C;outline-offset:3px}
+  body.nav-p2p.p2p-vendo:not(.p2p-piu-neutro):not(.barra-via) #navBarattozon{
+    clip-path:inset(-10px -10px -16px -10px);transform:none;
+    visibility:visible;pointer-events:auto;transition-delay:.1s,.1s,0s}
+  /* ⚠️ IL DITO, CHE IL CLICK DA JS NON VEDE: il + e' una cella della
+     barra, e la sua SCATOLA (72px per 44, vuota: la scritta e' scesa)
+     copre il tondo — sta dopo nel markup, quindi sopra anche per il
+     tocco, e il dito sul marchio apriva il foglio SENZA tabacchino.
+     Visto col tocco vero nel pane: `element.click()` non passa dal
+     bersaglio e diceva che andava. Mentre il tondo c'e' la scatola
+     lascia passare il dito, e il + lo prende col solo suo cerchio, che
+     e' tutto quel che di lui si vede. Solo sotto i 768px: da desktop il
+     tondo non c'e' e la pillola si tocca tutta. */
+  @media (max-width:767px){
+    body.nav-p2p.p2p-vendo:not(.p2p-piu-neutro):not(.barra-via) #nav-vendi{
+      pointer-events:none}
+    body.nav-p2p.p2p-vendo:not(.p2p-piu-neutro):not(.barra-via) #nav-vendi .ic{
+      pointer-events:auto}
+  }
+  @media (prefers-reduced-motion:reduce){
+    #navBarattozon{transition:none}
   }
 
   /* ---------- barra d'acquisto del dettaglio (solo mobile) ----------
@@ -7463,9 +7570,15 @@
         inset 0 1px 0 rgba(255,255,255,.06)}
     /* la pillola attiva sulla banda scura: il crema di giorno
        (--sats-soft) renderebbe il colore illeggibile — qui la pillola
-       e' un velo del LATO sulla banda, verde o rosso come la voce */
-    body.nav-p2p nav button.active{background:rgba(52,180,122,.14)}
-    body.nav-p2p.p2p-vendo nav button.active{background:rgba(240,122,71,.15)}
+       e' un velo del colore della voce: caldo per quelle senza lato,
+       verde o rosso per il solo libro (vedi la voce attiva, sopra) */
+    body.nav-p2p nav button.active{background:rgba(255,178,92,.16)}
+    body.nav-p2p nav #nav-p2plibro.active{background:rgba(52,180,122,.14)}
+    body.nav-p2p.p2p-vendo nav #nav-p2plibro.active{background:rgba(240,122,71,.15)}
+    /* il tasto Barattozon e' una tendina SOTTO il tondo, e da desktop
+       il tondo non c'e': sotto la pillola della topbar penderebbe sulla
+       pagina. Il tabacchino resta a un tocco nel foglio, fra i metodi */
+    #navBarattozon{display:none}
     header{top:60px}
     header .brand{display:none}   /* il logo ora sta nella topbar */
     .searchbar{max-width:640px}
@@ -10113,6 +10226,17 @@ document.getElementById('cartello')?.remove();</script>
          Dentro: gli ordini di TUTTI, il libro del coordinatore. -->
     <button id="nav-p2plibro" class="strato-p2p" onclick="go('p2p')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M12 6.1C10.2 4.9 7.7 4.6 5.1 5.2v12.5c2.6-.6 5.1-.3 6.9 1 1.8-1.3 4.3-1.6 6.9-1V5.1c-2.6-.5-5.1-.2-6.9 1z"/><path d="M12 6.1C10.2 4.9 7.7 4.6 5.1 5.2v12.5c2.6-.6 5.1-.3 6.9 1"/><path d="M12 6.1c1.8-1.2 4.3-1.5 6.9-1v12.6c-2.6-.6-5.1-.3-6.9 1"/><path d="M12 6.1v12.6"/></svg></span>Libro ordini</button>
     </div>
+    <!-- IL TASTO BARATTOZON (23 set 2026): il tondo col marchio che
+         nel libro, su «Vendi BTC», scende sotto il + e apre il foglio
+         col tabacchino gia' scelto. Sta PRIMA del + apposta: si dipinge
+         sotto di lui, e il + che scende nella barra gli passa davanti.
+         Nascosto finche' le classi non lo chiamano (vedi il suo CSS),
+         e da nascosto non si tocca e non si raggiunge col Tab. -->
+    <div id="navBarattozon" role="button" tabindex="0"
+         aria-label="Vendi con Barattozon: contanti al tabacchino"
+         title="Vendi con Barattozon"
+         onclick="apriBarattozonP2P()"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();apriBarattozonP2P()}"><img src="/assets/barattozon-tasto.webp" width="36" height="36" alt="" onerror="this.remove()"></div>
     <!-- Il + di Vendi: nel P2P la scritta scende e il tondo si
          trasforma (vedi il CSS della nav trasformata). Le DUE
          etichette stanno impilate in .eti-pila: «Pubblica» esiste
@@ -12612,13 +12736,36 @@ function vaiP2P(){
    cosi' vale anche per indietro e cronologia, la lezione di
    renderInteresse. */
 const VISTE_NAV_P2P = new Set(['p2p','p2pmiei','p2pordine','p2pinfo']);
-/* Il + della barra ha DUE mestieri e uno solo alla volta: fuori dal
-   P2P apre Vendi, dentro pubblica un ordine. Chiede alla classe sul
-   body — che e' la stessa verita' che l'utente ha davanti agli occhi:
-   se il + e' tondo e verde, pubblica. */
+/* IL + GRIGIO (23 set 2026, richiesta di Andrea): fuori dal libro il
+   tondo non pubblica — porta al libro, su «Compra BTC». La classe la
+   scrive go() dalla vista, come nav-p2p; la LARGHEZZA si chiede qui
+   come il CSS la chiede alla sua media, perche' da desktop il + e' la
+   pillola «Pubblica» della topbar e resta com'era. Le due domande sono
+   la stessa verita' che l'utente ha davanti: se il tondo e' grigio,
+   porta al libro. */
+function piuNeutroP2P(){
+  return document.body.classList.contains('p2p-piu-neutro')
+    && matchMedia('(max-width: 767px)').matches;
+}
+/* Il + della barra ha TRE mestieri e uno solo alla volta: fuori dal
+   P2P apre Vendi, nel libro pubblica un ordine, e fuori dal libro
+   (grigio) riporta al libro. Chiede alla classe sul body — che e' la
+   stessa verita' che l'utente ha davanti agli occhi: se il + e' tondo
+   e verde, pubblica. */
 function toccaPiu(){
+  if (piuNeutroP2P()) { libroDaPiuP2P(); return; }
   if (document.body.classList.contains('nav-p2p')) { apriNuovoOrdineP2P(); return; }
   go('vendi');
+}
+/* ...e il libro ci si apre su «Compra BTC», verde (richiesta di
+   Andrea): il lato si mette PRIMA di entrare, cosi' il libro si dipinge
+   gia' giusto e il + sale nel suo colore invece di passare dal rosso.
+   Senza la scossa del logo: quella e' la risposta al dito sul TAB, e
+   qui il dito era sul +. La strada e' quella della voce «Libro
+   ordini», go('p2p'): la pila della cronologia la sa gia'. */
+function libroDaPiuP2P(){
+  setLatoP2P('compro', true);
+  go('p2p');
 }
 
 function go(view){
@@ -12670,8 +12817,14 @@ function go(view){
      rimettono giusta da soli. Il + cambia mestiere con lei (toccaPiu)
      e l'aria-label dice quello del momento. */
   document.body.classList.toggle('nav-p2p', VISTE_NAV_P2P.has(view));
+  /* ...e il + GRIGIO fuori dal libro (23 set 2026), dalla stessa vista:
+     nel P2P si pubblica solo dal libro, e la pagina di uno scambio sta
+     con «I miei scambi», che e' la voce che accende */
+  document.body.classList.toggle('p2p-piu-neutro',
+    VISTE_NAV_P2P.has(view) && view !== 'p2p');
   el('nav-vendi')?.setAttribute('aria-label',
-    VISTE_NAV_P2P.has(view) ? 'Pubblica il tuo ordine' : 'Vendi un oggetto');
+    piuNeutroP2P() ? 'Vai al libro ordini'
+    : VISTE_NAV_P2P.has(view) ? 'Pubblica il tuo ordine' : 'Vendi un oggetto');
   /* la riga «nessuno puo' scriverti» compare solo a chi e' davvero
      senza canali: si rivaluta a ogni ingresso, perche' nel frattempo
      l'utente puo' aver verificato la npub */
@@ -40167,11 +40320,15 @@ function scuotiLogoP2P(){
     p.classList.add('scossa');
   });
 }
-function setLatoP2P(lato){
+/* `senzaScossa` (23 set 2026): chi mette il lato SENZA un dito sul tab —
+   il + grigio che riporta al libro su «Compra BTC» — non scuote il logo
+   e non vibra: la vibrazione la da' gia' go(), e la scossa e' la
+   risposta al tab. */
+function setLatoP2P(lato, senzaScossa){
   if (!P2P_LATO_K[lato]) return;
-  scuotiLogoP2P();
+  if (!senzaScossa) scuotiLogoP2P();
   if (lato === p2pLato) return;
-  haptic();
+  if (!senzaScossa) haptic();
   p2pLato = lato;
   /* il + della nav trasformata veste il colore del lato: verde a
      comprare, rosso a vendere. La classe resta anche fuori dal P2P
@@ -48059,12 +48216,21 @@ function chiudiMorfoP2P(){
   p2pMorfoTimer = setTimeout(spegniMorfoP2P, P2P_MORFO_MS + 30);
 }
 
-function apriNuovoOrdineP2P(){
+function apriNuovoOrdineP2P(metodo){
   haptic();
   if (DEMO) { toast('Nel demo si guarda soltanto: gli scambi veri vivono nell\'app 🔁'); return; }
   if (VETRINA || !myTgId) { invitoTelegram(INVITO_ONION.p2p, 'p2p'); return; }
   p2pNuovoEuro = ''; p2pNuovoEuroMax = ''; p2pNuovoSats = '';
   p2pNuovoMetodi = [];
+  /* IL TASTO BARATTOZON (23 set 2026) apre questo stesso foglio col
+     metodo gia' scelto, e lo sceglie QUI — prima del disegno e prima
+     della morfosi, non dopo: col tabacchino il bottone d'arrivo dice
+     «Rileggi e pubblica», e il fantasma che vola copia la scritta del
+     bottone vero; sceglierlo a foglio aperto le avrebbe scambiate a
+     corsa finita. Vale solo un metodo che il lato puo' pubblicare (il
+     tabacchino e' di chi vende): se no il foglio si apre come sempre. */
+  if (metodo && metodiPubblicabiliP2P(p2pLato).indexOf(metodo) >= 0)
+    p2pNuovoMetodi = [metodo];
   p2pNuovoAperta = false;
   p2pNuovoValuta = P2P_VALUTE[0].cod;
   p2pNuovoDue = false;
@@ -48085,6 +48251,16 @@ function apriNuovoOrdineP2P(){
      a pieno schermo la tastiera che si apre da sola copre meta' delle
      sezioni, e la prima cosa da leggere e' la valuta — non da
      scrivere. Si tocca il campo quando ci si arriva. */
+}
+/* IL TASTO BARATTOZON (23 set 2026, richiesta di Andrea): il tondo che
+   scende sotto il + nel libro, su «Vendi BTC». Apre lo STESSO foglio del
+   + — stesse guardie, stessa morfosi dal +, che e' il bottone che
+   pubblica — col tabacchino gia' scelto: il titolo e' «Vuoi vendere
+   Bitcoin» e si parte dal passo 1 del percorso, il PayCode. Senza fuoco
+   sul campo, per la ragione del foglio: la tastiera coprirebbe il
+   cappello che dice cos'e' Barattozon. */
+function apriBarattozonP2P(){
+  apriNuovoOrdineP2P(P2P_TABACCHINO);
 }
 
 /* IL RIQUADRO DI UNA SEZIONE: icona tonda, titolo, e quel che c'e'

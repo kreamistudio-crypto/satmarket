@@ -28540,3 +28540,82 @@ modalità collaudo); niente pubblicato. Da qui il config copiato nel
 worktree si neutralizza prima di avviare — relay Nostr e P2P su
 `127.0.0.1:9`, nsec al segnaposto — e si guarda che il server parli solo
 con `127.0.0.1`. La guardia nel codice la fa un'altra sessione.
+## Il tasto Barattozon e il + neutro nel P2P (23 set 2026)
+
+Richiesta di Andrea, tre ritocchi alla barra trasformata del P2P. Un
+worktree da `origin/main`, commit firmato.
+
+**COSA C'È.** 1) Nel libro, su «Vendi BTC», sotto il + rosso scende A
+TENDINA un tondo da 36px col marchio di Barattozon (`#navBarattozon`):
+al tocco apre «Vuoi vendere Bitcoin» col tabacchino già scelto, al passo
+1 (il PayCode). Rientra passando a «Compra BTC», uscendo dal libro e
+quando il + si apre nel foglio; con gli effetti ridotti compare senza
+corsa; da desktop non c'è. Il marchio viene da `barattozon-icona.jpeg`
+del Desktop: quadrato attorno alla B e alla freccia, centrato sul
+cerchio minimo che le contiene col punto più lontano all'82% del
+raggio, blu #191D29 fino ai bordi, WebP 108×108 (3×36), 1,7 KB, rotta
+esplicita. 2) Fuori dal libro — «I miei scambi», «Info P2P» e la pagina
+di uno scambio — il + scende nella barra, 42px senza rilievo, grigio
+#7A7262, e al tocco porta al libro su «Compra BTC». 3) «I miei scambi» e
+«Info P2P» accese sono ARANCIO (#FFB25C, il velo caldo da desktop): il
+verde e il rosso restano a «Libro ordini».
+
+**I PERCHÉ E LE STRADE SCARTATE.** La tendina è un RITAGLIO che si
+srotola (più 8px di scivolo), non un tondo che esce da sotto il +: la
+prima idea, scartata perché uscendo dal libro il + scende nella barra
+mentre il tondo rientra, e i due si sarebbero incrociati a mezz'aria.
+Col ritaglio il tondo sta fermo e il + gli passa davanti (sta dopo nel
+markup). LA MISURA È QUELLA CHE CI STA: sotto il gradino del + restano
+39px fino al fondo; a 40 toccava il fondo, a 34 il marchio si perdeva, a
+36 partendo da 20 resta un pixel sotto il gradino e quattro sopra il
+fondo. Sulla banda il blu del marchio non stacca (1,07:1 di giorno), e
+il bordo lo disegna un filo chiaro. Il + grigio si stringe a 42 perché a
+54 nella fila da 44 non ci sta. Il lato si mette PRIMA di entrare nel
+libro e senza la scossa del logo (`setLatoP2P(lato, senzaScossa)`: la
+scossa è la risposta al tab); la strada è quella della voce «Libro
+ordini», `go('p2p')`. Nessuna classe nuova per il tondo: lo accendono
+`nav-p2p`, `p2p-vendo`, `p2p-piu-neutro` e `barra-via`, quindi indietro,
+cronologia e gesto dell'app lo rimettono giusto da soli.
+DA FAR LEGGERE AD ANDREA, scelte mie: la pagina di uno scambio ha il +
+grigio (accende «I miei scambi», e lì non si pubblica); la stretta a
+42px; da desktop niente tondo, e la pillola «Pubblica» resta com'era
+anche nei miei — lì è una linguetta come «Vendi» nel mercatino (il
+giudice `piuNeutroP2P` chiede la larghezza come il CSS).
+
+**DUE DIFETTI TROVATI STRADA FACENDO.** 1) IL DITO: la scatola del +
+(una cella della barra, 72×44, vuota) copre il tondo e sta dopo nel
+markup, quindi il tocco VERO sul marchio apriva il foglio SENZA
+tabacchino — mentre `element.click()`, che non passa dal bersaglio,
+diceva che andava. L'ha visto il tocco nel pane; mentre il tondo c'è la
+scatola del + lascia passare il dito e il + si prende col suo cerchio,
+solo sotto i 768px. 2) GLI STRATI cambiavano colore DI SCATTO: la
+transizione delle celle non nominava il colore, mentre Esplora sfumava.
+Ora sfumano in .4s come lei, e reduced-motion li ferma.
+
+**PROVATO.** `prove_tasto_barattozon`, 31 (il file, la rotta, il markup,
+le sei regole del tondo e l'unica che lo accende, il dito, e un banco
+node con le funzioni vere dell'apertura), e `prove_nav_p2p` emendata col
+perché (il lato del solo libro, la firma di `setLatoP2P`, il grigio
+sotto i 768 dopo il rosso con due ombre, il colore degli strati,
+`toccaPiu` in quattro casi); tre ancore di `apriNuovoOrdineP2P`
+aggiornate. **TORTURA 37/37** su una copia (le otto sezioni toccate,
+1011 verdi di partenza), nessuna inciampata. DAL VIVO,
+server del worktree e relay morto: a 320/375/430 nei due temi il tondo
+sta fra 15 e 37px dalle etichette (a 320 «I miei scambi» va a capo, come
+prima); i fotogrammi a metà corsa (Chrome headless, reduced-motion
+spento a mano) mostrano la tendina e il + che scende senza incrociarla;
+il tocco vero sul tondo apre il foglio al passo 1, quello sul + grigio
+porta al libro su «Compra BTC»; la morfosi parte col fantasma «🧾
+Rileggi e pubblica» e alla chiusura il tondo torna; l'indietro dai miei
+rimette tutto. SEGNALATO, NON TOCCATO: il logo del libro ridondola a ogni
+ritorno nel libro (la classe `scossa` resta appesa e l'animazione
+riparte quando la vista torna visibile) — c'era già.
+
+**DA GUARDARE SUL TELEFONO.** Il tondo su «Vendi BTC» sotto il + rosso,
+che non copra «Libro ordini» e «I miei scambi» e non lo tagli la barra
+dei gesti (sta a 4px dal fondo senza margine di sistema); il tocco sul
+tondo (tabacchino al passo 1) e sul + subito sopra (foglio normale); in
+«I miei scambi», «Info P2P» e in uno scambio il + grigio e la voce
+arancio; il + grigio che porta al libro su «Compra BTC»; il gesto
+indietro dell'app da «I miei scambi», senza scatti; e con gli effetti
+ridotti il tondo che compare fermo.
