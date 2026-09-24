@@ -7457,6 +7457,16 @@ def init_db():
             con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
             pass
+    # LA FATTURA RIGENERATA (24 set 2026, «Paga ora»): quando il
+    # compratore ha chiesto una fattura nuova per un ordine 'creato' la
+    # cui fattura era scaduta senza pagamento. Il pattern di `busta_il`:
+    # il flag E il quando in una colonna sola, 0 = mai. Si rigenera UNA
+    # volta sola (vedi `nuova_fattura_ordine`, e il perche').
+    try:
+        con.execute("ALTER TABLE ordini ADD COLUMN "
+                    "fattura_rinnovata_il INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
     # I CREDITI DA RECUPERARE: il pagamento rimasto appeso sulla
     # cassaforte d'origine quando l'ordine e' stato pagato da un'altra.
     # Quei sats sono impegnati LA' finche' quel pagamento non si decide:
@@ -32519,6 +32529,195 @@ async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header(""),
     return await _incassa_ordine(ordine_id)
 
 
+def scadenza_fattura_ordine(invoice: str, creato: int) -> int:
+    """QUANDO MUORE la fattura di un ordine 'creato' (24 set 2026,
+    «Paga ora»): l'ora scritta DENTRO la bolt11, che e' quella che il
+    wallet e il nodo rispettano — e se la bolt11 non si legge (le
+    fatture di cartone dei collaudi) la nascita dell'ordine piu' la
+    vita di serie, cioe' l'ora con cui l'orologio la dichiara morta.
+    La bolt11 nasce qualche secondo PRIMA della riga (la si conia e poi
+    si scrive), quindi le due ore differiscono di quei secondi e mai
+    nel verso sbagliato: nessuno la dichiara morta prima del wallet.
+    E' il gemello di `scadenzaFatturaOrdine` del client: tutt'e due
+    leggono PRIMA la bolt11 (`leggi_bolt11` / `leggiBolt11`, gia'
+    gemelli con la loro prova) e ripiegano sullo stesso conto."""
+    letta = leggi_bolt11(invoice)
+    if letta:
+        return int(letta["scade"])
+    return int(creato or 0) + INVOICE_EXPIRY
+
+
+@app.post("/api/orders/{ordine_id}/nuova-fattura")
+async def nuova_fattura_ordine(ordine_id: int, x_tg_init_data: str = Header(""),
+                               barattolo_sessione: str = Cookie("")):
+    """LA FATTURA NUOVA PER LO STESSO ORDINE (24 set 2026, dal campo:
+    il compratore chiude per sbaglio il foglio del pagamento, riapre
+    l'ordine e non ha modo di rivedere la fattura — e alla scadenza
+    l'ordine si annulla in silenzio). La fattura VIVA la riapre il
+    client da solo, che l'ha gia' nella lista degli ordini; questa
+    rotta serve quando e' MORTA, e ne conia una nuova sulla stessa
+    riga, per lo stesso importo.
+
+    UNA SOLA FATTURA VIVA PER ORDINE, ed e' la regola che decide la
+    forma:
+    1) se quella di prima e' ancora viva si RIPRESENTA quella e non se
+       ne conia un'altra: un telefono con l'orologio avanti di un
+       minuto non deve lasciare due fatture pagabili sullo stesso
+       ordine;
+    2) prima di coniare si chiede a LNbits com'e' andata la vecchia —
+       l'invariante di controlla_abbandonati: nessun payment_hash esce
+       da una riga senza che qualcuno abbia chiesto. Pagata = si incassa
+       e basta. LNbits muto = 503 e non si conia niente: qui il dubbio
+       costa una fattura in meno, non un pagamento perso, quindi si sta
+       dalla parte del no (l'orologio fa il contrario, e ha ragione lui:
+       li' il dubbio costerebbe un ordine pagato buttato via);
+    3) lo scambio e' un CAS sulla fattura vecchia: due tocchi insieme
+       coniano due fatture, ma in colonna ne entra una sola — l'altra
+       non l'ha vista nessuno, e muore da sola in 15 minuti.
+    Fra la domanda e lo scambio la vecchia non e' pagabile: e' SCADUTA
+    per la sua bolt11, e il nodo rifiuta un pagamento su una fattura
+    scaduta. Se un backend lo incassasse lo stesso, l'incasso resterebbe
+    senza riga col memo nostro — esattamente quel che `orfani.py`
+    esiste per trovare.
+
+    LA STESSA RIGA, E NON UN ORDINE NUOVO come fa la ripresa in
+    compra(): la prenotazione dello stock resta dov'e' (_riservati
+    conta i 'creato'), il legame con l'offerta e il codice sconto pure,
+    le righe del set non si toccano, e il numero d'ordine che il
+    compratore ha davanti resta quello. `creato` si rinfresca perche' e'
+    l'ora di nascita della FATTURA per chi lo legge (l'orologio, la
+    ripresa, la finestra delle lapidi); `cassaforte` segue la fattura
+    nuova, che nasce dove nasce oggi il denaro nuovo — su un ordine non
+    pagato non c'e' ancora denaro da nessuna parte.
+
+    UNA VOLTA SOLA, ed e' la guardia sul prezzo: la vita della fattura
+    E' il lock del prezzo (lo dice la ripresa), e sugli annunci in euro
+    i sats sono stati convertiti al cambio della nascita. Rigenerare
+    all'infinito allo stesso importo darebbe a chi compra un'opzione
+    gratuita sul cambio — pagare solo se nel frattempo il BTC e' sceso —
+    e terrebbe il pezzo prenotato per sempre. Una volta copre il caso
+    vero, il foglio chiuso per sbaglio; per la seconda si ricompra
+    dall'annuncio, che rifa' i conti al cambio di adesso.
+
+    LE PORTE DELL'ACQUISTO CHE IL VENDITORE PUO' AVER CHIUSO mentre la
+    fattura moriva si riguardano: ogni annuncio dell'ordine ancora
+    'attivo', e il negozio non in ferie — PRIMA della fattura, come in
+    compra(). Lo stock no: la riga 'creato' lo teneva prenotato."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=? AND compratore_id=?",
+                    (ordine_id, user["id"])).fetchone()
+    con.close()   # niente transazione aperta durante gli await qui sotto
+    # UN MESSAGGIO SOLO per «non e' tuo» e «non aspetta piu' niente»: chi
+    # enumera gli id non impara niente (il patto delle rotte sorelle),
+    # e a chi ha comprato dice la cosa vera — l'orologio l'ha chiuso,
+    # o l'ha pagato un altro giro.
+    if not o or o["stato"] != "creato":
+        raise HTTPException(400, "Questo ordine non aspetta più un "
+                                 "pagamento: se l'oggetto ti interessa "
+                                 "ancora, ricompralo dall'annuncio")
+    adesso = int(time.time())
+    scade = scadenza_fattura_ordine(o["invoice"], o["creato"])
+    if o["invoice"] and scade > adesso:
+        return {"ordine_id": ordine_id, "invoice": o["invoice"],
+                "scade_il": scade, "prezzo_sats": o["prezzo_sats"],
+                "nuova": False}
+    if _campo(o, "fattura_rinnovata_il", 0):
+        raise HTTPException(400, "La fattura di quest'ordine è già stata "
+                                 "rigenerata una volta: se l'oggetto ti "
+                                 "interessa ancora, ricompralo "
+                                 "dall'annuncio, al prezzo di adesso")
+    if o["payment_hash"]:
+        try:
+            pagata = await invoice_pagata(o["payment_hash"],
+                                          o["cassaforte"])
+        except Exception as e:
+            print(f"⚠️ Fattura nuova per l'ordine #{ordine_id}: "
+                  f"LNbits non risponde ({e})")
+            raise HTTPException(503, "Non riesco a controllare il "
+                                     "pagamento di prima: riprova fra "
+                                     "un minuto")
+        if pagata:
+            # l'ha pagata davvero, all'ultimo secondo: niente fattura
+            # nuova, l'ordine va avanti (il CAS di _incassa_ordine fa il
+            # resto se il poll arriva insieme)
+            return await _incassa_ordine(ordine_id)
+    con = db()
+    righe = _righe_ordine(con, o)
+    for r in righe:
+        a = con.execute("SELECT stato FROM annunci WHERE id=?",
+                        (r["annuncio_id"],)).fetchone()
+        if not a or a["stato"] != "attivo":
+            con.close()
+            raise HTTPException(409, f"«{r['titolo']}» non è più in "
+                                     f"vendita: la fattura non si può "
+                                     f"rigenerare")
+    if not righe:
+        con.close()
+        raise HTTPException(409, "Quest'ordine non ha più oggetti da "
+                                 "pagare")
+    guardia_ferie(con, o["venditore_id"])   # sul rifiuto chiude lei
+    con.close()
+    # IL MEMO E' QUELLO DELLE DUE PORTE CHE CONIANO (compra e
+    # _compra_set), lettera per lettera nel prefisso: e' quel che
+    # `orfani.py` riconosce come «nostro» (vedi NOSTRI la').
+    primo = righe[0]["titolo"]
+    memo = (f"Barattolo escrow #{o['annuncio_id']}: {primo[:40]}"
+            if o["annuncio_id"] else
+            f"Barattolo escrow set: {primo[:25]} +{len(righe) - 1} "
+            f"({len(righe)} oggetti)")
+    cf = cassaforte_nuova()
+    try:
+        inv = await crea_invoice_escrow(o["prezzo_sats"], memo,
+                                        cassaforte=cf)
+    except Exception as e:
+        print(f"⚠️ Fattura nuova per l'ordine #{ordine_id} non coniata: {e}")
+        raise HTTPException(503, "Non riesco a creare la fattura adesso: "
+                                 "riprova fra un minuto")
+    # Da qui allo scambio NIENTE await: il CAS deve vedere la riga come
+    # sta adesso, non come stava prima di una pausa.
+    adesso = int(time.time())
+    con = db()
+    cur = con.execute(
+        "UPDATE ordini SET invoice=?, payment_hash=?, cassaforte=?, "
+        "creato=?, aggiornato=?, fattura_rinnovata_il=? "
+        "WHERE id=? AND stato='creato' AND payment_hash=? "
+        "AND COALESCE(fattura_rinnovata_il, 0)=0",
+        (inv["payment_request"], inv["payment_hash"], cf,
+         adesso, adesso, adesso, ordine_id, o["payment_hash"]))
+    con.commit()
+    if cur.rowcount == 0:
+        # qualcuno e' passato prima: un secondo tocco (e allora la sua
+        # fattura e' viva e si ripresenta quella), il saldo, o
+        # l'orologio che ha messo la lapide. La fattura appena coniata
+        # non entra da nessuna parte e muore da sola.
+        r = con.execute("SELECT stato, invoice, creato, prezzo_sats "
+                        "FROM ordini WHERE id=?", (ordine_id,)).fetchone()
+        con.close()
+        if r and r["stato"] == "creato" and r["invoice"]:
+            scade = scadenza_fattura_ordine(r["invoice"], r["creato"])
+            if scade > adesso:
+                return {"ordine_id": ordine_id, "invoice": r["invoice"],
+                        "scade_il": scade, "prezzo_sats": r["prezzo_sats"],
+                        "nuova": False}
+        if r and r["stato"] == "annullato":
+            raise HTTPException(400, "Questo ordine non aspetta più un "
+                                     "pagamento: se l'oggetto ti "
+                                     "interessa ancora, ricompralo "
+                                     "dall'annuncio")
+        if r and r["stato"] != "creato":
+            return {"stato": r["stato"]}   # pagato proprio adesso
+        raise HTTPException(409, "L'ordine è cambiato proprio adesso: "
+                                 "riaprilo dai tuoi Ordini")
+    con.close()
+    print(f"⚡ Ordine #{ordine_id}: fattura rigenerata "
+          f"({_fmt_sats(o['prezzo_sats'])} sats, cassaforte {cf})")
+    return {"ordine_id": ordine_id, "invoice": inv["payment_request"],
+            "scade_il": scadenza_fattura_ordine(inv["payment_request"],
+                                                adesso),
+            "prezzo_sats": o["prezzo_sats"], "nuova": True}
+
+
 # --------------- LA RICEVUTA DEL COMPRATORE (ago 2026) ---------------
 # Chi paga non riceveva NIENTE dal server: al venditore partiva «Hai
 # venduto», ai moderatori il polso, a lui il solo toast in-app, che
@@ -48810,10 +49009,17 @@ async def controlla_abbandonati():
             # Il CAS: se il poll del compratore ha portato l'ordine a
             # 'locked' fra la nostra domanda a LNbits e adesso, qui
             # rowcount 0 e non si tocca niente.
+            # E ANCHE SULLA FATTURA (24 set 2026, «Paga ora»): se nello
+            # stesso intervallo il compratore ne ha chiesta una NUOVA
+            # (`nuova_fattura_ordine`), la domanda qui sopra era sulla
+            # vecchia — e annullare adesso vorrebbe dire mettere la
+            # lapide su un ordine con la fattura appena nata, viva e
+            # pagabile. Col payment_hash nel WHERE quell'ordine resta
+            # 'creato', e lo si guarda al giro in cui la SUA muore.
             cur = con.execute(
                 "UPDATE ordini SET stato='annullato', aggiornato=? "
-                "WHERE id=? AND stato='creato'",
-                (int(time.time()), o["id"]))
+                "WHERE id=? AND stato='creato' AND payment_hash=?",
+                (int(time.time()), o["id"], o["payment_hash"]))
             if cur.rowcount:
                 # Come annulla_ordine: l'offerta si scioglie dal legame
                 # e resta 'accettata' fino alla SUA scadenza, cosi' si

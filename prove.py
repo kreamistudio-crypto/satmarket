@@ -3673,7 +3673,10 @@ def prove_doppio_wallet():
     prova("ogni crea_invoice_escrow passa cassaforte=", [],
           [cod[:i].count("\n") + 1 for i in chiamate
            if "cassaforte=" not in cod[i:i + 400]])
-    prova("...e le strade che coniano sono cinque", 5, len(chiamate))
+    # SEI dal 24 set 2026: la sesta e' `nuova_fattura_ordine`, la
+    # fattura nuova per lo STESSO ordine quando quella di prima e'
+    # scaduta senza pagamento («Paga ora»)
+    prova("...e le strade che coniano sono sei", 6, len(chiamate))
 
     # 3) chi legge passa la colonna della riga, mai un letterale
     prova("nessun invoice_pagata a un argomento solo", [],
@@ -12827,9 +12830,13 @@ console.log(JSON.stringify(out));
     # LA TABELLA INTERA, coi due stadi: fermo, e col pagamento in volo.
     # IN PAGAMENTO e' viola per tutti tranne il concluso, dove il
     # pagamento c'e' ma la corsa e' finita — e' il giudice di casa.
+    # DA PAGARE, a chi compra, si veste PIENO (24 set 2026, «Paga
+    # ora»): e' l'unico stato che aspetta un suo gesto, e col velato di
+    # «Sats depositati» le due righe si leggevano uguali. Il banco
+    # chiama da compratore, quindi e' qui che si vede.
     prova("ogni stato veste il suo rettangolino, e in pagamento passa "
           "al viola",
-          {"creato": ["locked", "confirmed"],
+          {"creato": ["dapagare", "confirmed"],
            "locked": ["locked", "confirmed"],
            "shipped": ["shipped", "confirmed"],
            "delivered": ["confirmed", "confirmed"],
@@ -22719,10 +22726,31 @@ def prove_pagina_acquisto():
     j = src.index("INSERT INTO pagamenti", i)
     prova("richiedi_slug_negozio: zero await tra invoice e INSERT", False,
           "await " in codice(src[i:j]))
+    # IL SESTO (24 set 2026, «Paga ora»): la fattura nuova per lo
+    # STESSO ordine, quando quella di prima e' morta senza pagamento.
+    # Non scrive un INSERT ma un UPDATE sulla riga che c'e' — un CAS
+    # sulla fattura vecchia — e fra il conio e lo scambio vale lo
+    # stesso patto: nessun await, o il CAS guarderebbe la riga com'era
+    # prima di una pausa.
+    i = src.index("crea_invoice_escrow(",
+                 src.index("def nuova_fattura_ordine("))
+    j = src.index("UPDATE ordini SET invoice=?", i)
+    prova("nuova_fattura_ordine: zero await tra invoice e UPDATE", False,
+          "await " in codice(src[i:j]))
+    # ...e le porte che il venditore puo' aver chiuso si guardano PRIMA
+    # della fattura, come in compra(): un no dopo lascerebbe una
+    # fattura coniata per niente
+    nf = pezzo("nuova_fattura_ordine")
+    # .find e non .index: una sentinella che ESPLODE sulla riga sparita
+    # si legge come un banco rotto, non come la guardia tolta
+    i_f, i_a, i_c = (nf.find("guardia_ferie("), nf.find("!= \"attivo\""),
+                     nf.find("crea_invoice_escrow("))
+    prova("nuova_fattura_ordine: ferie e annuncio attivo prima della "
+          "fattura", True, -1 < i_f < i_c and -1 < i_a < i_c)
     # E IL CENSIMENTO DEI CHIAMANTI, che vale piu' dell'elenco: sono
-    # CINQUE, e il sesto di domani lo sente da qui invece di
+    # SEI, e il settimo di domani lo sente da qui invece di
     # scoprirlo il giorno che un incasso resta senza riga.
-    prova("chi conia una fattura in entrata e' cinque", 5,
+    prova("chi conia una fattura in entrata e' sei", 6,
           codice(src).count("await crea_invoice_escrow("))
 
     # 3. Il punto NON esce su Nostr (tariffa interna del checkout,
@@ -92963,6 +92991,591 @@ caso('il tocco lungo', () => {
 """
 
 
+def prove_paga_ora():
+    """«⚡ PAGA ORA» (24 set 2026, dal campo — l'ordine #196): il
+    compratore chiude per sbaglio il foglio del pagamento senza pagare,
+    riapre l'ordine e trova il solo «Ho pagato la invoice — verifica»:
+    nessun modo di rivedere la fattura, e alla scadenza l'ordine si
+    annulla in silenzio. Qui:
+    1) il GIUDICE della scadenza, coi due gemelli che dicono la stessa
+       ora sulle stesse fatture;
+    2) la ROTTA della fattura nuova, sul pezzo vero con un database in
+       memoria e LNbits di cartone: viva = la stessa, senza conio;
+       morta = una nuova sulla stessa riga, una volta sola; pagata = si
+       incassa; LNbits muto = niente; le porte chiuse dal venditore; e
+       due tocchi insieme che lasciano UNA fattura in colonna;
+    3) l'OROLOGIO che non mette la lapide su una fattura appena nata;
+    4) il CLIENT: la fattura nella riga, «Paga ora» senza chiamate, il
+       conto alla rovescia del dettaglio e del foglio, e openOrder
+       fatto girare davvero per la linea del tempo — «Deposita i sats»
+       finche' non e' arrivato niente, «Hai depositato i sats» solo
+       dopo."""
+    print("\n[«Paga ora»: la stessa fattura, e una nuova solo da morta]")
+    import asyncio
+    import sqlite3
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+
+    def gira(coro):
+        return asyncio.new_event_loop().run_until_complete(coro)
+
+    ADESSO = int(time.time())
+    VIVA = bolt11_finta(25_000, 900, ADESSO - 60, phash=1)
+    MORTA = bolt11_finta(25_000, 900, ADESSO - 1000, phash=2)
+    NUOVE = [bolt11_finta(25_000, 900, ADESSO, phash=100 + k)
+             for k in range(4)]
+
+    # ---- 1) il giudice della scadenza, e i due gemelli -------------
+    amb = {}
+    for nome in ("_BECH32_ALFABETO", "_BECH32_GEN", "INVOICE_EXPIRY"):
+        exec(re.search(rf"^{nome} = .*$", _SORGENTE, re.M).group(0), amb)
+    exec(pezzo("leggi_bolt11"), amb)
+    exec(pezzo("scadenza_fattura_ordine"), amb)
+    sfo = amb["scadenza_fattura_ordine"]
+    prova("la scadenza si legge dalla bolt11", (ADESSO + 840, ADESSO - 100),
+          (sfo(VIVA, ADESSO), sfo(MORTA, ADESSO)))
+    prova("...e senza una bolt11 leggibile e' la nascita piu' la vita "
+          "di serie", (ADESSO + 900, ADESSO + 895),
+          (sfo("lnbc25000collaudo", ADESSO), sfo("", ADESSO - 5)))
+
+    # ---- 2) la rotta, sul pezzo vero --------------------------------
+    class Rifiuto(Exception):
+        def __init__(self, codice, detail=""):
+            super().__init__(detail)
+            self.status_code, self.detail = codice, detail
+
+    def mondo(stato="creato", invoice=MORTA, creato=ADESSO - 1000,
+              rinnovata=0, annuncio="attivo", ferie=0, pagata=False,
+              muto=False, pausa=False):
+        vero = sqlite3.connect(":memory:")
+        vero.row_factory = sqlite3.Row
+        vero.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, "
+                     "stato TEXT, compratore_id INT, venditore_id INT, "
+                     "annuncio_id INT, invoice TEXT, payment_hash TEXT, "
+                     "cassaforte TEXT, creato INT, aggiornato INT, "
+                     "prezzo_sats INT, quantita INT, spedizione_sats INT, "
+                     "protezione_sats INT, sconto_sats INT, "
+                     "fattura_rinnovata_il INTEGER DEFAULT 0)")
+        vero.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, "
+                     "stato TEXT, titolo TEXT)")
+        vero.execute("CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, "
+                     "ordine_id INT, annuncio_id INT, quantita INT, "
+                     "unitario_sats INT, titolo TEXT)")
+        vero.execute("CREATE TABLE utenti(tg_id INT, ferie_fino INT)")
+        vero.execute("INSERT INTO ordini VALUES(196,?,111,222,7,?,'hash-vecchio',"
+                     "'saas',?,?,25000,1,0,0,0,?)",
+                     (stato, invoice, creato, creato, rinnovata))
+        vero.execute("INSERT INTO annunci VALUES(7,?,'Pesto genovese')",
+                     (annuncio,))
+        vero.execute("INSERT INTO utenti VALUES(222,?)", (ferie,))
+        vero.commit()
+
+        class Con:
+            """close() non chiude davvero: il :memory: deve
+            sopravvivere fra una chiamata e l'altra."""
+            def execute(self, *a):
+                return vero.execute(*a)
+
+            def commit(self):
+                vero.commit()
+
+            def close(self):
+                pass
+
+        conii, chieste, incassati = [], [], []
+
+        async def _pagata(h, cf):
+            chieste.append((h, cf))
+            if pausa:
+                await asyncio.sleep(0)
+            if muto:
+                raise RuntimeError("LNbits non risponde")
+            return pagata
+
+        async def _conia(sats, memo, expiry=900, cassaforte=""):
+            if pausa:
+                await asyncio.sleep(0)
+            inv = NUOVE[len(conii)]
+            conii.append((sats, memo, cassaforte))
+            return {"payment_request": inv,
+                    "payment_hash": f"hash-nuovo-{len(conii)}",
+                    "cassaforte": cassaforte}
+
+        async def _incassa(oid):
+            incassati.append(oid)
+            vero.execute("UPDATE ordini SET stato='locked' WHERE id=?", (oid,))
+            return {"stato": "locked"}
+
+        amb = {"db": Con, "time": time, "print": lambda *a, **k: None,
+               "Header": lambda d="": d, "Cookie": lambda d="": d,
+               "HTTPException": Rifiuto,
+               "verifica_utente": lambda *a: {"id": 111},
+               "invoice_pagata": _pagata, "crea_invoice_escrow": _conia,
+               "_incassa_ordine": _incassa,
+               "cassaforte_nuova": lambda: "nodo",
+               "_fmt_sats": lambda n: str(n),
+               "data_ferie": lambda ts: "domani"}
+        for nome in ("_BECH32_ALFABETO", "_BECH32_GEN", "INVOICE_EXPIRY"):
+            exec(re.search(rf"^{nome} = .*$", _SORGENTE, re.M).group(0), amb)
+        for nome in ("leggi_bolt11", "scadenza_fattura_ordine", "_campo",
+                     "_righe_ordine", "in_ferie", "guardia_ferie"):
+            exec(pezzo(nome), amb)
+        exec("async " + pezzo("nuova_fattura_ordine"), amb)
+        return amb["nuova_fattura_ordine"], vero, conii, chieste, incassati
+
+    def riga(vero):
+        return dict(vero.execute("SELECT * FROM ordini WHERE id=196")
+                    .fetchone())
+
+    def chiama(f):
+        try:
+            return gira(f(196, "", ""))
+        except Rifiuto as e:
+            return (e.status_code, e.detail)
+
+    # a) VIVA: si ripresenta la stessa, senza conio e senza domande
+    f, vero, conii, chieste, _ = mondo(invoice=VIVA, creato=ADESSO - 60)
+    d = chiama(f)
+    prova("fattura viva: torna LA STESSA, e non se ne conia un'altra",
+          (VIVA, False, 0, 0),
+          (d.get("invoice"), d.get("nuova"), len(conii), len(chieste)))
+    prova("...e la riga non si tocca", (VIVA, "hash-vecchio", 0),
+          (riga(vero)["invoice"], riga(vero)["payment_hash"],
+           riga(vero)["fattura_rinnovata_il"]))
+
+    # b) MORTA, mai rigenerata: una nuova sulla STESSA riga
+    f, vero, conii, chieste, _ = mondo()
+    d = chiama(f)
+    r = riga(vero)
+    prova("fattura morta: se ne conia UNA, per lo stesso importo",
+          (1, 25000, True, NUOVE[0]),
+          (len(conii), conii[0][0] if conii else 0, d.get("nuova"),
+           d.get("invoice")))
+    prova("...prima si chiede a LNbits della vecchia, alla SUA cassaforte",
+          [("hash-vecchio", "saas")], chieste)
+    prova("...e la riga e' la stessa: fattura, hash e cassaforte nuovi, "
+          "stato fermo", ("creato", NUOVE[0], "hash-nuovo-1", "nodo"),
+          (r["stato"], r["invoice"], r["payment_hash"], r["cassaforte"]))
+    prova("...con la nascita rinfrescata e il timbro del rinnovo", True,
+          r["creato"] >= ADESSO and r["fattura_rinnovata_il"] >= ADESSO)
+    prova("...e il memo e' quello che orfani.py riconosce come nostro",
+          True, bool(conii) and conii[0][1].startswith(
+              "Barattolo escrow #7: Pesto"))
+    prova("...e la risposta dice quando scade", ADESSO + 900,
+          d.get("scade_il"))
+
+    # c) la seconda volta NO: la vita della fattura e' il lock del prezzo
+    vero.execute("UPDATE ordini SET invoice=?, creato=? WHERE id=196",
+                 (MORTA, ADESSO - 1000))
+    vero.commit()
+    d = chiama(f)
+    prova("rigenerata una volta, e morta di nuovo: non se ne fa un'altra",
+          (400, 1), (d[0] if isinstance(d, tuple) else d, len(conii)))
+    prova("...e la risposta dice dove andare", True,
+          isinstance(d, tuple) and "ricompralo dall'annuncio" in d[1])
+
+    # d) PAGATA all'ultimo secondo: si incassa, niente fattura nuova
+    f, vero, conii, _, incassati = mondo(pagata=True)
+    d = chiama(f)
+    prova("la vecchia risulta pagata: si incassa e basta", ([196], 0, MORTA),
+          (incassati, len(conii), riga(vero)["invoice"]))
+
+    # e) LNBITS MUTO: 503, niente conio, niente tocchi
+    f, vero, conii, _, _ = mondo(muto=True)
+    d = chiama(f)
+    prova("LNbits muto: 503 e nessuna fattura (non sappiamo se e' "
+          "pagata)", (503, 0, MORTA, "hash-vecchio"),
+          (d[0] if isinstance(d, tuple) else d, len(conii),
+           riga(vero)["invoice"], riga(vero)["payment_hash"]))
+
+    # f) le porte che il venditore puo' aver chiuso nel frattempo
+    for che, kw, codice_atteso in (("annuncio non piu' attivo",
+                                    {"annuncio": "rimosso"}, 409),
+                                   ("negozio in ferie",
+                                    {"ferie": ADESSO + 86400}, 400)):
+        f, vero, conii, _, _ = mondo(**kw)
+        d = chiama(f)
+        prova(f"{che}: no, PRIMA di coniare", (codice_atteso, 0, MORTA),
+              (d[0] if isinstance(d, tuple) else d, len(conii),
+               riga(vero)["invoice"]))
+
+    # g) un ordine che non aspetta piu' niente
+    f, vero, conii, _, _ = mondo(stato="annullato")
+    d = chiama(f)
+    prova("ordine annullato: 400, niente conio", (400, 0),
+          (d[0] if isinstance(d, tuple) else d, len(conii)))
+
+    # h) DUE TOCCHI INSIEME: due fatture coniate, UNA in colonna, e il
+    #    secondo tocco riceve quella del primo
+    f, vero, conii, _, _ = mondo(pausa=True)
+
+    async def insieme():
+        return await asyncio.gather(f(196, "", ""), f(196, "", ""))
+
+    a, b = gira(insieme())
+    prova("due tocchi insieme: in colonna entra UNA fattura sola",
+          (2, NUOVE[0], "hash-nuovo-1"),
+          (len(conii), riga(vero)["invoice"], riga(vero)["payment_hash"]))
+    prova("...e il secondo tocco riceve quella del primo, dichiarata "
+          "vecchia", (NUOVE[0], True, NUOVE[0], False),
+          (a.get("invoice"), a.get("nuova"), b.get("invoice"),
+           b.get("nuova")))
+
+    # sentinelle sulla forma: il CAS e il fail-closed si leggono
+    nf = pezzo("nuova_fattura_ordine")
+    prova("lo scambio e' un CAS sulla fattura vecchia e sul rinnovo",
+          True, "AND stato='creato' AND payment_hash=?" in nf
+          and "COALESCE(fattura_rinnovata_il, 0)=0" in nf)
+    prova("...e la domanda a LNbits viene PRIMA del conio", True,
+          -1 < nf.find("invoice_pagata(") < nf.find("crea_invoice_escrow("))
+
+    # ---- 3) l'orologio non annulla la fattura appena nata -----------
+    # La corsa vera: controlla_abbandonati chiede a LNbits della
+    # VECCHIA, e intanto il compratore ne genera una nuova. Senza il
+    # payment_hash nel WHERE, la lapide cadrebbe sulla fattura viva.
+    vero = sqlite3.connect(":memory:")
+    vero.row_factory = sqlite3.Row
+    vero.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, stato TEXT, "
+                 "payment_hash TEXT, creato INT, aggiornato INT, "
+                 "cassaforte TEXT DEFAULT 'saas')")
+    for t in ("offerte(id INTEGER PRIMARY KEY, ordine_id INT, stato TEXT)",
+              "rilanci(id INTEGER PRIMARY KEY, stato TEXT, "
+              "payment_hash TEXT, creato INT, cassaforte TEXT)",
+              "pagamenti(id INTEGER PRIMARY KEY, motivo TEXT, stato TEXT, "
+              "payment_hash TEXT, creato INT, cassaforte TEXT)"):
+        vero.execute("CREATE TABLE " + t)
+    vero.execute("INSERT INTO ordini VALUES(196,'creato','hash-vecchio',?,0,"
+                 "'saas')", (ADESSO - 2000,))
+    vero.commit()
+
+    class Con2:
+        def execute(self, *a):
+            return vero.execute(*a)
+
+        def commit(self):
+            vero.commit()
+
+        def close(self):
+            pass
+
+    async def _pagata_e_rinnovo(h, cf):
+        # mentre l'orologio aspetta la risposta sulla vecchia, la rotta
+        # scrive la nuova: e' esattamente la finestra da chiudere
+        vero.execute("UPDATE ordini SET payment_hash='hash-nuovo', creato=? "
+                     "WHERE id=196", (ADESSO,))
+        vero.commit()
+        return False
+
+    amb = {"db": Con2, "time": time, "invoice_pagata": _pagata_e_rinnovo,
+           "print": lambda *a, **k: None, "INVOICE_EXPIRY": 900,
+           "RILANCIO_EXPIRY": 600}
+    exec("async " + pezzo("controlla_abbandonati"), amb)
+    gira(amb["controlla_abbandonati"]())
+    prova("l'orologio che guardava la vecchia NON mette la lapide sulla "
+          "nuova", ("creato", "hash-nuovo"),
+          tuple(vero.execute("SELECT stato, payment_hash FROM ordini "
+                             "WHERE id=196").fetchone()))
+
+    # ---- 4) il client ------------------------------------------------
+    def solo_codice(js):
+        """Via i commenti: la sentinella guarda il programma, non la
+        prosa che lo racconta."""
+        js = re.sub(r"/\*[\s\S]*?\*/", "", js)
+        return "\n".join(r for r in js.split("\n")
+                         if not r.strip().startswith("//"))
+
+    mini = open("miniapp.html", encoding="utf-8").read()
+    mp = solo_codice(pezzo_js(mini, "function mapOrder(o){"))
+    prova("la riga dell'ordine porta la fattura, solo a chi compra e "
+          "solo da pagare", True,
+          "fattura:(role==='buyer' && o.stato==='creato') ? (o.invoice||'') : ''"
+          in mp and "fatturaRinnovataIl:o.fattura_rinnovata_il||0" in mp)
+    po = pezzo_js(mini, "function pagaOraOrdine(){", "\n}\n")
+    prova("«Paga ora» non chiama il server: e' la STESSA fattura", True,
+          "fetch(" not in po and "o.fattura" in po)
+    af = pezzo_js(mini, "function apriFoglioFattura(", "\n}\n")
+    prova("...e il foglio azzera le altre due modalita', cosi' «Annulla» "
+          "colpisce questo ordine", True,
+          "rilancioCorrente = null;" in af
+          and "pagamentoCorrente = null;" in af
+          and "currentOrderId = oid;" in af)
+    prova("...e il poll riparte, come dopo una fattura appena coniata",
+          True, "pollTimer = setInterval(()=>verificaOrdine(oid), 4000);"
+          in af)
+    mq = pezzo_js(mini, "async function mostraQr(invoice, scade){")
+    prova("il conto alla rovescia lo accende mostraQr, il collo di "
+          "bottiglia di ogni flusso", True,
+          "orologioPay(invoice, scade);" in mq)
+    prova("il bottone di ieri non c'e' piu'", 0,
+          mini.count("Ho pagato la invoice — verifica</button>"))
+
+    node = _sh.which("node")
+    if not node:
+        salta("il banco del client di «Paga ora»", "node non c'e'")
+        return
+
+    def fetta(firma, fine="\n}\n"):
+        i = mini.index(firma)
+        return mini[i:mini.index(fine, i) + len(fine)]
+
+    tempi = mini[mini.index("const TEMPI = {"):]
+    tempi = tempi[:tempi.index("\n};") + 3]
+    stati = mini[mini.index("const STATES = {"):]
+    stati = stati[:stati.index("\n};") + 3]
+    base = "\n".join([
+        tempi, stati,
+        "const inPagamento = o => !!(o && o.pagamento && o.state!=='released');",
+        fetta("function importoBolt11(pr){"),
+        fetta("function leggiBolt11(pr){"),
+        fetta("function scadenzaFatturaOrdine(o){"),
+        fetta("function minutiSecondi(sec){"),
+        fetta("function pannelloDaPagare(o){"),
+        "const esc = s => String(s ?? '').replace(/[&<>\"']/g, c => "
+        "({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));",
+        "const fmt = n => n.toLocaleString('it-IT');",
+        "const nodi = {};",
+        "const nodo = id => nodi[id] || (nodi[id] = {id, innerHTML: '', "
+        "textContent: '', outerHTML: '', href: '', style: {display: ''}, "
+        "_cl: new Set(), get classList(){ const s = this._cl; return {"
+        "add: c => s.add(c), remove: c => s.delete(c), contains: c => "
+        "s.has(c), toggle: (c, v) => (v === undefined ? !s.has(c) : v) "
+        "? s.add(c) : s.delete(c)}; }});",
+        "const el = id => nodo(id);",
+        "const esiti = {};",
+        "const dice = (che, v) => { esiti[che] = v; };",
+        "const V = " + json.dumps({"viva": VIVA, "morta": MORTA,
+                                   "adesso": ADESSO}) + ";",
+    ])
+
+    # 4a) i gemelli, il pannello nei tre stati, e l'orologio
+    banco = base + "\n" + fetta("function avviaOrologioOrdine(o){") + """
+let orologioOrdine = null, battito = null, currentOrder = null;
+globalThis.setInterval = f => { battito = f; return 1; };
+globalThis.clearInterval = () => { battito = null; };
+dice('gemelli', [scadenzaFatturaOrdine({fattura: V.viva, creato: 1}),
+  scadenzaFatturaOrdine({fattura: 'lnbc25000collaudo', creato: V.adesso}),
+  scadenzaFatturaOrdine({fattura: '', creato: V.adesso - 5})]);
+const vivo = {id: 196, role: 'buyer', state: 'creato', fattura: V.viva,
+  creato: V.adesso - 60, fatturaRinnovataIl: 0, annuncioId: 7};
+const morto = Object.assign({}, vivo, {fattura: V.morta, creato: V.adesso - 1000});
+const rifatto = Object.assign({}, morto, {fatturaRinnovataIl: V.adesso - 900});
+const cosa = h => ({paga: h.includes('pagaOraOrdine()'),
+  genera: h.includes('nuovaFatturaOrdine(this, 196)'),
+  annuncio: h.includes('apriAnnuncioPuntata(7)'),
+  verifica: h.includes('verificaDaOrdine(this)'),
+  evidenza: h.includes('class="payout pag-evidenza" id="ordDaPagare"')});
+dice('viva', cosa(pannelloDaPagare(vivo)));
+dice('morta', cosa(pannelloDaPagare(morto)));
+dice('rifatta', cosa(pannelloDaPagare(rifatto)));
+// l'orologio: scrive i minuti, e alla morte ridisegna il riquadro. Il
+// nodo del tempo lo crea innerHTML nel DOM vero: qui si crea a mano
+nodo('view-ordine').classList.add('active');
+nodo('ordDaPagare');
+nodo('ordFatturaScade');
+currentOrder = vivo;
+avviaOrologioOrdine(vivo);
+const primo = !!battito;
+battito();
+dice('minuti', nodi.ordFatturaScade.textContent);
+const vero = Date.now;
+Date.now = () => (V.adesso + 900) * 1000;
+battito();
+dice('alla morte', [primo, nodi.ordDaPagare.outerHTML.includes('nuovaFatturaOrdine(this, 196)'),
+  battito === null]);
+Date.now = vero;
+// ...e si ferma da solo quando l'ordine a schermo non e' piu' quello
+avviaOrologioOrdine(vivo);
+currentOrder = morto;
+nodi.ordDaPagare.outerHTML = '';
+battito();
+dice('si ferma da solo', [battito === null, nodi.ordDaPagare.outerHTML]);
+console.log(JSON.stringify(esiti));
+"""
+    cart = _tf.mkdtemp()
+    p = os.path.join(cart, "paga_ora.js")
+    open(p, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, p], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco del pannello gira", "", (r.stderr or "")[-600:])
+    if r.returncode or not r.stdout.strip():
+        return
+    e = json.loads(r.stdout)
+    prova("gemelli: il client dice la stessa ora del server",
+          [sfo(VIVA, 1), sfo("lnbc25000collaudo", ADESSO), sfo("", ADESSO - 5)],
+          e["gemelli"])
+    prova("fattura viva: «Paga ora» e «Ho pagato — verifica», nel "
+          "riquadro dei gesti che aspettano",
+          {"paga": True, "genera": False, "annuncio": False,
+           "verifica": True, "evidenza": True}, e["viva"])
+    prova("fattura morta: «Genera una nuova fattura», e la verifica resta",
+          {"paga": False, "genera": True, "annuncio": False,
+           "verifica": True, "evidenza": True}, e["morta"])
+    prova("morta DOPO la rigenerazione: niente terza, la strada e' "
+          "l'annuncio", {"paga": False, "genera": False, "annuncio": True,
+                         "verifica": True, "evidenza": True}, e["rifatta"])
+    prova("l'orologio del dettaglio scrive i minuti", True,
+          bool(re.fullmatch(r"1[34]:\d\d", e["minuti"])))
+    prova("...e quando la fattura muore ridisegna il riquadro e si ferma",
+          [True, True, True], e["alla morte"])
+    prova("...e si ferma da solo quando l'ordine a schermo cambia",
+          [True, ""], e["si ferma da solo"])
+
+    # 4b) il foglio: il conto alla rovescia e il bottoncino che cambia
+    #     mestiere, sui flussi veri che lo aprono
+    banco = base + "\n" + "\n".join([
+        fetta("function orologioPay(invoice, ripiego){"),
+        fetta("function battitoPay(){")]) + """
+let payScadeIl = 0, payOrologio = null, DEMO = false;
+let rilancioCorrente = null, pagamentoCorrente = null, currentOrderId = null;
+let orders = [];
+globalThis.setInterval = f => 1;
+globalThis.clearInterval = () => {};
+const foto = () => ({riga: nodi.payScadeRiga.style.display,
+  testo: nodi.payScade.textContent, wallet: nodi.payWallet.style.display,
+  href: nodi.payWallet.href, rinnova: nodi.payRinnova.style.display,
+  scaduta: nodi.paySheet.classList.contains('fattura-scaduta'),
+  nota: nodi.payEurNota.style.display});
+['payScadeRiga', 'payScade', 'payWallet', 'payRinnova', 'paySheet',
+ 'payEurNota'].forEach(nodo);
+nodi.payEurNota.style.display = 'block';
+currentOrderId = 196;
+orders = [{id: 196, fatturaRinnovataIl: 0}];
+orologioPay(V.viva);
+dice('viva', foto());
+orologioPay(V.morta);
+dice('morta', foto());
+orders = [{id: 196, fatturaRinnovataIl: V.adesso}];
+orologioPay(V.morta);
+dice('morta rifatta', foto().rinnova);
+orders = [{id: 196, fatturaRinnovataIl: 0}];
+rilancioCorrente = 5;
+orologioPay(V.morta);
+dice('morta di una puntata', foto().rinnova);
+rilancioCorrente = null;
+orologioPay('lnbc25000collaudo', V.adesso + 600);
+dice('illeggibile col ripiego', foto().testo);
+orologioPay('');
+dice('senza fattura', foto().riga);
+DEMO = true;
+orologioPay(V.viva);
+dice('in demo', foto().riga);
+console.log(JSON.stringify(esiti));
+"""
+    p = os.path.join(cart, "foglio.js")
+    open(p, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, p], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco del foglio gira", "", (r.stderr or "")[-600:])
+    if r.returncode or not r.stdout.strip():
+        return
+    e = json.loads(r.stdout)
+    v = e["viva"]
+    prova("foglio con la fattura viva: la scadenza e la porta del wallet",
+          ("", "", "lightning:" + VIVA, "none", False),
+          (v["riga"], v["wallet"], v["href"], v["rinnova"], v["scaduta"]))
+    prova("...e i minuti che restano", True,
+          bool(re.fullmatch(r"⏱ Scade tra 1[34]:\d\d", v["testo"])))
+    m = e["morta"]
+    prova("fattura morta nel foglio: velata, niente wallet, «Generane una "
+          "nuova», e spenta la nota che parlava della viva",
+          ("⌛ Fattura scaduta", "none", "", True, "none"),
+          (m["testo"], m["wallet"], m["rinnova"], m["scaduta"], m["nota"]))
+    prova("...ma non per un ordine gia' rigenerato, ne' per una puntata",
+          ("none", "none"), (e["morta rifatta"], e["morta di una puntata"]))
+    prova("una fattura che non si legge usa il ripiego di chi apre", True,
+          bool(re.fullmatch(r"⏱ Scade tra (10:00|9:5\d)",
+                            e["illeggibile col ripiego"])))
+    prova("senza fattura, e in demo, la riga non c'e'", ("none", "none"),
+          (e["senza fattura"], e["in demo"]))
+
+    # 4c) LA LINEA DEL TEMPO: openOrder fatto girare davvero. Tutto cio'
+    #     che non e' di questo cantiere risponde vuoto (un Proxy dietro
+    #     un `with`), e il pannello, i giudici e i cataloghi sono veri.
+    #     Il banco muto e' rosso: se openOrder esplode, node esce 1.
+    banco = base + "\n" + """
+const VUOTO = () => '';
+globalThis.isAdmin = false;
+globalThis.orders = [];
+for (const n of ['TEMPI', 'STATES', 'inPagamento', 'esc', 'fmt', 'el',
+                 'pannelloDaPagare', 'scadenzaFatturaOrdine',
+                 'minutiSecondi', 'leggiBolt11', 'importoBolt11'])
+  globalThis[n] = eval(n);
+const P = new Proxy({}, {
+  has: (t, k) => k !== Symbol.unscopables,
+  get: (t, k) => k === Symbol.unscopables ? undefined
+       : (k in globalThis ? globalThis[k] : VUOTO),
+  set: (t, k, v) => { globalThis[k] = v; return true; }});
+with (P) {
+  globalThis.openOrder = (function(){ return __OPEN__; })();
+}
+const ordine = (state, role, x) => Object.assign({id: 196,
+  listing: {title: 'Pesto genovese', price: 25000}, state, role,
+  fattura: role === 'buyer' && state === 'creato' ? V.viva : '',
+  creato: V.adesso - 60, fatturaRinnovataIl: 0, annuncioId: 7, righe: [],
+  qta: 1, consegnaScelta: 'ritiro', tracking: '', pagamento: null}, x || {});
+const leggi = o => {
+  globalThis.orders = [o];
+  delete nodi.orderContent;
+  openOrder(196);
+  const h = nodi.orderContent.innerHTML;
+  const m = h.match(/<div class="step (\\w+)">\\s*<span class="dot"><\\/span><b>([^<]*)<\\/b><small>([^<]*)<\\/small>/);
+  const t = h.match(/<div class="vault-head">[\\s\\S]*?<div><b>([^<]*)<\\/b>\\s*<small>([^<]*)<\\/small>/);
+  return {primo: m ? [m[1], m[2], m[3]] : null, testa: t ? [t[1], t[2]] : null,
+    alSicuro: h.includes('I sats sono al sicuro'),
+    paga: h.includes('⚡ Paga ora'), genera: h.includes('Genera una nuova fattura'),
+    titolo: h.includes('Pesto genovese')};
+};
+dice('compratore, da pagare', leggi(ordine('creato', 'buyer')));
+dice('compratore, fattura morta', leggi(ordine('creato', 'buyer',
+  {fattura: V.morta, creato: V.adesso - 1000})));
+dice('venditore, da pagare', leggi(ordine('creato', 'seller')));
+dice('compratore, pagato', leggi(ordine('locked', 'buyer')));
+dice('venditore, pagato', leggi(ordine('locked', 'seller')));
+dice('annullato', leggi(ordine('annullato', 'buyer')));
+console.log(JSON.stringify(esiti));
+""".replace("__OPEN__", fetta("function openOrder(id){"))
+    p = os.path.join(cart, "linea_del_tempo.js")
+    open(p, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, p], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco della linea del tempo gira", "", (r.stderr or "")[-600:])
+    if r.returncode or not r.stdout.strip():
+        return
+    e = json.loads(r.stdout)
+    prova("...e disegna davvero l'ordine (non un banco muto)",
+          [True] * 6, [x["titolo"] for x in e.values()])
+    c = e["compratore, da pagare"]
+    prova("DA PAGARE: il primo passo e' da fare, «Deposita i sats»",
+          ["now", "Deposita i sats",
+           "Paga la fattura: i sats restano custoditi dalla piattaforma"],
+          c["primo"])
+    prova("...e la testa non dice «al sicuro» a chi non ha pagato",
+          (["In attesa del tuo pagamento",
+            "Quando paghi, i sats entrano nel deposito di garanzia"], False),
+          (c["testa"], c["alSicuro"]))
+    prova("...e c'e' «⚡ Paga ora»", (True, False), (c["paga"], c["genera"]))
+    prova("fattura morta: il bottone diventa «Genera una nuova fattura»",
+          (False, True), (e["compratore, fattura morta"]["paga"],
+                          e["compratore, fattura morta"]["genera"]))
+    s = e["venditore, da pagare"]
+    prova("chi vende, prima del pagamento: in attesa, e niente «al sicuro»",
+          (["now", "In attesa del pagamento",
+            "L'acquirente non ha ancora pagato"],
+           "In attesa del pagamento", False, False),
+          (s["primo"], (s["testa"] or [""])[0], s["alSicuro"], s["paga"]))
+    prova("PAGATO: «Hai depositato i sats», fatto, e il deposito al sicuro",
+          (["done", "Hai depositato i sats",
+            "Il pagamento è custodito dalla piattaforma"],
+           ["Sats nel deposito di garanzia",
+            "I sats sono al sicuro, nessuno può toccarli"]),
+          (e["compratore, pagato"]["primo"], e["compratore, pagato"]["testa"]))
+    prova("...e a chi vende il pagamento in garanzia, come sempre",
+          "Hai il pagamento in garanzia",
+          (e["venditore, pagato"]["primo"] or ["", ""])[1])
+    prova("ANNULLATO: nessun deposito, e mai «hai depositato»",
+          ["todo", "Nessun deposito",
+           "L'ordine si è chiuso prima del pagamento"],
+          e["annullato"]["primo"])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -93063,6 +93676,7 @@ def main():
               prove_casa_vuota_gratis,
               prove_spedizione_standard,
               prove_cambio_converte,
+              prove_paga_ora,
               prove_catalogo_esterno,
               prove_modulo_negozio,
               prove_script_nel_workflow, prove_deploy,

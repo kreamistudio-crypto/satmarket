@@ -30366,3 +30366,100 @@ rifiuti spiegati senza lasciare una riga), `collaudo_catalogo_esterno`
 **Da guardare sul telefono**: da moderatore, il modulo con le chiavi
 scritte e le pillole toccate; l'ultimo passo di un negozio con il
 bottoncino sats ⇄ €; un Woo vero scritto con la pagina del negozio.
+
+## Paga ora: la fattura che si riapre (24 set 2026)
+
+Dal campo, con la foto: il compratore chiude per sbaglio il foglio del
+pagamento senza pagare, riapre l'ordine (#196) e trova il solo «🔄 Ho
+pagato la invoice — verifica»: nessun modo di rivedere la fattura, e
+alla scadenza l'orologio annulla l'ordine in silenzio. Worktree da
+`origin/main`, commit firmato.
+
+**COSA C'È.** 1) Nel dettaglio di un ordine da pagare il riquadro «⚡
+Manca il tuo pagamento» col conto alla rovescia, «⚡ Paga ora» — riapre
+il foglio di sempre con la STESSA fattura: QR, copia, «Apri nel
+wallet», scadenza — e «🔄 Ho pagato — verifica» da secondo, che adesso
+dice se il pagamento non è ancora arrivato. 2) A fattura morta «⚡
+Genera una nuova fattura»: stesso importo, stesso ordine. 3) La linea
+del tempo: finché i sats non sono arrivati il primo passo è «Deposita i
+sats» (da fare) e la testa dice «In attesa del tuo pagamento»; «Hai
+depositato i sats» e «I sats sono al sicuro» solo a pagamento ricevuto
+(a chi vende «In attesa del pagamento»; sull'annullato «Nessun
+deposito»). 4) In lista «Da pagare» si veste PIENO a chi compra
+(l'arancio profondo dei sats, 5,02:1 di giorno e 8,51:1 di sera): col
+velato era identico a «Sats depositati».
+
+**COM'ERA FATTO, e perché la strada è questa.** La fattura viva c'era
+già: `ordini.invoice` viaggia in `/api/orders` (la colonna è nata con
+la ripresa) e il client non la leggeva — quindi «Paga ora» non chiama
+nessuno. La morta invece il server non la rigenerava: la ripresa di
+`compra` lo fa solo ripassando dall'annuncio (ordine NUOVO, lapide sul
+vecchio), e l'orologio mette la lapide al primo battito dopo i 15
+minuti (batte ogni 10). La strada: `POST /api/orders/{id}/nuova-fattura`
+sulla STESSA riga, con le regole di sempre dei soldi — la domanda a
+LNbits prima di togliere un hash (pagata = si incassa; muto = 503 e
+niente conio), il CAS sulla fattura vecchia (due tocchi = una fattura in
+colonna), le porte del venditore riguardate prima del conio (annuncio
+attivo, ferie). Una sola fattura viva per ordine per costruzione:
+finché la vecchia vive si ripresenta quella, e la vecchia è morta per
+la sua bolt11, quindi il nodo non la incassa più (se un backend lo
+facesse, l'incasso senza riga lo trova `orfani.py`).
+
+**UNA VOLTA SOLA, deciso qui.** La vita della fattura è il lock del
+prezzo: sugli annunci in euro i sats sono del cambio della nascita, e
+rigenerare all'infinito allo stesso importo darebbe un'opzione gratuita
+sul cambio (la ragione dei 900 secondi di Mostro) e terrebbe il pezzo
+prenotato per sempre. Una copre il foglio chiuso per sbaglio; per la
+seconda si ricompra dall'annuncio, e il dettaglio lo dice col bottone.
+
+**LE STRADE SCARTATE.** Rigenerare dal client ripassando da `compra`:
+indirizzo ed email sono cifrati sul server, la richiesta identica non
+si rifà. Un ordine NUOVO come la ripresa: cambia il numero sotto gli
+occhi di chi ha scritto «#196», e vuole la copia di righe dei set,
+legame dell'offerta e codice sconto. Resuscitare la lapide («annullato
+da poco»): le lapidi non si vedono in lista, lo stock è già libero e
+può essere di un altro, e la ripresa può aver già creato l'ordine
+gemello — è un acquisto nuovo, e la sua strada è l'annuncio. Allungare
+la vita dei 'creato' nell'orologio: terrebbe il pezzo bloccato agli
+altri compratori, e non era chiesto.
+
+**IL BUCO CHE LA CURA APRIVA, chiuso nello stesso giro.**
+`controlla_abbandonati` chiede a LNbits della fattura vecchia e poi
+mette la lapide: se nel mezzo il compratore la rigenerava, la lapide
+cadeva sull'ordine con la fattura appena nata. Il suo UPDATE ora ha il
+`payment_hash` nel WHERE.
+
+**VISTI A SCHERMO, e curati.** Il conto scomposto vuoto disegnava una
+cornice vuota sotto il titolo del foglio in ogni acquisto semplice
+(anche su main, contro il commento del markup): `:empty{display:none}`.
+Nel foglio a fattura morta la nota «è la stessa fattura di prima» si
+spegne, e la riga dice «Fattura scaduta», corto (a 375 andava a capo).
+Il ⚡ davanti a «Da pagare» in lista è uscito: di sera spariva sul suo
+arancio.
+
+**PROVATO.** `prove_paga_ora` (53): il giudice della scadenza e i due
+gemelli; la rotta estratta su un database in memoria (viva, morta,
+seconda volta, pagata, LNbits muto, annuncio rimosso, ferie, annullato,
+due tocchi insieme); l'orologio nella corsa con la rigenerazione; il
+client in node — il riquadro nei tre stati, l'orologio del dettaglio,
+il foglio con scadenza, wallet e rinnovo, e `openOrder` fatto girare
+davvero (dietro un Proxy) per la linea del tempo in sei casi. I
+censimenti di chi conia da cinque a sei, il rettangolino di «creato».
+`collaudo_nuova_fattura` sul server vero in gabbia (24), entrato nella
+CI. Suite intera severa senza config, sull'albero ribasato su main
+(la cassaforte SaaS e il negozio collegato arrivati nel frattempo):
+14.999 verdi e 0 rosse; collaudi della CI 17/17. **TORTURA 20/20** su una copia — due mutazioni rifatte
+perché sbagliate mie, e una sentinella con `.index` che ESPLODEVA invece
+di fallire, resa `.find`. DAL VIVO a 375 col dito vero su una copia con
+LNbits di cartone: foglio chiuso, «Da pagare» pieno, dettaglio, «Paga
+ora» con la STESSA fattura (nessun conio, un solo ordine); invecchiato,
+«Genera una nuova fattura» → stesso ordine, hash nuovo; il foglio che
+scade davanti agli occhi e offre «Generane una nuova»; pagata la nuova,
+il poll chiude e la linea dice «Hai depositato i sats». Scatti CDP a
+375×3 nei due temi.
+
+**DA GUARDARE SUL TELEFONO.** «Apri nel wallet» (lo schema `lightning:`
+dentro la WebView di Telegram, Android e iPhone: non provato); il
+foglio che si riapre dal dettaglio; il pieno di «Da pagare». Resta
+com'era, e segnalato: a chi VENDE la stessa riga dice «Da pagare», che
+letta da lui è ambigua.

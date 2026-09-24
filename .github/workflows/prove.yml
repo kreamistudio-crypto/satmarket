@@ -96,6 +96,7 @@ jobs:
              prepara_logo_consigliato.py
              collaudo_spedizione_standard.py
              collaudo_catalogo_esterno.py
+             collaudo_nuova_fattura.py
 
       # Secondo scalino: il config d'esempio deve restare allineato,
       # perche' e' quello da cui Andrea copia quando mette mano al VPS.
@@ -163,6 +164,7 @@ jobs:
              collaudo_letture_relay
              collaudo_spedizione_standard
              collaudo_catalogo_esterno
+             collaudo_nuova_fattura
 
   # La regola ferrea numero 1, e vive in un JOB SUO — non in coda
   # all'altro, ed e' il pezzo da non rimettere com'era.

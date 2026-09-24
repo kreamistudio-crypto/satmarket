@@ -5859,6 +5859,12 @@
     font-size:13px;font-weight:600;color:var(--ink);
     background:var(--card);border:1px solid var(--line);
     border-radius:12px;padding:10px 12px}
+  /* VUOTO NON SI VEDE (24 set 2026, visto col «Paga ora»): il markup
+     promette il conto «solo quando c'e' qualcosa oltre all'articolo»,
+     e `contoScomposto` lo mantiene rispondendo '' — ma bordo e padding
+     disegnavano lo stesso una cornice vuota sotto il titolo, in ogni
+     acquisto di un pezzo solo senza spedizione. */
+  .conto-scomposto:empty{display:none}
   .seller{
     display:flex;align-items:center;gap:12px;background:var(--card);
     border:1px solid var(--line);border-radius:var(--radius);padding:12px;margin:14px 0;
@@ -7182,6 +7188,11 @@
   /* l'annuncio in attesa dei moderatori (terza via della moderazione) */
   .badge.revisione{background:var(--sats-soft);color:var(--sats-text)}
   .badge.annullato{background:var(--off-bg);color:var(--muted)}
+  /* DA PAGARE, a chi compra (24 set 2026, «Paga ora»): l'unico
+     rettangolino PIENO della lista, perche' e' l'unico che aspetta un
+     gesto — l'arancio profondo dei sats col testo della carta, AA nei
+     due temi (5,02:1 di giorno, 8,51:1 di sera). */
+  .badge.dapagare{background:var(--sats-text);color:var(--card)}
   /* Le azioni di «I tuoi annunci» (ago 2026, dal campo): stavano
      incollate sotto il titolo, col prezzo a filo del tasto Modifica.
      Ora sono un BLOCCO in fondo alla card, staccato dal prezzo, e
@@ -7230,6 +7241,10 @@
   .payout h4{font-size:14.5px;margin-bottom:6px}
   .payout .net{font-family:'JetBrains Mono',monospace;color:var(--sats-deep);font-weight:700}
   .payout .hint{font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.5}
+  /* il riquadro di chi deve ancora pagare (24 set 2026, «Paga ora»):
+     l'aria fra la frase e il bottone la mette la frase, che i bottoni
+     di margini loro non ne portano (la famiglia sorvegliata) */
+  .payout .hint.da-pagare{margin-bottom:12px}
   /* la domanda sulla forma del codice: si vede, ma non e' un errore —
      e' un «sei sicuro?», e il secondo tocco passa (vedi FORME_TRACKING) */
   .payout .hint.avviso-tracking{color:var(--sats-text);
@@ -7853,6 +7868,17 @@
        padding, e con 10px li' sotto spuntava un filo di quarta riga */
     padding:10px 10px 2px;
   }
+  /* LA RIGA DELLA SCADENZA (24 set 2026, «Paga ora»): il conto alla
+     rovescia a sinistra, il bottoncino a destra. Il testo sta
+     sull'inchiostro morbido (a 12,5px vuole l'AA, e --muted non lo
+     regge sulla carta). A fattura morta QR e stringa si velano: si
+     vedono ancora — e' la stessa fattura di prima — ma non invitano
+     piu' a inquadrarle. */
+  .pay-scade{display:flex;align-items:center;justify-content:space-between;
+    gap:10px;margin:-4px 0 12px;font-size:12.5px;font-weight:700;
+    color:var(--ink-soft)}
+  .pay-scade .btn.mini{text-decoration:none;flex:0 0 auto}
+  #paySheet.fattura-scaduta .qr,#paySheet.fattura-scaduta .invoice{opacity:.3}
   /* ---------- festa: le monete ₿ quando i sats si sbloccano ---------- */
   .festa-box{position:fixed;inset:0;pointer-events:none;z-index:70;overflow:hidden}
   .festa-coin{position:absolute;left:0;top:0;width:22px;height:22px;border-radius:50%;
@@ -10833,6 +10859,19 @@ document.getElementById('cartello')?.remove();</script>
     <div class="qr" id="payQr"></div>
     <div class="invoice" id="payInvoice" onclick="copiaInvoice()" style="cursor:pointer" title="Tocca per copiare">lnbc…</div>
     <div style="font-size:11.5px;color:var(--muted);font-weight:600;text-align:center;margin:-8px 0 12px">inquadra il QR col wallet, o tocca la invoice per copiarla</div>
+    <!-- LA SCADENZA E LA PORTA DEL WALLET (24 set 2026, «Paga ora»):
+         una riga sola, accesa da mostraQr per OGNI flusso che apre il
+         foglio. A sinistra il conto alla rovescia letto dalla bolt11;
+         a destra un bottoncino che cambia mestiere: «Apri nel wallet»
+         finche' la fattura vive, «Generane una nuova» quando e' morta
+         e la fattura e' di un ordine (vedi battitoPay). Senza una
+         scadenza leggibile la riga non c'e'. -->
+    <div class="pay-scade" id="payScadeRiga" style="display:none">
+      <span id="payScade"></span>
+      <a class="btn mini" id="payWallet" href="#">⚡ Apri nel wallet</a>
+      <button type="button" class="btn mini" id="payRinnova" style="display:none"
+        onclick="nuovaFatturaOrdine(this, currentOrderId)">⚡ Generane una nuova</button>
+    </div>
     <button class="btn primary" onclick="sheetPaid()">✓ Ho pagato</button>
     <button class="btn ghost" onclick="annullaPagamento()">Annulla</button>
     <div id="payHint"></div>
@@ -12411,6 +12450,15 @@ function mapOrder(o){
        e i rari casi di cambio muto): li' l'euro non si mostra. */
     cambioOrdine:o.cambio_ordine||0,
     sellerInvoice:o.invoice_venditore||'',
+    /* LA FATTURA DI CHI COMPRA, finche' l'ordine aspetta il pagamento
+       (24 set 2026, «Paga ora»): il server la manda da sempre nella
+       riga, e qui non la leggeva nessuno — cosi' chi chiudeva per
+       sbaglio il foglio del pagamento non aveva piu' modo di
+       rivederla. Solo a chi compra e solo su 'creato': a chi vende non
+       serve, e a ordine pagato e' una stringa morta. `fatturaRinnovataIl`
+       dice se e' gia' stata rigenerata (si puo' una volta sola). */
+    fattura:(role==='buyer' && o.stato==='creato') ? (o.invoice||'') : '',
+    fatturaRinnovataIl:o.fattura_rinnovata_il||0,
     /* LO STADIO «IN PAGAMENTO» (set 2026): lo decide il server
        (`stadio_pagamento`), qui arriva gia' giudicato — null dove non
        c'e', e allora la pagina e' quella di sempre */
@@ -24424,7 +24472,237 @@ async function verificaOrdine(oid){
       await loadOrders(); renderOrders();
       setTimeout(()=>openOrder(oid), 400);
     }
-  } catch(e) {}
+    /* lo stato torna a chi chiama (24 set 2026): il poll lo ignora, il
+       bottone del dettaglio ci dice «non e' ancora arrivato» */
+    return d.stato || '';
+  } catch(e) { return ''; }
+}
+
+/* ═══ «⚡ PAGA ORA» (24 set 2026, dal campo — l'ordine #196) ════════
+   Il compratore chiudeva per sbaglio il foglio del pagamento senza
+   pagare; riaprendo l'ordine trovava il solo «Ho pagato la invoice —
+   verifica», e nessun modo di rivedere la fattura: alla scadenza
+   l'ordine si annullava da solo. La fattura c'era gia' — il server la
+   manda nella riga dell'ordine — e mancava solo la porta per
+   rivederla. */
+
+/* QUANDO MUORE la fattura di un ordine da pagare: l'ora scritta dentro
+   la bolt11 — quella che il wallet rispetta — e, se la bolt11 non si
+   legge, la nascita dell'ordine piu' la vita di serie. Gemello di
+   `scadenza_fattura_ordine` del server, con la stessa ricetta: prima
+   la bolt11 (`leggiBolt11`, gia' gemello di `leggi_bolt11`), poi lo
+   stesso ripiego. */
+function scadenzaFatturaOrdine(o){
+  const b = o && o.fattura ? leggiBolt11(o.fattura) : null;
+  return b ? b.scade : ((o && o.creato) || 0) + TEMPI.invoice * 60;
+}
+/* «14:32»: i secondi che restano come li legge un orologio */
+function minutiSecondi(sec){
+  const n = Math.max(0, Math.ceil(sec));
+  return Math.floor(n / 60) + ':' + String(n % 60).padStart(2, '0');
+}
+
+/* IL PANNELLO DI CHI DEVE ANCORA PAGARE, nel dettaglio dell'ordine.
+   Tre stati, e il giudice e' l'ora della fattura:
+   - VIVA: «⚡ Paga ora» riapre il foglio di sempre con la STESSA
+     fattura — nessuna chiamata, nessuna fattura nuova;
+   - MORTA e mai rigenerata: «⚡ Genera una nuova fattura», stesso
+     importo e stesso ordine (vedi nuova_fattura_ordine nel server);
+   - MORTA dopo la rigenerazione: una terza non si fa (il perche' sta
+     nel server: la vita della fattura e' il lock del prezzo), e la
+     strada e' l'annuncio, che rifa' i conti al prezzo di adesso.
+   «Ho pagato — verifica» resta in tutti e tre, da secondo: chi ha
+   pagato all'ultimo secondo deve poterlo dire. Il riquadro e' quello
+   dei gesti che aspettano qualcuno (`.payout.pag-evidenza`, lo stesso
+   del venditore che deve incassare); l'annullo resta FUORI, in fondo e
+   staccato come prima. L'id serve all'orologio, che al passaggio viva
+   → morta ridisegna questo riquadro e nient'altro. */
+function pannelloDaPagare(o){
+  const resta = scadenzaFatturaOrdine(o) - Date.now() / 1000;
+  const corpo = (o.fattura && resta > 0)
+    ? `<h4>⚡ Manca il tuo pagamento</h4>
+      <div class="hint da-pagare">La fattura scade tra <b class="mono" id="ordFatturaScade">${minutiSecondi(resta)}</b>. Se hai chiuso il foglio del pagamento, la riapri da qui: è la stessa.</div>
+      <button class="btn orange" onclick="pagaOraOrdine()">⚡ Paga ora</button>`
+    : !o.fatturaRinnovataIl
+    ? `<h4>⌛ La fattura è scaduta</h4>
+      <div class="hint da-pagare">Non è arrivato nessun pagamento. Generane una nuova: stesso importo, stesso ordine.</div>
+      <button class="btn orange" onclick="nuovaFatturaOrdine(this, ${o.id})">⚡ Genera una nuova fattura</button>`
+    : `<h4>⌛ Anche la nuova fattura è scaduta</h4>
+      <div class="hint da-pagare">Un'altra non si può generare, e l'ordine si chiude da solo fra poco. Se l'oggetto ti interessa ancora, ricompralo dall'annuncio, al prezzo di adesso.</div>
+      ${o.annuncioId ? `<button class="btn orange" onclick="apriAnnuncioPuntata(${o.annuncioId})">Vai all'annuncio</button>` : ''}`;
+  return `<div class="payout pag-evidenza" id="ordDaPagare">${corpo}
+      <button class="btn ghost" onclick="verificaDaOrdine(this)">🔄 Ho pagato — verifica</button></div>`;
+}
+
+/* L'OROLOGIO DEL DETTAGLIO: un battito al secondo finche' a schermo
+   c'e' QUESTO ordine da pagare. Scrive i minuti e, quando la fattura
+   muore, ridisegna il solo pannello (niente openOrder: rifarebbe la
+   vista intera, vibrazione compresa, sotto il dito). Si ferma da solo
+   quando l'ordine non e' piu' quello a schermo — nessuno deve
+   ricordarsi di spegnerlo. */
+let orologioOrdine = null;
+function avviaOrologioOrdine(o){
+  if (orologioOrdine) { clearInterval(orologioOrdine); orologioOrdine = null; }
+  if (!(o && o.role === 'buyer' && o.state === 'creato')) return;
+  orologioOrdine = setInterval(() => {
+    const box = el('ordDaPagare');
+    if (!box || currentOrder !== o
+        || !el('view-ordine').classList.contains('active')) {
+      clearInterval(orologioOrdine); orologioOrdine = null; return;
+    }
+    const riga = el('ordFatturaScade');
+    const resta = scadenzaFatturaOrdine(o) - Date.now() / 1000;
+    if (riga && resta > 0) {
+      riga.textContent = minutiSecondi(resta);
+      return;
+    }
+    box.outerHTML = pannelloDaPagare(o);
+    clearInterval(orologioOrdine); orologioOrdine = null;
+  }, 1000);
+}
+
+/* IL FOGLIO DI SEMPRE, con una fattura che c'e' gia'. Le
+   variabili-modalita' si azzerano come all'ingresso di startBuy —
+   l'«Annulla» del foglio deve colpire QUESTO ordine e nessun altro —
+   e il poll riparte come dopo una fattura appena coniata. Il conto
+   scomposto resta vuoto: la sua pagina e' l'ordine, due dita sotto il
+   foglio, e le sue righe non si ricostruiscono fedeli dalla riga
+   (supplementi e accordi non ci sono). La cifra si scrive PRIMA di
+   mostraQr, che veste il titolo conservandola. */
+function apriFoglioFattura(oid, invoice, sats, scade, nota){
+  rilancioCorrente = null;
+  pagamentoCorrente = null;
+  currentOrderId = oid;
+  el('payAmount').textContent = fmt(sats);
+  el('payScomposto').innerHTML = '';
+  el('payEurNota').style.display = nota ? 'block' : 'none';
+  el('payEurNota').textContent = nota || '';
+  el('payInvoice').textContent = invoice;
+  el('sheetBg').classList.add('open');
+  el('paySheet').classList.add('open');
+  mostraQr(invoice, scade);
+  aggiornaPayHint();
+  if (pollTimer) clearInterval(pollTimer);   /* mai due controlli accavallati */
+  pollTimer = setInterval(()=>verificaOrdine(oid), 4000);
+}
+/* «⚡ Paga ora»: la STESSA fattura, dall'ordine. Nessuna chiamata al
+   server — e' la ripresa del foglio chiuso per sbaglio, non un
+   acquisto nuovo. */
+function pagaOraOrdine(){
+  const o = currentOrder;
+  if (!o || !o.fattura) return;
+  haptic();
+  apriFoglioFattura(o.id, o.fattura, o.listing.price, scadenzaFatturaOrdine(o),
+    'È la stessa fattura di prima: pagala prima che scada.');
+}
+/* «⚡ Genera una nuova fattura»: dal dettaglio e dal foglio. Il server
+   decide tutto — se quella di prima e' ancora viva la ripresenta, se
+   e' stata pagata incassa, se e' gia' stata rigenerata dice di no —
+   e qui si mostra quel che risponde. */
+async function nuovaFatturaOrdine(btn, oid){
+  haptic();
+  if (!oid || DEMO || VETRINA) return;
+  const ripristina = bottoneInAttesa(btn, 'Preparo la fattura…');
+  try {
+    const r = await fetch(`${API_BASE}/orders/${oid}/nuova-fattura`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) {
+      toast(d.detail || 'Fattura non creata: riprova', 7000);
+      /* un 400 vuol dire che l'ordine non aspetta piu' questa fattura
+         (chiuso dall'orologio, o gia' rigenerato): la lista si
+         rilegge, e il dettaglio pure se e' quello a schermo */
+      if (r.status === 400) {
+        if (el('paySheet').classList.contains('open')) closeSheet();
+        await loadOrders(); renderOrders();
+        if (currentOrder && currentOrder.id === oid
+            && el('view-ordine').classList.contains('active')) openOrder(oid);
+      }
+      return;
+    }
+    /* pagata all'ultimo secondo: il flusso del saldo, quello di sempre */
+    if (d.stato) { await verificaOrdine(oid); return; }
+    await loadOrders(); renderOrders();
+    /* il dettaglio sotto il foglio si rimette in pari (pannello e
+       orologio), senza rifare la vista */
+    const o = orders.find(x => x.id === oid);
+    if (o && currentOrder && currentOrder.id === oid && el('ordDaPagare')) {
+      currentOrder = o;
+      el('ordDaPagare').outerHTML = pannelloDaPagare(o);
+      avviaOrologioOrdine(o);
+    }
+    apriFoglioFattura(oid, d.invoice, d.prezzo_sats, d.scade_il,
+      d.nuova ? 'Fattura nuova, stesso importo: quella di prima era scaduta.'
+              : 'La fattura di prima vale ancora: eccola.');
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { ripristina(); }
+}
+/* «🔄 Ho pagato — verifica» dal dettaglio: la domanda di sempre, con
+   la risposta detta (prima il bottone taceva, se non era arrivato
+   niente, e sembrava rotto). */
+async function verificaDaOrdine(btn){
+  haptic();
+  const oid = currentOrder && currentOrder.id;
+  if (!oid) return;
+  toast('Verifico il pagamento…');
+  const stato = await verificaOrdine(oid);
+  if (stato === 'in_attesa')
+    toast('Il pagamento non è ancora arrivato: se hai appena pagato, riprova fra qualche secondo', 5000);
+  else if (!stato) toast('Controllo non riuscito: riprova');
+}
+
+/* IL CONTO ALLA ROVESCIA DEL FOGLIO (24 set 2026, «Paga ora»). Lo
+   accende mostraQr per ogni flusso; l'ora e' quella della bolt11, e
+   senza una bolt11 leggibile il ripiego di chi apre il foglio, o
+   niente (in demo nessuna riga: la fattura e' finta). Il battito si
+   ferma da solo col foglio chiuso o con la fattura morta. */
+let payScadeIl = 0, payOrologio = null;
+function orologioPay(invoice, ripiego){
+  const inv = String(invoice || '').trim();
+  const b = (!DEMO && inv) ? leggiBolt11(inv) : null;
+  payScadeIl = (DEMO || !inv) ? 0 : ((b && b.scade) || ripiego || 0);
+  const w = el('payWallet');
+  /* la porta del wallet: lo schema `lightning:` lo apre il sistema,
+     che lo passa al wallet installato (la stessa stringa del QR) */
+  if (w) w.href = inv ? 'lightning:' + inv : '#';
+  if (payOrologio) { clearInterval(payOrologio); payOrologio = null; }
+  battitoPay();
+  if (payScadeIl) payOrologio = setInterval(() => {
+    if (!el('paySheet').classList.contains('open')) {
+      clearInterval(payOrologio); payOrologio = null; return;
+    }
+    battitoPay();
+  }, 1000);
+}
+function battitoPay(){
+  const riga = el('payScadeRiga'), foglio = el('paySheet');
+  if (!riga || !foglio) return;
+  if (!payScadeIl) {
+    riga.style.display = 'none';
+    foglio.classList.remove('fattura-scaduta');
+    return;
+  }
+  const resta = payScadeIl - Date.now() / 1000;
+  const viva = resta > 0;
+  riga.style.display = '';
+  foglio.classList.toggle('fattura-scaduta', !viva);
+  /* corta apposta: a 375 accanto al bottoncino «Questa fattura è
+     scaduta» andava a capo (visto a schermo) */
+  el('payScade').textContent = viva ? '⏱ Scade tra ' + minutiSecondi(resta)
+                                    : '⌛ Fattura scaduta';
+  el('payWallet').style.display = viva ? '' : 'none';
+  /* la nota sotto il titolo parla della fattura VIVA («e' la stessa di
+     prima: pagala prima che scada», «convertito ora in sats: vale 15
+     minuti»): a fattura morta direbbe il contrario della riga qui, e
+     si spegne. La riaccende il flusso che apre il foglio di nuovo. */
+  if (!viva) el('payEurNota').style.display = 'none';
+  /* la fattura nuova si offre solo per un ORDINE: puntate e sblocchi
+     hanno i loro giri, e un ordine gia' rigenerato non ne ha un'altra */
+  const oid = !rilancioCorrente && !pagamentoCorrente && currentOrderId;
+  const noto = oid && orders.find(x => x.id === oid);
+  el('payRinnova').style.display =
+    (!viva && oid && !(noto && noto.fatturaRinnovataIl)) ? '' : 'none';
+  if (!viva && payOrologio) { clearInterval(payOrologio); payOrologio = null; }
 }
 
 /* ---- «Compra subito»: il wallet NWC paga la invoice escrow ----
@@ -24590,7 +24868,14 @@ function caricaQrcode(){
 }
 let qrGiro = 0;   /* il caricamento e' async: un giro vecchio arrivato
                      in ritardo non deve disegnare sopra quello nuovo */
-async function mostraQr(invoice){
+async function mostraQr(invoice, scade){
+  /* LA SCADENZA SEGUE LA FATTURA, dallo stesso collo di bottiglia del
+     vestito qui sotto (24 set 2026, «Paga ora»): ogni flusso che apre
+     il foglio passa di qui con la sua fattura, quindi il conto alla
+     rovescia e la porta del wallet li eredita anche quello di domani.
+     `scade` e' il ripiego di chi lo conosce (l'ordine sa quando e'
+     nato) per le fatture che non si leggono. */
+  orologioPay(invoice, scade);
   /* IL VESTITO SEGUE LA VARIABILE-MODALITA', da un posto solo.
      La prima stesura lo metteva a mano in `sbloccaBanner`, e il
      giro DAL VIVO ha mostrato il buco: nessuno rimetteva il testo
@@ -26910,7 +27195,17 @@ function verboOrdine(o){
    regola di «I miei scambi». E' tornata la carta di sempre, e la
    tinta per stato resta del solo P2P. */
 function badgeOrdine(o){
-  return inPagamento(o) ? 'confirmed' : STATES[o.state].badge;
+  /* DA PAGARE E' UN GESTO DI CHI COMPRA (24 set 2026, «Paga ora»): a
+     lui il rettangolino si veste PIENO, perche' e' l'unico stato della
+     lista che aspetta una sua mossa per esistere — con la tinta velata
+     di «Sats depositati» le due righe si leggevano uguali, e l'ordine
+     da pagare passava per uno gia' pagato. A chi vende resta il velato
+     di sempre: lui non ha niente da fare. La parola resta «Da pagare»,
+     senza il ⚡ davanti: provato a schermo, di sera il fulmine spariva
+     sul suo stesso arancio, e il pieno basta da solo a dirlo. */
+  return inPagamento(o) ? 'confirmed'
+       : (o.role === 'buyer' && o.state === 'creato') ? 'dapagare'
+       : STATES[o.state].badge;
 }
 /* Nascondere non e' cancellare: il server tiene la riga e accende il
    flag della MIA parte, solo su released/refunded. Il toast dice dove
@@ -27050,7 +27345,20 @@ function openOrder(id){
      invece li custodisce ancora la piattaforma (lo dice la riga
      sotto, che resta vera per tutti e due). Il moderatore, che guarda
      da fuori, tiene la frase neutra di sempre. */
-  const passoDeposito = {
+  /* ...MA SOLO QUANDO E' SUCCESSO (24 set 2026, dal campo: un ordine
+     ancora da pagare diceva «Hai depositato i sats» a chi non aveva
+     depositato niente, e piu' su «I sats sono al sicuro»). Finche' i
+     sats non sono arrivati il passo e' da FARE e parla all'imperativo;
+     a ordine annullato non si fa piu', e dice solo che non e'
+     successo. Il ramo del fatto resta quello di sempre, parola per
+     parola. */
+  const passoDeposito = s==='creato' ? {
+    t: o.role==='buyer' ? 'Deposita i sats' : 'In attesa del pagamento',
+    d: o.role==='buyer' ? 'Paga la fattura: i sats restano custoditi dalla piattaforma'
+                        : 'L\'acquirente non ha ancora pagato'}
+    : s==='annullato' ? {t:'Nessun deposito',
+        d:'L\'ordine si è chiuso prima del pagamento'}
+    : {
     t: o.role==='buyer'  ? 'Hai depositato i sats'
      : o.role==='seller' ? 'Hai il pagamento in garanzia'
      :                     'Sats nel deposito di garanzia',
@@ -27235,6 +27543,15 @@ function openOrder(id){
                           : 'Barattolo sta consegnando i sats al venditore'}
     : s==='dispute'             ? {ic:'⚖️', b:'Deposito congelato', d:'Disputa in corso: i sats restano fermi fino alla decisione'}
     : s==='annullato'           ? {ic:'✖️', b:'Ordine annullato',   d:'Nessun pagamento è stato trattenuto'}
+    /* DA PAGARE NON E' «AL SICURO» (24 set 2026, dal campo): la riga
+       qui sotto era il ripiego di TUTTI gli stati senza una testa sua,
+       'creato' compreso — e a chi non aveva ancora pagato diceva che i
+       sats erano nel deposito. Adesso il deposito si dice solo quando
+       c'e'. */
+    : s==='creato'              ? {ic:'⚡',
+      b:o.role==='buyer' ? 'In attesa del tuo pagamento' : 'In attesa del pagamento',
+      d:o.role==='buyer' ? 'Quando paghi, i sats entrano nel deposito di garanzia'
+                         : 'L\'acquirente non ha ancora pagato: nel deposito non c\'è niente'}
     :                             {ic:'🔒', b:'Sats nel deposito di garanzia', d:'I sats sono al sicuro, nessuno può toccarli'};
   el('orderContent').innerHTML = `
     <div class="detail-body">
@@ -27486,8 +27803,8 @@ function openOrder(id){
         </div>`):''}
       ${busteOrdine(o)}
       ${pannelloServizioCompratore(o)}
-      ${o.role==='buyer' && s==='creato' ? `<button class="btn primary" onclick="verificaOrdine(currentOrder.id)">🔄 Ho pagato la invoice — verifica</button>
-      <button class="btn danger-ghost" onclick="annullaOrdine()">✖️ Annulla questo ordine</button>`:''}
+      ${o.role==='buyer' && s==='creato' ? pannelloDaPagare(o)
+        + `<button class="btn danger-ghost" onclick="annullaOrdine()">✖️ Annulla questo ordine</button>` : ''}
       ${!inPagamento(o) && o.role==='seller' && s==='shipped' ? `<button class="btn ghost" onclick="sollecita(this)">🔔 Sollecita l'acquirente a confermare</button>`:''}
       ${notaTrackingSbagliato(o, s)}
       ${o.role==='buyer' && s==='delivered' && !inPagamento(o) ? `<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⏳ <span><b>${o.consegnaScelta==='digitale'?'Contenuto rivelato!':'Pacco consegnato!'}</b> ${o.consegnaScelta==='digitale'?'Provalo subito: conferma qui sotto, o apri una disputa se non funziona — poi l\'acquisto è definitivo. Allo scadere del tempo i sats si sbloccano automaticamente al venditore.':'Controlla l\'oggetto: conferma qui sotto, o apri una disputa se c\'è un problema. I sats restano nel deposito finché non decidi tu — nessuna fretta, ma non sparire: dopo un po\' di silenzio interviene un moderatore.'}</span></div>`:''}
@@ -27547,6 +27864,8 @@ function openOrder(id){
      server (fail-open: senza rete la scritta invita a riaprire) */
   if (o.role==='buyer' && s==='locked' && o.asta && !o.consegnaScelta)
     caricaStradeOrdine(o);
+  /* il conto alla rovescia della fattura, solo dove c'e' da pagare */
+  avviaOrologioOrdine(o);
   forseAvvisoTrasporto(o);
   /* Le monete partono dal messaggio di chiusura («Hai incassato…» /
      «Deposito sbloccato»), solo la prima volta che questo dispositivo

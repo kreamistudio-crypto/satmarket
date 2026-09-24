@@ -1161,6 +1161,35 @@
   Il prezzo dichiarato è che a LNbits giù quelle righe si accumulano
   invece di autopulirsi — meglio una riga che si attarda che un
   pagamento buttato via.
+  «PAGA ORA» E LA FATTURA NUOVA (24 set 2026, dal campo — l'ordine
+  #196: foglio chiuso per sbaglio, e nessun modo di rivedere la
+  fattura). La fattura VIVA la riapre il client da solo: `ordini.invoice`
+  viaggiava già nella riga di `/api/orders`, e `mapOrder` la legge come
+  `fattura` al solo compratore e al solo 'creato'; «⚡ Paga ora» apre il
+  paySheet di sempre con la STESSA bolt11 (`apriFoglioFattura` azzera
+  `rilancioCorrente`/`pagamentoCorrente`, `currentOrderId` = quest'ordine,
+  poll ripartito) senza chiamare il server. La fattura MORTA si rigenera
+  con `POST /api/orders/{id}/nuova-fattura` (`nuova_fattura_ordine`):
+  viva = ripresenta quella; morta = prima chiede a LNbits della vecchia
+  (pagata → `_incassa_ordine`; muto → 503 e niente conio), riguarda le
+  porte che il venditore può aver chiuso (annunci 'attivo',
+  `guardia_ferie`) e poi conia sulla STESSA riga con un CAS su
+  `payment_hash` e su `fattura_rinnovata_il` (colonna nuova, flag +
+  quando: UNA volta sola, perché la vita della fattura è il lock del
+  prezzo — per la seconda si ricompra dall'annuncio). `creato` si
+  rinfresca, `cassaforte` segue la fattura nuova. L'ora la dice
+  `scadenza_fattura_ordine` (la bolt11 via `leggi_bolt11`, ripiego
+  `creato + INVOICE_EXPIRY`), gemello di `scadenzaFatturaOrdine`.
+  E L'OROLOGIO HA UN CAS IN PIÙ: `controlla_abbandonati` mette la
+  lapide solo se il `payment_hash` è ancora quello di cui ha chiesto a
+  LNbits, o cadrebbe su una fattura appena rigenerata. Nel client il
+  conto alla rovescia vive in due posti, ognuno col suo battito che si
+  ferma da solo: nel dettaglio (`pannelloDaPagare` +
+  `avviaOrologioOrdine`, che alla morte ridisegna il solo riquadro) e
+  nel foglio (`orologioPay`/`battitoPay`, accesi da `mostraQr` per ogni
+  flusso: «⏱ Scade tra», la porta `lightning:` del wallet, e a fattura
+  morta il velo, la nota spenta e «Generane una nuova» se è un ordine).
+  Verbale in CANTIERI, «Paga ora: la fattura che si riapre».
   IL RILANCIO PAGATO NON ENTRA IN GARA, dichiarato: la fattura è
   scaduta da un pezzo e applicare adesso un rilancio vecchio di dieci
   minuti falserebbe una gara che è andata avanti. Prende il binario
