@@ -15438,7 +15438,8 @@ function vociSponsor(){
       titoloDentro: true, sponsor: true, file: slug + '.webp',
       testo: String((casa ? casa.titolo : s.titolo) || ''),
       vivo: () => !!negozio, accesa: () => false,
-      tocca: () => apriNegozio(negozio, true)});
+      /* il tocco dice da dove arriva: e' l'apertura che il bot conta */
+      tocca: () => apriNegozio(negozio, true, undefined, 'sponsor:' + slug)});
   });
   return fuori;
 }
@@ -16999,13 +17000,21 @@ let raccontoAperto = false;
    pagina in bozza che parla di lui. Si guarda il CODICE del negozio,
    che e' l'identita' vera — e a dire se la bozza e' sua e' comunque il
    server, che gliela manda solo se lo e'. */
-async function apriNegozio(chi, aperto, anteprima){
+/* `da` (24 set 2026) dice DA DOVE si arriva, ed e' il termometro delle
+   aperture dello spazio in vetrina: «sponsor:<slug>» lo manda SOLO il
+   tocco sulla card sponsorizzata di «Da scoprire», e il server conta
+   un'apertura per quel negozio (se il suo spazio e' acceso). Viaggia
+   sulla SOLA prima richiesta: le pagine dopo (caricaAltriNegozio), il
+   tasto indietro, la ricarica e ogni altra strada verso il negozio non
+   lo portano — un tocco, un'apertura. */
+async function apriNegozio(chi, aperto, anteprima, da){
   if (!chi) { toast('Questo venditore non ha ancora un negozio'); return; }
   raccontoAperto = !!aperto;
   try {
     const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
     const r = await fetch(
-      `${API_BASE}/negozio/${encodeURIComponent(chi)}?limit=${LIMITE_PAGINA}`, opz);
+      `${API_BASE}/negozio/${encodeURIComponent(chi)}?limit=${LIMITE_PAGINA}`
+      + (da ? `&da=${encodeURIComponent(da)}` : ''), opz);
     if (!r.ok) throw new Error('negozio non trovato');
     const d = await r.json();
     const annunci = (d.annunci||[]).map(mapListing);

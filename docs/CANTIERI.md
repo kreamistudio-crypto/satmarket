@@ -31302,3 +31302,39 @@ in collaudo a 375 nei due temi, colore calcolato e fondo vero su sei
 righe (Aspetto, i tre del foglio Nostr, il suggerimento del riquadro da
 pagare): 7,32:1 di giorno e 8,78:1 di sera; `.hintline` sul suo fondo
 arancio 6,27:1 e 7,79:1.
+
+## Il contatore delle aperture dello spazio in vetrina, collegato (24 set 2026)
+
+**IL FATTO.** Dall'ago 2026 il server contava le aperture dello spazio
+(`sponsor_aperture`, `?da=` su `/api/negozio`), ma il client il `da` non
+l'ha mai mandato: `/sponsor` e il preavviso dicevano «aperture: 0» per
+costruzione. Trovato nel cantiere dei negozi sponsorizzati, segnalato, e
+collegato col sì di Andrea.
+
+**LA CURA.** `apriNegozio(chi, aperto, anteprima, da)`: il quarto
+argomento lo passa SOLO la card sponsorizzata di «Da scoprire»
+(`da = 'sponsor:' + slug`), e viaggia sulla SOLA prima richiesta,
+codificato. `caricaAltriNegozio`, il tasto indietro/avanti, la ricarica,
+i Consigliati e ogni altra strada non lo portano: un tocco, un'apertura
+(lo spazio conta solo «Da scoprire», come deciso in 9821f3c). Il server
+non cambia: conta per quello slug se il suo spazio è acceso. In più il
+preavviso dice «1 volta» e non «1 volte».
+
+**PROVATO.** In `prove_sponsor` le due funzioni vere girano in node con
+una fetch che registra: il tocco porta `&da=sponsor%3A<slug>`, la pagina
+dopo e le altre strade niente, e a mandare «sponsor:» è una riga sola
+del client; il banco della fila e quello dei Consigliati registrano il
+`da` (la card lo porta col suo slug, i Consigliati no).
+`collaudo_sponsor` sul server vero (49): `/sponsor` dice le aperture di
+ognuno (le sue a lui, zero all'altro), a spazio spento il tocco non
+conta, il preavviso porta il numero suo e il singolare. Suite intera
+severa senza config: **15.381 verdi, 0 rosse**; collaudi della CI nella
+gabbia; tortura sulla copia **6/6** (al primo giro 5/6: il singolare non
+lo guardava nessuno, e il caso è entrato nel collaudo). Dal vivo sulla
+copia (Chrome headless, tocco vero): due tocchi sulla card di «Un tempo
+per te» → 2 aperture nel database; il «avanti» della cronologia che
+riapre il negozio non conta.
+
+**DA SAPERE.** È un termometro, non una misura: chi scrive l'URL a mano
+lo gonfia (già a verbale in ARCHITETTURA). Il numero parte da oggi:
+quel che c'era prima non si recupera. DA AVERE il telefono.

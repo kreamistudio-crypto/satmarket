@@ -3507,9 +3507,12 @@
   per attenzione: non essendoci la colonna, nessuna query futura potra'
   scriverlo per distrazione. ⚠️ E' UN TERMOMETRO E NON UNA MISURA: a
   dire «vengo dallo spazio» e' il CLIENT (`?da=sponsor:<slug>` dal 24
-  set 2026, e si conta solo se quello spazio e' acceso; ⚠️ il client
-  oggi quel parametro NON lo manda, quindi il numero resta a zero),
-  quindi il
+  set 2026, e si conta solo se quello spazio e' acceso). Lo manda SOLO
+  il tocco sulla card di «Da scoprire» (il quarto argomento di
+  `apriNegozio`, `da`), e sulla SOLA prima richiesta: le pagine dopo, il
+  tasto indietro e le altre strade verso il negozio non lo portano — un
+  tocco, un'apertura. (Fino al 24 set 2026 il client non lo mandava
+  affatto, e i messaggi del bot dicevano «0» per costruzione.) Quindi il
   numero si gonfia da chiunque sappia scrivere un URL. Va bene per la
   domanda che deve rispondere — «e' servito?» — e non per una fattura.
   ⚠️ La prova che lo verifica guarda il DDL SENZA LA PROSA: il

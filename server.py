@@ -55272,7 +55272,8 @@ async def avvisa_scadenza_sponsor():
         await notifica_admin(
             f"📣 <b>Lo spazio in vetrina di {slug} scade "
             f"{_quando_scade(fino)}.</b>\n"
-            f"Aperto {aperte} volte negli ultimi 30 giorni."
+            f"Aperto {aperte} {'volta' if aperte == 1 else 'volte'} "
+            f"negli ultimi 30 giorni."
             + ("\n⚠️ La sua pagina e' in bozza: la card non si vede."
                if bozza else "") + "\n\n"
             f"Alla scadenza sparisce da sola la sua card in «Da "

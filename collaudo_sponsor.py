@@ -214,6 +214,24 @@ def giro(c, SRV, cat):
     prova("...e uno slug inventato o il «sponsor» di ieri non contano",
           (prima + 1, 0), (SRV.aperture_sponsor(PAGINA),
                            SRV.aperture_sponsor("mai-visto")))
+    # I MESSAGGI DEL BOT DICONO IL NUMERO GIUSTO (24 set 2026): fino a
+    # oggi il client il `da` non lo mandava e qui c'era sempre «0». Due
+    # tocchi su Un tempo per te, nessuno su To The Mooon.
+    c.get(f"/api/negozio/{codice}?limit=12&da=sponsor:{PAGINA}")
+    t = bot("/sponsor")
+    riga_p = next(r for r in t.split(chr(10)) if f"<b>{PAGINA}</b>" in r)
+    riga_c = next(r for r in t.split(chr(10)) if f"<b>{CASA}</b>" in r)
+    prova("/sponsor dice le aperture di ognuno: le sue a lui, zero all'altro",
+          (True, True),
+          (f"ultimi 30 giorni: <b>{prima + 2}</b>" in riga_p,
+           "ultimi 30 giorni: <b>0</b>" in riga_c))
+    # ...e un'apertura che arriva mentre lo spazio e' spento non conta
+    fino_c = SRV.sponsor_fino(CASA)
+    scadenza(CASA, int(time.time()) - 1)
+    c.get(f"/api/negozio/{codice}?limit=12&da=sponsor:{CASA}")
+    scadenza(CASA, fino_c)
+    prova("...e a spazio spento il tocco non conta", 0,
+          SRV.aperture_sponsor(CASA))
 
     print("\n[il preavviso: uno per spazio]")
     banco.AVVISI.clear()
@@ -223,6 +241,11 @@ def giro(c, SRV, cat):
     prova("due spazi in scadenza: due preavvisi, uno per spazio",
           [True, True], [any(s in a for a in banco.AVVISI)
                          for s in (f"di {CASA} scade", f"di {PAGINA} scade")])
+    prova("...col numero delle SUE aperture", (True, True),
+          (any(f"di {PAGINA} scade" in a and "Aperto 2 volte" in a
+               for a in banco.AVVISI),
+           any(f"di {CASA} scade" in a and "Aperto 0 volte" in a
+               for a in banco.AVVISI)))
     prova("...e ognuno dice come rinnovare il suo", True,
           all(f"/sponsor {s} 30" in " ".join(banco.AVVISI)
               for s in (CASA, PAGINA)))
@@ -230,11 +253,17 @@ def giro(c, SRV, cat):
     asyncio.run(SRV.avvisa_scadenza_sponsor())
     prova("...e una volta sola per scadenza", [], banco.AVVISI)
     scadenza(CASA, ora + 3000)
+    # un tocco sulla card di To The Mooon, a spazio acceso: il rinnovo
+    # dira' «1 volta», al singolare
+    c.get(f"/api/negozio/{codice}?limit=12&da=sponsor:{CASA}")
     asyncio.run(SRV.avvisa_scadenza_sponsor())
     prova("un rinnovo (scadenza nuova) risuona solo per il suo", 1,
           len(banco.AVVISI))
     prova("...ed e' quello giusto", True, f"di {CASA} scade" in
           " ".join(banco.AVVISI))
+    prova("...e un'apertura sola si dice al singolare", (True, False),
+          ("Aperto 1 volta " in " ".join(banco.AVVISI),
+           "1 volte" in " ".join(banco.AVVISI)))
     scadenza(CASA, fino_casa)
     scadenza(PAGINA, fino_pag)
 

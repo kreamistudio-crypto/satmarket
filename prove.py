@@ -41849,8 +41849,9 @@ let occasioniServer = null, interessiMiei = [];
    il client parte finche' la busta non arriva (dal 24 set 2026 una
    fila, non piu' uno slug solo). */
 let sponsorizzati = [];
-function apriNegozio(chi, aperto){
-  scritte.push('negozio:' + chi + (aperto ? ':aperto' : ':chiuso')); }
+function apriNegozio(chi, aperto, anteprima, da){
+  scritte.push('negozio:' + chi + (aperto ? ':aperto' : ':chiuso')
+               + (da ? ':' + da : '')); }
 """
 
 _BANCO_SCOPRIRE = """
@@ -41979,8 +41980,10 @@ toccaScoperta('sponsor-to-the-moon');
 // vero. L'atteso viene dal CATALOGO e l'osservato dalla CHIAMATA:
 // restano due strade diverse, e la prova continua a dire quel che
 // deve — il tocco porta al negozio DI QUESTO sponsor, aperto.
-dice('il suo tocco porta al negozio, col racconto aperto',
-     ['negozio:' + codiceCard + ':aperto'], scritte);
+// ...E DICE DA DOVE ARRIVA (24 set 2026): e' l'apertura che il bot
+// conta per QUESTO spazio — `da` = «sponsor:<slug>»
+dice('il suo tocco porta al negozio, col racconto aperto e lo slug dello spazio',
+     ['negozio:' + codiceCard + ':aperto:sponsor:to-the-moon'], scritte);
 dice('...e nemmeno lui sfiora un filtro', [false, false],
      [filtroLampo, filtroSconto]);
 
@@ -42005,10 +42008,11 @@ dice('...e la pagina del server ha lo stesso aspetto: banner, pastiglia, niente 
 scritte = [];
 toccaScoperta('sponsor-un-tempo-per-te');
 dice('...e il suo tocco porta al SUO negozio, col racconto aperto',
-     ['negozio:cd34ef56:aperto'], scritte);
+     ['negozio:cd34ef56:aperto:sponsor:un-tempo-per-te'], scritte);
 scritte = [];
 toccaScoperta('sponsor-to-the-moon');
-dice('...e quello dell altra al suo', ['negozio:' + codiceCard + ':aperto'],
+dice('...e quello dell altra al suo, col suo slug',
+     ['negozio:' + codiceCard + ':aperto:sponsor:to-the-moon'],
      scritte);
 
 sponsorizzati = [{slug: 'to-the-moon'}, utpt];
@@ -42949,7 +42953,7 @@ def prove_sponsor():
     # (la firma ha preso un terzo argomento a set 2026 — l'anteprima
     # delle pagine in bozza, vedi prove_racconti_bozza — e l'ancora
     # la segue: e' la stessa funzione)
-    _an = pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima){")
+    _an = pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima, da){")
     prova("apriNegozio scrive l'apertura che riceve", True,
           "raccontoAperto = !!aperto;" in _an)
     # ⚠️ IL GIUDIZIO VIVE IN `raccontoDi` (ago 2026): il renderer non
@@ -42964,6 +42968,69 @@ def prove_sponsor():
           "r.negozio &&" in _rd)
     prova("...e il renderer passa dal giudice, non lo rifa'", (True, False),
           ("raccontoDi(v)" in _rn, "RACCONTI[sponsorVivo]" in _rn))
+
+    # ---- 10. LE APERTURE ARRIVANO DAVVERO (24 set 2026) ---------------
+    # Il server le contava da agosto, ma il client il `da` non l'ha MAI
+    # mandato: i messaggi del bot dicevano «0» per costruzione, e nessuna
+    # prova se ne accorgeva perche' guardavano il contatore da un lato
+    # solo. Qui le due funzioni VERE girano in node con una fetch che
+    # registra gli indirizzi: col `da` la prima richiesta lo porta,
+    # codificato; senza, niente; e la pagina dopo non lo porta MAI — o
+    # ogni scorrimento del negozio conterebbe un'apertura in piu'.
+    import shutil as _sh, subprocess as _sp, tempfile as _tf
+    _node = _sh.which("node")
+    if not _node:
+        salta("le aperture girate: serve node")
+        return
+    _js = ("""
+let VETRINA = false, DEMO = false, myNegozio = '', raccontoAperto = false;
+let negozioPag = {}, negozioCorrente = null;
+const API_BASE = '/api', LIMITE_PAGINA = 12, url = [];
+const authHdr = () => 'x', toast = () => {}, mapListing = x => x;
+const inCatalogo = () => {}, renderNegozio = () => {}, armaViste = () => {};
+const cardHTML = () => '', el = () => ({insertAdjacentHTML(){}});
+async function bozzaDelVenditore(){ return null; }
+async function fetch(u){ url.push(u);
+  return {ok: true, json: async () => ({annunci: [1], cursore: 'c2',
+                                        venditore: {negozio: 'ab'}})}; }
+""" + pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima, da){")
+        + "\n" + pezzo_js(mini, "async function caricaAltriNegozio(){") + """
+(async () => {
+  await apriNegozio('ab12cd34', true, undefined, 'sponsor:un-tempo-per-te');
+  await caricaAltriNegozio();
+  await apriNegozio('ab12cd34', true);
+  await apriNegozio('ab12cd34');
+  console.log(JSON.stringify(url));
+})();
+""")
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8") as _f:
+        _f.write(_js)
+        _p = _f.name
+    _r = _sp.run([_node, _p], capture_output=True, text=True,
+                 encoding="utf-8")
+    os.unlink(_p)
+    try:
+        _u = json.loads((_r.stdout or "").strip().splitlines()[-1])
+    except Exception:
+        _u = None
+    if _u is None:
+        prova("il banco delle aperture gira", "", (_r.stderr or "")[:300])
+        return
+    prova("il tocco sulla card porta lo spazio, codificato",
+          "/api/negozio/ab12cd34?limit=12&da=sponsor%3Aun-tempo-per-te",
+          _u[0])
+    prova("...la pagina dopo non lo porta, o ogni scorrimento conterebbe",
+          False, "da=" in _u[1])
+    prova("...e le altre strade verso il negozio nemmeno",
+          ["/api/negozio/ab12cd34?limit=12"] * 2, _u[2:])
+    # E L'UNICO A MANDARLO E' LA CARD DI «DA SCOPRIRE»: le altre chiamate
+    # di apriNegozio non passano il quarto argomento (i Consigliati
+    # compresi: lo spazio conta solo «Da scoprire», come deciso in 9821f3c)
+    _chi = [l_ for l_ in mini.split("\n")
+            if "'sponsor:' +" in l_ and "apriNegozio(" in l_]
+    prova("a mandare «sponsor:» e' la sola card sponsorizzata", 1,
+          len(_chi))
 
 
 def prove_racconto_girato():
@@ -43454,7 +43521,7 @@ def prove_racconti_bozza():
     # SUL SUO NEGOZIO la bozza la vede sempre: se il negozio aperto e'
     # il suo, prima di disegnare si chiede alla porta sua — e solo le
     # BOZZE, che una pubblicata la porta gia' il negozio a tutti
-    _an = pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima){")
+    _an = pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima, da){")
     prova("sul suo negozio il venditore chiede la sua bozza", True,
           "d.venditore.negozio === myNegozio" in _an
           and "anteprima = await bozzaDelVenditore(myNegozio);" in _an)
@@ -95229,8 +95296,9 @@ function centraNellaFila(){}
 function aggiornaFrecce(){}
 const clickNostro = e => !(e.ctrlKey || e.metaKey || e.shiftKey || e.button);
 function go(v){ scritte.push('go:' + v); }
-function apriNegozio(chi, aperto){
-  scritte.push('negozio:' + chi + (aperto ? ':aperto' : ':chiuso')); }
+function apriNegozio(chi, aperto, anteprima, da){
+  scritte.push('negozio:' + chi + (aperto ? ':aperto' : ':chiuso')
+               + (da ? ':' + da : '')); }
 function condividiLink(link){ scritte.push('condividi:' + link); }
 const baseCondivisione = () => 'https://barattolo.store';
 """
