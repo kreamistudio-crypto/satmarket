@@ -264,6 +264,29 @@
   `altraCassaforte` (tre fogli, ne sceglie uno il server), `boxCrediti`.
   Il perché, e il rischio dichiarato del calendario, stanno in
   CANTIERI, «Paga da un'altra cassaforte».
+  LA CHIUSURA DELLA CASSAFORTE SAAS (24 set 2026). Due gesti da
+  moderatore e una vista, per svuotare e spegnere il LNbits ospitato:
+  `GET/POST /api/admin/pagamenti/dichiara-morto` (solo `saas`, solo
+  `incerto`, LNbits «pending», fattura del tentativo scaduta da almeno
+  `MORTO_DOPO_SCADENZA_S` = 24 ore, una volta sola: l'hash va `deviato`,
+  nasce un credito, `cassaforte_payout='nodo'`, e si ripassa da
+  `_riprendi_uscita` — il flusso normale del pagamento fallito, che poi
+  paga dal nodo da solo), `GET/POST /api/admin/pagamenti/sposta-nodo`
+  (ordine del SaaS aperto e senza pagamenti in corso: promette il nodo
+  su `cassaforte_payout`, non muove un sat, non tocca `aggiornato`) e
+  `GET /api/admin/cassaforte-saas` (la vista: ordini aperti, totali per
+  cassaforte d'uscita, crediti, `DOVERI_SAAS`, registro). Giudici:
+  `_esamina_morto` (con rete), `_esamina_sposta` (solo database),
+  `_morto_forse` (il bottone acceso/spento, solo database),
+  `_appesi_sul_saas`. Il registro è `gesti_cassaforte` (UNIQUE su
+  ordine+gesto), il motivo è obbligatorio (`_motivo_del_gesto`, dieci
+  caratteri). ⚠️ DA QUEL GIORNO `_cassaforte_uscita` VALE ANCHE PER I
+  RIMBORSI: `_rimborsa_compratore` la legge nei due posti, e un ordine
+  spostato rimborsa dal nodo. Nel client `gestoCassaforte` (l'avviso, la
+  conferma col motivo, la conferma che rilegge), `dichiaraMorto`,
+  `spostaNodo`, `boxCassaforteSaas`; il quarto bottone di
+  `rigaPagamento`. Il perché sta in CANTIERI, «La chiusura della
+  cassaforte SaaS».
   IL PAGAMENTO IN VOLO (set 2026, cantiere B). `payout_stato` ha un
   terzo timbro, `in_volo`, e le tre parole dicono tre cose che prima si
   confondevano in due: `da_riprovare` = nessun sat si è mosso, si

@@ -7456,6 +7456,23 @@ def init_db():
         "chiuso_il INTEGER NOT NULL DEFAULT 0, "
         "nota TEXT NOT NULL DEFAULT '', "
         "UNIQUE(tabella, riga_id, hash))")
+    # IL REGISTRO DEI GESTI SULLA CASSAFORTE (24 set 2026, la chiusura
+    # del SaaS): chi ha dichiarato morto un pagamento appeso, chi ha
+    # spostato un ordine sul nodo, quando e con che motivo. Append-only,
+    # e la UNIQUE e' la regola «una volta sola per ordine»: il secondo
+    # gesto uguale sulla stessa riga non entra, e la rotta dice 409.
+    con.execute(
+        "CREATE TABLE IF NOT EXISTS gesti_cassaforte("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "tabella TEXT NOT NULL, riga_id INTEGER NOT NULL, "
+        "gesto TEXT NOT NULL, "
+        "da TEXT NOT NULL DEFAULT '', a TEXT NOT NULL DEFAULT '', "
+        "hash TEXT NOT NULL DEFAULT '', "
+        "sats INTEGER NOT NULL DEFAULT 0, "
+        "motivo TEXT NOT NULL DEFAULT '', "
+        "deciso_da INTEGER NOT NULL DEFAULT 0, "
+        "deciso_il INTEGER NOT NULL DEFAULT 0, "
+        "UNIQUE(tabella, riga_id, gesto))")
     # I PASSI DEL PAGAMENTO (set 2026, lo stadio «in pagamento»): la
     # linea del tempo di un'uscita, una riga per passaggio. PERCHE' UNA
     # TABELLA e non lo stato derivato e basta: lo STADIO si deriva
@@ -8433,13 +8450,18 @@ def _cassaforte_tentata(con, tabella: str, riga_id: int,
 
 
 def _cassaforte_uscita(o) -> str:
-    """DA DOVE ESCE l'incasso di quest'ordine: `cassaforte_payout` se un
+    """DA DOVE ESCONO i sats di quest'ordine: `cassaforte_payout` se un
     moderatore l'ha deviato (21 set 2026, «paga da un'altra
     cassaforte»), sennò `cassaforte`, cioe' da dove i sats sono entrati
-    — la regola di sempre, e quella di ogni ordine non deviato. Vale
-    SOLO per l'incasso del venditore: un rimborso torna al compratore da
-    dove e' arrivato. Un nome fuori catalogo non ripiega: lo ferma
-    `_chiavi_cassaforte`, che alza."""
+    — la regola di sempre, e quella di ogni ordine non deviato.
+    DAL 24 SET 2026 VALE PER TUTTE E DUE LE USCITE, l'incasso di chi
+    vende E il rimborso a chi compra: fino a quel giorno un rimborso
+    tornava «da dove e' arrivato», ma la cassaforte SaaS si sta
+    chiudendo e un ordine spostato sul nodo («Sposta sulla cassaforte
+    nodo») deve uscire di la' qualunque verso prenda — altrimenti una
+    disputa persa lo rimanderebbe a bussare a una cassaforte svuotata.
+    Un nome fuori catalogo non ripiega: lo ferma `_chiavi_cassaforte`,
+    che alza."""
     return _campo(o, "cassaforte_payout") or o["cassaforte"]
 
 
@@ -21940,6 +21962,8 @@ def coda_pagamenti(x_tg_init_data: str = Header(""),
                 o = interi[r["id"]]
                 r["cassaforte"] = _cassaforte_uscita(o)
                 r["altra_cassaforte"] = _altra_cassaforte_forse(con, o, adesso)
+                # IL QUARTO BOTTONE (24 set 2026, la chiusura del SaaS)
+                r["morto"] = _morto_forse(con, o, adesso)
             except Exception as e:
                 print(f"⚠️ Coda pagamenti, ordine #{r['id']}: altra "
                       f"cassaforte non giudicata ({e})")
@@ -22581,6 +22605,570 @@ async def _chiedi_fattura_nuova(ordine_id: int, esame: dict, a_verbale) -> dict:
         "📨 Chiesta a chi vende una fattura nuova: appena la incolla vi "
         "arriva l'avviso, e da qui si paga.")}
 
+# =====================================================================
+# LA CHIUSURA DELLA CASSAFORTE SAAS (24 set 2026). Sul LNbits ospitato
+# restano sei ordini e un pagamento appeso «pending» per sempre (il
+# #152: 247.707 sats, fattura scaduta il 20 set, nessuna preimage, e il
+# saldo del nodo Spark sopra quello di LNbits della stessa cifra). Il
+# giudice M1 dell'audit 2 e' GIUSTO — un «pending» sul SaaS e' vivo per
+# una macchina — e proprio per questo nessun automatismo puo' chiudere
+# quel caso: lo chiude UNA PERSONA, con due gesti a carte scoperte,
+# motivo scritto, registro nel database e riga nel journal.
+#  1) «Dichiara morto il pagamento appeso»: solo sul SaaS, solo
+#     «pending» con la fattura scaduta da almeno 24 ORE, una volta sola
+#     per ordine. Dopo, l'ordine torna nel flusso normale del pagamento
+#     fallito: chi deve ricevere sente il solito «dacci una fattura
+#     nuova», e quando la incolla il pagamento parte da solo DAL NODO.
+#  2) «Sposta sulla cassaforte nodo»: un ordine del SaaS senza pagamenti
+#     in corso paghera' (o rimborsera') dal nodo. Nessun sat si muove
+#     adesso: e' una promessa scritta sulla riga (`cassaforte_payout`).
+# I sats dal SaaS al nodo li sposta Andrea a mano: qui NON c'e' codice
+# che muove fondi fra le due cassaforti, per decisione sua.
+MORTO_DOPO_SCADENZA_S = 24 * 3600
+GESTO_MORTO, GESTO_SPOSTA = "dichiara_morto", "sposta_nodo"
+STATI_CHIUSI_ORDINE = ("creato", "annullato", "released", "refunded")
+
+
+def _gesto_fatto(con, riga_id: int, gesto: str):
+    """La riga del registro se quel gesto su quell'ordine e' gia' stato
+    fatto, sennò None. Sotto try: su uno schema che la tabella non l'ha
+    ancora si risponde «mai», che e' la verita'."""
+    try:
+        return con.execute(
+            "SELECT deciso_da, deciso_il, motivo FROM gesti_cassaforte "
+            "WHERE tabella='ordini' AND riga_id=? AND gesto=?",
+            (riga_id, gesto)).fetchone()
+    except sqlite3.OperationalError:
+        return None
+
+
+def _appesi_sul_saas(con, o) -> list:
+    """Gli hash di quest'ordine ancora SENZA un esito definitivo che
+    vivono sul SaaS: `(hash, quando, scade)`. Un hash senza cassaforte
+    nella memoria e' della cassaforte d'uscita della riga."""
+    origine = _cassaforte_uscita(o)
+    dove = _dove_tentati(con, "ordini", o["id"])
+    fuori = []
+    for h, quando, esito in _hash_tentati(con, "ordini", o["id"]):
+        if esito in (FALLITO, MAI_PARTITO, DEVIATO, USCITO):
+            continue
+        cf, scade = dove.get(h) or ("", 0)
+        if (cf or origine) == CASSAFORTE_SAAS:
+            fuori.append((h, quando, int(scade or 0)))
+    return fuori
+
+
+def _morto_forse(con, o, adesso: int) -> dict:
+    """IL BOTTONE «dichiara morto» ACCESO O SPENTO, senza rete: dal
+    database si sa se l'incasso esce dal SaaS, se e' congelato, se c'e'
+    un hash appeso e da quanto e' scaduta la sua fattura. Le guardie
+    vere (LNbits) girano al tocco e di nuovo alla conferma."""
+    if _cassaforte_uscita(o) != CASSAFORTE_SAAS:
+        return {"forse": False, "perche": "non esce dal SaaS"}
+    if o["payout_stato"] != "incerto":
+        return {"forse": False, "perche": "non è congelato"}
+    if _gesto_fatto(con, o["id"], GESTO_MORTO):
+        return {"forse": False, "perche": "già dichiarato morto"}
+    appesi = _appesi_sul_saas(con, o)
+    if not appesi:
+        return {"forse": False, "perche": "nessun pagamento appeso sul SaaS"}
+    scade = max(s for _, _, s in appesi)
+    if not scade:
+        return {"forse": True, "perche": "la scadenza si legge al tocco"}
+    if adesso - scade < MORTO_DOPO_SCADENZA_S:
+        return {"forse": False, "perche": "la fattura non è scaduta da 24 ore"}
+    return {"forse": True,
+            "perche": f"scaduta da {(adesso - scade) // 3600} ore"}
+
+
+async def _esamina_morto(ordine_id: int) -> dict:
+    """LE GUARDIE DI «DICHIARA MORTO», in un posto solo: le legge il
+    «posso?» del pannello e la rotta che decide (che le RIFA' da capo).
+    Non scrive niente tranne la trascrizione della scadenza. SOLO
+    `ok: True` apre; ogni no porta il suo `codice` e il suo perche',
+    con parole diverse perche' diverse sono le cose da fare."""
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=?", (ordine_id,)).fetchone()
+    if not o:
+        con.close()
+        return {"ok": False, "codice": "assente",
+                "perche": "Quest'ordine non esiste"}
+    origine, verso = _cassaforte_uscita(o), (o["payout_verso"] or "")
+    sats = (o["prezzo_sats"] if verso == "compratore"
+            else netto_venditore(o["prezzo_sats"] - o["protezione_sats"]))
+    base = {"ok": False, "id": ordine_id, "origine": origine, "verso": verso,
+            "sats": sats, "destinazione": CASSAFORTE_NODO, "voci": []}
+    fatto = _gesto_fatto(con, ordine_id, GESTO_MORTO)
+    if fatto:
+        con.close()
+        return {**base, "codice": "gia_fatto", "perche": (
+            f"Per quest'ordine il gesto è già stato fatto da {fatto[0]} il "
+            f"{time.strftime('%d/%m %H:%M', time.localtime(fatto[1]))}: si "
+            f"fa una volta sola")}
+    if origine != CASSAFORTE_SAAS:
+        con.close()
+        return {**base, "codice": "non_saas", "perche": (
+            f"Questo pagamento esce da «{origine}», non dal SaaS: qui non "
+            f"c'è niente da dichiarare morto")}
+    if o["payout_stato"] != "incerto" or verso not in ("venditore",
+                                                        "compratore"):
+        con.close()
+        return {**base, "codice": "non_congelato", "perche": (
+            "Questo pagamento non è (più) fra quelli da verificare: l'ha "
+            "già deciso qualcun altro, o si è chiarito da solo")}
+    if not _cassaforte_pronta(CASSAFORTE_NODO):
+        con.close()
+        return {**base, "codice": "nessuna", "perche": (
+            "La cassaforte del nodo non è configurata: da qui non si "
+            "potrebbe pagare")}
+    for h, quando, _ in _hash_tentati(con, "ordini", ordine_id):
+        con.execute("INSERT OR IGNORE INTO payout_tentati(tabella, riga_id, "
+                    "hash, quando, esito) VALUES('ordini',?,?,?,'')",
+                    (ordine_id, h, quando))
+    vecchia = _trascrivi_scadenza(con, ordine_id)
+    con.commit()
+    appesi = _appesi_sul_saas(con, o)
+    con.close()
+    if not appesi:
+        return {**base, "codice": "niente", "perche": (
+            "Su questa riga non c'è nessun pagamento appeso sul SaaS: non "
+            "c'è niente da dichiarare morto. Usa «Verifica e riprova».")}
+    adesso = int(time.time())
+    morti = []
+    for h, quando, scade in appesi:
+        v = await _verita_pagamento(h, CASSAFORTE_SAAS,
+                                    (adesso - quando) if quando else None,
+                                    f"ordini#{ordine_id} (morto?)")
+        voce = f"{h[:12]}… sul SaaS: LNbits dice «{v['lnbits']}»"
+        if v["verdetto"] == USCITO:
+            base["voci"].append(voce)
+            return {**base, "codice": "uscita", "perche": (
+                f"Il pagamento appeso risulta USCITO ({voce}): NON si "
+                f"dichiara morto. Usa «Verifica e riprova», che lo chiude "
+                f"come pagato.")}
+        if v["lnbits"] == "muto":
+            base["voci"].append(voce)
+            return {**base, "codice": "ignota", "perche": (
+                "LNbits non risponde: senza la sua parola non si dichiara "
+                "morto niente. Riprova fra poco.")}
+        if v["lnbits"] != "pending":
+            base["voci"].append(voce)
+            return {**base, "codice": "non_pending", "perche": (
+                f"LNbits non lo tiene «pending» ({voce}): non c'è niente da "
+                f"dichiarare morto — «Verifica e riprova» lo chiude da solo.")}
+        if not scade:
+            base["voci"].append(voce + ", scadenza della fattura ignota")
+            return {**base, "codice": "scadenza_ignota", "perche": (
+                "Non si sa quando scadeva la fattura di quel tentativo (la "
+                "colonna non la porta più): senza quella data il gesto non "
+                "si fa.")}
+        ore = (adesso - scade) // 3600
+        voce += (f", fattura scaduta da {ore} ore" if adesso >= scade else
+                 f", fattura che scade fra {(scade - adesso) // 60} minuti")
+        base["voci"].append(voce)
+        if adesso - scade < MORTO_DOPO_SCADENZA_S:
+            return {**base, "codice": "presto", "perche": (
+                f"È presto: {voce}. Servono almeno 24 ore dalla scadenza.")}
+        morti.append({"hash": h, "cassaforte": CASSAFORTE_SAAS,
+                      "scade": scade, "ore": ore,
+                      "motivo": (f"dichiarato morto: LNbits «pending» con la "
+                                 f"fattura scaduta da {ore} ore")})
+    return {**base, "ok": True, "codice": "si", "perche": "",
+            "appesi": morti, "fattura_vecchia": bool(vecchia)}
+
+
+def _esamina_sposta(con, o) -> dict:
+    """LE GUARDIE DI «SPOSTA SULLA CASSAFORTE NODO», senza rete: e' una
+    promessa sulla riga, e le si chiede solo che non ci sia NIENTE in
+    corso — un pagamento in volo o congelato, un hash senza esito — e
+    che l'ordine sia ancora aperto e nato sul SaaS."""
+    base = {"ok": False, "id": o["id"], "origine": _cassaforte_uscita(o),
+            "destinazione": CASSAFORTE_NODO, "sats": o["prezzo_sats"],
+            "netto": netto_venditore(o["prezzo_sats"] - o["protezione_sats"]),
+            "stato": o["stato"], "voci": []}
+    if o["stato"] in STATI_CHIUSI_ORDINE:
+        return {**base, "codice": "chiuso",
+                "perche": f"L'ordine è «{o['stato']}»: non ha più uscite"}
+    if base["origine"] != CASSAFORTE_SAAS:
+        return {**base, "codice": "gia_nodo", "perche": (
+            f"Quest'ordine esce già da «{base['origine']}»")}
+    if (o["payout_stato"] or "") in ("incerto", "in_volo"):
+        return {**base, "codice": "in_corso", "perche": (
+            f"C'è un pagamento in corso ({o['payout_stato']}): finché non è "
+            f"deciso non si sposta niente")}
+    if _appesi_sul_saas(con, o):
+        return {**base, "codice": "in_corso", "perche": (
+            "C'è un tentativo di pagamento sul SaaS senza un esito "
+            "definitivo: finché non è deciso non si sposta niente")}
+    if not _cassaforte_pronta(CASSAFORTE_NODO):
+        return {**base, "codice": "nessuna", "perche": (
+            "La cassaforte del nodo non è configurata")}
+    return {**base, "ok": True, "codice": "si", "perche": ""}
+
+
+def _registra_gesto(con, riga_id: int, gesto: str, da: str, a: str,
+                    hash_: str, sats: int, motivo: str, chi: int,
+                    adesso: int) -> bool:
+    """La riga del registro. False se quel gesto su quell'ordine c'era
+    gia' (la UNIQUE): e' la regola «una volta sola», e chi chiama si
+    ferma senza scrivere altro. NON COMMITTA."""
+    try:
+        con.execute(
+            "INSERT INTO gesti_cassaforte(tabella, riga_id, gesto, da, a, "
+            "hash, sats, motivo, deciso_da, deciso_il) "
+            "VALUES('ordini',?,?,?,?,?,?,?,?,?)",
+            (riga_id, gesto, da, a, hash_, sats, motivo[:300], chi, adesso))
+        return True
+    except sqlite3.IntegrityError:
+        return False
+
+
+def _motivo_del_gesto(d: dict) -> str:
+    """Il motivo scritto e' OBBLIGATORIO: almeno dieci caratteri, che
+    fra un mese lo chiedera' qualcuno. La stessa soglia dei crediti."""
+    motivo = str(d.get("motivo") or "").strip()[:300]
+    if len(motivo) < 10:
+        raise HTTPException(400, "Scrivi il motivo in due righe (almeno "
+                                 "dieci caratteri): resta nel registro")
+    return motivo
+
+
+@app.get("/api/admin/pagamenti/dichiara-morto")
+async def posso_dichiarare_morto(tipo: str = "", id: int = 0,
+                                 x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: «posso dichiarare morto il pagamento appeso di
+    quest'ordine?». Chiede a LNbits e NON decide niente: e' quel che il
+    pannello mostra prima delle due conferme."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    if tipo != "ordine":
+        raise HTTPException(400, "Si dichiara morto solo il pagamento di "
+                                 "un ordine")
+    return await _esamina_morto(int(id or 0))
+
+
+@app.post("/api/admin/pagamenti/dichiara-morto")
+async def dichiara_morto(req: Request, x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: dichiara MORTO il pagamento appeso sul SaaS di un
+    ordine e lo rimette nel flusso normale del pagamento fallito, che da
+    qui in poi paga DAL NODO.
+
+    Corpo: `tipo: 'ordine'`, `id`, `motivo` (obbligatorio, almeno dieci
+    caratteri), `conferma: true`. Le guardie si RIFANNO da capo; poi UNA
+    SOLA MANO: il registro (UNIQUE) e l'UPDATE condizionato al
+    congelamento e alla cassaforte letta. Chi arriva secondo trova il
+    registro pieno o zero righe, e legge un 409.
+    COSA SCRIVE: l'hash appeso → `deviato` (per la riga e' chiuso, non
+    si richiede piu'), un CREDITO da recuperare sul SaaS (lo sorveglia
+    la ronda: se fallisce «rientrato» col promemoria del Debit, se si
+    salda «doppio»), `cassaforte_payout='nodo'`, `payout_nota`, il
+    registro, la fattura vecchia via dalla colonna. Poi ripassa da
+    `_riprendi_uscita`: senza un metodo chi riceve sente il solito
+    «tocca a te», con un Lightning address i sats partono subito dal
+    nodo. Il gesto NON muove sats fra le cassaforti."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    d = await leggi_json(req)
+    riga_id = int(d.get("id") or 0)
+    if d.get("tipo") != "ordine":
+        raise HTTPException(400, "Richiesta non valida")
+    esame = await _esamina_morto(riga_id)
+    voci = "; ".join(esame.get("voci") or []) or "nessuna voce"
+
+    def a_verbale(fatto: str):
+        print(f"⚖️ Cassaforte SaaS, ordini#{riga_id} (moderatore "
+              f"{user['id']}): «dichiara morto» — {voci} → {fatto}",
+              flush=True)
+
+    if not esame.get("ok"):
+        a_verbale(f"RIFIUTATO ({esame.get('codice')})")
+        raise HTTPException(
+            503 if esame.get("codice") == "ignota" else 409,
+            esame.get("perche") or "Non si può")
+    motivo = _motivo_del_gesto(d)
+    if d.get("conferma") is not True:
+        a_verbale("manca la conferma esplicita")
+        raise HTTPException(400, "Serve la conferma esplicita")
+    adesso, verso = int(time.time()), esame["verso"]
+    appesi = esame["appesi"]
+    nota = (f"pagamento appeso sul saas dichiarato morto da {user['id']} il "
+            f"{time.strftime('%Y-%m-%d %H:%M', time.localtime(adesso))}, "
+            f"motivo: {motivo}; {voci}; da qui si paga dal nodo")[:600]
+    con = db()
+    if not _registra_gesto(con, riga_id, GESTO_MORTO, CASSAFORTE_SAAS,
+                           CASSAFORTE_NODO, appesi[0]["hash"], esame["sats"],
+                           motivo, user["id"], adesso):
+        con.close()
+        a_verbale("RIFIUTATO: gia' fatto")
+        raise HTTPException(409, "Per quest'ordine il gesto è già stato "
+                                 "fatto: si fa una volta sola")
+    cur = con.execute(
+        "UPDATE ordini SET payout_stato='', cassaforte_payout=?, "
+        "payout_nota=?, aggiornato=? WHERE id=? AND payout_stato='incerto' "
+        "AND COALESCE(NULLIF(cassaforte_payout,''), cassaforte)=?",
+        (CASSAFORTE_NODO, nota, adesso, riga_id, CASSAFORTE_SAAS))
+    if cur.rowcount == 0:
+        con.rollback()
+        con.close()
+        a_verbale("RIFIUTATO: un'altra mano ha già deciso")
+        raise HTTPException(409, "Questo pagamento non è più in attesa: "
+                                 "l'ha già deciso qualcun altro")
+    con.execute("UPDATE payout_tentati SET cassaforte=? WHERE tabella='ordini' "
+                "AND riga_id=? AND cassaforte=''", (CASSAFORTE_SAAS, riga_id))
+    for a in appesi:
+        con.execute("UPDATE payout_tentati SET esito=? WHERE tabella='ordini' "
+                    "AND riga_id=? AND hash=?", (DEVIATO, riga_id, a["hash"]))
+        con.execute(
+            "INSERT OR IGNORE INTO crediti_cassaforte(tabella, riga_id, "
+            "cassaforte, hash, sats, pagato_da, motivo, deciso_da, deciso_il) "
+            "VALUES('ordini',?,?,?,?,?,?,?,?)",
+            (riga_id, CASSAFORTE_SAAS, a["hash"], esame["sats"],
+             CASSAFORTE_NODO, f"{a['motivo']}; {user['id']}: {motivo}"[:300],
+             user["id"], adesso))
+    if esame.get("fattura_vecchia"):
+        # in colonna c'e' la fattura del tentativo MORTO: via, o la
+        # strada d'uscita proverebbe a ripagare quella dal nodo
+        con.execute("UPDATE ordini SET invoice_venditore='' WHERE id=?",
+                    (riga_id,))
+    _segna_passo(con, "ordini", riga_id, PASSO_RIPARTE,
+                 MOTIVO_ALTRA_CASSAFORTE)
+    con.commit()
+    con.close()
+    a_verbale(f"DICHIARATO MORTO ({len(appesi)} hash), {len(appesi)} "
+              f"credito/i sul saas, da qui si paga dal nodo — motivo: {motivo}")
+    try:
+        await notifica_admin(
+            f"💀 <b>Ordine #{riga_id}: pagamento appeso sul SaaS dichiarato "
+            f"morto.</b> <b>{_fmt_sats(esame['sats'])} sats</b> verso il "
+            f"{verso}, deciso da <code>{user['id']}</code>. Motivo: "
+            f"«{html.escape(motivo)}».\n\n<b>Le fonti:</b> {html.escape(voci)}."
+            f"\n\nDa adesso l'ordine si paga dal <b>nodo</b>: a chi deve "
+            f"ricevere arriva il solito avviso, e la fattura nuova parte da "
+            f"sola. Il pagamento appeso resta un <b>credito da recuperare</b> "
+            f"sul SaaS, sorvegliato dalla ronda.\n\n⚠️ Se su LNbits quel "
+            f"pagamento risultasse <b>failed</b>, i sats rientrano nel saldo "
+            f"del SaaS: se l'avevi già riallineato a mano, fai un "
+            f"<b>Debit</b> della stessa cifra.")
+    except Exception as e:
+        print(f"⚠️ Avviso ai moderatori non partito: {e}")
+    try:
+        fatto = await _riprendi_uscita("ordini", riga_id, verso)
+    except Exception as e:
+        print(f"⚠️ Cassaforte SaaS, ordini#{riga_id}: la strada d'uscita "
+              f"e' saltata ({type(e).__name__}: {e})", flush=True)
+        fatto = {"ok": False, "errore": True}
+    if fatto.get("ok"):
+        messaggio = "✅ Pagato dal nodo: c'era un modo per riceverli, e i sats sono partiti."
+    elif fatto.get("in_volo"):
+        messaggio = "↩︎ Il pagamento dal nodo è partito ed è in volo: lo segue la ronda."
+    elif fatto.get("incerto"):
+        messaggio = "🧊 Il pagamento dal nodo non ha avuto risposta: è tornato qui, da verificare."
+    elif fatto.get("errore"):
+        messaggio = "⚠️ Il pagamento appeso è chiuso ma la strada d'uscita è saltata: guarda il journal."
+    else:
+        messaggio = ("💀 Pagamento appeso chiuso. A chi deve ricevere è stato "
+                     "chiesto un modo nuovo: quando lo dà, si paga dal nodo "
+                     "da solo.")
+    return {**fatto, "ok": True, "esito": "morto", "messaggio": messaggio,
+            "crediti": len(appesi)}
+
+
+@app.get("/api/admin/pagamenti/sposta-nodo")
+def posso_spostare_nodo(tipo: str = "", id: int = 0,
+                        x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: «posso spostare quest'ordine sulla cassaforte nodo?»
+    Senza rete, dal database."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    if tipo != "ordine":
+        raise HTTPException(400, "Si sposta solo un ordine")
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=?",
+                    (int(id or 0),)).fetchone()
+    if not o:
+        con.close()
+        return {"ok": False, "codice": "assente",
+                "perche": "Quest'ordine non esiste"}
+    esame = _esamina_sposta(con, o)
+    con.close()
+    return esame
+
+
+@app.post("/api/admin/pagamenti/sposta-nodo")
+async def sposta_nodo(req: Request, x_tg_init_data: str = Header(""),
+                      barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: da adesso quest'ordine del SaaS paga (o rimborsa) dal
+    NODO. Corpo: `tipo: 'ordine'`, `id`, `motivo` (obbligatorio),
+    `conferma: true`. Rifiutato se c'e' un pagamento in corso. Scrive
+    `cassaforte_payout='nodo'` e `payout_nota`, il registro (UNIQUE: una
+    volta sola), la riga nel journal; NON tocca `cassaforte` (dice dove
+    sono entrati i sats), NON tocca `aggiornato` (l'ancora dei
+    promemoria) e NON muove un sat: i sats dal SaaS al nodo li sposta
+    una persona, a mano, PRIMA che l'affare si chiuda."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    d = await leggi_json(req)
+    riga_id = int(d.get("id") or 0)
+    if d.get("tipo") != "ordine":
+        raise HTTPException(400, "Richiesta non valida")
+    con = db()
+    o = con.execute("SELECT * FROM ordini WHERE id=?", (riga_id,)).fetchone()
+    if not o:
+        con.close()
+        raise HTTPException(404, "Quest'ordine non esiste")
+    esame = _esamina_sposta(con, o)
+
+    def a_verbale(fatto: str):
+        print(f"⚖️ Cassaforte SaaS, ordini#{riga_id} (moderatore "
+              f"{user['id']}): «sposta sul nodo» → {fatto}", flush=True)
+
+    if not esame.get("ok"):
+        con.close()
+        a_verbale(f"RIFIUTATO ({esame.get('codice')})")
+        raise HTTPException(409, esame.get("perche") or "Non si può")
+    try:
+        motivo = _motivo_del_gesto(d)
+        if d.get("conferma") is not True:
+            a_verbale("manca la conferma esplicita")
+            raise HTTPException(400, "Serve la conferma esplicita")
+    except HTTPException:
+        con.close()
+        raise
+    adesso = int(time.time())
+    nota = (f"spostato sulla cassaforte nodo (nato sul saas) da {user['id']} "
+            f"il {time.strftime('%Y-%m-%d %H:%M', time.localtime(adesso))}, "
+            f"motivo: {motivo}")[:600]
+    if not _registra_gesto(con, riga_id, GESTO_SPOSTA, CASSAFORTE_SAAS,
+                           CASSAFORTE_NODO, "", esame["sats"], motivo,
+                           user["id"], adesso):
+        con.close()
+        a_verbale("RIFIUTATO: gia' fatto")
+        raise HTTPException(409, "Quest'ordine è già stato spostato: si fa "
+                                 "una volta sola")
+    cur = con.execute(
+        "UPDATE ordini SET cassaforte_payout=?, payout_nota=? WHERE id=? "
+        "AND cassaforte=? AND COALESCE(cassaforte_payout,'')='' "
+        "AND COALESCE(payout_stato,'') NOT IN ('incerto','in_volo') "
+        "AND stato NOT IN ('creato','annullato','released','refunded')",
+        (CASSAFORTE_NODO, nota, riga_id, CASSAFORTE_SAAS))
+    if cur.rowcount == 0:
+        con.rollback()
+        con.close()
+        a_verbale("RIFIUTATO: la riga e' cambiata sotto")
+        raise HTTPException(409, "L'ordine è cambiato nel frattempo: "
+                                 "riguardalo prima di spostarlo")
+    # gli hash di ieri (tutti decisi, o non saremmo qui) ricordano da
+    # oggi per iscritto che erano del SaaS
+    con.execute("UPDATE payout_tentati SET cassaforte=? WHERE tabella='ordini' "
+                "AND riga_id=? AND cassaforte=''", (CASSAFORTE_SAAS, riga_id))
+    con.commit()
+    con.close()
+    a_verbale(f"SPOSTATO: da qui paga o rimborsa dal nodo ({esame['stato']}, "
+              f"fino a {_fmt_sats(esame['sats'])} sats) — motivo: {motivo}")
+    try:
+        await notifica_admin(
+            f"➡️ <b>Ordine #{riga_id} spostato sulla cassaforte nodo.</b> "
+            f"Nato sul SaaS, è «{esame['stato']}»: quando si chiuderà, "
+            f"l'incasso ({_fmt_sats(esame['netto'])} sats) o il rimborso "
+            f"({_fmt_sats(esame['sats'])} sats) usciranno dal <b>nodo</b>, "
+            f"che deve averne abbastanza. Deciso da <code>{user['id']}</code>"
+            f", motivo: «{html.escape(motivo)}». Nessun sat si è mosso.")
+    except Exception as e:
+        print(f"⚠️ Avviso ai moderatori non partito: {e}")
+    return {"ok": True, "esito": "spostato", "id": riga_id, "messaggio": (
+        f"➡️ Da adesso l'ordine #{riga_id} paga (o rimborsa) dal nodo. "
+        f"Nessun sat si è mosso: sul nodo devono esserci "
+        f"{_fmt_sats(esame['sats'])} sats nostri prima che l'affare si chiuda.")}
+
+
+@app.get("/api/admin/cassaforte-saas")
+def vista_cassaforte_saas(x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: LA VISTA «CASSAFORTE SAAS» (24 set 2026). Quanti
+    ordini nati sul SaaS restano aperti, quanti sats servono ancora e da
+    quale cassaforte usciranno, i crediti appesi, gli altri doveri del
+    SaaS e il registro dei gesti — cioe' quel che serve per sapere QUANDO
+    si puo' svuotare e spegnere. Legge e basta, senza rete: i bottoni
+    accesi dicono che il gesto ha senso dal database, le guardie vere
+    girano al tocco. «Al massimo» = il prezzo pieno, che copre anche il
+    rimborso: l'incasso di chi vende sta accanto, per ogni riga."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    con = db()
+    adesso = int(time.time())
+    righe = con.execute(
+        "SELECT o.*, COALESCE(a.titolo,'') AS titolo, "
+        "COALESCE(v.nome,'') AS venditore, COALESCE(c.nome,'') AS compratore "
+        "FROM ordini o LEFT JOIN annunci a ON a.id=o.annuncio_id "
+        "LEFT JOIN utenti v ON v.tg_id=o.venditore_id "
+        "LEFT JOIN utenti c ON c.tg_id=o.compratore_id "
+        "WHERE o.cassaforte=? AND o.stato NOT IN "
+        "('creato','annullato','released','refunded') ORDER BY o.id",
+        (CASSAFORTE_SAAS,)).fetchall()
+    ordini = []
+    totali = {"aperti": 0, "dal_saas": 0, "sul_nodo": 0,
+              "sats_dal_saas": 0, "sats_sul_nodo": 0,
+              "netto_dal_saas": 0, "netto_sul_nodo": 0}
+    for o in righe:
+        uscita = _cassaforte_uscita(o)
+        netto = netto_venditore(o["prezzo_sats"] - o["protezione_sats"])
+        appesi = _appesi_sul_saas(con, o)
+        try:
+            gesti = [dict(g) for g in con.execute(
+                "SELECT gesto, deciso_da, deciso_il, motivo FROM "
+                "gesti_cassaforte WHERE tabella='ordini' AND riga_id=? "
+                "ORDER BY id", (o["id"],))]
+        except sqlite3.OperationalError:
+            gesti = []
+        ordini.append({
+            "id": o["id"], "stato": o["stato"], "titolo": o["titolo"],
+            "venditore_id": o["venditore_id"], "venditore": o["venditore"],
+            "compratore_id": o["compratore_id"], "compratore": o["compratore"],
+            "prezzo_sats": o["prezzo_sats"], "netto": netto,
+            "payout_stato": o["payout_stato"] or "",
+            "payout_verso": o["payout_verso"] or "", "uscita": uscita,
+            "appesi": [{"hash": h, "scade": s} for h, _, s in appesi],
+            "gesti": gesti,
+            "morto": _morto_forse(con, o, adesso)["forse"],
+            "sposta": _esamina_sposta(con, o)["ok"]})
+        totali["aperti"] += 1
+        chiave = "sul_nodo" if uscita == CASSAFORTE_NODO else "dal_saas"
+        totali[chiave] += 1
+        totali["sats_" + chiave] += int(o["prezzo_sats"] or 0)
+        totali["netto_" + chiave] += int(netto or 0)
+    try:
+        r = con.execute(
+            "SELECT COUNT(*), COALESCE(SUM(sats),0) FROM crediti_cassaforte "
+            "WHERE cassaforte=? AND stato IN ('aperto','doppio')",
+            (CASSAFORTE_SAAS,)).fetchone()
+        crediti = {"n": int(r[0] or 0), "sats": int(r[1] or 0)}
+    except sqlite3.OperationalError:
+        crediti = {"n": 0, "sats": 0}
+    doveri = []
+    for nome, sql in DOVERI_SAAS:
+        try:
+            doveri.append({"nome": nome, "n": int(con.execute(sql).fetchone()[0] or 0)})
+        except Exception:
+            # nel dubbio non e' zero: il client scrive «?»
+            doveri.append({"nome": nome, "n": None})
+    try:
+        gesti = [dict(g) for g in con.execute(
+            "SELECT * FROM gesti_cassaforte ORDER BY id DESC LIMIT 30")]
+    except sqlite3.OperationalError:
+        gesti = []
+    con.close()
+    return {"ordini": ordini, "totali": totali, "crediti": crediti,
+            "doveri": doveri, "gesti": gesti,
+            "ore_minime": MORTO_DOPO_SCADENZA_S // 3600}
+
 
 @app.get("/api/admin/crediti")
 def lista_crediti(x_tg_init_data: str = Header(""),
@@ -22704,7 +23292,15 @@ async def sorveglia_crediti():
                     f"pagamento rimasto appeso su «{c['cassaforte']}» è "
                     f"<b>fallito</b>: i <b>{_fmt_sats(c['sats'])} sats</b> "
                     f"sono tornati nel saldo di quella cassaforte. Non c'è "
-                    f"più niente da recuperare.")
+                    f"più niente da recuperare."
+                    # IL PROMEMORIA DEL DEBIT (24 set 2026, la chiusura del
+                    # SaaS): il saldo del SaaS del #152 era gia' stato
+                    # riallineato a mano con un Credit, quindi un «failed»
+                    # arrivato dopo lo alzerebbe una seconda volta
+                    + (" ⚠️ Se il saldo di quella cassaforte l'avevi già "
+                       "riallineato a mano (un Credit), adesso è alto due "
+                       "volte: fai un <b>Debit</b> della stessa cifra."
+                       if c["cassaforte"] == CASSAFORTE_SAAS else ""))
         except Exception as e:
             print(f"⚠️ Avviso ai moderatori non partito: {e}")
 
@@ -47237,7 +47833,7 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
                                                          importo)
             esito = (PAGATO if o["payout_stato"] == "uscito"
                      else await paga_venditore(bolt11, importo, taccuino,
-                                               cassaforte=o["cassaforte"],
+                                               cassaforte=_cassaforte_uscita(o),
                                                riga=("ordini", ordine_id,
                                                      "compratore"))
                      if bolt11 else NON_PAGATO)
@@ -47257,7 +47853,7 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
                 con, "ordini", ordine_id, bolt11, "compratore",
                 f"Rimborso al compratore sull'ordine #{ordine_id}: "
                 f"<b>{_fmt_sats(importo)} sats</b>.",
-                cassaforte=o["cassaforte"])
+                cassaforte=_cassaforte_uscita(o))
             return {"ok": False, "stato": o["stato"], "incerto": True}
         if esito == NON_CHIESTO:
             # Gemello del ramo di `_sblocca_sats`: la riga resta com'era

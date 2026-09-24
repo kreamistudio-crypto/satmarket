@@ -30153,3 +30153,121 @@ scarto) e il colore con una curva sua (0,28 nel tocco).
 **DA GUARDARE SUL TELEFONO.** Il + che si scurisce scendendo fino al
 blu del logo e ritorna rosso lasciandolo prima; il tocco che lo porta
 giu' blu; la morfosi che parte gia' blu; la croce, di sera sul rosso.
+
+## La chiusura della cassaforte SaaS: dichiara morto, sposta sul nodo, e la vista (24 set 2026)
+
+**DA DOVE VIENE.** Sul LNbits ospitato (SaaS, fondi su Spark) restano
+sei ordini: #129, #131, #134, #138 (locked, venditore To The Mooon, un
+account nostro), #153 (shipped, venditore Steu) e #152 (confirmed,
+payout a P3dr0 appeso «pending» per sempre: 247.707 sats, fattura
+scaduta il 20 set, nessuna preimage, e il saldo del nodo Spark sopra
+quello di LNbits della stessa cifra — il saldo era già stato riallineato
+a mano con un Credit). Il giudice M1 dell'audit 2 è GIUSTO: dove non c'è
+un LND nostro, un «pending» di LNbits è vivo finché LNbits non dice
+«failed», e nessuna macchina può dire il contrario. Quindi il #152 era
+bloccato per costruzione, e i cinque ordini vivi avrebbero pagato dal
+SaaS il giorno della loro chiusura. Andrea vuole che TUTTI E SEI paghino
+dalla cassaforte nodo, per poi svuotare il SaaS e spegnerlo. Un worktree
+da `origin/main`, commit firmati.
+
+**COSA C'È: DUE GESTI DA MODERATORE E UNA VISTA**, tutto nel pannello
+del Profilo, con doppia conferma, motivo scritto obbligatorio (almeno
+dieci caratteri, la soglia dei crediti), registro nel database
+(`gesti_cassaforte`: gesto, da dove a dove, hash, sats, chi, quando,
+motivo, con la UNIQUE su ordine+gesto che è la regola «una volta sola»)
+e riga nel journal («⚖️ Cassaforte SaaS, ordini#N (moderatore X): …»).
+1) **«💀 Dichiara morto il pagamento appeso»**
+(`GET/POST /api/admin/pagamenti/dichiara-morto`), quarto bottone della
+riga del 🧊, solo sugli incassi che escono dal SaaS. Le guardie
+(`_esamina_morto`): solo cassaforte `saas`, solo `payout_stato
+'incerto'`, un hash appeso sul SaaS che LNbits tiene «pending» (un
+«success» è `uscita` → 409 «usa Verifica e riprova»; un «failed» è
+`non_pending` → 409, lo chiude da solo la ronda; LNbits muta è `ignota`
+→ 503), la fattura di quel tentativo scaduta da almeno **24 ORE**
+(`MORTO_DOPO_SCADENZA_S`; scadenza ignota = fail-closed; meno di 24 ore =
+`presto`), il nodo configurato, il gesto mai fatto prima (`gia_fatto`).
+Dopo: l'hash appeso prende l'esito `deviato` (per la riga è chiuso e non
+si richiede più), nasce un **credito da recuperare** sul SaaS (lo
+sorveglia `sorveglia_crediti`), `cassaforte_payout='nodo'`,
+`payout_nota`, la fattura vecchia via dalla colonna, e si ripassa da
+`_riprendi_uscita`: l'ordine **torna nel flusso normale del pagamento
+fallito** — senza un metodo chi riceve sente il solito «Tocca a te:
+incolla una fattura fatta adesso», e quando la incolla
+`deposita_invoice` paga da solo DAL NODO; con un Lightning address i
+sats partono subito dal nodo. 2) **«➡️ Sposta sulla cassaforte nodo»**
+(`GET/POST /api/admin/pagamenti/sposta-nodo`), nel cassetto della vista:
+per un ordine nato sul SaaS, aperto e SENZA pagamenti in corso (niente
+`incerto`/`in_volo`, nessun hash senza esito), scrive `cassaforte_payout
+='nodo'` e la nota; NON tocca `cassaforte` (dice dove sono entrati i
+sats), NON tocca `aggiornato` (l'ancora dei promemoria), NON muove un
+sat. È una promessa sulla riga: quando l'affare si chiude, incasso O
+rimborso escono dal nodo. 3) **La vista «🏦 Cassaforte SaaS»**
+(`GET /api/admin/cassaforte-saas`): gli ordini nati sul SaaS ancora
+aperti con stato, parti, prezzo, incasso, da dove escono, pagamenti
+appesi e gesti fatti; i totali «escono ancora dal SaaS» e «spostati sul
+nodo» (al massimo il prezzo pieno, che copre anche un rimborso, e
+accanto la somma degli incassi); i crediti aperti sul SaaS; i cinque
+doveri di `DOVERI_SAAS` (un conteggio che esplode è `None`, mai zero); il
+registro dei gesti; e il promemoria: **se un pagamento dichiarato morto
+risultasse `failed` su LNbits, fai un Debit della stessa cifra** — lo
+ripete anche l'avviso «Credito rientrato» della ronda, per i soli crediti
+del SaaS. Nel client la liturgia è UNA (`gestoCassaforte`): l'avviso che
+dice perché no, la prima conferma con la textarea del motivo nella
+testata del foglio, la seconda che rilegge ordine, cifra e motivo; tre
+`chiediConferma` per due gesti (SESSANTASETTE-SESSANTANOVE).
+
+**LA REGOLA CHE CAMBIA, E PERCHÉ.** `_cassaforte_uscita` valeva SOLO per
+l'incasso di chi vende: un rimborso tornava «da dove è arrivato».
+Dal 24 set vale per tutte e due le uscite, e `_rimborsa_compratore` la
+legge nei due posti (il pagamento e il congelamento): un ordine spostato
+sul nodo deve uscire di là qualunque verso prenda, o una disputa persa
+lo rimanderebbe a bussare a una cassaforte svuotata. La sentinella di
+`prove_doppio_wallet` che provava il contrario è stata emendata col
+perché. Un ordine NON spostato rimborsa ancora dal SaaS: c'è la prova.
+
+**IL CALENDARIO, DI NUOVO, E SOLO IN MANO A UNA PERSONA.** Il 23 set M1
+aveva tolto la scadenza dal giudice automatico (`_giudica_origine`): un
+HTLC accettato si salda fino al suo CLTV, e una fattura scaduta non lo
+prova morto. Qui la scadenza torna, ma come SOGLIA MINIMA di un gesto
+che fa una persona con le voci di LNbits davanti, un motivo scritto e il
+proprio nome nel registro — a 24 ore invece dei 60 minuti del 21 set, e
+il rischio resta dichiarato nel foglio: se il pagamento appeso un giorno
+si saldasse lo stesso, chi riceve avrebbe ricevuto due volte, e la ronda
+lo direbbe («doppio»). Nessun automatismo usa questa regola.
+
+**LE STRADE SCARTATE.** a) Riusare «🔀 Paga da un'altra cassaforte»:
+richiede l'origine MORTA per il giudice — che sul SaaS con un «pending»
+non arriva mai — e paga SUBITO, quindi vuole prima la fattura nuova;
+qui invece si chiude l'appeso e l'ordine torna nel flusso normale, così
+la fattura che chi vende incolla si paga da sola. b) Riscrivere
+`cassaforte` a 'nodo': falsificherebbe dove sono entrati i sats e il
+conto per cassaforte del libro mastro. c) Un gesto unico «chiudi tutto
+il SaaS»: sono sei decisioni con sei motivi, e una alla volta si legge.
+d) Muovere i fondi fra le cassaforti da codice: NO per decisione di
+Andrea, lo fa lui a mano — nel codice non c'è nessuna chiamata che
+sposti sats fra le due LNbits, e c'è la sentinella che i due gesti non
+parlano con `httpx` né con `paga_venditore`. e) Togliere dai doveri del
+SaaS un ordine spostato sul nodo: i sats del suo deposito stanno
+fisicamente di là finché non si fa lo sweep, e il 🏁 deve restare
+prudente — la vista distingue i due conti, il dovere no.
+
+**PROVATO.** `prove_chiusura_saas` (103: il #152 per intero — presto,
+25 ore, il posso, i rifiuti della rotta uno per uno, il 403, il gesto, la
+riga, il deviato, il credito, il registro, la nota, il solito avviso, il
+journal, lo stadio, una volta sola, la coda che tace, il libro mastro, la
+vista dopo, la fattura nuova pagata dal nodo da sola, il credito che
+rientra col Debit; l'address che paga subito; i sette rifiuti del
+giudice e la riga che cambia sotto; sposta con la riga, la nota, il
+registro, `aggiornato` fermo, niente mosso, la vista, l'incasso dal nodo;
+spostato e rimborsato dal nodo, e il non spostato che rimborsa dal SaaS;
+i sette rifiuti di sposta; le sentinelle del server e del client).
+`collaudo_chiusura_saas` col server vero (41: lo schema da `init_db`, il
+#152 sulle rotte vere, la coda e la vista vere, il libro mastro vero,
+sposta → conferma → nodo, sposta → disputa → rimborso dal nodo, i
+rifiuti), aggiunto ai collaudi della CI. Suite intera severa 14870/0.
+Tortura sulla copia: vedi il verbale del commit.
+
+**DA AVERE.** Il pannello sul telefono (il quarto bottone, la textarea
+nella testata del foglio, il cassetto); LNbits vero sulle due cassaforti
+(mai visto: le forme sono quelle del 21 set); e la sequenza vera sul
+VPS, in PRODUZIONE («CHIUDERE LA CASSAFORTE SAAS»).

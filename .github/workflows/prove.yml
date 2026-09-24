@@ -60,6 +60,7 @@ jobs:
              censimento_scadenze.py collaudo_fatture_scadute.py
              collaudo_rotte_metodi.py
              collaudo_in_pagamento.py collaudo_altra_cassaforte.py
+             collaudo_chiusura_saas.py
              ripulisci_anello_nostr.py
              ricategorizza.py sposta_a_mano.py ritaglia_categorie.py
              presenta_release.py config_esempio.py prova_notifica.py
@@ -151,6 +152,7 @@ jobs:
              collaudo_feedback_confermato
              collaudo_verita_lnd
              collaudo_altra_cassaforte
+             collaudo_chiusura_saas
              collaudo_in_pagamento
              collaudo_lnbits_muto
              collaudo_fatture_scadute

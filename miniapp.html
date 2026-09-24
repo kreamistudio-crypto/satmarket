@@ -36527,6 +36527,14 @@ async function loadAdminStats(){
         {headers:{'X-Tg-Init-Data':authHdr()}});
       if (rk.ok) crediti = await rk.json();
     } catch(e) {}
+    /* la cassaforte SaaS che si sta chiudendo (24 set 2026): il cassetto
+       c'e' finche' c'e' un ordine nato la' ancora aperto */
+    let saas = null;
+    try {
+      const rs = await fetch(`${API_BASE}/admin/cassaforte-saas`,
+        {headers:{'X-Tg-Init-Data':authHdr()}});
+      if (rs.ok) saas = await rs.json();
+    } catch(e) {}
     /* gli ordini coi sats in cassaforte su cui non si muove più
        nessuno: si chiedono SEMPRE — dopo il 🧊 questa è l'unica
        vista che li mostra, e una coda vuota è essa stessa la
@@ -36578,6 +36586,7 @@ async function loadAdminStats(){
       <div class="sub" style="margin-top:6px">Il nodo non ha risposto: <b>non sappiamo</b> se questi sats sono usciti. Cerca il payment_hash su LNbits e dì com'è andata — finché non lo fai, nessun pagamento riparte da solo.</div>
       <div style="margin-top:10px">${incerti.map(rigaPagamento).join('')}</div>` : ''}
       ${boxCrediti(crediti)}
+      ${boxCassaforteSaas(saas)}
       ${boxFermi()}
       ${rev.length ? `
       <div class="section-label" style="padding:26px 0 0">⏳ In revisione (${rev.length})</div>
@@ -36928,6 +36937,15 @@ const rigaPagamento = p => `
           : p.altra_cassaforte.forse
             ? `<span class="badge" onclick="altraCassaforte(${p.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)">🔀 Paga da un'altra cassaforte</span>`
             : `<span class="badge" onclick="altraCassaforte(${p.id})" style="cursor:pointer;background:var(--off-bg);color:var(--muted)">🔀 Paga da un'altra cassaforte</span>`}
+        ${/* IL QUARTO BOTTONE (24 set 2026, la chiusura del SaaS): solo
+              sugli incassi che escono dal SaaS con un pagamento appeso.
+              ACCESO quando dal database la fattura di quel tentativo e'
+              scaduta da almeno un giorno; SPENTO si tocca lo stesso e il
+              server dice perche' no. Le guardie vere girano al tocco. */
+          p.tipo!=='ordine' || !p.morto || p.cassaforte!=='saas' ? ''
+          : p.morto.forse
+            ? `<span class="badge" onclick="dichiaraMorto(${p.id})" style="cursor:pointer;background:var(--warn-bg);color:var(--danger)">💀 Dichiara morto il pagamento appeso</span>`
+            : `<span class="badge" onclick="dichiaraMorto(${p.id})" style="cursor:pointer;background:var(--off-bg);color:var(--muted)">💀 Dichiara morto il pagamento appeso</span>`}
       </div>
       ${p.cassaforte ? `<div class="sub" style="margin-top:6px">esce dalla cassaforte <b>${esc(p.cassaforte)}</b></div>` : ''}
     </div>`;
@@ -36986,6 +37004,133 @@ async function mandaAltraCassaforte(corpo){
                : (typeof j.detail==='string' ? j.detail : 'Non è andata'), 7000);
   } catch(e) { toast('Non è andata'); }
   loadAdminStats();
+}
+
+/* LA CHIUSURA DELLA CASSAFORTE SAAS (24 set 2026): due gesti da
+   moderatore con la STESSA liturgia. Prima il server dice se si puo' —
+   e se no, PERCHE' (un avviso) — poi due conferme: la prima spiega il
+   gesto e chiede il MOTIVO scritto (obbligatorio, almeno dieci
+   caratteri: fra un mese lo chiedera' qualcuno), la seconda rilegge
+   ordine, cifra e motivo prima di mandare. Il motivo viaggia nel corpo
+   e finisce nel registro del database e nel journal. Il campo sta nella
+   testata del foglio: i dialoghi di sistema in questa app non esistono.
+   - «Dichiara morto il pagamento appeso»: solo SaaS, solo «pending» con
+     la fattura scaduta da almeno 24 ore, una volta sola per ordine. Dopo
+     l'ordine torna nel flusso del pagamento fallito e paga dal nodo.
+   - «Sposta sulla cassaforte nodo»: da adesso l'ordine paga o rimborsa
+     dal nodo. Nessun sat si muove: i sats fra le due cassaforti li
+     sposta Andrea a mano. */
+async function gestoCassaforte(g){
+  let j = {};
+  try {
+    const r = await fetch(`${API_BASE}/admin/pagamenti/${g.rotta}?tipo=ordine&id=${g.id}`,
+      {headers:{'X-Tg-Init-Data':authHdr()}});
+    j = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(typeof j.detail==='string' ? j.detail : 'Non è andata'); return; }
+  } catch(e) { toast('Non è andata'); return; }
+  const voci = (j.voci||[]).length ? '\n\nCosa dicono le fonti:\n• ' + j.voci.join('\n• ') : '';
+  if (!j.ok) {
+    chiediConferma({
+      avviso: true,
+      titolo: g.titoloNo,
+      corpo: `${j.perche||'Non si può'}${voci}`,
+      etichetta: 'Ho capito'});
+    return;
+  }
+  chiediConferma({
+    titolo: g.titolo(j),
+    testata: `<span style="font-size:28px">${g.emoji}</span><textarea id="cfMotivo" style="flex:1;min-height:58px;font:inherit;font-size:13px;padding:8px;border-radius:10px" placeholder="Perché lo fai? Almeno dieci caratteri: resta nel registro"></textarea>`,
+    corpo: g.corpo(j) + voci,
+    etichetta: 'Avanti →',
+    poi: () => {
+      const motivo = ((el('cfMotivo')||{}).value||'').trim();
+      if (motivo.length < 10) { toast('Scrivi il motivo: almeno dieci caratteri'); return; }
+      chiediConferma({
+        titolo: 'Confermi?',
+        corpo: `${g.riepilogo(j)}\n\nMotivo: «${motivo}»\n\nResta scritto nel registro: chi, quando e perché.`,
+        etichetta: g.etichetta,
+        poi: () => mandaGestoCassaforte(g.rotta, {tipo:'ordine', id:g.id, motivo, conferma:true})});
+    }});
+}
+async function mandaGestoCassaforte(rotta, corpo){
+  try {
+    const r = await fetch(`${API_BASE}/admin/pagamenti/${rotta}`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify(corpo)});
+    const j = await r.json().catch(()=>({}));
+    toast(r.ok ? (j.messaggio || '↩︎ Fatto')
+               : (typeof j.detail==='string' ? j.detail : 'Non è andata'), 8000);
+  } catch(e) { toast('Non è andata'); }
+  loadAdminStats();
+}
+function dichiaraMorto(id){
+  return gestoCassaforte({
+    id, rotta: 'dichiara-morto', emoji: '💀',
+    titoloNo: 'Non si può dichiarare morto',
+    titolo: j => `Dichiaro morto il pagamento di ${fmt(j.sats)} sats?`,
+    corpo: j => `Sul SaaS il pagamento di ${fmt(j.sats)} sats verso il ${j.verso==='compratore'?'compratore':'venditore'} è «pending» da giorni e la sua fattura è scaduta da almeno ${(j.appesi||[{}])[0].ore||24} ore: per una macchina è ancora vivo, per te no.\n\nDopo il gesto l'ordine torna nel flusso normale del pagamento fallito: a chi deve ricevere arriva il solito avviso «dacci una fattura nuova», e quando la incolla il pagamento parte da solo dalla cassaforte NODO — che deve avere i sats.\n\nIl pagamento appeso resta un credito da recuperare, sorvegliato dalla ronda. ⚠️ Se un giorno si saldasse lo stesso, chi riceve avrebbe ricevuto due volte.`,
+    riepilogo: j => `Ordine #${j.id}: dichiaro morto il pagamento appeso sul SaaS (${(j.appesi||[]).map(a => a.hash.slice(0,12)+'…').join(', ')}), ${fmt(j.sats)} sats. Da qui si paga dal nodo.`,
+    etichetta: '💀 Sì, è morto'});
+}
+function spostaNodo(id){
+  return gestoCassaforte({
+    id, rotta: 'sposta-nodo', emoji: '➡️',
+    titoloNo: 'Non si può spostare',
+    titolo: j => `Sposto l'ordine #${j.id} sul nodo?`,
+    corpo: j => `L'ordine è «${j.stato}» ed è nato sul SaaS. Da adesso in poi l'incasso di chi vende (${fmt(j.netto)} sats) o il rimborso a chi compra (${fmt(j.sats)} sats) usciranno dalla cassaforte NODO invece che dal SaaS.\n\nNessun sat si muove adesso: prima che l'affare si chiuda sul nodo devono esserci ${fmt(j.sats)} sats nostri — li sposti tu, a mano.`,
+    riepilogo: j => `Ordine #${j.id} («${j.stato}», fino a ${fmt(j.sats)} sats): da qui paga o rimborsa dal nodo.`,
+    etichetta: '➡️ Sì, sposta'});
+}
+
+/* LA VISTA «CASSAFORTE SAAS» (24 set 2026): un cassetto con gli ordini
+   nati sul SaaS ancora aperti, da dove usciranno, quanti sats servono
+   ancora (al massimo il prezzo pieno, che copre anche il rimborso; accanto
+   l'incasso di chi vende), i crediti appesi, gli altri doveri del SaaS e
+   il registro dei gesti. E' la risposta a «quando posso svuotarla e
+   spegnerla?»: quando qui e' tutto a zero. I testi passano da esc(). */
+const NOMI_GESTI = {dichiara_morto: 'pagamento appeso dichiarato morto',
+                    sposta_nodo: 'spostato sulla cassaforte nodo'};
+const quandoGesto = t => t ? new Date(t*1000).toLocaleString('it-IT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
+function boxCassaforteSaas(s){
+  if (!s || !s.totali) return '';
+  const t = s.totali;
+  const rigaConto = (nome, testo) => `
+        <div class="leva-riga">
+          <div class="leva-testo">
+            <div class="leva-nome">${nome}</div>
+            <div class="leva-chiave">${testo}</div>
+          </div>
+        </div>`;
+  const righe = (s.ordini||[]).map(o => `
+        <div class="order">
+          <div class="row">
+            <b style="min-width:0;overflow:hidden;text-overflow:ellipsis">📦 Ordine #${o.id}${o.titolo ? ` — ${esc(o.titolo)}` : ''}</b>
+            <span class="mono" style="white-space:nowrap;font-weight:800;color:var(--sats-deep)">${fmt(o.prezzo_sats)} sats</span>
+          </div>
+          <div class="sub" style="margin-top:4px">stato <b>${esc(o.stato)}</b> · vende ${esc(o.venditore||String(o.venditore_id))} · compra ${esc(o.compratore||String(o.compratore_id))} · incasso venditore <b>${fmt(o.netto)} sats</b></div>
+          <div class="sub" style="margin-top:2px">esce dalla cassaforte <b>${esc(o.uscita)}</b>${o.payout_stato ? ` · pagamento: <b>${esc(o.payout_stato)}</b>` : ''}${(o.appesi||[]).length ? ` · <b style="color:var(--danger)">${o.appesi.length} pagamento appeso sul SaaS</b>` : ''}</div>
+          ${(o.gesti||[]).map(g => `<div class="sub" style="margin-top:2px">${g.gesto==='dichiara_morto'?'💀':'➡️'} ${esc(NOMI_GESTI[g.gesto]||g.gesto)} · da ${esc(String(g.deciso_da))} il ${quandoGesto(g.deciso_il)} · «${esc(g.motivo||'')}»</div>`).join('')}
+          ${o.sposta || o.morto ? `<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+            ${o.sposta ? `<span class="badge" onclick="spostaNodo(${o.id})" style="cursor:pointer;background:var(--chip-bg);color:var(--ink)">➡️ Sposta sulla cassaforte nodo</span>` : ''}
+            ${o.morto ? `<span class="badge" onclick="dichiaraMorto(${o.id})" style="cursor:pointer;background:var(--warn-bg);color:var(--danger)">💀 Dichiara morto il pagamento appeso</span>` : ''}
+          </div>` : ''}
+        </div>`).join('');
+  const doveri = (s.doveri||[]).map(d => `<div class="sub" style="margin-top:2px">· ${esc(d.nome)}: <b>${d.n===null ? '?' : fmt(d.n)}</b></div>`).join('');
+  const registro = (s.gesti||[]).length ? `
+        <div class="section-label" style="padding:14px 0 0">Registro dei gesti</div>
+        ${s.gesti.map(g => `<div class="sub" style="margin-top:4px">${g.gesto==='dichiara_morto'?'💀':'➡️'} #${g.riga_id} · ${esc(NOMI_GESTI[g.gesto]||g.gesto)} · ${fmt(g.sats)} sats · da ${esc(String(g.deciso_da))} il ${quandoGesto(g.deciso_il)} · «${esc(g.motivo||'')}»</div>`).join('')}` : '';
+  return cassettoAdm('accAdmSaas', '🏦', 'Cassaforte SaaS',
+    t.aperti ? `${t.aperti} aperti` : 'senza ordini', `
+    <div class="sub">Gli ordini nati sul LNbits ospitato (SaaS) e non ancora chiusi. Quando qui non resta niente — e i crediti sono a zero — la cassaforte si può svuotare e spegnere.</div>
+    ${rigaConto('Escono ancora dal SaaS', `${fmt(t.dal_saas)} ordini · al massimo ${fmt(t.sats_dal_saas)} sats (incassi ${fmt(t.netto_dal_saas)})`)}
+    ${rigaConto('Spostati sul nodo', `${fmt(t.sul_nodo)} ordini · al massimo ${fmt(t.sats_sul_nodo)} sats da avere sul nodo (incassi ${fmt(t.netto_sul_nodo)})`)}
+    ${rigaConto('Crediti aperti sul SaaS', `${fmt((s.crediti||{}).n||0)} · ${fmt((s.crediti||{}).sats||0)} sats appesi`)}
+    <div class="sub" style="margin-top:10px"><b>I doveri del SaaS</b> (il 🏁 suona quando sono tutti a zero):</div>
+    ${doveri}
+    <div class="sub" style="margin-top:10px">📌 <b>Promemoria:</b> se un pagamento dichiarato morto risultasse <b>failed</b> su LNbits, i sats rientrano nel saldo del SaaS: fai un <b>Debit</b> della stessa cifra (quel saldo era già stato riallineato a mano). La ronda te lo dirà con «Credito rientrato».</div>
+    <div style="margin-top:10px">${righe || '<div class="sub">Nessun ordine aperto sul SaaS.</div>'}</div>
+    ${registro}`);
 }
 
 /* I CREDITI DA RECUPERARE: il pagamento rimasto appeso sulla cassaforte

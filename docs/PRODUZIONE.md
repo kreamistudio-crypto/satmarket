@@ -952,6 +952,67 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   NON PROVATO DAL VIVO: LNbits vero sulle due cassaforti, la forma di
   `details.bolt11` (è un ripiego, e si crede solo se l'hash combacia),
   il bottone sul telefono. Provato: tutto il resto, su cartone.
+  CHIUDERE LA CASSAFORTE SAAS (24 set 2026): i passi sul pannello, ordine
+  per ordine. Il gesto e' sempre lo stesso: bottone → foglio col MOTIVO
+  (almeno dieci caratteri, resta nel registro) → «Avanti» → foglio che
+  rilegge ordine, cifra e motivo → conferma. Ogni gesto lascia una riga
+  in `gesti_cassaforte`, una nel journal («⚖️ Cassaforte SaaS») e un
+  avviso ai moderatori. NESSUN GESTO MUOVE SATS FRA LE DUE CASSAFORTI:
+  quelli li sposti tu, a mano, dal SaaS al nodo, PRIMA che un ordine si
+  chiuda — la vista dice quanti.
+  0) Dopo il deploy: Profilo → 👑 → cassetto «🏦 Cassaforte SaaS». Leggi
+  «Escono ancora dal SaaS» (dovrebbero essere 6 ordini) e «Spostati sul
+  nodo» (0). Sola lettura sul VPS, per confronto:
+  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT id,stato,payout_stato,payout_verso,cassaforte,cassaforte_payout,prezzo_sats FROM ordini WHERE cassaforte='saas' AND stato NOT IN ('creato','annullato','released','refunded');"`
+  1) IL #152 (P3dr0, 247.707 sats, «pending» dal 20 set). Prima: sul
+  nodo devono esserci 247.707 sats nostri piu' la riserva fee di LNbits
+  (max(1%, 2000) = 2.477): spostali a mano. Poi 🧊 Pagamenti da
+  verificare → ordine #152 → «💀 Dichiara morto il pagamento appeso» (e'
+  acceso: la fattura e' scaduta da giorni). Motivo suggerito: «pending
+  dal 20 set, nessuna preimage, saldo Spark riallineato: il SaaS
+  chiude». Conferma. ATTESO: toast «💀 Pagamento appeso chiuso. A chi
+  deve ricevere e' stato chiesto un modo nuovo…»; a P3dr0 il solito
+  «Tocca a te: incolla una fattura di 247.707 sats, fatta adesso»; ai
+  moderatori «💀 Ordine #152: pagamento appeso sul SaaS dichiarato
+  morto» col promemoria del Debit; nel cassetto il #152 passa a
+  «spostati sul nodo» e in «🔀 Crediti da recuperare» compare la riga
+  del #152 sul SaaS, aperta. Quando P3dr0 incolla la fattura, il
+  pagamento parte DA SOLO dal nodo (se ha messo un Lightning address,
+  parte al gesto stesso). Se dice NO («Non si puo' dichiarare morto»):
+  legge il perche' — «presto» non capita qui, «uscita» vuol dire che
+  LNbits lo dice pagato (usa «Verifica e riprova»), «non_pending» che
+  LNbits lo ha gia' marcato failed (lo chiude «Verifica e riprova»),
+  «ignota» che LNbits non risponde (riprova fra poco).
+  2) #129, #131, #134, #138 (locked, To The Mooon) e #153 (shipped,
+  Steu): nel cassetto «🏦 Cassaforte SaaS», per ognuno «➡️ Sposta sulla
+  cassaforte nodo», motivo («il SaaS chiude: paga dal nodo»), conferma.
+  ATTESO: toast «➡️ Da adesso l'ordine #N paga (o rimborsa) dal nodo.
+  Nessun sat si e' mosso…», l'ordine passa fra gli «spostati», e il
+  totale «al massimo N sats da avere sul nodo» cresce del prezzo pieno:
+  quella e' la cifra da spostare a mano sul nodo prima che si chiudano
+  (copre anche un rimborso; l'incasso di chi vende e' scritto accanto).
+  Se dice «in_corso» c'e' un pagamento appeso: prima si decide quello.
+  3) Poi si aspetta che gli affari si chiudano: incasso o rimborso
+  escono dal nodo, la vista scende, e quando «Escono ancora dal SaaS» e'
+  a zero E i crediti sono a zero E gli altri doveri sono a zero suona il
+  «🏁 il SaaS non ha piu' doveri». IL CREDITO DEL #152 resta aperto
+  finche' LNbits lo tiene «pending»: a) se il SaaS lo marca `failed`
+  arriva «✅ Credito rientrato … fai un Debit della stessa cifra» — fallo
+  (il saldo era gia' stato riallineato col Credit); b) se mai si
+  saldasse arriva «🚨 DOPPIO PAGAMENTO»: i 247.707 vanno chiesti a
+  P3dr0; c) se vuoi spegnere il SaaS col credito ancora appeso, chiudilo
+  a mano da «🔀 Crediti da recuperare» con una nota («SaaS disdetto il …,
+  hash mai saldato»): cosi' il 🏁 puo' suonare. Poi sweep del saldo e
+  disdetta, come dice «Il doppio wallet» in CANTIERI.
+  DOVE SI LEGGE: `journalctl -u barattolo | grep "⚖️ Cassaforte SaaS"`;
+  il registro: `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT riga_id,gesto,da,a,sats,deciso_da,datetime(deciso_il,'unixepoch','localtime'),motivo FROM gesti_cassaforte;"`
+  IL ROLLBACK e' il commit precedente: la tabella resta e non da'
+  fastidio; un ordine SPOSTATO e non ancora chiuso paga ancora dal nodo
+  (il codice del 21 set legge `cassaforte_payout` per l'incasso) ma un
+  suo RIMBORSO tornerebbe a uscire dal SaaS — si guarda prima che non
+  ce ne siano in disputa. NON PROVATO DAL VIVO: LNbits vero sulle due
+  cassaforti e il pannello sul telefono; provato tutto il resto col
+  server vero, su cartone.
   IL CONTROLLO DEGLI ORFANI, sulle due casseforti (set 2026):
   `cd ~/satmarket && python3 orfani.py` — sola lettura, legge il
   registro di ogni cassaforte configurata con la sua invoice key e

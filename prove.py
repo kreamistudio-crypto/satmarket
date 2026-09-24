@@ -2986,6 +2986,659 @@ def prove_capitale_cassa():
     con.close()
 
 
+def prove_chiusura_saas():
+    """LA CHIUSURA DELLA CASSAFORTE SAAS (24 set 2026).
+
+    Sul LNbits ospitato restano sei ordini e un pagamento appeso
+    «pending» per sempre (il #152: 247.707 sats, fattura scaduta il 20
+    set, nessuna preimage). Il giudice M1 dell'audit 2 e' giusto — per
+    una macchina un «pending» sul SaaS e' vivo — quindi a chiuderlo e'
+    UNA PERSONA, con due gesti: «dichiara morto il pagamento appeso» e
+    «sposta sulla cassaforte nodo». Qui si prova che i due gesti fanno
+    quel che dicono e RIFIUTANO tutto il resto: solo moderatori, solo
+    SaaS, solo «pending» con la fattura scaduta da almeno 24 ore, una
+    volta sola per ordine, motivo scritto, registro nel database, riga
+    nel journal; e che dopo il primo gesto la fattura nuova di chi vende
+    si paga DA SOLA dal nodo, mentre dopo il secondo incasso E rimborso
+    escono dal nodo.
+
+    IL MONDO E' QUELLO DEI PAGAMENTI IN VOLO (`attrezzi=True`), con le
+    due LNbits e l'orologio che si sposta, come in
+    `prove_altra_cassaforte`: le funzioni sono tutte vere, di cartone
+    restano i due estremi."""
+    print("\n[la chiusura della cassaforte SaaS: i due gesti e la vista]")
+    import asyncio
+    import sqlite3
+    import time as _time
+
+    A = prove_pagamenti_in_volo(attrezzi=True)
+    gira, K = A["gira"], A["K"]
+    MINUTI, ORE = 60, 3600
+    MOTIVO = "il SaaS chiude: pending dal 20 set, nessuna preimage"
+
+    class Orologio:
+        def __init__(self):
+            self.avanti = 0
+
+        def time(self):
+            return _time.time() + self.avanti
+
+        def localtime(self, t=None):
+            return _time.localtime(self.time() if t is None else t)
+
+        def strftime(self, forma, t=None):
+            return _time.strftime(forma, t or self.localtime())
+
+    def h(n):
+        return f"{n:064x}"
+
+    async def _niente(*a, **k):
+        return None
+
+    def tabella_vera(inizio, fine):
+        i = _SORGENTE.index(inizio)
+        j = _SORGENTE.index(fine, i) + len(fine) - 1
+        return eval("(" + _SORGENTE[i:j] + ")")
+
+    def mondo3(cassaforte="saas", address="", invoice_n=1, stato="confirmed"):
+        """Un ordine da 1000 sats nella cassaforte data, con in colonna
+        la fattura numero `invoice_n` (0 = nessuna). Le tabelle nuove
+        sono quelle VERE, lette dal sorgente."""
+        orologio = Orologio()
+
+        def F(n, vita=3600):
+            return bolt11_finta(1000, vita, int(orologio.time()), phash=n)
+
+        m = A["mondo"](invoice=F(invoice_n) if invoice_n else "",
+                       address=address, stato=stato)
+        m.orologio, m.F, m.detto_a = orologio, F, []
+        for col in ("cassaforte_payout TEXT DEFAULT ''",
+                    "payout_nota TEXT DEFAULT ''",
+                    "invoice_rimborso TEXT DEFAULT ''"):
+            m.vero.execute(f"ALTER TABLE ordini ADD COLUMN {col}")
+        m.vero.execute("ALTER TABLE utenti ADD COLUMN nome TEXT DEFAULT ''")
+        m.vero.execute("UPDATE utenti SET nome='Vende'")
+        m.vero.execute("INSERT INTO utenti VALUES(111,'',0,0,'Compra')")
+        m.vero.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT)")
+        m.vero.execute("INSERT INTO annunci VALUES(7,'una cosa')")
+        # le due sorelle della coda del pannello, vuote
+        m.vero.execute("CREATE TABLE rimborsi_asta(id INTEGER PRIMARY KEY, "
+                       "payout_hash TEXT, aggiornato INT, stato TEXT, "
+                       "importo_sats INT, annuncio_id INT, payout_stato TEXT)")
+        m.vero.execute("CREATE TABLE pagamenti(id INTEGER PRIMARY KEY, "
+                       "payout_hash TEXT, aggiornato INT, stato TEXT, "
+                       "importo_sats INT, payout_stato TEXT)")
+        m.vero.execute("UPDATE ordini SET cassaforte=?", (cassaforte,))
+        m.vero.execute(tabella_vera(
+            '"CREATE TABLE IF NOT EXISTS crediti_cassaforte("', 'hash))")'))
+        m.vero.execute(tabella_vera(
+            '"CREATE TABLE IF NOT EXISTS gesti_cassaforte("', 'gesto))")'))
+        m.vero.commit()
+        m.nodo.pronte = ["saas", "nodo"]
+
+        async def _nota(chi, testo, *a, **k):
+            m.detto_a.append((chi, testo))
+
+        amb = m.amb
+        amb.update({
+            "time": orologio, "notifica": _nota, "sqlite3": sqlite3,
+            "CASSAFORTI": ("saas", "nodo"), "CASSAFORTE_SAAS": "saas",
+            "_lnd_configurato": lambda: True,
+            "_cassaforte_pronta": lambda nome: nome in m.nodo.pronte,
+            # quel che serve al rimborso del compratore, di cartone
+            "registra_uscita_negozio": lambda *a, **k: None,
+            "annuncio_su_nostr": _niente, "promo_venduto": _niente,
+            "_coda_magazzino": lambda mag: ""})
+        for nome in ("leggi_bolt11", "vita_fattura", "giorno_scadenza",
+                     "rifiuto_scadenza", "_durata_a_parole",
+                     "_cassaforte_riga"):
+            exec(pezzo(nome), amb)
+        leggi = amb["leggi_bolt11"]
+        m.nodo.hash_di = lambda bolt: (
+            (leggi(bolt, con_hash=True) or {}).get("hash")
+            or ("hash-di-" + bolt)[:100])
+        for inizio in ("\nTIMBRO_CREDITI = ", "\nMORTO_DOPO_SCADENZA_S = ",
+                       "\nDOVERI_SAAS = ("):
+            i = _SORGENTE.index(inizio) + 1
+            exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+        for nome, asincrona in (
+                ("_giudica_origine", 0), ("_trascrivi_scadenza", 0),
+                ("_fattura_nuova_pronta", 0),
+                ("_esamina_altra_cassaforte", 1),
+                ("_altra_cassaforte_forse", 0),
+                ("lista_crediti", 0), ("sorveglia_crediti", 1),
+                ("deposita_invoice", 1), ("coda_pagamenti", 0),
+                ("_rimborsa_compratore", 1),
+                ("_gesto_fatto", 0), ("_appesi_sul_saas", 0),
+                ("_morto_forse", 0), ("_esamina_morto", 1),
+                ("_esamina_sposta", 0), ("_registra_gesto", 0),
+                ("_motivo_del_gesto", 0),
+                ("posso_dichiarare_morto", 1), ("dichiara_morto", 1),
+                ("posso_spostare_nodo", 0), ("sposta_nodo", 1),
+                ("vista_cassaforte_saas", 0)):
+            exec(("async " if asincrona else "") + pezzo(nome), amb)
+        return m
+
+    def riga(m):
+        return tuple(m.vero.execute(
+            "SELECT stato, payout_stato, payout_hash, cassaforte, "
+            "cassaforte_payout FROM ordini WHERE id=1").fetchone())
+
+    def primo(m, sql, *par):
+        r = m.vero.execute(sql, par).fetchone()
+        return r[0] if r else None
+
+    async def tenta(coro):
+        # una rotta che salta torna come valore: la prova che la guarda
+        # diventa rossa per conto suo, il banco non esplode
+        try:
+            return await coro
+        except Exception as e:
+            return e
+
+    def tenta_s(fn, *a):
+        try:
+            return fn(*a)
+        except Exception as e:
+            return e
+
+    def campo(r, chiave):
+        return r.get(chiave) if isinstance(r, dict) else None
+
+    def http(r):
+        return getattr(r, "status_code", None)
+
+    def dett(r):
+        return str(getattr(r, "detail", ""))
+
+    def posso_morto(m, oid=1):
+        return gira(tenta(m.amb["posso_dichiarare_morto"]("ordine", oid)))
+
+    def morto(m, oid=1, **k):
+        return gira(tenta(m.amb["dichiara_morto"](
+            {"tipo": "ordine", "id": oid, **k})))
+
+    def posso_sposta(m, oid=1):
+        return tenta_s(m.amb["posso_spostare_nodo"], "ordine", oid)
+
+    def sposta(m, oid=1, **k):
+        return gira(tenta(m.amb["sposta_nodo"](
+            {"tipo": "ordine", "id": oid, **k})))
+
+    def vista(m):
+        return tenta_s(m.amb["vista_cassaforte_saas"])
+
+    def coda(m):
+        return next((r for r in m.amb["coda_pagamenti"]()
+                     if r["tipo"] == "ordine" and r["id"] == 1), {})
+
+    def incolla(m, bolt):
+        m.amb["verifica_utente"] = lambda *a: {"id": 222}
+        try:
+            return gira(tenta(m.amb["deposita_invoice"](1, {"invoice": bolt})))
+        finally:
+            m.amb["verifica_utente"] = lambda *a: {"id": 999}
+
+    def stadio(m):
+        o = m.vero.execute("SELECT * FROM ordini WHERE id=1").fetchone()
+        return (m.amb["_stadi_ordini"](m.amb["db"](), [dict(o)]).get(1) or {})
+
+    def gesti(m):
+        return [tuple(r) for r in m.vero.execute(
+            "SELECT gesto, da, a, hash, sats, deciso_da, motivo FROM "
+            "gesti_cassaforte ORDER BY id")]
+
+    def fino_al_congelato(m):
+        bolt = m.vero.execute("SELECT invoice_venditore FROM ordini "
+                              "WHERE id=1").fetchone()[0]
+        m.nodo.modi[bolt] = "hold"
+        gira(m.sblocca())
+        m.orologio.avanti = 40 * MINUTI
+        gira(m.ronda())
+
+    def da_estraneo(m, fn):
+        m.amb["e_admin"] = lambda i: i == 999
+        m.amb["verifica_utente"] = lambda *a: {"id": 222}
+        try:
+            return fn()
+        finally:
+            m.amb["e_admin"] = lambda i: True
+            m.amb["verifica_utente"] = lambda *a: {"id": 999}
+
+    ctrl = {c[0]: c[2] for c in eval(
+        _SORGENTE[_SORGENTE.index("CONTROLLI_LIBRO_MASTRO = (")
+                  + len("CONTROLLI_LIBRO_MASTRO = "):
+                  _SORGENTE.index("\n)\n", _SORGENTE.index(
+                      "CONTROLLI_LIBRO_MASTRO = (")) + 2])
+        if c[0] in ("credito da recuperare su un'altra cassaforte",
+                    "incasso deviato senza verbale")}
+
+    def grida(m, nome):
+        return [x[0] for x in m.vero.execute(ctrl[nome]).fetchall()]
+
+    # ============ 1. IL #152, PER INTERO ==============================
+    m = mondo3()
+    fino_al_congelato(m)
+    prova("#152: il payout parte dal SaaS, resta appeso, e la ronda lo "
+          "congela", ("confirmed", "incerto", h(1), "saas", ""), riga(m))
+    c = coda(m)
+    prova("la coda del pannello propone il QUARTO bottone, SPENTO: la "
+          "fattura non e' scaduta da 24 ore",
+          ("saas", False, "la fattura non è scaduta da 24 ore"),
+          (c.get("cassaforte"), (c.get("morto") or {}).get("forse"),
+           (c.get("morto") or {}).get("perche")))
+    r = posso_morto(m)
+    prova("fattura ancora viva: «presto», e lo dice",
+          (False, "presto", True),
+          (campo(r, "ok"), campo(r, "codice"),
+           "scade fra" in " ".join(campo(r, "voci") or [])))
+    prova("...e la rotta rifiuta con un 409, anche con motivo e conferma",
+          409, http(morto(m, motivo=MOTIVO, conferma=True)))
+    m.orologio.avanti = 60 * MINUTI + 10 * ORE
+    prova("scaduta da 10 ore: ANCORA presto (servono 24)",
+          ("presto", True),
+          (lambda r: (campo(r, "codice"), "Servono almeno 24 ore" in
+                      (campo(r, "perche") or "")))(posso_morto(m)))
+    m.orologio.avanti = 60 * MINUTI + 25 * ORE
+    c = coda(m)
+    prova("scaduta da 25 ore: il bottone si ACCENDE, dal solo database",
+          (True, "scaduta da 25 ore"),
+          ((c.get("morto") or {}).get("forse"),
+           (c.get("morto") or {}).get("perche")))
+    r = posso_morto(m)
+    prova("...e il «posso?» dice SI': hash, cifra, verso, fattura vecchia "
+          "in colonna, le voci",
+          (True, "si", [h(1)], 1000, "venditore", "saas", "nodo", True, True),
+          (campo(r, "ok"), campo(r, "codice"),
+           [a["hash"] for a in campo(r, "appesi") or []], campo(r, "sats"),
+           campo(r, "verso"), campo(r, "origine"), campo(r, "destinazione"),
+           campo(r, "fattura_vecchia"),
+           "LNbits dice «pending», fattura scaduta da 25 ore"
+           in " ".join(campo(r, "voci") or [])))
+    prova("la vista «Cassaforte SaaS» conta l'ordine fra quelli che escono "
+          "ANCORA dal SaaS, col pagamento appeso e il gesto acceso",
+          (1, 1, 0, 1000, 1000, 1, True, False, 0),
+          (lambda v: (v["totali"]["aperti"], v["totali"]["dal_saas"],
+                      v["totali"]["sul_nodo"], v["totali"]["sats_dal_saas"],
+                      v["totali"]["netto_dal_saas"],
+                      len(v["ordini"][0]["appesi"]), v["ordini"][0]["morto"],
+                      v["ordini"][0]["sposta"], v["crediti"]["n"]))(vista(m)))
+    prova("...e un dovere che non si puo' contare e' None, mai zero",
+          ([1], True),
+          (lambda v: ([d["n"] for d in v["doveri"] if d["nome"] == "ordini aperti"],
+                      None in [d["n"] for d in v["doveri"]]))(vista(m)))
+    # i rifiuti della rotta, uno per uno
+    prova("senza motivo: 400, e la frase dice quanto", (400, True),
+          (lambda r: (http(r), "dieci caratteri" in dett(r)))(
+              morto(m, conferma=True)))
+    prova("motivo troppo corto: 400", 400,
+          http(morto(m, motivo="troppo", conferma=True)))
+    prova("senza la conferma esplicita: 400", 400,
+          http(morto(m, motivo=MOTIVO)))
+    prova("tipo che non e' un ordine: 400", 400,
+          http(gira(tenta(m.amb["dichiara_morto"](
+              {"tipo": "rimborso", "id": 1, "motivo": MOTIVO,
+               "conferma": True})))))
+    prova("un NON moderatore: 403 sulla rotta e sul «posso?»", (403, 403),
+          (da_estraneo(m, lambda: http(morto(m, motivo=MOTIVO, conferma=True))),
+           da_estraneo(m, lambda: http(posso_morto(m)))))
+    prova("fin qui non si e' mosso niente: un solo POST (al SaaS), nessun "
+          "gesto, nessun credito",
+          ([("saas", h(1))], [], 0, "incerto"),
+          (m.nodo.pagati_da, gesti(m),
+           primo(m, "SELECT COUNT(*) FROM crediti_cassaforte"), riga(m)[1]))
+    r = morto(m, motivo=MOTIVO, conferma=True)
+    prova("#152: DICHIARATO MORTO", ("morto", True, 1),
+          (campo(r, "esito"), campo(r, "ok"), campo(r, "crediti")))
+    prova("...l'ordine torna nel flusso del pagamento fallito: libero, "
+          "'confirmed', ESCE DAL NODO; `cassaforte` non si tocca",
+          ("confirmed", "", h(1), "saas", "nodo"), riga(m))
+    prova("...la fattura vecchia e' uscita dalla colonna", "",
+          primo(m, "SELECT invoice_venditore FROM ordini"))
+    prova("...l'hash appeso e' «deviato» e ricorda il SaaS",
+          ("deviato", "saas"),
+          tuple(m.vero.execute("SELECT esito, cassaforte FROM payout_tentati "
+                               "WHERE hash=?", (h(1),)).fetchone() or ()))
+    prova("...nasce il CREDITO sul SaaS, aperto, pagato dal nodo",
+          [("saas", h(1), 1000, "nodo", 999, "aperto")],
+          [tuple(x) for x in m.vero.execute(
+              "SELECT cassaforte, hash, sats, pagato_da, deciso_da, stato "
+              "FROM crediti_cassaforte")])
+    prova("...il REGISTRO dice il gesto, da dove a dove, l'hash, la cifra, "
+          "chi e il motivo",
+          [("dichiara_morto", "saas", "nodo", h(1), 1000, 999, MOTIVO)],
+          gesti(m))
+    nota = primo(m, "SELECT payout_nota FROM ordini") or ""
+    prova("...la nota sull'ordine dice chi, perche' e da dove si paga",
+          [True] * 3,
+          [x in nota for x in ("dichiarato morto da 999", MOTIVO,
+                               "da qui si paga dal nodo")])
+    prova("...chi vende sente IL SOLITO avviso: tocca a te, una fattura "
+          "fatta adesso", True,
+          any(chi == 222 and "Tocca a te" in t and "fattura" in t
+              for chi, t in m.detto_a))
+    prova("...i moderatori leggono il verbale, col promemoria del Debit",
+          True, any("💀" in a and "Debit" in a and MOTIVO in a
+                    for a in m.avvisi))
+    prova("...il journal ha la riga della decisione, col motivo", True,
+          any("⚖️ Cassaforte SaaS" in d and "DICHIARATO MORTO" in d
+              and MOTIVO in d for d in m.detto))
+    prova("...e dal nodo NON e' partito niente: manca il modo di pagare",
+          [("saas", h(1))], m.nodo.pagati_da)
+    s_ = stadio(m)
+    prova("...lo stadio chiede il gesto a chi vende: serve la fattura",
+          ("serve_fattura", True), (s_.get("passo"), s_.get("gesto_venditore")))
+    prova("UNA VOLTA SOLA: il secondo gesto e' un 409, e il «posso?» dice "
+          "«gia' fatto»", (409, "gia_fatto"),
+          (http(morto(m, motivo=MOTIVO, conferma=True)),
+           campo(posso_morto(m), "codice")))
+    prova("...e la coda del pannello non lo propone piu' (non e' congelato)",
+          {}, coda(m))
+    prova("il libro mastro: grida il credito (giusto), non la deviazione "
+          "(ha il suo verbale)", ([1], []),
+          (grida(m, "credito da recuperare su un'altra cassaforte"),
+           grida(m, "incasso deviato senza verbale")))
+    prova("la vista, dopo: l'ordine esce dal NODO, niente appeso (il deviato "
+          "non conta), il credito e' uno", ("nodo", [], 1, 0, 1),
+          (lambda v: (v["ordini"][0]["uscita"], v["ordini"][0]["appesi"],
+                      v["totali"]["sul_nodo"], v["totali"]["dal_saas"],
+                      v["crediti"]["n"]))(vista(m)))
+    prova("il registro rifiuta il doppione DA SOLO (la UNIQUE), anche senza "
+          "la rotta", False,
+          m.amb["_registra_gesto"](m.amb["db"](), 1, "dichiara_morto", "saas",
+                                   "nodo", h(1), 1000, MOTIVO, 999, 1))
+    r = incolla(m, m.F(2))
+    prova("chi vende incolla la fattura nuova: si paga DA SOLO, e DAL NODO",
+          (True, "released"), (campo(r, "ok"), campo(r, "stato")))
+    prova("...la POST e' andata al nodo, con la fattura nuova",
+          [("saas", h(1)), ("nodo", h(2))], m.nodo.pagati_da)
+    prova("...l'hash del SaaS non e' mai stato chiesto al nodo", False,
+          ("nodo", h(1)) in m.nodo.chiesti)
+    prova("...l'ordine e' chiuso: `cassaforte` saas, uscito dal nodo",
+          ("released", "uscito", h(2), "saas", "nodo"), riga(m))
+    prova("...e chi vende sente «Arrivati ✓»", True,
+          any(chi == 222 and "Arrivati ✓" in t for chi, t in m.detto_a))
+    # il credito, dopo: LNbits dice «failed», rientra, e ricorda il Debit
+    m.nodo.saas[h(1)] = "failed"
+    m.orologio.avanti += ORE
+    gira(m.amb["sorveglia_crediti"]())
+    prova("il pagamento appeso FALLISCE su LNbits: il credito rientra e "
+          "l'avviso ricorda il Debit (il saldo era gia' stato riallineato)",
+          ("rientrato", True),
+          (primo(m, "SELECT stato FROM crediti_cassaforte"),
+           any("Credito rientrato" in a and "Debit" in a for a in m.avvisi)))
+
+    # ============ 2. CON L'ADDRESS I SATS PARTONO SUBITO ==============
+    m = mondo3(address="chi@wallet.tld")
+    fino_al_congelato(m)
+    m.orologio.avanti = 60 * MINUTI + 25 * ORE
+    r = morto(m, motivo=MOTIVO, conferma=True)
+    prova("con un Lightning address i sats partono SUBITO, dal nodo",
+          ("morto", True, "released", "nodo"),
+          (campo(r, "esito"), campo(r, "ok"), campo(r, "stato"),
+           m.nodo.pagati_da[-1][0]))
+    prova("...la fattura l'ha coniata l'address, e l'ordine e' chiuso",
+          (1, ("released", "uscito", "saas", "nodo")),
+          (len(m.nodo.coniate), riga(m)[0:2] + riga(m)[3:5]))
+
+    # ============ 3. I RIFIUTI DEL GIUDICE ============================
+    def congelato_da_25_ore():
+        m = mondo3()
+        fino_al_congelato(m)
+        m.orologio.avanti = 60 * MINUTI + 25 * ORE
+        return m
+
+    m = congelato_da_25_ore()
+    m.nodo.saas[h(1)] = "success"
+    prova("LNbits dice «success»: e' USCITO, non si dichiara morto (409, "
+          "«Verifica e riprova»)", ("uscita", 409, True),
+          (campo(posso_morto(m), "codice"),
+           http(morto(m, motivo=MOTIVO, conferma=True)),
+           "Verifica e riprova" in dett(morto(m, motivo=MOTIVO, conferma=True))))
+    m = congelato_da_25_ore()
+    m.nodo.muto_saas = True
+    prova("LNbits tace: «ignota», 503, niente mosso", ("ignota", 503, 1),
+          (campo(posso_morto(m), "codice"),
+           http(morto(m, motivo=MOTIVO, conferma=True)), len(m.nodo.pagati_da)))
+    m = congelato_da_25_ore()
+    m.nodo.saas[h(1)] = "failed"
+    prova("LNbits dice «failed»: non c'e' niente da dichiarare morto "
+          "(lo chiude «Verifica e riprova»)", ("non_pending", 409),
+          (campo(posso_morto(m), "codice"),
+           http(morto(m, motivo=MOTIVO, conferma=True))))
+    m = congelato_da_25_ore()
+    m.vero.execute("UPDATE payout_tentati SET scade=0")
+    m.vero.execute("UPDATE ordini SET invoice_venditore=?", (m.F(2),))
+    m.vero.commit()
+    prova("scadenza IGNOTA (la colonna porta gia' un'altra fattura): non si "
+          "fa, fail-closed", ("scadenza_ignota", 409),
+          (campo(posso_morto(m), "codice"),
+           http(morto(m, motivo=MOTIVO, conferma=True))))
+    m = mondo3(cassaforte="nodo")
+    fino_al_congelato(m)
+    m.orologio.avanti = 60 * MINUTI + 25 * ORE
+    prova("un ordine del NODO: «non_saas», e il bottone e' spento",
+          ("non_saas", 409, False),
+          (campo(posso_morto(m), "codice"),
+           http(morto(m, motivo=MOTIVO, conferma=True)),
+           (coda(m).get("morto") or {}).get("forse")))
+    m = mondo3()
+    prova("un ordine NON congelato: «non_congelato»", ("non_congelato", 409),
+          (campo(posso_morto(m), "codice"),
+           http(morto(m, motivo=MOTIVO, conferma=True))))
+    m = congelato_da_25_ore()
+    m.nodo.pronte = ["saas"]
+    prova("il nodo non configurato: «nessuna», e da nessuna parte si paga",
+          ("nessuna", 409),
+          (campo(posso_morto(m), "codice"),
+           http(morto(m, motivo=MOTIVO, conferma=True))))
+    prova("un ordine che non esiste: «assente»", "assente",
+          campo(posso_morto(m, 2), "codice"))
+    m = congelato_da_25_ore()
+    m.nodo.saas[h(1)] = "pending"
+    # UNA SOLA MANO: fra il «posso?» e la conferma un'altra mano decide
+    m.vero.execute("UPDATE ordini SET payout_stato=''")
+    m.vero.commit()
+    prova("la riga cambia sotto (un'altra mano ha deciso): 409, e il "
+          "registro resta vuoto", (409, []),
+          (http(morto(m, motivo=MOTIVO, conferma=True)), gesti(m)))
+
+    # ============ 4. SPOSTA SULLA CASSAFORTE NODO ====================
+    m = mondo3(stato="locked", invoice_n=0)
+    r = posso_sposta(m)
+    prova("un ordine 'locked' del SaaS senza pagamenti: si puo' spostare",
+          (True, "si", "saas", "nodo", 1000, 1000, "locked"),
+          (campo(r, "ok"), campo(r, "codice"), campo(r, "origine"),
+           campo(r, "destinazione"), campo(r, "sats"), campo(r, "netto"),
+           campo(r, "stato")))
+    prova("senza motivo: 400; senza conferma: 400", (400, 400),
+          (http(sposta(m, conferma=True)), http(sposta(m, motivo=MOTIVO))))
+    prova("un NON moderatore: 403 sulla rotta e sul «posso?»", (403, 403),
+          (da_estraneo(m, lambda: http(sposta(m, motivo=MOTIVO, conferma=True))),
+           da_estraneo(m, lambda: http(posso_sposta(m)))))
+    prima = primo(m, "SELECT aggiornato FROM ordini")
+    r = sposta(m, motivo=MOTIVO, conferma=True)
+    prova("SPOSTATO: esito, messaggio con la cifra da avere sul nodo",
+          ("spostato", True, True),
+          (campo(r, "esito"), campo(r, "ok"),
+           "1.000 sats nostri" in (campo(r, "messaggio") or "")
+           or "1000 sats nostri" in (campo(r, "messaggio") or "")))
+    prova("...la riga: `cassaforte` saas, `cassaforte_payout` nodo, stato "
+          "e pagamento fermi", ("locked", "", "", "saas", "nodo"), riga(m))
+    nota = primo(m, "SELECT payout_nota FROM ordini") or ""
+    prova("...la nota e' il verbale: spostato, da chi, perche'", [True] * 3,
+          [x in nota for x in ("spostato sulla cassaforte nodo",
+                               "da 999", MOTIVO)])
+    prova("...il registro", [("sposta_nodo", "saas", "nodo", "", 1000, 999, MOTIVO)],
+          gesti(m))
+    prova("...`aggiornato` NON si tocca (e' l'ancora dei promemoria)",
+          prima, primo(m, "SELECT aggiornato FROM ordini"))
+    prova("...NESSUN sat si e' mosso, nessuna fattura coniata", ([], 0),
+          (m.nodo.pagati_da, len(m.nodo.coniate)))
+    prova("...il journal e i moderatori", (True, True),
+          (any("⚖️ Cassaforte SaaS" in d and "SPOSTATO" in d and MOTIVO in d
+               for d in m.detto),
+           any("➡️" in a and "spostato sulla cassaforte nodo" in a
+               and "Nessun sat" in a for a in m.avvisi)))
+    prova("...il libro mastro non grida «incasso deviato senza verbale»",
+          [], grida(m, "incasso deviato senza verbale"))
+    prova("UNA VOLTA SOLA: il secondo e' un 409, il «posso?» dice «gia_nodo»",
+          (409, "gia_nodo"),
+          (http(sposta(m, motivo=MOTIVO, conferma=True)),
+           campo(posso_sposta(m), "codice")))
+    v = vista(m)
+    prova("la vista lo conta fra gli SPOSTATI, col registro nella riga e i "
+          "bottoni spenti", (0, 1, 1000, 1000, "nodo", 1, False, False),
+          (v["totali"]["dal_saas"], v["totali"]["sul_nodo"],
+           v["totali"]["sats_sul_nodo"], v["totali"]["netto_sul_nodo"],
+           v["ordini"][0]["uscita"], len(v["ordini"][0]["gesti"]),
+           v["ordini"][0]["sposta"], v["ordini"][0]["morto"]))
+    prova("...e il registro in coda alla vista", ["sposta_nodo"],
+          [g["gesto"] for g in v["gesti"]])
+    # poi l'affare si chiude: l'incasso esce dal NODO
+    m.vero.execute("UPDATE ordini SET stato='delivered', invoice_venditore=?",
+                   (m.F(5),))
+    m.vero.commit()
+    gira(m.sblocca())
+    prova("l'acquirente conferma: l'incasso esce DAL NODO, l'ordine si chiude",
+          ([("nodo", h(5))], ("released", "uscito", h(5), "saas", "nodo")),
+          (m.nodo.pagati_da, riga(m)))
+    prova("...e la vista non lo conta piu'", 0, vista(m)["totali"]["aperti"])
+
+    # ============ 5. SPOSTATO, POI RIMBORSATO: DAL NODO ==============
+    m = mondo3(stato="locked", invoice_n=0)
+    sposta(m, motivo=MOTIVO, conferma=True)
+    m.vero.execute("UPDATE ordini SET stato='dispute', disputata=1, "
+                   "invoice_rimborso=?", (m.F(6),))
+    m.vero.commit()
+    r = gira(tenta(m.amb["_rimborsa_compratore"](1)))
+    prova("la disputa va al compratore: il RIMBORSO esce dal NODO",
+          (True, "refunded", [("nodo", h(6))]),
+          (campo(r, "ok"), campo(r, "stato"), m.nodo.pagati_da))
+    prova("...e la riga: refunded, uscito, `cassaforte` saas",
+          ("refunded", "uscito", h(6), "saas", "nodo"), riga(m))
+    # il contrario: un ordine NON spostato rimborsa da dove e' entrato
+    m = mondo3(stato="dispute", invoice_n=0)
+    m.vero.execute("UPDATE ordini SET disputata=1, invoice_rimborso=?",
+                   (m.F(7),))
+    m.vero.commit()
+    gira(tenta(m.amb["_rimborsa_compratore"](1)))
+    prova("un ordine NON spostato rimborsa da dove e' entrato (il SaaS)",
+          [("saas", h(7))], m.nodo.pagati_da)
+
+    # ============ 6. SPOSTA: I RIFIUTI =================================
+    m = mondo3()
+    fino_al_congelato(m)
+    prova("un pagamento congelato: «in_corso», 409", ("in_corso", 409),
+          (campo(posso_sposta(m), "codice"),
+           http(sposta(m, motivo=MOTIVO, conferma=True))))
+    m = mondo3()
+    m.vero.execute("INSERT INTO payout_tentati(tabella, riga_id, hash, quando, "
+                   "esito) VALUES('ordini',1,?,1,'')", (h(9),))
+    m.vero.commit()
+    prova("un hash senza esito definitivo: «in_corso»", "in_corso",
+          campo(posso_sposta(m), "codice"))
+    m = mondo3()
+    m.vero.execute("UPDATE ordini SET payout_stato='incerto'")
+    m.vero.commit()
+    prova("un congelato SENZA hash (una persona deve ancora decidere): "
+          "«in_corso» lo stesso", "in_corso", campo(posso_sposta(m), "codice"))
+    m = mondo3()
+    m.vero.execute("UPDATE ordini SET stato='released'")
+    m.vero.commit()
+    prova("un ordine chiuso: «chiuso»", ("chiuso", 409),
+          (campo(posso_sposta(m), "codice"),
+           http(sposta(m, motivo=MOTIVO, conferma=True))))
+    m = mondo3(cassaforte="nodo")
+    prova("un ordine gia' del nodo: «gia_nodo»", "gia_nodo",
+          campo(posso_sposta(m), "codice"))
+    m = mondo3()
+    m.nodo.pronte = ["saas"]
+    prova("il nodo non configurato: «nessuna»", "nessuna",
+          campo(posso_sposta(m), "codice"))
+    prova("un ordine che non esiste: «assente» e 404",
+          ("assente", 404),
+          (campo(posso_sposta(m, 2), "codice"),
+           http(sposta(m, 2, motivo=MOTIVO, conferma=True))))
+    m = mondo3()
+    prova("tipo che non e' un ordine: 400", 400,
+          http(gira(tenta(m.amb["sposta_nodo"](
+              {"tipo": "rimborso", "id": 1, "motivo": MOTIVO,
+               "conferma": True})))))
+
+    # ============ 7. LE SENTINELLE ====================================
+    prova("la soglia e' 24 ore, scritta una volta", True,
+          "\nMORTO_DOPO_SCADENZA_S = 24 * 3600\n" in _SORGENTE)
+    prova("il registro ha la UNIQUE che fa «una volta sola»", True,
+          '"UNIQUE(tabella, riga_id, gesto))")' in _SORGENTE)
+    for nome in ("dichiara_morto", "sposta_nodo"):
+        rotta = codice(pezzo(nome))
+        prova(f"`{nome}`: dei moderatori, e il 403 sta PRIMA del corpo", True,
+              0 < rotta.index("e_admin(") < rotta.index("leggi_json("))
+        prova(f"`{nome}`: non paga da se' e non parla con LNbits",
+              (False, False), ("paga_venditore(" in rotta, "httpx" in rotta))
+        prova(f"`{nome}`: motivo obbligatorio e conferma esplicita",
+              (True, True), ("_motivo_del_gesto(" in rotta,
+                             'd.get("conferma") is not True' in rotta))
+        prova(f"`{nome}`: scrive il registro PRIMA dell'UPDATE, e l'UPDATE "
+              "e' condizionato", True,
+              rotta.index("_registra_gesto(") < rotta.index("UPDATE ordini SET")
+              < rotta.index("rowcount == 0"))
+    rotta = codice(pezzo("dichiara_morto"))
+    prova("«dichiara morto» ripassa dalla strada d'uscita di sempre", True,
+          "_riprendi_uscita(" in rotta)
+    prova("...le guardie si rifanno DENTRO la rotta", True,
+          rotta.index("_esamina_morto(") < rotta.index("UPDATE ordini SET"))
+    prova("...e l'UPDATE vuole il congelamento e la cassaforte letta", True,
+          "AND payout_stato='incerto'" in rotta
+          and "COALESCE(NULLIF(cassaforte_payout,''), cassaforte)=?" in rotta)
+    rotta = codice(pezzo("sposta_nodo"))
+    # `aggiornato` e' l'ancora dei promemoria: si guarda l'UPDATE, non la
+    # prosa (il docstring lo nomina per dire che NON lo tocca)
+    prova("«sposta» non tocca `aggiornato` e non ripassa da nessuna uscita",
+          (False, False), ("aggiornato=?" in rotta, "_riprendi_uscita(" in rotta))
+    prova("...e il suo UPDATE rifiuta i pagamenti in corso e gli ordini chiusi",
+          True, "NOT IN ('incerto','in_volo')" in rotta
+          and "NOT IN ('creato','annullato','released','refunded')" in rotta)
+    for nome in ("posso_dichiarare_morto", "posso_spostare_nodo",
+                 "vista_cassaforte_saas"):
+        prova(f"`{nome}` e' dei moderatori", True, "e_admin(" in pezzo(nome))
+    prova("la vista legge i doveri del SaaS dal catalogo unico", True,
+          "DOVERI_SAAS" in pezzo("vista_cassaforte_saas"))
+    # si cerca l'ASSEGNAZIONE (`SET cassaforte=` o `, cassaforte=`), non
+    # il WHERE: «sposta» legge `cassaforte` per condizionare l'UPDATE
+    prova("`cassaforte` non la riscrive nessuno dei gesti: resta dove i "
+          "sats sono entrati", False,
+          any("SET cassaforte=" in r_ or ", cassaforte=" in r_
+              for r_ in (codice(pezzo(n)).replace(
+                  "payout_tentati SET cassaforte=?", "")
+                  for n in ("dichiara_morto", "sposta_nodo"))))
+    prova("la ronda dei crediti ricorda il Debit sui crediti del SaaS", True,
+          "Debit" in pezzo("sorveglia_crediti")
+          and 'if c["cassaforte"] == CASSAFORTE_SAAS' in pezzo("sorveglia_crediti"))
+    prova("la coda del pannello propone il quarto bottone", True,
+          '"morto"] = _morto_forse(' in pezzo("coda_pagamenti"))
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il client: i due gesti, la liturgia unica e il cassetto", [True] * 6,
+          [x in mini for x in (
+              "function dichiaraMorto(", "function spostaNodo(",
+              "async function gestoCassaforte(", "function boxCassaforteSaas(",
+              "${boxCassaforteSaas(saas)}", "/admin/cassaforte-saas")])
+    g = mini[mini.index("async function gestoCassaforte("):
+             mini.index("async function mandaGestoCassaforte(")]
+    prova("...la liturgia: un avviso e DUE conferme, col motivo letto dal "
+          "campo e la soglia di dieci", (3, 1, True, True),
+          (g.count("chiediConferma({"), g.count("avviso: true"),
+           "el('cfMotivo')" in g, "motivo.length < 10" in g))
+    prova("...il motivo viaggia nel corpo con la conferma esplicita", True,
+          "{tipo:'ordine', id:g.id, motivo, conferma:true}" in g)
+    prova("...il quarto bottone del 🧊 compare solo sul SaaS", True,
+          "p.cassaforte!=='saas' ? ''" in mini
+          and "dichiaraMorto(${p.id})" in mini)
+    prova("...e il cassetto porta il promemoria del Debit", True,
+          "fai un <b>Debit</b> della stessa cifra" in mini)
+
+
 def prove_doppio_wallet():
     """IL DOPPIO WALLET (set 2026): ogni riga di denaro porta la sua
     cassaforte, i tubi che leggono o pagano la pretendono, chi conia
@@ -7021,8 +7674,16 @@ def prove_altra_cassaforte():
     prova("`_sblocca_sats` paga e congela dalla cassaforte d'USCITA",
           (2, False), (esce.count("_cassaforte_uscita(o)"),
                        'cassaforte=o["cassaforte"]' in esce))
-    prova("...il rimborso al compratore invece no", False,
-          "_cassaforte_uscita" in pezzo("_rimborsa_compratore"))
+    # DAL 24 SET 2026 ANCHE IL RIMBORSO (la chiusura della cassaforte
+    # SaaS): fino a quel giorno qui si provava il CONTRARIO — «il
+    # rimborso torna da dove e' arrivato» — e la regola e' cambiata per
+    # un motivo scritto: un ordine spostato sul nodo deve uscire di la'
+    # qualunque verso prenda, o una disputa persa busserebbe a una
+    # cassaforte svuotata. Vedi `prove_chiusura_saas`.
+    rimb = codice(pezzo("_rimborsa_compratore"))
+    prova("...e il rimborso al compratore anche (dal 24 set 2026)",
+          (2, False), (rimb.count("_cassaforte_uscita(o)"),
+                       'cassaforte=o["cassaforte"]' in rimb))
     prova("la ronda e la riconciliazione chiedono alla cassaforte dell'hash",
           [True, True],
           ["_cassaforte_tentata(" in pezzo(n) for n in (
@@ -36208,8 +36869,18 @@ def prove_fogli_di_casa():
     # bozza — i due versi in UNA chiamata, il pattern di decidiBanner.
     # Pubblicare mette una pagina davanti a tutti, e tornare indietro la
     # toglie a chi magari la sta leggendo: si chiede tutt'e due le volte.
-    prova("i gesti che passano dalla domanda unica sono sessantasei",
-          66, solo_codice(mini).count("chiediConferma({"))
+    # SESSANTASETTE, SESSANTOTTO, SESSANTANOVE (24 set 2026, la chiusura
+    # della cassaforte SaaS): la liturgia UNICA dei due gesti da
+    # moderatore (`gestoCassaforte`): l'avviso degenere che dice perche'
+    # NO, la prima conferma che spiega e chiede il MOTIVO scritto, la
+    # seconda che rilegge ordine, cifra e motivo. Sono tre chiamate per
+    # due gesti perche' i gesti passano dalla stessa funzione: «dichiara
+    # morto» chiude un pagamento che una macchina considera vivo e fa
+    # partire i sats da un'altra cassaforte, «sposta sul nodo» promette
+    # da dove usciranno — tutt'e due si chiedono due volte, a carte
+    # scoperte, e il motivo resta nel registro.
+    prova("i gesti che passano dalla domanda unica sono sessantanove",
+          69, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -91833,6 +92504,7 @@ def main():
               prove_pagamenti_in_volo, prove_fatture_scadute,
               prove_fattura_solo_incasso,
               prove_in_pagamento, prove_altra_cassaforte,
+              prove_chiusura_saas,
               prove_doppio_wallet, prove_saas_senza_doveri, prove_orfani, prove_capitale_cassa,
               prove_disputa_incagliata,
               prove_idor_verifica, prove_contenuti_cifrati,
