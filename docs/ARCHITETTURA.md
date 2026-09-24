@@ -25622,7 +25622,25 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   momento di mostrod a meno di `P2P_STESSO_MOMENTO_S` (30), se no la
   manda — «se l'evento è arrivato, il libro tace». Il giro della
   riserva è `p2p_ordini.tornati + 1` (lo scaduto: `tornati`), che
-  combacia col conto delle prese. La presa NON si dice più a chi ha
+  combacia col conto delle prese.
+  NELL'ORDINE DEI FATTI, E MAI UNO SUPERATO (24 set 2026): sulle due
+  strade — gli eventi del coordinatore e la riserva — e sempre PRIMA del
+  timbro, `_superato_p2p` ferma un momento in corso (presa, garanzia,
+  fattura, fiat…) se la cronaca ha un momento che chiude
+  (`P2P_MOMENTI_FINALI`) con un'ora più tarda — per la riserva anche il
+  libro stesso (`tornati` arrivato al giro, o stato finale) — e
+  `_presa_detta_p2p` fa partire il ritorno in vetrina a chi ha
+  pubblicato solo dopo una presa detta (il timbro in `p2p_avvisi`). È la
+  cura dei due messaggi al contrario: la presa respira `P2P_RESPIRO_S`
+  e il suo POST può arrivare al retry per Tor, dopo quello del ritiro.
+  E `_registra_evento_p2p` non riscrive `p2p_scambi` da un evento
+  arrivato dopo un fatto più recente. Quel che non parte lo dice il
+  journal («è superato da…», «la presa non gli era stata detta»).
+  IL LIBRO SI CREDE SOLO CON LA FIRMA (24 set 2026,
+  `_firmato_dal_coordinatore`): il lettore al minuto, quello del 38385 e
+  l'ascolto verificano pubkey, id ricalcolato (NIP-01) e firma Schnorr
+  prima di leggere un evento; `authors` è una domanda al relay, la firma
+  è la prova. Fail-closed senza coincurve, col journal. La presa NON si dice più a chi ha
   preso, nemmeno dalla riserva. IL RILASCIO usa la stessa tabella: al
   `released` di chi vende il suo «Sats in pagamento» va in attesa un
   minuto, sul momento SUO (`sats_in_pagamento`), e alla scadenza tace se il

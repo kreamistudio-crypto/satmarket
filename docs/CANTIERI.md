@@ -30920,3 +30920,133 @@ due. Dal vivo come venditore 222 col tocco vero: a 375 il rettangolino
 e' largo 147 px su una riga, a 320 146 px con 12 px d'aria dalla foto,
 nessuno scorrimento di lato e la card alta uguale; scatti CDP a 320 e
 375 nei due temi, i due lati dello stesso ordine.
+## Avvisi P2P nell'ordine dei fatti, mai uno superato, e il libro creduto solo con la firma (24 set 2026)
+
+**IL FATTO.** Un venditore (un account di Andrea) con un PayCode nel
+libro riceve su Telegram, uno dietro l'altro, prima «🔄 Chi compra ha
+annullato lo scambio. Il tuo ordine è tornato in vetrina» e poi «🧾 Il
+tuo PayCode è stato preso». Nel journal, alle 12:31:04 e alle 12:31:16,
+«📖 Libro P2P: 1 frasi in attesa per [7248851104] (fra 60s, se il
+coordinatore tace)». Qualcuno ha preso e ritirato in dodici secondi.
+
+**L'INDAGINE, prima del codice.** 1) Le «frasi in attesa» NON sono una
+dichiarazione del telefono: le mette in coda il LIBRO — il 38383 che
+mostrod pubblica sui relay, letto dal giro al minuto e dall'ascolto sullo
+specchio — quando vede un passaggio (`_avvisi_libro_p2p` → `p2p_attese`,
+scadenza `P2P_RISERVA_S`); alla scadenza `_scarica_attese_p2p` le butta
+se la cronaca ha lo stesso momento da mostrod entro 30 s, se no le manda.
+Il telefono con «l'ho preso io» scrive solo `preso_dichiarato`, e da lì
+non parte niente (provato). 2) I due messaggi arrivati NON erano la
+riserva: le loro frasi («ha annullato», «PayCode») sono quelle di
+`_testo_evento_p2p`, cioè degli EVENTI di mostrod (patch 0007); la
+riserva le sue le ha buttate un minuto dopo, com'è giusto. Quindi mostrod
+la presa e il ritiro li ha visti tutt'e due. 3) Chi ha preso lo dicono
+le query sul VPS (`p2p_scambi.compratore`: 0 = una chiave che non è di
+nessuno dei nostri, cioè un client esterno; `p2p_momenti` con attore e
+dettaglio) e il log del nodo (`grep barattolo_eventi`, con «delivered at
+the retry» che dice se il POST della presa è arrivato al secondo colpo).
+4) L'ORDINE ROVESCIATO ha due cause, e tutt'e due stavano nel codice: la
+frase della presa RESPIRA fino a `P2P_RESPIRO_S` (6 s) aspettando i
+numeri del libro, mentre quella del ritiro parte subito; e i POST di
+mostrod viaggiano per Tor in un task ciascuno, con 8 s al primo colpo e
+un retry a 12 s dopo 5 — un circuito freddo misura 10,6 s, quindi la
+presa può arrivare DOPO il ritiro. In nessuno dei due casi qualcuno
+guardava se l'avviso era ancora vero.
+
+**LA CURA.** Tre giudici puri sulla connessione, gli stessi per le due
+strade (eventi e riserva), sempre PRIMA del timbro dell'anti-doppione:
+- `_superato_p2p(con, ordine, momento, giro, quando, fonte)`: un momento
+  IN CORSO non parte se la cronaca ha un momento che CHIUDE il giro
+  (`P2P_MOMENTI_FINALI`) con un'ora più tarda; per la riserva anche il
+  libro stesso (`tornati` arrivato al giro della frase, o stato finale).
+  Un momento che chiude non è mai superato.
+- `_presa_detta_p2p(con, ordine, giro, tg_id)`: il ritorno in vetrina a
+  chi ha pubblicato parte solo se la presa gli era stata detta (il
+  timbro in `p2p_avvisi`, di qualunque fonte); se no dal suo punto di
+  vista non è successo niente. A chi ha preso il suo «non hai
+  proseguito» parte come prima. Chi ha pubblicato lo dice mostrod
+  (`preso_dal`); se non l'ha ancora detto — il ritiro arrivato prima
+  della presa — lo sa il libro (`p2p_ordini.tg_id`), e la frase segue.
+- `_firmato_dal_coordinatore(ev, mostro)`: il 38383 (e il 38385) si
+  crede solo se la pubkey è quella di mostrod, l'id ricalcolato (NIP-01,
+  lo stesso del login Nostr) combacia e la firma Schnorr regge; lo
+  chiedono il lettore al minuto, il lettore del 38385 e l'ascolto, prima
+  di leggere l'evento. Fail-closed senza coincurve, col journal.
+E in `_registra_evento_p2p` le parti dello scambio (`p2p_scambi`) non si
+riscrivono da un evento arrivato DOPO un fatto più recente: vale l'ultima
+parola per l'orologio di mostrod, non per l'arrivo.
+
+**PERCHÉ LA RISERVA RESTA (la richiesta diceva di toglierla).** La
+richiesta a) chiedeva «nessun avviso di presa al maker senza l'evento di
+mostrod», perché sembrava che la riserva partisse da una dichiarazione.
+Non è così: parte dal 38383, che è parola di mostrod — e il difetto vero
+era che quella parola si prendeva dal relay SENZA controllare la firma
+(il socket va su con `CERT_NONE`, e `authors` è una domanda, non una
+prova): un relay bucato poteva far partire «preso» o «concluso» a chi
+voleva. Con la firma la riserva dice solo quel che mostrod ha firmato, e
+resta la rete di sicurezza di un POST perso per Tor (8 s + 12 s, un solo
+retry): toglierla avrebbe lasciato un venditore senza la presa proprio
+nel caso in cui serve. Se Andrea la vuole tolta lo stesso, è la riga di
+`_avvisi_libro_p2p` che mette in attesa il momento «preso».
+
+**STRADE SCARTATE.** Un lucchetto per ordine attorno a giudizio e invio
+(serializzerebbe, ma non cambierebbe nessun esito: la cronaca è già
+scritta prima del task, e il giudice la legge alla fine del respiro).
+Accorciare il respiro (i numeri del libro servono alla frase). Bloccare
+sul client l'auto-invio del PayCode a un taker che il server non
+riconosce (lascerebbe uno scambio legittimo fermo con la garanzia
+bloccata: la cura è al coordinatore, vedi sotto).
+
+**IL PAYCODE E IL TAKER ESTERNO (c).** Alla presa di un ordine `sell`
+mostrod manda al taker solo lo stato; il PayCode, l'importo e la scadenza
+partono dal TELEFONO di chi vende (`pianificaAutoRecapito`, 8 s dopo che
+conosce la chiave dell'altra parte — che l'ordine porta già alla presa,
+`buyer_trade_pubkey`) come kind 14 cifrato NIP-44 verso quella chiave,
+CHIUNQUE sia. Quindi sì: se l'app di chi vende è aperta durante la presa,
+un taker esterno riceve il PayCode (un client Mostro non lo mostra, ma i
+byte sono suoi e li apre con la sua trade key). Il danno è contenuto — il
+PayCode paga l'ordine Amazon di chi vende, e chi lo paga senza chiudere
+lo scambio regala — ma resta un dato che esce verso uno sconosciuto, e un
+PayCode già pagato da fuori rompe lo scambio del prossimo compratore.
+Oggi (presa e ritiro in dodici secondi, app chiusa) non è partito niente:
+lo dice `p2p_momenti` con `fonte='telefono'` e momento `recapito` su
+quell'ordine — se la riga non c'è, il PayCode non è uscito. LA STRADA
+PROPOSTA, non fatta perché non è contenuta: mostrod già chiede al server
+alla presa (la rotta dello sconto, patch 0005, con le due trade key); una
+patch 0008 può rifiutare la presa di un ordine col metodo «Contanti al
+tabacchino» se la trade key del taker non è in `chiavi_p2p` (la risposta
+dello sconto direbbe `sconosciuto`), così il PayCode non parte mai verso
+chi non passa da Barattolo. È una patch Rust sul nodo, coi suoi test in
+docker e il deploy di Andrea. FINCHÉ IL P2P È CHIUSO: gli ordini di prova
+si tolgono dalla piazza pubblica levando i tre relay pubblici da
+`[nostr] relays` nel `settings.toml` del nodo e lasciando il solo
+specchio (`relay.barattolo.store`): i client esterni non li vedono, i
+nostri sì (leggono e scrivono sullo specchio). Comporta: nessun ordine da
+client esterni (oggi lavoro nostro, l'1% compreso), la sonda del
+coordinator e le letture dai tre relay pubblici che tornano vuote, e da
+rimettere al lancio. Una riga, reversibile: decide Andrea.
+
+**PROVATO.** `prove_p2p_avvisi_in_ordine` (50: le sentinelle, presa e
+ritiro ravvicinati giudicati come il 24 set → niente; l'ordine giusto →
+presa col PayCode poi il ritorno; Tor → niente, e le parti dello scambio
+dell'ultimo fatto; un «fiat» dopo il rilascio → niente, il concluso sì;
+il timeout di chi ha preso → le due frasi; la riserva col coordinatore
+muto due volte → niente, e la presa nuova sì; presa e success nello
+stesso minuto → il solo concluso; la dichiarazione del telefono senza
+evento → niente; la firma con un verificatore di cartone e, dove
+coincurve c'è, coi byte veri). I banchi di prove.py che fanno girare
+`_scarica_attese_p2p` hanno imparato i due giudici; il banco
+dell'ascolto ha una firma di cartone dichiarata (i suoi 38383 non hanno
+firma); la spia «coincurve» del seme guarda l'IMPORT (il giudice nomina
+la libreria in una stringa). `collaudo_avvisi_in_ordine_p2p` col server
+vero e la rotta vera (19: la porta, il lampo, l'ordine calmo, Tor, il
+retry), verde nella gabbia della CI e aggiunto all'elenco. Suite intera
+severa senza config nel worktree da origin/main: **15.184 verdi, 0 rosse**.
+Tortura su copie: **15/15 uccise (tre giri: 11, poi 1-6-12 col rilevatore corretto e la riga di e_maker rimessa su due, poi 13 sul banco dell'ascolto)**.
+
+**DA FARE (Andrea).** Le query in sola lettura del report: sul VPS
+`p2p_scambi`, `p2p_momenti`, `chiavi_p2p` e il journal dell'ordine; sul
+nodo `grep barattolo_eventi` e `grep <id>` nei log di mostro. Decidere
+la patch 0008 (taker riconosciuti sui PayCode) e, fino al lancio, i relay
+del nodo. Sul telefono: un giro presa+ritiro con due identità e il
+journal che dice «superato»/«non parte».

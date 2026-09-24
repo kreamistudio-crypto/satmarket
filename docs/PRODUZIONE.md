@@ -1394,6 +1394,17 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `⚠️ Riserva P2P: … il coordinatore NON l'ha raccontato in 60s: parla
   il libro`, che è la riga DA GUARDARE: vuol dire un POST perso, e il
   perché sta nel log del nodo (`grep barattolo_eventi`).
+  DAL 24 SET 2026 (l'ordine dei fatti): `· Evento P2P: … «preso» a N e'
+  superato da «tornato» di 12s dopo (fonte mostro): non parte` e
+  `· Evento P2P: … «tornato» a N: la presa non gli era stata detta …:
+  non parte` — presa e ritiro ravvicinati, o il POST della presa
+  arrivato al retry: nessuno dei due parte, ed è voluto; `· Riserva
+  P2P: … e' superata da …: il libro tace`; `· Evento P2P: … e' arrivato
+  dopo un fatto piu' recente: le parti dello scambio restano quelle
+  dell'ultimo`; e `⛔ Libro P2P: un 38383 da <relay> non e' firmato dal
+  coordinatore: buttato` (o `⛔ Ascolto P2P: …`), che è la riga DA
+  GUARDARE SUBITO: un relay che serve eventi non di mostrod; `⚠️ Libro
+  P2P: coincurve non c'e'` vuol dire che il libro è fermo (pip).
   LA CRONACA DI UN ORDINE, quando qualcosa non torna (in sola lettura):
   `sqlite3 ~/satmarket/satmarket.db "SELECT datetime(quando,'unixepoch'), momento, dettaglio, attore, fonte, giro FROM p2p_momenti WHERE ordine LIKE '0f3a5c1e%' ORDER BY quando"`
   e chi è stato avvisato di cosa:
