@@ -1189,6 +1189,9 @@
   nel foglio (`orologioPay`/`battitoPay`, accesi da `mostraQr` per ogni
   flusso: «⏱ Scade tra», la porta `lightning:` del wallet, e a fattura
   morta il velo, la nota spenta e «Generane una nuova» se è un ordine).
+  In lista lo stesso ordine è «Da pagare» PIENO (`dapagare`) a chi
+  compra e «In attesa del pagamento» NEUTRO (`attesa`) a chi vende, dal
+  giudice `badgeOrdine`.
   Verbale in CANTIERI, «Paga ora: la fattura che si riapre».
   IL RILANCIO PAGATO NON ENTRA IN GARA, dichiarato: la fattura è
   scaduta da un pezzo e applicare adesso un rilancio vecchio di dieci

@@ -30460,9 +30460,9 @@ il poll chiude e la linea dice «Hai depositato i sats». Scatti CDP a
 
 **DA GUARDARE SUL TELEFONO.** «Apri nel wallet» (lo schema `lightning:`
 dentro la WebView di Telegram, Android e iPhone: non provato); il
-foglio che si riapre dal dettaglio; il pieno di «Da pagare». Resta
-com'era, e segnalato: a chi VENDE la stessa riga dice «Da pagare», che
-letta da lui è ambigua.
+foglio che si riapre dal dettaglio; il pieno di «Da pagare». Restava
+com'era, e segnalato: a chi VENDE la stessa riga diceva «Da pagare» —
+chiuso nel giro dopo, voce qui sotto.
 ## Varianti e prodotti digitali dai negozi collegati (24 set 2026)
 
 **Da dove nasce.** Due segnalazioni dallo stesso WooCommerce collegato
@@ -30894,3 +30894,29 @@ quadrate (rossa con la foto vecchia rimessa al suo posto, verde con la
 nuova). Suite severa senza config verde; dal vivo a 375 px nei due temi,
 su una copia legata al venditore di collaudo 222: le tre foto a 343x343,
 nessuno sbordo.
+
+## «In attesa del pagamento» per chi vende (24 set 2026)
+
+Richiesta di Andrea, subito dopo «Paga ora»: nella lista Ordini chi
+VENDE vedeva «Da pagare» sui suoi ordini non ancora pagati dal
+compratore — letto da lui sembra un conto suo — e col velato arancio
+di «Sats depositati». Adesso a lui la card dice «In attesa del
+pagamento» con un tono NEUTRO (`.badge.attesa`: il fondo degli spenti,
+`--off-bg`, con `--ink-soft`, 6,04:1 di giorno e 7,48:1 di sera; col
+`--muted` degli spenti di giorno sarebbe stato 3,15, sotto l'AA a
+11px). A chi compra resta «Da pagare» pieno. Il giudice e' sempre
+`badgeOrdine`; la parola la dice la card, in testa alla catena, cosi'
+la regola dei rettangolini (la parola dello stato in fondo) non cambia.
+Il dettaglio dell'ordine lo diceva gia' («In attesa del pagamento»
+nella testa e nel primo passo): adesso lista e dettaglio parlano
+uguale.
+
+**PROVATO.** In `prove_paga_ora` `renderOrders` girato davvero (col
+Proxy della linea del tempo): lo stesso ordine da pagare e' «Da
+pagare»/`dapagare` al compratore e «In attesa del pagamento»/`attesa`
+al venditore, e il pagato «Sats depositati» uguale ai due; il vestito
+nel foglio. Due mutazioni (la parola, il vestito), uccise tutte e
+due. Dal vivo come venditore 222 col tocco vero: a 375 il rettangolino
+e' largo 147 px su una riga, a 320 146 px con 12 px d'aria dalla foto,
+nessuno scorrimento di lato e la card alta uguale; scatti CDP a 320 e
+375 nei due temi, i due lati dello stesso ordine.

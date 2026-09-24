@@ -7237,6 +7237,11 @@
      gesto — l'arancio profondo dei sats col testo della carta, AA nei
      due temi (5,02:1 di giorno, 8,51:1 di sera). */
   .badge.dapagare{background:var(--sats-text);color:var(--card)}
+  /* ...e lo stesso ordine a chi VENDE (24 set 2026): un'attesa, tono
+     neutro e non arancio — il fondo degli spenti con l'inchiostro
+     morbido, che a 11px regge l'AA (6,04:1 di giorno, 7,48:1 di sera;
+     col --muted degli spenti di giorno sarebbe 3,15). */
+  .badge.attesa{background:var(--off-bg);color:var(--ink-soft)}
   /* Le azioni di «I tuoi annunci» (ago 2026, dal campo): stavano
      incollate sotto il titolo, col prezzo a filo del tasto Modifica.
      Ora sono un BLOCCO in fondo alla card, staccato dal prezzo, e
@@ -27251,12 +27256,16 @@ function badgeOrdine(o){
      lui il rettangolino si veste PIENO, perche' e' l'unico stato della
      lista che aspetta una sua mossa per esistere — con la tinta velata
      di «Sats depositati» le due righe si leggevano uguali, e l'ordine
-     da pagare passava per uno gia' pagato. A chi vende resta il velato
-     di sempre: lui non ha niente da fare. La parola resta «Da pagare»,
+     da pagare passava per uno gia' pagato. La parola resta «Da pagare»,
      senza il ⚡ davanti: provato a schermo, di sera il fulmine spariva
-     sul suo stesso arancio, e il pieno basta da solo a dirlo. */
+     sul suo stesso arancio, e il pieno basta da solo a dirlo.
+     A CHI VENDE LO STESSO ORDINE E' UN'ATTESA (24 set 2026, richiesta
+     di Andrea): «Da pagare» letto da lui sembrava un conto suo, e il
+     velato arancio lo vestiva come «Sats depositati». Gli tocca il
+     tono NEUTRO (`attesa`), e la parola la dice la card. */
   return inPagamento(o) ? 'confirmed'
        : (o.role === 'buyer' && o.state === 'creato') ? 'dapagare'
+       : (o.role === 'seller' && o.state === 'creato') ? 'attesa'
        : STATES[o.state].badge;
 }
 /* Nascondere non e' cancellare: il server tiene la riga e accende il
@@ -27361,6 +27370,9 @@ function renderOrders(){
              incassare», che e' il suo verbo. La CLASSE invece la
              dice `badgeOrdine`. */''}
         <span class="badge ${badgeOrdine(o)}">${
+          /* «Da pagare» e' la parola di chi compra: a chi vende lo
+             stesso ordine si dice per quello che e' per lui */
+          (o.role==='seller' && o.state==='creato') ? 'In attesa del pagamento' :
           inPagamento(o) && !(o.role==='seller' && o.pagamento.gesto_venditore)
             ? '💸 In pagamento' : inPagamento(o) ? STATES.confirmed.label : STATES[o.state].label}</span>
         <div class="ord-foto-data">${o.when}</div>${x}

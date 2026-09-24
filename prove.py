@@ -94575,6 +94575,60 @@ console.log(JSON.stringify(esiti));
            "L'ordine si è chiuso prima del pagamento"],
           e["annullato"]["primo"])
 
+    # 4d) LA LISTA DEI DUE LATI (24 set 2026, richiesta di Andrea): lo
+    #     stesso ordine da pagare e' «Da pagare» PIENO a chi compra e
+    #     «In attesa del pagamento» NEUTRO a chi vende — letto da lui,
+    #     «Da pagare» sembrava un conto suo. renderOrders girato davvero,
+    #     col Proxy della linea del tempo; il pagato resta uguale ai due.
+    banco = base + "\n" + """
+const VUOTO = () => '';
+for (const n of ['STATES', 'inPagamento', 'esc', 'el'])
+  globalThis[n] = eval(n);
+globalThis.CONCLUSI = ['released','refunded','annullato'];
+globalThis.NASCONDIBILI = ['released','refunded'];
+globalThis.ordiniRuolo = ''; globalThis.ordiniSoloAttivi = false;
+globalThis.ordiniMostraNascosti = false; globalThis.DEMO = false;
+const P = new Proxy({}, {
+  has: (t, k) => k !== Symbol.unscopables,
+  get: (t, k) => k === Symbol.unscopables ? undefined
+       : (k in globalThis ? globalThis[k] : VUOTO),
+  set: (t, k, v) => { globalThis[k] = v; return true; }});
+with (P) {
+  globalThis.badgeOrdine = (function(){ return __BADGE__; })();
+  globalThis.verboOrdine = (function(){ return __VERBO__; })();
+  globalThis.renderOrders = (function(){ return __LISTA__; })();
+}
+const riga = (id, state, role) => ({id, state, role, nascosto: 0,
+  listing: {title: 'Pesto ' + id, price: 25000}, when: '24 set',
+  pagamento: null});
+globalThis.orders = [riga(1, 'creato', 'buyer'), riga(2, 'creato', 'seller'),
+  riga(3, 'locked', 'buyer'), riga(4, 'locked', 'seller')];
+renderOrders();
+const h = nodi.ordersList.innerHTML;
+dice('rettangolini', [...h.matchAll(/<span class="badge ([a-z]+)">([^<]*)<\\/span>/g)]
+  .map(m => [m[1], m[2].trim()]));
+console.log(JSON.stringify(esiti));
+""".replace("__BADGE__", fetta("function badgeOrdine(o){")) \
+   .replace("__VERBO__", fetta("function verboOrdine(o){")) \
+   .replace("__LISTA__", fetta("function renderOrders(){"))
+    p = os.path.join(cart, "lista_due_lati.js")
+    open(p, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, p], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco della lista gira", "", (r.stderr or "")[-600:])
+    if r.returncode or not r.stdout.strip():
+        return
+    e = json.loads(r.stdout)
+    prova("da pagare: PIENO a chi compra, attesa NEUTRA a chi vende; il "
+          "pagato uguale ai due",
+          [["dapagare", "Da pagare"], ["attesa", "In attesa del pagamento"],
+           ["locked", "Sats depositati"], ["locked", "Sats depositati"]],
+          e["rettangolini"])
+    css = mini[mini.index("<style"):mini.index("</style>")]
+    prova("...e il neutro ha il suo vestito: il fondo degli spenti con "
+          "l'inchiostro morbido, mai l'arancio", True,
+          ".badge.attesa{background:var(--off-bg);color:var(--ink-soft)}"
+          in css)
+
 
 def main():
     print("=" * 58)
