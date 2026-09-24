@@ -15657,9 +15657,61 @@ const giuLogoConsigliato = px => {
   return +(n / LATO_LOGO_TELEFONO * 100).toFixed(2);
 };
 
+/* L'ORDINE DEI LOGHI NELLA CARD (set 2026, ritocco di Andrea): a ogni
+   apertura dell'app un ordine A CASO, e il primo logo mai quello della
+   volta prima — chi apre spesso non si ritrova sempre lo stesso negozio
+   in testa. Il primo e' anche quello che si carica subito (il solo col
+   suo `src`, vedi cardConsigliati): il resto del giro non cambia.
+   SI DECIDE UNA VOLTA PER APERTURA, al primo disegno della card, e poi
+   si tiene: la fila si ridisegna quando si cambia reparto o arriva la
+   busta, e un ordine rimescolato a ogni ridisegno sarebbe una card che
+   cambia sotto gli occhi. Un negozio arrivato dopo (la pagina appena
+   pubblicata di una busta nuova) va in coda; chi c'era resta dov'era.
+   LA VOLTA PRIMA LA RICORDA IL TELEFONO (CONSIGLIATI_PRIMO_CHIAVE: lo
+   slug del primo), sempre dentro un try — dove il localStorage non c'e'
+   o non risponde (navigazione privata, una webview senza archivio)
+   basta il caso. Con UN logo solo niente cambia, la card e' quella di
+   sempre; ma lui si ricorda lo stesso come il primo mostrato, cosi'
+   all'apertura in cui i negozi tornano due parte l'altro.
+   SOLO LA CARD: la lista resta quella del giudice unico
+   (consigliatiPubblicati), e la pagina «Consigliati» tiene il suo
+   ordine, col catalogo di casa per primo. */
+const CONSIGLIATI_PRIMO_CHIAVE = 'barattolo_consigliati_primo';
+let consigliatiOrdine = null;
+function ordinaLoghiConsigliati(loghi){
+  const slug = loghi.map(v => v.slug);
+  if (!slug.length) return loghi;
+  if (!consigliatiOrdine) {
+    let prima = '';
+    try { prima = localStorage.getItem(CONSIGLIATI_PRIMO_CHIAVE) || ''; } catch(e){}
+    consigliatiOrdine = mescolaConsigliati(slug, prima, Math.random);
+    try { localStorage.setItem(CONSIGLIATI_PRIMO_CHIAVE, consigliatiOrdine[0]); } catch(e){}
+  }
+  slug.forEach(s => { if (!consigliatiOrdine.includes(s)) consigliatiOrdine.push(s); });
+  return consigliatiOrdine.map(s => loghi.find(v => v.slug === s)).filter(Boolean);
+}
+/* IL MAZZO, PURO: il primo a caso fra chi NON e' `prima` (se c'e'
+   qualcun altro), gli altri mescolati alla Fisher-Yates — ogni ordine
+   col primo diverso dalla volta prima ha la stessa probabilita'. Il
+   caso arriva da fuori, cosi' le prove lo possono fissare; e un caso
+   che rispondesse 1 non esce dal mazzo. */
+function mescolaConsigliati(slug, prima, caso){
+  const tira = n => Math.min(n - 1, Math.floor(caso() * n));
+  const altri = slug.filter(s => s !== prima);
+  const scelta = altri.length ? altri : slug;
+  const primo = scelta[tira(scelta.length)];
+  const resto = slug.filter(s => s !== primo);
+  for (let i = resto.length - 1; i > 0; i--) {
+    const j = tira(i + 1);
+    [resto[i], resto[j]] = [resto[j], resto[i]];
+  }
+  return [primo, ...resto];
+}
+
 /* LA CARD NELLA FILA (la chiama renderStriscia): il quadrato bruno e
    l'etichetta delle sorelle, e dentro i LOGHI uno sopra l'altro — si
-   vede quello `attivo`, lo scorrimento lo fa il CSS.
+   vede quello `attivo`, lo scorrimento lo fa il CSS. I loghi vengono
+   nell'ordine di QUESTA apertura (ordinaLoghiConsigliati).
    SOLO IL PRIMO HA IL SUO `src`: gli altri portano l'indirizzo in
    `data-src` e si chiedono un giro prima del loro turno, quindi la
    prima apertura della home paga UN logo solo, e a priorita' bassa —
@@ -15670,7 +15722,8 @@ const giuLogoConsigliato = px => {
    l'ultimo logo, fratella adiacente: si accende solo quando gli onerror
    li hanno tolti tutti. Ogni logo porta il SUO `--giu`, che il CSS
    traduce in uno spostamento: girando, ognuno sta dove gli sta bene. */
-function cardConsigliati(loghi){
+function cardConsigliati(voci){
+  const loghi = ordinaLoghiConsigliati(voci);
   return `
     <a class="cat-cella cella-consigliati" data-cat="${CAT_CONSIGLIATI}" href="/consigliati"
        title="Consigliati" aria-label="Consigliati"

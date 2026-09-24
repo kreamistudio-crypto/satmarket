@@ -31468,3 +31468,66 @@ che apre la chat e NON il negozio, e il nome che apre ancora il
 negozio; le stelle scure; l'anteprima col testo nuovo.
 
 **DA GUARDARE.** Sul telefono, i loghi dentro Telegram.
+
+## L'ordine a caso dei loghi dei Consigliati (24 set 2026)
+
+Ritocco di Andrea a `0876717`: a ogni apertura dell'app la card
+«Consigliati» partiva sempre dallo stesso logo. Adesso l'ordine è a CASO
+a ogni apertura, e il primo logo non è mai quello della volta prima; con
+un logo solo niente cambia, e il resto del giro (scorrimento, pausa, solo
+se si vede, effetti ridotti, `logo_giu`, il secondo logo chiesto al primo
+giro) resta com'è. Il primo pescato è quello che si carica subito.
+
+**COME È FATTO.** `ordinaLoghiConsigliati`, chiamata dalla sola card: al
+PRIMO disegno della card in un'apertura legge dal telefono il primo della
+volta prima (`CONSIGLIATI_PRIMO_CHIAVE`), pesca il mazzo con
+`mescolaConsigliati` — il primo a caso fra gli ALTRI, poi il resto alla
+Fisher-Yates, così ogni ordine col primo diverso ha la stessa probabilità
+— e scrive il nuovo primo. Lettura e scrittura stanno dentro un try:
+senza localStorage (navigazione privata, una webview senza archivio)
+basta il caso. L'ordine si tiene per tutta l'apertura: i ridisegni della
+fila (un reparto, la busta che torna) non rimescolano e non riscrivono la
+memoria, e un negozio arrivato dopo va in coda. Il primo dell'ordine è
+anche il solo col suo `src`, quindi «si carica subito» viene da sé; il
+giro, le classi e gli effetti ridotti non guardano l'ordine.
+
+**LE SCELTE MIE, da far leggere.** Con un logo solo la card è quella di
+sempre, ma il telefono se lo ricorda lo stesso come il primo mostrato:
+all'apertura in cui i negozi tornano due parte l'altro (senza, lo stesso
+logo starebbe in testa due aperture di fila). Con DUE negozi la regola li
+fa alternare a ogni apertura: è quel che resta del caso quando il primo
+non può ripetersi. Solo la card: la pagina «Consigliati» e la lista del
+giudice unico tengono il loro ordine, col catalogo di casa per primo.
+
+**SCARTATE.** Rimescolare a ogni ridisegno (la card cambierebbe sotto gli
+occhi cambiando reparto); mescolare dentro `consigliatiPubblicati` (anche
+la pagina, e il giudice unico non cambia per un ornamento); scambiare il
+primo col secondo quando si ripete (il primo non sarebbe più uniforme fra
+gli altri).
+
+**PROVATO.** `prove_consigliati` a 175 (da 155): nel banco node una
+memoria del telefono di cartone, che sa anche esplodere, e un caso a seme
+fisso — seicento aperture senza memoria col mazzo sempre intero, tutte e
+sei le permutazioni e ognuno in testa circa un terzo delle volte; il
+primo col suo `src`, acceso e col suo ritocco; trecento aperture di fila
+senza un primo ripetuto, con la memoria sempre sul primo di adesso; due
+negozi che si alternano; un primo di ieri sparito che non vincola niente;
+la memoria muta; un logo solo identico al byte a quello che non pesca,
+ricordato, e l'apertura dopo che parte dall'altro; l'ordine che regge ai
+ridisegni, con chi arriva in coda; la pagina che non si mescola; il mazzo
+ai bordi del caso (0 e 1). I casi di ieri parlano dell'ordine naturale e
+adesso lo dichiarano (un'apertura che ha già deciso senza mescolare):
+prima erano verdi per l'ordine in cui giravano. TORTURA 13/13 su una
+copia; al primo giro una la prendeva la sola sentinella, perché il caso
+del logo solo partiva con la memoria già sul suo nome: ora parte da un
+altro. Suite intera severa senza config sull'albero ribasato su
+`8adea78` ed estratto in LF come in CI: 15.478 verdi e 0 rosse; i 20
+collaudi della CI verdi nella gabbia senza rete. DAL VIVO sulla copia
+col server di collaudo e «Un tempo per te» pubblicata: sei riaperture di
+fila col primo che si alterna, sempre col suo `src` e acceso, e la
+memoria sul primo di adesso; cinque ridisegni nella stessa apertura
+senza un cambio; la pagina col catalogo di casa per primo.
+
+**DA GUARDARE SUL TELEFONO.** Due aperture di fila dentro Telegram: il
+primo logo cambia. Dove il client non tiene il localStorage fra
+un'apertura e l'altra resta il solo caso, come chiesto.

@@ -3675,6 +3675,16 @@
   dell'altezza dell'header appiccicato; tornata in vista il battito
   riparte da capo. Il perche': Cantieri, «Lo scorrimento dei loghi dei
   Consigliati».
+  L'ORDINE DELLA CARD (set 2026): a CASO a ogni apertura dell'app, col
+  primo logo mai quello della volta prima (`ordinaLoghiConsigliati`; il
+  mazzo lo pesca `mescolaConsigliati`, puro, col caso passato da fuori).
+  Si decide una volta per apertura, al primo disegno della card, e i
+  ridisegni lo tengono; chi arriva dopo va in coda. Il primo di ogni
+  apertura lo ricorda il telefono (`CONSIGLIATI_PRIMO_CHIAVE`, dentro un
+  try: senza memoria basta il caso), anche con un logo solo, che per il
+  resto non cambia niente. Solo la card: la lista e la pagina tengono
+  l'ordine del giudice unico, col catalogo di casa per primo. Il
+  perche': Cantieri, «L'ordine a caso dei loghi dei Consigliati».
   La pagina e' NOINDEX e fuori dalla sitemap (puo' restare vuota) con
   l'anteprima del brand; il nome `consigliati` e' fra gli
   SLUG_NEGOZIO_RISERVATI. Il perche' di ogni pezzo: Cantieri,

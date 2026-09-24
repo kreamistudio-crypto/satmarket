@@ -95371,6 +95371,30 @@ def _consigliati_porte(src, mini, _pz):
     prova("...e l'osservatore rinasce col giro, a ogni ridisegno della fila",
           True, "guardaCardConsigliati(quanti > 1);" in
           _pz(mini, "function armaGiroConsigliati(quanti){", "\n}\n"))
+    # L'ORDINE DELLA CARD (set 2026, ritocco di Andrea): a caso a ogni
+    # apertura, col primo mai quello della volta prima. La card si disegna
+    # nell'ordine scelto; la lista e la pagina no — il loro ordine resta
+    # quello del giudice unico, col catalogo di casa per primo. Il banco
+    # prova che risponde giusto; qui si guarda DOVE sta
+    _ol = _pz(mini, "function ordinaLoghiConsigliati(loghi){", "\n}\n")
+    prova("la card si disegna nell'ordine di questa apertura, e la lista e "
+          "la pagina no", (True, False, False),
+          ("const loghi = ordinaLoghiConsigliati(voci);"
+           in _pz(mini, "function cardConsigliati(voci){", "\n}\n"),
+           "ordinaLoghiConsigliati"
+           in _pz(mini, "function renderConsigliati(){", "\n}\n"),
+           "Math.random"
+           in _pz(mini, "function consigliatiPubblicati(){", "\n}\n")))
+    # LA MEMORIA DEL PRIMO SI TOCCA SOLO DENTRO UN TRY: dove il
+    # localStorage non c'e' o esplode la card deve nascere lo stesso, e
+    # l'ordine si decide UNA volta per apertura
+    _mem = [r.strip() for r in _ol.splitlines() if "localStorage" in r]
+    prova("...la memoria del primo si legge e si scrive solo dentro un try, "
+          "una volta per apertura", (2, True, True),
+          (len(_mem), all(r.startswith("try {") and r.endswith("catch(e){}")
+                          for r in _mem),
+           0 <= _ol.find("if (!consigliatiOrdine) {")
+           < _ol.find("localStorage.getItem(CONSIGLIATI_PRIMO_CHIAVE)")))
     css = mini[mini.find("<style"):mini.find("</style>")]
     # ⚠️ PROVA CHE HA CAMBIATO (set 2026, ritocco di Andrea): la
     # dissolvenza e' diventata uno SCORRIMENTO, e l'opacita' non si anima
@@ -95674,6 +95698,26 @@ class IntersectionObserver {
   disconnect(){ this.spento = true; this.guarda = []; }
 }
 const window = {IntersectionObserver};
+/* LA MEMORIA DEL TELEFONO, di cartone: una mappa, e un interruttore che
+   la fa esplodere come un localStorage che non c'e' (navigazione
+   privata, una webview senza archivio). E IL CASO, che i casi possono
+   fissare: `semi(n)` da' sempre la stessa sequenza a parita' di seme
+   (mulberry32), cosi' una prova sul caso dice sempre la stessa cosa. */
+let magazzino = {}, memoriaMuta = false;
+const localStorage = {
+  getItem: k => { if (memoriaMuta) throw new Error('memoria muta');
+    return k in magazzino ? magazzino[k] : null; },
+  setItem: (k, v) => { if (memoriaMuta) throw new Error('memoria muta');
+    magazzino[k] = String(v); }};
+const casoVero = Math.random;
+function semi(n){
+  return () => {
+    n = n + 0x6D2B79F5 | 0;
+    let t = Math.imul(n ^ n >>> 15, 1 | n);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
 let richieste = [], scritte = [];
 let immagini = [], htmlVisto = null;
 function nuovaImg(attr){
@@ -95750,6 +95794,14 @@ function caso(nome, f){
   timer.clear(); htmlVisto = null;
   occhi = []; quotaVista = 1; testaAlta = 0;
   window.IntersectionObserver = IntersectionObserver;
+  magazzino = {}; memoriaMuta = false; Math.random = casoVero;
+  activeCat = 'Tutto';
+  /* L'ORDINE DELLA CARD (set 2026): a ogni apertura e' a caso. I casi di
+     ieri parlano dell'ordine NATURALE (il catalogo di casa, poi la
+     busta), e per loro l'apertura ha gia' deciso senza mescolare — `[]`:
+     ogni negozio va in coda, nell'ordine in cui arriva. Chi prova il
+     caso riapre l'app con `apri()`. */
+  consigliatiOrdine = [];
   try { f(); } catch (e) { console.log('ESPLOSO: ' + e.message + '|' + nome); }
 }
 const rifai = () => { strisciaFirma = ''; renderStriscia(); };
@@ -95772,6 +95824,12 @@ const vede = r => {
 const idTimer0 = () => [...timer.keys()][0];
 const conSrc = () => immaginiCard().map(x => !!x.getAttribute('src'));
 const giro = () => { for (const t of timer.values()) t.f(); };
+/* l'ordine dei loghi nella card, per slug; e UN'APERTURA NUOVA dell'app:
+   l'ordine non e' ancora deciso, e la fila si ridisegna da capo */
+const ordineCard = () => immaginiCard().map(x => (x._src || x.dataset.src)
+  .replace('/assets/consigliati/', '').replace('.webp', ''));
+const apri = () => {
+  consigliatiOrdine = null; htmlVisto = null; rifai(); return ordineCard(); };
 const arrivano = () => immaginiCard().forEach(x => { if (x._src) x.arrivata = true; });
 /* i gesti su nodi assenti tornano vuoti: una card che una mutazione toglie
    deve dare una rossa col suo nome, non far esplodere il caso */
@@ -96036,6 +96094,186 @@ caso('senza osservatore', () => {
   rifai(); giro(); arrivano(); giro();
   dice('un browser senza IntersectionObserver fa girare la card come prima',
        [['esce', 'attivo+entra'], 0], [classi(), occhi.length]);
+});
+
+/* L'ORDINE A CASO (set 2026, ritocco di Andrea): a ogni apertura
+   dell'app la card mette i loghi in un ordine a caso. Il caso ha un seme
+   fisso, cosi' la prova dice sempre la stessa cosa: su seicento aperture
+   senza memoria ogni ordine e' un mazzo intero (tutti, una volta sola),
+   escono tutte e sei le permutazioni, e ognuno dei tre va in testa circa
+   un terzo delle volte. */
+caso('ordine a caso', () => {
+  consigliatiServer = [BOTTEGA, TERZA];
+  Math.random = semi(7);
+  const visti = {}, primi = {};
+  let interi = true;
+  for (let n = 0; n < 600; n++) {
+    magazzino = {};
+    const o = apri();
+    interi = interi && o.length === 3 && ['to-the-moon', 'bottega-di-prova',
+      'terza-bottega'].every(s => o.includes(s));
+    visti[o.join(',')] = 1;
+    primi[o[0]] = (primi[o[0]] || 0) + 1;
+  }
+  dice('senza memoria ogni apertura mette in fila tutti i loghi, una volta sola',
+       true, interi);
+  dice('...in tutti e sei gli ordini possibili', 6, Object.keys(visti).length);
+  dice('...e ognuno va in testa circa un terzo delle volte', [true, true, true],
+       ['to-the-moon', 'bottega-di-prova', 'terza-bottega']
+         .map(s => (primi[s] || 0) > 160 && (primi[s] || 0) < 240));
+});
+
+/* IL PRIMO SI CARICA SUBITO: il primo del mazzo e' il solo col suo `src`
+   e il solo acceso, gli altri aspettano in `data-src`; e ogni logo porta
+   con se' il SUO ritocco, qualunque posto gli tocchi. */
+caso('il primo a caso si carica subito', () => {
+  RACCONTI['to-the-moon'].logo_giu = 4;
+  consigliatiServer = [Object.assign({}, BOTTEGA, {logo_giu: -3}), TERZA];
+  Math.random = semi(11);
+  const GIU = {'to-the-moon': '5.29', 'bottega-di-prova': '-3.97',
+               'terza-bottega': '0'};
+  const primi = {};
+  let buoni = 0;
+  for (let n = 0; n < 30; n++) {
+    magazzino = {};
+    const o = apri();
+    primi[o[0]] = 1;
+    const giu = immaginiCard().map(x =>
+      (x.attr.match(/--giu:([^%"]*)%/) || [])[1]);
+    if (JSON.stringify([conSrc(), accesi(), giu]) === JSON.stringify(
+        [[true, false, false], [true, false, false], o.map(s => GIU[s])]))
+      buoni++;
+  }
+  dice('a ogni apertura il primo del mazzo e il solo col suo src e acceso, e '
+       + 'ogni logo porta il suo ritocco', 30, buoni);
+  dice('...e in testa ci va davvero ognuno, non sempre lo stesso', 3,
+       Object.keys(primi).length);
+});
+
+/* IL PRIMO MAI QUELLO DELLA VOLTA PRIMA: la memoria resta da
+   un'apertura all'altra, e in trecento aperture di fila il primo non si
+   ripete mai, e la memoria dice sempre il primo di adesso. Con due
+   negozi quindi si alternano; e un primo di ieri che non c'e' piu' non
+   vincola niente. */
+caso('primo diverso dalla volta prima', () => {
+  consigliatiServer = [BOTTEGA, TERZA];
+  Math.random = semi(3);
+  let prima = null, ripetuti = 0, ricordati = 0;
+  for (let n = 0; n < 300; n++) {
+    const o = apri();
+    if (o[0] === prima) ripetuti++;
+    if (magazzino[CONSIGLIATI_PRIMO_CHIAVE] === o[0]) ricordati++;
+    prima = o[0];
+  }
+  dice('in trecento aperture di fila il primo non e mai quello della volta prima',
+       0, ripetuti);
+  dice('...e il telefono ricorda sempre il primo di adesso', 300, ricordati);
+  consigliatiServer = [BOTTEGA];
+  magazzino[CONSIGLIATI_PRIMO_CHIAVE] = 'to-the-moon';
+  dice('con due negozi il primo si alterna a ogni apertura',
+       ['bottega-di-prova', 'to-the-moon', 'bottega-di-prova', 'to-the-moon'],
+       [apri()[0], apri()[0], apri()[0], apri()[0]]);
+  const liberi = {};
+  for (let n = 0; n < 40; n++) {
+    magazzino[CONSIGLIATI_PRIMO_CHIAVE] = 'negozio-sparito';
+    liberi[apri()[0]] = 1;
+  }
+  dice('...e un primo di ieri che non c e piu non vincola niente', 2,
+       Object.keys(liberi).length);
+});
+
+/* SE LA MEMORIA NON C'E' BASTA IL CASO: un localStorage che esplode non
+   ferma la card, e il mazzo resta intero e mescolato. */
+caso('memoria che non c e', () => {
+  consigliatiServer = [BOTTEGA, TERZA];
+  memoriaMuta = true;
+  Math.random = semi(5);
+  const primi = {};
+  let interi = true;
+  for (let n = 0; n < 60; n++) {
+    const o = apri();
+    interi = interi && o.length === 3 && new Set(o).size === 3;
+    primi[o[0]] = 1;
+  }
+  dice('col localStorage che non risponde la card nasce lo stesso, col mazzo '
+       + 'intero e mescolato', [true, 3], [interi, Object.keys(primi).length]);
+});
+
+/* UN LOGO SOLO: niente cambia — la card e' quella di sempre, accesa col
+   suo src, e nessun giro —; ma il telefono se lo ricorda come il primo
+   mostrato, e all'apertura in cui i negozi tornano due parte l'altro. */
+caso('un solo logo', () => {
+  Math.random = semi(9);
+  magazzino[CONSIGLIATI_PRIMO_CHIAVE] = 'to-the-moon';
+  const o = apri();
+  const conCaso = nodi['catStrip'].innerHTML;
+  dice('con un logo solo la card e quella di sempre, anche se era lui il primo '
+       + 'della volta prima', [['to-the-moon'], [true], [true], 0],
+       [o, accesi(), conSrc(), timer.size]);
+  consigliatiOrdine = []; rifai();
+  dice('...identica, al byte, a quella che non pesca', true,
+       nodi['catStrip'].innerHTML === conCaso);
+  /* la memoria parte da un ALTRO nome: se partisse da lui, un logo solo
+     che non la scrive passerebbe per uno che la scrive (la tortura l'ha
+     presa cosi') */
+  magazzino[CONSIGLIATI_PRIMO_CHIAVE] = 'negozio-sparito';
+  apri();
+  dice('...e il telefono lo ricorda come il primo mostrato', 'to-the-moon',
+       magazzino[CONSIGLIATI_PRIMO_CHIAVE]);
+  consigliatiServer = [BOTTEGA];
+  dice('...cosi all apertura dopo, con due negozi, parte l altro',
+       'bottega-di-prova', apri()[0]);
+});
+
+/* L'ORDINE SI DECIDE UNA VOLTA PER APERTURA: la fila che si ridisegna
+   (un reparto scelto, la busta che torna) tiene lo stesso ordine e non
+   riscrive la memoria; un negozio arrivato dopo va in coda, e il primo
+   resta lui. */
+caso('stabile nell apertura', () => {
+  consigliatiServer = [BOTTEGA];
+  Math.random = semi(13);
+  const o1 = apri();
+  const ricordato = magazzino[CONSIGLIATI_PRIMO_CHIAVE];
+  magazzino[CONSIGLIATI_PRIMO_CHIAVE] = 'altro';
+  activeCat = 'Bitcoin'; renderStriscia();
+  const o2 = ordineCard();
+  consigliatiServer = [BOTTEGA, TERZA]; renderStriscia();
+  dice('ridisegnata nella stessa apertura la card tiene il suo ordine, e la '
+       + 'memoria non si riscrive', [o1[0], o1, 'altro'],
+       [ricordato, o2, magazzino[CONSIGLIATI_PRIMO_CHIAVE]]);
+  dice('...e un negozio arrivato dopo va in coda, col primo che resta lui',
+       o1.concat(['terza-bottega']), ordineCard());
+});
+
+/* IL MAZZO, AI BORDI DEL CASO: un caso che risponde 0 o 1 (Math.random
+   non arriva a 1, un rimpiazzo si') pesca comunque un mazzo intero, col
+   primo fra chi non e' quello della volta prima. */
+caso('il mazzo ai bordi del caso', () => {
+  const intero = m => m.length === 3 && m.every(Boolean)
+    && new Set(m).size === 3;
+  const m0 = mescolaConsigliati(['a', 'b', 'c'], 'a', () => 0);
+  const m1 = mescolaConsigliati(['a', 'b', 'c'], 'a', () => 1);
+  dice('col caso a 0 e a 1 il mazzo resta intero, e il primo non e quello '
+       + 'della volta prima', [[true, true], [false, false]],
+       [[intero(m0), intero(m1)], [m0[0] === 'a', m1[0] === 'a']]);
+});
+
+/* SOLO LA CARD: la pagina «Consigliati» tiene il suo ordine — il
+   catalogo di casa per primo —, qualunque mazzo abbia pescato la card. */
+caso('la pagina non si mescola', () => {
+  consigliatiServer = [BOTTEGA, TERZA];
+  Math.random = semi(21);
+  const NATURALE = 'to-the-moon,bottega-di-prova,terza-bottega';
+  let ferme = 0, mescolate = 0;
+  for (let n = 0; n < 20; n++) {
+    magazzino = {};
+    if (apri().join() !== NATURALE) mescolate++;
+    renderConsigliati();
+    if ([...nodi['consigliatiLista'].innerHTML.matchAll(/data-slug="([^"]+)"/g)]
+        .map(m => m[1]).join() === NATURALE) ferme++;
+  }
+  dice('la pagina resta nel suo ordine anche quando la card si mescola',
+       [20, true], [ferme, mescolate > 0]);
 });
 
 /* LA FILA SEGUE LA BUSTA: una pagina del server rimessa in bozza esce
