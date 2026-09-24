@@ -93,6 +93,7 @@ jobs:
              racconti.py collaudo_racconti_bozza.py
              collaudo_letture_relay.py
              prepara_logo_consigliato.py
+             collaudo_spedizione_standard.py
 
       # Secondo scalino: il config d'esempio deve restare allineato,
       # perche' e' quello da cui Andrea copia quando mette mano al VPS.
@@ -157,6 +158,7 @@ jobs:
              collaudo_racconti_bozza
              collaudo_inviti
              collaudo_letture_relay
+             collaudo_spedizione_standard
 
   # La regola ferrea numero 1, e vive in un JOB SUO — non in coda
   # all'altro, ed e' il pezzo da non rimettere com'era.

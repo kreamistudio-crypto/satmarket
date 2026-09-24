@@ -29713,3 +29713,100 @@ muro) e la riga del venditore. Lasciate com'erano: `collaudo_classifica.py`
 non è nell'elenco dei collaudi della CI (passa in gabbia, ci entrerebbe
 con una riga), e la frase della classifica vuota («ci si entra col primo
 affare concluso e il primo feedback ricevuto») non nomina il freno.
+
+
+## Il costo di spedizione standard del negozio (24 set 2026)
+
+Richiesta di Andrea, dall'idea di un venditore: la tariffa di casa si
+scrive **una volta**, in «🏪 Impostazioni di negozio» → «📦 Come
+spedisci», sotto i corrieri (col «sats ⇄» di Vendi e, facoltativi, il
+punto di ritiro e il pezzo in più), e si salva col «Salva» del
+cassetto. Da lì fa due cose. Il form di Vendi la trova **già scritta**
+a ogni articolo nuovo e al «Duplica» (dove prende il posto della
+tariffa copiata), mai in Modifica. E il bottone «🚚 Aggiorna tutti gli
+articoli con questo costo» la porta su tutto il negozio in un colpo,
+con anteprima, conferma e la frase chiesta: «Spedizione aggiornata su
+N articoli; M rimasti com'erano: …». Prima di cominciare ho cercato qui:
+né una tariffa di negozio né una modifica in blocco erano mai state
+scartate. Il precedente c'era, e a favore: la moderazione dell'import
+«si rigiudica quando cambia il testo», e «🔄 Aggiorna i pezzi» cambia un
+numero senza passare dalla Modifica.
+
+**Niente moderazione, ed è la riga da non «uniformare» alla Modifica.**
+La moderazione legge il testo (parole vietate e AI su titolo e
+descrizione, i link sulla descrizione), e qui cambiano solo numeri di
+tariffa: rimandare in revisione cinquanta articoli per un euro di
+spedizione vorrebbe dire svuotare la vetrina di un negozio per niente.
+Gli articoli restano dove sono; l'`UPDATE` tocca le sole colonne delle
+tariffe, la copia `dom` nella mappa delle zone (le due si scrivono
+insieme, sempre) e `modificato`, cioè l'«aggiornato» della scheda.
+
+**Lo stesso controllo dell'annuncio singolo**: i numeri nuovi passano
+da `consegna_da_payload` con la valuta del listino di ogni articolo —
+sats fissi, euro ancorati sul listino in sats, euro sul listino in euro.
+L'unico caso che il form non sa scrivere (standard in sats, listino in
+euro) si traduce al cambio di adesso e l'anteprima lo dice col «≈»;
+senza cambio l'articolo resta fuori. Lo standard è più severo del
+giudice dell'annuncio: un numero storto è un 400 che dice quale
+casella, mai uno zero (sarebbe «spedizione gratis» scritta da noi), e
+nei sats niente punti né virgole.
+
+**Chi resta com'era, e perché**, col primo motivo che vale: importato
+da Nostr o da un negozio collegato (il sync lo riscriverebbe), all'asta,
+solo ritiro, digitale o servizio, senza consegna, che non spedisce in
+casa, con la **spedizione gratis** (una scelta su quell'articolo, che un
+costo di negozio non deve ricoprire di nascosto), in revisione, con un
+ordine in corso (il giudice della Modifica, righe dei set comprese), in
+euro col cambio muto, già a questo costo. L'estero non si tocca, e
+l'anteprima dice quanti lo hanno diverso dalla tariffa nuova: dopo il
+travaso di settembre molti hanno i continenti copiati dalla casa di
+allora. Gli esauriti si contano e basta. Gli ordini aperti tengono il
+prezzo di quando sono nati per due strade: sono fuori, e comunque
+`ordini.spedizione_sats` è fissato alla nascita.
+
+**La corsa.** Il piano nasce fuori dalla transazione (il giudice aspetta
+il cambio, e dentro una scrittura non si aspetta la rete); poi `BEGIN
+IMMEDIATE`, e ogni riga si rigiudica: chi ha comprato nel mezzo lascia
+l'articolo com'era, una riga cambiata sotto i piedi resta sua
+(«cambiato»). L'anteprima non scrive niente, nemmeno lo standard; la
+conferma salva quello che si vede nella casella. E l'evento NIP-99 porta
+il costo di casa, quindi gli aggiornati ripartono sui relay a lotti come
+l'import, un giro per venditore: se il bottone si ripreme, il secondo si
+accoda.
+
+**La precompilazione ricorda quel che ha scritto da sé**: finché la
+casella dice quello, un cambio di valuta del listino o uno standard
+nuovo la riscrivono (niente «5000» riletto come 5000 €); se il
+venditore l'ha toccata, anche svuotandola, resta sua. Se nel form
+restano costi nell'altra valuta (le zone di un Duplica), il toggle non
+gira e lo standard si traduce.
+
+**Strade scartate**: applicare lo standard nell'import CSV, nei negozi
+collegati o da `pubblica()` (hanno la loro tariffa: una sentinella
+vuole che lo nominino solo le sue porte); ricoprire le spedizioni
+gratis; toccare l'estero; rimandare in revisione. **Emendata col
+perché** la sentinella «la mappa delle zone la leggono i DUE giudici»:
+sono quattro, tutti dal lettore unico, e i due nuovi non fanno un conto
+da pagare. **Note e sezioni in `--ink-soft`**: misurato dal vivo,
+`--muted` di giorno stava a 3,81:1, sotto l'AA del testo piccolo.
+
+**Provato.** `prove_spedizione_standard` (156: i giudici veri, le
+sentinelle sulle rotte, la precompilazione e il foglio in node caso per
+caso), suite intera severa e senza config 14.552/0;
+`collaudo_spedizione_standard.py` (61, server e rotte vere: il Salva,
+l'anteprima che non scrive, l'applicazione in sats ed euro, zero
+chiamate alla moderazione e zero righe nel suo registro, ordini
+intatti, la corsa, i lotti verso Nostr), aggiunto alla gabbia della CI e
+verde lì dentro coi tredici di prima. **Tortura 51/51** (28 sul server,
+23 sul client), nessuna inciampata: il primo giro del banco aveva
+chiamate che sollevavano e ritagli a `index`, e sono diventati valori e
+`find` con una rossa nominata prima di torturare. Dal vivo a 375 nei due temi, col tocco
+vero e il relay morto: cassetto, anteprima (4 cambiano, 6 restano),
+applicazione e frase finale, database riletto riga per riga, Vendi già
+scritto, cambio di valuta del listino (5000 → 3,71 € → 5000),
+Duplica, Modifica che non tocca, «Annulla» che non salva.
+
+**Da guardare sul telefono**: il cassetto e il bottone grande,
+un'anteprima lunga che scorre fino ai bottoni, il campo di Vendi già
+scritto (anche col Duplica); e chi pubblica col proprio account Nostr,
+che dopo l'aggiornamento si ritrova una firma in coda per ogni articolo.

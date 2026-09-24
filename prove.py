@@ -20345,12 +20345,23 @@ def prove_sped_gratis():
     # ed e' cio' che rende vero il commento del lettore — chi
     # normalizza sta in un posto solo, e a valle nessuno deve
     # ricordarsene. Un terzo lettore fa diventare rossa questa riga.
-    prova("la mappa delle zone la leggono i DUE giudici e nessun altro",
-          2, _SORGENTE.count("_zone_annuncio(a)")
+    # DAL COSTO STANDARD (set 2026) SONO QUATTRO, ed e' un'emenda col
+    # suo perche': l'aggiornamento in blocco legge la mappa in due punti
+    # — `_sped_std_mappa` la RISCRIVE con la sola casa cambiata,
+    # `_sped_std_estero_diverso` la CONFRONTA per l'anteprima — e
+    # nessuno dei due fa un conto da pagare, che e' il rischio che
+    # questa riga sorveglia. Tutti e quattro passano dal lettore unico,
+    # quindi «chi normalizza sta in un posto solo» resta vero; un QUINTO
+    # fa diventare rossa questa riga, e va guardato allo stesso modo.
+    prova("la mappa delle zone la leggono i DUE giudici del conto, le DUE "
+          "del costo standard e nessun altro",
+          4, _SORGENTE.count("_zone_annuncio(a)")
              - _SORGENTE.count("def _zone_annuncio(a)"))
-    prova("...e sono proprio loro", [True, True],
+    prova("...e sono proprio loro", [True, True, True, True],
           ["_zone_annuncio(a)" in pezzo("_zona_offerta"),
-           "_zone_annuncio(a)" in pezzo("_tariffa_dichiarata")])
+           "_zone_annuncio(a)" in pezzo("_tariffa_dichiarata"),
+           "_zone_annuncio(a)" in pezzo("_sped_std_mappa"),
+           "_zone_annuncio(a)" in pezzo("_sped_std_estero_diverso")])
 
     # IL CLIENT: il giudice unico che alla prima promessa c'era e alla
     # seconda no (buco trovato col cantiere dell'euro). Sono QUATTRO le
@@ -88941,6 +88952,734 @@ def prove_effetti_ridotti():
           "memoria dell'apertura", False, d["muto"])
 
 
+def prove_spedizione_standard():
+    """IL COSTO DI SPEDIZIONE STANDARD DEL NEGOZIO (set 2026).
+
+    Il venditore scrive la sua tariffa UNA volta in «📦 Come spedisci»:
+    il form di Vendi se la ritrova scritta a ogni articolo nuovo (e al
+    Duplica), e un bottone la porta su tutti gli articoli in vetrina —
+    con un'anteprima che dice chi cambia e chi resta com'era, e perche'.
+    Qui si fanno girare i giudici VERI (il costo, i motivi, i numeri
+    nuovi passati da `consegna_da_payload`), le sentinelle sulle rotte
+    (niente moderazione, anteprima che non scrive, il ricontrollo dentro
+    la transazione) e in node la precompilazione e il foglio, caso per
+    caso. Il server vero su un database vero sta nel collaudo
+    `collaudo_spedizione_standard.py`."""
+    print("\n[il costo di spedizione standard del negozio]")
+    import asyncio as _asSS
+    import math as _mSS
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = _SORGENTE
+
+    # ---- 1) i giudici del server, veri ------------------------------
+    class _Rifiuto(Exception):
+        def __init__(self, codice, detail=""):
+            super().__init__(detail)
+            self.status_code = codice
+            self.detail = detail
+
+    amb = {"json": json, "math": _mSS, "re": re, "HTTPException": _Rifiuto,
+           "MODALITA_CONSEGNA": ("spedizione", "ritiro", "entrambe",
+                                 "digitale", "servizio"),
+           "TAGLIE_PACCO": ("busta", "piccolo"), "SERVIZI_ATTIVI": False,
+           "ZONE_SPEDIZIONE": CATALOGHI_ZONE["ZONE_SPEDIZIONE"],
+           "nome_paese": CATALOGHI_ZONE["nome_paese"]}
+
+    async def _cambio():
+        return 100_000.0
+    amb["cambio_btc_eur"] = _cambio
+    # le costanti si eseguono dal sorgente, mai ricopiate (la lezione di
+    # `reale`): tetti, motivi, istantanea e i nomi dei negozi collegati
+    for inizio, fine in (("SPED_STD_TETTO_SATS = ", "\n\n"),
+                         ("SPED_STD_MOTIVI = (", ")\n"),
+                         ("_SPED_STD_ISTANTANEA = (", ")\n"),
+                         ("NOMI_ORIGINE = {", "}\n")):
+        i = src.index(inizio)
+        exec(src[i:src.index(fine, i) + len(fine)], amb)
+    for nome in ("non_spedisce_casa_da_payload", "zone_json",
+                 "origine_annuncio", "nome_origine", "_non_spedisce_casa",
+                 "_zone_annuncio", "spedizione_standard_leggi",
+                 "spedizione_standard_da_payload",
+                 "spedizione_standard_json", "_sped_std_escluso",
+                 "_sped_std_pari", "_sped_std_mappa",
+                 "_sped_std_estero_diverso", "_sped_std_tre"):
+        exec(pezzo(nome), amb)
+    exec("async " + pezzo("consegna_da_payload"), amb)
+    exec("async " + pezzo("_sped_std_nuovi"), amb)
+
+    def _salvo(f):
+        """Una chiamata che non esplode mai: un'eccezione diventa un
+        VALORE col suo nome, e la prova che lo guarda diventa rossa col
+        proprio — invece di portarsi via la sezione intera, che e' il
+        modo in cui una mutazione sembra presa senza aver dimostrato
+        niente (la lezione della tortura: «inciampata» non e' «uccisa»)."""
+        def g(*a, **k):
+            try:
+                return f(*a, **k)
+            except Exception as e:
+                return ("ESPLOSO", type(e).__name__, str(e)[:80])
+        return g
+
+    leggi = _salvo(amb["spedizione_standard_leggi"])
+    _dal_crudo = amb["spedizione_standard_da_payload"]
+    dal = _salvo(_dal_crudo)
+
+    prova("la colonna vuota: nessuno standard", None, leggi(""))
+    prova("...e None pure", None, leggi(None))
+    prova("un JSON storto vale nessuno standard, mai un 500", None,
+          leggi("{rotto"))
+    prova("una valuta sconosciuta vale nessuno standard", None,
+          leggi('{"valuta": "usd", "casa": 5}'))
+    prova("un costo storto NON diventa 0 (sarebbe gratis scritto da noi)",
+          None, leggi('{"valuta": "sats", "casa": "abc"}'))
+    prova("...ne' un negativo", None, leggi('{"valuta": "sats", "casa": -3}'))
+    prova("...ne' un infinito", None,
+          leggi('{"valuta": "eur", "casa": Infinity}'))
+    prova("...ne' un costo oltre il tetto", None,
+          leggi('{"valuta": "sats", "casa": 3000000000000000}'))
+    prova("sats interi, punto e supplemento facoltativi",
+          {"valuta": "sats", "casa": 5000, "extra": 500},
+          leggi('{"valuta": "sats", "casa": 5000.0, "extra": 500}'))
+    prova("euro a due decimali, lo zero del punto resta (gratis al punto)",
+          {"valuta": "eur", "casa": 4.5, "punto": 0.0},
+          leggi('{"valuta": "eur", "casa": 4.499999, "punto": 0}'))
+    prova("un facoltativo storto si perde da solo, la casa resta",
+          {"valuta": "sats", "casa": 5000},
+          leggi('{"valuta": "sats", "casa": 5000, "punto": "x"}'))
+
+    def _rifiuta(corpo, dentro=""):
+        try:
+            _dal_crudo(corpo)
+        except _Rifiuto as e:
+            return e.status_code == 400 and dentro.lower() in e.detail.lower()
+        except Exception as e:
+            return ("ESPLOSO", type(e).__name__, str(e)[:80])
+        return False
+
+    for vuoto in (None, "", {}):
+        prova(f"il corpo {vuoto!r}: lo spegnimento (None)", None, dal(vuoto))
+    prova("la casella di casa vuota spegne", None,
+          dal({"valuta": "sats", "casa": "", "punto": "", "extra": ""}))
+    prova("sats scritti come testo", {"valuta": "sats", "casa": 5000},
+          dal({"valuta": "sats", "casa": "5000"}))
+    prova("lo zero e' un costo vero: spedizione gratis",
+          {"valuta": "sats", "casa": 0}, dal({"valuta": "SATS", "casa": "0"}))
+    prova("euro con la virgola", {"valuta": "eur", "casa": 4.5, "extra": 1.0},
+          dal({"valuta": "eur", "casa": "4,50", "extra": "1"}))
+    prova("i tre costi insieme",
+          {"valuta": "eur", "casa": 4.5, "punto": 3.9, "extra": 0.5},
+          dal({"valuta": "eur", "casa": 4.5, "punto": "3,90", "extra": "0.5"}))
+    prova("«5.000» in sats si RIFIUTA (sarebbero cinque sats)", True,
+          _rifiuta({"valuta": "sats", "casa": "5.000"}, "senza punti"))
+    prova("...e «5000,5» pure", True,
+          _rifiuta({"valuta": "sats", "casa": "5000,5"}, "intero"))
+    prova("...e un float non intero", True,
+          _rifiuta({"valuta": "sats", "casa": 5000.5}, "intero"))
+    prova("un negativo si rifiuta", True,
+          _rifiuta({"valuta": "sats", "casa": -1}, "intero"))
+    prova("...anche in euro", True,
+          _rifiuta({"valuta": "eur", "casa": "-2"}, "da 0 in su"))
+    prova("un testo in euro si rifiuta", True,
+          _rifiuta({"valuta": "eur", "casa": "tre"}, "scrivi un numero"))
+    prova("un booleano non e' un costo", True,
+          _rifiuta({"valuta": "sats", "casa": True}))
+    prova("infinito si rifiuta", True,
+          _rifiuta({"valuta": "eur", "casa": "inf"}, "da 0 in su"))
+    prova("oltre il tetto si rifiuta, coi sats", True,
+          _rifiuta({"valuta": "sats", "casa": 3_000_000_000_000_000},
+                   "sats che esisteranno"))
+    prova("...e con gli euro", True,
+          _rifiuta({"valuta": "eur", "casa": "2000000000"}, "troppo alto"))
+    prova("una valuta sconosciuta si rifiuta", True,
+          _rifiuta({"valuta": "usd", "casa": "5"}, "sats o in euro"))
+    prova("un corpo che non e' un oggetto si rifiuta", True,
+          _rifiuta(["5000"], "formato"))
+    prova("punto senza casa: si rifiuta e si dice perche'", True,
+          _rifiuta({"valuta": "sats", "casa": "", "punto": "3000"},
+                   "scrivi prima il costo"))
+    prova("il messaggio dice QUALE casella", True,
+          _rifiuta({"valuta": "sats", "casa": "5000", "extra": "x"},
+                   "ogni pezzo in più"))
+    js = _salvo(amb["spedizione_standard_json"])
+    prova("la colonna: '' quando non c'e'", "", js(None))
+    prova("...e il JSON a chiavi ordinate quando c'e'",
+          '{"casa": 5000, "extra": 1, "valuta": "sats"}',
+          js({"valuta": "sats", "extra": 1, "casa": 5000}))
+    prova("...che la lettura rilegge identico",
+          {"valuta": "sats", "casa": 5000, "extra": 1},
+          leggi(js({"valuta": "sats", "extra": 1, "casa": 5000})))
+
+    # ---- 2) i motivi: chi resta com'era, e perche' --------------------
+    escl = _salvo(amb["_sped_std_escluso"])
+
+    def riga(**k):
+        base = {"id": 1, "titolo": "Cosa", "stato": "attivo",
+                "valuta": "sats", "consegna": "spedizione",
+                "contatto_nostr": "", "fonte": "", "connettore_id": 0,
+                "asta_base_sats": 0, "non_spedisce_casa": 0,
+                "spedizione_sats": 3000, "spedizione_eur": 0.0,
+                "spedizione_punto_sats": 0, "spedizione_punto_eur": 0.0,
+                "spedizione_punto_dichiarata": 0,
+                "spedizione_extra_sats": 0, "spedizione_extra_eur": 0.0,
+                "spedizione_zone": "", "paese_domestico": ""}
+        base.update(k)
+        return base
+
+    casi = {
+        "idoneo": (riga(), 0, 100_000.0, ""),
+        "nostr": (riga(contatto_nostr="npub1x"), 0, 1.0, "nostr"),
+        "negozio": (riga(fonte="shopify", connettore_id=7), 0, 1.0,
+                    "negozio"),
+        "asta": (riga(asta_base_sats=1000, spedizione_sats=0), 0, 1.0,
+                 "asta"),
+        "ritiro": (riga(consegna="ritiro"), 0, 1.0, "ritiro"),
+        "digitale": (riga(consegna="digitale"), 0, 1.0, "digitale"),
+        "servizio": (riga(consegna="servizio"), 0, 1.0, "servizio"),
+        "senza": (riga(consegna=""), 0, 1.0, "senza_consegna"),
+        "no_casa": (riga(non_spedisce_casa=1), 0, 1.0, "no_casa"),
+        "gratis": (riga(spedizione_sats=0, spedizione_eur=0.0), 0, 1.0,
+                   "gratis"),
+        "revisione": (riga(stato="revisione"), 0, 1.0, "revisione"),
+        "ordine": (riga(), 2, 1.0, "ordine"),
+        "cambio": (riga(valuta="eur", spedizione_eur=3.5), 0, 0.0,
+                   "cambio"),
+        "cambio_sats": (riga(), 0, 0.0, ""),
+        "entrambe": (riga(consegna="entrambe"), 0, 1.0, ""),
+        "ancorato": (riga(spedizione_sats=0, spedizione_eur=4.5), 0, 1.0,
+                     ""),
+    }
+    for nome, (a, vivi, cambio, atteso) in casi.items():
+        prova(f"motivo «{nome}»", atteso, escl(a, vivi, cambio))
+    # L'ORDINE conta: il primo che vale e' quello che si dice
+    prova("gratis con un ordine aperto: si dice GRATIS (restera' com'e')",
+          "gratis", escl(riga(spedizione_sats=0), 3, 1.0))
+    prova("...e un importato in revisione si dice importato", "nostr",
+          escl(riga(contatto_nostr="npub1x", stato="revisione"), 0, 1.0))
+    prova("il ritiro del listino in euro senza cambio: e' «ritiro»",
+          "ritiro", escl(riga(consegna="ritiro", valuta="eur"), 0, 0.0))
+
+    # ---- 3) i numeri nuovi, passati dal giudice di sempre -------------
+    nuovi = _salvo(lambda a, s: _asSS.new_event_loop().run_until_complete(
+        amb["_sped_std_nuovi"](a, s, 100_000.0)))
+
+    def colonne(r):
+        """Le colonne nuove da un risultato di `nuovi` — o il risultato
+        stesso, se e' esploso: cosi' una rossa porta il suo perche'."""
+        return r[0] if (isinstance(r, tuple) and len(r) == 2
+                        and isinstance(r[0], dict)) else r
+
+    prova("listino sats, standard sats: fisso", ({"spedizione_sats": 5000,
+          "spedizione_eur": 0.0}, False),
+          nuovi(riga(), {"valuta": "sats", "casa": 5000}))
+    prova("listino sats, standard euro: ANCORATO (sats a zero)",
+          ({"spedizione_sats": 0, "spedizione_eur": 4.5}, False),
+          nuovi(riga(), {"valuta": "eur", "casa": 4.5}))
+    prova("listino euro, standard euro: l'equivalente al cambio",
+          ({"spedizione_sats": 4500, "spedizione_eur": 4.5}, False),
+          nuovi(riga(valuta="eur"), {"valuta": "eur", "casa": 4.5}))
+    prova("listino euro, standard sats: TRADOTTO e detto (≈)",
+          ({"spedizione_sats": 5000, "spedizione_eur": 5.0}, True),
+          nuovi(riga(valuta="eur"), {"valuta": "sats", "casa": 5000}))
+    n = colonne(nuovi(riga(valuta="eur"), {"valuta": "sats", "casa": 3}))
+    prova("...e tre sats non diventano gratis per un arrotondamento",
+          0.01, n.get("spedizione_eur") if isinstance(n, dict) else n)
+    prova("punto e supplemento dichiarati: il punto si DICHIARA",
+          {"spedizione_sats": 5000, "spedizione_eur": 0.0,
+           "spedizione_punto_sats": 3500, "spedizione_punto_eur": 0.0,
+           "spedizione_punto_dichiarata": 1, "spedizione_extra_sats": 500,
+           "spedizione_extra_eur": 0.0},
+          colonne(nuovi(riga(), {"valuta": "sats", "casa": 5000,
+                                 "punto": 3500, "extra": 500})))
+    n = colonne(nuovi(riga(), {"valuta": "sats", "casa": 5000, "punto": 0}))
+    prova("il punto a zero e' «gratis al punto», dichiarato",
+          (0, 1), (n.get("spedizione_punto_sats"),
+                   n.get("spedizione_punto_dichiarata"))
+          if isinstance(n, dict) else n)
+    n = colonne(nuovi(riga(), {"valuta": "sats", "casa": 5000}))
+    prova("senza punto ne' supplemento, quelli dell'articolo NON si toccano",
+          False, any(k.startswith(("spedizione_punto", "spedizione_extra"))
+                     for k in n) if isinstance(n, dict) else n)
+    n = colonne(nuovi(riga(), {"valuta": "eur", "casa": 1, "punto": 2,
+                               "extra": 3}))
+    prova("i numeri nuovi sono SOLO tariffe (mai testo, stato, prezzo)",
+          True, all(k.startswith("spedizione_") for k in n)
+          if isinstance(n, dict) else n)
+
+    pari = _salvo(amb["_sped_std_pari"])
+    prova("gia' cosi': niente da fare", True,
+          pari(riga(spedizione_sats=5000), {"spedizione_sats": 5000,
+                                            "spedizione_eur": 0.0}))
+    prova("fisso contro ancorato NON e' pari", False,
+          pari(riga(spedizione_sats=0, spedizione_eur=5.0),
+               {"spedizione_sats": 5000, "spedizione_eur": 0.0}))
+    prova("sul listino in euro l'equivalente in sats NON conta", True,
+          pari(riga(valuta="eur", spedizione_sats=4400, spedizione_eur=4.5),
+               {"spedizione_sats": 4500, "spedizione_eur": 4.5}))
+    prova("...l'euro si'", False,
+          pari(riga(valuta="eur", spedizione_sats=4500, spedizione_eur=4.0),
+               {"spedizione_sats": 4500, "spedizione_eur": 4.5}))
+
+    mappa = _salvo(amb["_sped_std_mappa"])
+    _jl = lambda x: json.loads(x) if isinstance(x, str) else x
+    Z = json.dumps({"dom": {"sats": 3000, "eur": 0.0},
+                    "eu": {"sats": 3000, "eur": 0.0},
+                    "asia": {"sats": 9000, "eur": 0.0}})
+    prova("la copia di casa si riscrive, l'estero resta com'era",
+          {"asia": {"sats": 9000, "eur": 0.0},
+           "dom": {"sats": 5000, "eur": 0.0},
+           "eu": {"sats": 3000, "eur": 0.0}},
+          _jl(mappa(riga(spedizione_zone=Z), 5000, 0.0)))
+    prova("...nella forma di zone_json (chiavi ordinate)",
+          amb["zone_json"]({"asia": (9000, 0.0), "dom": (5000, 0.0),
+                            "eu": (3000, 0.0)}),
+          mappa(riga(spedizione_zone=Z), 5000, 0.0))
+    prova("una mappa vuota prende la sola casa",
+          {"dom": {"sats": 5000, "eur": 0.0}},
+          _jl(mappa(riga(), 5000, 0.0)))
+    diverso = _salvo(amb["_sped_std_estero_diverso"])
+    prova("estero copiato dalla casa di ieri: ora e' DIVERSO", True,
+          diverso(riga(spedizione_zone=Z), 5000, 0.0))
+    prova("estero uguale alla casa nuova: niente da dire", False,
+          diverso(riga(spedizione_zone=json.dumps(
+              {"dom": {"sats": 5000, "eur": 0}, "eu": {"sats": 5000,
+                                                   "eur": 0}})), 5000, 0.0))
+    prova("senza estero: niente da dire", False, diverso(riga(), 5000, 0.0))
+    # la copia di CASA non e' estero: diversa dalla tariffa nuova lo e'
+    # sempre (e' quella vecchia), e contarla accenderebbe l'avviso su
+    # ogni articolo che all'estero non spedisce affatto
+    prova("la sola casa di ieri nella mappa: niente estero da dire", False,
+          diverso(riga(spedizione_zone=json.dumps(
+              {"dom": {"sats": 3000, "eur": 0}})), 5000, 0.0))
+
+    # ---- 4) le rotte: forma e divieti -------------------------------
+    applica = codice(pezzo("sped_std_applica").split('"""')[-1])
+    anteprima = codice(pezzo("sped_std_anteprima").split('"""')[-1])
+    for spia in ("controlla_vietato", "moderazione_ai", "registra_moderazione",
+                 "avvisa_revisione", "notifica_admin"):
+        prova(f"l'aggiornamento in blocco NON passa da {spia}", False,
+              spia in applica)
+    prova("...e non scrive ne' testo ne' stato", False,
+          any(x in applica for x in ("titolo=", "descrizione=", "stato=?",
+                                     "prezzo_sats=")))
+    prova("...ma le sole tariffe, la copia di casa e la data", True,
+          '", spedizione_zone=?, modificato=? WHERE id=?"' in applica
+          and 'f"{k}=?" for k in nuovi' in applica)
+    _bi = applica.find('con.execute("BEGIN IMMEDIATE")')
+    prova("tiene fuori gli altri scrittori (BEGIN IMMEDIATE)", True, _bi >= 0)
+    _dentro = applica[_bi:] if _bi >= 0 else ""
+    prova("...e DENTRO la transazione rigiudica ogni riga", True,
+          all(x in _dentro for x in ("_ordini_vivi_annuncio(",
+                                     "_sped_std_escluso(",
+                                     "_SPED_STD_ISTANTANEA")))
+    prova("...col giudice dell'affare in corso della Modifica", True,
+          '("released", "refunded", "annullato")' in _dentro
+          and '("released", "refunded", "annullato")' in codice(
+              pezzo("modifica_annuncio")))
+    prova("lo standard si salva solo se arriva dal corpo, nella stessa "
+          "transazione", True, "if dal_corpo:" in _dentro)
+    prova("l'anteprima NON scrive niente", False,
+          any(x in anteprima for x in ("UPDATE", "INSERT", "DELETE",
+                                       "commit(")))
+    giro = codice(pezzo("_sped_std_giro").split('"""')[-1])
+    prova("il giro guarda gli articoli in vendita e in revisione", True,
+          "stato IN \"\n            \"('attivo','revisione')" in giro
+          or "('attivo','revisione')" in giro)
+    prova("...e ne conta gli esauriti senza toccarli", True,
+          "stato='venduto'" in giro)
+    su_nostr = codice(pezzo("_sped_std_su_nostr").split('"""')[-1])
+    prova("i relay li si riavvisa a LOTTI, col respiro dell'import", True,
+          "LOTTO_NOSTR" in su_nostr and "PAUSA_NOSTR" in su_nostr)
+    prova("...e solo per aggiornare un evento che c'e' gia'", True,
+          "solo_aggiornamento=True" in su_nostr)
+    prova("...e un giro per venditore (il secondo si accoda)", True,
+          "coda.update(ids)" in su_nostr)
+    prova("il task in sottofondo resta tenuto per mano", True,
+          "_TASK_SPED_STD.add(t)" in applica
+          and "t.add_done_callback(_TASK_SPED_STD.discard)" in applica)
+    salva = codice(pezzo("scegli_spedizioniere").split('"""')[-1])
+    prova("il Salva del cassetto porta lo standard", True,
+          'tocca_std = "spedizione_standard" in d' in salva)
+    _g, _w = (salva.find("spedizione_standard_da_payload("),
+              salva.find("con = db()"))
+    prova("...e lo giudica PRIMA di scrivere qualunque cosa", True,
+          0 <= _g < _w)
+    prova("...e un corpo senza reti le lascia com'erano", True,
+          'tocca_reti = "spedizionieri" in d or "spedizioniere" in d'
+          in salva and "if tocca_reti:" in salva)
+    prova("/api/me consegna lo standard GIA' letto, mai la stringa", True,
+          'profilo["spedizione_standard"] = spedizione_standard_leggi('
+          in pezzo("mio_profilo"))
+    _mig = src[src.index("def init_db("):]
+    _mig = _mig[:_mig.index("\ndef ", 10)]
+    prova("la colonna nasce vuota fra quelle di utenti", True,
+          "\"spedizione_standard TEXT DEFAULT ''\"" in _mig)
+
+    # SOLO QUESTE PORTE conoscono lo standard: in particolare nessun
+    # import, nessun negozio collegato e nessuna pubblicazione lo
+    # applica da se' — «hanno la loro tariffa»
+    ammessi = {"init_db", "spedizione_standard_leggi",
+               "spedizione_standard_da_payload", "spedizione_standard_json",
+               "_sped_std_da_usare", "scegli_spedizioniere", "mio_profilo",
+               "sped_std_anteprima", "sped_std_applica"}
+    # la funzione che CONTIENE ogni occorrenza: l'ultima `def` di primo
+    # livello che comincia prima di lei (le annidate sono rientrate e
+    # non contano), cercata con la bisezione sull'elenco delle teste
+    import bisect as _biS
+    _teste = [(m.start(), m.group(1)) for m in
+              re.finditer(r"^(?:async )?def (\w+)\(", src, re.M)]
+    _pos = [p for p, _n in _teste]
+    fuori_posto = set()
+    for m in re.finditer(r"spedizione_standard", src):
+        k = _biS.bisect_right(_pos, m.start()) - 1
+        chi = _teste[k][1] if k >= 0 else "(prima di ogni funzione)"
+        if chi not in ammessi:
+            fuori_posto.add(chi)
+    prova("lo standard lo nominano SOLO le sue porte (mai un import, mai "
+          "la pubblicazione)", set(), fuori_posto)
+
+    # i CODICI dei motivi sono del server, le PAROLE del client: in pari
+    _i = mini.find("const MOTIVI_SPED_STD = {")
+    _mc = mini[_i:mini.find("\n};\n", _i)] if _i >= 0 else ""
+    prova("ogni motivo del server ha le sue parole nel client",
+          set(amb["SPED_STD_MOTIVI"]),
+          set(re.findall(r"^  (\w+): \[", _mc, re.M)))
+
+    # ---- 5) il client: le porte ---------------------------------------
+    _cas = pezzo_js(mini, "function renderSpedizioniere(){", "\n}\n")
+    _b, _s = _cas.find("${bloccoSpedStd()}"), _cas.find("salvaReti()")
+    prova("il cassetto disegna il blocco del costo standard, sopra il Salva",
+          True, 0 <= _b < _s)
+    _blocco = pezzo_js(mini, "function bloccoSpedStd(){", "\n}\n")
+    prova("...col campo, il toggle e i due facoltativi", True,
+          all(x in _blocco for x in ("campo('spedStdCasa'", "toggleSpedStdCur()",
+                                     "campo('spedStdPunto'",
+                                     "campo('spedStdExtra'")))
+    prova("...e il bottone grande sotto il campo", True,
+          "apriSpedStdTutti(this)" in _blocco
+          and "Aggiorna tutti gli articoli con questo costo" in _blocco)
+    _sr = pezzo_js(mini, "async function salvaReti(){", "\n}\n")
+    prova("il Salva del cassetto manda lo standard", True,
+          "spedizione_standard: std" in _sr)
+    prova("...e dopo il salvataggio il form di Vendi si riallinea", True,
+          "precompilaSpedStd(false)" in _sr)
+    prova("l'anteprima chiede alla sua rotta", True,
+          "/me/spedizione-standard/anteprima" in pezzo_js(
+              mini, "async function apriSpedStdTutti(", "\n}\n"))
+    _ap = pezzo_js(mini, "async function applicaSpedStd(", "\n}\n")
+    prova("...e la conferma alla sua", True,
+          "/me/spedizione-standard/applica" in _ap)
+    prova("...e dopo riallinea il cassetto e il form", True,
+          "precompilaSpedStd(false)" in _ap and "renderSpedizioniere()" in _ap)
+    prova("il foglio esiste", True, 'id="spedStdSheet"' in mini)
+    prova("...e si registra in closeSheet", True,
+          "el('spedStdSheet').classList.remove('open')"
+          in pezzo_js(mini, "function closeSheet(){", "\n}\n"))
+    prova("/api/me porta lo standard nel client", True,
+          "mySpedStd = me.spedizione_standard || null;" in mini)
+    for firma, forza in (("function annullaModifica(){", "true"),
+                         ("function duplicaAnnuncio(", "true"),
+                         ("function impostaSellValuta(", "false")):
+        prova(f"{firma.split('(')[0]} precompila ({forza})", True,
+              f"precompilaSpedStd({forza})" in pezzo_js(mini, firma, "\n}\n"))
+    prova("publish precompila il prossimo articolo", True,
+          "precompilaSpedStd(true)" in pezzo_js(
+              mini, "async function publish(){", "\n}\n"))
+    prova("la Modifica NON precompila mai", False,
+          "precompilaSpedStd" in pezzo_js(mini, "function editListing(",
+                                          "\n}\n"))
+
+    import json as _jsS, shutil as _shS, subprocess as _spS
+    import tempfile as _tfS
+    if not _shS.which("node"):
+        salta("il costo standard in node", "node non installato")
+        return
+
+    def _node(prog, nome):
+        with _tfS.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+            f.write(prog)
+            p = f.name
+        try:
+            r = _spS.run(["node", p], capture_output=True, text=True,
+                         encoding="utf-8", timeout=60)
+        finally:
+            os.unlink(p)
+        if r.returncode != 0:
+            prova(nome + ": il banco gira", "", r.stderr[-300:])
+            return None
+        return _jsS.loads(r.stdout)
+
+    # ---- 6) la precompilazione, caso per caso --------------------------
+    _pre = mini[mini.index("let spedStdPosato = null;"):]
+    _pre = _pre[:_pre.index("\n}\n", _pre.index("function precompilaSpedStd(")) + 3]
+    banco = r"""
+let DEMO = false, editandoId = null, mySpedStd = null;
+let sellValuta = "sats", spedValuta = "sats", cambioVivo = true, eurPerSat = 0.001;
+const ZONE_INTL = ["eu", "asia"];
+let NODI = {};
+const el = id => NODI[id] || null;
+let RINFRESCHI = 0;
+const aggiornaSpedCampo = () => { RINFRESCHI++; };
+""" + _pre + r"""
+const CASI = {};
+function caso(nome, prep, forza){
+  try {
+    DEMO = false; editandoId = null; mySpedStd = null;
+    sellValuta = "sats"; spedValuta = "sats"; cambioVivo = true; eurPerSat = 0.001;
+    spedStdPosato = null; RINFRESCHI = 0;
+    NODI = {sellSped: {value: ""}, sellSpedPunto: {value: ""},
+            sellSpedExtra: {value: ""}, sellZona_eu: {value: ""},
+            sellZona_asia: {value: ""}};
+    prep();
+    precompilaSpedStd(forza);
+    CASI[nome] = {sped: NODI.sellSped.value, punto: NODI.sellSpedPunto.value,
+                  extra: NODI.sellSpedExtra.value, eu: NODI.sellZona_eu.value,
+                  valuta: spedValuta, posato: spedStdPosato,
+                  rinfreschi: RINFRESCHI};
+  } catch(e) { CASI[nome] = {esploso: String(e)}; }
+}
+const S = (v, casa, altro) => Object.assign({valuta: v, casa: casa}, altro || {});
+caso("nuovo_sats", () => { mySpedStd = S("sats", 5000); }, true);
+caso("nuovo_std_eur", () => { mySpedStd = S("eur", 4.5, {punto: 3.9, extra: 1}); }, true);
+caso("listino_eur_std_sats", () => { mySpedStd = S("sats", 5000);
+  sellValuta = "eur"; spedValuta = "eur"; }, true);
+caso("senza_cambio_forza", () => { mySpedStd = S("sats", 5000);
+  sellValuta = "eur"; spedValuta = "eur"; cambioVivo = false; }, true);
+caso("senza_cambio_nostro", () => { mySpedStd = S("sats", 5000);
+  sellValuta = "eur"; spedValuta = "eur"; cambioVivo = false;
+  spedStdPosato = {sped: "5000"}; NODI.sellSped.value = "5000"; }, false);
+caso("toccato", () => { mySpedStd = S("sats", 7000);
+  spedStdPosato = {sped: "5000"}; NODI.sellSped.value = "6000"; }, false);
+caso("intatto", () => { mySpedStd = S("sats", 7000);
+  spedStdPosato = {sped: "5000"}; NODI.sellSped.value = "5000"; }, false);
+caso("modifica", () => { mySpedStd = S("sats", 5000); editandoId = 12; }, true);
+caso("demo", () => { mySpedStd = S("sats", 5000); DEMO = true; }, true);
+caso("tolto", () => { spedStdPosato = {sped: "5000", punto: "3000"};
+  NODI.sellSped.value = "5000"; NODI.sellSpedPunto.value = "3000";
+  NODI.sellSpedExtra.value = "44"; }, false);
+caso("tolto_toccato", () => { spedStdPosato = {sped: "5000"};
+  NODI.sellSped.value = "4000"; }, false);
+caso("tolto_forza", () => { spedStdPosato = {sped: "5000"}; }, true);
+caso("duplica_zone_sats", () => { mySpedStd = S("eur", 4.5);
+  NODI.sellZona_eu.value = "20000"; NODI.sellSped.value = "3000"; }, true);
+caso("duplica_zone_vuote", () => { mySpedStd = S("eur", 4.5);
+  NODI.sellSped.value = "3000"; }, true);
+caso("extra_zero", () => { mySpedStd = S("sats", 5000, {extra: 0}); }, true);
+caso("punto_zero", () => { mySpedStd = S("sats", 5000, {punto: 0}); }, true);
+caso("mini_eur", () => { mySpedStd = S("sats", 5);
+  sellValuta = "eur"; spedValuta = "eur"; eurPerSat = 0.0005; }, true);
+caso("primo_arrivo", () => { mySpedStd = S("sats", 5000); }, false);
+caso("primo_arrivo_scritto", () => { mySpedStd = S("sats", 5000);
+  NODI.sellSped.value = "3000"; }, false);
+caso("punto_toccato", () => { mySpedStd = S("sats", 7000, {punto: 3500});
+  spedStdPosato = {sped: "5000", punto: "3000"};
+  NODI.sellSped.value = "5000"; NODI.sellSpedPunto.value = "2500"; }, false);
+caso("punto_nostro", () => { mySpedStd = S("sats", 7000, {punto: 3500});
+  spedStdPosato = {sped: "5000", punto: "3000"};
+  NODI.sellSped.value = "5000"; NODI.sellSpedPunto.value = "3000"; }, false);
+caso("punto_non_piu", () => { mySpedStd = S("sats", 7000);
+  spedStdPosato = {sped: "5000", punto: "3000"};
+  NODI.sellSped.value = "5000"; NODI.sellSpedPunto.value = "3000"; }, false);
+console.log(JSON.stringify(CASI));
+"""
+    o = _node(banco, "la precompilazione")
+    if o is not None:
+        def c(nome, *campi):
+            v = o.get(nome) or {"esploso": "manca"}
+            if "esploso" in v:
+                return ("ESPLOSO", v["esploso"])
+            return tuple(v.get(k) for k in campi)
+        prova("articolo nuovo: il costo standard nel campo di casa",
+              ("5000", "", "", "sats", {"sped": "5000"}),
+              c("nuovo_sats", "sped", "punto", "extra", "valuta", "posato"))
+        prova("standard in euro su listino sats: ANCORATO, e i tre costi",
+              ("4.5", "3.9", "1", "eur"),
+              c("nuovo_std_eur", "sped", "punto", "extra", "valuta"))
+        prova("listino in euro, standard in sats: tradotto al cambio vero",
+              ("5", "eur"), c("listino_eur_std_sats", "sped", "valuta"))
+        prova("...ma SENZA cambio non si inventa niente", ("", None),
+              c("senza_cambio_forza", "sped", "posato"))
+        prova("...e la casella nostra si svuota (mai 5000 letti come €)",
+              ("", {"sped": ""}), c("senza_cambio_nostro", "sped", "posato"))
+        prova("il venditore l'ha toccata: resta sua", ("6000",),
+              c("toccato", "sped"))
+        prova("intatta: lo standard nuovo la riscrive", ("7000",),
+              c("intatto", "sped"))
+        prova("in Modifica non si tocca niente", ("", 0),
+              c("modifica", "sped", "rinfreschi"))
+        prova("in demo nemmeno", ("",), c("demo", "sped"))
+        prova("standard tolto: se ne va il nostro, resta il suo",
+              ("", "", "44", None),
+              c("tolto", "sped", "punto", "extra", "posato"))
+        prova("...e una casella toccata resta com'e'", ("4000",),
+              c("tolto_toccato", "sped"))
+        prova("...e a form appena nato si dimentica cosa si era scritto",
+              (None,), c("tolto_forza", "posato"))
+        prova("Duplica con l'estero in sats: il toggle NON gira, si traduce",
+              ("4500", "sats", "20000"),
+              c("duplica_zone_sats", "sped", "valuta", "eu"))
+        prova("Duplica senza estero: lo standard in euro, ancorato",
+              ("4.5", "eur"), c("duplica_zone_vuote", "sped", "valuta"))
+        prova("il supplemento a zero si scrive non scrivendo niente", ("",),
+              c("extra_zero", "extra"))
+        prova("il punto a zero si scrive: e' «gratis al punto»", ("0",),
+              c("punto_zero", "punto"))
+        prova("tre sats in euro non diventano gratis", ("0.01",),
+              c("mini_eur", "sped"))
+        prova("all'arrivo di /api/me: casella vuota, si riempie", ("5000",),
+              c("primo_arrivo", "sped"))
+        prova("...ma una casella gia' scritta non si tocca", ("3000",),
+              c("primo_arrivo_scritto", "sped"))
+        prova("un punto scritto dal venditore resta suo, la casa si riscrive",
+              ("7000", "2500"), c("punto_toccato", "sped", "punto"))
+        prova("...un punto nostro si riscrive", ("7000", "3500"),
+              c("punto_nostro", "sped", "punto"))
+        prova("...e se lo standard non lo dice piu', il nostro se ne va",
+              ("7000", ""), c("punto_non_piu", "sped", "punto"))
+
+    # ---- 7) le parole del foglio e la frase finale --------------------
+    _f = mini[mini.index("function cifraSpedStd("):]
+    _f = _f[:_f.index("\n}\n", _f.index("function righeCambioSpedStd(")) + 3]
+    _rf = mini[mini.index("let spedStdAnteprima = null;"):]
+    _rf = _rf[:_rf.index("\n}\n", _rf.index("function renderSpedStdFoglio(")) + 3]
+    _fmt = mini[mini.index("const fmt = n =>"):]
+    _fmt = _fmt[:_fmt.index("\n")]
+    _fe = mini[mini.index("const fmtEur = e =>"):]
+    _fe = _fe[:_fe.index(";\n") + 1]
+    _es = mini[mini.index("const esc = s =>"):]
+    _es = _es[:_es.index(";\n") + 1]
+    banco = _fmt + "\n" + _fe + "\n" + _es + "\n" + r"""
+let NODI = {};
+const el = id => NODI[id] || null;
+""" + _f + "\n" + _rf + r"""
+const F = (motivo, titolo, origine) => ({motivo: motivo, titolo: titolo, origine: origine || ""});
+const out = {};
+const prova = (k, f) => { try { out[k] = f(); } catch(e) { out[k] = "ESPLOSO: " + e; } };
+prova("frase", () => fraseEsitoSpedStd({aggiornati: 12, fuori: [
+  F("gratis", "A"), F("ordine", "B"), F("negozio", "C", "Shopify"),
+  F("revisione", "D"), F("ordine", "E"), F("gratis", "G"), F("gratis", "H")]}));
+prova("frase_uno", () => fraseEsitoSpedStd({aggiornati: 1, fuori: []}));
+prova("frase_zero", () => fraseEsitoSpedStd({aggiornati: 0, fuori: [F("digitale", "X")]}));
+prova("frase_digitali", () => fraseEsitoSpedStd({aggiornati: 2, fuori: [F("digitale", "X"), F("digitale", "Y")]}));
+prova("gruppi", () => gruppiFuoriSpedStd([F("uguale", "U"), F("negozio", "W", "WooCommerce"),
+  F("sconosciuto", "Q"), F("negozio", "S", "Shopify"), F("ordine", "O")])
+  .map(g => g.n + " " + g.etichetta + " [" + g.titoli.join("|") + "]"));
+prova("cifre", () => [cifraSpedStd(0, 0, "sats"), cifraSpedStd(0, 4.5, "sats"),
+  cifraSpedStd(50000, 0, "sats"), cifraSpedStd(4500, 4.5, "eur"),
+  cifraStdSalvato({valuta: "eur", casa: 0}), cifraStdSalvato({valuta: "sats", casa: 50000})]);
+prova("righe_sats", () => righeCambioSpedStd({valuta: "sats", convertito: false,
+  prima: {casa: [30000, 0], punto: [0, 0, 0], extra: [0, 0]},
+  dopo: {casa: [50000, 0], punto: [35000, 0, 1], extra: [500, 0]}}));
+prova("righe_eur", () => righeCambioSpedStd({valuta: "eur", convertito: true,
+  prima: {casa: [3500, 3.5], punto: [0, 0, 0], extra: [0, 0]},
+  dopo: {casa: [5000, 5]}}));
+prova("righe_stessa_cifra", () => righeCambioSpedStd({valuta: "eur", convertito: false,
+  prima: {casa: [4400, 4.5], punto: [0, 0, 0], extra: [0, 0]},
+  dopo: {casa: [4500, 4.5], extra: [1000, 1]}}));
+const foglio = (a, errore) => {
+  NODI = {spedStdCorpo: {innerHTML: ""}, spedStdOk: {style: {}, textContent: ""},
+          spedStdNo: {textContent: ""}, spedStdTit: {textContent: ""}};
+  spedStdAnteprima = a;
+  renderSpedStdFoglio(errore);
+  return {corpo: NODI.spedStdCorpo.innerHTML, ok: NODI.spedStdOk.style.display,
+          okTesto: NODI.spedStdOk.textContent, no: NODI.spedStdNo.textContent,
+          tit: NODI.spedStdTit.textContent};
+};
+const V = (id, titolo, estero) => ({id: id, titolo: titolo, valuta: "sats", convertito: false,
+  estero_diverso: !!estero, prima: {casa: [3000, 0], punto: [0, 0, 0], extra: [0, 0]},
+  dopo: {casa: [5000, 0]}});
+const STD = {valuta: "sats", casa: 50000, extra: 0};
+prova("foglio", () => foglio({std: {}, esito: null, dati: {spedizione_standard: STD,
+  cambiano: [V(1, "Pentola <b>grande</b>", true), V(2, "Mestolo")],
+  fuori: [F("ordine", "Tazza"), F("gratis", "Piatto"), F("gratis", "Forchetta")],
+  esauriti: 2}}));
+prova("foglio_uno", () => foglio({std: {}, esito: null, dati: {spedizione_standard: STD,
+  cambiano: [V(1, "Pentola")], fuori: [], esauriti: 1}}));
+prova("foglio_vuoto", () => foglio({std: {}, esito: null, dati: {spedizione_standard: STD,
+  cambiano: [], fuori: [F("uguale", "Pentola")], esauriti: 0}}));
+prova("foglio_errore", () => foglio({std: {}, esito: null, dati: {spedizione_standard: STD,
+  cambiano: [V(1, "Pentola")], fuori: [], esauriti: 0}}, "Il <costo> non va"));
+prova("foglio_esito", () => foglio({std: {}, dati: {}, esito: {aggiornati: 3,
+  fuori: [F("ordine", "Tazza")]}}));
+console.log(JSON.stringify(out));
+"""
+    o = _node(banco, "le parole del foglio")
+    if o is not None:
+        NB = chr(0x202F)
+        prova("la frase finale, parola per parola",
+              "Spedizione aggiornata su 12 articoli; 7 rimasti com'erano: "
+              "2 con un ordine in corso, 1 in revisione, 1 dal tuo negozio "
+              "Shopify, 3 con la spedizione gratis.", o.get("frase"))
+        prova("...al singolare", "Spedizione aggiornata su 1 articolo.",
+              o.get("frase_uno"))
+        prova("...con uno solo rimasto", "Spedizione aggiornata su 0 articoli;"
+              " 1 rimasto com'era: 1 digitale.", o.get("frase_zero"))
+        prova("...e i digitali al plurale", "Spedizione aggiornata su 2 "
+              "articoli; 2 rimasti com'erano: 2 digitali.",
+              o.get("frase_digitali"))
+        prova("i gruppi nell'ordine di Andrea, due negozi due gruppi, "
+              "l'ignoto in fondo",
+              ["1 con un ordine in corso [O]",
+               "1 dal tuo negozio WooCommerce [W]",
+               "1 dal tuo negozio Shopify [S]",
+               "1 già con questo costo [U]", "1 per un altro motivo [Q]"],
+              o.get("gruppi"))
+        # CINQUE CIFRE e non quattro: in italiano `toLocaleString` le
+        # quattro non le raggruppa («5000»), e una prova che dipende da
+        # quella regola del CLDR direbbe il falso cambiando versione
+        prova("le cifre come le legge chi vende",
+              ["gratis", "4,50 €", f"50{NB}000 sats", "4,50 €", "gratis",
+               f"50{NB}000 sats"], o.get("cifre"))
+        prova("da quanto a quanto, una riga per tariffa che cambia",
+              [f"a casa: 30{NB}000 sats → 50{NB}000 sats",
+               f"al punto di ritiro: come a casa → 35{NB}000 sats",
+               "ogni pezzo in più: nessuno → +500 sats"],
+              o.get("righe_sats"))
+        prova("...col ≈ quando il costo e' tradotto",
+              ["a casa: 3,50 € → ≈ 5,00 €"], o.get("righe_eur"))
+        prova("...e la stessa cifra in euro non fa riga (i sats si muovono "
+              "col cambio)", ["ogni pezzo in più: nessuno → +1,00 €"],
+              o.get("righe_stessa_cifra"))
+        fg = o.get("foglio") or {}
+        prova("il foglio dice chi cambia e chi resta, col bottone contato",
+              ["", "🚚 Aggiorna 2 articoli", "Annulla"],
+              [fg.get("ok"), fg.get("okTesto"), fg.get("no")])
+        _c = fg.get("corpo") or ""
+        prova("...e dentro ci sono le sezioni e le note", True,
+              all(x in _c for x in ("Cambiano (2)", "Restano com'erano (3)",
+                                    "Gli articoli esauriti (2)",
+                                    "tariffe per l'estero diverse",
+                                    "non ripassano dalla",
+                                    "tengono il costo di quando sono")))
+        prova("...coi titoli scappati", True,
+              "Pentola &lt;b&gt;grande&lt;/b&gt;" in _c and "<b>grande" not in _c)
+        prova("...col costo standard in testa", True,
+              f"a casa <b>50{NB}000 sats</b>" in _c
+              and "nessun supplemento" in _c)
+        prova("un articolo solo: il bottone al singolare",
+              "🚚 Aggiorna 1 articolo", (o.get("foglio_uno") or {}).get("okTesto"))
+        prova("...e l'esaurito al singolare", True,
+              "L'articolo esaurito non si tocca" in
+              (o.get("foglio_uno") or {}).get("corpo", ""))
+        fv = o.get("foglio_vuoto") or {}
+        prova("niente da aggiornare: niente bottone, si chiude",
+              ["none", "Chiudi", True],
+              [fv.get("ok"), fv.get("no"),
+               "Nessun articolo da aggiornare" in (fv.get("corpo") or "")])
+        prova("l'errore resta dentro il foglio, scappato", True,
+              "Il &lt;costo&gt; non va" in
+              (o.get("foglio_errore") or {}).get("corpo", ""))
+        fe = o.get("foglio_esito") or {}
+        # la frase entra scappata (l'apostrofo e' &#39;): si confronta
+        # quel che si LEGGE, non l'HTML
+        prova("l'esito: la frase, e un bottone solo che chiude",
+              ["🚚 Spedizione aggiornata", "none", "Fatto", True],
+              [fe.get("tit"), fe.get("ok"), fe.get("no"),
+               "Spedizione aggiornata su 3 articoli; 1 rimasto com'era: 1 "
+               "con un ordine in corso." in (fe.get("corpo") or "")
+               .replace("&#39;", "'")])
+
+
 def prove_consigliati():
     """LA CARD «CONSIGLIATI» E LA SUA PAGINA (set 2026).
 
@@ -89910,6 +90649,7 @@ def main():
               prove_zona_comune_in_modifica,
               prove_cassa_strada_chiusa,
               prove_casa_vuota_gratis,
+              prove_spedizione_standard,
               prove_script_nel_workflow, prove_deploy,
               prove_giudice_deploy, prove_collaudi_in_ci,
               prove_servizio_non_root,

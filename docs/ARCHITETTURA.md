@@ -5943,6 +5943,53 @@
   fatti dell'annuncio di partenza e non della merce; e le foto si
   copiano davvero sul disco, quindi due annunci gemelli pesano il
   doppio (il patto della filiera vale più dello spazio).
+  IL COSTO DI SPEDIZIONE STANDARD DEL NEGOZIO (set 2026, dall'idea di
+  un venditore): la tariffa di casa scritta UNA volta, in «📦 Come
+  spedisci» sotto i corrieri, col «sats ⇄» di Vendi e — facoltativi —
+  il punto di ritiro e il pezzo in più. Colonna
+  `utenti.spedizione_standard`, un JSON `{valuta, casa, punto?,
+  extra?}` ('' = nessuno; la chiave ASSENTE di punto ed extra vuol dire
+  «non lo imposto», il patto delle zone). La legge solo
+  `spedizione_standard_leggi` (difensiva: storto = nessuno standard,
+  mai uno zero, che sarebbe la spedizione gratis scritta da noi) e la
+  giudica `spedizione_standard_da_payload`, più severo del giudice
+  dell'annuncio: un 400 che dice quale casella, e nei sats niente punti
+  né virgole («5.000» sarebbero cinque sats). Viaggia nel Salva del
+  cassetto (`POST /api/me/spedizioniere`: chiave assente = non si
+  tocca, e un corpo senza reti le lascia com'erano) e arriva da /api/me
+  già letto. Una sentinella vuole che lo nominino SOLO le sue porte:
+  nessun import, nessun negozio collegato e nessuna `pubblica()` lo
+  applica da sé — «hanno la loro tariffa».
+  LA PRECOMPILAZIONE è tutta del client (`precompilaSpedStd`): articolo
+  nuovo (arrivo di /api/me, «Annulla», dopo la pubblicazione) e
+  Duplica, dove prende il posto della tariffa copiata; mai la Modifica.
+  Ricorda quel che ha scritto da sé (`spedStdPosato`) e riscrive solo
+  una casella INTATTA — al cambio di valuta del listino, allo standard
+  appena salvato —; toccata, anche svuotata, resta del venditore. Col
+  listino in euro e lo standard in sats traduce al cambio VERO
+  (`cambioVivo`), e senza non inventa; se nel form restano costi
+  nell'altra valuta (le zone di un Duplica) il toggle non gira e lo
+  standard si traduce.
+  L'AGGIORNAMENTO IN BLOCCO: `POST /api/me/spedizione-standard/
+  anteprima` (non scrive niente, nemmeno lo standard) e `/applica`,
+  col costo che si VEDE nella casella, salvato solo alla conferma.
+  `_sped_std_giro` guarda gli articoli attivi e in revisione (gli
+  esauriti si contano), `_sped_std_escluso` dice il motivo — sincrona,
+  e il primo che vale: origine esterna, asta, consegna che non spedisce,
+  casa chiusa, spedizione gratis, revisione, ordine vivo (il giudice
+  della Modifica), cambio mancante sul listino in euro —, e
+  `_sped_std_nuovi` passa i numeri da `consegna_da_payload` con la
+  valuta del listino di ogni articolo. L'applicazione rigiudica ogni
+  riga dentro `BEGIN IMMEDIATE` (un ordine arrivato nel mezzo la lascia
+  fuori, una riga cambiata sotto i piedi resta sua: «cambiato»),
+  scrive le sole tariffe, la copia `dom` della mappa (`_sped_std_mappa`:
+  l'estero resta com'era) e `modificato`, SENZA moderazione — legge il
+  testo, e qui il testo non cambia: il perché sta nella docstring di
+  `sped_std_applica` — e rilancia i NIP-99, che portano il costo di
+  casa, a lotti (`_sped_std_su_nostr`, un giro per venditore: il
+  secondo si accoda). I codici dei motivi (`SPED_STD_MOTIVI`) e le
+  parole del client (`MOTIVI_SPED_STD`) stanno in pari per prova.
+  Verbale in CANTIERI, «Il costo di spedizione standard del negozio».
   Modifica FIRMATA degli importati (lug 2026): il doppio cittadino con
   `npub_accesso` ≡ `contatto_nostr` modifica anche gli annunci
   importati — Barattolo fa da client Nostr, la nsec resta nel browser

@@ -6945,6 +6945,29 @@
   .sats-input button.suffix{right:8px;border:0;background:var(--chip-bg);
     border-radius:999px;padding:5px 11px;cursor:pointer;color:var(--ink-soft);font:inherit;
     font-size:12px;font-weight:800}
+  /* IL COSTO DI SPEDIZIONE STANDARD (set 2026): il blocco sotto i
+     corrieri in «📦 Come spedisci» — staccato da un filo, perche' e' una
+     seconda domanda nello stesso cassetto — e il foglio
+     dell'aggiornamento in blocco, un elenco che scorre col foglio. Solo
+     token di casa: i due temi li porta la palette, non queste righe.
+     NOTE E SEZIONI IN --ink-soft, MAI --muted: misurato dal vivo, di
+     giorno --muted su bianco fa 3,81:1, sotto il 4,5 del testo piccolo —
+     ed e' la scelta di Andrea per le note (le «note piccole davvero»):
+     qui dicono cosa vuol dire la casella vuota e che la moderazione non
+     si ripassa, cioe' le due cose da non perdere. */
+  .sped-std{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+  .sped-std-nota{margin-top:6px;font-size:12px;color:var(--ink-soft);font-weight:600;line-height:1.4}
+  .sped-std-testa{font-size:13px;color:var(--desc);font-weight:600;line-height:1.5;margin-bottom:4px}
+  .sped-std-errore{margin:8px 0;font-size:13px;color:var(--danger);font-weight:700;line-height:1.4}
+  .sped-std-sez{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;
+    color:var(--ink-soft);margin:14px 0 4px}
+  .sped-std-lista{list-style:none;margin:0;padding:0}
+  .sped-std-lista li{padding:8px 0;border-top:1px solid var(--line);min-width:0}
+  .sped-std-lista li:first-child{border-top:0}
+  .sped-std-tit{display:block;font-size:14px;font-weight:800;color:var(--ink);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sped-std-da{display:block;font-size:12.5px;font-weight:700;color:var(--ink-soft);line-height:1.45}
+  .sped-std-esito{font-size:14.5px;font-weight:700;color:var(--ink);line-height:1.5;margin:4px 0 14px}
   .photo-drop{
     border:2px dashed var(--field-line);border-radius:20px;background:var(--card);
     padding:26px;text-align:center;color:var(--muted);font-weight:700;font-size:14px;cursor:pointer;
@@ -11216,6 +11239,24 @@ document.getElementById('cartello')?.remove();</script>
     <div style="font-size:12px;color:var(--muted);font-weight:600;margin-top:4px;line-height:1.4">È il numero che hai <b>adesso</b>, non quanti ne aggiungi. Non tocca nient'altro: gli affari in corso restano dove sono.</div>
     <button class="btn orange" id="rifInvia" style="margin-top:12px" onclick="inviaRifornimento(this)">🔄 Rifornisci</button>
     <button class="btn ghost" onclick="navIndietro()">Annulla</button>
+  </div>
+
+  <!-- ============ SHEET: IL COSTO STANDARD SU TUTTI GLI ARTICOLI ============
+       (set 2026) Il fratello di «🔄 Aggiorna i pezzi»: dei numeri che si
+       cambiano senza ripassare dalla Modifica. Due tempi nello stesso
+       foglio — l'ANTEPRIMA (chi cambia e da quanto a quanto, chi resta
+       com'era e perche') e l'ESITO dopo la conferma — cosi' la frase
+       finale si legge dove si e' deciso. Il corpo lo scrive
+       renderSpedStdFoglio, e i titoli degli articoli passano da esc(). -->
+  <div class="sheet" id="spedStdSheet" role="dialog" aria-modal="true"
+       aria-labelledby="spedStdTit">
+    <div class="grab"></div>
+    <h3 id="spedStdTit">🚚 Aggiorna la spedizione</h3>
+    <!-- il respiro sopra i bottoni e' quello del foglio di conferma
+         (confCorpo): senza, l'ultima nota tocca l'arancio -->
+    <div id="spedStdCorpo" style="margin-bottom:14px"></div>
+    <button class="btn orange" id="spedStdOk" onclick="applicaSpedStd(this)">🚚 Aggiorna</button>
+    <button class="btn ghost" id="spedStdNo" onclick="navIndietro()">Annulla</button>
   </div>
 
   <!-- ============ SHEET WIDGET DA INCORPORARE (ago 2026) ============
@@ -24748,6 +24789,7 @@ function closeSheet(){
   el('puntaSheet').classList.remove('open');
   el('lampoSheet').classList.remove('open');
   el('rifornisciSheet').classList.remove('open');
+  el('spedStdSheet').classList.remove('open');
   el('widgetSheet').classList.remove('open');
   el('rilancioSheet').classList.remove('open');
   el('riscuotiSheet').classList.remove('open');
@@ -29423,6 +29465,14 @@ async function setCanale(canale){
    lascerebbe il negozio con mezza dichiarazione per il tempo di un
    dito — e in quel mezzo secondo qualcuno compra. */
 let retiBozza = null;      // le spunte in corso; null = non aperto
+/* IL COSTO DI SPEDIZIONE STANDARD (set 2026): la tariffa di casa che il
+   venditore scrive UNA volta, piu' — facoltativi — il punto di ritiro e
+   il pezzo in piu'. {valuta, casa, punto?, extra?} oppure null, da
+   /api/me e dal Salva: la chiave ASSENTE (punto, extra) vuol dire «non
+   lo imposto», il patto delle zone. La bozza sono le caselle mentre le
+   si scrive, come testo; null = si rifanno dal salvato, come retiBozza. */
+let mySpedStd = null;
+let spedStdBozza = null;
 
 function renderSpedizioniere(){
   const box = el('spedizioniereBlocco');
@@ -29452,7 +29502,288 @@ function renderSpedizioniere(){
       chat sul punto.</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
       ${spedizionieriCatalogo.map(pill).join('')}</div>
+    ${bloccoSpedStd()}
     <button class="btn orange" onclick="salvaReti()">Salva</button>`;
+}
+
+/* Il blocco del COSTO STANDARD, sotto i corrieri: tre caselle nella
+   valuta scelta — una per tutte, il toggle di Vendi — e il bottone che
+   porta il costo su tutti gli articoli. Le caselle si scrivono dalla
+   BOZZA, cosi' un ridisegno del cassetto (il Salva del foglio dei
+   corrieri ne fa uno) non cancella quel che si sta scrivendo.
+   IN CASA VUOTO NON E' GRATIS, qui, ed e' l'unica parola diversa dal
+   form: nel cassetto la casella vuota vuol dire «nessun costo
+   standard» — il campo di Vendi nasce vuoto come prima — mentre lo 0 e'
+   un costo vero, «spedisco gratis». La riga sotto lo dice. */
+function bloccoSpedStd(){
+  if (!spedStdBozza) spedStdBozza = spedStdDaSalvato();
+  const b = spedStdBozza, inEur = b.valuta === 'eur';
+  const campo = (id, val, segnaposto, toggle) =>
+    `<div class="sats-input"><input id="${id}" type="number"
+      inputmode="${inEur ? 'decimal' : 'numeric'}" step="${inEur ? '0.01' : '1'}"
+      min="0" placeholder="${segnaposto}" value="${esc(val)}"
+      oninput="spedStdDigitata()">${toggle
+      ? `<button type="button" class="suffix" onclick="toggleSpedStdCur()"
+          title="Scegli come scrivere il costo">${inEur ? '€ ⇄' : 'sats ⇄'}</button>`
+      : `<span class="suffix" style="pointer-events:none">${inEur ? '€' : 'sats'}</span>`}</div>`;
+  return `
+    <div class="sped-std">
+      <div class="field">
+        <label for="spedStdCasa">Costo di spedizione standard</label>
+        ${campo('spedStdCasa', b.casa, 'nessuno', true)}
+        <div class="sped-std-nota">Nel tuo paese. Lo trovi già scritto
+          quando metti in vendita un articolo nuovo, anche con
+          «Duplica», e lo puoi sempre cambiare. Vuoto = nessun costo
+          standard; 0 = spedizione gratis.</div>
+      </div>
+      <div class="field">
+        <label for="spedStdPunto">Verso un punto di ritiro (facoltativo)</label>
+        ${campo('spedStdPunto', b.punto, 'come sopra', false)}
+      </div>
+      <div class="field">
+        <label for="spedStdExtra">Ogni pezzo in più: + (facoltativo)</label>
+        ${campo('spedStdExtra', b.extra, '0', false)}
+      </div>
+      <button type="button" class="btn ghost sped-std-tutti"
+        onclick="apriSpedStdTutti(this)">🚚 Aggiorna tutti gli articoli con questo costo</button>
+    </div>`;
+}
+
+/* La bozza dal salvato: i numeri come vanno in una casella number (col
+   punto decimale, che e' la forma che l'input vuole) */
+function spedStdDaSalvato(){
+  const s = mySpedStd;
+  const t = k => (s && s[k] !== undefined && s[k] !== null) ? String(s[k]) : '';
+  return {valuta: (s && s.valuta === 'eur') ? 'eur' : 'sats',
+          casa: t('casa'), punto: t('punto'), extra: t('extra')};
+}
+
+/* Il dito scrive e la bozza segue, senza ridisegnare: un render pieno
+   a ogni tasto chiuderebbe la tastiera (il patto di toggleRete) */
+function spedStdDigitata(){
+  if (!spedStdBozza) spedStdBozza = spedStdDaSalvato();
+  for (const [k, id] of [['casa', 'spedStdCasa'], ['punto', 'spedStdPunto'],
+                         ['extra', 'spedStdExtra']])
+    if (el(id)) spedStdBozza[k] = el(id).value;
+}
+
+/* Il toggle e' UNO per le tre caselle, come in Vendi, e girarlo le
+   svuota: resterebbero numeri nella valuta di prima */
+function toggleSpedStdCur(){
+  haptic();
+  spedStdDigitata();
+  spedStdBozza = {valuta: spedStdBozza.valuta === 'eur' ? 'sats' : 'eur',
+                  casa: '', punto: '', extra: ''};
+  renderSpedizioniere();
+}
+
+/* Quel che parte verso il server e' il TESTO delle caselle, e a
+   giudicarlo e' lui (`spedizione_standard_da_payload`): un solo giudice
+   per i numeri, e un 400 che dice quale casella non va */
+function spedStdPayload(){
+  spedStdDigitata();
+  const b = spedStdBozza;
+  return {valuta: b.valuta, casa: String(b.casa).trim(),
+          punto: String(b.punto).trim(), extra: String(b.extra).trim()};
+}
+
+/* La cifra di UNA tariffa come la legge chi vende, nella valuta in cui
+   il suo listino la conosce: l'euro per il listino in euro e per il
+   costo ancorato, i sats per quello fisso — e «gratis» allo zero */
+function cifraSpedStd(sats, eur, valuta){
+  if (!(sats > 0) && !(eur > 0)) return 'gratis';
+  if (valuta === 'eur' || (eur > 0 && !(sats > 0))) return fmtEur(eur) + ' €';
+  return fmt(sats) + ' sats';
+}
+const cifraStdSalvato = s => s.valuta === 'eur'
+  ? cifraSpedStd(0, s.casa, 'eur') : cifraSpedStd(s.casa, 0, 'sats');
+
+/* LE PAROLE DEI MOTIVI per cui un articolo resta com'era, singolare e
+   plurale. I CODICI li decide il server (SPED_STD_MOTIVI, e una prova
+   li tiene in pari); l'ORDINE e' questo, quello in cui Andrea li ha
+   elencati: prima quel che si sistema da solo col tempo (ordini,
+   revisione), poi le righe che vivono altrove, poi le scelte del
+   venditore su quell'articolo. */
+const MOTIVI_SPED_STD = {
+  ordine: ['con un ordine in corso', 'con un ordine in corso'],
+  revisione: ['in revisione', 'in revisione'],
+  negozio: ['dal tuo negozio collegato', 'dal tuo negozio collegato'],
+  nostr: ['importato da Nostr', 'importati da Nostr'],
+  gratis: ['con la spedizione gratis', 'con la spedizione gratis'],
+  ritiro: ['solo col ritiro a mano', 'solo col ritiro a mano'],
+  digitale: ['digitale', 'digitali'],
+  servizio: ['servizio', 'servizi'],
+  senza_consegna: ['senza una consegna indicata', 'senza una consegna indicata'],
+  no_casa: ['che non spedisce nel tuo paese', 'che non spediscono nel tuo paese'],
+  asta: ["all'asta, con la spedizione compresa", "all'asta, con la spedizione compresa"],
+  cambio: ["in euro, col cambio che adesso non c'è", "in euro, col cambio che adesso non c'è"],
+  cambiato: ['cambiato proprio mentre aggiornavo', 'cambiati proprio mentre aggiornavo'],
+  uguale: ['già con questo costo', 'già con questo costo'],
+};
+function etichettaMotivoSpedStd(motivo, origine, n){
+  if (motivo === 'negozio' && origine) return `dal tuo negozio ${origine}`;
+  const v = MOTIVI_SPED_STD[motivo] || ['per un altro motivo', 'per un altro motivo'];
+  return v[n === 1 ? 0 : 1];
+}
+/* I rimasti fuori raggruppati per motivo, nell'ordine qui sopra. Due
+   negozi collegati diversi sono due gruppi: «dal tuo negozio Shopify» e
+   «dal tuo negozio WooCommerce» dicono dove andare a cambiarli. */
+function gruppiFuoriSpedStd(fuori){
+  const gruppi = new Map();
+  for (const f of (fuori || [])){
+    const chiave = f.motivo === 'negozio' ? 'negozio:' + (f.origine || '') : f.motivo;
+    if (!gruppi.has(chiave))
+      gruppi.set(chiave, {motivo: f.motivo, origine: f.origine || '', titoli: []});
+    gruppi.get(chiave).titoli.push(f.titolo || '');
+  }
+  const ordine = Object.keys(MOTIVI_SPED_STD);
+  const pos = m => { const i = ordine.indexOf(m); return i < 0 ? ordine.length : i; };
+  return [...gruppi.values()]
+    .map(g => ({...g, n: g.titoli.length,
+                etichetta: etichettaMotivoSpedStd(g.motivo, g.origine, g.titoli.length)}))
+    .sort((a, b) => pos(a.motivo) - pos(b.motivo));
+}
+/* LA FRASE FINALE, quella chiesta da Andrea parola per parola:
+   «Spedizione aggiornata su N articoli; M rimasti com'erano: …» */
+function fraseEsitoSpedStd(d){
+  const n = (d && d.aggiornati) || 0, fuori = (d && d.fuori) || [];
+  const m = fuori.length;
+  let s = `Spedizione aggiornata su ${fmt(n)} articol${n === 1 ? 'o' : 'i'}`;
+  if (m)
+    s += `; ${fmt(m)} rimast${m === 1 ? 'o' : 'i'} com'er${m === 1 ? 'a' : 'ano'}: `
+      + gruppiFuoriSpedStd(fuori).map(g => `${fmt(g.n)} ${g.etichetta}`).join(', ');
+  return s + '.';
+}
+/* «Da quanto a quanto» di UN articolo, una riga per tariffa che cambia
+   davvero: si confrontano le CIFRE come si leggono, e non i numeri
+   grezzi — sul listino in euro i sats sono un equivalente che si muove
+   col cambio, e una riga «4,50 € → 4,50 €» sarebbe rumore. */
+function righeCambioSpedStd(v){
+  const out = [], circa = v.convertito ? '≈ ' : '';
+  const casa = t => cifraSpedStd(t[0], t[1], v.valuta);
+  const punto = t => t[2] ? cifraSpedStd(t[0], t[1], v.valuta) : 'come a casa';
+  const extra = t => (t[0] > 0 || t[1] > 0)
+    ? '+' + cifraSpedStd(t[0], t[1], v.valuta) : 'nessuno';
+  const riga = (nome, f, prima, dopo) => {
+    if (dopo && f(prima) !== f(dopo))
+      out.push(`${nome}: ${f(prima)} → ${circa}${f(dopo)}`);
+  };
+  riga('a casa', casa, v.prima.casa, v.dopo.casa);
+  riga('al punto di ritiro', punto, v.prima.punto, v.dopo.punto);
+  riga('ogni pezzo in più', extra, v.prima.extra, v.dopo.extra);
+  return out.length ? out : ['la tariffa si riallinea'];
+}
+
+/* IL FOGLIO in due tempi, ANTEPRIMA ed ESITO, nello stesso posto: la
+   frase finale si legge dove si e' deciso, e non in un toast che
+   scappa. `errore` resta dentro il foglio col bottone ancora li' —
+   la ricetta di «🔄 Aggiorna i pezzi». */
+let spedStdAnteprima = null;   // {std, dati, esito}
+function renderSpedStdFoglio(errore){
+  const a = spedStdAnteprima;
+  const corpo = el('spedStdCorpo'), ok = el('spedStdOk'), no = el('spedStdNo');
+  if (!a || !corpo || !ok || !no) return;
+  if (a.esito){
+    el('spedStdTit').textContent = '🚚 Spedizione aggiornata';
+    corpo.innerHTML = `<div class="sped-std-esito">${esc(fraseEsitoSpedStd(a.esito))}</div>`;
+    ok.style.display = 'none';
+    no.textContent = 'Fatto';
+    return;
+  }
+  const d = a.dati, s = d.spedizione_standard || {};
+  const cambiano = d.cambiano || [], fuori = d.fuori || [];
+  const u = x => s.valuta === 'eur' ? cifraSpedStd(0, x, 'eur') : cifraSpedStd(x, 0, 'sats');
+  const testa = [`a casa <b>${esc(u(s.casa))}</b>`];
+  if (s.punto !== undefined) testa.push(`al punto di ritiro <b>${esc(u(s.punto))}</b>`);
+  if (s.extra !== undefined)
+    testa.push(`ogni pezzo in più <b>${s.extra > 0 ? '+' + esc(u(s.extra)) : 'nessun supplemento'}</b>`);
+  const estero = cambiano.filter(v => v.estero_diverso).length;
+  let h = `<div class="sped-std-testa">Il costo standard: ${testa.join(' · ')}.</div>`;
+  if (errore) h += `<div class="sped-std-errore">${esc(errore)}</div>`;
+  if (cambiano.length){
+    h += `<div class="sped-std-sez">Cambiano (${fmt(cambiano.length)})</div>
+      <ul class="sped-std-lista">${cambiano.map(v => `<li>
+        <b class="sped-std-tit">${esc(v.titolo)}</b>
+        ${righeCambioSpedStd(v).map(r => `<span class="sped-std-da">${esc(r)}</span>`).join('')}
+      </li>`).join('')}</ul>`;
+    if (estero)
+      h += `<div class="sped-std-nota">🌍 ${estero === 1
+        ? "1 ha tariffe per l'estero diverse da questa"
+        : `${fmt(estero)} hanno tariffe per l'estero diverse da questa`}:
+        quelle restano come sono.</div>`;
+    h += `<div class="sped-std-nota">Restano in vetrina e non ripassano dalla
+      moderazione. Gli ordini già aperti tengono il costo di quando sono
+      nati.</div>`;
+  } else {
+    h += `<div class="sped-std-esito">Nessun articolo da aggiornare.</div>`;
+  }
+  if (fuori.length)
+    h += `<div class="sped-std-sez">Restano com'erano (${fmt(fuori.length)})</div>
+      <ul class="sped-std-lista">${gruppiFuoriSpedStd(fuori).map(g => `<li>
+        <b class="sped-std-tit">${esc(g.etichetta.charAt(0).toUpperCase() + g.etichetta.slice(1))} (${fmt(g.n)})</b>
+        <span class="sped-std-da">${esc(g.titoli.join(', '))}</span>
+      </li>`).join('')}</ul>`;
+  if (d.esauriti > 0)
+    h += `<div class="sped-std-nota">${d.esauriti === 1
+      ? "L'articolo esaurito non si tocca"
+      : `Gli articoli esauriti (${fmt(d.esauriti)}) non si toccano`}: se ne
+      rifornisci uno, ripeti l'aggiornamento.</div>`;
+  el('spedStdTit').textContent = '🚚 Aggiorna la spedizione';
+  corpo.innerHTML = h;
+  ok.style.display = cambiano.length ? '' : 'none';
+  ok.textContent = `🚚 Aggiorna ${fmt(cambiano.length)} articol${cambiano.length === 1 ? 'o' : 'i'}`;
+  no.textContent = cambiano.length ? 'Annulla' : 'Chiudi';
+}
+
+/* IL BOTTONE GRANDE: prima l'anteprima, e col costo che si VEDE nella
+   casella — «con questo costo» — anche se non e' ancora salvato. Lo
+   standard si salva solo alla conferma: chi guarda e annulla non ha
+   deciso niente. */
+async function apriSpedStdTutti(btn){
+  haptic();
+  if (DEMO) { toast('In demo si guarda soltanto 🙂'); return; }
+  const std = spedStdPayload();
+  if (!std.casa) { toast('Scrivi prima il costo di spedizione standard'); return; }
+  const ripristina = bottoneInAttesa(btn, 'Guardo i tuoi articoli…');
+  try {
+    const r = await fetch(`${API_BASE}/me/spedizione-standard/anteprima`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({spedizione_standard: std})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
+    spedStdAnteprima = {std, dati: d, esito: null};
+    renderSpedStdFoglio();
+    el('sheetBg').classList.add('open');
+    el('spedStdSheet').classList.add('open');
+  } catch(e) { toast('Rete assente: riprova'); }
+  finally { ripristina(); }
+}
+
+/* LA CONFERMA: il server rigiudica tutto da capo (fra l'anteprima e
+   adesso qualcuno puo' aver comprato), salva lo standard e aggiorna.
+   Poi il cassetto, il form di Vendi e le copie in pagina si riallineano
+   — DOPO la frase, che e' la cosa che si aspetta di leggere. */
+async function applicaSpedStd(btn){
+  haptic();
+  const a = spedStdAnteprima;
+  if (!a || a.esito) return;
+  const ripristina = bottoneInAttesa(btn, 'Aggiorno la spedizione…');
+  try {
+    const r = await fetch(`${API_BASE}/me/spedizione-standard/applica`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
+       body: JSON.stringify({spedizione_standard: a.std})});
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) { renderSpedStdFoglio(d.detail || 'Non ci sono riuscito: riprova'); return; }
+    a.esito = d;
+    mySpedStd = d.spedizione_standard || null;
+    spedStdBozza = null;
+    renderSpedizioniere();
+    precompilaSpedStd(false);
+    renderSpedStdFoglio();
+  } catch(e) { renderSpedStdFoglio('Rete assente: riprova'); return; }
+  finally { ripristina(); }
+  try { await loadListings(); await loadMyListings(); renderMyListings(); }
+  catch(e) { /* le copie in pagina si rifanno al prossimo giro */ }
 }
 
 /* Il toggle non fa re-render — il pattern delle categorie degli
@@ -29475,22 +29806,38 @@ async function salvaReti(){
      canonicalizza comunque, ma cosi' la lista che si manda e quella
      che torna sono la stessa cosa */
   const scelte = spedizionieriCatalogo.filter(s => retiBozza.has(s));
+  /* il costo standard viaggia nello STESSO Salva: e' nello stesso
+     cassetto, e un bottone che ne salva meta' sarebbe una trappola */
+  const std = spedStdPayload();
+  const stdPrima = JSON.stringify(mySpedStd);
   try {
     const r = await fetch(`${API_BASE}/me/spedizioniere`,
       {method:'POST', headers:{'X-Tg-Init-Data':authHdr(),'Content-Type':'application/json'},
-       body: JSON.stringify({spedizionieri: scelte})});
+       body: JSON.stringify({spedizionieri: scelte, spedizione_standard: std})});
     const d = await r.json().catch(()=>({}));
     if (!r.ok) { toast(d.detail || 'Non ci sono riuscito, riprova', 6000); return; }
     mieRetiSped = d.spedizionieri || [];
     mySpedizioniere = d.spedizioniere || '';
+    /* un server di ieri lo standard non lo conosce e non lo rimanda:
+       si tiene quel che si sapeva, che e' la verita' di quel server */
+    if ('spedizione_standard' in d) mySpedStd = d.spedizione_standard || null;
   } catch(e) { toast('Rete assente: riprova'); return; }
   retiBozza = new Set(mieRetiSped);
+  spedStdBozza = null;
   renderSpedizioniere();
-  toast(mieRetiSped.length
+  /* il toast dice cio' che e' CAMBIATO: le reti come sempre, e lo
+     standard quando e' lui la novita' */
+  const toastReti = mieRetiSped.length
     ? `📦 Spedisci con ${mieRetiSped.join(' e ')}: chi compra sceglierà il punto della rete giusta`
-    : 'Corrieri tolti: chi sceglie il punto si accorderà in chat');
-  /* la riga del form segue la dichiarazione appena fatta */
+    : 'Corrieri tolti: chi sceglie il punto si accorderà in chat';
+  const toastStd = mySpedStd
+    ? `🚚 Costo standard: ${cifraStdSalvato(mySpedStd)}. Lo trovi già scritto negli articoli nuovi`
+    : 'Costo standard tolto: gli articoli nuovi partono col campo vuoto';
+  toast(stdPrima === JSON.stringify(mySpedStd) ? toastReti : toastStd);
+  /* la riga del form segue la dichiarazione appena fatta, e il campo di
+     casa lo standard appena salvato (se nessuno l'ha toccato) */
   if (el('view-vendi')) aggiornaConsegnaForm();
+  precompilaSpedStd(false);
 }
 
 /* ---- I PUNTI DI RITIRO SALVATI, dal lato di chi compra (ago 2026) ----
@@ -37396,6 +37743,10 @@ function impostaSellValuta(v){
      riporta il campo alla sua valuta di default */
   spedValuta = v==='eur' ? 'eur' : 'sats';
   aggiornaSpedCampo();
+  /* ...e il costo standard, se la casella e' ancora quella che il form
+     ha scritto da se', si riscrive nella valuta nuova: «5000» rimasto
+     li' si rileggerebbe come 5000 € */
+  precompilaSpedStd(false);
   /* la riga dello sconto confronta il prezzo con la soglia, e la
      valuta cambia il confronto: «80 000» in sats e in euro sono due
      annunci diversi. Immediata e non in differita — un toggle e' un
@@ -37520,6 +37871,98 @@ function aggiornaSupplHint(){
   h.textContent = inEur
     ? `${q} pezzi = ${fmtEur(tot)} € di spedizione`
     : `${q} pezzi = ${fmt(tot)} sats di spedizione`;
+}
+/* LA PRECOMPILAZIONE DEL COSTO STANDARD (set 2026): un articolo NUOVO —
+   e il Duplica, chiesto da Andrea — nasce col costo di spedizione del
+   negozio gia' scritto, e lo si cambia come ogni altro campo. Mai in
+   Modifica (l'annuncio ha le sue tariffe), e mai per gli import e i
+   negozi collegati, che nel form non passano: hanno la loro tariffa.
+   IL FORM RICORDA CIO' CHE HA SCRITTO DA SE' (`spedStdPosato`): finche'
+   la casella dice ancora quello, il venditore non l'ha toccata, e un
+   cambio di listino o uno standard appena salvato la possono
+   riscrivere; se l'ha toccata — anche svuotandola, che a casa vuol dire
+   gratis — resta sua. `forza` e' dei due momenti in cui il form e'
+   appena nato (svuotato, o riempito dal Duplica): li' non c'e' niente
+   di suo da proteggere. */
+let spedStdPosato = null;
+/* Un costo dello standard nella valuta del campo: uguale se e' la
+   stessa, al cambio VERO se e' l'altra, null senza cambio — mai col
+   cambio di riserva, che per una tariffa sarebbe un numero inventato */
+function costoStdIn(v, da, a){
+  if (da === a) return v;
+  if (!cambioVivo || !(eurPerSat > 0)) return null;
+  if (a === 'eur'){
+    const e = Math.round(v * eurPerSat * 100) / 100;
+    return (v > 0 && e < 0.01) ? 0.01 : e;   // scritto non diventa gratis
+  }
+  return Math.round(v / eurPerSat);
+}
+function precompilaSpedStd(forza){
+  if (DEMO || editandoId || !el('sellSped')) return;
+  const s = mySpedStd, posato = spedStdPosato || {};
+  const val = id => String(el(id)?.value ?? '');
+  const libero = (id, k) => forza || val(id) === (posato[k] ?? '');
+  if (!libero('sellSped', 'sped')) return;
+  if (!s){
+    if (forza) { spedStdPosato = null; return; }
+    /* lo standard e' stato tolto: cio' che il form aveva scritto da se'
+       se ne va con lui — mai cio' che ha scritto il venditore */
+    if (spedStdPosato){
+      for (const [id, k] of [['sellSped', 'sped'], ['sellSpedPunto', 'punto'],
+                             ['sellSpedExtra', 'extra']])
+        if (posato[k] && el(id) && libero(id, k)) el(id).value = '';
+      spedStdPosato = null;
+      aggiornaSpedCampo();
+    }
+    return;
+  }
+  const scrive = {punto: 'punto' in s && libero('sellSpedPunto', 'punto'),
+                  extra: 'extra' in s && libero('sellSpedExtra', 'extra')};
+  /* LA VALUTA DEL CAMPO: sul listino in euro e' l'euro per forza (li'
+     il toggle non c'e'); su quello in sats e' quella dello standard —
+     salvo che nel form restino altri costi scritti nella valuta di
+     adesso (le zone, o il punto e il pezzo in piu' che non si
+     riscrivono): il toggle e' UNO per tutti, e girarlo rileggerebbe
+     quei numeri nella valuta sbagliata. Allora si traduce lo standard. */
+  let unita = sellValuta === 'eur' ? 'eur' : s.valuta;
+  if (sellValuta !== 'eur' && unita !== spedValuta){
+    const restano = [...ZONE_INTL.map(z => 'sellZona_' + z),
+                     ...(scrive.punto ? [] : ['sellSpedPunto']),
+                     ...(scrive.extra ? [] : ['sellSpedExtra'])];
+    if (restano.some(id => val(id).trim() !== '')) unita = spedValuta;
+  }
+  const casa = costoStdIn(s.casa, s.valuta, unita);
+  if (casa === null){
+    /* senza cambio non si traduce. Se la casella era nostra si svuota,
+       invece di lasciarci un numero nella valuta sbagliata («5000» che
+       diventerebbe 5000 €): un listino in euro senza cambio non si
+       pubblica comunque, e al prossimo giro la si riempie */
+    if (!forza && posato.sped){
+      el('sellSped').value = '';
+      spedStdPosato = {...posato, sped: ''};
+      aggiornaSpedCampo();
+    }
+    return;
+  }
+  const testo = v => unita === 'eur' ? String(v) : String(Math.round(v));
+  spedValuta = unita;
+  const nuovo = {sped: testo(casa)};
+  el('sellSped').value = nuovo.sped;
+  for (const [k, id] of [['punto', 'sellSpedPunto'], ['extra', 'sellSpedExtra']]){
+    if (!el(id)) continue;
+    if (scrive[k]){
+      const v = costoStdIn(s[k], s.valuta, unita);
+      if (v === null) continue;
+      /* il supplemento a zero e' «nessun supplemento», che nel form si
+         scrive non scrivendo niente (il patto di riempiFormDa) */
+      nuovo[k] = (k === 'extra' && !(v > 0)) ? '' : testo(v);
+      el(id).value = nuovo[k];
+    } else if (!forza && posato[k] && libero(id, k)){
+      el(id).value = '';   // era nostro, e lo standard non lo dice piu'
+    }
+  }
+  spedStdPosato = nuovo;
+  aggiornaSpedCampo();
 }
 /* parseFloat non capisce la virgola italiana: gliela traduciamo */
 const eurCampo = id =>
@@ -38116,6 +38559,11 @@ function duplicaAnnuncio(id){
   editandoNostr = false; consegnaFirmata = false;
   duplicaDaId = id; duplicaTitolo = l.title;
   riempiFormDa(l);
+  /* IL COSTO STANDARD VALE ANCHE QUI (set 2026, chiesto da Andrea): il
+     duplicato nasce come un articolo nuovo, e la tariffa del negozio
+     prende il posto di quella copiata — il resto resta quello
+     dell'annuncio di partenza */
+  precompilaSpedStd(true);
   navSpingi = true;   // e' una discesa come la modifica, v. editListing
   go('vendi'); window.scrollTo(0, 0);
 }
@@ -38170,6 +38618,7 @@ function annullaModifica(){
   impostaConsegnaForm('', 0);
   impostaSellValuta('sats');
   sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
+  precompilaSpedStd(true);   // il form rinasce: col costo standard, se c'e'
 }
 
 /* Il form di Vendi ha due facce: "pubblica" (di default) e "modifica"
@@ -38773,6 +39222,7 @@ async function publish(){
      ha piu' chiesto */
   duplicaDaId = null; duplicaTitolo = ''; fotoAttuali = [];
   sellFoto = []; renderFotoPreview(); aggiornaFormVendi();
+  precompilaSpedStd(true);   // il prossimo articolo nasce col costo standard
   if (inRevisione) {
     /* La terza via: l'annuncio esiste ma aspetta un moderatore. La
        verità subito, e il badge ⏳ nel cassetto dei tuoi annunci. */
@@ -54228,6 +54678,13 @@ async function avvia(){
     mieRetiSped = me.spedizionieri_miei
       || (mySpedizioniere ? [mySpedizioniere] : []);
     retiBozza = null;      // la bozza si rifa' dal salvato appena arrivato
+    /* il costo di spedizione STANDARD (set 2026): null = nessuno, che e'
+       anche cio' che vale da un server di ieri (la chiave non la manda).
+       Il cassetto si rifa' dal salvato, e il form di Vendi lo prende se
+       la casella di casa e' ancora intatta */
+    mySpedStd = me.spedizione_standard || null;
+    spedStdBozza = null;
+    precompilaSpedStd(false);
     /* i punti di ritiro salvati da chi COMPRA: qui arrivano TUTTI,
        anche quelli su una rete che nessun venditore dichiara piu' —
        questo e' il cassetto in cui si tolgono, e una riga che non si

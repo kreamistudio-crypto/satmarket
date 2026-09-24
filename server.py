@@ -6015,7 +6015,20 @@ def init_db():
                     # resta sul profilo, perche' serve alla fiducia
                     # negli scambi. Di serie 0, come la classifica e'
                     # sempre stata. Lo legge `classifica_ora`.
-                    "classifica_nascosta INTEGER DEFAULT 0"):
+                    "classifica_nascosta INTEGER DEFAULT 0",
+                    # IL COSTO DI SPEDIZIONE STANDARD DEL NEGOZIO (set
+                    # 2026): la tariffa che il venditore scrive UNA volta
+                    # in «📦 Come spedisci», e che il form di Vendi si
+                    # ritrova gia' scritta a ogni annuncio nuovo. '' =
+                    # nessuna, che e' il mondo di prima. Un JSON e non
+                    # quattro colonne: {"valuta", "casa", "punto"?,
+                    # "extra"?} — il punto e il supplemento sono
+                    # facoltativi, e l'ASSENZA della chiave e' la loro
+                    # dichiarazione («non lo imposto»), il patto di
+                    # `spedizione_zone`. La legge SOLO
+                    # `spedizione_standard_leggi`, e la scrivono il Salva
+                    # del cassetto e l'aggiornamento in blocco.
+                    "spedizione_standard TEXT DEFAULT ''"):
         try:
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -12236,6 +12249,427 @@ def guardia_almeno_una_zona(consegna: str, zone: dict, no_casa: int = 0):
                                  "il costo per almeno una zona estera: "
                                  "così com'è l'annuncio non si potrebbe "
                                  "spedire da nessuna parte.")
+
+
+# ---------------------------------------------------------------------
+# IL COSTO DI SPEDIZIONE STANDARD DEL NEGOZIO (set 2026)
+# ---------------------------------------------------------------------
+# Chi spedisce sempre allo stesso modo scrive la sua tariffa UNA volta,
+# nel cassetto «📦 Come spedisci», e ci fa due cose: il form di Vendi se
+# la ritrova gia' scritta a ogni articolo nuovo (e al Duplica), e un
+# bottone la porta su tutti gli articoli gia' in vetrina in un colpo
+# solo, invece che uno per uno con la Modifica.
+# LA VALUTA E' QUELLA DEL FORM: sats (costo fisso) o euro (ancorato,
+# diventa sats all'acquisto), e una sola per i tre numeri — come il
+# toggle di Vendi, che e' uno per tutti i costi.
+# I DUE TETTI non sono una politica di prezzo — la spedizione non ne ha,
+# e l'annuncio singolo non ne mette — ma il bordo di cio' che un numero
+# puo' essere: tutti i sats che esisteranno, e un miliardo di euro. Un
+# 1e30 finirebbe in una colonna INTEGER e l'aggiornamento in blocco
+# morirebbe a meta' con un OverflowError; un «Infinity» nel JSON
+# renderebbe /api/me illeggibile al client, che JSON.parse non lo sa.
+SPED_STD_TETTO_SATS = 2_100_000_000_000_000
+SPED_STD_TETTO_EUR = 1_000_000_000.0
+
+
+def spedizione_standard_leggi(grezzo) -> dict | None:
+    """Il costo standard letto dalla colonna: {"valuta", "casa",
+    "punto"?, "extra"?}, oppure None (nessuno).
+
+    DIFENSIVO come `_zone_annuncio`, e per la stessa ragione: questa
+    colonna esce da /api/me, cioe' dalla porta dell'app, e un JSON
+    storto non deve diventare un 500 li'. Quel che non si sa leggere
+    vale «nessuno standard» e MAI un numero inventato: un costo storto
+    che diventasse 0 sarebbe la spedizione GRATIS su ogni articolo
+    nuovo, scritta da noi."""
+    try:
+        d = json.loads(grezzo or "")
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(d, dict) or d.get("valuta") not in ("sats", "eur"):
+        return None
+    valuta = d["valuta"]
+    tetto = SPED_STD_TETTO_SATS if valuta == "sats" else SPED_STD_TETTO_EUR
+
+    def numero(v):
+        if v is None or isinstance(v, bool):
+            return None
+        try:
+            x = float(v)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(x) or x < 0 or x > tetto:
+            return None
+        return int(x) if valuta == "sats" else round(x, 2)
+
+    casa = numero(d.get("casa"))
+    if casa is None:
+        return None
+    fuori = {"valuta": valuta, "casa": casa}
+    for k in ("punto", "extra"):
+        v = numero(d.get(k))
+        if v is not None:
+            fuori[k] = v
+    return fuori
+
+
+def spedizione_standard_da_payload(v) -> dict | None:
+    """Il costo standard che arriva dal cassetto, normalizzato con la
+    liturgia del campo di Vendi — sats interi, euro a due decimali, mai
+    sotto zero — oppure un 400 che dice QUALE casella non va.
+
+    PIU' SEVERO DEL GIUDICE DELL'ANNUNCIO, ed e' voluto: la' un numero
+    storto diventa 0 e basta (i client di ieri non devono rompersi),
+    qui uno zero vorrebbe dire «spedizione gratis» scritta da noi su
+    ogni articolo nuovo e — col bottone — su tutto il negozio. Una
+    porta nuova non ha client di ieri da proteggere.
+    E NEI SATS NIENTE PUNTI NE' VIRGOLE: «5.000» e' cinquemila per chi
+    lo scrive e cinque per un float, e l'errore costerebbe proprio a
+    chi si fida del separatore delle migliaia.
+
+    None = nessuno standard: la casella di casa VUOTA e' lo spegnimento
+    (lo zero invece e' un costo: «spedisco gratis»). Punto e supplemento
+    senza la casa non si salvano: si appoggiano a lei, come nel form."""
+    if v is None or v == "" or v == {}:
+        return None
+    if not isinstance(v, dict):
+        raise HTTPException(400, "Costo standard in formato sbagliato")
+    valuta = str(v.get("valuta") or "").strip().lower()
+    if valuta not in ("sats", "eur"):
+        raise HTTPException(400, "Il costo standard si scrive in sats "
+                                 "o in euro")
+
+    def leggi(chiave, nome):
+        grezzo = v.get(chiave)
+        if grezzo is None or str(grezzo).strip() == "":
+            return None
+        if valuta == "sats":
+            x = None
+            if isinstance(grezzo, bool):
+                x = None
+            elif isinstance(grezzo, int):
+                x = grezzo
+            elif isinstance(grezzo, float):
+                if math.isfinite(grezzo) and grezzo == int(grezzo):
+                    x = int(grezzo)
+            elif re.fullmatch(r"[0-9]+", str(grezzo).strip()):
+                x = int(str(grezzo).strip())
+            if x is None or x < 0:
+                raise HTTPException(400, f"{nome}: scrivi un numero "
+                                         "intero di sats, senza punti "
+                                         "né virgole")
+            if x > SPED_STD_TETTO_SATS:
+                raise HTTPException(400, f"{nome}: è più di tutti i sats "
+                                         "che esisteranno mai")
+            return x
+        try:
+            if isinstance(grezzo, bool):
+                raise ValueError
+            x = float(str(grezzo).strip().replace(",", "."))
+        except ValueError:
+            raise HTTPException(400, f"{nome}: scrivi un numero")
+        if not math.isfinite(x) or x < 0:
+            raise HTTPException(400, f"{nome}: scrivi un numero da 0 in su")
+        x = round(x, 2)
+        if x > SPED_STD_TETTO_EUR:
+            raise HTTPException(400, f"{nome}: è troppo alto")
+        return x
+
+    casa = leggi("casa", "Il costo di spedizione")
+    punto = leggi("punto", "Il costo verso un punto di ritiro")
+    extra = leggi("extra", "Il costo di ogni pezzo in più")
+    if casa is None:
+        if punto is not None or extra is not None:
+            raise HTTPException(400, "Scrivi prima il costo di spedizione "
+                                     "standard: il punto di ritiro e il "
+                                     "pezzo in più si aggiungono a lui")
+        return None
+    fuori = {"valuta": valuta, "casa": casa}
+    if punto is not None:
+        fuori["punto"] = punto
+    if extra is not None:
+        fuori["extra"] = extra
+    return fuori
+
+
+def spedizione_standard_json(std) -> str:
+    """La colonna: '' quando non c'e', il JSON a chiavi ordinate
+    altrimenti — una forma sola, il patto di `zone_json`."""
+    return json.dumps(std, sort_keys=True) if std else ""
+
+
+# LE PAROLE DEI MOTIVI stanno nel client (sono testo per chi legge); qui
+# ci sono i CODICI, e l'ORDINE in cui si guardano: prima cio' che
+# l'articolo E' e non cambiera' da solo, poi cio' che gli sta SUCCEDENDO
+# e passera'. Il primo che vale e' quello che si dice: chi ha un ordine
+# aperto su un articolo a spedizione gratis deve sentirsi dire «gratis»,
+# che e' la ragione per cui anche a ordine chiuso restera' com'e'.
+SPED_STD_MOTIVI = ("nostr", "negozio", "asta", "ritiro", "digitale",
+                   "servizio", "senza_consegna", "no_casa", "gratis",
+                   "revisione", "ordine", "cambio", "uguale", "cambiato")
+
+# I campi da cui dipende un piano: se uno cambia fra l'anteprima di
+# questa richiesta e la sua transazione, l'articolo resta com'era
+# («cambiato») invece di prendersi dei numeri pensati per un altro.
+_SPED_STD_ISTANTANEA = ("stato", "valuta", "consegna", "non_spedisce_casa",
+                        "spedizione_sats", "spedizione_eur",
+                        "spedizione_punto_sats", "spedizione_punto_eur",
+                        "spedizione_punto_dichiarata",
+                        "spedizione_extra_sats", "spedizione_extra_eur")
+
+
+def _sped_std_escluso(a, vivi: int, cambio: float) -> str:
+    """Perche' QUESTO articolo resta com'era ('' = non resta fuori).
+
+    SINCRONA E SENZA DATABASE: la chiamano l'anteprima e, di nuovo,
+    l'applicazione DENTRO la sua transazione — fra le due l'annuncio
+    puo' essere cambiato, e il giudizio dev'essere lo stesso.
+    Le regole sono quelle della Modifica, lette una per una: la riga
+    che vive altrove (Nostr, un negozio collegato: il sync la
+    riscriverebbe entro l'ora), l'asta che non si modifica mai, l'ordine
+    vivo (chi paga trova l'annuncio com'era), la revisione (aspetta un
+    moderatore). In piu' le tre di questo cantiere: chi non spedisce
+    (ritiro, digitale, servizio), chi non spedisce IN CASA, e la
+    spedizione GRATIS — una scelta del venditore su quell'articolo, che
+    un costo di negozio non deve ricoprire di nascosto.
+    E il cambio: su un listino in euro i sats sono un equivalente al
+    cambio di adesso, e senza cambio la Modifica stessa si fermerebbe
+    (`prezzo_da_payload` risponde 503)."""
+    o = origine_annuncio(a)
+    if o == "nostr":
+        return "nostr"
+    if o:
+        return "negozio"
+    if (a["asta_base_sats"] or 0) > 0:
+        return "asta"
+    consegna = a["consegna"] or ""
+    if consegna not in ("spedizione", "entrambe"):
+        return {"ritiro": "ritiro", "digitale": "digitale",
+                "servizio": "servizio"}.get(consegna, "senza_consegna")
+    if _non_spedisce_casa(a):
+        return "no_casa"
+    if not (a["spedizione_sats"] or a["spedizione_eur"]):
+        return "gratis"
+    if a["stato"] != "attivo":
+        return "revisione"
+    if vivi:
+        return "ordine"
+    if a["valuta"] == "eur" and not cambio > 0:
+        return "cambio"
+    return ""
+
+
+async def _sped_std_nuovi(a, std: dict, cambio: float) -> tuple:
+    """I numeri NUOVI di un articolo, passati dal giudice di sempre
+    (`consegna_da_payload`) con la valuta del SUO listino: e' la
+    garanzia che il costo scritto nel cassetto valga esattamente come
+    lo stesso costo scritto nel form di quell'annuncio — stessi
+    arrotondamenti, stessa semantica (fisso o ancorato all'euro),
+    stessa presenza del punto. Torna (colonne, convertito).
+    Tocca SOLO cio' che lo standard dichiara: la casa sempre, il punto
+    e il supplemento se ci sono — senza, quelli dell'articolo restano."""
+    listino = "eur" if a["valuta"] == "eur" else "sats"
+    converti = listino == "eur" and std["valuta"] == "sats"
+
+    def chiave(base, x):
+        # IL SOLO CASO SENZA UNA FORMA NEL FORM: un listino in euro non
+        # ha il toggle, e un costo in sats li' non si puo' scrivere. Si
+        # traduce al cambio di adesso — l'anteprima lo dice col «≈» —
+        # invece di lasciarlo fuori: e' la conversione che l'app fa
+        # comunque a ogni acquisto, fatta qui un giorno prima.
+        if converti:
+            eur = round(x * cambio / 100_000_000, 2)
+            # un costo SCRITTO non diventa gratis per un arrotondamento
+            if x > 0 and eur < 0.01:
+                eur = 0.01
+            return {f"{base}_eur": eur}
+        return {f"{base}_{std['valuta']}": x}
+
+    d = {"consegna": a["consegna"], **chiave("spedizione", std["casa"])}
+    if "punto" in std:
+        d.update(chiave("spedizione_punto", std["punto"]))
+    if "extra" in std:
+        d.update(chiave("spedizione_extra", std["extra"]))
+    (_cons, sped_sats, sped_eur, punto_sats, punto_eur, punto_dich,
+     extra_sats, extra_eur, *_resto) = await consegna_da_payload(d, listino)
+    nuovi = {"spedizione_sats": sped_sats, "spedizione_eur": sped_eur}
+    if "punto" in std:
+        nuovi.update({"spedizione_punto_sats": punto_sats,
+                      "spedizione_punto_eur": punto_eur,
+                      "spedizione_punto_dichiarata": punto_dich})
+    if "extra" in std:
+        nuovi.update({"spedizione_extra_sats": extra_sats,
+                      "spedizione_extra_eur": extra_eur})
+    return nuovi, converti
+
+
+def _sped_std_pari(a, nuovi: dict) -> bool:
+    """Gia' cosi'? Sul listino in EURO i sats sono un EQUIVALENTE
+    ricalcolato al cambio del momento, quindi si confronta il solo euro:
+    o un articolo gia' giusto risulterebbe «da aggiornare» ogni volta
+    che il cambio si muove, e l'anteprima mentirebbe sul conto."""
+    for k, v in nuovi.items():
+        if a["valuta"] == "eur" and k.endswith("_sats"):
+            continue
+        if (a[k] or 0) != v:
+            return False
+    return True
+
+
+def _sped_std_mappa(a, sats: int, eur: float) -> str:
+    """La mappa delle zone con la sola CASA riscritta. La copia di `dom`
+    deve dire gli stessi numeri delle colonne — le due si scrivono
+    insieme, sempre (vedi `_tariffa_dichiarata`) — e l'estero resta
+    com'era: la lettura e' quella difensiva di sempre, la forma
+    d'uscita quella di `zone_json`."""
+    zone = _zone_annuncio(a)
+    zone["dom"] = (sats, eur)
+    return zone_json(zone)
+
+
+def _sped_std_estero_diverso(a, sats: int, eur: float) -> bool:
+    """Ha tariffe per l'estero DIVERSE dalla nuova tariffa di casa? Le
+    zone non si toccano (non le dichiara il costo standard), e l'
+    anteprima lo dice: dopo il travaso di settembre molti articoli
+    hanno i continenti copiati dalla casa di allora, e dopo questo giro
+    non lo saranno piu'. Sul listino in euro conta l'euro, come in
+    `_sped_std_pari`."""
+    for z, (s, e) in _zone_annuncio(a).items():
+        if z == "dom":
+            continue
+        if (e != eur) if a["valuta"] == "eur" else ((s, e) != (sats, eur)):
+            return True
+    return False
+
+
+def _sped_std_tre(src) -> dict:
+    """Le tre tariffe di un articolo, come le legge il client per dire
+    «da quanto a quanto»: casa [sats, eur], punto [sats, eur,
+    dichiarata], supplemento [sats, eur]."""
+    return {"casa": [src["spedizione_sats"], src["spedizione_eur"]],
+            "punto": [src["spedizione_punto_sats"],
+                      src["spedizione_punto_eur"],
+                      src["spedizione_punto_dichiarata"]],
+            "extra": [src["spedizione_extra_sats"],
+                      src["spedizione_extra_eur"]]}
+
+
+async def _sped_std_giro(tg_id: int, std: dict) -> dict:
+    """L'ANTEPRIMA: per ogni articolo IN VENDITA del venditore (attivo o
+    in revisione), cosa succederebbe col costo standard. Non scrive
+    niente — la stessa funzione la rifa' l'applicazione, e poi rigiudica
+    ogni riga dentro la transazione.
+    GLI ESAURITI NON SI GUARDANO: non si comprano, e la loro scheda dice
+    «esaurito»; si contano soltanto, perche' chi ne rifornisce uno deve
+    sapere che la tariffa e' rimasta quella di prima."""
+    cambio = await cambio_btc_eur()
+    con = db()
+    try:
+        righe = con.execute(
+            "SELECT * FROM annunci WHERE venditore_id=? AND stato IN "
+            "('attivo','revisione') ORDER BY id DESC", (tg_id,)).fetchall()
+        # il giudice unico dell'«affare in corso», quello della
+        # Modifica: conta anche le righe dei set
+        vivi = {r["id"]: _ordini_vivi_annuncio(
+            con, r["id"], ("released", "refunded", "annullato"),
+            esclusi=True) for r in righe}
+        esauriti = con.execute(
+            "SELECT COUNT(*) AS n FROM annunci WHERE venditore_id=? AND "
+            "stato='venduto'", (tg_id,)).fetchone()["n"]
+    finally:
+        con.close()
+    cambiano, fuori = [], []
+    for a in righe:
+        motivo = _sped_std_escluso(a, vivi[a["id"]], cambio)
+        if not motivo:
+            nuovi, convertito = await _sped_std_nuovi(a, std, cambio)
+            if _sped_std_pari(a, nuovi):
+                motivo = "uguale"
+        if motivo:
+            voce = {"id": a["id"], "titolo": a["titolo"], "motivo": motivo}
+            if motivo == "negozio":
+                voce["origine"] = nome_origine(a)
+            fuori.append(voce)
+            continue
+        dopo = {k: v for k, v in _sped_std_tre({**dict(a), **nuovi}).items()
+                if k == "casa" or (k == "punto" and "punto" in std)
+                or (k == "extra" and "extra" in std)}
+        cambiano.append({
+            "id": a["id"], "titolo": a["titolo"],
+            "valuta": "eur" if a["valuta"] == "eur" else "sats",
+            "prima": _sped_std_tre(a), "dopo": dopo,
+            "convertito": convertito,
+            "estero_diverso": _sped_std_estero_diverso(
+                a, nuovi["spedizione_sats"], nuovi["spedizione_eur"]),
+            # per l'applicazione, e mai al client: i numeri gia' giudicati
+            # e la fotografia da cui sono nati
+            "_nuovi": nuovi,
+            "_istantanea": tuple(a[k] for k in _SPED_STD_ISTANTANEA)})
+    return {"cambiano": cambiano, "fuori": fuori, "esauriti": esauriti,
+            "cambio": cambio}
+
+
+def _sped_std_pubblico(v: dict) -> dict:
+    """Una voce come la vede il client: senza le chiavi di servizio."""
+    return {k: x for k, x in v.items() if not k.startswith("_")}
+
+
+def _sped_std_da_usare(d: dict, tg_id: int) -> tuple:
+    """Quale costo si porta sugli articoli: quello scritto ADESSO nel
+    cassetto, se il client lo manda — «con questo costo», dice il
+    bottone, ed e' quello che si vede — altrimenti quello salvato.
+    Torna (std, dal_corpo); senza nessuno dei due, un 400 che dice cosa
+    fare invece di un'anteprima vuota."""
+    if "spedizione_standard" in d:
+        std = spedizione_standard_da_payload(d.get("spedizione_standard"))
+        dal_corpo = True
+    else:
+        con = db()
+        r = con.execute("SELECT spedizione_standard FROM utenti "
+                        "WHERE tg_id=?", (tg_id,)).fetchone()
+        con.close()
+        std = spedizione_standard_leggi(r["spedizione_standard"] if r else "")
+        dal_corpo = False
+    if not std:
+        raise HTTPException(400, "Scrivi prima il costo di spedizione "
+                                 "standard: è quello che finisce sugli "
+                                 "articoli")
+    return std, dal_corpo
+
+
+# I giri Nostr in corsa, uno per venditore: {tg_id: id ancora da
+# rilanciare}. E il riferimento ai task, che senza verrebbero raccolti
+# dal garbage collector a meta' volo (il patto di `_TASK_EVENTI_P2P`).
+_SPED_STD_NOSTR: dict = {}
+_TASK_SPED_STD: set = set()
+
+
+async def _sped_std_su_nostr(tg_id: int, ids: list):
+    """L'evento NIP-99 porta il costo di casa (il tag `delivery`), quindi
+    ogni articolo aggiornato riparte sui relay — A LOTTI, col respiro
+    dell'import in blocco (`LOTTO_NOSTR`, `PAUSA_NOSTR`): cento articoli
+    in una raffica sola sono il modo di farsi rifiutare dai relay.
+    UN GIRO PER VENDITORE: se il bottone si ripreme mentre il giro di
+    prima e' ancora in corsa, gli id si aggiungono alla SUA coda invece
+    di aprirne un secondo — e `annuncio_su_nostr` rilegge la riga al
+    momento dell'invio, quindi esce comunque l'ultimo stato."""
+    if not _NOSTR or not ids:
+        return
+    coda = _SPED_STD_NOSTR.get(tg_id)
+    if coda is not None:
+        coda.update(ids)
+        return
+    coda = _SPED_STD_NOSTR[tg_id] = set(ids)
+    try:
+        while coda:
+            lotto = sorted(coda)[:LOTTO_NOSTR]
+            coda.difference_update(lotto)
+            await asyncio.gather(*[annuncio_su_nostr(
+                x, "active", solo_aggiornamento=True) for x in lotto])
+            if coda:
+                await asyncio.sleep(PAUSA_NOSTR)
+    finally:
+        _SPED_STD_NOSTR.pop(tg_id, None)
 
 
 def guardia_venditore_digitale(tg_id: int, consegna: str,
@@ -34727,6 +35161,13 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # cancellerebbe da solo, in silenzio. Il gate vive sull'ACQUISTO.
     profilo["spedizionieri_miei"] = reti_venditore(
         u["spedizionieri"], u["spedizioniere"], True)
+    # IL COSTO DI SPEDIZIONE STANDARD (set 2026), per il cassetto e per
+    # la precompilazione del form di Vendi. Dal SELECT * la colonna esce
+    # GREZZA, una stringa JSON, e qui la si sostituisce con la lettura
+    # pulita — il patto di `visti`: il client non ha un secondo parser,
+    # e una colonna storta vale «nessuno standard» invece di un 500.
+    profilo["spedizione_standard"] = spedizione_standard_leggi(
+        u["spedizione_standard"] if u else "")
     # I punti di ritiro che si e' tenuto CHI COMPRA (ago 2026). Qui
     # escono TUTTI — anche quelli su una rete che nessun venditore
     # dichiara piu' — perche' questo e' il cassetto in cui si tolgono, e
@@ -35259,36 +35700,178 @@ async def scegli_spedizioniere(req: Request,
     di MSG_CLIENT_VECCHIO: la' la chiave di ieri portava un'altra
     UNITA' e leggerla sarebbe stato scrivere il falso, qui porta lo
     stesso identico significato — una rete — e ignorarla vorrebbe dire
-    rompere un client che non ha fatto niente di male."""
+    rompere un client che non ha fatto niente di male.
+
+    IL COSTO DI SPEDIZIONE STANDARD VIAGGIA NELLO STESSO SALVA (set
+    2026): vive nello stesso cassetto, e un bottone che salva mezza
+    pagina sarebbe una trappola. Chiave ASSENTE = non lo tocco (il
+    client di ieri non lo conosce, e non deve cancellarlo); presente e
+    vuota = lo tolgo. E per la stessa ragione, al rovescio: un corpo
+    senza NESSUNA delle due chiavi delle reti le lascia com'erano —
+    prima le azzerava, ed era un caso che nessun client mandava."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     d = await leggi_json(req)
-    if "spedizionieri" in d:
-        scelte = d.get("spedizionieri") or []
-    else:
-        # il client di ieri: una stringa sola, che vale come lista da uno
-        una = (d.get("spedizioniere") or "").strip()
-        scelte = [una] if una else []
-    if not isinstance(scelte, list):
-        raise HTTPException(400, "Reti in formato sbagliato")
-    ignote = [s for s in scelte if s not in SPEDIZIONIERI]
-    if ignote:
-        raise HTTPException(400, "Rete sconosciuta: "
-                            + ", ".join(SPEDIZIONIERI)
-                            + " o niente (non dichiarato)")
-    serializzate = _reti_serializza(scelte)
-    # `True` per la ragione del gemello in /api/me: qui si sceglie la
-    # prima rete per la colonna singolare, cioe' il dato di
-    # compatibilita' di CHI VENDE — gatarla lascerebbe vuota quella
-    # colonna a chi ha dichiarato solo la rete di casa.
-    reti = reti_venditore(serializzate, "", True)
+    # PRIMA di scrivere qualunque cosa: un costo storto ferma anche le
+    # reti, cosi' il Salva o riesce tutto o non scrive niente
+    tocca_std = "spedizione_standard" in d
+    std = (spedizione_standard_da_payload(d.get("spedizione_standard"))
+           if tocca_std else None)
+    tocca_reti = "spedizionieri" in d or "spedizioniere" in d
+    if tocca_reti:
+        if "spedizionieri" in d:
+            scelte = d.get("spedizionieri") or []
+        else:
+            # il client di ieri: una stringa sola, che vale come lista da uno
+            una = (d.get("spedizioniere") or "").strip()
+            scelte = [una] if una else []
+        if not isinstance(scelte, list):
+            raise HTTPException(400, "Reti in formato sbagliato")
+        ignote = [s for s in scelte if s not in SPEDIZIONIERI]
+        if ignote:
+            raise HTTPException(400, "Rete sconosciuta: "
+                                + ", ".join(SPEDIZIONIERI)
+                                + " o niente (non dichiarato)")
+        serializzate = _reti_serializza(scelte)
+        # `True` per la ragione del gemello in /api/me: qui si sceglie la
+        # prima rete per la colonna singolare, cioe' il dato di
+        # compatibilita' di CHI VENDE — gatarla lascerebbe vuota quella
+        # colonna a chi ha dichiarato solo la rete di casa.
+        reti = reti_venditore(serializzate, "", True)
     con = db()
-    con.execute("UPDATE utenti SET spedizionieri=?, spedizioniere=? "
-                "WHERE tg_id=?",
-                (serializzate, reti[0] if reti else "", user["id"]))
+    if tocca_reti:
+        con.execute("UPDATE utenti SET spedizionieri=?, spedizioniere=? "
+                    "WHERE tg_id=?",
+                    (serializzate, reti[0] if reti else "", user["id"]))
+    if tocca_std:
+        con.execute("UPDATE utenti SET spedizione_standard=? WHERE tg_id=?",
+                    (spedizione_standard_json(std), user["id"]))
     con.commit()
+    # si rilegge cio' che e' rimasto scritto (il patto dello sconto
+    # sugli articoli): con due chiavi facoltative la risposta non si
+    # deduce dal body, e il client riallinea il cassetto a colpo sicuro
+    r = con.execute("SELECT spedizionieri, spedizioniere, "
+                    "spedizione_standard FROM utenti WHERE tg_id=?",
+                    (user["id"],)).fetchone()
     con.close()
+    reti = reti_venditore(r["spedizionieri"], r["spedizioniere"],
+                          True) if r else []
     return {"ok": True, "spedizionieri": reti,
-            "spedizioniere": reti[0] if reti else ""}
+            "spedizioniere": reti[0] if reti else "",
+            "spedizione_standard": spedizione_standard_leggi(
+                r["spedizione_standard"] if r else "")}
+
+
+@app.post("/api/me/spedizione-standard/anteprima")
+async def sped_std_anteprima(req: Request,
+                             x_tg_init_data: str = Header(""),
+                             barattolo_sessione: str = Cookie("")):
+    """L'ANTEPRIMA dell'aggiornamento in blocco (set 2026, «📦 Come
+    spedisci» → «Aggiorna tutti gli articoli con questo costo»): quanti
+    articoli cambiano, da quanto a quanto, quali restano com'erano e
+    perche'. NON SCRIVE NIENTE, nemmeno lo standard: chi guarda e poi
+    annulla non ha deciso nulla. POST e non GET perche' il costo da
+    provare viaggia nel corpo — quello scritto adesso nel cassetto."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    std, _dal_corpo = _sped_std_da_usare(d, user["id"])
+    giro = await _sped_std_giro(user["id"], std)
+    return {"ok": True, "spedizione_standard": std,
+            "cambiano": [_sped_std_pubblico(v) for v in giro["cambiano"]],
+            "fuori": giro["fuori"], "esauriti": giro["esauriti"]}
+
+
+@app.post("/api/me/spedizione-standard/applica")
+async def sped_std_applica(req: Request,
+                           x_tg_init_data: str = Header(""),
+                           barattolo_sessione: str = Cookie("")):
+    """L'AGGIORNAMENTO IN BLOCCO: il costo standard su tutti gli articoli
+    idonei, in una transazione sola, e lo standard salvato insieme —
+    «con questo costo» vuol dire anche «d'ora in poi questo».
+
+    NIENTE MODERAZIONE, ed e' la riga da non «uniformare» alla Modifica.
+    La moderazione legge il TESTO — le parole vietate e l'AI guardano
+    titolo e descrizione, lo strato dei link la descrizione — e qui non
+    cambia nessuna parola: cambiano dei numeri di tariffa, che nessun
+    verdetto puo' leggere. E' la regola che l'import aperto ha gia'
+    scritto per se' (`_da_giudicare`: si rigiudica quando cambia il
+    testo, «un ritocco al prezzo non puo' cambiare un verdetto») e che
+    «🔄 Aggiorna i pezzi» vive da agosto: un numero si cambia senza
+    ripassare dalla Modifica. Rimandare in revisione cinquanta articoli
+    per un euro di spedizione vorrebbe dire togliere dalla vetrina un
+    negozio intero, per niente.
+
+    GLI ORDINI GIA' APERTI RESTANO COL PREZZO DI QUANDO SONO NATI, e per
+    due strade: l'articolo con un affare in corso resta fuori (il
+    giudice della Modifica, lo stesso), e comunque ogni ordine si porta
+    la sua quota di spedizione fissata alla nascita
+    (`ordini.spedizione_sats`: il config puo' cambiare, l'ordine no).
+
+    OGNI RIGA SI RIGIUDICA DENTRO LA TRANSAZIONE: il piano nasce fuori
+    (il giudice dei numeri aspetta il cambio, e dentro una scrittura non
+    si aspetta la rete), e fra il piano e la scrittura qualcuno puo'
+    aver comprato. `BEGIN IMMEDIATE` tiene fuori gli altri scrittori, e
+    li' dentro l'affare in corso si richiede da capo: chi ha comprato
+    prima di noi lascia l'articolo com'era, chi compra dopo trova la
+    tariffa nuova. Una riga cambiata sotto i piedi («cambiato») non si
+    prende numeri pensati per un'altra."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    d = await leggi_json(req)
+    std, dal_corpo = _sped_std_da_usare(d, user["id"])
+    giro = await _sped_std_giro(user["id"], std)
+    adesso = int(time.time())
+    fatti, fuori = [], list(giro["fuori"])
+    con = db()
+    try:
+        con.execute("BEGIN IMMEDIATE")
+        if dal_corpo:
+            con.execute("UPDATE utenti SET spedizione_standard=? "
+                        "WHERE tg_id=?",
+                        (spedizione_standard_json(std), user["id"]))
+        for v in giro["cambiano"]:
+            a = con.execute("SELECT * FROM annunci WHERE id=? AND "
+                            "venditore_id=?",
+                            (v["id"], user["id"])).fetchone()
+            if not a or a["stato"] not in ("attivo", "revisione"):
+                motivo = "cambiato"
+            else:
+                motivo = _sped_std_escluso(a, _ordini_vivi_annuncio(
+                    con, a["id"], ("released", "refunded", "annullato"),
+                    esclusi=True), giro["cambio"])
+                if (not motivo and tuple(a[k] for k in _SPED_STD_ISTANTANEA)
+                        != v["_istantanea"]):
+                    motivo = "cambiato"
+            if motivo:
+                fuori.append({"id": v["id"], "titolo": v["titolo"],
+                              "motivo": motivo})
+                continue
+            nuovi = v["_nuovi"]
+            # SOLO LE TARIFFE, la copia di casa nella mappa e la data: il
+            # testo resta quello che la moderazione ha gia' visto, e lo
+            # stato non si tocca (il perche' e' nella docstring)
+            con.execute(
+                "UPDATE annunci SET "
+                + ", ".join(f"{k}=?" for k in nuovi)
+                + ", spedizione_zone=?, modificato=? WHERE id=?",
+                (*nuovi.values(),
+                 _sped_std_mappa(a, nuovi["spedizione_sats"],
+                                 nuovi["spedizione_eur"]),
+                 adesso, a["id"]))
+            fatti.append(v)
+        con.commit()
+    except Exception:
+        con.rollback()
+        raise
+    finally:
+        con.close()
+    if fatti:
+        t = asyncio.create_task(_sped_std_su_nostr(
+            user["id"], [v["id"] for v in fatti]))
+        _TASK_SPED_STD.add(t)
+        t.add_done_callback(_TASK_SPED_STD.discard)
+    return {"ok": True, "spedizione_standard": std,
+            "aggiornati": len(fatti),
+            "cambiano": [_sped_std_pubblico(v) for v in fatti],
+            "fuori": fuori, "esauriti": giro["esauriti"]}
 
 
 @app.post("/api/me/punti-ritiro")
