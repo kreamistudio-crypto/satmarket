@@ -14470,8 +14470,10 @@ def prove_foto_telegram_fallita():
     def chiama(risposta):
         async def _bot_api(metodo, dati):
             return risposta
+        # i tre casi sono quelli della PRODUZIONE: in collaudo la
+        # funzione si ferma prima (prove_telegram_simulato_collaudo)
         amb = {"bot_api": _bot_api, "AVATAR_LATO": 128, "BOT_TOKEN": "x",
-               "httpx": None}
+               "httpx": None, "MODALITA_COLLAUDO": False}
         exec("async " + ft, amb)
         return asyncio.new_event_loop().run_until_complete(
             amb["_foto_profilo_telegram"](111))
@@ -31355,6 +31357,15 @@ def _amb_seo():
            "comune_da_zona": lambda z: "Carmagnola (TO)" if "Carmagnola" in z
            else "",
            "cambio_noto_ora": lambda *a: 0.0}
+    # le LEVE dello sconto del negozio, come le scrive il config
+    # d'esempio: il giudice della cassa le legge, e qui non c'e' config
+    _cfg = {}
+    exec(open("config_esempio.py", encoding="utf-8").read(), _cfg)
+    for _k in ("SCONTO_PACCO_ATTIVO", "SCONTO_PACCO_CRITERI",
+               "SCONTO_PACCO_MIN_SOGLIA", "SCONTO_PACCO_MIN_VALORE_EUR",
+               "SCONTO_PACCO_MIN_VALORE_SATS", "SCONTO_PACCO_MIN_PERCENTO",
+               "SCONTO_PACCO_MAX_PERCENTO", "VALUTE_SOGLIA"):
+        amb[_k] = _cfg[_k]
     # LA LEVETTA DELL'ONION, mutabile: `_pagina_con_meta` chiede a
     # `su_onion()` se togliere lo script di Telegram, e qui non c'e'
     # nessuna richiesta da cui leggere l'Host. Una lista di un
@@ -31391,7 +31402,12 @@ def _amb_seo():
               "_testa_seo", "_url_annuncio",
               "_url_negozio", "_categoria_da_slug", "_schede_cartello",
               "_link_categorie", "_seo_niente", "_prezzo_ld",
-              "_disponibilita_ld", "_ld_annuncio", "_seo_annuncio",
+              "_disponibilita_ld", "_ld_annuncio",
+              # il prezzo dell'anteprima col giudice della cassa
+              "_valuta_soglia", "_regola_sconto", "_regole_sconto",
+              "_sconto_percento", "_sconto_pacco", "_sconto_regole",
+              "_sconto_pacco_eur", "_eur_interi", "_listino_condiviso",
+              "_seo_annuncio",
               "_seo_negozio", "_seo_categoria", "_seo_home",
               "_seo_o_generici", "_fessure_base", "_fessura_tg",
               "_hash_asset", "_timbra_asset_pagina",
@@ -31431,7 +31447,13 @@ def _vetrina_finta(con):
                 "creato INT DEFAULT 0, modificato INT DEFAULT 0)")
     con.execute("CREATE TABLE utenti (tg_id INT, nome TEXT, username TEXT, "
                 "negozio TEXT, negozio_slug TEXT DEFAULT '', rating REAL, "
-                "n_feedback INT, ferie_fino INT DEFAULT 0)")
+                "n_feedback INT, ferie_fino INT DEFAULT 0, "
+                "sconto_pacco_criterio TEXT DEFAULT '', "
+                "sconto_pacco_valore_valuta TEXT DEFAULT '', "
+                "sconto_pacco_soglia INT DEFAULT 0, "
+                "sconto_pacco_valore INT DEFAULT 0, "
+                "sconto_pacco_valore_eur INT DEFAULT 0, "
+                "sconto_pacco_percento INT DEFAULT 0)")
     return con
 
 
@@ -43875,6 +43897,11 @@ def prove_collaudi_in_ci():
           [n for n in elenco if not os.path.exists(n + ".py")])
     prova("...e c'e' il feedback confermato, quello rimasto rosso tre "
           "giorni", True, "collaudo_feedback_confermato" in elenco)
+    # ...e la classifica (24 set 2026): passava nella gabbia ma non la
+    # girava nessuno — stava nel solo compileall, cioe' si controllava
+    # che si potesse leggere e non che dicesse il vero
+    prova("...e c'e' la classifica, che stava nel solo compileall", True,
+          "collaudo_classifica" in elenco)
     prova("...e parla anche quando le prove sono rosse", True,
           "!cancelled()" in job[job.rfind("- name:", 0, i):i])
 
@@ -74438,6 +74465,416 @@ def prove_p2p_ascolto():
         _sh.rmtree(dir_db, ignore_errors=True)
 
 
+def prove_anteprima_prezzo_condiviso():
+    """L'ANTEPRIMA DEL LINK DICE IL PREZZO DEL TESTO (24 set 2026).
+
+    Condividendo un annuncio il testo diceva 71,10 € (lo sconto del
+    negozio, 2d91a66) e la card del link, sotto, 79,00 €. Ora
+    `_seo_annuncio` passa da `_listino_condiviso`: la stessa regola —
+    sconto del negozio a un pezzo sul listino si', accordo e lampo no —
+    col giudice della cassa (`_regole_sconto` + `_sconto_regole`).
+    Qui l'anteprima vera su un database di cartone, e poi il confronto
+    caso per caso col `prezzoCondiviso` del client girato in node: i due
+    lati devono dire la stessa cifra."""
+    print("\n[l'anteprima del link dice il prezzo del testo]")
+    import json as _j, shutil as _sh, sqlite3, subprocess as _sp
+    import tempfile as _tf, time as _t
+    amb = _amb_seo()
+    cambio = 100_000.0                       # € per BTC: 1 sat = 0,001 €
+    amb["cambio_noto_ora"] = lambda *a: cambio
+    con = _vetrina_finta(sqlite3.connect(":memory:"))
+    negozi = {
+        # tg_id: (criterio, valuta, soglia, valore sats, valore eur, pct)
+        1: ("valore", "eur", 0, 0, 50, 10),
+        2: ("valore", "sats", 0, 10000, 0, 15),
+        3: ("pezzi", "", 2, 0, 0, 10),
+        4: ("", "", 0, 0, 0, 0),
+    }
+    for tg, (c, v, s, vs, ve, p) in negozi.items():
+        con.execute("INSERT INTO utenti (tg_id, nome, sconto_pacco_criterio, "
+                    "sconto_pacco_valore_valuta, sconto_pacco_soglia, "
+                    "sconto_pacco_valore, sconto_pacco_valore_eur, "
+                    "sconto_pacco_percento, ferie_fino) VALUES "
+                    "(?,?,?,?,?,?,?,?,?)",
+                    (tg, f"N{tg}", c, v, s, vs, ve, p,
+                     int(_t.time()) + 86400 if tg == 5 else 0))
+    con.execute("INSERT INTO utenti (tg_id, nome, sconto_pacco_criterio, "
+                "sconto_pacco_valore_valuta, sconto_pacco_valore_eur, "
+                "sconto_pacco_percento, ferie_fino) VALUES "
+                "(5,'N5','valore','eur',50,10,?)", (int(_t.time()) + 86400,))
+    casi = [
+        # id, venditore, valuta, sats, eur, stato, atteso nell'anteprima
+        (1, 1, "eur", 90000, 79.0, "attivo", "71,10 €"),
+        (2, 2, "sats", 20000, 0.0, "attivo", "17.000 sats"),
+        (3, 3, "eur", 90000, 79.0, "attivo", "79,00 €"),   # a pezzi: no
+        (4, 4, "sats", 20000, 0.0, "attivo", "20.000 sats"),
+        (5, 1, "eur", 30000, 30.0, "attivo", "30,00 €"),   # sotto soglia
+        (6, 1, "eur", 90000, 79.0, "venduto", "79,00 €"),
+        (7, 5, "eur", 90000, 79.0, "attivo", "79,00 €"),   # in ferie
+    ]
+    for aid, ven, val, sats, eur, stato, _ in casi:
+        con.execute("INSERT INTO annunci (id, titolo, descrizione, zona, "
+                    "valuta, prezzo_sats, prezzo_eur, foto, stato, "
+                    "venditore_id) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (aid, f"Cosa{aid}", "", "", val, sats, eur, "[]", stato,
+                     ven))
+    con.commit()
+    amb["db"] = _db_finto(con)
+    testa = {aid: amb["_seo_annuncio"](aid)[1] for aid, *_ in casi}
+    for aid, ven, val, sats, eur, stato, atteso in casi:
+        prova(f"anteprima {aid} ({val}, negozio {ven}, {stato}): {atteso}",
+              True, atteso in testa[aid])
+    # il listino in euro dice anche i sats, scontati della stessa misura
+    prova("...e i sats accanto all'euro scontato scendono con lui", True,
+          "71,10 € (≈ 81.000 sats)" in testa[1])
+    # A CAMBIO MUTO la soglia in euro non si misura: resta il listino
+    amb["cambio_noto_ora"] = lambda *a: 0.0
+    prova("a cambio muto la soglia in euro tace: resta il listino", True,
+          "79,00 €" in amb["_seo_annuncio"](1)[1])
+    amb["cambio_noto_ora"] = lambda *a: cambio
+    # le colonne della LAMPO restano fuori dalla query (la regola
+    # dell'anteprima, gia' sorvegliata), e l'accordo il server non lo sa
+    prova("il prezzo dell'anteprima passa dal giudice della cassa", True,
+          "_sconto_regole(" in pezzo("_listino_condiviso")
+          and "_regole_sconto(" in pezzo("_listino_condiviso"))
+    # la CHIAMATA e non il nome: la docstring lo nomina apposta
+    prova("...e non dall'unitario, che porta lampo e accordo", False,
+          "_unitario_effettivo(" in pezzo("_listino_condiviso")
+          or "lampo_" in pezzo("_listino_condiviso"))
+
+    # --- LO STESSO NUMERO DEI DUE LATI: il client in node ---------------
+    node = _sh.which("node")
+    if not node:
+        salta("anteprima e testo condiviso dicono la stessa cifra",
+              "node non installato")
+        return
+    mini = open("miniapp.html", encoding="utf-8").read()
+    vere = "".join(pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
+        "function astaE(", "function inFerie(", "function esaurito(",
+        "function regoleSconto(", "function scontoScatta(",
+        "function satsAnnuncio(", "function scontaSats(",
+        "function scontaEur(", "function conSconto(",
+        "function prezzoCondiviso("))
+    listini = []
+    for aid, ven, val, sats, eur, stato, _ in casi:
+        c, v, s, vs, ve, p = (negozi.get(ven) or
+                              ("valore", "eur", 0, 0, 50, 10))
+        listini.append(dict(id=aid, valuta=val, price=sats, priceEur=eur,
+                            stato=stato, scontoCriterio=c, scontoValuta=v,
+                            scontoSoglia=s, scontoValoreSats=vs,
+                            scontoValoreEur=ve, scontoPct=p,
+                            ferie=(int(_t.time()) + 86400 if ven == 5 else 0)))
+    prog = ("let cambioVivo = true, eurPerSat = " + repr(cambio / 1e8) + ";\n"
+            "const fmt = n => String(n);\n"
+            "const fmtEur = e => e.toFixed(2).replace('.', ',');\n" + vere
+            + "console.log(JSON.stringify(" + _j.dumps(listini)
+            + ".map(prezzoCondiviso)));\n")
+    f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8")
+    f.write(prog)
+    f.close()
+    r = _sp.run([node, f.name], capture_output=True, text=True, timeout=60,
+                encoding="utf-8")
+    os.unlink(f.name)
+    try:
+        cli = _j.loads(r.stdout)
+    except ValueError:
+        prova("il banco del client risponde", "sì",
+              "no: " + (r.stderr or r.stdout)[:300])
+        return
+
+    def cifra(t):
+        """«71,10 €» e «17.000 sats» ridotti a un numero confrontabile"""
+        n = re.sub(r"[^\d,]", "", t.split("(")[0]).replace(",", ".")
+        return round(float(n), 2) if n else None
+    serv = [cifra(re.search(r"(\d[\d.]*(?:,\d\d)? (?:€|sats))",
+                            testa[aid]).group(1)) for aid, *_ in casi]
+    prova("anteprima e testo condiviso dicono la stessa cifra, caso per caso",
+          [cifra(x) for x in cli], serv)
+
+
+def prove_filtri_prezzo_convertono():
+    """IL PREZZO DEI FILTRI DI ESPLORA SEGUE IL ₿/€ CONVERTENDO (24 set).
+
+    Cambiando valuta col pannello aperto, o riaprendolo dopo, min e max
+    cambiavano unita' restando le stesse cifre. Ora passano dal giudice
+    del cambio (convertiCampiValuta, 3d76f57) con le sue regole: il
+    vuoto resta vuoto, mai azzerati, e senza cambio la riga che chiede
+    di ricontrollare. Qui le funzioni VERE in node, su un DOM di cartone:
+    l'apertura, il toggle col pannello aperto, il ritorno, l'Applica."""
+    print("\n[il prezzo dei filtri segue il ₿/€ convertendo]")
+    import json as _j, shutil as _sh, subprocess as _sp, tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    sv = pezzo_js(mini, "function setValuta(v){", "\n}\n")
+    prova("setValuta allinea il pannello aperto", True,
+          "allineaFiltriValuta()" in sv and "filtriBox" in sv)
+    tf = pezzo_js(mini, "function toggleFiltri(){", "\n}\n")
+    prova("aprendo, i campi partono dalla valuta del filtro vivo", True,
+          "filtriValutaCampi = filtroPrezzo?.valuta || valutaVista;" in tf
+          and "allineaFiltriValuta();" in tf)
+    node = _sh.which("node")
+    if not node:
+        salta("i filtri che convertono in node", "node non installato")
+        return
+    vere = "".join(pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
+        "function costoStdIn(", "function convertiCifraCampo(",
+        "function convertiCampiValuta(", "function testoRigaCambio(",
+        "function rigaCambio(", "function allineaFiltriValuta(",
+        "function toggleFiltri(", "function applicaFiltri("))
+    vere += pezzo_js(mini, "const numeroFiltro = v => {", "\n};\n") + "\n};\n"
+    prog = r"""
+let valutaVista = 'sats', cambioVivo = true, eurPerSat = 0.001, DEMO = true;
+let filtroPrezzo = null, filtroSped = false, filtroRitiro = false, filtroDig = false,
+  filtroLampo = false, filtroAsta = false, filtroSpedGratis = false,
+  filtroSconto = false, filtroCond = '', filtroReg = '';
+let filtriValutaCampi = 'sats';
+const RIGA_CAMBIO_MS = 2600, ancoreCambio = {};
+const NODI = {}, TIMER = [];
+const setTimeout = (f, ms) => TIMER.push(f);
+const haptic = () => {}, aggiornaPicker = () => {}, renderFiltroRegioni = () => {};
+const condFiltrabile = () => true, renderScoprire = () => {}, renderGrid = () => {};
+const filtriVivi = () => !!filtroPrezzo;
+function nodo(id){
+  const n = {id, value: '', placeholder: '', checked: false, style: {display: 'none'},
+    ascolti: [], classList: {toggle(){}, add(){}},
+    addEventListener(t, f){ n.ascolti.push(f); },
+    remove(){ delete NODI[id]; }};
+  n.parentElement = {insertAdjacentElement(pos, r){ NODI[r.id] = r; }};
+  return NODI[id] = n;
+}
+['filtroMinInp','filtroMaxInp','filtriBox','filtroCondSel','filtroCondRiga',
+ 'filtroRegSel','filtroSpedInp','filtroRitiroInp','filtroDigInp','filtroLampoInp',
+ 'filtroAstaInp','filtroSpedGratisInp','filtroScontoInp','filtriBtn'].forEach(nodo);
+const el = id => NODI[id] || null;
+const document = {createElement(){ const r = {id: '', className: '', textContent: '',
+  attr: {}, setAttribute(k, v){ r.attr[k] = v; },
+  classList: {add(c){ r.className += ' ' + c; }},
+  remove(){ if (NODI[r.id] === r) delete NODI[r.id]; }}; return r; }};
+function setValuta(v){ valutaVista = v;
+  if (el('filtriBox') && el('filtriBox').style.display !== 'none') allineaFiltriValuta(); }
+""" + vere + r"""
+const stato = () => ({min: NODI.filtroMinInp.value, max: NODI.filtroMaxInp.value,
+  ph: NODI.filtroMinInp.placeholder,
+  riga: NODI.rigaCambioFiltri ? NODI.rigaCambioFiltri.textContent : null});
+const out = {};
+// 1) pannello aperto in sats, si scrive, si passa a euro
+toggleFiltri();
+NODI.filtroMinInp.value = '50000'; NODI.filtroMaxInp.value = '';
+setValuta('eur'); out.aperto_eur = stato();
+// ...e si torna: l'ancora ridà la cifra scritta, non una riconversione
+setValuta('sats'); out.ritorno = stato();
+// 2) Applica in sats, si chiude, si cambia valuta a pannello CHIUSO,
+//    si riapre: i campi parlano euro, convertiti
+setValuta('eur'); applicaFiltri(); out.applicato = filtroPrezzo;
+setValuta('sats');
+toggleFiltri(); out.riaperto_sats = stato();
+toggleFiltri();
+// 3) senza cambio: le cifre restano, e la riga lo dice
+cambioVivo = false; delete NODI.rigaCambioFiltri;
+toggleFiltri(); NODI.filtroMinInp.value = '1000'; NODI.filtroMaxInp.value = '';
+setValuta('eur'); out.senza_cambio = stato();
+console.log(JSON.stringify(out));
+"""
+    f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8")
+    f.write(prog)
+    f.close()
+    r = _sp.run([node, f.name], capture_output=True, text=True, timeout=60,
+                encoding="utf-8")
+    os.unlink(f.name)
+    try:
+        o = _j.loads(r.stdout)
+    except ValueError:
+        prova("il banco dei filtri risponde", "sì",
+              "no: " + (r.stderr or r.stdout)[:300])
+        return
+    prova("a pannello aperto 50000 sats diventano 50,00 €, il vuoto resta "
+          "vuoto", {"min": "50,00", "max": "", "ph": "Prezzo min (€)",
+                    "riga": "Convertito al cambio di adesso"}, o["aperto_eur"])
+    prova("...e tornando ai sats la cifra e' quella scritta", "50000",
+          o["ritorno"]["min"])
+    prova("Applica in euro tiene la valuta dei campi",
+          {"min": 50, "max": "", "valuta": "eur"}, o["applicato"])
+    prova("riaprendo dopo il cambio a pannello chiuso, i campi convertono",
+          ("50000", "Prezzo min (sats)", "Convertito al cambio di adesso"),
+          (o["riaperto_sats"]["min"], o["riaperto_sats"]["ph"],
+           o["riaperto_sats"]["riga"]))
+    prova("senza cambio la cifra resta, e la riga chiede di ricontrollare",
+          ("1000", True),
+          (o["senza_cambio"]["min"],
+           "Ricontroll" in (o["senza_cambio"]["riga"] or "")))
+
+
+def prove_introduzioni_leggibili():
+    """LE RIGHE D'INTRODUZIONE DEI CASSETTI SI LEGGONO (24 set 2026).
+
+    «📦 Come spedisci», «📥 Importa in blocco» e altri ventiquattro
+    posti aprono con la stessa riga in linea — 12,5px, peso 600 — che
+    era in --muted: di giorno sul bianco del cassetto fa 3,81:1, sotto
+    il 4,5:1 che il testo piccolo vuole. Ora e' --ink-soft, l'inchiostro
+    delle note (la scelta di Andrea delle «note piccole davvero»).
+    Qui il contrasto si CALCOLA dai token veri dei due temi, e non si
+    crede al nome del colore."""
+    print("\n[le righe d'introduzione dei cassetti si leggono]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    riga = "font-size:12.5px;color:var(--{});font-weight:600;line-height:1.45"
+    prova("nessuna riga d'introduzione e' rimasta in --muted", 0,
+          mini.count(riga.format("muted")))
+    prova("...e sono tutte in --ink-soft (le 26 di ieri e le 2 di prima)",
+          True, mini.count(riga.format("ink-soft")) >= 28)
+
+    def blocco(apertura):
+        i = mini.index(apertura)
+        return mini[i:mini.index("\n  }", i)]
+
+    def token(testo, nome):
+        m = re.search(r"--" + nome + r":(#[0-9A-Fa-f]{6})", testo)
+        return m.group(1) if m else None
+
+    def lum(h):
+        c = [int(h[k:k + 2], 16) / 255 for k in (1, 3, 5)]
+        c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4
+             for x in c]
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+    def contrasto(a, b):
+        la, lb = sorted((lum(a), lum(b)), reverse=True)
+        return (la + 0.05) / (lb + 0.05)
+
+    temi = {"chiaro": blocco(":root{"),
+            "scuro": blocco('html[data-tema="scuro"]{')}
+    for tema, t in temi.items():
+        for fondo in ("card", "bg"):
+            c = contrasto(token(t, "ink-soft"), token(t, fondo))
+            prova(f"{tema}: --ink-soft su --{fondo} passa il 4,5:1 "
+                  f"({c:.2f}:1)", True, c >= 4.5)
+    # il perche' del cambio, misurato: di giorno --muted sul cassetto no
+    prova("di giorno --muted sul cassetto sta sotto il 4,5:1", True,
+          contrasto(token(temi["chiaro"], "muted"),
+                    token(temi["chiaro"], "card")) < 4.5)
+
+
+def prove_telegram_simulato_collaudo():
+    """IN COLLAUDO NIENTE ESCE VERSO TELEGRAM (24 set 2026).
+
+    `_manda_telegram` simulava i soli id sotto 100000 — i tre finti —
+    e ogni altro destinatario partiva DAVVERO: nei giri dal vivo
+    l'avviso «nuovo pioniere» all'admin d'esempio (123456789 di
+    config_esempio.py) ha bussato ad api.telegram.org, fermato solo dal
+    token segnaposto. La regola e' quella dei relay: la leva basta.
+
+    1) IL CENSIMENTO: ogni indirizzo api.telegram.org del server sta in
+    una funzione (o in quella che la contiene) che si ferma su
+    `if MODALITA_COLLAUDO: ... return` PRIMA della chiamata, nel corpo
+    e non dentro un ramo. Un sito nuovo fa rosso finche' non si guarda.
+    2) IL TUBO DELLE NOTIFICHE girato davvero in collaudo, con un httpx
+    che registra: nessun destinatario lo tocca, piccolo o grande.
+    3) IL CONFIG D'ESEMPIO non porta piu' un moderatore inventato."""
+    print("\n[in collaudo niente esce verso Telegram]")
+    import asyncio as _aio
+    albero = ast.parse(_SORGENTE)
+    siti = []   # (catena di funzioni dall'interna all'esterna, riga)
+
+    def giro(nodo, catena):
+        for figlio in ast.iter_child_nodes(nodo):
+            # le docstring e i commenti NON sono chiamate
+            if isinstance(figlio, ast.Expr) and isinstance(
+                    getattr(figlio, "value", None), ast.Constant):
+                continue
+            if (isinstance(figlio, ast.Constant)
+                    and isinstance(figlio.value, str)
+                    and "api.telegram.org" in figlio.value):
+                siti.append((catena, figlio.lineno))
+            giro(figlio, [figlio] + catena if isinstance(
+                figlio, (ast.FunctionDef, ast.AsyncFunctionDef)) else catena)
+    giro(albero, [])
+
+    def ferma_prima(fn, riga):
+        for st in fn.body:
+            if (isinstance(st, ast.If) and isinstance(st.test, ast.Name)
+                    and st.test.id == "MODALITA_COLLAUDO"
+                    and isinstance(st.body[-1], ast.Return)
+                    and st.lineno < riga):
+                return True
+        return False
+
+    trovati = {}
+    for catena, riga in siti:
+        nome = catena[0].name if catena else "(fuori da ogni funzione)"
+        trovati[nome] = any(ferma_prima(fn, riga) for fn in catena)
+    prova("il censimento trova i quattro indirizzi di oggi",
+          ["_foto_profilo_telegram", "_manda_telegram", "_registra",
+           "bot_api"], sorted(trovati))
+    for nome, ok in sorted(trovati.items()):
+        prova(f"{nome}: in collaudo si ferma prima di Telegram", True, ok)
+
+    # fuori dal server l'indirizzo lo porta solo lo script a mano che
+    # esiste APPOSTA per chiamare il Telegram vero (e queste prove)
+    altri = sorted(f for f in os.listdir(".") if f.endswith(".py")
+                   and f not in ("server.py", "prove.py")
+                   and "api.telegram.org" in open(
+                       f, encoding="utf-8", errors="replace").read())
+    prova("fuori dal server solo prova_notifica.py", ["prova_notifica.py"],
+          altri)
+
+    # --- 2) il tubo vero, in collaudo, con un httpx che registra -----
+    bussate = []
+
+    class _Httpx:
+        class AsyncClient:
+            def __init__(self, *a, **k):
+                bussate.append("client")
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+            async def post(self, url, **k):
+                bussate.append(url)
+                return _Risposta()
+
+            async def get(self, url, **k):
+                bussate.append(url)
+                return _Risposta()
+
+    class _Risposta:
+        """un 200 di Telegram: se la guardia cede, la prova deve FALLIRE
+        dicendo chi ha bussato, non esplodere su un None"""
+        status_code, text = 200, '{"ok": true}'
+
+        def json(self):
+            return {"ok": True}
+    stampe = []
+    amb = {"MODALITA_COLLAUDO": True, "httpx": _Httpx, "BOT_TOKEN": "x",
+           "print": lambda *a, **k: stampe.append(" ".join(map(str, a)))}
+    exec("async " + pezzo("_manda_telegram"), amb)
+    esiti = [_aio.new_event_loop().run_until_complete(
+        amb["_manda_telegram"](i, "<b>Nuovo pioniere</b>"))
+        for i in (999, 123456789, 700000001)]
+    prova("in collaudo nessun destinatario bussa, piccolo o grande", [],
+          bussate)
+    prova("...e ognuno ha la sua riga simulata",
+          ["simulata (collaudo)"] * 3, esiti)
+    prova("...che nomina il destinatario", True,
+          any("123456789" in s for s in stampe))
+    # e fuori dal collaudo il tubo bussa ancora: la guardia non spegne
+    # la produzione (il POST finto risponde 200, come Telegram)
+    amb["MODALITA_COLLAUDO"] = False
+    try:
+        _aio.new_event_loop().run_until_complete(
+            amb["_manda_telegram"](123456789, "ciao"))
+    except Exception:
+        pass
+    prova("...e in produzione il tubo bussa ancora", True,
+          any("api.telegram.org" in b for b in bussate))
+
+    # --- 3) il config d'esempio ---------------------------------------
+    cfg = {}
+    exec(open("config_esempio.py", encoding="utf-8").read(), cfg)
+    prova("il config d'esempio non porta un moderatore inventato", [],
+          cfg.get("ADMIN_IDS"))
+
+
 def prove_letture_relay_collaudo():
     """IN COLLAUDO IL SERVER NON LEGGE DAI RELAY VERI (23 set 2026).
 
@@ -92931,6 +93368,21 @@ def prove_cambio_converte():
                        v.get("font-weight", (None,))[0],
                        v.get("color", (None, None, ["?"]))[2]))
 
+    # LA RIGA CHE SE NE VA TIENE IL POSTO (24 set 2026): svanita e' ancora
+    # nel flusso — visibility, mai display:none, che la toglierebbe dal
+    # disegno e farebbe risalire quel che sta sotto
+    base, _ = antenati("sellSpedHint", "chiaro")
+    for ferma in (False, True):
+        riga = {"tag": "div", "attr": {"id": "rigaCambioSped", "role": "status"},
+                "classi": {"riga-cambio", "svanita"} | ({"ferma"} if ferma else set())}
+        v = _vince_css(regole, base[:-1] + [riga],
+                       ("visibility", "display", "opacity"))
+        prova(f"la riga svanita{' che chiedeva di ricontrollare' if ferma else ''} "
+              f"tiene il suo posto: nascosta, non tolta",
+              ("hidden", None, "0"),
+              (v.get("visibility", (None,))[0], v.get("display", (None,))[0],
+               v.get("opacity", (None,))[0]))
+
     # ---- 4) IL BANCO IN NODE: le funzioni VERE su un DOM di cartone ----
     if not _shC.which("node"):
         salta("il cambio che converte in node", "node non installato")
@@ -92973,6 +93425,7 @@ function nodo(id, value){
 const document = {createElement(tag){
   const r = {tag, id: '', className: '', textContent: '', attr: {},
     tolta: false, setAttribute(k, v){ r.attr[k] = v; },
+    classList: {add(c){ r.className += ' ' + c; }},
     remove(){ r.tolta = true; if (NODI[r.id] === r) delete NODI[r.id]; }};
   return r; }};
 /* il disegno del cassetto: le caselle RINASCONO dalla bozza, come nel
@@ -93034,7 +93487,8 @@ caso('foto_senza_cambio', () => {
   const r = riga('rigaCambioStd');
   const ascolti = STD.map(id => NODI[id].ascolti.filter(a => a.t === 'input').length);
   NODI.spedStdPunto.ascolti[0].f();    // si riscrive una di quelle caselle
-  return {bozza: {...spedStdBozza}, riga: r, ascolti, restaDopoInput: !!NODI.rigaCambioStd};
+  return {bozza: {...spedStdBozza}, riga: r, ascolti, restaDopoInput: !!NODI.rigaCambioStd,
+          dopoInput: riga('rigaCambioStd')};
 });
 // le caselle che cambiano UNITA' col toggle dei costi
 caso('unita', () => {
@@ -93150,7 +93604,8 @@ caso('riga_va_via', () => {
   toggleSpedCur();
   const prima = !!NODI.rigaCambioSped, ms = TIMER.map(t => t.ms);
   TIMER[0].f();
-  return {prima, ms, dopo: !!NODI.rigaCambioSped};
+  return {prima, ms, dopo: !!NODI.rigaCambioSped, riga: riga('rigaCambioSped'),
+          muta: (NODI.rigaCambioSped || {attr: {}}).attr['aria-hidden']};
 });
 caso('ricerca', () => {
   pulisci({ricPrezzo: '50 000'});
@@ -93256,10 +93711,14 @@ console.log(JSON.stringify(OUT));
           (True, True, "riga-cambio ferma", []),
           ("Ricontrollali" in (_r.get("testo") or ""),
            "ora in €" in (_r.get("testo") or ""), _r.get("classe"), _r.get("timer")))
-    prova("...finche' non si riscrive una delle tre caselle",
-          ([1, 1, 1], False),
+    # ...e riscrivendo una delle tre SVANISCE MA TIENE IL POSTO (24 set
+    # 2026): toglierla faceva risalire sotto al dito quel che sta sotto
+    prova("...finche' non si riscrive una delle tre caselle: allora "
+          "svanisce, e il suo posto resta",
+          ([1, 1, 1], True, "riga-cambio ferma svanita"),
           (g("foto_senza_cambio", "ascolti"),
-           g("foto_senza_cambio", "restaDopoInput")))
+           g("foto_senza_cambio", "restaDopoInput"),
+           (g("foto_senza_cambio", "dopoInput") or {}).get("classe")))
 
     # --- OGNI CASELLA DEL CENSIMENTO --------------------------------------
     SPED = o.get("campi") or []
@@ -93378,9 +93837,15 @@ console.log(JSON.stringify(OUT));
            (_s.get("riga") or {}).get("dopo")))
     prova("un azzeramento del form spegne la riga rimasta", (True, False),
           (g("pulizia", "prima"), g("pulizia", "dopo")))
-    prova("«convertito» se ne va da sola, al suo tempo", (True, [RIGA_MS], False),
+    # SE NE VA SENZA SPOSTARE NIENTE (24 set 2026): toglierla dal DOM
+    # faceva risalire di un paio di centimetri quel che stava sotto.
+    # Al suo tempo svanisce, resta nel flusso e tace per lo screen reader
+    prova("«convertito» se ne va da sola, al suo tempo, e il suo posto "
+          "resta", (True, [RIGA_MS], True, "riga-cambio svanita", "true"),
           (g("riga_va_via", "prima"), g("riga_va_via", "ms"),
-           g("riga_va_via", "dopo")))
+           g("riga_va_via", "dopo"),
+           (g("riga_va_via", "riga") or {}).get("classe"),
+           g("riga_va_via", "muta")))
 
     # --- LE REGOLE --------------------------------------------------------
     R = o.get("regole") or {}
@@ -95185,7 +95650,7 @@ def main():
     prove_p2p_nuvola,
     prove_p2p_conto_dispositivo,
               prove_esclusioni_relay,
-              prove_letture_relay_collaudo,
+              prove_letture_relay_collaudo, prove_telegram_simulato_collaudo, prove_introduzioni_leggibili, prove_filtri_prezzo_convertono, prove_anteprima_prezzo_condiviso,
               prove_pagina_dati,
               prove_note_piccole,
               prove_font,

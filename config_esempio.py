@@ -13,13 +13,21 @@ PRIMA VOLTA:
 
 # --- Telegram -------------------------------------------------------
 BOT_TOKEN = "INCOLLA_QUI_IL_TOKEN_DEL_BOT"      # da @BotFather
-ADMIN_IDS = [123456789]      # il TUO user id Telegram (da @userinfobot):
-                             # decide le dispute e riceve gli avvisi.
+ADMIN_IDS = []               # es. [123456789]: il TUO user id Telegram
+                             # (da @userinfobot): decide le dispute e
+                             # riceve gli avvisi.
                              # Piu' moderatori? Elenca gli id separati da
                              # virgola: [123456789, 987654321]. Sono tutti
                              # pari grado (nessun super-admin) e la lista
                              # si cambia SOLO qui, sul server: nessun
                              # comando dell'app o del bot la tocca.
+                             # VUOTO DI SERIE (set 2026): un id d'esempio
+                             # scritto qui diventava un moderatore vero di
+                             # ogni config copiato da questo file, e gli
+                             # avvisi partivano verso uno sconosciuto. In
+                             # collaudo l'Admin finto 999 c'e' comunque, e
+                             # il pannello «Stato delle leve» segna in
+                             # rosso una lista vuota.
 
 # Chi ha FONDATO Barattolo (id Telegram, come sopra). Portano il
 # titolo «🏛 Fondatore» sotto il nome, messo da solo alla prima

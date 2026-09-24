@@ -6079,6 +6079,25 @@
   precompilazione segue) e `setRicercaValuta`. Il censimento dei bottoni
   di valuta sta in `prove_cambio_converte`, coi tre che non convertono e
   il perché. Verbale in CANTIERI, «Il cambio sats ⇄ € che converte».
+  IL QUINTO POSTO E' IL PREZZO DEI FILTRI DI ESPLORA (24 set 2026): min
+  e max sanno in che valuta parlano (`filtriValutaCampi`) e
+  `allineaFiltriValuta` li porta a quella della vetrina con
+  `convertiCampiValuta` e la stessa riga — quando il ₿/€ gira col
+  pannello aperto (`setValuta`) e quando lo si riapre (`toggleFiltri`
+  parte dalla valuta del filtro vivo). Il filtro vivo non si tocca:
+  porta la sua valuta, e cambia solo con «Applica».
+  LA RIGA CHE SE NE VA TIENE IL POSTO (stesso giorno): al suo tempo, o
+  al primo input se chiedeva di ricontrollare, prende `.svanita`
+  (opacity 0, poi `visibility:hidden`, `aria-hidden`) invece di
+  `remove()` — che faceva risalire di colpo quel che stava sotto. La
+  toglie il giro dopo o il disegno del cassetto; un azzeramento del form
+  la toglie come prima. La prova chiede alla cascata che `.svanita`
+  vinca e che non sia mai `display:none`.
+  LE RIGHE D'INTRODUZIONE DEI CASSETTI (stesso giorno): lo stile in
+  linea 12,5px/600 che apre «Come spedisci», «Importa in blocco» e altri
+  ventiquattro posti è in `--ink-soft` e non più in `--muted` (3,81:1 di
+  giorno sul cassetto, sotto il 4,5:1): 7,32:1 di giorno, 8,78:1 di
+  sera. `prove_introduzioni_leggibili` calcola il contrasto dai token.
   Modifica FIRMATA degli importati (lug 2026): il doppio cittadino con
   `npub_accesso` ≡ `contatto_nostr` modifica anche gli annunci
   importati — Barattolo fa da client Nostr, la nsec resta nel browser
@@ -17144,6 +17163,14 @@
   sua base; MAI l'accordo di chi condivide (per questo non passa da
   `prezzoMostrato`/`artStima`) e MAI la lampo, la regola di
   `_seo_annuncio`: il messaggio non invecchia, lo sconto a tempo sì.
+  E L'ANTEPRIMA DICE LA STESSA CIFRA (24 set 2026): `_seo_annuncio`
+  passa da `_listino_condiviso`, che applica al listino lo sconto del
+  negozio a UN pezzo col giudice della cassa (`_regole_sconto` +
+  `_sconto_regole`, sui campi `venditore_sconto_*` della stessa query),
+  mai `_unitario_effettivo` (lampo e accordo). Listino in euro misurato
+  al cambio di adesso (muto = listino), in ferie e sull'esaurito niente
+  sconto; i sats accanto all'euro scendono della stessa percentuale. La
+  prova confronta caso per caso l'anteprima con `prezzoCondiviso`.
   UN MODO SOLO DI DIRE LA PERSONA, in cascata: username Telegram →
   nome → npub. «@rosina (Rosina)» sarebbe la stessa persona detta due
   volte. E IL TRATTINO NON È UN NOME: `mapListing` mette '—' quando il
@@ -27143,6 +27170,15 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   libro P2P si rilegge ogni minuto, e la regola è quella di
   `_relay_p2p_dice`. Fuori collaudo il giudice dice sempre «leggi»: il
   mondo di ieri, byte per byte.
+  E NIENTE ESCE VERSO TELEGRAM (24 set 2026): `_manda_telegram`
+  simulava i soli id sotto 100000, e l'avviso «nuovo pioniere»
+  all'admin d'esempio (123456789) partiva davvero. Ora la leva basta,
+  per ogni destinatario; `bot_api` e il webhook lo facevano già, e
+  `_foto_profilo_telegram` ha la guardia scritta. `ADMIN_IDS` di
+  `config_esempio.py` nasce vuoto (in collaudo l'Admin 999 c'è
+  comunque). `prove_telegram_simulato_collaudo` censisce con l'albero
+  ogni indirizzo api.telegram.org e vuole `if MODALITA_COLLAUDO: …
+  return` nel corpo, prima della chiamata.
   LE SENTINELLE: `prove_letture_relay_collaudo` CENSISCE con l'albero
   sintattico ogni create_connection( del server e chiede a ognuna il
   giudice sullo STESSO relay, nel corpo e prima della rete — oppure un

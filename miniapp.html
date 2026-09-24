@@ -7040,8 +7040,13 @@
      le cifre rimaste com'erano nel colore degli avvisi del form, quello
      di zonaHint e di sellSpedHint. Vedi rigaCambio. */
   .riga-cambio{margin-top:6px;font-size:12px;font-weight:700;line-height:1.4;
-    color:var(--ink-soft)}
+    color:var(--ink-soft);transition:opacity .25s ease}
   .riga-cambio.ferma{color:var(--sats-text)}
+  /* quando se ne va TIENE IL POSTO: niente risale sotto al dito. La
+     visibilita' si spegne a dissolvenza finita, cosi' non la legge
+     nemmeno chi usa lo screen reader. */
+  .riga-cambio.svanita{opacity:0;visibility:hidden;
+    transition:opacity .25s ease,visibility 0s linear .25s}
   /* IL COSTO DI SPEDIZIONE STANDARD (set 2026): il blocco sotto i
      corrieri in «📦 Come spedisci» — staccato da un filo, perche' e' una
      seconda domanda nello stesso cassetto — e il foglio
@@ -10232,7 +10237,7 @@ document.getElementById('cartello')?.remove();</script>
            che la moderazione ripassa anche sulle modifiche — la lista
            delle cose vietate e' la stessa. La scrive
            aggiornaFormVendi. -->
-      <div id="sellDivieto" style="margin-top:10px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+      <div id="sellDivieto" style="margin-top:10px;font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
         È vietato vendere: armi, droghe, servizi sessuali, refurtiva,
         contraffazioni, documenti, dati personali, farmaci, animali
         protetti. Gli annunci vengono moderati.</div>
@@ -10345,7 +10350,7 @@ document.getElementById('cartello')?.remove();</script>
              sarebbe la promessa di una cosa che non c'e' -->
         <button class="acc-h" onclick="toggleAcc('accImport')"><span class="em">📥</span><span id="importTitolo">Importa in blocco</span><span class="fr">▾</span></button>
         <div class="acc-b">
-          <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+          <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
             Hai un catalogo grande? Compila il modello CSV (una riga = un
             annuncio, massimo 500 per volta) e caricalo qui. Le foto in
             tre modi: URL nella colonna <b>foto</b> (più d'uno separati
@@ -10570,7 +10575,7 @@ document.getElementById('cartello')?.remove();</script>
             <div class="field" style="margin-top:16px" id="nwcCampo"><label>⚡ Wallet Lightning (facoltativo)</label>
               <input id="nwcInput" type="password" placeholder="nostr+walletconnect://… (da Alby Hub, Coinos, Primal…)" autocomplete="off" spellcheck="false"></div>
             <button class="btn ghost" style="margin-top:0" id="nwcBottone" onclick="collegaWallet()">⚡ Collega il wallet (NWC)</button>
-            <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+            <div style="margin-top:8px;font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
               Col wallet collegato paghi in un tocco («⚡ Compra
               subito»), e nel P2P la fattura per ricevere i sats la fa
               il wallet da solo. La stringa resta <b>solo nel tuo
@@ -10582,7 +10587,7 @@ document.getElementById('cartello')?.remove();</script>
             <div id="nwcStato"></div>
           </div>
           <button class="btn ghost" style="margin-top:16px" onclick="esportaDati()">📄 Esporta i tuoi dati</button>
-          <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+          <div style="margin-top:8px;font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
             Il CSV dei tuoi affari conclusi, comodo per la contabilità.</div>
         </div>
       </div>
@@ -11455,7 +11460,7 @@ document.getElementById('cartello')?.remove();</script>
   <div class="sheet" id="riscuotiSheet">
     <div class="grab"></div>
     <h3 id="riscuotiTit">↩️ Riscuoti i tuoi sats</h3>
-    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-bottom:10px">Incolla una invoice Lightning dell'importo <b>esatto</b>. Se hai un Lightning address nel Profilo, i rimborsi arrivano da soli e questo foglio non serve.</div>
+    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-bottom:10px">Incolla una invoice Lightning dell'importo <b>esatto</b>. Se hai un Lightning address nel Profilo, i rimborsi arrivano da soli e questo foglio non serve.</div>
     <div class="field">
       <textarea id="riscuotiInv" rows="3" autocomplete="off" spellcheck="false"
         placeholder="lnbc..." style="width:100%;resize:vertical;font-family:var(--mono);font-size:12.5px" oninput="riscuotiDigitata()"></textarea>
@@ -12886,12 +12891,12 @@ function toggleFiltri(){
   const apre = box.style.display === 'none';
   box.style.display = apre ? 'block' : 'none';
   if (apre) {
-    /* I campi parlano la valuta del toggle e mostrano il filtro vivo */
-    const suff = valutaVista === 'eur' ? '€' : 'sats';
-    el('filtroMinInp').placeholder = `Prezzo min (${suff})`;
-    el('filtroMaxInp').placeholder = `Prezzo max (${suff})`;
+    /* I campi mostrano il filtro vivo NELLA SUA valuta, e poi passano
+       a quella del toggle convertendo (allineaFiltriValuta) */
     el('filtroMinInp').value = filtroPrezzo?.min || '';
     el('filtroMaxInp').value = filtroPrezzo?.max || '';
+    filtriValutaCampi = filtroPrezzo?.valuta || valutaVista;
+    allineaFiltriValuta();
     el('filtroCondSel').value = filtroCond;
     aggiornaPicker('filtroCondSel');
     /* dove la condizione non vuol dire niente la riga non c'e' */
@@ -12899,6 +12904,33 @@ function toggleFiltri(){
       el('filtroCondRiga').style.display = condFiltrabile() ? '' : 'none';
     renderFiltroRegioni();
   }
+}
+
+/* IL PREZZO DEI FILTRI SEGUE IL ₿/€ CONVERTENDO (24 set 2026, ritocchi
+   piccoli): fino a ieri, cambiando valuta col pannello aperto — o
+   riaprendolo dopo — min e max cambiavano UNITA' restando le stesse
+   cifre: 50000 sats diventavano un minimo di cinquantamila euro. Ora le
+   due caselle sanno in che valuta parlano (`filtriValutaCampi`) e quando
+   la vetrina ne parla un'altra passano dal giudice del cambio che
+   converte (convertiCampiValuta, vedi convertiCifraCampo): il vuoto
+   resta vuoto, un numero non diventa mai vuoto ne' zero, e senza cambio
+   le cifre restano com'erano con la riga che chiede di ricontrollarle.
+   Caselle di TESTO: i decimali con la virgola, come gli avvisi. Il
+   filtro VIVO non si tocca qui — porta la sua valuta e la vetrina lo
+   applica giusto —: diventa quello nuovo solo con «Applica». */
+let filtriValutaCampi = 'sats';
+function allineaFiltriValuta(){
+  const suff = valutaVista === 'eur' ? '€' : 'sats';
+  const min = el('filtroMinInp'), max = el('filtroMaxInp');
+  if (!min || !max) return;
+  min.placeholder = `Prezzo min (${suff})`;
+  max.placeholder = `Prezzo max (${suff})`;
+  const da = filtriValutaCampi;
+  filtriValutaCampi = valutaVista;
+  if (da === valutaVista) return;
+  rigaCambio('rigaCambioFiltri', min.parentElement, [min, max],
+    convertiCampiValuta(['filtroMinInp', 'filtroMaxInp'], da, valutaVista, true),
+    valutaVista);
 }
 
 /* Le regioni del pannello Filtri. Non sono un catalogo del client: sono
@@ -17785,6 +17817,9 @@ function setValuta(v){
   aggiornaCurToggle();
   renderGrid();
   aggiornaPrezzoDettaglio();   // se una scheda e' aperta, segue anche lei
+  /* e il pannello dei filtri, se e' aperto: min e max si convertono */
+  if (el('filtriBox') && el('filtriBox').style.display !== 'none')
+    allineaFiltriValuta();
   /* e la pagina del pacco: card e totale della barra parlano valutaVista */
   if (el('view-pacco')?.classList.contains('active')) renderPacco();
   /* e la cassa: si ridisegna dal preventivo in CACHE —
@@ -28402,7 +28437,7 @@ function renderLnAddress(){
     box.innerHTML = `
       <div style="margin-top:12px;font-size:13px;font-weight:800;color:var(--trust)">
         ⚡ Incassi automatici su <span class="mono">${esc(myLnAddress)}</span></div>
-      <div style="margin-top:4px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+      <div style="margin-top:4px;font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
         Ogni vendita conclusa arriva da sola qui.</div>
       <button class="btn ghost" style="margin-top:8px" onclick="lnAddrModifica=true;renderLnAddress()">↻ Cambia indirizzo</button>
       <button class="btn danger-ghost" onclick="rimuoviLnAddress()">🗑 Rimuovi l'indirizzo</button>`;
@@ -28412,7 +28447,7 @@ function renderLnAddress(){
     <div class="field" style="margin-top:12px"><label>Lightning address (incassi automatici)</label>
       <input id="lnAddrProfilo" placeholder="nome@walletofsatoshi.com" value="${esc(myLnAddress)}"></div>
     <button class="btn ghost" style="margin-top:0" onclick="salvaLnAddressProfilo(this)">⚡ Attiva incassi automatici</button>
-    <div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+    <div style="margin-top:8px;font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
       Lo trovi nella app del tuo wallet: <b>non scade mai</b>, lo usiamo
       al momento del pagamento, e lo imposti una volta sola per tutte
       le vendite. È l'unico metodo che si salva qui: senza, a ogni
@@ -28943,7 +28978,7 @@ function renderInviti(){
   if (sez) sez.style.display = '';
   const conta = el('invitiConta');
   if (conta) conta.textContent = inv.persone ? `(${fmt(inv.persone)})` : '';
-  const nota = 'font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45';
+  const nota = 'font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45';
   const adesso = Date.now() / 1000;
   const aperto = !inv.invitato && (inv.campo_fino || 0) > adesso;
   const giorni = Math.max(1, Math.ceil(((inv.campo_fino || 0) - adesso) / 86400));
@@ -29084,7 +29119,7 @@ function renderDoppioni(){
     </div>
     <div class="sub"><span class="mono" style="color:var(--sats-deep)">${a.valuta==='eur'&&a.prezzo_eur>0 ? fmtEur(a.prezzo_eur)+' €' : fmt(a.prezzo_sats)+' sats'}</span></div>`;
   box.innerHTML = `
-    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-bottom:4px">
+    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-bottom:4px">
       Questi annunci sembrano lo <b>stesso oggetto</b>, pubblicato due
       volte su Nostr: uno l'hai messo dal tuo client, l'altro è nato
       qui su Barattolo e ha un suo evento sui relay. Se vuoi ritiriamo
@@ -29575,7 +29610,7 @@ function renderIdentita(){
      toglie tutto (badge, ponte, verifica) da ovunque. Un utente le
      ha già confuse: la spiegazione sotto ogni bottone è il rimedio. */
   const sub = t =>
-    `<div style="margin:-2px 0 8px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">${t}</div>`;
+    `<div style="margin:-2px 0 8px;font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">${t}</div>`;
   const btnRimuovi =
     `<button class="btn danger-ghost" style="margin:0 0 2px" onclick="rimuoviNpub()">🗑 Rimuovi la npub dal profilo</button>` +
     sub(`Toglie npub, badge e verifica ovunque.`);
@@ -29773,12 +29808,12 @@ function renderAvvisi(){
     dentro = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
       ${pill('telegram','✈️ Telegram')}${pill('nostr', etichettaNostr('DM Nostr'))}${pill('entrambi','Entrambi')}</div>`;
   } else if (tgOk) {
-    dentro = `<div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-top:6px">
+    dentro = `<div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:6px">
       Arrivano nella chat del bot Telegram. Verifica una npub nella
       sezione 🆔 Identità e potrai riceverli anche come DM
       Nostr cifrati.</div>`;
   } else {
-    dentro = `<div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-top:6px">
+    dentro = `<div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:6px">
       Arrivano come DM Nostr cifrati alla tua npub: aprili col tuo
       client (0xchat, Amethyst, Damus…).</div>`;
   }
@@ -29975,7 +30010,7 @@ function renderSpedizioniere(){
     return `<button data-rete="${esc(val)}" onclick="toggleRete(this)" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${on?'var(--sats)':'var(--line)'};background:${on?'var(--sats)':'transparent'};color:${on?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${esc(val)}</button>`;
   };
   box.innerHTML = `
-    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
       Con quali corrieri spedisci? Spuntali tutti: chi sceglie la
       <b style="color:var(--ink)">consegna a un punto di ritiro</b>
       (locker o negozio convenzionato) dirà con quale vuole il pacco,
@@ -30745,7 +30780,7 @@ function renderScontoPacco(){
           prima cosa che si legge aprendo, ed e' la domanda che il
           venditore si fa per prima («mi mangia anche la spedizione?»).
           La seconda frase dipende dal criterio, che si sceglie SOTTO. */''}
-    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-bottom:2px">
+    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-bottom:2px">
       La spedizione è a parte.${aPezzi && aValore
         ? ' Basta che scatti una delle due.'
         : aValore
@@ -31040,7 +31075,7 @@ async function renderCodici(){
   };
   const pieno = myCodici.length >= tetto && !codiceInModifica;
   box.innerHTML = `
-    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-bottom:2px">
+    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-bottom:2px">
       Un codice lo dai a chi vuoi: chi lo scrive alla cassa ha lo
       sconto. Vale sugli articoli, mai sulla spedizione.
       <b style="color:var(--ink)">Se il tuo sconto del negozio è più
@@ -31082,7 +31117,7 @@ async function renderCodici(){
             contorno: uno sconto piu' grande del carrello e' il caso
             NORMALE di un buono generoso, e senza questa riga il
             venditore lo scoprirebbe da una vendita. */''}
-      <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-top:8px">
+      <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:8px">
         Se il carrello vale meno, si toglie quel che c'è: chi compra
         paga <b style="color:var(--ink)">1 sat</b> di articoli, più
         spedizione e protezione.</div>
@@ -31304,7 +31339,7 @@ async function renderPuntoPacchi(){
      spedito ha consegnato. E' la stessa regola che chi compra legge
      in «Il pagamento protetto» prima di scegliere il punto. */
   const testa = `
-    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
       I pacchi in arrivo a <b>${nomi}</b>. Di ognuno vedi il numero
       dell'ordine e il tracciamento del corriere — <b>non cosa c'è
       dentro né chi lo manda</b>.<br>Quando il pacco è sul tuo banco
@@ -31495,7 +31530,7 @@ async function renderConnettori(){
   const inMod = connInModifica
     ? (myConnettori.find(x => x.id === connInModifica) || null) : null;
   box.innerHTML = `
-    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-bottom:2px">
+    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-bottom:2px">
       Hai già un negozio online? Collegalo e i suoi prodotti entrano
       qui da soli, con prezzo e giacenza aggiornati ogni ora.
       <b style="color:var(--ink)">Barattolo il tuo catalogo lo legge,
@@ -31535,7 +31570,7 @@ async function renderConnettori(){
     <div class="field"><label for="connTok">Token dell'app privata</label>
       <input id="connTok" type="password" autocomplete="off" placeholder="${inMod ? 'lascia vuoto per non cambiarlo' : 'shpat_…'}" value=""></div></div>
     <div class="section-label" style="margin-top:12px">Come arriva la merce</div>
-    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-top:4px">
+    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:4px">
       Si dichiara qui una volta e vale per <b style="color:var(--ink)">tutti</b>
       gli annunci di questo negozio, anche quelli già entrati: il tuo
       e-commerce le spedizioni le organizza a modo suo, e tradurle
@@ -31900,7 +31935,7 @@ function renderSpedGratis(){
   box.innerHTML = `
     ${/* in cima come nel gemello: il vincolo e il cumulo sono fatti
           costanti, e sono anche le due cose che l'anteprima non copre */''}
-    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-bottom:2px">
+    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-bottom:2px">
       Vale sugli annunci che spedisci, anche su un oggetto solo. Si
       somma allo sconto.</div>
     <div id="spedGratisErrore"></div>
@@ -32004,7 +32039,7 @@ function renderFerie(){
   const val = chiuso
     ? new Date(myFerieFino*1000).toISOString().slice(0,10) : dom;
   box.innerHTML = `
-    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
       ${chiuso
         ? `Il tuo negozio è <b style="color:var(--ink)">chiuso fino al
            ${ferieData(myFerieFino)}</b>. I tuoi annunci si vedono ancora
@@ -32140,7 +32175,7 @@ function renderBanner(){
        chip direbbe un numero che moltiplicando non torna. */
     const pct = pieno ? (bannerLeve.prezzo_percento || 0) : 0;
     box.innerHTML = `
-      <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+      <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
         🔒 È l'insegna che puoi
         appendere sopra il tuo catalogo — una foto e il link al tuo
         sito.</div>`
@@ -32159,7 +32194,7 @@ function renderBanner(){
   const vivo = b.stato === 'attivo' && b.foto;
   const attesa = b.stato === 'revisione' && b.fotoAtt;
   box.innerHTML = `
-    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
       Un'immagine e il link al tuo sito, sopra il catalogo del tuo
       negozio. La guarda un moderatore prima che vada online — e se
       cambi qualcosa, quello di adesso <b style="color:var(--ink)">resta
@@ -32453,7 +32488,7 @@ function renderSlugNegozio(){
   if (sez) sez.style.display = '';
   el('slugNegozioConta').textContent = myNegozioSlug ? '✅' : '';
   const link = myNegozioSlug || myNegozio;
-  const attuale = `<div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+  const attuale = `<div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
     Il tuo negozio si trova su <b style="color:var(--ink)">barattolo.store/negozio/${esc(link)}</b>${
       myNegozioSlug ? ''
         : ' — il codice di sempre: puoi scegliertene uno più bello.'}</div>`;
@@ -32659,7 +32694,7 @@ async function renderRicerche(){
 
   let form;
   if (!ricercaInModifica && avvisi.length >= myRicerche.max) {
-    form = `<div style="margin-top:10px;font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+    form = `<div style="margin-top:10px;font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
       Hai già ${myRicerche.max} avvisi: eliminane uno per farne di nuovi.</div>`;
   } else {
     /* le categorie del catalogo: stringhe fisse, sicure negli onclick */
@@ -32694,7 +32729,7 @@ async function renderRicerche(){
   }
 
   box.innerHTML = `
-    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
+    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
       Ti avviso io quando esce quello che cerchi: scegli i criteri e
       ci pensa il barattolo a guardare la vetrina per te.</div>
     ${lista}${form}`;
@@ -38969,7 +39004,13 @@ function rigaCambio(id, dopo, campi, esiti, a){
   riga.setAttribute('role', 'status');
   dopo.insertAdjacentElement('afterend', riga);
   riga.textContent = dire.testo;
-  const via = () => riga.remove();
+  /* SVANISCE E TIENE IL POSTO (24 set 2026): toglierla dal DOM faceva
+     risalire di colpo tutto quel che sta sotto — il resto del form o
+     del cassetto, sotto al dito. Resta, invisibile e muta per chi
+     legge lo schermo, finche' il prossimo giro o il disegno del
+     cassetto non la sostituisce. */
+  const via = () => { riga.classList.add('svanita');
+                      riga.setAttribute('aria-hidden', 'true'); };
   if (dire.resta) campi.forEach(c => c && c.addEventListener('input', via, {once: true}));
   else setTimeout(via, RIGA_CAMBIO_MS);
 }

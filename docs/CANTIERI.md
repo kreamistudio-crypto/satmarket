@@ -31050,3 +31050,70 @@ nodo `grep barattolo_eventi` e `grep <id>` nei log di mostro. Decidere
 la patch 0008 (taker riconosciuti sui PayCode) e, fino al lancio, i relay
 del nodo. Sul telefono: un giro presa+ritiro con due identità e il
 journal che dice «superato»/«non parte».
+
+## Ritocchi piccoli, secondo giro (24 set 2026)
+
+Sei cose indipendenti, in un commit.
+
+**1. Niente Telegram vero in collaudo.** Nei giri dal vivo l'avviso
+«nuovo pioniere» all'admin d'esempio (123456789 di config_esempio.py)
+partiva davvero verso api.telegram.org, fermato solo dal token
+segnaposto: `_manda_telegram` simulava i soli id sotto 100000. Ora in
+collaudo nessun destinatario esce, con la riga «📨 [notifica simulata
+…]» nel log — la regola di `lettura_simulata`. `_foto_profilo_telegram`
+aveva la guardia di fatto (un `bot_api` finto senza foto) e ora ce l'ha
+scritta. `ADMIN_IDS` d'esempio nasce vuoto: un id scritto lì diventava
+un moderatore vero di ogni config copiato. La sentinella censisce con
+l'albero i quattro indirizzi del server (fuori ce l'ha solo
+`prova_notifica.py`, che esiste apposta) e fa girare il tubo con un
+httpx che registra: 999, 123456789 e 700000001 non bussano.
+
+**2. I filtri di prezzo di Esplora convertono.** Cambiando ₿/€ col
+pannello aperto, o riaprendolo, min e max cambiavano unità restando le
+stesse cifre. Ora passano da `convertiCampiValuta` (3d76f57) con le sue
+regole e la sua riga; il filtro vivo si tocca solo con «Applica».
+
+**3. La riga del cambio tiene il posto.** Sparendo faceva risalire di
+un paio di centimetri quel che stava sotto: ora svanisce (`.svanita`) e
+resta nel flusso. Vale anche per quella che chiede di ricontrollare,
+che spariva mentre si scriveva. Resta lo spostamento all'APPARIRE, che
+è sul tocco del bottoncino: scelto di non riservare una riga vuota
+sotto ogni casella che non ha mai girato.
+
+**4. Le introduzioni dei cassetti si leggono.** Non era una classe ma
+uno stile in linea ripetuto in 26 posti, tutti righe d'introduzione o
+note: da `--muted` (3,81:1) a `--ink-soft`, 7,32:1 di giorno e 8,78:1 di
+sera sul cassetto vero.
+
+**5. L'anteprima del link dice il prezzo del testo.** Il testo del
+«Condividi» diceva 71,10 € e la card del link 79,00 €. `_seo_annuncio`
+passa da `_listino_condiviso`: sconto del negozio a un pezzo col giudice
+della cassa, niente lampo né accordo, niente sconto in ferie o
+sull'esaurito. Una prova confronta caso per caso la cifra
+dell'anteprima con `prezzoCondiviso` del client girato in node. Il post
+del canale e la nota Nostr (`_prezzo_promo`) restano al listino: non
+toccati.
+
+**6. `collaudo_classifica` nella CI.** Stava nel solo compileall: ora
+anche nei collaudi senza rete, con la sentinella.
+
+**PROVATO.** Prove nuove: `prove_telegram_simulato_collaudo` (11),
+`prove_introduzioni_leggibili` (7), `prove_filtri_prezzo_convertono`
+(7), `prove_anteprima_prezzo_condiviso` (13); `prove_cambio_converte`
+emendata (la riga svanita al posto di quella tolta, col perché, e la
+cascata di `.svanita`), l'ambiente delle anteprime monta i giudici
+dello sconto, la prova della foto Telegram dice che parla della
+produzione. Tortura 16/16. Collaudi della CI 18/18 nella gabbia. Dal
+vivo sul server vero in collaudo (relay morti, config d'esempio) a 375
+px nei due temi, col dito vero dove c'era un bottone: 40 € → 54.252
+sats nel filtro, riaprendo di nuovo 40; la riga svanita con lo spazio
+fermo (81,5 px nel pannello, 401,4 px in «Come spedisci», prima e dopo);
+le due introduzioni 7,32:1 e 8,78:1 misurate sul cassetto vero;
+l'anteprima di /annuncio/1 «71,10 € (≈ 81.000 sats)»; zero chiamate a
+Telegram nel log. Gli scatti del riquadro uscivano ritagliati: le prove
+sono le misure.
+
+**DA AVERE.** Il telefono: il pannello dei filtri col ₿/€, la riga che
+svanisce in «Come spedisci» e in Vendi, le introduzioni nei due temi,
+e l'anteprima di un link condiviso in WhatsApp o Telegram (la cache
+delle app tiene quella vecchia finché non scade).

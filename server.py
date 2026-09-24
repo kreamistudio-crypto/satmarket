@@ -13052,8 +13052,15 @@ async def _manda_telegram(tg_id: int, testo: str):
     — si e' portata via la ricevuta del compratore e il polso dei
     moderatori di un ordine GIA' incassato. Venti secondi, gli stessi
     di `bot_api`: una convenzione sola, e la sentinella la fa valere."""
-    if MODALITA_COLLAUDO and tg_id < 100000:
-        # Utente finto del collaudo: la notifica si stampa in console
+    # IN COLLAUDO NON ESCE NIENTE, PER NESSUN DESTINATARIO (24 set 2026,
+    # ritocchi piccoli, secondo giro): fino a ieri si simulavano i soli
+    # id sotto 100000 — i tre finti — e ogni altro id partiva DAVVERO:
+    # nei giri dal vivo l'avviso «nuovo pioniere» all'admin di esempio
+    # (123456789 di config_esempio.py) bussava ad api.telegram.org, e a
+    # fermarlo era solo il token segnaposto. Con un config che porta il
+    # BOT_TOKEN vero sarebbe arrivato a una persona a caso. La regola
+    # dei relay (`lettura_simulata`): la leva basta, l'id non conta.
+    if MODALITA_COLLAUDO:
         print(f"📨 [notifica simulata per utente {tg_id}] {testo}")
         return "simulata (collaudo)"
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -35543,6 +35550,12 @@ async def _foto_profilo_telegram(tg_id: int) -> bytes | None:
     fallimento di rete non e' un «non ce l'ha», e il chiamante non deve
     scambiare l'uno per l'altro cancellando una foto buona per un
     intoppo di un istante (caso vero dal campo, set 2026)."""
+    # in collaudo `bot_api` risponde finto e senza foto, quindi il ramo
+    # che scarica il file non si raggiungerebbe comunque: la guardia sta
+    # qui scritta perche' la regola «in collaudo niente esce verso
+    # Telegram» si legga dove la chiamata c'e', e la sentinella la trovi
+    if MODALITA_COLLAUDO:
+        return b""
     r = await bot_api("getUserProfilePhotos",
                       {"user_id": tg_id, "limit": 1})
     if not r or not r.get("ok"):
@@ -57914,6 +57927,54 @@ def _ld_annuncio(a: dict, url: str, img: str) -> dict:
     return dati
 
 
+def _listino_condiviso(a: dict, cambio: float, adesso: int) -> dict:
+    """IL PREZZO DELL'ANTEPRIMA (24 set 2026, ritocchi piccoli): la
+    stessa regola del testo che il «Condividi» compone (`prezzoCondiviso`
+    nel client, 2d91a66) — il listino, con lo SCONTO DEL NEGOZIO quando
+    un pezzo da solo lo fa scattare. Fino a ieri il testo diceva 71,10 €
+    e la card del link, sotto, 79,00 €: due cifre vere nello stesso
+    messaggio.
+    LO STESSO GIUDICE DELLA CASSA: `_sconto_regole` sulle regole di
+    `_regole_sconto`, a UN pezzo, sul LISTINO — non su
+    `_unitario_effettivo`, che porta lampo e accordo. L'accordo e' di
+    chi l'ha stretto; la lampo scade e l'anteprima resta in cache per
+    giorni (la regola scritta qui sotto, che resta intera).
+    Un listino in euro si misura al cambio di adesso, come la vetrina:
+    a cambio muto la promessa non si valuta e resta il listino. In
+    ferie e sull'esaurito nessuno sconto: li' non si compra.
+    Torna una COPIA della riga coi due prezzi scontati nella loro
+    valuta, stessi arrotondamenti del conto: i sats col netto a floor
+    (`_sconto_percento`), l'euro coi centesimi (`_sconto_pacco_eur`)."""
+    if a.get("stato") == "venduto" or in_ferie(a.get("venditore_ferie") or 0,
+                                                adesso):
+        return a
+    regole = _regole_sconto(a.get("venditore_sconto_criterio") or "",
+                            a.get("venditore_sconto_valuta") or "",
+                            a.get("venditore_sconto_soglia") or 0,
+                            a.get("venditore_sconto_valore") or 0,
+                            a.get("venditore_sconto_valore_eur") or 0,
+                            a.get("venditore_sconto_percento") or 0)
+    if not regole:
+        return a
+    in_eur = a.get("valuta") == "eur" and (a.get("prezzo_eur") or 0) > 0
+    if in_eur:
+        if cambio <= 0:
+            return a
+        articolo = max(1, round(a["prezzo_eur"] / cambio * 100_000_000))
+    else:
+        articolo = int(a.get("prezzo_sats") or 0)
+    if not _sconto_regole(articolo, _eur_interi(articolo, cambio), 1, regole):
+        return a
+    pct = regole[0][2]         # la percentuale e' una sola per negozio
+    fuori = dict(a)
+    fuori["prezzo_sats"] = a["prezzo_sats"] - _sconto_percento(
+        int(a.get("prezzo_sats") or 0), pct)
+    if in_eur:
+        fuori["prezzo_eur"] = round(
+            a["prezzo_eur"] - _sconto_pacco_eur(a["prezzo_eur"], pct), 2)
+    return fuori
+
+
 def _seo_annuncio(aid):
     """(titolo, testa, corpo) di un annuncio, da UNA riga di database:
     la stessa che ieri serviva i soli meta. Sbagliarlo porterebbe la
@@ -57949,7 +58010,15 @@ def _seo_annuncio(aid):
             "a.prezzo_sats, a.prezzo_eur, a.foto, a.stato, a.categoria, "
             "a.consegna, a.condizione, a.quantita, "
             "u.nome AS venditore, u.negozio AS venditore_negozio, "
-            "u.ferie_fino AS venditore_ferie "
+            "u.ferie_fino AS venditore_ferie, "
+            # lo sconto del negozio, per il prezzo dell'anteprima
+            # (_listino_condiviso): le stesse colonne della cassa
+            "u.sconto_pacco_criterio AS venditore_sconto_criterio, "
+            "u.sconto_pacco_valore_valuta AS venditore_sconto_valuta, "
+            "u.sconto_pacco_soglia AS venditore_sconto_soglia, "
+            "u.sconto_pacco_valore AS venditore_sconto_valore, "
+            "u.sconto_pacco_valore_eur AS venditore_sconto_valore_eur, "
+            "u.sconto_pacco_percento AS venditore_sconto_percento "
             "FROM annunci a LEFT JOIN utenti u ON u.tg_id = a.venditore_id "
             "WHERE a.id=? AND a.stato IN ('attivo','venduto')",
             (aid,)).fetchone()
@@ -57964,7 +58033,11 @@ def _seo_annuncio(aid):
     # TESTA alla descrizione perche' e' l'unico pezzo che nessuna
     # piattaforma puo' troncare via.
     testa = "✅ Venduto · " if a["stato"] == "venduto" else ""
-    testa += _prezzo_promo(a, cambio_noto_ora())
+    # il prezzo del testo del «Condividi»: listino con lo sconto del
+    # negozio, mai lampo ne' accordo (_listino_condiviso)
+    cambio = cambio_noto_ora()
+    a = _listino_condiviso(a, cambio, int(time.time()))
+    testa += _prezzo_promo(a, cambio)
     comune = comune_da_zona(a["zona"] or "")
     if comune:
         testa += f" · {comune}"

@@ -167,6 +167,7 @@ jobs:
              collaudo_spedizione_standard
              collaudo_catalogo_esterno
              collaudo_nuova_fattura
+             collaudo_classifica
 
   # La regola ferrea numero 1, e vive in un JOB SUO — non in coda
   # all'altro, ed e' il pezzo da non rimettere com'era.
