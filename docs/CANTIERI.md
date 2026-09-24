@@ -32342,3 +32342,59 @@ torna all'ordine con la card intatta.
 
 **DA GUARDARE.** Dal telefono, dentro Telegram, un ordine vero dai due
 lati: il tondo Telegram che apre la chat e il link il negozio.
+
+## Il volto della card arrivata dall'ascolto (24 set 2026)
+
+Ritocco di Andrea a 0f24bd4 («Ritocchi al flusso P2P dalla prova vera»,
+punto 7): una card che entrava nel libro dall'ascolto nasceva col «?»
+al posto della foto — anche per un ordine pubblicato da lui — e il
+volto giusto compariva solo chiudendo e riaprendo l'app.
+
+**IL PERCHE'.** Il libro letto all'apertura trova i volti perche' chi
+ha pubblicato ha gia' detto al server «questo ordine e' mio»
+(`registraOrdiniP2P`, dall'eco del new-order). Una card dall'ascolto e'
+di un ordine nato un istante fa: il server non lo sa ancora, risponde
+senza quell'id, e `chiediFacceP2P` — che per regola non chiede mai due
+volte (`p2pFacceChieste`) — non tornava a chiedere. Per il proprio
+ordine la corsa era la stessa: il 38383 puo' arrivare prima dell'eco
+che intesta l'ordine.
+
+**LA CURA, con la STESSA funzione e la STESSA cache.** In
+`arrivaLibroP2P`, per la card nuova, `voltoCardNuovaP2P`: se l'ordine e'
+MIO (`ordineMioP2P`) il volto entra subito in `p2pFacce` dal profilo
+(`voltoMioP2P`: nome, avatar con la regola del server su «nessuna»,
+media e voti, negozio o username — lo stesso vocabolario di
+`_facce_ordini_p2p`), marcato `locale` cosi' il server lo sostituisce
+appena risponde; per tutti parte `riprovaVoltoP2P` con l'attesa che
+cresce (3, 8, 20, 45, 90 s): aspetta la domanda in volo, toglie l'id da
+`p2pFacceChieste` e richiede con `chiediFacceP2P` — il gesto di
+`intestaOrdiniP2P` — finche' il server risponde, la card sparisce dal
+libro, o le riprove finiscono. Il volto arrivato ridisegna con
+`ridisegnaLibroFermoP2P` (la lista non salta) e solo col libro davanti:
+altrove ci pensa il prossimo render. Le riprove valgono SOLO per le card
+dell'ascolto: gli ordini di altri client, senza volto per costruzione,
+non si richiedono a ogni apertura. Il blocco «I volti sul libro» non
+cambia di una riga (il suo banco lo carica intero, e resta com'e').
+Strada scartata: sintetizzare anche «giorni» dal profilo — non ce
+l'abbiamo in mano, e arriva col server alla prima riprova.
+
+**PROVATO.** `prove_volto_card_ascolto`: sentinelle (l'ordine dei gesti,
+la stessa funzione e la stessa cache, i tre arresti, il vocabolario del
+server, il blocco dei volti intatto) e il banco node coi blocchi veri
+dei volti e dell'ascolto, orologio finto e fetch di cartone: il mio
+ordine col volto subito (nome, avatar, media 4,9, 12 voti, username) e
+poi quello del server alla riprova con un ridisegno fermo; l'ordine di
+un altro a vuoto al render e alla prima riprova, il volto (nome,
+stelle, voti) alla seconda quando chi ha pubblicato si e' registrato,
+poi silenzio; la card sparita dal libro che non si richiede; cinque
+domande e basta per chi non si registra mai; il volto che arriva col
+libro non davanti entra in cache senza ridisegnare. Suite intera severa
+senza config nel worktree. Dal vivo a due dispositivi (due origini,
+`localhost` e `127.0.0.1`, Venditore e Compratore sulla stessa copia col
+relay morto): vedi il rapporto della sessione.
+
+**DA GUARDARE COI DUE TELEFONI.** Andrea pubblica un ordine col libro
+aperto sul telefono di Alan: la card compare con la foto di Andrea entro
+qualche secondo (al piu' due minuti), con nome, stelle e voti come le
+altre; sul telefono di Andrea la sua foto c'e' subito. Nel diario di
+Alan, «libro in ascolto: nuovo ordine …» e poi il volto senza salti.

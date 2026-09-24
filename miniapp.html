@@ -47020,7 +47020,7 @@ function arrivaLibroP2P(ev){
   const r = fondiLibroP2P(p2pLibro, ev);
   if (!r.cambiato) return false;
   p2pLibro = {ordini: r.ordini.filter(o => !lapidataP2P(o.id)), quando: p2pLibro.quando};
-  if (r.nuovo) p2pCardNuove[r.nuovo] = Date.now();
+  if (r.nuovo) { p2pCardNuove[r.nuovo] = Date.now(); voltoCardNuovaP2P(r.nuovo); }
   diarioP2P('libro in ascolto: ' + (r.nuovo ? 'nuovo ordine ' + r.nuovo : r.via ? 'via ' + r.via : 'aggiornato'));
   if (vistaAttivaP2P() === 'view-p2p') ridisegnaLibroFermoP2P();
   return true;
@@ -47063,6 +47063,62 @@ function chiudiAscoltoLibroP2P(){
   p2pAscoltoLibro = null;
   if (p2pAscolti.length || Object.keys(ordiniAscoltoP2P()).length) return;
   for (const u in p2pRelayVivi) { try { p2pRelayVivi[u].close(); } catch(e) {} }
+}
+/* ---- IL VOLTO DELLA CARD ARRIVATA DALL'ASCOLTO (24 set 2026, ritocco di
+   Andrea a 0f24bd4: la card nasceva col «?», anche quando l'ordine
+   l'aveva pubblicato lui, e la foto arrivava solo riaprendo l'app) ----
+   Il libro letto all'apertura trova i volti perche' chi ha pubblicato
+   ha GIA' detto al server «questo ordine e' mio» (`registraOrdiniP2P`);
+   una card che arriva dall'ascolto e' di un ordine nato un istante fa,
+   e il server ancora non lo sa: `chiediFacceP2P` — che per regola non
+   chiede mai due volte — riceveva una risposta senza quell'id e non
+   tornava piu' a chiedere. Due cure, con la STESSA funzione e la STESSA
+   cache del caricamento iniziale:
+   • se l'ordine e' MIO, il volto e' il mio e ce l'ho gia' in mano dal
+     profilo (`voltoMioP2P`, lo stesso vocabolario del server e la sua
+     regola sull'avatar «nessuna»): entra subito nella cache, marcato
+     `locale`, e il server lo sostituisce appena risponde;
+   • per tutti si RIPROVA con l'attesa che cresce — l'id esce da
+     `p2pFacceChieste` e si richiede con `chiediFacceP2P`, il gesto di
+     `intestaOrdiniP2P` — finche' il server risponde, la card sparisce
+     dal libro, o le riprove finiscono. Quando il volto arriva la lista
+     si ridisegna senza saltare (`ridisegnaLibroFermoP2P`), e solo se il
+     libro e' davanti: altrove ci pensa il prossimo render.
+   Le riprove valgono SOLO per le card dell'ascolto: gli ordini di
+   altri client, senza un volto per costruzione, non si richiedono a
+   ogni apertura. Sei domande al massimo per card, in due minuti. */
+const P2P_VOLTO_RIPROVE_MS = [3000, 8000, 20000, 45000, 90000];
+let p2pVoltoRiprove = {};        // id -> riprove gia' fatte
+function voltoMioP2P(){
+  const voti = Number(myNFeedback) || 0;
+  return {nome: myNome || '',
+          avatar: myAvatarScelta === 'nessuna' ? '' : (myAvatar || ''),
+          media: voti > 0 ? Math.round((Number(myRating) || 0) * 10) / 10 : 0,
+          voti, negozio: myNegozio || myUsername || '', locale: true};
+}
+function voltoCardNuovaP2P(id){
+  if (!id) return;
+  if (!p2pFacce[id] && ordineMioP2P(id)) p2pFacce[id] = voltoMioP2P();
+  p2pVoltoRiprove[id] = 0;
+  setTimeout(() => { riprovaVoltoP2P(id).catch(() => {}); }, P2P_VOLTO_RIPROVE_MS[0]);
+}
+async function riprovaVoltoP2P(id){
+  const f = p2pFacce[id];
+  if (f && !f.locale) return true;                  // il server ha gia' risposto
+  if (!p2pLibro || !p2pLibro.ordini.some(o => o.id === id)) return false;  // la card non c'e' piu'
+  const n = p2pVoltoRiprove[id] || 0;
+  try { await p2pFacceGiro; } catch(e) {}
+  p2pFacceChieste.delete(id);
+  let ok = false;
+  try { ok = await chiediFacceP2P([id]); } catch(e) { ok = false; }
+  if (ok && p2pFacce[id] && !p2pFacce[id].locale) {
+    if (vistaAttivaP2P() === 'view-p2p') ridisegnaLibroFermoP2P();
+    return true;
+  }
+  if (n + 1 >= P2P_VOLTO_RIPROVE_MS.length) return false;
+  p2pVoltoRiprove[id] = n + 1;
+  setTimeout(() => { riprovaVoltoP2P(id).catch(() => {}); }, P2P_VOLTO_RIPROVE_MS[n + 1]);
+  return false;
 }
 /* ============ fine del libro in ascolto ============ */
 

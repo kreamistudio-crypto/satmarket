@@ -6818,7 +6818,12 @@
   piu' fresco), la card nuova si veste `p2p-nuova` per un respiro e il
   ridisegno tiene fermo lo scorrimento (`ridisegnaLibroFermoP2P`).
   Chiudendo l'ascolto, se nessun altro tiene i relay si chiudono anche
-  loro. LO SPECCHIO RESTA FUORI, per l'invariante qui sopra: il coro e'
+  loro. IL VOLTO DELLA CARD NUOVA (24 set 2026): il server non sa ancora
+  di un ordine appena nato e `chiediFacceP2P` non chiede due volte,
+  quindi `voltoCardNuovaP2P` mette subito il MIO volto dal profilo
+  (`voltoMioP2P`, marcato `locale`) e `riprovaVoltoP2P` richiede con la
+  stessa funzione e la stessa cache, con l'attesa che cresce, finche' il
+  server risponde; il volto arrivato ridisegna fermo. LO SPECCHIO RESTA FUORI, per l'invariante qui sopra: il coro e'
   la gamba viva; la rilettura dei 60 secondi legge anche lo specchio.
   Il verbale: CANTIERI, «Ritocchi al flusso P2P dalla prova vera».
   IL CORO DEI RELAY (16 set 2026, la gamba VIVA del P2P): la

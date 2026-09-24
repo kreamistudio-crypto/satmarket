@@ -67550,7 +67550,11 @@ def prove_p2p_server():
     # ⚠️ E LO CHIAMANO IN TRE: la card, la porta del gesto e la cintura
     # della presa. Tre posti che devono dire la stessa cosa, o si vede
     # un segno e si riesce a prendere lo stesso.
-    prova("...e lo chiamano la card, la porta e la cintura", 3,
+    # ...E DAL 24 SET 2026 IN QUATTRO: il volto della card arrivata
+    # dall'ascolto (`voltoCardNuovaP2P`) chiede allo stesso giudice se
+    # l'ordine e' mio, per mettere subito il mio volto — e deve dire la
+    # stessa cosa della card che veste `p2p-mio`.
+    prova("...e lo chiamano la card, la porta, la cintura e il volto della card nuova", 4,
           solo_codice(mini).count("ordineMioP2P(") - 1)
     # --- 15c) LA CINTURA PRIMA DI FIRMARE (14 set 2026) ------------
     # Lo strato sotto all'avviso: OTTO posti derivano la trade key dal
@@ -99220,12 +99224,166 @@ console.log(JSON.stringify(esiti));
           e["pallino"][2:7])
 
 
+def prove_volto_card_ascolto():
+    """IL VOLTO DELLA CARD ARRIVATA DALL'ASCOLTO (24 set 2026, ritocco di
+    Andrea a 0f24bd4): la card nasceva col «?», anche per un ordine
+    pubblicato da lui, e il volto arrivava solo riaprendo l'app — il
+    server non sapeva ancora dell'ordine e `chiediFacceP2P` non richiede
+    mai due volte. Cura: il mio volto subito dal profilo (`voltoMioP2P`,
+    marcato `locale`), e per tutti le riprove con la STESSA funzione e
+    la STESSA cache (`riprovaVoltoP2P`: fuori da `p2pFacceChieste`, poi
+    `chiediFacceP2P`), finche' il server risponde, la card sparisce o le
+    riprove finiscono; il volto arrivato ridisegna senza saltare."""
+    print("\n[il volto della card arrivata dall'ascolto]")
+    import json as _json
+    import os as _os
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    def nudo(js):
+        return re.sub(r"/\*[\s\S]*?\*/", "", js)
+
+    def fn(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}\n"
+
+    arr = nudo(fn("function arrivaLibroP2P(ev){"))
+    prova("la card nuova dall'ascolto chiede il suo volto, prima del ridisegno", True,
+          "if (r.nuovo) { p2pCardNuove[r.nuovo] = Date.now(); voltoCardNuovaP2P(r.nuovo); }" in arr
+          and arr.index("voltoCardNuovaP2P(r.nuovo)") < arr.index("ridisegnaLibroFermoP2P()"))
+    rip = nudo(fn("async function riprovaVoltoP2P(id){"))
+    prova("...la riprova usa la STESSA funzione e la STESSA cache del libro: fuori dai chiesti, poi chiediFacceP2P", True,
+          0 < rip.find("try { await p2pFacceGiro; } catch(e) {}") < rip.find("p2pFacceChieste.delete(id);")
+          < rip.find("ok = await chiediFacceP2P([id]);"))
+    prova("...si ferma quando il server ha risposto, quando la card non c'e' piu', e a riprove finite", True,
+          "if (f && !f.locale) return true;" in rip
+          and "if (!p2pLibro || !p2pLibro.ordini.some(o => o.id === id)) return false;" in rip
+          and "if (n + 1 >= P2P_VOLTO_RIPROVE_MS.length) return false;" in rip)
+    prova("...e il volto arrivato ridisegna senza saltare, solo col libro davanti", True,
+          "if (vistaAttivaP2P() === 'view-p2p') ridisegnaLibroFermoP2P();" in rip)
+    mio = nudo(fn("function voltoMioP2P(){"))
+    prova("il mio volto parla il vocabolario del server, con la sua regola sull'avatar «nessuna»", True,
+          "avatar: myAvatarScelta === 'nessuna' ? '' : (myAvatar || '')" in mio
+          and "negozio: myNegozio || myUsername || ''" in mio and "locale: true" in mio
+          and 'voti = int(r["n_feedback"] or 0)' in _SORGENTE
+          and "\"negozio\": r[\"negozio\"] or r[\"username\"] or \"\"," in _SORGENTE)
+    prova("il blocco dei volti del libro non cambia: chiediFacceP2P chiede ancora una volta sola", True,
+          "const lista = (ids || []).filter(id => id && !p2pFacceChieste.has(id));"
+          in fn("async function chiediFacceP2P(ids){")
+          and "voltoMioP2P" not in mini[mini.index("let p2pOrdiniRegistrati = new Set();"):
+                                       mini.index("/* Dal volto al negozio")])
+    prova("le riprove sono poche e crescono", True,
+          "const P2P_VOLTO_RIPROVE_MS = [3000, 8000, 20000, 45000, 90000];" in mini)
+
+    node = _sh.which("node")
+    if not node:
+        salta("il banco node del volto dall'ascolto", "node non c'e'")
+        return
+    volti = mini[mini.index("let p2pOrdiniRegistrati = new Set();"):
+                 mini.index("/* Dal volto al negozio")]
+    ascolto = mini[mini.index("let p2pAscoltoLibro = null;"):
+                   mini.index("/* ============ fine del libro in ascolto")]
+    pezzi = "\n".join([
+        "let DEMO = false, VETRINA = false, myTgId = 111; const API_BASE = '/api';",
+        "function authHdr(){ return 'x'; }",
+        "function provvisorioP2P(id){ return String(id || '').indexOf('nuovo:') === 0; }",
+        "let renderN = 0, fermiN = 0; function renderP2P(){ renderN++; }",
+        "let vista = 'view-p2p'; function vistaAttivaP2P(){ return vista; }",
+        "let registrati = new Set(), chiamate = [];",
+        "async function fetch(url, opt){ chiamate.push(url); const ids = JSON.parse(opt.body).ordini;",
+        "  if (url.endsWith('/p2p/ordini')) { ids.forEach(i => registrati.add(i)); return {ok: true}; }",
+        "  const facce = {}; ids.forEach(i => { if (registrati.has(i)) facce[i] = {nome: 'Ada', avatar: 'a.png', media: 4.5, voti: 3, negozio: 'ada'}; });",
+        "  return {ok: true, json: async () => ({facce})}; }",
+        "let myNome = 'Andrea Bianchi', myAvatar = 'me.png', myAvatarScelta = '', myRating = 4.86, myNFeedback = 12, myNegozio = '', myUsername = 'andrea';",
+        "const miei = new Set(); function ordineMioP2P(id){ return miei.has(id); }",
+        "function lapidataP2P(){ return false; } function diarioP2P(){}",
+        "let p2pLibro = {ordini: [], quando: 1}; const P2P_VALUTA = 'EUR';",
+        "function euroTabacchinoP2P(){ return 0; }",
+        "const el = () => null;",
+        "const timer = []; const setTimeout = (f, ms) => { timer.push({f, ms}); return timer.length; };",
+        "async function scatta(){ const t = timer.splice(0); for (const x of t) { await x.f(); for (let i = 0; i < 3; i++) await new Promise(r => setImmediate(r)); } }",
+        pezzo_js(mini, "const P2P_FINALI = ", "\n"),
+        fn("function tagValore(ev, nome){"), fn("function tagValori(ev, nome){"),
+        fn("function ordineDaEvento(ev, adesso){"),
+        volti, ascolto,
+        "function ridisegnaLibroFermoP2P(){ fermiN++; renderP2P(); }",
+    ])
+    banco = pezzi + r"""
+const ora = Math.floor(Date.now() / 1000);
+const ev = (id) => ({kind: 38383, id: 'e-' + id, pubkey: 'm', created_at: ora, tags: [['d', id], ['k', 'sell'], ['f', 'EUR'], ['s', 'pending'], ['fa', '10'], ['pm', 'SEPA'], ['expires_at', String(ora + 9999)]]});
+(async () => {
+  const out = {};
+  // a) il mio ordine: volto subito dal profilo, poi quello del server alla riprova
+  miei.add('ord-mio');
+  arrivaLibroP2P(ev('ord-mio'));
+  const f0 = p2pFacce['ord-mio'];
+  out.mioSubito = [!!f0 && f0.locale === true, f0 && f0.nome, f0 && f0.avatar, f0 && f0.media, f0 && f0.voti, f0 && f0.negozio];
+  out.mioTimer = timer.map(t => t.ms);
+  registrati.add('ord-mio');                       // l'eco del coordinatore lo intesta
+  await scatta();
+  const f1 = p2pFacce['ord-mio'];
+  out.mioServer = [f1.nome, f1.locale === undefined, fermiN, timer.length];
+  // b) l'ordine di un altro: niente, niente, poi il volto — e basta
+  fermiN = 0; chiamate.length = 0;
+  arrivaLibroP2P(ev('ord-altrui'));
+  await chiediFacceP2P(['ord-altrui']);            // la domanda del render, a vuoto
+  out.altruiPrima = [!p2pFacce['ord-altrui'], chiamate.length, timer.map(t => t.ms)];
+  await scatta();                                   // riprova 1: ancora niente
+  out.altruiRiprova1 = [!p2pFacce['ord-altrui'], chiamate.length, timer.map(t => t.ms), fermiN];
+  registrati.add('ord-altrui');                    // chi ha pubblicato si e' registrato
+  await scatta();                                   // riprova 2: il volto arriva
+  const f2 = p2pFacce['ord-altrui'];
+  out.altruiArrivato = [f2 && f2.nome, f2 && f2.media, f2 && f2.voti, fermiN, timer.length, chiamate.length];
+  // c) la card sparita dal libro non si richiede piu'
+  chiamate.length = 0;
+  arrivaLibroP2P(ev('ord-sparito'));
+  p2pLibro = {ordini: p2pLibro.ordini.filter(o => o.id !== 'ord-sparito'), quando: 1};
+  await scatta();
+  out.sparito = [chiamate.length, timer.length];
+  // d) le riprove finiscono da sole
+  chiamate.length = 0;
+  arrivaLibroP2P(ev('ord-muto'));
+  let giri = 0; while (timer.length && giri < 20) { await scatta(); giri++; }
+  out.muto = [giri, chiamate.length, !p2pFacce['ord-muto']];
+  // e) il volto che arriva col libro NON davanti non ridisegna: ci pensa il prossimo render
+  vista = 'view-p2pmiei'; fermiN = 0; renderN = 0;
+  arrivaLibroP2P(ev('ord-dietro')); registrati.add('ord-dietro'); await scatta();
+  out.dietro = [!!p2pFacce['ord-dietro'], fermiN, renderN];
+  process.stdout.write(JSON.stringify(out));
+})();
+"""
+    cart = _tf.mkdtemp(prefix="volto_")
+    pth = _os.path.join(cart, "volto.js")
+    open(pth, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, pth], capture_output=True, text=True, timeout=60, encoding="utf-8")
+    _sh.rmtree(cart, ignore_errors=True)
+    prova("il banco node del volto gira", "", (r.stderr or "")[-600:])
+    if r.returncode or not r.stdout.strip():
+        return
+    o = _json.loads(r.stdout.strip())
+    prova("a) il mio ordine: il volto e' il mio SUBITO, dal profilo, marcato locale",
+          [True, "Andrea Bianchi", "me.png", 4.9, 12, "andrea"], o["mioSubito"])
+    prova("...con la prima riprova gia' in coda", [3000], o["mioTimer"])
+    prova("...e alla riprova il server lo sostituisce, la lista si ridisegna ferma, niente altre riprove",
+          ["Ada", True, 2, 0], o["mioServer"])
+    prova("b) l'ordine di un altro: la domanda del render torna a vuoto e la riprova e' in coda",
+          [True, 1, [3000]], o["altruiPrima"])
+    prova("...la prima riprova richiede (stessa funzione), ancora niente, la seconda in coda",
+          [True, 2, [8000], 1], o["altruiRiprova1"])
+    prova("...quando chi ha pubblicato si e' registrato il volto arriva: nome, stelle, voti; un ridisegno fermo e basta",
+          ["Ada", 4.5, 3, 2, 0, 3], o["altruiArrivato"])
+    prova("c) la card sparita dal libro non si richiede", [0, 0], o["sparito"])
+    prova("d) le riprove finiscono da sole: cinque domande e poi silenzio", [5, 5, True], o["muto"])
+    prova("e) col libro non davanti il volto entra in cache senza ridisegnare", [True, 0, 0], o["dietro"])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,
