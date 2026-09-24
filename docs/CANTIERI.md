@@ -29582,3 +29582,74 @@ anche a capo, i prezzi a filo del bordo, nessuno sbordo orizzontale.
 
 **Da guardare sul telefono**: un ordine a set con un titolo lungo e una
 quantità a due cifre, nei due temi.
+
+## Il + nella guida, la tasca e il marchio (24 set 2026)
+
+Ritocco di Andrea al giro di 66c3bba, quattro punti. Worktree da
+`origin/main`, commit firmato.
+
+**COSA C'È.** 1) IL + E' UN CURSORE NELLA SUA GUIDA: trascinato scorre
+solo in verticale, dalla sua casa al fondo della tendina e mai oltre, ne'
+sopra ne' sotto, dovunque vada il dito (di lato non si sposta; il dito
+che sale lo prende la pagina, come prima). 2) LA GUIDA RESTA: mentre
+scende, i fianchi della capsula stanno al loro posto — `#navBinario`, il
+contorno della capsula intera nel grigio delle voci, VUOTO dentro — e
+sopra il + si vede lo sfondo della pagina; il blu della tendina si ritira
+sotto il suo equatore, perche' il telaio scende con lui e la tendina
+risale dello stesso tanto, cioe' sta ferma. «Sopra la tendina» e' da
+meta' corsa in giu': li' il contorno si fa bianco e l'alone gira attorno
+alla tasca. 3) NIENTE LAMPO ROSSO: il foglio che si apre da Barattozon —
+tocco sulla tendina o + lasciato sopra di lei — ha il fantasma della
+morfosi che parte dalla TASCA (la parte blu della tendina sotto il +),
+col suo filo e il suo logo, e diventa il bottone blu; il + resta al suo
+posto finche' il foglio non lo copre. 4) IL MARCHIO IN CIMA AL FOGLIO al
+posto di «Vuoi vendere Bitcoin», che resta il nome del foglio per chi non
+vede (aria-label): alto 30, di giorno il file con «aratto» scuro e di
+sera quello bianco (`barattozon-scuro.webp` / `barattozon.webp`, 305x96:
+nitido a 3x); se un file non arriva torna la frase.
+
+**IL LAMPO AVEVA DUE CAUSE, e la seconda e' la lezione.** La prima era
+di disegno: il fantasma partiva dal + rosso e la sua forma restava rossa
+per due terzi della corsa. La seconda era la CASCATA: la meta blu del
+fantasma (`#p2pMorfo.bz .morfo-meta`, 1,2,0) perdeva contro quella rossa
+del lato (`body.p2p-vendo #p2pMorfo .morfo-meta`, 1,2,1), e di sera anche
+la scritta: il fantasma di Barattozon volava ROSSO fino all'ultimo
+fotogramma, e la sentinella del giro prima era verde perche' cercava la
+riga blu e la trovava. Le tre regole rosse escludono il blu col
+`:not()`, e le prove adesso chiedono al giudice della cascata chi vince,
+strato per strato — la lezione delle note piccole, pagata una seconda
+volta nello stesso giorno.
+
+**LE SCELTE.** Sotto il fantasma della tasca la tendina resta srotolata e
+ferma, col logo che porta lui (`morfo-tasca`), e al ritorno lui ci
+rientra; se il foglio era nato dal + e torna vestito di Barattozon, la
+tendina si rimette fuori SENZA corsa sotto il foglio ancora pieno, e solo
+dopo si misura (`srotolaTascaP2P`). Lasciato sopra, il + torna a casa con
+la sua corsa mentre la tasca gli passa davanti. La guida si misura sulla
+TENDINA, ferma per costruzione: un trascino ripreso mentre il + rientra
+conta la corsa da casa e non esce dalla capsula. Il binario resta finche'
+il + non e' a casa (la corsa della barra), e al ritorno la tendina perde il
+suo .1s di ritardo, o il taglio e lei si staccherebbero di un decimo.
+
+**PROVATO.** La suite intera, severa e senza config: 14.433 verdi e 0
+rosse; i 13 collaudi della CI verdi, in gabbia.
+`prove_tasto_barattozon` (il binario letto dalle regole del +, la cascata
+della tendina, il banco del cursore coi casi oltre, risale, di lato, per
+strada e riparte; il marchio: file, rotte, contrasto di «aratto» nei due
+temi, la cascata del tema e il banco del titolo) e `prove_p2p_pubblica`
+(la cascata del fantasma nei suoi vestiti, il banco della tasca, niente
+rosso strato per strato). **TORTURA 56/56** su una copia (55 al primo
+giro: la guardia che tiene il marchio fuori da «Compra BTC» non la
+provava nessuno — un caso in piu' nel banco del titolo). DAL
+VIVO col dito vero (eventi touch di Chrome) a 320/375/430 nei due temi:
+lo screencast dell'apertura dalla tendina e dal rilascio non ha rosso
+oltre quello che c'era gia' (il controllo, il tocco sul + rosso, ne
+mostra migliaia di pixel); i fermi-immagine del + a +15, +30, +55 e col
+dito a +140, di lato e in su; la testata col marchio 95x30 centrata, alta
+come prima (58px).
+
+**DA GUARDARE SUL TELEFONO.** Il + che scende nella guida senza sbandare
+di lato, col binario vuoto sopra di lui e il fondo che lo ferma; la luce
+da meta' corsa; il rilascio sopra e il tocco sulla tendina che aprono
+Barattozon senza passare dal rosso; il marchio in cima al foglio, di
+giorno e di sera.

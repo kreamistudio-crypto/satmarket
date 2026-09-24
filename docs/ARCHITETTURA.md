@@ -24917,16 +24917,24 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   col tabacchino gia' scelto (`apriBarattozonP2P` →
   `apriNuovoOrdineP2P(P2P_TABACCHINO)`, che sceglie il metodo PRIMA del
   disegno e della morfosi, e solo se `metodiPubblicabiliP2P` lo concede).
-  E IL + SI TRASCINA SULLA TENDINA: premuto e portato giu', al rilascio
-  sopra di lei apre lo stesso percorso, rilasciato fuori torna a casa.
-  Il gesto (IL TRASCINO, accanto ad `apriBarattozonP2P`) vive solo dove
-  c'e' la tendina (`trascinoPuoiP2P`); sotto P2P_SOGLIA_TRASCINO (12px)
-  e' un TOCCO, che il gesto stesso passa a `toccaPiu` — il click del
-  browser che segue si scarta con l'orologio `p2pPiuGestoAt`; il + segue
-  il dito con una transform sommata alla sua salita, la luce BIANCA
-  (classe `p2p-sopra`: filo e chiarore nella tendina, l'alone nel
-  `nav::after`, fuori dal telaio che lo taglierebbe) si accende col dito
-  sopra; `touch-action: pan-down` sul + lascia alla pagina il dito che
+  E IL + SI TRASCINA SULLA TENDINA, come un CURSORE nella sua guida (il
+  quarto giro, 24 set 2026): scorre solo in verticale, dalla casa al
+  fondo della tendina e mai oltre (`corsaCursoreP2P`, con la guida
+  misurata sulla tendina, ferma per costruzione), e da meta' corsa in giu'
+  e' «sopra» (`sopraTendinaP2P`): lasciato li' apre lo stesso percorso,
+  prima torna a casa. Sopra di lui resta il BINARIO VUOTO: `#navBinario`
+  e' il contorno della capsula intera, vuoto dentro, acceso dal gesto
+  (`p2p-binario`); il blu si ritira sotto il suo equatore perche' il
+  telaio scende con lui e la tendina risale dello stesso tanto
+  (`guidaCursoreP2P`, tre transform, che al ritorno se ne vanno insieme:
+  `rientraCursoreP2P`). Il gesto (IL TRASCINO, accanto ad
+  `apriBarattozonP2P`) vive solo dove c'e' la tendina (`trascinoPuoiP2P`);
+  sotto P2P_SOGLIA_TRASCINO (12px) e' un TOCCO, che il gesto stesso passa
+  a `toccaPiu` — il click del browser che segue si scarta con l'orologio
+  `p2pPiuGestoAt`; la luce BIANCA (classe `p2p-sopra`: il filo della
+  tendina e del binario, il chiarore nella tendina, l'alone attorno alla
+  tasca nel `nav::after`, fuori dal telaio che lo taglierebbe) si accende
+  da meta' corsa; `touch-action: pan-down` sul + lascia alla pagina il dito che
   sale, il gesto di aggiornamento non si arma da un tocco che parte dalla
   barra, e `go()` riporta a casa un + trascinato (`annullaTrascinoP2P`).
   Si arma all'avvio (`armaTrascinoP2P`, accanto a `navMotore`), non al
@@ -24943,7 +24951,16 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   scuro di sera), e col percorso Barattozon il blu della capsula col
   logo in piccolo (`.btn.bz`, `LOGO_BZ_HTML`), come il «Pubblica» del
   suo riepilogo (`chiediConferma` con `vestito: 'bz'`, l'etichetta
-  sempre col textContent). FUORI DAL LIBRO IL + E' ARANCIO:
+  sempre col textContent). IL FOGLIO DI BARATTOZON NASCE DALLA TASCA: col
+  bottone `.bz` il fantasma della morfosi parte dalla parte blu della
+  tendina sotto il + (`tascaBarattozonP2P`; classe `tasca` sul fantasma e
+  `morfo-tasca` sul body, che tiene la tendina fuori e ferma e ne nasconde
+  il logo, portato dal fantasma; il + resta a vista) e ci torna
+  (`srotolaTascaP2P`); le regole rosse del fantasma escludono il blu col
+  `:not()`, che per specificita' vincevano. In cima al foglio del
+  percorso c'e' il MARCHIO (`titoloNuovoP2P`, `MARCHIO_TITOLO_P2P`: un file
+  per tema, la frase come aria-label dell'<h3>, e il ripiego alla frase se
+  un file non arriva). FUORI DAL LIBRO IL + E' ARANCIO:
   `p2p-piu-neutro`, scritta da `go()` dalla vista, gli da' l'altezza e il
   rilievo del + del mercatino, e `toccaPiu` (col giudice `piuNeutroP2P`)
   porta al libro su «Compra BTC» con `setLatoP2P('compro', true)` e poi
@@ -24971,8 +24988,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   fotogramma all'apertura del foglio e all'ingresso dal mercatino. Da
   desktop le pillole sfumano ancora il loro fondo. I verbali: CANTIERI,
   «Il tasto Barattozon e il + neutro nel P2P», «La capsula di
-  Barattozon» e «La capsula col logo intero, il + che si trascina e le
-  corse della barra».
+  Barattozon», «La capsula col logo intero, il + che si trascina e le
+  corse della barra» e «Il + nella guida, la tasca e il marchio».
   LA SVEGLIA DEL TABACCHINO è l'emenda alla fase 6 (decisione di
   Andrea): il server impara UNA cosa — «questo account ha una scadenza
   a quest'ora» — nella tabella `p2p_sveglie` (quattro colonne, PK
@@ -26650,17 +26667,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    «Il ritocco dell'intestazione» e «I ritocchi del P2P»),
    `/assets/barattozon.webp` (il marchio del metodo «Contanti al
    tabacchino», 16 set 2026: WebP con trasparenza, 305x96, cartella
-   sua e mai assets/categorie/ — vedi «IL VESTITO BARATTOZON»),
+   sua e mai assets/categorie/ — vedi «IL VESTITO BARATTOZON»; dal 24
+   set 2026 e' anche, di sera, il titolo del foglio del percorso),
    `/assets/barattozon-scuro.webp` (il marchio SCURO, 17 set 2026: la
    stessa immagine con la sola metà bianca portata nell'inchiostro di
    casa, per quando il marchio sta in una frase su carta chiara —
-   vedi CANTIERI, «E il marchio Barattozon è passato nel testo»),
+   vedi CANTIERI, «E il marchio Barattozon è passato nel testo»; dal
+   24 set 2026 e' anche, di giorno, il titolo del foglio del percorso),
    `/assets/barattozon-tasto.webp` (il logo del tasto Barattozon nella
    barra del P2P, 23 set 2026, rifatto due volte: dal 24 il logo INTERO,
    la B bianca sopra la freccia arancio, 123x120 — il 3x dei 40px della
    tendina —, WebP con alfa; il blu della foto lo mette il CSS alla
    tendina e ai bottoni blu del percorso, dove lo stesso file va in
-   piccolo. Il nome e' quello del primo giro; vedi CANTIERI, «La capsula
+   piccolo, e dal 24 set 2026 nel fantasma della morfosi che parte dalla
+   tasca. Il nome e' quello del primo giro; vedi CANTIERI, «La capsula
    col logo intero, il + che si trascina e le corse della barra»),
    `/assets/scambi-intestazione.webp` (l'intestazione di «I miei
    scambi», 22 set 2026: le due monete, bitcoin e un euro, al posto

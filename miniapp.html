@@ -3039,6 +3039,24 @@
     font:inherit;font-size:19px;font-weight:800;line-height:1;
     padding:8px 8px;cursor:pointer;border-radius:10px}
   .foglio-back.vuoto{visibility:hidden}
+  /* IL MARCHIO AL POSTO DEL TITOLO (24 set 2026, ritocco di Andrea): nel
+     percorso Barattozon la testata del foglio porta il marchio — la B
+     arancio, «aratto», «zon» arancio con la freccia — invece di «Vuoi
+     vendere Bitcoin», che resta il nome del foglio per chi non vede
+     (aria-label sull'<h3>, e il dialogo lo prende da li'). Alto 30: le
+     minuscole di «aratto» (un terzo del file) vengono alte 10px, quelle
+     del titolo in Baloo a 18 ne misurano 9 — il marchio pesa come la
+     scritta che sostituisce —, e il file (305x96) ne ha piu' del triplo:
+     nitido a 3x. Due file, come nella frase del giro: di giorno «aratto»
+     nell'inchiostro di casa (bianco, sulla testata chiara sparirebbe), di
+     sera bianco. Il giudice del tema e' `html[data-tema]`, e le regole
+     nominano l'<img> per la ragione di .giro-marchio: senza, la riga del
+     `display:block` le batterebbe. */
+  .tit-marchio{display:block;height:30px;width:max-content;margin:0 auto}
+  .tit-marchio img{display:block;height:100%;width:auto}
+  .tit-marchio img.tit-m-scuro{display:none}
+  html[data-tema="scuro"] .tit-marchio img.tit-m-chiaro{display:none}
+  html[data-tema="scuro"] .tit-marchio img.tit-m-scuro{display:block}
   /* ⚠️ E LA VISTA DELLO SCAMBIO NON HA PIU' UNA REGOLA SUA (set
      2026): per un giro la sua uscita e' stata un ‹, che a pari corpo
      e' molto piu' magro della ✕ — misurato, 23px di larghezza contro
@@ -3143,13 +3161,21 @@
      che spariva di colpo col fantasma — visto nei fotogrammi fermi. Al
      ritorno ricompare subito, sotto la meta che ancora la copre. */
   #p2pMorfo.parte .morfo-forma{opacity:1;transition-delay:0s,0s}
-  body.p2p-vendo #p2pMorfo .morfo-forma{background:var(--danger);
+  /* ⚠️ IL ROSSO DEL LATO NON TOCCA BARATTOZON (24 set 2026): le tre
+     regole rosse del fantasma — forma, meta, scritta — escludono il
+     vestito blu col :not(), e non e' pignoleria. `body.p2p-vendo
+     #p2pMorfo .morfo-meta` pesa (1,2,1) e la regola blu `#p2pMorfo.bz
+     .morfo-meta` (1,2,0): VINCEVA IL ROSSO, e il fantasma di Barattozon
+     volava rosso — di sera anche con la scritta scura — fino all'ultimo
+     fotogramma, dove il bottone vero tornava blu. La sentinella cercava
+     la riga blu e la trovava; adesso chiede alla cascata chi vince. */
+  body.p2p-vendo #p2pMorfo:not(.tasca) .morfo-forma{background:var(--danger);
     box-shadow:0 4px 0 var(--danger-deep)}
   #p2pMorfo .morfo-meta{border-radius:var(--radius-btn);
     background:var(--trust);box-shadow:0 3px 0 var(--trust-deep);
     transition:transform var(--morfo-corsa) var(--morfo-curva),
       opacity var(--morfo-corsa) var(--morfo-curva)}
-  body.p2p-vendo #p2pMorfo .morfo-meta{background:var(--danger);
+  body.p2p-vendo #p2pMorfo:not(.bz) .morfo-meta{background:var(--danger);
     box-shadow:0 3px 0 var(--danger-deep)}
   #p2pMorfo.bz .morfo-meta{background:#191D29;box-shadow:0 3px 0 #0C0E15}
   #p2pMorfo .morfo-glifo,#p2pMorfo .morfo-eti{
@@ -3164,9 +3190,39 @@
     color:var(--on-trust);transition-delay:0s,var(--morfo-attesa)}
   /* la scritta ha l'inchiostro del bottone d'arrivo, o all'ultimo
      fotogramma cambierebbe di colpo; il logo copiato ha la misura sua */
-  body.p2p-vendo #p2pMorfo .morfo-eti{color:var(--on-danger)}
+  body.p2p-vendo #p2pMorfo:not(.bz) .morfo-eti{color:var(--on-danger)}
   #p2pMorfo.bz .morfo-eti{color:#fff}
   #p2pMorfo .morfo-eti .logo-bz{width:21px;height:20px;flex:0 0 auto;display:block}
+  /* ====== LA MORFOSI DALLA TASCA (24 set 2026, ritocco di Andrea) ======
+     Il foglio che si apre da Barattozon — il tocco sulla tendina, o il +
+     lasciato sopra di lei — non passa piu' dal +: il fantasma parte dalla
+     TASCA, la parte blu della tendina sotto il + a riposo, e diventa il
+     bottone blu. Prima partiva dal + ROSSO, e rosso restava per due terzi
+     della corsa con la scritta del foglio sopra: si leggeva «il foglio
+     rosso di vendita» un attimo prima di quello di Barattozon (visto da
+     Andrea, e nei fotogrammi dello screencast fino a 214ms).
+     IL PRIMO FOTOGRAMMA E' LA TASCA COM'ERA: lo stesso blu, lo stesso
+     gradino, il fondo tondo — i raggi sono in percento, 50% e 27/55,
+     perche' la forma e' grande quanto il bottone e SCALATA: schiacciata
+     sulla tasca tornano 27px —, il filo della tendina, e il logo al posto
+     del +. Il FILO non scala: sta fermo sulla tasca e sfuma via, o i suoi
+     2,5px si deformerebbero con la scala; al ritorno ricompare alla fine.
+     Il LOGO sta 1,5px sopra il centro della tasca, dove sta quello vero
+     (dalla cima della tendina: il centro del logo a 53, quello della
+     tasca a 54,5). Il + resta al suo posto, a vista: il fantasma non e'
+     lui. */
+  body.p2p-vendo #p2pMorfo.tasca .morfo-forma{background:#191D29;
+    box-shadow:0 4px 0 #0C0E15;border-radius:0 0 50% 50% / 0 0 49.1% 49.1%}
+  #p2pMorfo .morfo-filo{display:none}
+  #p2pMorfo.tasca .morfo-filo{display:block;box-sizing:border-box;
+    border:2.5px solid var(--nav-ink-p2p);border-top:0;
+    border-radius:0 0 27px 27px;opacity:0;
+    transition:opacity var(--morfo-velo) ease}
+  #p2pMorfo.tasca.parte .morfo-filo{opacity:1;transition-delay:var(--morfo-attesa)}
+  #p2pMorfo .g-logo{display:none}
+  #p2pMorfo.tasca .g-piu{display:none}
+  #p2pMorfo.tasca .g-logo{display:block;width:41px;height:40px;
+    position:relative;top:-1.5px}
   /* LO STATO DI PARTENZA E' IL TONDO DELLA BARRA, colore del LATO
      compreso: verde a comprare, rosso a vendere — lo stesso giudice
      del + e del logo, che e' una classe sul body e non una tinta
@@ -3244,7 +3300,7 @@
      difetto, resterebbe fermo invece di volare */
   @media (prefers-reduced-motion:reduce){
     #p2pMorfo .morfo-forma,#p2pMorfo .morfo-meta,#p2pMorfo .morfo-glifo,
-    #p2pMorfo .morfo-eti,nav .nav-lato{transition:none}
+    #p2pMorfo .morfo-eti,#p2pMorfo .morfo-filo,nav .nav-lato{transition:none}
   }
 
   /* ---- IL DETTAGLIO DI UN ORDINE DEL LIBRO (set 2026) ----
@@ -4392,13 +4448,17 @@
   body.nav-p2p.p2p-vendo:not(.p2p-piu-neutro):not(.barra-via) #navBarattozon{
     transform:none;visibility:visible;pointer-events:auto;
     transition-delay:.1s,0s}
-  /* LA LUCE DEL TRASCINO (scelta di Andrea: bianca): col dito sopra la
-     tendina il filo diventa bianco, dentro si accende un chiarore e
-     intorno un ALONE. Filo e chiarore stanno nella tendina; l'alone sta
-     FUORI dal telaio, che lo taglierebbe all'equatore — una riga dritta
-     accanto al +, vista di sera nelle varianti —, ed e' il ::after della
-     barra, a z-index:-1: sopra la banda, sotto le voci e il +. Si
-     accendono con l'opacity, e la classe e' del JS del trascino. */
+  /* LA LUCE DEL TRASCINO (scelta di Andrea: bianca): col + sopra la
+     tendina il filo diventa bianco — quello della tendina e quello del
+     binario, cioe' il contorno intero della capsula —, dentro si accende
+     un chiarore e intorno un ALONE. Filo e chiarore stanno nella tendina;
+     l'alone sta FUORI dal telaio, che lo taglierebbe all'equatore — una
+     riga dritta accanto al +, vista di sera nelle varianti —, ed e' il
+     ::after della barra, a z-index:-1: sopra la banda, sotto le voci e il
+     +. Si accendono con l'opacity, e la classe e' del JS del trascino.
+     L'ALONE FA IL GIRO DELLA TASCA (24 set 2026, col + che scende nella
+     guida): e' li' che il + va a posarsi, e un alone alto quanto la
+     tendina intera avrebbe la cima piatta in mezzo al binario vuoto. */
   #navBarattozon::after{content:'';position:absolute;left:0;right:0;top:-3px;bottom:0;
     border-radius:0 0 27px 27px;pointer-events:none;opacity:0;
     box-shadow:inset 0 0 0 2.5px #FFFFFF;
@@ -4406,15 +4466,61 @@
       rgba(255,255,255,0) 70%);
     transition:opacity var(--p2p-corsa) var(--p2p-curva)}
   nav::after{content:'';position:absolute;left:0;right:0;margin:0 auto;
-    top:-26px;width:54px;height:82px;border-radius:0 0 27px 27px;
+    top:1px;width:54px;height:55px;border-radius:27px;
     z-index:-1;pointer-events:none;opacity:0;
     box-shadow:0 0 18px 4px rgba(255,255,255,.45);
     transition:opacity var(--p2p-corsa) var(--p2p-curva)}
-  body.p2p-sopra #navBarattozon::after,body.p2p-sopra nav::after{opacity:1}
+  body.p2p-sopra #navBinario::after,body.p2p-sopra #navBarattozon::after,
+  body.p2p-sopra nav::after{opacity:1}
   /* IL + SEGUE IL DITO SENZA CORSA: lo sposta il JS con la sua
      transform, e al rilascio (classe tolta) torna a casa con la corsa di
      sempre */
   body.p2p-trascina nav button.sell .ic{transition:none}
+  /* ====== IL CURSORE NELLA GUIDA (24 set 2026, ritocco di Andrea) ======
+     Trascinato, il + non fluttua piu' dietro al dito: scorre SOLO in
+     verticale, incastrato fra i fianchi della capsula come un cursore in
+     una guida, dalla sua casa al fondo della tendina e mai oltre, ne'
+     sopra ne' sotto (il conto e' del JS, corsaCursoreP2P). Mentre scende:
+     • I FIANCHI RESTANO: #navBinario e' il contorno della capsula intera,
+       dalla cima del + a riposo al fondo della tendina, nel grigio delle
+       voci. Dentro e' VUOTO: sopra il + si vede la pagina, o la banda,
+       come sono dietro. Si vede solo col gesto (p2p-binario), e a + fermo
+       starebbe tutto sotto di lui.
+     • IL BLU SI RITIRA SOTTO IL +: il telaio scende con lui — la sua cima
+       resta l'equatore del cerchio — e la tendina risale dello stesso
+       tanto, cioe' sta ferma mentre il suo taglio scende. Sopra il + non
+       resta ne' blu ne' rosso: il binario vuoto, che si ricompone dietro
+       di lui. Tornando su, il + si riprende il suo posto.
+     Tre transform scritte dal dito — +, telaio, tendina — e al rilascio
+     tornano a casa INSIEME, con la corsa della barra: per questo durante
+     il gesto le corse del telaio e della tendina tacciono, come quella
+     del +, e al ritorno la tendina perde il suo .1s di ritardo (senza, il
+     taglio e la tendina si staccherebbero di un decimo e il blu
+     scenderebbe sotto il fondo della capsula).
+     La geometria e' quella della capsula, e una prova la rifa' leggendo
+     le regole del +: cima a −53 (padding 8, margine −30, salita −31),
+     fondo a 56 come la tendina, larga 54 col raggio 27. */
+  #navBinario{position:absolute;left:0;right:0;margin:0 auto;
+    top:-53px;width:54px;height:109px;border-radius:27px;
+    pointer-events:none;opacity:0;
+    box-shadow:inset 0 0 0 2.5px var(--nav-ink-p2p)}
+  #navBinario::after{content:'';position:absolute;inset:0;border-radius:27px;
+    box-shadow:inset 0 0 0 2.5px #FFFFFF;opacity:0;
+    transition:opacity var(--p2p-corsa) var(--p2p-curva)}
+  body.nav-p2p.p2p-vendo.p2p-binario:not(.p2p-piu-neutro) #navBinario{opacity:1}
+  body.p2p-trascina #navTendina,body.p2p-trascina #navBarattozon{transition:none}
+  body.nav-p2p.p2p-vendo.p2p-binario:not(.p2p-piu-neutro):not(.barra-via) #navBarattozon{
+    transition-delay:0s,0s}
+  /* LA TENDINA SOTTO IL FANTASMA (24 set 2026): quando il foglio si apre
+     da Barattozon il fantasma parte dalla tasca (vedi LA MORFOSI DALLA
+     TASCA) e la tendina resta srotolata e FERMA sotto di lui — niente
+     riavvolta a meta' corsa, mentre la barra si apre —, e il suo logo lo
+     porta il fantasma: due loghi uno sull'altro si sdoppierebbero appena
+     lui si muove. Poi arriva il foglio e la copre; al ritorno il fantasma
+     ci rientra, e la riconsegna com'era. */
+  body.nav-p2p.p2p-vendo.morfo-tasca:not(.p2p-piu-neutro) #navBarattozon{
+    transform:none;visibility:visible}
+  body.morfo-tasca #navBarattozon img{visibility:hidden}
   /* ⚠️ IL DITO, CHE IL CLICK DA JS NON VEDE: il + e' una cella della
      barra, e la sua SCATOLA (72px per 44, vuota: la scritta e' scesa)
      copre la tendina — sta dopo nel markup, quindi sopra anche per il
@@ -4437,7 +4543,8 @@
       pointer-events:auto;touch-action:none;touch-action:pan-down}
   }
   @media (prefers-reduced-motion:reduce){
-    #navTendina,#navBarattozon,#navBarattozon::after,nav::after{transition:none}
+    #navBinario::after,#navTendina,#navBarattozon,#navBarattozon::after,
+    nav::after{transition:none}
   }
 
   /* ---------- barra d'acquisto del dettaglio (solo mobile) ----------
@@ -7876,8 +7983,9 @@
     /* il tasto Barattozon e' la tendina che prosegue il tondo del + in
        una capsula, e da desktop il tondo non c'e': sotto la pillola della
        topbar penderebbe sulla pagina. Il tabacchino resta a un tocco nel
-       foglio, fra i metodi. Via anche l'alone del trascino, che e' suo */
-    #navTendina,nav::after{display:none}
+       foglio, fra i metodi. Via anche il binario e l'alone del trascino,
+       che sono suoi */
+    #navBinario,#navTendina,nav::after{display:none}
     header{top:60px}
     header .brand{display:none}   /* il logo ora sta nella topbar */
     .searchbar{max-width:640px}
@@ -10553,6 +10661,12 @@ document.getElementById('cartello')?.remove();</script>
          e ne copre la cima. Nascosta finche' le classi non la chiamano
          (vedi il suo CSS), e da nascosta non si tocca e non si raggiunge
          col Tab. -->
+    <!-- IL BINARIO (24 set 2026): i fianchi della capsula mentre il +
+         scende trascinato nella sua guida — il contorno, vuoto dentro.
+         Sta PRIMA del telaio: la tendina e il suo filo gli si dipingono
+         sopra, e il + sopra tutti. Lo accende il gesto (vedi IL CURSORE
+         NELLA GUIDA, nel CSS). -->
+    <div id="navBinario" aria-hidden="true"></div>
     <div id="navTendina"><div id="navBarattozon" role="button" tabindex="0"
          aria-label="Vendi con Barattozon: contanti al tabacchino"
          title="Vendi con Barattozon"
@@ -10718,10 +10832,17 @@ document.getElementById('cartello')?.remove();</script>
        forma. Vuoto e inerte finche' non serve; l'etichetta gliela
        COPIA il JS dal bottone vero, cosi' le due scritte non possono
        divergere. -->
+  <!-- ...e DALLA TASCA di Barattozon (24 set 2026) il fantasma parte
+       dalla tendina invece che dal +: il filo della tendina sta fermo
+       sulla partenza e sfuma, e al posto del + c'e' il suo logo (vedi LA
+       MORFOSI DALLA TASCA). Il logo e' lo stesso file della tendina, gia'
+       in memoria: `decoding="sync"` perche' il primo fotogramma non
+       arrivi senza. -->
   <div id="p2pMorfo" aria-hidden="true">
     <i class="morfo-forma"></i>
+    <i class="morfo-filo"></i>
     <i class="morfo-meta"></i>
-    <span class="morfo-glifo">＋</span>
+    <span class="morfo-glifo"><span class="g-piu">＋</span><img class="g-logo" src="/assets/barattozon-tasto.webp" width="41" height="40" alt="" decoding="sync"></span>
     <span class="morfo-eti"></span>
   </div>
 
@@ -48841,6 +48962,42 @@ function morfosiP2P(da, a){
 /* il tondo della barra: un posto solo, che i chiamanti sono tre */
 const tondoBarraP2P = () => document.querySelector('#nav-vendi .ic');
 
+/* LA TASCA DI BARATTOZON (24 set 2026): la parte della tendina che si
+   vede sotto il + a riposo, dal fondo del cerchio al fondo di lei. Da qui
+   parte — e qui torna — il fantasma quando il bottone e' quello di
+   Barattozon (vedi LA MORFOSI DALLA TASCA, nel CSS).
+   SI MISURA SULLA TENDINA E NON SUL +: il + puo' essere ancora per
+   strada (un trascino appena lasciato rientra con la sua corsa), la
+   tendina no — e' ferma per costruzione, e la sua cima e' l'equatore del
+   + a riposo. Niente tasca dove la tendina non c'e': le classi di
+   sempre, quelle che la srotolano. */
+function tascaBarattozonP2P(){
+  const b = document.body.classList;
+  if (!b.contains('nav-p2p') || !b.contains('p2p-vendo') || b.contains('p2p-piu-neutro'))
+    return null;
+  const tend = el('navBarattozon'), tondo = tondoBarraP2P();
+  if (!tend || !tondo) return null;
+  const r = tend.getBoundingClientRect(), raggio = tondo.offsetHeight / 2;
+  if (!r.width || r.height <= raggio) return null;
+  const cima = r.top + raggio;
+  return {left: r.left, top: cima, width: r.width, height: r.bottom - cima};
+}
+/* LA TENDINA FUORI E FERMA per il ritorno nella tasca: se il foglio era
+   nato dal + si era riavvolta con la barra, e ci torna SENZA corsa — sta
+   sotto il foglio ancora pieno, e una corsa arriverebbe dopo il fantasma.
+   Dopo, e solo dopo, la tasca si puo' misurare. */
+function srotolaTascaP2P(){
+  const tend = el('navBarattozon');
+  if (!tend) return false;
+  if (!document.body.classList.contains('morfo-tasca')) {
+    tend.style.transition = 'none';
+    document.body.classList.add('morfo-tasca');
+    void tend.offsetWidth;
+    tend.style.transition = '';
+  }
+  return true;
+}
+
 function morfoPuoiP2P(){
   if (effettiRidotti()) return false;
   if (!matchMedia('(max-width: 767px)').matches) return false;
@@ -48900,15 +49057,26 @@ function vestiMorfoP2P(g, da, a, eti, bottone){
     if (e) e.replaceChildren(...[...bottone.childNodes].map(n => n.cloneNode(true)));
     g.classList.toggle('bz', bottone.classList.contains('bz'));
   }
+  /* IL FILO DELLA TASCA NON SCALA: sta fermo sulla partenza, misurato li'
+     dentro il fantasma (che ha il posto del bottone d'arrivo) */
+  const f = g.querySelector('.morfo-filo');
+  if (f) {
+    f.style.left = (da.left - a.left) + 'px';
+    f.style.top = (da.top - a.top) + 'px';
+    f.style.width = da.width + 'px';
+    f.style.height = da.height + 'px';
+  }
   return m;
 }
 
 /* i due veri spariscono per la durata della corsa: il fantasma DEVE
    sembrare lo stesso bottone che si muove, e un tondo fermo dietro lo
-   smentirebbe. `visibility` e non `display`: il posto resta. */
-function celaVeriP2P(cela){
+   smentirebbe. `visibility` e non `display`: il posto resta.
+   DALLA TASCA il fantasma e' la tendina e non il +, che resta a vista
+   (e il logo della tendina lo nasconde il CSS, con la classe del body) */
+function celaVeriP2P(cela, tasca){
   const tondo = tondoBarraP2P(), meta = el('p2pNuovoInvia');
-  if (tondo) tondo.style.visibility = cela ? 'hidden' : '';
+  if (tondo) tondo.style.visibility = cela && !tasca ? 'hidden' : '';
   if (meta) meta.style.visibility = cela ? 'hidden' : '';
 }
 
@@ -48933,7 +49101,9 @@ function posaMorfoP2P(){
 function spegniMorfoP2P(){
   posaMorfoP2P();
   barraViaP2P(false);
-  document.body.classList.remove('morfosi');
+  document.body.classList.remove('morfosi', 'morfo-tasca');
+  const g = el('p2pMorfo');
+  if (g) g.classList.remove('tasca');
   const foglio = el('p2pNuovoSheet');
   if (foglio && foglio.classList.contains('morfo'))
     vestiFoglioMorfoP2P(foglio, false);
@@ -48973,9 +49143,15 @@ function apriMorfoP2P(){
      iniziata vorrebbe dire vederla schiarire a meta' strada */
   document.body.classList.add('morfosi');
   vestiFoglioMorfoP2P(foglio, true);
-  vestiMorfoP2P(g, tondo.getBoundingClientRect(),
+  /* COL BOTTONE DI BARATTOZON IL FANTASMA PARTE DALLA TASCA, non dal +
+     (vedi LA MORFOSI DALLA TASCA): il bottone blu nasce dal blu, e il +
+     resta al suo posto. Dove la tasca non c'e', dal + come sempre. */
+  const tasca = meta.classList.contains('bz') ? tascaBarattozonP2P() : null;
+  vestiMorfoP2P(g, tasca || tondo.getBoundingClientRect(),
                 meta.getBoundingClientRect(), meta.textContent, meta);
-  celaVeriP2P(true);
+  g.classList.toggle('tasca', !!tasca);
+  document.body.classList.toggle('morfo-tasca', !!tasca);
+  celaVeriP2P(true, !!tasca);
   g.classList.add('acceso', 'parte');
   void g.offsetWidth;        /* il fotogramma di partenza esiste solo se lo si CHIEDE */
   /* i tre che partono INSIEME, nello stesso giro di stile: il foglio
@@ -48999,9 +49175,14 @@ function chiudiMorfoP2P(){
   const g = el('p2pMorfo'), tondo = tondoBarraP2P(), meta = el('p2pNuovoInvia');
   if (!morfoPuoiP2P() || !g || !tondo || !meta) { spegniMorfoP2P(); return; }
   tempiMorfoP2P();
-  vestiMorfoP2P(g, tondo.getBoundingClientRect(),
+  /* COL BOTTONE DI BARATTOZON SI TORNA NELLA TASCA: la tendina si rimette
+     fuori e ferma (srotolaTascaP2P), e solo dopo si misura */
+  const tasca = meta.classList.contains('bz') && srotolaTascaP2P()
+    ? tascaBarattozonP2P() : null;
+  vestiMorfoP2P(g, tasca || tondo.getBoundingClientRect(),
                 meta.getBoundingClientRect(), meta.textContent, meta);
-  celaVeriP2P(true);
+  g.classList.toggle('tasca', !!tasca);
+  celaVeriP2P(true, !!tasca);
   g.classList.add('acceso');
   void g.offsetWidth;
   /* le voci rientrano nello STESSO giro in cui il fantasma riparte: e'
@@ -49009,6 +49190,9 @@ function chiudiMorfoP2P(){
      seguire il restringimento */
   g.classList.add('parte');
   barraViaP2P(false);
+  /* ...e senza tasca la tendina torna alle sue regole nello stesso giro in
+     cui la barra si richiude: srotolata com'e', e col suo logo */
+  if (!tasca) document.body.classList.remove('morfo-tasca');
   p2pMorfoTimer = setTimeout(spegniMorfoP2P, P2P_MORFO_MS + 30);
 }
 
@@ -49051,9 +49235,11 @@ function apriNuovoOrdineP2P(metodo){
 /* IL TASTO BARATTOZON (23 set 2026, richiesta di Andrea): la tendina che
    scende dal fondo del + nel libro, su «Vendi BTC», e con lui fa una
    capsula sola. Apre lo STESSO foglio del
-   + — stesse guardie, stessa morfosi dal +, che e' il bottone che
-   pubblica — col tabacchino gia' scelto: il titolo e' «Vuoi vendere
-   Bitcoin» e si parte dal passo 1 del percorso, il PayCode. Senza fuoco
+   + — stesse guardie, la stessa morfosi, che pero' parte dalla TASCA (il
+   bottone che pubblica nasce dal blu, vedi LA MORFOSI DALLA TASCA) — col
+   tabacchino gia' scelto: in cima il marchio di Barattozon (il titolo
+   «Vuoi vendere Bitcoin» resta a chi non vede, vedi titoloNuovoP2P) e si
+   parte dal passo 1 del percorso, il PayCode. Senza fuoco
    sul campo, per la ragione del foglio: la tastiera coprirebbe il
    cappello che dice cos'e' Barattozon. */
 function apriBarattozonP2P(){
@@ -49065,10 +49251,20 @@ function apriBarattozonP2P(){
    Nel libro, su «Vendi BTC», ai due tocchi di sempre — il + apre il
    foglio, la tendina apre Barattozon — si aggiunge un GESTO: si tiene
    premuto il + e lo si trascina giu' sulla tendina; al rilascio li'
-   sopra si apre il percorso Barattozon. Mentre si trascina il + segue il
-   dito e la tendina si illumina quando il dito ci e' sopra (la luce e'
-   del CSS, la classe `p2p-sopra` e' di qui); rilasciato fuori, il +
-   torna al suo posto e non succede niente.
+   sopra si apre il percorso Barattozon. Mentre si trascina la tendina si
+   illumina quando il + ci e' sopra (la luce e' del CSS, la classe
+   `p2p-sopra` e' di qui); rilasciato prima, il + torna al suo posto e
+   non succede niente.
+   IL + E' UN CURSORE NELLA SUA GUIDA (24 set 2026, secondo ritocco di
+   Andrea): non fluttua piu' dietro al dito in ogni direzione, scorre SOLO
+   in verticale fra i fianchi della capsula, dalla sua casa al fondo della
+   tendina e mai oltre — il dito puo' andare dove vuole. Sopra di se'
+   lascia il BINARIO VUOTO: il telaio della tendina scende con lui (la sua
+   cima e' l'equatore del cerchio) e la tendina risale dello stesso
+   tanto, cioe' resta ferma mentre il suo taglio scende; i fianchi li
+   disegna #navBinario (vedi IL CURSORE NELLA GUIDA, nel CSS). Quindi
+   «sopra la tendina» non e' piu' dove sta il dito ma dove sta il +: da
+   meta' corsa in giu'.
    UNA SOGLIA DISTINGUE IL TOCCO DAL TRASCINO: sotto P2P_SOGLIA_TRASCINO
    pixel di strada e' un TOCCO, anche un po' mosso, e lo prende il gesto
    stesso al rilascio. Non e' zelo: il browser il suo click lo butta via
@@ -49089,8 +49285,9 @@ function apriBarattozonP2P(){
    del ritorno, e la luce si accende di colpo —, ma il gesto funziona
    uguale. Il + che segue il dito non e' un'animazione: e' il dito. */
 const P2P_SOGLIA_TRASCINO = 12;   /* px: sotto e' un tocco, da qui un trascino */
-let p2pTrascino = null;          /* il gesto in corso: dito, partenza, zona */
+let p2pTrascino = null;          /* il gesto in corso: dito, partenza, corsa */
 let p2pPiuGestoAt = -1e9;        /* quando il gesto ha gia' fatto il mestiere del + */
+let p2pBinarioTimer = null;      /* il binario resta finche' il + non e' a casa */
 
 /* il gesto c'e' dove c'e' la tendina, e lo dicono le stesse classi */
 function trascinoPuoiP2P(){
@@ -49099,16 +49296,19 @@ function trascinoPuoiP2P(){
     && !b.contains('p2p-piu-neutro') && !b.contains('barra-via')
     && matchMedia('(max-width: 767px)').matches;
 }
-/* PURE, le due domande del gesto: ha fatto strada abbastanza da essere
-   un trascino? e il dito sta sopra la tendina — la parte scoperta, sotto
-   il fondo del + a riposo, con qualche pixel di tolleranza ai lati e in
-   fondo (un pollice non e' una punta)? */
+/* PURE, le tre domande del gesto: ha fatto strada abbastanza da essere
+   un trascino? dove sta il + nella sua guida — solo in giu', fra la casa
+   (0) e il fondo della tendina (`max`), qualunque strada faccia il dito,
+   di lato, sopra o oltre? e da li' e' «sopra» la tendina — da meta' corsa
+   in giu', che e' dove un cursore lasciato va a finire da solo? */
 function oltreSogliaP2P(dx, dy){
   return Math.hypot(dx, dy) >= P2P_SOGLIA_TRASCINO;
 }
-function sopraTendinaP2P(x, y, z){
-  return !!z && x >= z.left - 8 && x <= z.right + 8
-    && y >= z.top && y <= z.bottom + 8;
+function corsaCursoreP2P(dy, max){
+  return Math.min(Math.max(dy, 0), Math.max(max, 0));
+}
+function sopraTendinaP2P(d, max){
+  return max > 0 && d >= max / 2;
 }
 /* dove sta il + adesso, in verticale: la sua salita e' del CSS (−31 a
    «Vendi»), e il dito la deve SOMMARE, non rimpiazzare */
@@ -49124,11 +49324,18 @@ function trascinoGiuP2P(e){
   if (e.pointerType === 'mouse' && e.button !== 0) return;
   const tondo = tondoBarraP2P(), tendina = el('navBarattozon');
   if (!tondo || !tendina) return;
+  /* LA GUIDA SI MISURA QUI, una volta, SULLA TENDINA — che durante il
+     gesto sta ferma per costruzione: il + a riposo ha il centro sulla sua
+     cima (l'equatore), e la corsa finisce quando il fondo del + tocca
+     quello di lei. Anche la salita di casa si ricava da li' e non dal +,
+     che potrebbe essere ancora per strada (un trascino che riparte mentre
+     il + rientra): sommata a quella, la corsa non esce mai dalla capsula. */
   const r = tendina.getBoundingClientRect(), p = tondo.getBoundingClientRect();
-  /* la zona si misura QUI, una volta: durante il gesto la tendina sta ferma */
+  const raggio = tondo.offsetHeight / 2;
   p2pTrascino = {id: e.pointerId, x0: e.clientX, y0: e.clientY,
-    attivo: false, sopra: false, su: 0,
-    zona: {left: r.left, right: r.right, top: p.bottom, bottom: r.bottom}};
+    attivo: false, sopra: false,
+    su: salitaTondoP2P(tondo) + (r.top - raggio) - p.top,
+    max: r.height - raggio};
   /* la capture tiene il dito anche quando esce dal tondo — ed esce
      subito, e' il gesto stesso; se il browser la nega si vive lo stesso */
   try { tondo.setPointerCapture(e.pointerId); } catch(_) {}
@@ -49138,20 +49345,29 @@ function trascinoMuoveP2P(e){
   if (!t || e.pointerId !== t.id) return;
   if (!trascinoPuoiP2P()) { trascinoFineP2P(false); return; }
   const dx = e.clientX - t.x0, dy = e.clientY - t.y0;
-  const tondo = tondoBarraP2P();
   if (!t.attivo) {
     if (!oltreSogliaP2P(dx, dy)) return;
     t.attivo = true;
-    t.su = salitaTondoP2P(tondo);
-    document.body.classList.add('p2p-trascina');
+    clearTimeout(p2pBinarioTimer);
+    document.body.classList.add('p2p-trascina', 'p2p-binario');
   }
-  tondo.style.transform = 'translate(' + dx + 'px,' + (t.su + dy) + 'px)';
-  const sopra = sopraTendinaP2P(e.clientX, e.clientY, t.zona);
+  /* il dito di lato non sposta niente: il + scorre solo nella sua guida */
+  const d = corsaCursoreP2P(dy, t.max);
+  guidaCursoreP2P(t.su + d, d);
+  const sopra = sopraTendinaP2P(d, t.max);
   if (sopra !== t.sopra) {
     t.sopra = sopra;
     document.body.classList.toggle('p2p-sopra', sopra);
     if (sopra) haptic();
   }
+}
+/* il + a quota `y` nella guida, e la tendina tagliata alla sua cintura:
+   il telaio scende di `d` con lui, la tendina risale di `d` e resta ferma */
+function guidaCursoreP2P(y, d){
+  const tondo = tondoBarraP2P(), tel = el('navTendina'), tend = el('navBarattozon');
+  if (tondo) tondo.style.transform = 'translateY(' + y + 'px)';
+  if (tel) tel.style.transform = 'translateY(' + d + 'px)';
+  if (tend) tend.style.transform = 'translateY(' + (-d) + 'px)';
 }
 function trascinoSuP2P(e){
   const t = p2pTrascino;
@@ -49179,22 +49395,29 @@ function trascinoFineP2P(apri){
   if (!t.attivo) return;
   /* il click che segue il rilascio non e' un tocco sul + */
   p2pPiuGestoAt = performance.now();
-  if (apri) {
-    /* la morfosi misura il + DOVE L'HA LASCIATO IL DITO e parte da li';
-       poi il + torna a casa senza corsa, che tanto e' nascosto dietro il
-       fantasma (o, senza morfosi, gia' coperto dal foglio) */
-    apriBarattozonP2P();
-    tondo.style.transition = 'none';
-    tondo.style.transform = '';
-    document.body.classList.remove('p2p-trascina');
-    void tondo.offsetWidth;
-    tondo.style.transition = '';
-    return;
-  }
-  /* fuori dalla tendina: torna la corsa, e il + rientra con lei */
+  /* il + torna a casa con la corsa della barra, sopra o fuori che sia —
+     e con lui il taglio della tendina, che gli resta incollato */
+  rientraCursoreP2P();
+  /* ...e sopra la tendina si apre Barattozon: il fantasma della morfosi
+     parte dalla TASCA e non dal + (vedi LA MORFOSI DALLA TASCA), quindi il
+     + rientra a vista mentre il foglio arriva */
+  if (apri) apriBarattozonP2P();
+}
+/* IL RITORNO A CASA: le corse tornano PRIMA che le transform cambino (il
+   reflow in mezzo), e le tre transform se ne vanno insieme — il +, il
+   telaio e la tendina hanno la stessa corsa e la stessa curva, e il taglio
+   resta sull'equatore per tutta la strada. Il binario se ne va quando il
+   + e' a casa: dopo la corsa della barra, che e' quella della morfosi
+   (una prova le tiene uguali). */
+function rientraCursoreP2P(){
+  const tondo = tondoBarraP2P();
   document.body.classList.remove('p2p-trascina');
-  void tondo.offsetWidth;
-  tondo.style.transform = '';
+  if (tondo) void tondo.offsetWidth;
+  for (const x of [tondo, el('navTendina'), el('navBarattozon')])
+    if (x) x.style.transform = '';
+  clearTimeout(p2pBinarioTimer);
+  p2pBinarioTimer = setTimeout(() => document.body.classList.remove('p2p-binario'),
+                               P2P_MORFO_MS + 30);
 }
 function annullaTrascinoP2P(){
   if (p2pTrascino) trascinoFineP2P(false);
@@ -49690,13 +49913,41 @@ function rigaEuroViaP2P(){
   return p2pNuovoEuroVia
     ? '<div class="hint" id="p2pNuovoEuroVia">' + esc(p2pNuovoEuroVia) + '</div>' : '';
 }
+/* IL TITOLO DEL FOGLIO: «Vuoi comprare / vendere Bitcoin», e nel percorso
+   Barattozon IL MARCHIO al suo posto (24 set 2026, ritocco di Andrea) —
+   la frase resta il nome del foglio per chi non vede, come aria-label
+   dell'<h3> (il dialogo lo prende da li'). Il marchio si scrive solo
+   ENTRANDO in quel vestito, non a ogni disegno: il foglio si ridisegna a
+   ogni tocco, e due <img> riscritti ogni volta ricaricherebbero il fondo
+   della testata per niente. Se un file del marchio non arriva, torna la
+   frase e ci resta (ripiegoTitoloP2P): una testata vuota non dice
+   niente a nessuno. Il CSS sta con .tit-marchio. */
+const MARCHIO_TITOLO_P2P = '<span class="tit-marchio"><img class="tit-m-chiaro" src="/assets/barattozon-scuro.webp" width="95" height="30" alt="" onerror="ripiegoTitoloP2P()"><img class="tit-m-scuro" src="/assets/barattozon.webp" width="95" height="30" alt="" onerror="ripiegoTitoloP2P()"></span>';
+let p2pTitoloMarchio = false, p2pTitoloSenzaMarchio = false;
+function titoloNuovoP2P(tit, compro, tab){
+  const testo = compro ? 'Vuoi comprare Bitcoin' : 'Vuoi vendere Bitcoin';
+  const marchio = !!tab && !compro && !p2pTitoloSenzaMarchio;
+  if (marchio && !p2pTitoloMarchio) tit.innerHTML = MARCHIO_TITOLO_P2P;
+  if (!marchio) tit.textContent = testo;
+  if (marchio) tit.setAttribute('aria-label', testo);
+  else tit.removeAttribute('aria-label');
+  p2pTitoloMarchio = marchio;
+}
+function ripiegoTitoloP2P(){
+  p2pTitoloSenzaMarchio = true;
+  const tit = el('p2pNuovoTit');
+  if (!tit || !p2pTitoloMarchio) return;
+  tit.textContent = tit.getAttribute('aria-label') || '';
+  tit.removeAttribute('aria-label');
+  p2pTitoloMarchio = false;
+}
 function renderNuovoOrdineP2P(){
   const box = el('p2pNuovoCorpo');
   if (!box) return;
   const compro = p2pLato === 'compro';
   const tab = tabacchinoP2P(p2pNuovoMetodi);
   const tit = el('p2pNuovoTit');
-  if (tit) tit.textContent = compro ? 'Vuoi comprare Bitcoin' : 'Vuoi vendere Bitcoin';
+  if (tit) titoloNuovoP2P(tit, compro, tab);
   const val = P2P_VALUTE.find(v => v.cod === p2pNuovoValuta) || P2P_VALUTE[0];
   const scelti = p2pNuovoMetodi.length
     ? p2pNuovoMetodi.join(', ') : 'Seleziona metodi di pagamento';
