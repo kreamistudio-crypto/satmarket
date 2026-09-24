@@ -21022,9 +21022,29 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   role="button" rende «di presentazione» tutto quel che contiene, e
   dentro la porta i tondi sarebbero muti al lettore di schermo — oltre
   ad aprire il negozio insieme alla chat.
-  «UNA AZIONE, UN VESTITO» CEDE IN UN POSTO SOLO: il ponte grande di
-  `pontiContatto` resta DENTRO UN ORDINE del mercatino (`pontiOrdine`),
-  dove una card non c'è. Il censimento lo tiene una prova.
+  «UNA AZIONE, UN VESTITO» NON CEDE PIÙ DA NESSUNA PARTE (24 set
+  2026): il ponte grande (`pontiContatto`/`pontiOrdine`, e il CSS
+  `.btn.ponte`) viveva ancora dentro un ordine del mercatino, e se n'è
+  andato con lui. LA CARD DELL'ALTRA PARTE È UNA PER DUE POSTI,
+  `cardParte(c, chi, opz)`: la pagina di uno scambio P2P
+  (`profiloControparteP2P`, opzione `porta` — la faccia apre il
+  negozio) e, in FONDO al dettaglio di un ordine, `cardParteOrdine`
+  (opzione `link` — il tondo del link APRE il negozio di quella
+  persona, `tondiVenditore(…, 'apri', codice)`, e la porta resta
+  ferma). Chi compra vede chi vende, chi vende chi compra, il
+  moderatore tutti e due con la riga `.parte-chi` («Chi compra» /
+  «Chi vende»). I canali restano i campi di sempre dell'ordine
+  (`usernameVenditore`, `nostrVenditore`, …), quindi le azioni sono
+  quelle dei bottoni di ieri; senza canali la riga di sempre («non ha
+  contatti pubblici…»), senza volto (server di ieri, DEMO) la card
+  nasce col nome della parte. IL VOLTO LO COSTRUISCE UNO SOLO,
+  `_volti_persone(con, ids, adesso)` — nome, faccia, media e voti,
+  livello, titolo, giorni, negozio, canali —, che serve
+  `_controparti_p2p` e `/api/orders`: lì esce come `volto_compratore`
+  / `volto_venditore`, SOLO quello dell'altro (al moderatore su un
+  ordine altrui tutti e due), senza `telegram` e `npub`, in una query
+  per tutta la lista. Il censimento lo tengono `prove_feedback_tre_e_tondi`
+  e `prove_card_parte_ordine`.
   LE STELLE DI OGNI RIQUADRO `.seller` — negozio, dettaglio
   dell'annuncio, Profilo, classifica — sono `--sats-text` come quelle
   dei feedback (secondo giro); la stella della card P2P è un altro

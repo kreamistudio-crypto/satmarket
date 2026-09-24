@@ -32269,3 +32269,76 @@ salvato: la riga e niente scorciatoia; 6) «I vostri recapiti» che a chi
 compra non c'e' piu' e a chi vende compare solo dopo «Invia a chi
 compra»; 7) l'aria sotto i bottoni nei due temi, e l'ascolto che si
 chiude uscendo dal P2P (nel diario: «libro in ascolto: nuovo ordine …»).
+## La card del venditore anche nel dettaglio dell'ordine (24 set 2026)
+
+Ritocco di Andrea: nel dettaglio di un ordine del mercatino c'erano
+ancora i bottoni giganti «✈️ Scrivi al venditore su Telegram» e «Scrivi
+al venditore su Nostr» (per chi vende «…all'acquirente») — l'ultimo
+posto rimasto fuori dal censimento dei tondi (03e6a84, 8adea78).
+
+**COSA SI È DECISO.** Al loro posto, in FONDO alla pagina (dopo
+l'uscita di sicurezza «C'è un problema — apri disputa»), la card
+dell'altra parte: foto, nome, stelle, livello, giorni, e in basso a
+destra i tondi coi loghi veri — Telegram, Nostr e il link. Chi compra
+vede chi vende, chi vende chi compra, il moderatore tutti e due, con
+«Chi compra» / «Chi vende» sopra. Stesse azioni dei bottoni di ieri:
+i canali sono i campi di sempre dell'ordine, con le stesse condizioni
+(Telegram solo con lo username, Nostr solo dal possesso dimostrato), e
+solo i tondi che valgono per quella persona. Il tondo del link APRE il
+negozio di quella persona — non lo condivide, non è il tuo —, e la
+faccia resta ferma: un tocco, una cosa sola. Senza canali resta la
+riga di sempre («non ha contatti pubblici, ma … il deposito di garanzia
+protegge l'affare»), sotto la card.
+
+**LA CARD È UNA, NON UNA COPIA.** Quella della pagina di uno scambio
+P2P è diventata `cardParte(c, chi, opz)`, e la usano tutti e due:
+`profiloControparteP2P` con `porta` (come prima, la faccia apre il
+negozio), `cardParteOrdine` con `link`. `tondiVenditore` ha imparato un
+terzo mestiere del link, `'apri'` col codice del negozio filtrato
+dentro la fabbrica come username e npub. Il volto viene dal server da
+un costruttore solo, `_volti_persone`, estratto da `_controparti_p2p`:
+`/api/orders` porta `volto_compratore` / `volto_venditore`, SOLO
+quello dell'altro (il proprio mai; al moderatore su un ordine altrui
+tutti e due), senza i canali — quelli restano `*_username` e `*_nostr`,
+così una regola sola decide dove porta un tondo —, in UNA query per
+tutta la lista. Se ne vanno `pontiContatto`, `pontiOrdine`,
+`pontiControparteP2P` e il CSS `.btn.ponte`, che non aveva più nessuno.
+
+**STRADE SCARTATE.** La porta anche nell'ordine (faccia che apre il
+negozio, come nel P2P) accanto al tondo del link: due porte per la
+stessa stanza nella stessa card. Il volto coi canali dentro: due fonti
+per lo stesso tondo, e il giorno che divergono un tondo porta da
+un'altra parte. Una card nuova disegnata per l'ordine: è il modo in cui
+due facce della stessa persona cominciano a non somigliarsi.
+
+**PROVATO.** `prove_card_parte_ordine`, nuova (37): la rotta VERA
+`miei_ordini` su un database di cartone — chi compra vede chi vende e
+non sé, chi vende chi compra, il moderatore tutti e due, i canali
+fuori dal volto, una domanda sola sui volti e mai col proprio id —; la
+forma del client (la card dopo l'uscita di sicurezza e ultima cosa
+della pagina, nessun «Scrivi a» rimasto, la card dell'ordine che non
+disegna niente da sé); e il banco node con le funzioni vere (i tre
+tondi in ordine, le azioni, le etichette, la porta ferma, chi vende,
+il moderatore, senza volto, senza canali, l'alfabeto del codice, il
+nome passato da esc(), la card P2P com'era). Tortura 8/8 su una copia.
+Emendate col perché `prove_feedback_tre_e_tondi` (il censimento: il
+ponte grande non c'è più, `cardParte` chiamata dal P2P e dall'ordine),
+`prove_parti_si_vedono` (la fabbrica filtra da sé, il volto da
+`_volti_persone`), il censimento del glifo Nostr (da otto chiamate a
+sette: la quarta era il ponte grande), `prove_nascondi_ordine` e il
+banco degli eventi P2P (che eseguono le funzioni toccate). Suite intera
+severa senza config nel worktree ribasato su 0f24bd4: 15.786 verdi e 0
+rosse (15.727/0 prima del rebase, su d9193a6); i 23 collaudi della CI
+nella gabbia senza rete, verdi sui due alberi. DAL
+VIVO via CDP a 375 col tocco vero, due temi, contro un server gemello
+su origin/main con lo stesso database (90 verdi): per chi compra,
+chi vende e il moderatore tutto il resto della pagina è identico al
+pixel — classe, testo, altezza, bordi —, sopra la card spostamento
+zero, e l'uscita di sicurezza sale dei 129 px dei due bottoni tolti;
+tondi da 40 a filo del bordo in basso a destra, sotto il testo, niente
+scorrimento orizzontale; Telegram e Nostr col loro toast, il nome che
+non apre niente, il link che apre il negozio giusto e l'indietro che
+torna all'ordine con la card intatta.
+
+**DA GUARDARE.** Dal telefono, dentro Telegram, un ordine vero dai due
+lati: il tondo Telegram che apre la chat e il link il negozio.

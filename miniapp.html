@@ -6899,18 +6899,10 @@
   .btn .logo-bz{width:21px;height:20px;flex:0 0 auto;display:block}
   .btn.ghost{background:var(--card);border:2px solid var(--ink);color:var(--ink);
     box-shadow:0 3px 0 var(--ink);margin-top:10px}
-  /* I DUE PONTI verso l'esterno (ago 2026): stessa FORMA di ogni
-     altro bottone — rettangolo col raggio di casa, contorno da 2 e
-     ombra piena — e a cambiare e' solo la TINTA. E' la ricetta esatta
-     di `.btn.ghost`, che veste testo, bordo e ombra dello stesso
-     colore: qui quel colore non e' l'inchiostro, e' il mondo dove il
-     bottone porta.
-     Il fondo e' una VELATURA e non la tinta piena (ritocco di Andrea
-     guardandoli a schermo): due blocchi saturi in fila facevano
-     concorrenza a tutta la pagina, e questi non sono nemmeno azioni
-     dentro Barattolo — portano FUORI, quindi devono farsi trovare,
-     non gridare. Per la stessa ragione non parlano arancio, che resta
-     dell'acquisto. */
+  /* I DUE PONTI verso l'esterno erano bottoni a tutta larghezza
+     (`.btn.ponte`, ago 2026) e non ci sono piu' da nessuna parte: dal
+     24 set 2026 sono i TONDI coi loghi veri, qui sotto, anche dentro
+     un ordine del mercatino, l'ultimo posto che li aveva. */
   /* La testata del negozio non aveva MARGINI su mobile (li metteva
      solo la media query da 768 in su): riquadro venditore e bottoni
      arrivavano a filo schermo, e col ghost bianco non si notava. Coi
@@ -6920,12 +6912,6 @@
      già, dal padding di `.detail-body`: ora le due pagine si
      somigliano. */
   #negozioHeader{padding:0 var(--pad)}
-  .btn.ponte{border:2px solid}
-  .btn.ponte.tg{background:var(--tg-soft);color:var(--tg-soft-on);
-    border-color:var(--tg-soft-on);box-shadow:0 3px 0 var(--tg-soft-on)}
-  .btn.ponte.nostr{background:var(--nostr-soft);color:var(--nostr-text);
-    border-color:var(--nostr-text);box-shadow:0 3px 0 var(--nostr-text)}
-  .btn.ponte:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
   /* I TONDI COI LOGHI VERI (24 set 2026, secondo giro, decisione di
      Andrea: le icone disegnate a mano sembravano finte). Nel negozio
      (e quindi nelle pagine dei Consigliati e nei profili pubblici), nel
@@ -6979,6 +6965,12 @@
      schermo (e un tocco aprirebbe il negozio insieme alla chat). */
   .seller-porta{display:flex;align-items:center;gap:12px;flex:1 1 auto;
     min-width:0}
+  /* CHI E' CHI, sopra le due card che il MODERATORE vede in fondo a un
+     ordine altrui: chi compra e chi vende non si riconoscono dalla
+     faccia. Stringe il margine della card sotto, cosi' la riga le sta
+     attaccata e non a quella di sopra. */
+  .parte-chi{font-size:12px;font-weight:700;color:var(--ink-soft);
+    margin:14px 0 -8px}
   /* L'USCITA DI SICUREZZA (ago 2026): «C'è un problema — apri
      disputa» era un testuale sottolineato (.danger-ghost), e in fila
      coi due ponti colorati spariva — proprio il bottone che deve
@@ -12868,6 +12860,13 @@ function mapOrder(o){
        la decide il server); bech32: a-z0-9 e basta */
     nostrCompratore:(o.compratore_nostr||'').replace(/[^a-z0-9]/g,''),
     nostrVenditore:(o.venditore_nostr||'').replace(/[^a-z0-9]/g,''),
+    /* IL VOLTO DELL'ALTRA PARTE (24 set 2026): faccia, nome, stelle,
+       livello e negozio, per la card in fondo al dettaglio. Il server
+       manda solo quello dell'ALTRO (al moderatore tutti e due) e senza
+       canali: quelli sono i due campi qui sopra. null = server di ieri,
+       e la card nasce lo stesso col nome della parte. */
+    voltoCompratore:o.volto_compratore||null,
+    voltoVenditore:o.volto_venditore||null,
     /* LA DATA E' QUELLA DELL'AFFARE (ago 2026, dal campo): era
        `aggiornato`, cioe' il timbro dell'ULTIMO MOVIMENTO — e cosi'
        un ordine del 7 agosto sembrava di oggi appena il venditore
@@ -18151,23 +18150,6 @@ function apriNostrProfilo(npub){
   if (DEMO || collaudo) { toast(`🟣 In produzione apre il profilo Nostr: gli scrivi dal tuo client`); return; }
   window.open(`https://njump.me/${npub}`, '_blank');
 }
-/* I DUE PONTI SONO BOTTONI, NON LINK (ago 2026, decisione di Andrea):
-   nel negozio erano testo sottolineato («btn link») mentre gli stessi
-   due dentro l'ordine erano gia' bottoni ghost — la stessa azione con
-   due vestiti secondo la pagina. Ora il vestito e' UNO.
-   E PORTA IL COLORE DEL SUO MONDO (stessa decisione, subito dopo):
-   azzurro Telegram e viola Nostr, `.btn.ponte.tg` / `.ponte.nostr`.
-   La classe si compone qui e non nel chiamante — `cls` esiste ancora
-   per chi volesse un'altra base, ma il `.tg` / `.nostr` lo mette
-   sempre questa funzione: sono il ponte, non la pagina, a decidere
-   di che mondo parlano. */
-function pontiContatto(username, npub, chi, cls){
-  const b = [];
-  const c = cls || 'btn ponte';
-  if (username) b.push(`<button class="${c} tg" onclick="apriChat('${username}')">✈️ Scrivi ${chi} su Telegram</button>`);
-  if (npub) b.push(`<button class="${c} nostr" onclick="apriNostrProfilo('${npub}')">${etichettaNostr(`Scrivi ${chi} su Nostr`)}</button>`);
-  return b.join('');
-}
 /* I TONDI DEL RIQUADRO VENDITORE (24 set 2026, decisione di Andrea):
    nel NEGOZIO (e quindi nelle pagine dei Consigliati e nei profili
    pubblici), nel PROFILO e — dal secondo giro — nella card della
@@ -18183,8 +18165,15 @@ function pontiContatto(username, npub, chi, cls){
    B2 dell'audit del 23 set, per la fabbrica nuova): username e npub
    finiscono in un onclick, e una difesa che vive nella funzione vale
    anche per il chiamante di domani. `chi` arriva gia' passato da esc().
-   I PONTI GRANDI RESTANO in un posto solo: dentro un ordine del
-   mercatino (`pontiOrdine`), dove un riquadro che li ospiti non c'e'.
+   I PONTI GRANDI NON RESTANO DA NESSUNA PARTE (24 set 2026): l'ultimo
+   posto che li aveva, il dettaglio di un ordine del mercatino, ha ora
+   la card dell'altra parte (`cardParteOrdine`) coi tondi dentro.
+   IL TONDO DEL LINK HA TRE MESTIERI: condivide il negozio che si sta
+   guardando ('negozio'), condivide il proprio ('mio'), oppure APRE il
+   negozio di un altro ('apri', col codice in `negozio`) — nella card
+   dell'altra parte di un ordine, dove condividere il negozio di chi ti
+   ha venduto qualcosa non e' il gesto di nessuno. Il codice passa dal
+   filtro qui dentro come username e npub: finisce in un onclick.
    DAL SECONDO GIRO I LOGHI SONO QUELLI VERI (le icone disegnate a mano
    sembravano finte): Telegram e Nostr sono `data:` URI byte per byte
    uguali ai file di assets/loghi — provenienza, licenze e ricetta in
@@ -18211,11 +18200,14 @@ const TONDO_CONDIVIDI = {
   negozio: ['condividiNegozio()', 'Condividi il negozio'],
   mio: ['condividiMioNegozio()', 'Condividi il link del tuo negozio']
 };
-function tondiVenditore(username, npub, chi, condividi){
+function tondiVenditore(username, npub, chi, condividi, negozio){
   const u = String(username || '').replace(/[^A-Za-z0-9_]/g, '');
   const n = String(npub || '').replace(/[^a-z0-9]/g, '');
+  const cod = String(negozio || '').replace(/[^A-Za-z0-9_]/g, '');
   const link = (condividi === 'negozio' || condividi === 'mio')
-    ? TONDO_CONDIVIDI[condividi] : null;
+    ? TONDO_CONDIVIDI[condividi]
+    : (condividi === 'apri' && cod)
+      ? [`apriNegozio('${cod}')`, 'Apri il suo negozio'] : null;
   const tondo = (cls, azione, nome, dentro) =>
     `<button type="button" class="tondo ${cls}" onclick="${azione}" `
     + `aria-label="${nome}" title="${nome}">${dentro}</button>`;
@@ -18266,13 +18258,38 @@ function puntoBanner(o){
                              : 'Punto di ritiro dell\'acquirente'}: `
        + `<b>${esc(o.puntoRitiro)}</b>`;
 }
-/* Il ponte dentro l'ordine: come sopra, ma senza canali la riga
-   ricorda che l'escrow protegge comunque l'affare */
-function pontiOrdine(username, npub, chi, soggetto){
-  /* stesso vestito del negozio, e non piu' il ghost: la stessa azione
-     non puo' avere due colori secondo la pagina da cui la si tocca */
-  return pontiContatto(username, npub, chi)
-    || `<div class="trust-note">💬 <span>${soggetto} non ha contatti pubblici, ma le trattative non sono necessarie: il deposito di garanzia protegge l'affare. Per i problemi c'è la disputa, e interviene un moderatore.</span></div>`;
+/* LA CARD DELL'ALTRA PARTE DENTRO UN ORDINE DEL MERCATINO (24 set
+   2026, ritocco di Andrea): al posto dei bottoni giganti «Scrivi al
+   venditore / all'acquirente su Telegram / su Nostr», in fondo alla
+   pagina, la card di `cardParte` — la stessa della pagina di uno
+   scambio P2P: foto, nome, stelle, livello, e in basso a destra i
+   tondi coi loghi veri. Chi compra vede chi vende, chi vende chi
+   compra, il moderatore tutti e due, con la riga che dice chi e' chi.
+   STESSE AZIONI DEI BOTTONI DI IERI: i canali sono i campi di sempre
+   dell'ordine (`usernameVenditore`, `nostrVenditore`, ...), gia'
+   passati dal filtro-alfabeto in mapOrder, e dal volto arriva solo la
+   faccia. Il tondo del LINK APRE il negozio di quella persona — non lo
+   condivide: non e' il tuo — e la porta resta ferma, cosi' un tocco fa
+   una cosa sola e la card ha una porta sola.
+   SENZA VOLTO (il server di ieri, la DEMO) la card nasce lo stesso, col
+   nome della parte al posto del nome: i canali ci sono comunque. SENZA
+   CANALI resta la riga di sempre: il deposito protegge l'affare. */
+function cardParteOrdine(o, lato){
+  const vende = lato === 'venditore';
+  const soggetto = vende ? 'Il venditore' : "L'acquirente";
+  const volto = (vende ? o.voltoVenditore : o.voltoCompratore) || {};
+  const c = Object.assign({}, volto, {
+    nome: volto.nome || soggetto,
+    telegram: vende ? o.usernameVenditore : o.usernameCompratore,
+    npub: vende ? o.nostrVenditore : o.nostrCompratore});
+  /* il nome di battesimo per la frase del tondo, come nel negozio */
+  const primo = volto.nome ? String(volto.nome).split(' ')[0] : '';
+  return (o.role === 'admin'
+      ? `<div class="parte-chi">${vende ? 'Chi vende' : 'Chi compra'}</div>` : '')
+    + cardParte(c, primo ? 'a ' + esc(primo)
+                         : (vende ? 'al venditore' : "all'acquirente"), {
+      link: true,
+      nota: `<div class="trust-note">💬 <span>${soggetto} non ha contatti pubblici, ma le trattative non sono necessarie: il deposito di garanzia protegge l'affare. Per i problemi c'è la disputa, e interviene un moderatore.</span></div>`});
 }
 
 /* Cambio BTC/EUR (per il "≈ X €" sotto i prezzi): UNA SOLA FONTE, il
@@ -28445,13 +28462,17 @@ function openOrder(id){
       ${notaFermo(o)}
       ${bottoneSollecito(o)}
       ${puoiLasciareFeedback(o) ? feedbackPanel(o) : ''}
-      ${o.role==='admin'
-        ? pontiOrdine(o.usernameCompratore, o.nostrCompratore, "all'acquirente", "L'acquirente")
-          + pontiOrdine(o.usernameVenditore, o.nostrVenditore, 'al venditore', 'Il venditore')
-        : o.role==='buyer'
-          ? pontiOrdine(o.usernameVenditore, o.nostrVenditore, 'al venditore', 'Il venditore')
-          : pontiOrdine(o.usernameCompratore, o.nostrCompratore, "all'acquirente", "L'acquirente")}
       ${o.role==='buyer' && ['locked','shipped','delivered'].includes(s) && !inPagamento(o) ? `<button class="btn allarme" onclick="openDispute()">⚠️ C'è un problema — apri disputa</button>`:''}
+      ${/* LA CARD DELL'ALTRA PARTE, IN FONDO ALLA PAGINA (24 set 2026,
+            ritocco di Andrea): dove c'erano i due bottoni giganti fra
+            il gesto principale e l'uscita di sicurezza. Non e' piu' una
+            fila di bottoni in mezzo ai gesti dell'ordine ma il profilo
+            di chi sta dall'altra parte, e sta in fondo come il riquadro
+            del venditore sta in fondo alla scheda di un annuncio. Il
+            perche' e le regole stanno su `cardParteOrdine`. */''}
+      ${o.role==='admin'
+        ? cardParteOrdine(o, 'compratore') + cardParteOrdine(o, 'venditore')
+        : cardParteOrdine(o, o.role==='buyer' ? 'venditore' : 'compratore')}
     </div>`;
   go('ordine');
   /* le cifre le ha gia' scritte il giudice qui sopra; questo giro
@@ -56030,25 +56051,72 @@ async function chiediContropartiP2P(ids){
   })();
   return p2pControparteGiro;
 }
-/* I DUE PONTI, con l'alfabeto filtrato come ovunque: username e npub
-   finiscono dentro un onclick, e da li' non deve poter uscire niente
-   che non sia un nome. La fabbrica e' QUELLA del mercatino: dal 24 set
-   2026 (secondo giro dei tondi, decisione di Andrea) sono i TONDI coi
-   loghi veri del riquadro del negozio, `tondiVenditore`, senza il link
-   — qui non c'e' un negozio da condividere. Stesse azioni di prima;
-   il filtro resta anche qui, e la fabbrica lo rifa' per conto suo. */
-function pontiControparteP2P(c, chi){
-  return tondiVenditore(String(c.telegram || '').replace(/[^A-Za-z0-9_]/g, ''),
-                        String(c.npub || '').replace(/[^a-z0-9]/g, ''), chi, '');
+/* LA CARD DELL'ALTRA PARTE, UNA PER DUE POSTI (24 set 2026, «La card
+   del venditore anche nel dettaglio dell'ordine»): nata nella pagina di
+   uno scambio P2P, dal 24 set la usa anche il dettaglio di un ordine
+   del mercatino (`cardParteOrdine`). Una sola perche' e' la stessa
+   persona: due copie divergerebbero al primo ritocco, e la faccia di
+   chi ti vende un oggetto non deve cambiare secondo la pagina.
+   `c` e' il volto del server (`_volti_persone`: nome, avatar, media,
+   voti, livello, titolo, giorni, negozio) coi due canali `telegram` e
+   `npub`; `chi` la frase dei tondi, gia' passata da esc(). Le opzioni:
+   `porta` — la faccia apre il negozio (il P2P); `link` — il tondo del
+   link lo apre (l'ordine); `nota` — la riga da dire quando non c'e'
+   nessun canale per scriversi, che ogni posto dice a modo suo.
+   I DUE PONTI, con l'alfabeto filtrato come ovunque: la fabbrica e'
+   QUELLA del mercatino, `tondiVenditore`, che filtra username, npub e
+   codice del negozio per conto suo — finiscono dentro un onclick.
+   I TONDI IN BASSO A DESTRA NELLA CARD (24 set 2026, secondo giro dei
+   tondi): la PORTA del negozio — faccia, nome, stelle, la freccia — e'
+   un pezzo suo, e i tondi le stanno ACCANTO. Dentro un role="button"
+   sarebbero «di presentazione», cioe' muti al lettore di schermo, e il
+   tocco sulla chat aprirebbe anche il negozio. */
+function cardParte(c, chi, opz){
+  const op = opz || {};
+  const nome = c.nome || '—';
+  const rep = [];
+  if (c.voti > 0 && c.media > 0)
+    rep.push(stellaP2P(c.media) + ' '
+      + c.media.toLocaleString('it-IT',
+          {minimumFractionDigits: 1, maximumFractionDigits: 1})
+      + ' · ' + icoPersonaP2P() + ' ' + c.voti);
+  if (c.livello) rep.push(esc(c.livello));
+  /* I GIORNI SE CI SONO: la chiave manca quando il server non sa da
+     quando quella persona e' qui, e «0 giorni» direbbe «iscritta
+     oggi» — il contrario esatto del vero. Non si scrive niente. */
+  if (c.giorni !== undefined)
+    rep.push(c.giorni + (c.giorni === 1 ? ' giorno' : ' giorni') + ' qui');
+  /* IL TOCCO APRE IL NEGOZIO come il volto sulle card, e senza negozio
+     resta un profilo e basta: mai una porta che non porta da nessuna
+     parte. */
+  const porta = op.porta && c.negozio
+    ? ' role="button" tabindex="0" style="cursor:pointer" data-negozio="'
+      + esc(c.negozio) + '" onclick="apriNegozioP2P(event, this.dataset.negozio)"'
+    : '';
+  const tondi = tondiVenditore(c.telegram, c.npub, chi,
+                               op.link ? 'apri' : '', c.negozio);
+  /* i CANALI PER SCRIVERSI li giudica la stessa fabbrica, senza il
+     link: il tondo del negozio non e' un modo di parlarsi */
+  const canali = !!tondiVenditore(c.telegram, c.npub, chi, '');
+  return '<div class="seller' + (tondi ? ' con-tondi' : '') + '">'
+    + '<div class="seller-porta"' + porta + '>'
+    + '<div class="avatar">' + avatarImg(c.avatar) + esc(String(nome)[0]) + '</div>'
+    + '<div class="who"><b>' + esc(nome) + '</b>'
+    + titoloRiga(c.titolo)
+    + (rep.length ? '<div class="rep">' + rep.join(' · ') + '</div>' : '')
+    + '</div>'
+    + (porta ? '<span style="color:var(--muted);font-size:20px;font-weight:700">›</span>' : '')
+    + '</div>'
+    + tondi
+    + '</div>'
+    + (canali ? '' : (op.nota || ''));
 }
 /* IL PROFILO DELL'ALTRA PARTE nella pagina dello scambio: il calco del
    riquadro venditore del mercatino (`.seller`), che e' quello che chi
    usa Barattolo ha gia' imparato a leggere — e leggerlo qui vuol dire
    non doverne imparare un secondo. Il solo CSS suo e' la porta
-   (`.seller-porta`), nata col secondo giro dei tondi.
-   IL TOCCO APRE IL NEGOZIO come il volto sulle card, e senza negozio
-   resta un profilo e basta: mai una porta che non porta da nessuna
-   parte.
+   (`.seller-porta`), nata col secondo giro dei tondi. La card la
+   disegna `cardParte`, la stessa del dettaglio di un ordine.
    ⚠️ QUANDO NON SI SA, SI DICE UNA COSA SOLA e non si indovina fra i
    casi: l'altra persona puo' essere entrata con una chiave (e allora
    la presa non e' annotata apposta — e' la forma in cui l'anonimato
@@ -56067,45 +56135,13 @@ function profiloControparteP2P(o){
       + 'un profilo anonimo, o scambiare da un\'altra app. Per parlarvi '
       + 'restano i recapiti qui sotto, cifrati fra voi due.</span></div>';
   }
-  const nome = c.nome || '—';
-  /* IL NOME DI BATTESIMO per la frase del bottone («Scrivi a Mario»),
+  /* IL NOME DI BATTESIMO per la frase del tondo («Scrivi a Mario»),
      il nome intero nel riquadro: e' lo stesso taglio del negozio. */
-  const primo = String(nome).split(' ')[0];
-  const rep = [];
-  if (c.voti > 0 && c.media > 0)
-    rep.push(stellaP2P(c.media) + ' '
-      + c.media.toLocaleString('it-IT',
-          {minimumFractionDigits: 1, maximumFractionDigits: 1})
-      + ' · ' + icoPersonaP2P() + ' ' + c.voti);
-  if (c.livello) rep.push(esc(c.livello));
-  /* I GIORNI SE CI SONO: la chiave manca quando il server non sa da
-     quando quella persona e' qui, e «0 giorni» direbbe «iscritta
-     oggi» — il contrario esatto del vero. Non si scrive niente. */
-  if (c.giorni !== undefined)
-    rep.push(c.giorni + (c.giorni === 1 ? ' giorno' : ' giorni') + ' qui');
-  const porta = c.negozio
-    ? ' role="button" tabindex="0" style="cursor:pointer" data-negozio="'
-      + esc(c.negozio) + '" onclick="apriNegozioP2P(event, this.dataset.negozio)"'
-    : '';
-  /* I TONDI IN BASSO A DESTRA NELLA CARD (24 set 2026, secondo giro dei
-     tondi): la PORTA del negozio — faccia, nome, stelle, la freccia — e'
-     un pezzo suo, e i tondi le stanno ACCANTO. Dentro un role="button"
-     sarebbero «di presentazione», cioe' muti al lettore di schermo, e il
-     tocco sulla chat aprirebbe anche il negozio. */
-  const tondi = pontiControparteP2P(c, primo ? 'a ' + esc(primo) : "all'altra persona");
-  return '<div class="seller' + (tondi ? ' con-tondi' : '') + '">'
-    + '<div class="seller-porta"' + porta + '>'
-    + '<div class="avatar">' + avatarImg(c.avatar) + esc(String(nome)[0]) + '</div>'
-    + '<div class="who"><b>' + esc(nome) + '</b>'
-    + titoloRiga(c.titolo)
-    + (rep.length ? '<div class="rep">' + rep.join(' · ') + '</div>' : '')
-    + '</div>'
-    + (c.negozio ? '<span style="color:var(--muted);font-size:20px;font-weight:700">›</span>' : '')
-    + '</div>'
-    + tondi
-    + '</div>'
-    + (tondi ? '' : '<div class="hint">Non ha lasciato nessun canale pubblico: per '
-          + 'parlarvi restano i recapiti qui sotto, cifrati fra voi due.</div>');
+  const primo = String(c.nome || '—').split(' ')[0];
+  return cardParte(c, primo ? 'a ' + esc(primo) : "all'altra persona", {
+    porta: true,
+    nota: '<div class="hint">Non ha lasciato nessun canale pubblico: per '
+          + 'parlarvi restano i recapiti qui sotto, cifrati fra voi due.</div>'});
 }
 /* ============ fine delle parti che si vedono ============ */
 

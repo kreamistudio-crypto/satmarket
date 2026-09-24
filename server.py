@@ -40875,8 +40875,25 @@ def _controparti_p2p(con, ordini, io: int, adesso) -> dict:
             altri[r["ordine"]] = altro
     if not altri:
         return {}
-    unici = sorted(set(altri.values()))
-    segni_u = ",".join("?" * len(unici))
+    volti = _volti_persone(con, sorted(set(altri.values())), adesso)
+    return {o: volti[t] for o, t in altri.items() if t in volti}
+
+
+def _volti_persone(con, ids, adesso) -> dict:
+    """{tg_id: volto} per queste persone, in UNA query: nome, faccia,
+    media e voti, negozio, livello e titolo, i giorni da quando e' qui
+    e i due canali per scriverle. E' il volto della CARD DELL'ALTRA
+    PARTE, e la servono due posti: la pagina di uno scambio P2P
+    (`_controparti_p2p`) e, dal 24 set 2026, il dettaglio di un ordine
+    del mercatino (`/api/orders`). Uno solo perche' la card e' una sola
+    — due costruttori divergerebbero al primo campo nuovo, e la stessa
+    persona avrebbe due facce secondo la pagina.
+    Chi puo' vedere QUALE volto non si decide qui: lo decide chi chiama,
+    che sa chi sono le due parti."""
+    ids = [int(i) for i in ids if i]
+    if not ids:
+        return {}
+    segni_u = ",".join("?" * len(ids))
     volti = {}
     for u in con.execute(
             f"SELECT tg_id, nome, username, npub, npub_verificata, "
@@ -40884,7 +40901,7 @@ def _controparti_p2p(con, ordini, io: int, adesso) -> dict:
             f"titolo, xp, vendite_ok, acquisti_ok, "
             f"(CASE WHEN avatar_scelta='nessuna' THEN '' "
             f"ELSE avatar END) AS avatar "
-            f"FROM utenti WHERE tg_id IN ({segni_u})", unici):
+            f"FROM utenti WHERE tg_id IN ({segni_u})", ids):
         voti = int(u["n_feedback"] or 0)
         hexk = chiave_nostr_provata(u)
         chi = {
@@ -40908,7 +40925,7 @@ def _controparti_p2p(con, ordini, io: int, adesso) -> dict:
         if iscritto:
             chi["giorni"] = max(0, (adesso - iscritto) // 86400)
         volti[int(u["tg_id"])] = chi
-    return {o: volti[t] for o, t in altri.items() if t in volti}
+    return volti
 
 
 @app.post("/api/p2p/ordini")
@@ -50330,10 +50347,30 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
     # compra, chi vende e chi modera. La chiave c'e' SOLO dove c'e' uno
     # stadio: un client che non la trova disegna la pagina di ieri.
     stadi = _stadi_ordini(con, righe)
+    # IL VOLTO DELL'ALTRA PARTE (24 set 2026, «La card del venditore
+    # anche nel dettaglio dell'ordine»): in fondo alla pagina di un
+    # ordine chi compra vede la card di chi vende, e chi vende quella di
+    # chi compra — la stessa card della pagina di uno scambio P2P, dallo
+    # stesso costruttore (`_volti_persone`) e in UNA query per tutta la
+    # lista. Il PROPRIO volto non esce: a chi e' parte si serve L'ALTRO,
+    # e al moderatore che apre un ordine altrui tutti e due. I canali
+    # restano i campi di sempre (`*_username`, `*_nostr`), che la card
+    # usa come li usavano i bottoni: dal volto si tolgono, cosi' una
+    # regola sola decide dove porta un tondo.
+    volti = _volti_persone(con, sorted(
+        {r[k] for r in righe for k in ("compratore_id", "venditore_id")}
+        - {user["id"]}), int(time.time()))
     con.close()
     for r in righe:
         if r["id"] in stadi:
             r["pagamento"] = stadi[r["id"]]
+        for lato in ("compratore", "venditore"):
+            v = volti.get(r[lato + "_id"])
+            if v and r[lato + "_id"] != user["id"]:
+                v = dict(v)
+                v.pop("telegram", None)
+                v.pop("npub", None)
+                r["volto_" + lato] = v
         # Il contenuto digitale NON esce mai da qui: si legge solo da
         # /contenuto, dove la prima lettura del compratore fa da
         # ricevuta. Resta il flag: il client sa se c'e' qualcosa da

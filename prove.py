@@ -12052,6 +12052,10 @@ def prove_nascondi_ordine():
                "pulisci_ordini_fantasma": lambda con: None,
                "e_admin": lambda tg: False,
                "stima_taglia_set": lambda t: "",
+               # il volto dell'altra parte (24 set 2026) ha le sue prove
+               # in `prove_card_parte_ordine`: qui nessuno ha una faccia
+               "_volti_persone": lambda con, ids, adesso: {},
+               "time": __import__("time"),
                "json": __import__("json"), **ambiente_in_pagamento()}
         exec(pezzo("_titolo_ordine"), amb)
         exec(pezzo("miei_ordini"), amb)
@@ -32036,18 +32040,23 @@ def prove_onion():
     prova("i quattro siti della porta chiamano il giudice",
           (True, True, True, True),
           tuple(p in mini for p in _porte))
-    # I QUATTRO SITI NUOVI (ago 2026): il giudice dell'etichetta
-    # serve ormai anche i tre BOTTONI e le due PILLOLE del censimento
-    # qui sotto — il ponte «Scrivi su Nostr», il bottone di collaudo,
-    # e le pillole della foto e del canale.
-    _porte2 = ("${etichettaNostr(`Scrivi ${chi} su Nostr`)}",
-               "${etichettaNostr('nostr')}",
+    # I SITI NUOVI (ago 2026): il giudice dell'etichetta serve ormai
+    # anche i BOTTONI e le due PILLOLE del censimento qui sotto — il
+    # bottone di collaudo, e le pillole della foto e del canale.
+    # ⚠️ ERANO QUATTRO, e le chiamate OTTO, fino al 24 set 2026: il
+    # quarto era il ponte grande «Scrivi … su Nostr» (`pontiContatto`),
+    # che se n'e' andato con l'ultimo posto che lo usava — il dettaglio
+    # di un ordine del mercatino, dove ora c'e' la card dell'altra parte
+    # coi tondi, e il tondo Nostr porta il logo vero e non il glifo.
+    _porte2 = ("${etichettaNostr('nostr')}",
                "pillFoto('nostr', etichettaNostr('Nostr'))",
                "pill('nostr', etichettaNostr('DM Nostr'))")
-    prova("...e i quattro siti nuovi passano dallo stesso giudice",
-          (True, True, True, True),
+    prova("...e i tre siti nuovi passano dallo stesso giudice",
+          (True, True, True),
           tuple(p in mini for p in _porte2))
-    prova("...e le chiamate al giudice sono OTTO", 8,
+    prova("...e il ponte grande che lo chiamava non c'e' piu'", False,
+          "etichettaNostr(`Scrivi ${chi} su Nostr`)" in mini)
+    prova("...e le chiamate al giudice sono SETTE", 7,
           mini.count("etichettaNostr("))
     # ⚠️ IL CENSIMENTO HA CAMBIATO LATO (ago 2026, dal campo, e la
     # decisione con lui): qui si chiedeva che i bottoni col glifo
@@ -48941,8 +48950,10 @@ def prove_feedback_tre_e_tondi():
           "condividiMioNegozio()" in rp)
     # LA CARD DELLA CONTROPARTE P2P: la porta del negozio e' un pezzo suo
     # e i tondi le stanno ACCANTO. Il comportamento lo prova il banco di
-    # `prove_parti_si_vedono`; qui la forma, in un posto solo.
-    pc = pezzo_js(senza, "function profiloControparteP2P(o){", "\n}\n")
+    # `prove_parti_si_vedono`; qui la forma, in un posto solo. DAL 24 SET
+    # 2026 la card la disegna `cardParte`, la stessa del dettaglio di un
+    # ordine del mercatino: la forma si guarda li', e la prova la segue.
+    pc = pezzo_js(senza, "function cardParte(c, chi, opz){", "\n}\n")
     # ⚠️ LA SEQUENZA INTERA, dalla freccia alla chiusura della card: la
     # porta si CHIUDE, poi la fila, poi la card. La prima stesura
     # cercava il solo «+ tondi» seguito da una chiusura, e restava verde
@@ -48953,15 +48964,23 @@ def prove_feedback_tre_e_tondi():
           and "'<div class=\"seller' + (tondi ? ' con-tondi' : '') + '\">'" in pc)
 
     # IL CENSIMENTO (Andrea: «censisci tutti i posti»). Dal secondo giro
-    # il ponte grande vive in UN posto solo, dentro un ordine del
-    # mercatino (`pontiOrdine`), dove una card non c'e'; i tondi li
-    # chiamano il negozio, il Profilo e la card della controparte P2P.
+    # il ponte grande viveva in UN posto solo, dentro un ordine del
+    # mercatino; dal 24 set 2026 non vive piu' da nessuna parte — anche
+    # l'ordine ha la card dell'altra parte (`cardParteOrdine`, che passa
+    # da `cardParte`). I tondi li chiamano il negozio, il Profilo e
+    # `cardParte` — due volte: la fila e il giudice dei canali.
     # Un chiamante nuovo, di qua o di la', fa arrossire.
-    prova("censimento: il ponte grande resta solo dentro l'ordine",
-          ["pontiOrdine"], chiamanti("pontiContatto"))
-    prova("censimento: i tondi stanno nel negozio, nel Profilo e nel P2P",
-          ["renderNegozio", "renderProfilo", "pontiControparteP2P"],
+    prova("censimento: il ponte grande non c'e' piu' da nessuna parte",
+          [False, False, False],
+          ["function pontiContatto(" in senza, "function pontiOrdine(" in senza,
+           "btn ponte" in senza])
+    prova("censimento: i tondi stanno nel negozio, nel Profilo e nella "
+          "card dell'altra parte",
+          ["renderNegozio", "renderProfilo", "cardParte", "cardParte"],
           chiamanti("tondiVenditore"))
+    prova("censimento: la card dell'altra parte la chiamano il P2P e l'ordine",
+          ["cardParteOrdine", "profiloControparteP2P"],
+          chiamanti("cardParte"))
     # ...e le due condivisioni del negozio partono SOLO dai tondi: fuori
     # dalla definizione, il nome si trova una volta, nel catalogo dei
     # tondi (un `onclick` rimasto altrove sarebbe un secondo)
@@ -49351,6 +49370,326 @@ process.stdout.write(JSON.stringify(out));
     prova("feedback: l'arancio pieno sulla carta di giorno NON reggerebbe",
           True, contrasto(tok("--sats", "chiaro"),
                           tok("--card", "chiaro")) < 4.5)
+
+
+def prove_card_parte_ordine():
+    """LA CARD DEL VENDITORE ANCHE NEL DETTAGLIO DELL'ORDINE (24 set 2026,
+    ritocco di Andrea).
+
+    Nel dettaglio di un ordine del mercatino c'erano ancora i bottoni
+    giganti «Scrivi al venditore / all'acquirente su Telegram / su
+    Nostr». Al loro posto, in fondo alla pagina, la card dell'altra
+    parte — la STESSA della pagina di uno scambio P2P (`cardParte`):
+    foto, nome, stelle, livello, e in basso a destra i tondi coi loghi
+    veri, piu' il tondo del link che apre il negozio di quella persona.
+    Qui si difendono quattro cose: che il server mandi il volto
+    dell'ALTRO e mai il proprio, dallo stesso costruttore della pagina
+    P2P e in una query sola; che le azioni restino quelle dei bottoni di
+    ieri (i canali sono i campi di sempre dell'ordine); che la card sia
+    UNA — nessuna copia; e che stia in fondo, dopo tutto il resto."""
+    print("\n[la card dell'altra parte nell'ordine]")
+    import sqlite3
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    import json as _js
+    mini = open("miniapp.html", encoding="utf-8").read()
+    senza = re.sub(r"/\*[\s\S]*?\*/", "", mini)
+
+    # --- 1) IL SERVER, la forma -------------------------------------
+    rot = codice(pezzo("miei_ordini"))
+    prova("ordini: il volto viene dal costruttore unico della card", True,
+          "volti = _volti_persone(con, sorted(" in rot)
+    prova("ordini: ...mai il proprio", True,
+          '- {user["id"]}), int(time.time()))' in rot
+          and 'r[lato + "_id"] != user["id"]' in rot)
+    prova("ordini: ...e senza canali: restano i campi di sempre", True,
+          'v.pop("telegram", None)' in rot and 'v.pop("npub", None)' in rot)
+    prova("ordini: il volto si legge PRIMA di chiudere il database", True,
+          0 <= rot.find("volti = _volti_persone(")
+          < rot.find("con.close()", rot.find("stadi = _stadi_ordini(")))
+    prova("la pagina P2P passa dallo stesso costruttore", True,
+          "_volti_persone(con, " in pezzo("_controparti_p2p"))
+
+    # --- 2) LA ROTTA VERA SU UN DATABASE DI CARTONE -----------------
+    # `miei_ordini` e' una funzione normale: si esegue col suo testo,
+    # e di cartone ci sono solo le porte (chi sei, il database, il
+    # moderatore, lo stadio del pagamento). Il volto lo costruisce il
+    # `_volti_persone` vero, coi giudici del livello veri.
+    cartella = _tf.mkdtemp(prefix="barattolo-card-parte-")
+    percorso = os.path.join(cartella, "cartone.db")
+    con = sqlite3.connect(percorso)
+    con.executescript(
+        "CREATE TABLE ordini(id INTEGER PRIMARY KEY, compratore_id INTEGER,"
+        " venditore_id INTEGER, annuncio_id INTEGER, stato TEXT,"
+        " creato INTEGER, consegna_scelta TEXT DEFAULT '');"
+        "CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT,"
+        " zona TEXT DEFAULT '', foto TEXT DEFAULT '[]',"
+        " asta_base_sats INTEGER DEFAULT 0);"
+        "CREATE TABLE feedback(ordine_id INTEGER, da_tg_id INTEGER,"
+        " per_tg_id INTEGER, voto INTEGER, commento TEXT);"
+        "CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT,"
+        " avatar TEXT DEFAULT '', avatar_scelta TEXT DEFAULT '',"
+        " rating REAL DEFAULT 0, n_feedback INTEGER DEFAULT 0,"
+        " username TEXT DEFAULT '', negozio TEXT DEFAULT '',"
+        " registrato INTEGER DEFAULT 0, titolo TEXT DEFAULT '',"
+        " xp INTEGER DEFAULT 0, vendite_ok INTEGER DEFAULT 0,"
+        " acquisti_ok INTEGER DEFAULT 0, npub TEXT DEFAULT '',"
+        " npub_verificata INTEGER DEFAULT 0, npub_accesso TEXT DEFAULT '');"
+        # Carla compra: @username, nessuna chiave, nessun voto
+        "INSERT INTO utenti(tg_id,nome,username,negozio,registrato)"
+        " VALUES(111,'Carla Bianchi','carla_b','cb11aa22',1000000-3*86400);"
+        # Dario vende: entrato con la chiave, foto, voti, un negozio
+        "INSERT INTO utenti(tg_id,nome,avatar,rating,n_feedback,username,"
+        " negozio,registrato,xp,vendite_ok,npub_accesso) VALUES(222,"
+        " 'Dario Verdi','av_d.jpg',4.46,8,'dario_v','dv12ab34',"
+        " 1000000-90*86400,300,6,'NPUB');"
+        # due estranei, con un ordine in disputa: lo vede il moderatore
+        "INSERT INTO utenti(tg_id,nome,avatar,avatar_scelta)"
+        " VALUES(333,'Elio','av_e.jpg','nessuna');"
+        "INSERT INTO utenti(tg_id,nome) VALUES(444,'Fede');"
+        "INSERT INTO utenti(tg_id,nome) VALUES(999,'Moderatore');"
+        "INSERT INTO annunci(id,titolo) VALUES(1,'Lampada'),(2,'Sedia'),"
+        " (3,'Vaso');"
+        "INSERT INTO ordini VALUES(1,111,222,1,'locked',500,'spedizione');"
+        "INSERT INTO ordini VALUES(2,333,444,2,'dispute',400,'spedizione');"
+        "INSERT INTO ordini VALUES(3,222,111,3,'shipped',300,'spedizione');")
+    con.commit()
+    con.close()
+    domande = []
+
+    def apri():
+        c = sqlite3.connect(percorso)
+        c.row_factory = sqlite3.Row
+        c.set_trace_callback(domande.append)
+        return c
+
+    chi = {"id": 0}
+    i_l = _SORGENTE.index('LIVELLI = [(0, 0, "nuovo"')
+    # l'orologio e' di cartone anche lui: i giorni si contano da qui
+    import types as _ty
+    amb = {"json": _js, "time": _ty.SimpleNamespace(time=lambda: 1000000.0),
+           "re": re,
+           "Header": lambda d="": d, "Cookie": lambda d="": d,
+           "verifica_utente": lambda *a: {"id": chi["id"]},
+           "db": apri,
+           "pulisci_ordini_fantasma": lambda c: None,
+           "e_admin": lambda tg: tg == 999,
+           "_stadi_ordini": lambda c, righe: {},
+           "NOMI_TITOLI": {},
+           "chiave_nostr_provata": lambda u: (
+               "ab" * 32 if ((u["npub_accesso"] or "")
+                             or ((u["npub"] or "") and u["npub_verificata"]))
+               else ""),
+           "hex_to_npub": lambda h: "npub1" + h[:8]}
+    exec(_SORGENTE[i_l:_SORGENTE.index("]\n", i_l) + 1], amb)
+    for f in ("livello_utente", "_volti_persone", "miei_ordini"):
+        exec(pezzo(f), amb)
+    # la SPIA sul costruttore: chi gli si chiede, a ogni giro
+    chiesti = []
+    _vero = amb["_volti_persone"]
+    amb["_volti_persone"] = lambda c, ids, adesso: (
+        chiesti.append(list(ids)), _vero(c, ids, adesso))[1]
+
+    def come(tg):
+        chi["id"] = tg
+        domande.clear()
+        chiesti.clear()
+        return {r["id"]: r for r in amb["miei_ordini"](0, "", "")}
+
+    compra = come(111)
+    d_utenti = [q for q in domande if "FROM utenti WHERE tg_id IN" in q]
+    prova("chi compra vede la faccia di chi vende", "Dario Verdi",
+          (compra[1].get("volto_venditore") or {}).get("nome"))
+    v = compra[1].get("volto_venditore") or {}
+    prova("...con foto, stelle, voti, livello, negozio e giorni",
+          ["av_d.jpg", 4.5, 8, True, "dv12ab34", 90],
+          [v.get("avatar"), v.get("media"), v.get("voti"),
+           bool(v.get("livello")), v.get("negozio"), v.get("giorni")])
+    prova("...e il proprio volto non esce", False,
+          "volto_compratore" in compra[1])
+    prova("i canali NON viaggiano nel volto: restano i campi di sempre",
+          [False, False, "dario_v", "NPUB"],
+          ["telegram" in v, "npub" in v, compra[1]["venditore_username"],
+           compra[1]["venditore_nostr"]])
+    prova("sull'ordine dove vende, lo stesso utente vede chi compra",
+          ["Dario Verdi", False],
+          [(compra[3].get("volto_compratore") or {}).get("nome"),
+           "volto_venditore" in compra[3]])
+    prova("due ordini con la stessa persona: UNA domanda sui volti", 1,
+          len(d_utenti))
+    prova("...e il proprio id non e' nella domanda", [[222]], chiesti)
+    vende = come(222)
+    prova("chi vende vede la faccia di chi compra, senza voti inventati",
+          ["Carla Bianchi", 0, 0, 3, False],
+          [(vende[1].get("volto_compratore") or {}).get("nome"),
+           vende[1]["volto_compratore"].get("media"),
+           vende[1]["volto_compratore"].get("voti"),
+           vende[1]["volto_compratore"].get("giorni"),
+           "volto_venditore" in vende[1]])
+    mod = come(999)
+    prova("il moderatore su un ordine altrui vede tutti e due",
+          ["Elio", "Fede"],
+          [(mod[2].get("volto_compratore") or {}).get("nome"),
+           (mod[2].get("volto_venditore") or {}).get("nome")])
+    prova("...e chi ha scelto «nessuna foto» resta senza foto", "",
+          mod[2]["volto_compratore"]["avatar"])
+    prova("un estraneo non vede ne' l'ordine ne' i volti", [1, 3],
+          sorted(come(111)))
+    import shutil as _shutil
+    _shutil.rmtree(cartella, ignore_errors=True)
+
+    # --- 3) IL CLIENT, la forma -------------------------------------
+    prova("il volto arriva nella mappatura dell'ordine", True,
+          "voltoCompratore:o.volto_compratore||null," in senza
+          and "voltoVenditore:o.volto_venditore||null," in senza)
+    oo = pezzo_js(senza, "function openOrder(id){", "\n}\n")
+    i_dis = oo.find("onclick=\"openDispute()\"")
+    i_card = oo.find("cardParteOrdine(o, 'compratore') + cardParteOrdine(o, 'venditore')")
+    prova("la card sta DOPO l'uscita di sicurezza", True, 0 <= i_dis < i_card)
+    # IN FONDO DAVVERO: fra la card e la chiusura della pagina non c'e'
+    # niente — un pezzo aggiunto dopo di lei la farebbe tornare in mezzo
+    coda = oo[i_card:oo.find("</div>`;", i_card)] if i_card >= 0 else "x"
+    prova("...ed e' l'ULTIMA cosa della pagina", True,
+          re.sub(r"\s+", " ", coda).strip()
+          == "cardParteOrdine(o, 'compratore') + cardParteOrdine(o, "
+             "'venditore') : cardParteOrdine(o, o.role==='buyer' ? "
+             "'venditore' : 'compratore')}")
+    prova("nell'ordine non resta nessun bottone «Scrivi a»", 0,
+          len(re.findall(r"Scrivi (?:al|all'|a )", oo)) + oo.count("pontiOrdine"))
+    # UNA CARD SOLA: la fabbrica dell'ordine non disegna il riquadro, lo
+    # chiede a `cardParte`
+    cpo = pezzo_js(senza, "function cardParteOrdine(o, lato){", "\n}\n")
+    prova("la card dell'ordine e' quella del P2P, non una copia", [True, 0],
+          ["cardParte(c, " in cpo, cpo.count('class="seller')
+           + cpo.count("avatarImg(") + cpo.count("tondiVenditore(")])
+    prova("il CSS dei ponti grandi se n'e' andato con loro", [False, True],
+          [".btn.ponte" in senza, ".parte-chi{" in senza])
+
+    # --- 4) IL BANCO: la card vera in node ---------------------------
+    _node = _sh.which("node")
+    if not _node:
+        salta("la card dell'ordine gira in node", "node non installato")
+        return
+    pezzi = []
+    for firma in ("function tondiVenditore(username, npub, chi, condividi, negozio){",
+                  "function icoPersonaP2P(){",
+                  "function frazioneStellaP2P(media){",
+                  "function stellaP2P(media){",
+                  "function cardParte(c, chi, opz){",
+                  "function cardParteOrdine(o, lato){"):
+        pezzi.append(pezzo_js(mini, firma, "\n}\n") + "\n}\n")
+    for riga in ("const P2P_STELLA_D = ", "const titoloRiga = ",
+                 "const LOGO_TELEGRAM = ", "const LOGO_NOSTR = ",
+                 "const ICO_LINK = ", "const TONDO_CONDIVIDI = "):
+        i_a = mini.index(riga)
+        pezzi.append(mini[i_a:mini.index(";\n", i_a) + 1])
+    banco = ("const esc = s => String(s == null ? '' : s)\n"
+             "  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')\n"
+             "  .replace(/\"/g,'&quot;').replace(/'/g,'&#39;');\n"
+             "function avatarImg(n){ return n ? '<img src=\"/foto/' + n + '\">' : ''; }\n"
+             + "\n".join(pezzi) + "\n" + r"""
+const out = {};
+const tondi = h => (h.match(/class="tondo (\w+)"/g) || []).map(x => x.slice(13, -1));
+const dario = {nome: 'Dario Verdi', avatar: 'av_d.jpg', media: 4.5, voti: 8,
+  livello: 'Mercante pratico', negozio: 'dv12ab34', giorni: 90};
+const carla = {nome: 'Carla Bianchi', media: 0, voti: 0, livello: 'Nuovo arrivato',
+  negozio: 'cb11aa22', giorni: 3};
+const ord = o => Object.assign({role: 'buyer', usernameVenditore: 'dario_v',
+  nostrVenditore: 'npub1dario', usernameCompratore: 'carla_b',
+  nostrCompratore: '', voltoVenditore: dario, voltoCompratore: carla}, o);
+/* 1) CHI COMPRA: la card di chi vende, i tre tondi coi loghi veri */
+const c1 = cardParteOrdine(ord({}), 'venditore');
+out.faccia = c1.indexOf('<b>Dario Verdi</b>') >= 0
+  && c1.indexOf('/foto/av_d.jpg') >= 0 && c1.indexOf('p2p-rep-stella') >= 0
+  && c1.indexOf('4,5') >= 0 && c1.indexOf('Mercante pratico') >= 0;
+out.treTondi = tondi(c1).join(',');
+out.azioni = c1.indexOf(`onclick="apriChat('dario_v')"`) >= 0
+  && c1.indexOf(`onclick="apriNostrProfilo('npub1dario')"`) >= 0
+  && c1.indexOf(`onclick="apriNegozio('dv12ab34')"`) >= 0;
+out.etichette = c1.indexOf('aria-label="Scrivi a Dario su Telegram"') >= 0
+  && c1.indexOf('aria-label="Scrivi a Dario su Nostr"') >= 0
+  && c1.indexOf('aria-label="Apri il suo negozio"') >= 0;
+/* la porta resta ferma: il negozio lo apre il tondo, un tocco una cosa */
+out.portaFerma = c1.indexOf('role="button"') < 0
+  && c1.indexOf('apriNegozioP2P') < 0 && c1.indexOf('›') < 0;
+out.inBassoADestra = c1.indexOf('<div class="seller con-tondi">') === 0
+  && c1.indexOf('<div class="tondi">') > c1.indexOf('<div class="who">')
+  && c1.indexOf('btn') < 0 && c1.indexOf('trust-note') < 0;
+/* 2) CHI VENDE: la card di chi compra, coi canali che ha (Telegram solo) */
+const c2 = cardParteOrdine(ord({role: 'seller'}), 'compratore');
+out.venditoreVede = c2.indexOf('<b>Carla Bianchi</b>') >= 0
+  && c2.indexOf('Dario') < 0 && tondi(c2).join(',') === 'tg,link'
+  && c2.indexOf(`onclick="apriChat('carla_b')"`) >= 0
+  && c2.indexOf('p2p-rep-stella') < 0 && c2.indexOf('trust-note') < 0;
+/* 3) IL MODERATORE: tutte e due, con la riga che dice chi e' chi */
+const c3 = cardParteOrdine(ord({role: 'admin'}), 'compratore')
+  + cardParteOrdine(ord({role: 'admin'}), 'venditore');
+out.moderatore = c3.indexOf('<div class="parte-chi">Chi compra</div><div class="seller') === 0
+  && c3.indexOf('Chi compra') < c3.indexOf('Carla') && c3.indexOf('Carla') < c3.indexOf('Chi vende')
+  && c3.indexOf('Chi vende') < c3.indexOf('Dario');
+out.soloAlModeratore = c1.indexOf('parte-chi') < 0 && c2.indexOf('parte-chi') < 0;
+/* 4) SERVER DI IERI (o DEMO): nessun volto, la card nasce lo stesso */
+const c4 = cardParteOrdine(ord({voltoVenditore: null}), 'venditore');
+out.senzaVolto = c4.indexOf('<b>Il venditore</b>') >= 0
+  && tondi(c4).join(',') === 'tg,nostr'
+  && c4.indexOf('aria-label="Scrivi al venditore su Telegram"') >= 0;
+/* 5) NESSUN CANALE: la riga di sempre, e il negozio si apre lo stesso */
+const c5 = cardParteOrdine(ord({usernameVenditore: '', nostrVenditore: ''}), 'venditore');
+out.senzaCanali = tondi(c5).join(',') === 'link'
+  && c5.indexOf('Il venditore non ha contatti pubblici') >= 0
+  && c5.indexOf('trust-note') > c5.indexOf('</div></div>');
+const c6 = cardParteOrdine(ord({usernameVenditore: '', nostrVenditore: '',
+  voltoVenditore: null}), 'venditore');
+out.nulla = c6.indexOf('<div class="seller">') === 0 && tondi(c6).length === 0
+  && c6.indexOf('non ha contatti pubblici') >= 0;
+/* 6) L'ALFABETO: il codice del negozio finisce in un onclick */
+const c7 = cardParteOrdine(ord({voltoVenditore: Object.assign({}, dario,
+  {negozio: "dv12');alert(1)//", nome: '<b>x</b>'})}), 'venditore');
+out.alfabeto = c7.indexOf(`apriNegozio('dv12alert1')`) >= 0
+  && c7.indexOf('alert(1)') < 0;
+out.escapato = c7.indexOf('&lt;b&gt;x&lt;/b&gt;') >= 0 && c7.indexOf('<b><b>') < 0;
+/* 7) IL P2P RESTA COM'ERA: porta che apre il negozio, niente tondo link */
+const p = cardParte(Object.assign({telegram: 'ada', npub: ''}, dario), 'a Dario', {porta: true});
+out.p2pComEra = p.indexOf('apriNegozioP2P(event, this.dataset.negozio)') >= 0
+  && tondi(p).join(',') === 'tg' && p.indexOf('›') >= 0;
+process.stdout.write(JSON.stringify(out));
+""")
+    _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                               encoding="utf-8")
+    _f.write(banco)
+    _f.close()
+    _r = _sp.run([_node, _f.name], capture_output=True, text=True,
+                 timeout=60, encoding="utf-8")
+    os.unlink(_f.name)
+    if _r.returncode != 0:
+        prova("il banco della card dell'ordine gira", "", _r.stderr[-500:])
+        return
+    esito = _js.loads(_r.stdout)
+    for chiave, nome, atteso in (
+            ("faccia", "banco: foto, nome, stelle e livello di chi vende", True),
+            ("treTondi", "banco: i tre tondi, nell'ordine Telegram, Nostr, link",
+             "tg,nostr,link"),
+            ("azioni", "banco: le azioni dei bottoni di ieri, e il link apre il negozio",
+             True),
+            ("etichette", "banco: il nome dell'azione in aria-label", True),
+            ("portaFerma", "banco: la porta resta ferma, un tocco una cosa", True),
+            ("inBassoADestra", "banco: la fila in fondo alla card, nessun bottone",
+             True),
+            ("venditoreVede", "banco: chi vende vede chi compra, coi suoi canali",
+             True),
+            ("moderatore", "banco: il moderatore vede tutti e due, con chi e' chi",
+             True),
+            ("soloAlModeratore", "banco: ...e la riga solo a lui", True),
+            ("senzaVolto", "banco: senza volto la card nasce col nome della parte",
+             True),
+            ("senzaCanali", "banco: senza canali la riga di sempre, e il negozio",
+             True),
+            ("nulla", "banco: senza niente, la card nuda e la riga", True),
+            ("alfabeto", "banco: il codice del negozio passa dal filtro", True),
+            ("escapato", "banco: il nome passa da esc()", True),
+            ("p2pComEra", "banco: la card del P2P resta com'era", True)):
+        prova(nome, atteso, esito.get(chiave))
 
 
 def prove_loghi_tondi():
@@ -53414,10 +53753,18 @@ def prove_parti_si_vedono():
     # 2026 (secondo giro dei tondi, decisione di Andrea) la fabbrica del
     # mercatino sono i TONDI coi loghi veri, `tondiVenditore` — la prova
     # cambia nome insieme a lei, e la regola resta la stessa.
+    # DAL 24 SET 2026 la card e' `cardParte`, una per due posti (anche il
+    # dettaglio di un ordine del mercatino), e l'alfabeto lo filtra la
+    # fabbrica stessa: username, npub e codice del negozio finiscono in
+    # un onclick, e la difesa vale per ogni chiamante.
     prova("i due ponti sono la fabbrica del mercatino", True,
-          "return tondiVenditore(" in cod)
+          "const tondi = tondiVenditore(c.telegram, c.npub, chi," in cod
+          and "return cardParte(c, " in cod)
+    _fab = codice(pezzo_js(mini, "function tondiVenditore(", "\n}\n"))
     prova("...con l'alfabeto filtrato, che finiscono in un onclick",
-          True, "/[^A-Za-z0-9_]/g" in cod and "/[^a-z0-9]/g" in cod)
+          True, "String(username || '').replace(/[^A-Za-z0-9_]/g, '')" in _fab
+          and "String(npub || '').replace(/[^a-z0-9]/g, '')" in _fab
+          and "String(negozio || '').replace(/[^A-Za-z0-9_]/g, '')" in _fab)
 
     # --- 2) PRIMA DELLA PRESA NON SI VEDE NIENTE --------------------
     # Il guardiano e' `o.peer`, la chiave dell'altra parte: prima
@@ -53455,6 +53802,13 @@ def prove_parti_si_vedono():
           '_controparti_p2p(con, (d or {}).get("ordini"), user["id"]' in rot)
     giud = pezzo("_controparti_p2p")
     corpo = giud[giud.index('"""', giud.index('"""') + 3):]
+    # IL VOLTO LO COSTRUISCE `_volti_persone` dal 24 set 2026 (lo usa
+    # anche il dettaglio di un ordine del mercatino): le regole si
+    # guardano nei due pezzi insieme, e le query si contano in tutti e due
+    prova("il volto passa dal costruttore unico", True,
+          "_volti_persone(con, sorted(set(altri.values())), adesso)" in giud)
+    _vp = pezzo("_volti_persone")
+    corpo += _vp[_vp.index('"""', _vp.index('"""') + 3):]
     # LA NPUB SOLO DAL POSSESSO DIMOSTRATO: il giudice e' quello dei
     # ponti del mercatino, mai una regola ribattuta qui.
     prova("la npub passa dal giudice del possesso dimostrato", True,
@@ -53520,7 +53874,8 @@ def prove_parti_si_vedono():
                else ""),
            "hex_to_npub": lambda h: "npub1" + h[:8]}
     exec(_SORGENTE[i_l:_SORGENTE.index("]\n", i_l) + 1], amb)
-    for f in ("_ordini_puliti_p2p", "livello_utente", "_controparti_p2p"):
+    for f in ("_ordini_puliti_p2p", "livello_utente", "_volti_persone",
+              "_controparti_p2p"):
         exec(pezzo(f), amb)
     chi_di = amb["_controparti_p2p"]
 
@@ -53618,7 +53973,7 @@ def prove_parti_si_vedono():
         salta("il profilo della controparte gira", "node non installato")
         return
     pezzi = [blocco]
-    for firma in ("function tondiVenditore(username, npub, chi, condividi){",
+    for firma in ("function tondiVenditore(username, npub, chi, condividi, negozio){",
                   "function icoPersonaP2P(){",
                   "function frazioneStellaP2P(media){",
                   "function stellaP2P(media){"):
@@ -78119,7 +78474,7 @@ def prove_p2p_recapito_passo():
                   "P2P_SATS_MAX_EVENTO = "):
         _i = src.index("\n" + _riga) + 1
         exec(src[_i:src.index("\n", _i)], amb)
-    for f in _FUNZIONI_LIBRO_P2P + ("_controparti_p2p", "_nome_altro_p2p",
+    for f in _FUNZIONI_LIBRO_P2P + ("_volti_persone", "_controparti_p2p", "_nome_altro_p2p",
                                     "_parti_scambio_p2p", "_avviso_recapito_p2p",
                                     "_momento_evento_p2p", "_evento_p2p_pulito",
                                     "_registra_evento_p2p", "_parti_mostro_p2p", "_riconcilia_parti_p2p"):
@@ -99026,6 +99381,7 @@ def main():
               prove_note_piccole,
               prove_feedback_tre_e_tondi,
               prove_loghi_tondi,
+              prove_card_parte_ordine,
               prove_font,
               prove_porta_timer, prove_feedback_confermato,
               prove_recensione_p2p,
