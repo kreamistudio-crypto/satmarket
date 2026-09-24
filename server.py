@@ -5026,6 +5026,17 @@ def init_db():
         sats INTEGER DEFAULT 0,
         sats_compratore INTEGER DEFAULT 0,
         sats_venditore INTEGER DEFAULT 0,
+        -- LE DUE TRADE KEY COSI' COME LE DICE MOSTROD (24 set 2026, «I
+        -- miei scambi su ogni dispositivo»): fin qui l'evento le
+        -- portava e il server ne teneva solo la traduzione in account.
+        -- Servono a un SECONDO dispositivo dello stesso account, che
+        -- la riga dello scambio non ce l'ha: con la propria chiave
+        -- ritrova l'indice della trade key (`indiceDaChiaveP2P`) e con
+        -- quella dell'altra parte torna a scriverle. Sono chiavi
+        -- PUBBLICHE e usa-e-getta, gia' note a mostrod e ai relay;
+        -- una vuota e' «un posto che in questo giro non c'e'».
+        chiave_compratore TEXT DEFAULT '',
+        chiave_venditore TEXT DEFAULT '',
         aggiornato INTEGER DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS p2p_avvisi(
@@ -6223,6 +6234,14 @@ def init_db():
                     "tornati INTEGER DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE p2p_ordini ADD COLUMN {colonna}")
+        except sqlite3.OperationalError:
+            pass
+    # le due trade key dette da mostrod (24 set 2026, «I miei scambi
+    # su ogni dispositivo»): vedi lo schema di `p2p_scambi`
+    for colonna in ("chiave_compratore TEXT DEFAULT ''",
+                    "chiave_venditore TEXT DEFAULT ''"):
+        try:
+            con.execute(f"ALTER TABLE p2p_scambi ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
             pass
     # (le quattro colonne del gate e dell'eco su `chiavi_p2p` non si
@@ -44205,14 +44224,20 @@ def _registra_evento_p2p(con, ev: dict, adesso: int):
               "dopo un fatto piu' recente: le parti dello scambio restano "
               "quelle dell'ultimo", flush=True)
     else:
+        # ...e con le parti le loro CHIAVI (24 set 2026): stessa regola —
+        # vale l'ultima parola per l'orologio di mostrod, e un posto
+        # senza chiave in questo giro resta vuoto
         con.execute(
             "INSERT INTO p2p_scambi(ordine, compratore, venditore, preso_dal, "
-            "giro, aggiornato) VALUES(?,?,?,?,?,?) "
+            "giro, aggiornato, chiave_compratore, chiave_venditore) "
+            "VALUES(?,?,?,?,?,?,?,?) "
             "ON CONFLICT(ordine) DO UPDATE SET compratore=excluded.compratore, "
             "venditore=excluded.venditore, preso_dal=excluded.preso_dal, "
-            "giro=excluded.giro, aggiornato=excluded.aggiornato",
+            "giro=excluded.giro, aggiornato=excluded.aggiornato, "
+            "chiave_compratore=excluded.chiave_compratore, "
+            "chiave_venditore=excluded.chiave_venditore",
             (ev["ordine"], parti["compratore"], parti["venditore"], preso_dal,
-             giro, adesso))
+             giro, adesso, ev["compratore_key"], ev["venditore_key"]))
     # I DUE POSTI DEL LIBRO SI ALLINEANO A QUEL CHE HA DETTO (23 set
     # 2026, A1): la presa dichiarata dal telefono si conferma o cade, e
     # un'intestazione che mostrod smentisce si corregge. Il journal lo
@@ -44890,6 +44915,241 @@ async def pagamenti_p2p(req: Request, x_tg_init_data: str = Header(""),
     finally:
         con.close()
     return JSONResponse({"pagamenti": esiti},
+                        headers={"Cache-Control": "no-store"})
+
+
+# ---------- I MIEI SCAMBI SU OGNI DISPOSITIVO: L'ARCHIVIO DEL SERVER ---
+# (24 set 2026, dal campo: Andrea pubblica dall'app Android, Alan prende
+# dal tablet; nella mini app Telegram dello stesso account di Andrea lo
+# scambio NON c'era, e sul tablet di Alan e' anche sparito.) La riga di
+# uno scambio vive nel localStorage del dispositivo che l'ha aperto, e
+# dal secondo dispositivo si ricostruiva SOLO quel che il libro pubblico
+# sapeva descrivere: un ordine ancora in vetrina. Di uno scambio PRESO
+# il 38383 non dice piu' niente di utile, e la restore-session da' solo
+# id, indice e uno stato — non il lato, non la cifra, non chi c'e'
+# dall'altra parte. IL SERVER INVECE SA TUTTO: dalla patch 0007 mostrod
+# gli racconta ogni passo (`p2p_momenti`) e gli dice le due parti
+# (`p2p_scambi`), e il libro gli ha gia' insegnato lato, cifra e metodi
+# (`p2p_ordini`). Qui glielo si chiede: per ogni scambio di cui chi
+# chiede E' una delle due parti (o l'ha pubblicato), tutto quel che
+# serve a farlo COMPARIRE su un dispositivo che non l'ha mai visto — e
+# a governarlo, quando quel dispositivo sa ricavare la trade key.
+# LO STATO E' TRADOTTO NEL VOCABOLARIO DEL CLIENT dalla cronaca
+# (`_stato_scambio_p2p`, puro), con gli stessi momenti che gia' fanno
+# le frasi degli avvisi — nessuno stato nuovo, nessuna storia inventata:
+# un momento che non si conosce da' '' e il client tiene quel che sa.
+# CHI NON E' DELLA PARTITA NON RICEVE LA RIGA (la lezione di Q3): la
+# risposta e' senza quell'id, come per un ordine che non esiste.
+# I FINALI RESTANO PER `P2P_STORICO_GIORNI`: e' lo storico dei
+# conclusi e degli annullati, lo stesso orizzonte della scopa del client.
+P2P_STORICO_GIORNI = 30
+# a parita' d'ora vince il momento che viene DOPO nella storia: mostrod
+# fa certi passi a due a due nello stesso istante (la presa e la
+# garanzia chiesta; la garanzia pagata e la fattura chiesta) e a dire
+# «a chi tocca» e' il secondo della coppia
+_PESO_MOMENTO_P2P = {
+    "preso": 0, "fattura_data": 1, "garanzia_chiesta": 2, "garanzia_pagata": 2,
+    "fattura_chiesta": 3, "fiat": 4, "annullo_chiesto": 4, "rilasciato": 5,
+    "payout_fallito": 6, "concluso": 7, "annullato": 8, "scaduto": 8,
+    "tornato": 8, "disputa": 8}
+
+
+def _euro_numero_p2p(testo) -> float:
+    """PURA: da «10,00 €» — la cifra del libro come `p2p_ordini.euro`
+    la tiene, scritta come si legge — al numero. Storta o vuota = 0."""
+    t = str(testo or "").replace("€", "").replace("\xa0", "").replace(" ", "").strip()
+    if not t:
+        return 0.0
+    if "," in t:
+        t = t.replace(".", "").replace(",", ".")
+    try:
+        v = float(t)
+    except ValueError:
+        return 0.0
+    return v if v > 0 else 0.0
+
+
+def _metodi_lista_p2p(testo) -> list:
+    """PURA: i metodi come `p2p_ordini.metodi` li tiene (una lista JSON,
+    o i nomi separati da virgola) in una lista di stringhe."""
+    t = str(testo or "").strip()
+    if not t:
+        return []
+    if t.startswith("["):
+        try:
+            v = json.loads(t)
+            return [str(x).strip() for x in v if str(x).strip()] if isinstance(v, list) else []
+        except ValueError:
+            return []
+    return [x.strip() for x in t.split(",") if x.strip()]
+
+
+def _stato_scambio_p2p(momenti, lato: str, preso_dal: str, stato_libro: str,
+                       mio: bool) -> dict:
+    """PURA: dove sta uno scambio, nel vocabolario del CLIENT (le chiavi
+    di `STATI_P2P`), dalla cronaca di mostrod. Torna `{stato, preso,
+    quando, payout_fallito}`; `stato` vuoto = non si sa, e il client
+    tiene quel che sa (mai un default, la lezione di Q4).
+    GUARDA L'ULTIMO GIRO: un ordine tornato in vetrina e ripreso ha una
+    storia nuova, e i momenti del giro di prima non dicono piu' a chi
+    tocca. A parita' d'ora decide `_PESO_MOMENTO_P2P`.
+    SENZA CRONACA vale il libro: `pending` e' «pubblicato» per chi l'ha
+    scritto, `success` concluso, `canceled`/`expired` annullato,
+    `in-progress` non dice a chi tocca e resta vuoto.
+    `lato` e' di chi LEGGE ('compro' | 'vendo'); `preso_dal` chi ha
+    preso secondo mostrod ('buyer' | 'seller'), che decide il primo
+    passo dopo la presa: se ha preso chi compra deve dire dove ricevere
+    i sats, se ha preso chi vende deve bloccarli."""
+    giro = max([int(m.get("giro") or 0) for m in momenti] or [0])
+    del_giro = [m for m in momenti if int(m.get("giro") or 0) == giro]
+    if not del_giro:
+        s = {"pending": "pubblicato" if mio else "", "success": "concluso",
+             "canceled": "annullato", "expired": "annullato"}.get(
+                 str(stato_libro or ""), "")
+        return {"stato": s, "preso": False, "quando": 0, "payout_fallito": False}
+    ultimo = max(del_giro, key=lambda m: (int(m.get("quando") or 0),
+                                          _PESO_MOMENTO_P2P.get(m.get("momento"), 0)))
+    m = str(ultimo.get("momento") or "")
+    d = str(ultimo.get("dettaglio") or "")
+    a = str(ultimo.get("attore") or "")
+    compro = lato == "compro"
+    io_attore = "buyer" if compro else "seller"
+    attesa_hold = "attesa_hold_venditore" if compro else "attesa_mia_hold"
+    attesa_fatt = "attesa_mia_fattura" if compro else "attesa_fattura_compratore"
+    if m == "preso":
+        chi = preso_dal if preso_dal in ("buyer", "seller") else a
+        s = attesa_fatt if chi == "buyer" else (attesa_hold if chi == "seller" else "")
+    elif m == "garanzia_chiesta":
+        s = attesa_hold
+    elif m == "fattura_chiesta":
+        s = attesa_fatt
+    elif m == "fattura_data":
+        s = attesa_hold if d == "hold-next" else ("rilasciato" if d == "new-invoice" else "attivo")
+    elif m == "garanzia_pagata":
+        s = "attivo"
+    elif m == "fiat":
+        s = "euro_inviati"
+    elif m == "rilasciato":
+        s = "rilasciato"
+    elif m == "payout_fallito":
+        s = "fattura_nuova" if compro else "rilasciato"
+    elif m == "concluso":
+        s = "concluso"
+    elif m == "annullo_chiesto":
+        s = "annullo_chiesto" if a == io_attore else "annullo_proposto"
+    elif m in ("annullato", "scaduto"):
+        s = "annullato"
+    elif m == "tornato":
+        s = "pubblicato" if mio else "annullato"
+    elif m == "disputa":
+        s = "in_disputa"
+    else:
+        s = ""
+    return {"stato": s,
+            "preso": any(str(x.get("momento")) == "preso" for x in del_giro),
+            "quando": int(ultimo.get("quando") or 0),
+            "payout_fallito": m == "payout_fallito"}
+
+
+def _scambi_p2p(con, io, adesso: int) -> dict:
+    """PURA sulla connessione: gli scambi di `io` come il server li sa —
+    `{ordine: {lato, mio, preso, euro, sats, metodi, stato, stato_libro,
+    creato, quando, giro, chiave_mia, chiave_peer, sats_ordine,
+    sats_miei, payout_fallito, momenti}}`. Entrano gli ordini che `io`
+    ha pubblicato (`p2p_ordini`) e quelli in cui mostrod lo nomina come
+    una delle due parti (`p2p_scambi`); il LATO e' quello detto da
+    mostrod quando c'e', altrimenti quello del libro per chi ha
+    pubblicato; senza un lato la riga non si serve. I finali piu'
+    vecchi di `P2P_STORICO_GIORNI` restano fuori. Tetto
+    `MAX_ORDINI_P2P`, come le sorelle."""
+    io = int(io or 0)
+    if not io:
+        return {}
+    ids = [r["ordine"] for r in con.execute(
+        "SELECT ordine FROM p2p_ordini WHERE tg_id=? ORDER BY creato DESC", (io,))]
+    for r in con.execute("SELECT ordine FROM p2p_scambi WHERE compratore=? "
+                         "OR venditore=? ORDER BY aggiornato DESC", (io, io)):
+        if r["ordine"] not in ids:
+            ids.append(r["ordine"])
+    soglia = int(adesso) - P2P_STORICO_GIORNI * 86400
+    fuori = {}
+    for ordine in ids:
+        o = con.execute(
+            "SELECT tg_id, lato, maker, stato, euro, sats, metodi, creato "
+            "FROM p2p_ordini WHERE ordine=?", (ordine,)).fetchone()
+        s = con.execute(
+            "SELECT compratore, venditore, preso_dal, giro, sats, sats_compratore, "
+            "sats_venditore, chiave_compratore, chiave_venditore, aggiornato "
+            "FROM p2p_scambi WHERE ordine=?", (ordine,)).fetchone()
+        compra = int(s["compratore"] or 0) if s else 0
+        vende = int(s["venditore"] or 0) if s else 0
+        libro = (o["lato"] if o else "") or ""
+        if io == compra:
+            lato = "compro"
+        elif io == vende:
+            lato = "vendo"
+        elif o and int(o["tg_id"] or 0) == io:
+            lato = {"buy": "compro", "sell": "vendo"}.get(libro, "")
+        else:
+            lato = ""
+        if not lato:
+            continue
+        parti = _parti_mostro_p2p(con, ordine)
+        mio = ((parti["detto"] and parti["maker"] == io)
+               or (not parti["detto"] and bool(o) and int(o["tg_id"] or 0) == io))
+        momenti = [dict(r) for r in con.execute(
+            "SELECT momento, quando, attore, dettaglio, giro FROM p2p_momenti "
+            "WHERE ordine=? ORDER BY quando", (ordine,))]
+        q = _stato_scambio_p2p(momenti, lato, (s["preso_dal"] if s else "") or "",
+                               (o["stato"] if o else "") or "", bool(mio))
+        ultimo = q["quando"] or (int(s["aggiornato"] or 0) if s else 0) \
+            or (int(o["creato"] or 0) if o else 0)
+        if q["stato"] in ("concluso", "annullato") and ultimo < soglia:
+            continue
+        chiavi = {"compro": (s["chiave_compratore"] if s else "") or "",
+                  "vendo": (s["chiave_venditore"] if s else "") or ""}
+        altro = "vendo" if lato == "compro" else "compro"
+        fuori[ordine] = {
+            "lato": lato, "mio": bool(mio), "preso": bool(q["preso"]),
+            "euro": _euro_numero_p2p(o["euro"] if o else ""),
+            "sats": int(o["sats"] or 0) if o else 0,
+            "metodi": _metodi_lista_p2p(o["metodi"] if o else ""),
+            "stato": q["stato"],
+            "stato_libro": (o["stato"] if o else "") or "",
+            "creato": int(o["creato"] or 0) if o else 0,
+            "quando": int(q["quando"] or 0),
+            "giro": int(s["giro"] or 0) if s else 0,
+            "chiave_mia": chiavi[lato], "chiave_peer": chiavi[altro],
+            "sats_ordine": int(s["sats"] or 0) if s else 0,
+            "sats_miei": int((s["sats_compratore"] if lato == "compro"
+                              else s["sats_venditore"]) or 0) if s else 0,
+            "payout_fallito": bool(q["payout_fallito"]),
+            "momenti": [{"m": str(m.get("momento") or ""), "q": int(m.get("quando") or 0),
+                         "a": str(m.get("attore") or ""), "d": str(m.get("dettaglio") or "")}
+                        for m in momenti]}
+        if len(fuori) >= MAX_ORDINI_P2P:
+            break
+    return fuori
+
+
+@app.post("/api/p2p/scambi")
+async def scambi_p2p(x_tg_init_data: str = Header(""),
+                     barattolo_sessione: str = Cookie("")):
+    """«Quali sono i miei scambi, e a che punto stanno?» — la domanda di
+    un dispositivo che non li ha mai visti. Il giudice e' `_scambi_p2p`.
+    Le regole delle sorelle (`controparte`, `pagamenti`): la SESSIONE
+    serve (chi ha preso un ordine non e' un fatto pubblico), NESSUN
+    CORPO e niente nell'indirizzo (non si puo' chiedere degli scambi di
+    un altro: non esiste la sintassi), NESSUN GATE SULLA LEVA (qui non si
+    scrive niente, e un 409 toglierebbe i propri scambi a chi ne ha uno a
+    meta' il giorno che la leva si spegne), e `no-store`."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        esiti = _scambi_p2p(con, user["id"], int(time.time()))
+    finally:
+        con.close()
+    return JSONResponse({"scambi": esiti},
                         headers={"Cache-Control": "no-store"})
 
 

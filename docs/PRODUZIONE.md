@@ -331,6 +331,31 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   ne ricava la finestra utile togliendo 24 blocchi di margine nostro:
   cambiarlo sul nodo cambia il cap del foglio «Pubblica» senza toccare
   niente nel codice.
+- LA FINESTRA DELLA FATTURA DI CHI COMPRA SUL NODO (24 set 2026, le
+  fatture da un'ora): `invoice_expiration_window = 3600` nel
+  `[lightning]` di `/home/debian/nodo/mostro/settings.toml` è quanto
+  una fattura deve ANCORA valere quando arriva a mostrod
+  (`validate_bolt11_invoice`, v0.18.8: `expires_at < now + finestra` →
+  `invalid-invoice`); è l'unico posto del nodo che guarda quella
+  scadenza — al payout si controlla solo che non sia già scaduta, e se
+  lo è parte il giro della fattura nuova. Con 3600 una fattura da 60
+  minuti (SatsMobiBot e altri wallet) è rifiutata SEMPRE, perché
+  incollata vale già meno di un'ora. Per accettarle: si guarda prima
+  (`grep -n invoice_expiration_window
+  /home/debian/nodo/mostro/settings.toml`), si tiene la copia
+  (`cp settings.toml settings.toml.prima-600`), si porta a 600 (dieci
+  minuti: quanto basta al viaggio via Tor e alla verifica; sotto i
+  cinque non conviene), a scambi fermi, e il riavvio è dal compose —
+  `cd ~/nodo && docker compose restart mostro` — poi «Settings
+  correctly loaded» nei log. La verifica vale dal lato di chi legge,
+  sulla macchina del RELAY: `docker compose -f /opt/relay/compose.yml
+  exec relay strfry scan '{"kinds":[38385]}' | grep -o
+  '"invoice_expiration_window","[0-9]*"'` — finché dice 3600 il
+  coordinatore non ha ripubblicato. Il client legge questo numero dal
+  38385 (`fattFinestra`) e ferma prima le fatture troppo corte con la
+  stessa regola: cambiarlo sul nodo cambia la soglia del foglio «Dove
+  ricevere i sats» senza toccare niente nel codice. Le 23 ore del
+  client dal 24 set sono un consiglio, non un blocco.
 - IL NAMESPACE PRESTATO NON SI RIAVVIA DA SOLO (15 set 2026, il giorno
   in cui mostro non usciva). Nel compose del nodo due servizi vivono
   nel namespace di rete di un altro: `mostro` in quello di `mostro-net`

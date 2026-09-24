@@ -18741,6 +18741,7 @@ setInterval(() => {
   battitoTabacchinoP2P();
   battitoControlloTabP2P();
   battitoPagamentiP2P();
+  battitoScambiP2P();
   document.querySelectorAll('.lampo-count').forEach(n => {
     const fine = +n.dataset.fine || 0;
     n.textContent = lampoResta(fine);
@@ -44782,6 +44783,20 @@ function renderP2P(){
      bandierina alta lo renderebbe definitivo. Meglio non chiedere:
      questo render passa, e uno dei prossimi — la rilettura dei 60
      secondi basta — trova il pavimento partito e chiede davvero. */
+  /* L'ARCHIVIO DEL SERVER (24 set 2026): una volta per sessione, senza
+     aspettare il mazzo — la riga solo da guardare non ne ha bisogno —
+     e senza far aspettare nessuno: quando arriva si ridisegna. Il
+     gesto «Riprova» lo richiede; il battito dell'unico interval lo
+     rinfresca. Vive fuori dal motore: da qui il typeof. */
+  if (!p2pScambiChiesto && myTgId && !DEMO && !VETRINA
+      && typeof chiediScambiServerP2P === 'function') {
+    p2pScambiChiesto = true;
+    chiediScambiServerP2P().then(ok => {
+      if (!ok) return;
+      renderP2P();
+      if (p2pOrdineAperto) renderOrdineP2P();
+    }).catch(() => {});
+  }
   if (mz && !daGiudicare && !p2pMieiChiesto && !p2pMieiGiro
       && ((mz.indice | 0) > 0 || p2pPavimento)) {
     p2pMieiChiesto = true;
@@ -44841,7 +44856,15 @@ function renderP2P(){
     if (p2pErrore) chiudiAttesaP2P();
     else if (!p2pAttesa) p2pAttesa = attesaRitardata(null, 'Aspetta…', true);
     box.innerHTML = attesa;
-    if (mieiBox) mieiBox.innerHTML = attesa;
+    /* I MIEI SCAMBI NON ASPETTANO UN LIBRO CHE NON RISPONDE (24 set
+       2026, l'archivio del server): fin qui la striscia voleva il libro
+       perche' solo il libro sapeva ricostruire una riga; adesso le
+       righe arrivano anche dal server, e con i relay giu' chi ha uno
+       scambio a meta' deve poterlo vedere lo stesso. Mentre il libro
+       si LEGGE si aspetta ancora (niente conti su una lista a meta');
+       quando ha RISPOSTO di no, la striscia si disegna con quel che
+       c'e' — e senza niente resta la frase dell'errore. */
+    if (mieiBox) mieiBox.innerHTML = (p2pErrore && scambiP2P()) || attesa;
     /* niente pillola finche' non c'e' un libro da filtrare: un
        «0 offerte» appeso in alto mentre si legge sarebbe un numero
        vero di una cosa non ancora chiesta */
@@ -44851,8 +44874,9 @@ function renderP2P(){
        numero vero di una lista non ancora completa */
     if (mieiTesta) mieiTesta.innerHTML = '';
     /* ...e l'intestazione fa lo stesso: l'immagine resta, il conto
-       aspetta il libro per la stessa ragione */
-    intestaScambiP2P(null);
+       aspetta il libro per la stessa ragione — salvo che il libro
+       abbia gia' detto di no: allora conta le righe che ci sono */
+    intestaScambiP2P(p2pErrore ? mieiRigheP2P() : null);
     if (!p2pErrore) caricaLibroP2P().then(renderP2P, renderP2P)
       .finally(chiudiAttesaP2P);
     return;
@@ -45043,12 +45067,21 @@ function renderP2P(){
      sta comunque nella barra. L'immagine porta lo stesso alt
      dell'intestazione, che qui sotto si toglie: di titoli ce n'e'
      sempre uno. */
+  /* ...e gli annullati, che dalla lista escono da soli (24 set 2026),
+     dallo stato vuoto si raggiungono con un tocco: il conto e' quello
+     del giudice unico dei gruppi */
+  const mieiMorti = mieiTutti.filter(o => gruppoScambioP2P(o) === 'morti').length;
   if (mieiBox) mieiBox.innerHTML = scambiP2P()
     || '<div class="empty scambi-vuoto"><h2 class="scambi-tit">'
      + '<img class="scambi-img" src="/assets/scambi-intestazione.webp" width="682" height="459"'
      + ' alt="I miei scambi" aria-label="I miei scambi" onerror="this.replaceWith(this.alt)"></h2>'
      + '<span class="empty-title">Nessuno scambio in corso</span>'
-     + '<button type="button" class="btn orange" onclick="go(\'p2p\')">Vai al libro ordini</button></div>';
+     + '<button type="button" class="btn orange" onclick="go(\'p2p\')">Vai al libro ordini</button>'
+     + (mieiMorti
+         ? '<div class="hint"><button type="button" class="scopri-link" onclick="mostraAnnullatiP2P()">Vedi '
+           + (mieiMorti === 1 ? 'lo scambio annullato' : 'i ' + mieiMorti + ' scambi annullati') + '</button></div>'
+         : '')
+     + '</div>';
   /* l'intestazione DOPO il corpo, e non con la riga di strumenti: il
      conto deve contare le righe che scambiP2P ha appena adottato o
      pulito, cioe' le stesse card che si vedono */
@@ -45299,7 +45332,7 @@ function renderFiltroMieiP2P(){
       '" data-v="' + esc(g.k) + '" onclick="scegliGruppoMieiP2P(this.dataset.v)">' +
       esc(g.n) + ' <b>' + quanti(g.k) + '</b></button>').join('') +
     '</div>' +
-    '<div class="hint">Senza nessuna scelta si vedono tutti. ' +
+    '<div class="hint">Senza nessuna scelta si vedono tutti tranne gli annullati, che stanno qui. ' +
       '«Tocca a te» sono quelli che aspettano un tuo gesto.</div>' +
     '<div class="foglio-piede">' +
       '<button type="button" class="btn ghost" onclick="azzeraFiltroMieiP2P()">Cancella</button>' +
@@ -45336,6 +45369,8 @@ function ricaricaP2P(){
      richiede pure dopo una risposta gia' avuta. Una fresca sostituisce
      la vecchia; un giro caduto lascia quel che si sapeva. */
   p2pMieiChiesto = false;
+  /* ...e l'archivio del server (24 set 2026) */
+  p2pScambiChiesto = false;
   renderP2P();
 }
 
@@ -47006,11 +47041,25 @@ function recensioneInSospesoP2P(o){
 }
 const P2P_SCOPA_GIORNI = 30;
 const P2P_SCOPA_LAMPO_S = 24 * 3600;
+/* quanto vive la lapide di uno scambio tolto a mano: lo storico del
+   server (30 giorni) piu' un margine — oltre, il server non lo serve piu' */
+const P2P_LAPIDE_TOLTO_S = 40 * 86400;
 /* IL GIUDICE DEL RITIRATO, uno per i tre posti: annullato senza sats
    mai tenuti. Un annullato con la hold in mano (o coi satsNetti gia'
-   detti) e' una RICEVUTA di uno scambio abortito, non un ritiro. */
+   detti) e' una RICEVUTA di uno scambio abortito, non un ritiro.
+   ⚠️ E DEV'ESSERE UN MIO ORDINE MAI PRESO (24 set 2026, dal campo: lo
+   scambio spariva dal tablet di chi l'aveva PRESO). Il giudice di
+   prima non guardava chi fosse: una presa che muore prima della
+   garanzia — l'altra parte che ritira, il quarto d'ora che scade —
+   arriva come `canceled` senza hold e senza sats, cioe' con la stessa
+   forma di un ritiro, e la riga di chi aveva preso spariva con «Ordine
+   ritirato ✓». Per chi ha preso non e' mai un ritiro, e per chi ha
+   pubblicato lo e' solo se nessuno l'aveva preso (`preso`, scritto
+   dalla macchina a stati): il resto e' uno scambio abortito, che resta
+   fra gli annullati. */
 function p2pRitirato(o){
-  return !!o && o.stato === 'annullato' && !o.hold && !(o.satsNetti > 0);
+  return !!o && o.stato === 'annullato' && !o.hold && !(o.satsNetti > 0)
+    && !!o.mio && !o.preso;
 }
 /* LE LAPIDI DEI RITIRATI (set 2026, dal campo: il morto che risorge).
    Il rimotore toglie la riga, ma il LIBRO arriva dai relay — e un
@@ -47076,8 +47125,12 @@ function pulisciScambiP2P(){
     if (!o || !p2pTogliibile(o, adesso).si) continue;
     if (recensioneInSospesoP2P(o)) continue;
     const mosso = o.quando || o.aggiornato || o.creato || 0;
-    const lampo = (o.stato === 'annullato' || o.stato === 'rifiutato')
-      && !o.hold && !(o.satsNetti > 0);
+    /* IL LAMPO E' DEL SOLO RIFIUTATO (24 set 2026): l'annullato di uno
+       scambio preso e' STORICO — non sta piu' nella lista di tutti i
+       giorni (il filtro spento lo nasconde), sta sotto «Annullati», e
+       ci resta i trenta giorni di un concluso. Il ritirato non arriva
+       qui: sparisce subito, come sempre. */
+    const lampo = o.stato === 'rifiutato';
     const soglia = p2pRitirato(o) ? 0
       : lampo ? P2P_SCOPA_LAMPO_S : P2P_SCOPA_GIORNI * 86400;
     if (!mosso || adesso - mosso < soglia) continue;
@@ -47116,6 +47169,11 @@ function togliScambioP2P(id, ev){
     etichetta: 'Togli',
     poi: () => {
       const tutti = ordiniP2P();
+      /* LA LAPIDE ANCHE QUI (24 set 2026): l'archivio del server lo
+         ricorda per trenta giorni, e senza una lapide la riga tolta a
+         mano rinascerebbe al render dopo. Vive quanto lo storico del
+         server, con un margine. */
+      lapideP2P(Object.assign({}, o, {scade: Math.floor(Date.now() / 1000) + P2P_LAPIDE_TOLTO_S}));
       delete tutti[id];
       try { localStorage.setItem(chiaveP2P(MOSTRO_ORDINI_CHIAVE), JSON.stringify(tutti)); } catch(e){}
       if (typeof aggiornaPallinoScambiP2P === 'function') aggiornaPallinoScambiP2P();
@@ -47486,6 +47544,11 @@ let p2pMieiGiro = null;        // la promessa in volo
    `p2pMieiOrdini` a null (il fail-open) ma la bandierina alzata,
    cosi' nessun render lo rilancia da solo. La riabbassa ricaricaP2P. */
 let p2pMieiChiesto = false;
+/* L'ARCHIVIO DEL SERVER (24 set 2026, «I miei scambi su ogni
+   dispositivo»): {id: {...}} come risponde `/api/p2p/scambi`, null =
+   mai arrivato. Lo riempie `chiediScambiServerP2P`, che vive FUORI dal
+   motore (e' una fetch); qui lo legge la sola adozione. */
+let p2pScambiServer = null;
 /* IL GIUDICE E' UNO SOLO, e lo chiamano la card, la porta del gesto e
    la cintura della presa: tre posti che devono dire la stessa cosa. */
 function ordineMioP2P(id){
@@ -48112,6 +48175,13 @@ function avanzaOrdineP2P(ordine, azione, payload){
          che tiene la riga (vedi p2pRitirato) e nessun bottone la apre. */
       if (nuovo === 'pubblicato') delete o.hold;
     } else if (nuovo !== 'pubblicato' && nuovo !== 'annullato') delete o.giroMorto;
+    /* L'ORDINE E' STATO PRESO (24 set 2026): la riga se lo scrive
+       entrando nel giro aperto o in uno scambio attivo, e lo perde
+       tornando nel libro. Lo legge `p2pRitirato`: un annullato di un
+       ordine MAI preso e' un ritiro (sparisce), uno di un ordine preso
+       e' uno scambio abortito (resta nello storico). */
+    if (nuovo === 'pubblicato') delete o.preso;
+    else if (P2P_GIRO_APERTO.indexOf(nuovo) >= 0 || nuovo === 'attivo') o.preso = true;
     /* una mossa vera del coordinatore chiude anche lo stato grezzo */
     delete o.statoGrezzo;
     o.stato = nuovo;
@@ -48168,6 +48238,10 @@ const P2P_TOAST_GIRO_MORTO = {
    il pagamento e poi libera i sats. Mai due gesti insieme. */
 function azioniDisponibili(o){
   if (!o) return '';
+  /* la riga SOLO DA GUARDARE (24 set 2026, l'archivio del server): le
+     chiavi stanno su un altro dispositivo, e un bottone che non puo'
+     firmare niente e' peggio di nessun bottone */
+  if (o.soloVista) return '';
   if (o.lato === 'compro' && o.stato === 'attesa_mia_fattura') return 'fattura';
   /* il pagamento dei sats e' fallito: l'unico gesto e' la fattura nuova */
   if (o.lato === 'compro' && o.stato === 'fattura_nuova')      return 'fattura-nuova';
@@ -48253,6 +48327,10 @@ const P2P_DISPUTABILI = ['attivo', 'pagamento_ritentato', 'euro_inviati'];
    successivo — quello e' uno solo ed e' azioniDisponibili. */
 function azioniSecondarieP2P(o, rec){
   if (!o) return [];
+  /* la riga SOLO DA GUARDARE non ha gesti nemmeno qui (24 set 2026,
+     l'archivio del server): un annullo o una disputa vanno firmati
+     con la chiave dello scambio, che sta su un altro dispositivo */
+  if (o.soloVista) return [];
   const fuori = [];
   if (P2P_ANNULLA_SUBITO.indexOf(o.stato) >= 0) fuori.push('ritira');
   else if (P2P_ANNULLA_INSIEME.indexOf(o.stato) >= 0) fuori.push('annulla');
@@ -50510,6 +50588,12 @@ function renderOrdineP2P(){
       ).join('') +
     '</div></div>' +
     '<div class="trust-note nota-scambio"><span><b>' + esc(st.t) + '</b><br>' + esc(st.d) + '</span></div>' +
+    /* LA RIGA SOLO DA GUARDARE (24 set 2026, l'archivio del server):
+       lo scambio c'e' e si segue, ma le chiavi cifrate con cui si
+       fanno i gesti stanno sul dispositivo dove e' stato aperto */
+    (o.soloVista && P2P_FINALI.indexOf(o.stato) < 0
+      ? '<div class="trust-note"><span>📱</span><span>I messaggi cifrati di questo scambio sono sul dispositivo dove l\'hai aperto: qui lo vedi e lo segui, ma i gesti — la fattura, i sats, il recapito — si fanno da là.</span></div>'
+      : '') +
     (avviso ? '<div class="trust-note" style="background:var(--sats-soft);color:var(--sats-text)">⚠️ <span>' + esc(avviso) + '</span></div>' : '') +
     (bottoni[azione] || '') +
     /* IL RECAPITO STA SOTTO IL SUO GESTO (23 set 2026): subito dopo «Ho
@@ -50709,17 +50793,12 @@ function copiaHoldP2P(){
 }
 
 /* ---- il foglio di dove ricevere i sats ---- */
-/* la fattura CORTA gia' avvisata una volta: rimandata uguale, parte
-   (vedi `P2P_FATTURA_CORTA_SI_MANDA`). Un foglio riaperto riparte da
-   zero: l'avviso si rilegge. */
-let p2pFatturaCortaVista = '';
 function apriIncassoP2P(){
   const id = p2pOrdineAperto;
   const o = ordiniP2P()[id];
   if (!o) return;
   haptic();
   p2pIncassoOrdine = id;
-  p2pFatturaCortaVista = '';
   renderIncassoP2P();
   el('sheetBg').classList.add('open');
   el('p2pIncassoSheet').classList.add('open');
@@ -50777,17 +50856,21 @@ async function fatturaDalWalletP2P(id){
     const b = leggiBolt11(bolt);
     if (!b) throw new Error('ha risposto con una fattura che non si legge');
     if (b.sats !== deve) throw new Error('ha fatto una fattura di ' + fmt(b.sats) + ' sats invece di ' + fmt(deve));
-    /* la durata e' quella del foglio a mano (`vitaMinimaFatturaP2P`:
-       un giorno prima del rilascio, la finestra del coordinatore dopo):
-       al wallet si chiede la vita dell'ordine, ma puo' ignorarla */
-    if (b.scade < Math.floor(Date.now() / 1000) + vitaMinimaFatturaP2P(o))
+    /* IL BLOCCO E' QUELLO DEL COORDINATORE, come nel foglio a mano
+       (`finestraFatturaP2P`): al wallet si chiede la vita dell'ordine,
+       ma puo' ignorarla — una piu' corta del consiglio parte lo
+       stesso, e lo si dice (24 set 2026, vedi `vitaMinimaFatturaP2P`) */
+    const adessoW = Math.floor(Date.now() / 1000);
+    if (b.scade < adessoW + finestraFatturaP2P())
       throw new Error('ha fatto una fattura che scade troppo presto');
+    const cortaW = b.scade < adessoW + vitaMinimaFatturaP2P(o);
     if (p2pIncassoOrdine !== id) return false;   /* il foglio e' gia' passato ad altro */
     await chiamataOrdineP2P(o, 'add-invoice', {payment_request: [null, bolt, null]});
     ricordaFatturaP2P(id, b.scade);
     chiudiFoglioP2P('p2pIncassoSheet');
     p2pIncassoOrdine = '';
-    toast('⚡ Fattura fatta dal wallet e inviata ✅');
+    if (cortaW) toast('⚡ ' + avvisoFatturaCortaP2P(b.scade, adessoW), 8000);
+    else toast('⚡ Fattura fatta dal wallet e inviata ✅');
     return true;
   } catch(e){
     dillo('Il wallet non ha dato la fattura (' + ((e && e.message) || 'errore') + '). Puoi incollarne una qui, o dare il tuo indirizzo Lightning.');
@@ -50906,19 +50989,33 @@ function finestraFatturaP2P(){
    (o della porta di riserva) si paga APPENA ARRIVA, e li' basta la
    finestra del coordinatore — chiedere un giorno a chi sta aspettando
    i suoi sats sarebbe un ostacolo senza una ragione.
+   ⚠️ DAL 24 SET 2026 E' UN CONSIGLIO, NON UN BLOCCO (decisione di
+   Andrea, dal campo: molti wallet — SatsMobiBot fra questi — fanno
+   fatture da sessanta minuti e non fanno scegliere altro, e il secondo
+   tocco non lo trovava nessuno). Il solo blocco che resta e' quello
+   del coordinatore (`finestraFatturaP2P`, che lui applica comunque:
+   `validate_bolt11_invoice`, letto su v0.18.8, e' l'unico posto in cui
+   una scadenza si guarda — al pagamento guarda solo che non sia GIA'
+   scaduta). Una fattura piu' corta di un giorno PARTE, e chi l'ha data
+   lo legge: se scade prima del rilascio il pagamento non passa e il
+   coordinatore ne chiede una nuova (`fattura_nuova`, patch 0007),
+   che e' un'attesa e non una perdita.
    PURA. */
 const P2P_FATTURA_VITA_MIN_S = 23 * 3600;
-/* UNA FATTURA CORTA SI PUO' MANDARE LO STESSO, al secondo tocco e
-   sapendolo: ci sono wallet che la scadenza non la fanno scegliere, e
-   se in piu' il loro indirizzo non passa la verifica il blocco secco
-   sarebbe un vicolo cieco. Il prezzo di una fattura scaduta al
-   rilascio e' un'attesa, non una perdita: il coordinatore ne chiede
-   una nuova (`fattura_nuova`). A `false` il blocco torna secco. */
-let P2P_FATTURA_CORTA_SI_MANDA = true;
 function vitaMinimaFatturaP2P(o){
   const finestra = finestraFatturaP2P();
   const dopo = !!o && P2P_DOPO_RILASCIO.indexOf(o.stato) >= 0;
   return dopo ? finestra : Math.max(finestra, P2P_FATTURA_VITA_MIN_S);
+}
+/* PURA: la frase che accompagna una fattura piu' corta del consiglio,
+   che parte lo stesso (24 set 2026). Dice quanto vive e cosa succede
+   se non basta: mai un numero inventato, e mai «arriverebbe scaduta»
+   — puo' bastare, e spesso basta. */
+function avvisoFatturaCortaP2P(scade, adesso){
+  const min = Math.max(1, Math.floor((Number(scade) - Number(adesso)) / 60));
+  const fra = min >= 120 ? Math.floor(min / 60) + ' ore' : min + ' minuti';
+  return 'Inviato ✅ La fattura scade fra ' + fra
+    + ': se chi vende libera i sats dopo, il pagamento non passa e te ne chiediamo una nuova.';
 }
 /* PURA: il PERCHE' di un payout fallito, quando e' un FATTO. Il
    coordinatore il motivo non lo dice, ma la scadenza della fattura che
@@ -50988,9 +51085,11 @@ function renderIncassoP2P(){
      (fallito/riserva) la fattura si paga appena arriva: li' resta la
      finestra del coordinatore, e «un giorno» non si chiede. */
   const dopo = fallito || riserva;
+  /* DAL 24 SET 2026 «un giorno» E' UN CONSIGLIO: una fattura piu' corta
+     parte, e la frase dice cosa succede se non basta */
   const durata = dopo
     ? 'valida più di ' + vale
-    : '<b>fai una fattura che duri almeno un giorno</b>: i sats ti arrivano quando chi vende li libera, e possono passare ore';
+    : 'valida più di ' + vale + '. <b>Meglio se dura almeno un giorno</b>: i sats ti arrivano quando chi vende li libera, e possono passare ore. Una più corta va bene lo stesso, ma se scade prima te ne chiediamo una nuova';
   box.innerHTML =
     (fallito
       ? '<div class="hint" style="color:var(--danger);font-weight:800">⚠️ Il pagamento dei tuoi sats non è riuscito.</div>'
@@ -51069,6 +51168,7 @@ async function inviaIncassoP2P(){
   if (!testo) { dillo('Serve un indirizzo o una richiesta di pagamento.'); return; }
   const bolt = /^ln[a-z0-9]+$/i.test(testo);
   let scadeData = 0;   /* quando scade la fattura che parte; 0 = indirizzo */
+  let corta = false;   /* piu' corta del consiglio: parte, e lo si dice */
   if (bolt) {
     const b = leggiBolt11(testo);
     if (!b) { dillo('Questa richiesta di pagamento non si legge: controlla di averla copiata tutta.'); return; }
@@ -51090,30 +51190,22 @@ async function inviaIncassoP2P(){
     const adesso = Math.floor(Date.now() / 1000);
     if (b.scade < adesso + finestra) {
       const resta = Math.floor((b.scade - adesso) / 60);
+      /* «QUELLE DA UN'ORA ESATTA» SI DICE SOLO SE E' VERO (24 set 2026):
+         la finestra la decide il nodo, e con una piu' corta di un'ora
+         quella frase sarebbe falsa */
       dillo((resta > 0 ? 'Questa richiesta scade fra ' + resta + ' minuti' : 'Questa richiesta è già scaduta')
         + ', e viene accettata solo se vale ancora più di ' + Math.ceil(finestra / 60)
-        + ' minuti quando arriva: quelle da un\'ora esatta non bastano. Rifalla con una scadenza più lunga, un giorno va benissimo: molti wallet la fanno scegliere nelle opzioni della richiesta, alla voce «Scadenza» (o «Expiry»).');
+        + ' minuti quando arriva' + (finestra >= 3600 ? ': quelle da un\'ora esatta non bastano' : '')
+        + '. Rifalla con una scadenza più lunga: molti wallet la fanno scegliere nelle opzioni della richiesta, alla voce «Scadenza» (o «Expiry»).');
       return;
     }
-    /* ...E DEVE COPRIRE LO SCAMBIO (21 set 2026): il coordinatore la
-       accetterebbe, ma la paga al RILASCIO, che puo' arrivare ore dopo
-       — vedi `vitaMinimaFatturaP2P`. Questa regola e' NOSTRA, quindi
-       ha un'uscita: la stessa fattura mandata una seconda volta parte,
-       e chi la manda ha letto cosa rischia (un'attesa, non i sats). */
+    /* ...E MEGLIO SE COPRE LO SCAMBIO (21 set 2026, dal 24 set un
+       consiglio): il coordinatore la accetta, ma la paga al RILASCIO,
+       che puo' arrivare ore dopo — vedi `vitaMinimaFatturaP2P`. Una
+       piu' corta PARTE, e chi la manda legge cosa puo' succedere. */
     const giorno = vitaMinimaFatturaP2P(o);
     scadeData = b.scade;
-    if (b.scade < adesso + giorno
-        && !(P2P_FATTURA_CORTA_SI_MANDA && p2pFatturaCortaVista === testo)) {
-      p2pFatturaCortaVista = testo;
-      const ore = Math.floor((b.scade - adesso) / 3600);
-      dillo('Questa fattura scade fra ' + (ore >= 2 ? ore + ' ore' : 'meno di due ore')
-        + ', ma i sats ti arrivano quando chi vende li libera, e possono passare ore: arriverebbe scaduta. '
-        + 'Fai una fattura che duri almeno un giorno — molti wallet la fanno scegliere alla voce «Scadenza» (o «Expiry») — oppure usa il tuo indirizzo Lightning, che non scade.'
-        + (P2P_FATTURA_CORTA_SI_MANDA
-            ? ' Se il tuo wallet non le fa più lunghe, tocca di nuovo «Invia»: la mandiamo lo stesso, e se scade prima del rilascio te ne chiederemo una nuova.'
-            : ''));
-      return;
-    }
+    corta = b.scade < adesso + giorno;
   } else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(testo)) {
     dillo('Non sembra un indirizzo Lightning né una richiesta di pagamento.');
     return;
@@ -51127,10 +51219,11 @@ async function inviaIncassoP2P(){
        nessun wallet di terzi deve rispondere al nostro browser */
     await chiamataOrdineP2P(o, 'add-invoice', {payment_request: [null, testo, null]});
     ricordaFatturaP2P(o.id, scadeData);
-    p2pFatturaCortaVista = '';
     chiudiFoglioP2P('p2pIncassoSheet');
     p2pIncassoOrdine = '';
-    toast('Inviato ✅');
+    /* la fattura corta e' partita: lo si dice, col tempo che ha */
+    if (corta) toast(avvisoFatturaCortaP2P(scadeData, Math.floor(Date.now() / 1000)), 8000);
+    else toast('Inviato ✅');
   } catch(e) {
     const perche = ragioneIncassoP2P(e, testo);
     dillo(perche);
@@ -55125,9 +55218,23 @@ let p2pMieiFiltroBozza = null;
    se uno scambio passa. Il secondo e' l'unico posto dove vive la
    regola, e si prova senza browser. */
 function filtroAccesoMieiP2P(f){ return !!(f && f.length); }
+/* ⚠️ COL FILTRO SPENTO GLI ANNULLATI NON SI VEDONO (24 set 2026,
+   richiesta di Andrea): uno scambio annullato — da chi compra, da chi
+   vende, o scaduto — esce da solo dalla lista di tutti i giorni, senza
+   che nessuno lo chiuda a mano, e resta nello storico: la pillola
+   «Annullati» del filtro, dove il conto lo dice. Il giudice del gruppo
+   resta uno (`gruppoScambioP2P`). */
 function passaStatoMieiP2P(o, f){
-  if (!f || !f.length) return true;
+  if (!f || !f.length) return gruppoScambioP2P(o) !== 'morti';
   return f.indexOf(gruppoScambioP2P(o)) >= 0;
+}
+/* la scorciatoia dello stato vuoto: «vedi gli annullati» accende la
+   sola pillola dello storico */
+function mostraAnnullatiP2P(){
+  haptic();
+  p2pMieiFiltro = ['morti'];
+  p2pMieiFiltroBozza = null;
+  renderP2P();
 }
 /* I QUATTRO ORDINI DEI PROPRI SCAMBI: il piu' recente (di casa), i
    «da fare» prima, e l'importo nei due versi.
@@ -55486,6 +55593,11 @@ function rigaScambioP2P(o){
              + esc(met) + '">'
              + (senzaNomi ? '' : iconaMetodiP2P(metodi))
              + metodi.map(m => marchioMetodoP2P(m)).join(', ') + '</div>' : '')
+    /* LA RIGA SOLO DA GUARDARE LO DICE (24 set 2026, l'archivio del
+       server): le chiavi stanno dove lo scambio e' stato aperto */
+    + (o.soloVista && !finita
+        ? '<div class="hint p2p-altrove">📱 Aperto su un altro dispositivo: qui lo segui, i gesti si fanno da là</div>'
+        : '')
     /* IL PIEDE E' RIMASTO ALLA SOLA ✕: «tocca a te» e' salito nella
        casella, e le due non potevano comunque coesistere — l'una vive
        sugli stati vivi, l'altra sui finali. Senza di lei la riga non
@@ -55757,6 +55869,172 @@ function adottaOrdiniAltroveP2P(locali){
   }
   return nati;
 }
+/* ═══ L'ARCHIVIO DEL SERVER: I MIEI SCAMBI SU OGNI DISPOSITIVO ═══════
+   (24 set 2026, dal campo: Andrea pubblica dall'app Android e Alan
+   prende dal tablet; nella mini app Telegram dello STESSO account di
+   Andrea lo scambio non c'era, e dal tablet di Alan e' anche sparito.)
+   LA RIGA DI UNO SCAMBIO VIVE NEL localStorage DEL DISPOSITIVO CHE
+   L'HA APERTO, e da un secondo dispositivo l'adozione qui sopra sa
+   ricostruire solo cio' che il libro pubblico descrive: un ordine
+   ancora in vetrina. Di uno scambio PRESO il 38383 non dice piu'
+   niente di utile, e la restore-session da' id, indice e uno stato —
+   non il lato, non la cifra, non chi c'e' dall'altra parte. Era il
+   confine dichiarato («quel che nel libro non c'e' resta fuori»), e
+   questo e' il cantiere che lo apre.
+   IL SERVER SA TUTTO: dalla patch 0007 mostrod gli racconta ogni
+   passo e gli dice le due parti, e il libro gli ha gia' insegnato
+   lato, cifra e metodi. `/api/p2p/scambi` lo restituisce (giudice
+   `_scambi_p2p`, stato gia' tradotto nel NOSTRO vocabolario da
+   `_stato_scambio_p2p`), e qui si RICOSTRUISCE la riga vera — come
+   fa l'adozione dal libro — cosi' lo scambio torna un cittadino
+   normale: pagina apribile, ascolto sulla sua chiave, gesti.
+   LA CHIAVE SI RITROVA IN DUE MODI, e nessuno dei due e' un segreto
+   che viaggia: dall'indice della restore (la stessa identita' su
+   tutti i dispositivi: il mazzo 'conto' nasce dal seme del server), o
+   — quando la restore non ha risposto — dalla trade key PUBBLICA che
+   mostrod ha detto al server (`chiave_mia`), che si confronta con le
+   chiavi derivate dal mazzo fino al pavimento dell'indice
+   (`indiceDaChiaveP2P`): stessa formula con cui l'ordine e' nato, e
+   se combacia e' un fatto. Quando combacia la riga e' GOVERNABILE.
+   QUANDO NON COMBACIA — un mazzo di dispositivo nato prima del seme, o
+   un'altra identita' — la riga nasce lo stesso, ma SOLO DA GUARDARE
+   (`soloVista`): stato, cifre, momenti e controparte si vedono, i
+   gesti no (`azioniDisponibili` la salta), e la pagina dice dove
+   stanno le chiavi. Appena l'indice arriva, si promuove.
+   LE RIGHE GIA' LOCALI SI MUOVONO SOLO IN AVANTI, con la stessa scala
+   della ripresa dalla restore (`P2P_RIPRESA_PASSO`, una volta per
+   fotografia): lo stato del server e' la cronaca di mostrod, quindi
+   vale quanto la restore — e in piu' sa distinguere il pagamento non
+   passato. E gli si prende QUEL CHE MANCA: la controparte, le cifre,
+   il fatto che l'ordine e' stato preso.
+   NON NASCE: quel che e' stato tolto a mano o ritirato (le lapidi), un
+   ritiro di un mio ordine mai preso (ritirato = sparito), e uno
+   scambio di cui il server non sa dire lo stato (mai un default).
+   SINCRONA E SENZA RETE, come la gemella: deriva chiavi e scrive righe. */
+const P2P_INDICE_CERCA_MAX = 500;
+/* si cerca ALMENO fino a qui, anche con un pavimento piu' basso: il
+   pavimento dell'indice arriva dal server DOPO che l'altro dispositivo
+   l'ha alzato, e un dispositivo aperto prima lo legge stantio — costa
+   cinquanta derivazioni, cioe' niente */
+const P2P_INDICE_CERCA_MIN = 50;
+function indiceDaChiaveP2P(mz, pub, max){
+  if (!mz || !mz.sk || !pub || !window.NostrTools) return 0;
+  const fino = Math.min(Math.max(Number(max) || 0, 0), P2P_INDICE_CERCA_MAX);
+  for (let i = 1; i <= fino; i++) {
+    try { if (chiaveScambio(mz.sk, i).pub === pub) return i; } catch(e) {}
+  }
+  return 0;
+}
+/* PURA: la riga nuova dai dati del server; `tk` e' la trade key
+   ritrovata (null = solo da guardare) */
+function rigaDaServerP2P(id, s, tk, stato, adesso){
+  const lato = s.lato === 'vendo' ? 'vendo' : 'compro';
+  const o = {
+    id: String(id), lato: lato,
+    indice: tk ? (tk.indice | 0) : 0, pubTrade: tk ? tk.pub : '',
+    mio: !!s.mio, stato: stato,
+    euro: Number(s.euro) || 0, euroMax: 0,
+    sats: Math.max(0, Math.floor(Number(s.sats) || 0)),
+    satsNetti: Math.max(0, Math.floor(Number(s.sats_ordine) || 0)),
+    importoScelto: 0,
+    metodi: Array.isArray(s.metodi) ? s.metodi.map(String) : [],
+    premium: 0,
+    peer: (s.chiave_peer && s.chiave_peer !== (tk ? tk.pub : '')) ? String(s.chiave_peer) : '',
+    hold: null, contattato: true, cantDo: '', errore: '', votabile: false,
+    creato: Math.floor(Number(s.creato) || 0) || adesso,
+    aggiornato: adesso,
+    daServer: true
+  };
+  const q = Math.floor(Number(s.quando) || 0);
+  if (q > 0) { o.quando = q; o.ultimaMossa = q; }
+  if (Number(s.sats_miei) > 0) o.satsMiei = Math.floor(Number(s.sats_miei));
+  if (s.preso) o.preso = true;
+  if (!tk) o.soloVista = true;
+  if (s.payout_fallito && lato === 'vendo' && stato === 'rilasciato') o.payoutFallito = true;
+  return o;
+}
+/* la trade key di QUESTO ordine, se questo mazzo la sa derivare: prima
+   l'indice della restore (della mia identita'), poi la chiave detta dal
+   server. Con la chiave in mano la derivata DEVE combaciare: una che
+   non combacia e' un'altra identita', e la riga resta da guardare. */
+function chiaveScambioDaServerP2P(mz, id, s){
+  if (!mz || !window.NostrTools) return null;
+  const voce = p2pMieiOrdini && p2pMieiOrdini[id];
+  let indice = (voce && (!voce.identita || voce.identita === mz.pub)) ? (voce.indice | 0) : 0;
+  if (!(indice > 0) && s.chiave_mia)
+    indice = indiceDaChiaveP2P(mz, s.chiave_mia, Math.max(mz.indice | 0, P2P_INDICE_CERCA_MIN));
+  if (!(indice > 0)) return null;
+  let tk = null;
+  try { tk = chiaveScambio(mz.sk, indice); } catch(e) { return null; }
+  if (s.chiave_mia && tk.pub !== s.chiave_mia) return null;
+  return {sk: tk.sk, pub: tk.pub, indice: indice};
+}
+function adottaScambiServerP2P(locali){
+  if (!p2pScambiServer) return 0;
+  const mz = mazzoMostro();
+  const adesso = Math.floor(Date.now() / 1000);
+  let nati = 0;
+  for (const id in p2pScambiServer) {
+    const s = p2pScambiServer[id];
+    if (!s || typeof s !== 'object') continue;
+    const gia = locali[id];
+    const tk = chiaveScambioDaServerP2P(mz, id, s);
+    if (gia) {
+      let mosso = false;
+      /* QUEL CHE MANCA si prende sempre: e' lo stesso ordine */
+      if (!gia.peer && s.chiave_peer && s.chiave_peer !== gia.pubTrade) { gia.peer = String(s.chiave_peer); mosso = true; }
+      if (!(gia.satsNetti > 0) && Number(s.sats_ordine) > 0) { gia.satsNetti = Math.floor(Number(s.sats_ordine)); mosso = true; }
+      if (!(gia.satsMiei > 0) && Number(s.sats_miei) > 0) { gia.satsMiei = Math.floor(Number(s.sats_miei)); mosso = true; }
+      if (!(gia.euro > 0) && Number(s.euro) > 0) { gia.euro = Number(s.euro); mosso = true; }
+      if (!(gia.metodi && gia.metodi.length) && Array.isArray(s.metodi) && s.metodi.length) { gia.metodi = s.metodi.map(String); mosso = true; }
+      if (s.preso && !gia.preso) { gia.preso = true; mosso = true; }
+      /* la riga solo da guardare si PROMUOVE appena la chiave si ritrova */
+      if (gia.soloVista && tk) {
+        gia.pubTrade = tk.pub; gia.indice = tk.indice; delete gia.soloVista; mosso = true;
+        diarioP2P('archivio ' + String(id).slice(0, 8) + ': chiave ritrovata (indice ' + tk.indice + '), la riga torna governabile');
+      }
+      /* LO STATO, in avanti e una volta per fotografia */
+      if (!s.ripreso) {
+        s.ripreso = true;
+        const da = P2P_RIPRESA_PASSO[gia.stato], a = P2P_RIPRESA_PASSO[s.stato];
+        if (s.stato && a > da && P2P_FINALI.indexOf(gia.stato) < 0) {
+          diarioP2P('archivio ' + String(id).slice(0, 8) + ': il server dice ' + s.stato + ', la riga e\' a ' + gia.stato + ' → ' + s.stato);
+          gia.stato = s.stato; gia.aggiornato = adesso;
+          gia.cantDo = ''; gia.errore = ''; gia.nonPartito = false;
+          delete gia.giroMorto; delete gia.statoGrezzo;
+          const q = Math.floor(Number(s.quando) || 0);
+          if (q > (Number(gia.ultimaMossa) || 0)) gia.ultimaMossa = q;
+          mosso = true;
+        }
+        /* il pagamento a chi compra, a chi vende: lo stesso giudice della rotta dei pagamenti */
+        if (gia.lato === 'vendo' && gia.stato === 'rilasciato' && !!gia.payoutFallito !== !!s.payout_fallito) {
+          if (s.payout_fallito) gia.payoutFallito = true; else delete gia.payoutFallito;
+          mosso = true;
+        }
+      }
+      if (mosso) { scriviOrdineP2P(gia); nati++; }
+      continue;
+    }
+    /* LA NASCITA: mai su una lapide, mai un mio ritiro, mai senza stato */
+    if (lapidataP2P(id)) continue;
+    let stato = s.stato || '';
+    if (!stato) {
+      const voce = p2pMieiOrdini && p2pMieiOrdini[id];
+      stato = voce ? statoDaRestoreP2P({lato: s.lato}, voce.stato) : '';
+    }
+    if (!stato || !STATI_P2P[stato]) {
+      diarioP2P('archivio ' + String(id).slice(0, 8) + ': il server non sa dire lo stato, non nasce');
+      continue;
+    }
+    if (s.mio && !s.preso && (stato === 'annullato' || stato === 'rifiutato')) continue;
+    const o = rigaDaServerP2P(id, s, tk, stato, adesso);
+    diarioP2P('archivio ' + String(id).slice(0, 8) + ': nata dal server a ' + stato
+              + (tk ? ' con la chiave (indice ' + tk.indice + ')' : ', solo da guardare'));
+    scriviOrdineP2P(o);
+    nati++;
+  }
+  return nati;
+}
 /* ---- «I tuoi scambi», in cima al libro ----
    SINCRONA apposta: renderP2P la incolla dentro l'innerHTML, e un
    await qui vorrebbe dire una pagina che si riscrive sotto le dita.
@@ -55767,6 +56045,8 @@ function scambiP2P(){
   /* PRIMA l'adozione, poi la lettura: le righe appena ricostruite
      devono stare in QUESTO render, non nel prossimo */
   adottaOrdiniAltroveP2P(ordiniP2P());
+  /* ...e poi l'ARCHIVIO DEL SERVER, che sa anche degli scambi presi */
+  adottaScambiServerP2P(ordiniP2P());
   /* L'ORDINE NON E' PIU' CABLATO QUI (set 2026): lo dice la pillola
      «Ordina», e il «piu' recenti» di sempre e' rimasto il suo
      predefinito — chi non tocca niente vede quel che vedeva ieri. */
@@ -55803,6 +56083,11 @@ function scambiP2P(){
      di Andrea): in questa pagina il simbolo e' quello dell'intestazione,
      che qui sopra c'e' — gli scambi ci sono, e' il filtro a nasconderli.
      Decorative (alt vuoto): il titolo della pagina lo porta gia' lei. */
+  /* A FILTRO SPENTO E SOLI ANNULLATI si torna allo stato vuoto di
+     sempre (24 set 2026): gli annullati escono da soli dalla lista, e
+     un «nessuno passa il filtro» su un filtro che non c'e' sarebbe una
+     bugia — la strada per vederli la mette lo stato vuoto stesso. */
+  if (!mostrati.length && !filtroAccesoMieiP2P(p2pMieiFiltro)) return '';
   if (!mostrati.length)
     return '<div class="empty"><img class="scambi-img scambi-mini" src="/assets/scambi-intestazione.webp" width="682" height="459" alt="" onerror="this.remove()">'
       + '<span class="empty-title">Nessuno scambio col tuo filtro</span>'
@@ -56308,6 +56593,60 @@ async function parteRiconosciutaP2P(o){
   } catch(e) { return 'ignoto'; }
 }
 /* ============ fine del PayCode che chiede ============ */
+
+/* ============ L'ARCHIVIO DEL SERVER: I MIEI SCAMBI SU OGNI DISPOSITIVO (24 set 2026) =========
+   La domanda di un dispositivo che i propri scambi non li ha mai
+   visti: «quali sono, e a che punto stanno?». Il giudice di la' e'
+   `_scambi_p2p`; qui si chiede e si posa la fotografia in
+   `p2pScambiServer`, e a ricostruire le righe e' l'adozione nel motore
+   (`adottaScambiServerP2P`), sincrona, al render.
+   UN BLOCCO SUO, fuori dal motore, per la ragione delle sorelle: il
+   motore non ha dentro nessuna fetch (c'e' la sentinella). Le regole
+   sono le loro: il cancello dell'anonimo, POST, e NESSUN CORPO — non
+   si puo' chiedere degli scambi di un altro, non esiste la sintassi.
+   UNA DOMANDA ALLA VOLTA, e il battito la rifa' ogni
+   `P2P_SCAMBI_OGNI_MS` solo con una vista del P2P aperta e visibile:
+   la fotografia nuova prende il posto della vecchia, coi suoi timbri
+   «ripreso» — e' quel che porta il passo nuovo a chi ha la pagina
+   aperta su un dispositivo che i messaggi non li riceve. */
+const P2P_SCAMBI_OGNI_MS = 120000;
+let p2pScambiChiesto = false;
+let p2pScambiGiro = null;
+let p2pScambiBattito = 0;
+async function chiediScambiServerP2P(){
+  if (DEMO || VETRINA || !myTgId) return false;
+  if (p2pScambiGiro) return p2pScambiGiro;
+  p2pScambiGiro = (async () => {
+    try {
+      const r = await fetch(`${API_BASE}/p2p/scambi`, {method: 'POST',
+        headers: {'X-Tg-Init-Data': authHdr()}});
+      if (!r.ok) return false;
+      const d = await r.json();
+      const lista = (d && d.scambi && typeof d.scambi === 'object' && !Array.isArray(d.scambi))
+        ? d.scambi : null;
+      if (!lista) return false;
+      p2pScambiServer = lista;
+      diarioP2P('archivio: ' + Object.keys(lista).length + ' scambi dal server');
+      return true;
+    } catch(e) { return false; }
+    finally { p2pScambiGiro = null; }
+  })();
+  return p2pScambiGiro;
+}
+function battitoScambiP2P(){
+  const adesso = Date.now();
+  if (adesso - p2pScambiBattito < P2P_SCAMBI_OGNI_MS) return;
+  p2pScambiBattito = adesso;
+  if (document.visibilityState === 'hidden') return;
+  const v = vistaAttivaP2P();
+  if (v !== 'view-p2p' && v !== 'view-p2pmiei' && v !== 'view-p2pordine') return;
+  chiediScambiServerP2P().then(ok => {
+    if (!ok) return;
+    renderP2P();
+    if (p2pOrdineAperto && vistaAttivaP2P() === 'view-p2pordine') renderOrdineP2P();
+  }).catch(() => {});
+}
+/* ============ fine dell'archivio del server ============ */
 
 /* Racconta un ordine appena pubblicato nel canale «Barattolo Vetrina»,
    come per un annuncio normale (chiesto da Andrea, set 2026). STA QUI

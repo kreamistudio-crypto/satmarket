@@ -26011,6 +26011,42 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `in-progress` non muovono, uno stato fuori tabella nemmeno — lascia
   una riga in console e la parola GREZZA sulla riga (`statoGrezzo`,
   che statoTestoP2P mostra senza interpretarla), mai un default.
+  L'ARCHIVIO DEL SERVER: I MIEI SCAMBI SU OGNI DISPOSITIVO (24 set
+  2026). La riga vive nel `localStorage` del dispositivo che l'ha
+  aperto; da un altro, il libro sa ricostruire solo un ordine ancora
+  in vetrina. `POST /api/p2p/scambi` (sessione, nessun corpo, nessun
+  gate sulla leva, `no-store`; giudice `_scambi_p2p`) serve tutti gli
+  scambi di cui chi chiede è una delle due parti dette da mostrod
+  (`p2p_scambi`) o che ha pubblicato (`p2p_ordini`): lato, `mio`,
+  `preso`, euro, sats, metodi, `stato` nel vocabolario del client
+  (`_stato_scambio_p2p`: l'ultimo momento dell'ultimo giro, a parità
+  d'ora `_PESO_MOMENTO_P2P`), `quando`, i tre importi, la cronaca e le
+  due trade key — che `_registra_evento_p2p` scrive in `p2p_scambi`
+  (`chiave_compratore`, `chiave_venditore`). I finali per
+  `P2P_STORICO_GIORNI` (30). Nel client `chiediScambiServerP2P`
+  (blocco suo fuori dal motore, una fetch, una volta per sessione +
+  «Riprova» + `battitoScambiP2P` ogni `P2P_SCAMBI_OGNI_MS`) posa la
+  fotografia in `p2pScambiServer`; `adottaScambiServerP2P` (motore,
+  dopo `adottaOrdiniAltroveP2P`) ricostruisce la riga: la chiave
+  dall'indice della restore della mia identità o da
+  `indiceDaChiaveP2P` (le derivate del mazzo fino al pavimento, e
+  almeno `P2P_INDICE_CERCA_MIN` = 50) confrontata con `chiave_mia` —
+  combacia, riga governabile; no, riga `soloVista` (niente gesti in
+  `azioniDisponibili`/`azioniSecondarieP2P`, la card e la pagina lo
+  dicono, si promuove quando l'indice arriva). Le righe locali si
+  muovono solo in avanti (`P2P_RIPRESA_PASSO`, `ripreso` sulla
+  fotografia) e prendono quel che manca. Non nasce su una lapide, per
+  un mio ritiro mai preso, senza uno stato. Con `p2pErrore` la
+  striscia si disegna lo stesso. `p2pRitirato` = annullato senza sats,
+  MIO e mai preso (`preso` dalla macchina a stati); a filtro spento
+  `passaStatoMieiP2P` nasconde «Annullati» (`mostraAnnullatiP2P` dallo
+  stato vuoto); la scopa lampo è del solo `rifiutato`; la ✕ lascia una
+  lapide di `P2P_LAPIDE_TOLTO_S`. Le fatture di chi compra: il blocco
+  resta la sola finestra del coordinatore (`finestraFatturaP2P`, dal
+  38385); le 23 ore (`vitaMinimaFatturaP2P`) sono un consiglio, la
+  fattura più corta parte col toast di `avvisoFatturaCortaP2P`.
+  Verbale: CANTIERI, «I miei scambi su ogni dispositivo, le fatture da
+  un'ora e gli annullati che escono da soli».
   IL PASSATO NON SI RIAPPLICA: `mostroArriva` mette sull'oggetto del
   messaggio l'ora dell'evento (`quando`, il `created_at` firmato dal
   coordinatore) e la riga tiene quella dell'ultima MOSSA applicata

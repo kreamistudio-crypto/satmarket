@@ -31897,3 +31897,168 @@ indietro +0.
 numeri veri di un negozio, e il 📊 del pannello sotto il dito. Dopo
 qualche giorno, che le visite di un negozio conosciuto abbiano l'ordine
 di grandezza che ci si aspetta.
+
+## I miei scambi su ogni dispositivo, le fatture da un'ora e gli annullati che escono da soli (24 set 2026)
+
+**DAL CAMPO.** Andrea pubblica un ordine P2P dall'app Android (TWA,
+stesso account); Alan lo prende dalla mini app Telegram sul tablet.
+Andrea lo vede nell'app ma NON nella mini app Telegram dello stesso
+account; Alan lo vedeva sul tablet, poi non più nemmeno lì, e mai sul
+telefono con lo stesso account.
+
+**DOVE VIVE LO STATO DI UNO SCAMBIO, e perché non viaggiava.** La riga
+(`barattolo_mostro_ordini@<tg_id>`) vive nel `localStorage` del
+dispositivo che l'ha aperto — la WebView di Telegram, il browser
+dell'app Android e Chrome sono TRE origini con tre `localStorage`. Il
+CloudStorage di Telegram porta in giro il solo MAZZO (le chiavi), non
+le righe, e fuori da Telegram non esiste. Il mazzo di chi entra da
+Telegram è comunque lo stesso ovunque (nasce dal seme del server,
+origine 'conto'), quindi le chiavi usa-e-getta si RIDERIVANO su ogni
+dispositivo: a mancare era la riga. Da un secondo dispositivo la
+striscia sapeva ricostruire SOLO quel che il libro pubblico descrive —
+un ordine ancora in vetrina (`adottaOrdiniAltroveP2P`, «quel che nel
+libro non c'è resta fuori», il confine dichiarato il 9 e il 17 set):
+di uno scambio PRESO il 38383 non dice più niente di utile, e la
+restore-session dà id, indice e stato, non il lato né la cifra né chi
+c'è dall'altra parte. Nessuno dei cantieri recenti (A1 072a66c, gli
+avvisi in ordine, il PayCode riconosciuto, «Sats in pagamento») aveva
+toccato quel percorso: lo aspettava «la ripresa piena delle fasi
+5-6-7». **PERCHÉ SPARIVA DAL TABLET DI ALAN:** una presa che muore
+prima della garanzia — l'altra parte che ritira, il quarto d'ora che
+scade — arriva come `canceled` senza hold e senza sats, cioè con la
+stessa forma di un RITIRO, e `p2pRitirato` non guardava chi fosse: la
+riga di chi aveva PRESO spariva con «Ordine ritirato ✓» (la regola del
+«ritirato = sparito» pensata per chi ritira un proprio ordine mai
+preso). Non ho il diario del tablet: è il solo meccanismo del codice
+che toglie una riga di chi ha preso, e il caso combacia.
+
+**LA CURA 1 — L'ARCHIVIO DEL SERVER.** Il server sa tutto dalla patch
+0007: ogni passo (`p2p_momenti`), le due parti (`p2p_scambi`), lato,
+cifra e metodi dal libro (`p2p_ordini`). Nuova rotta `POST
+/api/p2p/scambi` (sessione, nessun corpo, nessun gate sulla leva,
+`no-store`): per ogni ordine di cui chi chiede è una delle due parti
+dette da mostrod, o che ha pubblicato, torna lato, `mio`, `preso`,
+euro, sats, metodi, `stato` già nel vocabolario del client
+(`_stato_scambio_p2p`, puro: dall'ultimo momento dell'ultimo giro, a
+parità d'ora vince il peso — la coppia «garanzia pagata + fattura
+chiesta» la decide la fattura chiesta), l'ora di mostrod, i tre
+importi, la cronaca intera e LE DUE TRADE KEY, che da oggi
+`_registra_evento_p2p` scrive in `p2p_scambi` (colonne
+`chiave_compratore`/`chiave_venditore`: pubbliche, usa-e-getta, già
+note a mostrod e ai relay). I finali restano `P2P_STORICO_GIORNI` (30).
+Nel client `chiediScambiServerP2P` (blocco suo fuori dal motore, una
+fetch, una volta per sessione + «Riprova» + il battito ogni
+`P2P_SCAMBI_OGNI_MS` a vista P2P visibile) posa la fotografia in
+`p2pScambiServer`, e `adottaScambiServerP2P` — sincrona, nel motore,
+dopo l'adozione dal libro — RICOSTRUISCE la riga vera. La chiave si
+ritrova in due modi, nessuno dei quali fa viaggiare un segreto: dall'
+indice della restore della mia identità, oppure dalla chiave pubblica
+detta dal server confrontata con le derivate del mazzo fino al
+pavimento e comunque almeno fino a 50 (`indiceDaChiaveP2P`,
+`P2P_INDICE_CERCA_MIN`: il pavimento arriva dal server DOPO che l'altro
+dispositivo l'ha alzato). Combacia → riga GOVERNABILE (pagina, ascolto
+sulla chiave, gesti). Non combacia (un mazzo di dispositivo nato prima
+del seme, un'altra identità, o il mazzo che manca) → la riga nasce
+SOLO DA GUARDARE (`soloVista`): stato, cifre, controparte; niente gesti
+(`azioniDisponibili` e `azioniSecondarieP2P` la saltano); la card dice
+«📱 Aperto su un altro dispositivo: qui lo segui, i gesti si fanno da
+là» e la pagina «I messaggi cifrati di questo scambio sono sul
+dispositivo dove l'hai aperto…»; appena l'indice arriva si promuove.
+Le righe già locali si muovono SOLO IN AVANTI con la scala della
+ripresa (`P2P_RIPRESA_PASSO`), una volta per fotografia, e prendono
+quel che manca (controparte, cifre, `preso`, il pagamento non passato).
+Non nasce: le lapidi, un mio ritiro mai preso, uno scambio di cui il
+server non sa dire lo stato. **E la striscia non aspetta più un libro
+che ha detto di no**: coi relay giù le righe del server si vedono lo
+stesso (prima `renderP2P` usciva sull'errore del libro senza disegnare
+i miei). SCELTA: il CloudStorage cifrato per portare le chiavi «anche
+lì» non serve per chi entra da Telegram (il seme le dà uguali ovunque)
+e non esiste fuori da Telegram, che è proprio la coppia del caso
+reale (TWA ↔ mini app): la strada è il server, che le chiavi
+PUBBLICHE le ha già.
+
+**LA CURA 2 — LE FATTURE DA UN'ORA.** Il blocco delle 23 ore (21 set)
+diventa un CONSIGLIO: la fattura più corta di un giorno PARTE al primo
+tocco, e il toast dice quanto vive e cosa succede se non basta
+(`avvisoFatturaCortaP2P`: «se chi vende libera i sats dopo, il
+pagamento non passa e te ne chiediamo una nuova» — il flusso di
+`fattura_nuova`, patch 0007). Via `P2P_FATTURA_CORTA_SI_MANDA` e il
+secondo tocco; la fattura del wallet NWC segue la stessa regola; la
+frase del foglio dice «meglio se dura almeno un giorno». **NIENTE NEL
+PERCORSO VUOLE LE 23 ORE:** letto su mostro v0.18.8, l'unico posto che
+guarda una scadenza è `validate_bolt11_invoice` all'`add-invoice`
+(`expires_at < now + invoice_expiration_window` → `invalid-invoice`), e
+al payout `validate_payout_invoice` guarda solo che non sia GIÀ
+scaduta; la hold invoice ha il suo cltv e i timer (`expiration_seconds`,
+`hold_invoice_cltv_delta`) non c'entrano con la fattura di chi compra.
+**MA IL PAVIMENTO VERO STA SUL NODO:** `invoice_expiration_window` è
+3600 nel `[lightning]` di `settings.toml` (lo dice il 38385, il client
+lo legge in `fattFinestra`), quindi una fattura da 60 minuti incollata
+dopo pochi secondi vale meno di un'ora e mostrod la RIFIUTA comunque —
+il client la ferma prima con la stessa regola. Per accettare «da 59
+minuti in su» va girata la leva sul nodo (PRODUZIONE, «LA FINESTRA
+DELLA FATTURA DI CHI COMPRA SUL NODO»: proposta 600 s); il client si
+adegua da solo leggendo il 38385, e la frase «quelle da un'ora esatta
+non bastano» esce solo se la finestra è ancora di un'ora.
+
+**LA CURA 3 — GLI ANNULLATI ESCONO DA SOLI.** `p2pRitirato` è ora
+«annullato senza sats, MIO e mai preso» (`preso` lo scrive la macchina a
+stati entrando nel giro aperto o in `attivo`, e lo toglie il ritorno
+nel libro): chi ha preso non ritira mai, e l'annullato di uno scambio
+preso è STORICO. Col filtro spento `passaStatoMieiP2P` nasconde il
+gruppo «Annullati», che resta sotto la sua pillola (col conto) e nello
+stato vuoto con «Vedi lo scambio annullato» (`mostraAnnullatiP2P`); la
+scopa tiene il lampo delle 24 ore al solo `rifiutato`, gli annullati
+vivono i 30 giorni di un concluso. La ✕ lascia una lapide di 40 giorni
+(`P2P_LAPIDE_TOLTO_S`), o l'archivio del server rifarebbe nascere la
+riga al render dopo.
+
+**STRADE SCARTATE.** Una lista sul server DEI SOLI ID (già scartata nel
+cantiere della scopa lampo): oggi il server sa già molto di più, e non
+c'è privacy nuova da pagare. Il quaderno cifrato sui relay (kind
+30078): resta la via per lo storage personale, non serve a questo.
+Portare le chiavi private nel CloudStorage anche per il P2P: le chiavi
+sono già derivabili ovunque, e la coppia del caso reale il cloud non
+ce l'ha. Tenere il blocco delle 23 ore: la strada dei wallet da
+un'ora era un vicolo cieco pagato sul campo.
+
+**PROVATO.** `prove_scambi_ovunque` (nuova): i giudici puri
+(`_stato_scambio_p2p` sull'intero scambio dai due lati, coppie e giro,
+libro senza cronaca, momento ignoto), `_scambi_p2p` su un database in
+memoria (chi vede cosa, chiavi per lato, storico), le sentinelle del
+client e il banco node dell'adozione (nascita governabile, solo da
+guardare e promozione, indice storto, altra identità, ripresa in
+avanti una volta per fotografia, payout fallito, ciò che non nasce, lo
+storico, il cercatore). Emendate `prove_scambi_p2p_vecchi` (ritirato =
+mio e mai preso; scopa: annullati storico), `prove_p2p_vista_miei`
+(filtro spento: 4 su 5), il banco della corsa, `prove_p2p_motore` (la
+fattura da sei ore parte al primo tocco col toast; quella da un giorno
+senza), `prove_p2p_libro`. `collaudo_scambi_ovunque` col server vero
+(rotta, eventi dalla porta vera, 28 verdi) in CI. Suite intera severa:
+15.627 verdi, 0 rosse (prima delle ultime tre toppe piccole; le sezioni
+toccate rigirate dopo: verdi). Tortura su una copia: 15 mutazioni,
+vedi il verbale del giro. DAL VIVO a due «dispositivi» (server dalla
+copia, config di cartone, relay morto, `localhost` e `127.0.0.1` come
+due origini): sul B fresco lo scambio preso NASCE governabile (indice 1
+ritrovato dalla chiave del server, «tocca a te», il bottone del
+recapito), l'altro solo da guardare con le due frasi e senza gesti; sul
+A la riga locale indietro va avanti e prende la controparte; dopo il
+`canceled` di chi compra tutt'e due leggono «annullato», la card esce
+dalla lista di tutti i giorni e sta sotto «Annullati 1»; la ✕ la toglie
+e l'archivio non la fa rinascere.
+
+**RESTA DA GUARDARE, coi due telefoni.** 1) Andrea pubblica dall'app
+Android, Alan prende dal tablet: nella mini app Telegram di Andrea lo
+scambio deve comparire in «I miei scambi» entro un minuto, governabile
+(il diario deve dire «nata dal server … con la chiave»), e sul telefono
+di Alan pure. 2) Se compare «solo da guardare», il mazzo di quel
+dispositivo non è quello del seme: si legge `origine` in «I tuoi dati»
+e si decide se dimenticarlo. 3) Alan ritira la presa: sul tablet la
+card NON sparisce — va sotto «Annullati» — e Andrea torna a «Ordine
+pubblicato». 4) Una fattura da 60 minuti (SatsMobiBot): finché il nodo
+ha `invoice_expiration_window = 3600` il client la ferma con «più di
+60 minuti»; dopo la leva a 600 parte col toast. 5) I relay: il
+riascolto sulla chiave ritrovata deve portare i messaggi arretrati
+(controparte, hold) sul dispositivo nuovo. 6) Un ordine pending nato
+prima di oggi non ha le chiavi in `p2p_scambi`: la riga dipende dalla
+restore, come prima.

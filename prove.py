@@ -54161,9 +54161,14 @@ def prove_nav_p2p():
     prova("renderP2P dipinge anche p2pMieiCorpo", True,
           "el('p2pMieiCorpo')" in rp
           and "mieiBox.innerHTML = scambiP2P()" in rp)
-    prova("...e prima del libro l'attesa sta in TUTT'E DUE", True,
-          "box.innerHTML = attesa;" in rp
-          and "if (mieiBox) mieiBox.innerHTML = attesa;" in rp)
+    # 24 set 2026 (l'archivio del server): mentre il libro si LEGGE
+    # l'attesa sta in tutt'e due; quando ha risposto di no, la striscia
+    # si disegna lo stesso con le righe che il server sa — chi ha uno
+    # scambio a meta' coi relay giu' deve poterlo vedere
+    prova("...e prima del libro l'attesa sta in TUTT'E DUE, salvo un libro che ha detto di no",
+          True, "box.innerHTML = attesa;" in rp
+          and "if (mieiBox) mieiBox.innerHTML = (p2pErrore && scambiP2P()) || attesa;" in rp
+          and "intestaScambiP2P(p2pErrore ? mieiRigheP2P() : null);" in rp)
     # IL LIBRO E' SOLO IL LIBRO: via la striscia e via il bottone —
     # pubblicare e' il + della nav, un gesto solo (decisione di Andrea)
     prova("il libro non incolla piu' la striscia in testa", False,
@@ -57764,9 +57769,12 @@ def prove_p2p_motore():
     # ══ NWC PER IL P2P (16 set 2026) ══ il wallet fa la fattura da
     # solo; ogni superficie guarda il suo metodo; la chiave porta il conto
     _fw = pezzo_js(mini, "async function fatturaDalWalletP2P(id){", "\n}\n")
+    # DAL 24 SET 2026 il solo blocco e' quello del coordinatore: la
+    # fattura piu' corta del consiglio parte, e il toast lo dice
     prova("la fattura del wallet passa dalla STESSA guardia della fattura incollata", True,
           "leggiBolt11(bolt)" in _fw and "b.sats !== deve" in _fw
-          and "+ vitaMinimaFatturaP2P(o))" in _fw)
+          and "if (b.scade < adessoW + finestraFatturaP2P())" in _fw
+          and "avvisoFatturaCortaP2P(b.scade, adessoW)" in _fw)
     prova("...con l'importo di satsDaRicevereP2P e la vita dell'ordine", True,
           "satsDaRicevereP2P(o)" in _fw and "scadenzaFatturaP2P()" in _fw)
     prova("...e il wallet ha 15 secondi, non i 30 del mercatino", True,
@@ -58757,8 +58765,11 @@ function reset(){
     /* LA DURATA (21 set 2026): prima del rilascio non basta piu' «valida
        più di un'ora» — la fattura si paga al RILASCIO, ore dopo — e la
        frase accanto al campo chiede un giorno */
-    out.foglioAvvisaSullaScadenza = h.indexOf('<b>fai una fattura che duri almeno un giorno</b>') >= 0
-      && h.indexOf('valida più di') < 0;
+    /* dal 24 set 2026 «un giorno» e' un CONSIGLIO: la finestra del
+       coordinatore resta scritta, e la frase dice cosa succede a una
+       fattura piu' corta */
+    out.foglioAvvisaSullaScadenza = h.indexOf('<b>Meglio se dura almeno un giorno</b>') >= 0
+      && h.indexOf('valida più di') >= 0 && h.indexOf('te ne chiediamo una nuova') >= 0;
     /* LA PRIORITA' (21 set 2026, rovescia il 17): l'INDIRIZZO prima
        della fattura — non scade — ma col suo avviso ACCANTO; la copia
        della cifra in evidenza e prima del campo — mai piu' «la via più
@@ -58766,7 +58777,7 @@ function reset(){
     out.foglioIndirizzoPrima = h.indexOf('<b>⚡ Consigliato: il tuo indirizzo Lightning</b>') >= 0
       && h.indexOf('Non scade mai') >= 0
       && h.indexOf('Consigliato: il tuo indirizzo') < h.indexOf('<b>Oppure una fattura</b>');
-    out.foglioCifraEsatta = h.indexOf(', o di 7543 sats esatti, <b>fai una fattura') >= 0;
+    out.foglioCifraEsatta = h.indexOf(', o di 7543 sats esatti, valida più di') >= 0;
     out.foglioCopiaInEvidenza = h.indexOf('<button class="btn primary" type="button" onclick="copiaLink(') >= 0
       && h.indexOf('copiaLink(') < h.indexOf('id="p2pIncassoInp"');
     /* l'avviso sui provider sta NELLA STESSA FRASE che consiglia
@@ -59020,10 +59031,15 @@ function reset(){
      accetterebbe, ma la paga al rilascio. Al wallet si chiede la vita
      dell'ordine; se la ignora si torna al foglio a mano, dove la regola
      — e la sua uscita — stanno scritte. */
+  /* ⚠️ DAL 24 SET 2026 PARTE: il solo blocco e' la finestra del
+     coordinatore, e la fattura piu' corta del consiglio si manda col
+     toast che dice quanto vive e cosa succede se non basta */
   await presaConWallet('seiore');
-  out.walletSeiOreNonManda = ricevuti.length === 1
-    && (el('p2pIncassoAvviso').textContent || '').indexOf('scade troppo presto') >= 0
-    && chiusi.indexOf('p2pIncassoSheet') < 0;
+  await pausa(60);
+  out.walletSeiOreParte = ricevuti.length === 2
+    && ricevuti[1].dentro.payload.payment_request[1] === FATT.f7543_6h
+    && chiusi.indexOf('p2pIncassoSheet') >= 0
+    && toasts.some(t => /^⚡ Inviato ✅ La fattura scade fra \d+ ore/.test(t) && t.indexOf('te ne chiediamo una nuova') >= 0);
   /* senza make_invoice fra i metodi il wallet non si disturba: il
      foglio e' quello a mano di sempre */
   await presaConWallet('buona', ['pay_invoice', 'get_info']);
@@ -59125,23 +59141,21 @@ function reset(){
     await pausa(30);
     apriIncassoP2P();
   };
+  /* ⚠️ DAL 24 SET 2026 LA FATTURA CORTA PARTE AL PRIMO TOCCO (decisione
+     di Andrea, dal campo: i wallet da sessanta minuti, e il secondo tocco
+     che nessuno trovava). Il solo blocco e' la finestra del coordinatore
+     (scena 4-ter); qui la fattura da sei ore parte SUBITO, e il toast
+     dice quanto vive e cosa succede se non basta. */
   try {
     await presaPerLaDurata();
     el('p2pIncassoInp').value = FATT.f7543_6h;
     await inviaIncassoP2P();
-    {
-      const t = String(nodi.p2pIncassoAvviso.textContent || '');
-      out.cortaFermataUnaVolta = ricevuti.length === 1 && /scade fra \d+ ore/.test(t);
-      out.cortaDiceLaRegola = t.indexOf('Fai una fattura che duri almeno un giorno') >= 0
-        && t.indexOf('indirizzo Lightning, che non scade') >= 0
-        && t.indexOf('arriverebbe scaduta') >= 0;
-      out.cortaDiceLUscita = t.indexOf('tocca di nuovo «Invia»') >= 0
-        && t.indexOf('te ne chiederemo una nuova') >= 0;
-    }
-    await inviaIncassoP2P();
     await pausa(60);
-    out.cortaRimandataParte = ricevuti.length === 2
-      && ricevuti[1].dentro.payload.payment_request[1] === FATT.f7543_6h;
+    out.cortaParteSubito = ricevuti.length === 2
+      && ricevuti[1].dentro.payload.payment_request[1] === FATT.f7543_6h
+      && String(nodi.p2pIncassoAvviso.textContent || '') === '';
+    out.cortaLoDiceAlToast = toasts.some(t => /^Inviato ✅ La fattura scade fra \d+ ore/.test(t)
+      && t.indexOf('se chi vende libera i sats dopo, il pagamento non passa e te ne chiediamo una nuova') >= 0);
     {
       const oc = ordiniP2P()['0199b7c1-2d3e-4f50-a1b2-c3d4e5f60002'];
       const b6 = leggiBolt11(FATT.f7543_6h);
@@ -59149,28 +59163,15 @@ function reset(){
         && oc.stato === 'attesa_hold_venditore';
     }
   } catch(e) { out.cortaEsplosa = String(e && e.message || e); }
-  /* ...un foglio RIAPERTO riparte da zero: l'avviso si rilegge */
+  /* ...e quella da un giorno intero parte SENZA l'avviso */
   try {
     await presaPerLaDurata();
-    el('p2pIncassoInp').value = FATT.f7543_6h;
+    el('p2pIncassoInp').value = FATT.f7543_1g;
     await inviaIncassoP2P();
-    apriIncassoP2P();
-    el('p2pIncassoInp').value = FATT.f7543_6h;
-    await inviaIncassoP2P();
-    out.cortaFoglioRiapertoRiavvisa = ricevuti.length === 1;
-  } catch(e) { out.cortaRiapertoEsploso = String(e && e.message || e); }
-  /* ...e con la leva a `false` il blocco torna secco */
-  try {
-    await presaPerLaDurata();
-    P2P_FATTURA_CORTA_SI_MANDA = false;
-    el('p2pIncassoInp').value = FATT.f7543_6h;
-    await inviaIncassoP2P();
-    await inviaIncassoP2P();
-    out.cortaLevaSpentaBlocca = ricevuti.length === 1
-      && String(nodi.p2pIncassoAvviso.textContent).indexOf('tocca di nuovo') < 0
-      && String(nodi.p2pIncassoAvviso.textContent).indexOf('almeno un giorno') >= 0;
-  } catch(e) { out.cortaLevaEsplosa = String(e && e.message || e); }
-  P2P_FATTURA_CORTA_SI_MANDA = true;
+    await pausa(60);
+    out.lungaSenzaAvviso = ricevuti.length === 2 && toasts.indexOf('Inviato ✅') >= 0
+      && !toasts.some(t => t.indexOf('La fattura scade fra') >= 0);
+  } catch(e) { out.lungaEsplosa = String(e && e.message || e); }
   /* ...l'INDIRIZZO non ha scadenza: parte, e sulla riga resta 0 */
   try {
     await presaPerLaDurata();
@@ -59951,7 +59952,7 @@ function reset(){
         "foglioDiceIlMioLato": "il foglio promette la cifra DETTA dal coordinatore: 7543, non 7468 ne' 7619",
         "foglioCopiaLaCifra": "...con la cifra da copiare",
         "foglioConsigliaLaLibera": "...consiglia la fattura senza importo",
-        "foglioAvvisaSullaScadenza": "...e chiede PRIMA una fattura che duri almeno un giorno: si paga al rilascio, non all'arrivo",
+        "foglioAvvisaSullaScadenza": "...e CONSIGLIA una fattura che duri almeno un giorno, dicendo cosa succede a una piu' corta",
         "foglioIndirizzoPrima": "la via consigliata del foglio e' l'INDIRIZZO, che non scade, detto prima della fattura",
         "foglioCifraEsatta": "...senza importo, o della cifra esatta",
         "foglioCopiaInEvidenza": "...con «Copia la cifra» in evidenza, e prima del campo",
@@ -59975,13 +59976,10 @@ function reset(){
         "importoStortoFermato": "la fattura vera del 16 set (7468) si ferma, e la ragione dice 7543",
         "nonChiedeIlLordo": "...mai il lordo",
         "laMetaDueVolteFermata": "...e 7468 con un giorno di vita si ferma lo stesso: era la meta' tolta due volte",
-        "cortaFermataUnaVolta": "DURATA: la fattura da sei ore — che il coordinatore accetterebbe — si ferma, con le ore che restano",
-        "cortaDiceLaRegola": "...e dice la regola (almeno un giorno), il perche' e la via che non scade",
-        "cortaDiceLUscita": "...e l'uscita per i wallet che la scadenza non la fanno scegliere",
-        "cortaRimandataParte": "...la STESSA rimandata parte: la regola e' nostra, non un vicolo cieco",
+        "cortaParteSubito": "DURATA (24 set 2026): la fattura da sei ore — che il coordinatore accetta — parte al primo tocco",
+        "cortaLoDiceAlToast": "...e il toast dice quanto vive e che, se non basta, se ne chiede una nuova",
         "cortaRicordaLaScadenza": "...e la sua scadenza resta sulla riga, per dire il motivo vero se al rilascio fallisce",
-        "cortaFoglioRiapertoRiavvisa": "...un foglio riaperto riparte da zero: l'avviso si rilegge",
-        "cortaLevaSpentaBlocca": "...e con la leva a false il blocco e' secco, senza promettere un'uscita",
+        "lungaSenzaAvviso": "...mentre quella da un giorno parte senza nessun avviso",
         "indirizzoNonRicordaScadenze": "...l'indirizzo non ha una scadenza da ricordare",
         "vitaMinimaPura": "DURATA: 23 ore prima del rilascio, la finestra del coordinatore dopo",
         "percheFallitoPura": "...e il perche' di un payout fallito e' un fatto solo se la scadenza si sa",
@@ -59991,8 +59989,7 @@ function reset(){
         "fallitoNonChiedeUnGiorno": "...dopo il rilascio il campo c'e' subito e un giorno non si chiede: si paga all'arrivo",
         # un caso che ESPLODE non e' un caso fallito: si legge col suo nome
         "cortaEsplosa": ("DURATA: il caso della fattura corta non esplode", None),
-        "cortaRiapertoEsploso": ("...ne' quello del foglio riaperto", None),
-        "cortaLevaEsplosa": ("...ne' quello della leva spenta", None),
+        "lungaEsplosa": ("...ne' quello della fattura lunga", None),
         "indirizzoDurataEsploso": ("...ne' quello dell'indirizzo", None),
         "durataPureEsplose": ("...ne' le pure", None),
         "fallitoEsploso": ("...ne' il foglio del payout fallito", None),
@@ -60023,7 +60020,7 @@ function reset(){
         "stortaLoDice": "...e la ragione dice le due cifre (la stessa guardia della fattura incollata)",
         "cortaNonManda": "una fattura del wallet da un'ora non parte",
         "cortaLoDice": "...e la ragione dice che scade troppo presto",
-        "walletSeiOreNonManda": "...e nemmeno una da sei ore: il coordinatore la accetterebbe, ma si paga al rilascio",
+        "walletSeiOreParte": "...mentre una da sei ore PARTE (24 set 2026), col toast che dice quanto vive",
         "senzaMetodoNonChiede": "senza make_invoice fra i metodi il wallet non si disturba",
         "migraAlConto": "la riga NWC di ieri migra alla chiave del conto",
         "vecchiaPagaAncora": "...e per il mercatino vale ancora (era stata collegata con pay_invoice)",
@@ -67555,7 +67552,8 @@ console.log(JSON.stringify(out));
             return mini[i:mini.index(";\n", i) + 1]
         banco5 = esc5 + "\n" + "\n".join(
             _cost5(n) for n in ("P2P_DA_RESTORE", "P2P_RESTORE_FERMI",
-                                "P2P_RIPRESA_PASSO")) + "\n" + "\n".join(
+                                "P2P_RIPRESA_PASSO", "P2P_INDICE_CERCA_MAX",
+                                "P2P_INDICE_CERCA_MIN")) + "\n" + "\n".join(
             pezzo_js(mini, f, "\n}\n") + "\n}"
             for f in ("function statoDaRestoreP2P(o, statoMostro){",
                       "function riprendiDaRestoreP2P(o, statoMostro){",
@@ -67575,7 +67573,16 @@ console.log(JSON.stringify(out));
                       "function ordinaMieiP2P(righe, criterio){",
                       "function mieiMostratiP2P(righe){",
                       "function mieiRigheP2P(){",
+                      # l'archivio del server (24 set 2026): la striscia lo
+                      # adotta dopo il libro, e qui l'archivio e' vuoto —
+                      # i suoi casi girano in prove_scambi_ovunque
+                      "function indiceDaChiaveP2P(mz, pub, max){",
+                      "function rigaDaServerP2P(id, s, tk, stato, adesso){",
+                      "function chiaveScambioDaServerP2P(mz, id, s){",
+                      "function adottaScambiServerP2P(locali){",
                       "function scambiP2P(")) + r"""
+let p2pScambiServer = null;
+function lapidataP2P(){ return false; }
 /* il filtro spento e l'ordine di casa: qui non si provano le leve, si
    presta la lista intera — i loro casi girano nel banco della card */
 let p2pMieiFiltro = [];
@@ -69384,7 +69391,10 @@ console.log(JSON.stringify(out));
 
     prova("i cinque casi del banco cadono dove devono",
           ["libro", "fare", "corso", "fatti", "morti"], o["gruppiDelBanco"])
-    prova("il filtro spento lascia passare tutti", 5, o["spentoPassa"])
+    # 24 set 2026 (richiesta di Andrea): a filtro spento gli annullati
+    # non si vedono — escono da soli dalla lista, e stanno sotto
+    # «Annullati», dove la pillola li conta
+    prova("il filtro spento lascia passare tutti tranne gli annullati", 4, o["spentoPassa"])
     prova("...un gruppo solo lascia passare i suoi", ["d"], o["unGruppo"])
     prova("...e due gruppi fanno l'unione", ["d", "e"], o["dueGruppi"])
     prova("...e il filtro e' acceso solo quando restringe",
@@ -70022,9 +70032,11 @@ def prove_intestazione_scambi():
     # --- 6) IL GANCIO: renderP2P, e dopo il corpo --------------------
     rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
     rpn = nudo(rp)
+    # 24 set 2026 (l'archivio del server): il conto aspetta mentre il
+    # libro si LEGGE, e conta le righe che ci sono se ha detto di no
     prova("prima del libro l'immagine resta e il conto aspetta", True,
           0 < rpn.find("if (mieiTesta) mieiTesta.innerHTML = '';")
-          < rpn.find("intestaScambiP2P(null);")
+          < rpn.find("intestaScambiP2P(p2pErrore ? mieiRigheP2P() : null);")
           < rpn.find("caricaLibroP2P().then(renderP2P, renderP2P)"))
     prova("...e col libro il conto si scrive DOPO il corpo dei miei", True,
           0 < rpn.find("mieiBox.innerHTML = scambiP2P()")
@@ -74142,6 +74154,466 @@ def prove_paycode_riconosciuto():
           o["manualeArrivaACompra"])
     prova("senza controparte il bottone dice perche' no, e non apre la conferma",
           [0, 0, 1], o["manualeSenzaPeer"])
+
+
+def prove_scambi_ovunque():
+    """I MIEI SCAMBI SU OGNI DISPOSITIVO (24 set 2026, dal campo: lo
+    scambio preso da Alan sul tablet non c'era nella mini app Telegram
+    di Andrea, ed e' sparito anche dal tablet).
+
+    La riga vive nel localStorage del dispositivo che l'ha aperto, e da
+    un altro si ricostruiva solo cio' che il libro pubblico descrive:
+    un ordine ancora in vetrina. Adesso il SERVER — che dalla patch 0007
+    sa ogni passo e le due parti — li serve tutti (`/api/p2p/scambi`,
+    giudice `_scambi_p2p`, stato tradotto da `_stato_scambio_p2p`), e
+    il client li RICOSTRUISCE: governabili quando ritrova la trade key
+    (dall'indice della restore o dalla chiave pubblica detta dal server,
+    `indiceDaChiaveP2P`), solo da guardare altrimenti. E l'annullato di
+    uno scambio PRESO e' storico, non un ritiro: non sparisce piu'."""
+    print("\n[i miei scambi su ogni dispositivo]")
+    import json as _json
+    import shutil as _sh
+    import sqlite3
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) IL SERVER: la rotta e lo schema ----------------------------
+    prova("la rotta c'e'", True, '@app.post("/api/p2p/scambi")' in _SORGENTE)
+    rot = pezzo("scambi_p2p")
+    prova("...chiede la sessione, e passa chi chiede al giudice", True,
+          "verifica_utente(x_tg_init_data, barattolo_sessione)" in rot
+          and '_scambi_p2p(con, user["id"], int(time.time()))' in rot)
+    prova("...senza corpo e senza niente nell'indirizzo: non si chiede degli scambi di un altro",
+          True, "req" not in codice(rot).split('"""')[-1]
+          and "leggi_json" not in codice(rot))
+    prova("...no-store, e nessun gate sulla leva", [True, False],
+          ['"Cache-Control": "no-store"' in rot, "_p2p_per(" in codice(rot)])
+    prova("lo schema di p2p_scambi porta le due trade key, e la migrazione pure",
+          [True, True, True],
+          ["chiave_compratore TEXT DEFAULT ''," in _SORGENTE,
+           "chiave_venditore TEXT DEFAULT ''," in _SORGENTE,
+           'con.execute(f"ALTER TABLE p2p_scambi ADD COLUMN {colonna}")' in _SORGENTE])
+    reg = pezzo("_registra_evento_p2p")
+    prova("...e la registrazione dell'evento le scrive con le parti", True,
+          "chiave_compratore=excluded.chiave_compratore" in reg
+          and 'ev["compratore_key"], ev["venditore_key"]' in reg)
+
+    # --- 2) I GIUDICI PURI ---------------------------------------------
+    amb = {"json": _json, "sqlite3": sqlite3, "MAX_ORDINI_P2P": 200}
+    for c in ("P2P_STORICO_GIORNI", "_PESO_MOMENTO_P2P"):
+        i = _SORGENTE.index(c + " = ")
+        exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
+    for f in ("_euro_numero_p2p", "_metodi_lista_p2p", "_stato_scambio_p2p",
+              "_parti_mostro_p2p", "_scambi_p2p"):
+        exec(pezzo(f), amb)
+    euro, metodi = amb["_euro_numero_p2p"], amb["_metodi_lista_p2p"]
+    stato = amb["_stato_scambio_p2p"]
+    prova("la cifra del libro torna numero: «10,00 €», «23,47 €», «1.500,00 €», storta, vuota",
+          [10.0, 23.47, 1500.0, 0.0, 0.0, 12.0],
+          [euro("10,00 €"), euro("23,47 €"), euro("1.500,00 €"), euro("dieci"),
+           euro(""), euro("12")])
+    prova("i metodi tornano lista: JSON, virgole, vuoto, JSON storto",
+          [["SEPA", "PayPal"], ["SEPA", "Revolut"], [], []],
+          [metodi('["SEPA", "PayPal"]'), metodi("SEPA, Revolut"), metodi(""),
+           metodi("[non json")])
+
+    def m(momento, q, attore="mostro", dettaglio="", giro=1):
+        return {"momento": momento, "quando": q, "attore": attore,
+                "dettaglio": dettaglio, "giro": giro}
+
+    def st(momenti, lato, preso_dal="buyer", libro="in-progress", mio=False):
+        return stato(momenti, lato, preso_dal, libro, mio)["stato"]
+
+    # la presa di chi COMPRA (ordine sell): prima la fattura
+    presa_b = [m("preso", 100, "buyer")]
+    prova("presa di chi compra: chi compra deve dire dove ricevere, chi vende aspetta",
+          ["attesa_mia_fattura", "attesa_fattura_compratore"],
+          [st(presa_b, "compro"), st(presa_b, "vendo")])
+    # la presa di chi VENDE (ordine buy): la garanzia chiesta nello stesso istante
+    presa_s = [m("preso", 100, "seller"), m("garanzia_chiesta", 100, "mostro", "take")]
+    prova("presa di chi vende, con la garanzia chiesta nello stesso secondo: tocca a lui bloccare",
+          ["attesa_mia_hold", "attesa_hold_venditore"],
+          [st(presa_s, "vendo", "seller"), st(presa_s, "compro", "seller")])
+    # la fattura data (hold-next) + garanzia chiesta (invoice) nello stesso istante
+    fatt = presa_b + [m("fattura_data", 110, "buyer", "hold-next"), m("garanzia_chiesta", 110, "mostro", "invoice")]
+    prova("fattura data e garanzia chiesta insieme: chi vende blocca",
+          ["attesa_mia_hold", "attesa_hold_venditore"],
+          [st(fatt, "vendo"), st(fatt, "compro")])
+    pag = fatt + [m("garanzia_pagata", 120, "seller")]
+    prova("garanzia pagata a fattura gia' data: scambio attivo per tutt'e due",
+          ["attivo", "attivo"], [st(pag, "compro"), st(pag, "vendo")])
+    # garanzia pagata + fattura chiesta insieme (chi vende ha preso un buy)
+    pag2 = presa_s + [m("garanzia_pagata", 120, "seller"), m("fattura_chiesta", 120, "mostro")]
+    prova("garanzia pagata e fattura chiesta insieme: tocca a chi compra dire dove",
+          ["attesa_mia_fattura", "attesa_fattura_compratore"],
+          [st(pag2, "compro", "seller"), st(pag2, "vendo", "seller")])
+    fiat = pag + [m("fiat", 130, "buyer")]
+    prova("euro inviati", ["euro_inviati", "euro_inviati"],
+          [st(fiat, "compro"), st(fiat, "vendo")])
+    ril = fiat + [m("rilasciato", 140, "seller")]
+    prova("liberati: in pagamento per tutt'e due", ["rilasciato", "rilasciato"],
+          [st(ril, "compro"), st(ril, "vendo")])
+    fall = ril + [m("payout_fallito", 150, "mostro", "NO_ROUTE")]
+    prova("pagamento non passato: a chi compra la fattura nuova, chi vende resta in pagamento e lo sa",
+          ["fattura_nuova", "rilasciato", True],
+          [st(fall, "compro"), st(fall, "vendo"),
+           stato(fall, "vendo", "buyer", "", False)["payout_fallito"]])
+    nuova = fall + [m("fattura_data", 160, "buyer", "new-invoice")]
+    prova("...la fattura nuova riporta in pagamento", ["rilasciato", "rilasciato"],
+          [st(nuova, "compro"), st(nuova, "vendo")])
+    conc = nuova + [m("concluso", 170)]
+    prova("concluso", ["concluso", "concluso"], [st(conc, "compro"), st(conc, "vendo")])
+    prova("...e i fatti nello stesso secondo li decide il peso: fallito dopo rilasciato",
+          "fattura_nuova", st(fiat + [m("rilasciato", 140, "seller"), m("payout_fallito", 140, "mostro")], "compro"))
+    ann_c = pag + [m("annullo_chiesto", 130, "buyer")]
+    prova("annullo chiesto da chi compra: lui «ha chiesto», l'altro «propone»",
+          ["annullo_chiesto", "annullo_proposto"], [st(ann_c, "compro"), st(ann_c, "vendo")])
+    prova("annullato, scaduto, disputa", ["annullato", "annullato", "in_disputa"],
+          [st(pag + [m("annullato", 130)], "vendo"), st([m("scaduto", 130, giro=0)], "compro"),
+           st(pag + [m("disputa", 130, "buyer")], "vendo")])
+    prova("tornato in vetrina: chi ha pubblicato torna a «pubblicato», chi aveva preso legge annullato",
+          ["pubblicato", "annullato"],
+          [st(presa_b + [m("tornato", 130, "mostro", "taker-timeout")], "vendo", mio=True),
+           st(presa_b + [m("tornato", 130, "mostro", "taker-timeout")], "compro")])
+    # IL GIRO: un ordine ripreso ha una storia nuova
+    due = [m("preso", 100, "buyer", giro=1), m("tornato", 120, "mostro", "republished", giro=1),
+           m("preso", 200, "buyer", giro=2)]
+    q = stato(due, "vendo", "buyer", "in-progress", True)
+    prova("solo l'ultimo giro conta: dopo il ritorno la nuova presa decide",
+          ["attesa_fattura_compratore", True, 200], [q["stato"], q["preso"], q["quando"]])
+    # SENZA CRONACA vale il libro
+    prova("senza cronaca vale il libro: pending del mio = pubblicato, success, canceled, in-progress vuoto",
+          ["pubblicato", "", "concluso", "annullato", "annullato", ""],
+          [st([], "vendo", "", "pending", True), st([], "vendo", "", "pending", False),
+           st([], "compro", "", "success"), st([], "compro", "", "canceled"),
+           st([], "compro", "", "expired"), st([], "compro", "", "in-progress")])
+    prova("un momento sconosciuto non racconta niente", "",
+          st([m("boh", 100)], "compro"))
+    prova("la presa senza `preso_dal` legge l'attore, e senza nemmeno quello tace",
+          ["attesa_mia_hold", ""],
+          [st([m("preso", 100, "seller")], "vendo", ""), st([m("preso", 100, "mostro")], "vendo", "")])
+
+    # --- 3) L'ARCHIVIO SUL DATABASE VERO --------------------------------
+    KA, KB, KX = "a1" * 32, "b2" * 32, "c3" * 32
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    ORA = 1_800_000_000
+    con.executescript(
+        "CREATE TABLE p2p_scambi(ordine TEXT PRIMARY KEY, compratore INTEGER DEFAULT 0,"
+        " venditore INTEGER DEFAULT 0, preso_dal TEXT DEFAULT '', giro INTEGER DEFAULT 0,"
+        " sats INTEGER DEFAULT 0, sats_compratore INTEGER DEFAULT 0,"
+        " sats_venditore INTEGER DEFAULT 0, chiave_compratore TEXT DEFAULT '',"
+        " chiave_venditore TEXT DEFAULT '', aggiornato INTEGER DEFAULT 0);"
+        "CREATE TABLE p2p_ordini(ordine TEXT PRIMARY KEY, tg_id INTEGER, lato TEXT DEFAULT '',"
+        " maker INTEGER DEFAULT 0, stato TEXT DEFAULT '', euro TEXT DEFAULT '',"
+        " sats INTEGER DEFAULT 0, metodi TEXT DEFAULT '', creato INTEGER DEFAULT 0);"
+        "CREATE TABLE p2p_momenti(ordine TEXT, momento TEXT, quando INTEGER, fonte TEXT,"
+        " giro INTEGER DEFAULT 0, attore TEXT DEFAULT '', dettaglio TEXT DEFAULT '');"
+        "CREATE TABLE chiavi_p2p(pubkey TEXT PRIMARY KEY, tg_id INTEGER);"
+        f"INSERT INTO chiavi_p2p VALUES('{KA}',111),('{KB}',222);"
+        # 111 ha pubblicato un sell (vende), 222 l'ha preso (compra), attivo
+        f"INSERT INTO p2p_ordini VALUES('ord-attivo-1',111,'sell',1,'in-progress','10,00 €',15000,'[\"SEPA\"]',{ORA - 3600});"
+        f"INSERT INTO p2p_scambi VALUES('ord-attivo-1',222,111,'buyer',1,15000,14850,15150,'{KB}','{KA}',{ORA - 100});"
+        f"INSERT INTO p2p_momenti VALUES('ord-attivo-1','preso',{ORA - 1000},'mostro',1,'buyer',''),"
+        f" ('ord-attivo-1','fattura_data',{ORA - 900},'mostro',1,'buyer','hold-next'),"
+        f" ('ord-attivo-1','garanzia_chiesta',{ORA - 900},'mostro',1,'mostro','invoice'),"
+        f" ('ord-attivo-1','garanzia_pagata',{ORA - 800},'mostro',1,'seller','');"
+        # un mio ordine ancora in vetrina, mai preso
+        f"INSERT INTO p2p_ordini VALUES('ord-vetrina-1',111,'buy',1,'pending','5,00 €',0,'[\"PayPal\"]',{ORA - 60});"
+        # un annullato di uno scambio preso, di ieri (storico) e uno di due mesi fa (fuori)
+        f"INSERT INTO p2p_ordini VALUES('ord-morto-ieri',111,'sell',1,'canceled','7,00 €',0,'',{ORA - 86400 * 2});"
+        f"INSERT INTO p2p_scambi VALUES('ord-morto-ieri',222,111,'buyer',1,0,0,0,'{KB}','{KA}',{ORA - 86400});"
+        f"INSERT INTO p2p_momenti VALUES('ord-morto-ieri','preso',{ORA - 90000},'mostro',1,'buyer',''),"
+        f" ('ord-morto-ieri','annullato',{ORA - 86400},'mostro',1,'seller','');"
+        f"INSERT INTO p2p_ordini VALUES('ord-morto-vecchio',111,'sell',1,'canceled','7,00 €',0,'',{ORA - 86400 * 70});"
+        f"INSERT INTO p2p_scambi VALUES('ord-morto-vecchio',222,111,'buyer',1,0,0,0,'{KB}','{KA}',{ORA - 86400 * 60});"
+        f"INSERT INTO p2p_momenti VALUES('ord-morto-vecchio','preso',{ORA - 86400 * 61},'mostro',1,'buyer',''),"
+        f" ('ord-morto-vecchio','annullato',{ORA - 86400 * 60},'mostro',1,'seller','');"
+        # un ordine preso da un client esterno: chiave che nessuno conosce
+        f"INSERT INTO p2p_ordini VALUES('ord-esterno-1',111,'sell',1,'in-progress','9,00 €',0,'',{ORA - 600});"
+        f"INSERT INTO p2p_scambi VALUES('ord-esterno-1',0,111,'buyer',1,0,0,0,'{KX}','{KA}',{ORA - 500});"
+        f"INSERT INTO p2p_momenti VALUES('ord-esterno-1','preso',{ORA - 500},'mostro',1,'buyer','');")
+    scambi = amb["_scambi_p2p"]
+    v = scambi(con, 111, ORA)
+    c = scambi(con, 222, ORA)
+    prova("chi ha pubblicato vede i suoi, senza l'annullato di due mesi fa",
+          ["ord-attivo-1", "ord-esterno-1", "ord-morto-ieri", "ord-vetrina-1"], sorted(v))
+    prova("chi ha preso vede quelli in cui mostrod lo nomina", ["ord-attivo-1", "ord-morto-ieri"], sorted(c))
+    prova("un estraneo non vede niente, e nemmeno uno zero", [{}, {}],
+          [scambi(con, 333, ORA), scambi(con, 0, ORA)])
+    # `.get` e non `[]`: un archivio storto deve fare ROSSO, non esplodere
+    a = v.get("ord-attivo-1", {})
+    prova("la riga di chi vende: lato, mio, preso, cifre, metodi, stato, chiavi mia e dell'altro",
+          ["vendo", True, True, 10.0, 15000, ["SEPA"], "attivo", "in-progress", 15000, 15150, KA, KB, ORA - 800],
+          [a["lato"], a["mio"], a["preso"], a["euro"], a["sats"], a["metodi"], a["stato"],
+           a["stato_libro"], a["sats_ordine"], a["sats_miei"], a["chiave_mia"], a["chiave_peer"], a["quando"]])
+    b = c.get("ord-attivo-1", {})
+    prova("...e di chi compra, con le chiavi girate", ["compro", False, 14850, KB, KA],
+          [b["lato"], b["mio"], b["sats_miei"], b["chiave_mia"], b["chiave_peer"]])
+    prova("la cronaca viaggia intera, nell'ordine del tempo",
+          ["preso", "fattura_data", "garanzia_chiesta", "garanzia_pagata"],
+          [x["m"] for x in a["momenti"]])
+    vet, morto, est = v.get("ord-vetrina-1", {}), v.get("ord-morto-ieri", {}), v.get("ord-esterno-1", {})
+    prova("il mio ordine in vetrina: pubblicato, non preso, senza chiavi",
+          ["pubblicato", False, "", "", "compro"],
+          [vet.get("stato"), vet.get("preso"), vet.get("chiave_mia"), vet.get("chiave_peer"), vet.get("lato")])
+    prova("l'annullato di ieri e' storico, con l'ora dell'annullo",
+          ["annullato", True, ORA - 86400], [morto.get("stato"), morto.get("preso"), morto.get("quando")])
+    prova("preso da un client esterno: la chiave dell'altro c'e' lo stesso (e' pubblica), e a chi vende tocca aspettare la fattura",
+          [KX, "attesa_fattura_compratore"], [est.get("chiave_peer"), est.get("stato")])
+    con.close()
+
+    # --- 4) IL CLIENT: le sentinelle -----------------------------------
+    sc = pezzo_js(mini, "function scambiP2P(){", "\n}\n")
+    prova("la striscia adotta dal server DOPO l'adozione dal libro e prima di leggere",
+          True, 0 < sc.find("adottaOrdiniAltroveP2P(ordiniP2P());")
+          < sc.find("adottaScambiServerP2P(ordiniP2P());") < sc.find("mieiRigheP2P()"))
+    ad = pezzo_js(mini, "function adottaScambiServerP2P(locali){", "\n}\n")
+    prova("...mai su una lapide, mai un mio ritiro, mai senza stato", True,
+          "if (lapidataP2P(id)) continue;" in ad
+          and "if (s.mio && !s.preso && (stato === 'annullato' || stato === 'rifiutato')) continue;" in ad
+          and "if (!stato || !STATI_P2P[stato]) {" in ad)
+    prova("...la riga locale si muove SOLO IN AVANTI, una volta per fotografia", True,
+          "if (!s.ripreso) {" in ad and "const da = P2P_RIPRESA_PASSO[gia.stato], a = P2P_RIPRESA_PASSO[s.stato];" in ad
+          and "if (s.stato && a > da && P2P_FINALI.indexOf(gia.stato) < 0) {" in ad)
+    ch = pezzo_js(mini, "function chiaveScambioDaServerP2P(mz, id, s){", "\n}\n")
+    prova("la chiave: prima l'indice della restore della MIA identita', poi la chiave del server, e deve combaciare",
+          True, "voce.identita === mz.pub" in ch
+          and "indiceDaChiaveP2P(mz, s.chiave_mia, Math.max(mz.indice | 0, P2P_INDICE_CERCA_MIN))" in ch
+          and "if (s.chiave_mia && tk.pub !== s.chiave_mia) return null;" in ch)
+    prova("i gesti non escono da una riga solo da guardare", True,
+          "if (o.soloVista) return '';" in pezzo_js(mini, "function azioniDisponibili(o){", "\n}\n"))
+    prova("il ritirato e' il MIO ordine mai preso", True,
+          "&& !!o.mio && !o.preso;" in pezzo_js(mini, "function p2pRitirato(o){", "\n}"))
+    av = pezzo_js(mini, "function avanzaOrdineP2P(ordine, azione, payload){", "\n}\n")
+    prova("...e il preso lo scrive la macchina a stati, e lo toglie il ritorno nel libro", True,
+          "if (nuovo === 'pubblicato') delete o.preso;" in av
+          and "else if (P2P_GIRO_APERTO.indexOf(nuovo) >= 0 || nuovo === 'attivo') o.preso = true;" in av)
+    prova("il filtro spento nasconde gli annullati, che stanno sotto la loro pillola", True,
+          "if (!f || !f.length) return gruppoScambioP2P(o) !== 'morti';"
+          in pezzo_js(mini, "function passaStatoMieiP2P(o, f){", "\n}")
+          and "function mostraAnnullatiP2P(){" in mini
+          and 'onclick="mostraAnnullatiP2P()"' in pezzo_js(mini, "function renderP2P(){", "\n}\n"))
+    prova("...e la scopa tiene il lampo al solo rifiutato", True,
+          "const lampo = o.stato === 'rifiutato';" in pezzo_js(mini, "function pulisciScambiP2P(){", "\n}"))
+    prova("la ✕ lascia una lapide lunga quanto lo storico del server", True,
+          "lapideP2P(Object.assign({}, o, {scade: Math.floor(Date.now() / 1000) + P2P_LAPIDE_TOLTO_S}));"
+          in pezzo_js(mini, "function togliScambioP2P(id, ev){", "\n}")
+          and "const P2P_LAPIDE_TOLTO_S = 40 * 86400;" in mini)
+    prova("la card e la pagina dicono «da un altro dispositivo» sulla riga solo da guardare", [True, True],
+          ["Aperto su un altro dispositivo" in pezzo_js(mini, "function rigaScambioP2P(o){", "\n}\n"),
+           "I messaggi cifrati di questo scambio sono sul dispositivo dove l\\'hai aperto"
+           in pezzo_js(mini, "function renderOrdineP2P(){", "\n}\n")])
+    # il blocco che chiede, fuori dal motore
+    i_b = mini.index("/* ============ L'ARCHIVIO DEL SERVER: I MIEI SCAMBI SU OGNI DISPOSITIVO")
+    i_fb = mini.index("/* ============ fine dell'archivio del server")
+    cod = re.sub(r"/\*[\s\S]*?\*/", "", mini[i_b:i_fb])
+    prova("il blocco che chiede sta fuori dal motore, dopo il PayCode che chiede", True,
+          i_b > mini.index("/* ============ fine del PayCode che chiede")
+          > mini.index("/* ============ fine del motore dello scambio"))
+    prova("...UNA fetch, in POST, SENZA corpo, col cancello dell'anonimo",
+          [1, 1, 0, True], [cod.count("fetch("), cod.count("method: 'POST'"), cod.count("body:"),
+                           "if (DEMO || VETRINA || !myTgId) return false;" in cod
+                           and "/p2p/scambi`" in cod])
+    prova("...e una fotografia storta non prende il posto di quella buona", True,
+          "typeof d.scambi === 'object' && !Array.isArray(d.scambi)" in cod)
+    motore = re.sub(r"/\*[\s\S]*?\*/", "",
+                    mini[mini.index("const MOSTRO_ORDINI_CHIAVE"):
+                         mini.index("/* ============ fine del motore dello scambio")])
+    prova("il motore resta a zero fetch", 0, motore.count("fetch("))
+    rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
+    prova("renderP2P chiede l'archivio una volta per sessione, senza aspettare il mazzo", True,
+          "if (!p2pScambiChiesto && myTgId && !DEMO && !VETRINA" in rp
+          and "p2pScambiChiesto = true;" in rp)
+    prova("...«Riprova» lo richiede, e il battito dell'unico interval lo rinfresca", [True, True],
+          ["p2pScambiChiesto = false;" in pezzo_js(mini, "function ricaricaP2P(){", "\n}"),
+           "  battitoPagamentiP2P();\n  battitoScambiP2P();" in mini])
+
+    # --- 5) IL BANCO NODE: l'adozione gira ------------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("l'adozione dal server gira", "node non c'e'")
+        return
+    def _cost(nome, fine=";\n"):
+        i = mini.index("const " + nome + " = ")
+        return mini[i:mini.index(fine, i) + len(fine)]
+    banco = ("\n".join(_cost(n) for n in ("P2P_DA_RESTORE", "P2P_RESTORE_FERMI", "P2P_RIPRESA_PASSO",
+                                          "P2P_FINALI", "P2P_INDICE_CERCA_MAX", "P2P_INDICE_CERCA_MIN",
+                                          "P2P_GIRO_APERTO"))
+             + "\n" + _cost("STATI_P2P", "\n};\n") + "\n"
+             + "\n".join(pezzo_js(mini, f, "\n}\n") + "\n}"
+                         for f in ("function statoDaRestoreP2P(o, statoMostro){",
+                                   "function diarioP2P(riga){",
+                                   "function indiceDaChiaveP2P(mz, pub, max){",
+                                   "function rigaDaServerP2P(id, s, tk, stato, adesso){",
+                                   "function chiaveScambioDaServerP2P(mz, id, s){",
+                                   "function adottaScambiServerP2P(locali){",
+                                   "function azioniDisponibili(o){",
+                                   "function recapitoEuroArrivatoP2P(o){"))
+             + "\n" + pezzo_js(mini, "function p2pRitirato(o){", "\n}") + "\n}\n" + r"""
+let p2pDiario = [];
+let p2pMieiOrdini = null, p2pScambiServer = null;
+let ordiniFinti = {}, lapidi = new Set();
+const window = {NostrTools: {}};
+function chiaveScambio(sk, i){ if (!sk) throw new Error('senza sk'); return {sk: 'sk:' + i, pub: 'pub:' + i, indice: i}; }
+function scriviOrdineP2P(o){ ordiniFinti[o.id] = o; return o; }
+function lapidataP2P(id){ return lapidi.has(id); }
+let mazzoFinto = {sk: 'S'.repeat(64), pub: 'P', indice: 5};
+function mazzoMostro(){ return mazzoFinto; }
+const log0 = console.log; console.log = () => {};
+const out = {};
+const S = (extra) => Object.assign({lato: 'compro', mio: false, preso: true, euro: 10, sats: 15000,
+  metodi: ['SEPA'], stato: 'attivo', stato_libro: 'in-progress', creato: 1000, quando: 2000,
+  giro: 1, chiave_mia: 'pub:3', chiave_peer: 'peerKEY', sats_ordine: 15000, sats_miei: 14850,
+  payout_fallito: false, momenti: []}, extra);
+// a) dispositivo fresco, scambio preso e attivo: la riga nasce GOVERNABILE dalla chiave del server
+ordiniFinti = {}; p2pScambiServer = {'ord-a': S()};
+let n = adottaScambiServerP2P(ordiniFinti);
+const ra = ordiniFinti['ord-a'];
+out.nataDalServer = n === 1 && !!ra && ra.indice === 3 && ra.pubTrade === 'pub:3' && ra.peer === 'peerKEY'
+  && ra.stato === 'attivo' && ra.lato === 'compro' && ra.mio === false && ra.preso === true
+  && ra.euro === 10 && ra.sats === 15000 && ra.satsNetti === 15000 && ra.satsMiei === 14850
+  && ra.quando === 2000 && ra.ultimaMossa === 2000 && ra.creato === 1000 && !ra.soloVista
+  && ra.contattato === true && ra.daServer === true && ra.metodi.join() === 'SEPA';
+out.nataGoverna = azioniDisponibili(Object.assign({}, ra, {campiLoro: {euro: {id: 'x'}}})) === 'euro-inviati';
+out.nataNelDiario = p2pDiario.some(r => r.includes('ord-a') && r.includes('nata dal server') && r.includes('indice 3'));
+// ...una seconda adozione della STESSA fotografia non tocca la riga
+n = adottaScambiServerP2P(ordiniFinti);
+out.stessaFotoFerma = n === 0 && ordiniFinti['ord-a'].stato === 'attivo';
+// b) la chiave non si ritrova (oltre il pavimento): SOLO DA GUARDARE, e senza gesti
+ordiniFinti = {}; p2pScambiServer = {'ord-b': S({chiave_mia: 'pub:99', lato: 'vendo', stato: 'euro_inviati'})};
+adottaScambiServerP2P(ordiniFinti);
+const rb = ordiniFinti['ord-b'];
+out.soloVista = !!rb && rb.soloVista === true && rb.pubTrade === '' && rb.indice === 0
+  && rb.stato === 'euro_inviati' && rb.peer === 'peerKEY';
+out.soloVistaSenzaGesti = azioniDisponibili(rb) === '' && azioniDisponibili(Object.assign({}, rb, {soloVista: false})) === 'rilascia';
+// ...e si PROMUOVE quando la restore porta l'indice giusto
+p2pMieiOrdini = {'ord-b': {indice: 99, stato: 'fiat-sent', identita: 'P'}};
+adottaScambiServerP2P(ordiniFinti);
+out.promossa = ordiniFinti['ord-b'].pubTrade === 'pub:99' && ordiniFinti['ord-b'].indice === 99
+  && !('soloVista' in ordiniFinti['ord-b']);
+// ...ma un indice della restore che NON combacia con la chiave del server non promuove
+ordiniFinti = {}; p2pMieiOrdini = {'ord-b2': {indice: 4, stato: 'active', identita: 'P'}};
+p2pScambiServer = {'ord-b2': S({chiave_mia: 'pub:99'})};
+adottaScambiServerP2P(ordiniFinti);
+out.indiceStortoNonGoverna = ordiniFinti['ord-b2'].soloVista === true;
+// ...e un indice della restore di un'ALTRA identita' non si usa
+ordiniFinti = {}; p2pMieiOrdini = {'ord-b3': {indice: 3, stato: 'active', identita: 'P-ALTRO'}};
+p2pScambiServer = {'ord-b3': S({chiave_mia: ''})};
+adottaScambiServerP2P(ordiniFinti);
+out.altraIdentitaSoloVista = ordiniFinti['ord-b3'].soloVista === true;
+// ...mentre senza chiave del server l'indice della MIA restore basta
+ordiniFinti = {}; p2pMieiOrdini = {'ord-b4': {indice: 3, stato: 'active', identita: 'P'}};
+p2pScambiServer = {'ord-b4': S({chiave_mia: ''})};
+adottaScambiServerP2P(ordiniFinti);
+out.restoreBasta = ordiniFinti['ord-b4'].pubTrade === 'pub:3' && !ordiniFinti['ord-b4'].soloVista;
+p2pMieiOrdini = null;
+// c) la riga locale indietro si muove in avanti, una volta per fotografia
+ordiniFinti = {'ord-c': {id: 'ord-c', lato: 'compro', stato: 'attesa_mia_fattura', indice: 3, pubTrade: 'pub:3', creato: 10, cantDo: 'vecchio no', giroMorto: 'prima'}};
+p2pScambiServer = {'ord-c': S({quando: 3000})};
+n = adottaScambiServerP2P(ordiniFinti);
+const rc = ordiniFinti['ord-c'];
+out.ripresaAvanti = n === 1 && rc.stato === 'attivo' && rc.cantDo === '' && !('giroMorto' in rc)
+  && rc.ultimaMossa === 3000 && rc.peer === 'peerKEY' && rc.satsNetti === 15000 && rc.preso === true;
+rc.stato = 'attesa_mia_fattura';
+adottaScambiServerP2P(ordiniFinti);
+out.ripresaUnaVolta = ordiniFinti['ord-c'].stato === 'attesa_mia_fattura';
+p2pScambiServer = {'ord-c': S({stato: 'euro_inviati', quando: 4000})};
+adottaScambiServerP2P(ordiniFinti);
+out.fotoNuovaRiprende = ordiniFinti['ord-c'].stato === 'euro_inviati' && ordiniFinti['ord-c'].ultimaMossa === 4000;
+// ...SOLO IN AVANTI: il gesto fatto qui non torna indietro
+ordiniFinti = {'ord-d': {id: 'ord-d', lato: 'compro', stato: 'euro_inviati', indice: 3, pubTrade: 'pub:3', creato: 10, peer: 'gia'}};
+p2pScambiServer = {'ord-d': S({stato: 'attivo'})};
+adottaScambiServerP2P(ordiniFinti);
+out.soloAvanti = ordiniFinti['ord-d'].stato === 'euro_inviati' && ordiniFinti['ord-d'].peer === 'gia';
+// ...e una riga finita non si tocca
+ordiniFinti = {'ord-e': {id: 'ord-e', lato: 'compro', stato: 'concluso', indice: 3, pubTrade: 'pub:3', creato: 10}};
+p2pScambiServer = {'ord-e': S({stato: 'in_disputa'})};
+adottaScambiServerP2P(ordiniFinti);
+out.finitaFerma = ordiniFinti['ord-e'].stato === 'concluso';
+// d) il pagamento non passato, a chi vende in pagamento
+ordiniFinti = {'ord-f': {id: 'ord-f', lato: 'vendo', stato: 'rilasciato', indice: 3, pubTrade: 'pub:3', creato: 10}};
+p2pScambiServer = {'ord-f': S({lato: 'vendo', stato: 'rilasciato', payout_fallito: true})};
+adottaScambiServerP2P(ordiniFinti);
+out.payoutFallitoScritto = ordiniFinti['ord-f'].payoutFallito === true;
+p2pScambiServer = {'ord-f': S({lato: 'vendo', stato: 'rilasciato', payout_fallito: false})};
+adottaScambiServerP2P(ordiniFinti);
+out.payoutFallitoTolto = !('payoutFallito' in ordiniFinti['ord-f']);
+// e) quel che NON nasce
+ordiniFinti = {}; lapidi = new Set(['ord-g']);
+p2pScambiServer = {'ord-g': S(),
+  'ord-h': S({mio: true, preso: false, stato: 'annullato'}),
+  'ord-i': S({stato: ''}),
+  'ord-j': S({stato: 'roba-nuova'})};
+n = adottaScambiServerP2P(ordiniFinti);
+out.nonNasce = n === 0 && Object.keys(ordiniFinti).length === 0;
+out.nonNasceDetto = p2pDiario.some(r => r.includes('ord-i') && r.includes('non sa dire lo stato'));
+lapidi = new Set();
+// ...ma con la restore che parla, lo stato vuoto del server si traduce
+p2pMieiOrdini = {'ord-i': {indice: 3, stato: 'active', identita: 'P'}};
+p2pScambiServer = {'ord-i': S({stato: ''})};
+adottaScambiServerP2P(ordiniFinti);
+out.restoreTraduce = !!ordiniFinti['ord-i'] && ordiniFinti['ord-i'].stato === 'attivo';
+p2pMieiOrdini = null;
+// f) l'annullato di uno scambio PRESO nasce come storico, e non e' un ritirato
+ordiniFinti = {}; p2pScambiServer = {'ord-k': S({lato: 'vendo', mio: true, preso: true, stato: 'annullato', quando: 5000})};
+adottaScambiServerP2P(ordiniFinti);
+const rk = ordiniFinti['ord-k'];
+out.storicoNasce = !!rk && rk.stato === 'annullato' && rk.quando === 5000 && p2pRitirato(rk) === false;
+// g) il cercatore dell'indice: bordi
+out.cercatore = [indiceDaChiaveP2P(mazzoFinto, 'pub:5', 5), indiceDaChiaveP2P(mazzoFinto, 'pub:6', 5),
+  indiceDaChiaveP2P(mazzoFinto, 'pub:1', 0), indiceDaChiaveP2P(null, 'pub:1', 5),
+  indiceDaChiaveP2P(mazzoFinto, '', 5), indiceDaChiaveP2P(mazzoFinto, 'pub:600', 900)];
+// h) senza mazzo tutto nasce solo da guardare; senza archivio niente
+mazzoFinto = null; ordiniFinti = {}; p2pScambiServer = {'ord-l': S()};
+adottaScambiServerP2P(ordiniFinti);
+out.senzaMazzoSoloVista = ordiniFinti['ord-l'].soloVista === true;
+p2pScambiServer = null; ordiniFinti = {};
+out.senzaArchivio = adottaScambiServerP2P(ordiniFinti) === 0;
+// i) la riga pura
+const rp = rigaDaServerP2P('x', S({quando: 0, sats_miei: 0, preso: false, chiave_peer: 'pub:3'}), {sk: 'sk:3', pub: 'pub:3', indice: 3}, 'attivo', 777);
+out.rigaPura = rp.peer === '' && !('quando' in rp) && !('satsMiei' in rp) && !('preso' in rp) && rp.aggiornato === 777 && rp.hold === null;
+console.log = log0;
+console.log(JSON.stringify(out));
+""")
+    with _tf.TemporaryDirectory() as d:
+        f = os.path.join(d, "ovunque.js")
+        with open(f, "w", encoding="utf-8") as fh:
+            fh.write(banco)
+        r = _sp.run([node, f], capture_output=True, text=True, encoding="utf-8", timeout=60)
+    if r.returncode:
+        prova("l'adozione dal server gira", "", (r.stdout or "") + (r.stderr or "")[-800:])
+        return
+    o = _json.loads(r.stdout.strip().splitlines()[-1])
+    for k, nome in (
+            ("nataDalServer", "dispositivo fresco: lo scambio preso NASCE dal server, con la chiave ritrovata"),
+            ("nataGoverna", "...ed e' governabile: il gesto c'e'"),
+            ("nataNelDiario", "...e il diario dice da dove viene"),
+            ("stessaFotoFerma", "la stessa fotografia non tocca piu' niente"),
+            ("soloVista", "chiave non ritrovata: la riga nasce SOLO DA GUARDARE, con stato e controparte"),
+            ("soloVistaSenzaGesti", "...e senza gesti"),
+            ("promossa", "...e si promuove quando la restore porta l'indice"),
+            ("indiceStortoNonGoverna", "...ma un indice che non combacia con la chiave del server non governa"),
+            ("altraIdentitaSoloVista", "...e l'indice di un'altra identita' non si usa"),
+            ("restoreBasta", "senza chiave del server basta l'indice della mia restore"),
+            ("ripresaAvanti", "la riga locale indietro si muove in avanti, e prende quel che manca"),
+            ("ripresaUnaVolta", "...una volta per fotografia"),
+            ("fotoNuovaRiprende", "...e una fotografia nuova riprende"),
+            ("soloAvanti", "...mai indietro: il gesto fatto qui resta"),
+            ("finitaFerma", "...e una riga finita non si tocca"),
+            ("payoutFallitoScritto", "il pagamento non passato arriva a chi vende"),
+            ("payoutFallitoTolto", "...e se ne va con la fattura nuova"),
+            ("nonNasce", "non nasce: la lapide, il mio ritiro, lo stato vuoto, lo stato ignoto"),
+            ("nonNasceDetto", "...e lo stato che manca si dice nel diario"),
+            ("restoreTraduce", "...mentre con la restore che parla lo stato vuoto si traduce"),
+            ("storicoNasce", "l'annullato di uno scambio preso nasce come storico, e non e' un ritiro"),
+            ("senzaMazzoSoloVista", "senza mazzo si guarda soltanto"),
+            ("senzaArchivio", "senza archivio non succede niente"),
+            ("rigaPura", "la riga pura non inventa campi")):
+        prova(nome, True, o.get(k))
+    prova("il cercatore dell'indice: trova, si ferma al pavimento, e tace sui bordi",
+          [5, 0, 0, 0, 0, 0], o.get("cercatore"))
 
 
 def prove_p2p_avvisi_in_ordine():
@@ -88431,11 +88903,15 @@ def prove_scambi_p2p_vecchi():
         "esito.sr_oltre = g({stato:'senza_risposta', creato: fa(200)});\n"
         "esito.sr_quasi = g({stato:'senza_risposta', creato: fa(167.5)});\n"
         "esito.sr_cieco = g({stato:'senza_risposta', creato: 0});\n"
-        "esito.ritirato = p2pRitirato({stato:'annullato'});\n"
-        "esito.ritiratoConHold = p2pRitirato({stato:'annullato', hold:{bolt11:'x'}});\n"
-        "esito.ritiratoConSats = p2pRitirato({stato:'annullato', satsNetti: 5});\n"
-        "esito.ritiratoNonERifiutato = p2pRitirato({stato:'rifiutato'});\n"
-        "esito.ritiratoNonEConcluso = p2pRitirato({stato:'concluso'});\n"
+        "esito.ritirato = p2pRitirato({stato:'annullato', mio: true});\n"
+        "esito.ritiratoConHold = p2pRitirato({stato:'annullato', mio: true, hold:{bolt11:'x'}});\n"
+        "esito.ritiratoConSats = p2pRitirato({stato:'annullato', mio: true, satsNetti: 5});\n"
+        "esito.ritiratoNonERifiutato = p2pRitirato({stato:'rifiutato', mio: true});\n"
+        "esito.ritiratoNonEConcluso = p2pRitirato({stato:'concluso', mio: true});\n"
+        # 24 set 2026: chi ha PRESO non ritira mai, e chi ha pubblicato
+        # solo se nessuno l'aveva preso
+        "esito.presoNonRitira = p2pRitirato({stato:'annullato'});\n"
+        "esito.mioPresoNonRitira = p2pRitirato({stato:'annullato', mio: true, preso: true});\n"
         "console.log(JSON.stringify(esito));\n")
 
     _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
@@ -88483,6 +88959,15 @@ def prove_scambi_p2p_vecchi():
           [_out.get(k) for k in ("ritirato", "ritiratoConHold",
                                  "ritiratoConSats", "ritiratoNonERifiutato",
                                  "ritiratoNonEConcluso")])
+    # ⚠️ E DEV'ESSERE UN MIO ORDINE MAI PRESO (24 set 2026, dal campo: lo
+    # scambio spariva dal tablet di chi l'aveva PRESO, con «Ordine
+    # ritirato ✓»). Una presa che muore prima della garanzia arriva come
+    # `canceled` senza hold e senza sats — la stessa forma del ritiro —
+    # e il giudice di prima non guardava chi fosse.
+    prova("...e chi ha PRESO non ritira mai: il suo annullato e' storico",
+          False, _out.get("presoNonRitira"))
+    prova("...ne' chi ha pubblicato un ordine che qualcuno aveva preso",
+          False, _out.get("mioPresoNonRitira"))
 
     # --- la scopa, girata sull'archivio ---------------------------
     _semi = (
@@ -88505,6 +88990,10 @@ def prove_scambi_p2p_vecchi():
         "   creato: fa(24*60), aggiornato: fa(24*60), quando: fa(12)},"
         " notizia_vecchia: {id:'i', stato:'annullato',"
         "   creato: fa(24*3), aggiornato: fa(24*3), quando: fa(25)},"
+        # 24 set 2026: l'annullato di uno scambio PRESO e' storico, come
+        # il concluso — 30 giorni sotto «Annullati». Sopra i trenta va via.
+        " annullato_di_un_mese: {id:'r', stato:'annullato', preso: true,"
+        "   creato: fa(24*40), aggiornato: fa(24*40), quando: fa(24*31)},"
         " ricevuta_annullata: {id:'l', stato:'annullato',"
         "   creato: fa(24*3), aggiornato: fa(25), quando: fa(25),"
         "   hold: {bolt11:'lnbc1'}},"
@@ -88512,7 +89001,9 @@ def prove_scambi_p2p_vecchi():
         "   creato: fa(25), aggiornato: fa(25)},"
         " rifiutato_stamattina: {id:'n', stato:'rifiutato',"
         "   creato: fa(24*60), aggiornato: fa(24*60), quando: fa(12)},"
-        " ritirato_appena: {id:'o', stato:'annullato',"
+        # il RITIRO e' di un mio ordine mai preso (24 set 2026): senza
+        # `mio` la riga sarebbe di chi ha preso, e quella e' storico
+        " ritirato_appena: {id:'o', stato:'annullato', mio: true,"
         "   creato: fa(1), quando: fa(0)},"
         # LE RECENSIONI (set 2026): finche' c'e' una recensione da
         # lasciare la riga non si tocca — e' la sua chiave che permette
@@ -88562,18 +89053,29 @@ def prove_scambi_p2p_vecchi():
     # recensione si puo' lasciare anche se il coordinatore non l'ha
     # mai chiesta. A far uscire la riga e' il timbro — `recensita` e
     # `senza_posto` se ne vanno.
-    prova("la scopa toglie i vecchi, i ritirati e le notizie fredde",
-          {"tolti": 7,
-           "resta": ["aperto_vecchio", "fresco_finito",
+    # ⚠️ EMENDATA (24 set 2026, «I miei scambi su ogni dispositivo»):
+    # l'ANNULLATO DI UNO SCAMBIO PRESO E' STORICO, e il lampo delle 24
+    # ore resta al solo rifiutato. Quindi `notizia_vecchia` (annullato
+    # senza `mio`: la riga di chi aveva preso) e
+    # `chiuso_stamattina_dal_coordinatore` RESTANO, per i trenta giorni
+    # di un concluso — dalla lista escono da soli, che il filtro spento
+    # nasconde gli annullati — e `annullato_di_un_mese` se ne va. Il
+    # ritirato e' MIO (`mio: true`) e sparisce subito come sempre.
+    prova("la scopa toglie i vecchi, i ritirati e i rifiuti freddi",
+          {"tolti": 6,
+           "resta": ["aperto_vecchio", "chiuso_stamattina_dal_coordinatore",
+                     "fresco_finito", "notizia_vecchia",
                      "ricevuta_annullata", "rifiutato_stamattina",
                      "sr_scaduto_ma_recente", "vecchio_finito",
                      "voto_dato", "voto_in_sospeso"]},
           _o2)
     prova("il ritirato di ADESSO non arriva nemmeno al prossimo render",
           False, "ritirato_appena" in (_o2.get("resta") or []))
-    prova("...e quello di stamattina, rimasto da prima, sparisce uguale",
-          False, "chiuso_stamattina_dal_coordinatore"
+    prova("...mentre l'annullato di uno scambio preso resta, e' storico",
+          True, "chiuso_stamattina_dal_coordinatore"
           in (_o2.get("resta") or []))
+    prova("...per trenta giorni: a un mese se ne va",
+          False, "annullato_di_un_mese" in (_o2.get("resta") or []))
     prova("...mentre la RICEVUTA no: la hold la promuove ai 30 giorni",
           True, "ricevuta_annullata" in (_o2.get("resta") or []))
 
@@ -98546,7 +99048,7 @@ def main():
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,
