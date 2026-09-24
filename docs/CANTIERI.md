@@ -29539,3 +29539,46 @@ rilasciato fuori; un tocco un po' storto sul + che apre il foglio lo
 stesso; il dito che sale sul + che fa scorrere la pagina; i bottoni verde,
 rosso e blu; la morfosi e il cambio fra libro e «I miei scambi» senza
 scatti, anche col gesto indietro dell'app.
+
+
+## La quantità in testa ai pezzi di un ordine (24 set 2026)
+
+Secondo ritocco di Andrea all'elenco dei pezzi del dettaglio di un
+ordine a set (voce «I pezzi di un ordine a righe, in elenco», 23 set):
+ogni riga **comincia con la quantità, sempre, anche 1** — «2 × Pesto…»,
+«1 × Miso…» — e il puntino, che la quantità sostituisce, se ne va.
+Prima la quantità stava in coda al titolo e solo sopra 1: chi leggeva
+doveva arrivare in fondo a un titolo lungo per sapere quanti pezzi.
+
+**La quantità ha la colonna che aveva il puntino**: ogni pezzo resta
+una griglia (quantità, titolo, prezzo), quindi un titolo lungo va a capo
+sotto il proprio testo e non sotto il numero. Il numero sta **a destra
+dentro la sua colonna, in cifre tabellari**, così il 2 cade sotto il 2
+del 12 e le «×» fanno una colonna sola; fra numero e «×» uno spazio che
+non si spezza.
+
+**La larghezza della colonna è una per elenco, non una costante**:
+`righeOrdine` scrive sul `<ul>` quante cifre ha la quantità più lunga
+(`--ord-qta`), e il foglio ne fa `calc(N·1ch + 1em)` — le cifre più lo
+spazio e la «×». **La strada scartata** era una larghezza fissa in `ch`
+(4ch, «99 ×»): regge fino a due cifre, ma i pezzi per annuncio arrivano
+a `MAX_QUANTITA_ANNUNCIO`, e a cento la quantità sarebbe sbordata sul
+titolo. Il separatore delle migliaia conta come una cifra (è più
+stretto): un filo d'aria invece di uno sbordo. In italiano 1500 si
+scrive senza separatore, e le prove lo sanno.
+
+**L'ordine di un pezzo solo non cambia**: le righe arrivano solo ai set,
+e lì la fabbrica non disegna niente.
+
+**Prove**: `prove_righe_ordine` da 20 a 24 — la quantità in testa anche
+a 1 (e 1 quando la riga non ce l'ha), niente puntino né nel foglio né
+nel markup, la colonna larga quanto la quantità più lunga (1, 2, 6
+cifre), il numero a destra in cifre tabellari, il titolo lungo intero
+nella sua colonna. Tortura 10/10. **Dal vivo** su una vetrina di cartone
+col `<style>` e le funzioni vere (tre elenchi: 2-1-1, 12-1-3 col titolo
+lungo, 10-2-1 in sats) a 375 e 320 nei due temi: le «×» sulla stessa
+verticale in ogni elenco, i titoli che partono tutti dallo stesso punto
+anche a capo, i prezzi a filo del bordo, nessuno sbordo orizzontale.
+
+**Da guardare sul telefono**: un ordine a set con un titolo lungo e una
+quantità a due cifre, nei due temi.

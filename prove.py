@@ -12274,14 +12274,16 @@ def prove_righe_ordine():
     tutti attaccati: una riga di prosa dopo l'altra, subito sotto
     l'inciso della spedizione, e un titolo lungo che andava a capo si
     confondeva col pezzo dopo. Adesso: una riga vuota di stacco, poi un
-    elenco puntato — «• Titolo × quantita'», la quantita' solo sopra 1 —
-    col prezzo di ognuno allineato a destra, se la riga ce l'ha.
+    elenco — «2 × Titolo», la quantita' in testa SEMPRE, anche 1, al
+    posto del puntino di prima (24 set 2026, secondo ritocco) — col
+    prezzo di ognuno allineato a destra, se la riga ce l'ha.
 
-    Qui si prova la fabbrica sui tre casi della richiesta (l'ordine a
-    una riga che non cambia, quello a tre righe con le quantita', il
-    titolo lungo) con un banco node sulle funzioni VERE, e il foglio che
-    fa andare a capo il titolo sotto il proprio testo e non sotto il
-    puntino. Nient'altro del dettaglio cambia: la riga «N pezzi ×
+    Qui si prova la fabbrica sui casi della richiesta (l'ordine a una
+    riga che non cambia, quello a tre righe con le quantita', il titolo
+    lungo, le quantita' a due cifre e oltre) con un banco node sulle
+    funzioni VERE, e il foglio che incolonna le quantita' a destra e fa
+    andare a capo il titolo sotto il proprio testo e non sotto la
+    quantita'. Nient'altro del dettaglio cambia: la riga «N pezzi ×
     unitario» dell'ordine di un pezzo solo resta quella di prima."""
     print("\n[i pezzi di un ordine a righe]")
     import json as _json
@@ -12321,22 +12323,32 @@ def prove_righe_ordine():
     prova("una riga vuota di stacco dal prezzo, e niente puntini del "
           "browser", True,
           "list-style:none;margin:16px 0 14px;padding:0;" in el_)
-    # IL PUNTINO HA UNA COLONNA SUA: la riga e' una griglia (puntino,
-    # titolo, prezzo), quindi il titolo che va a capo ricomincia sotto
-    # il PROPRIO testo e non sotto il puntino
-    riga = regola(".ord-righe li")
-    prova("ogni pezzo e' una griglia: puntino, titolo, prezzo", True,
-          "display:grid;grid-template-columns:auto minmax(0,1fr) auto;"
-          in riga)
+    # LA QUANTITA' HA UNA COLONNA SUA: la riga e' una griglia
+    # (quantita', titolo, prezzo), quindi il titolo che va a capo
+    # ricomincia sotto il PROPRIO testo e non sotto la quantita'. La
+    # colonna e' larga uguale per tutto l'elenco: le cifre della
+    # quantita' piu' lunga (`--ord-qta`) piu' lo spazio e la «×»
+    riga = re.sub(r"\n\s*", "", regola(".ord-righe li"))
+    prova("ogni pezzo e' una griglia: quantita', titolo, prezzo", True,
+          "display:grid;grid-template-columns:calc(var(--ord-qta,1)*1ch "
+          "+ 1em) minmax(0,1fr) auto;" in riga)
     prova("...col prezzo sulla prima riga del titolo", True,
           "align-items:baseline" in riga)
-    prova("...e il puntino e' il primo pezzo della griglia", True,
-          "content:'\\2022'" in regola(".ord-righe li::before"))
+    # IL PUNTINO NON C'E' PIU': al suo posto c'e' la quantita'
+    prova("...e il puntino se n'e' andato", ("", []),
+          (regola(".ord-righe li::before"),
+           re.findall(r"\.ord-righe[^{]*::?(?:before|marker)", nudo)))
     cifra = regola(".ord-riga-cifra")
     prova("il prezzo sta a destra, e non va mai a capo", True,
           "white-space:nowrap;text-align:right" in cifra)
-    prova("...e nemmeno «× 2» si spezza a meta'", True,
-          "white-space:nowrap" in regola(".ord-riga-qta"))
+    # LE QUANTITA' INCOLONNATE: a destra nella loro colonna, in cifre
+    # tabellari, cosi' il 2 sta sotto il 2 del 12 e le «×» fanno una
+    # colonna sola
+    qta_ = regola(".ord-riga-qta")
+    prova("la quantita' sta a destra nella sua colonna, in cifre "
+          "tabellari, e «2 ×» non si spezza", [True] * 3,
+          ["white-space:nowrap" in qta_, "text-align:right" in qta_,
+           "font-variant-numeric:tabular-nums" in qta_])
     # INCHIOSTRO E NON --muted: a 13px il 4,5:1 sulla pagina lo da'
     # `--ink-soft`, non il grigio degli incisi
     prova("l'elenco sta sull'inchiostro che passa l'AA", True,
@@ -12367,6 +12379,13 @@ const casi = {
     {titolo: LUNGO, quantita: 2, unitario_sats: 6500},
     {titolo: 'Candela', quantita: 3, unitario_sats: 4200}]},
   senza_prezzo: {righe: [{titolo: 'Pezzo', quantita: 2}]},
+  due_cifre: {righe: [
+    {titolo: 'Candela', quantita: 12, unitario_sats: 4200},
+    {titolo: 'Miso', quantita: 1, unitario_sats: 9800}]},
+  senza_quantita: {righe: [{titolo: 'Pezzo', unitario_sats: 500}]},
+  mille: {righe: [
+    {titolo: 'Bottoni', quantita: 12000, unitario_sats: 10},
+    {titolo: 'Ago', quantita: 3, unitario_sats: 40}]},
   cattivo: {righe: [{titolo: '<img src=x onerror=alert(1)>', quantita: 1, unitario_sats: 1}]},
 };
 const out = {};
@@ -12389,15 +12408,36 @@ console.log(JSON.stringify(out));
     tre = b["tre"]
     voci = re.findall(r"<li>([\s\S]*?)</li>", tre)
     prova("tre righe, tre voci d'elenco, in un elenco vero", (3, True),
-          (len(voci), tre.startswith('<ul class="ord-righe" role="list">')))
-    prova("ogni voce: il titolo, e poi il suo prezzo a parte",
-          [True] * 3,
-          [v.startswith('<span class="ord-riga-tit">')
+          (len(voci), tre.startswith('<ul class="ord-righe" role="list"')))
+    prova("ogni voce: la quantita', il titolo, e poi il suo prezzo a "
+          "parte", [True] * 3,
+          [v.startswith('<span class="ord-riga-qta">')
+           and '</span><span class="ord-riga-tit">' in v
            and '</span><span class="ord-riga-cifra">' in v for v in voci])
-    # LA QUANTITA' SOLO SOPRA 1, e dentro il titolo: va a capo con lui
-    prova("la quantita' compare solo sopra 1", ["", "× 2", "× 3"],
-          [(re.search(r'<span class="ord-riga-qta">([^<]*)</span>', v)
-            or [None, ""])[1] for v in voci])
+    # LA QUANTITA' IN TESTA, SEMPRE — anche 1 — e staccata dal titolo
+    # con uno spazio che non si spezza: «2 ×» resta intero
+    def qta(html):
+        return [x.group(1) for x in re.finditer(
+            r'<span class="ord-riga-qta">([^<]*)</span>', html)]
+    prova("la quantita' apre ogni riga, anche quando e' 1",
+          ["1\u00a0×", "2\u00a0×", "3\u00a0×"], qta(tre))
+    prova("...e senza quantita' nella riga vale 1", ["1\u00a0×"],
+          qta(b["senza_quantita"]))
+    prova("...e il puntino di prima non c'e' piu'", False, "•" in tre)
+    # LA COLONNA LARGA UGUALE: `--ord-qta` sono le cifre della quantita'
+    # piu' lunga dell'elenco, e vale per tutte le sue righe — 12 e 1
+    # stanno nella stessa colonna, e cosi' 12 000 (il separatore conta
+    # come una cifra: meglio un filo d'aria che uno sbordo; e in
+    # italiano 1500 si scrive senza, quindi il caso e' a cinque cifre)
+    prova("la colonna delle quantita' e' larga quanto la piu' lunga",
+          ['style="--ord-qta:1"', 'style="--ord-qta:2"',
+           'style="--ord-qta:6"'],
+          [(re.match(r'<ul class="ord-righe" role="list" (style="[^"]*")>',
+                     b[k]) or [None, None])[1]
+           for k in ("tre", "due_cifre", "mille")])
+    prova("...e le quantita' a due cifre e oltre si scrivono intere",
+          (["12\u00a0×", "1\u00a0×"], ["12\u202f000\u00a0×", "3\u00a0×"]),
+          (qta(b["due_cifre"]), qta(b["mille"])))
     # IL PREZZO E' QUELLO DELLA RIGA: unitario fotografato × quantita'
     prova("il prezzo di ognuno e' unitario × quantita'",
           ["18000", "13000", "12600"],
@@ -12405,10 +12445,9 @@ console.log(JSON.stringify(out));
     # IL TITOLO LUNGO resta intero, nel suo posto: a farlo andare a capo
     # sotto il proprio testo ci pensa la griglia qui sopra
     prova("il titolo lungo resta intero, nella colonna del titolo", True,
-          voci[1].startswith('<span class="ord-riga-tit">Set di '
-                             'sottobicchieri in sughero naturale con '
-                             'portabicchieri in legno di castagno, '
-                             'confezione regalo <span class="ord-riga-qta">'))
+          '<span class="ord-riga-tit">Set di sottobicchieri in sughero '
+          'naturale con portabicchieri in legno di castagno, confezione '
+          'regalo</span>' in voci[1])
     # SE LA RIGA NON HA IL PREZZO non se ne inventa uno
     prova("senza prezzo nella riga, niente cifra inventata", False,
           "ord-riga-cifra" in b["senza_prezzo"])

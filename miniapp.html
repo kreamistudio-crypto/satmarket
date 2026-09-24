@@ -5561,13 +5561,23 @@
      il prezzo totale stavano tutti attaccati — una riga di prosa dopo
      l'altra, subito sotto l'inciso della spedizione, e un titolo lungo
      che andava a capo si confondeva col pezzo dopo. Adesso sono un
-     ELENCO: una riga vuota di stacco dal prezzo, un puntino per pezzo,
-     e il prezzo di ognuno allineato a destra.
-     IL PUNTINO HA UNA COLONNA SUA, ed e' tutto il trucco del titolo
-     lungo: la riga e' una griglia (puntino, titolo, prezzo), quindi il
-     titolo che va a capo ricomincia sotto il PROPRIO testo e non sotto
-     il puntino. Il prezzo si allinea alla prima riga del titolo
-     (`baseline`), come in uno scontrino.
+     ELENCO: una riga vuota di stacco dal prezzo, la quantita' in testa
+     a ogni pezzo, e il prezzo di ognuno allineato a destra.
+     LA QUANTITA' APRE LA RIGA, SEMPRE (24 set 2026, secondo ritocco di
+     Andrea): «2 × Pesto», «1 × Miso» — anche quando e' 1, e al posto
+     del puntino di prima, che adesso non serve piu'. Ha una COLONNA
+     SUA, ed e' tutto il trucco del titolo lungo: la riga e' una griglia
+     (quantita', titolo, prezzo), quindi il titolo che va a capo
+     ricomincia sotto il PROPRIO testo e non sotto la quantita'.
+     La colonna e' LARGA UGUALE per tutte le righe di un elenco: tante
+     cifre quante ne ha la quantita' piu' lunga (`--ord-qta`, la scrive
+     `righeOrdine`) piu' lo spazio e la «×». Dentro, il numero si
+     allinea a DESTRA in cifre tabellari: il 2 sta sotto il 2 del 12, e
+     le «×» fanno una colonna sola, come in uno scontrino. Una larghezza
+     fissa in `ch` da sola (4ch) avrebbe tenuto fino a 99 e poi, a
+     cento pezzi, la quantita' sarebbe sbordata sul titolo: i pezzi per
+     annuncio arrivano a MAX_QUANTITA_ANNUNCIO, non a due cifre.
+     Il prezzo si allinea alla prima riga del titolo (`baseline`).
      Fra un pezzo e l'altro 8px in piu' dell'interlinea: senza, il
      titolo che va a capo e il pezzo dopo stavano alla stessa distanza.
      INCHIOSTRO E NON --muted: e' l'elenco di quel che si e' comprato, e
@@ -5578,11 +5588,12 @@
      schermo non sentirebbe piu' «elenco, tre elementi». */
   .ord-righe{list-style:none;margin:16px 0 14px;padding:0;font-size:13px;
     font-weight:600;line-height:1.4;color:var(--ink-soft)}
-  .ord-righe li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;
+  .ord-righe li{display:grid;
+    grid-template-columns:calc(var(--ord-qta,1)*1ch + 1em) minmax(0,1fr) auto;
     column-gap:8px;align-items:baseline}
   .ord-righe li+li{margin-top:8px}
-  .ord-righe li::before{content:'\2022';color:var(--muted)}
-  .ord-riga-qta{white-space:nowrap}
+  .ord-riga-qta{white-space:nowrap;text-align:right;
+    font-variant-numeric:tabular-nums}
   .ord-riga-cifra{font-family:'JetBrains Mono',monospace;font-size:12.5px;
     white-space:nowrap;text-align:right;padding-left:4px}
   /* Il nuovo ordine del dettaglio (lug 2026): data discreta sotto la
@@ -26528,8 +26539,11 @@ function zonaOrdine(o){
   return dove + (nome ? ` (${esc(nome)})` : '');
 }
 /* I PEZZI DI UN ORDINE A RIGHE, in elenco (23 set 2026, ritocco di
-   Andrea): «• Titolo × quantita'» — la quantita' solo sopra 1 — e il
-   prezzo del pezzo a destra. Il prezzo e' quello FOTOGRAFATO nella riga
+   Andrea): «2 × Titolo» — la quantita' in testa SEMPRE, anche 1 (24 set
+   2026, al posto del puntino) — e il prezzo del pezzo a destra.
+   `--ord-qta` e' quante cifre ha la quantita' piu' lunga dell'elenco:
+   la colonna delle quantita' la usa per essere larga uguale su tutte
+   le righe (il perche' sta nel foglio, sopra `.ord-righe`). Il prezzo e' quello FOTOGRAFATO nella riga
    (`unitario_sats` × quantita'), e si scrive solo se la riga ce l'ha:
    un elenco senza cifre e' meglio di una cifra inventata.
    Le righe arrivano solo per gli ordini a SET: un ordine di un pezzo
@@ -26540,12 +26554,13 @@ function zonaOrdine(o){
 function righeOrdine(o){
   const righe = (o && o.righe) || [];
   if (!righe.length) return '';
-  return `<ul class="ord-righe" role="list">${righe.map(r => {
+  const cifre = Math.max(...righe.map(r => fmt(r.quantita || 1).length));
+  return `<ul class="ord-righe" role="list" style="--ord-qta:${cifre}">${righe.map(r => {
     const q = r.quantita || 1;
-    const qta = q > 1 ? ` <span class="ord-riga-qta">× ${fmt(q)}</span>` : '';
     const cifra = Number.isFinite(r.unitario_sats)
       ? `<span class="ord-riga-cifra">${cifraOrdine(o, r.unitario_sats * q)}</span>` : '';
-    return `<li><span class="ord-riga-tit">${esc(r.titolo || '?')}${qta}</span>${cifra}</li>`;
+    return `<li><span class="ord-riga-qta">${fmt(q)}\u00A0×</span>`
+      + `<span class="ord-riga-tit">${esc(r.titolo || '?')}</span>${cifra}</li>`;
   }).join('')}</ul>`;
 }
 function incisoConto(o){
@@ -26972,7 +26987,8 @@ function openOrder(id){
       <div class="eur-hint" id="ordineSenzaCambio" style="margin-top:-6px;display:none">Di questo giorno non abbiamo il cambio: qui restano i sats.</div>
       ${/* il SET: l'elenco dei pezzi con gli unitari fotografati —
            qui la media «pezzi × unitario» mentirebbe. Dal 23 set 2026
-           e' un elenco puntato staccato dal prezzo: `righeOrdine` */''}
+           e' un elenco staccato dal prezzo, la quantita' in testa a
+           ogni riga (24 set): `righeOrdine` */''}
       ${righeOrdine(o)}
       ${o.scontoSats>0 ? `<div class="eur-hint" style="margin-top:-6px">🎁 Sconto sugli articoli${o.scontoPct?` −${o.scontoPct}%`:''}: <b>−${cifraOrdine(o, o.scontoSats)}</b> sul prezzo qui sopra</div>` : ''}
       ${/* la tariffa che il negozio ha offerto: il conto quadra anche
