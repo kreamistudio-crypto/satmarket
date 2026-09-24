@@ -30463,3 +30463,118 @@ dentro la WebView di Telegram, Android e iPhone: non provato); il
 foglio che si riapre dal dettaglio; il pieno di «Da pagare». Resta
 com'era, e segnalato: a chi VENDE la stessa riga dice «Da pagare», che
 letta da lui è ambigua.
+## Varianti e prodotti digitali dai negozi collegati (24 set 2026)
+
+**Da dove nasce.** Due segnalazioni dallo stesso WooCommerce collegato
+(«Un tempo per te»): il libro *Healthy Poke Bowls* in due formati —
+pdf 13 €, disponibile; cartaceo 15,90 €, esaurito — non era stato
+importato; il corso online *Lo Yoga dell'Ascolto: Hatha* era entrato
+come oggetto fisico, con «🚚 Spedizione disponibile» e «🤝 Ritiro in
+zona». Tutt'e due erano decisioni di agosto, scritte: il multi-variante
+si SALTAVA («`annunci` è piatto, le varianti sono un cantiere loro») e
+la consegna digitale sui connettori era «MAI» (il codice si consegna
+premendo un bottone QUI). Questo è il cantiere delle varianti, e
+rovescia la seconda per i soli prodotti che il NEGOZIO dichiara
+virtuali.
+
+**Le tre domande prima del codice.** 1) Né Shopify né Woo leggevano le
+varianti: Shopify saltava il prodotto con più di una («ha N varianti»),
+Woo il tipo `variable`; i saltati entravano in `viste` (giusto: non
+sono spariti) e finivano nel report, che il venditore riceve solo se
+nel giro nasce o si spegne qualcosa; nei log si stampa solo la riga di
+riepilogo, mai i saltati. 2) `virtual`, `downloadable` e
+`requires_shipping` non erano letti da nessuno: la consegna veniva dal
+cassetto, una per catalogo, fisica per costruzione. 3) Le varianti in
+Barattolo non esistono; il digitale è `consegna='digitale'`: il bene lo
+scrive il venditore DENTRO l'ordine dopo il pagamento (testo
+obbligatorio, foto facoltativa, cifrato a riposo), il compratore lo
+rivela e quel gesto vale «consegnato». Nessun campo sull'annuncio col
+link: il venditore lo incolla a ogni ordine, che è lo stesso gesto della
+spedizione. «Servizio» no: vuole un appuntamento, la leva è spenta, e un
+negozio non sa dirci quale prodotto virtuale sia una prestazione.
+
+**Cosa si è deciso.** Un annuncio per variante, «Titolo — pdf», con
+prezzo e giacenza della variante; le esaurite nascono 'venduto'. Tutto
+ciò che il negozio dichiara virtuale o scaricabile è digitale: niente
+spedizione né ritiro, costi del negozio a zero. Il perché del rovescio:
+la riga di agosto riguardava il CASSETTO, che non può promettere
+«codice online» per tutto il catalogo; qui a dichiararlo è il negozio
+prodotto per prodotto, e il venditore del collegamento è una persona
+su Barattolo che il bottone ce l'ha. `CONSEGNE_NEGOZIO` resta fisico.
+
+**Com'è fatto.** L'esplosione sta PRIMA del traduttore e non dentro:
+`esplodi_shopify` e `esplodi_woo` fanno di ogni variante un prodotto
+finto nella forma della sua piattaforma (una variante dentro, titolo
+composto, foto della variante davanti, testo e categorie del padre) e
+il traduttore lo legge come sempre — prezzo, IVA, stato, testo canonico
+dalle stesse righe. Chiave `padre:variante`; il mono-variante tiene
+l'id di ieri, nessuna riga in vetrina cambia nome. Su Woo le variazioni
+vivono a `/products/{id}/variations`: le aggancia il lettore in
+`_variazioni`, DOPO il taglio al tetto (la prova del collegamento legge
+con tetto 1 e non deve bussare cento volte), con l'URL composto
+dall'id intero, e ALZA su una risposta storta — una lista a metà
+farebbe passare le figlie non lette per sparite, cioè spente per
+sempre. Il variabile arrivato intero al traduttore si salta dicendo
+quale caso è («non le ho potute leggere» o «nessuna delle sue varianti
+è in vendita»). `manage_stock: 'parent'` si scioglie nell'esplosione,
+che prende i numeri del padre. Il flag `digitale` nella riga; il
+giudice unico `consegna_riga` (consegna e costi) letto da nascita e
+aggiornamento; `_aggiorna` corregge la consegna SOLO quando la strada
+cambia (il cassetto è l'altro scrittore della colonna fisica) e conta
+`consegna_corretta`; `_applica_dichiarazione` ricopre la consegna delle
+sole righe non digitali, la geografia di tutte. Il digitale con
+giacenza ignota nasce «pezzo unico» come ogni stock ignoto ma non si
+esaurisce: venduto, il giro dopo lo rimette in vetrina con un pezzo
+(fuori al massimo un'ora), e `registra_uscita_negozio` non lo conta —
+un PDF non ha un magazzino da scalare, e «aggiorna il magazzino» a ogni
+vendita sarebbe una bugia. Con giacenza contata tutto resta come per i
+fisici. Il report porta `entrati` (titolo, digitale, stato; i primi
+30, il conto vero è `nuovi`); la notifica elenca i primi cinque coi
+digitali marcati («il contenuto lo consegni tu, dall'ordine») e parte
+anche per la sola consegna corretta; il cassetto mostra il riepilogo
+dell'ultimo giro (`riepilogoGiroConnettore`, giudice puro), che prima
+non stava da nessuna parte.
+
+**Strade scartate.** Un campo «link» sull'annuncio digitale importato:
+non esiste nel flusso di Barattolo e servirebbe a un solo caso. Le
+varianti come colonna di `annunci`: il cantiere di agosto l'aveva già
+detto, e ogni lettore dell'annuncio andrebbe riscritto. Un numero di
+copie inventato per il digitale senza magazzino (99, 999999): il
+negozio non lo dice, e in vetrina comparirebbe «N disponibili» detto da
+noi. Il rovescio, lasciare il PDF 'venduto' dopo la prima vendita: un
+digitale importato che sparisce alla prima vendita non è importato.
+Alzare sul solo tetto per le variazioni, o tornare a metà: la metà è
+la sparizione falsa. Esentare i variabili dal giro finché le variazioni
+non si leggono (il cambio di forma semplice → variabile spegne la riga
+vecchia e fa nascere le figlie): è una sparizione VERA della chiave, e
+si dichiara invece di nasconderla.
+
+**Provato.** `prove_connettori_varianti` (57): esplosione Shopify e
+Woo girate, chiavi, titoli, foto, prezzi e giacenze per variante, il
+'parent', la privata, il titolo lungo che tiene l'opzione, il semplice
+invariato, virtuale/scaricabile → digitale, il lettore che chiede le
+variazioni solo entro il tetto e alza sul 500, la riconciliazione su un
+database di cartone (PDF digitale a costi zero, cartaceo col cassetto
+ed esaurito, il pregresso corretto al giro dopo e il rovescio, a
+strada ferma non si tocca, il PDF venduto che torna, il fisico ignoto
+che resta venduto come ieri, il digitale contato a zero, semplice →
+variabile), il server per forma, il riepilogo del cassetto girato in
+node. Emendate: la cintura del traduttore Shopify, il messaggio del
+`variable` Woo, due tabelle di cartone che ora portano `consegna` e
+`origine_stock_visto` (il registro le legge). `collaudo_connettori`
+sul server vero 121/0, con la sezione 16 (il libro in due formati, il
+corso corretto al giro dopo, il ritocco del cassetto che non tocca i
+digitali, la vendita del PDF senza registro e il ritorno in vetrina,
+il cartaceo rifornito); la Maglietta Shopify del collaudo entra ora in
+tre righe. Suite intera severa senza config verde sull'albero del
+worktree.
+
+**Da guardare (Andrea).** Sul VPS, al primo giro dopo il deploy: nel
+journal la riga `↔ consegna corretta (digitale): Lo Yoga…` e le due
+righe `🏪 Healthy Poke Bowls — pdf … · digitale` e `— cartaceo`; nel
+cassetto del venditore il riepilogo; la notifica «1 con la consegna
+corretta». Poi la scheda del corso senza «🚚» né «🤝», e la cassa che
+chiede al venditore il contenuto. Restano dichiarate: il digitale
+senza magazzino è fuori vetrina fino a un'ora dopo ogni vendita; un
+ordine pagato di un digitale importato passa dal venditore che incolla
+il link, come per i buoni nati qui.

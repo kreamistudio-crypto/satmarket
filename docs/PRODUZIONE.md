@@ -1904,3 +1904,19 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   cancellare subito). Scaduta non blocca niente — le release escono lo
   stesso — ma il legame smette di essere dimostrabile. Il perché e il
   rito per esteso stanno in ARCHITETTURA, «Distribuzione dell'APK».
+- DOVE SI LEGGE IL GIRO DEI NEGOZI COLLEGATI (set 2026): il giro
+  dell'ora stampa una riga per annuncio nato (`🏪 Titolo — prezzo €
+  [categoria]`, con ` · digitale` sui virtuali), una per consegna
+  corretta (`↔ consegna corretta (digitale|del cassetto): Titolo`),
+  una per spegnimento (`🗑 tolto dal negozio`) e la riga di riepilogo
+  `🏪 woo #<id>: N nuovi, …, K saltati`; i SALTATI col loro perché
+  NON si stampano, stanno nel JSON `connettori.ultimo_esito`
+  (`saltati`, `entrati`, `consegna_corretta`), che è quello che il
+  cassetto del venditore mostra. In sola lettura:
+  `journalctl -u barattolo --since "48h ago" | grep -E "🏪|Connettore|↔|🗑"`
+  e `sqlite3 -readonly satmarket.db "SELECT id, fonte, url_negozio,
+  datetime(ultimo_giro,'unixepoch','localtime'), ultimo_errore,
+  ultimo_esito FROM connettori"`. Un `variable` Woo che nel report dice
+  «ha piu' varianti e non le ho potute leggere» è un lettore che non ha
+  agganciato le variazioni (chiamata fuori dal lettore); «nessuna delle
+  sue varianti e' in vendita» è il negozio.

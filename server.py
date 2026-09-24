@@ -53349,12 +53349,18 @@ except ImportError:
 # «WooCommerce».
 FONTI_NEGOZIO = ("shopify", "woo")
 
-# Le strade di consegna che un negozio collegato puo' dichiarare, e
-# sono le tre FISICHE. Niente 'digitale' — il codice si consegna
-# premendo un bottone QUI, e un e-commerce quel bottone non ce l'ha:
-# e' la stessa regola gia' scritta per i tag NIP-99, dove
-# `estrai_commercio` butta via la consegna digitale apposta — e niente
-# 'servizio', che non e' merce che viaggia.
+# Le strade di consegna che un negozio collegato puo' dichiarare NEL
+# CASSETTO, e sono le tre FISICHE: valgono per tutto il catalogo, e un
+# negozio non puo' promettere «codice online» per ogni prodotto.
+# Niente 'servizio', che non e' merce che viaggia.
+# ⚠️ MA IL 'digitale' SULLE RIGHE ESISTE (set 2026), e non passa da
+# qui: lo dichiara il NEGOZIO prodotto per prodotto (Woo `virtual` o
+# `downloadable`, Shopify `requires_shipping: false`) e lo scrive
+# `importa_negozio.consegna_riga` — niente spedizione, niente ritiro,
+# costi a zero. Il bottone «consegna il contenuto» lo preme il
+# venditore del collegamento, che e' una persona qui dentro; la
+# vecchia riga «la consegna digitale MAI» riguardava il cassetto, e
+# per il cassetto vale ancora.
 CONSEGNE_NEGOZIO = ("spedizione", "ritiro", "entrambe")
 
 # Chi e' in mezzo a un giro. Serve da quando il giro si puo' chiedere
@@ -53514,9 +53520,19 @@ def registra_uscita_negozio(con, ordine_id: int, righe: list,
     fuori = []
     for r in righe:
         a = con.execute(
-            "SELECT contatto_nostr, fonte, connettore_id, titolo "
+            "SELECT contatto_nostr, fonte, connettore_id, titolo, "
+            "consegna, origine_stock_visto "
             "FROM annunci WHERE id=?", (r["annuncio_id"],)).fetchone()
         if not a or not da_connettore(a):
+            continue
+        # IL DIGITALE SENZA MAGAZZINO NON HA NIENTE DA SCALARE (set
+        # 2026): un PDF che il negozio non conta non e' un pezzo che di
+        # la' «risulta ancora disponibile» — e' disponibile davvero, e
+        # la riga «aggiorna il magazzino» sarebbe una bugia a ogni
+        # vendita. Con la giacenza contata (licenze numerate) il
+        # registro vale come per la merce fisica.
+        if a["consegna"] == "digitale" and int(a["origine_stock_visto"]
+                                               or -1) < 0:
             continue
         pezzi = int(r["quantita"] or 1)
         if tipo == "rimborso":
@@ -53828,11 +53844,18 @@ async def _chiudi_giro_connettore(c: dict, esito: dict):
     con.commit()
     con.close()
     if not (esito["nuovi"] or esito["spenti"] or esito["in_revisione"]
-            or esito["falliti"]):
+            or esito["falliti"] or esito.get("consegna_corretta")):
         return
     pezzi = []
     if esito["nuovi"]:
         pezzi.append(f"{esito['nuovi']} in vetrina")
+    # (set 2026) la consegna corretta si dice: e' il giro che rimette
+    # a posto un corso online importato come pacco, e il venditore
+    # deve sapere che da adesso quel prodotto lo consegna lui,
+    # dall'ordine
+    if esito.get("consegna_corretta"):
+        pezzi.append(f"{esito['consegna_corretta']} con la consegna "
+                     f"corretta")
     if esito["spenti"]:
         pezzi.append(f"{esito['spenti']} tolti (non sono più sul negozio)")
     if esito["in_revisione"]:
@@ -53847,11 +53870,26 @@ async def _chiudi_giro_connettore(c: dict, esito: dict):
     if esito.get("rimandati"):
         pezzi.append(f"{esito['rimandati']} in arrivo ai prossimi giri")
     coda = ""
+    # I TITOLI ENTRATI (set 2026), coi digitali marcati: «quali
+    # prodotti sono stati importati» e non solo quanti. I primi
+    # cinque, come i saltati; il resto sta nel cassetto.
+    entrati = [e for e in esito.get("entrati") or [] if e.get("titolo")]
+    if entrati:
+        righe_e = "\n".join(
+            f"• {html.escape(e['titolo'])}"
+            + (" 💾 digitale: il contenuto lo consegni tu, dall'ordine"
+               if e.get("digitale") else "")
+            + (" (esaurito, fuori vetrina)" if e.get("stato") == "venduto"
+               else "")
+            for e in entrati[:5])
+        if len(entrati) > 5 or esito["nuovi"] > len(entrati):
+            righe_e += f"\n• …e altri {max(esito['nuovi'], len(entrati)) - 5}"
+        coda += f"\n\nEntrati:\n{righe_e}"
     if esito["saltati"]:
         primi = "\n".join(
             f"• {html.escape(s['titolo'] or '—')}: {html.escape(s['perche'])}"
             for s in esito["saltati"][:5])
-        coda = f"\n\nSaltati:\n{primi}"
+        coda += f"\n\nSaltati:\n{primi}"
     await notifica(
         c["tg_id"],
         f"🏪 <b>Il tuo catalogo è aggiornato</b>\n\n"
@@ -54240,7 +54278,12 @@ def _applica_dichiarazione(con, cid: int, c: dict):
     la sigla cambierebbe in vetrina e il filtro per regione
     continuerebbe a dire quella di ieri.
     I 'rimosso' restano com'erano: quella e' storia, e non si
-    riscrive."""
+    riscrive.
+    E I DIGITALI NEMMENO (set 2026): la loro consegna la dichiara il
+    negozio prodotto per prodotto (`consegna_riga`), non il cassetto —
+    ricoprirla qui rimetterebbe «🚚 Spedizione» su un corso online a
+    ogni ritocco della tariffa. La geografia invece scende anche su
+    di loro: la zona e' del venditore, non della merce."""
     lat, lon = coordinate_da_zona(c["zona"])
     # LE TARIFFE SCENDONO IN TUTT'E DUE LE VALUTE (set 2026): nella
     # scelta i numeri, nell'altra ZERI. Non basta scrivere i sats:
@@ -54249,17 +54292,20 @@ def _applica_dichiarazione(con, cid: int, c: dict):
     # sats appena dichiarati, e il compratore pagherebbe la tariffa
     # vecchia col cambio del momento.
     con.execute(
+        "UPDATE annunci SET zona=?, lat=?, lon=?, regione=? "
+        "WHERE connettore_id=? AND stato<>'rimosso'",
+        (c["zona"], lat, lon, regione_da_zona(c["zona"]), cid))
+    con.execute(
         "UPDATE annunci SET consegna=?, spedizione_eur=?, "
         "spedizione_sats=?, spedizione_punto_eur=?, "
         "spedizione_punto_sats=?, spedizione_punto_dichiarata=?, "
-        "spedizione_extra_eur=?, spedizione_extra_sats=?, "
-        "zona=?, lat=?, lon=?, regione=? "
-        "WHERE connettore_id=? AND stato<>'rimosso'",
+        "spedizione_extra_eur=?, spedizione_extra_sats=? "
+        "WHERE connettore_id=? AND stato<>'rimosso' "
+        "AND consegna<>'digitale'",
         (c["consegna"], c["spedizione_eur"], c["spedizione_sats"],
          c["spedizione_punto_eur"], c["spedizione_punto_sats"],
          c["spedizione_punto_dichiarata"], c["spedizione_extra_eur"],
-         c["spedizione_extra_sats"],
-         c["zona"], lat, lon, regione_da_zona(c["zona"]), cid))
+         c["spedizione_extra_sats"], cid))
 
 
 async def _sync_uno(cid: int):

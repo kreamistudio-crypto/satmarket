@@ -31254,6 +31254,39 @@ async function segnaPaccoRicevuto(btn, id){
 
 let myConnettori = null;      /* cache, azzerata dopo ogni mutazione */
 let connettoriLeve = null;    /* le leve vengono dal server, mai qui */
+
+/* IL RIEPILOGO DELL'ULTIMO GIRO, sotto la riga del negozio (set 2026):
+   fin qui il report del giro viveva solo nella notifica Telegram, e
+   solo quando era nato o spento qualcosa — un venditore che cercava
+   il suo libro non aveva NESSUN posto dove leggere «ha piu' varianti».
+   Qui si dicono i titoli entrati (coi digitali marcati: li consegna
+   lui, dall'ordine) e i saltati col loro perche', i primi cinque per
+   lista. Testo del NEGOZIO su un tubo HTML: passa da esc(). Giudice
+   puro — report in, HTML out — cosi' si prova senza un server. */
+function riepilogoGiroConnettore(e){
+  if (!e || typeof e !== 'object') return '';
+  const entrati = Array.isArray(e.entrati) ? e.entrati.filter(x => x && x.titolo) : [];
+  const saltati = Array.isArray(e.saltati) ? e.saltati.filter(x => x && x.perche) : [];
+  const corrette = Number(e.consegna_corretta) || 0;
+  if (!entrati.length && !saltati.length && !corrette) return '';
+  const st = 'font-size:12px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:4px';
+  const voce = t => `<div style="padding-left:10px">• ${t}</div>`;
+  let h = `<div style="${st}">`;
+  if (entrati.length){
+    h += `<div>Ultimo giro, entrati (${fmt(e.nuovi || entrati.length)}):</div>`;
+    h += entrati.slice(0, 5).map(x => voce(esc(x.titolo)
+      + (x.digitale ? ' <span title="Il contenuto lo consegni tu, dall\'ordine">💾 digitale</span>' : '')
+      + (x.stato === 'venduto' ? ' <span style="color:var(--muted)">(esaurito)</span>' : ''))).join('');
+    if ((e.nuovi || entrati.length) > 5) h += voce(`…e altri ${fmt((e.nuovi || entrati.length) - 5)}`);
+  }
+  if (corrette) h += `<div>${fmt(corrette)} con la consegna corretta (digitale ⇄ del cassetto)</div>`;
+  if (saltati.length){
+    h += `<div>Saltati (${fmt(saltati.length)}):</div>`;
+    h += saltati.slice(0, 5).map(x => voce(`${esc(x.titolo || '—')}: ${esc(x.perche)}`)).join('');
+    if (saltati.length > 5) h += voce(`…e altri ${fmt(saltati.length - 5)}`);
+  }
+  return h + '</div>';
+}
 let connInModifica = 0;
 let bozzaConn = null;
 
@@ -31343,6 +31376,7 @@ async function renderConnettori(){
         <button style="${az}" title="Scollega" onclick="scollegaConnettore(${c.id})">🔌</button>
       </div>
       ${c.ultimo_errore ? `<div style="font-size:12px;color:var(--danger);font-weight:700;margin-top:4px;line-height:1.4">${esc(c.ultimo_errore)}</div>` : ''}
+      ${riepilogoGiroConnettore(c.esito)}
     </div>`;
   };
   const pieno = myConnettori.length >= tetto && !connInModifica;

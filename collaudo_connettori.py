@@ -32,7 +32,13 @@ Le altre domande che si fanno insieme a quella:
     invariato, all'AI non si chiede niente;
   · quel che il negozio non dichiara non si inventa (lo stock non
     tracciato) e quel che non sappiamo trattare si salta DICENDOLO
-    (i multi-variante);
+    (gruppi e affiliazioni; i multi-variante dal set 2026 ENTRANO,
+    una riga per variante — vedi la sezione 16);
+  · (set 2026) il libro in due formati diventa due annunci, il PDF e
+    il corso online nascono DIGITALI senza spedizione ne' ritiro, il
+    corso importato ieri come pacco si corregge al giro dopo, e la
+    vendita di un PDF senza magazzino non scrive il registro e torna
+    in vetrina al giro dopo;
   · a SCRIVERE il registro c'e' `_incassa_ordine` (tappa 4), e un
     annuncio nato qui non ci entra;
   · un reso lo rimette in pari — se il negozio non aveva ancora
@@ -70,6 +76,7 @@ USO:  python collaudo_connettori.py
 import asyncio
 import json
 import os
+import re
 import sqlite3
 import sys
 import tempfile
@@ -120,6 +127,21 @@ TASSE_WOO = ["yes"]     # woocommerce_calc_taxes
 # pagina del negozio. {prefisso: (stato, corpo, intestazioni)}.
 RISPOSTE_WOO = {}
 IVA_WOO = ["yes"]       # woocommerce_prices_include_tax
+# le variazioni dei prodotti `variable`, per id del padre (set 2026):
+# su Woo vivono a un indirizzo loro, e il lettore le chiede a parte
+VARIAZIONI_WOO = {}
+
+
+def variazione_woo(vid, prezzo, opzione, stock=None, gestito=False,
+                   disponibile="instock", virtuale=False,
+                   scaricabile=False, stato="publish", foto=""):
+    return {"id": vid, "price": prezzo, "regular_price": prezzo,
+            "status": stato, "manage_stock": gestito,
+            "stock_quantity": stock if gestito else None,
+            "stock_status": disponibile, "virtual": virtuale,
+            "downloadable": scaricabile,
+            "attributes": [{"id": 0, "name": "Formato", "option": opzione}],
+            "image": {"src": foto} if foto else None}
 
 
 def prodotto(pid, titolo, prezzo="7.50", stock=12, stato="active",
@@ -128,7 +150,10 @@ def prodotto(pid, titolo, prezzo="7.50", stock=12, stato="active",
     v = [{"id": pid * 10 + k, "price": prezzo,
           "inventory_quantity": stock,
           "inventory_management": "shopify" if gestito else None,
-          "inventory_item_id": pid * 100 + k}
+          "inventory_item_id": pid * 100 + k,
+          # col multi-variante ogni variante ha il suo nome, come sul
+          # negozio vero («S», «M»...): e' quel che finisce nel titolo
+          **({"title": f"T{k + 1}"} if varianti > 1 else {})}
          for k in range(varianti)]
     return {"id": pid, "title": titolo, "body_html": desc, "status": stato,
             "product_type": tipo, "variants": v,
@@ -180,6 +205,10 @@ def api_finta(metodo, url, intestazioni):
     if url.endswith("/settings/tax"):
         return 200, {"lista": [{"id": "woocommerce_prices_include_tax",
                                 "value": IVA_WOO[0]}]}, {}
+    m = re.search(r"/products/(\d+)/variations", url)
+    if m:
+        return 200, {"lista": list(VARIAZIONI_WOO.get(int(m.group(1)),
+                                                      []))}, {}
     return (200, {"lista": list(CATALOGO_WOO)},
             {"X-WP-Total": str(len(CATALOGO_WOO))})
 
@@ -394,8 +423,11 @@ def main():
     ]
     giro()
     righe = annunci(cid)
-    prova("entrano i prodotti trattabili (il multi-variante no)",
-          {"Miele di castagno", "Olio EVO 500ml", "Birra artigianale"},
+    # (set 2026) il multi-variante non si salta piu': entra come UNA
+    # RIGA PER VARIANTE, «Titolo — variante»
+    prova("entrano i prodotti trattabili, e il multi-variante per variante",
+          {"Miele di castagno", "Olio EVO 500ml", "Birra artigianale",
+           "Maglietta — T1", "Maglietta — T2", "Maglietta — T3"},
           {a["titolo"] for a in righe if a["stato"] == "attivo"})
     miele = uno(cid, 1)
     prova("il prezzo e' il listino in EURO", (7.5, "eur"),
@@ -419,16 +451,20 @@ def main():
           birra["origine_stock_visto"])
     prova("la bozza non entra in vetrina", "rimosso",
           uno(cid, 5)["stato"])
-    prova("il multi-variante non diventa un annuncio", None, uno(cid, 3))
+    prova("il PADRE multi-variante non e' un annuncio: lo sono le figlie",
+          (None, "3:30", 20.0),
+          (uno(cid, 3), uno(cid, "3:30")["origine_chiave"],
+           uno(cid, "3:30")["prezzo_eur"]))
     con = SRV.db()
     esito = json.loads(con.execute(
         "SELECT ultimo_esito FROM connettori WHERE id=?", (cid,)
     ).fetchone()[0])
     con.close()
-    prova("...ma il report lo dice, col motivo",
-          ["ha 3 varianti"],
-          [s["perche"] for s in esito["saltati"]
-           if s["titolo"].startswith("Maglietta")])
+    prova("...e il report non le salta: le elenca fra gli ENTRATI",
+          ([], 3),
+          ([s for s in esito["saltati"] if s["titolo"].startswith("Maglietta")],
+           len([e for e in esito["entrati"]
+                if e["titolo"].startswith("Maglietta")])))
     prova("il venditore riceve UN riepilogo", 1, len(NOTIFICHE))
 
     # ---- 2. il secondo giro, a catalogo fermo ------------------------
@@ -437,7 +473,9 @@ def main():
     giro()
     prova("a testo invariato all'AI non si chiede niente", prima,
           len(CHIAMATE_AI))
-    prova("...e non nasce nessun doppione", 4, len(annunci(cid)))
+    # sette: Miele, Olio, Birra, la bozza rimossa e le TRE varianti della
+    # Maglietta (set 2026); erano quattro quando il multi-variante si saltava
+    prova("...e non nasce nessun doppione", 7, len(annunci(cid)))
     prova("...ne' un secondo riepilogo (niente e' successo)", 1,
           len(NOTIFICHE))
 
@@ -618,8 +656,10 @@ def main():
     # I TRE TIPI CHE NON SAPPIAMO TRATTARE, e `external` e' quello che
     # si dimentica: un prezzo ce l'ha e sembra un prodotto normale, ma
     # il suo bottone porta su un ALTRO sito.
+    # (set 2026) il `variable` si legge; la Maglietta qui non ha
+    # variazioni in vendita, e il motivo dice QUELLO
     prova("i tre tipi che non sappiamo trattare si saltano, col motivo",
-          {"Maglietta": "ha piu' varianti",
+          {"Maglietta": "nessuna delle sue varianti e' in vendita",
            "Set di posate": "e' un gruppo di prodotti",
            "Corso di cucina": "si compra su un altro sito"},
           {s["titolo"]: s["perche"] for s in esito["saltati"]
@@ -898,6 +938,132 @@ def main():
     prova("...e la giacenza qui dice la verita', non quella del negozio",
           4, uno(wid, 11)["quantita"])
 
+
+    # ---- 16. VARIANTI E DIGITALI (set 2026) --------------------------
+    # LE DUE SEGNALAZIONI DI «UN TEMPO PER TE», sul percorso vero: il
+    # libro in PDF o cartaceo che non entrava («ha piu' varianti») e il
+    # corso online entrato con «🚚 Spedizione» e «🤝 Ritiro».
+    print("\n[varianti e digitali: il libro in due formati e il corso]")
+    NOTIFICHE.clear()
+    CATALOGO_WOO.extend([
+        prodotto_woo(18, "Healthy Poke Bowls", "13.00", tipo="variable",
+                     gestito=False),
+        # il corso, OGGI dichiarato fisico sul negozio: e' il pregresso
+        # della segnalazione, che si corregge qui sotto
+        prodotto_woo(19, "Lo Yoga dell'Ascolto", "45.00", gestito=False),
+    ])
+    VARIAZIONI_WOO[18] = [
+        variazione_woo(181, "13.00", "pdf", virtuale=True, scaricabile=True,
+                       foto="https://cdn.esempio/pdf.jpg"),
+        variazione_woo(182, "15.90", "cartaceo", disponibile="outofstock"),
+    ]
+    giro()
+    pdf, carta = uno(wid, "18:181"), uno(wid, "18:182")
+    corso = uno(wid, 19)
+    prova("il variabile entra: un annuncio per variante, «Titolo — formato»",
+          ("Healthy Poke Bowls — pdf", "Healthy Poke Bowls — cartaceo"),
+          (pdf and pdf["titolo"], carta and carta["titolo"]))
+    prova("...il PADRE no", None, uno(wid, 18))
+    prova("il PDF e' DIGITALE: niente spedizione ne' ritiro, costi a zero",
+          ("digitale", 0.0, 0.0, 0, 0.0, "attivo", 1),
+          (pdf["consegna"], pdf["spedizione_eur"], pdf["spedizione_punto_eur"],
+           pdf["spedizione_punto_dichiarata"], pdf["spedizione_extra_eur"],
+           pdf["stato"], pdf["quantita"]))
+    prova("il cartaceo ha la consegna del CASSETTO e, esaurito, e' fuori vetrina",
+          ("spedizione", 5.0, "venduto", 0),
+          (carta["consegna"], carta["spedizione_eur"], carta["stato"],
+           carta["quantita"]))
+    prova("...coi prezzi di ciascuna variante", (13.0, 15.9),
+          (pdf["prezzo_eur"], carta["prezzo_eur"]))
+    prova("...e la foto della variante davanti", True,
+          json.loads(pdf["origine_foto"])[0].endswith("pdf.jpg"))
+    prova("il corso, oggi fisico sul negozio, entra col cassetto",
+          ("spedizione", 5.0), (corso["consegna"], corso["spedizione_eur"]))
+    con = SRV.db()
+    esito = json.loads(con.execute(
+        "SELECT ultimo_esito FROM connettori WHERE id=?", (wid,)
+    ).fetchone()[0])
+    con.close()
+    prova("il report dice CHI e' entrato, coi digitali marcati",
+          {("Healthy Poke Bowls — pdf", True, "attivo"),
+           ("Healthy Poke Bowls — cartaceo", False, "venduto"),
+           ("Lo Yoga dell'Ascolto", False, "attivo")},
+          {(e["titolo"], e["digitale"], e["stato"]) for e in esito["entrati"]})
+    venditore = [t for chi, t in NOTIFICHE if chi == VENDITORE]
+    prova("...e la notifica elenca gli entrati", True,
+          bool(venditore) and "Entrati:" in venditore[-1]
+          and "💾 digitale" in venditore[-1]
+          and "(esaurito, fuori vetrina)" in venditore[-1])
+
+    # (d) IL PREGRESSO SI CORREGGE AL GIRO DOPO: il negozio spunta
+    # «Virtuale» sul corso, e da qui non serve nessun gesto
+    NOTIFICHE.clear()
+    CATALOGO_WOO[-1] = dict(prodotto_woo(19, "Lo Yoga dell'Ascolto", "45.00",
+                                         gestito=False), virtual=True)
+    giro()
+    corso = uno(wid, 19)
+    prova("al giro dopo il corso e' digitale, coi costi a zero",
+          ("digitale", 0.0, 0.0, 0, 0.0),
+          (corso["consegna"], corso["spedizione_eur"],
+           corso["spedizione_punto_eur"], corso["spedizione_punto_dichiarata"],
+           corso["spedizione_extra_eur"]))
+    venditore = [t for chi, t in NOTIFICHE if chi == VENDITORE]
+    prova("...e il venditore lo viene a sapere", True,
+          bool(venditore) and "con la consegna corretta" in venditore[-1])
+
+    # LA DICHIARAZIONE DEL CASSETTO NON RICOPRE I DIGITALI: un ritocco
+    # alla tariffa scende sul cartaceo e lascia stare PDF e corso
+    con = SRV.db()
+    SRV._applica_dichiarazione(con, wid, {
+        "consegna": "entrambe", "spedizione_eur": 7.0,
+        "spedizione_punto_eur": 0.0, "spedizione_punto_dichiarata": 0,
+        "spedizione_extra_eur": 0.0,
+        "spedizione_sats": 0, "spedizione_punto_sats": 0,
+        "spedizione_extra_sats": 0, "zona": "Carmagnola (TO)"})
+    con.commit()
+    con.close()
+    prova("il ritocco del cassetto scende sul cartaceo...",
+          ("entrambe", 7.0),
+          (uno(wid, "18:182")["consegna"], uno(wid, "18:182")["spedizione_eur"]))
+    prova("...e NON sul PDF ne' sul corso", ("digitale", 0.0, "digitale", 0.0),
+          (uno(wid, "18:181")["consegna"], uno(wid, "18:181")["spedizione_eur"],
+           uno(wid, 19)["consegna"], uno(wid, 19)["spedizione_eur"]))
+    con = SRV.db()
+    SRV._applica_dichiarazione(con, wid, {
+        "consegna": "spedizione", "spedizione_eur": 5.0,
+        "spedizione_punto_eur": 0.0, "spedizione_punto_dichiarata": 0,
+        "spedizione_extra_eur": 0.0,
+        "spedizione_sats": 0, "spedizione_punto_sats": 0,
+        "spedizione_extra_sats": 0, "zona": "Carmagnola (TO)"})
+    con.commit()
+    con.close()
+
+    # LA VENDITA DEL PDF: non c'e' un magazzino da scalare, quindi il
+    # registro non lo conta e il venditore non riceve «aggiorna il
+    # magazzino»; e al giro dopo il PDF e' di nuovo in vetrina
+    NOTIFICHE.clear()
+    ordine = ordine_pagato(pdf["id"])
+    asyncio.run(SRV._incassa_ordine(ordine))
+    prova("il PDF venduto e' fuori vetrina, per ora", ("venduto", 0),
+          (uno(wid, "18:181")["stato"], uno(wid, "18:181")["quantita"]))
+    con = SRV.db()
+    uscite = con.execute("SELECT COUNT(*) FROM connettori_uscite "
+                         "WHERE annuncio_id=?", (pdf["id"],)).fetchone()[0]
+    con.close()
+    prova("...il registro NON lo conta: niente da scalare sul negozio", 0,
+          uscite)
+    venditore = [t for chi, t in NOTIFICHE if chi == VENDITORE]
+    prova("...e nessun «aggiorna il magazzino» al venditore", False,
+          any("Aggiorna il magazzino" in t for t in venditore))
+    giro()
+    prova("al giro dopo il PDF e' di nuovo in vetrina", ("attivo", 1),
+          (uno(wid, "18:181")["stato"], uno(wid, "18:181")["quantita"]))
+    # e il cartaceo che il negozio rifornisce torna come sempre
+    VARIAZIONI_WOO[18][1] = variazione_woo(182, "15.90", "cartaceo",
+                                           gestito=True, stock=2)
+    giro()
+    prova("il cartaceo rifornito sul negozio torna in vetrina", ("attivo", 2),
+          (uno(wid, "18:182")["stato"], uno(wid, "18:182")["quantita"]))
 
     # ---- 7. il cassetto e i suoi endpoint (tappa 5) -----------------
     print("\n[tappa 5: il cassetto e i suoi endpoint]")

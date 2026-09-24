@@ -23590,6 +23590,35 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   è uno solo, cambia solo chi firma l'evento.
   Il disegno è documentato in `proposte/` (la PR al repo dei NIP resta
   in backlog).
+- LE VARIANTI E I DIGITALI DEI NEGOZI COLLEGATI (set 2026): un
+  prodotto con più varianti diventa UN ANNUNCIO PER VARIANTE («Titolo
+  — pdf», «Titolo — cartaceo»), col prezzo e la giacenza della
+  variante; le esaurite nascono 'venduto' come ogni esaurito. `annunci`
+  resta piatto: l'esplosione sta PRIMA del traduttore
+  (`esplodi_shopify`, `esplodi_woo`, il dispatch in `traduci`) e ogni
+  figlio è un prodotto finto nella forma della sua piattaforma, con
+  una sola variante dentro — così prezzo, IVA, stato e testo canonico
+  passano dalle righe di sempre. La chiave del figlio è
+  `padre:variante`; il mono-variante tiene la chiave di ieri. Il
+  cambio di forma (semplice → variabile) è una sparizione dichiarata:
+  la riga vecchia si spegne, le figlie nascono. Su Woo le variazioni
+  vivono a un altro indirizzo: le aggancia il lettore
+  (`_variazioni_woo`, URL composto dall'id intero, DOPO il taglio al
+  tetto, e ALZA su una risposta storta perché una lista a metà farebbe
+  passare le figlie non lette per sparite). IL DIGITALE: ciò che il
+  negozio dichiara virtuale o scaricabile (Woo `virtual`/`downloadable`,
+  Shopify `requires_shipping: false`) porta `digitale=True` nella riga
+  e nasce con `consegna='digitale'` e costi a zero — un giudice solo,
+  `consegna_riga`, letto da nascita e aggiornamento; il cassetto
+  (`CONSEGNE_NEGOZIO`) resta fisico e `_applica_dichiarazione` non
+  ricopre i digitali (la geografia sì). Il pregresso si corregge al
+  giro dopo (`consegna_corretta` nel report). Il digitale con giacenza
+  ignota non si esaurisce: venduto, torna in vetrina al giro dopo con
+  un pezzo, e `registra_uscita_negozio` non lo conta (niente da scalare
+  sul negozio). Il report porta `entrati` (titolo, digitale, stato; i
+  primi `MAX_ENTRATI_REPORT`), la notifica li elenca e il cassetto li
+  mostra (`riepilogoGiroConnettore`). Il perché in CANTIERI, «Varianti
+  e prodotti digitali dai negozi collegati».
 - I CONNETTORI DEL NEGOZIO (ago 2026, cantiere in corso — oggi ci sono
   le TAPPE 1 e 2: schema, giudice, censimento, il modulo col
   traduttore Shopify e il giro orario a leva spenta. Il resto è
@@ -23641,9 +23670,11 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   era UNA. Con la seconda ognuno di quei siti diventa una DECISIONE —
   la modifica si blocca come per Nostr, la ricarica dello stock pure,
   le lampo e le offerte restano AMMESSE (la decisione già presa per
-  Nostr), le promo del canale no, la consegna digitale MAI (il codice
-  si consegna premendo un bottone QUI, che è la stessa ragione dei
-  relay) — e una decisione presa in venti posti fra sei mesi ne dice
+  Nostr), le promo del canale no, la consegna digitale MAI dal
+  CASSETTO (il codice si consegna premendo un bottone QUI, che è la
+  stessa ragione dei relay; dal set 2026 la può dichiarare il NEGOZIO
+  per singolo prodotto — vedi «LE VARIANTI E I DIGITALI DEI NEGOZI
+  COLLEGATI», qui sopra) — e una decisione presa in venti posti fra sei mesi ne dice
   venti diverse. `origine_annuncio(a)` ('' | 'nostr' | 'shopify' |
   'woo') è l'unico posto che legge le due colonne insieme, con la sua
   forma SQL `SQL_ORIGINE_ESTERNA`; `da_connettore` è la domanda

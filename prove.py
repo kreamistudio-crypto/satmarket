@@ -30803,7 +30803,9 @@ def prove_ricevuta_compratore():
             CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT,
               quantita INT, stato TEXT, contatto_nostr TEXT DEFAULT '',
               taglia_pacco TEXT DEFAULT '',
-              fonte TEXT DEFAULT '', connettore_id INT DEFAULT 0);
+              fonte TEXT DEFAULT '', connettore_id INT DEFAULT 0,
+              -- (set 2026) il registro legge anche queste due
+              consegna TEXT DEFAULT '', origine_stock_visto INT DEFAULT -1);
             CREATE TABLE offerte(id INTEGER PRIMARY KEY, annuncio_id INT,
               compratore_id INT, ordine_id INT, stato TEXT,
               aggiornato INT DEFAULT 0);
@@ -78346,10 +78348,15 @@ def prove_connettori_sync():
     prova("la variante di default NON e' un multi-variante", "",
           traduci(prodotto(variants=[{"price": "1.00"}]),
                   CAMBIO)["saltato_perche"])
+    # DAL SET 2026 IL MULTI-VARIANTE NON SI SALTA PIU': `traduci` lo
+    # esplode prima (vedi prove_connettori_varianti). Il salto nel
+    # traduttore resta come CINTURA per chi lo chiamasse da solo, e
+    # continua a dirlo invece di leggere il prezzo della prima
+    # variante come fosse quello di tutte.
     due = traduci(prodotto(variants=[{"price": "1.00"},
                                      {"price": "2.00"}]), CAMBIO)
-    prova("due varianti si saltano, DICENDOLO", "ha 2 varianti",
-          due["saltato_perche"])
+    prova("il traduttore da solo salta ancora il multi-variante (cintura)",
+          "ha 2 varianti", due["saltato_perche"])
     # «non tracciato» non e' «zero»: chi non fa gestire il magazzino a
     # Shopify vende senza contare i pezzi, e uno zero gli spegnerebbe
     # il catalogo intero al primo giro
@@ -78678,11 +78685,18 @@ def prove_connettori_woo():
     # `external` e' quello che si dimentica, perche' un prezzo ce l'ha
     # e sembra un prodotto normale — ma il suo bottone porta su un
     # ALTRO sito, quindi comprarlo qui non vorrebbe dire niente.
+    # (set 2026) il `variable` arriva qui intero SOLO senza le sue
+    # variazioni — e allora si salta dicendo che non le abbiamo lette,
+    # non piu' «ha piu' varianti»: quelle adesso si leggono
     prova("i tipi che non sappiamo trattare si saltano, DICENDOLO",
-          ["ha piu' varianti", "e' un gruppo di prodotti",
-           "si compra su un altro sito"],
+          ["ha piu' varianti e non le ho potute leggere",
+           "e' un gruppo di prodotti", "si compra su un altro sito"],
           [traduci(prodotto(type=t), CAMBIO)["saltato_perche"]
            for t in ("variable", "grouped", "external")])
+    prova("...e con zero variazioni in vendita lo dice",
+          "nessuna delle sue varianti e' in vendita",
+          traduci(prodotto(type="variable", _variazioni=[]),
+                  CAMBIO)["saltato_perche"])
     # LA TRAPPOLA GEMELLA DELLA VARIANTE DI DEFAULT: `manage_stock`
     # non e' un booleano — puo' essere la STRINGA 'parent', che in
     # Python e' VERA. Scritto `if p.get("manage_stock"):` quel
@@ -78996,7 +79010,10 @@ def prove_connettori_registro():
         con.executescript("""
             CREATE TABLE annunci(id INTEGER PRIMARY KEY, titolo TEXT,
               contatto_nostr TEXT DEFAULT '', fonte TEXT DEFAULT '',
-              connettore_id INT DEFAULT 0);
+              connettore_id INT DEFAULT 0,
+              -- (set 2026) il registro legge anche queste due: il
+              -- digitale senza magazzino non ci entra
+              consegna TEXT DEFAULT '', origine_stock_visto INT DEFAULT -1);
             CREATE TABLE connettori_uscite(id INTEGER PRIMARY KEY
               AUTOINCREMENT, connettore_id INT, annuncio_id INT,
               ordine_id INT, delta INT, tipo TEXT,
@@ -79387,6 +79404,419 @@ def prove_connettori_ingresso():
     prova("il tetto non ferma l'aggiornamento di chi c'e' gia'", 2000,
           con.execute("SELECT prezzo_sats FROM annunci "
                       "WHERE origine_chiave='a'").fetchone()[0])
+
+
+def prove_connettori_varianti():
+    """VARIANTI E DIGITALI DAI NEGOZI COLLEGATI (set 2026), dalle due
+    segnalazioni di «Un tempo per te»: il libro in PDF o cartaceo che
+    non entrava («ha piu' varianti») e il corso online entrato con
+    «🚚 Spedizione» e «🤝 Ritiro».
+
+    LE COSE CHE QUI POSSONO ROMPERSI IN SILENZIO: un figlio col prezzo
+    di un'altra variante; la giacenza «parent» letta come un numero;
+    il digitale che nasce coi costi del cassetto (un PDF con 5 € di
+    spedizione); la dichiarazione del cassetto che al primo ritocco
+    rimette il pacco sul corso; il PDF venduto una volta e sparito
+    per sempre; la vendita di un PDF che manda al venditore «aggiorna
+    il magazzino». Le funzioni pure si GIRANO, la riconciliazione
+    gira su un database di cartone, il server si legge per forma."""
+    print("\n[i connettori: varianti e digitali]")
+    import sqlite3
+    src = open("importa_negozio.py", encoding="utf-8").read()
+    m = {}
+    exec(compile(src, "importa_negozio.py", "exec"), m)
+    traduci = m["traduci"]
+    esplodi_s, esplodi_w = m["esplodi_shopify"], m["esplodi_woo"]
+    riconcilia = m["riconcilia_connettore"]
+    CAMBIO = {"EUR": 100_000.0}          # 1000 sats = 1 €
+
+    # --- Shopify: le varianti stanno nel prodotto -----------------
+    def shop(**kw):
+        b = {"id": 7, "title": "Maglia", "body_html": "<p>Cotone</p>",
+             "status": "active", "product_type": "Abbigliamento",
+             "images": [{"id": 1, "src": "https://cdn/a.jpg"},
+                        {"id": 2, "src": "https://cdn/b.jpg"}],
+             "variants": [{"id": 71, "title": "S", "price": "20.00",
+                           "inventory_quantity": 3,
+                           "inventory_management": "shopify",
+                           "image_id": 2},
+                          {"id": 72, "title": "M", "price": "22.00",
+                           "inventory_quantity": 0,
+                           "inventory_management": "shopify"}]}
+        b.update(kw)
+        return b
+
+    righe = traduci([shop()], "shopify", CAMBIO)
+    prova("Shopify: due varianti fanno DUE righe, nessuna saltata",
+          ["", ""], [r["saltato_perche"] for r in righe])
+    prova("...con la chiave padre:variante", ["7:71", "7:72"],
+          [r["origine_chiave"] for r in righe])
+    prova("...il titolo composto «Titolo — variante»",
+          ["Maglia — S", "Maglia — M"], [r["titolo"] for r in righe])
+    prova("...prezzo e giacenza DELLA variante, non della prima",
+          [(20.0, 3), (22.0, 0)],
+          [(r["prezzo_eur"], r["quantita"]) for r in righe])
+    prova("...e la foto della variante davanti",
+          ["https://cdn/b.jpg", "https://cdn/a.jpg"], righe[0]["foto"])
+    # IL PRODOTTO NORMALE NON CAMBIA NOME: la variante «di default» e'
+    # una sola, la chiave resta l'id del padre e nessuna riga gia' in
+    # vetrina viene spenta come sparita
+    uno = traduci([shop(variants=[shop()["variants"][0]])], "shopify",
+                  CAMBIO)
+    prova("una sola variante: chiave e titolo di ieri", ("7", "Maglia"),
+          (uno[0]["origine_chiave"], uno[0]["titolo"]))
+    prova("...e `esplodi` restituisce il prodotto COM'E'", True,
+          esplodi_s(shop(variants=[{"price": "1"}]))[0] is not None
+          and len(esplodi_s(shop(variants=[{"price": "1"}]))) == 1)
+    # NIENTE DA SPEDIRE: lo dice la variante, col FALSO esplicito
+    dig = traduci([shop(variants=[dict(shop()["variants"][0],
+                                        requires_shipping=False)])],
+                  "shopify", CAMBIO)[0]
+    prova("`requires_shipping: false` e' digitale", True, dig["digitale"])
+    prova("...la chiave che manca e' fisica, come ieri", False,
+          uno[0]["digitale"])
+    prova("...e `true` pure", False,
+          traduci([shop(variants=[dict(shop()["variants"][0],
+                                        requires_shipping=True)])],
+                  "shopify", CAMBIO)[0]["digitale"])
+
+    # --- Woo: le variazioni le aggancia il lettore ----------------
+    def libro(**kw):
+        b = {"id": 5, "name": "Healthy Poke Bowls", "type": "variable",
+             "description": "<p>Ricette</p>", "status": "publish",
+             "catalog_visibility": "visible", "price": "13.00",
+             "manage_stock": False, "stock_quantity": None,
+             "stock_status": "instock", "virtual": False,
+             "downloadable": False,
+             "images": [{"src": "https://cdn/cover.jpg"}],
+             "categories": [{"name": "Libri"}],
+             "_variazioni": [
+                 {"id": 51, "price": "13.00", "regular_price": "13.00",
+                  "status": "publish", "manage_stock": False,
+                  "stock_quantity": None, "stock_status": "instock",
+                  "virtual": True, "downloadable": True,
+                  "attributes": [{"name": "Formato", "option": "pdf"}],
+                  "image": {"src": "https://cdn/pdf.jpg"}},
+                 {"id": 52, "price": "15.90", "regular_price": "15.90",
+                  "status": "publish", "manage_stock": False,
+                  "stock_quantity": None, "stock_status": "outofstock",
+                  "virtual": False, "downloadable": False,
+                  "attributes": [{"name": "Formato",
+                                  "option": "cartaceo"}]}]}
+        b.update(kw)
+        return b
+
+    righe = traduci([libro()], "woo", CAMBIO)
+    prova("Woo: il variabile fa una riga per variazione, nessuna saltata",
+          ["", ""], [r["saltato_perche"] for r in righe])
+    prova("...«Titolo — pdf» e «Titolo — cartaceo»",
+          ["Healthy Poke Bowls — pdf", "Healthy Poke Bowls — cartaceo"],
+          [r["titolo"] for r in righe])
+    prova("...chiavi padre:variazione", ["5:51", "5:52"],
+          [r["origine_chiave"] for r in righe])
+    prova("il PDF e' digitale, il cartaceo no", [True, False],
+          [r["digitale"] for r in righe])
+    prova("il cartaceo esaurito ha giacenza ZERO (nasce fuori vetrina)",
+          [None, 0], [r["quantita"] for r in righe])
+    prova("...coi prezzi della variazione", [13.0, 15.9],
+          [r["prezzo_eur"] for r in righe])
+    prova("...la foto della variazione davanti, poi quelle del padre",
+          ["https://cdn/pdf.jpg", "https://cdn/cover.jpg"], righe[0]["foto"])
+    prova("...testo e categoria dal padre", ("Ricette", "Libri"),
+          (righe[1]["descrizione"], righe[1]["categoria_grezza"]))
+    # LA GIACENZA «parent» SI SCIOGLIE NELL'ESPLOSIONE: la variazione
+    # che eredita il magazzino del padre prende i NUMERI del padre, e
+    # al traduttore arriva un booleano — non la stringa 'parent'
+    figli = esplodi_w(libro(manage_stock=True, stock_quantity=4,
+                            _variazioni=[dict(libro()["_variazioni"][1],
+                                              manage_stock="parent")]))
+    prova("`manage_stock: parent` prende i numeri del padre", (True, 4),
+          (figli[0]["manage_stock"], figli[0]["stock_quantity"]))
+    # una variazione privata non e' in vendita sul negozio
+    priv = traduci([libro(_variazioni=[dict(libro()["_variazioni"][0],
+                                            status="private")])],
+                   "woo", CAMBIO)[0]
+    prova("la variazione privata non e' attiva", False, priv["attivo"])
+    # senza opzioni il nome ripiega su sku, poi «variante N»
+    senza = esplodi_w(libro(_variazioni=[
+        dict(libro()["_variazioni"][0], attributes=[], sku="HPB-1"),
+        dict(libro()["_variazioni"][1], attributes=[], sku="")]))
+    prova("senza opzioni il nome ripiega su sku e poi «variante N»",
+          ["Healthy Poke Bowls — HPB-1", "Healthy Poke Bowls — variante 2"],
+          [f["name"] for f in senza])
+    # il titolo lungo si accorcia dal lato del PADRE, l'opzione resta
+    lungo = m["_titolo_variante"]("x" * 200, "cartaceo")
+    prova("il titolo lungo tiene l'opzione", (True, 120),
+          (lungo.endswith("— cartaceo"), len(lungo)))
+    # il prodotto semplice passa dall'esplosione COM'E'
+    semplice = {"id": 9, "name": "Tazza", "type": "simple", "price": "5",
+                "status": "publish", "virtual": False}
+    prova("il prodotto semplice e' invariato", (1, "9", "Tazza", False),
+          (len(esplodi_w(semplice)),
+           traduci([semplice], "woo", CAMBIO)[0]["origine_chiave"],
+           traduci([semplice], "woo", CAMBIO)[0]["titolo"],
+           traduci([semplice], "woo", CAMBIO)[0]["digitale"]))
+    prova("...e virtuale diventa digitale", True,
+          traduci([dict(semplice, virtual=True)], "woo",
+                  CAMBIO)[0]["digitale"])
+    prova("...anche solo scaricabile", True,
+          traduci([dict(semplice, downloadable=True)], "woo",
+                  CAMBIO)[0]["digitale"])
+    # il variabile senza variazioni agganciate: si salta col motivo, e
+    # la SUA chiave va in `viste` (e' il padre: nessun figlio da spegnere)
+    prova("il variabile mai letto si salta dicendolo",
+          ("5", "ha piu' varianti e non le ho potute leggere"),
+          ((lambda r: (r["origine_chiave"], r["saltato_perche"]))(
+              traduci([libro(_variazioni=None)], "woo", CAMBIO)[0])))
+
+    # --- il lettore Woo chiede le variazioni, DOPO il tetto -------
+    letture = []
+
+    def chiama(metodo, url, intestazioni):
+        letture.append(url)
+        if url.endswith("/settings/general"):
+            return 200, {"lista": [{"id": "woocommerce_calc_taxes",
+                                    "value": "no"}]}, {}
+        if "/variations" in url:
+            return 200, {"lista": [{"id": 51, "price": "13.00",
+                                    "attributes": []}]}, {}
+        return 200, {"lista": [libro(_variazioni=None),
+                               dict(libro(_variazioni=None), id=6),
+                               semplice]}, {"X-WP-Total": "3"}
+
+    prodotti, _, _ = m["leggi_catalogo_woo"](
+        "https://negozio.it", {"consumer_key": "a", "consumer_secret": "b"},
+        chiama, tetto=1)
+    prova("il lettore aggancia le variazioni solo entro il tetto",
+          ["https://negozio.it/wp-json/wc/v3/products/5/variations"
+           "?per_page=100&page=1&orderby=id&order=asc"],
+          [u for u in letture if "/variations" in u])
+    prova("...e le mette in `_variazioni`", [51],
+          [v["id"] for v in prodotti[0]["_variazioni"]])
+    # ALZA su una risposta storta: una lista a meta' farebbe passare le
+    # figlie non lette per sparite dal negozio
+    def rotto(metodo, url, intestazioni):
+        if "/variations" in url:
+            return 500, None, {}
+        return chiama(metodo, url, intestazioni)
+    prova("una variazione che non risponde ALZA, non torna a meta'", True,
+          "ha risposto 500" in _alza(lambda: m["leggi_catalogo_woo"](
+              "https://negozio.it", {"consumer_key": "a",
+                                     "consumer_secret": "b"}, rotto, 5)))
+    # e l'URL delle variazioni lo COMPONIAMO noi dall'id intero
+    lett = codice(_pezzo_da(src, "_variazioni_woo"))
+    prova("l'indirizzo delle variazioni si costruisce, non si segue", True,
+          '/products/{pid}/variations' in lett and "pid = int(" in
+          codice(_pezzo_da(src, "leggi_catalogo_woo")))
+
+    # --- la riconciliazione sul database di cartone ---------------
+    CONNETTORE = {"id": 3, "fonte": "woo", "tg_id": 222,
+                  "zona": "Pavia (PV)", "consegna": "entrambe",
+                  "spedizione_eur": 5.0, "spedizione_punto_eur": 3.0,
+                  "spedizione_punto_dichiarata": 1,
+                  "spedizione_extra_eur": 1.0}
+
+    def banco():
+        con = sqlite3.connect(":memory:")
+        con.row_factory = sqlite3.Row
+        con.executescript("""
+            CREATE TABLE annunci(id INTEGER PRIMARY KEY AUTOINCREMENT,
+              venditore_id INT, titolo TEXT, descrizione TEXT,
+              categoria TEXT, prezzo_sats INT, zona TEXT, foto TEXT,
+              valuta TEXT, prezzo_eur REAL, quantita INT, quantita_max INT,
+              consegna TEXT, spedizione_eur REAL, spedizione_punto_eur REAL,
+              spedizione_punto_dichiarata INT, spedizione_extra_eur REAL,
+              spedizione_sats INT, spedizione_punto_sats INT,
+              spedizione_extra_sats INT,
+              taglia_pacco TEXT DEFAULT '',
+              fonte TEXT, connettore_id INT, origine_chiave TEXT,
+              origine_foto TEXT, origine_stock_visto INT,
+              creato INT, modificato INT, stato TEXT);
+            CREATE TABLE ordini(id INTEGER PRIMARY KEY, annuncio_id INT,
+              stato TEXT, aggiornato INT);
+            CREATE TABLE ordine_righe(ordine_id INT, annuncio_id INT);
+        """)
+        return con
+
+    def leggi(con, chiave):
+        return dict(con.execute("SELECT * FROM annunci WHERE origine_chiave=?",
+                                (chiave,)).fetchone())
+
+    def gira(con, righe, **kw):
+        return riconcilia(con, CONNETTORE, righe, lambda *a: None, {},
+                          completo=True, **kw)
+
+    con = banco()
+    esito = gira(con, traduci([libro(), dict(semplice, virtual=True,
+                                             name="Corso Hatha")],
+                              "woo", CAMBIO))
+    pdf, carta, corso = leggi(con, "5:51"), leggi(con, "5:52"), leggi(con, "9")
+    prova("il PDF nasce digitale, senza costi ne' punto",
+          ("digitale", 0.0, 0.0, 0, 0.0),
+          (pdf["consegna"], pdf["spedizione_eur"], pdf["spedizione_punto_eur"],
+           pdf["spedizione_punto_dichiarata"], pdf["spedizione_extra_eur"]))
+    prova("il cartaceo nasce col cassetto: consegna e costi del negozio",
+          ("entrambe", 5.0, 3.0, 1, 1.0),
+          (carta["consegna"], carta["spedizione_eur"],
+           carta["spedizione_punto_eur"], carta["spedizione_punto_dichiarata"],
+           carta["spedizione_extra_eur"]))
+    prova("...ed esaurito e' fuori vetrina: «venduto» con zero pezzi",
+          ("venduto", 0), (carta["stato"], carta["quantita"]))
+    prova("il corso virtuale nasce digitale", "digitale", corso["consegna"])
+    prova("il report dice CHI e' entrato, coi digitali marcati",
+          [("Healthy Poke Bowls — pdf", True, "attivo"),
+           ("Healthy Poke Bowls — cartaceo", False, "venduto"),
+           ("Corso Hatha", True, "attivo")],
+          [(e["titolo"], e["digitale"], e["stato"]) for e in esito["entrati"]])
+    prova("...e il conto dei nuovi combacia", 3, esito["nuovi"])
+
+    # (d) IL PREGRESSO SI CORREGGE AL GIRO DOPO: il corso importato ieri
+    # come pacco — il caso della segnalazione — torna digitale
+    con = banco()
+    gira(con, traduci([dict(semplice, name="Corso Hatha")], "woo", CAMBIO))
+    prova("ieri: il corso era entrato col cassetto", ("entrambe", 5.0),
+          (leggi(con, "9")["consegna"], leggi(con, "9")["spedizione_eur"]))
+    esito = gira(con, traduci([dict(semplice, name="Corso Hatha",
+                                    virtual=True)], "woo", CAMBIO))
+    dopo = leggi(con, "9")
+    prova("oggi: al giro dopo e' digitale, coi costi a zero",
+          ("digitale", 0.0, 0.0, 0, 0.0, ""),
+          (dopo["consegna"], dopo["spedizione_eur"],
+           dopo["spedizione_punto_eur"], dopo["spedizione_punto_dichiarata"],
+           dopo["spedizione_extra_eur"], dopo["taglia_pacco"]))
+    prova("...e il report lo conta", 1, esito["consegna_corretta"])
+    # il rovescio: smette di essere virtuale, riprende il cassetto
+    esito = gira(con, traduci([dict(semplice, name="Corso Hatha")], "woo",
+                              CAMBIO))
+    prova("il rovescio riprende consegna e costi del cassetto",
+          ("entrambe", 5.0, 3.0, 1),
+          (leggi(con, "9")["consegna"], leggi(con, "9")["spedizione_eur"],
+           leggi(con, "9")["spedizione_punto_eur"],
+           leggi(con, "9")["spedizione_punto_dichiarata"]))
+    # ...e a strada ferma la consegna NON si riscrive ogni ora (il
+    # cassetto e' l'altro scrittore della colonna fisica)
+    esito = gira(con, traduci([dict(semplice, name="Corso Hatha")], "woo",
+                              CAMBIO))
+    prova("a strada ferma non si tocca", 0, esito["consegna_corretta"])
+
+    # IL DIGITALE SENZA MAGAZZINO NON SI ESAURISCE: venduto qui (quantita
+    # a zero, stato venduto), al giro dopo torna in vetrina con un pezzo
+    con = banco()
+    gira(con, traduci([dict(semplice, virtual=True)], "woo", CAMBIO))
+    con.execute("UPDATE annunci SET quantita=0, stato='venduto' "
+                "WHERE origine_chiave='9'")
+    esito = gira(con, traduci([dict(semplice, virtual=True)], "woo", CAMBIO))
+    prova("il PDF venduto torna in vetrina al giro dopo", ("attivo", 1, 1),
+          (leggi(con, "9")["stato"], leggi(con, "9")["quantita"],
+           esito["riaccesi"]))
+    # ...ma quello FISICO senza magazzino resta venduto, come ieri: la
+    # regola e' del digitale, non dello stock ignoto
+    con = banco()
+    gira(con, traduci([semplice], "woo", CAMBIO))
+    con.execute("UPDATE annunci SET quantita=0, stato='venduto' "
+                "WHERE origine_chiave='9'")
+    gira(con, traduci([semplice], "woo", CAMBIO))
+    prova("...il fisico senza magazzino resta venduto, come ieri",
+          "venduto", leggi(con, "9")["stato"])
+    # ...e il digitale con la giacenza CONTATA segue il negozio
+    con = banco()
+    gira(con, traduci([dict(semplice, virtual=True, manage_stock=True,
+                            stock_quantity=0)], "woo", CAMBIO))
+    prova("il digitale contato a zero nasce venduto", "venduto",
+          leggi(con, "9")["stato"])
+
+    # IL CAMBIO DI FORMA E' UNA SPARIZIONE, dichiarata: il semplice che
+    # diventa variabile perde la chiave `pid` e ne guadagna `pid:vid`
+    con = banco()
+    gira(con, traduci([dict(semplice, id=5)], "woo", CAMBIO))
+    esito = gira(con, traduci([libro()], "woo", CAMBIO))
+    prova("semplice → variabile: la riga vecchia si spegne, le figlie nascono",
+          ({"5": "rimosso", "5:51": "attivo", "5:52": "venduto"}, 1, 2),
+          ({r["origine_chiave"]: r["stato"] for r in
+            con.execute("SELECT origine_chiave, stato FROM annunci")},
+           esito["spenti"], esito["nuovi"]))
+
+    # --- il server, per forma --------------------------------------
+    dich = codice(pezzo("_applica_dichiarazione"))
+    prova("la dichiarazione del cassetto NON ricopre i digitali", True,
+          "AND consegna<>'digitale'" in dich)
+    prova("...ma la geografia scende su tutti", True,
+          '"UPDATE annunci SET zona=?, lat=?, lon=?, regione=? "' in dich)
+    reg = codice(pezzo("registra_uscita_negozio"))
+    prova("il registro non conta il digitale senza magazzino", True,
+          'a["consegna"] == "digitale"' in reg
+          and 'origine_stock_visto' in reg)
+    chiudi = codice(pezzo("_chiudi_giro_connettore"))
+    prova("la notifica elenca gli ENTRATI coi digitali", True,
+          'esito.get("entrati")' in chiudi
+          and "il contenuto lo consegni tu" in chiudi)
+    prova("...e parte anche per la sola consegna corretta", True,
+          'esito.get("consegna_corretta")' in chiudi.split("pezzi = []")[0])
+    prova("il cassetto resta fisico: CONSEGNE_NEGOZIO senza digitale",
+          ("spedizione", "ritiro", "entrambe"),
+          tuple(x.strip().strip('"') for x in
+                _SORGENTE.split("CONSEGNE_NEGOZIO = (")[1]
+                .split(")")[0].split(",")))
+    # il giudice della consegna e' UNO e lo leggono nascita e aggiornamento
+    nasce = codice(_pezzo_da(src, "_una_riga"))
+    agg = codice(src[src.index("def _aggiorna("):])   # e' l'ultima del file
+    prova("nascita e aggiornamento passano dallo stesso giudice", True,
+          "consegna_riga(connettore" in nasce
+          and "consegna_riga(connettore" in agg
+          and "connettore[\"consegna\"]" not in nasce)
+    # il client ha il riepilogo, giudice puro
+    mini = open("miniapp.html", encoding="utf-8").read()
+    prova("il cassetto mostra il riepilogo dell'ultimo giro", True,
+          "riepilogoGiroConnettore(c.esito)" in mini
+          and "function riepilogoGiroConnettore(e)" in mini)
+    fn = pezzo_js(mini, "function riepilogoGiroConnettore(e)")
+    prova("...coi titoli passati da esc()", True,
+          "esc(x.titolo)" in fn and "esc(x.perche)" in fn)
+    # ...e GIRATO in node, sul report vero della riconciliazione qui
+    # sopra: il giudice e' puro, quindi si prova senza un server
+    import subprocess, tempfile
+    js = "\n".join([
+        "const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')"
+        ".replace(/>/g,'&gt;');",
+        "const fmt = n => String(n);", fn, "const out = {};",
+        "out.vuoto = [riepilogoGiroConnettore(null), riepilogoGiroConnettore({}),"
+        " riepilogoGiroConnettore({nuovi: 0, entrati: [], saltati: []})];",
+        "out.pieno = riepilogoGiroConnettore(" + json.dumps({
+            "nuovi": 7, "consegna_corretta": 1,
+            "entrati": [{"titolo": f"Libro <{i}>", "digitale": i == 0,
+                         "stato": "venduto" if i == 1 else "attivo"}
+                        for i in range(7)],
+            "saltati": [{"titolo": "Maglia & co",
+                         "perche": "ha piu' varianti e non le ho potute"
+                                   " leggere"}]}) + ");",
+        "console.log(JSON.stringify(out));"])
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(js)
+        p = f.name
+    try:
+        r = subprocess.run(["node", p], capture_output=True, text=True,
+                           encoding="utf-8", timeout=60)
+    except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
+        r = None
+    os.unlink(p)
+    if r is None:
+        salta("il riepilogo del cassetto gira in node (node assente)")
+    elif r.returncode != 0:
+        prova("il riepilogo del cassetto gira in node", "", r.stderr[-300:])
+    else:
+        o = json.loads(r.stdout)
+        prova("senza niente da dire il riepilogo e' vuoto", ["", "", ""],
+              o["vuoto"])
+        h = o["pieno"]
+        prova("il riepilogo dice entrati, digitale, esaurito, corretti e saltati",
+              [True, True, True, True, True, True],
+              ["entrati (7)" in h, "💾 digitale" in h, "(esaurito)" in h,
+               "…e altri 2" in h, "1 con la consegna corretta" in h,
+               "Maglia &amp; co: ha piu&#39; varianti" in h
+               or "Maglia &amp; co: ha piu' varianti" in h])
+        prova("...coi titoli del negozio escapati", (True, False),
+              ("Libro &lt;0&gt;" in h, "<0>" in h))
 
 
 def prove_connettori_cassetto():
@@ -90516,10 +90946,18 @@ def prove_modulo_negozio():
     prova("...e il salvataggio le passa tutte", True,
           '"spedizione_sats": tariffe[1]' in salva
           and '"spedizione_extra_sats": tariffe[6]' in salva)
+    # EMENDATA lo stesso giorno (varianti e digitali): le tariffe della
+    # riga nuova non si leggono piu' dal connettore dentro `_una_riga`
+    # ma dal giudice unico `consegna_riga` (che sul digitale le azzera),
+    # e la nascita scrive quel che il giudice dice. La domanda resta la
+    # stessa — i sats scendono sulle righe nuove — divisa nei due posti
+    # dove adesso vive.
     riga_nuova = codice(_pezzo_da(imp, "_una_riga"))
+    giudice = codice(_pezzo_da(imp, "consegna_riga"))
     prova("le righe nuove del catalogo nascono con le tariffe in sats", True,
           "spedizione_sats,spedizione_punto_eur" in riga_nuova
-          and 'connettore.get("spedizione_sats") or 0' in riga_nuova)
+          and 'cons["spedizione_sats"]' in riga_nuova
+          and 'connettore.get("spedizione_sats") or 0' in giudice)
     prova("la riga in uscita porta la valuta e i sats", True,
           all(g in pezzo("_connettore_pubblico") for g in
               ('"tariffe_valuta"', '"spedizione_sats"',
@@ -93749,6 +94187,7 @@ def main():
               prove_connettori, prove_connettori_sync,
               prove_connettori_woo, prove_connettori_registro,
               prove_connettori_ingresso,
+              prove_connettori_varianti,
               prove_connettori_cassetto,
               prove_finestra,
               prove_ordini_prova,

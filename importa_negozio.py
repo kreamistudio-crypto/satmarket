@@ -58,6 +58,12 @@ MAX_DESCRIZIONE = 1500
 # dell'import CSV.
 MAX_FOTO = 5
 
+# Quanti titoli ENTRATI porta il report di un giro (set 2026): il
+# venditore legge cosa e' comparso, il conto vero resta `nuovi`. Il
+# report vive in una colonna JSON riletta a ogni apertura del
+# cassetto, e duecento titoli a giro la gonfierebbero per niente.
+MAX_ENTRATI_REPORT = 30
+
 # Quel che si dice al venditore quando il catalogo non ci sta nel
 # tetto di lettura, e la seconda meta' e' quella che prima MANCAVA: la
 # frase di ieri prometteva «il resto arriva ai giri successivi», ed
@@ -184,11 +190,20 @@ def _numero(v) -> float:
 
 
 def traduci_shopify(p: dict, cambio: dict) -> dict:
-    """Un prodotto Shopify diventa una riga normalizzata."""
+    """Un prodotto Shopify diventa una riga normalizzata.
+
+    UN PRODOTTO, UNA RIGA: il multi-variante non arriva piu' qui
+    intero — `esplodi_shopify` lo ha gia' spezzato in un figlio per
+    variante (set 2026), ognuno con la SUA sola variante dentro.
+    Il salto sul `> 1` resta come cintura: se un giorno qualcuno
+    chiamasse il traduttore senza passare da `traduci`, il prodotto
+    si salta dicendolo invece di leggere il prezzo della prima
+    variante come fosse quello di tutte."""
     riga = {"origine_chiave": str(p.get("id") or ""),
             "saltato_perche": "", "titolo": "", "descrizione": "",
             "prezzo_eur": 0.0, "prezzo_sats": 0, "quantita": None,
-            "foto": [], "categoria_grezza": "", "attivo": True}
+            "foto": [], "categoria_grezza": "", "attivo": True,
+            "digitale": False}
     titolo, descrizione = testo_negozio(p, "shopify")
     riga["titolo"], riga["descrizione"] = titolo, descrizione
     if not riga["origine_chiave"] or not titolo:
@@ -202,6 +217,12 @@ def traduci_shopify(p: dict, cambio: dict) -> dict:
     if len(varianti) > 1:
         riga["saltato_perche"] = f"ha {len(varianti)} varianti"
         return riga
+    # NIENTE DA SPEDIRE (set 2026): Shopify lo dice per variante, con
+    # `requires_shipping`. E' il negozio a dichiararlo, non noi a
+    # dedurlo dal titolo — e vale il FALSO esplicito: la chiave che
+    # manca e' un prodotto fisico, come lo era ieri.
+    riga["digitale"] = (varianti[0].get("requires_shipping") is False
+                        if isinstance(varianti[0], dict) else False)
     if not varianti:
         riga["saltato_perche"] = "senza prezzo"
         return riga
@@ -236,17 +257,21 @@ def traduci_shopify(p: dict, cambio: dict) -> dict:
 
 # I TIPI DI PRODOTTO WOO CHE NON SAPPIAMO TRATTARE, e ognuno col suo
 # perche' scritto: un annuncio di Barattolo e' UNA cosa con UN prezzo
-# e UNA giacenza, e questi tre non lo sono.
-# · `variable` e' il gemello del multi-variante di Shopify (taglie,
-#   colori: `annunci` e' piatto, e le varianti sono un cantiere loro);
+# e UNA giacenza, e questi due non lo sono.
 # · `grouped` e' un contenitore che rimanda ad altri prodotti e un
 #   prezzo suo non ce l'ha;
 # · `external` e' il prodotto in affiliazione: il bottone porta su un
 #   ALTRO sito, quindi comprarlo qui non vorrebbe dire niente — ed e'
 #   quello che si dimentica, perche' un prezzo ce l'ha.
-SALTI_WOO = {"variable": "ha piu' varianti",
+# · `variable` NON e' piu' un salto (set 2026): il lettore gli aggancia
+#   le variazioni (`_variazioni`) e `esplodi_woo` ne fa un figlio per
+#   ciascuna. Arriva qui intero solo se le variazioni non ci sono —
+#   mai lette (un chiamante che non passa dal lettore) o zero in
+#   vendita — e allora si salta DICENDO quale dei due casi e'.
+SALTI_WOO = {"variable": "ha piu' varianti e non le ho potute leggere",
              "grouped": "e' un gruppo di prodotti",
              "external": "si compra su un altro sito"}
+MSG_VARIANTI_VUOTE = "nessuna delle sue varianti e' in vendita"
 
 
 def traduci_woo(p: dict, cambio: dict) -> dict:
@@ -263,7 +288,8 @@ def traduci_woo(p: dict, cambio: dict) -> dict:
     riga = {"origine_chiave": str(p.get("id") or ""),
             "saltato_perche": "", "titolo": "", "descrizione": "",
             "prezzo_eur": 0.0, "prezzo_sats": 0, "quantita": None,
-            "foto": [], "categoria_grezza": "", "attivo": True}
+            "foto": [], "categoria_grezza": "", "attivo": True,
+            "digitale": False}
     titolo, descrizione = testo_negozio(p, "woo")
     riga["titolo"], riga["descrizione"] = titolo, descrizione
     if not riga["origine_chiave"] or not titolo:
@@ -271,8 +297,17 @@ def traduci_woo(p: dict, cambio: dict) -> dict:
         return riga
     tipo = str(p.get("type") or "simple").lower()
     if tipo in SALTI_WOO:
-        riga["saltato_perche"] = SALTI_WOO[tipo]
+        riga["saltato_perche"] = (MSG_VARIANTI_VUOTE
+                                  if tipo == "variable"
+                                  and p.get("_variazioni") == []
+                                  else SALTI_WOO[tipo])
         return riga
+    # NIENTE DA SPEDIRE (set 2026): WooCommerce lo dice con due
+    # spunte, «Virtuale» e «Scaricabile», e basta una delle due — un
+    # corso online e' virtuale e non scaricabile, un PDF e' tutt'e
+    # due. Sulle variazioni le spunte sono loro (`esplodi_woo` le
+    # porta qui gia' fuse con quelle del padre).
+    riga["digitale"] = bool(p.get("virtual")) or bool(p.get("downloadable"))
     # `price` e' gia' il prezzo EFFICACE (lo sconto, se c'e'); il
     # `regular_price` e' il ripiego per i temi che lasciano `price`
     # vuoto sui prodotti mai visitati.
@@ -326,14 +361,158 @@ def traduci_woo(p: dict, cambio: dict) -> dict:
 TRADUTTORI = {"shopify": traduci_shopify, "woo": traduci_woo}
 
 
+# --- LE VARIANTI (set 2026) -------------------------------------------
+# `annunci` e' piatto: un annuncio ha UN prezzo e UNA giacenza. Un
+# prodotto con piu' varianti (il libro in PDF o cartaceo, la maglia in
+# tre taglie) non ci sta dentro, e fino a ieri si saltava dicendolo.
+# La forma che ci sta e' UN ANNUNCIO PER VARIANTE — «Titolo — pdf»,
+# «Titolo — cartaceo» — col prezzo e la giacenza della variante, e le
+# esaurite fuori vetrina come ogni esaurito.
+#
+# L'ESPLOSIONE STA PRIMA DEL TRADUTTORE E NON DENTRO, ed e' la scelta
+# che tiene tutto il resto com'era: ogni figlio e' un prodotto FINTO
+# nella forma della sua piattaforma — una sola variante dentro, il
+# titolo gia' composto, le foto della variante davanti — e il
+# traduttore lo legge come un prodotto normale, senza sapere che era
+# un pezzo di qualcosa. Cosi' il prezzo, la giacenza, l'IVA, lo
+# stato e il testo canonico passano dalle STESSE righe di sempre, e
+# una regola aggiunta domani a un traduttore vale da sola anche per
+# le varianti.
+#
+# LA CHIAVE DEL FIGLIO E' `padre:variante`, e non il solo id della
+# variante: si legge nel database (`origine_chiave` dice subito di
+# chi e' figlia), e non puo' MAI combaciare con l'id di un prodotto
+# semplice. Il prodotto con UNA sola variante tiene la chiave di ieri
+# (l'id del padre), quindi nessuna riga gia' in vetrina cambia nome.
+# ⚠️ IL CAMBIO DI FORMA E' UNA SPARIZIONE, dichiarata: un prodotto
+# semplice che sul negozio diventa variabile perde la chiave `pid` e
+# ne guadagna N `pid:vid` — la riga vecchia si spegne come «tolta dal
+# negozio» (e 'rimosso' non risorge) e ne nascono N nuove, che la
+# moderazione guarda una volta. E' lo stesso patto scritto per lo
+# scudo anti-resurrezione: «per tornare serve una chiave nuova».
+
+def _titolo_variante(base: str, opzione: str) -> str:
+    """«Titolo — pdf». Se il titolo del padre e' lungo si accorcia
+    LUI e non l'opzione: e' l'opzione che distingue due annunci che
+    per il resto sono identici, e troncata dal fondo sparirebbe
+    proprio lei."""
+    base = str(base or "").strip()
+    opzione = str(opzione or "").strip()
+    if not opzione:
+        return base
+    spazio = MAX_TITOLO - len(opzione) - 3
+    if len(base) > spazio > 0:
+        base = base[:spazio].rstrip()
+    return f"{base} — {opzione}"
+
+
+def esplodi_shopify(p: dict) -> list:
+    """Un prodotto Shopify con piu' varianti diventa un figlio per
+    variante; con una sola (quella «di default», che c'e' sempre)
+    torna com'e' — cioe' la chiave e il titolo di ieri."""
+    varianti = [v for v in (p.get("variants") or []) if isinstance(v, dict)]
+    if len(varianti) <= 1:
+        return [p]
+    pid = p.get("id")
+    foto = [i for i in (p.get("images") or []) if isinstance(i, dict)]
+    figli = []
+    for n, v in enumerate(varianti, 1):
+        vid = v.get("id")
+        # la foto DELLA variante davanti alle altre: il cartaceo ha la
+        # sua copertina, e in vetrina e' la prima che si vede
+        sue = [i for i in foto if v.get("image_id")
+               and i.get("id") == v.get("image_id")]
+        figlio = dict(p)
+        figlio["id"] = f"{pid}:{vid}" if pid and vid else ""
+        figlio["title"] = _titolo_variante(
+            p.get("title"), v.get("title") or f"variante {n}")
+        figlio["variants"] = [v]
+        figlio["images"] = sue + [i for i in foto if i not in sue]
+        figli.append(figlio)
+    return figli
+
+
+def esplodi_woo(p: dict) -> list:
+    """Un prodotto WooCommerce `variable` diventa un figlio per
+    variazione, nella forma di un prodotto `simple`.
+
+    LE VARIAZIONI LE AGGANCIA IL LETTORE (`_variazioni`), perche' su
+    Woo vivono a un altro indirizzo e questo modulo non fa rete. Se
+    non ci sono — mai lette, o lista vuota — il padre torna com'e' e
+    il traduttore lo salta col motivo giusto.
+    COSA VIENE DAL PADRE E COSA DALLA VARIAZIONE, e non e' una scelta
+    di gusto: prezzo, giacenza, stato, spunte digitali e foto sono
+    della variazione (e' li' che il negoziante li scrive); testo,
+    categorie, visibilita' a scaffale sono del padre (la variazione
+    non li ha). La giacenza «parent» — la variazione che eredita il
+    magazzino del padre — prende i numeri del padre, cosi' la
+    trappola di `manage_stock: 'parent'` si scioglie QUI, una volta,
+    e al traduttore arriva un booleano."""
+    if str(p.get("type") or "simple").lower() != "variable":
+        return [p]
+    variazioni = p.get("_variazioni")
+    if not isinstance(variazioni, list) or not variazioni:
+        return [p]
+    pid = p.get("id")
+    figli = []
+    for n, v in enumerate(variazioni, 1):
+        if not isinstance(v, dict):
+            continue
+        vid = v.get("id")
+        opzioni = ", ".join(
+            str(a.get("option")).strip()
+            for a in (v.get("attributes") or [])
+            if isinstance(a, dict) and a.get("option"))
+        nome = opzioni or str(v.get("sku") or "").strip() or f"variante {n}"
+        gestito, scorte = v.get("manage_stock"), v.get("stock_quantity")
+        if gestito == "parent" or gestito is None:
+            gestito, scorte = p.get("manage_stock"), p.get("stock_quantity")
+        foto = []
+        if isinstance(v.get("image"), dict) and v["image"].get("src"):
+            foto.append(v["image"])
+        foto += [i for i in (p.get("images") or []) if isinstance(i, dict)]
+        # una variazione «privata» non e' in vendita sul negozio: per
+        # il traduttore e' un prodotto non pubblicato
+        stato = (p.get("status") if str(v.get("status") or "publish")
+                 == "publish" else "private")
+        figli.append({
+            "id": f"{pid}:{vid}" if pid and vid else "",
+            "name": _titolo_variante(p.get("name"), nome),
+            "description": p.get("description") or "",
+            "short_description": p.get("short_description") or "",
+            "type": "simple", "status": stato,
+            "catalog_visibility": p.get("catalog_visibility"),
+            "price": v.get("price"), "regular_price": v.get("regular_price"),
+            "manage_stock": gestito, "stock_quantity": scorte,
+            "stock_status": v.get("stock_status") or p.get("stock_status"),
+            "images": foto, "categories": p.get("categories") or [],
+            "virtual": bool(v.get("virtual")) or bool(p.get("virtual")),
+            "downloadable": (bool(v.get("downloadable"))
+                             or bool(p.get("downloadable"))),
+        })
+    return figli or [p]
+
+
+ESPLOSIONI = {"shopify": esplodi_shopify, "woo": esplodi_woo}
+
+
 def traduci(prodotti: list, fonte: str, cambio: dict) -> list:
     """Il dispatch: una lista di prodotti diventa una lista di righe
-    normalizzate. Chi aggiunge una piattaforma aggiunge una voce a
-    TRADUTTORI e non tocca nient'altro."""
+    normalizzate — prima l'esplosione delle varianti, poi il
+    traduttore su ogni figlio. Chi aggiunge una piattaforma aggiunge
+    una voce a TRADUTTORI (e una a ESPLOSIONI) e non tocca
+    nient'altro."""
     tr = TRADUTTORI.get(fonte)
     if not tr:
         return []
-    return [tr(p, cambio) for p in prodotti if isinstance(p, dict)]
+    esplodi = ESPLOSIONI.get(fonte) or (lambda p: [p])
+    righe = []
+    for p in prodotti:
+        if not isinstance(p, dict):
+            continue
+        for figlio in esplodi(p):
+            righe.append(tr(figlio, cambio))
+    return righe
 
 
 # --- LA LETTURA DEL CATALOGO ------------------------------------------
@@ -766,7 +945,47 @@ def leggi_catalogo_woo(url_negozio: str, credenziali: dict, chiama,
     else:
         completo = not restano and len(prodotti) <= tetto
     avviso = "" if completo else _msg_troncato(tetto, totale)
-    return prodotti[:tetto], avviso, completo
+    prodotti = prodotti[:tetto]
+    # LE VARIAZIONI (set 2026), e DOPO il taglio al tetto: su Woo
+    # vivono a un indirizzo loro, una chiamata per prodotto variabile,
+    # quindi si chiedono solo per i prodotti che entrano davvero — la
+    # prova del collegamento legge con tetto 1 e non deve bussare
+    # cento volte. L'indirizzo lo componiamo NOI dall'id (un intero),
+    # come ogni URL di questo lettore: niente da seguire.
+    for p in prodotti:
+        if str(p.get("type") or "").lower() != "variable":
+            continue
+        try:
+            pid = int(p.get("id"))
+        except (TypeError, ValueError):
+            continue          # senza un id da comporre resta intero: si salta
+        p["_variazioni"] = _variazioni_woo(base, pid, intestazioni, chiama)
+    return prodotti, avviso, completo
+
+
+def _variazioni_woo(base: str, pid: int, intestazioni: dict, chiama) -> list:
+    """Le variazioni di un prodotto variabile, tutte le pagine.
+
+    ALZA su una risposta storta, e non torna una lista corta — per la
+    ragione di tutto il lettore: le chiavi delle figlie sono
+    `pid:vid`, e una lista a meta' farebbe passare le variazioni non
+    lette per SPARITE dal negozio, cioe' spente per sempre. Un giro
+    che fallisce si conta e si riprova fra un'ora; una sparizione
+    falsa no."""
+    variazioni, pagina = [], 1
+    while True:
+        url = (f"{base}/wp-json/{VERSIONE_API_WOO}/products/{pid}/variations"
+               f"?per_page={PER_PAGINA_WOO}&page={pagina}"
+               f"&orderby=id&order=asc")
+        stato, corpo, _ = chiama("GET", url, intestazioni)
+        if stato != 200:
+            raise RuntimeError(f"WooCommerce ha risposto {stato} sulle "
+                               f"varianti del prodotto {pid}")
+        fetta = _prodotti_dalla_risposta(corpo)
+        variazioni.extend(fetta)
+        if len(fetta) < PER_PAGINA_WOO:
+            return variazioni
+        pagina += 1
 
 
 LETTORI = {"shopify": leggi_catalogo_shopify, "woo": leggi_catalogo_woo}
@@ -911,9 +1130,49 @@ def _riga_locale(con, connettore_id: int, chiave: str):
     dice — «se e' lo stesso oggetto, ritira quello vecchio»."""
     return con.execute(
         "SELECT id, stato, foto, origine_foto, quantita, "
-        "origine_stock_visto FROM annunci "
+        "origine_stock_visto, consegna FROM annunci "
         "WHERE connettore_id=? AND origine_chiave=?",
         (connettore_id, chiave)).fetchone()
+
+
+def consegna_riga(connettore: dict, digitale: bool) -> dict:
+    """La consegna e i costi da scrivere su UNA riga: quelli del
+    cassetto per la merce che viaggia, «digitale» e tutto a zero per
+    cio' che il negozio dichiara virtuale o scaricabile (set 2026).
+
+    E' L'UNICO POSTO che decide, e lo leggono la nascita e
+    l'aggiornamento: se i due divergessero, un corso online nascerebbe
+    digitale e al giro dopo tornerebbe con «🚚 Spedizione».
+    ⚠️ ROVESCIA UNA DECISIONE DI AGOSTO, e va detto: la consegna
+    digitale sui negozi collegati era «MAI», perche' la consegna si
+    dichiara nel CASSETTO per tutto il catalogo e un negozio non puo'
+    promettere «codice online» per ogni prodotto. Qui a dichiararlo e'
+    il NEGOZIO, prodotto per prodotto, e il venditore del
+    collegamento e' una persona su Barattolo che il bottone «consegna
+    il contenuto» ce l'ha: incolla il link o il codice nell'ordine,
+    come farebbe per un buono nato qui. Il cassetto continua a non
+    poterlo dichiarare (`CONSEGNE_NEGOZIO` resta fisico)."""
+    if digitale:
+        return {"consegna": "digitale", "spedizione_eur": 0.0,
+                "spedizione_sats": 0, "spedizione_punto_eur": 0.0,
+                "spedizione_punto_sats": 0,
+                "spedizione_punto_dichiarata": 0,
+                "spedizione_extra_eur": 0.0, "spedizione_extra_sats": 0}
+    # le tariffe del collegamento nella valuta che ha scelto: euro
+    # ancorato o sats FISSI, con zeri nell'altra (la forma di `annunci`,
+    # dove fisso batte ancorato); il `.get` sui sats e' per i banchi di
+    # cartone e le righe di ieri
+    return {"consegna": connettore["consegna"],
+            "spedizione_eur": connettore["spedizione_eur"],
+            "spedizione_sats": connettore.get("spedizione_sats") or 0,
+            "spedizione_punto_eur": connettore["spedizione_punto_eur"],
+            "spedizione_punto_sats":
+                connettore.get("spedizione_punto_sats") or 0,
+            "spedizione_punto_dichiarata":
+                connettore["spedizione_punto_dichiarata"],
+            "spedizione_extra_eur": connettore["spedizione_extra_eur"],
+            "spedizione_extra_sats":
+                connettore.get("spedizione_extra_sats") or 0}
 
 
 def _foto_locali(con, annuncio_id: int, urls: list, salva_foto) -> str:
@@ -976,7 +1235,11 @@ def riconcilia_connettore(con, connettore: dict, righe: list,
     fonte = connettore["fonte"]
     esito = {"nuovi": 0, "aggiornati": 0, "invariati": 0, "spenti": 0,
              "riaccesi": 0, "in_revisione": 0, "rimandati": 0,
-             "parziale": not completo, "saltati": [], "falliti": []}
+             "parziale": not completo, "saltati": [], "falliti": [],
+             # (set 2026) i titoli NATI in questo giro, e quante righe
+             # hanno cambiato consegna: il venditore legge COSA e'
+             # entrato, non solo quanti
+             "entrati": [], "consegna_corretta": 0}
     viste = set()
 
     for r in righe:
@@ -1115,6 +1378,9 @@ def _una_riga(con, connettore: dict, r: dict, salva_foto, revisioni,
     # senza far gestire il magazzino a WooCommerce.
     if stato == "attivo" and quantita == 0:
         stato = "venduto"
+    # la consegna: del cassetto, o «digitale» se il negozio lo dichiara
+    # (set 2026) — un giudice solo, lo stesso dell'aggiornamento
+    cons = consegna_riga(connettore, bool(r.get("digitale")))
     cur = con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
         "prezzo_sats,zona,foto,valuta,prezzo_eur,quantita,quantita_max,"
@@ -1129,18 +1395,13 @@ def _una_riga(con, connettore: dict, r: dict, salva_foto, revisioni,
          connettore["zona"], "", "eur", r["prezzo_eur"],
          1 if quantita is None else quantita,
          1 if quantita is None else quantita,
-         # LE TARIFFE DEL COLLEGAMENTO, nella valuta che ha scelto (set
-         # 2026): euro ancorato o sats FISSI, con zeri nell'altra — la
-         # forma di `annunci`, dove fisso batte ancorato. La riga del
-         # negozio e' quella del database, e le colonne dei sats ci sono
-         # dalla migrazione; il `.get` e' per i banchi di cartone.
-         connettore["consegna"], connettore["spedizione_eur"],
-         connettore.get("spedizione_sats") or 0,
-         connettore["spedizione_punto_eur"],
-         connettore.get("spedizione_punto_sats") or 0,
-         connettore["spedizione_punto_dichiarata"],
-         connettore["spedizione_extra_eur"],
-         connettore.get("spedizione_extra_sats") or 0,
+         # LE TARIFFE nella valuta del collegamento (euro ancorato o sats
+         # FISSI) o tutto a zero sul digitale: le decide `consegna_riga`,
+         # lo stesso giudice dell'aggiornamento
+         cons["consegna"], cons["spedizione_eur"], cons["spedizione_sats"],
+         cons["spedizione_punto_eur"], cons["spedizione_punto_sats"],
+         cons["spedizione_punto_dichiarata"],
+         cons["spedizione_extra_eur"], cons["spedizione_extra_sats"],
          connettore["fonte"], cid, chiave,
          json.dumps(r["foto"]) if r["foto"] else "",
          -1 if r.get("quantita") is None else r["quantita"],
@@ -1155,8 +1416,16 @@ def _una_riga(con, connettore: dict, r: dict, salva_foto, revisioni,
     esito["nuovi"] += 1
     if marchio:
         esito["in_revisione"] += 1
+    # il titolo nel report, con la sua strada: e' quel che il
+    # venditore legge per sapere COSA e' entrato (i primi, per non
+    # gonfiare il JSON: il conto vero e' `nuovi`)
+    if len(esito["entrati"]) < MAX_ENTRATI_REPORT:
+        esito["entrati"].append({"titolo": r["titolo"][:60],
+                                 "digitale": bool(r.get("digitale")),
+                                 "stato": stato})
     print(f"    🏪 {r['titolo'][:50]} — {r['prezzo_eur']:.2f} € "
-          f"[{r.get('categoria') or 'Altro'}]")
+          f"[{r.get('categoria') or 'Altro'}]"
+          f"{' · digitale' if r.get('digitale') else ''}")
 
 
 def _aggiorna(con, gia, r: dict, connettore: dict, salva_foto, marchio,
@@ -1180,6 +1449,32 @@ def _aggiorna(con, gia, r: dict, connettore: dict, salva_foto, marchio,
         con.execute("UPDATE annunci SET quantita=?, "
                     "quantita_max=MAX(quantita_max,?) WHERE id=?",
                     (quantita, quantita, gia["id"]))
+    # --- la consegna (set 2026) ---------------------------------------
+    # LA RIGA CHE CORREGGE IL PREGRESSO: un corso online importato
+    # ieri con «🚚 Spedizione» e «🤝 Ritiro» torna digitale al primo
+    # giro dopo il deploy, e un prodotto che il negozio smette di
+    # dichiarare virtuale riprende la consegna del cassetto. Si tocca
+    # SOLO quando la strada cambia: la consegna fisica la scrive il
+    # cassetto (`_applica_dichiarazione`), e ricoprirla ogni ora da qui
+    # sarebbe un secondo scrittore sulla stessa colonna.
+    digitale = bool(r.get("digitale"))
+    if digitale != (gia["consegna"] == "digitale"):
+        cons = consegna_riga(connettore, digitale)
+        con.execute(
+            "UPDATE annunci SET consegna=?, spedizione_eur=?, "
+            "spedizione_sats=?, spedizione_punto_eur=?, "
+            "spedizione_punto_sats=?, spedizione_punto_dichiarata=?, "
+            "spedizione_extra_eur=?, spedizione_extra_sats=?, "
+            "taglia_pacco='' WHERE id=?",
+            (cons["consegna"], cons["spedizione_eur"],
+             cons["spedizione_sats"], cons["spedizione_punto_eur"],
+             cons["spedizione_punto_sats"],
+             cons["spedizione_punto_dichiarata"],
+             cons["spedizione_extra_eur"], cons["spedizione_extra_sats"],
+             gia["id"]))
+        esito["consegna_corretta"] += 1
+        print(f"    ↔ consegna corretta ({cons['consegna'] or 'cassetto'}): "
+              f"{r['titolo'][:50]}")
     # --- lo stato -----------------------------------------------------
     if marchio:
         # il testo e' cambiato e la moderazione non sa piu' approvarlo:
@@ -1196,6 +1491,20 @@ def _aggiorna(con, gia, r: dict, connettore: dict, salva_foto, marchio,
                     (gia["id"],))
         esito["riaccesi"] += 1
         print(f"    ↑ tornato in vetrina: {r['titolo'][:50]}")
+    elif gia["stato"] == "venduto" and digitale and r.get("quantita") is None:
+        # IL DIGITALE SENZA MAGAZZINO NON SI ESAURISCE (set 2026): un
+        # PDF che il negozio non conta nasce «pezzo unico» come ogni
+        # stock ignoto, e dopo la prima vendita resterebbe «venduto»
+        # per sempre — il negozio non lo rifornisce, perche' per lui
+        # non e' mai finito (`instock` senza numero). Qui torna in
+        # vetrina al giro dopo, con un pezzo: quel che il negozio
+        # dice («c'e'») e non piu' di quello. Fra la vendita e il giro
+        # e' fuori per un'ora al massimo, ed e' il prezzo dichiarato
+        # di non inventare un numero di copie.
+        con.execute("UPDATE annunci SET stato='attivo', quantita=1 "
+                    "WHERE id=?", (gia["id"],))
+        esito["riaccesi"] += 1
+        print(f"    ↑ digitale di nuovo in vetrina: {r['titolo'][:50]}")
     elif gia["stato"] == "attivo" and quantita == 0:
         # l'invariante di casa: venduto <=> quantita = 0
         con.execute("UPDATE annunci SET stato='venduto' WHERE id=?",
