@@ -15904,10 +15904,6 @@
   (un pacco solo)» + taglia stimata. In DEMO il set non esiste
   (toast), in VETRINA apre l'invito. Gli importati da Nostr restano
   fuori dai set per costruzione (consegna '').
-  ⚠️ ROVESCIATA il 24 set 2026 (decisione di Andrea, vedi «I CARRELLI
-  NON SI PERDONO» qui sotto): la ✕ chiude e METTE DA PARTE, come
-  l'indietro, e a buttare è «🗑 Svuota carrello» con la sua conferma.
-  Il paragrafo resta com'era, per il perché di allora:
   LA ✕ DELLA PAGINA DEL PACCO CHIUDE E BUTTA VIA (ago 2026, decisione
   di Andrea). Il pacco è STICKY per venditore — uscire e rientrare dal
   dettaglio non svuota niente, `apriPacco` lo dice: stesso venditore =
@@ -15959,9 +15955,7 @@
   `disabled`; `toccaCarrelloCard` aggiunge (via `apriPacco`) o toglie
   (`togliDalCarrello`), e `aggiornaCarrelloCards` ritocca i bottoncini
   in place — chiamata da `apriPacco`, `svuotaPacco` e `rinfrescaViste`.
-  Tutto in memoria, come il carrello di sempre — fino al 24 set 2026:
-  da allora i carrelli restano fra un'apertura e l'altra (vedi «I
-  CARRELLI NON SI PERDONO»).
+  Tutto in memoria, come il carrello di sempre.
   IL PAGAMENTO UNICO DI PIÙ CARRELLI (24 set 2026). LA BUSTA È UNA RIGA
   DI `pagamenti` con motivo `carrello` (importo = la somma, hash e
   bolt11 della fattura unica, la cassaforte del denaro nuovo): il
@@ -16017,62 +16011,11 @@
   «Paga tutto insieme» → `startBuyCarrelli`, gemello di `startBuySet`
   col body a carrelli, stesso paySheet in veste escrow, poll
   `verificaCarrelli`; `carrelliCorrente` è la quarta modalità del
-  foglio (con `sheetPaid` e `annullaPagamento`), e a saldo arrivato
-  escono dai carrelli i pezzi della busta (dal 24 set 2026: prima si
-  svuotava tutto) e si va agli Ordini. `mapOrder` porta `pagamentoId`,
+  foglio (con `sheetPaid` e `annullaPagamento`), e a saldo arrivato si
+  svuota tutto e si va agli Ordini. `mapOrder` porta `pagamentoId`,
   `maiIncassato` e `pagamentoUnicoSats`: «Paga ora» apre la fattura
   unica con la cifra intera, la scaduta non si rigenera, e l'ordine
   mai nato parla della parte che torna, non di una disputa.
-  I CARRELLI NON SI PERDONO (24 set 2026, decisione di Andrea). LA
-  REGOLA: un carrello si svuota in tre modi soli — «🗑 Svuota carrello»
-  con la conferma, togliendo l'ultimo articolo, o col pagamento
-  riuscito dei SUOI pezzi; la ✕ e l'indietro chiudono e mettono da
-  parte. `chiudiPagPacco` è `navIndietro` e basta; «🗑 Svuota carrello»
-  (`.btn.danger-ghost`) sta in fondo alla pagina del carrello
-  (`renderPacco`, solo a carrello pieno) e in ogni blocco di «I tuoi
-  carrelli», e chiama `chiediSvuotaCarrello(sid)`, che apre
-  `#paccoSvuotaSheet` sapendo di chi è il carrello (`svuotaDi`,
-  «Svuotare il carrello di Anna?»); il sì è `svuotaPacco`, l'unica sua
-  chiamata: svuota QUEL carrello, aperto o da parte — dalla pagina del
-  carrello ne esce, da «I tuoi carrelli» ci resta. IL PAGAMENTO
-  RIUSCITO toglie i pezzi pagati con le loro quantità
-  (`togliPagatiDaiCarrelli`), da qualunque carrello stiano: quali lo
-  scrive chi apre la fattura (`pagatoInCorso` in `startBuy` e
-  `startBuySet`, `bustaCarrelliInCorso` in `startBuyCarrelli`), e per
-  «Paga ora» lo dicono gli ordini (`righePagateOrdine`, la busta intera
-  se è una quota). L'ACCORDO SUL CARRELLO non scrive più sopra il
-  carrello aperto: `pagaOffertaCarrello` lo mette da parte com'è
-  (`carrelloPrimaAccordo`) e lo rimette `go()` uscendo dalla cassa, o
-  `togliPagatiDaiCarrelli` prima di togliere i pezzi pattuiti. I
-  CARRELLI RESTANO fra un'apertura e l'altra: sul telefono
-  (`localStorage`, `barattolo_carrelli@<tg_id>`: per conto, come le
-  chiavi del P2P) e dentro Telegram nella nuvola (CloudStorage 6.9+,
-  `barattolo_carrelli`, già per utente), nella forma
-  `{v, t, a, c:[[venditore, provenienza, nome, [[id, pezzi, titolo],…]]]}`
-  — coi titoli se stanno nei 4096 caratteri, senza se no. Mai le
-  preparazioni del pagamento unico (portano l'indirizzo). LA PENNA È
-  UNA: `aggiornaCarrelloCards`, il campanello che ogni cambio suona per
-  card e badge, chiama `salvaCarrelli` — telefono subito, nuvola dopo
-  1,2 s (e subito se l'app va in sottofondo, `visibilitychange`); un
-  ridisegno non sposta l'ora (`carrelliImpronta`: venditori, pezzi e
-  quantità), e con i carrelli in memoria di un altro conto
-  (`carrelliDi`) non si scrive. Una sentinella censisce chi scrive i
-  carrelli: suona il campanello o è un aiutante dichiarato. ALL'APERTURA
-  `avvia` chiama `carrelliDalTelefono` subito dopo il `/me` (sincrono:
-  il badge conta già giusto) e `ripristinaCarrelli` dopo vetrina e
-  barattolo: la nuvola più recente vince (è l'altro dispositivo), la
-  più vecchia si porta in pari, `ok:false` non tocca niente, e un tocco
-  arrivato nel frattempo vince su di lei (`carrelliGiro`); poi
-  `ripulisciCarrelli` chiede alla porta di sempre
-  (`/api/listings/{id}`) i soli pezzi che il catalogo dell'apertura non
-  conosce — 404 = non più disponibile, stato non attivo = esaurito,
-  meno pezzi = la quantità scende — e lo dice (`fraseCarrello`: un
-  toast, e la riga in cima a «I tuoi carrelli», `carrelliAvvisi`); rete
-  giù = resta. `annuncioDelCarrello` chiede il catalogo solo quando è
-  VERO (`DEMO || datiVivi`): prima della prima pagina `listings` è il
-  seme della demo, con gli stessi id. E `rileggiVenditore` spegne chi
-  manca dal negozio solo a lista INTERA (senza `cursore`) e non pota
-  mai un pezzo che il catalogo non conosce.
   IL CARRELLO SI PAGA DOVE SI CONTROLLA (ago 2026, decisione di
   Andrea): la pagina del RIEPILOGO non esiste più — né il foglio
   `#setSheet` che l'aveva preceduta, né la vista

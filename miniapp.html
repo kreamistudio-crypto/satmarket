@@ -4995,16 +4995,6 @@
   .carrello-unico.pronto{color:var(--trust)}
   .carrello-unico .btn.mini{margin:0 0 0 auto;width:auto;flex:0 0 auto;
     font-size:12.5px;padding:6px 12px 7px;white-space:nowrap}
-  /* «🗑 SVUOTA CARRELLO» (24 set 2026, «i carrelli non si perdono»):
-     l'unica strada per buttare un carrello, in fondo al blocco e in
-     fondo alla pagina del carrello — il terziario distruttivo di casa
-     (.btn.danger-ghost), stretto al suo blocco invece che staccato
-     come sotto una pagina. Le righe della ripulitura stanno in cima
-     alla lista, nella voce dei suggerimenti (.eur-hint). */
-  .carrello-blocco .btn.carrello-svuota{margin-top:6px;padding:8px 16px}
-  .pacco-svuota{grid-column:1/-1}
-  .carrelli-avvisi{padding:0 var(--pad) 10px;margin-bottom:0}
-  .carrelli-avvisi div + div{margin-top:4px}
   /* LA BARRA DI «I TUOI CARRELLI» (24 set 2026): gemella di #barraPacco
      per posizione e carta — il totale dei pronti a sinistra, «Paga
      tutto insieme» a destra. Vive solo con body.con-carrelli, che
@@ -9772,9 +9762,8 @@ document.getElementById('cartello')?.remove();</script>
        bottoni: «Apri» porta al carrello di quel venditore (la pagina
        del pacco di sempre), «Controlla e paga» alla sua cassa. La
        testata e' quella del carrello (.pacco-testa) con la ✕ che qui
-       CHIUDE E BASTA, come in ogni carrello dal 24 set 2026: a
-       svuotare e' «🗑 Svuota carrello», in ogni blocco. Il contenuto
-       lo disegna renderCarrelli().
+       CHIUDE E BASTA: non c'e' niente da buttare, a svuotare e' la ✕
+       del singolo carrello. Il contenuto lo disegna renderCarrelli().
        -->
   <div class="view" id="view-carrelli">
     <div class="pacco-appiccicato">
@@ -11398,11 +11387,11 @@ document.getElementById('cartello')?.remove();</script>
   <div class="sheet" id="paccoSvuotaSheet" role="dialog" aria-modal="true"
        aria-labelledby="paccoSvuotaTit">
     <div class="grab"></div>
-    <h3 id="paccoSvuotaTit">Svuotare il carrello?</h3>
+    <h3 id="paccoSvuotaTit">Vuoi ignorare le modifiche?</h3>
     <div style="font-size:13px;color:var(--muted);font-weight:600;
       line-height:1.5;margin-bottom:14px">Non potrai annullare questa
       azione: il carrello si svuota e si ricomincia da capo.</div>
-    <button class="btn orange" onclick="svuotaPacco()">Sì, svuota il carrello</button>
+    <button class="btn orange" onclick="svuotaPacco()">Sì, ignora le modifiche</button>
     <button class="btn ghost" onclick="navIndietro()">Annulla</button>
   </div>
 
@@ -13769,10 +13758,6 @@ function go(view){
       view);
     return;
   }
-  /* uscendo dalla cassa di un ACCORDO sul carrello, il carrello aperto
-     torna quello di prima (vedi pagaOffertaCarrello): la composizione
-     pattuita vive solo li' dentro */
-  if (carrelloPrimaAccordo && view !== 'acquisto') rimettiCarrelloPrimaAccordo();
   /* Si segna dove si era in vetrina PRIMA di spegnerla: un istante
      dopo il display:none accorcia il documento e il browser clampa lo
      scorrimento a zero — la posizione sarebbe gia' persa. Insieme alla
@@ -20461,9 +20446,8 @@ let consegnaSetScelta = 'spedizione';
 const MAX_PACCO = 8;
 /* La pagina del pacco (ago 2026): a chi appartiene il pacco in
    composizione. Sopravvive alla navigazione (si torna e lo si ritrova)
-   ed e' per un venditore solo; dal 24 set 2026 aprirlo da un altro
-   venditore mette da parte quello che c'era (montaCarrello), e a
-   pagamento riuscito escono i soli pezzi pagati (togliPagatiDaiCarrelli). */
+   ed e' per un venditore solo: aprirlo da un altro venditore lo
+   ricomincia da capo. Si azzera a pagamento riuscito. */
 let paccoDati = null;               // {sellerId, origineId}
 /* I CARRELLI, UNO PER VENDITORE (24 set 2026, idea di due utenti).
    Quello APERTO vive nelle due variabili di sempre — setScelte e
@@ -20473,9 +20457,8 @@ let paccoDati = null;               // {sellerId, origineId}
    da un altro venditore buttava via quello che si stava componendo;
    adesso lo mette da parte, e lo si ritrova in «🛒 I tuoi carrelli».
    Il modello NON cambia: un carrello e' di un venditore solo, con la
-   sua spedizione — cambia che se ne puo' tenere piu' d'uno. Dal 24 set
-   2026 non vive piu' in sola memoria: resta fra un'apertura e l'altra
-   (vedi «I CARRELLI NON SI PERDONO», qui sotto). */
+   sua spedizione — cambia che se ne puo' tenere piu' d'uno. Vive in
+   memoria come il carrello di sempre: un ricaricamento lo perde. */
 let carrelliDaParte = new Map();     // sellerId -> {scelte, dati}
 /* Il carrellino nasce SOLO mentre renderGrid disegna il barattolo:
    cardHTML e' una fabbrica sola e la chiamano anche le celle del
@@ -20534,15 +20517,9 @@ function carrelliTutti(){
 }
 /* L'annuncio si trova nel catalogo O fra i preferiti: le card del
    barattolo nascono da myPreferiti, che entrano nel catalogo solo se
-   attivi o esauriti. E il catalogo vale solo quando e' VERO (24 set
-   2026, visto dal vivo): prima della prima pagina `listings` e' il seme
-   della DEMO, con gli STESSI id degli annunci veri, e i carrelli di
-   ieri appena ripresi dal telefono si prendevano i titoli degli
-   annunci finti — «Cuffie Sony…» al posto della Lampada. Il giudice e'
-   quello di contaCategorie: DEMO, o `datiVivi`. */
+   attivi o esauriti. */
 const annuncioDelCarrello = id =>
-  ((DEMO || datiVivi) && listings.find(t => t.id === id))
-  || myPreferiti.find(t => t.id === id);
+  listings.find(t => t.id === id) || myPreferiti.find(t => t.id === id);
 /* Sta in UN carrello, quello del suo venditore — aperto o da parte. */
 function inCarrello(id){
   const l = annuncioDelCarrello(id);
@@ -20617,11 +20594,7 @@ function toccaCarrelloCard(id){
 }
 /* I bottoncini in griglia si aggiornano IN PLACE (dentro/fuori,
    etichetta) e con loro il badge: la griglia non si ridisegna per un
-   tocco — il pattern di aggiornaJarCards.
-   E' IL CAMPANELLO DEI CARRELLI (24 set 2026): chi li cambia lo suona
-   gia' per card e badge, e quindi e' qui che si salvano — una penna
-   sola, e un cambio che dimenticasse di salvare dimenticherebbe anche
-   il badge, cioe' si vedrebbe (vedi salvaCarrelli). */
+   tocco — il pattern di aggiornaJarCards. */
 function aggiornaCarrelloCards(){
   document.querySelectorAll('.card-carrello').forEach(b => {
     if (b.classList.contains('spento')) return;
@@ -20631,7 +20604,6 @@ function aggiornaCarrelloCards(){
     b.title = t; b.setAttribute('aria-label', t);
   });
   renderBadgeCarrelli();
-  salvaCarrelli();
 }
 /* «🛒 Carrelli (N)» in cima al barattolo: c'e' SOLO con almeno un
    carrello pieno (la classe .pieno; la vista la decide il CSS con
@@ -20641,314 +20613,6 @@ function renderBadgeCarrelli(){
   const n = carrelliTutti().length;
   el('carrelliConta').textContent = String(n);
   b.classList.toggle('pieno', n > 0);
-}
-
-/* ---- I CARRELLI NON SI PERDONO (24 set 2026, dal telefono di Andrea) ----
-   Dal barattolo il carrellino apriva il carrello del venditore, e
-   tornando indietro quel carrello non c'era piu'. LA REGOLA, in una
-   riga: un carrello si svuota in TRE modi soli — «🗑 Svuota carrello»
-   con la sua conferma, togliendo l'ultimo articolo, o col pagamento
-   riuscito dei SUOI pezzi (togliPagatiDaiCarrelli). Nessun gesto di
-   navigazione lo tocca: indietro, ✕, cambio pagina, un altro negozio,
-   un altro carrello.
-   E I CARRELLI RESTANO fra un'apertura e l'altra, in due posti: sul
-   TELEFONO (localStorage, per conto — il nome porta il tg_id come le
-   chiavi del P2P, e due account sullo stesso telefono non si vedono i
-   carrelli: «IL CONTO SUL DISPOSITIVO») e, dentro Telegram, nella
-   NUVOLA (CloudStorage, gia' per utente: la chiave e' una sola), cosi'
-   si ritrovano anche da un altro dispositivo. Vince la fotografia piu'
-   RECENTE. Si salva la sola COMPOSIZIONE — venditore, righe e
-   quantita', col titolo corto che serve a dire cosa e' uscito — e MAI
-   le preparazioni del pagamento unico: portano l'indirizzo di casa, e
-   rifarle costa un tocco.
-   All'apertura i carrelli si ripuliscono da soli di cio' che nel
-   frattempo e' esaurito o sparito, e una riga lo dice
-   (ripulisciCarrelli). */
-const CLOUD_CARRELLI = 'barattolo_carrelli';
-const CARRELLI_FORMATO = 1;
-/* il tetto di Telegram per il valore di una chiave del CloudStorage */
-const CARRELLI_NUVOLA_MAX = 4096;
-const chiaveCarrelli = () => 'barattolo_carrelli@' + myTgId;
-let carrelliDi = null;          // il conto dei carrelli in memoria (null = mai letti)
-let carrelliT = 0;              // l'ora dell'ultimo cambio VERO (ms)
-let carrelliImpronta = '';      // cosa c'e' dentro, senza l'ora
-let carrelliGiro = 0;           // cresce a ogni cambio: una nuvola letta prima non vince
-let carrelliNuvolaTimer = 0;
-let carrelliAvvisi = [];        // le righe «e' uscito dal carrello», per «I tuoi carrelli»
-let carrelliRipristino = null;  // la ripulitura dell'apertura, finche' e' in volo
-const titoliCarrello = new Map();     // annuncioId -> titolo corto, dalla fotografia
-const venditoriCarrello = new Map();  // sellerId -> nome, idem
-/* i pezzi del pagamento in corso ({ordine, righe}) e quelli della busta
-   del pagamento unico ({pid, venditori, righe}): chi apre la fattura
-   sa COSA sta pagando, e a saldo arrivato sono loro a uscire */
-let pagatoInCorso = null;
-let bustaCarrelliInCorso = null;
-/* IL CARRELLO DI PRIMA DELL'ACCORDO (vedi pagaOffertaCarrello): {scelte,
-   dati} finche' la cassa di un accordo sul carrello e' aperta */
-let carrelloPrimaAccordo = null;
-
-/* La composizione in una forma che sta nei 4096 caratteri della nuvola:
-   per carrello [venditore, provenienza, nome, [[id, pezzi, titolo], …]].
-   Mentre la cassa di un ACCORDO e' aperta, l'aperto e' quello messo da
-   parte: la composizione pattuita non e' un carrello. E i titoli e i
-   nomi che vede li RICORDA: servono a dire cosa e' uscito anche il
-   giorno che il catalogo non lo sa piu' (un 404 non ha un titolo). */
-function fotografiaCarrelli(conTitoli){
-  const c = [];
-  const metti = (sid, scelte, dati) => {
-    if (!sid || !scelte || !scelte.size) return;
-    const righe = [...scelte].map(([id, q]) => {
-      const l = annuncioDelCarrello(id);
-      if (l && l.title) titoliCarrello.set(id, String(l.title).slice(0, 40));
-      const t = titoliCarrello.get(id) || '';
-      return conTitoli ? [id, q, t] : [id, q];
-    });
-    const nome = nomeVenditoreCarrello(sid, scelte).slice(0, 30);
-    if (nome) venditoriCarrello.set(sid, nome);
-    c.push([sid, (dati && dati.origineId) || 0, conTitoli ? nome : '', righe]);
-  };
-  const ap = carrelloPrimaAccordo || {scelte: setScelte, dati: paccoDati};
-  if (ap.dati) metti(ap.dati.sellerId, ap.scelte, ap.dati);
-  for (const [sid, x] of carrelliDaParte) metti(sid, x.scelte, x.dati);
-  return {v: CARRELLI_FORMATO,
-          a: (ap.dati && ap.scelte.size) ? ap.dati.sellerId : 0, c};
-}
-/* L'IMPRONTA dice cosa c'e' dentro e basta — venditori, pezzi e
-   quantita', in ordine di venditore —: l'aperto che cambia, la
-   provenienza e i titoli non sono cambi. */
-const improntaCarrelli = f => JSON.stringify(f.c
-  .map(x => [x[0], x[3].map(r => [r[0], r[1]])])
-  .sort((a, b) => a[0] - b[0]));
-/* LA PENNA DEI CARRELLI, suonata dal campanello (aggiornaCarrelloCards).
-   Il telefono SUBITO, la nuvola dopo un respiro (tocchi di fila fanno
-   una scrittura sola). Un ridisegno che non cambia niente non scrive e
-   non sposta l'ora: sennò un telefono che ha solo GUARDATO vincerebbe
-   su quello dove si e' composto davvero. E finche' i carrelli in
-   memoria non sono del conto di adesso (l'apertura, il cambio
-   d'identita' del collaudo) non si scrive niente: si scriverebbe il
-   vuoto sopra i carrelli di ieri. */
-function salvaCarrelli(){
-  if (DEMO || VETRINA || !myTgId || carrelliDi !== myTgId) return;
-  const f = fotografiaCarrelli(true);
-  const imp = improntaCarrelli(f);
-  if (imp === carrelliImpronta) return;
-  carrelliImpronta = imp; carrelliT = Date.now(); carrelliGiro++;
-  try { localStorage.setItem(chiaveCarrelli(), JSON.stringify({...f, t: carrelliT})); } catch(e){}
-  clearTimeout(carrelliNuvolaTimer);
-  carrelliNuvolaTimer = setTimeout(scriviNuvolaCarrelli, 1200);
-}
-/* Nella nuvola coi titoli se ci stanno, senza se non ci stanno (servono
-   solo a dire COSA e' uscito); e se non ci sta nemmeno cosi' resta il
-   telefono. Fuori da Telegram non c'e' nuvola, e non succede niente. */
-function scriviNuvolaCarrelli(){
-  clearTimeout(carrelliNuvolaTimer); carrelliNuvolaTimer = 0;
-  if (!cloudTelegram() || carrelliDi !== myTgId) return;
-  let testo = JSON.stringify({...fotografiaCarrelli(true), t: carrelliT});
-  if (testo.length > CARRELLI_NUVOLA_MAX)
-    testo = JSON.stringify({...fotografiaCarrelli(false), t: carrelliT});
-  if (testo.length <= CARRELLI_NUVOLA_MAX) cloudScrivi(CLOUD_CARRELLI, testo);
-}
-/* Una fotografia (del telefono o della nuvola) torna in memoria, letta
-   con sospetto: e' roba nostra, ma un JSON storto, un formato che non
-   conosciamo o una riga senza senso valgono «niente», mai
-   un'eccezione. I numeri passano da numeroConto e mai da `| 0`: un
-   tg_id supera i 32 bit. */
-function adottaCarrelli(s){
-  setScelte = new Map(); paccoDati = null; consegnaSetScelta = 'spedizione';
-  carrelliDaParte = new Map();
-  const ok = !!(s && s.v === CARRELLI_FORMATO && Array.isArray(s.c));
-  for (const x of (ok ? s.c : [])) {
-    if (!Array.isArray(x) || !Array.isArray(x[3])) continue;
-    const sid = numeroConto(x[0]);
-    if (sid <= 0 || carrelliDaParte.has(sid)) continue;
-    const scelte = new Map();
-    for (const r of x[3]) {
-      if (!Array.isArray(r)) continue;
-      const id = numeroConto(r[0]), q = numeroConto(r[1]);
-      if (id <= 0 || q <= 0 || scelte.has(id) || scelte.size >= MAX_PACCO) continue;
-      scelte.set(id, q);
-      if (r[2]) titoliCarrello.set(id, String(r[2]).slice(0, 40));
-    }
-    if (!scelte.size) continue;
-    if (x[2]) venditoriCarrello.set(sid, String(x[2]).slice(0, 30));
-    carrelliDaParte.set(sid, {scelte, dati: {sellerId: sid,
-      origineId: numeroConto(x[1]) || [...scelte.keys()][0]}});
-  }
-  /* l'aperto torna aperto */
-  const a = ok ? numeroConto(s.a) : 0;
-  if (a > 0 && carrelliDaParte.has(a)) {
-    const x = carrelliDaParte.get(a);
-    carrelliDaParte.delete(a);
-    setScelte = x.scelte; paccoDati = x.dati;
-  }
-  carrelliT = ok ? (Number(s.t) || 0) : 0;
-  carrelliImpronta = improntaCarrelli(fotografiaCarrelli(false));
-}
-/* ALL'APERTURA, appena si sa CHI sei (avvia): i carrelli di QUESTO conto
-   dal telefono, in sincrono — il badge conta gia' giusto, e il primo
-   tocco trova il carrello di ieri. Nuvola e ripulitura arrivano dopo,
-   in sottofondo (ripristinaCarrelli). Vale anche per il cambio
-   d'identita' del collaudo, che rifa' avvia senza ricaricare: i
-   carrelli in memoria (e le preparazioni, e un accordo a meta') erano
-   dell'altro conto. */
-function carrelliDalTelefono(){
-  clearTimeout(carrelliNuvolaTimer); carrelliNuvolaTimer = 0;
-  titoliCarrello.clear(); venditoriCarrello.clear();
-  carrelliPronti = new Map(); carrelloPrimaAccordo = null;
-  let s = null;
-  try { s = JSON.parse(localStorage.getItem(chiaveCarrelli()) || 'null'); } catch(e){ s = null; }
-  adottaCarrelli(s);
-  carrelliDi = myTgId;
-  carrelliAvvisi = [];
-  pagatoInCorso = bustaCarrelliInCorso = null;
-  renderBadgeCarrelli();
-}
-/* Il secondo tempo dell'apertura, in sottofondo. La NUVOLA prima: piu'
-   recente del telefono vince lei (e' l'altro dispositivo), piu'
-   vecchia la si porta in pari. `ok:false` e' «non lo so», non «vuota»
-   (il patto di cloudLeggiEsito): sopra non si scrive niente. E se nel
-   frattempo i carrelli sono cambiati QUI (o c'e' una cassa d'accordo
-   aperta), la nuvola letta prima non vince: il cambio di adesso e'
-   piu' nuovo. Poi la RIPULITURA. */
-async function ripristinaCarrelli(){
-  try {
-    const conto = myTgId, giro = carrelliGiro;
-    const e = await cloudLeggiEsito(CLOUD_CARRELLI);
-    if (conto !== myTgId || carrelliDi !== conto) return;
-    if (e.ok && giro === carrelliGiro && !carrelloPrimaAccordo) {
-      let s = null;
-      try { s = JSON.parse(e.testo || 'null'); } catch(err){ s = null; }
-      const tn = (s && s.v === CARRELLI_FORMATO) ? (Number(s.t) || 0) : 0;
-      if (tn > carrelliT) {
-        adottaCarrelli(s);
-        try { localStorage.setItem(chiaveCarrelli(), JSON.stringify(s)); } catch(err){}
-        renderBadgeCarrelli();
-      } else if (tn < carrelliT) scriviNuvolaCarrelli();
-    }
-    await ripulisciCarrelli(conto);
-  } catch(e){}
-}
-/* Le righe che dicono cosa e' cambiato in un carrello, in UN posto:
-   all'apertura (ripulisciCarrelli) e alla rilettura del negozio
-   (rileggiVenditore) parlano con le stesse parole. */
-function fraseCarrello(come, titolo, venditore, q){
-  const cosa = titolo ? `«${titolo}»` : 'Un articolo';
-  const da = venditore ? ` dal carrello di ${venditore}` : ' dal carrello';
-  if (come === 'meno')
-    return `${cosa}: ne ${q === 1 ? 'resta' : 'restano'} solo ${fmt(q)}, e il carrello è sceso a ${fmt(q)}`;
-  if (come === 'esaurito') return `${cosa} è esaurito: è uscito${da}`;
-  return `${cosa} non è più disponibile: è uscito${da}`;
-}
-/* Il nome del venditore di un carrello: dal catalogo, o dalla fotografia */
-function nomeVenditoreCarrello(sid, scelte){
-  const l0 = [...(scelte || new Map()).keys()].map(annuncioDelCarrello).find(Boolean);
-  return (l0 && l0.seller && l0.seller !== '—')
-    ? String(l0.seller) : (venditoriCarrello.get(sid) || '');
-}
-/* Chi legge le righe: un toast subito, e la riga in cima a «I tuoi
-   carrelli» per il resto della sessione (renderCarrelli). */
-function annunciaAvvisiCarrelli(avvisi){
-  if (!avvisi.length) return;
-  carrelliAvvisi = avvisi.concat(carrelliAvvisi).slice(0, 8);
-  toast(avvisi.length === 1 ? '🛒 ' + avvisi[0]
-    : `🛒 Nei tuoi carrelli sono cambiati ${avvisi.length} articoli: i dettagli in «I tuoi carrelli»`, 6000);
-}
-/* LA RIPULITURA DELL'APERTURA: chi e' esaurito o sparito esce, chi ha
-   meno pezzi di quanti ne chiedeva il carrello scende, e le righe lo
-   dicono. Chi il catalogo conosce gia' da QUESTA apertura (la prima
-   pagina della vetrina, il barattolo) e' fresco; gli altri si chiedono
-   uno per uno alla porta di sempre, che risponde anche per gli esauriti
-   (lo stato) e dice 404 per chi non c'e' piu'. NEL DUBBIO SI RESTA: una
-   rete giu' o un server che non sa rispondere non tolgono niente — un
-   carrello non si perde per un giro di rete storto, e il giudice vero
-   resta il server, alla cassa. Si applica ai carrelli di ADESSO e non a
-   quelli di prima della rete: chi nel frattempo ha toccato qualcosa non
-   si vede riscrivere il suo tocco. */
-async function ripulisciCarrelli(conto){
-  const ids = [...new Set(carrelliTutti().flatMap(c => [...c.scelte.keys()]))];
-  if (!ids.length) return;
-  const via = new Set();
-  await Promise.all(ids.filter(id => !listings.some(t => t.id === id)).map(async id => {
-    try {
-      const r = await fetch(`${API_BASE}/listings/${id}`,
-        {headers: {'X-Tg-Init-Data': authHdr()}});
-      if (r.status === 404) { via.add(id); return; }
-      if (r.ok) inCatalogo([mapListing(await r.json())]);
-    } catch(e){}
-  }));
-  if (conto !== myTgId || carrelliDi !== conto) return;
-  const avvisi = [];
-  for (const c of carrelliTutti()) {
-    const chi = nomeVenditoreCarrello(c.sellerId, c.scelte);
-    for (const [id, q] of [...c.scelte]) {
-      const l = listings.find(t => t.id === id);
-      const tit = l ? l.title : (titoliCarrello.get(id) || '');
-      if (via.has(id)) {
-        c.scelte.delete(id);
-        avvisi.push(fraseCarrello('via', tit, chi));
-      } else if (l && l.stato && l.stato !== 'attivo') {
-        c.scelte.delete(id);
-        avvisi.push(fraseCarrello(esaurito(l) ? 'esaurito' : 'via', tit, chi));
-      } else if (l && q > (l.quantita || 1)) {
-        c.scelte.set(id, l.quantita || 1);
-        avvisi.push(fraseCarrello('meno', tit, chi, l.quantita || 1));
-      }
-    }
-  }
-  potaCarrelliVuoti();
-  annunciaAvvisiCarrelli(avvisi);
-  aggiornaCarrelloCards();
-  if (el('view-carrelli')?.classList.contains('active')) renderCarrelli();
-  if (el('view-pacco')?.classList.contains('active')) renderPacco();
-}
-/* Un carrello rimasto vuoto sparisce (il patto di togliDalCarrello), e
-   con lui la sua preparazione per il pagamento unico. L'aperto no, se
-   la sua pagina e' a schermo: li' resta il carrello vuoto del
-   venditore coi suoi «Aggiungi», e non una pagina che non si sa piu'
-   ridisegnare. */
-function potaCarrelliVuoti(){
-  for (const [sid, x] of [...carrelliDaParte])
-    if (!x.scelte.size) { carrelliDaParte.delete(sid); carrelliPronti.delete(sid); }
-  if (paccoDati && !setScelte.size && !el('view-pacco')?.classList.contains('active')) {
-    carrelliPronti.delete(paccoDati.sellerId);
-    paccoDati = null; consegnaSetScelta = 'spedizione';
-  }
-}
-/* I pezzi di un ordine, nella forma di togliPagatiDaiCarrelli: il set
-   porta le righe, il singolo il suo annuncio coi suoi pezzi. */
-const righePagateOrdine = o => (o && o.righe && o.righe.length)
-  ? o.righe.map(r => ({id: r.annuncio_id, qta: r.quantita || 1}))
-  : ((o && o.annuncioId) ? [{id: o.annuncioId, qta: o.qta || 1}] : []);
-/* IL PAGAMENTO RIUSCITO TOGLIE DAI CARRELLI I PEZZI PAGATI, e solo
-   quelli. Prima QUALUNQUE pagamento riuscito azzerava il carrello
-   aperto — anche quello di un altro venditore, anche per un pezzo
-   singolo comprato dalla sua scheda. Adesso escono i pezzi pagati, da
-   qualunque carrello stiano, con le loro quantita' (tre tazze nel
-   carrello e una comprata dalla scheda: ne restano due), e un carrello
-   si svuota solo se era tutto li'. Il carrello di prima dell'accordo
-   torna PRIMA di togliere: e' da lui che i pezzi pattuiti escono. */
-function togliPagatiDaiCarrelli(righe){
-  rimettiCarrelloPrimaAccordo();
-  for (const r of (righe || [])) {
-    for (const c of carrelliTutti()) {
-      if (!c.scelte.has(r.id)) continue;
-      const q = c.scelte.get(r.id) - (r.qta || 1);
-      if (q > 0) c.scelte.set(r.id, q); else c.scelte.delete(r.id);
-    }
-  }
-  potaCarrelliVuoti();
-  aggiornaCarrelloCards();
-}
-/* La cassa dell'accordo si e' chiusa (go) o l'accordo si e' pagato: il
-   carrello aperto torna quello di prima, com'era. E la cassa
-   dell'accordo non si ricostruisce su un carrello che non e' il suo. */
-function rimettiCarrelloPrimaAccordo(){
-  const p = carrelloPrimaAccordo;
-  if (!p) return;
-  carrelloPrimaAccordo = null;
-  setScelte = p.scelte; paccoDati = p.dati; consegnaSetScelta = 'spedizione';
-  if (acqDati && acqDati.accordoId) acqDati = null;
-  aggiornaCarrelloCards();
 }
 
 function stradeFisiche(x){
@@ -23736,17 +23400,14 @@ function apriPacco(){
     if (el('view-pacco').classList.contains('active')) renderPacco();
   });
 }
-/* ---- LA ✕ CHIUDE E METTE DA PARTE (24 set 2026, decisione di Andrea
-   che ROVESCIA quella di ago 2026, «la ✕ chiude e butta via») ----
-   Era la ✕ a buttare, con la domanda davanti («Vuoi ignorare le
-   modifiche?»): chi voleva solo uscire dal carrello si trovava a
-   scegliere se buttarlo, e chi rispondeva di si' lo perdeva. Adesso la
-   ✕ fa quello che fa l'indietro — torna dove eri, e il carrello resta
-   com'e', da parte, contato in «🛒 Carrelli (N)» — e per ricominciare
-   da capo c'e' «🗑 Svuota carrello», in fondo alla pagina del carrello
-   e in ogni blocco di «I tuoi carrelli», con la sua conferma
-   (chiediSvuotaCarrello). Il pacco resta STICKY per venditore come
-   sempre: stesso venditore = ritrova il suo carrello com'era.
+/* ---- LA ✕ CHIUDE E BUTTA VIA (ago 2026, decisione di Andrea) ----
+   Il pacco e' STICKY per venditore: uscire e rientrare dal dettaglio
+   di un annuncio non svuota niente (lo dice apriPacco: stesso
+   venditore = ritrova il suo pacco com'era), e questo non cambia. Ma
+   allora serviva una strada per ricominciare da capo, e la ✕ e'
+   quella: chiude E svuota, con la conferma davanti perche' non si
+   torna indietro. A pacco gia' vuoto non si chiede nulla — una
+   domanda su una cosa che non esiste e' solo un ostacolo.
 
    IL GESTO INDIETRO NON CHIEDE E NON SVUOTA, ed e' dichiarato: fa
    quello che ha sempre fatto, torna al dettaglio col pacco intatto.
@@ -23757,65 +23418,33 @@ function apriPacco(){
    SISTEMA e non passa da navIndietro — non lo si puo' intercettare,
    solo preparare (vedi il motore di navigazione). Un ripensamento
    agganciato al gesto funzionerebbe dentro Telegram e NON nella PWA,
-   cioe' lo stesso gesto farebbe due cose diverse sui due telefoni. Fra
-   una garanzia che c'e' solo a meta' e una regola onesta, la regola —
-   e dal 24 set 2026 la ✕ la segue anche lei. */
+   cioe' la stessa ✕ farebbe due cose diverse sui due telefoni. Fra
+   una garanzia che c'e' solo a meta' e una regola onesta, la regola. */
 function chiudiPagPacco(){
   haptic();
-  navIndietro();
-}
-/* «🗑 Svuota carrello»: la domanda davanti, perche' non si torna
-   indietro, e il foglio sa DI CHI e' il carrello (svuotaDi) — ci si
-   arriva dalla pagina del carrello aperto e da ogni blocco di «I tuoi
-   carrelli», che puo' essere un carrello da parte. A carrello gia'
-   vuoto non si chiede nulla: una domanda su una cosa che non esiste e'
-   solo un ostacolo. */
-let svuotaDi = null;       // il venditore del carrello che il foglio sta per svuotare
-function chiediSvuotaCarrello(sid){
-  haptic();
-  const c = carrelliTutti().find(x => x.sellerId === sid);
-  if (!c) return;                                  /* niente da buttare */
-  svuotaDi = sid;
-  const chi = nomeVenditoreCarrello(sid, c.scelte);
-  el('paccoSvuotaTit').textContent = chi
-    ? `Svuotare il carrello di ${chi}?` : 'Svuotare il carrello?';
+  if (!setScelte.size) { navIndietro(); return; }   /* niente da buttare */
   el('sheetBg').classList.add('open');
   el('paccoSvuotaSheet').classList.add('open');
 }
-/* Il carrello si svuota DAVVERO, e solo lui: gli altri carrelli restano
-   dove sono. Se era l'aperto, paccoDati torna a null = il prossimo
-   «Aggiungi al carrello» e' un carrello nuovo, anche dallo stesso
-   venditore. */
+/* Il pacco si svuota DAVVERO: rientrando si ricomincia da capo
+   (paccoDati a null = il prossimo «Aggiungi al pacco» e' un pacco
+   nuovo, anche dallo stesso venditore). */
 function svuotaPacco(){
   haptic();
-  const sid = svuotaDi;
-  svuotaDi = null;
-  if (sid === null) return;                        /* cintura: solo dal foglio */
-  if (paccoDati && paccoDati.sellerId === sid) {
-    setScelte = new Map();
-    consegnaSetScelta = 'spedizione';
-    paccoDati = null;
-  } else carrelliDaParte.delete(sid);
-  carrelliPronti.delete(sid);
+  setScelte = new Map();
+  consegnaSetScelta = 'spedizione';
+  paccoDati = null;
+  /* si chiude il foglio e si esce dalla pagina in un colpo solo: due
+     navIndietro di fila si mangerebbero anche il gradino sotto (la
+     serratura dei 350ms), e comunque la pagina del pacco senza
+     paccoDati non si puo' piu' ricostruire — navRendiVista ripiega
+     sulla vetrina, che e' esattamente dove si vuole atterrare. */
+  chiudiPicker();                    /* chiusura MIRATA, mai closeSheet */
+  el('paccoSvuotaSheet').classList.remove('open');
+  if (!document.querySelector('.sheet.open'))
+    el('sheetBg').classList.remove('open');
   aggiornaCarrelloCards();
-  if (el('view-carrelli').classList.contains('active')) {
-    /* da «I tuoi carrelli» si resta sulla pagina: il foglio si chiude
-       dalla cronologia (e' uno strato, e il suo gradino si consuma) e
-       la lista si ridisegna senza quel carrello */
-    renderCarrelli();
-    navIndietro();
-  } else {
-    /* dalla pagina del carrello si chiude il foglio e si esce dalla
-       pagina in un colpo solo: due navIndietro di fila si mangerebbero
-       anche il gradino sotto (la serratura dei 350ms), e comunque la
-       pagina del pacco senza paccoDati non si puo' piu' ricostruire —
-       navRendiVista ripiega sulla vetrina. */
-    chiudiPicker();                    /* chiusura MIRATA, mai closeSheet */
-    el('paccoSvuotaSheet').classList.remove('open');
-    if (!document.querySelector('.sheet.open'))
-      el('sheetBg').classList.remove('open');
-    navIndietro();
-  }
+  navIndietro();
   toast('Carrello svuotato');
 }
 /* ---- «I TUOI CARRELLI» (24 set 2026) ----
@@ -23861,26 +23490,17 @@ function renderCarrelli(){
   el('carrelliSub').textContent = tutti.length
     ? `${tutti.length} venditor${tutti.length===1?'e':'i'}, una spedizione per carrello`
     : 'uno per venditore';
-  /* le righe della ripulitura (24 set 2026): cosa e' uscito dai
-     carrelli dall'ultima volta, in cima, per il resto della sessione */
-  const avvisi = carrelliAvvisi.length
-    ? `<div class="eur-hint carrelli-avvisi">${carrelliAvvisi
-        .map(a => `<div>${esc(a)}</div>`).join('')}</div>` : '';
   if (!tutti.length) {
-    box.innerHTML = avvisi + '<div id="carrelliVuoto">Nessun carrello aperto. Nel tuo barattolo 🫙 tocca il 🛒 sulla foto di un oggetto per cominciarne uno.</div>';
+    box.innerHTML = '<div id="carrelliVuoto">Nessun carrello aperto. Nel tuo barattolo 🫙 tocca il 🛒 sulla foto di un oggetto per cominciarne uno.</div>';
     aggiornaBarraCarrelli();
     return;
   }
   const resa = resaCarrello;
-  box.innerHTML = avvisi + tutti.map(c => {
-    /* un pezzo che il catalogo non conosce ancora (dopo un'apertura,
-       finche' la ripulitura e' in volo, o con la rete giu') resta una
-       riga: col titolo della fotografia, senza prezzo — sparire
-       dalla pagina sarebbe dire che non c'e' */
+  box.innerHTML = tutti.map(c => {
     const righe = [...c.scelte]
-      .map(([id, qta]) => ({id, l: annuncioDelCarrello(id), qta}));
-    const primo = righe.map(r => r.l).find(Boolean) || null;
-    const chi = nomeVenditoreCarrello(c.sellerId, c.scelte);
+      .map(([id, qta]) => ({l: annuncioDelCarrello(id), qta}))
+      .filter(r => r.l);
+    const primo = righe.length ? righe[0].l : null;
     const t = totaleCarrello(c.scelte);
     /* la riga del pagamento unico: pronto (con via e totale), da
        preparare, o da ricontrollare perche' il carrello e' cambiato */
@@ -23891,7 +23511,6 @@ function renderCarrelli(){
           ? 'Il carrello è cambiato: da ricontrollare per il pagamento unico'
           : 'Per pagare tutto insieme serve la consegna di ogni carrello'}<button type="button" class="btn ghost mini" onclick="preparaCarrello(${c.sellerId})">${carrelliPronti.has(c.sellerId) ? 'Ricontrolla' : 'Prepara'}</button></div>`;
     const mini = righe.map(r => {
-      if (!r.l) return `<span title="${esc(titoliCarrello.get(r.id) || '')}">📦</span>`;
       const tit = esc(r.l.title) + (r.qta > 1 ? ` × ${fmt(r.qta)}` : '');
       const foto = r.l.photos && r.l.photos[0];
       return foto
@@ -23901,7 +23520,7 @@ function renderCarrelli(){
     return `
     <div class="order carrello-blocco" data-seller="${c.sellerId}">
       <div class="row">
-        <b>🛒 ${chi ? esc(chi) : 'venditore'}</b>
+        <b>🛒 ${primo ? esc(primo.seller) : 'venditore'}</b>
         <span class="badge" style="background:var(--chip-bg);color:var(--ink)">${righe.length} articol${righe.length===1?'o':'i'}${t.pezzi > righe.length ? `, ${fmt(t.pezzi)} pezzi` : ''}</span>
       </div>
       <div class="carrello-mini">${mini}</div>
@@ -23911,7 +23530,6 @@ function renderCarrelli(){
         <button type="button" class="btn orange" onclick="pagaCarrello(${c.sellerId})">Controlla e paga</button>
       </div>
       ${rigaUnico}
-      <button type="button" class="btn danger-ghost carrello-svuota" onclick="chiediSvuotaCarrello(${c.sellerId})">🗑 Svuota carrello</button>
     </div>`;
   }).join('');
   aggiornaBarraCarrelli();
@@ -24028,11 +23646,6 @@ async function startBuyCarrelli(){
     return;
   }
   carrelliCorrente = d.pagamento_id;
-  /* cosa sta dentro la busta, per chi la vedra' saldata: i carrelli
-     entrati e i loro pezzi — a saldo escono loro, e solo loro */
-  bustaCarrelliInCorso = {pid: d.pagamento_id, venditori: pronti.map(x => x.c.sellerId),
-    righe: pronti.flatMap(x => (x.p.body.righe || [])
-      .map(r => ({id: r.annuncio_id, qta: r.quantita || 1})))};
   el('payAmount').textContent = fmt(d.importo_sats);
   el('payInvoice').textContent = d.invoice;
   mostraQr(d.invoice);
@@ -24040,11 +23653,8 @@ async function startBuyCarrelli(){
   pollTimer = setInterval(()=>verificaCarrelli(carrelliCorrente), 4000);
 }
 /* Il poll del pagamento unico: a saldo arrivato gli ordini sono nati
-   (o la parte morta e' in rimborso), i carrelli della BUSTA si
-   svuotano e si va agli Ordini, dove ognuno ha la sua riga. Dal 24 set
-   2026 escono i soli pezzi della busta (bustaCarrelliInCorso, scritta da chi
-   l'ha aperta; se questa pagina non l'ha vista nascere, la dicono gli
-   ordini): un carrello nato dopo la fattura resta dov'e'. */
+   (o la parte morta e' in rimborso), i carrelli si svuotano TUTTI e si
+   va agli Ordini, dove ognuno ha la sua riga. */
 async function verificaCarrelli(pid){
   if (!pid) return;
   try {
@@ -24055,20 +23665,11 @@ async function verificaCarrelli(pid){
     carrelliCorrente = null;
     closeSheet();              /* spegne anche il poll */
     if (d.stato === 'pagato'){
-      const busta = (bustaCarrelliInCorso && bustaCarrelliInCorso.pid === pid) ? bustaCarrelliInCorso : null;
-      bustaCarrelliInCorso = null;
-      acqDati = null;
-      if (busta) {
-        togliPagatiDaiCarrelli(busta.righe);
-        busta.venditori.forEach(s => carrelliPronti.delete(s));
-      }
+      carrelliDaParte = new Map(); carrelliPronti = new Map();
+      setScelte = new Map(); paccoDati = null; acqDati = null;
+      aggiornaCarrelloCards();
       const n = (d.nati || []).length, m = (d.morti || []).length;
       await loadOrders(); renderOrders();
-      if (!busta) {
-        togliPagatiDaiCarrelli(orders.filter(o => o.pagamentoId === pid)
-          .flatMap(righePagateOrdine));
-        carrelliPronti = new Map();
-      }
       go('affari');
       toast(`🔒 ${n} ordin${n===1?'e':'i'} pagat${n===1?'o':'i'}, ${n===1?'col suo deposito':'ognuno col suo deposito'}`
         + (m ? ` — ${m} non ${m===1?'è nato':'sono nati'}: la parte torna a te, apri l'ordine` : ''), 8000);
@@ -24086,13 +23687,6 @@ function rimontaCarrello(sid){
   montaCarrello(sid);
   const orig = annuncioDelCarrello(paccoDati?.origineId)
     || [...setScelte.keys()].map(annuncioDelCarrello).find(Boolean);
-  /* appena aperta l'app i pezzi dei carrelli di ieri arrivano col giro
-     della ripulitura: finche' e' in volo non e' un carrello rotto, e'
-     un carrello che sta arrivando (24 set 2026) */
-  if (!orig && carrelliRipristino) {
-    toast('Un attimo: sto ricontrollando i tuoi carrelli');
-    return null;
-  }
   if (!orig || !paccoDati) {
     toast('Questo carrello non si può riaprire: ricomincia dal barattolo');
     renderCarrelli();
@@ -24187,17 +23781,9 @@ function renderPacco(){
   const rigaDigitali = digitali
     ? '<div class="eur-hint" style="grid-column:1/-1">💾 Gli articoli digitali si comprano singolarmente, dalla loro scheda.</div>'
     : '';
-  /* «🗑 Svuota carrello» in FONDO (24 set 2026): la ✕ in testata chiude
-     e mette da parte, e l'unica strada per buttare il carrello sta qui,
-     lontano dal pollice, con la sua conferma — e solo se c'e' qualcosa
-     da buttare */
-  const svuota = setScelte.size
-    ? `<div class="pacco-svuota"><button type="button" class="btn danger-ghost" onclick="chiediSvuotaCarrello(${paccoDati.sellerId})">🗑 Svuota carrello</button></div>`
-    : '';
   el('paccoGrid').innerHTML =
-    ((inGriglia.map(cellaPacco).join('') + rigaDigitali)
-    || '<div class="eur-hint" style="grid-column:1/-1">Questo venditore non ha oggetti attivi.</div>')
-    + svuota;
+    (inGriglia.map(cellaPacco).join('') + rigaDigitali)
+    || '<div class="eur-hint" style="grid-column:1/-1">Questo venditore non ha oggetti attivi.</div>';
   armaViste();
   /* il sottotitolo dice il MODELLO, in una riga corta: un venditore
      alla volta, ed e' quel che permette la spedizione unica. SENZA il
@@ -24647,7 +24233,6 @@ function setQtaPacco(id, d){
   setScelte.set(id, q);
   aggiornaPezziCella(id, x);
   aggiornaBarraPacco();
-  aggiornaCarrelloCards();              /* il campanello: anche un pezzo in piu' si salva */
 }
 /* La patch in place di UNA cella: numero, estremi del chip e segno
    sulla foto. Solo nostro markup, nessun testo utente. */
@@ -24669,7 +24254,6 @@ function aggiornaPezziCella(id, x){
    cio' che il catalogo gia' sapeva. */
 async function rileggiVenditore(l){
   if (!l) return;
-  let freschi = null;         // il negozio INTERO, se ha risposto per intero
   try {
     const chi = l.negozio || l.username;
     if (chi) {
@@ -24677,45 +24261,23 @@ async function rileggiVenditore(l){
         `${API_BASE}/negozio/${encodeURIComponent(chi)}?limit=100`,
         {headers:{'X-Tg-Init-Data': authHdr()}});
       if (r.ok) {
-        const j = await r.json();
-        const mappati = ((j && j.annunci)||[]).map(mapListing);
+        const mappati = (((await r.json()).annunci)||[]).map(mapListing);
         inCatalogo(mappati);
         /* il negozio porta solo gli ATTIVI: chi non c'e' piu' e'
-           venduto o rimosso, e nel catalogo va spento a mano. MA SOLO
-           SE LA LISTA E' INTERA (24 set 2026): con una pagina dopo
-           (oltre 100 attivi — un negozio collegato arriva a 200) chi
-           manca e' soltanto piu' in la', e spegnerlo lo toglieva dal
-           carrello senza che fosse venduto */
-        if (j && !j.cursore) {
-          freschi = new Set(mappati.map(x=>x.id));
-          listings.forEach(t => {
-            if (t.sellerId===l.sellerId && t.stato==='attivo'
-                && !freschi.has(t.id)) t.stato = 'venduto';
-          });
-        }
+           venduto o rimosso, e nel catalogo va spento a mano */
+        const freschi = new Set(mappati.map(x=>x.id));
+        listings.forEach(t => {
+          if (t.sellerId===l.sellerId && t.stato==='attivo'
+              && !freschi.has(t.id)) t.stato = 'venduto';
+        });
       }
     }
   } catch(e) {}
-  /* LA POTATURA DEL CARRELLO APERTO: esce chi il catalogo SA che non e'
-     piu' attivo, e chi il negozio intero non porta; MAI chi non si sa
-     (24 set 2026) — un negozio muto non e' un negozio vuoto, e dopo
-     un'apertura i pezzi di ieri possono non essere ancora in catalogo.
-     Il pezzo resta, e il giudice e' il server alla cassa. E le righe
-     lo dicono, con le parole della ripulitura dell'apertura. */
-  const suo = !!(paccoDati && paccoDati.sellerId === l.sellerId);
-  const avvisi = [];
   for (const [id, qta] of [...setScelte]){
     const x = listings.find(t=>t.id===id);
-    if (x ? x.stato!=='attivo' : (suo && freschi && !freschi.has(id))) {
-      setScelte.delete(id);
-      avvisi.push(fraseCarrello(x && esaurito(x) ? 'esaurito' : 'via',
-        x ? x.title : (titoliCarrello.get(id) || ''), ''));
-    } else if (x && qta > (x.quantita||1)) {
-      setScelte.set(id, x.quantita||1);
-      avvisi.push(fraseCarrello('meno', x.title, '', x.quantita||1));
-    }
+    if (!x || x.stato!=='attivo') setScelte.delete(id);
+    else if (qta > (x.quantita||1)) setScelte.set(id, x.quantita||1);
   }
-  if (avvisi.length) { annunciaAvvisiCarrelli(avvisi); aggiornaCarrelloCards(); }
 }
 /* Dopo un 409/404 che nomina il pezzo: catalogo riletto, pacco potato,
    e la vista attiva si ridisegna — l'utente vede il buco, non un
@@ -24812,9 +24374,6 @@ async function startBuySet(){
     return;
   }
   currentOrderId = d.ordine_id;
-  /* i pezzi che questo pagamento paga: a saldo escono dai carrelli */
-  pagatoInCorso = {ordine: d.ordine_id,
-                   righe: righe.map(r => ({id: r.annuncio_id, qta: r.quantita}))};
   el('payAmount').textContent = fmt(d.prezzo_sats);
   el('payScomposto').innerHTML = contoScomposto({
     art: d.articolo_lordo_sats || d.articolo_sats || d.prezzo_sats,
@@ -25986,10 +25545,6 @@ async function startBuy(){
   const d = await r.json().catch(()=>({}));
   if (!r.ok) { toast(d.detail||'Errore nella creazione dell\'ordine'); closeSheet(); return; }
   currentOrderId = d.ordine_id;
-  /* il pezzo che questo pagamento paga: a saldo esce dai carrelli (se
-     c'e' — e c'e' sempre quando il carrello da una riga passa di qui) */
-  pagatoInCorso = {ordine: d.ordine_id,
-                   righe: [{id: l.id, qta: d.quantita || acqDati?.qta || qtaScelta}]};
   if (d.prezzo_sats) el('payAmount').textContent = fmt(d.prezzo_sats);
   if (d.prezzo_sats !== undefined)
     el('payScomposto').innerHTML = contoScomposto({
@@ -26025,35 +25580,22 @@ async function verificaOrdine(oid){
          poll su LNbits a decretare il successo, mai il wallet */
       if (nwcRipristina) { nwcRipristina(); nwcRipristina = null; }
       closeSheet();
-      /* IL PAGAMENTO RIUSCITO TOGLIE DAI CARRELLI I SOLI PEZZI PAGATI
-         (24 set 2026, «i carrelli non si perdono»). Qui c'era «qualunque
-         pagamento riuscito azzera il pacco in composizione»: anche un
-         pezzo singolo comprato dalla sua scheda si portava via il
-         carrello aperto, di chiunque fosse. Il conto della cassa invece
-         si butta sempre: lo stock e' appena cambiato, e un conto
-         stantio mentirebbe. Quali pezzi lo sa chi ha aperto il
-         pagamento (pagatoInCorso); per «Paga ora» e «Ho pagato» lo
-         dice l'ordine, e per la quota di un PAGAMENTO UNICO la busta
-         intera — sono nati anche gli altri ordini, e le preparazioni
-         vanno via con loro. */
-      const inCorso = (pagatoInCorso && pagatoInCorso.ordine === oid)
-        ? pagatoInCorso.righe : null;
-      pagatoInCorso = null;
+      /* qualunque pagamento riuscito azzera il pacco in composizione:
+         lo stock e' appena cambiato, e un pacco stantio mentirebbe —
+         e con lui il conto della cassa, per la stessa ragione */
+      paccoDati = null; setScelte = new Map();
       acqDati = null;
-      if (inCorso && !d.pagamento_unico) togliPagatiDaiCarrelli(inCorso);
+      /* ...e se l'ordine era la quota di un PAGAMENTO UNICO (pagato da
+         «Paga ora»), sono nati anche gli altri: via tutti i carrelli,
+         e le preparazioni con loro (24 set 2026) */
+      if (d.pagamento_unico) { carrelliDaParte = new Map(); carrelliPronti = new Map(); }
+      aggiornaCarrelloCards();
       /* niente toast (ago 2026): durava tre secondi e non lasciava
          niente da ritrovare. Adesso la ricevuta la manda il SERVER da
          _incassa_ordine — su questa strada come su quelle
          dell'orologio — e qui sotto si apre comunque l'ordine. In DEMO
          il toast resta: li' non c'e' nessun server che notifichi. */
       await loadOrders(); renderOrders();
-      if (!inCorso || d.pagamento_unico) {
-        const o = orders.find(x => x.id === oid);
-        togliPagatiDaiCarrelli(d.pagamento_unico && o && o.pagamentoId
-          ? orders.filter(x => x.pagamentoId === o.pagamentoId).flatMap(righePagateOrdine)
-          : righePagateOrdine(o));
-        if (d.pagamento_unico) carrelliPronti = new Map();
-      }
       setTimeout(()=>openOrder(oid), 400);
     }
     /* lo stato torna a chi chiama (24 set 2026): il poll lo ignora, il
@@ -27805,16 +27347,6 @@ async function pagaOffertaCarrello(id){
       } catch(e) {}
     }
   }
-  /* IL CARRELLO APERTO NON SI SCRIVE SOPRA (24 set 2026, «i carrelli
-     non si perdono»): la cassa dell'accordo legge la composizione
-     pattuita nelle due variabili del carrello aperto, e prima ci finiva
-     SOPRA quello che c'era — il carrello di un altro venditore spariva,
-     e quello dello stesso perdeva le righe aggiunte dopo la proposta.
-     Adesso si mette da parte com'e' (carrelloPrimaAccordo) e torna da
-     solo appena la cassa si chiude (go) o l'accordo si paga
-     (togliPagatiDaiCarrelli, che poi toglie i pezzi pattuiti). */
-  if (!carrelloPrimaAccordo)
-    carrelloPrimaAccordo = {scelte: setScelte, dati: paccoDati};
   setScelte = new Map(righe.map(f=>[f.annuncio_id,
                                     Math.max(1, f.quantita||1)]));
   const primo = listings.find(x=>x.id===righe[0].annuncio_id);
@@ -58062,9 +57594,6 @@ async function avvia(){
     /* ...e il pallino degli scambi, qui dove conto e leva del P2P sono
        arrivati tutt'e due: l'archivio si legge con la chiave del conto */
     aggiornaPallinoScambiP2P();
-    /* i carrelli di QUESTO conto, dal telefono e subito (vedi «I CARRELLI
-       NON SI PERDONO»): nuvola e ripulitura dopo il barattolo, qui sotto */
-    carrelliDalTelefono();
     collaudo = !tg?.initData && !WEB;
     const b = el('demoBanner');
     if (collaudo) {
@@ -58120,14 +57649,6 @@ async function avvia(){
        rilegge (fail-open: senza risposta resta vuoto) */
     preferiti = new Set(); myPreferiti = [];
     await caricaPreferiti();
-    /* il secondo tempo dei carrelli, in sottofondo e DOPO vetrina e
-       barattolo: la ripulitura chiede solo i pezzi che il catalogo di
-       questa apertura non conosce (e il primo giro della vetrina butta
-       il catalogo della demo: prima, avrebbe buttato anche loro) */
-    const giroCarrelli = carrelliRipristino = ripristinaCarrelli();
-    giroCarrelli.finally(() => {
-      if (carrelliRipristino === giroCarrelli) carrelliRipristino = null;
-    });
     /* gli account aperti su questo browser: fire-and-forget, il
        selettore vive nel Profilo e nessuno lo aspetta qui */
     caricaAccount();
@@ -58381,12 +57902,6 @@ fermaPaginaSotto();
 navMotore();   /* il gesto indietro, prima che parta qualunque vista */
 armaTrascinoP2P();   /* il + che si trascina sulla tendina di Barattozon */
 tinteVociP2P();   /* le voci della barra P2P si accendono con uno strato */
-/* la nuvola dei carrelli non aspetta il respiro se l'app se ne va: chi
-   chiude Telegram subito dopo un tocco ritrova il carrello anche
-   sull'altro dispositivo (vedi salvaCarrelli) */
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden' && carrelliNuvolaTimer) scriviNuvolaCarrelli();
-});
 /* IL GUSCIO SCENDE QUANDO L'APP E' USABILE, e «usabile» ha una
    definizione precisa invece di un timer a occhio: la VETRINA
    DISEGNATA — il primo `renderGrid`, che arriva in tutti i rami (le
