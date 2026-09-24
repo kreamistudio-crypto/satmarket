@@ -567,6 +567,23 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   si è ancora mosso: sembra un difetto del codice ed è solo la CI
   che sta ancora girando. Aspettare di più prima di concludere che
   qualcosa non funziona, o controllare `--dimmi` da chi ha le chiavi.
+  ⚠️ DOPO UN COMMIT CHE TOCCA IL WORKFLOW `pronto` PUÒ RESTARE INDIETRO
+  (24 set 2026, `782b70e`): `prove` e `segreti` verdi, e il job `pronto`
+  rosso con «refusing to allow a GitHub App to create or update workflow
+  `.github/workflows/prove.yml` without `workflows` permission» — GitHub
+  non ha lasciato al token delle Actions spostare il ref. Non succede a
+  ogni modifica del workflow (`c1d1fdd` e `36f61dd` erano passati), ma
+  quando succede il VPS resta fermo al commit di prima, e lo si vede da
+  `git ls-remote origin refs/heads/pronto refs/heads/main`: due SHA
+  diversi. DUE STRADE, tutt'e due buone: aspettare il commit successivo
+  con la CI verde, che porta `pronto` fino a lui (quel giorno l'ha fatto
+  `fed4697`, pochi minuti dopo); oppure spostarlo A MANO, SENZA FORZARE:
+  `git fetch origin` e poi `git push origin origin/main:refs/heads/pronto`
+  — è un avanti veloce, e se `pronto` non fosse un antenato di quel
+  commit il push si rifiuterebbe da solo invece di spostarlo di lato;
+  mai `--force`. Il giudice di `deploy.sh` resta quello di sempre (su
+  main, in avanti, `prove` e `segreti` in `success`, punta firmata): il
+  ref spostato a mano è solo il campanello.
 - La verifica npub richiede `websocket-client` (pip) nell'ambiente del
   servizio: se manca, il server parte lo stesso e l'endpoint risponde 503.
 - La pubblicazione su Nostr richiede anche `coincurve`: installarla con
