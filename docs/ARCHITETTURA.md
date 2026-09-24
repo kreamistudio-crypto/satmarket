@@ -20907,24 +20907,44 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   che è dei badge spedizione: un colore che significa una cosa non se
   ne prende un'altra. Misurati, testo su fondo: Telegram 5,36 e 7,81,
   Nostr 4,91 e 7,88 — AA pieno in entrambi i temi.
-  I TONDI DEL RIQUADRO VENDITORE (24 set 2026, decisione di Andrea):
-  nel NEGOZIO — e quindi nelle pagine dei Consigliati e nei profili
-  pubblici — e nel PROFILO i due ponti e «Condividi il negozio» non
-  sono più bottoni a tutta larghezza sotto il riquadro ma cerchi
-  DENTRO, sotto le stelle: `tondiVenditore` (l'aeroplanino, il pallino
-  Nostr, i due anelli). Stessa ricetta velata e stessi token, quindi
-  gli stessi contrasti; cerchio da 38px, area di tocco da 44 data dal
-  `::after`, il nome dell'azione in aria-label e title. Stesse funzioni
-  e stesse condizioni dei bottoni che sostituiscono, e l'alfabeto si
-  filtra DENTRO la fabbrica (la cura B2 dell'audit 2). Nel tondo il
-  pallino Nostr prende `--nostr-text`: senza la scritta accanto deve
-  reggere da solo il 3:1, e il viola pieno sulla velatura della sera
-  fa 2,6 (di giorno i due token sono lo stesso #7C3AED).
-  «UNA AZIONE, UN VESTITO» CEDE QUI, per decisione: i ponti grandi di
-  `pontiContatto` restano DENTRO L'ORDINE (`pontiOrdine`, dove un
-  riquadro che li ospiti non c'è) e nella pagina dello SCAMBIO P2P
-  (`pontiControparteP2P`, il contatto principale con l'altra persona:
-  si decide a parte). Il censimento lo tiene una prova.
+  I TONDI DEL RIQUADRO VENDITORE (24 set 2026, decisione di Andrea, in
+  due giri): nel NEGOZIO — e quindi nelle pagine dei Consigliati e nei
+  profili pubblici —, nel PROFILO e nella card della CONTROPARTE P2P i
+  ponti e «Condividi il negozio» non sono più bottoni a tutta larghezza
+  ma cerchi da 40px nella fila IN BASSO A DESTRA della card
+  (`tondiVenditore`; la card si veste `.seller.con-tondi`, va a capo, e
+  la fila è una riga sua spinta a destra: non tocca mai nome, titolo e
+  stelle, e a 320px non li stringe). Area di tocco da 44 dal `::after`,
+  il nome dell'azione in aria-label e title; stesse funzioni e stesse
+  condizioni dei bottoni che sostituiscono, e l'alfabeto si filtra
+  DENTRO la fabbrica (la cura B2 dell'audit 2).
+  I LOGHI SONO QUELLI VERI (secondo giro: gli aeroplanini disegnati a
+  mano sembravano finti). Telegram è il logo stesso, il cerchio
+  azzurro; Nostr è la «n» viola con lo struzzo su un tondo di carta
+  chiara FISSO nei due temi (la faccia dello struzzo è un buco nel
+  logo); il link è l'icona «link» di Lucide su un tondo del colore
+  delle card. I due loghi sono `data:` URI (`LOGO_TELEGRAM`,
+  `LOGO_NOSTR`) byte per byte uguali ai WebP senza perdita di
+  `assets/loghi/` — 120 e 72px, cioè densità 3 nei loro 40 e 24 —, con
+  provenienza, licenze e ricetta in `assets/loghi/LEGGIMI.md`; lo
+  controlla `prove_loghi_tondi`. Nessuna rotta nuova: al primo disegno
+  ci sono già, come il barattolo del guscio. Il filo dei due tondi
+  chiari è `--muted` (3,8 e 6,0 sulla card: con `--line`, di sera, il
+  tondo del link spariva). L'azzurro del logo di Telegram sulla card
+  bianca sta fra 2,6 e 2,9:1 (di sera oltre 5): sono i colori del
+  marchio, che non si cambiano.
+  NELLA CARD P2P LA PORTA È UN PEZZO SUO (`.seller-porta`, il
+  role="button" che apre il negozio) e i tondi le stanno accanto: un
+  role="button" rende «di presentazione» tutto quel che contiene, e
+  dentro la porta i tondi sarebbero muti al lettore di schermo — oltre
+  ad aprire il negozio insieme alla chat.
+  «UNA AZIONE, UN VESTITO» CEDE IN UN POSTO SOLO: il ponte grande di
+  `pontiContatto` resta DENTRO UN ORDINE del mercatino (`pontiOrdine`),
+  dove una card non c'è. Il censimento lo tiene una prova.
+  LE STELLE DI OGNI RIQUADRO `.seller` — negozio, dettaglio
+  dell'annuncio, Profilo, classifica — sono `--sats-text` come quelle
+  dei feedback (secondo giro); la stella della card P2P è un altro
+  disegno, oro (`.p2p-rep-stella`), e non passa di lì.
   GLI ULTIMI FEEDBACK, TRE ALLA VOLTA (stesso giorno): giudice puro
   `feedbackNegozioHTML` — i tre più recenti, gli altri in un
   contenitore che nasce `hidden` a ogni disegno e si apre con la riga

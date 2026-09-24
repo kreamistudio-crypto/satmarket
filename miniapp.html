@@ -6431,10 +6431,15 @@
      LE STELLE PARLANO L'ARANCIO DEL TESTO (--sats-text) e non quello
      pieno di `.stars`, che sul bianco sta a 2,3:1: qui fanno 5,0:1 di
      giorno e 8,5:1 di sera, e la riga piccola in fondo (l'inchiostro a
-     .65) 4,8 e 6,1 — AA nei due temi, misurati da prove.py. */
+     .65) 4,8 e 6,1 — AA nei due temi, misurati da prove.py.
+     E DAL SECONDO GIRO (stesso giorno, decisione di Andrea) LE STESSE
+     STELLE LE HA OGNI RIQUADRO `.seller`: il negozio, il dettaglio
+     dell'annuncio, il Profilo e la classifica, che le leggono sulla
+     stessa carta. La stella della card P2P e' un altro disegno
+     (`.p2p-rep-stella`, oro) e non passa di qui. */
   .trust-note.nota-feedback{background:var(--card);color:var(--ink);
     border:1px solid var(--line);margin-left:var(--pad);margin-right:var(--pad)}
-  .trust-note.nota-feedback .stars{color:var(--sats-text)}
+  .trust-note.nota-feedback .stars,.seller .stars{color:var(--sats-text)}
   /* Pillole informative del dettaglio: strade discrete e disponibilita' */
   .pills{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px}
   .pill{background:var(--card);border:1.5px solid var(--field-line);border-radius:999px;
@@ -6875,47 +6880,59 @@
   .btn.ponte.nostr{background:var(--nostr-soft);color:var(--nostr-text);
     border-color:var(--nostr-text);box-shadow:0 3px 0 var(--nostr-text)}
   .btn.ponte:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
-  /* I TONDI DEL RIQUADRO VENDITORE (24 set 2026, decisione di Andrea):
-     nel negozio e nel Profilo i due ponti e «Condividi il negozio» non
-     sono piu' bottoni a tutta larghezza sotto il riquadro — tre blocchi
-     da 54px davanti a una pagina che parla del venditore — ma cerchi
-     DENTRO il riquadro, sotto le stelle.
-     STESSA RICETTA DEI PONTI, in piccolo: la velatura del mondo dove
-     portano, contorno e ombra piena nella tinta forte (azzurro
-     Telegram, viola Nostr; il link e' il ghost di casa, carta e
-     inchiostro) — gli stessi token, quindi gli stessi contrasti misurati.
-     Il cerchio che si vede e' 38px, l'AREA DI TOCCO e' 44: la da' il
-     ::after, 5px oltre il bordo interno (38 − 2×2 di bordo + 2×5), e
-     fra due vicini restano 2px di nessuno — due aree che si toccano
-     farebbero scegliere al dito. Il nome dell'azione, che a schermo non
-     c'e' piu', lo portano aria-label e title. */
-  .tondi{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}
-  .tondo{position:relative;flex:none;width:38px;height:38px;padding:0;
+  /* I TONDI COI LOGHI VERI (24 set 2026, secondo giro, decisione di
+     Andrea: le icone disegnate a mano sembravano finte). Nel negozio
+     (e quindi nelle pagine dei Consigliati e nei profili pubblici), nel
+     Profilo e nella card della controparte P2P, al posto dei bottoni a
+     tutta larghezza. TELEGRAM E' IL LOGO STESSO, il cerchio azzurro con
+     l'aeroplano, che e' gia' un tondo. NOSTR e' la «n» viola con lo
+     struzzo su un tondo di CARTA CHIARA, fisso nei due temi: la faccia
+     dello struzzo e' un buco nel logo, e su un fondo scuro diventerebbe
+     una macchia — oltre al viola, che sul bruno della sera non si
+     legge. Il LINK e' l'icona di Lucide su un tondo del colore delle
+     card. Mai ridisegnati ne' ricolorati: i due loghi sono `data:` URI
+     byte per byte uguali ai file di assets/loghi.
+     STESSA MISURA E STESSO PESO: tre cerchi da 40px, la stessa ombra
+     leggera, e dove il bordo del tondo non lo disegna il logo (Nostr e
+     link) un filo sottile DENTRO il cerchio — un box-shadow e non un
+     border, cosi' tutti e tre hanno lo stesso riquadro interno e la
+     stessa area di tocco: 44, dal ::after che sporge 2px per lato. Fra
+     due vicini restano 6px di nessuno (gap 10): due aree che si
+     toccano farebbero scegliere al dito. Il nome dell'azione lo
+     portano aria-label e title.
+     IN BASSO A DESTRA NEL RIQUADRO: `.seller.con-tondi` va a capo, e la
+     fila dei tondi e' una riga sua, larga quanto il riquadro e spinta a
+     destra. Non tocca mai nome, titolo e stelle, e a 320px non li
+     stringe: il testo si tiene tutta la sua larghezza. */
+  .seller.con-tondi{flex-wrap:wrap;row-gap:8px}
+  .seller.con-tondi > .tondi{flex:1 0 100%}
+  .tondi{display:flex;gap:10px;justify-content:flex-end}
+  .tondo{position:relative;flex:none;width:40px;height:40px;padding:0;
     display:inline-flex;align-items:center;justify-content:center;
-    border:2px solid;border-radius:50%;cursor:pointer;font:inherit;
-    transition:transform .1s,box-shadow .1s}
-  .tondo::after{content:'';position:absolute;inset:-5px}
-  .tondo svg{width:20px;height:20px;display:block}
-  /* Nel tondo il pallino Nostr e' da SOLO a dire di che mondo si parla
-     (la scritta non c'e' piu'), quindi deve reggere il 3:1 del
-     non-testo: il viola pieno sulla velatura di sera fa 2,6:1, quello
-     del testo 7,9. Di giorno i due token sono lo stesso #7C3AED, e il
-     pallino resta identico a quello accanto al nome. */
-  .tondo .ico-nostr{width:17px;height:17px;fill:currentColor}
-  .tondo .ico-tg{width:23px;height:23px}
-  .tondo.tg{background:var(--tg-soft);color:var(--tg-soft-on);
-    border-color:var(--tg-soft-on);box-shadow:0 2px 0 var(--tg-soft-on)}
-  .tondo.nostr{background:var(--nostr-soft);color:var(--nostr-text);
-    border-color:var(--nostr-text);box-shadow:0 2px 0 var(--nostr-text)}
+    border:0;border-radius:50%;background:none;cursor:pointer;
+    box-shadow:0 1px 3px rgba(0,0,0,.22);transition:transform .1s}
+  .tondo::after{content:'';position:absolute;inset:-2px}
+  .tondo img,.tondo svg{display:block;pointer-events:none}
+  .tondo.tg img{width:40px;height:40px}
+  /* il filo e' `--muted` e non `--line`: di sera `--line` sulla card fa
+     1,25:1 e il tondo del link spariva, restava l'icona nuda. `--muted`
+     regge il 3:1 del contorno di un bottone nei due temi (3,8 e 6,0), e
+     da' ai due tondi chiari un peso vicino a quello del logo azzurro */
+  .tondo.nostr{background:#FFF8EA;
+    box-shadow:inset 0 0 0 1px var(--muted),0 1px 3px rgba(0,0,0,.22)}
+  .tondo.nostr img{width:24px;height:24px}
   .tondo.link{background:var(--card);color:var(--ink);
-    border-color:var(--ink);box-shadow:0 2px 0 var(--ink)}
-  .tondo:active{transform:translateY(2px);box-shadow:none}
-  .tondo:focus-visible{outline:2.5px solid var(--sats);outline-offset:3px}
-  /* l'aeroplanino di Telegram pieno, gli spigoli smussati dal tratto;
-     i due anelli del link solo a contorno */
-  .ico-tg{fill:currentColor;stroke:currentColor;stroke-width:1.3;
-    stroke-linejoin:round}
-  .ico-link{fill:none;stroke:currentColor;stroke-width:2.1}
+    box-shadow:inset 0 0 0 1px var(--muted),0 1px 3px rgba(0,0,0,.22)}
+  .tondo.link svg{width:21px;height:21px}
+  .tondo:active{transform:scale(.94)}
+  .tondo:focus-visible{outline:2.5px solid var(--sats);outline-offset:2px}
+  /* LA CARD DELLA CONTROPARTE P2P: la porta del negozio (faccia, nome,
+     stelle e la freccia) e' un pezzo suo, e i tondi le stanno ACCANTO e
+     non dentro — un role="button" rende «di presentazione» tutto quel
+     che contiene, e dentro la porta i tondi sparirebbero al lettore di
+     schermo (e un tocco aprirebbe il negozio insieme alla chat). */
+  .seller-porta{display:flex;align-items:center;gap:12px;flex:1 1 auto;
+    min-width:0}
   /* L'USCITA DI SICUREZZA (ago 2026): «C'è un problema — apri
      disputa» era un testuale sottolineato (.danger-ghost), e in fila
      coi due ponti colorati spariva — proprio il bottone che deve
@@ -17673,8 +17690,9 @@ function renderAnteprimaSenzaNegozio(r){
   raccontoAperto = true;
   el('negozioHeader').innerHTML = raccontoNegozio({negozio: '', racconto: r})
     + `<div class="rac-da-collegare"><b>🔗 Venditore da collegare</b>
-         <span>Qui andranno il suo profilo, «Scrivi al venditore» e
-         «Condividi il negozio», poi i feedback.</span></div>`;
+         <span>Qui andranno il suo profilo, coi tondi in basso a destra
+         per scrivergli su Telegram o su Nostr e per condividere il
+         negozio, poi i feedback.</span></div>`;
   el('negozioPromesse').innerHTML = '';
   el('negozioFeedback').innerHTML = '';
   el('negozioGrid').innerHTML = `<div class="rac-da-collegare"
@@ -17821,13 +17839,13 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
   el('negozioHeader').innerHTML = `
     ${bannerNegozio(v)}
     ${raccontoNegozio(v)}
-    <div class="seller" style="margin-top:14px">
+    <div class="seller${tondi ? ' con-tondi' : ''}" style="margin-top:14px">
       <div class="avatar">${avatarImg(v.avatar)}${esc((v.nome||'?')[0])}</div>
       <div class="who"><b>${esc(v.nome||'—')}${badge}${fiducia}</b>
         ${titoloRiga(v.titolo)}
         <div class="rep">${rep}</div>
-        ${tondi}
       </div>
+      ${tondi}
     </div>`;
   /* LE DUE PROMESSE SCENDONO SOTTO «In vetrina in questo negozio»
      (ago 2026, decisione di Andrea), e l'ordine di montaggio non
@@ -18000,32 +18018,44 @@ function pontiContatto(username, npub, chi, cls){
   return b.join('');
 }
 /* I TONDI DEL RIQUADRO VENDITORE (24 set 2026, decisione di Andrea):
-   nel NEGOZIO (e quindi nelle pagine dei Consigliati) e nel PROFILO i
-   due ponti e «Condividi il negozio» sono cerchi DENTRO il riquadro,
-   sotto le stelle, e non piu' bottoni a tutta larghezza sotto di lui.
+   nel NEGOZIO (e quindi nelle pagine dei Consigliati e nei profili
+   pubblici), nel PROFILO e — dal secondo giro — nella card della
+   CONTROPARTE P2P, i ponti e «Condividi il negozio» sono cerchi DENTRO
+   il riquadro, in basso a destra, e non piu' bottoni a tutta larghezza.
    Fanno ESATTAMENTE quel che facevano: stesse funzioni (`apriChat`,
    `apriNostrProfilo`, `condividiNegozio` / `condividiMioNegozio`) e
    stesse condizioni — Telegram solo con lo username pubblico, Nostr
    solo con la npub dal possesso dimostrato, il link solo se il negozio
-   ha un indirizzo. Il nome dell'azione, che a schermo non c'e' piu',
-   lo portano aria-label e title.
+   ha un indirizzo. Il nome dell'azione, che a schermo non c'e', lo
+   portano aria-label e title.
    L'ALFABETO SI FILTRA QUI DENTRO, e non solo nei chiamanti (la cura
    B2 dell'audit del 23 set, per la fabbrica nuova): username e npub
    finiscono in un onclick, e una difesa che vive nella funzione vale
    anche per il chiamante di domani. `chi` arriva gia' passato da esc().
-   I PONTI GRANDI RESTANO dove un riquadro che li ospiti non c'e' —
-   dentro l'ordine, `pontiOrdine` — e nella pagina dello scambio P2P,
-   dove sono il contatto principale con l'altra persona: quella si
-   decide a parte (Andrea: «chiedimi prima di toccarlo»). */
-/* L'aeroplanino disegnato a mano sulle proporzioni del logo (largo
-   quanto alto, un filo a sinistra e in basso nel cerchio, come nel
-   logo): ala, muso, coda e la tacca fra ala e coda. */
-const ICO_TELEGRAM = '<svg class="ico-tg" viewBox="0 0 24 24" aria-hidden="true">'
-  + '<path d="M3.1 12.6 19.6 5.4 17.2 20.4 12.3 16.9 9.9 19.6 9.1 15.6Z"/></svg>';
-const ICO_LINK = '<svg class="ico-link" viewBox="0 0 24 24" aria-hidden="true">'
-  + '<g transform="rotate(-45 12 12)"><rect x="1.8" y="8.3" width="11.4" '
-  + 'height="7.4" rx="3.7"/><rect x="10.8" y="8.3" width="11.4" '
-  + 'height="7.4" rx="3.7"/></g></svg>';
+   I PONTI GRANDI RESTANO in un posto solo: dentro un ordine del
+   mercatino (`pontiOrdine`), dove un riquadro che li ospiti non c'e'.
+   DAL SECONDO GIRO I LOGHI SONO QUELLI VERI (le icone disegnate a mano
+   sembravano finte): Telegram e Nostr sono `data:` URI byte per byte
+   uguali ai file di assets/loghi — provenienza, licenze e ricetta in
+   assets/loghi/LEGGIMI.md, e prove.py confronta i byte —, e il link e'
+   l'icona «link» di Lucide coi tracciati dell'originale. Stanno nella
+   pagina e non dietro una rotta: al primo disegno ci sono gia', come
+   il barattolo del guscio. */
+const LOGO_TELEGRAM = 'data:image/webp;base64,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';
+const LOGO_NOSTR = 'data:image/webp;base64,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';
+/* L'icona «link» di Lucide (lucide.dev, `icons/link.svg`), tale e
+   quale: viewBox, tratto e i due tracciati dell'originale; la misura
+   la da' il foglio. Lucide l'ha presa da Feather, quindi porta due
+   licenze, coi testi interi in assets/loghi/LEGGIMI.md:
+   SPDX-License-Identifier: ISC AND MIT
+   Copyright (c) 2026 Lucide Icons and Contributors (ISC)
+   Copyright (c) 2013-present Cole Bemis (MIT) */
+const ICO_LINK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+  + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" '
+  + 'aria-hidden="true">'
+  + '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>'
+  + '<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'
+  + '</svg>';
 const TONDO_CONDIVIDI = {
   negozio: ['condividiNegozio()', 'Condividi il negozio'],
   mio: ['condividiMioNegozio()', 'Condividi il link del tuo negozio']
@@ -18035,12 +18065,16 @@ function tondiVenditore(username, npub, chi, condividi){
   const n = String(npub || '').replace(/[^a-z0-9]/g, '');
   const link = (condividi === 'negozio' || condividi === 'mio')
     ? TONDO_CONDIVIDI[condividi] : null;
-  const tondo = (cls, azione, nome, ico) =>
+  const tondo = (cls, azione, nome, dentro) =>
     `<button type="button" class="tondo ${cls}" onclick="${azione}" `
-    + `aria-label="${nome}" title="${nome}">${ico}</button>`;
+    + `aria-label="${nome}" title="${nome}">${dentro}</button>`;
+  const logo = (src, lato) =>
+    `<img src="${src}" width="${lato}" height="${lato}" alt="" draggable="false">`;
   const b = [];
-  if (u) b.push(tondo('tg', `apriChat('${u}')`, `Scrivi ${chi} su Telegram`, ICO_TELEGRAM));
-  if (n) b.push(tondo('nostr', `apriNostrProfilo('${n}')`, `Scrivi ${chi} su Nostr`, ICO_NOSTR));
+  if (u) b.push(tondo('tg', `apriChat('${u}')`, `Scrivi ${chi} su Telegram`,
+                      logo(LOGO_TELEGRAM, 40)));
+  if (n) b.push(tondo('nostr', `apriNostrProfilo('${n}')`, `Scrivi ${chi} su Nostr`,
+                      logo(LOGO_NOSTR, 24)));
   if (link) b.push(tondo('link', link[0], link[1], ICO_LINK));
   return b.length ? `<div class="tondi">${b.join('')}</div>` : '';
 }
@@ -28973,14 +29007,15 @@ function renderProfilo(){
      2026), come nel negozio: qui e' l'unico dei tre che vale — a se
      stessi non si scrive. Stessa condizione e stessa funzione del
      bottone grande che c'era («🔗 Il tuo negozio — condividi il link»). */
+  const tondi = tondiVenditore('', '', '', (myUsername||myNegozio) ? 'mio' : '');
   box.innerHTML = `
-    <div class="seller" style="margin-top:14px">
+    <div class="seller${tondi ? ' con-tondi' : ''}" style="margin-top:14px">
       <div class="avatar">${avatarImg(myAvatar)}${esc(nome[0])}</div>
       <div class="who"><b>${esc(nome)}${badge}</b>
         ${titoloRiga(nomeTitolo(myTitolo))}
         <div class="rep">${rep}</div>
-        ${tondiVenditore('', '', '', (myUsername||myNegozio) ? 'mio' : '')}
       </div>
+      ${tondi}
     </div>
     ${(myUsername||myNegozio)&&!DEMO&&!VETRINA?`<button class="btn ghost" style="margin-top:0" onclick="apriMioNegozio()">👁 Guarda il tuo negozio come lo vedono tutti</button>`:''}
     ${(myNegozio)&&!DEMO&&!VETRINA?`<button class="btn ghost" onclick="apriWidget('negozio')">&lt;/&gt; Widget per il web</button>`:''}`;
@@ -55150,19 +55185,20 @@ async function chiediContropartiP2P(ids){
 }
 /* I DUE PONTI, con l'alfabeto filtrato come ovunque: username e npub
    finiscono dentro un onclick, e da li' non deve poter uscire niente
-   che non sia un nome. La fabbrica dei bottoni e' QUELLA del
-   mercatino (`pontiContatto`): la stessa azione non puo' avere due
-   vestiti secondo la pagina da cui la si tocca — e' la regola gia'
-   scritta il giorno che i ponti del negozio e quelli dell'ordine sono
-   diventati uguali. */
+   che non sia un nome. La fabbrica e' QUELLA del mercatino: dal 24 set
+   2026 (secondo giro dei tondi, decisione di Andrea) sono i TONDI coi
+   loghi veri del riquadro del negozio, `tondiVenditore`, senza il link
+   — qui non c'e' un negozio da condividere. Stesse azioni di prima;
+   il filtro resta anche qui, e la fabbrica lo rifa' per conto suo. */
 function pontiControparteP2P(c, chi){
-  return pontiContatto(String(c.telegram || '').replace(/[^A-Za-z0-9_]/g, ''),
-                       String(c.npub || '').replace(/[^a-z0-9]/g, ''), chi);
+  return tondiVenditore(String(c.telegram || '').replace(/[^A-Za-z0-9_]/g, ''),
+                        String(c.npub || '').replace(/[^a-z0-9]/g, ''), chi, '');
 }
 /* IL PROFILO DELL'ALTRA PARTE nella pagina dello scambio: il calco del
    riquadro venditore del mercatino (`.seller`), che e' quello che chi
    usa Barattolo ha gia' imparato a leggere — e leggerlo qui vuol dire
-   non doverne imparare un secondo. Zero CSS nuovo.
+   non doverne imparare un secondo. Il solo CSS suo e' la porta
+   (`.seller-porta`), nata col secondo giro dei tondi.
    IL TOCCO APRE IL NEGOZIO come il volto sulle card, e senza negozio
    resta un profilo e basta: mai una porta che non porta da nessuna
    parte.
@@ -55204,7 +55240,14 @@ function profiloControparteP2P(o){
     ? ' role="button" tabindex="0" style="cursor:pointer" data-negozio="'
       + esc(c.negozio) + '" onclick="apriNegozioP2P(event, this.dataset.negozio)"'
     : '';
-  return '<div class="seller"' + porta + '>'
+  /* I TONDI IN BASSO A DESTRA NELLA CARD (24 set 2026, secondo giro dei
+     tondi): la PORTA del negozio — faccia, nome, stelle, la freccia — e'
+     un pezzo suo, e i tondi le stanno ACCANTO. Dentro un role="button"
+     sarebbero «di presentazione», cioe' muti al lettore di schermo, e il
+     tocco sulla chat aprirebbe anche il negozio. */
+  const tondi = pontiControparteP2P(c, primo ? 'a ' + esc(primo) : "all'altra persona");
+  return '<div class="seller' + (tondi ? ' con-tondi' : '') + '">'
+    + '<div class="seller-porta"' + porta + '>'
     + '<div class="avatar">' + avatarImg(c.avatar) + esc(String(nome)[0]) + '</div>'
     + '<div class="who"><b>' + esc(nome) + '</b>'
     + titoloRiga(c.titolo)
@@ -55212,8 +55255,9 @@ function profiloControparteP2P(o){
     + '</div>'
     + (c.negozio ? '<span style="color:var(--muted);font-size:20px;font-weight:700">›</span>' : '')
     + '</div>'
-    + (pontiControparteP2P(c, primo ? 'a ' + esc(primo) : "all'altra persona")
-       || '<div class="hint">Non ha lasciato nessun canale pubblico: per '
+    + tondi
+    + '</div>'
+    + (tondi ? '' : '<div class="hint">Non ha lasciato nessun canale pubblico: per '
           + 'parlarvi restano i recapiti qui sotto, cifrati fra voi due.</div>');
 }
 /* ============ fine delle parti che si vedono ============ */

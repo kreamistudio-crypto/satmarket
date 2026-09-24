@@ -31410,3 +31410,61 @@ sul primo.
 **DA GUARDARE SUL TELEFONO.** La corsa dentro Telegram, nei due temi. Se
 il rimbalzo sembra troppo o troppo poco è il `5%` del fotogramma del 75%
 in `consEntra`; se la pausa sembra lunga, `CONSIGLIATI_MS`.
+
+## I tondi coi loghi veri, in basso a destra, anche nel P2P (24 set 2026)
+
+Secondo giro dei tondi (il primo è «Feedback a tre e bottoni tondi nel
+riquadro», 03e6a84), richiesta di Andrea: le icone disegnate a mano
+sembravano finte. I LOGHI VERI, mai ridisegnati né ricolorati:
+Telegram è il suo logo ufficiale (il cerchio azzurro con l'aeroplano),
+Nostr la «n» viola con lo struzzo (CC0, github.com/mbarulli/nostr-logo)
+su un tondo di carta chiara FISSO nei due temi — la faccia dello
+struzzo è un buco nel logo, e su un fondo scuro diventerebbe una
+macchia —, il link l'icona «link» di Lucide (MIT, da Feather, più ISC)
+su un tondo del colore delle card. I due loghi sono WebP senza perdita
+in `assets/loghi/` (120 e 72px: densità 3 nei 40 e 24 a schermo; alfa
+premoltiplicato, o il bordo del cerchio prendeva un alone scuro) e in
+pagina come `data:` URI byte per byte uguali; provenienza, sha256 degli
+originali, licenze intere e ricetta nel LEGGIMI accanto. Tre cerchi da
+40px con la stessa ombra e, sui due chiari, un filo `--muted`: con
+`--line`, di sera, il tondo del link spariva. A 26px gli spigoli della
+«n» sfioravano il bordo: 24. LA POSIZIONE: in basso a destra nella card
+— la card va a capo e la fila è una riga sua spinta a destra, quindi
+non tocca mai nome, titolo e stelle, e a 320px non li stringe. IL P2P:
+i due bottoni giganti della pagina di uno scambio sono i tondi nella
+card della controparte; la porta del negozio è diventata un pezzo suo
+(`.seller-porta`), perché dentro un role="button" i tondi sarebbero
+stati muti al lettore di schermo, e un tocco sulla chat avrebbe aperto
+anche il negozio. Nello stesso commit le stelle di ogni riquadro
+`.seller` (negozio, dettaglio dell'annuncio, Profilo, classifica)
+scurite come quelle dei feedback, e il testo dell'anteprima delle
+pagine Consigliati senza venditore che parla dei tondi.
+
+IL CENSIMENTO: CAMBIATI il negozio con Consigliati e profili pubblici
+(Telegram, Nostr, link; sul proprio negozio il solo link), il Profilo
+(il link) e la card della controparte P2P (Telegram e Nostr). INVARIATO
+solo «Scrivi al venditore / all'acquirente» dentro un ordine del
+mercatino. L'azzurro del logo di Telegram sulla card bianca sta fra 2,6
+e 2,9:1: sono i colori del marchio, e il nome lo dice l'etichetta.
+
+**PROVATO.** `prove_loghi_tondi`, nuova: i byte dei due loghi contro i
+file, WebP senza perdita alle misure giuste, i tracciati e il tratto di
+Lucide, le licenze. `prove_feedback_tre_e_tondi` emendata: la fila in
+fondo alla card nei tre posti, 40px, la cascata nei due temi, le stelle
+nei quattro riquadri, il filo `--muted`, il censimento, l'anteprima; e
+il banco del profilo P2P di `prove_parti_si_vedono` emendato col perché
+(due tondi ACCANTO alla porta, la porta chiusa prima della fila).
+TORTURA 24/24 su una copia al secondo giro: al primo 22/24, e le due
+accusavano le prove — la sentinella del P2P restava verde coi tondi
+dentro la porta, e l'immagine «muta» si cercava in tutta la pagina,
+dove la stessa coppia d'attributi vive anche altrove. Suite intera
+severa senza config sull'albero ribasato, 15.458 verdi e 0 rosse; i 20
+collaudi della CI verdi, in gabbia. DAL VIVO via CDP
+col tocco vero a 375 e 320 nei due temi, 76/76 per larghezza: i loghi
+a 3× dalla pagina, 40x40 allineati a 0px dal bordo destro e dal fondo
+della card, nessun tocco col testo e il testo largo quanto prima, il
+bersaglio da 43 attorno al centro, i toast di sempre; nel P2P il tondo
+che apre la chat e NON il negozio, e il nome che apre ancora il
+negozio; le stelle scure; l'anteprima col testo nuovo.
+
+**DA GUARDARE.** Sul telefono, i loghi dentro Telegram.

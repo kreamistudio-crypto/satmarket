@@ -48448,13 +48448,15 @@ def prove_feedback_tre_e_tondi():
        «Mostra meno ▴») — mai tutti aperti all'inizio. «Tutti» dev'essere
        vero: il server ne manda fino al suo tetto, non piu' dieci.
     2) Lo sfondo non e' piu' il verde della fiducia ma la carta delle
-       card, con testo e stelle AA nei due temi.
+       card, con testo e stelle AA nei due temi — e dal secondo giro le
+       stesse stelle scure le ha ogni riquadro `.seller`.
     3) I due ponti e «Condividi il negozio» non sono piu' bottoni a
-       tutta larghezza ma TONDI dentro il riquadro del venditore (negozio
-       e Profilo): stesse azioni, solo quelli che valgono, tocco da 44px,
-       etichetta per il lettore di schermo. Dentro l'ordine e nella
-       pagina dello scambio P2P restano i ponti grandi: lo dice il
-       censimento qui in fondo."""
+       tutta larghezza ma TONDI coi loghi veri, in basso a destra nella
+       card: negozio, Profilo e — dal secondo giro — la card della
+       controparte P2P. Stesse azioni, solo quelli che valgono, tocco da
+       44px, etichetta per il lettore di schermo. Il solo ponte grande
+       che resta e' dentro un ordine del mercatino: lo dice il
+       censimento qui in fondo. I loghi li guarda `prove_loghi_tondi`."""
     print("\n[feedback a tre e bottoni tondi]")
     import json as _js, shutil as _sh, subprocess as _sp, tempfile as _tf
     mini = open("miniapp.html", encoding="utf-8").read()
@@ -48467,6 +48469,21 @@ def prove_feedback_tre_e_tondi():
         j = mini.find(fine, i + len(inizio)) if i >= 0 else -1
         prova(f"tondi: l'ancora «{inizio[:40]}» c'e'", True, i >= 0 and j >= 0)
         return mini[i:j + len(fine)] if i >= 0 and j >= 0 else ""
+
+    def chiamanti(nome):
+        """Le funzioni di primo livello che chiamano `nome(`: la
+        dichiarazione in colonna 0 piu' vicina prima di ogni chiamata
+        (quelle annidate sono rientrate), la definizione esclusa."""
+        fuori = []
+        for mm in re.finditer(re.escape(nome) + r"\(", senza):
+            k = mm.start()
+            if senza.startswith("function " + nome + "(", k - 9):
+                continue
+            testa = max(senza.rfind("\nfunction ", 0, k),
+                        senza.rfind("\nasync function ", 0, k))
+            riga = senza[testa + 1:senza.find("(", testa)]
+            fuori.append(riga.replace("async ", "").replace("function ", ""))
+        return fuori
 
     # --- 1) IL SERVER: tutti, e dal piu' nuovo ------------------------
     m = re.search(r"^TETTO_FEEDBACK_NEGOZIO = (\d+)", _SORGENTE, re.M)
@@ -48488,12 +48505,14 @@ def prove_feedback_tre_e_tondi():
     prova("feedback: il negozio li disegna col giudice unico", True,
           "el('negozioFeedback').innerHTML = "
           "feedbackNegozioHTML(feedback, v.n_feedback);" in rn)
-    # I TONDI STANNO DENTRO il riquadro: dentro `.who`, dopo le stelle —
-    # non fratelli del riquadro, che e' dove stavano i bottoni grandi
-    prova("tondi: nel negozio stanno DENTRO il riquadro, sotto le "
-          "stelle", True, bool(re.search(
-              r'<div class="who">[\s\S]*?<div class="rep">\$\{rep\}</div>'
-              r'\s*\$\{tondi\}\s*</div>\s*</div>`;', rn)))
+    # I TONDI SONO LA FILA IN FONDO ALLA CARD (secondo giro): figli del
+    # riquadro, DOPO `.who` — non dentro il testo, che deve tenersi la
+    # sua larghezza — e il riquadro si veste `con-tondi` solo se ci sono
+    prova("tondi: nel negozio sono la fila in fondo alla card", True,
+          bool(re.search(
+              r'<div class="seller\$\{tondi \? \' con-tondi\' : \'\'\}"[^>]*>'
+              r'[\s\S]*?<div class="rep">\$\{rep\}</div>\s*</div>\s*'
+              r'\$\{tondi\}\s*</div>`;', rn)))
     prova("tondi: ...con le stesse condizioni dei bottoni di prima", True,
           "mio ? '' : v.username," in rn
           and "mio ? '' : (v.npub_verificata && v.npub ? v.npub : '')," in rn
@@ -48502,25 +48521,37 @@ def prove_feedback_tre_e_tondi():
           ["pontiContatto(" in rn, "condividiNegozio()" in rn,
            'class="btn' in rn])
     rp = pezzo_js(senza, "function renderProfilo(){", "\n}\n")
-    prova("tondi: nel Profilo il solo link, DENTRO il riquadro", True,
-          bool(re.search(r'<div class="rep">\$\{rep\}</div>\s*'
-                         r"\$\{tondiVenditore\('', '', '', "
-                         r"\(myUsername\|\|myNegozio\) \? 'mio' : ''\)\}"
-                         r"\s*</div>", rp)))
+    prova("tondi: nel Profilo il solo link, nella fila in fondo alla card",
+          True, "const tondi = tondiVenditore('', '', '', "
+          "(myUsername||myNegozio) ? 'mio' : '');" in rp and bool(re.search(
+              r'<div class="seller\$\{tondi \? \' con-tondi\' : \'\'\}"[^>]*>'
+              r'[\s\S]*?<div class="rep">\$\{rep\}</div>\s*</div>\s*'
+              r'\$\{tondi\}\s*</div>', rp)))
     prova("tondi: ...e il bottone grande del link non c'e' piu'", False,
           "condividiMioNegozio()" in rp)
+    # LA CARD DELLA CONTROPARTE P2P: la porta del negozio e' un pezzo suo
+    # e i tondi le stanno ACCANTO. Il comportamento lo prova il banco di
+    # `prove_parti_si_vedono`; qui la forma, in un posto solo.
+    pc = pezzo_js(senza, "function profiloControparteP2P(o){", "\n}\n")
+    # ⚠️ LA SEQUENZA INTERA, dalla freccia alla chiusura della card: la
+    # porta si CHIUDE, poi la fila, poi la card. La prima stesura
+    # cercava il solo «+ tondi» seguito da una chiusura, e restava verde
+    # coi tondi spostati DENTRO la porta — l'ha detto la tortura.
+    prova("tondi: nel P2P la porta a parte e la fila accanto", True,
+          "'<div class=\"seller-porta\"' + porta + '>'" in pc
+          and ": '')\n    + '</div>'\n    + tondi\n    + '</div>'\n" in pc
+          and "'<div class=\"seller' + (tondi ? ' con-tondi' : '') + '\">'" in pc)
 
-    # IL CENSIMENTO (Andrea: «censisci tutti i posti»). I ponti grandi
-    # vivono ancora in DUE posti, e sono quelli giusti: dentro l'ordine
-    # (`pontiOrdine`, nessun riquadro che li ospiti) e nella pagina
-    # dello scambio P2P (il contatto principale con l'altra persona, che
-    # si decide a parte). Un terzo chiamante nuovo farebbe arrossire.
-    chiamanti = [senza[max(0, k - 400):k].rsplit("function ", 1)[-1]
-                 .split("(")[0] for k in
-                 (mm.start() for mm in re.finditer(r"pontiContatto\(", senza))
-                 if not senza.startswith("function pontiContatto(", k - 9)]
-    prova("censimento: i ponti grandi restano solo nell'ordine e nel "
-          "P2P", ["pontiOrdine", "pontiControparteP2P"], chiamanti)
+    # IL CENSIMENTO (Andrea: «censisci tutti i posti»). Dal secondo giro
+    # il ponte grande vive in UN posto solo, dentro un ordine del
+    # mercatino (`pontiOrdine`), dove una card non c'e'; i tondi li
+    # chiamano il negozio, il Profilo e la card della controparte P2P.
+    # Un chiamante nuovo, di qua o di la', fa arrossire.
+    prova("censimento: il ponte grande resta solo dentro l'ordine",
+          ["pontiOrdine"], chiamanti("pontiContatto"))
+    prova("censimento: i tondi stanno nel negozio, nel Profilo e nel P2P",
+          ["renderNegozio", "renderProfilo", "pontiControparteP2P"],
+          chiamanti("tondiVenditore"))
     # ...e le due condivisioni del negozio partono SOLO dai tondi: fuori
     # dalla definizione, il nome si trova una volta, nel catalogo dei
     # tondi (un `onclick` rimasto altrove sarebbe un secondo)
@@ -48531,6 +48562,12 @@ def prove_feedback_tre_e_tondi():
     prova("censimento: nessun bottone con la vecchia scritta", [0, 0],
           [senza.count("🔗 Condividi il negozio"),
            senza.count("Il tuo negozio — condividi il link")])
+    # L'ANTEPRIMA DI UNA PAGINA SENZA VENDITORE racconta la card di
+    # domani: coi tondi, e non piu' coi bottoni che non ci sono
+    ra = pezzo_js(mini, "function renderAnteprimaSenzaNegozio(r){", "\n}\n")
+    prova("tondi: l'anteprima senza venditore parla dei tondi", [True, False],
+          [" ".join(ra.split()).find("coi tondi in basso a destra") >= 0,
+           "«Scrivi al venditore»" in ra])
 
     # --- 3) LE FUNZIONI VERE IN NODE ----------------------------------
     _node = _sh.which("node")
@@ -48542,20 +48579,19 @@ def prove_feedback_tre_e_tondi():
             fetta("const FEEDBACK_VISIBILI = ", ";"),
             pezzo_js(mini, "function feedbackNegozioHTML(", "\n}\n") + "\n}",
             pezzo_js(mini, "function toggleFeedbackAltri(", "\n}\n") + "\n}",
-            fetta("const ICO_TELEGRAM = ", "</svg>';"),
+            fetta("const LOGO_TELEGRAM = ", "';"),
+            fetta("const LOGO_NOSTR = ", "';"),
             fetta("const ICO_LINK = ", "</svg>';"),
             fetta("const TONDO_CONDIVIDI = {", "\n};"),
             pezzo_js(mini, "function tondiVenditore(", "\n}\n") + "\n}",
         ]
         banco = ("let isAdmin = false; let aptiche = 0;\n"
-                 "const ICO_NOSTR = '<svg class=\"ico-nostr\" aria-hidden=\"true\"></svg>';\n"
                  "function avatarImg(n){ return n ? '<img src=\"/foto/' + n + '\">' : ''; }\n"
                  "function haptic(){ aptiche++; }\n"
                  "const DOM = {};\n"
                  "function el(id){ return DOM[id] || null; }\n"
                  + "\n".join(pezzi) + "\n" + r"""
 const out = {};
-const CASI = {};
 const fb = (n, extra) => Array.from({length: n}, (_, k) => Object.assign({
   id: k + 1, voto: 5 - (k % 3), commento: 'commento ' + k, creato: 1790000000 - k * 86400,
   ruolo: k === 4 ? 'scambio' : 'acquirente', da_nome: 'Persona' + k,
@@ -48603,8 +48639,13 @@ const bottoni = h => (h.match(/<button[^>]*>/g) || []).map(t => ({
   nome: (t.match(/aria-label="([^"]*)"/) || [])[1], titolo: (t.match(/title="([^"]*)"/) || [])[1],
   tipo: (t.match(/type="([^"]*)"/) || [])[1]}));
 caso('pieni', () => { const h = tondiVenditore('venditore', 'npub1abc', 'a Mario', 'negozio');
+  const img = (h.match(/<img [^>]*>/g) || []);
   return {b: bottoni(h), riga: h.startsWith('<div class="tondi">'),
-          icone: (h.match(/<svg[^>]*aria-hidden="true"/g) || []).length}; });
+          loghi: img.map(t => [(t.match(/src="(data:image\/webp;base64,)/) || [])[1] || null,
+                               (t.match(/width="(\d+)"/) || [])[1], (t.match(/alt="([^"]*)"/) || [])[1]]),
+          telegram: img.length > 0 && img[0].indexOf('src="' + LOGO_TELEGRAM + '"') >= 0,
+          nostr: img.length > 1 && img[1].indexOf('src="' + LOGO_NOSTR + '"') >= 0,
+          svgMuto: (h.match(/<svg[^>]*aria-hidden="true"/g) || []).length}; });
 caso('soloTelegram', () => bottoni(tondiVenditore('mario_tg', '', 'a Mario', '')).map(x => x.azione));
 caso('soloNostr', () => bottoni(tondiVenditore('', 'npub1xyz', 'a Mario', 'negozio')).map(x => x.azione));
 caso('nessuno', () => [tondiVenditore('', '', 'al venditore', ''), tondiVenditore(null, undefined, '', 'boh'),
@@ -48680,8 +48721,17 @@ process.stdout.write(JSON.stringify(out));
                "Condividi il negozio"], [x.get("nome") for x in p.get("b", [])])
         prova("tondi: ...la stessa nel title, per il mouse", True,
               all(x.get("titolo") == x.get("nome") for x in p.get("b", [])))
-        prova("tondi: ...bottoni veri, e le icone mute", [["button"] * 3, 3],
-              [[x.get("tipo") for x in p.get("b", [])], p.get("icone")])
+        prova("tondi: ...bottoni veri", ["button"] * 3,
+              [x.get("tipo") for x in p.get("b", [])])
+        # I LOGHI VERI: le due immagini sono i data: URI delle costanti,
+        # a 40 e 24 px, mute (il nome lo dice il bottone); il link e' un
+        # svg muto
+        prova("tondi: Telegram e Nostr sono i loghi veri, a 40 e 24 px, muti",
+              [["data:image/webp;base64,", "40", ""],
+               ["data:image/webp;base64,", "24", ""]], p.get("loghi"))
+        prova("tondi: ...proprio quelli delle due costanti", [True, True],
+              [p.get("telegram"), p.get("nostr")])
+        prova("tondi: ...e il link e' un svg muto", 1, p.get("svgMuto"))
         prova("tondi: nella loro fila", True, p.get("riga"))
         prova("tondi: senza npub niente Nostr (e senza link niente link)",
               ["apriChat('mario_tg')"], o.get("soloTelegram"))
@@ -48735,54 +48785,76 @@ process.stdout.write(JSON.stringify(out));
                         "classi": set(classi)})
         return out
 
+    def vince(catena, proprieta):
+        return {k: x[0] for k, x in _vince_css(regole, catena, proprieta).items()}
+
     RIGA = ("div", ["trust-note", "nota-feedback"])
+    CARD = ("div", ["seller", "con-tondi"])
+    FILA = ("div", ["tondi"])
     for tema in ("chiaro", "scuro"):
-        v = _vince_css(regole, verso("negozioFeedback", tema, RIGA),
-                       ("background", "color", "border", "margin-left",
-                        "margin-right"))
         prova(f"feedback ({tema}): la riga veste la carta delle card, "
               "col filo e rientrata come il riquadro",
               {"background": "var(--card)", "color": "var(--ink)",
                "border": "1px solid var(--line)",
                "margin-left": "var(--pad)", "margin-right": "var(--pad)"},
-              {k: x[0] for k, x in v.items()})
-        v = _vince_css(regole, verso("negozioFeedback", tema, RIGA,
-                                     ("span", ["stars"])), ("color",))
+              vince(verso("negozioFeedback", tema, RIGA),
+                    ("background", "color", "border", "margin-left",
+                     "margin-right")))
         prova(f"feedback ({tema}): le stelle parlano l'arancio del testo",
-              "var(--sats-text)", v.get("color", (None,))[0])
-        v = _vince_css(regole, verso("negozioFeedback", tema,
-                                     ("button", ["fb-tutti"])),
-                       ("min-height", "color", "background"))
+              {"color": "var(--sats-text)"},
+              vince(verso("negozioFeedback", tema, RIGA, ("span", ["stars"])),
+                    ("color",)))
         prova(f"feedback ({tema}): la riga «Mostra tutti» alta 44 e in "
               "--ink-soft", {"min-height": "44px", "color": "var(--ink-soft)",
                              "background": "none"},
-              {k: x[0] for k, x in v.items()})
-        for dove, catena in (("negozio", ("negozioHeader", ("div", ["seller"]))),
-                             ("Profilo", ("profiloTestata", ("div", ["seller"])))):
-            for mondo, fondo, inch in (("tg", "var(--tg-soft)", "var(--tg-soft-on)"),
-                                       ("nostr", "var(--nostr-soft)", "var(--nostr-text)"),
-                                       ("link", "var(--card)", "var(--ink)")):
-                v = _vince_css(regole, verso(catena[0], tema, catena[1],
-                                             ("div", ["who"]), ("div", ["tondi"]),
-                                             ("button", ["tondo", mondo])),
-                               ("width", "height", "border", "background",
-                                "color", "border-color", "position"))
-                prova(f"tondi ({dove}, {tema}, {mondo}): 38px, la velatura "
-                      "del suo mondo e il contorno forte",
-                      {"width": "38px", "height": "38px", "border": "2px solid",
-                       "background": fondo, "color": inch, "border-color": inch,
-                       "position": "relative"},
-                      {k: x[0] for k, x in v.items()})
-        v = _vince_css(regole, verso("negozioHeader", tema, ("div", ["seller"]),
-                                     ("div", ["who"]), ("div", ["tondi"]),
-                                     ("button", ["tondo", "nostr"]),
-                                     ("svg", ["ico-nostr"])), ("fill",))
-        prova(f"tondi ({tema}): il pallino Nostr prende il colore del testo",
-              "currentColor", v.get("fill", (None,))[0])
+              vince(verso("negozioFeedback", tema, ("button", ["fb-tutti"])),
+                    ("min-height", "color", "background")))
+        # LE STELLE DI OGNI RIQUADRO .seller (secondo giro): negozio,
+        # Profilo, dettaglio dell'annuncio e classifica, dove stanno
+        # davvero — non una regola «da qualche parte»
+        for dove in ("negozioHeader", "profiloTestata", "detailContent",
+                     "classificaCorpo"):
+            prova(f"stelle ({tema}, {dove}): scure come quelle dei feedback",
+                  {"color": "var(--sats-text)"},
+                  vince(verso(dove, tema, ("div", ["seller"]), ("div", ["who"]),
+                              ("div", ["rep"]), ("span", ["stars"])), ("color",)))
+        # LA FILA IN BASSO A DESTRA: la card va a capo, la fila e' una
+        # riga sua larga quanto la card, e i tondi vanno a destra — nel
+        # negozio, nel Profilo e nella card della controparte P2P
+        for dove in ("negozioHeader", "profiloTestata", "p2pOrdineCorpo"):
+            prova(f"tondi ({tema}, {dove}): la fila in fondo alla card, a "
+                  "destra", [{"flex-wrap": "wrap"},
+                             {"flex": "1 0 100%", "justify-content": "flex-end"}],
+                  [vince(verso(dove, tema, CARD), ("flex-wrap",)),
+                   vince(verso(dove, tema, CARD, FILA), ("flex", "justify-content"))])
+            for mondo, fondo in (("tg", "none"), ("nostr", "#FFF8EA"),
+                                 ("link", "var(--card)")):
+                prova(f"tondi ({tema}, {dove}, {mondo}): 40px, lo stesso "
+                      "tondo per tutti e tre",
+                      {"width": "40px", "height": "40px", "border": "0",
+                       "background": fondo, "position": "relative"},
+                      vince(verso(dove, tema, CARD, FILA, ("button", ["tondo", mondo])),
+                            ("width", "height", "border", "background", "position")))
+        prova(f"tondi ({tema}): il link ha l'inchiostro della prosa",
+              {"color": "var(--ink)"},
+              vince(verso("negozioHeader", tema, CARD, FILA,
+                          ("button", ["tondo", "link"])), ("color",)))
+        # il filo dei due tondi chiari e' DAVVERO `--muted`: il contrasto
+        # qui sotto si calcola sui token, e senza questa domanda una
+        # regola tornata a `--line` resterebbe verde
+        prova(f"tondi ({tema}): Nostr e link hanno il filo --muted", [True, True],
+              ["inset 0 0 0 1px var(--muted)" in vince(
+                  verso("negozioHeader", tema, CARD, FILA,
+                        ("button", ["tondo", mondo])), ("box-shadow",)
+              ).get("box-shadow", "") for mondo in ("nostr", "link")])
+        prova(f"tondi ({tema}): nel P2P la porta e' una riga sua",
+              {"display": "flex", "flex": "1 1 auto", "min-width": "0"},
+              vince(verso("p2pOrdineCorpo", tema, CARD, ("div", ["seller-porta"])),
+                    ("display", "flex", "min-width")))
 
     # L'AREA DI TOCCO: il ::after del tondo (la cascata non guarda i
-    # pseudo-elementi, quindi si legge la regola): 5px oltre il bordo
-    # interno di un cerchio da 38 con 2 di bordo fanno 44
+    # pseudo-elementi, quindi si legge la regola) sporge dal riquadro
+    # interno del cerchio; con 40px e nessun bordo, 2px per lato fanno 44
     cssn = re.sub(r"/\*[\s\S]*?\*/", "", css)
     m = re.search(r"\.tondo::after\{([^}]*)\}", cssn)
     ins = re.search(r"inset:-(\d+(?:\.\d+)?)px", m.group(1)) if m else None
@@ -48794,7 +48866,7 @@ process.stdout.write(JSON.stringify(out));
     # l'area e' il lato meno i due bordi piu' le due sporgenze
     t = re.search(r"\.tondo\{([^}]*)\}", cssn)
     lato = re.search(r"width:(\d+)px", t.group(1)) if t else None
-    bordo = re.search(r"border:(\d+)px", t.group(1)) if t else None
+    bordo = re.search(r"border:(\d+)(?:px)?[;}]?", t.group(1)) if t else None
     area = (int(lato.group(1)) - 2 * int(bordo.group(1))
             + 2 * float(ins.group(1))) if (lato and bordo and ins) else 0
     prova("tondi: l'area di tocco fa almeno 44px", True, area >= 44)
@@ -48838,11 +48910,11 @@ process.stdout.write(JSON.stringify(out));
     TESTO = (("il testo", "--ink", "--card"),
              ("le stelle", "--sats-text", "--card"),
              ("«Mostra tutti» sulla pagina", "--ink-soft", "--bg"))
-    NON_TESTO = (("il contorno Telegram sul riquadro", "--tg-soft-on", "--card"),
-                 ("l'aeroplanino sulla sua velatura", "--tg-soft-on", "--tg-soft"),
-                 ("il contorno Nostr sul riquadro", "--nostr-text", "--card"),
-                 ("il pallino Nostr sulla sua velatura", "--nostr-text", "--nostr-soft"),
-                 ("il contorno del link sul riquadro", "--ink", "--card"))
+    # IL FILO DEI DUE TONDI CHIARI e' `--muted`: regge il 3:1 del
+    # contorno di un bottone sulla card nei due temi (con `--line`, di
+    # sera, 1,25:1 — il tondo del link spariva)
+    NON_TESTO = (("il filo dei tondi chiari sul riquadro", "--muted", "--card"),
+                 ("l'icona del link sul suo tondo", "--ink", "--card"))
     for tema in ("chiaro", "scuro"):
         for cosa, fg, bg in TESTO:
             a, b = tok(fg, tema), tok(bg, tema)
@@ -48859,14 +48931,98 @@ process.stdout.write(JSON.stringify(out));
             a, b = tok(fg, tema), tok(bg, tema)
             prova(f"contrasto ({tema}): 3:1 per {cosa}", True,
                   bool(a and b) and contrasto(a, b) >= 3)
+    # lo struzzo viola sulla sua carta chiara: i due colori sono fissi nei
+    # due temi — il viola e' quello del logo, misurato sui suoi pixel
+    prova("contrasto: lo struzzo sulla sua carta regge il 3:1", True,
+          contrasto("#662482", "#FFF8EA") >= 3)
     # IL PERCHE' delle stelle scure, a verbale: l'arancio pieno sulla
     # carta di giorno non arriva all'AA — chi «semplificasse» tornando a
     # `.stars` qui trova la ragione scritta
     prova("feedback: l'arancio pieno sulla carta di giorno NON reggerebbe",
           True, contrasto(tok("--sats", "chiaro"),
                           tok("--card", "chiaro")) < 4.5)
-    prova("tondi: di giorno il pallino e' lo stesso viola del nome", True,
-          tok("--nostr-text", "chiaro") == tok("--nostr", "chiaro"))
+
+
+def prove_loghi_tondi():
+    """I LOGHI VERI DEI TONDI (24 set 2026, secondo giro, decisione di
+    Andrea: le icone disegnate a mano sembravano finte). Telegram e Nostr
+    stanno nella pagina come `data:` URI e devono essere BYTE PER BYTE i
+    file di assets/loghi, con la provenienza e le licenze nel LEGGIMI
+    accanto: cosi' nessuno li ridisegna o li ricolora senza che una prova
+    se ne accorga. Il link e' l'icona «link» di Lucide coi tracciati
+    dell'originale."""
+    print("\n[i loghi veri dei tondi]")
+    import base64 as _b64
+    import io as _io
+    mini = open("miniapp.html", encoding="utf-8").read()
+    for costante, nome, lato in (("LOGO_TELEGRAM", "telegram.webp", 120),
+                                 ("LOGO_NOSTR", "nostr.webp", 72)):
+        p = os.path.join("assets", "loghi", nome)
+        dati = open(p, "rb").read() if os.path.exists(p) else b""
+        m = re.search(r"^const %s = 'data:image/webp;base64,([A-Za-z0-9+/=]+)';$"
+                      % costante, mini, re.M)
+        prova(f"loghi: {costante} e' un data: URI WebP", True, bool(m))
+        prova(f"loghi: ...byte per byte assets/loghi/{nome}", True,
+              bool(m) and dati != b"" and _b64.b64decode(m.group(1)) == dati)
+        # senza perdita (VP8L): i colori del logo restano i suoi
+        prova(f"loghi: {nome} e' un WebP senza perdita",
+              (b"RIFF", b"WEBP", b"VP8L"), (dati[:4], dati[8:12], dati[12:16]))
+        try:
+            from PIL import Image
+        except ImportError:
+            salta(f"loghi: {nome} si misura", "Pillow non installato")
+            continue
+        try:
+            im = Image.open(_io.BytesIO(dati))
+            misura = (im.size, im.mode)
+        except Exception as e:
+            misura = repr(e)
+        prova(f"loghi: {nome} e' {lato}x{lato} con la trasparenza — tre "
+              "volte la sua misura a schermo", ((lato, lato), "RGBA"), misura)
+    prova("loghi: a schermo 40 e 24 px, un terzo del file", [1, 1],
+          [mini.count("logo(LOGO_TELEGRAM, 40)"), mini.count("logo(LOGO_NOSTR, 24)")])
+    # ⚠️ NELLA FABBRICA dei tondi e non nella pagina intera: la stessa
+    # coppia d'attributi vive anche altrove, e la prova rispondeva per il
+    # vicino (la tortura non trovava nemmeno un'ancora sola)
+    i = mini.find("function tondiVenditore(")
+    tv = mini[i:mini.find("\n}\n", i)] if i >= 0 else ""
+    prova("loghi: l'immagine e' muta, il nome lo dice il bottone", True,
+          'alt="" draggable="false"' in tv)
+    # il link: i due tracciati e il tratto di `icons/link.svg` di Lucide,
+    # letti sull'originale il 24 set 2026
+    i = mini.find("const ICO_LINK = ")
+    ico = mini[i:mini.find("</svg>';", i)] if i >= 0 else ""
+    prova("link: i due tracciati di Lucide, tali e quali",
+          ["M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71",
+           "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"],
+          re.findall(r'<path d="([^"]+)"/>', ico))
+    prova("link: ...col tratto dell'originale", True,
+          all(a in ico for a in ('viewBox="0 0 24 24"', 'fill="none"',
+                                 'stroke="currentColor"', 'stroke-width="2"',
+                                 'stroke-linecap="round"',
+                                 'stroke-linejoin="round"')))
+    # LE LICENZE: la nota accanto all'icona nella pagina, e i testi interi
+    # accanto ai file
+    prova("licenze: la pagina porta la nota accanto all'icona", True,
+          "Cole Bemis" in mini and "Lucide Icons and Contributors" in mini)
+    p = os.path.join("assets", "loghi", "LEGGIMI.md")
+    leggimi = open(p, encoding="utf-8").read() if os.path.exists(p) else ""
+    prova("licenze: il LEGGIMI nomina le tre fonti", True,
+          all(x in leggimi for x in ("telegram.webp", "nostr.webp",
+                                     "mbarulli/nostr-logo", "CC0", "Lucide")))
+    prova("licenze: ...e porta per intero la MIT di Feather e la ISC di "
+          "Lucide", True,
+          all(x in leggimi for x in (
+              "Copyright (c) 2013-present Cole Bemis",
+              "Permission is hereby granted, free of charge",
+              "ISC License",
+              "Copyright (c) 2026 Lucide Icons and Contributors",
+              "Permission to use, copy, modify, and/or distribute")))
+    # i disegni a mano del primo giro non ci sono piu'
+    prova("loghi: l'aeroplanino e i due anelli disegnati a mano non ci "
+          "sono piu'", [0, 0, 0],
+          [mini.count("ICO_TELEGRAM"), mini.count("ico-tg"),
+           mini.count("rotate(-45 12 12)")])
 
 
 def prove_font():
@@ -52844,9 +53000,12 @@ def prove_parti_si_vedono():
           and "!p2pControparti[id]" in cod
           and "> P2P_CONTROPARTE_RIPROVA_MS" in cod)
     # I PONTI SONO QUELLI DEL MERCATINO: la stessa azione non puo'
-    # avere due vestiti secondo la pagina da cui la si tocca.
+    # avere due vestiti secondo la pagina da cui la si tocca. DAL 24 SET
+    # 2026 (secondo giro dei tondi, decisione di Andrea) la fabbrica del
+    # mercatino sono i TONDI coi loghi veri, `tondiVenditore` — la prova
+    # cambia nome insieme a lei, e la regola resta la stessa.
     prova("i due ponti sono la fabbrica del mercatino", True,
-          "return pontiContatto(" in cod)
+          "return tondiVenditore(" in cod)
     prova("...con l'alfabeto filtrato, che finiscono in un onclick",
           True, "/[^A-Za-z0-9_]/g" in cod and "/[^a-z0-9]/g" in cod)
 
@@ -53049,12 +53208,16 @@ def prove_parti_si_vedono():
         salta("il profilo della controparte gira", "node non installato")
         return
     pezzi = [blocco]
-    for firma in ("function pontiContatto(username, npub, chi, cls){",
+    for firma in ("function tondiVenditore(username, npub, chi, condividi){",
                   "function icoPersonaP2P(){",
                   "function frazioneStellaP2P(media){",
                   "function stellaP2P(media){"):
         pezzi.append(pezzo_js(mini, firma, "\n}\n") + "\n}\n")
-    for riga in ("const P2P_STELLA_D = ", "const titoloRiga = "):
+    # i loghi e il catalogo della fabbrica dei tondi (una riga, o tre
+    # sommate: in nessuna c'e' un «;» prima della fine)
+    for riga in ("const P2P_STELLA_D = ", "const titoloRiga = ",
+                 "const LOGO_TELEGRAM = ", "const LOGO_NOSTR = ",
+                 "const ICO_LINK = ", "const TONDO_CONDIVIDI = "):
         i_a = mini.index(riga)
         pezzi.append(mini[i_a:mini.index(";\n", i_a) + 1])
     banco = ("let DEMO = false, VETRINA = false, myTgId = 111;\n"
@@ -53097,16 +53260,38 @@ out.stelline = piena.indexOf('4,8') >= 0 && piena.indexOf('41 giorni qui') >= 0;
 out.livello = piena.indexOf('Mercante pratico') >= 0;
 out.titolo = piena.indexOf('Pioniere') >= 0;
 out.porta = piena.indexOf("apriNegozioP2P(event, this.dataset.negozio)") >= 0;
-out.dueBottoni = (piena.match(/class="btn ponte/g) || []).length === 2;
-/* 4) UN CANALE SOLO: nasce un bottone solo, e l'altro non c'e' */
+/* I DUE PONTI SONO TONDI dal secondo giro (24 set 2026): due tondi nella
+   card coi tondi, e nessun bottone grande */
+out.dueBottoni = (piena.match(/class="tondo /g) || []).length === 2
+  && piena.indexOf('btn ponte') < 0 && piena.indexOf('<div class="seller con-tondi">') === 0;
+/* ...con le azioni di prima, e senza il link: qui non c'e' un negozio
+   da condividere */
+out.azioni = piena.indexOf(`onclick="apriChat('ada_tg')"`) >= 0
+  && piena.indexOf(`onclick="apriNostrProfilo('npub1abc')"`) >= 0
+  && piena.indexOf('tondo link') < 0;
+/* ...e ACCANTO alla porta del negozio, mai dentro: la porta e' un
+   role="button", e quel che contiene e' «di presentazione» — muto al
+   lettore di schermo */
+{ const iP = piena.indexOf('<div class="seller-porta" role="button"');
+  const iT = piena.indexOf('<div class="tondi">');
+  /* ⚠️ LA PORTA DEV'ESSERE CHIUSA prima della fila: nel pezzo che va
+     dalla porta ai tondi i <div> aperti e chiusi si pareggiano. Senza,
+     i tondi spostati DENTRO la porta passavano (l'ha detto la tortura) */
+  const pezzo = iP > 0 && iT > iP ? piena.slice(iP, iT) : '';
+  out.tondiFuori = pezzo !== '' && pezzo.indexOf('class="tondo') < 0
+    && (pezzo.match(/<div\b/g) || []).length === (pezzo.match(/<\/div>/g) || []).length
+    && piena.indexOf('<div class="seller" role') < 0; }
+/* 4) UN CANALE SOLO: nasce un tondo solo, e l'altro non c'e' */
 p2pControparti['ord-1'] = {nome: 'Bruno', telegram: '', npub: 'npub1xyz'};
 const uno = profiloControparteP2P(ord({}));
-out.unSoloBottone = (uno.match(/class="btn ponte/g) || []).length === 1
+out.unSoloBottone = (uno.match(/class="tondo /g) || []).length === 1
   && uno.indexOf('su Telegram') < 0;
-/* 5) NESSUN CANALE: il profilo resta, e la riga dice cosa fare */
+/* 5) NESSUN CANALE: il profilo resta, senza la fila, e la riga dice
+   cosa fare */
 p2pControparti['ord-1'] = {nome: 'Cleo', telegram: '', npub: ''};
 const zero = profiloControparteP2P(ord({}));
-out.zeroBottoni = zero.indexOf('class="btn ponte') < 0
+out.zeroBottoni = zero.indexOf('class="tondo') < 0
+  && zero.indexOf('<div class="seller">') === 0
   && zero.indexOf('Non ha lasciato nessun canale') >= 0
   && zero.indexOf('<b>Cleo</b>') >= 0;
 /* 6) SENZA VOTI NIENTE MEDIA INVENTATA, e senza giorni niente riga */
@@ -53145,7 +53330,9 @@ process.stdout.write(JSON.stringify(out));
             ("livello", "...il livello"),
             ("titolo", "...e il titolo, che e' il badge di coorte"),
             ("porta", "il tocco apre il negozio"),
-            ("dueBottoni", "coi due canali nascono due bottoni"),
+            ("dueBottoni", "coi due canali nascono due tondi nella card"),
+            ("azioni", "...con le azioni di prima, e senza il link"),
+            ("tondiFuori", "...accanto alla porta del negozio, mai dentro"),
             ("unSoloBottone", "...con uno solo ne nasce uno"),
             ("zeroBottoni", "...e senza canali resta il profilo e una riga"),
             ("senzaVoti", "senza voti niente media inventata"),
@@ -96826,6 +97013,7 @@ def main():
               prove_pagina_dati,
               prove_note_piccole,
               prove_feedback_tre_e_tondi,
+              prove_loghi_tondi,
               prove_font,
               prove_porta_timer, prove_feedback_confermato,
               prove_recensione_p2p,
