@@ -615,12 +615,6 @@
      conteggio resta, che dice quanti oggetti hai messo da parte. */
   body.solo-barattolo .strumenti #ordinaSelBtn,
   body.solo-barattolo .strumenti #filtriBtn{display:none}
-  /* ...e al loro posto, col barattolo acceso e almeno un carrello
-     pieno, «🛒 Carrelli (N)» (24 set 2026): la veste e' quella dei
-     due comandi, l'inchiostro pieno perche' e' una PORTA e non un
-     filtro. Fuori dal barattolo non esiste. */
-  .strumenti #carrelliBtn{display:none;color:var(--ink);font-weight:800}
-  body.solo-barattolo .strumenti #carrelliBtn.pieno{display:inline-block}
   /* ...e la vista OSPITE (il barattolo condiviso di qualcun altro) li
      nasconde per la stessa ragione: la lista e' chiusa, e quei
      controlli chiamano un server che di quella lista non sa niente.
@@ -1671,29 +1665,6 @@
   /* da salvato il fondo di carta resta, e a parlare e' il vetro pieno
      d'arancio (vedi il rovesciamento dell'animazione, sopra) */
   .card-jar.salvato{box-shadow:0 2px 6px rgba(0,0,0,.28)}
-  /* ---- IL CARRELLO SULLA CARD (24 set 2026) ----
-     Il gemello del barattolino, in alto a SINISTRA e solo nel
-     barattolo in vetrina (lo decide bottoneCarrelloCard: qui non c'e'
-     nessuna regola di vista). Stesso cerchio di carta, stessi colori
-     fissi di cio' che vive sulla foto; l'area di tocco e' il ::after
-     (34 + 5 + 5 = 44px, la misura del dito). Da DENTRO il carrello si
-     accende d'arancio; SPENTO resta toccabile (il tocco spiega
-     perche') ma sbiadito. */
-  .card-carrello{position:absolute;top:8px;left:8px;z-index:2;
-    width:34px;height:34px;border-radius:50%;border:0;cursor:pointer;
-    background:rgba(255,248,234,.75);color:#23282C;font-size:16px;line-height:1;
-    display:flex;align-items:center;justify-content:center;padding:0;
-    box-shadow:0 1px 4px rgba(0,0,0,.18)}
-  .card-carrello::after{content:'';position:absolute;inset:-5px;border-radius:50%}
-  .card-carrello:active{transform:scale(.92)}
-  .card-carrello.dentro{background:var(--sats);box-shadow:0 2px 6px rgba(0,0,0,.28)}
-  .card-carrello.spento{opacity:.45;cursor:default}
-  .card-carrello.spento:active{transform:none}
-  /* l'angolo in alto a sinistra e' di uno solo: col carrello sulla
-     card il badge di stato scende sotto di lui (8 + 34 + 6) */
-  .card.con-carrello .card-lampo,.card.con-carrello .card-sconto,
-  .card.con-carrello .card-asta,.card.con-carrello .card-ferie,
-  .card.con-carrello .card-esaurito,.card.con-carrello .card-ultimo{top:48px}
   /* ---- QUANTI L'HANNO MESSO NEL BARATTOLO (ago 2026) ----
      Il numero vive DENTRO il cerchietto, che diventa una pastiglia:
      un elemento solo, un bersaglio solo, e niente che possa
@@ -4971,23 +4942,6 @@
      3) sui numeri lunghi il corpo scala (classe .lungo da
         aggiornaBarraPacco): senza il toggle in mezzo, anche a 320px
         il 7 cifre sta su UNA riga col bottone pieno. */
-  /* ---- «I TUOI CARRELLI» (24 set 2026): un blocco per venditore
-     nella card delle righe di Ordini (.order), con le miniature dei
-     pezzi e i due bottoni a meta'. Il blocco non e' un bersaglio:
-     lo sono i bottoni. ---- */
-  .carrello-blocco{cursor:default}
-  .carrello-blocco .row b{overflow:hidden;text-overflow:ellipsis;
-    white-space:nowrap;min-width:0}
-  .carrello-mini{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-  .carrello-mini img,.carrello-mini span{width:44px;height:44px;
-    border-radius:10px;object-fit:cover;flex:none;display:flex;
-    align-items:center;justify-content:center;font-size:22px;
-    background:var(--chip-bg)}
-  .carrello-azioni{display:flex;gap:8px;margin-top:10px}
-  .carrello-azioni .btn{margin-top:0;flex:1 1 50%;min-width:0;
-    white-space:nowrap}
-  #carrelliVuoto{color:var(--muted);font-weight:600;font-size:13.5px;
-    line-height:1.5;padding:14px var(--pad)}
   #barraPacco{position:fixed;bottom:0;left:0;right:0;z-index:30;
     background:var(--nav-bg);backdrop-filter:blur(10px);
     border-top:1px solid var(--line);display:none;flex-wrap:wrap;
@@ -9044,12 +8998,6 @@ document.getElementById('cartello')?.remove();</script>
            diventano due disegni. -->
       <button type="button" class="campo-scelta" id="ordinaSelBtn" onclick="apriPicker('ordinaSel')" aria-haspopup="dialog" title="Ordina la vetrina"><span class="ico-strum" id="icoOrdinaVetrina"></span><span class="cs-val"></span><span class="cs-freccia" aria-hidden="true">▾</span></button>
       <button id="filtriBtn" type="button" onclick="toggleFiltri()"><span class="ico-strum" id="icoFiltriVetrina"></span>Filtro</button>
-      <!-- «🛒 Carrelli (N)» (24 set 2026): SOLO col barattolo acceso e
-           con almeno un carrello pieno (.pieno la mette
-           renderBadgeCarrelli). Sta nel posto che Ordina e Filtro
-           lasciano libero col barattolo, e porta a «I tuoi carrelli»,
-           uno per venditore. -->
-      <button id="carrelliBtn" type="button" onclick="apriCarrelli()" title="I tuoi carrelli, uno per venditore" aria-label="I tuoi carrelli, uno per venditore">🛒 Carrelli (<span id="carrelliConta">0</span>)</button>
     </div>
     <div id="filtriBox" style="display:none">
       <div class="filtri-riga">
@@ -9726,29 +9674,6 @@ document.getElementById('cartello')?.remove();</script>
     </div>
     </div><!-- /.pacco-appiccicato -->
     <div class="grid" id="paccoGrid" style="margin-top:10px"></div>
-  </div>
-
-  <!-- ============ VISTA: I TUOI CARRELLI (24 set 2026) ============
-       Un blocco per venditore — la card delle righe di Ordini con le
-       miniature dei pezzi, il totale dei soli articoli e i due
-       bottoni: «Apri» porta al carrello di quel venditore (la pagina
-       del pacco di sempre), «Controlla e paga» alla sua cassa. La
-       testata e' quella del carrello (.pacco-testa) con la ✕ che qui
-       CHIUDE E BASTA: non c'e' niente da buttare, a svuotare e' la ✕
-       del singolo carrello. Il contenuto lo disegna renderCarrelli().
-       -->
-  <div class="view" id="view-carrelli">
-    <div class="pacco-appiccicato">
-    <div class="pacco-testa">
-      <button type="button" class="pacco-x" onclick="navIndietro()" title="Chiudi" aria-label="Chiudi i carrelli">✕</button>
-      <div class="pacco-tit"><b>🛒 I tuoi carrelli</b><span class="eur-hint" id="carrelliSub"></span></div>
-      <div class="cur-seg inriga" title="Mostra i prezzi in euro o in sats">
-        <button type="button" data-cur="eur" onclick="setValuta('eur')">€</button>
-        <button type="button" data-cur="sats" onclick="setValuta('sats')">₿</button>
-      </div>
-    </div>
-    </div><!-- /.pacco-appiccicato -->
-    <div id="carrelliLista" style="padding-top:10px"></div>
   </div>
 
   <!-- ============ VISTA: LA CASSA (ago 2026) ============
@@ -13583,7 +13508,7 @@ function voceNav(view){
   /* «sfoglia» e' uscita dall'elenco con la pagina (ago 2026): le
      entry vecchie della cronologia non arrivano qui — le degrada
      navRendiVista prima di rendere qualunque cosa. */
-  if (['dettaglio','negozio','sicurezza','privacy','pacco','carrelli',
+  if (['dettaglio','negozio','sicurezza','privacy','pacco',
        'acquisto','classifica','consigliati'].includes(view)) view = 'esplora';
   else if (view === 'ordine') view = 'affari';
   /* il «coming soon» delle aste e' la voce Aste a tutti gli effetti:
@@ -14221,9 +14146,6 @@ function navRendiVista(b){
         && listings.some(x=>x.id===b.k)) { renderPacco(); return go('pacco'); }
     return go('esplora');
   }
-  /* i carrelli si ridisegnano dal registro, che se e' vuoto lo dice
-     in pagina: niente da ricostruire, niente su cui mentire */
-  if (b.v === 'carrelli') { renderCarrelli(); return go('carrelli'); }
   if (b.v === 'acquisto') {
     /* mai ricostruire il vuoto: acqDati dev'essere ancora SUO
        (stesso annuncio, o stesso pacco con articoli) — svuotato da
@@ -16515,13 +16437,7 @@ function renderGrid(items){
   const ba = el('btnAvvisami');
   if (ba) ba.style.display =
     (!data.length && !DEMO && !VETRINA && !vistaBarattolo) ? '' : 'none';
-  /* il carrellino sulle card SOLO qui, e solo col barattolo: la
-     bandierina si alza attorno a questa mappa e si abbassa subito
-     (vedi cardConCarrello) */
-  cardConCarrello = !!(items && vistaBarattolo);
   el('grid').innerHTML = data.map(cardHTML).join('');
-  cardConCarrello = false;
-  renderBadgeCarrelli();   /* «🛒 Carrelli (N)»: vive solo col barattolo */
   armaViste();
   /* La griglia non ha piu' contatori da aggiornare (il badge dice
      solo la percentuale), ma allo scadere va comunque ridisegnata o
@@ -16873,11 +16789,6 @@ const cardHTML = l => {
   const rif = bottoneRifornisci(l);
   const jar = rif ? ''
     : bottoneJar(l, 'card-jar', 16, 'event.stopPropagation();');
-  /* IL CARRELLO A SINISTRA (24 set 2026): solo sulle card del
-     barattolo in vetrina, vedi bottoneCarrelloCard. Come il barattolino sta FUORI
-     dall'<a> e si ancora alla card; la classe .con-carrello sulla card
-     fa scendere il badge di stato sotto di lui. */
-  const carr = bottoneCarrelloCard(l);
   /* LA CARD E' UN COLLEGAMENTO VERO (ago 2026): l'<a> avvolge foto e
      testo, i due BOTTONI restano fuori — contenuto interattivo dentro
      un <a> e' HTML non valido — mentre il badge di stato ${flash}, che
@@ -16887,7 +16798,7 @@ const cardHTML = l => {
      apra una scheda nuova; il tocco normale lo spegne e apre in pagina
      come sempre, senza toccare l'URL (il patto del motore). */
   return `
-    <div class="card${esa?' esaurito':ferie?' in-ferie':asta?' in-asta':lampo?' in-lampo':sconto?' in-sconto':''}${carr?' con-carrello':''}" data-vid="${l.id}">
+    <div class="card${esa?' esaurito':ferie?' in-ferie':asta?' in-asta':lampo?' in-lampo':sconto?' in-sconto':''}" data-vid="${l.id}">
       <a class="card-link"${linkAnnuncio(l)} onclick="apriCard(event,${l.id})">
       <div class="ph-wrap">
         <div class="ph">${l.photos && l.photos[0]
@@ -16906,7 +16817,7 @@ const cardHTML = l => {
              al suo posto per tutti. */''}
         <div class="meta"><span class="luogo">${luogoTesto(l)}</span>${iconeCard(l)}</div>
       </div>
-      </a>${jar}${rif}${carr}
+      </a>${jar}${rif}
     </div>`; };
 
 /* Cercare da dentro un reparto SPEGNE il reparto (ago 2026, decisione
@@ -20401,155 +20312,6 @@ const MAX_PACCO = 8;
    ed e' per un venditore solo: aprirlo da un altro venditore lo
    ricomincia da capo. Si azzera a pagamento riuscito. */
 let paccoDati = null;               // {sellerId, origineId}
-/* I CARRELLI, UNO PER VENDITORE (24 set 2026, idea di due utenti).
-   Quello APERTO vive nelle due variabili di sempre — setScelte e
-   paccoDati: ogni funzione del carrello le legge com'era — e gli
-   altri stanno DA PARTE qui, per venditore ({scelte, dati}), finche'
-   qualcuno non li rimonta (montaCarrello). Prima aprire il carrello
-   da un altro venditore buttava via quello che si stava componendo;
-   adesso lo mette da parte, e lo si ritrova in «🛒 I tuoi carrelli».
-   Il modello NON cambia: un carrello e' di un venditore solo, con la
-   sua spedizione — cambia che se ne puo' tenere piu' d'uno. Vive in
-   memoria come il carrello di sempre: un ricaricamento lo perde. */
-let carrelliDaParte = new Map();     // sellerId -> {scelte, dati}
-/* Il carrellino nasce SOLO mentre renderGrid disegna il barattolo:
-   cardHTML e' una fabbrica sola e la chiamano anche le celle del
-   carrello, «Altri oggetti» e il negozio — con vistaBarattolo ancora
-   accesa in vetrina, guardare quella variabile li metteva un
-   carrellino sopra al loro «Aggiungi» (visto dal vivo). La bandierina
-   la alza renderGrid attorno alla sua sola mappa, e la abbassa
-   subito. */
-let cardConCarrello = false;
-/* Monta il carrello di `sellerId`: se e' gia' quello aperto non fa
-   nulla (aggiorna solo la provenienza), sennò mette da parte l'aperto
-   — SE ha qualcosa dentro: un carrello vuoto non si conserva — e tira
-   fuori il suo, o ne apre uno nuovo. */
-function montaCarrello(sellerId, origineId){
-  if (paccoDati && paccoDati.sellerId === sellerId) {
-    if (origineId) paccoDati.origineId = origineId;
-    return;
-  }
-  if (paccoDati && setScelte.size)
-    carrelliDaParte.set(paccoDati.sellerId,
-                        {scelte: setScelte, dati: paccoDati});
-  const suo = carrelliDaParte.get(sellerId);
-  carrelliDaParte.delete(sellerId);
-  setScelte = suo ? suo.scelte : new Map();
-  consegnaSetScelta = 'spedizione';
-  paccoDati = suo ? suo.dati : {sellerId, origineId: origineId || 0};
-  if (origineId) paccoDati.origineId = origineId;
-}
-/* Tutti i carrelli con qualcosa dentro, l'aperto in testa: e' la
-   lista di «I tuoi carrelli» e il numero del badge. */
-function carrelliTutti(){
-  const out = [];
-  if (paccoDati && setScelte.size)
-    out.push({sellerId: paccoDati.sellerId, scelte: setScelte,
-              dati: paccoDati, aperto: true});
-  for (const [sid, c] of carrelliDaParte)
-    if (c.scelte.size)
-      out.push({sellerId: sid, scelte: c.scelte, dati: c.dati, aperto: false});
-  return out;
-}
-/* L'annuncio si trova nel catalogo O fra i preferiti: le card del
-   barattolo nascono da myPreferiti, che entrano nel catalogo solo se
-   attivi o esauriti. */
-const annuncioDelCarrello = id =>
-  listings.find(t => t.id === id) || myPreferiti.find(t => t.id === id);
-/* Sta in UN carrello, quello del suo venditore — aperto o da parte. */
-function inCarrello(id){
-  const l = annuncioDelCarrello(id);
-  if (!l) return false;
-  if (paccoDati && paccoDati.sellerId === l.sellerId) return setScelte.has(id);
-  const c = carrelliDaParte.get(l.sellerId);
-  return !!(c && c.scelte.has(id));
-}
-/* Toglie la riga dal carrello del suo venditore; un carrello rimasto
-   vuoto sparisce (quello aperto torna a null, come dopo svuotaPacco). */
-function togliDalCarrello(id){
-  const l = annuncioDelCarrello(id);
-  if (!l) return;
-  if (paccoDati && paccoDati.sellerId === l.sellerId) {
-    setScelte.delete(id);
-    if (!setScelte.size) { paccoDati = null; consegnaSetScelta = 'spedizione'; }
-  } else {
-    const c = carrelliDaParte.get(l.sellerId);
-    if (c) { c.scelte.delete(id); if (!c.scelte.size) carrelliDaParte.delete(l.sellerId); }
-  }
-  aggiornaCarrelloCards();
-}
-/* ---- IL CARRELLO SULLA CARD (24 set 2026, idea di due utenti) ----
-   SOLO sulle card del barattolo in vetrina (cardConCarrello, alzata
-   da renderGrid): e' il posto dove si torna a guardare le cose messe
-   da parte per comprarle. In alto a
-   SINISTRA, il gemello del barattolino di destra — stesso cerchio di
-   carta, stessa area di tocco (44px: 34 di cerchio piu' il ::after),
-   e il badge di stato (lampo, sconto, «Ne resta 1») scende sotto di
-   lui, perche' l'angolo e' di uno solo (.con-carrello nel CSS). Il
-   primo tocco AGGIUNGE e porta al carrello di quel venditore; il
-   ritocco TOGLIE. Chi non si puo' comprare — proprio, esaurito, in
-   ferie, all'asta, senza una strada fisica — ha il bottone SPENTO col
-   motivo nell'etichetta (per chi legge con la voce) e nel toast (per
-   chi tocca): mai `disabled`, che si mangerebbe il tocco e con lui
-   la spiegazione. */
-function motivoCarrelloCard(l){
-  if (myTgId && l.sellerId === myTgId) return 'è un tuo annuncio';
-  if (l.stato && l.stato !== 'attivo')
-    return esaurito(l) ? 'per ora è esaurito' : 'non è più disponibile';
-  if (inFerie(l)) return 'il negozio è in ferie';
-  if (astaE(l)) return 'è all\'asta: si aggiudica puntando';
-  if (!stradeFisiche(l).length)
-    return l.consegna === 'digitale'
-      ? 'si consegna solo come codice online: si compra da solo'
-      : 'non dichiara una consegna: si compra da solo';
-  return '';
-}
-function bottoneCarrelloCard(l){
-  if (!cardConCarrello || DEMO || VETRINA || !myTgId) return '';
-  const motivo = motivoCarrelloCard(l);
-  const dentro = !motivo && inCarrello(l.id);
-  const t = motivo ? `Non si può mettere nel carrello: ${motivo}`
-          : dentro ? 'Togli dal carrello' : 'Aggiungi al carrello';
-  return `<button type="button" class="card-carrello${dentro?' dentro':''}${motivo?' spento':''}"`
-    + ` data-id="${l.id}" onclick="event.stopPropagation();toccaCarrelloCard(${l.id})"`
-    + ` title="${esc(t)}" aria-label="${esc(t)}"${motivo?' aria-disabled="true"':''}>🛒</button>`;
-}
-function toccaCarrelloCard(id){
-  const l = annuncioDelCarrello(id);
-  if (!l) return;
-  haptic();
-  const motivo = motivoCarrelloCard(l);
-  if (motivo) { toast(`Non si può mettere nel carrello: ${motivo}`, 4000); return; }
-  if (inCarrello(id)) { togliDalCarrello(id); toast('Tolto dal carrello'); return; }
-  /* il primo tocco: entra nel carrello del SUO venditore (montato da
-     apriPacco) e si atterra li', dove sotto ci sono gli altri suoi
-     pezzi da aggiungere con un tocco. qtaScelta e' il passamano dello
-     stepper del dettaglio, che qui non c'e': un pezzo. */
-  currentListing = l; qtaScelta = 1;
-  apriPacco();
-}
-/* I bottoncini in griglia si aggiornano IN PLACE (dentro/fuori,
-   etichetta) e con loro il badge: la griglia non si ridisegna per un
-   tocco — il pattern di aggiornaJarCards. */
-function aggiornaCarrelloCards(){
-  document.querySelectorAll('.card-carrello').forEach(b => {
-    if (b.classList.contains('spento')) return;
-    const dentro = inCarrello(+b.dataset.id);
-    b.classList.toggle('dentro', dentro);
-    const t = dentro ? 'Togli dal carrello' : 'Aggiungi al carrello';
-    b.title = t; b.setAttribute('aria-label', t);
-  });
-  renderBadgeCarrelli();
-}
-/* «🛒 Carrelli (N)» in cima al barattolo: c'e' SOLO con almeno un
-   carrello pieno (la classe .pieno; la vista la decide il CSS con
-   body.solo-barattolo). */
-function renderBadgeCarrelli(){
-  const b = el('carrelliBtn'); if (!b) return;
-  const n = carrelliTutti().length;
-  el('carrelliConta').textContent = String(n);
-  b.classList.toggle('pieno', n > 0);
-}
 
 function stradeFisiche(x){
   const s = [];
@@ -23300,21 +23062,25 @@ function apriPacco(){
     return;
   }
   if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
-  /* UN CARRELLO PER VENDITORE (24 set 2026): lo stesso venditore
-     ritrova il suo carrello com'era, con l'annuncio di provenienza in
-     piu'; un ALTRO venditore non lo svuota piu' — quello che c'era va
-     da parte (montaCarrello) e si ritrova in «🛒 I tuoi carrelli». Il
-     toast del ricambio («e' di un venditore alla volta») e' morto con
-     la regola che raccontava: la spedizione resta UNA per carrello, e
-     i carrelli possono essere piu' d'uno. */
-  montaCarrello(l.sellerId, l.id);
+  if (!paccoDati || paccoDati.sellerId !== l.sellerId) {
+    /* venditore nuovo = carrello nuovo; lo stesso venditore ritrova
+       il suo carrello com'era, con l'annuncio di provenienza in piu'.
+       Se c'era una spesa in corso da un ALTRO venditore, il ricambio
+       si DICE (ago 2026): e' il modello — un venditore alla volta,
+       cosi' la spedizione e' una sola — non un errore, e in silenzio
+       sembrerebbe roba sparita. */
+    if (paccoDati && setScelte.size)
+      toast('Carrello nuovo: è di un venditore alla volta, così la spedizione è una sola');
+    setScelte = new Map();
+    consegnaSetScelta = 'spedizione';
+    paccoDati = {sellerId: l.sellerId, origineId: l.id};
+  } else paccoDati.origineId = l.id;
   /* il pezzo di partenza entra gia' nel pacco (coi pezzi scelti nel
      dettaglio), ma solo se puo': asta, solo-digitale e incompatibili
      restano fuori col loro motivo scritto in cella */
   if (!setScelte.has(l.id) && !motivoEsclusione(l)
       && setScelte.size < MAX_PACCO)
     setScelte.set(l.id, qtaScelta);
-  aggiornaCarrelloCards();   /* la card del barattolo, al ritorno */
   renderPacco();
   go('pacco');
   /* la griglia parte da cio' che il catalogo gia' sa (la striscia ha
@@ -23366,103 +23132,8 @@ function svuotaPacco(){
   el('paccoSvuotaSheet').classList.remove('open');
   if (!document.querySelector('.sheet.open'))
     el('sheetBg').classList.remove('open');
-  aggiornaCarrelloCards();
   navIndietro();
   toast('Carrello svuotato');
-}
-/* ---- «I TUOI CARRELLI» (24 set 2026) ----
-   La lista dei carrelli, uno per venditore, dal registro
-   (carrelliTutti): nome del venditore, le miniature dei pezzi, il
-   totale dei SOLI articoli nella valuta dello spettatore (la stessa
-   matematica della barra del carrello, senza sconti ne' spedizione,
-   che entrano nella cassa) e i due bottoni. Le card del barattolo
-   danno la strada per arrivarci (toccaCarrelloCard) e il badge in
-   cima al barattolo la strada per tornarci. */
-function apriCarrelli(){
-  haptic();
-  renderCarrelli();
-  go('carrelli');
-}
-function totaleCarrello(scelte){
-  let tot = 0, pezzi = 0, circa = '';
-  for (const [id, qta] of scelte){
-    const x = annuncioDelCarrello(id);
-    if (!x) continue;
-    tot += artStima(x) * qta; pezzi += qta;
-    if (x.valuta === 'eur') circa = '≈ ';
-  }
-  return {tot, pezzi, circa};
-}
-function renderCarrelli(){
-  const box = el('carrelliLista'); if (!box) return;
-  const tutti = carrelliTutti();
-  el('carrelliSub').textContent = tutti.length
-    ? `${tutti.length} venditor${tutti.length===1?'e':'i'}, una spedizione per carrello`
-    : 'uno per venditore';
-  if (!tutti.length) {
-    box.innerHTML = '<div id="carrelliVuoto">Nessun carrello aperto. Nel tuo barattolo 🫙 tocca il 🛒 sulla foto di un oggetto per cominciarne uno.</div>';
-    return;
-  }
-  const resa = (n, circa) => valutaVista === 'eur'
-    ? `≈ ${fmtEur(n * eurPerSat)} €` : `${circa}${fmt(n)} sats`;
-  box.innerHTML = tutti.map(c => {
-    const righe = [...c.scelte]
-      .map(([id, qta]) => ({l: annuncioDelCarrello(id), qta}))
-      .filter(r => r.l);
-    const primo = righe.length ? righe[0].l : null;
-    const t = totaleCarrello(c.scelte);
-    const mini = righe.map(r => {
-      const tit = esc(r.l.title) + (r.qta > 1 ? ` × ${fmt(r.qta)}` : '');
-      const foto = r.l.photos && r.l.photos[0];
-      return foto
-        ? `<img src="${esc((r.l.thumbs&&r.l.thumbs[0])||foto)}" loading="lazy" decoding="async" alt="" title="${tit}">`
-        : `<span title="${tit}">${r.l.emoji || '📦'}</span>`;
-    }).join('');
-    return `
-    <div class="order carrello-blocco" data-seller="${c.sellerId}">
-      <div class="row">
-        <b>🛒 ${primo ? esc(primo.seller) : 'venditore'}</b>
-        <span class="badge" style="background:var(--chip-bg);color:var(--ink)">${righe.length} articol${righe.length===1?'o':'i'}${t.pezzi > righe.length ? `, ${fmt(t.pezzi)} pezzi` : ''}</span>
-      </div>
-      <div class="carrello-mini">${mini}</div>
-      <div class="sub"><span class="mono" style="color:var(--sats-deep)">${resa(t.tot, t.circa)}</span> di articoli${primo && primo.username ? ` · @${esc(primo.username)}` : ''}</div>
-      <div class="carrello-azioni">
-        <button type="button" class="btn ghost" onclick="apriCarrello(${c.sellerId})">Apri</button>
-        <button type="button" class="btn orange" onclick="pagaCarrello(${c.sellerId})">Controlla e paga</button>
-      </div>
-    </div>`;
-  }).join('');
-}
-/* Il carrello di un venditore si rimonta e si riapre com'era: la
-   provenienza torna sul suo annuncio (o sul primo pezzo, se quello
-   non e' piu' nel catalogo), che e' cio' che la pagina del pacco e
-   la cassa leggono in currentListing. */
-function rimontaCarrello(sid){
-  montaCarrello(sid);
-  const orig = annuncioDelCarrello(paccoDati?.origineId)
-    || [...setScelte.keys()].map(annuncioDelCarrello).find(Boolean);
-  if (!orig || !paccoDati) {
-    toast('Questo carrello non si può riaprire: ricomincia dal barattolo');
-    renderCarrelli();
-    return null;
-  }
-  currentListing = orig; paccoDati.origineId = orig.id;
-  return orig;
-}
-function apriCarrello(sid){
-  haptic();
-  const orig = rimontaCarrello(sid);
-  if (!orig) return;
-  renderPacco();
-  go('pacco');
-  rileggiVenditore(orig).then(()=>{
-    if (el('view-pacco').classList.contains('active')) renderPacco();
-  });
-}
-function pagaCarrello(sid){
-  haptic();
-  if (!rimontaCarrello(sid)) return;
-  apriAcquistoSet();
 }
 /* Gli annunci della pagina: i soli ATTIVI del venditore del pacco,
    provenienza in testa, poi i componibili prima degli esclusi.
@@ -23945,9 +23616,6 @@ function rinfrescaViste(){
      il CONTO quando la composizione e' stata potata ci pensa
      rinfrescaSet, che e' l'unica a saperlo — vedi la' */
   if (el('view-acquisto')?.classList.contains('active')) renderAcquisto();
-  /* ...e i bottoncini del barattolo, che al ritorno devono dire chi
-     e' dentro (una riga entrata o uscita qui si vede anche la') */
-  aggiornaCarrelloCards();
 }
 /* Il tocco su «Aggiungi»: la riga entra con UN pezzo. */
 function aggiungiAlPacco(id){
