@@ -7278,6 +7278,26 @@
      seconda domanda nello stesso cassetto, staccata da un filo come il
      costo standard in «📦 Come spedisci» */
   .catalogo-esterno{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+  /* 📊 IL TUO NEGOZIO (24 set 2026): i numeri della bottega in una
+     tabella di due colonne — cosa si conta a sinistra, il numero a
+     destra — divisa per argomento. Solo i colori dei cassetti (--ink,
+     --ink-soft, --line), quindi i due temi vengono da soli. Lo stesso
+     disegno vive nel pannello dei moderatori, sotto la riga del
+     negozio (.adm-nn). */
+  .numeri-neg{font-size:14px;color:var(--ink)}
+  .numeri-neg .nn-sez{font-weight:800;margin:16px 0 2px}
+  .numeri-neg .nn-sez:first-child{margin-top:0}
+  .numeri-neg .nn-riga{display:flex;justify-content:space-between;
+    align-items:baseline;gap:12px;padding:7px 0;border-bottom:1px solid var(--line)}
+  .numeri-neg .nn-riga > span{color:var(--ink-soft);font-weight:600;min-width:0}
+  /* le stelle nell'arancio del TESTO, come in ogni riquadro `.seller`:
+     quello pieno di `.stars` sul bianco sta a 2,3:1 */
+  .numeri-neg .stars{color:var(--sats-text)}
+  .numeri-neg .nn-riga b{font-weight:800;text-align:right;
+    font-variant-numeric:tabular-nums}
+  .numeri-neg .nn-nota{font-size:13px;color:var(--ink-soft);font-weight:600;
+    line-height:1.45;margin-top:10px}
+  .adm-nn{padding:12px 14px;border-bottom:1px solid var(--line)}
   .photo-drop{
     border:2px dashed var(--field-line);border-radius:20px;background:var(--card);
     padding:26px;text-align:center;color:var(--muted);font-weight:700;font-size:14px;cursor:pointer;
@@ -10651,6 +10671,18 @@ document.getElementById('cartello')?.remove();</script>
         <button type="button" class="grp-h" onclick="toggleGrp('grpNegozio')"
                 aria-expanded="false">🏪 Impostazioni di negozio<span class="fr">▾</span></button>
         <div class="grp-b">
+      <!-- 📊 IL TUO NEGOZIO (24 set 2026): i numeri della bottega —
+           visite alla pagina, aperture dallo spazio in vetrina,
+           vendite, recensioni. Compare SOLO a chi ha almeno un
+           annuncio, e a deciderlo e' il SERVER (`mostra` di
+           /api/me/negozio/numeri). In DEMO e in vetrina sparisce, il
+           patto del wallet. Il disegno e' `tabellaNumeriNegozio`, lo
+           stesso del pannello dei moderatori. -->
+      <div class="acc" id="accNumeriNegozio" style="display:none">
+        <button class="acc-h" onclick="toggleAcc('accNumeriNegozio')"><span class="em">📊</span>Il tuo negozio <span class="conta" id="numeriNegozioConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="numeriNegozioBlocco"></div></div>
+      </div>
+
       <!-- I corrieri del negozio (ago 2026, al PLURALE dal cantiere
            «chi spedisce dichiara»): con quali reti di punti di ritiro
            spedisci. La via punto si offre COMUNQUE (secondo giro) —
@@ -14260,7 +14292,7 @@ function navRendiVista(b){
     /* senza codice (il negozio finto della DEMO) il markup e' ancora
        quello giusto: basta riaccendere la vista */
     if (!b.k) return negozioCorrente ? go('negozio') : go('esplora');
-    return apriNegozio(b.k).then(() => {
+    return ridisegnaNegozio(b.k).then(() => {
       if (!el('view-negozio').classList.contains('active')) go('esplora');
     });
   }
@@ -17320,15 +17352,24 @@ let raccontoAperto = false;
    un'apertura per quel negozio (se il suo spazio e' acceso). Viaggia
    sulla SOLA prima richiesta: le pagine dopo (caricaAltriNegozio), il
    tasto indietro, la ricarica e ogni altra strada verso il negozio non
-   lo portano — un tocco, un'apertura. */
-async function apriNegozio(chi, aperto, anteprima, da){
+   lo portano — un tocco, un'apertura.
+   `ridisegno` (24 set 2026, cantiere «📊 Il tuo negozio») dice che la
+   pagina NON si sta aprendo: la si ridisegna — il tasto indietro,
+   l'annuncio appena cambiato, il feedback rimosso dal moderatore —, e
+   passa da `ridisegnaNegozio`. Ogni altra chiamata e' un'APERTURA, e
+   la prima richiesta porta `vista=1`: il server conta una visita per
+   quel negozio (mai per chi guarda, e mai sul negozio proprio).
+   Nemmeno l'anteprima di una bozza conta: e' il moderatore che
+   controlla, non qualcuno che visita. */
+async function apriNegozio(chi, aperto, anteprima, da, ridisegno){
   if (!chi) { toast('Questo venditore non ha ancora un negozio'); return; }
   raccontoAperto = !!aperto;
   try {
     const opz = VETRINA ? {} : {headers:{'X-Tg-Init-Data': authHdr()}};
     const r = await fetch(
       `${API_BASE}/negozio/${encodeURIComponent(chi)}?limit=${LIMITE_PAGINA}`
-      + (da ? `&da=${encodeURIComponent(da)}` : ''), opz);
+      + (da ? `&da=${encodeURIComponent(da)}` : '')
+      + (ridisegno || anteprima ? '' : '&vista=1'), opz);
     if (!r.ok) throw new Error('negozio non trovato');
     const d = await r.json();
     const annunci = (d.annunci||[]).map(mapListing);
@@ -17342,6 +17383,12 @@ async function apriNegozio(chi, aperto, anteprima, da){
     if (anteprima && d.venditore) d.venditore.racconto = anteprima;
     renderNegozio(d.venditore, annunci, d.feedback||[], d.esauriti||[]);
   } catch(e) { toast('Negozio non trovato'); }
+}
+
+/* LA PAGINA DEL NEGOZIO RIDISEGNATA, non aperta: stessa strada di
+   `apriNegozio`, senza la visita (vedi il suo `ridisegno`). */
+function ridisegnaNegozio(chi){
+  return apriNegozio(chi, false, undefined, undefined, true);
 }
 
 async function caricaAltriNegozio(){
@@ -18159,7 +18206,7 @@ async function rimuoviFeedback(fid){
       const d = await r.json().catch(()=>({}));
       if (!r.ok) { toast(d.detail || 'Operazione non riuscita'); return; }
       toast('🧹 Feedback rimosso');
-      if (negozioCorrente) apriNegozio(negozioCorrente.negozio || negozioCorrente.username);
+      if (negozioCorrente) ridisegnaNegozio(negozioCorrente.negozio || negozioCorrente.username);
     }});
 }
 
@@ -30715,6 +30762,7 @@ function renderIdentita(){
   renderSlugNegozio();
   renderRicerche();
   renderPuntoPacchi();
+  renderNumeriNegozio();
   /* L'ALTRA CATENA che decide la visibilita' dei cassetti: questa
      non e' nella lista del reload dati, quindi le sezioni si
      riaggiornano da tutt'e due o su un percorso resterebbero
@@ -32325,6 +32373,128 @@ function eliminaCodice(id){
    perde, e non passano MAI da una variabile ne' da localStorage. Il
    disegno intero (`renderConnettori`) resta per entrare e uscire dalla
    modifica e dopo un salvataggio, dove il modulo cambia davvero. */
+/* ---- 📊 IL TUO NEGOZIO (24 set 2026) ------------------------------
+   I numeri della bottega nel Profilo. Se il cassetto esiste lo dice il
+   SERVER (`mostra`: almeno un annuncio), e il disegno e' di
+   `tabellaNumeriNegozio`, lo stesso che il pannello dei moderatori usa
+   per ogni negozio — chi risponde a un venditore legge la sua stessa
+   tabella. UN MINUTO DI MEMORIA: renderIdentita gira a ogni giro del
+   Profilo, e questi numeri non cambiano a quel ritmo. La memoria e'
+   di UN'identita' (`myNumeriDi`): cambiato account, si richiede. */
+let myNumeriNegozio = null, myNumeriQuando = 0, myNumeriDi = null;
+
+async function renderNumeriNegozio(){
+  const box = el('numeriNegozioBlocco');
+  if (!box) return;
+  const sez = el('accNumeriNegozio');
+  const spegni = () => {
+    if (sez) sez.style.display = 'none';
+    box.innerHTML = '';
+    aggiornaGruppiProfilo();
+  };
+  /* la guardia di casa: in DEMO e in vetrina non c'e' un negozio vero
+     da contare, e un cassetto vuoto sarebbe una porta su un muro */
+  if (DEMO || VETRINA || !myTgId) return spegni();
+  if (myNumeriDi !== myTgId) { myNumeriNegozio = null; myNumeriDi = myTgId; }
+  if (!myNumeriNegozio || Date.now() - myNumeriQuando > 60000){
+    try {
+      const r = await fetch(`${API_BASE}/me/negozio/numeri`,
+                            {headers:{'X-Tg-Init-Data':authHdr()}});
+      if (!r.ok) throw new Error(r.status);
+      myNumeriNegozio = await r.json();
+      myNumeriQuando = Date.now();
+    } catch(e) {
+      /* fail-closed sulla PRIMA lettura (senza numeri il cassetto non
+         c'e'), e sulle dopo si resta con quelli di un minuto fa */
+      if (!myNumeriNegozio) return spegni();
+    }
+  }
+  const d = myNumeriNegozio;
+  if (!d || !d.mostra) return spegni();
+  if (sez) sez.style.display = '';
+  const conta = el('numeriNegozioConta');
+  if (conta) conta.textContent = '';
+  box.innerHTML = tabellaNumeriNegozio(d, false);
+  aggiornaGruppiProfilo();
+}
+
+/* IL GIUDICE DEL DISEGNO, puro: dai numeri del server all'HTML della
+   tabella. Tutto passa da Number() o da esc(): qui dentro non entra
+   una stringa di nessuno. `perModeratore` cambia soltanto la persona
+   della nota in fondo («le tue visite» / «quelle del venditore»). */
+function tabellaNumeriNegozio(d, perModeratore){
+  d = d || {};
+  const n = x => fmt(Number(x) || 0);
+  const riga = (cosa, quanto) =>
+    `<div class="nn-riga"><span>${cosa}</span><b>${quanto}</b></div>`;
+  const data = t => t.toLocaleDateString('it-IT',
+    {day:'numeric', month:'long', year:'numeric'});
+  /* LE VISITE PARTONO DAL DEPLOY: finche' la storia e' piu' corta della
+     finestra lunga lo si dice, o «0 negli ultimi 30 giorni» il giorno
+     dopo direbbe il falso. La data arriva 'AAAA-MM-GG' e si legge a
+     mezzogiorno, lontano da ogni cambio d'ora. */
+  const dal = /^\d{4}-\d{2}-\d{2}$/.test(d.visite_dal || '')
+    ? new Date(d.visite_dal + 'T12:00:00') : null;
+  const giovane = dal && Date.now() - dal.getTime() < 30 * 86400000;
+  const visite = `<div class="nn-sez">👀 Visite al negozio</div>`
+    + riga('Ultimi 7 giorni', n(d.visite_7))
+    + riga('Ultimi 30 giorni', n(d.visite_30))
+    + (giovane
+      ? `<div class="nn-nota">Le visite si contano dal ${data(dal)}.</div>`
+      : '');
+  /* LO SPAZIO IN VETRINA solo se e' acceso — il server manda i soli
+     accesi. Con piu' di uno (oggi non succede) ognuno porta il suo
+     nome, dal catalogo di casa se c'e'. */
+  const spazi = Array.isArray(d.sponsor) ? d.sponsor : [];
+  const sponsor = spazi.length
+    ? `<div class="nn-sez">📣 Aperture da «Da scoprire»</div>`
+      + spazi.map(x => {
+          const nome = spazi.length < 2 ? '' : ` · ${esc(
+            (RACCONTI[x.slug] && RACCONTI[x.slug].titolo) || x.slug || '')}`;
+          return riga(`Ultimi 30 giorni${nome}`, n(x.aperture_30))
+            + riga('Spazio acceso fino al',
+                   data(new Date((Number(x.fino) || 0) * 1000)));
+        }).join('')
+    : '';
+  const vendite = `<div class="nn-sez">🤝 Vendite concluse</div>`
+    + riga('Ultimi 30 giorni', `${n(d.vendite_30)} · ${n(d.sats_30)} sats`)
+    + riga('Da sempre', `${n(d.vendite_tot)} · ${n(d.sats_tot)} sats`);
+  /* LE RECENSIONI COME LE LEGGE IL NEGOZIO: le stesse stelle, lo stesso
+     numero, e «da N persone» quando le persone sono meno dei voti */
+  const voti = Number(d.n_feedback) || 0, persone = Number(d.n_recensori) || 0;
+  const media = Number(d.rating) || 0;
+  const recensioni = `<div class="nn-sez">⭐ Recensioni</div>`
+    + (voti
+      ? riga('Ricevute', n(voti) + (persone && persone < voti
+          ? ` da ${n(persone)} ${persone === 1 ? 'persona' : 'persone'}` : ''))
+        + riga('Media', `<span class="stars">${'★'.repeat(Math.round(media))}</span> ${media}`)
+      : riga('Ricevute', 'ancora nessuna'));
+  const loro = perModeratore
+    ? 'Le visite del venditore al suo negozio non si contano.'
+    : 'Le tue visite al tuo negozio non si contano.';
+  return `<div class="numeri-neg">${visite}${sponsor}${vendite}${recensioni}
+    <div class="nn-nota">Numeri indicativi: le visite contano le aperture della pagina, non le persone. ${loro}</div></div>`;
+}
+
+/* I NUMERI DI UN NEGOZIO DAL PANNELLO (24 set 2026): il moderatore
+   tocca 📊 sulla riga di un utente e sotto compare la tabella che quel
+   venditore vede nel suo Profilo. Un secondo tocco la richiude. Il
+   codice arriva gia' passato dal filtro-alfabeto. */
+async function admNumeriNegozio(btn, cod){
+  const riga = btn && btn.closest('.adm-utente');
+  if (!riga) return;
+  const sotto = riga.nextElementSibling;
+  if (sotto && sotto.classList.contains('adm-nn')) { sotto.remove(); return; }
+  try {
+    const r = await fetch(`${API_BASE}/admin/negozio/${encodeURIComponent(cod)}/numeri`,
+                          {headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { toast(d.detail || 'Numeri non disponibili'); return; }
+    riga.insertAdjacentHTML('afterend',
+      `<div class="adm-nn">${tabellaNumeriNegozio(d, true)}</div>`);
+  } catch(e) { toast('Numeri non disponibili'); }
+}
+
 /* I PACCHI AL MIO PUNTO (ago 2026). La cache si azzera dopo ogni
    presa in carico: quel gesto cambia la riga sul server (timbro e
    codice), e ridisegnare dalla copia in memoria mostrerebbe lo stato
@@ -37354,7 +37524,7 @@ async function dopoRifornimento(id){
   if (attiva('dettaglio') && currentListing && currentListing.id === id) {
     openDetail(id); return;
   }
-  if (attiva('negozio') && negozioPag.chi) apriNegozio(negozioPag.chi);
+  if (attiva('negozio') && negozioPag.chi) ridisegnaNegozio(negozioPag.chi);
 }
 
 function renderMyListings(){
@@ -38285,13 +38455,18 @@ async function loadAdminStats(){
       ${registroModerazione(s.moderazione)}
       <div style="max-height:280px;overflow-y:auto;margin-top:10px;background:var(--card);border:1.5px solid var(--line);border-radius:14px">
         ${(s.lista_utenti||[]).map(u => `
-          <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px">
+          <div class="adm-utente" style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12.5px">
             <div style="min-width:0">
               <b>${esc(u.nome||'—')}</b>${u.username?` <span style="color:var(--muted)">@${esc(u.username)}</span>`:''}
               <div style="color:var(--muted);font-weight:600">dal ${u.registrato?new Date(u.registrato*1000).toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'2-digit'}):'—'}</div>
             </div>
             <div style="text-align:right;white-space:nowrap;color:var(--muted);font-weight:700">
-              🏷️ ${u.annunci_attivi} · 🤝 ${u.affari_conclusi}
+              🏷️ ${u.annunci_attivi} · 🤝 ${u.affari_conclusi}${
+                /* 📊 i numeri del suo negozio (24 set 2026): nell'onclick
+                   solo il codice passato dal filtro-alfabeto */
+                (u.negozio || '').replace(/[^A-Za-z0-9]/g, '')
+                  ? ` <button type="button" class="btn ghost" style="display:inline-flex;vertical-align:middle;width:auto;padding:4px 9px;margin-left:6px;font-size:13px" aria-label="I numeri del negozio" onclick="admNumeriNegozio(this, '${(u.negozio || '').replace(/[^A-Za-z0-9]/g, '')}')">📊</button>`
+                  : ''}
             </div>
           </div>`).join('')}
       </div>

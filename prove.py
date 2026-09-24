@@ -28925,7 +28925,11 @@ def prove_canale_bot():
                "sponsor_slug",      # chi era in vetrina (la riga di
                "sponsor_fino",      # ieri, solo letta: `/sponsor`)
                "sponsor_ordine",    # l'ordine delle card (`/sponsor`)
-               "punti_barattolo"}   # i punti di casa    (`/punti`)
+               "punti_barattolo",   # i punti di casa    (`/punti`)
+               # il giorno da cui si contano le visite ai negozi (24 set
+               # 2026, «📊 Il tuo negozio»): una data scritta una volta
+               # all'avvio, non un segreto e non una leva del denaro
+               "negozio_visite_dal"}
     chiavi = set(re.findall(r'\bimpostazione\("([a-z_]+)"', _SORGENTE))
     chiavi |= set(re.findall(r'\bscrivi_impostazione\("([a-z_]+)"',
                              _SORGENTE))
@@ -43006,8 +43010,9 @@ def prove_sponsor():
     # tortura, non la rilettura.
     # (la firma ha preso un terzo argomento a set 2026 — l'anteprima
     # delle pagine in bozza, vedi prove_racconti_bozza — e l'ancora
-    # la segue: e' la stessa funzione)
-    _an = pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima, da){")
+    # la segue: e' la stessa funzione; il quinto, `ridisegno`, e' del 24
+    # set 2026 — le visite al negozio, vedi prove_numeri_negozio)
+    _an = pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima, da, ridisegno){")
     prova("apriNegozio scrive l'apertura che riceve", True,
           "raccontoAperto = !!aperto;" in _an)
     # ⚠️ IL GIUDIZIO VIVE IN `raccontoDi` (ago 2026): il renderer non
@@ -43047,7 +43052,7 @@ async function bozzaDelVenditore(){ return null; }
 async function fetch(u){ url.push(u);
   return {ok: true, json: async () => ({annunci: [1], cursore: 'c2',
                                         venditore: {negozio: 'ab'}})}; }
-""" + pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima, da){")
+""" + pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima, da, ridisegno){")
         + "\n" + pezzo_js(mini, "async function caricaAltriNegozio(){") + """
 (async () => {
   await apriNegozio('ab12cd34', true, undefined, 'sponsor:un-tempo-per-te');
@@ -43071,13 +43076,19 @@ async function fetch(u){ url.push(u);
     if _u is None:
         prova("il banco delle aperture gira", "", (_r.stderr or "")[:300])
         return
+    # ⚠️ EMENDATA IL 24 SET 2026 (cantiere «📊 Il tuo negozio»): ogni
+    # APERTURA della pagina porta adesso anche `&vista=1`, che conta
+    # una visita per il cassetto del venditore — il tocco sulla card
+    # compreso, che e' un'apertura come le altre. La domanda di qui non
+    # cambia: lo SPAZIO lo porta il solo tocco sulla card, e la pagina
+    # dopo non porta ne' l'uno ne' l'altro (vedi prove_numeri_negozio).
     prova("il tocco sulla card porta lo spazio, codificato",
-          "/api/negozio/ab12cd34?limit=12&da=sponsor%3Aun-tempo-per-te",
-          _u[0])
+          "/api/negozio/ab12cd34?limit=12&da=sponsor%3Aun-tempo-per-te"
+          "&vista=1", _u[0])
     prova("...la pagina dopo non lo porta, o ogni scorrimento conterebbe",
           False, "da=" in _u[1])
     prova("...e le altre strade verso il negozio nemmeno",
-          ["/api/negozio/ab12cd34?limit=12"] * 2, _u[2:])
+          ["/api/negozio/ab12cd34?limit=12&vista=1"] * 2, _u[2:])
     # E L'UNICO A MANDARLO E' LA CARD DI «DA SCOPRIRE»: le altre chiamate
     # di apriNegozio non passano il quarto argomento (i Consigliati
     # compresi: lo spazio conta solo «Da scoprire», come deciso in 9821f3c)
@@ -43085,6 +43096,398 @@ async function fetch(u){ url.push(u);
             if "'sponsor:' +" in l_ and "apriNegozio(" in l_]
     prova("a mandare «sponsor:» e' la sola card sponsorizzata", 1,
           len(_chi))
+
+
+def prove_numeri_negozio():
+    """📊 IL TUO NEGOZIO (24 set 2026): il venditore vede i numeri della
+    sua bottega — visite alla pagina, aperture dallo spazio in vetrina,
+    vendite, recensioni — e il moderatore gli stessi, per ogni negozio,
+    dal pannello.
+
+    QUI SI PROVANO LE COSE CHE SI ROMPONO IN SILENZIO.
+    1) IL CONTEGGIO PER GIORNO E LE FINESTRE, sul giudice VERO e un
+       database in memoria: «7 giorni» vuol dire oggi e i sei prima, e
+       un giorno di troppo o di meno non fallisce — dice un numero
+       sbagliato a chi lo legge.
+    2) NIENTE IP, NIENTE CHI: la tabella ha tre colonne per costruzione,
+       e la rotta passa al contatore il solo codice del negozio.
+    3) LE VENDITE SONO QUELLE DEL PROFILO: il «da sempre» e' `vendite_ok`,
+       il numero che il negozio chiama «N vendite concluse».
+    4) IL CASSETTO NON C'E' SENZA ANNUNCI, e lo decide il server.
+    5) SI CONTA L'APERTURA, NON IL RIDISEGNO: il tasto indietro, la
+       pagina dopo, «Altri oggetti» e la rilettura del carrello chiedono
+       la stessa rotta, e contarli gonfierebbe il numero."""
+    import sqlite3 as _sq
+    import time
+    print("\n[📊 il tuo negozio]")
+    src = _SORGENTE
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # ---- 1. la tabella: tre colonne, nessuna che dica chi ------------
+    _i = src.index("CREATE TABLE IF NOT EXISTS negozio_visite(")
+    ddl = src[_i:src.index("\n    );", _i) + 7]
+    con = _sq.connect(":memory:")
+    con.row_factory = _sq.Row
+    con.execute(ddl)
+    colonne = [r[1] for r in con.execute("PRAGMA table_info(negozio_visite)")]
+    prova("la tabella delle visite ha tre colonne: negozio, giorno, quante",
+          ["negozio", "giorno", "quante"], colonne)
+    prova("...e nessuna che dica chi guarda (IP, tg_id, cookie)", [],
+          [c for c in colonne if c in ("ip", "tg_id", "identita", "cookie",
+                                       "utente", "venditore_id")])
+    prova("...e nello schema non c'e' un posto per l'IP", False,
+          bool(re.search(r"\bip\b", codice(ddl.replace("--", "#")),
+                         re.I)))
+    con.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, "
+                "venditore_id INTEGER, stato TEXT, prezzo_sats INTEGER, "
+                "protezione_sats INTEGER DEFAULT 0, aggiornato INTEGER)")
+    con.execute("CREATE TABLE payout_passi(id INTEGER PRIMARY KEY, "
+                "tabella TEXT, riga_id INTEGER, passo TEXT, quando INTEGER)")
+
+    impost = {"negozio_visite_dal": "2026-09-24"}
+    amb = {"time": time, "re": re, "COMMISSIONE_PERCENTO": 0,
+           "PASSO_ARRIVATO": "arrivato",
+           "impostazione": lambda k, d="": impost.get(k, d),
+           "aperture_sponsor": lambda s, g=30: {"to-the-moon": 5}.get(s, 0),
+           "sponsor_fino": lambda s, a=None: accesi.get(s, 0),
+           "sponsor_ordine": lambda: ["un-tempo-per-te", "to-the-moon"],
+           "SLUG_SPONSOR": ("to-the-moon",),
+           "RACCONTI_NEGOZI": {"un-tempo-per-te": {"negozio": "",
+                                                   "venditore_tg": 613}}}
+    accesi = {}
+    exec(re.search(r"^NEGOZIO_SPONSOR_CASA = \{[^}]*\}", src, re.M).group(),
+         amb)
+    for nome in ("netto_venditore", "_e_suo", "_giorno_indietro",
+                 "conta_visita_negozio", "sponsor_del_negozio",
+                 "numeri_negozio"):
+        exec(pezzo(nome), amb)
+
+    # ---- 2. il conteggio per giorno ---------------------------------
+    # mezzogiorno di un giorno fisso: le finestre si misurano a
+    # calendario, e un istante qualunque le renderebbe ballerine
+    ora = int(time.mktime((2026, 10, 20, 12, 0, 0, 0, 0, -1)))
+    giorno = lambda k: amb["_giorno_indietro"](ora, k)
+    prova("il giorno di oggi e' la data locale", "2026-10-20", giorno(0))
+    prova("...sei giorni fa e' il 14", "2026-10-14", giorno(6))
+    # IL CAMBIO D'ORA: il 25 ottobre 2026 in Italia la notte e' lunga
+    # 25 ore. Da mezzanotte e mezza del 26 un «meno 24 ore» nudo
+    # cadrebbe il 24; da mezzogiorno si resta nel giorno giusto.
+    _notte = int(time.mktime((2026, 10, 26, 0, 30, 0, 0, 0, -1)))
+    prova("...e attraverso il cambio d'ora un giorno indietro e' ieri",
+          "2026-10-25", amb["_giorno_indietro"](_notte, 1))
+    for _ in range(3):
+        amb["conta_visita_negozio"](con, "ab12cd34", ora)
+    amb["conta_visita_negozio"](con, "ab12cd34", ora - 86400)
+    amb["conta_visita_negozio"](con, "zz99yy88", ora)
+    amb["conta_visita_negozio"](con, "", ora)
+    prova("tre aperture oggi e una ieri: due righe, una per giorno",
+          [("ab12cd34", "2026-10-19", 1), ("ab12cd34", "2026-10-20", 3),
+           ("zz99yy88", "2026-10-20", 1)],
+          [tuple(r) for r in con.execute(
+              "SELECT negozio, giorno, quante FROM negozio_visite "
+              "ORDER BY negozio, giorno")])
+
+    # ---- 3. le finestre 7 e 30 -------------------------------------
+    con.execute("DELETE FROM negozio_visite")
+    for k, q in ((0, 1), (6, 10), (7, 100), (29, 1000), (30, 10000)):
+        con.execute("INSERT INTO negozio_visite VALUES(?,?,?)",
+                    ("ab12cd34", giorno(k), q))
+    con.execute("INSERT INTO negozio_visite VALUES(?,?,?)",
+                ("altro000", giorno(0), 77777))
+    v = {"tg_id": 222, "negozio": "ab12cd34", "vendite_ok": 4,
+         "rating": 4.5, "n_feedback": 3, "n_recensori": 2}
+    d = amb["numeri_negozio"](con, v, ora)
+    prova("7 giorni sono oggi e i sei prima: il settimo giorno fa no",
+          11, d["visite_7"])
+    prova("30 giorni sono oggi e i ventinove prima: il trentesimo no",
+          1111, d["visite_30"])
+    prova("...e le visite degli altri negozi non entrano mai", False,
+          "77777" in repr(d))
+    prova("il giorno da cui si conta arriva con i numeri", "2026-09-24",
+          d["visite_dal"])
+
+    # ---- 4. le vendite: il «da sempre» e' quello del profilo ---------
+    # 10 giorni fa col passo «arrivato»; 40 giorni fa senza linea del
+    # tempo (vale `aggiornato`); 40 giorni fa DI LINEA ma aggiornato
+    # ieri (vale la linea: un ritocco dopo non la sposta); un
+    # rimborsato e uno di un altro venditore che non contano.
+    righe = ((1, 222, "released", 10000, 0, ora - 3600),
+             (2, 222, "released", 5000, 1000, ora - 40 * 86400),
+             (3, 222, "released", 2000, 0, ora - 86400),
+             (4, 222, "refunded", 99999, 0, ora),
+             (5, 333, "released", 88888, 0, ora),
+             (6, 222, "locked", 55555, 0, ora))
+    con.executemany("INSERT INTO ordini VALUES(?,?,?,?,?,?)", righe)
+    con.execute("INSERT INTO payout_passi(tabella, riga_id, passo, quando) "
+                "VALUES('ordini', 1, 'arrivato', ?)", (ora - 10 * 86400,))
+    con.execute("INSERT INTO payout_passi(tabella, riga_id, passo, quando) "
+                "VALUES('ordini', 3, 'arrivato', ?)", (ora - 40 * 86400,))
+    con.execute("INSERT INTO payout_passi(tabella, riga_id, passo, quando) "
+                "VALUES('rimborsi_asta', 2, 'arrivato', ?)", (ora,))
+    d = amb["numeri_negozio"](con, v, ora)
+    prova("negli ultimi 30 giorni: la vendita di 10 giorni fa e basta",
+          (1, 10000), (d["vendite_30"], d["sats_30"]))
+    prova("...da sempre: il numero del profilo, e i sats di tutte e tre",
+          (4, 16000), (d["vendite_tot"], d["sats_tot"]))
+    prova("...il netto e' prezzo meno protezione, con la commissione",
+          (0.95 * 10000, 0.95 * 4000),
+          ((amb.__setitem__("COMMISSIONE_PERCENTO", 5),
+            amb["numeri_negozio"](con, v, ora))[1]["sats_30"],
+           amb["netto_venditore"](4000)))
+    amb["COMMISSIONE_PERCENTO"] = 0
+    prova("le recensioni sono le colonne del profilo",
+          (4.5, 3, 2), (d["rating"], d["n_feedback"], d["n_recensori"]))
+    _pr = codice(pezzo("numeri_negozio"))
+    prova("il «da sempre» e' vendite_ok, non un conteggio parallelo", True,
+          '"vendite_tot": int(v["vendite_ok"] or 0)' in _pr)
+
+    # ---- 5. lo spazio in vetrina: solo acceso, solo il suo -----------
+    prova("spento, lo spazio non esce", [], d["sponsor"])
+    accesi.update({"to-the-moon": ora + 86400})
+    _moon = dict(v, negozio="1b9a53e6")
+    prova("To The Mooon acceso esce sul SUO negozio, con le aperture",
+          [{"slug": "to-the-moon", "fino": ora + 86400, "aperture_30": 5}],
+          amb["numeri_negozio"](con, _moon, ora)["sponsor"])
+    prova("...e su un altro negozio no", [],
+          amb["numeri_negozio"](con, v, ora)["sponsor"])
+    accesi.update({"un-tempo-per-te": ora + 99})
+    prova("una pagina del server si lega col suo tg_id",
+          ["un-tempo-per-te"],
+          [x["slug"] for x in amb["numeri_negozio"](
+              con, dict(v, tg_id=613, negozio="qq11ww22"), ora)["sponsor"]])
+    prova("...e un negozio senza codice non ha spazi", [],
+          amb["sponsor_del_negozio"]("", 613))
+    # IL CODICE DI CASA E' LO STESSO DEL CLIENT: il server dice di chi e'
+    # lo spazio, il client lo mette nella card — due copie, in pari qui
+    _cli = {m.group(1): m.group(2) for m in re.finditer(
+        r"^  '([a-z0-9-]+)': \{\n    negozio: '([a-z0-9]*)'",
+        pezzo_js(mini, "const RACCONTI = {", "\n};\n"), re.M)}
+    prova("NEGOZIO_SPONSOR_CASA combacia col RACCONTI del client",
+          {s_: _cli.get(s_) for s_ in amb["SLUG_SPONSOR"]},
+          amb["NEGOZIO_SPONSOR_CASA"])
+    prova("...e copre tutto il catalogo di casa", True,
+          set(re.search(r'^SLUG_SPONSOR = \(([^)]*)\)', src, re.M).group(1)
+              .replace('"', "").replace(",", " ").split())
+          == set(amb["NEGOZIO_SPONSOR_CASA"]))
+
+    # ---- 6. le due porte ---------------------------------------------
+    _me = codice(pezzo("miei_numeri_negozio"))
+    prova("la porta del venditore legge il negozio di CHI BUSSA", True,
+          '(user["id"],)' in _me
+          and "codice" not in _me[:_me.index("):")])
+    prova("...e senza annunci risponde «mostra: false» e basta", True,
+          'return {"mostra": False}' in _me
+          and "SELECT 1 FROM annunci WHERE venditore_id=?" in _me)
+    _ad = codice(pezzo("numeri_negozio_admin"))
+    prova("la porta del moderatore: il 403 prima di cercare il negozio",
+          True, 0 <= _ad.find("raise HTTPException(403")
+          < _ad.find("con.execute("))
+    prova("...e il codice passa da una forma prima della query", True,
+          0 <= _ad.find("re.fullmatch(") < _ad.find("con.execute("))
+    prova("le due porte passano dallo stesso giudice", (True, True),
+          ("numeri_negozio(con, v)" in _me, "numeri_negozio(con, v)" in _ad))
+
+    # ---- 7. la rotta del negozio conta l'apertura e basta ------------
+    _neg = pezzo("negozio")
+    _firma = _neg[:_neg.index(":\n")]
+    prova("la rotta del negozio prende `vista` e non la Request", True,
+          "vista: int = 0" in _firma and "Request" not in _firma)
+    _c = codice(_neg)
+    _blocco = _c[_c.index("if vista == 1"):]
+    _blocco = _blocco[:_blocco.index("print(")]
+    prova("si conta solo con vista=1 e mai sul negozio proprio", True,
+          'if vista == 1 and not (user and user["id"] == v["tg_id"]):'
+          in _blocco)
+    prova("...e al contatore arriva il solo codice del negozio", True,
+          'conta_visita_negozio(con, v["negozio"])' in _blocco)
+    prova("...e nessun IP in giro", False,
+          any(x in _neg for x in ("client.host", "x-forwarded", "X-Forwarded",
+                                  "remote_addr")))
+    _cv = codice(pezzo("conta_visita_negozio"))
+    prova("il contatore scrive solo negozio, giorno e quante", True,
+          "INSERT INTO negozio_visite(negozio, giorno, quante)" in _cv)
+    prova("la data di partenza si scrive una volta sola", True,
+          "INSERT OR IGNORE INTO impostazioni(chiave, valore) "
+          "\"\n                \"VALUES('negozio_visite_dal'" in src)
+    prova("la fusione porta le visite del negozio Nostr", True,
+          "SELECT ?, giorno, quante FROM negozio_visite" in pezzo(
+              "esegui_fusione"))
+
+    # ---- 8. il client: il cassetto, il posto, la catena --------------
+    _gi = mini.index('<div class="grp" id="grpNegozio">')
+    _ac = mini.find('<div class="acc" id="accNumeriNegozio" style="display:none">')
+    _sp = mini.index('id="accSpedizioniere"')
+    prova("il cassetto sta in «Impostazioni di negozio», per primo, spento",
+          True, _gi < _ac < _sp)
+    prova("...col titolo chiesto", True,
+          '<span class="em">📊</span>Il tuo negozio' in mini[_ac:_sp])
+    _ri = pezzo_js(mini, "function renderIdentita(){", "\n}\n")
+    prova("la catena del Profilo lo disegna", True,
+          "renderNumeriNegozio();" in _ri)
+
+    # ---- 9. il banco node: cassetto, tabella, aperture ----------------
+    import shutil as _sh, subprocess as _spr, tempfile as _tf
+    _node = _sh.which("node")
+    if not _node:
+        salta("il cassetto girato: serve node")
+        return
+    _fmt = re.search(r"^const fmt = n =>.*$", mini, re.M).group()
+    _js = """
+let DEMO = false, VETRINA = false, myTgId = 222, myNegozio = '';
+let raccontoAperto = false, negozioPag = {}, negozioCorrente = null;
+const API_BASE = '/api', LIMITE_PAGINA = 12, chiesti = [];
+let risposta = {};
+const nodi = {};
+function el(id){ return nodi[id] || (nodi[id] = {id, style: {display: 'none'},
+  innerHTML: '', textContent: '', insertAdjacentHTML(){}}); }
+const authHdr = () => 'x', toast = () => {}, mapListing = x => x;
+const inCatalogo = () => {}, renderNegozio = () => {}, armaViste = () => {};
+const cardHTML = () => '';
+let gruppi = 0; function aggiornaGruppiProfilo(){ gruppi++; }
+async function bozzaDelVenditore(){ return null; }
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const RACCONTI = {'to-the-moon': {titolo: 'To The Mooon!'}};
+async function fetch(u){ chiesti.push(u);
+  if (u.startsWith('/api/negozio/'))
+    return {ok: true, json: async () => ({annunci: [1], cursore: 'c2',
+                                          venditore: {negozio: 'ab'}})};
+  if (risposta === 'giu') throw new Error('rete');
+  return {ok: true, json: async () => risposta}; }
+""" + _fmt + "\n" + re.search(
+        r"^let myNumeriNegozio = .*$", mini, re.M).group() + "\n" + pezzo_js(
+        mini, "async function renderNumeriNegozio(){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function tabellaNumeriNegozio(d, perModeratore){",
+                   "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima, da, ridisegno){") \
+        + "\n" + pezzo_js(mini, "function ridisegnaNegozio(chi){", "\n}\n") \
+        + "\n}\n" + pezzo_js(mini, "async function caricaAltriNegozio(){") \
+        + """
+const pieno = {mostra: true, negozio: 'ab12cd34', visite_7: 12,
+  visite_30: 12345, visite_dal: '2020-01-01', sponsor: [],
+  vendite_30: 2, sats_30: 21000, vendite_tot: 14, sats_tot: 150000,
+  rating: 4.8, n_feedback: 12, n_recensori: 9};
+(async () => {
+  const out = {};
+  risposta = {mostra: false};
+  await renderNumeriNegozio();
+  out.senza = [el('accNumeriNegozio').style.display,
+               el('numeriNegozioBlocco').innerHTML, chiesti.length];
+  myTgId = 223;              // un altro account: si richiede subito
+  risposta = pieno;
+  await renderNumeriNegozio();
+  out.con = [el('accNumeriNegozio').style.display,
+             el('numeriNegozioBlocco').innerHTML, chiesti.length];
+  await renderNumeriNegozio();
+  out.memoria = chiesti.length;
+  DEMO = true; await renderNumeriNegozio();
+  out.demo = [el('accNumeriNegozio').style.display, chiesti.length];
+  DEMO = false; myNumeriNegozio = null; risposta = 'giu';
+  await renderNumeriNegozio();
+  out.giu = el('accNumeriNegozio').style.display;
+  out.mod = tabellaNumeriNegozio(pieno, true);
+  out.vuota = tabellaNumeriNegozio({mostra: true, visite_dal:
+    new Date(Date.now() - 86400000).toISOString().slice(0, 10)}, false);
+  out.spazio = tabellaNumeriNegozio(Object.assign({}, pieno, {sponsor:
+    [{slug: 'to-the-moon', fino: 1792000000, aperture_30: 7}]}), false);
+  out.due = tabellaNumeriNegozio(Object.assign({}, pieno, {sponsor:
+    [{slug: 'to-the-moon', fino: 1792000000, aperture_30: 7},
+     {slug: '<b>x', fino: 1792000000, aperture_30: 1}]}), false);
+  chiesti.length = 0;
+  await apriNegozio('ab12cd34');
+  await caricaAltriNegozio();
+  await apriNegozio('ab12cd34', true, undefined, 'sponsor:to-the-moon');
+  await ridisegnaNegozio('ab12cd34');
+  await apriNegozio('ab12cd34', true, {titolo: 'bozza'});
+  out.url = chiesti.slice();
+  console.log(JSON.stringify(out));
+})();
+"""
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8") as _f:
+        _f.write(_js)
+        _p = _f.name
+    _r = _spr.run([_node, _p], capture_output=True, text=True,
+                  encoding="utf-8")
+    os.unlink(_p)
+    try:
+        o = json.loads((_r.stdout or "").strip().splitlines()[-1])
+    except Exception:
+        prova("il banco del cassetto gira", "", (_r.stderr or "")[:400])
+        return
+    prova("senza annunci il cassetto resta spento e vuoto", ["none", "", 1],
+          o["senza"])
+    prova("...con: acceso, e UNA domanda in piu' (l'account e' cambiato)",
+          ["", True, 2], [o["con"][0], "numeri-neg" in o["con"][1],
+                          o["con"][2]])
+    _h = o["con"][1]
+    prova("le visite: 7 e 30 giorni, coi numeri del server", True,
+          "<span>Ultimi 7 giorni</span><b>12</b>" in _h
+          and "<span>Ultimi 30 giorni</span><b>12 345</b>" in _h)
+    prova("le vendite: 30 giorni e da sempre, coi sats", True,
+          "<b>2 · 21 000 sats</b>" in _h
+          and "<span>Da sempre</span><b>14 · 150 000 sats</b>" in _h)
+    prova("le recensioni come il negozio: quante, da quante persone, media",
+          True, "<b>12 da 9 persone</b>" in _h and "★★★★★</span> 4.8" in _h)
+    prova("la riga onesta c'e'", True,
+          "Numeri indicativi: le visite contano le aperture della pagina, "
+          "non le persone." in _h)
+    prova("...e dice che le proprie visite non contano", True,
+          "Le tue visite al tuo negozio non si contano." in _h)
+    prova("senza spazio acceso, niente riga di «Da scoprire»", False,
+          "Da scoprire" in _h)
+    prova("storia di un anno: niente «si contano dal»", False,
+          "si contano dal" in _h)
+    prova("un minuto di memoria: il secondo giro non richiede", 2,
+          o["memoria"])
+    prova("in DEMO il cassetto sparisce senza chiedere", ["none", 2],
+          o["demo"])
+    prova("rete giu' alla prima lettura: il cassetto resta spento", "none",
+          o["giu"])
+    prova("al moderatore la nota parla del venditore", True,
+          "Le visite del venditore al suo negozio non si contano." in o["mod"])
+    prova("il giorno dopo il deploy si dice da quando si conta", True,
+          "Le visite si contano dal" in o["vuota"]
+          and "<b>0</b>" in o["vuota"] and "ancora nessuna" in o["vuota"])
+    prova("lo spazio acceso: aperture e scadenza", True,
+          "📣 Aperture da «Da scoprire»" in o["spazio"]
+          and "<b>7</b>" in o["spazio"]
+          and "Spazio acceso fino al" in o["spazio"]
+          and "2026" in o["spazio"])
+    prova("...con due spazi ognuno ha il suo nome, passato da esc()", True,
+          "· To The Mooon!" in o["due"] and "&lt;b&gt;x" in o["due"]
+          and "<b>x" not in o["due"])
+    prova("aprire il negozio conta una visita; la pagina dopo, il "
+          "ridisegno e l'anteprima no",
+          ["/api/negozio/ab12cd34?limit=12&vista=1",
+           "/api/negozio/ab12cd34?limit=12&cursore=c2",
+           "/api/negozio/ab12cd34?limit=12&da=sponsor%3Ato-the-moon&vista=1",
+           "/api/negozio/ab12cd34?limit=12",
+           "/api/negozio/ab12cd34?limit=12"],
+          o["url"])
+
+    # ---- 10. i ridisegni sono tre, e passano dalla loro porta ---------
+    _rid = [l_.strip() for l_ in mini.split("\n")
+            if "ridisegnaNegozio(" in l_
+            and "function ridisegnaNegozio" not in l_]
+    prova("i tre ridisegni passano da ridisegnaNegozio", 3, len(_rid))
+    prova("...il tasto indietro fra loro", True,
+          any("ridisegnaNegozio(b.k)" in l_ for l_ in _rid))
+    prova("...e «Altri oggetti» e il carrello non portano vista=1", True,
+          all("vista" not in l_ for l_ in mini.split("\n")
+              if "/negozio/${encodeURIComponent(chi)}?limit=${ALTRI_PAGINA}"
+              in l_ or "?limit=100" in l_))
+
+    # ---- 11. il pannello: 📊 sulla riga di ogni negozio ----------------
+    prova("il pannello ha il 📊 sulla riga, col codice filtrato", True,
+          "admNumeriNegozio(this, '${(u.negozio || '').replace(/[^A-Za-z0-9]/g, '')}')"
+          in mini and 'class="adm-utente"' in mini)
+    _adm = pezzo_js(mini, "async function admNumeriNegozio(btn, cod){",
+                    "\n}\n")
+    prova("...che chiede la porta dei moderatori e disegna la stessa "
+          "tabella", True,
+          "/admin/negozio/${encodeURIComponent(cod)}/numeri" in _adm
+          and "tabellaNumeriNegozio(d, true)" in _adm)
 
 
 def prove_racconto_girato():
@@ -43575,7 +43978,7 @@ def prove_racconti_bozza():
     # SUL SUO NEGOZIO la bozza la vede sempre: se il negozio aperto e'
     # il suo, prima di disegnare si chiede alla porta sua — e solo le
     # BOZZE, che una pubblicata la porta gia' il negozio a tutti
-    _an = pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima, da){")
+    _an = pezzo_js(mini, "async function apriNegozio(chi, aperto, anteprima, da, ridisegno){")
     prova("sul suo negozio il venditore chiede la sua bozza", True,
           "d.venditore.negozio === myNegozio" in _an
           and "anteprima = await bozzaDelVenditore(myNegozio);" in _an)
@@ -98227,6 +98630,7 @@ def main():
         prove_strisce_web,
               prove_scoprire_p2p,
               prove_sponsor,
+              prove_numeri_negozio,
               prove_racconto_girato,
               prove_racconti_bozza,
               prove_consigliati,

@@ -94,6 +94,7 @@ jobs:
              spoglia_foto_esistenti.py collaudo_verita_lnd.py
              giudice_deploy.py collaudi_ci.py
              racconti.py collaudo_racconti_bozza.py collaudo_sponsor.py
+             collaudo_numeri_negozio.py
              collaudo_letture_relay.py
              prepara_logo_consigliato.py
              collaudo_spedizione_standard.py
@@ -167,6 +168,7 @@ jobs:
              collaudo_paycode_riconosciuto
              collaudo_racconti_bozza
              collaudo_sponsor
+             collaudo_numeri_negozio
              collaudo_inviti
              collaudo_letture_relay
              collaudo_spedizione_standard

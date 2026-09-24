@@ -1844,6 +1844,17 @@ def imposta_canale(valore: str) -> str:
 # le scrive piu'.
 SLUG_SPONSOR = ("to-the-moon",)
 
+# IL NEGOZIO DI OGNI SPAZIO DEL CATALOGO DI CASA (24 set 2026, cantiere
+# «📊 Il tuo negozio»). Il client lo sa da sempre (`RACCONTI`); il server
+# non gli serviva, perche' la busta porta lo slug e basta. Adesso il
+# venditore legge le aperture del SUO spazio, e a dire di chi e' lo spazio
+# dev'essere il server: un codice arrivato dal client lo scriverebbe
+# chiunque. E' il CODICE negozio — pubblico e stabile, nessun tg_id nel
+# repo (il patto dei punti di ritiro) — e a tenerlo in pari con
+# `RACCONTI` del client c'e' prove_numeri_negozio. Le pagine del server
+# (`racconti.py`) non passano di qui: il loro legame e' gia' nel catalogo.
+NEGOZIO_SPONSOR_CASA = {"to-the-moon": "1b9a53e6"}
+
 _SPONSOR = None     # None = mai letto; {"fino": {slug: fino}, "ordine": [...]}
 
 
@@ -5409,6 +5420,21 @@ def init_db():
         quante INTEGER DEFAULT 0,
         PRIMARY KEY (slug, giorno)
     );
+    CREATE TABLE IF NOT EXISTS negozio_visite(
+        -- QUANTE volte si apre la pagina di un negozio, MAI CHI (24 set
+        -- 2026, cantiere «📊 Il tuo negozio»): la sorella di
+        -- sponsor_aperture, con la stessa regola. Un numero per negozio
+        -- e per giorno, e nient'altro: niente tg_id di chi guarda,
+        -- niente IP, niente cookie — le colonne non ci sono, quindi
+        -- nessuna query futura potra' scriverli per distrazione.
+        -- IL NEGOZIO E' IL CODICE e non il tg_id del venditore: si
+        -- conta una bottega, non una persona (il patto di
+        -- `ordini.punto_preso_da`).
+        negozio TEXT NOT NULL,
+        giorno TEXT NOT NULL,            -- 'AAAA-MM-GG' locale
+        quante INTEGER DEFAULT 0,
+        PRIMARY KEY (negozio, giorno)
+    );
     CREATE TABLE IF NOT EXISTS viste_annuncio(
         -- Il DEDUPLICATORE delle visualizzazioni (set 2026): una riga
         -- per (annuncio, identita'), e serve SOLO a sapere se questa
@@ -5710,6 +5736,13 @@ def init_db():
         venditore_percento REAL DEFAULT 2.5
     );
     """)
+    # IL GIORNO DA CUI SI CONTANO LE VISITE (24 set 2026): il primo
+    # avvio col cantiere lo scrive, e nessuno lo riscrive (OR IGNORE).
+    # Serve al cassetto per dire «contate dal …» finche' le finestre
+    # sono piu' lunghe della storia: un «0 visite negli ultimi 30
+    # giorni» il giorno dopo il deploy direbbe il falso.
+    con.execute("INSERT OR IGNORE INTO impostazioni(chiave, valore) "
+                "VALUES('negozio_visite_dal', date('now', 'localtime'))")
     # Migrazione per database creati prima dell'introduzione degli
     # incassi automatici: aggiunge la colonna se manca.
     try:
@@ -13765,6 +13798,21 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
         # esattamente la verita' da guardare.
         con.execute("UPDATE pagamenti SET tg_id=? WHERE tg_id=?",
                     (id_telegram, id_nostr))
+        # LE VISITE DEL NEGOZIO NOSTR (24 set 2026) si sommano a quelle
+        # del negozio che resta: il codice che sopravvive e' quello di
+        # Telegram, e quello Nostr muore con la sua riga qui sotto.
+        # Giorno per giorno, perche' un giorno puo' averle tutt'e due.
+        if n and p and n["negozio"] and p["negozio"] \
+                and n["negozio"] != p["negozio"]:
+            con.execute(
+                "INSERT INTO negozio_visite(negozio, giorno, quante) "
+                "SELECT ?, giorno, quante FROM negozio_visite "
+                "WHERE negozio=? AND true "
+                "ON CONFLICT(negozio, giorno) DO UPDATE "
+                "SET quante=quante+excluded.quante",
+                (p["negozio"], n["negozio"]))
+            con.execute("DELETE FROM negozio_visite WHERE negozio=?",
+                        (n["negozio"],))
         _sbl_n = (n["banner_sbloccato_il"] or 0) if n else 0
         _sbl_p = (p["banner_sbloccato_il"] or 0) if p else 0
         if _sbl_n and (not _sbl_p or _sbl_n < _sbl_p):
@@ -20529,8 +20577,179 @@ def barattolo_pubblico(token: str):
             "quanti": len(righe)}
 
 
+def _giorno_indietro(adesso: int, giorni: int) -> str:
+    """Il giorno di calendario (locale, 'AAAA-MM-GG') di N giorni fa.
+    SI PARTE DA MEZZOGIORNO e non dall'istante: togliere 24 ore a
+    mezzanotte e mezza nel giorno del cambio d'ora cade due giorni
+    indietro, da mezzogiorno non ci arriva mai."""
+    t = time.localtime(adesso)
+    mezzodi = time.mktime((t.tm_year, t.tm_mon, t.tm_mday,
+                           12, 0, 0, 0, 0, -1))
+    return time.strftime("%Y-%m-%d", time.localtime(mezzodi - giorni * 86400))
+
+
+def conta_visita_negozio(con, codice: str, adesso: int | None = None):
+    """UNA APERTURA DELLA PAGINA DI UN NEGOZIO: +1 sul suo giorno. Non
+    sa chi guarda e non lo riceve nemmeno — solo il codice del negozio.
+    NON COMMITTA e non protegge: la connessione e' di chi chiama, e il
+    fail-open e' della rotta (un contatore non rompe una pagina)."""
+    if not codice:
+        return
+    giorno = _giorno_indietro(
+        int(adesso if adesso is not None else time.time()), 0)
+    con.execute("INSERT INTO negozio_visite(negozio, giorno, quante) "
+                "VALUES(?,?,1) ON CONFLICT(negozio, giorno) DO UPDATE "
+                "SET quante=quante+1", (codice, giorno))
+
+
+def sponsor_del_negozio(codice: str, tg_id=None) -> list:
+    """GLI SPAZI IN VETRINA DI UN NEGOZIO, accesi o no, nell'ordine
+    delle card. Il catalogo di casa col suo codice
+    (`NEGOZIO_SPONSOR_CASA`), le pagine del server col loro legame
+    (`_e_suo`: il codice, o il tg_id quando il catalogo non ha il
+    codice). Fail-closed: un negozio senza codice non ha spazi."""
+    if not codice:
+        return []
+    fuori = []
+    for s in sponsor_ordine():
+        if s in SLUG_SPONSOR:
+            if NEGOZIO_SPONSOR_CASA.get(s) == codice:
+                fuori.append(s)
+        elif s in RACCONTI_NEGOZI and _e_suo(RACCONTI_NEGOZI[s], codice,
+                                              tg_id):
+            fuori.append(s)
+    return fuori
+
+
+def numeri_negozio(con, v, adesso: int | None = None) -> dict:
+    """I NUMERI DEL CASSETTO «📊 Il tuo negozio» (24 set 2026), e UN
+    giudice per le due porte che li mostrano: il venditore sul SUO
+    negozio (`/api/me/negozio/numeri`) e il moderatore su qualunque
+    negozio dal pannello (`/api/admin/negozio/{codice}/numeri`). Cosi'
+    quel che il moderatore legge rispondendo a un venditore e' lo
+    stesso numero che il venditore ha davanti.
+    `v` e' la riga di `utenti` del NEGOZIO (tg_id, negozio, vendite_ok,
+    rating, n_feedback, n_recensori). Legge e basta.
+
+    LE VISITE: le righe di `negozio_visite`, negli ultimi 7 e 30 giorni
+    CONTANDO OGGI (7 = oggi e i sei prima), come su un calendario.
+    LE VENDITE: il «da sempre» e' `vendite_ok`, cioe' LO STESSO numero
+    che il profilo pubblico chiama «N vendite concluse» — non un
+    conteggio parallelo che un giorno direbbe un'altra cifra. La
+    finestra dei 30 giorni conta gli ordini `released` del negozio per
+    il momento in cui si sono CHIUSI: il passo «arrivato» della linea
+    del tempo, e per gli ordini chiusi prima che la linea esistesse
+    `aggiornato`, che il rilascio scrive.
+    I SATS sono il netto del venditore con la regola del pagamento
+    (`netto_venditore` su prezzo meno protezione). IMPERFEZIONE
+    DICHIARATA: la commissione e' quella di OGGI, perche' un ordine
+    non si porta la sua — il giorno che COMMISSIONE_PERCENTO cambia, il
+    netto degli ordini di prima si ricalcola con la nuova.
+    LO SPAZIO IN VETRINA esce solo ACCESO, con la sua scadenza e le
+    aperture degli ultimi 30 giorni: lo stesso numero di `/sponsor`.
+    LE RECENSIONI sono le colonne del profilo, quelle che il negozio
+    mostra a tutti."""
+    adesso = int(adesso if adesso is not None else time.time())
+    cod = v["negozio"] or ""
+
+    def visite(giorni):
+        return int(con.execute(
+            "SELECT COALESCE(SUM(quante), 0) AS n FROM negozio_visite "
+            "WHERE negozio=? AND giorno>=?",
+            (cod, _giorno_indietro(adesso, giorni - 1))).fetchone()["n"])
+
+    righe = con.execute(
+        "SELECT o.prezzo_sats, o.protezione_sats, COALESCE((SELECT "
+        "MAX(p.quando) FROM payout_passi p WHERE p.tabella='ordini' "
+        "AND p.riga_id=o.id AND p.passo=?), o.aggiornato, 0) AS chiuso "
+        "FROM ordini o WHERE o.venditore_id=? AND o.stato='released'",
+        (PASSO_ARRIVATO, v["tg_id"])).fetchall()
+    dal30 = adesso - 30 * 86400
+    netto = [(netto_venditore((r["prezzo_sats"] or 0)
+                              - (r["protezione_sats"] or 0)),
+              int(r["chiuso"] or 0)) for r in righe]
+    spazi = []
+    for s in sponsor_del_negozio(cod, v["tg_id"]):
+        fino = sponsor_fino(s, adesso)
+        if fino:
+            spazi.append({"slug": s, "fino": fino,
+                          "aperture_30": aperture_sponsor(s)})
+    return {
+        "negozio": cod,
+        "visite_7": visite(7), "visite_30": visite(30),
+        "visite_dal": impostazione("negozio_visite_dal", ""),
+        "sponsor": spazi,
+        "vendite_30": sum(1 for _, q in netto if q >= dal30),
+        "sats_30": sum(x for x, q in netto if q >= dal30),
+        "vendite_tot": int(v["vendite_ok"] or 0),
+        "sats_tot": sum(x for x, _ in netto),
+        "rating": v["rating"] or 0,
+        "n_feedback": int(v["n_feedback"] or 0),
+        "n_recensori": int(v["n_recensori"] or 0),
+    }
+
+
+_CAMPI_NUMERI = ("SELECT tg_id, negozio, nome, vendite_ok, rating, "
+                 "n_feedback, n_recensori FROM utenti ")
+
+
+@app.get("/api/me/negozio/numeri")
+def miei_numeri_negozio(x_tg_init_data: str = Header(""),
+                        barattolo_sessione: str = Cookie("")):
+    """LA PORTA DEL VENDITORE: i numeri del SUO negozio, e di nessun
+    altro — il negozio si legge per il tg_id di chi bussa, mai da un
+    parametro.
+    IL CASSETTO ESISTE SOLO PER CHI HA ALMENO UN ANNUNCIO, in qualunque
+    stato: chi ha venduto tutto e ritirato il resto ha ancora un negozio
+    con una storia da leggere; chi non ne ha mai pubblicato uno non ha
+    niente da contare. Senza, `{"mostra": false}` e basta — la domanda
+    e' «cosa c'e' di mio?», e a chi non ha niente la risposta e' niente.
+    L'anonimo prende il 401 di `verifica_utente`, come in tutte le porte
+    `/api/me`."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    con = db()
+    try:
+        v = con.execute(_CAMPI_NUMERI + "WHERE tg_id=?",
+                        (user["id"],)).fetchone()
+        ha = v and con.execute(
+            "SELECT 1 FROM annunci WHERE venditore_id=? LIMIT 1",
+            (user["id"],)).fetchone()
+        if not ha:
+            return {"mostra": False}
+        return dict(numeri_negozio(con, v), mostra=True)
+    finally:
+        con.close()
+
+
+@app.get("/api/admin/negozio/{codice}/numeri")
+def numeri_negozio_admin(codice: str, x_tg_init_data: str = Header(""),
+                         barattolo_sessione: str = Cookie("")):
+    """SOLO ADMIN: lo stesso cassetto per QUALUNQUE negozio, dal pannello
+    — serve a rispondere a un venditore guardando i suoi stessi numeri.
+    Il 403 sta PRIMA di cercare il codice: a chi non e' moderatore non
+    si dice nemmeno se il negozio esiste. Qui l'annuncio non si chiede:
+    il moderatore guarda anche un negozio vuoto, e il numero giusto e'
+    lo zero."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not e_admin(user["id"]):
+        raise HTTPException(403, "Riservato ai moderatori")
+    if not re.fullmatch(r"[A-Za-z0-9]{1,32}", codice or ""):
+        raise HTTPException(404, "Negozio non trovato")
+    con = db()
+    try:
+        v = con.execute(_CAMPI_NUMERI + "WHERE negozio=? LIMIT 1",
+                        (codice,)).fetchone()
+        if not v:
+            raise HTTPException(404, "Negozio non trovato")
+        return dict(numeri_negozio(con, v), mostra=True,
+                    nome=v["nome"] or "")
+    finally:
+        con.close()
+
+
 @app.get("/api/negozio/{chi}")
 def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
+            vista: int = 0,
             x_tg_init_data: str = Header(""),
             barattolo_sessione: str = Cookie("")):
     """La pagina-negozio di un venditore: profilo pubblico + i suoi
@@ -20611,6 +20830,26 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
                 con.commit()
             except Exception as e:
                 print(f"[!] Aperture sponsor: {e}")
+    # LE VISITE AL NEGOZIO (24 set 2026, cantiere «📊 Il tuo negozio»):
+    # quante volte si APRE questa pagina, per il cassetto del venditore.
+    # Si conta SOLO con `vista=1`, che il client manda dalla prima
+    # richiesta di `apriNegozio` e da nessun'altra strada: le pagine
+    # dopo, «Altri oggetti del venditore», la rilettura del carrello,
+    # il tasto indietro e i ridisegni chiedono questa stessa rotta e un
+    # conteggio sul solo arrivo li conterebbe come visite.
+    # IL VENDITORE SUL SUO NEGOZIO NON CONTA: guardarsi la vetrina non e'
+    # una visita, e gonfierebbe proprio il numero che legge. Qui `user`
+    # si guarda per quel confronto e basta — nella riga entra il solo
+    # codice del negozio.
+    # Stessa imperfezione dichiarata del `da` qui sopra: `vista` lo
+    # scrive il client, e chi lo manda a mano gonfia il numero. E' un
+    # termometro, non un dato su cui si decide del denaro.
+    if vista == 1 and not (user and user["id"] == v["tg_id"]):
+        try:
+            conta_visita_negozio(con, v["negozio"])
+            con.commit()
+        except Exception as e:
+            print(f"[!] Visite negozio: {e}")
     # venditore_id in piu' solo agli autenticati ("questo annuncio e' tuo")
     campi = CAMPI_VETRINA + (", a.venditore_id" if user else "")
     dove = "a.venditore_id=? AND a.stato='attivo'"
