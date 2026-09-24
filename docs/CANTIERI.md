@@ -29966,3 +29966,50 @@ e riappare se lo si lascia prima; il + fermo in fondo, pulito sopra, che
 diventa il bottone blu senza passare dal rosso — trascinato e col tocco,
 anche il primo dopo l'avvio; la chiusura con la freccia e col gesto
 indietro dell'app, senza niente in volo.
+
+## Il telaio mangiato dal + (24 set 2026)
+
+Sesto giro sul trascino della capsula, ritocco di Andrea a 72d834c.
+Worktree da `origin/main`, commit firmato.
+
+**COSA C'È.** Il telaio di sopra non sfuma piu': se lo MANGIA il +.
+In ogni istante il contorno esiste solo dall'equatore del + in giu', a
+piena opacita', e sopra non c'e' niente; tornando su — rilasciato fuori
+dal logo — la capsula si srotola dietro di lui allo stesso modo. Tutto il
+resto del quinto giro e' com'era.
+
+**LA SCELTA, ed e' una sola.** Andrea chiedeva un ritaglio che segue il
++ — clip-path o maschera —, non l'opacita', per restare sul compositor.
+Il ritaglio c'era gia': il TELAIO della tendina, che la taglia
+all'equatore e scende col + (una transform), col filo della tendina
+dentro. Quindi il binario del quarto giro, che disegnava il contorno
+intero ed era lui a sfumare, e' uscito del tutto — markup, regole, JS —,
+e sotto l'equatore il contorno che resta e' quello che c'era gia'. Un
+clip-path che corre invece si ridipinge a ogni fotogramma: e' la lezione
+della tendina del terzo giro, e il motivo per cui non l'ho scritto. Della
+classe `p2p-binario` resta il gesto in corso, che toglie alla tendina il
+suo .1s al ritorno.
+
+**PROVATO.** La suite intera, severa e senza config: 14.680 verdi e 0
+rosse; i 15 collaudi della CI verdi, in gabbia. Le prove chiedono che il
+binario non ci sia piu'
+(ne' elemento, ne' regola, ne' JS), che nessuna regola dia alla capsula
+un'opacita' intermedia, che il contorno viva nel telaio senza clip-path
+ne' maschere, e alla cascata che il telaio segua il dito senza corsa e
+torni con la corsa della barra; il banco del trascino annota ogni
+scrittura di stile sulla capsula che non sia una transform (nessuna) e
+controlla in ogni fotogramma che il taglio sia sceso quanto il +.
+**TORTURA 30/30** su una copia, tutte uccise al primo giro. DAL VIVO col
+dito vero a 320/375/430 nei due temi: col +
+tenuto a 15, 30, 45 e 55px, 0 pixel di telaio sopra l'equatore e un
+contorno IDENTICO a quello a riposo sotto (col + nascosto nei due
+scatti); un registratore a ogni fotogramma su un trascino lento giu' e
+su, col rilascio fuori e il ritorno, e sul tocco: il taglio sempre
+sull'equatore (scarto massimo 0,01px) e nessuna opacita' diversa da 1.
+Il banco e' stato provato prima sui difetti: un contorno a meta'
+opacita' rimesso a mano sopra (fino a 4.033 pixel) e il filo della
+tendina a meta' sotto (fino a 3.920 pixel, e il registratore vede 0,5).
+
+**DA GUARDARE SUL TELEFONO.** Il + che scende e si mangia la capsula
+senza lasciare niente sopra di se', e lasciato prima del logo la
+capsula che gli si srotola dietro.

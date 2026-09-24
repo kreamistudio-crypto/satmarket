@@ -25049,20 +25049,23 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   misurata sulla tendina, ferma per costruzione), e da meta' corsa in giu'
   e' «sopra» (`sopraTendinaP2P`): lasciato li' il + si FERMA in fondo e
   diventa il bottone blu (`lasciaSulLogoP2P`, quinto giro), prima torna a
-  casa. Sopra di lui resta il BINARIO VUOTO: `#navBinario` e' il contorno
-  della capsula intera, vuoto dentro, acceso dal gesto (`p2p-binario`), e
-  dal quinto giro sfuma man mano che il + scende (`.bin-su`, 1 −
-  corsa/fondo, scritta dal dito): col + in fondo sopra il cerchio c'e' solo
-  la barra, e sotto il suo equatore il filo e' quello della tendina, dentro
-  il telaio che la taglia; il blu si ritira sotto il suo equatore perche' il
-  telaio scende con lui e la tendina risale dello stesso tanto
-  (`guidaCursoreP2P`, tre transform, che al ritorno se ne vanno insieme:
-  `rientraCursoreP2P`). Il gesto (IL TRASCINO, accanto ad
+  casa. SCENDENDO SI MANGIA LA CAPSULA (sesto giro, 24 set 2026): il
+  contorno esiste solo dall'equatore del + in giu', a piena opacita', e
+  sopra di lui non c'e' niente — ne' blu ne' filo —; tornando su la
+  capsula si srotola dietro di lui. Il ritaglio e' il TELAIO della
+  tendina, che la taglia all'equatore e scende col + mentre la tendina
+  risale dello stesso tanto (`guidaCursoreP2P`, tre transform, che al
+  ritorno se ne vanno insieme: `rientraCursoreP2P`), e il filo della
+  tendina ci sta dentro: solo transform, quindi compositor, e nessuna
+  opacita' scritta dal dito. Il binario del quarto giro (`#navBinario`, il
+  contorno intero, vuoto dentro) e la sua dissolvenza del quinto non ci
+  sono piu'; della sua classe resta `p2p-binario`, il gesto in corso, che
+  toglie alla tendina il suo .1s al ritorno. Il gesto (IL TRASCINO, accanto ad
   `apriBarattozonP2P`) vive solo dove c'e' la tendina (`trascinoPuoiP2P`);
   sotto P2P_SOGLIA_TRASCINO (12px) e' un TOCCO, che il gesto stesso passa
   a `toccaPiu` — il click del browser che segue si scarta con l'orologio
   `p2pPiuGestoAt`; la luce BIANCA (classe `p2p-sopra`: il filo della
-  tendina e del binario, il chiarore nella tendina, l'alone nel
+  tendina, il chiarore nella tendina, l'alone nel
   `nav::after`, fuori dal telaio che lo taglierebbe: una conca di luce
   concentrica al + posato, spenta da una maschera dall'equatore in su) si accende
   da meta' corsa; `touch-action: pan-down` sul + lascia alla pagina il dito che
@@ -25125,8 +25128,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   desktop le pillole sfumano ancora il loro fondo. I verbali: CANTIERI,
   «Il tasto Barattozon e il + neutro nel P2P», «La capsula di
   Barattozon», «La capsula col logo intero, il + che si trascina e le
-  corse della barra», «Il + nella guida, la tasca e il marchio» e «Il +
-  che si ferma sul logo».
+  corse della barra», «Il + nella guida, la tasca e il marchio», «Il +
+  che si ferma sul logo» e «Il telaio mangiato dal +».
   LA SVEGLIA DEL TABACCHINO è l'emenda alla fase 6 (decisione di
   Andrea): il server impara UNA cosa — «questo account ha una scadenza
   a quest'ora» — nella tabella `p2p_sveglie` (quattro colonne, PK

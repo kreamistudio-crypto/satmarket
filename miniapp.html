@@ -3213,12 +3213,10 @@
      ancora e' un cerchio. Il gradino del gemello e' da 3px come quello del
      bottone, cosi' all'arrivo la meta lo copre intero (quello da 4 della
      forma sporgeva di un pixel: vedi sopra).
-     LA CAPSULA SE NE VA CON LUI: binario e tendina sfumano nella stessa
-     dissolvenza (`capsula-via`), fermi dov'erano — il + ne esce, e quel
-     che resta non si deve veder tornare a casa: ci torna sotto il foglio
-     ormai pieno, di colpo, a fine andata (posaFondoP2P). La regola del
-     binario porta anche `p2p-binario`: e' quella che lo accende, e a pari
-     peso vincerebbe lei, che nel foglio sta piu' in basso.
+     LA CAPSULA SE NE VA CON LUI: quel che resta della tendina sfuma nella
+     stessa dissolvenza (`capsula-via`), ferma dov'era — il + ne esce, e
+     quel che resta non si deve veder tornare a casa: ci torna sotto il
+     foglio ormai pieno, di colpo, a fine andata (posaFondoP2P).
      ⚠️ LA STORIA, perche' non torni per sbaglio: fino a meta' di questo
      giro il foglio si apriva dalla TASCA blu della tendina (quarto giro,
      con filo e logo copiati) e ci tornava. E' caduta quando il tocco e'
@@ -3230,8 +3228,6 @@
   #p2pMorfo.bz .morfo-forma{transition-delay:0s,0s;
     transition-duration:var(--morfo-corsa),calc(var(--morfo-velo) / 2)}
   body.capsula-via #navTendina{opacity:0;transition:opacity var(--morfo-velo) ease}
-  body.nav-p2p.p2p-vendo.p2p-binario.capsula-via:not(.p2p-piu-neutro) #navBinario{
-    opacity:0;transition:opacity var(--morfo-velo) ease}
   /* LO STATO DI PARTENZA E' IL TONDO DELLA BARRA, colore del LATO
      compreso: verde a comprare, rosso a vendere — lo stesso giudice
      del + e del logo, che e' una classe sul body e non una tinta
@@ -4459,8 +4455,8 @@
     transform:none;visibility:visible;pointer-events:auto;
     transition-delay:.1s,0s}
   /* LA LUCE DEL TRASCINO (scelta di Andrea: bianca): col + sopra la
-     tendina il filo diventa bianco — quello della tendina e quello del
-     binario, cioe' il contorno intero della capsula —, dentro si accende
+     tendina il filo diventa bianco — il contorno della capsula, che dal
+     sesto giro e' tutto della tendina —, dentro si accende
      un chiarore e intorno un ALONE. Filo e chiarore stanno nella tendina;
      l'alone sta FUORI dal telaio, che lo taglierebbe all'equatore — una
      riga dritta accanto al +, vista di sera nelle varianti —, ed e' il
@@ -4488,8 +4484,7 @@
     -webkit-mask-image:linear-gradient(to bottom,transparent 50%,#000 75%);
     mask-image:linear-gradient(to bottom,transparent 50%,#000 75%);
     transition:opacity var(--p2p-corsa) var(--p2p-curva)}
-  body.p2p-sopra #navBinario>i::after,body.p2p-sopra #navBarattozon::after,
-  body.p2p-sopra nav::after{opacity:1}
+  body.p2p-sopra #navBarattozon::after,body.p2p-sopra nav::after{opacity:1}
   /* IL + SEGUE IL DITO SENZA CORSA: lo sposta il JS con la sua
      transform, e al rilascio (classe tolta) torna a casa con la corsa di
      sempre */
@@ -4499,53 +4494,36 @@
      verticale, incastrato fra i fianchi della capsula come un cursore in
      una guida, dalla sua casa al fondo della tendina e mai oltre, ne'
      sopra ne' sotto (il conto e' del JS, corsaCursoreP2P). Mentre scende:
-     • I FIANCHI: #navBinario e' il contorno della capsula intera, dalla
-       cima del + a riposo al fondo della tendina, nel grigio delle voci.
-       Dentro e' VUOTO: sopra il + si vede la pagina, o la banda, come sono
-       dietro. Si vede solo col gesto (p2p-binario), e a + fermo starebbe
-       tutto sotto di lui. Dal quinto giro i fianchi di SOPRA sfumano man
-       mano che il + scende (vedi IL TELAIO DI SOPRA, qui sotto).
-     • IL BLU SI RITIRA SOTTO IL +: il telaio scende con lui — la sua cima
+     • IL + SI MANGIA LA CAPSULA: il telaio scende con lui — la sua cima
        resta l'equatore del cerchio — e la tendina risale dello stesso
        tanto, cioe' sta ferma mentre il suo taglio scende. Sopra il + non
-       resta ne' blu ne' rosso: il binario vuoto, che si ricompone dietro
-       di lui. Tornando su, il + si riprende il suo posto.
+       resta niente, ne' blu ne' filo: si vede la pagina, o la banda, come
+       sono dietro (vedi IL TELAIO MANGIATO DAL +, qui sotto). Tornando su,
+       il + si riprende il suo posto e la capsula si srotola dietro di lui.
      Tre transform scritte dal dito — +, telaio, tendina — e al rilascio
      tornano a casa INSIEME, con la corsa della barra: per questo durante
      il gesto le corse del telaio e della tendina tacciono, come quella
      del +, e al ritorno la tendina perde il suo .1s di ritardo (senza, il
      taglio e la tendina si staccherebbero di un decimo e il blu
-     scenderebbe sotto il fondo della capsula).
-     La geometria e' quella della capsula, e una prova la rifa' leggendo
-     le regole del +: cima a −53 (padding 8, margine −30, salita −31),
-     fondo a 56 come la tendina, larga 54 col raggio 27. */
-  /* IL TELAIO DI SOPRA SE NE VA COL + (quinto giro, 24 set 2026, ritocco
-     di Andrea): `.bin-su`, il contorno della capsula intera, mentre il +
-     scende SFUMA — la sua opacita' la scrive il dito, 1 − corsa/fondo —:
-     i fianchi sopra il +, dove stava a riposo, se ne vanno man mano, e col
-     + in fondo sono a zero. Quel che resta e' la parte che contiene il + e
-     la tendina, e non le serve un pezzo suo: sotto l'equatore del + il filo
-     e' quello della tendina (IL FILO STA SU UNO STRATO SUO, qui sopra),
-     dentro il telaio che la taglia li' e scende con lui. Tornando su —
-     rilasciato prima del logo — il telaio ricompare con la corsa del +.
-     ⚠️ LA TASCA NON C'E' PIU', e non si rimetta: nella prima stesura del
-     giro un secondo pezzo di binario, dal fondo del + a riposo al fondo
-     della tendina, restava pieno per tutta la corsa, e col + in fondo i
-     suoi fianchi dritti spuntavano ai lati della meta' alta del cerchio —
-     due righe, bianche a luce accesa. Viste da Andrea nei fotogrammi a
-     fine corsa: sopra il cerchio posato ci dev'essere solo la barra. */
-  #navBinario{position:absolute;left:0;right:0;margin:0 auto;
-    top:-53px;width:54px;height:109px;pointer-events:none;opacity:0}
-  #navBinario>i{position:absolute;left:0;right:0}
-  #navBinario .bin-su{top:0;bottom:0;border-radius:27px;
-    box-shadow:inset 0 0 0 2.5px var(--nav-ink-p2p);
-    transition:opacity var(--p2p-corsa) var(--p2p-curva)}
-  #navBinario>i::after{content:'';position:absolute;inset:0;border-radius:inherit;
-    box-shadow:inset 0 0 0 2.5px #FFFFFF;opacity:0;
-    transition:opacity var(--p2p-corsa) var(--p2p-curva)}
-  body.nav-p2p.p2p-vendo.p2p-binario:not(.p2p-piu-neutro) #navBinario{opacity:1}
-  body.p2p-trascina #navTendina,body.p2p-trascina #navBarattozon,
-  body.p2p-trascina #navBinario .bin-su{transition:none}
+     scenderebbe sotto il fondo della capsula). */
+  /* IL TELAIO MANGIATO DAL + (sesto giro, 24 set 2026, ritocco di Andrea):
+     mentre il + scende il contorno della capsula non sfuma — se lo mangia
+     lui. In ogni istante il filo esiste solo dall'equatore del + in giu', a
+     piena opacita', e sopra non c'e' niente: un binario arrotolato dietro
+     al cursore, che tornando su si srotola dietro di lui allo stesso modo.
+     IL RITAGLIO C'ERA GIA', ed e' il telaio: taglia la tendina all'equatore
+     del cerchio e scende col + — una transform, cioe' compositor; un
+     clip-path che corre si ridipingerebbe a ogni fotogramma, la lezione
+     della tendina —, e il filo della tendina ci sta dentro (IL FILO STA SU
+     UNO STRATO SUO, qui sopra). Quindi il pezzo che disegnava il contorno
+     intero non serve piu', e non c'e'.
+     ⚠️ LA STORIA, perche' non torni: il quarto giro teneva sopra il + il
+     BINARIO VUOTO, il contorno intero della capsula; il quinto lo faceva
+     SFUMARE con un'opacita' scritta dal dito; e prima ancora una TASCA
+     restava piena fino in fondo e col + posato spuntava ai lati della
+     meta' alta del cerchio. Sopra il +, in ogni punto della corsa, c'e'
+     solo la barra. */
+  body.p2p-trascina #navTendina,body.p2p-trascina #navBarattozon{transition:none}
   body.nav-p2p.p2p-vendo.p2p-binario:not(.p2p-piu-neutro):not(.barra-via) #navBarattozon{
     transition-delay:0s,0s}
   /* ⚠️ IL DITO, CHE IL CLICK DA JS NON VEDE: il + e' una cella della
@@ -4570,8 +4548,7 @@
       pointer-events:auto;touch-action:none;touch-action:pan-down}
   }
   @media (prefers-reduced-motion:reduce){
-    #navBinario .bin-su,#navBinario>i::after,#navTendina,#navBarattozon,
-    #navBarattozon::after,nav::after{transition:none}
+    #navTendina,#navBarattozon,#navBarattozon::after,nav::after{transition:none}
   }
 
   /* ---------- barra d'acquisto del dettaglio (solo mobile) ----------
@@ -8049,9 +8026,8 @@
     /* il tasto Barattozon e' la tendina che prosegue il tondo del + in
        una capsula, e da desktop il tondo non c'e': sotto la pillola della
        topbar penderebbe sulla pagina. Il tabacchino resta a un tocco nel
-       foglio, fra i metodi. Via anche il binario e l'alone del trascino,
-       che sono suoi */
-    #navBinario,#navTendina,nav::after{display:none}
+       foglio, fra i metodi. Via anche l'alone del trascino, che e' suo */
+    #navTendina,nav::after{display:none}
     header{top:60px}
     header .brand{display:none}   /* il logo ora sta nella topbar */
     .searchbar{max-width:640px}
@@ -10735,12 +10711,6 @@ document.getElementById('cartello')?.remove();</script>
          e ne copre la cima. Nascosta finche' le classi non la chiamano
          (vedi il suo CSS), e da nascosta non si tocca e non si raggiunge
          col Tab. -->
-    <!-- IL BINARIO (24 set 2026): i fianchi della capsula mentre il +
-         scende trascinato nella sua guida — il contorno, vuoto dentro.
-         Sta PRIMA del telaio: la tendina e il suo filo gli si dipingono
-         sopra, e il + sopra tutti. Lo accende il gesto (vedi IL CURSORE
-         NELLA GUIDA, nel CSS). -->
-    <div id="navBinario" aria-hidden="true"><i class="bin-su"></i></div>
     <div id="navTendina"><div id="navBarattozon" role="button" tabindex="0"
          aria-label="Vendi con Barattozon: contanti al tabacchino"
          title="Vendi con Barattozon"
@@ -49545,10 +49515,6 @@ function morfosiP2P(da, a){
 /* il tondo della barra: un posto solo, che i chiamanti sono tre */
 const tondoBarraP2P = () => document.querySelector('#nav-vendi .ic');
 
-/* il pezzo di sopra del binario, che sfuma col + (vedi IL TELAIO DI SOPRA) */
-function binarioSuP2P(){
-  return document.querySelector('#navBinario .bin-su');
-}
 /* UN CAMBIO DI STATO SENZA CORSA, su questi pezzi soli: la corsa si spegne
    in riga, lo stato cambia, un reflow lo fissa, e la corsa torna per i
    cambi di dopo — la strada di vestiFoglioMorfoP2P. Non la regola
@@ -49563,17 +49529,14 @@ function senzaCorsaP2P(pezzi, fai){
   pezzi.forEach(x => { x.style.transition = ''; });
 }
 function pezziCapsulaP2P(){
-  return [tondoBarraP2P(), el('navTendina'), el('navBarattozon'), el('navBinario'),
-          binarioSuP2P()];
+  return [tondoBarraP2P(), el('navTendina'), el('navBarattozon')];
 }
 /* LA CAPSULA A CASA, com'e' a riposo: il +, il telaio e la tendina senza
-   le transform del dito, il binario spento e intero, niente che sfumi.
+   le transform del dito, le classi del gesto spente, niente che sfumi.
    Lo STATO soltanto: come ci si arriva lo dice chi la chiama. */
 function capsulaCasaP2P(){
   for (const x of [tondoBarraP2P(), el('navTendina'), el('navBarattozon')])
     if (x) x.style.transform = '';
-  const su = binarioSuP2P();
-  if (su) su.style.opacity = '';
   clearTimeout(p2pBinarioTimer);
   document.body.classList.remove('p2p-trascina', 'p2p-sopra', 'p2p-binario', 'capsula-via');
 }
@@ -49859,18 +49822,18 @@ function apriBarattozonP2P(){
    IL + E' UN CURSORE NELLA SUA GUIDA (24 set 2026, secondo ritocco di
    Andrea): non fluttua piu' dietro al dito in ogni direzione, scorre SOLO
    in verticale fra i fianchi della capsula, dalla sua casa al fondo della
-   tendina e mai oltre — il dito puo' andare dove vuole. Sopra di se'
-   lascia il BINARIO VUOTO: il telaio della tendina scende con lui (la sua
-   cima e' l'equatore del cerchio) e la tendina risale dello stesso
-   tanto, cioe' resta ferma mentre il suo taglio scende; i fianchi li
-   disegna #navBinario (vedi IL CURSORE NELLA GUIDA, nel CSS), e dal
-   quinto giro quelli di sopra sfumano man mano che il + scende. Quindi
+   tendina e mai oltre — il dito puo' andare dove vuole. Scendendo si
+   MANGIA LA CAPSULA: il telaio della tendina scende con lui (la sua cima
+   e' l'equatore del cerchio) e la tendina risale dello stesso tanto,
+   cioe' resta ferma mentre il suo taglio scende — sopra il + non resta
+   niente, dal sesto giro nemmeno il filo (vedi IL TELAIO MANGIATO DAL +,
+   nel CSS). Quindi
    «sopra la tendina» non e' piu' dove sta il dito ma dove sta il +: da
    meta' corsa in giu'. E lasciato li' il + NON torna a casa: diventa lui
    il bottone blu (vedi lasciaSulLogoP2P).
    E IL TOCCO SULLA TENDINA FA LO STESSO DA SOLO (quinto giro, 24 set
    2026, ripensamento di Andrea): il + scende nella guida con la corsa della
-   barra — il telaio di sopra che sfuma, la luce che si accende —, si
+   barra — la capsula mangiata dietro di lui, la luce che si accende —, si
    blocca in fondo e diventa il bottone blu. Il gesto e il tocco finiscono
    nello stesso posto: lasciaSulLogoP2P.
    UNA SOGLIA DISTINGUE IL TOCCO DAL TRASCINO: sotto P2P_SOGLIA_TRASCINO
@@ -49895,7 +49858,7 @@ function apriBarattozonP2P(){
 const P2P_SOGLIA_TRASCINO = 12;   /* px: sotto e' un tocco, da qui un trascino */
 let p2pTrascino = null;          /* il gesto in corso: dito, partenza, corsa */
 let p2pPiuGestoAt = -1e9;        /* quando il gesto ha gia' fatto il mestiere del + */
-let p2pBinarioTimer = null;      /* il binario resta finche' il + non e' a casa */
+let p2pBinarioTimer = null;      /* `p2p-binario` resta finche' il + non e' a casa */
 let p2pDiscesaTimer = null;      /* il + che scende da solo al tocco sulla tendina */
 
 /* il gesto c'e' dove c'e' la tendina, e lo dicono le stesse classi */
@@ -49966,7 +49929,7 @@ function trascinoMuoveP2P(e){
   }
   /* il dito di lato non sposta niente: il + scorre solo nella sua guida */
   const d = corsaCursoreP2P(dy, t.max);
-  guidaCursoreP2P(t.su + d, d, t.max);
+  guidaCursoreP2P(t.su + d, d);
   const sopra = sopraTendinaP2P(d, t.max);
   if (sopra !== t.sopra) {
     t.sopra = sopra;
@@ -49988,8 +49951,9 @@ function lasciaSulLogoP2P(){
 }
 /* IL TOCCO SULLA TENDINA FA IL TRASCINO DA SOLO (quinto giro, 24 set 2026,
    ripensamento di Andrea): il + scende nella guida fino in fondo, con la
-   corsa della barra — telaio e tendina con lui, il telaio di sopra che
-   sfuma, la luce che si accende come quando il dito lo porta sopra —, si
+   corsa della barra — telaio e tendina con lui, la capsula mangiata
+   dietro di lui, la luce che si accende come quando il dito lo porta
+   sopra —, si
    blocca e diventa il bottone blu: dopo la corsa, lasciaSulLogoP2P, come
    al rilascio. Tastiera compresa: Invio e spazio passano di qui.
    DOVE NON SCENDE: dove la morfosi non c'e' (effetti ridotti, schermo
@@ -50005,26 +49969,25 @@ function toccaTendinaP2P(){
   if (!guida || !(guida.max > 0)) { apriBarattozonP2P(); return; }
   haptic();
   p2pPiuGestoAt = performance.now();
-  /* il binario si accende PRIMA che il + parta: la tendina corre senza il
-     suo .1s solo con lui acceso, e la corsa deve partire insieme */
+  /* la classe del gesto si accende PRIMA che il + parta: la tendina corre
+     senza il suo .1s solo con lei, e la corsa deve partire insieme */
   document.body.classList.add('p2p-binario', 'p2p-sopra');
   void document.body.offsetWidth;
-  guidaCursoreP2P(guida.su + guida.max, guida.max, guida.max);
+  guidaCursoreP2P(guida.su + guida.max, guida.max);
   p2pDiscesaTimer = setTimeout(() => {
     p2pDiscesaTimer = null;
     lasciaSulLogoP2P();
   }, P2P_MORFO_MS + 30);
 }
 /* il + a quota `y` nella guida, e la tendina tagliata alla sua cintura:
-   il telaio scende di `d` con lui, la tendina risale di `d` e resta ferma;
-   e i fianchi di sopra sfumano man mano, fino a sparire in fondo (`max`) */
-function guidaCursoreP2P(y, d, max){
+   il telaio scende di `d` con lui, la tendina risale di `d` e resta ferma.
+   Il taglio del telaio E' il ritaglio del contorno: sopra il + non resta
+   niente, e qui non si scrive nessuna opacita' (IL TELAIO MANGIATO DAL +) */
+function guidaCursoreP2P(y, d){
   const tondo = tondoBarraP2P(), tel = el('navTendina'), tend = el('navBarattozon');
-  const su = binarioSuP2P();
   if (tondo) tondo.style.transform = 'translateY(' + y + 'px)';
   if (tel) tel.style.transform = 'translateY(' + d + 'px)';
   if (tend) tend.style.transform = 'translateY(' + (-d) + 'px)';
-  if (su) su.style.opacity = max > 0 ? String(Math.max(0, 1 - d / max)) : '';
 }
 function trascinoSuP2P(e){
   const t = p2pTrascino;
@@ -50060,18 +50023,15 @@ function trascinoFineP2P(apri){
 /* IL RITORNO A CASA: le corse tornano PRIMA che le transform cambino (il
    reflow in mezzo), e le tre transform se ne vanno insieme — il +, il
    telaio e la tendina hanno la stessa corsa e la stessa curva, e il taglio
-   resta sull'equatore per tutta la strada. Il binario se ne va quando il
-   + e' a casa: dopo la corsa della barra, che e' quella della morfosi
-   (una prova le tiene uguali). */
+   resta sull'equatore per tutta la strada: la capsula si srotola dietro
+   al +. La classe del gesto se ne va quando il + e' a casa: dopo la corsa
+   della barra, che e' quella della morfosi (una prova le tiene uguali). */
 function rientraCursoreP2P(){
   const tondo = tondoBarraP2P();
   document.body.classList.remove('p2p-trascina');
   if (tondo) void tondo.offsetWidth;
   for (const x of [tondo, el('navTendina'), el('navBarattozon')])
     if (x) x.style.transform = '';
-  /* ...e il telaio di sopra ricompare, con la stessa corsa */
-  const su = binarioSuP2P();
-  if (su) su.style.opacity = '';
   clearTimeout(p2pBinarioTimer);
   p2pBinarioTimer = setTimeout(() => document.body.classList.remove('p2p-binario'),
                                P2P_MORFO_MS + 30);
