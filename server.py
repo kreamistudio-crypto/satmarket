@@ -40761,6 +40761,106 @@ async def controparte_p2p(req: Request, x_tg_init_data: str = Header(""),
     return {"controparti": chi}
 
 
+# ═══ IL PAYCODE NON PARTE VERSO CHI NON RICONOSCIAMO (24 set 2026) ═══
+# Alla presa di un PayCode il telefono di chi vende manda DA SOLO, come
+# kind 14 cifrato, PayCode, importo e scadenza verso la chiave di chi
+# ha preso — chiunque sia (`pianificaAutoRecapito`, nel client). Un
+# ordine del nostro coordinatore lo puo' prendere anche un client Mostro
+# esterno, e allora quei tre dati uscirebbero verso uno sconosciuto (il
+# verbale: CANTIERI, «Avvisi P2P nell'ordine dei fatti», punto c). La
+# cura al coordinatore — la patch 0008 — NON si fa, deciso da Andrea
+# con Alan: il rischio e' basso (il PayCode paga l'ordine Amazon di chi
+# vende, e dai client esterni arrivera' pochissima gente) e il nodo non
+# si tocca. La cura sta tutta qui: il telefono, PRIMA di sparare,
+# chiede se la chiave a cui sta per scrivere e' l'altra parte dello
+# scambio COME L'HA DETTA MOSTROD (`p2p_scambi`, dopo la cura A1) e se
+# e' una delle nostre (`chiavi_p2p`). Se la risposta non e' un si',
+# non parte niente da solo: chi vende lo legge nella pagina e decide.
+# I MOTIVI sono codici e non frasi, il patto delle recensioni: le
+# frasi le scrive chi le mostra. `ignoto` = mostrod non ha ancora
+# nominato nessuno (o l'ordine non lo conosciamo); `estraneo` = chi
+# chiede non e' una delle due parti; `esterno` = l'altra parte c'e' ma
+# non e' nessuno dei nostri (un altro client); `diversa` = l'altra
+# parte e' dei nostri ma la chiave data non e' la sua (un telefono con
+# una riga stantia). Fail-closed: tutti tranne il primo sono un no.
+MOTIVI_PARTE_P2P = ("riconosciuta", "ignoto", "estraneo", "esterno", "diversa")
+
+
+def _giudice_parte_p2p(parti: dict, io, tg_chiave) -> str:
+    """PURA: uno dei `MOTIVI_PARTE_P2P`. `parti` e' quel che dice
+    `_parti_mostro_p2p` ({maker, taker, detto}), `io` chi chiede,
+    `tg_chiave` di chi e' la chiave che sta per ricevere il recapito
+    (0 = di nessuno dei nostri). L'ALTRA PARTE si guarda dai due lati,
+    come nelle recensioni: chi ha pubblicato chiede di chi ha preso, e
+    chi ha preso di chi ha pubblicato — un `buy` preso da chi vende e'
+    lo stesso giudizio col posto girato."""
+    io, tg_chiave = int(io or 0), int(tg_chiave or 0)
+    if not parti.get("detto"):
+        return "ignoto"
+    maker, taker = int(parti.get("maker") or 0), int(parti.get("taker") or 0)
+    if io and io == maker:
+        altro = taker
+    elif io and io == taker:
+        altro = maker
+    else:
+        return "estraneo"
+    if not altro:
+        return "esterno"
+    if altro != tg_chiave:
+        return "diversa"
+    return "riconosciuta"
+
+
+def _parte_riconosciuta_p2p(con, ordine, chiave, io) -> dict:
+    """`{riconosciuta, motivo}` per un ordine e la chiave a cui il
+    telefono sta per scrivere. Le due forme si controllano QUI (400 a
+    chi le sbaglia), la chiave si cerca in `chiavi_p2p` come fa lo
+    sconto, e il resto e' il giudice puro. Pura sulla connessione."""
+    ordine = str(ordine or "").strip()
+    if not FORMA_ORDINE_P2P.fullmatch(ordine):
+        raise ValueError("Ordine in una forma sconosciuta")
+    chiave = str(chiave or "").strip().lower()
+    if not FORMA_PUBKEY_P2P.fullmatch(chiave):
+        raise ValueError("Chiave in una forma sconosciuta")
+    r = con.execute("SELECT tg_id FROM chiavi_p2p WHERE pubkey=?",
+                    (chiave,)).fetchone()
+    motivo = _giudice_parte_p2p(_parti_mostro_p2p(con, ordine), io,
+                                int(r["tg_id"]) if r else 0)
+    return {"riconosciuta": motivo == "riconosciuta", "motivo": motivo}
+
+
+@app.post("/api/p2p/parte-riconosciuta")
+async def parte_riconosciuta_p2p(req: Request, x_tg_init_data: str = Header(""),
+                                 barattolo_sessione: str = Cookie("")):
+    """«La chiave a cui sto per mandare il PayCode e' l'altra parte di
+    questo scambio, e la riconoscete?» — la domanda che il telefono di
+    chi vende fa PRIMA dell'invio automatico.
+    LA SESSIONE SERVE, e chi chiede dev'essere una delle due parti (lo
+    decide il giudice: agli altri `estraneo`, che e' un no come gli
+    altri e non dice niente dell'ordine). NIENTE ID NELL'URL: ordine e
+    chiave stanno nel POST, come per volti e parti. NESSUN GATE SULLA
+    LEVA: qui non si scrive niente. NEL JOURNAL solo i no, che sono
+    quelli da guardare: un «esterno» e' un client Mostro esterno sul
+    nostro coordinatore, un «diversa» un telefono con una riga stantia."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    try:
+        d = await req.json()
+    except Exception:
+        raise HTTPException(400, "Richiesta illeggibile")
+    con = db()
+    try:
+        esito = _parte_riconosciuta_p2p(con, (d or {}).get("ordine"),
+                                        (d or {}).get("chiave"), user["id"])
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    finally:
+        con.close()
+    if not esito["riconosciuta"]:
+        print(f"🧾 PayCode P2P fermo: {str((d or {}).get('ordine') or '')[:8]} "
+              f"per {user['id']}: {esito['motivo']}", flush=True)
+    return esito
+
+
 # ═══ LE RECENSIONI DEGLI SCAMBI P2P (set 2026) ══════════════════════
 # UNA REPUTAZIONE SOLA, e qui la regola di casa diventa una riga di
 # SQL: la recensione di uno scambio finisce nella TABELLA dei feedback

@@ -36951,8 +36951,15 @@ def prove_fogli_di_casa():
     # partire i sats da un'altra cassaforte, «sposta sul nodo» promette
     # da dove usciranno — tutt'e due si chiedono due volte, a carte
     # scoperte, e il motivo resta nel registro.
-    prova("i gesti che passano dalla domanda unica sono sessantanove",
-          69, solo_codice(mini).count("chiediConferma({"))
+    # SETTANTA (24 set 2026, il PayCode verso chi non riconosciamo):
+    # «Mandare il PayCode a mano?» (`mandaRecapitoFermoP2P`). Il
+    # recapito automatico del tabacchino non parte piu' verso una chiave
+    # che il server non riconosce come l'altra parte detta da mostrod;
+    # chi vende puo' mandarlo lo stesso, ma quella busta esce verso uno
+    # sconosciuto, e una app esterna potrebbe non mostrarla nemmeno: si
+    # chiede, dicendo cosa esce e verso chi.
+    prova("i gesti che passano dalla domanda unica sono settanta",
+          70, solo_codice(mini).count("chiediConferma({"))
     # ...E OGNUNO PORTA LA SUA AZIONE, che e' l'unica chiave senza
     # la quale il foglio si apre, si legge e NON FA NIENTE — il
     # bottone chiude e basta. Non e' teorico: e' successo scrivendo
@@ -60296,6 +60303,11 @@ function ordiniAscoltoP2P(){
 let pubblicati = [];
 async function mostroConnetti(){ return {publish: async ev => { pubblicati.push(ev); }}; }
 const hexBytes = hexToBytes;
+/* (24 set 2026) prima dell'invio automatico del PayCode il motore
+   chiede al blocco di fuori chi c'e' dall'altra parte: qui un server
+   di cartone che RICONOSCE, cosi' il tabacchino parte come ieri — il
+   banco dei no e' prove_paycode_riconosciuto, che questa riga la toglie */
+async function parteRiconosciutaP2P(o){ return 'riconosciuta'; }
 
 __PEZZI__
 (async () => {
@@ -73230,6 +73242,455 @@ def prove_p2p_riserva_libro():
           "concluso» del rilascio", (False, False),
           ("rilasciato_vende" in pezzo("_testo_evento_p2p"),
            "per te lo scambio" in pezzo("_testo_evento_p2p")))
+
+
+BANCO_PAYCODE = r"""
+/* ===== il server di cartone: risponde in fila; senza risposte in
+   fila la rete e' giu' ===== */
+const API_BASE = '/api';
+function authHdr(){ return 'sessione'; }
+let risposteParte = [], domandeParte = [];
+async function fetch(url, opz){
+  domandeParte.push({url, metodo: opz.method, corpo: JSON.parse(opz.body)});
+  if (!risposteParte.length) throw new Error('rete giu');
+  const r = risposteParte.shift();
+  if (r && r.__http) return {ok: false, status: r.__http, json: async () => ({})};
+  return {ok: true, json: async () => r};
+}
+__PEZZI__
+(async () => {
+const attesa = ms => new Promise(r => setTimeout(r, ms));
+function dalRelay(ev){ return JSON.parse(JSON.stringify(ev)); }
+const TAB = {ordine: '479-868-518', importo: '10,00', scade: 1790000000,
+             testo: 'Contanti al tabacchino\nPayCode: 479-868-518\nImporto: 10,00 €\nScade: 17/09/2026 alle 14:30'};
+let ridisegni = 0;
+renderOrdineP2P = function(){ ridisegni++; };
+let conferme = [];
+chiediConferma = function(c){ conferme.push(c); };
+myTgId = 111;
+P2P_AUTOINVIO_MS = 0;
+P2P_RICONOSCI_ATTESE_MS = [5, 5, 5];
+p2pOrdineAperto = 'X';
+function apparecchia(){
+  mondo.a = {mazzo: {sk: 'a1'.repeat(32), pub: ''}, ordini: {}};
+  mondo.b = {mazzo: {sk: 'b2'.repeat(32), pub: ''}, ordini: {}};
+  const ta = chiaveScambio(mondo.a.mazzo.sk, 1);
+  const tb = chiaveScambio(mondo.b.mazzo.sk, 1);
+  mondo.a.mazzo.pub = ta.pub; mondo.b.mazzo.pub = tb.pub;
+  mondo.a.ordini['X'] = {id: 'X', indice: 1, pubTrade: ta.pub, peer: tb.pub, stato: 'attivo',
+                         creato: 1000, lato: 'vendo', metodi: ['Contanti al tabacchino'],
+                         tabacchino: Object.assign({}, TAB)};
+  mondo.b.ordini['X'] = {id: 'X', indice: 1, pubTrade: tb.pub, peer: ta.pub, stato: 'attivo',
+                         creato: 1000, lato: 'compro', metodi: ['Contanti al tabacchino']};
+  p2pChiaviChat = {}; p2pChatSecchio = {}; pubblicati = []; p2pAutoTentati = {};
+  risposteParte = []; domandeParte = []; toasts = []; ridisegni = 0; conferme = []; LATO = 'a';
+  return {ta, tb};
+}
+const mio = () => mondo.a.ordini['X'];
+const euroMio = () => ((mio().campiMiei || {}).euro || {}).testo;
+
+/* 1) chiave riconosciuta: parte come ieri */
+const {tb} = apparecchia();
+risposteParte = [{riconosciuta: true, motivo: 'riconosciuta'}];
+pianificaAutoRecapito('X');
+await attesa(40);
+out.riconosciutaParte = pubblicati.length === 1 && euroMio() === TAB.testo;
+out.domanda = domandeParte.length === 1
+  ? {url: domandeParte[0].url, metodo: domandeParte[0].metodo,
+     chiavi: Object.keys(domandeParte[0].corpo).sort(), ordine: domandeParte[0].corpo.ordine,
+     chiaveEDelPeer: domandeParte[0].corpo.chiave === tb.pub}
+  : null;
+out.riconosciutaSenzaFermo = !mio().recapitoFermo;
+out.riconosciutaToast = toasts.some(t => t.indexOf('partiti verso chi compra') >= 0);
+out.riconosciutaUnaBusta14 = pubblicati.length === 1 && pubblicati[0].kind === 14;
+
+/* 2) esterno: non parte, fermo, avviso */
+apparecchia();
+risposteParte = [{riconosciuta: false, motivo: 'esterno'}];
+pianificaAutoRecapito('X');
+await attesa(40);
+out.esternoNonParte = pubblicati.length === 0 && !euroMio();
+out.esterno = [domandeParte.length, mio().recapitoFermo, ridisegni >= 1];
+out.esternoToast = toasts.some(t => t.indexOf('app esterna') >= 0);
+out.esternoAvviso = avvisoRecapitoFermoP2P(mio());
+
+/* 3) ignoto poi riconosciuta: si riprova e parte */
+apparecchia();
+risposteParte = [{riconosciuta: false, motivo: 'ignoto'}, {riconosciuta: false, motivo: 'ignoto'},
+                 {riconosciuta: true, motivo: 'riconosciuta'}];
+pianificaAutoRecapito('X');
+await attesa(120);
+out.ignotoRiprova = [domandeParte.length, pubblicati.length, mio().recapitoFermo || ''];
+
+/* 4) sempre ignoto: si arrende dopo le attese, fermo «ignoto» */
+apparecchia();
+risposteParte = [1, 2, 3, 4, 5].map(() => ({riconosciuta: false, motivo: 'ignoto'}));
+pianificaAutoRecapito('X');
+await attesa(120);
+out.ignotoSiArrende = [domandeParte.length, pubblicati.length, mio().recapitoFermo];
+out.ignotoAvviso = avvisoRecapitoFermoP2P(mio());
+
+/* 5) rete giu': come ignoto */
+apparecchia();
+pianificaAutoRecapito('X');
+await attesa(120);
+out.reteGiu = [domandeParte.length, pubblicati.length, mio().recapitoFermo];
+
+/* 6) risposte storte: un 500, un si' scritto come stringa, un no col
+   motivo «riconosciuta», un corpo vuoto — nessuna fa partire niente */
+apparecchia();
+risposteParte = [{__http: 500}, {riconosciuta: 'true'},
+                 {riconosciuta: false, motivo: 'riconosciuta'}, {}];
+pianificaAutoRecapito('X');
+await attesa(120);
+out.storte = [domandeParte.length, pubblicati.length, mio().recapitoFermo];
+
+/* 7) diversa: fermo subito, senza riprovare, e l'avviso non dice «esterna» */
+apparecchia();
+risposteParte = [{riconosciuta: false, motivo: 'diversa'}];
+pianificaAutoRecapito('X');
+await attesa(40);
+out.diversa = [domandeParte.length, pubblicati.length, mio().recapitoFermo];
+out.diversaAvviso = avvisoRecapitoFermoP2P(mio());
+
+/* 8) chi compra non chiede e non manda; in DEMO o senza sessione non
+   si chiede, e non si parte */
+apparecchia();
+LATO = 'b';
+mondo.b.ordini['X'].tabacchino = Object.assign({}, TAB);
+pianificaAutoRecapito('X');
+await attesa(40);
+out.compraNonChiede = [domandeParte.length, pubblicati.length];
+LATO = 'a';
+apparecchia();
+DEMO = true;
+risposteParte = [{riconosciuta: true, motivo: 'riconosciuta'}];
+pianificaAutoRecapito('X');
+await attesa(120);
+DEMO = false;
+out.demoNonChiede = [domandeParte.length, pubblicati.length, mio().recapitoFermo];
+apparecchia();
+myTgId = null;
+risposteParte = [{riconosciuta: true, motivo: 'riconosciuta'}];
+pianificaAutoRecapito('X');
+await attesa(120);
+myTgId = 111;
+out.senzaSessione = [domandeParte.length, pubblicati.length, mio().recapitoFermo];
+
+/* 9) l'avviso: solo a chi vende, solo fermo, solo finche' non e' partito */
+apparecchia();
+out.avvisoSenzaFermo = avvisoRecapitoFermoP2P(mio());
+mio().recapitoFermo = 'esterno';
+mondo.b.ordini['X'].recapitoFermo = 'esterno';
+mondo.b.ordini['X'].tabacchino = Object.assign({}, TAB);
+out.avvisoNonACompra = avvisoRecapitoFermoP2P(mondo.b.ordini['X']);
+mio().stato = 'concluso';
+out.avvisoNonAFinito = avvisoRecapitoFermoP2P(mio());
+mio().stato = 'attivo';
+mio().campiMiei = {euro: {id: 'x', testo: TAB.testo, t: 1}};
+out.avvisoNonAPartito = avvisoRecapitoFermoP2P(mio());
+
+/* 10) a mano: chiede conferma, e manda SOLO dopo il si' — la stessa
+   busta, che chi compra apre */
+apparecchia();
+mio().recapitoFermo = 'esterno';
+mandaRecapitoFermoP2P();
+out.manualeChiede = [conferme.length, pubblicati.length];
+out.manualeConferma = conferme.length
+  ? {titolo: conferme[0].titolo, etichetta: conferme[0].etichetta,
+     corpoDiceChat: /scriviglielo in chat/.test(conferme[0].corpo || '')}
+  : null;
+await conferme[0].poi();
+out.manualeParte = pubblicati.length === 1 && euroMio() === TAB.testo;
+out.manualeAvvisoCade = avvisoRecapitoFermoP2P(mio());
+LATO = 'b';
+campoArriva(mondo.b.ordini['X'], dalRelay(pubblicati[0]));
+out.manualeArrivaACompra = ((mondo.b.ordini['X'].campiLoro || {}).euro || {}).testo === TAB.testo;
+LATO = 'a';
+/* ...e senza controparte non si apre nemmeno la conferma */
+apparecchia();
+mio().recapitoFermo = 'esterno';
+delete mio().peer;
+mandaRecapitoFermoP2P();
+out.manualeSenzaPeer = [conferme.length, pubblicati.length, toasts.length];
+
+console.log(JSON.stringify(out));
+})().catch(e => { console.log('BANCO ROTTO: ' + (e && e.stack || e)); process.exit(1); });
+"""
+
+
+def prove_paycode_riconosciuto():
+    """IL PAYCODE NON PARTE VERSO CHI NON RICONOSCIAMO (24 set 2026).
+
+    Alla presa di un PayCode il telefono di chi vende manda da solo,
+    cifrati, PayCode, importo e scadenza verso la chiave di chi ha preso
+    — chiunque sia. Un ordine del nostro coordinatore lo puo' prendere
+    anche un client Mostro esterno: la patch al nodo (0008) non si fa,
+    e la cura sta tutta dal lato nostro. Qui si prova: il giudice puro
+    e la rotta del server; nel client, che PRIMA di sparare si chiede e
+    si parte SOLO su un si', che un «ignoto» si riprova per un tempo
+    finito e ogni altro no ferma subito, che il fermo si dice nella
+    pagina con la frase decisa con Alan e col bottone a mano, e che il
+    bottone manda solo dopo la conferma — la stessa busta, che chi
+    compra apre. E che fra due utenti di Barattolo non cambia niente."""
+    print("\n[il PayCode non parte verso chi non riconosciamo]")
+    import json as _json
+    import shutil as _sh
+    import sqlite3
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) IL SERVER: la rotta ---------------------------------------
+    prova("la rotta c'e'", True,
+          '@app.post("/api/p2p/parte-riconosciuta")' in _SORGENTE)
+    rot = pezzo("parte_riconosciuta_p2p")
+    prova("...chiede la sessione e passa chi chiede al giudice", True,
+          "verifica_utente(x_tg_init_data, barattolo_sessione)" in rot
+          and '_parte_riconosciuta_p2p(con, (d or {}).get("ordine"),' in rot
+          and 'user["id"])' in rot)
+    prova("...400 su una forma sbagliata, e nel journal solo i no", True,
+          "except ValueError as e:" in rot
+          and 'if not esito["riconosciuta"]:' in rot
+          and "PayCode P2P fermo" in rot)
+    prova("...e non tocca la leva: qui non si scrive niente", False,
+          "_p2p_per(" in codice(rot))
+    prova("i motivi sono cinque, codici e non frasi", True,
+          'MOTIVI_PARTE_P2P = ("riconosciuta", "ignoto", "estraneo", "esterno", "diversa")'
+          in _SORGENTE)
+
+    # --- 2) IL GIUDICE SUL DATABASE VERO -------------------------------
+    amb = {"sqlite3": sqlite3,
+           "FORMA_ORDINE_P2P": re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
+           "FORMA_PUBKEY_P2P": re.compile(r"^[0-9a-f]{64}$")}
+    for f in ("_parti_mostro_p2p", "_giudice_parte_p2p",
+              "_parte_riconosciuta_p2p"):
+        exec(pezzo(f), amb)
+    giudice, chiedi = amb["_giudice_parte_p2p"], amb["_parte_riconosciuta_p2p"]
+    KA, KB, KC, KX = "a1" * 32, "b2" * 32, "c3" * 32, "d4" * 32
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript(
+        "CREATE TABLE p2p_scambi(ordine TEXT PRIMARY KEY, compratore INTEGER,"
+        " venditore INTEGER, preso_dal TEXT DEFAULT '', giro INTEGER DEFAULT 1,"
+        " aggiornato INTEGER DEFAULT 0);"
+        "CREATE TABLE p2p_ordini(ordine TEXT PRIMARY KEY, tg_id INTEGER,"
+        " lato TEXT DEFAULT '');"
+        "CREATE TABLE chiavi_p2p(pubkey TEXT PRIMARY KEY, tg_id INTEGER);"
+        f"INSERT INTO chiavi_p2p VALUES('{KA}',111),('{KB}',222),('{KC}',333);"
+        "INSERT INTO p2p_ordini VALUES('ord-nostro-1',111,'sell'),"
+        " ('ord-esterno-1',111,'sell'),('ord-senza-lato',111,'sell'),"
+        " ('ord-buy-preso',222,'buy'),('ord-in-vetrina',111,'sell');"
+        # 111 ha pubblicato, 222 ha preso: tutt'e due nostri
+        "INSERT INTO p2p_scambi(ordine,compratore,venditore,preso_dal)"
+        " VALUES('ord-nostro-1',222,111,'buyer'),"
+        # una chiave che chiavi_p2p non conosce ha preso: un altro client
+        " ('ord-esterno-1',0,111,'buyer'),"
+        # mostrod ha nominato le parti senza dire chi ha preso: vale il
+        # lato del libro (sell → ha preso chi compra)
+        " ('ord-senza-lato',222,111,''),"
+        # un `buy` di 222 preso da 111, che vende: il posto girato
+        " ('ord-buy-preso',222,111,'seller');")
+
+    def v(ordine, chiave, io):
+        return chiedi(con, ordine, chiave, io)["motivo"]
+
+    prova("chi ha pubblicato chiede di chi ha preso, dei nostri: riconosciuta",
+          "riconosciuta", v("ord-nostro-1", KB, 111))
+    prova("...e la risposta porta il si' esplicito", {"riconosciuta": True, "motivo": "riconosciuta"},
+          chiedi(con, "ord-nostro-1", KB, 111))
+    prova("...dall'altro lato, chi ha preso chiede di chi ha pubblicato: riconosciuta",
+          "riconosciuta", v("ord-nostro-1", KA, 222))
+    prova("la chiave si accetta anche in maiuscolo (si normalizza)",
+          "riconosciuta", v("ord-nostro-1", KB.upper(), 111))
+    prova("chi ha preso da un altro client: esterno", "esterno",
+          v("ord-esterno-1", KX, 111))
+    prova("...esterno anche se il telefono porta una chiave nostra: a decidere e' mostrod",
+          "esterno", v("ord-esterno-1", KB, 111))
+    prova("mostrod non ha ancora parlato di quest'ordine: ignoto", "ignoto",
+          v("ord-in-vetrina", KB, 111))
+    prova("...e un ordine mai visto e' ignoto, non un errore", "ignoto",
+          v("ord-mai-visto-1", KB, 111))
+    prova("chi non e' una delle due parti: estraneo", "estraneo",
+          v("ord-nostro-1", KB, 333))
+    prova("...anche a chiave giusta: la chiave non da' il posto", "estraneo",
+          v("ord-nostro-1", KA, 333))
+    prova("una chiave nostra ma non dell'altra parte: diversa", "diversa",
+          v("ord-nostro-1", KC, 111))
+    prova("...e una chiave sconosciuta su una parte nostra: diversa, non esterno",
+          "diversa", v("ord-nostro-1", KX, 111))
+    prova("senza `preso_dal` vale il lato del libro", "riconosciuta",
+          v("ord-senza-lato", KB, 111))
+    prova("un `buy` preso da chi vende: chi vende chiede di chi ha pubblicato",
+          "riconosciuta", v("ord-buy-preso", KB, 111))
+    prova("...e chi ha pubblicato di chi ha preso", "riconosciuta",
+          v("ord-buy-preso", KA, 222))
+    # LE DUE FORME: 400 a chi le sbaglia, mai una query
+    for nome, ordine, chiave in (("ordine corto", "abc", KB),
+                                 ("ordine con caratteri strani", "ord;drop-1", KB),
+                                 ("chiave corta", "ord-nostro-1", "abcd"),
+                                 ("chiave non esadecimale", "ord-nostro-1", "zz" * 32),
+                                 ("chiave vuota", "ord-nostro-1", ""),
+                                 ("ordine mancante", None, KB)):
+        try:
+            chiedi(con, ordine, chiave, 111)
+            esito = "passato"
+        except ValueError:
+            esito = "ValueError"
+        prova(f"forma sbagliata ({nome}): ValueError", "ValueError", esito)
+    # IL GIUDICE PURO, sui casi che il database non produce
+    prova("detto=False vince su tutto: ignoto anche con le parti scritte",
+          "ignoto", giudice({"maker": 111, "taker": 222, "detto": False}, 111, 222))
+    prova("parti dette ma vuote (due esterni): estraneo per chiunque",
+          "estraneo", giudice({"maker": 0, "taker": 0, "detto": True}, 111, 222))
+    prova("un io a zero non e' mai una parte", "estraneo",
+          giudice({"maker": 0, "taker": 222, "detto": True}, 0, 222))
+    prova("e i numeri arrivano anche come stringhe o None", "riconosciuta",
+          giudice({"maker": "111", "taker": "222", "detto": True}, "111", "222"))
+    con.close()
+
+    # --- 3) IL CLIENT: le sentinelle --------------------------------
+    pia = pezzo_js(mini, "function pianificaAutoRecapito(", "\n}\n")
+    prova("prima di sparare si chiede al server, e si parte SOLO su «riconosciuta»",
+          True, 0 < pia.find("await parteRiconosciutaP2P(o)")
+          < pia.find("if (verdetto !== 'riconosciuta') { fermaRecapitoP2P(id, verdetto); return; }")
+          < pia.find("await campoInvia(o, 'euro', r.testo)"))
+    prova("...un «ignoto» si riprova per un tempo finito", True,
+          "if (verdetto === 'ignoto' && attese.length) { setTimeout(tenta, attese.shift()); return; }"
+          in pia and "const attese = P2P_RICONOSCI_ATTESE_MS.slice();" in pia)
+    prova("...senza il blocco che chiede e' un «non lo so», mai un si'", True,
+          "typeof parteRiconosciutaP2P === 'function'" in pia
+          and ": 'ignoto';" in pia)
+    prova("...e le regole di ieri restano: un tentativo per scambio, le condizioni al momento dello sparo",
+          True, "if (p2pAutoTentati[id]) return;" in pia
+          and "const r = recapitoDaAutoInvio(o);" in pia
+          and "setTimeout(tenta, P2P_AUTOINVIO_MS);" in pia)
+    attese = re.search(r"let P2P_RICONOSCI_ATTESE_MS = \[([0-9, ]+)\];", mini)
+    prova("le attese coprono i POST di mostrod per Tor (8 s + un retry a 12 s dopo 5)",
+          True, bool(attese) and sum(int(x) for x in attese.group(1).split(",")) >= 30000)
+    prova("il fermo si scrive sulla riga in UN posto solo", 1,
+          mini.count("recapitoFermo = "))
+    fer = pezzo_js(mini, "function fermaRecapitoP2P(id, motivo){", "\n}\n")
+    prova("...e non se il recapito e' gia' partito per un'altra strada", True,
+          "if (!o || (o.campiMiei || {}).euro) return;" in fer
+          and "scriviOrdineP2P(o);" in fer)
+    # il blocco di fuori
+    i_b = mini.index("/* ============ IL PAYCODE CHIEDE CHI C'E' DALL'ALTRA PARTE")
+    i_fb = mini.index("/* ============ fine del PayCode che chiede")
+    cod = re.sub(r"/\*[\s\S]*?\*/", "", mini[i_b:i_fb])
+    prova("il blocco che chiede sta FUORI dal motore, dopo il pagamento detto a chi vende",
+          True, i_b > mini.index("/* ============ fine del pagamento detto a chi vende")
+          > mini.index("/* ============ fine del motore dello scambio"))
+    prova("...UNA fetch, in POST, e nel corpo il solo id e la chiave PUBBLICA dell'altra parte",
+          [1, 1, True], [cod.count("fetch("), cod.count("method: 'POST'"),
+                         "body: JSON.stringify({ordine: o.id, chiave: o.peer})" in cod])
+    prova("...alla sua rotta, col cancello dell'anonimo", True,
+          "/p2p/parte-riconosciuta`" in cod
+          and "if (DEMO || VETRINA || !myTgId || !o || !o.id || !o.peer) return 'ignoto';" in cod)
+    prova("...e un si' e' solo `riconosciuta === true`: il resto e' un codice o «ignoto»",
+          True, "if (d && d.riconosciuta === true) return 'riconosciuta';" in cod
+          and "return (m && m !== 'riconosciuta') ? m : 'ignoto';" in cod
+          and "catch(e) { return 'ignoto'; }" in cod)
+    motore = re.sub(r"/\*[\s\S]*?\*/", "",
+                    mini[mini.index("const MOSTRO_ORDINI_CHIAVE"):
+                         mini.index("/* ============ fine del motore dello scambio")])
+    prova("il motore resta a zero fetch e zero corpo", [0, 0],
+          [motore.count("fetch("), motore.count("body:")])
+    ren = pezzo_js(mini, "function renderOrdineP2P(", "\n}\n")
+    prova("la pagina dello scambio mostra l'avviso sotto il gesto di chi vende", True,
+          0 < ren.find("(bottoni[azione] || '') +") < ren.find("avvisoRecapitoFermoP2P(o) +"))
+    av = pezzo_js(mini, "function avvisoRecapitoFermoP2P(o){", "\n}\n").replace("\\'", "'")
+    prova("...con la frase decisa con Alan", True,
+          "Chi ha preso usa un'app esterna a Barattolo: il PayCode non è partito "
+          "da solo. Se vuoi procedere, scriviglielo in chat." in av)
+    prova("...la variante per quando non si sa chi ha preso", True,
+          "Non sappiamo ancora chi ha preso l'ordine" in av
+          and "il PayCode non è partito da solo. Se vuoi procedere, scriviglielo in chat." in av)
+    prova("...e il bottone per mandarlo a mano", True,
+          'onclick="mandaRecapitoFermoP2P()"' in av)
+    prova("...solo finche' potrebbe partire: il giudice e' quello dell'invio automatico",
+          True, "if (!o || !o.recapitoFermo || !recapitoDaAutoInvio(o)) return '';" in av)
+    man = pezzo_js(mini, "function mandaRecapitoFermoP2P(){", "\n}\n")
+    prova("a mano si manda SOLO dopo la conferma: la campoInvia sta dentro il `poi`",
+          True, 0 < man.find("chiediConferma({") < man.find("poi: async () =>")
+          < man.find("await campoInvia(o, 'euro', r.testo)")
+          and man.count("campoInvia(") == 1)
+    prova("...e la conferma dice cosa esce e verso chi", True,
+          "titolo: 'Mandare il PayCode a mano?'" in man
+          and "che Barattolo non riconosce" in man)
+    prova("il banco della chat ha il server di cartone che riconosce", True,
+          "async function parteRiconosciutaP2P(o){ return 'riconosciuta'; }\n" in BANCO_CHAT)
+
+    # --- 4) IL BANCO NODE: il blocco gira col bundle vero -------------
+    node = _sh.which("node")
+    if not node:
+        salta("il PayCode fermo gira col bundle vero", "node non c'e'")
+        return
+    blocco = mini[mini.index("/* ---- I DUE RECAPITI CIFRATI"):
+                  mini.index("/* ---- LA RIGA LOCALE NEL VOCABOLARIO DEL LIBRO ----")]
+    pezzi = (re.search(r"const MAZZO_INFO = [^\n]+", mini).group(0) + "\n"
+             + pezzo_js(mini, "function chiaveScambio(", "\n}\n") + "\n}\n"
+             + blocco + "\n"
+             + pezzo_js(mini, "async function parteRiconosciutaP2P(", "\n}\n") + "\n}\n")
+    prelude = BANCO_CHAT[:BANCO_CHAT.index("__PEZZI__")].replace(
+        "async function parteRiconosciutaP2P(o){ return 'riconosciuta'; }\n", "")
+    banco = prelude + BANCO_PAYCODE.replace("__PEZZI__", pezzi)
+    with _tf.TemporaryDirectory() as d:
+        f = os.path.join(d, "paycode.js")
+        with open(f, "w", encoding="utf-8") as fh:
+            fh.write(banco)
+        r = _sp.run([node, f, "vendor/nostr.bundle.js"], capture_output=True,
+                    text=True, encoding="utf-8", timeout=120)
+    if r.returncode:
+        prova("il PayCode fermo gira col bundle vero", "",
+              (r.stdout or "") + (r.stderr or ""))
+        return
+    o = _json.loads(r.stdout.strip().splitlines()[-1])
+    prova("chiave riconosciuta: il PayCode parte come ieri, una busta kind 14",
+          [True, True], [o["riconosciutaParte"], o["riconosciutaUnaBusta14"]])
+    prova("...dopo UNA domanda in POST alla rotta, con l'id e la chiave del peer",
+          {"url": "/api/p2p/parte-riconosciuta", "metodo": "POST",
+           "chiavi": ["chiave", "ordine"], "ordine": "X", "chiaveEDelPeer": True},
+          o["domanda"])
+    prova("...senza fermo, e col toast di sempre", [True, True],
+          [o["riconosciutaSenzaFermo"], o["riconosciutaToast"]])
+    prova("esterno: non parte niente", True, o["esternoNonParte"])
+    prova("...una domanda sola, il fermo sulla riga, la pagina ridisegnata",
+          [1, "esterno", True], o["esterno"])
+    prova("...e lo si dice a voce", True, o["esternoToast"])
+    prova("...e nella pagina, con la frase e il bottone", True,
+          "Chi ha preso usa un'app esterna a Barattolo: il PayCode non è partito da solo. "
+          "Se vuoi procedere, scriviglielo in chat." in o["esternoAvviso"]
+          and 'onclick="mandaRecapitoFermoP2P()"' in o["esternoAvviso"])
+    prova("ignoto poi riconosciuta: tre domande, e parte", [3, 1, ""],
+          o["ignotoRiprova"])
+    prova("sempre ignoto: quattro domande (una + tre attese), non parte, fermo «ignoto»",
+          [4, 0, "ignoto"], o["ignotoSiArrende"])
+    prova("...e l'avviso dice che non si sa chi ha preso, non «app esterna»",
+          [True, False], ["Non sappiamo ancora chi ha preso" in o["ignotoAvviso"],
+                          "app esterna" in o["ignotoAvviso"]])
+    prova("rete giu': come ignoto", [4, 0, "ignoto"], o["reteGiu"])
+    prova("risposte storte (500, «true» stringa, no col motivo si', corpo vuoto): niente parte",
+          [4, 0, "ignoto"], o["storte"])
+    prova("diversa: fermo subito, senza riprovare", [1, 0, "diversa"], o["diversa"])
+    prova("...e l'avviso non dice «esterna» ma ha il bottone", [False, True],
+          ["app esterna" in o["diversaAvviso"], "mandaRecapitoFermoP2P" in o["diversaAvviso"]])
+    prova("chi compra non chiede e non manda", [0, 0], o["compraNonChiede"])
+    prova("in DEMO non si chiede e non si parte", [0, 0, "ignoto"], o["demoNonChiede"])
+    prova("senza sessione nemmeno", [0, 0, "ignoto"], o["senzaSessione"])
+    prova("l'avviso non c'e' senza fermo, a chi compra, a scambio finito, a PayCode partito",
+          ["", "", "", ""], [o["avvisoSenzaFermo"], o["avvisoNonACompra"],
+                             o["avvisoNonAFinito"], o["avvisoNonAPartito"]])
+    prova("a mano: prima la conferma, e niente e' partito", [1, 0], o["manualeChiede"])
+    prova("...la conferma dice titolo, etichetta e la strada della chat",
+          {"titolo": "Mandare il PayCode a mano?", "etichetta": "🧾 Manda",
+           "corpoDiceChat": True}, o["manualeConferma"])
+    prova("...dopo il si' parte, e l'avviso cade", [True, ""],
+          [o["manualeParte"], o["manualeAvvisoCade"]])
+    prova("...ed e' la stessa busta: chi compra la apre e legge il PayCode", True,
+          o["manualeArrivaACompra"])
+    prova("senza controparte il bottone dice perche' no, e non apre la conferma",
+          [0, 0, 1], o["manualeSenzaPeer"])
 
 
 def prove_p2p_avvisi_in_ordine():
@@ -97227,6 +97688,7 @@ def main():
     prove_card_tinte_stato,
     prove_p2p_campanello,
     prove_p2p_eventi, prove_p2p_riserva_libro, prove_p2p_avvisi_in_ordine,
+    prove_paycode_riconosciuto,
     prove_p2p_avvisi_libro, prove_p2p_orologio, prove_p2p_tutti_i_relay, prove_p2p_ascolto, prove_p2p_esito_notifiche, prove_p2p_silenzi,
     prove_p2p_avvisi_precisi,
     prove_p2p_recapito_passo,

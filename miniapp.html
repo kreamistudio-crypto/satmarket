@@ -49716,6 +49716,9 @@ function renderOrdineP2P(){
     /* IL RECAPITO STA SOTTO IL SUO GESTO (23 set 2026): subito dopo «Ho
        inviato gli euro», che e' dove l'IBAN si legge e si copia */
     recapitoCompratoreP2P(o) +
+    /* IL PAYCODE CHE NON E' PARTITO DA SOLO (24 set 2026): a chi vende,
+       sotto il suo gesto, con la strada a mano */
+    avvisoRecapitoFermoP2P(o) +
     /* IL BOTTONE SPENTO DI CHI ASPETTA IL RECAPITO (18 set 2026): si
        vede, cosi' si sa qual e' il passo dopo, e non si tocca. Sotto,
        l'uscita per chi il recapito l'ha avuto per un'altra strada —
@@ -53864,19 +53867,95 @@ function recapitoDaAutoInvio(o){
   /* ...e NIENT'ALTRO: un recapito ricordato qui non si guarda nemmeno */
   return null;
 }
+/* ⚠️ E PRIMA DI SPARARE SI CHIEDE CHI C'E' DALL'ALTRA PARTE (24 set
+   2026, decisione di Andrea con Alan). Un ordine del nostro
+   coordinatore lo puo' prendere anche un client Mostro esterno, e la
+   chiave a cui questo invio scrive e' quella di chi ha preso,
+   CHIUNQUE sia: i tre dati del tabacchino uscirebbero verso uno
+   sconosciuto. Quindi si chiede al server (`parteRiconosciutaP2P`,
+   fuori dal motore) se quella chiave e' l'altra parte dello scambio
+   come l'ha nominata mostrod E se e' una delle nostre: solo su un
+   `riconosciuta` si parte, come ieri. Su un `ignoto` — mostrod non ha
+   ancora parlato, o la rete non risponde — si riprova per un po'
+   (`P2P_RICONOSCI_ATTESE_MS`: i POST del coordinatore viaggiano per
+   Tor, 8 s piu' un retry a 12 s), poi ci si ferma; su ogni altro no ci
+   si ferma subito. FERMARSI vuol dire scriverlo sulla riga
+   (`recapitoFermo`) e dirlo nella pagina, con un bottone per mandarlo
+   a mano: `avvisoRecapitoFermoP2P` e `mandaRecapitoFermoP2P`. Fra
+   due utenti di Barattolo non cambia niente: il server dice si' e il
+   PayCode parte come oggi. La cura al coordinatore (la patch 0008
+   proposta nel verbale degli avvisi in ordine) non si fa: vedi
+   CANTIERI, «Il PayCode non parte verso chi non riconosciamo». */
+let P2P_RICONOSCI_ATTESE_MS = [10000, 20000, 30000];  // `let`: il banco le accorcia
 function pianificaAutoRecapito(id){
   if (p2pAutoTentati[id]) return;
   if (!recapitoDaAutoInvio(ordiniP2P()[id])) return;
   p2pAutoTentati[id] = 1;
-  setTimeout(async () => {
+  const attese = P2P_RICONOSCI_ATTESE_MS.slice();
+  const tenta = async () => {
     const o = ordiniP2P()[id];
     const r = recapitoDaAutoInvio(o);
     if (!r || !chiaviChatOrdine(o)) return;
+    /* fail-closed: senza il blocco che chiede (o senza una risposta
+       pulita) e' un «non lo so», mai un si' */
+    const verdetto = typeof parteRiconosciutaP2P === 'function'
+      ? await parteRiconosciutaP2P(o) : 'ignoto';
+    if (verdetto === 'ignoto' && attese.length) { setTimeout(tenta, attese.shift()); return; }
+    if (verdetto !== 'riconosciuta') { fermaRecapitoP2P(id, verdetto); return; }
     try {
       await campoInvia(o, 'euro', r.testo);
       toast('🧾 PayCode, importo e scadenza sono partiti verso chi compra ✓');
     } catch(e) { }
-  }, P2P_AUTOINVIO_MS);
+  };
+  setTimeout(tenta, P2P_AUTOINVIO_MS);
+}
+/* il PayCode che NON e' partito: la riga lo ricorda (sopravvive alla
+   riapertura, come il resto della riga) e la pagina lo dice. Se nel
+   frattempo e' partito per un'altra strada — un altro dispositivo —
+   non c'e' niente da fermare. */
+function fermaRecapitoP2P(id, motivo){
+  const o = ordiniP2P()[id];
+  if (!o || (o.campiMiei || {}).euro) return;
+  o.recapitoFermo = String(motivo || 'ignoto');
+  scriviOrdineP2P(o);
+  toast(o.recapitoFermo === 'esterno'
+    ? '🧾 Il PayCode non è partito da solo: chi ha preso usa un\'app esterna a Barattolo'
+    : '🧾 Il PayCode non è partito da solo: non sappiamo ancora chi ha preso', 6000);
+  if (p2pOrdineAperto === id) renderOrdineP2P();
+}
+/* PURA: l'avviso nella pagina dello scambio, col bottone per mandarlo
+   a mano. Solo finche' e' vero: a chi vende, su un PayCode che
+   potrebbe partire (`recapitoDaAutoInvio`) e non e' partito — mandato
+   a mano, l'avviso cade da solo. La frase e' quella decisa con Alan;
+   la variante «non sappiamo chi ha preso» e' per tutti i no che non
+   sono «esterno» (mostrod muto, rete giu', una riga stantia). */
+function avvisoRecapitoFermoP2P(o){
+  if (!o || !o.recapitoFermo || !recapitoDaAutoInvio(o)) return '';
+  const esterno = o.recapitoFermo === 'esterno';
+  return '<div class="trust-note nota-scambio"><span>🧾</span><span>'
+    + (esterno
+       ? 'Chi ha preso usa un\'app esterna a Barattolo: il PayCode non è partito da solo. Se vuoi procedere, scriviglielo in chat.'
+       : 'Non sappiamo ancora chi ha preso l\'ordine (il coordinatore non ce l\'ha confermato): il PayCode non è partito da solo. Se vuoi procedere, scriviglielo in chat.')
+    + '</span></div>'
+    + '<button class="btn ghost" onclick="mandaRecapitoFermoP2P()">🧾 Mandalo da qui lo stesso</button>';
+}
+/* il gesto a mano: la stessa busta dell'invio automatico, ma solo
+   dopo una conferma che dice cosa sta per uscire e verso chi */
+function mandaRecapitoFermoP2P(){
+  const o = ordiniP2P()[p2pOrdineAperto];
+  const r = recapitoDaAutoInvio(o);
+  if (!r || !chiaviChatOrdine(o)) { toast('Non si sa ancora con chi stai scambiando'); return; }
+  chiediConferma({
+    titolo: 'Mandare il PayCode a mano?',
+    corpo: 'PayCode, importo e scadenza partono cifrati verso la chiave di chi ha preso, che Barattolo non riconosce. La sua app potrebbe non mostrarli: se non risponde, scriviglielo in chat.',
+    etichetta: '🧾 Manda',
+    poi: async () => {
+      try {
+        await campoInvia(o, 'euro', r.testo);
+        toast('🧾 PayCode, importo e scadenza sono partiti verso chi ha preso ✓');
+      } catch(e) { toast('Non è partito: riprova fra un momento'); }
+    }
+  });
 }
 
 /* ---- il foglio dei recapiti ---- */
@@ -55400,6 +55479,36 @@ function battitoPagamentiP2P(){
   if (ids.length) chiediPagamentiP2P(ids);
 }
 /* ============ fine del pagamento detto a chi vende ============ */
+
+/* ============ IL PAYCODE CHIEDE CHI C'E' DALL'ALTRA PARTE (24 set 2026) =========
+   La domanda che `pianificaAutoRecapito` fa PRIMA dell'invio
+   automatico: «la chiave a cui sto per scrivere e' l'altra parte di
+   questo scambio come l'ha detta mostrod, e la riconoscete?». Il
+   giudice di la' e' `_parte_riconosciuta_p2p`, e risponde con un
+   codice: `riconosciuta`, `ignoto`, `estraneo`, `esterno`, `diversa`.
+   UN BLOCCO SUO, fuori dal motore, per la stessa ragione dei volti,
+   delle parti e del pagamento: il motore non ha dentro nessuna fetch
+   (c'e' la sentinella), e questa e' una chiamata vera al server. Le
+   regole sono le loro: il cancello dell'anonimo, gli id in POST e mai
+   nell'indirizzo, e nel corpo il solo id dell'ordine e la chiave
+   PUBBLICA dell'altra parte (che mostrod e il server conoscono gia').
+   FAIL-CLOSED: qualunque cosa non sia un si' pulito del server e'
+   `ignoto` — una rete giu', un 5xx, una risposta storta — e un
+   `ignoto` non fa partire niente. */
+async function parteRiconosciutaP2P(o){
+  if (DEMO || VETRINA || !myTgId || !o || !o.id || !o.peer) return 'ignoto';
+  try {
+    const r = await fetch(`${API_BASE}/p2p/parte-riconosciuta`, {method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
+      body: JSON.stringify({ordine: o.id, chiave: o.peer})});
+    if (!r.ok) return 'ignoto';
+    const d = await r.json();
+    if (d && d.riconosciuta === true) return 'riconosciuta';
+    const m = d && typeof d.motivo === 'string' ? d.motivo : '';
+    return (m && m !== 'riconosciuta') ? m : 'ignoto';
+  } catch(e) { return 'ignoto'; }
+}
+/* ============ fine del PayCode che chiede ============ */
 
 /* Racconta un ordine appena pubblicato nel canale «Barattolo Vetrina»,
    come per un annuncio normale (chiesto da Andrea, set 2026). STA QUI

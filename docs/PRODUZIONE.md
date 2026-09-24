@@ -1380,7 +1380,17 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   SPECCHIO GIRA SULLA MACCHINA DEL RELAY»). Finché resta il vecchio le
   buste continuano ad arrivare sullo specchio, e nessuno le guarda.
   NEL JOURNAL DEL VPS, le righe nuove:
-  `journalctl -u barattolo -f | grep -E "Evento P2P|Attese P2P|Riserva P2P|Libro P2P|Recapito P2P"`.
+  `journalctl -u barattolo -f | grep -E "Evento P2P|Attese P2P|Riserva P2P|Libro P2P|Recapito P2P|PayCode P2P"`.
+  DAL 24 SET 2026 (il PayCode verso chi non riconosciamo): `🧾 PayCode
+  P2P fermo: <ordine> per <tg>: esterno|ignoto|estraneo|diversa` — il
+  telefono di chi vende ha chiesto PRIMA dell'invio automatico del
+  PayCode e il server ha detto no, quindi non è partito niente da solo.
+  `esterno` = un client Mostro esterno ha preso sul nostro coordinatore
+  (chi vende vede l'avviso e il bottone a mano); `ignoto` = mostrod non
+  aveva ancora nominato le parti (il telefono riprova per ~1 minuto: tre
+  o quattro righe di fila sono normali, poi o tace o cambia motivo);
+  `diversa` = una riga stantia sul telefono; `estraneo` = chi ha chiesto
+  non è una delle due parti. Un sì non lascia righe.
   `🛰️ Evento P2P: 0f3a5c1e «fiat» da buyer (giro 1): avvisati [222]`
   con sotto l'esito di Telegram per destinatario; `🛰️ Evento P2P: …
   nessuno da avvisare (giro 1, compra 111, vende 222)` per i momenti

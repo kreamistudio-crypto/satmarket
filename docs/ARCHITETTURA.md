@@ -25803,7 +25803,19 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   in `p2p_avvisi` come `recapito1..3` di QUEL giro. NEL CLIENT il
   recapito RICORDATO non parte più da solo (`recapitoDaAutoInvio`
   guarda la sola riga del tabacchino): si precompila, e parte col tocco
-  di chi vende. La pubblicazione alza il velo dei gesti («Sto
+  di chi vende. E IL TABACCHINO, che parte da solo, dal 24 set 2026
+  parte SOLO verso una chiave che il server riconosce come l'altra
+  parte detta da mostrod: `POST /api/p2p/parte-riconosciuta` (sessione,
+  id e chiave nel corpo) risponde `{riconosciuta, motivo}` col giudice
+  puro `_giudice_parte_p2p` su `p2p_scambi` + `chiavi_p2p` (motivi:
+  `riconosciuta`, `ignoto`, `estraneo`, `esterno`, `diversa`); nel
+  client `parteRiconosciutaP2P` vive fuori dal motore (una fetch, la
+  sua sentinella), `pianificaAutoRecapito` chiede prima di sparare e
+  parte solo su un sì (un `ignoto` si riprova per `P2P_RICONOSCI_
+  ATTESE_MS`), `fermaRecapitoP2P` scrive `recapitoFermo` sulla riga,
+  `avvisoRecapitoFermoP2P` lo dice nella pagina e `mandaRecapitoFermoP2P`
+  manda a mano dopo `chiediConferma`. Verbale: CANTIERI, «Il PayCode
+  non parte verso chi non riconosciamo». La pubblicazione alza il velo dei gesti («Sto
   pubblicando…»), mostra la spunta arancione ferma «Ordine pubblicato»
   per `P2P_SPUNTA_MS` (2,5 s, `spuntaAttesaP2P`, classe `fatto`
   sull'overlay) e lo chiude nel `finally`.

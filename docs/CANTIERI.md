@@ -31531,3 +31531,110 @@ senza un cambio; la pagina col catalogo di casa per primo.
 **DA GUARDARE SUL TELEFONO.** Due aperture di fila dentro Telegram: il
 primo logo cambia. Dove il client non tiene il localStorage fra
 un'apertura e l'altra resta il solo caso, come chiesto.
+
+## Il PayCode non parte verso chi non riconosciamo (24 set 2026)
+
+**IL FATTO E LA DECISIONE.** Dal verbale degli avvisi in ordine
+(`9adaaf7`/`2eb4809`, punto c): un ordine Barattozon si può prendere
+anche da un client Mostro esterno, e se in quel momento l'app di chi
+vende è aperta `pianificaAutoRecapito` manda da sola, come kind 14
+cifrato, PayCode, importo e scadenza verso la chiave di chi ha preso —
+chiunque sia. Deciso da Andrea con Alan: la patch 0008 di mostrod NON
+si fa (rischio basso: il PayCode paga solo l'ordine Amazon di chi vende,
+e dai client esterni arriverà pochissima gente); niente al nodo né a
+mostrod. La cura è tutta dal lato nostro, in tre righe: il recapito
+automatico parte solo verso una chiave che il server riconosce come
+parte dello scambio confermata da mostrod; se no non parte niente da
+solo e chi vende lo legge nella pagina, con un bottone per mandarlo a
+mano dopo una conferma; fra due utenti di Barattolo non cambia niente.
+
+**LA CURA, SUL SERVER.** `_giudice_parte_p2p(parti, io, tg_chiave)`,
+puro: da `_parti_mostro_p2p` (`p2p_scambi`, le parti dette da mostrod
+dopo la cura A1) e da chi possiede la chiave (`chiavi_p2p`) esce uno
+dei cinque codici di `MOTIVI_PARTE_P2P` — `riconosciuta`, `ignoto`
+(mostrod non ha nominato nessuno, o l'ordine non lo conosciamo),
+`estraneo` (chi chiede non è una delle due parti), `esterno` (l'altra
+parte c'è ma non è nessuno dei nostri), `diversa` (l'altra parte è dei
+nostri ma la chiave data non è la sua: una riga stantia). L'altra parte
+si guarda dai due lati come nelle recensioni, quindi un `buy` preso da
+chi vende è lo stesso giudizio col posto girato. `_parte_riconosciuta_
+p2p` controlla le due forme (400) e la rotta `POST /api/p2p/parte-
+riconosciuta` (sessione, id e chiave nel corpo e mai nell'indirizzo,
+nessun gate sulla leva: non scrive niente) risponde `{riconosciuta,
+motivo}`; nel journal SOLO i no, `🧾 PayCode P2P fermo: <ordine> per
+<tg>: <motivo>`.
+
+**LA CURA, NEL CLIENT.** `pianificaAutoRecapito` tiene le regole di
+ieri (un tentativo per scambio, le condizioni al momento dello sparo,
+gli 8 s) e in più, PRIMA di `campoInvia`, chiede `parteRiconosciutaP2P`
+— in un blocco suo fuori dal motore, «IL PAYCODE CHIEDE CHI C'È
+DALL'ALTRA PARTE», con la sua sentinella (una fetch, POST, nel corpo il
+solo id e la chiave pubblica del peer); si parte SOLO su
+`riconosciuta`. Un `ignoto` si riprova con `P2P_RICONOSCI_ATTESE_MS`
+(10, 20, 30 s: i POST di mostrod viaggiano per Tor, 8 s più un retry a
+12 s dopo 5) e poi ci si ferma; ogni altro no ferma subito. Fermarsi è
+`fermaRecapitoP2P`: `recapitoFermo` sulla riga (sopravvive alla
+riapertura), un toast, la pagina ridisegnata. Nella pagina dello
+scambio, sotto il gesto di chi vende, `avvisoRecapitoFermoP2P`: per
+`esterno` la frase decisa con Alan — «Chi ha preso usa un'app esterna
+a Barattolo: il PayCode non è partito da solo. Se vuoi procedere,
+scriviglielo in chat.» — e per tutti gli altri no «Non sappiamo ancora
+chi ha preso l'ordine (il coordinatore non ce l'ha confermato): …»;
+sotto, «🧾 Mandalo da qui lo stesso» → `mandaRecapitoFermoP2P`, che
+apre `chiediConferma` («Mandare il PayCode a mano?», col corpo che dice
+cosa esce e che l'app dell'altro potrebbe non mostrarlo) e manda la
+STESSA busta dell'invio automatico solo dentro il `poi`. L'avviso cade
+da solo appena il PayCode è partito (il giudice è `recapitoDaAutoInvio`,
+lo stesso dell'automatico). FAIL-CLOSED ovunque: rete giù, un 5xx, una
+risposta storta, DEMO, nessuna sessione, il blocco che manca → `ignoto`,
+mai un sì.
+
+**STRADE SCARTATE.** Decidere dal profilo dell'altra parte già in
+pagina (`p2pControparti`): dice chi ha preso da `p2p_ordini.preso_da`,
+che per chi entra da Nostr non si scrive PER SCELTA — lo si sarebbe
+trattato da esterno — e non lega la CHIAVE a cui la busta parte. Far
+partire il PayCode su un `ignoto` dopo le attese, «tanto è quasi sempre
+uno dei nostri»: un «non lo so» non è un sì, la lezione della sonda.
+Tenere l'avviso solo in pagina senza il toast: chi vende, alla presa,
+sta spesso su un'altra vista. Il bottone a mano senza conferma: la
+busta esce verso uno sconosciuto, e va detto prima.
+
+**PROVATO.** `prove_paycode_riconosciuto` (73: la rotta e le sue
+regole; il giudice su un database in memoria dai due lati, col `buy`
+girato, senza `preso_dal`, l'estraneo a chiave giusta, la chiave nostra
+ma di un terzo, le forme sbagliate; le sentinelle del client — l'ordine
+chiedi→giudica→manda, le attese, il fermo in un posto solo, il blocco
+di fuori con una fetch, il motore a zero fetch, la frase, il bottone,
+la `campoInvia` dentro il `poi`; e il banco node col bundle vero:
+riconosciuta parte con una busta kind 14 dopo una domanda in POST,
+esterno non parte e ferma con avviso e toast, ignoto poi riconosciuta
+riprova e parte, sempre ignoto si arrende a quattro domande, rete giù e
+risposte storte non partono, diversa ferma subito, chi compra e DEMO e
+senza sessione non chiedono, l'avviso solo dove è vero, a mano prima la
+conferma poi la busta che chi compra apre, senza controparte il perché
+no). Il banco della chat ha un server di cartone che riconosce, così il
+tabacchino parte come ieri. `collaudo_paycode_riconosciuto` col server
+vero e gli eventi dalla rotta vera (19: ignoto prima che mostrod parli,
+riconosciuta dai due lati, esterno con una chiave di nessuno, estraneo,
+diversa, i 400, il ritiro che riporta a esterno e la presa nuova che
+rimette il sì), aggiunto ai collaudi della CI. Suite intera severa
+senza config nel worktree da origin/main: 15.487 verdi e 1 rossa, il censimento dei fogli di conferma che contava 69 chiediConferma — la conferma del PayCode a mano e' la settantesima, e la prova e' emendata a 70 col perche' (la sua sezione rigirata: 45/0). DAL VIVO a
+375 px nei due temi (server da una copia col relay morto, identità
+Venditore, riga seminata da `scriviOrdineP2P`): l'avviso e il bottone
+sotto «Blocca i sats», larghezza 375 senza sbordi, colori del tema
+scuro sui riquadri; il bottone apre la conferma e con «Annulla» non
+esce niente; e la strada intera dalla pagina: eventi di mostrod dalla
+porta vera (`/api/p2p/evento`) prima con la chiave di chi vende non
+registrata → quattro domande, `ignoto`, avviso «non sappiamo»; poi
+registrata e chi ha preso sconosciuto → una domanda, `esterno`, toast e
+avviso con la frase, nessuna busta, e nel journal le cinque righe
+`🧾 PayCode P2P fermo`. Le foto del pane escono a mosaico 2×2 (difetto
+suo, a verbale): quel che si legge è giusto, l'impaginazione l'ha detta
+il DOM.
+
+**DA GUARDARE (Andrea).** Sul telefono, con un PayCode preso da un
+client Mostro esterno: l'avviso entro ~1 minuto dalla presa, il toast,
+il bottone e la conferma; e nel journal la riga `🧾 PayCode P2P fermo`.
+Se un venditore nostro vedesse «non sappiamo chi ha preso» con un
+compratore nostro, la prima cosa da guardare è `chiavi_p2p`: la chiave
+di chi ha preso (o di chi vende) non è arrivata al server.
