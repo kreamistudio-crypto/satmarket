@@ -249,7 +249,17 @@ jobs:
       # nella cronologia). Si TOGLIE IL VALORE dalla riga prima di
       # guardarla, non la riga: una chiave vera accanto a una di
       # cartone resta li' e fa scattare la regola.
-      CARTONE_HEX: 's/\b([0-9a-f])\1{63}\b//g'
+      # E DUE VALORI PUBBLICI (24 set 2026): gli sha256 dei due PNG
+      # originali dei loghi dei tondi, scritti interi nel primo commit
+      # di assets/loghi/LEGGIMI.md (8adea78) — impronte di file
+      # pubblici, non chiavi, e la storia non si riscrive. Si tolgono
+      # per VALORE, mai il file: una chiave vera incollata domani in
+      # quel LEGGIMI fa scattare la regola come ovunque. Sono scritti
+      # come prefisso di 16 + [0-9a-f]{48} perche' questo file non
+      # contenga a sua volta sessantaquattro esadecimali di fila; oggi
+      # nel LEGGIMI stanno a gruppi di otto, e l'albero e' pulito anche
+      # SENZA questa eccezione (provato in locale sui due passi).
+      CARTONE_HEX: 's/\b([0-9a-f])\1{63}\b//g;s/\bf91e9d7c30894cb0[0-9a-f]{48}\b//g;s/\b85d68c6972360099[0-9a-f]{48}\b//g'
       FORMA_HEX: '\b[0-9a-f]{64}\b'
     steps:
       - uses: actions/checkout@v5

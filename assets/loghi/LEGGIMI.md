@@ -10,13 +10,19 @@ il `data:` URI, mai uno dei due da solo.
 - `telegram.webp` — il logo ufficiale di Telegram (il cerchio azzurro
   con l'aeroplano bianco), dalla pagina dei loghi di Telegram.
   Originale: `logo-telegram.png`, 1000×1000, 197.144 byte, sha256
-  `f91e9d7c30894cb0f00196581d4cc8867dd1139b2b1455de2c58071103475ca8`.
+  `f91e9d7c 30894cb0 f0019658 1d4cc886 7dd1139b 2b1455de 2c580711 03475ca8`.
   È un marchio di Telegram: qui dice soltanto «questo bottone ti porta
   su Telegram», che è l'uso per cui la pagina dei loghi lo offre.
 - `nostr.webp` — il logo di Nostr (la «n» viola con lo struzzo), dal
   pacchetto di github.com/mbarulli/nostr-logo, rilasciato CC0 1.0
   (pubblico dominio). Originale: `logo-nostr.png`, 256×256, 3.189 byte,
-  sha256 `85d68c69723600993cbe18fe1c28324570b25fafde9ca4fefc62acb5ec2e155c`.
+  sha256 `85d68c69 72360099 3cbe18fe 1c283245 70b25faf de9ca4fe fc62acb5 ec2e155c`.
+
+LE IMPRONTE STANNO A GRUPPI DI OTTO, ed è la riga da non «ripulire»:
+sessantaquattro esadecimali di fila sono la forma di una chiave
+privata Nostr, e il controllo dei segreti della CI li ferma — lo ha
+fatto davvero col primo commit di questo file (8adea78), dove erano
+scritte intere. Per confrontarle si tolgono gli spazi.
 - L'icona «link» di Lucide (i due anelli intrecciati) non ha un file
   qui: è un SVG di due tracciati, e sta dentro `miniapp.html` con i
   tracciati dell'originale (`icons/link.svg` del repository di Lucide),
