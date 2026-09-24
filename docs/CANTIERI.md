@@ -29878,3 +29878,91 @@ blocco / catalogo esterno» e il giro intero su un negozio di prova
 (collega → ultimo passo coi costi → catalogo letto); da venditore
 qualunque, che il cassetto si chiami solo «Importa in blocco» e la
 sezione non ci sia.
+
+## Il + che si ferma sul logo (24 set 2026)
+
+Quinto giro sul trascino della capsula, ritocco di Andrea a 9a8ff0d, con
+due correzioni sue a meta' strada. Worktree da `origin/main`, commit
+firmato.
+
+**COSA C'È.** 1) IL TELAIO DI SOPRA SFUMA COL +: mentre il + scende il
+contorno della capsula (`.bin-su`) prende opacita' 1 − corsa/fondo,
+scritta dal dito; col + in fondo e' a zero, e rilasciato prima del logo
+ricompare con la corsa del +. Sotto l'equatore del + il filo e' quello
+della tendina, dentro il telaio che la taglia li'. 2) LASCIATO SUL LOGO
+IL + SI FERMA IN FONDO e da li' diventa il bottone blu «Rileggi e
+pubblica» (`lasciaSulLogoP2P`): il fantasma parte da lui, il rosso sfuma
+finche' e' tondo e sotto c'e' gia' un gemello blu che cresce fino al
+bottone; la capsula se ne va con lui (`capsula-via`) e torna a casa di
+colpo sotto il foglio pieno. 3) IL TOCCO SULLA TENDINA FA LO STESSO DA
+SOLO (ripensamento di Andrea a giro iniziato: prima restava la morfosi
+dalla tasca): il + scende con la corsa della barra, si blocca e si
+trasforma (`toccaTendinaP2P`); dove la morfosi non c'e' — effetti
+ridotti, demo, vetrina — il foglio si apre subito, come prima. 4)
+CHIUDENDO NIENTE RITORNO: freccia, gesto indietro dell'app o
+pubblicazione, il foglio sfuma e sotto la barra e' gia' a riposo
+(`barraSeccaP2P`). Il foglio rosso o verde nato dal + torna ancora nel +.
+
+**LE CORREZIONI DI META' STRADA, che sono la lezione.** a) IL ROSSO: con
+la dissolvenza intera, a 430px, a un quinto di rosso la forma era gia'
+un ovale di 105 pixel — una velatura bordeaux su qualcosa che si
+allunga. Sfuma in meta' dissolvenza, e l'ultimo fotogramma che ne ha
+ancora e' un cerchio. b) A FINE CORSA (Andrea, dai fotogrammi): un
+secondo pezzo di binario, la TASCA — dal fondo del + a riposo al fondo
+della tendina —, restava pieno, e col + in fondo i suoi fianchi dritti
+spuntavano ai lati della meta' alta del cerchio, bianchi a luce accesa;
+e l'alone, un'ombra attorno alla tasca alta un pixel piu' del cerchio,
+gli girava intorno anche sopra, con una falce scura in mezzo. La tasca
+non c'e' piu' (il filo di sotto lo dava gia' la tendina) e l'alone e'
+una CONCA di luce concentrica al + posato, spenta da una maschera
+dall'equatore in su. c) IL PRIMO TOCCO: il banco dal vivo ha trovato un
+difetto che le prove non vedevano — al primo tocco dopo l'avvio la
+discesa non partiva, perche' la guardia della morfosi chiedeva il
+bottone d'arrivo, che nasce solo col primo disegno del foglio. Il tocco
+chiede `morfoPuoiP2P(true)`, «a foglio ancora da disegnare»; e il banco
+del trascino non ha mai il bottone, come all'avvio. d) Il conto dei
+pixel a fine corsa mentiva in un modo solo, ed era il riferimento: lo
+«sfondo nudo» nascondeva il telaio, ma la tendina ha `visibility:
+visible` sua e restava accesa. Il confronto buono e' lo stesso scatto
+col solo +.
+
+**LE SCELTE.** Lo stato che cambia senza corsa si scrive in riga sui soli
+pezzi (`senzaCorsaP2P`: corsa spenta, stato, riflusso, corsa di nuovo),
+non con la regola universale dell'arrivo secco, che spegnerebbe anche la
+dissolvenza del foglio che si chiude — e un terzo `!important` sulle
+transizioni una prova lo vieta. La regola che spegne il binario porta
+anche `p2p-binario`, o a pari peso vincerebbe quella che lo accende. La
+morfosi dalla tasca del quarto giro e' caduta quando il tocco e'
+diventato il trascino fatto da solo: nessuno la usava piu'. I capi del
+censimento delle corse si cercano invece di pretenderli: con `index` un
+capo cambiato faceva esplodere l'intera sezione.
+
+**PROVATO.** La suite intera, severa e senza config, sull'albero
+ribasato: 14.680 verdi e 0 rosse; i 15 collaudi della CI verdi, in
+gabbia. `prove_tasto_barattozon` (le sedici regole della
+tendina; il binario e la conca dell'alone letti dalle regole; la
+cascata del binario di sopra — segue il dito, torna con la corsa, negli
+effetti ridotti no — e della capsula che se ne va; il banco del
+trascino: lasciato sul logo resta giu', senza morfosi torna, il tocco
+che scende da solo, il secondo tocco, il demo, il cambio di vista a
+meta' discesa, il dito durante la discesa) e `prove_p2p_pubblica` (il
+gemello blu e il rosso in meta' dissolvenza chiesti alla cascata; il
+banco della barra secca e della capsula a posto; la chiusura senza
+ritorno; la tasca che non c'e' piu'). **TORTURA 53/53** su una copia (49
+al primo giro: le altre quattro non sopravvivevano, facevano esplodere
+la sezione — mie prove con `index` invece di una rossa col suo nome;
+rifatte con `find`, uccise pulite). DAL VIVO col dito vero
+(eventi touch di Chrome, relay morto) a 320/375/430 nei due temi: il
+telaio di sopra a 0,73 / 0,45 / 0,18 / 0 col + a 15, 30, 45 e 55px, e di
+nuovo a 1 al ritorno; la morfosi dal + in fondo senza rosso largo; la
+chiusura con la freccia e col gesto indietro senza fantasma, la barra a
+riposo dal primo fotogramma; il tocco che scende da −31 a +24 e si
+trasforma a ~450ms; A FINE CORSA, col dito fermo e a discesa finita, 0
+pixel di telaio o di luce sopra l'equatore del cerchio (lo stesso conto,
+con la tasca e l'alone di prima rimessi a mano, ne trova 15.488).
+
+**DA GUARDARE SUL TELEFONO.** Il telaio che sparisce mentre il + scende,
+e riappare se lo si lascia prima; il + fermo in fondo, pulito sopra, che
+diventa il bottone blu senza passare dal rosso — trascinato e col tocco,
+anche il primo dopo l'avvio; la chiusura con la freccia e col gesto
+indietro dell'app, senza niente in volo.

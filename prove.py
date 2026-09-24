@@ -52197,7 +52197,10 @@ def prove_tasto_barattozon():
        set 2026, secondo ritocco): solo in verticale, dentro la capsula,
        col binario vuoto sopra di lui; lasciato sulla tendina apre lo
        stesso percorso, prima di lei torna a casa e non fa niente; una
-       soglia distingue il tocco dal trascino;
+       soglia distingue il tocco dal trascino. (Quinto giro) il telaio di
+       sopra sfuma man mano che il + scende; lasciato sul logo il + si
+       ferma li' e DIVENTA il bottone blu; e il tocco sulla tendina fa lo
+       stesso da solo — il + scende, si blocca, si trasforma;
     3) il bottone che pubblica veste il + che si e' aperto (verde,
        rosso) e col percorso Barattozon il blu col logo, come il
        «Pubblica» del suo riepilogo;
@@ -52333,9 +52336,9 @@ def prove_tasto_barattozon():
           [True] * 5,
           ['role="button"' in _tag, 'tabindex="0"' in _tag,
            'aria-label="Vendi con Barattozon: contanti al tabacchino"' in _tag,
-           'onclick="apriBarattozonP2P()"' in _tag,
+           'onclick="toccaTendinaP2P()"' in _tag,
            "if(event.key==='Enter'||event.key===' ')"
-           "{event.preventDefault();apriBarattozonP2P()}" in _tag])
+           "{event.preventDefault();toccaTendinaP2P()}" in _tag])
     prova("...col logo 41x40, e l'immagine che manca si toglie", True,
           '<img src="/assets/barattozon-tasto.webp" width="41" height="40" '
           'alt="" onerror="this.remove()"></div></div>' in barra)
@@ -52348,31 +52351,31 @@ def prove_tasto_barattozon():
                   if "navBarattozon" in s or "navTendina" in s)
     VISTO = ("body.nav-p2p.p2p-vendo:not(.p2p-piu-neutro):not(.barra-via) "
              "#navBarattozon")
-    TASCA = "body.nav-p2p.p2p-vendo.morfo-tasca:not(.p2p-piu-neutro) #navBarattozon"
-    # diciassette regole e nessuna di piu': chi ne aggiunge una la scrive
-    # qui, e soprattutto nessun'altra la ACCENDE — il giudice e' uno.
-    # (24 set 2026, quarto giro) quattro nuove: telaio e tendina che seguono
-    # il dito senza corsa, il ritorno che non aspetta il .1s, e la tendina
-    # ferma — col logo nascosto — sotto il fantasma della tasca
-    prova("le regole della tendina e del suo telaio sono queste diciassette", sorted([
+    # sedici regole e nessuna di piu': chi ne aggiunge una la scrive qui, e
+    # soprattutto nessun'altra la ACCENDE — il giudice e' uno.
+    # (quarto giro) telaio e tendina che seguono il dito senza corsa e il
+    # ritorno che non aspetta il .1s; (quinto giro) la tendina che se ne va
+    # col + sceso sul logo (`capsula-via`), e le due regole della tendina
+    # ferma sotto il fantasma della tasca che se ne sono andate con lei
+    prova("le regole della tendina e del suo telaio sono queste sedici", sorted([
         "#navTendina", "body.nav-p2p #navTendina",
         "body.nav-p2p.p2p-vendo #navTendina",
         "body.nav-p2p.p2p-piu-neutro #navTendina",
         "#navBarattozon", "#navBarattozon img", "#navBarattozon:focus-visible",
         VISTO, "#navBarattozon::before", "#navBarattozon::after",
-        "body.p2p-sopra #navBinario::after,body.p2p-sopra #navBarattozon::after, "
+        "body.p2p-sopra #navBinario>i::after,body.p2p-sopra #navBarattozon::after, "
         "body.p2p-sopra nav::after",
-        "body.p2p-trascina #navTendina,body.p2p-trascina #navBarattozon",
+        "body.p2p-trascina #navTendina,body.p2p-trascina #navBarattozon, "
+        "body.p2p-trascina #navBinario .bin-su",
         "body.nav-p2p.p2p-vendo.p2p-binario:not(.p2p-piu-neutro):not(.barra-via) "
         "#navBarattozon",
-        TASCA, "body.morfo-tasca #navBarattozon img",
-        "#navBinario::after,#navTendina,#navBarattozon,#navBarattozon::after, nav::after",
+        "body.capsula-via #navTendina",
+        "#navBinario .bin-su,#navBinario>i::after,#navTendina,#navBarattozon, "
+        "#navBarattozon::after,nav::after",
         "#navBinario,#navTendina,nav::after"]), _sel)
-    # DUE LA FANNO VEDERE, ed e' la seconda a essere nuova: libro, «Vendi
-    # BTC», barra ferma — e sotto il fantasma della tasca, dove la barra si
-    # e' aperta ma la tendina resta fuori e ferma (24 set 2026)
-    prova("...e due la fanno vedere: la barra ferma, e il fantasma della tasca",
-          sorted([VISTO, TASCA]),
+    # UNA SOLA LA FA VEDERE: libro, «Vendi BTC», barra ferma (la seconda,
+    # quella della tasca, e' caduta col quinto giro)
+    prova("...e una sola la fa vedere: libro, «Vendi BTC», barra ferma", [VISTO],
           sorted(_norm(s) for s, c in re.findall(r"([^{}]+)\{([^{}]*)\}", senza)
                  if "navBarattozon" in s and "visibility:visible" in c))
     _tel = _regola(css, "  #navTendina{position:absolute;", "}")
@@ -52496,26 +52499,34 @@ def prove_tasto_barattozon():
           [True, True, True, True],
           ["box-shadow:inset 0 0 0 2.5px #FFFFFF;" in _dopo
            and "rgba(255,255,255,.22)" in _dopo,
-           "box-shadow:0 0 18px 4px rgba(255,255,255,.45);" in _alone,
+           "background:radial-gradient(closest-side,rgba(255,255,255,.45) 50%," in _alone,
            "z-index:-1;pointer-events:none;opacity:0;" in _alone,
-           "body.p2p-sopra #navBinario::after,body.p2p-sopra #navBarattozon::after,\n"
+           "body.p2p-sopra #navBinario>i::after,body.p2p-sopra #navBarattozon::after,\n"
            "  body.p2p-sopra nav::after{opacity:1}" in css])
-    # L'ALONE FA IL GIRO DELLA TASCA (24 set 2026, col + nella guida): e'
-    # li' che il + va a posarsi, e un alone alto quanto la tendina avrebbe
-    # la cima piatta in mezzo al binario vuoto. Dal fondo del + a riposo
-    # (equatore piu' raggio) al fondo della tendina, tondo col raggio del +
-    prova("...e l'alone fa il giro della tasca, tondo col raggio del +",
-          [(_px(_tel, "top") or 0) + (_lato or 0) / 2, _lato,
-           (_alta or 0) - (_lato or 0) / 2, True],
-          [_px(_alone, "top"), _px(_alone, "width"), _px(_alone, "height"),
-           "border-radius:%gpx;" % ((_lato or 0) / 2) in _alone])
+    # L'ALONE E' UNA CONCA SOTTO IL + POSATO (quinto giro, richiesta di
+    # Andrea): concentrico al cerchio in fondo alla corsa — il centro e' il
+    # fondo della tendina meno il raggio —, la luce parte dal bordo del
+    # cerchio (meta' del raggio della sfumatura, lato 2 × il diametro) e una
+    # maschera la spegne dall'equatore in su. Niente ombra: quella di prima
+    # girava intorno anche sopra, un pixel piu' alta, con la falce scura
+    _centro_giu = (_px(_tel, "top") or 0) + (_alta or 0) - (_lato or 0) / 2
+    prova("...e l'alone e' una conca concentrica al + posato: la luce parte dal "
+          "bordo del cerchio, e dall'equatore in su la maschera la spegne (anche "
+          "col prefisso), senza ombra", [_centro_giu, 2 * (_lato or 0), 2 * (_lato or 0),
+                                         True, True, None],
+          [(_px(_alone, "top") or 0) + (_px(_alone, "height") or 0) / 2,
+           _px(_alone, "width"), _px(_alone, "height"),
+           "-webkit-mask-image:linear-gradient(to bottom,transparent 50%,#000 75%);"
+           in _alone,
+           "\n    mask-image:linear-gradient(to bottom,transparent 50%,#000 75%);" in _alone,
+           _dichiarazione(_alone, "box-shadow")])
     prova("il + trascinato segue il dito senza corsa", True,
           "body.p2p-trascina nav button.sell .ic{transition:none}" in css)
     prova("reduced-motion la fa comparire senza corsa, luce compresa (anche "
           "quella del binario)", True,
           "@media (prefers-reduced-motion:reduce){\n"
-          "    #navBinario::after,#navTendina,#navBarattozon,#navBarattozon::after,\n"
-          "    nav::after{transition:none}\n  }" in css)
+          "    #navBinario .bin-su,#navBinario>i::after,#navTendina,#navBarattozon,\n"
+          "    #navBarattozon::after,nav::after{transition:none}\n  }" in css)
     prova("...e da desktop non c'e', ne' lei ne' il binario ne' il suo alone", True,
           "#navBinario,#navTendina,nav::after{display:none}"
           in blocco_media("@media (min-width:768px){\n    #app{max-width:960px"))
@@ -52526,35 +52537,55 @@ def prove_tasto_barattozon():
     # disegna #navBinario, e dentro si vede la pagina. Il binario e' la
     # capsula INTERA — dalla cima del + a riposo al fondo della tendina —,
     # e i suoi numeri si leggono dalle regole del + e della tendina.
-    i_bin = barra.find('<div id="navBinario" aria-hidden="true"></div>')
+    # (quinto giro) IL TELAIO DI SOPRA SE NE VA COL +: `.bin-su`, il
+    # contorno intero, sfuma man mano che il + scende (l'opacita' la scrive
+    # il dito), e sotto l'equatore del + il filo e' quello della tendina.
+    i_bin = barra.find('<div id="navBinario" aria-hidden="true"><i class="bin-su"></i></div>')
     prova("il binario sta nella barra, uno solo, PRIMA del telaio (la tendina "
-          "e il + gli si dipingono sopra)", [True, 1, True],
+          "e il + gli si dipingono sopra), col suo contorno", [True, 1, True],
           [i_bin >= 0, mini.count('id="navBinario"'),
            0 <= i_bin < barra.find('<div id="navTendina">')])
     _bin = _regola(css, "  #navBinario{position:absolute;", "}")
+    _bsu = _regola(css, "  #navBinario .bin-su{", "}")
     _cima_bin = (float(_m_pad.group(1)) + _px(_casa, "margin-top") + _su_vendi
                  if _m_pad and _su_vendi is not None
                  and _px(_casa, "margin-top") is not None else None)
     prova("...ed e' la capsula intera: dalla cima del + a riposo (padding, margine "
-          "e salita letti da lui) al fondo della tendina, larga 54 col raggio 27",
+          "e salita letti da lui) al fondo della tendina, larga 54; il pezzo di "
+          "sopra col raggio 27",
           [_cima_bin, (_px(_tel, "top") or 0) + (_alta or 0), _lato, True],
           [_px(_bin, "top"),
            (_px(_bin, "top") or 0) + (_px(_bin, "height") or 0),
            _px(_bin, "width"),
-           "border-radius:%gpx;" % ((_lato or 0) / 2) in _bin])
-    prova("...col filo della tendina, lo stesso token, e VUOTO dentro: sopra il "
-          "+ si vede la pagina", ["inset 0 0 0 2.5px var(--nav-ink-p2p)", None, True],
-          [_dichiarazione(_bin, "box-shadow"), _dichiarazione(_bin, "background"),
-           "pointer-events:none;opacity:0;" in _bin])
+           "border-radius:%gpx;" % ((_lato or 0) / 2) in _bsu])
+    # LA TASCA NON C'E' PIU' (quinto giro, i fotogrammi a fine corsa di
+    # Andrea): un secondo pezzo di binario restava pieno fino in fondo, e
+    # col + posato i suoi fianchi spuntavano ai lati della meta' alta del
+    # cerchio. Sotto l'equatore del + il filo e' quello della tendina,
+    # aperto in cima, dentro il telaio che la taglia li' e scende col +
+    prova("...e la tasca non c'e' piu': un pezzo solo, e sotto l'equatore del + "
+          "il filo e' quello della tendina, aperto in cima, dentro il telaio che "
+          "la taglia li'", [1, False, True, True],
+          [barra.count('<i class="bin-'), "bin-giu" in mini,
+           "top:-3px;bottom:0;\n    border-radius:0 0 27px 27px;pointer-events:none;\n"
+           "    box-shadow:inset 0 0 0 2.5px var(--nav-ink-p2p)}"
+           in _regola(css, "  #navBarattozon::before{", "}") + "}",
+           "overflow:hidden;" in _tel])
+    prova("...col filo della tendina, lo stesso token, e VUOTO dentro: sopra il + "
+          "si vede la pagina",
+          ["inset 0 0 0 2.5px var(--nav-ink-p2p)", None, True],
+          [_dichiarazione(_bsu, "box-shadow"),
+           _dichiarazione(_bin, "background"), "pointer-events:none;opacity:0}" in _bin + "}"])
     prova("...si vede solo col gesto, nel libro su «Vendi BTC»; e col + sopra "
           "la tendina il suo filo diventa bianco", [True, True],
           ["body.nav-p2p.p2p-vendo.p2p-binario:not(.p2p-piu-neutro) #navBinario{opacity:1}"
            in css,
-           "#navBinario::after{content:'';position:absolute;inset:0;border-radius:27px;\n"
+           "#navBinario>i::after{content:'';position:absolute;inset:0;border-radius:inherit;\n"
            "    box-shadow:inset 0 0 0 2.5px #FFFFFF;opacity:0;" in css])
-    prova("il telaio e la tendina seguono il dito senza corsa, come il +", True,
-          "body.p2p-trascina #navTendina,body.p2p-trascina #navBarattozon{transition:none}"
-          in css)
+    prova("il telaio, la tendina e il binario di sopra seguono il dito senza "
+          "corsa, come il +", True,
+          "body.p2p-trascina #navTendina,body.p2p-trascina #navBarattozon,\n"
+          "  body.p2p-trascina #navBinario .bin-su{transition:none}" in css)
     # LA CASCATA, e non la stringa: su QUESTA tendina, con QUESTE classi,
     # chi vince? (la lezione del lampo rosso: la regola c'era e perdeva)
     _reg, _sq = _regole_css(css[len("<style>"):])
@@ -52578,16 +52609,34 @@ def prove_tasto_barattozon():
           ["0s,0s", ".1s,0s"],
           [_vince(_VB + ["p2p-binario"], "transition-delay"),
            _vince(_VB, "transition-delay")])
-    prova("sotto il fantasma della tasca la tendina resta fuori e ferma, col logo "
-          "nascosto; senza, la barra aperta la riavvolge",
-          {"tasca": ["none", "visible", "hidden"],
-           "via": ["translateY(-55px)", "hidden", None]},
-          {"tasca": [_vince(_VB + ["barra-via", "morfo-tasca"], "transform"),
-                     _vince(_VB + ["barra-via", "morfo-tasca"], "visibility"),
-                     _vince(_VB + ["barra-via", "morfo-tasca"], "visibility", _nodo("img"))],
-           "via": [_vince(_VB + ["barra-via"], "transform"),
-                   _vince(_VB + ["barra-via"], "visibility"),
-                   _vince(_VB + ["barra-via"], "visibility", _nodo("img"))]})
+    # IL TELAIO DI SOPRA (quinto giro): segue il dito senza corsa, e al
+    # rilascio torna con la corsa della barra; negli effetti ridotti niente
+    # corsa. Il primo conto si fa SENZA le regole del reduced-motion (che il
+    # giudice, nel dubbio, darebbe per vere), il secondo con loro.
+    _reg_mosso = [r for r in _reg if not any("reduced-motion" in g for g in r[2])]
+    _su_chain = lambda corpo: [_nodo("html"), _nodo("body", classi=corpo), _nodo("nav"),
+                               _nodo("div", "navBinario"), _nodo("i", classi=("bin-su",))]
+    _tr_su = lambda regole, corpo: (_vince_css(regole, _su_chain(corpo), ["transition"])
+                                    .get("transition") or [None])[0]
+    prova("il binario di sopra segue il dito senza corsa, torna con la corsa della "
+          "barra, e negli effetti ridotti non corre (lo dice la cascata)",
+          ["none", "opacity var(--p2p-corsa) var(--p2p-curva)", "none"],
+          [_tr_su(_reg_mosso, _VB + ["p2p-binario", "p2p-trascina"]),
+           _tr_su(_reg_mosso, _VB + ["p2p-binario"]),
+           _tr_su(_reg, _VB + ["p2p-binario"])])
+    # LA CAPSULA SE NE VA COL + SCESO SUL LOGO: binario e tendina sfumano
+    # (`capsula-via`), e la regola che spegne il binario vince quella che lo
+    # accende — a pari peso vincerebbe lei, che nel foglio sta piu' in basso
+    _op = lambda corpo, figlio: (_vince_css(_reg, [_nodo("html"), _nodo("body", classi=corpo),
+                                                   _nodo("nav"), figlio], ["opacity"])
+                                 .get("opacity") or [None])[0]
+    prova("sceso il + sul logo, binario e tendina sfumano via con lui (lo dice la "
+          "cascata: la regola che li spegne vince quella che accende il binario)",
+          {"binario": ["1", "0"], "telaio": [None, "0"]},
+          {"binario": [_op(_VB + ["p2p-binario"], _nodo("div", "navBinario")),
+                       _op(_VB + ["p2p-binario", "capsula-via"], _nodo("div", "navBinario"))],
+           "telaio": [_op(_VB, _nodo("div", "navTendina")),
+                      _op(_VB + ["capsula-via"], _nodo("div", "navTendina"))]})
     # ⚠️ IL DITO (23 set 2026, trovato col tocco VERO nel pane): la
     # scatola del + copre la tendina e sta dopo nel markup, quindi il dito
     # sul marchio apriva il foglio SENZA tabacchino — mentre
@@ -52700,9 +52749,17 @@ def prove_tasto_barattozon():
           < _rie.find("if (tondo) void tondo.offsetWidth;")
           < _rie.find("if (x) x.style.transform = '';")
           and "for (const x of [tondo, el('navTendina'), el('navBarattozon')])" in _rie
+          and "if (su) su.style.opacity = '';" in _rie
           and "P2P_MORFO_MS + 30);" in _rie)
-    prova("...e sopra la tendina Barattozon si apre DOPO il ritorno", True,
-          0 <= _fin.find("rientraCursoreP2P();") < _fin.find("if (apri) apriBarattozonP2P();"))
+    # LASCIATO SUL LOGO IL + NON TORNA A CASA (quinto giro): la morfosi parte
+    # da lui, e il ritorno c'e' solo se la morfosi non c'e' stata
+    _las = pezzo_js(mini, "function lasciaSulLogoP2P(){", "\n}\n")
+    prova("...e lasciato sul logo il + NON torna a casa: la morfosi parte da lui, "
+          "e torna solo se la morfosi non c'e' (effetti ridotti, le guardie)", True,
+          "if (apri) { lasciaSulLogoP2P(); return; }" in _fin
+          and 0 <= _las.find("document.body.classList.remove('p2p-trascina', 'p2p-sopra');")
+          < _las.find("apriBarattozonP2P();")
+          < _las.find("if (!document.body.classList.contains('capsula-via')) rientraCursoreP2P();"))
     _ptr = mini[mini.index("addEventListener('touchstart', e => {"):]
     _ptr = _ptr[:_ptr.index("}, {passive:true});")]
     prova("il gesto di aggiornamento non si arma da un tocco che parte dalla barra",
@@ -52801,29 +52858,36 @@ console.log(JSON.stringify(out));
     # (24 set 2026, richiesta di Andrea) Il gesto gira coi pezzi veri —
     # la soglia, la guida, la salita letta dal CSS, la fine in un posto
     # solo, e toccaPiu con l'orologio che scarta il click del browser — e
-    # attorno un +, un telaio e una tendina di cartone, alle misure vere
-    # di 375px. Ogni caso riparte pulito: le classi, lo stile, i timer.
-    # (24 set 2026, secondo ritocco) IL + E' UN CURSORE NELLA SUA GUIDA:
-    # scorre solo in verticale, dalla casa al fondo della tendina, il
-    # telaio scende con lui e la tendina risale dello stesso tanto; e
-    # «sopra la tendina» lo dice dove sta il +, da meta' corsa in giu'.
+    # attorno un +, un telaio, una tendina e il binario di sopra di
+    # cartone, alle misure vere di 375px. Ogni caso riparte pulito.
+    # (secondo ritocco) IL + E' UN CURSORE NELLA SUA GUIDA: scorre solo in
+    # verticale, dalla casa al fondo della tendina, il telaio scende con lui
+    # e la tendina risale dello stesso tanto; «sopra» da meta' corsa in giu'.
+    # (quinto giro) il telaio di sopra sfuma man mano (1 − corsa/fondo);
+    # lasciato sul logo il + NON torna a casa — la morfosi parte da lui (qui
+    # di cartone: apre e fa sfumare la capsula) —; e il TOCCO sulla tendina
+    # fa lo stesso da solo, con la corsa della barra.
     banco3 = ("\n".join(_riga(n) for n in ("P2P_SOGLIA_TRASCINO", "P2P_MORFO_MS")) + "\n"
               + re.search(r"let p2pTrascino = null;", mini).group(0) + "\n"
               + re.search(r"let p2pPiuGestoAt = -1e9;", mini).group(0) + "\n"
               + re.search(r"let p2pBinarioTimer = null;", mini).group(0) + "\n"
+              + re.search(r"let p2pDiscesaTimer = null;", mini).group(0) + "\n"
               + "".join(_una(f) for f in (
                   "function trascinoPuoiP2P(){", "function oltreSogliaP2P(dx, dy){",
                   "function corsaCursoreP2P(dy, max){", "function sopraTendinaP2P(d, max){",
-                  "function salitaTondoP2P(tondo){",
+                  "function salitaTondoP2P(tondo){", "function misuraGuidaP2P(){",
                   "function trascinoGiuP2P(e){", "function trascinoMuoveP2P(e){",
-                  "function guidaCursoreP2P(y, d){",
+                  "function lasciaSulLogoP2P(){", "function toccaTendinaP2P(){",
+                  "function guidaCursoreP2P(y, d, max){",
                   "function trascinoSuP2P(e){", "function trascinoFineP2P(apri){",
                   "function rientraCursoreP2P(){",
                   "function annullaTrascinoP2P(){", "function piuNeutroP2P(){",
-                  "function toccaPiu(){"))
+                  "function toccaPiu(){", "function binarioSuP2P(){"))
               + r"""
 const classi = new Set();
-const document = {body: {classList: {
+const binSu = {style: {opacity: ''}};
+const document = {querySelector: s => s === '#navBinario .bin-su' ? binSu : null,
+  body: {get offsetWidth(){ return 1; }, classList: {
   contains: c => classi.has(c), add: (...cc) => { cc.forEach(c => classi.add(c)); },
   remove: (...cc) => { cc.forEach(c => classi.delete(c)); },
   toggle: (c, si) => { ((si === undefined) ? !classi.has(c) : si) ? classi.add(c) : classi.delete(c); }}}};
@@ -52853,16 +52917,23 @@ function clearTimeout(id){ timer = timer.filter(t => t.id !== id); }
 function scorri(){ const t = timer; timer = []; t.forEach(x => x.f()); }
 let fatti = [];
 function haptic(){ fatti.push('vibra'); }
-/* Barattozon si apre col + GIA' lasciato: la tasca si misura sulla
-   tendina a casa, e il + rientra a vista */
-function apriBarattozonP2P(){ fatti.push('barattozon' + (tondo.style.transform
-  || telaio.style.transform || tendina.style.transform ? ' col + ancora fuori' : '')); }
+/* la morfosi di cartone: dove c'e' (e il foglio si apre), Barattozon si
+   apre e la capsula sfuma col + — che quindi resta giu' —; dove non c'e'
+   (effetti ridotti) o il foglio non si apre (il demo), niente sfuma */
+let DEMO = false, VETRINA = false, myTgId = 111, morfosiFinta = true;
+/* il bottone d'arrivo nasce col primo disegno del foglio: qui non c'e'
+   mai, come al primo tocco dopo l'avvio — chi non chiede `prima` non passa */
+function morfoPuoiP2P(prima){ return morfosiFinta && !!prima; }
+function apriBarattozonP2P(){ fatti.push('barattozon');
+  if (morfosiFinta && !DEMO) classi.add('capsula-via'); }
 function apriNuovoOrdineP2P(){ fatti.push('foglio'); }
 function libroDaPiuP2P(){ fatti.push('libro'); }
 function go(v){ fatti.push('go:' + v); }
 const C = [187, 726];   /* il centro del + */
 const stato = () => ({tr: tondo.style.transform, tel: telaio.style.transform,
-  tend: tendina.style.transform, trascina: classi.has('p2p-trascina'),
+  tend: tendina.style.transform,
+  su: binSu.style.opacity === '' ? '' : +(+binSu.style.opacity).toFixed(3),
+  trascina: classi.has('p2p-trascina'),
   binario: classi.has('p2p-binario'), sopra: classi.has('p2p-sopra')});
 function dito(passi){
   const vede = {};
@@ -52876,8 +52947,12 @@ function dito(passi){
     else if (t === 'vista') annullaTrascinoP2P();
     /* il click che il browser manda DOPO il rilascio (o la tastiera) */
     else if (t === 'click') toccaPiu();
-    /* la corsa del ritorno finisce: i timer partono */
+    /* il tocco sulla tendina (o Invio, o spazio) */
+    else if (t === 'tendina') toccaTendinaP2P();
+    /* le corse finiscono: i timer partono */
     else if (t === 'tempo') scorri();
+    else if (t === 'senzaMorfosi') morfosiFinta = false;
+    else if (t === 'demo') DEMO = true;
     /* il + e' ancora per strada, 21px sotto casa, a meta' del suo ritorno */
     else if (t === 'perStrada') { rettoPiu = Object.assign({}, A_CASA, {top: 720, bottom: 774});
                                   salita = -10; }
@@ -52889,16 +52964,16 @@ const out = {};
 function caso(nome, iniz, passi){
   classi.clear(); iniz.forEach(c => classi.add(c)); largo = 375;
   tondo.style.transform = ''; tondo.style.transition = '';
-  telaio.style.transform = ''; tendina.style.transform = '';
+  telaio.style.transform = ''; tendina.style.transform = ''; binSu.style.opacity = '';
   tondo.catture = []; tondo.rilasci = []; fatti = []; timer = [];
-  p2pTrascino = null; p2pPiuGestoAt = -1e9; p2pBinarioTimer = null;
-  rettoPiu = A_CASA; salita = -31;
+  p2pTrascino = null; p2pPiuGestoAt = -1e9; p2pBinarioTimer = null; p2pDiscesaTimer = null;
+  rettoPiu = A_CASA; salita = -31; morfosiFinta = true; DEMO = false;
   try {
     const vede = dito(passi);
     const s = stato();
-    out[nome] = {fatti, vede, tr: s.tr, tel: s.tel, tend: s.tend,
+    out[nome] = {fatti, vede, tr: s.tr, tel: s.tel, tend: s.tend, su: s.su,
       classi: [...classi].filter(c => c.startsWith('p2p-t') || c === 'p2p-sopra'
-                                 || c === 'p2p-binario').sort(),
+                                 || c === 'p2p-binario' || c === 'capsula-via').sort(),
       timer: timer.map(t => t.ms),
       preso: tondo.catture.length, lasciato: tondo.rilasci.length};
   } catch(e) { out[nome] = 'ESPLOSO: ' + e.message; }
@@ -52909,9 +52984,8 @@ caso('tocco', VENDI, [['giu', ...C], ['su', ...C], ['click']]);
 /* 2) un tocco UN PO' MOSSO (7,8px, sotto la soglia): resta un tocco */
 caso('mosso', VENDI, [['giu', ...C], ['muove', 192, 732], ['su', 192, 732], ['click']]);
 /* 3) GIU' NELLA GUIDA E LASCIATO SOPRA la tendina: a meta' corsa non ancora,
-   in fondo si'; il dito un po' di lato non sposta il +; Barattozon si apre
-   col + gia' lasciato, e il binario resta finche' la corsa del ritorno non
-   e' finita */
+   in fondo si'; il dito un po' di lato non sposta il +; lasciato li', il +
+   RESTA GIU' e Barattozon si apre da lui, con la capsula che sfuma */
 caso('sopra', VENDI, [['giu', ...C], ['muove', 187, 746], ['guarda', 'meta'],
   ['muove', 190, 780], ['guarda', 'dentro'], ['su', 190, 780], ['guarda', 'lasciato'],
   ['click'], ['tempo']]);
@@ -52919,6 +52993,10 @@ caso('sopra', VENDI, [['giu', ...C], ['muove', 187, 746], ['guarda', 'meta'],
    tendina, e lasciato li' apre */
 caso('oltre', VENDI, [['giu', ...C], ['muove', 260, 990], ['guarda', 'fondo'],
   ['su', 260, 990], ['tempo']]);
+/* 4b) lasciato sul logo SENZA morfosi (effetti ridotti): il foglio si apre
+   come sempre, e il + torna a casa */
+caso('ridotti', VENDI, [['senzaMorfosi'], ['giu', ...C], ['muove', 187, 790],
+  ['su', 187, 790]]);
 /* 5) IL DITO CHE RISALE OLTRE LA CASA: il + si ferma a casa, non sale */
 caso('risale', VENDI, [['giu', ...C], ['muove', 187, 790], ['muove', 187, 600],
   ['guarda', 'casa'], ['su', 187, 600], ['tempo']]);
@@ -52941,15 +53019,31 @@ caso('destro', VENDI, [['giu', ...C, {pointerType: 'mouse', button: 2}],
   ['muove', 187, 790], ['su', 187, 790]]);
 /* 12) la tastiera: nessun gesto, il click apre il foglio */
 caso('tastiera', VENDI, [['click']]);
+/* 13) un trascino che RIPARTE mentre il + rientra: il binario non si
+   spegne sotto il dito (il timer del primo e' cancellato) */
+caso('riparte', VENDI, [['giu', ...C], ['muove', 187, 750], ['su', 187, 750],
+  ['giu', ...C], ['muove', 187, 760], ['guarda', 'di nuovo']]);
 /* 14) il dito lo riprende MENTRE il + rientra (21px sotto casa): la corsa
    si conta da casa — la salita la dice la tendina, non il + per strada —,
    o il + finirebbe oltre il fondo della capsula */
 caso('perStrada', VENDI, [['perStrada'], ['giu', ...C], ['muove', 187, 746],
   ['guarda', 'ripreso'], ['muove', 187, 900], ['guarda', 'fondo']]);
-/* 13) un trascino che RIPARTE mentre il + rientra: il binario non si
-   spegne sotto il dito (il timer del primo e' cancellato) */
-caso('riparte', VENDI, [['giu', ...C], ['muove', 187, 750], ['su', 187, 750],
-  ['giu', ...C], ['muove', 187, 760], ['guarda', 'di nuovo']]);
+/* 15) IL TOCCO SULLA TENDINA fa il trascino da solo: il + scende fino in
+   fondo con la corsa (le transform d'arrivo scritte subito, il binario e la
+   luce accesi), e a corsa finita si ferma li' e Barattozon si apre da lui */
+caso('tendina', VENDI, [['tendina'], ['guarda', 'scende'], ['tempo'], ['guarda', 'in fondo']]);
+/* 16) ...un secondo tocco non la raddoppia */
+caso('tendinaDue', VENDI, [['tendina'], ['tendina'], ['tempo']]);
+/* 17) ...nel demo, o senza morfosi, nessuna discesa: il foglio (o la sua
+   scusa) subito */
+caso('tendinaDemo', VENDI, [['demo'], ['tendina']]);
+caso('tendinaRidotti', VENDI, [['senzaMorfosi'], ['tendina']]);
+/* 18) ...un cambio di vista a meta' discesa la ferma e riporta a casa il + */
+caso('tendinaVista', VENDI, [['tendina'], ['vista'], ['tempo']]);
+/* 19) ...mentre scende il + non si riprende col dito, e il click sul + si
+   scarta */
+caso('tendinaDito', VENDI, [['tendina'], ['giu', ...C], ['muove', 187, 790],
+  ['guarda', 'col dito'], ['click']]);
 console.log(JSON.stringify(out));
 """)
     d3 = _tf.mkdtemp()
@@ -52966,36 +53060,42 @@ console.log(JSON.stringify(out));
     else:
         _sub = lambda o, k: {x: o.get(x) for x in k} if isinstance(o, dict) else o
         _vede = lambda k, v: out3[k]["vede"].get(v) if isinstance(out3[k], dict) else out3[k]
-        _casa = {"tr": "", "tel": "", "tend": ""}
-        # il + nella guida a quota `tr`, col telaio sceso di `d` e la
-        # tendina risalita di `d`: e' quel che resta fermo che conta
-        _g = lambda tr, d, sopra: {"tr": "translateY(%dpx)" % tr, "tel": "translateY(%dpx)" % d,
-                                  "tend": "translateY(%dpx)" % -d, "trascina": True,
-                                  "binario": True, "sopra": sopra}
+        _casa = {"tr": "", "tel": "", "tend": "", "su": ""}
+        _K = ("fatti", "tr", "tel", "tend", "su", "classi")
+        # il + nella guida a quota `tr`, col telaio sceso di `d`, la tendina
+        # risalita di `d` e il telaio di sopra a 1 − d/55: e' quel che resta
+        # fermo, e quel che sfuma, che contano
+        _g = lambda tr, d, sopra, trascina=True: {
+            "tr": "translateY(%dpx)" % tr, "tel": "translateY(%dpx)" % d,
+            "tend": "translateY(%dpx)" % -d, "su": round(1 - d / 55.0, 3),
+            "trascina": trascina, "binario": True, "sopra": sopra}
         prova("il tocco sul + apre il foglio normale, una volta sola",
               dict(_casa, fatti=["foglio"], classi=[], timer=[], preso=1, lasciato=1),
-              _sub(out3["tocco"], ("fatti", "tr", "tel", "tend", "classi", "timer",
-                                   "preso", "lasciato")))
+              _sub(out3["tocco"], _K + ("timer", "preso", "lasciato")))
         prova("...anche un po' mosso (7,8px, sotto la soglia): resta un tocco",
-              dict(_casa, fatti=["foglio"], classi=[]),
-              _sub(out3["mosso"], ("fatti", "tr", "tel", "tend", "classi")))
+              dict(_casa, fatti=["foglio"], classi=[]), _sub(out3["mosso"], _K))
         prova("il + scende nella guida, sommato alla sua salita: il taglio del "
-              "telaio scende con lui e la tendina resta ferma; a meta' corsa non "
-              "e' ancora sopra, e il dito di lato non lo sposta",
+              "telaio scende con lui, la tendina resta ferma e il telaio di sopra "
+              "sfuma man mano; a meta' corsa non e' ancora sopra, e il dito di lato "
+              "non lo sposta",
               {"meta": _g(-11, 20, False), "dentro": _g(23, 54, True)},
               {"meta": _vede("sopra", "meta"), "dentro": _vede("sopra", "dentro")})
-        prova("lasciato SOPRA la tendina: apre Barattozon col + gia' lasciato (le "
-              "tre transform via), con la vibrazione all'ingresso; il binario "
-              "resta per la corsa del ritorno, e poi se ne va",
-              [{"tr": "", "tel": "", "tend": "", "trascina": False, "binario": True,
-                "sopra": False},
-               dict(_casa, fatti=["vibra", "barattozon"], classi=[], timer=[])],
-              [_vede("sopra", "lasciato"),
-               _sub(out3["sopra"], ("fatti", "tr", "tel", "tend", "classi", "timer"))])
+        prova("lasciato SOPRA la tendina il + NON torna a casa: resta giu' dove "
+              "l'ha lasciato il dito (le transform restano, il telaio di sopra e' "
+              "quasi sparito) e Barattozon si apre da lui, con la capsula che sfuma",
+              [_g(23, 54, False, False),
+               {"fatti": ["vibra", "barattozon"], "classi": ["capsula-via", "p2p-binario"],
+                "timer": []}],
+              [_vede("sopra", "lasciato"), _sub(out3["sopra"], ("fatti", "classi", "timer"))])
         prova("il dito OLTRE il fondo, e di lato: il + si ferma sul fondo della "
               "tendina, mai piu' giu', e lasciato li' apre",
-              [_g(24, 55, True), {"fatti": ["vibra", "barattozon"], "classi": []}],
+              [_g(24, 55, True), {"fatti": ["vibra", "barattozon"],
+                                  "classi": ["capsula-via", "p2p-binario"]}],
               [_vede("oltre", "fondo"), _sub(out3["oltre"], ("fatti", "classi"))])
+        prova("...e senza morfosi (effetti ridotti) il foglio si apre come sempre e "
+              "il + torna a casa", dict(_casa, fatti=["vibra", "barattozon"],
+                                          classi=["p2p-binario"], timer=[350]),
+              _sub(out3["ridotti"], _K + ("timer",)))
         prova("il dito che risale OLTRE la casa: il + si ferma a casa, mai piu' su, "
               "e lasciato li' non apre niente",
               [_g(-31, 0, False), {"fatti": ["vibra"], "classi": []}],
@@ -53004,19 +53104,17 @@ console.log(JSON.stringify(out));
               "lasciato non fa niente — nemmeno il click dopo",
               [_g(-31, 0, False), {"fatti": [], "classi": []}],
               [_vede("lato", "fermo"), _sub(out3["lato"], ("fatti", "classi"))])
-        prova("...giu' in fondo e poi su, sopra meta': la luce si spegne, e "
-              "lasciato li' torna a casa senza aprire",
+        prova("...giu' in fondo e poi su, sopra meta': la luce si spegne, e lasciato "
+              "li' torna a casa senza aprire — col telaio di sopra che ricompare",
               [_g(-7, 24, False), dict(_casa, fatti=["vibra"], classi=["p2p-binario"],
                                        timer=[350])],
-              [_vede("vaEVieni", "risalito"),
-               _sub(out3["vaEVieni"], ("fatti", "tr", "tel", "tend", "classi", "timer"))])
+              [_vede("vaEVieni", "risalito"), _sub(out3["vaEVieni"], _K + ("timer",))])
         # (il + era gia' passato sopra la tendina: la vibrazione
         # dell'ingresso c'e', l'apertura no)
         prova("...il browser che si prende il gesto, o un cambio di vista a "
               "meta': niente, e il + torna a casa",
               [dict(_casa, fatti=["vibra"], classi=["p2p-binario"])] * 2,
-              [_sub(out3[k], ("fatti", "tr", "tel", "tend", "classi"))
-               for k in ("cancel", "vista")])
+              [_sub(out3[k], _K) for k in ("cancel", "vista")])
         prova("a «Compra BTC» niente gesto: il click di sempre apre il foglio",
               {"fatti": ["foglio"], "tr": "", "preso": 0},
               _sub(out3["compra"], ("fatti", "tr", "preso")))
@@ -53032,6 +53130,31 @@ console.log(JSON.stringify(out));
               [_g(3, 34, True), {"timer": [], "classi": ["p2p-binario", "p2p-sopra",
                                                          "p2p-trascina"]}],
               [_vede("riparte", "di nuovo"), _sub(out3["riparte"], ("timer", "classi"))])
+        # IL TOCCO SULLA TENDINA FA IL TRASCINO DA SOLO (quinto giro,
+        # ripensamento di Andrea): il + scende in fondo con la corsa della
+        # barra, si ferma, e Barattozon si apre da lui
+        prova("il tocco sulla tendina fa il trascino DA SOLO — anche il primo dopo "
+              "l'avvio, col bottone del foglio ancora da disegnare: il + parte subito "
+              "verso il fondo (le transform d'arrivo, la corsa le fa correre), col "
+              "binario e la luce accesi e una vibrazione; a corsa finita resta giu' "
+              "e Barattozon si apre da lui",
+              [dict(_g(24, 55, True, False)), dict(_g(24, 55, False, False)),
+               {"fatti": ["vibra", "barattozon"], "classi": ["capsula-via", "p2p-binario"],
+                "timer": []}],
+              [_vede("tendina", "scende"), _vede("tendina", "in fondo"),
+               _sub(out3["tendina"], ("fatti", "classi", "timer"))])
+        prova("...un secondo tocco non la raddoppia", ["vibra", "barattozon"],
+              out3["tendinaDue"]["fatti"] if isinstance(out3["tendinaDue"], dict)
+              else out3["tendinaDue"])
+        prova("...nel demo e senza morfosi niente discesa: il foglio (o la sua "
+              "scusa) subito", [dict(_casa, fatti=["barattozon"], classi=[])] * 2,
+              [_sub(out3[k], _K) for k in ("tendinaDemo", "tendinaRidotti")])
+        prova("...un cambio di vista a meta' discesa la ferma e riporta a casa il +, "
+              "senza aprire", dict(_casa, fatti=["vibra"], classi=[], timer=[]),
+              _sub(out3["tendinaVista"], _K + ("timer",)))
+        prova("...e mentre scende il + non si riprende col dito, e il click sul + si "
+              "scarta", [dict(_g(24, 55, True, False)), {"fatti": ["vibra"], "preso": 0}],
+              [_vede("tendinaDito", "col dito"), _sub(out3["tendinaDito"], ("fatti", "preso"))])
 
     # --- 8) LA SCOSSA DEL LOGO: la classe se ne va, e il saluto e' uno --
     # (23 set 2026, ritocco di Andrea) Il banco fa girare scuotiLogoP2P
@@ -53105,10 +53228,15 @@ console.log(JSON.stringify(out));
     # il colore corre solo sulle VOCI — l'eccezione dichiarata —, mai sul
     # +, sulla banda o sulla tendina; e le durate sono la corsa unica, il
     # 0s della visibility o i 120ms della pelle che se ne va.
-    _i0 = css.index("  nav button.sell .ic{\n    width:54px")
-    _i1 = css.index("#navBinario::after,#navTendina,#navBarattozon,#navBarattozon::after,\n"
-                    "    nav::after{transition:none}")
-    _zona = re.sub(r"/\*.*?\*/", "", css[_i0:_i1], flags=re.S)
+    # (quinto giro) I CAPI SI CERCANO, non si pretendono: con `index` un capo
+    # cambiato faceva esplodere tutta la sezione — la tortura lo contava
+    # come «uccisa col botto», e le prove dopo di lui non giravano piu'
+    _i0 = css.find("  nav button.sell .ic{\n    width:54px")
+    _i1 = css.find("#navBinario .bin-su,#navBinario>i::after,#navTendina,#navBarattozon,\n"
+                   "    #navBarattozon::after,nav::after{transition:none}")
+    prova("il censimento trova i suoi due capi: la regola del + di casa e il "
+          "reduced-motion della capsula", True, 0 <= _i0 < _i1)
+    _zona = re.sub(r"/\*.*?\*/", "", css[_i0:_i1] if 0 <= _i0 < _i1 else "", flags=re.S)
     _corse, _strane = [], []
     for s_, c_ in re.findall(r"([^{}]+)\{([^{}]*)\}", _zona):
         m = re.search(r"(?<![-\w])transition:([^;}]*)", c_)
@@ -60555,7 +60683,7 @@ def prove_p2p_pubblica():
     # trappole che la spengono in silenzio.
     morfo = pezzo_js(mini, "function apriMorfoP2P(){", "\n}\n")
     chiumo = pezzo_js(mini, "function chiudiMorfoP2P(){", "\n}\n")
-    puoi = pezzo_js(mini, "function morfoPuoiP2P(){", "\n}\n")
+    puoi = pezzo_js(mini, "function morfoPuoiP2P(prima){", "\n}\n")
     vesti = pezzo_js(mini, "function vestiMorfoP2P(g, da, a, eti, bottone){", "\n}\n")
     tempi = pezzo_js(mini, "function tempiMorfoP2P(){", "\n}\n")
 
@@ -60653,9 +60781,11 @@ def prove_p2p_pubblica():
     #    a meta' corsa. Quindi la FORMA scala, gli altri due traslano.
     # (24 set 2026) le due PELLI scalano con UNA regola sola, la stessa
     # scala e la stessa curva: la forma (il tondo) e la meta (il bottone)
-    _mf = stile[stile.index("#p2pMorfo.parte .morfo-forma,#p2pMorfo.parte .morfo-meta{"):
+    _mf = stile[stile.index("#p2pMorfo.parte .morfo-blu,#p2pMorfo.parte .morfo-forma,"
+                            "#p2pMorfo.parte .morfo-meta{"):
                 stile.index("@media (prefers-reduced-motion:reduce){\n    #p2pMorfo")]
-    prova("solo le due pelli scalano, con una regola; glifo e scritta traslano",
+    prova("solo le pelli scalano — la forma, il gemello blu e la meta —, con una "
+          "regola; glifo e scritta traslano",
           (1, 3), (_mf.count("scale("), _mf.count("translate(")))
     prova("...e la forma e' un cerchio col 50%, la meta ha il raggio del bottone",
           True, "#p2pMorfo .morfo-forma{border-radius:50%;" in stile
@@ -60682,15 +60812,15 @@ def prove_p2p_pubblica():
                                               "border", "border-radius"])
         return {p: x[0] for p, x in v.items()}
     _FORMA, _META, _ETI = ("i", "morfo-forma"), ("i", "morfo-meta"), ("span", "morfo-eti")
-    _FILO, _GLIFO = ("i", "morfo-filo"), ("span", "morfo-glifo")
+    _BLU, _GLIFO = ("i", "morfo-blu"), ("span", "morfo-glifo")
     _V = ["p2p-vendo"]
-    prova("...e la tinta della forma e' quella della PARTENZA (lo dice la "
-          "cascata): verde a comprare, rosso a vendere, blu dalla tasca",
-          ["var(--trust)", "var(--danger)", "var(--danger)", "#191D29"],
+    prova("...e la tinta della forma e' quella del + da cui parte (lo dice la "
+          "cascata): verde a comprare, rosso a vendere — anche verso il bottone "
+          "blu di Barattozon, dove sfuma finche' e' tonda",
+          ["var(--trust)", "var(--danger)", "var(--danger)"],
           [_fantasma([], ["acceso"], _FORMA).get("background"),
            _fantasma(_V, ["acceso"], _FORMA).get("background"),
-           _fantasma(_V, ["acceso", "bz"], _FORMA).get("background"),
-           _fantasma(_V, ["acceso", "bz", "tasca"], _FORMA).get("background")])
+           _fantasma(_V, ["acceso", "bz"], _FORMA).get("background")])
     prova("...e il colore non lo legge il JS: e' una classe", False,
           "getComputedStyle" in morfo + chiumo + vesti)
     # DUE PELLI E NON UNA CHE CAMBIA (24 set 2026, ritocco di Andrea: solo
@@ -60700,7 +60830,7 @@ def prove_p2p_pubblica():
     def _regola_fantasma(testa):
         i = stile.index(testa)
         return stile[i:stile.index("}", i) + 1]
-    _pelli = (_regola_fantasma("#p2pMorfo .morfo-forma,#p2pMorfo .morfo-meta{")
+    _pelli = (_regola_fantasma("#p2pMorfo .morfo-blu,#p2pMorfo .morfo-forma,#p2pMorfo .morfo-meta{")
               + _regola_fantasma("#p2pMorfo .morfo-meta{border-radius"))
     prova("le pelli del fantasma corrono solo in transform e opacity", [],
           sorted(set(re.findall(r"([a-z-]+) var\(--morfo-corsa\)", _pelli))
@@ -60724,11 +60854,10 @@ def prove_p2p_pubblica():
     # cambierebbe di colpo
     prova("...e la meta veste il bottone, e VINCE: verde, rosso col lato, blu "
           "col tabacchino anche a «Vendi BTC»",
-          ["var(--trust)", "var(--danger)", "#191D29", "#191D29"],
+          ["var(--trust)", "var(--danger)", "#191D29"],
           [_fantasma([], ["acceso"], _META).get("background"),
            _fantasma(_V, ["acceso"], _META).get("background"),
-           _fantasma(_V, ["acceso", "bz"], _META).get("background"),
-           _fantasma(_V, ["acceso", "bz", "tasca"], _META).get("background")])
+           _fantasma(_V, ["acceso", "bz"], _META).get("background")])
     prova("...e la scritta ha l'inchiostro del bottone d'arrivo, e VINCE (di "
           "sera il rosso vuole l'inchiostro scuro, il blu il bianco)",
           ["var(--on-trust)", "var(--on-danger)", "#fff"],
@@ -60832,6 +60961,14 @@ def prove_p2p_pubblica():
           "if (effettiRidotti()) return false;" in puoi)
     prova("...e nemmeno da 768px in su", True,
           "matchMedia('(max-width: 767px)').matches" in puoi)
+    # (quinto giro) il bottone d'arrivo nasce col primo disegno del foglio:
+    # il tocco sulla tendina chiede PRIMA di aprirlo, e senza `prima` al
+    # primo tocco dopo l'avvio la discesa non partiva (il banco dal vivo)
+    prova("...il bottone d'arrivo lo chiede solo a foglio gia' disegnato, e il "
+          "tocco sulla tendina chiede prima di disegnarlo", [True, True],
+          ["(prima || el('p2pNuovoInvia'))" in puoi,
+           "morfoPuoiP2P(true) && trascinoPuoiP2P()"
+           in pezzo_js(mini, "function toccaTendinaP2P(){", "\n}\n")])
     prova("...e allora il foglio si apre come sempre", True,
           "if (!apriMorfoP2P()) el('p2pNuovoSheet').classList.add('open');"
           in pezzo_js(mini, "function apriNuovoOrdineP2P(metodo){", "\n}\n"))
@@ -60848,7 +60985,7 @@ def prove_p2p_pubblica():
     # ...e si RIMISURA invece di riciclare: fra apertura e chiusura la
     # tastiera puo' essersi alzata e il bottone non e' piu' dov'era
     prova("...e il ritorno rimisura invece di riciclare", True,
-          "vestiMorfoP2P(g, tasca || tondo.getBoundingClientRect()," in chiumo)
+          "vestiMorfoP2P(g, tondo.getBoundingClientRect()," in chiumo)
 
     # I) LA BARRA SI APRE (set 2026, richiesta di Andrea). Mentre il
     #    bottone si allarga, le voci ai due lati del + vengono spinte
@@ -60879,7 +61016,7 @@ def prove_p2p_pubblica():
     # ...e in reduced-motion stanno ferme come tutta la barra
     prova("...e in reduced-motion restano ferme", True,
           "#p2pMorfo .morfo-forma,#p2pMorfo .morfo-meta,#p2pMorfo .morfo-glifo,\n"
-          "    #p2pMorfo .morfo-eti,#p2pMorfo .morfo-filo,nav .nav-lato{transition:none}"
+          "    #p2pMorfo .morfo-eti,#p2pMorfo .morfo-blu,nav .nav-lato{transition:none}"
           in stile)
     # LE DUE CLASSI HANNO DUE VITE DIVERSE, e per questo sono due:
     # `barra-via` vale dalla partenza dell'andata alla partenza del
@@ -60889,7 +61026,7 @@ def prove_p2p_pubblica():
     prova("la barra sale sopra il velo per tutta la morfosi", True,
           "body.morfosi nav{z-index:41}" in stile
           and "document.body.classList.add('morfosi');" in morfo
-          and "document.body.classList.remove('morfosi', 'morfo-tasca');" in
+          and "document.body.classList.remove('morfosi');" in
               pezzo_js(mini, "function spegniMorfoP2P(){", "\n}\n"))
     # e le voci partono e rientrano nello STESSO giro di stile del
     # fantasma: un giro dopo, e si muoverebbero in ritardo di un frame
@@ -60958,15 +61095,13 @@ def prove_p2p_pubblica():
     # G) IL FANTASMA. Tre strati, e NON e' un foglio: la pila della
     #    cronologia censisce `.sheet.open`, e un quarto strato li'
     #    dentro costerebbe un gradino di indietro per niente.
-    prova("il fantasma c'e', coi suoi strati: forma, filo della tasca, meta, "
-          "glifo (il + o il logo della tasca) e scritta", True,
+    prova("il fantasma c'e', coi suoi strati: il gemello blu, la forma, la meta, "
+          "il glifo e la scritta", True,
           '<div id="p2pMorfo" aria-hidden="true">\n'
+          '    <i class="morfo-blu"></i>\n'
           '    <i class="morfo-forma"></i>\n'
-          '    <i class="morfo-filo"></i>\n'
           '    <i class="morfo-meta"></i>\n'
-          '    <span class="morfo-glifo"><span class="g-piu">＋</span>'
-          '<img class="g-logo" src="/assets/barattozon-tasto.webp" width="41" height="40" '
-          'alt="" decoding="sync"></span>\n'
+          '    <span class="morfo-glifo">＋</span>\n'
           '    <span class="morfo-eti"></span>\n  </div>' in mini)
     prova("...e non e' un foglio: la cronologia non lo vede", False,
           '<div id="p2pMorfo" class="sheet"' in mini)
@@ -60981,168 +61116,168 @@ def prove_p2p_pubblica():
           and "Pubblica ordine" not in morfo + chiumo + vesti)
     # e i due VERI spariscono per la durata della corsa: un tondo fermo
     # dietro il fantasma smentirebbe l'illusione
-    _cela = pezzo_js(mini, "function celaVeriP2P(cela, tasca){", "\n}\n")
-    prova("...e i due veri si nascondono, senza perdere il posto — ma dalla "
-          "tasca il + resta a vista: il fantasma non e' lui", True,
-          "tondo.style.visibility = cela && !tasca ? 'hidden' : '';" in _cela
+    _cela = pezzo_js(mini, "function celaVeriP2P(cela){", "\n}\n")
+    prova("...e i due veri si nascondono, senza perdere il posto", True,
+          "tondo.style.visibility = cela ? 'hidden' : '';" in _cela
           and "meta.style.visibility = cela ? 'hidden' : '';" in _cela)
 
-    # M) LA MORFOSI DALLA TASCA (24 set 2026, ritocco di Andrea). Il foglio
-    #    che si apre da Barattozon non passa dal + rosso: il fantasma parte
-    #    dalla TASCA — la parte blu della tendina sotto il + a riposo — e
-    #    ci torna. Qui: da dove parte (le funzioni vere, fatte girare),
-    #    che il primo fotogramma e' la tasca com'era, e che niente del
-    #    fantasma e' rosso (la cascata, strato per strato).
-    prova("col bottone di Barattozon il fantasma parte dalla tasca, e il + "
-          "resta a vista", True,
-          "const tasca = meta.classList.contains('bz') ? tascaBarattozonP2P() : null;" in morfo
-          and "vestiMorfoP2P(g, tasca || tondo.getBoundingClientRect()," in morfo
-          and morfo.index("document.body.classList.toggle('morfo-tasca', !!tasca);")
-              < morfo.index("celaVeriP2P(true, !!tasca);")
-              < morfo.index("classList.add('acceso', 'parte')"))
-    prova("...e ci torna: la tendina si rimette fuori PRIMA di misurare, e senza "
-          "tasca torna alle sue regole col giro che richiude la barra", True,
-          "const tasca = meta.classList.contains('bz') && srotolaTascaP2P()\n"
-          "    ? tascaBarattozonP2P() : null;" in chiumo
-          and chiumo.index("barraViaP2P(false);")
-              < chiumo.index("if (!tasca) document.body.classList.remove('morfo-tasca');"))
-    _pt = (_intera("function morfosiP2P(da, a){")
-           + _intera("function tascaBarattozonP2P(){")
-           + _intera("function srotolaTascaP2P(){")
-           + _intera("function vestiMorfoP2P(g, da, a, eti, bottone){")
-           + _intera("function celaVeriP2P(cela, tasca){")
+    # M) IL FOGLIO DI BARATTOZON NASCE DAL + SCESO SUL LOGO (quinto giro, 24
+    #    set 2026, richieste di Andrea). Trascinato e lasciato li', o sceso
+    #    da solo al tocco sulla tendina: il fantasma parte dal +, il rosso
+    #    sfuma finche' e' tondo e sotto c'e' gia' il gemello blu; la capsula
+    #    se ne va con lui e torna a casa sotto il foglio pieno. Chiudendo,
+    #    nessun ritorno: la barra e' gia' a riposo. (La morfosi dalla TASCA
+    #    del quarto giro non c'e' piu': la usava il solo tocco, e il tocco
+    #    adesso fa il trascino da solo.)
+    # L'ORDINE SI CERCA, non si pretende: con `index` un pezzo che manca
+    # faceva esplodere la sezione intera (la tortura: «inciampata») invece
+    # di dare una rossa col suo nome
+    def _in_fila(testo, *pezzi):
+        poste = [testo.find(p_) for p_ in pezzi]
+        return min(poste) >= 0 and poste == sorted(poste)
+    prova("il fantasma parte dal + dov'e', e col bottone di Barattozon la capsula "
+          "se ne va con lui e torna a casa sotto il foglio pieno", True,
+          "const bz = meta.classList.contains('bz');" in morfo
+          and "vestiMorfoP2P(g, tondo.getBoundingClientRect()," in morfo
+          and _in_fila(morfo, "document.body.classList.toggle('capsula-via', bz);",
+                       "celaVeriP2P(true);", "classList.add('acceso', 'parte')")
+          and "setTimeout(bz ? posaFondoP2P : posaMorfoP2P, P2P_MORFO_MS + 30);" in morfo
+          and "posaMorfoP2P();\n  capsulaAPostoP2P();"
+              in pezzo_js(mini, "function posaFondoP2P(){", "\n}\n"))
+    _i_bz = chiumo.find("if (meta.classList.contains('bz')) {")
+    _bzc = chiumo[_i_bz:] if _i_bz >= 0 else ""
+    _bzc = _bzc[:_bzc.find("\n  }\n") + 4] if "\n  }\n" in _bzc else ""
+    prova("il foglio di Barattozon si chiude SENZA ritorno: la barra a riposo di "
+          "colpo, nessun fantasma acceso, e la classe che la tiene sopra il velo "
+          "se ne va a fine dissolvenza", [True, False, True, True],
+          ["barraSeccaP2P();" in _bzc, "acceso" in _bzc,
+           "p2pMorfoTimer = setTimeout(spegniMorfoP2P, P2P_MORFO_MS + 30);" in _bzc,
+           _in_fila(chiumo, "if (meta.classList.contains('bz')) {",
+                    "g.classList.add('acceso');")])
+    prova("...mentre il foglio rosso o verde torna ancora nel +, dopo aver rimesso "
+          "a posto la capsula", True,
+          _in_fila(chiumo, "capsulaAPostoP2P();",
+                   "vestiMorfoP2P(g, tondo.getBoundingClientRect(),",
+                   "g.classList.add('acceso');", "barraViaP2P(false);"))
+    prova("...e la morfosi dalla tasca non c'e' piu': ne' la misura, ne' il filo, "
+          "ne' il logo nel glifo, ne' la tendina ferma sotto di lei", [False] * 4,
+          ["tascaBarattozonP2P" in mini, "morfo-filo" in mini, "g-logo" in mini,
+           "morfo-tasca" in mini])
+    # LA BARRA SECCA E LA CAPSULA A POSTO, fatte girare: lo stato cambia
+    # DENTRO la corsa spenta pezzo per pezzo, un reflow solo lo fissa, e la
+    # corsa torna dopo; la barra secca in piu' richiude la barra e rimette a
+    # vista il +, e `morfosi` resta (se ne va a fine dissolvenza)
+    _pb = (_intera("function celaVeriP2P(cela){")
+           + _intera("function barraViaP2P(via){")
+           + _intera("function binarioSuP2P(){")
+           + _intera("function senzaCorsaP2P(pezzi, fai){")
+           + _intera("function pezziCapsulaP2P(){")
+           + _intera("function capsulaCasaP2P(){")
+           + _intera("function capsulaAPostoP2P(){")
+           + _intera("function barraSeccaP2P(){")
+           + re.search(r"let p2pBinarioTimer = null;", mini).group(0) + "\n"
            + r"""
-const g6 = v => Math.round(v * 1e6) / 1e6;
-const r6 = o => o && Object.fromEntries(Object.entries(o).map(([k, v]) => [k, g6(v)]));
-const classi = new Set(['nav-p2p', 'p2p-vendo']);
+let log = [];
+function pezzo(nome){
+  const st = {}, style = {};
+  for (const k of ['transform', 'visibility', 'opacity'])
+    Object.defineProperty(style, k, {get(){ return st[k] ?? ''; }, set(v){ st[k] = v; }});
+  Object.defineProperty(style, 'transition', {get(){ return st.transition ?? ''; },
+    set(v){ st.transition = v; log.push(nome + '=' + (v || '-')); }});
+  return {nome, style};
+}
+const tondo = pezzo('+'), telaio = pezzo('telaio'), tendina = pezzo('tendina'),
+      binario = pezzo('binario'), binSu = pezzo('su'), bottone = pezzo('bottone');
+const voci = ['v1', 'v2', 'v3', 'v4'].map(pezzo);
+const classi = new Set();
 const document = {body: {classList: {contains: c => classi.has(c),
-  add: c => classi.add(c), remove: c => classi.delete(c)}}};
-/* la tendina a 375px: dall'equatore del + (725.78) al fondo (807.78) */
-let corse = [];
-const tend = {style: {set transition(v){ corse.push(v); }, get transition(){ return ''; }},
-  get offsetWidth(){ return 54; },
-  getBoundingClientRect(){ return {left: 160.5, top: 725.78, width: 54, height: 82,
-                                   right: 214.5, bottom: 807.78}; }};
-const tondo = {style: {visibility: ''}, offsetHeight: 54};
-const bottone = {style: {visibility: ''}, childNodes: [],
-  classList: {contains: c => c === 'bz'}};
-function el(id){ return id === 'navBarattozon' ? tend : id === 'p2pNuovoInvia' ? bottone : null; }
+    add: (...cc) => cc.forEach(c => classi.add(c)),
+    remove: (...cc) => cc.forEach(c => classi.delete(c)),
+    toggle: (c, si) => { ((si === undefined) ? !classi.has(c) : si) ? classi.add(c) : classi.delete(c); }},
+  get offsetWidth(){ log.push('riflusso'); return 1; }},
+  querySelector: s => s === '#navBinario .bin-su' ? binSu : null,
+  querySelectorAll: s => s === 'nav .nav-lato' ? voci : []};
+function el(id){ return {navTendina: telaio, navBarattozon: tendina, navBinario: binario,
+                         p2pNuovoInvia: bottone}[id] || null; }
 const tondoBarraP2P = () => tondo;
+let spenti = [];
+function clearTimeout(id){ spenti.push(id); }
+function sporca(){
+  ['p2p-trascina', 'p2p-sopra', 'p2p-binario', 'capsula-via', 'barra-via', 'morfosi',
+   'nav-p2p', 'p2p-vendo'].forEach(c => classi.add(c));
+  [tondo, telaio, tendina].forEach(x => { x.style.transform = 'translateY(9px)'; });
+  binSu.style.opacity = '0.3'; tondo.style.visibility = 'hidden';
+  bottone.style.visibility = 'hidden'; p2pBinarioTimer = 7; log = []; spenti = [];
+}
+const stato = () => ({classi: [...classi].sort(),
+  tr: [tondo, telaio, tendina].map(x => x.style.transform), su: binSu.style.opacity,
+  piu: tondo.style.visibility, bottone: bottone.style.visibility,
+  log: log.slice(), spenti: spenti.slice()});
 const out = {};
-out.vendi = r6(tascaBarattozonP2P());
-classi.delete('p2p-vendo'); out.compra = tascaBarattozonP2P();
-classi.add('p2p-vendo'); classi.add('p2p-piu-neutro'); out.fuori = tascaBarattozonP2P();
-classi.delete('p2p-piu-neutro');
-/* il fantasma vestito sulla tasca: la forma schiacciata torna la tasca, e
-   il filo sta fermo li' sopra */
-const filo = {style: {}}, eti = {textContent: '', replaceChildren(){}};
-const g = {style: {setProperty(){}}, classList: {toggle(){}},
-  querySelector: s => s === '.morfo-filo' ? filo : s === '.morfo-eti' ? eti : null};
-const meta = {left: 16, top: 752, width: 343, height: 48};
-const m = vestiMorfoP2P(g, tascaBarattozonP2P(), meta, '', bottone);
-const cx = meta.left + meta.width / 2, cy = meta.top + meta.height / 2;
-out.reso = [g6(cx + m.x - meta.width * m.sx / 2), g6(cy + m.y - meta.height * m.sy / 2),
-            g6(meta.width * m.sx), g6(meta.height * m.sy)];
-out.filo = [filo.style.left, filo.style.top, filo.style.width, filo.style.height]
-  .map(v => g6(parseFloat(v)));
-out.scale = [g6(m.sx), g6(m.sy)];
-/* chi si nasconde: dalla tasca il + resta, dal + il + se ne va */
-celaVeriP2P(true, true); out.celaTasca = [tondo.style.visibility, bottone.style.visibility];
-celaVeriP2P(true, false); out.celaPiu = [tondo.style.visibility, bottone.style.visibility];
-celaVeriP2P(false); out.posa = [tondo.style.visibility, bottone.style.visibility];
-/* il ritorno: la tendina riavvolta si rimette fuori SENZA corsa, una volta */
-out.srotola = [srotolaTascaP2P(), classi.has('morfo-tasca'), corse.slice()];
-corse = []; srotolaTascaP2P(); out.gia = corse;
+sporca(); capsulaAPostoP2P(); out.aPosto = stato();
+sporca(); barraSeccaP2P(); out.secca = stato();
 console.log(JSON.stringify(out));
 """)
-    _f5 = _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8")
-    _f5.write(_pt)
-    _f5.close()
-    _r5 = _sp.run([_node, _f5.name], capture_output=True, text=True,
+    _f6 = _tf.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8")
+    _f6.write(_pb)
+    _f6.close()
+    _r6 = _sp.run([_node, _f6.name], capture_output=True, text=True,
                   timeout=60, encoding="utf-8")
-    os.unlink(_f5.name)
-    if _r5.returncode != 0:
-        prova("il banco della tasca gira", "", _r5.stderr[-600:])
+    os.unlink(_f6.name)
+    if _r6.returncode != 0:
+        prova("il banco della barra secca gira", "", _r6.stderr[-600:])
     else:
-        t5 = _js.loads(_r5.stdout.strip().splitlines()[-1])
-        prova("la tasca e' la tendina sotto il + a riposo: dal fondo del cerchio "
-              "(equatore piu' raggio) al fondo di lei; niente tasca a «Compra "
-              "BTC» ne' fuori dal libro",
-              [{"left": 160.5, "top": 752.78, "width": 54, "height": 55}, None, None],
-              [t5["vendi"], t5["compra"], t5["fuori"]])
-        prova("...il fantasma schiacciato torna la tasca, al pixel, e il suo filo "
-              "sta fermo li' sopra (misurato dentro il fantasma)",
-              [[160.5, 752.78, 54, 55], [144.5, 0.78, 54, 55]], [t5["reso"], t5["filo"]])
-        prova("...dalla tasca si nasconde il bottone vero ma non il +; dal + tutt'e "
-              "due; posato, nessuno", [["", "hidden"], ["hidden", "hidden"], ["", ""]],
-              [t5["celaTasca"], t5["celaPiu"], t5["posa"]])
-        prova("...e al ritorno la tendina riavvolta si rimette fuori SENZA corsa, "
-              "una volta sola", [[True, True, ["none", ""]], []],
-              [t5["srotola"], t5["gia"]])
-        # I RAGGI IN PERCENTO: la forma e' grande quanto il bottone e SCALATA,
-        # quindi il 50% e il 27/55 del CSS, schiacciati sulla tasca, devono
-        # tornare il raggio del + (27px) in tutt'e due le direzioni
-        _rr = re.search(r"border-radius:0 0 ([\d.]+)% [\d.]+% / 0 0 ([\d.]+)% [\d.]+%",
-                        stile[stile.index("  body.p2p-vendo #p2pMorfo.tasca .morfo-forma{"):])
-        _rx = float(_rr.group(1)) / 100 * 343 * t5["scale"][0] if _rr else None
-        _ry = float(_rr.group(2)) / 100 * 48 * t5["scale"][1] if _rr else None
-        prova("...e i raggi del CSS, schiacciati sulla tasca, tornano quelli del + "
-              "(27px, al decimo)", [True, True],
-              [_rx is not None and abs(_rx - 27) < .1, _ry is not None and abs(_ry - 27) < .1])
+        t6 = _js.loads(_r6.stdout.strip().splitlines()[-1])
+        _capsula = ["+", "telaio", "tendina", "binario", "su"]
+        _voci = ["v1", "v2", "v3", "v4"]
+        prova("la capsula a posto: il +, il telaio e la tendina senza le transform "
+              "del dito, il binario spento e intero, niente che sfumi — DI COLPO, "
+              "coi soli pezzi della capsula", {
+                  "classi": ["barra-via", "morfosi", "nav-p2p", "p2p-vendo"],
+                  "tr": ["", "", ""], "su": "", "piu": "hidden", "bottone": "hidden",
+                  "log": [p + "=none" for p in _capsula] + ["riflusso"]
+                         + [p + "=-" for p in _capsula],
+                  "spenti": [7]}, t6["aPosto"])
+        prova("...e la barra secca: in piu' le voci tornano al loro posto, la barra "
+              "si richiude e il + e il bottone tornano a vista, sempre di colpo; "
+              "`morfosi` resta, per la fine della dissolvenza", {
+                  "classi": ["morfosi", "nav-p2p", "p2p-vendo"],
+                  "tr": ["", "", ""], "su": "", "piu": "", "bottone": "",
+                  "log": [p + "=none" for p in _voci + _capsula] + ["riflusso"]
+                         + [p + "=-" for p in _voci + _capsula],
+                  "spenti": [7]}, t6["secca"])
 
-    # IL PRIMO FOTOGRAMMA E' LA TASCA COM'ERA: lo stesso blu e lo stesso
-    # gradino della tendina, il suo filo (stesso spessore, stesso token,
-    # cima aperta, raggio del +) e il logo dove sta quello vero — i numeri
-    # si leggono dalle regole della tendina e del +, non si ricopiano
-    def _rg_(testa):
-        i = stile.index(testa)
-        return stile[i:stile.index("}", i) + 1]
-
-    def _pxx(testo, prop):
-        m_ = re.search(r"(?<![-\w])" + re.escape(prop) + r":\s*(-?[\d.]+)px", testo)
-        return float(m_.group(1)) if m_ else None
-    _tend_ = _rg_("  #navBarattozon{position:absolute;")
-    _img_ = _rg_("  #navBarattozon img{")
-    _filo_t = _rg_("  #navBarattozon::before{")
-    _casa_ = _rg_("  nav button.sell .ic{\n    width:54px")
-    _ft = _rg_("  body.p2p-vendo #p2pMorfo.tasca .morfo-forma{")
-    _fi = _rg_("  #p2pMorfo.tasca .morfo-filo{")
-    _gl = _rg_("  #p2pMorfo.tasca .g-logo{")
-    _r_ = (_pxx(_casa_, "width") or 0) / 2
-    _tasca_h = (_pxx(_tend_, "height") or 0) - _r_
-    _logo_c = (_pxx(_img_, "top") or 0) + (_pxx(_img_, "height") or 0) / 2
-    prova("il primo fotogramma e' la tasca com'era: lo stesso blu e lo stesso "
-          "gradino della tendina", [True, True],
-          ["background:#191D29;" in _ft and "background:#191D29;" in _tend_,
-           "box-shadow:0 4px 0 #0C0E15;" in _ft and "box-shadow:0 4px 0 #0C0E15;" in _tend_])
-    prova("...il suo filo: stesso spessore e stesso token, la cima aperta, il "
-          "raggio del +", [True, True, True],
-          ["inset 0 0 0 2.5px var(--nav-ink-p2p)" in _filo_t
-           and "border:2.5px solid var(--nav-ink-p2p);border-top:0;" in _fi,
-           "box-sizing:border-box;" in _fi,
-           "border-radius:0 0 %gpx %gpx;" % (_r_, _r_) in _fi])
-    prova("...e il logo dove sta quello vero: 1,5px sopra il centro della tasca "
-          "(il centro del logo a %g dalla cima della tendina, della tasca a %g)"
-          % (_logo_c, _r_ + _tasca_h / 2),
-          [_pxx(_img_, "width"), _pxx(_img_, "height"), _logo_c - (_r_ + _tasca_h / 2)],
-          [_pxx(_gl, "width"), _pxx(_gl, "height"), _pxx(_gl, "top")])
-    # NIENTE DEL FANTASMA DELLA TASCA E' ROSSO, strato per strato, alla
-    # partenza e in volo: il lampo rosso non ha piu' dove nascere
+    # IL ROSSO SE NE VA FINCHE' E' TONDO: col vestito blu la forma resta la
+    # pelle rossa del + ma sfuma dal primo fotogramma (ritardo zero) e in
+    # meta' della dissolvenza breve — con quella intera, a 430px, il rosso
+    # velava ancora un ovale di 105 pixel —, sotto c'e' il gemello blu col
+    # gradino del bottone, e senza vestito blu il gemello non c'e';
+    # nient'altro del fantasma di Barattozon e' rosso
+    _BZ = ["acceso", "bz"]
+    prova("col vestito blu la forma e' la pelle rossa del +, ma sfuma dal primo "
+          "fotogramma e in meta' della dissolvenza breve; sotto c'e' il gemello "
+          "blu, tondo, col gradino del bottone (che senza vestito blu non c'e')",
+          [["var(--danger)", "0s,0s", "var(--morfo-corsa),calc(var(--morfo-velo) / 2)"],
+           ["block", "#191D29", "0 3px 0 #0C0E15", "50%"],
+           [None, "none"]],
+          [[_fantasma(_V, _BZ, _FORMA).get("background"),
+            _fantasma(_V, _BZ, _FORMA, props=["transition-delay"]).get("transition-delay"),
+            _fantasma(_V, _BZ, _FORMA, props=["transition-duration"]).get("transition-duration")],
+           [_fantasma(_V, _BZ, _BLU, props=["display"]).get("display"),
+            _fantasma(_V, _BZ, _BLU).get("background"),
+            _fantasma(_V, _BZ, _BLU).get("box-shadow"),
+            _fantasma(_V, _BZ, _BLU).get("border-radius")],
+           [_fantasma(_V, ["acceso"], _FORMA, props=["transition-delay"]).get("transition-delay"),
+            _fantasma(_V, ["acceso"], _BLU, props=["display"]).get("display")]])
     _rossi = []
-    for _vg in (["acceso", "bz", "tasca", "parte"], ["acceso", "bz", "tasca"]):
-        for _st in (_FORMA, _FILO, _META, _GLIFO, _ETI):
+    for _vg in (["acceso", "bz", "parte"], ["acceso", "bz"]):
+        for _st in (_BLU, _META, _GLIFO, _ETI):
             for _p, _v in _fantasma(_V, _vg, _st).items():
                 if "danger" in (_v or ""):
                     _rossi.append((_st[1], _p, _v))
-    prova("...e niente del fantasma della tasca e' rosso, strato per strato, alla "
-          "partenza e in volo (la cascata a «Vendi BTC»)", [], _rossi)
-    _PIU_ = {"tag": "span", "attr": {"class": "g-piu"}, "classi": {"g-piu"}}
-    _LOGO_ = {"tag": "img", "attr": {"class": "g-logo"}, "classi": {"g-logo"}}
-    _dis = lambda vg, f: _fantasma(_V, vg, _GLIFO, f, ["display"]).get("display")
-    prova("...dal + il glifo e' il +, dalla tasca e' il logo (e il + non c'e')",
-          {"piu": [None, "none"], "tasca": ["none", "block"]},
-          {"piu": [_dis(["acceso"], _PIU_), _dis(["acceso"], _LOGO_)],
-           "tasca": [_dis(["acceso", "tasca"], _PIU_), _dis(["acceso", "tasca"], _LOGO_)]})
+    prova("...e nient'altro del fantasma di Barattozon e' rosso — gemello, meta, "
+          "glifo, scritta —, alla partenza e in volo (la cascata a «Vendi BTC»)",
+          [], _rossi)
 
     # H) LA RIGA SOTTO L'IMPORTO, FATTA GIRARE COI NUMERI CHE CAMBIANO
     #    Le sentinelle qui sopra dicono che la riga c'e' e che sta al
@@ -88737,8 +88872,8 @@ def prove_effetti_ridotti():
           "if (!ancora || effettiRidotti()) return;"
           in pezzo_js(mini, "function festaSats(ancora, mini){", "\n}\n"))
     prova("la morfosi del «+» non nasce: e' la PRIMA cosa che chiede", True,
-          pezzo_js(mini, "function morfoPuoiP2P(){", "\n}\n").startswith(
-              "function morfoPuoiP2P(){\n  if (effettiRidotti()) return false;"))
+          pezzo_js(mini, "function morfoPuoiP2P(prima){", "\n}\n").startswith(
+              "function morfoPuoiP2P(prima){\n  if (effettiRidotti()) return false;"))
     # ogni `behavior:` di una scorsa: o e' secco, o chiede al giudice
     _buone = {"tourRidotto() ? 'auto' : 'smooth'", "corto ? 'smooth' : 'auto'",
               "'auto'", "'instant'"}

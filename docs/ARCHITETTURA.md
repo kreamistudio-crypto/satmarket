@@ -25037,15 +25037,24 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   Sopra, il + apre il foglio di sempre; sotto, la tendina apre il foglio
   col tabacchino gia' scelto (`apriBarattozonP2P` →
   `apriNuovoOrdineP2P(P2P_TABACCHINO)`, che sceglie il metodo PRIMA del
-  disegno e della morfosi, e solo se `metodiPubblicabiliP2P` lo concede).
-  E IL + SI TRASCINA SULLA TENDINA, come un CURSORE nella sua guida (il
+  disegno e della morfosi, e solo se `metodiPubblicabiliP2P` lo concede)
+  — e dal quinto giro il TOCCO ci arriva facendo da solo il trascino
+  (`toccaTendinaP2P`): il + scende con la corsa della barra, si ferma e
+  diventa il bottone blu; senza morfosi (effetti ridotti, demo, vetrina)
+  il foglio si apre subito, e la guardia chiede `morfoPuoiP2P(true)`, «a
+  foglio ancora da disegnare», che il bottone d'arrivo nasce col primo
+  disegno. E IL + SI TRASCINA SULLA TENDINA, come un CURSORE nella sua guida (il
   quarto giro, 24 set 2026): scorre solo in verticale, dalla casa al
   fondo della tendina e mai oltre (`corsaCursoreP2P`, con la guida
   misurata sulla tendina, ferma per costruzione), e da meta' corsa in giu'
-  e' «sopra» (`sopraTendinaP2P`): lasciato li' apre lo stesso percorso,
-  prima torna a casa. Sopra di lui resta il BINARIO VUOTO: `#navBinario`
-  e' il contorno della capsula intera, vuoto dentro, acceso dal gesto
-  (`p2p-binario`); il blu si ritira sotto il suo equatore perche' il
+  e' «sopra» (`sopraTendinaP2P`): lasciato li' il + si FERMA in fondo e
+  diventa il bottone blu (`lasciaSulLogoP2P`, quinto giro), prima torna a
+  casa. Sopra di lui resta il BINARIO VUOTO: `#navBinario` e' il contorno
+  della capsula intera, vuoto dentro, acceso dal gesto (`p2p-binario`), e
+  dal quinto giro sfuma man mano che il + scende (`.bin-su`, 1 −
+  corsa/fondo, scritta dal dito): col + in fondo sopra il cerchio c'e' solo
+  la barra, e sotto il suo equatore il filo e' quello della tendina, dentro
+  il telaio che la taglia; il blu si ritira sotto il suo equatore perche' il
   telaio scende con lui e la tendina risale dello stesso tanto
   (`guidaCursoreP2P`, tre transform, che al ritorno se ne vanno insieme:
   `rientraCursoreP2P`). Il gesto (IL TRASCINO, accanto ad
@@ -25053,8 +25062,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   sotto P2P_SOGLIA_TRASCINO (12px) e' un TOCCO, che il gesto stesso passa
   a `toccaPiu` — il click del browser che segue si scarta con l'orologio
   `p2pPiuGestoAt`; la luce BIANCA (classe `p2p-sopra`: il filo della
-  tendina e del binario, il chiarore nella tendina, l'alone attorno alla
-  tasca nel `nav::after`, fuori dal telaio che lo taglierebbe) si accende
+  tendina e del binario, il chiarore nella tendina, l'alone nel
+  `nav::after`, fuori dal telaio che lo taglierebbe: una conca di luce
+  concentrica al + posato, spenta da una maschera dall'equatore in su) si accende
   da meta' corsa; `touch-action: pan-down` sul + lascia alla pagina il dito che
   sale, il gesto di aggiornamento non si arma da un tocco che parte dalla
   barra, e `go()` riporta a casa un + trascinato (`annullaTrascinoP2P`).
@@ -25072,13 +25082,18 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   scuro di sera), e col percorso Barattozon il blu della capsula col
   logo in piccolo (`.btn.bz`, `LOGO_BZ_HTML`), come il «Pubblica» del
   suo riepilogo (`chiediConferma` con `vestito: 'bz'`, l'etichetta
-  sempre col textContent). IL FOGLIO DI BARATTOZON NASCE DALLA TASCA: col
-  bottone `.bz` il fantasma della morfosi parte dalla parte blu della
-  tendina sotto il + (`tascaBarattozonP2P`; classe `tasca` sul fantasma e
-  `morfo-tasca` sul body, che tiene la tendina fuori e ferma e ne nasconde
-  il logo, portato dal fantasma; il + resta a vista) e ci torna
-  (`srotolaTascaP2P`); le regole rosse del fantasma escludono il blu col
-  `:not()`, che per specificita' vincevano. In cima al foglio del
+  sempre col textContent). IL FOGLIO DI BARATTOZON NASCE DAL + SCESO SUL
+  LOGO (quinto giro): col bottone `.bz` il fantasma parte dal + dov'e', il
+  rosso sfuma in meta' della dissolvenza breve finche' e' tondo e sotto
+  c'e' un gemello blu (`.morfo-blu`) che cresce fino al bottone; la capsula
+  se ne va con lui (`capsula-via`) e torna a casa di colpo sotto il foglio
+  pieno (`posaFondoP2P` → `capsulaAPostoP2P`, cioe' `senzaCorsaP2P` sui
+  soli pezzi). CHIUDENDOLO NIENTE RITORNO: il foglio sfuma e sotto la barra
+  e' gia' a riposo (`barraSeccaP2P`), qualunque strada lo chiuda — freccia,
+  gesto indietro dell'app, pubblicazione —; il foglio rosso o verde torna
+  ancora nel +. Le regole rosse del fantasma escludono il blu col
+  `:not()`, che per specificita' vincevano; la morfosi dalla tasca del
+  quarto giro non c'e' piu'. In cima al foglio del
   percorso c'e' il MARCHIO (`titoloNuovoP2P`, `MARCHIO_TITOLO_P2P`: un file
   per tema, la frase come aria-label dell'<h3>, e il ripiego alla frase se
   un file non arriva). FUORI DAL LIBRO IL + E' ARANCIO:
@@ -25110,7 +25125,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   desktop le pillole sfumano ancora il loro fondo. I verbali: CANTIERI,
   «Il tasto Barattozon e il + neutro nel P2P», «La capsula di
   Barattozon», «La capsula col logo intero, il + che si trascina e le
-  corse della barra» e «Il + nella guida, la tasca e il marchio».
+  corse della barra», «Il + nella guida, la tasca e il marchio» e «Il +
+  che si ferma sul logo».
   LA SVEGLIA DEL TABACCHINO è l'emenda alla fase 6 (decisione di
   Andrea): il server impara UNA cosa — «questo account ha una scadenza
   a quest'ora» — nella tabella `p2p_sveglie` (quattro colonne, PK
@@ -26800,8 +26816,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    la B bianca sopra la freccia arancio, 123x120 — il 3x dei 40px della
    tendina —, WebP con alfa; il blu della foto lo mette il CSS alla
    tendina e ai bottoni blu del percorso, dove lo stesso file va in
-   piccolo, e dal 24 set 2026 nel fantasma della morfosi che parte dalla
-   tasca. Il nome e' quello del primo giro; vedi CANTIERI, «La capsula
+   piccolo, e dal 24 set 2026 nella scritta del fantasma della morfosi,
+   copiata dal bottone blu. Il nome e' quello del primo giro; vedi CANTIERI, «La capsula
    col logo intero, il + che si trascina e le corse della barra»),
    `/assets/scambi-intestazione.webp` (l'intestazione di «I miei
    scambi», 22 set 2026: le due monete, bitcoin e un euro, al posto
