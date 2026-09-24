@@ -30578,3 +30578,58 @@ chiede al venditore il contenuto. Restano dichiarate: il digitale
 senza magazzino è fuori vetrina fino a un'ora dopo ogni vendita; un
 ordine pagato di un digitale importato passa dal venditore che incolla
 il link, come per i buoni nati qui.
+
+## Il link nel «Condividi» (24 set 2026)
+
+Dal bottone sulla foto di un annuncio partiva il solo testo («titolo —
+prezzo su Barattolo 🫙 / Annuncio di @… / Pagamento in satoshi»), senza
+il link. Il link c'era, ma nel SOLO campo `url` del foglio di
+condivisione, e più di un'app ne tiene uno solo: il testo.
+
+**IL CENSIMENTO.** Il difetto stava nel tubo unico `condividiLink`,
+quindi lo avevano TUTTI i suoi chiamanti: l'annuncio, «Condividi questa
+pagina» del deposito e dei dati, i reparti (tocco lungo), la card P2P e
+quella dei Consigliati, l'invito e il barattolo condiviso. NON lo
+avevano i due «condividi il negozio» (`condividiNegozio`,
+`condividiMioNegozio`) e il «Copia» dell'invito e del barattolo: copiano
+il LINK negli appunti, e il link è tutto il contenuto. Dentro Telegram
+il link arrivava già: `tg.shareURL` non esiste nell'API delle Web App
+(verificato sulla pagina ufficiale), e t.me/share/url porta l'url come
+campo obbligatorio. Quindi il testo nudo usciva da `navigator.share`:
+browser e APK.
+
+**LA CURA È NEL TUBO.** Il link sta nella riga in fondo al testo per
+tutti (`testoColLink`), e resta anche in `url`. Tranne dove lo incolla
+già la piattaforma, che ne farebbe due: t.me/share/url («url a capo
+testo»: lì il testo resta senza) e Android (l'intent ha un solo campo
+di testo, e Chrome — quindi anche l'APK — ci scrive «testo spazio url»:
+lì `url` non si passa). Il link è quello di sempre,
+`/annuncio/{id}-{slug}`: apre la scheda dal browser e nella mini app, e
+porta l'anteprima OG.
+
+**IL PREZZO.** `prezzoCondiviso`: il listino nella valuta
+dell'annuncio, con lo sconto del negozio quando un pezzo da solo lo fa
+scattare (la cifra della card verde), l'asta «da» la sua base. Prima
+era il listino nudo, anche con lo sconto acceso. Non ci entrano
+l'ACCORDO (è la cifra di chi condivide, non dell'amico: per questo non
+si passa da `prezzoMostrato`/`artStima`) né la LAMPO (la regola di
+`_seo_annuncio`: il messaggio non invecchia, lo sconto a tempo sì).
+
+**PROVATO.** `prove_condividi_col_link` (33): il tubo vero in node su
+Telegram, iPhone, Android, ripensamento, rifiuto e senza foglio; il
+prezzo vero su dieci casi più il cambio muto, con le vie dell'accordo e
+della lampo che esplodono se chiamate; il censimento (un solo
+`navigator.share`, i sei chiamanti nel tubo). La sentinella dei
+chiamanti di `scontoScatta` passa da 3 a 4 col perché. Tortura 15/15.
+Dal vivo sul server vero (copia in collaudo, relay morti), col tocco
+vero sul bottone e un registratore al posto del foglio: desktop → testo
+col link e `url`, «71,10 €» su un listino da 79 € col −10% del
+negozio; Android → un campo solo col link, «20 000 sats» con una lampo
+al −50% accesa; «Condividi questa pagina» del deposito → testo col link.
+
+**DA AVERE.** Il telefono vero: WhatsApp da Android e da iPhone. Su
+iPhone il link va nel testo E nell'`url`: un'app che li tiene tutti e
+due lo mostra due volte — è il prezzo di non perderlo mai.
+**DA GUARDARE.** L'anteprima OG dice il listino (79,00 €) mentre il
+testo dice lo scontato (71,10 €): due cifre vere, ma diverse nello
+stesso messaggio. Non toccato qui.

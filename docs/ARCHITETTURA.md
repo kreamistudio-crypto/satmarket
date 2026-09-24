@@ -17113,6 +17113,20 @@
   compone `condividiAnnuncio` e non `condividiLink`, che è il tubo
   condiviso con /sicurezza e /privacy, dove nessun venditore c'è da
   nominare.
+  IL LINK VIAGGIA ANCHE NEL TESTO (24 set 2026): nel foglio di
+  condivisione del telefono `text` e `url` sono due campi e più di
+  un'app ne tiene uno solo — il testo — quindi `condividiLink` mette
+  il link nella riga in fondo al testo (`testoColLink`) per TUTTI i
+  chiamanti, e lo lascia anche in `url`. Due strade lo mettono una
+  volta sola, perché lo incollano già loro: t.me/share/url (l'url è il
+  campo obbligatorio, il messaggio nasce «url a capo testo») e Android
+  (l'intent ha un solo campo di testo, e Chrome ci scrive «testo
+  spazio url»: lì `url` non si passa). IL PREZZO DEL TESTO è
+  `prezzoCondiviso`: il listino nella valuta dell'annuncio, con lo
+  sconto del negozio se un pezzo da solo lo fa scattare, l'asta dalla
+  sua base; MAI l'accordo di chi condivide (per questo non passa da
+  `prezzoMostrato`/`artStima`) e MAI la lampo, la regola di
+  `_seo_annuncio`: il messaggio non invecchia, lo sconto a tempo sì.
   UN MODO SOLO DI DIRE LA PERSONA, in cascata: username Telegram →
   nome → npub. «@rosina (Rosina)» sarebbe la stessa persona detta due
   volte. E IL TRATTINO NON È UN NOME: `mapListing` mette '—' quando il

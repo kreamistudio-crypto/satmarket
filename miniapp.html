@@ -29146,7 +29146,22 @@ function renderAvatar(){
    Dentro Telegram (initData vero: nel browser lo stub mentirebbe) la
    WebView NON ha navigator.share — si usa il canale di Telegram, a
    scalare: shareURL se il client lo offre, altrimenti il selettore
-   chat via t.me/share/url. */
+   chat via t.me/share/url.
+   IL LINK VIAGGIA ANCHE DENTRO IL TESTO (24 set 2026, il difetto
+   visto da Andrea: dal bottone sulla foto partiva «titolo — prezzo /
+   Annuncio di @… / Pagamento in satoshi» e nient'altro). Nel foglio
+   di condivisione del telefono `text` e `url` sono DUE campi, e piu'
+   di un'app (WhatsApp, Mail) ne tiene uno solo: quello che resta e'
+   il testo. Quindi il link sta in fondo al testo SEMPRE, e resta
+   anche nel campo `url` per chi lo legge da li'.
+   DUE STRADE LO METTONO UNA VOLTA SOLA, perche' lo incollano gia'
+   loro e ci si ritroverebbe il link due volte di fila:
+   • Telegram (t.me/share/url): l'url e' il campo OBBLIGATORIO, il
+     messaggio nasce «url a capo testo» — il link non si perde mai;
+   • Android: l'intent di condivisione ha UN solo campo di testo, e
+     Chrome (quindi anche l'APK) ci scrive «testo spazio url». Il
+     campo `url` separato li' non esiste: si manda il testo che lo
+     contiene gia'. */
 async function condividiLink(link, testo, titolo){
   haptic();
   if (tg?.initData) {
@@ -29158,10 +29173,17 @@ async function condividiLink(link, testo, titolo){
     }
   }
   if (navigator.share) {
-    try { await navigator.share({title: titolo, text: testo, url: link}); return; }
+    const dati = {title: titolo, text: testoColLink(testo, link)};
+    if (!/Android/i.test(navigator.userAgent || '')) dati.url = link;
+    try { await navigator.share(dati); return; }
     catch(e) { if (e.name === 'AbortError') return; }  // ripensamento: fine
   }
   return copiaLink(link, 'Link copiato 🔗');
+}
+/* il testo con il link nella sua riga in fondo: una riga sola, cosi'
+   chi riceve lo tocca, e l'anteprima la costruisce l'app da li' */
+function testoColLink(testo, link){
+  return testo ? testo + '\n' + link : link;
 }
 
 /* L'ULTIMO GRADINO DELLA SCALA, in un posto solo: si copia negli
@@ -29224,10 +29246,36 @@ function bottoneCopia(v, aria){
     + 'aria-label="' + esc(aria) + '">📋 Copia</button>';
 }
 
+/* IL PREZZO DEL TESTO CONDIVISO (24 set 2026): quello che trova chi
+   apre il link, nella valuta dell'annuncio — cioe' il listino con lo
+   SCONTO DEL NEGOZIO quando un pezzo da solo lo fa scattare (la card
+   verde dice gia' quella cifra), e l'asta dalla sua base.
+   DUE COSE NON CI ENTRANO, ed e' deliberato:
+   • l'ACCORDO: e' la cifra pattuita da CHI CONDIVIDE, non quella che
+     vedra' l'amico — `prezzoMostrato` la porta, e per questo qui non
+     la si chiama;
+   • la LAMPO: il messaggio non invecchia e lo sconto a tempo si', la
+     stessa regola dell'anteprima del server (`_seo_annuncio`, «meglio
+     dire il prezzo che non scade»). Chi apre dopo la lampo trova il
+     prezzo scritto; chi apre durante, uno piu' basso.
+   Lo sconto si misura sul LISTINO e non su `artStima`, che dentro ha
+   accordo e lampo: la domanda e' la stessa di `scontoQui`, fatta per
+   chi non ha niente di suo. */
+function prezzoCondiviso(l){
+  if (astaE(l)) return `asta da ${fmt(l.astaBase)} sats`;
+  const sconto = !inFerie(l) && !esaurito(l)
+    && regoleSconto(l.scontoCriterio, l.scontoSoglia,
+                    l.scontoValoreSats, l.scontoValoreEur,
+                    l.scontoValuta, l.scontoPct)
+       .some(r => scontoScatta(r, satsAnnuncio(l), l.valuta, 1));
+  const v = sconto ? conSconto(l) : l;
+  return (v.valuta==='eur' && v.priceEur>0)
+    ? `${fmtEur(v.priceEur)} €` : `${fmt(v.price)} sats`;
+}
+
 function condividiAnnuncio(){
   const l = currentListing; if (!l) return;
-  const prezzo = (l.valuta==='eur' && l.priceEur>0)
-    ? `${fmtEur(l.priceEur)} €` : `${fmt(l.price)} sats`;
+  const prezzo = prezzoCondiviso(l);
   /* Si condivide l'indirizzo PARLANTE: lo slug arriva dal server nel
      payload (mai ricalcolato qui) e senza di lui il link resta quello
      di sempre, che continua a funzionare. */

@@ -39601,8 +39601,12 @@ def prove_promesse_raggiungibili():
     _ss = pezzo_js(mini, "function scontoScatta(", "\n}")
     prova("il cuore del verdetto e' uno", 1,
           mini.count("function scontoScatta("))
-    prova("...e lo chiamano la vetrina e il form", 3,
-          mini.count("scontoScatta("))   # la definizione piu' i due
+    # ...e il TERZO chiamante e' il prezzo del testo condiviso (24 set
+    # 2026, «Il link nel Condividi»): stessa domanda, misurata sul
+    # listino pubblico invece che su artStima, che porta l'accordo di
+    # chi condivide. Passa dallo stesso cuore, e non se ne ricopia uno.
+    prova("...e lo chiamano la vetrina, il form e il testo condiviso", 4,
+          mini.count("scontoScatta("))   # la definizione piu' i tre
     prova("la cifra e' quella del server, per i pezzi scelti", True,
           "scontoScatta(r, artStima(l), l.valuta, qta)" in _sc
           and "const art = artSats * n;" in _ss)
@@ -46228,6 +46232,9 @@ def prove_condivisione_venditore():
             + _onion + "\n}\n" + _base_c + "\n}\n"
             "const fmt = n => String(n);\n"
             "const fmtEur = n => String(n);\n"
+            # il prezzo ha il suo banco, con le funzioni vere
+            # (prove_condividi_col_link): qui si guarda chi vende
+            "function prezzoCondiviso(l){ return fmt(l.price) + ' sats'; }\n"
             "let visto = null, currentListing = null;\n"
             "function condividiLink(url, testo, titolo)"
             "{ visto = [url, testo]; }\n"
@@ -46273,6 +46280,203 @@ def prove_condivisione_venditore():
               _atteso,
               _tutto[0] if _tutto
               else "ERRORE: " + (_r.stderr or "")[:200])
+
+
+def prove_condividi_col_link():
+    """IL LINK NEL «CONDIVIDI» (24 set 2026).
+
+    Dal bottone sulla foto di un annuncio partiva il solo testo
+    («titolo — prezzo su Barattolo / Annuncio di @… / Pagamento in
+    satoshi»): il link viaggiava nel SOLO campo `url` del foglio di
+    condivisione, e piu' di un'app di quel foglio tiene il testo e
+    butta l'url. Il difetto stava nel tubo unico `condividiLink`,
+    quindi lo avevano tutti i suoi chiamanti — annuncio, pagine del
+    deposito e dei dati, reparti, P2P, Consigliati, invito, barattolo.
+    La cura e' nel tubo: il link sta in fondo al testo SEMPRE, e nel
+    campo `url` dove quel campo esiste davvero come campo a parte.
+
+    Qui si fa GIRARE il tubo vero con node, in quattro telefoni finti,
+    e il prezzo dell'annuncio su tutti i casi che lo cambiano. Le
+    sentinelle a stringa direbbero che le righe ci sono, mai che il
+    link arrivi UNA volta e non zero o due."""
+    print("\n[il link nel «Condividi»]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    cl = pezzo_js(mini, "async function condividiLink(", "\n}\n")
+    tl = pezzo_js(mini, "function testoColLink(", "\n}\n")
+    pc = pezzo_js(mini, "function prezzoCondiviso(", "\n}\n")
+
+    # IL CENSIMENTO: chi condivide passa dal tubo, e nessuno si ricopia
+    # un `navigator.share` suo — un secondo tubo tornerebbe a mandare
+    # il link nel solo campo `url`, e nessuno se ne accorgerebbe.
+    codice = _senza_commenti_js(mini)
+    prova("un solo navigator.share in tutta l'app, quello del tubo", 1,
+          codice.count("navigator.share("))
+    prova("...e sta dentro condividiLink", True,
+          "navigator.share(" in cl)
+    for chi in ("condividiAnnuncio(){", "condividiSicurezza(){",
+                "condividiPrivacy(){", "condividiCategoria(c){",
+                "condividiInvito(){", "condividiJarLink(){"):
+        f = pezzo_js(mini, "function " + chi, "\n}\n")
+        prova(f"{chi.split('(')[0]} passa dal tubo", True,
+              "condividiLink(" in f)
+
+    # IL PREZZO NON PRENDE LE CIFRE DI CHI CONDIVIDE: l'accordo e' il
+    # suo, e artStima/prezzoMostrato/giudizioPrezzo ce l'hanno dentro.
+    # La lampo resta fuori per la regola dell'anteprima del server.
+    for vietato in ("prezzoMostrato", "artStima", "giudizioPrezzo",
+                    "conAccordo", "conLampo", "vistaArticolo"):
+        prova(f"il prezzo condiviso non passa da {vietato}", False,
+              vietato + "(" in pc)
+    prova("condividiAnnuncio usa il prezzo condiviso", True,
+          "prezzoCondiviso(l)" in pezzo_js(
+              mini, "function condividiAnnuncio(){", "\n}\n"))
+
+    import json as _j, shutil as _sh, subprocess as _sp, tempfile as _tf
+    node = _sh.which("node")
+    if not node:
+        salta("il tubo e il prezzo girano davvero", "node non installato")
+        return
+    # le funzioni del prezzo montate VERE, mai ricopiate
+    vere = "".join(pezzo_js(mini, firma, "\n}\n") + "\n}\n" for firma in (
+        "function astaE(", "function inFerie(", "function esaurito(",
+        "function regoleSconto(", "function scontoScatta(",
+        "function satsAnnuncio(", "function scontaSats(",
+        "function scontaEur(", "function conSconto(",
+        "function prezzoCondiviso("))
+    fmts = ("const fmt = n => n.toLocaleString('it-IT')"
+            ".replace(/\\./g,'\\u202F');\n"
+            "const fmtEur = e => e.toLocaleString('it-IT',"
+            " {minimumFractionDigits:2, maximumFractionDigits:2});\n")
+    # le vie che portano le cifre di chi condivide ESPLODONO se chiamate
+    trappole = "".join(
+        f"function {n}(){{ throw new Error('chiamata {n}'); }}\n"
+        for n in ("artStima", "prezzoMostrato", "giudizioPrezzo",
+                  "conAccordo", "conLampo", "offertaAccettataPer"))
+    b = dict(id=7, title="Poster", valuta="sats", price=20000,
+             priceEur=0, stato="attivo")
+    eur = dict(b, valuta="eur", price=100000, priceEur=79)
+    val_sats = dict(scontoCriterio="valore", scontoValoreSats=10000,
+                    scontoValuta="sats", scontoPct=15)
+    casi_prezzo = [
+        ("sats nudo", b, "20\u202f000 sats"),
+        ("euro nudo, nella valuta dell'annuncio", eur, "79,00 €"),
+        ("sconto a valore che scatta a un pezzo", dict(b, **val_sats),
+         "17\u202f000 sats"),
+        ("sconto in euro sul listino in euro, cambio vivo",
+         dict(eur, priceEur=100, scontoCriterio="valore",
+              scontoValoreEur=50, scontoValuta="eur", scontoPct=10),
+         "90,00 €"),
+        ("sconto a pezzi: un pezzo solo non lo fa scattare",
+         dict(eur, scontoCriterio="pezzi", scontoSoglia=2, scontoPct=10),
+         "79,00 €"),
+        ("sconto sotto soglia", dict(b, price=5000, **val_sats),
+         "5000 sats"),
+        ("lampo viva: resta il listino (col suo sconto)",
+         dict(b, lampoPct=60, lampoFine=9999999999, **val_sats),
+         "17\u202f000 sats"),
+        ("esaurito: nessuno sconto da promettere",
+         dict(b, stato="venduto", **val_sats), "20\u202f000 sats"),
+        ("in ferie: nessuno sconto da promettere",
+         dict(b, ferie=9999999999, **val_sats), "20\u202f000 sats"),
+        ("asta: dalla sua base", dict(b, astaBase=5000, astaTop=8000),
+         "asta da 5000 sats"),
+    ]
+    prog_prezzo = (
+        "let cambioVivo = true, eurPerSat = 0.001;\n" + fmts + trappole
+        + vere
+        + "const casi = " + _j.dumps([c[1] for c in casi_prezzo]) + ";\n"
+        + "const fuori = casi.map(l => { try { return prezzoCondiviso(l); }"
+          " catch(e) { return 'ESPLOSA: ' + e.message; } });\n"
+        # a cambio muto la soglia in euro non si puo' misurare: tace,
+        # come la card
+        + "cambioVivo = false;\n"
+        + "fuori.push(prezzoCondiviso(casi[3]));\n"
+        + "console.log(JSON.stringify(fuori));\n")
+
+    # IL TUBO in quattro telefoni finti. `link` compare UNA volta in
+    # quel che arriva a chi riceve, e il testo lo porta in fondo dove
+    # il campo url non basta.
+    link = "https://barattolo.store/annuncio/7-poster"
+    testo = "Poster \u2014 79,00 € su Barattolo \U0001fad9\nPagamento in satoshi"
+    prog_tubo = (
+        "let visto = [];\n"
+        "function haptic(){}\n"
+        "function copiaLink(l, f){ visto.push(['copia', l]); }\n"
+        "let tg = null;\n"
+        "const navigator = {userAgent: ''};\n"
+        + tl + "\n}\n" + cl + "\n}\n"
+        + "const L = " + _j.dumps(link) + ", T = " + _j.dumps(testo) + ";\n"
+        "(async () => {\n"
+        "  const esiti = {};\n"
+        # Telegram: il selettore chat, che compone «url a capo testo»
+        "  tg = {initData: 'x', openTelegramLink: u => visto.push(['tg', u])};\n"
+        "  visto = []; await condividiLink(L, T, 'Poster'); esiti.tg = visto;\n"
+        "  tg = null;\n"
+        # iPhone: text e url sono due campi, e un'app ne tiene uno
+        "  navigator.userAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0)';\n"
+        "  navigator.share = async d => visto.push(['share', d]);\n"
+        "  visto = []; await condividiLink(L, T, 'Poster'); esiti.iphone = visto;\n"
+        # Android (Chrome e l'APK): un campo solo, il testo col link
+        "  navigator.userAgent = 'Mozilla/5.0 (Linux; Android 14; K)';\n"
+        "  visto = []; await condividiLink(L, T, 'Poster'); esiti.android = visto;\n"
+        # il ripensamento chiude; un rifiuto vero scende agli appunti
+        "  navigator.share = async () => { const e = new Error('x');"
+        " e.name = 'AbortError'; throw e; };\n"
+        "  visto = []; await condividiLink(L, T, 'Poster'); esiti.abort = visto;\n"
+        "  navigator.share = async () => { throw new Error('no'); };\n"
+        "  visto = []; await condividiLink(L, T, 'Poster'); esiti.rifiuto = visto;\n"
+        "  delete navigator.share;\n"
+        "  visto = []; await condividiLink(L, T, 'Poster'); esiti.nudo = visto;\n"
+        "  console.log(JSON.stringify(esiti));\n"
+        "})();\n")
+
+    def gira(prog):
+        f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                   encoding="utf-8")
+        f.write(prog)
+        f.close()
+        r = _sp.run([node, f.name], capture_output=True, text=True,
+                    timeout=60, encoding="utf-8")
+        os.unlink(f.name)
+        try:
+            return _j.loads(r.stdout), ""
+        except ValueError:
+            return None, (r.stderr or r.stdout or "")[:300]
+
+    fuori, err = gira(prog_prezzo)
+    if fuori is None:
+        prova("il banco del prezzo risponde", "sì", "no: " + err)
+    else:
+        for (nome, _, atteso), avuto in zip(casi_prezzo, fuori):
+            prova(f"prezzo: {nome}", atteso, avuto)
+        prova("prezzo: a cambio muto la soglia in euro tace", "100,00 €",
+              fuori[-1])
+
+    es, err = gira(prog_tubo)
+    if es is None:
+        prova("il banco del tubo risponde", "sì", "no: " + err)
+        return
+    from urllib.parse import urlsplit, parse_qs
+    t = es.get("tg") or [["", ""]]
+    q = parse_qs(urlsplit(t[0][1]).query)
+    prova("Telegram: il selettore chat col link come url", [link],
+          q.get("url"))
+    # «url a capo testo» lo compone Telegram: nel testo il link non ci
+    # va, o arriverebbe due volte
+    prova("...e il link arriva UNA volta", 1,
+          (q.get("url", [""])[0] + "\n" + q.get("text", [""])[0])
+          .count(link))
+    prova("iPhone: il testo finisce col link, e l'url c'e' uguale",
+          [["share", {"title": "Poster", "text": testo + "\n" + link,
+                      "url": link}]], es.get("iphone"))
+    prova("Android: un campo solo, il testo col link in fondo",
+          [["share", {"title": "Poster", "text": testo + "\n" + link}]],
+          es.get("android"))
+    prova("il ripensamento non scende agli appunti", [], es.get("abort"))
+    prova("un rifiuto vero scende agli appunti, col link",
+          [["copia", link]], es.get("rifiuto"))
+    prova("senza foglio di condivisione si copia il link",
+          [["copia", link]], es.get("nudo"))
 
 
 def prove_altri_scorrimento():
@@ -94108,7 +94312,7 @@ def main():
               prove_consigliati,
               prove_guardia_is_bot,
               prove_altri_scorrimento, prove_widget, prove_ricerca,
-              prove_condivisione_venditore,
+              prove_condivisione_venditore, prove_condividi_col_link,
               prove_zona_comune_in_modifica,
               prove_cassa_strada_chiusa,
               prove_casa_vuota_gratis,
