@@ -609,6 +609,58 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   mai `--force`. Il giudice di `deploy.sh` resta quello di sempre (su
   main, in avanti, `prove` e `segreti` in `success`, punta firmata): il
   ref spostato a mano è solo il campanello.
+- LE SESSIONI CLOUD (24 set 2026, regola di Andrea): una sessione di
+  Claude Code che gira nel cloud (claude.ai/code, o una sessione spostata
+  lì dal PC) lavora su un ramo `cantiere/<nome>` e apre una PR verso
+  main — MAI un push su main. È l'unica eccezione a «si pusha su main,
+  mai su un ramo», e ha due perché.
+  LA FIRMA: il VPS tira solo una punta FIRMATA da una chiave di
+  `/etc/barattolo-deploy/firmatari` (vedi «IL DEPLOY CHE SI FIDA SOLO DI
+  MAIN»), e quella chiave vive sul PC. Dal cloud un push arriverebbe
+  nudo e verrebbe rifiutato — e portare la chiave lassù per farlo
+  passare è proprio quel che la firma deve impedire: è la sola difesa
+  che regge a un GitHub bucato, e regge finché la chiave non ci sta.
+  IL BANCO: nel cloud non ci sono `config.py`, il browser col relay
+  morto, il telefono, l'APK. `prove.py` e i collaudi in gabbia girano
+  (la CI parte anche sulla PR: il workflow ha `pull_request:`, e il job
+  `pronto` resta fermo perché vuole un push su main), le prove dal vivo
+  no. Quindi la sessione cloud scrive nel suo verbale in CANTIERI cosa
+  NON ha potuto provare, invece di lasciarlo intendere.
+  LE PROVE DAL VIVO RESTANO ALLE SESSIONI SUL PC — config, browser col
+  relay morto, app Android, telefono —, e si fanno PRIMA del merge, sul
+  ramo, in un worktree suo (mai nella cartella condivisa):
+  `git fetch origin`
+  `git worktree add .claude/worktrees/<nome> origin/cantiere/<nome>`
+  Se dal vivo esce un difetto, la cura va sul ramo: la PR si aggiorna da
+  sé, e il merge aspetta.
+  IL MERGE LO FA UNA PERSONA DAL PC, firmato, anche lui in un worktree:
+  `git fetch origin`
+  `git worktree add --detach .claude/worktrees/merge-<nome> origin/main`
+  `git -C .claude/worktrees/merge-<nome> merge --no-ff -S origin/cantiere/<nome>`
+  `git -C .claude/worktrees/merge-<nome> cat-file commit HEAD` — deve
+  esserci la riga `gpgsig`
+  `git -C .claude/worktrees/merge-<nome> push origin HEAD:main`
+  `--no-ff` NON È ESTETICA: `deploy.sh` guarda la firma della sola
+  PUNTA, e un avanti veloce metterebbe in punta l'ultimo commit nato nel
+  cloud, che firmato non è — rifiutato. Col merge la punta è il commit
+  di merge, firmato qui; i commit del ramo restano senza firma, e va
+  bene così. `-S` si scrive anche se `commit.gpgsign` è acceso: su
+  un'altra macchina potrebbe non esserlo. La CI verde della PR NON è
+  quella che il giudice chiede: `giudice_deploy.py` vuole il giro nato
+  dal push SU MAIN, che parte col push del merge — quindi fra il push e
+  il deploy passa un giro intero di CI. ⚠️ MAI il bottone «Merge» del
+  SITO di GitHub: quel commit lo firma GitHub, e il VPS lo rifiuta (se
+  succede, un commit firmato sopra, come scritto là).
+  LA PULIZIA A FINE GIRO, dopo che il push del merge è passato (GitHub
+  segna la PR come «merged» da solo, perché i suoi commit ora stanno su
+  main):
+  `git worktree remove .claude/worktrees/merge-<nome>`
+  `git worktree remove .claude/worktrees/<nome>` (se c'era il giro dal
+  vivo)
+  `git push origin --delete cantiere/<nome>`
+  `git fetch --prune origin`
+  Un ramo `cantiere/*` rimasto su origin dopo il merge è una riga di
+  troppo nell'elenco, non un pericolo: il deploy non lo guarda.
 - La verifica npub richiede `websocket-client` (pip) nell'ambiente del
   servizio: se manca, il server parte lo stesso e l'endpoint risponde 503.
 - La pubblicazione su Nostr richiede anche `coincurve`: installarla con
