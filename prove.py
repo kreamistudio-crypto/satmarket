@@ -75376,6 +75376,86 @@ def prove_introduzioni_leggibili():
     prova("...e sono tutte in --ink-soft (le 26 di ieri e le 2 di prima)",
           True, mini.count(riga.format("ink-soft")) >= 28)
 
+    # IL SECONDO GIRO (24 set 2026, richiesta di Andrea): la riga sopra
+    # guardava UNO stile esatto, e fuori da lui restavano in --muted
+    # altre introduzioni e spiegazioni a 12,5px («Chiaro o scuro?», il
+    # foglio di Nostr, il barattolo condiviso, i suggerimenti dei
+    # pannelli). Adesso si CENSISCE ogni stile a 12,5px in --muted, in
+    # linea e nelle regole: quel che resta deve stare nell'elenco qui
+    # sotto — stati, righe vuote, etichette, dati e controlli —, e una
+    # riga nuova fuori elenco fa rosso finche' qualcuno non la guarda.
+    def piccolo_grigio(stile):
+        return ("color:var(--muted)" in stile and re.search(
+            r"(font-size:\s*12\.5px|font:[^;]*\b12\.5px)", stile))
+
+    i0, i1 = mini.index("<style"), mini.index("</style>")
+    css = re.sub(r"/\*[\s\S]*?\*/", "", mini[i0:i1])
+    regole = sorted(sel.strip().split("\n")[-1].strip()
+                    for sel, corpo in re.findall(r"([^{}]+)\{([^{}]*)\}", css)
+                    if piccolo_grigio(corpo))
+    RESTANO_CSS = sorted([
+        ".strumenti select,.strumenti button",   # controlli
+        ".p2p-leva", ".tema-pill", ".tour-salta",  # controlli
+        ".giro-porta",                            # il link che riapre il tour
+        ".p2p-sez-tit",                           # titoli di sezione
+        ".acc-h .conta",                          # il conteggio del cassetto
+        ".p2p-meta", ".p2p-box", ".order .sub",   # dati
+        ".ctrl-riga .ctrl-nota",                  # «per N pezzi»: un dato
+        ".punto-salvato .ps-dove",                # un indirizzo
+        ".ordine-num"])                           # il numero d'ordine
+    prova("a 12,5px in --muted restano solo controlli, titoli e dati "
+          "(regole CSS)", RESTANO_CSS, regole)
+    linea = []
+    for m in re.finditer(r'style="([^"]*)"', mini):
+        if piccolo_grigio(m.group(1)):
+            dopo = re.sub(r"\s+", " ", mini[m.end():m.end() + 70])
+            linea.append(dopo.lstrip(">").strip())
+    RESTANO_LINEA = (
+        "listino ${",                  # il prezzo di listino: un dato
+        "${stato}",                    # gli stati
+        "<span>oppure</span>",         # la riga di un campo
+        "<input id=\"codUsi\"",        # la riga di un campo
+        "— ${da}",                     # il mittente: un dato
+        "${esaurito(l)",               # uno stato dell'annuncio
+        "Nessun codice, per ora.",     # righe vuote
+        "Nessun negozio collegato, per ora.",
+        "Nessuna riga valida",
+        "Non riesco a leggere i tuoi avvisi",   # uno stato d'errore
+        "Categorie (nessuna = tutte)")          # un'etichetta
+    prova("...e in linea: stati, righe vuote, etichette e dati", [],
+          [x[:50] for x in linea
+           if not any(x.startswith(r) for r in RESTANO_LINEA)])
+    # e quelle del secondo giro ci sono, in --ink-soft
+    for testo in ("Chiaro o scuro?", "Quanto grande si legge",
+                  "Se il firmatario ce l'hai", "La chiave resta SOLO",
+                  "Amber e nstart.me non sono", "codici: eliminane uno",
+                  "negozi collegati: scollegane", "Il prezzo qui sotto è già",
+                  "Si sblocca dal livello", "La pagina non fa il tuo nome",
+                  "La fotografia è del", "L'anteprima vale 15 minuti"):
+        # il testo puo' comparire anche altrove (un commento, un'altra
+        # frase): contano le occorrenze che vivono in una riga a 12,5px
+        stili = []
+        for m in re.finditer(re.escape(testo), mini):
+            j = mini.rfind('style="', max(0, m.start() - 400), m.start())
+            if j < 0:
+                continue
+            fine = mini.index('"', j + 7)
+            # la frase sta DENTRO l'elemento dello stile: nessun elemento
+            # chiuso fra l'attributo e lei
+            if fine < m.start() and "</" not in mini[fine:m.start()]:
+                stili.append(mini[j:fine + 1])
+        stili = [x for x in stili if "12.5px" in x]
+        prova(f"«{testo}» in --ink-soft", (True, True),
+              (bool(stili), all("color:var(--ink-soft)" in x for x in stili)))
+    for sel in (".payout .hint{", ".eur-hint{", ".acq-nota{", ".hintline{",
+                ".interesse-promessa{"):
+        # la regola col selettore ESATTO a inizio riga, non una che lo
+        # contiene (`#view-x .eur-hint{…}` e' un'altra regola)
+        k = re.search(r"\n\s*" + re.escape(sel), css).end()
+        corpo = css[k:css.index("}", k)]
+        prova(f"{sel[:-1]} in --ink-soft", True,
+              "color:var(--ink-soft)" in corpo)
+
     def blocco(apertura):
         i = mini.index(apertura)
         return mini[i:mini.index("\n  }", i)]

@@ -1825,7 +1825,7 @@
   .interesse .btn{margin-top:0}
   .interesse-conta{margin-top:10px;font-weight:800;font-size:15px;
     color:var(--sats-text)}
-  .interesse-promessa{margin-top:4px;font-size:12.5px;color:var(--muted);
+  .interesse-promessa{margin-top:4px;font-size:12.5px;color:var(--ink-soft);
     font-weight:600}
 
   /* ---------- lo scambio P2P: il libro ordini (set 2026) ----------
@@ -5351,7 +5351,7 @@
   /* la strada spenta (cambio assente) resta visibile col motivo:
      si spegne, non sparisce — il campo non deve mentire */
   .via-opzione.off{opacity:.55;cursor:default}
-  .acq-nota{font-size:12.5px;color:var(--muted);font-weight:600;
+  .acq-nota{font-size:12.5px;color:var(--ink-soft);font-weight:600;
     line-height:1.45;margin-top:10px}
   /* Il cassetto del punto (quinto giro): il margine del bottone lo
      porta gia' il contenitore #acqPuntoCampo, e la riga compatta del
@@ -5757,7 +5757,7 @@
      `color:var(--sats-deep)` che teneva il € arancio anche nello
      stato normale). */
   .detail-price .unit.eur{font-size:20px;font-weight:700;margin-left:2px}
-  .eur-hint{font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:14px}
+  .eur-hint{font-size:12.5px;color:var(--ink-soft);font-weight:600;margin-bottom:14px}
   /* I PEZZI DI UN ORDINE A RIGHE (23 set 2026, ritocco di Andrea): sotto
      il prezzo totale stavano tutti attaccati — una riga di prosa dopo
      l'altra, subito sotto l'inciso della spedizione, e un titolo lungo
@@ -7363,7 +7363,7 @@
   }
   .payout h4{font-size:14.5px;margin-bottom:6px}
   .payout .net{font-family:'JetBrains Mono',monospace;color:var(--sats-deep);font-weight:700}
-  .payout .hint{font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.5}
+  .payout .hint{font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5}
   /* il riquadro di chi deve ancora pagare (24 set 2026, «Paga ora»):
      l'aria fra la frase e il bottone la mette la frase, che i bottoni
      di margini loro non ne portano (la famiglia sorvegliata) */
@@ -7536,7 +7536,7 @@
     display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
     margin-top:10px;padding:10px 12px;background:var(--sats-soft);
     border:1px solid var(--line);border-radius:12px;
-    font-size:12.5px;font-weight:600;color:var(--muted);line-height:1.45;
+    font-size:12.5px;font-weight:600;color:var(--ink-soft);line-height:1.45;
   }
   .hintline b{color:var(--ink)}
   .hintline .hl-az{margin-left:auto;white-space:nowrap}
@@ -10675,14 +10675,14 @@ document.getElementById('cartello')?.remove();</script>
       <div class="acc" id="accAspetto">
         <button class="acc-h" onclick="toggleAcc('accAspetto')"><span class="em">🌗</span>Aspetto<span class="fr">▾</span></button>
         <div class="acc-b">
-          <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.4">
+          <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.4">
             Chiaro o scuro? Con <b style="color:var(--ink)">Auto</b> segue <span id="temaSegnale">il sistema</span>.</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
             <button class="tema-pill" id="temaAuto" onclick="setTema('auto')">Auto</button>
             <button class="tema-pill" id="temaChiaro" onclick="setTema('chiaro')">☀️ Chiaro</button>
             <button class="tema-pill" id="temaScuro" onclick="setTema('scuro')">🌙 Scuro</button>
           </div>
-          <div style="font-size:12.5px;color:var(--muted);font-weight:600;
+          <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;
                       line-height:1.4;margin-top:16px">
             Quanto grande si legge Barattolo. La scelta ti segue su
             <b style="color:var(--ink)">ogni dispositivo</b>.</div>
@@ -11619,7 +11619,7 @@ document.getElementById('cartello')?.remove();</script>
       <div class="qr" id="nostrQr"></div>
       <div class="invoice" id="nostrQrUri" style="user-select:all;margin-top:10px"></div>
       <button class="btn mini" style="margin-top:6px" onclick="copiaUriConnessione()">📋 Copia il link</button>
-      <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.5;margin-top:6px">Se il firmatario ce l'hai su <b>questo</b> telefono il codice non lo puoi inquadrare da solo: copia il link e incollalo nell'app.</div>
+      <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5;margin-top:6px">Se il firmatario ce l'hai su <b>questo</b> telefono il codice non lo puoi inquadrare da solo: copia il link e incollalo nell'app.</div>
     </div>
     <button class="btn primary" style="margin-top:10px" onclick="loginNostrEstensione()">🧩 Con l'estensione del browser</button>
     <details style="margin-top:10px">
@@ -11631,7 +11631,7 @@ document.getElementById('cartello')?.remove();</script>
     </details>
     <details style="margin-top:10px">
       <summary style="cursor:pointer;font-weight:700;font-size:14px;padding:6px 0">🔑 Con la chiave privata (sconsigliato)</summary>
-      <div style="font-size:12.5px;color:var(--muted);font-weight:600;margin:6px 0 8px">
+      <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;margin:6px 0 8px">
         La chiave resta SOLO in questa pagina: non viene mai inviata né
         salvata da nessuna parte. Ma incollare una nsec è comunque
         rischioso: se puoi, usa l'estensione o il bunker.
@@ -11693,7 +11693,7 @@ document.getElementById('cartello')?.remove();</script>
     </div>
     <button class="btn ghost" style="margin-top:8px" onclick="apriLinkGuida('nstart')">🌐 Apri nstart.me</button>
 
-    <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.5;margin-top:14px">
+    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5;margin-top:14px">
       Amber e nstart.me non sono di Barattolo: sono strumenti liberi
       del mondo Nostr, e la chiave che creano è tua e funziona con
       qualsiasi app, non solo qui.
@@ -31284,7 +31284,7 @@ async function renderCodici(){
       alto vince quello</b> — e il codice non consuma un uso.</div>
     <div id="codiciErrore"></div>
     ${myCodici.map(riga).join('') || '<div style="font-size:12.5px;color:var(--muted);font-weight:600;margin:10px 0">Nessun codice, per ora.</div>'}
-    ${pieno ? `<div style="font-size:12.5px;color:var(--muted);font-weight:600;margin-top:12px">Hai già ${tetto} codici: eliminane uno per farne di nuovi.</div>` : `
+    ${pieno ? `<div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;margin-top:12px">Hai già ${tetto} codici: eliminane uno per farne di nuovi.</div>` : `
     <div class="section-label" style="margin-top:14px">${codiceInModifica ? 'Modifica il codice' : 'Nuovo codice'}</div>
     <div class="field"><input id="codCodice" maxlength="24"
       placeholder="Es. SATOSHI10" autocomplete="off"
@@ -31740,7 +31740,7 @@ async function renderConnettori(){
       aggiorni tu — te lo ricordiamo a ogni vendita.</div>
     <div id="connettoriErrore"></div>
     ${myConnettori.map(riga).join('') || '<div style="font-size:12.5px;color:var(--muted);font-weight:600;margin:10px 0">Nessun negozio collegato, per ora.</div>'}
-    ${pieno ? `<div style="font-size:12.5px;color:var(--muted);font-weight:600;margin-top:12px">Hai già ${tetto} negozi collegati: scollegane uno per aggiungerne un altro.</div>` : `
+    ${pieno ? `<div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;margin-top:12px">Hai già ${tetto} negozi collegati: scollegane uno per aggiungerne un altro.</div>` : `
     <div class="section-label" style="margin-top:14px">${inMod ? 'Modifica il collegamento' : 'Collega un negozio'}</div>
     <div id="connPilloleFonte" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${connPillole('fonte')}</div>
     <div class="field" style="margin-top:10px"><label for="connUrl">Indirizzo del negozio</label>
@@ -32382,7 +32382,7 @@ function renderBanner(){
         appendere sopra il tuo catalogo — una foto e il link al tuo
         sito.</div>`
       + (prezzo && pieno ? `
-      <div style="font-size:12.5px;color:var(--muted);font-weight:600;margin-top:10px">
+      <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;margin-top:10px">
         Il prezzo qui sotto è già <b style="color:var(--ink)">scontato per te</b>.</div>` : '')
       + (prezzo ? `
       <button class="btn orange sblocca-cta" style="margin-top:12px"
@@ -32699,7 +32699,7 @@ function renderSlugNegozio(){
      apre, o non la scoprirebbe mai. */
   if (!slugNegozioLeve.livello_sblocca){
     box.innerHTML = attuale + `
-      <div style="font-size:12.5px;color:var(--muted);font-weight:600;margin-top:10px">
+      <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;margin-top:10px">
         🔒 Si sblocca dal livello <b style="color:var(--ink)">${esc(slugNegozioLeve.livello_nome)}</b>.</div>`;
     return;
   }
@@ -37178,7 +37178,7 @@ function apriJarShare(){
         comprare — anche un venditore con cui stai trattando, se il
         link gli arriva. È come pubblicare una lista di desideri: un
         gesto tuo, da fare sapendolo.</div>
-      <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.5;margin-bottom:12px">
+      <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5;margin-bottom:12px">
         La pagina non fa il tuo nome, e mostra la <b>fotografia di
         adesso</b> (${contaFotografia()} oggett${contaFotografia()===1?'o':'i'}):
         quello che salverai dopo non si vede finché non la aggiorni.
@@ -37190,7 +37190,7 @@ function apriJarShare(){
     const quando = new Date((myBarattoloCond.aggiornato||0)*1000)
       .toLocaleDateString('it-IT');
     box.innerHTML = `
-      <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.5;margin-bottom:10px">
+      <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.5;margin-bottom:10px">
         La fotografia è del <b>${quando}</b> — ${myBarattoloCond.quanti}
         oggett${myBarattoloCond.quanti===1?'o':'i'}. Chi ha il link vede
         quella: quello che salvi dopo non c'è finché non la aggiorni.</div>
@@ -55488,7 +55488,7 @@ async function importPrepara(btn){
       ${importProblemiHTML(d.avvisi, 'var(--muted)')}
       ${d.valide
         ? `<button class="btn" style="margin-top:12px" onclick="importAvvia(this)">✅ Importa ${d.valide} annunci</button>
-           <div style="margin-top:6px;font-size:12.5px;color:var(--muted);font-weight:600">L'anteprima vale 15 minuti. Le righe con problemi si possono correggere e ricaricare anche dopo.</div>`
+           <div style="margin-top:6px;font-size:12.5px;color:var(--ink-soft);font-weight:600">L'anteprima vale 15 minuti. Le righe con problemi si possono correggere e ricaricare anche dopo.</div>`
         : `<div style="margin-top:8px;font-size:12.5px;color:var(--muted);font-weight:600">Nessuna riga valida: correggi il file e ricontrolla.</div>`}`;
   } catch(e){ ripristina(); toast('❌ Caricamento non riuscito, riprova'); }
 }
@@ -55583,7 +55583,7 @@ function renderWallet(){
     vecchia ? '↻ Per usarlo anche nel P2P, scollega e ricollega: serve sapere cosa permette' : '',
     (paga && !fatt && !vecchia) ? '– Nel P2P no: la connessione non permette make_invoice' : '',
     paga ? '⚠️ Questa connessione sa <b>pagare</b>: tienile un limite di spesa nel wallet, e se ti serve solo per il P2P ricreala col solo permesso di ricevere' : ''
-  ].filter(Boolean).map(r => '<div style="margin-top:6px;font-size:12.5px;font-weight:600;color:var(--muted);line-height:1.4">' + r + '</div>').join('');
+  ].filter(Boolean).map(r => '<div style="margin-top:6px;font-size:12.5px;font-weight:600;color:var(--ink-soft);line-height:1.4">' + r + '</div>').join('');
   el('nwcStato').innerHTML = w ? `
     <div style="margin-top:24px;font-size:13px;font-weight:800;color:var(--trust)">
       ⚡ Wallet collegato <span class="mono">${esc((w.pubkey||'').slice(0,8))}…</span>

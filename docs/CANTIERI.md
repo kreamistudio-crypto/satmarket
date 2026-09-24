@@ -31264,3 +31264,41 @@ restano verdi. Confronto prima/dopo a 375 px nei due temi, su una copia
 con la pagina pubblicata, legata al venditore di collaudo 222, e lo
 spazio acceso a mano nel suo database: la card `sponsor-un-tempo-per-te`
 vera nella fila, e la card della pagina «Consigliati».
+
+## Le introduzioni a --ink-soft, secondo giro (24 set 2026)
+
+Richiesta di Andrea dopo «Ritocchi piccoli, secondo giro»: quel giro
+aveva portato a `--ink-soft` le 26 righe d'introduzione dei cassetti con
+UNO stile esatto in linea (12,5px, 600, interlinea 1,45), e fuori da lui
+restavano in `--muted` altre introduzioni e spiegazioni a 12,5px.
+
+**COSA CAMBIA.** Diciotto posti da `--muted` a `--ink-soft`: in linea
+«Chiaro o scuro?» e «Quanto grande si legge» (cassetto Aspetto), le tre
+spiegazioni del foglio di Nostr, «Hai già N codici / negozi collegati:
+…», «Il prezzo qui sotto è già scontato per te», «Si sblocca dal
+livello…», le due del barattolo condiviso, «L'anteprima vale 15
+minuti…» e le righe che dicono cosa sa fare il wallet collegato; nelle
+regole `.payout .hint` (le spiegazioni dei pannelli dell'ordine),
+`.eur-hint`, `.acq-nota`, `.hintline`, `.interesse-promessa`.
+
+**COSA RESTA IN --muted, per scelta scritta:** stati (`${stato}`, «Non
+riesco a leggere i tuoi avvisi»), righe vuote («Nessun codice / negozio
+collegato, per ora», «Nessuna riga valida»), un'etichetta («Categorie
+(nessuna = tutte)»), dati (listino, mittente, indirizzo, metadati,
+numero d'ordine, «per N pezzi»), titoli di sezione e controlli (leva,
+pillole del tema, «Salta», i campi con «oppure»). Le righe a 12px non
+erano nel perimetro.
+
+**LA PROVA ORA CENSISCE.** `prove_introduzioni_leggibili` non guarda più
+un solo stile: trova ogni stile a 12,5px in `--muted`, in linea e nelle
+regole CSS, e vuole che stia in un elenco dichiarato (controlli, titoli,
+dati; stati, vuote, etichette), più le diciotto in `--ink-soft` una per
+una. Una spiegazione nuova in grigio fa rosso finché qualcuno non la
+guarda. Tortura 3/3: una riga in linea rimessa in grigio, una regola
+rimessa in grigio, una spiegazione nuova aggiunta in grigio.
+
+**PROVATO.** Suite intera severa senza config 15.377/0; dal vivo sul server
+in collaudo a 375 nei due temi, colore calcolato e fondo vero su sei
+righe (Aspetto, i tre del foglio Nostr, il suggerimento del riquadro da
+pagare): 7,32:1 di giorno e 8,78:1 di sera; `.hintline` sul suo fondo
+arancio 6,27:1 e 7,79:1.
