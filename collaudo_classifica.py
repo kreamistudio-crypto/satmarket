@@ -15,7 +15,9 @@ Il giro:
   2. l'ANONIMO chiama /api/classifica e riceve i primi N: nomi, media,
      persone, affari — e nient'altro;
   3. l'UTENTE fuori dai primi riceve in piu' la SUA riga; chi e' nei
-     primi non la riceve (la vede gia');
+     primi non la riceve (la vede gia'); e sulla sua riga, e solo li',
+     arriva anche il numero di recensioni del NEGOZIO (set 2026), che
+     puo' essere piu' alto dei voti che il freno lascia contare;
   4. il FARMER con le identita' complici non compare da nessuna parte;
   5. gli XP di 'visita' non spostano una posizione: contano solo quelli
      degli ordini;
@@ -113,7 +115,8 @@ def semina(db):
     con = sqlite3.connect(db)
     gente = [(1, "Rosina"), (2, "Bottega Sole"), (3, "Miele di Bea"),
              (4, "Luca"), (5, "Carmen"), (6, "Dario"),
-             (7, "FARMER"), (8, "Complice A"), (9, "Complice B")]
+             (7, "FARMER"), (8, "Complice A"), (9, "Complice B"),
+             (10, "Nuova")]
     for tg, nome in gente:
         con.execute("INSERT OR REPLACE INTO utenti(tg_id, nome, negozio, "
                     "registrato) VALUES(?,?,?,?)",
@@ -160,6 +163,16 @@ def semina(db):
         complice = 8 if i % 2 else 9
         ordine(7, complice)
         voto(7, complice, 5)
+    # CHI HA COMPRATO SOLO DA ROSINA (set 2026, le recensioni che
+    # contano): la sua stella il negozio la conta, il freno del
+    # recensore reale no — e' il caso che fa dire alla riga di Rosina
+    # piu' recensioni nel negozio che in classifica.
+    ordine(1, 10)
+    voto(1, 10, 5)
+    # il numero del negozio lo scrive il ricalcolo vero, come a ogni voto
+    con.row_factory = sqlite3.Row
+    for tg, _nome in gente:
+        SRV._ricalcola_rating(con, tg)
     con.commit()
     con.close()
 
@@ -229,6 +242,30 @@ def main() -> int:
     come(7)                       # il farmer
     prova("il farmer non ha nemmeno una posizione", None,
           SRV.classifica()["mia"])
+
+    # LE TUE RECENSIONI, TUTTE (set 2026): sulla SOLA riga di chi guarda
+    # se stesso arriva anche il numero del negozio, `n_feedback` — per
+    # Rosina uno in piu' dei voti che contano: la stella di chi ha
+    # comprato solo da lei.
+    come(1)
+    r = SRV.classifica()
+    ros = next((v for v in r["voci"] if v["nome"] == "Rosina"), {})
+    con = sqlite3.connect(db)
+    n_negozio = con.execute("SELECT n_feedback FROM utenti "
+                            "WHERE tg_id=1").fetchone()[0]
+    con.close()
+    prova("chi guarda se stesso riceve sulla sua riga il numero del "
+          "negozio", n_negozio, ros.get("recensioni_tutte"))
+    prova("...uno in piu' dei voti che contano (la stella fermata dal "
+          "freno)", ros.get("voti", 0) + 1, ros.get("recensioni_tutte"))
+    prova("...e sulle righe degli altri non c'e'", ["Rosina"],
+          [v["nome"] for v in r["voci"] if "recensioni_tutte" in v])
+    come(6)                       # Dario, fuori dai primi
+    r = SRV.classifica()
+    prova("fuori dai primi lo porta la sua riga «La tua posizione»", True,
+          "recensioni_tutte" in (r["mia"] or {}))
+    prova("...e nessuna riga pubblica", [],
+          [v["nome"] for v in r["voci"] if "recensioni_tutte" in v])
 
     # GLI XP DI 'VISITA' NON CONTANO, e qui si guarda il numero invece
     # di dedurlo: Dario ha 80 XP d'ordine e 99.999 di visita, e a

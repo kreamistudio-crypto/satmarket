@@ -24959,6 +24959,278 @@ console.log(JSON.stringify(out));
           and "smettiamo di pubblicarla e chiediamo di ritirarla" in priv)
 
 
+def prove_classifica_recensioni_tutte():
+    """QUANTE DELLE TUE RECENSIONI CONTANO IN CLASSIFICA (set 2026,
+    decisione di Andrea). Un venditore leggeva nel negozio piu'
+    recensioni che in classifica e la credeva ferma: era il freno del
+    recensore reale, che fa il suo mestiere. Il calcolo NON si tocca: si
+    DICE. Per tutti una frase sul freno e sul 🤝 (vendite piu' acquisti,
+    mentre il negozio conta le sole vendite); sulla SOLA riga di chi
+    guarda se stesso «N recensioni su M contano in classifica», dove M e'
+    il numero del negozio, `n_feedback`.
+    Qui gira la ROTTA vera, estratta dal sorgente, su un mercatino di
+    cartone — e poi il client in node con le risposte che la rotta ha
+    dato, cosi' il banco del client non si inventa la forma del server."""
+    print("\n[le tue recensioni che contano]")
+    import shutil
+    import sqlite3
+    import subprocess as _sp
+    import tempfile as _tf
+    amb = _amb_classifica()
+    amb.update({"XP_INVITO": "invito", "XP_COMMERCIO": ("ordine", "invito"),
+                "CACHE_CLASSIFICA": 60, "CLASSIFICA_TOP": 20,
+                "_classifica_cache": {"quando": 0.0, "righe": [], "piene": False},
+                "time": time, "CLASSIFICA_ATTIVA": True, "NOMI_TITOLI": {},
+                # i due segnaposto di FastAPI nella firma della rotta: qui
+                # valgono il loro default, che e' quel che serve
+                "Header": lambda d="": d, "Cookie": lambda d="": d})
+    for f in ("sql_xp_commercio", "somme_xp", "xp_contati",
+              "_dati_classifica", "classifica_ora", "_ricalcola_rating",
+              "classifica"):
+        exec(pezzo(f), amb)
+    percorso_db = os.path.join(_tf.mkdtemp(), "classifica.db")
+
+    def apri():
+        c = sqlite3.connect(percorso_db)
+        c.row_factory = sqlite3.Row
+        return c
+    amb["db"] = apri
+    con = apri()
+    con.executescript("""
+    CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT DEFAULT '',
+      negozio TEXT DEFAULT '', titolo TEXT DEFAULT '',
+      avatar TEXT DEFAULT '', avatar_scelta TEXT DEFAULT '',
+      rating REAL DEFAULT 0, n_feedback INTEGER DEFAULT 0,
+      n_recensori INTEGER DEFAULT 0, classifica_nascosta INTEGER DEFAULT 0);
+    CREATE TABLE ordini(id INTEGER PRIMARY KEY, venditore_id INTEGER,
+      compratore_id INTEGER, stato TEXT DEFAULT 'released',
+      prova INTEGER DEFAULT 0);
+    CREATE TABLE feedback(ordine_id INTEGER, da_tg_id INTEGER,
+      per_tg_id INTEGER, voto INTEGER);
+    CREATE TABLE xp_eventi(tg_id INTEGER, tipo TEXT, punti INTEGER,
+      riferimento TEXT DEFAULT '');
+    INSERT INTO utenti(tg_id, nome, negozio) VALUES
+      (1, 'Ada', 'NEGADA'), (2, 'Bice', 'NEGBICE'), (3, 'Carlo', 'NEGCARLO'),
+      (10, 'Dora', ''), (11, 'Ezio', ''), (12, 'Fede', ''), (13, 'Gea', '');
+    -- Dora ed Ezio hanno comprato da due banchi: sono recensori reali.
+    -- Fede e Gea hanno comprato SOLO da Ada: le loro stelle il negozio
+    -- le conta, la classifica no. E' il caso del venditore che ha
+    -- aperto il cantiere, in piccolo.
+    INSERT INTO ordini(id, venditore_id, compratore_id) VALUES
+      (1, 1, 10), (2, 2, 10), (3, 1, 12), (4, 1, 13), (5, 2, 11), (6, 3, 11);
+    INSERT INTO feedback VALUES (1, 10, 1, 5), (3, 12, 1, 5), (4, 13, 1, 4),
+      (2, 10, 2, 5), (5, 11, 2, 5), (6, 11, 3, 5);
+    """)
+    # il numero del negozio lo scrive il ricalcolo vero, come a ogni voto
+    for t in (1, 2, 3):
+        amb["_ricalcola_rating"](con, t)
+    con.commit()
+    con.close()
+
+    def chiedi(chi, top=20):
+        amb["utente_se_autenticato"] = ((lambda *a, **k: None) if chi is None
+                                        else (lambda *a, **k: {"id": chi}))
+        amb["CLASSIFICA_TOP"] = top
+        return amb["classifica"]()
+
+    def con_numero(r):
+        return [v["nome"] for v in r["voci"] if "recensioni_tutte" in v]
+
+    PUBBLICHE = {"posizione", "nome", "negozio", "avatar", "titolo", "media",
+                 "punteggio", "voti", "persone", "affari"}
+    anon = chiedi(None)
+    prova("la rotta gira sul mercatino di cartone: Bice, Ada, Carlo",
+          ["Bice", "Ada", "Carlo"], [v["nome"] for v in anon["voci"]])
+    prova("all'anonimo il numero del negozio non arriva su nessuna riga",
+          [], con_numero(anon))
+    prova("...e le chiavi pubbliche restano quelle di sempre", [PUBBLICHE] * 3,
+          [set(v) for v in anon["voci"]])
+    ada = chiedi(1)
+    sua = next((v for v in ada["voci"] if v["nome"] == "Ada"), {})
+    prova("chi guarda se stesso riceve, sulla SUA riga, le recensioni del "
+          "negozio accanto a quelle che contano", (1, 3),
+          (sua.get("voti"), sua.get("recensioni_tutte")))
+    prova("...e le righe degli altri restano quelle pubbliche", ["Ada"],
+          con_numero(ada))
+    prova("il calcolo non cambia: gli stessi voti per chi guarda e per "
+          "l'anonimo", [v["voti"] for v in anon["voci"]],
+          [v["voti"] for v in ada["voci"]])
+    fuori = chiedi(1, top=1)
+    mia = fuori["mia"] or {}
+    prova("fuori dai primi il numero viaggia sulla riga «La tua posizione»",
+          (2, 1, 3), (mia.get("posizione"), mia.get("voti"),
+                      mia.get("recensioni_tutte")))
+    prova("...e mai sulle righe pubbliche", [], con_numero(fuori))
+    fede = chiedi(12)
+    prova("chi non e' in classifica non riceve niente di suo", (None, []),
+          (fede["mia"], con_numero(fede)))
+    bice = chiedi(2)
+    sua_b = next((v for v in bice["voci"] if v["nome"] == "Bice"), {})
+    prova("quando contano tutte il numero arriva uguale (e il client tace)",
+          (2, 2), (sua_b.get("voti"), sua_b.get("recensioni_tutte")))
+
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- LA CASCATA: la riga del proprietario si LEGGE ---------------
+    # La frase sta in una `.rep`, che di serie e' --muted: a 12px sul
+    # bianco della card fa 3,8:1 (misurato dal vivo), sotto il 4,5 che
+    # il testo piccolo vuole — la regola delle note piccole di Andrea.
+    # Non si cerca la regola: si chiede al giudice della cascata CHI
+    # VINCE sulla catena vera (il markup statico fino a
+    # #classificaCorpo, poi i tre anelli che la riga scrive), nei due
+    # temi, con addosso a <html> e <body> le classi che il JS accende.
+    i0 = mini.find("<style>")
+    css = mini[i0 + 7:mini.find("</style>", i0)] if i0 >= 0 else ""
+    regole, _squilibrio = _regole_css(css)
+    base = _catene_html(mini[mini.find("<body>"):],
+                        lambda p: p[-1]["attr"].get("id") == "classificaCorpo")
+    su_html = set(re.findall(
+        r"documentElement\.classList\.(?:add|toggle)\('([\w-]+)'", mini))
+    su_body = set(re.findall(
+        r"document\.body\.classList\.(?:add|toggle)\('([\w-]+)'", mini))
+    prova("la catena della classifica si trova nel markup", 1, len(base))
+
+    def catena(tema, *coda):
+        html = {"tag": "html", "attr": {"lang": "it"}, "classi": set(su_html)}
+        if tema == "scuro":
+            html["attr"]["data-tema"] = "scuro"
+        out = [html]
+        for e in (base[0] if base else []):
+            e = dict(e, classi=set(e["classi"]))
+            if e["tag"] == "body":
+                e["classi"] |= su_body
+            if "view" in e["classi"]:
+                e["classi"].add("active")
+            out.append(e)
+        return out + [{"tag": t, "attr": {}, "classi": set(c)} for t, c in coda]
+    RIGA = (("div", ("seller",)), ("div", ("who",)))
+    for tema in ("chiaro", "scuro"):
+        v = _vince_css(regole, catena(tema, *RIGA, ("div", ("rep", "cl-conto"))),
+                       ("color", "font-size"))
+        prova(f"la riga del proprietario vince l'inchiostro delle note, "
+              f"non --muted ({tema})", ("var(--ink-soft)", "12px", []),
+              (v.get("color", (None,))[0], v.get("font-size", (None,))[0],
+               v.get("color", (None, None, ["?"]))[2]))
+        # ...e la reputazione accanto resta com'era: la cura e' della
+        # riga nuova, non della famiglia `.rep`
+        v = _vince_css(regole, catena(tema, *RIGA, ("div", ("rep",))),
+                       ("color",))
+        prova(f"...e la reputazione sopra resta --muted ({tema})",
+              "var(--muted)", v.get("color", (None,))[0])
+        # LA NOTA DEL FRENO: piccola e d'inchiostro come le sorelle di
+        # `.sicu`, e col suo respiro sopra (senza, dal vivo, sembrava la
+        # coda del paragrafo a 15px che le sta sopra)
+        v = _vince_css(regole, catena(tema, ("p", ("sicu-nota", "cl-nota"))),
+                       ("font-size", "color", "margin-top"))
+        prova(f"la nota del freno: 13,5px, --ink-soft, 10px d'aria sopra "
+              f"({tema})", ("13.5px", "var(--ink-soft)", "10px"),
+              tuple(v.get(p, (None,))[0]
+                    for p in ("font-size", "color", "margin-top")))
+
+    # --- il client, in node, sulle risposte vere ---------------------
+    node = shutil.which("node")
+    if not node:
+        salta("il banco node delle recensioni che contano", "node non c'e'")
+        return
+    pezzi = [pezzo_js(mini, "const fmt = n =>", "\n"),
+             pezzo_js(mini, "const esc = s =>", "));") + "));",
+             pezzo_js(mini, "const titoloRiga = nome =>", "'';") + "'';",
+             pezzo_js(mini, "function contaFeedback(", "\n}\n") + "\n}",
+             pezzo_js(mini, "const CLASSIFICA_SOGLIE", "\n"),
+             pezzo_js(mini, "function soglieClassificaUtili(", "\n}\n") + "\n}",
+             pezzo_js(mini, "function contanoInClassifica(", "\n}\n") + "\n}",
+             pezzo_js(mini, "function rigaClassifica(", "\n}\n") + "\n}",
+             pezzo_js(mini, "function renderClassifica(", "\n}\n") + "\n}"]
+    banco = "\n".join(pezzi) + """
+function avatarImg(n){ return ''; }
+const BOX = {innerHTML: ''};
+const el = id => id === 'classificaCorpo' ? BOX : null;
+let classificaDati = null, classificaFiltro = 0;
+const PAGINE = %s;
+const RIGHE = {
+  sei_otto: {voti: 6, recensioni_tutte: 8}, una_tre: {voti: 1, recensioni_tutte: 3},
+  pari: {voti: 2, recensioni_tutte: 2}, rovescio: {voti: 3, recensioni_tutte: 2},
+  senza: {voti: 4}, nulla: null,
+};
+const out = {pagine: {}, righe: {}};
+for (const [k, d] of Object.entries(PAGINE)) {
+  try { classificaDati = d; BOX.innerHTML = ''; renderClassifica();
+        out.pagine[k] = BOX.innerHTML; }
+  catch(e) { out.pagine[k] = 'ESPLOSO: ' + (e && e.message || e); }
+}
+for (const [k, v] of Object.entries(RIGHE)) {
+  try { out.righe[k] = contanoInClassifica(v); }
+  catch(e) { out.righe[k] = 'ESPLOSO: ' + (e && e.message || e); }
+}
+console.log(JSON.stringify(out));
+""" % json.dumps({"anon": anon, "ada": ada, "fuori": fuori, "bice": bice},
+                 ensure_ascii=False)
+    p = os.path.join(_tf.mkdtemp(), "recensioni.js")
+    open(p, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, p], capture_output=True, text=True,
+                encoding="utf-8", errors="replace")
+    prova("il banco node delle recensioni che contano gira", "",
+          (r.stderr or "")[-600:])
+    try:
+        b = json.loads(r.stdout.strip().splitlines()[-1])
+    except Exception:
+        b = {"pagine": {}, "righe": {}}
+    riga = b["righe"]
+    prova("sei su otto: la frase col numero del negozio",
+          '<div class="rep cl-conto">6 recensioni su 8 contano in '
+          'classifica</div>', riga.get("sei_otto"))
+    prova("...e al singolare quando ne conta una",
+          '<div class="rep cl-conto">1 recensione su 3 conta in '
+          'classifica</div>', riga.get("una_tre"))
+    prova("se contano tutte, o il numero manca, o e' storto: niente frase",
+          ["", "", "", ""], [riga.get(k) for k in ("pari", "rovescio",
+                                                   "senza", "nulla")])
+    frase = re.compile(r"\d+ recension[ei] su \d+ cont")
+    pag = b["pagine"]
+    # LA CINTURA DEL BANCO: una pagina esplosa non contiene la frase, e
+    # le due prove «tace» sarebbero verdi per la ragione sbagliata
+    prova("le quattro pagine si disegnano davvero", [True] * 4,
+          ['"hint">I primi' in (pag.get(k) or "")
+           for k in ("anon", "ada", "fuori", "bice")])
+    prova("sulla pagina dell'anonimo la frase non c'e'", 0,
+          len(frase.findall(pag.get("anon", "ESPLOSO"))))
+    righe_ada = (pag.get("ada") or "").split('<div class="seller"')[1:]
+    prova("sulla pagina di chi guarda se stesso c'e' una volta, nella SUA "
+          "riga", ["Ada"], [re.search(r"<b>(.*?)</b>", x).group(1)
+                           for x in righe_ada if frase.search(x)])
+    prova("...con le sue cifre", True,
+          "1 recensione su 3 conta in classifica" in (pag.get("ada") or ""))
+    pf = pag.get("fuori") or ""
+    prova("fuori dai primi sta sotto «La tua posizione»", True,
+          0 <= pf.find("La tua posizione") < pf.find("1 recensione su 3"))
+    prova("quando contano tutte la pagina tace", 0,
+          len(frase.findall(pag.get("bice", "ESPLOSO"))))
+    pa = pag.get("anon") or ""
+    i_primi, i_freno = pa.find('"hint">I primi'), pa.find("Valgono solo i voti")
+    prova("la nota del freno la leggono tutti, dopo «I primi» e prima "
+          "della lista", True,
+          0 <= i_primi < i_freno < pa.find('<div class="seller"'))
+    # UNA NOTA E NON UN PARAGRAFO: a 15px come le sorelle prendeva otto
+    # righe e mandava la lista sotto la piega del telefono (misurato dal
+    # vivo a 375: 174px); col vestito delle note piccole sta in sei
+    prova("...col vestito delle note piccole", True,
+          '<p class="sicu-nota cl-nota">Valgono solo i voti' in pa)
+    # a spazi schiacciati: la nota deve dire queste cose, non andare a
+    # capo proprio qui
+    freno = " ".join((pa[i_freno:pa.find("</p>", i_freno)]
+                      if i_freno >= 0 else "").split())
+    for pezzo_frase in ("chi ha concluso un affare anche con altri",
+                        "qui le recensioni possono essere meno che nel "
+                        "negozio",
+                        "e salgono da sole",
+                        "🤝 sono vendite più acquisti",
+                        "il negozio conta le sole vendite"):
+        prova(f"...e dice «{pezzo_frase}»", True, pezzo_frase in freno)
+    prova("il 🤝 porta il suo perche' su ogni riga", 3,
+          pa.count('<span title="Affari conclusi: vendite più acquisti">🤝 '))
+
+
+
 def prove_classifica():
     """LA CLASSIFICA (ago 2026).
 
@@ -89588,6 +89860,7 @@ def main():
               prove_trasloco_nostr, prove_collega_npub_firma,
               prove_conta_feedback,
               prove_classifica, prove_classifica_nascosta,
+              prove_classifica_recensioni_tutte,
               prove_ferie, prove_stock_raccontato, prove_pausa,
               prove_xp, prove_inviti, prove_coorti_titoli,
               prove_conto_acquisto,

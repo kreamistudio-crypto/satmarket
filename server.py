@@ -20152,9 +20152,10 @@ def classifica(x_tg_init_data: str = Header(""),
     reputazione di un venditore e' gia' pubblica sulla sua pagina, qui
     cambia solo che si leggono insieme.
 
-    L'identita' e' FACOLTATIVA e serve a una cosa sola: chi ce l'ha
-    riceve IN PIU' la sua riga e la sua posizione, che a nessun altro
-    escono. Chi sta in fondo non compare mai in una lista che vedono
+    L'identita' e' FACOLTATIVA e serve a chi guarda SE STESSO: chi ce
+    l'ha riceve IN PIU' la sua riga e la sua posizione, che a nessun
+    altro escono, e sulla sua riga quante recensioni ha IN TUTTO (vedi
+    `voce`). Chi sta in fondo non compare mai in una lista che vedono
     gli altri (scelta di Andrea): fuori escono i primi
     CLASSIFICA_TOP e basta.
 
@@ -20213,7 +20214,7 @@ def classifica(x_tg_init_data: str = Header(""),
         if serve:
             segni = ",".join("?" * len(serve))
             ana = {r["tg_id"]: r for r in con.execute(
-                "SELECT tg_id, nome, negozio, titolo, "
+                "SELECT tg_id, nome, negozio, titolo, n_feedback, "
                 "(CASE WHEN avatar_scelta='nessuna' THEN '' ELSE avatar "
                 f"END) AS avatar FROM utenti WHERE tg_id IN ({segni})",
                 tuple(serve))}
@@ -20222,18 +20223,30 @@ def classifica(x_tg_init_data: str = Header(""),
 
     def voce(r, posizione):
         u = ana.get(r["id"]) or {}
-        return {"posizione": posizione,
-                "nome": (u["nome"] if u and u["nome"] else "") or "—",
-                "negozio": (u["negozio"] if u else "") or "",
-                "avatar": (u["avatar"] if u else "") or "",
-                "titolo": NOMI_TITOLI.get((u["titolo"] if u else "") or "", ""),
-                "media": round(r["media"], 2),
-                # ×100 e arrotondato: e' il numero che si legge, e il
-                # solo posto dove il punteggio prende una forma.
-                "punteggio": round(r["punti"] * 100),
-                "voti": r["voti"],
-                "persone": r["persone"],
-                "affari": r["affari"]}
+        fuori = {"posizione": posizione,
+                 "nome": (u["nome"] if u and u["nome"] else "") or "—",
+                 "negozio": (u["negozio"] if u else "") or "",
+                 "avatar": (u["avatar"] if u else "") or "",
+                 "titolo": NOMI_TITOLI.get((u["titolo"] if u else "") or "", ""),
+                 "media": round(r["media"], 2),
+                 # ×100 e arrotondato: e' il numero che si legge, e il
+                 # solo posto dove il punteggio prende una forma.
+                 "punteggio": round(r["punti"] * 100),
+                 "voti": r["voti"],
+                 "persone": r["persone"],
+                 "affari": r["affari"]}
+        # LE TUE RECENSIONI, TUTTE (set 2026, decisione di Andrea). Un
+        # venditore leggeva nel negozio piu' recensioni che qui e credeva
+        # la classifica ferma: `voti` sono le sole che passano il freno
+        # del recensore reale, il negozio mostra `n_feedback`, cioe'
+        # tutte. Il numero del negozio esce SOLO sulla riga di chi guarda
+        # se stesso — a lui spiega perche' i due non combaciano, agli
+        # altri sarebbe una cifra in piu' in una riga gia' piena — e il
+        # client lo dice solo quando e' diverso. Il calcolo non si tocca:
+        # e' un fatto accanto, non una seconda classifica.
+        if io_ and r["id"] == io_["id"]:
+            fuori["recensioni_tutte"] = int((u["n_feedback"] if u else 0) or 0)
+        return fuori
 
     return {"attiva": True,
             "voci": [voce(r, i) for i, r in enumerate(

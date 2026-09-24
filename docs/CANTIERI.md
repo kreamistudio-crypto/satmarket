@@ -29653,3 +29653,63 @@ di lato, col binario vuoto sopra di lui e il fondo che lo ferma; la luce
 da meta' corsa; il rilascio sopra e il tocco sulla tendina che aprono
 Barattozon senza passare dal rosso; il marchio in cima al foglio, di
 giorno e di sera.
+
+## Le recensioni che contano in classifica: il freno si dice (24 set 2026)
+
+**LA SEGNALAZIONE.** Un venditore vedeva in classifica un totale di
+recensioni che «non si aggiornava»: nel negozio «(8 da 6 persone) · 7
+vendite concluse», in classifica «(6 da 4 persone) · 🤝 8». La query in
+sola lettura sul VPS (scritta qui, lanciata da Andrea) ha detto che
+profilo e tabella `feedback` combaciano, 8 da 6 — nessuna cache vecchia
+— e che le due recensioni fuori dal conto vengono da due persone senza
+affari con altri: è il FRENO DEL RECENSORE REALE, che fa il suo
+mestiere. E l'8 contro il 7 è un'altra regola scritta: la classifica
+conta gli affari dai due lati (vendite più acquisti, dagli `ordini`
+released, mai il P2P), il negozio le sole vendite (`vendite_ok`).
+
+**LA DECISIONE (di Andrea): il calcolo non si tocca, niente P2P nel
+freno per ora — si DICE.** Una nota per tutti sotto «I primi N su M»: il
+freno, il perché, che le recensioni qui possono essere meno che nel
+negozio e salgono da sole, e che il 🤝 somma vendite e acquisti mentre
+il negozio conta le sole vendite (più un `title` sul 🤝). E sulla SOLA
+riga di chi guarda se stesso «6 recensioni su 8 contano in classifica»:
+`/api/classifica` aggiunge `recensioni_tutte` (= `n_feedback`, il
+numero del negozio) alla voce dell'identità che chiede — in cima o in
+«La tua posizione», mai alle righe altrui né all'anonimo — e
+`contanoInClassifica` la dice solo quando supera i voti che contano.
+**LA STRADA SCARTATA**, chiesta e ritirata da Andrea visti i dati: lo
+stesso numero in classifica e nel negozio, da un giudice solo. O il
+freno entrava nel negozio (numeri pubblici che calano, una lista più
+lunga del suo conto, una colonna che invecchia a ogni affare altrui), o
+la classifica mostrava fatti diversi da quelli su cui poggia il
+punteggio. Il conto era giusto: mancava la parola.
+
+**DUE COSE LE HA DETTE IL GIRO DAL VIVO.** La nota scritta come le
+sorelle (`div.hint`, 15px) prendeva otto righe e mandava la lista a
+620px su 812: è diventata una nota piccola, più corta
+(`p.sicu-nota.cl-nota`, il vestito di `.sicu` dove la classifica vive,
+con 10px d'aria sopra, senza i quali sembrava la coda del paragrafo).
+E la riga del proprietario nel grigio della `.rep` stava a 3,81:1 sul
+bianco della card, sotto il 4,5 che Andrea vuole per il testo piccolo:
+ha l'inchiostro delle note (`.cl-conto`), 7,32:1 di giorno e 8,78:1 di
+sera. La `.rep` accanto resta `--muted` com'era: anche lei è a 3,81, ma
+è un fatto di prima, non di questo cantiere.
+
+**PROVATO.** La suite intera, severa e senza config: 14.468 verdi e 0
+rosse. `prove_classifica_recensioni_tutte` (35): la rotta vera estratta,
+su un mercatino di cartone con due compratori da un banco solo, coi
+quattro sguardi (anonimo, se stesso in cima, se stesso fuori dai primi,
+chi non entra); la cascata chiesta al giudice nei due temi; il client in
+node sulle risposte vere della rotta. `collaudo_classifica.py` +5 sul
+server vero (32/32, verde anche nella gabbia senza rete). TORTURA 20/20
+su una copia. DAL VIVO a 375 e 320 nei due temi, col caso rifatto
+(7 vendite e 1 acquisto, 8 recensioni da 6 persone, due da chi ha
+comprato solo da lui): la riga dice «(6 da 4 persone) · 🤝 8» e sotto
+«6 recensioni su 8 contano in classifica»; niente sulle righe altrui né
+per chi non è in classifica, niente che sbordi.
+
+**DA GUARDARE.** Sul telefono la nota in cima (leggibile senza essere un
+muro) e la riga del venditore. Lasciate com'erano: `collaudo_classifica.py`
+non è nell'elenco dei collaudi della CI (passa in gabbia, ci entrerebbe
+con una riga), e la frase della classifica vuota («ci si entra col primo
+affare concluso e il primo feedback ricevuto») non nomina il freno.

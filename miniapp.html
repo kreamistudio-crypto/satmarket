@@ -5868,6 +5868,18 @@
   .cl-punti{margin-left:auto;flex:0 0 auto;font-weight:800;
     font-size:14px;font-family:var(--mono);color:var(--ink)}
   .cl-punti + .cl-fr{margin-left:6px}
+  /* «6 recensioni su 8 contano in classifica» (set 2026): la riga che
+     solo chi guarda se stesso trova sotto la sua reputazione. Il corpo
+     e il peso della `.rep` di sopra, ma l'INCHIOSTRO delle note
+     piccole e non --muted (la regola di Andrea): e' una frase da
+     leggere, e a 12px --muted sul bianco della card sta a 3,8:1, sotto
+     il 4,5 che il testo piccolo vuole. */
+  .seller .rep.cl-conto{color:var(--ink-soft)}
+  /* La nota del freno in cima alla pagina: il vestito e' quello delle
+     note piccole di `.sicu`, che sotto hanno i loro 10px e sopra
+     niente — e qui sopra c'e' un paragrafo a 15px, di cui senza aria
+     sembrava la coda. */
+  .sicu p.sicu-nota.cl-nota{margin-top:10px}
   /* IL CARTELLO DEL RODAGGIO (ago 2026, decisione di Andrea): la
      classifica e' accesa, ma finche' la commissione e' sospesa i
      punti si prendono gratis — quindi il giorno che si accende gli
@@ -16455,6 +16467,25 @@ function filtraClassifica(soglia){
   renderClassifica();
 }
 
+/* QUANTE DELLE TUE RECENSIONI CONTANO QUI (set 2026, decisione di
+   Andrea). In classifica valgono i soli voti dei recensori reali — chi
+   ha concluso un affare anche con qualcun altro —, il negozio invece
+   le conta tutte: un venditore leggeva piu' recensioni la' che qui, e
+   credeva la classifica ferma. Il server manda il numero del negozio
+   (`recensioni_tutte`) SOLO sulla riga di chi guarda se stesso, e la
+   frase compare solo quando i due numeri differiscono: se contano
+   tutte non c'e' niente da spiegare, la regola della seconda cifra del
+   conteggio delle persone. Il vestito e' la riga `.rep` di sopra, con
+   l'inchiostro delle note piccole (`.cl-conto`): e' una frase da
+   leggere, non un dato di contorno. */
+function contanoInClassifica(v){
+  const tutte = Number(v && v.recensioni_tutte) || 0;
+  const voti = Number(v && v.voti) || 0;
+  if (!(tutte > voti)) return '';
+  return `<div class="rep cl-conto">${fmt(voti)} ${voti === 1 ? 'recensione' : 'recensioni'}`
+    + ` su ${fmt(tutte)} ${voti === 1 ? 'conta' : 'contano'} in classifica</div>`;
+}
+
 function rigaClassifica(v, mia){
   /* Negli onclick viaggia SOLO il codice negozio passato dal
      filtro-alfabeto: il patto anti-XSS di renderNegozio. Senza codice
@@ -16465,17 +16496,21 @@ function rigaClassifica(v, mia){
     ? ['🥇','🥈','🥉'][v.posizione - 1] : '';
   /* Le stelle come in negozio e nel Profilo: la media c'e' sempre (in
      classifica ci si entra con almeno un voto), quindi qui la guardia
-     «solo con un rating vero» non ha un ramo da coprire. */
+     «solo con un rating vero» non ha un ramo da coprire.
+     Il 🤝 sono gli AFFARI, vendite piu' acquisti, e nel negozio si
+     legge «vendite concluse»: la nota in cima lo dice a tutti, il
+     `title` a chi ci passa sopra col mouse. */
   const rep = `<span class="stars">${'★'.repeat(Math.round(v.media))}</span> `
     + `${v.media.toFixed(2).replace('.', ',')}`
-    + `${contaFeedback(v.voti, v.persone)} · 🤝 ${fmt(v.affari)}`;
+    + `${contaFeedback(v.voti, v.persone)} · `
+    + `<span title="Affari conclusi: vendite più acquisti">🤝 ${fmt(v.affari)}</span>`;
   return `
     <div class="seller"${apre}>
       <div class="cl-pos">${medaglia || v.posizione + '°'}</div>
       <div class="avatar">${avatarImg(v.avatar)}${esc((v.nome||'?')[0])}</div>
       <div class="who" style="min-width:0">
         <b>${esc(v.nome)}</b>${titoloRiga(v.titolo)}
-        <div class="rep">${rep}</div>
+        <div class="rep">${rep}</div>${contanoInClassifica(v)}
       </div>
       <div class="cl-punti" title="Punteggio: media dei voti e commercio">${fmt(v.punteggio || 0)}</div>
       ${cod ? '<div class="cl-fr">›</div>' : ''}
@@ -16530,7 +16565,16 @@ function renderClassifica(){
      legge come si legge. E' HTML letterale perche' non dipende da
      nessun dato: niente esc() da ricordare. Vive nel ramo PIENO e
      non sopra i due return: su «ancora nessuno in classifica» non
-     c'e' nessuna posizione a cui affezionarsi. */
+     c'e' nessuna posizione a cui affezionarsi.
+     IL FRENO SI DICE (set 2026, decisione di Andrea): qui valgono i
+     soli voti di chi ha commerciato anche con altri, e senza dirlo chi
+     legge «8 recensioni» nel negozio e meno qui crede la classifica
+     ferma. Nella stessa nota il 🤝, che conta vendite PIU' acquisti
+     mentre il negozio dice «vendite concluse». Il calcolo non cambia:
+     cambia che si legge. E' una NOTA, col vestito delle note piccole
+     di `.sicu` (la classifica ci sta dentro): a 15px come le sorelle
+     prendeva otto righe e mandava la lista sotto la piega del
+     telefono. */
   box.innerHTML = `
     <div class="cl-rodaggio">🚧 <b>La classifica è in rodaggio.</b>
       Quando accenderemo le commissioni i punti ripartiranno da zero
@@ -16540,6 +16584,11 @@ function renderClassifica(){
       classifica. Conta la media dei feedback, quanto si è commerciato,
       e da quante persone diverse ti hanno votato.
       Il numero a destra è il punteggio che decide l'ordine.</div>
+    <p class="sicu-nota cl-nota">Valgono solo i voti di chi ha concluso un
+      affare anche con altri: è il freno contro gli account di comodo.
+      Per questo qui le recensioni possono essere meno che nel negozio,
+      e salgono da sole quando chi ti ha votato commercia con altri.
+      🤝 sono vendite più acquisti; il negozio conta le sole vendite.</p>
     ${spiega}${pillole}
     ${viste.map(v => rigaClassifica(v, false)).join('')}
     ${viste.length ? '' : '<div class="hint">Nessuno con questa media.</div>'}

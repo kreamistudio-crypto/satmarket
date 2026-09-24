@@ -9307,6 +9307,18 @@
   Giudice unico `contaFeedback()`, due soli posti (negozio pubblico e
   Profilo); MAI nel dettaglio annuncio, dove la riga è già
   «4,8 (40) ·» e un secondo numero la rende illeggibile.
+  LE RECENSIONI CHE CONTANO IN CLASSIFICA (set 2026): la classifica
+  conta i soli voti dei recensori reali (il freno), negozio e Profilo
+  tutti (`n_feedback`) — due numeri diversi per costruzione, e il
+  calcolo resta così. Si DICE: nella pagina una nota per tutti (il
+  freno, e il 🤝 che somma vendite e acquisti mentre il negozio conta
+  le sole vendite), piccola (`p.sicu-nota.cl-nota`) perché a 15px
+  mandava la lista sotto la piega; e `/api/classifica` aggiunge
+  `recensioni_tutte` (= `n_feedback`) SOLO alla voce dell'identità che
+  chiede, in cima o in «La tua posizione» — mai alle righe altrui né
+  all'anonimo. Il client la dice con `contanoInClassifica(v)` («6
+  recensioni su 8 contano in classifica») solo quando supera `voti`,
+  in `.rep.cl-conto`: l'inchiostro delle note piccole, non `--muted`.
   Export dati contabili (lug 2026): colonna `ordini.cambio_eur` = EUR
   per BTC al momento della chiusura, scritta da `_sblocca_sats` e
   `_rimborsa_compratore` via `cambio_btc_eur()` (CoinGecko lato server
