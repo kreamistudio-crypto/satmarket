@@ -225,13 +225,16 @@ RACCONTI_NEGOZI = {
                   "una cucina aperta a chi vuole imparare, e oggi anche i "
                   "nostri prodotti."),
         # LE FOTO CI SONO (WebP senza metadati, al massimo 1360 di lato
-        # come quelle di To The Mooon, mai ingrandite):
+        # come quelle di To The Mooon, mai ingrandite). LE VERTICALI SONO
+        # QUADRATE (24 set 2026, ritocco di Andrea: in piedi si prendevano
+        # troppo spazio): ritaglio 1:1 centrato dagli originali, che sul
+        # soggetto non tagliava niente — le orizzontali restano com'erano.
         #   un-tempo-per-te-cop.webp  la copertina (1-copertina), 21:9
-        #   un-tempo-per-te-1.webp    i prodotti
+        #   un-tempo-per-te-1.webp    i prodotti, 1:1
         #   un-tempo-per-te-2.webp    la cucina
-        #   un-tempo-per-te-3.webp    la colazione
+        #   un-tempo-per-te-3.webp    la colazione, 1:1
         #   un-tempo-per-te-4.webp    Katia e Luca
-        #   un-tempo-per-te-5.webp    il dettaglio
+        #   un-tempo-per-te-5.webp    il dettaglio, 1:1
         "foto": True,
         # il logo della card «Consigliati», da logo.pdf: entra nella card
         # solo a pagina pubblicata

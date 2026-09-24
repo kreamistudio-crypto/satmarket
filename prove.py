@@ -43030,6 +43030,21 @@ def prove_racconti_bozza():
           ["testo", "foto", "punti", "foto", "testo", "foto", "tappe", "foto",
            "elenco", "foto", "firma"],
           [b.get("t") for b in _ut.get("blocchi", [])])
+    # ...E NESSUNA FOTO IN PIEDI (24 set 2026, ritocco di Andrea): le tre
+    # verticali si prendevano troppo spazio e sono diventate quadrate; le
+    # orizzontali restano larghe. Una foto nuova arrivata verticale va
+    # ritagliata prima di entrare, e questa riga lo ricorda.
+    try:
+        from PIL import Image as _Im
+        _dim = {n: _Im.open(os.path.join("assets", "racconti",
+                                         f"un-tempo-per-te-{n}.webp")).size
+                for n in (1, 2, 3, 4, 5)}
+        prova("...e nessuna delle sue foto e' in piedi: le verticali sono "
+              "quadrate", ([], [1, 3, 5]),
+              ([n for n, (w, h) in _dim.items() if h > w],
+               sorted(n for n, (w, h) in _dim.items() if w == h)))
+    except (ImportError, OSError) as e:
+        prova("...e le sue foto si aprono", "", str(e))
     # ...E IL TG_ID E' UN NUMERO: scritto fra virgolette non combacerebbe
     # MAI col tg_id del negozio, e la pagina non uscirebbe senza che
     # niente lo dica. (bool no, anche se Python lo conta fra gli int.)

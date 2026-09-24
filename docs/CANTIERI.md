@@ -30873,3 +30873,24 @@ alla partenza a 35px) e il fantasma senza contorno (229).
 blu; il bagliore che a 320 non tocca «Libro ordini»; la morfosi da un
 rilascio a meta' corsa e dal fondo. Resta da decidere, dal settimo giro,
 la croce bianca sul rosso della sera (2,77:1).
+
+## «Un tempo per te»: le foto verticali diventano quadrate (24 set 2026)
+
+Ritocco di Andrea sulla pagina in bozza: le tre foto in piedi — i
+prodotti, la colazione, il dettaglio — si prendevano troppo spazio (a 375
+px erano alte 514 su 343 di larghezza). Rifatte QUADRATE dagli originali
+in `Desktop\untempoperte\`, ritaglio 1:1 centrato: guardato su ognuna,
+il centro non tagliava niente del soggetto (le fragole e il pane; la mano
+che versa il miele e le cialde; il piatto intero), quindi nessuno
+spostamento. Si perdono i bordi alti e bassi — il fondo della ciotola di
+pistacchi e il crostino in basso nei prodotti, il barattolo in alto e le
+piastrelle in basso nella colazione, le rose in alto e il tagliere in
+basso nel dettaglio. 854x854, 854x854 e 1360x1360, 64-202 KB, stessa
+ricetta di prima (WebP q82 senza metadati, mai ingrandite). Le
+orizzontali e la copertina non si toccano. Nel codice cambia solo il
+commento del catalogo; una prova nuova in `prove_racconti_bozza` vuole
+che nessuna foto della pagina sia in piedi e che le tre verticali siano
+quadrate (rossa con la foto vecchia rimessa al suo posto, verde con la
+nuova). Suite severa senza config verde; dal vivo a 375 px nei due temi,
+su una copia legata al venditore di collaudo 222: le tre foto a 343x343,
+nessuno sbordo.
