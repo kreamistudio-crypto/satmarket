@@ -31338,3 +31338,75 @@ riapre il negozio non conta.
 **DA SAPERE.** È un termometro, non una misura: chi scrive l'URL a mano
 lo gonfia (già a verbale in ARCHITETTURA). Il numero parte da oggi:
 quel che c'era prima non si recupera. DA AVERE il telefono.
+
+## Lo scorrimento dei loghi dei Consigliati (24 set 2026)
+
+Ritocco di Andrea alla card «Consigliati»: al posto della dissolvenza,
+uno SCORRIMENTO dall'alto in basso, come una slot machine lenta — il
+logo che c'è parte lento e accelera fino a uscire dal fondo del quadrato;
+nello stesso istante il nuovo entra dall'alto, parte lento, accelera e
+all'arrivo fa un piccolo rimbalzo morbido, lui solo; mezzo secondo circa,
+poi tre-quattro secondi di pausa. Solo transform e opacity, niente che
+sbordi, e parte solo con la card a schermo. Con un logo solo ferma, con
+gli effetti ridotti ferma sul primo, e il `logo_giu` di ogni negozio vale
+come prima.
+
+**COME È FATTO.** Due classi e due @keyframes, nessun JS che anima:
+`.esce` al logo che c'era, `.entra` e `attivo` al nuovo; `consEsce` e
+`consEntra` corrono mezzo secondo, e il giro batte ogni quattro
+(`CONSIGLIATI_MS`, era tre): tre e mezzo di pausa. LA STESSA CADUTA per
+tutti e due nei primi tre quinti — una parabola, da fermi e sempre più
+svelti —, così si seguono come le figure di un rullo e il nuovo non
+raggiunge mai il vecchio; poi il vecchio è fuori, e il nuovo supera il
+suo posto del 5% del riquadro (3,8 px sul telefono), entrandoci alla
+velocità con cui ha passato il centro, e ci torna adagio. I capi della
+corsa stanno a ±106% del riquadro, fuori dal quadrato per intero (col 5%
+di margine per lato basta 105,6), e il quadrato ha già `overflow:hidden`;
+il nuovo si ferma al SUO `--giu`. GLI STATI FINALI SONO LE REGOLE DI
+SEMPRE: dove le animazioni non girano si vede l'arrivo, mai due loghi
+insieme; e le classi di una corsa restano fino a quella dopo, quando ogni
+logo cambia classe e l'animazione riparte da sé. L'OPACITÀ NON SI ANIMA
+PIÙ: nella cascata le transizioni battono le animazioni, e quella di ieri
+avrebbe spento il logo che esce mentre scende. SOLO SE SI VEDE:
+`guardaCardConsigliati`, un IntersectionObserver sulla card (almeno
+metà), rinato a ogni ridisegno della fila e col tetto abbassato
+dell'altezza dell'header appiccicato, perché la pagina ci scorre sotto;
+tornata in vista il battito riparte da capo, un osservatore vecchio non
+parla più, e senza osservatore la card gira come prima. IL PRIMO LOGO
+RESTA OTTO SECONDI (erano sei): il secondo si chiede al primo battito, il
+prezzo già scritto della prima apertura leggera.
+
+**SCARTATE.** Un rullo unico che scende tutto insieme: col `--giu`
+diverso per logo il vecchio non uscirebbe per intero senza un passo più
+lungo. Una curva sola con l'overshoot (`y` oltre 1): arriva al suo posto
+ancora in corsa e si ferma di colpo. La proprietà `translate` per tenere i
+`var()` fuori dai fotogrammi: WebKit li risolve anche nei @keyframes (il
+suo vecchio difetto era solo sulla variabile cambiata a corsa iniziata, e
+`--giu` non cambia). Un ascoltatore di scroll.
+
+**PROVATO.** `prove_consigliati` a 155 (da 121): i fotogrammi letti per
+quel che dicono — solo transform e opacity, i capi fuori dal quadrato
+calcolati dall'`inset`, un rimbalzo solo, piccolo e di chi entra, la
+stessa curva lenta-poi-svelta, la velocità al centro e nel rimbalzo
+entro un quarto, 450-550 ms di corsa e 3-4 s di pausa —, la cascata
+chiesta al giudice su un logo vero, e il banco node con un osservatore di
+cartone (le classi a ogni passaggio con tre negozi, meno di metà a
+schermo, il battito da capo, l'header, l'osservatore vecchio, il browser
+senza). Emendate col perché: la dissolvenza, il ritocco «che non si
+anima», il giro «ogni tre secondi». TORTURA 35/35 su una copia, zero
+botti. Suite intera severa senza config sull'albero ribasato su
+`5c71768` ed estratto in LF come in CI: 15.415 verdi e 0 rosse; i 20
+collaudi della CI verdi nella gabbia senza rete. DAL VIVO a 375 px nei
+due temi (Chrome headless a densità 3, movimento pieno; server da una
+copia con «Un tempo per te» pubblicata e legata al Venditore di
+collaudo): primo passaggio a 8,02 s; dieci fotogrammi a tempi esatti,
+zero pixel cambiati fuori dal quadrato; la traiettoria vera a 60
+fotogrammi al secondo — chi esce da 4 a 80,2 px in 300 ms, chi entra da
+−80,2 al suo posto, 3,8 px di rimbalzo, fermo a 500 ms; sotto l'header,
+fuori schermo e con la fila scorsa di lato nessun passaggio in 9 s, e
+tornata in vista il passaggio a 4,03 s; con gli effetti ridotti fermo
+sul primo.
+
+**DA GUARDARE SUL TELEFONO.** La corsa dentro Telegram, nei due temi. Se
+il rimbalzo sembra troppo o troppo poco è il `5%` del fotogramma del 75%
+in `consEntra`; se la pausa sembra lunga, `CONSIGLIATI_MS`.

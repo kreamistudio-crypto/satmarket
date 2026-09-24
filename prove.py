@@ -95165,24 +95165,239 @@ def _consigliati_porte(src, mini, _pz):
     _gc = _pz(mini, "function giraConsigliati(){", "\n}\n")
     prova("il giro chiede agli effetti ridotti PRIMA di chiedere un logo",
           True, 0 <= _gc.find("effettiRidotti()") < _gc.find("dataset.src"))
+    # SI MUOVE SOLO SE SI VEDE (set 2026, ritocco di Andrea): la domanda
+    # «la card e' a schermo?» si fa prima di chiedere e prima di muovere,
+    # e la fa l'osservatore — mai un ascoltatore di scroll
+    prova("...e alla card a schermo PRIMA di chiedere un logo", True,
+          0 <= _gc.find("!consigliatiInVista") < _gc.find("dataset.src"))
+    _gv = _senza_commenti_js(_pz(mini, "function guardaCardConsigliati(serve){",
+                                 "\n}\n"))
+    prova("...e a dirlo e' un IntersectionObserver sulla card, a meta' card, "
+          "col tetto sotto l'header appiccicato, senza ascoltare lo scroll",
+          (True, True, True, True, False),
+          (".querySelector('.cella-consigliati')" in _gv,
+           "new IntersectionObserver(" in _gv,
+           "threshold: .5" in _gv and ".intersectionRatio >= .5" in _gv,
+           "rootMargin: `${-(testa ? testa.offsetHeight : 0)}px 0px 0px 0px`"
+           in _gv,
+           "scroll" in _gv))
+    prova("...e l'osservatore rinasce col giro, a ogni ridisegno della fila",
+          True, "guardaCardConsigliati(quanti > 1);" in
+          _pz(mini, "function armaGiroConsigliati(quanti){", "\n}\n"))
     css = mini[mini.find("<style"):mini.find("</style>")]
-    prova("la dissolvenza la fa l'opacita' dei loghi, nel riquadro dei "
-          "marchi", (True, True, True),
-          (".cons-logo{opacity:0;transition:opacity .6s ease}" in css,
-           ".cons-logo.attivo{opacity:1}" in css,
-           ".cella-consigliati .cat-fig{inset:5%}" in css))
-    # IL RITOCCO DI OGNI LOGO LO APPLICA UNA REGOLA SOLA, dalla variabile
-    # che cardConsigliati scrive sull'immagine; e lo spostamento non entra
-    # nella transizione, che resta della sola opacita': un logo che scivola
-    # mentre compare si leggerebbe come un'animazione in piu' nella fila
+    # ⚠️ PROVA CHE HA CAMBIATO (set 2026, ritocco di Andrea): la
+    # dissolvenza e' diventata uno SCORRIMENTO, e l'opacita' non si anima
+    # piu' — dice solo chi si vede da fermo. Una transizione rimasta qui
+    # peserebbe sul logo che esce: nella cascata le transizioni battono le
+    # animazioni, e lo spegnerebbe in dissolvenza mentre scende.
     _rc = _pz(css, ".cons-logo{", "}")
+    prova("i loghi fermi li nasconde l'opacita', che non si anima piu', nel "
+          "riquadro dei marchi", (True, True, True, False),
+          (".cons-logo{opacity:0}" in css,
+           ".cons-logo.attivo{opacity:1}" in css,
+           ".cella-consigliati .cat-fig{inset:5%}" in css,
+           "transition" in _rc))
+    # IL RITOCCO DI OGNI LOGO LO APPLICA UNA REGOLA SOLA, dalla variabile
+    # che cardConsigliati scrive sull'immagine: e' il posto dove il logo
+    # STA, e dove lo scorrimento lo fa arrivare. ⚠️ RILETTA (set 2026): qui
+    # si diceva «e non si anima», quando a muoversi era la sola
+    # dissolvenza; adesso il logo corre, ma la regola del ritocco non ha
+    # una corsa sua
     _rg = _pz(css, ".cella-consigliati .cons-logo{", "}")
-    prova("...e lo spostamento di ogni logo viene dalla sua variabile, e non "
-          "si anima", (True, False, False),
+    prova("...e il posto di ogni logo viene dalla sua variabile, senza una "
+          "transizione sua", (True, False, False),
           (".cella-consigliati .cons-logo{transform:translateY(var(--giu,0%))}"
            in css, "transform" in _rc, "transition" in _rg))
+    _consigliati_scorrimento(src, mini, css, _pz)
     prova("la pagina allarga la card di «Da scoprire», non ne fa una "
           "gemella", True, "#consigliatiLista .scoprire-card{width:100%}" in css)
+
+
+def _curva_css(testo):
+    """I quattro numeri di un `cubic-bezier(...)`, o None."""
+    m = re.search(r"cubic-bezier\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*"
+                  r"([-\d.]+)\s*,\s*([-\d.]+)\s*\)", testo or "")
+    return tuple(float(x) for x in m.groups()) if m else None
+
+
+def _fotogrammi_css(css, nome):
+    """I fotogrammi di un @keyframes, senza commenti: {percento:
+    {proprieta: valore}}. Vuoto se il blocco non c'e'."""
+    i = css.find("@keyframes %s{" % nome)
+    if i < 0:
+        return {}
+    j, fondo = css.find("{", i) + 1, 1
+    while fondo and j < len(css):
+        fondo += {"{": 1, "}": -1}.get(css[j], 0)
+        j += 1
+    corpo = re.sub(r"/\*[\s\S]*?\*/", "", css[css.find("{", i) + 1:j - 1])
+    fot = {}
+    for sel, dich in re.findall(r"([\d.%,\s]+)\{([^{}]*)\}", corpo):
+        d = {}
+        for x in dich.split(";"):
+            k, _, v = x.partition(":")
+            if k.strip():
+                d[k.strip()] = re.sub(r"\s+", " ", v.strip())
+        for p in sel.split(","):
+            fot[float(p.strip().rstrip("%"))] = d
+    return fot
+
+
+def _consigliati_scorrimento(src, mini, css, _pz):
+    """4bis. LO SCORRIMENTO DEI LOGHI (set 2026, ritocco di Andrea che
+    SOSTITUISCE la dissolvenza): «come una slot machine lenta», dall'alto
+    in basso. Qui si leggono i FOTOGRAMMI e le curve per quel che dicono —
+    le richieste di Andrea, una per prova — e non per le cifre: una
+    taratura puo' cambiare, la richiesta no. Il banco node guarda chi
+    porta quale classe; la corsa vera l'ha misurata il giro dal vivo."""
+    esce = _fotogrammi_css(css, "consEsce")
+    entra = _fotogrammi_css(css, "consEntra")
+    prova("lo scorrimento ha i suoi due fotogrammi: chi esce e chi entra",
+          (True, True), (bool(esce), bool(entra)))
+    if not (esce and entra):
+        return
+
+    def dove(v):
+        """translateY(N%) → N; translateY(var(--giu…)) → 'giu';
+        translateY(calc(var(--giu…) + N%)) → ('giu', N)"""
+        v = (v or "").replace(" ", "")
+        m = re.fullmatch(r"translateY\((-?[\d.]+)%\)", v)
+        if m:
+            return float(m.group(1))
+        if v == "translateY(var(--giu,0%))":
+            return "giu"
+        m = re.fullmatch(r"translateY\(calc\(var\(--giu,0%\)\+([\d.]+)%\)\)", v)
+        return ("giu", float(m.group(1))) if m else v
+
+    # SOLO TRANSFORM E OPACITY (la curva di un tratto non e' una
+    # proprieta' che si anima: dice come)
+    prova("nei fotogrammi si muovono solo transform e opacity", [],
+          sorted({k for f in (esce, entra) for d in f.values() for k in d}
+                 - {"transform", "opacity", "animation-timing-function"}))
+    # NIENTE CHE SBORDI, e i due capi FUORI dal quadrato per intero: il
+    # riquadro del logo e' il quadrato meno il margine di `inset`, quindi
+    # per sparire deve correre di (100 - margine) / (100 - 2 margini)
+    _m = re.search(r"\.cella-consigliati \.cat-fig\{inset:([\d.]+)%\}", css)
+    margine = float(_m.group(1)) if _m else 0.0
+    fuori = (100 - margine) / (100 - 2 * margine) * 100
+    k_esce, k_entra = sorted(esce), sorted(entra)
+    prova("chi ESCE parte da dov'e' (il suo ritocco), acceso, e finisce "
+          "sotto il quadrato per intero", (0.0, "giu", "1", True, "1"),
+          (k_esce[0], dove(esce[k_esce[0]].get("transform")),
+           esce[k_esce[0]].get("opacity"),
+           isinstance(dove(esce.get(100.0, {}).get("transform")), float)
+           and dove(esce.get(100.0, {}).get("transform")) >= fuori,
+           esce.get(100.0, {}).get("opacity")))
+    posti = [dove(esce[k].get("transform")) for k in k_esce]
+    numeri = [0.0 if p == "giu" else p for p in posti]
+    prova("...scende soltanto: nessun rimbalzo per lui", True,
+          all(isinstance(x, float) for x in numeri)
+          and numeri == sorted(numeri))
+    prova("chi ENTRA parte sopra il quadrato per intero e si ferma al SUO "
+          "posto: il ritocco `logo_giu` vale ancora", (True, "giu"),
+          (isinstance(dove(entra[k_entra[0]].get("transform")), float)
+           and dove(entra[k_entra[0]].get("transform")) <= -fuori,
+           dove(entra.get(100.0, {}).get("transform"))))
+    # IL RIMBALZO: UNO, sotto il suo posto (supera il centro scendendo),
+    # di pochi pixel — al massimo il 6% del riquadro, 4,5px sul telefono
+    _oltre = [(k, dove(entra[k].get("transform"))) for k in k_entra
+              if isinstance(dove(entra[k].get("transform")), tuple)]
+    prova("...con UN rimbalzo morbido, oltre il suo posto di pochi pixel",
+          True, len(_oltre) == 1 and 0 < _oltre[0][1][1] <= 6)
+    # PARTE LENTO E ACCELERA, tutt'e due: il primo tratto parte piatto e
+    # arriva ripido. E LA STESSA CADUTA NELLO STESSO TEMPO, come le figure
+    # di un rullo: il nuovo non raggiunge mai il vecchio
+    c_esce = _curva_css(esce[k_esce[0]].get("animation-timing-function"))
+    c_entra = _curva_css(entra[k_entra[0]].get("animation-timing-function"))
+
+    def pendenze(c):
+        """la pendenza della curva in partenza e in arrivo"""
+        x1, y1, x2, y2 = c
+        return (y1 / x1 if x1 else (0.0 if y1 == 0 else float("inf")),
+                (1 - y2) / (1 - x2) if x2 != 1 else float("inf"))
+    prova("tutt'e due partono lenti e accelerano scendendo", True,
+          bool(c_esce and c_entra) and all(
+              pendenze(c)[0] == 0 and pendenze(c)[1] > 1
+              for c in (c_esce, c_entra)))
+    _k_giu = next((k for k in k_entra[1:]
+                   if dove(entra[k].get("transform")) == "giu"), None)
+    _k_via = next((k for k in k_esce[1:]
+                   if isinstance(dove(esce[k].get("transform")), float)
+                   and dove(esce[k].get("transform")) >= fuori), None)
+    prova("...con la stessa curva, e il vecchio esce quando il nuovo passa "
+          "il suo posto", (True, True),
+          (c_esce == c_entra, _k_giu is not None and _k_giu == _k_via))
+    # IL RIMBALZO E' MORBIDO: ci entra alla velocita' con cui ha passato il
+    # centro (a un quarto di scarto: di piu' si leggerebbe come un urto o
+    # una frenata), si ferma in cima (pendenza zero), e torna adagio
+    if _k_giu is not None and _oltre:
+        k_su = _oltre[0][0]
+        c_su = _curva_css(entra[_k_giu].get("animation-timing-function"))
+        c_torna = _curva_css(entra[k_su].get("animation-timing-function"))
+        corsa = dove(entra[k_entra[0]].get("transform"))
+        corsa = abs(corsa) if isinstance(corsa, float) else 0
+        v_centro = pendenze(c_entra)[1] * corsa / _k_giu
+        v_oltre = (pendenze(c_su)[0] * _oltre[0][1][1] / (k_su - _k_giu)
+                   if c_su else 0)
+        prova("...il rimbalzo prende la velocita' del centro, si ferma in "
+              "cima e torna adagio", (True, True, True),
+              (bool(v_centro) and abs(v_oltre / v_centro - 1) <= 0.25,
+               bool(c_su) and pendenze(c_su)[1] == 0,
+               bool(c_torna) and pendenze(c_torna) == (0.0, 0.0)))
+    # I TEMPI: mezzo secondo di corsa (fra 450 e 550 ms), la stessa per
+    # tutt'e due, e fra una corsa e l'altra una pausa di tre-quattro
+    # secondi — il battito del giro meno la corsa
+    _d = [re.search(r"\.cons-logo\.%s\{animation:%s ([\d.]+)(m?s) linear\}"
+                    % (c, n), css) for c, n in (("esce", "consEsce"),
+                                                ("entra", "consEntra"))]
+    durate = [float(m.group(1)) * (1 if m.group(2) == "ms" else 1000)
+              if m else None for m in _d]
+    _b = re.search(r"^const CONSIGLIATI_MS = (\d+);", mini, re.M)
+    battito = int(_b.group(1)) if _b else 0
+    prova("mezzo secondo di corsa, uguale per tutt'e due, e tre-quattro "
+          "secondi di pausa", (True, True, True),
+          (None not in durate and durate[0] == durate[1],
+           None not in durate and 450 <= durate[0] <= 550,
+           None not in durate and 3000 <= battito - durate[0] <= 4000))
+    # LA CASCATA, chiesta al giudice e non cercata: su un logo della card
+    # VERO (le classi che il JS scrive, dentro la home aperta) la regola
+    # dell'animazione deve VINCERE, e gli effetti ridotti la spengono
+    regole, _sq = _regole_css(css[css.find(">") + 1:])
+
+    def logo(classi, html=()):
+        def nodo(tag, classi=(), **attr):
+            return {"tag": tag, "attr": attr, "classi": set(classi)}
+        return [nodo("html", html), nodo("body"),
+                nodo("div", ("view", "active"), id="view-esplora"),
+                nodo("div", id="catSez"), nodo("div", ("strip-wrap",)),
+                nodo("div", ("cat-strip",), id="catStrip"),
+                nodo("a", ("cat-cella", "cella-consigliati")),
+                nodo("span", ("cat-quad",)), nodo("span", ("cat-fig",)),
+                nodo("img", ("cons-logo",) + tuple(classi))]
+
+    def vince(classi, html=()):
+        v = _vince_css(regole, logo(classi, html),
+                       ["animation", "opacity", "transform", "transition"])
+        return {p: (v[p][0].split(" ")[0] if p == "animation" else v[p][0])
+                for p in v}
+    prova("alla cascata: chi entra corre acceso verso il suo posto, chi esce "
+          "corre e resta spento, chi e' fermo non corre",
+          [{"animation": "consEntra", "opacity": "1",
+            "transform": "translateY(var(--giu,0%))"},
+           {"animation": "consEsce", "opacity": "0",
+            "transform": "translateY(var(--giu,0%))"},
+           {"opacity": "1", "transform": "translateY(var(--giu,0%))"},
+           {"opacity": "0", "transform": "translateY(var(--giu,0%))"}],
+          [vince(("attivo", "entra")), vince(("esce",)), vince(("attivo",)),
+           vince(())])
+    prova("...e con gli effetti ridotti nessuno corre", ["none", "none"],
+          [vince(("attivo", "entra"), ("fx-ridotti",)).get("animation"),
+           vince(("esce",), ("fx-ridotti",)).get("animation")])
+    # NIENTE CHE SBORDI: il quadrato della card taglia quel che ne esce —
+    # chiesto anche lui alla cascata, sul suo posto nella card
+    _quad = _vince_css(regole, logo(())[:-2], ["overflow"])
+    prova("...e il quadrato taglia quel che esce: niente che sbordi",
+          ["hidden", 0], [(_quad.get("overflow") or ("",))[0], _sq])
 
 
 def _consigliati_banco(src, mini, _pz):
@@ -95245,6 +95460,33 @@ const nodo = id => nodi[id] || (nodi[id] = {id, innerHTML: '',
 let homeAttiva = true;
 nodo('view-esplora').classList.contains = c => c === 'active' && homeAttiva;
 const el = id => nodo(id);
+/* LA CARD, per l'osservatore: un oggetto NUOVO a ogni ridisegno della
+   fila, come il nodo vero (un innerHTML nuovo = nodi nuovi). E l'header
+   appiccicato della home, alto quanto il caso decide. */
+let cardVista = null, htmlCard = null, nCard = 0, testaAlta = 0;
+nodo('catStrip').querySelector = sel => {
+  const h = nodi['catStrip'].innerHTML;
+  if (h !== htmlCard) {
+    htmlCard = h;
+    cardVista = h.includes('cella-consigliati') ? {card: ++nCard} : null;
+  }
+  return sel === '.cella-consigliati' ? cardVista : null;
+};
+nodo('view-esplora').querySelector = sel =>
+  sel === 'header' && testaAlta ? {offsetHeight: testaAlta} : null;
+/* L'OSSERVATORE DI CARTONE: si ricorda cosa guarda e con quali opzioni,
+   e QUANTO della card si vede lo decide il caso (`vede`). Il primo
+   giudizio arriva all'`observe`, come in pagina — la' un attimo dopo. */
+let occhi = [], quotaVista = 1;
+class IntersectionObserver {
+  constructor(cb, opz){ this.cb = cb; this.opz = opz; this.guarda = [];
+    this.spento = false; occhi.push(this); }
+  observe(x){ this.guarda.push(x);
+    this.cb([{target: x, intersectionRatio: quotaVista,
+              isIntersecting: quotaVista > 0}]); }
+  disconnect(){ this.spento = true; this.guarda = []; }
+}
+const window = {IntersectionObserver};
 let richieste = [], scritte = [];
 let immagini = [], htmlVisto = null;
 function nuovaImg(attr){
@@ -95319,6 +95561,8 @@ function caso(nome, f){
   homeAttiva = true; document.hidden = false; DEMO = false; myTgId = 111;
   premutaFatta = false; richieste = []; scritte = [];
   timer.clear(); htmlVisto = null;
+  occhi = []; quotaVista = 1; testaAlta = 0;
+  window.IntersectionObserver = IntersectionObserver;
   try { f(); } catch (e) { console.log('ESPLOSO: ' + e.message + '|' + nome); }
 }
 const rifai = () => { strisciaFirma = ''; renderStriscia(); };
@@ -95326,6 +95570,19 @@ const ordine = () => [...nodi['catStrip'].innerHTML
   .matchAll(/href="([^"]*)"|cella-barattolo/g)]
   .map(m => m[1] !== undefined ? m[1] : 'barattolo');
 const accesi = () => immaginiCard().map(x => x.classList.contains('attivo'));
+/* le classi di ogni logo, lette per quel che dicono: acceso, che entra,
+   che esce, o fermo e spento ('-') */
+const classi = () => immaginiCard().map(x => ['attivo', 'entra', 'esce']
+  .filter(c => x.classList.contains(c)).join('+') || '-');
+/* quanto della card si vede ADESSO: lo dice l'osservatore in carica */
+const occhio = () => occhi.filter(x => !x.spento).pop() || null;
+const vede = r => {
+  quotaVista = r;
+  const o = occhio();
+  if (o) o.guarda.forEach(t => o.cb([{target: t, intersectionRatio: r,
+                                      isIntersecting: r > 0}]));
+};
+const idTimer0 = () => [...timer.keys()][0];
 const conSrc = () => immaginiCard().map(x => !!x.getAttribute('src'));
 const giro = () => { for (const t of timer.values()) t.f(); };
 const arrivano = () => immaginiCard().forEach(x => { if (x._src) x.arrivata = true; });
@@ -95412,7 +95669,10 @@ caso('due negozi', () => {
        [true, false], accesi());
   dice('...e alla prima apertura si chiede solo il primo',
        [[true, false], []], [conSrc(), richieste]);
-  dice('...e il giro parte, ogni tre secondi', [1, 3000],
+  /* ⚠️ ERA OGNI TRE SECONDI (set 2026, ritocco di Andrea): lo scorrimento
+     vuole mezzo secondo di corsa e tre-quattro di pausa, quindi il giro
+     batte ogni quattro */
+  dice('...e il giro parte, ogni quattro secondi', [1, 4000],
        [timer.size, ([...timer.values()][0] || {}).ms]);
   giro();
   dice('al primo giro il secondo logo si CHIEDE, ma non si accende a meta',
@@ -95481,8 +95741,114 @@ caso('effetti ridotti', () => {
   ridotti = true; giro();
   dice('...e riaccesi a meta giro, la card torna al primo', [true, false],
        accesi());
+  /* ...DI COLPO: nessuna corsa verso il primo, e le classi della corsa di
+     prima se ne vanno con lui */
+  dice('...di colpo, senza corse a meta', ['attivo', '-'], classi());
   giro(); giro();
   dice('...e li resta ferma', [true, false], accesi());
+});
+
+/* LO SCORRIMENTO (set 2026, ritocco di Andrea che SOSTITUISCE la
+   dissolvenza): a ogni passaggio chi entra porta `attivo` ed `entra`, chi
+   esce `esce` e basta, gli altri niente — la corsa la fa il CSS. Le
+   classi si guardano a OGNI passaggio e con TRE negozi: con due, «chi
+   esce» e «chi c era prima» sono sempre lo stesso logo. */
+caso('lo scorrimento', () => {
+  consigliatiServer = [BOTTEGA, TERZA];
+  rifai();
+  dice('a card appena nata nessuna corsa: il primo acceso e fermo',
+       ['attivo', '-', '-'], classi());
+  giro(); arrivano();
+  dice('...e il giro che CHIEDE il secondo non muove niente',
+       ['attivo', '-', '-'], classi());
+  giro();
+  dice('al passaggio il primo ESCE e il secondo ENTRA, acceso lui solo',
+       ['esce', 'attivo+entra', '-'], classi());
+  arrivano(); giro();
+  dice('...al passaggio dopo esce il secondo ed entra il terzo, e il primo '
+       + 'resta fermo e spento', ['-', 'esce', 'attivo+entra'], classi());
+  giro();
+  dice('...e il giro ricomincia: il primo rientra dall alto',
+       ['attivo+entra', '-', 'esce'], classi());
+});
+
+/* SI MUOVE SOLO SE SI VEDE (set 2026, ritocco di Andrea): con meno di
+   META card a schermo il giro non cambia e non chiede niente, e quando la
+   card torna in vista il battito riparte DA CAPO — il logo che c e' si
+   guarda per tutta la pausa. */
+caso('solo se si vede', () => {
+  consigliatiServer = [BOTTEGA];
+  rifai();
+  const o = occhio() || {opz: {}, guarda: []};
+  dice('un osservatore sulla card, a meta card, e la card nuova e la sua',
+       [1, 0.5, true], [o.guarda.length, (o.opz || {}).threshold,
+                        o.guarda[0] === el('catStrip').querySelector(
+                          '.cella-consigliati')]);
+  vede(0); giro(); giro();
+  dice('fuori dallo schermo il giro non cambia e non chiede niente',
+       [['attivo', '-'], []], [classi(), richieste]);
+  vede(0.4); giro();
+  dice('...ne con meno di meta card a schermo', [['attivo', '-'], []],
+       [classi(), richieste]);
+  const prima = idTimer0();
+  vede(0.6);
+  dice('tornata in vista, il battito riparte da capo', [1, true],
+       [timer.size, idTimer0() !== prima]);
+  const dopo = idTimer0();
+  vede(1);
+  dice('...una volta sola: a card gia in vista non si riarma', dopo,
+       idTimer0());
+  giro(); arrivano(); giro();
+  dice('...e il giro riprende', ['esce', 'attivo+entra'], classi());
+});
+
+/* L HEADER E APPICCICATO e la pagina ci scorre sotto: una card coperta da
+   lui non e a schermo. Il tetto dell osservatore scende della sua
+   altezza, e senza header resta dov e. */
+caso('l header appiccicato', () => {
+  testaAlta = 118;
+  consigliatiServer = [BOTTEGA];
+  rifai();
+  dice('il tetto dello schermo scende dell altezza dell header',
+       '-118px 0px 0px 0px', ((occhio() || {}).opz || {}).rootMargin);
+  testaAlta = 0;
+  rifai();
+  dice('...e senza header resta in cima', '0px 0px 0px 0px',
+       ((occhio() || {}).opz || {}).rootMargin);
+});
+
+/* L OSSERVATORE SEGUE LA CARD: a ogni ridisegno della fila il vecchio si
+   spegne e ne nasce uno sulla card nuova; il vecchio, se una risposta sua
+   arriva tardi, non riarma niente; e con un logo solo nessuno guarda. */
+caso('l osservatore segue la card', () => {
+  consigliatiServer = [BOTTEGA];
+  rifai();
+  const primo = occhio() || {guarda: [], cb(){}};
+  const cardPrima = primo.guarda[0];
+  consigliatiServer = [Object.assign({}, BOTTEGA, {logo_giu: 3})];
+  renderStriscia();
+  const secondo = occhio() || {guarda: []};
+  dice('al ridisegno il vecchio si spegne e il nuovo guarda la card nuova',
+       [true, 1, true], [!!primo.spento, secondo.guarda.length,
+                         !!secondo.guarda[0] && secondo.guarda[0] !== cardPrima]);
+  vede(0);
+  const id = idTimer0();
+  primo.cb([{intersectionRatio: 1, isIntersecting: true}]);
+  dice('...e il vecchio che parla tardi non riarma niente', [false, id],
+       [consigliatiInVista, idTimer0()]);
+  consigliatiServer = []; renderStriscia();
+  dice('...e con un logo solo nessuno guarda la card', [true, null],
+       [!!secondo.spento, occhio()]);
+});
+
+/* SENZA OSSERVATORE (un browser vecchio) si fa come prima: la card si
+   considera a schermo, e gira. */
+caso('senza osservatore', () => {
+  delete window.IntersectionObserver;
+  consigliatiServer = [BOTTEGA];
+  rifai(); giro(); arrivano(); giro();
+  dice('un browser senza IntersectionObserver fa girare la card come prima',
+       [['esce', 'attivo+entra'], 0], [classi(), occhi.length]);
 });
 
 /* LA FILA SEGUE LA BUSTA: una pagina del server rimessa in bozza esce

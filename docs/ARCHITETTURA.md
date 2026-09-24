@@ -3636,8 +3636,9 @@
   e due i lati (un valore che non e' un numero vale zero); il client lo
   scrive sull'immagine come `--giu` in percento del riquadro del logo
   (75,6px: sul computer scala con la card) e una regola sola lo applica
-  con `translateY`, fuori dalla transizione. To The Mooon ha 4: il peso
-  del suo disegno sta al 39% dell'altezza, ~5px sopra il centro.
+  con `translateY`: e' il posto dove il logo STA, e dove lo scorrimento
+  qui sotto lo fa arrivare. To The Mooon ha 4: il peso del suo disegno
+  sta al 39% dell'altezza, ~5px sopra il centro.
   IL BANNER DI UNA PAGINA DEL SERVER (set 2026, «Un tempo per te»): nella
   pagina le voci del catalogo di casa hanno il banner di «Da scoprire», e
   una pagina del server lo puo' avere dichiarando `banner: True` in
@@ -3660,6 +3661,20 @@
   POSIZIONE no, la scrive il template), e a pagina nascosta o fuori dalla
   home non fa niente. Con gli EFFETTI RIDOTTI (`effettiRidotti()`,
   chiesto a ogni giro) resta il primo e gli altri non si chiedono.
+  LO SCORRIMENTO (set 2026, al posto della dissolvenza): ogni quattro
+  secondi (`CONSIGLIATI_MS`) mezzo secondo di corsa dall'alto in basso,
+  come una slot machine lenta — `.esce` al logo che c'era, `.entra` e
+  `attivo` al nuovo, e la corsa la fanno due @keyframes di sole transform
+  e opacity (`consEsce`, `consEntra`: la stessa caduta per tre quinti,
+  poi il rimbalzo del solo nuovo, il 5% del riquadro, e l'arrivo al suo
+  `--giu`). I capi della corsa stanno fuori dal quadrato per intero (106%
+  del riquadro) e il quadrato taglia: niente sborda. Gli stati finali
+  sono le regole di sempre, quindi dove le animazioni non girano si vede
+  subito l'arrivo. E SI MUOVE SOLO SE SI VEDE: `guardaCardConsigliati`,
+  un IntersectionObserver sulla card (almeno meta'), col tetto abbassato
+  dell'altezza dell'header appiccicato; tornata in vista il battito
+  riparte da capo. Il perche': Cantieri, «Lo scorrimento dei loghi dei
+  Consigliati».
   La pagina e' NOINDEX e fuori dalla sitemap (puo' restare vuota) con
   l'anteprima del brand; il nome `consigliati` e' fra gli
   SLUG_NEGOZIO_RISERVATI. Il perche' di ogni pezzo: Cantieri,

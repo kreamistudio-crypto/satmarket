@@ -1004,21 +1004,65 @@
      IL RIQUADRO E' QUELLO DELLA CARD DELLO SCAMBIO, e per la stessa
      ragione: sono MARCHI e non illustrazioni pareggiate, e alla misura
      delle sorelle peserebbero meno.
-     LA DISSOLVENZA LA FA L'OPACITA' e mai il `display`: da nascosto a
-     visibile non si transiziona niente. Con gli effetti ridotti la regola
-     universale in fondo al foglio spegne la transizione, e il giro in JS
-     non parte nemmeno (resta il primo logo). */
+     I LOGHI FERMI LI NASCONDE L'OPACITA', e mai il `display`: un logo
+     senza scatola non avrebbe da dove partire per scorrere. L'opacita'
+     NON SI ANIMA PIU' (era la dissolvenza del primo giro): una
+     transizione rimasta qui vincerebbe sull'animazione del logo che
+     esce — nella cascata le transizioni battono le animazioni — e lo
+     spegnerebbe in dissolvenza mentre scende. */
   .cella-consigliati .cat-fig{inset:5%}
-  .cons-logo{opacity:0;transition:opacity .6s ease}
+  .cons-logo{opacity:0}
   .cons-logo.attivo{opacity:1}
   /* IL CENTRO OTTICO DI OGNI LOGO (set 2026): un marchio centrato a
      riquadro puo' sembrare alto o basso — To The Mooon ha il peso in
      alto, e nel quadrato pareva salito. Ogni logo porta il suo `--giu`
      (in percento della SUA altezza, che e' il riquadro: lo scrive
      cardConsigliati da `logo_giu` del catalogo), e la regola e' una per
-     tutti. Lo spostamento non si anima: la dissolvenza resta la sola
-     cosa che si muove. */
+     tutti. E' il posto dove ogni logo STA, e quello dove lo scorrimento
+     qui sotto lo fa arrivare: il ritocco non ha una corsa sua. */
   .cella-consigliati .cons-logo{transform:translateY(var(--giu,0%))}
+  /* LO SCORRIMENTO (set 2026, ritocco di Andrea che SOSTITUISCE la
+     dissolvenza): come una slot machine lenta, dall'alto in basso. Il
+     logo che c'e' parte lento e accelera fino a uscire dal fondo del
+     quadrato; nello stesso istante il nuovo entra dall'alto, parte
+     lento, accelera, passa il suo posto di un soffio e ci torna — il
+     rimbalzo lo fa solo lui. Mezzo secondo in tutto; la pausa la batte
+     il giro in JS (CONSIGLIATI_MS).
+     SOLO TRANSFORM E OPACITY. E NIENTE CHE SBORDI: il quadrato
+     (`.cat-quad`) ha `overflow:hidden` e taglia quel che esce, e i due
+     capi della corsa stanno FUORI dal quadrato per intero — il riquadro
+     del logo e' il 90% del quadrato col 5% di margine per lato, quindi
+     per sparire deve scendere (o salire) di (90+5)/90 = 105,6% della sua
+     altezza: 106.
+     LE DUE CADUTE SONO LA STESSA CURVA NELLO STESSO TEMPO, una parabola
+     per i primi tre quinti: si seguono come le figure di un rullo, e il
+     nuovo non raggiunge mai il vecchio. Nei due quinti dopo il vecchio e'
+     gia' fuori, e il nuovo fa il suo rimbalzo — il 5% del riquadro, ~4px
+     sul telefono —, entrandoci alla velocita' con cui ha passato il
+     centro (la curva del tratto parte ripida apposta: piu' piano
+     sembrerebbe urtare) e tornando al suo posto adagio.
+     GLI STATI FINALI SONO LE REGOLE DI SEMPRE, non le animazioni: chi
+     esce, senza `attivo`, torna a opacita' zero (nella corsa lo tiene
+     acceso il fotogramma), chi entra e' `attivo` al suo `--giu`. Dove le
+     animazioni non girano — gli EFFETTI RIDOTTI, con la regola universale
+     in fondo al foglio — si vede quindi subito l'arrivo, mai due loghi
+     insieme; e la' il giro in JS non parte nemmeno. */
+  .cons-logo.esce{animation:consEsce .5s linear}
+  .cons-logo.entra{animation:consEntra .5s linear}
+  @keyframes consEsce{
+    0%{transform:translateY(var(--giu,0%));opacity:1;
+      animation-timing-function:cubic-bezier(.33,0,.67,.33)}
+    60%,100%{transform:translateY(106%);opacity:1}
+  }
+  @keyframes consEntra{
+    0%{transform:translateY(-106%);
+      animation-timing-function:cubic-bezier(.33,0,.67,.33)}
+    60%{transform:translateY(var(--giu,0%));
+      animation-timing-function:cubic-bezier(.08,.86,.4,1)}
+    75%{transform:translateY(calc(var(--giu,0%) + 5%));
+      animation-timing-function:cubic-bezier(.45,0,.55,1)}
+    100%{transform:translateY(var(--giu,0%))}
+  }
   /* La card «Tutto» in TESTA alla fila (ago 2026, decisione di Andrea
      che ROVESCIA il «nessuna card Tutto in piu'» del primo giro) non
      ha regole sue: veste .cat-cella, .cat-quad e l'anello .attiva come
@@ -15598,7 +15642,7 @@ const giuLogoConsigliato = px => {
 
 /* LA CARD NELLA FILA (la chiama renderStriscia): il quadrato bruno e
    l'etichetta delle sorelle, e dentro i LOGHI uno sopra l'altro — si
-   vede quello `attivo`, la dissolvenza la fa il CSS.
+   vede quello `attivo`, lo scorrimento lo fa il CSS.
    SOLO IL PRIMO HA IL SUO `src`: gli altri portano l'indirizzo in
    `data-src` e si chiedono un giro prima del loro turno, quindi la
    prima apertura della home paga UN logo solo, e a priorita' bassa —
@@ -15624,46 +15668,109 @@ function cardConsigliati(loghi){
     </a>`;
 }
 
-/* IL GIRO DEI LOGHI, uno ogni tre secondi circa (richiesta di Andrea).
+/* IL GIRO DEI LOGHI: uno scorrimento ogni quattro secondi — mezzo
+   secondo di corsa e tre e mezzo di pausa (set 2026, ritocco di Andrea
+   che SOSTITUISCE la dissolvenza ogni tre: «come una slot machine
+   lenta»). La corsa la fa il CSS con `.entra` ed `.esce`; qui si decide
+   solo CHI e QUANDO.
    ⚠️ LA FILA DELLE CATEGORIE AVEVA UNA REGOLA: niente che si muova — il
    viraggio della card dello scambio fu tolto (set 2026) perche' tirava
-   l'occhio via dalle sorelle. Questa dissolvenza e' una richiesta
-   esplicita che la supera per QUESTA card, e con un logo solo la card
-   resta ferma come le altre: si muove dal secondo negozio in poi, e il
-   timer con un logo non nasce nemmeno.
-   IL PRIMO RESTA SEI SECONDI e non tre, ed e' il prezzo della prima
+   l'occhio via dalle sorelle. Questo giro e' una richiesta esplicita che
+   la supera per QUESTA card, e con un logo solo la card resta ferma come
+   le altre: si muove dal secondo negozio in poi, e il timer con un logo
+   non nasce nemmeno.
+   IL PRIMO RESTA OTTO SECONDI e non quattro, ed e' il prezzo della prima
    apertura leggera: il secondo logo si chiede al primo giro, non
-   all'avvio. Da li' ognuno si chiede quando si accende il precedente, e
-   il ritmo torna quello chiesto. Un logo che non e' ancora arrivato non
-   si accende a meta': si aspetta il giro dopo.
-   EFFETTI RIDOTTI: niente dissolvenza e niente giro, resta il PRIMO. Il
+   all'avvio. Da li' ognuno si chiede quando entra il precedente, e il
+   ritmo torna quello chiesto. Un logo che non e' ancora arrivato non
+   entra a meta': si aspetta il giro dopo.
+   LE CLASSI DI UNA CORSA RESTANO FINO ALLA CORSA DOPO, e non serve
+   toglierle prima: finita l'animazione, le regole di sempre dicono gia'
+   lo stato giusto (vedi il CSS), e al passaggio dopo ogni logo cambia
+   classe — chi e' entrato esce, chi e' uscito resta fermo o entra —
+   quindi l'animazione riparte sempre, senza fotogrammi d'attesa ne'
+   ascoltatori.
+   EFFETTI RIDOTTI: niente corsa e niente giro, resta il PRIMO. Il
    giudice e' `effettiRidotti()`, chiesto a OGNI giro: la scelta si cambia
    da «🌗 Aspetto» senza ridisegnare la fila, e al giro dopo la card torna
    al primo e si ferma. Sotto quella classe gli altri loghi non si
    chiedono nemmeno.
-   E SI FERMA DOVE NON SI VEDE: a pagina nascosta, o fuori dalla home, un
-   giro non cambia niente e non chiede niente. */
-const CONSIGLIATI_MS = 3000;
+   E SI FERMA DOVE NON SI VEDE: a pagina nascosta, fuori dalla home, o con
+   la card fuori dallo schermo (vedi guardaCardConsigliati) un giro non
+   cambia niente e non chiede niente. */
+const CONSIGLIATI_MS = 4000;
 let consigliatiGiro = 0;
+function battitoConsigliati(){
+  clearInterval(consigliatiGiro);
+  consigliatiGiro = setInterval(giraConsigliati, CONSIGLIATI_MS);
+}
 function armaGiroConsigliati(quanti){
   clearInterval(consigliatiGiro);
-  consigliatiGiro = quanti > 1 ? setInterval(giraConsigliati, CONSIGLIATI_MS) : 0;
+  consigliatiGiro = 0;
+  if (quanti > 1) battitoConsigliati();
+  guardaCardConsigliati(quanti > 1);
+}
+/* SI MUOVE SOLO SE SI VEDE (set 2026, ritocco di Andrea): una corsa che
+   nessuno guarda e' lavoro buttato, e un logo cambiato di nascosto e' un
+   logo che non si e' visto. Un IntersectionObserver sulla card — mai un
+   ascoltatore di scroll, per una domanda che cambia di rado — dice se ne
+   sta a schermo almeno META'; e conta da se' anche la fila che scorre di
+   lato (la card tagliata dal bordo della striscia) e la vista che si
+   nasconde (fuori dalla home la card non ha scatola).
+   L'HEADER E' APPICCICATO e la pagina ci scorre SOTTO: per l'osservatore
+   una card coperta da lui sarebbe «a schermo». Il tetto del suo schermo
+   scende quindi dell'altezza dell'header, misurata qui — l'osservatore
+   rinasce a ogni ridisegno della fila, sulla card nuova.
+   E QUANDO LA CARD TORNA IN VISTA IL BATTITO RIPARTE DA CAPO: il logo
+   che c'e' si guarda per tutta la pausa, e la corsa non parte mezzo
+   secondo dopo che la card e' comparsa.
+   UN OSSERVATORE VECCHIO NON PARLA PIU': una risposta gia' in coda puo'
+   arrivare dopo il `disconnect`, e riarmerebbe il battito di una card
+   che non c'e' piu'. Parla solo quello in carica.
+   Senza osservatore (un browser vecchio) vale come prima: si vede. */
+let consigliatiInVista = false, consigliatiOcchio = null;
+function guardaCardConsigliati(serve){
+  if (consigliatiOcchio) consigliatiOcchio.disconnect();
+  consigliatiOcchio = null;
+  consigliatiInVista = false;
+  const card = serve && el('catStrip').querySelector('.cella-consigliati');
+  if (!card) return;
+  if (!('IntersectionObserver' in window)) { consigliatiInVista = true; return; }
+  const testa = el('view-esplora').querySelector('header');
+  const occhio = new IntersectionObserver(voci => {
+    if (occhio !== consigliatiOcchio) return;
+    const si = voci[voci.length - 1].intersectionRatio >= .5;
+    if (si && !consigliatiInVista) battitoConsigliati();
+    consigliatiInVista = si;
+  }, {rootMargin: `${-(testa ? testa.offsetHeight : 0)}px 0px 0px 0px`,
+      threshold: .5});
+  consigliatiOcchio = occhio;
+  occhio.observe(card);
 }
 function giraConsigliati(){
   const loghi = [...document.querySelectorAll('#catStrip .cella-consigliati img')];
   if (loghi.length < 2) return;
   const ora = Math.max(0, loghi.findIndex(x => x.classList.contains('attivo')));
-  if (effettiRidotti()) { if (ora) accendiLogoConsigliato(loghi, 0); return; }
-  if (document.hidden || !el('view-esplora').classList.contains('active')) return;
+  if (effettiRidotti()) { accendiLogoConsigliato(loghi, 0); return; }
+  if (document.hidden || !el('view-esplora').classList.contains('active')
+      || !consigliatiInVista) return;
   const k = (ora + 1) % loghi.length, dopo = loghi[k];
   if (!dopo.getAttribute('src')) { dopo.src = dopo.dataset.src; return; }
   if (!(dopo.complete && dopo.naturalWidth > 0)) return;
-  accendiLogoConsigliato(loghi, k);
+  accendiLogoConsigliato(loghi, k, ora);
   const poi = loghi[(k + 1) % loghi.length];
   if (!poi.getAttribute('src')) poi.src = poi.dataset.src;
 }
-function accendiLogoConsigliato(loghi, k){
-  loghi.forEach((x, j) => x.classList.toggle('attivo', j === k));
+/* ACCENDERE UN LOGO: `attivo` a lui solo e, se si sa da dove viene la
+   corsa, `entra` a lui ed `esce` a chi c'era. Senza (gli effetti ridotti
+   che riportano al primo) nessuna corsa: il cambio e' secco, e le classi
+   di una corsa vecchia se ne vanno con lui. */
+function accendiLogoConsigliato(loghi, k, prima = -1){
+  loghi.forEach((x, j) => {
+    x.classList.toggle('attivo', j === k);
+    x.classList.toggle('entra', prima >= 0 && j === k);
+    x.classList.toggle('esce', prima >= 0 && j === prima);
+  });
 }
 
 /* IL TOCCO DELLA CARD, il calco esatto di vaiP2PDaTocco: il click si
