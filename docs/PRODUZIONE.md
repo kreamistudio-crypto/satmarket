@@ -2035,3 +2035,28 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   «ha piu' varianti e non le ho potute leggere» è un lettore che non ha
   agganciato le variazioni (chiamata fuori dal lettore); «nessuna delle
   sue varianti e' in vendita» è il negozio.
+- I CARRELLI TOLTI (24 set 2026): il carrello torna quello di prima —
+  uno solo, di un venditore alla volta, in memoria — e con i carrelli
+  per venditore se ne va il PAGAMENTO UNICO, cioè la busta in
+  `pagamenti` col motivo 'carrello', in produzione da 297063d. Il
+  server di adesso quella busta NON la sa più incassare
+  (`_incasso_del_motivo` conosce 'banner' e 'negozio_slug'), quindi
+  PRIMA del deploy si guarda, in sola lettura, che non ce ne siano:
+  `sqlite3 -readonly ~/satmarket/satmarket.db "SELECT 'busta', id, stato, importo_sats, datetime(creato,'unixepoch','localtime') FROM pagamenti WHERE motivo='carrello' UNION ALL SELECT 'ordine', id, stato, pagamento_id, datetime(creato,'unixepoch','localtime') FROM ordini WHERE pagamento_id > 0;"`
+  Nessuna riga (o «no such column: pagamento_id», su un database che
+  quella colonna non l'ha mai avuta) = si va: il 24 set 2026, prima
+  del push, non ha stampato niente. Una `busta` in `creato` = una
+  fattura ancora aperta che dopo il deploy nessuno incasserebbe: ci
+  si ferma. Una busta chiusa (`pagato`, `annullato`, `rimborsato`)
+  non blocca, ma il libro mastro la segnala per sempre, in qualunque
+  stato («pagamento con un motivo che nessuno sa incassare»): si
+  guarda a mano. `orfani.py` invece non la vede — riconosce l'incasso
+  dal suo hash, e la riga non si cancella mai. Le righe `ordine` sono
+  ordini nati da una busta: dopo il deploy vivono come ordini
+  qualunque, ognuno col suo prezzo. LE COLONNE RESTANO:
+  `ordini.pagamento_id` e `ordini.mai_incassato` (con l'indice) sul
+  VPS ci sono e non le scrive più nessuno; niente DROP, apposta. E IL
+  WORKFLOW È CAMBIATO (via `collaudo_carrelli_unico` dai due elenchi):
+  se il job `pronto` si ferma con «refusing to allow a GitHub App…»,
+  vale «LA CATENA DEL DEPLOY» — il ref si sposta a mano, senza
+  --force, col via di Andrea.

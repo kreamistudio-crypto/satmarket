@@ -31953,3 +31953,83 @@ riascolto sulla chiave ritrovata deve portare i messaggi arretrati
 (controparte, hold) sul dispositivo nuovo. 6) Un ordine pending nato
 prima di oggi non ha le chiavi in `p2p_scambi`: la riga dipende dalla
 restore, come prima.
+
+## I carrelli sono stati tolti: troppo complessi per i numeri di oggi (24 set 2026)
+
+**LA DECISIONE (Andrea).** Via tutto il lavoro sui carrelli di oggi:
+il carrellino sulle card del barattolo, i carrelli da parte con
+«🛒 Carrelli (N)» e la pagina «I tuoi carrelli», «Paga tutto insieme»
+(una fattura per più venditori, la busta in `pagamenti` col motivo
+'carrello'), la persistenza sul telefono e nella nuvola di Telegram.
+Torna il carrello di prima: UNO solo, di un venditore alla volta, in
+memoria, composto dalla pagina dell'articolo, pagato dalla cassa con
+un ordine, una fattura, un deposito. Il perché è nel titolo: tre
+pagine nuove, una quarta modalità del foglio, un secondo modo di
+incassare coi suoi giri dell'orologio e i suoi controlli del libro
+mastro, una memoria in due posti — per un mercatino in rodaggio, dove
+chi compra da due venditori insieme è un caso che non si vede.
+**NON SI RIFANNO PER SBAGLIO**: chi riapre l'idea parte da qui e dai
+quattro commit qui sotto, che la raccontano intera coi loro perché.
+
+**COME.** Quattro `git revert`, dal più nuovo, la storia intatta:
+0de2be9 (i carrelli non si perdono), e2921b9 (il verbale), 297063d (il
+pagamento unico), f44180f (dal barattolo al carrello). Altri ritocchi
+sui carrelli non ce n'erano: dopo f44180f sono arrivati solo le
+statistiche del negozio (b7a490b, d0f0976), gli scambi su ogni
+dispositivo (af13368) e una voce di PRODUZIONE (17d6f3f), che non li
+toccano. Tre revert puliti; e2921b9 in conflitto in CANTIERI, dove
+dopo di lui erano arrivate altre voci, sciolto togliendo le SOLE 109
+righe che aveva aggiunto. LA PROVA CHE VALE DI PIÙ: ogni file di
+codice, ARCHITETTURA, PRODUZIONE e CLAUDE.md sono identici al byte
+all'albero rifatto come se i carrelli non fossero mai esistiti
+(b916518 con sopra i soli quattro commit arrivati dopo). Le prove
+tornano quelle di prima — escono `prove_carrelli_per_venditore` e
+`prove_carrelli_non_si_perdono`, le sentinelle-censimento tornano ai
+loro numeri — e `collaudo_carrelli_unico.py` esce dal repo e dai due
+elenchi del workflow.
+
+**IL DATABASE NON SI POTA.** `ordini.pagamento_id` e
+`ordini.mai_incassato` (con l'indice) restano dove ci sono, e non le
+scrive né le legge più nessuno: niente migrazioni distruttive. Il
+server di adesso non sa incassare una busta, quindi prima del push la
+query di sola lettura sul VPS (PRODUZIONE, «I CARRELLI TOLTI»),
+girata da Andrea: non ha stampato niente — nemmeno l'errore della
+colonna, che quindi c'è. Nessuna busta, né aperta né chiusa, e nessun
+ordine nato da una busta: il pagamento unico in produzione non l'ha
+usato nessuno, e il libro mastro non avrà niente da dire.
+Restano, innocue, anche le chiavi `barattolo_carrelli` sui telefoni
+che hanno aperto l'app fra 0de2be9 e il deploy (localStorage e nuvola
+di Telegram: articoli e quantità, mai indirizzi): nessuno le legge
+più, e toglierle vorrebbe codice nuovo.
+
+**PROVATO.** Suite intera severa senza config nel worktree: 15.687
+verdi e 0 rosse. I 23 collaudi della CI nella gabbia senza rete, più
+`collaudo_offerta_carrello` e `collaudo_altri_oggetti` (l'offerta sul
+carrello di prima girata fino al pagamento, al sat): verdi. Dal vivo
+(server da una copia col relay morto, un LNbits di cartone, Chrome col
+tocco vero e lo stub di Telegram, 27 verdi): nel barattolo nessun
+carrellino e nessun «Carrelli (N)»; dall'articolo «🛒 Aggiungi al
+carrello» apre il carrello di quel venditore; la ✕ chiede «Vuoi
+ignorare le modifiche?», «Annulla» lo lascia com'è, «Sì» lo butta;
+l'indietro di Telegram torna all'articolo e rientrando il carrello è
+lo stesso; «Controlla e paga» → cassa → ritiro a mano → «Paga»: UNA
+fattura (21.000 sats per due articoli), UN ordine con due righe, e al
+saldo l'ordine nel deposito di garanzia col carrello vuoto; da un
+altro venditore il carrello ricomincia col toast di sempre; ricaricata
+l'app, il carrello non c'è più e sul telefono nessuna chiave dei
+carrelli. E IL DEPLOY IN PICCOLO (21 verdi), perché nessuna prova
+girava il server nuovo sopra un database con le colonne rimaste: il
+codice di produzione del giorno (17d6f3f) crea il database — colonne e
+indice come sul VPS — e da una pagina aperta si apre una fattura dal
+carrello; sotto la pagina parte il server senza carrelli, sullo
+stesso database e sulla stessa porta; la fattura pagata DOPO va nel
+deposito di garanzia e la pagina di ieri lo vede; ricaricata, il
+client nuovo ignora le chiavi rimaste sul telefono e fa un giro intero
+sopra le colonne rimaste, che restano al loro 0; le query del libro
+mastro, lette dal sorgente, girano tutte e tacciono; nei log dei due
+server nessun errore.
+
+**DA GUARDARE.** Dopo il deploy, dal telefono, il carrello una volta
+— dall'articolo alla ✕, poi il pagamento — dentro Telegram e nell'app
+Android: il banco l'ha girato con lo stub di Telegram, non con le due
+app vere.

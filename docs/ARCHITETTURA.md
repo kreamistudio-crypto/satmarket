@@ -15931,6 +15931,28 @@
   nella PWA, cioè la stessa ✕ farebbe due cose diverse sui due
   telefoni. Fra una garanzia che c'è solo a metà e una regola onesta,
   la regola.
+  I CARRELLI PER VENDITORE SONO STATI TOLTI (24 set 2026, decisione
+  di Andrea), e il carrello resta QUELLO DESCRITTO QUI: uno solo, di
+  un venditore alla volta, in memoria, composto dalla pagina
+  dell'articolo, pagato dalla cassa con un ordine, una fattura, un
+  deposito. Il 24 set ne era nato un secondo modello — il carrellino
+  sulle card del barattolo, più carrelli da parte con «🛒 Carrelli
+  (N)», «Paga tutto insieme» con UNA fattura per più venditori (la
+  busta in `pagamenti` col motivo 'carrello'), i carrelli salvati sul
+  telefono e nella nuvola di Telegram — tolto lo stesso giorno con
+  quattro `git revert`: la storia resta, il perché sta in CANTIERI,
+  «I carrelli sono stati tolti». Due cose sono rimaste, apposta. IL
+  DATABASE NON SI È POTATO: `ordini.pagamento_id` e
+  `ordini.mai_incassato` (col loro indice) restano nei database che
+  le hanno avute, produzione compresa, e non le scrive né le legge
+  più nessuno; un database nuovo non le ha. Un DROP per due colonne
+  ferme è un rischio senza guadagno. E UNA BUSTA RIMASTA NON LA
+  INCASSA PIÙ NESSUNO: `_incasso_del_motivo` conosce solo 'banner' e
+  'negozio_slug', quindi una riga col motivo 'carrello' i giri
+  dell'orologio non la toccano e il libro mastro la segnala, in
+  qualunque stato («pagamento con un motivo che nessuno sa
+  incassare»). Per questo, prima del deploy, la domanda al database
+  (PRODUZIONE, «I CARRELLI TOLTI»).
   IL CARRELLO SI PAGA DOVE SI CONTROLLA (ago 2026, decisione di
   Andrea): la pagina del RIEPILOGO non esiste più — né il foglio
   `#setSheet` che l'aveva preceduta, né la vista
