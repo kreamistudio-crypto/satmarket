@@ -25111,7 +25111,17 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   c'e' un gemello blu (`.morfo-blu`) che cresce fino al bottone; la capsula
   se ne va con lui (`capsula-via`) e torna a casa di colpo sotto il foglio
   pieno (`posaFondoP2P` → `capsulaAPostoP2P`, cioe' `senzaCorsaP2P` sui
-  soli pezzi). CHIUDENDOLO NIENTE RITORNO: il foglio sfuma e sotto la barra
+  soli pezzi). IL + DIVENTA BLU SCENDENDO (settimo giro): una quinta pelle
+  (`.pelle-bz`, il blu e il gradino della tendina) sta sopra la rossa con
+  l'opacita' presa da `--discesa-p2p`, la discesa d su fondo che la guida
+  scrive sul tondo — a meta' corsa a meta' strada, in fondo blu pieno —,
+  con la corsa del + al tocco e al ritorno (che la toglie) e ferma col
+  dito; il bagliore rosso sta su `.pelle-rossa::after` e si spegne al
+  contrario. Il fantasma parte dal rosso che resta (`--morfo-rosso`,
+  scritta da `vestiMorfoP2P`): dal + in fondo nasce blu. La croce resta
+  bianca (5,18:1 sul rosso di giorno, 16,81:1 sul blu); di sera, sul rosso
+  a riposo (#F07A47), il bianco sta a 2,77:1 — il + di sempre, da
+  decidere. CHIUDENDOLO NIENTE RITORNO: il foglio sfuma e sotto la barra
   e' gia' a riposo (`barraSeccaP2P`), qualunque strada lo chiuda — freccia,
   gesto indietro dell'app, pubblicazione —; il foglio rosso o verde torna
   ancora nel +. Le regole rosse del fantasma escludono il blu col
@@ -25132,7 +25142,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   morfosi, che `P2P_MORFO_MS` tiene in pari), e sul telefono SOLO
   transform e opacity. Colore e forma non corrono piu': il + ha QUATTRO
   PELLI (`.pelle`: la casa quadrata del mercatino, verde, rosso,
-  arancio) e cambiare colore vuol dire accenderne un'altra — chi arriva
+  arancio; dal settimo giro una quinta, il blu del logo, che si accende
+  con la discesa del trascino) e cambiare colore vuol dire accenderne un'altra — chi arriva
   si accende sopra, chi va via resta pieno sotto e sfuma dopo la corsa,
   e lo decide lo z-index —; la BANDA e' il `nav::before`, che sfuma; le
   quattro voci della barra P2P (Esplora e le tre del P2P) hanno le loro
@@ -25149,7 +25160,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   «Il tasto Barattozon e il + neutro nel P2P», «La capsula di
   Barattozon», «La capsula col logo intero, il + che si trascina e le
   corse della barra», «Il + nella guida, la tasca e il marchio», «Il +
-  che si ferma sul logo» e «Il telaio mangiato dal +».
+  che si ferma sul logo», «Il telaio mangiato dal +» e «Il + che diventa
+  blu scendendo».
   LA SVEGLIA DEL TABACCHINO è l'emenda alla fase 6 (decisione di
   Andrea): il server impara UNA cosa — «questo account ha una scadenza
   a quest'ora» — nella tabella `p2p_sveglie` (quattro colonne, PK

@@ -30092,3 +30092,64 @@ prezzo 80 000 → 58,60 € coi costi dietro; i soli costi; la ricerca
 **DA GUARDARE SUL TELEFONO.** Il tocco sul bottoncino in «Come spedisci»
 e in Vendi con la tastiera numerica aperta, la riga che compare e se ne
 va; e che salvando i numeri convertiti arrivino giusti.
+
+## Il + che diventa blu scendendo (24 set 2026)
+
+Settimo giro sul trascino della capsula, richiesta di Andrea a 278fc7d.
+Worktree da `origin/main`, commit firmato.
+
+**COSA C'È.** Mentre scende sul logo il + passa dal rosso al blu del
+fondo del logo (#191D29) in proporzione alla discesa: a casa rosso pieno,
+a meta' corsa a meta' strada, in fondo blu pieno; rilasciato fuori torna
+rosso con la stessa corsa. Col tocco sulla tendina il colore segue la
+discesa da sola allo stesso modo, e arrivato in fondo il + e' gia' blu:
+la morfosi nel bottone «Rileggi e pubblica» parte blu, senza un
+fotogramma rosso. Negli effetti ridotti il colore segue la posizione e
+torna di colpo.
+
+**COM'È FATTO, senza nessun colore che corre.** Una quinta pelle del +
+(`.pelle-bz`, il blu e il gradino della tendina) sta SOPRA la rossa con
+l'opacita' presa da una variabile, `--discesa-p2p` (d su fondo, da 0 a
+1), che la guida scrive sul tondo; la sua corsa e' quella del +, quindi
+al tocco e al ritorno opacita' e posizione vanno al passo, e col dito
+non corre. Il rosso sotto resta pieno — due pelli che sfumano insieme
+farebbero sbiancare il tondo a meta' strada, la lezione del terzo giro
+—; a spegnersi al contrario e' il suo solo BAGLIORE, spostato su
+`.pelle-rossa::after`, che sta fuori dal cerchio e che il blu non
+coprirebbe: in fondo e' blu pieno, ombra compresa. Il fantasma di
+Barattozon parte dal rosso che il + ha ancora (`--morfo-rosso`, 1 − la
+discesa, scritta da `vestiMorfoP2P`): dal fondo nasce blu, da un
+rilascio a meta' col rosso che resta.
+
+**LA CROCE, e una cosa da decidere.** Il bianco della croce sta a
+5,18:1 sul rosso di giorno e a 16,81:1 sul blu, e sale lungo tutta la
+strada. DI SERA il rosso del + e' #F07A47 e il bianco ci sta a 2,77:1,
+sotto l'AA anche per un segno grande (3:1): e' il + a riposo di sempre,
+non di questo giro, e non l'ho toccato — scurirlo cambierebbe il + della
+sera e il rosso da cui parte la sua morfosi. Da decidere con Andrea.
+
+**PROVATO.** La suite intera, severa e senza config, sull'albero
+ribasato: 14.777 verdi e 0 rosse; i 15 collaudi della CI verdi, in
+gabbia. Le prove chiedono cinque pelli col blu per
+ultimo, il blu e il gradino della pelle presi dalla regola della
+tendina, alla cascata l'opacita' uguale alla discesa e la corsa del +
+(ferma col dito, niente negli effetti ridotti), il bagliore che si
+spegne al contrario, la croce bianca sopra il 4,5 sul blu e sul rosso di
+giorno e mai sotto il rosso lungo la strada, il ritorno che toglie la
+discesa dopo il reflow, e il fantasma che parte da 1 − discesa; il banco
+del trascino segue il colore in ogni fotogramma (meta' corsa 0,5, in
+fondo 1, fuori di nuovo rosso). **TORTURA 29/29** su una copia, tutte
+uccise al primo giro. DAL VIVO col dito vero a
+320/375/430 nei due temi: il colore VERO del + contro la mescola attesa
+a 0, 15, 27,5, 45 e 55px, entro 2 livelli; la croce bianca pura; un
+registratore a ogni fotogramma su un trascino lento giu' e su col
+ritorno, e sul tocco: l'opacita' del blu uguale alla discesa entro
+0,001; il fantasma che nasce blu dal fondo e parte da 0,364 dopo un
+rilascio a 35px; negli effetti ridotti il colore a 0,5 a meta' corsa,
+nessuna corsa CSS e il rosso di colpo al rilascio. Il banco e' stato
+provato prima sui difetti: il + che resta rosso (fino a 169 livelli di
+scarto) e il colore con una curva sua (0,28 nel tocco).
+
+**DA GUARDARE SUL TELEFONO.** Il + che si scurisce scendendo fino al
+blu del logo e ritorna rosso lasciandolo prima; il tocco che lo porta
+giu' blu; la morfosi che parte gia' blu; la croce, di sera sul rosso.

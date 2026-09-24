@@ -3206,7 +3206,11 @@
      +, sfuma dal primo fotogramma in META' della dissolvenza breve, e sotto
      di lei c'e' gia' un gemello BLU (`.morfo-blu`, un cerchio che scala con
      lei) che resta pieno e cresce fino al bottone, dove la meta blu gli
-     sfuma sopra. La meta' l'hanno decisa i fotogrammi: con la dissolvenza
+     sfuma sopra. E PARTE DAL ROSSO CHE IL + HA ANCORA (settimo giro): il +
+     sceso sul logo e' gia' blu per quanto e' sceso (IL + CHE DIVENTA BLU
+     SCENDENDO), e la forma parte da quel che resta — `--morfo-rosso`,
+     1 − discesa, scritta da vestiMorfoP2P —: in fondo zero, cioe' il
+     fantasma nasce blu e la morfosi e' continua. La meta' l'hanno decisa i fotogrammi: con la dissolvenza
      intera, a 430px, a un quinto di rosso la forma era gia' un ovale di
      105 pixel — una velatura bordeaux su qualcosa che si allunga —; con la
      meta', a 105 pixel il rosso e' zero, e l'ultimo fotogramma che ne ha
@@ -3227,6 +3231,7 @@
     background:#191D29;box-shadow:0 3px 0 #0C0E15}
   #p2pMorfo.bz .morfo-forma{transition-delay:0s,0s;
     transition-duration:var(--morfo-corsa),calc(var(--morfo-velo) / 2)}
+  #p2pMorfo.bz.parte .morfo-forma{opacity:var(--morfo-rosso)}
   body.capsula-via #navTendina{opacity:0;transition:opacity var(--morfo-velo) ease}
   /* LO STATO DI PARTENZA E' IL TONDO DELLA BARRA, colore del LATO
      compreso: verde a comprare, rosso a vendere — lo stesso giudice
@@ -4106,7 +4111,7 @@
   nav button.sell .pelle-verde{background:var(--trust);
     box-shadow:0 4px 0 var(--trust-deep),0 8px 20px rgba(27,139,84,.35)}
   nav button.sell .pelle-rossa{background:var(--danger);
-    box-shadow:0 4px 0 var(--danger-deep),0 8px 20px rgba(194,65,12,.35)}
+    box-shadow:0 4px 0 var(--danger-deep)}
   nav button.sell .pelle-arancio{background:var(--sats);
     box-shadow:0 4px 0 var(--sats-deep),0 8px 20px rgba(247,147,26,.35)}
   /* quale pelle e' accesa lo dicono le classi di sempre, e a pari catena:
@@ -4117,6 +4122,32 @@
   body.nav-p2p.p2p-piu-neutro nav button.sell .pelle-arancio{
     opacity:1;z-index:-1;transition:opacity var(--p2p-corsa) var(--p2p-curva)}
   body.nav-p2p nav button.sell .pelle-casa{
+    transition:opacity var(--p2p-corsa) var(--p2p-curva)}
+  /* IL + CHE DIVENTA BLU SCENDENDO (settimo giro, 24 set 2026, richiesta
+     di Andrea): mentre scende sul logo il + passa dal rosso al blu del
+     fondo del logo (#191D29), in proporzione alla discesa — a casa rosso
+     pieno, in fondo blu pieno, a meta' corsa a meta' strada —, e tornando
+     su torna rosso con la stessa corsa. NESSUN COLORE CHE CORRE: e' una
+     QUINTA PELLE blu col gradino della tendina (#0C0E15), SOPRA la rossa,
+     la cui opacita' e' la discesa — una variabile che il dito scrive sul
+     tondo (`--discesa-p2p`, da 0 a 1: guidaCursoreP2P), cioe' uno strato
+     che si accende, sul compositor. Al tocco sulla tendina la variabile
+     salta a 1 e la corsa della barra la porta al passo del +; al ritorno
+     la si toglie, con la stessa corsa.
+     IL ROSSO SOTTO RESTA PIENO: due pelli che sfumano insieme lascerebbero
+     passare la banda a meta' strada (vedi LA PELLE DEL +). A spegnersi al
+     contrario e' il solo suo BAGLIORE, che sta fuori dal cerchio e che il
+     blu non coprirebbe: in fondo il + e' blu pieno, ombra compresa.
+     LA CROCE RESTA BIANCA: 5,18:1 sul rosso di giorno e 16,81:1 sul blu,
+     e il contrasto sale lungo tutta la strada. ⚠️ Di sera il rosso del +
+     e' #F07A47 e il bianco ci sta a 2,77:1: e' il + a riposo di sempre,
+     non di questo giro, e resta da decidere. */
+  nav button.sell .pelle-bz{background:#191D29;box-shadow:0 4px 0 #0C0E15;
+    z-index:-1;opacity:var(--discesa-p2p,0);
+    transition:opacity var(--p2p-corsa) var(--p2p-curva)}
+  nav button.sell .pelle-rossa::after{content:'';position:absolute;inset:0;
+    border-radius:inherit;box-shadow:0 8px 20px rgba(194,65,12,.35);
+    opacity:calc(1 - var(--discesa-p2p,0));
     transition:opacity var(--p2p-corsa) var(--p2p-curva)}
   nav button.sell{color:var(--ink-soft)}
   nav button.sell.active{color:var(--sats-deep)}
@@ -4358,7 +4389,7 @@
   @media (prefers-reduced-motion:reduce){
     nav .nav-cella>.strato-p2p,
     nav button,nav,nav::before,nav .nav-cella>button,nav button.sell .ic,
-    nav button.sell .pelle,nav .tinta,
+    nav button.sell .pelle,nav button.sell .pelle-rossa::after,nav .tinta,
     nav button.sell .eti-pila>span{transition:none}
   }
 
@@ -4489,6 +4520,9 @@
      transform, e al rilascio (classe tolta) torna a casa con la corsa di
      sempre */
   body.p2p-trascina nav button.sell .ic{transition:none}
+  /* ...e il suo colore con lui (IL + CHE DIVENTA BLU SCENDENDO) */
+  body.p2p-trascina nav button.sell .pelle-bz,
+  body.p2p-trascina nav button.sell .pelle-rossa::after{transition:none}
   /* ====== IL CURSORE NELLA GUIDA (24 set 2026, ritocco di Andrea) ======
      Trascinato, il + non fluttua piu' dietro al dito: scorre SOLO in
      verticale, incastrato fra i fianchi della capsula come un cursore in
@@ -10729,7 +10763,7 @@ document.getElementById('cartello')?.remove();</script>
          trasforma (vedi il CSS della nav trasformata). Le DUE
          etichette stanno impilate in .eti-pila: «Pubblica» esiste
          solo da desktop, dove il + resta una pillola. -->
-    <button id="nav-vendi" class="sell" onclick="toccaPiu()"><span class="ic"><i class="pelle pelle-casa"></i><i class="pelle pelle-verde"></i><i class="pelle pelle-rossa"></i><i class="pelle pelle-arancio"></i>＋</span><span class="eti-pila"><span class="eti">Vendi</span><span class="eti eti-p2p">Pubblica</span></span></button>
+    <button id="nav-vendi" class="sell" onclick="toccaPiu()"><span class="ic"><i class="pelle pelle-casa"></i><i class="pelle pelle-verde"></i><i class="pelle pelle-rossa"></i><i class="pelle pelle-arancio"></i><i class="pelle pelle-bz"></i>＋</span><span class="eti-pila"><span class="eti">Vendi</span><span class="eti eti-p2p">Pubblica</span></span></button>
     <!-- Aste: il MARTELLETTO (ago 2026). Il markup della barra e'
          STATICO — a leva spenta il tasto resta e porta al suo «coming
          soon» (vaiAste), mai una cella accesa e spenta a runtime, che
@@ -49712,14 +49746,17 @@ function senzaCorsaP2P(pezzi, fai){
   pezzi.forEach(x => { x.style.transition = ''; });
 }
 function pezziCapsulaP2P(){
-  return [tondoBarraP2P(), el('navTendina'), el('navBarattozon')];
+  return [tondoBarraP2P(), el('navTendina'), el('navBarattozon'),
+          document.querySelector('#nav-vendi .pelle-bz')];
 }
 /* LA CAPSULA A CASA, com'e' a riposo: il +, il telaio e la tendina senza
-   le transform del dito, le classi del gesto spente, niente che sfumi.
-   Lo STATO soltanto: come ci si arriva lo dice chi la chiama. */
+   le transform del dito, il + rosso, le classi del gesto spente, niente
+   che sfumi. Lo STATO soltanto: come ci si arriva lo dice chi la chiama. */
 function capsulaCasaP2P(){
-  for (const x of [tondoBarraP2P(), el('navTendina'), el('navBarattozon')])
+  const tondo = tondoBarraP2P();
+  for (const x of [tondo, el('navTendina'), el('navBarattozon')])
     if (x) x.style.transform = '';
+  if (tondo) tondo.style.removeProperty('--discesa-p2p');
   clearTimeout(p2pBinarioTimer);
   document.body.classList.remove('p2p-trascina', 'p2p-sopra', 'p2p-binario', 'capsula-via');
 }
@@ -49780,8 +49817,9 @@ function tempiMorfoP2P(){
 }
 
 /* il fantasma prende la MISURA e il POSTO del bottone d'arrivo, piu' le
-   quattro variabili che dicono da dove parte */
-function vestiMorfoP2P(g, da, a, eti, bottone){
+   quattro variabili che dicono da dove parte — e la quinta, quanto rosso
+   ha ancora il + (`rosso`, 1 se non si dice: vedi IL + CHE DIVENTA BLU) */
+function vestiMorfoP2P(g, da, a, eti, bottone, rosso){
   const m = morfosiP2P(da, a);
   g.style.left = a.left + 'px';
   g.style.top = a.top + 'px';
@@ -49791,6 +49829,7 @@ function vestiMorfoP2P(g, da, a, eti, bottone){
   g.style.setProperty('--morfo-y', m.y + 'px');
   g.style.setProperty('--morfo-sx', m.sx);
   g.style.setProperty('--morfo-sy', m.sy);
+  g.style.setProperty('--morfo-rosso', rosso == null ? 1 : rosso);
   /* L'ETICHETTA SI COPIA dal bottone vero e non si riscrive: due
      scritte uguali in due posti divergono al primo ritocco. */
   const e = g.querySelector('.morfo-eti');
@@ -49885,10 +49924,14 @@ function apriMorfoP2P(){
      l'ha portato il dito (o il tocco sulla tendina, che ce lo porta da
      solo). Col bottone di Barattozon — la classe `bz`, che il fantasma
      prende dal bottone — il rosso sfuma finche' e' tondo e la capsula se
-     ne va con lui (vedi LA MORFOSI DAL + IN FONDO). */
+     ne va con lui (vedi LA MORFOSI DAL + IN FONDO). E parte dal COLORE
+     del +: sceso sul logo e' gia' blu per quanto e' sceso, e il rosso del
+     fantasma parte da quel che resta — in fondo niente. */
   const bz = meta.classList.contains('bz');
+  const discesa = parseFloat(tondo.style.getPropertyValue('--discesa-p2p')) || 0;
   vestiMorfoP2P(g, tondo.getBoundingClientRect(),
-                meta.getBoundingClientRect(), meta.textContent, meta);
+                meta.getBoundingClientRect(), meta.textContent, meta,
+                bz ? 1 - discesa : 1);
   document.body.classList.toggle('capsula-via', bz);
   celaVeriP2P(true);
   g.classList.add('acceso', 'parte');
@@ -50010,7 +50053,8 @@ function apriBarattozonP2P(){
    e' l'equatore del cerchio) e la tendina risale dello stesso tanto,
    cioe' resta ferma mentre il suo taglio scende — sopra il + non resta
    niente, dal sesto giro nemmeno il filo (vedi IL TELAIO MANGIATO DAL +,
-   nel CSS). Quindi
+   nel CSS) — e il + passa dal rosso al blu del logo quanto e' sceso (IL +
+   CHE DIVENTA BLU SCENDENDO, nel CSS). Quindi
    «sopra la tendina» non e' piu' dove sta il dito ma dove sta il +: da
    meta' corsa in giu'. E lasciato li' il + NON torna a casa: diventa lui
    il bottone blu (vedi lasciaSulLogoP2P).
@@ -50112,7 +50156,7 @@ function trascinoMuoveP2P(e){
   }
   /* il dito di lato non sposta niente: il + scorre solo nella sua guida */
   const d = corsaCursoreP2P(dy, t.max);
-  guidaCursoreP2P(t.su + d, d);
+  guidaCursoreP2P(t.su + d, d, t.max);
   const sopra = sopraTendinaP2P(d, t.max);
   if (sopra !== t.sopra) {
     t.sopra = sopra;
@@ -50135,8 +50179,8 @@ function lasciaSulLogoP2P(){
 /* IL TOCCO SULLA TENDINA FA IL TRASCINO DA SOLO (quinto giro, 24 set 2026,
    ripensamento di Andrea): il + scende nella guida fino in fondo, con la
    corsa della barra — telaio e tendina con lui, la capsula mangiata
-   dietro di lui, la luce che si accende come quando il dito lo porta
-   sopra —, si
+   dietro di lui, il + che si fa blu, la luce che si accende come quando
+   il dito lo porta sopra —, si
    blocca e diventa il bottone blu: dopo la corsa, lasciaSulLogoP2P, come
    al rilascio. Tastiera compresa: Invio e spazio passano di qui.
    DOVE NON SCENDE: dove la morfosi non c'e' (effetti ridotti, schermo
@@ -50156,7 +50200,7 @@ function toccaTendinaP2P(){
      senza il suo .1s solo con lei, e la corsa deve partire insieme */
   document.body.classList.add('p2p-binario', 'p2p-sopra');
   void document.body.offsetWidth;
-  guidaCursoreP2P(guida.su + guida.max, guida.max);
+  guidaCursoreP2P(guida.su + guida.max, guida.max, guida.max);
   p2pDiscesaTimer = setTimeout(() => {
     p2pDiscesaTimer = null;
     lasciaSulLogoP2P();
@@ -50165,12 +50209,16 @@ function toccaTendinaP2P(){
 /* il + a quota `y` nella guida, e la tendina tagliata alla sua cintura:
    il telaio scende di `d` con lui, la tendina risale di `d` e resta ferma.
    Il taglio del telaio E' il ritaglio del contorno: sopra il + non resta
-   niente, e qui non si scrive nessuna opacita' (IL TELAIO MANGIATO DAL +) */
-function guidaCursoreP2P(y, d){
+   niente, e sulla capsula non si scrive nessuna opacita' (IL TELAIO
+   MANGIATO DAL +). Sul + si scrive la DISCESA, d su `max` da 0 a 1: e' la
+   variabile che accende il suo blu (IL + CHE DIVENTA BLU SCENDENDO) */
+function guidaCursoreP2P(y, d, max){
   const tondo = tondoBarraP2P(), tel = el('navTendina'), tend = el('navBarattozon');
   if (tondo) tondo.style.transform = 'translateY(' + y + 'px)';
   if (tel) tel.style.transform = 'translateY(' + d + 'px)';
   if (tend) tend.style.transform = 'translateY(' + (-d) + 'px)';
+  if (tondo) tondo.style.setProperty('--discesa-p2p',
+                                     max > 0 ? Math.min(1, Math.max(0, d / max)) : 0);
 }
 function trascinoSuP2P(e){
   const t = p2pTrascino;
@@ -50215,6 +50263,8 @@ function rientraCursoreP2P(){
   if (tondo) void tondo.offsetWidth;
   for (const x of [tondo, el('navTendina'), el('navBarattozon')])
     if (x) x.style.transform = '';
+  /* ...e il + torna rosso con la stessa corsa */
+  if (tondo) tondo.style.removeProperty('--discesa-p2p');
   clearTimeout(p2pBinarioTimer);
   p2pBinarioTimer = setTimeout(() => document.body.classList.remove('p2p-binario'),
                                P2P_MORFO_MS + 30);
