@@ -30789,3 +30789,87 @@ Pubblicare dal pannello quando Luca dice sì: da lì la pagina esce sul suo
 negozio, il logo entra nella card dei Consigliati e il banner nella loro
 pagina. 5) Sul telefono: il logo nella card (il riquadro bruno sul
 bruno) nei due temi.
+
+## Il contorno arancio del + che diventa blu (24 set 2026)
+
+Ottavo giro sul trascino della capsula, richiesta di Andrea a 8bc0a99.
+Worktree da `origin/main`, commit firmato. Nessuna riga di JS: CSS e un
+`<i>` nel fantasma.
+
+**COSA C'È.** Blu sulla banda scura, il + in fondo si perdeva. Adesso,
+man mano che il blu si accende, il contorno del + e il bagliore attorno
+si fanno ARANCIO — quello della freccia del logo — in proporzione alla
+discesa: a casa il contorno e il bagliore di sempre, rossi; in fondo un
+filo arancio pieno e un bagliore corto; lasciato prima, tornano come
+prima con la stessa corsa. Negli effetti ridotti seguono la posizione,
+senza corse.
+
+**COM'È FATTO, senza colori che corrono e senza conti nuovi.** Il
+contorno e' il `::before` della pelle blu del settimo giro: ne eredita
+l'opacita' (la discesa), la corsa, il dito che la ferma e gli effetti
+ridotti. L'arancio e' #FE8400, misurato sui pixel della freccia di
+`barattozon-tasto.webp` (nessun token lo portava: `--sats` e' un altro).
+Un filo di 2,5px DENTRO il cerchio, lo spessore del filo della capsula,
+e un bagliore FUORI di 5px: a 320 la scritta «Libro ordini» sta a 6,9px
+dal + posato (14,2 a 375, 25,1 a 430), e i tre bagliori provati prima
+davano zero pixel sulle voci. Niente bagliore dentro, che schiarirebbe
+il fondo della croce.
+
+**LA MORFOSI: SPENTO, NON SFUMATO NEL BOTTONE (la proposta).** Il
+bottone «Rileggi e pubblica» non ha bordo arancio, e dargliene uno
+cambierebbe il bottone in ogni sua apparizione — e un filo che segue la
+meta scalata si assottiglierebbe ai lati. Quindi il contorno accompagna
+il + fino alla partenza e SI SPEGNE in meta' della dissolvenza breve
+(64ms) mentre il blu si allunga: un cerchio di 54px nel fantasma
+(`.morfo-bordo`) che trasla col centro del + senza scalare. Volerlo sul
+bottone e' un ritocco del bottone, da decidere a parte.
+
+**IL DIFETTO TROVATO PRIMA DEL BANCO, ed e' la lezione.** Nella prima
+stesura il filo del fantasma stava SOPRA la forma rossa col peso della
+discesa. Nel + il filo e' della pelle blu, posata sulla rossa piena; nel
+fantasma gli strati sono al rovescio (gemello blu pieno sotto, forma col
+rosso che resta sopra), e TRE STRATI NON SI SCAMBIANO COME DUE: lasciato
+sul logo a meta' corsa il filo partiva piu' scuro di un quarto della
+strada fra il rosso e il blu, una cinquantina di livelli. Adesso il filo
+sta FRA il gemello e la forma, pieno da meta' corsa — il doppio della
+discesa: da li' il logo si accende (`sopraTendinaP2P`), e ogni partenza
+vera ha la discesa da ½ in su —, e il bagliore e' il suo `::after` col
+peso della discesa: il conto torna identico a ogni discesa, e un
+fantasma partito dal + a casa non mostra arancio nemmeno mentre il rosso
+sfuma. Una prova rifa' quei conti sull'ordine del markup e sui pesi
+della cascata, e un'altra chiede che filo e forma sfumino insieme (la
+cascata letta col moto acceso: il giudice non guarda le @media, e la
+`transition:none` degli effetti ridotti per lui vinceva sulla forma).
+
+**PROVATO.** La suite intera, severa e senza config, sull'albero
+ribasato sul link nel «Condividi»: 15.096 verdi e 0 rosse; i 17
+collaudi della CI verdi, in gabbia. Main correva: dopo l'ultimo rebase
+(«Un tempo per te», che la capsula non la tocca) le sezioni della
+capsula e quelle toccate, 1.098 verdi, e di nuovo i 17 collaudi; la
+suite intera sul commit la rifa' la CI. Le prove chiedono il contorno
+come strato della
+pelle blu senza opacita' sua, l'arancio uguale alla mediana dei pixel
+della freccia (letta dal file, a meno di 3) nel filo e nel bagliore, un
+filo solo dentro e un bagliore corto fuori; nel fantasma il filo fra il
+gemello e la forma, i due pezzi dell'ombra del +, il centro sul +, la
+partenza piena da meta' corsa, i conti, la dissolvenza insieme alla
+forma, gli effetti ridotti. **TORTURA 31/31 su una copia, tutte uccise
+al primo giro.** DAL VIVO col dito vero
+a 320/375/430 nei due temi: il filo del + contro la mescola
+rosso→arancio a 0, ¼, ½, 0,8 e 1 della corsa entro 1,3 livelli, la
+croce bianca pura, il bagliore che cresce da zero; in fondo ZERO pixel
+diversi sulle voci con e senza lo strato; un registratore a ogni
+fotogramma (l'opacita' del blu, quindi del contorno, uguale alla
+discesa entro 0,001); la partenza della morfosi FERMATA al suo primo
+istante contro il + un attimo prima, in fondo e a 35px: filo entro 1,1
+livelli, bagliore entro 2,3, centro esatto; il filo del fantasma che si
+spegne in 65-68ms senza mai risalire; negli effetti ridotti niente corse
+e niente fantasma. Il banco provato prima sui difetti: un bagliore largo
+(fino a 2.416 pixel sulle voci a 320), il filo che manca (229 livelli),
+il filo del fantasma sopra la forma — la prima stesura — (40-50 livelli
+alla partenza a 35px) e il fantasma senza contorno (229).
+
+**DA GUARDARE SUL TELEFONO.** Il + che scende e si accende d'arancio sul
+blu; il bagliore che a 320 non tocca «Libro ordini»; la morfosi da un
+rilascio a meta' corsa e dal fondo. Resta da decidere, dal settimo giro,
+la croce bianca sul rosso della sera (2,77:1).

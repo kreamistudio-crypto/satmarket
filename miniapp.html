@@ -3232,6 +3232,36 @@
   #p2pMorfo.bz .morfo-forma{transition-delay:0s,0s;
     transition-duration:var(--morfo-corsa),calc(var(--morfo-velo) / 2)}
   #p2pMorfo.bz.parte .morfo-forma{opacity:var(--morfo-rosso)}
+  /* ...E IL CONTORNO ARANCIO DEL + SI SPEGNE MENTRE IL + SI ALLUNGA
+     (ottavo giro). Il bottone d'arrivo non ha bordo arancio, e ci arriva
+     com'e': il contorno si spegne in meta' della dissolvenza breve mentre
+     il blu cresce, e parte IDENTICO a quello del + posato — un cerchio di
+     54px sul + che NON SCALA, trasla col suo centro (un filo scalato col
+     bottone si assottiglierebbe di lato).
+     IDENTICO PERCHE' STA DOVE STA NEL +: li' il filo e' della pelle blu,
+     che si posa col peso della discesa sulla rossa piena; nel fantasma e'
+     il rovescio — gemello blu pieno sotto, forma rossa sopra col rosso che
+     resta —, quindi il filo sta SOPRA IL GEMELLO E SOTTO LA FORMA, pieno:
+     il rosso che resta sopra l'arancio e' il filo del + a ogni discesa.
+     Messo sopra la forma col peso della discesa, a meta' corsa partiva
+     piu' scuro di un quarto della strada fra il rosso e il blu.
+     PIENO DA META' CORSA, che e' la soglia del logo (sopraTendinaP2P): ogni
+     partenza vera ha la discesa da 1/2 in su. Il doppio della discesa, e
+     non «pieno sempre», perche' un fantasma partito dal + a casa
+     (discesa 0) non mostri arancio nemmeno mentre il rosso sfuma.
+     Il bagliore e' il suo ::after, fuori dal cerchio dove la forma non
+     copre, col peso della discesa come sul +. */
+  #p2pMorfo .morfo-bordo{display:none}
+  #p2pMorfo.bz .morfo-bordo{display:block;inset:auto;left:50%;top:50%;
+    width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;
+    box-shadow:inset 0 0 0 2.5px #FE8400;opacity:0;
+    transition:transform var(--morfo-corsa) var(--morfo-curva),
+      opacity calc(var(--morfo-velo) / 2) ease}
+  #p2pMorfo.bz .morfo-bordo::after{content:'';position:absolute;inset:0;
+    border-radius:inherit;box-shadow:0 0 5px rgba(254,132,0,.65);
+    opacity:calc(1 - var(--morfo-rosso))}
+  #p2pMorfo.bz.parte .morfo-bordo{opacity:min(1,calc(2 * (1 - var(--morfo-rosso))));
+    transform:translate(var(--morfo-x),var(--morfo-y))}
   body.capsula-via #navTendina{opacity:0;transition:opacity var(--morfo-velo) ease}
   /* LO STATO DI PARTENZA E' IL TONDO DELLA BARRA, colore del LATO
      compreso: verde a comprare, rosso a vendere — lo stesso giudice
@@ -3310,7 +3340,8 @@
      difetto, resterebbe fermo invece di volare */
   @media (prefers-reduced-motion:reduce){
     #p2pMorfo .morfo-forma,#p2pMorfo .morfo-meta,#p2pMorfo .morfo-glifo,
-    #p2pMorfo .morfo-eti,#p2pMorfo .morfo-blu,nav .nav-lato{transition:none}
+    #p2pMorfo .morfo-eti,#p2pMorfo .morfo-blu,#p2pMorfo .morfo-bordo,
+    nav .nav-lato{transition:none}
   }
 
   /* ---- IL DETTAGLIO DI UN ORDINE DEL LIBRO (set 2026) ----
@@ -4149,6 +4180,19 @@
     border-radius:inherit;box-shadow:0 8px 20px rgba(194,65,12,.35);
     opacity:calc(1 - var(--discesa-p2p,0));
     transition:opacity var(--p2p-corsa) var(--p2p-curva)}
+  /* IL CONTORNO ARANCIO DEL + CHE DIVENTA BLU (ottavo giro, 24 set 2026,
+     richiesta di Andrea): blu sulla banda scura, il + in fondo si perdeva.
+     Man mano che il blu si accende, contorno e bagliore si fanno ARANCIO,
+     quello della freccia del logo — #FE8400, misurato sui pixel della
+     freccia di barattozon-tasto.webp, che nessun token portava. E' uno
+     strato DELLA PELLE BLU, il suo ::before: ne ha l'opacita' (la
+     discesa), la corsa e gli effetti ridotti, e nessun conto suo.
+     Il contorno e' un filo di 2,5px DENTRO il cerchio, lo spessore del filo
+     della capsula; il bagliore sta fuori ed e' CORTO, 5px: a 320 la scritta
+     «Libro ordini» sta a 6,9px dal + posato, e le voci non si toccano.
+     Niente bagliore dentro, che schiarirebbe il fondo della croce. */
+  nav button.sell .pelle-bz::before{content:'';position:absolute;inset:0;
+    border-radius:inherit;box-shadow:inset 0 0 0 2.5px #FE8400,0 0 5px rgba(254,132,0,.65)}
   nav button.sell{color:var(--ink-soft)}
   nav button.sell.active{color:var(--sats-deep)}
   /* Lo SPAZIATORE della barra NON ESISTE PIU' (ago 2026, e una
@@ -10964,6 +11008,7 @@ document.getElementById('cartello')?.remove();</script>
        MORFOSI DAL + IN FONDO). -->
   <div id="p2pMorfo" aria-hidden="true">
     <i class="morfo-blu"></i>
+    <i class="morfo-bordo"></i>
     <i class="morfo-forma"></i>
     <i class="morfo-meta"></i>
     <span class="morfo-glifo">＋</span>

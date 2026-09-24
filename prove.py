@@ -53624,6 +53624,52 @@ def prove_tasto_barattozon():
            "transition:opacity var(--p2p-corsa) var(--p2p-curva)" in _bagliore + "}",
            "body.p2p-trascina nav button.sell .pelle-bz,\n"
            "  body.p2p-trascina nav button.sell .pelle-rossa::after{transition:none}" in css])
+    # IL CONTORNO ARANCIO DEL + CHE DIVENTA BLU (ottavo giro, richiesta di
+    # Andrea): uno strato DELLA pelle blu — il suo ::before, quindi con la
+    # sua opacita' (la discesa), la sua corsa e i suoi effetti ridotti, e
+    # nessuna opacita' sua —. Un filo di 2,5px dentro il cerchio e un
+    # bagliore fuori e CORTO: a 320 la prima voce sta a 6,9px dal + posato.
+    # Niente bagliore dentro, che schiarirebbe il fondo della croce.
+    # L'arancio e' quello della freccia del logo, letto dai suoi pixel.
+    _anello = _regola(css, "  nav button.sell .pelle-bz::before{", "}")
+    _ombra_an = _dichiarazione(_anello, "box-shadow") or ""
+    _pezzi_an = [x.strip() for x in re.split(r",(?![^(]*\))", _ombra_an) if x.strip()]
+    _dentro_an = [x for x in _pezzi_an if x.startswith("inset")]
+    _fuori_an = [x for x in _pezzi_an if not x.startswith("inset")]
+    def _portata(ombra):
+        """quanto va lontano un'ombra: scostamento + sfocatura + allargamento"""
+        lung = [float(t[:-2] if t.endswith("px") else t) for t in ombra.split()
+                if re.fullmatch(r"-?[\d.]+(px)?", t)] + [0.0] * 4
+        return max(abs(lung[0]), abs(lung[1])) + lung[2] + lung[3]
+    prova("il contorno arancio e' uno strato della pelle blu: un filo di 2,5px "
+          "dentro il cerchio e un bagliore corto fuori (meno dei 6,9px che a 320 "
+          "lo separano dalla prima voce), nessun bagliore dentro e nessuna "
+          "opacita' sua", [True, ["inset 0 0 0 2.5px #FE8400"], 1, True, None],
+          ["content:'';position:absolute;inset:0;" in _anello, _dentro_an, len(_fuori_an),
+           bool(_fuori_an) and _portata(_fuori_an[0]) < 6.9,
+           _dichiarazione(_anello, "opacity")])
+    # L'ARANCIO DELLA FRECCIA si legge dal file del logo: la mediana dei
+    # pixel pieni della freccia (un WebP ridecodificato puo' spostarne uno di
+    # un'unita', quindi a meno di 3); il filo e il bagliore sono lo stesso
+    try:
+        from PIL import Image as _Img
+        _byte = _Img.open("assets/barattozon-tasto.webp").convert("RGBA").tobytes()
+        _px_fr = [tuple(_byte[i:i + 4]) for i in range(0, len(_byte), 4)]
+        _px_fr = [p_ for p_ in _px_fr if p_[3] > 250 and p_[0] > 180 and 60 < p_[1] < 190
+                  and p_[2] < 90 and p_[0] - p_[2] > 120]
+        _freccia = (tuple(sorted(p_[i] for p_ in _px_fr)[len(_px_fr) // 2] for i in range(3))
+                    if len(_px_fr) > 100 else None)
+    except Exception:
+        _freccia = None
+    _hex_an = re.search(r"inset 0 0 0 2\.5px #([0-9A-Fa-f]{6})", _ombra_an)
+    _rgb_an = tuple(int(_hex_an.group(1)[i:i + 2], 16) for i in (0, 2, 4)) if _hex_an else None
+    _rgba_an = re.search(r"rgba\((\d+),(\d+),(\d+),", _ombra_an)
+    prova("...l'arancio e' quello della freccia del logo (la mediana dei suoi pixel "
+          "in barattozon-tasto.webp, a meno di 3), uguale nel filo e nel bagliore",
+          [True, True],
+          [bool(_freccia and _rgb_an)
+           and max(abs(a_ - b_) for a_, b_ in zip(_freccia, _rgb_an)) <= 3,
+           bool(_rgba_an and _rgb_an) and tuple(int(x) for x in _rgba_an.groups()) == _rgb_an])
     # LA CROCE RESTA BIANCA E LEGGIBILE: bianco (il colore del tondo) sul
     # blu, e sul rosso di giorno, sopra il 4,5; e lungo la strada il
     # contrasto non scende mai sotto quello del rosso da cui parte, nei due
@@ -62107,7 +62153,8 @@ def prove_p2p_pubblica():
     # ...e in reduced-motion stanno ferme come tutta la barra
     prova("...e in reduced-motion restano ferme", True,
           "#p2pMorfo .morfo-forma,#p2pMorfo .morfo-meta,#p2pMorfo .morfo-glifo,\n"
-          "    #p2pMorfo .morfo-eti,#p2pMorfo .morfo-blu,nav .nav-lato{transition:none}"
+          "    #p2pMorfo .morfo-eti,#p2pMorfo .morfo-blu,#p2pMorfo .morfo-bordo,\n"
+          "    nav .nav-lato{transition:none}"
           in stile)
     # LE DUE CLASSI HANNO DUE VITE DIVERSE, e per questo sono due:
     # `barra-via` vale dalla partenza dell'andata alla partenza del
@@ -62186,10 +62233,11 @@ def prove_p2p_pubblica():
     # G) IL FANTASMA. Tre strati, e NON e' un foglio: la pila della
     #    cronologia censisce `.sheet.open`, e un quarto strato li'
     #    dentro costerebbe un gradino di indietro per niente.
-    prova("il fantasma c'e', coi suoi strati: il gemello blu, la forma, la meta, "
-          "il glifo e la scritta", True,
+    prova("il fantasma c'e', coi suoi strati: il gemello blu, il contorno "
+          "arancio, la forma, la meta, il glifo e la scritta", True,
           '<div id="p2pMorfo" aria-hidden="true">\n'
           '    <i class="morfo-blu"></i>\n'
+          '    <i class="morfo-bordo"></i>\n'
           '    <i class="morfo-forma"></i>\n'
           '    <i class="morfo-meta"></i>\n'
           '    <span class="morfo-glifo">＋</span>\n'
@@ -62376,14 +62424,170 @@ console.log(JSON.stringify(out));
             _fantasma(_V, _BZ, _BLU).get("border-radius")],
            [_fantasma(_V, ["acceso"], _FORMA, props=["transition-delay"]).get("transition-delay"),
             _fantasma(_V, ["acceso"], _BLU, props=["display"]).get("display")]])
+    # IL CONTORNO ARANCIO SI SPEGNE MENTRE IL + SI ALLUNGA (ottavo giro):
+    # col vestito blu il fantasma porta un cerchio grande come il +, col
+    # contorno del + in due pezzi — il FILO (la parte `inset` della sua
+    # ombra) sul cerchio, il BAGLIORE (l'altra) nel suo ::after col peso
+    # della discesa, lette tutte e due dalla regola del + —; in partenza il
+    # filo e' pieno dalla soglia del logo (il doppio della discesa, fino a
+    # 1: vedi i conti qui sotto), trasla col centro del + senza scalare — un
+    # filo scalato si assottiglierebbe di lato — e sfuma in meta' della
+    # dissolvenza breve; il bottone d'arrivo ci arriva com'e'. Senza
+    # vestito blu non c'e'.
+    _BORDO = ("i", "morfo-bordo")
+    _an_piu = re.search(r"nav button\.sell \.pelle-bz::before\{[^}]*?box-shadow:([^;}]+)", stile)
+    _an_pezzi = ([x.strip() for x in re.split(r",(?![^(]*\))", _an_piu.group(1)) if x.strip()]
+                 if _an_piu else [])
+    _an_filo = next((x for x in _an_pezzi if x.startswith("inset")), None)
+    _an_luce = next((x for x in _an_pezzi if not x.startswith("inset")), None)
+    _lato_piu = re.search(r"  nav button\.sell \.ic\{\s*width:(\d+)px;height:(\d+)px;", stile)
+    _spazi = lambda v: re.sub(r"\s+", " ", v) if v else v
+    _i_luce = stile.find("  #p2pMorfo.bz .morfo-bordo::after{")
+    _luce_f = stile[_i_luce:stile.find("}", _i_luce)] if _i_luce >= 0 else ""
+    def _decl_f(testo, p):
+        m = re.search(r"(?<![-\w])" + re.escape(p) + r":([^;}]*)", testo)
+        return _spazi(m.group(1)).strip() if m else None
+    prova("col vestito blu il fantasma porta il contorno arancio del +: il filo sul "
+          "cerchio grande come il +, il bagliore nel suo ::after col peso della "
+          "discesa — i due pezzi dell'ombra del + —; in partenza il filo e' pieno "
+          "dalla soglia del logo, parte sul centro del + e trasla col suo centro senza "
+          "scalare, e sfuma in meta' della dissolvenza breve; senza vestito blu non c'e'",
+          [[True, "block", (_lato_piu.group(1) + "px") if _lato_piu else None,
+            (_lato_piu.group(2) + "px") if _lato_piu else None, "50%", _an_filo,
+            ["50%", "50%", ("-%gpx 0 0 -%gpx" % (int(_lato_piu.group(2)) / 2,
+                                                  int(_lato_piu.group(1)) / 2))
+                           if _lato_piu else None]],
+           [True, _an_luce, "calc(1 - var(--morfo-rosso))"],
+           ["min(1,calc(2 * (1 - var(--morfo-rosso))))",
+            "translate(var(--morfo-x),var(--morfo-y))"],
+           "transform var(--morfo-corsa) var(--morfo-curva), "
+           "opacity calc(var(--morfo-velo) / 2) ease",
+           "none"],
+          [[bool(_an_filo and _an_luce),
+            _fantasma(_V, _BZ, _BORDO, props=["display"]).get("display"),
+            _fantasma(_V, _BZ, _BORDO, props=["width"]).get("width"),
+            _fantasma(_V, _BZ, _BORDO, props=["height"]).get("height"),
+            _fantasma(_V, _BZ, _BORDO).get("border-radius"),
+            _fantasma(_V, _BZ, _BORDO).get("box-shadow"),
+            [_fantasma(_V, _BZ, _BORDO, props=[k]).get(k) for k in ("left", "top", "margin")]],
+           ["content:'';position:absolute;inset:0;" in _luce_f,
+            _decl_f(_luce_f, "box-shadow"), _decl_f(_luce_f, "opacity")],
+           [_fantasma(_V, _BZ + ["parte"], _BORDO, props=["opacity"]).get("opacity"),
+            _fantasma(_V, _BZ + ["parte"], _BORDO, props=["transform"]).get("transform")],
+           _spazi(_fantasma(_V, _BZ, _BORDO, props=["transition"]).get("transition")),
+           _fantasma(_V, ["acceso"], _BORDO, props=["display"]).get("display")])
+    # LA PARTENZA DEL FILO, FATTA DI CONTI. Gli strati del fantasma non hanno
+    # z-index: dipingono nell'ordine del markup, e i pesi si leggono dalla
+    # cascata. Sul + il filo e' della pelle blu, posata col peso della
+    # discesa p sulla rossa piena: rosso·(1−p) + arancio·p. Nel fantasma alla
+    # partenza — il gemello blu pieno, poi il filo e la forma col loro peso,
+    # nell'ordine in cui stanno — deve fare LO STESSO NUMERO a ogni discesa
+    # dalla soglia del logo (meta' corsa, sopraTendinaP2P) in giu': col filo
+    # sopra la forma, a meta' corsa usciva piu' scuro di un quarto della
+    # strada fra il rosso e il blu. E mentre filo e forma sfumano insieme —
+    # stessa durata, stessa curva, nessun ritardo: lette qui sotto —
+    # l'arancio che si vede non cresce mai e non supera quello del +; col
+    # fantasma partito dal + a casa (p = 0) e' zero dall'inizio alla fine.
+    _strati_f = re.search(r'<div id="p2pMorfo"[^>]*>([\s\S]*?)</div>', mini)
+    _ordine_f = re.findall(r'class="(morfo-[a-z]+)"', _strati_f.group(1)) if _strati_f else []
+    def _peso_f(espr, rosso):
+        """un'opacita' della cascata fatta numero: var(--morfo-rosso) → il rosso che resta"""
+        if not espr:
+            return None
+        e = espr.replace("var(--morfo-rosso)", repr(rosso)).replace("calc(", "(")
+        if not re.fullmatch(r"(?:min|[\d.\s()+\-*/,])*", e):
+            return None
+        try:
+            return max(0.0, min(1.0, float(eval(e, {"__builtins__": {}, "min": min}))))
+        except Exception:
+            return None
+    _w_filo = _fantasma(_V, _BZ + ["parte"], _BORDO, props=["opacity"]).get("opacity")
+    _w_forma = _fantasma(_V, _BZ + ["parte"], _FORMA, props=["opacity"]).get("opacity")
+    def _filo_f(p, e, colori):
+        """il colore del filo del fantasma a un punto e (0..1) della dissolvenza"""
+        pesi = {"morfo-blu": 1.0, "morfo-bordo": _peso_f(_w_filo, 1 - p),
+                "morfo-forma": _peso_f(_w_forma, 1 - p)}
+        px = colori["fondo"]
+        for n in _ordine_f:
+            if n in pesi:
+                a = float("nan") if pesi[n] is None else pesi[n] * (1 if n == "morfo-blu" else 1 - e)
+                px = tuple(c * a + x * (1 - a) for x, c in zip(px, colori[n]))
+        return px
+    _danger_f = re.search(r"--danger:#([0-9A-Fa-f]{6})", stile)
+    _veri = {"fondo": (255.0, 255.0, 255.0),
+             "morfo-forma": tuple(int(_danger_f.group(1)[i:i + 2], 16) for i in (0, 2, 4))
+                            if _danger_f else (220, 38, 38),
+             "morfo-blu": (0x19, 0x1D, 0x29), "morfo-bordo": (0xFE, 0x84, 0x00)}
+    _solo_arancio = {"fondo": (0.0,), "morfo-forma": (0.0,), "morfo-blu": (0.0,),
+                     "morfo-bordo": (1.0,)}
+    _scarti_f = {}
+    for _p in (0.5, 0.64, 0.8, 1.0):
+        _sul_piu = tuple(r * (1 - _p) + a * _p
+                         for r, a in zip(_veri["morfo-forma"], _veri["morfo-bordo"]))
+        _nel_f = _filo_f(_p, 0.0, _veri)
+        _scarti_f[_p] = round(max(abs(x - y) for x, y in zip(_nel_f, _sul_piu)), 3)
+    _arancio_f = {_p: [_filo_f(_p, k / 20, _solo_arancio)[0] for k in range(21)]
+                  for _p in (0.0, 0.5, 0.64, 0.8, 1.0)}
+    prova("i conti della partenza: gli strati nell'ordine del markup coi pesi della "
+          "cascata fanno il filo del + — rosso·(1−p) + arancio·p — a ogni discesa "
+          "dalla soglia del logo in giu'",
+          [["morfo-blu", "morfo-bordo", "morfo-forma"], {0.5: 0, 0.64: 0, 0.8: 0, 1.0: 0}],
+          [[n for n in _ordine_f if n in ("morfo-blu", "morfo-bordo", "morfo-forma")],
+           {k: (0 if v == v and v < 0.5 else v) for k, v in _scarti_f.items()}])
+    prova("...e mentre filo e forma sfumano l'arancio che si vede non cresce mai e "
+          "non supera quello del +; partito dal + a casa e' zero dall'inizio alla fine",
+          [True, True, 0.0],
+          [all(all(b <= a + 1e-9 for a, b in zip(v, v[1:])) for v in _arancio_f.values()),
+           all(max(v) <= _p + 1e-9 for _p, v in _arancio_f.items()),
+           max(_arancio_f[0.0])])
+    # ...e sfumano INSIEME: la stessa durata, la stessa curva e nessun
+    # ritardo per l'opacita' del filo e per quella della forma (la forma ha
+    # la scorciatoia nella regola di base e le longhand del vestito blu, che
+    # vincono: la curva resta quella della scorciatoia). La cascata si
+    # chiede COL MOTO ACCESO: il giudice non guarda le @media, e la
+    # `transition:none` degli effetti ridotti — stessa specificita', scritta
+    # dopo — per lui vincerebbe sulla forma.
+    _reg_mosso = [r for r in _reg_f if not any("reduced-motion" in g for g in r[2])]
+    def _transizioni_f(strato):
+        cat = [{"tag": "html", "attr": {}, "classi": set()},
+               {"tag": "body", "attr": {}, "classi": set(_V)},
+               {"tag": "div", "attr": {"id": "p2pMorfo"}, "classi": set(_BZ)},
+               {"tag": strato[0], "attr": {"class": strato[1]}, "classi": {strato[1]}}]
+        return {k: x[0] for k, x in _vince_css(_reg_mosso, cat, [
+            "transition", "transition-duration", "transition-delay"]).items()}
+    def _parole_f(t):
+        out, cur, d = [], "", 0
+        for ch in (t or ""):
+            d += (ch == "(") - (ch == ")")
+            if ch == " " and d == 0:
+                if cur:
+                    out.append(cur)
+                cur = ""
+            else:
+                cur += ch
+        return out + ([cur] if cur else [])
+    def _pezzo_opacita(t):
+        pz = [x.strip() for x in re.split(r",(?![^(]*\))", _spazi(t or "")) if x.strip()]
+        return next((_parole_f(x)[1:] for x in pz if x.startswith("opacity ")), None)
+    _t_forma = _transizioni_f(_FORMA)
+    _o_forma = _pezzo_opacita(_t_forma.get("transition")) or []
+    _d_forma = [x.strip() for x in re.split(r",(?![^(]*\))", _t_forma.get("transition-duration") or "")]
+    _r_forma = [x.strip() for x in (_t_forma.get("transition-delay") or "").split(",")]
+    _o_filo = _pezzo_opacita(_transizioni_f(_BORDO).get("transition")) or []
+    prova("...e sfumano INSIEME: l'opacita' del filo e quella della forma hanno la "
+          "stessa durata, la stessa curva e nessun ritardo",
+          [_d_forma[1] if len(_d_forma) > 1 else "?", _o_forma[1] if len(_o_forma) > 1 else "?",
+           "0s"],
+          [_o_filo[0] if _o_filo else None, _o_filo[1] if len(_o_filo) > 1 else None,
+           _r_forma[1] if len(_r_forma) > 1 else None])
     _rossi = []
     for _vg in (["acceso", "bz", "parte"], ["acceso", "bz"]):
-        for _st in (_BLU, _META, _GLIFO, _ETI):
+        for _st in (_BLU, _BORDO, _META, _GLIFO, _ETI):
             for _p, _v in _fantasma(_V, _vg, _st).items():
                 if "danger" in (_v or ""):
                     _rossi.append((_st[1], _p, _v))
-    prova("...e nient'altro del fantasma di Barattozon e' rosso — gemello, meta, "
-          "glifo, scritta —, alla partenza e in volo (la cascata a «Vendi BTC»)",
+    prova("...e nient'altro del fantasma di Barattozon e' rosso — gemello, contorno, "
+          "meta, glifo, scritta —, alla partenza e in volo (la cascata a «Vendi BTC»)",
           [], _rossi)
 
     # H) LA RIGA SOTTO L'IMPORTO, FATTA GIRARE COI NUMERI CHE CAMBIANO
