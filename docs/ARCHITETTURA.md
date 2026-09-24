@@ -3517,6 +3517,26 @@
   domanda che deve rispondere — «e' servito?» — e non per una fattura.
   ⚠️ La prova che lo verifica guarda il DDL SENZA LA PROSA: il
   commento nomina `tg_id` apposta, per dire che non c'e'.
+  LE VISITE AL NEGOZIO E IL CASSETTO «📊 IL TUO NEGOZIO» (24 set 2026):
+  la sorella di `sponsor_aperture` e' `negozio_visite(negozio, giorno,
+  quante)` — il CODICE del negozio e non il tg_id, e ancora nessuna
+  colonna per chi guarda. Si conta sulla rotta del negozio SOLO con
+  `vista=1`, che il client manda dalla prima richiesta di ogni
+  APERTURA (`apriNegozio`) e mai dai ridisegni (`ridisegnaNegozio`: il
+  tasto indietro, l'annuncio cambiato, il feedback rimosso), ne' dalla
+  pagina dopo, da «Altri oggetti» o dalla rilettura del carrello; il
+  venditore sul suo negozio non conta. Stesso termometro del `da`:
+  gonfiabile a mano, e detto nella riga onesta del cassetto. I numeri
+  li fa UN giudice, `numeri_negozio`, per due porte: il venditore
+  (`/api/me/negozio/numeri`, il suo negozio, `mostra` solo con almeno
+  un annuncio) e il moderatore (`/api/admin/negozio/{codice}/numeri`,
+  qualunque negozio, dal 📊 della lista utenti del pannello). Il «da
+  sempre» delle vendite e' `vendite_ok`, cioe' il numero pubblico del
+  negozio; la finestra dei 30 giorni guarda il passo «arrivato» della
+  linea del tempo. Lo spazio in vetrina del catalogo di casa si lega al
+  suo negozio sul server con `NEGOZIO_SPONSOR_CASA`, in pari col
+  `RACCONTI` del client per una prova. Il disegno e'
+  `tabellaNumeriNegozio`, lo stesso nel Profilo e nel pannello.
   LA ROTTA DEGLI ASSET E' UNA WHITELIST DI FORMA e non un elenco
   (`FORMA_RACCONTO` + `SLUG_SPONSOR`): le foto di un racconto sono tre
   oggi e cinque domani, e un elenco a mano sarebbe l'ennesima lista da

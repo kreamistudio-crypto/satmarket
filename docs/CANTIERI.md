@@ -31747,3 +31747,153 @@ il telefono (il carrellino a 44px sotto il dito, la barra dei carrelli
 sopra la nav, il foglio della fattura unica in Telegram), la prima
 busta vera sul nodo, e — dichiarato — i carrelli che un ricaricamento
 perde, come il carrello di sempre.
+
+## Le statistiche del negozio per il venditore: «📊 Il tuo negozio» (24 set 2026)
+
+**IL FATTO E LA DECISIONE.** Un venditore consigliato («Un tempo per
+te») ha chiesto dove vede il contatore delle visite. Non lo vedeva da
+nessuna parte: le aperture della sua card in «Da scoprire» (`5c71768`)
+le leggeva solo il moderatore con `/sponsor`, e le visite alla pagina
+del negozio non le contava nessuno. Deciso da Andrea: nel Profilo, dentro
+«🏪 Impostazioni di negozio», un cassetto «📊 Il tuo negozio» per chi ha
+almeno un annuncio — visite, aperture da «Da scoprire», vendite,
+recensioni e una riga onesta —, senza grafici in questo giro, senza
+cookie né dati personali, e lo stesso cassetto per ogni negozio dal
+pannello dei moderatori, per rispondere ai venditori.
+
+**COSA VEDE IL VENDITORE.** Il primo cassetto di «Impostazioni di
+negozio», una tabella di due colonne divisa per argomento: 👀 VISITE AL
+NEGOZIO negli ultimi 7 e 30 giorni (e, finché la storia è più corta di
+trenta giorni, «Le visite si contano dal …»); 📣 APERTURE DA «DA
+SCOPRIRE» negli ultimi 30 giorni e «Spazio acceso fino al …», solo se il
+suo spazio è acceso; 🤝 VENDITE CONCLUSE negli ultimi 30 giorni e da
+sempre, ognuna col numero e i sats incassati; ⭐ RECENSIONI ricevute
+(«12 da 9 persone», come le scrive il negozio) e la media con le stelle.
+In fondo: «Numeri indicativi: le visite contano le aperture della
+pagina, non le persone. Le tue visite al tuo negozio non si contano.»
+Chi non ha mai pubblicato un annuncio il cassetto non lo vede; in DEMO e
+in vetrina sparisce.
+
+**IL CONTEGGIO, SUL SERVER.** Tabella nuova `negozio_visite(negozio,
+giorno, quante)`, la sorella di `sponsor_aperture`: un numero per
+negozio e per giorno, e basta — niente tg_id di chi guarda, niente IP,
+niente cookie, e non essendoci le colonne nessuna query futura potrà
+scriverli. Il negozio è il CODICE e non il tg_id del venditore (si conta
+una bottega; il patto di `punto_preso_da`), e la fusione di un account
+Nostr porta le sue visite sul codice che resta, giorno per giorno. Si
+conta sulla rotta `/api/negozio/{chi}` SOLO con `vista=1`, e mai quando
+chi guarda è il venditore stesso (`conta_visita_negozio` riceve il solo
+codice). Il giorno è quello locale, e i «7 giorni» sono oggi e i sei
+prima: `_giorno_indietro` parte da mezzogiorno, così il cambio d'ora non
+sposta nessun confine. La data da cui si conta la scrive il primo avvio
+(`negozio_visite_dal` in `impostazioni`, `INSERT OR IGNORE`: non si
+riscrive più), ed entra nel recinto delle impostazioni col suo perché —
+non è un segreto né una leva del denaro.
+
+**IL GIUDICE UNICO E LE DUE PORTE.** `numeri_negozio(con, v, adesso)`
+legge e basta, ed è lo stesso per `/api/me/negozio/numeri` (il negozio
+di CHI BUSSA, mai da un parametro; senza annunci risponde
+`{"mostra": false}`; l'anonimo prende il 401) e per
+`/api/admin/negozio/{codice}/numeri` (403 prima di cercare il negozio,
+il codice passa da una forma prima della query, 404 se non c'è; qui
+l'annuncio non si chiede). LE VENDITE: il «da sempre» è `vendite_ok`, lo
+STESSO numero che il negozio chiama «N vendite concluse» — non un
+conteggio parallelo —, e la finestra dei 30 giorni conta gli ordini
+`released` per il momento in cui si sono chiusi: il passo «arrivato»
+della linea del tempo, o `aggiornato` per gli ordini di prima della
+linea. I sats sono il netto del venditore con la regola del pagamento
+(`netto_venditore` su prezzo meno protezione). LO SPAZIO IN VETRINA esce
+solo acceso, con la scadenza e le aperture di `/sponsor` (lo stesso
+numero): per le pagine del server il legame è quello del catalogo
+(`_e_suo`), e per il catalogo di casa il server ha adesso il suo codice
+in `NEGOZIO_SPONSOR_CASA` — prima non gli serviva, e a dire di chi è
+uno spazio dev'essere lui, non un codice arrivato dal client. Una prova
+lo tiene in pari col `RACCONTI` del client.
+
+**IL CLIENT.** `apriNegozio` ha un quinto argomento, `ridisegno`: ogni
+APERTURA porta `&vista=1` sulla prima richiesta; i tre ridisegni (il
+tasto indietro, l'annuncio appena cambiato, il feedback rimosso dal
+moderatore) passano da `ridisegnaNegozio` e non lo portano, e nemmeno
+l'anteprima di una bozza. «Altri oggetti del venditore», la rilettura del
+carrello e la pagina dopo chiedono la stessa rotta senza `vista`, come
+prima. Il cassetto è `renderNumeriNegozio`, chiamato dalla catena di
+`renderIdentita`, con un minuto di memoria legata all'identità (cambiato
+account si richiede); il disegno è `tabellaNumeriNegozio`, puro, dove
+tutto passa da `Number()` o `esc()`. Le stelle parlano l'arancio del
+testo (`--sats-text`), come in ogni riquadro `.seller`.
+
+**IL PANNELLO.** Nella lista degli utenti del pannello ogni riga con un
+codice ha un 📊: un tocco apre sotto la riga la stessa tabella del
+venditore (la nota dice «le visite del venditore al suo negozio»), un
+secondo tocco la richiude. Nell'onclick viaggia il solo codice passato
+dal filtro-alfabeto.
+
+**STRADE SCARTATE.** Contare ogni arrivo alla rotta del negozio senza un
+segnale: la chiedono anche «Altri oggetti», la rilettura del carrello,
+la pagina dopo e i ridisegni, e il numero sarebbe stato gonfio di
+richieste che non sono visite. Deduplicare per visitatore come
+`viste_annuncio` (un token casuale nel telefono): vorrebbe un'identità,
+anche anonima, dove la richiesta era «un numero per negozio e giorno» —
+la riga onesta dice «aperture, non persone» apposta. Tenere il conto per
+tg_id del venditore: si conta la bottega, col codice. Mettere i numeri
+dentro `/api/me`: tre query in più a ogni giro del Profilo per un
+cassetto che si apre di rado. Far dire al client di chi è lo spazio del
+catalogo di casa: lo scriverebbe chiunque.
+
+**IMPERFEZIONI DICHIARATE.** `vista` lo scrive il client, come il `da`
+dello spazio: chi lo manda a mano gonfia il numero — è un termometro,
+non un dato su cui si decide del denaro. La commissione del netto è
+quella di OGGI: il giorno che `COMMISSIONE_PERCENTO` cambia, il netto
+degli ordini di prima si ricalcola con la nuova. Le aperture dello
+spazio sono il numero di `/sponsor`, che conta da trenta giorni fa
+compreso (un giorno di calendario in più delle visite): si è preferito
+lo stesso numero del bot a una seconda definizione. Le visite partono
+dal deploy.
+
+**SUL VPS NON C'È NIENTE DA FARE.** La tabella nasce da sola all'avvio
+(`CREATE TABLE IF NOT EXISTS`) e la data di partenza pure.
+
+**PROVATO.** `prove_numeri_negozio` (60: lo schema a tre colonne senza
+posto per un IP; il conteggio per giorno sul giudice vero e un database
+in memoria, con due negozi e un codice vuoto che non scrive; le
+finestre ai bordi — il sesto giorno dentro, il settimo fuori, il
+ventinovesimo dentro, il trentesimo fuori — e il giorno attraverso il
+cambio d'ora del 25 ottobre; le vendite con la linea del tempo che vince
+su `aggiornato`, il rimborso, un altro venditore e un ordine non
+concluso fuori, il netto con la commissione; lo spazio acceso solo sul
+suo negozio, anche per una pagina del server legata col tg_id;
+`NEGOZIO_SPONSOR_CASA` in pari col client; le due porte, la rotta del
+negozio che prende `vista` e non la Request, il venditore escluso, il
+solo codice al contatore, la fusione; e il banco node con le funzioni
+vere: cassetto spento senza annunci, acceso coi numeri, un minuto di
+memoria, l'account che cambia, DEMO, rete giù, la riga onesta, la nota
+del moderatore, i due spazi coi nomi passati da `esc()`, e gli indirizzi
+di apertura, pagina dopo, spazio, ridisegno e anteprima); emendate col
+perché le tre ancore di `apriNegozio` e i tre indirizzi attesi di
+`prove_sponsor` (ogni apertura porta anche `&vista=1`) e il recinto delle
+impostazioni (`negozio_visite_dal`). `collaudo_numeri_negozio.py` col
+server vero (30, aggiunto ai collaudi della CI e verde nella gabbia
+senza rete): 401 all'anonimo, «mostra: false» senza annunci, le aperture
+che contano e quelle che no (il venditore, senza `vista`, col cursore,
+`vista=2`), una riga per negozio e giorno, NESSUNA TABELLA del database
+che contenga l'indirizzo con cui il banco ha bussato, le vendite a 30
+giorni e da sempre uguali a `vendite_ok` del negozio pubblico, lo spazio
+acceso col tocco della card che conta un'apertura e una visita, la porta
+dei moderatori (403, 401, 404 per codice assente e per forma storta) che
+risponde gli STESSI numeri del venditore. TORTURA su una copia, 15
+mutazioni (10 sul server, 5 sul client), 15 uccise. Suite intera severa
+senza config nel worktree da `e2921b9`: 15.708 verdi e 0 rosse. DAL VIVO
+a 375 px nei due temi (Chrome headless via CDP, tocco vero sul titolo
+del cassetto, server da una copia col relay morto e un database
+seminato): il cassetto primo di «Impostazioni di negozio», nessuno
+sbordo, le stelle arancio dopo la cura (la regola delle etichette
+`.nn-riga span` colorava anche loro: ora è `> span`), il 📊 del pannello
+in riga coi numeri (`.btn` è un blocco: ora `inline-flex`) che apre e
+richiude la tabella; e la pagina vera che conta: arrivo dal link
+condiviso +1, ridisegno +0, pagina dopo +0, nuova apertura +1, tasto
+indietro +0.
+
+**DA GUARDARE (Andrea).** Sul telefono: il cassetto in Telegram coi
+numeri veri di un negozio, e il 📊 del pannello sotto il dito. Dopo
+qualche giorno, che le visite di un negozio conosciuto abbiano l'ordine
+di grandezza che ci si aspetta.
