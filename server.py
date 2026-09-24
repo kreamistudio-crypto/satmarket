@@ -36377,6 +36377,10 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
             "SELECT riferimento, punti FROM xp_eventi WHERE tg_id=? "
             f"AND {_dove_xp}", [user["id"]] + _par_xp)],
         (u["xp"] or 0) if u else 0) if u else None
+    # A CHI TOCCA NEL P2P, per il pallino all'apertura (24 set 2026): il
+    # server sa ogni passo dalla patch 0007, e il telefono che apre
+    # l'app nel mercatino non ascolta i relay — vedi `_quanti_tocca_p2p`
+    p2p_tocca = _quanti_tocca_p2p(con, user["id"], int(time.time()))
     con.close()
     profilo = dict(u) if u else {}
     # LA FOTO SPENTA NON ESCE NEMMENO A LUI (ago 2026): questa era
@@ -36660,6 +36664,9 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # diverse, e il client ha gia' il calco di `asteAccese` per
     # metterle insieme.
     profilo["p2p_leve"] = _p2p_per(user["id"])
+    # ...e quanti dei miei scambi aspettano un mio gesto: il pallino
+    # all'apertura lo legge da qui, senza aprire i relay
+    profilo["p2p_tocca"] = p2p_tocca
     # LO SCONTO FEDELTA' DEL P2P, per il conto di CHI LEGGE: lo stesso
     # giudice che risponde al coordinatore, dai fatti che qui sono gia'
     # in mano. E' una STIMA per lo schermo: la cifra vera la dice
@@ -44911,7 +44918,13 @@ def _stato_scambio_p2p(momenti, lato: str, preso_dal: str, stato_libro: str,
     passo dopo la presa: se ha preso chi compra deve dire dove ricevere
     i sats, se ha preso chi vende deve bloccarli."""
     giro = max([int(m.get("giro") or 0) for m in momenti] or [0])
-    del_giro = [m for m in momenti if int(m.get("giro") or 0) == giro]
+    # SOLO I MOMENTI CHE SI CONOSCONO DECIDONO (24 set 2026): la cronaca
+    # porta anche `recapito` (la dichiarazione del telefono di chi
+    # vende, fonte 'telefono'), e preso come «ultimo» spegneva lo stato
+    # — «non si sa» su uno scambio attivo, proprio dopo il gesto che lo
+    # rende pagabile. Un momento fuori dal peso non racconta niente.
+    del_giro = [m for m in momenti if int(m.get("giro") or 0) == giro
+                and str(m.get("momento") or "") in _PESO_MOMENTO_P2P]
     if not del_giro:
         s = {"pending": "pubblicato" if mio else "", "success": "concluso",
              "canceled": "annullato", "expired": "annullato"}.get(
@@ -44959,6 +44972,22 @@ def _stato_scambio_p2p(momenti, lato: str, preso_dal: str, stato_libro: str,
             "preso": any(str(x.get("momento")) == "preso" for x in del_giro),
             "quando": int(ultimo.get("quando") or 0),
             "payout_fallito": m == "payout_fallito"}
+
+
+def _tocca_a_me_p2p(stato: str, lato: str, recapito_detto: bool) -> bool:
+    """PURA: in questo scambio la mossa e' di chi legge? Il calco di
+    `azioniDisponibili` del client, stato per stato (24 set 2026, il
+    pallino all'apertura): chi compra deve dire dove ricevere i sats
+    (`attesa_mia_fattura`, `fattura_nuova`) e, a garanzia bloccata,
+    mandare gli euro — ma solo se il recapito gli e' stato detto; chi
+    vende deve bloccare (`attesa_mia_hold`), indicare dove ricevere gli
+    euro (`attivo` senza recapito) e liberare (`euro_inviati`)."""
+    compro = lato == "compro"
+    if compro:
+        return stato in ("attesa_mia_fattura", "fattura_nuova") or (
+            stato == "attivo" and bool(recapito_detto))
+    return stato in ("attesa_mia_hold", "euro_inviati") or (
+        stato == "attivo" and not recapito_detto)
 
 
 def _scambi_p2p(con, io, adesso: int) -> dict:
@@ -45012,6 +45041,12 @@ def _scambi_p2p(con, io, adesso: int) -> dict:
             "WHERE ordine=? ORDER BY quando", (ordine,))]
         q = _stato_scambio_p2p(momenti, lato, (s["preso_dal"] if s else "") or "",
                                (o["stato"] if o else "") or "", bool(mio))
+        # il recapito gia' detto in QUESTO giro (la dichiarazione del
+        # telefono di chi vende, `momento` = 'recapito'): decide a chi
+        # tocca a garanzia bloccata (24 set 2026)
+        giro_s = int(s["giro"] or 0) if s else 0
+        recapito = any(str(x.get("momento") or "") == "recapito"
+                       and int(x.get("giro") or 0) == giro_s for x in momenti)
         ultimo = q["quando"] or (int(s["aggiornato"] or 0) if s else 0) \
             or (int(o["creato"] or 0) if o else 0)
         if q["stato"] in ("concluso", "annullato") and ultimo < soglia:
@@ -45034,12 +45069,25 @@ def _scambi_p2p(con, io, adesso: int) -> dict:
             "sats_miei": int((s["sats_compratore"] if lato == "compro"
                               else s["sats_venditore"]) or 0) if s else 0,
             "payout_fallito": bool(q["payout_fallito"]),
+            "recapito_detto": bool(recapito),
+            "tocca": _tocca_a_me_p2p(q["stato"], lato, recapito),
             "momenti": [{"m": str(m.get("momento") or ""), "q": int(m.get("quando") or 0),
                          "a": str(m.get("attore") or ""), "d": str(m.get("dettaglio") or "")}
                         for m in momenti]}
         if len(fuori) >= MAX_ORDINI_P2P:
             break
     return fuori
+
+
+def _quanti_tocca_p2p(con, io, adesso: int) -> int:
+    """Quanti dei miei scambi aspettano un mio gesto, per il pallino
+    all'apertura (`/api/me.p2p_tocca`, 24 set 2026). Lo stesso giudice
+    della rotta degli scambi, contato. Un database senza le tabelle —
+    i banchi di ieri — vale zero, mai un errore sul profilo."""
+    try:
+        return sum(1 for r in _scambi_p2p(con, io, adesso).values() if r["tocca"])
+    except sqlite3.OperationalError:
+        return 0
 
 
 @app.post("/api/p2p/scambi")

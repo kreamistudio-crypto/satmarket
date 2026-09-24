@@ -32073,3 +32073,199 @@ banda scura in fondo alla corsa, e se il bagliore a .65 si legge come
 luce o come alone. Restano aperte le due domande dell'ottavo giro: la
 croce bianca sul rosso della sera (2,77:1) e se il bottone d'arrivo
 vuole anche lui un bordo.
+
+## Ritocchi al flusso P2P dalla prova vera: colore, Wallet of Satoshi, aria, «Aspetta», recapiti, pallino all'avvio, libro in ascolto (24 set 2026)
+
+Dalla prova vera della sera (Andrea vende BTC, Alan compra): sette
+punti, tutti nella pagina dello scambio, nelle card di «I miei scambi»,
+nel libro e nella barra. Un solo commit, worktree da origin/main.
+
+**1) IL COLORE DELLA RIGA «Paghi X sats».** Nel dettaglio del proprio
+ordine appena pubblicato (vendo BTC) la riga era VERDE. Il verde e il
+rosso di quella riga dicono il LATO (verde = i sats arrivano a chi legge,
+rosso = escono, lo stesso della barra e del libro), ma le due regole che
+la tingevano leggevano `body.p2p-vendo`, cioe' l'ultimo tab del LIBRO
+guardato — che in una pagina di scambio non dice niente: ci si arriva da
+«I miei scambi» col tab dov'era rimasto, quasi sempre «Compra BTC». Il
+verde non aveva significato. Adesso `renderOrdineP2P` scrive sulla
+scatola del conto la classe del lato della RIGA (`lato-compro` /
+`lato-vendo`) e due regole con sette classi la vestono, sopra le due del
+tab. Strada scartata: la riga neutra — il colore ha un significato in
+tutto il P2P, e toglierlo qui l'avrebbe resa l'unica cifra muta.
+
+**2) WALLET OF SATOSHI NON SI PROPONE.** Nel foglio «Dove ricevere i
+sats» la scorciatoia «Usa l'indirizzo dei tuoi incassi» portava dritto
+al rifiuto del coordinatore, che verifica l'indirizzo da dietro Tor con
+budget stretti e con Wallet of Satoshi va sempre in `invalid-invoice`
+(vedi «LA DEV FEE SI IMPIANTA SUL CIRCUITO FREDDO» in CLAUDE.md). Un
+elenco di wallet incompatibili non c'era: nasce adesso,
+`P2P_WALLET_NON_PASSANO` (dominio → nome), con una voce, e il giudice
+puro `walletNonPassaP2P` guarda il solo dominio dopo la chiocciola. Con
+un indirizzo che non passa la scorciatoia non c'e', il campo resta vuoto
+e una riga dice «Il tuo indirizzo Wallet of Satoshi qui non funziona:
+incolla una fattura di un altro wallet»; `usaIndirizzoSalvatoP2P` non
+scrive mai un indirizzo che non passa. L'invio di un indirizzo scritto A
+MANO resta com'e' (il «no» del coordinatore ha gia' la sua frase, e un
+banco del motore manda apposta un indirizzo WoS): se serve, fermarlo
+prima e' un ritocco a se'.
+
+**3) L'ARIA SOTTO I BOTTONI.** «Dove vuoi ricevere i sats» sotto «Copia
+la cifra», il profilo sotto «Blocca i sats», le righe sotto «Invia a chi
+compra» stavano attaccati: `.btn` non ha margine e le note nemmeno. UNA
+regola, per fratello: nella pagina dello scambio (`#p2pOrdineCorpo`) e
+in ogni foglio del P2P (`.sheet [id^="p2p"][id$="Corpo"]`) quel che
+segue un bottone e non e' un bottone prende 14px sopra; fra due bottoni
+resta il passo di `.btn.ghost`. Vale per un foglio che nasce domani, nei
+due temi e a ogni larghezza (non tocca colori). Misurato dal vivo a 375:
+14px sotto «Blocca i sats», «Indica dove ricevere gli euro», «Ho inviato
+gli euro» (il riquadro del recapito), «Dove ricevere i sats», «Invia a
+chi compra», «Copia la richiesta». Resta a 12 la nota «Oppure una
+fattura» sotto la scorciatoia dell'indirizzo, che ha il suo margine
+inline e sta nel range chiesto.
+
+**4) «✋ ASPETTA».** Quando la mossa e' dell'altra persona la casella dello
+stato lo dice con la stessa evidenza di «👉 tocca a te»: la pillola
+«✋ Aspetta» e, sotto, la riga di chi fa cosa — «Alan sta bloccando i
+sats in garanzia», «Chi vende deve indicarti dove inviare gli euro»,
+«Chi compra deve inviarti gli euro», «Chi vende deve controllare gli
+euro e liberare i sats», «Chi compra deve dare una fattura nuova», «I
+sats sono in pagamento verso il tuo wallet», «Un moderatore deve
+decidere», «… deve accettare di annullare». Il giudice e' PURO,
+`attesaAltraParteP2P`, ed e' il gemello di `azioniDisponibili`: se quello
+ha un bottone, tocca a me e la pillola non c'e'; finali, libro e voli
+nemmeno. La riga solo da guardare si giudica come se le chiavi ci
+fossero (la mossa e' mia su un altro dispositivo: «aspetta» sarebbe
+falso). `annullo_proposto` resta senza pillola per la stessa scelta di
+`gruppoScambioP2P`. Il nome viene da `nomeControparteP2P` (passa da
+esc()), altrimenti «chi vende» / «chi compra». Nella card la pillola sta
+dove sta «tocca a te» e la riga occupa la larghezza della casella; nella
+pagina le due pillole stanno accanto al titolo del riquadro di stato, e
+la riga prende il posto dell'a capo. Niente movimento: chi aspetta non
+viene chiamato.
+
+**5) «🤝 I VOSTRI RECAPITI» SOLO DOVE SERVE**, fase per fase
+(`serveRecapitiP2P`, puro). Chi COMPRA: mai — il recapito per gli euro
+gli sta gia' sotto «Ho inviato gli euro» (`recapitoCompratoreP2P`) e il
+foglio non gli darebbe altro; resta solo se e' arrivato un «contatto» da
+un'app di ieri, che si legge soltanto la'. Chi VENDE: prima di mandare il
+recapito NO — la porta e' il bottone arancio del passo «Indica dove
+ricevere gli euro», che apre lo stesso foglio (due bottoni per lo stesso
+gesto); dopo averlo mandato SI', a garanzia bloccata, a euro inviati e
+negli altri stati vivi — per rileggerlo o cambiarlo (un IBAN sbagliato si
+corregge da li', e «l'ultimo che mandi e' quello che vale»). A scambio
+finito: a nessuno. La sentinella di ieri che vuole la funzione
+`campiOrdineP2P` intatta resta vera: il giudice sta fuori, nella pagina.
+Strada scartata: mandare il recapito PRIMA della garanzia da chi vende —
+lo fa da solo il tabacchino, e per gli altri metodi non lo chiede
+nessuno.
+
+**6) IL PALLINO ALL'AVVIO.** Compariva solo entrando nel P2P, quando il
+motore ascolta i relay: nel mercatino diceva l'ultimo stato che
+l'archivio del telefono conosceva. La strada piu' leggera, chiesta da
+Andrea: il server sa gia' a chi tocca (cronaca di mostrod, patch 0007),
+quindi `/api/me` — che l'app chiede comunque all'apertura — porta
+`p2p_tocca`, quanti dei miei scambi aspettano un mio gesto.
+`_tocca_a_me_p2p` (puro) e' il calco di `azioniDisponibili` sul server:
+chi compra tocca su `attesa_mia_fattura`, `fattura_nuova` e su `attivo`
+SE il recapito gli e' stato detto; chi vende su `attesa_mia_hold`,
+`attivo` senza recapito, `euro_inviati`. Il recapito detto lo dice il
+momento 'recapito' (fonte telefono) del giro. `_quanti_tocca_p2p` conta
+sulle righe di `_scambi_p2p`, che ora servono anche `tocca` e
+`recapito_detto`; un database senza le tabelle vale zero. Nel client
+`p2pToccaServer` si legge in `avvia` prima del pallino;
+`aggiornaPallinoScambiP2P` lo usa SOLO se l'archivio dice zero e finche'
+l'archivio del server non e' arrivato in questa sessione
+(`p2pArchivioRinfrescato`, alzata in `renderP2P` quando
+`chiediScambiServerP2P` risponde): da li' comanda l'archivio, anche a
+spegnere. Nessuna domanda nuova, nessun orologio, nessun relay aperto.
+⚠️ Il 22 set questa stessa strada era stata scartata «per principio»
+(seconda logica): dal 24 set la seconda logica c'e' comunque
+(`_stato_scambio_p2p` serve gli scambi a ogni dispositivo), quindi il
+principio non regge piu' e Andrea l'ha chiesta. Il costo dell'alternativa
+— caricare il motore in sottofondo all'apertura — sarebbe stato tre
+websocket verso i relay del coordinatore a ogni apertura dell'app, per
+tutti, anche per chi il P2P non lo apre; e su un telefono con l'app
+aperta in sottofondo la connessione resta viva: rete e batteria per un
+pallino. UN DIFETTO CURATO DI PASSAGGIO, perche' senza il conto sarebbe
+stato sbagliato: `_stato_scambio_p2p` prendeva come «ultimo» anche il
+momento 'recapito' e rispondeva stato VUOTO su uno scambio attivo
+proprio dopo il gesto che lo rende pagabile — la rotta degli scambi di
+ieri serviva «non si sa» a un secondo dispositivo. Ora decidono solo i
+momenti che stanno nel peso.
+
+**7) IL LIBRO IN ASCOLTO.** Un ordine appena pubblicato compariva nel
+libro solo ricaricando: `leggiLibroMostro` e' una REQ che si chiude
+all'EOSE e la rilettura dei 60 secondi e' una rete di sicurezza. Adesso,
+finche' una vista del P2P e' aperta (le quattro di `VISTE_NAV_P2P`),
+resta UN ascolto ai 38383 del coordinatore sul coro di casa
+(`ascoltaP2P`), con `since` dalla data del libro letto: si riapplica da
+solo a chi si riconnette, e con un ascolto aperto la caduta di un relay
+si riprova con l'attesa che cresce — «se cade si riprende» e' il coro,
+non codice nuovo. `go()` lo apre entrando e lo chiude uscendo (dalla
+VISTA, come nav-p2p: vale anche per indietro e cronologia), e
+`caricaLibroP2P` lo apre a lettura fatta se la leva e' arrivata dopo il
+primo go(). Chiudendo, se nessun altro tiene i relay (niente ascolti e
+niente scambi vivi) si chiudono anche loro: chi guarda il libro non
+resta con tre websocket aperti. Il lettore e' PURO, `fondiLibroP2P`, con
+le regole di `libroDaEventi` un evento alla volta: un 38383 non piu'
+`pending` toglie la card se e' fresco almeno quanto lei (preso,
+annullato, scaduto); un `pending` leggibile, nella valuta, non scaduto
+entra in testa o sostituisce se piu' fresco; quel che non si capisce non
+muove niente; il libro di partenza non si tocca. Dedup per id evento
+(`p2pLibroVisti`). Chi ha pubblicato lo vede subito anche lui: e' un
+38383 come gli altri, e la card e' la sua `p2p-mio`. La card nuova si
+veste `p2p-nuova` per un respiro (velo `--sats-soft` che si spegne in
+1,5 s; con gli effetti ridotti la regola universale la toglie), e il
+ridisegno tiene fermo lo scorrimento: si misura la prima card visibile
+prima e dopo e si compensa (`ridisegnaLibroFermoP2P`). LO SPECCHIO RESTA
+FUORI, apposta: il coro e' la gamba viva e non deve nominarlo
+(l'invariante in ARCHITETTURA, con le sue sentinelle), mostrod scrive
+prima sui suoi relay e lo specchio arriva dopo; la rilettura dei 60 s lo
+legge comunque. Il motore resta a zero fetch.
+
+**PROVATO.** `prove_ritocchi_flusso_p2p` (sentinelle su markup e CSS
+dei sette punti; il banco server su un database in memoria che segue
+uno scambio passo per passo e conta a chi tocca dai due lati, col
+momento 'recapito' che non spegne piu' lo stato; il banco node dei
+giudici puri: i wallet in ogni forma, i recapiti fase per fase,
+«Aspetta» in 24 casi col nome che passa da esc(), il lettore del libro
+in 12 casi, il pallino col conto del server). Tre banchi di ieri
+emendati col perche': il banco della card carica le tre funzioni di
+«Aspetta», il conto della pagina porta la classe del lato, la rotta
+degli scambi entra nell'ambiente col giudice nuovo. Suite intera severa
+senza config nel worktree da origin/main: 15.746 verdi e 0 rosse. Dal
+vivo a 375 nei due temi (copia col relay morto, Venditore 222, righe
+seminate da `scriviOrdineP2P`, eventi del coordinatore dalla rotta vera
+col segreto di cartone): il pallino su «P2P» acceso all'apertura nel
+mercatino con `p2p_tocca` 1 dal server, senza entrare nel P2P e senza
+un relay; l'ascolto del libro che si apre entrando, resta su «I miei
+scambi», si chiude su Esplora e si riapre; nove ordini entrati uno alla
+volta, la card sotto il dito ferma al pixel mentre uno nuovo entra in
+testa, un preso che esce, un doppio e una copia vecchia che non muovono;
+«Paghi ≈ 32 720 sats» ROSSA nel proprio ordine di vendita col body senza
+`p2p-vendo`, nei due temi; le pillole e le righe di «Aspetta» su undici
+righe in card e in pagina; il foglio della fattura con l'indirizzo WoS
+(riga, niente bottone, campo vuoto, scorciatoia muta) e con un altro
+indirizzo (bottone); il bottone dei recapiti solo a chi vende col
+recapito mandato; i 14px misurati. ⚠️ Il velo della card nuova NON si
+vede nel Browser pane, che emula gli effetti ridotti: la classe c'e', il
+CSS c'e', l'effetto si guarda sul telefono.
+
+**DA GUARDARE COI DUE TELEFONI.** Andrea vende, Alan compra: 1) il
+pallino su «P2P» ACCESO aprendo l'app nel mercatino quando tocca a uno
+dei due, prima di entrare nel P2P — e SPENTO dopo il gesto, appena si
+entra in «I miei scambi»; 2) il libro aperto su un telefono mentre
+l'altro pubblica: la card compare da sola entro qualche secondo, col velo
+arancio che si spegne, senza che la lista salti; e sparisce da sola
+quando l'ordine viene preso; 3) nel proprio ordine di vendita la riga
+«Paghi» ROSSA, in quello di acquisto «Ricevi» VERDE, qualunque tab del
+libro si sia guardato prima; 4) le pillole: «✋ Aspetta» con «Alan sta
+bloccando i sats in garanzia» a chi compra dopo la presa, «Andrea deve
+indicarti dove inviare gli euro» a garanzia bloccata, «Alan deve
+inviarti gli euro» a chi vende dopo il recapito, «Andrea deve controllare
+gli euro e liberare i sats» dopo «Ho inviato gli euro»; 5) nel foglio
+«Dove ricevere i sats» di chi compra con l'indirizzo Wallet of Satoshi
+salvato: la riga e niente scorciatoia; 6) «I vostri recapiti» che a chi
+compra non c'e' piu' e a chi vende compare solo dopo «Invia a chi
+compra»; 7) l'aria sotto i bottoni nei due temi, e l'ascolto che si
+chiude uscendo dal P2P (nel diario: «libro in ascolto: nuovo ordine …»).

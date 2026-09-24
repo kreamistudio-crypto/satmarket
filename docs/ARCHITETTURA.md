@@ -6808,6 +6808,19 @@
   scrive «elenco parziale»: un ordine gia' preso e' una SOSTITUZIONE e
   non una cancellazione, quindi uno specchio indietro lo mostrerebbe
   ancora libero.
+  E IL LIBRO RESTA IN ASCOLTO (24 set 2026): finche' una vista del P2P e'
+  aperta, UN ascolto ai 38383 del coordinatore sul coro (`ascoltaP2P`,
+  `since` dalla data del libro letto), aperto e chiuso da `go()` dalla
+  VISTA e aperto anche da `caricaLibroP2P` a lettura fatta; ogni evento
+  entra nel libro gia' letto col lettore PURO `fondiLibroP2P` (le regole
+  di `libroDaEventi` un evento alla volta: un non-pending fresco almeno
+  quanto la card la toglie, un pending leggibile entra o sostituisce se
+  piu' fresco), la card nuova si veste `p2p-nuova` per un respiro e il
+  ridisegno tiene fermo lo scorrimento (`ridisegnaLibroFermoP2P`).
+  Chiudendo l'ascolto, se nessun altro tiene i relay si chiudono anche
+  loro. LO SPECCHIO RESTA FUORI, per l'invariante qui sopra: il coro e'
+  la gamba viva; la rilettura dei 60 secondi legge anche lo specchio.
+  Il verbale: CANTIERI, «Ritocchi al flusso P2P dalla prova vera».
   IL CORO DEI RELAY (16 set 2026, la gamba VIVA del P2P): la
   connessione con cui il client parla col coordinator — richieste,
   risposte, restore, recapiti, via di riserva — non e' piu' UN relay
@@ -10826,6 +10839,25 @@
   l'anello prende `--nav-bg-p2p`. A leva spenta, in vetrina e senza
   conto resta spento. Il verbale: CANTIERI, «Il pallino su I miei
   scambi».
+  E ALL'APERTURA VALE ANCHE LA PAROLA DEL SERVER (24 set 2026): `/api/me`
+  porta `p2p_tocca` — quanti dei miei scambi aspettano un mio gesto
+  secondo la cronaca di mostrod, `_tocca_a_me_p2p` (puro, il calco di
+  `azioniDisponibili` sul server: fattura, fattura nuova e attivo col
+  recapito detto per chi compra; garanzia, attivo senza recapito ed euro
+  inviati per chi vende) contato da `_quanti_tocca_p2p` sulle righe di
+  `_scambi_p2p`, che servono anche `tocca` e `recapito_detto`. Nel
+  client `p2pToccaServer` vale SOLO se l'archivio dice zero e finche'
+  l'archivio del server non e' arrivato (`p2pArchivioRinfrescato`): da
+  li' comanda l'archivio. Nessun relay aperto nel mercatino, nessuna
+  domanda nuova. LE DUE PILLOLE (24 set 2026): nella casella dello stato
+  della card e nel riquadro della pagina, «👉 tocca a te» quando
+  `azioniDisponibili` ha il bottone, «✋ Aspetta» con la riga di chi fa
+  cosa quando la mossa e' dell'altra persona — `attesaAltraParteP2P`,
+  puro, gemello di quel giudice, col nome da `nomeControparteP2P`. E IL
+  BOTTONE «🤝 I VOSTRI RECAPITI» passa da `serveRecapitiP2P`: mai a chi
+  compra (il recapito gli sta sotto «Ho inviato gli euro»), a chi vende
+  solo col recapito gia' mandato, mai a scambio finito. Il verbale:
+  CANTIERI, «Ritocchi al flusso P2P dalla prova vera».
   QUEL CHE È FATTO SI DICE AL PASSATO (22 set 2026, richiesta di
   Andrea): le card di «I miei scambi» CHIUSE non promettono più. Una
   conclusa porta la data della chiusura in alto a destra — piccola,

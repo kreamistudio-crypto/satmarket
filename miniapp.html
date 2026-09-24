@@ -2585,6 +2585,17 @@
      il primo. Un gradino sotto di corpo, che la parola grossa resta
      lo stato. */
   .p2p-tocca{font-size:12px;font-weight:700;white-space:nowrap}
+  /* «✋ ASPETTA» E' IL GEMELLO DI «TOCCA A TE» (24 set 2026, dalla prova
+     vera): quando la mossa e' dell'altra persona la casella lo dice con
+     la stessa evidenza, e la riga sotto dice COSA sta facendo — col
+     nome, se la pagina lo sa. Stesso corpo e stesso inchiostro della
+     manina; la riga occupa tutta la larghezza della casella. Niente
+     movimento: chi aspetta non viene chiamato. Nel riquadro della
+     PAGINA le due pillole stanno accanto al titolo, e la riga sotto. */
+  .p2p-aspetta{font-size:12px;font-weight:700;white-space:nowrap}
+  .p2p-aspetta-riga{flex-basis:100%;font-size:12px;font-weight:600;color:var(--ink-soft)}
+  .nota-scambio .p2p-tocca,.nota-scambio .p2p-aspetta{margin-left:6px}
+  .nota-scambio .p2p-aspetta-riga{display:block;margin:2px 0}
   /* ⚠️ LA MANINA E' L'UNICA COSA CHE SI MUOVE in questa card, ed e'
      una chiamata e non un racconto: si sposta di tre pixel verso le
      parole che indica, avanti e indietro. `inline-block` perche' su
@@ -2739,6 +2750,14 @@
      e la persona davanti al numero metterebbe uno sconosciuto prima
      della cifra. */
   .p2p-mio{border-color:var(--orange);opacity:.85}
+  /* LA CARD APPENA ARRIVATA (24 set 2026, il libro in ascolto): un velo
+     arancio che si spegne in un secondo e mezzo — un respiro, non un
+     lampo. Solo il fondo: niente si sposta e niente sfoca; con gli
+     effetti ridotti la regola universale la toglie, e la card e' quella
+     di sempre da subito. */
+  @keyframes p2pNuova{from{background:var(--sats-soft)}to{background:var(--card)}}
+  .p2p-ord.p2p-nuova{animation:p2pNuova 1.5s ease-out}
+  @media (prefers-reduced-motion:reduce){.p2p-ord.p2p-nuova{animation:none}}
   .p2p-tuo{background:rgba(255,138,0,.10);color:var(--orange);font-weight:700}
   /* ══ IL MARCHIO DEL METODO (16 set 2026) ══
      Il marchio sta al posto del NOME, in tre posti: la scatola dei
@@ -3798,6 +3817,19 @@
      cosa. La stessa ragione per cui la riga di stato e' `.nota-scambio`
      e non il verde della fiducia. */
   .p2p-passi{margin:14px 0 4px}
+  /* L'ARIA FRA UN BOTTONE E QUEL CHE LO SEGUE (24 set 2026, dalla prova
+     vera): nella pagina dello scambio e nei suoi fogli il testo o il
+     riquadro sotto un bottone gli stava attaccato — «Dove vuoi
+     ricevere i sats» sotto «Copia la cifra», il profilo sotto «Blocca i
+     sats», le righe sotto «Invia a chi compra» — perche' `.btn` non ha
+     margine e le note nemmeno. UNA regola, per fratello: quel che segue
+     un bottone e non e' un bottone prende 14px sopra; fra due bottoni
+     resta il passo di `.btn.ghost`. L'id della pagina e i corpi dei
+     fogli del P2P (tutti `p2p…Corpo`), cosi' vale anche per un foglio
+     che nasce domani. Specificita' sopra ogni margine di classe, e vale
+     nei due temi e a ogni larghezza perche' non tocca un colore. */
+  #p2pOrdineCorpo .btn+:not(.btn),
+  .sheet [id^="p2p"][id$="Corpo"] .btn+:not(.btn){margin-top:14px}
   /* le bolle della chat sono uscite con la fase 6: al posto dei
      messaggi ci sono i due recapiti cifrati, che vestono i pezzi di
      casa (field, hint, trust-note) e non chiedono CSS loro. */
@@ -5246,6 +5278,19 @@
      essere una macchia sola. */
   .conto-p2p .ctrl-riga.tot.sats .mono{color:var(--trust)}
   body.p2p-vendo .conto-p2p .ctrl-riga.tot.sats .mono{color:var(--danger)}
+  /* ⚠️ NELLA PAGINA DI UNO SCAMBIO PROPRIO IL LATO E' DELLA RIGA, NON
+     DEL TAB (24 set 2026, dalla prova vera: Andrea vende, e la riga
+     «Paghi X sats» del suo ordine appena pubblicato era VERDE). Le due
+     regole qui sopra leggono `body.p2p-vendo`, cioe' l'ultimo tab del
+     LIBRO guardato — che nella pagina di uno scambio non dice niente:
+     ci si arriva da «I miei scambi» col tab dov'era rimasto. Qui il
+     colore lo dice `o.lato`, scritto sulla scatola del conto da
+     renderOrdineP2P (`lato-compro` / `lato-vendo`): verde se i sats
+     ARRIVANO a chi legge, rosso se ESCONO — lo stesso significato
+     della barra e del libro. Sette classi contro sei piu' un elemento:
+     vince a prescindere dall'ordine nel foglio. */
+  .p2p-ord.lato-compro .conto-p2p .ctrl-riga.tot.sats .mono{color:var(--trust)}
+  .p2p-ord.lato-vendo .conto-p2p .ctrl-riga.tot.sats .mono{color:var(--danger)}
   .conto-p2p .ctrl-riga.tot.euro .mono{color:var(--ink)}
   .ctrl-riga.tot{font-weight:800;font-size:16.5px;padding:11px 0 10px}
   .ctrl-riga.tot .mono{color:var(--sats-text)}
@@ -13704,6 +13749,11 @@ function go(view){
      cronologia, e da vaiP2P non si passa. renderP2P dipinge ENTRAMBI
      i corpi (libro e miei), quindi le due viste chiamano lo stesso. */
   if (view==='p2p' || view==='p2pmiei') renderP2P();
+  /* IL LIBRO IN ASCOLTO (24 set 2026): l'orecchio sui 38383 si apre
+     entrando in una vista del P2P e si chiude uscendone — dalla VISTA,
+     come nav-p2p, cosi' vale anche per indietro e cronologia */
+  if (VISTE_NAV_P2P.has(view)) { if (typeof ascoltaLibroP2P === 'function') ascoltaLibroP2P(); }
+  else if (typeof chiudiAscoltoLibroP2P === 'function') chiudiAscoltoLibroP2P();
   /* la PRIMA apertura del libro in questa sessione saluta col dondolio
      del logo, poi dondola solo al cambio fra Compra e Vendi: tornando
      nel libro non piu' (scuotiLogoP2P toglie la classe a fine giro) */
@@ -43258,6 +43308,11 @@ function caricaLibroP2P(forza){
       };
       p2pErrore = '';
       p2pParziale = !completo;
+      /* col libro letto, se una vista del P2P e' aperta, l'orecchio
+         sui 38383 si apre (24 set 2026): la leva puo' essere arrivata
+         dopo il primo go() */
+      if (typeof ascoltaLibroP2P === 'function'
+          && VISTE_NAV_P2P.has(vistaAttivaP2P().replace('view-', ''))) ascoltaLibroP2P();
     } catch(e) {
       if (giro === p2pGiro) p2pErrore = e?.message || String(e);
       throw e;
@@ -44040,7 +44095,7 @@ function rigaOrdineP2P(o){
   const mio = ordineMioP2P(o.id);
   /* l'id viaggia nel dataset e non dentro la stringa dell'onclick:
      e' testo di sconosciuti — il patto del filtro-alfabeto */
-  return `<div class="p2p-ord${mio ? ' p2p-mio' : ''}" data-id="${esc(o.id)}" role="button" tabindex="0"
+  return `<div class="p2p-ord${mio ? ' p2p-mio' : ''}${typeof cardNuovaP2P === 'function' && cardNuovaP2P(o.id) ? ' p2p-nuova' : ''}" data-id="${esc(o.id)}" role="button" tabindex="0"
     onclick="prendiOrdineP2P(this.dataset.id)">
     <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${anelloScadenzaP2P(o)}</div>
     ${paghiEuro ? rigaSats : rigaEuro}
@@ -44170,8 +44225,12 @@ function renderP2P(){
     p2pScambiChiesto = true;
     chiediScambiServerP2P().then(ok => {
       if (!ok) return;
+      /* da qui l'archivio sa quel che sa il server: il pallino torna a
+         leggere il solo archivio (24 set 2026) */
+      p2pArchivioRinfrescato = true;
       renderP2P();
       if (p2pOrdineAperto) renderOrdineP2P();
+      if (typeof aggiornaPallinoScambiP2P === 'function') aggiornaPallinoScambiP2P();
     }).catch(() => {});
   }
   if (mz && !daGiudicare && !p2pMieiChiesto && !p2pMieiGiro
@@ -46884,6 +46943,108 @@ function ascoltaSuP2P(a, url, relay){
   }
 }
 
+/* ============ IL LIBRO IN ASCOLTO (24 set 2026, dalla prova vera Andrea/Alan) ============
+   Un ordine appena pubblicato — da chiunque, anche da chi lo pubblica —
+   compariva nel libro solo ricaricando: `leggiLibroMostro` e' una REQ
+   che si chiude all'EOSE, e la rilettura dei 60 secondi e' una rete di
+   sicurezza, non un orecchio. Qui l'orecchio: finche' una vista del P2P
+   e' aperta resta su UN ascolto ai 38383 del coordinatore, sui relay
+   dove lui scrive (il coro), e ogni evento entra nel libro gia' letto
+   senza rileggere niente. `ascoltaP2P` e' il coro di casa: si riapplica
+   da solo a chi si riconnette, e con un ascolto aperto la caduta di un
+   relay si riprova con l'attesa che cresce — quindi «se cade si
+   riprende» non e' codice nuovo, e' il coro. Lo SPECCHIO resta fuori,
+   apposta: il coro e' la gamba viva e non deve nominarlo (l'invariante
+   in ARCHITETTURA), e mostrod scrive prima sui suoi relay — lo
+   specchio arriva dopo, e la rilettura dei 60 s lo legge comunque.
+   FUORI DAL P2P L'ASCOLTO SI CHIUDE (`go`), e con lui i relay se
+   nessun altro li tiene: chi non ha scambi vivi non resta con tre
+   websocket aperti per aver guardato il libro.
+   IL LETTORE E' PURO (`fondiLibroP2P`): le stesse regole di
+   `libroDaEventi`, un evento alla volta — un 38383 non piu' `pending`
+   toglie la card se e' fresco almeno quanto lei; un `pending` leggibile,
+   nella valuta, non scaduto, entra o sostituisce se e' piu' fresco;
+   quel che non si capisce non muove niente. La card NUOVA si veste
+   `p2p-nuova` per un respiro (CSS, e con gli effetti ridotti niente),
+   e il ridisegno tiene fermo lo scorrimento: si misura dov'e' la prima
+   card visibile prima e dopo, e si compensa. */
+let p2pAscoltoLibro = null;      // l'ascolto aperto sul libro, o null
+let p2pLibroVisti = [];          // gli id degli eventi gia' entrati: i relay ripetono
+let p2pCardNuove = {};           // id -> quando e' comparsa: la card si veste «nuova»
+const P2P_NUOVA_MS = 2500;       // per quanto una card appena arrivata resta «nuova» ai ridisegni
+function fondiLibroP2P(libro, ev, adesso){
+  adesso = adesso || Math.floor(Date.now() / 1000);
+  const ordini = ((libro && libro.ordini) || []).slice();
+  const fuori = {ordini, cambiato: false, nuovo: '', via: ''};
+  if (!ev || ev.kind !== 38383) return fuori;
+  const id = String(tagValore(ev, 'd') || '');
+  if (!id) return fuori;
+  const quando = Number(ev.created_at) || 0;
+  const i = ordini.findIndex(o => o.id === id);
+  if (String(tagValore(ev, 's') || '') !== 'pending') {
+    if (i >= 0 && quando >= ordini[i].creato) { ordini.splice(i, 1); fuori.cambiato = true; fuori.via = id; }
+    return fuori;
+  }
+  const o = ordineDaEvento(ev, adesso);
+  if (!o || o.fiat !== P2P_VALUTA) return fuori;
+  if (i < 0) { ordini.unshift(o); fuori.cambiato = true; fuori.nuovo = id; }
+  else if (o.creato > ordini[i].creato) { ordini[i] = o; fuori.cambiato = true; }
+  return fuori;
+}
+function arrivaLibroP2P(ev){
+  if (!ev || !ev.id || p2pLibroVisti.indexOf(ev.id) >= 0) return false;
+  p2pLibroVisti.push(ev.id);
+  if (p2pLibroVisti.length > 600) p2pLibroVisti.splice(0, p2pLibroVisti.length - 300);
+  if (!p2pLibro) return false;   // la prima lettura e' in volo: porta anche questo
+  const r = fondiLibroP2P(p2pLibro, ev);
+  if (!r.cambiato) return false;
+  p2pLibro = {ordini: r.ordini.filter(o => !lapidataP2P(o.id)), quando: p2pLibro.quando};
+  if (r.nuovo) p2pCardNuove[r.nuovo] = Date.now();
+  diarioP2P('libro in ascolto: ' + (r.nuovo ? 'nuovo ordine ' + r.nuovo : r.via ? 'via ' + r.via : 'aggiornato'));
+  if (vistaAttivaP2P() === 'view-p2p') ridisegnaLibroFermoP2P();
+  return true;
+}
+function cardNuovaP2P(id){
+  const t = p2pCardNuove[id];
+  return !!(t && Date.now() - t < P2P_NUOVA_MS);
+}
+function ridisegnaLibroFermoP2P(){
+  const box = el('p2pCorpo');
+  let anc = '', top = 0;
+  if (box && window.scrollY > 0) {
+    for (const c of box.querySelectorAll('.p2p-ord[data-id]')) {
+      const r = c.getBoundingClientRect();
+      if (r.bottom > 0) { anc = c.dataset.id; top = r.top; break; }
+    }
+  }
+  renderP2P();
+  if (!anc || !box) return;
+  for (const c of box.querySelectorAll('.p2p-ord[data-id]')) {
+    if (c.dataset.id !== anc) continue;
+    const d = c.getBoundingClientRect().top - top;
+    if (d) window.scrollTo(0, window.scrollY + d);
+    break;
+  }
+}
+function ascoltaLibroP2P(){
+  if (p2pAscoltoLibro) return;
+  if (typeof DEMO !== 'undefined' && DEMO) return;
+  const c = p2pCoord();
+  if (!c || !c.mostro || !urlViviP2P().length) return;
+  const da = Math.floor(((p2pLibro && p2pLibro.quando) || Date.now()) / 1000) - 120;
+  p2pAscoltoLibro = ascoltaP2P([{kinds: [38383], authors: [c.mostro], since: da}],
+                               {onevent(ev){ arrivaLibroP2P(ev); }, oneose(){}, onclose(){}});
+  urlViviP2P().forEach(u => connettiUnoP2P(u).catch(() => {}));
+}
+function chiudiAscoltoLibroP2P(){
+  if (!p2pAscoltoLibro) return;
+  try { p2pAscoltoLibro.close(); } catch(e) {}
+  p2pAscoltoLibro = null;
+  if (p2pAscolti.length || Object.keys(ordiniAscoltoP2P()).length) return;
+  for (const u in p2pRelayVivi) { try { p2pRelayVivi[u].close(); } catch(e) {} }
+}
+/* ============ fine del libro in ascolto ============ */
+
 /* le trade key da ascoltare: quelle degli scambi non ancora finiti */
 function ordiniAscoltoP2P(){
   const m = {};
@@ -47887,6 +48048,49 @@ function tintaStatoP2P(o){
 function tonoCardP2P(o){
   const t = tintaStatoP2P(o).replace(' badge ', '');
   return t ? ' tinta tono-' + t : '';
+}
+/* ---- «✋ ASPETTA»: LA MOSSA E' DELL'ALTRA PERSONA (24 set 2026, dalla
+   prova vera Andrea/Alan) ----
+   PURA, gemella di `azioniDisponibili` e col suo stesso giudice: se
+   quel giudice ha un bottone, tocca a me e qui non c'e' niente; se lo
+   scambio e' finito, nel libro o in volo, nemmeno. Nel mezzo la mossa
+   e' dell'altra persona (o del pagamento, o di un moderatore) e si
+   dice CHI e COSA: il nome se la pagina lo sa (`nomeControparteP2P`),
+   «chi vende»/«chi compra» altrimenti. Torna `{chi, cosa}` o null.
+   ⚠️ LA RIGA SOLO DA GUARDARE SI GIUDICA COME SE LE CHIAVI CI FOSSERO:
+   `azioniDisponibili` le tace il bottone perche' non puo' firmare, ma
+   «aspetta» sarebbe falso — la mossa e' sua, su un altro dispositivo.
+   `annullo_proposto` resta senza pillola: il gesto e' mio ma non e'
+   il bottone pieno, la stessa scelta di `gruppoScambioP2P`. */
+function attesaAltraParteP2P(o){
+  if (!o || P2P_FINALI.indexOf(o.stato) >= 0) return null;
+  if (azioniDisponibili(o.soloVista ? Object.assign({}, o, {soloVista: false}) : o)) return null;
+  const compro = o.lato === 'compro';
+  const altro = nomeControparteP2P(o, compro ? 'chi vende' : 'chi compra');
+  const s = o.stato;
+  let cosa = '';
+  if (s === 'attesa_hold_venditore') cosa = 'sta bloccando i sats in garanzia';
+  else if (s === 'attesa_fattura_compratore') cosa = 'sta indicando dove ricevere i sats';
+  else if (s === 'attivo') cosa = compro ? 'deve indicarti dove inviare gli euro' : 'deve inviarti gli euro';
+  else if (s === 'euro_inviati') cosa = 'deve controllare gli euro e liberare i sats';
+  else if (s === 'fattura_nuova') cosa = 'deve dare una fattura nuova';
+  else if (s === 'annullo_chiesto') cosa = 'deve accettare di annullare';
+  else if (s === 'rilasciato' || s === 'pagamento_ritentato')
+    return {chi: '', cosa: 'I sats sono in pagamento verso ' + (compro ? 'il tuo wallet' : 'chi compra')};
+  else if (s === 'in_disputa') return {chi: 'Un moderatore', cosa: 'deve decidere'};
+  if (!cosa) return null;
+  return {chi: altro, cosa};
+}
+/* PURE: la pillola e la riga, o '' — per la card e per la pagina. Il
+   nome e' testo di un altro: passa da esc(). */
+function pillolaAttesaP2P(o){
+  return attesaAltraParteP2P(o) ? '<span class="p2p-aspetta">✋ Aspetta</span>' : '';
+}
+function rigaAttesaP2P(o){
+  const a = attesaAltraParteP2P(o);
+  if (!a) return '';
+  const chi = a.chi ? a.chi.charAt(0).toUpperCase() + a.chi.slice(1) + ' ' : '';
+  return '<span class="p2p-aspetta-riga">' + esc(chi + a.cosa) + '</span>';
 }
 function statoTestoP2P(o){
   const s = STATI_P2P[o && o.stato] || {t: 'Scambio in corso', d: ''};
@@ -49519,6 +49723,23 @@ const SECONDARI_EVIDENZA_P2P = {
   'accetta-annullo': '<button class="btn orange" onclick="accettaAnnulloP2P()">🤝 Accetta di annullare</button>'
 };
 
+/* ---- QUANDO IL BOTTONE «I VOSTRI RECAPITI» SERVE (24 set 2026, dalla
+   prova vera Andrea/Alan) ----
+   PURA, fase per fase. A chi COMPRA non serve: il recapito per gli euro
+   gli sta gia' sotto «Ho inviato gli euro» (`recapitoCompratoreP2P`) e
+   il foglio non gli darebbe altro — resta solo per un «contatto»
+   arrivato da un'app di ieri, che si legge soltanto la'. A chi VENDE
+   serve quando il recapito l'ha GIA' mandato — per rileggerlo o
+   cambiarlo (un IBAN sbagliato si corregge da li', e «l'ultimo che
+   mandi e' quello che vale») — mentre prima di mandarlo la porta e' il
+   bottone arancio del passo, che apre lo stesso foglio: due bottoni
+   per lo stesso gesto erano uno di troppo. A scambio finito non serve
+   a nessuno. */
+function serveRecapitiP2P(o){
+  if (!o || P2P_FINALI.indexOf(o.stato) >= 0) return false;
+  if (o.lato === 'vendo') return !!((o.campiMiei || {}).euro);
+  return !!((o.campiLoro || {}).contatto);
+}
 /* I RECAPITI NELLA PAGINA DELLO SCAMBIO (fase 6): qui sta la porta
    del foglio «I vostri recapiti», dove i due si scambiano i dati.
    ⚠️ E QUI NON STANNO PIU' LE DUE RIGHE DI PRIMA (23 set 2026,
@@ -49955,7 +50176,9 @@ function renderOrdineP2P(){
        il foglio dei recapiti, che e' dove serve davvero. Ripetuti
        qui, in grigio piccolo sotto un conto, erano due etichette che
        non decidevano niente. */
-    '<div class="p2p-ord">' + conto + '</div>' +
+    /* il conto veste il lato della RIGA, non del tab del libro (24
+       set 2026): vedi il CSS di `.p2p-ord.lato-vendo` */
+    '<div class="p2p-ord lato-' + (o.lato === 'vendo' ? 'vendo' : 'compro') + '">' + conto + '</div>' +
     anelloneTabacchinoP2P(o) +
     '<div class="p2p-passi"><div class="steps">' +
       passi.map((p, i) =>
@@ -49964,7 +50187,12 @@ function renderOrdineP2P(){
         + esc(p.d) + '</small></div>'
       ).join('') +
     '</div></div>' +
-    '<div class="trust-note nota-scambio"><span><b>' + esc(st.t) + '</b><br>' + esc(st.d) + '</span></div>' +
+    /* LE DUE PILLOLE ANCHE NELLA PAGINA (24 set 2026): «👉 tocca a te»
+       quando c'e' il bottone pieno, «✋ Aspetta» con la riga di chi fa
+       cosa quando la mossa e' dell'altra persona */
+    '<div class="trust-note nota-scambio"><span><b>' + esc(st.t) + '</b>'
+      + (azione ? '<span class="p2p-tocca">👉 tocca a te</span>' : pillolaAttesaP2P(o))
+      + (rigaAttesaP2P(o) || '<br>') + esc(st.d) + '</span></div>' +
     /* LA RIGA SOLO DA GUARDARE (24 set 2026, l'archivio del server):
        lo scambio c'e' e si segue, ma le chiavi cifrate con cui si
        fanno i gesti stanno sul dispositivo dove e' stato aperto */
@@ -50028,7 +50256,7 @@ function renderOrdineP2P(){
        manca si chiede. Compaiono solo quando si sa con chi si sta
        scambiando: prima non c'e' nessuno a cui mandarli, e un bottone
        che porta a un muro e' peggio di un bottone che non c'e'. */
-    (chiaviChatOrdine(o) ? campiOrdineP2P(o) : '') +
+    (chiaviChatOrdine(o) && serveRecapitiP2P(o) ? campiOrdineP2P(o) : '') +
     /* ⚠️ SOTTO LE USCITE NON C'E' PIU' NIENTE (set 2026, decisione di
        Andrea), ed e' la stessa scelta gia' fatta sotto il conto del
        libro: qui stava «I sats dello scambio restano custoditi in
@@ -50413,6 +50641,23 @@ function ricordaFatturaP2P(id, scade){
   agg.fatturaScade = Math.floor(Number(scade) || 0);
   scriviOrdineP2P(agg);
 }
+/* ---- I WALLET CHE COL P2P NON PASSANO (24 set 2026, dalla prova vera
+   Andrea/Alan) ----
+   Il coordinatore VERIFICA l'indirizzo Lightning da dietro Tor, con tre
+   budget stretti compilati nel binario, e Wallet of Satoshi a quel giro
+   non risponde: `invalid-invoice`, ogni volta (vedi CLAUDE.md, «LA DEV
+   FEE SI IMPIANTA SUL CIRCUITO FREDDO»). Un elenco non c'era: questo e'
+   il primo, e ha una voce — dominio dopo la chiocciola, e il nome da
+   dire. Il giudice e' PURO, guarda il solo dominio e in minuscolo, e
+   torna il nome del wallet o ''. Decide se la scorciatoia
+   dell'indirizzo salvato si offre; l'invio di un indirizzo scritto a
+   mano resta com'e' — il «no» del coordinatore ha gia' la sua frase
+   (`P2P_INDIRIZZO_RIFIUTATO`). */
+const P2P_WALLET_NON_PASSANO = {'walletofsatoshi.com': 'Wallet of Satoshi'};
+function walletNonPassaP2P(indirizzo){
+  const m = /^[^@\s]+@([^@\s]+)$/.exec(String(indirizzo || '').trim().toLowerCase());
+  return (m && P2P_WALLET_NON_PASSANO[m[1]]) || '';
+}
 function renderIncassoP2P(){
   const box = el('p2pIncassoCorpo');
   const o = ordiniP2P()[p2pIncassoOrdine];
@@ -50485,7 +50730,14 @@ function renderIncassoP2P(){
     /* la scorciatoia sta SOTTO l'avviso, che cosi' vale anche per lei;
        l'indirizzo e' testo dell'utente: a schermo passa da esc(), e
        nell'onclick non ci entra — lo rilegge la funzione */
-    (myLnAddress
+    /* L'INDIRIZZO SALVATO SI PROPONE SOLO SE PASSA (24 set 2026, dalla
+       prova vera): con Wallet of Satoshi la scorciatoia portava dritto
+       al rifiuto del coordinatore. Al suo posto si dice il perche' e
+       cosa fare, e il campo resta vuoto. */
+    (myLnAddress && walletNonPassaP2P(myLnAddress)
+      ? '<div class="hint p2p-wallet-no">⚠️ Il tuo indirizzo ' + esc(walletNonPassaP2P(myLnAddress))
+        + ' qui non funziona: incolla una fattura di un altro wallet.</div>'
+      : myLnAddress
       ? '<button class="btn ghost" type="button" onclick="usaIndirizzoSalvatoP2P()">⚡ Usa l\'indirizzo dei tuoi incassi: '
         + esc(myLnAddress) + '</button>'
       : '') +
@@ -50514,7 +50766,7 @@ function renderIncassoP2P(){
    cosi' l'indirizzo si puo' ancora correggere per questo solo scambio */
 function usaIndirizzoSalvatoP2P(){
   const c = el('p2pIncassoInp');
-  if (!c || !myLnAddress) return;
+  if (!c || !myLnAddress || walletNonPassaP2P(myLnAddress)) return;
   haptic();
   c.value = myLnAddress;
 }
@@ -54963,7 +55215,9 @@ function rigaScambioP2P(o){
     + righe
     + premioMioP2P(l)
     + '<div class="p2p-scambio-stato' + tintaStatoP2P(o) + '">'
-    + '<span>' + esc(st.t) + '</span>' + agire + '</div>'
+    /* ...e quando non tocca a me la casella dice «✋ Aspetta» con la
+       riga di cosa fa l'altra persona (24 set 2026) */
+    + '<span>' + esc(st.t) + '</span>' + (agire || pillolaAttesaP2P(o)) + rigaAttesaP2P(o) + '</div>'
     + (metodi.length ? '<div class="p2p-box p2p-paga'
              + (senzaNomi ? ' p2p-paga-marchio' : '')
              + (senzaNomi && finita ? ' p2p-paga-spenta' : '') + '" title="'
@@ -56239,12 +56493,35 @@ if (typeof document !== 'undefined' && document.addEventListener) {
    la raggiunge appena il motore riascolta.
    A LEVA SPENTA, IN VETRINA E SENZA CONTO NON SI ACCENDE: il tasto
    porterebbe dove il gesto non si puo' fare. E non rompe mai chi
-   scrive l'archivio: un errore resta qui dentro. */
+   scrive l'archivio: un errore resta qui dentro.
+   ⚠️ E ALL'APERTURA VALE ANCHE LA PAROLA DEL SERVER (24 set 2026, dalla
+   prova vera: il pallino compariva solo entrando nel P2P, quando il
+   motore ascolta). Il limite dichiarato qui sopra si cura senza aprire
+   nessun relay: `/api/me` — che l'app chiede comunque all'apertura —
+   porta `p2p_tocca`, quanti dei miei scambi aspettano un mio gesto
+   secondo la cronaca di mostrod (`_quanti_tocca_p2p`, il calco di
+   `azioniDisponibili` sul server). Vale FINCHE' l'archivio del server
+   non e' arrivato in questa sessione (`p2pArchivioRinfrescato`, alzata
+   da renderP2P quando `chiediScambiServerP2P` risponde): da li' in poi
+   l'archivio sa tutto quel che sa il server, e comanda lui — anche a
+   spegnere, che il server un gesto appena fatto lo vede dopo. E vale
+   solo se l'archivio dice zero: un gesto che l'archivio sa e' un fatto
+   piu' fresco di qualunque conto. Nessuna domanda nuova, nessun
+   orologio: il patto di sopra regge. */
+let p2pToccaServer = 0;             // da /api/me.p2p_tocca: a chi tocca, secondo il server
+let p2pArchivioRinfrescato = false; // l'archivio del server e' arrivato: da li' comanda l'archivio
 function aggiornaPallinoScambiP2P(){
   let n = 0;
   try {
-    if (!DEMO && !VETRINA && myTgId && p2pAcceso())
+    if (!DEMO && !VETRINA && myTgId && p2pAcceso()) {
       n = quantiToccaAMeP2P(mieiRigheP2P());
+      /* col typeof: il banco del pallino estrae questa funzione da sola,
+         senza le due variabili, e un ReferenceError nel try la
+         spegnerebbe in silenzio */
+      if (!n && typeof p2pToccaServer === 'number'
+          && typeof p2pArchivioRinfrescato !== 'undefined' && !p2pArchivioRinfrescato)
+        n = p2pToccaServer;
+    }
     document.querySelectorAll('.scambi-dot')
       .forEach(d => d.classList.toggle('on', n > 0));
   } catch(e) { }
@@ -56947,6 +57224,10 @@ async function avvia(){
     /* la leva dello scambio P2P per chi e' dentro: la prima delle due
        fonti di p2pAcceso, il calco di astaLeve */
     p2pLeve = me.p2p_leve || null;
+    /* A CHI TOCCA, DETTO DAL SERVER (24 set 2026): quanti dei miei
+       scambi aspettano un mio gesto secondo la cronaca di mostrod, per
+       il pallino all'apertura — vedi aggiornaPallinoScambiP2P */
+    p2pToccaServer = Number(me.p2p_tocca) || 0;
     /* ...e lo sconto fedelta' di CHI E' DENTRO (pioniere o livello 5):
        l'anonimo non ne ha, e la busta di vetrina non lo porta */
     p2pSconto = me.p2p_sconto || null;

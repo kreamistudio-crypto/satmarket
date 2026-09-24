@@ -58549,7 +58549,11 @@ function reset(){
      detta — mai 7468, che era la meta' tolta due volte. */
   {
     const h = nodi.p2pOrdineCorpo.innerHTML || '';
-    out.contoInCard = h.indexOf('<div class="p2p-ord"><div class="ctrl-conto conto-p2p">') >= 0;
+    /* EMENDATA (24 set 2026, ritocchi dal flusso vero): la scatola del
+       conto porta la classe del LATO della riga — `lato-compro` o
+       `lato-vendo` — perche' il colore della riga «Paghi X sats» non
+       segua piu' l'ultimo tab del libro */
+    out.contoInCard = /<div class="p2p-ord lato-(compro|vendo)"><div class="ctrl-conto conto-p2p">/.test(h);
     out.contoSullaCifraVera = h.indexOf('7619 sats') >= 0
       && h.indexOf('7543 sats') >= 0 && h.indexOf('7468') < 0;
     /* ...e la testa a due colonne non c'e' piu': quel che diceva —
@@ -68324,6 +68328,9 @@ def prove_p2p_card_scambio():
         "function euroTestoP2P(o){",
         "function metodoSceltoP2P(o){",
         "function comeLibroP2P(o){",
+        # le tre di «✋ Aspetta» (24 set 2026): la casella dello stato le chiama
+        "function attesaAltraParteP2P(o){", "function pillolaAttesaP2P(o){",
+        "function rigaAttesaP2P(o){",
         "function rigaScambioP2P(o){")]
     banco = "\n".join(pezzi) + r"""
 /* il cambio e la commissione sono le SOLE cose di cartone */
@@ -74162,7 +74169,7 @@ def prove_scambi_ovunque():
         i = _SORGENTE.index(c + " = ")
         exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
     for f in ("_euro_numero_p2p", "_metodi_lista_p2p", "_stato_scambio_p2p",
-              "_parti_mostro_p2p", "_scambi_p2p"):
+              "_parti_mostro_p2p", "_tocca_a_me_p2p", "_scambi_p2p"):
         exec(pezzo(f), amb)
     euro, metodi = amb["_euro_numero_p2p"], amb["_metodi_lista_p2p"]
     stato = amb["_stato_scambio_p2p"]
@@ -98464,12 +98471,406 @@ console.log(JSON.stringify(esiti));
           in css)
 
 
+def prove_ritocchi_flusso_p2p():
+    """RITOCCHI AL FLUSSO P2P DALLA PROVA VERA (24 set 2026: Andrea vende
+    BTC, Alan compra). Sette punti: 1) la riga «Paghi X sats» nella
+    pagina di uno scambio proprio veste il LATO DELLA RIGA e non l'ultimo
+    tab del libro; 2) l'indirizzo Wallet of Satoshi salvato non si
+    propone (e si dice perche'); 3) aria fra ogni bottone e quel che lo
+    segue, nella pagina e nei fogli; 4) «✋ Aspetta» con la riga di chi
+    fa cosa, in card e in pagina, col giudice di `azioniDisponibili`;
+    5) «🤝 I vostri recapiti» solo dove serve (`serveRecapitiP2P`);
+    6) il pallino all'apertura dal conto del server (`/api/me.p2p_tocca`,
+    `_tocca_a_me_p2p`), senza aprire i relay; 7) il libro in ascolto sui
+    38383 (`fondiLibroP2P` puro, `ascoltaLibroP2P` sul coro), aperto e
+    chiuso da go()."""
+    print("\n[ritocchi al flusso P2P dalla prova vera]")
+    import json as _json
+    import os as _os
+    import shutil as _sh
+    import sqlite3
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    css = mini[mini.index("<style>"):mini.index("</style>")]
+
+    def nudo(js):
+        return re.sub(r"/\*[\s\S]*?\*/", "", js)
+
+    def fn(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}\n"
+
+    # --- 1) IL COLORE DEL LATO NELLA PAGINA DELLO SCAMBIO -------------
+    prova("1) il conto della pagina porta la classe del lato della RIGA", True,
+          "'<div class=\"p2p-ord lato-' + (o.lato === 'vendo' ? 'vendo' : 'compro') + '\">' + conto + '</div>' +"
+          in fn("function renderOrdineP2P(){"))
+    prova("...e il CSS la veste: verde a comprare, rosso a vendere, sopra il tab del libro", True,
+          ".p2p-ord.lato-compro .conto-p2p .ctrl-riga.tot.sats .mono{color:var(--trust)}" in css
+          and ".p2p-ord.lato-vendo .conto-p2p .ctrl-riga.tot.sats .mono{color:var(--danger)}" in css
+          and css.index("body.p2p-vendo .conto-p2p .ctrl-riga.tot.sats .mono{color:var(--danger)}")
+              < css.index(".p2p-ord.lato-vendo .conto-p2p"))
+    prova("...senza una terza regola sui sats delle card (la sentinella del libro conta due)", 2,
+          mini.count(".p2p-ord .p2p-sats{color"))
+
+    # --- 2) WALLET OF SATOSHI NON SI PROPONE -------------------------
+    inc = nudo(fn("function renderIncassoP2P(){"))
+    prova("2) la scorciatoia dell'indirizzo salvato chiede prima al giudice dei wallet", True,
+          "(myLnAddress && walletNonPassaP2P(myLnAddress)" in inc
+          and inc.index("walletNonPassaP2P(myLnAddress)") < inc.index("usaIndirizzoSalvatoP2P()"))
+    prova("...e al suo posto dice perche' e cosa fare, col nome del wallet", True,
+          "qui non funziona: incolla una fattura di un altro wallet.</div>'" in inc
+          and "\">⚠️ Il tuo indirizzo ' + esc(walletNonPassaP2P(myLnAddress))" in inc)
+    prova("...la scorciatoia non scrive mai un indirizzo che non passa", True,
+          "if (!c || !myLnAddress || walletNonPassaP2P(myLnAddress)) return;"
+          in fn("function usaIndirizzoSalvatoP2P(){"))
+    prova("...l'elenco esiste, e' uno solo, e ha Wallet of Satoshi", True,
+          "const P2P_WALLET_NON_PASSANO = {'walletofsatoshi.com': 'Wallet of Satoshi'};" in mini
+          and mini.count("P2P_WALLET_NON_PASSANO") == 2)
+
+    # --- 3) L'ARIA SOTTO I BOTTONI ----------------------------------
+    prova("3) quel che segue un bottone prende 14px: nella pagina e in ogni foglio p2p…Corpo", True,
+          "#p2pOrdineCorpo .btn+:not(.btn),\n  .sheet [id^=\"p2p\"][id$=\"Corpo\"] .btn+:not(.btn){margin-top:14px}" in css)
+    corpi = re.findall(r'<div class="sheet" id="(p2p\w+Sheet)"[^>]*>\s*<div class="grab"></div>\s*<h3[^>]*>[^<]*</h3>\s*<div id="(\w+)"', mini)
+    prova("...e ogni foglio del P2P ha un corpo che quel selettore prende", True,
+          len(corpi) >= 5 and all(c.startswith("p2p") and c.endswith("Corpo") for _, c in corpi))
+    prova("...la pagina dello scambio e' quel corpo", True,
+          'id="p2pOrdineCorpo"' in mini)
+
+    # --- 4) «✋ ASPETTA» ----------------------------------------------
+    card = nudo(fn("function rigaScambioP2P(o){"))
+    prova("4) nella card la casella dello stato dice «tocca a te» O «Aspetta», e la riga di chi fa cosa", True,
+          "+ '<span>' + esc(st.t) + '</span>' + (agire || pillolaAttesaP2P(o)) + rigaAttesaP2P(o) + '</div>'" in card)
+    ren = nudo(fn("function renderOrdineP2P(){"))
+    prova("...e nella pagina le due pillole stanno accanto al titolo, la riga al posto dell'a capo", True,
+          "(azione ? '<span class=\"p2p-tocca\">👉 tocca a te</span>' : pillolaAttesaP2P(o))" in ren
+          and "(rigaAttesaP2P(o) || '<br>') + esc(st.d)" in ren)
+    prova("...il CSS: stesso corpo della manina, riga a tutta larghezza, niente movimento", True,
+          ".p2p-aspetta{font-size:12px;font-weight:700;white-space:nowrap}" in css
+          and ".p2p-aspetta-riga{flex-basis:100%;" in css
+          and "p2p-aspetta{animation" not in css)
+    att = nudo(fn("function attesaAltraParteP2P(o){"))
+    prova("...il giudice e' quello del bottone pieno, e la riga solo da guardare si giudica con le chiavi", True,
+          "if (azioniDisponibili(o.soloVista ? Object.assign({}, o, {soloVista: false}) : o)) return null;" in att
+          and "P2P_FINALI.indexOf(o.stato) >= 0" in att)
+
+    # --- 5) «I VOSTRI RECAPITI» SOLO DOVE SERVE ----------------------
+    prova("5) il bottone dei recapiti passa dal giudice delle fasi", True,
+          "(chiaviChatOrdine(o) && serveRecapitiP2P(o) ? campiOrdineP2P(o) : '') +" in ren)
+    prova("...e il bottone arancio del passo apre lo stesso foglio (la porta di chi vende senza recapito)", True,
+          "recapito: '<button class=\"btn orange\" onclick=\"apriCampiP2P()\">💶 Indica dove ricevere gli euro</button>'" in mini)
+
+    # --- 6) IL PALLINO ALL'APERTURA, DAL SERVER -----------------------
+    av = fn("async function avvia(){")
+    prova("6) /api/me porta p2p_tocca e avvia lo legge PRIMA di accendere il pallino", True,
+          0 < av.find("p2pToccaServer = Number(me.p2p_tocca) || 0;")
+          < re.search(r"^\s*aggiornaPallinoScambiP2P\(\);", av, re.M).start())
+    pal = nudo(fn("function aggiornaPallinoScambiP2P(){"))
+    prova("...il pallino legge il conto del server solo a archivio zero e non ancora rinfrescato", True,
+          "n = quantiToccaAMeP2P(mieiRigheP2P());" in pal
+          and "&& typeof p2pArchivioRinfrescato !== 'undefined' && !p2pArchivioRinfrescato)" in pal
+          and "n = p2pToccaServer;" in pal)
+    prova("...e non chiede niente a nessuno nemmeno adesso", [],
+          [s for s in ("setInterval", "setTimeout", "fetch(", "subscribe(") if s in pal])
+    rp = nudo(fn("function renderP2P(){"))
+    prova("...l'archivio del server arrivato alza la bandierina e ricalcola", True,
+          "p2pArchivioRinfrescato = true;" in rp
+          and rp.index("p2pArchivioRinfrescato = true;") < rp.index("if (typeof aggiornaPallinoScambiP2P === 'function') aggiornaPallinoScambiP2P();"))
+    prova("...sul server: /api/me conta prima di chiudere il database, e lo scrive nel profilo", True,
+          '_quanti_tocca_p2p(con, user["id"], int(time.time()))' in pezzo("mio_profilo")
+          and pezzo("mio_profilo").index("_quanti_tocca_p2p(") < pezzo("mio_profilo").index("con.close()")
+          and 'profilo["p2p_tocca"] = p2p_tocca' in pezzo("mio_profilo"))
+    prova("...e la rotta degli scambi serve `tocca` e `recapito_detto` in ogni riga", True,
+          '"tocca": _tocca_a_me_p2p(q["stato"], lato, recapito),' in pezzo("_scambi_p2p")
+          and '"recapito_detto": bool(recapito),' in pezzo("_scambi_p2p"))
+
+    amb = {"json": _json, "sqlite3": sqlite3, "MAX_ORDINI_P2P": 200}
+    for c in ("P2P_STORICO_GIORNI", "_PESO_MOMENTO_P2P"):
+        i = _SORGENTE.index(c + " = ")
+        exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
+    for f in ("_euro_numero_p2p", "_metodi_lista_p2p", "_stato_scambio_p2p",
+              "_parti_mostro_p2p", "_tocca_a_me_p2p", "_scambi_p2p", "_quanti_tocca_p2p"):
+        exec(pezzo(f), amb)
+    tocca = amb["_tocca_a_me_p2p"]
+    prova("il giudice del server: chi compra tocca su fattura, fattura nuova, e attivo col recapito detto",
+          [True, True, False, True, False, False],
+          [tocca("attesa_mia_fattura", "compro", False), tocca("fattura_nuova", "compro", False),
+           tocca("attivo", "compro", False), tocca("attivo", "compro", True),
+           tocca("euro_inviati", "compro", True), tocca("attesa_hold_venditore", "compro", False)])
+    prova("...chi vende tocca su garanzia, attivo senza recapito, euro inviati",
+          [True, True, False, True, False, False, False],
+          [tocca("attesa_mia_hold", "vendo", False), tocca("attivo", "vendo", False),
+           tocca("attivo", "vendo", True), tocca("euro_inviati", "vendo", True),
+           tocca("attesa_fattura_compratore", "vendo", False), tocca("rilasciato", "vendo", True),
+           tocca("", "vendo", False)])
+    stato = amb["_stato_scambio_p2p"]
+
+    def m(momento, q, attore="mostro", dettaglio="", giro=1):
+        return {"momento": momento, "quando": q, "attore": attore,
+                "dettaglio": dettaglio, "giro": giro}
+    pag = [m("preso", 100, "buyer"), m("fattura_data", 110, "buyer", "hold-next"),
+           m("garanzia_chiesta", 110, "mostro", "invoice"), m("garanzia_pagata", 120, "seller")]
+    prova("la dichiarazione del recapito (momento 'recapito') non spegne piu' lo stato: resta attivo",
+          ["attivo", "attivo", "euro_inviati"],
+          [stato(pag + [m("recapito", 125, "seller")], "compro", "buyer", "", False)["stato"],
+           stato(pag + [m("recapito", 125, "seller")], "vendo", "buyer", "", False)["stato"],
+           stato(pag + [m("recapito", 125, "seller"), m("fiat", 130, "buyer")], "vendo", "buyer", "", False)["stato"]])
+    prova("...e un momento sconosciuto da solo continua a non raccontare niente", "",
+          stato([m("boh", 100)], "compro", "buyer", "in-progress", False)["stato"])
+
+    KA, KB = "a1" * 32, "b2" * 32
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    ORA = 1_800_000_000
+    con.executescript(
+        "CREATE TABLE p2p_scambi(ordine TEXT PRIMARY KEY, compratore INTEGER DEFAULT 0,"
+        " venditore INTEGER DEFAULT 0, preso_dal TEXT DEFAULT '', giro INTEGER DEFAULT 0,"
+        " sats INTEGER DEFAULT 0, sats_compratore INTEGER DEFAULT 0,"
+        " sats_venditore INTEGER DEFAULT 0, chiave_compratore TEXT DEFAULT '',"
+        " chiave_venditore TEXT DEFAULT '', aggiornato INTEGER DEFAULT 0);"
+        "CREATE TABLE p2p_ordini(ordine TEXT PRIMARY KEY, tg_id INTEGER, lato TEXT DEFAULT '',"
+        " maker INTEGER DEFAULT 0, stato TEXT DEFAULT '', euro TEXT DEFAULT '',"
+        " sats INTEGER DEFAULT 0, metodi TEXT DEFAULT '', creato INTEGER DEFAULT 0);"
+        "CREATE TABLE p2p_momenti(ordine TEXT, momento TEXT, quando INTEGER, fonte TEXT,"
+        " giro INTEGER DEFAULT 0, attore TEXT DEFAULT '', dettaglio TEXT DEFAULT '');"
+        "CREATE TABLE chiavi_p2p(pubkey TEXT PRIMARY KEY, tg_id INTEGER);"
+        f"INSERT INTO chiavi_p2p VALUES('{KA}',111),('{KB}',222);"
+        f"INSERT INTO p2p_ordini VALUES('ord-1',111,'sell',1,'in-progress','10,00 €',15000,'[\"SEPA\"]',{ORA - 3600});"
+        f"INSERT INTO p2p_scambi VALUES('ord-1',222,111,'buyer',1,15000,14850,15150,'{KB}','{KA}',{ORA - 100});"
+        f"INSERT INTO p2p_momenti VALUES('ord-1','preso',{ORA - 300},'mostro',1,'buyer','');")
+    quanti = amb["_quanti_tocca_p2p"]
+
+    def passo(momento, q, attore, fonte="mostro", dettaglio=""):
+        con.execute("INSERT INTO p2p_momenti VALUES('ord-1',?,?,?,1,?,?)",
+                    (momento, ORA - q, fonte, attore, dettaglio))
+    prova("dal database: alla presa di chi compra tocca a lui (222), non a chi vende (111)",
+          [1, 0], [quanti(con, 222, ORA), quanti(con, 111, ORA)])
+    passo("fattura_data", 290, "buyer", dettaglio="hold-next"); passo("garanzia_chiesta", 290, "mostro", dettaglio="invoice")
+    prova("...fattura data: tocca a chi vende bloccare", [0, 1], [quanti(con, 222, ORA), quanti(con, 111, ORA)])
+    passo("garanzia_pagata", 280, "seller")
+    prova("...garanzia pagata, recapito non detto: tocca a chi vende indicarlo", [0, 1],
+          [quanti(con, 222, ORA), quanti(con, 111, ORA)])
+    passo("recapito", 270, "seller", fonte="telefono")
+    prova("...recapito detto dal telefono: tocca a chi compra mandare gli euro", [1, 0],
+          [quanti(con, 222, ORA), quanti(con, 111, ORA)])
+    passo("fiat", 260, "buyer")
+    prova("...euro inviati: tocca a chi vende liberare", [0, 1], [quanti(con, 222, ORA), quanti(con, 111, ORA)])
+    passo("concluso", 250, "mostro")
+    prova("...concluso: a nessuno; e chi non e' della partita conta zero", [0, 0, 0],
+          [quanti(con, 222, ORA), quanti(con, 111, ORA), quanti(con, 333, ORA)])
+    vuoto = sqlite3.connect(":memory:"); vuoto.row_factory = sqlite3.Row
+    prova("...un database senza le tabelle vale zero, non un errore", 0, quanti(vuoto, 111, ORA))
+
+    # --- 7) IL LIBRO IN ASCOLTO -------------------------------------
+    blocco = nudo(mini[mini.index("/* ============ IL LIBRO IN ASCOLTO"):
+                       mini.index("/* ============ fine del libro in ascolto")])
+    prova("7) l'ascolto e' UNO, sui 38383 del coordinatore, sul coro di casa", True,
+          "p2pAscoltoLibro = ascoltaP2P([{kinds: [38383], authors: [c.mostro], since: da}]," in blocco
+          and "if (p2pAscoltoLibro) return;" in blocco
+          and "urlViviP2P().forEach(u => connettiUnoP2P(u).catch(() => {}));" in blocco)
+    prova("...e non nomina mai lo specchio: la gamba viva resta la gamba viva", False,
+          "specchio" in blocco.lower())
+    prova("...niente orologio e niente domanda a casa: e' il coro che si riprende da solo", [],
+          [s for s in ("setInterval", "fetch(", "new WebSocket") if s in blocco])
+    prova("...fuori dal P2P l'ascolto si chiude, e i relay con lui se nessun altro li tiene", True,
+          "try { p2pAscoltoLibro.close(); } catch(e) {}" in blocco
+          and "if (p2pAscolti.length || Object.keys(ordiniAscoltoP2P()).length) return;" in blocco
+          and "for (const u in p2pRelayVivi) { try { p2pRelayVivi[u].close(); } catch(e) {} }" in blocco)
+    go = nudo(fn("function go(view){"))
+    prova("...go() lo apre entrando in una vista del P2P e lo chiude uscendone, dalla VISTA", True,
+          "if (VISTE_NAV_P2P.has(view)) { if (typeof ascoltaLibroP2P === 'function') ascoltaLibroP2P(); }" in go
+          and "else if (typeof chiudiAscoltoLibroP2P === 'function') chiudiAscoltoLibroP2P();" in go)
+    prova("...e la prima lettura del libro lo apre anche lei, se la vista e' quella", True,
+          "&& VISTE_NAV_P2P.has(vistaAttivaP2P().replace('view-', ''))) ascoltaLibroP2P();"
+          in fn("function caricaLibroP2P(forza){"))
+    prova("...la card nuova si veste, e il CSS la spegne in un respiro e con gli effetti ridotti", True,
+          "${typeof cardNuovaP2P === 'function' && cardNuovaP2P(o.id) ? ' p2p-nuova' : ''}" in mini
+          and ".p2p-ord.p2p-nuova{animation:p2pNuova 1.5s ease-out}" in css
+          and "@media (prefers-reduced-motion:reduce){.p2p-ord.p2p-nuova{animation:none}}" in css)
+    prova("...il ridisegno tiene fermo lo scorrimento sulla prima card visibile", True,
+          "if (r.bottom > 0) { anc = c.dataset.id; top = r.top; break; }" in blocco
+          and "if (d) window.scrollTo(0, window.scrollY + d);" in blocco)
+    motore = re.sub(r"/\*[\s\S]*?\*/", "",
+                    mini[mini.index("const MOSTRO_ORDINI_CHIAVE"):
+                         mini.index("/* ============ fine del motore dello scambio")])
+    prova("...il motore resta a zero fetch e zero corpo anche col libro in ascolto", [0, 0],
+          [motore.count("fetch("), motore.count("body:")])
+
+    # --- IL BANCO NODE DEI GIUDICI PURI ------------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco node dei giudici del flusso P2P", "node non c'e'")
+        return
+    cart = _tf.mkdtemp(prefix="flussop2p_")
+    pezzi = "\n".join([
+        pezzo_js(mini, "const P2P_FINALI = ", "\n"),
+        pezzo_js(mini, "const P2P_VALUTA = ", "\n"),
+        pezzo_js(mini, "const P2P_WALLET_NON_PASSANO = ", "\n"),
+        "let p2pControparti = {};",
+        "const esc = s => String(s ?? '').replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));",
+        "function euroTabacchinoP2P(){ return 0; }",
+        fn("function tagValore(ev, nome){"), fn("function tagValori(ev, nome){"),
+        fn("function ordineDaEvento(ev, adesso){"),
+        fn("function azioniDisponibili(o){"), fn("function recapitoEuroArrivatoP2P(o){"),
+        fn("function aspettaRecapitoP2P(o){"), fn("function nomeControparteP2P(o, ripiego){"),
+        fn("function attesaAltraParteP2P(o){"), fn("function pillolaAttesaP2P(o){"),
+        fn("function rigaAttesaP2P(o){"), fn("function serveRecapitiP2P(o){"),
+        fn("function walletNonPassaP2P(indirizzo){"), fn("function fondiLibroP2P(libro, ev, adesso){"),
+        fn("function gruppoScambioP2P(o){"), fn("function quantiToccaAMeP2P(righe){"),
+        mini[mini.index("let p2pToccaServer = 0;"):
+             mini.index("\n}\n", mini.index("function aggiornaPallinoScambiP2P(){")) + 3],
+    ])
+    banco = pezzi + r"""
+const esiti = {};
+const dice = (k, v) => { esiti[k] = v; };
+// 2) i wallet
+dice('wos', ['io@walletofsatoshi.com', ' IO@WalletOfSatoshi.COM ', 'io@wallet.com', 'lnbc1abc', '', 'a@b@walletofsatoshi.com']
+  .map(walletNonPassaP2P));
+// 5) i recapiti, fase per fase
+const r = (lato, stato, extra) => Object.assign({id: 'x', lato, stato, peer: 'p'}, extra || {});
+dice('recapiti', [
+  serveRecapitiP2P(r('compro', 'attivo', {campiLoro: {euro: {testo: 'IBAN'}}})),
+  serveRecapitiP2P(r('compro', 'attivo', {campiLoro: {contatto: {testo: '@alan'}}})),
+  serveRecapitiP2P(r('compro', 'euro_inviati', {campiLoro: {euro: {testo: 'IBAN'}}})),
+  serveRecapitiP2P(r('vendo', 'attivo')),
+  serveRecapitiP2P(r('vendo', 'attivo', {campiMiei: {euro: {testo: 'IBAN'}}})),
+  serveRecapitiP2P(r('vendo', 'euro_inviati', {campiMiei: {euro: {testo: 'IBAN'}}})),
+  serveRecapitiP2P(r('vendo', 'attesa_mia_hold')),
+  serveRecapitiP2P(r('vendo', 'concluso', {campiMiei: {euro: {testo: 'IBAN'}}})),
+  serveRecapitiP2P(r('compro', 'concluso', {campiLoro: {contatto: {testo: '@alan'}}})),
+  serveRecapitiP2P(null)
+]);
+// 4) aspetta
+const A = (lato, stato, extra) => attesaAltraParteP2P(r(lato, stato, extra));
+dice('aspetta', [
+  A('compro', 'attesa_hold_venditore'), A('vendo', 'attesa_fattura_compratore'),
+  A('compro', 'attivo'), A('compro', 'attivo', {campiLoro: {euro: {testo: 'IBAN'}}}),
+  A('vendo', 'attivo'), A('vendo', 'attivo', {campiMiei: {euro: {testo: 'IBAN'}}}),
+  A('compro', 'euro_inviati'), A('vendo', 'euro_inviati'),
+  A('vendo', 'fattura_nuova'), A('compro', 'fattura_nuova'),
+  A('compro', 'rilasciato'), A('vendo', 'pagamento_ritentato'),
+  A('vendo', 'in_disputa'), A('compro', 'annullo_chiesto'), A('compro', 'annullo_proposto'),
+  A('vendo', 'pubblicato', {mio: true}), A('compro', 'concluso'), A('vendo', 'annullato'),
+  A('vendo', 'attesa_mia_hold'), A('compro', 'attesa_mia_fattura'),
+  A('compro', 'attesa_mia_fattura', {soloVista: true}), A('compro', 'attesa_hold_venditore', {soloVista: true}),
+  A('compro', 'prendo'), A('compro', 'senza_risposta')
+]);
+p2pControparti = {x: {nome: 'Alan <Rossi>'}};
+dice('conNome', [attesaAltraParteP2P(r('compro', 'attesa_hold_venditore')).chi,
+  rigaAttesaP2P(r('compro', 'attesa_hold_venditore')), pillolaAttesaP2P(r('compro', 'attesa_hold_venditore')),
+  rigaAttesaP2P(r('vendo', 'attesa_mia_hold')), pillolaAttesaP2P(r('vendo', 'attesa_mia_hold')),
+  rigaAttesaP2P(r('compro', 'rilasciato')), rigaAttesaP2P(r('vendo', 'in_disputa'))]);
+p2pControparti = {};
+// 7) il lettore del libro
+const ev = (id, at, s, extra) => ({kind: 38383, id: 'e' + id + at, pubkey: 'm', created_at: at,
+  tags: [['d', id], ['k', 'sell'], ['f', (extra && extra.f) || 'EUR'], ['s', s], ['fa', '10'], ['pm', 'SEPA'],
+         ['expires_at', String((extra && extra.exp) || 9999999999)]]});
+const ord = (id, creato) => ({id, lato: 'sell', stato: 'pending', fiat: 'EUR', euro: 10, euroMax: 0,
+  sats: 0, premium: 0, metodi: ['SEPA'], scade: 0, creato});
+const libro = {ordini: [ord('A', 100), ord('B', 200)], quando: 1};
+const ADESSO = 1000;
+const f1 = fondiLibroP2P(libro, ev('C', 300, 'pending'), ADESSO);
+const f2 = fondiLibroP2P(libro, ev('A', 50, 'pending'), ADESSO);
+const f3 = fondiLibroP2P(libro, ev('A', 150, 'pending'), ADESSO);
+const f4 = fondiLibroP2P(libro, ev('B', 250, 'in-progress'), ADESSO);
+const f5 = fondiLibroP2P(libro, ev('A', 100, 'canceled'), ADESSO);
+const f6 = fondiLibroP2P(libro, ev('A', 90, 'canceled'), ADESSO);
+const f7 = fondiLibroP2P(libro, ev('Z', 300, 'success'), ADESSO);
+const f8 = fondiLibroP2P(libro, Object.assign(ev('D', 300, 'pending'), {kind: 38385}), ADESSO);
+const f9 = fondiLibroP2P(libro, ev('D', 300, 'pending', {f: 'USD'}), ADESSO);
+const f10 = fondiLibroP2P(libro, ev('D', 300, 'pending', {exp: 500}), ADESSO);
+const f11 = fondiLibroP2P(null, ev('D', 300, 'pending'), ADESSO);
+const f12 = fondiLibroP2P(libro, null, ADESSO);
+dice('libro', {
+  nuovo: [f1.cambiato, f1.nuovo, f1.ordini.map(o => o.id), f1.ordini[0].creato],
+  vecchio: [f2.cambiato, f2.ordini.length],
+  fresco: [f3.cambiato, f3.nuovo, f3.ordini.map(o => o.id), f3.ordini[0].creato],
+  preso: [f4.cambiato, f4.via, f4.ordini.map(o => o.id)],
+  annullatoPari: [f5.cambiato, f5.via], annullatoVecchio: [f6.cambiato],
+  ignoto: [f7.cambiato, f7.ordini.length], info: [f8.cambiato], usd: [f9.cambiato],
+  scaduto: [f10.cambiato], senzaLibro: [f11.cambiato, f11.ordini.length, f11.nuovo], senzaEvento: [f12.cambiato],
+  intatto: libro.ordini.map(o => o.id + ':' + o.creato)
+});
+// 6) il pallino
+const dots = [{on: null, classList: {toggle(c, v){ this.on = v; }}}, {on: null, classList: {toggle(c, v){ this.on = v; }}}];
+globalThis.document = {querySelectorAll(){ return dots; }};
+let DEMO = false, VETRINA = false, myTgId = 111;
+let righe = [];
+function p2pAcceso(){ return true; }
+function mieiRigheP2P(){ return righe; }
+const acceso = () => dots.map(d => d.classList.on);
+const pal = [];
+p2pToccaServer = 2; pal.push([aggiornaPallinoScambiP2P(), acceso()]);
+p2pArchivioRinfrescato = true; pal.push([aggiornaPallinoScambiP2P(), acceso()]);
+p2pArchivioRinfrescato = false; righe = [r('compro', 'attesa_mia_fattura')]; p2pToccaServer = 0; pal.push([aggiornaPallinoScambiP2P(), acceso()]);
+righe = [r('compro', 'attesa_hold_venditore')]; pal.push([aggiornaPallinoScambiP2P(), acceso()]);
+righe = [r('compro', 'attesa_hold_venditore')]; p2pToccaServer = 1; p2pArchivioRinfrescato = true; pal.push([aggiornaPallinoScambiP2P(), acceso()]);
+p2pArchivioRinfrescato = false; righe = [r('compro', 'attesa_mia_fattura')]; p2pToccaServer = 1; pal.push([aggiornaPallinoScambiP2P(), acceso()]);
+DEMO = true; righe = []; pal.push([aggiornaPallinoScambiP2P(), acceso()]);
+dice('pallino', pal);
+console.log(JSON.stringify(esiti));
+"""
+    p = _os.path.join(cart, "flusso_p2p.js")
+    open(p, "w", encoding="utf-8").write(banco)
+    rr = _sp.run([node, p], capture_output=True, text=True, encoding="utf-8")
+    prova("il banco node dei giudici gira", "", (rr.stderr or "")[-800:])
+    if rr.returncode or not rr.stdout.strip():
+        _sh.rmtree(cart, ignore_errors=True)
+        return
+    e = _json.loads(rr.stdout)
+    _sh.rmtree(cart, ignore_errors=True)
+    prova("2) il giudice dei wallet: Wallet of Satoshi in ogni forma, mai gli altri",
+          ["Wallet of Satoshi", "Wallet of Satoshi", "", "", "", ""], e["wos"])
+    prova("5) i recapiti fase per fase: mai a chi compra (salvo un contatto di ieri), a chi vende solo col recapito mandato, mai a fine",
+          [False, True, False, False, True, True, False, False, False, False], e["recapiti"])
+    a = e["aspetta"]
+    prova("4) «Aspetta» dove la mossa e' dell'altra persona, con chi e cosa",
+          [{"chi": "chi vende", "cosa": "sta bloccando i sats in garanzia"},
+           {"chi": "chi compra", "cosa": "sta indicando dove ricevere i sats"},
+           {"chi": "chi vende", "cosa": "deve indicarti dove inviare gli euro"}, None,
+           None, {"chi": "chi compra", "cosa": "deve inviarti gli euro"},
+           {"chi": "chi vende", "cosa": "deve controllare gli euro e liberare i sats"}, None,
+           {"chi": "chi compra", "cosa": "deve dare una fattura nuova"}, None],
+          a[:10])
+    prova("...il pagamento in corso, il moderatore, l'annullo chiesto",
+          [{"chi": "", "cosa": "I sats sono in pagamento verso il tuo wallet"},
+           {"chi": "", "cosa": "I sats sono in pagamento verso chi compra"},
+           {"chi": "Un moderatore", "cosa": "deve decidere"},
+           {"chi": "chi vende", "cosa": "deve accettare di annullare"}],
+          a[10:14])
+    prova("...e niente su annullo proposto, libro, finali, i miei gesti, la riga solo da guardare col gesto mio, e i voli",
+          [None] * 9, a[14:21] + a[22:24])
+    prova("...la riga solo da guardare in attesa vera lo dice lo stesso", "chi vende",
+          (a[21] or {}).get("chi"))
+    prova("...col nome della pagina, e il nome passa da esc()",
+          ["Alan", '<span class="p2p-aspetta-riga">Alan sta bloccando i sats in garanzia</span>',
+           '<span class="p2p-aspetta">✋ Aspetta</span>', "", "",
+           '<span class="p2p-aspetta-riga">I sats sono in pagamento verso il tuo wallet</span>',
+           '<span class="p2p-aspetta-riga">Un moderatore deve decidere</span>'],
+          e["conNome"])
+    lb = e["libro"]
+    prova("7) un ordine nuovo entra in testa e si dice nuovo", [True, "C", ["C", "A", "B"], 300], lb["nuovo"])
+    prova("...una copia vecchia non muove niente", [False, 2], lb["vecchio"])
+    prova("...una copia piu' fresca sostituisce senza dirsi nuova", [True, "", ["A", "B"], 150], lb["fresco"])
+    prova("...preso (non piu' pending) esce, e si dice chi", [True, "B", ["A"]], lb["preso"])
+    prova("...annullato con la stessa data esce, uno piu' vecchio della card no",
+          [[True, "A"], [False]], [lb["annullatoPari"], lb["annullatoVecchio"]])
+    prova("...uno stato finale di un ordine mai visto, un 38385, un'altra valuta, uno scaduto: niente",
+          [[False, 2], [False], [False], [False]], [lb["ignoto"], lb["info"], lb["usd"], lb["scaduto"]])
+    prova("...senza libro entra da solo, senza evento niente; e il libro di partenza non si tocca",
+          [[True, 1, "D"], [False], ["A:100", "B:200"]], [lb["senzaLibro"], lb["senzaEvento"], lb["intatto"]])
+    prova("6) il pallino: il conto del server accende ad archivio vuoto, si spegne a archivio rinfrescato",
+          [[2, [True, True]], [0, [False, False]]], e["pallino"][:2])
+    prova("...l'archivio comanda quando dice qualcosa, e a rinfrescato comanda lui anche a zero",
+          [[1, [True, True]], [0, [False, False]], [0, [False, False]], [1, [True, True]], [0, [False, False]]],
+          e["pallino"][2:7])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi, prove_scambi_ovunque,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,
