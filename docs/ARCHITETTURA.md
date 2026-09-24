@@ -15911,6 +15911,91 @@
   nella PWA, cioè la stessa ✕ farebbe due cose diverse sui due
   telefoni. Fra una garanzia che c'è solo a metà e una regola onesta,
   la regola.
+  UN CARRELLO PER VENDITORE (24 set 2026, idea di due utenti). Il
+  carrello APERTO vive nelle due variabili di sempre — `setScelte` e
+  `paccoDati` — e nessuna funzione del carrello le legge diversamente;
+  gli altri stanno da parte in `carrelliDaParte` (venditore → {scelte,
+  dati}) e si rimontano con `montaCarrello`, che mette da parte
+  l'aperto SE ha qualcosa dentro e tira fuori quello chiesto o ne apre
+  uno nuovo. `apriPacco` monta invece di svuotare; `carrelliTutti` è
+  la lista (l'aperto in testa) di «🛒 Carrelli (N)» — nella barra degli
+  strumenti, visibile solo con `body.solo-barattolo` e almeno un
+  carrello pieno — e di «I tuoi carrelli» (`view-carrelli`, la testata
+  del carrello, un blocco `.order` per venditore con miniature, totale
+  dei soli articoli, «Apri» e «Controlla e paga»; `rimontaCarrello`
+  rimette la provenienza su `currentListing`). Il carrellino sulle
+  card (`bottoneCarrelloCard`) nasce SOLO mentre `renderGrid` disegna
+  il barattolo, con la bandierina `cardConCarrello` alzata attorno
+  alla sua mappa: `cardHTML` serve anche le celle del pacco, «Altri
+  oggetti» e il negozio, e una regola sulla vista le avrebbe prese
+  tutte. In alto a sinistra, 34px col `::after` a 44, la classe
+  `.con-carrello` sulla card fa scendere il badge di stato a 48px;
+  spento con `aria-disabled` e il motivo (`motivoCarrelloCard`:
+  proprio, non attivo, ferie, asta, senza strada fisica), mai
+  `disabled`; `toccaCarrelloCard` aggiunge (via `apriPacco`) o toglie
+  (`togliDalCarrello`), e `aggiornaCarrelloCards` ritocca i bottoncini
+  in place — chiamata da `apriPacco`, `svuotaPacco` e `rinfrescaViste`.
+  Tutto in memoria, come il carrello di sempre.
+  IL PAGAMENTO UNICO DI PIÙ CARRELLI (24 set 2026). LA BUSTA È UNA RIGA
+  DI `pagamenti` con motivo `carrello` (importo = la somma, hash e
+  bolt11 della fattura unica, la cassaforte del denaro nuovo): il
+  registro generico degli incassi, con le sue lapidi, la sua ripresa e
+  i due giri dell'orologio che smistano per motivo
+  (`_incasso_del_motivo` → `_incassa_carrello`). Gli ordini nascono da
+  `_compra_set(user, d, busta)` — niente conio, hash e bolt11
+  condivisi in colonna, `pagamento_id` verso la busta, una riga sola
+  ammessa — e sono ordini come gli altri da lì in poi. `POST
+  /api/carrelli/paga` (`paga_carrelli`) fa DUE PASSATE: i preventivi
+  (`_preventivo_set` col flag `pagamento_unico`) sommano e coniano, poi
+  ogni carrello passa da `_compra_set` che rifà il conto dalle stesse
+  pure e si ferma se non torna al sat; una caduta a metà seppellisce
+  tutto (`_seppellisci_carrello`: busta 'annullato', ordini 'annullato',
+  offerte sciolte — mai un DELETE). `POST /api/carrelli/{id}/verifica`
+  è il poll (proprietà nella WHERE); a fattura pagata
+  `_incassa_carrello` passa la busta a 'pagato' col CAS e
+  `_avanza_ordini_carrello` — IDEMPOTENTE, la chiamano anche il poll
+  del singolo ordine e la verifica a busta già pagata con ordini fermi
+  — fa nascere o morire ogni ordine: `_merce_mancante` ricontrolla la
+  merce (un 'creato' ha tenuto la prenotazione; un 'annullato' l'ha
+  persa e guarda anche `_riservati`), chi c'è passa da
+  `_incassa_ordine`, chi no va in 'refund' con `mai_incassato=1` e
+  `_rimborsa_compratore` restituisce la sua parte SENZA rimettere in
+  vetrina, senza toccare il negozio collegato e senza parlare di una
+  disputa. `_esito_carrello` (nati, morti, in attesa) è quel che legge
+  chi perde la corsa. I DUE GIRI dell'orologio saltano gli ordini di
+  busta (`AND pagamento_id=0`) e li governano dalla busta: la lapide di
+  `controlla_abbandonati` passa da `_seppellisci_carrello`, il saldo
+  tardivo di `controlla_annullati` da `_incassa_carrello`.
+  `verifica_pagamento` su un ordine di busta chiede alla busta e
+  risponde lo stato suo (più `pagamento_unico`, così il client svuota
+  tutti i carrelli); `nuova_fattura_ordine` ripresenta la fattura
+  condivisa con l'importo intero e non rigenera mai per un ordine solo;
+  `annulla_ordine` rifiuta l'ordine di busta (`POST
+  /api/carrelli/{id}/annulla` la seppellisce tutta, pagamento
+  controllato prima); `_rimborso_del_motivo` NON conosce 'carrello',
+  apposta: la busta si rimborsa ordine per ordine. `miei_ordini` porta
+  `pagamento_unico_sats` e `pagamento_unico_stato` accanto agli ordini
+  di busta; il libro mastro ha due controlli nuovi (ordine con una
+  busta che non c'è; busta pagata da più di un'ora con ordini fermi) e
+  il memo «Barattolo escrow carrello #» sta fra i NOSTRI di
+  `orfani.py`. IL CLIENT: `apriAcquistoSet(busta)` apre la cassa in
+  modalità «prepara» (`acqDati.busta`: titolo «Prepara il carrello»,
+  niente «Aggiungi altro», bottone «✓ Pronto per il pagamento unico»,
+  il set a una riga non devia sul mono); `ctaAcquisto` con la busta
+  chiama `salvaCarrelloPronto`, che salva in `carrelliPronti` il body
+  che `startBuySet` avrebbe mandato con la FIRMA della composizione
+  (`firmaScelte`; `carrelloPronto` la confronta: cambia il carrello,
+  decade) e torna ai carrelli; `aggiornaBarraCarrelli` scrive la barra
+  `#barraCarrelli` (`body.con-carrelli` solo in vista e con due
+  carrelli o più): «Prepara il prossimo» finché ne manca uno, poi
+  «Paga tutto insieme» → `startBuyCarrelli`, gemello di `startBuySet`
+  col body a carrelli, stesso paySheet in veste escrow, poll
+  `verificaCarrelli`; `carrelliCorrente` è la quarta modalità del
+  foglio (con `sheetPaid` e `annullaPagamento`), e a saldo arrivato si
+  svuota tutto e si va agli Ordini. `mapOrder` porta `pagamentoId`,
+  `maiIncassato` e `pagamentoUnicoSats`: «Paga ora» apre la fattura
+  unica con la cifra intera, la scaduta non si rigenera, e l'ordine
+  mai nato parla della parte che torna, non di una disputa.
   IL CARRELLO SI PAGA DOVE SI CONTROLLA (ago 2026, decisione di
   Andrea): la pagina del RIEPILOGO non esiste più — né il foglio
   `#setSheet` che l'aveva preceduta, né la vista
