@@ -18798,6 +18798,14 @@ TETTO_LEGACY = 500        # rete di sicurezza per chi chiama senza limit
 # Niente paginazione apposta: se non ci stanno in dodici, il messaggio
 # e' gia' passato.
 TETTO_ESAURITI = 12
+# I feedback del negozio (24 set 2026): il client ne mostra TRE e apre
+# gli altri con «Mostra tutti (N)» — quindi TUTTI devono arrivare, e i
+# dieci di ieri non bastavano piu' (un venditore con dodici voti avrebbe
+# letto «tutti» su dieci). Un TETTO resta, perche' la lista viaggia a
+# ogni apertura del negozio: un commento sta sotto i 200 caratteri e
+# cinquanta righe restano poche decine di KB. Oltre, il client lo dice
+# («Mostra gli ultimi N») confrontando con `n_feedback`.
+TETTO_FEEDBACK_NEGOZIO = 50
 
 
 # Gli ordinamenti della vetrina: chiave del keyset + verso. Il
@@ -20619,9 +20627,9 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     # pagina in poi non le legge nessuno — ne' la sezione «Altri
     # oggetti del venditore» del dettaglio, che da qui pagina il
     # negozio, ne' lo scorrimento della pagina negozio, che gia' oggi
-    # si scarica fino a 12 esauriti arricchiti e 10 feedback per
-    # pagina e li butta (`caricaAltriNegozio` legge `annunci` e
-    # `cursore`, il resto lo ignora).
+    # si scarica fino a 12 esauriti arricchiti e TETTO_FEEDBACK_NEGOZIO
+    # feedback per pagina e li butta (`caricaAltriNegozio` legge
+    # `annunci` e `cursore`, il resto lo ignora).
     # LE CHIAVI RESTANO, VUOTE E MAI ASSENTI: un client in cache che
     # scriva `d.feedback.length` non deve esplodere — un'assenza si
     # dice con una lista vuota, non togliendo la chiave.
@@ -20670,8 +20678,8 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
         " ELSE au.avatar END) AS da_avatar "
         "FROM feedback f LEFT JOIN ordini o ON o.id=f.ordine_id "
         "LEFT JOIN utenti au ON au.tg_id=f.da_tg_id "
-        "WHERE f.per_tg_id=? ORDER BY f.creato DESC LIMIT 10",
-        (v["tg_id"],))]
+        "WHERE f.per_tg_id=? ORDER BY f.creato DESC LIMIT ?",
+        (v["tg_id"], TETTO_FEEDBACK_NEGOZIO))]
     # Sul profilo pubblico TUTTI i distintivi guadagnati (lug 2026,
     # bacheca stile Vinted): sono aggregati senza segreti, e il
     # foglietto del negozio li racconta uno a uno. L'ordine del

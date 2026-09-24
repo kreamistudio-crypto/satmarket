@@ -20889,6 +20889,34 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   che è dei badge spedizione: un colore che significa una cosa non se
   ne prende un'altra. Misurati, testo su fondo: Telegram 5,36 e 7,81,
   Nostr 4,91 e 7,88 — AA pieno in entrambi i temi.
+  I TONDI DEL RIQUADRO VENDITORE (24 set 2026, decisione di Andrea):
+  nel NEGOZIO — e quindi nelle pagine dei Consigliati e nei profili
+  pubblici — e nel PROFILO i due ponti e «Condividi il negozio» non
+  sono più bottoni a tutta larghezza sotto il riquadro ma cerchi
+  DENTRO, sotto le stelle: `tondiVenditore` (l'aeroplanino, il pallino
+  Nostr, i due anelli). Stessa ricetta velata e stessi token, quindi
+  gli stessi contrasti; cerchio da 38px, area di tocco da 44 data dal
+  `::after`, il nome dell'azione in aria-label e title. Stesse funzioni
+  e stesse condizioni dei bottoni che sostituiscono, e l'alfabeto si
+  filtra DENTRO la fabbrica (la cura B2 dell'audit 2). Nel tondo il
+  pallino Nostr prende `--nostr-text`: senza la scritta accanto deve
+  reggere da solo il 3:1, e il viola pieno sulla velatura della sera
+  fa 2,6 (di giorno i due token sono lo stesso #7C3AED).
+  «UNA AZIONE, UN VESTITO» CEDE QUI, per decisione: i ponti grandi di
+  `pontiContatto` restano DENTRO L'ORDINE (`pontiOrdine`, dove un
+  riquadro che li ospiti non c'è) e nella pagina dello SCAMBIO P2P
+  (`pontiControparteP2P`, il contatto principale con l'altra persona:
+  si decide a parte). Il censimento lo tiene una prova.
+  GLI ULTIMI FEEDBACK, TRE ALLA VOLTA (stesso giorno): giudice puro
+  `feedbackNegozioHTML` — i tre più recenti, gli altri in un
+  contenitore che nasce `hidden` a ogni disegno e si apre con la riga
+  «Mostra tutti (N) ▾» / «Mostra meno ▴» (`toggleFeedbackAltri`,
+  aria-expanded). «Tutti» è vero fino a `TETTO_FEEDBACK_NEGOZIO` (50;
+  erano dieci), oltre la riga dice «Mostra gli ultimi N». La riga di
+  un feedback veste la CARTA (`.trust-note.nota-feedback`: `--card`,
+  filo `--line`, rientrata ai 16px della pagina) e non più il verde
+  della fiducia; le sue stelle sono `--sats-text`, perché l'arancio
+  pieno sul bianco fa 2,3:1.
   E L'USCITA DI SICUREZZA HA LA STESSA RICETTA (ago 2026): «⚠️ C'è un
   problema — apri disputa» era un testuale sottolineato
   (`.danger-ghost`) e in fila coi due ponti colorati spariva — proprio

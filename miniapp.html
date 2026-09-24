@@ -4042,6 +4042,18 @@
     vertical-align:-5px}
   .fb-chi{cursor:pointer;text-decoration:underline;
     text-decoration-thickness:1px;text-underline-offset:2px}
+  /* «Mostra tutti (N) ▾» sotto i primi tre feedback (24 set 2026,
+     decisione di Andrea): una RIGA e non un bottone pieno — apre la
+     lista che c'e' gia', non porta da nessuna parte. Alta 44px, che e'
+     un bersaglio del dito, rientrata come le card che apre, e in
+     --ink-soft, che sulla pagina regge nei due temi (6,7:1 e 10:1). */
+  .fb-tutti{display:flex;align-items:center;min-height:44px;
+    width:calc(100% - 2 * var(--pad));margin:-8px var(--pad) 4px;
+    padding:0 2px;border:0;background:none;font:inherit;font-size:13.5px;
+    font-weight:800;color:var(--ink-soft);cursor:pointer;text-align:left}
+  .fb-tutti:active{opacity:.6}
+  .fb-tutti:focus-visible{outline:2.5px solid var(--sats);outline-offset:2px;
+    border-radius:8px}
 
   /* ---------- viste / navigazione ---------- */
   .view{display:none}
@@ -6363,6 +6375,22 @@
      dentro il markup. Sullo span funziona perche' i figli di un flex
      sono di livello blocco. */
   .trust-note.nota-promessa span::first-letter{text-transform:uppercase}
+  /* I FEEDBACK DEL NEGOZIO SU CARTA (24 set 2026, decisione di Andrea):
+     non piu' verdi. Il verde e' il registro della FIDUCIA — il deposito
+     di garanzia — e il giudizio di un'altra persona non e' quello. La
+     superficie e' quella delle card di casa, `--card` col filo `--line`
+     (di giorno il bianco un filo piu' chiaro della carta, di sera il
+     bruno un filo piu' chiaro del fondo), con l'inchiostro della prosa.
+     RIENTRANO AI BORDI della pagina come il riquadro venditore sopra:
+     a filo schermo una card si legge come una striscia, e il verde di
+     ieri ci stava solo perche' era un fondo tinto.
+     LE STELLE PARLANO L'ARANCIO DEL TESTO (--sats-text) e non quello
+     pieno di `.stars`, che sul bianco sta a 2,3:1: qui fanno 5,0:1 di
+     giorno e 8,5:1 di sera, e la riga piccola in fondo (l'inchiostro a
+     .65) 4,8 e 6,1 — AA nei due temi, misurati da prove.py. */
+  .trust-note.nota-feedback{background:var(--card);color:var(--ink);
+    border:1px solid var(--line);margin-left:var(--pad);margin-right:var(--pad)}
+  .trust-note.nota-feedback .stars{color:var(--sats-text)}
   /* Pillole informative del dettaglio: strade discrete e disponibilita' */
   .pills{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px}
   .pill{background:var(--card);border:1.5px solid var(--field-line);border-radius:999px;
@@ -6803,6 +6831,47 @@
   .btn.ponte.nostr{background:var(--nostr-soft);color:var(--nostr-text);
     border-color:var(--nostr-text);box-shadow:0 3px 0 var(--nostr-text)}
   .btn.ponte:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
+  /* I TONDI DEL RIQUADRO VENDITORE (24 set 2026, decisione di Andrea):
+     nel negozio e nel Profilo i due ponti e «Condividi il negozio» non
+     sono piu' bottoni a tutta larghezza sotto il riquadro — tre blocchi
+     da 54px davanti a una pagina che parla del venditore — ma cerchi
+     DENTRO il riquadro, sotto le stelle.
+     STESSA RICETTA DEI PONTI, in piccolo: la velatura del mondo dove
+     portano, contorno e ombra piena nella tinta forte (azzurro
+     Telegram, viola Nostr; il link e' il ghost di casa, carta e
+     inchiostro) — gli stessi token, quindi gli stessi contrasti misurati.
+     Il cerchio che si vede e' 38px, l'AREA DI TOCCO e' 44: la da' il
+     ::after, 5px oltre il bordo interno (38 − 2×2 di bordo + 2×5), e
+     fra due vicini restano 2px di nessuno — due aree che si toccano
+     farebbero scegliere al dito. Il nome dell'azione, che a schermo non
+     c'e' piu', lo portano aria-label e title. */
+  .tondi{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}
+  .tondo{position:relative;flex:none;width:38px;height:38px;padding:0;
+    display:inline-flex;align-items:center;justify-content:center;
+    border:2px solid;border-radius:50%;cursor:pointer;font:inherit;
+    transition:transform .1s,box-shadow .1s}
+  .tondo::after{content:'';position:absolute;inset:-5px}
+  .tondo svg{width:20px;height:20px;display:block}
+  /* Nel tondo il pallino Nostr e' da SOLO a dire di che mondo si parla
+     (la scritta non c'e' piu'), quindi deve reggere il 3:1 del
+     non-testo: il viola pieno sulla velatura di sera fa 2,6:1, quello
+     del testo 7,9. Di giorno i due token sono lo stesso #7C3AED, e il
+     pallino resta identico a quello accanto al nome. */
+  .tondo .ico-nostr{width:17px;height:17px;fill:currentColor}
+  .tondo .ico-tg{width:23px;height:23px}
+  .tondo.tg{background:var(--tg-soft);color:var(--tg-soft-on);
+    border-color:var(--tg-soft-on);box-shadow:0 2px 0 var(--tg-soft-on)}
+  .tondo.nostr{background:var(--nostr-soft);color:var(--nostr-text);
+    border-color:var(--nostr-text);box-shadow:0 2px 0 var(--nostr-text)}
+  .tondo.link{background:var(--card);color:var(--ink);
+    border-color:var(--ink);box-shadow:0 2px 0 var(--ink)}
+  .tondo:active{transform:translateY(2px);box-shadow:none}
+  .tondo:focus-visible{outline:2.5px solid var(--sats);outline-offset:3px}
+  /* l'aeroplanino di Telegram pieno, gli spigoli smussati dal tratto;
+     i due anelli del link solo a contorno */
+  .ico-tg{fill:currentColor;stroke:currentColor;stroke-width:1.3;
+    stroke-linejoin:round}
+  .ico-link{fill:none;stroke:currentColor;stroke-width:2.1}
   /* L'USCITA DI SICUREZZA (ago 2026): «C'è un problema — apri
      disputa» era un testuale sottolineato (.danger-ghost), e in fila
      coi due ponti colorati spariva — proprio il bottone che deve
@@ -17625,10 +17694,14 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
       : '';
   };
   const chi = (v.nome||'').split(' ')[0];
-  const ponti = mio ? '' : pontiContatto(
-    (v.username||'').replace(/[^A-Za-z0-9_]/g,''),
-    (v.npub_verificata && v.npub ? v.npub : '').replace(/[^a-z0-9]/g,''),
-    chi ? `a ${esc(chi)}` : 'al venditore');
+  /* I PONTI E IL LINK SONO TONDI DENTRO IL RIQUADRO (24 set 2026): i due
+     ponti mai sul PROPRIO negozio, il link del negozio anche li'. Il
+     perche', e il filtro-alfabeto, stanno su `tondiVenditore`. */
+  const tondi = tondiVenditore(
+    mio ? '' : v.username,
+    mio ? '' : (v.npub_verificata && v.npub ? v.npub : ''),
+    chi ? `a ${esc(chi)}` : 'al venditore',
+    (v.username||v.negozio) ? 'negozio' : '');
   el('negozioHeader').innerHTML = `
     ${bannerNegozio(v)}
     ${raccontoNegozio(v)}
@@ -17637,10 +17710,9 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
       <div class="who"><b>${esc(v.nome||'—')}${badge}${fiducia}</b>
         ${titoloRiga(v.titolo)}
         <div class="rep">${rep}</div>
+        ${tondi}
       </div>
-    </div>
-    ${ponti}
-    ${(v.username||v.negozio)?`<button class="btn ghost" onclick="condividiNegozio()">🔗 Condividi il negozio</button>`:''}`;
+    </div>`;
   /* LE DUE PROMESSE SCENDONO SOTTO «In vetrina in questo negozio»
      (ago 2026, decisione di Andrea), e l'ordine di montaggio non
      cambia: 🚚 PRIMA della 🎁, come in Paga, in «Altri oggetti» e nel
@@ -17651,33 +17723,7 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
      prima resterebbe a schermo su un negozio che non ne ha. */
   el('negozioPromesse').innerHTML =
     `${spedGratisNegozioRiga(v)}${scontoNegozioRiga(v)}`;
-  /* Gli ultimi feedback ricevuti: stelle, commento, ruolo, data — e
-     CHI li ha scritti, con nome e faccia (ago 2026). Un voto senza un
-     volto non si puo' pesare: e' la stessa ragione del «da N persone».
-     Il nome porta al SUO negozio, dove i ponti Telegram/Nostr ci sono
-     gia' — nessun recapito qui, o sarebbe una seconda porta da tenere
-     allineata. L'oggetto comprato non esce MAI: si vede che ha fatto
-     un affare qui, non che cosa ha preso. Il codice del negozio passa
-     dal filtro-alfabeto, che finisce dentro un onclick. */
-  el('negozioFeedback').innerHTML = feedback.length ? `
-    <div class="section-label" style="margin-top:16px">Gli ultimi feedback</div>
-    ${feedback.map(f=>{
-      const cod = (f.da_negozio||'').replace(/[^A-Za-z0-9]/g,'');
-      const chi = f.da_nome || '';
-      const faccia = `<span class="fb-faccia">${avatarImg(f.da_avatar)}${esc((chi||'?')[0])}</span>`;
-      const nome = chi
-        ? (cod ? `<b class="fb-chi" onclick="apriNegozio('${cod}')">${esc(chi)}</b>`
-               : `<b>${esc(chi)}</b>`)
-        : '<b>Un utente</b>';
-      return `
-      <div class="trust-note" style="align-items:flex-start">
-        <span class="stars">${'★'.repeat(f.voto)}</span>
-        <span>${nome} ${faccia}<br>
-          ${f.commento?`${esc(f.commento)}<br>`:''}
-          <small style="opacity:.65">${f.ruolo==='acquirente'?'ha comprato qui':f.ruolo==='venditore'?'ha venduto qui':f.ruolo==='scambio'?'da uno scambio P2P':'utente'} · ${new Date(f.creato*1000).toLocaleDateString('it-IT')}</small>
-          ${isAdmin?` <a href="#" onclick="rimuoviFeedback(${f.id});return false" style="color:var(--danger);font-size:12px">rimuovi</a>`:''}
-        </span>
-      </div>`;}).join('')}` : '';
+  el('negozioFeedback').innerHTML = feedbackNegozioHTML(feedback, v.n_feedback);
   el('negozioGrid').innerHTML = annunci.length
     ? annunci.map(cardHTML).join('')
     : `<div class="empty" style="grid-column:1/-1">
@@ -17705,6 +17751,75 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
   }
   armaViste();
   go('negozio');
+}
+
+/* GLI ULTIMI FEEDBACK DEL NEGOZIO, TRE ALLA VOLTA (24 set 2026,
+   decisione di Andrea). Se ne vedono i TRE piu' recenti — il server li
+   manda gia' dal piu' nuovo — e se ce ne sono altri una riga «Mostra
+   tutti (N) ▾» li apre sotto, e diventa «Mostra meno ▴». MAI TUTTI
+   APERTI ALL'INIZIO: gli altri nascono `hidden` a ogni disegno, e
+   renderNegozio gira a ogni apertura del negozio — anche le pagine dei
+   Consigliati, che sono il negozio col racconto in testa.
+   «TUTTI» DEV'ESSERE VERO: il server ne manda fino a
+   TETTO_FEEDBACK_NEGOZIO, e se il venditore ne ha di piu' (il conto
+   vero e' `n_feedback`, lo stesso delle stelle nel riquadro) la riga
+   dice «Mostra gli ultimi N» invece di promettere quel che non ha.
+   La riga di ogni feedback: stelle, commento, ruolo, data — e CHI l'ha
+   scritto, con nome e faccia (ago 2026). Un voto senza un volto non si
+   puo' pesare: e' la stessa ragione del «da N persone». Il nome porta
+   al SUO negozio, dove i ponti Telegram/Nostr ci sono gia' — nessun
+   recapito qui, o sarebbe una seconda porta da tenere allineata.
+   L'oggetto comprato non esce MAI: si vede che ha fatto un affare qui,
+   non che cosa ha preso. Il codice del negozio passa dal
+   filtro-alfabeto, che finisce dentro un onclick.
+   Pura (legge solo `isAdmin`): la fa girare il banco di prove.py. */
+const FEEDBACK_VISIBILI = 3;
+function feedbackNegozioHTML(feedback, nFeedback){
+  if (!feedback || !feedback.length) return '';
+  const riga = f => {
+    const cod = (f.da_negozio||'').replace(/[^A-Za-z0-9]/g,'');
+    const chi = f.da_nome || '';
+    const faccia = `<span class="fb-faccia">${avatarImg(f.da_avatar)}${esc((chi||'?')[0])}</span>`;
+    const nome = chi
+      ? (cod ? `<b class="fb-chi" onclick="apriNegozio('${cod}')">${esc(chi)}</b>`
+             : `<b>${esc(chi)}</b>`)
+      : '<b>Un utente</b>';
+    return `
+      <div class="trust-note nota-feedback" style="align-items:flex-start">
+        <span class="stars">${'★'.repeat(f.voto)}</span>
+        <span>${nome} ${faccia}<br>
+          ${f.commento?`${esc(f.commento)}<br>`:''}
+          <small style="opacity:.65">${f.ruolo==='acquirente'?'ha comprato qui':f.ruolo==='venditore'?'ha venduto qui':f.ruolo==='scambio'?'da uno scambio P2P':'utente'} · ${new Date(f.creato*1000).toLocaleDateString('it-IT')}</small>
+          ${isAdmin?` <a href="#" onclick="rimuoviFeedback(${f.id});return false" style="color:var(--danger);font-size:12px">rimuovi</a>`:''}
+        </span>
+      </div>`;
+  };
+  const altri = feedback.slice(FEEDBACK_VISIBILI);
+  const apri = feedback.length >= (Number(nFeedback) || 0)
+    ? `Mostra tutti (${feedback.length}) ▾`
+    : `Mostra gli ultimi ${feedback.length} ▾`;
+  return `
+    <div class="section-label" style="margin-top:16px">Gli ultimi feedback</div>
+    ${feedback.slice(0, FEEDBACK_VISIBILI).map(riga).join('')}
+    ${altri.length ? `<div id="fbAltri" hidden>${altri.map(riga).join('')}</div>
+    <button type="button" class="fb-tutti" aria-expanded="false"
+      aria-controls="fbAltri" data-apri="${apri}"
+      onclick="toggleFeedbackAltri(this)">${apri}</button>` : ''}`;
+}
+/* Il tocco sulla riga: apre o chiude gli altri, e la riga dice il
+   gesto che fara' dopo. Chiudendo, la riga risale di tutta la lista
+   che sparisce: se stava in fondo allo schermo finirebbe sopra, fuori
+   vista — si riporta a portata, e 'nearest' non muove niente se si
+   vede gia'. */
+function toggleFeedbackAltri(b){
+  const box = el('fbAltri');
+  if (!box || !b) return;
+  haptic();
+  const apre = box.hidden;
+  box.hidden = !apre;
+  b.setAttribute('aria-expanded', apre ? 'true' : 'false');
+  b.textContent = apre ? 'Mostra meno ▴' : b.dataset.apri;
+  if (!apre) b.scrollIntoView({block: 'nearest'});
 }
 
 /* SOLO ADMIN: rimozione di un commento abusivo dal negozio.
@@ -17767,6 +17882,51 @@ function pontiContatto(username, npub, chi, cls){
   if (username) b.push(`<button class="${c} tg" onclick="apriChat('${username}')">✈️ Scrivi ${chi} su Telegram</button>`);
   if (npub) b.push(`<button class="${c} nostr" onclick="apriNostrProfilo('${npub}')">${etichettaNostr(`Scrivi ${chi} su Nostr`)}</button>`);
   return b.join('');
+}
+/* I TONDI DEL RIQUADRO VENDITORE (24 set 2026, decisione di Andrea):
+   nel NEGOZIO (e quindi nelle pagine dei Consigliati) e nel PROFILO i
+   due ponti e «Condividi il negozio» sono cerchi DENTRO il riquadro,
+   sotto le stelle, e non piu' bottoni a tutta larghezza sotto di lui.
+   Fanno ESATTAMENTE quel che facevano: stesse funzioni (`apriChat`,
+   `apriNostrProfilo`, `condividiNegozio` / `condividiMioNegozio`) e
+   stesse condizioni — Telegram solo con lo username pubblico, Nostr
+   solo con la npub dal possesso dimostrato, il link solo se il negozio
+   ha un indirizzo. Il nome dell'azione, che a schermo non c'e' piu',
+   lo portano aria-label e title.
+   L'ALFABETO SI FILTRA QUI DENTRO, e non solo nei chiamanti (la cura
+   B2 dell'audit del 23 set, per la fabbrica nuova): username e npub
+   finiscono in un onclick, e una difesa che vive nella funzione vale
+   anche per il chiamante di domani. `chi` arriva gia' passato da esc().
+   I PONTI GRANDI RESTANO dove un riquadro che li ospiti non c'e' —
+   dentro l'ordine, `pontiOrdine` — e nella pagina dello scambio P2P,
+   dove sono il contatto principale con l'altra persona: quella si
+   decide a parte (Andrea: «chiedimi prima di toccarlo»). */
+/* L'aeroplanino disegnato a mano sulle proporzioni del logo (largo
+   quanto alto, un filo a sinistra e in basso nel cerchio, come nel
+   logo): ala, muso, coda e la tacca fra ala e coda. */
+const ICO_TELEGRAM = '<svg class="ico-tg" viewBox="0 0 24 24" aria-hidden="true">'
+  + '<path d="M3.1 12.6 19.6 5.4 17.2 20.4 12.3 16.9 9.9 19.6 9.1 15.6Z"/></svg>';
+const ICO_LINK = '<svg class="ico-link" viewBox="0 0 24 24" aria-hidden="true">'
+  + '<g transform="rotate(-45 12 12)"><rect x="1.8" y="8.3" width="11.4" '
+  + 'height="7.4" rx="3.7"/><rect x="10.8" y="8.3" width="11.4" '
+  + 'height="7.4" rx="3.7"/></g></svg>';
+const TONDO_CONDIVIDI = {
+  negozio: ['condividiNegozio()', 'Condividi il negozio'],
+  mio: ['condividiMioNegozio()', 'Condividi il link del tuo negozio']
+};
+function tondiVenditore(username, npub, chi, condividi){
+  const u = String(username || '').replace(/[^A-Za-z0-9_]/g, '');
+  const n = String(npub || '').replace(/[^a-z0-9]/g, '');
+  const link = (condividi === 'negozio' || condividi === 'mio')
+    ? TONDO_CONDIVIDI[condividi] : null;
+  const tondo = (cls, azione, nome, ico) =>
+    `<button type="button" class="tondo ${cls}" onclick="${azione}" `
+    + `aria-label="${nome}" title="${nome}">${ico}</button>`;
+  const b = [];
+  if (u) b.push(tondo('tg', `apriChat('${u}')`, `Scrivi ${chi} su Telegram`, ICO_TELEGRAM));
+  if (n) b.push(tondo('nostr', `apriNostrProfilo('${n}')`, `Scrivi ${chi} su Nostr`, ICO_NOSTR));
+  if (link) b.push(tondo('link', link[0], link[1], ICO_LINK));
+  return b.length ? `<div class="tondi">${b.join('')}</div>` : '';
 }
 /* LA FOTO VERA DELL'ARTICOLO (ago 2026): il quadratino a sinistra del
    titolo, nella LISTA degli ordini e nel DETTAGLIO. Una fabbrica sola
@@ -28693,16 +28853,20 @@ function renderProfilo(){
     ? `<span class="stars">${'★'.repeat(Math.round(myRating))}</span> ${myRating}${contaFeedback(myNFeedback, myNRecensori)} · ` : '')
     + `${myVenditeOk} vendite · ${myAcquistiOk} acquisti conclusi`;
   const nome = myNome || 'Tu';
+  /* Il link del proprio negozio e' un TONDO dentro il riquadro (24 set
+     2026), come nel negozio: qui e' l'unico dei tre che vale — a se
+     stessi non si scrive. Stessa condizione e stessa funzione del
+     bottone grande che c'era («🔗 Il tuo negozio — condividi il link»). */
   box.innerHTML = `
     <div class="seller" style="margin-top:14px">
       <div class="avatar">${avatarImg(myAvatar)}${esc(nome[0])}</div>
       <div class="who"><b>${esc(nome)}${badge}</b>
         ${titoloRiga(nomeTitolo(myTitolo))}
         <div class="rep">${rep}</div>
+        ${tondiVenditore('', '', '', (myUsername||myNegozio) ? 'mio' : '')}
       </div>
     </div>
     ${(myUsername||myNegozio)&&!DEMO&&!VETRINA?`<button class="btn ghost" style="margin-top:0" onclick="apriMioNegozio()">👁 Guarda il tuo negozio come lo vedono tutti</button>`:''}
-    ${(myUsername||myNegozio)?`<button class="btn ghost" onclick="condividiMioNegozio()">🔗 Il tuo negozio — condividi il link</button>`:''}
     ${(myNegozio)&&!DEMO&&!VETRINA?`<button class="btn ghost" onclick="apriWidget('negozio')">&lt;/&gt; Widget per il web</button>`:''}`;
   /* «Esci» dice cosa fa: con piu' account aperti esce da QUESTO e
      passa a chi resta, e chiamarlo «Esci» secco farebbe temere di

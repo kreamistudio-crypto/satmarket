@@ -31189,3 +31189,54 @@ aperture — non l'ha mai mandato — quindi il conto delle aperture nei
 messaggi del bot resta a zero: segnalato, non toccato. Per Andrea: a
 pagina pubblicata, `/sponsor un-tempo-per-te 30`; l'ordine è già quello
 giusto. DA AVERE il telefono.
+
+## Feedback a tre e bottoni tondi nel riquadro (24 set 2026)
+
+Ritocco di Andrea, tre pezzi. 1) «GLI ULTIMI FEEDBACK» — un posto solo,
+`renderNegozio`: negozi, profili pubblici e pagine dei Consigliati, che
+sono il negozio col racconto in testa — ne mostrano i TRE più recenti;
+sotto, se ce ne sono altri, la riga «Mostra tutti (N) ▾» li apre e
+diventa «Mostra meno ▴». Mai tutti aperti all'inizio: gli altri nascono
+`hidden` a ogni disegno. «TUTTI» DEV'ESSERE VERO: il server ne mandava
+dieci, e chi ne ha dodici avrebbe letto «tutti» su dieci; ora
+`TETTO_FEEDBACK_NEGOZIO` (50: la lista viaggia a ogni apertura, un tetto
+resta) e oltre la riga dice «Mostra gli ultimi N». 2) LO SFONDO non è
+più il verde della fiducia ma la carta delle card (`--card` col filo
+`--line`), rientrata ai 16px come il riquadro — a filo schermo una card
+si leggeva come una striscia; le stelle passano a `--sats-text` (l'arancio
+pieno sul bianco fa 2,3:1). 3) «✈️ Scrivi a … su Telegram», «Scrivi a …
+su Nostr» e «🔗 Condividi il negozio» diventano TONDI dentro il riquadro,
+sotto le stelle: stesse funzioni e condizioni, cerchio da 38px con
+l'area di tocco a 44, aria-label e title, la ricetta velata dei ponti;
+il pallino Nostr nel tondo prende il viola del testo (quello pieno, da
+solo, di sera fa 2,6:1).
+
+IL CENSIMENTO DEI BOTTONI: CAMBIATI il negozio (con Consigliati e
+profili pubblici: Telegram, Nostr, link; sul proprio negozio il solo
+link) e il Profilo («🔗 Il tuo negozio — condividi il link» è il tondo
+del link). NON TOCCATI: dentro l'ordine (`pontiOrdine`, «Scrivi al
+venditore/all'acquirente»: nessun riquadro che li ospiti) e la pagina
+dello scambio P2P (`pontiControparteP2P`, il contatto principale con
+l'altra persona: Andrea ha chiesto di essere interpellato prima). Una
+prova tiene il censimento.
+
+**PROVATO.** `prove_feedback_tre_e_tondi` (93: le funzioni vere in node
+— tre su sette, i più recenti, gli altri chiusi, la riga e il suo
+aria-expanded, il tocco che apre e chiude, oltre il tetto, lo scudo; i
+tondi, le azioni, le etichette, le condizioni, l'alfabeto —, la cascata
+nei due temi, l'area di tocco, i contrasti dai token, il server, il
+censimento); `prove_conta_feedback` emendata col perché (la fetta della
+query si chiude su `))]`). TORTURA 30/30 su una copia, zero botti al
+secondo giro. Suite intera severa senza config sull'albero ribasato,
+15.358 verdi e 0 rosse; i 20 collaudi della CI verdi, in gabbia. DAL
+VIVO via CDP col tocco vero a 375 e 320 nei due temi, 106/106 (e di
+nuovo a 375 sull'albero ribasato): tre feedback su sette, la riga che
+apre i sette e richiude,
+fondo della card e non verde, testo 14,9/12,5, stelle 5,0/8,5, riga
+piccola 4,8/6,1, «Mostra tutti» 6,7/10,0; i tre tondi coi toast di
+sempre, il bersaglio da 43 attorno al centro (a 23px non sono più loro);
+il Profilo col solo link; la pagina dei Consigliati (una copia con «Un
+tempo per te» legata al venditore di collaudo) uguale.
+
+**DA GUARDARE.** Sul telefono, i tondi dentro Telegram; e la decisione
+sul P2P. Le stelle del riquadro venditore restano l'arancio pieno.

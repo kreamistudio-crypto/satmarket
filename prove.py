@@ -26381,7 +26381,16 @@ def prove_conta_feedback():
     # recapito. Si guarda la QUERY, che e' l'unico posto da cui quei
     # campi potrebbero uscire.
     i = _SORGENTE.index("feedback = [] if cursore else [dict(r)")
-    query = _SORGENTE[i:_SORGENTE.index("(v[\"tg_id\"],))]", i)]
+    # LA FETTA SI CHIUDE SULLA FINE DELLA LISTA (24 set 2026, feedback a
+    # tre): la tupla dei parametri ha preso TETTO_FEEDBACK_NEGOZIO al
+    # posto del LIMIT 10 scritto nel testo, e la vecchia fine
+    # `(v["tg_id"],))]` non c'e' piu' — cercarla avrebbe allungato la
+    # fetta fino a una query lontana, coi suoi `username` e `titolo`.
+    # `))]` chiude la comprensione qualunque cosa ci sia nella tupla, e
+    # se mancasse la rossa ha un nome invece di un botto.
+    j = _SORGENTE.find("))]", i)
+    prova("la query dei feedback si ritaglia", True, j > i)
+    query = _SORGENTE[i:j] if j > i else ""
     prova("il nome di chi ha votato esce", True, "da_nome" in query)
     prova("la faccia rispetta la scelta «nessuna»", True,
           "avatar_scelta='nessuna'" in query)
@@ -48362,6 +48371,435 @@ def prove_note_piccole():
           "nei due temi", [True, True],
           [contrasto(a, b) >= 4.5
            for a, b in zip(tok("--ink-soft"), tok("--bg"))])
+
+
+def prove_feedback_tre_e_tondi():
+    """FEEDBACK A TRE E BOTTONI TONDI NEL RIQUADRO (24 set 2026,
+    decisione di Andrea). Tre cose, e la prova le tiene tutte e tre:
+    1) «Gli ultimi feedback» ne mostrano i TRE piu' recenti, e se ce ne
+       sono altri una riga «Mostra tutti (N) ▾» li apre (e diventa
+       «Mostra meno ▴») — mai tutti aperti all'inizio. «Tutti» dev'essere
+       vero: il server ne manda fino al suo tetto, non piu' dieci.
+    2) Lo sfondo non e' piu' il verde della fiducia ma la carta delle
+       card, con testo e stelle AA nei due temi.
+    3) I due ponti e «Condividi il negozio» non sono piu' bottoni a
+       tutta larghezza ma TONDI dentro il riquadro del venditore (negozio
+       e Profilo): stesse azioni, solo quelli che valgono, tocco da 44px,
+       etichetta per il lettore di schermo. Dentro l'ordine e nella
+       pagina dello scambio P2P restano i ponti grandi: lo dice il
+       censimento qui in fondo."""
+    print("\n[feedback a tre e bottoni tondi]")
+    import json as _js, shutil as _sh, subprocess as _sp, tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    senza = re.sub(r"/\*[\s\S]*?\*/", "", mini)
+
+    def fetta(inizio, fine):
+        """Da `inizio` fino a `fine` compreso; "" (e una rossa col suo
+        nome) se manca: un'ancora sparita non si porta via la sezione."""
+        i = mini.find(inizio)
+        j = mini.find(fine, i + len(inizio)) if i >= 0 else -1
+        prova(f"tondi: l'ancora «{inizio[:40]}» c'e'", True, i >= 0 and j >= 0)
+        return mini[i:j + len(fine)] if i >= 0 and j >= 0 else ""
+
+    # --- 1) IL SERVER: tutti, e dal piu' nuovo ------------------------
+    m = re.search(r"^TETTO_FEEDBACK_NEGOZIO = (\d+)", _SORGENTE, re.M)
+    prova("feedback: il tetto del negozio c'e' ed e' ben sopra i dieci "
+          "di ieri", True, bool(m) and int(m.group(1)) >= 30)
+    neg = pezzo("negozio")
+    i = neg.find("feedback = [] if cursore else [dict(r)")
+    q = neg[i:neg.find("))]", i)] if i >= 0 else ""
+    prova("feedback: la query chiede il tetto, non piu' dieci", True,
+          "LIMIT ?" in q and "TETTO_FEEDBACK_NEGOZIO" in q
+          and "LIMIT 10" not in q)
+    # i «tre piu' recenti» del client sono i primi tre della lista: vale
+    # solo finche' il server li manda dal piu' nuovo
+    prova("feedback: ...e li manda dal piu' nuovo", True,
+          "ORDER BY f.creato DESC" in q)
+
+    # --- 2) IL CLIENT, le sentinelle sul markup ------------------------
+    rn = pezzo_js(senza, "function renderNegozio(v, annunci", "\n}\n")
+    prova("feedback: il negozio li disegna col giudice unico", True,
+          "el('negozioFeedback').innerHTML = "
+          "feedbackNegozioHTML(feedback, v.n_feedback);" in rn)
+    # I TONDI STANNO DENTRO il riquadro: dentro `.who`, dopo le stelle —
+    # non fratelli del riquadro, che e' dove stavano i bottoni grandi
+    prova("tondi: nel negozio stanno DENTRO il riquadro, sotto le "
+          "stelle", True, bool(re.search(
+              r'<div class="who">[\s\S]*?<div class="rep">\$\{rep\}</div>'
+              r'\s*\$\{tondi\}\s*</div>\s*</div>`;', rn)))
+    prova("tondi: ...con le stesse condizioni dei bottoni di prima", True,
+          "mio ? '' : v.username," in rn
+          and "mio ? '' : (v.npub_verificata && v.npub ? v.npub : '')," in rn
+          and "(v.username||v.negozio) ? 'negozio' : ''" in rn)
+    prova("tondi: nel negozio non resta nessun bottone grande", [False] * 3,
+          ["pontiContatto(" in rn, "condividiNegozio()" in rn,
+           'class="btn' in rn])
+    rp = pezzo_js(senza, "function renderProfilo(){", "\n}\n")
+    prova("tondi: nel Profilo il solo link, DENTRO il riquadro", True,
+          bool(re.search(r'<div class="rep">\$\{rep\}</div>\s*'
+                         r"\$\{tondiVenditore\('', '', '', "
+                         r"\(myUsername\|\|myNegozio\) \? 'mio' : ''\)\}"
+                         r"\s*</div>", rp)))
+    prova("tondi: ...e il bottone grande del link non c'e' piu'", False,
+          "condividiMioNegozio()" in rp)
+
+    # IL CENSIMENTO (Andrea: «censisci tutti i posti»). I ponti grandi
+    # vivono ancora in DUE posti, e sono quelli giusti: dentro l'ordine
+    # (`pontiOrdine`, nessun riquadro che li ospiti) e nella pagina
+    # dello scambio P2P (il contatto principale con l'altra persona, che
+    # si decide a parte). Un terzo chiamante nuovo farebbe arrossire.
+    chiamanti = [senza[max(0, k - 400):k].rsplit("function ", 1)[-1]
+                 .split("(")[0] for k in
+                 (mm.start() for mm in re.finditer(r"pontiContatto\(", senza))
+                 if not senza.startswith("function pontiContatto(", k - 9)]
+    prova("censimento: i ponti grandi restano solo nell'ordine e nel "
+          "P2P", ["pontiOrdine", "pontiControparteP2P"], chiamanti)
+    # ...e le due condivisioni del negozio partono SOLO dai tondi: fuori
+    # dalla definizione, il nome si trova una volta, nel catalogo dei
+    # tondi (un `onclick` rimasto altrove sarebbe un secondo)
+    for f in ("condividiNegozio", "condividiMioNegozio"):
+        prova(f"censimento: «{f}» parte solo dal tondo", (1, 1),
+              (senza.count(f + "()") - senza.count("function %s()" % f),
+               senza.count("'%s()'" % f)))
+    prova("censimento: nessun bottone con la vecchia scritta", [0, 0],
+          [senza.count("🔗 Condividi il negozio"),
+           senza.count("Il tuo negozio — condividi il link")])
+
+    # --- 3) LE FUNZIONI VERE IN NODE ----------------------------------
+    _node = _sh.which("node")
+    if not _node:
+        salta("feedback e tondi girano in node", "node non installato")
+    else:
+        pezzi = [
+            fetta("const esc = s =>", "}[c]));"),
+            fetta("const FEEDBACK_VISIBILI = ", ";"),
+            pezzo_js(mini, "function feedbackNegozioHTML(", "\n}\n") + "\n}",
+            pezzo_js(mini, "function toggleFeedbackAltri(", "\n}\n") + "\n}",
+            fetta("const ICO_TELEGRAM = ", "</svg>';"),
+            fetta("const ICO_LINK = ", "</svg>';"),
+            fetta("const TONDO_CONDIVIDI = {", "\n};"),
+            pezzo_js(mini, "function tondiVenditore(", "\n}\n") + "\n}",
+        ]
+        banco = ("let isAdmin = false; let aptiche = 0;\n"
+                 "const ICO_NOSTR = '<svg class=\"ico-nostr\" aria-hidden=\"true\"></svg>';\n"
+                 "function avatarImg(n){ return n ? '<img src=\"/foto/' + n + '\">' : ''; }\n"
+                 "function haptic(){ aptiche++; }\n"
+                 "const DOM = {};\n"
+                 "function el(id){ return DOM[id] || null; }\n"
+                 + "\n".join(pezzi) + "\n" + r"""
+const out = {};
+const CASI = {};
+const fb = (n, extra) => Array.from({length: n}, (_, k) => Object.assign({
+  id: k + 1, voto: 5 - (k % 3), commento: 'commento ' + k, creato: 1790000000 - k * 86400,
+  ruolo: k === 4 ? 'scambio' : 'acquirente', da_nome: 'Persona' + k,
+  da_negozio: 'neg' + k, da_avatar: ''}, extra || {}));
+/* le righe che si VEDONO sono quelle fuori dal contenitore nascosto */
+const parti = h => { const i = h.indexOf('<div id="fbAltri" hidden>');
+  const fuori = i < 0 ? h : h.slice(0, i), dentro = i < 0 ? '' : h.slice(i);
+  const n = s => (s.match(/class="trust-note nota-feedback"/g) || []).length;
+  return {visibili: n(fuori), nascoste: n(dentro),
+          nomi: (fuori.match(/Persona\d+/g) || []),
+          riga: (h.match(/<button type="button" class="fb-tutti"[\s\S]*?>([^<]*)<\/button>/) || [])[1] || null}; };
+const caso = (nome, f) => { try { out[nome] = f(); } catch (e) { out[nome] = 'ESPLOSO: ' + e.message; } };
+caso('sette', () => { const h = feedbackNegozioHTML(fb(7), 7); const p = parti(h);
+  return {visibili: p.visibili, nascoste: p.nascoste, nomi: p.nomi, riga: p.riga,
+          hidden: h.includes('<div id="fbAltri" hidden>'),
+          aria: h.includes('aria-expanded="false"') && h.includes('aria-controls="fbAltri"'),
+          titolo: h.includes('>Gli ultimi feedback</div>'),
+          verdi: (h.match(/class="trust-note"/g) || []).length,
+          scambio: h.includes('da uno scambio P2P')}; });
+caso('tre', () => { const h = feedbackNegozioHTML(fb(3), 3); const p = parti(h);
+  return {visibili: p.visibili, riga: p.riga, contenitore: h.includes('fbAltri')}; });
+caso('quattro', () => { const p = parti(feedbackNegozioHTML(fb(4), 4));
+  return [p.visibili, p.nascoste, p.riga]; });
+caso('zero', () => [feedbackNegozioHTML([], 0), feedbackNegozioHTML(null, 3)]);
+caso('oltreIlTetto', () => parti(feedbackNegozioHTML(fb(50), 60)).riga);
+caso('contoVecchio', () => parti(feedbackNegozioHTML(fb(7), 5)).riga);
+caso('senzaConto', () => parti(feedbackNegozioHTML(fb(5))).riga);
+caso('scudo', () => { const h = feedbackNegozioHTML(fb(1, {da_nome: '<b>x</b>',
+    commento: '<img onerror=1>', da_negozio: "ab')x"}), 1);
+  return {nome: h.includes('&lt;b&gt;x&lt;/b&gt;') && !h.includes('<b>x</b>'),
+          commento: !h.includes('<img onerror'), codice: h.includes("apriNegozio('abx')")}; });
+caso('tocco', () => {
+  const box = {hidden: true}; let vista = null;
+  const b = {dataset: {apri: 'Mostra tutti (7) ▾'}, attr: {}, textContent: 'Mostra tutti (7) ▾',
+    setAttribute(k, v){ this.attr[k] = v; }, scrollIntoView(o){ vista = o; }};
+  DOM.fbAltri = box;
+  toggleFeedbackAltri(b);
+  const aperto = {hidden: box.hidden, aria: b.attr['aria-expanded'], testo: b.textContent, vista};
+  toggleFeedbackAltri(b);
+  const chiuso = {hidden: box.hidden, aria: b.attr['aria-expanded'], testo: b.textContent, vista};
+  delete DOM.fbAltri; const prima = aptiche; toggleFeedbackAltri(b);
+  return {aperto, chiuso, senzaScatola: aptiche === prima, aptiche}; });
+const bottoni = h => (h.match(/<button[^>]*>/g) || []).map(t => ({
+  cls: (t.match(/class="([^"]*)"/) || [])[1], azione: (t.match(/onclick="([^"]*)"/) || [])[1],
+  nome: (t.match(/aria-label="([^"]*)"/) || [])[1], titolo: (t.match(/title="([^"]*)"/) || [])[1],
+  tipo: (t.match(/type="([^"]*)"/) || [])[1]}));
+caso('pieni', () => { const h = tondiVenditore('venditore', 'npub1abc', 'a Mario', 'negozio');
+  return {b: bottoni(h), riga: h.startsWith('<div class="tondi">'),
+          icone: (h.match(/<svg[^>]*aria-hidden="true"/g) || []).length}; });
+caso('soloTelegram', () => bottoni(tondiVenditore('mario_tg', '', 'a Mario', '')).map(x => x.azione));
+caso('soloNostr', () => bottoni(tondiVenditore('', 'npub1xyz', 'a Mario', 'negozio')).map(x => x.azione));
+caso('nessuno', () => [tondiVenditore('', '', 'al venditore', ''), tondiVenditore(null, undefined, '', 'boh'),
+                       tondiVenditore('', '', '', '__proto__')]);
+caso('mio', () => bottoni(tondiVenditore('', '', '', 'mio')));
+caso('alfabeto', () => { const h = tondiVenditore("a')alert(1)//", 'NPUB1<b>"x', 'a Mario', '');
+  return bottoni(h).map(x => x.azione); });
+process.stdout.write(JSON.stringify(out));
+""")
+        _f = _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                    encoding="utf-8")
+        _f.write(banco)
+        _f.close()
+        _r = _sp.run([_node, _f.name], capture_output=True, text=True,
+                     timeout=60, encoding="utf-8")
+        os.unlink(_f.name)
+        o = {}
+        if _r.returncode != 0:
+            prova("feedback e tondi: il banco gira", "", _r.stderr[-600:])
+        else:
+            o = _js.loads(_r.stdout.strip())
+        s = o.get("sette") or {}
+        prova("feedback: di sette se ne VEDONO tre", 3, s.get("visibili"))
+        prova("feedback: ...e sono i tre piu' recenti, in ordine",
+              ["Persona0", "Persona1", "Persona2"], s.get("nomi"))
+        prova("feedback: ...gli altri quattro nascono CHIUSI", [4, True],
+              [s.get("nascoste"), s.get("hidden")])
+        prova("feedback: la riga dice «Mostra tutti (7) ▾»",
+              "Mostra tutti (7) ▾", s.get("riga"))
+        prova("feedback: ...e porta aria-expanded e aria-controls", True,
+              s.get("aria"))
+        prova("feedback: il titolo della sezione resta", True, s.get("titolo"))
+        prova("feedback: nessuna riga col verde di ieri", 0, s.get("verdi"))
+        prova("feedback: ...e lo scambio P2P lo dice ancora", True,
+              s.get("scambio"))
+        prova("feedback: con tre soli niente riga e niente scatola",
+              {"visibili": 3, "riga": None, "contenitore": False},
+              o.get("tre"))
+        prova("feedback: con quattro, tre fuori e uno dentro",
+              [3, 1, "Mostra tutti (4) ▾"], o.get("quattro"))
+        prova("feedback: senza feedback nessuna sezione", ["", ""],
+              o.get("zero"))
+        # «TUTTI» SOLO SE E' VERO: oltre il tetto del server la riga non
+        # promette quel che non ha
+        prova("feedback: oltre il tetto la riga dice «gli ultimi N»",
+              "Mostra gli ultimi 50 ▾", o.get("oltreIlTetto"))
+        prova("feedback: un conto vecchio piu' basso non la fa mentire",
+              "Mostra tutti (7) ▾", o.get("contoVecchio"))
+        prova("feedback: ...e senza conto vale la lista",
+              "Mostra tutti (5) ▾", o.get("senzaConto"))
+        prova("feedback: nome, commento e codice passano dallo scudo",
+              {"nome": True, "commento": True, "codice": True},
+              o.get("scudo"))
+        t = o.get("tocco") or {}
+        prova("feedback: il tocco APRE — «Mostra meno ▴», aria true",
+              {"hidden": False, "aria": "true", "testo": "Mostra meno ▴",
+               "vista": None}, t.get("aperto"))
+        prova("feedback: il secondo CHIUDE, torna la riga di prima e la "
+              "riporta a portata",
+              {"hidden": True, "aria": "false", "testo": "Mostra tutti (7) ▾",
+               "vista": {"block": "nearest"}}, t.get("chiuso"))
+        prova("feedback: ...e senza la scatola non fa niente", [True, 2],
+              [t.get("senzaScatola"), t.get("aptiche")])
+        p = o.get("pieni") or {}
+        prova("tondi: coi tre canali nascono tre tondi, in quell'ordine",
+              ["tondo tg", "tondo nostr", "tondo link"],
+              [x.get("cls") for x in p.get("b", [])])
+        prova("tondi: ...e fanno ESATTAMENTE quel che facevano i bottoni",
+              ["apriChat('venditore')", "apriNostrProfilo('npub1abc')",
+               "condividiNegozio()"], [x.get("azione") for x in p.get("b", [])])
+        prova("tondi: ...con l'etichetta per il lettore di schermo",
+              ["Scrivi a Mario su Telegram", "Scrivi a Mario su Nostr",
+               "Condividi il negozio"], [x.get("nome") for x in p.get("b", [])])
+        prova("tondi: ...la stessa nel title, per il mouse", True,
+              all(x.get("titolo") == x.get("nome") for x in p.get("b", [])))
+        prova("tondi: ...bottoni veri, e le icone mute", [["button"] * 3, 3],
+              [[x.get("tipo") for x in p.get("b", [])], p.get("icone")])
+        prova("tondi: nella loro fila", True, p.get("riga"))
+        prova("tondi: senza npub niente Nostr (e senza link niente link)",
+              ["apriChat('mario_tg')"], o.get("soloTelegram"))
+        prova("tondi: senza username niente Telegram",
+              ["apriNostrProfilo('npub1xyz')", "condividiNegozio()"],
+              o.get("soloNostr"))
+        prova("tondi: senza niente, niente — nemmeno la fila", ["", "", ""],
+              o.get("nessuno"))
+        prova("tondi: il proprio negozio condivide il proprio link",
+              [{"cls": "tondo link", "azione": "condividiMioNegozio()",
+                "nome": "Condividi il link del tuo negozio",
+                "titolo": "Condividi il link del tuo negozio",
+                "tipo": "button"}], o.get("mio"))
+        # L'ALFABETO SI FILTRA DENTRO la fabbrica (la cura B2 dell'audit):
+        # nell'onclick non entra niente che non sia un nome
+        prova("tondi: l'alfabeto si filtra dentro la fabbrica",
+              ["apriChat('aalert1')", "apriNostrProfilo('1bx')"],
+              o.get("alfabeto"))
+
+    # --- 4) LA CASCATA, nei due temi: chi vince davvero ----------------
+    i0 = mini.find("<style>")
+    css = mini[i0 + 7:mini.find("</style>", i0)] if i0 >= 0 else ""
+    regole, squilibrio = _regole_css(css)
+    prova("feedback: il foglio si legge fino in fondo", 0, squilibrio)
+    corpo = mini[mini.find("<body>"):]
+    su_html = set(re.findall(
+        r"documentElement\.classList\.(?:add|toggle)\('([\w-]+)'", mini))
+    su_body = set(re.findall(
+        r"document\.body\.classList\.(?:add|toggle)\('([\w-]+)'", mini))
+
+    def verso(id_, tema, *figli):
+        """La catena vera fino a #id_ (vista aperta, classi del JS su
+        <html> e <body>, il tema come lo accende il JS) e poi i figli
+        che il JS scrive dentro."""
+        cat = _catene_html(corpo, lambda p: p[-1]["attr"].get("id") == id_)
+        if not cat:
+            return []
+        html = {"tag": "html", "attr": {"lang": "it"}, "classi": set(su_html)}
+        if tema == "scuro":
+            html["attr"]["data-tema"] = "scuro"
+        out = [html]
+        for e in cat[0]:
+            e = dict(e, classi=set(e["classi"]))
+            if e["tag"] == "body":
+                e["classi"] |= su_body
+            if "view" in e["classi"]:
+                e["classi"].add("active")
+            out.append(e)
+        for tag, classi in figli:
+            out.append({"tag": tag, "attr": {"class": " ".join(classi)},
+                        "classi": set(classi)})
+        return out
+
+    RIGA = ("div", ["trust-note", "nota-feedback"])
+    for tema in ("chiaro", "scuro"):
+        v = _vince_css(regole, verso("negozioFeedback", tema, RIGA),
+                       ("background", "color", "border", "margin-left",
+                        "margin-right"))
+        prova(f"feedback ({tema}): la riga veste la carta delle card, "
+              "col filo e rientrata come il riquadro",
+              {"background": "var(--card)", "color": "var(--ink)",
+               "border": "1px solid var(--line)",
+               "margin-left": "var(--pad)", "margin-right": "var(--pad)"},
+              {k: x[0] for k, x in v.items()})
+        v = _vince_css(regole, verso("negozioFeedback", tema, RIGA,
+                                     ("span", ["stars"])), ("color",))
+        prova(f"feedback ({tema}): le stelle parlano l'arancio del testo",
+              "var(--sats-text)", v.get("color", (None,))[0])
+        v = _vince_css(regole, verso("negozioFeedback", tema,
+                                     ("button", ["fb-tutti"])),
+                       ("min-height", "color", "background"))
+        prova(f"feedback ({tema}): la riga «Mostra tutti» alta 44 e in "
+              "--ink-soft", {"min-height": "44px", "color": "var(--ink-soft)",
+                             "background": "none"},
+              {k: x[0] for k, x in v.items()})
+        for dove, catena in (("negozio", ("negozioHeader", ("div", ["seller"]))),
+                             ("Profilo", ("profiloTestata", ("div", ["seller"])))):
+            for mondo, fondo, inch in (("tg", "var(--tg-soft)", "var(--tg-soft-on)"),
+                                       ("nostr", "var(--nostr-soft)", "var(--nostr-text)"),
+                                       ("link", "var(--card)", "var(--ink)")):
+                v = _vince_css(regole, verso(catena[0], tema, catena[1],
+                                             ("div", ["who"]), ("div", ["tondi"]),
+                                             ("button", ["tondo", mondo])),
+                               ("width", "height", "border", "background",
+                                "color", "border-color", "position"))
+                prova(f"tondi ({dove}, {tema}, {mondo}): 38px, la velatura "
+                      "del suo mondo e il contorno forte",
+                      {"width": "38px", "height": "38px", "border": "2px solid",
+                       "background": fondo, "color": inch, "border-color": inch,
+                       "position": "relative"},
+                      {k: x[0] for k, x in v.items()})
+        v = _vince_css(regole, verso("negozioHeader", tema, ("div", ["seller"]),
+                                     ("div", ["who"]), ("div", ["tondi"]),
+                                     ("button", ["tondo", "nostr"]),
+                                     ("svg", ["ico-nostr"])), ("fill",))
+        prova(f"tondi ({tema}): il pallino Nostr prende il colore del testo",
+              "currentColor", v.get("fill", (None,))[0])
+
+    # L'AREA DI TOCCO: il ::after del tondo (la cascata non guarda i
+    # pseudo-elementi, quindi si legge la regola): 5px oltre il bordo
+    # interno di un cerchio da 38 con 2 di bordo fanno 44
+    cssn = re.sub(r"/\*[\s\S]*?\*/", "", css)
+    m = re.search(r"\.tondo::after\{([^}]*)\}", cssn)
+    ins = re.search(r"inset:-(\d+(?:\.\d+)?)px", m.group(1)) if m else None
+    prova("tondi: il ::after e' posizionato e allarga il bersaglio", True,
+          bool(m) and "position:absolute" in m.group(1)
+          and "content:''" in m.group(1) and bool(ins))
+    # le misure si LEGGONO dalla regola del tondo, mai ricopiate qui: il
+    # ::after parte dal bordo INTERNO (il riquadro di padding), quindi
+    # l'area e' il lato meno i due bordi piu' le due sporgenze
+    t = re.search(r"\.tondo\{([^}]*)\}", cssn)
+    lato = re.search(r"width:(\d+)px", t.group(1)) if t else None
+    bordo = re.search(r"border:(\d+)px", t.group(1)) if t else None
+    area = (int(lato.group(1)) - 2 * int(bordo.group(1))
+            + 2 * float(ins.group(1))) if (lato and bordo and ins) else 0
+    prova("tondi: l'area di tocco fa almeno 44px", True, area >= 44)
+    # ...e due aree vicine non si toccano: ognuna sporge dal cerchio di
+    # (sporgenza − bordo) per parte, e fra due cerchi c'e' il gap
+    g = re.search(r"\.tondi\{[^}]*gap:(\d+)px", cssn)
+    prova("tondi: ...e due vicine non si sovrappongono", True,
+          bool(g and ins and bordo) and int(g.group(1))
+          - 2 * (float(ins.group(1)) - int(bordo.group(1))) >= 0)
+
+    # --- 5) I CONTRASTI, dai token dei due temi ------------------------
+    def lum(h):
+        c = [int(h[k:k + 2], 16) / 255 for k in (1, 3, 5)]
+        c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4
+             for x in c]
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+    def contrasto(a, b):
+        la, lb = sorted((lum(a), lum(b)), reverse=True)
+        return (la + 0.05) / (lb + 0.05)
+
+    def tok(nome, tema):
+        """Il valore del token nel blocco del tema: `:root` di giorno,
+        `html[data-tema="scuro"]` di sera, e di sera il token che non
+        viene ridetto e' quello del giorno."""
+        radice = re.search(r":root\{([\s\S]*?)\n  \}", cssn)
+        sera = re.search(r'html\[data-tema="scuro"\]\{([\s\S]*?)\n  \}', cssn)
+        for blocco in ((sera,) if tema == "scuro" else ()) + (radice,):
+            mm = blocco and re.search(r"%s:(#[0-9A-Fa-f]{6})\b" % re.escape(nome),
+                                      blocco.group(1))
+            if mm:
+                return mm.group(1)
+        return None
+
+    def sopra(fg, bg, a):
+        f = [int(fg[k:k + 2], 16) for k in (1, 3, 5)]
+        b = [int(bg[k:k + 2], 16) for k in (1, 3, 5)]
+        return "#" + "".join("%02X" % round(x * a + y * (1 - a))
+                             for x, y in zip(f, b))
+
+    TESTO = (("il testo", "--ink", "--card"),
+             ("le stelle", "--sats-text", "--card"),
+             ("«Mostra tutti» sulla pagina", "--ink-soft", "--bg"))
+    NON_TESTO = (("il contorno Telegram sul riquadro", "--tg-soft-on", "--card"),
+                 ("l'aeroplanino sulla sua velatura", "--tg-soft-on", "--tg-soft"),
+                 ("il contorno Nostr sul riquadro", "--nostr-text", "--card"),
+                 ("il pallino Nostr sulla sua velatura", "--nostr-text", "--nostr-soft"),
+                 ("il contorno del link sul riquadro", "--ink", "--card"))
+    for tema in ("chiaro", "scuro"):
+        for cosa, fg, bg in TESTO:
+            a, b = tok(fg, tema), tok(bg, tema)
+            prova(f"contrasto ({tema}): AA per {cosa}", True,
+                  bool(a and b) and contrasto(a, b) >= 4.5)
+        # la riga piccola: l'inchiostro a .65 SULLA carta
+        a, b = tok("--ink", tema), tok("--card", tema)
+        prova(f"contrasto ({tema}): la riga piccola (inchiostro a .65) "
+              "regge l'AA", True,
+              bool(a and b) and contrasto(sopra(a, b, 0.65), b) >= 4.5)
+        prova(f"feedback ({tema}): la carta non e' la pagina", True,
+              tok("--card", tema) != tok("--bg", tema))
+        for cosa, fg, bg in NON_TESTO:
+            a, b = tok(fg, tema), tok(bg, tema)
+            prova(f"contrasto ({tema}): 3:1 per {cosa}", True,
+                  bool(a and b) and contrasto(a, b) >= 3)
+    # IL PERCHE' delle stelle scure, a verbale: l'arancio pieno sulla
+    # carta di giorno non arriva all'AA — chi «semplificasse» tornando a
+    # `.stars` qui trova la ragione scritta
+    prova("feedback: l'arancio pieno sulla carta di giorno NON reggerebbe",
+          True, contrasto(tok("--sats", "chiaro"),
+                          tok("--card", "chiaro")) < 4.5)
+    prova("tondi: di giorno il pallino e' lo stesso viola del nome", True,
+          tok("--nostr-text", "chiaro") == tok("--nostr", "chiaro"))
 
 
 def prove_font():
@@ -95873,6 +96311,7 @@ def main():
               prove_letture_relay_collaudo, prove_telegram_simulato_collaudo, prove_introduzioni_leggibili, prove_filtri_prezzo_convertono, prove_anteprima_prezzo_condiviso,
               prove_pagina_dati,
               prove_note_piccole,
+              prove_feedback_tre_e_tondi,
               prove_font,
               prove_porta_timer, prove_feedback_confermato,
               prove_recensione_p2p,
