@@ -24900,45 +24900,79 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   digitale, oro, abbonamenti a Prime, buoni regalo, 1-Click) e i posti (tabaccheria,
   bar, edicola, posta) stanno nelle parole: tappe, riquadro, Info. Il
   verbale: CANTIERI, «I limiti di Amazon».
-  IL TASTO BARATTOZON (23 set 2026, richiesta di Andrea, rifatto la notte
-  stessa): nel libro, su «Vendi BTC», dal fondo del + rosso della barra
-  scende A TENDINA la sua continuazione (`#navBarattozon`): larga
-  esattamente come lui, coi fianchi dritti che nascono al suo equatore e
-  arrotondata in fondo — + e tendina fanno una CAPSULA sola, «a supposta».
-  La tendina e' del blu della foto (#191D29) con la sola freccia arancio
-  del logo sopra (`/assets/barattozon-tasto.webp`, su trasparente), e un
-  filo di 2,5px del colore del + la tiene capsula sulla banda bruna, dove
-  quel blu da solo sparisce. Sopra il + apre il foglio di sempre, sotto la
-  tendina apre il foglio col tabacchino gia' scelto: `apriBarattozonP2P` chiama
+  IL TASTO BARATTOZON (23 set 2026, richiesta di Andrea, rifatto due volte;
+  il terzo giro il 24): nel libro, su «Vendi BTC», dal fondo del + rosso
+  della barra scende A TENDINA la sua continuazione (`#navBarattozon`):
+  larga esattamente come lui, coi fianchi dritti che nascono al suo
+  equatore e arrotondata in fondo — + e tendina fanno una CAPSULA sola.
+  Dentro c'e' il LOGO INTERO, la B bianca sopra la freccia arancio
+  (`/assets/barattozon-tasto.webp`, 41x40 su trasparente), sul blu della
+  foto (#191D29); il contorno e' il GRIGIO DELLE VOCI della banda
+  (`--nav-ink-p2p`, lo stesso token delle voci, uguale nei due temi) e
+  sta su uno strato che parte 3px sopra la tendina, cosi' la cima resta
+  aperta quando il dito porta via il +; il gradino e' blu. Per far posto
+  alla B, a «Vendi BTC» il + SALE di 31px invece di 15, e il fondo della
+  tendina resta a 56 dal bordo della barra: sopra la barra dei gesti.
+  Sopra, il + apre il foglio di sempre; sotto, la tendina apre il foglio
+  col tabacchino gia' scelto (`apriBarattozonP2P` →
   `apriNuovoOrdineP2P(P2P_TABACCHINO)`, che sceglie il metodo PRIMA del
-  disegno e della morfosi (il fantasma copia la scritta del bottone
-  d'arrivo, «Rileggi e pubblica») e solo se `metodiPubblicabiliP2P` lo
-  concede al lato. Quando c'e' lo dicono le classi che c'erano gia' —
+  disegno e della morfosi, e solo se `metodiPubblicabiliP2P` lo concede).
+  E IL + SI TRASCINA SULLA TENDINA: premuto e portato giu', al rilascio
+  sopra di lei apre lo stesso percorso, rilasciato fuori torna a casa.
+  Il gesto (IL TRASCINO, accanto ad `apriBarattozonP2P`) vive solo dove
+  c'e' la tendina (`trascinoPuoiP2P`); sotto P2P_SOGLIA_TRASCINO (12px)
+  e' un TOCCO, che il gesto stesso passa a `toccaPiu` — il click del
+  browser che segue si scarta con l'orologio `p2pPiuGestoAt`; il + segue
+  il dito con una transform sommata alla sua salita, la luce BIANCA
+  (classe `p2p-sopra`: filo e chiarore nella tendina, l'alone nel
+  `nav::after`, fuori dal telaio che lo taglierebbe) si accende col dito
+  sopra; `touch-action: pan-down` sul + lascia alla pagina il dito che
+  sale, il gesto di aggiornamento non si arma da un tocco che parte dalla
+  barra, e `go()` riporta a casa un + trascinato (`annullaTrascinoP2P`).
+  Si arma all'avvio (`armaTrascinoP2P`, accanto a `navMotore`), non al
+  caricamento della fetta del motore, che i banchi node caricano senza
+  pagina. Quando la tendina c'e' lo dicono le classi che c'erano gia' —
   `nav-p2p`, `p2p-vendo`, `p2p-piu-neutro`, `barra-via` —, quindi
   indietro, cronologia e gesto dell'app la rimettono giusta da soli; e'
   un `<div role="button">` e non un `<button>` (la ragione del logo in
-  topbar), sta PRIMA del + nel markup (il cerchio le copre la cima), e
-  mentre c'e' la scatola del + lascia passare il dito (`pointer-events`,
-  sotto i 768px): senza, il tocco sul marchio lo prendeva il +. Si
-  srotola col solo ritaglio (`clip-path`), senza scivolo; il filo e il
-  gradino cambiano colore col +; e fuori dal libro scende di 15px con
-  lui, con la stessa curva, cosi' la cima dritta non sporge mai accanto
-  al cerchio. Da desktop non c'e'. FUORI DAL LIBRO IL + E' ARANCIO:
-  `p2p-piu-neutro`, scritta da `go()` dalla vista (tutte le viste del
-  P2P tranne il libro), gli da' il colore, l'altezza e il rilievo del +
-  del mercatino — tondo, grande come il verde e il rosso —, e `toccaPiu`
-  (col giudice `piuNeutroP2P`, che chiede anche la larghezza) porta al
-  libro su «Compra BTC» con `setLatoP2P('compro', true)` — il secondo
-  argomento salta la scossa e la vibrazione del tab — e poi `go('p2p')`,
-  la strada della voce «Libro ordini». Da desktop la pillola resta
-  «Pubblica». E LA VOCE ATTIVA VESTE IL LATO SOLO NEL LIBRO: la regola
-  di base sulla banda e' l'arancio (#FFB25C, il velo caldo da desktop),
-  il verde e il rosso sono un'eccezione col nome di `#nav-p2plibro`; gli
-  strati sfumano anche il colore. IL LOGO DEL LIBRO DONDOLA alla prima
-  apertura della sessione (`p2pLogoSalutato`, in `go()`) e al tocco di un
-  tab, mai piu' a ogni ritorno: `scuotiLogoP2P` toglie la classe dopo
-  400ms. I verbali: CANTIERI, «Il tasto Barattozon e il + neutro nel
-  P2P» e «La capsula di Barattozon».
+  topbar), sta PRIMA del + nel markup, e mentre c'e' la scatola del +
+  lascia passare il dito (`pointer-events`, sotto i 768px). Da desktop
+  non c'e'. IL BOTTONE CHE PUBBLICA VESTE IL + CHE SI E' APERTO
+  (`vestitoInvioP2P`): verde a «Compra BTC» (`.btn.primary`), rosso a
+  «Vendi BTC» (`.btn.rosso`, testo `--on-danger`: bianco di giorno,
+  scuro di sera), e col percorso Barattozon il blu della capsula col
+  logo in piccolo (`.btn.bz`, `LOGO_BZ_HTML`), come il «Pubblica» del
+  suo riepilogo (`chiediConferma` con `vestito: 'bz'`, l'etichetta
+  sempre col textContent). FUORI DAL LIBRO IL + E' ARANCIO:
+  `p2p-piu-neutro`, scritta da `go()` dalla vista, gli da' l'altezza e il
+  rilievo del + del mercatino, e `toccaPiu` (col giudice `piuNeutroP2P`)
+  porta al libro su «Compra BTC» con `setLatoP2P('compro', true)` e poi
+  `go('p2p')`. Da desktop la pillola resta «Pubblica». IL LOGO DEL LIBRO
+  DONDOLA alla prima apertura della sessione (`p2pLogoSalutato`, in
+  `go()`) e al tocco di un tab, mai a ogni ritorno: `scuotiLogoP2P`
+  toglie la classe dopo 400ms.
+  LE CORSE DELLA BARRA P2P (24 set 2026, ritocco di Andrea): UNA durata
+  e UNA curva (`--p2p-corsa` 320ms, `--p2p-curva` quella dolce della
+  morfosi, che `P2P_MORFO_MS` tiene in pari), e sul telefono SOLO
+  transform e opacity. Colore e forma non corrono piu': il + ha QUATTRO
+  PELLI (`.pelle`: la casa quadrata del mercatino, verde, rosso,
+  arancio) e cambiare colore vuol dire accenderne un'altra — chi arriva
+  si accende sopra, chi va via resta pieno sotto e sfuma dopo la corsa,
+  e lo decide lo z-index —; la BANDA e' il `nav::before`, che sfuma; le
+  quattro voci della barra P2P (Esplora e le tre del P2P) hanno le loro
+  TINTE, copie di icona e scritta fatte da `tinteVociP2P` all'avvio dal
+  markup vero, mute al lettore e al dito, accese con la stessa regola;
+  la tendina scivola in un TELAIO fermo (`#navTendina`) che segue il +
+  e la taglia all'equatore; il fantasma della morfosi ha due pelli, la
+  forma del + e la meta del bottone, che le sfuma sopra. Misurato:
+  nessuna animazione di colore nei sette passaggi della barra
+  (`document.getAnimations()`), e lo screencast di Chrome — CPU 1x e 4x
+  — consegna 60 fotogrammi al secondo, con al piu' un buco di un
+  fotogramma all'apertura del foglio e all'ingresso dal mercatino. Da
+  desktop le pillole sfumano ancora il loro fondo. I verbali: CANTIERI,
+  «Il tasto Barattozon e il + neutro nel P2P», «La capsula di
+  Barattozon» e «La capsula col logo intero, il + che si trascina e le
+  corse della barra».
   LA SVEGLIA DEL TABACCHINO è l'emenda alla fase 6 (decisione di
   Andrea): il server impara UNA cosa — «questo account ha una scadenza
   a quest'ora» — nella tabella `p2p_sveglie` (quattro colonne, PK
@@ -26621,12 +26655,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    stessa immagine con la sola metà bianca portata nell'inchiostro di
    casa, per quando il marchio sta in una frase su carta chiara —
    vedi CANTIERI, «E il marchio Barattozon è passato nel testo»),
-   `/assets/barattozon-tasto.webp` (la freccia del tasto Barattozon nella
-   barra del P2P, 23 set 2026, rifatta la notte stessa: la SOLA freccia
-   arancio del logo, senza la B, 138x35 — il 3x dei 46px —, WebP con
-   alfa; il blu della foto lo mette il CSS alla tendina. Il nome e'
-   quello del primo giro, che era un tondo col marchio intero; vedi
-   CANTIERI, «La capsula di Barattozon»),
+   `/assets/barattozon-tasto.webp` (il logo del tasto Barattozon nella
+   barra del P2P, 23 set 2026, rifatto due volte: dal 24 il logo INTERO,
+   la B bianca sopra la freccia arancio, 123x120 — il 3x dei 40px della
+   tendina —, WebP con alfa; il blu della foto lo mette il CSS alla
+   tendina e ai bottoni blu del percorso, dove lo stesso file va in
+   piccolo. Il nome e' quello del primo giro; vedi CANTIERI, «La capsula
+   col logo intero, il + che si trascina e le corse della barra»),
    `/assets/scambi-intestazione.webp` (l'intestazione di «I miei
    scambi», 22 set 2026: le due monete, bitcoin e un euro, al posto
    del titolo scritto e nello stato vuoto — WebP con trasparenza,

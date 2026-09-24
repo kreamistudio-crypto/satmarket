@@ -56978,19 +56978,21 @@ def asset_barattozon_scuro():
 
 @app.get("/assets/barattozon-tasto.webp")
 def asset_barattozon_tasto():
-    """LA FRECCIA DI BARATTOZON (23 set 2026, richiesta di Andrea): la
-    finestrella della tendina che nel libro P2P, su «Vendi BTC», scende
-    dal fondo del + e con lui fa una capsula sola; apre il foglio col
-    tabacchino gia' scelto. E' la SOLA freccia arancio del sorgente di
-    Andrea (barattozon-icona.jpeg), senza la B: presa per colore — l'alfa
-    dal vettore blu->arancio, fuori i bordi della B, che non tirano
-    all'arancio — su fondo TRASPARENTE: il blu del logo (#191D29) lo
-    mette il CSS alla tendina intera, come nella foto, e i bordi della
-    freccia, calcolati contro quel blu, ci tornano identici. 138x35, il 3x
-    dei 46px a schermo; WebP con alfa, niente ICC ne' EXIF, meno di 3 KB.
-    Il nome e' rimasto quello del primo giro (un tondo col
-    marchio intero): il timbro ?v= lo mette _timbra_asset_pagina, quindi
-    nessuna cache tiene il file di prima. Rotta esplicita come le
+    """IL LOGO DI BARATTOZON (23 set 2026, ritoccato il 24 da Andrea):
+    quello della tendina che nel libro P2P, su «Vendi BTC», scende dal
+    fondo del + e con lui fa una capsula sola, e in piccolo quello dei
+    bottoni blu del percorso («Rileggi e pubblica», il «Pubblica» del
+    riepilogo). E' il logo INTERO del sorgente di Andrea
+    (barattozon-icona.jpeg) — la B bianca sopra la freccia arancio; il
+    secondo giro aveva la sola freccia, e la B e' tornata —, su fondo
+    TRASPARENTE: l'alfa di ogni pixel si ricava dal vettore blu->colore
+    provando i due colori del logo, il bianco e l'arancio, e tenendo
+    quello che lo ricostruisce meglio. Il blu della foto (#191D29) lo
+    mette il CSS alla tendina e ai bottoni, e i bordi, calcolati contro
+    quel blu, ci tornano identici. 123x120, il 3x dei 40px della tendina;
+    WebP con alfa, niente ICC ne' EXIF, meno di 5 KB. Il nome e' rimasto
+    quello del primo giro: il timbro ?v= lo mette _timbra_asset_pagina,
+    quindi nessuna cache tiene il file di prima. Rotta esplicita come le
     sorelle: mai un mount (regola 3)."""
     return FileResponse("assets/barattozon-tasto.webp",
                         media_type="image/webp",

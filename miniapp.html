@@ -217,6 +217,11 @@
        tema chiaro, con l'incasso 3D. «Sei in un altro posto» si deve
        vedere al colpo d'occhio, non intuire da un mezzo tono. */
     --nav-bg-p2p:#2B2214;
+    /* IL GRIGIO DELLE VOCI SULLA BANDA (24 set 2026): lo stesso nei due
+       temi, perche' la banda e' scura in tutt'e due. Lo bevono le voci
+       e il filo della tendina di Barattozon — «il grigio delle icone
+       della barra» chiesto da Andrea, che deve essere UNO solo. */
+    --nav-ink-p2p:#B5AA90;
     --ph-a:#F3ECDA; --ph-b:#ECE3CE;
     --ship-bg:#E3F0FB; --ship-text:#2A6FB0; --warn-bg:#FDE8E4; --off-bg:#EFE9DA;
     /* LA SCATOLA DELLE RIGHE FINALI DEL CONTO (set 2026): di giorno
@@ -294,6 +299,9 @@
        (in chiaro bianco; al buio quei fondi si schiariscono e il
        testo deve tornare scuro) */
     --on-ink:#fff; --on-trust:#fff;
+    /* il testo sul ROSSO pieno (24 set 2026, il bottone che pubblica a
+       «Vendi BTC»): bianco di giorno, 5,2:1 sul --danger */
+    --on-danger:#fff;
     --shadow-card:0 1px 4px rgba(60,45,10,.08);
     --shadow-hover:0 8px 24px rgba(0,0,0,.07);
   }
@@ -381,6 +389,9 @@
     --tile-off:#2E2A1E; --toast-bg:#F1E8D5; --toast-text:#23282C;
     --ink-soft:#CFC4AD; --desc:#E2D9C6;
     --on-ink:#211A10; --on-trust:#0B2417;
+    /* ...e di sera il rosso schiarisce (#F07A47): il bianco li' fa 2,8:1,
+       l'inchiostro scuro 6,2 — la stessa scelta di --on-trust */
+    --on-danger:#211A10;
     --shadow-card:0 1px 4px rgba(0,0,0,.35);
     --shadow-hover:0 8px 24px rgba(0,0,0,.5);
   }
@@ -3109,24 +3120,38 @@
   #p2pMorfo{position:fixed;z-index:42;display:none;pointer-events:none}
   #p2pMorfo.acceso{display:block}
   #p2pMorfo>*{position:absolute;inset:0}
-  #p2pMorfo .morfo-forma{background:var(--sats);color:#fff;
-    border-radius:var(--radius-btn);box-shadow:0 3px 0 var(--sats-deep);
-    will-change:transform;
-    /* IL COLORE CORRE QUANTO LA FORMA (ritocco di Andrea, che
-       ROVESCIA la scorciatoia di ieri): il verde del lato diventa
-       l'arancio di casa lungo TUTTA la corsa, interpolato, non a
-       scatto. Ieri correva sulla dissolvenza (160ms) per scansare il
-       verde-oliva torbido che sta a meta' strada fra i due colori —
-       ma un cambio che finisce mentre la forma e' ancora a meta' si
-       legge come uno scatto, ed era proprio quello che si vedeva.
-       IL GUADO TORBIDO SE LO MANGIA LA CURVA: con una curva dolce il
-       tratto fangoso (fra il 35% e il 60% della strada) sta fra i 90
-       e i 150 ms — sessanta millesimi, dentro un volo di mezzo
-       secondo. Misurato, non stimato. */
+  /* DUE PELLI E NON UNA CHE CAMBIA (24 set 2026, ritocco di Andrea:
+     solo transform e opacity — e ROVESCIA «il colore corre quanto la
+     forma» di prima, che faceva correre raggio, fondo e ombra). La FORMA
+     e' il tondo del +, cerchio col colore del lato, e resta piena per
+     tutta la corsa; la META e' il bottone d'arrivo — il suo raggio e il
+     suo colore: verde a comprare, rosso a vendere, blu col tabacchino
+     (#p2pMorfo.bz) — e le sfuma SOPRA. Scalano insieme con la stessa
+     curva: a cambiare e' quale pelle si vede, e il guado torbido fra
+     due colori non c'e' piu' da mangiare. Da ferma la forma e'
+     un'ellisse tutta dentro la meta, che la copre per intero; al ritorno
+     la meta svanisce e sotto c'e' gia' il tondo. */
+  #p2pMorfo .morfo-forma,#p2pMorfo .morfo-meta{will-change:transform;
+    transition:transform var(--morfo-corsa) var(--morfo-curva)}
+  #p2pMorfo .morfo-forma{border-radius:50%;background:var(--trust);
+    box-shadow:0 4px 0 var(--trust-deep);opacity:0;
     transition:transform var(--morfo-corsa) var(--morfo-curva),
-      border-radius var(--morfo-corsa) var(--morfo-curva),
-      background-color var(--morfo-corsa) var(--morfo-curva),
-      box-shadow var(--morfo-corsa) var(--morfo-curva)}
+      opacity var(--morfo-velo) ease var(--morfo-attesa)}
+  /* ...e nell'ultimo tratto dell'andata la forma SVANISCE sotto la meta
+     (gia' quasi piena): il suo gradino e' da 4px come quello del + e
+     quello del bottone da 3, e all'arrivo ne sporgeva un pixel a pancia,
+     che spariva di colpo col fantasma — visto nei fotogrammi fermi. Al
+     ritorno ricompare subito, sotto la meta che ancora la copre. */
+  #p2pMorfo.parte .morfo-forma{opacity:1;transition-delay:0s,0s}
+  body.p2p-vendo #p2pMorfo .morfo-forma{background:var(--danger);
+    box-shadow:0 4px 0 var(--danger-deep)}
+  #p2pMorfo .morfo-meta{border-radius:var(--radius-btn);
+    background:var(--trust);box-shadow:0 3px 0 var(--trust-deep);
+    transition:transform var(--morfo-corsa) var(--morfo-curva),
+      opacity var(--morfo-corsa) var(--morfo-curva)}
+  body.p2p-vendo #p2pMorfo .morfo-meta{background:var(--danger);
+    box-shadow:0 3px 0 var(--danger-deep)}
+  #p2pMorfo.bz .morfo-meta{background:#191D29;box-shadow:0 3px 0 #0C0E15}
   #p2pMorfo .morfo-glifo,#p2pMorfo .morfo-eti{
     display:flex;align-items:center;justify-content:center;
     color:#fff;font-weight:800;
@@ -3135,18 +3160,21 @@
   /* il glifo e' quello della barra, stesso carattere e stessa misura */
   #p2pMorfo .morfo-glifo{font-family:'Baloo 2',sans-serif;font-size:26px;
     opacity:0;transition-delay:0s,0s}
-  #p2pMorfo .morfo-eti{font-size:15.5px;opacity:1;
-    transition-delay:0s,var(--morfo-attesa)}
+  #p2pMorfo .morfo-eti{font-size:15.5px;opacity:1;gap:8px;
+    color:var(--on-trust);transition-delay:0s,var(--morfo-attesa)}
+  /* la scritta ha l'inchiostro del bottone d'arrivo, o all'ultimo
+     fotogramma cambierebbe di colpo; il logo copiato ha la misura sua */
+  body.p2p-vendo #p2pMorfo .morfo-eti{color:var(--on-danger)}
+  #p2pMorfo.bz .morfo-eti{color:#fff}
+  #p2pMorfo .morfo-eti .logo-bz{width:21px;height:20px;flex:0 0 auto;display:block}
   /* LO STATO DI PARTENZA E' IL TONDO DELLA BARRA, colore del LATO
      compreso: verde a comprare, rosso a vendere — lo stesso giudice
      del + e del logo, che e' una classe sul body e non una tinta
      letta a mano da JS. */
-  #p2pMorfo.parte .morfo-forma{border-radius:50%;
-    background:var(--trust);box-shadow:0 4px 0 var(--trust-deep);
+  #p2pMorfo.parte .morfo-forma,#p2pMorfo.parte .morfo-meta{
     transform:translate(var(--morfo-x),var(--morfo-y))
       scale(var(--morfo-sx),var(--morfo-sy))}
-  body.p2p-vendo #p2pMorfo.parte .morfo-forma{
-    background:var(--danger);box-shadow:0 4px 0 var(--danger-deep)}
+  #p2pMorfo.parte .morfo-meta{opacity:0}
   #p2pMorfo.parte .morfo-glifo{opacity:1;
     transform:translate(var(--morfo-x),var(--morfo-y));
     transition-delay:0s,var(--morfo-attesa)}
@@ -3192,14 +3220,14 @@
      (`nav-lato`) sui quattro che si muovono, e il verso e' una
      conseguenza — cosi' il giorno che una voce cambia posto nella
      barra il verso la segue da solo.
-     ⚠️ LA TRANSIZIONE RIPETE color E background-color, e non e'
-     ridondanza: `nav .nav-lato` batte `nav button`, quindi senza
-     quelle due voci Esplora perderebbe la sfumatura del colore
-     entrando nel P2P — la riga nuova avrebbe spento una vecchia. */
+     ⚠️ LA TRANSIZIONE RIPETE background-color, e non e' ridondanza:
+     `nav .nav-lato` batte `nav button`, e da desktop Esplora perderebbe
+     la sfumatura della sua pillola. Il COLORE non c'e' piu' (24 set
+     2026): Esplora si accende con le sue tinte, strati in opacity. */
   nav .nav-lato{transition:
-    transform var(--morfo-corsa,.4s) var(--morfo-curva,ease),
-    opacity var(--morfo-corsa,.4s) var(--morfo-curva,ease),
-    color .4s ease,background-color .4s ease}
+    transform var(--morfo-corsa,var(--p2p-corsa)) var(--morfo-curva,var(--p2p-curva)),
+    opacity var(--morfo-corsa,var(--p2p-corsa)) var(--morfo-curva,var(--p2p-curva)),
+    background-color var(--p2p-corsa) var(--p2p-curva)}
   body.barra-via nav .nav-lato{opacity:0;pointer-events:none;
     transform:translateX(-38px)}
   body.barra-via nav #nav-vendi ~ .nav-lato{transform:translateX(38px)}
@@ -3215,8 +3243,8 @@
      morfoPuoiP2P), e queste righe sono la cintura: se nascesse per un
      difetto, resterebbe fermo invece di volare */
   @media (prefers-reduced-motion:reduce){
-    #p2pMorfo .morfo-forma,#p2pMorfo .morfo-glifo,#p2pMorfo .morfo-eti,
-    nav .nav-lato{transition:none}
+    #p2pMorfo .morfo-forma,#p2pMorfo .morfo-meta,#p2pMorfo .morfo-glifo,
+    #p2pMorfo .morfo-eti,nav .nav-lato{transition:none}
   }
 
   /* ---- IL DETTAGLIO DI UN ORDINE DEL LIBRO (set 2026) ----
@@ -3987,14 +4015,50 @@
   nav .strato-p2p .off-dot{box-shadow:0 0 0 2px var(--nav-bg-p2p)}
   /* Il "+" di Vendi: bottone-oggetto rialzato sopra la barra */
   nav button.sell .ic{
-    width:54px;height:54px;border-radius:18px;background:var(--sats);color:#fff;
+    width:54px;height:54px;color:#fff;
     display:flex;align-items:center;justify-content:center;font-size:26px;padding:0;
     font-family:'Baloo 2',sans-serif;font-weight:800;margin-top:-30px;
-    box-shadow:0 4px 0 var(--sats-deep), 0 8px 20px rgba(247,147,26,.35);
+    position:relative;z-index:0;
   }
+  /* LA PELLE DEL + (24 set 2026, ritocco di Andrea: le animazioni della
+     barra solo con transform e opacity). Fondo, raggio e ombre non
+     stanno piu' sul tondo ma su QUATTRO strati sotto il glifo: la CASA
+     (il quadrato arancio del mercatino), il VERDE di «Compra BTC», il
+     ROSSO di «Vendi BTC» e l'ARANCIO fuori dal libro. Cambiare colore o
+     forma vuol dire accenderne un altro, e a correre e' la sola
+     opacity — che il compositor fa andare anche mentre la pagina
+     lavora, dove un colore che sfuma si fermerebbe a meta' strada.
+     CHI ARRIVA SI ACCENDE SOPRA, CHI VA VIA RESTA PIENO SOTTO finche'
+     l'altro non l'ha coperto, e solo dopo sfuma (120ms): due strati che
+     sfumano insieme lascerebbero trasparire la banda a meta' corsa — un
+     tondo che «sbianca». Il sopra e il sotto li decide lo z-index, che
+     cambia di colpo e non corre. Il cerchio sta tutto dentro il quadrato,
+     quindi la stessa regola vale tornando al mercatino; solo la CASA,
+     uscendo, sfuma subito insieme all'arrivo: e' piu' larga del cerchio,
+     e i suoi angoli resterebbero a vista. Lo z-index:0 del tondo e'
+     il recinto: gli strati stanno sotto il glifo e sopra niente altro. */
+  nav button.sell .pelle{position:absolute;inset:0;z-index:-2;opacity:0;
+    border-radius:50%;pointer-events:none;
+    transition:opacity 120ms ease var(--p2p-corsa)}
+  nav button.sell .pelle-casa{border-radius:18px;background:var(--sats);
+    box-shadow:0 4px 0 var(--sats-deep),0 8px 20px rgba(247,147,26,.35)}
+  nav button.sell .pelle-verde{background:var(--trust);
+    box-shadow:0 4px 0 var(--trust-deep),0 8px 20px rgba(27,139,84,.35)}
+  nav button.sell .pelle-rossa{background:var(--danger);
+    box-shadow:0 4px 0 var(--danger-deep),0 8px 20px rgba(194,65,12,.35)}
+  nav button.sell .pelle-arancio{background:var(--sats);
+    box-shadow:0 4px 0 var(--sats-deep),0 8px 20px rgba(247,147,26,.35)}
+  /* quale pelle e' accesa lo dicono le classi di sempre, e a pari catena:
+     il neutro (fuori dal libro) vince sul lato */
+  body:not(.nav-p2p) nav button.sell .pelle-casa,
+  body.nav-p2p:not(.p2p-vendo):not(.p2p-piu-neutro) nav button.sell .pelle-verde,
+  body.nav-p2p.p2p-vendo:not(.p2p-piu-neutro) nav button.sell .pelle-rossa,
+  body.nav-p2p.p2p-piu-neutro nav button.sell .pelle-arancio{
+    opacity:1;z-index:-1;transition:opacity var(--p2p-corsa) var(--p2p-curva)}
+  body.nav-p2p nav button.sell .pelle-casa{
+    transition:opacity var(--p2p-corsa) var(--p2p-curva)}
   nav button.sell{color:var(--ink-soft)}
   nav button.sell.active{color:var(--sats-deep)}
-  nav button.sell.active .ic{background:var(--sats);box-shadow:0 4px 0 var(--sats-deep), 0 8px 20px rgba(247,147,26,.35)}
   /* Lo SPAZIATORE della barra NON ESISTE PIU' (ago 2026, e una
      sentinella vieta perfino il suo nome, commenti compresi): il
      quinto posto se l'e' preso il tasto P2P, che da nav button
@@ -4002,6 +4066,18 @@
      celle equilarghe senza una regola dedicata. */
   /* Il lockup nella barra: esiste solo da desktop in su */
   .nav-logo{display:none}
+
+  /* LA CORSA DELLA BARRA P2P E' UNA SOLA (24 set 2026, ritocco di
+     Andrea: «durate coerenti, un valore unico fra 250 e 350 ms, curve
+     che arrivano morbide»). 320ms e la curva DOLCE sono quelle della
+     morfosi del +, tarate da Andrea in cinque giri sul telefono — la
+     sola corsa della barra che era gia' stata misurata a occhio — e
+     adesso le seguono tutti: la banda, le voci, il +, la tendina, il
+     ritorno del + trascinato. Parte piano e atterra lunga: nessuna
+     lineare, nessuno scatto al primo fotogramma. Il JS della morfosi
+     scrive la SUA durata (P2P_MORFO_MS) e una prova tiene i due numeri
+     in pari. */
+  :root{--p2p-corsa:320ms;--p2p-curva:cubic-bezier(.4,0,.2,1)}
 
   /* ====== LA NAV CHE SI TRASFORMA NEL P2P (set 2026) ======
      Entrando nello scambio (body.nav-p2p, che go() deriva dalla VISTA
@@ -4018,12 +4094,14 @@
      li prende tutti. L'overflow:hidden taglia chi scende al bordo
      della cella, cosi' da desktop nessuno cala sul contenuto. */
   nav .nav-cella{flex:1;display:grid;position:relative;overflow:hidden}
-  /* i tempi: ~.4s la corsa (rallentata su richiesta di Andrea, che la
-     trasformazione si deve godere), .3s la dissolvenza, e la
-     visibility gira DOPO la corsa (delay .4s) cosi' l'uscita si vede */
+  /* i tempi: la corsa unica della barra per la salita e per la
+     dissolvenza (erano .4s e .3s: la seconda finiva prima della prima,
+     e il bottone arrivava gia' pieno mentre ancora scivolava), e la
+     visibility gira DOPO la corsa cosi' l'uscita si vede */
   nav .nav-cella>button{grid-area:1/1;width:100%;
-    transition:transform .4s cubic-bezier(.2,.7,.2,1),
-      opacity .3s ease,visibility 0s linear .4s}
+    transition:transform var(--p2p-corsa) var(--p2p-curva),
+      opacity var(--p2p-corsa) var(--p2p-curva),
+      visibility 0s linear var(--p2p-corsa)}
   /* i due stati: fuori scena = giu' oltre il bordo, invisibile e
      intoccabile. LA SCALA E' SIMMETRICA (richiesta di Andrea): chi
      ENTRA — in tutt'e due le direzioni — parte .1s dopo chi esce, e
@@ -4032,19 +4110,21 @@
      solo al cambio di stato, quindi a riposo quel delay non fa nulla,
      e al RITORNO e' proprio lui la scala che mancava. */
   nav .nav-cella>button:not(.strato-p2p){transition-delay:.1s,.1s,0s}
-  /* ⚠️ GLI STRATI SFUMANO ANCHE IL COLORE (23 set 2026, col lato del
-     solo libro): la riga qui sopra, che e' di tutte le celle, non lo
-     nomina, e fin qui «Libro ordini» e «I miei scambi» cambiavano
-     colore DI SCATTO — verde, rosso o arancio al tocco, mentre il + e
-     la banda correvano .4s e Esplora (che non vive in una cella)
-     sfumava. Solo sugli strati: le voci del mercatino restano com'erano. */
+  /* ⚠️ GLI STRATI CAMBIANO COLORE SENZA SCATTO (23 set 2026, col lato
+     del solo libro): fin qui «Libro ordini» e «I miei scambi» cambiavano
+     colore DI SCATTO, mentre il + e la banda correvano. Il 24 set il
+     colore non corre piu' sul bottone: lo portano le sue TINTE, strati
+     che sfumano in opacity (vedi LE VOCI SI ACCENDONO CON UNO STRATO).
+     Qui resta il fondo, che da desktop e' la pillola della voce accesa. */
   nav .nav-cella>.strato-p2p{transform:translateY(110%);opacity:0;
     visibility:hidden;pointer-events:none;
-    transition:transform .4s cubic-bezier(.2,.7,.2,1),opacity .3s ease,
-      visibility 0s linear .4s,color .4s ease,background-color .4s ease}
+    transition:transform var(--p2p-corsa) var(--p2p-curva),
+      opacity var(--p2p-corsa) var(--p2p-curva),
+      visibility 0s linear var(--p2p-corsa),
+      background-color var(--p2p-corsa) var(--p2p-curva)}
   body.nav-p2p nav .nav-cella>button:not(.strato-p2p){
     transform:translateY(110%);opacity:0;visibility:hidden;
-    pointer-events:none;transition-delay:0s,0s,.4s}
+    pointer-events:none;transition-delay:0s,0s,var(--p2p-corsa)}
   body.nav-p2p nav .nav-cella>.strato-p2p{transform:none;opacity:1;
     visibility:visible;pointer-events:auto;transition-delay:.1s,.1s,0s,0s,0s}
   /* lo SFONDO E' UNA BANDA SCURA INCASSATA (scelta di Andrea fra due
@@ -4053,18 +4133,33 @@
      deve VEDERSI, non solo leggersi nelle etichette — e sulla banda
      scura le voci parlano la lingua della sera in TUTT'E DUE i temi:
      valori fissi, non token, perche' qui il tema non c'entra piu'. */
-  nav{transition:background-color .4s ease,box-shadow .4s ease,
-    border-color .4s ease}
-  /* ...e le voci sfumano il colore in pari con la banda: senza, il
-     grigio del giorno scatterebbe al chiaro della sera a meta' corsa */
-  nav button{transition:color .4s ease,background-color .4s ease}
-  body.nav-p2p nav{background:var(--nav-bg-p2p);border-top-color:transparent;
+  /* LA BANDA E' UNO STRATO CHE SFUMA (24 set 2026, ritocco di Andrea:
+     solo transform e opacity). Prima correvano il fondo, l'ombra e il
+     bordo della barra intera — sfocata dietro, quindi ridipinta a ogni
+     fotogramma per tutta la sua larghezza. Adesso la banda e' il
+     ::before della barra, pieno e con l'incasso suo, e ad accendersi e'
+     la sua opacity. Copre anche il filo di sopra (top:-1px), che quindi
+     non deve piu' spegnersi. Sta a z-index:-2, sotto tutto quel che la
+     barra porta: la barra e' un contesto suo (fixed, z-index 30), e li'
+     dentro -2 vuol dire «sopra il fondo della barra, sotto le voci». */
+  nav::before{content:'';position:absolute;left:0;right:0;top:-1px;bottom:0;
+    z-index:-2;pointer-events:none;background:var(--nav-bg-p2p);
     box-shadow:inset 0 4px 12px rgba(0,0,0,.5),
-      inset 0 -1px 0 rgba(255,255,255,.08)}
-  html[data-tema="scuro"] body.nav-p2p nav{
+      inset 0 -1px 0 rgba(255,255,255,.08);
+    opacity:0;transition:opacity var(--p2p-corsa) var(--p2p-curva)}
+  html[data-tema="scuro"] nav::before{
     box-shadow:inset 0 4px 12px rgba(0,0,0,.65),
       inset 0 -1px 0 rgba(255,255,255,.06)}
-  body.nav-p2p nav button{color:#B5AA90}
+  body.nav-p2p nav::before{opacity:1}
+  /* ...e le voci sfumano il colore in pari con la banda: senza, il
+     grigio del giorno scatterebbe al chiaro della sera a meta' corsa.
+     (24 set 2026) Resta per le voci che non hanno una tinta — le tre
+     del mercatino, che nel P2P scendono via, e da desktop la levetta,
+     il podio e il tappo —: le quattro della barra P2P si accendono con
+     uno STRATO, vedi LE VOCI SI ACCENDONO CON UNO STRATO qui sotto. */
+  nav button{transition:color var(--p2p-corsa) var(--p2p-curva),
+    background-color var(--p2p-corsa) var(--p2p-curva)}
+  body.nav-p2p nav button{color:var(--nav-ink-p2p)}
   /* LA VOCE ATTIVA VESTE IL LATO (set 2026, ritocco di Andrea): verde
      a comprare, rosso a vendere — lo stesso giudice del + e del logo.
      Toni della sera fissi, come tutto sulla banda: i chiari del tema
@@ -4076,29 +4171,76 @@
      e mai il verde o il rosso del tab che si e' guardato per ultimo.
      La regola di base e' l'arancio per tutte; il lato e' un'eccezione
      che porta il NOME della voce che ce l'ha. */
-  body.nav-p2p nav button.active{color:#FFB25C}
-  body.nav-p2p nav #nav-p2plibro.active{color:#34B47A}
-  body.nav-p2p.p2p-vendo nav #nav-p2plibro.active{color:#F07A47}
+  /* LE VOCI SI ACCENDONO CON UNO STRATO (24 set 2026, ritocco di Andrea:
+     solo transform e opacity). Misurato con la CPU rallentata 4x: il
+     colore che sfumava sulle scritte era l'ultima corsa della barra sul
+     thread principale, e a ogni cambio di tab lasciava dodici o tredici
+     fotogrammi «parziali» — presentati senza l'aggiornamento della
+     pagina; tolto lui, zero. Adesso Esplora e le tre voci del P2P tengono
+     scritta e icona in una BASE grigia, e sopra ne portano una COPIA per
+     ogni colore in cui si accendono (le fa tinteVociP2P all'avvio, dal
+     markup vero: nessuna icona ricopiata a mano): Esplora il grigio del
+     mercatino e l'arancio di casa, il libro il verde e il rosso del lato,
+     «I miei scambi» e «Info P2P» l'arancio. Cambiare colore vuol dire
+     accendere una copia: la regola della pelle del + — chi arriva si
+     accende sopra, chi va via resta sotto e sfuma dopo la corsa —, e la
+     base si spegne sotto lo strato acceso e torna di colpo quando lui se
+     ne va. Le copie non si leggono (aria-hidden) e non si toccano.
+     IL LATO RESTA DEL SOLO LIBRO, la regola di sopra: verde e rosso sono
+     le copie del libro, e le altre due voci hanno il solo arancio. */
+  nav .tinta{display:flex;flex-direction:inherit;align-items:inherit;
+    justify-content:inherit;gap:inherit}
+  nav .tinta-base{color:var(--nav-ink-p2p);transition:opacity 0s}
+  nav .tinta:not(.tinta-base){position:absolute;inset:0;padding:inherit;
+    box-sizing:border-box;z-index:1;opacity:0;pointer-events:none;
+    transition:opacity var(--p2p-corsa) var(--p2p-curva)}
+  /* ...la tinta di una voce che si SPEGNE sfuma subito, che sotto c'e'
+     gia' la base; resta piena sotto e sfuma DOPO la corsa solo quando
+     un'altra tinta della stessa voce prende il suo posto: il libro fra
+     verde e rosso, Esplora nel mercatino fra il grigio e l'arancio.
+     (Visto nei fotogrammi fermi: con la regola sola, passando dal libro
+     ai miei, «Libro ordini» restava acceso per tutta la corsa.) */
+  nav button.active .tinta:not(.tinta-base),
+  body:not(.nav-p2p) nav #nav-esplora .tinta:not(.tinta-base){
+    transition:opacity 120ms ease var(--p2p-corsa)}
+  nav .tinta-mercato{color:var(--muted)}
+  nav .tinta-acceso{color:var(--sats-deep)}
+  html[data-tema="scuro"] nav .tinta-acceso{color:var(--sats-text)}
+  nav .tinta-arancio{color:#FFB25C}
+  nav .tinta-verde{color:#34B47A}
+  nav .tinta-rossa{color:#F07A47}
+  body:not(.nav-p2p) nav #nav-esplora:not(.active) .tinta-mercato,
+  body:not(.nav-p2p) nav #nav-esplora.active .tinta-acceso,
+  body.nav-p2p nav #nav-p2pmiei.active .tinta-arancio,
+  body.nav-p2p nav #nav-p2pinfo.active .tinta-arancio,
+  body.nav-p2p:not(.p2p-vendo) nav #nav-p2plibro.active .tinta-verde,
+  body.nav-p2p.p2p-vendo nav #nav-p2plibro.active .tinta-rossa{
+    opacity:1;z-index:2;transition:opacity var(--p2p-corsa) var(--p2p-curva)}
+  body:not(.nav-p2p) nav #nav-esplora .tinta-base,
+  body.nav-p2p nav .strato-p2p.active .tinta-base{opacity:0;
+    transition:opacity 120ms ease var(--p2p-corsa)}
+  /* il pallino sta SOPRA gli strati: e' suo il dire «tocca a te» */
+  nav .off-dot{z-index:3}
   /* il lockup della topbar eredita l'inchiostro della pagina, che
      sulla banda scura affoga: qui si schiarisce (il ₿ e il lampo
      restano arancio da soli, --sats non si tocca) */
-  nav .nav-logo{transition:color .4s ease}
+  nav .nav-logo{transition:color var(--p2p-corsa) var(--p2p-curva)}
   body.nav-p2p nav .nav-logo{color:#F1E8D5}
   /* IL + CAMBIA PELLE: la scritta «Vendi» scende con le sorelle, il
      tondo sale di un soffio e passa da quadrato arancio a CERCHIO col
      colore del lato — verde protezione a comprare, rosso di casa a
      vendere (body.p2p-vendo, scritto da setLatoP2P). E' lo stesso
      bottone: cambia il vestito, mai la cella. */
-  nav button.sell .ic{transition:transform .4s cubic-bezier(.2,.7,.2,1),
-    border-radius .4s ease,background-color .4s ease,box-shadow .4s ease}
+  nav button.sell .ic{transition:transform var(--p2p-corsa) var(--p2p-curva)}
   /* le due etichette del + stanno impilate nella stessa cella di
      griglia: «Vendi» (base) e «Pubblica» (solo desktop, vedi giu') —
      la pila e' larga quanto la piu' lunga, quindi il crossfade non
      sposta niente */
   nav button.sell .eti-pila{display:grid;justify-items:center}
   nav button.sell .eti-pila>span{grid-area:1/1;
-    transition:transform .4s cubic-bezier(.2,.7,.2,1),
-      opacity .3s ease,visibility 0s linear .4s}
+    transition:transform var(--p2p-corsa) var(--p2p-curva),
+      opacity var(--p2p-corsa) var(--p2p-curva),
+      visibility 0s linear var(--p2p-corsa)}
   nav button.sell .eti-p2p{visibility:hidden;opacity:0}
   /* lo stato di quiete di «Vendi» porta il delay dell'INGRESSO, come
      i bottoni base delle celle: senza, al ritorno la visibility
@@ -4116,12 +4258,10 @@
      ed e' il gemello rovescio del difetto del ritorno. */
   body.nav-p2p nav button.sell .eti-pila>.eti:not(.eti-p2p){
     transform:translateY(120%);opacity:0;visibility:hidden;
-    transition-delay:0s,0s,.4s}
-  body.nav-p2p nav button.sell .ic{transform:translateY(-15px);
-    border-radius:50%;background:var(--trust);
-    box-shadow:0 4px 0 var(--trust-deep),0 8px 20px rgba(27,139,84,.35)}
-  body.nav-p2p.p2p-vendo nav button.sell .ic{background:var(--danger);
-    box-shadow:0 4px 0 var(--danger-deep),0 8px 20px rgba(194,65,12,.35)}
+    transition-delay:0s,0s,var(--p2p-corsa)}
+  /* nel libro il tondo sale di un soffio; colore e forma li porta la
+     sua pelle (vedi sopra), qui c'e' solo la corsa */
+  body.nav-p2p nav button.sell .ic{transform:translateY(-15px)}
   /* IL + FUORI DAL LIBRO (23 set 2026, richiesta di Andrea): in «I miei
      scambi», in «Info P2P» e nella pagina di uno scambio, che accende «I
      miei scambi», non si pubblica, e al tocco il + porta al libro su
@@ -4129,9 +4269,9 @@
      sta alla SUA altezza, col suo stesso rilievo (niente −15px: quel
      sollevamento e' del libro), restando un tondo grande come il verde e
      il rosso. Tornando nel libro risale e riprende il colore del lato con la
-     stessa corsa: transform, fondo e ombra, le tre che il tondo sa gia'
-     far correre — e DUE ombre da tutt'e due le parti, o l'ombra non
-     correrebbe.
+     stessa corsa: la transform, e la pelle arancio che si accende al
+     posto di quella del lato (24 set 2026: fondo e ombra non corrono
+     piu', vedi LA PELLE DEL +).
      ⚠️ ROVESCIA IL PRIMO GIRO dello stesso giorno, e non si ripropone: il
      tondo GRIGIO stretto a 42px e sceso nella barra sembrava un tasto
      spento, non la strada per il libro.
@@ -4142,99 +4282,139 @@
      topbar, una linguetta sempre uguale come «Vendi» nel mercatino, e
      resta com'era — per questo la regola vive sotto i 768px, e il JS
      chiede la stessa larghezza (piuNeutroP2P). */
+  /* A «VENDI BTC» IL + SALE DI PIU' (24 set 2026, richiesta di Andrea):
+     31px invece di 15, per far posto alla B del logo nella tendina che
+     gli scende da sotto — vedi LA CAPSULA, qui sotto. Solo sotto i
+     768px, come il neutro: da desktop il + e' la pillola della topbar.
+     Il neutro sta DOPO a pari catena, e fuori dal libro vince lui. */
   @media (max-width:767px){
-    body.nav-p2p.p2p-piu-neutro nav button.sell .ic{
-      transform:none;background:var(--sats);
-      box-shadow:0 4px 0 var(--sats-deep),0 8px 20px rgba(247,147,26,.35)}
+    body.nav-p2p.p2p-vendo nav button.sell .ic{transform:translateY(-31px)}
+    body.nav-p2p.p2p-piu-neutro nav button.sell .ic{transform:none}
+    /* la scritta «Vendi» scende via in opacity: il suo colore cambia di
+       colpo mentre sparisce, e non tiene una corsa sul thread principale */
+    nav button.sell{transition:none}
   }
   @media (prefers-reduced-motion:reduce){
     nav .nav-cella>.strato-p2p,
-    nav button,nav,nav .nav-cella>button,nav button.sell .ic,
+    nav button,nav,nav::before,nav .nav-cella>button,nav button.sell .ic,
+    nav button.sell .pelle,nav .tinta,
     nav button.sell .eti-pila>span{transition:none}
   }
 
-  /* ====== IL TASTO BARATTOZON: LA CAPSULA (23 set 2026, richiesta di
-     Andrea) ======
+  /* ====== IL TASTO BARATTOZON: LA CAPSULA (23 set 2026, ritoccata il 24
+     da Andrea) ======
      Nel libro, sul lato «Vendi BTC», dal fondo del + rosso scende A
      TENDINA la sua continuazione: larga ESATTAMENTE come lui (54px), coi
      bordi dritti che proseguono quelli del cerchio e arrotondata in
      fondo, cosi' che + e tendina facciano una capsula sola, «a supposta».
      Sopra resta il + (il suo tocco apre il foglio di sempre), sotto la
-     tendina col marchio: al tocco apre «Vuoi vendere Bitcoin» col
-     tabacchino gia' scelto, cioe' dritto al passo 1 del percorso
-     (apriBarattozonP2P). Rientra passando a «Compra BTC», uscendo dal
-     libro e mentre il + si apre nel foglio (body.barra-via).
-     ⚠️ ROVESCIA IL PRIMO GIRO dello stesso giorno: un tondo blu da 36px
-     sotto il + — troppo piccolo, e sembrava un oggetto a parte.
-     LA TENDINA E' DEL BLU DELLA FOTO (#191D29, misurato ai bordi del
-     sorgente) e la freccia ci sta sopra NUDA, com'e' nel logo (decisione
-     di Andrea, che ha rovesciato la finestrella blu dentro una tendina
-     rossa del primo passaggio): sul blu la freccia arancio (#FE8402)
-     stacca 6,8:1, sul rosso sparirebbe (1,1:1 la sera). IL CONTORNO E' UN
-     FILO DEL COLORE DEL + (2,5px dentro il bordo), ed e' quel che la tiene
-     capsula: sulla banda bruna quel blu da solo non stacca (1,07:1 di
-     giorno) e la tendina diventava un oggetto a parte — il filo prosegue
-     il bordo del cerchio.
+     tendina col LOGO INTERO di Barattozon — la B bianca sopra la freccia
+     arancio, sul blu della foto (#191D29) —: al tocco apre «Vuoi vendere
+     Bitcoin» col tabacchino gia' scelto, cioe' dritto al passo 1 del
+     percorso (apriBarattozonP2P). E il + ci si puo' TRASCINARE sopra:
+     vedi IL TRASCINO, nel JS accanto ad apriBarattozonP2P.
+     ⚠️ LA STORIA, perche' non si rifaccia: il primo giro era un tondo
+     da 36px sotto il + (sembrava un oggetto a parte), il secondo la
+     capsula con la sola freccia e il FILO DEL COLORE DEL + (il filo
+     rosso si confondeva col +). Questo terzo giro rovescia tutt'e due:
+     TORNA LA B, e il filo prende il GRIGIO DELLE VOCI della banda —
+     --nav-ink-p2p, lo stesso token, nei due temi.
+     IL + SALE PER FARLE POSTO: sotto un + alto 15px la B misurava 22px
+     e non si leggeva (varianti a 0, 12, 16 e 20px di salita, guardate a
+     schermo). A «Vendi BTC» il + sale di 31px invece di 15 — sedici in
+     piu', quel che fa stare il logo alto 40 con le punte della freccia
+     lontane dal filo, dove la curva del fondo e' ancora larga — e torna
+     giu' su «Compra BTC» con la corsa di tutta la barra. La capsula
+     resta larga 54, quindi le voci ai lati non si toccano, e il fondo
+     resta a 56 dal bordo alto della barra, cioe' sopra la sua
+     imbottitura di sistema: mai sotto la barra dei gesti.
+     IL GRADINO E' BLU (#0C0E15) E LA LUCE DEL TRASCINO E' BIANCA: scelte
+     di Andrea fra tre gradini e due luci guardati a schermo.
      QUANDO C'E' LO DICONO LE CLASSI CHE C'ERANO GIA' — nav-p2p,
      p2p-vendo, p2p-piu-neutro, barra-via — e nessuna sua: le scrivono
      go() dalla vista e setLatoP2P dal tab, quindi indietro, cronologia
      e gesto dell'app Android la rimettono giusta da soli.
-     LA GEOMETRIA: parte dal CENTRO del cerchio (−10 dal bordo della
-     barra: il cerchio va da −37 a 17), cosi' i fianchi dritti escono
-     esattamente dove il cerchio smette di esserlo, e finisce a 56,
-     quattro pixel sopra il fondo dello schermo. Sta PRIMA del + nel
-     markup: il cerchio le si dipinge sopra e ne copre la cima.
-     E' UNA TENDINA: si SROTOLA — il bordo di sotto del ritaglio scende e
-     la scopre da sotto il +, e rientrando risale sotto di lui. Il
-     ritaglio lascia fuori la cima (sta sotto il cerchio) e 24px di
-     fianco e di sotto, per l'ombra.
-     ⚠️ LA CIMA NON SI DEVE MAI VEDERE, e i fotogrammi a meta' corsa hanno
-     detto dove scappava: la cima e' dritta, e nasce all'equatore del
-     cerchio, dove lui e' largo 54 come lei — un pixel piu' su o piu' giu'
-     e i suoi angoli sporgono. Quindi 1) nessuno scivolo (la prima stesura
-     saliva di 8px rientrando: angoli rossi accanto al cerchio); 2) il
-     FILO ha sempre il colore del +, con la sua stessa dissolvenza —
-     verde, rosso, arancio —, cosi' mentre il + cambia colore la capsula
-     cambia con lui; 3) fuori dal libro SCENDE DI 15px COL +, con la sua
-     stessa curva: il + lascia il libro abbassandosi, e la cima della
-     tendina resta sotto il suo equatore mentre si arrotola.
+     SOLO TRANSFORM (24 set 2026, ritocco di Andrea): la tendina non si
+     srotola piu' col ritaglio che scende — un clip-path che corre si
+     ridipinge a ogni fotogramma — ma SCIVOLA fuori da sotto il + dentro
+     un TELAIO che la taglia all'equatore del cerchio. Il telaio
+     (#navTendina) segue il +, cosi' la sua cima e' sempre l'equatore; la
+     tendina ci si muove dentro. Due transform con la corsa della barra.
+     ⚠️ LA CIMA NON SI DEVE MAI VEDERE, e la geometria sta tutta qui: la
+     cima della tendina e' dritta e nasce all'equatore, dove il cerchio
+     e' largo 54 come lei, e li' il telaio la taglia. Arrotolata, la
+     tendina ha il fondo sul fondo del cerchio: il suo mezzo tondo e'
+     quello del +, quindi e' tutta sotto di lui (e il suo gradino sotto
+     il suo). I numeri, dal bordo alto della barra: a «Vendi» il cerchio
+     va da −53 a 1 (padding 8, margine −30, salita −31) e l'equatore sta
+     a −26, la cima del telaio; la tendina finisce a 56. Una prova rifa'
+     il conto leggendo le regole del +.
      UN <div> E NON UN <button>, la ragione del logo in topbar: `nav
      button` e' il selettore delle VOCI (CSS, spazzata di go(), conta
      delle celle) e la tendina non e' una voce. Role, tabindex e tasti
      glieli da' il markup. */
-  #navBarattozon{position:absolute;left:0;right:0;top:-10px;
-    width:54px;height:66px;margin:0 auto;border-radius:0 0 27px 27px;
-    background:#191D29;cursor:pointer;-webkit-tap-highlight-color:transparent;
-    box-shadow:inset 0 0 0 2.5px var(--trust),0 4px 0 var(--trust-deep),
-      0 8px 20px rgba(27,139,84,.35);
-    clip-path:inset(0 -24px 100% -24px);
-    visibility:hidden;pointer-events:none;
-    transition:clip-path .4s cubic-bezier(.2,.7,.2,1),
-      transform .4s cubic-bezier(.2,.7,.2,1),visibility 0s linear .4s,
-      box-shadow .4s ease}
-  /* il filo e il gradino hanno il colore del +, lato per lato: le stesse
-     coppie delle sue regole, e TRE ombre in ogni stato, o non correrebbero */
-  body.p2p-vendo #navBarattozon{
-    box-shadow:inset 0 0 0 2.5px var(--danger),0 4px 0 var(--danger-deep),
-      0 8px 20px rgba(194,65,12,.35)}
+  #navTendina{position:absolute;left:0;right:0;margin:0 auto;
+    top:-26px;width:54px;height:86px;overflow:hidden;pointer-events:none;
+    transform:translateY(31px);
+    transition:transform var(--p2p-corsa) var(--p2p-curva)}
+  /* il telaio segue il +: la sua cima e' l'equatore del cerchio in ogni
+     stato — 16px piu' giu' a «Compra BTC», 31 fuori dal libro, dove il
+     + non e' sollevato */
+  body.nav-p2p #navTendina{transform:translateY(16px)}
+  body.nav-p2p.p2p-vendo #navTendina{transform:none}
   @media (max-width:767px){
-    body.p2p-piu-neutro #navBarattozon{transform:translateY(15px);
-      box-shadow:inset 0 0 0 2.5px var(--sats),0 4px 0 var(--sats-deep),
-        0 8px 20px rgba(247,147,26,.35)}
+    body.nav-p2p.p2p-piu-neutro #navTendina{transform:translateY(31px)}
   }
-  /* la freccia, nuda sul blu: larga quanto ci sta dentro il filo (46 dei
-     49) e centrata nel blu che il + lascia scoperto (dal suo gradino, a
-     21, al filo del fondo, a 53,5): va da 31 a 42,7. E' un sorriso — le
-     punte stanno in alto, dove la tendina e' ancora larga 49, e in basso
-     c'e' solo la pancia, che la curva del fondo contiene */
-  #navBarattozon img{position:absolute;left:4px;top:41px;
-    width:46px;height:auto;display:block}
-  #navBarattozon:focus-visible{outline:2px solid #FFB25C;outline-offset:3px}
-  /* srotolata: il ritaglio parte .1s dopo (la scala della barra), ma la
-     corsa verticale e i colori no — devono andare col + */
+  /* arrotolata = fondo sul fondo del +: 82 di tendina, 27 di mezzo tondo */
+  #navBarattozon{position:absolute;left:0;top:0;width:54px;height:82px;
+    border-radius:0 0 27px 27px;background:#191D29;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;box-shadow:0 4px 0 #0C0E15;
+    transform:translateY(-55px);visibility:hidden;pointer-events:none;
+    transition:transform var(--p2p-corsa) var(--p2p-curva),
+      visibility 0s linear var(--p2p-corsa)}
+  /* IL FILO STA SU UNO STRATO SUO che parte 3px SOPRA la tendina, dove il
+     telaio lo taglia: la cima resta APERTA. A riposo non cambia niente
+     (la cima e' sotto il +), ma quando il dito porta via il + sotto c'e'
+     una TASCA, non una scatola col coperchio bordato — visto nel primo
+     scatto del trascino. Lo stesso vale per la luce, piu' sotto. */
+  #navBarattozon::before{content:'';position:absolute;left:0;right:0;top:-3px;bottom:0;
+    border-radius:0 0 27px 27px;pointer-events:none;
+    box-shadow:inset 0 0 0 2.5px var(--nav-ink-p2p)}
+  /* il logo alto 40, subito sotto il gradino del + (che a «Vendi»
+     finisce a 31 dalla cima della tendina), centrato: la freccia e' un
+     sorriso, e le sue punte stanno dove la curva del fondo e' ancora
+     larga — col logo piu' grande toccavano il filo */
+  #navBarattozon img{position:absolute;left:6.5px;top:33px;
+    width:41px;height:40px;display:block}
+  /* l'anello del Tab sta DENTRO: il telaio taglia tutto quel che esce */
+  #navBarattozon:focus-visible{outline:2px solid #FFB25C;outline-offset:-5px}
+  /* srotolata: la corsa parte .1s dopo (la scala della barra) */
   body.nav-p2p.p2p-vendo:not(.p2p-piu-neutro):not(.barra-via) #navBarattozon{
-    clip-path:inset(0 -24px -28px -24px);
-    visibility:visible;pointer-events:auto;transition-delay:.1s,0s,0s,0s}
+    transform:none;visibility:visible;pointer-events:auto;
+    transition-delay:.1s,0s}
+  /* LA LUCE DEL TRASCINO (scelta di Andrea: bianca): col dito sopra la
+     tendina il filo diventa bianco, dentro si accende un chiarore e
+     intorno un ALONE. Filo e chiarore stanno nella tendina; l'alone sta
+     FUORI dal telaio, che lo taglierebbe all'equatore — una riga dritta
+     accanto al +, vista di sera nelle varianti —, ed e' il ::after della
+     barra, a z-index:-1: sopra la banda, sotto le voci e il +. Si
+     accendono con l'opacity, e la classe e' del JS del trascino. */
+  #navBarattozon::after{content:'';position:absolute;left:0;right:0;top:-3px;bottom:0;
+    border-radius:0 0 27px 27px;pointer-events:none;opacity:0;
+    box-shadow:inset 0 0 0 2.5px #FFFFFF;
+    background:radial-gradient(circle at 50% 60%,rgba(255,255,255,.22),
+      rgba(255,255,255,0) 70%);
+    transition:opacity var(--p2p-corsa) var(--p2p-curva)}
+  nav::after{content:'';position:absolute;left:0;right:0;margin:0 auto;
+    top:-26px;width:54px;height:82px;border-radius:0 0 27px 27px;
+    z-index:-1;pointer-events:none;opacity:0;
+    box-shadow:0 0 18px 4px rgba(255,255,255,.45);
+    transition:opacity var(--p2p-corsa) var(--p2p-curva)}
+  body.p2p-sopra #navBarattozon::after,body.p2p-sopra nav::after{opacity:1}
+  /* IL + SEGUE IL DITO SENZA CORSA: lo sposta il JS con la sua
+     transform, e al rilascio (classe tolta) torna a casa con la corsa di
+     sempre */
+  body.p2p-trascina nav button.sell .ic{transition:none}
   /* ⚠️ IL DITO, CHE IL CLICK DA JS NON VEDE: il + e' una cella della
      barra, e la sua SCATOLA (72px per 44, vuota: la scritta e' scesa)
      copre la tendina — sta dopo nel markup, quindi sopra anche per il
@@ -4244,15 +4424,20 @@
      lascia passare il dito, e il + lo prende col solo suo cerchio, che
      e' tutto quel che di lui si vede: sopra il +, sotto la tendina. Solo
      sotto i 768px: da desktop la tendina non c'e' e la pillola si tocca
-     tutta. */
+     tutta.
+     E IL + NON SI FA RUBARE IL TRASCINO (24 set 2026): `pan-down` vuol
+     dire che la pagina scorre solo se il dito SALE — quel gesto resta
+     suo, e a noi arriva un pointercancel —, mentre il dito che scende e'
+     il trascino. Dove i versi di touch-action non esistono (Safari) la
+     riga cade e vale `none`, scritta prima apposta. */
   @media (max-width:767px){
     body.nav-p2p.p2p-vendo:not(.p2p-piu-neutro):not(.barra-via) #nav-vendi{
       pointer-events:none}
     body.nav-p2p.p2p-vendo:not(.p2p-piu-neutro):not(.barra-via) #nav-vendi .ic{
-      pointer-events:auto}
+      pointer-events:auto;touch-action:none;touch-action:pan-down}
   }
   @media (prefers-reduced-motion:reduce){
-    #navBarattozon{transition:none}
+    #navTendina,#navBarattozon,#navBarattozon::after,nav::after{transition:none}
   }
 
   /* ---------- barra d'acquisto del dettaglio (solo mobile) ----------
@@ -6362,6 +6547,15 @@
   .btn.orange{background:var(--sats);color:#fff;box-shadow:0 3px 0 var(--sats-deep)}
   /* il pieno dell'asta: stessa forma dell'orange, colore suo */
   .btn.asta{background:var(--asta);color:var(--asta-on);box-shadow:0 3px 0 var(--asta-deep)}
+  /* IL BOTTONE CHE PUBBLICA NEL P2P VESTE IL + CHE SI E' APERTO (24 set
+     2026, richieste di Andrea): verde a «Compra BTC» (il .primary di
+     casa), ROSSO a «Vendi BTC», e col percorso Barattozon il BLU della
+     capsula (#191D29) col logo in piccolo al posto dell'icona. Stessa
+     forma dell'orange, cambia la tinta; il testo regge l'AA nei due temi
+     (il bianco sul blu fa 16,8:1; sul rosso lo decide --on-danger). */
+  .btn.rosso{background:var(--danger);color:var(--on-danger);box-shadow:0 3px 0 var(--danger-deep)}
+  .btn.bz{background:#191D29;color:#fff;box-shadow:0 3px 0 #0C0E15}
+  .btn .logo-bz{width:21px;height:20px;flex:0 0 auto;display:block}
   .btn.ghost{background:var(--card);border:2px solid var(--ink);color:var(--ink);
     box-shadow:0 3px 0 var(--ink);margin-top:10px}
   /* I DUE PONTI verso l'esterno (ago 2026): stessa FORMA di ogni
@@ -7624,6 +7818,9 @@
       width:auto;height:auto;border-radius:0;background:none;
       font-size:17px;margin-top:0;box-shadow:none;font-family:inherit;
     }
+    /* la pelle e' del tondo, e qui il tondo non c'e': la pillola e' il
+       bottone intero, e il glifo e' solo un glifo */
+    nav button.sell .pelle{display:none}
     /* LA NAV TRASFORMATA, DA DESKTOP (set 2026): qui le voci sono
        pillole, non c'e' un + rialzato da far levitare. Le celle a
        strati smettono di allargarsi (flex:0 0 auto come le sorelle) e
@@ -7634,8 +7831,8 @@
     /* la pillola del + non scappa in alto ne' diventa tonda: cambia
        COLORE (il fondo del bottone, non l'.ic che qui e' solo il
        glifo) e la scritta fa il crossfade «Vendi» → «Pubblica» */
-    nav button.sell{transition:background-color .4s ease,
-      box-shadow .4s ease}
+    nav button.sell{transition:background-color var(--p2p-corsa) var(--p2p-curva),
+      box-shadow var(--p2p-corsa) var(--p2p-curva)}
     body.nav-p2p nav button.sell .ic{transform:none;border-radius:0;
       background:none;box-shadow:none}
     body.nav-p2p nav button.sell{background:var(--trust);
@@ -7652,10 +7849,10 @@
       transition-delay:.1s,.1s,0s}
     /* l'incavo da desktop viene dal BASSO: la topbar e' appesa in
        cima, il suo bordo vivo e' quello di sotto */
-    body.nav-p2p nav{border-bottom-color:transparent;
+    nav::before{top:0;bottom:-1px;
       box-shadow:inset 0 -4px 12px rgba(0,0,0,.5),
         inset 0 1px 0 rgba(255,255,255,.08)}
-    html[data-tema="scuro"] body.nav-p2p nav{
+    html[data-tema="scuro"] nav::before{
       box-shadow:inset 0 -4px 12px rgba(0,0,0,.65),
         inset 0 1px 0 rgba(255,255,255,.06)}
     /* la pillola attiva sulla banda scura: il crema di giorno
@@ -7668,8 +7865,8 @@
     /* il tasto Barattozon e' la tendina che prosegue il tondo del + in
        una capsula, e da desktop il tondo non c'e': sotto la pillola della
        topbar penderebbe sulla pagina. Il tabacchino resta a un tocco nel
-       foglio, fra i metodi */
-    #navBarattozon{display:none}
+       foglio, fra i metodi. Via anche l'alone del trascino, che e' suo */
+    #navTendina,nav::after{display:none}
     header{top:60px}
     header .brand{display:none}   /* il logo ora sta nella topbar */
     .searchbar{max-width:640px}
@@ -10336,22 +10533,25 @@ document.getElementById('cartello')?.remove();</script>
          Dentro: gli ordini di TUTTI, il libro del coordinatore. -->
     <button id="nav-p2plibro" class="strato-p2p" onclick="go('p2p')"><span class="ic"><svg class="nav-ico" viewBox="2 2 20 20" aria-hidden="true"><path class="velo" d="M12 6.1C10.2 4.9 7.7 4.6 5.1 5.2v12.5c2.6-.6 5.1-.3 6.9 1 1.8-1.3 4.3-1.6 6.9-1V5.1c-2.6-.5-5.1-.2-6.9 1z"/><path d="M12 6.1C10.2 4.9 7.7 4.6 5.1 5.2v12.5c2.6-.6 5.1-.3 6.9 1"/><path d="M12 6.1c1.8-1.2 4.3-1.5 6.9-1v12.6c-2.6-.6-5.1-.3-6.9 1"/><path d="M12 6.1v12.6"/></svg></span>Libro ordini</button>
     </div>
-    <!-- IL TASTO BARATTOZON (23 set 2026): la tendina col marchio che
-         nel libro, su «Vendi BTC», scende dal fondo del + e con lui fa
-         una capsula sola; apre il foglio col tabacchino gia' scelto. Sta
-         PRIMA del + apposta: il cerchio le si dipinge sopra e ne copre la
-         cima. Nascosta finche' le classi non la chiamano (vedi il suo
-         CSS), e da nascosta non si tocca e non si raggiunge col Tab. -->
-    <div id="navBarattozon" role="button" tabindex="0"
+    <!-- IL TASTO BARATTOZON (23 set 2026, ritoccato il 24): la tendina
+         col logo intero che nel libro, su «Vendi BTC», scende dal fondo
+         del + e con lui fa una capsula sola; apre il foglio col
+         tabacchino gia' scelto. Vive in un TELAIO (#navTendina) che la
+         taglia all'equatore del + e lo segue: lei ci scivola dentro, solo
+         transform. Sta PRIMA del + apposta: il cerchio le si dipinge sopra
+         e ne copre la cima. Nascosta finche' le classi non la chiamano
+         (vedi il suo CSS), e da nascosta non si tocca e non si raggiunge
+         col Tab. -->
+    <div id="navTendina"><div id="navBarattozon" role="button" tabindex="0"
          aria-label="Vendi con Barattozon: contanti al tabacchino"
          title="Vendi con Barattozon"
          onclick="apriBarattozonP2P()"
-         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();apriBarattozonP2P()}"><img src="/assets/barattozon-tasto.webp" width="46" height="12" alt="" onerror="this.remove()"></div>
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();apriBarattozonP2P()}"><img src="/assets/barattozon-tasto.webp" width="41" height="40" alt="" onerror="this.remove()"></div></div>
     <!-- Il + di Vendi: nel P2P la scritta scende e il tondo si
          trasforma (vedi il CSS della nav trasformata). Le DUE
          etichette stanno impilate in .eti-pila: «Pubblica» esiste
          solo da desktop, dove il + resta una pillola. -->
-    <button id="nav-vendi" class="sell" onclick="toccaPiu()"><span class="ic">＋</span><span class="eti-pila"><span class="eti">Vendi</span><span class="eti eti-p2p">Pubblica</span></span></button>
+    <button id="nav-vendi" class="sell" onclick="toccaPiu()"><span class="ic"><i class="pelle pelle-casa"></i><i class="pelle pelle-verde"></i><i class="pelle pelle-rossa"></i><i class="pelle pelle-arancio"></i>＋</span><span class="eti-pila"><span class="eti">Vendi</span><span class="eti eti-p2p">Pubblica</span></span></button>
     <!-- Aste: il MARTELLETTO (ago 2026). Il markup della barra e'
          STATICO — a leva spenta il tasto resta e porta al suo «coming
          soon» (vaiAste), mai una cella accesa e spenta a runtime, che
@@ -10509,6 +10709,7 @@ document.getElementById('cartello')?.remove();</script>
        divergere. -->
   <div id="p2pMorfo" aria-hidden="true">
     <i class="morfo-forma"></i>
+    <i class="morfo-meta"></i>
     <span class="morfo-glifo">＋</span>
     <span class="morfo-eti"></span>
   </div>
@@ -12874,6 +13075,11 @@ function piuNeutroP2P(){
    stessa verita' che l'utente ha davanti agli occhi: se il + e' tondo
    e verde, pubblica. */
 function toccaPiu(){
+  /* il click che il browser manda DOPO un tocco o un trascino che il
+     gesto del + ha gia' gestito (vedi IL TRASCINO): si scarta, o il
+     foglio si aprirebbe due volte. Tastiera e lettore di schermo non
+     passano dal gesto, e restano su questa strada. */
+  if (performance.now() - p2pPiuGestoAt < 700) return;
   if (piuNeutroP2P()) { libroDaPiuP2P(); return; }
   if (document.body.classList.contains('nav-p2p')) { apriNuovoOrdineP2P(); return; }
   go('vendi');
@@ -12937,6 +13143,9 @@ function go(view){
      VISTA, qui e non nei vai* — cosi' indietro e cronologia la
      rimettono giusta da soli. Il + cambia mestiere con lei (toccaPiu)
      e l'aria-label dice quello del momento. */
+  /* un trascino del + a meta' non sopravvive al cambio di vista: il +
+     torna a casa e non apre niente (vedi IL TRASCINO) */
+  annullaTrascinoP2P();
   document.body.classList.toggle('nav-p2p', VISTE_NAV_P2P.has(view));
   /* ...e il + GRIGIO fuori dal libro (23 set 2026), dalla stessa vista:
      nel P2P si pubblica solo dal libro, e la pagina di uno scambio sta
@@ -13763,7 +13972,7 @@ function navMotore(){
    toglie l'overscroll-behavior:none che il body ha da sempre, e qui si
    rilegge soltanto cio' che la vista mostra.
 
-   TRE recinti, e sono la parte che conta — un touchmove su tutta la
+   QUATTRO recinti, e sono la parte che conta — un touchmove su tutta la
    pagina e' un ascoltatore invadente, e va reso timido per costruzione:
 
    1) solo dalla CIMA (scrollY 0) e solo a STRATI CHIUSI: dentro un
@@ -13778,7 +13987,12 @@ function navMotore(){
    3) il gesto dev'essere VERTICALE: appena il dito va piu' di lato che
       in giu' la tirata si annulla e non torna fino al tocco dopo. E' il
       recinto delle strisce che scorrono di fianco e restano dentro le
-      viste ammesse (le pillole delle categorie, «Altri oggetti»).
+      viste ammesse (le pillole delle categorie, «Altri oggetti»);
+   4) mai da un tocco che parte dalla BARRA (24 set 2026): li' il dito
+      ha un mestiere suo — nel libro, su «Vendi BTC», il + si trascina
+      GIU' sulla tendina di Barattozon, cioe' proprio nel verso della
+      tirata, e senza questo recinto lo stesso dito aprirebbe il
+      percorso e ricaricherebbe il libro.
 
    IL touchmove E' NON-PASSIVO, MA SOLO MENTRE LA TIRATA E' ARMATA
    (lug 2026, da un bug vero nella PWA installata): un ascoltatore
@@ -13844,7 +14058,7 @@ function ptrMuove(e){
 const ptrStacca = () => removeEventListener('touchmove', ptrMuove, {passive:false});
 
 addEventListener('touchstart', e => {
-  const ok = e.touches.length === 1 && ptrPuo();
+  const ok = e.touches.length === 1 && ptrPuo() && !e.target.closest?.('nav');
   ptrDa  = ok ? e.touches[0].clientY : 0;
   ptrDaX = ok ? e.touches[0].clientX : 0;
   /* l'ascoltatore non-passivo vive solo per la durata del gesto, ed e'
@@ -26085,7 +26299,17 @@ function chiediConferma(c){
   testata.innerHTML = c.testata || '';
   testata.style.display = c.testata ? '' : 'none';
   el('confCorpo').textContent = c.corpo || '';
+  /* IL VESTITO DEL BOTTONE (24 set 2026): di serie l'arancio di casa;
+     `vestito: 'bz'` e' il blu di Barattozon col suo logo in piccolo al
+     posto dell'icona — il riepilogo del percorso, richiesta di Andrea.
+     Il foglio e' uno per tutti, quindi il vestito si rimette a ogni
+     apertura; l'etichetta resta testo, scappato. */
+  const ok = el('confOk');
+  ok.className = 'btn ' + (c.vestito === 'bz' ? 'bz' : 'orange');
   el('confOk').textContent = c.etichetta || 'Conferma';
+  /* il logo e' una costante nostra, e l'etichetta resta col textContent
+     di sempre, che e' la guardia (vedi prove_onion) */
+  if (c.vestito === 'bz') ok.insertAdjacentHTML('afterbegin', LOGO_BZ_HTML);
   el('confNo').style.display = c.avviso ? 'none' : '';
   el('sheetBg').classList.add('open');
   el('confermaSheet').classList.add('open');
@@ -48639,7 +48863,7 @@ function tempiMorfoP2P(){
 
 /* il fantasma prende la MISURA e il POSTO del bottone d'arrivo, piu' le
    quattro variabili che dicono da dove parte */
-function vestiMorfoP2P(g, da, a, eti){
+function vestiMorfoP2P(g, da, a, eti, bottone){
   const m = morfosiP2P(da, a);
   g.style.left = a.left + 'px';
   g.style.top = a.top + 'px';
@@ -48653,6 +48877,13 @@ function vestiMorfoP2P(g, da, a, eti){
      scritte uguali in due posti divergono al primo ritocco. */
   const e = g.querySelector('.morfo-eti');
   if (e) e.textContent = eti;
+  /* ...e col bottone in mano ne copia i NODI, logo di Barattozon
+     compreso (24 set 2026): con la sola scritta il logo comparirebbe di
+     colpo all'ultimo fotogramma. Il blu lo dice la sua classe. */
+  if (bottone) {
+    if (e) e.replaceChildren(...[...bottone.childNodes].map(n => n.cloneNode(true)));
+    g.classList.toggle('bz', bottone.classList.contains('bz'));
+  }
   return m;
 }
 
@@ -48727,7 +48958,7 @@ function apriMorfoP2P(){
   document.body.classList.add('morfosi');
   vestiFoglioMorfoP2P(foglio, true);
   vestiMorfoP2P(g, tondo.getBoundingClientRect(),
-                meta.getBoundingClientRect(), meta.textContent);
+                meta.getBoundingClientRect(), meta.textContent, meta);
   celaVeriP2P(true);
   g.classList.add('acceso', 'parte');
   void g.offsetWidth;        /* il fotogramma di partenza esiste solo se lo si CHIEDE */
@@ -48753,7 +48984,7 @@ function chiudiMorfoP2P(){
   if (!morfoPuoiP2P() || !g || !tondo || !meta) { spegniMorfoP2P(); return; }
   tempiMorfoP2P();
   vestiMorfoP2P(g, tondo.getBoundingClientRect(),
-                meta.getBoundingClientRect(), meta.textContent);
+                meta.getBoundingClientRect(), meta.textContent, meta);
   celaVeriP2P(true);
   g.classList.add('acceso');
   void g.offsetWidth;
@@ -48812,6 +49043,173 @@ function apriNuovoOrdineP2P(metodo){
 function apriBarattozonP2P(){
   apriNuovoOrdineP2P(P2P_TABACCHINO);
 }
+
+/* ====== IL TRASCINO DEL + SULLA TENDINA (24 set 2026, richiesta di
+   Andrea) ======
+   Nel libro, su «Vendi BTC», ai due tocchi di sempre — il + apre il
+   foglio, la tendina apre Barattozon — si aggiunge un GESTO: si tiene
+   premuto il + e lo si trascina giu' sulla tendina; al rilascio li'
+   sopra si apre il percorso Barattozon. Mentre si trascina il + segue il
+   dito e la tendina si illumina quando il dito ci e' sopra (la luce e'
+   del CSS, la classe `p2p-sopra` e' di qui); rilasciato fuori, il +
+   torna al suo posto e non succede niente.
+   UNA SOGLIA DISTINGUE IL TOCCO DAL TRASCINO: sotto P2P_SOGLIA_TRASCINO
+   pixel di strada e' un TOCCO, anche un po' mosso, e lo prende il gesto
+   stesso al rilascio. Non e' zelo: il browser il suo click lo butta via
+   appena il dito si sposta di un pelo (Chrome per Android a ~8px), e fra
+   le due soglie restava una fascia in cui il dito non faceva niente. Il
+   click che il browser manda comunque dopo il nostro tocco lo scarta
+   toccaPiu (l'orologio p2pPiuGestoAt); tastiera e lettore di schermo non
+   passano di qui, e restano sul click di sempre.
+   NON RUBA NIENTE A NESSUNO: vive solo dove c'e' la tendina
+   (trascinoPuoiP2P: le classi di sempre, sotto i 768px); il CSS da' al +
+   `touch-action: pan-down`, quindi un dito che SALE fa scorrere la
+   pagina come prima e qui arriva un pointercancel; il gesto di
+   aggiornamento non si arma da un tocco che parte dalla barra (il suo
+   quarto recinto); il gesto indietro dell'app Android nasce dal bordo
+   dello schermo, e un cambio di vista a meta' riporta a casa il + (go
+   chiama annullaTrascinoP2P).
+   EFFETTI RIDOTTI: niente corse — la regola universale spegne quella
+   del ritorno, e la luce si accende di colpo —, ma il gesto funziona
+   uguale. Il + che segue il dito non e' un'animazione: e' il dito. */
+const P2P_SOGLIA_TRASCINO = 12;   /* px: sotto e' un tocco, da qui un trascino */
+let p2pTrascino = null;          /* il gesto in corso: dito, partenza, zona */
+let p2pPiuGestoAt = -1e9;        /* quando il gesto ha gia' fatto il mestiere del + */
+
+/* il gesto c'e' dove c'e' la tendina, e lo dicono le stesse classi */
+function trascinoPuoiP2P(){
+  const b = document.body.classList;
+  return b.contains('nav-p2p') && b.contains('p2p-vendo')
+    && !b.contains('p2p-piu-neutro') && !b.contains('barra-via')
+    && matchMedia('(max-width: 767px)').matches;
+}
+/* PURE, le due domande del gesto: ha fatto strada abbastanza da essere
+   un trascino? e il dito sta sopra la tendina — la parte scoperta, sotto
+   il fondo del + a riposo, con qualche pixel di tolleranza ai lati e in
+   fondo (un pollice non e' una punta)? */
+function oltreSogliaP2P(dx, dy){
+  return Math.hypot(dx, dy) >= P2P_SOGLIA_TRASCINO;
+}
+function sopraTendinaP2P(x, y, z){
+  return !!z && x >= z.left - 8 && x <= z.right + 8
+    && y >= z.top && y <= z.bottom + 8;
+}
+/* dove sta il + adesso, in verticale: la sua salita e' del CSS (−31 a
+   «Vendi»), e il dito la deve SOMMARE, non rimpiazzare */
+function salitaTondoP2P(tondo){
+  try {
+    const t = getComputedStyle(tondo).transform;
+    return t && t !== 'none' ? new DOMMatrixReadOnly(t).m42 : 0;
+  } catch(e) { return 0; }
+}
+
+function trascinoGiuP2P(e){
+  if (p2pTrascino || !trascinoPuoiP2P()) return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  const tondo = tondoBarraP2P(), tendina = el('navBarattozon');
+  if (!tondo || !tendina) return;
+  const r = tendina.getBoundingClientRect(), p = tondo.getBoundingClientRect();
+  /* la zona si misura QUI, una volta: durante il gesto la tendina sta ferma */
+  p2pTrascino = {id: e.pointerId, x0: e.clientX, y0: e.clientY,
+    attivo: false, sopra: false, su: 0,
+    zona: {left: r.left, right: r.right, top: p.bottom, bottom: r.bottom}};
+  /* la capture tiene il dito anche quando esce dal tondo — ed esce
+     subito, e' il gesto stesso; se il browser la nega si vive lo stesso */
+  try { tondo.setPointerCapture(e.pointerId); } catch(_) {}
+}
+function trascinoMuoveP2P(e){
+  const t = p2pTrascino;
+  if (!t || e.pointerId !== t.id) return;
+  if (!trascinoPuoiP2P()) { trascinoFineP2P(false); return; }
+  const dx = e.clientX - t.x0, dy = e.clientY - t.y0;
+  const tondo = tondoBarraP2P();
+  if (!t.attivo) {
+    if (!oltreSogliaP2P(dx, dy)) return;
+    t.attivo = true;
+    t.su = salitaTondoP2P(tondo);
+    document.body.classList.add('p2p-trascina');
+  }
+  tondo.style.transform = 'translate(' + dx + 'px,' + (t.su + dy) + 'px)';
+  const sopra = sopraTendinaP2P(e.clientX, e.clientY, t.zona);
+  if (sopra !== t.sopra) {
+    t.sopra = sopra;
+    document.body.classList.toggle('p2p-sopra', sopra);
+    if (sopra) haptic();
+  }
+}
+function trascinoSuP2P(e){
+  const t = p2pTrascino;
+  if (!t || e.pointerId !== t.id) return;
+  if (!t.attivo) {
+    /* un TOCCO, anche un po' mosso: il + di sempre. L'orologio si segna
+       DOPO, o toccaPiu scarterebbe proprio questo */
+    trascinoFineP2P(false);
+    if (trascinoPuoiP2P()) { toccaPiu(); p2pPiuGestoAt = performance.now(); }
+    return;
+  }
+  trascinoFineP2P(t.sopra && trascinoPuoiP2P());
+}
+/* LA FINE DEL GESTO, in un posto solo — rilascio, cancel, capture persa,
+   cambio di vista —: tre strade per la stessa fine divergerebbero al
+   primo ripiego aggiunto da una parte sola. `apri` = il dito era sopra
+   la tendina */
+function trascinoFineP2P(apri){
+  const t = p2pTrascino;
+  p2pTrascino = null;
+  document.body.classList.remove('p2p-sopra');
+  if (!t) return;
+  const tondo = tondoBarraP2P();
+  try { tondo.releasePointerCapture(t.id); } catch(_) {}
+  if (!t.attivo) return;
+  /* il click che segue il rilascio non e' un tocco sul + */
+  p2pPiuGestoAt = performance.now();
+  if (apri) {
+    /* la morfosi misura il + DOVE L'HA LASCIATO IL DITO e parte da li';
+       poi il + torna a casa senza corsa, che tanto e' nascosto dietro il
+       fantasma (o, senza morfosi, gia' coperto dal foglio) */
+    apriBarattozonP2P();
+    tondo.style.transition = 'none';
+    tondo.style.transform = '';
+    document.body.classList.remove('p2p-trascina');
+    void tondo.offsetWidth;
+    tondo.style.transition = '';
+    return;
+  }
+  /* fuori dalla tendina: torna la corsa, e il + rientra con lei */
+  document.body.classList.remove('p2p-trascina');
+  void tondo.offsetWidth;
+  tondo.style.transform = '';
+}
+function annullaTrascinoP2P(){
+  if (p2pTrascino) trascinoFineP2P(false);
+}
+/* SI ARMA UNA VOLTA, ALL'AVVIO (accanto a navMotore), e non qui al
+   caricamento: questa e' la fetta del motore, che i banchi node caricano
+   SENZA una pagina — un ascoltatore appeso qui li faceva esplodere tutti
+   al primo `document`. Gli ascoltatori sono passivi: qui non si chiama
+   mai preventDefault, lo scorrimento lo tiene fermo il touch-action. */
+function armaTrascinoP2P(){
+  const tondo = tondoBarraP2P();
+  if (!tondo) return;
+  tondo.addEventListener('pointerdown', trascinoGiuP2P, {passive: true});
+  tondo.addEventListener('pointermove', trascinoMuoveP2P, {passive: true});
+  tondo.addEventListener('pointerup', trascinoSuP2P, {passive: true});
+  tondo.addEventListener('pointercancel', () => trascinoFineP2P(false), {passive: true});
+  tondo.addEventListener('lostpointercapture', () => trascinoFineP2P(false), {passive: true});
+}
+
+/* IL VESTITO DEL BOTTONE CHE PUBBLICA (24 set 2026, richieste di Andrea):
+   e' il + che si e' aperto, quindi ne porta il colore — verde a «Compra
+   BTC» (il .primary di casa), rosso a «Vendi BTC» — e col percorso
+   Barattozon il BLU della capsula, col logo in piccolo al posto
+   dell'icona. Il fantasma della morfosi legge la stessa classe. */
+function vestitoInvioP2P(tab){
+  return tab ? 'bz' : (p2pLato === 'vendo' ? 'rosso' : 'primary');
+}
+/* il logo di Barattozon in piccolo, per i bottoni: lo stesso file della
+   tendina (123x120, il 3x dei 40), qui alto 20; alt vuoto perche' la
+   scritta accanto dice gia' tutto */
+const LOGO_BZ_HTML = '<img class="logo-bz" src="/assets/barattozon-tasto.webp" width="21" height="20" alt="">';
 
 /* IL RIQUADRO DI UNA SEZIONE: icona tonda, titolo, e quel che c'e'
    dentro. Un pezzo solo per tutte, cosi' le cinque restano allineate
@@ -49530,11 +49928,12 @@ function renderNuovoOrdineP2P(){
        questo foglio non nomina, e un commento innocente la farebbe
        rossa (successo, due volte di fila). */
     '<div class="foglio-piede sola">' +
-      '<button type="button" class="btn orange" id="p2pNuovoInvia" ' +
+      '<button type="button" class="btn ' + vestitoInvioP2P(tab) + '" id="p2pNuovoInvia" ' +
         'onclick="inviaNuovoOrdineP2P()">' +
         /* col percorso Barattozon il bottone dice che prima c'e' il
-           riepilogo: e' l'ultimo passo, non un salto nel vuoto */
-        (tab ? '🧾 Rileggi e pubblica' : '⚡ Pubblica ordine') + '</button>' +
+           riepilogo: e' l'ultimo passo, non un salto nel vuoto — e al
+           posto della ricevuta porta il logo (24 set 2026) */
+        (tab ? LOGO_BZ_HTML + 'Rileggi e pubblica' : '⚡ Pubblica ordine') + '</button>' +
     '</div>';
 }
 /* ---- IL PERCORSO BARATTOZON NEL FOGLIO «PUBBLICA» (23 set 2026) ----
@@ -50275,7 +50674,8 @@ async function inviaNuovoOrdineP2P(confermato){
     chiediConferma({
       titolo: 'Il tuo PayCode, in breve',
       corpo: riepilogoTabacchinoP2P(campi),
-      etichetta: '⚡ Pubblica',
+      /* il blu di Barattozon col logo, come il bottone che l'ha aperto */
+      etichetta: 'Pubblica', vestito: 'bz',
       poi: () => inviaNuovoOrdineP2P(true)
     });
     return;
@@ -53889,9 +54289,40 @@ function fermaPaginaSotto(){
   new MutationObserver(dice).observe(velo,
     {attributes: true, attributeFilter: ['class']});
 }
+/* LE TINTE DELLE VOCI (24 set 2026, ritocco di Andrea: solo transform e
+   opacity). Esplora e le tre voci del P2P tengono icona e scritta in una
+   BASE, e sopra ne portano una copia per ogni colore in cui si accendono:
+   a cambiare colore e' quale copia si vede, e la corsa e' un'opacity (il
+   CSS e il perche' stanno in LE VOCI SI ACCENDONO CON UNO STRATO). Le
+   copie nascono QUI dal markup vero — nessuna icona ricopiata a mano che
+   diverga al primo ritocco —, non si leggono e non si toccano; il
+   pallino resta figlio del bottone, fuori dalla base e dalle copie. Una
+   volta sola: una voce che ha gia' le sue tinte si lascia com'e'. */
+const TINTE_VOCI_P2P = {'nav-esplora': ['mercato', 'acceso'],
+  'nav-p2plibro': ['verde', 'rossa'], 'nav-p2pmiei': ['arancio'],
+  'nav-p2pinfo': ['arancio']};
+function tinteVociP2P(){
+  for (const [id, tinte] of Object.entries(TINTE_VOCI_P2P)) {
+    const b = el(id);
+    if (!b || b.querySelector('.tinta')) continue;
+    const base = document.createElement('span');
+    base.className = 'tinta tinta-base';
+    [...b.childNodes].filter(n => !(n.classList && n.classList.contains('off-dot')))
+      .forEach(n => base.appendChild(n));
+    b.prepend(base);
+    for (const t of tinte) {
+      const copia = base.cloneNode(true);
+      copia.className = 'tinta tinta-' + t;
+      copia.setAttribute('aria-hidden', 'true');
+      b.appendChild(copia);
+    }
+  }
+}
 tastieraSegue();
 fermaPaginaSotto();
 navMotore();   /* il gesto indietro, prima che parta qualunque vista */
+armaTrascinoP2P();   /* il + che si trascina sulla tendina di Barattozon */
+tinteVociP2P();   /* le voci della barra P2P si accendono con uno strato */
 /* IL GUSCIO SCENDE QUANDO L'APP E' USABILE, e «usabile» ha una
    definizione precisa invece di un timer a occhio: la VETRINA
    DISEGNATA — il primo `renderGrid`, che arriva in tutti i rami (le

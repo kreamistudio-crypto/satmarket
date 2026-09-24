@@ -29442,3 +29442,100 @@ resta 100, i soli propri; la pillola dice «…» mentre la risposta tarda
   `riga=` che `paga_venditore` passa dal 19 set (lo stesso difetto che
   aveva tenuto rosso `collaudo_feedback_confermato`). Segnalato, non
   curato.
+## La capsula col logo intero, il + che si trascina e le corse della barra (24 set 2026)
+
+Ritocco di Andrea alla capsula di poche ore prima (37fd154), piu' due
+richieste arrivate a lavoro in corso (il bottone del foglio verde o rosso
+come il +; gradino blu e luce bianca, scelti fra le varianti). Un
+worktree da `origin/main`, commit firmato.
+
+**COSA C'È.** 1) IL CONTORNO DELLA TENDINA E' IL GRIGIO DELLE VOCI della
+banda, lo stesso token (`--nav-ink-p2p`, uguale nei due temi): il filo
+rosso si confondeva col +. Il gradino e' blu. 2) TORNA LA B: il logo
+intero, la B bianca sopra la freccia arancio, 41x40 (WebP 123x120 con
+alfa, presa per colore dal sorgente: per ogni pixel il bianco o l'arancio
+che lo ricostruisce meglio). Per farle posto, a «Vendi BTC» il + SALE di
+31px invece di 15, e il fondo resta a 56 dal bordo della barra, sopra la
+barra dei gesti. 3) IL + SI TRASCINA sulla tendina: al rilascio sopra si
+apre Barattozon, fuori torna a casa; sotto 12px e' un tocco, anche un po'
+mosso; il + segue il dito, la tendina s'illumina di BIANCO col dito sopra
+(e una vibrazione). 4) IL BOTTONE CHE PUBBLICA VESTE IL +: verde a «Compra
+BTC», rosso a «Vendi BTC», blu #191D29 col logo in piccolo nel percorso
+Barattozon e nel «Pubblica» del suo riepilogo. 5) LE CORSE DELLA BARRA:
+una durata e una curva (320ms, quella dolce della morfosi) e, sul
+telefono, solo transform e opacity.
+
+**COME, E I PERCHE'.** Il colore e la forma non corrono piu': il + ha
+QUATTRO PELLI (casa, verde, rosso, arancio) e cambiare vuol dire
+accenderne un'altra, chi arriva sopra e chi va via sotto finche' non e'
+coperto — due strati che sfumano insieme lascerebbero passare la banda a
+meta' corsa. La BANDA e' il `nav::before` che sfuma. La TENDINA scivola
+fuori da sotto il + dentro un telaio fermo (`#navTendina`) che la taglia
+all'equatore e segue il +: il clip-path che correva si ridipingeva a ogni
+fotogramma. Le VOCI (Esplora e le tre del P2P) hanno le loro TINTE, copie
+di icona e scritta fatte all'avvio dal markup vero, mute al lettore e al
+dito. Il FANTASMA della morfosi ha due pelli, il tondo e il bottone
+d'arrivo che gli sfuma sopra, e copia i nodi del bottone, logo compreso.
+Il TRASCINO prende lui il tocco sotto la soglia (Chrome per Android butta
+il suo click a ~8px: fra le due soglie il dito non faceva niente) e
+scarta il click che segue (`p2pPiuGestoAt`); `touch-action: pan-down`
+lascia alla pagina il dito che SALE — provato: scorre di 256px —, il
+gesto di aggiornamento non si arma da un tocco che parte dalla barra, e
+un cambio di vista a meta' riporta a casa il +.
+
+**LE STRADE SCARTATE E I DIFETTI TROVATI.** Varianti a 0/12/16/20px di
+salita: sotto un + alto 15 la B misurava 22px; il logo alto 42-45 con la
+salita piu' larga toccava il filo con le punte della freccia. Tre gradini
+e due luci guardati a schermo: scelte di Andrea. L'alone della luce dentro
+il telaio veniva tagliato all'equatore (una riga dritta accanto al +, di
+sera): sta fuori, nel `nav::after`. Col + portato via dal dito, la cima
+della tendina era una scatola col coperchio bordato: il filo sta su uno
+strato che parte 3px sopra, e la cima resta aperta. IL COLORE DELLE
+SCRITTE L'AVEVO DICHIARATO ECCEZIONE, e la misura l'ha rovesciato: a CPU
+4x lasciava dodici-tredici fotogrammi «parziali» a ogni cambio di tab,
+tolto lui zero — da qui le tinte. E i fotogrammi fermi hanno trovato la
+regola «chi va via resta sotto» applicata anche alla voce che si SPEGNE
+(«Libro ordini» restava acceso per tutta la corsa passando ai miei), e il
+gradino da 4px della forma che sporgeva un pixel sotto il bottone
+all'arrivo: curati. Il blocco del trascino appeso al caricamento stava
+nella fetta del motore, che i banchi node caricano senza pagina: 232
+rosse in un colpo; si arma all'avvio (`armaTrascinoP2P`).
+
+**MISURATO.** `document.getAnimations()` nei sette passaggi della barra
+(Compra↔Vendi, libro↔miei, mercatino↔libro, morfosi): nessuna animazione
+di colore. Lo SCREENCAST di Chrome, che consegna i fotogrammi composti col
+loro orario, a CPU 1x e 4x: 60 al secondo in ogni passaggio, col buco
+piu' lungo di 18-20ms, e un fotogramma saltato all'apertura del foglio
+(~32ms) e all'ingresso dal mercatino a 4x (37ms). ⚠️ LA TRACCIA HEADLESS
+MENTIVA: il suo reporter segnava «persi» i fotogrammi della barra anche a
+CPU 1x, mentre un quadratino di prova usciva pulito e lo screencast li
+consegnava tutti — non si giudica la fluidita' dal solo `PipelineReporter`.
+
+**PROVATO.** La suite intera, severa e senza config: 14.317 verdi e 0
+rosse, e di nuovo tutta verde sul ramo rebasato; i tredici collaudi della
+CI verdi, in gabbia. `prove_tasto_barattozon` riscritta (72): il
+logo, la geometria letta dal + (equatore, salita, telaio in ogni stato),
+il filo col token delle voci, la luce, i bottoni col loro contrasto AA
+calcolato dai token nei due temi, il banco del TRASCINO con le funzioni
+vere (tocco, tocco mosso, rilascio sopra e fuori, uscito e rientrato,
+cancel, cambio di vista, «Compra BTC», tasto destro, tastiera) e il
+censimento delle corse; `prove_nav_p2p` e la morfosi emendate.
+**TORTURA 47/47** su una copia (46 al primo giro: la regola della pelle
+del + cercata a pezzi rispondeva per le tinte, che portano lo stesso
+«120ms ease» — stretta sulla regola intera). DAL VIVO col tocco e il trascinamento veri (eventi touch di Chrome) a
+320/375/430 nei due temi: tocco sul + (foglio, bottone rosso), sulla
+tendina (Barattozon al passo 1, bottone blu), tocco mosso, trascino sopra
+(luce, poi Barattozon) e fuori (a casa), dito che sale (la pagina
+scorre), gesto di aggiornamento mai armato, nessun errore; le tinte
+identiche al pixel ai colori di prima; con gli effetti ridotti il gesto
+funziona senza corse. Il verde del bottone di giorno e' il `.btn.primary`
+di casa: bianco sul verde fa 4,31:1, un soffio sotto l'AA, come gli
+altri bottoni verdi dell'app.
+
+**DA GUARDARE SUL TELEFONO.** La capsula su «Vendi BTC» col + alto e la B
+che si legge, e che non tocchi le voci ne' la barra dei gesti; il + che
+si trascina sulla tendina (luce bianca, vibrazione) e che torna a casa
+rilasciato fuori; un tocco un po' storto sul + che apre il foglio lo
+stesso; il dito che sale sul + che fa scorrere la pagina; i bottoni verde,
+rosso e blu; la morfosi e il cambio fra libro e «I miei scambi» senza
+scatti, anche col gesto indietro dell'app.
