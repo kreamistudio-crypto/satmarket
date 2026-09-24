@@ -7627,22 +7627,6 @@ def init_db():
                     "fattura_rinnovata_il INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass
-    # IL PAGAMENTO UNICO DI PIU' CARRELLI (24 set 2026): `pagamento_id`
-    # lega l'ordine alla riga di `pagamenti` (motivo 'carrello') che
-    # porta la fattura CONDIVISA — 0 = l'ordine ha la sua fattura, come
-    # tutti quelli di ieri. `mai_incassato` = 1 sull'ordine di quel
-    # pagamento che NON e' potuto nascere (merce sparita fra la fattura
-    # e il saldo): la sua parte torna al compratore senza che nessuno
-    # stock si sia mai scalato, ed e' `_rimborsa_compratore` a leggerlo
-    # per non rimettere in vetrina pezzi mai usciti.
-    for colonna in ("pagamento_id INTEGER DEFAULT 0",
-                    "mai_incassato INTEGER DEFAULT 0"):
-        try:
-            con.execute(f"ALTER TABLE ordini ADD COLUMN {colonna}")
-        except sqlite3.OperationalError:
-            pass
-    con.execute("CREATE INDEX IF NOT EXISTS idx_ordini_pagamento "
-                "ON ordini(pagamento_id)")
     # I CREDITI DA RECUPERARE: il pagamento rimasto appeso sulla
     # cassaforte d'origine quando l'ordine e' stato pagato da un'altra.
     # Quei sats sono impegnati LA' finche' quel pagamento non si decide:
@@ -30157,7 +30141,7 @@ def _accordo_carrello(con, user_id: int, off_id: int, scrivi: bool):
     return off, figlie
 
 
-async def _compra_set(user: dict, d: dict, busta: dict | None = None) -> dict:
+async def _compra_set(user: dict, d: dict) -> dict:
     """Il ramo SET di compra() (lug 2026, «Riempi il barattolo»):
     piu' annunci DIVERSI dello stesso venditore in UN ordine solo —
     una invoice escrow, UNA spedizione (il MAX dei costi dichiarati:
@@ -30171,18 +30155,7 @@ async def _compra_set(user: dict, d: dict, busta: dict | None = None) -> dict:
     set come tutti, ed e' giusto — il catalogo e' uno solo, cambia
     solo chi firma l'evento. Stessa liturgia del mono:
     fail-fast di cortesia, poi la invoice, poi il ricontrollo che fa
-    fede — per OGNI riga — senza await fino all'INSERT.
-    CON LA `busta` (24 set 2026, il pagamento unico di piu' carrelli)
-    la fattura NON si conia qui: e' gia' nata per la somma dei carrelli
-    (`paga_carrelli`) e arriva con l'hash, la bolt11, la cassaforte e il
-    totale ATTESO per questo carrello — quello del preventivo con cui
-    la somma si e' fatta. Tutto il resto e' identico, guardie e conto:
-    l'ordine nasce 'creato' con la fattura condivisa e `pagamento_id`,
-    e da li' in poi e' un ordine come gli altri. Dentro una busta il
-    carrello puo' avere UNA riga sola: la regola «per uno solo c'e'
-    l'acquisto di sempre» vale per chi paga un carrello alla volta,
-    qui il carrello e' una quota di una fattura che copre piu'
-    venditori e il binario mono non c'e'."""
+    fede — per OGNI riga — senza await fino all'INSERT."""
     # La destinazione, dal giudice unico: assente = il domestico (il
     # mondo di ieri), presente e ignota = 400. Sta PRIMA di aprire il
     # database perche' e' una pura, e un 400 che non ha aperto niente
@@ -30191,7 +30164,7 @@ async def _compra_set(user: dict, d: dict, busta: dict | None = None) -> dict:
     paese = _paese_da_payload(d)
     # --- Le righe richieste: 2..MAX, annunci distinti, quantita sane
     grezze = d.get("righe") or []
-    if not isinstance(grezze, list) or len(grezze) < (1 if busta else 2):
+    if not isinstance(grezze, list) or len(grezze) < 2:
         raise HTTPException(400, "Un set ha almeno due oggetti diversi: "
                                  "per uno solo c'è l'acquisto di sempre")
     if len(grezze) > MAX_RIGHE_SET:
@@ -30769,26 +30742,10 @@ async def _compra_set(user: dict, d: dict, busta: dict | None = None) -> dict:
     prot, totale = conto["protezione"], conto["totale"]
 
     primo = righe[0]["titolo"]
-    if busta:
-        # IL PAGAMENTO UNICO: la fattura e' gia' nata per la somma dei
-        # carrelli, e questo conto deve valere ESATTAMENTE quanto il
-        # preventivo con cui quella somma si e' fatta — un sat di
-        # differenza (una lampo scaduta in mezzo, un cambio mosso) e la
-        # fattura non coprirebbe piu' gli ordini che promette. Nessun
-        # await: il patto del ricontrollo resta intatto.
-        if totale != busta["atteso"]:
-            con.close()
-            raise HTTPException(409, "Il conto di questo carrello è "
-                                     "cambiato proprio adesso: "
-                                     "ricontrollalo e riprova")
-        cf = busta["cassaforte"]
-        inv = {"payment_hash": busta["payment_hash"],
-               "payment_request": busta["invoice"]}
-    else:
-        cf = cassaforte_nuova()
-        inv = await crea_invoice_escrow(
-            totale, f"Barattolo escrow set: {primo[:25]} +{len(righe) - 1} "
-                    f"({len(righe)} oggetti)", cassaforte=cf)
+    cf = cassaforte_nuova()
+    inv = await crea_invoice_escrow(
+        totale, f"Barattolo escrow set: {primo[:25]} +{len(righe) - 1} "
+                f"({len(righe)} oggetti)", cassaforte=cf)
     # Il ricontrollo che fa fede, per OGNI riga (il patto del mono:
     # da qui all'INSERT nessun await, e nessun DML prima — l'offerta
     # scaduta qui sopra committa e solleva subito). Fallita una riga,
@@ -30841,8 +30798,8 @@ async def _compra_set(user: dict, d: dict, busta: dict | None = None) -> dict:
         "indirizzo,indirizzo_il,indirizzo_atteso,"
         "spedizione_sats,protezione_sats,quantita,"
         "sconto_sats,sconto_percento,sped_gratis_sats,"
-        "codice_sconto,codice_sconto_id,accordo_sats,pagamento_id) "
-        "VALUES(?,0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "codice_sconto,codice_sconto_id,accordo_sats) "
+        "VALUES(?,0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (cf, user["id"], venditore_id, totale, "creato", inv["payment_hash"],
          inv["payment_request"], adesso, adesso, cambio_ordine, scelta,
          punto, via_punto, rete, tipo, pid,
@@ -30869,9 +30826,7 @@ async def _compra_set(user: dict, d: dict, busta: dict | None = None) -> dict:
          cod_nome, cod_id if chi_sc else 0,
          # la voce di testata dell'accordo sul carrello: TESTIMONE come
          # sconto_sats — l'unico numero che comanda resta prezzo_sats
-         accordo_sats_v,
-         # la busta del pagamento unico, 0 per l'ordine che paga da solo
-         busta["id"] if busta else 0))
+         accordo_sats_v))
     ordine_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     for r in righe:
         con.execute(
@@ -31602,11 +31557,7 @@ async def _preventivo_set(user: dict, d: dict) -> dict:
     # dipende anche dal paese di casa del venditore.
     paese = _paese_da_payload(d)
     grezze = d.get("righe") or []
-    # dentro un PAGAMENTO UNICO (24 set 2026) il carrello puo' avere una
-    # riga sola: e' una quota di una fattura che copre piu' venditori,
-    # e il binario mono li' non c'e' (vedi _compra_set con la busta)
-    if not isinstance(grezze, list) or len(grezze) < (
-            1 if d.get("pagamento_unico") else 2):
+    if not isinstance(grezze, list) or len(grezze) < 2:
         raise HTTPException(400, "Un set ha almeno due oggetti diversi: "
                                  "per uno solo c'è l'acquisto di sempre")
     if len(grezze) > MAX_RIGHE_SET:
@@ -33018,39 +32969,14 @@ async def verifica_pagamento(ordine_id: int, x_tg_init_data: str = Header(""),
     enumera non impara niente."""
     user = verifica_utente(x_tg_init_data, barattolo_sessione)
     con = db()
-    o = con.execute("SELECT stato, payment_hash, cassaforte, pagamento_id "
-                    "FROM ordini WHERE id=? AND compratore_id=?",
+    o = con.execute("SELECT stato, payment_hash, cassaforte FROM ordini "
+                    "WHERE id=? AND compratore_id=?",
                     (ordine_id, user["id"])).fetchone()
     con.close()
     if not o:
         raise HTTPException(400, "Operazione non permessa")
     if o["stato"] != "creato":
         return {"stato": o["stato"]}
-    if o["pagamento_id"]:
-        # L'ORDINE DI UN PAGAMENTO UNICO (24 set 2026): il poll di «Paga
-        # ora» sul singolo ordine chiede alla BUSTA, che e' l'unica a
-        # sapere se i sats sono arrivati e a far nascere gli ordini con
-        # la merce ricontrollata; qui si risponde lo stato di QUESTO.
-        con = db()
-        p = con.execute("SELECT stato, payment_hash, cassaforte FROM pagamenti "
-                        "WHERE id=?", (o["pagamento_id"],)).fetchone()
-        con.close()
-        if not p:
-            return {"stato": "in_attesa"}
-        if p["stato"] == "pagato":
-            await _avanza_ordini_carrello(o["pagamento_id"])
-        elif p["stato"] == "creato":
-            if not await invoice_pagata(p["payment_hash"], p["cassaforte"]):
-                return {"stato": "in_attesa"}
-            await _incassa_carrello(o["pagamento_id"])
-        con = db()
-        r = con.execute("SELECT stato FROM ordini WHERE id=?",
-                        (ordine_id,)).fetchone()
-        con.close()
-        # la busta viaggia con la risposta: il client che ha pagato da
-        # «Paga ora» deve svuotare TUTTI i carrelli, non solo quello aperto
-        return {"stato": r["stato"] if r else "annullato",
-                "pagamento_unico": o["pagamento_id"]}
     if not await invoice_pagata(o["payment_hash"], o["cassaforte"]):
         return {"stato": "in_attesa"}
     return await _incassa_ordine(ordine_id)
@@ -33145,22 +33071,6 @@ async def nuova_fattura_ordine(ordine_id: int, x_tg_init_data: str = Header(""),
                                  "ancora, ricompralo dall'annuncio")
     adesso = int(time.time())
     scade = scadenza_fattura_ordine(o["invoice"], o["creato"])
-    if _campo(o, "pagamento_id", 0):
-        # L'ORDINE DI UN PAGAMENTO UNICO (24 set 2026): la fattura e' UNA
-        # per piu' venditori e vale l'importo intero — si ripresenta
-        # quella, con la cifra vera, finche' vive; non si rigenera mai
-        # per un ordine solo, o due fatture coprirebbero la stessa quota.
-        con = db()
-        p = con.execute("SELECT importo_sats, stato FROM pagamenti WHERE id=?",
-                        (o["pagamento_id"],)).fetchone()
-        con.close()
-        if p and p["stato"] == "creato" and o["invoice"] and scade > adesso:
-            return {"ordine_id": ordine_id, "invoice": o["invoice"],
-                    "scade_il": scade, "prezzo_sats": p["importo_sats"],
-                    "pagamento_unico": o["pagamento_id"], "nuova": False}
-        raise HTTPException(400, "La fattura unica di questo carrello è "
-                                 "scaduta: se gli oggetti ti interessano "
-                                 "ancora, rifai i carrelli e paga di nuovo")
     if o["invoice"] and scade > adesso:
         return {"ordine_id": ordine_id, "invoice": o["invoice"],
                 "scade_il": scade, "prezzo_sats": o["prezzo_sats"],
@@ -49134,12 +49044,6 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
         # tutti al compratore (l'affare e' saltato, la protezione non
         # si e' consumata) — e' il totale, zero commissioni.
         importo = o["prezzo_sats"]
-        # L'ORDINE MAI INCASSATO (24 set 2026): la quota di un pagamento
-        # unico il cui ordine non e' potuto nascere. Stessa liturgia del
-        # rimborso — stessa cassaforte, stessi quattro esiti — ma niente
-        # e' mai uscito: lo stock non torna, il negozio collegato non si
-        # tocca, e le parole non parlano di una disputa che non c'e'.
-        mai = bool(_campo(o, "mai_incassato", 0))
 
         bolt11 = ""
         taccuino = {"etichetta": f"Rimborso al compratore sull'ordine "
@@ -49200,7 +49104,7 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
             # il massimo di ieri. Chiudere la falla dove nasce vale piu'
             # che aspettare la scopa del riavvio.
             righe = _righe_ordine(con, o)
-            for r in ([] if mai else righe):
+            for r in righe:
                 con.execute("UPDATE annunci SET quantita=quantita+?, "
                             "quantita_max=MAX(quantita_max,quantita+?), "
                             "stato='attivo' WHERE id=?",
@@ -49213,13 +49117,12 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
             # silenzio; se l'aveva gia' fatto, i pezzi vanno RIMESSI e
             # glielo si dice. Stessa transazione dello stock, per la
             # ragione del gemello in `_incassa_ordine`.
-            magazzino = (None if mai else
-                         registra_uscita_negozio(con, ordine_id, righe,
-                                                 "rimborso"))
+            magazzino = registra_uscita_negozio(con, ordine_id, righe,
+                                                "rimborso")
             con.commit()
             titolo = html.escape(_titolo_ordine(righe)[:60])
             con.close()
-            for r in ([] if mai else righe):
+            for r in righe:
                 # ...e torna disponibile anche sulla piazza Nostr
                 asyncio.create_task(annuncio_su_nostr(r["annuncio_id"],
                                                       "active",
@@ -49228,18 +49131,6 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
                 # e' di nuovo in vetrina, il post non deve mentire
                 asyncio.create_task(promo_venduto(r["annuncio_id"],
                                                   venduto=False))
-            if mai:
-                await notifica(o["compratore_id"],
-                               f"↩️ <b>Rimborso in arrivo:</b> «{titolo}» non "
-                               f"è potuto nascere dal tuo pagamento unico "
-                               f"(un articolo non era più disponibile) e la "
-                               f"sua parte, <b>{_fmt_sats(importo)} sats</b>, "
-                               f"sta tornando nel tuo wallet.")
-                await polso_ordini_admin(
-                    f"↩️ <b>Quota di un pagamento unico rimborsata:</b> "
-                    f"«{titolo}» — {_fmt_sats(importo)} sats, ordine mai "
-                    f"nato. Restano {{aperti}} ordini aperti.")
-                return {"ok": True, "stato": "refunded"}
             await notifica(o["compratore_id"],
                            f"↩️ <b>Disputa risolta a tuo favore:</b> il rimborso di "
                            f"<b>{_fmt_sats(importo)} sats</b> è in arrivo nel tuo wallet. "
@@ -49272,12 +49163,6 @@ async def _rimborsa_compratore(ordine_id: int) -> dict:
         con.close()
         await notifica(
             o["compratore_id"], _msg_ritentiamo(importo) if ritenta else
-            (f"↩️ <b>Un ordine del tuo pagamento unico non è potuto "
-             f"nascere</b> (un articolo non era più disponibile): la sua "
-             f"parte, <b>{_fmt_sats(importo)} sats</b>, torna a te. Apri "
-             f"l'ordine nella Mini App e imposta il tuo Lightning address, "
-             f"oppure incolla una invoice di esattamente quell'importo.")
-            if mai else
             f"⚖️ <b>Disputa risolta a tuo favore!</b> Per ricevere il "
             f"rimborso di <b>{_fmt_sats(importo)} sats</b>: apri l'ordine nella "
             f"Mini App e imposta il tuo Lightning address, oppure "
@@ -49942,9 +49827,7 @@ def _incasso_del_motivo(motivo: str):
     Il dizionario si costruisce ALLA CHIAMATA: i nomi si risolvono
     quando servono, e un banco puo' metterci le sue casse di cartone."""
     return {"banner": _incassa_sblocco,
-            "negozio_slug": _incassa_slug_negozio,
-            # il pagamento unico di piu' carrelli (24 set 2026)
-            "carrello": _incassa_carrello}.get(motivo)
+            "negozio_slug": _incassa_slug_negozio}.get(motivo)
 
 
 async def controlla_annullati():
@@ -49965,10 +49848,7 @@ async def controlla_annullati():
     con = db()
     ordini = [dict(r) for r in con.execute(
         "SELECT id, payment_hash, cassaforte FROM ordini WHERE stato='annullato' "
-        # gli ordini di un pagamento unico li riacciuffa la BUSTA
-        # (che ricontrolla la merce), mai questo giro
-        "AND payment_hash != '' AND pagamento_id=0 AND creato >= ?",
-        (adesso - 1800,))]
+        "AND payment_hash != '' AND creato >= ?", (adesso - 1800,))]
     rilanci = [dict(r) for r in con.execute(
         "SELECT * FROM rilanci WHERE stato='annullato' AND creato >= ?",
         (adesso - RILANCIO_STANTIO,))]
@@ -50109,8 +49989,7 @@ async def controlla_abbandonati():
     con = db()
     ordini = [dict(r) for r in con.execute(
         "SELECT id, payment_hash, cassaforte FROM ordini WHERE stato='creato' "
-        # gli ordini di un pagamento unico li governa la BUSTA, qui sotto
-        "AND payment_hash != '' AND pagamento_id=0 AND creato < ?",
+        "AND payment_hash != '' AND creato < ?",
         (adesso - INVOICE_EXPIRY,))]
     rilanci = [dict(r) for r in con.execute(
         "SELECT * FROM rilanci WHERE stato='creato' AND payment_hash != '' "
@@ -50220,15 +50099,10 @@ async def controlla_abbandonati():
                 await incassa(p["id"])
                 continue
             con = db()
-            if p["motivo"] == "carrello":
-                # la lapide del pagamento unico porta con se' i suoi
-                # ordini, o resterebbero 'creato' per sempre (24 set 2026)
-                _seppellisci_carrello(con, p["id"])
-            else:
-                con.execute("UPDATE pagamenti SET stato='annullato', "
-                            "aggiornato=? WHERE id=? AND stato='creato'",
-                            (int(time.time()), p["id"]))
-                con.commit()
+            con.execute("UPDATE pagamenti SET stato='annullato', "
+                        "aggiornato=? WHERE id=? AND stato='creato'",
+                        (int(time.time()), p["id"]))
+            con.commit()
             con.close()
         except Exception as e:
             # FAIL-OPEN NEL VERSO GIUSTO: LNbits muto = la riga resta
@@ -50262,12 +50136,6 @@ async def annulla_ordine(ordine_id: int, x_tg_init_data: str = Header(""),
     con.close()   # niente transazione aperta durante l'await qui sotto
     if not o or o["stato"] != "creato":
         raise HTTPException(400, "Operazione non permessa")
-    if _campo(o, "pagamento_id", 0):
-        # la fattura e' UNA per piu' ordini: si annulla tutta dal foglio
-        # del pagamento unico, mai un ordine per volta (24 set 2026)
-        raise HTTPException(400, "Questo ordine fa parte di un pagamento "
-                                 "unico: si annulla dal foglio del "
-                                 "pagamento, insieme agli altri")
     if o["payment_hash"] and await invoice_pagata(o["payment_hash"], o["cassaforte"]):
         raise HTTPException(409, "Questo pagamento risulta già arrivato: "
                                  "niente da annullare — attendi un attimo "
@@ -50293,370 +50161,6 @@ async def annulla_ordine(ordine_id: int, x_tg_init_data: str = Header(""),
     con.commit()
     con.close()
     return {"ok": True}
-
-
-# ============ IL PAGAMENTO UNICO DI PIU' CARRELLI (24 set 2026) ============
-# Un compratore con carrelli di piu' venditori paga UNA fattura per la
-# somma, e a saldo arrivato nasce un ordine per venditore, ognuno col
-# suo deposito di garanzia, come se li avesse pagati uno per uno.
-# LA BUSTA E' UNA RIGA DI `pagamenti` (motivo 'carrello'): il registro
-# generico degli incassi che esiste dal banner, con le sue lapidi, la
-# sua ripresa e i due giri dell'orologio che smistano per motivo. Gli
-# ordini nascono da `_compra_set` con la fattura condivisa (stesso hash
-# in `ordini.payment_hash`, cosi' ogni riga tiene il suo filo verso il
-# pagamento) e `pagamento_id` verso la busta. Da li' in poi ogni ordine
-# e' un ordine come gli altri: rimborsi, dispute, feedback, tutto PER
-# ORDINE, e il venditore vede solo il suo.
-# I DUE GIRI DELL'OROLOGIO li governano DALLA BUSTA e non dagli ordini
-# (`AND pagamento_id=0` nelle loro SELECT): un ordine di busta
-# annullato dal venditore che rimuove un pezzo NON si riacciuffa da
-# solo — a decidere e' `_avanza_ordini_carrello`, che ricontrolla la
-# merce prima di far nascere un ordine col saldo arrivato.
-MAX_CARRELLI_UNICO = 8
-
-
-def _seppellisci_carrello(con, pagamento_id: int) -> int:
-    """La LAPIDE del pagamento unico e dei suoi ordini, in una
-    transazione sola: la busta 'annullato' (mai un DELETE: un saldo
-    arrivato dopo deve avere una riga su cui atterrare, e
-    `controlla_annullati` la riacciuffa) e i suoi 'creato' pure, con le
-    offerte sciolte come in `annulla_ordine`. Le righe dei set restano:
-    se un saldo tardivo riacciuffa la busta servono intatte, e le
-    spazza la purga con le lapidi. Torna quanti ordini ha seppellito."""
-    adesso = int(time.time())
-    con.execute("UPDATE pagamenti SET stato='annullato', aggiornato=? "
-                "WHERE id=? AND stato='creato'", (adesso, pagamento_id))
-    cur = con.execute("UPDATE ordini SET stato='annullato', aggiornato=? "
-                      "WHERE pagamento_id=? AND stato='creato'",
-                      (adesso, pagamento_id))
-    con.execute("UPDATE offerte SET ordine_id=0 WHERE ordine_id IN "
-                "(SELECT id FROM ordini WHERE pagamento_id=? "
-                "AND stato='annullato')", (pagamento_id,))
-    con.commit()
-    return cur.rowcount
-
-
-def _merce_mancante(con, o, righe: list) -> str:
-    """Il pezzo che NON c'e' piu' per far nascere quest'ordine di busta
-    al saldo, o '' se la merce c'e' tutta. Un ordine 'creato' ha tenuto
-    la sua prenotazione (`_riservati`): basta che l'annuncio sia ancora
-    attivo e che i pezzi non siano stati tolti sotto. Un 'annullato'
-    (il venditore ha rimosso o messo in attesa un pezzo, o la busta e'
-    stata sepolta e il saldo e' arrivato dopo) la prenotazione l'ha
-    persa: si guarda anche cosa hanno prenotato gli altri nel
-    frattempo."""
-    for r in righe:
-        a = con.execute("SELECT stato, quantita, titolo FROM annunci "
-                        "WHERE id=?", (r["annuncio_id"],)).fetchone()
-        if not a or a["stato"] != "attivo":
-            return r["titolo"] or (a["titolo"] if a else "un oggetto")
-        liberi = a["quantita"]
-        if o["stato"] != "creato":
-            liberi -= _riservati(con, r["annuncio_id"])
-        if r["quantita"] > liberi:
-            return r["titolo"] or a["titolo"]
-    return ""
-
-
-def _esito_carrello(con, pagamento_id: int) -> dict:
-    """Com'e' andata a ogni ordine della busta, per chi legge dopo il
-    fatto (il poll che ha perso la corsa, il client che riapre): quelli
-    NATI (pagati e oltre), quelli MORTI (mai incassati, la parte in
-    rimborso) e quelli ancora IN ATTESA."""
-    nati, morti, attesa = [], [], []
-    for r in con.execute(
-            "SELECT id, venditore_id, prezzo_sats, stato, mai_incassato "
-            "FROM ordini WHERE pagamento_id=? ORDER BY id",
-            (pagamento_id,)):
-        voce = {"ordine_id": r["id"], "venditore_id": r["venditore_id"],
-                "prezzo_sats": r["prezzo_sats"], "stato": r["stato"]}
-        if r["mai_incassato"]:
-            morti.append(voce)
-        elif r["stato"] in ("creato", "annullato"):
-            attesa.append(voce)
-        else:
-            nati.append(voce)
-    return {"nati": nati, "morti": morti, "in_attesa": attesa}
-
-
-async def _avanza_ordini_carrello(pagamento_id: int) -> dict:
-    """I sats della busta sono arrivati: ogni suo ordine ancora fermo
-    ('creato', o 'annullato' da una rimozione o da una lapide) o NASCE
-    — la merce c'e', e passa da `_incassa_ordine` come un ordine
-    pagato da solo, col suo CAS — o MUORE: la merce non c'e' piu', e la
-    sua parte torna al compratore per la strada di sempre del rimborso
-    (`_rimborsa_compratore`, che con `mai_incassato` non rimette in
-    vetrina niente, perche' niente e' mai uscito). IDEMPOTENTE: la
-    chiama l'incasso della busta e, a cose gia' fatte, il poll di un
-    singolo ordine — chi trova tutto nato o morto non tocca niente."""
-    con = db()
-    fermi = [dict(r) for r in con.execute(
-        "SELECT * FROM ordini WHERE pagamento_id=? "
-        "AND stato IN ('creato','annullato') ORDER BY id", (pagamento_id,))]
-    con.close()
-    nati, morti = [], []
-    for o in fermi:
-        con = db()
-        righe = _righe_ordine(con, o)
-        manca = _merce_mancante(con, o, righe)
-        adesso = int(time.time())
-        if not manca:
-            if o["stato"] == "annullato":
-                # la lapide torna 'creato' col timbro fresco, come nel
-                # riacciuffo di controlla_annullati: da qui _incassa_ordine
-                # fa il flusso di sempre
-                cur = con.execute(
-                    "UPDATE ordini SET stato='creato', creato=?, aggiornato=? "
-                    "WHERE id=? AND stato='annullato'", (adesso, adesso, o["id"]))
-                con.commit()
-                if cur.rowcount == 0:
-                    con.close()
-                    continue
-            con.close()
-            r = await _incassa_ordine(o["id"])
-            nati.append({"ordine_id": o["id"], "venditore_id": o["venditore_id"],
-                         "prezzo_sats": o["prezzo_sats"], "stato": r.get("stato")})
-            continue
-        cur = con.execute(
-            "UPDATE ordini SET stato='refund', mai_incassato=1, aggiornato=? "
-            "WHERE id=? AND stato IN ('creato','annullato')", (adesso, o["id"]))
-        con.commit()
-        con.close()
-        if cur.rowcount == 0:
-            continue
-        print(f"↩️ Pagamento unico #{pagamento_id}: l'ordine #{o['id']} non "
-              f"nasce («{manca[:40]}» non c'e' piu'), la sua parte "
-              f"({_fmt_sats(o['prezzo_sats'])} sats) torna al compratore")
-        r = await _rimborsa_compratore(o["id"])
-        morti.append({"ordine_id": o["id"], "venditore_id": o["venditore_id"],
-                      "prezzo_sats": o["prezzo_sats"], "manca": manca,
-                      "stato": r.get("stato")})
-    return {"nati": nati, "morti": morti}
-
-
-async def _incassa_carrello(pagamento_id: int) -> dict:
-    """I sats del pagamento unico sono in cassaforte: la busta passa a
-    'pagato' col CAS (il poll del telefono, quello di un singolo ordine
-    e i due giri dell'orologio possono arrivare insieme: vince uno
-    solo, gli altri leggono l'esito), poi gli ordini nascono o muoiono
-    uno per uno (`_avanza_ordini_carrello`), e al compratore arriva il
-    riepilogo — le ricevute dei singoli ordini partono da
-    `_incassa_ordine`, come sempre. Non ricontrolla la fattura: l'ha
-    appena fatto il chiamante."""
-    adesso = int(time.time())
-    con = db()
-    p = con.execute("SELECT * FROM pagamenti WHERE id=?",
-                    (pagamento_id,)).fetchone()
-    if not p or p["stato"] != "creato":
-        stato = p["stato"] if p else "annullato"
-        esito = _esito_carrello(con, pagamento_id) if p else {}
-        con.close()
-        return {"stato": stato, **esito}
-    cur = con.execute("UPDATE pagamenti SET stato='pagato', pagato_il=?, "
-                      "aggiornato=? WHERE id=? AND stato='creato'",
-                      (adesso, adesso, pagamento_id))
-    con.commit()
-    if cur.rowcount == 0:
-        esito = _esito_carrello(con, pagamento_id)
-        con.close()
-        return {"stato": "pagato", **esito}
-    con.close()
-    print(f"🛒 Pagamento unico #{pagamento_id} pagato: "
-          f"{_fmt_sats(p['importo_sats'])} sats da #{p['tg_id']}")
-    esito = await _avanza_ordini_carrello(pagamento_id)
-    nati, morti = esito["nati"], esito["morti"]
-    # IL RIEPILOGO AL COMPRATORE, oltre alle ricevute dei singoli ordini:
-    # e' l'unico posto che sa dire «erano tre, ne sono nati due». I
-    # titoli sono testo dei venditori e la notifica e' HTML: si tronca
-    # PRIMA e si escapa DOPO (la lezione dell'avviso di spedizione).
-    try:
-        msg = (f"🛒 <b>Pagamento unico ricevuto:</b> "
-               + (f"{len(nati)} ordini nati, ognuno col suo deposito di "
-                  f"garanzia." if len(nati) != 1 else
-                  "1 ordine nato, col suo deposito di garanzia."))
-        for m in morti:
-            msg += (f"\n\n↩️ Un ordine non è potuto nascere: "
-                    f"«{html.escape(m['manca'][:40])}» non è più "
-                    f"disponibile. La sua parte, "
-                    f"<b>{_fmt_sats(m['prezzo_sats'])} sats</b>, torna a te"
-                    + (": è in arrivo nel tuo wallet."
-                       if m["stato"] == "refunded" else
-                       ": apri l'ordine nella Mini App per dire dove "
-                       "riceverla."))
-        await notifica(p["tg_id"], msg)
-    except Exception as e:
-        print(f"⚠️ Riepilogo del pagamento unico #{pagamento_id} non "
-              f"partito: {e}")
-    return {"stato": "pagato", "nati": nati, "morti": morti, "in_attesa": []}
-
-
-@app.post("/api/carrelli/paga")
-async def paga_carrelli(req: Request, x_tg_init_data: str = Header(""),
-                        barattolo_sessione: str = Cookie("")):
-    """«Paga tutto insieme»: UNA fattura per la somma dei carrelli, un
-    ordine per venditore a saldo arrivato. Il body porta i carrelli
-    come li manda la cassa di ognuno (`righe` + consegna, via, punto,
-    indirizzo, nota, codice sconto, accordo): ogni carrello e' il body
-    che `_compra_set` avrebbe ricevuto da solo.
-    DUE PASSATE, ed e' la forma che tiene il patto «preventivo e fattura
-    dicono la stessa cifra»: la prima chiede a `_preventivo_set` il
-    conto di ogni carrello sulla via scelta (una pura, nessuna
-    scrittura) e ne fa la somma, la fattura nasce per QUELLA; la
-    seconda fa nascere gli ordini con `_compra_set` e la busta, che
-    rifa' il conto dalle stesse pure e si ferma se non torna al sat.
-    SE UNA PASSATA CADE A META' si seppellisce tutto (busta e ordini
-    gia' nati diventano lapidi) e il rifiuto NOMINA il carrello: la
-    fattura appena coniata non l'ha vista nessuno e muore da sola. Mai
-    un DELETE, la regola delle lapidi."""
-    user = verifica_utente(x_tg_init_data, barattolo_sessione)
-    d = await leggi_json(req)
-    carrelli = d.get("carrelli")
-    if not isinstance(carrelli, list) or len(carrelli) < 2:
-        raise HTTPException(400, "Il pagamento unico serve con almeno due "
-                                 "carrelli: per uno solo c'è «Controlla "
-                                 "e paga»")
-    if len(carrelli) > MAX_CARRELLI_UNICO:
-        raise HTTPException(400, f"Si pagano insieme al massimo "
-                                 f"{MAX_CARRELLI_UNICO} carrelli")
-    # --- prima passata: il conto di ogni carrello, dalla via scelta
-    attesi, venditori = [], set()
-    for k, c in enumerate(carrelli, 1):
-        if not isinstance(c, dict):
-            raise HTTPException(400, "Carrelli non leggibili")
-        try:
-            p = await _preventivo_set(user, {**c, "pagamento_unico": True})
-        except HTTPException as e:
-            raise HTTPException(e.status_code, f"Carrello {k}: {e.detail}")
-        scelta = c.get("consegna") or ""
-        via = ("punto" if scelta == "spedizione"
-               and (c.get("spedizione_via") or "casa") == "punto"
-               else "casa" if scelta == "spedizione" else scelta)
-        strada = next((x for x in (p.get("strade") or [])
-                       if x.get("via") == via and "totale_sats" in x), None)
-        if not strada:
-            raise HTTPException(400, f"Carrello {k}: la consegna scelta "
-                                     f"non è disponibile, ricontrollalo")
-        # il venditore lo dicono le righe del preventivo, che e' gia'
-        # passato dalla guardia «stesso venditore»
-        con = db()
-        vid = con.execute("SELECT venditore_id FROM annunci WHERE id=?",
-                          ((p.get("righe") or [{}])[0].get("annuncio_id"),)
-                          ).fetchone()
-        con.close()
-        vid = vid["venditore_id"] if vid else 0
-        if vid in venditori:
-            raise HTTPException(400, f"Carrello {k}: due carrelli dello "
-                                     f"stesso venditore si uniscono in uno")
-        venditori.add(vid)
-        attesi.append(int(strada["totale_sats"]))
-    importo = sum(attesi)
-    if importo <= 0:
-        raise HTTPException(400, "Non c'è niente da pagare")
-    # --- la fattura per la somma, nella cassaforte del denaro nuovo
-    cf = cassaforte_nuova()
-    inv = await crea_invoice_escrow(
-        importo, f"Barattolo escrow carrello #{user['id']}: "
-                 f"{len(carrelli)} venditori", cassaforte=cf)
-    adesso = int(time.time())
-    con = db()
-    con.execute("INSERT INTO pagamenti(tg_id,motivo,riferimento,"
-                "importo_sats,payment_hash,invoice,stato,creato,"
-                "aggiornato,cassaforte) "
-                "VALUES(?,'carrello','',?,?,?,'creato',?,?,?)",
-                (user["id"], importo, inv["payment_hash"],
-                 inv["payment_request"], adesso, adesso, cf))
-    pid = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
-    con.commit()
-    con.close()
-    busta = {"id": pid, "payment_hash": inv["payment_hash"],
-             "invoice": inv["payment_request"], "cassaforte": cf}
-    # --- seconda passata: gli ordini, uno per carrello
-    nati = []
-    for k, (c, atteso) in enumerate(zip(carrelli, attesi), 1):
-        try:
-            r = await _compra_set(user, c, busta={**busta, "atteso": atteso})
-        except HTTPException as e:
-            con = db()
-            _seppellisci_carrello(con, pid)
-            con.close()
-            raise HTTPException(e.status_code, f"Carrello {k}: {e.detail}")
-        nati.append({"ordine_id": r["ordine_id"], "prezzo_sats": r["prezzo_sats"],
-                     "righe": r.get("righe") or [],
-                     "spedizione_sats": r.get("spedizione_sats", 0),
-                     "sconto_sats": r.get("sconto_sats", 0),
-                     "protezione_sats": r.get("protezione_sats", 0),
-                     "consegna": r.get("consegna", "")})
-    # la cintura sui numeri: la somma degli ordini E' la fattura, per
-    # costruzione (ogni _compra_set si e' fermato altrimenti)
-    if sum(x["prezzo_sats"] for x in nati) != importo:
-        con = db()
-        _seppellisci_carrello(con, pid)
-        con.close()
-        raise HTTPException(409, "I conti dei carrelli non tornano con la "
-                                 "fattura: riprova")
-    print(f"🛒 Pagamento unico #{pid}: {len(nati)} ordini per "
-          f"{_fmt_sats(importo)} sats (cassaforte {cf})")
-    return {"pagamento_id": pid, "invoice": inv["payment_request"],
-            "payment_hash": inv["payment_hash"], "importo_sats": importo,
-            "scadenza_invoice": INVOICE_EXPIRY, "ordini": nati}
-
-
-@app.post("/api/carrelli/{pagamento_id}/verifica")
-async def verifica_carrelli(pagamento_id: int, x_tg_init_data: str = Header(""),
-                            barattolo_sessione: str = Cookie("")):
-    """Il poll del pagamento unico, gemello di `verifica_pagamento`:
-    la guardia di proprieta' sta nella WHERE (chi enumera non impara
-    niente), e a fattura pagata l'incasso fa nascere gli ordini."""
-    user = verifica_utente(x_tg_init_data, barattolo_sessione)
-    con = db()
-    p = con.execute("SELECT id, stato, payment_hash, cassaforte FROM pagamenti "
-                    "WHERE id=? AND tg_id=? AND motivo='carrello'",
-                    (pagamento_id, user["id"])).fetchone()
-    if not p:
-        con.close()
-        raise HTTPException(400, "Operazione non permessa")
-    if p["stato"] != "creato":
-        esito = _esito_carrello(con, pagamento_id)
-        con.close()
-        if p["stato"] == "pagato" and esito["in_attesa"]:
-            # un giro morto a meta' (o un ordine riacciuffato): si finisce
-            esito = {**esito, **await _avanza_ordini_carrello(pagamento_id)}
-        return {"stato": p["stato"], **esito}
-    con.close()
-    if not await invoice_pagata(p["payment_hash"], p["cassaforte"]):
-        return {"stato": "in_attesa"}
-    return await _incassa_carrello(pagamento_id)
-
-
-@app.post("/api/carrelli/{pagamento_id}/annulla")
-async def annulla_carrelli(pagamento_id: int, x_tg_init_data: str = Header(""),
-                           barattolo_sessione: str = Cookie("")):
-    """Chi ci ripensa: pagamento controllato PRIMA (se e' arrivato,
-    niente annullo: 409 onesto e il poll fa il suo mestiere), poi la
-    lapide della busta e dei suoi ordini in un colpo (mai un DELETE:
-    `controlla_annullati` riacciuffa un saldo arrivato nella corsa)."""
-    user = verifica_utente(x_tg_init_data, barattolo_sessione)
-    con = db()
-    p = con.execute("SELECT * FROM pagamenti WHERE id=? AND tg_id=? "
-                    "AND motivo='carrello'",
-                    (pagamento_id, user["id"])).fetchone()
-    con.close()
-    if not p or p["stato"] != "creato":
-        raise HTTPException(400, "Operazione non permessa")
-    if await invoice_pagata(p["payment_hash"], p["cassaforte"]):
-        raise HTTPException(409, "Questo pagamento risulta già arrivato: "
-                                 "niente da annullare — attendi un attimo "
-                                 "la verifica, gli ordini stanno nascendo")
-    con = db()
-    n = _seppellisci_carrello(con, pagamento_id)
-    vivo = con.execute("SELECT stato FROM pagamenti WHERE id=?",
-                       (pagamento_id,)).fetchone()
-    con.close()
-    if not vivo or vivo["stato"] != "annullato":
-        raise HTTPException(409, "Il pagamento è arrivato proprio adesso: "
-                                 "gli ordini sono andati avanti, li trovi "
-                                 "nei tuoi Ordini")
-    return {"ok": True, "ordini_annullati": n}
 
 
 @app.get("/api/orders")
@@ -50778,19 +50282,6 @@ def miei_ordini(ordine: int = 0, x_tg_init_data: str = Header(""),
     # compra, chi vende e chi modera. La chiave c'e' SOLO dove c'e' uno
     # stadio: un client che non la trova disegna la pagina di ieri.
     stadi = _stadi_ordini(con, righe)
-    # L'IMPORTO DEL PAGAMENTO UNICO accanto ai suoi ordini (24 set 2026):
-    # «Paga ora» su uno di loro riapre la fattura condivisa, e il foglio
-    # deve dire la cifra che quella fattura vale davvero
-    buste = {r["pagamento_id"] for r in righe if r.get("pagamento_id")}
-    if buste:
-        seg = ",".join("?" * len(buste))
-        importi = {p["id"]: (p["importo_sats"], p["stato"]) for p in con.execute(
-            f"SELECT id, importo_sats, stato FROM pagamenti WHERE id IN ({seg})",
-            tuple(buste))}
-        for r in righe:
-            if r.get("pagamento_id") in importi:
-                r["pagamento_unico_sats"], r["pagamento_unico_stato"] = \
-                    importi[r["pagamento_id"]]
     con.close()
     for r in righe:
         if r["id"] in stadi:
@@ -57979,26 +57470,7 @@ CONTROLLI_LIBRO_MASTRO = (
      "nessuno l'ha incassata — si guarda a mano su LNbits col suo "
      "payment_hash, e si da' al motivo la sua cassa",
      "SELECT id FROM pagamenti "
-     "WHERE motivo NOT IN ('banner','negozio_slug','carrello')"),
-    # IL PAGAMENTO UNICO (24 set 2026): ogni ordine con `pagamento_id`
-    # deve avere la sua busta, e la busta deve essere un 'carrello'
-    ("ordine di un pagamento unico senza la sua busta",
-     "un ordine porta un `pagamento_id` che in `pagamenti` non c'e' o "
-     "non e' un 'carrello': la fattura di quell'ordine non si sa dove "
-     "stia",
-     "SELECT o.id FROM ordini o LEFT JOIN pagamenti p ON p.id=o.pagamento_id "
-     "WHERE o.pagamento_id<>0 AND (p.id IS NULL OR p.motivo<>'carrello')"),
-    # ...e a busta pagata nessun ordine puo' restare fermo a lungo:
-    # `_avanza_ordini_carrello` li fa nascere o morire nel giro stesso,
-    # e il poll di un singolo ordine rifinisce un giro morto a meta'
-    ("pagamento unico pagato con ordini ancora fermi",
-     "la busta e' 'pagato' da piu' di un'ora e un suo ordine e' ancora "
-     "'creato' o 'annullato': l'incasso e' morto a meta' — si fa girare "
-     "la verifica del pagamento unico, o si guarda a mano",
-     "SELECT o.id FROM ordini o JOIN pagamenti p ON p.id=o.pagamento_id "
-     "WHERE p.motivo='carrello' AND p.stato='pagato' "
-     "AND p.pagato_il < strftime('%s','now') - 3600 "
-     "AND o.stato IN ('creato','annullato')"),
+     "WHERE motivo NOT IN ('banner','negozio_slug')"),
     # E QUALI NON NASCONO QUI, con la stessa domanda:
     # - «una lapide senza payment_hash»: NO, e' innocua e non dice
     #   niente a nessuno — una riga 'annullato' non tiene occupato
