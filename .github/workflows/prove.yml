@@ -92,7 +92,7 @@ jobs:
              collaudo_offerta_carrello.py collaudo_punti_barattolo.py
              spoglia_foto_esistenti.py collaudo_verita_lnd.py
              giudice_deploy.py collaudi_ci.py
-             racconti.py collaudo_racconti_bozza.py
+             racconti.py collaudo_racconti_bozza.py collaudo_sponsor.py
              collaudo_letture_relay.py
              prepara_logo_consigliato.py
              collaudo_spedizione_standard.py
@@ -162,6 +162,7 @@ jobs:
              collaudo_pagamento_p2p
              collaudo_avvisi_in_ordine_p2p
              collaudo_racconti_bozza
+             collaudo_sponsor
              collaudo_inviti
              collaudo_letture_relay
              collaudo_spedizione_standard

@@ -3438,11 +3438,36 @@
   e nessun 404. C'e' il censimento che a scrivere sia il
   solo comando del bot — un orologio che spegnesse sarebbe uno stato
   in piu' da tenere in pari con la lettura.
-  LO STATO VIVE IN `impostazioni` (`sponsor_slug`, `sponsor_fino`), e
-  il suo recinto li ammette: uno slug e una data non accendono niente
-  e sbagliarli si vede subito — la famiglia dell'id del canale. Si
-  cambia DAL BOT: `/sponsor to-the-moon 30`, `/sponsor` per sapere chi
-  c'e', `/sponsor spento`. ⚠️ NON SI PROVA NIENTE PRIMA DI CREDERCI,
+  LO STATO VIVE IN `impostazioni`, e il suo recinto lo ammette: uno
+  slug e una data non accendono niente e sbagliarli si vede subito — la
+  famiglia dell'id del canale.
+  ⚠️ PIU' NEGOZI INSIEME (24 set 2026, decisione di Andrea: «uno alla
+  volta» era la tappa). Ogni negozio ha il SUO spazio, una riga
+  `sponsor_fino:<slug>` (l'istante in cui scade, 0 = spento), e le card
+  stanno in fila nell'ordine di `sponsor_ordine` (gli slug nominati in
+  testa, gli altri dietro nell'ordine del vocabolario). Il VOCABOLARIO
+  (`slug_sponsorizzabili`) e' la somma di due cataloghi che restano due:
+  le pagine del server con `banner: True` — prima — e `SLUG_SPONSOR`,
+  il catalogo di casa; da qui «prima Un tempo per te, poi To The Mooon»
+  senza nessun gesto. La scadenza di uno non tocca l'altro: il gate in
+  lettura e' per slug (`sponsor_fino(slug)`). ACCESO NON VUOL DIRE
+  VISIBILE: la busta di prima pagina porta `sponsorizzati`
+  (`sponsorizzati_pubblici`) — `{slug}` per il catalogo di casa,
+  `{slug, titolo, emoji, negozio}` per una pagina del server, e quella
+  SOLO PUBBLICATA col banner (lo stesso giudice che serve il file,
+  `_banner_consigliato`) e col negozio risolto, mai il tg_id. La chiave
+  di ieri, `sponsor`, non esce piu'. Le due righe di ieri
+  (`sponsor_slug` + `sponsor_fino`) si LEGGONO ancora per lo slug che
+  nominano, finche' la sua riga nuova non c'e': lo spazio acceso prima
+  del deploy resta acceso. Nessuno le scrive piu'.
+  Si cambia DAL BOT: `/sponsor` (lo stato di tutti, nell'ordine, con
+  la bozza detta), `/sponsor <slug> 30` (accende o rinnova quello; una
+  pagina in bozza si accende lo stesso, la scadenza corre, e il bot lo
+  dice), `/sponsor <slug> spento` (quello solo), `/sponsor spento`
+  (tutti), `/sponsor ordine <slug> <slug>` (l'ordine). Il preavviso
+  delle 72 ore e' uno per spazio, col timbro `sponsor_scadenza:<slug>`
+  (quello unico di ieri vale ancora per lo slug che nomina).
+  Il pannello dello spazio non esiste: si governa solo dal bot. ⚠️ NON SI PROVA NIENTE PRIMA DI CREDERCI,
   al contrario di `/canale`: li' si manda un messaggio di collaudo
   perche' il permesso su un canale altrui non dipende da noi, qui lo
   slug si valida contro `SLUG_SPONSOR` — che e' roba di casa — e non
@@ -3464,10 +3489,15 @@
   `titoloDentro`, quindi togliendo quel flag la CI viene a chiedere la
   sua misura. La RISERVA invece resta sempre — e' il ripiego di quando
   l'immagine non arriva, e li' un nome ci vuole.
-  `file` E `testo` SONO FUNZIONI e non valori, e il renderer li
-  risolve in un posto solo: questa voce non sa a chi appartiene finche'
-  la busta non arriva, e una costante letta all'avvio direbbe sempre
-  lo spazio di ieri. Un `${v.testo}` rimasto in giro scriverebbe
+  NEL CLIENT LA FILA SI RIFA' A OGNI DISEGNO (`vociSponsor`, dalla
+  busta `sponsorizzati`; la fila intera e' `vociScoprire`, che leggono
+  il renderer e il tocco e nessun altro): una card per spazio, id
+  `sponsor-<slug>`, in testa prima del P2P, nell'ordine della busta —
+  il client non riordina niente. Il catalogo di casa vince sui dati del
+  server, come nei Consigliati; senza codice negozio quella card non
+  nasce e le altre restano; il titolo e l'emoji passano da `esc()`.
+  `file` e `testo` possono ancora essere FUNZIONI, e il renderer li
+  risolve in un posto solo. Un `${v.testo}` rimasto in giro scriverebbe
   «() => ...» dentro un aria-label, e a dirlo non sarebbe nessuno: si
   legge solo con lo screen reader acceso.
   LE APERTURE SI CONTANO, MAI CHI (decisione di Andrea, la regola del
@@ -3476,7 +3506,10 @@
   invece di un totale piatto — e NIENTE `tg_id`, per costruzione e non
   per attenzione: non essendoci la colonna, nessuna query futura potra'
   scriverlo per distrazione. ⚠️ E' UN TERMOMETRO E NON UNA MISURA: a
-  dire «vengo dallo spazio» e' il CLIENT (`?da=sponsor`), quindi il
+  dire «vengo dallo spazio» e' il CLIENT (`?da=sponsor:<slug>` dal 24
+  set 2026, e si conta solo se quello spazio e' acceso; ⚠️ il client
+  oggi quel parametro NON lo manda, quindi il numero resta a zero),
+  quindi il
   numero si gonfia da chiunque sappia scrivere un URL. Va bene per la
   domanda che deve rispondere — «e' servito?» — e non per una fattura.
   ⚠️ La prova che lo verifica guarda il DDL SENZA LA PROSA: il
@@ -3582,7 +3615,7 @@
   toglie a mano; lo spazio decide solo la card in «Da scoprire».
   TOGLIERE UN NEGOZIO: per il catalogo di casa `consigliato: false` in
   `RACCONTI` e un push (esce da card, pagina e storia; la card in «Da
-  scoprire», se lo spazio e' vivo, la spegne `/sponsor spento`); per
+  scoprire», se lo spazio e' vivo, la spegne `/sponsor <slug> spento`); per
   una pagina del server «📝 Rimetti in bozza» dal pannello — nessuna
   leva di visibilita' in `racconti.py`, che dice COSA c'e' scritto e
   mai SE si vede.
@@ -3612,9 +3645,11 @@
   di «Da scoprire»: dopo `FILE_SCOPRIRE` passa da `_banner_consigliato`,
   cioe' una chiave di `RACCONTI_NEGOZI` con la stretta dei loghi — solo a
   pagina pubblicata col banner vero. Senza banner, la riserva col logo.
-  NON accende lo spazio sponsorizzato, che resta del catalogo di casa (uno
-  slug non sta nei due cataloghi): il file e' pronto, la leva no. Il
-  perche': Cantieri, la voce «Un tempo per te» in bozza.
+  Dal 24 set 2026 lo stesso banner e' anche la card dello SPAZIO
+  SPONSORIZZATO della pagina (`/sponsor <slug> 30`), che compare solo a
+  pagina pubblicata; uno slug non sta nei due cataloghi, quindi ogni
+  spazio ha una leva sola. Il perche': Cantieri, «Piu' negozi
+  sponsorizzati in Da scoprire».
   IL GIRO: solo il primo logo ha il suo `src` (gli altri `data-src`,
   chiesti un giro prima del loro turno) e a `fetchpriority="low"`; il
   timer nasce con due loghi, si riarma a ogni ridisegno della fila

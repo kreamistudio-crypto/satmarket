@@ -12712,12 +12712,18 @@ let vetrinaPos = null;   // {y, n} — dove si era, e con quante card
    `sconto_pacco_*`): si rinominano i testi, mai le chiavi. */
 let conteggiServer = null, ultimaRicercaAI = false;
 let regioniServer = null;    // {regione: quanti} dal server, per i Filtri
-/* Lo SLUG dello spazio in vetrina, dalla busta di prima pagina —
-   '' = nessuno. E' il gate in LETTURA: alla scadenza il server
-   smette di mandarlo e la card sparisce da sola, senza che nessuna
-   scopa passi (il patto di ferie e lampo). Chiave assente = server
-   di ieri = niente spazio, che un'assenza non e' una bugia. */
-let sponsorVivo = '';
+/* GLI SPAZI IN VETRINA, dalla busta di prima pagina: la fila delle
+   card sponsorizzate, nell'ordine deciso da noi — [{slug}] per il
+   catalogo di casa, [{slug, titolo, emoji, negozio}] per le pagine del
+   server, che arrivano solo pubblicate. [] = nessuno. E' il gate in
+   LETTURA: alla scadenza il server smette di mandare quella voce e la
+   sua card sparisce da sola, senza che nessuna scopa passi (il patto di
+   ferie e lampo), e le altre restano. Chiave assente = server di ieri =
+   niente spazio, che un'assenza non e' una bugia.
+   ⚠️ ERA UNO SLUG SOLO (`sponsorVivo`) fino al 24 set 2026: «uno alla
+   volta» era la tappa, e dai negozi in vetrina piu' d'uno insieme e'
+   una lista. */
+let sponsorizzati = [];
 /* LE PAGINE DEI NEGOZI CONSIGLIATI che il server dice PUBBLICATE e col
    logo (set 2026), dalla stessa busta: [{slug, titolo, emoji, negozio}].
    La scrive SOLO loadListings, e sempre per intero — una lista che non
@@ -13086,7 +13092,7 @@ async function loadListings(anonimo){
   if (j.conteggi) conteggiServer = j.conteggi;
   if (j.regioni) regioniServer = j.regioni;
   if (j.occasioni) occasioniServer = j.occasioni;
-  sponsorVivo = j.sponsor || '';
+  sponsorizzati = Array.isArray(j.sponsorizzati) ? j.sponsorizzati : [];
   consigliatiServer = Array.isArray(j.consigliati) ? j.consigliati : [];
   if (j.pionieri !== undefined) pionieri = Number(j.pionieri) || 0;
   /* i totali del like: arrivano di qui perche' e' l'unico canale che
@@ -15161,7 +15167,7 @@ const RACCONTI = {
        pagina) e con la storia sul suo negozio, a spazio in vetrina
        acceso o spento. false = TOLTO A MANO: esce dalla card e dalla
        pagina, e il negozio torna senza storia. La card in «Da scoprire»
-       non lo guarda — la spegne `/sponsor spento` dal bot. Un vero
+       non lo guarda — la spegne `/sponsor to-the-moon spento` dal bot. Un vero
        booleano: una voce senza, per il giudice, non e' consigliata. */
     consigliato: true,
     /* IL LOGO DELLA CARD «CONSIGLIATI» (set 2026): il file e'
@@ -15297,12 +15303,24 @@ const SCOPRIRE = [
      NIENTE anello e niente interruttore: `accesa` risponde sempre no
      — la card non si accende, si tocca e si va — e il template le
      toglie anche l'aria-pressed. */
+  {id: 'p2p', file: 'p2p.webp', emoji: '₿', testo: 'P2P',
+   vivo: () => true,
+   accesa: () => false,
+   tocca: () => vaiP2P()},
+  {id: 'lampo', file: 'lampo.webp', emoji: '⚡', testo: 'Offerte a tempo',
+   vivo: () => DEMO ? listings.some(l => lampoAttiva(l))
+                    : !!(occasioniServer && occasioniServer.lampo),
+   accesa: () => filtroLampo},
+  {id: 'sconto', file: 'sconto.webp', emoji: '🎁', testo: 'Sconti dei negozi',
+   vivo: () => DEMO ? listings.some(l => scontoQui(l, 1))
+                    : !!(occasioniServer && occasioniServer.sconto),
+   accesa: () => filtroSconto},
+];
   /* LO SPAZIO IN VETRINA, in testa a tutto (ago 2026): la posizione
      che a 320px si vede senza scorrere e' quella che si vende, ed e'
-     anche il posto del P2P — che scala di uno finche' lo spazio e'
-     vivo. Alla scadenza la card sparisce da sola e il P2P torna
-     primo, senza che nessuna scopa passi: il `vivo` guarda lo slug
-     della busta, che il server smette di mandare.
+     anche il posto del P2P — che scala finche' c'e' uno spazio vivo.
+     Alla scadenza la card sparisce da sola e il P2P risale, senza che
+     nessuna scopa passi: il server smette di mandare quella voce.
      IL TITOLO STA DENTRO L'IMMAGINE (decisione di Andrea), ed e'
      l'unica card che non porta la scritta dell'app: il progetto
      manda la sua grafica col nome dentro, e sovrapporgli il nostro
@@ -15319,29 +15337,46 @@ const SCOPRIRE = [
      gli occhi di chi l'ha gia' imparata. La CHIAVE resta `sponsor`
      dappertutto (classe, id, colonne, comando del bot): si rinominano
      i testi, mai le chiavi.
-     `file` E `testo` SONO FUNZIONI come i tre giudici, e non valori:
-     questa voce non sa a chi appartiene finche' la busta non arriva,
-     e una costante letta all'avvio direbbe sempre lo spazio di ieri. */
-  {id: 'sponsor', emoji: '📣', titoloDentro: true, sponsor: true,
-   file: () => sponsorVivo + '.webp',
-   testo: () => (RACCONTI[sponsorVivo] || {}).titolo || '',
-   vivo: () => !!(sponsorVivo && RACCONTI[sponsorVivo]
-                  && RACCONTI[sponsorVivo].negozio),
-   accesa: () => false,
-   tocca: () => apriNegozio(RACCONTI[sponsorVivo].negozio, true)},
-  {id: 'p2p', file: 'p2p.webp', emoji: '₿', testo: 'P2P',
-   vivo: () => true,
-   accesa: () => false,
-   tocca: () => vaiP2P()},
-  {id: 'lampo', file: 'lampo.webp', emoji: '⚡', testo: 'Offerte a tempo',
-   vivo: () => DEMO ? listings.some(l => lampoAttiva(l))
-                    : !!(occasioniServer && occasioniServer.lampo),
-   accesa: () => filtroLampo},
-  {id: 'sconto', file: 'sconto.webp', emoji: '🎁', testo: 'Sconti dei negozi',
-   vivo: () => DEMO ? listings.some(l => scontoQui(l, 1))
-                    : !!(occasioniServer && occasioniServer.sconto),
-   accesa: () => filtroSconto},
-];
+     LA FILA SI RIFA' A OGNI DISEGNO, dalla busta: una voce non sa a
+     chi appartiene finche' la busta non arriva, e una costante letta
+     all'avvio direbbe sempre lo spazio di ieri. */
+  /* ⚠️ PIU' NEGOZI INSIEME (24 set 2026, decisione di Andrea): la voce
+     fissa di ieri, che leggeva uno slug solo, e' diventata una FILA —
+     una card per ogni spazio acceso, nell'ordine in cui il server le
+     manda. L'ordine lo decidiamo noi dal bot (`/sponsor ordine`), e qui
+     non si riordina niente: stanno tutte in testa, prima del P2P, che
+     scala di tante quante sono.
+     DUE FONTI, come per i Consigliati: il catalogo di casa (`RACCONTI`:
+     la busta porta il solo slug) e le pagine del server (la busta porta
+     anche titolo, emoji e codice negozio, e SOLO PUBBLICATE — una bozza
+     da qui non arriva). Il catalogo di casa vince, come in
+     consigliatiPubblicati; il banner e' `<slug>.webp` per tutt'e due.
+     FAIL-CLOSED PER VOCE: senza codice negozio quella card non nasce, e
+     le altre restano. Lo slug si ripassa dalla forma per cintura: finisce
+     in un indirizzo e in un attributo.
+     L'ID PORTA LO SLUG (`sponsor-<slug>`): due card sponsor devono potersi
+     distinguere al tocco e nella firma della fila. */
+function vociSponsor(){
+  const fuori = [];
+  (Array.isArray(sponsorizzati) ? sponsorizzati : []).forEach(s => {
+    const slug = String((s && s.slug) || '');
+    if (!/^[a-z0-9-]{2,40}$/.test(slug)) return;
+    if (fuori.some(v => v.slug === slug)) return;
+    const casa = RACCONTI[slug];
+    const negozio = casa ? casa.negozio : String(s.negozio || '');
+    fuori.push({id: 'sponsor-' + slug, slug,
+      emoji: String((casa ? casa.emoji : s.emoji) || '📣'),
+      titoloDentro: true, sponsor: true, file: slug + '.webp',
+      testo: String((casa ? casa.titolo : s.titolo) || ''),
+      vivo: () => !!negozio, accesa: () => false,
+      tocca: () => apriNegozio(negozio, true)});
+  });
+  return fuori;
+}
+/* la fila intera: gli spazi in testa, poi le card fisse. La leggono il
+   renderer e il tocco, e nessun altro — due letture della stessa fila
+   un giorno direbbero due card diverse sotto lo stesso dito. */
+const vociScoprire = () => vociSponsor().concat(SCOPRIRE);
 let scoprireFirma = '';
 function renderScoprire(){
   /* Col barattolo restano le sole card che NAVIGANO (ago 2026,
@@ -15358,7 +15393,7 @@ function renderScoprire(){
      si scrive PRIMA del controllo della firma (la lezione storica di
      renderStriscia: scritto dopo, tornando dal barattolo la firma
      uguale lascerebbe la sezione spenta per sempre). */
-  const vive = SCOPRIRE.filter(v =>
+  const vive = vociScoprire().filter(v =>
     (!vistaBarattolo || v.tocca) && v.vivo());
   el('scoprireSez').style.display = vive.length ? '' : 'none';
   if (!vive.length) return;
@@ -15384,7 +15419,10 @@ function renderScoprire(){
        solo: due letture sparse direbbero due nomi diversi sulla
        stessa card. */
     const file = typeof v.file === 'function' ? v.file() : v.file;
-    const testo = typeof v.testo === 'function' ? v.testo() : v.testo;
+    /* IL TITOLO PASSA DA esc() (set 2026): da quando le card dello spazio
+       arrivano anche dal server, niente di un catalogo entra nudo nel
+       markup — il patto di raccontoNegozio. */
+    const testo = esc(typeof v.testo === 'function' ? v.testo() : v.testo);
     /* LA PASTIGLIA CHE DICE «e' pubblicita'», e sta SEMPRE dove il
        titolo non c'e' — angolo in BASSO a destra: il titolo delle
        sorelle vive a sinistra, e quello di questa card sta dentro il
@@ -15412,7 +15450,7 @@ function renderScoprire(){
          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toccaScoperta(this.dataset.id);}">
       <img src="/assets/scoprire/${file}" alt="" loading="lazy"
            decoding="async" onerror="this.remove()"
-      ><span class="sc-riserva" aria-hidden="true"><span class="sc-emoji">${v.emoji}</span>${testo}</span
+      ><span class="sc-riserva" aria-hidden="true"><span class="sc-emoji">${esc(v.emoji)}</span>${testo}</span
       >${titolo}${pastiglia}
     </div>`;
   }).join('');
@@ -15727,7 +15765,7 @@ function toccaScoperta(id){
      poterci cadere dentro nemmeno per sbaglio.
      L'HAPTIC lo da' la strada che si prende — vaiP2P ha il suo, e
      batterlo due volte si sente. */
-  const voce = SCOPRIRE.find(v => v.id === id);
+  const voce = vociScoprire().find(v => v.id === id);
   if (voce && voce.tocca) { voce.tocca(); return; }
   haptic();
   const acceso = id === 'sconto' ? filtroSconto : filtroLampo;

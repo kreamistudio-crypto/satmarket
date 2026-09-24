@@ -28868,8 +28868,9 @@ def prove_canale_bot():
                "canale_riepilogo",  # dove va il lunedi' (`/canale riepilogo`)
                "canale_vetrina",    # il canale OSPITE   (`/canale vetrina`)
                "ritmo_vetrina",     # quanto parla       (`/vetrina`)
-               "sponsor_slug",      # chi e' in vetrina  (`/sponsor`)
-               "sponsor_fino",      # ...e fino a quando (`/sponsor`)
+               "sponsor_slug",      # chi era in vetrina (la riga di
+               "sponsor_fino",      # ieri, solo letta: `/sponsor`)
+               "sponsor_ordine",    # l'ordine delle card (`/sponsor`)
                "punti_barattolo"}   # i punti di casa    (`/punti`)
     chiavi = set(re.findall(r'\bimpostazione\("([a-z_]+)"', _SORGENTE))
     chiavi |= set(re.findall(r'\bscrivi_impostazione\("([a-z_]+)"',
@@ -41583,8 +41584,10 @@ def prove_scoprire():
     # sarebbe nessuno: si legge solo con lo screen reader acceso.
     prova("...e il testo e' quello del catalogo, tre volte", 3,
           _rs.count("${testo}"))
+    # (e dal set 2026 passa da esc(): le card dello spazio arrivano
+    # anche dal server, e niente di un catalogo entra nudo nel markup)
     prova("...risolto in un posto solo", (1, 0, 0),
-          (_rs.count("const testo = typeof v.testo === 'function'"),
+          (_rs.count("const testo = esc(typeof v.testo === 'function'"),
            _rs.count("${v.testo}"), _rs.count("${v.file}")))
     # LA PROVA DEL CONTRASTO, sui file veri e non sulle intenzioni
     # (il patto del pareggio dell'inchiostro): il titolo atterra nella
@@ -41769,8 +41772,14 @@ def prove_scoprire_p2p(mini=None, node=None):
     # catalogo e' vuoto apposta (si riempie a mano quando lo spazio si
     # vende), quindi la card NON deve nascere — e a dirlo e' il
     # catalogo vero, non un finto costruito per l'occasione.
-    pezzi = (_fetta("const RACCONTI = {", "\n};")
+    # ...e dal 24 set 2026 la FILA degli spazi (`vociSponsor` e la fila
+    # intera, `vociScoprire`) e `esc` VERO, che il titolo attraversa: uno
+    # stub proverebbe se' stesso.
+    pezzi = (pezzo_js(mini, "const esc = ", "\nconst el =") + "\n"
+             + _fetta("const RACCONTI = {", "\n};")
              + _fetta("const SCOPRIRE = [", "\n];")
+             + "\n" + _fetta("function vociSponsor(){", "\n}") + "\n"
+             + _fetta("const vociScoprire = ", ";\n")
              + "\nlet scoprireFirma = '';\n"
              + _fetta("function renderScoprire(){", "\n}") + "\n"
              + _fetta("function toccaScoperta(id){", "\n}"))
@@ -41827,9 +41836,10 @@ function scontoQui(){ return false; }
 let DEMO = false, vistaBarattolo = false, listings = [];
 let filtroLampo = false, filtroSconto = false;
 let occasioniServer = null, interessiMiei = [];
-/* Lo spazio in vetrina: '' = nessuno, che e' anche il valore con cui
-   il client parte finche' la busta non arriva. */
-let sponsorVivo = '';
+/* Gli spazi in vetrina: [] = nessuno, che e' anche il valore con cui
+   il client parte finche' la busta non arriva (dal 24 set 2026 una
+   fila, non piu' uno slug solo). */
+let sponsorizzati = [];
 function apriNegozio(chi, aperto){
   scritte.push('negozio:' + chi + (aperto ? ':aperto' : ':chiuso')); }
 """
@@ -41841,7 +41851,7 @@ function dice(che, atteso, avuto){
     + ', avuto ' + JSON.stringify(avuto)) + '|' + che);
 }
 const idCard = () =>
-  (nodi['scoprireStrip'].innerHTML.match(/data-id="([a-z0-9]+)"/g)
+  (nodi['scoprireStrip'].innerHTML.match(/data-id="([a-z0-9-]+)"/g)
    || []).map(s => s.slice(9, -1));
 const rifai = () => { scoprireFirma = ''; renderScoprire(); };
 
@@ -41894,9 +41904,12 @@ dice('...anche col voto gia dato', '',
 // La card nasce dalla BUSTA e non dal catalogo, quindi qui si prova
 // il GATE: e' l'unica cosa che la fa comparire e sparire, e nessuna
 // sentinella sulla forma puo' dire se risponde giusto.
+// ⚠️ PIU' NEGOZI INSIEME (24 set 2026): la busta porta una FILA
+// (`sponsorizzati`) e non piu' uno slug — il catalogo di casa col solo
+// slug, le pagine del server con titolo, emoji e codice negozio.
 vistaBarattolo = false;
 occasioniServer = {lampo: 1, sconto: 1};
-sponsorVivo = '';
+sponsorizzati = [];
 rifai();
 dice('senza spazio venduto la fila e quella di sempre',
      ['p2p','lampo','sconto'], idCard());
@@ -41912,7 +41925,7 @@ dice('senza spazio venduto la fila e quella di sempre',
 // comincia a servire. Una prova non deve dipendere da uno stato del
 // catalogo che il cantiere esiste per cambiare: si costruisce il
 // caso che si vuole sorvegliare.
-sponsorVivo = 'to-the-moon';
+sponsorizzati = [{slug: 'to-the-moon'}];
 const codiceVero = RACCONTI['to-the-moon'].negozio;
 RACCONTI['to-the-moon'].negozio = '';
 rifai();
@@ -41928,10 +41941,11 @@ const codiceCard = codiceVero || 'ab12cd34';
 RACCONTI['to-the-moon'].negozio = codiceCard;
 rifai();
 dice('col codice e la prima della fila',
-     ['sponsor','p2p','lampo','sconto'], idCard());
+     ['sponsor-to-the-moon','p2p','lampo','sconto'], idCard());
 
-const cardSp = nodi['scoprireStrip'].innerHTML
-  .split('data-id="sponsor"')[1].split('</div>')[0];
+const cardDi = id => nodi['scoprireStrip'].innerHTML
+  .split('data-id="' + id + '"')[1].split('</div>')[0];
+const cardSp = cardDi('sponsor-to-the-moon');
 // META' DEL PUNTO 1: e' pubblicita' e si dice sulla card. L'altra
 // meta' — la riga sulla pagina — vive in prove_sponsor, e nessuna
 // delle due basta da sola.
@@ -41945,9 +41959,11 @@ dice('...e senza il titolo scritto dall app', false,
 // arriva, e li' un nome ci vuole
 dice('...ma con la riserva, che senza immagine e l unico nome', true,
      cardSp.includes('class="sc-riserva"'));
+dice('...e il banner e il suo, dallo slug', true,
+     cardSp.includes('src="/assets/scoprire/to-the-moon.webp"'));
 
 scritte = [];
-toccaScoperta('sponsor');
+toccaScoperta('sponsor-to-the-moon');
 // L'ATTESO NON SI SCRIVE COL LETTERALE, ed e' la stessa lezione di
 // venti righe piu' su: col codice finto inchiodato qui la prova
 // diventava rossa il giorno in cui il catalogo prende il suo codice
@@ -41959,19 +41975,79 @@ dice('il suo tocco porta al negozio, col racconto aperto',
 dice('...e nemmeno lui sfiora un filtro', [false, false],
      [filtroLampo, filtroSconto]);
 
-// COL BARATTOLO RESTANO LE CARD CHE NAVIGANO, tutte e due: a uscire
-// sono gli INTERRUTTORI, che su una lista chiusa non hanno senso.
+// ---- PIU' NEGOZI INSIEME (24 set 2026) --------------------------
+// IL CASO DEL CANTIERE: due card affiancate, NELL'ORDINE DELLA BUSTA —
+// l'ordine lo decide il server (lo scegliamo noi dal bot), il client
+// non riordina niente. La pagina del server arriva con i suoi dati.
+const utpt = {slug: 'un-tempo-per-te', titolo: 'Un tempo per te',
+              emoji: '🌱', negozio: 'cd34ef56'};
+sponsorizzati = [utpt, {slug: 'to-the-moon'}];
+rifai();
+dice('due spazi: due card in testa, nell ordine della busta',
+     ['sponsor-un-tempo-per-te','sponsor-to-the-moon','p2p','lampo','sconto'],
+     idCard());
+const cardU = cardDi('sponsor-un-tempo-per-te');
+dice('...e la pagina del server ha lo stesso aspetto: banner, pastiglia, niente titolo dell app',
+     [true, true, false, true],
+     [cardU.includes('src="/assets/scoprire/un-tempo-per-te.webp"'),
+      cardU.includes('class="sc-sponsor"'),
+      cardU.includes('class="sc-titolo"'),
+      cardU.includes('aria-label="Un tempo per te"')]);
+scritte = [];
+toccaScoperta('sponsor-un-tempo-per-te');
+dice('...e il suo tocco porta al SUO negozio, col racconto aperto',
+     ['negozio:cd34ef56:aperto'], scritte);
+scritte = [];
+toccaScoperta('sponsor-to-the-moon');
+dice('...e quello dell altra al suo', ['negozio:' + codiceCard + ':aperto'],
+     scritte);
+
+sponsorizzati = [{slug: 'to-the-moon'}, utpt];
+rifai();
+dice('l ordine rovesciato nella busta rovescia le card',
+     ['sponsor-to-the-moon','sponsor-un-tempo-per-te','p2p','lampo','sconto'],
+     idCard());
+
+// LA SCADENZA DI UNO NON TOCCA L'ALTRO: il server smette di mandare
+// quella voce, e l'altra card resta dov'e'.
+sponsorizzati = [utpt];
+rifai();
+dice('scaduto To The Mooon resta Un tempo per te',
+     ['sponsor-un-tempo-per-te','p2p','lampo','sconto'], idCard());
+
+// FAIL-CLOSED PER VOCE: una pagina senza codice non nasce, e le altre
+// restano; uno slug fuori forma nemmeno; un doppione conta una volta.
+sponsorizzati = [{slug: 'un-tempo-per-te', titolo: 'X', negozio: ''},
+                 {slug: '../x', negozio: 'ab'}, {slug: 'to-the-moon'},
+                 {slug: 'to-the-moon'}];
+rifai();
+dice('una voce senza codice o fuori forma non nasce, e le altre restano',
+     ['sponsor-to-the-moon','p2p','lampo','sconto'], idCard());
+
+// IL TITOLO DAL SERVER PASSA DA esc(): niente di un catalogo entra nudo
+sponsorizzati = [{slug: 'un-tempo-per-te', titolo: 'A <b>"B"</b>',
+                  emoji: '<i>', negozio: 'cd34ef56'}];
+rifai();
+const cardE = cardDi('sponsor-un-tempo-per-te');
+dice('il titolo e l emoji del server passano da esc',
+     [false, false, true],
+     [cardE.includes('<b>'), cardE.includes('<i>'),
+      cardE.includes('&lt;b&gt;')]);
+
+// COL BARATTOLO RESTANO LE CARD CHE NAVIGANO, tutte: a uscire sono gli
+// INTERRUTTORI, che su una lista chiusa non hanno senso.
+sponsorizzati = [utpt, {slug: 'to-the-moon'}];
 vistaBarattolo = true;
 rifai();
-dice('col barattolo restano le due card che navigano',
-     ['sponsor','p2p'], idCard());
+dice('col barattolo restano le card che navigano',
+     ['sponsor-un-tempo-per-te','sponsor-to-the-moon','p2p'], idCard());
 
-// E ALLA SCADENZA SE NE VA DA SOLA, senza che nessuna scopa passi:
-// il server smette di mandare lo slug, e il `vivo` guarda quello.
+// E ALLA SCADENZA SE NE VANNO DA SOLE, senza che nessuna scopa passi:
+// il server smette di mandarle, e la fila guarda quella.
 vistaBarattolo = false;
-sponsorVivo = '';
+sponsorizzati = [];
 rifai();
-dice('alla scadenza la card se ne va da sola',
+dice('alla scadenza le card se ne vanno da sole',
      ['p2p','lampo','sconto'], idCard());
 """
 
@@ -41992,11 +42068,13 @@ def prove_sponsor():
     3) LE APERTURE NON SANNO CHI — si conta quante volte lo spazio si
        apre, mai da parte di chi.
 
-    ⚠️ «UNO ALLA VOLTA» E' LA TAPPA, NON LA FORMA: `SLUG_SPONSOR` e'
-    una tupla e `RACCONTI` un dizionario apposta — il giorno dei
-    «Consigliati» (piu' progetti insieme, decisione gia' annunciata da
-    Andrea e NON costruita) a cambiare sara' la sola impostazione, che
-    oggi tiene uno slug solo. Il renderer mangia gia' una lista."""
+    ⚠️ «UNO ALLA VOLTA» ERA LA TAPPA, NON LA FORMA, e la tappa e'
+    finita (24 set 2026, decisione di Andrea): ogni negozio ha il suo
+    spazio, le card stanno in fila nell'ordine deciso da noi, e anche
+    le pagine del server (`racconti.py`) si possono accendere. A
+    cambiare sono state l'impostazione — una riga per negozio piu'
+    l'ordine — e la fonte della fila; il renderer mangiava gia' una
+    lista."""
     import time
     print("\n[lo spazio in vetrina]")
     src = open("server.py", encoding="utf-8").read()
@@ -42007,48 +42085,180 @@ def prove_sponsor():
     # cartone. Una sentinella direbbe che il confronto c'e', mai che
     # risponda giusto — e qui la risposta e' l'unica cosa che fa
     # comparire e sparire uno spazio pagato.
+    # ⚠️ PIU' NEGOZI INSIEME (24 set 2026, decisione di Andrea): «uno
+    # alla volta» era la tappa. Ogni negozio ha il SUO spazio — una riga
+    # `sponsor_fino:<slug>` — e le card stanno in fila nell'ordine
+    # deciso da noi. Il giro qui sotto e' quello di ieri fatto su ogni
+    # spazio, piu' le tre domande che una riga sola non poneva: la
+    # scadenza di uno non tocca l'altro, la pagina in bozza non si vede,
+    # e l'ordine e' quello scelto.
+    import racconti as _rac
     amb = {"time": time, "impostazione": None, "_SPONSOR": None,
-           "scrivi_impostazione": lambda k, v: scritte.append((k, v))}
+           "RACCONTI_NEGOZI": _rac.RACCONTI_NEGOZI,
+           "scrivi_impostazione": lambda k, v: (scritte.append((k, v)),
+                                                tavola.__setitem__(k, v))}
     scritte = []
     tavola = {}
     amb["impostazione"] = lambda k, d="": tavola.get(k, d)
     exec(re.search(r"^SLUG_SPONSOR = \([^)]*\)", src, re.M).group(), amb)
     exec(re.search(r"^MAX_GIORNI_SPONSOR = \d+", src, re.M).group(), amb)
-    for nome in ("_sponsor_righe", "sponsor_vivo",
-                 "sponsor_fino", "imposta_sponsor"):
+    for nome in ("slug_sponsorizzabili", "_sponsor_righe", "sponsor_ordine",
+                 "sponsor_fino", "sponsor_accesi", "sponsorizzati_pubblici",
+                 "imposta_sponsor", "imposta_ordine_sponsor",
+                 "racconto_stato", "_banner_consigliato",
+                 "_venditore_racconto"):
         exec(pezzo(nome), amb)
     slug_vero = amb["SLUG_SPONSOR"][0]
+    voc = amb["slug_sponsorizzabili"]()
+    # IL VOCABOLARIO: le pagine del server col banner, poi il catalogo di
+    # casa — e una pagina senza banner no, che la card si vende col suo
+    # disegno. Derivato dal catalogo vero, e il caso del cantiere scritto
+    # per nome: «prima Un tempo per te, poi To The Mooon».
+    _col_banner = [s_ for s_, r_ in _rac.RACCONTI_NEGOZI.items()
+                   if r_.get("banner") is True]
+    prova("il vocabolario: le pagine col banner, poi il catalogo di casa",
+          tuple(_col_banner) + amb["SLUG_SPONSOR"], voc)
+    prova("...e l'ordine di partenza e' quello chiesto da Andrea", True,
+          voc.index("un-tempo-per-te") < voc.index("to-the-moon"))
+    prova("...e una pagina senza banner non si accende", [],
+          [s_ for s_ in voc if s_ in _rac.RACCONTI_NEGOZI
+           and _rac.RACCONTI_NEGOZI[s_].get("banner") is not True])
 
-    def _rileggi(sl, fino):
+    def _rileggi(righe):
         # si riparte a freddo: la cache e' un globale, e la prova
         # deve misurare la LETTURA e non un residuo del caso prima
         amb["_SPONSOR"] = None
         tavola.clear()
-        tavola.update({"sponsor_slug": sl, "sponsor_fino": str(fino)})
-        return amb["sponsor_vivo"]()
+        tavola.update({k: str(v) for k, v in righe.items()})
+
+    def _fino(sl, righe):
+        _rileggi(righe)
+        return amb["sponsor_fino"](sl)
 
     _ora = int(time.time())
-    prova("lo spazio vivo esce", slug_vero, _rileggi(slug_vero, _ora + 60))
-    prova("...e scaduto NON esce", "", _rileggi(slug_vero, _ora - 1))
+    _k = f"sponsor_fino:{slug_vero}"
+    prova("lo spazio vivo esce", _ora + 60, _fino(slug_vero, {_k: _ora + 60}))
+    prova("...e scaduto NON esce", 0, _fino(slug_vero, {_k: _ora - 1}))
     # al filo esatto e' SCADUTO: `fino` e' l'istante di fine, e il
     # confronto e' stretto — la stessa forma di `_asta_viva`, che al
     # filo invece e' viva perche' li' `fino` e' la chiusura
-    prova("...e al secondo esatto e' finito", "", _rileggi(slug_vero, _ora))
+    prova("...e al secondo esatto e' finito", 0, _fino(slug_vero, {_k: _ora}))
     # uno slug scritto a mano e fuori catalogo NON accende niente:
     # fail-closed, il patto di `importo_invoice`
-    prova("uno slug inventato non accende niente", "",
-          _rileggi("un-progetto-mai-visto", _ora + 60))
+    prova("uno slug inventato non accende niente", 0,
+          _fino("un-progetto-mai-visto",
+                {"sponsor_fino:un-progetto-mai-visto": _ora + 60}))
     # e una data storta vale «scaduto», mai «per sempre»
-    prova("...e una data storta vale scaduto", "",
-          _rileggi(slug_vero, "domani"))
-    prova("senza slug non c'e' niente in vetrina", "",
-          _rileggi("", _ora + 60))
-    # la data si legge SOLO quando lo spazio e' vivo, o
-    # `avvisa_scadenza_sponsor` guarderebbe la scadenza di uno spazio
-    # che non c'e' piu' e ribusserebbe per sempre
-    _rileggi(slug_vero, _ora - 1)
-    prova("...e la scadenza di uno spazio spento non si legge", 0,
-          amb["sponsor_fino"]())
+    prova("...e una data storta vale scaduto", 0,
+          _fino(slug_vero, {_k: "domani"}))
+    prova("senza riga non c'e' niente in vetrina", [],
+          (_rileggi({}), amb["sponsor_accesi"]())[1])
+
+    # LA RIGA DI IERI VALE ANCORA, e solo per lo slug che nomina: uno
+    # spazio acceso prima del deploy resta acceso fino alla sua
+    # scadenza, senza che nessuno debba riaccenderlo a mano. Ma una
+    # riga nuova scritta — anche «0», cioe' spento — vince su di lei.
+    _ieri = {"sponsor_slug": slug_vero, "sponsor_fino": _ora + 60}
+    prova("lo spazio acceso ieri resta acceso dopo il deploy", _ora + 60,
+          _fino(slug_vero, _ieri))
+    prova("...e non accende gli altri", [slug_vero],
+          (_rileggi(_ieri), amb["sponsor_accesi"]())[1])
+    prova("...e spento dalla riga nuova resta spento", 0,
+          _fino(slug_vero, dict(_ieri, **{_k: 0})))
+
+    # IL CASO DEL CANTIERE: DUE SPAZI, e la scadenza di uno non tocca
+    # l'altro. Col catalogo vero.
+    _k2 = "sponsor_fino:un-tempo-per-te"
+    _rileggi({_k: _ora + 60, _k2: _ora + 60})
+    prova("due spazi accesi insieme, nell'ordine di partenza",
+          ["un-tempo-per-te", slug_vero], amb["sponsor_accesi"]())
+    _rileggi({_k: _ora - 1, _k2: _ora + 60})
+    prova("...e se scade To The Mooon resta Un tempo per te",
+          ["un-tempo-per-te"], amb["sponsor_accesi"]())
+    _rileggi({_k: _ora + 60, _k2: _ora - 1})
+    prova("...e se scade Un tempo per te resta To The Mooon",
+          [slug_vero], amb["sponsor_accesi"]())
+
+    # L'ORDINE: quelli nominati in testa, gli altri dietro come prima; un
+    # nome che non c'e' piu' si salta, e un doppione conta una volta.
+    _rileggi({"sponsor_ordine": f"{slug_vero},un-tempo-per-te"})
+    prova("l'ordine scelto vince su quello di partenza",
+          [slug_vero, "un-tempo-per-te"], amb["sponsor_ordine"]())
+    _rileggi({"sponsor_ordine": f"mai-visto,{slug_vero},{slug_vero}"})
+    prova("...un nome sparito si salta e un doppione conta una volta",
+          [slug_vero, "un-tempo-per-te"], amb["sponsor_ordine"]())
+    _rileggi({})
+    prova("...e scriverlo mette in testa i nominati",
+          [slug_vero, "un-tempo-per-te"],
+          amb["imposta_ordine_sponsor"]([slug_vero, "mai-visto"]))
+    prova("...scrivendo solo quelli del vocabolario", slug_vero,
+          tavola.get("sponsor_ordine"))
+
+    # ACCENDERE UNO NON TOCCA L'ALTRO, e uno slug inventato non scrive.
+    _rileggi({_k2: _ora + 60})
+    scritte.clear()
+    prova("accendere uno scrive la sua riga e basta",
+          (slug_vero, [(_k, str(_ora + 99))]),
+          (amb["imposta_sponsor"](slug_vero, _ora + 99), scritte[:]))
+    prova("...e l'altro resta com'era", _ora + 60,
+          amb["sponsor_fino"]("un-tempo-per-te"))
+    scritte.clear()
+    prova("uno slug inventato non scrive niente", ("", []),
+          (amb["imposta_sponsor"]("mai-visto", _ora + 99), scritte[:]))
+
+    # ---- 1-bis. LA FILA DELLA BUSTA: la bozza non si vede ------------
+    # Il giudice VERO della busta, col catalogo vero e un database di
+    # cartone che risolve il venditore: acceso non vuol dire visibile —
+    # una pagina del server in BOZZA ha lo spazio acceso (la scadenza
+    # corre) e la sua card non esce, per nessuno.
+    class _Riga(dict):
+        pass
+
+    class _Con:
+        def execute(self, q, par):
+            class _R:
+                def fetchone(_s):
+                    return _Riga(tg_id=par[0], negozio="ab12cd34",
+                                 nome="Luca") if "tg_id=?" in q else None
+            return _R()
+
+    def _busta(righe):
+        _rileggi(righe)
+        return amb["sponsorizzati_pubblici"](_Con())
+
+    _due = {_k: _ora + 60, _k2: _ora + 60}
+    prova("Un tempo per te in bozza: in vetrina resta solo To The Mooon",
+          [{"slug": slug_vero}], _busta(_due))
+    _pub = dict(_due, **{"racconto_pubblicato:un-tempo-per-te": _ora})
+    _cat_utpt = _rac.RACCONTI_NEGOZI["un-tempo-per-te"]
+    prova("...pubblicata: due card, nell'ordine giusto, col codice risolto",
+          [{"slug": "un-tempo-per-te", "titolo": _cat_utpt["titolo"],
+            "emoji": _cat_utpt["emoji"], "negozio": "ab12cd34"},
+           {"slug": slug_vero}], _busta(_pub))
+    prova("...e il tg_id del venditore non esce", False,
+          str(_cat_utpt.get("venditore_tg")) in repr(_busta(_pub)))
+    prova("...e l'ordine scelto vale anche qui",
+          [slug_vero, "un-tempo-per-te"],
+          [x["slug"] for x in _busta(dict(
+              _pub, sponsor_ordine=f"{slug_vero}"))])
+    prova("...e la scadenza di To The Mooon non tocca Un tempo per te",
+          ["un-tempo-per-te"],
+          [x["slug"] for x in _busta(dict(_pub, **{_k: _ora - 1}))])
+    _salvato = _cat_utpt.get("banner")
+    _cat_utpt["banner"] = "si"
+    try:
+        prova("...e senza il banner vero la pagina non si accende", [],
+              [x["slug"] for x in _busta(_pub)
+               if x["slug"] == "un-tempo-per-te"])
+    finally:
+        _cat_utpt["banner"] = _salvato
+
+    class _Rotto:
+        def execute(self, *a):
+            raise RuntimeError("database giu'")
+    _rileggi(_pub)
+    prova("un guasto non rompe la busta: la fila esce vuota", [],
+          amb["sponsorizzati_pubblici"](_Rotto()))
 
     # ...E NESSUNA SCOPA LO SPEGNE, che e' la meta' strutturale del
     # gate: `imposta_sponsor` e' l'unico posto che scrive, e lo
@@ -42059,9 +42269,10 @@ def prove_sponsor():
         _m = re.match(r"(?:async )?def (\w+)\(", _r)
         if _m:
             _fn = _m.group(1)
-        elif "imposta_sponsor(" in _r and _fn != "imposta_sponsor":
+        elif (("imposta_sponsor(" in _r or "imposta_ordine_sponsor(" in _r)
+              and _fn not in ("imposta_sponsor", "imposta_ordine_sponsor")):
             _scrittori.add(_fn)
-    prova("a scrivere lo spazio e' il solo comando del bot",
+    prova("a scrivere lo spazio e il suo ordine e' il solo comando del bot",
           {"comando_sponsor"}, _scrittori)
 
     # ---- 1b. LA DATA, NON I GIORNI RIMASTI ----------------------
@@ -42081,12 +42292,14 @@ def prove_sponsor():
     prova("...e la scrive come un calendario", "01/01/2027 alle 12:30",
           _amb_d["_data_sponsor"](int(_t)))
     _cmd = pezzo("comando_sponsor")
-    prova("lo stato dice la data e non i giorni", (1, 0),
-          (_cmd.count("_data_sponsor(sponsor_fino())"),
-           _cmd.count("_quando_scade(sponsor_fino())")))
-    prova("...e la conferma dice la stessa data", (1, 0),
+    # ⚠️ L'ANCORA E' CAMBIATA coi negozi piu' d'uno (24 set 2026): lo
+    # stato non chiede piu' `sponsor_fino()` dello spazio unico ma la
+    # scadenza di OGNI spazio, nella stessa variabile `fino` della
+    # conferma — quindi le date sono due (lo stato di ognuno e la
+    # conferma) e le formule relative nessuna.
+    prova("lo stato e la conferma dicono la data e non i giorni", (2, 0),
           (_cmd.count("_data_sponsor(fino)"),
-           _cmd.count("_quando_scade(fino)")))
+           _cmd.count("_quando_scade(")))
     _pre = pezzo("avvisa_scadenza_sponsor")
     prova("il preavviso resta relativo", (2, 0),
           (_pre.count("_quando_scade(fino)"),
@@ -42103,8 +42316,11 @@ def prove_sponsor():
         n.value for nome in ("comando_sponsor", "avvisa_scadenza_sponsor")
         for n in _ast.walk(_ast.parse(pezzo(nome)))
         if isinstance(n, _ast.Constant) and isinstance(n.value, str))
+    # ⚠️ QUATTRO E NON TRE dai negozi piu' d'uno (24 set 2026): c'e' un
+    # messaggio in piu', quello che spegne UN solo spazio — e anche lui
+    # deve dire che la storia e il posto fra i Consigliati restano.
     prova("i messaggi dello spazio dicono che storia e Consigliati restano",
-          (3, False, False, False),
+          (4, False, False, False),
           (_testi.count("posto fra i Consigliati restano"),
            "racconto in cima" in _testi, "quello di sempre" in _testi,
            "banner del venditore" in _testi))
@@ -42709,7 +42925,8 @@ def prove_sponsor():
           _rnz.index("bannerNegozio") < _rnz.index("raccontoNegozio"))
     prova("il banner non guarda il racconto", False,
           "raccontoAperto" in _rnz.split("bannerNegozio")[0][-400:]
-          or "sponsorVivo" in _rnz.split("bannerNegozio")[0][-400:])
+          or "sponsorVivo" in _rnz.split("bannerNegozio")[0][-400:]
+          or "sponsorizzati" in _rnz.split("bannerNegozio")[0][-400:])
 
     # ---- 9. IL RACCONTO E' LEGATO AL NEGOZIO GIUSTO -------------
     # Fail-closed: senza codice negozio non nasce niente — meglio
@@ -42769,7 +42986,7 @@ def prove_racconto_girato():
 
     # `esc` VERO e non uno stub: uno stub proverebbe se' stesso, e la
     # mutazione che lascia il testo nudo passerebbe liscia.
-    pezzi = ("let raccontoAperto = false, sponsorVivo = '';\n"
+    pezzi = ("let raccontoAperto = false, sponsorizzati = [];\n"
              + pezzo_js(mini, "const esc = ", "\nconst el =") + "\n"
              + _fetta("const RACCONTI = {", "\n};")
              # ⚠️ IL GIUDICE VA MONTATO col renderer, che dall'ago 2026
@@ -42819,17 +43036,17 @@ const altro = {negozio: 'ff99ee88'};
 // cartella — lo slug prima lo prestava lo spazio vivo, e a spazio
 // spento le foto sarebbero uscite senza nome.
 RACCONTI[slug].negozio = 'ab12cd34';
-sponsorVivo = '';
+sponsorizzati = [];
 const r = raccontoNegozio(mio);
 dice('a spazio in vetrina spento il negozio consigliato ha la sua storia',
      true, r.length > 200);
 dice('...con le foto dalla sua cartella', [true, false],
      [r.includes('/assets/racconti/' + slug + '-cop.webp'),
       r.includes('/assets/racconti/-')]);
-sponsorVivo = slug;
+sponsorizzati = [{slug}];
 dice('...e a spazio acceso la stessa, parola per parola', true,
      raccontoNegozio(mio) === r);
-sponsorVivo = '';
+sponsorizzati = [];
 
 // 2. TOLTO A MANO: `consigliato: false` spegne la storia, e la leva
 // vuole il vero booleano — una stringa non accende niente.
@@ -43271,7 +43488,7 @@ def prove_racconti_bozza():
         j = mini.index(fine, i)
         return mini[i:j + len(fine)]
 
-    js = ("let raccontoAperto = false, sponsorVivo = '';\n"
+    js = ("let raccontoAperto = false, sponsorizzati = [];\n"
           + "let admRacconti = [];\n"
           + pezzo_js(mini, "const esc = ", "\nconst el =") + "\n"
           + _fetta("const RACCONTI = {", "\n};") + "\n"
@@ -43409,7 +43626,7 @@ for (const slug of Object.keys(CAT)) {
 // server il giudice ricade su di lui, pastiglia 📣 — a spazio in
 // vetrina SPENTO, che dal set 2026 la storia non la decide piu'
 const s0 = Object.keys(RACCONTI)[0];
-sponsorVivo = '';
+sponsorizzati = [];
 RACCONTI[s0].negozio = 'cc11dd22';
 const tm = raccontoNegozio({negozio: 'cc11dd22'});
 dice('il negozio consigliato esce ancora dal catalogo di casa', true,
@@ -85067,7 +85284,7 @@ def prove_punti_barattolo():
     Le quattro righe che questa famiglia difende, e sono quelle che un
     riordino toglierebbe per prime:
     · il GATE E' IN LETTURA — nessuna scopa spegne niente, il patto di
-      `sponsor_vivo` e di `in_ferie`: spegnere un punto lo toglie
+      `sponsor_fino` e di `in_ferie`: spegnere un punto lo toglie
       dall'elenco all'istante e non tocca gli ordini gia' nati;
     · FAIL-CLOSED sul catalogo, in tutti e tre i posti (l'id scritto a
       mano sul VPS, il punto spento al momento dell'acquisto, il
@@ -94051,7 +94268,8 @@ def _consigliati_giudice(src, mini, _pz):
 
     # ...E VIAGGIA NELLA BUSTA DI PRIMA PAGINA, accanto allo sponsor: la
     # card deve nascere col primo disegno della fila
-    _i_sp = src.find('risposta["sponsor"] = sponsor_vivo(_ora)')
+    _i_sp = src.find(
+        'risposta["sponsorizzati"] = sponsorizzati_pubblici(con, _ora)')
     _i_co = src.find('risposta["consigliati"] = consigliati_pubblici(con)')
     _i_pi = src.find('risposta["pionieri"] = conta_pionieri(con)')
     prova("la lista viaggia nella busta di prima pagina, accanto allo "
@@ -94300,10 +94518,12 @@ def _consigliati_porte(src, mini, _pz):
     # piu', nel CODICE — la prosa che racconta il rovescio lo puo' nominare
     prova("il giudice della lista e quello della storia non guardano lo "
           "spazio in vetrina", (False, False),
-          ("sponsorVivo" in _senza_commenti_js(
-              _pz(mini, "function consigliatiPubblicati(){", "\n}\n")),
-           "sponsorVivo" in _senza_commenti_js(
-              _pz(mini, "function raccontoDi(v){", "\n}\n"))))
+          (any(x in _senza_commenti_js(
+              _pz(mini, "function consigliatiPubblicati(){", "\n}\n"))
+               for x in ("sponsorVivo", "sponsorizzati", "vociSponsor")),
+           any(x in _senza_commenti_js(
+              _pz(mini, "function raccontoDi(v){", "\n}\n"))
+               for x in ("sponsorVivo", "sponsorizzati", "vociSponsor"))))
     _js = _senza_commenti_js(mini[mini.find("</style>"):]
                              .replace("image/*", "image/STELLA"))
     prova("la lista del server ha due scrittori soli: la nascita e la "
@@ -94477,7 +94697,7 @@ function clearInterval(id){ timer.delete(id); }
 function setTimeout(){ return 0; }
 let DEMO = false, VETRINA = false, datiVivi = true, conteggiServer = {};
 let myTgId = 111, activeCat = 'Tutto', vistaBarattolo = false;
-let sponsorVivo = '', consigliatiServer = [];
+let sponsorizzati = [], consigliatiServer = [];
 let ridotti = false, premutaFatta = false;
 const effettiRidotti = () => ridotti;
 const ordineSfoglia = () => ['Bitcoin', 'Libri e media'];
@@ -94508,7 +94728,7 @@ function dice(che, atteso, avuto){
    To The Mooon si rimette com'e' nel catalogo VERO: i casi la toccano */
 const TTM0 = JSON.stringify(RACCONTI['to-the-moon']);
 function caso(nome, f){
-  sponsorVivo = ''; consigliatiServer = []; ridotti = false;
+  sponsorizzati = []; consigliatiServer = []; ridotti = false;
   RACCONTI['to-the-moon'] = JSON.parse(TTM0);
   homeAttiva = true; document.hidden = false; DEMO = false; myTgId = 111;
   premutaFatta = false; richieste = []; scritte = [];
@@ -94706,10 +94926,10 @@ caso('la fila segue la busta', () => {
    scaduto la card se ne va»): acceso o spento, To The Mooon resta fra i
    Consigliati, e quando scade la fila non si ridisegna nemmeno. */
 caso('lo spazio non decide', () => {
-  sponsorVivo = 'to-the-moon';
+  sponsorizzati = [{slug: 'to-the-moon'}];
   rifai();
   const prima = nodi['catStrip'].innerHTML;
-  sponsorVivo = ''; renderStriscia();
+  sponsorizzati = []; renderStriscia();
   dice('allo spazio scaduto la card resta, e la fila non si tocca',
        [true, true], [ordine().includes('/consigliati'),
                       nodi['catStrip'].innerHTML === prima]);
@@ -94719,10 +94939,10 @@ caso('le fonti', () => {
   const casa = () => consigliatiPubblicati().map(v => v.slug);
   dice('il negozio consigliato del catalogo entra a spazio in vetrina spento',
        ['to-the-moon'], casa());
-  sponsorVivo = 'to-the-moon';
+  sponsorizzati = [{slug: 'to-the-moon'}];
   dice('...e acceso uguale: lo spazio decide solo Da scoprire',
        ['to-the-moon'], casa());
-  sponsorVivo = '';
+  sponsorizzati = [];
   RACCONTI['to-the-moon'].consigliato = false;
   dice('TOLTO A MANO non entra', [], casa());
   RACCONTI['to-the-moon'].consigliato = 'true';

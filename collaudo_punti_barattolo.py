@@ -21,7 +21,7 @@ Le domande a cui risponde, e sono quelle su cui il commit si regge:
     davvero — mono e carrello, uno per uno;
   · IL GATE E' IN LETTURA: a punti spenti «Barattolo» non esce dalle
     reti di nessun venditore, e accendendo esce all'istante — nessuna
-    scopa, nessun orologio, il patto di `sponsor_vivo`;
+    scopa, nessun orologio, il patto di `sponsor_fino`;
   · IL FAIL-CLOSED in tutti e tre i posti: l'id fuori catalogo, il
     punto spento al momento dell'acquisto, il codice negozio che non
     risolve. Meglio nessun punto che uno che porta al vuoto;

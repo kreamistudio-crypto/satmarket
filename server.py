@@ -1821,74 +1821,177 @@ def imposta_canale(valore: str) -> str:
 # ogni sponsor nuovo e' un deploy, che con «uno alla volta» e' la
 # stessa scaletta di `assets/scoprire/`.
 #
-# SLUG_SPONSOR e' il vocabolario, gemello di `FILE_SCOPRIRE`: lo slug
-# arriva dal bot e finisce in una riga che il client poi cerca nel suo
-# catalogo, quindi un nome inventato non deve poterci entrare. A
-# tenerlo in pari col client c'e' `prove.py` — il patto di
-# EMOJI_CATEGORIA/EMOJI_CAT.
+# SLUG_SPONSOR e' il vocabolario DEL CATALOGO DI CASA, gemello di
+# `FILE_SCOPRIRE`: lo slug arriva dal bot e finisce in una riga che il
+# client poi cerca nel suo catalogo, quindi un nome inventato non deve
+# poterci entrare. A tenerlo in pari col client c'e' `prove.py` — il
+# patto di EMOJI_CATEGORIA/EMOJI_CAT.
+#
+# ⚠️ PIU' NEGOZI INSIEME (24 set 2026, decisione di Andrea): «uno alla
+# volta» era la tappa, e la tappa e' finita. Ogni negozio ha il SUO
+# spazio — acceso, spento, la sua scadenza — e le card stanno in fila
+# nell'ordine deciso da noi. Il vocabolario e' la somma di DUE
+# cataloghi, che restano due: le pagine del server (`racconti.py`) che
+# hanno il loro `banner`, e questo. Uno slug non sta mai in tutt'e due
+# (lo tiene una prova di prove_racconti_bozza), quindi ogni spazio ha
+# una leva sola.
+# LO STATO E' UNA RIGA PER NEGOZIO, `sponsor_fino:<slug>` (l'istante in
+# cui scade, 0 = spento), piu' l'ordine delle card, `sponsor_ordine`.
+# Le due righe di ieri (`sponsor_slug` + `sponsor_fino`) si leggono
+# ancora, e solo per lo slug che nominano, finche' la sua riga nuova
+# non c'e': uno spazio acceso prima del deploy resta acceso fino alla
+# sua scadenza, senza che nessuno debba riaccenderlo a mano. Nessuno
+# le scrive piu'.
 SLUG_SPONSOR = ("to-the-moon",)
 
-_SPONSOR = None     # None = mai letto; (slug, fino) = quel che vale
+_SPONSOR = None     # None = mai letto; {"fino": {slug: fino}, "ordine": [...]}
 
 
-def _sponsor_righe() -> tuple:
-    """Le due righe di `impostazioni`, con la cache. Si tengono INSIEME
-    perche' si scrivono insieme e nessuna delle due vuol dire niente da
-    sola: uno slug senza scadenza sarebbe per sempre, una scadenza
-    senza slug non sponsorizza nessuno."""
+def slug_sponsorizzabili() -> tuple:
+    """IL VOCABOLARIO DEGLI SPAZI, nell'ordine di partenza delle card: le
+    pagine del server che hanno il loro banner (il disegno della card
+    con il nome dentro, in `assets/scoprire/<slug>.webp`), poi il
+    catalogo di casa. Una pagina senza banner non si puo' accendere: la
+    card sarebbe una riserva con l'emoji, e lo spazio si vende col suo
+    disegno. L'ordine vero lo decide `sponsor_ordine`."""
+    return tuple(s for s, r in RACCONTI_NEGOZI.items()
+                 if r.get("banner") is True
+                 and s not in SLUG_SPONSOR) + SLUG_SPONSOR
+
+
+def _sponsor_righe() -> dict:
+    """Le righe di `impostazioni`, con la cache: la scadenza di ogni
+    spazio e l'ordine scelto. LA CACHE TIENE I VALORI, MAI IL VERDETTO:
+    la scadenza si confronta a ogni chiamata, o il giudizio resterebbe
+    quello del primo avvio.
+    Una riga vuota vuol dire «mai scritta»: lo spazio di ieri, se era
+    il suo. Una riga scritta a mano e storta vale «scaduto», mai «per
+    sempre»."""
     global _SPONSOR
     if _SPONSOR is None:
         try:
-            fino = int(impostazione("sponsor_fino", "0") or 0)
+            fino_ieri = int(impostazione("sponsor_fino", "0") or 0)
         except ValueError:
-            fino = 0        # scritta a mano e storta: vale «scaduto»
-        _SPONSOR = (impostazione("sponsor_slug", ""), fino)
+            fino_ieri = 0
+        slug_ieri = impostazione("sponsor_slug", "")
+        fino = {}
+        for s in slug_sponsorizzabili():
+            riga = impostazione(f"sponsor_fino:{s}", "")
+            if riga == "":
+                fino[s] = fino_ieri if s == slug_ieri else 0
+                continue
+            try:
+                fino[s] = int(riga)
+            except ValueError:
+                fino[s] = 0
+        ordine = [x for x in (impostazione("sponsor_ordine", "")
+                              or "").split(",") if x]
+        _SPONSOR = {"fino": fino, "ordine": ordine}
     return _SPONSOR
 
 
-def sponsor_vivo(adesso: int | None = None) -> str:
-    """LO SLUG VIVO, o '' — ed e' un GATE IN LETTURA e non un
-    interruttore che qualcuno spegne: il pattern di `in_ferie` e delle
-    lampo, «la lettura gatea su scadenza, l'orologio fa solo pulizia».
-    Alla scadenza la card sparisce da «Da scoprire» — SENZA che giri
-    niente, e quindi anche a server fermo per una settimana.
+def sponsor_ordine() -> list:
+    """TUTTI gli spazi, accesi o no, nell'ordine delle card: prima quelli
+    che `/sponsor ordine` ha nominato, nell'ordine in cui li ha nominati,
+    poi gli altri nell'ordine del vocabolario. Uno slug dell'ordine che
+    non e' piu' nel vocabolario si salta in silenzio: l'ordine dice
+    DOVE, mai SE."""
+    voc = slug_sponsorizzabili()
+    scelti = list(dict.fromkeys(
+        s for s in _sponsor_righe()["ordine"] if s in voc))
+    return scelti + [s for s in voc if s not in scelti]
+
+
+def sponsor_fino(slug: str, adesso: int | None = None) -> int:
+    """FINO A QUANDO E' ACCESO QUELLO SPAZIO, 0 se e' spento o scaduto —
+    ed e' un GATE IN LETTURA e non un interruttore che qualcuno spegne:
+    il pattern di `in_ferie` e delle lampo, «la lettura gatea su
+    scadenza, l'orologio fa solo pulizia». Alla scadenza la card
+    sparisce da «Da scoprire» — SENZA che giri niente, e quindi anche a
+    server fermo per una settimana. Ognuno scade per conto suo: la
+    scadenza di uno non tocca l'altro.
     ⚠️ E SPARISCE SOLO LEI (set 2026, decisione di Andrea): la storia in
-    cima al negozio e il posto fra i Consigliati non seguono piu' lo
-    spazio, li decide `consigliato` nel catalogo `RACCONTI` del client.
+    cima al negozio e il posto fra i Consigliati non seguono lo spazio.
 
-    LA CACHE TIENE I DUE VALORI, MAI IL VERDETTO: la scadenza si
-    confronta a ogni chiamata, o il giudizio resterebbe quello del
-    primo avvio. Al filo esatto e' ancora vivo, come `_asta_viva` e
-    `in_ferie`.
-
-    Fail-closed su uno slug fuori catalogo: una riga scritta a mano e
+    Al secondo esatto e' finito: `fino` e' l'istante di fine.
+    Fail-closed su uno slug fuori vocabolario: una riga scritta a mano e
     storta non deve poter mandare il client a cercare un racconto che
     non ha — meglio nessuno sponsor che una card che porta al vuoto."""
-    slug, fino = _sponsor_righe()
-    if not slug or slug not in SLUG_SPONSOR:
-        return ""
-    return slug if fino > (adesso if adesso is not None else int(time.time())) else ""
+    if slug not in slug_sponsorizzabili():
+        return 0
+    f = _sponsor_righe()["fino"].get(slug, 0)
+    return f if f > (adesso if adesso is not None else int(time.time())) else 0
 
 
-def sponsor_fino() -> int:
-    """Quando scade quello vivo (0 = non c'e'). Serve al promemoria e
-    al comando del bot, mai al client: a lui basta lo slug."""
-    return _sponsor_righe()[1] if sponsor_vivo() else 0
+def sponsor_accesi(adesso: int | None = None) -> list:
+    """Gli spazi accesi adesso, nell'ordine delle card. ACCESO NON VUOL
+    DIRE VISIBILE: una pagina del server in bozza e' accesa — la
+    scadenza corre — e non si vede finche' non la si pubblica. Chi la
+    mostra e' `sponsorizzati_pubblici`."""
+    return [s for s in sponsor_ordine() if sponsor_fino(s, adesso)]
+
+
+def sponsorizzati_pubblici(con, adesso: int | None = None) -> list:
+    """LE CARD DELLO SPAZIO IN VETRINA, per chiunque apra la home: gli
+    spazi accesi, nell'ordine deciso, che si possono anche VEDERE.
+
+    Per il catalogo di casa esce lo SLUG e basta: il titolo, il codice
+    negozio e il racconto stanno gia' nel client, e da questa parte non
+    ne esiste una riga.
+    Per una pagina del server la card compare SOLO SE LA PAGINA E'
+    PUBBLICATA col suo banner — il giudice e' `_banner_consigliato`, lo
+    stesso che serve il file: la card c'e' quando c'e' la sua immagine —
+    e col negozio risolto. Escono quattro chiavi: lo slug, il titolo,
+    l'emoji e il CODICE del negozio, mai il tg_id con cui il catalogo
+    puo' legare la pagina (il patto dei CAMPI_RACCONTO). In bozza non
+    esce niente, per nessuno: questa busta la riceve chiunque.
+
+    Fail-closed anche sul guasto: un ornamento della home non deve poter
+    rompere la vetrina, e senza lista la fila resta quella di sempre."""
+    fuori = []
+    try:
+        for s in sponsor_accesi(adesso):
+            if s in SLUG_SPONSOR:
+                fuori.append({"slug": s})
+                continue
+            if not _banner_consigliato(s + ".webp"):
+                continue
+            r = RACCONTI_NEGOZI[s]
+            v = _venditore_racconto(con, r)
+            if not (v and v["negozio"]):
+                continue
+            fuori.append({"slug": s, "titolo": r.get("titolo") or "",
+                          "emoji": r.get("emoji") or "",
+                          "negozio": v["negozio"]})
+    except Exception as e:
+        print(f"⚠️ [sponsor] la fila non si legge: {e}")
+        return []
+    return fuori
 
 
 def imposta_sponsor(slug: str, fino: int) -> str:
-    """Accende (o spegne, con slug vuoto) lo spazio e riallinea la
-    cache. Il vuoto E' lo spegnimento, come in `imposta_canale_vetrina`
-    e per la stessa ragione: non esiste nessun altro posto dove quello
-    spazio debba andare."""
+    """Accende (o spegne, con `fino` 0) lo spazio di UN negozio e
+    riallinea la cache. Gli altri non si toccano. Uno slug fuori
+    vocabolario non scrive niente e torna vuoto."""
     global _SPONSOR
     slug = (slug or "").strip().lower()
-    if slug not in SLUG_SPONSOR:
-        slug, fino = "", 0
-    scrivi_impostazione("sponsor_slug", slug)
-    scrivi_impostazione("sponsor_fino", str(int(fino)))
-    _SPONSOR = (slug, int(fino))
+    if slug not in slug_sponsorizzabili():
+        return ""
+    scrivi_impostazione(f"sponsor_fino:{slug}", str(max(0, int(fino))))
+    _SPONSOR = None
     return slug
+
+
+def imposta_ordine_sponsor(slugs) -> list:
+    """L'ORDINE DELLE CARD: gli slug nominati vanno in testa, in
+    quell'ordine; quelli non nominati seguono come prima. Scrive solo
+    quelli del vocabolario, una volta sola ciascuno."""
+    global _SPONSOR
+    voc = slug_sponsorizzabili()
+    scelti = list(dict.fromkeys(s for s in slugs if s in voc))
+    scrivi_impostazione("sponsor_ordine", ",".join(scelti))
+    _SPONSOR = None
+    return sponsor_ordine()
 
 
 # ======== LE PAGINE DEI NEGOZI CONSIGLIATI, IN BOZZA (set 2026) ========
@@ -1937,7 +2040,7 @@ def racconto_stato(slug: str) -> str:
     """«pubblicato» o «bozza». BOZZA e' anche il verdetto su una riga
     che non si sa leggere — assente, vuota o scritta a mano storta: il
     dubbio non pubblica niente (fail-closed, il patto di
-    `sponsor_vivo`)."""
+    `sponsor_fino`)."""
     try:
         quando = int(impostazione(f"racconto_pubblicato:{slug}", "") or 0)
     except ValueError:
@@ -14438,62 +14541,120 @@ def aperture_sponsor(slug: str, giorni: int = 30) -> int:
 
 
 async def comando_sponsor(mittente: dict, testo: str):
-    """`/sponsor` — lo spazio raccontato in vetrina. Solo admin.
+    """`/sponsor` — gli spazi raccontati in vetrina. Solo admin.
 
     E' il terzo della famiglia di `/canale` e `/vetrina`: uno slug e
     una data non accendono niente che muova denaro, e sbagliarli si
     vede subito in home — per questo vivono in `impostazioni` e si
     cambiano da qui invece che dal config del VPS.
 
-    LO SLUG SI VALIDA CONTRO IL CATALOGO, e non e' pignoleria: quel
-    nome finisce in una colonna e il client ci cerca dentro il suo
+    PIU' NEGOZI INSIEME (24 set 2026): ogni negozio ha il SUO spazio, e
+    le forme sono cinque —
+      `/sponsor`                      lo stato di tutti, nell'ordine
+      `/sponsor <slug> 30`            accende (o rinnova) quello
+      `/sponsor <slug> spento`        spegne quello, gli altri restano
+      `/sponsor spento`               li spegne tutti, subito
+      `/sponsor ordine <slug> <slug>` l'ordine delle card
+    e le scadenze e i messaggi di prima valgono per ognuno.
+
+    LO SLUG SI VALIDA CONTRO IL VOCABOLARIO, e non e' pignoleria: quel
+    nome finisce in una riga e il client ci cerca dentro il suo
     racconto — uno inventato spegnerebbe lo spazio in silenzio invece
     di dire di no. Il patto di `TIMBRI_SUGGERIMENTO`.
 
     NON SI PROVA NIENTE PRIMA DI CREDERCI, al contrario di `/canale`:
     li' si scrive in una chat di qualcun altro e l'unico modo di
     sapere se il bot ci arriva e' provare, qui il racconto e' markup
-    NOSTRO gia' committato — se lo slug e' in catalogo, c'e'."""
+    NOSTRO gia' committato — se lo slug e' in catalogo, c'e'. L'unica
+    cosa che si DICE e' la pagina del server ancora in bozza: lo spazio
+    si accende lo stesso (la scadenza corre), ma la card compare solo
+    quando la pagina e' pubblicata."""
     chat = mittente["id"]
     if not e_admin_bot(mittente):
         return await _comando_sconosciuto(chat)
     pezzi = testo.split()
     arg = pezzi[1].strip().lower() if len(pezzi) > 1 else ""
+    voc = slug_sponsorizzabili()
+
+    def in_bozza(s):
+        return s in RACCONTI_NEGOZI and racconto_stato(s) != "pubblicato"
+
     if not arg:
-        vivo = sponsor_vivo()
-        if vivo:
-            resta = max(0, (sponsor_fino() - int(time.time())) // 86400)
-            # LA DATA COMANDA E I GIORNI SONO L'INCISO (decisione di
-            # Andrea): questa riga si confronta col calendario, e un
-            # «ancora 47 giorni» costringe a fare il conto a mano.
-            stato = (f"In vetrina: <b>{vivo}</b>, fino al "
-                     f"<b>{_data_sponsor(sponsor_fino())}</b> "
-                     f"(fra {resta} giorni).\n"
-                     f"Aperture negli ultimi 30 giorni: "
-                     f"<b>{aperture_sponsor(vivo)}</b>.")
-        else:
-            stato = "Nessuno spazio in vetrina adesso."
-        voci = "\n".join(f"<code>/sponsor {s} 30</code>"
-                          for s in SLUG_SPONSOR)
+        righe = []
+        for k, s in enumerate(sponsor_ordine(), 1):
+            fino = sponsor_fino(s)
+            if fino:
+                resta = max(0, (fino - int(time.time())) // 86400)
+                # LA DATA COMANDA E I GIORNI SONO L'INCISO (decisione di
+                # Andrea): questa riga si confronta col calendario, e un
+                # «ancora 47 giorni» costringe a fare il conto a mano.
+                riga = (f"{k}. <b>{s}</b> — in vetrina fino al "
+                        f"<b>{_data_sponsor(fino)}</b> (fra {resta} "
+                        f"giorni), aperture negli ultimi 30 giorni: "
+                        f"<b>{aperture_sponsor(s)}</b>")
+            else:
+                riga = f"{k}. <b>{s}</b> — spento"
+            if in_bozza(s):
+                riga += "\n    ⚠️ pagina in bozza: la card non si vede"
+            righe.append(riga)
+        primo = voc[0] if voc else "slug"
         return await bot_api("sendMessage", {"chat_id": chat,
-            "text": f"📣 <b>Spazio in vetrina</b>\n{stato}\n\n{voci}\n"
-                    "<code>/sponsor spento</code> — lo toglie subito.\n\n"
+            "text": "📣 <b>Spazi in vetrina</b>, nell'ordine delle card "
+                    "in «Da scoprire»:\n" + "\n".join(righe) + "\n\n"
+                    f"<code>/sponsor {primo} 30</code> — accende (o "
+                    "rinnova) per 30 giorni\n"
+                    f"<code>/sponsor {primo} spento</code> — spegne quello\n"
+                    "<code>/sponsor spento</code> — li spegne tutti\n"
+                    "<code>/sponsor ordine "
+                    + " ".join(reversed(sponsor_ordine()))
+                    + "</code> — cambia l'ordine\n\n"
                     "Alla scadenza sparisce da sola la card in «Da "
-                    "scoprire»: la storia in cima al negozio e il "
-                    "posto fra i Consigliati restano.",
+                    "scoprire» di quello spazio: la storia in cima al "
+                    "negozio e il posto fra i Consigliati restano.",
             "parse_mode": "HTML", "reply_markup": tastiera_bot()})
     if arg in ("spento", "no", "off"):
-        imposta_sponsor("", 0)
-        await notifica_admin(f"📣 Spazio in vetrina tolto (da tg {chat})")
+        for s in voc:
+            imposta_sponsor(s, 0)
+        await notifica_admin(f"📣 Spazi in vetrina tolti tutti (da tg {chat})")
         return await bot_api("sendMessage", {"chat_id": chat,
-            "text": "✅ Tolto. La card in «Da scoprire» non c'e' piu'; "
-                    "la storia del negozio e il suo posto fra i "
-                    "Consigliati restano.",
+            "text": "✅ Tolti tutti. In «Da scoprire» non c'e' piu' nessuna "
+                    "card sponsorizzata; la storia dei negozi e il loro "
+                    "posto fra i Consigliati restano.",
             "reply_markup": tastiera_bot()})
-    if arg not in SLUG_SPONSOR:
+    if arg == "ordine":
+        nomi = [p.strip().lower() for p in pezzi[2:]]
+        ignoti = [n for n in nomi if n not in voc]
+        if not nomi or ignoti:
+            return await bot_api("sendMessage", {"chat_id": chat,
+                "text": (f"Non conosco «{html.escape(', '.join(ignoti))}». "
+                         if ignoti else "Scrivi gli spazi nell'ordine. ")
+                        + "Esempio: <code>/sponsor ordine "
+                        + " ".join(sponsor_ordine()) + "</code>",
+                "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+        ordine = imposta_ordine_sponsor(nomi)
+        await notifica_admin(f"📣 Ordine degli spazi in vetrina: "
+                             f"{', '.join(ordine)} (da tg {chat})")
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": "✅ L'ordine delle card in «Da scoprire» adesso e':\n"
+                    + "\n".join(f"{k}. <b>{s}</b>"
+                                for k, s in enumerate(ordine, 1))
+                    + "\nConta per quelli accesi; gli spenti tengono il "
+                      "loro posto per quando li riaccendi.",
+            "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+    if arg not in voc:
         return await bot_api("sendMessage", {"chat_id": chat,
             "text": f"Non conosco «{html.escape(arg)}». Quelli che ci sono: "
-                    + ", ".join(SLUG_SPONSOR) + ".",
+                    + ", ".join(voc) + ".",
+            "parse_mode": "HTML", "reply_markup": tastiera_bot()})
+    if len(pezzi) > 2 and pezzi[2].strip().lower() in ("spento", "no", "off"):
+        imposta_sponsor(arg, 0)
+        await notifica_admin(f"📣 Spazio in vetrina tolto: {arg} "
+                             f"(da tg {chat})")
+        return await bot_api("sendMessage", {"chat_id": chat,
+            "text": f"✅ <b>{arg}</b> tolto. La sua card in «Da scoprire» "
+                    "non c'e' piu', gli altri spazi restano come sono; la "
+                    "storia del negozio e il suo posto fra i Consigliati "
+                    "restano.",
             "parse_mode": "HTML", "reply_markup": tastiera_bot()})
     try:
         giorni = int(pezzi[2]) if len(pezzi) > 2 else 7
@@ -14508,11 +14669,17 @@ async def comando_sponsor(mittente: dict, testo: str):
     imposta_sponsor(arg, fino)
     await notifica_admin(f"📣 Spazio in vetrina: {arg} per {giorni} "
                          f"giorni (da tg {chat})")
+    posto = sponsor_accesi().index(arg) + 1
     await bot_api("sendMessage", {"chat_id": chat,
         "text": f"✅ <b>{arg}</b> e' in vetrina per <b>{giorni}</b> "
                 f"giorni, fino al <b>{_data_sponsor(fino)}</b>.\n"
-                "La card e' in testa a «Da scoprire» e porta al suo "
-                "negozio, con la storia aperta.",
+                f"La sua card sta in «Da scoprire», la numero {posto} fra "
+                "gli spazi accesi, e porta al suo negozio con la storia "
+                "aperta."
+                + ("\n\n⚠️ La sua pagina e' ancora IN BOZZA: la card "
+                   "compare quando la pubblichi dal pannello, e la "
+                   "scadenza corre gia' da adesso."
+                   if in_bozza(arg) else ""),
         "parse_mode": "HTML", "reply_markup": tastiera_bot()})
 
 
@@ -17894,7 +18061,7 @@ def _punti_accesi() -> tuple:
     Coi pipe ai bordi come `avvisi_ricerca.categorie`, e FILTRATI
     contro il catalogo: un id scritto a mano sul VPS - o rimasto da un
     punto che il catalogo non ha piu' - non deve poter accendere
-    niente. Fail-closed come `sponsor_vivo`: meglio nessun punto che
+    niente. Fail-closed come `sponsor_fino`: meglio nessun punto che
     uno che porta al vuoto."""
     global _PUNTI
     if _PUNTI is None:
@@ -17907,7 +18074,7 @@ def punti_barattolo_vivi() -> list:
     """I punti accesi, nell'ordine del catalogo.
 
     E' un GATE IN LETTURA e non un interruttore che qualcuno spegne -
-    il pattern di `sponsor_vivo` e di `in_ferie`: spegnere un punto lo
+    il pattern di `sponsor_fino` e di `in_ferie`: spegnere un punto lo
     toglie dall'elenco all'istante, senza che giri nessuna scopa e
     senza toccare gli ordini gia' nati, che il loro punto ce l'hanno
     scritto in colonna."""
@@ -19422,15 +19589,20 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
                 "SELECT 1 FROM annunci a WHERE a.stato='attivo'"
                 + _w + " LIMIT 1", _wp).fetchone() else 0
         risposta["occasioni"] = occ
-        # LO SPAZIO SPONSORIZZATO (ago 2026): lo SLUG di chi e' vivo,
-        # o '' — e viaggia qui accanto alle occasioni per la stessa
+        # LO SPAZIO SPONSORIZZATO (ago 2026): le card di chi e' in
+        # vetrina, e viaggiano qui accanto alle occasioni per la stessa
         # ragione, che questa risposta il client la chiede gia' e una
         # card in home non merita un giro di rete suo. Il testo del
-        # racconto NON passa da qui: sta nel catalogo del client, e da
-        # questa parte non ne esiste una riga. La chiave assente (un
-        # server di ieri) = nessuno sponsor, cioe' un'assenza e mai una
-        # bugia.
-        risposta["sponsor"] = sponsor_vivo(_ora)
+        # racconto NON passa da qui.
+        # ⚠️ PIU' NEGOZI INSIEME (24 set 2026): era lo SLUG di uno solo
+        # (`sponsor`), adesso e' la FILA nell'ordine deciso — per il
+        # catalogo di casa lo slug, per le pagine del server anche
+        # titolo, emoji e codice negozio, e solo pubblicate (vedi il
+        # giudice). La chiave vecchia non esce piu': la legge solo un
+        # client di ieri, e a lui manca una card finche' non ricarica.
+        # La chiave assente (un server di ieri) = nessuno sponsor, cioe'
+        # un'assenza e mai una bugia.
+        risposta["sponsorizzati"] = sponsorizzati_pubblici(con, _ora)
         # ...E I NEGOZI CONSIGLIATI PUBBLICATI (set 2026), per la card
         # «Consigliati» della fila delle categorie e per la sua pagina:
         # nella busta e non in un giro di rete loro, per la ragione dello
@@ -20399,10 +20571,13 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     # in arrivo), e stringerlo vorrebbe dire tenere qui anche il codice
     # negozio dello sponsor — una terza chiave da mantenere in pari per
     # una difesa che dal negozio giusto non reggerebbe comunque.
+    # ⚠️ PIU' NEGOZI INSIEME (24 set 2026): `da` porta lo slug —
+    # «sponsor:<slug>» — perche' con due spazi accesi il solo «sponsor»
+    # non direbbe QUALE si e' aperto. Si conta solo se QUELLO e' acceso.
     # Fail-open: un contatore non deve poter rompere una pagina.
-    if da == "sponsor":
-        _sp = sponsor_vivo()
-        if _sp:
+    if da.startswith("sponsor:"):
+        _sp = da[len("sponsor:"):]
+        if _sp in sponsor_accesi():
             try:
                 con.execute(
                     "INSERT INTO sponsor_aperture(slug, giorno, quante) "
@@ -55053,39 +55228,49 @@ TIMBRO_SPONSOR = "sponsor_scadenza"
 
 async def avvisa_scadenza_sponsor():
     """«Fra tre giorni lo spazio in vetrina scade»: UNA notifica ai
-    moderatori, cosi' la scadenza non arriva di sorpresa e c'e' il
-    tempo di rinnovare o di avvisare chi l'ha comprato.
+    moderatori PER OGNI SPAZIO, cosi' la scadenza non arriva di sorpresa
+    e c'e' il tempo di rinnovare o di avvisare chi l'ha comprato. Da
+    quando i negozi in vetrina sono piu' d'uno (24 set 2026) ognuno ha
+    il suo preavviso e il suo timbro: la scadenza di uno non tace ne'
+    risuona quella dell'altro.
 
     IL TIMBRO PORTA LA SCADENZA e non il solo nome, ed e' la riga da
     non semplificare: col nome nudo un rinnovo — che sposta `fino` e
     tiene lo stesso slug — non risuonerebbe mai piu'. Cosi' invece
     ogni scadenza nuova ha il suo timbro, e quella vecchia resta
-    scritta senza dar fastidio a nessuno.
+    scritta senza dar fastidio a nessuno. Il timbro di ieri, uno solo
+    per tutti, vale ancora per lo slug che nomina: un preavviso gia'
+    detto prima del deploy non si ripete.
 
     Timbro PRIMA dell'invio, il patto delle campagne: un errore di
     rete puo' perdere un avviso di cortesia, mai raddoppiarlo. E si
     tace se lo spazio non c'e': una coda ferma non suona."""
     if ORE_PREAVVISO_SPONSOR <= 0:
         return
-    slug = sponsor_vivo()
-    if not slug:
-        return                      # niente in vetrina: niente da dire
-    fino = sponsor_fino()
-    if fino > int(time.time()) + ORE_PREAVVISO_SPONSOR * 3600:
-        return                      # troppo presto
-    marchio = f"{slug}:{fino}"
-    if timbro_letto(TIMBRO_SPONSOR) == marchio:
-        return                      # gia' detto per QUESTA scadenza
-    timbro_scrivi(TIMBRO_SPONSOR, marchio)
-    aperte = aperture_sponsor(slug)
-    print(f"[i] Spazio in vetrina «{slug}» in scadenza {_quando_scade(fino)}")
-    await notifica_admin(
-        f"📣 <b>Lo spazio in vetrina scade {_quando_scade(fino)}.</b>\n"
-        f"In vetrina: <b>{slug}</b> — aperto {aperte} volte negli "
-        f"ultimi 30 giorni.\n\n"
-        f"Alla scadenza sparisce da sola la card in «Da scoprire»: la "
-        f"storia in cima al negozio e il posto fra i Consigliati "
-        f"restano. Per rinnovare: <code>/sponsor {slug} 30</code>")
+    for slug in sponsor_accesi():
+        fino = sponsor_fino(slug)
+        if fino > int(time.time()) + ORE_PREAVVISO_SPONSOR * 3600:
+            continue                    # troppo presto
+        marchio = f"{slug}:{fino}"
+        timbro = f"{TIMBRO_SPONSOR}:{slug}"
+        if marchio in (timbro_letto(timbro), timbro_letto(TIMBRO_SPONSOR)):
+            continue                    # gia' detto per QUESTA scadenza
+        timbro_scrivi(timbro, marchio)
+        aperte = aperture_sponsor(slug)
+        bozza = (slug in RACCONTI_NEGOZI
+                 and racconto_stato(slug) != "pubblicato")
+        print(f"[i] Spazio in vetrina «{slug}» in scadenza "
+              f"{_quando_scade(fino)}")
+        await notifica_admin(
+            f"📣 <b>Lo spazio in vetrina di {slug} scade "
+            f"{_quando_scade(fino)}.</b>\n"
+            f"Aperto {aperte} volte negli ultimi 30 giorni."
+            + ("\n⚠️ La sua pagina e' in bozza: la card non si vede."
+               if bozza else "") + "\n\n"
+            f"Alla scadenza sparisce da sola la sua card in «Da "
+            f"scoprire» — gli altri spazi non si toccano — e la storia "
+            f"in cima al negozio e il posto fra i Consigliati "
+            f"restano. Per rinnovare: <code>/sponsor {slug} 30</code>")
 
 
 async def avvisa_rientro_ferie():

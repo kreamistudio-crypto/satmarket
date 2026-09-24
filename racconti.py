@@ -55,9 +55,12 @@ una scheda, `n` il numero della foto. In piu', per queste pagine:
     bruno. Come il logo conta SOLO a pagina pubblicata: la busta lo
     porta come vero/falso, e la rotta di «Da scoprire» serve il file di
     una pagina del server solo quando e' pubblicata col suo `banner`
-    vero. NON accende lo spazio sponsorizzato di «Da scoprire»: quello
-    e' del catalogo di casa (`SLUG_SPONSOR`), e uno slug non puo' stare
-    in tutt'e due i cataloghi — il file e' pronto, la leva no.
+    vero. E' ANCHE LA CARD DELLO SPAZIO SPONSORIZZATO di «Da scoprire»
+    (24 set 2026): una pagina col suo `banner` si accende dal bot come
+    quelle del catalogo di casa (`/sponsor <slug> 30`), e la sua card
+    compare solo a pagina PUBBLICATA — in bozza lo spazio puo' essere
+    acceso, e la scadenza corre, ma non si vede. Uno slug non puo' stare
+    in tutt'e due i cataloghi: ogni spazio ha una leva sola.
 
 LO STATO (bozza o pubblicata) NON STA QUI: vive in `impostazioni`, e
 lo cambia il gesto del moderatore dal pannello. Questo file dice COSA

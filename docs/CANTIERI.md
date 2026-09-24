@@ -31117,3 +31117,75 @@ sono le misure.
 svanisce in «Come spedisci» e in Vendi, le introduzioni nei due temi,
 e l'anteprima di un link condiviso in WhatsApp o Telegram (la cache
 delle app tiene quella vecchia finché non scade).
+
+## Più negozi sponsorizzati in «Da scoprire» (24 set 2026)
+
+**IL FATTO.** Lo spazio in vetrina reggeva un negozio alla volta
+(`sponsor_slug` + `sponsor_fino`) e solo del catalogo del client (To The
+Mooon). Andrea ne vuole più d'uno affiancati, in un ordine deciso da noi
+— prima «Un tempo per te», poi To The Mooon — con le pagine del server
+(`racconti.py`) sponsorizzabili, e la card di una pagina solo a pagina
+pubblicata. «Uno alla volta» era dichiarato come la tappa e non la forma
+(la docstring di `prove_sponsor` lo diceva da agosto): la tappa è finita.
+
+**LA FORMA.** Una riga per negozio, `sponsor_fino:<slug>`, più
+`sponsor_ordine`. Il vocabolario (`slug_sponsorizzabili`) è la somma dei
+due cataloghi, che restano due: le pagine del server col `banner` vero,
+prima, e `SLUG_SPONSOR`. Da lì l'ordine di partenza è già quello chiesto,
+senza nessun gesto; `/sponsor ordine` lo cambia. `sponsor_fino(slug)` è
+il gate in lettura per slug, quindi la scadenza di uno non tocca l'altro.
+Acceso non vuol dire visibile: `sponsorizzati_pubblici` manda nella busta
+la fila delle sole card che si possono vedere — per una pagina del server
+solo pubblicata col banner (lo stesso `_banner_consigliato` che serve il
+file) e col negozio risolto, mai il tg_id. Nel client la voce fissa di
+`SCOPRIRE` è diventata `vociSponsor()`: una card per spazio, id
+`sponsor-<slug>`, stesso aspetto (banner, pastiglia «Consigliato», tocco
+che apre il negozio con la storia), in testa e nell'ordine della busta.
+I Consigliati non si toccano (card, pagina, `raccontoDi`): lo spazio
+decide solo «Da scoprire», come in 9821f3c.
+
+**IL BOT.** `/sponsor` (lo stato di tutti nell'ordine, con «pagina in
+bozza» detto), `/sponsor <slug> 30`, `/sponsor <slug> spento`,
+`/sponsor spento` (tutti), `/sponsor ordine <slug> <slug>`. Una pagina in
+bozza si ACCENDE lo stesso e il bot avverte che la scadenza corre già: è
+la scelta più semplice, e il gesto di pubblicare resta del pannello. Il
+preavviso delle 72 ore è uno per spazio (timbro `sponsor_scadenza:<slug>`).
+Pannello per gli spazi: non c'era e non è nato.
+
+**IL PASSAGGIO DAL DEPLOY.** Le due righe di ieri si leggono ancora, e
+solo per lo slug che nominano, finché la sua riga nuova non c'è: se To
+The Mooon è acceso sul VPS resta acceso fino alla sua scadenza. Il timbro
+unico di ieri vale per lo slug che nomina, così un preavviso già detto non
+si ripete. La chiave `sponsor` della busta non esce più: un client di ieri
+in cache perde la card finché non ricarica (anti-cache già attivi).
+
+**SCARTATO.** Una leva di visibilità in `racconti.py` (resta «dice COSA,
+mai SE»); tenere `sponsor` accanto a `sponsorizzati` per i client di ieri
+(una card doppia da tenere in pari per qualche minuto di cache); un ordine
+a numeri per slug (una lista si legge e si scrive in un comando solo).
+
+**PROVATO.** `prove_sponsor` riscritta nella sezione 1: il vocabolario
+dal catalogo vero, il gate per slug, la riga di ieri, due spazi e la
+scadenza di ognuno nei due versi, l'ordine, accendere uno non tocca
+l'altro, e la busta col giudice vero (bozza → solo To The Mooon,
+pubblicata → due card nell'ordine, ordine scelto, banner non vero →
+fuori, guasto → fila vuota); il banco in node di `prove_scoprire_p2p`
+con due card, ordine rovesciato, scadenza di una, fail-closed per voce,
+`esc` sul titolo del server, tocco per card; emendate col perché le
+ancore di stato/conferma (due date), i messaggi (quattro con «posto fra
+i Consigliati restano»), il recinto (`sponsor_ordine`), la busta dei
+Consigliati e i banchi che dicevano «lo spazio non decide» con la
+variabile nuova. `collaudo_sponsor.py` sul server vero (45: stato, bozza
+esclusa, pubblicazione, ordine, scadenze, aperture per spazio, preavvisi,
+spegnimenti, riga di ieri, ritorno in bozza), nella gabbia della CI e
+aggiunto all'elenco. Suite intera severa senza config nel worktree da origin/main: **15.224 verdi, 0 rosse**. Tortura sulla copia: **9/9 uccise** (bozza visibile, scadenza condivisa, ordine ignorato, riga di ieri, timbro unico, spento-uno che spegne tutti, fila rovesciata, titolo nudo, server che vince sul catalogo). Dal vivo a 375 nei due temi
+(Chrome headless via CDP, densità 3, su una copia col venditore di
+collaudo 222): in bozza una card sola, pubblicata due affiancate col
+banner, la pastiglia e nessuno sbordo; il tocco vero su «Un tempo per te»
+apre il negozio con la storia aperta.
+
+**DA SAPERE / DA FARE.** Il client non manda il `da=sponsor…` delle
+aperture — non l'ha mai mandato — quindi il conto delle aperture nei
+messaggi del bot resta a zero: segnalato, non toccato. Per Andrea: a
+pagina pubblicata, `/sponsor un-tempo-per-te 30`; l'ordine è già quello
+giusto. DA AVERE il telefono.
