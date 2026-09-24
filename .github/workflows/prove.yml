@@ -98,6 +98,7 @@ jobs:
              prepara_logo_consigliato.py
              collaudo_spedizione_standard.py
              collaudo_catalogo_esterno.py
+             collaudo_carrelli_unico.py
              collaudo_nuova_fattura.py
 
       # Secondo scalino: il config d'esempio deve restare allineato,
@@ -156,6 +157,7 @@ jobs:
              collaudo_verita_lnd
              collaudo_altra_cassaforte
              collaudo_chiusura_saas
+             collaudo_carrelli_unico
              collaudo_in_pagamento
              collaudo_lnbits_muto
              collaudo_fatture_scadute

@@ -2085,7 +2085,8 @@ def prove_abbandonati():
         vero.row_factory = sqlite3.Row
         vero.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, "
                      "stato TEXT, payment_hash TEXT, creato INT, "
-                     "aggiornato INT, cassaforte TEXT DEFAULT 'saas')")
+                     "aggiornato INT, cassaforte TEXT DEFAULT 'saas', "
+                     "pagamento_id INT DEFAULT 0)")
         vero.execute("CREATE TABLE offerte(id INTEGER PRIMARY KEY, "
                      "ordine_id INT, stato TEXT)")
         vero.execute("CREATE TABLE rilanci(id INTEGER PRIMARY KEY, "
@@ -3675,8 +3676,9 @@ def prove_doppio_wallet():
            if "cassaforte=" not in cod[i:i + 400]])
     # SEI dal 24 set 2026: la sesta e' `nuova_fattura_ordine`, la
     # fattura nuova per lo STESSO ordine quando quella di prima e'
-    # scaduta senza pagamento («Paga ora»)
-    prova("...e le strade che coniano sono sei", 6, len(chiamate))
+    # scaduta senza pagamento («Paga ora»). SETTE dallo stesso giorno,
+    # sera: `paga_carrelli`, la fattura unica di piu' carrelli.
+    prova("...e le strade che coniano sono sette", 7, len(chiamate))
 
     # 3) chi legge passa la colonna della riga, mai un letterale
     prova("nessun invoice_pagata a un argomento solo", [],
@@ -8454,7 +8456,7 @@ def prove_idor_verifica():
 
     vero = sqlite3.connect(":memory:")
     vero.row_factory = sqlite3.Row
-    vero.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, "
+    vero.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, pagamento_id INT DEFAULT 0, "
                  "compratore_id INT, stato TEXT, payment_hash TEXT, "
                  "cassaforte TEXT DEFAULT 'saas')")
     vero.executemany("INSERT INTO ordini(id, compratore_id, stato, "
@@ -11617,7 +11619,10 @@ def prove_nota_compratore():
     # i varchi che POSTano sono TRE (startBuy, startBuySet e il ⚡ NWC):
     # sparsa a mano, il terzo la dimentica — e nessun collaudo lo
     # esercita, perche' in locale un wallet non c'e'
-    prova("client: i chiamanti di corpoConsegna restano tre", 3,
+    # ...e un QUARTO dal 24 set 2026: `salvaCarrelloPronto`, la cassa
+    # che PREPARA un carrello per il pagamento unico e mette da parte
+    # il body che startBuySet avrebbe mandato — dalla stessa fabbrica
+    prova("client: i chiamanti di corpoConsegna restano quattro", 4,
           mini.count("...corpoConsegna()"))
     prova("client: ...e nessuno dei tre la aggiunge per conto suo", [],
           [n for n, f in (("startBuy", "async function startBuy(){"),
@@ -22752,7 +22757,10 @@ def prove_pagina_acquisto():
     # E IL CENSIMENTO DEI CHIAMANTI, che vale piu' dell'elenco: sono
     # SEI, e il settimo di domani lo sente da qui invece di
     # scoprirlo il giorno che un incasso resta senza riga.
-    prova("chi conia una fattura in entrata e' sei", 6,
+    # ...SETTE dal 24 set 2026: la settima e' `paga_carrelli`, la
+    # fattura unica di piu' carrelli, che scrive la sua riga in
+    # `pagamenti` (motivo 'carrello') prima di far nascere gli ordini.
+    prova("chi conia una fattura in entrata e' sette", 7,
           codice(src).count("await crea_invoice_escrow("))
 
     # 3. Il punto NON esce su Nostr (tariffa interna del checkout,
@@ -23540,18 +23548,26 @@ def prove_pagina_acquisto():
     _chiamate = [_chiamata(_pulito, m.start())
                  for m in re.finditer(r"(?<!function )contoScomposto\(",
                                       _pulito)]
-    prova("...e OGNI chiamata le passa la percentuale",
-          (6, []), (len(_chiamate),
-                    [c[:40] for c in _chiamate if "_percento" not in c]))
+    # LA SETTIMA E' IL PAGAMENTO UNICO (24 set 2026), ed e' esente
+    # con un motivo: somma N carrelli, e una percentuale di sconto
+    # o un'origine UNICA non esistono — le passa a zero, dichiarato.
+    _busta = [c for c in _chiamate if "somma('art')" in c]
+    prova("...e la settima chiamata e' la busta del pagamento unico", 1,
+          len(_busta))
+    prova("...e OGNI chiamata le passa la percentuale (la busta esclusa)",
+          (7, []), (len(_chiamate),
+                    [c[:40] for c in _chiamate
+                     if "_percento" not in c and c not in _busta]))
     #    E L'ORIGINE, che e' la gemella nata coi codici sconto: le sei
     #    chiamate si dividono TRE dal preventivo e TRE dalla risposta di
     #    POST /orders, quindi l'origine deve uscire da TUTTE E DUE — o
     #    il foglio direbbe «Sconto codice» prima di pagare e «Sconto» un
     #    istante dopo, sullo stesso schermo. Chi ne aggiunge una settima
     #    e la dimentica lascia l'etichetta nuda, che non alza niente.
-    prova("...e OGNI chiamata le passa anche l'ORIGINE",
-          (6, []), (len(_chiamate),
-                    [c[:40] for c in _chiamate if "sconto_origine" not in c]))
+    prova("...e OGNI chiamata le passa anche l'ORIGINE (la busta esclusa)",
+          (7, []), (len(_chiamate),
+                    [c[:40] for c in _chiamate
+                     if "sconto_origine" not in c and c not in _busta]))
     prova("...e porta la percentuale, dal server e mai dedotta", True,
           '<span class="sconto-tag">−${c.scontoPct}%</span>' in _cr
           and "scontoPct: p.sconto_percento" in mini3)
@@ -23669,15 +23685,18 @@ def prove_pagina_acquisto():
     _rs = pezzo_js(mini3, "async function rinfrescaSet(){", "\n}")
     prova("il carrello potato rifa' il conto", True,
           "caricaPreventivo()" in _rs)
+    #    ...e UNO dentro un pagamento unico (24 set 2026), dove la riga
+    #    sola e' lecita (vedi apriAcquistoSet con la busta).
     prova("...e sotto i due articoli esce invece di restare", True,
-          "setScelte.size < 2" in _rs and "navIndietro()" in _rs)
+          "setScelte.size < (acqDati.busta ? 1 : 2)" in _rs
+          and "navIndietro()" in _rs)
     #    LA PROVENIENZA SI RIALLINEA PRIMA DEL CONTO: currentListing
     #    puo' essere rimasto su un annuncio di un ALTRO venditore (le
     #    celle del carrello sono card, e il tocco apre il dettaglio), e
     #    rinfrescaSet legge proprio lui per rileggere il negozio. La
     #    riga arriva da controllaPacco, che non esiste piu': senza,
     #    dopo un 409 si poterebbe il pacco col catalogo sbagliato.
-    _aas = pezzo_js(mini3, "function apriAcquistoSet(){", "\n}")
+    _aas = pezzo_js(mini3, "function apriAcquistoSet(busta){", "\n}")
     prova("la provenienza si riallinea prima del conto", True,
           "currentListing = orig" in _aas)
     #    IL RIENTRO E' ISTANTANEO: la cassa si apre e si chiude mentre
@@ -23792,8 +23811,13 @@ def prove_pagina_acquisto():
           "esc(o.puntoRitiro)" in mini)
     # (CORRIERI del tracking resta legittimamente nel client: qui si
     # guarda che il catalogo SPEDIZIONIERI arrivi dal server)
-    prova("il bottone finale della pagina dice «Paga»", True,
-          'id="acqCompra" onclick="ctaAcquisto()">Paga<' in mini)
+    # ...E NELLA CASSA CHE PREPARA UN PAGAMENTO UNICO (24 set 2026) dice
+    # «Pronto»: stesso bottone, stessa guardia, un verbo diverso perche'
+    # li' non si paga, si salva (vedi salvaCarrelloPronto)
+    prova("il bottone finale della pagina dice «Paga» (o «Pronto» nella "
+          "busta)", True,
+          'id="acqCompra" onclick="ctaAcquisto()">${d.busta ? '
+          "'✓ Pronto per il pagamento unico' : 'Paga'}<" in mini)
     # IL DEFAULT DELLA VIA E' IL PUNTO DI RITIRO (ago 2026, che AFFINA
     # il 12 ago: la spedizione batte il ritiro — i numeri di
     # produzione, 35 schede su 82 col badge 🚚 sopra un ritiro
@@ -24146,7 +24170,8 @@ def prove_libro_mastro():
           punto_obiezioni INT DEFAULT 0,
           venditore_id INT DEFAULT 0,
           cassaforte TEXT DEFAULT 'saas',
-          cassaforte_payout TEXT DEFAULT '', payout_nota TEXT DEFAULT '');
+          cassaforte_payout TEXT DEFAULT '', payout_nota TEXT DEFAULT '',
+          pagamento_id INT DEFAULT 0, mai_incassato INT DEFAULT 0);
         CREATE TABLE crediti_cassaforte(id INTEGER PRIMARY KEY,
           riga_id INT, cassaforte TEXT, stato TEXT DEFAULT 'aperto');
         CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, ordine_id INT,
@@ -24194,7 +24219,8 @@ def prove_libro_mastro():
           negozio_slug TEXT DEFAULT '');
         CREATE TABLE pagamenti(id INTEGER PRIMARY KEY, tg_id INT,
           motivo TEXT, riferimento TEXT DEFAULT '', importo_sats INT,
-          stato TEXT DEFAULT 'creato', payout_stato TEXT DEFAULT '');
+          stato TEXT DEFAULT 'creato', payout_stato TEXT DEFAULT '',
+           pagato_il INT DEFAULT 0);
         CREATE UNIQUE INDEX idx_rimborso_chiusura ON rimborsi_asta(puntata_id)
           WHERE motivo IN ('perdente','annullo_admin');
         CREATE UNIQUE INDEX idx_rimborso_tardivo ON rimborsi_asta(rilancio_id)
@@ -24678,6 +24704,18 @@ def prove_libro_mastro():
         ("INSERT INTO pagamenti(id,tg_id,motivo,importo_sats,stato) "
          "VALUES(19, 222, 'sponsor', 100, 'creato')",
          "pagamento con un motivo che nessuno sa incassare", "19"),
+        # IL PAGAMENTO UNICO DI PIU' CARRELLI (24 set 2026): un ordine
+        # che punta a una busta che non c'e', e una busta pagata da due
+        # ore con un suo ordine ancora fermo (l'incasso morto a meta').
+        ("INSERT INTO ordini(id,annuncio_id,prezzo_sats,quantita,"
+         "pagamento_id) VALUES(31, 9, 1000, 1, 4242)",
+         "ordine di un pagamento unico senza la sua busta", "31"),
+        ("INSERT INTO pagamenti(id,tg_id,motivo,importo_sats,stato,"
+         "pagato_il) VALUES(32, 111, 'carrello', 1000, 'pagato', "
+         "strftime('%s','now') - 7200); "
+         "INSERT INTO ordini(id,annuncio_id,prezzo_sats,quantita,"
+         "pagamento_id,stato) VALUES(33, 9, 1000, 1, 32, 'creato')",
+         "pagamento unico pagato con ordini ancora fermi", "33"),
         # L'OBIEZIONE SUL PUNTO (ago 2026): il timbro senza il motivo e'
         # una guardia caduta a meta' UPDATE. Il ramo che morde davvero
         # e' l'altro — un'obiezione fuori dalla via punto — perche' li'
@@ -25368,8 +25406,11 @@ def prove_forma_sconto_pacco():
               "await " in codice(corpo[i:j]))
         prova(f"{chi}: il totale non si riscrive li' in mezzo", 0,
               corpo[i:j].count("totale ="))
+        # in _compra_set il conio sta nel ramo SENZA busta (24 set
+        # 2026), un gradino piu' dentro: si guarda la forma, non lo spazio
         prova(f"{chi}: la invoice si conia sul TOTALE", True,
-              "crea_invoice_escrow(\n        totale," in corpo)
+              "crea_invoice_escrow(\n        totale," in corpo
+              or "crea_invoice_escrow(\n            totale," in corpo)
 
     # 6) Il tetto di rodaggio giudica il LORDO, PRIMA dello sconto: e'
     # un vincolo del listino, non del checkout — altrimenti si
@@ -40302,7 +40343,9 @@ def prove_prezzo_accordo():
     # scavalca, perche' l'orologio del telefono e' il giudice di cosa
     # si DISEGNA, mai dei soldi. Sono i due preventivi, i due startBuy
     # e il pagamento col wallet: un sesto deve farsi vedere qui.
-    prova("...e lo scavalcano i cinque che parlano col server", 5,
+    # ...SEI dal 24 set 2026: `salvaCarrelloPronto`, che compone il body
+    # del pagamento unico come startBuySet
+    prova("...e lo scavalcano i sei che parlano col server", 6,
           len([1 for r in mini.split("\n")
                if "offertaAccettataPer(" in r and ", true)" in r]))
 
@@ -45989,7 +46032,8 @@ def prove_cassa_strada_chiusa():
     prova("il verde «Spedizione gratis» chiede una strada viva", True,
           "const sgGratisOra = stradaViva(stradaSel)" in ra)
     prova("a conto chiuso «Paga» e' spento, senza l'id che paga", True,
-          ': `<button class="btn orange" disabled>Paga</button>`}' in ra)
+          ': `<button class="btn orange" disabled>${d.busta ? '
+          "'✓ Pronto per il pagamento unico' : 'Paga'}</button>`}" in ra)
     prova("...e il ⚡ del wallet non compare", True,
           "const nwc = (viaOk && d.tipo==='mono'" in ra)
     prova("il menu del paese resta raggiungibile a via casa chiusa",
@@ -76121,7 +76165,9 @@ def prove_introduzioni_leggibili():
         ".p2p-meta", ".p2p-box", ".order .sub",   # dati
         ".ctrl-riga .ctrl-nota",                  # «per N pezzi»: un dato
         ".punto-salvato .ps-dove",                # un indirizzo
-        ".ordine-num"])                           # il numero d'ordine
+        ".ordine-num",                            # il numero d'ordine
+        ".carrello-unico"])                       # lo stato del carrello
+                                                  # per il pagamento unico
     prova("a 12,5px in --muted restano solo controlli, titoli e dati "
           "(regole CSS)", RESTANO_CSS, regole)
     linea = []
@@ -84270,7 +84316,11 @@ def prove_paracadute_motivo():
 
     # ---- 2. LO SMISTATORE, girato ------------------------------------
     casse = {"_incassa_sblocco": object(),
-             "_incassa_slug_negozio": object()}
+             "_incassa_slug_negozio": object(),
+             # il pagamento unico di piu' carrelli (24 set 2026): il
+             # dizionario si costruisce ALLA CHIAMATA, quindi ogni cassa
+             # che nomina deve esistere nell'ambiente del banco
+             "_incassa_carrello": object()}
     amb0 = dict(casse)
     exec(pezzo("_incasso_del_motivo"), amb0)
     smista = amb0["_incasso_del_motivo"]
@@ -84313,7 +84363,8 @@ def prove_paracadute_motivo():
         vero.executescript("""
           CREATE TABLE ordini(id INTEGER PRIMARY KEY, stato TEXT,
             payment_hash TEXT, creato INT, aggiornato INT,
-            cassaforte TEXT DEFAULT 'saas');
+            cassaforte TEXT DEFAULT 'saas',
+            pagamento_id INT DEFAULT 0);
           CREATE TABLE rilanci(id INTEGER PRIMARY KEY, stato TEXT,
             payment_hash TEXT, creato INT, aggiornato INT,
             cassaforte TEXT DEFAULT 'saas');
@@ -84396,6 +84447,11 @@ def prove_paracadute_motivo():
         exec(pezzo("_slug_negozio_libero"), amb)
         exec("async " + pezzo("_incassa_sblocco"), amb)
         exec("async " + pezzo("_incassa_slug_negozio"), amb)
+        # la cassa del pagamento unico (24 set 2026): lo smistatore la
+        # NOMINA a ogni chiamata, quindi deve esistere; qui nessuna
+        # busta e' in gioco e non va mai chiamata (il suo giro sta in
+        # collaudo_carrelli_unico.py, col server vero)
+        amb["_incassa_carrello"] = _mai
         exec(pezzo("_incasso_del_motivo"), amb)
         if cieco:
             # LO SMISTATORE DI PRIMA, rimesso a mano: tutto al banner,
@@ -84524,8 +84580,17 @@ def prove_rimborso_motivo():
                               pezzo("_incasso_del_motivo")))
     rimborsi = set(_re.findall(r'"([a-z_]+)": \("',
                                pezzo("_rimborso_del_motivo")))
-    prova("ogni motivo che si incassa sa anche come si rimborsa",
-          incassi, rimborsi)
+    # ...TRANNE il pagamento unico di piu' carrelli (24 set 2026): la
+    # busta si rimborsa ORDINE PER ORDINE, con la liturgia di sempre
+    # dell'ordine (`_rimborsa_compratore`), perche' a saldo arrivato i
+    # sats vivono negli N depositi di garanzia. Un rimborso «in blocco»
+    # della busta li restituirebbe una seconda volta: il None dello
+    # smistatore e' la guardia, e `_rimborsa_sblocco` lo rifiuta.
+    prova("ogni motivo che si incassa sa anche come si rimborsa (la "
+          "busta esclusa: si rimborsa per ordine)",
+          incassi - {"carrello"}, rimborsi)
+    prova("...e la busta del pagamento unico NON ha un rimborso in blocco",
+          False, "carrello" in rimborsi)
     prova("...e il censimento vede almeno i due del set 2026", True,
           {"banner", "negozio_slug"} <= rimborsi)
     _rim = codice(pezzo("_rimborsa_sblocco"))
@@ -92869,7 +92934,7 @@ def prove_effetti_ridotti():
     sfocano = [(s, c) for s, c in regole if "backdrop-filter:" in c]
     prova("le regole che sfocano sono queste cinque (chi ne aggiunge una "
           "la scrive qui, e le da' il suo colore pieno)",
-          ["#barraCompra", "#barraPacco", "#testModale",
+          ["#barraCarrelli", "#barraCompra", "#barraPacco", "#testModale",
            "#view-acquisto .ctrl-fondo", "nav"],
           sorted(s for s, c in sfocano))
     senza_pieno = [s for s, c in sfocano
@@ -96984,7 +97049,10 @@ def prove_paga_ora():
                      "cassaforte TEXT, creato INT, aggiornato INT, "
                      "prezzo_sats INT, quantita INT, spedizione_sats INT, "
                      "protezione_sats INT, sconto_sats INT, "
-                     "fattura_rinnovata_il INTEGER DEFAULT 0)")
+                     "fattura_rinnovata_il INTEGER DEFAULT 0, "
+                     # la busta del pagamento unico (24 set 2026), in coda:
+                     # l'INSERT qui sotto e' posizionale
+                     "pagamento_id INT DEFAULT 0)")
         vero.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, "
                      "stato TEXT, titolo TEXT)")
         vero.execute("CREATE TABLE ordine_righe(id INTEGER PRIMARY KEY, "
@@ -96992,7 +97060,7 @@ def prove_paga_ora():
                      "unitario_sats INT, titolo TEXT)")
         vero.execute("CREATE TABLE utenti(tg_id INT, ferie_fino INT)")
         vero.execute("INSERT INTO ordini VALUES(196,?,111,222,7,?,'hash-vecchio',"
-                     "'saas',?,?,25000,1,0,0,0,?)",
+                     "'saas',?,?,25000,1,0,0,0,?,0)",   # ...e pagamento_id 0: non e' di busta
                      (stato, invoice, creato, creato, rinnovata))
         vero.execute("INSERT INTO annunci VALUES(7,?,'Pesto genovese')",
                      (annuncio,))
@@ -97166,7 +97234,7 @@ def prove_paga_ora():
     vero.row_factory = sqlite3.Row
     vero.execute("CREATE TABLE ordini(id INTEGER PRIMARY KEY, stato TEXT, "
                  "payment_hash TEXT, creato INT, aggiornato INT, "
-                 "cassaforte TEXT DEFAULT 'saas')")
+                 "cassaforte TEXT DEFAULT 'saas', pagamento_id INT DEFAULT 0)")
     for t in ("offerte(id INTEGER PRIMARY KEY, ordine_id INT, stato TEXT)",
               "rilanci(id INTEGER PRIMARY KEY, stato TEXT, "
               "payment_hash TEXT, creato INT, cassaforte TEXT)",
@@ -97174,7 +97242,7 @@ def prove_paga_ora():
               "payment_hash TEXT, creato INT, cassaforte TEXT)"):
         vero.execute("CREATE TABLE " + t)
     vero.execute("INSERT INTO ordini VALUES(196,'creato','hash-vecchio',?,0,"
-                 "'saas')", (ADESSO - 2000,))
+                 "'saas',0)", (ADESSO - 2000,))
     vero.commit()
 
     class Con2:
@@ -97735,6 +97803,28 @@ def prove_carrelli_per_venditore():
         prova(f"{fn[9:-2]} aggiorna le card del barattolo", True,
               "aggiornaCarrelloCards();" in nudo(pezzo_js(mini, fn, "\n}\n")))
 
+    # --- 6b) LA CASSA CHE PREPARA (parte 2): la deviazione e il salvataggio
+    aas = nudo(pezzo_js(mini, "function apriAcquistoSet(busta){", "\n}\n"))
+    prova("nella busta il carrello da una riga NON devia sul mono", True,
+          "if (setScelte.size === 1 && !busta) {" in aas)
+    cta = nudo(pezzo_js(mini, "function ctaAcquisto(){", "\n}\n"))
+    prova("ctaAcquisto con la busta salva invece di pagare, dopo le guardie",
+          True, "if (d.tipo==='set' && d.busta) { salvaCarrelloPronto(); return; }"
+          in cta and cta.index("salvaCarrelloPronto()") > cta.index("indirizzoCompleto("))
+
+    # --- 6c) LA FORMA DEL CAS SULLA BUSTA: il collaudo non puo' coglierla
+    #        senza una corsa vera (la guardia sullo stato che sta prima
+    #        dell'UPDATE risponde per lui a chiamate in fila), e la
+    #        tortura l'ha lasciata viva. Qui si guarda la riga.
+    ic = codice(pezzo("_incassa_carrello"))
+    prova("l'incasso della busta passa da un CAS sullo stato", True,
+          "UPDATE pagamenti SET stato='pagato', pagato_il=?, " in ic
+          and "WHERE id=? AND stato='creato'" in ic
+          and "if cur.rowcount == 0:" in ic)
+    prova("...e il rimborso della quota morta pure (creato o annullato)", True,
+          "WHERE id=? AND stato IN ('creato','annullato')"
+          in codice(pezzo("_avanza_ordini_carrello")))
+
     # --- 7) IL BANCO: le funzioni VERE su un DOM di cartone ----------
     esiti = _banco_carrelli(mini)
     if esiti is None:
@@ -97799,8 +97889,24 @@ function nodo(){ const c = new Set();
           setAttribute(k,v){ this.attr[k]=v; }, classi: c}; }
 function el(id){ if (!nodi[id]) nodi[id] = nodo(); return nodi[id]; }
 const BOTTONI = [];   // i carrellini «in griglia», che aggiornaCarrelloCards ritocca
-const document = {querySelectorAll: sel => sel === '.card-carrello' ? BOTTONI : [],
+const document = {body: nodo(),
+                  querySelectorAll: sel => sel === '.card-carrello' ? BOTTONI : [],
                   querySelector: () => null};
+/* la cassa di cartone per salvaCarrelloPronto (parte 2) */
+let acqDati = null;
+const corpoConsegna = () => ({consegna: 'spedizione', spedizione_via: 'casa'});
+const corpoCodiceSconto = () => ({});
+const offertaAccettataPer = () => null;
+const navIndietro = () => DIARIO.push(['indietro']);
+const firmaSet = () => firmaScelte(setScelte);   // com'e' nel client
+/* la rete di cartone per verificaCarrelli: la busta 7 e' pagata */
+const API_BASE = '/api';
+const authHdr = () => 'x';
+const closeSheet = () => DIARIO.push(['closeSheet']);
+const loadOrders = async () => DIARIO.push(['loadOrders']);
+const renderOrders = () => DIARIO.push(['renderOrders']);
+const fetch = async (url) => ({ok: true, json: async () =>
+  url.endsWith('/carrelli/7/verifica') ? {stato: 'pagato', nati: [{ordine_id: 1}, {ordine_id: 2}], morti: []} : {}});
 """ + stato + "\n" + pagina + "\n" + ap + r"""
 const fuori = {};
 const carr = () => carrelliTutti().map(c => [c.sellerId, [...c.scelte].map(([i,q])=>[i,q]), c.aperto]);
@@ -97835,8 +97941,43 @@ fuori.spenti = {diario: DIARIO.slice(), carr: carr()};
 DIARIO.length = 0;
 // 5) la pagina dei carrelli con due carrelli (Anna con due righe, una da 3 pezzi)
 toccaCarrelloCard(1); setScelte.set(2, 3);
+el('view-carrelli').classList.add('active');    // «siamo» nella pagina
 renderCarrelli();
 fuori.pagina = {sub: el('carrelliSub').textContent, html: el('carrelliLista').innerHTML, carr: carr()};
+// --- IL PAGAMENTO UNICO (parte 2): la barra, la preparazione, la firma
+const barra = () => ({con: document.body.classi.has('con-carrelli'),
+  btn: el('carrelliPaga').textContent, pronti: el('carrelliPronti').textContent,
+  tot: el('carrelliTot').textContent,
+  righe: (el('carrelliLista').innerHTML.match(/carrello-unico/g) || []).length,
+  prepara: (el('carrelliLista').innerHTML.match(/>Prepara</g) || []).length,
+  modifica: (el('carrelliLista').innerHTML.match(/>Modifica</g) || []).length,
+  ricontrolla: (el('carrelliLista').innerHTML.match(/>Ricontrolla</g) || []).length});
+fuori.barra0 = barra();
+// la cassa di Anna prepara: il body salvato, la firma, il totale
+acqDati = {preventivo: {strade: [{via: 'casa', totale_sats: 3500, spedizione_sats: 500}],
+                        articolo_lordo_sats: 3000, sconto_sats: 0, protezione_sats: 0},
+           via: 'casa', accordoId: 0, busta: true};
+DIARIO.length = 0;
+salvaCarrelloPronto();
+const pr = carrelliPronti.get(10);
+fuori.pronto = {chi: [...carrelliPronti.keys()], righe: pr && pr.body.righe,
+                consegna: pr && pr.body.consegna, firma: pr && pr.firma,
+                totale: pr && pr.totale, etichetta: pr && pr.etichetta, diario: DIARIO.slice()};
+renderCarrelli();
+fuori.barra1 = barra();
+// anche Bruno pronto (come se la sua cassa avesse salvato): si paga tutto insieme
+carrelliPronti.set(20, {body: {righe: [{annuncio_id: 3, quantita: 1}]}, firma: firmaScelte(carrelliDaParte.get(20).scelte),
+                        totale: 2100, stima: false, etichetta: 'ritiro a mano', art: 2000, sped: 0, sconto: 0, prot: 100});
+renderCarrelli();
+fuori.barra2 = barra();
+// il carrello di Anna cambia: la sua preparazione decade (la firma)
+setScelte.set(2, 4);
+renderCarrelli();
+fuori.barra3 = barra();
+setScelte.set(2, 3);      // com'era, per i passi dopo
+renderCarrelli();
+fuori.barra4 = barra();
+el('view-carrelli').classList.remove('active');
 // 6) «Apri» sul carrello da parte (Bruno) lo rimonta, «Controlla e paga» apre la cassa
 DIARIO.length = 0;
 apriCarrello(20);
@@ -97852,7 +97993,18 @@ fuori.paginaConUno = el('carrelliLista').innerHTML;
 togliDalCarrello(3);
 renderCarrelli();
 fuori.paginaVuota = {sub: el('carrelliSub').textContent, html: el('carrelliLista').innerHTML, badge: el('carrelliBtn').classi.has('pieno')};
-console.log(JSON.stringify(fuori));
+// 8) il saldo del pagamento unico svuota TUTTO: aperto, da parte, pronti
+toccaCarrelloCard(1); toccaCarrelloCard(3);
+carrelliPronti.set(10, {firma: 'x'}); carrelliPronti.set(20, {firma: 'y'});
+carrelliCorrente = 7;
+DIARIO.length = 0;
+(async () => {
+  await verificaCarrelli(7);
+  fuori.saldo = {carr: carr(), pronti: [...carrelliPronti.keys()], busta: carrelliCorrente,
+                 pacco: paccoDati, diario: DIARIO.slice(),
+                 toast: (DIARIO.find(d => d[0] === 'toast') || [])[1]};
+  console.log(JSON.stringify(fuori));
+})();
 """
     with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
                                 encoding="utf-8") as f:
@@ -97866,7 +98018,7 @@ console.log(JSON.stringify(fuori));
         return None
     _os.unlink(p)
     if r.returncode != 0:
-        return [("il banco dei carrelli gira", "", r.stderr[-400:])]
+        return [("il banco dei carrelli gira", "", r.stderr[:500])]
     f = _json.loads(r.stdout)
     return [
         ("senza la bandierina della griglia la card non ha carrellino", "",
@@ -97934,6 +98086,29 @@ console.log(JSON.stringify(fuori));
         ("...con «Apri» e «Controlla e paga» per ognuno", (2, 2),
          (f["pagina"]["html"].count('onclick="apriCarrello('),
           f["pagina"]["html"].count('onclick="pagaCarrello('))),
+        # IL PAGAMENTO UNICO (parte 2)
+        ("con due carrelli la barra c'e', nessuno e' pronto, il bottone prepara",
+         (True, "Prepara il prossimo", "0 di 2 carrelli pronti", "—", 2, 2, 0, 0),
+         tuple(f["barra0"][k] for k in ("con", "btn", "pronti", "tot", "righe",
+                                          "prepara", "modifica", "ricontrolla"))),
+        ("la cassa di Anna prepara: il body con le righe e la consegna, la firma, il totale della via, e si torna ai carrelli",
+         ([10], [[1, 1], [2, 3]], "spedizione", "1x1,2x3", 3500, "spedizione a casa",
+          [["toast", "✓ Carrello pronto per il pagamento unico"], ["indietro"]]),
+         (f["pronto"]["chi"], [[r["annuncio_id"], r["quantita"]] for r in (f["pronto"]["righe"] or [])],
+          f["pronto"]["consegna"], f["pronto"]["firma"], f["pronto"]["totale"],
+          f["pronto"]["etichetta"], f["pronto"]["diario"])),
+        ("...e la barra conta uno su due, col suo totale, e resta a preparare",
+         ("Prepara il prossimo", "1 di 2 carrelli pronto", "3500 sats", 1, 1),
+         tuple(f["barra1"][k] for k in ("btn", "pronti", "tot", "prepara", "modifica"))),
+        ("con tutt'e due pronti: «Paga tutto insieme» e la somma",
+         ("Paga tutto insieme", "2 di 2 carrelli pronti", "5600 sats", 0, 2),
+         tuple(f["barra2"][k] for k in ("btn", "pronti", "tot", "prepara", "modifica"))),
+        ("il carrello che cambia perde la preparazione (la firma) e chiede di ricontrollare",
+         ("Prepara il prossimo", "1 di 2 carrelli pronto", "2100 sats", 1, 1),
+         tuple(f["barra3"][k] for k in ("btn", "pronti", "tot", "ricontrolla", "modifica"))),
+        ("...e rimesso com'era torna pronto senza rifare niente",
+         ("Paga tutto insieme", "2 di 2 carrelli pronti"),
+         (f["barra4"]["btn"], f["barra4"]["pronti"])),
         # 6) apri e paga
         ("«Apri» rimonta il carrello da parte e apre la sua pagina",
          ([[20, [[3, 1]], True], [10, [[1, 1], [2, 3]], False]], 3,
@@ -97952,6 +98127,15 @@ console.log(JSON.stringify(fuori));
          ("uno per venditore", True, False),
          (f["paginaVuota"]["sub"], "Nessun carrello aperto" in f["paginaVuota"]["html"],
           f["paginaVuota"]["badge"])),
+        # 8) il saldo svuota tutto
+        ("il saldo del pagamento unico svuota l'aperto, quelli da parte e i "
+         "pronti, chiude il foglio e va agli Ordini",
+         ([], [], None, None, True, True),
+         (f["saldo"]["carr"], f["saldo"]["pronti"], f["saldo"]["busta"],
+          f["saldo"]["pacco"], ["closeSheet"] in f["saldo"]["diario"],
+          ["go", "affari"] in f["saldo"]["diario"])),
+        ("...e il toast dice due ordini pagati", True,
+         str(f["saldo"]["toast"]).startswith("🔒 2 ordini pagati")),
     ]
 
 def main():

@@ -1735,7 +1735,7 @@
      tutto. `visibility` e non `display`: l'header e' sticky, cioe'
      sta nel flusso, e toglierlo di li' farebbe saltare la pagina
      sotto — invisibile ora, ma ben visibile alla chiusura. */
-  body.lb-aperto header, body.lb-aperto nav, body.lb-aperto #barraCompra, body.lb-aperto #barraPacco{visibility:hidden}
+  body.lb-aperto header, body.lb-aperto nav, body.lb-aperto #barraCompra, body.lb-aperto #barraPacco, body.lb-aperto #barraCarrelli{visibility:hidden}
   #lbStage{position:absolute;inset:0;overflow:hidden;touch-action:none;
     display:flex;align-items:center;justify-content:center}
   /* La pista: le foto in fila, una per schermo. Scorre in orizzontale
@@ -4988,6 +4988,34 @@
     white-space:nowrap}
   #carrelliVuoto{color:var(--muted);font-weight:600;font-size:13.5px;
     line-height:1.5;padding:14px var(--pad)}
+  /* la riga del pagamento unico dentro il blocco: lo stato a sinistra,
+     il bottoncino a destra; verde di fiducia quando e' pronto */
+  .carrello-unico{display:flex;align-items:center;gap:8px;margin-top:10px;
+    font-size:12.5px;font-weight:600;color:var(--muted);line-height:1.35}
+  .carrello-unico.pronto{color:var(--trust)}
+  .carrello-unico .btn.mini{margin:0 0 0 auto;width:auto;flex:0 0 auto;
+    font-size:12.5px;padding:6px 12px 7px;white-space:nowrap}
+  /* LA BARRA DI «I TUOI CARRELLI» (24 set 2026): gemella di #barraPacco
+     per posizione e carta — il totale dei pronti a sinistra, «Paga
+     tutto insieme» a destra. Vive solo con body.con-carrelli, che
+     go() e aggiornaBarraCarrelli scrivono con due carrelli o piu'. */
+  #barraCarrelli{position:fixed;bottom:0;left:0;right:0;z-index:30;
+    background:var(--nav-bg);backdrop-filter:blur(10px);
+    border-top:1px solid var(--line);display:none;gap:10px;
+    align-items:center;
+    padding:10px var(--pad) calc(8px + env(safe-area-inset-bottom));
+    max-width:520px;margin:0 auto}
+  body.con-carrelli #barraCarrelli{display:flex;animation:barraSu .18s ease}
+  #barraCarrelli .btn{margin-top:0;width:auto;flex:0 0 auto;margin-left:auto;
+    white-space:nowrap;box-shadow:none;font-size:15px;padding:9px 14px 10px}
+  #barraCarrelli .btn:active{transform:translateY(1px);box-shadow:none}
+  #carrelliTot{font-size:17px;font-weight:800;white-space:nowrap}
+  #carrelliPronti{font-size:11.5px;color:var(--muted);font-weight:600;
+    white-space:nowrap}
+  body.con-carrelli #app{padding-bottom:150px}
+  @media (max-width:767.98px){
+    body.con-carrelli nav{display:none}
+  }
   #barraPacco{position:fixed;bottom:0;left:0;right:0;z-index:30;
     background:var(--nav-bg);backdrop-filter:blur(10px);
     border-top:1px solid var(--line);display:none;flex-wrap:wrap;
@@ -10961,6 +10989,16 @@ document.getElementById('cartello')?.remove();</script>
     <button class="btn orange" id="paccoControlla" onclick="apriAcquistoSet()">Controlla e paga</button>
   </div>
 
+  <!-- La barra di «I tuoi carrelli» (24 set 2026): il totale dei
+       carrelli PRONTI e «Paga tutto insieme» — o «Prepara il
+       prossimo» finche' ne manca uno. Vive solo con due carrelli o
+       piu' (body.con-carrelli); testi e bottone li scrive
+       aggiornaBarraCarrelli. -->
+  <div id="barraCarrelli">
+    <div class="pacco-somma"><b class="mono" id="carrelliTot"></b><span id="carrelliPronti"></span></div>
+    <button type="button" class="btn orange" id="carrelliPaga">Paga tutto insieme</button>
+  </div>
+
   <nav>
     <!-- Cinque voci in CINQUE posti, col + di Vendi al centro esatto
          perche' e' la TERZA di cinque celle equilarghe (flex:1).
@@ -12695,6 +12733,11 @@ function mapOrder(o){
              : o.venditore_id===myTgId ? 'seller' : 'admin';
   return {id:o.id, listing:{emoji:'📦', title:o.titolo, price:o.prezzo_sats},
     state:o.stato, role,
+    /* il pagamento unico (24 set 2026): la busta, l'ordine mai nato
+       (la sua parte in rimborso) e la cifra della fattura condivisa,
+       che «Paga ora» deve dire al posto del prezzo del solo ordine */
+    pagamentoId:o.pagamento_id||0, maiIncassato:!!o.mai_incassato,
+    pagamentoUnicoSats:o.pagamento_unico_sats||0,
     /* la miniatura della riga (ago 2026): il server manda SOLO il
        primo nome ('' = niente foto, e resta il 📦); per i set e' la
        foto del primo pezzo, quello che il titolo nomina */
@@ -13712,6 +13755,10 @@ function go(view){
      totale (il CSS decide dove: sotto i 768 sostituisce la nav, da
      desktop convive con la topbar) */
   document.body.classList.toggle('con-pacco', view==='pacco');
+  /* ...e in «I tuoi carrelli» la barra del pagamento unico, solo con
+     due carrelli o piu' (aggiornaBarraCarrelli la tiene in pari) */
+  document.body.classList.toggle('con-carrelli',
+    view==='carrelli' && carrelliTutti().length >= 2);
   /* Nella cassa la tab bar sparisce e basta: e' una cassa, non una
      vetrina, e Paga vive in pagina */
   document.body.classList.toggle('senza-nav', view==='acquisto');
@@ -14197,7 +14244,8 @@ function navRendiVista(b){
        (stesso annuncio, o stesso pacco con articoli) — svuotato da
        un pagamento o da un reload, si ripiega sulla vetrina */
     const ok = acqDati && (acqDati.tipo==='set'
-      ? ('set|' + (paccoDati?.origineId || 0)) === b.k && setScelte.size >= 2
+      ? ('set|' + (paccoDati?.origineId || 0)) === b.k
+        && setScelte.size >= (acqDati.busta ? 1 : 2)
       : acqDati.annuncioId === b.k
         && (listings.some(x=>x.id===b.k) || myListings.some(x=>x.id===b.k)));
     if (ok) {
@@ -20372,6 +20420,22 @@ let carrelliDaParte = new Map();     // sellerId -> {scelte, dati}
    la alza renderGrid attorno alla sua sola mappa, e la abbassa
    subito. */
 let cardConCarrello = false;
+/* IL PAGAMENTO UNICO (24 set 2026, parte 2): per pagare tutti i
+   carrelli con una fattura sola ogni carrello va PREPARATO nella sua
+   cassa — consegna, indirizzo, nota, codice — e il risultato sta qui,
+   per venditore: il body che la cassa avrebbe mandato da sola, la
+   FIRMA della composizione (cambia il carrello, la preparazione
+   decade), il totale del preventivo sulla via scelta e le voci del
+   conto. La cassa non paga: salva (salvaCarrelloPronto) e torna ai
+   carrelli, dove la barra somma i pronti e «Paga tutto insieme»
+   chiede al server UNA fattura (startBuyCarrelli). */
+let carrelliPronti = new Map();      // sellerId -> {body, firma, totale, ...}
+/* la busta del pagamento unico aperta nel foglio (l'id della riga di
+   `pagamenti`): la quarta modalita' del paySheet, accanto all'ordine,
+   alla puntata e allo sblocco */
+let carrelliCorrente = null;
+const firmaScelte = sc =>
+  [...sc].map(([id, q]) => id + 'x' + q).sort().join(',');
 /* Monta il carrello di `sellerId`: se e' gia' quello aperto non fa
    nulla (aggiorna solo la provenienza), sennò mette da parte l'aperto
    — SE ha qualcosa dentro: un carrello vuoto non si conserva — e tira
@@ -20595,8 +20659,7 @@ function stimaTagliaSet(){
    ridisegnare dalla cache invece di ricomprare l'attesa. Ordina le
    stringhe e non i numeri: e' deterministica, che e' tutto quel che le
    si chiede. */
-const firmaSet = () =>
-  [...setScelte].map(([id, q]) => id + 'x' + q).sort().join(',');
+const firmaSet = () => firmaScelte(setScelte);
 /* IL GIUDICE DEL «≈» (ago 2026, bug visto dal telefono: il ≈
    compariva su ENTRAMBE le valute). La regola, in UNA funzione e non
    in condizioni sparse — che sono il modo in cui il bug e' nato:
@@ -20952,7 +21015,7 @@ function apriAcquisto(l){
   }
   caricaPreventivo();
 }
-function apriAcquistoSet(){
+function apriAcquistoSet(busta){
   haptic();
   if (DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
   if (!setScelte.size)
@@ -20973,7 +21036,11 @@ function apriAcquistoSet(){
      carrello. Prima la deviazione si vedeva dopo il riepilogo, adesso
      al posto suo. La ← in testata riporta al carrello comunque, e il
      bottone dell'offerta il singolo ce l'ha nella sua scheda. */
-  if (setScelte.size === 1) {
+  /* ...MA NON DENTRO UN PAGAMENTO UNICO (24 set 2026): li' il carrello
+     e' una quota di una fattura che copre piu' venditori, il binario
+     mono non esiste e il server accetta la riga sola (pagamento_unico
+     nel preventivo, la busta in _compra_set) */
+  if (setScelte.size === 1 && !busta) {
     const [id, qta] = [...setScelte][0];
     const l = listings.find(t=>t.id===id);
     if (!l || l.stato!=='attivo')
@@ -21009,6 +21076,7 @@ function apriAcquistoSet(){
      conto ce l'abbiamo, si ridisegna e basta — mai un secondo fetch. */
   const f = firmaSet();
   if (acqDati?.tipo === 'set' && acqDati.firma === f && acqDati.preventivo) {
+    acqDati.busta = !!busta;     /* la modalita' segue chi apre */
     go('acquisto');
     renderAcquisto();
     return;
@@ -21027,7 +21095,10 @@ function apriAcquistoSet(){
              nota:'', notaAperta: notaApertaDefault([...setScelte.keys()]
                .map(id => (listings.find(t => t.id === id) || {}).cat)),
              codice:'', codiceAperto:false,
-             errore:''};
+             errore:'',
+             /* la cassa che PREPARA per il pagamento unico invece di
+                pagare (vedi salvaCarrelloPronto) */
+             busta: !!busta};
   go('acquisto');
   renderAcquisto();
   caricaPreventivo();
@@ -21195,7 +21266,9 @@ async function caricaPreventivo(){
     ? {righe: [...setScelte].map(([id, qta]) => ({annuncio_id:id,
         quantita:qta, offerta_id: d0.accordoId ? 0
           : (offertaAccettataPer(id, true)?.id || 0)})),
-       ...(d0.accordoId ? {offerta_carrello_id: d0.accordoId} : {})}
+       ...(d0.accordoId ? {offerta_carrello_id: d0.accordoId} : {}),
+       /* dentro un pagamento unico il server accetta la riga sola */
+       ...(d0.busta ? {pagamento_unico: true} : {})}
     : {annuncio_id: d0.annuncioId, quantita: d0.qta,
        offerta_id: d0.offertaId};
   /* LA DESTINAZIONE va anche nel PREVENTIVO, o la pagina direbbe la
@@ -21644,8 +21717,9 @@ function renderAcquisto(){
   /* IL TITOLO DICE QUALE DEI DUE ACQUISTI E' (ago 2026): sul carrello
      resta «Controlla il carrello», che e' quel che il bottone della
      barra promette — e la pagina fa davvero tutte e due le cose. */
-  el('acqTit').textContent = d.tipo==='set' ? 'Controlla il carrello'
-                                            : 'Acquista';
+  el('acqTit').textContent = d.tipo==='set'
+    ? (d.busta ? 'Prepara il carrello' : 'Controlla il carrello')
+    : 'Acquista';
   if (d.errore) {
     /* IL «RIPROVA» ACCANTO AL «TORNA» (ago 2026, col cantiere della
        cassa): il carrello aveva un riepilogo fail-open — conto storto,
@@ -21674,7 +21748,7 @@ function renderAcquisto(){
         : `<div class="acq-art">${facciaMini(primo, 0)}<div class="acq-col"><div class="acq-tit">${esc(primo ? primo.title : '')}</div></div></div>`}
       <div class="section-label conto-tit">Il conto${toggleValuta()}</div>
       <div class="acq-nota" style="margin-top:2px">Calcolo il conto…</div>
-      <div class="ctrl-fondo"><button class="btn orange" disabled>Paga</button></div>`;
+      <div class="ctrl-fondo"><button class="btn orange" disabled>${d.busta ? '✓ Pronto per il pagamento unico' : 'Paga'}</button></div>`;
     return;
   }
   /* --- gli articoli --- */
@@ -22470,7 +22544,7 @@ function renderAcquisto(){
   /* ...e MAI in modalita' accordo (ago 2026): li' la composizione e'
      PINNATA — sono le righe pattuite, fotografate — e un invito ad
      aggiungere sarebbe un invito a rompere l'accordo. */
-  const tornaCarrello = (d.tipo==='set' && !d.accordoId
+  const tornaCarrello = (d.tipo==='set' && !d.accordoId && !d.busta
                          && pillole.includes('pill-barra'))
     ? `<button type="button" class="btn ghost torna-carrello" onclick="navIndietro()">← Aggiungi altro nel carrello</button>`
     : '';
@@ -22499,8 +22573,8 @@ function renderAcquisto(){
     <div class="ctrl-fondo">${nwc}
       ${/* A CONTO CHIUSO «PAGA» E' SPENTO, e come nello scheletro
             NON porta l'id acqCompra: quello e' il bottone che paga. */
-        viaOk ? `<button class="btn orange" id="acqCompra" onclick="ctaAcquisto()">Paga</button>`
-              : `<button class="btn orange" disabled>Paga</button>`}
+        viaOk ? `<button class="btn orange" id="acqCompra" onclick="ctaAcquisto()">${d.busta ? '✓ Pronto per il pagamento unico' : 'Paga'}</button>`
+              : `<button class="btn orange" disabled>${d.busta ? '✓ Pronto per il pagamento unico' : 'Paga'}</button>`}
       ${secondari}
     </div>`;
   /* ...e il via: partenze e bersagli li mette barreCorri, il ferro
@@ -23226,6 +23300,9 @@ function ctaAcquisto(){
     toast('Scrivi l\'indirizzo: al venditore serve per spedire');
     return;
   }
+  /* la cassa che PREPARA (pagamento unico): stesse guardie fin qui,
+     ma invece di pagare salva il body e torna ai carrelli */
+  if (d.tipo==='set' && d.busta) { salvaCarrelloPronto(); return; }
   if (d.tipo==='set') startBuySet(); else startBuy();
 }
 /* ---------------- la pagina del pacco (ago 2026) ----------------
@@ -23345,24 +23422,46 @@ function totaleCarrello(scelte){
   }
   return {tot, pezzi, circa};
 }
+/* La cifra nella valuta dello spettatore, come la barra del carrello */
+const resaCarrello = (n, circa) => valutaVista === 'eur'
+  ? `≈ ${fmtEur(n * eurPerSat)} €` : `${circa}${fmt(n)} sats`;
+/* Un carrello e' PRONTO per il pagamento unico se la cassa l'ha
+   preparato E la composizione e' ancora quella (la firma): una riga
+   entrata o uscita dopo rimanda in cassa, mai un conto vecchio dentro
+   una fattura nuova. */
+function carrelloPronto(c){
+  const p = carrelliPronti.get(c.sellerId);
+  return (p && p.firma === firmaScelte(c.scelte)) ? p : null;
+}
 function renderCarrelli(){
   const box = el('carrelliLista'); if (!box) return;
   const tutti = carrelliTutti();
+  /* «Paga tutto insieme» vive da DUE carrelli in su: con uno solo c'e'
+     «Controlla e paga», che e' la cassa di sempre */
+  const unico = tutti.length >= 2;
   el('carrelliSub').textContent = tutti.length
     ? `${tutti.length} venditor${tutti.length===1?'e':'i'}, una spedizione per carrello`
     : 'uno per venditore';
   if (!tutti.length) {
     box.innerHTML = '<div id="carrelliVuoto">Nessun carrello aperto. Nel tuo barattolo 🫙 tocca il 🛒 sulla foto di un oggetto per cominciarne uno.</div>';
+    aggiornaBarraCarrelli();
     return;
   }
-  const resa = (n, circa) => valutaVista === 'eur'
-    ? `≈ ${fmtEur(n * eurPerSat)} €` : `${circa}${fmt(n)} sats`;
+  const resa = resaCarrello;
   box.innerHTML = tutti.map(c => {
     const righe = [...c.scelte]
       .map(([id, qta]) => ({l: annuncioDelCarrello(id), qta}))
       .filter(r => r.l);
     const primo = righe.length ? righe[0].l : null;
     const t = totaleCarrello(c.scelte);
+    /* la riga del pagamento unico: pronto (con via e totale), da
+       preparare, o da ricontrollare perche' il carrello e' cambiato */
+    const pr = carrelloPronto(c);
+    const rigaUnico = !unico ? '' : pr
+      ? `<div class="carrello-unico pronto">✓ Pronto per il pagamento unico · ${esc(pr.etichetta)} · <span class="mono">${resa(pr.totale, pr.stima ? '≈ ' : '')}</span><button type="button" class="btn ghost mini" onclick="preparaCarrello(${c.sellerId})">Modifica</button></div>`
+      : `<div class="carrello-unico">${carrelliPronti.has(c.sellerId)
+          ? 'Il carrello è cambiato: da ricontrollare per il pagamento unico'
+          : 'Per pagare tutto insieme serve la consegna di ogni carrello'}<button type="button" class="btn ghost mini" onclick="preparaCarrello(${c.sellerId})">${carrelliPronti.has(c.sellerId) ? 'Ricontrolla' : 'Prepara'}</button></div>`;
     const mini = righe.map(r => {
       const tit = esc(r.l.title) + (r.qta > 1 ? ` × ${fmt(r.qta)}` : '');
       const foto = r.l.photos && r.l.photos[0];
@@ -23382,8 +23481,155 @@ function renderCarrelli(){
         <button type="button" class="btn ghost" onclick="apriCarrello(${c.sellerId})">Apri</button>
         <button type="button" class="btn orange" onclick="pagaCarrello(${c.sellerId})">Controlla e paga</button>
       </div>
+      ${rigaUnico}
     </div>`;
   }).join('');
+  aggiornaBarraCarrelli();
+}
+/* La barra in fondo a «I tuoi carrelli»: il totale dei carrelli PRONTI
+   e «Paga tutto insieme» — o «Prepara il prossimo» finche' ne manca
+   uno. Solo con due carrelli o piu' (body.con-carrelli). */
+function aggiornaBarraCarrelli(){
+  const b = el('barraCarrelli'); if (!b) return;
+  const tutti = carrelliTutti();
+  const unico = tutti.length >= 2;
+  /* la classe sul body guarda anche la VISTA (la barra e' fissa, e
+     fuori dalla pagina non deve comparire); i testi si scrivono
+     comunque — apriCarrelli disegna PRIMA di cambiare vista, e col
+     gate sulla vista la barra arrivava vuota (visto dal vivo) */
+  document.body.classList.toggle('con-carrelli',
+    unico && el('view-carrelli').classList.contains('active'));
+  if (!unico) return;
+  const pronti = tutti.map(c => carrelloPronto(c)).filter(Boolean);
+  const tot = pronti.reduce((s, p) => s + p.totale, 0);
+  el('carrelliTot').textContent = pronti.length
+    ? resaCarrello(tot, pronti.some(p => p.stima) ? '≈ ' : '') : '—';
+  el('carrelliPronti').textContent =
+    `${pronti.length} di ${tutti.length} carrelli pront${pronti.length===1?'o':'i'}`;
+  const manca = tutti.find(c => !carrelloPronto(c));
+  const btn = el('carrelliPaga');
+  btn.textContent = manca ? 'Prepara il prossimo' : 'Paga tutto insieme';
+  btn.onclick = manca ? () => preparaCarrello(manca.sellerId)
+                      : () => startBuyCarrelli();
+}
+/* La cassa del carrello in modalita' «prepara»: stessa pagina, stesso
+   conto del server, ma il bottone in fondo salva invece di pagare. */
+function preparaCarrello(sid){
+  haptic();
+  if (!rimontaCarrello(sid)) return;
+  apriAcquistoSet(true);
+}
+const etichettaViaBusta = v => v==='ritiro' ? 'ritiro a mano'
+  : v==='punto' ? 'al punto di ritiro' : v==='casa' ? 'spedizione a casa' : (v || '');
+/* Il «Pronto» della cassa: il body che startBuySet avrebbe mandato
+   (stesse righe, stessa consegna, stesso codice o accordo: i tre
+   varchi dicono la stessa cosa per costruzione) va nel registro dei
+   pronti col totale del preventivo, e si torna ai carrelli. */
+function salvaCarrelloPronto(){
+  const d = acqDati, p = d && d.preventivo;
+  const via = p && (p.strade||[]).find(x => x.via === d.via);
+  if (!p || !via || !paccoDati) { toast('Il conto non è pronto: riprova'); return; }
+  const accId = d.accordoId || 0;
+  const righe = [...setScelte].map(([id, qta]) => ({annuncio_id:id,
+    quantita:qta, offerta_id: accId ? 0
+      : (offertaAccettataPer(id, true)?.id || 0)}));
+  const body = {righe, ...corpoConsegna(),
+                ...(accId ? {offerta_carrello_id: accId} : corpoCodiceSconto())};
+  carrelliPronti.set(paccoDati.sellerId, {
+    body, firma: firmaSet(), totale: via.totale_sats || 0,
+    stima: !!(p.stima || via.stima), etichetta: etichettaViaBusta(d.via),
+    art: p.articolo_lordo_sats || p.articolo_sats || 0,
+    sped: via.spedizione_sats || 0, sconto: p.sconto_sats || 0,
+    prot: p.protezione_sats || 0});
+  haptic();
+  toast('✓ Carrello pronto per il pagamento unico');
+  navIndietro();
+}
+/* «Paga tutto insieme»: UNA fattura per la somma dei carrelli pronti.
+   Il gemello di startBuySet col body a carrelli: stesso paySheet,
+   stesso QR, poll suo (verificaCarrelli). Sul no del server — che
+   NOMINA il carrello («Carrello 2: …») — quel carrello torna da
+   preparare, gli altri restano pronti. */
+async function startBuyCarrelli(){
+  haptic();
+  if (VETRINA || DEMO) { toast('Nel demo si guarda soltanto ⚡'); return; }
+  const tutti = carrelliTutti();
+  const pronti = tutti.map(c => ({c, p: carrelloPronto(c)}));
+  if (tutti.length < 2 || pronti.some(x => !x.p)) {
+    toast('Prepara prima ogni carrello: serve la consegna di ognuno');
+    return;
+  }
+  /* le altre tre modalita' del foglio si spengono: l'«Annulla» deve
+     colpire QUESTA busta e nessun ordine di un giro prima */
+  rilancioCorrente = pagamentoCorrente = carrelliCorrente = null;
+  currentOrderId = null;
+  const somma = k => pronti.reduce((s, x) => s + (x.p[k] || 0), 0);
+  const tot = somma('totale');
+  el('payAmount').textContent = (pronti.some(x => x.p.stima) ? '≈ ' : '') + fmt(tot);
+  el('payScomposto').innerHTML = contoScomposto({art: somma('art'),
+    sped: somma('sped'), prot: somma('prot'), tot, qta: 1,
+    sconto: somma('sconto'), accordo: 0, suppl: 0, pezziSped: 0,
+    scontoPct: 0, scontoOrigine: ''});
+  el('payEurNota').style.display = 'block';
+  el('payEurNota').textContent =
+    `Pagamento unico di ${tutti.length} carrelli: a pagamento avvenuto nascono ${tutti.length} ordini, ognuno col suo deposito di garanzia.`;
+  el('sheetBg').classList.add('open');
+  el('paySheet').classList.add('open');
+  aggiornaPayHint();
+  el('payInvoice').textContent = 'creazione invoice…';
+  mostraQr('');
+  let r, d = {};
+  try {
+    r = await fetch(`${API_BASE}/carrelli/paga`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Tg-Init-Data':authHdr()},
+      body: JSON.stringify({carrelli: pronti.map(x => x.p.body)})});
+    d = await r.json().catch(()=>({}));
+  } catch(e) { r = null; d = {detail: 'Rete assente: riprova'}; }
+  if (!r || !r.ok) {
+    toast(d.detail || 'Errore nella creazione del pagamento', 7000);
+    /* chiusura MIRATA (mai closeSheet: il patto del pollTimer) */
+    el('paySheet').classList.remove('open');
+    if (!document.querySelector('.sheet.open'))
+      el('sheetBg').classList.remove('open');
+    const m = /^Carrello (\d+):/.exec(d.detail || '');
+    if (m && pronti[m[1] - 1]) carrelliPronti.delete(pronti[m[1] - 1].c.sellerId);
+    renderCarrelli();
+    return;
+  }
+  carrelliCorrente = d.pagamento_id;
+  el('payAmount').textContent = fmt(d.importo_sats);
+  el('payInvoice').textContent = d.invoice;
+  mostraQr(d.invoice);
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(()=>verificaCarrelli(carrelliCorrente), 4000);
+}
+/* Il poll del pagamento unico: a saldo arrivato gli ordini sono nati
+   (o la parte morta e' in rimborso), i carrelli si svuotano TUTTI e si
+   va agli Ordini, dove ognuno ha la sua riga. */
+async function verificaCarrelli(pid){
+  if (!pid) return;
+  try {
+    const r = await fetch(`${API_BASE}/carrelli/${pid}/verifica`,
+      {method:'POST', headers:{'X-Tg-Init-Data':authHdr()}});
+    const d = await r.json();
+    if (d.stato === 'in_attesa' || d.stato === 'creato') return;
+    carrelliCorrente = null;
+    closeSheet();              /* spegne anche il poll */
+    if (d.stato === 'pagato'){
+      carrelliDaParte = new Map(); carrelliPronti = new Map();
+      setScelte = new Map(); paccoDati = null; acqDati = null;
+      aggiornaCarrelloCards();
+      const n = (d.nati || []).length, m = (d.morti || []).length;
+      await loadOrders(); renderOrders();
+      go('affari');
+      toast(`🔒 ${n} ordin${n===1?'e':'i'} pagat${n===1?'o':'i'}, ${n===1?'col suo deposito':'ognuno col suo deposito'}`
+        + (m ? ` — ${m} non ${m===1?'è nato':'sono nati'}: la parte torna a te, apri l'ordine` : ''), 8000);
+      return;
+    }
+    toast('Questo pagamento non è più in attesa', 5000);
+    renderCarrelli();
+  } catch(e) {}
 }
 /* Il carrello di un venditore si rimonta e si riapre com'era: la
    provenienza torna sul suo annuncio (o sul primo pezzo, se quello
@@ -24005,7 +24251,7 @@ async function rinfrescaSet(){
   rinfrescaViste();
   const inCassaSet = el('view-acquisto')?.classList.contains('active')
                   && acqDati?.tipo === 'set';
-  if (inCassaSet && setScelte.size < 2) { navIndietro(); return; }
+  if (inCassaSet && setScelte.size < (acqDati.busta ? 1 : 2)) { navIndietro(); return; }
   if (inCassaSet) caricaPreventivo();   /* arriva e ridisegna */
 }
 /* Il gemello di startBuy: stesso paySheet, stesso poll, ma il body
@@ -24020,6 +24266,7 @@ async function startBuySet(){
     { toast('Con un oggetto solo c\'è l\'acquisto di sempre: aprilo dalla sua scheda'); return; }
   rilancioCorrente = null;
   pagamentoCorrente = null;
+  carrelliCorrente = null;
   currentOrderId = null;     /* il patto di startBuy: l'Annulla non deve
                                 mai colpire un ordine di un giro prima */
   /* in modalita' accordo le offerte per riga si azzerano e l'id
@@ -25182,6 +25429,7 @@ async function startBuy(){
   haptic();
   rilancioCorrente = null;   /* il paySheet torna al poll degli ordini */
   pagamentoCorrente = null;
+  carrelliCorrente = null;
   currentOrderId = null;     /* l'Annulla non deve mai colpire un ordine
                                 di un giro precedente */
   if (VETRINA) {
@@ -25289,6 +25537,11 @@ async function verificaOrdine(oid){
          e con lui il conto della cassa, per la stessa ragione */
       paccoDati = null; setScelte = new Map();
       acqDati = null;
+      /* ...e se l'ordine era la quota di un PAGAMENTO UNICO (pagato da
+         «Paga ora»), sono nati anche gli altri: via tutti i carrelli,
+         e le preparazioni con loro (24 set 2026) */
+      if (d.pagamento_unico) { carrelliDaParte = new Map(); carrelliPronti = new Map(); }
+      aggiornaCarrelloCards();
       /* niente toast (ago 2026): durava tre secondi e non lasciava
          niente da ritrovare. Adesso la ricevuta la manda il SERVER da
          _incassa_ordine — su questa strada come su quelle
@@ -25348,6 +25601,9 @@ function pannelloDaPagare(o){
     ? `<h4>⚡ Manca il tuo pagamento</h4>
       <div class="hint da-pagare">La fattura scade tra <b class="mono" id="ordFatturaScade">${minutiSecondi(resta)}</b>. Se hai chiuso il foglio del pagamento, la riapri da qui: è la stessa.</div>
       <button class="btn orange" onclick="pagaOraOrdine()">⚡ Paga ora</button>`
+    : o.pagamentoId
+    ? `<h4>⌛ La fattura unica è scaduta</h4>
+      <div class="hint da-pagare">Era una fattura sola per più carrelli e non si rigenera: se gli oggetti ti interessano ancora, rifai i carrelli dal tuo barattolo e paga di nuovo.</div>`
     : !o.fatturaRinnovataIl
     ? `<h4>⌛ La fattura è scaduta</h4>
       <div class="hint da-pagare">Non è arrivato nessun pagamento. Generane una nuova: stesso importo, stesso ordine.</div>
@@ -25397,6 +25653,7 @@ function avviaOrologioOrdine(o){
 function apriFoglioFattura(oid, invoice, sats, scade, nota){
   rilancioCorrente = null;
   pagamentoCorrente = null;
+  carrelliCorrente = null;
   currentOrderId = oid;
   el('payAmount').textContent = fmt(sats);
   el('payScomposto').innerHTML = '';
@@ -25417,8 +25674,12 @@ function pagaOraOrdine(){
   const o = currentOrder;
   if (!o || !o.fattura) return;
   haptic();
-  apriFoglioFattura(o.id, o.fattura, o.listing.price, scadenzaFatturaOrdine(o),
-    'È la stessa fattura di prima: pagala prima che scada.');
+  apriFoglioFattura(o.id, o.fattura,
+    o.pagamentoId ? (o.pagamentoUnicoSats || o.listing.price) : o.listing.price,
+    scadenzaFatturaOrdine(o),
+    o.pagamentoId
+      ? 'È la fattura unica dei tuoi carrelli: vale per tutti gli ordini insieme, pagala prima che scada.'
+      : 'È la stessa fattura di prima: pagala prima che scada.');
 }
 /* «⚡ Genera una nuova fattura»: dal dettaglio e dal foglio. Il server
    decide tutto — se quella di prima e' ancora viva la ripresenta, se
@@ -25785,9 +26046,10 @@ async function disegnaQr(box, testo, modo){
 async function annullaPagamento(){
   if (DEMO || VETRINA) { navIndietro(); return; }
   const ril = rilancioCorrente, oid = currentOrderId,
-        pag = pagamentoCorrente;
-  if (!ril && !oid && !pag) { navIndietro(); return; }
-  const cosa = pag ? 'questo sblocco'
+        pag = pagamentoCorrente, car = carrelliCorrente;
+  if (!ril && !oid && !pag && !car) { navIndietro(); return; }
+  const cosa = car ? 'questo pagamento unico'
+             : pag ? 'questo sblocco'
              : ril ? 'questa fattura di puntata' : 'questo ordine';
   /* Il foglio di casa si apre SOPRA il paySheet, e regge per
      costruzione: sta dopo di lui nel DOM (quindi navPila lo mette in
@@ -25799,7 +26061,8 @@ async function annullaPagamento(){
          + 'attendi la verifica.',
     etichetta: 'Sì, annulla',
     poi: async () => {
-      const url = pag ? `${API_BASE}/pagamenti/${pag}/annulla`
+      const url = car ? `${API_BASE}/carrelli/${car}/annulla`
+                : pag ? `${API_BASE}/pagamenti/${pag}/annulla`
                 : ril ? `${API_BASE}/rilanci/${ril}/annulla`
                       : `${API_BASE}/orders/${oid}/annulla`;
       const r = await fetch(url, {method:'POST',
@@ -25813,8 +26076,10 @@ async function annullaPagamento(){
       }
       if (ril) rilancioCorrente = null;
       if (pag) pagamentoCorrente = null;
+      if (car) carrelliCorrente = null;
       navIndietro();
-      toast(pag ? '✖️ Sblocco annullato: non è stato pagato niente'
+      toast(car ? '✖️ Pagamento unico annullato: i carrelli restano qui'
+          : pag ? '✖️ Sblocco annullato: non è stato pagato niente'
           : ril ? '✖️ Fattura di puntata annullata' : '✖️ Ordine annullato');
       if (!ril && !pag) { await loadOrders(); renderOrders(); }
     }});
@@ -26139,7 +26404,8 @@ function sheetPaid(){
   /* il paySheet serve TRE pagamenti: l'ordine di sempre, la fattura
      di puntata e lo sblocco del banner — a dirlo e' la variabile
      -modalita' che il flusso ha valorizzato */
-  if (pagamentoCorrente) verificaSblocco(pagamentoCorrente);
+  if (carrelliCorrente) verificaCarrelli(carrelliCorrente);
+  else if (pagamentoCorrente) verificaSblocco(pagamentoCorrente);
   else if (rilancioCorrente) verificaPuntata(rilancioCorrente);
   else verificaOrdine(currentOrderId);
 }
@@ -28203,7 +28469,28 @@ function openOrder(id){
   const rigaSpedizione = () =>
     `${esc(o.corriere)} — tracking ${codiceTracking(o, s)}${rigaCorretto(o.trackingCorretto)}`;
   let steps, progress;
-  if (['dispute','refund','refunded','return_pending','return_shipped'].includes(s)) {
+  if (o.maiIncassato && ['refund','refunded'].includes(s)) {
+    /* LA QUOTA MAI NATA DI UN PAGAMENTO UNICO (24 set 2026): niente
+       disputa da raccontare — la fattura unica e' stata pagata, un
+       articolo non c'era piu' quando il saldo e' arrivato, e la sua
+       parte torna. Tre passi, e il racconto della disputa qui sotto
+       direbbe cose mai successe (visto dal vivo). */
+    steps = [
+      {t:'Hai pagato la fattura unica',
+       d:'I sats di questo carrello erano nel pagamento di più venditori'},
+      {t:'L\'ordine non è nato',
+       d:'Un articolo non era più disponibile quando il pagamento è arrivato'},
+      s==='refunded'
+        ? {t: o.role==='buyer' ? 'Ti abbiamo rimborsato la sua parte'
+                               : 'La sua parte è tornata all\'acquirente',
+           d:'Per intero, nessuna commissione'}
+        : {t: o.role==='buyer' ? 'Ti rimborsiamo la sua parte'
+                               : 'La sua parte torna all\'acquirente',
+           d: o.role==='buyer' ? 'Scegli qui sotto come riceverla'
+                               : 'Appena dice dove riceverla'},
+    ];
+    progress = s==='refunded' ? 3 : 2;
+  } else if (['dispute','refund','refunded','return_pending','return_shipped'].includes(s)) {
     /* Storia della disputa: la cassaforte racconta il congelamento */
     const conReso = ['return_pending','return_shipped'].includes(s);
     steps = [
@@ -28351,7 +28638,12 @@ function openOrder(id){
       d:o.role==='buyer'  ? `Ti abbiamo rimborsato ${cifraOrdine(o, o.listing.price)} (integrale)`
                           : 'I sats sono tornati all\'acquirente'}
     : s==='refund'              ? {ic:'↩️', b:'Rimborso in corso',
-      d:o.role==='buyer'  ? 'Disputa vinta! Scegli qui sotto come ricevere i tuoi sats'
+      /* la quota di un pagamento unico mai nata (24 set 2026): niente
+         disputa da nominare, un articolo non c'era piu' */
+      d:o.maiIncassato    ? (o.role==='buyer'
+                              ? 'Un articolo non era più disponibile: scegli qui sotto come ricevere la parte che ti torna'
+                              : 'Quest\'ordine non è nato: un articolo non era più disponibile, i sats tornano all\'acquirente')
+        : o.role==='buyer'  ? 'Disputa vinta! Scegli qui sotto come ricevere i tuoi sats'
                           : 'Disputa decisa: i sats tornano all\'acquirente'}
     : ['return_pending','return_shipped'].includes(s)
       /* IL RESO E' UN GESTO, e finche' non e' partito e' di chi ha
@@ -33753,14 +34045,14 @@ function refundPanel(o){
   if (myLnAddress) return `
     <div class="payout">
       <h4>↩️ Rimborso in elaborazione</h4>
-      <div class="hint">Hai vinto la disputa: <b class="net">${fmt(o.listing.price)}<span class="unit">sats</span></b> in arrivo su <b>${esc(myLnAddress)}</b>. Se non arrivano, incolla qui sotto una invoice.</div>
+      <div class="hint">${o.maiIncassato ? 'Un ordine del tuo pagamento unico non è nato, e la sua parte torna a te' : 'Hai vinto la disputa'}: <b class="net">${fmt(o.listing.price)}<span class="unit">sats</span></b> in arrivo su <b>${esc(myLnAddress)}</b>. Se non arrivano, incolla qui sotto una invoice.</div>
       <textarea id="sellerInvoice" placeholder="lnbc… (invoice di ${fmt(o.listing.price)} sats)"></textarea>
       <button class="btn orange" onclick="saveSellerInvoice(this)">↩️ Ricevi il rimborso</button>
     </div>`;
   return `
     <div class="payout">
       <h4>↩️ Ricevi il tuo rimborso</h4>
-      <div class="hint">La disputa è stata risolta <b>a tuo favore</b>: ti aspettano <b class="net">${fmt(o.listing.price)}<span class="unit">sats</span></b> (rimborso integrale).
+      <div class="hint">${o.maiIncassato ? 'Un ordine del tuo pagamento unico <b>non è nato</b> (un articolo non era più disponibile)' : 'La disputa è stata risolta <b>a tuo favore</b>'}: ti aspettano <b class="net">${fmt(o.listing.price)}<span class="unit">sats</span></b> (${o.maiIncassato ? 'la sua parte, per intero' : 'rimborso integrale'}).
         <br><br><b>⚡ Consigliato:</b> imposta il tuo Lightning address per riceverli subito (e per tutti gli incassi futuri).</div>
       <textarea id="lnAddrInput" style="min-height:38px" placeholder="nome@walletofsatoshi.com"></textarea>
       <button class="btn orange" onclick="saveLnAddress(this)">⚡ Ricevi con Lightning address</button>

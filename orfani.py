@@ -58,7 +58,9 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 # un quinto va aggiunto, o un incasso nostro finirebbe fra i «non
 # nostri» di la' e fra il capitale di la' — in silenzio tutt'e due.
 NOSTRI = ("Barattolo escrow #", "Barattolo escrow set:",
-          "Barattolo asta #", "Barattolo sblocco banner #")
+          "Barattolo asta #", "Barattolo sblocco banner #",
+          # il pagamento unico di piu' carrelli (24 set 2026)
+          "Barattolo escrow carrello #")
 
 # Le tre tabelle che portano una fattura in ENTRATA col suo hash.
 # `rimborsi_asta` e `payout_hash` sono uscite: non c'entrano.

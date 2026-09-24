@@ -764,3 +764,24 @@ SELECT id, tabella, riga_id, cassaforte, pagato_da, sats, stato,
 SELECT '25b) GLI INCASSI DEVIATI (un polso: ognuno con la sua nota)' AS polso;
 SELECT id, stato, payout_stato, cassaforte, cassaforte_payout, payout_nota
   FROM ordini WHERE COALESCE(cassaforte_payout,'') <> '';
+
+-- ---------------------------------------------------------------------
+-- 26) IL PAGAMENTO UNICO DI PIU'' CARRELLI (24 set 2026): la busta e''
+-- una riga di `pagamenti` (motivo 'carrello') e ogni ordine nato da
+-- lei porta il suo `pagamento_id`. Due controlli, gli stessi della
+-- ronda: un ordine con una busta che non c''e'' (o non e'' un
+-- carrello), e una busta PAGATA da piu'' di un''ora con un ordine
+-- ancora fermo — l''incasso e'' morto a meta'': si fa girare la
+-- verifica del pagamento unico, o si guarda a mano.
+SELECT '26) ORDINE DI UN PAGAMENTO UNICO SENZA BUSTA (deve essere vuoto)' AS controllo;
+SELECT o.id, o.pagamento_id, o.stato, p.motivo
+  FROM ordini o LEFT JOIN pagamenti p ON p.id = o.pagamento_id
+ WHERE o.pagamento_id <> 0 AND (p.id IS NULL OR p.motivo <> 'carrello');
+
+SELECT '26b) PAGAMENTO UNICO PAGATO CON ORDINI FERMI (deve essere vuoto)' AS controllo;
+SELECT o.id, o.pagamento_id, o.stato,
+       datetime(p.pagato_il, 'unixepoch', 'localtime') AS pagato
+  FROM ordini o JOIN pagamenti p ON p.id = o.pagamento_id
+ WHERE p.motivo = 'carrello' AND p.stato = 'pagato'
+   AND p.pagato_il < strftime('%s','now') - 3600
+   AND o.stato IN ('creato','annullato');
