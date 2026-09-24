@@ -3515,7 +3515,8 @@
   oltre le aperture — niente clic sui link, niente tempo di lettura,
   niente chi.
   LE PAGINE DEI NEGOZI CONSIGLIATI, IN BOZZA (set 2026; la prima e'
-  «Una Garlanda»): la stessa forma di `RACCONTI` e lo STESSO renderer,
+  «Una Garlanda», la seconda «Un tempo per te» — una voce del catalogo e
+  i suoi file, nessun ramo suo): la stessa forma di `RACCONTI` e lo STESSO renderer,
   ma i DATI vivono sul server, in `racconti.py` — una bozza nel
   catalogo del client sarebbe leggibile nel sorgente da chiunque apra
   la pagina. Il testo esce da DUE porte: `/api/negozio` (la chiave
@@ -3598,6 +3599,19 @@
   (75,6px: sul computer scala con la card) e una regola sola lo applica
   con `translateY`, fuori dalla transizione. To The Mooon ha 4: il peso
   del suo disegno sta al 39% dell'altezza, ~5px sopra il centro.
+  IL BANNER DI UNA PAGINA DEL SERVER (set 2026, «Un tempo per te»): nella
+  pagina le voci del catalogo di casa hanno il banner di «Da scoprire», e
+  una pagina del server lo puo' avere dichiarando `banner: True` in
+  `racconti.py`, col file in `assets/scoprire/<slug>.webp` alle misure di
+  quello di To The Mooon (1040x498). La busta porta la SESTA chiave,
+  `banner`, vero/falso (solo col `True` del catalogo) e mai un nome di
+  file: lo compone il client dallo slug gia' ripassato. La rotta e' quella
+  di «Da scoprire»: dopo `FILE_SCOPRIRE` passa da `_banner_consigliato`,
+  cioe' una chiave di `RACCONTI_NEGOZI` con la stretta dei loghi — solo a
+  pagina pubblicata col banner vero. Senza banner, la riserva col logo.
+  NON accende lo spazio sponsorizzato, che resta del catalogo di casa (uno
+  slug non sta nei due cataloghi): il file e' pronto, la leva no. Il
+  perche': Cantieri, la voce «Un tempo per te» in bozza.
   IL GIRO: solo il primo logo ha il suo `src` (gli altri `data-src`,
   chiesti un giro prima del loro turno) e a `fetchpriority="low"`; il
   timer nasce con due loghi, si riarma a ogni ridisegno della fila
@@ -26955,7 +26969,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    il nome arriva dal client, quindi whitelist — `SLUG_CATEGORIE`,
    calcolata dal catalogo), `/assets/scoprire/{nome}` (i due banner
    della sezione «Da scoprire», whitelist a tupla `FILE_SCOPRIRE`,
-   ago 2026), `/assets/consigliati/{slug}.webp` (i loghi della card
+   ago 2026; da set 2026 anche il banner della card dei Consigliati di
+   una pagina del server, solo pubblicata col `banner` vero — vedi «I
+   CONSIGLIATI: LA CARD E LA PAGINA»), `/assets/consigliati/{slug}.webp` (i loghi della card
    «Consigliati», set 2026: whitelist di FORMA più i due cataloghi, e
    delle pagine del server solo quelle pubblicate col logo — vedi «I
    CONSIGLIATI: LA CARD E LA PAGINA»), `/assets/mascotte.jpeg`,

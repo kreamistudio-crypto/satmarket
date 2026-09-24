@@ -30633,3 +30633,159 @@ due lo mostra due volte — è il prezzo di non perderlo mai.
 **DA GUARDARE.** L'anteprima OG dice il listino (79,00 €) mentre il
 testo dice lo scontato (71,10 €): due cifre vere, ma diverse nello
 stesso messaggio. Non toccato qui.
+
+## «Un tempo per te» in bozza: la seconda pagina, le foto arrivate e il banner della card (24 set 2026)
+
+**LA RICHIESTA.** La pagina del negozio «Un tempo per te» — Luca e Katia,
+Dro (TN), autoproduzione vegetale, B&B ecologico e Vegan Home Lab — con lo
+stesso motore e lo stesso percorso di Una Garlanda: in bozza, visibile ai
+moderatori e al venditore collegato (col tg_id, @lucabortolameotti)
+col riquadro «Anteprima: la vedi solo tu», pubblicazione dal pannello.
+Con in più tre materiali che Una Garlanda non aveva: le SEI FOTO, il LOGO
+(un PDF vettoriale) e un BANNER per la card del negozio nella pagina
+«Consigliati», da tenere pronto anche per lo spazio sponsorizzato di «Da
+scoprire» senza accenderlo.
+
+**LA PAGINA È UNA VOCE DI `racconti.py`, E NIENT'ALTRO.** Nessun ramo
+suo: il renderer, le tre porte, il giudice della bozza, il cassetto del
+pannello e il messaggio per il venditore sono quelli del 23 set. Il
+legame col venditore è il tg_id, la stessa eccezione dichiarata di Una
+Garlanda (decisione di Andrea, «come per Manuele»), con la stessa strada
+del ritorno: letto il codice nel cassetto, una riga.
+IL TESTO: usato com'era consegnato, una correzione sola e dichiarata —
+«sono nati il Home Lab» è diventato «il Vegan Home Lab», il nome intero
+com'è nella scheda sopra, che rimette a posto l'articolo. Il TITOLO
+consegnato («Un tempo per te. Il cibo, per noi, è cura.») è la riga
+intera dell'h3 della testa (`sottotitolo`, che è quel che il renderer
+mostra lì); `titolo` resta il nome del negozio, «Un tempo per te», che
+serve alla card, al cassetto e al messaggio. «Com'è nato» sono le
+`tappe` di Una Garlanda (il titolo sopra, la prosa sotto con la
+maiuscola), «Com'è fatto» l'`elenco` a pallini, la chiusura la `firma`.
+
+**LE FOTO: WEBP DA PAGINA, NON GLI ORIGINALI.** La copertina (1280x599)
+ritagliata a 21:9 centrata — il rapporto dell'hero sta nel file, e
+l'architettura lo chiede consegnato così —, le altre col loro rapporto;
+al massimo 1360 di lato come quelle di To The Mooon e MAI ingrandite
+(cinque su sei arrivavano più piccole), qualità 82, senza metadati: 67-169 KB
+l'una, 7 file. Il dettaglio arrivava da 2621x3278 e 1,2 MB. Una prova
+nuova lo tiene per tutte le pagine del server: WebP, niente
+EXIF/XMP/ICC, entro 1360 e 250 KB, copertina 21:9 — un EXIF porta la
+data, il telefono e a volte il luogo dello scatto di chi ce le manda.
+
+**IL LOGO: DAL PDF COL RENDERER DI WINDOWS.** Sulla macchina non c'era
+nessun lettore di PDF (niente PyMuPDF, poppler, Ghostscript, Inkscape),
+e invece di scaricarne uno si è usato quello che Windows ha già,
+`Windows.Data.Pdf` da PowerShell, con lo sfondo trasparente: il logo era
+un disegno su una pagina A4 con attorno il vuoto. Reso a 12000 px di
+larghezza, ritagliato sopra la soglia 8, ne è uscito un PNG 2420x4125
+(consegnato ad Andrea accanto al PDF, `logo.png`), e da lì
+`prepara_logo_consigliato.py` → 253x432, 37 KB. Lo script avverte «il
+logo non ha bordi trasparenti», ed è un falso allarme DICHIARATO: il PNG
+era già ritagliato a filo, quindi i bordi toccano la tela. `logo_giu` a
+−4: il peso del disegno sta al 56% dell'altezza (il riquadro scuro col
+nome in basso, il camino sottile in cima), cioè ~4 px sotto il centro
+nella card da 84. Il riquadro bruno del logo quasi si confonde col bruno
+della card: il nome bianco si legge, e il bordo bianco lo contorna —
+guardato nei due temi, da rivedere sul telefono.
+
+**IL BANNER È IL PEZZO NUOVO, e decide una cosa di architettura.** Fino
+a ieri nella pagina «Consigliati» le voci del catalogo di casa avevano il
+banner di «Da scoprire» e le pagine del server la RISERVA col logo sul
+bruno, per costruzione: la busta non portava niente per dire il
+contrario. Adesso una pagina del server può dichiarare `banner: True`:
+- IL FILE sta in `assets/scoprire/<slug>.webp`, alle misure di quello
+  di To The Mooon (1040x498) — è la stessa card, e un rapporto diverso lo
+  ritaglierebbe il CSS a caso. Il sorgente era 14882x6024 (2,47:1) contro
+  2,09:1: ritaglio centrato, perdono ~7,7% per lato. Resta intero quel che
+  conta — il logo, «Ogni sapore. Al suo tempo.», il cuore —; se ne vanno
+  la margherita gialla a sinistra e quasi tutto il ramo di ciliegie in
+  alto a destra (resta una ciliegia al bordo), più un po' di foglie ai
+  lati. Detto ad Andrea, perché la scelta del taglio è sua.
+- LA BUSTA porta una SESTA chiave, `banner`, vero/falso e mai un nome di
+  file: vero solo col `True` del catalogo (una stringa lo lascia falso),
+  e il nome lo compone il client dallo slug che ha già ripassato dalla
+  forma. Senza, la card resta la riserva col logo di sempre, che è anche
+  il ripiego di un banner che non arriva.
+- LA ROTTA è quella di «Da scoprire», e non una nuova: ogni file servito
+  ha la sua rotta, e questo file È una card di «Da scoprire». Dopo
+  `FILE_SCOPRIRE` (l'elenco delle card fisse e dello spazio) passa da
+  `_banner_consigliato`: lo slug dev'essere una chiave di
+  `RACCONTI_NEGOZI` — nessun nome inventato diventa un percorso — con la
+  STRETTA DEI LOGHI, cioè solo a pagina pubblicata col suo `banner` vero.
+  Il banner di una bozza non lo chiede nessuno (la pagina dei Consigliati
+  una bozza non la mostra), al contrario delle foto, che l'anteprima deve
+  vedere e che per questo si servono anche in bozza.
+- LO SPAZIO SPONSORIZZATO NON SI ACCENDE, e non si potrebbe nemmeno per
+  sbaglio: è del catalogo di casa (`SLUG_SPONSOR` + la voce in `RACCONTI`
+  del client), e una prova vieta che uno slug stia nei due cataloghi. Il
+  file è PRONTO — nome e misure sono quelli che quello spazio vuole —, la
+  leva no: il giorno che si vende lo spazio a una pagina del server, il
+  cantiere è decidere come lo spazio legge un catalogo che vive sul
+  server (lo stesso trasloco già rimandato per To The Mooon).
+
+**IL COLLAUDO FA UN GIRO PER OGNI PAGINA.** `collaudo_racconti_bozza`
+era scritto su `una-garlanda`; adesso gira ogni pagina del catalogo col
+nome del suo venditore di collaudo (una pagina senza nome è una rossa,
+non una pagina saltata). Nel giro, oltre a quel che c'era: il banner
+404 in bozza e 200 pubblicata, vero/falso nella busta e 404 fra
+virgolette, 404 di nuovo rimessa in bozza; le foto dichiarate servite
+tutte anche in bozza; e nessuna risposta — il negozio, la sua pagina coi
+meta, la home con la leva, il JSON del negozio — che linki le immagini
+della pagina, prima e dopo la pubblicazione (l'anteprima social resta
+quella del brand).
+
+**LE STRADE SCARTATE.** 1) Il banner in `FILE_SCOPRIRE`: la rotta lo
+servirebbe a pagina in bozza e a chiunque, e quell'elenco dice quali card
+ha «Da scoprire», non chi è consigliato. 2) Il nome del file nella busta:
+un campo in più da ripassare, quando lo slug c'è già. 3) Una rotta sua
+per i banner: una rotta pubblica in più per un file che è una card di «Da
+scoprire». 4) Accendere lo spazio sponsorizzato per «tenerlo pronto»:
+Andrea ha detto di NON attivarlo, e oggi vorrebbe dire la voce nel
+catalogo del client — cioè la pagina leggibile nel sorgente prima di
+essere pubblicata. 5) Ingrandire le foto piccole a 1360: pixel inventati
+e file più pesanti. 6) Scaricare un lettore di PDF: c'era già quello di
+Windows.
+
+**PROVATO.** `prove.py` nel worktree da origin/main, senza config e con
+PROVE_SEVERE: **14.918 verdi, 0 rosse** — in `prove_consigliati` la
+busta a sei chiavi e il banner booleano, la rotta di «Da scoprire»
+GIRATA (le card fisse, la pagina pubblicata, la bozza, quella senza
+banner, quella fra virgolette, lo slug inventato, quattro nomi fuori
+forma), il file del banner alle misure di To The Mooon e nessun file
+orfano nella cartella, la sentinella del client e il banco (banner vero:
+la sua immagine con la riserva del nome; fra virgolette: la riserva col
+logo); in `prove_racconti_bozza` le foto delle pagine del server e la
+forma della pagina nuova. La sentinella «cinque chiavi» è diventata «sei»
+col perché scritto accanto. `collaudo_racconti_bozza` **120 verdi** sui
+due giri; i **sedici collaudi della CI** verdi nella gabbia senza rete.
+**TORTURA 15/15** su una copia: il banner non booleano nella busta e
+nel client, la busta senza banner, il client che lo ignora, la rotta
+che lo serve in bozza o senza dichiarazione o mai, il catalogo col banner
+fra virgolette, il venditore scollegato, una foto che non c'è, il
+ritocco fra virgolette, il banner e il logo mancanti, una copertina non
+21:9, un banner orfano. **DAL VIVO** a 375 px nei due temi (Chrome
+headless via CDP, densità 2) su una COPIA dell'albero col catalogo legato
+al venditore di collaudo 222 — mai il tg_id vero in un server acceso —,
+config finto e relay morto: chi compra apre `/?bozza=un-tempo-per-te` e
+resta sulla home con «Questa anteprima la vedono solo i moderatori e il
+venditore»; il venditore vede la sua anteprima col riquadro, le sei foto
+e la firma, niente sbordo; il moderatore «📝 Bozza · la vedono i
+moderatori e il venditore» col «✅ Pubblica la pagina»; pubblicata (nella
+copia, notifiche simulate), la pagina «Consigliati» mostra To The Mooon e
+sotto il banner di «Un tempo per te», e la card della fila il logo al
+centro del quadrato.
+
+**VISTO E NON TOCCATO.** «Acquista» nella testa del racconto resta a
+tutta larghezza (il difetto già a verbale con Una Garlanda:
+`.rac-acquista{width:auto}` perde contro `.btn{width:100%}`).
+
+**DA FARE (Andrea).** 1) Mandare a Luca il messaggio (cassetto → «🔗
+Copia il link per il venditore», o il testo nel report) e sentire cosa
+vede. 2) Nel cassetto, accanto al suo nome, deve comparire un codice di
+otto caratteri: se dice che quel venditore non ha un negozio, il tg_id è
+sbagliato o quell'account non è mai entrato in Barattolo. 3) Guardare il
+taglio del banner e decidere se va bene (ciliegie e margherita fuori). 4)
+Pubblicare dal pannello quando Luca dice sì: da lì la pagina esce sul suo
+negozio, il logo entra nella card dei Consigliati e il banner nella loro
+pagina. 5) Sul telefono: il logo nella card (il riquadro bruno sul
+bruno) nei due temi.
