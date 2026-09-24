@@ -29810,3 +29810,71 @@ Duplica, Modifica che non tocca, «Annulla» che non salva.
 un'anteprima lunga che scorre fino ai bottoni, il campo di Vendi già
 scritto (anche col Duplica); e chi pubblica col proprio account Nostr,
 che dopo l'aggiornamento si ritrova una firma in coda per ogni articolo.
+
+
+## Il catalogo esterno dentro «Importa in blocco» (24 set 2026)
+
+Stesso giro, dalla segnalazione di un venditore: nel cassetto «🏪 Il tuo
+negozio» (Shopify/WooCommerce) trovava i campi dei costi di spedizione,
+li prendeva per i suoi, e il salvataggio gli diceva di no — senza un
+negozio da collegare, la prova del negozio non passa. Chiesto da Andrea:
+la spedizione del venditore normale vive **solo** in «📦 Come spedisci»;
+il collegamento si sposta **dentro «📥 Importa in blocco / catalogo
+esterno»** e per ora lo vedono solo i negozi già collegati e i
+moderatori, con una leva per riaccenderlo; nessun negozio collegato perde
+niente.
+
+**Il posto**: la sezione «🏪 Catalogo esterno» in fondo al cassetto
+dell'import (una sezione, non un cassetto nel cassetto), e il titolo del
+cassetto dice «/ catalogo esterno» solo a chi la vede. La notifica del
+negozio muto manda lì.
+
+**Chi la vede** lo dice il server, per persona (`_connettori_visibile`):
+tutti con `CONNETTORI_NEGOZIO_PER_TUTTI` accesa (nasce **spenta**, ed è
+nel pannello delle leve); sennò i moderatori e chi ha già un collegamento,
+in qualunque stato — anche in pausa o rotto, che è quando deve poterlo
+sistemare. La porta nuova si chiude anche sul server, prima di bussare
+al negozio; i ritocchi di un collegamento che c'è passano sempre.
+
+**I costi dopo, e il catalogo che li aspetta.** Nel modulo di un negozio
+nuovo i costi non ci sono più (una riga dice che si scrivono subito
+dopo); compaiono sul negozio collegato, con la riga «valgono solo per i
+prodotti di …». Ma un catalogo letto senza costi entrerebbe in vetrina a
+spedizione zero, cioè gratis detto da noi: la colonna
+`connettori.tariffe_da_dire` lo tiene fermo — il giro dell'ora e
+«Aggiorna ora» non lo leggono — finché i costi non arrivano, e il primo
+giro parte lì. Il client, collegato il negozio, apre da solo quel passo
+(«Ultimo passo: quanto costa spedire», «💾 Salva e leggi il catalogo»).
+Col solo ritiro si legge subito; il client di ieri, che i costi li manda
+alla nascita, fa come sempre; le righe di ieri nascono a 0.
+
+**Strade scartate**: mandare uno zero alla nascita (spedizione offerta
+senza che nessuno l'abbia detto); lasciare i campi dov'erano con una
+riga in più (prima di avere un negozio si leggono come i propri).
+
+**Provato.** `prove_catalogo_esterno` (50: il giudice di chi vede sul
+database, le sentinelle del server, il modulo e il salvataggio del client
+in node caso per caso); `collaudo_catalogo_esterno.py` (32, server e
+rotte vere: il venditore qualunque respinto prima di bussare al negozio,
+il moderatore che collega senza costi, il giro dell'ora e «Aggiorna ora»
+che lo saltano, un ritocco senza costi che non lo sblocca, i costi che
+fanno partire il primo giro una volta, il client di ieri e il solo
+ritiro subito, il negozio di ieri che vede, ritocca e resta letto, la
+leva accesa), nella gabbia della CI; il vecchio `collaudo_connettori.py`
+103/0. **Tortura 34/34** (19 sul server, 15 sul client): al primo giro
+una è sopravvissuta — il ritocco che scrive zero al posto dei costi da
+dire, cioè un catalogo sbloccato dalla porta di servizio — e ha portato
+al collaudo il caso che mancava. Suite intera severa e senza config
+14.674/0 sull'albero rebasato sulla classifica arrivata a metà giro
+(14.639 prima), i quindici collaudi della CI verdi in gabbia. Dal vivo a 375 nei
+due temi (e il titolo a 320), coi tocchi veri e il database della copia:
+il venditore qualunque che vede solo «Importa in blocco», il moderatore
+col modulo senza costi, il negozio che aspetta, l'ultimo passo salvato
+col dito (da «aspetta» a 4,90 € + 1 € nel database), il negozio di ieri
+coi suoi costi e la riga di chi sono.
+
+**Da guardare sul telefono**: da moderatore, il cassetto «📥 Importa in
+blocco / catalogo esterno» e il giro intero su un negozio di prova
+(collega → ultimo passo coi costi → catalogo letto); da venditore
+qualunque, che il cassetto si chiami solo «Importa in blocco» e la
+sezione non ci sia.

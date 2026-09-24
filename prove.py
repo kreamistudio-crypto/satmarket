@@ -27617,7 +27617,8 @@ def _censimento(acceso, dopo=None):
                  "POST_LAMPO_CANALE", "RIEPILOGO_SETTIMANALE",
                  "RIEPILOGO_MINIMO", "RIEPILOGO_IMMAGINE",
                  "MAX_NEGOZI_RAFFICA", "MAX_LINK_NEGOZIO",
-                 "CONNETTORI_NEGOZIO_APERTI", "MAX_PRODOTTI_CONNETTORE",
+                 "CONNETTORI_NEGOZIO_APERTI", "CONNETTORI_NEGOZIO_PER_TUTTI",
+                 "MAX_PRODOTTI_CONNETTORE",
                  "MAX_NUOVI_CONNETTORE_GIRO",
                  "CONNETTORI_ERRORI_MAX", "MAX_CONNETTORI_VENDITORE",
                  "CONNETTORI_SYNC_MANUALE_S", "MAX_TARIFFA_CONNETTORE",
@@ -78720,10 +78721,15 @@ def prove_connettori_cassetto():
           "renderConnettori();\n  renderAvvisi();" in mini)
     rc = pezzo_js(mini, "async function renderConnettori()")
     # in DEMO e in vetrina non c'e' niente da collegare, e a leva
-    # spenta il cassetto sarebbe una porta su un muro
-    prova("il cassetto sparisce dove non serve", True,
-          "DEMO || VETRINA || !(connettoriLeve && connettoriLeve.attivo)"
-          in rc)
+    # spenta il cassetto sarebbe una porta su un muro.
+    # EMENDATA (set 2026, catalogo esterno): la condizione ha un pezzo in
+    # piu', `visibile` — la sezione dentro «Importa in blocco» la vedono
+    # solo i negozi gia' collegati e i moderatori finche' la leva
+    # CONNETTORI_NEGOZIO_PER_TUTTI e' spenta —, e la forma e' diventata
+    # quella positiva del `mostra`, che serve anche al titolo del cassetto
+    prova("la sezione sparisce dove non serve", True,
+          "!DEMO && !VETRINA" in rc
+          and "connettoriLeve.attivo && connettoriLeve.visibile" in rc)
     # LE CIFRE VENGONO DAL SERVER: il tetto, le piattaforme e le
     # strade sono leve, e il client non hardcoda mai una leva
     prova("...e le voci vengono dal server", True,
@@ -88952,6 +88958,316 @@ def prove_effetti_ridotti():
           "memoria dell'apertura", False, d["muto"])
 
 
+def prove_catalogo_esterno():
+    """IL CATALOGO ESTERNO DENTRO «📥 IMPORTA IN BLOCCO» (set 2026).
+
+    Dalla segnalazione di un venditore: nel cassetto «🏪 Il tuo negozio»
+    trovava dei campi di spedizione, li prendeva per i SUOI costi, e il
+    salvataggio gli diceva di no. Adesso il collegamento e' una sezione
+    dentro «📥 Importa in blocco / catalogo esterno», la vedono solo i
+    negozi gia' collegati e i moderatori (leva
+    CONNETTORI_NEGOZIO_PER_TUTTI per tutti), e i costi di spedizione di
+    un negozio compaiono solo dopo averlo collegato — col catalogo fermo
+    finche' non arrivano, o entrerebbe in vetrina a spedizione zero."""
+    print("\n[il catalogo esterno dentro «Importa in blocco»]")
+    import sqlite3 as _sqCE
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = _SORGENTE
+
+    # ---- 1) chi vede la sezione: il giudice, fatto girare ------------
+    amb = {"CONNETTORI_NEGOZIO_PER_TUTTI": False,
+           "e_admin": lambda tg: tg == 999}
+    exec(pezzo("_connettori_visibile"), amb)
+    vis = amb["_connettori_visibile"]
+    con = _sqCE.connect(":memory:")
+    con.row_factory = _sqCE.Row
+    con.execute("CREATE TABLE connettori(id INTEGER PRIMARY KEY, "
+                "tg_id INTEGER, stato TEXT)")
+    con.executemany("INSERT INTO connettori(tg_id, stato) VALUES(?,?)",
+                    [(333, "attivo"), (444, "pausa"), (555, "errore")])
+    prova("un venditore qualunque non la vede", False, vis(con, 222))
+    prova("un moderatore si'", True, vis(con, 999))
+    prova("chi ha gia' un negozio collegato si'", True, vis(con, 333))
+    prova("...anche in pausa o rotto: deve poterlo sistemare", [True, True],
+          [vis(con, 444), vis(con, 555)])
+    amb["CONNETTORI_NEGOZIO_PER_TUTTI"] = True
+    prova("con la leva accesa la vedono tutti", True, vis(con, 222))
+    prova("la leva nasce SPENTA nel codice", True,
+          "CONNETTORI_NEGOZIO_PER_TUTTI = False" in src)
+    prova("...e il pannello delle leve la conosce", True,
+          '"CONNETTORI_NEGOZIO_PER_TUTTI"' in pezzo("_leve_stato"))
+    prova("/api/me dice al client se la sezione e' sua", True,
+          'profilo["connettori_visibile"] = _connettori_visibile('
+          in pezzo("mio_profilo"))
+    prova("...e la lista pure", True,
+          '"visibile": visibile' in codice(pezzo("lista_connettori")))
+
+    # ---- 2) il server: la porta nuova, i costi da dire, il giro ------
+    salva = codice(pezzo("salva_connettore").split('"""')[-1])
+    _v, _q = salva.find("_connettori_visibile(con,"), salva.find("quanti = ")
+    prova("un collegamento NUOVO si rifiuta a chi la sezione non la vede",
+          True, 0 <= _v < _q)
+    prova("...e il ritocco di un collegamento suo passa sempre", True,
+          salva.find("if cid:") < salva.find("else:") < _v)
+    prova("i costi non detti tengono fermo un negozio che spedisce", True,
+          'if consegna not in ("spedizione", "entrambe") or '
+          '"spedizione_eur" in d:' in salva
+          and 'da_dire = vecchio["tariffe_da_dire"] if vecchio else 1'
+          in salva)
+    prova("...e si scrivono in tutt'e due le strade", True,
+          "zona=?, tariffe_da_dire=? " in salva
+          and "tariffe_da_dire,creato)" in salva
+          # e il ritocco scrive il VALUE giudicato, non uno zero: un
+          # aggiornamento senza costi lascerebbe entrare il catalogo
+          and "*tariffe, zona, da_dire, cid," in salva)
+    prova("il primo giro parte solo a costi detti", True,
+          'parte = (riga["stato"] == "attivo" and not riga["tariffe_da_dire"]'
+          in salva and "if parte:" in salva
+          and '"primo_giro": parte' in salva)
+    prova("il giro dell'ora salta chi aspetta i costi", True,
+          "AND tariffe_da_dire=0 ORDER BY id" in codice(
+              pezzo("sincronizza_connettori")))
+    prova("...e il giro singolo pure", True,
+          "stato='attivo' AND tariffe_da_dire=0" in codice(
+              pezzo("_sync_uno")))
+    _man = codice(pezzo("sincronizza_uno_a_mano"))
+    _t, _ct = _man.find('if c["tariffe_da_dire"]:'), _man.find(
+        "asyncio.create_task(")
+    prova("«Aggiorna ora» dice perche' non legge", True, 0 <= _t < _ct)
+    prova("la riga in uscita porta lo stato dei costi", True,
+          '"tariffe_da_dire": bool(c["tariffe_da_dire"])' in pezzo(
+              "_connettore_pubblico"))
+    _mig = src[src.index("def init_db("):]
+    _mig = _mig[:_mig.index("\ndef ", 10)]
+    _cr = _mig.find("CREATE TABLE IF NOT EXISTS connettori(")
+    _al = _mig.find('"ALTER TABLE connettori ADD COLUMN "\n'
+                    '                    "tariffe_da_dire INTEGER DEFAULT 0"')
+    prova("la colonna nasce a 0: i negozi di ieri si leggono come sempre",
+          True, _al > 0)
+    prova("...e il giro che la aggiunge viene DOPO la tabella: su un "
+          "database nuovo l'ALTER non cade nel vuoto", True, 0 <= _cr < _al)
+    _err = codice(pezzo("_connettore_in_errore"))
+    prova("l'avviso del negozio muto manda al posto nuovo", [True, False],
+          ["«📥 Importa in blocco / catalogo esterno»" in _err,
+           "«🏪 Il tuo negozio»" in _err])
+
+    # ---- 3) il client: il posto ---------------------------------------
+    _ai = mini.find('<div class="acc" id="accImport">')
+    _ac = mini.find('id="accConnettori"')
+    _fine = mini.find('<div class="acc" ', _ai + 10)
+    prova("la sezione vive DENTRO «Importa in blocco»", True,
+          0 <= _ai < _ac < _fine)
+    prova("...ed e' una sezione, non un cassetto nel cassetto", False,
+          '<div class="acc" id="accConnettori"' in mini
+          or "toggleAcc('accConnettori')" in mini)
+    prova("il titolo del cassetto si nomina da solo", True,
+          'id="importTitolo"' in mini)
+    rc = pezzo_js(mini, "async function renderConnettori(", "\n}\n")
+    prova("...e dice «/ catalogo esterno» solo a chi la vede", True,
+          "'Importa in blocco / catalogo esterno' : 'Importa in blocco'"
+          in rc)
+    prova("il client cuce la risposta per persona nelle leve", True,
+          "visibile: !!me.connettori_visibile" in mini)
+
+    import json as _jsCE, shutil as _shCE, subprocess as _spCE
+    import tempfile as _tfCE
+    if not _shCE.which("node"):
+        salta("il catalogo esterno in node", "node non installato")
+        return
+
+    def _node(prog, nome):
+        with _tfCE.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                      encoding="utf-8") as f:
+            f.write(prog)
+            p = f.name
+        try:
+            r = _spCE.run(["node", p], capture_output=True, text=True,
+                          encoding="utf-8", timeout=60)
+        finally:
+            os.unlink(p)
+        if r.returncode != 0:
+            prova(nome + ": il banco gira", "", r.stderr[-300:])
+            return None
+        return _jsCE.loads(r.stdout)
+
+    _fmt = mini[mini.index("const fmt = n =>"):]
+    _fmt = _fmt[:_fmt.index("\n")]
+    _es = mini[mini.index("const esc = s =>"):]
+    _es = _es[:_es.index(";\n") + 1]
+    _rc = mini[mini.index("let myConnettori = null;"):]
+    _rc = _rc[:_rc.index("\n}\n", _rc.index("async function renderConnettori(")) + 3]
+    _salva = (pezzo_js(mini, "function connLeggiCampi(", "\n}\n") + "\n}\n"
+              + pezzo_js(mini, "async function salvaConnettore(", "\n}\n")
+              + "\n}\n")
+
+    # ---- 4) il modulo, caso per caso ----------------------------------
+    banco = _fmt + "\n" + _es + "\n" + r"""
+let DEMO = false, VETRINA = false;
+let NODI = {};
+const el = id => NODI[id] || null;
+""" + _rc + r"""
+const out = {};
+const LEVE = () => ({attivo: true, visibile: true, max: 3,
+  fonti: [{id: "shopify", nome: "Shopify"}, {id: "woo", nome: "WooCommerce"}],
+  consegne: ["spedizione", "ritiro", "entrambe"]});
+const C = extra => Object.assign({id: 7, fonte: "shopify", nome_fonte: "Shopify",
+  url_negozio: "miele.myshopify.com", stato: "attivo", consegna: "spedizione",
+  spedizione_eur: 0, spedizione_punto_eur: 0, spedizione_punto_dichiarata: 0,
+  spedizione_extra_eur: 0, zona: "", tariffe_da_dire: false, ultimo_giro: 0,
+  ultimo_errore: "", errori_di_fila: 0, annunci: 3, esito: {}, in_corso: false,
+  riprova_fra: 0}, extra || {});
+async function caso(nome, prep){
+  try {
+    NODI = {connettoriBlocco: {innerHTML: ""}, accConnettori: {style: {}},
+            connettoriConta: {textContent: ""}, importTitolo: {textContent: ""}};
+    DEMO = false; VETRINA = false; connettoriLeve = LEVE();
+    myConnettori = []; connInModifica = 0; bozzaConn = null;
+    prep();
+    await renderConnettori();
+    out[nome] = {html: NODI.connettoriBlocco.innerHTML,
+                 display: NODI.accConnettori.style.display,
+                 titolo: NODI.importTitolo.textContent};
+  } catch(e) { out[nome] = {esploso: String(e)}; }
+}
+(async () => {
+  await caso("nuovo", () => {});
+  await caso("nuovo_ritiro", () => { bozzaConn = {fonte: "shopify", consegna: "ritiro"}; });
+  await caso("modifica", () => { myConnettori = [C({spedizione_eur: 4.9})];
+    connInModifica = 7; bozzaConn = {fonte: "shopify", url: "miele.myshopify.com",
+    consegna: "spedizione", sped: "4.9"}; });
+  await caso("da_dire", () => { myConnettori = [C({tariffe_da_dire: true})];
+    connInModifica = 7; bozzaConn = {fonte: "shopify", url: "miele.myshopify.com",
+    consegna: "spedizione"}; });
+  await caso("modifica_ritiro", () => { myConnettori = [C({consegna: "ritiro"})];
+    connInModifica = 7; bozzaConn = {fonte: "shopify", url: "x", consegna: "ritiro"}; });
+  await caso("riga_da_dire", () => { myConnettori = [C({tariffe_da_dire: true})]; });
+  await caso("riga_attiva", () => { myConnettori = [C()]; });
+  await caso("nascosta", () => { connettoriLeve.visibile = false; });
+  await caso("ponte_spento", () => { connettoriLeve.attivo = false; });
+  await caso("demo", () => { DEMO = true; });
+  console.log(JSON.stringify(out));
+})();
+"""
+    o = _node(banco, "il modulo del catalogo esterno")
+    if o is not None:
+        def h(k):
+            v = o.get(k) or {"esploso": "manca"}
+            return v.get("html", "ESPLOSO: " + str(v.get("esploso")))
+        for k in ("nuovo", "modifica", "da_dire", "riga_da_dire", "nascosta"):
+            prova(f"il caso «{k}» non esplode", None,
+                  (o.get(k) or {"esploso": "manca"}).get("esploso"))
+        prova("collegando un negozio NUOVO i costi non ci sono", False,
+              'id="connSped"' in h("nuovo"))
+        prova("...e una riga dice che si scrivono subito dopo", True,
+              "lo scrivi subito dopo" in h("nuovo"))
+        prova("...ma non a chi consegna solo a mano", False,
+              "lo scrivi subito dopo" in h("nuovo_ritiro"))
+        prova("sul negozio collegato i costi ci sono, e si dice di chi sono",
+              [True, True, True, True],
+              ['id="connSped"' in h("modifica"),
+               "solo per i" in h("modifica"),
+               "prodotti di miele.myshopify.com</b>" in h("modifica"),
+               "«📦 Come spedisci»" in h("modifica")])
+        prova("...col bottone di sempre", True,
+              "💾 Salva le modifiche" in h("modifica"))
+        prova("a costi da dire: l'ultimo passo, e il catalogo che parte",
+              [True, True, True],
+              ["Ultimo passo" in h("da_dire"),
+               "💾 Salva e leggi il catalogo" in h("da_dire"),
+               "si comincia a leggere" in h("da_dire")])
+        prova("in modifica senza spedizione niente costi", False,
+              'id="connSped"' in h("modifica_ritiro"))
+        prova("la riga che aspetta i costi lo dice, senza «Aggiorna ora»",
+              [True, False],
+              ["⏳ aspetta i costi di spedizione" in h("riga_da_dire"),
+               'title="Aggiorna ora"' in h("riga_da_dire")])
+        prova("...mentre una riga attiva il suo 🔄 ce l'ha", True,
+              'title="Aggiorna ora"' in h("riga_attiva"))
+        prova("la sezione si vede, e il titolo la nomina",
+              ["", "Importa in blocco / catalogo esterno"],
+              [(o.get("nuovo") or {}).get("display"),
+               (o.get("nuovo") or {}).get("titolo")])
+        for k in ("nascosta", "ponte_spento", "demo"):
+            prova(f"«{k}»: nascosta, e il titolo resta quello di sempre",
+                  ["none", "Importa in blocco", ""],
+                  [(o.get(k) or {}).get("display"),
+                   (o.get(k) or {}).get("titolo"),
+                   (o.get(k) or {}).get("html")])
+
+    # ---- 5) il salvataggio: le tariffe solo dal modulo che le mostra ---
+    banco = r"""
+let NODI = {};
+const el = id => NODI[id] || null;
+let connettoriLeve = {fonti: [{id: "shopify", nome: "Shopify"}]};
+let connInModifica = 0, bozzaConn = null, myConnettori = null;
+function bozzaCon(){ if (!bozzaConn) bozzaConn = {fonte: "shopify", consegna: "spedizione"}; return bozzaConn; }
+const API_BASE = "/api", authHdr = () => "x", haptic = () => {};
+const esc = s => String(s);
+let TOASTS = [], CORPI = [], RENDER = 0, RISPOSTA = {};
+const toast = t => TOASTS.push(t);
+const bottoneInAttesa = () => () => {};
+async function renderConnettori(){ RENDER++; }
+const fetch = async (url, opz) => { CORPI.push(JSON.parse(opz.body));
+  return {ok: true, json: async () => RISPOSTA}; };
+""" + _salva + r"""
+const out = {};
+async function caso(nome, prep){
+  try {
+    TOASTS = []; CORPI = []; RENDER = 0;
+    NODI = {connUrl: {value: "miele.myshopify.com"}, connZona: {value: ""},
+            connTok: {value: "shpat_x"}, connettoriErrore: {innerHTML: ""}};
+    prep();
+    await salvaConnettore(null);
+    out[nome] = {corpo: CORPI[0] || null, mod: connInModifica,
+                 toast: TOASTS[0] || "", bozza: bozzaConn};
+  } catch(e) { out[nome] = {esploso: String(e)}; }
+}
+(async () => {
+  await caso("crea", () => { connInModifica = 0;
+    bozzaConn = {fonte: "shopify", consegna: "spedizione"};
+    RISPOSTA = {ok: true, primo_giro: false, connettore: {id: 9, fonte: "shopify",
+      url_negozio: "miele.myshopify.com", consegna: "spedizione", zona: "",
+      tariffe_da_dire: true}}; });
+  await caso("costi", () => { connInModifica = 9;
+    bozzaConn = {fonte: "shopify", consegna: "spedizione"};
+    NODI.connSped = {value: "4,90"}; NODI.connPunto = {value: ""};
+    NODI.connExtra = {value: ""}; NODI.connTok = {value: ""};
+    RISPOSTA = {ok: true, primo_giro: true, connettore: {id: 9,
+      tariffe_da_dire: false}}; });
+  await caso("crea_ritiro", () => { connInModifica = 0;
+    bozzaConn = {fonte: "shopify", consegna: "ritiro"};
+    RISPOSTA = {ok: true, primo_giro: true, connettore: {id: 10,
+      tariffe_da_dire: false}}; });
+  console.log(JSON.stringify(out));
+})();
+"""
+    o = _node(banco, "il salvataggio del catalogo esterno")
+    if o is not None:
+        cr = o.get("crea") or {}
+        prova("il collegamento nuovo non manda NESSUNA tariffa", [],
+              sorted(k for k in (cr.get("corpo") or {"ESPLOSO": 1})
+                     if k.startswith("spedizione_") or k == "ESPLOSO"))
+        prova("...e se il negozio aspetta i costi si entra nella sua modifica",
+              [9, True], [cr.get("mod"), "Ultimo passo" in (cr.get("toast") or "")])
+        prova("...con la bozza del negozio appena collegato", True,
+              (cr.get("bozza") or {}).get("url") == "miele.myshopify.com")
+        co = o.get("costi") or {}
+        prova("i costi partono dal modulo che li mostra",
+              ["4,90", 0, False],
+              [(co.get("corpo") or {}).get("spedizione_eur"),
+               (co.get("corpo") or {}).get("spedizione_extra_eur"),
+               "spedizione_punto_eur" in (co.get("corpo") or {})])
+        prova("...e dopo si esce dalla modifica, col catalogo che parte",
+              [0, True], [co.get("mod"),
+                          "sto leggendo il catalogo" in (co.get("toast") or "")])
+        cri = o.get("crea_ritiro") or {}
+        prova("col solo ritiro non c'e' niente da dire: si legge subito",
+              [0, True, []],
+              [cri.get("mod"), "sto leggendo" in (cri.get("toast") or ""),
+               sorted(k for k in (cri.get("corpo") or {})
+                      if k.startswith("spedizione_"))])
+
+
 def prove_spedizione_standard():
     """IL COSTO DI SPEDIZIONE STANDARD DEL NEGOZIO (set 2026).
 
@@ -90650,6 +90966,7 @@ def main():
               prove_cassa_strada_chiusa,
               prove_casa_vuota_gratis,
               prove_spedizione_standard,
+              prove_catalogo_esterno,
               prove_script_nel_workflow, prove_deploy,
               prove_giudice_deploy, prove_collaudi_in_ci,
               prove_servizio_non_root,

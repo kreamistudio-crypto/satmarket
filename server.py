@@ -6033,6 +6033,16 @@ def init_db():
             con.execute(f"ALTER TABLE utenti ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
             pass
+    # I COSTI DA DIRE DI UN NEGOZIO COLLEGATO (set 2026): 1 = nato senza
+    # costi di spedizione, e il giro non lo legge finche' non arrivano
+    # (vedi `salva_connettore`). Le righe di ieri nascono a 0: i negozi
+    # gia' collegati continuano a leggersi come sempre, e nessuno perde
+    # niente.
+    try:
+        con.execute("ALTER TABLE connettori ADD COLUMN "
+                    "tariffe_da_dire INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
     # LE COLONNE DEL LIBRO su p2p_ordini (16 set 2026): la CREATE le ha
     # per i database nuovi, questo giro le da' a quelli che la tabella
     # ce l'avevano gia' (il calco del giro di `pagamenti` qui sotto).
@@ -23207,6 +23217,15 @@ def _leve_stato():
                          "l'interruttore d'emergenza: False e riavvia — i "
                          "collegamenti restano in tabella e gli annunci "
                          "dove sono, semplicemente nessuno li rilegge"),
+            _leva("Negozi collegati: la porta per tutti",
+                  "CONNETTORI_NEGOZIO_PER_TUTTI",
+                  bool(CONNETTORI_NEGOZIO_PER_TUTTI),
+                  spento="la sezione dentro «📥 Importa in blocco» la "
+                         "vedono solo i negozi già collegati e i "
+                         "moderatori: gli altri venditori non la trovano, "
+                         "e chi è collegato non perde niente",
+                  acceso="chiunque trova la sezione e può collegare un "
+                         "negozio (se il ponte qui sopra è acceso)"),
             _leva("Bot in ascolto (webhook)", "TELEGRAM_WEBHOOK_SEGRETO",
                   webhook_attivo(),
                   spento="il bot manda e basta: niente /start, niente "
@@ -35302,6 +35321,15 @@ async def mio_profilo(x_tg_init_data: str = Header(""),
     # la leva e' spenta, cosi' il client non chiede una lista che non
     # potrebbe usare.
     profilo["connettori_leve"] = _connettori_leve()
+    # ...e A CHI SI MOSTRA la sezione (set 2026, dentro «📥 Importa in
+    # blocco»): una risposta per persona, che resta fuori dalle leve —
+    # la leva spenta la tiene ai negozi gia' collegati e ai moderatori
+    _con_vis = db()
+    try:
+        profilo["connettori_visibile"] = _connettori_visibile(
+            _con_vis, user["id"])
+    finally:
+        _con_vis.close()
     # I CODICI SCONTO: le cifre delle pillole vengono da qui e mai dal
     # client — il patto di LAMPO_SCONTI. `attivo` e' anche cio' che
     # nasconde il cassetto quando la leva e' spenta.
@@ -52389,6 +52417,24 @@ try:
 except ImportError:
     CONNETTORI_NEGOZIO_APERTI = False
 
+# CHI VEDE LA PORTA (set 2026, decisione di Andrea, dalla segnalazione
+# di un venditore): il collegamento vive in una sezione di «📥 Importa in
+# blocco / catalogo esterno», e PER ORA la vedono solo i negozi GIA'
+# collegati e i moderatori. Il perche' e' il caso vero: un venditore
+# normale apriva il cassetto «🏪 Il tuo negozio», ci trovava dei campi
+# di spedizione, li compilava come fossero i SUOI costi — e il Salva gli
+# rispondeva di no senza che capisse perche'. La spedizione di chi
+# pubblica a mano vive in «📦 Come spedisci».
+# E' un'ALTRA leva da CONNETTORI_NEGOZIO_APERTI, e l'ordine conta:
+# quella accende il ponte (spenta, nessuno legge e nessuno collega),
+# questa decide a chi si mostra la porta finche' il ponte e' acceso. Chi
+# e' gia' collegato non perde niente: vede la sua sezione, e il giro lo
+# rilegge come sempre. True = la porta torna per tutti.
+try:
+    from config import CONNETTORI_NEGOZIO_PER_TUTTI
+except ImportError:
+    CONNETTORI_NEGOZIO_PER_TUTTI = False
+
 SECONDI_SYNC_CONNETTORI = 3600
 _prossimo_giro_connettori = 0.0   # 0 = primo giro subito all'avvio
 
@@ -52804,9 +52850,11 @@ async def sincronizza_connettori():
     _prossimo_giro_connettori = time.time() + SECONDI_SYNC_CONNETTORI
     import importa_negozio
     con = db()
+    # chi aspetta i costi di spedizione non si legge (set 2026): letto,
+    # il suo catalogo entrerebbe in vetrina a spedizione zero
     collegati = con.execute(
-        "SELECT * FROM connettori WHERE stato='attivo' ORDER BY id"
-    ).fetchall()
+        "SELECT * FROM connettori WHERE stato='attivo' "
+        "AND tariffe_da_dire=0 ORDER BY id").fetchall()
     con.close()
     if not collegati:
         return
@@ -52932,8 +52980,8 @@ async def _connettore_in_errore(c: dict, errore: str):
             f"{html.escape(c['url_negozio'])} e non ci sono riuscito.\n\n"
             f"I tuoi annunci restano dove sono, ma non si aggiornano "
             f"più. Controlla il collegamento dal Profilo, in "
-            f"«🏪 Il tuo negozio»: se il token è scaduto basta "
-            f"rifarlo.")
+            f"«📥 Importa in blocco / catalogo esterno»: se il token è "
+            f"scaduto basta rifarlo.")
 
 
 async def _chiudi_giro_connettore(c: dict, esito: dict):
@@ -52982,7 +53030,10 @@ async def _chiudi_giro_connettore(c: dict, esito: dict):
 # --- IL CASSETTO E I SUOI ENDPOINT (ago 2026, tappa 5) ---------------
 # Fin qui il collegamento si scriveva a mano nel database (il collaudo
 # lo faceva, e lo dichiarava). Qui nasce il gesto: «🏪 Il tuo negozio»
-# nel Profilo — collega, metti in pausa, aggiorna ora, scollega.
+# nel Profilo — collega, metti in pausa, aggiorna ora, scollega. (Dal
+# set 2026 e' la sezione «🏪 Catalogo esterno» dentro «📥 Importa in
+# blocco», per i soli negozi gia' collegati e i moderatori finche'
+# CONNETTORI_NEGOZIO_PER_TUTTI e' spenta: vedi `_connettori_visibile`.)
 #
 # LE DUE COSE CHE RENDONO QUESTA TAPPA DIVERSA DALLE SORELLE
 # (spedizioniere, sconto, ferie), e sono la ragione per cui non e' un
@@ -53011,6 +53062,20 @@ def _connettori_leve() -> dict:
             "consegne": list(CONSEGNE_NEGOZIO),
             "pausa_s": CONNETTORI_SYNC_MANUALE_S,
             "max_tariffa": MAX_TARIFFA_CONNETTORE}
+
+
+def _connettori_visibile(con, tg_id: int) -> bool:
+    """CHI VEDE LA SEZIONE DEL CATALOGO ESTERNO, per persona (set 2026):
+    tutti a leva CONNETTORI_NEGOZIO_PER_TUTTI accesa; altrimenti i soli
+    moderatori e chi ha GIA' un negozio collegato — in qualunque stato,
+    anche in pausa o rotto: e' proprio li' che deve poter entrare a
+    sistemarlo. Sta fuori da `_connettori_leve` apposta: quella e' la
+    stessa per tutti e questa no, e mescolarle farebbe di una leva una
+    risposta personale."""
+    if CONNETTORI_NEGOZIO_PER_TUTTI or e_admin(tg_id):
+        return True
+    return con.execute("SELECT 1 FROM connettori WHERE tg_id=? LIMIT 1",
+                       (tg_id,)).fetchone() is not None
 
 
 def _connettore_pubblico(con, c) -> dict:
@@ -53044,6 +53109,9 @@ def _connettore_pubblico(con, c) -> dict:
         "spedizione_punto_dichiarata": c["spedizione_punto_dichiarata"],
         "spedizione_extra_eur": c["spedizione_extra_eur"],
         "zona": c["zona"],
+        # il catalogo aspetta i costi di spedizione (set 2026): il
+        # cassetto li chiede su questa riga, e il giro non la legge
+        "tariffe_da_dire": bool(c["tariffe_da_dire"]),
         "ultimo_giro": c["ultimo_giro"],
         "ultimo_errore": c["ultimo_errore"],
         "errori_di_fila": c["errori_di_fila"],
@@ -53242,7 +53310,8 @@ async def _sync_uno(cid: int):
     import importa_negozio
     con = db()
     riga = con.execute("SELECT * FROM connettori WHERE id=? AND "
-                       "stato='attivo'", (cid,)).fetchone()
+                       "stato='attivo' AND tariffe_da_dire=0",
+                       (cid,)).fetchone()
     con.close()
     if not riga:
         return
@@ -53261,8 +53330,9 @@ async def lista_connettori(x_tg_init_data: str = Header(""),
     righe = con.execute("SELECT * FROM connettori WHERE tg_id=? ORDER BY id",
                         (user["id"],)).fetchall()
     fuori = [_connettore_pubblico(con, r) for r in righe]
+    visibile = _connettori_visibile(con, user["id"])
     con.close()
-    return {"connettori": fuori, **_connettori_leve()}
+    return {"connettori": fuori, **_connettori_leve(), "visibile": visibile}
 
 
 @app.post("/api/me/connettori")
@@ -53311,6 +53381,16 @@ async def salva_connettore(req: Request,
             con.close()
             raise HTTPException(400, "Collegamento non trovato")
     else:
+        # LA PORTA NUOVA SI APRE SOLO A CHI LA VEDE (set 2026): la
+        # sezione e' nascosta a chi non e' ne' collegato ne' moderatore
+        # (`_connettori_visibile`), e un client che la chiama lo stesso
+        # si sente dire la stessa cosa. I RITOCCHI di un collegamento che
+        # c'e' passano sempre: e' suo, e deve poterlo sistemare.
+        if not _connettori_visibile(con, user["id"]):
+            con.close()
+            raise HTTPException(400, "Il collegamento di un negozio online "
+                                     "per ora non è aperto a tutti: se ti "
+                                     "serve, scrivici")
         quanti = con.execute("SELECT COUNT(*) AS n FROM connettori "
                              "WHERE tg_id=?", (user["id"],)).fetchone()["n"]
         if quanti >= MAX_CONNETTORI_VENDITORE:
@@ -53330,6 +53410,20 @@ async def salva_connettore(req: Request,
         else (vecchio["spedizione_punto_dichiarata"] if vecchio else 0),
         _tariffa_negozio(d, "spedizione_extra_eur",
                          vecchio["spedizione_extra_eur"] if vecchio else 0.0))
+    # I COSTI SI DICONO DOPO IL COLLEGAMENTO (set 2026): il modulo per
+    # un negozio NUOVO non li chiede piu' — i campi di spedizione in
+    # quel cassetto sembravano quelli del venditore, ed era il guasto —
+    # e compaiono sul negozio appena collegato. Finche' non arrivano il
+    # catalogo NON SI LEGGE (`tariffe_da_dire`): letto subito entrerebbe
+    # in vetrina a spedizione zero, cioe' gratis per chi compra, senza
+    # che il venditore l'abbia mai detto. La dichiarazione e' la
+    # PRESENZA della chiave di casa, il patto di sempre; senza strade che
+    # spediscono non c'e' niente da dire. Il client di ieri le tariffe le
+    # manda gia' alla nascita, e resta sulla strada di prima.
+    if consegna not in ("spedizione", "entrambe") or "spedizione_eur" in d:
+        da_dire = 0
+    else:
+        da_dire = vecchio["tariffe_da_dire"] if vecchio else 1
     if cred is None:
         if not vecchio:
             con.close()
@@ -53363,17 +53457,18 @@ async def salva_connettore(req: Request,
                 "UPDATE connettori SET fonte=?, url_negozio=?, "
                 "credenziali=?, consegna=?, spedizione_eur=?, "
                 "spedizione_punto_eur=?, spedizione_punto_dichiarata=?, "
-                "spedizione_extra_eur=?, zona=? WHERE id=? AND tg_id=?",
-                (fonte, url, blob, consegna, *tariffe, zona, cid,
+                "spedizione_extra_eur=?, zona=?, tariffe_da_dire=? "
+                "WHERE id=? AND tg_id=?",
+                (fonte, url, blob, consegna, *tariffe, zona, da_dire, cid,
                  user["id"]))
         else:
             cur = con.execute(
                 "INSERT INTO connettori(tg_id,fonte,url_negozio,"
                 "credenziali,consegna,spedizione_eur,spedizione_punto_eur,"
                 "spedizione_punto_dichiarata,spedizione_extra_eur,zona,"
-                "creato) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                "tariffe_da_dire,creato) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                 (user["id"], fonte, url, blob, consegna, *tariffe, zona,
-                 adesso))
+                 da_dire, adesso))
             cid = cur.lastrowid
     except sqlite3.IntegrityError:
         con.close()
@@ -53399,9 +53494,14 @@ async def salva_connettore(req: Request,
     # per vedere un annuncio. Sui ritocchi no — la dichiarazione e'
     # gia' scesa sulle righe qui sopra, e rileggere il negozio non
     # aggiungerebbe niente.
-    if not vecchio and riga["stato"] == "attivo":
+    # DAL SET 2026 «LA NASCITA» E' QUANDO I COSTI SONO DETTI: un negozio
+    # che spedisce e non li ha ancora dati aspetta (vedi `da_dire`), e il
+    # suo primo giro parte al ritocco che glieli porta.
+    parte = (riga["stato"] == "attivo" and not riga["tariffe_da_dire"]
+             and (not vecchio or bool(vecchio["tariffe_da_dire"])))
+    if parte:
         asyncio.create_task(_sync_uno(cid))
-    return {"ok": True, "connettore": fuori, "primo_giro": not vecchio}
+    return {"ok": True, "connettore": fuori, "primo_giro": parte}
 
 
 @app.post("/api/me/connettori/{conn_id}/pausa")
@@ -53509,12 +53609,17 @@ async def sincronizza_uno_a_mano(conn_id: int,
         raise HTTPException(400, "I collegamenti col negozio non sono "
                                  "attivi")
     con = db()
-    c = con.execute("SELECT id, stato, ultimo_giro FROM connettori "
-                    "WHERE id=? AND tg_id=?",
+    c = con.execute("SELECT id, stato, ultimo_giro, tariffe_da_dire "
+                    "FROM connettori WHERE id=? AND tg_id=?",
                     (conn_id, user["id"])).fetchone()
     con.close()
     if not c:
         raise HTTPException(400, "Collegamento non trovato")
+    if c["tariffe_da_dire"]:
+        # il giro non la legge finche' mancano, e il bottone dice perche'
+        raise HTTPException(400, "Prima dicci quanto costa spedire i "
+                                 "prodotti di questo negozio: il catalogo "
+                                 "si legge da lì")
     if c["stato"] != "attivo":
         raise HTTPException(400, "Il collegamento è in pausa: riattivalo "
                                  "prima di rileggere il catalogo")

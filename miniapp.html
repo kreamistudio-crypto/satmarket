@@ -6968,6 +6968,10 @@
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .sped-std-da{display:block;font-size:12.5px;font-weight:700;color:var(--ink-soft);line-height:1.45}
   .sped-std-esito{font-size:14.5px;font-weight:700;color:var(--ink);line-height:1.5;margin:4px 0 14px}
+  /* il catalogo esterno dentro «📥 Importa in blocco» (set 2026): una
+     seconda domanda nello stesso cassetto, staccata da un filo come il
+     costo standard in «📦 Come spedisci» */
+  .catalogo-esterno{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
   .photo-drop{
     border:2px dashed var(--field-line);border-radius:20px;background:var(--card);
     padding:26px;text-align:center;color:var(--muted);font-weight:700;font-size:14px;cursor:pointer;
@@ -10215,7 +10219,10 @@ document.getElementById('cartello')?.remove();</script>
       <!-- Import in blocco da CSV: per i commercianti coi cataloghi
            grandi. In demo il cassetto sparisce (come il wallet). -->
       <div class="acc" id="accImport">
-        <button class="acc-h" onclick="toggleAcc('accImport')"><span class="em">📥</span>Importa in blocco<span class="fr">▾</span></button>
+        <!-- il titolo dice «/ catalogo esterno» solo a chi la sezione
+             qui sotto la vede (renderConnettori): per tutti gli altri
+             sarebbe la promessa di una cosa che non c'e' -->
+        <button class="acc-h" onclick="toggleAcc('accImport')"><span class="em">📥</span><span id="importTitolo">Importa in blocco</span><span class="fr">▾</span></button>
         <div class="acc-b">
           <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45">
             Hai un catalogo grande? Compila il modello CSV (una riga = un
@@ -10234,23 +10241,28 @@ document.getElementById('cartello')?.remove();</script>
           <div id="importEsito"></div>
           <div id="importProgresso"></div>
           <div id="importReport"></div>
+          <!-- IL CATALOGO ESTERNO, cioe' il negozio collegato (ago 2026,
+               tappa 5; qui DENTRO dal set 2026): chi ha gia' un
+               e-commerce collega il catalogo e i suoi prodotti compaiono
+               qui, invece di ripubblicarli a mano.
+               Era un cassetto suo, «🏪 Il tuo negozio», ACCANTO a questo:
+               rispondono alla STESSA domanda — come fai entrare il tuo
+               catalogo — e il collegamento e' la versione che si tiene
+               in pari da sola, l'import CSV quella una-tantum. Adesso ci
+               sta dentro (decisione di Andrea, dalla segnalazione di un
+               venditore): da solo si chiamava come il NEGOZIO, e chi ci
+               trovava dei costi di spedizione li prendeva per i suoi.
+               E' una SEZIONE e non un cassetto (niente classe `acc`: un
+               cassetto dentro un cassetto non si apre). La vedono solo
+               i negozi gia' collegati e i moderatori finche' la leva
+               CONNETTORI_NEGOZIO_PER_TUTTI e' spenta; in DEMO e in
+               vetrina sparisce, e sparisce a ponte spento, che una porta
+               su un muro e' peggio di nessuna porta. -->
+          <div id="accConnettori" class="catalogo-esterno" style="display:none">
+            <div class="section-label">🏪 Catalogo esterno <span class="conta" id="connettoriConta"></span></div>
+            <div id="connettoriBlocco"></div>
+          </div>
         </div>
-      </div>
-
-      <!-- IL NEGOZIO COLLEGATO (ago 2026, tappa 5): chi ha gia' un
-           e-commerce collega il catalogo e i suoi prodotti compaiono
-           qui, invece di ripubblicarli a mano.
-           STA ACCANTO A «Importa in blocco», e non fra le politiche
-           di negozio piu' in basso: quei due rispondono alla STESSA
-           domanda — come fai entrare il tuo catalogo — e il
-           collegamento e' la versione che si tiene in pari da sola,
-           l'import CSV quella una-tantum.
-           In DEMO e in vetrina il cassetto sparisce, il patto del
-           wallet; e sparisce anche a leva spenta, che una porta su un
-           muro e' peggio di nessuna porta. -->
-      <div class="acc" id="accConnettori">
-        <button class="acc-h" onclick="toggleAcc('accConnettori')"><span class="em">🏪</span>Il tuo negozio <span class="conta" id="connettoriConta"></span><span class="fr">▾</span></button>
-        <div class="acc-b"><div id="connettoriBlocco"></div></div>
       </div>
 
       <!-- I PACCHI AL TUO PUNTO (ago 2026, la rete di casa): compare
@@ -30744,7 +30756,9 @@ function eliminaCodice(id){
 
 /* ============ IL NEGOZIO COLLEGATO (ago 2026, tappa 5) ============
    Il cassetto «🏪 Il tuo negozio»: collega un e-commerce, lo metti in
-   pausa, lo rileggi a comando, lo scolleghi.
+   pausa, lo rileggi a comando, lo scolleghi. Dal set 2026 non e' piu'
+   un cassetto suo ma la sezione «🏪 Catalogo esterno» dentro «📥
+   Importa in blocco» (#accConnettori, il markup spiega perche').
 
    E' una LISTA con un tetto, quindi il modello e' renderCodici e non
    i due cassetti delle promesse — che sono una regola sola.
@@ -30887,7 +30901,15 @@ async function renderConnettori(){
   const box = el('connettoriBlocco');
   if (!box) return;
   const sez = el('accConnettori');
-  if (DEMO || VETRINA || !(connettoriLeve && connettoriLeve.attivo)){
+  /* LA SEZIONE LA VEDE CHI LA PUO' USARE (set 2026): a ponte acceso, e
+     solo se il server dice che e' per lui — `visibile`, i negozi gia'
+     collegati e i moderatori finche' CONNETTORI_NEGOZIO_PER_TUTTI e'
+     spenta. Il titolo del cassetto la nomina solo quando c'e'. */
+  const mostra = !DEMO && !VETRINA && !!(connettoriLeve
+    && connettoriLeve.attivo && connettoriLeve.visibile);
+  if (el('importTitolo')) el('importTitolo').textContent = mostra
+    ? 'Importa in blocco / catalogo esterno' : 'Importa in blocco';
+  if (!mostra){
     if (sez) sez.style.display = 'none';
     box.innerHTML = ''; return;
   }
@@ -30916,8 +30938,13 @@ async function renderConnettori(){
        ieri sotto non aiuta nessuno. */
     const rotto = c.stato === 'errore';
     const pausa = c.stato === 'pausa';
+    /* il catalogo che aspetta i costi di spedizione (set 2026): il
+       server non lo legge, e la riga dice cosa manca invece di un
+       «mai letto» che sembrerebbe un guasto */
+    const daDire = !!c.tariffe_da_dire;
     const colore = rotto ? 'var(--danger)' : pausa ? 'var(--muted)' : 'var(--ink)';
-    const stato = rotto ? '⚠️ non risponde' : pausa ? '⏸ in pausa'
+    const stato = daDire ? '⏳ aspetta i costi di spedizione'
+                : rotto ? '⚠️ non risponde' : pausa ? '⏸ in pausa'
                 : c.in_corso ? '🔄 lo sto leggendo…' : quandoGiro(c.ultimo_giro);
     return `<div style="padding:8px 0;border-bottom:1px dashed var(--line)">
       <div style="display:flex;align-items:center;gap:6px">
@@ -30932,7 +30959,7 @@ async function renderConnettori(){
           ${esc(c.nome_fonte)} · <b class="mono">${esc(c.url_negozio)}</b><br>
           <span style="font-weight:600;color:var(--muted)">${fmt(c.annunci)} ${c.annunci === 1 ? 'annuncio' : 'annunci'} in vetrina · ${esc(stato)}</span>
         </div>
-        ${pausa || rotto ? '' : `<button style="${az}" title="Aggiorna ora" onclick="sincronizzaConnettore(${c.id})">🔄</button>`}
+        ${pausa || rotto || daDire ? '' : `<button style="${az}" title="Aggiorna ora" onclick="sincronizzaConnettore(${c.id})">🔄</button>`}
         <button style="${az}" title="Modifica" onclick="modificaConnettore(${c.id})">✏️</button>
         <button style="${az}" title="${c.stato==='attivo'?'Metti in pausa':'Riattiva'}" onclick="pausaConnettore(${c.id})">${c.stato==='attivo'?'⏸':'▶️'}</button>
         <button style="${az}" title="Scollega" onclick="scollegaConnettore(${c.id})">🔌</button>
@@ -30983,8 +31010,22 @@ async function renderConnettori(){
       <input id="connZona" list="zonaList" autocomplete="off"
         placeholder="Es. Pavia (PV)" oninput="suggerisciZona(this.value)"
         value="${esc(b.zona || '')}"></div>
-    ${b.consegna === 'ritiro' ? '' : `
-    <div class="field"><label>Costo di spedizione (€)</label>
+    ${/* I COSTI DI SPEDIZIONE COMPAIONO SOLO SU UN NEGOZIO GIA'
+          COLLEGATO (set 2026, dalla segnalazione di un venditore): nel
+          modulo per un negozio nuovo sembravano i costi del venditore,
+          li compilava come tali e il salvataggio gli diceva di no. Qui
+          si dicono dopo, e la riga dice di CHI sono; il server non legge
+          il catalogo finche' non arrivano (`tariffe_da_dire`). */''}
+    ${b.consegna === 'ritiro' ? '' : !inMod ? `
+    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:4px">
+      Quanto costa spedire i suoi prodotti lo scrivi subito dopo,
+      appena il negozio è collegato.</div>` : `
+    <div class="section-label" style="margin-top:12px">${inMod.tariffe_da_dire ? 'Ultimo passo: quanto costa spedire' : 'Quanto costa spedire'}</div>
+    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:4px">
+      Questi costi valgono <b style="color:var(--ink)">solo per i
+      prodotti di ${esc(inMod.url_negozio)}</b>. La spedizione degli
+      articoli che pubblichi a mano si imposta in «📦 Come spedisci»${inMod.tariffe_da_dire ? ', e il catalogo si comincia a leggere appena salvi questi' : ''}.</div>
+    <div class="field" style="margin-top:10px"><label>Costo di spedizione (€)</label>
       <input id="connSped" inputmode="decimal" autocomplete="off"
         placeholder="0 = la offri tu" value="${esc(b.sped || '')}"></div>
     <div class="field"><label>Costo verso un punto di ritiro (€, facoltativo)</label>
@@ -30993,7 +31034,7 @@ async function renderConnettori(){
     <div class="field"><label>Ogni pezzo in più (€)</label>
       <input id="connExtra" inputmode="decimal" autocomplete="off"
         placeholder="0 = niente supplemento" value="${esc(b.extra || '')}"></div>`}
-    <button class="btn orange" onclick="salvaConnettore(this)">${inMod ? '💾 Salva le modifiche' : '🏪 Collega il negozio'}</button>
+    <button class="btn orange" onclick="salvaConnettore(this)">${inMod ? (inMod.tariffe_da_dire ? '💾 Salva e leggi il catalogo' : '💾 Salva le modifiche') : '🏪 Collega il negozio'}</button>
     ${inMod ? `<button class="btn ghost" onclick="annullaModificaConnettore()">Annulla la modifica</button>` : ''}`}`;
 }
 
@@ -31047,7 +31088,11 @@ async function salvaConnettore(btn){
   const b = connLeggiCampi();
   const corpo = {fonte: b.fonte, url_negozio: b.url || '',
                  consegna: b.consegna, zona: b.zona || ''};
-  if (b.consegna !== 'ritiro') {
+  /* LE TARIFFE PARTONO SOLO DAL MODULO CHE LE MOSTRA (set 2026): nel
+     collegamento nuovo i campi non ci sono, e mandare uno zero vorrebbe
+     dire «spedisco gratis» detto da noi — senza la chiave il server
+     tiene il catalogo fermo finche' i costi non arrivano. */
+  if (connInModifica && b.consegna !== 'ritiro') {
     corpo.spedizione_eur = b.sped || 0;
     corpo.spedizione_extra_eur = b.extra || 0;
     /* LA DICHIARAZIONE E' LA PRESENZA DELLA CHIAVE, mai il valore (il
@@ -31084,6 +31129,20 @@ async function salvaConnettore(btn){
       return;
     }
     myConnettori = null;
+    const nuovo = d.connettore || null;
+    if (!connInModifica && nuovo && nuovo.tariffe_da_dire) {
+      /* COLLEGATO, E ADESSO I COSTI: il negozio risponde, ma il catalogo
+         aspetta che si dica quanto costa spedire i suoi prodotti — si
+         entra subito nella sua modifica, dove quei campi ci sono */
+      connInModifica = nuovo.id;
+      bozzaConn = {fonte: nuovo.fonte, url: nuovo.url_negozio,
+                   consegna: nuovo.consegna, zona: nuovo.zona,
+                   sped: '', punto: '', extra: ''};
+      await renderConnettori();
+      toast('🏪 Collegato! Ultimo passo: quanto costa spedire i suoi prodotti',
+            6000);
+      return;
+    }
     connInModifica = 0;
     bozzaConn = null;
     await renderConnettori();
@@ -54732,7 +54791,12 @@ async function avvia(){
        la lista si rilegge da /api/me/connettori — puo' essere
        cambiata (un giro dell'orologio, un errore) mentre eravamo
        altrove; la bozza si butta come le sorelle */
-    connettoriLeve = me.connettori_leve || null;
+    /* ...e se la sezione e' per LUI (set 2026): una risposta per persona
+       che il server tiene fuori dalle leve, qui cucita dentro perche'
+       il cassetto la legga in un posto solo. Un server di ieri non la
+       manda: vale «no», che e' anche il verso prudente. */
+    connettoriLeve = me.connettori_leve
+      ? {...me.connettori_leve, visibile: !!me.connettori_visibile} : null;
     myConnettori = null; bozzaConn = null; connInModifica = 0;
     codiciLeve = me.codici_sconto_leve || null;     // idem
     myCodici = null;        // la lista si rilegge: puo' essere cambiata

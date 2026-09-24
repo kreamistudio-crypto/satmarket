@@ -23905,6 +23905,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   una-tantum. Il nome del cassetto non è una scelta di adesso: lo
   fissava già la notifica del collegamento rotto, che manda «dal
   Profilo, in «🏪 Il tuo negozio»».
+  ⚠️ DAL SET 2026 NON È PIÙ UN CASSETTO: è la sezione «🏪 Catalogo
+  esterno» DENTRO «📥 Importa in blocco», nascosta a chi non è né
+  collegato né moderatore, e la notifica del collegamento rotto manda
+  lì. Vedi «IL CATALOGO ESTERNO DENTRO «IMPORTA IN BLOCCO»», più giù.
   LE DUE COSE CHE RENDONO QUESTA TAPPA DIVERSA DALLE SORELLE
   (spedizioniere, sconto, ferie), ed è la ragione per cui non è un
   copia-incolla del loro pattern.
@@ -24164,6 +24168,64 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   fase 2, e non si aggiunge una colonna per una cosa che non c'è (il
   precedente di `banner_sbloccato_il`); il traduttore la LEGGE già
   perché costa zero e sta nella stessa risposta.
+  IL CATALOGO ESTERNO DENTRO «IMPORTA IN BLOCCO» (set 2026, dalla
+  segnalazione di un venditore). Nel cassetto «🏪 Il tuo negozio» un
+  venditore NORMALE trovava i campi dei costi di spedizione, li
+  prendeva per i SUOI — quelli degli articoli che pubblica a mano — e
+  il salvataggio gli diceva di no, perché senza un negozio la prova
+  del negozio non passa. Tre pezzi, e il terzo è quello che non si
+  vede:
+  1) IL POSTO. Il cassetto non c'è più: il collegamento è la sezione
+  «🏪 Catalogo esterno» (id `accConnettori`, SENZA la classe `acc`: un
+  cassetto dentro un cassetto non si apre né si chiude, è una sezione)
+  in fondo a «📥 Importa in blocco», il cui titolo diventa «Importa in
+  blocco / catalogo esterno» solo per chi la vede (`#importTitolo`,
+  lo scrive `renderConnettori`). È il posto che la voce della tappa 5
+  qui sopra già diceva giusto — i due «rispondono alla STESSA
+  domanda» — reso letterale. La spedizione del venditore normale vive
+  SOLO in «📦 Come spedisci» (vedi «IL COSTO DI SPEDIZIONE STANDARD
+  DEL NEGOZIO»).
+  2) CHI LA VEDE, `_connettori_visibile(con, tg_id)`: tutti a leva
+  `CONNETTORI_NEGOZIO_PER_TUTTI` accesa (nasce SPENTA, sta nel
+  pannello delle leve subito sotto il ponte); altrimenti i moderatori
+  e chi ha GIÀ un collegamento, in QUALUNQUE stato — anche in pausa o
+  rotto, che è proprio quando deve entrare a sistemarlo. Sta FUORI da
+  `_connettori_leve` apposta: quella è la stessa per tutti, questa è
+  per persona. Arriva al client in `/api/me` (`connettori_visibile`,
+  cucito nelle leve come `visibile`) e nella lista; e la porta NUOVA
+  di `salva_connettore` si chiude anche sul server, PRIMA di bussare
+  al negozio — un client vecchio o scritto a mano si sente dire la
+  stessa cosa. I ritocchi di un collegamento che c'è passano sempre.
+  NESSUNO PERDE NIENTE: chi era collegato vede la sezione, ritocca, e
+  il giro lo legge come ieri (provato dal collaudo).
+  3) I COSTI DOPO IL COLLEGAMENTO, e il catalogo che li ASPETTA. Nel
+  modulo di un negozio nuovo i campi dei costi non ci sono (una riga
+  dice che si scrivono subito dopo); compaiono sul negozio collegato,
+  con la riga che dice che valgono SOLO per i suoi prodotti. Ma un
+  catalogo letto senza costi entrerebbe in vetrina a spedizione ZERO,
+  cioè gratis per chi compra, detto da noi: nel Vendi la casella vuota
+  vale gratis perché la casella c'è e il venditore la vede (voce «Casa
+  vuota vuol dire gratis» in CANTIERI), qui non c'era proprio. Da qui
+  la colonna `connettori.tariffe_da_dire` (1 = nato senza costi): la
+  scrive `salva_connettore` quando la consegna spedisce e la chiave
+  `spedizione_eur` MANCA — la dichiarazione è la PRESENZA della chiave,
+  il patto di sempre —, la leggono il giro dell'ora e `_sync_uno`
+  (`AND tariffe_da_dire=0`), e «Aggiorna ora» dice cosa manca invece di
+  partire. Il PRIMO GIRO parte quando i costi arrivano, una volta sola:
+  «la nascita» del catalogo è quella, non l'INSERT (vedi «IL PRIMO GIRO
+  PARTE SUBITO», qui sopra, che resta vero con questa lettura). Il
+  client, a collegamento riuscito con costi da dire, entra da solo
+  nella modifica di quel negozio («Ultimo passo: quanto costa
+  spedire», «💾 Salva e leggi il catalogo»), e la riga della lista
+  dice «⏳ aspetta i costi di spedizione» senza il 🔄. Col solo ritiro
+  non c'è niente da dire e si legge subito; il client di IERI, che i
+  costi li manda alla nascita, resta sulla strada di prima. Le righe
+  di ieri nascono a 0 dalla migrazione: nessun catalogo si ferma.
+  LE STRADE SCARTATE: nascondere i campi alla nascita e mandare lo
+  zero (il catalogo sarebbe partito «a spedizione offerta» senza che
+  nessuno l'avesse detto); e lasciare i campi dov'erano con una riga in
+  più, che non cura la segnalazione — prima di avere un negozio, quei
+  campi si leggono come i propri.
 - `ricategorizza.py` (lug 2026) — l'AI PROPONE, l'admin decide. Quando
   il catalogo è passato da 9 voci a 25, gli annunci di ieri sono
   rimasti nelle caselle di ieri (un portatile in «Elettronica» invece

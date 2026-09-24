@@ -872,8 +872,11 @@ REVISIONE_SOLLECITO_GIORNI = 2  # una notifica aggregata al giorno ai
 RICATEGORIZZA_AUTO = True
 
 # --- I connettori del negozio (Shopify e WooCommerce) -----------------
-# Chi ha gia' un e-commerce lo collega dal Profilo, in
-# «🏪 Il tuo negozio», e i suoi prodotti compaiono qui: prezzo e
+# Chi ha gia' un e-commerce lo collega dal Profilo, nella sezione
+# «🏪 Catalogo esterno» di «📥 Importa in blocco / catalogo esterno»
+# (fino al set 2026 era il cassetto «🏪 Il tuo negozio»; a chi si
+# mostra lo decide CONNETTORI_NEGOZIO_PER_TUTTI, qui sotto), e i suoi
+# prodotti compaiono qui: prezzo e
 # giacenza si tengono in pari da soli, un giro all'ora. E' la terza
 # fonte che viene da FUORI, dopo Nostr e l'import CSV.
 #
@@ -897,6 +900,17 @@ RICATEGORIZZA_AUTO = True
 # rifiuta con un 503 invece di scrivere in chiaro il token di un
 # negozio — e' il patto dell'indirizzo di casa.
 CONNETTORI_NEGOZIO_APERTI = False
+
+# A CHI SI MOSTRA la porta, finche' il ponte qui sopra e' acceso (set
+# 2026). Il collegamento vive in una sezione di «📥 Importa in blocco /
+# catalogo esterno», e con questa riga a False la vedono SOLO i negozi
+# gia' collegati (anche in pausa o rotti: devono poterli sistemare) e i
+# moderatori; per tutti gli altri non c'e', e un collegamento nuovo si
+# rifiuta anche se un client lo chiede. Il perche' e' il caso vero: un
+# venditore normale trovava nel vecchio cassetto dei campi di
+# spedizione, li prendeva per i SUOI costi, e il salvataggio gli
+# rispondeva di no. True = la porta torna per tutti.
+CONNETTORI_NEGOZIO_PER_TUTTI = False
 
 # Quanti prodotti si leggono per collegamento a ogni giro. Il target
 # dichiarato (cataloghi da ~200 articoli) passa tutto in un giro solo.
