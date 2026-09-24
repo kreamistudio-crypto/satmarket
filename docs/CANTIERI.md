@@ -30271,3 +30271,98 @@ Tortura sulla copia: vedi il verbale del commit.
 nella testata del foglio, il cassetto); LNbits vero sulle due cassaforti
 (mai visto: le forme sono quelle del 21 set); e la sequenza vera sul
 VPS, in PRODUZIONE («CHIUDERE LA CASSAFORTE SAAS»).
+
+## Il modulo del negozio collegato: caselle, radice e sats (24 set 2026)
+
+Da un venditore con un WooCommerce, tre cose nello stesso giro (chieste
+da Andrea). **1) Le caselle si perdevano.** Scritti indirizzo, consumer
+key e consumer secret, toccava «Tutt'e due» sotto e il modulo si
+ridisegnava vuoto: `connPill` rifaceva `renderConnettori`, e le chiavi
+per scelta non si tenevano in nessuna variabile. La cura è **non
+ridisegnare**: le pillole passano da `connAggiornaModulo`, che ritocca
+sul posto solo ciò che dipende dalla scelta (pillole, segnaposto e nota
+dell'indirizzo, quale blocco di chiavi si vede, l'etichetta della zona,
+se i costi si vedono, la valuta delle loro caselle) e non tocca nessuna
+casella. I due blocchi di chiavi (Woo e Shopify) stanno tutt'e due nel
+DOM e si nascondono, così cambiare piattaforma e tornare indietro non le
+perde; i costi col solo ritiro stanno nascosti, non assenti. Le chiavi
+vivono **solo nelle loro caselle**: mai in una variabile, mai in
+localStorage (una prova legge il codice senza i commenti). Il disegno
+intero resta per entrare e uscire dalla modifica e dopo un salvataggio.
+**2) L'indirizzo con il percorso.** Aveva scritto la pagina del suo
+negozio (`https://sito.it/negozio/`) e si sentiva dire «le impostazioni
+non rispondono»: `/negozio/wp-json/…` non è una strada di WordPress,
+l'API sta alla radice. Ora `_prova_indirizzo_negozio` con un percorso
+bussa **prima alla radice** e, se risponde, salva quella dicendolo
+(`indirizzo_nota`, nel riquadro del modulo perché in lista comparirà un
+indirizzo diverso da quello battuto); se la radice tace prova il
+percorso com'è scritto (i Woo in sottocartella esistono, `_base_woo` lo
+ammette apposta); se tacciono tutt'e due il rifiuto li racconta
+entrambi. Una chiamata in più al massimo, solo al collegamento. Sotto la
+casella una nota lo dice prima di salvare. E i rifiuti di Woo dicono
+cosa fare (`spiega_risposta_woo`): 404 senza codice WordPress = lì non
+risponde un WordPress, «usa l'indirizzo principale del sito, per esempio
+https://…»; 404 con codice = WordPress c'è, WooCommerce no; 401 con
+codice = chiavi non riconosciute; 403 con codice = chiavi senza permesso
+di lettura o utente che non gestisce il negozio; 401/403 **senza**
+codice = una risposta che non è di WordPress, cioè il sito che blocca
+(firewall, Cloudflare, una password del server); un redirect si dice con
+l'indirizzo (senza query) e non si segue mai; 5xx = del sito. Il 200
+senza le voci attese resta «non lo sappiamo». Il tetto del motivo nel
+rifiuto sale da 160 a 320 caratteri. **3) I costi in sats.** Nell'ultimo
+passo del negozio collegato le tre caselle hanno il bottoncino sats ⇄ €
+di «Come spedisci» (`toggleConnCur`, censito in `prove_cambio_converte`,
+converte con `convertiCampiValuta`: mai svuotare né azzerare). In sats la
+tariffa si salva e scende sugli articoli del negozio come **sats
+fissi**, anche se i prezzi arrivano in euro dal catalogo, nella forma
+di `annunci` (fisso batte ancorato): la valuta scelta porta i numeri,
+l'altra **zeri** — non basta scrivere i sats, `_sped_in_sats` guarda
+prima l'euro e un 4,90 rimasto vincerebbe. Colonne nuove su
+`connettori`: `tariffe_valuta`, `spedizione_sats`,
+`spedizione_punto_sats`, `spedizione_extra_sats` (le righe di ieri
+nascono `eur` a zero sats, com'erano). **Cosa assumeva l'euro e cosa è
+cambiato**: `_tariffa_negozio` leggeva float in euro col tetto in € (ora
+ha la valuta: sats interi senza punti né virgole, tetto
+`MAX_TARIFFA_CONNETTORE_SATS`, leva nuova nel config d'esempio e nel
+pannello); `_applica_dichiarazione` scriveva solo le colonne `*_eur`
+(ora tutt'e otto); l'INSERT di `_una_riga` in `importa_negozio` idem;
+`_connettore_pubblico` esportava solo l'euro; lo schema diceva «tariffe
+in EUR e basta». La valuta la dice il payload (`tariffe_valuta`) o il
+nome delle chiavi (`spedizione_sats`/`spedizione_eur`, la convenzione
+di `consegna_da_payload`), sennò quella di ieri: il client di ieri resta
+in euro. Il «conserva» a chiave assente vale solo a valuta uguale (un
+4,90 conservato dentro un passaggio ai sats sarebbe 4 sats).
+`tariffe_da_dire` guarda `_dice_tariffa_casa`, cioè la chiave di casa in
+una valuta qualunque. Il giro orario non ricopia le tariffe sulle righe
+che ci sono (non lo faceva prima): le righe nuove nascono nella valuta
+scelta, quelle di prima le riceve `_applica_dichiarazione` al Salva.
+
+**Strade scartate**: conservare le chiavi in una variabile fra un
+disegno e l'altro (un token in memoria più del necessario, e il cantiere
+di ieri l'aveva già rifiutato); avvisare soltanto, senza provare la
+radice (il venditore deve indovinare); una colonna sola col valore e la
+valuta (le righe di `annunci` vogliono le due colonne).
+
+**Provato.** `prove_modulo_negozio` (64: sentinelle sul client, la
+radice e la spiegazione stato per stato, `_prova_indirizzo_negozio`
+girata con un negozio di cartone che risponde per indirizzo, i giudici
+delle tariffe in sats e della valuta, le sentinelle di dove i sats
+scendono, e in node il modulo vero: le pillole toccate con le caselle
+scritte, le chiavi che restano anche cambiando piattaforma, il
+bottoncino 4,90 € → 4900 sats e ritorno esatto, il salvataggio con le
+chiavi in sats, la riapertura di un negozio in sats); emendate col
+perché `prove_connettori_woo`, `prove_connettori_cassetto`,
+`prove_connettori_ingresso`, `prove_catalogo_esterno`,
+`prove_cambio_converte`, `prove_pagina_acquisto`.
+`collaudo_connettori.py` +14 sul server vero (117/0: i sats sulla riga
+e sugli articoli in vetrina, le righe nate dopo, il ritorno all'euro
+che azzera i sats, la virgola nei sats rifiutata; la radice collegata
+al posto della pagina del negozio con la nota, la sottocartella che
+vale quando la radice tace, i due rifiuti raccontati, e i quattro
+rifiuti spiegati senza lasciare una riga), `collaudo_catalogo_esterno`
+32/0, tutt'e due verdi in gabbia. Suite intera severa senza config
+14.841/0. Dal vivo a 375 px nei due temi con la copia del worktree.
+
+**Da guardare sul telefono**: da moderatore, il modulo con le chiavi
+scritte e le pillole toccate; l'ultimo passo di un negozio con il
+bottoncino sats ⇄ €; un Woo vero scritto con la pagina del negozio.

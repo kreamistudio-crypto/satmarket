@@ -5462,13 +5462,23 @@ def init_db():
         -- LA CONSEGNA SI DICHIARA QUI, UNA VOLTA, e vale per tutte le
         -- righe di questo negozio: i campi di Shopify e Woo non
         -- combaciano coi nostri (tariffe per zona, classi di spedizione,
-        -- flat rate...) e tradurli sarebbe indovinare. Le tariffe sono
-        -- in EUR e basta, che il listino di un e-commerce e' in euro.
+        -- flat rate...) e tradurli sarebbe indovinare.
+        -- LE TARIFFE HANNO UNA VALUTA (set 2026): 'eur' com'erano dalla
+        -- nascita, o 'sats' FISSI — come gli annunci a mano col listino
+        -- in sats — anche se i prezzi dei prodotti arrivano in euro dal
+        -- catalogo. Le colonne _sats e _eur si escludono: nella valuta
+        -- scelta stanno i numeri, nell'altra restano zeri, ed e' la
+        -- stessa forma delle colonne di `annunci` (fisso batte
+        -- ancorato, vedi `_leggi_costo`) su cui scendono.
         consegna TEXT DEFAULT '',
+        tariffe_valuta TEXT DEFAULT 'eur', -- 'eur' | 'sats'
         spedizione_eur REAL DEFAULT 0,
+        spedizione_sats INTEGER DEFAULT 0,
         spedizione_punto_eur REAL DEFAULT 0,
+        spedizione_punto_sats INTEGER DEFAULT 0,
         spedizione_punto_dichiarata INTEGER DEFAULT 0,
         spedizione_extra_eur REAL DEFAULT 0,
+        spedizione_extra_sats INTEGER DEFAULT 0,
         zona TEXT DEFAULT '',             -- la zona di tutte le righe
         ultimo_giro INTEGER DEFAULT 0,
         ultimo_esito TEXT DEFAULT '',     -- JSON del report dell'ultimo giro
@@ -6043,6 +6053,17 @@ def init_db():
                     "tariffe_da_dire INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass
+    # LE TARIFFE IN SATS DI UN NEGOZIO COLLEGATO (set 2026): la valuta
+    # e le tre colonne fisse. Le righe di ieri nascono 'eur' a zero
+    # sats, cioe' esattamente com'erano: nessun catalogo cambia prezzo.
+    for colonna in ("tariffe_valuta TEXT DEFAULT 'eur'",
+                    "spedizione_sats INTEGER DEFAULT 0",
+                    "spedizione_punto_sats INTEGER DEFAULT 0",
+                    "spedizione_extra_sats INTEGER DEFAULT 0"):
+        try:
+            con.execute(f"ALTER TABLE connettori ADD COLUMN {colonna}")
+        except sqlite3.OperationalError:
+            pass
     # LE COLONNE DEL LIBRO su p2p_ordini (16 set 2026): la CREATE le ha
     # per i database nuovi, questo giro le da' a quelli che la tabella
     # ce l'avevano gia' (il calco del giro di `pagamenti` qui sotto).
@@ -24359,6 +24380,8 @@ def _leve_stato():
                          "qualcun altro, che ha i suoi limiti di richieste"),
             _leva("Tetto delle tariffe dichiarate (€)",
                   "MAX_TARIFFA_CONNETTORE", MAX_TARIFFA_CONNETTORE),
+            _leva("Tetto delle tariffe dichiarate (sats)",
+                  "MAX_TARIFFA_CONNETTORE_SATS", MAX_TARIFFA_CONNETTORE_SATS),
         ]},
         {"gruppo": "🏷️ Vetrina e limiti", "voci": [
             _leva("Cartello «fase di test»", "BANNER_TEST", bool(BANNER_TEST),
@@ -53104,6 +53127,12 @@ try:
     from config import MAX_TARIFFA_CONNETTORE
 except ImportError:
     MAX_TARIFFA_CONNETTORE = 500.0
+# ...e il gemello in sats (set 2026), per chi dichiara le tariffe del
+# negozio in sats fissi: stessa cintura, stessa ragione.
+try:
+    from config import MAX_TARIFFA_CONNETTORE_SATS
+except ImportError:
+    MAX_TARIFFA_CONNETTORE_SATS = 1_000_000
 
 # Le piattaforme che sappiamo leggere. E' il GEMELLO di
 # `importa_negozio.LETTORI` e vive qui perche' il client deve poterle
@@ -53657,7 +53686,8 @@ def _connettori_leve() -> dict:
                       for f in FONTI_NEGOZIO],
             "consegne": list(CONSEGNE_NEGOZIO),
             "pausa_s": CONNETTORI_SYNC_MANUALE_S,
-            "max_tariffa": MAX_TARIFFA_CONNETTORE}
+            "max_tariffa": MAX_TARIFFA_CONNETTORE,
+            "max_tariffa_sats": MAX_TARIFFA_CONNETTORE_SATS}
 
 
 def _connettori_visibile(con, tg_id: int) -> bool:
@@ -53700,10 +53730,16 @@ def _connettore_pubblico(con, c) -> dict:
         "url_negozio": c["url_negozio"],
         "stato": c["stato"],
         "consegna": c["consegna"],
+        # la valuta delle tariffe e i sats fissi (set 2026): il modulo
+        # riscrive le caselle nella valuta scelta, non in euro e basta
+        "tariffe_valuta": c["tariffe_valuta"] or "eur",
         "spedizione_eur": c["spedizione_eur"],
+        "spedizione_sats": c["spedizione_sats"] or 0,
         "spedizione_punto_eur": c["spedizione_punto_eur"],
+        "spedizione_punto_sats": c["spedizione_punto_sats"] or 0,
         "spedizione_punto_dichiarata": c["spedizione_punto_dichiarata"],
         "spedizione_extra_eur": c["spedizione_extra_eur"],
+        "spedizione_extra_sats": c["spedizione_extra_sats"] or 0,
         "zona": c["zona"],
         # il catalogo aspetta i costi di spedizione (set 2026): il
         # cassetto li chiede su questa riga, e il giro non la legge
@@ -53782,8 +53818,14 @@ def _credenziali_negozio(fonte: str, d: dict):
     return busta
 
 
-def _tariffa_negozio(d: dict, chiave: str, se_manca: float) -> float:
-    """Una tariffa del cassetto, in euro.
+def _tariffa_negozio(d: dict, chiave: str, se_manca,
+                     valuta: str = "eur"):
+    """Una tariffa del cassetto, nella valuta dichiarata: euro a due
+    decimali (com'era) o SATS INTERI (set 2026), con la liturgia del
+    costo standard di «Come spedisci» — nei sats niente punti ne'
+    virgole, che «5.000» e' cinquemila per chi lo scrive e cinque per
+    un float, e l'errore costerebbe proprio a chi si fida del
+    separatore delle migliaia.
 
     `se_manca` e' quel che resta quando la chiave NON c'e' — il patto
     dello stock: un client rimasto in cache non deve azzerare un costo
@@ -53791,8 +53833,23 @@ def _tariffa_negozio(d: dict, chiave: str, se_manca: float) -> float:
     ed e' la distinzione che questa funzione esiste per non perdere."""
     if chiave not in d:
         return se_manca
+    grezzo = d.get(chiave)
+    if valuta == "sats":
+        testo = str(grezzo if grezzo is not None else 0).strip() or "0"
+        if isinstance(grezzo, float) and grezzo == int(grezzo):
+            testo = str(int(grezzo))
+        if isinstance(grezzo, bool) or not re.fullmatch(r"[0-9]+", testo):
+            raise HTTPException(400, "Le tariffe in sats si scrivono come "
+                                     "numero intero, senza punti né "
+                                     "virgole (es. 5000)")
+        v = int(testo)
+        if v > MAX_TARIFFA_CONNETTORE_SATS:
+            raise HTTPException(400, f"Una tariffa di spedizione va da 0 a "
+                                     f"{_fmt_sats(MAX_TARIFFA_CONNETTORE_SATS)} "
+                                     f"sats")
+        return v
     try:
-        v = float(str(d.get(chiave) or 0).replace(",", "."))
+        v = float(str(grezzo or 0).replace(",", "."))
     except (TypeError, ValueError):
         raise HTTPException(400, "Le tariffe di spedizione vanno scritte "
                                  "in euro (es. 5 oppure 4,90)")
@@ -53800,6 +53857,69 @@ def _tariffa_negozio(d: dict, chiave: str, se_manca: float) -> float:
         raise HTTPException(400, f"Una tariffa di spedizione va da 0 a "
                                  f"{_fmt_eur(MAX_TARIFFA_CONNETTORE)} €")
     return round(v, 2)
+
+
+def _valuta_tariffe_negozio(d: dict, vecchio) -> str:
+    """In che valuta il modulo ha scritto le tariffe (set 2026).
+
+    LA DICE IL PAYLOAD, o il NOME delle chiavi che porta — la
+    convenzione di `consegna_da_payload`: `spedizione_sats` e' in sats,
+    `spedizione_eur` in euro —, e in mancanza di tutt'e due resta
+    quella di ieri. Il client di ieri manda le chiavi in euro senza
+    nominare nessuna valuta e finisce in 'eur' come sempre."""
+    detta = str(d.get("tariffe_valuta") or "").strip().lower()
+    if detta:
+        if detta not in ("sats", "eur"):
+            raise HTTPException(400, "Le tariffe si scrivono in sats o "
+                                     "in euro")
+        return detta
+    if any(k in d for k in ("spedizione_sats", "spedizione_punto_sats",
+                            "spedizione_extra_sats")):
+        return "sats"
+    if any(k in d for k in ("spedizione_eur", "spedizione_punto_eur",
+                            "spedizione_extra_eur")):
+        return "eur"
+    return (vecchio["tariffe_valuta"] or "eur") if vecchio else "eur"
+
+
+def _tariffe_negozio(d: dict, vecchio) -> tuple:
+    """Le OTTO colonne delle tariffe di un collegamento, nell'ordine
+    dello schema: (spedizione_eur, spedizione_sats, spedizione_punto_eur,
+    spedizione_punto_sats, spedizione_punto_dichiarata,
+    spedizione_extra_eur, spedizione_extra_sats, tariffe_valuta).
+
+    Nella valuta scelta stanno i numeri, nell'altra ZERI: e' la forma di
+    `annunci` (fisso batte ancorato), e ci scende pari pari. Il
+    «conserva» a chiave assente vale solo se la valuta e' la stessa di
+    ieri: un 4,90 conservato dentro un collegamento passato ai sats
+    sarebbe 4 sats, cioe' gratis detto da noi."""
+    valuta = _valuta_tariffe_negozio(d, vecchio)
+    stessa = bool(vecchio) and (vecchio["tariffe_valuta"] or "eur") == valuta
+    sfx = "_sats" if valuta == "sats" else "_eur"
+
+    def ieri(col):
+        return (vecchio[col + sfx] or 0) if stessa else 0
+
+    casa = _tariffa_negozio(d, "spedizione" + sfx,
+                            ieri("spedizione"), valuta)
+    punto = _tariffa_negozio(d, "spedizione_punto" + sfx,
+                             ieri("spedizione_punto"), valuta)
+    extra = _tariffa_negozio(d, "spedizione_extra" + sfx,
+                             ieri("spedizione_extra"), valuta)
+    # la DICHIARAZIONE e' la presenza della chiave e mai il valore
+    # (il patto di spedizione_punto_dichiarata): vuoto non e' zero
+    dich = (1 if ("spedizione_punto" + sfx) in d
+            else (vecchio["spedizione_punto_dichiarata"] if vecchio else 0))
+    if valuta == "sats":
+        return (0.0, casa, 0.0, punto, dich, 0.0, extra, "sats")
+    return (casa, 0, punto, 0, dich, extra, 0, "eur")
+
+
+def _dice_tariffa_casa(d: dict) -> bool:
+    """Il payload porta il costo di casa, in una valuta qualunque: e'
+    la presenza della chiave che dice «i costi sono detti»
+    (`tariffe_da_dire`), e dal set 2026 la chiave puo' essere in sats."""
+    return "spedizione_eur" in d or "spedizione_sats" in d
 
 
 def _zona_negozio(zona: str, consegna: str) -> str:
@@ -53856,7 +53976,46 @@ async def _prova_negozio(fonte: str, url: str, credenziali: dict):
         # Le credenziali non ci finiscono mai — il modulo e il
         # trasporto dicono lo stato e l'indirizzo, mai le intestazioni.
         raise HTTPException(400, f"Non riesco a leggere il catalogo di "
-                                 f"{url}: {str(e)[:160]}")
+                                 f"{url}: {str(e)[:320]}")
+
+
+async def _prova_indirizzo_negozio(fonte: str, url: str,
+                                   credenziali: dict) -> tuple:
+    """Prova il negozio e torna `(indirizzo che ha risposto, nota)`.
+
+    PER WOOCOMMERCE L'API STA ALLA RADICE DEL SITO (set 2026, da un
+    venditore che aveva scritto `https://sito.it/negozio/`, la pagina
+    del suo shop, e si sentiva dire che «le impostazioni non
+    rispondono»): `/negozio/wp-json/...` non e' una strada di WordPress.
+    Quindi con un percorso si bussa PRIMA alla radice, e se risponde e'
+    quella che si salva — dicendolo, perche' l'indirizzo in lista non
+    sara' quello scritto. Se la radice tace si prova l'indirizzo com'e'
+    stato scritto, che parecchi Woo vivono davvero in una sottocartella
+    (la ragione per cui `_base_woo` il percorso lo ammette); e se
+    tacciono tutt'e due il rifiuto li racconta entrambi, col motivo di
+    ognuno. Shopify non ha percorsi: una prova sola, com'era.
+    UNA CHIAMATA IN PIU' AL MASSIMO, e solo al collegamento: il giro
+    dell'ora legge l'indirizzo salvato, mai questa funzione."""
+    import importa_negozio
+    radice = importa_negozio.radice_woo(url) if fonte == "woo" else url
+    if radice == url:
+        await _prova_negozio(fonte, url, credenziali)
+        return url, ""
+    try:
+        await _prova_negozio(fonte, radice, credenziali)
+    except HTTPException as alla_radice:
+        try:
+            await _prova_negozio(fonte, url, credenziali)
+        except HTTPException as al_percorso:
+            # il motivo del percorso senza il suo preambolo, che e' lo
+            # stesso della radice: due righe, non due discorsi
+            motivo = str(al_percorso.detail).split(": ", 1)[-1]
+            raise HTTPException(
+                400, f"{alla_radice.detail}\n\nE nemmeno da {url}: {motivo}")
+        return url, ""
+    return radice, (f"Ho collegato {radice}, l'indirizzo principale del "
+                    f"sito: l'API di WooCommerce sta lì, non nella pagina "
+                    f"del negozio ({url}).")
 
 
 def _applica_dichiarazione(con, cid: int, c: dict):
@@ -53877,13 +54036,23 @@ def _applica_dichiarazione(con, cid: int, c: dict):
     I 'rimosso' restano com'erano: quella e' storia, e non si
     riscrive."""
     lat, lon = coordinate_da_zona(c["zona"])
+    # LE TARIFFE SCENDONO IN TUTT'E DUE LE VALUTE (set 2026): nella
+    # scelta i numeri, nell'altra ZERI. Non basta scrivere i sats:
+    # `_sped_in_sats` guarda PRIMA l'euro, quindi un 4,90 € di ieri
+    # rimasto sulle righe di un negozio passato ai sats vincerebbe sui
+    # sats appena dichiarati, e il compratore pagherebbe la tariffa
+    # vecchia col cambio del momento.
     con.execute(
         "UPDATE annunci SET consegna=?, spedizione_eur=?, "
-        "spedizione_punto_eur=?, spedizione_punto_dichiarata=?, "
-        "spedizione_extra_eur=?, zona=?, lat=?, lon=?, regione=? "
+        "spedizione_sats=?, spedizione_punto_eur=?, "
+        "spedizione_punto_sats=?, spedizione_punto_dichiarata=?, "
+        "spedizione_extra_eur=?, spedizione_extra_sats=?, "
+        "zona=?, lat=?, lon=?, regione=? "
         "WHERE connettore_id=? AND stato<>'rimosso'",
-        (c["consegna"], c["spedizione_eur"], c["spedizione_punto_eur"],
+        (c["consegna"], c["spedizione_eur"], c["spedizione_sats"],
+         c["spedizione_punto_eur"], c["spedizione_punto_sats"],
          c["spedizione_punto_dichiarata"], c["spedizione_extra_eur"],
+         c["spedizione_extra_sats"],
          c["zona"], lat, lon, regione_da_zona(c["zona"]), cid))
 
 
@@ -53995,17 +54164,9 @@ async def salva_connettore(req: Request,
                                      f"{MAX_CONNETTORI_VENDITORE} negozi "
                                      f"collegati: scollegane uno per "
                                      f"aggiungerne un altro.")
-    tariffe = (
-        _tariffa_negozio(d, "spedizione_eur",
-                         vecchio["spedizione_eur"] if vecchio else 0.0),
-        _tariffa_negozio(d, "spedizione_punto_eur",
-                         vecchio["spedizione_punto_eur"] if vecchio else 0.0),
-        # la DICHIARAZIONE e' la presenza della chiave e mai il valore
-        # (il patto di spedizione_punto_dichiarata): vuoto non e' zero
-        1 if "spedizione_punto_eur" in d
-        else (vecchio["spedizione_punto_dichiarata"] if vecchio else 0),
-        _tariffa_negozio(d, "spedizione_extra_eur",
-                         vecchio["spedizione_extra_eur"] if vecchio else 0.0))
+    # LE OTTO COLONNE DELLE TARIFFE, nella valuta che il modulo dice
+    # (set 2026: anche sats fissi): il giudice e' `_tariffe_negozio`
+    tariffe = _tariffe_negozio(d, vecchio)
     # I COSTI SI DICONO DOPO IL COLLEGAMENTO (set 2026): il modulo per
     # un negozio NUOVO non li chiede piu' — i campi di spedizione in
     # quel cassetto sembravano quelli del venditore, ed era il guasto —
@@ -54016,7 +54177,7 @@ async def salva_connettore(req: Request,
     # PRESENZA della chiave di casa, il patto di sempre; senza strade che
     # spediscono non c'e' niente da dire. Il client di ieri le tariffe le
     # manda gia' alla nascita, e resta sulla strada di prima.
-    if consegna not in ("spedizione", "entrambe") or "spedizione_eur" in d:
+    if consegna not in ("spedizione", "entrambe") or _dice_tariffa_casa(d):
         da_dire = 0
     else:
         da_dire = vecchio["tariffe_da_dire"] if vecchio else 1
@@ -54042,8 +54203,12 @@ async def salva_connettore(req: Request,
         da_provare = cred
     con.close()
 
+    nota_indirizzo = ""
     if cred is not None or not vecchio or vecchio["url_negozio"] != url:
-        await _prova_negozio(fonte, url, da_provare)
+        # per Woo si prova PRIMA la radice del sito, dove sta l'API, e
+        # l'indirizzo che si salva e' quello che ha risposto
+        url, nota_indirizzo = await _prova_indirizzo_negozio(fonte, url,
+                                                             da_provare)
 
     adesso = int(time.time())
     con = db()
@@ -54052,17 +54217,22 @@ async def salva_connettore(req: Request,
             con.execute(
                 "UPDATE connettori SET fonte=?, url_negozio=?, "
                 "credenziali=?, consegna=?, spedizione_eur=?, "
-                "spedizione_punto_eur=?, spedizione_punto_dichiarata=?, "
-                "spedizione_extra_eur=?, zona=?, tariffe_da_dire=? "
+                "spedizione_sats=?, spedizione_punto_eur=?, "
+                "spedizione_punto_sats=?, spedizione_punto_dichiarata=?, "
+                "spedizione_extra_eur=?, spedizione_extra_sats=?, "
+                "tariffe_valuta=?, zona=?, tariffe_da_dire=? "
                 "WHERE id=? AND tg_id=?",
                 (fonte, url, blob, consegna, *tariffe, zona, da_dire, cid,
                  user["id"]))
         else:
             cur = con.execute(
                 "INSERT INTO connettori(tg_id,fonte,url_negozio,"
-                "credenziali,consegna,spedizione_eur,spedizione_punto_eur,"
-                "spedizione_punto_dichiarata,spedizione_extra_eur,zona,"
-                "tariffe_da_dire,creato) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                "credenziali,consegna,spedizione_eur,spedizione_sats,"
+                "spedizione_punto_eur,spedizione_punto_sats,"
+                "spedizione_punto_dichiarata,spedizione_extra_eur,"
+                "spedizione_extra_sats,tariffe_valuta,zona,"
+                "tariffe_da_dire,creato) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (user["id"], fonte, url, blob, consegna, *tariffe, zona,
                  da_dire, adesso))
             cid = cur.lastrowid
@@ -54075,10 +54245,13 @@ async def salva_connettore(req: Request,
                                  "account Barattolo")
     _applica_dichiarazione(con, cid, {"consegna": consegna,
                                       "spedizione_eur": tariffe[0],
-                                      "spedizione_punto_eur": tariffe[1],
+                                      "spedizione_sats": tariffe[1],
+                                      "spedizione_punto_eur": tariffe[2],
+                                      "spedizione_punto_sats": tariffe[3],
                                       "spedizione_punto_dichiarata":
-                                          tariffe[2],
-                                      "spedizione_extra_eur": tariffe[3],
+                                          tariffe[4],
+                                      "spedizione_extra_eur": tariffe[5],
+                                      "spedizione_extra_sats": tariffe[6],
                                       "zona": zona})
     con.commit()
     riga = con.execute("SELECT * FROM connettori WHERE id=?",
@@ -54097,7 +54270,11 @@ async def salva_connettore(req: Request,
              and (not vecchio or bool(vecchio["tariffe_da_dire"])))
     if parte:
         asyncio.create_task(_sync_uno(cid))
-    return {"ok": True, "connettore": fuori, "primo_giro": parte}
+    fuori_json = {"ok": True, "connettore": fuori, "primo_giro": parte}
+    if nota_indirizzo:
+        # l'indirizzo salvato non e' quello scritto: si DICE (set 2026)
+        fuori_json["indirizzo_nota"] = nota_indirizzo
+    return fuori_json
 
 
 @app.post("/api/me/connettori/{conn_id}/pausa")

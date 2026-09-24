@@ -480,6 +480,103 @@ def _base_woo(url_negozio: str) -> str:
     return base
 
 
+def radice_woo(url_negozio: str) -> str:
+    """L'indirizzo principale del sito, senza il percorso:
+    `https://sito.it/negozio/` → `https://sito.it`. E' dove sta l'API
+    di WooCommerce quando WordPress vive alla radice — il caso normale
+    — e chi collega il negozio scrive spesso la pagina dello shop. Se
+    la forma non e' quella di `_base_woo` torna l'indirizzo com'e':
+    a rifiutarlo pensa lei."""
+    base = str(url_negozio or "").strip().rstrip("/")
+    m = re.match(r"(https://[A-Za-z0-9.-]+)(/|$)", base)
+    return m.group(1) if m else base
+
+
+def _codice_wp(corpo) -> str:
+    """Il codice d'errore che WordPress e WooCommerce mettono nel corpo
+    (`{"code": "rest_no_route", "message": ..., "data": {...}}`), o ''
+    quando la risposta NON viene da loro: la pagina 404 di un tema, il
+    muro HTML di un firewall, una risposta vuota. E' la differenza fra
+    «WordPress mi ha risposto di no» e «non sono nemmeno arrivato»."""
+    if isinstance(corpo, dict) and isinstance(corpo.get("code"), str):
+        return corpo["code"]
+    return ""
+
+
+def _dove_rimanda(intestazioni) -> str:
+    """Il `Location` di un redirect, senza query (che potrebbe portare
+    un token di sessione): serve a dire al venditore QUALE indirizzo
+    scrivere, non a seguirlo — quello il trasporto non lo fa mai."""
+    for k, v in (intestazioni or {}).items():
+        if str(k).lower() == "location":
+            return str(v).split("?", 1)[0].split("#", 1)[0].strip()[:160]
+    return ""
+
+
+def spiega_risposta_woo(stato: int, corpo, intestazioni, base: str) -> str:
+    """Una risposta non-200 dell'API di WooCommerce, detta a chi collega
+    il negozio con quel che puo' FARE (set 2026): prima diceva «le
+    impostazioni non rispondono» per qualunque stato, e un venditore con
+    l'indirizzo della pagina del negozio non aveva modo di capire che
+    il guasto era l'indirizzo.
+
+    Si distingue, quando si puo': l'INDIRIZZO sbagliato (un 404 senza
+    codice WordPress = li' non risponde nessun WordPress; con codice =
+    WordPress c'e' ma WooCommerce no), le CHIAVI (401 con codice = il
+    negozio non le riconosce; 403 con codice = le riconosce ma non
+    hanno il permesso di leggere, o l'utente non gestisce il negozio),
+    il SITO CHE BLOCCA (401/403 SENZA codice, cioe' una risposta che
+    non e' di WordPress: un firewall, una protezione del server), il
+    REDIRECT (si dice dove, non si segue: e' il patto del trasporto), e
+    l'errore del server. Il 200 senza le voci attese resta quel che
+    era, MSG_IVA_IGNOTA — li' davvero non si sa."""
+    codice = _codice_wp(corpo)
+    radice = radice_woo(base)
+    if 300 <= stato < 400:
+        dove = _dove_rimanda(intestazioni)
+        return ("il sito rimanda a un altro indirizzo"
+                + (f" ({dove})" if dove else "")
+                + ": scrivi quello, come lo apre il browser (con o senza "
+                  "«www», con https)")
+    if stato == 401:
+        if codice:
+            return ("il negozio non riconosce le chiavi: ricontrolla "
+                    "Consumer key e Consumer secret (WooCommerce → "
+                    "Impostazioni → Avanzate → API REST), o generane una "
+                    "coppia nuova. Se sono giuste, il server potrebbe "
+                    "scartare l'intestazione Authorization: chiedi a chi "
+                    "lo gestisce")
+        return ("il sito chiede una password prima ancora di arrivare a "
+                "WooCommerce (una protezione del server): chiedi a chi lo "
+                "gestisce di lasciar passare le chiamate a /wp-json/")
+    if stato == 403:
+        if codice:
+            return ("le chiavi sono giuste ma non possono leggere: la "
+                    "chiave API deve avere il permesso «Lettura» ed essere "
+                    "di un utente che gestisce il negozio (Shop manager o "
+                    "Amministratore)")
+        return ("il sito blocca le richieste (un firewall, o un servizio "
+                "come Cloudflare): chiedi a chi lo gestisce di lasciar "
+                "passare le chiamate a /wp-json/wc/v3/ con User-Agent "
+                "«Barattolo/1.0»")
+    if stato == 404:
+        if codice:
+            return (f"a {base} risponde un WordPress, ma non WooCommerce "
+                    f"(o la sua API REST è spenta): controlla che "
+                    f"WooCommerce sia attivo")
+        if radice != base:
+            return (f"a {base} non risponde nessun WordPress: usa "
+                    f"l'indirizzo principale del sito, per esempio "
+                    f"{radice}")
+        return f"a {base} non risponde nessun WordPress: controlla l'indirizzo"
+    if stato >= 500:
+        return (f"il sito ha risposto con un errore suo ({stato}): riprova "
+                f"fra un po', o chiedi a chi lo gestisce")
+    return (f"il sito ha rifiutato la richiesta ({stato}), probabilmente un "
+            f"firewall: chiedi a chi lo gestisce di lasciar passare le "
+            f"chiamate a /wp-json/wc/v3/")
+
+
 def _intestazioni_woo(credenziali: dict) -> dict:
     """Le chiavi di WooCommerce viaggiano in BASIC AUTH e mai in
     query string, che e' l'altra strada che la sua documentazione
@@ -564,21 +661,24 @@ def prezzi_finiti_woo(base: str, intestazioni: dict, chiama) -> None:
     dichiarata dal venditore nel cassetto del collegamento — una
     colonna e un campo, cioe' roba della tappa 5 — e finche' non c'e'
     non si aggiunge una colonna per una cosa che non esiste."""
-    stato, corpo, _ = chiama(
+    stato, corpo, risposta = chiama(
         "GET", f"{base}/wp-json/{VERSIONE_API_WOO}/settings/general",
         intestazioni)
     if stato != 200:
-        raise RuntimeError(MSG_IVA_IGNOTA)
+        # e' la PRIMA chiamata al negozio, quindi e' qui che un
+        # indirizzo sbagliato o una chiave senza permesso si scoprono:
+        # si dice quale dei due, non «le impostazioni non rispondono»
+        raise RuntimeError(spiega_risposta_woo(stato, corpo, risposta, base))
     tasse = _valore_impostazione(corpo, "woocommerce_calc_taxes")
     if tasse is None:
         raise RuntimeError(MSG_IVA_IGNOTA)
     if tasse != "yes":
         return          # le tasse sono spente: il prezzo e' quel che e'
-    stato, corpo, _ = chiama(
+    stato, corpo, risposta = chiama(
         "GET", f"{base}/wp-json/{VERSIONE_API_WOO}/settings/tax",
         intestazioni)
     if stato != 200:
-        raise RuntimeError(MSG_IVA_IGNOTA)
+        raise RuntimeError(spiega_risposta_woo(stato, corpo, risposta, base))
     incluse = _valore_impostazione(corpo, "woocommerce_prices_include_tax")
     if incluse is None:
         raise RuntimeError(MSG_IVA_IGNOTA)
@@ -634,7 +734,8 @@ def leggi_catalogo_woo(url_negozio: str, credenziali: dict, chiama,
                f"&orderby=id&order=asc")
         stato, corpo, risposta = chiama("GET", url, intestazioni)
         if stato != 200:
-            raise RuntimeError(f"WooCommerce ha risposto {stato}")
+            raise RuntimeError(spiega_risposta_woo(stato, corpo, risposta,
+                                                   base))
         totale = totale or _quanti_in_tutto(risposta)
         fetta = _prodotti_dalla_risposta(corpo)
         prodotti.extend(fetta)
@@ -1017,20 +1118,29 @@ def _una_riga(con, connettore: dict, r: dict, salva_foto, revisioni,
     cur = con.execute(
         "INSERT INTO annunci(venditore_id,titolo,descrizione,categoria,"
         "prezzo_sats,zona,foto,valuta,prezzo_eur,quantita,quantita_max,"
-        "consegna,spedizione_eur,spedizione_punto_eur,"
-        "spedizione_punto_dichiarata,spedizione_extra_eur,"
+        "consegna,spedizione_eur,spedizione_sats,spedizione_punto_eur,"
+        "spedizione_punto_sats,spedizione_punto_dichiarata,"
+        "spedizione_extra_eur,spedizione_extra_sats,"
         "fonte,connettore_id,origine_chiave,origine_foto,"
         "origine_stock_visto,creato,modificato,stato) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (connettore["tg_id"], r["titolo"], r["descrizione"],
          r.get("categoria") or "Altro", r["prezzo_sats"],
          connettore["zona"], "", "eur", r["prezzo_eur"],
          1 if quantita is None else quantita,
          1 if quantita is None else quantita,
+         # LE TARIFFE DEL COLLEGAMENTO, nella valuta che ha scelto (set
+         # 2026): euro ancorato o sats FISSI, con zeri nell'altra — la
+         # forma di `annunci`, dove fisso batte ancorato. La riga del
+         # negozio e' quella del database, e le colonne dei sats ci sono
+         # dalla migrazione; il `.get` e' per i banchi di cartone.
          connettore["consegna"], connettore["spedizione_eur"],
+         connettore.get("spedizione_sats") or 0,
          connettore["spedizione_punto_eur"],
+         connettore.get("spedizione_punto_sats") or 0,
          connettore["spedizione_punto_dichiarata"],
          connettore["spedizione_extra_eur"],
+         connettore.get("spedizione_extra_sats") or 0,
          connettore["fonte"], cid, chiave,
          json.dumps(r["foto"]) if r["foto"] else "",
          -1 if r.get("quantita") is None else r["quantita"],

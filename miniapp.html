@@ -30816,7 +30816,19 @@ function eliminaCodice(id){
    LE CIFRE VENGONO DAL SERVER (`connettoriLeve`) e mai da qui: il
    tetto dei collegamenti, le piattaforme, le strade di consegna e la
    pausa fra due «Aggiorna ora» sono leve, e il client non hardcoda
-   mai una leva (il patto di max_barattolo). */
+   mai una leva (il patto di max_barattolo).
+   IL MODULO NON SI RIDISEGNA AL CAMBIO DI UNA SCELTA (set 2026, da un
+   venditore che aveva scritto indirizzo, consumer key e consumer
+   secret, toccato «Tutt'e due» sotto, e si e' ritrovato le caselle
+   vuote): le pillole passano da `connAggiornaModulo`, che ritocca sul
+   posto quel che dipende dalla scelta — le pillole, il segnaposto,
+   quale blocco di chiavi si vede, l'etichetta della zona, i costi —
+   e non tocca nessuna casella. Le CHIAVI vivono solo nelle loro
+   caselle: tutt'e due i blocchi (Woo e Shopify) stanno nel DOM e si
+   nascondono, cosi' cambiare piattaforma e tornare indietro non le
+   perde, e non passano MAI da una variabile ne' da localStorage. Il
+   disegno intero (`renderConnettori`) resta per entrare e uscire dalla
+   modifica e dopo un salvataggio, dove il modulo cambia davvero. */
 /* I PACCHI AL MIO PUNTO (ago 2026). La cache si azzera dopo ogni
    presa in carico: quel gesto cambia la riga sul server (timbro e
    codice), e ridisegnare dalla copia in memoria mostrerebbe lo stato
@@ -30978,11 +30990,7 @@ async function renderConnettori(){
   el('connettoriConta').textContent = `(${myConnettori.length} di ${tetto})`;
   const b = bozzaCon();
   const woo = b.fonte === 'woo';
-  const pill = (v, testo, campo) =>
-    `<button onclick="connPill('${campo}','${v}')" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${b[campo]===v?'var(--sats)':'var(--line)'};background:${b[campo]===v?'var(--sats)':'transparent'};color:${b[campo]===v?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${testo}</button>`;
   const az = 'font:inherit;background:none;border:none;cursor:pointer;font-size:15px;padding:2px 4px';
-  const NOMI_CONS = {spedizione:'🚚 Spedizione', ritiro:'🤝 Ritiro in zona',
-                     entrambe:'🚚🤝 Tutt\'e due'};
   const riga = c => {
     /* LO STATO SI LEGGE PRIMA DEI NUMERI: un collegamento rotto o in
        pausa e' la sola cosa da vedere, e il conto degli annunci di
@@ -31032,32 +31040,43 @@ async function renderConnettori(){
     ${myConnettori.map(riga).join('') || '<div style="font-size:12.5px;color:var(--muted);font-weight:600;margin:10px 0">Nessun negozio collegato, per ora.</div>'}
     ${pieno ? `<div style="font-size:12.5px;color:var(--muted);font-weight:600;margin-top:12px">Hai già ${tetto} negozi collegati: scollegane uno per aggiungerne un altro.</div>` : `
     <div class="section-label" style="margin-top:14px">${inMod ? 'Modifica il collegamento' : 'Collega un negozio'}</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-      ${((connettoriLeve.fonti)||[]).map(f => pill(f.id, esc(f.nome), 'fonte')).join('')}</div>
-    <div class="field" style="margin-top:10px"><label>Indirizzo del negozio</label>
+    <div id="connPilloleFonte" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${connPillole('fonte')}</div>
+    <div class="field" style="margin-top:10px"><label for="connUrl">Indirizzo del negozio</label>
       <input id="connUrl" autocomplete="off" placeholder="${woo ? 'https://ilmionegozio.it' : 'ilmionegozio.myshopify.com'}"
-        value="${esc(b.url || '')}"></div>
+        value="${esc(b.url || '')}">
+      ${/* L'INDIRIZZO DI UN WOO E' LA RADICE DEL SITO (set 2026): un
+            venditore aveva scritto la pagina del suo negozio
+            (https://sito.it/negozio/) e l'API, che sta alla radice, non
+            rispondeva. La riga lo dice PRIMA di salvare; il server, se
+            arriva un percorso, prova comunque prima la radice. */''}
+      <div id="connUrlNota" class="hint" style="margin-top:4px;line-height:1.4;${woo ? '' : 'display:none'}">L'indirizzo
+        principale del sito (es. https://ilmionegozio.it), non la pagina
+        del negozio: l'API di WooCommerce sta lì. Se WooCommerce vive in
+        una sottocartella, scrivi quella.</div></div>
     ${/* LE CHIAVI NON TORNANO MAI INDIETRO: il server le scrive e non
           le rilegge a nessuno, quindi in modifica il campo nasce VUOTO
           e vuoto vuol dire «lascia quelle di prima». E' il patto dello
-          stock, detto dove si vede. */''}
-    ${woo ? `
-    <div class="field"><label>Consumer key</label>
+          stock, detto dove si vede.
+          E VIVONO SOLO QUI (set 2026): i due blocchi stanno tutt'e due
+          nel DOM e si nascondono con la piattaforma, cosi' un cambio di
+          scelta non li ridisegna e non li svuota — e nessuna variabile
+          li tiene, ne' localStorage. */''}
+    <div id="connChiaviWoo" style="${woo ? '' : 'display:none'}">
+    <div class="field"><label for="connCk">Consumer key</label>
       <input id="connCk" autocomplete="off" placeholder="${inMod ? 'lascia vuoto per non cambiarla' : 'ck_…'}" value=""></div>
-    <div class="field"><label>Consumer secret</label>
-      <input id="connCs" type="password" autocomplete="off" placeholder="${inMod ? 'lascia vuoto per non cambiarlo' : 'cs_…'}" value=""></div>`
-    : `
-    <div class="field"><label>Token dell'app privata</label>
-      <input id="connTok" type="password" autocomplete="off" placeholder="${inMod ? 'lascia vuoto per non cambiarlo' : 'shpat_…'}" value=""></div>`}
+    <div class="field"><label for="connCs">Consumer secret</label>
+      <input id="connCs" type="password" autocomplete="off" placeholder="${inMod ? 'lascia vuoto per non cambiarlo' : 'cs_…'}" value=""></div></div>
+    <div id="connChiaviShopify" style="${woo ? 'display:none' : ''}">
+    <div class="field"><label for="connTok">Token dell'app privata</label>
+      <input id="connTok" type="password" autocomplete="off" placeholder="${inMod ? 'lascia vuoto per non cambiarlo' : 'shpat_…'}" value=""></div></div>
     <div class="section-label" style="margin-top:12px">Come arriva la merce</div>
     <div style="font-size:12.5px;color:var(--muted);font-weight:600;line-height:1.45;margin-top:4px">
       Si dichiara qui una volta e vale per <b style="color:var(--ink)">tutti</b>
       gli annunci di questo negozio, anche quelli già entrati: il tuo
       e-commerce le spedizioni le organizza a modo suo, e tradurle
       sarebbe indovinare.</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-      ${((connettoriLeve.consegne)||[]).map(v => pill(v, NOMI_CONS[v] || v, 'consegna')).join('')}</div>
-    <div class="field" style="margin-top:10px"><label>Zona${b.consegna==='spedizione'?' (facoltativa)':''}</label>
+    <div id="connPilloleConsegna" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${connPillole('consegna')}</div>
+    <div class="field" style="margin-top:10px"><label id="connZonaLabel" for="connZona">Zona${b.consegna==='spedizione'?' (facoltativa)':''}</label>
       <input id="connZona" list="zonaList" autocomplete="off"
         placeholder="Es. Pavia (PV)" oninput="suggerisciZona(this.value)"
         value="${esc(b.zona || '')}"></div>
@@ -31066,33 +31085,77 @@ async function renderConnettori(){
           modulo per un negozio nuovo sembravano i costi del venditore,
           li compilava come tali e il salvataggio gli diceva di no. Qui
           si dicono dopo, e la riga dice di CHI sono; il server non legge
-          il catalogo finche' non arrivano (`tariffe_da_dire`). */''}
-    ${b.consegna === 'ritiro' ? '' : !inMod ? `
-    <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:4px">
+          il catalogo finche' non arrivano (`tariffe_da_dire`).
+          Col solo ritiro il blocco c'e' e sta NASCOSTO: e' quel che
+          permette di tornare a «Spedizione» e ritrovare i costi scritti.
+          IN SATS O IN EURO (set 2026): il bottoncino di «Come spedisci»,
+          che converte al cambio del momento; in sats la tariffa scende
+          sugli articoli del negozio come sats FISSI, anche se i prezzi
+          dei prodotti arrivano in euro dal catalogo. */''}
+    ${!inMod ? `
+    <div id="connCostiNota" style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:4px;${b.consegna === 'ritiro' ? 'display:none' : ''}">
       Quanto costa spedire i suoi prodotti lo scrivi subito dopo,
       appena il negozio è collegato.</div>` : `
+    <div id="connCosti" style="${b.consegna === 'ritiro' ? 'display:none' : ''}">
     <div class="section-label" style="margin-top:12px">${inMod.tariffe_da_dire ? 'Ultimo passo: quanto costa spedire' : 'Quanto costa spedire'}</div>
     <div style="font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45;margin-top:4px">
       Questi costi valgono <b style="color:var(--ink)">solo per i
       prodotti di ${esc(inMod.url_negozio)}</b>. La spedizione degli
-      articoli che pubblichi a mano si imposta in «📦 Come spedisci»${inMod.tariffe_da_dire ? ', e il catalogo si comincia a leggere appena salvi questi' : ''}.</div>
-    <div class="field" style="margin-top:10px"><label>Costo di spedizione (€)</label>
-      <input id="connSped" inputmode="decimal" autocomplete="off"
-        placeholder="0 = la offri tu" value="${esc(b.sped || '')}"></div>
-    <div class="field"><label>Costo verso un punto di ritiro (€, facoltativo)</label>
-      <input id="connPunto" inputmode="decimal" autocomplete="off"
-        placeholder="vuoto = come a casa" value="${esc(b.punto || '')}"></div>
-    <div class="field"><label>Ogni pezzo in più (€)</label>
-      <input id="connExtra" inputmode="decimal" autocomplete="off"
-        placeholder="0 = niente supplemento" value="${esc(b.extra || '')}"></div>`}
+      articoli che pubblichi a mano si imposta in «📦 Come spedisci»${inMod.tariffe_da_dire ? ', e il catalogo si comincia a leggere appena salvi questi' : ''}.
+      In sats la tariffa resta fissa in sats; in euro segue il cambio.</div>
+    <div class="field" style="margin-top:10px"><label for="connSped">Costo di spedizione</label>
+      ${connCampoCosto('connSped', b.sped || '', '0 = la offri tu', true)}</div>
+    <div class="field"><label for="connPunto">Verso un punto di ritiro (facoltativo)</label>
+      ${connCampoCosto('connPunto', b.punto || '', 'vuoto = come a casa', false)}</div>
+    <div class="field"><label for="connExtra">Ogni pezzo in più</label>
+      ${connCampoCosto('connExtra', b.extra || '', '0 = niente supplemento', false)}</div></div>`}
     <button class="btn orange" onclick="salvaConnettore(this)">${inMod ? (inMod.tariffe_da_dire ? '💾 Salva e leggi il catalogo' : '💾 Salva le modifiche') : '🏪 Collega il negozio'}</button>
     ${inMod ? `<button class="btn ghost" onclick="annullaModificaConnettore()">Annulla la modifica</button>` : ''}`}`;
 }
 
-/* il testo scritto si tiene PRIMA di ridisegnare, o toccare una
-   pillola cancellerebbe l'indirizzo appena battuto. Le CHIAVI no: si
-   riscrivono, e tenerle in una variabile vorrebbe dire tenere un
-   token nella memoria della pagina piu' a lungo del necessario. */
+/* I nomi delle strade e le pillole del modulo, fuori dal disegno
+   intero: le riscrive anche `connAggiornaModulo`, che ridisegna SOLO le
+   pillole quando se ne tocca una. */
+const NOMI_CONS_NEGOZIO = {spedizione:'🚚 Spedizione', ritiro:'🤝 Ritiro in zona',
+                           entrambe:'🚚🤝 Tutt\'e due'};
+function connPillole(campo){
+  const b = bozzaCon();
+  const pill = (v, testo) =>
+    `<button type="button" onclick="connPill('${campo}','${v}')" style="font:inherit;font-size:12.5px;font-weight:700;border:1px solid ${b[campo]===v?'var(--sats)':'var(--line)'};background:${b[campo]===v?'var(--sats)':'transparent'};color:${b[campo]===v?'#fff':'var(--muted)'};border-radius:99px;padding:5px 12px;cursor:pointer">${testo}</button>`;
+  if (campo === 'fonte')
+    return ((connettoriLeve && connettoriLeve.fonti) || [])
+      .map(f => pill(f.id, esc(f.nome))).join('');
+  return ((connettoriLeve && connettoriLeve.consegne) || [])
+    .map(v => pill(v, NOMI_CONS_NEGOZIO[v] || v)).join('');
+}
+
+/* La valuta delle tre caselle dei costi: 'eur' finche' il venditore
+   non gira il bottoncino (i negozi di ieri sono in euro, e il server
+   senza una valuta detta legge euro). */
+function connValutaTariffe(){
+  return bozzaCon().tvaluta === 'sats' ? 'sats' : 'eur';
+}
+
+/* Una casella dei costi, la forma di bloccoSpedStd: number, la valuta
+   nel suffisso, il bottoncino che converte su quella di casa. I
+   suffissi hanno un id perche' `connAggiornaModulo` li riscrive sul
+   posto quando la valuta gira, senza rifare le caselle. */
+function connCampoCosto(id, val, segnaposto, toggle){
+  const inEur = connValutaTariffe() === 'eur';
+  return `<div class="sats-input"><input id="${id}" type="number"
+      inputmode="${inEur ? 'decimal' : 'numeric'}" step="${inEur ? '0.01' : '1'}"
+      min="0" placeholder="${segnaposto}" value="${esc(val)}">${toggle
+      ? `<button type="button" class="suffix" id="${id}Cur" onclick="toggleConnCur()"
+          title="Scegli come scrivere il costo">${inEur ? '€ ⇄' : 'sats ⇄'}</button>`
+      : `<span class="suffix" id="${id}U" style="pointer-events:none">${inEur ? '€' : 'sats'}</span>`}</div>`;
+}
+
+/* Il testo scritto si tiene nella bozza, cosi' un disegno intero
+   (entrare in modifica, un salvataggio) riparte da li'. Le CHIAVI no,
+   e adesso non ne hanno bisogno: al cambio di una scelta il modulo
+   non si ridisegna (`connAggiornaModulo`), quindi restano nelle loro
+   caselle — e una variabile terrebbe un token nella memoria della
+   pagina piu' a lungo del necessario. */
 function connLeggiCampi(){
   const b = bozzaCon();
   const v = id => (el(id) ? el(id).value : undefined);
@@ -31109,7 +31172,53 @@ function connPill(campo, valore){
   haptic();
   const b = connLeggiCampi();
   b[campo] = valore;
-  renderConnettori();
+  /* NIENTE RIDISEGNO: si ritocca sul posto quel che dipende dalla
+     scelta, e le caselle — chiavi comprese — non si toccano */
+  connAggiornaModulo();
+}
+
+/* Quel che nel modulo dipende dalle scelte, ritoccato SUL POSTO: le
+   pillole, il segnaposto e la nota dell'indirizzo, quale blocco di
+   chiavi si vede, l'etichetta della zona, se i costi si vedono, e la
+   valuta delle loro caselle (inputmode, passo, suffissi). Nessuna
+   casella viene riscritta: e' la ragione per cui esiste. */
+function connAggiornaModulo(){
+  const b = bozzaCon(), woo = b.fonte === 'woo', rit = b.consegna === 'ritiro';
+  const mostra = (id, si) => { const n = el(id); if (n) n.style.display = si ? '' : 'none'; };
+  if (el('connPilloleFonte')) el('connPilloleFonte').innerHTML = connPillole('fonte');
+  if (el('connPilloleConsegna')) el('connPilloleConsegna').innerHTML = connPillole('consegna');
+  if (el('connUrl')) el('connUrl').placeholder = woo ? 'https://ilmionegozio.it' : 'ilmionegozio.myshopify.com';
+  mostra('connUrlNota', woo);
+  mostra('connChiaviWoo', woo);
+  mostra('connChiaviShopify', !woo);
+  if (el('connZonaLabel'))
+    el('connZonaLabel').textContent = 'Zona' + (b.consegna === 'spedizione' ? ' (facoltativa)' : '');
+  mostra('connCostiNota', !rit);
+  mostra('connCosti', !rit);
+  const inEur = connValutaTariffe() === 'eur';
+  ['connSped', 'connPunto', 'connExtra'].forEach(id => {
+    const n = el(id); if (!n) return;
+    n.inputMode = inEur ? 'decimal' : 'numeric'; n.step = inEur ? '0.01' : '1';
+  });
+  if (el('connSpedCur')) el('connSpedCur').textContent = inEur ? '€ ⇄' : 'sats ⇄';
+  ['connPuntoU', 'connExtraU'].forEach(id => { if (el(id)) el(id).textContent = inEur ? '€' : 'sats'; });
+}
+
+/* Il bottoncino sats ⇄ € dei costi del negozio: UNO per le tre caselle
+   e le CONVERTE al cambio di adesso (convertiCampiValuta, il giudice di
+   «Come spedisci»: il vuoto resta vuoto, lo zero resta zero, senza
+   cambio le cifre restano e la riga chiede di ricontrollarle). Poi la
+   bozza segue le caselle e il modulo si ritocca sul posto. */
+function toggleConnCur(){
+  haptic();
+  const b = connLeggiCampi();
+  const da = connValutaTariffe(), a = da === 'eur' ? 'sats' : 'eur';
+  const esiti = convertiCampiValuta(['connSped', 'connPunto', 'connExtra'], da, a);
+  b.tvaluta = a;
+  connLeggiCampi();
+  connAggiornaModulo();
+  rigaCambio('rigaCambioConn', el('connSped')?.closest('.sats-input'),
+             ['connSped', 'connPunto', 'connExtra'].map(el), esiti, a);
 }
 
 function modificaConnettore(id){
@@ -31117,13 +31226,17 @@ function modificaConnettore(id){
   if (!c) return;
   haptic();
   connInModifica = id;
+  /* le caselle nella valuta in cui il negozio le ha salvate: i sats
+     fissi dalle colonne dei sats, l'euro dalle sue (set 2026) */
+  const inSats = c.tariffe_valuta === 'sats';
+  const cifra = (sats, eur) => { const v = inSats ? sats : eur; return v ? String(v) : ''; };
   bozzaConn = {fonte: c.fonte, url: c.url_negozio, consegna: c.consegna,
-               zona: c.zona,
-               sped: c.spedizione_eur ? String(c.spedizione_eur) : '',
+               zona: c.zona, tvaluta: inSats ? 'sats' : 'eur',
+               sped: cifra(c.spedizione_sats, c.spedizione_eur),
                punto: c.spedizione_punto_dichiarata
-                      ? String(c.spedizione_punto_eur) : '',
-               extra: c.spedizione_extra_eur
-                      ? String(c.spedizione_extra_eur) : ''};
+                      ? String((inSats ? c.spedizione_punto_sats
+                                       : c.spedizione_punto_eur) || 0) : '',
+               extra: cifra(c.spedizione_extra_sats, c.spedizione_extra_eur)};
   renderConnettori();
 }
 
@@ -31144,13 +31257,19 @@ async function salvaConnettore(btn){
      dire «spedisco gratis» detto da noi — senza la chiave il server
      tiene il catalogo fermo finche' i costi non arrivano. */
   if (connInModifica && b.consegna !== 'ritiro') {
-    corpo.spedizione_eur = b.sped || 0;
-    corpo.spedizione_extra_eur = b.extra || 0;
+    /* IL NOME DELLA CHIAVE DICE LA VALUTA (set 2026), la convenzione
+       del form Vendi: `spedizione_sats` per i sats fissi,
+       `spedizione_eur` per l'euro — e `tariffe_valuta` lo dice a
+       lettere, che un vuoto in sats non si legga euro */
+    const sfx = connValutaTariffe() === 'sats' ? '_sats' : '_eur';
+    corpo.tariffe_valuta = connValutaTariffe();
+    corpo['spedizione' + sfx] = b.sped || 0;
+    corpo['spedizione_extra' + sfx] = b.extra || 0;
     /* LA DICHIARAZIONE E' LA PRESENZA DELLA CHIAVE, mai il valore (il
        patto di spedizione_punto_dichiarata): il campo vuoto NON manda
        niente, e vale «come a casa» — mandarci uno zero direbbe
        «gratis», che e' un'altra cosa. */
-    if ((b.punto || '').trim() !== '') corpo.spedizione_punto_eur = b.punto;
+    if ((b.punto || '').trim() !== '') corpo['spedizione_punto' + sfx] = b.punto;
   }
   const chiavi = b.fonte === 'woo'
     ? {consumer_key: (el('connCk')||{}).value || '',
@@ -31188,8 +31307,9 @@ async function salvaConnettore(btn){
       connInModifica = nuovo.id;
       bozzaConn = {fonte: nuovo.fonte, url: nuovo.url_negozio,
                    consegna: nuovo.consegna, zona: nuovo.zona,
-                   sped: '', punto: '', extra: ''};
+                   tvaluta: 'eur', sped: '', punto: '', extra: ''};
       await renderConnettori();
+      connNotaIndirizzo(d);
       toast('🏪 Collegato! Ultimo passo: quanto costa spedire i suoi prodotti',
             6000);
       return;
@@ -31197,10 +31317,21 @@ async function salvaConnettore(btn){
     connInModifica = 0;
     bozzaConn = null;
     await renderConnettori();
+    connNotaIndirizzo(d);
     toast(d.primo_giro ? 'Collegato: sto leggendo il catalogo 🏪'
                        : 'Collegamento aggiornato', 6000);
   } catch(e) { toast('Rete assente: riprova'); }
   finally { ripristina(); }
+}
+
+/* L'INDIRIZZO SALVATO NON E' QUELLO SCRITTO, e si dice (set 2026): per
+   un Woo scritto con la pagina del negozio il server ha collegato la
+   radice del sito, dove sta l'API. Sta nel riquadro e non in un toast,
+   perche' in lista comparira' un indirizzo diverso da quello battuto. */
+function connNotaIndirizzo(d){
+  const dove = el('connettoriErrore');
+  if (!dove || !d || !d.indirizzo_nota) return;
+  dove.innerHTML = `<div class="trust-note" style="margin-top:10px">ℹ️ ${esc(d.indirizzo_nota)}</div>`;
 }
 
 async function pausaConnettore(id){

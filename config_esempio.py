@@ -966,6 +966,10 @@ CONNETTORI_SYNC_MANUALE_S = 300
 # venditore, non noi, com'e' per MAX_QUANTITA_ANNUNCIO — e' la
 # cintura contro lo zero in piu' battuto per sbaglio.
 MAX_TARIFFA_CONNETTORE = 500.0
+# ...e il gemello in SATS (set 2026), per chi dichiara le tariffe del
+# negozio collegato in sats fissi col bottoncino sats ⇄ €: stessa
+# cintura, stessa ragione.
+MAX_TARIFFA_CONNETTORE_SATS = 1_000_000
 
 # --- Post automatici (la piattaforma racconta i fatti) ----------------
 # Ogni nuovo annuncio in vetrina viene annunciato dai canali di

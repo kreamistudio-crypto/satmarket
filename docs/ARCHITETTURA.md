@@ -24269,6 +24269,45 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   nessuno l'avesse detto); e lasciare i campi dov'erano con una riga in
   più, che non cura la segnalazione — prima di avere un negozio, quei
   campi si leggono come i propri.
+  IL MODULO DEL NEGOZIO COLLEGATO: CASELLE, RADICE E SATS (set 2026, da
+  un venditore con un WooCommerce). 1) IL MODULO NON SI RIDISEGNA AL
+  CAMBIO DI UNA SCELTA: le pillole passano da `connAggiornaModulo`, che
+  ritocca sul posto ciò che dipende dalla scelta e non tocca nessuna
+  casella; i due blocchi di chiavi (Woo e Shopify) stanno tutt'e due
+  nel DOM e si nascondono, i costi col solo ritiro pure. Le chiavi
+  vivono SOLO nelle loro caselle: mai in `bozzaConn`, mai in
+  localStorage. `renderConnettori` resta per entrare e uscire dalla
+  modifica e dopo un salvataggio. 2) L'API DI WOOCOMMERCE STA ALLA
+  RADICE: `_prova_indirizzo_negozio` (server) con un percorso bussa
+  prima alla radice (`radice_woo`), salva quella se risponde e lo dice
+  (`indirizzo_nota` nella risposta, `connNotaIndirizzo` nel riquadro),
+  sennò prova il percorso com'è scritto, e se tacciono tutt'e due il
+  rifiuto racconta entrambi. Una chiamata in più al massimo, solo al
+  collegamento. I rifiuti li spiega `spiega_risposta_woo` in
+  `importa_negozio`, sulla prima chiamata (le impostazioni dell'IVA) e
+  sulle pagine: l'indirizzo (404 senza codice WordPress → «usa
+  l'indirizzo principale del sito, per esempio https://…»; con codice →
+  WordPress senza WooCommerce), le chiavi (401 con codice → non
+  riconosciute; 403 con codice → senza permesso di lettura), il sito
+  che blocca (401/403 SENZA codice: una risposta che non è di
+  WordPress), il redirect (detto, mai seguito), il 5xx. Il 200 senza le
+  voci attese resta MSG_IVA_IGNOTA. 3) LE TARIFFE HANNO UNA VALUTA:
+  `connettori.tariffe_valuta` ('eur' | 'sats') e le tre colonne
+  `spedizione_sats`, `spedizione_punto_sats`, `spedizione_extra_sats`;
+  nella valuta scelta i numeri, nell'altra ZERI, e scendono così sulle
+  righe di `annunci` (`_applica_dichiarazione` al Salva, l'INSERT di
+  `_una_riga` alla nascita), dove «fisso batte ancorato» — un euro
+  rimasto vincerebbe sui sats. I giudici: `_valuta_tariffe_negozio` (il
+  payload la dice, o il nome delle chiavi, o quella di ieri),
+  `_tariffe_negozio` (le otto colonne; il «conserva» solo a valuta
+  uguale), `_tariffa_negozio` con la valuta (sats interi senza punti
+  né virgole, tetto `MAX_TARIFFA_CONNETTORE_SATS`),
+  `_dice_tariffa_casa` per `tariffe_da_dire`. Nel client il bottoncino
+  `toggleConnCur` converte con `convertiCampiValuta` (censito in
+  `prove_cambio_converte`) e il salvataggio manda le chiavi col
+  suffisso della valuta più `tariffe_valuta`. Il client di ieri resta
+  in euro. Vedi CANTIERI, «Il modulo del negozio collegato: caselle,
+  radice e sats».
 - `ricategorizza.py` (lug 2026) — l'AI PROPONE, l'admin decide. Quando
   il catalogo è passato da 9 voci a 25, gli annunci di ieri sono
   rimasti nelle caselle di ieri (un portatile in «Elettronica» invece

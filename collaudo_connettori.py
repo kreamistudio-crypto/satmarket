@@ -114,6 +114,11 @@ LETTURE = []            # gli URL chiesti, per contare le pagine
 # il caso in cui il catalogo NON si deve leggere.
 CATALOGO_WOO = []
 TASSE_WOO = ["yes"]     # woocommerce_calc_taxes
+# Risposte di Woo per PREFISSO d'indirizzo (set 2026): la pagina 404 di
+# un tema, un firewall, un WordPress senza WooCommerce — quel che il
+# modulo deve saper spiegare, e la radice che risponde al posto della
+# pagina del negozio. {prefisso: (stato, corpo, intestazioni)}.
+RISPOSTE_WOO = {}
 IVA_WOO = ["yes"]       # woocommerce_prices_include_tax
 
 
@@ -166,6 +171,9 @@ def api_finta(metodo, url, intestazioni):
             return 401, {"errors": "Invalid API key or access token"}, {}
         return 200, {"products": list(CATALOGO)}, {}
     # --- WooCommerce ---
+    for prefisso, risposta in RISPOSTE_WOO.items():
+        if url.startswith(prefisso):
+            return risposta
     if url.endswith("/settings/general"):
         return 200, {"lista": [{"id": "woocommerce_calc_taxes",
                                 "value": TASSE_WOO[0]}]}, {}
@@ -970,6 +978,133 @@ def main():
                          (nid,)).fetchone()[0]
     con.close()
     prova("...e le chiavi restano quelle di prima", blob, ancora)
+
+    # LE TARIFFE IN SATS (set 2026): il venditore gira il bottoncino e
+    # scrive 7000 sats; sulla riga del collegamento e su TUTTI gli
+    # articoli di quel negozio scendono sats FISSI e zeri nell'euro —
+    # anche se i prezzi dei prodotti arrivano in euro — e le righe che
+    # il giro fa nascere DOPO nascono cosi'. Poi torna all'euro e i sats
+    # si azzerano: «fisso batte ancorato» non deve trovare un resto.
+    fuori = chiama(SRV.salva_connettore, None, corpo={
+        "id": nid, "fonte": "shopify", "url_negozio": "nuovo.myshopify.com",
+        "consegna": "spedizione", "tariffe_valuta": "sats",
+        "spedizione_sats": "7000", "spedizione_punto_sats": "0",
+        "spedizione_extra_sats": 300})
+    c_ = fuori["connettore"]
+    prova("le tariffe in sats si salvano come sats, con zeri nell'euro",
+          ("sats", 7000, 0.0, 0, 1, 300, 0.0),
+          (c_["tariffe_valuta"], c_["spedizione_sats"], c_["spedizione_eur"],
+           c_["spedizione_punto_sats"], c_["spedizione_punto_dichiarata"],
+           c_["spedizione_extra_sats"], c_["spedizione_extra_eur"]))
+    dopo = annunci(nid)[0]
+    prova("...e scendono sugli articoli gia' in vetrina, fissi",
+          (7000, 0.0, 0, 1, 300, 0.0, "eur"),
+          (dopo["spedizione_sats"], dopo["spedizione_eur"],
+           dopo["spedizione_punto_sats"], dopo["spedizione_punto_dichiarata"],
+           dopo["spedizione_extra_sats"], dopo["spedizione_extra_eur"],
+           dopo["valuta"]))
+    CATALOGO.append(prodotto(42, "Pepe nero", "3.00", stock=2))
+    asyncio.run(SRV._sync_uno(nid))
+    nato = uno(nid, 42)
+    prova("...e le righe che nascono dopo nascono in sats",
+          (7000, 0.0, 300, 3.0), (nato["spedizione_sats"],
+                                  nato["spedizione_eur"],
+                                  nato["spedizione_extra_sats"],
+                                  nato["prezzo_eur"]))
+    prova("i sats con la virgola si rifiutano, dicendolo", (400, True),
+          (lambda e: (e[0], "senza punti" in e[1]))(errore(
+              SRV.salva_connettore, None, corpo={
+                  "id": nid, "fonte": "shopify",
+                  "url_negozio": "nuovo.myshopify.com",
+                  "consegna": "spedizione", "tariffe_valuta": "sats",
+                  "spedizione_sats": "7.000"})))
+    fuori = chiama(SRV.salva_connettore, None, corpo={
+        "id": nid, "fonte": "shopify", "url_negozio": "nuovo.myshopify.com",
+        "consegna": "spedizione", "tariffe_valuta": "eur",
+        "spedizione_eur": "4,90", "spedizione_extra_eur": 1.5})
+    dopo = annunci(nid)[0]
+    prova("tornando all'euro i sats si azzerano, sulla riga e sugli articoli",
+          (("eur", 0, 4.9), (0, 4.9, 0, 1.5)),
+          ((fuori["connettore"]["tariffe_valuta"],
+            fuori["connettore"]["spedizione_sats"],
+            fuori["connettore"]["spedizione_eur"]),
+           (dopo["spedizione_sats"], dopo["spedizione_eur"],
+            dopo["spedizione_extra_sats"], dopo["spedizione_extra_eur"])))
+    CATALOGO.pop()
+    # (la riga nata qui se ne va: i casi di sotto contano gli attivi)
+    con = SRV.db()
+    con.execute("DELETE FROM annunci WHERE id=?", (nato["id"],))
+    con.commit()
+    con.close()
+
+    # LA RADICE DI UN WOO (set 2026): scritto con la pagina del negozio,
+    # dove `/negozio/wp-json/...` e' una pagina 404 del tema (niente
+    # codice WordPress), si collega la RADICE e lo si dice; se la radice
+    # tace e il percorso risponde, vale il percorso; e i rifiuti dicono
+    # se e' l'indirizzo, le chiavi o il sito.
+    # (li collega il moderatore: il venditore e' gia' al tetto dei tre)
+    come(999)
+    prima_woo = quanti_connettori()
+    RISPOSTE_WOO["https://untempo.it/negozio/wp-json/"] = (404, {}, {})
+    fuori = chiama(SRV.salva_connettore, None, corpo={
+        "fonte": "woo", "url_negozio": "https://untempo.it/negozio/",
+        "credenziali": {"consumer_key": "ck_x", "consumer_secret": "cs_y"},
+        "consegna": "spedizione", "spedizione_eur": 5})
+    wid = fuori["connettore"]["id"]
+    prova("un Woo scritto con la pagina del negozio si collega alla radice",
+          "https://untempo.it", fuori["connettore"]["url_negozio"])
+    prova("...e lo dice", True,
+          "indirizzo principale del sito" in fuori.get("indirizzo_nota", "")
+          and "(https://untempo.it/negozio)" in fuori.get("indirizzo_nota", ""))
+    chiama(SRV.scollega_connettore, wid)
+    RISPOSTE_WOO["https://sub.it/wp-json/"] = (404, {}, {})
+    fuori = chiama(SRV.salva_connettore, None, corpo={
+        "fonte": "woo", "url_negozio": "https://sub.it/shop",
+        "credenziali": {"consumer_key": "ck_x", "consumer_secret": "cs_y"},
+        "consegna": "spedizione", "spedizione_eur": 5})
+    prova("...ma se la radice tace vale la sottocartella, senza nota",
+          ("https://sub.it/shop", None),
+          (fuori["connettore"]["url_negozio"], fuori.get("indirizzo_nota")))
+    chiama(SRV.scollega_connettore, fuori["connettore"]["id"])
+    RISPOSTE_WOO["https://muto.it/"] = (404, {}, {})
+    esito = errore(SRV.salva_connettore, None, corpo={
+        "fonte": "woo", "url_negozio": "https://muto.it/negozio",
+        "credenziali": {"consumer_key": "ck_x", "consumer_secret": "cs_y"},
+        "consegna": "spedizione", "spedizione_eur": 5})
+    prova("se tacciono tutt'e due si racconta la radice e il percorso",
+          (400, True, True),
+          (esito[0], "https://muto.it: a https://muto.it non risponde "
+                     "nessun WordPress: controlla l'indirizzo" in esito[1],
+           "E nemmeno da https://muto.it/negozio: a https://muto.it/negozio "
+           "non risponde nessun WordPress: usa l'indirizzo principale del "
+           "sito" in esito[1]))
+
+    def rifiuto_woo(stato, corpo):
+        RISPOSTE_WOO["https://woo-r.it/"] = (stato, corpo, {})
+        e = errore(SRV.salva_connettore, None, corpo={
+            "fonte": "woo", "url_negozio": "https://woo-r.it",
+            "credenziali": {"consumer_key": "ck_x", "consumer_secret": "cs_y"},
+            "consegna": "spedizione", "spedizione_eur": 5})
+        return e[0], e[1]
+
+    e = rifiuto_woo(401, {"code": "woocommerce_rest_authentication_error",
+                          "message": "Consumer key is invalid"})
+    prova("chiavi sbagliate: si dice di ricontrollarle", (400, True),
+          (e[0], "Consumer key e Consumer secret" in e[1]))
+    e = rifiuto_woo(403, {"code": "woocommerce_rest_cannot_view",
+                          "message": "Sorry, you cannot list resources."})
+    prova("chiavi senza permesso di lettura: si dice il permesso", (400, True),
+          (e[0], "permesso «Lettura»" in e[1]))
+    e = rifiuto_woo(403, {})
+    prova("un muro senza codice WordPress: il sito blocca", (400, True),
+          (e[0], "blocca le richieste" in e[1]))
+    e = rifiuto_woo(404, {"code": "rest_no_route", "message": "No route"})
+    prova("WordPress senza WooCommerce: si dice quello", (400, True),
+          (e[0], "non WooCommerce" in e[1]))
+    prova("...e nessun rifiuto ha lasciato una riga", prima_woo,
+          quanti_connettori())
+    RISPOSTE_WOO.clear()
+    come(VENDITORE)
 
     # LA PAUSA: il giro non lo guarda piu', ma gli annunci restano
     chiama(SRV.pausa_connettore, nid)

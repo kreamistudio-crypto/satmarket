@@ -23684,8 +23684,18 @@ def prove_pagina_acquisto():
     # 6. La modifica firmata non tocca MAI le colonne punto (l'evento
     #    Nostr non le porta: le azzererebbe a ogni sync). L'unico
     #    UPDATE che le scrive e' quello di modifica().
-    prova("spedizione_punto_sats=? vive in UN solo UPDATE", 1,
-          src.count("spedizione_punto_sats=?"))
+    # EMENDATA (set 2026, tariffe in sats dei negozi collegati): i siti
+    # sono TRE, e due non sono la modifica — l'UPDATE della riga del
+    # COLLEGAMENTO (un'altra tabella) e `_applica_dichiarazione`, la
+    # dichiarazione del cassetto che scende sulle sole righe di quel
+    # negozio (la stessa terza porta che la prova di `consegna=?` gia'
+    # ammette, legata a `connettore_id`). Fuori da quei due resta UNO.
+    _fuori = (codice(pezzo("salva_connettore")).count("spedizione_punto_sats=?")
+              + codice(pezzo("_applica_dichiarazione")).count(
+                  "spedizione_punto_sats=?"))
+    prova("spedizione_punto_sats=? vive in UN solo UPDATE (fuori dal "
+          "collegamento e dalla sua dichiarazione)", (1, 2),
+          (src.count("spedizione_punto_sats=?") - _fuori, _fuori))
 
     # 6bis. La notifica una-tantum dello spedizioniere: il timbro si
     #    scrive PRIMA degli invii (il patto del cooldown della lampo:
@@ -78841,9 +78851,11 @@ def prove_connettori_woo():
         if "/settings/" in url:
             return 200, {"lista": voce("woocommerce_calc_taxes", "no")}, {}
         return 500, {}, {}
-    prova("una pagina fallita ALZA, non torna una lista corta",
-          "WooCommerce ha risposto 500",
-          _alza(lambda: leggi("https://x.it", cred, rotto, 200)))
+    # EMENDATA (set 2026): il messaggio non e' piu' «WooCommerce ha
+    # risposto 500» ma la spiegazione di `spiega_risposta_woo`, che
+    # dice cosa fare; qui conta che ALZI e che porti lo stato
+    prova("una pagina fallita ALZA, non torna una lista corta", True,
+          "(500)" in _alza(lambda: leggi("https://x.it", cred, rotto, 200)))
     # L'ORDINE E' PER ID: col default (la data) basta che il venditore
     # ritocchi un prodotto mentre paginiamo perche' una riga scivoli
     # fra due pagine — cioe' un prodotto dichiarato sparito e spento
@@ -79212,6 +79224,8 @@ def prove_connettori_ingresso():
               valuta TEXT, prezzo_eur REAL, quantita INT, quantita_max INT,
               consegna TEXT, spedizione_eur REAL, spedizione_punto_eur REAL,
               spedizione_punto_dichiarata INT, spedizione_extra_eur REAL,
+              spedizione_sats INT, spedizione_punto_sats INT,
+              spedizione_extra_sats INT,
               fonte TEXT, connettore_id INT, origine_chiave TEXT,
               origine_foto TEXT, origine_stock_visto INT,
               creato INT, modificato INT, stato TEXT);
@@ -79446,11 +79460,14 @@ def prove_connettori_cassetto():
 
     # --- SI PROVA PRIMA DI CREDERCI -------------------------------
     salva = codice(pezzo("salva_connettore"))
+    # EMENDATA (set 2026): la prova passa da `_prova_indirizzo_negozio`,
+    # che per un Woo con percorso bussa prima alla radice e poi chiama
+    # `_prova_negozio` — l'ordine coi due scritti resta quello
     prova("il negozio si prova PRIMA dell'INSERT", True,
-          0 <= salva.find("await _prova_negozio(")
+          0 <= salva.find("await _prova_indirizzo_negozio(")
           < salva.find("INSERT INTO connettori"))
     prova("...e prima dell'UPDATE", True,
-          0 <= salva.find("await _prova_negozio(")
+          0 <= salva.find("await _prova_indirizzo_negozio(")
           < salva.find("UPDATE connettori SET"))
     # LA PROVA COSTA UNA CHIAMATA DI RETE, quindi si fa SOLO quando
     # cambia qualcosa che il negozio possa rifiutare: correggere una
@@ -79462,13 +79479,17 @@ def prove_connettori_cassetto():
     provaneg = codice(pezzo("_prova_negozio"))
     prova("la prova legge UNA pagina sola", True,
           "chiama_api_negozio, 1)" in provaneg)
+    # EMENDATA (set 2026): il tetto e' salito a 320, che i motivi adesso
+    # dicono cosa fare («usa l'indirizzo principale del sito, per
+    # esempio https://…») e in 160 non ci stavano
     prova("...e il motivo del rifiuto e' quello VERO", True,
-          "str(e)[:160]" in provaneg)
+          "str(e)[:320]" in provaneg)
     # niente connessione aperta mentre si parla con la rete: la si
     # chiude PRIMA della prova e se ne riapre una per scrivere
     prova("nessuna connessione aperta durante la chiamata", True,
-          0 <= salva.find("con.close()\n\n    if cred is not None")
-          < salva.find("await _prova_negozio("))
+          0 <= salva.find("con.close()\n\n    nota_indirizzo = \"\"\n"
+                          "    if cred is not None")
+          < salva.find("await _prova_indirizzo_negozio("))
 
     # --- IL FAIL-OPEN SI FERMA QUI --------------------------------
     # un PIN di ritiro in chiaro e' una degradazione accettabile, un
@@ -79684,8 +79705,12 @@ def prove_connettori_cassetto():
           and "connettoriLeve.attivo && connettoriLeve.visibile" in rc)
     # LE CIFRE VENGONO DAL SERVER: il tetto, le piattaforme e le
     # strade sono leve, e il client non hardcoda mai una leva
+    # EMENDATA (set 2026): le pillole le disegna `connPillole`, fuori dal
+    # disegno intero, perche' al tocco si ridisegnano SOLO loro
+    _pil = pezzo_js(mini, "function connPillole(")
     prova("...e le voci vengono dal server", True,
-          "connettoriLeve.fonti" in rc and "connettoriLeve.consegne" in rc)
+          "connettoriLeve.fonti" in _pil and "connettoriLeve.consegne" in _pil
+          and "connPillole('fonte')" in rc and "connPillole('consegna')" in rc)
     prova("...compreso il tetto", True, "connettoriLeve.max" in rc)
     # LE CHIAVI NON TORNANO MAI INDIETRO: i tre campi nascono VUOTI
     # anche in modifica, e vuoto vuol dire «lascia quelle di prima»
@@ -79700,8 +79725,9 @@ def prove_connettori_cassetto():
     # la DICHIARAZIONE e' la presenza della chiave e mai il valore: il
     # campo vuoto NON manda niente, e vale «come a casa» — uno zero
     # direbbe «gratis», che e' un'altra cosa
+    # EMENDATA (set 2026): la chiave porta il suffisso della valuta
     prova("la tariffa punto si manda solo se scritta", True,
-          "if ((b.punto || '').trim() !== '') corpo.spedizione_punto_eur"
+          "if ((b.punto || '').trim() !== '') corpo['spedizione_punto' + sfx]"
           in sal)
     prova("...e le chiavi solo se scritte", True,
           "if (Object.values(chiavi).some(v => v.trim() !== ''))" in sal)
@@ -89961,9 +89987,11 @@ def prove_catalogo_esterno():
           True, 0 <= _v < _q)
     prova("...e il ritocco di un collegamento suo passa sempre", True,
           salva.find("if cid:") < salva.find("else:") < _v)
+    # EMENDATA (set 2026): la chiave di casa puo' essere in sats, e a
+    # dirlo e' `_dice_tariffa_casa`
     prova("i costi non detti tengono fermo un negozio che spedisce", True,
           'if consegna not in ("spedizione", "entrambe") or '
-          '"spedizione_eur" in d:' in salva
+          '_dice_tariffa_casa(d):' in salva
           and 'da_dire = vecchio["tariffe_da_dire"] if vecchio else 1'
           in salva)
     prova("...e si scrivono in tutt'e due le strade", True,
@@ -90047,8 +90075,12 @@ def prove_catalogo_esterno():
     _es = mini[mini.index("const esc = s =>"):]
     _es = _es[:_es.index(";\n") + 1]
     _rc = mini[mini.index("let myConnettori = null;"):]
-    _rc = _rc[:_rc.index("\n}\n", _rc.index("async function renderConnettori(")) + 3]
+    # ...fino alle caselle dei costi: le pillole e le caselle vivono in
+    # funzioni loro dal set 2026, subito dopo il disegno
+    _rc = _rc[:_rc.index("\n}\n", _rc.index("function connCampoCosto(")) + 3]
     _salva = (pezzo_js(mini, "function connLeggiCampi(", "\n}\n") + "\n}\n"
+              + pezzo_js(mini, "function connValutaTariffe(", "\n}\n") + "\n}\n"
+              + pezzo_js(mini, "function connNotaIndirizzo(", "\n}\n") + "\n}\n"
               + pezzo_js(mini, "async function salvaConnettore(", "\n}\n")
               + "\n}\n")
 
@@ -90112,8 +90144,11 @@ async function caso(nome, prep){
               'id="connSped"' in h("nuovo"))
         prova("...e una riga dice che si scrivono subito dopo", True,
               "lo scrivi subito dopo" in h("nuovo"))
-        prova("...ma non a chi consegna solo a mano", False,
-              "lo scrivi subito dopo" in h("nuovo_ritiro"))
+        # EMENDATA (set 2026): la riga c'e' e sta NASCOSTA, cosi' tornare a
+        # «Spedizione» non ridisegna il modulo (e non svuota le caselle)
+        prova("...ma non a chi consegna solo a mano", True,
+              bool(re.search(r'id="connCostiNota" style="[^"]*display:none"',
+                             h("nuovo_ritiro"))))
         prova("sul negozio collegato i costi ci sono, e si dice di chi sono",
               [True, True, True, True],
               ['id="connSped"' in h("modifica"),
@@ -90127,8 +90162,11 @@ async function caso(nome, prep){
               ["Ultimo passo" in h("da_dire"),
                "💾 Salva e leggi il catalogo" in h("da_dire"),
                "si comincia a leggere" in h("da_dire")])
-        prova("in modifica senza spedizione niente costi", False,
-              'id="connSped"' in h("modifica_ritiro"))
+        # EMENDATA (set 2026): col solo ritiro il blocco dei costi c'e'
+        # ed e' NASCOSTO — cosi' tornare a «Spedizione» non lo ridisegna
+        # e ritrova i costi scritti — e a salvare non parte lo stesso
+        prova("in modifica senza spedizione i costi sono nascosti", True,
+              'id="connCosti" style="display:none"' in h("modifica_ritiro"))
         prova("la riga che aspetta i costi lo dice, senza «Aggiorna ora»",
               [True, False],
               ["⏳ aspetta i costi di spedizione" in h("riga_da_dire"),
@@ -90218,6 +90256,450 @@ async function caso(nome, prep){
               [cri.get("mod"), "sto leggendo" in (cri.get("toast") or ""),
                sorted(k for k in (cri.get("corpo") or {})
                       if k.startswith("spedizione_"))])
+
+def prove_modulo_negozio():
+    """IL MODULO DEL NEGOZIO COLLEGATO, TRE RITOCCHI (set 2026): 1) al
+    cambio di una scelta non si ridisegna, e le caselle — chiavi
+    comprese — restano; 2) per WooCommerce l'API sta alla radice del
+    sito: con un percorso si prova prima quella, e i rifiuti dicono se
+    e' l'indirizzo, le chiavi senza permesso, o il sito che blocca;
+    3) i costi del negozio anche in SATS fissi, col bottoncino di «Come
+    spedisci» che converte, e scendono sugli articoli nella valuta
+    scelta.
+    I giudici si GIRANO: la radice, la spiegazione stato per stato, la
+    prova alla radice con un negozio di cartone che dice si' o no per
+    indirizzo, le tariffe in sats; e in node il modulo vero, con le
+    caselle scritte e le pillole toccate."""
+    print("\n[il modulo del negozio collegato: caselle, radice, sats]")
+    import asyncio as _asMN
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = _SORGENTE
+    imp = open("importa_negozio.py", encoding="utf-8").read()
+
+    class _Http(Exception):
+        def __init__(self, code, detail=""):
+            self.status_code = code
+            self.detail = detail
+            super().__init__(detail)
+
+    # ---- 1) il client: niente ridisegno, le chiavi solo nelle caselle -
+    blocco = mini[mini.index("let myConnettori = null;"):
+                  mini.index("async function pausaConnettore(")]
+    pill = pezzo_js(mini, "function connPill(")
+    prova("toccare una pillola NON ridisegna il modulo", (False, True),
+          ("renderConnettori(" in pill, "connAggiornaModulo()" in pill))
+    leggi = pezzo_js(mini, "function connLeggiCampi(")
+    prova("la bozza non tiene mai una chiave", [],
+          [g for g in ("connCk", "connCs", "connTok") if g in leggi])
+    # (il codice senza i commenti, che la parola la nominano per dire
+    # che NON si usa)
+    prova("...e il modulo non tocca localStorage", False,
+          "localStorage" in re.sub(r"/\*.*?\*/", "", blocco, flags=re.S))
+    rc = pezzo_js(mini, "async function renderConnettori(")
+    prova("i due blocchi di chiavi stanno tutt'e due nel DOM", True,
+          'id="connChiaviWoo"' in rc and 'id="connChiaviShopify"' in rc)
+    prova("...e la nota dell'indirizzo dice la radice", True,
+          'id="connUrlNota"' in rc and "principale del sito" in rc)
+    agg = pezzo_js(mini, "function connAggiornaModulo(")
+    prova("l'aggiornamento sul posto non riscrive nessuna casella", [],
+          [g for g in (".value =", ".value=") if g in agg])
+    tog = pezzo_js(mini, "function toggleConnCur(")
+    prova("il bottoncino dei costi converte, non svuota", True,
+          "convertiCampiValuta(['connSped', 'connPunto', 'connExtra'], da, a)"
+          in tog and "rigaCambio(" in tog)
+
+    # ---- 2) il modulo: la radice e la spiegazione ---------------------
+    amb = {"re": re}
+    for nome in ("radice_woo", "_codice_wp", "_dove_rimanda",
+                 "spiega_risposta_woo"):
+        exec(_pezzo_da(imp, nome), amb)
+    radice = amb["radice_woo"]
+    prova("la radice di un Woo scritto con la pagina del negozio",
+          "https://www.untempoperte.it",
+          radice("https://www.untempoperte.it/negozio/"))
+    prova("...e senza percorso resta com'e'", "https://sito.it",
+          radice("https://sito.it/"))
+    spiega = amb["spiega_risposta_woo"]
+    wp = lambda c: {"code": c, "message": "x", "data": {"status": 1}}
+    B = "https://www.untempoperte.it/negozio"
+    prova("404 senza codice WordPress: l'indirizzo, e la radice da usare",
+          True, "usa l'indirizzo principale del sito, per esempio "
+          "https://www.untempoperte.it" in spiega(404, {}, {}, B))
+    prova("...ma alla radice non si suggerisce se' stessi", True,
+          "controlla l'indirizzo" in spiega(404, {}, {}, "https://sito.it"))
+    prova("404 con codice: WordPress c'e', WooCommerce no", True,
+          "non WooCommerce" in spiega(404, wp("rest_no_route"), {}, B))
+    prova("401 con codice: le chiavi", True,
+          "Consumer key" in spiega(401, wp("woocommerce_rest_cannot_view"),
+                                   {}, B))
+    prova("403 con codice: le chiavi senza permesso di lettura", True,
+          "«Lettura»" in spiega(403, wp("woocommerce_rest_cannot_view"),
+                                {}, B))
+    prova("403 senza codice: il sito blocca", True,
+          "blocca le richieste" in spiega(403, {}, {}, B))
+    prova("401 senza codice: una password del server", True,
+          "password" in spiega(401, {}, {}, B))
+    prova("un redirect si DICE, con l'indirizzo e senza la query", True,
+          "(https://www.sito.it/)" in spiega(
+              301, {}, {"Location": "https://www.sito.it/?s=1"}, B)
+          and "s=1" not in spiega(301, {}, {"Location": "https://www.sito.it/?s=1"}, B))
+    prova("un 5xx e' del sito", True, "(503)" in spiega(503, {}, {}, B))
+    prova("il resto e' un firewall, con lo stato", True,
+          "(429)" in spiega(429, {}, {}, B))
+    prova("le due sonde dell'IVA e le pagine passano dalla spiegazione", 3,
+          codice(_pezzo_da(imp, "prezzi_finiti_woo")).count(
+              "spiega_risposta_woo(")
+          + codice(_pezzo_da(imp, "leggi_catalogo_woo")).count(
+              "spiega_risposta_woo("))
+    prova("...e il 200 senza le voci resta «non lo sappiamo»", 2,
+          codice(_pezzo_da(imp, "prezzi_finiti_woo")).count(
+              "raise RuntimeError(MSG_IVA_IGNOTA)"))
+
+    # ---- 3) il server: la prova alla radice, girata -------------------
+    import importa_negozio as _imn
+    a2 = {"HTTPException": _Http, "importa_negozio": _imn}
+    # `pezzo` parte dal `def`: l'`async` davanti si rimette
+    exec("async " + pezzo("_prova_indirizzo_negozio"), a2)
+    prova_ind = a2["_prova_indirizzo_negozio"]
+
+    def negozio(risponde):
+        chiamate = []
+
+        async def _prova_negozio(fonte, url, credenziali):
+            chiamate.append(url)
+            if url not in risponde:
+                raise _Http(400, f"Non riesco a leggere il catalogo di {url}: "
+                                 f"motivo di {url}")
+        a2["_prova_negozio"] = _prova_negozio
+        return chiamate
+
+    def esito(fonte, url, risponde):
+        ch = negozio(risponde)
+        try:
+            r = _asMN.run(prova_ind(fonte, url, {}))
+            return r, ch
+        except _Http as e:
+            return e.detail, ch
+
+    r, ch = esito("woo", "https://sito.it/negozio/", ["https://sito.it"])
+    prova("con un percorso si bussa PRIMA alla radice, e si salva quella",
+          (["https://sito.it"], "https://sito.it"), (ch, r[0]))
+    prova("...dicendolo", True, "indirizzo principale" in r[1]
+          and "https://sito.it/negozio/" in r[1])
+    r, ch = esito("woo", "https://sito.it/shop", ["https://sito.it/shop"])
+    prova("se la radice tace si prova il percorso, e vale lui senza nota",
+          (["https://sito.it", "https://sito.it/shop"],
+           ("https://sito.it/shop", "")), (ch, r))
+    r, ch = esito("woo", "https://sito.it/negozio", [])
+    prova("se tacciono tutt'e due il rifiuto li racconta entrambi", True,
+          isinstance(r, str) and "motivo di https://sito.it" in r
+          and "E nemmeno da https://sito.it/negozio: motivo di "
+              "https://sito.it/negozio" in r)
+    r, ch = esito("woo", "https://sito.it", ["https://sito.it"])
+    prova("senza percorso una prova sola", (["https://sito.it"],
+                                            ("https://sito.it", "")), (ch, r))
+    r, ch = esito("shopify", "mio.myshopify.com", ["mio.myshopify.com"])
+    prova("shopify non ha radici: com'era", (["mio.myshopify.com"],
+                                             ("mio.myshopify.com", "")),
+          (ch, r))
+    salva = codice(pezzo("salva_connettore"))
+    prova("il salvataggio tiene l'indirizzo che ha risposto", True,
+          "url, nota_indirizzo = await _prova_indirizzo_negozio(" in salva
+          and 'fuori_json["indirizzo_nota"] = nota_indirizzo' in salva)
+    prova("...e il client la mostra nel riquadro", True,
+          "connNotaIndirizzo(d)" in pezzo_js(mini, "async function salvaConnettore(")
+          and "indirizzo_nota" in pezzo_js(mini, "function connNotaIndirizzo("))
+
+    # ---- 4) le tariffe in sats: i giudici, girati ---------------------
+    a3 = {"HTTPException": _Http, "re": re, "MAX_TARIFFA_CONNETTORE": 500.0,
+          "MAX_TARIFFA_CONNETTORE_SATS": 1_000_000,
+          "_fmt_eur": lambda x: "500,00", "_fmt_sats": lambda x: "1.000.000"}
+    for nome in ("_tariffa_negozio", "_valuta_tariffe_negozio",
+                 "_tariffe_negozio", "_dice_tariffa_casa"):
+        exec(pezzo(nome), a3)
+    tar, val, tutte = a3["_tariffa_negozio"], a3["_valuta_tariffe_negozio"], a3["_tariffe_negozio"]
+
+    def _v(fn, *a):
+        try:
+            return fn(*a)
+        except _Http as e:
+            return e.status_code
+
+    def _det(fn, *a):
+        try:
+            fn(*a)
+            return ""
+        except _Http as e:
+            return e.detail
+
+    prova("tariffa in sats: intera", 5000,
+          _v(tar, {"spedizione_sats": "5000"}, "spedizione_sats", 0, "sats"))
+    prova("...un float tondo passa, e un JSON manda numeri", 5000,
+          _v(tar, {"spedizione_sats": 5000.0}, "spedizione_sats", 0, "sats"))
+    prova("...niente punti ne' virgole nei sats", ["400", "400"],
+          [str(_v(tar, {"spedizione_sats": t}, "spedizione_sats", 0, "sats"))
+           for t in ("5.000", "4,9")])
+    prova("...e lo dice", True, "senza punti" in _det(
+        tar, {"spedizione_sats": "5.000"}, "spedizione_sats", 0, "sats"))
+    prova("...col suo tetto", 400,
+          _v(tar, {"spedizione_sats": 1_000_001}, "spedizione_sats", 0, "sats"))
+    prova("...e la chiave assente conserva", 700,
+          _v(tar, {}, "spedizione_sats", 700, "sats"))
+    prova("in euro tutto com'era", (4.9, 400),
+          (_v(tar, {"spedizione_eur": "4,90"}, "spedizione_eur", 0.0),
+           _v(tar, {"spedizione_eur": 501}, "spedizione_eur", 0.0)))
+    prova("la valuta: detta, o dal NOME della chiave, o quella di ieri",
+          ["sats", "sats", "eur", "sats", "eur", 400],
+          [val({"tariffe_valuta": "sats"}, None),
+           val({"spedizione_sats": 1}, None),
+           val({"spedizione_eur": 1}, None),
+           val({}, {"tariffe_valuta": "sats"}),
+           val({}, None),
+           _v(val, {"tariffe_valuta": "oro"}, None)])
+    prova("le otto colonne in sats: i numeri nei sats, zeri nell'euro",
+          (0.0, 5000, 0.0, 3500, 1, 0.0, 500, "sats"),
+          tutte({"tariffe_valuta": "sats", "spedizione_sats": 5000,
+                 "spedizione_punto_sats": 3500, "spedizione_extra_sats": 500},
+                None))
+    prova("...e in euro il contrario, col punto non dichiarato",
+          (4.9, 0, 0.0, 0, 0, 1.5, 0, "eur"),
+          tutte({"spedizione_eur": "4,90", "spedizione_extra_eur": 1.5}, None))
+    ieri = {"tariffe_valuta": "eur", "spedizione_eur": 4.9,
+            "spedizione_punto_eur": 2.0, "spedizione_punto_dichiarata": 1,
+            "spedizione_extra_eur": 1.0}
+    prova("a chiave assente e stessa valuta si conserva",
+          (4.9, 0, 2.0, 0, 1, 1.0, 0, "eur"), tutte({}, ieri))
+    # UN 4,90 CONSERVATO DENTRO UN COLLEGAMENTO PASSATO AI SATS sarebbe 4
+    # sats, cioe' gratis detto da noi: cambiando valuta il «conserva» vale
+    # zero, e il modulo manda comunque tutt'e tre le chiavi
+    prova("...ma cambiando valuta il conserva vale zero",
+          (0.0, 0, 0.0, 0, 1, 0.0, 0, "sats"),
+          tutte({"tariffe_valuta": "sats"}, ieri))
+    prova("la casa e' detta in una valuta qualunque", [True, True, False],
+          [a3["_dice_tariffa_casa"]({"spedizione_eur": 0}),
+           a3["_dice_tariffa_casa"]({"spedizione_sats": 0}),
+           a3["_dice_tariffa_casa"]({"spedizione_punto_sats": 0})])
+
+    # ---- 5) le sentinelle: dove i sats scendono -----------------------
+    dich = codice(pezzo("_applica_dichiarazione"))
+    prova("la dichiarazione scende in tutt'e due le valute", True,
+          all(g in dich for g in ("spedizione_sats=?", "spedizione_punto_sats=?",
+                                  "spedizione_extra_sats=?", "spedizione_eur=?")))
+    prova("...e il salvataggio le passa tutte", True,
+          '"spedizione_sats": tariffe[1]' in salva
+          and '"spedizione_extra_sats": tariffe[6]' in salva)
+    riga_nuova = codice(_pezzo_da(imp, "_una_riga"))
+    prova("le righe nuove del catalogo nascono con le tariffe in sats", True,
+          "spedizione_sats,spedizione_punto_eur" in riga_nuova
+          and 'connettore.get("spedizione_sats") or 0' in riga_nuova)
+    prova("la riga in uscita porta la valuta e i sats", True,
+          all(g in pezzo("_connettore_pubblico") for g in
+              ('"tariffe_valuta"', '"spedizione_sats"',
+               '"spedizione_punto_sats"', '"spedizione_extra_sats"')))
+    prova("le leve portano il tetto in sats", True,
+          '"max_tariffa_sats": MAX_TARIFFA_CONNETTORE_SATS' in pezzo("_connettori_leve"))
+    prova("...e il pannello lo conosce", True,
+          '"MAX_TARIFFA_CONNETTORE_SATS"' in pezzo("_leve_stato"))
+    _mig = src[src.index("def init_db("):]
+    _mig = _mig[:_mig.index("\ndef ", 10)]
+    _dd = _mig.find('"tariffe_da_dire INTEGER DEFAULT 0"')
+    _tv = _mig.find("\"tariffe_valuta TEXT DEFAULT 'eur'\"")
+    prova("la migrazione da' le colonne nuove, dopo quella di ieri", True,
+          0 <= _dd < _tv and all(
+              g in _mig for g in ('"spedizione_sats INTEGER DEFAULT 0"',
+                                  '"spedizione_punto_sats INTEGER DEFAULT 0"',
+                                  '"spedizione_extra_sats INTEGER DEFAULT 0"')))
+    prova("...e lo schema le ha per i database nuovi", True,
+          "tariffe_valuta TEXT DEFAULT 'eur'" in _mig
+          and "spedizione_extra_sats INTEGER DEFAULT 0," in _mig)
+
+    # ---- 6) in node: il modulo vero, le caselle e le pillole ----------
+    import json as _jsMN, shutil as _shMN, subprocess as _spMN
+    import tempfile as _tfMN
+    if not _shMN.which("node"):
+        salta("il modulo del negozio in node", "node non installato")
+        return
+
+    def _node(prog, nome):
+        with _tfMN.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                      encoding="utf-8") as f:
+            f.write(prog)
+            p = f.name
+        try:
+            r = _spMN.run(["node", p], capture_output=True, text=True,
+                          encoding="utf-8", timeout=60)
+        finally:
+            os.unlink(p)
+        if r.returncode != 0:
+            prova(nome + ": il banco gira", "", r.stderr[-400:])
+            return None
+        return _jsMN.loads(r.stdout)
+
+    _fmt = mini[mini.index("const fmt = n =>"):]
+    _fmt = _fmt[:_fmt.index("\n")]
+    _es = mini[mini.index("const esc = s =>"):]
+    _es = _es[:_es.index(";\n") + 1]
+    _mod = mini[mini.index("let myConnettori = null;"):
+                mini.index("async function pausaConnettore(")]
+    _conv = "\n".join(pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
+        "function costoStdIn(", "function convertiCifraCampo(",
+        "function convertiCampiValuta("))
+    banco = _fmt + "\n" + _es + "\n" + r"""
+let DEMO = false, VETRINA = false, cambioVivo = true, eurPerSat = 0.001;
+let NODI = {};
+const el = id => NODI[id] || null;
+const haptic = () => {}, toast = () => {}, bottoneInAttesa = () => () => {};
+const API_BASE = "/api", authHdr = () => "x";
+const ancoreCambio = {};
+function rigaCambio(){ RIGHE++; }
+let RIGHE = 0, CORPI = [];
+const fetch = async (url, opz) => { CORPI.push(JSON.parse(opz.body));
+  return {ok: true, json: async () => ({ok: true, connettore: {id: 7}})}; };
+""" + _conv + "\n" + _mod + r"""
+const out = {};
+const LEVE = () => ({attivo: true, visibile: true, max: 3,
+  fonti: [{id: "shopify", nome: "Shopify"}, {id: "woo", nome: "WooCommerce"}],
+  consegne: ["spedizione", "ritiro", "entrambe"]});
+const C = {id: 7, fonte: "woo", nome_fonte: "WooCommerce",
+  url_negozio: "https://sito.it", stato: "attivo", consegna: "spedizione",
+  tariffe_valuta: "eur", spedizione_eur: 4.9, spedizione_sats: 0,
+  spedizione_punto_eur: 0, spedizione_punto_sats: 0, spedizione_punto_dichiarata: 0,
+  spedizione_extra_eur: 1, spedizione_extra_sats: 0, zona: "", tariffe_da_dire: false,
+  ultimo_giro: 0, ultimo_errore: "", errori_di_fila: 0, annunci: 3, esito: {}};
+const nodo = (v, extra) => Object.assign({value: v, style: {}, textContent: "",
+  innerHTML: "", placeholder: "", closest: () => null}, extra || {});
+(async () => {
+  try {
+    NODI = {connettoriBlocco: nodo(""), accConnettori: nodo(""),
+            connettoriConta: nodo(""), importTitolo: nodo("")};
+    connettoriLeve = LEVE(); myConnettori = [C];
+    modificaConnettore(7);          // disegna il modulo di modifica, in euro
+    await new Promise(r => setTimeout(r, 0));
+    const html = NODI.connettoriBlocco.innerHTML;
+    out.disegno = {chiaviWoo: html.includes('id="connChiaviWoo" style=""'),
+      chiaviShopify: html.includes('id="connChiaviShopify" style="display:none"'),
+      costi: html.includes('id="connCosti" style=""'),
+      nota: html.includes('id="connUrlNota"'),
+      toggle: html.includes('id="connSpedCur"') && html.includes("€ ⇄"),
+      sped: html.includes('value="4.9"')};
+    /* il DOM di cartone: quel che il disegno ha appena scritto, con le
+       caselle come le riempirebbe il dito */
+    Object.assign(NODI, {
+      connPilloleFonte: nodo(""), connPilloleConsegna: nodo(""),
+      connUrl: nodo("https://sito.it/negozio/"), connUrlNota: nodo(""),
+      connChiaviWoo: nodo(""), connChiaviShopify: nodo("", {style: {display: "none"}}),
+      connCk: nodo("ck_scritta"), connCs: nodo("cs_scritta"), connTok: nodo(""),
+      connZona: nodo("Pavia (PV)"), connZonaLabel: nodo(""),
+      connCosti: nodo(""), connSped: nodo("4.9"), connPunto: nodo(""),
+      connExtra: nodo("1"), connSpedCur: nodo(""), connPuntoU: nodo(""),
+      connExtraU: nodo("")});
+    connPill("consegna", "entrambe");
+    out.entrambe = {ridisegnato: NODI.connettoriBlocco.innerHTML !== html,
+      ck: NODI.connCk.value, cs: NODI.connCs.value, url: NODI.connUrl.value,
+      sped: NODI.connSped.value, costi: NODI.connCosti.style.display,
+      zona: NODI.connZonaLabel.textContent,
+      pillole: NODI.connPilloleConsegna.innerHTML.includes("Tutt'e due"),
+      bozzaUrl: bozzaConn.url, bozzaCons: bozzaConn.consegna};
+    connPill("consegna", "ritiro");
+    out.ritiro = {costi: NODI.connCosti.style.display, sped: NODI.connSped.value,
+      ck: NODI.connCk.value};
+    connPill("consegna", "spedizione");
+    out.spedizione = {costi: NODI.connCosti.style.display,
+      zona: NODI.connZonaLabel.textContent};
+    connPill("fonte", "shopify");
+    out.shopify = {woo: NODI.connChiaviWoo.style.display,
+      shop: NODI.connChiaviShopify.style.display, ck: NODI.connCk.value,
+      segnaposto: NODI.connUrl.placeholder, nota: NODI.connUrlNota.style.display,
+      ridisegnato: NODI.connettoriBlocco.innerHTML !== html};
+    connPill("fonte", "woo");
+    out.woo = {woo: NODI.connChiaviWoo.style.display, ck: NODI.connCk.value,
+      cs: NODI.connCs.value, nota: NODI.connUrlNota.style.display};
+    /* il bottoncino: 4.9 € → 4900 sats, 1 € → 1000, il vuoto resta */
+    toggleConnCur();
+    out.sats = {sped: NODI.connSped.value, punto: NODI.connPunto.value,
+      extra: NODI.connExtra.value, cur: NODI.connSpedCur.textContent,
+      u: NODI.connPuntoU.textContent, step: NODI.connSped.step,
+      modo: NODI.connSped.inputMode, valuta: bozzaConn.tvaluta, righe: RIGHE,
+      ridisegnato: NODI.connettoriBlocco.innerHTML !== html};
+    toggleConnCur();
+    out.ritorno = {sped: NODI.connSped.value, extra: NODI.connExtra.value,
+      cur: NODI.connSpedCur.textContent, valuta: bozzaConn.tvaluta};
+    toggleConnCur();                 // di nuovo in sats, per salvare
+    NODI.connettoriErrore = nodo("");
+    await salvaConnettore(null);     // (il salvataggio butta la bozza)
+    out.corpo = CORPI[0];
+    /* entrare in modifica di un negozio salvato in sats: le caselle
+       nei sats, il bottoncino che lo dice */
+    myConnettori = [Object.assign({}, C, {tariffe_valuta: "sats",
+      spedizione_eur: 0, spedizione_sats: 7000, spedizione_punto_dichiarata: 1,
+      spedizione_punto_sats: 0, spedizione_extra_sats: 300, spedizione_extra_eur: 0})];
+    connInModifica = 0; bozzaConn = null;
+    modificaConnettore(7);
+    await new Promise(r => setTimeout(r, 0));
+    out.inSats = {bozza: bozzaConn,
+      html: NODI.connettoriBlocco.innerHTML.includes("sats ⇄")
+        && NODI.connettoriBlocco.innerHTML.includes('value="7000"')
+        && NODI.connettoriBlocco.innerHTML.includes('value="0"')};
+  } catch(e) { out.esploso = String(e && e.stack || e); }
+  console.log(JSON.stringify(out));
+})();
+"""
+    o = _node(banco, "il modulo del negozio")
+    if o is None:
+        return
+    prova("il banco non esplode", None, o.get("esploso"))
+    d = o.get("disegno") or {}
+    prova("in modifica di un Woo: chiavi Woo visibili, Shopify nascoste, "
+          "i costi con il bottoncino", [True] * 6,
+          [d.get(k) for k in ("chiaviWoo", "chiaviShopify", "costi", "nota",
+                              "toggle", "sped")])
+    e = o.get("entrambe") or {}
+    prova("«Tutt'e due»: il modulo NON si ridisegna", False, e.get("ridisegnato"))
+    prova("...e indirizzo, chiavi e costi restano dove sono",
+          ["https://sito.it/negozio/", "ck_scritta", "cs_scritta", "4.9"],
+          [e.get("url"), e.get("ck"), e.get("cs"), e.get("sped")])
+    prova("...le pillole si ridisegnano, la zona non e' piu' facoltativa",
+          [True, "Zona", "", "entrambe", "https://sito.it/negozio/"],
+          [e.get("pillole"), e.get("zona"), e.get("costi"), e.get("bozzaCons"),
+           e.get("bozzaUrl")])
+    r = o.get("ritiro") or {}
+    prova("«Ritiro»: i costi si nascondono e restano scritti",
+          ["none", "4.9", "ck_scritta"], [r.get("costi"), r.get("sped"), r.get("ck")])
+    sp = o.get("spedizione") or {}
+    prova("«Spedizione»: i costi tornano, la zona facoltativa",
+          ["", "Zona (facoltativa)"], [sp.get("costi"), sp.get("zona")])
+    sh = o.get("shopify") or {}
+    prova("Shopify: il blocco Woo si nasconde, la chiave resta nella casella",
+          ["none", "", "ck_scritta", "ilmionegozio.myshopify.com", "none", False],
+          [sh.get("woo"), sh.get("shop"), sh.get("ck"), sh.get("segnaposto"),
+           sh.get("nota"), sh.get("ridisegnato")])
+    w = o.get("woo") or {}
+    prova("...e tornando a Woo le chiavi sono ancora li'",
+          ["", "ck_scritta", "cs_scritta", ""],
+          [w.get("woo"), w.get("ck"), w.get("cs"), w.get("nota")])
+    st = o.get("sats") or {}
+    prova("sats ⇄: 4,90 € → 4900 sats, 1 € → 1000, il vuoto resta vuoto",
+          ["4900", "", "1000"], [st.get("sped"), st.get("punto"), st.get("extra")])
+    prova("...i suffissi e il passo seguono, senza ridisegnare, con la riga",
+          ["sats ⇄", "sats", "1", "numeric", "sats", 1, False],
+          [st.get("cur"), st.get("u"), st.get("step"), st.get("modo"),
+           st.get("valuta"), st.get("righe"), st.get("ridisegnato")])
+    co = o.get("corpo") or {}
+    prova("il salvataggio manda i sats con le chiavi in sats",
+          ["sats", "4900", "1000", False, False],
+          [co.get("tariffe_valuta"), co.get("spedizione_sats"),
+           co.get("spedizione_extra_sats"), "spedizione_eur" in co,
+           "spedizione_punto_sats" in co])
+    ri = o.get("ritorno") or {}
+    prova("...e il ritorno all'euro rida' le cifre di partenza",
+          ["4.9", "1", "€ ⇄", "eur"],
+          [ri.get("sped"), ri.get("extra"), ri.get("cur"), ri.get("valuta")])
+    ins = o.get("inSats") or {}
+    prova("un negozio salvato in sats si riapre in sats",
+          [True, "sats", "7000", "0", "300"],
+          [ins.get("html"), (ins.get("bozza") or {}).get("tvaluta"),
+           (ins.get("bozza") or {}).get("sped"), (ins.get("bozza") or {}).get("punto"),
+           (ins.get("bozza") or {}).get("extra")])
 
 
 def prove_spedizione_standard():
@@ -90999,6 +91481,7 @@ def prove_cambio_converte():
         "toggleSellCur": "converte",      # Vendi: il prezzo, e i costi col listino
         "toggleSpedCur": "converte",      # Vendi: casa, le zone, il punto, il pezzo in piu'
         "setRicercaValuta": "converte",   # avvisi di ricerca: il prezzo massimo
+        "toggleConnCur": "converte",      # negozio collegato: casa, punto, pezzo in piu' (set 2026)
         # la VISTA €/₿: cambia come si legge un numero, e dove governa un
         # campo (i due fogli dell'offerta) converte gia' con la sua ancora
         "setValuta": "vista",
@@ -91011,8 +91494,9 @@ def prove_cambio_converte():
     prova("il censimento dei bottoni di valuta e' completo (uno nuovo "
           "decide qui cosa fa ai numeri gia' scritti)", set(CENSIMENTO),
           set(re.findall(r'onclick="(\w*(?:Valuta|Cur)\w*)\(', mini)))
-    prova("i bottoncini «⇄» sono i tre che convertono",
-          {"toggleSellCur", "toggleSpedCur", "toggleSpedStdCur"},
+    prova("i bottoncini «⇄» sono i quattro che convertono",
+          {"toggleSellCur", "toggleSpedCur", "toggleSpedStdCur",
+           "toggleConnCur"},
           set(re.findall(r'<button[^>]*onclick="(\w+)\(\)"[^>]*>[^<]*⇄', mini)))
     _ast = nudo(fn("function aggiornaAstaForm(){"))
     prova("l'asta riporta il listino ai sats CONVERTENDO, non rileggendo "
@@ -92580,6 +93064,7 @@ def main():
               prove_spedizione_standard,
               prove_cambio_converte,
               prove_catalogo_esterno,
+              prove_modulo_negozio,
               prove_script_nel_workflow, prove_deploy,
               prove_giudice_deploy, prove_collaudi_in_ci,
               prove_servizio_non_root,
