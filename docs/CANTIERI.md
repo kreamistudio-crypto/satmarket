@@ -31240,3 +31240,27 @@ tempo per te» legata al venditore di collaudo) uguale.
 
 **DA GUARDARE.** Sul telefono, i tondi dentro Telegram; e la decisione
 sul P2P. Le stelle del riquadro venditore restano l'arancio pieno.
+
+## «Un tempo per te»: il banner nuovo in 2:1 (24 set 2026)
+
+Il banner del 24 set (10ecc5a) nasceva da un originale 2,47:1, e il
+ritaglio centrato alle misure della card gli toglieva ~7,7% per lato: la
+margherita a sinistra e quasi tutto il ramo di ciliegie. Luca ne ha fatto
+una versione 2:1 (`banner-2x1.jpg`, 14882x7441), che sostituisce il file
+`assets/scoprire/un-tempo-per-te.webp` con lo stesso trattamento di quello
+di To The Mooon: 1040x498, WebP q85 senza metadati, 52 KB. IL RAPPORTO NON
+E' ESATTO: 2:1 contro 2,088:1 del file (la card e' 2,092:1), cioe' il 4,2%
+dell'altezza in piu'. NIENTE INGRANDIMENTO: il ritaglio minimo e' solo
+verticale, centrato, 157 px sopra e 158 sotto su 7441 (2,1% per parte),
+e i lati restano interi. Si perde una striscia sottile: le punte delle
+foglie del ramo in alto a sinistra e del ramo di ciliegie in alto a
+destra, e il piede delle piante in basso, che gia' uscivano dal bordo.
+Vale per la card della pagina «Consigliati» e per quella dello spazio in
+«Da scoprire» (dal cantiere «Più negozi sponsorizzati», le pagine del
+server si accendono lì col `/sponsor`), che leggono lo stesso file.
+Nessuna riga di codice: il nome e le misure sono gli stessi, e le prove
+del banner (misure di To The Mooon, sotto i 100 KB, nessun orfano)
+restano verdi. Confronto prima/dopo a 375 px nei due temi, su una copia
+con la pagina pubblicata, legata al venditore di collaudo 222, e lo
+spazio acceso a mano nel suo database: la card `sponsor-un-tempo-per-te`
+vera nella fila, e la card della pagina «Consigliati».
