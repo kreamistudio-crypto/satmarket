@@ -65438,8 +65438,12 @@ def prove_p2p_server():
     N = amb_s["ORDINE_SECP256K1"]
     prova("l'ordine e' quello di secp256k1", True, N ==
           0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141)
-    prova("...e non si importa coincurve per averlo", False,
-          "coincurve" in cod)
+    # (24 set 2026) la spia era sulla PAROLA, e il giudice della firma
+    # del libro — che sta in questo blocco — la nomina in una stringa e
+    # in un commento in coda a una riga, senza importarla: si guarda
+    # l'import, che e' la cosa che la prova promette di non trovare
+    prova("...e non si importa coincurve per averlo", (False, False),
+          ("import coincurve" in cod, "from coincurve" in cod))
 
     SEG, SAL = "a" * 64, "b" * 32
     uno = seme(SEG, SAL, 111, 1)
@@ -71463,6 +71467,8 @@ def _banco_eventi_p2p(eventi_attivi=True):
                  "P2P_EVENTO_OROLOGIO_S = ", "P2P_SATS_MAX_EVENTO = ",
                  "P2P_RECAPITO_MAX = ", "P2P_RECAPITO_PAUSA_S = ",
                  "P2P_LIBRO_MEMORIA_S = ", "FORMA_DETTAGLIO_P2P = ",
+                 # gli stati finali del libro: la riserva superata (24 set)
+                 "STATI_LIBRO_FINALI = ",
                  # il giudice del pagamento, per l'attesa del rilascio
                  "_DOPO_RILASCIO_P2P = "):
         i = src.index("\n" + riga) + 1
@@ -71490,6 +71496,8 @@ def _banco_eventi_p2p(eventi_attivi=True):
               "_registra_evento_p2p", "_parti_mostro_p2p", "_riconcilia_parti_p2p", "_destinatari_evento_p2p",
               "_testo_evento_p2p", "_nome_altro_p2p", "_dati_frase_p2p",
               "_avvisi_evento_p2p", "_scarica_attese_p2p",
+              # l'avviso superato e la presa detta (24 set 2026)
+              "_superato_p2p", "_presa_detta_p2p",
               "_pagamento_ordine_p2p",
               "_pulisci_memoria_p2p", "_parti_scambio_p2p",
               "_avviso_recapito_p2p"):
@@ -72288,6 +72296,368 @@ def prove_p2p_riserva_libro():
            "per te lo scambio" in pezzo("_testo_evento_p2p")))
 
 
+def prove_p2p_avvisi_in_ordine():
+    """GLI AVVISI P2P NELL'ORDINE DEI FATTI, MAI UNO SUPERATO, E IL
+    LIBRO CREDUTO SOLO CON LA FIRMA (24 set 2026, dai due messaggi al
+    contrario a chi vendeva: prima «chi compra ha annullato: il tuo
+    ordine e' tornato in vetrina», poi «il tuo PayCode e' stato
+    preso»).
+
+    Tre difetti, e nessuno faceva rosso: 1) la frase della presa
+    RESPIRA sei secondi aspettando i numeri, e il POST della presa
+    viaggia per Tor in un task suo con un retry — quindi il ritiro di
+    dodici secondi dopo poteva essere GIUDICATO prima, e la presa
+    partire a ordine gia' tornato in vetrina; 2) il ritorno in vetrina
+    si raccontava a chi ha pubblicato anche se la presa non gli era
+    mai stata detta; 3) la riserva del libro credeva a qualunque 38383
+    che un relay servisse con la pubkey di mostrod, senza guardare la
+    firma — la stessa notizia non confermata che la cura di A1 ha
+    tolto al telefono.
+
+    I giudici sono tre e puri: `_superato_p2p` (un momento in corso
+    non parte se la cronaca ha un momento che chiude piu' tardi; per
+    la riserva anche il libro stesso), `_presa_detta_p2p` (il ritorno
+    a chi ha pubblicato solo dopo una presa detta) e
+    `_firmato_dal_coordinatore` (pubkey, id ricalcolato, firma
+    Schnorr). Qui girano sul banco vero, negli ordini di arrivo che
+    il 24 set hanno fatto male, e nell'ordine giusto — che deve
+    restare come oggi."""
+    print("\n[gli avvisi P2P nell'ordine dei fatti, e mai uno superato]")
+    import hashlib as _hashlib
+    ORA = 1_790_000_000
+    ORD = "0f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc33"
+    A, B, C = 111, 222, 333        # A prende, B ha pubblicato (sell), C e' un estraneo
+    METODI = '["Contanti al tabacchino 10.00"]'
+
+    def monta():
+        con, amb = _banco_eventi_p2p(True)
+        for chi, pub in ((A, "a" * 64), (B, "b" * 64), (C, "c" * 64)):
+            con.execute("INSERT INTO utenti VALUES(?,1)", (chi,))
+            con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) "
+                        "VALUES(?,?,0)", (pub, chi))
+        con.execute("INSERT INTO p2p_ordini(ordine, tg_id, creato, stato, lato, "
+                    "maker, sats, euro, metodi) VALUES(?,?,0,'pending','sell',1,"
+                    "15000,'10,00 €',?)", (ORD, B, METODI))
+        return con, amb
+
+    def registra(con, amb, azione, attore, dettaglio, quando, buyer="a" * 64):
+        e = amb["_evento_p2p_pulito"](
+            {"order": ORD, "action": azione, "ts": quando, "actor": attore,
+             "detail": dettaglio, "buyer": buyer, "seller": "b" * 64}, quando)
+        return e, amb["_registra_evento_p2p"](con, e, quando)
+
+    def giudica(con, amb, e, fatto, adesso):
+        return [(chi, t) for chi, t in amb["_avvisi_evento_p2p"](con, e, fatto, adesso)]
+
+    def detti(con):
+        return [tuple(r) for r in con.execute(
+            "SELECT momento, tg_id FROM p2p_avvisi ORDER BY quando, momento")]
+
+    # --- 1) LE SENTINELLE: i giudici stanno dove devono ---------------
+    ev_p = codice(_senza_prosa(pezzo("_avvisi_evento_p2p")))
+    att_p = codice(_senza_prosa(pezzo("_scarica_attese_p2p")))
+    for nome, corpo in (("_avvisi_evento_p2p", ev_p), ("_scarica_attese_p2p", att_p)):
+        timbro = corpo.index("INSERT OR IGNORE INTO p2p_avvisi")
+        prova(f"{nome}: i due giudici stanno PRIMA del timbro dell'anti-doppione",
+              (True, True), ("_superato_p2p(" in corpo and corpo.index("_superato_p2p(") < timbro,
+                             "_presa_detta_p2p(" in corpo
+                             and corpo.index("_presa_detta_p2p(") < timbro))
+    prova("la riserva chiede il giudice con la SUA fonte (il libro guarda anche se stesso)",
+          True, '"libro")' in att_p[att_p.index("_superato_p2p("):][:200])
+    for nome, chiamata in (("eventi_libro_da_relay", "_firmato_dal_coordinatore(msg[2], mostro)"),
+                           ("info_libro_da_relay", "_firmato_dal_coordinatore(msg[2], mostro)"),
+                           ("_ascolto_p2p_filo", "_firmato_dal_coordinatore(ev, mostro)")):
+        corpo = codice(_senza_prosa(pezzo(nome)))
+        dopo = "tag = {" if nome == "info_libro_da_relay" else "_evento_libro_p2p("
+        prova(f"{nome}: la firma si controlla PRIMA di leggere l'evento", True,
+              chiamata in corpo and corpo.index(chiamata) < corpo.index(dopo))
+    firma_p = codice(_senza_prosa(pezzo("_firmato_dal_coordinatore")))
+    prova("il giudice della firma: fail-closed senza coincurve, id ricalcolato, pubkey del coordinatore",
+          (True, True, True, True),
+          ("ChiavePubblicaNostr is None" in firma_p, "hashlib.sha256(" in firma_p,
+           "!= ev_id" in firma_p, "pubkey == mostro" in firma_p))
+    reg_p = codice(_senza_prosa(pezzo("_registra_evento_p2p")))
+    prova("le parti dello scambio non si riscrivono da un evento arrivato in ritardo",
+          True, "in_ritardo" in reg_p and "quando>?" in reg_p)
+
+    # --- 2) PRESA E RITIRO RAVVICINATI, giudicati come il 24 set -------
+    #   il ritiro passa per primo (la presa respira) e la presa dopo
+    con, amb = monta()
+    e1, f1 = registra(con, amb, "taken", "buyer", "invoice-next", ORA)
+    e2, f2 = registra(con, amb, "canceled", "buyer", "republished", ORA + 12, buyer=None)
+    prova("il ritiro, giudicato per primo: a chi ha pubblicato non parte niente "
+          "(la presa non gli era stata detta)", [], giudica(con, amb, e2, f2, ORA + 12))
+    prova("la presa, giudicata dopo il suo respiro: superata dal ritiro, non parte",
+          [], giudica(con, amb, e1, f1, ORA + 13))
+    prova("...e nessuno risulta avvisato: i due giudici stanno prima del timbro",
+          [], detti(con))
+    prova("...ma la cronaca ha tutt'e due i fatti", [("preso", ORA), ("tornato", ORA + 12)],
+          [tuple(r) for r in con.execute(
+              "SELECT momento, quando FROM p2p_momenti ORDER BY quando")])
+    con.close()
+
+    # --- 3) L'ORDINE GIUSTO resta com'era: presa, poi ritiro -------
+    con, amb = monta()
+    e1, f1 = registra(con, amb, "taken", "buyer", "invoice-next", ORA)
+    fuori = giudica(con, amb, e1, f1, ORA + 6)
+    prova("la presa giudicata prima del ritiro: a chi ha pubblicato, col PayCode",
+          [B], [chi for chi, _ in fuori])
+    prova("...con la frase di oggi", True,
+          fuori[0][1].startswith("🧾 <b>Il tuo PayCode è stato preso!</b> Vendi 15.000 sats per 10,00 €"))
+    e2, f2 = registra(con, amb, "canceled", "buyer", "republished", ORA + 120, buyer=None)
+    fuori = giudica(con, amb, e2, f2, ORA + 120)
+    prova("il ritiro dopo la presa detta: il ritorno in vetrina, a chi ha pubblicato",
+          [(B, "🔄 <b>Chi compra ha annullato lo scambio.</b> Il tuo ordine "
+               "è tornato in vetrina: non devi fare niente.")], fuori)
+    prova("...e i timbri sono nell'ordine dei fatti", [("preso", B), ("tornato", B)], detti(con))
+    con.close()
+
+    # --- 4) TOR: il POST della presa arriva DOPO quello del ritiro ---
+    con, amb = monta()
+    e2, f2 = registra(con, amb, "canceled", "buyer", "republished", ORA + 12, buyer=None)
+    prova("il ritiro arriva per primo: non parte (presa mai detta)", [],
+          giudica(con, amb, e2, f2, ORA + 30))
+    e1, f1 = registra(con, amb, "taken", "buyer", "invoice-next", ORA)
+    prova("la presa arriva al retry, con l'ora di prima: superata, non parte", [],
+          giudica(con, amb, e1, f1, ORA + 31))
+    prova("...e le parti dello scambio sono quelle dell'ULTIMO fatto: nessuno ha "
+          "preso, l'ordine e' in vetrina", (0, B, ""),
+          tuple(con.execute("SELECT compratore, venditore, preso_dal FROM p2p_scambi "
+                            "WHERE ordine=?", (ORD,)).fetchone()))
+    prova("...mentre il giro delle prese conta lo stesso la presa", 1,
+          con.execute("SELECT COUNT(*) FROM p2p_momenti WHERE momento='preso' "
+                      "AND fonte='mostro'").fetchone()[0])
+    con.close()
+
+    # --- 5) UN MOMENTO IN CORSO in ritardo su uno che chiude ---------
+    con, amb = monta()
+    e1, f1 = registra(con, amb, "taken", "buyer", "invoice-next", ORA)
+    giudica(con, amb, e1, f1, ORA + 6)
+    registra(con, amb, "hold-invoice-paid", "seller", "invoice-next", ORA + 60)
+    registra(con, amb, "buyer-invoice-added", "buyer", "active", ORA + 120)
+    e_r, f_r = registra(con, amb, "released", "seller", "", ORA + 300)
+    prova("il rilascio di chi vende non avvisa nessuno subito (com'era)", [],
+          giudica(con, amb, e_r, f_r, ORA + 300))
+    e_f, f_f = registra(con, amb, "fiat-sent", "buyer", "", ORA + 200)
+    prova("«dice di aver inviato gli euro» arrivato DOPO il rilascio: superato, "
+          "non dice a chi vende di rilasciare quel che ha gia' rilasciato", [],
+          giudica(con, amb, e_f, f_f, ORA + 301))
+    e_s, f_s = registra(con, amb, "success", "mostro", "", ORA + 310)
+    prova("il concluso, che chiude, parte a tutti e due anche dopo", sorted([A, B]),
+          sorted(chi for chi, _ in giudica(con, amb, e_s, f_s, ORA + 310)))
+    e_a, f_a = registra(con, amb, "canceled", "seller", "cooperative", ORA + 400)
+    prova("un momento che CHIUDE non e' mai superato: un annullo in ritardo resta vero",
+          "", amb["_superato_p2p"](con, ORD, "annullato", 1, ORA + 400))
+    prova("...nemmeno da un altro che chiude DOPO di lui: il concluso resta vero "
+          "con un annullo (assurdo) piu' tardi in cronaca", "",
+          amb["_superato_p2p"](con, ORD, "concluso", 1, ORA + 310))
+    prova("...mentre uno in corso si': la stessa domanda sul «fiat» dice l'annullo", True,
+          amb["_superato_p2p"](con, ORD, "fiat", 1, ORA + 350).startswith("«annullato» di 50s dopo"))
+    con.close()
+
+    # --- 6) IL RITORNO A CHI HA PRESO parte lo stesso ----------------
+    con, amb = monta()
+    e1, f1 = registra(con, amb, "taken", "buyer", "invoice-next", ORA)
+    giudica(con, amb, e1, f1, ORA + 6)
+    e_t, f_t = registra(con, amb, "expired", "mostro", "taker-timeout", ORA + 900)
+    fuori = dict(giudica(con, amb, e_t, f_t, ORA + 900))
+    prova("il timeout di chi ha preso: a lui «non hai proseguito», a chi ha "
+          "pubblicato (presa detta) il ritorno in vetrina", sorted([A, B]),
+          sorted(fuori))
+    prova("...con le due frasi giuste", (True, True),
+          (fuori.get(A, "").startswith("🔄 <b>Non hai proseguito in tempo:</b>"),
+           fuori.get(B, "").startswith("🔄 <b>Chi aveva preso il tuo ordine non ha proseguito.</b>")))
+    con.close()
+
+    # --- 7) LA RISERVA DEL LIBRO, col coordinatore muto due volte -----
+    con, amb = monta()
+    giud, scarica = amb["_avvisi_libro_p2p"], amb["_scarica_attese_p2p"]
+
+    def libro(stato, quando):
+        return {"id": ORD, "stato": stato, "lato": "sell", "sats": 15000,
+                "euro": ["10"], "metodi": ["Contanti al tabacchino 10.00"],
+                "quando": quando}
+    giud(con, [libro("in-progress", ORA + 2)], ORA + 3, 0.03, 0)
+    giud(con, [libro("pending", ORA + 14)], ORA + 15, 0.03, 0)
+    prova("presa e ritorno letti dal libro a dodici secondi: due frasi in attesa, "
+          "dello stesso giro", [("preso", 1, B), ("tornato", 1, B)],
+          [tuple(r) for r in con.execute(
+              "SELECT momento, giro, tg_id FROM p2p_attese ORDER BY id")])
+    prova("alla scadenza della presa: superata (il libro dice pending, tornato "
+          "una volta): il libro tace", ([], ORA + 15 + amb["P2P_RISERVA_S"]),
+          scarica(con, ORA + 64))
+    prova("alla scadenza del ritorno: la presa non era stata detta: il libro tace",
+          ([], 0), scarica(con, ORA + 76))
+    prova("...e nessuna riga del libro in cronaca, nessun timbro", ([], []),
+          ([tuple(r) for r in con.execute("SELECT momento FROM p2p_momenti")],
+           detti(con)))
+    giud(con, [libro("in-progress", ORA + 100)], ORA + 101, 0.03, 0)
+    fuori, _ = scarica(con, ORA + 162)
+    prova("una presa NUOVA (giro 2), non superata: parte, col coordinatore muto",
+          [(B, "libro")], [(chi, f) for chi, _, f in fuori])
+    giud(con, [libro("pending", ORA + 200)], ORA + 201, 0.03, 0)
+    fuori, _ = scarica(con, ORA + 262)
+    prova("...e il ritorno di quella presa, detta: parte", [(B, "libro")],
+          [(chi, f) for chi, _, f in fuori])
+    con.close()
+
+    # --- 8) IL LIBRO CHE VA DRITTO A success sotto i sessanta secondi -
+    con, amb = monta()
+    giud, scarica = amb["_avvisi_libro_p2p"], amb["_scarica_attese_p2p"]
+    giud(con, [libro("in-progress", ORA + 2)], ORA + 3, 0.03, 0)
+    giud(con, [libro("success", ORA + 40)], ORA + 41, 0.03, 0)
+    fuori, _ = scarica(con, ORA + 102)
+    prova("presa e concluso nello stesso minuto: parte il solo concluso",
+          ["concluso"], [tuple(r)[0] for r in con.execute(
+              "SELECT momento FROM p2p_momenti WHERE fonte='libro'")])
+    prova("...e la presa superata non e' fra i timbri", [("concluso", B)], detti(con))
+    con.close()
+
+    # --- 9) UNA DICHIARAZIONE DEL TELEFONO, SENZA EVENTO: niente -----
+    con, amb = monta()
+    exec(_senza_prosa(pezzo("_registra_ordini_p2p")), amb)
+    r = amb["_registra_ordini_p2p"](con, A, [ORD], ORA, presi=True)
+    prova("«l'ho preso io» dal telefono, a coordinatore muto: la dichiarazione ASPETTA",
+          (1, 0), (r["in_attesa"], r["confermate"]))
+    r = amb["_registra_ordini_p2p"](con, C, [ORD], ORA, pubblicati=True)
+    prova("«l'ho pubblicato io» di un estraneo su un ordine gia' di B: non si intesta",
+          B, con.execute("SELECT tg_id FROM p2p_ordini WHERE ordine=?", (ORD,)).fetchone()[0])
+    prova("...e da nessuna delle due parte niente: nessuna attesa, nessun avviso, "
+          "nessuna cronaca", (0, 0, 0),
+          tuple(con.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+                for t in ("p2p_attese", "p2p_avvisi", "p2p_momenti")))
+    con.close()
+
+    # --- 10) LA FIRMA DI MOSTROD SUL LIBRO ----------------------------
+    MOSTRO = "d" * 64
+    amb_f = {"json": json, "hashlib": _hashlib, "re": re,
+             "RE_HEX_64": re.compile(r"[0-9a-f]{64}"),
+             "RE_HEX_128": re.compile(r"[0-9a-f]{128}"),
+             "print": lambda *a, **k: None, "_P2P_FIRMA_DETTO": {"manca": False},
+             "ChiavePubblicaNostr": None}
+    exec(_senza_prosa(pezzo("_firmato_dal_coordinatore")), amb_f)
+    firmato = amb_f["_firmato_dal_coordinatore"]
+
+    def evento(pubkey=MOSTRO, tags=None, sig="e" * 128, **extra):
+        tags = [["d", ORD], ["s", "in-progress"], ["k", "sell"]] if tags is None else tags
+        ev = {"kind": 38383, "pubkey": pubkey, "created_at": ORA, "tags": tags,
+              "content": "", "sig": sig}
+        ev.update(extra)
+        serial = json.dumps([0, ev["pubkey"], ev["created_at"], ev["kind"], ev["tags"],
+                             ev["content"]], separators=(",", ":"), ensure_ascii=False)
+        ev.setdefault("id", _hashlib.sha256(serial.encode("utf-8")).hexdigest())
+        return ev
+    prova("senza coincurve non si crede a niente (fail-closed), e lo si dice una volta",
+          (False, True), (firmato(evento(), MOSTRO), amb_f["_P2P_FIRMA_DETTO"]["manca"]))
+
+    chiamate = []
+
+    class Verifica:
+        def __init__(self, pub):
+            chiamate.append(("chiave", pub.hex()))
+
+        def verify(self, sig, msg):
+            chiamate.append(("verify", sig.hex(), msg.hex()))
+            return Verifica.esito
+    Verifica.esito = True
+    amb_f["ChiavePubblicaNostr"] = Verifica
+    prova("un evento di un'ALTRA chiave: no, senza nemmeno interrogare la firma",
+          (False, []), (firmato(evento(pubkey="c" * 64), MOSTRO), chiamate))
+    prova("...anche se il relay lo serve con la pubkey giusta ma il chiamante ne "
+          "aspetta un'altra", (False, []), (firmato(evento(), "c" * 64), chiamate))
+    prova("un id che non torna col contenuto: no, senza interrogare la firma",
+          (False, []), (firmato(evento(id="f" * 64), MOSTRO), chiamate))
+    ev = evento()
+    prova("pubkey e id giusti: si interroga la firma, con (sig, id), e vale lei",
+          (True, [("chiave", MOSTRO), ("verify", "e" * 128, ev["id"])]),
+          (firmato(ev, MOSTRO), chiamate))
+    Verifica.esito = False
+    prova("...e se la firma non regge: no", False, firmato(ev, MOSTRO))
+    Verifica.esito = True
+    prova("una firma che non e' esadecimale, un evento che non e' un dizionario, "
+          "una data che non e' un numero: no", (False, False, False),
+          (firmato(evento(sig="zz" * 64), MOSTRO), firmato("ev", MOSTRO),
+           firmato(evento(created_at="ieri"), MOSTRO)))
+    prova("un tag manomesso dopo la firma cambia l'id: no", False,
+          firmato(dict(ev, tags=[["d", ORD], ["s", "success"], ["k", "sell"]]), MOSTRO))
+    try:
+        from coincurve import PrivateKey as _Sk, PublicKeyXOnly as _Pk
+    except ImportError:
+        _Sk = None
+    if _Sk is not None:
+        # LA PROVA COI BYTE VERI, dove coincurve c'e' (in CI non c'e', e
+        # li' nessun relay si legge): una chiave a caso firma un 38383
+        sk = _Sk()
+        pub = _Pk.from_secret(sk.secret).format().hex()
+        vero = evento(pubkey=pub)
+        vero["sig"] = sk.sign_schnorr(bytes.fromhex(vero["id"])).hex()
+        amb_f["ChiavePubblicaNostr"] = _Pk
+        prova("[coincurve] un 38383 firmato davvero dalla chiave attesa: si",
+              True, firmato(vero, pub))
+        prova("[coincurve] ...la stessa firma su un contenuto ritoccato: no", False,
+              firmato(dict(evento(pubkey=pub, tags=[["d", ORD], ["s", "success"]]),
+                           sig=vero["sig"]), pub))
+        altra = _Pk.from_secret(_Sk().secret).format().hex()
+        falso = evento(pubkey=altra)
+        falso["sig"] = sk.sign_schnorr(bytes.fromhex(falso["id"])).hex()
+        prova("[coincurve] ...e un evento con la pubkey attesa e l'id giusto, ma "
+              "firmato da un'ALTRA chiave: no", False, firmato(falso, altra))
+
+    # --- 11) I DUE LETTORI GIRATI, con un relay di cartone -----------
+    # (la tortura: una spia sul testo restava verde con la chiamata resa
+    # inerte da un `False and`; qui il giudice della firma e' di cartone
+    # e dice di no a chi ha `sig` "storta", e si guarda cosa ESCE)
+    import ssl as _ssl
+    detto_l = []
+
+    class _WsCartone:
+        def __init__(self, risposte):
+            self.r = list(risposte)
+
+        def send(self, m):
+            pass
+
+        def recv(self):
+            return json.dumps(self.r.pop(0))
+
+        def close(self):
+            pass
+
+    def lettore(risposte):
+        amb_l = {"json": json, "time": time, "ssl": _ssl,
+                 "create_connection": lambda relay, timeout=0, sslopt=None: _WsCartone(risposte),
+                 "lettura_simulata": lambda *a, **k: False,
+                 "print": lambda *a, **k: detto_l.append(" ".join(str(x) for x in a)),
+                 "_firmato_dal_coordinatore": lambda ev, m: (
+                     isinstance(ev, dict) and ev.get("sig") != "storta")}
+        for f in ("_evento_libro_p2p", "eventi_libro_da_relay", "info_libro_da_relay"):
+            exec(_senza_prosa(pezzo(f)), amb_l)
+        return amb_l
+    buono = evento(tags=[["d", "ordine-buono"], ["s", "in-progress"], ["k", "sell"]])
+    storto = dict(evento(tags=[["d", "ordine-storto"], ["s", "success"], ["k", "sell"]]),
+                  sig="storta")
+    amb_l = lettore([["EVENT", "libro", storto], ["EVENT", "libro", buono],
+                     ["EOSE", "libro"]])
+    fuori = amb_l["eventi_libro_da_relay"]("wss://specchio.di.cartone", ["x"], 0, MOSTRO)
+    prova("il lettore al minuto: il 38383 con la firma storta non esce, l'altro si'",
+          ["ordine-buono"], [e["id"] for e in (fuori or [])])
+    prova("...e il journal lo dice, col relay", True,
+          any(r.startswith("⛔ Libro P2P: un 38383 da wss://specchio.di.cartone")
+              for r in detto_l))
+    del detto_l[:]
+    info_storto = dict(evento(kind=38385, tags=[["fee", "0.03"], ["expiration_hours", "168"]]),
+                       sig="storta")
+    amb_l = lettore([["EVENT", "info", info_storto], ["EOSE", "info"]])
+    prova("il 38385 con la firma storta non si legge: fee e finestre restano ignote",
+          {}, amb_l["info_libro_da_relay"]("wss://specchio.di.cartone", MOSTRO))
+    prova("...e il journal lo dice", True,
+          any(r.startswith("⛔ Libro P2P: un 38385 da") for r in detto_l))
+    info_buono = evento(kind=38385, tags=[["fee", "0.03"], ["expiration_hours", "168"]])
+    amb_l = lettore([["EVENT", "info", info_buono], ["EOSE", "info"]])
+    prova("...e quello firmato si legge come sempre", {"fee": 0.03, "ore": 168},
+          amb_l["info_libro_da_relay"]("wss://specchio.di.cartone", MOSTRO))
+
+
 def prove_p2p_avvisi_libro():
     """IL LIBRO CHE AVVISA (16 set 2026, decisione di Andrea con Alan):
     i PASSAGGI PUBBLICI dello scambio stanno sul 38383 in chiaro, e di
@@ -72505,6 +72875,9 @@ def prove_p2p_avvisi_libro():
                                  "waiting-payment")}
     _m = src.index("\nMOMENTI_DEL_LIBRO_P2P = {") + 1
     exec(src[_m:src.index("}\n", _m) + 2], amb)
+    for _riga in ("P2P_MOMENTI_FINALI = ", "STATI_LIBRO_FINALI = "):
+        _i = src.index("\n" + _riga) + 1
+        exec(src[_i:src.index("\n", _i)], amb)
     for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
               "_parti_recensione_p2p",
               "_euro_libro", "_euro_tabacchino", "_metodi_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
@@ -72984,6 +73357,9 @@ def prove_p2p_orologio():
                "_fee_di_p2p": lambda c, chi, fee: fee}
         _m = src.index("\nMOMENTI_DEL_LIBRO_P2P = {") + 1
         exec(src[_m:src.index("}\n", _m) + 2], amb)
+        for _riga in ("P2P_MOMENTI_FINALI = ", "STATI_LIBRO_FINALI = "):
+            _i = src.index("\n" + _riga) + 1
+            exec(src[_i:src.index("\n", _i)], amb)
         for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
               "_parti_recensione_p2p",
                   "_euro_libro", "_euro_tabacchino", "_metodi_libro", "_testo_libro_p2p", "_avvisi_libro_p2p",
@@ -72993,6 +73369,7 @@ def prove_p2p_orologio():
                   "_chiave_evento_p2p", "_ascolto_porta", "_mazzetto_sveglia",
                   "_mazzetto_prendi", "_ascolto_mancato_p2p", "_stato_ascolto_p2p",
                   "eventi_p2p_attivi", "_scarica_attese_p2p",
+              "_superato_p2p", "_presa_detta_p2p",
                   "_pulisci_memoria_p2p", "_giro_attese_p2p",
                   "_giro_libro_p2p",
                   "orologio_p2p", "guardiano_p2p"):
@@ -73254,6 +73631,9 @@ def prove_p2p_tutti_i_relay():
            "_fee_di_p2p": lambda c, chi, fee: fee}
     _m = src.index("\nMOMENTI_DEL_LIBRO_P2P = {") + 1
     exec(src[_m:src.index("}\n", _m) + 2], amb)
+    for _riga in ("P2P_MOMENTI_FINALI = ", "STATI_LIBRO_FINALI = "):
+        _i = src.index("\n" + _riga) + 1
+        exec(src[_i:src.index("\n", _i)], amb)
     asincrone = ("_chiedi_relay_p2p", "_chiedi_tutti_p2p", "_giro_libro_p2p",
                  "_giro_attese_p2p")
     for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
@@ -73262,6 +73642,7 @@ def prove_p2p_tutti_i_relay():
               "_relay_p2p_dice", "_esiti_p2p_dice", "_unisci_p2p",
               "_conto_relay_p2p", "_chiave_evento_p2p", "_ascolto_mancato_p2p",
               "eventi_p2p_attivi", "_scarica_attese_p2p",
+              "_superato_p2p", "_presa_detta_p2p",
               "_pulisci_memoria_p2p") + asincrone:
         testo = _senza_prosa(pezzo(f))
         exec(("async " if f in asincrone else "") + testo, amb)
@@ -73526,7 +73907,16 @@ def prove_p2p_ascolto():
                # mondo di ieri byte per byte; col collaudo acceso e' il 4b
                "MODALITA_COLLAUDO": piu.get("collaudo", False),
                "_LETTURE_SIMULATE": set(), "urlparse": _urlparse,
-               "ipaddress": _ipaddress}
+               "ipaddress": _ipaddress,
+               # LA FIRMA DI CARTONE (24 set 2026): i 38383 di questo banco
+               # non hanno una firma, e il giudice vero (`_firmato_dal_
+               # coordinatore`, provato coi byte in prove_p2p_avvisi_in_
+               # ordine) li butterebbe tutti. Qui resta la sola domanda di
+               # ieri — e' la pubkey del coordinatore? — che e' quella che
+               # il caso «firmato da un ALTRO» qui sotto vuole vedere.
+               "_firmato_dal_coordinatore": lambda ev, mostro: (
+                   isinstance(ev, dict) and ev.get("pubkey") == mostro
+                   and ev.get("sig") != "storta")}
         for f in ("relay_di_casa", "lettura_simulata",
                   "_evento_libro_p2p", "_chiave_evento_p2p",
                   "_ascolto_porta", "_mazzetto_sveglia", "_mazzetto_prendi",
@@ -73573,6 +73963,9 @@ def prove_p2p_ascolto():
         ws.dice("EVENT", "ascolto", ev38383("ordine-vivo", "waiting-payment", adesso))
         ws.dice("EVENT", "ascolto", ev14("2" * 64, adesso, autore="f" * 64))
         ws.dice("EVENT", "ascolto", ev38383("ordine-falso", "success", adesso, autore="f" * 64))
+        # (24 set 2026) la pubkey e' quella giusta ma la firma no: il
+        # giudice della firma — qui di cartone — dice di no, e non entra
+        ws.dice("EVENT", "ascolto", dict(ev38383("ordine-storto", "success", adesso), sig="storta"))
         ws.dice("EVENT", "altra-sub", ev14("3" * 64, adesso))
         await _fino_a(lambda: amb["_P2P_MAZZETTO"]["libro"])
         await _aio.sleep(0.1)
@@ -73588,6 +73981,10 @@ def prove_p2p_ascolto():
                or "1" * 64 in repr(amb["_P2P_ASCOLTO"])])
         prova("...e un evento firmato da un ALTRO nemmeno, anche se il relay lo manda",
               1, amb["_P2P_ASCOLTO"]["vivi"])
+        prova("...ne' uno con la pubkey del coordinatore e la firma STORTA: il giudice "
+              "della firma lo ferma, e il journal lo dice", (False, True),
+              ("ordine-storto" in repr(amb["_P2P_MAZZETTO"]["libro"]),
+               any(r.startswith("⛔ Ascolto P2P: un 38383 da " + SPECCHIO) for r in detto)))
         ok = await _fino_a(lambda: amb["_P2P_ASCOLTO"]["polso"] > 0)
         prova("il polso parte da solo, e l'EOSE che torna si segna", True, ok)
         prova("...la domandina si richiude (o al relay restano sottoscrizioni appese)", True,
@@ -73862,6 +74259,9 @@ def prove_p2p_ascolto():
                     "\nP2P_IN_PAGAMENTO_TESTI = {"):
         _m = src.index(_blocco) + 1
         exec(src[_m:src.index("}\n", _m) + 2], amb6)
+        for _riga in ("P2P_MOMENTI_FINALI = ", "STATI_LIBRO_FINALI = "):
+            _i = src.index("\n" + _riga) + 1
+            exec(src[_i:src.index("\n", _i)], amb6)
     asincrone = ("_chiedi_relay_p2p", "_chiedi_tutti_p2p", "_giro_libro_p2p",
                  "_giro_attese_p2p", "orologio_p2p")
     for f in ("_fmt_sats", "_avvisi_p2p_accesi", "_passaggio_libro_p2p",
@@ -73873,6 +74273,7 @@ def prove_p2p_ascolto():
               "_ascolto_porta", "_mazzetto_sveglia", "_mazzetto_prendi",
               "_ascolto_mancato_p2p", "_stato_ascolto_p2p",
               "eventi_p2p_attivi", "_scarica_attese_p2p",
+              "_superato_p2p", "_presa_detta_p2p",
               "_pagamento_ordine_p2p",
               "_pulisci_memoria_p2p") + asincrone:
         exec(("async " if f in asincrone else "") + _senza_prosa(pezzo(f)), amb6)
@@ -94763,7 +95164,7 @@ def main():
     prove_logo_p2p_nitido,
     prove_card_tinte_stato,
     prove_p2p_campanello,
-    prove_p2p_eventi, prove_p2p_riserva_libro,
+    prove_p2p_eventi, prove_p2p_riserva_libro, prove_p2p_avvisi_in_ordine,
     prove_p2p_avvisi_libro, prove_p2p_orologio, prove_p2p_tutti_i_relay, prove_p2p_ascolto, prove_p2p_esito_notifiche, prove_p2p_silenzi,
     prove_p2p_avvisi_precisi,
     prove_p2p_recapito_passo,

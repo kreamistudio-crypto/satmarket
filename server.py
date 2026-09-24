@@ -41835,6 +41835,64 @@ def _evento_libro_p2p(ev: dict):
             "quando": int(ev.get("created_at") or 0), "scade": scade}
 
 
+_P2P_FIRMA_DETTO = {"manca": False}   # l'avviso di coincurve assente, una volta
+
+
+def _firmato_dal_coordinatore(ev, mostro: str) -> bool:
+    """IL LIBRO SI CREDE SOLO SE LO HA FIRMATO MOSTROD (24 set 2026).
+    PURA: un evento Nostr grezzo (38383 o 38385), e la pubkey
+    esadecimale del coordinatore. Vero solo se l'evento e' SUO — la
+    pubkey e' la sua, l'id ricalcolato con la serializzazione canonica
+    NIP-01 combacia, e la firma Schnorr regge su quell'id (lo stesso
+    controllo del login Nostr, `verifica_evento_login`).
+    PERCHE': il filtro `authors` e' una DOMANDA al relay, non una
+    prova. Fin qui il lettore del libro e l'ascolto si fidavano della
+    risposta — un relay bucato, o chiunque in mezzo (il socket va su
+    con `CERT_NONE`), poteva servire un 38383 con la pubkey di mostrod
+    e far partire dalla riserva un «preso» o un «concluso» a chi vuole:
+    la stessa notizia non confermata che la cura di A1 (23 set 2026)
+    ha tolto al telefono. Con la firma, quel che il libro dice l'ha
+    detto mostrod: la riserva resta la rete di sicurezza di un POST
+    perso, e non e' piu' una parola presa in prestito.
+    FAIL-CLOSED: senza `coincurve` (sul VPS c'e', firma gli annunci
+    NIP-99; in CI no, e li' nessun relay si legge) nessun evento si
+    crede, e il journal lo dice una volta."""
+    if ChiavePubblicaNostr is None:
+        if not _P2P_FIRMA_DETTO["manca"]:
+            _P2P_FIRMA_DETTO["manca"] = True
+            print("⚠️ Libro P2P: coincurve non c'e': nessun 38383 si puo' "
+                  "credere, il libro resta fermo", flush=True)
+        return False
+    if not isinstance(ev, dict):
+        return False
+    pubkey, sig, ev_id = ev.get("pubkey"), ev.get("sig"), ev.get("id")
+    creato, kind = ev.get("created_at"), ev.get("kind")
+    tags, content = ev.get("tags"), ev.get("content")
+    if not (isinstance(pubkey, str) and pubkey == mostro):
+        return False
+    if not (isinstance(sig, str) and RE_HEX_128.fullmatch(sig)):
+        return False
+    if not (isinstance(ev_id, str) and RE_HEX_64.fullmatch(ev_id)):
+        return False
+    if (not isinstance(creato, int) or isinstance(creato, bool)
+            or not isinstance(kind, int) or isinstance(kind, bool)
+            or not isinstance(content, str)):
+        return False
+    if not (isinstance(tags, list)
+            and all(isinstance(t, list)
+                    and all(isinstance(x, str) for x in t) for t in tags)):
+        return False
+    serial = json.dumps([0, pubkey, creato, kind, tags, content],
+                        separators=(",", ":"), ensure_ascii=False)
+    if hashlib.sha256(serial.encode("utf-8")).hexdigest() != ev_id:
+        return False
+    try:
+        return bool(ChiavePubblicaNostr(bytes.fromhex(pubkey)).verify(
+            bytes.fromhex(sig), bytes.fromhex(ev_id)))
+    except Exception:
+        return False
+
+
 # ═══ L'ASCOLTO: le notifiche P2P istantanee (17 set 2026) ═══
 # Il giro al minuto ha una latenza fino a sessanta secondi, su finestre
 # da novecento. Qui il server tiene UNA connessione permanente al
@@ -42041,7 +42099,11 @@ def _ascolto_p2p_filo(relay: str, mostro: str, loop, ferma):
                           and len(msg) > 2 and isinstance(msg[2], dict)
                           and msg[2].get("pubkey") == mostro):
                         ev = msg[2]
-                        if ev.get("kind") == 38383:
+                        if (ev.get("kind") == 38383
+                                and not _firmato_dal_coordinatore(ev, mostro)):
+                            print(f"⛔ Ascolto P2P: un 38383 da {relay} non e' "
+                                  "firmato dal coordinatore: buttato", flush=True)
+                        elif ev.get("kind") == 38383:
                             letto = _evento_libro_p2p(ev)
                             if letto:
                                 loop.call_soon_threadsafe(
@@ -42209,6 +42271,77 @@ def _sollecito_p2p_vivo(momenti, quando_fiat: int) -> bool:
     return True
 
 
+def _superato_p2p(con, ordine: str, momento: str, giro: int, quando: int,
+                  fonte: str = "mostro") -> str:
+    """UN AVVISO SUPERATO DAI FATTI NON PARTE (24 set 2026, i due
+    messaggi al contrario: a chi vendeva prima «chi compra ha
+    annullato: tornato in vetrina» e subito dopo «il tuo PayCode e'
+    stato preso»). Pura sulla connessione: torna '' se l'avviso di
+    `momento`, nato all'ora `quando` (l'orologio di mostrod, che e' lo
+    stesso del 38383), e' ancora una notizia, o il PERCHE' non lo e'
+    piu' — per il journal.
+    LA REGOLA: un momento IN CORSO (la presa, la garanzia, la fattura,
+    il fiat...) e' superato se la cronaca (`p2p_momenti`, di qualunque
+    fonte) ha un momento che CHIUDE il giro (`P2P_MOMENTI_FINALI`)
+    con un'ora PIU' TARDA. Il caso del giorno: presa alle :04, ritiro
+    alle :16, e la presa giudicata DOPO il ritiro — perche' la sua
+    frase respira `P2P_RESPIRO_S` aspettando i numeri, o perche' il
+    suo POST e' arrivato al retry (Tor: un circuito freddo e' 10 s, il
+    primo tentativo ne ha 8) mentre quello del ritiro e' passato al
+    primo colpo. «Il tuo ordine e' stato preso» a ordine gia' tornato
+    in vetrina non e' una notizia, e' un errore.
+    Un momento che chiude non e' mai superato: un «annullato» in
+    ritardo resta vero. L'ora e' STRETTAMENTE piu' tarda: due fatti
+    dello stesso ordine mostrod li tiene in fila di un secondo
+    (`monotonic_order_event_timestamp`), e un fatto del giro PRIMA sta
+    per forza prima.
+    LA RISERVA DEL LIBRO (`fonte` 'libro') ha una seconda fonte, la
+    riga del libro stessa: se da quando la frase e' andata in attesa
+    l'ordine e' TORNATO in vetrina (`tornati` ha raggiunto il giro
+    della frase) o si e' chiuso, la frase e' vecchia — e' il caso in
+    cui il coordinatore ha taciuto DUE volte e l'attesa del ritorno
+    non e' ancora scaduta. Per gli eventi di mostrod il libro non si
+    guarda: il suo conto dei giri e' un altro (i ritorni, non le prese)
+    e a un POST perso i due numeri divergono."""
+    if momento in P2P_MOMENTI_FINALI:
+        return ""
+    segni = ",".join("?" * len(P2P_MOMENTI_FINALI))
+    r = con.execute(
+        f"SELECT momento, quando, fonte FROM p2p_momenti WHERE ordine=? "
+        f"AND quando>? AND momento IN ({segni}) ORDER BY quando LIMIT 1",
+        (ordine, int(quando or 0)) + tuple(P2P_MOMENTI_FINALI)).fetchone()
+    if r:
+        return (f"«{r['momento']}» di {int(r['quando']) - int(quando or 0)}s "
+                f"dopo (fonte {r['fonte']})")
+    if fonte == "libro":
+        o = con.execute("SELECT stato, tornati FROM p2p_ordini WHERE ordine=?",
+                        (ordine,)).fetchone()
+        if o and (int(o["tornati"] or 0) >= int(giro or 0)
+                  or (o["stato"] or "") in STATI_LIBRO_FINALI):
+            return (f"il libro, che intanto dice «{o['stato']}» "
+                    f"(tornato in vetrina {int(o['tornati'] or 0)} volte)")
+    return ""
+
+
+def _presa_detta_p2p(con, ordine: str, giro: int, tg_id: int) -> bool:
+    """LA PRESA DI QUESTO GIRO E' STATA DETTA a questa persona? Pura
+    sulla connessione: guarda l'anti-doppione (`p2p_avvisi`), che e'
+    dove OGNI presa detta lascia il timbro — dal coordinatore o dal
+    libro. Serve al RITORNO IN VETRINA: a chi ha pubblicato, «chi
+    compra ha annullato: il tuo ordine e' tornato in vetrina» e' una
+    notizia solo se prima ha saputo della presa; se no e' il secondo
+    dei due messaggi del 24 set 2026, quello che arrivava PRIMA del
+    primo. Dal suo punto di vista non e' successo niente: l'ordine e'
+    in vetrina com'era, e non c'e' niente da fare.
+    `giro >=` e non `=`: a un POST della presa perso, il conto dei giri
+    di mostrod resta indietro di uno rispetto a quello del libro — che
+    la presa l'ha detta lui — e una presa detta e' detta."""
+    return bool(con.execute(
+        "SELECT 1 FROM p2p_avvisi WHERE ordine=? AND momento='preso' "
+        "AND giro>=? AND tg_id=?",
+        (ordine, int(giro or 0), int(tg_id or 0))).fetchone())
+
+
 def _scarica_attese_p2p(con, adesso: int) -> tuple:
     """Le attese SCADUTE: chi avvisare adesso, e con che frase. Pura
     sulla connessione. Torna `(avvisi, prossima)`: la lista di
@@ -42245,6 +42378,30 @@ def _scarica_attese_p2p(con, adesso: int) -> tuple:
             print(f"· Riserva P2P: {corto} «{r['momento']}» l'ha gia' "
                   "raccontato il coordinatore: il libro tace", flush=True)
             continue
+        if r["fonte"] == "libro":
+            # ...E NON PARTE NEMMENO SE I FATTI L'HANNO SUPERATA, o se e'
+            # un ritorno in vetrina a chi ha pubblicato senza che la
+            # presa gli sia stata detta (24 set 2026): i due giudici
+            # sono gli stessi degli eventi del coordinatore, e stanno
+            # prima del timbro — quel che non parte non risulta detto
+            perche = _superato_p2p(con, r["ordine"], r["momento"],
+                                   int(r["giro"] or 0), int(r["quando"] or 0),
+                                   "libro")
+            if perche:
+                print(f"· Riserva P2P: {corto} «{r['momento']}» e' superata da "
+                      f"{perche}: il libro tace", flush=True)
+                continue
+            if r["momento"] == "tornato":
+                o = con.execute("SELECT tg_id FROM p2p_ordini WHERE ordine=?",
+                                (r["ordine"],)).fetchone()
+                if (o and int(o["tg_id"] or 0) == int(r["tg_id"])
+                        and not _presa_detta_p2p(con, r["ordine"],
+                                                 int(r["giro"] or 0), r["tg_id"])):
+                    print(f"· Riserva P2P: {corto} «tornato» a {r['tg_id']}: la "
+                          "presa non gli era stata detta, e un ritorno in "
+                          "vetrina senza presa non e' una notizia: il libro "
+                          "tace", flush=True)
+                    continue
         testo = r["testo"]
         if r["fonte"] == "rilascio":
             # IL PAGAMENTO A CHI COMPRA si chiede al SUO giudice, lo
@@ -42572,7 +42729,10 @@ def eventi_libro_da_relay(relay: str, ids: list, since: int, mostro: str):
     del campanello: dal relay entra il minimo).
     IL FILTRO PORTA `authors`: senza, chiunque potrebbe pubblicare un
     38383 con il `d` di un nostro ordine e far partire «scambio
-    concluso» a chi vuole. Parla solo il coordinatore.
+    concluso» a chi vuole. Parla solo il coordinatore — E LO PROVA LA
+    FIRMA (24 set 2026, `_firmato_dal_coordinatore`): il filtro e' una
+    domanda al relay, la firma e' la prova. Un evento non firmato da
+    lui si butta, e il journal lo dice.
     None = «non ho potuto chiedere», che e' un'altra cosa da `[]`: e'
     anche quel che torna in collaudo verso un relay che non e' di casa
     (vedi `lettura_simulata`), cioe' un relay muto."""
@@ -42593,6 +42753,10 @@ def eventi_libro_da_relay(relay: str, ids: list, since: int, mostro: str):
         while time.time() - inizio < 8:
             msg = json.loads(ws.recv())
             if msg[0] == "EVENT" and msg[1] == "libro":
+                if not _firmato_dal_coordinatore(msg[2], mostro):
+                    print(f"⛔ Libro P2P: un 38383 da {relay} non e' firmato "
+                          "dal coordinatore: buttato", flush=True)
+                    continue
                 letto = _evento_libro_p2p(msg[2])
                 if letto:
                     fuori.append(letto)
@@ -42624,6 +42788,10 @@ def info_libro_da_relay(relay: str, mostro: str):
         while time.time() - inizio < 8:
             msg = json.loads(ws.recv())
             if msg[0] == "EVENT" and msg[1] == "info":
+                if not _firmato_dal_coordinatore(msg[2], mostro):
+                    print(f"⛔ Libro P2P: un 38385 da {relay} non e' firmato "
+                          "dal coordinatore: buttato", flush=True)
+                    continue
                 tag = {t[0]: t[1] for t in msg[2].get("tags", [])
                        if len(t) > 1}
                 try:
@@ -43371,7 +43539,11 @@ def _registra_evento_p2p(con, ev: dict, adesso: int):
     prima. Conta le PRESE e non i ritorni apposta: una presa e' sempre
     un evento nuovo, mentre un ritorno perso per strada lascerebbe il
     contatore indietro proprio sullo scambio dopo.
-    LE PARTI SI RISCRIVONO A OGNI EVENTO, e vale l'ultima parola: una
+    LE PARTI SI RISCRIVONO A OGNI EVENTO, e vale l'ultima parola PER
+    L'OROLOGIO DI MOSTROD, non per l'arrivo (24 set 2026): un POST che
+    arriva al retry dopo un fatto piu' recente — la presa dopo il
+    ritiro, via Tor — non rimette in `p2p_scambi` una parte che non
+    c'e' piu'; la cronaca lo registra lo stesso. Un'ultima parola: una
     chiave che `chiavi_p2p` non conosce (un altro client) vale 0. Un
     evento SENZA una delle due chiavi — un ordine ancora in vetrina ha
     solo chi l'ha pubblicato — azzera quel posto, o al giro dopo ci
@@ -43400,14 +43572,22 @@ def _registra_evento_p2p(con, ev: dict, adesso: int):
     preso_dal = (prima["preso_dal"] if prima else "") or ""
     if ev["momento"] == "preso":
         preso_dal = ev["attore"] if ev["attore"] in ("buyer", "seller") else ""
-    con.execute(
-        "INSERT INTO p2p_scambi(ordine, compratore, venditore, preso_dal, "
-        "giro, aggiornato) VALUES(?,?,?,?,?,?) "
-        "ON CONFLICT(ordine) DO UPDATE SET compratore=excluded.compratore, "
-        "venditore=excluded.venditore, preso_dal=excluded.preso_dal, "
-        "giro=excluded.giro, aggiornato=excluded.aggiornato",
-        (ev["ordine"], parti["compratore"], parti["venditore"], preso_dal,
-         giro, adesso))
+    in_ritardo = con.execute(
+        "SELECT 1 FROM p2p_momenti WHERE ordine=? AND fonte='mostro' "
+        "AND quando>?", (ev["ordine"], ev["ts"])).fetchone()
+    if in_ritardo:
+        print(f"· Evento P2P: {ev['ordine'][:8]} «{ev['momento']}» e' arrivato "
+              "dopo un fatto piu' recente: le parti dello scambio restano "
+              "quelle dell'ultimo", flush=True)
+    else:
+        con.execute(
+            "INSERT INTO p2p_scambi(ordine, compratore, venditore, preso_dal, "
+            "giro, aggiornato) VALUES(?,?,?,?,?,?) "
+            "ON CONFLICT(ordine) DO UPDATE SET compratore=excluded.compratore, "
+            "venditore=excluded.venditore, preso_dal=excluded.preso_dal, "
+            "giro=excluded.giro, aggiornato=excluded.aggiornato",
+            (ev["ordine"], parti["compratore"], parti["venditore"], preso_dal,
+             giro, adesso))
     # I DUE POSTI DEL LIBRO SI ALLINEANO A QUEL CHE HA DETTO (23 set
     # 2026, A1): la presa dichiarata dal telefono si conferma o cade, e
     # un'intestazione che mostrod smentisce si corregge. Il journal lo
@@ -43812,6 +43992,27 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
             print(f"🔕 Evento P2P: {chi} ha gli avvisi P2P SPENTI (cassetto "
                   f"Avvisi): «{momento}» su {corto} non parte", flush=True)
             continue
+        # UN AVVISO SUPERATO DAI FATTI NON PARTE, E UN RITORNO IN
+        # VETRINA SENZA PRESA DETTA NEMMENO (24 set 2026): i giudici
+        # sono `_superato_p2p` e `_presa_detta_p2p`, e stanno PRIMA del
+        # timbro — un avviso che non parte non risulta detto, e il
+        # ritorno che seguisse una presa mai detta tace anche lui
+        perche = _superato_p2p(con, ordine, momento, giro, ev["ts"])
+        if perche:
+            print(f"· Evento P2P: {corto} «{momento}» a {chi} e' superato da "
+                  f"{perche}: non parte", flush=True)
+            continue
+        # CHI HA PUBBLICATO lo dice mostrod (`preso_dal`); se non l'ha
+        # ancora detto — il ritiro arrivato prima della presa — lo sa
+        # il libro (`p2p_ordini.tg_id`), come nel ramo di sopra
+        e_maker = ((ruolo == lato_maker) if lato_maker
+                   else (dati["maker"] > 0 and chi == dati["maker"]))
+        if (momento == "tornato" and e_maker
+                and not _presa_detta_p2p(con, ordine, giro, chi)):
+            print(f"· Evento P2P: {corto} «tornato» a {chi}: la presa non gli "
+                  "era stata detta, e un ritorno in vetrina senza presa non e' "
+                  "una notizia: non parte", flush=True)
+            continue
         if not con.execute(
                 "INSERT OR IGNORE INTO p2p_avvisi(ordine, momento, giro, "
                 "tg_id, quando, fonte) VALUES(?,?,?,?,?,'mostro')",
@@ -43822,7 +44023,7 @@ def _avvisi_evento_p2p(con, ev: dict, fatto: dict, adesso: int) -> list:
         testo = _testo_evento_p2p(
             momento, ev["dettaglio"], ruolo, dati,
             nome=_nome_altro_p2p(con, ordine, chi, adesso),
-            maker=(ruolo == lato_maker),
+            maker=e_maker,
             recensibile=(momento == "concluso" and recensibile(chi)))
         if testo:
             fuori.append((chi, testo))
