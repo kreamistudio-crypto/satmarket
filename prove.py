@@ -42956,6 +42956,35 @@ def prove_racconti_bozza():
             prova("...e con le foto dichiarate, i file ci sono", [],
                   [x for x in nomi if not os.path.exists(
                       os.path.join("assets", "racconti", x))])
+            # ...E SONO FOTO DA PAGINA, non gli originali (set 2026, «Un
+            # tempo per te»): WebP, al massimo 1360 di lato come quelle di
+            # To The Mooon, leggere, e SENZA METADATI — un EXIF porta la
+            # data, il telefono e a volte il luogo dello scatto di chi ce
+            # le ha mandate. La copertina e' 21:9, come l'hero di casa.
+            for x in nomi:
+                _p = os.path.join("assets", "racconti", x)
+                if not os.path.exists(_p):
+                    continue
+                raw = open(_p, "rb").read()
+                pezzi_riff, i = [], 12
+                while raw[:4] == b"RIFF" and i + 8 <= len(raw):
+                    n = int.from_bytes(raw[i + 4:i + 8], "little")
+                    pezzi_riff.append(raw[i:i + 4].decode("ascii", "replace"))
+                    i += 8 + n + (n & 1)
+                try:
+                    from PIL import Image as _Im
+                    lato = max(_Im.open(_p).size)
+                    rapp = _Im.open(_p).size[0] / _Im.open(_p).size[1]
+                except ImportError:
+                    lato, rapp = 0, 21 / 9
+                prova(f"«{x}»: WebP senza metadati, al massimo 1360 di lato "
+                      f"e sotto i 250 KB", (True, [], True, True),
+                      (bool(pezzi_riff), [p for p in pezzi_riff
+                                          if p in ("EXIF", "XMP ", "ICCP")],
+                       lato <= 1360, len(raw) < 250000))
+                if x.endswith("-cop.webp"):
+                    prova(f"«{x}»: la copertina e' 21:9", True,
+                          abs(rapp - 21 / 9) < .01)
         # LA DICHIARAZIONE E' DEL RENDERER, la regola del catalogo
         # gemello: se la parola stesse nei dati, la pagina di domani
         # potrebbe nascere senza
@@ -42984,6 +43013,23 @@ def prove_racconti_bozza():
     # codice, questa riga resta vera, ed e' giusto che resti vera.
     prova("Una Garlanda ha il suo venditore collegato", True,
           bool(_ug.get("negozio") or _ug.get("venditore_tg")))
+    # IL CASO CHIESTO IL 24 SET 2026: «Un tempo per te», le sue cinque foto
+    # piu' la copertina (arrivate: `foto` vero), il logo, il banner e il
+    # suo venditore — un'altra pagina con la STESSA forma, nessun ramo suo
+    _ut = CAT.get("un-tempo-per-te", {})
+    prova("Un tempo per te ha le sue cinque foto nel catalogo, nell'ordine "
+          "consegnato", ["prodotti", "cucina", "colazione", "Katia e Luca",
+                         "dettaglio"],
+          [b.get("etichetta", "") for b in _ut.get("blocchi", [])
+           if b.get("t") == "foto"])
+    prova("...le foto, il logo e il banner dichiarati, e il venditore "
+          "collegato", (True, True, True, True),
+          (_ut.get("foto"), _ut.get("logo"), _ut.get("banner"),
+           bool(_ut.get("negozio") or _ut.get("venditore_tg"))))
+    prova("...e i blocchi nell'ordine della pagina consegnata",
+          ["testo", "foto", "punti", "foto", "testo", "foto", "tappe", "foto",
+           "elenco", "foto", "firma"],
+          [b.get("t") for b in _ut.get("blocchi", [])])
     # ...E IL TG_ID E' UN NUMERO: scritto fra virgolette non combacerebbe
     # MAI col tg_id del negozio, e la pagina non uscirebbe senza che
     # niente lo dica. (bool no, anche se Python lo conta fra gli int.)
@@ -92847,13 +92893,15 @@ def _consigliati_giudice(src, mini, _pz):
     finta = {"titolo": "Bottega di prova", "emoji": "🌾", "sottotitolo": "S",
              "intro": "I", "foto": False, "blocchi": [], "logo": True,
              "negozio": "", "venditore_tg": 525}
-    cat = {"pubblicata": dict(finta, logo_giu=3),
-           "bozza": dict(finta),
+    cat = {"pubblicata": dict(finta, logo_giu=3, banner=True),
+           "bozza": dict(finta, banner=True),
            "senza-logo": dict(finta, logo=False),
            # il logo e' un VERO booleano: una stringa non accende niente
            "logo-scritto": dict(finta, logo="si"),
            "orfana": dict(finta, venditore_tg=0),
-           "per-codice": dict(finta, negozio="ab12cd34", venditore_tg=0)}
+           # il banner fra virgolette non vale: vuole il vero booleano
+           "per-codice": dict(finta, negozio="ab12cd34", venditore_tg=0,
+                              banner="si")}
 
     def _imp(k, d=""):
         chieste.append(k)
@@ -92873,9 +92921,14 @@ def _consigliati_giudice(src, mini, _pz):
           [x["slug"] for x in fuori])
     prova("...e la BOZZA col suo logo resta fuori", False,
           any(x["slug"] == "bozza" for x in fuori))
-    prova("...con cinque chiavi e nessun'altra",
-          [["emoji", "logo_giu", "negozio", "slug", "titolo"]] * 2,
+    # ⚠️ ERANO CINQUE (set 2026, «Un tempo per te»): la sesta e' il
+    # BANNER della card della pagina, un vero/falso e mai il nome di un
+    # file — il nome lo compone il client dallo slug che ha gia' ripassato
+    prova("...con sei chiavi e nessun'altra",
+          [["banner", "emoji", "logo_giu", "negozio", "slug", "titolo"]] * 2,
           [sorted(x) for x in fuori])
+    prova("...e il banner e' vero solo col True del catalogo", [True, False],
+          [x.get("banner") for x in fuori])
     # IL RITOCCO DEL LOGO (set 2026): esce quel che il catalogo dice, e
     # senza la chiave vale zero — il logo sta dove lo mette il riquadro
     prova("...col ritocco del logo dal catalogo, zero se non c'e'", [3, 0],
@@ -92990,6 +93043,38 @@ def _consigliati_rotte(src, mini, _pz):
                                 "TO-THE-MOON.webp", "to-the-moon.webp/..")])
     prova("...e la cartella e' sua, fuori dal glob del pareggio", True,
           'os.path.join("assets", "consigliati", slug + ".webp")' in _rotta)
+    # IL BANNER DI UNA PAGINA DEL SERVER (set 2026): la rotta di «Da
+    # scoprire» GIRATA, con la stessa stretta dei loghi — l'elenco delle
+    # card fisse resta servito, il banner solo a pagina pubblicata col
+    # suo `banner` vero, e un nome inventato mai
+    cat_b = {"pubblicata": {"banner": True}, "bozza": {"banner": True},
+             "senza-banner": {"logo": True}, "scritto": {"banner": "si"}}
+    tavola.update({"racconto_pubblicato:senza-banner": "1790000000",
+                   "racconto_pubblicato:scritto": "1790000000"})
+    amb_b = dict(amb_a, RACCONTI_NEGOZI=cat_b,
+                 FILE_SCOPRIRE=("lampo.webp", "to-the-moon.webp"))
+    exec(_pz(src, "def _banner_consigliato(", "\n\n\n"), amb_b)
+    _rs = _pz(src, "def asset_scoprire(", "\n\n\n")
+    exec(_rs, amb_b)
+
+    def _scopri(nome):
+        try:
+            return amb_b["asset_scoprire"](nome, "")
+        except _NonC:
+            return 404
+    prova("la rotta di «Da scoprire» serve le sue card e il banner della "
+          "pagina pubblicata", ["servito"] * 3,
+          [_scopri(n) for n in ("lampo.webp", "to-the-moon.webp",
+                                "pubblicata.webp")])
+    prova("...e MAI il banner di una bozza, di una pagina che non lo "
+          "dichiara (o lo scrive fra virgolette) o di uno slug inventato",
+          [404] * 4, [_scopri(n) for n in ("bozza.webp", "senza-banner.webp",
+                                           "scritto.webp", "mai-visto.webp")])
+    prova("...ne' un nome fuori forma", [404] * 4,
+          [_scopri(n) for n in ("pubblicata", "pubblicata.png",
+                                "../pubblicata.webp", "pubblicata.webp/..")])
+    prova("...e la cartella resta quella di «Da scoprire»", True,
+          'os.path.join("assets", "scoprire", nome)' in _rs)
 
 
 def _consigliati_file(src, mini, _pz):
@@ -93070,6 +93155,33 @@ def _consigliati_file(src, mini, _pz):
               bool(_fs) and f'"{s}.webp"' in _fs.group(1)
               and os.path.exists(os.path.join("assets", "scoprire",
                                               s + ".webp")))
+    # LE PAGINE DEL SERVER COL LORO BANNER (set 2026, «Un tempo per te»):
+    # un vero booleano, il file c'e' e ha le misure di quello di To The
+    # Mooon — la card e' la stessa, e un rapporto diverso lo ritaglierebbe
+    # il CSS a caso. E nella cartella di «Da scoprire» nessun file orfano:
+    # ognuno e' dell'elenco delle card o di una pagina che lo dichiara.
+    prova("il banner del catalogo del server, se c'e', e' un vero booleano",
+          [], [s for s, r in CAT.items()
+               if "banner" in r and not isinstance(r["banner"], bool)])
+    banner_server = [s for s, r in CAT.items() if r.get("banner") is True]
+    from PIL import Image as _Im
+    _ttm = os.path.join("assets", "scoprire", "to-the-moon.webp")
+    _misura = _Im.open(_ttm).size if os.path.exists(_ttm) else None
+    for s in banner_server:
+        _b = os.path.join("assets", "scoprire", s + ".webp")
+        _ok = os.path.exists(_b)
+        prova(f"«{s}»: il suo banner c'e', WebP con le misure di quello di "
+              f"To The Mooon, e sotto i 100 KB", (True, "WEBP", _misura, True),
+              (_ok, _Im.open(_b).format if _ok else None,
+               _Im.open(_b).size if _ok else None,
+               _ok and os.path.getsize(_b) < 100000))
+        prova(f"«{s}»: ...e non e' nell'elenco delle card di «Da scoprire»",
+              False, bool(_fs) and f'"{s}.webp"' in _fs.group(1))
+    _elenco = set(re.findall(r'"([^"]+)"', _fs.group(1) if _fs else ""))
+    prova("nella cartella di «Da scoprire» nessun file orfano", [],
+          sorted(f for f in os.listdir(os.path.join("assets", "scoprire"))
+                 if f not in _elenco
+                 and f[:-5] not in banner_server))
 
 
 def _consigliati_porte(src, mini, _pz):
@@ -93111,6 +93223,10 @@ def _consigliati_porte(src, mini, _pz):
                              .replace("image/*", "image/STELLA"))
     prova("la lista del server ha due scrittori soli: la nascita e la "
           "busta", 2, len(re.findall(r"consigliatiServer\s*=(?!=)", _js)))
+    prova("il banner di una pagina del server: il vero booleano della "
+          "busta, e il nome dallo slug gia' ripassato", True,
+          "banner: s.banner === true ? slug + '.webp' : ''," in
+          _pz(mini, "function consigliatiPubblicati(){", "\n}\n"))
     prova("...e la busta la scrive intera, vuota se non arriva", True,
           "consigliatiServer = Array.isArray(j.consigliati) ? "
           "j.consigliati : [];"
@@ -93585,6 +93701,29 @@ caso('la pagina', () => {
        + 'non apre niente',
        ['negozio:cd34ef56:aperto', 'negozio:' + CODICE_TTM + ':aperto'],
        scritte);
+});
+
+/* IL BANNER DI UNA PAGINA DEL SERVER (set 2026, «Un tempo per te»): con
+   `banner` vero nella busta la card e' la sua immagine, dalla cartella di
+   Da scoprire col nome dello slug; senza, o scritto fra virgolette, la
+   riserva col logo. */
+caso('la pagina col banner', () => {
+  RACCONTI['to-the-moon'].consigliato = false;
+  consigliatiServer = [Object.assign({}, BOTTEGA, {banner: true}),
+                       Object.assign({}, TERZA, {banner: 'true'})];
+  renderConsigliati();
+  const carte = nodi['consigliatiLista'].innerHTML
+    .split('class="scoprire-card"').slice(1);
+  dice('la pagina del server col banner mostra la SUA immagine, dalla '
+       + 'cartella di Da scoprire', [true, false],
+       [(carte[0] || '').includes('src="/assets/scoprire/bottega-di-prova.webp"'),
+        (carte[0] || '').includes('cons-riserva')]);
+  dice('...col nome nella riserva, se l immagine non arriva', true,
+       (carte[0] || '').includes('<span class="sc-riserva" aria-hidden="true">'));
+  dice('...e il banner fra virgolette non vale: la riserva col logo',
+       [false, true],
+       [(carte[1] || '').includes('/assets/scoprire/'),
+        (carte[1] || '').includes('src="/assets/consigliati/terza-bottega.webp"')]);
 });
 
 caso('la pagina scappa i testi', () => {

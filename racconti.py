@@ -48,6 +48,16 @@ una scheda, `n` il numero della foto. In piu', per queste pagine:
     con lei), negativo per salire, da -12 a 12. Serve ai marchi col
     peso tutto in alto o in basso, che centrati a riquadro sembrano
     fuori centro. Esce nella busta dei Consigliati accanto al logo.
+  - `banner` (set 2026): l'immagine della card del negozio nella
+    pagina «Consigliati», in `assets/scoprire/<slug>.webp` — le misure
+    del banner di To The Mooon (1040x498), col nome dentro il disegno.
+    Senza, la card della pagina e' la riserva col logo e il nome sul
+    bruno. Come il logo conta SOLO a pagina pubblicata: la busta lo
+    porta come vero/falso, e la rotta di «Da scoprire» serve il file di
+    una pagina del server solo quando e' pubblicata col suo `banner`
+    vero. NON accende lo spazio sponsorizzato di «Da scoprire»: quello
+    e' del catalogo di casa (`SLUG_SPONSOR`), e uno slug non puo' stare
+    in tutt'e due i cataloghi — il file e' pronto, la leva no.
 
 LO STATO (bozza o pubblicata) NON STA QUI: vive in `impostazioni`, e
 lo cambia il gesto del moderatore dal pannello. Questo file dice COSA
@@ -191,6 +201,129 @@ RACCONTI_NEGOZI = {
              "p": "Famiglia Stocchi, Rovasenda (VC)"},
             {"t": "foto", "n": 6, "etichetta": "logo", "piccola": True,
              "alt": "Il logo di Una Garlanda"},
+        ],
+    },
+    "un-tempo-per-te": {
+        # IL LEGAME COL VENDITORE E' IL TG_ID, la stessa eccezione
+        # dichiarata di Una Garlanda (24 set 2026, decisione di Andrea):
+        # Luca, @lucabortolameotti, negozio «Un tempo per te». La strada
+        # del ritorno e' la stessa: letto il codice nel cassetto del
+        # pannello, lo si scrive in `negozio` e si toglie `venditore_tg`.
+        "negozio": "",
+        "venditore_tg": 613784705,
+        "emoji": "🌱",
+        "titolo": "Un tempo per te",
+        # il titolo della pagina e' l'h3 della testa, che il renderer
+        # prende da qui: la riga intera come l'hanno scritta loro
+        "sottotitolo": "Un tempo per te. Il cibo, per noi, è cura.",
+        "intro": ("Siamo Luca e Katia. Amiamo la natura, gli animali, lo "
+                  "sport e il vivere in modo semplice e sano. Per anni "
+                  "abbiamo cercato un luogo dove tutto questo potesse "
+                  "incontrarsi, e lo abbiamo trovato nel centro storico di "
+                  "Dro, in Trentino, a pochi chilometri dal Lago di Garda. "
+                  "Lì il nostro sogno è diventato casa: prima un B&B, poi "
+                  "una cucina aperta a chi vuole imparare, e oggi anche i "
+                  "nostri prodotti."),
+        # LE FOTO CI SONO (WebP senza metadati, al massimo 1360 di lato
+        # come quelle di To The Mooon, mai ingrandite):
+        #   un-tempo-per-te-cop.webp  la copertina (1-copertina), 21:9
+        #   un-tempo-per-te-1.webp    i prodotti
+        #   un-tempo-per-te-2.webp    la cucina
+        #   un-tempo-per-te-3.webp    la colazione
+        #   un-tempo-per-te-4.webp    Katia e Luca
+        #   un-tempo-per-te-5.webp    il dettaglio
+        "foto": True,
+        # il logo della card «Consigliati», da logo.pdf: entra nella card
+        # solo a pagina pubblicata
+        "logo": True,
+        # il peso del disegno sta al 56% dell'altezza (il riquadro scuro
+        # col nome in basso, il camino sottile in cima): centrato a
+        # riquadro pare sceso di ~4px, e -4 lo riporta al centro
+        "logo_giu": -4,
+        # il banner della card nella pagina «Consigliati», 1040x498
+        "banner": True,
+        "blocchi": [
+            {"t": "testo", "h": "COS'È",
+             "p": ("Una realtà di autoproduzione alimentare 100% vegetale. "
+                   "Creme spalmabili, prodotti da forno, fermentati, "
+                   "conserve e alternative vegetali ai formaggi, preparati "
+                   "a mano e in piccole quantità, con attenzione alle "
+                   "materie prime, alla qualità nutrizionale e alla "
+                   "sostenibilità. Sono le stesse ricette che nascono ogni "
+                   "mattina nella nostra cucina, per i nostri ospiti.")},
+            {"t": "foto", "n": 1, "etichetta": "prodotti",
+             "alt": "I prodotti di Un tempo per te"},
+            {"t": "punti", "h": "UN TEMPO PER TE, PER INTERO", "voci": [
+                {"e": "🏡", "h": "Il B&B ecologico",
+                 "p": ("Da qui è partito tutto. Tre camere e un "
+                       "appartamento, luminosi ed essenziali, con i nomi "
+                       "delle posizioni dello yoga; una cucina comune dove "
+                       "ci si incontra al mattino, un angolo lettura con la "
+                       "nostra Biblioteca del Benessere, e un giardino dove "
+                       "fare colazione quando il sole lo permette. Qui non "
+                       "troverete lusso, ma accoglienza vera.")},
+                {"e": "🥣", "h": "Il Vegan Home Lab",
+                 "p": ("Non un ristorante, ma uno spazio dove condividiamo "
+                       "quello che abbiamo imparato: corsi di cucina "
+                       "vegetale, laboratori sulle fermentazioni naturali e "
+                       "sulle autoproduzioni casalinghe, anche in versione "
+                       "crudista e senza glutine, e percorsi di formazione "
+                       "per cuochi. Si impara facendo, e si finisce sempre "
+                       "a tavola, insieme, ad assaggiare quello che abbiamo "
+                       "preparato.")},
+                {"e": "🧘", "h": "La sala olistica",
+                 "p": ("Yoga e ritiri dedicati all'Ayurveda, per un "
+                       "benessere che parte dal corpo e arriva a tutto il "
+                       "resto.")},
+            ]},
+            {"t": "foto", "n": 2, "etichetta": "cucina",
+             "alt": "Luca e Katia al lavoro nella loro cucina"},
+            {"t": "testo", "h": "IL CIBO È CURA",
+             "p": ("Ogni colazione e ogni brunch è preparato in casa, 100% "
+                   "vegetale, biologico e naturale, con la stessa "
+                   "attenzione che mettiamo nell'accogliere chi arriva. È "
+                   "da questa cura quotidiana che sono nati i prodotti che "
+                   "trovate qui: non una linea pensata a tavolino, ma "
+                   "quello che serviamo davvero, in barattolo.")},
+            {"t": "foto", "n": 3, "etichetta": "colazione",
+             "alt": "Una colazione preparata in casa"},
+            # le tappe vanno a capo sotto il loro titolo, come in Una
+            # Garlanda: la prosa comincia con la maiuscola
+            {"t": "tappe", "h": "COM'È NATO", "voci": [
+                {"h": "Il sogno",
+                 "p": ("Un luogo dove natura, sport, cibo sano e "
+                       "accoglienza potessero stare insieme, cercato per "
+                       "anni.")},
+                {"h": "La casa",
+                 "p": ("Un piccolo B&B ecologico nel centro di Dro, per chi "
+                       "ha voglia di fermarsi, respirare e ricominciare con "
+                       "più energia.")},
+                # «il Home Lab» nel testo consegnato: il nome intero, come
+                # nella scheda qui sopra, rimette a posto l'articolo
+                {"h": "La cucina",
+                 "p": ("Dalle colazioni per gli ospiti sono nati il Vegan "
+                       "Home Lab, i corsi e i laboratori.")},
+                {"h": "Oggi",
+                 "p": ("Le stesse preparazioni, ora anche per chi non passa "
+                       "da Dro.")},
+            ]},
+            {"t": "foto", "n": 4, "etichetta": "Katia e Luca",
+             "alt": "Katia e Luca fra gli scaffali dei loro barattoli"},
+            {"t": "elenco", "h": "COM'È FATTO", "voci": [
+                "100% vegetale, biologico e naturale",
+                "Piccole quantità, preparate a mano",
+                ("Creme spalmabili, prodotti da forno, fermentati, conserve, "
+                 "formaggi vegetali"),
+                "Filiera corta, etica e relazione diretta",
+                "Opzioni crudiste e senza glutine nei laboratori",
+                ("B&B ecologico, Vegan Home Lab e sala olistica a Dro (TN)"),
+            ]},
+            {"t": "foto", "n": 5, "etichetta": "dettaglio",
+             "alt": "Un piatto preparato da Un tempo per te"},
+            {"t": "firma",
+             "h": ("Un tempo per rallentare, per nutrirsi bene, per tornare "
+                   "a casa un po' più leggeri."),
+             "p": "Katia e Luca, Dro (TN)"},
         ],
     },
 }

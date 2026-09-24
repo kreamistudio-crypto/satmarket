@@ -38,6 +38,17 @@ LE PORTE CHE SI BUSSANO, e il verso di ognuna:
     in bozza no, nemmeno col logo; e la rotta del logo di una bozza
     risponde 404. La pagina /consigliati risponde coi suoi meta, senza
     indicizzarsi e fuori dalla mappa del sito.
+  - IL BANNER E LE FOTO (set 2026, «Un tempo per te»): il banner della
+    card dei Consigliati viaggia nella busta come vero/falso, e la rotta
+    di «Da scoprire» lo serve solo a pagina pubblicata; le foto di una
+    pagina che le dichiara si servono anche in bozza (l'anteprima le
+    deve vedere: l'imperfezione dichiarata), e nessuna risposta del
+    negozio o della home le linka finche' la pagina e' in bozza.
+
+UN GIRO PER OGNI PAGINA DEL CATALOGO (set 2026): nato su Una Garlanda,
+il collaudo gira adesso ogni pagina di `racconti.py`, ciascuna col suo
+venditore — una pagina nuova entra nel conto da sola, invece di
+aspettare che qualcuno si ricordi di aggiungerla qui.
 
 IL VENDITORE E' QUELLO VERO DEL CATALOGO, legato col tg_id: l'utente
 nasce qui, sul database usa-e-getta, alla sua prima richiesta, con
@@ -54,10 +65,12 @@ import sys
 import collaudo_lnbits_muto as banco
 
 prova = banco.prova
-SLUG = "una-garlanda"
 ANONIMO = {}
 COMPRATORE = {"X-Tg-Init-Data": "collaudo:111:Compratore"}
 MODERATORE = {"X-Tg-Init-Data": "collaudo:999:Admin"}
+# il nome dell'identita' di collaudo del venditore di ogni pagina: fa
+# anche lo username (in minuscolo), da cui si riapre il negozio
+NOMI = {"una-garlanda": "Manuele", "un-tempo-per-te": "Luca"}
 
 
 def main():
@@ -69,9 +82,23 @@ def main():
 
     SRV = banco.SRV
     c = TestClient(SRV.app)
+    prova("ogni pagina del catalogo ha il nome del suo venditore qui", [],
+          [s for s in SRV.RACCONTI_NEGOZI if s not in NOMI])
+    for slug in SRV.RACCONTI_NEGOZI:
+        if slug in NOMI:
+            giro(c, SRV, slug, NOMI[slug])
+
+    print("\n" + "=" * 58)
+    print(f"  {banco.PASSATE} passate, {banco.FALLITE} fallite")
+    print("=" * 58)
+    return 1 if banco.FALLITE else 0
+
+
+def giro(c, SRV, SLUG, NOME):
+    print(f"\n######## {SLUG} ########")
     cat = SRV.RACCONTI_NEGOZI[SLUG]
     TG = int(cat["venditore_tg"])
-    VENDITORE = {"X-Tg-Init-Data": f"collaudo:{TG}:Manuele"}
+    VENDITORE = {"X-Tg-Init-Data": f"collaudo:{TG}:{NOME}"}
     # LE SPIE, dal catalogo vero: il sottotitolo (il titolo che si
     # legge), un pezzo dell'apertura, la firma in fondo — e il tg_id
     firma = next(b for b in cat["blocchi"] if b["t"] == "firma")
@@ -100,6 +127,21 @@ def main():
                 [x for x in (lista or []) if x.get("slug") == SLUG], r.text)
 
     logo_salvato = cat.get("logo")
+    banner_salvato = cat.get("banner")
+    # LE IMMAGINI DELLA PAGINA come le cercherebbe una risposta che le
+    # linka: nessuna pagina pubblica le deve nominare finche' e' in bozza
+    immagini = (f"/assets/racconti/{SLUG}-", f"/assets/scoprire/{SLUG}.",
+                f"/assets/consigliati/{SLUG}.")
+
+    def linkate(testo):
+        return [s for s in immagini if s in testo]
+
+    def rimetti_banner():
+        """il catalogo com'era: la chiave che non c'era non resta"""
+        if banner_salvato is None:
+            cat.pop("banner", None)
+        else:
+            cat["banner"] = banner_salvato
 
     print("\n[la porta admin: chi la puo' aprire]")
     prova("l'anonimo prende 401", 401,
@@ -193,8 +235,13 @@ def main():
     r = c.get("/sitemap.xml")
     prova("...e nemmeno la mappa del sito", [], trovate(r.text))
     lista, testo = elenco_admin()
+    prova("...e nessuna delle tre linka le immagini della pagina",
+          [[], [], []],
+          [linkate(c.get(u).text) for u in (f"/negozio/{codice}",
+                                            f"/?bozza={SLUG}",
+                                            f"/api/negozio/{codice}?limit=12")])
     prova("il pannello riconosce il venditore, col codice risolto",
-          (codice, {"trovato": True, "nome": "Manuele"}),
+          (codice, {"trovato": True, "nome": NOME}),
           (lista[SLUG].get("negozio"), lista[SLUG].get("venditore")))
 
     print("\n[fra i Consigliati: la bozza no]")
@@ -210,7 +257,24 @@ def main():
           (mia, trovate(testo)))
     prova("...e il suo logo non si serve a nessuno", 404,
           c.get(f"/assets/consigliati/{SLUG}.webp").status_code)
+    # ...E IL SUO BANNER NEMMENO (set 2026): la card della pagina dei
+    # Consigliati una bozza non la mostra, quindi il file non si serve
+    cat["banner"] = True
+    prova("...e nemmeno il suo banner, dichiarato", 404,
+          c.get(f"/assets/scoprire/{SLUG}.webp").status_code)
+    rimetti_banner()
     cat["logo"] = logo_salvato
+    # LE FOTO SI SERVONO ANCHE IN BOZZA, ed e' l'imperfezione dichiarata:
+    # l'anteprima del moderatore e del venditore le deve vedere, e un
+    # <img> non porta l'initData
+    if cat.get("foto") is True:
+        nomi = ["cop"] + [str(b["n"]) for b in cat["blocchi"]
+                          if b["t"] == "foto"]
+        prova("le foto dichiarate si servono tutte, WebP, anche in bozza",
+              [(200, "image/webp")] * len(nomi),
+              [(r.status_code, r.headers.get("content-type", "")[:10])
+               for r in (c.get(f"/assets/racconti/{SLUG}-{n}.webp")
+                         for n in nomi)])
     r = c.get("/assets/consigliati/to-the-moon.webp")
     prova("il logo dello spazio in vetrina si serve, WebP", (200, True),
           (r.status_code, r.headers.get("content-type", "").startswith(
@@ -243,7 +307,7 @@ def main():
     prova("...con le sole chiavi dichiarate, e il tg_id a casa",
           (sorted(SRV.CAMPI_RACCONTO + ("slug",)), False),
           (sorted(rac), str(TG) in testo))
-    _, rac_u, _ = racconto_di("manuele", ANONIMO)
+    _, rac_u, _ = racconto_di(NOME.lower(), ANONIMO)
     prova("...anche arrivando dallo username", SLUG,
           (rac_u or {}).get("slug"))
     c.get("/api/me/racconti", headers=COMPRATORE)
@@ -260,21 +324,39 @@ def main():
     r = c.get(f"/negozio/{codice}")
     prova("l'anteprima social del negozio resta quella del brand", [],
           trovate(r.text))
+    prova("...senza le immagini della pagina, nemmeno pubblicata", [],
+          linkate(r.text))
 
     print("\n[fra i Consigliati: pubblicata, e col logo]")
+    cat["logo"] = False
     st, e_lista, mia, testo = consigliati()
     prova("pubblicata ma SENZA logo, fra i Consigliati non entra", [], mia)
     cat["logo"] = True
     # IL RITOCCO DEL LOGO VIAGGIA CON LUI (set 2026): un valore diverso
-    # dallo zero del catalogo, o la prova non saprebbe dire se esce
+    # da quello del catalogo, o la prova non saprebbe dire se esce
     giu_salvato = cat.get("logo_giu", 0)
-    cat["logo_giu"] = 3
+    cat["logo_giu"] = 3 if giu_salvato != 3 else -3
     st, e_lista, mia, testo = consigliati()
     prova("...col logo si': col codice del negozio risolto, il nome, "
-          "l'emoji e il ritocco del logo",
+          "l'emoji, il ritocco del logo e il banner (vero o falso)",
           [{"slug": SLUG, "titolo": cat["titolo"], "emoji": cat["emoji"],
-            "negozio": codice, "logo_giu": 3}], mia)
+            "negozio": codice, "logo_giu": cat["logo_giu"],
+            "banner": cat.get("banner") is True}], mia)
     cat["logo_giu"] = giu_salvato
+    # IL BANNER (set 2026): a pagina pubblicata la rotta di «Da scoprire»
+    # lo serve se il catalogo lo dichiara, e il file c'e' davvero
+    r = c.get(f"/assets/scoprire/{SLUG}.webp")
+    prova("il banner si serve a pagina pubblicata solo se dichiarato",
+          (200, "image/webp") if cat.get("banner") is True else (404, ""),
+          (r.status_code, r.headers.get("content-type", "")[:10]
+           if r.status_code == 200 else ""))
+    cat["banner"] = "si"
+    st, e_lista, mia, testo = consigliati()
+    prova("...e vuole il vero booleano: scritto fra virgolette, falso e "
+          "404", ([False], 404),
+          ([x.get("banner") for x in mia],
+           c.get(f"/assets/scoprire/{SLUG}.webp").status_code))
+    rimetti_banner()
     prova("...e ne' il tg_id ne' il testo della storia viaggiano", (False, []),
           (str(TG) in testo, trovate(testo)))
 
@@ -291,6 +373,8 @@ def main():
           ["bozza"], [x.get("stato") for x in r.json().get("racconti") or []])
     st, e_lista, mia, testo = consigliati()
     prova("...e dai Consigliati esce subito, anche col logo", [], mia)
+    prova("...e il suo banner torna 404", 404,
+          c.get(f"/assets/scoprire/{SLUG}.webp").status_code)
     cat["logo"] = logo_salvato
 
     print("\n[la precedenza: col codice nel catalogo il tg_id non conta]")
@@ -306,11 +390,6 @@ def main():
     prova("col SUO codice scritto nel catalogo, la vede di nuovo",
           [SLUG], [x.get("slug") for x in r.json().get("racconti") or []])
     cat["negozio"] = ""
-
-    print("\n" + "=" * 58)
-    print(f"  {banco.PASSATE} passate, {banco.FALLITE} fallite")
-    print("=" * 58)
-    return 1 if banco.FALLITE else 0
 
 
 if __name__ == "__main__":

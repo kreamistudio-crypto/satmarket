@@ -2051,10 +2051,14 @@ def consigliati_pubblici(con) -> list:
     chiunque apra la home, e come `racconto_pubblico` non sa (e non deve
     sapere) chi bussa. Il moderatore la bozza la guarda dalla porta sua.
 
-    Escono cinque chiavi e nessun'altra: lo slug (per il logo), il
+    Escono sei chiavi e nessun'altra: lo slug (per il logo), il
     titolo, l'emoji, il CODICE del negozio RISOLTO — mai il tg_id
     con cui il catalogo puo' legare la pagina, il patto dei CAMPI_RACCONTO
-    — e `logo_giu`, il ritocco del suo logo nel quadrato (set 2026).
+    —, `logo_giu`, il ritocco del suo logo nel quadrato (set 2026), e
+    `banner` (set 2026, «Un tempo per te»): VERO se la pagina ha la sua
+    immagine per la card della pagina «Consigliati», in
+    `assets/scoprire/<slug>.webp`. Solo col `True` del catalogo: una
+    stringa lo lascia falso, e la card resta la riserva col logo.
     TOGLIERE UNA PAGINA DAI CONSIGLIATI e' il gesto del moderatore,
     «📝 Rimetti in bozza»: questo file dice COSA c'e' scritto, lo stato
     dice SE si vede — e una leva di visibilita' nel catalogo sarebbe un
@@ -2077,7 +2081,8 @@ def consigliati_pubblici(con) -> list:
                           "emoji": r.get("emoji") or "",
                           "negozio": v["negozio"],
                           "logo_giu": _logo_giu_consigliato(
-                              r.get("logo_giu"))})
+                              r.get("logo_giu")),
+                          "banner": r.get("banner") is True})
     except Exception as e:
         print(f"⚠️ [consigliati] la lista non si legge: {e}")
         return []
@@ -58940,10 +58945,27 @@ def asset_consigliato(nome: str, if_none_match: str = Header("")):
                           if_none_match)
 
 
+# IL BANNER DI UNA PAGINA DEL SERVER (set 2026, «Un tempo per te»): la
+# card del negozio nella pagina «Consigliati», nella cartella di «Da
+# scoprire» perche' e' la stessa card con le stesse misure. Non passa da
+# FILE_SCOPRIRE, che e' l'elenco delle card di «Da scoprire» e dello
+# spazio sponsorizzato: qui la whitelist sono le chiavi di
+# RACCONTI_NEGOZI (nessun nome inventato diventa un percorso) con la
+# stretta dei LOGHI — il banner di una bozza non lo chiede nessuno,
+# perche' la pagina dei Consigliati una bozza non la mostra — quindi si
+# serve solo a pagina pubblicata col suo `banner` vero.
+def _banner_consigliato(nome: str) -> bool:
+    slug = nome[:-5] if nome.endswith(".webp") else ""
+    pagina = RACCONTI_NEGOZI.get(slug)
+    return bool(pagina and pagina.get("banner") is True
+                and racconto_stato(slug) == "pubblicato")
+
+
 @app.get("/assets/scoprire/{nome}")
 def asset_scoprire(nome: str, if_none_match: str = Header("")):
     if nome not in FILE_SCOPRIRE:
-        raise HTTPException(404, "immagine non trovata")
+        if not _banner_consigliato(nome):
+            raise HTTPException(404, "immagine non trovata")
     percorso = os.path.join("assets", "scoprire", nome)
     if not os.path.exists(percorso):
         raise HTTPException(404, "immagine non trovata")

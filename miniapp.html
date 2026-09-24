@@ -15374,14 +15374,19 @@ function consigliatiPubblicati(){
   });
   /* LE PAGINE DEL SERVER: la busta porta solo le pubblicate col logo, e
      qui si ripassano dalla forma per cintura — lo slug finisce in un
-     indirizzo e in un attributo, il codice in una richiesta. */
+     indirizzo e in un attributo, il codice in una richiesta.
+     IL BANNER (set 2026): se la busta dice `banner` vero la card della
+     pagina e' l'immagine del negozio, con lo stesso nome dello slug
+     nella cartella di «Da scoprire»; senza, la riserva col logo. Vuole
+     il vero booleano, come il server che lo scrive. */
   (Array.isArray(consigliatiServer) ? consigliatiServer : []).forEach(s => {
     const slug = String((s && s.slug) || '');
     if (!/^[a-z0-9-]{2,40}$/.test(slug) || !s.negozio) return;
     if (fuori.some(x => x.slug === slug)) return;
     fuori.push({slug, titolo: String(s.titolo || ''),
                 emoji: String(s.emoji || '📣'), negozio: String(s.negozio),
-                banner: '', giu: s.logo_giu});
+                banner: s.banner === true ? slug + '.webp' : '',
+                giu: s.logo_giu});
   });
   return fuori;
 }
@@ -15496,8 +15501,10 @@ function apriConsigliati(){ go('consigliati'); }
    ripeteva. Resta in «Da scoprire», dove la card dello spazio sta in
    mezzo alle occasioni e la parola e' l'unica che la dichiara.
    L'IMMAGINE E' IL BANNER quando c'e' (le voci del catalogo di casa hanno
-   il loro, col nome dentro), altrimenti la riserva col LOGO e il nome sul
-   bruno: il logo c'e' per costruzione, e' la condizione per stare qui.
+   il loro, col nome dentro, e le pagine del server lo dichiarano nella
+   busta), altrimenti la riserva col LOGO e il nome sul bruno: il logo
+   c'e' per costruzione, e' la condizione per stare qui — ed e' anche il
+   ripiego del banner che non arriva.
    SENZA NEGOZI la pagina lo dice invece di restare muta: ci si arriva
    anche dall'indirizzo, e un negozio tolto a mano la puo' svuotare. */
 function renderConsigliati(){
