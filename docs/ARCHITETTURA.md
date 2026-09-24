@@ -25454,17 +25454,17 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   scritta da `vestiMorfoP2P`): dal + in fondo nasce blu. La croce resta
   bianca (5,18:1 sul rosso di giorno, 16,81:1 sul blu); di sera, sul rosso
   a riposo (#F07A47), il bianco sta a 2,77:1 — il + di sempre, da
-  decidere. E SI ACCENDE UN CONTORNO ARANCIO (ottavo giro): blu sulla
-  banda scura il + si perdeva, e la pelle blu porta nel suo `::before` un
-  filo di 2,5px dentro il cerchio e un bagliore corto fuori (5px: a 320 la
-  prima voce sta a 6,9px dal + posato), nell'arancio della freccia del
-  logo (#FE8400, misurato sui suoi pixel) — con la sua opacita', cioe' la
-  discesa, e nessun conto suo. Nel fantasma il filo (`.morfo-bordo`) sta
+  decidere. E SI ACCENDE UN CONTORNO BIANCO (ottavo giro, bianco dal
+  nono): blu sulla banda scura il + si perdeva, e la pelle blu porta nel
+  suo `::before` un filo di 2,5px dentro il cerchio e un bagliore corto
+  fuori (5px: a 320 la prima voce sta a 6,9px dal + posato), nel bianco
+  della croce (all'ottavo giro era l'arancio della freccia del logo,
+  #FE8400) — con la sua opacita', cioe' la discesa, e nessun conto suo. Nel fantasma il filo (`.morfo-bordo`) sta
   FRA il gemello blu e la forma rossa, pieno da meta' corsa (il doppio
   della discesa: la soglia del logo), e il bagliore e' il suo `::after`
   col peso della discesa: parte identico al + a ogni discesa e si spegne
   in meta' della dissolvenza breve, che il bottone d'arrivo di bordo
-  arancio non ne ha. CHIUDENDOLO NIENTE RITORNO: il foglio sfuma e sotto la barra
+  non ne ha. CHIUDENDOLO NIENTE RITORNO: il foglio sfuma e sotto la barra
   e' gia' a riposo (`barraSeccaP2P`), qualunque strada lo chiuda — freccia,
   gesto indietro dell'app, pubblicazione —; il foglio rosso o verde torna
   ancora nel +. Le regole rosse del fantasma escludono il blu col

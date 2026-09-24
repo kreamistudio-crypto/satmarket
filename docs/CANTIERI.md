@@ -32033,3 +32033,43 @@ server nessun errore.
 — dall'articolo alla ✕, poi il pagamento — dentro Telegram e nell'app
 Android: il banco l'ha girato con lo stub di Telegram, non con le due
 app vere.
+
+## Il contorno bianco del + che diventa blu (24 set 2026)
+
+Nono giro sul trascino della capsula, ritocco di Andrea a 8d351d5.
+Worktree da `origin/main`, commit firmato. Nessuna riga di JS: quattro
+colori nel CSS.
+
+**COSA CAMBIA.** Mentre il + scende e diventa blu, il contorno (il filo
+di 2,5px dentro il cerchio) e il bagliore corto attorno si fanno
+BIANCHI invece che arancio: il bianco della croce, `#FFFFFF`, e il
+bagliore a `rgba(255,255,255,.65)`. Il bagliore non era gia' bianco
+(era l'arancio #FE8400 a .65), quindi sono cambiati tutti e due.
+
+**NIENT'ALTRO SI MUOVE.** Stesso metodo dell'ottavo giro: il contorno
+resta il `::before` della pelle blu, con la sua opacita' (la discesa),
+la corsa della barra al tocco e al ritorno, il dito che la ferma e gli
+effetti ridotti; nel fantasma il filo `.morfo-bordo` e il suo `::after`
+cambiano colore e tengono ordine, pesi e spegnimento in meta' della
+dissolvenza breve. I conti della partenza non dipendono dal colore: il
+filo del fantasma parte identico a quello del + a ogni discesa.
+
+**PROVATO.** Le prove chiedono il bianco uguale a quello della croce (letto
+dalla regola del tondo) nel filo e nel bagliore, nessun arancio sulla
+pelle blu, e nel fantasma il filo col bianco del + (letto dalla sua
+regola, non piu' ricopiato nei conti); la prova sulla mediana dei pixel
+della freccia e' caduta con l'arancio. Tortura 5/5 su una copia (filo,
+bagliore, filo e bagliore del fantasma rimessi arancio, croce non
+bianca: tutte rosse). DAL VIVO a 375 nei due temi, Chrome headless a
+densita' 3 col dito vero e il relay morto: la striscia del trascino e
+quella della morfosi (lasciato in fondo e a 35px) coi fotogrammi; il
+filo tenuto in fondo e' bianco puro (255,255,255) di giorno e di sera,
+a meta' strada (discesa 0,49) e' la mescola rosso·(1−p) + bianco·p a
+meno di un livello, a casa e' il rosso del + senza filo; nessun errore
+in console.
+
+**DA GUARDARE.** Dal telefono, di giorno e di sera: il bianco sulla
+banda scura in fondo alla corsa, e se il bagliore a .65 si legge come
+luce o come alone. Restano aperte le due domande dell'ottavo giro: la
+croce bianca sul rosso della sera (2,77:1) e se il bottone d'arrivo
+vuole anche lui un bordo.
