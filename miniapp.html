@@ -6949,6 +6949,15 @@
   .sats-input button.suffix{right:8px;border:0;background:var(--chip-bg);
     border-radius:999px;padding:5px 11px;cursor:pointer;color:var(--ink-soft);font:inherit;
     font-size:12px;font-weight:800}
+  /* LA RIGA DEL CAMBIO (set 2026): sotto la casella col bottoncino
+     sats ⇄ €, dice cosa e' appena successo ai numeri. «Convertito al
+     cambio di adesso» in --ink-soft, l'inchiostro delle note (mai
+     --muted: di giorno fa 3,81:1); la riga che chiede di ricontrollare
+     le cifre rimaste com'erano nel colore degli avvisi del form, quello
+     di zonaHint e di sellSpedHint. Vedi rigaCambio. */
+  .riga-cambio{margin-top:6px;font-size:12px;font-weight:700;line-height:1.4;
+    color:var(--ink-soft)}
+  .riga-cambio.ferma{color:var(--sats-text)}
   /* IL COSTO DI SPEDIZIONE STANDARD (set 2026): il blocco sotto i
      corrieri in «📦 Come spedisci» — staccato da un filo, perche' e' una
      seconda domanda nello stesso cassetto — e il foglio
@@ -29575,13 +29584,26 @@ function spedStdDigitata(){
 }
 
 /* Il toggle e' UNO per le tre caselle, come in Vendi, e girarlo le
-   svuota: resterebbero numeri nella valuta di prima */
+   CONVERTE al cambio di adesso (24 set 2026: prima le svuotava, e un
+   venditore si e' visto sparire 11800 e 10300, col supplemento da 500
+   tornato al segnaposto «0» — cioe' «nessun supplemento», salvando).
+   Vedi convertiCifraCampo; la bozza porta i testi nuovi nel disegno. */
 function toggleSpedStdCur(){
   haptic();
   spedStdDigitata();
-  spedStdBozza = {valuta: spedStdBozza.valuta === 'eur' ? 'sats' : 'eur',
-                  casa: '', punto: '', extra: ''};
+  const b = spedStdBozza, da = b.valuta, a = da === 'eur' ? 'sats' : 'eur';
+  const nuova = {valuta: a}, esiti = [];
+  for (const [k, id] of [['casa', 'spedStdCasa'], ['punto', 'spedStdPunto'],
+                         ['extra', 'spedStdExtra']]){
+    const r = convertiCifraCampo(b[k], da, a, ancoreCambio[id]);
+    ancoreCambio[id] = r.ancora;
+    nuova[k] = r.testo;
+    esiti.push(r.esito);
+  }
+  spedStdBozza = nuova;
   renderSpedizioniere();
+  rigaCambio('rigaCambioStd', el('spedStdCasa')?.closest('.sats-input'),
+             ['spedStdCasa', 'spedStdPunto', 'spedStdExtra'].map(el), esiti, a);
 }
 
 /* Quel che parte verso il server e' il TESTO delle caselle, e a
@@ -32059,11 +32081,19 @@ function toggleRicercaCat(c, nodo){
    campi gia' digitati) */
 function setRicercaValuta(v){
   if (v !== ricercaValuta) haptic();
+  const da = ricercaValuta;
   ricercaValuta = v;
   el('ricValSats')?.classList.toggle('active', v === 'sats');
   el('ricValEur')?.classList.toggle('active', v === 'eur');
   const inp = el('ricPrezzo');
   if (inp) inp.placeholder = v === 'eur' ? 'Es. 50' : 'Es. 50 000';
+  /* LA CIFRA GIA' SCRITTA SI CONVERTE (24 set 2026): restando la stessa,
+     «50 000» pensati in sats diventavano un tetto di cinquantamila euro.
+     Casella di testo, quindi i decimali con la virgola — vedi
+     convertiCifraCampo */
+  if (v !== da)
+    rigaCambio('rigaCambioRicerca', inp?.parentElement, [inp],
+               convertiCampiValuta(['ricPrezzo'], da, v, true), v);
 }
 
 /* ------- Citta' vere nel campo Zona di Vendi (lug 2026) -------
@@ -37777,10 +37807,49 @@ let consegnaFirmata = false;
 let sellValuta = 'sats';
 function toggleSellCur(){
   if (astaAccesa()) { toast("Un'asta parla sats: base e rilanci vivono lì"); return; }
-  haptic(); impostaSellValuta(sellValuta==='sats' ? 'eur' : 'sats');
+  haptic(); cambiaValutaListino(sellValuta==='sats' ? 'eur' : 'sats');
+}
+/* Le caselle dei costi di spedizione che seguono il toggle: casa, le
+   zone estere, il punto di ritiro e il pezzo in piu' — le stesse di cui
+   aggiornaSpedCampo cambia l'unita' */
+const campiSpedValuta = () => ['sellSped', ...ZONE_INTL.map(z => 'sellZona_' + z),
+                               'sellSpedPunto', 'sellSpedExtra'];
+/* IL LISTINO CAMBIA VALUTA PER UN GESTO — il bottoncino, o l'asta che lo
+   riporta ai sats — e le caselle scritte si CONVERTONO prima che
+   impostaSellValuta ne cambi le unita' (convertiCifraCampo): il prezzo
+   col listino, i costi di spedizione con la valuta che il listino da'
+   loro (euro col listino in euro, sats con quello in sats: la regola di
+   impostaSellValuta). Lei resta il posto delle UNITA', ed e' anche
+   quello dei riempimenti e degli azzeramenti del form, dove convertire
+   sarebbe sbagliato: li' il numero arriva gia' nella valuta giusta.
+   LA MEMORIA DELLA PRECOMPILAZIONE SEGUE LA CONVERSIONE: una casella che
+   il form aveva scritto da se' (lo standard del negozio) resta sua anche
+   nella valuta nuova, cosi' precompilaSpedStd — che impostaSellValuta
+   chiama — la riscrive dallo standard salvato, esatto e nella valuta
+   dello standard, come ha sempre fatto; senza, la prenderebbe per un
+   ritocco del venditore. */
+function cambiaValutaListino(a){
+  const posato = spedStdPosato;
+  const nostri = !posato ? [] : [['sellSped', 'sped'], ['sellSpedPunto', 'punto'],
+    ['sellSpedExtra', 'extra']].filter(([id, k]) =>
+      posato[k] && el(id) && el(id).value === posato[k]);
+  const esiti = [...convertiCampiValuta(['sellPrice'], sellValuta, a),
+                 ...convertiCampiValuta(campiSpedValuta(), spedValuta,
+                                        a === 'eur' ? 'eur' : 'sats')];
+  if (nostri.length){
+    spedStdPosato = {...posato};
+    for (const [id, k] of nostri) spedStdPosato[k] = el(id).value;
+  }
+  impostaSellValuta(a);
+  rigaCambio('rigaCambioPrezzo', el('sellCur')?.closest('.sats-input'),
+             ['sellPrice', ...campiSpedValuta()].map(el), esiti, a);
 }
 function impostaSellValuta(v){
   sellValuta = v;
+  /* le righe del cambio parlano del giro appena fatto: qualunque strada
+     cambi la valuta del form (un riempimento, un azzeramento) le spegne,
+     e il gesto che converte le riaccende subito dopo (cambiaValutaListino) */
+  el('rigaCambioPrezzo')?.remove(); el('rigaCambioSped')?.remove();
   const inp = el('sellPrice'), btn = el('sellCur'), hint = el('sellCurHint');
   if (!inp || !btn) return;
   if (v==='eur'){
@@ -37819,14 +37888,19 @@ let spedValuta = 'sats';
 function toggleSpedCur(){
   if (sellValuta !== 'sats') return;
   haptic();
-  spedValuta = spedValuta==='sats' ? 'eur' : 'sats';
-  el('sellSped').value = '';
-  /* il toggle e' UNO per TUTTI i costi: cambiarlo azzera anche le due
-     zone, il campo punto e il supplemento, o resterebbero numeri
-     nella valuta di prima */
-  [...ZONE_INTL.map(z => 'sellZona_' + z), 'sellSpedPunto',
-   'sellSpedExtra'].forEach(i => { if (el(i)) el(i).value = ''; });
+  /* il toggle e' UNO per TUTTI i costi — casa, le zone, il punto e il
+     supplemento — e girarlo li CONVERTE tutti al cambio di adesso (24 set
+     2026: prima li svuotava, per non lasciarci numeri nella valuta di
+     prima). Vedi convertiCifraCampo. La memoria della precompilazione
+     qui NON segue: questo gesto sceglie la valuta del costo, e la
+     casella convertita diventa del venditore — lo standard salvato dopo
+     non gliela rigira. */
+  const da = spedValuta, a = da === 'sats' ? 'eur' : 'sats';
+  const esiti = convertiCampiValuta(campiSpedValuta(), da, a);
+  spedValuta = a;
   aggiornaSpedCampo();
+  rigaCambio('rigaCambioSped', el('sellSpedCur')?.closest('.sped-zona'),
+             campiSpedValuta().map(el), esiti, a);
 }
 function aggiornaSpedCampo(){
   const inp = el('sellSped'), btn = el('sellSpedCur');
@@ -37941,7 +38015,9 @@ function aggiornaSupplHint(){
 let spedStdPosato = null;
 /* Un costo dello standard nella valuta del campo: uguale se e' la
    stessa, al cambio VERO se e' l'altra, null senza cambio — mai col
-   cambio di riserva, che per una tariffa sarebbe un numero inventato */
+   cambio di riserva, che per una tariffa sarebbe un numero inventato.
+   E' anche l'aritmetica del bottoncino sats ⇄ € (convertiCifraCampo):
+   una sola, per la precompilazione e per le caselle che si convertono. */
 function costoStdIn(v, da, a){
   if (da === a) return v;
   if (!cambioVivo || !(eurPerSat > 0)) return null;
@@ -37949,7 +38025,8 @@ function costoStdIn(v, da, a){
     const e = Math.round(v * eurPerSat * 100) / 100;
     return (v > 0 && e < 0.01) ? 0.01 : e;   // scritto non diventa gratis
   }
-  return Math.round(v / eurPerSat);
+  const s = Math.round(v / eurPerSat);
+  return (v > 0 && s < 1) ? 1 : s;           // ...e nemmeno zero sats
 }
 function precompilaSpedStd(forza){
   if (DEMO || editandoId || !el('sellSped')) return;
@@ -37987,15 +38064,13 @@ function precompilaSpedStd(forza){
   }
   const casa = costoStdIn(s.casa, s.valuta, unita);
   if (casa === null){
-    /* senza cambio non si traduce. Se la casella era nostra si svuota,
-       invece di lasciarci un numero nella valuta sbagliata («5000» che
-       diventerebbe 5000 €): un listino in euro senza cambio non si
-       pubblica comunque, e al prossimo giro la si riempie */
-    if (!forza && posato.sped){
-      el('sellSped').value = '';
-      spedStdPosato = {...posato, sped: ''};
-      aggiornaSpedCampo();
-    }
+    /* SENZA CAMBIO NON SI TRADUCE, E NON SI SVUOTA NIENTE (24 set 2026,
+       regola di Andrea: nessuna casella scritta diventa vuota per un
+       cambio di valuta). Fino a ieri la casella nostra si svuotava, per
+       non lasciarci «5000» letti come 5000 €: adesso resta com'era, e il
+       gesto che ha cambiato valuta lo dice con la riga che chiede di
+       ricontrollarla (rigaCambio). Resta nostra: al prossimo giro, col
+       cambio in mano, la si riscrive dallo standard. */
     return;
   }
   const testo = v => unita === 'eur' ? String(v) : String(Math.round(v));
@@ -38018,6 +38093,112 @@ function precompilaSpedStd(forza){
   spedStdPosato = nuovo;
   aggiornaSpedCampo();
 }
+
+/* IL CAMBIO DI VALUTA CONVERTE LE CASELLE (24 set 2026, dalla foto di un
+   venditore: in «📦 Come spedisci», passando da sats a euro, 11800 →
+   vuoto, 10300 → vuoto e 500 → «0» — il segnaposto di una casella
+   svuotata, che si legge «nessun supplemento» e salvando lo diventa).
+   Dove un bottoncino sats ⇄ € gira su caselle gia' scritte, i numeri si
+   CONVERTONO al cambio vero, invece di svuotarsi o di restare le stesse
+   cifre in un'altra unita': sats → euro a due decimali, euro → sats
+   interi. E' il giudice unico dei posti del censimento — i costi di
+   «Come spedisci», il listino di Vendi (anche quando l'asta lo riporta
+   ai sats), i costi di spedizione di Vendi, il prezzo massimo degli
+   avvisi di ricerca — e le regole stanno tutte qui:
+   - la casella VUOTA resta vuota e lo ZERO resta zero: hanno un
+     significato loro, e il cambio non lo tocca;
+   - un numero scritto non diventa MAI vuoto ne' zero: sotto il
+     centesimo resta 0,01 €, sotto il sats resta 1 (costoStdIn);
+   - SENZA CAMBIO VERO le cifre restano com'erano ('senza_cambio') e chi
+     chiama lo dice con una riga che chiede di ricontrollarle: mai il
+     cambio di riserva, che per un prezzo sarebbe un numero inventato, e
+     mai una casella svuotata in silenzio;
+   - L'ANCORA, la lezione del foglio dell'offerta: si tiene la cifra
+     COM'E' STATA SCRITTA con la sua valuta, e il ritorno la RILEGGE
+     invece di riconvertire il convertito — andata e ritorno ridanno gli
+     11800 sats di partenza, non 11804. Vale finche' la casella dice
+     ancora quel che ci abbiamo scritto noi, nella valuta in cui l'abbiamo
+     scritto: un ritocco del dito la fa ripartire da li'.
+   Pura: il testo della casella dentro, il testo nuovo fuori, e l'esito
+   per la riga. `virgola` e' delle caselle di TESTO (l'avviso di
+   ricerca): un input number vuole il punto, e con la virgola il browser
+   lo svuoterebbe da se'. */
+function convertiCifraCampo(testo, da, a, ancora, virgola){
+  const t = String(testo ?? '');
+  if (da === a) return {testo: t, ancora: ancora || null, esito: 'uguale'};
+  if (t.replace(/\s/g, '') === '') return {testo: t, ancora: null, esito: 'vuoto'};
+  const nostra = !!ancora && ancora.scritto === t && ancora.in === da;
+  const orig = nostra ? ancora : {testo: t, valuta: da};
+  /* si legge come la legge chi salva: via gli spazi, la virgola e' il
+     punto. Tutto il resto — segni, esponenti, due separatori — non e' un
+     importo, e resta com'e' */
+  const nudo = orig.testo.replace(/\s/g, '');
+  const n = /^(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(nudo)
+    ? Number(nudo.replace(',', '.')) : NaN;
+  if (!Number.isFinite(n)) return {testo: t, ancora: null, esito: 'illeggibile'};
+  if (n === 0) return {testo: t, ancora: null, esito: 'zero'};
+  let nuovo = orig.testo;             // il ritorno: la cifra com'era scritta
+  if (orig.valuta !== a){
+    const v = costoStdIn(n, orig.valuta, a);
+    if (v === null) return {testo: t, ancora: null, esito: 'senza_cambio'};
+    nuovo = a === 'eur' ? v.toFixed(2) : String(v);
+    if (virgola) nuovo = nuovo.replace('.', ',');
+  }
+  return {testo: nuovo, esito: 'convertito',
+          ancora: {testo: orig.testo, valuta: orig.valuta, scritto: nuovo, in: a}};
+}
+/* Le caselle del DOM passate dal giudice qui sopra. Si riscrive solo
+   quel che cambia: una casella number che il browser giudica illeggibile
+   ha il valore vuoto, e riscriverla la svuoterebbe davvero. Le ancore
+   vivono qui, per id: le caselle di «Come spedisci» rinascono a ogni
+   disegno del cassetto, gli id restano. Torna gli esiti, per la riga. */
+const ancoreCambio = {};
+function convertiCampiValuta(ids, da, a, virgola){
+  return ids.map(id => {
+    const inp = el(id);
+    if (!inp) return 'vuoto';
+    const r = convertiCifraCampo(inp.value, da, a, ancoreCambio[id], virgola);
+    ancoreCambio[id] = r.ancora;
+    if (r.testo !== inp.value) inp.value = r.testo;
+    return r.esito;
+  });
+}
+/* LA RIGA DEL CAMBIO, sotto la casella che porta il bottoncino: dice
+   cosa e' appena successo ai numeri. «Convertito al cambio di adesso»
+   se ne va da sola in un paio di secondi; quella che chiede di
+   ricontrollare le cifre rimaste com'erano RESTA finche' non si
+   riscrive una di quelle caselle — un avviso che scappa in due secondi
+   non lo legge chi ha lo sguardo sulla tastiera. Un elemento nuovo a
+   ogni giro: il timer e gli ascolti del giro prima parlano a un nodo
+   che non c'e' piu'. */
+const RIGA_CAMBIO_MS = 2600;
+function testoRigaCambio(esiti, a){
+  const u = a === 'eur' ? '€' : 'sats';
+  if (esiti.includes('senza_cambio'))
+    return {testo: `Cambio non disponibile: i numeri sono rimasti com'erano, `
+      + `ora in ${u}. Ricontrollali.`, resta: true};
+  if (esiti.includes('illeggibile'))
+    return {testo: `Un numero non l'ho capito e l'ho lasciato com'era, `
+      + `ora in ${u}. Ricontrollalo.`, resta: true};
+  if (esiti.includes('convertito'))
+    return {testo: 'Convertito al cambio di adesso', resta: false};
+  return null;     // tutto vuoto o a zero: non e' successo niente da dire
+}
+function rigaCambio(id, dopo, campi, esiti, a){
+  el(id)?.remove();
+  const dire = testoRigaCambio(esiti, a);
+  if (!dire || !dopo) return;
+  const riga = document.createElement('div');
+  riga.id = id;
+  riga.className = 'riga-cambio' + (dire.resta ? ' ferma' : '');
+  riga.setAttribute('role', 'status');
+  dopo.insertAdjacentElement('afterend', riga);
+  riga.textContent = dire.testo;
+  const via = () => riga.remove();
+  if (dire.resta) campi.forEach(c => c && c.addEventListener('input', via, {once: true}));
+  else setTimeout(via, RIGA_CAMBIO_MS);
+}
+
 /* parseFloat non capisce la virgola italiana: gliela traduciamo */
 const eurCampo = id =>
   Math.round((parseFloat(String(el(id).value).replace(',','.'))||0)*100)/100;
@@ -38092,7 +38273,9 @@ function aggiornaAstaForm(){
   const on = astaAccesa();
   el('sellAstaOpzioni').style.display = on ? '' : 'none';
   if (on){
-    if (sellValuta === 'eur') impostaSellValuta('sats');
+    /* l'asta parla sats: il listino in euro ci torna CONVERTENDO, come
+       col bottoncino — 25 € non diventano una base da 25 sats */
+    if (sellValuta === 'eur') cambiaValutaListino('sats');
     renderAstaDurate();
   }
   aggiornaConsegnaForm();   /* quantita' e costo seguono il toggle */

@@ -5990,6 +5990,26 @@
   secondo si accoda). I codici dei motivi (`SPED_STD_MOTIVI`) e le
   parole del client (`MOTIVI_SPED_STD`) stanno in pari per prova.
   Verbale in CANTIERI, «Il costo di spedizione standard del negozio».
+  IL CAMBIO DI VALUTA CHE CONVERTE (set 2026, dalla foto di un
+  venditore: in «Come spedisci» 11800, 10300 e 500 sats diventavano
+  vuoto, vuoto e «0»). Dove un bottoncino sats ⇄ € gira su caselle già
+  scritte, i numeri si convertono al cambio vero: giudice unico
+  `convertiCifraCampo` (puro; sats → euro a due decimali, euro → sats
+  interi) con l'aritmetica di `costoStdIn` — il vuoto resta vuoto, lo 0
+  resta 0, uno scritto non diventa mai vuoto né zero (0,01 € e 1 sat i
+  minimi), e senza `cambioVivo` le cifre restano com'erano. L'ANCORA per
+  id (`ancoreCambio`, la lezione di `offCifra`): il ritorno rilegge la
+  cifra scritta finché la casella dice ancora quel che ci abbiamo
+  scritto noi. `convertiCampiValuta` riscrive nel DOM solo quel che
+  cambia; `rigaCambio` mette sotto la casella «Convertito al cambio di
+  adesso» (2,6 s) o la riga che chiede di ricontrollare, che resta fino
+  al primo input. I gesti sono quattro: `toggleSpedStdCur`,
+  `toggleSpedCur`, `cambiaValutaListino` (il bottoncino del prezzo e
+  l'asta: converte e POI chiama `impostaSellValuta`, che resta il posto
+  delle unità e dei riempimenti, dove non si converte; la memoria della
+  precompilazione segue) e `setRicercaValuta`. Il censimento dei bottoni
+  di valuta sta in `prove_cambio_converte`, coi tre che non convertono e
+  il perché. Verbale in CANTIERI, «Il cambio sats ⇄ € che converte».
   Modifica FIRMATA degli importati (lug 2026): il doppio cittadino con
   `npub_accesso` ≡ `contatto_nostr` modifica anche gli annunci
   importati — Barattolo fa da client Nostr, la nsec resta nel browser

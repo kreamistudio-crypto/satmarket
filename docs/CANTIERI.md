@@ -30013,3 +30013,82 @@ tendina a meta' sotto (fino a 3.920 pixel, e il registratore vede 0,5).
 **DA GUARDARE SUL TELEFONO.** Il + che scende e si mangia la capsula
 senza lasciare niente sopra di se', e lasciato prima del logo la
 capsula che gli si srotola dietro.
+
+## Il cambio sats ⇄ € che converte (24 set 2026)
+
+Ritocco chiesto da Andrea dalla foto di un venditore: in «📦 Come
+spedisci», passando da sats a euro, 11800 → vuoto («nessuno»), 10300 →
+vuoto («come sopra») e 500 → «0» — il segnaposto della casella svuotata,
+che salvando diventa «nessun supplemento». Worktree da `origin/main`,
+commit firmato.
+
+**COSA C'È.** Dove un bottoncino sats ⇄ € gira su caselle già scritte, i
+numeri si CONVERTONO al cambio vero del momento (`cambioVivo` ed
+`eurPerSat`, quelli di tutta l'app): sats → euro a due decimali, euro →
+sats interi. Giudice unico `convertiCifraCampo`, puro; l'aritmetica è
+`costoStdIn` della precompilazione, che ha preso anche il minimo di un
+sats. Le regole: il vuoto resta vuoto, lo 0 resta 0, un numero scritto
+non diventa mai vuoto né zero (sotto il centesimo 0,01 €, sotto il sats
+1); SENZA CAMBIO le cifre restano com'erano e una riga chiede di
+ricontrollarle; e L'ANCORA del foglio dell'offerta — il ritorno rilegge
+la cifra scritta invece di riconvertire il convertito (11800 → 10,86 € →
+11800, non 11804). Sotto la casella col bottoncino, `rigaCambio`:
+«Convertito al cambio di adesso» per 2,6 secondi, in --ink-soft; oppure
+la riga che chiede di ricontrollare, in --sats-text, che resta finché
+non si riscrive una di quelle caselle.
+
+**IL CENSIMENTO**, tenuto da una prova (un bottone di valuta nuovo è
+rosso finché non si decide cosa fa ai numeri già scritti). CONVERTONO:
+«Come spedisci» (`toggleSpedStdCur`: casa, punto, pezzo in più — prima
+svuotava); Vendi, i costi (`toggleSpedCur`: casa, le sette zone, punto,
+pezzo in più — prima svuotava); Vendi, il prezzo (`toggleSellCur` →
+`cambiaValutaListino`, coi costi che seguono il listino — prima teneva le
+cifre e cambiava l'unità: 80 000 sats diventavano «80 000 €»), e con lui
+l'ASTA, che su un listino in euro lo riporta ai sats (25 € diventavano
+una base da 25 sats); gli avvisi di ricerca (`setRicercaValuta`, il
+prezzo massimo — prima teneva le cifre). NON SONO QUESTO MECCANISMO, e
+restano come sono: la vista €/₿ (`setValuta`), che dove governa un campo
+— i due fogli dell'offerta — converte già con la sua ancora; le soglie
+del negozio (`toggleValutaSoglia`), che CONSERVANO per decisione scritta
+(ogni valuta ha la sua colonna); il P2P, che sceglie la valuta fiat.
+
+**LE SCELTE.** 1) Riempimenti e azzeramenti del form (Modifica, Duplica,
+Annulla, dopo la pubblicazione) passano da `impostaSellValuta` e NON
+convertono: lì il numero arriva già nella valuta giusta. Converte solo
+il gesto. 2) Al cambio di listino LA MEMORIA DELLA PRECOMPILAZIONE
+SEGUE: lo standard scritto dal form resta suo e `precompilaSpedStd` lo
+riscrive dallo standard salvato, come ha sempre fatto (uno standard in
+euro resta ancorato anche col listino in sats); il toggle dei soli
+costi invece la lascia cadere — sceglie la valuta del costo, e la
+casella convertita è del venditore. 3) ROVESCIATA UNA RIGA DELLA
+PRECOMPILAZIONE: senza cambio la casella nostra si svuotava («mai 5000
+letti come €»); adesso resta com'era, per la regola di Andrea, e la sua
+prova è emendata col perché. 4) Una casella number che il browser non
+capisce ha il valore vuoto: non si riscrive, o si cancellerebbe quel che
+si vede.
+
+**SEGNALATO, NON TOCCATO.** I filtri di Esplora (prezzo min e max)
+parlano la valuta della vista senza convertire: cambiando vista a
+pannello aperto, o riaprendolo dopo, le cifre si rileggono nell'altra
+valuta ad «Applica». È la stessa famiglia, ma il bottone è quello della
+vista e non un bottoncino del campo: da decidere.
+
+**PROVATO.** `prove_cambio_converte` (90): il censimento; le
+sentinelle; la riga chiesta alla cascata nei quattro posti e nei due
+temi; il banco in node con le funzioni vere su un DOM di cartone — la
+foto al centesimo (500 → 0,46 € a 0,00092 €/sat, mai «0» né vuoto) e il
+ritorno esatto, ogni casella del censimento col suo numero, le regole,
+la precompilazione che segue e quella ritoccata che resta del
+venditore, la riga che se ne va o resta. `prove_spedizione_standard`
+emendata in una prova, col perché. Suite intera severa e senza config
+14.770/0 sull'albero ribasato sul telaio mangiato; i 15 collaudi
+della CI verdi in gabbia. **TORTURA 30/30** su una copia. DAL VIVO a
+375 nei due temi, col cambio vero del momento
+(73.247 €/BTC) e i tocchi veri: 11800/10300/500 → 8,64/7,54/0,37 € e
+ritorno esatto; senza cambio le cifre ferme e la riga arancio; il
+prezzo 80 000 → 58,60 € coi costi dietro; i soli costi; la ricerca
+50 000 sats → 36,62 €; niente scorrimento di lato.
+
+**DA GUARDARE SUL TELEFONO.** Il tocco sul bottoncino in «Come spedisci»
+e in Vendi con la tastiera numerica aperta, la riga che compare e se ne
+va; e che salvando i numeri convertiti arrivino giusti.

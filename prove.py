@@ -89960,8 +89960,15 @@ console.log(JSON.stringify(CASI));
               ("5", "eur"), c("listino_eur_std_sats", "sped", "valuta"))
         prova("...ma SENZA cambio non si inventa niente", ("", None),
               c("senza_cambio_forza", "sped", "posato"))
-        prova("...e la casella nostra si svuota (mai 5000 letti come €)",
-              ("", {"sped": ""}), c("senza_cambio_nostro", "sped", "posato"))
+        # ROVESCIATA IL 24 SET 2026 (il cambio di valuta che converte):
+        # fino a ieri la casella nostra si svuotava, per non lasciarci
+        # «5000» letti come 5000 €. La regola di Andrea e' che nessuna
+        # casella scritta diventa vuota per un cambio di valuta: il
+        # numero resta, e la riga del gesto chiede di ricontrollarlo.
+        prova("...e la casella nostra resta com'era, e resta nostra (mai "
+              "svuotata: la riga del cambio chiede di ricontrollarla)",
+              ("5000", {"sped": "5000"}),
+              c("senza_cambio_nostro", "sped", "posato"))
         prova("il venditore l'ha toccata: resta sua", ("6000",),
               c("toccato", "sped"))
         prova("intatta: lo standard nuovo la riscrive", ("7000",),
@@ -90139,6 +90146,658 @@ console.log(JSON.stringify(out));
                "Spedizione aggiornata su 3 articoli; 1 rimasto com'era: 1 "
                "con un ordine in corso." in (fe.get("corpo") or "")
                .replace("&#39;", "'")])
+
+
+def prove_cambio_converte():
+    """IL CAMBIO DI VALUTA CHE CONVERTE (24 set 2026, dalla foto di un
+    venditore: in «📦 Come spedisci», passando da sats a euro, 11800 →
+    vuoto, 10300 → vuoto e 500 → «0» — il segnaposto di una casella
+    svuotata, che salvando diventa «nessun supplemento»). Dove un
+    bottoncino sats ⇄ € gira su caselle gia' scritte i numeri si
+    convertono al cambio vero: sats → euro a due decimali, euro → sats
+    interi; il vuoto resta vuoto, lo zero resta zero, e un numero scritto
+    non diventa mai vuoto ne' zero. Qui:
+    1) IL CENSIMENTO — ogni bottone di valuta dell'app col suo verdetto:
+       uno nuovo fa rossa la prova finche' non si decide cosa fa ai
+       numeri gia' scritti;
+    2) le sentinelle — i gesti passano dal giudice unico, lo svuotamento
+       di ieri non c'e' piu', e i riempimenti del form non convertono;
+    3) la riga, chiesta alla cascata nei due temi e nei quattro posti;
+    4) il banco in node, che fa girare le funzioni VERE su un DOM di
+       cartone: il caso della foto al centesimo, ogni casella del
+       censimento, le regole (vuoto, zero, il minimo, senza cambio,
+       l'ancora, il ritocco), la precompilazione che segue, la riga."""
+    print("\n[il cambio di valuta che converte]")
+    import json as _jsC
+    import math as _mC
+    import shutil as _shC
+    import subprocess as _spC
+    import tempfile as _tfC
+    mini = open("miniapp.html", encoding="utf-8").read()
+    nudo = lambda js: re.sub(r"/\*[\s\S]*?\*/", "", js)
+
+    def fn(firma):
+        """la funzione per intero; '' se non c'e' — una rossa col suo
+        nome, non la sezione che esplode"""
+        if firma not in mini:
+            return ""
+        return pezzo_js(mini, firma, "\n}\n") + "\n}"
+
+    # ---- 1) IL CENSIMENTO ----------------------------------------------
+    # Ogni bottone di valuta dell'app (un onclick che nomina Valuta o Cur)
+    # col suo verdetto. Quelli che CONVERTONO sono i quattro del cantiere;
+    # gli altri non sono questo meccanismo, e il perche' sta accanto.
+    CENSIMENTO = {
+        "toggleSpedStdCur": "converte",   # «Come spedisci»: casa, punto, pezzo in piu'
+        "toggleSellCur": "converte",      # Vendi: il prezzo, e i costi col listino
+        "toggleSpedCur": "converte",      # Vendi: casa, le zone, il punto, il pezzo in piu'
+        "setRicercaValuta": "converte",   # avvisi di ricerca: il prezzo massimo
+        # la VISTA €/₿: cambia come si legge un numero, e dove governa un
+        # campo (i due fogli dell'offerta) converte gia' con la sua ancora
+        "setValuta": "vista",
+        # le soglie del negozio CONSERVANO per decisione di Andrea: ogni
+        # valuta ha la sua colonna (ARCHITETTURA, «IL TOGGLE CONSERVA»)
+        "toggleValutaSoglia": "conserva",
+        # P2P: si sceglie la valuta FIAT dell'ordine, non sats ⇄ €
+        "apriValutaP2P": "fiat", "scegliValutaP2P": "fiat",
+    }
+    prova("il censimento dei bottoni di valuta e' completo (uno nuovo "
+          "decide qui cosa fa ai numeri gia' scritti)", set(CENSIMENTO),
+          set(re.findall(r'onclick="(\w*(?:Valuta|Cur)\w*)\(', mini)))
+    prova("i bottoncini «⇄» sono i tre che convertono",
+          {"toggleSellCur", "toggleSpedCur", "toggleSpedStdCur"},
+          set(re.findall(r'<button[^>]*onclick="(\w+)\(\)"[^>]*>[^<]*⇄', mini)))
+    _ast = nudo(fn("function aggiornaAstaForm(){"))
+    prova("l'asta riporta il listino ai sats CONVERTENDO, non rileggendo "
+          "le stesse cifre", (True, False),
+          ("cambiaValutaListino('sats')" in _ast, "impostaSellValuta(" in _ast))
+
+    # ---- 2) LE SENTINELLE ----------------------------------------------
+    _tsc = nudo(fn("function toggleSpedStdCur(){"))
+    prova("«Come spedisci»: il toggle converte le tre caselle, non le svuota",
+          (True, False),
+          ("convertiCifraCampo(b[k], da, a, ancoreCambio[id])" in _tsc,
+           "casa: ''" in _tsc))
+    _tsp = nudo(fn("function toggleSpedCur(){"))
+    prova("Vendi, i costi: il toggle li converte tutti, non li svuota",
+          (True, False),
+          ("convertiCampiValuta(campiSpedValuta(), da, a)" in _tsp,
+           ".value = ''" in _tsp))
+    prova("Vendi, il prezzo: il bottoncino passa da cambiaValutaListino",
+          True, "cambiaValutaListino(" in nudo(fn("function toggleSellCur(){")))
+    prova("gli avvisi di ricerca: la cifra si converte, coi decimali a "
+          "virgola", True, "convertiCampiValuta(['ricPrezzo'], da, v, true)"
+          in nudo(fn("function setRicercaValuta(v){")))
+    # I RIEMPIMENTI E GLI AZZERAMENTI NON CONVERTONO: li' il numero arriva
+    # gia' nella valuta giusta (l'annuncio da modificare o da duplicare,
+    # il form che rinasce), e convertirlo lo storcerebbe
+    for firma in ("function impostaSellValuta(v){", "function riempiFormDa(l){",
+                  "function annullaModifica(){"):
+        _c = nudo(fn(firma))
+        prova(f"{firma[9:firma.index('(')]} non converte niente", (True, False),
+              (bool(_c), bool(re.search(r"convertiC|cambiaValutaListino", _c))))
+    _pre = nudo(fn("function precompilaSpedStd(forza){"))
+    _i = _pre.find("if (casa === null){")
+    prova("la precompilazione senza cambio non svuota la casella nostra",
+          (True, False),
+          (_i >= 0, _i >= 0 and ".value = ''" in _pre[_i:_pre.find("}", _i)]))
+    _ms = re.search(r"const RIGA_CAMBIO_MS = (\d+);", mini)
+    RIGA_MS = int(_ms.group(1)) if _ms else 0
+    prova("«convertito» resta un paio di secondi, non un lampo ne' un "
+          "cartello", True, 2000 <= RIGA_MS <= 3500)
+
+    # ---- 3) LA RIGA, chiesta alla cascata --------------------------------
+    # nei quattro posti dove nasce, coi suoi antenati VERI e ogni classe
+    # che l'app sa mettere su html e body: la regola c'e', ma deve anche
+    # VINCERE (la lezione delle note piccole)
+    regole, _sq = _regole_css(mini[:mini.index("</style>")])
+    _corpo = mini[mini.find("<body>"):]
+    _su_html = set(re.findall(
+        r"documentElement\.classList\.(?:add|toggle)\('([\w-]+)'", mini))
+    _su_body = set(re.findall(
+        r"document\.body\.classList\.(?:add|toggle)\('([\w-]+)'", mini))
+
+    def antenati(id_fisso, tema):
+        base = _catene_html(_corpo,
+                            lambda p: p[-1]["attr"].get("id") == id_fisso)
+        html = {"tag": "html", "attr": {"lang": "it"}, "classi": set(_su_html)}
+        if tema == "scuro":
+            html["attr"]["data-tema"] = "scuro"
+        out = [html]
+        for e in (base[0] if base else []):
+            e = dict(e, classi=set(e["classi"]))
+            if e["tag"] == "body":
+                e["classi"] |= _su_body
+            if "view" in e["classi"]:
+                e["classi"].add("active")
+            out.append(e)
+        return out, bool(base)
+
+    for nome, id_fisso, sorella, coda, id_riga in (
+            ("Vendi, il prezzo", "sellCurHint", True, (), "rigaCambioPrezzo"),
+            ("Vendi, i costi", "sellSpedHint", True, (), "rigaCambioSped"),
+            ("«Come spedisci»", "spedizioniereBlocco", False,
+             (("div", ("sped-std",)), ("div", ("field",))), "rigaCambioStd"),
+            ("gli avvisi di ricerca", "ricercheBlocco", False,
+             (("div", ("field",)),), "rigaCambioRicerca")):
+        for tema in ("chiaro", "scuro"):
+            base, trovata = antenati(id_fisso, tema)
+            if tema == "chiaro":
+                prova(f"la riga del cambio, {nome}: i suoi antenati si "
+                      f"trovano nel markup", True, trovata)
+            # accanto a una sorella (la riga d'aiuto del campo) la riga
+            # prende il posto di lei nella catena: stesso genitore
+            base = base[:-1] if sorella else base
+            for ferma, colore in ((False, "var(--ink-soft)"),
+                                  (True, "var(--sats-text)")):
+                riga = {"tag": "div", "attr": {"id": id_riga, "role": "status"},
+                        "classi": {"riga-cambio"} | ({"ferma"} if ferma else set())}
+                c = base + [{"tag": t, "attr": {}, "classi": set(k)}
+                            for t, k in coda] + [riga]
+                v = _vince_css(regole, c, ("color", "font-size", "font-weight"))
+                prova(f"la riga del cambio, {nome}, "
+                      f"{'che chiede di ricontrollare' if ferma else 'convertito'}"
+                      f" ({tema}): {colore}, 12px, 700",
+                      (colore, "12px", "700", []),
+                      (v.get("color", (None,))[0],
+                       v.get("font-size", (None,))[0],
+                       v.get("font-weight", (None,))[0],
+                       v.get("color", (None, None, ["?"]))[2]))
+
+    # ---- 4) IL BANCO IN NODE: le funzioni VERE su un DOM di cartone ----
+    if not _shC.which("node"):
+        salta("il cambio che converte in node", "node non installato")
+        return
+
+    def fetta(inizio, ultima):
+        """dal primo carattere di `inizio` alla graffa che chiude la
+        funzione `ultima`, che sta piu' sotto"""
+        i = mini.index(inizio)
+        j = mini.index(ultima, i)
+        return mini[i:mini.index("\n}\n", j) + 3]
+
+    _zone = mini[mini.index("const ZONA_NOME = {"):]
+    _zone = _zone[:_zone.index("\n")] + "\nconst ZONE_INTL = Object.keys(ZONA_NOME);\n"
+    _asta = mini[mini.index("function astaAccesa(){"):]
+    _asta = _asta[:_asta.index("\n") + 1]
+    banco = r"""
+let DEMO = false, editandoId = null, mySpedStd = null, spedStdBozza = null;
+let cambioVivo = true, eurPerSat = 0.00092, ricercaValuta = 'sats';
+let NODI = {}, TIMER = [], RIGHE = [];
+const el = id => NODI[id] || null;
+const haptic = () => {}, toast = () => {};
+const aggiornaSpedHint = () => {}, aggiornaHintPolitiche = () => {};
+const renderAstaDurate = () => {}, aggiornaConsegnaForm = () => {};
+const setTimeout = (f, ms) => { TIMER.push({f, ms}); return TIMER.length; };
+function porta(nome){
+  return {nome, insertAdjacentElement(pos, r){
+    r.dopo = nome; r.pos = pos; NODI[r.id] = r; RIGHE.push(r); }};
+}
+function nodo(id, value){
+  const n = {id, value: value === undefined ? '' : String(value),
+    placeholder: '', step: '', inputMode: '', textContent: '', style: {},
+    checked: false, ascolti: [], classList: {toggle(){}, add(){}, remove(){}},
+    closest(sel){ return porta(id + ' ' + sel); },
+    addEventListener(t, f, o){ n.ascolti.push({t, f, o}); },
+    remove(){ if (NODI[id] === n) delete NODI[id]; }};
+  n.parentElement = porta(id + ' ..');
+  return n;
+}
+const document = {createElement(tag){
+  const r = {tag, id: '', className: '', textContent: '', attr: {},
+    tolta: false, setAttribute(k, v){ r.attr[k] = v; },
+    remove(){ r.tolta = true; if (NODI[r.id] === r) delete NODI[r.id]; }};
+  return r; }};
+/* il disegno del cassetto: le caselle RINASCONO dalla bozza, come nel
+   vero (value="${esc(val)}"), e la riga se ne va con l'innerHTML */
+function renderSpedizioniere(){
+  delete NODI.rigaCambioStd;
+  NODI.spedStdCasa = nodo('spedStdCasa', spedStdBozza.casa);
+  NODI.spedStdPunto = nodo('spedStdPunto', spedStdBozza.punto);
+  NODI.spedStdExtra = nodo('spedStdExtra', spedStdBozza.extra);
+}
+""" + _zone + fetta("let sellValuta = 'sats';", "function aggiornaSpedCampo(){") \
+        + fetta("let spedStdPosato = null;", "function rigaCambio(") + _asta \
+        + fn("function aggiornaAstaForm(){") + "\n" \
+        + fn("function spedStdDaSalvato(){") + "\n" \
+        + fn("function spedStdDigitata(){") + "\n" \
+        + fn("function toggleSpedStdCur(){") + "\n" \
+        + fn("function setRicercaValuta(v){") + "\n" + r"""
+const CAMPI = ['sellPrice', 'sellCur', 'sellCurHint', 'sellSped', 'sellSpedCur',
+  'sellSpedPunto', 'sellSpedPuntoCur', 'sellSpedExtra', 'sellSpedExtraCur',
+  'sellAsta', 'sellAstaOpzioni', 'ricPrezzo', 'ricValSats', 'ricValEur',
+  ...ZONE_INTL.flatMap(z => ['sellZona_' + z, 'sellZonaCur_' + z])];
+function pulisci(valori){
+  NODI = {}; TIMER = []; RIGHE = [];
+  for (const id of CAMPI) NODI[id] = nodo(id);
+  for (const k in ancoreCambio) delete ancoreCambio[k];
+  sellValuta = 'sats'; spedValuta = 'sats'; cambioVivo = true; eurPerSat = 0.00092;
+  spedStdPosato = null; mySpedStd = null; spedStdBozza = null;
+  ricercaValuta = 'sats'; DEMO = false; editandoId = null;
+  for (const [id, v] of Object.entries(valori || {})) NODI[id].value = String(v);
+}
+const valori = ids => Object.fromEntries(ids.map(id => [id, el(id) ? el(id).value : null]));
+const riga = id => { const r = NODI[id]; return !r ? null : {testo: r.textContent,
+  classe: r.className, ruolo: r.attr.role, dopo: r.dopo, pos: r.pos,
+  timer: TIMER.map(t => t.ms)}; };
+const SPED = campiSpedValuta();
+const OUT = {campi: SPED};
+function caso(nome, f){
+  try { OUT[nome] = f(); } catch(e) { OUT[nome] = {esploso: String(e && e.stack || e)}; }
+}
+const STD = ['spedStdCasa', 'spedStdPunto', 'spedStdExtra'];
+// IL CASO DELLA FOTO, al centesimo (a 0,00092 €/sat)
+caso('foto', () => {
+  pulisci();
+  spedStdBozza = {valuta: 'sats', casa: '11800', punto: '10300', extra: '500'};
+  renderSpedizioniere();
+  toggleSpedStdCur();
+  const andata = {bozza: {...spedStdBozza}, caselle: valori(STD), riga: riga('rigaCambioStd')};
+  toggleSpedStdCur();
+  const ritorno = {bozza: {...spedStdBozza}, caselle: valori(STD)};
+  const senzaAncora = ['10.86', '9.48', '0.46'].map(t =>
+    convertiCifraCampo(t, 'eur', 'sats', null).testo);
+  return {andata, ritorno, senzaAncora};
+});
+caso('foto_senza_cambio', () => {
+  pulisci(); cambioVivo = false;
+  spedStdBozza = {valuta: 'sats', casa: '11800', punto: '10300', extra: '500'};
+  renderSpedizioniere();
+  toggleSpedStdCur();
+  const r = riga('rigaCambioStd');
+  const ascolti = STD.map(id => NODI[id].ascolti.filter(a => a.t === 'input').length);
+  NODI.spedStdPunto.ascolti[0].f();    // si riscrive una di quelle caselle
+  return {bozza: {...spedStdBozza}, riga: r, ascolti, restaDopoInput: !!NODI.rigaCambioStd};
+});
+// le caselle che cambiano UNITA' col toggle dei costi
+caso('unita', () => {
+  pulisci(); spedValuta = 'eur'; aggiornaSpedCampo();
+  return Object.keys(NODI).filter(id => /€/.test(NODI[id].textContent || ''));
+});
+// OGNI casella dei costi, ognuna col suo numero
+caso('vendi_costi', () => {
+  const v = {};
+  SPED.forEach((id, i) => { v[id] = String((i + 1) * 1000); });
+  pulisci(v);
+  toggleSpedCur();
+  const andata = {caselle: valori(SPED), spedValuta, riga: riga('rigaCambioSped')};
+  toggleSpedCur();
+  return {andata, ritorno: {caselle: valori(SPED), spedValuta}};
+});
+caso('vendi_regole', () => {
+  pulisci({sellSped: '5000', sellZona_eu: '20000', sellSpedPunto: '0', sellSpedExtra: '3'});
+  const ids = ['sellSped', 'sellZona_eu', 'sellZona_asia', 'sellSpedPunto', 'sellSpedExtra'];
+  toggleSpedCur();
+  const andata = valori(ids);
+  toggleSpedCur();
+  return {andata, ritorno: valori(ids)};
+});
+caso('vendi_listino', () => {
+  const v = {sellPrice: '80000'};
+  SPED.forEach((id, i) => { v[id] = String((i + 1) * 1000); });
+  pulisci(v);
+  toggleSellCur();
+  const andata = {caselle: valori(['sellPrice', ...SPED]), sellValuta, spedValuta,
+                  riga: riga('rigaCambioPrezzo'), bottone: NODI.sellCur.textContent};
+  toggleSellCur();
+  return {andata, ritorno: {caselle: valori(['sellPrice', ...SPED]), sellValuta, spedValuta}};
+});
+caso('vendi_listino_ancorato', () => {
+  pulisci({sellPrice: '80000', sellSped: '4.50'}); spedValuta = 'eur';
+  toggleSellCur();
+  return {caselle: valori(['sellPrice', 'sellSped']), sellValuta, spedValuta};
+});
+caso('vendi_listino_da_euro', () => {
+  pulisci({sellPrice: '25', sellSped: '4.5'}); sellValuta = 'eur'; spedValuta = 'eur';
+  toggleSellCur();
+  return {caselle: valori(['sellPrice', 'sellSped']), sellValuta, spedValuta};
+});
+caso('asta', () => {
+  pulisci({sellPrice: '25'}); sellValuta = 'eur'; spedValuta = 'eur';
+  NODI.sellAsta.checked = true;
+  aggiornaAstaForm();
+  return {prezzo: NODI.sellPrice.value, sellValuta, riga: riga('rigaCambioPrezzo')};
+});
+caso('asta_sats', () => {
+  pulisci({sellPrice: '80000'});
+  NODI.sellAsta.checked = true;
+  aggiornaAstaForm();
+  return {prezzo: NODI.sellPrice.value, sellValuta, riga: riga('rigaCambioPrezzo')};
+});
+caso('ritocco', () => {
+  pulisci({sellSped: '5000'});
+  toggleSpedCur();
+  NODI.sellSped.value = '5.00';        // il dito riscrive la cifra convertita
+  toggleSpedCur();
+  return NODI.sellSped.value;
+});
+// LA PRECOMPILAZIONE SEGUE: lo standard scritto dal form resta suo
+caso('std_sats', () => {
+  pulisci({sellSped: '5000'});
+  mySpedStd = {valuta: 'sats', casa: 5000}; spedStdPosato = {sped: '5000'};
+  toggleSellCur();
+  const andata = {sped: NODI.sellSped.value, posato: spedStdPosato, spedValuta};
+  toggleSellCur();
+  return {andata, ritorno: {sped: NODI.sellSped.value, posato: spedStdPosato, spedValuta}};
+});
+caso('std_euro', () => {
+  pulisci({sellPrice: '25', sellSped: '4.5'}); sellValuta = 'eur'; spedValuta = 'eur';
+  mySpedStd = {valuta: 'eur', casa: 4.5}; spedStdPosato = {sped: '4.5'};
+  toggleSellCur();
+  return {prezzo: NODI.sellPrice.value, sped: NODI.sellSped.value, spedValuta,
+          posato: spedStdPosato};
+});
+caso('std_toccato', () => {
+  pulisci({sellSped: '6000'});           // il venditore l'aveva ritoccato
+  mySpedStd = {valuta: 'sats', casa: 5000}; spedStdPosato = {sped: '5000'};
+  toggleSellCur();
+  return {sped: NODI.sellSped.value, posato: spedStdPosato, spedValuta};
+});
+caso('illeggibile_number', () => {
+  pulisci({sellSped: '5000'});
+  /* una casella number con dentro una cifra che il browser non capisce:
+     il suo valore e' vuoto, ma quel che si vede c'e', e riscriverla lo
+     cancellerebbe */
+  const visto = {testo: '5,5,5', scritture: 0};
+  Object.defineProperty(NODI.sellZona_eu, 'value', {get(){ return ''; },
+    set(v){ visto.scritture++; visto.testo = v; }});
+  toggleSpedCur();
+  return {visto, sped: NODI.sellSped.value};
+});
+caso('std_senza_cambio', () => {
+  pulisci({sellPrice: '80000', sellSped: '5000'}); cambioVivo = false;
+  mySpedStd = {valuta: 'sats', casa: 5000}; spedStdPosato = {sped: '5000'};
+  toggleSellCur();
+  return {prezzo: NODI.sellPrice.value, sped: NODI.sellSped.value, sellValuta,
+          spedValuta, posato: spedStdPosato, riga: riga('rigaCambioPrezzo')};
+});
+caso('pulizia', () => {
+  pulisci({sellPrice: '80000'}); cambioVivo = false;
+  toggleSellCur();
+  const prima = !!NODI.rigaCambioPrezzo;
+  impostaSellValuta('sats');            // un azzeramento del form
+  return {prima, dopo: !!NODI.rigaCambioPrezzo};
+});
+caso('riga_va_via', () => {
+  pulisci({sellSped: '5000'});
+  toggleSpedCur();
+  const prima = !!NODI.rigaCambioSped, ms = TIMER.map(t => t.ms);
+  TIMER[0].f();
+  return {prima, ms, dopo: !!NODI.rigaCambioSped};
+});
+caso('ricerca', () => {
+  pulisci({ricPrezzo: '50 000'});
+  setRicercaValuta('eur');
+  const andata = {prezzo: NODI.ricPrezzo.value, ricercaValuta,
+                  riga: riga('rigaCambioRicerca'), segnaposto: NODI.ricPrezzo.placeholder};
+  setRicercaValuta('eur');              // la pillola gia' accesa: niente
+  const ferma = NODI.ricPrezzo.value;
+  setRicercaValuta('sats');
+  return {andata, ferma, ritorno: NODI.ricPrezzo.value};
+});
+caso('ricerca_illeggibile', () => {
+  pulisci({ricPrezzo: 'tanti'});
+  setRicercaValuta('eur');
+  return {prezzo: NODI.ricPrezzo.value, riga: riga('rigaCambioRicerca')};
+});
+// LE REGOLE, sul giudice nudo
+caso('regole', () => {
+  const c = (t, da, a, anc, v) => {
+    const r = convertiCifraCampo(t, da, a, anc, v); return [r.testo, r.esito]; };
+  const out = {
+    vuoto: c('', 'sats', 'eur'), spazi: c('  ', 'sats', 'eur'),
+    zero: c('0', 'sats', 'eur'), zero_eur: c('0.00', 'eur', 'sats'),
+    minimo_eur: c('3', 'sats', 'eur'),
+    due_decimali: c('1000', 'sats', 'eur'), intero: c('4.5', 'eur', 'sats'),
+    virgola_in: c('4,5', 'eur', 'sats'), virgola_out: c('5000', 'sats', 'eur', null, true),
+    uguale: c('123', 'sats', 'sats'),
+    esponente: c('1e3', 'sats', 'eur'), negativo: c('-5', 'sats', 'eur'),
+    due_separatori: c('1.234,5', 'eur', 'sats'),
+    ancora_altra_unita: c('4.60', 'sats', 'eur',
+      {testo: '5000', valuta: 'sats', scritto: '4.60', in: 'eur'}),
+  };
+  eurPerSat = 0.5;                       // un cambio assurdo: 1 cent = 0,02 sats
+  out.minimo_sats = c('0.01', 'eur', 'sats');
+  eurPerSat = 0.00092; cambioVivo = false;
+  out.senza_cambio = c('500', 'sats', 'eur');
+  out.senza_cambio_ritorno = c('0.46', 'eur', 'sats',
+    {testo: '500', valuta: 'sats', scritto: '0.46', in: 'eur'});
+  cambioVivo = true;
+  out.righe = {
+    convertito: testoRigaCambio(['vuoto', 'convertito', 'zero'], 'eur'),
+    niente: testoRigaCambio(['vuoto', 'zero', 'uguale'], 'eur'),
+    senza: testoRigaCambio(['convertito', 'senza_cambio'], 'eur'),
+    illeggibile: testoRigaCambio(['illeggibile'], 'sats'),
+  };
+  return out;
+});
+console.log(JSON.stringify(OUT));
+"""
+    with _tfC.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                 encoding="utf-8") as f:
+        f.write(banco)
+        p = f.name
+    try:
+        r = _spC.run(["node", p], capture_output=True, text=True,
+                     encoding="utf-8", timeout=60)
+    finally:
+        os.unlink(p)
+    if r.returncode != 0:
+        prova("il banco del cambio gira", "", r.stderr[-400:])
+        return
+    o = _jsC.loads(r.stdout)
+    esplosi = {k: v["esploso"][:200] for k, v in o.items()
+               if isinstance(v, dict) and "esploso" in v}
+    prova("il banco del cambio: nessun caso esploso", {}, esplosi)
+
+    def g(nome, *chiavi):
+        x = o.get(nome)
+        for k in chiavi:
+            x = x.get(k) if isinstance(x, dict) else None
+        return x
+
+    # l'aritmetica attesa, scritta qui una volta: Math.round e' floor(x+.5)
+    E = 0.00092
+    eur = lambda n: f"{max(_mC.floor(n * E * 100 + 0.5) / 100, 0.01):.2f}"
+
+    # --- IL CASO DELLA FOTO -----------------------------------------------
+    prova("la foto: 11800, 10300 e 500 sats diventano 10,86, 9,48 e 0,46 €",
+          {"valuta": "eur", "casa": "10.86", "punto": "9.48", "extra": "0.46"},
+          g("foto", "andata", "bozza"))
+    prova("...e le caselle ridisegnate dicono lo stesso",
+          {"spedStdCasa": "10.86", "spedStdPunto": "9.48", "spedStdExtra": "0.46"},
+          g("foto", "andata", "caselle"))
+    _extra = g("foto", "andata", "bozza", "extra")
+    prova("IL SUPPLEMENTO DA 500 NON DIVENTA MAI «0» NE' VUOTO", True,
+          _extra not in (None, "", "0") and float(_extra) > 0)
+    prova("...e al ritorno, dall'ancora, i numeri di partenza esatti",
+          {"valuta": "sats", "casa": "11800", "punto": "10300", "extra": "500"},
+          g("foto", "ritorno", "bozza"))
+    prova("...che riconvertendo il convertito sarebbero derivati",
+          ["11804", "10304", "500"], g("foto", "senzaAncora"))
+    prova("...con «Convertito al cambio di adesso» sotto la casella di casa, "
+          "per un paio di secondi",
+          {"testo": "Convertito al cambio di adesso", "classe": "riga-cambio",
+           "ruolo": "status", "dopo": "spedStdCasa .sats-input",
+           "pos": "afterend", "timer": [RIGA_MS]},
+          g("foto", "andata", "riga"))
+    prova("senza cambio le cifre restano com'erano, e la valuta gira",
+          {"valuta": "eur", "casa": "11800", "punto": "10300", "extra": "500"},
+          g("foto_senza_cambio", "bozza"))
+    _r = g("foto_senza_cambio", "riga") or {}
+    prova("...con la riga che chiede di ricontrollarle, e che RESTA",
+          (True, True, "riga-cambio ferma", []),
+          ("Ricontrollali" in (_r.get("testo") or ""),
+           "ora in €" in (_r.get("testo") or ""), _r.get("classe"), _r.get("timer")))
+    prova("...finche' non si riscrive una delle tre caselle",
+          ([1, 1, 1], False),
+          (g("foto_senza_cambio", "ascolti"),
+           g("foto_senza_cambio", "restaDopoInput")))
+
+    # --- OGNI CASELLA DEL CENSIMENTO --------------------------------------
+    SPED = o.get("campi") or []
+    _zn = re.search(r"const ZONA_NOME = \{([^}]*)\}", mini)
+    _zk = re.findall(r"(\w+):'", _zn.group(1)) if _zn else []
+    prova("i costi che il toggle converte: casa, ogni zona estera, il punto "
+          "e il pezzo in piu'",
+          ["sellSped"] + ["sellZona_" + z for z in _zk]
+          + ["sellSpedPunto", "sellSpedExtra"], SPED)
+    prova("...e sono proprio le caselle di cui il toggle cambia l'unita'",
+          sorted(SPED),
+          sorted(re.sub(r"Cur(_|$)", r"\1", i) for i in (o.get("unita") or [])))
+    _att = {id_: eur((k + 1) * 1000) for k, id_ in enumerate(SPED)}
+    _orig = {id_: str((k + 1) * 1000) for k, id_ in enumerate(SPED)}
+    prova("Vendi, i costi: ogni casella si converte, ognuna col suo numero",
+          (_att, "eur"), (g("vendi_costi", "andata", "caselle"),
+                          g("vendi_costi", "andata", "spedValuta")))
+    prova("...e al ritorno tornano tutte quelle scritte",
+          (_orig, "sats"), (g("vendi_costi", "ritorno", "caselle"),
+                            g("vendi_costi", "ritorno", "spedValuta")))
+    prova("...con la riga sotto la casella di casa",
+          ("Convertito al cambio di adesso", "sellSpedCur .sped-zona"),
+          (g("vendi_costi", "andata", "riga", "testo"),
+           g("vendi_costi", "andata", "riga", "dopo")))
+    prova("Vendi, i costi: vuoto resta vuoto, 0 resta 0, 3 sats non "
+          "diventano gratis",
+          {"sellSped": "4.60", "sellZona_eu": "18.40", "sellZona_asia": "",
+           "sellSpedPunto": "0", "sellSpedExtra": "0.01"},
+          g("vendi_regole", "andata"))
+    prova("...e al ritorno i 3 sats sono ancora 3",
+          {"sellSped": "5000", "sellZona_eu": "20000", "sellZona_asia": "",
+           "sellSpedPunto": "0", "sellSpedExtra": "3"},
+          g("vendi_regole", "ritorno"))
+    prova("Vendi, il prezzo: 80000 sats diventano 73,60 € e i costi seguono",
+          (dict({"sellPrice": "73.60"}, **_att), "eur", "eur", "€ ⇄"),
+          (g("vendi_listino", "andata", "caselle"),
+           g("vendi_listino", "andata", "sellValuta"),
+           g("vendi_listino", "andata", "spedValuta"),
+           g("vendi_listino", "andata", "bottone")))
+    prova("...con la riga sotto il prezzo",
+          ("Convertito al cambio di adesso", "sellCur .sats-input"),
+          (g("vendi_listino", "andata", "riga", "testo"),
+           g("vendi_listino", "andata", "riga", "dopo")))
+    prova("...e al ritorno il prezzo e i costi di partenza",
+          (dict({"sellPrice": "80000"}, **_orig), "sats", "sats"),
+          (g("vendi_listino", "ritorno", "caselle"),
+           g("vendi_listino", "ritorno", "sellValuta"),
+           g("vendi_listino", "ritorno", "spedValuta")))
+    prova("un costo gia' ancorato all'euro resta com'era: e' gia' in euro",
+          ({"sellPrice": "73.60", "sellSped": "4.50"}, "eur", "eur"),
+          (g("vendi_listino_ancorato", "caselle"),
+           g("vendi_listino_ancorato", "sellValuta"),
+           g("vendi_listino_ancorato", "spedValuta")))
+    prova("dal listino in euro ai sats: interi, arrotondati",
+          ({"sellPrice": "27174", "sellSped": "4891"}, "sats", "sats"),
+          (g("vendi_listino_da_euro", "caselle"),
+           g("vendi_listino_da_euro", "sellValuta"),
+           g("vendi_listino_da_euro", "spedValuta")))
+    prova("l'asta su un listino in euro: 25 € diventano una base da 27174 "
+          "sats, detto dalla riga",
+          ("27174", "sats", "Convertito al cambio di adesso"),
+          (g("asta", "prezzo"), g("asta", "sellValuta"),
+           g("asta", "riga", "testo")))
+    prova("...e su un listino gia' in sats non tocca niente",
+          ("80000", "sats", None),
+          (g("asta_sats", "prezzo"), g("asta_sats", "sellValuta"),
+           g("asta_sats", "riga")))
+    prova("una cifra ritoccata dopo la conversione riparte da li' "
+          "(5,00 € → 5435 sats, non i 5000 di prima)", "5435", g("ritocco"))
+    prova("gli avvisi di ricerca: 50 000 sats diventano 46,00 €, con la "
+          "virgola della casella di testo",
+          ("46,00", "eur", "Es. 50", "Convertito al cambio di adesso",
+           "ricPrezzo .."),
+          (g("ricerca", "andata", "prezzo"), g("ricerca", "andata", "ricercaValuta"),
+           g("ricerca", "andata", "segnaposto"),
+           g("ricerca", "andata", "riga", "testo"),
+           g("ricerca", "andata", "riga", "dopo")))
+    prova("...la pillola gia' accesa non riconverte, e il ritorno ridà "
+          "il testo scritto", ("46,00", "50 000"),
+          (g("ricerca", "ferma"), g("ricerca", "ritorno")))
+    prova("...e una cifra che non si capisce resta com'era, detta dalla riga",
+          ("tanti", "riga-cambio ferma", True),
+          (g("ricerca_illeggibile", "prezzo"),
+           g("ricerca_illeggibile", "riga", "classe"),
+           "Ricontrollalo" in (g("ricerca_illeggibile", "riga", "testo") or "")))
+
+    # --- LA PRECOMPILAZIONE SEGUE -----------------------------------------
+    prova("lo standard in sats, listino in euro: la casella resta del form "
+          "e la riscrive la precompilazione, dallo standard",
+          {"sped": "4.6", "posato": {"sped": "4.6"}, "spedValuta": "eur"},
+          g("std_sats", "andata"))
+    prova("...e tornando ai sats lo standard esatto",
+          {"sped": "5000", "posato": {"sped": "5000"}, "spedValuta": "sats"},
+          g("std_sats", "ritorno"))
+    prova("lo standard in euro, listino in sats: resta ANCORATO all'euro, "
+          "come ha sempre fatto",
+          {"prezzo": "27174", "sped": "4.5", "spedValuta": "eur",
+           "posato": {"sped": "4.5"}}, o.get("std_euro"))
+    prova("un costo che il venditore aveva ritoccato resta suo: si converte, "
+          "e la precompilazione non se lo riprende",
+          {"sped": "5.52", "posato": {"sped": "5000"}, "spedValuta": "eur"},
+          o.get("std_toccato"))
+    prova("una casella number che il browser non capisce non si riscrive: "
+          "quel che si vede resta", ({"testo": "5,5,5", "scritture": 0}, "4.60"),
+          (g("illeggibile_number", "visto"), g("illeggibile_number", "sped")))
+    _s = o.get("std_senza_cambio") or {}
+    prova("senza cambio niente si svuota: prezzo e costo restano com'erano, "
+          "e restano del form",
+          ("80000", "5000", "eur", "eur", {"sped": "5000"}),
+          (_s.get("prezzo"), _s.get("sped"), _s.get("sellValuta"),
+           _s.get("spedValuta"), _s.get("posato")))
+    prova("...con la riga che chiede di ricontrollare, sotto il prezzo",
+          ("riga-cambio ferma", True, "sellCur .sats-input"),
+          ((_s.get("riga") or {}).get("classe"),
+           "Ricontrollali" in ((_s.get("riga") or {}).get("testo") or ""),
+           (_s.get("riga") or {}).get("dopo")))
+    prova("un azzeramento del form spegne la riga rimasta", (True, False),
+          (g("pulizia", "prima"), g("pulizia", "dopo")))
+    prova("«convertito» se ne va da sola, al suo tempo", (True, [RIGA_MS], False),
+          (g("riga_va_via", "prima"), g("riga_va_via", "ms"),
+           g("riga_va_via", "dopo")))
+
+    # --- LE REGOLE --------------------------------------------------------
+    R = o.get("regole") or {}
+    for chiave, atteso, cosa in (
+            ("vuoto", ["", "vuoto"], "il vuoto resta vuoto"),
+            ("spazi", ["  ", "vuoto"], "...anche fatto di spazi"),
+            ("zero", ["0", "zero"], "lo zero resta zero"),
+            ("zero_eur", ["0.00", "zero"], "...anche scritto 0.00"),
+            ("minimo_eur", ["0.01", "convertito"],
+             "3 sats non diventano 0 €: il minimo e' un centesimo"),
+            ("minimo_sats", ["1", "convertito"],
+             "...e un centesimo non diventa 0 sats, nemmeno a un cambio assurdo"),
+            ("due_decimali", ["0.92", "convertito"], "gli euro a due decimali"),
+            ("intero", ["4891", "convertito"], "i sats interi"),
+            ("virgola_in", ["4891", "convertito"], "la virgola si legge"),
+            ("virgola_out", ["4,60", "convertito"],
+             "...e nelle caselle di testo si scrive"),
+            ("uguale", ["123", "uguale"], "stessa valuta, niente da fare"),
+            ("esponente", ["1e3", "illeggibile"], "un esponente non e' un importo"),
+            ("negativo", ["-5", "illeggibile"], "...un segno nemmeno"),
+            ("due_separatori", ["1.234,5", "illeggibile"],
+             "...e due separatori nemmeno: resta com'e'"),
+            ("ancora_altra_unita", ["0.01", "convertito"],
+             "l'ancora vale solo nella valuta in cui l'abbiamo scritta"),
+            ("senza_cambio", ["500", "senza_cambio"],
+             "senza cambio vero la cifra resta"),
+            ("senza_cambio_ritorno", ["500", "convertito"],
+             "...ma il ritorno all'ancora non ha bisogno del cambio")):
+        prova(f"il giudice: {cosa}", atteso, R.get(chiave))
+    _rr = R.get("righe") or {}
+    prova("la riga: «convertito» se qualcosa si e' convertito, e se ne va",
+          {"testo": "Convertito al cambio di adesso", "resta": False},
+          _rr.get("convertito"))
+    prova("...niente riga se niente e' cambiato (vuoti e zeri)", None,
+          _rr.get("niente"))
+    prova("...e senza cambio la riga che resta vince su «convertito»",
+          (True, True, True),
+          ((_rr.get("senza") or {}).get("resta"),
+           "Cambio non disponibile" in ((_rr.get("senza") or {}).get("testo") or ""),
+           "ora in €" in ((_rr.get("senza") or {}).get("testo") or "")))
+    prova("...e la cifra illeggibile ha la sua, che dice l'unita' nuova",
+          (True, True), ((_rr.get("illeggibile") or {}).get("resta"),
+                         "ora in sats" in ((_rr.get("illeggibile") or {})
+                                           .get("testo") or "")))
 
 
 def prove_consigliati():
@@ -91111,6 +91770,7 @@ def main():
               prove_cassa_strada_chiusa,
               prove_casa_vuota_gratis,
               prove_spedizione_standard,
+              prove_cambio_converte,
               prove_catalogo_esterno,
               prove_script_nel_workflow, prove_deploy,
               prove_giudice_deploy, prove_collaudi_in_ci,
