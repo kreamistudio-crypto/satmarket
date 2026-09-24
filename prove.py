@@ -23585,7 +23585,11 @@ def prove_pagina_acquisto():
     #    aggiornaCurToggle a doverli conoscere tutti — ed e' anche il
     #    motivo per cui quel foglio non ha inventato nessun comando
     #    suo, ha aggiunto una superficie a quello che c'era gia'.
-    prova("...e le superfici del toggle sono nove", 9,
+    #    DIECI dal 24 set 2026: la decima e' la testata di «I tuoi
+    #    carrelli» (view-carrelli), che veste la testata del carrello
+    #    col suo toggle — stesso markup, stessa fabbrica, una
+    #    superficie in piu' da pescare per data-cur.
+    prova("...e le superfici del toggle sono dieci", 10,
           mini3.count('class="cur-seg'))
     prova("...tutte pescate per data-cur, mai per id", True,
           "'.cur-seg button[data-cur]'" in mini3)
@@ -97554,6 +97558,402 @@ console.log(JSON.stringify(esiti));
           in css)
 
 
+def prove_carrelli_per_venditore():
+    """DAL BARATTOLO AL CARRELLO, UNO PER VENDITORE (24 set 2026, idea di
+    due utenti). Sulle card di «Nel tuo barattolo» un carrellino in
+    alto a sinistra: il primo tocco aggiunge e porta al carrello di
+    quel venditore, il ritocco toglie, chi non si compra e' spento col
+    motivo. Un carrello PER VENDITORE: quello aperto vive nelle due
+    variabili di sempre, gli altri stanno da parte (carrelliDaParte) e
+    si rimontano; «🛒 Carrelli (N)» in cima al barattolo porta alla
+    pagina che li elenca.
+
+    Qui: il markup e la sua guardia (il carrellino nasce SOLO nella
+    griglia del barattolo — con vistaBarattolo accesa cardHTML disegna
+    anche le celle del carrello e «Altri oggetti», e li' sopra
+    «Aggiungi» non ci va un secondo comando: visto dal vivo), la
+    cascata chiesta a _vince_css (il cerchio, i 44px, il badge che
+    scende, il bottone della barra che vive solo col barattolo), la
+    navigazione, e il banco node con le funzioni VERE su un DOM di
+    cartone, che parte dal TOCCO sulla card e non dalla funzione di
+    mezzo (la lezione del velo P2P)."""
+    print("\n[dal barattolo al carrello: un carrello per venditore]")
+    import json as _json
+    import os as _os
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    def nudo(js):
+        return re.sub(r"/\*[\s\S]*?\*/", "", js)
+
+    # --- 1) LA CARD: il carrellino fuori dall'<a>, e la classe ------
+    card = mini[mini.index("const cardHTML = l => {"):]
+    card = card[:card.index("</div>`; };") + 12]
+    prova("cardHTML chiede il carrellino alla sua fabbrica", 1,
+          card.count("const carr = bottoneCarrelloCard(l);"))
+    prova("...lo mette FUORI dall'<a>, dopo barattolino e rifornimento", 1,
+          card.count("</a>${jar}${rif}${carr}"))
+    prova("...e la card porta la classe che fa scendere il badge", 1,
+          card.count("${carr?' con-carrello':''}"))
+    fab = nudo(pezzo_js(mini, "function bottoneCarrelloCard(l){", "\n}\n"))
+    prova("il carrellino nasce solo con la bandierina della griglia del "
+          "barattolo, mai in demo/vetrina/anonimo", True,
+          "if (!cardConCarrello || DEMO || VETRINA || !myTgId) return '';" in fab)
+    prova("...e non guarda vistaBarattolo (le celle del carrello la "
+          "vedrebbero accesa)", 0, fab.count("vistaBarattolo"))
+    prova("...il tocco non apre il dettaglio", True,
+          "event.stopPropagation();toccaCarrelloCard(${l.id})" in fab)
+    prova("...con l'etichetta per chi legge con la voce e lo spento che "
+          "resta toccabile (aria-disabled, mai disabled)", (True, True, False),
+          ('aria-label="${esc(t)}"' in fab,
+           "aria-disabled=\"true\"" in fab, " disabled" in fab))
+    rg = nudo(pezzo_js(mini, "function renderGrid(items){", "\n}\n"))
+    prova("renderGrid alza la bandierina attorno alla SUA mappa e la "
+          "abbassa subito", True,
+          "cardConCarrello = !!(items && vistaBarattolo);\n"
+          "  el('grid').innerHTML = data.map(cardHTML).join('');\n"
+          "  cardConCarrello = false;" in rg)
+    prova("...e rifa' il badge a ogni render", True,
+          "renderBadgeCarrelli();" in rg)
+    prova("nessun altro alza la bandierina", 1,
+          nudo(mini).count("cardConCarrello = !!("))
+
+    # --- 2) I MOTIVI dello spento: proprio, esaurito, ferie, asta, senza
+    #        strada fisica — e l'ordine (il proprio prima di tutto)
+    mot = nudo(pezzo_js(mini, "function motivoCarrelloCard(l){", "\n}\n"))
+    ordine = [mot.index(x) for x in (
+        "l.sellerId === myTgId", "l.stato !== 'attivo'", "inFerie(l)",
+        "astaE(l)", "!stradeFisiche(l).length")]
+    prova("i cinque motivi, nell'ordine: proprio, non attivo, ferie, "
+          "asta, senza strada fisica", True, ordine == sorted(ordine))
+    prova("...con le parole che il tocco e l'etichetta ripetono", True,
+          all(t in mot for t in ("è un tuo annuncio", "per ora è esaurito",
+                                  "il negozio è in ferie",
+                                  "si aggiudica puntando",
+                                  "si compra da solo")))
+
+    # --- 3) LA CASCATA: cerchio, 44px, badge sotto, bottone della barra
+    i0 = mini.find("<style>")
+    css = mini[i0 + 7:mini.find("</style>", i0)]
+    regole, _sq = _regole_css(css)
+
+    def cat(*coda):
+        return ([{"tag": "html", "attr": {}, "classi": set()},
+                 {"tag": "body", "attr": {}, "classi": set()}]
+                + [{"tag": t, "attr": {}, "classi": set(c)} for t, c in coda])
+    v = _vince_css(regole, cat(("div", ("card",)),
+                               ("button", ("card-carrello",))),
+                   ("position", "top", "left", "width", "height",
+                    "border-radius", "z-index"))
+    prova("il carrellino: cerchio di 34 in alto a sinistra sulla card",
+          ("absolute", "8px", "8px", "34px", "34px", "50%", "2"),
+          tuple(v.get(p, ("?",))[0] for p in (
+              "position", "top", "left", "width", "height",
+              "border-radius", "z-index")))
+    # il ::after e' l'area di tocco: 34 + 5 + 5 = 44
+    m = re.search(r"\.card-carrello::after\{([^}]*)\}", css)
+    ins = re.search(r"inset:(-?\d+)px", m.group(1) if m else "")
+    prova("...e il ::after lo allarga a 44px (inset −5)", 44,
+          34 - 2 * int(ins.group(1)) if ins else None)
+    v = _vince_css(regole, cat(("div", ("card",)),
+                               ("button", ("card-carrello", "dentro"))),
+                   ("background",))
+    prova("da dentro si accende d'arancio", "var(--sats)",
+          v.get("background", ("?",))[0])
+    v = _vince_css(regole, cat(("div", ("card",)),
+                               ("button", ("card-carrello", "spento"))),
+                   ("opacity", "cursor"))
+    prova("spento: sbiadito ma non sparito (il tocco spiega)", (".45", "default"),
+          (v.get("opacity", ("?",))[0], v.get("cursor", ("?",))[0]))
+    # il badge di stato scende sotto il carrellino, per tutti e sei
+    for badge in ("card-lampo", "card-sconto", "card-asta", "card-ferie",
+                  "card-esaurito", "card-ultimo"):
+        v = _vince_css(regole, cat(("div", ("card", "con-carrello")),
+                                   ("a", ("card-link",)),
+                                   ("div", ("ph-wrap",)),
+                                   ("div", (badge,))), ("top", "left"))
+        prova(f"col carrellino il badge .{badge} scende a 48px, a sinistra",
+              ("48px", "8px"), (v.get("top", ("?",))[0], v.get("left", ("?",))[0]))
+    v = _vince_css(regole, cat(("div", ("card",)), ("a", ("card-link",)),
+                               ("div", ("ph-wrap",)), ("div", ("card-lampo",))),
+                   ("top",))
+    prova("...e senza carrellino resta a 8px", "8px", v.get("top", ("?",))[0])
+    # «🛒 Carrelli (N)»: spento di serie, acceso SOLO col barattolo E pieno
+    for body, btn, atteso in (((), ("",), "none"),
+                              (("solo-barattolo",), ("",), "none"),
+                              ((), ("pieno",), "none"),
+                              (("solo-barattolo",), ("pieno",), "inline-block")):
+        catena = [{"tag": "html", "attr": {}, "classi": set()},
+                  {"tag": "body", "attr": {}, "classi": set(body)},
+                  {"tag": "div", "attr": {}, "classi": {"strumenti"}},
+                  {"tag": "button", "attr": {"id": "carrelliBtn"},
+                   "classi": set(c for c in btn if c)}]
+        v = _vince_css(regole, catena, ("display",))
+        prova(f"«Carrelli (N)» con body {list(body)} e classi {list(btn)}: "
+              f"{atteso}", atteso, v.get("display", ("?",))[0])
+
+    # --- 4) IL MARKUP della barra e della vista -----------------------
+    strum = mini[mini.index('<div class="strumenti">'):]
+    strum = strum[:strum.index('<div id="filtriBox"')]
+    prova("il bottone sta nella barra degli strumenti, dopo Filtro", True,
+          strum.index('id="filtriBtn"') < strum.index('id="carrelliBtn"'))
+    prova("...apre i carrelli e porta il conteggio", True,
+          'onclick="apriCarrelli()"' in strum
+          and '🛒 Carrelli (<span id="carrelliConta">0</span>)' in strum)
+    vista = mini[mini.index('<div class="view" id="view-carrelli">'):]
+    vista = vista[:vista.index('<div class="view" id="view-acquisto">')]
+    prova("la vista dei carrelli veste la testata del carrello", True,
+          all(x in vista for x in ('class="pacco-appiccicato"',
+                                   'class="pacco-testa"', 'class="pacco-x"',
+                                   'id="carrelliSub"', 'id="carrelliLista"')))
+    prova("...e la sua ✕ chiude e basta (niente da svuotare)", True,
+          'class="pacco-x" onclick="navIndietro()"' in vista)
+    prova("...col toggle €/₿ di casa", 2,
+          vista.count('onclick="setValuta('))
+
+    # --- 5) LA NAVIGAZIONE: la voce accesa e la ricostruzione ---------
+    vn = nudo(pezzo_js(mini, "function voceNav(view){", "\n}\n"))
+    prova("«carrelli» accende Esplora nella nav", True,
+          "'pacco','carrelli'," in vn)
+    nrv = nudo(pezzo_js(mini, "function navRendiVista(b){", "\n}\n"))
+    prova("...e dalla cronologia si ridisegna dal registro", True,
+          "if (b.v === 'carrelli') { renderCarrelli(); return go('carrelli'); }"
+          in nrv)
+
+    # --- 6) apriPacco MONTA, non svuota piu' --------------------------
+    ap = nudo(pezzo_js(mini, "function apriPacco(){", "\n}\n"))
+    prova("apriPacco monta il carrello del venditore", True,
+          "montaCarrello(l.sellerId, l.id);" in ap)
+    prova("...e non azzera piu' niente da solo", 0,
+          ap.count("setScelte = new Map()"))
+    prova("...il toast «e' di un venditore alla volta» e' morto", 0,
+          mini.count("Carrello nuovo: è di un venditore alla volta"))
+    prova("...e al ritorno le card del barattolo si aggiornano", True,
+          "aggiornaCarrelloCards();" in ap)
+    for fn in ("function svuotaPacco(){", "function rinfrescaViste(){"):
+        prova(f"{fn[9:-2]} aggiorna le card del barattolo", True,
+              "aggiornaCarrelloCards();" in nudo(pezzo_js(mini, fn, "\n}\n")))
+
+    # --- 7) IL BANCO: le funzioni VERE su un DOM di cartone ----------
+    esiti = _banco_carrelli(mini)
+    if esiti is None:
+        salta("il banco dei carrelli", "node non c'e'")
+    else:
+        for nome, atteso, avuto in esiti:
+            prova(nome, atteso, avuto)
+
+
+def _banco_carrelli(mini):
+    """Le funzioni vere del registro e della card, girate in node con
+    un catalogo di cartone: due venditori, un'asta, un digitale, un
+    annuncio proprio. Si parte dal TOCCO sulla card (toccaCarrelloCard →
+    apriPacco → montaCarrello), non dalla funzione di mezzo."""
+    import json as _json
+    import os as _os
+    import subprocess as _sp
+    import tempfile as _tf
+    # lo stato e il registro: da `let setScelte` a motivoEsclusione
+    i = mini.index("let setScelte = new Map();")
+    j = mini.index("function motivoEsclusione(x){")
+    j = mini.index("\n}\n", j) + 3
+    stato = mini[i:j]
+    # la pagina: da apriCarrelli a annunciPacco (esclusa)
+    i = mini.index("function apriCarrelli(){")
+    j = mini.index("function annunciPacco(){")
+    pagina = mini[i:j]
+    ap = pezzo_js(mini, "function apriPacco(){", "\n}\n") + "\n}"
+    js = r"""
+const DEMO = false, VETRINA = false;
+let myTgId = 111, vistaBarattolo = true, qtaScelta = 1, currentListing = null;
+let valutaVista = 'sats', eurPerSat = 0.001;
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+const fmt = n => String(n);
+const fmtEur = n => n.toFixed(2).replace('.', ',');
+const artStima = l => l.price;
+const astaE = l => (l.astaBase||0) > 0;
+const esaurito = l => l.stato === 'venduto';
+const inFerie = l => !!l.ferie;
+const DIARIO = [];
+const toast = (m) => DIARIO.push(['toast', m]);
+const haptic = () => {};
+const go = v => DIARIO.push(['go', v]);
+const renderPacco = () => DIARIO.push(['renderPacco']);
+const apriAcquistoSet = () => DIARIO.push(['apriAcquistoSet']);
+const rileggiVenditore = () => Promise.resolve();
+const invitoTelegram = () => DIARIO.push(['invito']);
+const listings = [
+  {id: 1, sellerId: 10, seller: 'Anna', username: 'anna', title: 'Cuffie', price: 1000, valuta: 'sats', consegna: 'spedizione', quantita: 3, stato: 'attivo', emoji: '🎧'},
+  {id: 2, sellerId: 10, seller: 'Anna', username: 'anna', title: 'Tazze', price: 500, valuta: 'sats', consegna: 'entrambe', quantita: 9, stato: 'attivo', emoji: '☕'},
+  {id: 3, sellerId: 20, seller: 'Bruno', username: 'bruno', title: 'Lampada', price: 2000, valuta: 'sats', consegna: 'spedizione', quantita: 1, stato: 'attivo', emoji: '💡'},
+  {id: 4, sellerId: 30, seller: 'Carla', username: 'carla', title: 'Radio', price: 7000, valuta: 'sats', consegna: 'entrambe', quantita: 1, stato: 'attivo', astaBase: 100, emoji: '📻'},
+  {id: 5, sellerId: 111, seller: 'Io', username: 'io', title: 'Mio', price: 10, valuta: 'sats', consegna: 'spedizione', quantita: 1, stato: 'attivo', emoji: '🙂'},
+  {id: 6, sellerId: 20, seller: 'Bruno', username: 'bruno', title: 'Ebook', price: 300, valuta: 'sats', consegna: 'digitale', quantita: 1, stato: 'attivo', emoji: '💾'},
+];
+const myPreferiti = listings;
+const nodi = {};
+function nodo(){ const c = new Set();
+  return {textContent:'', innerHTML:'', title:'', style:{}, attr:{},
+          classList:{add:x=>c.add(x), remove:x=>c.delete(x), contains:x=>c.has(x),
+                     toggle:(x,f)=>{ if (f===undefined) f=!c.has(x); f?c.add(x):c.delete(x); return f; }},
+          setAttribute(k,v){ this.attr[k]=v; }, classi: c}; }
+function el(id){ if (!nodi[id]) nodi[id] = nodo(); return nodi[id]; }
+const BOTTONI = [];   // i carrellini «in griglia», che aggiornaCarrelloCards ritocca
+const document = {querySelectorAll: sel => sel === '.card-carrello' ? BOTTONI : [],
+                  querySelector: () => null};
+""" + stato + "\n" + pagina + "\n" + ap + r"""
+const fuori = {};
+const carr = () => carrelliTutti().map(c => [c.sellerId, [...c.scelte].map(([i,q])=>[i,q]), c.aperto]);
+// la card: niente carrellino senza bandierina, o in demo
+fuori.senzaBandierina = bottoneCarrelloCard(listings[0]);
+cardConCarrello = true;
+fuori.card = bottoneCarrelloCard(listings[0]);
+fuori.cardAsta = bottoneCarrelloCard(listings[3]);
+fuori.cardMio = bottoneCarrelloCard(listings[4]);
+fuori.cardDig = bottoneCarrelloCard(listings[5]);
+// i carrellini «in griglia» su cui aggiornaCarrelloCards lavora
+for (const l of listings) { const b = nodo(); b.dataset = {id: String(l.id)};
+  if (motivoCarrelloCard(l)) b.classList.add('spento'); BOTTONI.push(b); }
+// 1) il primo tocco: Cuffie -> carrello di Anna, si atterra nel pacco
+toccaCarrelloCard(1);
+fuori.dopoCuffie = {carr: carr(), diario: DIARIO.slice(), pacco: paccoDati, cur: currentListing && currentListing.id,
+                    bottoni: BOTTONI.map(b => [b.dataset.id, b.classList.contains('dentro'), b.title])};
+fuori.cardDentro = bottoneCarrelloCard(listings[0]);
+DIARIO.length = 0;
+// 2) Lampada di Bruno: un secondo carrello, Anna da parte intatta
+toccaCarrelloCard(3);
+fuori.dopoLampada = {carr: carr(), pacco: paccoDati, badge: [el('carrelliBtn').classi.has('pieno'), el('carrelliConta').textContent],
+                     inCarrello: [inCarrello(1), inCarrello(2), inCarrello(3)]};
+DIARIO.length = 0;
+// 3) il ritocco toglie le Cuffie (dal carrello DA PARTE): Anna sparisce
+toccaCarrelloCard(1);
+fuori.dopoTogli = {carr: carr(), diario: DIARIO.slice(), inCarrello: inCarrello(1)};
+DIARIO.length = 0;
+// 4) l'asta, il proprio e il digitale: un toast e nessun carrello
+toccaCarrelloCard(4); toccaCarrelloCard(5); toccaCarrelloCard(6);
+fuori.spenti = {diario: DIARIO.slice(), carr: carr()};
+DIARIO.length = 0;
+// 5) la pagina dei carrelli con due carrelli (Anna con due righe, una da 3 pezzi)
+toccaCarrelloCard(1); setScelte.set(2, 3);
+renderCarrelli();
+fuori.pagina = {sub: el('carrelliSub').textContent, html: el('carrelliLista').innerHTML, carr: carr()};
+// 6) «Apri» sul carrello da parte (Bruno) lo rimonta, «Controlla e paga» apre la cassa
+DIARIO.length = 0;
+apriCarrello(20);
+fuori.apri = {carr: carr(), cur: currentListing && currentListing.id, diario: DIARIO.slice()};
+DIARIO.length = 0;
+pagaCarrello(10);
+fuori.paga = {carr: carr(), cur: currentListing && currentListing.id, diario: DIARIO.slice()};
+// 7) togliere l'ultima riga del carrello APERTO lo chiude
+togliDalCarrello(1); togliDalCarrello(2);
+fuori.vuotato = {carr: carr(), pacco: paccoDati};
+renderCarrelli();
+fuori.paginaConUno = el('carrelliLista').innerHTML;
+togliDalCarrello(3);
+renderCarrelli();
+fuori.paginaVuota = {sub: el('carrelliSub').textContent, html: el('carrelliLista').innerHTML, badge: el('carrelliBtn').classi.has('pieno')};
+console.log(JSON.stringify(fuori));
+"""
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8") as f:
+        f.write(js)
+        p = f.name
+    try:
+        r = _sp.run(["node", p], capture_output=True, text=True,
+                    encoding="utf-8", timeout=60)
+    except (FileNotFoundError, OSError, _sp.TimeoutExpired):
+        _os.unlink(p)
+        return None
+    _os.unlink(p)
+    if r.returncode != 0:
+        return [("il banco dei carrelli gira", "", r.stderr[-400:])]
+    f = _json.loads(r.stdout)
+    return [
+        ("senza la bandierina della griglia la card non ha carrellino", "",
+         f["senzaBandierina"]),
+        ("con la bandierina: il carrellino, con l'etichetta e il tocco",
+         True, ('class="card-carrello"' in f["card"]
+                and 'aria-label="Aggiungi al carrello"' in f["card"]
+                and 'toccaCarrelloCard(1)' in f["card"])),
+        ("l'asta esce spenta col motivo, e senza `disabled`",
+         (True, True, False),
+         ('class="card-carrello spento"' in f["cardAsta"],
+          "si aggiudica puntando" in f["cardAsta"],
+          " disabled" in f["cardAsta"])),
+        ("il proprio e il digitale pure", (True, True),
+         ("è un tuo annuncio" in f["cardMio"],
+          "si compra da solo" in f["cardDig"])),
+        # 1) il primo tocco
+        ("il primo tocco mette le Cuffie nel carrello di Anna, aperto",
+         [[10, [[1, 1]], True]], f["dopoCuffie"]["carr"]),
+        ("...e porta alla pagina del carrello, con la provenienza giusta",
+         (["renderPacco"], ["go", "pacco"], 10, 1),
+         (f["dopoCuffie"]["diario"][0], f["dopoCuffie"]["diario"][1],
+          f["dopoCuffie"]["pacco"]["sellerId"], f["dopoCuffie"]["cur"])),
+        ("...e in griglia il SUO carrellino si accende, gli altri no",
+         [["1", True, "Togli dal carrello"], ["2", False, "Aggiungi al carrello"],
+          ["3", False, "Aggiungi al carrello"]],
+         f["dopoCuffie"]["bottoni"][:3]),
+        ("...gli spenti non si toccano", [["4", False, ""], ["5", False, ""],
+                                          ["6", False, ""]],
+         f["dopoCuffie"]["bottoni"][3:]),
+        ("la card ridisegnata dice «dentro»", True,
+         'class="card-carrello dentro"' in f["cardDentro"]
+         and 'aria-label="Togli dal carrello"' in f["cardDentro"]),
+        # 2) il secondo venditore
+        ("il tocco su Bruno apre il SUO carrello e mette Anna da parte, intatta",
+         [[20, [[3, 1]], True], [10, [[1, 1]], False]], f["dopoLampada"]["carr"]),
+        ("...il badge si accende e dice 2", [True, "2"], f["dopoLampada"]["badge"]),
+        ("...e inCarrello risponde per tutt'e due i carrelli",
+         [True, False, True], f["dopoLampada"]["inCarrello"]),
+        # 3) il ritocco toglie
+        ("il ritocco toglie le Cuffie dal carrello DA PARTE, che sparisce",
+         ([[20, [[3, 1]], True]], [["toast", "Tolto dal carrello"]], False),
+         (f["dopoTogli"]["carr"], f["dopoTogli"]["diario"], f["dopoTogli"]["inCarrello"])),
+        # 4) gli spenti
+        ("asta, proprio e digitale: tre toast col motivo e nessun carrello nuovo",
+         (["Non si può mettere nel carrello: è all'asta: si aggiudica puntando",
+           "Non si può mettere nel carrello: è un tuo annuncio",
+           "Non si può mettere nel carrello: si consegna solo come codice online: si compra da solo"],
+          1),
+         ([d[1] for d in f["spenti"]["diario"] if d[0] == "toast"],
+          len(f["spenti"]["carr"]))),
+        # 5) la pagina
+        ("la pagina conta i venditori", "2 venditori, una spedizione per carrello",
+         f["pagina"]["sub"]),
+        ("...un blocco per venditore, l'aperto in testa, coi nomi",
+         True, (f["pagina"]["html"].index('data-seller="10"')
+                < f["pagina"]["html"].index('data-seller="20"')
+                and "🛒 Anna" in f["pagina"]["html"]
+                and "🛒 Bruno" in f["pagina"]["html"])),
+        ("...articoli E pezzi quando differiscono, e il totale dei soli articoli",
+         True, ("2 articoli, 4 pezzi" in f["pagina"]["html"]
+                and "2500 sats" in f["pagina"]["html"]
+                and "1 articolo</span>" in f["pagina"]["html"]
+                and "2000 sats" in f["pagina"]["html"])),
+        ("...con «Apri» e «Controlla e paga» per ognuno", (2, 2),
+         (f["pagina"]["html"].count('onclick="apriCarrello('),
+          f["pagina"]["html"].count('onclick="pagaCarrello('))),
+        # 6) apri e paga
+        ("«Apri» rimonta il carrello da parte e apre la sua pagina",
+         ([[20, [[3, 1]], True], [10, [[1, 1], [2, 3]], False]], 3,
+          [["renderPacco"], ["go", "pacco"]]),
+         (f["apri"]["carr"], f["apri"]["cur"], f["apri"]["diario"])),
+        ("«Controlla e paga» rimonta l'altro e apre la cassa",
+         ([[10, [[1, 1], [2, 3]], True], [20, [[3, 1]], False]], 1,
+          [["apriAcquistoSet"]]),
+         (f["paga"]["carr"], f["paga"]["cur"], f["paga"]["diario"])),
+        # 7) svuotato
+        ("togliere l'ultima riga del carrello aperto lo chiude (paccoDati a null)",
+         ([[20, [[3, 1]], False]], None), (f["vuotato"]["carr"], f["vuotato"]["pacco"])),
+        ("...e la pagina lo dice con un blocco solo", 1,
+         f["paginaConUno"].count("carrello-blocco")),
+        ("senza carrelli la pagina lo dice, e il badge si spegne",
+         ("uno per venditore", True, False),
+         (f["paginaVuota"]["sub"], "Nessun carrello aperto" in f["paginaVuota"]["html"],
+          f["paginaVuota"]["badge"])),
+    ]
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
@@ -97657,6 +98057,7 @@ def main():
               prove_paga_ora,
               prove_catalogo_esterno,
               prove_modulo_negozio,
+              prove_carrelli_per_venditore,
               prove_script_nel_workflow, prove_deploy,
               prove_giudice_deploy, prove_collaudi_in_ci,
               prove_servizio_non_root,
