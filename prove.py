@@ -96,6 +96,22 @@ def reale(nome, extra=None):
     return amb[nome]
 
 
+def gemelli_trackbot(amb=None):
+    """I gemelli VERI della regola del client per il link a @trackbot
+    (25 set 2026: il codice di tracciamento cliccabile nei messaggi del
+    bot) — le due costanti e le quattro funzioni, montate in `amb` per i
+    banchi che eseguono segna_spedito, correggi_tracking o
+    _manda_telegram. Pezzi veri, mai stub (vedi `reale`)."""
+    amb = {} if amb is None else amb
+    src = _SORGENTE
+    i = src.index("TRACKBOT_START = ")
+    j = src.index('@app.post("/api/orders/{ordine_id}/spedito")', i)
+    amb.setdefault("re", re)
+    amb.setdefault("html", __import__("html"))
+    exec(src[i:j], amb)
+    return amb
+
+
 def cataloghi_zone():
     """I cataloghi delle zone e i loro tre lettori, VERI.
 
@@ -9255,6 +9271,7 @@ def prove_busta_ritiro():
                "BUSTE_DIR": buste_dir, "MAX_DOC_BUSTA": 15 * 1024 * 1024,
                "_e_immagine": lambda raw: True,
                "io": _io, "ImmaginePillow": _Im, "ImageOps": _IOps}
+        gemelli_trackbot(amb)   # il codice cliccabile del messaggio
         exec(pezzo("_cifra_contenuto"), amb)
         exec(pezzo("_decifra_contenuto"), amb)
         exec(pezzo("_cifra_blob"), amb)
@@ -15468,6 +15485,7 @@ def prove_notifica_fail_open():
 
         amb2 = {"httpx": type("H", (), {"AsyncClient": Cliente}),
                 "BOT_TOKEN": "finto", "MODALITA_COLLAUDO": False,
+                "TRACKBOT_START": gemelli_trackbot()["TRACKBOT_START"],
                 "spoglia_html": amb_s["spoglia_html"],
                 "print": lambda s: righe.append(s)}
         exec(pezzo_async("_manda_telegram"), amb2)
@@ -30581,6 +30599,7 @@ def prove_avviso_spedizione():
             return {"corriere": corriere, "tracking": tracking}
         amb["leggi_json"] = json_finto
 
+        gemelli_trackbot(amb)
         exec("async " + pezzo("segna_spedito"), amb)
         asyncio.run(amb["segna_spedito"](7, None, "", ""))
         return (detto[0] if detto else ""), scritto
@@ -30636,9 +30655,13 @@ def prove_avviso_spedizione():
           scritto["corriere"])
 
     # --- 5) e il caso normale non e' cambiato ----------------------
+    # QUESTA PROVA HA CAMBIATO LATO (25 set 2026): chiedeva il codice
+    # grassetto e basta; adesso il grassetto porta dentro il link a
+    # @trackbot, lo stesso che apre l'app (prove_tracciamento_nei_messaggi).
     testo, _ = gira("BRT", "0123456789")
-    prova("un corriere onesto esce come sempre", True,
-          "con <b>BRT</b>, tracciamento <b>0123456789</b>" in testo)
+    prova("un corriere onesto esce come sempre, col codice che si tocca",
+          True, "con <b>BRT</b>, tracciamento <b><a href=\"https://t.me/"
+          "trackbot?start=0123456789\">0123456789</a></b>" in testo)
 
     # --- 6) IL GEMELLO DEL RESO, che aveva lo stesso buco ----------
     # Stessa trappola, altra parte: qui il testo e' del COMPRATORE che
@@ -30707,6 +30730,354 @@ def prove_avviso_spedizione():
     prova("e nel reso lo stesso, dopo l'UPDATE", 0,
           corpo_reso.count("{corriere}") + corpo_reso.count("{tracking}"))
 
+
+def prove_tracciamento_nei_messaggi():
+    """IL CODICE DI TRACCIAMENTO CLICCABILE NEI MESSAGGI DEL BOT (25 set
+    2026, ritocco di Andrea). Nell'app il codice di un pacco in viaggio
+    apre @trackbot col codice nel link di avvio; nei messaggi del bot
+    adesso il codice e' un link allo STESSO indirizzo. La regola del
+    server e' una COPIA di quella del client (nudo_trackbot,
+    intermediario_noto, link_trackbot), e questa prova e' quel che le
+    tiene uguali: fa girare in node le funzioni VERE del client —
+    trackbotPossibile e attivaNotifichePacco, con un Telegram di
+    cartone che si segna l'indirizzo aperto — e chiede al server lo
+    stesso link, per ogni corriere del selettore e per i codici storti.
+    E TIENE FERMA L'APP: per ogni corriere il link del client dev'essere
+    quello scritto qui a mano il giorno del cantiere, cioe' quello che
+    l'app apriva prima. Se cambia il client, lo dice questa riga prima
+    di tutte le altre."""
+    print("\n[il codice di tracciamento cliccabile nei messaggi]")
+    import asyncio as _aio
+    import html as _html
+    import shutil
+    import subprocess as _sp
+    import tempfile as _tf
+    import time as _time
+    import types as _types
+    from html.parser import HTMLParser
+
+    mini = open("miniapp.html", encoding="utf-8").read()
+    g = gemelli_trackbot()
+    T = "https://t.me/trackbot?start="
+
+    # --- 1) le due copie dicono la stessa cosa, anche a leggerle ----
+    # Prima del comportamento, i due pezzi che si copiano per testo:
+    # l'indirizzo e la lista degli intermediari. Se uno si muove, la
+    # rossa nomina il pezzo invece di cento codici.
+    url_app = re.search(r"const url = `([^`$]+)\$\{nudo\}`;",
+                        pezzo_js(mini, "async function attivaNotifichePacco",
+                                 "\n}\n"))
+    prova("l'indirizzo del server e' quello dell'app",
+          url_app.group(1) if url_app else "?", g["TRACKBOT_START"])
+    lista = re.search(r"const INTERMEDIARI = \[([^\]]+)\]", mini)
+    prova("...e gli intermediari sono gli stessi, nello stesso ordine",
+          tuple(re.findall(r"'([^']+)'", lista.group(1))) if lista else (),
+          g["INTERMEDIARI_TRACKING"])
+
+    # --- 2) IL LINK DELL'APP PER OGNI CORRIERE, COM'ERA -------------
+    # Codici SINTETICI della forma di ogni corriere, scritti come la
+    # gente li scrive (minuscole, spazi, trattini): un tracciamento
+    # vero e' di una spedizione di qualcuno, e nel repo non ci va.
+    PRIMA = {
+        "Poste Italiane":  ("rr 123 456 789 it", T + "RR123456789IT"),
+        "BRT":             ("0123-456789", T + "0123456789"),
+        "GLS":             ("ab 123456789", T + "AB123456789"),
+        "SDA":             ("123456789012", T + "123456789012"),
+        "DHL":             ("JJD-0146 0000 3522 46",
+                            T + "JJD01460000352246"),
+        "UPS":             ("1z 999 aa1 01 2345 6784",
+                            T + "1Z999AA10123456784"),
+        "InPost":          ("6300 0123 4567 8901 2345 6789",
+                            T + "630001234567890123456789"),
+        # sotto il filtro di trackbot il link c'e' lo stesso: il filtro
+        # decide le PAROLE della didascalia, mai la presenza del link
+        "Altro corriere":  ("abc_12", T + "ABC12"),
+        # la sentinella non ha tracciamento: niente da toccare
+        "Consegna a mano": ("", ""),
+    }
+    corrieri = re.search(r"const CORRIERI = \[([^\]]+)\]", mini)
+    nomi = re.findall(r"'([^']+)'", corrieri.group(1)) if corrieri else []
+    prova("ogni corriere del selettore del client ha la sua riga qui",
+          sorted(PRIMA), sorted(nomi))
+    # I CODICI STORTI sono quelli dove due copie di una regola si
+    # separano: le maiuscole che si ALLARGANO (ß → SS, ŉ → ʼN, le
+    # legature), il segno del Kelvin che in minuscolo diventa una «k»
+    # vera (e fa riconoscere un intermediario scritto di sbieco), le
+    # cifre larghe, gli spazi invisibili, un'emoji fatta di due
+    # surrogati in JS e di un carattere solo in Python.
+    STORTI = [
+        "1UW1YZL046050",                  # il Poste del caso di Andrea
+        "AB<script>12", "12\"34&56'78", "<b>x</b>9876543",
+        "straße 1234", "ſ12345678", "ﬁ 12345678", "ŉ12345678",
+        "İ12345678", "１２３ABC45678", "📦 123456789",
+        "rr\u200b123\u00a0456 789it",
+        "PACKLINK-4471", "pac\u212alink 123", "Sendcloud 998877",
+        # la s lunga resta se stessa in minuscolo, in JS e in Python
+        # (un casefold la farebbe «s» e vedrebbe un Sendcloud)
+        "\u017fendcloud 12345678",
+        "IT2026COM0001",                  # l'ordine NUDO: il link c'e'
+        "---", "   ", "",
+    ]
+    casi = [c for c, _ in PRIMA.values()] + STORTI
+
+    node = shutil.which("node")
+    if not node:
+        salta("il link dell'app e quello del bot coincidono",
+              "node non c'e'")
+        app = {}
+    else:
+        js = (pezzo_js(mini, "const FILTRO_TRACKBOT") + "\n"
+              + pezzo_js(mini, "const INTERMEDIARI =") + "\n"
+              + pezzo_js(mini, "function trackbotPossibile") + "\n"
+              + pezzo_js(mini, "async function attivaNotifichePacco",
+                         "\n}\n") + "\n}\n" + r"""
+let currentOrder = null, aperto = '';
+function haptic(){}
+function toast(){}
+const navigator = {clipboard: {writeText: async () => {}}};
+const tg = {initData: 'x', openTelegramLink: u => { aperto = u; }};
+const window = {open: u => { aperto = u; }};
+async function tocca(o){
+  currentOrder = o; aperto = '';
+  await attivaNotifichePacco();
+  return aperto;
+}
+(async () => {
+  const out = {};
+  for (const c of CASI) {
+    const o = {tracking: c};
+    // il codice si tocca solo dove l'app lo fa toccabile
+    if (!trackbotPossibile(o, 'shipped')) { out[c] = ['', '']; continue; }
+    tg.initData = 'x';
+    const dentro = await tocca(o);          // dentro Telegram
+    tg.initData = '';
+    const fuori = await tocca(o);           // nel browser
+    out[c] = [dentro, fuori];
+  }
+  console.log(JSON.stringify(out));
+})();
+""").replace("CASI", json.dumps(casi))
+        with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                    encoding="utf-8") as fh:
+            fh.write(js)
+            percorso = fh.name
+        r = _sp.run([node, percorso], capture_output=True, text=True,
+                    encoding="utf-8", errors="replace")
+        os.unlink(percorso)
+        try:
+            app = json.loads(r.stdout.strip().splitlines()[-1])
+        except Exception:
+            app = {}
+            print(r.stderr[-600:])
+        prova("il banco del client ha risposto su tutti i codici",
+              len(set(casi)), len(app))
+        for corriere, (codice, atteso) in PRIMA.items():
+            prova(f"app invariata, {corriere}: apre l'indirizzo di prima",
+                  atteso, app.get(codice, ["?"])[0])
+            prova(f"...e il bot porta allo stesso indirizzo ({corriere})",
+                  app.get(codice, ["?"])[0], g["link_trackbot"](codice))
+        storti = [c for c in STORTI
+                  if app.get(c, ["?"])[0] != g["link_trackbot"](c)]
+        prova(f"i {len(STORTI)} codici storti: stesso link nell'app e "
+              f"nel bot", [], storti)
+        prova("...compresi l'intermediario di sbieco (niente link) e "
+              "l'ordine nudo (il link c'e')",
+              ("", T + "IT2026COM0001"),
+              (app.get("pac\u212alink 123", ["?"])[0],
+               app.get("IT2026COM0001", ["?"])[0]))
+        prova("...e il Poste del caso vero", T + "1UW1YZL046050",
+              g["link_trackbot"]("1UW1YZL046050"))
+        prova("dentro e fuori da Telegram l'app apre lo stesso indirizzo",
+              [], [c for c, (d, f) in app.items() if d != f])
+
+    # --- 3) IL FRAMMENTO: leggibile, copiabile, scappato ------------
+    # Si legge con un parser HTML vero, che e' quel che fa Telegram
+    # prima di rifiutare un messaggio: tag pari e annidati giusti, il
+    # testo visibile uguale al codice come l'ha scritto il venditore
+    # (e' quello che si legge e si copia), e nell'href solo il nudo.
+    class Lettore(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.testo, self.pila, self.href, self.storto = "", [], [], False
+
+        def handle_starttag(self, tag, attrs):
+            if tag not in ("a", "b"):
+                self.storto = True
+            if tag == "a":
+                self.href.append(dict(attrs).get("href", ""))
+            self.pila.append(tag)
+
+        def handle_endtag(self, tag):
+            if not self.pila or self.pila.pop() != tag:
+                self.storto = True
+
+        def handle_data(self, d):
+            self.testo += d
+
+    def leggi(frammento):
+        lt = Lettore()
+        lt.feed(frammento)
+        lt.close()
+        return lt
+
+    leggibili, scappati, link_giusti = [], [], []
+    for c in casi:
+        if not c:
+            continue
+        lt = leggi(g["codice_tracking_bot"](c))
+        if lt.testo != c:
+            leggibili.append(c)
+        if lt.storto or lt.pila:
+            scappati.append(c)
+        atteso = [g["link_trackbot"](c)] if g["link_trackbot"](c) else []
+        if lt.href != atteso or not all(
+                re.fullmatch(r"https://t\.me/trackbot\?start=[A-Z0-9]+", h)
+                for h in lt.href):
+            link_giusti.append(c)
+    prova("il codice resta leggibile e copiabile com'e' scritto", [],
+          leggibili)
+    prova("...i caratteri strani escono scappati (tag pari, niente "
+          "tag loro)", [], scappati)
+    prova("...e il link e' uno, di sole maiuscole e cifre, dove l'app "
+          "lo apre", [], link_giusti)
+    prova("il grassetto resta quello di sempre", True,
+          g["codice_tracking_bot"]("PACKLINK-4471")
+          == "<b>PACKLINK-4471</b>")
+
+    # --- 4) I MESSAGGI VERI --------------------------------------
+    # Le funzioni vere del server, coi soli pezzi che guardano. Il
+    # codice e' quello del caso di Andrea.
+    COD = "1UW1YZL046050"
+    FRAMMENTO = g["codice_tracking_bot"](COD)
+
+    def spedisci(**extra):
+        o = {"id": 7, "compratore_id": 111, "venditore_id": 222,
+             "stato": "locked", "consegna_scelta": "spedizione",
+             "annuncio_id": 3, "via_punto": 0, "punto_ritiro": "",
+             "busta_il": 0, "indirizzo_atteso": 0, "indirizzo_il": 0}
+        diretta = extra.pop("diretta", False)
+        o.update(extra)
+        detto = []
+
+        class Con:
+            def execute(self, sql, par=()):
+                if sql.startswith("SELECT * FROM ordini"):
+                    return _types.SimpleNamespace(fetchone=lambda: o)
+                return _types.SimpleNamespace(fetchone=lambda: None,
+                                              fetchall=lambda: [])
+
+            def commit(self): pass
+
+            def close(self): pass
+
+        async def notifica_finta(chi, testo, *a, **k):
+            detto.append(testo)
+
+        async def json_finto(req):
+            return {"corriere": "Poste Italiane", "tracking": COD,
+                    "busta_diretta": diretta}
+
+        amb = gemelli_trackbot({
+            "time": _time, "db": lambda: Con(), "notifica": notifica_finta,
+            "MSG_BUSTA_PRONTA": "il pacco ti aspetta",
+            "Header": lambda d="": d, "Cookie": lambda d="": d,
+            "Request": object, "leggi_json": json_finto,
+            "verifica_utente": lambda *a: {"id": 222},
+            "HTTPException": type("HTTPException", (Exception,), {})})
+        exec("async " + pezzo("segna_spedito"), amb)
+        _aio.run(amb["segna_spedito"](7, None, "", ""))
+        return detto[0] if detto else ""
+
+    for nome, extra in (("a casa", {}),
+                        ("verso il punto di ritiro",
+                         {"via_punto": 1, "punto_ritiro": "Locker InPost"}),
+                        ("verso il punto, busta diretta",
+                         {"via_punto": 1, "punto_ritiro": "Locker InPost",
+                          "diretta": True})):
+        testo = spedisci(**extra)
+        prova(f"«in viaggio» {nome}: il codice e' il link dell'app", True,
+              f"tracciamento {FRAMMENTO}" in testo)
+
+    def correggi(reso):
+        o = {"id": 9, "compratore_id": 111, "venditore_id": 222,
+             "corriere": "Poste Italiane", "tracking": "VECCHIO",
+             "corriere_reso": "Poste Italiane", "tracking_reso": "VECCHIO",
+             "consegna_scelta": "spedizione"}
+        detto = []
+
+        class Con:
+            def execute(self, sql, par=()):
+                return _types.SimpleNamespace(fetchone=lambda: o)
+
+            def commit(self): pass
+
+            def close(self): pass
+
+        async def notifica_finta(chi, testo, *a, **k):
+            detto.append((chi, testo))
+
+        async def json_finto(req):
+            return {"corriere": "Poste Italiane", "tracking": COD,
+                    "reso": reso}
+
+        amb = gemelli_trackbot({
+            "time": _time, "db": lambda: Con(), "notifica": notifica_finta,
+            "Header": lambda d="": d, "Cookie": lambda d="": d,
+            "Request": object, "leggi_json": json_finto,
+            "verifica_utente": lambda *a: {"id": 999},
+            "e_admin": lambda i: True,
+            "CORRIERI_SENTINELLA": ("Consegna a mano", "Ritiro in zona",
+                                    "Consegna digitale"),
+            "registra_moderazione": lambda *a, **k: None,
+            "HTTPException": type("HTTPException", (Exception,), {})})
+        exec("async " + pezzo("correggi_tracking"), amb)
+        _aio.run(amb["correggi_tracking"](9, None, "", ""))
+        return detto[0]
+
+    chi, testo = correggi(False)
+    prova("la correzione del moderatore: al compratore, col link", (111, True),
+          (chi, f"tracciamento {FRAMMENTO}." in testo))
+    chi, testo = correggi(True)
+    # IL RESO RESTA TESTO, ed e' la regola dell'app e non una svista:
+    # li' il codice del reso non apre trackbot (ha il suo «segui →»).
+    prova("...quella del reso al venditore, e il codice resta testo",
+          (222, True, False),
+          (chi, f"tracciamento <b>{COD}</b>." in testo, T in testo))
+    prova("l'avviso del reso non passa dal link", False,
+          "codice_tracking_bot" in pezzo("reso_spedito"))
+
+    # --- 5) IL TRASPORTO: niente scheda d'anteprima, e il DM Nostr --
+    mandati = []
+
+    class Cliente:
+        def __init__(self, timeout=None): pass
+
+        async def __aenter__(self): return self
+
+        async def __aexit__(self, *a): return False
+
+        async def post(self, url, json=None):
+            mandati.append(json)
+            return _types.SimpleNamespace(
+                status_code=200, text='{"result": {"message_id": 1}}')
+
+    sp = {"html": _html, "re": re}
+    exec(pezzo("spoglia_html"), sp)
+    amb = gemelli_trackbot({
+        "MODALITA_COLLAUDO": False, "BOT_TOKEN": "t", "json": json,
+        "spoglia_html": sp["spoglia_html"], "print": lambda *a: None,
+        "httpx": _types.SimpleNamespace(AsyncClient=Cliente)})
+    exec("async " + pezzo("_manda_telegram"), amb)
+    testo = spedisci()
+    _aio.run(amb["_manda_telegram"](111, testo))
+    _aio.run(amb["_manda_telegram"](111, "🔒 <b>Venduto</b> <a href="
+                                         "\"https://barattolo.store\">x</a>"))
+    prova("col link a trackbot la scheda d'anteprima si spegne", True,
+          mandati[0].get("disable_web_page_preview"))
+    prova("...solo li': gli altri avvisi partono come sempre",
+          {"chat_id", "text", "parse_mode"}, set(mandati[1]))
+    prova("il DM Nostr (testo puro) porta il codice com'e' scritto", True,
+          f"tracciamento {COD}!" in sp["spoglia_html"](testo))
 
 # ====================================================================
 def prove_ricevuta_compratore():
@@ -31148,6 +31519,7 @@ def prove_titoli_scappati():
         exec(pezzo("spoglia_html"), spoglia)
         amb = {"MODALITA_COLLAUDO": False, "BOT_TOKEN": "t",
                "spoglia_html": spoglia["spoglia_html"],
+               "TRACKBOT_START": gemelli_trackbot()["TRACKBOT_START"],
                # il `timeout=` e' arrivato con la cura dell'ordine
                # 151 (set 2026): senza il parametro qui, il banco
                # rispondeva TypeError e questa prova usciva rossa
@@ -77931,6 +78303,7 @@ def prove_telegram_simulato_collaudo():
             return {"ok": True}
     stampe = []
     amb = {"MODALITA_COLLAUDO": True, "httpx": _Httpx, "BOT_TOKEN": "x",
+           "TRACKBOT_START": gemelli_trackbot()["TRACKBOT_START"],
            "print": lambda *a, **k: stampe.append(" ".join(map(str, a)))}
     exec("async " + pezzo("_manda_telegram"), amb)
     esiti = [_aio.new_event_loop().run_until_complete(
@@ -78360,6 +78733,7 @@ def prove_p2p_esito_notifiche():
         exec(pezzo("spoglia_html"), amb_s)
         amb = {"httpx": type("H", (), {"AsyncClient": Cliente}), "json": json,
                "BOT_TOKEN": "finto", "MODALITA_COLLAUDO": False,
+               "TRACKBOT_START": gemelli_trackbot()["TRACKBOT_START"],
                "spoglia_html": amb_s["spoglia_html"],
                "print": lambda *a, **k: righe.append(" ".join(str(x) for x in a))}
         exec("async " + pezzo("_manda_telegram"), amb)
@@ -100853,6 +101227,7 @@ def main():
               prove_posizione_vetrina, prove_anteprime, prove_seo,
               prove_onion,
               prove_impersonazione, prove_avviso_spedizione,
+              prove_tracciamento_nei_messaggi,
               prove_niente_passo_intermedio,
               prove_ricevuta_compratore, prove_titoli_scappati,
               prove_timbri_periodici, prove_offerta_quantita,

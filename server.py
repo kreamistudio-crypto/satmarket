@@ -13277,9 +13277,16 @@ async def _manda_telegram(tg_id: int, testo: str):
         print(f"📨 [notifica simulata per utente {tg_id}] {testo}")
         return "simulata (collaudo)"
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    dati = {"chat_id": tg_id, "text": testo, "parse_mode": "HTML"}
+    # IL CODICE DI TRACCIAMENTO CLICCABILE (25 set 2026): un link a
+    # @trackbot si porterebbe dietro la scheda d'anteprima del bot
+    # sotto l'avviso. Il link e' il codice stesso, e basta lui: la
+    # scheda si spegne SOLO su questi messaggi — gli altri avvisi coi
+    # loro link restano come sono sempre stati.
+    if TRACKBOT_START in testo:
+        dati["disable_web_page_preview"] = True
     async with httpx.AsyncClient(timeout=20) as c:
-        r = await c.post(url, json={"chat_id": tg_id, "text": testo,
-                                    "parse_mode": "HTML"})
+        r = await c.post(url, json=dati)
         if r.status_code == 400 and "parse" in r.text.lower():
             print(f"⚠️ HTML rifiutato da Telegram per l'utente {tg_id}: "
                   f"rimando spoglio. Da scappare alla fonte — {r.text[:200]}")
@@ -35057,6 +35064,65 @@ async def nascondi_ordine(ordine_id: int, req: Request,
     return {"ok": True, "nascosto": valore}
 
 
+# IL CODICE DI TRACCIAMENTO SI TOCCA ANCHE NEI MESSAGGI DEL BOT (25 set
+# 2026, ritocco di Andrea). Nell'app il codice di un pacco in viaggio
+# apre @trackbot col codice nel link di avvio (`attivaNotifichePacco`
+# in miniapp.html); nei messaggi del bot il codice era grassetto e
+# basta. Adesso e' un link che porta allo STESSO indirizzo, fatto con
+# la STESSA regola — e la regola qui e' una COPIA di quella del
+# client, non una nuova: `nudoTrackbot` (maiuscole, via tutto quel che
+# non e' A-Z o cifra — il filtro di trackbot, vedi il commento lassu')
+# e `intermediarioNoto` (un codice che nomina un intermediario resta
+# testo, come nell'app, dove un link a vuoto e' peggio di nessun
+# link). Due copie di una regola sono il posto dove un giorno si dice
+# una cosa e se ne fa un'altra: a tenerle uguali e' la prova
+# prove_tracciamento_nei_messaggi, che fa girare le funzioni VERE del
+# client in node sugli stessi codici e chiede lo stesso link.
+# IL CLIENT NON SI TOCCA: la regola si e' copiata qui invece di
+# spostarla, e la stessa prova tiene fermo il link dell'app per ogni
+# corriere contro i valori scritti a mano del giorno del cantiere.
+# Quel che si LEGGE nel messaggio resta il codice come l'ha scritto
+# il venditore (scappato: e' testo suo su un tubo HTML), e resta
+# copiabile col testo del messaggio; solo il link porta il nudo.
+TRACKBOT_START = "https://t.me/trackbot?start="
+INTERMEDIARI_TRACKING = ("packlink", "sendcloud", "spedirecomodo",
+                         "shippypro", "sendabox", "qapla")
+
+
+def nudo_trackbot(tracking: str) -> str:
+    """Il gemello di `nudoTrackbot` del client: quel che va A TRACKBOT."""
+    return re.sub(r"[^A-Z0-9]", "", (tracking or "").upper())
+
+
+def intermediario_noto(tracking: str) -> str:
+    """Il gemello di `intermediarioNoto` del client: il nome
+    dell'intermediario che il codice nomina, o ''."""
+    lettere = re.sub(r"[^a-z]", "", (tracking or "").lower())
+    return next((n for n in INTERMEDIARI_TRACKING if n in lettere), "")
+
+
+def link_trackbot(tracking: str) -> str:
+    """L'indirizzo che l'app apre toccando il codice, o '' dove l'app
+    il codice lo lascia testo (intermediario) o il tocco non apre
+    niente (nessuna lettera ne' cifra)."""
+    nudo = nudo_trackbot(tracking)
+    if not nudo or intermediario_noto(tracking):
+        return ""
+    return TRACKBOT_START + nudo
+
+
+def codice_tracking_bot(tracking: str) -> str:
+    """Il codice di un pacco in viaggio dentro un messaggio del bot:
+    grassetto come sempre, e un link a @trackbot dove l'app lo apre.
+    Il testo e' il codice del venditore scappato; nell'href va solo il
+    nudo, che e' fatto di A-Z e cifre e non ha niente da scappare."""
+    link = link_trackbot(tracking)
+    testo = html.escape(tracking or "")
+    if not link:
+        return f"<b>{testo}</b>"
+    return f'<b><a href="{link}">{testo}</a></b>'
+
+
 @app.post("/api/orders/{ordine_id}/spedito")
 async def segna_spedito(ordine_id: int, req: Request,
                         x_tg_init_data: str = Header(""),
@@ -35187,7 +35253,10 @@ async def segna_spedito(ordine_id: int, req: Request,
     # non se ne accorge nessuno. Si escapa QUI e non a monte: nel
     # database, e nei confronti coi corrieri-sentinella, corriere e
     # tracciamento devono restare quelli che il venditore ha scritto.
-    corr_e, track_e = html.escape(corriere), html.escape(tracking)
+    # Il tracciamento esce dal gemello del client: scappato come il
+    # corriere, e link a @trackbot dove l'app lo apre (vedi
+    # codice_tracking_bot, qui sopra) — il grassetto ce l'ha gia'.
+    corr_e, track_e = html.escape(corriere), codice_tracking_bot(tracking)
     if corriere == "Ritiro in zona":
         await notifica(o["compratore_id"],
                        f"🤝 <b>Il venditore ha segnato la consegna a mano</b>. "
@@ -35207,7 +35276,7 @@ async def segna_spedito(ordine_id: int, req: Request,
             # nell'ordine», che non arrivera' mai — lo manda il
             # corriere ai recapiti del compratore, e lo si dice.
             dettaglio = (f" con <b>{corr_e}</b>, tracciamento "
-                         f"<b>{track_e}</b>" if tracking else "")
+                         f"{track_e}" if tracking else "")
             await notifica(o["compratore_id"],
                 f"📦 <b>Il tuo oggetto è in viaggio verso il punto di "
                 f"ritiro</b>{dettaglio}! Il venditore ha indicato i "
@@ -35219,13 +35288,13 @@ async def segna_spedito(ordine_id: int, req: Request,
             # al venditore quando il pacco e' al punto — e sara' il
             # deposito della busta a dire «ti aspetta».
             dettaglio = (f" con <b>{corr_e}</b>, tracciamento "
-                         f"<b>{track_e}</b>" if tracking else "")
+                         f"{track_e}" if tracking else "")
             await notifica(o["compratore_id"],
                 f"📦 <b>Il tuo oggetto è in viaggio verso il punto di "
                 f"ritiro</b>{dettaglio}! Ti avviseremo quando il nome "
                 f"e il codice per ritirarlo saranno nell'ordine.")
         return {"ok": True}
-    dettaglio = (f"con <b>{corr_e}</b>, tracciamento <b>{track_e}</b>"
+    dettaglio = (f"con <b>{corr_e}</b>, tracciamento {track_e}"
                  if tracking else "in consegna a mano")
     await notifica(o["compratore_id"],
                    f"📦 <b>Il tuo oggetto è in viaggio</b> {dettaglio}! "
@@ -49598,12 +49667,17 @@ async def correggi_tracking(ordine_id: int, req: Request,
         titolo=f"ordine #{ordine_id}", deciso_da=user["id"])
     # Avvisa CHI ASPETTA IL PACCO: il compratore sulla spedizione, il
     # venditore sul reso (e' lui che sta aspettando indietro l'oggetto).
+    # Il codice nuovo della SPEDIZIONE e' un link a @trackbot come
+    # nell'app (codice_tracking_bot); quello del RESO resta testo,
+    # perche' nell'app il codice del reso non apre trackbot.
+    track_e = (f"<b>{html.escape(tracking)}</b>" if reso
+               else codice_tracking_bot(tracking))
     await notifica(
         o["venditore_id"] if reso else o["compratore_id"],
         f"📦 <b>Un moderatore ha corretto il tracciamento</b>"
         f"{' del reso' if reso else ''} dell'ordine #{ordine_id}: ora è "
         f"<b>{html.escape(corriere)}</b>, tracciamento "
-        f"<b>{html.escape(tracking)}</b>. Il codice di prima non era "
+        f"{track_e}. Il codice di prima non era "
         f"quello del corriere.")
     return {"ok": True, "corriere": corriere, "tracking": tracking,
             "corretto_il": ora}

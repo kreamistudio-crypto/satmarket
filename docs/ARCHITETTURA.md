@@ -19275,6 +19275,24 @@
   DENTRO IL COMMENTO due righe sopra la costante — allargare il
   filtro non la faceva rossa. Ora guarda la costante. Una sentinella
   si scrive rompendo il codice, non rileggendola.
+  IL CODICE SI TOCCA ANCHE NEI MESSAGGI DEL BOT (25 set 2026, ritocco
+  di Andrea): negli avvisi che citano il codice di un pacco in viaggio
+  — «in viaggio» (a casa, verso il punto, busta diretta) e la
+  correzione del moderatore sulla spedizione — il codice è un link
+  allo STESSO indirizzo che apre l'app. La regola sul server è una
+  COPIA di quella del client (`nudo_trackbot`, `intermediario_noto`,
+  `link_trackbot`, `codice_tracking_bot`, accanto a `segna_spedito`),
+  non uno spostamento: il client non si tocca. A tenerle uguali è
+  `prove_tracciamento_nei_messaggi`, che fa girare in node
+  `trackbotPossibile` e `attivaNotifichePacco` VERE e confronta i due
+  link per ogni corriere del selettore e per i codici storti (ß, s
+  lunga, Kelvin, legature, emoji, spazi invisibili), e tiene fermo il
+  link dell'app contro i valori scritti il giorno del cantiere. Il
+  RESO resta testo, come nell'app (lì ha il suo «segui →» a
+  17track). Il testo del link è il codice del venditore scappato — si
+  legge e si copia col messaggio — e nell'href va solo il nudo;
+  `_manda_telegram` spegne la scheda d'anteprima SOLO sui messaggi
+  che portano quel link.
   `POST /api/orders/{id}/punto-ritiro` è la RETE DI SICUREZZA: solo
   il COMPRATORE, solo su 'locked', solo sulla via punto — il punto
   scelto in pagina si CORREGGE finché il venditore non spedisce (un

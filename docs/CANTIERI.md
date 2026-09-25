@@ -33135,3 +33135,70 @@ sette distanze fra le voci misurate a 8px, raggio 12, nessuno
 scorrimento laterale; la sonda del contrasto sui 220 testi delle voci
 dice lo stesso del giro prima (sotto soglia solo il bianco sui bottoni
 arancio, sul loro fondo, e il falso allarme del distintivo).
+
+## Il codice di tracciamento cliccabile nei messaggi del bot (25 set 2026)
+
+Ritocco di Andrea. Nell'app, toccando il codice di un pacco in viaggio,
+si apre @trackbot col codice nel link di avvio
+(`https://t.me/trackbot?start=<nudo>`); nei messaggi del bot il codice
+era grassetto e basta. Adesso è un link allo STESSO indirizzo.
+IL CENSIMENTO dei messaggi del bot che citano un codice di
+tracciamento: sei. CAMBIATI quattro — i tre «📦 Il tuo oggetto è in
+viaggio» di `segna_spedito` (a casa, verso il punto di ritiro, verso il
+punto con la busta diretta) e l'avviso al compratore di
+`correggi_tracking` quando il moderatore corregge il codice della
+SPEDIZIONE. LASCIATI TESTO due, per scelta: «↩️ Il reso è in viaggio»
+di `reso_spedito` e la correzione del codice del RESO — nell'app il
+codice del reso non apre trackbot (ha il suo «segui →» a 17track), e il
+link del bot fa quel che fa l'app, non di più. Il pannello del punto
+di Barattolo e la nota ai moderatori non sono messaggi del bot col
+codice (la prima è un'API, la seconda non lo cita).
+LA REGOLA È COPIATA, NON SPOSTATA: sul server `nudo_trackbot`,
+`intermediario_noto`, `link_trackbot` e `codice_tracking_bot`, accanto
+a `segna_spedito`, gemelli di `nudoTrackbot`, `intermediarioNoto` e
+del link di `attivaNotifichePacco`. Il client non si tocca: spostare la
+funzione in un punto comune avrebbe voluto dire servire JS al server o
+Python al client, e il rischio di cambiare il link dell'app era
+proprio quello da non correre. Dove l'app lascia il codice testo
+(intermediario riconosciuto per nome) o il tocco non apre niente
+(nessuna lettera né cifra) anche il messaggio lo lascia testo.
+LEGGIBILE E COPIABILE: il testo del link è il codice come l'ha scritto
+il venditore, scappato con `html.escape` (è testo suo su un tubo
+HTML); nell'href va solo il nudo, fatto di A-Z e cifre, che non ha
+niente da scappare. Si copia col testo del messaggio; un tocco lungo
+sul link copia l'indirizzo. Il `<code>` di Telegram (tocca-per-copiare)
+SCARTATO: le entità code e link non si annidano (regola della Bot API),
+e un codice ripetuto due volte nella stessa riga era peggio. Il DM
+Nostr, che è testo puro, porta il codice com'è scritto.
+LA SCHEDA D'ANTEPRIMA: un link a t.me/trackbot si porterebbe dietro la
+scheda del bot sotto l'avviso. `_manda_telegram` la spegne SOLO sui
+messaggi che portano quel link; gli altri avvisi coi loro link partono
+come sempre.
+PROVATO: prove_tracciamento_nei_messaggi (39) — i due pezzi copiati
+per testo (indirizzo e intermediari) uguali ai due lati; in node le
+funzioni VERE del client (`trackbotPossibile` e `attivaNotifichePacco`
+con un Telegram di cartone che si segna l'indirizzo aperto) contro
+quelle del server, per ogni corriere del selettore — ogni corriere del
+client deve avere la sua riga — con il link dell'app confrontato coi
+valori scritti a mano il giorno del cantiere («app invariata»), e per
+20 codici storti (ß, s lunga, Kelvin, legature, I col punto, cifre
+larghe, emoji, spazi invisibili, «<script>», virgolette, intermediari
+dritti e di sbieco, l'ordine nudo, vuoti); il frammento letto con un
+parser HTML vero (tag pari, testo visibile uguale al codice, un solo
+href di sole maiuscole e cifre); i messaggi veri dei quattro posti e
+dei due lasciati testo; l'anteprima spenta solo lì. Emendate col perché
+prove_avviso_spedizione (il codice ora porta il link) e i banchi che
+eseguono `segna_spedito` e `_manda_telegram` (montano i gemelli veri,
+`gemelli_trackbot`). Tortura: 13 mutazioni su 13 prese, sei sul server,
+tre sul client, quattro sul trasporto e sui posti — al primo giro il
+casefold al posto del lower passava muto, e l'ha preso la s lunga di
+«ſendcloud», che JS e Python lasciano s lunga e il casefold no. Suite
+intera severa senza config nel worktree ribasato su b71502b: 16.070
+verdi e 0 rosse; i 24 collaudi della CI più busta diretta, punto
+concordato ed email del corriere verdi nella gabbia senza rete.
+`collaudo_punti_barattolo` (fuori dalla CI) è rosso con 5 fallite
+IDENTICHE su origin/main pulito (`paga_finta` senza `riga=`): non è di
+questo cantiere.
+DA GUARDARE SUL TELEFONO: al prossimo ordine spedito, che il codice
+nell'avviso si tocchi e apra @trackbot col codice dentro, e che sotto
+l'avviso non compaia la scheda del bot.
