@@ -27565,6 +27565,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `_volti_persone`), sempre da `livello_utente`, mai gli XP; non sta in
   `CAMPI_VETRINA`. Lo sconto fedeltà del P2P si scrive con
   `scontoFedeltaTestoP2P(punti)` («sconto dello 0,5%», punti dal
-  config via `/api/me.p2p_sconto`) in tutti i posti che lo dicono, e
-  il conto mostra l'aliquota piena accanto al cartello dello sconto:
-  nessun testo dice la cifra finale di chi ha lo sconto.
+  config via `/api/me.p2p_sconto`) nel cassetto del livello, nel foglio
+  «Pubblica» e in Info P2P. Il CONTO DELLO SCAMBIO è l'eccezione voluta
+  (ritocco dello stesso giorno): la riga dice la MIA aliquota
+  (`feeMiaP2P`, fee viva meno lo sconto) e `cartelloFeeP2P` mette
+  accanto la pastiglia del motivo, «🌱 Pioniere» o «Lv. N» con
+  `LIVELLO_SCONTO_P2P`.

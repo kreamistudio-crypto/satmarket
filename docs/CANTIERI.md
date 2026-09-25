@@ -32701,3 +32701,37 @@ La card dell'altra parte non l'ho vista dal vivo (vuole uno scambio con
 le parti note): la coprono la sentinella e il campo del server.
 **DA AVERE IL TELEFONO:** il cassetto e una card della classifica con un
 titolo lungo, e il conto di uno scambio vero con lo sconto.
+
+## Il conto dello scambio torna alla pastiglia del motivo (25 set 2026)
+
+Ritocco di Andrea su d717b12, che nel conto dello scambio P2P aveva
+messo l'aliquota PIENA con accanto «sconto dello 0,5%». Torna com'era:
+chi ha lo sconto legge «Fee Barattolo 1%» con la pastiglia del motivo,
+«🌱 Pioniere» o «Lv. 5» (pioniere E livello 5 = il solo «🌱 Pioniere»,
+che e' il motivo che sceglie il server); chi non ce l'ha legge «Fee
+Barattolo 1,5%». La percentuale resta CALCOLATA — la fee viva di mostro
+meno lo sconto del config (`feeMiaP2P`), mai scritta a mano — quindi il
+giorno che la beta finisce cambia da sola; e il «5» della pastiglia e'
+`LIVELLO_SCONTO_P2P`, il gemello del server. «sconto non verificato» e
+«beta» restano com'erano.
+Il resto di d717b12 non si tocca: «Lv. N» accanto al titolo e le frasi
+«sconto dello 0,5%» nel cassetto Livello e titolo, nel foglio «Pubblica»
+e in Info P2P. Il riquadro del foglio «Pubblica» chiedeva quella frase
+al CARTELLO del conto: adesso la chiede direttamente a
+`scontoFedeltaTestoP2P`, che resta il testo unico di quei tre posti.
+
+**PROVATO.** Il banco di `prove_p2p_sconto` (pastiglie «🌱 Pioniere» e
+«Lv. 5» accanto all'1%, gli stessi sats), `prove_livello_accanto_al_titolo`
+(la MIA aliquota nel conto e niente `feePiena`, la pastiglia dal giudice,
+il 5 mai scritto a mano, lo sconto mancato che vince sul motivo; il
+riquadro «Pubblica» che dice ancora lo sconto) e la sentinella di
+`prove_p2p_pubblica` riportata a `mezzaCommissioneP2P(fee)`. Suite
+intera severa senza config nel worktree da origin/main (d717b12):
+15.926 verdi e 0 rosse. Dal vivo su una copia col server di collaudo
+(relay morto, sconto a 0,5), a 375 px nei due temi via CDP, il conto
+coi quattro volti veri di /api/me: pioniere al 3 «1% 🌱 Pioniere»,
+livello 5 «1% Lv. 5», nessuno sconto «1,5%» senza pastiglia, pioniere
+E livello 5 «1% 🌱 Pioniere»; il riquadro «Pubblica» dice ancora lo
+sconto. ⚠️ Seminando a mano la coorte vuota il server la RIASSEGNA
+(i primi cento sono pionieri): per un non-pioniere si scrive
+`primi_giorni`, che resta congelata.

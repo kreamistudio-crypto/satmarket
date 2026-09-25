@@ -62051,10 +62051,8 @@ def prove_p2p_pubblica():
           in pezzo_js(mini, "function rigaTettoFeeP2P(){", "\n}\n"))
     prova("la quota di chi legge ha un giudice solo", 1,
           mini.count("(n * 50).toLocaleString("))
-    # dal 25 set 2026 il conto scrive l'aliquota PIENA (`feePiena`) e lo
-    # sconto nel cartello: e' sempre il giudice a fare la meta'
     prova("...e il conto lo chiama invece di ribattere la formula",
-          True, "esc(mezzaCommissioneP2P(feePiena))"
+          True, "esc(mezzaCommissioneP2P(fee))"
           in pezzo_js(mini, "function contoDettP2P(o){", "\n}\n"))
     for parola in ("Nostr", "nsec", "npub", "relay"):
         prova("il foglio del nuovo ordine non nomina «%s»" % parola,
@@ -88890,9 +88888,13 @@ def prove_livello_accanto_al_titolo():
        finale: «sconto dello 0,5%», col numero di
        P2P_SCONTO_FEDELTA_PERCENTO (in `p2p_sconto.punti`). Una cifra
        finale («la tua meta' e' l'1%») era vera solo finche' la fee
-       restava quella. Quattro posti, un testo solo:
+       restava quella. Tre posti, un testo solo:
        `scontoFedeltaTestoP2P`. Si FANNO GIRARE: una sentinella direbbe
-       che la funzione c'e', non che dica la cosa giusta."""
+       che la funzione c'e', non che dica la cosa giusta.
+    4) IL CONTO DELLO SCAMBIO NO (25 set 2026, ritocco di Andrea su
+       d717b12): li' «Fee Barattolo 1%» e' la MIA aliquota — fee viva di
+       mostro meno lo sconto del config, `feeMiaP2P` — con accanto la
+       pastiglia del motivo, «🌱 Pioniere» o «Lv. 5»."""
     import re as _re, shutil as _sh, subprocess as _sp, tempfile as _tf
     import json as _js
     print("\n[il numero del livello accanto al titolo]")
@@ -88917,19 +88919,25 @@ def prove_livello_accanto_al_titolo():
     c = _re.search(r"^const LIVELLO_SCONTO_P2P = (\d+);", mini, _re.M)
     prova("LIVELLO_SCONTO_P2P del client = P2P_SCONTO_LIVELLO del server",
           True, bool(m and c and m.group(1) == c.group(1)))
-    # NESSUNA CIFRA FINALE per chi ha lo sconto, nei posti che la dicevano
+    # NESSUNA CIFRA FINALE per chi ha lo sconto, nei due posti che la
+    # dicevano (il conto dello scambio e' l'eccezione voluta, sotto)
     for vecchia, dove in (
             ("' <b>Tu sei fra questi</b>: la tua met", "la pagina Informazioni"),
-            ("'la tua commissione è '", "il riquadro del foglio Pubblica"),
-            ("'pioniere' : 'livello 5'", "il cartello del conto")):
+            ("'la tua commissione è '", "il riquadro del foglio Pubblica")):
         prova(f"la cifra finale non torna: {dove}", False, vecchia in mini)
     inf = pezzo_js(mini, "function renderP2PInfo(){", "\n}\n")
     prova("la pagina Informazioni dice lo sconto dal testo unico", True,
           "scontoFedeltaTestoP2P(p2pSconto.punti)" in inf)
     conto = pezzo_js(mini, "function contoDettP2P(o){", "\n}\n")
-    prova("il conto scrive l'aliquota PIENA accanto al cartello dello sconto",
-          True, "esc(mezzaCommissioneP2P(feePiena))" in conto
-          and "const feePiena = commissioneVivaP2P();" in conto)
+    prova("il conto scrive la MIA aliquota (fee viva meno lo sconto)",
+          True, "esc(mezzaCommissioneP2P(fee))" in conto
+          and "const fee = feeMiaP2P(o);" in conto
+          and "feePiena" not in conto)
+    prova("...e la pastiglia la chiede al giudice del cartello", True,
+          "const cartello = cartelloFeeP2P(o);" in conto)
+    cart = pezzo_js(mini, "function cartelloFeeP2P(o){", "\n}\n")
+    prova("la pastiglia del livello non scrive il 5 a mano", True,
+          "'Lv. ' + LIVELLO_SCONTO_P2P" in cart and "'Lv. 5'" not in cart)
 
     # --- il server: il numero esce, gli XP no ------------------------
     volti = pezzo("_volti_persone")
@@ -88996,6 +89004,10 @@ out.pieno = rigaTettoFeeP2P();
 p2pSconto = S('pioniere', true);
 out.scontato = rigaTettoFeeP2P();
 out.cartello = cartelloFeeP2P(null);
+p2pSconto = S('livello', true);
+out.cartelloLivello = cartelloFeeP2P(null);
+out.cartelloMancato = cartelloFeeP2P({scontoMancato: true});
+p2pSconto = S('pioniere', true);
 /* la fee cambia sul nodo: lo sconto resta lo stesso, la meta' si muove */
 p2pInfo = {fee: 0.04, maxSats: 0};
 out.feeNuova = rigaTettoFeeP2P();
@@ -89054,8 +89066,10 @@ console.log(JSON.stringify(out));
     prova("...con lo sconto: la meta' piena e lo sconto, mai l'1% finale",
           '<div class="hint">La commissione di Barattolo è dell\'1,5% per parte, '
           'e tu hai uno sconto dello 0,5%</div>', o["scontato"])
-    prova("il cartello del conto dice lo sconto", "sconto dello 0,5%",
-          o["cartello"])
+    prova("la pastiglia del conto dice il motivo: 🌱 Pioniere o Lv. 5",
+          ["🌱 Pioniere", "Lv. 5"], [o["cartello"], o["cartelloLivello"]])
+    prova("...e lo sconto mancato vince sul motivo", "sconto non verificato",
+          o["cartelloMancato"])
     prova("la fee cambia sul nodo: la meta' si muove, lo sconto resta",
           '<div class="hint">La commissione di Barattolo è del 2% per parte, '
           'e tu hai uno sconto dello 0,5%</div>', o["feeNuova"])
@@ -89258,10 +89272,8 @@ def prove_p2p_sconto():
         pezzo_js(mini, "function %s(" % n, "\n}\n") + "\n}"
         for n in ("commissioneVivaP2P", "commissioneListinoP2P", "feeMiaP2P",
                   "cartelloFeeP2P", "scontoMancatoP2P", "mezzaCommissioneP2P",
-                  # il cartello dello sconto lo scrive il testo UNICO
-                  # (25 set 2026), che chiede l'articolo al suo giudice
-                  "scontoFedeltaTestoP2P", "articoloPercentoP2P",
-                  "nettoLatoP2P", "lordoDaMieiP2P")) + r"""
+                  "nettoLatoP2P", "lordoDaMieiP2P")) + "\n" \
+        + pezzo_js(mini, "const LIVELLO_SCONTO_P2P = ", "\n") + r"""
 let p2pInfo = {fee: 0.03}, p2pSconto = null;
 const p2pCoord = () => ({commissione: 4});
 const out = {};
@@ -89321,15 +89333,15 @@ console.log(JSON.stringify(out));
           piena, o["nessuno"])
     prova("leva accesa ma lo sconto non e' mio: identico, byte per byte",
           piena, o["levaAccesaMaNonMio"])
-    # IL CARTELLO DICE LO SCONTO E NON IL MOTIVO (25 set 2026, decisione
-    # di Andrea): «sconto dello 0,5%», coi punti che arrivano dal config
-    # — accanto all'aliquota piena, non a quella finale.
-    prova("pioniere: 1%, 99.000 e 101.000, e il cartello dice lo sconto",
-          {"quota": "1", "cartello": "sconto dello 0,5%", "compro": 99000,
+    # LA PASTIGLIA DICE IL MOTIVO (25 set 2026, ritocco di Andrea su
+    # d717b12, che per un giro aveva detto «sconto dello 0,5%» accanto
+    # all'aliquota piena): «🌱 Pioniere» o «Lv. 5», accanto alla MIA.
+    prova("pioniere: 1%, 99.000 e 101.000, e la pastiglia lo dice",
+          {"quota": "1", "cartello": "🌱 Pioniere", "compro": 99000,
            "vendo": 101000},
           {k: o["pioniere"][k] for k in ("quota", "cartello", "compro", "vendo")})
-    prova("livello 5: gli stessi numeri, lo stesso cartello",
-          {"quota": "1", "cartello": "sconto dello 0,5%", "compro": 99000,
+    prova("livello 5: gli stessi numeri, un'altra pastiglia",
+          {"quota": "1", "cartello": "Lv. 5", "compro": 99000,
            "vendo": 101000},
           {k: o["livello"][k] for k in ("quota", "cartello", "compro", "vendo")})
     prova("il lordo si ricava all'indietro anche scontato",
