@@ -10329,6 +10329,8 @@ document.getElementById('cartello')?.remove();</script>
           </div>
           <div class="sats-input" style="margin-top:8px"><input id="sellServDurata" type="number" inputmode="numeric" min="1" placeholder="60"><span class="suffix" style="pointer-events:none">minuti</span></div>
           <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Quanto dura, e che cosa comprende: scrivilo nella descrizione. <b>Una prestazione si vende qui se è stabilita PRIMA</b> — «un'ora di conversazione in inglese» sì, «ti sviluppo quello che ti serve» no: senza un perimetro, in disputa non si può decidere niente. Dopo il pagamento proponi tu giorno e ora, e chi ha comprato conferma.</div>
+          <div class="sats-input" style="margin-top:8px"><input id="sellServLimite" type="number" inputmode="numeric" min="1" placeholder="senza limite"><span class="suffix" style="pointer-events:none">unità/ordine</span></div>
+          <div style="margin-top:6px;font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">Quante unità accetti in UN ordine solo (es. 2&nbsp;= un'ora, se l'unità è mezz'ora). Vuoto = nessun limite: chi compra sceglie quante ne vuole.</div>
         </div></div>
       <!-- LE ZONE (set 2026): la tariffa secondo DOVE va il pacco.
            Due campi per chi vende solo a casa — il PAESE e il suo
@@ -12594,6 +12596,10 @@ function mapListing(a){
        piattaforma, sceglie chi compra */
     ancheDigitale:!!a.anche_digitale,
     servDove:a.servizio_dove||'', durataMin:a.durata_min||0,
+    /* il limite per ordine (cantiere quantita-servizi): 0 = nessuno.
+       NON e' lo stock — vedi qtaMassimaAnnuncio, che lo usa al posto
+       di `quantita` per i servizi */
+    servizioLimiteOrdine:a.servizio_limite_ordine||0,
     /* la condizione dell'oggetto: '' = mai dichiarata (storici) */
     condizione:a.condizione||'',
     /* lo stato viaggia dove serve — i preferiti, il singolo e lo
@@ -18651,6 +18657,13 @@ const bloccoMioEsaurito = l => `
   <div class="trust-note">🔄 <span><b>Questo annuncio è esaurito.</b> Resta tuo e non è sparito da nessuna parte: torna in vetrina appena gli rimetti dei pezzi.</span></div>
   ${l.nostr
     ? `<div class="trust-note">🟣 <span>Arriva da Nostr: la quantità vive sui relay, non qui.</span></div>`
+    /* un servizio non arriva mai qui in condizioni normali (cantiere
+       quantita-servizi: la sua quantita' e' un sentinel che non si
+       esaurisce), ma se un annuncio pre-cantiere ci fosse rimasto
+       incastrato, ricarica_quantita rifiuterebbe comunque: niente
+       bottone che porta a un 400. */
+    : l.consegna === 'servizio'
+    ? `<div class="trust-note">📅 <span>I servizi non hanno scorte: modifica l'annuncio per riattivarlo.</span></div>`
     : `<button class="btn orange" onclick="apriRifornisci(${l.id})">🔄 Rifornisci</button>`}`;
 /* Il battito della lampo: UN solo interval per tutta l'app. Il
    contatore «Scade tra 2h 14m» vive SOLO nella scheda (in griglia il
@@ -18921,6 +18934,21 @@ let consegnaScelta = 'spedizione';
    ogni dettaglio aperto; il massimo e' la quantita' dell'annuncio.
    Lo stepper compare solo con piu' di un pezzo disponibile. */
 let qtaScelta = 1;
+/* IL TETTO CHE IL COMPRATORE PUO' SCEGLIERE (cantiere quantita-servizi):
+   per un prodotto e' lo stock vero (l.quantita, count che decresce a
+   ogni vendita). Per un SERVIZIO lo stock e' un sentinel tecnico che
+   non dice niente al compratore (server.py lo tiene al tetto anti-
+   refuso apposta, cosi' un servizio non "si esaurisce" mai) — il
+   tetto vero, se il venditore lo ha dichiarato, e' il limite per
+   ordine. Giudice UNICO: ogni punto che oggi legge `l.quantita||1`
+   come massimo scelta-compratore deve passare da qui, o i due mondi
+   (prodotto/servizio) divergerebbero al primo posto dimenticato. */
+const LIMITE_LIBERO_SERVIZIO = 999999;   // gemello di MAX_QUANTITA_ANNUNCIO
+function qtaMassimaAnnuncio(l){
+  if (l.consegna === 'servizio')
+    return l.servizioLimiteOrdine > 0 ? l.servizioLimiteOrdine : LIMITE_LIBERO_SERVIZIO;
+  return l.quantita || 1;
+}
 /* IL CHIP − N + , UN CUORE SOLO (ago 2026): lo stesso markup serve
    il bottone Acquista (dettaglio e barra) e il bottone della cella
    nella pagina del pacco. Chi lo chiama passa il numero, le due
@@ -18941,7 +18969,7 @@ function stepperMini(n, meno, piu, offMeno, offPiu, etMeno){
    coi pezzi >1 accanto alla scritta compaiono − N + — in pagina e
    nella barra, due istanze gemelle aggiornate insieme per classe. */
 function stepperAcquista(l){
-  if ((l.quantita||1) <= 1) return '';
+  if (qtaMassimaAnnuncio(l) <= 1) return '';
   /* Con un accordo che dichiara i pezzi la quantita' non si sceglie
      piu': si dice. Uno stepper li' prometterebbe una scelta che il
      server non accetta — la quantita' dell'accordo comanda, ed e'
@@ -18950,7 +18978,7 @@ function stepperAcquista(l){
   if (off && off.quantita > 0)
     return `<span class="off-qta mono">× ${fmt(qtaScelta)}</span>`;
   return stepperMini(qtaScelta, 'setQta(-1)', 'setQta(1)',
-                     qtaScelta <= 1, qtaScelta >= (l.quantita||1));
+                     qtaScelta <= 1, qtaScelta >= qtaMassimaAnnuncio(l));
 }
 /* L'ETICHETTA DEL TASTO OFFERTA (ago 2026): porta la quantita' come
    il suo gemello, cosi' i pezzi si vedono PRIMA di aprire il foglio.
@@ -18964,13 +18992,13 @@ function stepperAcquista(l){
    in pagina da 768px in su): sono la stessa cosa vista da due
    larghezze, e non devono poter dire due numeri. */
 function etichettaOfferta(l){
-  const n = Math.min(qtaScelta, l.quantita||1);
+  const n = Math.min(qtaScelta, qtaMassimaAnnuncio(l));
   return n <= 1 ? 'Fai un\'offerta'
                 : `Offri<span class="off-qta mono">× ${fmt(n)}</span>`;
 }
 function setQta(d){
   const l = currentListing; if (!l) return;
-  qtaScelta = Math.min(l.quantita||1, Math.max(1, qtaScelta + d));
+  qtaScelta = Math.min(qtaMassimaAnnuncio(l), Math.max(1, qtaScelta + d));
   /* SOLO i gemelli di Acquista (ago 2026, visto dal vivo appena il
      chip e' diventato condiviso): un querySelectorAll nudo su
      `.qta-mini` prendeva anche i conteggi delle celle del pacco, che
@@ -18980,7 +19008,7 @@ function setQta(d){
   const q = s => document.querySelectorAll(`#detailContent ${s}, #barraCompra ${s}`);
   q('.qta-mini .qm-num').forEach(n => n.textContent = fmt(qtaScelta));
   q('.qta-mini .qm-meno').forEach(b => b.classList.toggle('off', qtaScelta <= 1));
-  q('.qta-mini .qm-piu').forEach(b => b.classList.toggle('off', qtaScelta >= (l.quantita||1)));
+  q('.qta-mini .qm-piu').forEach(b => b.classList.toggle('off', qtaScelta >= qtaMassimaAnnuncio(l)));
   /* Il tasto offerta segue lo stesso giro: qui non si sostituisce una
      cifra ma si RISCRIVE l'etichetta, che a un pezzo torna «Fai
      un'offerta» — e si riscrivono tutte e due le superfici, o quella
@@ -20163,7 +20191,7 @@ function aggiornaBarraCompra(view){
   el('bcCompra').classList.add('orange');
   el('bcCompra').classList.remove('asta');
   el('bcCompra').innerHTML = `Acquista${stepperAcquista(l)}`;
-  el('barraCompra').classList.toggle('con-qta', (l.quantita||1) > 1);
+  el('barraCompra').classList.toggle('con-qta', qtaMassimaAnnuncio(l) > 1);
   /* con un accordo stretto l'offerta non si rifa': come in pagina */
   el('bcOfferta').style.display = offertaAccettataPer(l.id) ? 'none' : '';
   el('bcOfferta').innerHTML = etichettaOfferta(l);
@@ -21208,9 +21236,10 @@ function acqPasso(delta){
   if (!d0 || d0.tipo !== 'mono' || d0.offertaId || !d0.preventivo) return;
   const l = listings.find(t=>t.id===d0.annuncioId)
         || myListings.find(t=>t.id===d0.annuncioId);
-  const stock = (l && l.quantita) || 1;
-  /* il clamp della scheda: stock come tetto, silenzio al limite (il
-     bottone e' gia' .off e non si puo' toccare) */
+  const stock = l ? qtaMassimaAnnuncio(l) : 1;
+  /* il clamp della scheda: stock (o il limite per ordine, per un
+     servizio) come tetto, silenzio al limite (il bottone e' gia' .off
+     e non si puo' toccare) */
   const n = Math.min(stock, Math.max(1, d0.qta + delta));
   if (n === d0.qta) return;
   qtaScelta = n;
@@ -24037,14 +24066,21 @@ function openDetail(id){
       </div>
       ${(p => p ? `<div class="pills">${p}</div>` : '')(
         spedBadge(l) + pilloleModalita(l)
-        + ((l.quantita||1)>1?`<span class="pill">${fmt(l.quantita)} disponibili</span>`
+        /* UN SERVIZIO NON HA UNO STOCK DA MOSTRARE (cantiere
+           quantita-servizi): l.quantita per lui e' un sentinel
+           tecnico, mai un numero da dire al compratore — la sola
+           cosa che gli riguarda e' il limite per ordine, se c'e'. */
+        + (l.consegna==='servizio'
+           ? (l.servizioLimiteOrdine>0
+              ? `<span class="pill">Max ${fmt(l.servizioLimiteOrdine)} a ordine</span>` : '')
+           : ((l.quantita||1)>1?`<span class="pill">${fmt(l.quantita)} disponibili</span>`
            /* A UNO oggi non c'e' niente, e continua a non esserci: il
               «1» di un annuncio nato a pezzo unico non e' una notizia.
               A parlare e' solo il flag del server, e lo fa col
               GRASSETTO invece che col colore — la regola dello
               sfollamento, la stessa di «spedizione gratuita». Zero CSS
               nuovo, e la fila resta una fila di fatti. */
-           : ultimoPezzo(l)?`<span class="pill"><b>Ultimo</b> disponibile</span>`:''))}
+           : ultimoPezzo(l)?`<span class="pill"><b>Ultimo</b> disponibile</span>`:'')))}
       <div class="desc-tit">Descrizione</div>
       <div class="desc">${descrizioneHTML(l)}</div>
       <div class="seller" onclick="apriNegozioDaAnnuncio()" style="cursor:pointer" title="Apri il negozio di questo venditore">
@@ -24110,8 +24146,10 @@ function openDetail(id){
                 badge va a capo e fa crescere OGNI riga della lista.
                 L'importato non ce l'ha: la sua quantita' vive sui
                 relay e ricarica_quantita risponde 400 (la stessa
-                guardia di bottoneRifornisci). -->
-           ${l.nostr ? '' : `<button class="btn ghost" onclick="apriRifornisci(${l.id})">🔄 Aggiorna i pezzi</button>`}
+                guardia di bottoneRifornisci). Un SERVIZIO nemmeno
+                (cantiere quantita-servizi): non ha scorte, e la
+                stessa rotta lo rifiuta per lo stesso motivo. -->
+           ${(l.nostr || l.consegna === 'servizio') ? '' : `<button class="btn ghost" onclick="apriRifornisci(${l.id})">🔄 Aggiorna i pezzi</button>`}
            <button class="btn ghost" onclick="apriWidget('annuncio',${l.id})">&lt;/&gt; Widget per il web</button>
            <!-- L'uscita della colonna, e ora un bottone vero: il
                 testuale sottolineato spariva fra due ghost — proprio
@@ -26198,7 +26236,7 @@ function apriOfferta(){
     toast(`🌴 Il negozio è in ferie: riapre il ${ferieData(l.ferie)}`, 5000);
     return;
   }
-  qtaScelta = Math.max(1, Math.min(qtaScelta, l.quantita||1));
+  qtaScelta = Math.max(1, Math.min(qtaScelta, qtaMassimaAnnuncio(l)));
   /* si azzera l'ANCORA, non il solo campo: e' lei la cifra */
   offCifra = 0; offCifraValuta = ''; offCampoValuta = '';
   el('offImporto').value = '';
@@ -26283,10 +26321,10 @@ function aggiornaFoglioOfferta(){
           variabile del gemello sotto — non puo' nascere un secondo
           numero. Ha lo stesso tetto e lo stesso comportamento al
           limite perche' e' la stessa funzione, setQta. */''}
-    ${(l.quantita||1) > 1
+    ${qtaMassimaAnnuncio(l) > 1
       ? `<span style="flex:0 0 auto">${stepperMini(qtaScelta,
            'setQta(-1)', 'setQta(1)',
-           qtaScelta <= 1, qtaScelta >= (l.quantita||1))}</span>`
+           qtaScelta <= 1, qtaScelta >= qtaMassimaAnnuncio(l))}</span>`
       : ''}`;
   /* Le pillole non portano piu' il controvalore: erano due cifre in
      concorrenza con quella che conta, che e' la riga qui sotto.
@@ -36806,7 +36844,9 @@ const rigaMioAnnuncio = l => { const rev = l.stato==='revisione',
       ${/* in coda alla meta il conteggio dei barattoli, nudo (saversPunto):
            qui il venditore i suoi annunci li guarda in fila, ed e' il
            posto dove quel numero si confronta a colpo d'occhio */''}
-      <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span>${!esa&&(l.quantita||1)>1?` · ${fmt(l.quantita)} pezzi`:''}${luogoPunto(l)}${saversPunto(l)}${vistePunto(l)}</div>
+      <div class="sub"><span class="mono" style="color:var(--sats-deep)">${l.valuta==='eur'&&l.priceEur>0 ? fmtEur(l.priceEur)+' €' : fmt(l.price)+' sats'}</span>${l.consegna==='servizio'
+        ? (l.servizioLimiteOrdine>0 ? ` · max ${fmt(l.servizioLimiteOrdine)} a ordine` : '')
+        : (!esa&&(l.quantita||1)>1?` · ${fmt(l.quantita)} pezzi`:'')}${luogoPunto(l)}${saversPunto(l)}${vistePunto(l)}</div>
       ${/* le azioni chiudono la card, sotto il prezzo e staccate da
            lui: il posto dove il pollice arriva senza coprire quello
            che sta leggendo */''}
@@ -37140,7 +37180,7 @@ function avvisoBarattoloMio(){
    disegnata. */
 function bottoneRifornisci(l){
   if (DEMO || VETRINA || !myTgId || l.sellerId !== myTgId) return '';
-  if (!esaurito(l) || astaE(l) || l.nostr) return '';
+  if (!esaurito(l) || astaE(l) || l.nostr || l.consegna === 'servizio') return '';
   return `<button class="card-rifornisci" onclick="event.stopPropagation();`
     + `apriRifornisci(${l.id})" title="Hai altri pezzi? L'annuncio torna `
     + `in vetrina" aria-label="Rifornisci">🔄 Rifornisci</button>`;
@@ -39687,7 +39727,8 @@ function consegnaForm(){
   if (el('sellConsServ')?.checked)
     return {consegna: 'servizio', anche_digitale: 0,
             servizio_dove: servDove,
-            durata_min: parseInt(el('sellServDurata')?.value, 10) || 0};
+            durata_min: parseInt(el('sellServDurata')?.value, 10) || 0,
+            servizio_limite_ordine: parseInt(el('sellServLimite')?.value, 10) || 0};
   const sped = el('sellConsSped').checked,
         rit  = el('sellConsRitiro').checked,
         dig  = el('sellConsDig').checked;
@@ -39713,12 +39754,13 @@ function setServDove(v){
 }
 /* Il verso opposto: dai valori salvati alle caselle (precompilazione
    della modifica e reset del form). */
-function impostaConsegnaForm(c, ancheDig, dove, durata){
+function impostaConsegnaForm(c, ancheDig, dove, durata, limite){
   el('sellConsSped').checked = c==='spedizione' || c==='entrambe';
   el('sellConsRitiro').checked = c==='ritiro' || c==='entrambe';
   el('sellConsDig').checked = c==='digitale' || !!ancheDig;
   if (el('sellConsServ')) el('sellConsServ').checked = c==='servizio';
   if (el('sellServDurata')) el('sellServDurata').value = durata || '';
+  if (el('sellServLimite')) el('sellServLimite').value = limite || '';
   servDove = '';
   setServDove(dove || '');        /* '' spegne tutte e due */
 }
@@ -40003,9 +40045,12 @@ function aggiornaConsegnaForm(){
   el('sellTagliaField').style.display = (sped && !editandoNostr) ? '' : 'none';
   /* la quantita' invece la strada firmata la dichiara: il tag `stock`
      l'import lo rilegge, quindi il giro si chiude (ago 2026 — prima
-     qui c'era un `&& !editandoNostr`, che teneva nascosto il campo) */
+     qui c'era un `&& !editandoNostr`, che teneva nascosto il campo).
+     UN SERVIZIO NON LA MOSTRA PIU' (cantiere quantita-servizi): non
+     ha piu' uno stock da dichiarare — il suo campo e' quello dentro
+     sellServOpzioni qui sopra (il limite per ordine). */
   if (el('sellQtaField'))
-    el('sellQtaField').style.display = asta ? 'none' : '';
+    el('sellQtaField').style.display = (asta || serv) ? 'none' : '';
   el('sellDigitaleHint').style.display = el('sellConsDig').checked ? '' : 'none';
   /* la zona segue la consegna: col ritiro e' obbligatoria e deve
      essere un comune vero, senza resta facoltativa */
@@ -40046,13 +40091,13 @@ function aggiornaCondizioneForm(){
    flag anche_digitale accanto alla parte fisica. */
 function consegnaPayload(){
   const {consegna, anche_digitale, servizio_dove,
-         durata_min} = consegnaForm();
-  /* Il servizio viaggia coi suoi due campi e con NIENT'ALTRO: niente
+         durata_min, servizio_limite_ordine} = consegnaForm();
+  /* Il servizio viaggia coi suoi TRE campi e con NIENT'ALTRO: niente
      taglia, niente tariffe, niente combo. Il giudice del server le
      azzererebbe comunque — qui non si mandano proprio, che e' la
      forma del solo-digitale una riga piu' sotto. */
   if (consegna==='servizio')
-    return {consegna, servizio_dove, durata_min};
+    return {consegna, servizio_dove, durata_min, servizio_limite_ordine};
   if (consegna==='digitale' || !consegna) return {consegna};
   const out = {consegna, taglia_pacco:el('sellTaglia').value};
   if (anche_digitale) out.anche_digitale = 1;
@@ -40153,7 +40198,7 @@ function riempiFormDa(l){
     ? l.zone : '';
   el('sellDesc').value = l.desc==='—' ? '' : l.desc;
   impostaConsegnaForm(l.consegna||'', l.ancheDigitale,
-                      l.servDove, l.durataMin);
+                      l.servDove, l.durataMin, l.servizioLimiteOrdine);
   el('sellTaglia').value = l.taglia||'';
   /* uno storico senza condizione arriva vuoto: publish() la esige,
      ed e' cosi' che la modifica «la chiede» senza obblighi retroattivi */

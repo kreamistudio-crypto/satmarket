@@ -4060,6 +4060,29 @@ def riallinea_quantita_max(con):
                 "WHERE quantita>quantita_max")
 
 
+def riallinea_servizi_senza_scorte(con):
+    """I SERVIZI NON HANNO SCORTE (cantiere quantita-servizi). Gemella
+    di `riallinea_quantita_max` qui sopra, stessa forma: idempotente,
+    solo-avanti, e serve al BACKFILL onesto dello storico — chi e'
+    nato PRIMA di questo cantiere ha `quantita=1` (il default di
+    sempre) e resterebbe bloccato a un pezzo solo per costruzione.
+
+    Alza `quantita`/`quantita_max` al sentinel tecnico
+    (MAX_QUANTITA_ANNUNCIO) per ogni servizio ATTIVO sotto quel tetto:
+    un servizio non si esaurisce mai (vedi pubblica/modifica, che
+    forzano lo stesso sentinel a ogni scrittura), quindi `quantita` per
+    lui non e' un vero stock ma un numero interno che rende no-op
+    `_riservati`/`_incassa_ordine` — il vincolo che conta e' altrove,
+    in `servizio_limite_ordine`. Solo gli ATTIVI: un 'venduto' storico
+    non si riaccende da solo (la stessa regola di riallinea_quantita_max
+    sull'invariante venduto <=> quantita=0)."""
+    con.execute("UPDATE annunci SET quantita=?, "
+                "quantita_max=MAX(quantita_max,?) WHERE consegna='servizio' "
+                "AND stato='attivo' AND quantita<?",
+                (MAX_QUANTITA_ANNUNCIO, MAX_QUANTITA_ANNUNCIO,
+                 MAX_QUANTITA_ANNUNCIO))
+
+
 MIGRAZIONE_QUOTE_ACCANTONATE = "migrazione:quote_accantonate"
 # chi la migrazione ha toccato: il suo 30382 dice ancora il numero di
 # ieri, e lo riallinea `ripubblica_reputazione_migrata` all'avvio
@@ -6518,6 +6541,15 @@ def init_db():
                     # domicilio si fa a casa del cliente.
                     "durata_min INTEGER DEFAULT 0",
                     "servizio_dove TEXT DEFAULT ''",
+                    # il limite per ordine (cantiere quantita-servizi):
+                    # quante unita' di QUESTO servizio si possono
+                    # chiedere in UN ordine solo (0 = nessun limite).
+                    # NON e' uno stock: i servizi non si esauriscono
+                    # piu' (vedi il riallineamento d'avvio), quindi la
+                    # colonna `quantita` per un servizio nasce e resta
+                    # al tetto MAX_QUANTITA_ANNUNCIO — un sentinel
+                    # tecnico, mai un numero da mostrare.
+                    "servizio_limite_ordine INTEGER DEFAULT 0",
                     # LA RICERCA (ago 2026): il timbro dell'indice
                     # full-text. 0 = questa riga non e' indicizzata, o
                     # il suo testo e' cambiato dopo l'ultima passata;
@@ -7746,6 +7778,7 @@ def init_db():
     # e nessun badge si accende finche' non ricarica. Non e' un guasto:
     # e' il prezzo di non inventare un passato.
     riallinea_quantita_max(con)
+    riallinea_servizi_senza_scorte(con)
     # Le reti al plurale (ago 2026): chi ne aveva dichiarata una la
     # ritrova dentro la colonna nuova, o al deploy perderebbe mappa e
     # nome della rete nel cassetto senza che nessuno gliel'abbia tolti.
@@ -12961,6 +12994,31 @@ def durata_da_payload(d: dict, consegna: str) -> int:
         return max(0, int(d.get("durata_min") or 0))
     except (TypeError, ValueError):
         return 0
+
+
+def servizio_limite_ordine_da_payload(d: dict, consegna: str) -> int:
+    """QUANTE unita' di questo servizio si accettano in UN ordine solo
+    (0 = nessun limite). Il terzo gemello di `servizio_dove_da_payload`/
+    `durata_da_payload`, con le stesse due regole: fuori dal servizio
+    vale 0 anche se arriva qualcosa, e un valore storto vale 0 e mai un
+    400 — il client guida chi pubblica, il server tollera.
+
+    NON E' UNO STOCK (la differenza da non perdere): per un servizio
+    `annunci.quantita` e' un sentinel tecnico che non si esaurisce mai
+    (vedi pubblica/modifica), quindi qui non serve il rigore di
+    `quantita_da_payload` — un numero fuori scala si CLAMPA muto al
+    tetto anti-refuso, come gia' succede al clamp dei pezzi
+    sull'offerta (fai_offerta): un limite per-ordine sbagliato non deve
+    far fallire una pubblicazione."""
+    if consegna != "servizio":
+        return 0
+    try:
+        n = int(d.get("servizio_limite_ordine") or 0)
+    except (TypeError, ValueError):
+        return 0
+    if n <= 0:
+        return 0
+    return min(n, MAX_QUANTITA_ANNUNCIO)
 
 
 def strade_annuncio(a) -> set:
@@ -18639,6 +18697,13 @@ CAMPI_VETRINA = (
     # dettaglio deve sapere quanti chiederne (in vetrina solo attivi,
     # quindi sempre >= 1)
     "a.quantita, "
+    # IL LIMITE PER ORDINE DI UN SERVIZIO (cantiere quantita-servizi):
+    # stessa natura pubblica di `a.quantita` qui sopra — il selettore
+    # dei pezzi lo deve conoscere per fermarsi al tetto giusto, non a
+    # quello di un prodotto (per un servizio `a.quantita` e' un
+    # sentinel tecnico, vedi qtaMassimaAnnuncio lato client). 0 = nessun
+    # limite, e vale solo se `a.consegna='servizio'`.
+    "a.servizio_limite_ordine, "
     # il massimo mai dichiarato NON esce da qui: lo legge
     # arricchisci_righe_vetrina per decidere il flag `ultimo`, e poi lo
     # butta via — grezzo racconterebbe «ne ha venduti N», che e' un dato
@@ -19812,6 +19877,14 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     guardia_venditore_digitale(user["id"], consegna, anche_dig)
     condizione = guardia_zona_condizione(d, consegna)
     quantita = quantita_da_payload(d)
+    # UN SERVIZIO NON HA SCORTE (cantiere quantita-servizi): il client
+    # non dichiara piu' uno stock per una prestazione — quel che si
+    # dichiara, se c'e', e' il limite per ordine (qui sotto, nella
+    # colonna nuova). La quantita' resta al sentinel per costruzione,
+    # cosi' _riservati/_incassa_ordine restano quelli dei prodotti,
+    # byte per byte, e non vedono mai un servizio "esaurirsi".
+    if consegna == "servizio":
+        quantita = MAX_QUANTITA_ANNUNCIO
     asta_secondi = durata_asta_da_payload(d)
     if asta_secondi:
         # L'asta parla SOLO sats (v1, deciso): base, rilanci e minimi
@@ -19934,9 +20007,10 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
         "anche_digitale,condizione,quantita,quantita_max,stato,creato,"
         "asta_base_sats,asta_scadenza,asta_creato,"
         # la prestazione (ago 2026): dove e quanto dura — le due
-        # colonne che per tre settimane nessuno scriveva
-        "servizio_dove,durata_min) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        # colonne che per tre settimane nessuno scriveva — piu' il
+        # limite per ordine (cantiere quantita-servizi)
+        "servizio_dove,durata_min,servizio_limite_ordine) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (user["id"], d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          sotto, prezzo_sats, zona, valuta, prezzo_eur,
          lat, lon, regione, consegna, sped_sats, sped_eur,
@@ -19956,7 +20030,8 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
          adesso + asta_secondi if asta_secondi else 0,
          adesso if asta_secondi else 0,
          servizio_dove_da_payload(d, consegna),
-         durata_da_payload(d, consegna)))
+         durata_da_payload(d, consegna),
+         servizio_limite_ordine_da_payload(d, consegna)))
     annuncio_id = con.execute("SELECT last_insert_rowid() AS i").fetchone()["i"]
     con.commit()
     con.close()
@@ -21323,6 +21398,16 @@ async def ricarica_quantita(annuncio_id: int, req: Request,
     if origine_annuncio(a):
         con.close()
         raise HTTPException(400, msg_stock_altrove(a))
+    # I SERVIZI NON HANNO SCORTE (cantiere quantita-servizi): non c'e'
+    # niente da ricaricare o mettere in pausa — la quantita' e' un
+    # sentinel tecnico e non un numero del venditore. Chi vuole un
+    # tetto per ordine lo scrive in "Modifica", non qui.
+    if a["consegna"] == "servizio":
+        con.close()
+        raise HTTPException(400, "I servizi non hanno scorte da "
+                                 "ricaricare: usa «Modifica» per cambiare "
+                                 "il limite di unità per ordine (o "
+                                 "lascialo senza limite)")
     if a["asta_base_sats"] > 0:
         # L'asta e' a pezzo unico, anche da venduta: il «rimetti in
         # vendita» qui gonfierebbe lo stock di una gara gia' chiusa.
@@ -21484,6 +21569,14 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         # In modifica l'assenza CONSERVA lo stock: un client vecchio
         # che ritocca il titolo non deve azzerare i pezzi a 1.
         quantita = quantita_da_payload(d, se_manca=a["quantita"])
+        # Stesso sentinel di pubblica(): un servizio non dichiara piu'
+        # uno stock, quindi anche in modifica la quantita' resta (o
+        # torna) al tetto — a prescindere da cosa manda il client, e
+        # a prescindere da cosa aveva PRIMA (un annuncio nato quando
+        # questo cantiere non c'era, col riallineamento d'avvio, non
+        # deve tornare a 1 al primo ritocco del titolo).
+        if consegna == "servizio":
+            quantita = MAX_QUANTITA_ANNUNCIO
     except HTTPException:
         con.close()
         raise
@@ -21594,7 +21687,8 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
         # il massimo non si assegna MAI secco: una modifica che abbassa
         # la quantita' non deve cancellare la memoria dei pezzi avuti
         "quantita_max=MAX(quantita_max,?), stato=?, "
-        "modificato=?, servizio_dove=?, durata_min=? WHERE id=?",
+        "modificato=?, servizio_dove=?, durata_min=?, "
+        "servizio_limite_ordine=? WHERE id=?",
         (d["titolo"], d.get("descrizione", ""), categoria_valida(d.get("categoria")),
          sotto, prezzo_sats, zona, valuta, prezzo_eur,
          lat, lon, regione, consegna, sped_sats, sped_eur,
@@ -21605,7 +21699,8 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
          "revisione" if in_revisione else "attivo",
          int(time.time()),
          servizio_dove_da_payload(d, consegna),
-         durata_da_payload(d, consegna), annuncio_id))
+         durata_da_payload(d, consegna),
+         servizio_limite_ordine_da_payload(d, consegna), annuncio_id))
     # Il prezzo cambiato fa decadere le trattative APERTE: erano una
     # percentuale di un prezzo che non esiste piu'. Le offerte gia'
     # ACCETTATE sopravvivono — l'accordo e' stretto.
@@ -28702,6 +28797,12 @@ async def fai_offerta(annuncio_id: int, req: Request,
         except (TypeError, ValueError):
             pezzi = 1
         pezzi = min(pezzi, max(1, a["quantita"]))
+        # Il gemello per i servizi (cantiere quantita-servizi): lo
+        # stock (a["quantita"]) per loro e' un sentinel che non limita
+        # niente — il tetto vero, se c'e', e' il limite per ordine.
+        # Stesso stile: si lima, non si scarta.
+        if a["consegna"] == "servizio" and a["servizio_limite_ordine"]:
+            pezzi = min(pezzi, a["servizio_limite_ordine"])
     # Le due guardie di conteggio: una offerta attiva alla volta, e un
     # numero chiuso di tentativi totali. Niente await tra i COUNT e
     # l'INSERT: nel server mono-processo il blocco e' atomico (il
@@ -31125,6 +31226,14 @@ async def preventivo_ordine(req: Request, x_tg_init_data: str = Header(""),
         richiesti = max(1, int(d.get("quantita") or 1))
     except (TypeError, ValueError):
         richiesti = 1
+    # Lo stesso tetto per-ordine di compra, stesso testo (il patto
+    # «preventivo == compra al sat» vale anche sull'errore).
+    if (a["consegna"] == "servizio" and a["servizio_limite_ordine"]
+            and richiesti > a["servizio_limite_ordine"]):
+        con.close()
+        raise HTTPException(400, f"Per questo servizio il massimo per "
+                                 f"ordine è {a['servizio_limite_ordine']} "
+                                 f"unità: scegli una quantità più piccola")
     # Il fail-fast dello stock, di cortesia come in compra: la pagina
     # avvisa subito, e il ricontrollo vero resta quello della invoice.
     disponibile = a["quantita"] - _riservati(con, a["id"])
@@ -32089,6 +32198,20 @@ async def compra(req: Request, x_tg_init_data: str = Header(""),
         richiesti = max(1, int(d.get("quantita") or 1))
     except (TypeError, ValueError):
         richiesti = 1
+    # IL LIMITE PER ORDINE DI UN SERVIZIO (cantiere quantita-servizi):
+    # un servizio non ha uno stock condiviso da confrontare (vedi
+    # a["quantita"], che per lui e' un sentinel) — il tetto vero, se
+    # il venditore lo ha dichiarato, e' SOLO su QUESTO ordine. Prima
+    # di lasciare che un'offerta accettata comandi la quantita' qui
+    # sotto: un accordo gia' stretto non si rompe per un limite
+    # abbassato dopo (la stessa asimmetria delle ferie, decisione di
+    # Andrea gia' in vigore altrove in questa rotta).
+    if (a["consegna"] == "servizio" and a["servizio_limite_ordine"]
+            and richiesti > a["servizio_limite_ordine"]):
+        con.close()
+        raise HTTPException(400, f"Per questo servizio il massimo per "
+                                 f"ordine è {a['servizio_limite_ordine']} "
+                                 f"unità: scegli una quantità più piccola")
 
     # La scelta della consegna, validata contro le STRADE che
     # l'annuncio offre davvero (dal lug 2026 anche in combinazione:
@@ -45661,8 +45784,10 @@ def tag_commercio(a: dict) -> list:
     if condizione:
         tags.append(["condition", condizione])
     # Assente = un pezzo solo, che e' il caso di quasi tutti gli
-    # annunci: dirlo ogni volta sarebbe rumore.
-    if (a.get("quantita") or 1) > 1:
+    # annunci: dirlo ogni volta sarebbe rumore. Un servizio non conta:
+    # la sua quantita' e' un sentinel tecnico (cantiere
+    # quantita-servizi), mai un numero vero da pubblicare sui relay.
+    if a.get("consegna") != "servizio" and (a.get("quantita") or 1) > 1:
         tags.append(["stock", str(a["quantita"])])
     return tags
 
