@@ -32639,3 +32639,65 @@ non incollare la fattura, uscire: quando torna nel libro la card NON
 dice «È il tuo ordine», si prende di nuovo, e il vecchio giro sta sotto
 «Annullati». 5) Sul VPS, dopo una garanzia pagata: `SELECT stato FROM
 p2p_ordini WHERE ordine='…'` dice `active`.
+
+## Il numero del livello accanto al titolo (25 set 2026)
+
+Ritocco di Andrea. Nel cassetto «Livello e titolo» si vedevano XP e
+affari ma non il NUMERO del livello. Adesso il grado dice «Mercante
+pratico · Lv. 3», sotto la barra «Mancano 550 XP e 9 affari conclusi al
+livello 4 (Mercante esperto)» — o «Hai raggiunto il livello massimo» —
+e, dove il P2P c'e' per chi legge e la leva dello sconto e' accesa, la
+riga del vantaggio: «⚡ Dal livello 5: sconto dello 0,5% sulle
+commissioni P2P» (al 5: «Il tuo livello ti dà uno sconto dello 0,5%»;
+al pioniere sotto il 5: «Tu ce l'hai già, da 🌱 pioniere»).
+
+**DOVE STA «Lv. N» ACCANTO AL TITOLO:** testata del proprio Profilo,
+testata del negozio, righe della classifica, card dell'altra parte
+(pagina di uno scambio P2P e dettaglio di un ordine). Tutti e cinque
+passano da `titoloRiga(nome, liv)`: «🌱 Pioniere · Lv. 3», e «Lv. 3» da
+solo a chi un titolo non l'ha scelto — il livello non si sceglie, e' un
+fatto come le stelle. Senza numero la riga e' quella di ieri. NON nel
+dettaglio dell'annuncio: il numero li' vorrebbe gli XP dentro
+`CAMPI_VETRINA`, la SELECT di sei rotte, e un campo che non deve uscire
+in una query che va dappertutto e' il modo in cui esce per sbaglio.
+Il server manda `livello_numero` in tre posti (negozio, voce della
+classifica, `_volti_persone`), dallo stesso `livello_utente` del
+cassetto; gli XP restano dentro.
+
+**LO SCONTO SI DICE COME SCONTO, MAI COME CIFRA FINALE** (seconda
+richiesta di Andrea nello stesso giro): una cifra finale («la tua metà
+è l'1%») era vera solo finche' la commissione restava quella. Il testo
+unico e' `scontoFedeltaTestoP2P(punti)` → «sconto dello 0,5%», coi punti
+di P2P_SCONTO_FEDELTA_PERCENTO che arrivano in `/api/me.p2p_sconto`, e
+lo usano i quattro posti che ne parlavano: la riga del vantaggio, il
+cartello del conto dello scambio (che dice lo sconto e non piu' il
+motivo, «pioniere»/«livello 5», e accanto ha l'aliquota PIENA:
+«Fee Barattolo 1,5% · sconto dello 0,5%», con a destra la cifra vera
+gia' scontata), il riquadro del foglio «Pubblica» («la commissione di
+Barattolo è dell'1,5% per parte, e tu hai uno sconto dello 0,5%») e la
+pagina «Informazioni» («… ha uno sconto dello 0,5% sulla sua metà. Tu
+sei fra questi.»). Il livello dello sconto ha un gemello nel client,
+`LIVELLO_SCONTO_P2P`, incrociato con `P2P_SCONTO_LIVELLO` da una prova.
+Fuori perimetro: la fee dinamica del MERCATINO («sconto pioniere» nel
+foglio Paga) non e' P2P e non dice una cifra finale.
+
+**PROVATO.** `prove_livello_accanto_al_titolo` (sentinelle sui cinque
+posti, il gemello del livello, le tre cifre finali che non tornano; il
+banco node di `titoloRiga`, del vantaggio, del testo unico e del
+riquadro con la fee che cambia); emendate col perche' `prove_frase_xp`
+(la frase nuova col numero), il banco dello sconto di `prove_p2p_sconto`
+(il cartello), `prove_classifica_recensioni_tutte` (la voce ha una
+chiave in piu', e Bice e' livello 3) e la sentinella del conto in
+`prove_p2p_pubblica` (`feePiena`), e `collaudo_classifica` (la voce
+ha una chiave in piu'). Suite intera severa senza config nel worktree
+da origin/main (b53ec16): 15.924 verdi e 0 rosse; i 24 collaudi della
+CI verdi nella gabbia senza rete. Dal vivo su una copia col server di
+collaudo (relay morto, sconto a 0,5, classifica accesa, livelli e titoli
+seminati nel db): la classifica e il negozio veri rispondono col numero
+e senza XP; a 375 px nei due temi, via CDP perche' il pane non componeva:
+cassetto di un pioniere al 3 e di un maestro al 5, testata del Profilo,
+negozio, classifica, conto P2P e pagina Informazioni, nessuno sborda.
+La card dell'altra parte non l'ho vista dal vivo (vuole uno scambio con
+le parti note): la coprono la sentinella e il campo del server.
+**DA AVERE IL TELEFONO:** il cassetto e una card della classifica con un
+titolo lungo, e il conto di uno scambio vero con lo sconto.

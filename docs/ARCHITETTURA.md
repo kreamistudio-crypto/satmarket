@@ -27556,3 +27556,15 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   a piacere, non duplica mai. I badge custom (creati con «+ Nuovo
   badge», come quello di una live) restano un gesto manuale separato:
   l'automatismo copre solo i 12 distintivi, non li sostituisce.
+
+- IL NUMERO DEL LIVELLO ACCANTO AL TITOLO (25 set 2026, perché in
+  `docs/CANTIERI.md` alla voce omonima). `titoloRiga(nome, liv)` è
+  l'unica riga del titolo sotto un nome: «🌱 Pioniere · Lv. 3», «Lv. 3»
+  senza titolo, quella di ieri senza numero. Il numero lo manda il
+  server come `livello_numero` (negozio, voce della classifica,
+  `_volti_persone`), sempre da `livello_utente`, mai gli XP; non sta in
+  `CAMPI_VETRINA`. Lo sconto fedeltà del P2P si scrive con
+  `scontoFedeltaTestoP2P(punti)` («sconto dello 0,5%», punti dal
+  config via `/api/me.p2p_sconto`) in tutti i posti che lo dicono, e
+  il conto mostra l'aliquota piena accanto al cartello dello sconto:
+  nessun testo dice la cifra finale di chi ha lo sconto.

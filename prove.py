@@ -25709,6 +25709,10 @@ def prove_classifica_recensioni_tutte():
               "_dati_classifica", "classifica_ora", "_ricalcola_rating",
               "classifica"):
         exec(pezzo(f), amb)
+    # il numero del livello accanto al titolo (25 set 2026): la voce lo
+    # chiede allo stesso giudice del Profilo, coi LIVELLI veri
+    amb["LIVELLI"] = _livelli_dal_sorgente()
+    exec(pezzo("livello_utente"), amb)
     percorso_db = os.path.join(_tf.mkdtemp(), "classifica.db")
 
     def apri():
@@ -25722,7 +25726,9 @@ def prove_classifica_recensioni_tutte():
       negozio TEXT DEFAULT '', titolo TEXT DEFAULT '',
       avatar TEXT DEFAULT '', avatar_scelta TEXT DEFAULT '',
       rating REAL DEFAULT 0, n_feedback INTEGER DEFAULT 0,
-      n_recensori INTEGER DEFAULT 0, classifica_nascosta INTEGER DEFAULT 0);
+      n_recensori INTEGER DEFAULT 0, classifica_nascosta INTEGER DEFAULT 0,
+      xp INTEGER DEFAULT 0, vendite_ok INTEGER DEFAULT 0,
+      acquisti_ok INTEGER DEFAULT 0);
     CREATE TABLE ordini(id INTEGER PRIMARY KEY, venditore_id INTEGER,
       compratore_id INTEGER, stato TEXT DEFAULT 'released',
       prova INTEGER DEFAULT 0);
@@ -25733,6 +25739,8 @@ def prove_classifica_recensioni_tutte():
     INSERT INTO utenti(tg_id, nome, negozio) VALUES
       (1, 'Ada', 'NEGADA'), (2, 'Bice', 'NEGBICE'), (3, 'Carlo', 'NEGCARLO'),
       (10, 'Dora', ''), (11, 'Ezio', ''), (12, 'Fede', ''), (13, 'Gea', '');
+    -- Bice e' «Mercante pratico», il livello 3: la sua voce lo dice
+    UPDATE utenti SET xp=250, vendite_ok=4, acquisti_ok=2 WHERE tg_id=2;
     -- Dora ed Ezio hanno comprato da due banchi: sono recensori reali.
     -- Fede e Gea hanno comprato SOLO da Ada: le loro stelle il negozio
     -- le conta, la classifica no. E' il caso del venditore che ha
@@ -25757,13 +25765,17 @@ def prove_classifica_recensioni_tutte():
     def con_numero(r):
         return [v["nome"] for v in r["voci"] if "recensioni_tutte" in v]
 
+    # «livello_numero» dal 25 set 2026: il numero accanto al titolo — lo
+    # stesso fatto del livello che il negozio mostra da sempre, in cifra
     PUBBLICHE = {"posizione", "nome", "negozio", "avatar", "titolo", "media",
-                 "punteggio", "voti", "persone", "affari"}
+                 "punteggio", "voti", "persone", "affari", "livello_numero"}
     anon = chiedi(None)
     prova("la rotta gira sul mercatino di cartone: Bice, Ada, Carlo",
           ["Bice", "Ada", "Carlo"], [v["nome"] for v in anon["voci"]])
     prova("all'anonimo il numero del negozio non arriva su nessuna riga",
           [], con_numero(anon))
+    prova("ogni voce porta il numero del livello, dal giudice del Profilo",
+          [3, 1, 1], [v["livello_numero"] for v in anon["voci"]])
     prova("...e le chiavi pubbliche restano quelle di sempre", [PUBBLICHE] * 3,
           [set(v) for v in anon["voci"]])
     ada = chiedi(1)
@@ -25855,7 +25867,7 @@ def prove_classifica_recensioni_tutte():
         return
     pezzi = [pezzo_js(mini, "const fmt = n =>", "\n"),
              pezzo_js(mini, "const esc = s =>", "));") + "));",
-             pezzo_js(mini, "const titoloRiga = nome =>", "'';") + "'';",
+             pezzo_js(mini, "const titoloRiga = (", "'';") + "'';",
              pezzo_js(mini, "function contaFeedback(", "\n}\n") + "\n}",
              pezzo_js(mini, "const CLASSIFICA_SOGLIE", "\n"),
              pezzo_js(mini, "function soglieClassificaUtili(", "\n}\n") + "\n}",
@@ -47789,7 +47801,7 @@ att('i numeri passano da fmt (spazio stretto, mai il punto)',
    («mancano 0 XP e 1 affari conclusi»), e ognuno ha il suo caso. */
 const rosseM = [];
 function attM(nome, cond){ if (!cond) rosseM.push(nome); }
-const G = (xpP, afP) => ({xp_prossimo: xpP, affari_prossimo: afP,
+const G = (xpP, afP) => ({xp_prossimo: xpP, affari_prossimo: afP, numero: 1,
                           nome_prossimo: 'Bottega avviata'});
 const soloAf = fraseManca(G(50, 1), 76, 0);    // il caso dal campo
 const soloXp = fraseManca(G(200, 5), 80, 9);
@@ -47809,17 +47821,27 @@ attM("IL SINGOLARE: 1 affare concluso, mai <<1 affari>>",
      soloAf.includes('1 affare concluso') && !soloAf.includes('affari'));
 attM("...e il plurale da 2 in su", tuttiE.includes('3 affari conclusi'));
 attM("IL VERBO segue quel che resta: manca, con uno solo",
-     soloAf.includes(') manca 1 affare') && !soloAf.includes('mancano'));
-attM("...manca anche con 1 XP", unXp.includes(') manca 1 XP'));
-attM("...mancano con piu' d'uno", soloXp.includes(') mancano 120 XP'));
+     soloAf.startsWith('Manca 1 affare') && !soloAf.includes('Mancano'));
+attM("...manca anche con 1 XP", unXp.startsWith('Manca 1 XP'));
+attM("...mancano con piu' d'uno", soloXp.startsWith('Mancano 120 XP'));
 attM("...e mancano con DUE pezzi, qualunque siano i numeri",
-     unoEuno.includes(') mancano 1 XP e 1 affare concluso'));
+     unoEuno.startsWith('Mancano 1 XP e 1 affare concluso'));
+/* IL NUMERO DEL LIVELLO (25 set 2026, ritocco di Andrea): «Mancano
+   120 XP al livello 2 (Bottega avviata)» — il prossimo e' il numero di
+   adesso piu' uno. Senza numero (server di ieri) si dice «prossimo». */
+attM("il livello che manca si dice col suo numero",
+     soloXp.endsWith(' al livello 2 (<b>Bottega avviata</b>)'));
+attM("...e senza numero si dice il prossimo, mai «livello 1» o NaN",
+     fraseManca({xp_prossimo: 50, affari_prossimo: 1,
+                 nome_prossimo: 'Bottega avviata'}, 0, 0)
+       .endsWith(' al prossimo livello (<b>Bottega avviata</b>)'));
 attM("i due pezzi si uniscono con <<e>>",
      tuttiE.includes('120 XP e 3 affari conclusi'));
 attM("in cima alla scala non si chiede niente",
-     cima.includes('cima alla scala') && !cima.includes('manca'));
+     cima.startsWith('Hai raggiunto il livello massimo')
+     && !/manca/i.test(cima));
 attM("la cintura non lascia una frase rotta",
-     vuoto.includes('ci sei.') && !vuoto.includes('manca'));
+     vuoto.includes('ci sei.') && !/manca/i.test(vuoto));
 attM("il grado si nomina sempre", [soloAf, soloXp, tuttiE, vuoto]
      .every(f => f.includes('<b>Bottega avviata</b>')));
 attM("...e il suo nome passa da esc", cattivo.includes('&lt;img src=x&gt;'));
@@ -47870,7 +47892,7 @@ console.log(JSON.stringify([rosse, rosseM]));
     prova("...il singolare c'e', e il plurale pure", True,
           "e concluso" in gm and "i conclusi" in gm)
     prova("...e il verbo ha tutt'e due le forme", True,
-          '"manca "' in gm and '"mancano "' in gm)
+          '"Manca "' in gm and '"Mancano "' in gm)
     # La frase fissa di prima non deve tornare da nessuna parte
     prova("la frase fissa di prima non c'e' piu'", False,
           "Math.max(0, myLivello.xp_prossimo" in mini)
@@ -62029,8 +62051,10 @@ def prove_p2p_pubblica():
           in pezzo_js(mini, "function rigaTettoFeeP2P(){", "\n}\n"))
     prova("la quota di chi legge ha un giudice solo", 1,
           mini.count("(n * 50).toLocaleString("))
+    # dal 25 set 2026 il conto scrive l'aliquota PIENA (`feePiena`) e lo
+    # sconto nel cartello: e' sempre il giudice a fare la meta'
     prova("...e il conto lo chiama invece di ribattere la formula",
-          True, "esc(mezzaCommissioneP2P(fee))"
+          True, "esc(mezzaCommissioneP2P(feePiena))"
           in pezzo_js(mini, "function contoDettP2P(o){", "\n}\n"))
     for parola in ("Nostr", "nsec", "npub", "relay"):
         prova("il foglio del nuovo ordine non nomina «%s»" % parola,
@@ -88850,6 +88874,201 @@ def prove_punti_pubblici():
     prova("...e non lo da' a chi ha tutto il resto ma non ospita nulla",
           False, bool(_crit["punto_ritiro"](_tutto)))
 
+def prove_livello_accanto_al_titolo():
+    """IL NUMERO DEL LIVELLO ACCANTO AL TITOLO (25 set 2026, ritocco di
+    Andrea), e LO SCONTO P2P DETTO COME SCONTO.
+
+    1) La riga del titolo porta il numero: «🌱 Pioniere · Lv. 3», e
+       «Lv. 3» da solo a chi un titolo non l'ha scelto — il livello non
+       si sceglie, e' un fatto. Senza numero la riga e' byte per byte
+       quella di ieri. Il numero lo manda il server in tre posti
+       (negozio, classifica, volto dell'altra parte), dallo stesso
+       `livello_utente` del cassetto, e gli XP non escono.
+    2) Nel cassetto: «Mercante pratico · Lv. 3», «Mancano … al livello
+       4 (…)» (lo prova `prove_frase_xp`), e il vantaggio del livello.
+    3) Il vantaggio e lo sconto si dicono come SCONTO e mai come cifra
+       finale: «sconto dello 0,5%», col numero di
+       P2P_SCONTO_FEDELTA_PERCENTO (in `p2p_sconto.punti`). Una cifra
+       finale («la tua meta' e' l'1%») era vera solo finche' la fee
+       restava quella. Quattro posti, un testo solo:
+       `scontoFedeltaTestoP2P`. Si FANNO GIRARE: una sentinella direbbe
+       che la funzione c'e', non che dica la cosa giusta."""
+    import re as _re, shutil as _sh, subprocess as _sp, tempfile as _tf
+    import json as _js
+    print("\n[il numero del livello accanto al titolo]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- le sentinelle: il numero arriva dove la riga si disegna -----
+    prova("negozio e classifica passano il numero alla riga del titolo", 2,
+          mini.count("titoloRiga(v.titolo, v.livello_numero)"))
+    prova("...la card dell'altra parte (P2P e ordine) pure", 1,
+          mini.count("titoloRiga(c.titolo, c.livello_numero)"))
+    prova("...e la testata del proprio Profilo", 1,
+          mini.count("titoloRiga(nomeTitolo(myTitolo), myLivello && myLivello.numero)"))
+    rl = pezzo_js(mini, "function renderLivello(){", "\n}\n")
+    prova("il cassetto scrive «· Lv. N» accanto al grado", True,
+          "${esc(myLivello.nome)}${numLiv ? ` · Lv.&nbsp;${numLiv}` : ''}" in rl)
+    prova("...e chiede la riga del vantaggio al suo giudice, solo a P2P acceso",
+          True, "rigaVantaggioLivello(myLivello," in rl
+          and "p2pAcceso()) ? p2pSconto : null" in rl)
+    # IL LIVELLO DELLO SCONTO E' UNO: il gemello del client combacia col
+    # server, come SOGLIE_LIV con LIVELLI
+    m = _re.search(r"^P2P_SCONTO_LIVELLO = (\d+)", _SORGENTE, _re.M)
+    c = _re.search(r"^const LIVELLO_SCONTO_P2P = (\d+);", mini, _re.M)
+    prova("LIVELLO_SCONTO_P2P del client = P2P_SCONTO_LIVELLO del server",
+          True, bool(m and c and m.group(1) == c.group(1)))
+    # NESSUNA CIFRA FINALE per chi ha lo sconto, nei posti che la dicevano
+    for vecchia, dove in (
+            ("' <b>Tu sei fra questi</b>: la tua met", "la pagina Informazioni"),
+            ("'la tua commissione è '", "il riquadro del foglio Pubblica"),
+            ("'pioniere' : 'livello 5'", "il cartello del conto")):
+        prova(f"la cifra finale non torna: {dove}", False, vecchia in mini)
+    inf = pezzo_js(mini, "function renderP2PInfo(){", "\n}\n")
+    prova("la pagina Informazioni dice lo sconto dal testo unico", True,
+          "scontoFedeltaTestoP2P(p2pSconto.punti)" in inf)
+    conto = pezzo_js(mini, "function contoDettP2P(o){", "\n}\n")
+    prova("il conto scrive l'aliquota PIENA accanto al cartello dello sconto",
+          True, "esc(mezzaCommissioneP2P(feePiena))" in conto
+          and "const feePiena = commissioneVivaP2P();" in conto)
+
+    # --- il server: il numero esce, gli XP no ------------------------
+    volti = pezzo("_volti_persone")
+    prova("il volto dell'altra parte porta il numero del livello", True,
+          '"livello_numero": _liv["numero"]' in volti)
+    prova("...e non gli XP", False, '"xp":' in volti)
+    prova("il negozio porta il numero del livello", 1,
+          _SORGENTE.count('venditore["livello_numero"] = _liv["numero"]'))
+    i_c = _SORGENTE.index('"livello_numero": livello_utente(')
+    prova("la classifica lo calcola dallo stesso giudice", True,
+          '"titolo": NOMI_TITOLI.get((u["titolo"] if u else "")'
+          in _SORGENTE[i_c - 400:i_c])
+    amb = {}
+    exec(pezzo("livello_utente"), {"LIVELLI": _livelli_dal_sorgente()}, amb)
+    prova("i numeri del giudice: 1 all'inizio, 3 a meta', 5 in cima",
+          [1, 3, 5], [amb["livello_utente"](0, 0)["numero"],
+                      amb["livello_utente"](200, 5)["numero"],
+                      amb["livello_utente"](9999, 99)["numero"]])
+
+    node = _sh.which("node")
+    if not node:
+        salta("la riga del titolo e il vantaggio girano", "node non installato")
+        return
+    pezzi = [pezzo_js(mini, "const esc = s =>", "));") + "));",
+             pezzo_js(mini, "const titoloRiga = (", "'';") + "'';",
+             pezzo_js(mini, "const LIVELLO_SCONTO_P2P = ", "\n"),
+             pezzo_js(mini, "function rigaVantaggioLivello(", "\n}\n") + "\n}"]
+    for f in ("scontoFedeltaTestoP2P", "articoloPercentoP2P",
+              "commissioneVivaP2P", "commissioneListinoP2P", "feeMiaP2P",
+              "cartelloFeeP2P", "mezzaCommissioneP2P", "maxEuroP2P",
+              "maxSatsTestoP2P", "rigaTettoFeeP2P"):
+        pezzi.append(pezzo_js(mini, "function %s(" % f, "\n}\n") + "\n}")
+    banco = "\n".join(pezzi) + r"""
+const fmt = n => n.toLocaleString('it-IT');
+let p2pInfo = {fee: 0.03, maxSats: 0}, p2pSconto = null;
+let p2pLeve = null, p2pLevaPubblica = null;
+const p2pCoord = () => ({commissione: 3});
+const out = {};
+out.riga = {
+  tutti: titoloRiga('🌱 Pioniere', 3),
+  senzaTitolo: titoloRiga('', 3),
+  senzaNumero: titoloRiga('🌱 Pioniere'),
+  niente: titoloRiga('', undefined),
+  cattivo: titoloRiga('<img src=x>', 2),
+  storti: [titoloRiga('T', 'x'), titoloRiga('T', 0), titoloRiga('T', -2),
+           titoloRiga('T', null)],
+  decimale: titoloRiga('T', 3.7),
+};
+const S = (motivo, attivo) => ({attivo, motivo, punti: 0.5});
+out.vant = {
+  sotto: rigaVantaggioLivello({numero: 3}, S('', false)),
+  cinque: rigaVantaggioLivello({numero: 5}, S('livello', true)),
+  pioniere: rigaVantaggioLivello({numero: 2}, S('pioniere', true)),
+  pioniereCinque: rigaVantaggioLivello({numero: 5}, S('pioniere', true)),
+  spenta: rigaVantaggioLivello({numero: 5}, {attivo: false, motivo: '', punti: 0}),
+  chiusa: rigaVantaggioLivello({numero: 5}, null),
+  senzaLivello: rigaVantaggioLivello(null, S('', false)),
+  unPunto: rigaVantaggioLivello({numero: 1}, {attivo: false, punti: 1}),
+};
+out.testo = [0.5, 1, 0.25, 0, -1, 'x'].map(scontoFedeltaTestoP2P);
+/* il riquadro del foglio «Pubblica»: senza sconto la meta' per parte,
+   con lo sconto la stessa meta' PIU' lo sconto — mai l'1% finale */
+out.pieno = rigaTettoFeeP2P();
+p2pSconto = S('pioniere', true);
+out.scontato = rigaTettoFeeP2P();
+out.cartello = cartelloFeeP2P(null);
+/* la fee cambia sul nodo: lo sconto resta lo stesso, la meta' si muove */
+p2pInfo = {fee: 0.04, maxSats: 0};
+out.feeNuova = rigaTettoFeeP2P();
+console.log(JSON.stringify(out));
+"""
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8") as f:
+        f.write(banco)
+        percorso = f.name
+    r = _sp.run([node, percorso], capture_output=True, text=True,
+                encoding="utf-8")
+    os.unlink(percorso)
+    if r.returncode != 0:
+        prova("il banco del livello accanto al titolo gira", "",
+              (r.stderr or "")[-400:])
+        return
+    o = _js.loads(r.stdout)
+    rg = o["riga"]
+    prova("titolo e livello: «🌱 Pioniere · Lv. 3»",
+          '<div class="titolo-riga">🌱 Pioniere · Lv.&nbsp;3</div>', rg["tutti"])
+    prova("senza titolo il livello sta da solo",
+          '<div class="titolo-riga">Lv.&nbsp;3</div>', rg["senzaTitolo"])
+    prova("senza numero la riga di ieri, byte per byte",
+          '<div class="titolo-riga">🌱 Pioniere</div>', rg["senzaNumero"])
+    prova("niente titolo e niente numero: niente riga", "", rg["niente"])
+    prova("il titolo passa ancora da esc", True,
+          "&lt;img src=x&gt; · Lv.&nbsp;2" in rg["cattivo"])
+    prova("un numero storto non scrive nessun «Lv.»",
+          ['<div class="titolo-riga">T</div>'] * 4, rg["storti"])
+    prova("...e un decimale si tronca", True, "Lv.&nbsp;3<" in rg["decimale"])
+    v = o["vant"]
+    prova("sotto il 5: «Dal livello 5: sconto dello 0,5% sulle commissioni P2P»",
+          "⚡ Dal livello 5: <b>sconto dello 0,5%</b> sulle commissioni P2P.",
+          v["sotto"])
+    prova("dal 5: il vantaggio e' tuo",
+          "⚡ Il tuo livello ti dà uno <b>sconto dello 0,5%</b> sulle commissioni P2P.",
+          v["cinque"])
+    prova("il pioniere sotto il 5 sa che ce l'ha gia'", True,
+          v["pioniere"].startswith("⚡ Dal livello 5:")
+          and v["pioniere"].endswith("Tu ce l'hai già, da&nbsp;🌱&nbsp;pioniere."))
+    prova("...e al 5 la frase di tutti (uno sconto solo)", v["cinque"],
+          v["pioniereCinque"])
+    prova("leva spenta, P2P chiuso o livello ignoto: nessuna riga",
+          ["", "", ""], [v["spenta"], v["chiusa"], v["senzaLivello"]])
+    # l'apostrofo esce da esc come &#39;: a schermo e' «dell'1%»
+    prova("l'articolo segue il numero: «sconto dell'1%»", True,
+          "sconto dell&#39;1%" in v["unPunto"])
+    prova("mai una cifra finale nella riga del vantaggio", False,
+          any("invece" in x or "1,5" in x for x in v.values()))
+    prova("il testo unico dello sconto, coi suoi articoli",
+          ["sconto dello 0,5%", "sconto dell'1%", "sconto dello 0,25%",
+           "", "", ""], o["testo"])
+    prova("il foglio Pubblica senza sconto: la meta' per parte",
+          '<div class="hint">La commissione di Barattolo è dell\'1,5% per parte</div>',
+          o["pieno"])
+    prova("...con lo sconto: la meta' piena e lo sconto, mai l'1% finale",
+          '<div class="hint">La commissione di Barattolo è dell\'1,5% per parte, '
+          'e tu hai uno sconto dello 0,5%</div>', o["scontato"])
+    prova("il cartello del conto dice lo sconto", "sconto dello 0,5%",
+          o["cartello"])
+    prova("la fee cambia sul nodo: la meta' si muove, lo sconto resta",
+          '<div class="hint">La commissione di Barattolo è del 2% per parte, '
+          'e tu hai uno sconto dello 0,5%</div>', o["feeNuova"])
+
+
+def _livelli_dal_sorgente():
+    """LIVELLI di server.py, letti dal sorgente (senza importarlo)."""
+    i = _SORGENTE.index("LIVELLI = [")
+    amb = {}
+    exec(_SORGENTE[i:_SORGENTE.index("]\n", i) + 2], {}, amb)
+    return amb["LIVELLI"]
+
+
 def prove_p2p_sconto():
     """LE COMMISSIONI PER PERSONA (set 2026): lo sconto fedelta' del
     P2P. Lo sconto vero lo applica il coordinatore (patch 0005 del
@@ -89039,6 +89258,9 @@ def prove_p2p_sconto():
         pezzo_js(mini, "function %s(" % n, "\n}\n") + "\n}"
         for n in ("commissioneVivaP2P", "commissioneListinoP2P", "feeMiaP2P",
                   "cartelloFeeP2P", "scontoMancatoP2P", "mezzaCommissioneP2P",
+                  # il cartello dello sconto lo scrive il testo UNICO
+                  # (25 set 2026), che chiede l'articolo al suo giudice
+                  "scontoFedeltaTestoP2P", "articoloPercentoP2P",
                   "nettoLatoP2P", "lordoDaMieiP2P")) + r"""
 let p2pInfo = {fee: 0.03}, p2pSconto = null;
 const p2pCoord = () => ({commissione: 4});
@@ -89099,12 +89321,15 @@ console.log(JSON.stringify(out));
           piena, o["nessuno"])
     prova("leva accesa ma lo sconto non e' mio: identico, byte per byte",
           piena, o["levaAccesaMaNonMio"])
-    prova("pioniere: 1%, 99.000 e 101.000, e il cartello lo dice",
-          {"quota": "1", "cartello": "pioniere", "compro": 99000,
+    # IL CARTELLO DICE LO SCONTO E NON IL MOTIVO (25 set 2026, decisione
+    # di Andrea): «sconto dello 0,5%», coi punti che arrivano dal config
+    # — accanto all'aliquota piena, non a quella finale.
+    prova("pioniere: 1%, 99.000 e 101.000, e il cartello dice lo sconto",
+          {"quota": "1", "cartello": "sconto dello 0,5%", "compro": 99000,
            "vendo": 101000},
           {k: o["pioniere"][k] for k in ("quota", "cartello", "compro", "vendo")})
-    prova("livello 5: gli stessi numeri, un altro cartello",
-          {"quota": "1", "cartello": "livello 5", "compro": 99000,
+    prova("livello 5: gli stessi numeri, lo stesso cartello",
+          {"quota": "1", "cartello": "sconto dello 0,5%", "compro": 99000,
            "vendo": 101000},
           {k: o["livello"][k] for k in ("quota", "cartello", "compro", "vendo")})
     prova("il lordo si ricava all'indietro anche scontato",
@@ -100003,6 +100228,7 @@ def main():
               prove_bundle_nostr,
               prove_relay_chiavi,
               prove_p2p_sconto,
+              prove_livello_accanto_al_titolo,
               prove_p2p_server,
         prove_p2p_libro,
         prove_tour_p2p,

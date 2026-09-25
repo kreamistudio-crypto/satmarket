@@ -21028,8 +21028,13 @@ def negozio(chi: str, limit: int = 0, cursore: str = "", da: str = "",
     # Il grado, derivato come sempre (mai in colonna). In pubblico
     # escono il nome e basta: gli XP sono roba di chi li ha, e un
     # numero altrui non aiuta nessuno a decidere se fidarsi.
-    venditore["livello"] = livello_utente(
-        v["xp"] or 0, (v["vendite_ok"] or 0) + (v["acquisti_ok"] or 0))["nome"]
+    _liv = livello_utente(
+        v["xp"] or 0, (v["vendite_ok"] or 0) + (v["acquisti_ok"] or 0))
+    venditore["livello"] = _liv["nome"]
+    # ...e il suo NUMERO, che il client scrive accanto al titolo
+    # («🌱 Pioniere · Lv. 3», 25 set 2026): e' lo stesso fatto del
+    # nome detto in cifra, non un dato in piu'.
+    venditore["livello_numero"] = _liv["numero"]
     venditore["titolo"] = NOMI_TITOLI.get(v["titolo"] or "", "")
     # lo sconto carrello dallo stesso giudice della vetrina, e per la
     # stessa ragione: la leva spenta lo spegne anche qui, e la soglia
@@ -21240,6 +21245,7 @@ def classifica(x_tg_init_data: str = Header(""),
             segni = ",".join("?" * len(serve))
             ana = {r["tg_id"]: r for r in con.execute(
                 "SELECT tg_id, nome, negozio, titolo, n_feedback, "
+                "xp, vendite_ok, acquisti_ok, "
                 "(CASE WHEN avatar_scelta='nessuna' THEN '' ELSE avatar "
                 f"END) AS avatar FROM utenti WHERE tg_id IN ({segni})",
                 tuple(serve))}
@@ -21253,6 +21259,12 @@ def classifica(x_tg_init_data: str = Header(""),
                  "negozio": (u["negozio"] if u else "") or "",
                  "avatar": (u["avatar"] if u else "") or "",
                  "titolo": NOMI_TITOLI.get((u["titolo"] if u else "") or "", ""),
+                 # il numero del livello accanto al titolo (25 set 2026):
+                 # dallo stesso giudice del Profilo, e gli XP non escono
+                 "livello_numero": livello_utente(
+                     (u["xp"] if u else 0) or 0,
+                     ((u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0))
+                     if u else 0)["numero"],
                  "media": round(r["media"], 2),
                  # ×100 e arrotondato: e' il numero che si legge, e il
                  # solo posto dove il punteggio prende una forma.
@@ -41027,15 +41039,17 @@ def _volti_persone(con, ids, adesso) -> dict:
             f"FROM utenti WHERE tg_id IN ({segni_u})", ids):
         voti = int(u["n_feedback"] or 0)
         hexk = chiave_nostr_provata(u)
+        _liv = livello_utente(
+            u["xp"] or 0, (u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0))
         chi = {
             "nome": u["nome"] or "",
             "avatar": u["avatar"] or "",
             "media": round(float(u["rating"] or 0), 1) if voti else 0,
             "voti": voti,
             "negozio": u["negozio"] or u["username"] or "",
-            "livello": livello_utente(
-                u["xp"] or 0,
-                (u["vendite_ok"] or 0) + (u["acquisti_ok"] or 0))["nome"],
+            "livello": _liv["nome"],
+            # il numero, accanto al titolo (25 set 2026)
+            "livello_numero": _liv["numero"],
             "titolo": NOMI_TITOLI.get(u["titolo"] or "", ""),
             "telegram": u["username"] or "",
             "npub": hex_to_npub(hexk) if hexk else "",

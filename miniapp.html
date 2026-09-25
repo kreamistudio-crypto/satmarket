@@ -13524,9 +13524,19 @@ function contaFeedback(n, persone){
 /* Il titolo sotto il nome (ago 2026). Arriva GIA' col suo nome dal
    server — il catalogo sta la', il client non ne tiene una copia che
    divergerebbe al primo titolo nuovo. Vuoto = niente riga: chi non ne
-   porta uno non deve avere uno spazio bianco al suo posto. */
-const titoloRiga = nome =>
-  nome ? `<div class="titolo-riga">${esc(nome)}</div>` : '';
+   porta uno non deve avere uno spazio bianco al suo posto.
+   IL NUMERO DEL LIVELLO GLI STA ACCANTO (25 set 2026, ritocco di
+   Andrea): «🌱 Pioniere · Lv. 3». Arriva dal server gia' calcolato
+   (`livello_numero`, dallo stesso `livello_utente` del cassetto), e
+   c'e' anche SENZA titolo — «Lv. 3» da solo — perche' il livello non
+   si sceglie: e' un fatto, come le stelle. Senza numero (server di
+   ieri, demo) la riga e' quella di sempre. `n` e' il numero ripulito:
+   un parametro e non una riga a parte, perche' la funzione resti UNA
+   espressione (i banchi di prove.py la ritagliano fino al punto e
+   virgola). */
+const titoloRiga = (nome, liv, n = Math.max(0, Math.floor(Number(liv)) || 0)) =>
+  (nome || n) ? `<div class="titolo-riga">${nome ? esc(nome) : ''}${
+    nome && n ? ' · ' : ''}${n ? `Lv.&nbsp;${n}` : ''}</div>` : '';
 /* Sul PROPRIO profilo il titolo si conosce per id (viene da
    /api/me.titolo, che e' quello che si scrive scegliendolo): il nome
    si pesca dal catalogo gia' in pagina, senza un secondo giro. */
@@ -17110,7 +17120,7 @@ function rigaClassifica(v, mia){
       <div class="cl-pos">${medaglia || v.posizione + '°'}</div>
       <div class="avatar">${avatarImg(v.avatar)}${esc((v.nome||'?')[0])}</div>
       <div class="who" style="min-width:0">
-        <b>${esc(v.nome)}</b>${titoloRiga(v.titolo)}
+        <b>${esc(v.nome)}</b>${titoloRiga(v.titolo, v.livello_numero)}
         <div class="rep">${rep}</div>${contanoInClassifica(v)}
       </div>
       <div class="cl-punti" title="Punteggio: media dei voti e commercio">${fmt(v.punteggio || 0)}</div>
@@ -17998,7 +18008,7 @@ function renderNegozio(v, annunci, feedback=[], esauriti=[]){
     <div class="seller${tondi ? ' con-tondi' : ''}" style="margin-top:14px">
       <div class="avatar">${avatarImg(v.avatar)}${esc((v.nome||'?')[0])}</div>
       <div class="who"><b>${esc(v.nome||'—')}${badge}${fiducia}</b>
-        ${titoloRiga(v.titolo)}
+        ${titoloRiga(v.titolo, v.livello_numero)}
         <div class="rep">${rep}</div>
       </div>
       ${tondi}
@@ -29223,7 +29233,7 @@ function renderProfilo(){
     <div class="seller${tondi ? ' con-tondi' : ''}" style="margin-top:14px">
       <div class="avatar">${avatarImg(myAvatar)}${esc(nome[0])}</div>
       <div class="who"><b>${esc(nome)}${badge}</b>
-        ${titoloRiga(nomeTitolo(myTitolo))}
+        ${titoloRiga(nomeTitolo(myTitolo), myLivello && myLivello.numero)}
         <div class="rep">${rep}</div>
       </div>
       ${tondi}
@@ -29356,12 +29366,19 @@ function renderLivello(){
      dispetto. Chi non ha ancora niente non vede l'elenco vuoto:
      vede solo «Nessuno», che e' la verita' senza il rimprovero. */
   const scelti = (myTitoli||[]).filter(t=>t.sbloccato);
+  /* IL VANTAGGIO DEL LIVELLO, solo dove il P2P c'e' per chi legge: una
+     riga su una commissione che non puo' pagare sarebbe una promessa
+     su una porta chiusa. Il numero viene dal config (vedi il giudice). */
+  const numLiv = Math.max(0, Math.floor(Number(myLivello.numero)) || 0);
+  const vantaggio = rigaVantaggioLivello(myLivello,
+    (typeof p2pAcceso === 'function' && p2pAcceso()) ? p2pSconto : null);
   box.innerHTML = `
-    <div class="grado">${esc(myLivello.nome)}</div>
+    <div class="grado">${esc(myLivello.nome)}${numLiv ? ` · Lv.&nbsp;${numLiv}` : ''}</div>
     <div class="grado-xp">${fmt(myXp)} XP · ${fmt(myAffari)} affari conclusi</div>
     <div class="hint" style="margin-top:6px">${fraseXp(myXpRuoli)}</div>
     <div class="barra-xp"><i style="width:${q}%"></i></div>
     <div class="hint">${manca}</div>
+    ${vantaggio ? `<div class="hint" style="margin-top:6px">${vantaggio}</div>` : ''}
     <div style="margin-top:16px"><b>Il tuo titolo</b></div>
     <div class="hint">Compare sotto il tuo nome, dove ti vedono gli altri.</div>
     <div class="titoli">
@@ -29507,16 +29524,48 @@ function fraseXp(r){
    sempre almeno una — ma una frase rotta e' peggio di una riga in
    piu', e il giudice si prova anche li'. */
 function fraseManca(liv, xp, affari){
-  if (!liv || !liv.xp_prossimo) return "Sei in cima alla scala. 🫙";
+  if (!liv || !liv.xp_prossimo) return "Hai raggiunto il livello massimo. 🫙";
   const dx = Math.max(0, liv.xp_prossimo - xp);
   const da = Math.max(0, (liv.affari_prossimo || 0) - affari);
   const pezzi = [];
   if (dx) pezzi.push(`${fmt(dx)} XP`);
   if (da) pezzi.push(`${fmt(da)} affar` + (da === 1 ? "e concluso" : "i conclusi"));
-  const grado = `Al prossimo grado (<b>${esc(liv.nome_prossimo)}</b>) `;
-  if (!pezzi.length) return grado + "ci sei.";
+  const n = Math.floor(Number(liv.numero)) || 0;
+  const grado = (n > 0 ? `livello ${n + 1}` : "prossimo livello")
+    + ` (<b>${esc(liv.nome_prossimo)}</b>)`;
+  if (!pezzi.length) return "Al " + grado + " ci sei.";
   const solo_uno = pezzi.length === 1 && (dx === 1 || da === 1);
-  return grado + (solo_uno ? "manca " : "mancano ") + pezzi.join(" e ");
+  return (solo_uno ? "Manca " : "Mancano ") + pezzi.join(" e ") + " al " + grado;
+}
+
+/* IL LIVELLO CHE APRE LO SCONTO FEDELTA' DEL P2P. E' il gemello di
+   `P2P_SCONTO_LIVELLO` in server.py — chi ne cambia uno cambia
+   l'altro, e prove.py li incrocia come fa con SOGLIE_LIV. Serve solo
+   alla FRASE: chi ha lo sconto lo decide il server (`p2p_sconto`). */
+const LIVELLO_SCONTO_P2P = 5;
+/* IL VANTAGGIO DEL LIVELLO, in una riga (25 set 2026, ritocco di
+   Andrea). Oggi il solo vantaggio e' lo sconto fedelta' del P2P dal
+   livello 5; la riga c'e' SOLO quando la leva e' accesa (`punti` > 0,
+   dal server) — a leva spenta un vantaggio non c'e', e dirlo sarebbe
+   una promessa.
+   SI DICE COME SCONTO E MAI COME CIFRA FINALE (decisione di Andrea):
+   «sconto dello 0,5%», col numero di P2P_SCONTO_FEDELTA_PERCENTO che
+   arriva in `p2p_sconto.punti` — il testo e' `scontoFedeltaTestoP2P`,
+   lo stesso del conto dello scambio. Cosi' resta giusto il giorno che
+   la commissione cambia sul nodo.
+   IL PIONIERE LO SCONTO CE L'HA GIA', e la riga lo dice: «dal livello
+   5» a lui suonerebbe come una cosa che gli manca. Uno sconto solo:
+   arrivato al 5 non ne prende un secondo (la regola del server).
+   PURA: livello e sconto arrivano da fuori. */
+function rigaVantaggioLivello(liv, sconto){
+  const sc = scontoFedeltaTestoP2P(sconto && sconto.punti);
+  if (!liv || !sc) return '';
+  const cosa = `<b>${esc(sc)}</b> sulle commissioni P2P`;
+  if ((Math.floor(Number(liv.numero)) || 0) >= LIVELLO_SCONTO_P2P)
+    return `⚡ Il tuo livello ti dà uno ${cosa}.`;
+  const giaPioniere = sconto.attivo && sconto.motivo === 'pioniere';
+  return `⚡ Dal livello ${LIVELLO_SCONTO_P2P}: ${cosa}.`
+    + (giaPioniere ? " Tu ce l'hai già, da&nbsp;🌱&nbsp;pioniere." : '');
 }
 
 /* ---- 💌 I tuoi inviti (set 2026). Il codice, il link e due CONTI:
@@ -43791,16 +43840,34 @@ function feeMiaP2P(o){
   if (!(punti > 0)) return fee;
   return Math.max(0, fee - 2 * punti / 100);
 }
+/* LO SCONTO FEDELTA' SI DICE COME SCONTO, MAI COME CIFRA FINALE (25 set
+   2026, decisione di Andrea): «sconto dello 0,5%», col numero che arriva
+   dal server — `p2p_sconto.punti`, cioe' P2P_SCONTO_FEDELTA_PERCENTO
+   del config — e mai battuto a mano. Una cifra finale («la tua meta'
+   e' l'1%») era giusta solo finche' la commissione restava quella: lo
+   sconto resta vero anche il giorno che la fee cambia sul nodo.
+   E' il testo UNICO dei quattro posti che lo dicono — il cartello del
+   conto, la pagina «Informazioni», il riquadro del foglio «Pubblica» e
+   il vantaggio del livello nel Profilo. Vuoto senza punti. PURA. */
+function scontoFedeltaTestoP2P(punti){
+  const n = Number(punti);
+  if (!(n > 0)) return '';
+  const t = n.toLocaleString('it-IT', {maximumFractionDigits: 2});
+  return 'sconto ' + articoloPercentoP2P(t) + t + '%';
+}
 /* il cartello accanto all'aliquota: PERCHE' pago questa cifra. Lo
    sconto vince sulla beta (dice una cosa di ME, l'altra del momento);
    lo sconto MANCATO vince su tutti e due, perche' e' l'unico dei tre
-   che chi legge non si aspetta. Vuoto = nessun cartello. */
+   che chi legge non si aspetta. Vuoto = nessun cartello.
+   ⚠️ DAL 25 SET 2026 IL CARTELLO DELLO SCONTO DICE LO SCONTO («sconto
+   dello 0,5%») e non piu' il motivo («pioniere», «livello 5»): accanto
+   c'e' l'aliquota PIENA, e i due insieme si leggono senza conti. */
 function cartelloFeeP2P(o){
   const fee = commissioneVivaP2P();
   if (fee === null) return '';
   if (o && o.scontoMancato) return 'sconto non verificato';
   if (fee > 0 && feeMiaP2P(o) < fee)
-    return p2pSconto.motivo === 'pioniere' ? 'pioniere' : 'livello 5';
+    return scontoFedeltaTestoP2P(p2pSconto.punti);
   return (commissioneListinoP2P() > 0 && fee * 100 < commissioneListinoP2P())
     ? 'beta' : '';
 }
@@ -43899,11 +43966,10 @@ function renderP2PInfo(){
            tutti, `attivo` e' di chi legge): la regola la legge
            chiunque, la riga «tu» solo chi ce l'ha */
         + ((p2pSconto && Number(p2pSconto.punti) > 0 && fee > 0)
-          ? '<p>Chi &egrave; <b>pioniere</b> o ha raggiunto il <b>livello 5</b> paga <b>'
-            + num(Number(p2pSconto.punti)) + ' punti in meno</b> sulla sua met&agrave; (uno sconto solo, non si sommano).'
-            + (feeMiaP2P(null) < fee
-              ? ' <b>Tu sei fra questi</b>: la tua met&agrave; &egrave; <b>'
-                + esc(mezzaCommissioneP2P(feeMiaP2P(null))) + '%</b>.' : '')
+          ? '<p>Chi &egrave; <b>pioniere</b> o ha raggiunto il <b>livello '
+            + LIVELLO_SCONTO_P2P + '</b> ha uno <b>'
+            + esc(scontoFedeltaTestoP2P(p2pSconto.punti)) + '</b> sulla sua met&agrave; (uno sconto solo, non si sommano).'
+            + (feeMiaP2P(null) < fee ? ' <b>Tu sei fra questi.</b>' : '')
             + '</p>'
           : '');
   }
@@ -49233,8 +49299,9 @@ function contoDettP2P(o){
      invece di precedere la cifra: l'aria le serve dall'altra parte */
   /* ⚠️ NON PIU' «IN PROMO» (set 2026, le commissioni per persona):
      il cartello dice PERCHE' chi legge paga quella cifra — «beta»
-     finche' la fee viva sta sotto il listino, «pioniere» o
-     «livello 5» per chi ha lo sconto. Lo decide `cartelloFeeP2P`. */
+     finche' la fee viva sta sotto il listino, «sconto dello 0,5%»
+     per chi ha lo sconto (fino al 25 set 2026 diceva il motivo,
+     «pioniere» o «livello 5»). Lo decide `cartelloFeeP2P`. */
   const cartello = cartelloFeeP2P(o);
   const promo = cartello
     ? '<span class="promo-tag dopo">' + esc(cartello) + '</span>' : '';
@@ -49250,8 +49317,14 @@ function contoDettP2P(o){
      aggiunge a quelli che blocca. E' un giudizio, non la direzione
      che vestono le cifre a destra: le due letture stanno in due
      colonne diverse. */
+  /* L'ALIQUOTA E' QUELLA PIENA (25 set 2026): con lo sconto il
+     cartello accanto dice «sconto dello 0,5%», e l'1,5% piu' lo sconto
+     si legge da solo — l'1% scritto qui era una cifra finale, che il
+     giorno che la fee cambia diventa un'altra. La cifra a destra resta
+     la MIA, gia' scontata: e' il numero che passa davvero di mano. */
+  const feePiena = commissioneVivaP2P();
   const etichettaFee = 'Fee Barattolo'
-    + (fee > 0 ? ' <b class="p2p-avviso">' + esc(mezzaCommissioneP2P(fee))
+    + (fee > 0 ? ' <b class="p2p-avviso">' + esc(mezzaCommissioneP2P(feePiena))
                  + '%</b>' : '')
     + promo;
   const commissione = fee === null ? num('—')
@@ -52592,12 +52665,15 @@ function rigaTettoFeeP2P(){
   const fee = feeMiaP2P(null);
   if (fee > 0) {
     const q = mezzaCommissioneP2P(fee);
-    /* con lo sconto la frase parla di ME: «per parte» direbbe che
-       anche l'altro paga l'1%, e non e' detto */
+    /* con lo sconto la frase dice la commissione PIENA per parte e
+       poi lo sconto di chi legge (25 set 2026): «la tua e' l'1%» era
+       una cifra finale, che il giorno che la fee cambia sul nodo
+       diventa un'altra — lo sconto resta vero */
     const mia = fee < commissioneVivaP2P();
+    const piena = mezzaCommissioneP2P(commissioneVivaP2P());
     pezzi.push(mia
-      ? 'la tua commissione è ' + articoloPercentoP2P(q) + q
-        + '% (sconto ' + cartelloFeeP2P(null) + ')'
+      ? 'la commissione di Barattolo è ' + articoloPercentoP2P(piena)
+        + piena + '% per parte, e tu hai uno ' + cartelloFeeP2P(null)
       : 'la commissione di Barattolo è ' + articoloPercentoP2P(q)
         + q + '% per parte');
   }
@@ -56288,7 +56364,7 @@ function cardParte(c, chi, opz){
     + '<div class="seller-porta"' + porta + '>'
     + '<div class="avatar">' + avatarImg(c.avatar) + esc(String(nome)[0]) + '</div>'
     + '<div class="who"><b>' + esc(nome) + '</b>'
-    + titoloRiga(c.titolo)
+    + titoloRiga(c.titolo, c.livello_numero)
     + (rep.length ? '<div class="rep">' + rep.join(' · ') + '</div>' : '')
     + '</div>'
     + (porta ? '<span style="color:var(--muted);font-size:20px;font-weight:700">›</span>' : '')

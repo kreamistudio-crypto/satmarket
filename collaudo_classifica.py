@@ -215,9 +215,12 @@ def main() -> int:
     prova("il punteggio esce ×100 e arrotondato", True,
           isinstance(r["voci"][0].get("punteggio"), int)
           and r["voci"][0]["punteggio"] > 0)
+    # «livello_numero» dal 25 set 2026: il numero accanto al titolo —
+    # lo stesso fatto del livello, in cifra, e gli XP restano dentro
     prova("escono i fatti su cui poggia la posizione",
           {"posizione", "nome", "negozio", "avatar", "titolo",
-           "media", "voti", "persone", "affari", "punteggio"}, chiavi)
+           "media", "voti", "persone", "affari", "punteggio",
+           "livello_numero"}, chiavi)
     # L'ORDINE SI LEGGE, che e' la ragione per cui il numero esce: chi
     # sta sopra ha un punteggio maggiore o uguale a chi sta sotto.
     punti = [v["punteggio"] for v in r["voci"]]
