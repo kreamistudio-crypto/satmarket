@@ -55240,6 +55240,14 @@ const matchMedia = q => ({matches: q === '(max-width: 767px)' && largo < 768});
 function apriNuovoOrdineP2P(){ aperto++; passi.push('pubblica'); }
 function setLatoP2P(l, s){ passi.push('lato:' + l + (s ? ':senza' : '')); }
 function go(v){ andato = v; passi.push('go:' + v); }
+/* LA MORFOSI DEL + NEL MERCATINO (25 set 2026): il + chiede prima a lei,
+   che apre Vendi da se' quando se ne occupa */
+let morfoVendi = false;
+function apriMorfoVendi(){
+  passi.push('morfosi-vendi');
+  if (morfoVendi) { andato = 'vendi'; return true; }
+  return false;
+}
 const out = {};
 out.libro = voceNav('p2p') === 'p2plibro';
 out.miei = voceNav('p2pmiei') === 'p2pmiei';
@@ -55252,6 +55260,12 @@ out.modalita = VISTE_NAV_P2P.has('p2p') && VISTE_NAV_P2P.has('p2pmiei')
   && VISTE_NAV_P2P.size === 4;
 toccaPiu();
 out.fuoriApreVendi = andato === 'vendi' && aperto === 0;
+out.fuoriSenza = passi.slice();
+passi = []; andato = ''; morfoVendi = true;
+toccaPiu();
+out.fuoriMorfosi = passi.slice();
+out.fuoriMorfosiVendi = andato === 'vendi' && aperto === 0;
+morfoVendi = false;
 inP2P = true; andato = '';
 toccaPiu();
 out.dentroPubblica = aperto === 1 && andato === '';
@@ -55289,12 +55303,361 @@ console.log(JSON.stringify(out));
     prova("il giudice della modalita' dice quattro viste, mai il presto",
           True, out["modalita"])
     prova("fuori dal P2P il + apre Vendi", True, out["fuoriApreVendi"])
+    # LA MORFOSI DEL + NEL MERCATINO (25 set 2026): il + chiede prima alla
+    # morfosi, e go('vendi') solo se lei non se ne occupa — mai tutt'e due,
+    # o la vista si aprirebbe due volte
+    prova("...chiedendo prima alla morfosi, e senza di lei con go()",
+          ["morfosi-vendi", "go:vendi"], out["fuoriSenza"])
+    prova("...e con la morfosi la vista la apre lei, una volta sola",
+          [["morfosi-vendi"], True],
+          [out["fuoriMorfosi"], out["fuoriMorfosiVendi"]])
     prova("...e dentro pubblica un ordine, senza navigare", True,
           out["dentroPubblica"])
     prova("...e grigio, fuori dal libro, porta al libro su «Compra BTC»",
           ["lato:compro:senza", "go:p2p"], out["grigio"])
     prova("...ma da desktop la pillola pubblica ancora", ["pubblica"],
           out["grigioDesktop"])
+
+
+def prove_morfosi_vendi():
+    """LA MORFOSI DEL + NEL MERCATINO (25 set 2026, richiesta di Andrea).
+    Il + arancio di «Vendi», al tocco, diventa «⚡ Pubblica annuncio» con
+    la morfosi del P2P — lo STESSO fantasma e le stesse funzioni, non una
+    copia —, e il bottone resta attaccato in fondo allo schermo per tutta
+    la compilazione; chiudendo, la barra torna secca (niente in volo).
+    E il paragrafo del divieto esce dal form: un link discreto accanto al
+    bottone apre un foglio breve, che COPIA la lista dalla pagina «Il
+    pagamento protetto», dove sta una volta sola.
+    Qui: il markup (piede, freccia, link, foglio, la voce nella pagina),
+    la lista in pari col filtro del server, il JS che riusa i pezzi del
+    P2P, la cascata del vestito arancio, il raggio di un terzo, le regole
+    della pagina piena e il banco node sulle funzioni VERE."""
+    print("\n[la morfosi del + nel mercatino]")
+    import ast as _ast
+    import json as _json
+    import shutil as _sh
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    i0 = mini.find("<style>")
+    stile = mini[i0 + 7:mini.find("</style>", i0)]
+
+    # --- 1) IL MARKUP DELLA VISTA ---------------------------------------
+    vv = mini[mini.index('<div class="view" id="view-vendi">'):
+              mini.index("<!-- ============ VISTA: AFFARI")]
+    piede = vv[vv.index('<div class="vendi-piede" id="vendiPiede">'):]
+    prova("il bottone che pubblica sta nel piede attaccato, ed e' l'ultima "
+          "cosa della vista", True,
+          'id="sellSubmit" onclick="publish()"' in piede
+          and piede.count("<button") == 1
+          and vv.index('id="sellAnnulla"') < vv.index('id="sellVietato"')
+          < vv.index('id="vendiPiede"'))
+    prova("il paragrafo del divieto e' uscito dal form (e nessuno lo "
+          "riscrive)", [0, 0, 0],
+          [mini.count("sellDivieto"), vv.count("vietato vendere"),
+           vv.count("animali protetti")])
+    prova("...il link e' un bersaglio da dito: la sua regola batte "
+          "`.scopri-link`", True,
+          "#view-vendi .vendi-vietato{display:block;margin:6px auto 0;"
+          "padding:13px 6px;" in mini)
+    prova("...al suo posto un link discreto che apre il foglio breve", True,
+          'class="scopri-link vendi-vietato" id="sellVietato"' in vv
+          and 'onclick="apriVietato()" aria-haspopup="dialog">'
+              'Cosa non si può vendere</button>' in vv)
+    prova("la freccia della pagina piena e' il gesto indietro", True,
+          'id="sellIndietro"\n                onclick="navIndietro()"' in vv)
+    _afv = pezzo_js(mini, "function aggiornaFormVendi(){", "\n}\n")
+    prova("...e in modifica e nel duplicato cede il posto alla ✕", True,
+          "if (el('sellIndietro')) el('sellIndietro').hidden = aMeta;" in _afv
+          and _afv.index("const aMeta = !!(editandoId || duplicaDaId);")
+          < _afv.index("el('sellIndietro').hidden"))
+
+    # --- 2) LA VOCE NELLA PAGINA, UNA STESURA SOLA ----------------------
+    sicu = mini[mini.index('<div class="view" id="view-sicurezza">'):
+                mini.index("<!-- ============ VISTA: I TUOI DATI")]
+    prova("la pagina «Il pagamento protetto» ha la voce, con l'ancora",
+          True, '<h3 id="sicu-vietato">Cosa non si può vendere</h3>' in sicu)
+    _ul = sicu[sicu.index('id="sicuVietatoLista">'):]
+    _ul = _ul[:_ul.index("</ul>")]
+    voci = re.findall(r"<li>([^<]+)</li>", _ul)
+    # le nove famiglie sono quelle del filtro del server: ogni chiave di
+    # PAROLE_VIETATE comincia con una voce della lista, e viceversa
+    srv = open("server.py", encoding="utf-8").read()
+    _pv = srv[srv.index("PAROLE_VIETATE = {"):]
+    _pv = _pv[:_pv.index("\n}\n") + 2]
+    chiavi = list(_ast.literal_eval(_pv.split("=", 1)[1].strip()).keys())
+    prova("...con le nove famiglie del filtro del server, nello stesso "
+          "ordine", [True] * len(chiavi),
+          [len(voci) == len(chiavi) and k.startswith(v)
+           for k, v in zip(chiavi, voci)])
+    prova("...e la nota della moderazione, che vale anche in modifica",
+          True, 'id="sicuVietatoNota">Ogni annuncio passa dalla moderazione, '
+                'anche quando lo modifichi' in sicu)
+    _av = pezzo_js(mini, "function apriVietato(){", "\n}\n")
+    prova("il foglio COPIA lista e nota dalla pagina (nessuna seconda "
+          "stesura, e gli id non si doppiano)", True,
+          "el('sicuVietatoLista'), nota = el('sicuVietatoNota')" in _av
+          and "cloneNode(true)" in _av and "removeAttribute('id')" in _av
+          and "armi" not in _av)
+    _cs = pezzo_js(mini, "function closeSheet(){", "\n}\n")
+    _vs = mini[mini.index('<div class="sheet" id="vietatoSheet"'):]
+    _vs = _vs[:_vs.index("Ho capito</button>") + len("Ho capito</button>")]
+    # «Ho capito» scende di un gradino con navIndietro: chiuso togliendo la
+    # classe restava un gradino in piu' nella cronologia, e la freccia di
+    # Vendi andava toccata due volte (visto dal vivo)
+    prova("...e il foglio si chiude con gli altri (closeSheet) e col suo "
+          "«Ho capito», che scende di un gradino", True,
+          "el('vietatoSheet').classList.remove('open');" in _cs
+          and '<div class="sheet" id="vietatoSheet" role="dialog"' in mini
+          and _vs.endswith('onclick="navIndietro()">Ho capito</button>'))
+
+    # --- 3) IL JS RIUSA LA MORFOSI DEL P2P ------------------------------
+    _tp = pezzo_js(mini, "function toccaPiu(){", "\n}\n")
+    prova("il + del mercatino chiede prima alla morfosi, poi go('vendi')",
+          True, "if (!apriMorfoVendi()) go('vendi');" in _tp
+          and "\n  go('vendi');" not in _tp)
+    _go = pezzo_js(mini, "function go(view){", "\n}\n")
+    prova("la pagina piena la dice la VISTA (go), e uscendo la morfosi si "
+          "posa", True,
+          "document.body.classList.toggle('con-vendi', view==='vendi');" in _go
+          and "if (view !== 'vendi') lasciaMorfoVendi();" in _go)
+    _ap = pezzo_js(mini, "function apriMorfoVendi(){", "\n}\n")
+    _po = pezzo_js(mini, "function posaMorfoVendi(){", "\n}\n")
+    _pu = pezzo_js(mini, "function morfoPuoiVendi(){", "\n}\n")
+    prova("le funzioni del P2P si RIUSANO, non si copiano", [True] * 7,
+          [x in _ap for x in ("tempiMorfoP2P();", "vestiMorfoP2P(g, da,",
+                              "celaVeriP2P(true);", "barraViaP2P(true);",
+                              "P2P_MORFO_MS + 30")]
+          + ["posaMorfoP2P();" in _po, "barraSeccaP2P();" in _po])
+    prova("...nessuna misura ne' tempo ricopiati a mano", [0, 0, 0],
+          [(_ap + _po).count("scale("), (_ap + _po).count("320"),
+           (_ap + _po).count("--morfo-")])
+    prova("le guardie: effetti ridotti, schermo largo, vetrina", True,
+          "VETRINA || effettiRidotti()" in _pu
+          and "matchMedia('(max-width: 767px)')" in _pu)
+
+    # --- 4) IL CSS: vestito, raggio, pagina piena -----------------------
+    _reg, _sq = _regole_css(stile)
+
+    def _vince(corpo, strato, props):
+        cat = [{"tag": "html", "attr": {}, "classi": set()},
+               {"tag": "body", "attr": {}, "classi": set(corpo)},
+               {"tag": "div", "attr": {"id": "p2pMorfo"},
+                "classi": {"acceso", "merc"}},
+               {"tag": strato[0], "attr": {"class": strato[1]},
+                "classi": {strato[1]}}]
+        return {p: x[0] for p, x in _vince_css(_reg, cat, props).items()}
+    _pr = ["background", "box-shadow", "border-radius", "color"]
+    _F, _M, _E = ("i", "morfo-forma"), ("i", "morfo-meta"), ("span", "morfo-eti")
+    # col lato del P2P ricordato sul body (p2p-vendo resta uscendo), le
+    # regole rosse del fantasma nominano quella classe: devono perdere
+    for corpo in (["con-vendi"], ["con-vendi", "p2p-vendo"]):
+        f, m, e = _vince(corpo, _F, _pr), _vince(corpo, _M, _pr), _vince(corpo, _E, _pr)
+        prova(f"il fantasma veste l'arancio di casa (body {' '.join(corpo)})",
+              ["var(--sats)", "0 4px 0 var(--sats-deep)", "calc(100% / 3)",
+               "var(--sats)", "0 3px 0 var(--sats-deep)", "#fff"],
+              [f.get("background"), f.get("box-shadow"), f.get("border-radius"),
+               m.get("background"), m.get("box-shadow"), e.get("color")])
+    # IL RAGGIO DI UN TERZO: schiacciata alla misura del +, l'ellisse di un
+    # terzo torna il quadrato di casa — 18 su 54
+    _ic = re.search(r"nav button\.sell \.ic\{\s*width:(\d+)px;height:(\d+)px",
+                    stile)
+    _rc = re.search(r"nav button\.sell \.pelle-casa\{border-radius:(\d+)px;",
+                    stile)
+    prova("...e il raggio di un terzo e' il + di casa (18 su 54)", True,
+          bool(_ic and _rc) and int(_ic.group(1)) == int(_ic.group(2))
+          and abs(int(_rc.group(1)) / int(_ic.group(1)) - 1 / 3) < 1e-9)
+    _m767 = [(l, c, g) for l, c, g in _reg
+             if any("max-width:767px" in x for x in g)]
+    _sel = {l.strip(): c for l, c, g in _m767}
+    prova("sul telefono la barra lascia il posto al piede, ma resta per la "
+          "corsa", True,
+          _sel.get("body.con-vendi:not(.morfosi) nav") == "display:none"
+          and "z-index:30" in _sel.get("body.con-vendi.morfosi nav", ""))
+    prova("il piede e' STICKY (a fine pagina si posa dopo l'ultimo campo) e "
+          "sta sopra la barra dei gesti", True,
+          "position:sticky;bottom:0;" in _sel.get(".vendi-piede", "")
+          and "env(safe-area-inset-bottom,0px)" in _sel.get(".vendi-piede", "")
+          and "padding-bottom:0" in _sel.get("body.con-vendi #app", "")
+          and "padding-bottom:0" in _sel.get("body.con-vendi #view-vendi .form", ""))
+    prova("il piede arriva per ultimo, coi tempi della morfosi", True,
+          "#view-vendi.morfo .vendi-piede{\n    transition:opacity "
+          "var(--morfo-velo) ease var(--morfo-attesa)}" in stile
+          and "#view-vendi.morfo.velata .vendi-piede{opacity:0}" in stile
+          and "#view-vendi.morfo{animation:none}" in stile)
+    prova("...e con gli effetti ridotti niente corsa (la cintura)", True,
+          "@media (prefers-reduced-motion:reduce){\n    #view-vendi.morfo "
+          ".vendi-piede,\n    body.con-vendi.barra-via nav #nav-vendi "
+          ".eti-pila{transition:none}" in stile)
+    # la scritta «Vendi» sotto il + esce con le voci: restava sotto il
+    # bottone che si allarga e ne spuntava a meta' corsa (fotogrammi fermi)
+    prova("la scritta «Vendi» sfuma con le voci, solo durante la corsa", True,
+          "body.con-vendi.barra-via nav #nav-vendi .eti-pila{opacity:0;\n"
+          "    transition:opacity var(--morfo-corsa) var(--morfo-curva)}"
+          in stile)
+    prova("da desktop la freccia non c'e' (la barra e' in cima)", True,
+          ".vendi-testa #sellIndietro{display:none}" in stile
+          and ".vendi-testa #sellIndietro:not([hidden])"
+              in "".join(_sel.keys()))
+
+    # --- 5) IL BANCO: le funzioni VERE, il DOM di cartone ---------------
+    node = _sh.which("node")
+    if not node:
+        salta("il banco della morfosi del mercatino", "node non c'e'")
+        return
+    banco = ("\n".join(pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
+        "function morfoPuoiVendi(){", "function apriMorfoVendi(){",
+        "function posaMorfoVendi(){", "function lasciaMorfoVendi(){",
+        "function morfosiP2P(da, a){",
+        "function vestiMorfoP2P(g, da, a, eti, bottone, rosso){"))
+        + "\nconst P2P_MORFO_MS = " + re.search(
+            r"const P2P_MORFO_MS = (\d+);", mini).group(1) + ";\n" + r"""
+let passi = [], VETRINA = false, ridotti = false, largo = 375;
+let p2pMorfoTimer = null, timer = null;
+function insieme(){ const s = new Set(); return {s,
+  add: (...c) => c.forEach(x => s.add(x)),
+  remove: (...c) => c.forEach(x => s.delete(x)),
+  contains: c => s.has(c),
+  toggle: (c, f) => { (f === undefined ? !s.has(c) : f) ? s.add(c) : s.delete(c); }}; }
+function nodo(r){ const st = {visibility: '', props: {}};
+  st.setProperty = (k, v) => { st.props[k] = v; };
+  return {classList: insieme(), style: st, rect: r, textContent: '',
+    offsetWidth: 1, getBoundingClientRect(){ return this.rect; },
+    querySelector: () => null, childNodes: []}; }
+const body = {classList: insieme()};
+const document = {body};
+/* il + sta nella barra: se la barra e' spenta (con-vendi senza morfosi)
+   non ha misura — cosi' una misura presa a barra spenta si vede */
+const tondo = nodo(null);
+tondo.getBoundingClientRect = () =>
+  (body.classList.contains('con-vendi') && !body.classList.contains('morfosi'))
+    ? {left: 0, top: 0, width: 0, height: 0}
+    : {left: 160.5, top: 714.8, width: 54, height: 54};
+const g = nodo(null), v = nodo(null);
+const bottone = nodo({left: 16, top: 735, width: 343, height: 50.5});
+bottone.textContent = '⚡ Pubblica annuncio';
+const nodi = {p2pMorfo: g, sellSubmit: bottone, 'view-vendi': v};
+const el = id => nodi[id] || null;
+const tondoBarraP2P = () => tondo;
+const effettiRidotti = () => ridotti;
+const matchMedia = q => ({matches: q === '(max-width: 767px)' && largo < 768});
+function tempiMorfoP2P(){ passi.push('tempi'); }
+function go(w){ passi.push('go:' + w + (body.classList.contains('morfosi') ? '+morfosi' : ''));
+  body.classList.toggle('con-vendi', w === 'vendi'); }
+function celaVeriP2P(c){ passi.push('cela:' + c); tondo.style.visibility = c ? 'hidden' : ''; }
+function barraViaP2P(via){ passi.push('barraVia:' + via); body.classList.toggle('barra-via', via); }
+function posaMorfoP2P(){ passi.push('posa'); clearTimeout(p2pMorfoTimer);
+  g.classList.remove('acceso', 'parte'); celaVeriP2P(false); }
+function barraSeccaP2P(){ passi.push('secca:' + (body.classList.contains('morfosi') ? 'con' : 'senza'));
+  body.classList.remove('barra-via'); }
+const setTimeout = (f, ms) => { timer = {f, ms}; return 1; };
+const clearTimeout = () => {};
+const out = {};
+function pulito(){ passi = []; timer = null; body.classList.s.clear();
+  for (const x of [g, v]) x.classList.s.clear();
+  bottone.style.visibility = ''; tondo.style.visibility = ''; }
+
+/* A) l'andata al telefono */
+pulito();
+out.apre = apriMorfoVendi();
+out.andata = passi.slice();
+out.inCorsa = {morfosi: body.classList.contains('morfosi'),
+  barraVia: body.classList.contains('barra-via'),
+  merc: g.classList.contains('merc'), acceso: g.classList.contains('acceso'),
+  parte: g.classList.contains('parte'), morfo: v.classList.contains('morfo'),
+  velata: v.classList.contains('velata'), bottone: bottone.style.visibility,
+  tondo: tondo.style.visibility, ms: timer && timer.ms};
+/* il fantasma parte dal + e arriva sul bottone vero */
+out.fantasma = {left: g.style.left, top: g.style.top, width: g.style.width,
+  x: g.style.props['--morfo-x'], y: g.style.props['--morfo-y'],
+  sx: g.style.props['--morfo-sx'], sy: g.style.props['--morfo-sy'],
+  rosso: g.style.props['--morfo-rosso'], bz: g.classList.contains('bz')};
+/* B) la corsa finisce */
+passi = [];
+timer.f();
+out.posa = passi.slice();
+out.dopo = {morfosi: body.classList.contains('morfosi'),
+  barraVia: body.classList.contains('barra-via'),
+  merc: g.classList.contains('merc'), acceso: g.classList.contains('acceso'),
+  morfo: v.classList.contains('morfo'), bottone: bottone.style.visibility,
+  conVendi: body.classList.contains('con-vendi')};
+/* C) si esce dalla vista: la vista smette il vestito, niente altro */
+passi = [];
+lasciaMorfoVendi();
+out.uscita = {passi: passi.slice(), morfo: v.classList.contains('morfo')};
+/* D) si esce A META' CORSA: il fantasma si posa, la barra torna secca */
+pulito();
+apriMorfoVendi();
+passi = [];
+lasciaMorfoVendi();
+out.meta = {passi: passi.slice(), morfosi: body.classList.contains('morfosi'),
+  merc: g.classList.contains('merc'), morfo: v.classList.contains('morfo'),
+  bottone: bottone.style.visibility, tondo: tondo.style.visibility};
+/* E) dove non si fa: niente go, e go('vendi') lo fa chi chiama */
+pulito(); ridotti = true;
+out.ridotti = [apriMorfoVendi(), passi.slice()];
+pulito(); ridotti = false; largo = 1024;
+out.largo = [apriMorfoVendi(), passi.slice()];
+pulito(); largo = 375; VETRINA = true;
+out.vetrina = [apriMorfoVendi(), passi.slice()];
+console.log(JSON.stringify(out));
+""")
+    d = _tf.mkdtemp()
+    try:
+        p = os.path.join(d, "banco_morfosi_vendi.js")
+        open(p, "w", encoding="utf-8").write(banco)
+        r = _sp.run([node, p], capture_output=True, encoding="utf-8",
+                    timeout=60)
+        out = (_json.loads(r.stdout.strip().splitlines()[-1])
+               if r.returncode == 0 else None)
+    finally:
+        _sh.rmtree(d, ignore_errors=True)
+    if out is None:
+        prova("il banco della morfosi del mercatino gira", "",
+              (r.stderr or "")[-600:])
+        return
+    prova("banco: l'andata apre la vista UNA volta, con la barra ancora a "
+          "vista, e fa partire tutto nello stesso giro",
+          [True, ["tempi", "go:vendi+morfosi", "cela:true",
+                  "barraVia:true"]], [out["apre"], out["andata"]])
+    prova("...in corsa: fantasma arancio acceso e gia' partito, piede che "
+          "arriva, veri nascosti, un timer lungo la corsa",
+          {"morfosi": True, "barraVia": True, "merc": True, "acceso": True,
+           "parte": False, "morfo": True, "velata": False,
+           "bottone": "hidden", "tondo": "hidden",
+           "ms": int(re.search(r"const P2P_MORFO_MS = (\d+);",
+                               mini).group(1)) + 30}, out["inCorsa"])
+    _f = out["fantasma"]
+    # i numeri del tondo (160,5 · 714,8, 54x54) e del bottone (16 · 735,
+    # 343x50,5): il centro del + meno quello del bottone, e le due scale
+    _atteso = {"x": (160.5 + 27) - (16 + 343 / 2),
+               "y": (714.8 + 27) - (735 + 50.5 / 2),
+               "sx": 54 / 343, "sy": 54 / 50.5}
+    prova("...il fantasma ha la misura del bottone e parte dal + (misurato "
+          "a barra ACCESA), col vestito arancio e non il blu",
+          [True, True, True, True, "16px", "735px", "343px", 1, False],
+          [abs(float(str(_f[k]).replace("px", "")) - _atteso[k]) < 1e-9
+           for k in ("x", "y", "sx", "sy")]
+          + [_f["left"], _f["top"], _f["width"], _f["rosso"], _f["bz"]])
+    prova("banco: a fine corsa il fantasma si posa, e la barra torna secca "
+          "DOPO essersi spenta", ["posa", "cela:false", "secca:senza"],
+          out["posa"])
+    prova("...e resta la pagina piena col bottone vero, la vista senza "
+          "fadein fino all'uscita",
+          {"morfosi": False, "barraVia": False, "merc": False,
+           "acceso": False, "morfo": True, "bottone": "", "conVendi": True},
+          out["dopo"])
+    prova("banco: uscendo a corsa finita la vista smette il vestito, e "
+          "nient'altro", {"passi": [], "morfo": False}, out["uscita"])
+    prova("banco: uscendo A META' CORSA il fantasma si posa, la barra torna "
+          "secca e tutto e' a vista",
+          {"passi": ["posa", "cela:false", "secca:senza"], "morfosi": False,
+           "merc": False, "morfo": False, "bottone": "", "tondo": ""},
+          out["meta"])
+    prova("banco: effetti ridotti, schermo largo e vetrina non fanno niente "
+          "(e go('vendi') resta a chi chiama)",
+          [[False, []], [False, []], [False, []]],
+          [out["ridotti"], out["largo"], out["vetrina"]])
 
 
 def prove_tasto_barattozon():
@@ -78091,9 +78454,13 @@ def prove_introduzioni_leggibili():
     # dell'export («Il CSV dei tuoi affari conclusi…») e' diventata il
     # sottotitolo della sua voce, `.tit2 small`, che e' --ink-soft anche
     # lui — ed e' la riga qui sotto a dirlo.
+    # 26 e non 27 dal 25 set 2026 (la morfosi del + nel mercatino): il
+    # paragrafo del divieto in fondo al form di Vendi (#sellDivieto) e'
+    # uscito dal form — ora e' un foglio breve e una voce della pagina
+    # «Il pagamento protetto» —, e con lui la sua riga in --ink-soft.
     prova("...e sono tutte in --ink-soft (le 26 di ieri e le 2 di prima, "
-          "meno l'export salito a sottotitolo)",
-          True, mini.count(riga.format("ink-soft")) >= 27)
+          "meno l'export salito a sottotitolo e il divieto uscito dal form)",
+          True, mini.count(riga.format("ink-soft")) >= 26)
     _t2 = mini[mini.index("  .tit2 small{"):]
     prova("...e il sottotitolo dei cassetti e' nell'inchiostro delle note",
           True, "color:var(--ink-soft)" in _t2[:_t2.index("}")])
@@ -101361,6 +101728,7 @@ def main():
               prove_tutorial,
               prove_timbri_visti,
               prove_effetti_ridotti,
+              prove_morfosi_vendi,
               prove_guscio_apertura,
               prove_guscio_barra_e_scarto,
               prove_copertura_home,

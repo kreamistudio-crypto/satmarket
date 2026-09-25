@@ -3461,6 +3461,97 @@
     nav .nav-lato{transition:none}
   }
 
+  /* ====== LA MORFOSI DEL + NEL MERCATINO (25 set 2026, richiesta di
+     Andrea) ======
+     Il + arancio di «Vendi» fa quel che fa il + del P2P: al tocco scende
+     e si allarga fino a diventare «⚡ Pubblica annuncio», che resta
+     attaccato in fondo allo schermo per tutta la compilazione. E' LA
+     STESSA MORFOSI e non una copia: lo stesso fantasma (#p2pMorfo) coi
+     suoi strati, la stessa curva e la stessa durata (le --morfo-* di
+     tempiMorfoP2P), le stesse voci spinte fuori (`barra-via`), la stessa
+     funzione che misura (vestiMorfoP2P). Cambia il VESTITO, e lo dice la
+     classe `merc`: la forma e' il quadrato arancio del + di casa, la meta
+     il bottone arancio d'arrivo. Niente colori che corrono: due pelli in
+     opacity, come nel P2P.
+     IL RAGGIO PARTE DA UN TERZO, la riga gemella del 50% del P2P: il + del
+     mercatino e' un quadrato di 54 col raggio di 18, un terzo del lato, e
+     schiacciata alla misura del + l'ellisse di un terzo torna quel
+     quadrato qualunque sia la larghezza del bottone.
+     ⚠️ E PESANO PIU' DEL ROSSO DEL LATO: `p2p-vendo` resta sul body anche
+     fuori dal P2P (il lato si ricorda), e le regole rosse del fantasma lo
+     nominano — `body.p2p-vendo #p2pMorfo .morfo-forma` pesa (1,2,1) e
+     batterebbe un `#p2pMorfo.merc` (1,2,0). Col body della vista le
+     regole salgono a (1,3,1), e stando DOPO vincono anche i pari (la meta
+     e la scritta rosse escludono il blu col :not, e pesano uguale). */
+  body.con-vendi #p2pMorfo.merc .morfo-forma{border-radius:calc(100% / 3);
+    background:var(--sats);box-shadow:0 4px 0 var(--sats-deep)}
+  body.con-vendi #p2pMorfo.merc .morfo-meta{background:var(--sats);
+    box-shadow:0 3px 0 var(--sats-deep)}
+  body.con-vendi #p2pMorfo.merc .morfo-eti{color:#fff}
+  /* ...e la scritta «Vendi» sotto il + esce con le voci: nel libro la sua
+     gemella e' gia' scesa via, qui restava sotto il bottone che si
+     allarga e ne spuntava a meta' corsa (visto nei fotogrammi fermi).
+     Sfuma e basta, con la corsa delle voci; torna con la barra secca. */
+  body.con-vendi.barra-via nav #nav-vendi .eti-pila{opacity:0;
+    transition:opacity var(--morfo-corsa) var(--morfo-curva)}
+  /* LA PAGINA PIENA DI VENDI, SOLO SUL TELEFONO. La barra se ne va — il +
+     e' diventato il bottone —, e il bottone resta in fondo allo schermo:
+     STICKY e non fixed, cosi' a fine pagina si posa DOPO l'ultimo campo
+     e non ne copre nessuno, e sopra la barra dei gesti ci pensa il
+     margine di sicurezza. La via d'uscita e' la freccia in testata, cioe'
+     il gesto indietro (e la ✕ in modifica).
+     `con-vendi` la scrive go() dalla VISTA, come `con-pacco`: vale per
+     ogni strada che porta qui — il +, la modifica, il duplicato, indietro
+     e cronologia — e non solo per la morfosi. Durante la corsa
+     (`morfosi`) la barra resta a vista: le voci si devono veder uscire. */
+  .vendi-testa #sellIndietro{display:none}
+  /* il link del divieto: discreto, ma un bersaglio da dito (44px). Con
+     l'id davanti, o `.scopri-link` — scritta piu' in basso, pari peso —
+     gli rimetterebbe padding zero (visto dal vivo: 22px) */
+  #view-vendi .vendi-vietato{display:block;margin:6px auto 0;padding:13px 6px;
+    font-size:13px;font-weight:700;color:var(--ink-soft)}
+  @media (max-width:767px){
+    body.con-vendi:not(.morfosi) nav{display:none}
+    body.con-vendi #app{padding-bottom:0}
+    body.con-vendi #view-vendi .form{padding-bottom:0}
+    .vendi-testa #sellIndietro:not([hidden]){display:block;margin:-4px 0 0 -8px}
+    .vendi-piede{position:sticky;bottom:0;z-index:31;
+      margin:6px calc(-1 * var(--pad)) 0;
+      padding:12px var(--pad) calc(14px + env(safe-area-inset-bottom,0px));
+      background:var(--card);border-top:1px solid var(--line-soft)}
+    /* ...e la barra NON sale sopra il velo, che qui non c'e': a 41
+       coprirebbe il piede che le arriva sopra alla fine della corsa */
+    body.con-vendi.morfosi nav{z-index:30}
+  }
+  /* IL PIEDE ARRIVA PER ULTIMO, come il foglio del P2P (IL FOGLIO ARRIVA
+     PER ULTIMO): trasparente finche' la corsa non e' quasi finita, e
+     chiude col suo ultimo fotogramma — prima coprirebbe le voci che
+     escono. Il resto della pagina c'e' subito: sta SOTTO la barra, e non
+     nasconde niente.
+     LA VISTA NATA DALLA MORFOSI NON FA IL SUO FADEIN: il bottone d'arrivo
+     si misura appena la vista c'e', e il fadein lo teneva 6px piu' giu'
+     (il suo translateY), che il fantasma avrebbe mancato atterrando.
+     `.morfo` resta finche' non si esce dalla vista: toglierla prima
+     farebbe ripartire il fadein a pagina gia' ferma. */
+  #view-vendi.morfo{animation:none}
+  #view-vendi.morfo .vendi-piede{
+    transition:opacity var(--morfo-velo) ease var(--morfo-attesa)}
+  #view-vendi.morfo.velata .vendi-piede{opacity:0}
+  @media (prefers-reduced-motion:reduce){
+    #view-vendi.morfo .vendi-piede,
+    body.con-vendi.barra-via nav #nav-vendi .eti-pila{transition:none}
+  }
+  /* il foglio breve del divieto: la lista copiata dalla pagina, in due
+     colonne — nove parole corte, e in una sola sarebbe un nastro */
+  .vietato-corpo{margin-bottom:14px}
+  .vietato-corpo p{margin:0 0 10px;font-size:14px;line-height:1.45}
+  .vietato-corpo p.sicu-nota{font-size:13px;color:var(--ink-soft);font-weight:600}
+  .vietato-lista{list-style:none;margin:0 0 12px;padding:0;
+    display:grid;grid-template-columns:1fr 1fr;column-gap:14px}
+  .vietato-corpo .vietato-lista li{font-size:14px;line-height:1.45;
+    font-weight:600;margin-bottom:6px}
+  .sicu .vietato-lista li{margin-bottom:6px}
+
   /* ---- IL DETTAGLIO DI UN ORDINE DEL LIBRO (set 2026) ----
      IL CAPPELLO NEL CORPO NON C'E' PIU' (ritocco di Andrea): il lato
      e' diventato il TITOLO della pagina, e tenerlo anche qui sotto
@@ -9909,6 +10000,27 @@ document.getElementById('cartello')?.remove();</script>
         <li><b>Il deposito garantisce l'oggetto promesso, non i gusti.</b> «Non mi piace più» non è un difetto; un oggetto diverso da com'era descritto sì.</li>
       </ul>
 
+      <!-- COSA NON SI PUO' VENDERE (25 set 2026): la lista che stava in
+           fondo al form di Vendi vive QUI, una volta sola — il foglio breve
+           che si apre dal link accanto a «Pubblica annuncio» ne COPIA i
+           nodi (apriVietato), cosi' le due stesure non possono divergere.
+           Le nove famiglie sono quelle del filtro del server
+           (PAROLE_VIETATE), e una prova le tiene in pari. -->
+      <h3 id="sicu-vietato">Cosa non si può vendere</h3>
+      <p>Su Barattolo non si vendono:</p>
+      <ul class="sicu-lista vietato-lista" id="sicuVietatoLista">
+        <li>armi</li>
+        <li>droghe</li>
+        <li>servizi sessuali</li>
+        <li>refurtiva</li>
+        <li>contraffazioni</li>
+        <li>documenti</li>
+        <li>dati personali</li>
+        <li>farmaci</li>
+        <li>animali protetti</li>
+      </ul>
+      <p class="sicu-nota" id="sicuVietatoNota">Ogni annuncio passa dalla moderazione, anche quando lo modifichi: se qualcosa non convince, resta in attesa di un moderatore.</p>
+
       <h3>Il pagamento, in pratica</h3>
       <p>Su Barattolo si paga <b>solo in bitcoin</b>, sulla rete <b>Lightning</b>: trasferimenti immediati e con commissioni di rete quasi nulle, anche per pochi euro di valore. Il prezzo lo puoi leggere in sats o in euro con l'interruttore <b>€ / ₿</b> — quello che viaggia sono sempre sats.</p>
       <p>Ti serve un wallet Lightning: ne esistono tanti, gratuiti, e ne basta uno. Al pagamento Barattolo ti mostra una <b>invoice</b>: la copi, o inquadri il codice, e il wallet fa il resto. Se colleghi il wallet con <b>NWC</b> (Nostr Wallet Connect) dal tuo Profilo, il bottone «⚡ Compra subito» paga senza passaggi, e nel P2P la fattura per ricevere i sats la fa il wallet da solo — la connessione resta <b>solo sul tuo dispositivo</b>, non arriva mai ai nostri server, e nel wallet puoi darle un tetto di spesa (o, per il solo P2P, il solo permesso di ricevere).</p>
@@ -10314,6 +10426,14 @@ document.getElementById('cartello')?.remove();</script>
            — ha bisogno di sapere cosa succede quando salva. I testi
            li scrive aggiornaFormVendi. -->
       <div class="vendi-testa">
+        <!-- LA FRECCIA DELLA PAGINA PIENA (25 set 2026, la morfosi del +
+             nel mercatino): sul telefono la barra lascia il posto al
+             bottone che pubblica, e la via d'uscita sale qui — la stessa
+             del foglio «Pubblica» del P2P, cioe' il gesto indietro.
+             Solo in pubblicazione e solo sotto i 768px (il CSS): in
+             modifica l'uscita e' la ✕, e da desktop la barra resta. -->
+        <button type="button" class="foglio-back" id="sellIndietro"
+                onclick="navIndietro()" aria-label="Torna indietro">&#8592;</button>
         <h2 id="sellTitolo">Metti in vendita</h2>
         <!-- La ✕ di casa (`.pacco-x`), SOLO in modifica: fa la stessa
              identica cosa del bottone in fondo — chiede col foglio e,
@@ -10496,23 +10616,35 @@ document.getElementById('cartello')?.remove();</script>
            canali (nonContattabile), al momento in cui sta per
            mettersi in vetrina: il pattern degli hint contestuali. -->
       <div id="sellContattoHint" style="display:none;margin:0 0 12px;font-size:12.5px;color:var(--sats-text);font-weight:700;line-height:1.45">🔕 Nessuno può scriverti: aggiungi uno <b>username</b> su Telegram (Impostazioni&nbsp;→&nbsp;Nome utente) per farti contattare da chi compra — o collega una npub nel Profilo.</div>
-      <button class="btn orange" id="sellSubmit" onclick="publish()">⚡ Pubblica annuncio</button>
-      <!-- L'annulla della modifica sta SOTTO il salva (ago 2026, dal
-           campo: era solo un link nel banner in cima, cioe' dalla
-           parte opposta del gesto che chiude). Bottone VERO col
+      <!-- L'annulla della modifica sta in fondo, accanto al salva (ago
+           2026, dal campo: era solo un link nel banner in cima, cioe'
+           dalla parte opposta del gesto che chiude). Bottone VERO col
            disegno dei secondari di casa (ghost: stessa forma e
            stessa altezza del salva), non un link testuale —
-           decisione di Andrea al secondo giro. -->
+           decisione di Andrea al secondo giro. Dal 25 set 2026 sta
+           SOPRA il salva: il salva e' nel piede attaccato in fondo
+           allo schermo, e l'annulla e' l'ultima cosa della pagina. -->
       <button class="btn ghost" id="sellAnnulla" style="display:none" onclick="annullaModificaChiedendo()">Annulla la modifica</button>
-      <!-- La coda del divieto parlava solo a chi PUBBLICA («gli
-           annunci vengono moderati»): in modifica la frase da dire e'
-           che la moderazione ripassa anche sulle modifiche — la lista
-           delle cose vietate e' la stessa. La scrive
-           aggiornaFormVendi. -->
-      <div id="sellDivieto" style="margin-top:10px;font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
-        È vietato vendere: armi, droghe, servizi sessuali, refurtiva,
-        contraffazioni, documenti, dati personali, farmaci, animali
-        protetti. Gli annunci vengono moderati.</div>
+      <!-- COSA NON SI PUO' VENDERE (25 set 2026, richiesta di Andrea): il
+           paragrafo del divieto e' uscito dal form, che lo faceva leggere
+           a ogni annuncio a chi non ne aveva bisogno. Resta a un tocco,
+           accanto al bottone: un link discreto che apre il foglio breve
+           (apriVietato), e la stessa voce nella pagina «Il pagamento
+           protetto» (#sicu-vietato), da cui il foglio COPIA la lista. Il
+           controllo che ferma gli annunci vietati e' del server, e non e'
+           cambiato. -->
+      <button type="button" class="scopri-link vendi-vietato" id="sellVietato"
+              onclick="apriVietato()" aria-haspopup="dialog">Cosa non si può vendere</button>
+      <!-- IL PIEDE ATTACCATO (25 set 2026, la morfosi del + nel
+           mercatino): sul telefono il + della barra diventa questo
+           bottone, che resta in fondo allo schermo per tutta la
+           compilazione — sopra la barra dei gesti, e in fondo alla
+           pagina dopo l'ultimo campo, mai sopra. Da desktop e' il
+           bottone di sempre, in fondo al form. Vedi LA MORFOSI DEL + NEL
+           MERCATINO, nel CSS. -->
+      <div class="vendi-piede" id="vendiPiede">
+        <button class="btn orange" id="sellSubmit" onclick="publish()">⚡ Pubblica annuncio</button>
+      </div>
     </div>
   </div>
 
@@ -11466,6 +11598,20 @@ document.getElementById('cartello')?.remove();</script>
     <h3 id="p2pFeeTit">Le commissioni del P2P</h3>
     <div class="p2p-fee-corpo" id="p2pFeeCorpo"></div>
     <button type="button" class="btn orange" onclick="chiudiFoglioP2P('p2pFeeSheet')">Ho capito</button>
+  </div>
+
+  <!-- COSA NON SI PUO' VENDERE (25 set 2026): il foglio breve del link
+       accanto a «Pubblica annuncio». Il corpo lo scrive apriVietato
+       COPIANDO lista e nota dalla pagina «Il pagamento protetto»
+       (#sicu-vietato): la stesura e' una sola. «Ho capito» scende di un
+       gradino con navIndietro, come la ✕ dei fogli: chiuso togliendo la
+       classe, restava un gradino in piu' nella cronologia e la freccia
+       di Vendi andava toccata due volte (visto dal vivo). -->
+  <div class="sheet" id="vietatoSheet" role="dialog" aria-modal="true" aria-labelledby="vietatoTit">
+    <div class="grab"></div>
+    <h3 id="vietatoTit">Cosa non si può vendere</h3>
+    <div class="vietato-corpo" id="vietatoCorpo"></div>
+    <button type="button" class="btn orange" onclick="navIndietro()">Ho capito</button>
   </div>
 
   <div class="sheet" id="p2pVotoSheet" role="dialog" aria-modal="true" aria-labelledby="p2pVotoTit">
@@ -13856,7 +14002,9 @@ function toccaPiu(){
   if (performance.now() - p2pPiuGestoAt < 700) return;
   if (piuNeutroP2P()) { libroDaPiuP2P(); return; }
   if (document.body.classList.contains('nav-p2p')) { apriNuovoOrdineP2P(); return; }
-  go('vendi');
+  /* nel mercatino il + diventa «Pubblica annuncio» (LA MORFOSI DEL + NEL
+     MERCATINO); dove la morfosi non c'e' si entra come sempre */
+  if (!apriMorfoVendi()) go('vendi');
 }
 /* ...e il libro ci si apre su «Compra BTC», verde (richiesta di
    Andrea): il lato si mette PRIMA di entrare, cosi' il libro si dipinge
@@ -13913,6 +14061,13 @@ function go(view){
   /* Nella cassa la tab bar sparisce e basta: e' una cassa, non una
      vetrina, e Paga vive in pagina */
   document.body.classList.toggle('senza-nav', view==='acquisto');
+  /* LA PAGINA PIENA DI VENDI (25 set 2026): sul telefono la barra lascia
+     il posto al bottone che pubblica, attaccato in fondo (il CSS decide
+     dove, come con-pacco). Dalla VISTA, cosi' vale per ogni strada; e
+     uscendo, una morfosi a meta' si posa e la vista smette il vestito
+     della morfosi (vedi lasciaMorfoVendi). */
+  document.body.classList.toggle('con-vendi', view==='vendi');
+  if (view !== 'vendi') lasciaMorfoVendi();
   /* LA NAV SI TRASFORMA NEL P2P (set 2026): la classe si deriva dalla
      VISTA, qui e non nei vai* — cosi' indietro e cronologia la
      rimettono giusta da soli. Il + cambia mestiere con lei (toccaPiu)
@@ -25962,6 +26117,7 @@ function closeSheet(){
   el('p2pFiltroSheet').classList.remove('open');
   el('p2pMieiFiltroSheet').classList.remove('open');
   el('p2pFeeSheet').classList.remove('open');
+  el('vietatoSheet').classList.remove('open');
   el('p2pVotoSheet').classList.remove('open');
   el('p2pHoldSheet').classList.remove('open');
   el('p2pIncassoSheet').classList.remove('open');
@@ -40669,11 +40825,6 @@ function aggiornaFormVendi(){
     if (el('sellFotoEtichetta'))
       el('sellFotoEtichetta').textContent = 'Sostituisci le foto (fino a 5)';
     if (el('sellFotoNota')) el('sellFotoNota').style.display = '';
-    if (el('sellDivieto')) el('sellDivieto').textContent =
-      'Anche le modifiche vengono moderate: vale la stessa lista di cose '
-      + 'che non si possono vendere — armi, droghe, servizi sessuali, '
-      + 'refurtiva, contraffazioni, documenti, dati personali, farmaci, '
-      + 'animali protetti.';
     /* «la consegna compresa» solo dove la consegna si dichiara
        davvero: sui due importati digitali il blocco non c'e', e quella
        coda sarebbe una promessa che la pagina non mantiene (visto a
@@ -40698,10 +40849,6 @@ function aggiornaFormVendi(){
     if (el('sellFotoEtichetta'))
       el('sellFotoEtichetta').textContent = 'Aggiungi foto (fino a 5)';
     if (el('sellFotoNota')) el('sellFotoNota').style.display = 'none';
-    if (el('sellDivieto')) el('sellDivieto').textContent =
-      'È vietato vendere: armi, droghe, servizi sessuali, refurtiva, '
-      + 'contraffazioni, documenti, dati personali, farmaci, animali '
-      + 'protetti. Gli annunci vengono moderati.';
     if (el('sellSottotitolo')) el('sellSottotitolo').textContent =
       '3 minuti e il tuo oggetto è nel mercatino. Pubblicare non costa nulla: il deposito di garanzia protegge ogni vendita.';
     /* IL DUPLICATO VIVE NELL'ELSE, e non e' una sistemazione di
@@ -40737,6 +40884,10 @@ function aggiornaFormVendi(){
     el('sellAnnulla').textContent = editandoId
       ? 'Annulla la modifica' : 'Annulla il duplicato';
   }
+  /* ...e la freccia della pagina piena e' l'uscita di chi PUBBLICA:
+     in modifica e nel duplicato l'uscita e' la ✕, che chiede prima di
+     buttare il lavoro (vedi LA MORFOSI DEL + NEL MERCATINO) */
+  if (el('sellIndietro')) el('sellIndietro').hidden = aMeta;
   if (el('sellChiudi')) {
     el('sellChiudi').style.display = aMeta ? '' : 'none';
     const chiudi = editandoId ? 'Chiudi la modifica' : 'Chiudi il duplicato';
@@ -52287,6 +52438,102 @@ function chiudiMorfoP2P(){
   g.classList.add('parte');
   barraViaP2P(false);
   p2pMorfoTimer = setTimeout(spegniMorfoP2P, P2P_MORFO_MS + 30);
+}
+
+/* ====== LA MORFOSI DEL + NEL MERCATINO (25 set 2026, richiesta di
+   Andrea) ======
+   Il + arancio di «Vendi» diventa «⚡ Pubblica annuncio» con la morfosi
+   del P2P — non una copia: lo stesso fantasma, la stessa misura
+   (vestiMorfoP2P), gli stessi tempi (tempiMorfoP2P), le stesse voci
+   spinte fuori (barraViaP2P) e la stessa barra secca (barraSeccaP2P).
+   Qui c'e' solo quel che il mercatino ha di SUO: la vista al posto del
+   foglio, il vestito arancio (`merc`) e il piede che arriva per ultimo.
+   DOVE NON SI FA: le guardie del P2P — effetti ridotti, schermo largo —
+   piu' la vetrina, dove Vendi non si apre. Li' si entra come sempre.
+   IL RITORNO E' LA BARRA SECCA, chiunque chiuda (la freccia, il gesto
+   indietro, la ✕ della modifica, la pubblicazione): uscendo dalla
+   vista la barra e' GIA' a riposo — rimessa li' a fine corsa, sotto il
+   piede —, e ricompare ferma. Niente in volo verso la barra. */
+function morfoPuoiVendi(){
+  if (VETRINA || effettiRidotti()) return false;
+  if (!matchMedia('(max-width: 767px)').matches) return false;
+  const tondo = tondoBarraP2P();
+  return !!(el('p2pMorfo') && el('sellSubmit') && tondo
+            && tondo.getBoundingClientRect().width);
+}
+/* L'ANDATA. Apre anche la vista, come il P2P apre il foglio: il bottone
+   d'arrivo si misura solo a vista gia' al suo posto. Torna `false` quando
+   non se ne occupa — e allora go('vendi') come sempre. */
+function apriMorfoVendi(){
+  lasciaMorfoVendi();        /* niente corse a meta' da un giro di prima */
+  if (!morfoPuoiVendi()) return false;
+  tempiMorfoP2P();
+  const g = el('p2pMorfo'), tondo = tondoBarraP2P();
+  /* il + si misura PRIMA di entrare, e la barra resta a vista durante la
+     corsa (`morfosi`): con-vendi da sola la spegnerebbe al primo giro */
+  const da = tondo.getBoundingClientRect();
+  document.body.classList.add('morfosi');
+  go('vendi');
+  const v = el('view-vendi'), meta = el('sellSubmit');
+  /* la vista senza il suo fadein, e il piede trasparente: nello stesso
+     giro in cui la vista compare, cosi' non corre niente per arrivarci */
+  v.classList.add('morfo', 'velata');
+  g.classList.add('merc');
+  vestiMorfoP2P(g, da, meta.getBoundingClientRect(), meta.textContent, meta);
+  celaVeriP2P(true);
+  meta.style.visibility = 'hidden';
+  g.classList.add('acceso', 'parte');
+  void g.offsetWidth;        /* il fotogramma di partenza esiste solo se lo si CHIEDE */
+  /* i tre che partono INSIEME: il piede che arriva per ultimo, il
+     fantasma che vola e le voci che si aprono */
+  v.classList.remove('velata');
+  g.classList.remove('parte');
+  barraViaP2P(true);
+  p2pMorfoTimer = setTimeout(posaMorfoVendi, P2P_MORFO_MS + 30);
+  return true;
+}
+/* A FINE CORSA il fantasma si posa sul bottone vero, e la barra — gia'
+   coperta dal piede — torna a riposo di colpo e se ne va (con-vendi senza
+   `morfosi`): quando si uscira' dalla vista ricomparira' ferma. */
+function posaMorfoVendi(){
+  const g = el('p2pMorfo');
+  if (!g || !g.classList.contains('merc')) return;
+  posaMorfoP2P();
+  g.classList.remove('merc');
+  const meta = el('sellSubmit');
+  if (meta) meta.style.visibility = '';
+  document.body.classList.remove('morfosi');
+  barraSeccaP2P();
+}
+/* ...e uscendo dalla vista (go): una corsa a meta' si posa, e la vista
+   smette `.morfo` mentre e' gia' nascosta — tolta a vista ferma, farebbe
+   ripartire il suo fadein */
+function lasciaMorfoVendi(){
+  posaMorfoVendi();
+  const v = el('view-vendi');
+  if (v) v.classList.remove('morfo', 'velata');
+}
+
+/* COSA NON SI PUO' VENDERE (25 set 2026): il foglio breve del link
+   accanto a «Pubblica annuncio». Lista e nota si COPIANO dalla pagina
+   «Il pagamento protetto» (#sicu-vietato), che e' l'unica stesura: due
+   stesure dello stesso fatto divergono al primo ritocco. */
+function apriVietato(){
+  haptic();
+  const corpo = el('vietatoCorpo');
+  if (corpo) {
+    const lista = el('sicuVietatoLista'), nota = el('sicuVietatoNota');
+    const apre = document.createElement('p');
+    apre.textContent = 'Su Barattolo non si vendono:';
+    corpo.replaceChildren(apre,
+      ...[lista, nota].filter(Boolean).map(n => {
+        const c = n.cloneNode(true);
+        c.removeAttribute('id');
+        return c;
+      }));
+  }
+  el('sheetBg').classList.add('open');
+  el('vietatoSheet').classList.add('open');
 }
 
 function apriNuovoOrdineP2P(metodo){

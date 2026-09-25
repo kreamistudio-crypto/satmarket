@@ -33216,3 +33216,79 @@ PROVATO: prove_profilo_elegante (42) — più piccoli di un bottone di
 serie, con la misura dei secondari, area di tocco ≥ 44; tortura 4 su 4.
 Suite intera severa senza config nel worktree da origin/main (07c73b9):
 16.073 verdi e 0 rosse.
+
+## La morfosi del + anche nel mercatino (25 set 2026)
+
+**CHIESTO DA ANDREA.** Il + arancio di «Vendi», al tocco, diventa «⚡
+Pubblica annuncio» con la STESSA animazione del P2P, e il bottone resta
+attaccato in fondo per tutta la compilazione; chiudendo, niente in volo
+contro la barra; effetti ridotti come nel P2P. E il testo sul divieto
+esce dal form.
+
+**DECISO.** 1) SUL TELEFONO VENDI DIVENTA UNA PAGINA PIENA, come il
+foglio «Pubblica» del P2P: la barra lascia il posto al bottone, e la via
+d'uscita e' la freccia ← in testata (il gesto indietro; in modifica e
+nel duplicato resta la ✕, che chiede). Resta una VISTA — non un foglio
+— perche' ci arrivano la modifica, il duplicato, la cronologia: la
+classe `con-vendi` la scrive `go()` dalla vista, come `con-pacco`. 2) LA
+MORFOSI SI RIUSA, non si copia: fantasma, misura, tempi, voci spinte
+fuori e barra secca sono le funzioni del P2P; del mercatino ci sono solo
+le quattro funzioni della vista e il vestito arancio (`merc`), col
+raggio di un terzo che schiacciato sul + ridà il suo quadrato da 18 su
+54. 3) IL PIEDE E' STICKY e non fixed: a fine pagina si posa dopo
+l'ultimo campo, quindi non ne copre nessuno per costruzione; arriva per
+ultimo coi tempi del foglio del P2P. Il resto della pagina c'e' subito,
+perche' sta sotto la barra e non nasconde le voci che escono. 4) IL
+RITORNO E' LA BARRA SECCA (letto «nessun pezzo in volo»): la barra
+torna a riposo sotto il piede a fine corsa, e uscendo ricompare ferma.
+5) COSA NON SI PUO' VENDERE: la proposta fatta, cioe' un link discreto
+«Cosa non si può vendere» sotto l'ultimo campo, accanto al bottone, che
+apre un foglio breve; la stessa voce nella pagina «Il pagamento
+protetto», che e' l'aiuto del mercatino (non c'e' un «Info» come nel
+P2P). La lista sta in un posto solo — la pagina — e il foglio la copia.
+«Annulla la modifica» sale sopra il piede, che il salva e' attaccato
+in fondo.
+
+**SCARTATO.** Il foglio pieno al posto della vista (la pila della
+cronologia, la modifica e il duplicato la vogliono vista). Il bottone
+che torna nel + chiudendo (e' la corsa che si scontrava). La pagina che
+arriva per ultima come il foglio del P2P: la vista vecchia sparisce
+subito, e per due decimi resterebbe il vuoto. Il piede `fixed`
+(coprirebbe l'ultimo campo). Il paragrafo del divieto riscritto nel
+foglio (due stesure divergono). Il bagliore del + sulla forma (scalato
+col bottone si deforma; nel P2P non c'e').
+
+**TROVATO DAL VIVO.** La scritta «Vendi» restava sotto il bottone che si
+allarga e ne spuntava a meta' corsa: ora sfuma con le voci. Il link era
+alto 22px (`.scopri-link`, scritta dopo, gli rimetteva padding zero). E
+«Ho capito» chiuso togliendo la classe lasciava un gradino in piu' nella
+cronologia: la freccia andava toccata due volte — ora e' `navIndietro`,
+come la ✕ dei fogli.
+
+**PROVATO.** `prove_morfosi_vendi` (33, col banco node sulle funzioni
+vere), `prove_nav_p2p` emendata (il + chiede prima alla morfosi, e
+go() solo senza di lei), `prove_introduzioni_leggibili` emendata (il
+paragrafo del divieto era una delle righe in --ink-soft: 26). Tortura su
+una copia: 18 mutazioni su 18 prese. Suite intera severa senza config
+nel worktree ribasato su origin/main (7abe3f6): 16.108 verdi e 0
+rosse; i 24 collaudi della CI verdi nella gabbia senza rete (sull'albero
+ribasato su 07c73b9). Dal vivo, Chrome
+headless via CDP col server di collaudo (relay morto), tocco vero: i
+fotogrammi fermati a 0/64/128/192/256/320 ms a 320, 375 e 430 nei due
+temi — partenza sul + e arrivo sul bottone vero al decimo di pixel,
+niente scorrimento laterale —; le uscite (freccia, indietro di
+Telegram, a meta' corsa) con la barra ferma a riposo e nessuna corsa
+viva, il piede in fondo a meta' pagina e dopo l'ultimo campo in fondo,
+il foglio del divieto con le nove voci: 60 controlli su 60. Poi
+reduced-motion ed effetti ridotti dell'app (pagina piena senza corsa),
+desktop (niente morfosi, niente freccia), la modifica (✕, «Salva le
+modifiche» nel piede, «Annulla» sopra), la voce nella pagina, e l'app
+Android simulata (UA Android, display-mode standalone, CloseWatcher
+vero armato, Esc come gesto): indietro a corsa finita e a meta' corsa
+tornano a Esplora con la barra secca — 14 su 14.
+**DA GUARDARE SUL TELEFONO:** la corsa a occhio (l'alone chiaro della
+meta rettangolare sopra la forma arrotondata a inizio corsa e' quello
+del P2P); il piede con la tastiera su, in Telegram e nell'app (li'
+non c'e' un banco: se la tastiera lo copre o lo porta su lo decide il
+telefono); il gesto indietro vero nell'app; la barra dei gesti di
+Android sotto il piede.

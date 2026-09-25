@@ -26244,6 +26244,43 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   la prova nasceva rossa per colpa di una spiegazione. Si conta sul
   codice, coi commenti tolti.
 
+- LA MORFOSI DEL + NEL MERCATINO (25 set 2026, richiesta di Andrea): il
+  + arancio di «Vendi» diventa «⚡ Pubblica annuncio» con la morfosi del
+  P2P, e sul telefono Vendi e' una PAGINA PIENA — la barra lascia il
+  posto al bottone, attaccato in fondo per tutta la compilazione. NON E'
+  UNA COPIA: stesso fantasma (`#p2pMorfo`, i suoi strati), stessa misura
+  (`vestiMorfoP2P`), stessi tempi (`tempiMorfoP2P`), stesse voci spinte
+  fuori (`barraViaP2P`), stessa barra secca (`barraSeccaP2P`); del
+  mercatino sono solo `morfoPuoiVendi` (le guardie del P2P piu' la
+  vetrina), `apriMorfoVendi` (misura il + a barra ancora accesa — la
+  classe `morfosi` sul body la tiene a vista durante la corsa —, poi
+  `go('vendi')`), `posaMorfoVendi` e `lasciaMorfoVendi`. Il VESTITO lo
+  dice la classe `merc` sul fantasma: forma col raggio di UN TERZO (il +
+  di casa e' un quadrato da 54 col raggio 18, la riga gemella del 50%
+  del P2P) e meta arancio; le regole portano `body.con-vendi` per
+  battere quelle rosse del lato, che nominano `p2p-vendo` e restano sul
+  body anche fuori dal P2P. La scritta «Vendi» sotto il + sfuma con le
+  voci. LA PAGINA PIENA la scrive `go()` dalla VISTA (`con-vendi`, come
+  `con-pacco`): sotto i 768px la barra e' `display:none` tranne durante
+  la corsa, il piede `#vendiPiede` e' STICKY (a fine pagina si posa dopo
+  l'ultimo campo, mai sopra; sopra la barra dei gesti col margine di
+  sicurezza) e ARRIVA PER ULTIMO coi tempi della morfosi (`.morfo` /
+  `.velata` sulla vista, che nata dalla morfosi non fa il suo fadein: la
+  misura del bottone si prende subito, e il translateY del fadein la
+  spostava di 6px). L'uscita e' la freccia ← in testata (`#sellIndietro`,
+  `navIndietro`), la ✕ in modifica e nel duplicato. IL RITORNO E' LA
+  BARRA SECCA, chiunque chiuda: a fine corsa la barra torna a riposo
+  sotto il piede e si spegne, e uscendo dalla vista ricompare ferma;
+  un'uscita a meta' corsa posa il fantasma (`lasciaMorfoVendi` da
+  `go()`). Da desktop niente di tutto questo, e con gli effetti ridotti
+  la pagina piena arriva senza corsa.
+  COSA NON SI PUO' VENDERE e' uscito dal form: la lista vive UNA volta
+  nella pagina «Il pagamento protetto» (`#sicu-vietato`, nove voci in
+  pari con le famiglie di `PAROLE_VIETATE` del server, e una prova le
+  confronta), e il link discreto accanto al bottone apre `#vietatoSheet`,
+  che la COPIA (`apriVietato`); «Ho capito» scende col `navIndietro`. Il
+  controllo del server non e' cambiato.
+
 - UN BUNDLE VECCHIO NON FALLISCE DOVE LO CARICHI (set 2026, dal campo:
   col client NUOVO confermato in pagina, «pubblica» non faceva NIENTE —
   nessun ordine a schermo, nessuna riga nel journal del nodo, e in
