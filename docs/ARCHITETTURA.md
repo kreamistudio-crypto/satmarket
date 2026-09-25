@@ -10601,16 +10601,46 @@
   è una soglia per PUBBLICARE e `TETTO_DIGITALE_NUOVI` un tetto sul
   COMPRATORE — questo è un tetto sulle partite aperte, l'unica forma
   che morde su una raffica.
-  UN SERVIZIO = UNA EROGAZIONE, quindi `quantita` è bloccata a 1, e il
-  gate va DOVE SI SCRIVE LO STOCK e non dove si legge: cinque porte
-  sull'annuncio (`pubblica`, `ricarica_quantita`, `modifica`, la
-  MODIFICA FIRMATA degli importati — quella che si dimentica — e
-  l'import CSV). Sull'ordine NESSUNA, ed è la parte buona: il
-  carrello/set esclude il servizio GRATIS per costruzione
-  (`_compra_set` parte da `{"spedizione","ritiro"}`, un annuncio senza
-  nessuna delle due dà `sue = set()` → 400 «si compra da solo», come il
-  digitale), e stepper e quantità dell'accordo si limano già allo
-  stock.
+  ⚠️ QUI C'ERA SCRITTO «UN SERVIZIO = UNA EROGAZIONE, quindi `quantita`
+  è bloccata a 1» su cinque porte — e non era mai stato vero: il gate
+  non esisteva in NESSUNA delle cinque, e un servizio condivideva
+  semplicemente `annunci.quantita` coi prodotti (stock che decresce a
+  ogni vendita, `stato='venduto'` a zero). In pratica non aveva mai
+  morso — nessun servizio aveva mai avuto quantita>1 — ma era comunque
+  la ricetta sbagliata per una prestazione ripetibile.
+  DAL CANTIERE «QUANTITA-SERVIZI» LA SCELTA È L'OPPOSTA, e voluta: un
+  servizio ora COMPRA a più unità come un prodotto qualsiasi (2× una
+  consulenza da 30 min = un'ora), riusando byte per byte la stessa
+  logica dei prodotti — stepper, offerta, notifiche, storico ordini,
+  la matematica del conto — perché tutta quella logica era già
+  generica e già funzionante. L'UNICA cosa nuova: per un servizio
+  `annunci.quantita` smette di essere un numero vero e diventa un
+  sentinel tecnico fissato a `MAX_QUANTITA_ANNUNCIO` (999.999, mai
+  mostrato, mai un vero stock) — così `_riservati`/`_incassa_ordine`/
+  l'invariante `venduto ⟺ quantita=0` restano quelli dei prodotti,
+  senza una riga toccata, e col sentinel sono no-op per un servizio
+  (999.999 vendite prima che vada mai «esaurito», in pratica mai). Il
+  vincolo che il compratore vede è un campo nuovo e opzionale,
+  `servizio_limite_ordine` (0 = nessun limite): un tetto SOLO
+  sull'ordine che sta facendo, non uno stock condiviso fra ordini
+  diversi — si dichiara in due porte (`pubblica`, `modifica`, lo
+  stesso schema di `servizio_dove`/`durata_min`), si controlla in tre
+  (`compra`, `preventivo_ordine`, `fai_offerta`), e `ricarica_quantita`
+  ora RIGETTA un servizio (niente scorte da ricaricare — il messaggio
+  rimanda a «Modifica»). Il carrello/set continua a escludere il
+  servizio GRATIS per costruzione, invariato (`_compra_set` parte da
+  `{"spedizione","ritiro"}`, un annuncio senza nessuna delle due dà
+  `sue = set()` → 400 «si compra da solo», come il digitale) — non è
+  in scope di questo cantiere, ed è comunque la regola giusta: un
+  servizio non condivide la spedizione con nient'altro.
+  ⚠️ UN RISCHIO DISTINTO E DICHIARATO, non chiuso da questo cantiere:
+  `SERVIZIO_MAX_APERTI` (qui sopra, nasce SPENTA e non è applicata da
+  NESSUNA guardia — dichiarata, mai cablata) risponderebbe alla truffa
+  PARALLELA contando gli ORDINI aperti insieme. Un ordine solo con
+  tante unità è un'ALTRA forma dello stesso rischio, che quella leva —
+  anche il giorno che si accendesse — non vedrebbe: conta gli ordini,
+  non le unità dentro un ordine. Resta una leva a se', da cablare
+  (o da ripensare insieme al tetto per-ordine) in un cantiere suo.
   IL GIUDICE UNICO DELLE STRADE è il prerequisito che il cantiere ha
   pagato per primo, e NON era una funzione nuova: le sei righe che
   costruiscono `disponibili` erano scritte A MANO in quattro posti

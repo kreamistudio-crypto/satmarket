@@ -17365,11 +17365,16 @@ def prove_pausa():
     # le tre strade di ieri sono tutte gatate sull'esaurito.
     prova("la porta sull'attivo esiste, nella colonna del proprietario",
           True, "🔄 Aggiorna i pezzi</button>" in mini)
-    prova("...e non la offre agli importati", True,
-          "${l.nostr ? '' : `<button class=\"btn ghost\" "
-          "onclick=\"apriRifornisci(" in mini)
+    # DAL CANTIERE QUANTITA-SERVIZI la guardia e' cresciuta di un
+    # motivo — anche i servizi restano fuori, la stessa ragione
+    # dell'importato: niente scorte da ricaricare (server.py rigetta
+    # anche loro, non solo l'origine esterna).
+    prova("...e non la offre agli importati ne' ai servizi", True,
+          "${(l.nostr || l.consegna === 'servizio') ? '' : `<button "
+          "class=\"btn ghost\" onclick=\"apriRifornisci(" in mini)
     prova("la card NON offre la pausa (li' si scorre, non si spegne)",
-          True, "if (!esaurito(l) || astaE(l) || l.nostr) return '';"
+          True, "if (!esaurito(l) || astaE(l) || l.nostr "
+          "|| l.consegna === 'servizio') return '';"
           in pezzo_js(mini, "function bottoneRifornisci(l){"))
 
     # ---- 43-45: il barattolo che si riapre ------------------------
@@ -34768,10 +34773,17 @@ def prove_offerta_quantita():
     # in pari (l'anchor sta dentro il render del foglio, non altrove)
     fogjs = mini[mini.index("function aggiornaFoglioOfferta("):
                  mini.index("function offertaScritta(")]
+    # DAL CANTIERE QUANTITA-SERVIZI il tetto non e' piu' il letterale
+    # `l.quantita||1` ma il giudice unico `qtaMassimaAnnuncio(l)` (per
+    # un servizio lo stock e' un sentinel che non dice niente al
+    # compratore — il tetto vero e' il limite per ordine, se c'e'):
+    # la garanzia della prova non cambia, cambia solo DOVE il tetto si
+    # calcola — resta la STESSA funzione, chiamata dal foglio come dal
+    # gemello.
     prova("lo stepper del foglio e' la STESSA funzione del gemello",
           True, "stepperMini(qtaScelta," in fogjs
           and "'setQta(-1)', 'setQta(1)'," in fogjs
-          and "qtaScelta >= (l.quantita||1)" in fogjs)
+          and "qtaScelta >= qtaMassimaAnnuncio(l)" in fogjs)
     # DENTRO setQta, non «da qualche parte nel file»: la stessa riga
     # vive anche in setValuta, quindi cercarla nel file intero era una
     # sentinella che non poteva fallire (l'ha detto la tortura).
@@ -80221,7 +80233,7 @@ def prove_servizi():
     i = pb.index("INSERT INTO annunci(")
     ins = pb[i:pb.index("last_insert_rowid", i)]
     prova("pubblica SCRIVE servizio_dove e durata_min", True,
-          "servizio_dove,durata_min)" in ins
+          "servizio_dove,durata_min,servizio_limite_ordine)" in ins
           and "servizio_dove_da_payload(d, consegna)" in ins
           and "durata_da_payload(d, consegna)" in ins)
     prova("...con un segnaposto per colonna", True,
@@ -80230,8 +80242,12 @@ def prove_servizi():
     md = codice(pezzo("modifica_annuncio"))
     i = md.index("UPDATE annunci SET titolo=?")
     upd = md[i:md.index("decadute_prezzo", i)]
+    # la stringa e' spezzata a capo nel sorgente (`"durata_min=?, "` va a
+    # capo su `"servizio_limite_ordine=? ..."`): si cercano i due pezzi
+    # separati, la stessa lezione della piega gia' pagata qui sotto
     prova("modifica SCRIVE servizio_dove e durata_min", True,
-          "servizio_dove=?, durata_min=? WHERE id=?" in upd
+          "servizio_dove=?, durata_min=?, " in upd
+          and "servizio_limite_ordine=? WHERE id=?" in upd
           and "servizio_dove_da_payload(d, consegna)" in upd
           and "durata_da_payload(d, consegna)" in upd)
 
@@ -80651,7 +80667,8 @@ def prove_servizi():
     prova("...e che a un servizio non si chiede la condizione", True,
           "|| consegna === 'servizio';" in mini)
     prova("il payload del servizio non porta tariffe ne' taglia", True,
-          "return {consegna, servizio_dove, durata_min};" in mini)
+          "return {consegna, servizio_dove, durata_min, "
+          "servizio_limite_ordine};" in mini)
     # A leva SPENTA la casella non si disegna: un gesto che porta a un
     # annuncio senza modalita' e' peggio di un gesto che non c'e'
     prova("la casella e' gatata sulla leva", True,
@@ -80804,6 +80821,277 @@ def prove_servizi():
     # silenzio — la lezione gia' pagata tre volte
     prova("...col LEFT JOIN, o i set spariscono", True,
           "LEFT JOIN annunci a ON a.id=o.annuncio_id" in ss)
+
+
+def prove_quantita_servizi():
+    """QUANTITA' PER I SERVIZI (cantiere quantita-servizi, set 2026).
+
+    Un servizio si comprava solo un pezzo alla volta — non per un gate
+    scritto da qualche parte (non esisteva, nonostante ARCHITETTURA.md
+    lo dichiarasse su cinque porte), ma perche' nessuno aveva mai
+    tolto la strada che serviva: un servizio condivideva semplicemente
+    `annunci.quantita` coi prodotti, stock vero che decresce a ogni
+    vendita e porta l'annuncio a 'venduto' a zero — la ricetta
+    sbagliata per una prestazione che non si esaurisce mai.
+
+    La cura riusa TUTTA la logica dei prodotti (stepper, offerta,
+    notifiche, storico ordini, la matematica del conto — gia' generica
+    e gia' funzionante, verificata altrove) e aggiunge UNA cosa sola:
+    per un servizio `quantita` diventa un sentinel tecnico fissato al
+    tetto anti-refuso (`MAX_QUANTITA_ANNUNCIO`), mai un vero stock, e
+    il vincolo che il compratore vede e' un campo nuovo e opzionale,
+    `servizio_limite_ordine` — un tetto SOLO sull'ordine che sta
+    facendo, non uno stock condiviso fra ordini diversi."""
+    print("\n[quantita' per i servizi]")
+    import sqlite3
+
+    def corpo(nome):
+        i = _SORGENTE.index(f"def {nome}(")
+        return _SORGENTE[i:_SORGENTE.index("\n\n\n", i)]
+
+    # ---- 1-7: il giudice puro, sui casi che decidono ----------------
+    amb = {"MAX_QUANTITA_ANNUNCIO": 999999}
+    exec(pezzo("servizio_limite_ordine_da_payload"), amb)
+    lim = amb["servizio_limite_ordine_da_payload"]
+    prova("fuori dal servizio vale 0 anche se arriva un numero", 0,
+          lim({"servizio_limite_ordine": 5}, "spedizione"))
+    prova("assente vale 0: nessun limite, la quantita' resta libera", 0,
+          lim({}, "servizio"))
+    prova("un valore valido si preserva", 3,
+          lim({"servizio_limite_ordine": 3}, "servizio"))
+    prova("in stringa si legge lo stesso", 4,
+          lim({"servizio_limite_ordine": "4"}, "servizio"))
+    prova("storto vale 0, mai un 400 (il client guida, il server tollera)",
+          0, lim({"servizio_limite_ordine": "due"}, "servizio"))
+    prova("negativo vale 0", 0,
+          lim({"servizio_limite_ordine": -5}, "servizio"))
+    prova("zero esplicito vale 0 (nessun limite, non un errore)", 0,
+          lim({"servizio_limite_ordine": 0}, "servizio"))
+    prova("oltre il tetto anti-refuso si CLAMPA, mai un 400", 999999,
+          lim({"servizio_limite_ordine": 5_000_000}, "servizio"))
+
+    # ---- 8-13: pubblica/modifica forzano il sentinel, mai lo stock --
+    pub = corpo("pubblica")
+    prova("pubblica forza il sentinel su un servizio", True,
+          'if consegna == "servizio":' in pub
+          and "quantita = MAX_QUANTITA_ANNUNCIO" in pub)
+    prova("...e scrive la colonna nuova, col suo giudice", True,
+          "servizio_dove,durata_min,servizio_limite_ordine)" in pub
+          and "servizio_limite_ordine_da_payload(d, consegna)" in pub)
+    md = corpo("modifica_annuncio")
+    prova("modifica forza lo stesso sentinel (mai piu' un pezzo solo "
+          "al primo ritocco)", True,
+          'if consegna == "servizio":' in md
+          and "quantita = MAX_QUANTITA_ANNUNCIO" in md)
+    prova("...e scrive/preserva il limite per ordine", True,
+          "servizio_limite_ordine=? WHERE id=?" in md
+          and "servizio_limite_ordine_da_payload(d, consegna)" in md)
+    # la forzatura vive DENTRO il blocco che gia' preserva lo stock in
+    # assenza del campo — o un client vecchio che ritocca solo il
+    # titolo tornerebbe a 1 pezzo per un servizio nato prima di questo
+    # cantiere
+    prova("...la forzatura sta DOPO la lettura che conserva lo stock",
+          True, md.index('quantita = quantita_da_payload(d, se_manca=')
+          < md.index('if consegna == "servizio":\n            quantita'))
+
+    # ---- 14-16: ricarica_quantita rigetta un servizio ---------------
+    ric = corpo("ricarica_quantita")
+    prova("ricarica_quantita rigetta un servizio", True,
+          'if a["consegna"] == "servizio":' in ric
+          and "I servizi non hanno scorte da " in ric)
+    # la guardia sta PRIMA della lettura di riservati/quantita: un
+    # servizio non deve nemmeno arrivare a quel conto
+    prova("...e la guardia viene prima del resto della rotta", True,
+          ric.index('if a["consegna"] == "servizio":')
+          < ric.index("riservati = _riservati"))
+    prova("...rimanda a Modifica, non lascia il venditore senza strada",
+          True, "usa «Modifica»" in ric)
+
+    # ---- 17-22: il tetto per-ordine, in compra/preventivo -----------
+    guardia = (
+        'if (a["consegna"] == "servizio" and a["servizio_limite_ordine"]\n'
+        '            and richiesti > a["servizio_limite_ordine"]):')
+    compra = corpo("compra")
+    prev = corpo("preventivo_ordine")
+    prova("compra ha il tetto per-ordine", True, guardia in compra)
+    prova("preventivo_ordine ha LO STESSO tetto (patto preventivo==compra)",
+          True, guardia in prev)
+    # la stringa e' spezzata a capo nel sorgente (`"per "` va a capo su
+    # `"ordine è "`): si cercano i due pezzi separati, la lezione gia'
+    # pagata dal censimento dei sats
+    prova("...stesso messaggio nei due", True,
+          "il massimo per " in compra and "ordine è" in compra
+          and "il massimo per " in prev and "ordine è" in prev)
+    # l'offerta accettata comanda la quantita' DOPO questa guardia: un
+    # accordo gia' stretto non si rompe per un limite abbassato dopo
+    prova("in compra il tetto viene PRIMA che l'offerta comandi", True,
+          compra.index(guardia) < compra.index('if d.get("offerta_id"):'))
+    # ...ma DOPO aver letto `a` e calcolato `richiesti`: la guardia deve
+    # vedere l'annuncio vero e il numero del client, non tirare a indovinare
+    prova("...e dopo aver letto l'annuncio e la quantita' richiesta", True,
+          compra.index('richiesti = max(1, int(d.get("quantita")')
+          < compra.index(guardia))
+    # il tetto NON tocca lo stock/riservati: e' un vincolo per-ordine, non
+    # una prenotazione condivisa (i servizi non condividono un pool)
+    prova("il tetto non chiama _riservati (non e' uno stock condiviso)",
+          False, "_riservati" in guardia)
+
+    # ---- 23-25: il clamp sull'offerta, gemello dello stock -----------
+    fai = corpo("fai_offerta")
+    prova("fai_offerta lima anche al limite per ordine, come allo stock",
+          True, 'pezzi = min(pezzi, max(1, a["quantita"]))' in fai
+          and 'if a["consegna"] == "servizio" and a["servizio_limite_ordine"]:'
+          in fai)
+    prova("...si LIMA, mai uno scarto (stesso stile dello stock)", True,
+          fai.index('pezzi = min(pezzi, max(1, a["quantita"]))')
+          < fai.index('pezzi = min(pezzi, a["servizio_limite_ordine"])'))
+
+    # ---- 26-27: il tag NIP-99 non conta un sentinel come stock -------
+    prova("il tag stock non esce mai per un servizio", True,
+          'a.get("consegna") != "servizio" and (a.get("quantita") or 1) > 1'
+          in _SORGENTE)
+
+    # ---- 28-29: il campo e' pubblico (CAMPI_VETRINA) -----------------
+    cv = _SORGENTE[_SORGENTE.index("CAMPI_VETRINA = ("):]
+    cv = cv[:cv.index("\n)")]
+    prova("il limite per ordine e' pubblico: il selettore lo deve "
+          "conoscere", True, "a.servizio_limite_ordine" in cv)
+
+    # ---- 30-36: il riallineamento d'avvio, girato DAVVERO -----------
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE annunci(id INTEGER PRIMARY KEY, "
+                "consegna TEXT, stato TEXT, quantita INT, quantita_max INT)")
+    con.executemany("INSERT INTO annunci VALUES(?,?,?,?,?)", [
+        (1, "servizio", "attivo", 1, 1),        # pre-cantiere: un pezzo solo
+        (2, "servizio", "attivo", 999999, 999999),  # gia' in pari: non si tocca
+        (3, "servizio", "venduto", 0, 1),       # esaurito: NON si riaccende
+        (4, "spedizione", "attivo", 1, 1),      # un prodotto: non e' suo
+        (5, "servizio", "attivo", 5, 20),       # limite dichiarato: il max non scende
+    ])
+    amb2 = {"MAX_QUANTITA_ANNUNCIO": 999999}
+    exec(pezzo("riallinea_servizi_senza_scorte"), amb2)
+    amb2["riallinea_servizi_senza_scorte"](con)
+    leggi = lambda i: tuple(con.execute(
+        "SELECT quantita, quantita_max FROM annunci WHERE id=?",
+        (i,)).fetchone())
+    prova("un servizio pre-cantiere sale al sentinel", (999999, 999999),
+          leggi(1))
+    prova("chi era gia' al sentinel non si tocca", (999999, 999999),
+          leggi(2))
+    prova("un servizio 'venduto' NON si riaccende da solo", (0, 1),
+          leggi(3))
+    prova("un prodotto non e' suo: resta com'e'", (1, 1), leggi(4))
+    prova("...e il massimo sale col MAX, mai secco (la memoria dei "
+          "pezzi non si perde)", (999999, 999999), leggi(5))
+    prima = [leggi(i) for i in (1, 2, 3, 4, 5)]
+    amb2["riallinea_servizi_senza_scorte"](con)
+    prova("idempotente al secondo giro", prima,
+          [leggi(i) for i in (1, 2, 3, 4, 5)])
+    prova("la scopa gira all'avvio, gemella di riallinea_quantita_max",
+          True, "riallinea_servizi_senza_scorte(con)" in
+          corpo("init_db") if "def init_db(" in _SORGENTE else True)
+
+    # ---- 37-40: retrocompat — un ordine servizio nato prima di questo
+    #             cantiere (quantita=1, nessun limite) legge uguale -----
+    amb3 = {}
+    for f in ("_unitario_effettivo", "_conto_ordine", "_righe_ordine"):
+        exec(pezzo(f), amb3)
+
+    class _Fila:
+        def __init__(self, d): self.d = d
+        def __getitem__(self, k): return self.d[k]
+
+    class _Con:
+        def execute(self, q, p):
+            self.r = _Fila({"titolo": "Consulenza 30 min"})
+            return self
+        def fetchone(self): return self.r
+
+    o_vecchio = {"annuncio_id": 9, "quantita": 1, "prezzo_sats": 50_000,
+                 "spedizione_sats": 0, "protezione_sats": 0, "sconto_sats": 0}
+    riga = amb3["_righe_ordine"](_Con(), o_vecchio)[0]
+    prova("un ordine servizio di ieri: un pezzo, prezzo intero",
+          (1, 50_000), (riga["quantita"], riga["unitario_sats"]))
+
+    # ---- 41-43: un servizio multi-unita' torna al satoshi ------------
+    unit = amb3["_unitario_effettivo"](
+        {"prezzo_sats": 15_000, "prezzo_eur": 0.0, "valuta": "sats",
+         "lampo_percento": 0, "lampo_scadenza": 0}, None, 1000, 0.0)
+    conto = amb3["_conto_ordine"](unit * 4, 0, 0, 0)
+    prova("2 unita' da 30 min = un'ora, al satoshi: articolo = "
+          "unitario × 4", 60_000, conto["articolo"])
+    prova("...nessuna spedizione su un servizio: totale = articolo",
+          60_000, conto["totale"])
+    o_nuovo = {"annuncio_id": 9, "quantita": 4, "prezzo_sats": conto["totale"],
+               "spedizione_sats": 0, "protezione_sats": 0, "sconto_sats": 0}
+    riga4 = amb3["_righe_ordine"](_Con(), o_nuovo)[0]
+    prova("...e la divisione a ritroso torna esatta", 15_000,
+          riga4["unitario_sats"])
+
+    # ---- 44-46: regressione — il carrello resta escluso --------------
+    amb4 = {}
+    exec(pezzo("strade_annuncio"), amb4)
+    strade = amb4["strade_annuncio"]
+    ann = lambda consegna: {"consegna": consegna, "anche_digitale": 0}
+    prova("regressione: un servizio non entra nel set (si compra da "
+          "solo)", set(),
+          strade(ann("servizio")) & {"spedizione", "ritiro"})
+    prova("...la sua unica strada resta 'servizio'", {"servizio"},
+          strade(ann("servizio")))
+    prova("_compra_set esclude ancora servizio e digitale", True,
+          '- {"digitale", "servizio"}' in corpo("_compra_set"))
+
+    # ---- 47-52: il client — il tetto e' un giudice unico -------------
+    # `fine="\n}\n"` ovunque (e non il default "\n\n"): queste funzioni
+    # non hanno una riga vuota vicino all'inizio, e col default
+    # l'estrazione sfonda dentro le funzioni dopo — l'ha detto la prova
+    # scritta e girata, non la rilettura.
+    mini = open("miniapp.html", encoding="utf-8").read()
+    qm = pezzo_js(mini, "function qtaMassimaAnnuncio(l){", "\n}\n")
+    prova("il client ha il giudice unico del tetto-compratore", True,
+          bool(qm))
+    prova("...per un servizio legge il limite per ordine", True,
+          "l.servizioLimiteOrdine" in qm)
+    prova("...libero (non zero, non uno) quando non e' dichiarato", True,
+          "LIMITE_LIBERO_SERVIZIO" in qm)
+    prova("...e quel libero e' il gemello del tetto anti-refuso del "
+          "server", True,
+          "const LIMITE_LIBERO_SERVIZIO = 999999;" in mini)
+    prova("...per un prodotto resta lo stock di sempre", True,
+          "return l.quantita || 1;" in qm)
+    # I PUNTI CHE DEVONO PASSARE DAL GIUDICE, non da un letterale
+    # `l.quantita||1` rimasto indietro — il censimento e' la garanzia
+    # che un domani non si dimentichi un posto (la lezione delle
+    # STRADE in ARCHITETTURA.md, la stessa ragione dell'estrazione)
+    for firma in ("function stepperAcquista(l){",
+                  "function etichettaOfferta(l){", "function setQta(d){"):
+        corpo_js = pezzo_js(mini, firma, "\n}\n")
+        prova(f"{firma[9:firma.index('(')]} usa il giudice unico", True,
+              "qtaMassimaAnnuncio(l)" in corpo_js)
+    prova("il carrello NON passa dal giudice (servizio non ci entra "
+          "mai)", True,
+          "x.quantita||1" in
+          pezzo_js(mini, "function setQtaPacco(id, d){", "\n}\n"))
+
+    # ---- 53-55: niente bottone di ricarica su un servizio -------------
+    prova("bottoneRifornisci esclude anche i servizi (stessa guardia "
+          "del server)", True,
+          "l.consegna === 'servizio'" in
+          pezzo_js(mini, "function bottoneRifornisci(l){", "\n}\n"))
+    prova("...idem «Aggiorna i pezzi» sulla scheda propria", True,
+          "l.consegna === 'servizio') ? '' : `<button "
+          "class=\"btn ghost\" onclick=\"apriRifornisci(" in mini)
+
+    # ---- 56-58: il form di vendita ------------------------------------
+    prova("il campo «Quantità disponibile» si nasconde anche per "
+          "servizio", True,
+          "(asta || serv) ? 'none' : ''" in
+          pezzo_js(mini, "function aggiornaConsegnaForm(){", "\n}\n"))
+    prova("...e il nuovo campo del limite esiste nel form", True,
+          'id="sellServLimite"' in mini)
+    prova("consegnaForm porta il nuovo campo per un servizio", True,
+          "servizio_limite_ordine: parseInt(el('sellServLimite')" in mini)
 
 
 def prove_feedback_confermato():
@@ -99548,6 +99836,7 @@ def main():
               prove_dati_spedizione_copia,
               prove_foglio_tastiera_iphone,
               prove_servizi,
+              prove_quantita_servizi,
               prove_sintassi_client,
               prove_banner_negozio, prove_paracadute_motivo,
               prove_rimborso_motivo,

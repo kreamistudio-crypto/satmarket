@@ -32398,3 +32398,117 @@ aperto sul telefono di Alan: la card compare con la foto di Andrea entro
 qualche secondo (al piu' due minuti), con nome, stelle e voti come le
 altre; sul telefono di Andrea la sua foto c'e' subito. Nel diario di
 Alan, «libro in ascolto: nuovo ordine …» e poi il volto senza salti.
+
+## Quantità per i servizi (25 set 2026)
+
+Oggi un servizio («Consulenza 30 min») si comprava un pezzo alla
+volta. Il compito: farlo funzionare come un prodotto — quantità nella
+scheda, nel carrello, nell'offerta — con un totale calcolato dal vivo.
+
+**IL PERCHE'.** `docs/ARCHITETTURA.md` dichiarava «UN SERVIZIO = UNA
+EROGAZIONE, quindi `quantita` è bloccata a 1» su cinque porte scritte
+— e non era mai stato vero: il gate non esisteva in NESSUNA delle
+cinque. Un servizio condivideva semplicemente `annunci.quantita` coi
+prodotti: stock vero che decresce a ogni vendita, `stato='venduto'` a
+zero. In pratica non aveva mai morso (nessun servizio aveva mai avuto
+quantita>1), ma era comunque la ricetta sbagliata per una prestazione
+che non si esaurisce mai — e la doc mentiva su un fatto verificabile.
+
+**LA CURA.** Riuso totale della logica dei prodotti — stepper,
+offerta, notifiche, storico ordini, la matematica del conto erano già
+generiche e già funzionanti, verificato leggendo ogni chiamante prima
+di scrivere una riga — più UNA cosa sola, nuova: per un servizio
+`annunci.quantita` smette di essere un vero stock e diventa un
+sentinel tecnico fissato a `MAX_QUANTITA_ANNUNCIO` (999.999, mai
+mostrato), scritto a ogni `pubblica`/`modifica` a prescindere da cosa
+manda il client. Così `_riservati`/`_incassa_ordine`/l'invariante
+`venduto ⟺ quantita=0` restano quelli dei prodotti, senza una riga
+toccata — col sentinel sono no-op per un servizio (999.999 vendite
+prima di «esaurirsi», mai in pratica). Il vincolo che il compratore
+vede è un campo nuovo e opzionale, `servizio_limite_ordine` (0 =
+nessun limite): un tetto SOLO sull'ordine che sta facendo, non uno
+stock condiviso fra ordini — si dichiara in `pubblica`/`modifica`
+(stesso schema di `servizio_dove`/`durata_min`, giudice gemello
+`servizio_limite_ordine_da_payload`), si controlla in `compra` e
+`preventivo_ordine` (stesso testo, il patto «preventivo == compra al
+sat»; PRIMA dell'override dell'offerta accettata — un accordo già
+stretto non si rompe per un limite abbassato dopo, l'asimmetria delle
+ferie) e si LIMA — mai un rifiuto — nel clamp di `fai_offerta`, gemello
+di quello sullo stock. `ricarica_quantita` ora RIGETTA un servizio
+(niente scorte da ricaricare, il messaggio rimanda a «Modifica»), e il
+client nasconde ovunque il bottone di ricarica per un servizio
+(`bottoneRifornisci`, «Aggiorna i pezzi», il blocco esaurito). Il
+riallineamento d'avvio (`riallinea_servizi_senza_scorte`, gemella di
+`riallinea_quantita_max`) alza al sentinel chi è nato prima di questo
+cantiere, idempotente, mai su un 'venduto'. Lato client, UN giudice
+unico — `qtaMassimaAnnuncio(l)` — decide il tetto che il compratore
+può scegliere (lo stock per un prodotto, il limite per un servizio):
+lo stepper, l'etichetta dell'offerta e `setQta` passano tutti da lì,
+così un domani non si dimentica un posto (la stessa lezione di
+`strade_annuncio`).
+
+**STRADE SCARTATE.** Un sistema di stock parallelo per i servizi
+(scorte vere, ricaricabili) — scartato: non risponde a una domanda
+vera («quante consulenze ho fatto» non è «quante ne ho in
+magazzino»), e avrebbe duplicato tutta la logica di
+`_riservati`/`_incassa_ordine` invece di riusarla. Il carrello/set che
+accetta i servizi — scartato: l'esclusione (`strade_annuncio(a) -
+{"digitale", "servizio"}`) è una regola voluta e testata, un servizio
+non condivide la spedizione con nient'altro, e non è in scope di
+questo cantiere.
+
+**UN RISCHIO DISTINTO, DICHIARATO E NON CHIUSO.** `SERVIZIO_MAX_APERTI`
+(nasce SPENTA, e non è applicata da NESSUNA guardia — dichiarata, mai
+cablata) risponderebbe alla truffa PARALLELA contando gli ORDINI
+aperti insieme per un venditore senza vendite concluse. Un ordine solo
+con tante unità è un'ALTRA forma dello stesso rischio, che quella leva
+— anche il giorno che si accendesse — non vedrebbe: conta gli ordini,
+non le unità dentro un ordine. Resta una leva a sé, da cablare (o da
+ripensare insieme al tetto per-ordine) in un cantiere suo — non di
+questo.
+
+**PROVATO.** `prove_quantita_servizi` (54 prove): il giudice puro
+`servizio_limite_ordine_da_payload` sui casi che decidono; pubblica e
+modifica forzano il sentinel e scrivono/preservano il limite;
+`ricarica_quantita` rigetta un servizio, prima di ogni altra guardia;
+il tetto per-ordine in `compra`/`preventivo_ordine` (stesso testo,
+stessa posizione rispetto all'offerta); il clamp in `fai_offerta`; il
+tag NIP-99 `stock` mai su un servizio; il riallineamento d'avvio girato
+DAVVERO su sqlite di cartone (pre-cantiere → sentinel, già in pari →
+non si tocca, 'venduto' → non si riaccende, un prodotto → non è suo,
+idempotente); un ordine servizio "di ieri" (quantita=1, nessun limite)
+legge uguale; un servizio multi-unità torna esatto al satoshi
+(2 × 30 min = un'ora, la divisione a ritroso di `_righe_ordine`);
+regressione — il carrello continua a escludere il servizio; il client:
+`qtaMassimaAnnuncio` come giudice unico, i tre chiamanti che devono
+passare da lì, il carrello che non lo tocca mai, i bottoni di ricarica
+nascosti, il campo nuovo nel form. `collaudo_quantita_servizi.py`
+(22 prove, il SERVER VERO su un database usa-e-getta, girato anche
+dentro la gabbia senza rete di `collaudi_ci.py`): un servizio pubblicato
+con `quantita: 5` nel payload nasce comunque al sentinel; il limite
+dichiarato si scrive; compra/preventivo senza limite lasciano la
+quantità libera (3 unità, totale = unitario × 3, zero spedizione);
+con un limite, sotto passa e sopra è un 400 col numero giusto, identico
+nei due; `ricarica_quantita` rigetta con «scorte»; modifica cambia il
+limite e ignora lo stock che il client manda; un'offerta di 50 su un
+limite di 7 si lima a 7; un servizio scritto a mano nel database con
+`quantita=1` (il mondo di prima di questo cantiere) sale al sentinel al
+prossimo `init_db()`. Suite intera (`prove.py`): 15.854 passate, 4
+rosse — le stesse 4 di PRIMA di questo cantiere, verificate una per
+una: mancava il plugin AVIF di Pillow nell'ambiente
+(`genera_icone_apk`/splash, «il barattolo incorporato»), un gap
+ambientale e non una regressione di questo lavoro.
+
+**COSA NON HO PROVATO DAL VIVO.** Nessuna prova con fondi veri (vincolo
+del task): il collaudo usa una invoice finta (`crea_invoice_escrow`
+sostituita) e un database usa-e-getta, mai LNbits vero. Non ho aperto
+il browser: verificare a mano lo stepper sulla scheda di un servizio,
+il campo nuovo nel form di vendita, e che il numero scelto sopravviva
+al giro offerta→accettazione→pagamento con un server locale in
+MODALITA_COLLAUDO.
+
+**DA GUARDARE.** L'esperienza nel browser (vedi sopra); se
+`SERVIZIO_MAX_APERTI` va cablata, il tetto per-ordine di questo
+cantiere andrà probabilmente ripensato insieme a lei (le due leve
+rispondono a domande vicine ma diverse: quante unità in un ordine,
+quanti ordini aperti insieme).
