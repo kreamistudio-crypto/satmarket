@@ -32605,7 +32605,11 @@ che sono una, demo e id vuoto che non fanno niente; il «gia' fatto» con
 la frase e il riallineo pieno, gli altri errori che restano errori); sul
 server `_passaggio_libro_p2p` con `active` (→success conclude,
 →in-progress tace, →pending torna) e il ripiego ad `attivo`. Due
-sentinelle di casa emendate col perche' (i chiamanti, «solo in avanti»).
+sentinelle di casa emendate col perche' (i chiamanti, «solo in avanti»),
+e il collaudo dei pagamenti che pretendeva il libro «ancora in-progress»
+dopo la garanzia: ora dice «active», e la prova resta la stessa (non e'
+a success, e si recensisce lo stesso) — l'ha detto la CI, rossa sul
+primo push di questo cantiere.
 Tortura su una copia, 12/12 guasti presi. Suite intera severa senza
 config nel worktree da origin/main (b85a26e): 15.887 verdi prima delle
 ultime due emende, e rigirata intera dopo (vedi il commit). Dal vivo a

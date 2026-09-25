@@ -359,7 +359,12 @@ def main():
 
     print("\n6) col libro ancora indietro, la recensione da tutt'e due")
     con = con_db()
-    prova("(il libro dello scambio e' ancora in-progress)", "in-progress",
+    # EMENDATA (25 set 2026, «Lo schermo segue lo stato di mostro»): a
+    # garanzia pagata la riga del libro passa ad «active» — il libro
+    # pubblico quel passo non lo scrive, e prima il database diceva
+    # in-progress mentre mostro diceva active. Il punto della prova
+    # resta: il libro NON e' a success, e si recensisce lo stesso.
+    prova("(il libro dello scambio dice active, non success)", "active",
           con.execute("SELECT stato FROM p2p_ordini WHERE ordine=?",
                       (SCAMBIO,)).fetchone()["stato"])
     con.close()
