@@ -1993,7 +1993,24 @@
      DIPINTO, o da attaccati le prime card si vedrebbero passare in
      quello spazio invece di sparire sotto la pillola. */
   .p2p-sticky{position:sticky;top:0;z-index:3;background:var(--bg);
-    padding-bottom:3px}
+    padding-bottom:3px;box-shadow:0 0 0 100vmax var(--bg);
+    clip-path:inset(0 -100vmax)}
+  /* ⚠️ IL FONDO VA DA BORDO A BORDO DELLO SCHERMO (25 set 2026, ritocco
+     di Andrea): il blocco sta dentro `.sicu`, che ha i suoi margini, e
+     il suo fondo copriva solo la parte INTERNA — ai due lati, nelle
+     strisce dei margini, si vedeva passare quel che scorreva sotto: il
+     bagliore del banner, scorrendo durante l'impulso, e l'ombra delle
+     card. Il fondo si allarga con un'OMBRA PIENA dello stesso colore
+     (`box-shadow` senza sfocatura, `100vmax` di espansione) e il
+     `clip-path` la taglia sopra e sotto al filo del blocco, lasciandola
+     libera solo ai lati: da bordo a bordo su qualunque larghezza, anche
+     oltre i 640 di `.sicu`. NON un margine negativo (misurato: toglie il
+     blocco dal `top:0`, vedi sopra) e NON uno pseudo-elemento largo
+     `100vw`: nel foglio non c'e' un `overflow-x:hidden` globale, e con
+     la barra di scorrimento del desktop `100vw` sbordava — un'ombra non
+     conta nello scorrimento, uno pseudo si'. Il `clip-path` taglia anche
+     il contenuto del blocco al suo filo: dentro non c'e' niente che ne
+     esca, e la prova dal vivo lo misura figlio per figlio. */
   /* IL BANNER DELLE COMMISSIONI (25 set 2026, disegno di Andrea):
      largo quanto la pagina fra i suoi margini, e alto quanto vuole il
      disegno (`height:auto` sui width/height del markup, che tengono il
@@ -2002,17 +2019,19 @@
      tagliato stretto sulla capsula e `border-radius:999px` lo fa uno
      stadio — la forma esatta della capsula, quindi l'alone ne segue
      il bordo arrotondato senza un `filter` che ricomponga l'immagine.
-     L'arancio e' quello di casa (#FF8A00, `--orange`). Batte DUE volte
-     (`2` e mai `infinite`: un invito, non un lampeggiante) e poi resta
-     l'ombra ferma di riposo. I 14px sopra sono l'aria dell'alone: il
-     blocco attaccato ha il fondo dipinto e al picco lo tagliava con
+     L'arancio e' quello di casa (#FF8A00, `--orange`). Batte UNA volta
+     sola all'ingresso (erano due fino al ritocco di Andrea dello stesso
+     giorno; mai `infinite`: un invito, non un lampeggiante) e poi resta
+     l'ombra ferma di riposo. E APPENA LA PAGINA SCORRE SI SPEGNE:
+     `fermaBaglioreFeeP2P` lo porta alla fine, cioe' all'ombra di
+     riposo. I 14px sopra sono l'aria dell'alone: il blocco attaccato ha il fondo dipinto e al picco lo tagliava con
      una riga netta (visto a 320 col primo alone, 24px: l'alone e'
      sceso a 16 e l'aria salita da 10 a 14). */
   .p2p-fee-banner{display:block;width:100%;margin:14px 0 16px;padding:0;
     border:0;border-radius:999px;background:none;cursor:pointer;
     -webkit-tap-highlight-color:transparent;
     box-shadow:0 0 8px 0 rgba(255,138,0,.30);
-    animation:p2pFeeBagliore 1.2s ease-in-out 2}
+    animation:p2pFeeBagliore 1.2s ease-in-out 1}
   .p2p-fee-banner img{display:block;width:100%;height:auto}
   .p2p-fee-banner:focus-visible{outline:2px solid var(--orange);
     outline-offset:3px}
@@ -9392,8 +9411,9 @@ document.getElementById('cartello')?.remove();</script>
            la descrizione di QUESTA immagine, e il giorno che il file
            cambia (PRODUZIONE, «IL BANNER DELLE COMMISSIONI P2P»)
            cambia con lui. I numeri veri li dice il foglio.
-           IL BAGLIORE e' un'ombra della capsula che batte DUE volte e
-           poi resta ferma: parte da solo a ogni ingresso nella pagina,
+           IL BAGLIORE e' un'ombra della capsula che batte UNA volta e
+           poi resta ferma (si spegne subito se la pagina scorre durante
+           l'impulso): parte da solo a ogni ingresso nella pagina,
            perche' la vista passa da `display:none` e il CSS rifa'
            l'animazione da capo — nessun JS. Con gli effetti ridotti la
            regola universale la spegne e resta l'ombra ferma.
@@ -44139,6 +44159,25 @@ function apriFeeP2P(){
   el('sheetBg').classList.add('open');
   el('p2pFeeSheet').classList.add('open');
 }
+/* IL BAGLIORE SI SPEGNE APPENA LA PAGINA SCORRE (25 set 2026, ritocco di
+   Andrea): un impulso che continua mentre il banner corre sotto gli
+   strumenti e' movimento che nessuno guarda. `finish()` lo porta alla
+   FINE, cioe' all'ombra di riposo — non un salto a zero — e non lascia
+   stato: al prossimo ingresso la vista ripassa da `display:none` e il
+   CSS rifa' l'animazione da capo, come prima.
+   ⚠️ `scrollY > 0` E NON «un evento di scroll qualsiasi»: `go('p2p')`
+   riporta la pagina in cima ENTRANDO, e quello scroll arriva proprio
+   mentre l'impulso comincia — lo spegnerebbe a ogni ingresso.
+   Senza `getAnimations` (webview vecchie) l'impulso finisce da solo in
+   un secondo: non c'e' niente da ripiegare. Gli effetti ridotti non
+   lo avviano nemmeno, quindi qui non trovano niente da fermare. */
+function fermaBaglioreFeeP2P(){
+  if (!(window.scrollY > 0)) return;
+  const b = el('p2pFeeBanner');
+  if (!b || !b.getAnimations) return;
+  b.getAnimations().forEach(a => a.finish());
+}
+window.addEventListener('scroll', fermaBaglioreFeeP2P, {passive: true});
 
 /* ---- LA PAGINA «INFORMAZIONI» DEL P2P (set 2026) ----
    Il markup e' fisso, i NUMERI no: la commissione, le due finestre e

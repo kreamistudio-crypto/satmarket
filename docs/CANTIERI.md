@@ -33024,3 +33024,52 @@ aperto, l'intestazione toccata deve restare sotto il dito. Il piede
 dentro Telegram, dove c'è il solo «Tutorial» a metà larghezza. E se
 un venditore cerca il Lightning address sotto «Negozio» invece che in
 «Incassi e pagamenti».
+
+## Il banner delle commissioni: un impulso, e il blocco da bordo a bordo (25 set 2026)
+
+Ritocco di Andrea a b0b8794, due cose.
+1) **UN SOLO IMPULSO** all'ingresso nel libro, non due (`animation: … 1`).
+E **APPENA LA PAGINA SCORRE SI SPEGNE**: `fermaBaglioreFeeP2P`, ascoltata
+sullo scorrimento della finestra, porta l'animazione alla fine con
+`finish()` — cioe' all'ombra di riposo, senza salti — e non lascia stato:
+al prossimo ingresso la vista ripassa da `display:none` e il CSS rifa'
+l'impulso. Guarda `scrollY > 0` e non «un evento qualsiasi», perche'
+`go('p2p')` riporta la pagina in cima ENTRANDO e quello scroll arriva
+proprio all'inizio dell'impulso: lo spegnerebbe sempre.
+2) **SCORRENDO DURANTE L'IMPULSO L'ARANCIO SI VEDEVA AI LATI DEL BLOCCO
+ATTACCATO.** Il blocco (`.p2p-sticky`) sta dentro `.sicu`, e il suo fondo
+copriva solo la parte fra i margini: nelle due strisce da 16px ai lati
+passava visibile tutto quel che gli scorreva sotto. Il fondo adesso va
+DA BORDO A BORDO con un'ombra piena del suo colore
+(`box-shadow:0 0 0 100vmax var(--bg)`) che il `clip-path:inset(0
+-100vmax)` taglia al filo sopra e sotto, lasciandola libera solo ai lati
+— anche oltre i 640 di `.sicu`. Strade scartate: il margine negativo (lo
+sticky pinnerebbe il margine, la fessura gia' misurata e scritta nel
+commento) e uno pseudo largo `100vw` (nel foglio non c'e' un
+`overflow-x:hidden` globale, e con la barra di scorrimento del desktop
+sborderebbe; un'ombra non conta nello scorrimento). Vale per tutt'e due
+i blocchi attaccati, libro e «I miei scambi».
+LE CARD, che Andrea ha chiesto di guardare: stanno dentro i margini e la
+loro ombra non arriva alle strisce — misurato 0 pixel diversi dal fondo
+sia prima sia dopo. Il difetto era del solo bagliore, che esce di ~20px.
+
+**PROVATO.** `prove_banner_fee_p2p` (49): un impulso, la funzione e il
+suo ascolto, il fondo da bordo a bordo (e nessuno pseudo `::before` /
+`::after` sul blocco), e nel banco node lo spegnimento — in cima no,
+scorso si', senza `getAnimations` o senza banner niente esplode. Suite
+intera severa senza config nel worktree da origin/main (a813835): 16.022
+verdi e 0 rosse. Dal vivo, Chrome headless via CDP a 320 e 375 nei due
+temi, col server di origin/main («prima») e col worktree («dopo»),
+contando sui PIXEL dello scatto quelli diversi dal fondo nelle due
+strisce laterali dentro l'altezza del blocco: scorrendo durante
+l'impulso prima 998–1.287 pixel arancio, dopo 0 e l'impulso gia'
+spento; col picco fermato apposta sotto il blocco (ascolto tolto, per
+provare il fondo da solo) prima 756–912, dopo 0; con le card sotto 0 e
+0. Il blocco resta attaccato in cima, nessun suo figlio esce dal filo
+(il `clip-path` non taglia niente), niente scorrimento orizzontale: 60
+controlli verdi. ⚠️ Al primo giro il tour del P2P, che alla prima visita
+di un server nuovo si apre in RITARDO, velava la pagina e faceva
+«diverse» tutte le strisce a 320 chiaro, prima e dopo: la misura adesso
+lo salta e controlla che non ci sia.
+**DA AVERE IL TELEFONO:** lo scorrimento vero col dito durante
+l'impulso, in Telegram.

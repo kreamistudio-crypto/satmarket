@@ -27615,6 +27615,9 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `testoFeeP2P` (pura, il cuore è la frase di Info P2P,
   `testoFeeInfoP2P`) via `renderFeeP2P` con `commissioneVivaP2P`,
   `commissioneListinoP2P` e `p2pSconto.punti`. Il bagliore è un
-  `box-shadow` del bottone a stadio, due battiti, riavviato dal
-  `display:none` della vista; gli effetti ridotti lo spengono con la
-  regola universale.
+  `box-shadow` del bottone a stadio, UN battito, riavviato dal
+  `display:none` della vista e spento al primo scorrimento
+  (`fermaBaglioreFeeP2P`, `finish()` se `scrollY > 0`); gli effetti
+  ridotti lo spengono con la regola universale. `.p2p-sticky` ha il
+  fondo da bordo a bordo: `box-shadow:0 0 0 100vmax var(--bg)` tagliato
+  sopra e sotto da `clip-path:inset(0 -100vmax)`.

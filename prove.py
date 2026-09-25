@@ -70697,8 +70697,10 @@ def prove_banner_fee_p2p():
     Andrea). La capsula con le tre pillole — la fee di listino barrata,
     la BETA, lo sconto di pionieri e livello 5 — subito sotto la riga
     degli strumenti del libro, FUORI dal blocco attaccato (se ne va col
-    primo dito); un bagliore arancio che batte DUE volte e poi resta
-    fermo, spento dagli effetti ridotti; al tocco un foglio breve coi
+    primo dito); un bagliore arancio che batte UNA volta e poi resta
+    fermo, spento dagli effetti ridotti e appena la pagina scorre (e il
+    blocco attaccato ha il fondo da bordo a bordo, cosi' niente di quel
+    che gli scorre sotto si vede ai lati); al tocco un foglio breve coi
     numeri VIVI, mai scritti a mano. Il file si sostituisce a fine beta:
     le misure del markup si confrontano col FILE, cosi' un disegno nuovo
     di altre proporzioni fa rosso qui col numero da scrivere."""
@@ -70809,8 +70811,9 @@ def prove_banner_fee_p2p():
                                r"height:auto", css)))
     anim = re.search(r"animation:(\S+?)(?:;|$)", regola)
     anim = anim.group(1) if anim else ""
-    prova("il bagliore batte DUE volte e poi si ferma: mai infinite", True,
-          anim.startswith("p2pFeeBagliore") and anim.endswith("2")
+    # UN SOLO IMPULSO (ritocco di Andrea, stesso giorno: erano due)
+    prova("il bagliore batte UNA volta e poi si ferma: mai infinite", True,
+          anim.startswith("p2pFeeBagliore") and anim.endswith("ease-in-out1")
           and "infinite" not in regola)
     kf = re.search(r"@keyframes p2pFeeBagliore\{(.*?)\}\}", css, flags=re.S)
     kf = kf.group(1) if kf else ""
@@ -70836,6 +70839,28 @@ def prove_banner_fee_p2p():
           or bool(re.search(r"html\.fx-ridotti \*,html\.fx-ridotti "
                             r"\*::before,html\.fx-ridotti \*::after\{\s*"
                             r"animation:none!important", mini)))
+    # SCORRENDO SI SPEGNE (ritocco di Andrea): una funzione sola,
+    # ascoltata sullo scorrimento della finestra, che il banco qui sotto
+    # fa girare davvero
+    ferma = pezzo_js(mini, "function fermaBaglioreFeeP2P(){", "\n}\n")
+    prova("scorrendo il bagliore si spegne: la funzione e il suo ascolto",
+          [True, 1],
+          ["a.finish()" in ferma and "window.scrollY > 0" in ferma,
+           js.count("window.addEventListener('scroll', fermaBaglioreFeeP2P, "
+                    "{passive: true});")])
+    # IL FONDO DEL BLOCCO ATTACCATO DA BORDO A BORDO: un'ombra piena del
+    # suo colore, tagliata sopra e sotto al filo del blocco — ai lati,
+    # nelle strisce dei margini di `.sicu`, non si vede piu' passare
+    # niente (il bagliore, l'ombra delle card)
+    stk = re.sub(r"\s+", "", pezzo_js(mini, "  .p2p-sticky{position:sticky",
+                                      "}"))
+    prova("il blocco attaccato ha il fondo da bordo a bordo, e solo ai lati",
+          [True, True, True],
+          ["background:var(--bg)" in stk,
+           "box-shadow:000100vmaxvar(--bg)" in stk,
+           "clip-path:inset(0-100vmax)" in stk])
+    prova("...e nessuno pseudo largo 100vw, che sborderebbe", [],
+          re.findall(r"\.p2p-sticky::(?:before|after)", css))
 
     # --- 5) IL FOGLIO -------------------------------------------------
     prova("il foglio c'e', ed e' un dialogo col suo titolo", True,
@@ -70879,9 +70904,10 @@ def prove_banner_fee_p2p():
               "mezzaCommissioneP2P", "testoFeeInfoP2P", "testoFeeP2P"):
         pezzi_js.append(pezzo_js(mini, "function %s(" % f, "\n}\n") + "\n}")
     pezzi_js.append(rend + "\n}")
+    pezzi_js.append(ferma + "\n}")
     banco = "\n".join(pezzi_js) + r"""
 const box = {innerHTML: ''};
-const el = id => id === 'p2pFeeCorpo' ? box : null;
+let el = id => id === 'p2pFeeCorpo' ? box : null;
 let p2pInfo = {fee: 0.03}, p2pSconto = null, listino = 4;
 const p2pCoord = () => ({commissione: listino});
 const out = {};
@@ -70904,6 +70930,22 @@ p2pSconto = null;
 renderFeeP2P(); out.rendNessuno = box.innerHTML;
 p2pInfo = null;
 renderFeeP2P(); out.rendIgnota = box.innerHTML;
+/* lo scorrimento spegne l'impulso: in cima no (e' il go('p2p') che
+   entra), appena scorre si', e senza getAnimations niente esplode */
+const finiti = [];
+const banner = {getAnimations: () => [{finish: () => finiti.push(1)}]};
+globalThis.el2 = null;
+const window = {scrollY: 0};
+const elVero = el;
+el = id => id === 'p2pFeeBanner' ? banner : elVero(id);
+fermaBaglioreFeeP2P(); out.inCima = finiti.length;
+window.scrollY = 3; fermaBaglioreFeeP2P(); out.scorso = finiti.length;
+el = id => id === 'p2pFeeBanner' ? {} : null;
+let esploso = false;
+try { fermaBaglioreFeeP2P(); } catch (e) { esploso = true; }
+el = () => null;
+try { fermaBaglioreFeeP2P(); } catch (e) { esploso = true; }
+out.esploso = esploso;
 console.log(JSON.stringify(out));
 """
     with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
@@ -70968,6 +71010,10 @@ console.log(JSON.stringify(out));
           "Pionieri" in o["rendNessuno"])
     prova("...e senza il 38385 la frase di ripiego", True,
           "non l'abbiamo ancora letta" in o["rendIgnota"])
+    prova("in cima (l'ingresso) l'impulso non si spegne, scorrendo si'",
+          [0, 1], [o["inCima"], o["scorso"]])
+    prova("...e senza getAnimations o senza banner niente esplode", False,
+          o["esploso"])
 
 
 def prove_logo_p2p_nitido():
