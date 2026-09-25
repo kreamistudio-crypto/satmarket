@@ -33202,3 +33202,17 @@ questo cantiere.
 DA GUARDARE SUL TELEFONO: al prossimo ordine spedito, che il codice
 nell'avviso si tocchi e apra @trackbot col codice dentro, e che sotto
 l'avviso non compaia la scheda del bot.
+
+## Il profilo più elegante, il piede più piccolo (25 set 2026)
+
+Ritocco di Andrea: «Tutorial» ed «Esci» in fondo al Profilo un po' più
+piccoli. Prendono la misura dei bottoni secondari dell'app, quella di
+`.giro-piede .btn` (padding 11, testo 14) invece dei 14/15,5 di serie,
+più un `min-height:44px` come pavimento dell'area di tocco. Misurati dal
+vivo: da 54 a 46px d'altezza, testo da 15,5 a 14, sempre affiancati e
+uguali (139px a 320, 167 a 375, nei due temi), nessuno scorrimento
+laterale.
+PROVATO: prove_profilo_elegante (42) — più piccoli di un bottone di
+serie, con la misura dei secondari, area di tocco ≥ 44; tortura 4 su 4.
+Suite intera severa senza config nel worktree da origin/main (07c73b9):
+16.073 verdi e 0 rosse.

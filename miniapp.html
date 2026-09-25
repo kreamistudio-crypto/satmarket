@@ -4051,7 +4051,13 @@
      al centro. `.btn.ghost` porta un margine suo e sta piu' giu' nel
      foglio: da qui lo si batte con la specificita'. */
   .profilo-piede{display:flex;justify-content:center;gap:10px;margin-top:22px}
-  .profilo-piede .btn.ghost{flex:0 1 50%;width:auto;min-width:0;margin-top:0}
+  /* PIU' PICCOLI DI «ACQUISTA» (ritocco di Andrea, 25 set 2026): la
+     misura dei bottoni secondari dell'app, quella di `.giro-piede .btn`
+     (padding 11, testo 14) invece dei 14/15,5 di serie. Il
+     `min-height` e' la cintura dell'area di tocco: 44px anche se un
+     giorno il testo o l'interlinea scendessero ancora. */
+  .profilo-piede .btn.ghost{flex:0 1 50%;width:auto;min-width:0;margin-top:0;
+    padding:11px 16px;font-size:14px;min-height:44px}
 
   /* ---------- ⚙️ stato delle leve (ago 2026) ----------
      Settanta righe fitte: il nome a sinistra con sotto la chiave da

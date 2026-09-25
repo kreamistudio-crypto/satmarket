@@ -88296,6 +88296,21 @@ def prove_profilo_elegante():
           "crescono a tutta larghezza", True,
           "flex:0 1 50%" in pp and "width:auto" in pp)
     prova("...affiancati", True, ".profilo-piede{display:flex;" in css)
+    # PIU' PICCOLI DI «ACQUISTA» (ritocco di Andrea, 25 set 2026): la
+    # misura dei bottoni secondari dell'app (`.giro-piede .btn`, padding
+    # 11 e testo 14) invece dei 14/15,5 di serie — misurati dal vivo da
+    # 54 a 46px — e un pavimento esplicito per l'area di tocco
+    _fp = re.search(r"font-size:([\d.]+)px", pp)
+    _pp = re.search(r"padding:(\d+)px", pp)
+    _mh = re.search(r"min-height:(\d+)px", pp)
+    prova("i due del piede sono piu' piccoli di un bottone di serie", True,
+          bool(_fp and _pp) and float(_fp.group(1)) < 15.5
+          and int(_pp.group(1)) < 14)
+    prova("...con la misura dei bottoni secondari dell'app", True,
+          "padding:11px" in pp and "font-size:14px" in pp
+          and "padding:11px 22px;font-size:14px" in css)
+    prova("...e l'area di tocco resta di almeno 44px", True,
+          bool(_mh) and int(_mh.group(1)) >= 44)
 
     # --- 5) NIENTE ICONE SUI CASSETTI PRINCIPALI, le icone sulle voci ---
     teste = re.findall(r'<button type="button" class="grp-h"[^>]*>(.*?)</button>',
