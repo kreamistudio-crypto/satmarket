@@ -33111,3 +33111,27 @@ Dal vivo via CDP a 320 e 375 nei due temi con «Negozio e spedizioni» e
 «Codici sconto» aperti: nessuno scorrimento laterale.
 DA GUARDARE SUL TELEFONO: di sera, che il fondo delle voci si veda
 staccato dalla carta anche con la luminosità bassa.
+
+## Il profilo più elegante, le voci separate (25 set 2026)
+
+Secondo ritocco di Andrea, a ae977a0: aprendo un cassetto le voci
+sembravano un blocco unico — righe della carta separate da un filo, e
+col fondo del secondo livello il filo non si vedeva più. Adesso ogni
+voce è un rettangolino a sé: contorno fine e chiaro (`--field-line`:
+#E0D7C0 sul crema di giorno, #4A4029 più chiaro della carta di sera),
+raggio 12 — più piccolo dei 16 del cassetto, così si legge chi contiene
+chi —, e 8px d'aria. L'aria viene dal `gap` del corpo in colonna e non
+da un margine: una voce spenta (display:none) non prende spazio, quindi
+non lascia buchi doppi. Il filo del primo giro è tolto. Fondo del
+secondo livello e grigio AA (`--muted-voce`) restano quelli di ae977a0,
+e il cassetto principale non cambia.
+PROVATO: prove_profilo_sezioni (53) emendata — il contorno, il raggio
+più piccolo del cassetto, il fondo, l'aria fra 6 e 8px dal gap, il filo
+che non torna; tortura 6 su 6. Suite intera severa
+senza config nel worktree da origin/main (ae977a0): 16.031 verdi e 0
+rosse. Dal vivo via CDP a 320 e 375
+nei due temi con «Negozio e spedizioni» e «Codici sconto» aperti: le
+sette distanze fra le voci misurate a 8px, raggio 12, nessuno
+scorrimento laterale; la sonda del contrasto sui 220 testi delle voci
+dice lo stesso del giro prima (sotto soglia solo il bianco sui bottoni
+arancio, sul loro fondo, e il falso allarme del distintivo).

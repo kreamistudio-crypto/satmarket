@@ -3981,8 +3981,10 @@
   .grp-h .fr{margin-left:auto;flex:none;color:var(--muted);font-size:13px;
     transition:transform .18s ease}
   .grp.open .grp-h .fr{transform:rotate(180deg)}
-  .grp-b{display:none}
-  .grp.open .grp-b{display:block}
+  .grp-b{display:none;padding:2px 12px 12px}
+  /* in colonna col gap e non coi margini: una voce spenta (display:none)
+     non prende spazio, quindi non lascia un buco doppio fra le altre */
+  .grp.open .grp-b{display:flex;flex-direction:column;gap:8px}
   /* IL CONTATORE DI «COMPLETA IL PROFILO» sta sulla riga del titolo
      (ritocco di Andrea, 25 set 2026: i sottotitoli dei cassetti
      principali sono caduti, e resta solo il titolo con la freccia).
@@ -3999,28 +4001,30 @@
   .tit2{display:flex;flex-direction:column;min-width:0}
   .tit2 small{font-size:12.5px;font-weight:600;color:var(--ink-soft);
     line-height:1.35;margin-top:2px}
-  /* LE VOCI: righe della carta, non carte. Il filo sta in un ::before
-     che parte dal rientro e si ferma prima del bordo — nessun bordo
-     vero, cosi' il `.acc` di serie (margine, fondo, raggio) si
-     spegne qui e resta intatto dovunque altro, pannello dei
-     moderatori compreso (i suoi cassetti stanno dentro #adminStats,
-     non sono figli diretti del corpo).
+  /* LE VOCI: RETTANGOLINI A SE' (secondo ritocco di Andrea, 25 set
+     2026). Al primo giro erano righe della carta separate da un filo, e
+     col fondo del secondo livello si leggevano come un blocco unico:
+     adesso ognuna ha il suo raggio (12, piu' piccolo dei 16 del
+     cassetto: si capisce chi contiene chi), un contorno fine e chiaro
+     (--field-line: sul crema di giorno, piu' chiaro della carta di
+     sera) e 8px d'aria dal gap del corpo. La regola tocca solo i figli
+     diretti del corpo: il `.acc` di serie resta intatto dovunque altro,
+     pannello dei moderatori compreso (i suoi cassetti stanno dentro
+     #adminStats).
      IL FONDO DEL SECONDO LIVELLO (ritocco di Andrea, 25 set 2026): le
      voci staccano dal cassetto col fondo dei chip, che fa gia' il
      verso chiesto nei due temi — crema piu' scuro del bianco di giorno
      (#F3ECDA), piu' chiaro della carta di sera (#37301F). Nessun token
      nuovo. Il testo resta AA: misurato dal vivo su ogni testo delle
      voci aperte, nei due temi. */
-  .grp-b > .acc{margin:0;border:0;border-radius:0;background:var(--chip-bg);
-    position:relative;
+  .grp-b > .acc{margin:0;border:1px solid var(--field-line);border-radius:12px;
+    background:var(--chip-bg);position:relative;
     /* ...e dentro la voce il grigio delle note si scurisce quel tanto
        che basta per l'AA sul crema (le etichette dei campi, i «nessun
        annuncio», i dati): il token si ridefinisce qui e vale per tutto
        quel che la voce contiene, senza toccare una regola sola */
     --muted:var(--muted-voce)}
-  .grp-b > .acc::before{content:'';position:absolute;top:0;left:16px;right:16px;
-    border-top:1px solid var(--line-soft)}
-  .grp-b > .acc > .acc-h{padding:13px 16px;font-size:14.5px;font-weight:700}
+  .grp-b > .acc > .acc-h{padding:12px 14px;font-size:14.5px;font-weight:700}
   /* il conteggio della voce («(0 di 20)») sul fondo crema: il --muted di
      serie scende a 3,3:1, l'inchiostro delle note resta sopra il 4,5 */
   .grp-b > .acc > .acc-h .conta{color:var(--ink-soft)}

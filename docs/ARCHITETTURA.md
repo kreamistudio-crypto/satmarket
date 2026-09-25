@@ -23190,9 +23190,13 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   tuo catalogo · Negozio e spedizioni · Quando compri · Incassi e
   pagamenti · Livello e inviti · Avvisi e aspetto · Privacy ·
   Amministrazione (solo moderatori).
-  LE VOCI DENTRO SONO RIGHE DELLA CARTA, non carte nella carta
-  (`.grp-b > .acc`: niente bordo né raggio, un filo col rientro,
-  l'icona in una colonna di 24px, e il fondo dei chip `--chip-bg` —
+  LE VOCI DENTRO SONO RETTANGOLINI A SÉ (dal secondo ritocco dello
+  stesso giorno; al primo giro erano righe della carta col filo, e col
+  fondo si leggevano come un blocco unico): `.grp-b > .acc` col
+  contorno fine `--field-line`, raggio 12 (più piccolo dei 16 del
+  cassetto), 8px d'aria dal `gap` del corpo in colonna (una voce spenta
+  non lascia buchi), l'icona in una colonna di 24px, e il fondo dei
+  chip `--chip-bg` —
   crema di giorno, più chiaro della carta di sera — con dentro il
   grigio delle note ridefinito su `--muted-voce` per restare AA):
   è così che due livelli restano distinti senza la veste nuda d'agosto. Le VOCI-PORTA

@@ -86042,25 +86042,36 @@ def prove_profilo_sezioni():
     # posti del foglio)
     carta = css[css.index("  .grp{"):css.index("  .grp-h{")]
     titolo = css[css.index("  .grp-h{"):css.index("  .grp-h .fr{")]
-    voce = css[css.index("  .grp-b > .acc{"):css.index("  .grp-b > .acc::before{")]
-    filo = css[css.index("  .grp-b > .acc::before{"):css.index("  .grp-b > .acc > .acc-h{")]
+    voce = css[css.index("  .grp-b > .acc{"):css.index("  .grp-b > .acc > .acc-h{")]
+    corpo = css[css.index("  .grp.open .grp-b{"):]
+    corpo = corpo[:corpo.index("}")]
     riga = css[css.index("  .grp-b > .acc > .acc-h{"):]
     riga = riga[:riga.index("}") + 1]
     prova("la sezione e' una carta rettangolare, come i cassetti", True,
           "background:var(--card)" in carta and "border-radius:16px" in carta
           and "border:1px solid var(--line-soft)" in carta)
-    # IL FONDO DEL SECONDO LIVELLO (ritocco di Andrea, 25 set 2026): le
-    # voci non sono piu' trasparenti, prendono il fondo dei chip — piu'
-    # crema di giorno, piu' chiaro di sera — cosi' staccano dal
-    # cassetto. Restano righe e non carte: niente bordo, raggio, margine.
-    prova("...e le voci dentro NON sono carte nella carta", True,
-          "border:0" in voce and "border-radius:0" in voce
+    # LE VOCI SONO RETTANGOLINI A SE' (secondo ritocco di Andrea, 25 set
+    # 2026). Il primo giro le voleva righe della carta separate da un
+    # filo; col fondo del secondo livello si leggevano come un blocco
+    # unico, e Andrea le ha chieste di nuovo separate: raggio loro,
+    # contorno fine e chiaro, 8px d'aria. Due livelli restano distinti
+    # dal fondo dei chip e dal raggio PIU' PICCOLO del cassetto.
+    prova("...e le voci dentro sono rettangolini a se', col contorno fine",
+          True, "border:1px solid var(--field-line)" in voce
           and "margin:0" in voce)
-    prova("...ma hanno il loro fondo, quello dei chip", True,
+    _rv = int(re.search(r"border-radius:(\d+)px", voce).group(1))
+    prova("...col raggio piu' piccolo del cassetto (chi contiene chi)", True,
+          0 < _rv < 16)
+    prova("...e il loro fondo, quello dei chip", True,
           "background:var(--chip-bg)" in voce)
-    prova("...ma righe separate da un filo col rientro", True,
-          "border-top:1px solid var(--line-soft)" in filo
-          and "left:16px" in filo)
+    # l'aria fra una voce e l'altra: il gap del corpo in colonna, e non un
+    # margine — una voce spenta non lascia un buco doppio
+    _gap = re.search(r"gap:(\d+)px", corpo)
+    prova("...con 6-8px d'aria fra l'una e l'altra, dal gap del corpo", True,
+          "flex-direction:column" in corpo and bool(_gap)
+          and 6 <= int(_gap.group(1)) <= 8)
+    prova("...e il filo del primo giro non c'e' piu'", True,
+          ".grp-b > .acc::before" not in css)
     # LA MISURA: il livello SOPRA resta piu' grande di quello sotto
     _ct = int(re.search(r"font-size:(\d+)px", titolo).group(1))
     _cr = float(re.search(r"font-size:([\d.]+)px", riga).group(1))
@@ -86082,8 +86093,8 @@ def prove_profilo_sezioni():
           "border-radius" not in css[css.index("  .acc-h .fr{"):
                                      css.index("  .acc.open .acc-h .fr")])
     prova("il corpo della sezione si apre con la classe", True,
-          ".grp-b{display:none}" in css
-          and ".grp.open .grp-b{display:block}" in css)
+          ".grp-b{display:none;" in css
+          and ".grp.open .grp-b{display:flex;" in css)
 
     # --- 3) LA REGIA E' CHIAMATA DA TUTT'E DUE LE CATENE che decidono
     # la visibilita' dei cassetti — la seconda non e' nella lista del
