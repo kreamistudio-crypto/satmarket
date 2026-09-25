@@ -43942,6 +43942,42 @@ function nettoLatoP2P(o, sats){
    libro prima o poi e p2pInfo arriva con lui; una fetch di piu' da
    una pagina di sola lettura pagherebbe l'attesa per un numero che
    la frase di ripiego gia' copre. */
+/* LA FEE IN «INFO P2P», IN UNA FRASE (25 set 2026, ritocco di Andrea):
+   «Durante la beta la fee P2P è del 3% in tutto, cioè 1,5% per chi
+   compra e 1,5% per chi vende. Finita la beta sarà del 4% in tutto (2%
+   per parte). Pionieri e livello 5 hanno sempre uno sconto dello 0,5%
+   sulla propria parte.»
+   OGNI NUMERO E' LETTO, mai scritto: il 3% e' la fee VIVA del
+   coordinatore (38385), il 4% il listino (P2P_COMMISSIONE_PERCENTO, in
+   busta con le leve P2P), lo 0,5% P2P_SCONTO_FEDELTA_PERCENTO
+   (`p2p_sconto.punti`), il 5 `LIVELLO_SCONTO_P2P`. Le meta' passano dal
+   giudice del conto (`mezzaCommissioneP2P`), gli articoli da
+   `articoloPercentoP2P`.
+   LA BETA SPARISCE DA SOLA: la frase c'e' finche' la fee viva sta SOTTO
+   il listino — lo stesso criterio del cartello «beta» del conto — e il
+   giorno che lo raggiunge resta «La fee P2P è del 4% in tutto…». Senza
+   listino (busta non arrivata) non si promette niente sul dopo.
+   ⚠️ ROVESCIA la decisione del 14 set 2026 («il listino non si
+   nomina»): allora il listino era un prezzo mai applicato raccontato
+   come promo; adesso e' detto per quel che e', il prezzo DOPO la beta.
+   Lo sconto c'e' solo a leva accesa. PURA: `fee` e' la frazione viva
+   (0.03), `listino` in punti percentuali (4), `punti` lo sconto. */
+function testoFeeInfoP2P(fee, listino, punti){
+  const pc = x => Number(x).toLocaleString('it-IT', {maximumFractionDigits: 2});
+  const tot = pc(fee * 100), meta = mezzaCommissioneP2P(fee);
+  const l = Number(listino) || 0;
+  const beta = l > 0 && fee * 100 < l;
+  let t = (beta ? 'Durante la beta la fee P2P è ' : 'La fee P2P è ')
+    + articoloPercentoP2P(tot) + '<b>' + tot + '%</b> in tutto, cioè <b>'
+    + meta + '%</b> per chi compra e <b>' + meta + '%</b> per chi vende.';
+  if (beta)
+    t += ' Finita la beta sarà ' + articoloPercentoP2P(pc(l)) + '<b>' + pc(l)
+      + '%</b> in tutto (' + pc(l / 2) + '% per parte).';
+  if (Number(punti) > 0)
+    t += ' Pionieri e livello ' + LIVELLO_SCONTO_P2P + ' hanno sempre uno <b>'
+      + esc(scontoFedeltaTestoP2P(punti)) + '</b> sulla propria parte.';
+  return t;
+}
 function renderP2PInfo(){
   const num = n => esc(Number(n).toLocaleString('it-IT',
                                                {maximumFractionDigits: 2}));
@@ -43951,14 +43987,10 @@ function renderP2PInfo(){
     if (q === 'metodi') e.textContent = P2P_METODI.join(', ');
   });
   /* LA COMMISSIONE, dallo stesso giudice del conto dello scambio: le
-     due cifre non possono divergere perche' la fonte e' una sola.
-     ⚠️ E IL LISTINO NON SI NOMINA (14 set 2026, correzione di Andrea):
-     qui si dice la commissione VIVA e come si divide, e basta. Il
-     «listino 3%, e adesso e' promo» raccontava un prezzo che non e'
-     mai stato applicato a nessuno, e in una pagina che chi legge
-     prende per il REGOLAMENTO un prezzo che non esiste fa piu' danno
-     di un numero vecchio. La pillola «in promo» del conto questo giro
-     non la tocca: la' e' un cartello sulla riga, non una tariffa. */
+     due cifre non possono divergere perche' la fonte e' una sola. La
+     frase la scrive `testoFeeInfoP2P` (25 set 2026: la beta, il prezzo
+     dopo e lo sconto, tutti letti); qui resta il «non lo so» e il
+     «Tu sei fra questi», che e' di chi legge. */
   const box = el('p2pInfoFee');
   if (box) {
     const fee = commissioneVivaP2P();
@@ -43966,20 +43998,13 @@ function renderP2PInfo(){
       ? '<p>La commissione la dichiara il coordinatore, e in questo momento non l\'abbiamo ancora letta. La trovi sempre scritta <b>nel conto dello scambio</b>, prima che tu confermi: si divide <b>met&agrave; a testa</b>.</p>'
       : (fee <= 0)
       ? '<p>In questo momento lo scambio <b>non ha commissione</b>. Quando ci sar&agrave;, la vedrai scritta nel conto prima di confermare.</p>'
-      : '<p>La commissione dello scambio &egrave; <b>' + num(fee * 100)
-        + '%</b>, e si divide <b>met&agrave; a testa</b>: nel conto che leggi c\'&egrave; la <b>tua met&agrave;</b>, cio&egrave; <b>'
-        + num(fee * 50) + '%</b>.</p>'
-        + '<p>Non si paga a parte: &egrave; gi&agrave; dentro i sats che passano di mano — chi vende ne blocca un po\' di pi&ugrave;, chi compra ne riceve un po\' di meno.</p>'
-        /* LO SCONTO FEDELTA', solo a leva accesa (`punti` viaggia a
-           tutti, `attivo` e' di chi legge): la regola la legge
-           chiunque, la riga «tu» solo chi ce l'ha */
-        + ((p2pSconto && Number(p2pSconto.punti) > 0 && fee > 0)
-          ? '<p>Chi &egrave; <b>pioniere</b> o ha raggiunto il <b>livello '
-            + LIVELLO_SCONTO_P2P + '</b> ha uno <b>'
-            + esc(scontoFedeltaTestoP2P(p2pSconto.punti)) + '</b> sulla sua met&agrave; (uno sconto solo, non si sommano).'
-            + (feeMiaP2P(null) < fee ? ' <b>Tu sei fra questi.</b>' : '')
-            + '</p>'
-          : '');
+      : '<p>' + testoFeeInfoP2P(fee, commissioneListinoP2P(),
+                                 p2pSconto ? p2pSconto.punti : 0)
+        /* LO SCONTO FEDELTA': la regola la legge chiunque (`punti`
+           viaggia a tutti), la riga «tu» solo chi ce l'ha */
+        + (feeMiaP2P(null) < fee ? ' <b>Tu sei fra questi.</b>' : '')
+        + '</p>'
+        + '<p>Non si paga a parte: &egrave; gi&agrave; dentro i sats che passano di mano — chi vende ne blocca un po\' di pi&ugrave;, chi compra ne riceve un po\' di meno.</p>';
   }
   /* LE DUE FINESTRE. La vita nel libro e' `expiration_hours`, la
      finestra del gesto `expiration_seconds`: si leggono, e i ripieghi

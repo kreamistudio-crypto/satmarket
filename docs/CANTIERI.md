@@ -32769,3 +32769,40 @@ il riquadro «Pubblica» da pioniere («Fee P2P 1% 🌱 Pioniere», «…la fee
 P2P è dell'1,5% per parte, e tu hai uno sconto dello 0,5%») e senza
 sconto («Fee P2P 1,5%»), e il conto di un ordine Barattozon (Contanti
 al tabacchino, col premio): nessuno sborda.
+
+## La fee in Info P2P: la beta, il dopo e lo sconto (25 set 2026)
+
+Ritocco di Andrea. In Info P2P «La commissione dello scambio è 3%, e si
+divide metà a testa…» diventa: «Durante la beta la fee P2P è del 3% in
+tutto, cioè 1,5% per chi compra e 1,5% per chi vende. Finita la beta
+sarà del 4% in tutto (2% per parte). Pionieri e livello 5 hanno sempre
+uno sconto dello 0,5% sulla propria parte.» (più «Tu sei fra questi» a
+chi lo sconto ce l'ha, e il paragrafo «Non si paga a parte» com'era).
+La scrive `testoFeeInfoP2P(fee, listino, punti)`, PURA, e ogni numero è
+letto: la fee VIVA del 38385, il listino `P2P_COMMISSIONE_PERCENTO`
+(`commissioneListinoP2P`), lo sconto `P2P_SCONTO_FEDELTA_PERCENTO`
+(`p2p_sconto.punti`, via `scontoFedeltaTestoP2P`), il livello
+`LIVELLO_SCONTO_P2P`; le metà dal giudice del conto e gli articoli da
+`articoloPercentoP2P`. LA BETA SPARISCE DA SOLA: la frase c'è finché la
+fee viva sta sotto il listino (lo stesso criterio del cartello «beta»
+del conto); a listino raggiunto resta «La fee P2P è del 4% in tutto…».
+Senza listino non si promette niente sul dopo, a leva spenta niente
+sconto. ⚠️ ROVESCIA la decisione del 14 set 2026 («il listino non si
+nomina» in Info P2P): allora il listino era un prezzo mai applicato
+raccontato come promo, adesso è detto per quel che è, il prezzo dopo la
+beta. La sentinella che certificava il silenzio è rovesciata con la
+decisione e col perché.
+⚠️ Il «4%» a schermo dipende dal VALORE VIVO di `P2P_COMMISSIONE_PERCENTO`
+nel config del VPS (il default nel codice è 2): si guarda nel pannello
+«⚙️ Stato delle leve», riga «Commissione P2P — listino (%)».
+
+**PROVATO.** Nel banco di `prove_livello_accanto_al_titolo` la frase di
+Andrea parola per parola (3/4/0,5), le cifre in grassetto, la beta che
+sparisce a fee = listino e sopra, niente promessa senza listino, niente
+sconto a leva spenta, altri numeri (2/3/1) con gli stessi pezzi, gli
+articoli «dell'8%», «dell'11%».
+Suite intera severa senza config nel worktree da origin/main (5d7dff3):
+15.937 verdi e 0 rosse. Dal vivo su una copia col server di collaudo
+(relay morto, listino 4, sconto 0,5), a 375 px nei due temi via CDP:
+in beta senza sconto, in beta da pioniere («Tu sei fra questi.») e con
+la fee viva al 4% — la frase sulla beta non c'è più.

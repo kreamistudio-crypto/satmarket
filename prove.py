@@ -54644,18 +54644,16 @@ def prove_nav_p2p():
     _rp = pezzo_js(mini, "function renderP2PInfo(){", "\n}\n")
     prova("il render legge la commissione dal giudice unico", True,
           "commissioneVivaP2P()" in _rp)
-    # ⚠️ E IL LISTINO NON LO NOMINA PIU' (14 set 2026, correzione di
-    # Andrea): la pagina dice la commissione VIVA e come si divide, e
-    # basta. Il «listino 3%, e adesso e' promo» raccontava un prezzo che
-    # non e' mai stato applicato a nessuno, e qui chi legge prende la
-    # pagina per il REGOLAMENTO. La sentinella si rovescia con la
-    # decisione, come quella della frase sotto il conto: prima
-    # certificava la riga, adesso certifica il silenzio.
-    # (il VERBALE il listino deve poterlo nominare — e' il posto dove si
-    # dice perche' se n'e' andato: la sentinella guarda il CODICE)
+    # IL LISTINO TORNA, DETTO PER QUEL CHE E' (25 set 2026, ritocco di
+    # Andrea): il prezzo DOPO la beta. La sentinella del 14 set 2026
+    # certificava il silenzio («il listino non si nomina», quando era
+    # raccontato come una promo su un prezzo mai applicato) e si
+    # rovescia con la decisione: adesso certifica che il listino arriva
+    # dal giudice di casa e mai scritto a mano. Cosa dice la frase lo
+    # prova il banco di `prove_livello_accanto_al_titolo`.
     _rpn = re.sub(r"/\*.*?\*/", "", _rp, flags=re.S)
-    prova("...e il listino non lo nomina affatto", [],
-          [s for s in ("commissioneListinoP2P", "listino") if s in _rpn])
+    prova("...e il listino lo passa il giudice alla frase", True,
+          "testoFeeInfoP2P(fee, commissioneListinoP2P()," in _rpn)
     prova("...e il «non lo so» non diventa uno zero", True,
           "(fee === null)" in _rp
           and "abbiamo ancora letta" in _rp)
@@ -88937,8 +88935,10 @@ def prove_livello_accanto_al_titolo():
             ("'la tua commissione è '", "il riquadro del foglio Pubblica")):
         prova(f"la cifra finale non torna: {dove}", False, vecchia in mini)
     inf = pezzo_js(mini, "function renderP2PInfo(){", "\n}\n")
+    tfi = pezzo_js(mini, "function testoFeeInfoP2P(", "\n}\n")
     prova("la pagina Informazioni dice lo sconto dal testo unico", True,
-          "scontoFedeltaTestoP2P(p2pSconto.punti)" in inf)
+          "testoFeeInfoP2P(" in inf
+          and "scontoFedeltaTestoP2P(punti)" in tfi)
     conto = pezzo_js(mini, "function contoDettP2P(o){", "\n}\n")
     prova("il conto scrive la MIA aliquota (fee viva meno lo sconto)",
           True, "esc(mezzaCommissioneP2P(fee))" in conto
@@ -88976,7 +88976,7 @@ def prove_livello_accanto_al_titolo():
              pezzo_js(mini, "const titoloRiga = (", "'';") + "'';",
              pezzo_js(mini, "const LIVELLO_SCONTO_P2P = ", "\n"),
              pezzo_js(mini, "function rigaVantaggioLivello(", "\n}\n") + "\n}"]
-    for f in ("scontoFedeltaTestoP2P", "articoloPercentoP2P",
+    for f in ("scontoFedeltaTestoP2P", "articoloPercentoP2P", "testoFeeInfoP2P",
               "commissioneVivaP2P", "commissioneListinoP2P", "feeMiaP2P",
               "cartelloFeeP2P", "mezzaCommissioneP2P", "maxEuroP2P",
               "maxSatsTestoP2P", "rigaTettoFeeP2P"):
@@ -89022,6 +89022,18 @@ p2pSconto = S('pioniere', true);
 /* la fee cambia sul nodo: lo sconto resta lo stesso, la meta' si muove */
 p2pInfo = {fee: 0.04, maxSats: 0};
 out.feeNuova = rigaTettoFeeP2P();
+/* LA FEE IN «INFO P2P» (25 set 2026): la frase coi numeri che cambiano */
+const nudo = h => h.replace(/<[^>]*>/g, '').replace(/&#39;/g, "'");  // come a schermo
+out.info = {
+  beta: testoFeeInfoP2P(0.03, 4, 0.5),
+  fineBeta: testoFeeInfoP2P(0.04, 4, 0.5),
+  sopra: testoFeeInfoP2P(0.05, 4, 0.5),
+  senzaListino: testoFeeInfoP2P(0.03, 0, 0.5),
+  levaSpenta: testoFeeInfoP2P(0.03, 4, 0),
+  altriNumeri: testoFeeInfoP2P(0.02, 3, 1),
+  otto: testoFeeInfoP2P(0.08, 11, 0.5),
+};
+out.infoNudo = Object.fromEntries(Object.entries(out.info).map(([k, v]) => [k, nudo(v)]));
 console.log(JSON.stringify(out));
 """
     with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
@@ -89081,6 +89093,30 @@ console.log(JSON.stringify(out));
           ["🌱 Pioniere", "Lv. 5"], [o["cartello"], o["cartelloLivello"]])
     prova("...e lo sconto mancato vince sul motivo", "sconto non verificato",
           o["cartelloMancato"])
+    fi = o["infoNudo"]
+    prova("Info P2P in beta: la frase di Andrea, parola per parola",
+          "Durante la beta la fee P2P è del 3% in tutto, cioè 1,5% per chi "
+          "compra e 1,5% per chi vende. Finita la beta sarà del 4% in tutto "
+          "(2% per parte). Pionieri e livello 5 hanno sempre uno sconto "
+          "dello 0,5% sulla propria parte.", fi["beta"])
+    prova("...e le cifre in grassetto", True,
+          "<b>3%</b>" in o["info"]["beta"] and "<b>4%</b>" in o["info"]["beta"]
+          and "<b>sconto dello 0,5%</b>" in o["info"]["beta"])
+    prova("la fee viva raggiunge il listino: la beta sparisce da sola",
+          "La fee P2P è del 4% in tutto, cioè 2% per chi compra e 2% per chi "
+          "vende. Pionieri e livello 5 hanno sempre uno sconto dello 0,5% "
+          "sulla propria parte.", fi["fineBeta"])
+    prova("...e sopra il listino nemmeno", False, "beta" in fi["sopra"])
+    prova("senza listino non si promette niente sul dopo", False,
+          "beta" in fi["senzaListino"])
+    prova("a leva spenta niente sconto", False, "sconto" in fi["levaSpenta"])
+    prova("altri numeri, gli stessi pezzi: tutto letto, niente a mano",
+          "Durante la beta la fee P2P è del 2% in tutto, cioè 1% per chi "
+          "compra e 1% per chi vende. Finita la beta sarà del 3% in tutto "
+          "(1,5% per parte). Pionieri e livello 5 hanno sempre uno sconto "
+          "dell'1% sulla propria parte.", fi["altriNumeri"])
+    prova("...e gli articoli seguono il numero: «dell'8%», «dell'11%»", True,
+          "è dell'8% in tutto" in fi["otto"] and "sarà dell'11% in tutto" in fi["otto"])
     prova("la fee cambia sul nodo: la meta' si muove, lo sconto resta",
           '<div class="hint">La fee P2P è del 2% per parte, '
           'e tu hai uno sconto dello 0,5%</div>', o["feeNuova"])
