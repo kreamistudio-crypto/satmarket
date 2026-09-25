@@ -10893,6 +10893,22 @@
   compra (il recapito gli sta sotto «Ho inviato gli euro»), a chi vende
   solo col recapito gia' mandato, mai a scambio finito. Il verbale:
   CANTIERI, «Ritocchi al flusso P2P dalla prova vera».
+  LO SCHERMO SEGUE LO STATO DI MOSTRO (25 set 2026): la macchina a
+  stati si muove coi kind 14 del coordinatore E si riallinea con chi sa
+  — `riallineaScambioP2P` (server → libro pubblico → restore se non
+  leggero, uno alla volta per ordine, fuori dal motore) chiamata dal
+  cant-do «gia' fatto» (`gestoGiaFattoP2P`: `not-allowed-by-status`
+  dopo un gesto non e' un errore), dalla risposta in ritardo di un
+  gesto, dall'apertura di uno scambio vivo e dal ritorno in primo
+  piano; in `adottaScambiServerP2P` la riga avanza anche fra due stati
+  dello stesso gradino se il momento del server e' piu' fresco. Il
+  giudice «e' mio» ignora un giro caduto (`giroCadutoP2P`: finale e
+  non mio; dalla restore `P2P_RESTORE_CHIUSI`), che la presa nuova
+  mette da parte come `id~quando` con `idVero` (`archiviaGiroCadutoP2P`)
+  e l'archivio del server non fa rinascere. Sul server la garanzia
+  pagata scrive `active` in `p2p_ordini.stato` (per il libro e' una
+  presa, `STATI_LIBRO_PRESO`). Il verbale: CANTIERI, «Lo schermo segue
+  lo stato di mostro».
   QUEL CHE È FATTO SI DICE AL PASSATO (22 set 2026, richiesta di
   Andrea): le card di «I miei scambi» CHIUSE non promettono più. Una
   conclusa porta la data della chiusura in alto a destra — piccola,

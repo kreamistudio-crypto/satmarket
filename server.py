@@ -42333,7 +42333,11 @@ _TASK_EVENTI_P2P = set()     # gli invii in volo: un task senza riferimento si p
 # perche' un coordinatore che li pubblicasse non deve far cadere la
 # presa fra gli stati «mai visti».
 STATI_LIBRO_PRESO = ("in-progress", "waiting-buyer-invoice",
-                     "waiting-payment")
+                     "waiting-payment",
+                     # ...e «active», che il libro non scrive mai: lo scrive
+                     # l'evento della garanzia pagata (25 set 2026), e per
+                     # i passaggi del libro vale come una presa
+                     "active")
 P2P_BLOCCO = 100         # quanti id in un filtro (i relay hanno tetti)
 P2P_PRIMO_SGUARDO = 600  # al primo avvio si guarda indietro dieci minuti
 
@@ -44254,6 +44258,16 @@ def _registra_evento_p2p(con, ev: dict, adesso: int):
         "attore, dettaglio, arrivato) VALUES(?,?,?,'mostro',?,?,?)",
         (ev["ordine"], ev["momento"], ev["ts"], ev["attore"],
          ev["dettaglio"], adesso)).rowcount
+    # LO STATO NEL NOSTRO ARCHIVIO SEGUE MOSTRO (25 set 2026, caso A: il
+    # database diceva «in-progress» mentre mostro diceva «active»): a
+    # garanzia pagata la riga del libro passa ad `active`. Il libro
+    # pubblico quel passo non lo scrive (il 38383 resta in-progress),
+    # quindi il lettore del libro non lo rimette indietro; per lui
+    # `active` e' una presa (STATI_LIBRO_PRESO).
+    if ev["momento"] == "garanzia_pagata":
+        con.execute("UPDATE p2p_ordini SET stato='active' WHERE ordine=? "
+                    "AND stato IN ('in-progress','waiting-buyer-invoice','waiting-payment','')",
+                    (ev["ordine"],))
     if not scritto:
         return None
     giro = con.execute(
@@ -45067,7 +45081,8 @@ def _stato_scambio_p2p(momenti, lato: str, preso_dal: str, stato_libro: str,
                 and str(m.get("momento") or "") in _PESO_MOMENTO_P2P]
     if not del_giro:
         s = {"pending": "pubblicato" if mio else "", "success": "concluso",
-             "canceled": "annullato", "expired": "annullato"}.get(
+             "canceled": "annullato", "expired": "annullato",
+             "active": "attivo"}.get(
                  str(stato_libro or ""), "")
         return {"stato": s, "preso": False, "quando": 0, "payout_fallito": False}
     ultimo = max(del_giro, key=lambda m: (int(m.get("quando") or 0),

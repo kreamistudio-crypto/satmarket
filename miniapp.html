@@ -47211,10 +47211,50 @@ let p2pMieiChiesto = false;
 let p2pScambiServer = null;
 /* IL GIUDICE E' UNO SOLO, e lo chiamano la card, la porta del gesto e
    la cintura della presa: tre posti che devono dire la stessa cosa. */
+/* ⚠️ UNA PRESA CADUTA NON E' «MIO» (25 set 2026, dal vivo: presa e
+   lasciata cadere, l'ordine torna in vetrina per mostro, e nel libro
+   la card diceva «È il tuo ordine» e apriva «Scambio annullato» senza
+   gesti). La riga locale di un giro FINITO che non ho pubblicato io e'
+   storia — sta sotto «Annullati» — e non dice niente sull'ordine di
+   ADESSO, che nel libro e' di nuovo di nessuno: si prende di nuovo.
+   Lo stesso per la restore: un `canceled`/`expired` non e' una presa.
+   Il giudice e' `giroCadutoP2P`, puro; `prendiOrdineP2P` ed
+   `eseguiPresaP2P` gli mettono da parte la riga (`archiviaGiroCadutoP2P`)
+   e prendono da capo. Vale per ogni modo in cui una presa cade: esco,
+   scade il tempo, annullo prima della garanzia. */
+const P2P_RESTORE_CHIUSI = ['canceled', 'canceled-by-admin', 'cooperatively-canceled', 'expired'];
+function giroCadutoP2P(o){
+  return !!o && P2P_FINALI.indexOf(o.stato) >= 0 && !o.mio;
+}
 function ordineMioP2P(id){
   if (!id) return false;
-  if (ordiniP2P()[id]) return true;
-  return !!(p2pMieiOrdini && p2pMieiOrdini[id]);
+  /* col typeof: i banchi di casa estraggono questa funzione da sola */
+  const o = ordiniP2P()[id];
+  if (o) return typeof giroCadutoP2P === 'function' ? !giroCadutoP2P(o) : true;
+  const v = p2pMieiOrdini && p2pMieiOrdini[id];
+  if (!v) return false;
+  const chiusi = typeof P2P_RESTORE_CHIUSI !== 'undefined' ? P2P_RESTORE_CHIUSI : [];
+  return chiusi.indexOf(String(v.stato || '').trim().toLowerCase()) < 0;
+}
+/* la riga del giro caduto si mette da parte SOTTO UN ALTRO NOME
+   (`id~quando`), con `idVero` che ricorda l'ordine: resta in «I miei
+   scambi» sotto «Annullati», libera la chiave vera per la presa nuova,
+   e nessun gesto la tocca piu' (un id cosi' non e' un id di mostro).
+   Torna il nome nuovo, o '' se non c'era niente da archiviare. */
+function archiviaGiroCadutoP2P(id){
+  const o = ordiniP2P()[id];
+  if (!giroCadutoP2P(o)) return '';
+  o.idVero = id;
+  o.giroCaduto = 1;
+  rinominaOrdineP2P(o, id + '~' + (o.aggiornato || o.quando || Math.floor(Date.now() / 1000)));
+  diarioP2P('presa caduta ' + String(id).slice(0, 8) + ': messa da parte come ' + o.id + ', si puo\' riprendere');
+  return o.id;
+}
+/* PURA: c'e' gia' una riga messa da parte per questo ordine? (l'archivio
+   del server non deve farla rinascere sotto il nome vero) */
+function giroArchiviatoP2P(locali, id){
+  for (const k in (locali || {})) if (locali[k] && locali[k].idVero === id) return true;
+  return false;
 }
 /* ⚠️ LE MIE IDENTITA' POSSONO ESSERE DUE (13 set 2026, dal campo di
    Andrea: dal PC, col conto PRINCIPALE, i propri ordini non si
@@ -49566,7 +49606,10 @@ function prendiOrdineP2P(id){
   if (DEMO) { toast('Nel demo si guarda soltanto: gli scambi veri vivono nell\'app 🔁'); return; }
   if (VETRINA || !myTgId) { invitoTelegram(INVITO_ONION.p2p, 'p2p'); return; }
   const gia = ordiniP2P()[id];
-  if (gia) { apriOrdineP2P(id); return; }
+  /* la riga di una presa caduta si mette da parte e si prende da capo
+     (25 set 2026): l'ordine nel libro e' di nuovo di nessuno */
+  if (giroCadutoP2P(gia)) archiviaGiroCadutoP2P(id);
+  else if (gia) { apriOrdineP2P(id); return; }
   /* MIO MA NON IN LISTA: l'ordine e' di questo profilo, e qui non c'e'
      uno scambio da aprire — ma prenderlo no. ⚠️ E NON SI DICE DA DOVE
      E' NATO (set 2026, dal campo): l'assenza della riga locale non
@@ -49597,6 +49640,7 @@ async function eseguiPresaP2P(id, scelto, metodo){
      ordine: e' uno scambio con se stessi che congela l'ordine vero per
      tutta la finestra della presa in carico, e lo toglie dal libro a
      chi lo avrebbe preso davvero. */
+  if (giroCadutoP2P(ordiniP2P()[id])) archiviaGiroCadutoP2P(id);
   if (ordiniP2P()[id]) {
     toast('Questo ordine è tuo: non puoi prenderlo');
     apriOrdineP2P(id);
@@ -50082,6 +50126,12 @@ function apriOrdineP2P(id){
   p2pOrdineAperto = id;
   renderOrdineP2P();
   go('p2pordine');
+  /* APRENDO UNO SCAMBIO VIVO SI CHIEDE A CHI SA (25 set 2026): la
+     fotografia del server (gli eventi di mostrod) e il libro pubblico,
+     leggeri, per non restare su un passo che mostro ha gia' passato */
+  if (typeof riallineaScambioP2P === 'function' && P2P_FINALI.indexOf(o.stato) < 0
+      && P2P_PRIMA_DELLA_PRESA.indexOf(o.stato) < 0)
+    riallineaScambioP2P(id, 'apertura', true).catch(() => {});
   /* Il bottone dei messaggi vuole il bundle, che si carica pigro:
      chi arriva qui dalla lista o dal gesto indietro non e' passato da
      nessun take, quindi puo' non esserci ancora -- e senza, il
@@ -50976,8 +51026,27 @@ async function inviaIncassoP2P(){
     if (corta) toast(avvisoFatturaCortaP2P(scadeData, Math.floor(Date.now() / 1000)), 8000);
     else toast('Inviato ✅');
   } catch(e) {
+    /* «non si puo' in questo momento» = il passo e' gia' fatto: si
+       rilegge lo stato invece di mostrare un errore (25 set 2026) */
+    if (typeof gestoGiaFattoP2P === 'function' && gestoGiaFattoP2P(e, o.id)) {
+      chiudiFoglioP2P('p2pIncassoSheet');
+      p2pIncassoOrdine = '';
+      return;
+    }
     const perche = ragioneIncassoP2P(e, testo);
     dillo(perche);
+    /* la risposta in ritardo (25 set 2026, caso A): la fattura puo'
+       essere GIA' stata accettata — si chiede a chi lo sa, e se lo
+       scambio e' andato avanti il foglio si chiude da solo */
+    if (e && e.silenzio && typeof riallineaScambioP2P === 'function')
+      riallineaScambioP2P(o.id, 'attesa').then(mosso => {
+        const agg = ordiniP2P()[o.id];
+        if (mosso && agg && agg.stato !== 'attesa_mia_fattura' && p2pIncassoOrdine === o.id) {
+          chiudiFoglioP2P('p2pIncassoSheet');
+          p2pIncassoOrdine = '';
+          toast('La fattura era già arrivata: scambio aggiornato ✅');
+        }
+      }).catch(() => {});
     /* la pagina sotto ripete l'ultimo «no» (`o.cantDo`), e quello
        l'ha scritto `applicaMessaggioP2P` con la frase generica — che
        parla di importo e scadenza: sull'indirizzo si riscrive, o foglio
@@ -51065,10 +51134,14 @@ async function mossaOrdineP2P(id, azione, fatto, sto){
     await chiamataOrdineP2P(o, azione);
     toast(fatto);
   } catch(e) {
+    /* il passo gia' fatto non e' un errore: si rilegge (25 set 2026) */
+    if (typeof gestoGiaFattoP2P === 'function' && gestoGiaFattoP2P(e, id)) return;
     const agg = ordiniP2P()[id] || o;
     agg.errore = ragioneGestoP2P(e);
     scriviOrdineP2P(agg);
     toast(agg.errore);
+    if (e && e.silenzio && typeof riallineaScambioP2P === 'function')
+      riallineaScambioP2P(id, 'attesa').catch(() => {});
   } finally { rip(); }
   if (p2pOrdineAperto === id) renderOrdineP2P();
 }
@@ -55750,12 +55823,21 @@ function adottaScambiServerP2P(locali){
       if (!s.ripreso) {
         s.ripreso = true;
         const da = P2P_RIPRESA_PASSO[gia.stato], a = P2P_RIPRESA_PASSO[s.stato];
-        if (s.stato && a > da && P2P_FINALI.indexOf(gia.stato) < 0) {
+        const q = Math.floor(Number(s.quando) || 0);
+        /* ⚠️ ALLO STESSO GRADINO VALE L'ORA (25 set 2026, caso A): «dove
+           vuoi i sats» e «chi vende sta bloccando» stanno tutti e due al
+           passo 1 — l'ordine fra i due dipende da chi ha preso — quindi
+           il passo «fattura accettata» non era MAI «in avanti» e la riga
+           restava ferma. Se il server dice un ALTRO stato dello stesso
+           gradino con un momento piu' fresco dell'ultima mossa vista
+           qui, e' avanti. */
+        const avanti = !!s.stato && P2P_FINALI.indexOf(gia.stato) < 0
+          && (a > da || (a === da && s.stato !== gia.stato && q > (Number(gia.ultimaMossa) || 0)));
+        if (avanti) {
           diarioP2P('archivio ' + String(id).slice(0, 8) + ': il server dice ' + s.stato + ', la riga e\' a ' + gia.stato + ' → ' + s.stato);
           gia.stato = s.stato; gia.aggiornato = adesso;
           gia.cantDo = ''; gia.errore = ''; gia.nonPartito = false;
           delete gia.giroMorto; delete gia.statoGrezzo;
-          const q = Math.floor(Number(s.quando) || 0);
           if (q > (Number(gia.ultimaMossa) || 0)) gia.ultimaMossa = q;
           mosso = true;
         }
@@ -55770,6 +55852,9 @@ function adottaScambiServerP2P(locali){
     }
     /* LA NASCITA: mai su una lapide, mai un mio ritiro, mai senza stato */
     if (lapidataP2P(id)) continue;
+    /* un giro caduto messo da parte non rinasce sotto il nome vero
+       (25 set 2026): sta gia' sotto «Annullati» col suo */
+    if (typeof giroArchiviatoP2P === 'function' && giroArchiviatoP2P(locali, id)) continue;
     let stato = s.stato || '';
     if (!stato) {
       const voce = p2pMieiOrdini && p2pMieiOrdini[id];
@@ -56414,6 +56499,66 @@ function battitoScambiP2P(){
     if (p2pOrdineAperto && vistaAttivaP2P() === 'view-p2pordine') renderOrdineP2P();
   }).catch(() => {});
 }
+/* ---- LO SCHERMO SEGUE LO STATO DI MOSTRO (25 set 2026, dai due casi
+   dal vivo Andrea/Alan) ----
+   Caso A: la fattura di chi compra era stata ACCETTATA e i sats
+   bloccati, ma la risposta al gesto (e i due messaggi dopo) non sono
+   arrivati sul suo telefono via relay; lo schermo e' rimasto su
+   «incolla la fattura», il secondo «Invia» ha preso un cant-do
+   `not-allowed-by-status`, e l'app lo mostrava come un rifiuto. La
+   macchina a stati si muoveva SOLO coi kind 14 del coordinatore; il
+   server, che dalla patch 0007 sa ogni passo, lo si chiedeva una volta
+   ogni due minuti e la restore una volta per sessione.
+   DUE CURE, con le fonti che c'erano gia':
+   • `gestoGiaFattoP2P`: un cant-do «non si puo' in questo momento»
+     dopo un gesto e' «gia' fatto», non un errore — si dice cosi', e si
+     rilegge lo stato;
+   • `riallineaScambioP2P(id, motivo, leggero)`: la fotografia del
+     server (`chiediScambiServerP2P` + `adottaScambiServerP2P`, in
+     avanti e mai indietro), il libro pubblico per i finali
+     (`statoPubblicoOrdini`), e — se non e' leggero — la restore ripetuta
+     apposta (`chiediMieiOrdiniP2P` + `adottaOrdiniAltroveP2P`, che
+     riprende in avanti con `P2P_RIPRESA_PASSO`). Poi ridisegna. Torna se
+     lo stato e' cambiato. La chiamano: il cant-do «gia' fatto» (pieno),
+     la risposta in ritardo di un gesto (pieno), l'apertura della pagina
+     di uno scambio vivo e il ritorno in primo piano (leggeri: solo il
+     server e il libro, che costano una fetch e una REQ). Il battito dei
+     due minuti resta. Una alla volta per ordine.
+   VIVE FUORI DAL MOTORE, come l'archivio: qui il server si chiama. */
+let p2pRiallineoInVolo = {};    // id -> la promessa in volo
+function gestoGiaFattoP2P(e, id){
+  if (!(e && e.cantDo && e.motivo === 'not-allowed-by-status')) return false;
+  toast('Questo passo è già fatto: aggiorno lo scambio ↻', 5000);
+  const agg = ordiniP2P()[id];
+  if (agg) { agg.cantDo = ''; agg.errore = ''; scriviOrdineP2P(agg); }
+  riallineaScambioP2P(id, 'gia-fatto').catch(() => {});
+  return true;
+}
+async function riallineaScambioP2P(id, motivo, leggero){
+  if (!id || DEMO || VETRINA || !myTgId) return false;
+  if (p2pRiallineoInVolo[id]) return p2pRiallineoInVolo[id];
+  p2pRiallineoInVolo[id] = (async () => {
+    const prima = (ordiniP2P()[id] || {}).stato || '';
+    try { await chiediScambiServerP2P(); } catch(e) {}
+    try { adottaScambiServerP2P(ordiniP2P()); } catch(e) {}
+    try { await statoPubblicoOrdini([id]); } catch(e) {}
+    if (!leggero) {
+      try {
+        p2pMieiChiesto = false;
+        await chiediMieiOrdiniP2P();
+        adottaOrdiniAltroveP2P(ordiniP2P());
+      } catch(e) {}
+    }
+    const dopo = (ordiniP2P()[id] || {}).stato || '';
+    diarioP2P('riallineo ' + String(id).slice(0, 8) + ' (' + motivo + (leggero ? ', leggero' : '')
+              + '): ' + prima + (dopo === prima ? ' fermo' : ' → ' + dopo));
+    if (p2pOrdineAperto === id && vistaAttivaP2P() === 'view-p2pordine') renderOrdineP2P();
+    const v = vistaAttivaP2P();
+    if (v === 'view-p2p' || v === 'view-p2pmiei') renderP2P();
+    return dopo !== prima;
+  })().finally(() => { delete p2pRiallineoInVolo[id]; });
+  return p2pRiallineoInVolo[id];
+}
 /* ============ fine dell'archivio del server ============ */
 
 /* Racconta un ordine appena pubblicato nel canale «Barattolo Vetrina»,
@@ -56574,6 +56719,17 @@ function sondaRelayP2P(){
 }
 async function risvegliaP2P(sonda){
   if (typeof VETRINA !== 'undefined' && VETRINA) return;
+  /* LO SCAMBIO CHE SI HA DAVANTI SI RIALLINEA COL SERVER al ritorno in
+     primo piano (25 set 2026): un messaggio perso mentre l'app era
+     dietro non deve lasciare lo schermo su un passo gia' fatto. Sta
+     PRIMA delle uscite qui sotto — senza bundle o senza ascolti il
+     motore non riparte, ma il server risponde lo stesso — e solo con
+     `sonda` (il ritorno in primo piano), non dal polso dei 20 secondi:
+     quello lo fa gia' il battito dei due minuti. */
+  const ap = sonda && p2pOrdineAperto && ordiniP2P()[p2pOrdineAperto];
+  if (ap && P2P_FINALI.indexOf(ap.stato) < 0 && vistaAttivaP2P() === 'view-p2pordine'
+      && typeof riallineaScambioP2P === 'function')
+    riallineaScambioP2P(ap.id, 'risveglio', true).catch(() => {});
   if (!window.NostrTools || !Object.keys(ordiniAscoltoP2P()).length) return;
   const adesso = Date.now();
   if (adesso - p2pUltimoRisveglio < 5000) return;

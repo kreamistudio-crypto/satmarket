@@ -32512,3 +32512,126 @@ MODALITA_COLLAUDO.
 cantiere andrà probabilmente ripensato insieme a lei (le due leve
 rispondono a domande vicine ma diverse: quante unità in un ordine,
 quanti ordini aperti insieme).
+
+## Lo schermo segue lo stato di mostro (25 set 2026)
+
+Due casi dal vivo, stesso difetto: l'app teneva uno stato locale dello
+scambio invece di seguire quello di mostro.
+
+**CASO A, PERCHE'.** Alan prende un ordine di vendita di Andrea, manda
+la fattura, mostro la ACCETTA (`waiting-payment`) e Andrea blocca i sats
+(`active`); lo schermo di Alan resta su «incolla la fattura», il secondo
+«Invia» prende `not-allowed-by-status` e l'app lo mostra come «la
+richiesta è stata rifiutata». La macchina a stati del client si muoveva
+SOLO coi kind 14 del coordinatore: la risposta al gesto
+(`waiting-seller-to-pay`, stessa `request_id`) e i due messaggi dopo non
+sono arrivati sul suo telefono via relay — l'attesa di 30 s e' scaduta
+(«la risposta sta tardando») e da li' niente ha piu' mosso la riga. Il
+server, che dalla patch 0007 sa ogni passo, lo si chiedeva una volta ogni
+due minuti (`battitoScambiP2P`) e la restore una volta per sessione. E
+C'ERA UN SECONDO DIFETTO SOTTO, che avrebbe reso inutile anche il
+battito: l'adozione dal server muove la riga solo «in avanti» sulla scala
+`P2P_RIPRESA_PASSO`, dove «dove vuoi i sats» e «chi vende sta bloccando»
+stanno TUTTI E DUE al passo 1 (l'ordine fra i due dipende da chi ha
+preso), quindi il passo «fattura accettata» non era MAI in avanti e la
+riga restava ferma anche col server che diceva il contrario — visto dal
+vivo nel giro di questo cantiere («riallineo … fermo»). Nel database del
+server l'ordine risultava `in-progress` perche' `p2p_ordini.stato`
+segue il libro pubblico (NIP-69: pending/in-progress/success/canceled),
+e «active» il libro non lo scrive.
+
+**CASO B, PERCHE'.** Una presa lasciata cadere torna in vetrina per
+mostro (`pending`); il client riceve `canceled`, la riga locale va ad
+`annullato` (presa, non mia), e `ordineMioP2P` diceva «mio» per il solo
+fatto che una riga con quell'id esisteva: la card «È il tuo ordine» e,
+toccandola, `prendiOrdineP2P` apriva la riga vecchia («Scambio annullato»)
+invece di prendere.
+
+**LE CURE.**
+• `gestoGiaFattoP2P(e, id)`: un cant-do `not-allowed-by-status` dopo un
+  gesto e' «gia' fatto», non un errore: toast «Questo passo è già fatto:
+  aggiorno lo scambio ↻», il no vecchio cancellato, riallineo pieno. La
+  usano il foglio della fattura (che si chiude) e `mossaOrdineP2P` (euro
+  inviati, rilascio). Ogni altro cant-do resta un errore.
+• `riallineaScambioP2P(id, motivo, leggero)`, fuori dal motore (chiama il
+  server): la fotografia del server (`chiediScambiServerP2P` +
+  `adottaScambiServerP2P`), il libro pubblico per i finali
+  (`statoPubblicoOrdini`) e, se non e' leggero, la restore ripetuta apposta
+  (`chiediMieiOrdiniP2P` con la bandierina riabbassata +
+  `adottaOrdiniAltroveP2P`). Poi ridisegna pagina e liste. Uno alla volta
+  per ordine. La chiamano: il «gia' fatto» (pieno), la risposta in ritardo
+  di un gesto (pieno; nel foglio della fattura, se lo scambio e' andato
+  avanti, il foglio si chiude da solo: «La fattura era già arrivata:
+  scambio aggiornato ✅»), l'apertura della pagina di uno scambio vivo e
+  preso (leggero) e il ritorno in primo piano con la pagina davanti
+  (leggero, in testa a `risvegliaP2P`, prima delle sue uscite: senza bundle
+  o senza ascolti il motore non riparte ma il server risponde). Il battito
+  dei due minuti resta.
+• ALLO STESSO GRADINO VALE L'ORA: in `adottaScambiServerP2P` la riga
+  avanza anche fra due stati dello stesso passo se il momento del server
+  e' piu' fresco dell'ultima mossa vista qui (`s.quando > ultimaMossa`).
+  Mai indietro. La restore NON ha questa regola: non porta un'ora, e una
+  fotografia vecchia potrebbe riportare indietro.
+• Sul server, a `garanzia_pagata` la riga del libro passa ad `active`
+  (`p2p_ordini.stato`): il 38383 quel passo non lo scrive, quindi il
+  lettore del libro non lo rimette indietro; per i passaggi del libro
+  `active` e' una presa (`STATI_LIBRO_PRESO`), e il ripiego di
+  `_stato_scambio_p2p` lo traduce in `attivo`.
+• `giroCadutoP2P` (puro: finale e non pubblicato da me) entra nel giudice
+  «e' mio», che dalla restore ignora `canceled`/`expired`
+  (`P2P_RESTORE_CHIUSI`); `prendiOrdineP2P` ed `eseguiPresaP2P` mettono da
+  parte la riga caduta (`archiviaGiroCadutoP2P`: nome `id~quando`,
+  `idVero`, `giroCaduto`) e prendono da capo; `adottaScambiServerP2P` non
+  la fa rinascere sotto il nome vero (`giroArchiviatoP2P`). La riga messa
+  da parte resta sotto «Annullati» con la sua ✕; un id cosi' non e' di
+  mostro e nessun gesto lo tocca. Vale per ogni caduta: esco, scade,
+  annullo prima della garanzia.
+Strade scartate: un avanzamento «ottimistico» dopo un gesto (la risposta
+del coordinatore lo fa gia', e senza risposta non si sa se il gesto e'
+passato: si CHIEDE a chi lo sa); il riallineo dal polso dei 20 secondi
+(una fetch e una REQ ogni venti secondi a pagina aperta: lo fa gia' il
+battito). Il typeof su `giroCadutoP2P`/`giroArchiviatoP2P` sta li' perche'
+i banchi di casa estraggono `ordineMioP2P` e `adottaScambiServerP2P` da
+sole.
+
+**PROVATO.** `prove_schermo_segue_mostro`: sentinelle sui punti; il
+banco node del giudice «e' mio» (presa caduta e rifiutato no, mio
+annullato e vivo si', restore pending/active si' e canceled/expired no,
+la riga messa da parte col nome nuovo, la chiave vera libera, il giro
+vivo che non si mette da parte); il banco node del riallineo (leggero:
+server e libro, pieno: anche la restore con la bandierina giu', la riga
+che si muove quando il server dice un altro passo, due domande insieme
+che sono una, demo e id vuoto che non fanno niente; il «gia' fatto» con
+la frase e il riallineo pieno, gli altri errori che restano errori); sul
+server `_passaggio_libro_p2p` con `active` (→success conclude,
+→in-progress tace, →pending torna) e il ripiego ad `attivo`. Due
+sentinelle di casa emendate col perche' (i chiamanti, «solo in avanti»).
+Tortura su una copia, 12/12 guasti presi. Suite intera severa senza
+config nel worktree da origin/main (b85a26e): 15.887 verdi prima delle
+ultime due emende, e rigirata intera dopo (vedi il commit). Dal vivo a
+375 nei due temi su DUE DISPOSITIVI (due origini sulla stessa copia col
+relay morto, Compratore e Venditore) con gli EVENTI VERI dalla rotta del
+coordinatore (`taken`, `buyer-invoice-added`, `hold-invoice-requested`,
+`hold-invoice-paid`): la riga di chi compra ferma su «Dove vuoi i sats?»
+che aprendo la pagina passa a «Chi vende sta bloccando i sats ✋
+Aspetta»; quella di chi vende ferma su «chi compra sta indicando» che
+passa a «Blocca i sats 👉 tocca a te»; dopo la garanzia pagata il
+database dice `active` e al risveglio tutti e due passano a «Sats in
+garanzia» (Aspetta da un lato, «Indica dove ricevere gli euro»
+dall'altro); la presa caduta nel libro senza «È il tuo ordine»,
+prendibile, con la riga vecchia messa da parte e sotto «Annullati».
+⚠️ Nel Browser pane il documento e' `hidden`: il `visibilitychange` non
+scatta, si e' chiamata `risvegliaP2P(true)` a mano.
+
+**DA PROVARE COI DUE TELEFONI.** 1) Alan prende un ordine di Andrea e
+manda la fattura: se la risposta tarda, quando lo scambio va avanti il
+foglio si chiude da solo con «La fattura era già arrivata»; se preme
+«Invia» di nuovo a passo fatto legge «Questo passo è già fatto: aggiorno
+lo scambio ↻» e la pagina passa al passo giusto. 2) Con l'app dietro
+mentre l'altro blocca la garanzia: al ritorno la pagina dello scambio
+si aggiorna da sola (Sats in garanzia). 3) Chiudere e riaprire la
+pagina di uno scambio vivo la riallinea sempre. 4) Prendere un ordine,
+non incollare la fattura, uscire: quando torna nel libro la card NON
+dice «È il tuo ordine», si prende di nuovo, e il vecchio giro sta sotto
+«Annullati». 5) Sul VPS, dopo una garanzia pagata: `SELECT stato FROM
+p2p_ordini WHERE ordine='…'` dice `active`.

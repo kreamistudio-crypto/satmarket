@@ -74709,9 +74709,16 @@ def prove_scambi_ovunque():
           "if (lapidataP2P(id)) continue;" in ad
           and "if (s.mio && !s.preso && (stato === 'annullato' || stato === 'rifiutato')) continue;" in ad
           and "if (!stato || !STATI_P2P[stato]) {" in ad)
+    # EMENDATA (25 set 2026, «Lo schermo segue lo stato di mostro», caso
+    # A): «in avanti» vale anche fra due stati dello STESSO gradino, se il
+    # momento del server e' piu' fresco dell'ultima mossa vista qui — la
+    # fattura accettata (attesa_mia_fattura → attesa_hold_venditore) sta
+    # tutta al passo 1 e prima non si muoveva mai.
     prova("...la riga locale si muove SOLO IN AVANTI, una volta per fotografia", True,
           "if (!s.ripreso) {" in ad and "const da = P2P_RIPRESA_PASSO[gia.stato], a = P2P_RIPRESA_PASSO[s.stato];" in ad
-          and "if (s.stato && a > da && P2P_FINALI.indexOf(gia.stato) < 0) {" in ad)
+          and "const avanti = !!s.stato && P2P_FINALI.indexOf(gia.stato) < 0" in ad
+          and "&& (a > da || (a === da && s.stato !== gia.stato && q > (Number(gia.ultimaMossa) || 0)));" in ad
+          and "if (avanti) {" in ad)
     ch = pezzo_js(mini, "function chiaveScambioDaServerP2P(mz, id, s){", "\n}\n")
     prova("la chiave: prima l'indice della restore della MIA identita', poi la chiave del server, e deve combaciare",
           True, "voce.identita === mz.pub" in ch
@@ -99666,12 +99673,226 @@ const ev = (id) => ({kind: 38383, id: 'e-' + id, pubkey: 'm', created_at: ora, t
     prova("e) col libro non davanti il volto entra in cache senza ridisegnare", [True, 0, 0], o["dietro"])
 
 
+def prove_schermo_segue_mostro():
+    """LO SCHERMO SEGUE LO STATO DI MOSTRO (25 set 2026, dai due casi dal
+    vivo Andrea/Alan). Caso A: la fattura accettata e i sats bloccati,
+    ma i messaggi non arrivati sul telefono; lo schermo fermo su «incolla
+    la fattura» e il secondo «Invia» letto come un rifiuto. Caso B: una
+    presa lasciata cadere, l'ordine tornato in vetrina, e nel libro la
+    card «È il tuo ordine» che apriva «Scambio annullato».
+    Cure: `gestoGiaFattoP2P` (il cant-do «non si puo' in questo momento»
+    rilegge), `riallineaScambioP2P` (server → libro pubblico → restore,
+    in avanti), l'apertura e il risveglio che riallineano, `giroCadutoP2P`
+    nel giudice «e' mio» con la riga messa da parte (`archiviaGiroCadutoP2P`)
+    e la presa da capo; sul server `active` a garanzia pagata."""
+    print("\n[lo schermo segue lo stato di mostro]")
+    import json as _json
+    import os as _os
+    import shutil as _sh
+    import sqlite3
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    def nudo(js):
+        return re.sub(r"/\*[\s\S]*?\*/", "", js)
+
+    def fn(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}\n"
+
+    # --- B) «E' MIO» GUARDA LO STATO ATTUALE ---------------------------
+    mio = nudo(fn("function ordineMioP2P(id){"))
+    prova("B) «e' mio» non conta una presa caduta, ne' una restore chiusa", True,
+          "if (o) return typeof giroCadutoP2P === 'function' ? !giroCadutoP2P(o) : true;" in mio
+          and "return chiusi.indexOf(String(v.stato || '').trim().toLowerCase()) < 0;" in mio)
+    prova("...il giudice del giro caduto e' puro: finale e non pubblicato da me", True,
+          "return !!o && P2P_FINALI.indexOf(o.stato) >= 0 && !o.mio;" in fn("function giroCadutoP2P(o){"))
+    pr = nudo(fn("function prendiOrdineP2P(id){"))
+    prova("...la porta del libro mette da parte il giro caduto e prende da capo", True,
+          "if (giroCadutoP2P(gia)) archiviaGiroCadutoP2P(id);\n  else if (gia) { apriOrdineP2P(id); return; }" in pr)
+    es = nudo(fn("async function eseguiPresaP2P(id, scelto, metodo){"))
+    prova("...e la cintura della presa fa lo stesso, PRIMA della guardia «e' tuo»", True,
+          0 < es.find("if (giroCadutoP2P(ordiniP2P()[id])) archiviaGiroCadutoP2P(id);")
+          < es.find("toast('Questo ordine è tuo: non puoi prenderlo');"))
+    ad = nudo(fn("function adottaScambiServerP2P(locali){"))
+    prova("...e l'archivio del server non fa rinascere il giro messo da parte", True,
+          "if (typeof giroArchiviatoP2P === 'function' && giroArchiviatoP2P(locali, id)) continue;" in ad
+          and ad.index("if (lapidataP2P(id)) continue;") < ad.index("giroArchiviatoP2P(locali, id)) continue;"))
+
+    # --- A) IL GIA' FATTO RILEGGE, L'APERTURA E IL RISVEGLIO RIALLINEANO --
+    inc = nudo(fn("async function inviaIncassoP2P(){"))
+    prova("A) nel foglio della fattura il cant-do «gia' fatto» chiude il foglio e rilegge, prima di ogni altra frase", True,
+          0 < inc.find("if (typeof gestoGiaFattoP2P === 'function' && gestoGiaFattoP2P(e, o.id)) {")
+          < inc.find("const perche = ragioneIncassoP2P(e, testo);")
+          and "riallineaScambioP2P(o.id, 'attesa')" in inc
+          and "La fattura era già arrivata: scambio aggiornato" in inc)
+    mo = nudo(fn("async function mossaOrdineP2P(id, azione, fatto, sto){"))
+    prova("...e lo stesso per «ho inviato gli euro» e «libera i sats»", True,
+          "if (typeof gestoGiaFattoP2P === 'function' && gestoGiaFattoP2P(e, id)) return;" in mo
+          and "riallineaScambioP2P(id, 'attesa')" in mo)
+    ap = nudo(fn("function apriOrdineP2P(id){"))
+    prova("...aprendo uno scambio vivo si riallinea, leggero, mai i finali ne' prima della presa", True,
+          "riallineaScambioP2P(id, 'apertura', true)" in ap
+          and "P2P_FINALI.indexOf(o.stato) < 0" in ap and "P2P_PRIMA_DELLA_PRESA.indexOf(o.stato) < 0" in ap)
+    ri = nudo(fn("async function risvegliaP2P(sonda){"))
+    prova("...e al ritorno in primo piano lo scambio aperto si riallinea, leggero", True,
+          "riallineaScambioP2P(ap.id, 'risveglio', true)" in ri and "vistaAttivaP2P() === 'view-p2pordine'" in ri)
+    ra = nudo(fn("async function riallineaScambioP2P(id, motivo, leggero){"))
+    prova("il riallineo chiede al server, poi al libro pubblico, e la restore solo se non e' leggero", True,
+          0 < ra.find("await chiediScambiServerP2P();") < ra.find("adottaScambiServerP2P(ordiniP2P());")
+          < ra.find("await statoPubblicoOrdini([id]);") < ra.find("if (!leggero) {")
+          < ra.find("await chiediMieiOrdiniP2P();") < ra.find("adottaOrdiniAltroveP2P(ordiniP2P());"))
+    prova("l'adozione dal server avanza anche fra due stati dello stesso gradino, se il momento del server e' piu' fresco", True,
+          "&& (a > da || (a === da && s.stato !== gia.stato && q > (Number(gia.ultimaMossa) || 0)));" in ad
+          and "if (avanti) {" in ad)
+    prova("...uno alla volta per ordine, e vive fuori dal motore", True,
+          "if (p2pRiallineoInVolo[id]) return p2pRiallineoInVolo[id];" in ra
+          and mini.index("async function riallineaScambioP2P(") > mini.index("/* ============ fine del motore dello scambio"))
+    motore = re.sub(r"/\*[\s\S]*?\*/", "",
+                    mini[mini.index("const MOSTRO_ORDINI_CHIAVE"):
+                         mini.index("/* ============ fine del motore dello scambio")])
+    prova("...il motore resta a zero fetch e zero corpo", [0, 0],
+          [motore.count("fetch("), motore.count("body:")])
+    prova("il cant-do «gia' fatto» ha la sua frase, e non passa da MOTIVI_CANTDO", True,
+          "toast('Questo passo è già fatto: aggiorno lo scambio ↻', 5000);" in fn("function gestoGiaFattoP2P(e, id){")
+          and "'not-allowed-by-status': 'non si può fare in questo momento dello scambio'," in mini)
+
+    # --- il server: active a garanzia pagata ---------------------------
+    prova("sul server la garanzia pagata scrive «active» sulla riga del libro", True,
+          'if ev["momento"] == "garanzia_pagata":' in pezzo("_registra_evento_p2p")
+          and "UPDATE p2p_ordini SET stato='active' WHERE ordine=? " in pezzo("_registra_evento_p2p"))
+    amb = {}
+    i = _SORGENTE.index("STATI_LIBRO_PRESO = (")
+    exec(_SORGENTE[i:_SORGENTE.index("\n", _SORGENTE.index('"active")', i))], amb)
+    exec(pezzo("_passaggio_libro_p2p"), amb)
+    pl = amb["_passaggio_libro_p2p"]
+    prova("...e per il lettore del libro «active» e' una presa: active→success conclude, active→in-progress tace, active→pending torna",
+          ["concluso", "", "tornato"],
+          [pl("active", "success", 1), pl("active", "in-progress", 1), pl("active", "pending", 1)])
+    amb2 = {"json": _json, "sqlite3": sqlite3}
+    for c in ("P2P_STORICO_GIORNI", "_PESO_MOMENTO_P2P"):
+        j = _SORGENTE.index(c + " = ")
+        exec(_SORGENTE[j:_SORGENTE.index("\n\n", j)], amb2)
+    exec(pezzo("_stato_scambio_p2p"), amb2)
+    st = amb2["_stato_scambio_p2p"]
+    prova("...e senza cronaca un libro ad «active» dice attivo, ai due lati",
+          ["attivo", "attivo"],
+          [st([], "compro", "buyer", "active", False)["stato"], st([], "vendo", "buyer", "active", True)["stato"]])
+
+    node = _sh.which("node")
+    if not node:
+        salta("i banchi node dello schermo che segue mostro", "node non c'e'")
+        return
+    cart = _tf.mkdtemp(prefix="schermo_")
+
+    # --- banco 1: il giudice «e' mio» e la riga messa da parte ---------
+    b1 = "\n".join([
+        "const localStorage = {setItem(){}, getItem(){ return null; }};",
+        "const chiaveP2P = k => k; const MOSTRO_ORDINI_CHIAVE = 'o';",
+        "let archivio = {}; function ordiniP2P(){ return archivio; }",
+        "let p2pOrdineAperto = '', p2pHoldOrdine = '', p2pIncassoOrdine = '';",
+        "let p2pMieiOrdini = null; const diario = []; function diarioP2P(r){ diario.push(r); }",
+        pezzo_js(mini, "const P2P_FINALI = ", "\n"),
+        fn("function rinominaOrdineP2P(o, nuovoId){"),
+        mini[mini.index("const P2P_RESTORE_CHIUSI = "):mini.index("\n}\n", mini.index("function giroArchiviatoP2P(locali, id){")) + 3],
+    ]) + r"""
+const out = {};
+const r = (id, stato, extra) => Object.assign({id, lato: 'compro', stato, aggiornato: 1700000100}, extra || {});
+archivio = {caduto: r('caduto', 'annullato', {preso: true, giroMorto: 'prima'}), rif: r('rif', 'rifiutato'),
+            mioAnn: r('mioAnn', 'annullato', {mio: true}), vivo: r('vivo', 'attesa_mia_fattura', {preso: true}),
+            mioVivo: r('mioVivo', 'pubblicato', {mio: true})};
+out.mio = ['caduto', 'rif', 'mioAnn', 'vivo', 'mioVivo', 'ignoto', ''].map(ordineMioP2P);
+p2pMieiOrdini = {restPend: {stato: 'pending'}, restCanc: {stato: 'canceled'}, restExp: {stato: 'Expired'}, restAct: {stato: 'active'}};
+out.restore = ['restPend', 'restCanc', 'restExp', 'restAct'].map(ordineMioP2P);
+out.caduto = ['caduto', 'rif', 'mioAnn', 'vivo'].map(k => giroCadutoP2P(archivio[k]));
+p2pOrdineAperto = 'caduto';
+const nuovo = archiviaGiroCadutoP2P('caduto');
+out.archivio = [nuovo, !!archivio['caduto'], archivio[nuovo] && archivio[nuovo].idVero, archivio[nuovo] && archivio[nuovo].stato,
+                archivio[nuovo] && archivio[nuovo].giroCaduto, p2pOrdineAperto, giroArchiviatoP2P(archivio, 'caduto'), giroArchiviatoP2P(archivio, 'vivo'),
+                ordineMioP2P('caduto'), Object.keys(archivio).length, diario.length];
+out.nonArchivia = [archiviaGiroCadutoP2P('vivo'), archiviaGiroCadutoP2P('mioAnn'), archiviaGiroCadutoP2P('ignoto'), !!archivio['vivo'], !!archivio['mioAnn']];
+process.stdout.write(JSON.stringify(out));
+"""
+    p1 = _os.path.join(cart, "mio.js"); open(p1, "w", encoding="utf-8").write(b1)
+    r1 = _sp.run([node, p1], capture_output=True, text=True, timeout=60, encoding="utf-8")
+    prova("il banco del giudice «e' mio» gira", "", (r1.stderr or "")[-500:])
+    if r1.returncode == 0 and r1.stdout.strip():
+        o = _json.loads(r1.stdout)
+        prova("B) «e' mio»: no alla presa caduta e al rifiutato, si' al mio annullato, al vivo e al mio pubblicato; no a chi non c'e'",
+              [False, False, True, True, True, False, False], o["mio"])
+        prova("...dalla restore: pending e active sono mie, canceled ed expired no",
+              [True, False, False, True], o["restore"])
+        prova("...il giro caduto e' il finale non mio", [True, True, False, False], o["caduto"])
+        prova("...messa da parte: nome nuovo con l'ora, la chiave vera libera, idVero e stato tenuti, la pagina aperta segue, si sa che c'e', e adesso non e' piu' mio",
+              ["caduto~1700000100", False, "caduto", "annullato", 1, "caduto~1700000100", True, False, False, 5, 1], o["archivio"])
+        prova("...e un giro vivo, un mio annullato o un ignoto non si mettono da parte",
+              ["", "", "", True, True], o["nonArchivia"])
+
+    # --- banco 2: il riallineo e il «gia' fatto» --------------------------
+    b2 = "\n".join([
+        "let DEMO = false, VETRINA = false, myTgId = 111; let p2pMieiChiesto = true;",
+        "let archivio = {}; function ordiniP2P(){ return archivio; } function scriviOrdineP2P(o){ archivio[o.id] = o; }",
+        "const toasts = []; function toast(t){ toasts.push(t); }",
+        "let vista = 'view-p2pordine'; function vistaAttivaP2P(){ return vista; } let p2pOrdineAperto = 'x';",
+        "let renderPag = 0, renderLib = 0; function renderOrdineP2P(){ renderPag++; } function renderP2P(){ renderLib++; }",
+        "const diario = []; function diarioP2P(r){ diario.push(r); }",
+        "const chiamate = []; let serverDice = '';",
+        "async function chiediScambiServerP2P(){ chiamate.push('server'); return true; }",
+        "function adottaScambiServerP2P(){ chiamate.push('adotta'); if (serverDice && archivio.x) archivio.x.stato = serverDice; }",
+        "async function statoPubblicoOrdini(ids){ chiamate.push('libro:' + ids.join()); return 0; }",
+        "async function chiediMieiOrdiniP2P(){ chiamate.push('restore'); return {}; }",
+        "function adottaOrdiniAltroveP2P(){ chiamate.push('ripresa'); }",
+        pezzo_js(mini, "const P2P_FINALI = ", "\n"),
+        mini[mini.index("let p2pRiallineoInVolo = {};"):mini.index("\n}\n", mini.index("async function riallineaScambioP2P(")) + 3],
+    ]) + r"""
+(async () => {
+  const out = {};
+  archivio = {x: {id: 'x', lato: 'compro', stato: 'attesa_mia_fattura', cantDo: 'vecchio', errore: 'vecchio'}};
+  out.leggero = [await riallineaScambioP2P('x', 'apertura', true), chiamate.slice(), renderPag, renderLib, p2pMieiChiesto];
+  chiamate.length = 0;
+  out.pieno = [await riallineaScambioP2P('x', 'attesa'), chiamate.slice(), p2pMieiChiesto];
+  chiamate.length = 0; serverDice = 'attivo'; renderPag = 0;
+  out.mosso = [await riallineaScambioP2P('x', 'gia-fatto'), archivio.x.stato, renderPag, diario[diario.length - 1].indexOf('attesa_mia_fattura → attivo') >= 0];
+  chiamate.length = 0; vista = 'view-p2pmiei'; renderLib = 0;
+  const a = riallineaScambioP2P('x', 'a'), b = riallineaScambioP2P('x', 'b');
+  out.unoAllaVolta = [await b, await a, chiamate.filter(c => c === 'server').length, renderLib];
+  out.spento = [await (async () => { DEMO = true; try { return await riallineaScambioP2P('x', 'a'); } finally { DEMO = false; } })(), await riallineaScambioP2P('', 'a')];
+  chiamate.length = 0; toasts.length = 0;
+  archivio.x.cantDo = 'vecchio'; archivio.x.errore = 'vecchio';
+  const gia = gestoGiaFattoP2P({cantDo: true, motivo: 'not-allowed-by-status'}, 'x');
+  await new Promise(r => setImmediate(r)); await new Promise(r => setImmediate(r));
+  out.giaFatto = [gia, toasts[0], archivio.x.cantDo, archivio.x.errore, chiamate.indexOf('server') >= 0, chiamate.indexOf('restore') >= 0];
+  out.altri = [gestoGiaFattoP2P({cantDo: true, motivo: 'invalid-invoice'}, 'x'), gestoGiaFattoP2P(new Error('boh'), 'x'), gestoGiaFattoP2P(null, 'x')];
+  process.stdout.write(JSON.stringify(out));
+})();
+"""
+    p2 = _os.path.join(cart, "riallineo.js"); open(p2, "w", encoding="utf-8").write(b2)
+    r2 = _sp.run([node, p2], capture_output=True, text=True, timeout=60, encoding="utf-8")
+    _sh.rmtree(cart, ignore_errors=True)
+    prova("il banco del riallineo gira", "", (r2.stderr or "")[-500:])
+    if r2.returncode or not r2.stdout.strip():
+        return
+    o = _json.loads(r2.stdout)
+    prova("A) il riallineo leggero chiede al server e al libro, non alla restore; ferma non ridisegna il libro ma la pagina si'",
+          [False, ["server", "adotta", "libro:x"], 1, 0, True], o["leggero"])
+    prova("...quello pieno ripete la restore, abbassando la bandierina",
+          [False, ["server", "adotta", "libro:x", "restore", "ripresa"], False], o["pieno"])
+    prova("...quando il server dice un altro passo la riga si muove, la pagina si ridisegna e il diario lo scrive",
+          [True, "attivo", 1, True], o["mosso"])
+    prova("...due domande insieme sono una sola, e su «I miei scambi» si ridisegna la lista",
+          [False, False, 1, 1], o["unoAllaVolta"])
+    prova("...in demo e senza id non fa niente", [False, False], o["spento"])
+    prova("il cant-do «gia' fatto»: si', la frase, il no vecchio cancellato, e il riallineo pieno parte",
+          [True, "Questo passo è già fatto: aggiorno lo scambio ↻", "", "", True, True], o["giaFatto"])
+    prova("...ogni altro errore resta un errore", [False, False, False], o["altri"])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_schermo_segue_mostro,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,
