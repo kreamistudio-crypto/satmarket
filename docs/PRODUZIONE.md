@@ -2060,3 +2060,29 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   se il job `pronto` si ferma con «refusing to allow a GitHub App…»,
   vale «LA CATENA DEL DEPLOY» — il ref si sposta a mano, senza
   --force, col via di Andrea.
+
+- IL BANNER DELLE COMMISSIONI P2P (25 set 2026): la capsula in cima al
+  libro ordini («Fee P2P 2%» barrato, «BETA 1,5%», «Pionieri o Lv.5
+  −0,5%») è UN FILE, `assets/p2p-banner-fee.webp`, e le sue cifre sono
+  disegnate: il foglio che si apre al tocco invece legge i numeri vivi
+  (fee del nodo, `P2P_COMMISSIONE_PERCENTO`, `P2P_SCONTO_FEDELTA_PERCENTO`)
+  e da solo non va toccato. QUANDO FINISCE LA BETA (o cambia una cifra)
+  si cambia il DISEGNO, sul PC e non sul VPS, e parte col deploy:
+  1) il PNG nuovo con lo sfondo trasparente → ritaglio stretto
+  sull'alpha, largo 1200 (il 3x di un telefono), WebP qualità ~86,
+  sotto i 50 KB, senza ICC/EXIF/XMP — la ricetta di Pillow sta nella
+  voce di CANTIERI «Il banner delle commissioni nel libro P2P»;
+  2) si SOSTITUISCE il file con lo STESSO NOME (la rotta
+  `/assets/p2p-banner-fee.webp` e il markup non cambiano; il timbro
+  `?v=` lo rifà `_timbra_asset_pagina`, quindi nessuna cache tiene il
+  disegno vecchio);
+  3) nel `<button id="p2pFeeBanner">` di `miniapp.html` si riscrive
+  l'`alt` con le cifre del disegno NUOVO (è la descrizione di
+  quell'immagine, per chi legge con la voce) e, se le proporzioni sono
+  cambiate, `width`/`height` coi pixel del file: `prove_banner_fee_p2p`
+  li confronta col file e se non tornano dice i due numeri giusti;
+  4) prove, commit firmato, push. Se la beta finisce SENZA un disegno
+  nuovo, il banner si toglie (il bottone, la sua regola e la prova) —
+  un disegno che dice «BETA» dopo la beta è peggio di niente, mentre
+  il foglio si aggiusta da solo: a fee pari al listino smette di dire
+  «beta».

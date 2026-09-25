@@ -1994,6 +1994,36 @@
      quello spazio invece di sparire sotto la pillola. */
   .p2p-sticky{position:sticky;top:0;z-index:3;background:var(--bg);
     padding-bottom:3px}
+  /* IL BANNER DELLE COMMISSIONI (25 set 2026, disegno di Andrea):
+     largo quanto la pagina fra i suoi margini, e alto quanto vuole il
+     disegno (`height:auto` sui width/height del markup, che tengono il
+     posto prima che il file arrivi: niente salto delle card).
+     IL BAGLIORE E' UN'OMBRA DEL BOTTONE, non del file: il bottone e'
+     tagliato stretto sulla capsula e `border-radius:999px` lo fa uno
+     stadio — la forma esatta della capsula, quindi l'alone ne segue
+     il bordo arrotondato senza un `filter` che ricomponga l'immagine.
+     L'arancio e' quello di casa (#FF8A00, `--orange`). Batte DUE volte
+     (`2` e mai `infinite`: un invito, non un lampeggiante) e poi resta
+     l'ombra ferma di riposo. I 14px sopra sono l'aria dell'alone: il
+     blocco attaccato ha il fondo dipinto e al picco lo tagliava con
+     una riga netta (visto a 320 col primo alone, 24px: l'alone e'
+     sceso a 16 e l'aria salita da 10 a 14). */
+  .p2p-fee-banner{display:block;width:100%;margin:14px 0 16px;padding:0;
+    border:0;border-radius:999px;background:none;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+    box-shadow:0 0 8px 0 rgba(255,138,0,.30);
+    animation:p2pFeeBagliore 1.2s ease-in-out 2}
+  .p2p-fee-banner img{display:block;width:100%;height:auto}
+  .p2p-fee-banner:focus-visible{outline:2px solid var(--orange);
+    outline-offset:3px}
+  .p2p-fee-banner:active{transform:scale(.99)}
+  /* il foglio che il banner apre: paragrafi da leggere, e il respiro
+     sopra «Ho capito» quello del foglio di conferma */
+  .p2p-fee-corpo{margin-bottom:14px}
+  .p2p-fee-corpo p{margin:0 0 10px;font-size:14px;line-height:1.45}
+  @keyframes p2pFeeBagliore{
+    0%,100%{box-shadow:0 0 8px 0 rgba(255,138,0,.30)}
+    50%{box-shadow:0 0 16px 4px rgba(255,138,0,.75)}}
   /* ⚠️ L'ARIA ATTORNO ALLA RIGA DI STRUMENTI, pareggiata (set 2026,
      richiesta di Andrea — e MISURATA, non dedotta): sotto la riga ce
      n'erano 13 — i 10 del suo margine piu' i 3 del fondo dipinto del
@@ -9374,6 +9404,27 @@ document.getElementById('cartello')?.remove();</script>
       </select>
       <div id="p2pTesta"></div>
       </div>
+      <!-- IL BANNER DELLE COMMISSIONI (25 set 2026, disegno di Andrea):
+           la capsula con le tre pillole, subito sotto la riga «Recenti»
+           e «Filtro». FUORI dal blocco attaccato, ed e' la scelta: si
+           vede appena si entra e se ne va col primo dito, mentre tab e
+           strumenti restano in cima — un banner fisso ruberebbe spazio
+           alle card per tutta la visita.
+           E' UN BOTTONE e non un'immagine con un onclick: al tocco apre
+           #p2pFeeSheet (`apriFeeP2P`), e chi legge con la voce sente un
+           bottone col nome delle tre cifre, preso dall'alt.
+           ⚠️ L'ALT DICE LE CIFRE DEL DISEGNO, non quelle vive: e'
+           la descrizione di QUESTA immagine, e il giorno che il file
+           cambia (PRODUZIONE, «IL BANNER DELLE COMMISSIONI P2P»)
+           cambia con lui. I numeri veri li dice il foglio.
+           IL BAGLIORE e' un'ombra della capsula che batte DUE volte e
+           poi resta ferma: parte da solo a ogni ingresso nella pagina,
+           perche' la vista passa da `display:none` e il CSS rifa'
+           l'animazione da capo — nessun JS. Con gli effetti ridotti la
+           regola universale la spegne e resta l'ombra ferma.
+           Se il file non arriva il bottone se ne va: un bottone vuoto
+           in cima al libro sarebbe un buco. -->
+      <button type="button" class="p2p-fee-banner" id="p2pFeeBanner" aria-haspopup="dialog" onclick="apriFeeP2P()"><img src="/assets/p2p-banner-fee.webp" width="1200" height="310" alt="Fee P2P: 2% barrato, in beta 1,5% per parte, pionieri o livello 5 meno 0,5%" onerror="this.parentNode.remove()"></button>
       <div id="p2pCorpo"></div>
       <!-- IL BOTTONE DEL PROFILO NON C'E' PIU' (set 2026, fase 6):
            l'identita' e' l'account, tutta sotto il cofano. Il
@@ -11286,6 +11337,17 @@ document.getElementById('cartello')?.remove();</script>
     <div class="grab"></div>
     <h3 id="p2pQuantoTit">Quanto vuoi scambiare?</h3>
     <div id="p2pQuantoCorpo"></div>
+  </div>
+
+  <!-- LE COMMISSIONI DEL P2P (25 set 2026): il foglio breve che apre
+       il banner del libro. Markup fisso tranne il corpo, che lo scrive
+       `renderFeeP2P` coi numeri VIVI — la fee del coordinatore, il
+       listino e lo sconto del config: mai una cifra battuta qui. -->
+  <div class="sheet" id="p2pFeeSheet" role="dialog" aria-modal="true" aria-labelledby="p2pFeeTit">
+    <div class="grab"></div>
+    <h3 id="p2pFeeTit">Le commissioni del P2P</h3>
+    <div class="p2p-fee-corpo" id="p2pFeeCorpo"></div>
+    <button type="button" class="btn orange" onclick="chiudiFoglioP2P('p2pFeeSheet')">Ho capito</button>
   </div>
 
   <div class="sheet" id="p2pVotoSheet" role="dialog" aria-modal="true" aria-labelledby="p2pVotoTit">
@@ -25774,6 +25836,7 @@ function closeSheet(){
   el('p2pQuantoSheet').classList.remove('open');
   el('p2pFiltroSheet').classList.remove('open');
   el('p2pMieiFiltroSheet').classList.remove('open');
+  el('p2pFeeSheet').classList.remove('open');
   el('p2pVotoSheet').classList.remove('open');
   el('p2pHoldSheet').classList.remove('open');
   el('p2pIncassoSheet').classList.remove('open');
@@ -43926,6 +43989,51 @@ function nettoLatoP2P(o, sats){
   if (!(sats > 0) || !(fee > 0)) return sats;
   const meta = Math.round(sats * fee / 2);
   return o.lato === 'sell' ? sats - meta : sats + meta;
+}
+
+/* ---- IL FOGLIO DELLE COMMISSIONI (25 set 2026, il banner del libro) ----
+   Il banner in cima al libro e' un DISEGNO, con le cifre del giorno in
+   cui e' stato fatto; al tocco apre questo foglio, che dice le stesse
+   cose coi numeri VIVI.
+   IL CUORE E' LA FRASE DI INFO P2P, non una sua sorella: beta, meta' a
+   testa, il prezzo dopo e lo sconto li scrive `testoFeeInfoP2P` (le
+   parole di Andrea, stesso giorno), coi suoi numeri letti — fee del
+   38385, listino P2P_COMMISSIONE_PERCENTO, sconto
+   P2P_SCONTO_FEDELTA_PERCENTO, LIVELLO_SCONTO_P2P. Due stesure dello
+   stesso fatto, una nella pagina e una nel foglio, divergerebbero al
+   primo ritocco. Qui si aggiungono solo le due righe che il foglio ha
+   in piu': che non si paga a parte, e che Barattolo non chiede
+   nient'altro.
+   Senza il 38385 niente zero inventato, la frase che dice dove
+   trovarla: la regola della pagina «Informazioni».
+   PURA: `fee` e' la fee viva intera (o null se non l'abbiamo letta),
+   `listino` in punti percentuali sull'intero, `punti` lo sconto,
+   `scontato` se chi legge ce l'ha. */
+function testoFeeP2P(fee, listino, punti, scontato){
+  const altro = '<p>Oltre a questa, Barattolo non ti chiede <b>nient\'altro</b>: pubblicare un ordine o prenderlo non costa niente.</p>';
+  const f = (fee === null || fee === undefined) ? NaN : Number(fee);
+  if (!Number.isFinite(f))
+    return '<p>La commissione si divide <b>met&agrave; a testa</b> fra chi compra e chi vende. La cifra di adesso non l\'abbiamo ancora letta: la trovi sempre scritta <b>nel conto dello scambio</b>, prima di confermare.</p>' + altro;
+  if (f <= 0)
+    return '<p>In questo momento lo scambio <b>non ha commissione</b>. Quando ci sar&agrave;, la vedrai scritta nel conto prima di confermare.</p>' + altro;
+  return '<p>' + testoFeeInfoP2P(f, listino, punti)
+    + (scontato && Number(punti) > 0 ? ' <b>Tu sei fra questi.</b>' : '') + '</p>'
+    + '<p>Non si paga a parte: &egrave; gi&agrave; dentro i sats che passano di mano — chi vende ne blocca un po\' di pi&ugrave;, chi compra ne riceve un po\' di meno.</p>'
+    + altro;
+}
+function renderFeeP2P(){
+  const box = el('p2pFeeCorpo');
+  if (!box) return;
+  const fee = commissioneVivaP2P();
+  const punti = p2pSconto ? p2pSconto.punti : 0;
+  box.innerHTML = testoFeeP2P(fee, commissioneListinoP2P(), punti,
+                              fee !== null && feeMiaP2P(null) < fee);
+}
+function apriFeeP2P(){
+  haptic();
+  renderFeeP2P();
+  el('sheetBg').classList.add('open');
+  el('p2pFeeSheet').classList.add('open');
 }
 
 /* ---- LA PAGINA «INFORMAZIONI» DEL P2P (set 2026) ----

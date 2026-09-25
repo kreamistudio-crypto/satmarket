@@ -60056,6 +60056,24 @@ def asset_scambi_intestazione():
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
+@app.get("/assets/p2p-banner-fee.webp")
+def asset_p2p_banner_fee():
+    """IL BANNER DELLE COMMISSIONI DEL LIBRO P2P (25 set 2026, disegno
+    di Andrea): la capsula con le tre pillole — la fee di listino
+    barrata, la BETA, lo sconto di pionieri e livello 5 —, subito sotto
+    la riga degli strumenti del libro; al tocco apre il foglio che
+    spiega le commissioni coi numeri VIVI. WebP con trasparenza
+    ritagliato stretto sull'alpha dal PNG di Andrea: 1200x310 (il 3x
+    dei 400px di un telefono largo), qualita' 86, 35 KB, niente ICC ne'
+    EXIF ne' XMP. FINITA LA BETA SI SOSTITUISCE IL FILE, con lo stesso
+    nome: PRODUZIONE, «IL BANNER DELLE COMMISSIONI P2P». Rotta esplicita
+    come le sorelle: mai un mount (regola 3). Il timbro ?v= lo mette
+    _timbra_asset_pagina, quindi il file nuovo non resta in cache."""
+    return FileResponse("assets/p2p-banner-fee.webp",
+                        media_type="image/webp",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/assets/tappo.jpeg")
 def asset_tappo():
     """Il tappo del barattolo (128px, ritagliato sul diametro): e' il

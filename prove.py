@@ -50829,10 +50829,17 @@ def prove_p2p_libro():
     # fra la pillola e il corpo che scorre torna UNA graffa sola. La
     # forma sorvegliata e' sempre quella: il blocco si apre sui tab e si
     # chiude DOPO la pillola.
+    # ⚠️ E FRA LA GRAFFA E IL CORPO PUO' STARE IL BANNER DELLE
+    # COMMISSIONI (25 set 2026, `prove_banner_fee_p2p`): sta FUORI dal
+    # blocco apposta — se ne va col primo dito —, quindi la graffa resta
+    # subito dopo la pillola e la forma sorvegliata non cambia.
     prova("...e tab e pillola stanno DENTRO il blocco, non dopo", True,
           re.search(r'<div class="p2p-sticky">\s*(?:<!--[\s\S]*?-->\s*)?'
                     r'<div class="p2p-lati"', mini) is not None
           and re.search(r'<div id="p2pTesta"></div>\s*</div>\s*'
+                        r'(?:<!--[\s\S]*?-->\s*)?'
+                        r'(?:<button [^>]*id="p2pFeeBanner"[\s\S]*?'
+                        r'</button>\s*)?'
                         r'<div id="p2pCorpo">', mini) is not None)
     # ⚠️ IL LIBRO NON HA VELO, ed e' una decisione presa e disfatta in
     # un pomeriggio (22 set 2026): per un'ora la testata ha avuto dietro
@@ -70683,6 +70690,284 @@ console.log(JSON.stringify(out));
     prova("dentro la riga ci sono solo cifre", "2 scambi aperti · " + SI % 1,
           o["soloCifre"])
     prova("senza le scatole non esplode", "intera", o["senzaScatole"])
+
+
+def prove_banner_fee_p2p():
+    """IL BANNER DELLE COMMISSIONI DEL LIBRO P2P (25 set 2026, disegno di
+    Andrea). La capsula con le tre pillole — la fee di listino barrata,
+    la BETA, lo sconto di pionieri e livello 5 — subito sotto la riga
+    degli strumenti del libro, FUORI dal blocco attaccato (se ne va col
+    primo dito); un bagliore arancio che batte DUE volte e poi resta
+    fermo, spento dagli effetti ridotti; al tocco un foglio breve coi
+    numeri VIVI, mai scritti a mano. Il file si sostituisce a fine beta:
+    le misure del markup si confrontano col FILE, cosi' un disegno nuovo
+    di altre proporzioni fa rosso qui col numero da scrivere."""
+    print("\n[il banner delle commissioni del libro P2P]")
+    import json as _json
+    import os as _os
+    import shutil as _sh
+    import struct as _st
+    import subprocess as _sp
+    import tempfile as _tf
+    mini = open("miniapp.html", encoding="utf-8").read()
+    css = mini[mini.index("<style>"):mini.index("</style>")]
+    FILE = "assets/p2p-banner-fee.webp"
+    URL = "/assets/p2p-banner-fee.webp"
+
+    # --- 1) IL FILE: WebP con trasparenza, netto a 3x, leggero --------
+    raw = open(FILE, "rb").read()
+    prova("il banner e' un WebP", (b"RIFF", b"WEBP"), (raw[:4], raw[8:12]))
+    prova("...sotto i 50 KB", True, len(raw) < 50000)
+    pezzi, i = [], 12
+    while i + 8 <= len(raw):
+        n = _st.unpack("<I", raw[i + 4:i + 8])[0]
+        pezzi.append(raw[i:i + 4].decode("ascii", "replace"))
+        i += 8 + n + (n & 1)
+    prova("...coi soli tre pezzi che servono: niente ICC, EXIF o XMP",
+          ["VP8X", "ALPH", "VP8 "], pezzi)
+    prova("...e con la trasparenza dichiarata", True, bool(raw[20] & 0x10))
+    larg = 1 + int.from_bytes(raw[24:27], "little")
+    alt = 1 + int.from_bytes(raw[27:30], "little")
+    # a 375 la pagina e' larga 343 fra i suoi margini: il 3x sono 1029
+    prova("...largo abbastanza per un telefono a 3x", True, larg >= 3 * 343)
+    try:
+        from PIL import Image as _Im
+        with _Im.open(FILE) as _im:
+            _modo = _im.mode
+            _bbox = _im.getchannel("A").getbbox()
+        # STRETTO sulla capsula: il bagliore e' un'ombra del BOTTONE, e
+        # segue la capsula solo se il bottone e' largo quanto lei
+        prova("...ritagliato stretto sulla capsula (4px al massimo)",
+              ("RGBA", True),
+              (_modo, _bbox is not None and _bbox[0] <= 4 and _bbox[1] <= 4
+               and larg - _bbox[2] <= 4 and alt - _bbox[3] <= 4))
+    except ImportError:
+        salta("il ritaglio del banner", "serve Pillow")
+    prova("...e non sta in assets/categorie/", False,
+          _os.path.exists(_os.path.join("assets", "categorie",
+                                        "p2p-banner-fee.webp")))
+
+    # --- 2) LA ROTTA: esplicita, come le sorelle ----------------------
+    rotta = pezzo("asset_p2p_banner_fee")
+    prova("la rotta e' esplicita, mai un mount", True,
+          ('@app.get("%s")' % URL) in _SORGENTE
+          and ('FileResponse("%s",' % FILE) in rotta
+          and 'media_type="image/webp"' in rotta)
+    prova("...con la cache delle sorelle: il ?v= la rende innocua", True,
+          '"Cache-Control": "public, max-age=86400"' in rotta)
+
+    # --- 3) IL MARKUP: sotto gli strumenti, FUORI dal blocco attaccato --
+    j = mini.index('id="view-p2p"')
+    fetta = re.sub(r"<!--.*?-->", "", mini[j:mini.index("============", j)],
+                   flags=re.S)
+    i_sticky = fetta.find('<div class="p2p-sticky">')
+    i_testa = fetta.find('<div id="p2pTesta"></div>')
+    i_banner = fetta.find('id="p2pFeeBanner"')
+    i_corpo = fetta.find('<div id="p2pCorpo">')
+    # il blocco attaccato si chiude con la </div> dopo #p2pTesta
+    i_chiude = fetta.find("</div>", i_testa + len('<div id="p2pTesta"></div>'))
+    prova("il banner sta nel libro, dopo la riga degli strumenti e prima "
+          "delle card", True, 0 <= i_sticky < i_testa < i_banner < i_corpo)
+    prova("...FUORI dal blocco attaccato: se ne va scorrendo", True,
+          0 <= i_chiude < i_banner)
+    prova("...ed e' uno solo, in tutta la pagina", 1,
+          mini.count('id="p2pFeeBanner"'))
+    m = re.search(r'<button [^>]*id="p2pFeeBanner"[^>]*>(.*?)</button>',
+                  fetta, flags=re.S)
+    bottone = m.group(0) if m else ""
+    prova("e' un BOTTONE che apre il foglio, e lo dichiara", True,
+          'type="button"' in bottone and 'onclick="apriFeeP2P()"' in bottone
+          and 'aria-haspopup="dialog"' in bottone
+          and 'class="p2p-fee-banner"' in bottone)
+    im = re.search(r"<img [^>]*>", bottone)
+    img = im.group(0) if im else ""
+    prova("...con dentro l'immagine del file", True,
+          ('src="%s"' % URL) in img)
+    # LE MISURE SONO QUELLE DEL FILE: tengono il posto prima che arrivi
+    # (niente salto delle card), e un disegno nuovo di altre proporzioni
+    # fa rosso qui col numero giusto da scrivere
+    prova("...con width e height del FILE", (str(larg), str(alt)),
+          (re.search(r'width="(\d+)"', img).group(1) if 'width="' in img
+           else None,
+           re.search(r'height="(\d+)"', img).group(1) if 'height="' in img
+           else None))
+    _alt = re.search(r'alt="([^"]*)"', img)
+    _alt = _alt.group(1) if _alt else ""
+    prova("l'alt dice le tre cifre del disegno, per chi legge con la voce",
+          [True, True, True, True],
+          ["Fee P2P" in _alt, "2%" in _alt, "1,5%" in _alt, "0,5%" in _alt])
+    prova("...e se il file non arriva il bottone se ne va (niente buco)",
+          True, 'onerror="this.parentNode.remove()"' in img)
+
+    # --- 4) IL VESTITO E IL BAGLIORE ----------------------------------
+    regola = re.search(r"\.p2p-fee-banner\{([^}]*)\}", css)
+    regola = re.sub(r"\s+", "", regola.group(1)) if regola else ""
+    prova("largo quanto la pagina, e uno stadio come la capsula", True,
+          "width:100%" in regola and "border-radius:999px" in regola)
+    prova("...l'immagine si adatta, con l'altezza che vuole il disegno",
+          True, bool(re.search(r"\.p2p-fee-banner img\{[^}]*width:100%;"
+                               r"height:auto", css)))
+    anim = re.search(r"animation:(\S+?)(?:;|$)", regola)
+    anim = anim.group(1) if anim else ""
+    prova("il bagliore batte DUE volte e poi si ferma: mai infinite", True,
+          anim.startswith("p2pFeeBagliore") and anim.endswith("2")
+          and "infinite" not in regola)
+    kf = re.search(r"@keyframes p2pFeeBagliore\{(.*?)\}\}", css, flags=re.S)
+    kf = kf.group(1) if kf else ""
+    prova("...con l'arancio di casa, nell'ombra che segue la forma", True,
+          kf.count("box-shadow:") >= 2 and "rgba(255,138,0," in kf)
+    prova("...e da fermo resta un'ombra di riposo, la stessa del bordo "
+          "dell'animazione", True,
+          bool(re.search(r"0%,100%\{box-shadow:([^}]*)\}", kf))
+          and ("box-shadow:" + re.search(r"0%,100%\{box-shadow:([^}]*)\}",
+                                         kf).group(1)).replace(" ", "")
+          in regola)
+    # EFFETTI RIDOTTI: la regola universale spegne ogni animazione con
+    # `!important`; qui basta che nessuno la batta e che il JS non la
+    # riaccenda per conto suo (prove_effetti_ridotti fa il resto)
+    js = _senza_commenti_js(mini[mini.index("</style>"):]
+                            .replace("image/*", "image/STELLA"))
+    prova("gli effetti ridotti la spengono: nessun !important sul banner, "
+          "e il JS non la tocca", [False, 0],
+          ["!important" in regola, js.count("p2pFeeBagliore")])
+    prova("...e la regola universale che la spegne c'e'", True,
+          "html.fx-ridotti *,html.fx-ridotti *::before,html.fx-ridotti "
+          "*::after{\n    animation:none!important" in mini
+          or bool(re.search(r"html\.fx-ridotti \*,html\.fx-ridotti "
+                            r"\*::before,html\.fx-ridotti \*::after\{\s*"
+                            r"animation:none!important", mini)))
+
+    # --- 5) IL FOGLIO -------------------------------------------------
+    prova("il foglio c'e', ed e' un dialogo col suo titolo", True,
+          '<div class="sheet" id="p2pFeeSheet" role="dialog" '
+          'aria-modal="true" aria-labelledby="p2pFeeTit">' in mini
+          and 'id="p2pFeeTit">Le commissioni del P2P</h3>' in mini)
+    prova("...si chiude con «Ho capito» e con closeSheet", True,
+          "onclick=\"chiudiFoglioP2P('p2pFeeSheet')\">Ho capito</button>"
+          in mini and "el('p2pFeeSheet').classList.remove('open');"
+          in pezzo_js(mini, "function closeSheet(){", "\n}"))
+    apri = pezzo_js(mini, "function apriFeeP2P(){", "\n}\n")
+    prova("...e si apre col corpo scritto adesso", True,
+          apri.index("renderFeeP2P();")
+          < apri.index("el('p2pFeeSheet').classList.add('open');"))
+    testo = _senza_commenti_js(pezzo_js(mini, "function testoFeeP2P(",
+                                        "\n}\n"))
+    # nessuna cifra battuta a mano: niente «1,5», «0,5», «2%» o «5» nel
+    # testo — i numeri arrivano tutti dagli argomenti e dai gemelli
+    prova("nel testo del foglio nessuna cifra scritta a mano", [],
+          re.findall(r"\d+(?:,\d+)?%|\b[1-9],\d\b|livello \d", testo))
+    # IL CUORE E' LA FRASE DI INFO P2P (892d063, le parole di Andrea):
+    # due stesure dello stesso fatto divergerebbero al primo ritocco
+    prova("...la frase e' quella di Info P2P, non una sorella", True,
+          "testoFeeInfoP2P(f, listino, punti)" in testo
+          and "mezzaCommissioneP2P(" not in testo)
+    rend = pezzo_js(mini, "function renderFeeP2P(){", "\n}\n")
+    prova("...e il render gli passa i numeri VIVI: la fee del coordinatore, "
+          "il listino e lo sconto del config", [True] * 3,
+          ["commissioneVivaP2P()" in rend, "commissioneListinoP2P()" in rend,
+           "p2pSconto.punti" in rend])
+
+    # --- 6) IL FOGLIO GIRA ---------------------------------------------
+    node = _sh.which("node")
+    if not node:
+        salta("il foglio delle commissioni gira", "node non installato")
+        return
+    pezzi_js = [pezzo_js(mini, "const esc = s =>", "));") + "));",
+                pezzo_js(mini, "const LIVELLO_SCONTO_P2P = ", "\n")]
+    for f in ("scontoFedeltaTestoP2P", "articoloPercentoP2P",
+              "commissioneVivaP2P", "commissioneListinoP2P", "feeMiaP2P",
+              "mezzaCommissioneP2P", "testoFeeInfoP2P", "testoFeeP2P"):
+        pezzi_js.append(pezzo_js(mini, "function %s(" % f, "\n}\n") + "\n}")
+    pezzi_js.append(rend + "\n}")
+    banco = "\n".join(pezzi_js) + r"""
+const box = {innerHTML: ''};
+const el = id => id === 'p2pFeeCorpo' ? box : null;
+let p2pInfo = {fee: 0.03}, p2pSconto = null, listino = 4;
+const p2pCoord = () => ({commissione: listino});
+const out = {};
+out.beta = testoFeeP2P(0.03, 4, 0.5, false);
+out.betaMio = testoFeeP2P(0.03, 4, 0.5, true);
+out.senzaBeta = testoFeeP2P(0.04, 4, 0.5, false);
+out.senzaListino = testoFeeP2P(0.03, 0, 0.5, false);
+out.senzaSconto = testoFeeP2P(0.03, 4, 0, false);
+out.ignota = testoFeeP2P(null, 4, 0.5, false);
+out.zero = testoFeeP2P(0, 4, 0.5, false);
+out.feeNuova = testoFeeP2P(0.02, 4, 0.5, false);
+out.scontoUno = testoFeeP2P(0.03, 4, 1, false);
+out.info = testoFeeInfoP2P(0.03, 4, 0.5);
+/* il render legge lo stato vivo: pioniere scontato, poi nessuno */
+p2pSconto = {attivo: true, motivo: 'pioniere', punti: 0.5};
+renderFeeP2P(); out.rendMio = box.innerHTML;
+p2pSconto = {attivo: false, motivo: '', punti: 0.5};
+renderFeeP2P(); out.rendAltro = box.innerHTML;
+p2pSconto = null;
+renderFeeP2P(); out.rendNessuno = box.innerHTML;
+p2pInfo = null;
+renderFeeP2P(); out.rendIgnota = box.innerHTML;
+console.log(JSON.stringify(out));
+"""
+    with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                encoding="utf-8") as f:
+        f.write(banco)
+        percorso = f.name
+    r = _sp.run([node, percorso], capture_output=True, text=True,
+                encoding="utf-8")
+    _os.unlink(percorso)
+    if r.returncode != 0:
+        prova("il banco del foglio delle commissioni gira", "",
+              (r.stderr or "")[-400:])
+        return
+    o = _json.loads(r.stdout)
+    ALTRO = "Barattolo non ti chiede <b>nient'altro</b>"
+    PARTE = "Non si paga a parte: &egrave; gi&agrave; dentro i sats"
+    prova("in beta: la frase di Info P2P, poi «non si paga a parte» e "
+          "«nient'altro»", True,
+          o["beta"] == "<p>" + o["info"] + "</p><p>" + PARTE
+          + " che passano di mano — chi vende ne blocca un po' di "
+          "pi&ugrave;, chi compra ne riceve un po' di meno.</p><p>Oltre a "
+          "questa, " + ALTRO + ": pubblicare un ordine o prenderlo non "
+          "costa niente.</p>")
+    prova("...che dice beta, metà a testa, il dopo e lo sconto", [True] * 4,
+          ["Durante la beta la fee P2P" in o["beta"],
+           "<b>1,5%</b> per chi compra e <b>1,5%</b> per chi vende"
+           in o["beta"],
+           "Finita la beta sarà del <b>4%</b> in tutto (2% per parte)"
+           in o["beta"],
+           "Pionieri e livello 5 hanno sempre uno <b>sconto dello 0,5%</b>"
+           in o["beta"]])
+    prova("...e il «tu» solo a chi ce l'ha", [False, True],
+          ["Tu sei fra questi" in o["beta"],
+           "sulla propria parte. <b>Tu sei fra questi.</b></p>"
+           in o["betaMio"]])
+    prova("fee pari al listino: niente beta, la cifra e basta", [True, False],
+          ["La fee P2P è del <b>4%</b> in tutto, cioè <b>2%</b>"
+           in o["senzaBeta"], "beta" in o["senzaBeta"]])
+    prova("senza listino nel config non si inventa una beta", [True, False],
+          ["<b>1,5%</b> per chi compra" in o["senzaListino"],
+           "beta" in o["senzaListino"]])
+    prova("sconto spento: nessuna riga dello sconto", [False, False],
+          ["Pionieri" in o["senzaSconto"], "Tu sei" in o["senzaSconto"]])
+    prova("fee non ancora letta: dove trovarla, e nessuna cifra inventata",
+          [True, True, []],
+          ["non l'abbiamo ancora letta" in o["ignota"], ALTRO in o["ignota"],
+           re.findall(r"\d%", o["ignota"])])
+    prova("fee a zero: lo dice, senza «0%»", [True, False],
+          ["<b>non ha commissione</b>" in o["zero"], "0%" in o["zero"]])
+    prova("la fee cambia sul nodo e il foglio la segue", True,
+          "<b>1%</b> per chi compra e <b>1%</b> per chi vende. Finita la "
+          "beta sarà del <b>4%</b>" in o["feeNuova"])
+    prova("...e cosi' lo sconto del config", True,
+          "<b>sconto dell&#39;1%</b>" in o["scontoUno"])
+    prova("il render legge lo stato vivo: al pioniere «Tu sei fra questi»",
+          [True, True], ["Tu sei fra questi" in o["rendMio"],
+                         "<b>1,5%</b> per chi compra" in o["rendMio"]])
+    prova("...a chi non ce l'ha la regola senza il «tu»", [True, False],
+          ["sconto dello 0,5%" in o["rendAltro"],
+           "Tu sei" in o["rendAltro"]])
+    prova("...senza /api/me nessuna riga dello sconto", False,
+          "Pionieri" in o["rendNessuno"])
+    prova("...e senza il 38385 la frase di ripiego", True,
+          "non l'abbiamo ancora letta" in o["rendIgnota"])
 
 
 def prove_logo_p2p_nitido():
@@ -100303,6 +100588,7 @@ def main():
     prove_p2p_vista_miei,
     prove_pallino_scambi,
     prove_intestazione_scambi,
+    prove_banner_fee_p2p,
     prove_logo_p2p_nitido,
     prove_card_tinte_stato,
     prove_p2p_campanello,

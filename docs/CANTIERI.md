@@ -32806,3 +32806,86 @@ Suite intera severa senza config nel worktree da origin/main (5d7dff3):
 (relay morto, listino 4, sconto 0,5), a 375 px nei due temi via CDP:
 in beta senza sconto, in beta da pioniere («Tu sei fra questi.») e con
 la fee viva al 4% — la frase sulla beta non c'è più.
+
+## Il banner delle commissioni nel libro P2P (25 set 2026)
+
+Disegno di Andrea: una capsula marrone con tre pillole — «Fee P2P 2%»
+barrato, «BETA 1,5%», «Pionieri o Lv.5 −0,5%» —, messa nel libro ordini
+subito sotto la riga «Recenti» / «Filtro», larga quanto la pagina fra i
+suoi margini.
+**NON È FISSA, ed è la scelta:** sta FUORI dal blocco attaccato
+(`.p2p-sticky`), quindi si vede appena si entra e se ne va col primo
+dito, mentre tab e strumenti restano in cima. Un banner fisso ruberebbe
+alle card 90px per tutta la visita. La sentinella di `prove_p2p_libro`
+che voleva il corpo SUBITO dopo la graffa del blocco è emendata col
+perché: fra i due può stare il banner, e la graffa resta dov'era.
+**È UN BOTTONE** (`#p2pFeeBanner`, `aria-haspopup="dialog"`) con dentro
+l'immagine: il nome per chi legge con la voce lo dà l'`alt`, che dice
+le tre cifre DEL DISEGNO — è la descrizione di quel file, e cambia con
+lui. Se il file non arriva il bottone se ne va (niente buco in cima).
+**IL BAGLIORE È UN'OMBRA DEL BOTTONE**, non un `filter` sull'immagine: il
+file è ritagliato stretto sulla capsula e `border-radius:999px` fa del
+bottone uno stadio, cioè la forma esatta — l'alone ne segue il bordo
+arrotondato. Arancio di casa (`#FF8A00`), `animation: … 2` e mai
+`infinite`, poi l'ombra ferma di riposo. RIPARTE A OGNI INGRESSO NEL
+LIBRO SENZA JS: la vista passa da `display:none`, e il CSS rifà
+l'animazione da capo. Con gli effetti ridotti la spegne la regola
+universale (`animation:none!important`) e resta l'ombra ferma.
+⚠️ Il primo alone (24px al picco) veniva TAGLIATO con una riga netta
+dal fondo dipinto del blocco attaccato, visto a 320 chiaro: sceso a
+16px e l'aria sopra il banner da 10 a 14.
+**IL FOGLIO** `#p2pFeeSheet` («Le commissioni del P2P», «Ho capito»)
+ha per cuore LA FRASE DI INFO P2P, arrivata su main mentre il cantiere
+era aperto (892d063, le parole di Andrea): «Durante la beta la fee P2P
+è del 3% in tutto, cioè 1,5% per chi compra e 1,5% per chi vende.
+Finita la beta sarà del 4% in tutto (2% per parte). Pionieri e livello
+5 hanno sempre uno sconto dello 0,5% sulla propria parte.», più «Tu sei
+fra questi» a chi ce l'ha. La prima stesura del foglio aveva una frase
+sua («Siamo in beta: … dell'1,5% per parte, invece del 2%»), con gli
+stessi numeri ma parole diverse: due stesure dello stesso fatto, una
+nella pagina e una nel foglio, divergono al primo ritocco — quindi
+`testoFeeP2P(fee, listino, punti, scontato)`, pura, chiama
+`testoFeeInfoP2P` e aggiunge solo le due righe che il foglio ha in più:
+«Non si paga a parte: è già dentro i sats che passano di mano» e
+«Oltre a questa, Barattolo non ti chiede nient'altro». NESSUNA CIFRA
+SCRITTA A MANO: la fee VIVA del coordinatore (38385,
+`commissioneVivaP2P`, quella che si paga davvero), il listino
+`P2P_COMMISSIONE_PERCENTO` (sull'intero: 4 sul VPS) che decide SE si è
+in beta, lo sconto `P2P_SCONTO_FEDELTA_PERCENTO` da `/api/me.p2p_sconto`
+e `LIVELLO_SCONTO_P2P`. Senza 38385 niente zero inventato (la frase «la
+trovi nel conto»), a fee pari al listino niente «beta», a sconto spento
+niente riga dello sconto.
+**IL FILE**: `assets/p2p-banner-fee.webp`, dal PNG di Andrea (2752×1536,
+capsula nella sola fascia centrale): `crop` sul bbox dell'alpha
+(393,505,2443,1035), `resize` a 1200×310 LANCZOS, WebP qualità 86,
+`method=6`, `alpha_quality=90`, info svuotata — 35 KB, soli VP8X/ALPH/VP8.
+Rotta esplicita come le sorelle. Come si cambia a fine beta: PRODUZIONE,
+«IL BANNER DELLE COMMISSIONI P2P».
+
+**PROVATO.** `prove_banner_fee_p2p` (43): il file (WebP, pezzi, alpha,
+largo per un 3x, stretto sulla capsula), la rotta, il posto nel markup
+(dopo gli strumenti, fuori dal blocco, prima delle card), bottone e
+`alt` con le tre cifre, `width`/`height` confrontate col FILE, il
+bagliore (due battiti, l'arancio, l'ombra di riposo uguale al bordo
+dell'animazione, nessun `!important`, nessun JS), il foglio (dialogo,
+`closeSheet`, «Ho capito»), nessuna cifra a mano nel testo, e il banco
+node di `testoFeeP2P` e `renderFeeP2P` — la frase di Info P2P intera
+e poi le due righe del foglio, beta, fee pari al listino, listino
+assente, sconto spento, 38385 assente, fee a zero, fee e sconto che
+cambiano, lo stato vivo di `/api/me`. Tortura su una copia: 10
+mutazioni su 10 prese (fra cui una frase sorella al posto di quella di
+Info). Il primo giro della suite, su 5d7dff3, aveva UNA rossa: la
+sentinella del blocco attaccato, emendata. Suite intera severa senza
+config nel worktree ribasato su origin/main (892d063): 15.981 verdi e 0
+rosse; i 24 collaudi della CI verdi nella gabbia senza rete.
+Dal vivo su una copia col server di collaudo (relay morto, listino 4,
+sconto 0,5, la fee del 38385 seminata a 0,03), Chrome headless via CDP
+a 320 e 375 nei due temi, col tocco vero: 76 controlli verdi — largo
+fra i margini da 16, proporzioni del file, subito sotto gli strumenti,
+due battiti poi fermo, di nuovo a ogni rientro, via sotto gli strumenti
+scorrendo, il tocco apre il foglio che sta nello schermo, «Ho capito»
+chiude foglio e velo; con `prefers-reduced-motion` nessuna animazione e
+l'ombra ferma. A 320 la levetta del tema va a capo sotto «Recenti» e
+«Filtro»: era già così, non è del banner.
+**DA AVERE IL TELEFONO:** il bagliore su un OLED vero nei due temi, e
+il foglio in Telegram (iOS e Android).

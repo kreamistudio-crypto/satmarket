@@ -27571,3 +27571,15 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (`feeMiaP2P`, fee viva meno lo sconto) e `cartelloFeeP2P` mette
   accanto la pastiglia del motivo, «🌱 Pioniere» o «Lv. N» con
   `LIVELLO_SCONTO_P2P`.
+
+- IL BANNER DELLE COMMISSIONI P2P (25 set 2026, perché in
+  `docs/CANTIERI.md` alla voce omonima). `#p2pFeeBanner` è un bottone
+  fuori da `.p2p-sticky`, fra la riga degli strumenti e `#p2pCorpo`,
+  con dentro `/assets/p2p-banner-fee.webp` (rotta esplicita): il
+  disegno ha cifre FERME, quelle vive le dice `#p2pFeeSheet`, scritto da
+  `testoFeeP2P` (pura, il cuore è la frase di Info P2P,
+  `testoFeeInfoP2P`) via `renderFeeP2P` con `commissioneVivaP2P`,
+  `commissioneListinoP2P` e `p2pSconto.punti`. Il bagliore è un
+  `box-shadow` del bottone a stadio, due battiti, riavviato dal
+  `display:none` della vista; gli effetti ridotti lo spengono con la
+  regola universale.
