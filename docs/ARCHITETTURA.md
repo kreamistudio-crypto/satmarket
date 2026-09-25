@@ -23182,17 +23182,20 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   veste delle sezioni qui sopra e ne rovescia la «terza forma»: il
   titolo «Il tuo profilo» in alto e al centro (`h2.profilo-tit`), poi
   il biglietto da visita, poi NOVE cassetti rettangolari — la carta di
-  `.acc`, con titolo, SOTTOTITOLO (`.tit2 small`) e freccia, SENZA
-  icona — e in fondo soli «Tutorial» ed «Esci», affiancati e gemelli
+  `.acc`, col solo titolo e la freccia, SENZA icona (i sottotitoli
+  del primo giro sono caduti col ritocco dello stesso giorno; resta il
+  contatore di «Completa il profilo» sulla riga del titolo) — e in fondo soli «Tutorial» ed «Esci», affiancati e gemelli
   (`.profilo-piede`, base al 50%: da solo uno resta a metà, al
   centro). L'ordine: Completa il profilo (solo se incompleto) · Il
   tuo catalogo · Negozio e spedizioni · Quando compri · Incassi e
   pagamenti · Livello e inviti · Avvisi e aspetto · Privacy ·
   Amministrazione (solo moderatori).
   LE VOCI DENTRO SONO RIGHE DELLA CARTA, non carte nella carta
-  (`.grp-b > .acc`: niente bordo, fondo né raggio, un filo col
-  rientro, l'icona in una colonna di 24px): è così che due livelli
-  restano distinti senza la veste nuda d'agosto. Le VOCI-PORTA
+  (`.grp-b > .acc`: niente bordo né raggio, un filo col rientro,
+  l'icona in una colonna di 24px, e il fondo dei chip `--chip-bg` —
+  crema di giorno, più chiaro della carta di sera — con dentro il
+  grigio delle note ridefinito su `--muted-voce` per restare AA):
+  è così che due livelli restano distinti senza la veste nuda d'agosto. Le VOCI-PORTA
   (`.acc.voce-porta`, freccia › che non ruota) sono i bottoni a tutta
   larghezza di prima, con la stessa funzione e le stesse condizioni:
   «Guarda il tuo negozio» e «Widget per il web» in Negozio,

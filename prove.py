@@ -86049,9 +86049,15 @@ def prove_profilo_sezioni():
     prova("la sezione e' una carta rettangolare, come i cassetti", True,
           "background:var(--card)" in carta and "border-radius:16px" in carta
           and "border:1px solid var(--line-soft)" in carta)
+    # IL FONDO DEL SECONDO LIVELLO (ritocco di Andrea, 25 set 2026): le
+    # voci non sono piu' trasparenti, prendono il fondo dei chip — piu'
+    # crema di giorno, piu' chiaro di sera — cosi' staccano dal
+    # cassetto. Restano righe e non carte: niente bordo, raggio, margine.
     prova("...e le voci dentro NON sono carte nella carta", True,
-          "border:0" in voce and "background:none" in voce
-          and "border-radius:0" in voce and "margin:0" in voce)
+          "border:0" in voce and "border-radius:0" in voce
+          and "margin:0" in voce)
+    prova("...ma hanno il loro fondo, quello dei chip", True,
+          "background:var(--chip-bg)" in voce)
     prova("...ma righe separate da un filo col rientro", True,
           "border-top:1px solid var(--line-soft)" in filo
           and "left:16px" in filo)
@@ -87917,8 +87923,57 @@ def prove_profilo_elegante():
         if any(ord(ch) >= 0x2000 for ch in testo):
             iconati.append(testo.strip())
     prova("nessuna icona sui cassetti principali", [], iconati)
-    prova("...e ognuno ha il suo sottotitolo", len(ordine),
+    # I SOTTOTITOLI SONO CADUTI (ritocco di Andrea, 25 set 2026): resta
+    # il titolo con la freccia. L'unica eccezione e' il contatore di
+    # «Completa il profilo», sulla STESSA riga del titolo (misurato a
+    # 320 px: il bottone resta alto 48, una riga sola).
+    prova("...e nessuno ha piu' il sottotitolo", 0,
           sum('<small' in t for t in teste))
+    prova("...tranne il contatore di «Completa il profilo», sulla riga",
+          True, 'Completa il profilo <span class="conta" id="checklistConta"></span>'
+          in vista)
+    prova("...nell'inchiostro delle note", True,
+          ".grp-h .conta{font-weight:700;font-size:12.5px;color:var(--ink-soft)}"
+          in mini)
+
+    # --- IL CONTRASTO DEL SECONDO LIVELLO, calcolato dai token veri dei
+    # due temi e non creduto dal nome del colore: sul fondo delle voci il
+    # testo resta AA (4,5:1). Il --muted di giorno ci scendeva a 3,23, e
+    # dentro la voce si ridefinisce su --muted-voce. ---
+    def _tok(blocco):
+        return dict(re.findall(r"--([a-z0-9-]+):\s*(#[0-9A-Fa-f]{6})", blocco))
+    _i = mini.index("  :root{")
+    chiaro = _tok(mini[_i:mini.index("\n  }", _i)])
+    _j = mini.index('  html[data-tema="scuro"]{')
+    scuro = _tok(mini[_j:mini.index("\n  }", _j)])
+
+    def _lum(h):
+        c = [int(h[k:k + 2], 16) / 255 for k in (1, 3, 5)]
+        c = [x / 12.92 if x <= .03928 else ((x + .055) / 1.055) ** 2.4 for x in c]
+        return .2126 * c[0] + .7152 * c[1] + .0722 * c[2]
+
+    def _k(a, b):
+        x, y = _lum(a), _lum(b)
+        return (max(x, y) + .05) / (min(x, y) + .05)
+
+    bassi = []
+    for nome, t in (("chiaro", chiaro), ("scuro", scuro)):
+        fondo = t.get("chip-bg")
+        for col in ("ink", "ink-soft", "muted-voce"):
+            if not fondo or col not in t or _k(t[col], fondo) < 4.5:
+                bassi.append((nome, col, t.get(col), fondo))
+    prova("sul fondo delle voci inchiostro, note e grigio sono AA nei due temi",
+          [], bassi)
+    prova("...e il fondo stacca dalla carta: piu' scuro di giorno, piu' "
+          "chiaro di sera", [True, True],
+          [_lum(chiaro["chip-bg"]) < _lum(chiaro["card"]),
+           _lum(scuro["chip-bg"]) > _lum(scuro["card"])])
+    _v = mini[mini.index("  .grp-b > .acc{"):]
+    _v = _v[:_v.index("}")]
+    prova("dentro la voce il grigio delle note e' --muted-voce", True,
+          "--muted:var(--muted-voce)" in _v)
+    prova("...e il conteggio della voce parla l'inchiostro delle note", True,
+          ".grp-b > .acc > .acc-h .conta{color:var(--ink-soft)}" in mini)
     voci_h = re.findall(r'<div class="acc[^"]*" id="[^"]+"[^>]*>\s*<button[^>]*class="acc-h"[^>]*>(.*?)</button>',
                         vista, re.S)
     prova("le voci dentro tengono l'icona", [], [v[:40] for v in voci_h

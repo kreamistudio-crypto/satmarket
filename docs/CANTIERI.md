@@ -33073,3 +33073,41 @@ di un server nuovo si apre in RITARDO, velava la pagina e faceva
 lo salta e controlla che non ci sia.
 **DA AVERE IL TELEFONO:** lo scorrimento vero col dito durante
 l'impulso, in Telegram.
+
+## Il profilo più elegante, il ritocco (25 set 2026)
+
+Due ritocchi di Andrea a 6ac4c2c.
+1) VIA I SOTTOTITOLI dei nove cassetti principali: resta il titolo con
+la freccia. Il contatore di «Completa il profilo» («0 di 3 fatti») sale
+sulla riga del titolo (`.grp-h .conta`, in --ink-soft): misurato a 320
+px ci sta, il bottone resta alto 48 in tutt'e due le misure. La voce
+dell'export tiene il suo, che è una voce e non un cassetto.
+2) LE VOCI DEL SECONDO LIVELLO HANNO UN FONDO LORO: `--chip-bg`, il
+token che fa già il verso chiesto — crema più scuro del bianco di
+giorno (#F3ECDA), più chiaro della carta di sera (#37301F). Nessun
+fondo nuovo da tarare.
+IL CONTRASTO, MISURATO E NON CREDUTO: una sonda dal vivo apre ogni
+cassetto e ogni voce e calcola il rapporto di ogni testo visibile (220)
+contro il fondo su cui sta davvero, a 320 e 375 nei due temi. Di giorno
+ha trovato il punto che a occhio non si vede: il --muted delle note
+dentro le voci (etichette dei campi, «nessun annuncio», dati), che sul
+bianco faceva già 3,81, sul crema scende a 3,23 — 83 testi sotto l'AA.
+La cura sta in un posto solo: dentro la voce il token si ridefinisce
+(`--muted:var(--muted-voce)`), #6F6857 di giorno (4,70 sul crema, 5,54
+sul bianco) e il --muted di sempre di sera, dove regge già (4,98). Il
+conteggio delle voci («(0 di 20)») passa all'inchiostro delle note.
+Dopo la cura restano sotto soglia solo due famiglie che il fondo nuovo
+non tocca: il bianco sui bottoni arancio (il CTA di casa, sul suo
+fondo) e i distintivi, falso allarme della sonda — testo #7A4B06 su un
+gradiente d'oro che lei non legge, e che sta sopra il 4,5.
+PROVATO: prove_profilo_elegante (39) e prove_profilo_sezioni (51)
+emendate — nessun sottotitolo tranne il contatore sulla riga, il fondo
+dei chip sulle voci, il contrasto calcolato dai token veri dei due temi
+(inchiostro, note e --muted-voce sul fondo delle voci ≥ 4,5; il fondo
+più scuro della carta di giorno e più chiaro di sera), il token
+ridefinito dentro la voce. Tortura: 6 mutazioni su 6 prese. Suite intera severa
+senza config nel worktree da origin/main (fe3cbef): 16.029 verdi e 0 rosse.
+Dal vivo via CDP a 320 e 375 nei due temi con «Negozio e spedizioni» e
+«Codici sconto» aperti: nessuno scorrimento laterale.
+DA GUARDARE SUL TELEFONO: di sera, che il fondo delle voci si veda
+staccato dalla carta anche con la luminosità bassa.
