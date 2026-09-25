@@ -55420,18 +55420,42 @@ def prove_morfosi_vendi():
     prova("la pagina piena la dice la VISTA (go), e uscendo la morfosi si "
           "posa", True,
           "document.body.classList.toggle('con-vendi', view==='vendi');" in _go
-          and "if (view !== 'vendi') lasciaMorfoVendi();" in _go)
+          and "if (view !== 'vendi') lasciaMorfoVendi(daVendi, view);" in _go)
+    # IL RITORNO (25 set 2026): il bottone si misura PRIMA che la vista se ne
+    # vada, poi non ha piu' misura
+    prova("...il bottone del ritorno si misura prima che la vista se ne vada",
+          True, 0 < _go.index("const daVendi = view !== 'vendi' ? "
+                              "misuraRitornoVendi() : null;")
+          < _go.index("document.querySelectorAll('.view').forEach("
+                      "v=>v.classList.remove('active'));"))
     _ap = pezzo_js(mini, "function apriMorfoVendi(){", "\n}\n")
     _po = pezzo_js(mini, "function posaMorfoVendi(){", "\n}\n")
     _pu = pezzo_js(mini, "function morfoPuoiVendi(){", "\n}\n")
-    prova("le funzioni del P2P si RIUSANO, non si copiano", [True] * 7,
+    _ri = pezzo_js(mini, "function ritornoMorfoVendi(da, verso){", "\n}\n")
+    _la = pezzo_js(mini, "function lasciaMorfoVendi(da, verso){", "\n}\n")
+    _cm = pezzo_js(mini, "function chiudiMorfoP2P(){", "\n}\n")
+    prova("le funzioni del P2P si RIUSANO, non si copiano", [True] * 9,
           [x in _ap for x in ("tempiMorfoP2P();", "vestiMorfoP2P(g, da,",
                               "celaVeriP2P(true);", "barraViaP2P(true);",
                               "P2P_MORFO_MS + 30")]
-          + ["posaMorfoP2P();" in _po, "barraSeccaP2P();" in _po])
+          + ["posaMorfoP2P();" in _po, "barraSeccaP2P();" in _la,
+             "rientraFantasmaP2P(da, el('sellSubmit'), posaMorfoVendi);" in _ri,
+             "rientraFantasmaP2P(meta.getBoundingClientRect(), meta, "
+             "spegniMorfoP2P);" in _cm])
+    prova("il ritorno e' UNO: il rientro nel + vive in una funzione sola, "
+          "che il foglio del libro e la pagina del mercatino chiamano", [1, 2],
+          [mini.count("function rientraFantasmaP2P("),
+           ("rientraFantasmaP2P(" in _cm) + ("rientraFantasmaP2P(" in _ri)])
+    prova("...e dove il + all'arrivo non e' quello di casa (il P2P, una vista "
+          "senza barra) niente ritorno", True,
+          "VISTE_NAV_P2P.has(verso) || !morfoPuoiVendi()" in _ri)
+    prova("a fine andata le voci restano FUORI, da dove il ritorno le fa "
+          "rientrare (come col foglio del P2P aperto)", False,
+          "barraSeccaP2P" in _po or "barraViaP2P(false)" in _po)
     prova("...nessuna misura ne' tempo ricopiati a mano", [0, 0, 0],
-          [(_ap + _po).count("scale("), (_ap + _po).count("320"),
-           (_ap + _po).count("--morfo-")])
+          [(_ap + _po + _ri + _la).count("scale("),
+           (_ap + _po + _ri + _la).count("320"),
+           (_ap + _po + _ri + _la).count("--morfo-")])
     prova("le guardie: effetti ridotti, schermo largo, vetrina", True,
           "VETRINA || effettiRidotti()" in _pu
           and "matchMedia('(max-width: 767px)')" in _pu)
@@ -55451,7 +55475,9 @@ def prove_morfosi_vendi():
     _F, _M, _E = ("i", "morfo-forma"), ("i", "morfo-meta"), ("span", "morfo-eti")
     # col lato del P2P ricordato sul body (p2p-vendo resta uscendo), le
     # regole rosse del fantasma nominano quella classe: devono perdere
-    for corpo in (["con-vendi"], ["con-vendi", "p2p-vendo"]):
+    # ...e anche SENZA la vista: nel ritorno con-vendi e' gia' spenta
+    for corpo in (["con-vendi"], ["con-vendi", "p2p-vendo"], ["morfosi"],
+                  ["morfosi", "p2p-vendo"]):
         f, m, e = _vince(corpo, _F, _pr), _vince(corpo, _M, _pr), _vince(corpo, _E, _pr)
         prova(f"il fantasma veste l'arancio di casa (body {' '.join(corpo)})",
               ["var(--sats)", "0 4px 0 var(--sats-deep)", "calc(100% / 3)",
@@ -55487,18 +55513,41 @@ def prove_morfosi_vendi():
           and "#view-vendi.morfo{animation:none}" in stile)
     prova("...e con gli effetti ridotti niente corsa (la cintura)", True,
           "@media (prefers-reduced-motion:reduce){\n    #view-vendi.morfo "
-          ".vendi-piede,\n    body.con-vendi.barra-via nav #nav-vendi "
-          ".eti-pila{transition:none}" in stile)
+          ".vendi-piede,\n    nav #nav-vendi .eti-pila{transition:none}"
+          in stile)
     # la scritta «Vendi» sotto il + esce con le voci: restava sotto il
     # bottone che si allarga e ne spuntava a meta' corsa (fotogrammi fermi)
-    prova("la scritta «Vendi» sfuma con le voci, solo durante la corsa", True,
-          "body.con-vendi.barra-via nav #nav-vendi .eti-pila{opacity:0;\n"
-          "    transition:opacity var(--morfo-corsa) var(--morfo-curva)}"
-          in stile)
+    # ...e col ritorno rientra con loro: la corsa sta sulla regola di BASE,
+    # quella che vale quando barra-via se ne va
+    prova("la scritta «Vendi» esce e rientra con le voci", True,
+          "body.barra-via nav #nav-vendi .eti-pila{opacity:0}" in stile
+          and "nav #nav-vendi .eti-pila{transition:opacity\n    "
+              "var(--morfo-corsa,var(--p2p-corsa)) "
+              "var(--morfo-curva,var(--p2p-curva))}" in stile)
     prova("da desktop la freccia non c'e' (la barra e' in cima)", True,
           ".vendi-testa #sellIndietro{display:none}" in stile
           and ".vendi-testa #sellIndietro:not([hidden])"
               in "".join(_sel.keys()))
+
+    # --- 4b) IL LAMPO DELLE PILLOLE (25 set 2026) ------------------------
+    # uscendo da «Pubblica annuncio» sotto il cartello sfumava la fila
+    # «Tutto · Casa e giardino…»: la sezione nascosta con la sua vista si
+    # leggeva «scorsa via», la barra si accendeva, e tornando in Esplora si
+    # spegneva SFUMANDO. Una sezione senza misura spegne di colpo.
+    _io = mini[mini.index("if (window.IntersectionObserver) {\n  new IntersectionObserver(\n"
+                          "    ([voce]) => (voce.boundingClientRect"):]
+    _io = _io[:_io.index(".observe(el('catSez'));")]
+    _cs2 = pezzo_js(mini, "function chipsSpente(){", "\n}\n")
+    prova("le pillole: la sezione nascosta con la vista le spegne di colpo, "
+          "quella scorsa via le accende come prima", True,
+          "(voce.boundingClientRect.width || voce.boundingClientRect.height)"
+          in _io and "? chipsAppiccicate(!voce.isIntersecting) : chipsSpente()"
+          in _io)
+    prova("...e spegnere di colpo vuol dire senza corsa, e rimessa subito",
+          True, _cs2.index("c.style.transition = 'none';")
+          < _cs2.index("c.classList.remove('appiccicate');")
+          < _cs2.index("void c.offsetWidth;")
+          < _cs2.index("c.style.transition = '';"))
 
     # --- 5) IL BANCO: le funzioni VERE, il DOM di cartone ---------------
     node = _sh.which("node")
@@ -55507,13 +55556,17 @@ def prove_morfosi_vendi():
         return
     banco = ("\n".join(pezzo_js(mini, f, "\n}\n") + "\n}" for f in (
         "function morfoPuoiVendi(){", "function apriMorfoVendi(){",
-        "function posaMorfoVendi(){", "function lasciaMorfoVendi(){",
+        "function posaMorfoVendi(){", "function misuraRitornoVendi(){",
+        "function ritornoMorfoVendi(da, verso){",
+        "function lasciaMorfoVendi(da, verso){",
+        "function rientraFantasmaP2P(da, bottone, fine){",
         "function morfosiP2P(da, a){",
         "function vestiMorfoP2P(g, da, a, eti, bottone, rosso){"))
         + "\nconst P2P_MORFO_MS = " + re.search(
             r"const P2P_MORFO_MS = (\d+);", mini).group(1) + ";\n" + r"""
 let passi = [], VETRINA = false, ridotti = false, largo = 375;
-let p2pMorfoTimer = null, timer = null;
+let p2pMorfoTimer = null, timer = null, senzaBarra = false;
+const VISTE_NAV_P2P = new Set(['p2p', 'p2pmiei', 'p2pordine', 'p2pinfo']);
 function insieme(){ const s = new Set(); return {s,
   add: (...c) => c.forEach(x => s.add(x)),
   remove: (...c) => c.forEach(x => s.delete(x)),
@@ -55530,7 +55583,8 @@ const document = {body};
    non ha misura — cosi' una misura presa a barra spenta si vede */
 const tondo = nodo(null);
 tondo.getBoundingClientRect = () =>
-  (body.classList.contains('con-vendi') && !body.classList.contains('morfosi'))
+  ((body.classList.contains('con-vendi') && !body.classList.contains('morfosi'))
+   || senzaBarra)
     ? {left: 0, top: 0, width: 0, height: 0}
     : {left: 160.5, top: 714.8, width: 54, height: 54};
 const g = nodo(null), v = nodo(null);
@@ -55543,7 +55597,16 @@ const effettiRidotti = () => ridotti;
 const matchMedia = q => ({matches: q === '(max-width: 767px)' && largo < 768});
 function tempiMorfoP2P(){ passi.push('tempi'); }
 function go(w){ passi.push('go:' + w + (body.classList.contains('morfosi') ? '+morfosi' : ''));
-  body.classList.toggle('con-vendi', w === 'vendi'); }
+  body.classList.toggle('con-vendi', w === 'vendi'); v.classList.toggle('active', w === 'vendi'); }
+/* l'uscita dalla vista come la fa go(): il bottone si misura PRIMA, poi la
+   vista se ne va, con-vendi si spegne, e lasciaMorfoVendi */
+function esci(verso){ const da = misuraRitornoVendi();
+  v.classList.remove('active'); body.classList.remove('con-vendi');
+  lasciaMorfoVendi(da, verso); }
+function stato(){ return {morfosi: body.classList.contains('morfosi'),
+  barraVia: body.classList.contains('barra-via'), merc: g.classList.contains('merc'),
+  acceso: g.classList.contains('acceso'), parte: g.classList.contains('parte'),
+  morfo: v.classList.contains('morfo'), tondo: tondo.style.visibility}; }
 function celaVeriP2P(c){ passi.push('cela:' + c); tondo.style.visibility = c ? 'hidden' : ''; }
 function barraViaP2P(via){ passi.push('barraVia:' + via); body.classList.toggle('barra-via', via); }
 function posaMorfoP2P(){ passi.push('posa'); clearTimeout(p2pMorfoTimer);
@@ -55581,18 +55644,31 @@ out.dopo = {morfosi: body.classList.contains('morfosi'),
   merc: g.classList.contains('merc'), acceso: g.classList.contains('acceso'),
   morfo: v.classList.contains('morfo'), bottone: bottone.style.visibility,
   conVendi: body.classList.contains('con-vendi')};
-/* C) si esce dalla vista: la vista smette il vestito, niente altro */
+/* C) IL RITORNO: si esce verso Esplora e il bottone rientra nel + */
+passi = []; timer = null;
+esci('esplora');
+out.ritorno = {passi: passi.slice(), stato: stato(), ms: timer && timer.ms,
+  left: g.style.left, width: g.style.width,
+  x: g.style.props['--morfo-x'], sx: g.style.props['--morfo-sx']};
 passi = [];
-lasciaMorfoVendi();
-out.uscita = {passi: passi.slice(), morfo: v.classList.contains('morfo')};
-/* D) si esce A META' CORSA: il fantasma si posa, la barra torna secca */
+timer.f();
+out.ritornoFine = {passi: passi.slice(), stato: stato()};
+/* D) verso il P2P, o verso una vista senza barra: barra secca */
+function daCapo(){ pulito(); apriMorfoVendi(); timer.f(); passi = []; timer = null; }
+daCapo(); esci('p2p');
+out.versoP2P = {passi: passi.slice(), stato: stato(), timer: !!timer};
+daCapo(); senzaBarra = true; esci('dettaglio'); senzaBarra = false;
+out.senzaBarra = {passi: passi.slice(), stato: stato(), timer: !!timer};
+/* E) A META' CORSA: il fantasma si posa, e il ritorno riparte dal bottone */
 pulito();
 apriMorfoVendi();
 passi = [];
-lasciaMorfoVendi();
-out.meta = {passi: passi.slice(), morfosi: body.classList.contains('morfosi'),
-  merc: g.classList.contains('merc'), morfo: v.classList.contains('morfo'),
-  bottone: bottone.style.visibility, tondo: tondo.style.visibility};
+esci('esplora');
+out.meta = {passi: passi.slice(), stato: stato(), bottone: bottone.style.visibility};
+/* F) una pagina NON nata dalla morfosi (modifica, cronologia): niente */
+pulito(); v.classList.add('active'); body.classList.add('con-vendi');
+esci('esplora');
+out.nonNata = {passi: passi.slice(), stato: stato()};
 /* E) dove non si fa: niente go, e go('vendi') lo fa chi chiama */
 pulito(); ridotti = true;
 out.ridotti = [apriMorfoVendi(), passi.slice()];
@@ -55639,21 +55715,48 @@ console.log(JSON.stringify(out));
           [abs(float(str(_f[k]).replace("px", "")) - _atteso[k]) < 1e-9
            for k in ("x", "y", "sx", "sy")]
           + [_f["left"], _f["top"], _f["width"], _f["rosso"], _f["bz"]])
-    prova("banco: a fine corsa il fantasma si posa, e la barra torna secca "
-          "DOPO essersi spenta", ["posa", "cela:false", "secca:senza"],
-          out["posa"])
+    prova("banco: a fine corsa il fantasma si posa e la barra se ne va con "
+          "le voci ancora FUORI", ["posa", "cela:false"], out["posa"])
     prova("...e resta la pagina piena col bottone vero, la vista senza "
           "fadein fino all'uscita",
-          {"morfosi": False, "barraVia": False, "merc": False,
+          {"morfosi": False, "barraVia": True, "merc": False,
            "acceso": False, "morfo": True, "bottone": "", "conVendi": True},
           out["dopo"])
-    prova("banco: uscendo a corsa finita la vista smette il vestito, e "
-          "nient'altro", {"passi": [], "morfo": False}, out["uscita"])
-    prova("banco: uscendo A META' CORSA il fantasma si posa, la barra torna "
-          "secca e tutto e' a vista",
-          {"passi": ["posa", "cela:false", "secca:senza"], "morfosi": False,
-           "merc": False, "morfo": False, "bottone": "", "tondo": ""},
-          out["meta"])
+    # IL RITORNO (25 set 2026, ritocco di Andrea): come il foglio del libro
+    _ms = int(re.search(r"const P2P_MORFO_MS = (\d+);", mini).group(1)) + 30
+    _r = out["ritorno"]
+    prova("banco: uscendo verso Esplora il bottone rientra nel + — fantasma "
+          "arancio dal bottone misurato prima, voci che rientrano, un timer "
+          "lungo la corsa",
+          [["tempi", "cela:true", "barraVia:false"],
+           {"morfosi": True, "barraVia": False, "merc": True, "acceso": True,
+            "parte": True, "morfo": False, "tondo": "hidden"}, _ms,
+           "16px", "343px", True, True],
+          [_r["passi"], _r["stato"], _r["ms"], _r["left"], _r["width"],
+           abs(float(str(_r["x"]).replace("px", ""))
+               - ((160.5 + 27) - (16 + 343 / 2))) < 1e-9,
+           abs(float(_r["sx"]) - 54 / 343) < 1e-9])
+    prova("...e a fine ritorno si posa: + a vista, niente in volo",
+          {"passi": ["posa", "cela:false"],
+           "stato": {"morfosi": False, "barraVia": False, "merc": False,
+                     "acceso": False, "parte": False, "morfo": False,
+                     "tondo": ""}}, out["ritornoFine"])
+    prova("banco: verso il P2P e verso una vista senza barra niente ritorno, "
+          "la barra secca",
+          [["secca:senza"], False, False, ["secca:senza"], False, False],
+          [out["versoP2P"]["passi"], out["versoP2P"]["stato"]["acceso"],
+           out["versoP2P"]["timer"], out["senzaBarra"]["passi"],
+           out["senzaBarra"]["stato"]["acceso"], out["senzaBarra"]["timer"]])
+    prova("banco: uscendo A META' CORSA il fantasma si posa e il ritorno "
+          "riparte dal bottone",
+          [["posa", "cela:false", "tempi", "cela:true", "barraVia:false"],
+           True, True, False],
+          [out["meta"]["passi"], out["meta"]["stato"]["acceso"],
+           out["meta"]["stato"]["merc"], out["meta"]["stato"]["barraVia"]])
+    prova("banco: una pagina non nata dalla morfosi esce senza toccare niente",
+          [[], False, False], [out["nonNata"]["passi"],
+                               out["nonNata"]["stato"]["acceso"],
+                               out["nonNata"]["stato"]["morfosi"]])
     prova("banco: effetti ridotti, schermo largo e vetrina non fanno niente "
           "(e go('vendi') resta a chi chiama)",
           [[False, []], [False, []], [False, []]],
@@ -64312,7 +64415,13 @@ def prove_p2p_pubblica():
     # quel che a occhio non si vede — i NUMERI della corsa e le tre
     # trappole che la spengono in silenzio.
     morfo = pezzo_js(mini, "function apriMorfoP2P(){", "\n}\n")
-    chiumo = pezzo_js(mini, "function chiudiMorfoP2P(){", "\n}\n")
+    # (25 set 2026) il rientro nel + e' COMUNE al foglio del libro e alla
+    # pagina «Pubblica annuncio» del mercatino: vive in rientraFantasmaP2P,
+    # che chiudiMorfoP2P chiama in coda — le sentinelle del ritorno leggono
+    # le due funzioni in fila, nell'ordine in cui girano
+    chiumo = (pezzo_js(mini, "function chiudiMorfoP2P(){", "\n}\n")
+              + pezzo_js(mini, "function rientraFantasmaP2P(da, bottone, fine){",
+                         "\n}\n"))
     puoi = pezzo_js(mini, "function morfoPuoiP2P(prima){", "\n}\n")
     vesti = pezzo_js(mini, "function vestiMorfoP2P(g, da, a, eti, bottone, rosso){", "\n}\n")
     tempi = pezzo_js(mini, "function tempiMorfoP2P(){", "\n}\n")
@@ -64503,7 +64612,10 @@ def prove_p2p_pubblica():
            "g.classList.toggle('bz', bottone.classList.contains('bz'));" in vesti,
            # (settimo giro) l'andata passa anche il rosso che resta, dopo il
            # bottone: si conta il bottone passato, non la chiusura della riga
-           (morfo + chiumo).count("meta.getBoundingClientRect(), meta.textContent, meta")])
+           # (25 set 2026) il ritorno lo passa da rientraFantasmaP2P, che
+           # riceve il bottone da chi chiama: si conta la sua forma
+           (morfo + chiumo).count("meta.getBoundingClientRect(), meta.textContent, meta")
+           + chiumo.count("da, bottone.textContent, bottone)")])
 
     # D) I TEMPI STANNO IN DUE COSTANTI e l'attesa della scritta e' la
     #    loro DIFFERENZA: cosi' la scritta finisce di comparire quando
@@ -71539,8 +71651,12 @@ def prove_banner_fee_p2p():
     # --- 4) IL VESTITO E IL BAGLIORE ----------------------------------
     regola = re.search(r"\.p2p-fee-banner\{([^}]*)\}", css)
     regola = re.sub(r"\s+", "", regola.group(1)) if regola else ""
-    prova("largo quanto la pagina, e uno stadio come la capsula", True,
-          "width:100%" in regola and "border-radius:999px" in regola)
+    # PIU' PICCOLO DI UN TERZO (25 set 2026, ritocco di Andrea): due terzi
+    # della pagina, centrato; l'altezza la segue il file (height:auto)
+    prova("largo due terzi della pagina e centrato, uno stadio come la "
+          "capsula", True,
+          "width:calc(200%/3)" in regola and "margin:14pxauto16px" in regola
+          and "border-radius:999px" in regola)
     prova("...l'immagine si adatta, con l'altezza che vuole il disegno",
           True, bool(re.search(r"\.p2p-fee-banner img\{[^}]*width:100%;"
                                r"height:auto", css)))
@@ -71554,6 +71670,14 @@ def prove_banner_fee_p2p():
     kf = kf.group(1) if kf else ""
     prova("...con l'arancio di casa, nell'ombra che segue la forma", True,
           kf.count("box-shadow:") >= 2 and "rgba(255,138,0," in kf)
+    # ...e il bagliore rimpicciolito col banner: i numeri di prima (8 a
+    # riposo, 16 e 4 al picco) per due terzi
+    _bp = re.search(r"50%\{box-shadow:0 0 ([\d.]+)px ([\d.]+)px", kf)
+    _br = re.search(r"0%,100%\{box-shadow:0 0 ([\d.]+)px", kf)
+    prova("...in proporzione al banner: due terzi di 8, 16 e 4", True,
+          bool(_bp and _br) and all(
+              abs(float(x) / y - 2 / 3) < 0.02 for x, y in
+              ((_br.group(1), 8), (_bp.group(1), 16), (_bp.group(2), 4))))
     prova("...e da fermo resta un'ombra di riposo, la stessa del bordo "
           "dell'animazione", True,
           bool(re.search(r"0%,100%\{box-shadow:([^}]*)\}", kf))
@@ -71602,9 +71726,15 @@ def prove_banner_fee_p2p():
           '<div class="sheet" id="p2pFeeSheet" role="dialog" '
           'aria-modal="true" aria-labelledby="p2pFeeTit">' in mini
           and 'id="p2pFeeTit">Le commissioni del P2P</h3>' in mini)
-    prova("...si chiude con «Ho capito» e con closeSheet", True,
-          "onclick=\"chiudiFoglioP2P('p2pFeeSheet')\">Ho capito</button>"
-          in mini and "el('p2pFeeSheet').classList.remove('open');"
+    # «Ho capito» scende di un gradino con navIndietro (25 set 2026): chiuso
+    # togliendo la classe restava un gradino in piu' nella cronologia, e la
+    # freccia andava toccata due volte — il difetto del foglio del divieto
+    _fs = mini[mini.index('<div class="sheet" id="p2pFeeSheet"'):]
+    _fs = _fs[:_fs.index("Ho capito</button>") + len("Ho capito</button>")]
+    prova("...si chiude con «Ho capito», che scende di un gradino, e con "
+          "closeSheet", True,
+          _fs.endswith('onclick="navIndietro()">Ho capito</button>')
+          and "el('p2pFeeSheet').classList.remove('open');"
           in pezzo_js(mini, "function closeSheet(){", "\n}"))
     apri = pezzo_js(mini, "function apriFeeP2P(){", "\n}\n")
     prova("...e si apre col corpo scritto adesso", True,

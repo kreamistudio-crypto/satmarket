@@ -2031,11 +2031,17 @@
      `fermaBaglioreFeeP2P` lo porta alla fine, cioe' all'ombra di
      riposo. I 14px sopra sono l'aria dell'alone: il blocco attaccato ha il fondo dipinto e al picco lo tagliava con
      una riga netta (visto a 320 col primo alone, 24px: l'alone e'
-     sceso a 16 e l'aria salita da 10 a 14). */
-  .p2p-fee-banner{display:block;width:100%;margin:14px 0 16px;padding:0;
+     sceso a 16 e l'aria salita da 10 a 14).
+     PIU' PICCOLO DI UN TERZO (25 set 2026, ritocco di Andrea): largo DUE
+     TERZI della pagina e centrato — l'altezza la segue da sola, che il
+     file tiene le sue proporzioni (`height:auto`) —, e il bagliore coi
+     suoi numeri per due terzi: 8→5,3 a riposo, 16/4→10,7/2,7 al picco.
+     L'aria sopra e sotto resta quella di prima: e' dello spazio fra il
+     blocco e le card, non del banner. */
+  .p2p-fee-banner{display:block;width:calc(200% / 3);margin:14px auto 16px;padding:0;
     border:0;border-radius:999px;background:none;cursor:pointer;
     -webkit-tap-highlight-color:transparent;
-    box-shadow:0 0 8px 0 rgba(255,138,0,.30);
+    box-shadow:0 0 5.3px 0 rgba(255,138,0,.30);
     animation:p2pFeeBagliore 1.2s ease-in-out 1}
   .p2p-fee-banner img{display:block;width:100%;height:auto}
   .p2p-fee-banner:focus-visible{outline:2px solid var(--orange);
@@ -2046,8 +2052,8 @@
   .p2p-fee-corpo{margin-bottom:14px}
   .p2p-fee-corpo p{margin:0 0 10px;font-size:14px;line-height:1.45}
   @keyframes p2pFeeBagliore{
-    0%,100%{box-shadow:0 0 8px 0 rgba(255,138,0,.30)}
-    50%{box-shadow:0 0 16px 4px rgba(255,138,0,.75)}}
+    0%,100%{box-shadow:0 0 5.3px 0 rgba(255,138,0,.30)}
+    50%{box-shadow:0 0 10.7px 2.7px rgba(255,138,0,.75)}}
   /* ⚠️ L'ARIA ATTORNO ALLA RIGA DI STRUMENTI, pareggiata (set 2026,
      richiesta di Andrea — e MISURATA, non dedotta): sotto la riga ce
      n'erano 13 — i 10 del suo margine piu' i 3 del fondo dipinto del
@@ -3479,21 +3485,25 @@
      quadrato qualunque sia la larghezza del bottone.
      ⚠️ E PESANO PIU' DEL ROSSO DEL LATO: `p2p-vendo` resta sul body anche
      fuori dal P2P (il lato si ricorda), e le regole rosse del fantasma lo
-     nominano — `body.p2p-vendo #p2pMorfo .morfo-forma` pesa (1,2,1) e
-     batterebbe un `#p2pMorfo.merc` (1,2,0). Col body della vista le
-     regole salgono a (1,3,1), e stando DOPO vincono anche i pari (la meta
-     e la scritta rosse escludono il blu col :not, e pesano uguale). */
-  body.con-vendi #p2pMorfo.merc .morfo-forma{border-radius:calc(100% / 3);
+     nominano — `body.p2p-vendo #p2pMorfo .morfo-forma` pesa (1,2,1), e
+     meta e scritta, che escludono il blu col :not, (1,3,1). Queste pesano
+     (1,3,2) e vincono comunque. NON nominano la vista (erano
+     `body.con-vendi`, 6960a29): nel ritorno la pagina se n'e' gia' andata,
+     e il fantasma sarebbe rientrato nel + col vestito del lato. */
+  html body #p2pMorfo.merc:not(.bz) .morfo-forma{border-radius:calc(100% / 3);
     background:var(--sats);box-shadow:0 4px 0 var(--sats-deep)}
-  body.con-vendi #p2pMorfo.merc .morfo-meta{background:var(--sats);
+  html body #p2pMorfo.merc:not(.bz) .morfo-meta{background:var(--sats);
     box-shadow:0 3px 0 var(--sats-deep)}
-  body.con-vendi #p2pMorfo.merc .morfo-eti{color:#fff}
+  html body #p2pMorfo.merc:not(.bz) .morfo-eti{color:#fff}
   /* ...e la scritta «Vendi» sotto il + esce con le voci: nel libro la sua
      gemella e' gia' scesa via, qui restava sotto il bottone che si
      allarga e ne spuntava a meta' corsa (visto nei fotogrammi fermi).
-     Sfuma e basta, con la corsa delle voci; torna con la barra secca. */
-  body.con-vendi.barra-via nav #nav-vendi .eti-pila{opacity:0;
-    transition:opacity var(--morfo-corsa) var(--morfo-curva)}
+     Sfuma e basta, con la corsa delle voci, e col ritorno rientra con
+     loro: la corsa sta sulla regola di base, che e' quella che vale
+     quando `barra-via` se ne va (come per `nav .nav-lato`). */
+  nav #nav-vendi .eti-pila{transition:opacity
+    var(--morfo-corsa,var(--p2p-corsa)) var(--morfo-curva,var(--p2p-curva))}
+  body.barra-via nav #nav-vendi .eti-pila{opacity:0}
   /* LA PAGINA PIENA DI VENDI, SOLO SUL TELEFONO. La barra se ne va — il +
      e' diventato il bottone —, e il bottone resta in fondo allo schermo:
      STICKY e non fixed, cosi' a fine pagina si posa DOPO l'ultimo campo
@@ -3539,7 +3549,7 @@
   #view-vendi.morfo.velata .vendi-piede{opacity:0}
   @media (prefers-reduced-motion:reduce){
     #view-vendi.morfo .vendi-piede,
-    body.con-vendi.barra-via nav #nav-vendi .eti-pila{transition:none}
+    nav #nav-vendi .eti-pila{transition:none}
   }
   /* il foglio breve del divieto: la lista copiata dalla pagina, in due
      colonne — nove parole corte, e in una sola sarebbe un nastro */
@@ -11597,7 +11607,7 @@ document.getElementById('cartello')?.remove();</script>
     <div class="grab"></div>
     <h3 id="p2pFeeTit">Le commissioni del P2P</h3>
     <div class="p2p-fee-corpo" id="p2pFeeCorpo"></div>
-    <button type="button" class="btn orange" onclick="chiudiFoglioP2P('p2pFeeSheet')">Ho capito</button>
+    <button type="button" class="btn orange" onclick="navIndietro()">Ho capito</button>
   </div>
 
   <!-- COSA NON SI PUO' VENDERE (25 set 2026): il foglio breve del link
@@ -14043,6 +14053,9 @@ function go(view){
   if (document.querySelector('.view.active')?.id === 'view-profilo')
     mieiPos = {y: Math.round(window.scrollY),
                n: el('myListings').children.length};
+  /* il bottone di «Pubblica annuncio» si misura PRIMA che la vista se ne
+     vada: e' da li' che il ritorno lo riporta nel + (lasciaMorfoVendi) */
+  const daVendi = view !== 'vendi' ? misuraRitornoVendi() : null;
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   el('view-'+view).classList.add('active');
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
@@ -14067,7 +14080,7 @@ function go(view){
      uscendo, una morfosi a meta' si posa e la vista smette il vestito
      della morfosi (vedi lasciaMorfoVendi). */
   document.body.classList.toggle('con-vendi', view==='vendi');
-  if (view !== 'vendi') lasciaMorfoVendi();
+  if (view !== 'vendi') lasciaMorfoVendi(daVendi, view);
   /* LA NAV SI TRASFORMA NEL P2P (set 2026): la classe si deriva dalla
      VISTA, qui e non nei vai* — cosi' indietro e cronologia la
      rimettono giusta da soli. Il + cambia mestiere con lei (toccaPiu)
@@ -16506,11 +16519,29 @@ function chipsAppiccicate(attive){
   if (attive) centraNellaFila(el('chips'),
                               el('chips')?.querySelector('.chip.active'));
 }
+/* LA SEZIONE SPARITA CON LA SUA VISTA NON E' «SCORSA VIA» (25 set 2026,
+   il lampo delle pillole): uscendo da Esplora la sezione va in
+   `display:none`, l'osservatore la legge «fuori» e accendeva la barra.
+   Tornando in Esplora la spegneva un fotogramma dopo, cioe' la barra
+   SFUMAVA VIA davanti agli occhi — la fila «Tutto · Casa e giardino ·
+   Elettronica…» sotto il cartello per 180 ms, visto uscendo dalla pagina
+   «Pubblica annuncio» ma vero tornando da qualunque vista. Una sezione
+   senza misura vuol dire «vista nascosta»: la barra si spegne DI COLPO,
+   senza corsa, e al ritorno non c'e' niente da veder sfumare. */
+function chipsSpente(){
+  const c = el('chips');
+  if (!c || !c.classList.contains('appiccicate')) return;
+  c.style.transition = 'none';
+  c.classList.remove('appiccicate');
+  void c.offsetWidth;
+  c.style.transition = '';
+}
 /* Armato una volta sola sulla sezione, che vive in pagina per sempre
    (si nasconde, non si smonta): l'osservatore non va mai riattaccato. */
 if (window.IntersectionObserver) {
   new IntersectionObserver(
-    ([voce]) => chipsAppiccicate(!voce.isIntersecting),
+    ([voce]) => (voce.boundingClientRect.width || voce.boundingClientRect.height)
+      ? chipsAppiccicate(!voce.isIntersecting) : chipsSpente(),
     {threshold: 0}
   ).observe(el('catSez'));
 }
@@ -52427,8 +52458,19 @@ function chiudiMorfoP2P(){
      capsula torna a casa di colpo, sotto il foglio ancora pieno, e poi il
      bottone rientra nel + come sempre */
   capsulaAPostoP2P();
-  vestiMorfoP2P(g, tondo.getBoundingClientRect(),
-                meta.getBoundingClientRect(), meta.textContent, meta);
+  rientraFantasmaP2P(meta.getBoundingClientRect(), meta, spegniMorfoP2P);
+}
+/* IL RIENTRO NEL +, COMUNE AI DUE BOTTONI CHE NE NASCONO (25 set 2026, il
+   ritorno della morfosi nel mercatino): il fantasma prende la misura del
+   bottone da cui riparte — `da`, rimisurato da chi chiama, che nel
+   mercatino lo misura PRIMA che la pagina se ne vada — e rientra nel
+   tondo; le voci tornano nello stesso giro, e a fine corsa `fine`
+   sveste tutto. Lo chiamano chiudiMorfoP2P (il foglio «Pubblica» del
+   libro) e lasciaMorfoVendi (la pagina «Pubblica annuncio»): un ritorno
+   solo, com'e' una sola l'andata. I tempi li scrive chi chiama. */
+function rientraFantasmaP2P(da, bottone, fine){
+  const g = el('p2pMorfo'), tondo = tondoBarraP2P();
+  vestiMorfoP2P(g, tondo.getBoundingClientRect(), da, bottone.textContent, bottone);
   celaVeriP2P(true);
   g.classList.add('acceso');
   void g.offsetWidth;
@@ -52437,7 +52479,7 @@ function chiudiMorfoP2P(){
      seguire il restringimento */
   g.classList.add('parte');
   barraViaP2P(false);
-  p2pMorfoTimer = setTimeout(spegniMorfoP2P, P2P_MORFO_MS + 30);
+  p2pMorfoTimer = setTimeout(fine, P2P_MORFO_MS + 30);
 }
 
 /* ====== LA MORFOSI DEL + NEL MERCATINO (25 set 2026, richiesta di
@@ -52450,10 +52492,14 @@ function chiudiMorfoP2P(){
    foglio, il vestito arancio (`merc`) e il piede che arriva per ultimo.
    DOVE NON SI FA: le guardie del P2P — effetti ridotti, schermo largo —
    piu' la vetrina, dove Vendi non si apre. Li' si entra come sempre.
-   IL RITORNO E' LA BARRA SECCA, chiunque chiuda (la freccia, il gesto
-   indietro, la ✕ della modifica, la pubblicazione): uscendo dalla
-   vista la barra e' GIA' a riposo — rimessa li' a fine corsa, sotto il
-   piede —, e ricompare ferma. Niente in volo verso la barra. */
+   IL RITORNO E' QUELLO DEL P2P (25 set 2026, ritocco di Andrea a 6960a29,
+   che aveva la barra secca): uscendo dalla pagina — la freccia, il gesto
+   indietro di Telegram o dell'app, la pubblicazione — il bottone rientra
+   nel + con rientraFantasmaP2P, la stessa funzione del foglio del libro,
+   e le voci tornano con lui. Per questo a fine andata restano FUORI,
+   come restano col foglio del P2P aperto: la barra se ne va con loro
+   spinte ai lati, e ricompare cosi' per farle rientrare. Dove il + non
+   c'e' all'arrivo (una vista senza barra, il P2P), barra secca. */
 function morfoPuoiVendi(){
   if (VETRINA || effettiRidotti()) return false;
   if (!matchMedia('(max-width: 767px)').matches) return false;
@@ -52493,8 +52539,9 @@ function apriMorfoVendi(){
   return true;
 }
 /* A FINE CORSA il fantasma si posa sul bottone vero, e la barra — gia'
-   coperta dal piede — torna a riposo di colpo e se ne va (con-vendi senza
-   `morfosi`): quando si uscira' dalla vista ricomparira' ferma. */
+   coperta dal piede — se ne va (con-vendi senza `morfosi`) con le voci
+   ancora FUORI: e' da li' che rientreranno col ritorno. La stessa posa
+   chiude anche il ritorno, a voci gia' rientrate. */
 function posaMorfoVendi(){
   const g = el('p2pMorfo');
   if (!g || !g.classList.contains('merc')) return;
@@ -52503,15 +52550,39 @@ function posaMorfoVendi(){
   const meta = el('sellSubmit');
   if (meta) meta.style.visibility = '';
   document.body.classList.remove('morfosi');
-  barraSeccaP2P();
 }
-/* ...e uscendo dalla vista (go): una corsa a meta' si posa, e la vista
-   smette `.morfo` mentre e' gia' nascosta — tolta a vista ferma, farebbe
-   ripartire il suo fadein */
-function lasciaMorfoVendi(){
+/* il bottone da cui parte il ritorno, misurato da go() PRIMA che la vista
+   se ne vada (poi non ha piu' misura). Se la pagina era nata dalla
+   morfosi — la sola che il ritorno riguarda — lo decide lasciaMorfoVendi,
+   in un posto solo. */
+function misuraRitornoVendi(){
+  const v = el('view-vendi'), meta = el('sellSubmit');
+  if (!v || !meta || !v.classList.contains('active')) return null;
+  return meta.getBoundingClientRect();
+}
+/* IL RITORNO: il fantasma arancio riparte dal bottone e rientra nel +,
+   con la barra che ricompare a voci fuori e le fa rientrare. Non se ne
+   occupa — e torna `false` — dove il + all'arrivo non c'e' o non e'
+   quello di casa: le guardie dell'andata (il + senza misura vuol dire
+   una vista senza barra), e il P2P, dove il + ha un altro vestito. */
+function ritornoMorfoVendi(da, verso){
+  if (!da || !da.width || VISTE_NAV_P2P.has(verso) || !morfoPuoiVendi()) return false;
+  tempiMorfoP2P();
+  document.body.classList.add('morfosi');
+  el('p2pMorfo').classList.add('merc');
+  rientraFantasmaP2P(da, el('sellSubmit'), posaMorfoVendi);
+  return true;
+}
+/* ...USCENDO DALLA VISTA (go): una corsa d'andata a meta' si posa, la
+   vista smette `.morfo` mentre e' gia' nascosta — tolta a vista ferma,
+   farebbe ripartire il suo fadein — e se era nata dalla morfosi il
+   bottone rientra nel +; dove il ritorno non c'e', la barra secca. */
+function lasciaMorfoVendi(da, verso){
   posaMorfoVendi();
   const v = el('view-vendi');
+  const nata = !!(v && v.classList.contains('morfo'));
   if (v) v.classList.remove('morfo', 'velata');
+  if (nata && !ritornoMorfoVendi(da, verso)) barraSeccaP2P();
 }
 
 /* COSA NON SI PUO' VENDERE (25 set 2026): il foglio breve del link

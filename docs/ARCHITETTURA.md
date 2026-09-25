@@ -26268,18 +26268,36 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   `.velata` sulla vista, che nata dalla morfosi non fa il suo fadein: la
   misura del bottone si prende subito, e il translateY del fadein la
   spostava di 6px). L'uscita e' la freccia ← in testata (`#sellIndietro`,
-  `navIndietro`), la ✕ in modifica e nel duplicato. IL RITORNO E' LA
-  BARRA SECCA, chiunque chiuda: a fine corsa la barra torna a riposo
-  sotto il piede e si spegne, e uscendo dalla vista ricompare ferma;
-  un'uscita a meta' corsa posa il fantasma (`lasciaMorfoVendi` da
-  `go()`). Da desktop niente di tutto questo, e con gli effetti ridotti
-  la pagina piena arriva senza corsa.
+  `navIndietro`), la ✕ in modifica e nel duplicato. IL RITORNO E' QUELLO
+  DEL P2P (dal ritocco dello stesso giorno; il primo giro aveva la barra
+  secca): uscendo — freccia, indietro di Telegram, gesto dell'app,
+  pubblicazione — il bottone rientra nel + con `rientraFantasmaP2P`, la
+  funzione del rientro COMUNE al foglio del libro (`chiudiMorfoP2P` la
+  chiama uguale). `go()` misura il bottone PRIMA che la vista se ne vada
+  (`misuraRitornoVendi`) e lo passa a `lasciaMorfoVendi(da, verso)`, che
+  fa il ritorno se la pagina era nata dalla morfosi (`.morfo`) e il + di
+  casa c'e' all'arrivo (`ritornoMorfoVendi`: niente verso il P2P, niente
+  verso una vista senza barra, e allora barra secca). Per questo a fine
+  andata le voci restano FUORI (`barra-via`), come col foglio del P2P
+  aperto; la scritta «Vendi» esce e rientra con loro (la corsa sulla
+  regola di base di `nav #nav-vendi .eti-pila`). Il vestito `merc` non
+  nomina piu' la vista — nel ritorno `con-vendi` e' gia' spenta —: pesa
+  (1,3,2) da solo. Da desktop niente di tutto questo, e con gli effetti
+  ridotti la pagina piena arriva e se ne va senza corsa.
   COSA NON SI PUO' VENDERE e' uscito dal form: la lista vive UNA volta
   nella pagina «Il pagamento protetto» (`#sicu-vietato`, nove voci in
   pari con le famiglie di `PAROLE_VIETATE` del server, e una prova le
   confronta), e il link discreto accanto al bottone apre `#vietatoSheet`,
   che la COPIA (`apriVietato`); «Ho capito» scende col `navIndietro`. Il
   controllo del server non e' cambiato.
+
+- LE PILLOLE APPICCICATE SI SPENGONO DI COLPO CON LA VISTA (25 set 2026):
+  l'osservatore di `#catSez` legge «fuori» anche una sezione nascosta con
+  la sua vista, e accendeva `#chips.appiccicate`; tornando in Esplora la
+  barra si spegneva sfumando (180 ms) sotto il cartello. Una sezione
+  senza misura (`boundingClientRect` a zero) chiama `chipsSpente`, che
+  toglie la classe a corsa spenta; quella scorsa via chiama
+  `chipsAppiccicate` come prima.
 
 - UN BUNDLE VECCHIO NON FALLISCE DOVE LO CARICHI (set 2026, dal campo:
   col client NUOVO confermato in pagina, «pubblica» non faceva NIENTE —
@@ -27682,4 +27700,8 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   (`fermaBaglioreFeeP2P`, `finish()` se `scrollY > 0`); gli effetti
   ridotti lo spengono con la regola universale. `.p2p-sticky` ha il
   fondo da bordo a bordo: `box-shadow:0 0 0 100vmax var(--bg)` tagliato
-  sopra e sotto da `clip-path:inset(0 -100vmax)`.
+  sopra e sotto da `clip-path:inset(0 -100vmax)`. Dal ritocco dello
+  stesso giorno il banner e' largo DUE TERZI della pagina, centrato
+  (`width:calc(200% / 3)`, `margin` auto; l'altezza la segue il file), e
+  il bagliore ha i suoi numeri per due terzi (5,3 a riposo, 10,7/2,7 al
+  picco). «Ho capito» del foglio scende col `navIndietro`.

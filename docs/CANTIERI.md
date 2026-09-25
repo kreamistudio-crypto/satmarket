@@ -33292,3 +33292,61 @@ del P2P); il piede con la tastiera su, in Telegram e nell'app (li'
 non c'e' un banco: se la tastiera lo copre o lo porta su lo decide il
 telefono); il gesto indietro vero nell'app; la barra dei gesti di
 Android sotto il piede.
+
+## Il ritorno della morfosi nel mercatino, il lampo delle pillole e il banner piu' piccolo (25 set 2026)
+
+Tre ritocchi di Andrea a 6960a29, piu' uno di passaggio.
+1) **IL RITORNO E' QUELLO DEL P2P.** Uscendo dalla pagina «Pubblica
+annuncio» (freccia, indietro di Telegram, gesto dell'app, pubblicazione)
+il bottone rientra nel + arancio con l'animazione, e le voci con lui. Il
+rientro e' diventato COMUNE: `rientraFantasmaP2P(da, bottone, fine)` e'
+la coda che stava in `chiudiMorfoP2P`, e ora la chiamano il foglio del
+libro e la pagina del mercatino. Il bottone si misura in `go()` PRIMA
+che la vista se ne vada; il ritorno vale per una pagina nata dalla
+morfosi e verso una vista col + di casa (verso il P2P o una vista senza
+barra resta la barra secca). A fine andata le voci restano fuori, come
+col foglio del P2P aperto: e' da li' che rientrano. Il vestito arancio
+del fantasma non nomina piu' la vista (nel ritorno e' gia' spenta, e
+sarebbe rientrato col colore del lato), e la scritta «Vendi» rientra con
+le voci. A meta' andata si fa come il P2P: il fantasma si posa e il
+ritorno riparte dal bottone.
+2) **IL LAMPO ERA LA FILA DELLE PILLOLE** «Tutto · Casa e giardino ·
+Elettronica · …» (`#chips`), sotto il cartello «Barattolo è in fase di
+test», per ~180 ms. Trovata con lo screencast in tempo reale a CPU 4x sul
+codice di 6960a29 e un registratore a ogni fotogramma: l'osservatore della
+sezione categorie legge «fuori» anche una sezione NASCOSTA con la sua
+vista, e accendeva le pillole appiccicate; tornando in Esplora le
+spegneva un fotogramma dopo, e la loro transizione le faceva sfumare
+davanti agli occhi. Non era di Vendi: capitava tornando in Esplora da
+qualunque vista. Cura: una sezione senza misura spegne le pillole DI
+COLPO (`chipsSpente`, a corsa spenta).
+3) **IL BANNER DELLE COMMISSIONI DUE TERZI**, centrato, l'altezza che
+segue il file, il bagliore coi numeri per due terzi; tocco e foglio
+uguali. L'aria sopra e sotto resta: e' dello spazio fra blocco e card.
+In piu': nel foglio delle commissioni «Ho capito» scende col
+`navIndietro` (la freccia andava toccata due volte, il difetto gia'
+curato nel foglio del divieto).
+
+**PROVATO.** `prove_morfosi_vendi` (44: il ritorno nel banco node — dal
+bottone misurato prima, verso il P2P e verso una vista senza barra la
+barra secca, a meta' andata, una pagina non nata dalla morfosi —, la
+funzione comune, la cascata del vestito anche senza la vista, le
+pillole), `prove_p2p_pubblica` e `prove_banner_fee_p2p` emendate col
+perche'. Tortura: 13 mutazioni su 13 prese (una quattordicesima e'
+sfuggita a ragione: la condizione su `.morfo` in `misuraRitornoVendi`
+era doppia, ed e' stata tolta). Suite intera severa senza config nel
+worktree da origin/main (6960a29): 16.120 verdi e 0 rosse; i 24 collaudi
+della CI verdi nella gabbia senza rete. Dal vivo, Chrome
+headless via CDP col server di collaudo (relay morto): i fotogrammi
+fermati del ritorno (la pausa armata dentro l'uscita) a 320, 375 e 430
+nei due temi e con l'indietro di Telegram — partenza dal bottone e
+arrivo sul + al decimo di pixel, pillole sempre spente (7/7); le uscite
+col ritorno in volo a 50 ms e la barra a riposo a fine corsa, anche a
+meta' andata (78/78); l'app Android simulata col CloseWatcher vero, a
+corsa finita e a meta' andata, nei due temi (8/8); il ritorno del P2P
+dal foglio del libro, verde, dalla funzione comune; il banner a due
+terzi, centrato, bagliore al picco a 10,7/2,7 e un solo indietro dopo
+«Ho capito» (24/24); effetti ridotti, desktop e modifica invariati
+(10/10).
+**DA GUARDARE SUL TELEFONO:** il ritorno a occhio, e che tornando in
+Esplora da una vista qualunque la fila delle pillole non lampeggi piu'.
