@@ -43864,7 +43864,7 @@ function scontoFedeltaTestoP2P(punti){
    LA PASTIGLIA DELLO SCONTO DICE IL MOTIVO (25 set 2026, ritocco di
    Andrea su d717b12, che l'aveva girata in «sconto dello 0,5%» con
    l'aliquota piena accanto): «🌱 Pioniere» o «Lv. 5», e l'aliquota
-   accanto e' la MIA, gia' scontata — «Fee Barattolo 1% 🌱 Pioniere».
+   accanto e' la MIA, gia' scontata — «Fee P2P 1% 🌱 Pioniere».
    Pioniere E livello 5 dice il solo «🌱 Pioniere»: il motivo e' uno
    (lo sceglie il server, `_sconto_p2p_fatti`, e vince il pioniere).
    Il numero del livello e' `LIVELLO_SCONTO_P2P`, il gemello del
@@ -49314,7 +49314,7 @@ function contoDettP2P(o){
     ? '<span class="promo-tag dopo">' + esc(cartello) + '</span>' : '';
   /* ⚠️ L'ALIQUOTA STA NELL'ETICHETTA (set 2026, ritocco di Andrea),
      come la percentuale del premio: a destra vanno le CIFRE, a
-     sinistra il nome della voce con quanto vale — «Fee Barattolo 1%»
+     sinistra il nome della voce con quanto vale — «Fee P2P 1%»
      si legge in un colpo, mentre spinta all'altro capo della riga
      sembrava un secondo numero da mettere in relazione col primo.
      E LA PILLOLA «IN PROMO» LE STA ACCANTO, come nel foglio «Paga»
@@ -49329,7 +49329,11 @@ function contoDettP2P(o){
      (`feeMiaP2P`), mai scritta a mano — l'1% di chi ha lo sconto e
      l'1,5% di chi non ce l'ha oggi, e un'altra coppia il giorno che la
      beta finisce. La pastiglia accanto dice il perche'. */
-  const etichettaFee = 'Fee Barattolo'
+  /* «FEE P2P» (25 set 2026, ritocco di Andrea): nel P2P la voce si
+     chiama cosi', e non piu' «Fee Barattolo» — che resta il nome del
+     conto del MERCATINO. Una stringa sola per tre schermi: il dettaglio
+     dal libro, la pagina dello scambio e il percorso Barattozon. */
+  const etichettaFee = 'Fee P2P'
     + (fee > 0 ? ' <b class="p2p-avviso">' + esc(mezzaCommissioneP2P(fee))
                  + '%</b>' : '')
     + promo;
@@ -49419,7 +49423,7 @@ function contoDettP2P(o){
      restano le sole CIFRE — che il conto le sappia spiegare da solo
      e' il patto del foglio «Paga» del mercatino.
      Quel che resta a dirlo in un carattere: il `≈` davanti a ogni
-     stima, e la percentuale accanto a «Fee Barattolo», che e' la
+     stima, e la percentuale accanto a «Fee P2P», che e' la
      META' di chi legge. */
   /* `conto-p2p` NON e' un vestito diverso: e' il permesso di cedere
      dalla parte giusta. Qui i valori sono lunghi come in nessun'altra
@@ -49447,7 +49451,8 @@ function contoDettP2P(o){
         ? r('Subtotale', cifra('merc'), 'sub') : '')
     /* «FEE BARATTOLO» (11 set 2026, decisione di Andrea), lo stesso
        nome del conto del mercatino: i due conti si vestono uguali e
-       adesso dicono anche lo stesso nome. «Commissione Barattolo»
+       dicevano anche lo stesso nome — dal 25 set 2026 qui e' «Fee
+       P2P» (vedi `etichettaFee`), piu' corta ancora. «Commissione Barattolo»
        resta bocciata — cedeva coi puntini a 320px e, coi casi promo
        e intervallo, perfino a 375 — mentre questa e' piu' CORTA
        della secca che l'aveva sostituita, e nel caso peggiore
@@ -50355,7 +50360,7 @@ function renderOrdineP2P(){
   /* IL CONTO E' QUELLO DEL LIBRO, tradotto al verso di chi l'ordine
      ce l'ha (set 2026, richiesta di Andrea): stesse righe, stessi
      nomi, stesso vestito — Controvalore, premio o sconto, Subtotale,
-     «Fee Barattolo» con la pillola «in promo», e il riquadro finale
+     «Fee P2P» con la sua pillola, e il riquadro finale
      con quel che passa di mano. Prima qui c'era una riga sola («6,00
      € — ≈ 12 000 sats») che diceva l'affare e taceva il prezzo: chi
      l'ordine l'ha scritto vedeva DI MENO di chi lo guarda dal libro.
@@ -52677,11 +52682,13 @@ function rigaTettoFeeP2P(){
        diventa un'altra — lo sconto resta vero */
     const mia = fee < commissioneVivaP2P();
     const piena = mezzaCommissioneP2P(commissioneVivaP2P());
+    /* «la fee P2P», lo stesso nome della riga del conto (25 set
+       2026): era «la commissione di Barattolo» */
     pezzi.push(mia
-      ? 'la commissione di Barattolo è ' + articoloPercentoP2P(piena)
+      ? 'la fee P2P è ' + articoloPercentoP2P(piena)
         + piena + '% per parte, e tu hai uno '
         + scontoFedeltaTestoP2P(p2pSconto.punti)
-      : 'la commissione di Barattolo è ' + articoloPercentoP2P(q)
+      : 'la fee P2P è ' + articoloPercentoP2P(q)
         + q + '% per parte');
   }
   if (!pezzi.length) return '';

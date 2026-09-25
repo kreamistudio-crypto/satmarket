@@ -23481,6 +23481,17 @@ def prove_pagina_acquisto():
     #    la pillola «in promo» accanto allo zero.
     prova("nel conto la fee porta il nome di casa", (True, False),
           ("r('Fee Barattolo'" in _cr, "Commissione Barattolo" in _cr))
+    #    ...MA NEL P2P SI CHIAMA «FEE P2P» (25 set 2026, ritocco di
+    #    Andrea): il censimento sul CODICE, senza i commenti che
+    #    raccontano com'era. «Fee Barattolo» sta nel solo conto del
+    #    mercatino; nel P2P ne' lei ne' «la commissione di Barattolo».
+    _cod = re.sub(r"/\*[\s\S]*?\*/", "", mini3)
+    prova("«Fee Barattolo» esce UNA volta sola: il conto del mercatino",
+          1, _cod.count("'Fee Barattolo'"))
+    prova("...e il P2P ha la sua voce, «Fee P2P», una volta sola", 1,
+          _cod.count("'Fee P2P'"))
+    prova("...e nessuna frase dice «commissione di Barattolo»", 0,
+          _cod.lower().count("commissione di barattolo"))
     #    E L'ALIQUOTA STA ATTACCATA AL NOME (set 2026, ritocco di
     #    Andrea), come nel conto del P2P: «Fee Barattolo 3%». ⚠️ E' LA
     #    PERCENTUALE VIVA DEL SERVER e mai un numero cablato — la leva
@@ -53178,7 +53189,7 @@ console.log(JSON.stringify(out));
           # l'aliquota sta ATTACCATA al nome e in ROSSO, che e' un
           # costo: a perdere il colore sono state le CIFRE a destra,
           # non le percentuali a sinistra — due colonne, due letture
-          '<span>Fee Barattolo <b class="p2p-avviso">1%</b></span>' in cm
+          '<span>Fee P2P <b class="p2p-avviso">1%</b></span>' in cm
           and '<span class="num meno">≈ −120 sats</span>' in cm
           and "Commissione Barattolo" not in cm)
     prova("...e il conto SOMMA: Ricevi = controvalore − meta'", True,
@@ -53278,7 +53289,7 @@ console.log(JSON.stringify(out));
           "dello scambio)" not in cm and "metà a testa" not in cm
           and 'class="hint"' not in cm)
     prova("...e la commissione la dice la riga, con la meta' di chi legge",
-          True, "Fee Barattolo" in cm
+          True, "Fee P2P" in cm
           and '<b class="p2p-avviso">1%</b>' in cm)
     # COL PREMIO: la percentuale sta nell'ETICHETTA, attaccata al
     # nome della voce e in tinta col giudizio di sempre — «Premio al
@@ -53306,7 +53317,7 @@ console.log(JSON.stringify(out));
           True,
           o["contoPremio"].index("Premio al venditore")
           < o["contoPremio"].index("Subtotale")
-          < o["contoPremio"].index("Fee Barattolo"))
+          < o["contoPremio"].index("Fee P2P"))
     # ...e il conto SOMMA: 12000 − 480 = 11520, meno l'1% (115) = 11405
     prova("...e il subtotale e' la base su cui la fee si calcola", True,
           '<span class="num">≈ 11520 sats</span>' in o["contoPremio"]
@@ -53421,14 +53432,14 @@ console.log(JSON.stringify(out));
     # non trova niente fa esplodere la suite con un IndexError invece
     # di dire una rossa leggibile.
     def _riga_fee(html):
-        i = html.index("Fee Barattolo")
+        i = html.index("Fee P2P")
         return html[i:html.index("</div>", i)]
     # ⚠️ IL CASO VERO DI OGGI: listino 3 sul VPS, fee viva 2 — la
     # promo scatta e la pillola sta accanto all'aliquota di chi legge,
     # che e' la META' (1%) e non la fee intera.
     prova("col listino 3 la fee al 2% e' beta, e la meta' e' 1%",
           True,
-          '<span>Fee Barattolo <b class="p2p-avviso">1%</b>'
+          '<span>Fee P2P <b class="p2p-avviso">1%</b>'
           '<span class="promo-tag dopo">beta</span></span>'
           in o["contoListino3"])
     prova("...e a fee zero il cartello dice 0 sats, come il mercatino",
@@ -53459,7 +53470,7 @@ console.log(JSON.stringify(out));
                 for n in re.findall(r"([\d.]+) sats", html)]
     prova("il conto dello scambio proprio e' quello del libro", True,
           '<div class="ctrl-conto conto-p2p">' in o["mioStima"]
-          and "Fee Barattolo" in o["mioStima"] and "Ricevi" in o["mioStima"])
+          and "Fee P2P" in o["mioStima"] and "Ricevi" in o["mioStima"])
     # ⚠️ LA CIFRA DEL COORDINATORE E' UN FATTO E NON UNA STIMA: senza
     # `≈`, e la fee ci morde sopra. E' la promessa di «Info P2P» —
     # presa in carico l'ordine, quel che si legge non cambia piu'.
@@ -64431,7 +64442,7 @@ console.log(JSON.stringify(out));
     o8 = _js.loads(r8.stdout.strip())
     prova("la riga di oggi, coi due numeri vivi",
           '<div class="hint">Al momento si accettano ordini fino a '
-          '500\u202f000 sats \u2014 la commissione di Barattolo '
+          '500\u202f000 sats \u2014 la fee P2P '
           "\u00e8 dell'1% per parte</div>", o8["oggi"])
     prova("...e con la fee al 4% la riga dice «del 2% per parte»", True,
           "del 2% per parte" in o8["quattro"])
@@ -64441,8 +64452,8 @@ console.log(JSON.stringify(out));
           "dello 0,5% per parte" in o8["mezzo"])
     prova("un pezzo solo resta solo, con la sua maiuscola", [True, True],
           [o8["soloTetto"].startswith('<div class="hint">Al momento')
-           and "commissione" not in o8["soloTetto"],
-           o8["soloFee"].startswith('<div class="hint">La commissione')
+           and "fee P2P" not in o8["soloTetto"],
+           o8["soloFee"].startswith('<div class="hint">La fee P2P')
            and "ordini fino a" not in o8["soloFee"]])
     prova("...e senza impostazioni la riga non nasce affatto", "", o8["muto"])
     prova("gli articoli, uno per uno",
@@ -64461,7 +64472,7 @@ console.log(JSON.stringify(out));
           ["", True, True],
           [o8["maxMuto"],
            o8["scatolaSenzaTetto"].startswith('<div class="p2p-sez">'),
-           "commissione" in o8["scatolaSenzaTetto"]
+           "fee P2P" in o8["scatolaSenzaTetto"]
            and "ordini fino a" not in o8["scatolaSenzaTetto"]])
     prova("...e senza impostazioni la scatola non nasce affatto",
           "", o8["scatolaMuta"])
@@ -88892,7 +88903,7 @@ def prove_livello_accanto_al_titolo():
        `scontoFedeltaTestoP2P`. Si FANNO GIRARE: una sentinella direbbe
        che la funzione c'e', non che dica la cosa giusta.
     4) IL CONTO DELLO SCAMBIO NO (25 set 2026, ritocco di Andrea su
-       d717b12): li' «Fee Barattolo 1%» e' la MIA aliquota — fee viva di
+       d717b12): li' «Fee P2P 1%» e' la MIA aliquota — fee viva di
        mostro meno lo sconto del config, `feeMiaP2P` — con accanto la
        pastiglia del motivo, «🌱 Pioniere» o «Lv. 5»."""
     import re as _re, shutil as _sh, subprocess as _sp, tempfile as _tf
@@ -89061,17 +89072,17 @@ console.log(JSON.stringify(out));
           ["sconto dello 0,5%", "sconto dell'1%", "sconto dello 0,25%",
            "", "", ""], o["testo"])
     prova("il foglio Pubblica senza sconto: la meta' per parte",
-          '<div class="hint">La commissione di Barattolo è dell\'1,5% per parte</div>',
+          '<div class="hint">La fee P2P è dell\'1,5% per parte</div>',
           o["pieno"])
     prova("...con lo sconto: la meta' piena e lo sconto, mai l'1% finale",
-          '<div class="hint">La commissione di Barattolo è dell\'1,5% per parte, '
+          '<div class="hint">La fee P2P è dell\'1,5% per parte, '
           'e tu hai uno sconto dello 0,5%</div>', o["scontato"])
     prova("la pastiglia del conto dice il motivo: 🌱 Pioniere o Lv. 5",
           ["🌱 Pioniere", "Lv. 5"], [o["cartello"], o["cartelloLivello"]])
     prova("...e lo sconto mancato vince sul motivo", "sconto non verificato",
           o["cartelloMancato"])
     prova("la fee cambia sul nodo: la meta' si muove, lo sconto resta",
-          '<div class="hint">La commissione di Barattolo è del 2% per parte, '
+          '<div class="hint">La fee P2P è del 2% per parte, '
           'e tu hai uno sconto dello 0,5%</div>', o["feeNuova"])
 
 

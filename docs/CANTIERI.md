@@ -32735,3 +32735,37 @@ E livello 5 «1% 🌱 Pioniere»; il riquadro «Pubblica» dice ancora lo
 sconto. ⚠️ Seminando a mano la coorte vuota il server la RIASSEGNA
 (i primi cento sono pionieri): per un non-pioniere si scrive
 `primi_giorni`, che resta congelata.
+
+## «Fee P2P» nella sezione P2P (25 set 2026)
+
+Ritocco di Andrea: nel P2P la voce della commissione si chiama «Fee P2P»
+e non piu' «Fee Barattolo», che resta il nome del conto del MERCATINO.
+IL CENSIMENTO, sul codice e non sui commenti: il nome della nostra
+commissione compariva a chi legge in DUE punti del P2P.
+1) L'etichetta del conto, `etichettaFee` in `contoDettP2P`: «Fee P2P 1%
+🌱 Pioniere», «Fee P2P 1,5%». E' una stringa sola per tre schermi — il
+dettaglio di un ordine dal libro, la pagina dello scambio e il percorso
+Barattozon, che usa lo stesso conto.
+2) Il riquadro del foglio «Pubblica», `rigaTettoFeeP2P`: «la
+commissione di Barattolo è dell'1,5% per parte» diventa «la fee P2P è
+dell'1,5% per parte» (e con lo sconto «…, e tu hai uno sconto dello
+0,5%»).
+NON cambiano, perche' il nome di Barattolo non ce l'hanno: Info P2P
+(«La commissione dello scambio è 3%»), gli avvisi del bot (l'unica
+frase sulla fee e' «commissione compresa»), le righe di Barattozon che
+parlano di Amazon («senza commissione» e' quella della tabaccheria).
+Nel mercatino «Fee Barattolo» resta dov'era (`contoRighe`).
+
+**PROVATO.** Le prove che leggevano il conto P2P e il riquadro
+aggiornate al nome nuovo (`prove_p2p_dettaglio`, `prove_p2p_pubblica`,
+`prove_livello_accanto_al_titolo`), e in `prove_pagina_acquisto` il
+censimento sul codice senza commenti: «'Fee Barattolo'» una volta sola
+(il mercatino), «'Fee P2P'» una volta sola, «commissione di Barattolo»
+mai.
+Suite intera severa senza config nel worktree da origin/main (c84d044):
+15.929 verdi e 0 rosse. Dal vivo su una copia col server di collaudo
+(relay morto, sconto a 0,5), a 375 px nei due temi via CDP: il conto e
+il riquadro «Pubblica» da pioniere («Fee P2P 1% 🌱 Pioniere», «…la fee
+P2P è dell'1,5% per parte, e tu hai uno sconto dello 0,5%») e senza
+sconto («Fee P2P 1,5%»), e il conto di un ordine Barattozon (Contanti
+al tabacchino, col premio): nessuno sborda.
