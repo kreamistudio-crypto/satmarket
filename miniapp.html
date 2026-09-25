@@ -3922,112 +3922,87 @@
      di serie: qui i cassetti stanno in fila con dei section-label. */
   #adminStats .acc{margin-top:22px}
 
-  /* ---------- LE SEZIONI DEL PROFILO (ago 2026) ----------
-     I cassetti erano diciannove in fila piatta: chi entrava per
-     cambiare una cosa scorreva tre schermate leggendo diciannove
-     titoli senza nessun appiglio. Ora stanno in cinque sezioni
-     richiudibili, chiuse di serie.
+  /* ---------- I CASSETTI DEL PROFILO (set 2026) ----------
+     STORIA IN DUE RIGHE. Ad agosto i diciannove cassetti in fila
+     piatta finirono in sezioni richiudibili, e la sezione fu
+     volutamente una TERZA FORMA — testo nudo sul crema, 18px, la
+     freccia in un cerchietto — per non vestire due livelli uguali (la
+     trappola del doppio significato gia' pagata con «lampo», «attesa»
+     e «nota»). A settembre Andrea ha chiesto il contrario, «Il profilo
+     più elegante»: la pagina era piena di bottoni giganti e di icone,
+     e TUTTO deve stare in cassetti rettangolari con titolo, sottotitolo
+     breve e freccia, SENZA icona; le icone solo sulle voci dentro.
 
-     LA SEZIONE E' UNA TERZA FORMA (ago 2026, dal campo: «i titoli
-     sono troppo piccoli e non sembrano toccabili»). Nasceva come
-     .section-label reso toccabile, e la misura diceva il difetto: 11px
-     GRIGI MAIUSCOLETTI contro i 15px in inchiostro del cassetto —
-     cioe' il livello SOPRA si leggeva piu' piccolo di quello sotto — e
-     le due frecce erano IDENTICHE, 12px nude tutte e due a fine riga.
-     A schermo le sezioni si leggevano come «IL TUO PROFILO», che e' un
-     titolo statico che non si tocca.
+     LA TRAPPOLA RESTA CHIUSA, in un altro modo: il cassetto principale
+     e' la CARTA (bordo, raggio 16, il fondo del cassetto di sempre) col
+     SOTTOTITOLO, e le voci dentro NON sono carte nella carta ma RIGHE
+     della stessa carta — senza bordo ne' fondo loro, separate da un
+     filo che parte dopo il rientro (lo stile delle liste di sistema),
+     con l'icona davanti. Due segni diversi per due livelli: in alto
+     titolo + sottotitolo senza icona, sotto icona + nome su una riga.
 
-     NON DIVENTA UN CASSETTO, e quella ragione resta intera: due
-     livelli con la stessa veste sono la trappola del doppio
-     significato gia' pagata con «lampo», «attesa» e «nota», e un .acc
-     dentro un .acc-b non esiste da nessuna parte nel client. Quindi
-     TRE differenze insieme, guardate a schermo con una sezione APERTA
-     — che e' l'unico caso in cui i due livelli si vedono uno sopra
-     l'altro: 1) LA CARTA — il cassetto e' una card bianca col bordo,
-     la sezione sta sul crema della pagina, ed e' la differenza piu'
-     forte; 2) LA MISURA — 18px contro 15, che il livello sopra dev'
-     essere piu' grande; 3) IL SEGNO DEL TOCCO — la freccia in un
-     CERCHIETTO di carta col contorno, mentre il cassetto ce l'ha NUDA.
-     Piu' il rientro: il testo del cassetto parte molto piu' a destra.
+     E IL DUBBIO DELLA SERA NON MORDE PIU': ad agosto il contorno sul
+     gruppo fu scartato perche' di notte la carta stacca dal fondo solo
+     1,13 e «bordo da 2 contro bordo da 1» si vede confrontando. Qui la
+     distinzione fra i livelli non passa dal contrasto della carta: e'
+     il sottotitolo e l'icona, che si leggono uguali nei due temi.
 
-     E CADE IL MAIUSCOLETTO, che non e' cosmesi: quello e' il registro
-     delle etichette di SERVIZIO in tutto il client, e finche' la
-     sezione lo portava si leggeva come una nota e non come un comando.
-     Per la stessa ragione cade il .section-label dal markup: la
-     sezione non e' piu' un'etichetta, e tenersi la classe vorrebbe
-     dire sovrascriverne ogni proprieta'.
-
-     LE TRE FORME PROVATE E SCARTATE, guardate a schermo prima di
-     decidere: 1) IL CERCHIETTO ATTACCATO AL TESTO invece che a fine
-     riga — i cerchietti finiscono a x diverse, la colonna si perde e
-     la lista si sfilaccia; 2) LA FASCIA VELATA a tutta larghezza —
-     indistinguibile dalla CHECKLIST che sta due dita sopra (stessa
-     larghezza, stesso raggio, fondo simile): sette fasce di fila e tre
-     significati diversi, cioe' il difetto del cantiere spostato di un
-     livello; 3) LA LINEA PIENA SOTTO il titolo — a sezione APERTA
-     taglia fra il titolo e i suoi cassetti, e si legge «finisco qui»
-     invece di «questi sono miei» (il dubbio c'era gia' sulla carta, e
-     il giro dal vivo l'ha confermato peggiore del previsto).
-
-     E LA QUARTA, chiesta due volte a giorni di distanza e quindi
-     la prima che tornera' in mente: IL CONTORNO, cioe' dare al
-     titolo un riquadro come quello dei cassetti. Sul TITOLO
-     fallisce in tutte le sue forme (bordo marcato col fondo
-     vuoto, bordo inchiostro, velo, riquadro sporgente): la
-     sezione diventa un FRATELLO dei cassetti invece del loro
-     contenitore, e il padding laterale del bordo si mangia i
-     29,6px d'aria del titolo lungo, che va a capo. Sul GRUPPO
-     INTERO invece FUNZIONA — il riquadro abbraccia anche i
-     cassetti, quindi dice «contengo» — e di giorno la gerarchia
-     si legge meglio di adesso. MA DI SERA SI ASSOTTIGLIA, ed e'
-     il numero che ha deciso: la carta del cassetto stacca dal
-     fondo notturno appena 1,13, quindi di notte i cassetti
-     sembrano vuoti anche loro e la distinzione passa da «testo
-     nudo contro riquadro» — categoriale, si vede subito — a
-     «bordo da 2 contro bordo da 1», che si vede confrontando.
-     I TRE COSTI, misurati: il Profilo chiuso da 1113 a 1213 a
-     375 (+9%), il tetto del corpo che scende da 19 a 18 — la
-     riserva di un carattere sparisce — e i cassetti piu' stretti
-     di 16px a 320. Chi la ripropone porti il pezzo che manca: un
-     fondo di cassetto che si veda anche di notte.
-
-     `padding:24px 0 8px` e non i `16px var(--pad)` di serie: qui siamo
-     dentro .form, che il rientro laterale ce l'ha gia' e si
-     sommerebbe — e' quel che fa il pannello dei moderatori due righe
-     piu' su. L'aria SOTTO e' nuova e serve: il primo cassetto ha solo
-     i suoi 10px di margine, e senza il titolo gli toccherebbe.
-     `font:inherit` va PRIMA dei longhand, o la scorciatoia azzera
-     corpo e peso — la lezione gia' pagata da .demo-cta.
-
-     ⚠️ IL TETTO E' 19px E IL TITOLO STA A 18, ed e' MISURATO sulla
-     pagina vera e non stimato: a 320px «🏪 Impostazioni di negozio»
-     e' il piu' lungo, e a 20px VA A CAPO (il bottone passa da 60 a
-     90). L'aria che resta prima del cerchietto e' 42px a 17, 30 a
-     18, 17 a 19: sul tetto ci starebbe UN carattere, quindi non ci
-     si piazza sopra — la prossima etichetta un filo piu' lunga lo
-     romperebbe. Chi cresce ancora il corpo, o allunga un titolo,
-     RIMISURI li': e' la larghezza dove la riga si gioca.
-
-     E CRESCERE IL TITOLO NON COSTA UN PIXEL D'ALTEZZA, che e' la
-     cosa che leggendo non si vede: la riga la detta il CERCHIETTO
-     da 28px (align-items:center), e la line box del testo ci sta
-     sotto fino a 19px — il bottone resta 60px a 17, 18 e 19. Per
-     la stessa ragione il cerchietto NON si ingrandisce insieme al
-     titolo: costerebbe due volte, in altezza e nell'aria del testo,
-     mentre a farsi leggere basta il GLIFO dentro — a 11px riempiva
-     il 38% del cerchietto, a 16 ne riempie il 56%. */
-  .grp-h{display:flex;align-items:center;gap:9px;
-    padding:24px 0 8px;border:0;background:none;font:inherit;
-    width:100%;cursor:pointer;text-align:left;
-    font-size:18px;font-weight:800;color:var(--ink)}
-  .grp-h .fr{margin-left:auto;flex:none;width:28px;height:28px;
-    border-radius:50%;background:var(--card);
-    border:1.5px solid var(--field-line);color:var(--ink);font-size:16px;
-    display:flex;align-items:center;justify-content:center;
+     `font:inherit` va PRIMA dei longhand, o la scorciatoia azzera corpo
+     e peso — la lezione gia' pagata da .demo-cta. */
+  .grp{margin-top:10px;background:var(--card);border:1px solid var(--line-soft);
+    border-radius:16px;overflow:hidden}
+  .grp-h{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;
+    border:0;background:none;font:inherit;cursor:pointer;text-align:left;
+    font-size:16px;font-weight:800;line-height:1.25;color:var(--ink)}
+  .grp-h .fr{margin-left:auto;flex:none;color:var(--muted);font-size:13px;
     transition:transform .18s ease}
   .grp.open .grp-h .fr{transform:rotate(180deg)}
   .grp-b{display:none}
   .grp.open .grp-b{display:block}
+  /* TITOLO E SOTTOTITOLO in colonna: la classe la usano il cassetto
+     principale e le voci-porta che hanno bisogno di due parole in piu'
+     (l'export). Il sottotitolo e' una nota, quindi piu' piccolo e
+     sottile — ma nell'inchiostro delle note e non nel grigio muto: a
+     12,5px il --muted sul bianco fa 3,81:1, sotto il 4,5 che il testo
+     piccolo vuole (la regola delle «note piccole davvero»). */
+  .tit2{display:flex;flex-direction:column;min-width:0}
+  .tit2 small{font-size:12.5px;font-weight:600;color:var(--ink-soft);
+    line-height:1.35;margin-top:2px}
+  /* LE VOCI: righe della carta, non carte. Il filo sta in un ::before
+     che parte dal rientro e si ferma prima del bordo — nessun bordo
+     vero, cosi' il `.acc` di serie (margine, fondo, raggio) si
+     spegne qui e resta intatto dovunque altro, pannello dei
+     moderatori compreso (i suoi cassetti stanno dentro #adminStats,
+     non sono figli diretti del corpo). */
+  .grp-b > .acc{margin:0;border:0;border-radius:0;background:none;
+    position:relative}
+  .grp-b > .acc::before{content:'';position:absolute;top:0;left:16px;right:16px;
+    border-top:1px solid var(--line-soft)}
+  .grp-b > .acc > .acc-h{padding:13px 16px;font-size:14.5px;font-weight:700}
+  /* L'ICONA IN UNA COLONNA FISSA: le emoji non sono larghe uguali (e
+     «</>» del widget e' tre caratteri), e senza colonna i nomi delle voci
+     partivano a x diverse — la lista si sfilacciava. */
+  .grp-b > .acc > .acc-h .em{flex:none;width:24px;text-align:center}
+  .acc-h .em.em-testo{font-size:12px;font-weight:800;letter-spacing:-.5px}
+  /* LA VOCE-PORTA: la veste della voce, ma la freccia › dice che si va
+     altrove invece di aprire qui (le porte che erano bottoni a tutta
+     larghezza). Non ruota mai: non ha niente da aprire. */
+  .voce-porta .acc-h .fr{font-size:20px;font-weight:700;line-height:1;transform:none}
+  /* il pannello dei moderatori non e' fatto di voci: e' un pannello, e
+     dentro la carta prende l'aria dei corpi dei cassetti */
+  #grpAdmin .grp-b{padding:0 14px 14px}
+  /* IL TITOLO DELLA PAGINA, in alto e al centro (set 2026): la veste
+     di `.form h2` (lo stesso carattere delle pagine di racconto), piu'
+     il centro. La specificita' serve: `.form h2` sta piu' giu'. */
+  .form h2.profilo-tit{text-align:center;margin:4px 0 0}
+  /* I DUE BOTTONI DEL PIEDE, gli unici fuori dai cassetti: gemelli
+     come «Fai un'offerta» / «Acquista», con la base al 50% e non a 0
+     (la lezione gia' pagata li': con la base a zero il bordo del ghost
+     si somma FUORI e i due escono diversi). Da soli restano a meta' e
+     al centro. `.btn.ghost` porta un margine suo e sta piu' giu' nel
+     foglio: da qui lo si batte con la specificita'. */
+  .profilo-piede{display:flex;justify-content:center;gap:10px;margin-top:22px}
+  .profilo-piede .btn.ghost{flex:0 1 50%;width:auto;min-width:0;margin-top:0}
 
   /* ---------- ⚙️ stato delle leve (ago 2026) ----------
      Settanta righe fitte: il nome a sinistra con sotto la chiave da
@@ -10083,7 +10058,7 @@ document.getElementById('cartello')?.remove();</script>
              toglierlo e' nato: prima il server la stringa vuota la
              accettava ma dal client non si arrivava, e «finche' non lo
              togli» sarebbe stata una porta che non si apre. -->
-        <li><b>Il tuo Lightning address</b>, se l'hai impostato: <b>finché non lo togli</b>. Sta nel Profilo, in «⚡ Incassi e pagamenti», col suo bottone.</li>
+        <li><b>Il tuo Lightning address</b>, se l'hai impostato: <b>finché non lo togli</b>. Sta nel Profilo, in «Incassi e pagamenti», col suo bottone.</li>
         <!-- Ricade sotto «tutto il resto non ha una scadenza», ma si
              nomina lo stesso: e' testo LIBERO scritto da una persona, e
              chi lo scrive ha diritto di sapere che resta. La strada per
@@ -10550,14 +10525,46 @@ document.getElementById('cartello')?.remove();</script>
        non la logica. -->
   <div class="view" id="view-profilo">
     <div class="form">
-      <div class="section-label" style="padding-top:22px">Il tuo profilo</div>
+      <!-- IL TITOLO IN ALTO, AL CENTRO (set 2026, «Il profilo più
+           elegante»): era l'etichetta di servizio in maiuscoletto
+           grigio, cioe' il registro delle note. Adesso e' il titolo
+           della pagina, nello stesso carattere di quelli delle pagine
+           di racconto (.sicu-hero h2), un filo piu' piccolo. -->
+      <h2 class="profilo-tit">Il tuo profilo</h2>
       <div id="profiloTestata"></div>
       <!-- (Gli account aperti NON stanno qui: vivono nel foglio che si
            apre col SECONDO tocco sul tappo — vedi toccaTappo(). Un
            elenco in pagina e uno nel foglio sarebbero due posti per la
            stessa cosa, che e' il difetto che il gesto esiste per
            togliere.) -->
-      <div id="profiloChecklist"></div>
+      <!-- ============ I CASSETTI DEL PROFILO (set 2026) ============
+           «Il profilo più elegante» (richiesta di Andrea): la pagina era
+           piena di bottoni a tutta larghezza e di icone. Adesso TUTTO
+           sta dentro cassetti rettangolari — titolo, sottotitolo breve e
+           freccia, SENZA icona — e i bottoni di prima sono VOCI dentro
+           il cassetto giusto: le icone restano solo li'. Fuori restano
+           soltanto «Tutorial» ed «Esci», affiancati in fondo.
+           UNO ALLA VOLTA (toggleGrp): aprendone uno si chiude l'altro,
+           e l'intestazione toccata resta ferma sotto il dito. Le voci
+           dentro restano indipendenti, come sempre.
+           ROVESCIA LA DECISIONE D'AGOSTO («la sezione non diventa un
+           cassetto»), e lo fa sapendolo: la trappola era DUE LIVELLI
+           CON LA STESSA VESTE. Qui il cassetto e' la carta col
+           sottotitolo e le voci sono RIGHE DELLA STESSA CARTA (icona +
+           nome, separate da un filo), mai carte dentro una carta.
+           Gli id dei gruppi e dei cassetti restano quelli di sempre,
+           tranne il vecchio `walletBlocco`, diviso in tre voci. -->
+      <!-- «Completa il profilo (N di M)»: le righe arancio di prima
+           diventano un cassetto come gli altri. Il guscio e' FISSO,
+           renderChecklist ne scrive solo il sottotitolo e le voci: cosi'
+           un ridisegno non gli chiude il cassetto in mano, e a profilo
+           completo il corpo vuoto lo spegne da solo
+           (aggiornaGruppiProfilo, «un titolo sul vuoto»). -->
+      <div class="grp" id="grpChecklist" style="display:none">
+        <button type="button" class="grp-h" onclick="toggleGrp('grpChecklist')"
+                aria-expanded="false"><span class="tit2">Completa il profilo<small id="checklistConta"></small></span><span class="fr">▾</span></button>
+        <div class="grp-b" id="profiloChecklist"></div>
+      </div>
       <!-- ============ LE CINQUE SEZIONI (ago 2026) ============
            I cassetti erano una lista piatta di diciannove voci in ordine
            di sedimentazione storica: impostazioni di negozio, dati
@@ -10576,7 +10583,7 @@ document.getElementById('cartello')?.remove();</script>
            render, e /api/me non ha un campo che lo dica. ============ -->
       <div class="grp" id="grpCatalogo">
         <button type="button" class="grp-h" onclick="toggleGrp('grpCatalogo')"
-                aria-expanded="false">📋 Il tuo catalogo<span class="fr">▾</span></button>
+                aria-expanded="false"><span class="tit2">Il tuo catalogo<small>Annunci, import e catalogo esterno</small></span><span class="fr">▾</span></button>
         <div class="grp-b">
       <div class="acc" id="accAnnunci">
         <button class="acc-h" onclick="toggleAcc('accAnnunci')"><span class="em">📋</span>I tuoi annunci<span class="fr">▾</span></button>
@@ -10657,7 +10664,7 @@ document.getElementById('cartello')?.remove();</script>
 
       <div class="grp" id="grpNegozio">
         <button type="button" class="grp-h" onclick="toggleGrp('grpNegozio')"
-                aria-expanded="false">🏪 Impostazioni di negozio<span class="fr">▾</span></button>
+                aria-expanded="false"><span class="tit2">Negozio e spedizioni<small>Vetrina, spedizioni, sconti e ferie</small></span><span class="fr">▾</span></button>
         <div class="grp-b">
       <!-- 📊 IL TUO NEGOZIO (24 set 2026): i numeri della bottega —
            visite alla pagina, aperture dallo spazio in vetrina,
@@ -10669,6 +10676,18 @@ document.getElementById('cartello')?.remove();</script>
       <div class="acc" id="accNumeriNegozio" style="display:none">
         <button class="acc-h" onclick="toggleAcc('accNumeriNegozio')"><span class="em">📊</span>Il tuo negozio <span class="conta" id="numeriNegozioConta"></span><span class="fr">▾</span></button>
         <div class="acc-b"><div id="numeriNegozioBlocco"></div></div>
+      </div>
+
+      <!-- LE DUE PORTE DEL NEGOZIO (set 2026): erano i due bottoni a
+           tutta larghezza sotto il biglietto da visita. Adesso sono
+           VOCI-PORTA — la veste del cassetto, ma la freccia › dice che
+           si va altrove invece di aprire qui. Stesse condizioni di
+           prima, decise da renderProfilo; nascono spente. -->
+      <div class="acc voce-porta" id="vocMioNegozio" style="display:none">
+        <button type="button" class="acc-h" onclick="apriMioNegozio()"><span class="em">👁</span>Guarda il tuo negozio come lo vedono tutti<span class="fr">›</span></button>
+      </div>
+      <div class="acc voce-porta" id="vocWidgetNegozio" style="display:none">
+        <button type="button" class="acc-h" onclick="apriWidget('negozio')"><span class="em em-testo">&lt;/&gt;</span>Widget per il web<span class="fr">›</span></button>
       </div>
 
       <!-- I corrieri del negozio (ago 2026, al PLURALE dal cantiere
@@ -10751,7 +10770,7 @@ document.getElementById('cartello')?.remove();</script>
 
       <div class="grp" id="grpCompri">
         <button type="button" class="grp-h" onclick="toggleGrp('grpCompri')"
-                aria-expanded="false">🫙 Quando compri<span class="fr">▾</span></button>
+                aria-expanded="false"><span class="tit2">Quando compri<small>Preferiti, ricerche, ritiro e garanzia</small></span><span class="fr">▾</span></button>
         <div class="grp-b">
       <!-- I preferiti, primo cassetto: cio' che hai messo da parte
            col barattolino. In demo e vetrina non esiste (il patto
@@ -10764,44 +10783,6 @@ document.getElementById('cartello')?.remove();</script>
       <div class="acc" id="accRicerche" style="display:none">
         <button class="acc-h" onclick="toggleAcc('accRicerche')"><span class="em">🔎</span>Avvisi di ricerca <span class="conta" id="ricercheConta"></span><span class="fr">▾</span></button>
         <div class="acc-b"><div id="ricercheBlocco"></div></div>
-      </div>
-        </div>
-      </div>
-
-      <div class="grp" id="grpPrivacy">
-        <button type="button" class="grp-h" onclick="toggleGrp('grpPrivacy')"
-                aria-expanded="false">🔐 Privacy<span class="fr">▾</span></button>
-        <div class="grp-b">
-      <div class="acc" id="accIdentita">
-        <button class="acc-h" onclick="toggleAcc('accIdentita')"><span class="em">🆔</span>Identità<span class="fr">▾</span></button>
-        <div class="acc-b">
-          <!-- Niente piu' campo a mano, verifica con nota pubblica, ne'
-               invito NIP-85 separato (set 2026, decisione di Andrea):
-               davano un badge/una fiducia dichiarata senza mai firmare
-               davvero, e lasciavano pensare che bastasse. "Entra anche
-               con Nostr" qui sotto e' l'UNICA porta, e firma tutto -
-               badge, accesso, fiducia NIP-85 - nello stesso gesto. -->
-          <div id="identitaBlocco"></div>
-        </div>
-      </div>
-
-      <!-- 🧅 IL SITO TOR. Il servizio nascosto ESISTE da prima di questo
-           cassetto — la sua chiave sta nel backup giornaliero — e non lo
-           sapeva nessuno: ONION_HOST non usciva mai verso il client,
-           quindi chi leggeva «Se ti colleghi da Tor» in «I tuoi dati»
-           scopriva che il .onion c'e' e non aveva modo di sapere QUALE.
-           E' lo stesso difetto gia' pagato coi reparti: ci si atterrava
-           bene, ma da dentro l'app quel link non si poteva PRENDERE.
-           QUI NON SI SPIEGA NIENTE, si porta il dato: la spiegazione
-           vive in «I tuoi dati» in tre paragrafi, e riscriverla qui
-           sarebbe la stessa prosa in due posti. Il cassetto porta
-           l'indirizzo, la copia e la porta verso quella sezione — il
-           pattern del recinto escrow, una riga e «Scopri di piu'».
-           Nasce SPENTO come i due sotto: senza indirizzo configurato
-           non deve lampeggiare prima di sparire. -->
-      <div class="acc" id="accTor" style="display:none">
-        <button class="acc-h" onclick="toggleAcc('accTor')"><span class="em">🧅</span>Sito Tor<span class="fr">▾</span></button>
-        <div class="acc-b"><div id="torBlocco"></div></div>
       </div>
 
       <!-- I punti di ritiro che si tiene CHI COMPRA (ago 2026): il
@@ -10820,12 +10801,39 @@ document.getElementById('cartello')?.remove();</script>
         <div class="acc-b"><div id="puntiRitiroBlocco"></div></div>
       </div>
 
-      <div class="acc" id="walletBlocco">
-        <button class="acc-h" onclick="toggleAcc('walletBlocco')"><span class="em">⚡</span>Incassi e pagamenti<span class="fr">▾</span></button>
+      <!-- La porta alla pagina del pagamento protetto (le altre due
+           sono il recinto del dettaglio e la riga di fiducia della
+           vetrina): qui la si cerca a mente fredda, non davanti a un
+           acquisto. Era un bottone a tutta larghezza in fondo alla
+           pagina; dal set 2026 e' una voce-porta di «Quando compri». -->
+      <div class="acc voce-porta" id="vocSicurezza">
+        <button type="button" class="acc-h" onclick="apriSicurezza()"><span class="em">🔒</span>Come funziona il pagamento protetto<span class="fr">›</span></button>
+      </div>
+        </div>
+      </div>
+
+      <div class="grp" id="grpIncassi">
+        <button type="button" class="grp-h" onclick="toggleGrp('grpIncassi')"
+                aria-expanded="false"><span class="tit2">Incassi e pagamenti<small>Lightning address, wallet ed export</small></span><span class="fr">▾</span></button>
+        <div class="grp-b">
+      <!-- ⚡ INCASSI E PAGAMENTI (set 2026): era UN cassetto con dentro
+           tre cose — il Lightning address, il wallet NWC e l'export —
+           e adesso e' un cassetto principale con tre voci. In DEMO
+           spariscono tutte e tre (renderLnAddress, il patto del
+           wallet) e il gruppo si spegne da solo. Il wallet si chiama
+           «Wallet NWC» (decisione di Andrea): «Wallet Lightning» diceva
+           la rete e non il modo, e il Lightning address QUI SOPRA e'
+           Lightning anche lui. -->
+      <div class="acc" id="accLnAddress">
+        <button class="acc-h" onclick="toggleAcc('accLnAddress')"><span class="em">⚡</span>Lightning address<span class="fr">▾</span></button>
+        <div class="acc-b"><div id="lnAddrBlocco"></div></div>
+      </div>
+
+      <div class="acc" id="accNwc">
+        <button class="acc-h" onclick="toggleAcc('accNwc')"><span class="em">👛</span>Wallet NWC (facoltativo)<span class="fr">▾</span></button>
         <div class="acc-b">
-          <div id="lnAddrBlocco"></div>
           <div id="nwcBlocco">
-            <div class="field" style="margin-top:16px" id="nwcCampo"><label>⚡ Wallet Lightning (facoltativo)</label>
+            <div class="field" style="margin-top:16px" id="nwcCampo"><label>La stringa di connessione (NWC)</label>
               <input id="nwcInput" type="password" placeholder="nostr+walletconnect://… (da Alby Hub, Coinos, Primal…)" autocomplete="off" spellcheck="false"></div>
             <button class="btn ghost" style="margin-top:0" id="nwcBottone" onclick="collegaWallet()">⚡ Collega il wallet (NWC)</button>
             <div style="margin-top:8px;font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
@@ -10839,17 +10847,46 @@ document.getElementById('cartello')?.remove();</script>
               la rubasse non potrebbe spendere niente.</div>
             <div id="nwcStato"></div>
           </div>
-          <button class="btn ghost" style="margin-top:16px" onclick="esportaDati()">📄 Esporta i tuoi dati</button>
-          <div style="margin-top:8px;font-size:12.5px;color:var(--ink-soft);font-weight:600;line-height:1.45">
-            Il CSV dei tuoi affari conclusi, comodo per la contabilità.</div>
         </div>
+      </div>
+
+      <div class="acc voce-porta" id="vocEsporta">
+        <button type="button" class="acc-h" onclick="esportaDati()"><span class="em">📄</span><span class="tit2">Esporta i tuoi dati<small>Il CSV dei tuoi affari conclusi, comodo per la contabilità.</small></span><span class="fr">›</span></button>
       </div>
         </div>
       </div>
 
-      <div class="grp" id="grpAccount">
-        <button type="button" class="grp-h" onclick="toggleGrp('grpAccount')"
-                aria-expanded="false">⚙️ Il tuo account<span class="fr">▾</span></button>
+      <div class="grp" id="grpLivello">
+        <button type="button" class="grp-h" onclick="toggleGrp('grpLivello')"
+                aria-expanded="false"><span class="tit2">Livello e inviti<small>Livello, titolo, inviti e distintivi</small></span><span class="fr">▾</span></button>
+        <div class="grp-b">
+      <div class="acc" id="accLivello">
+        <button class="acc-h" onclick="toggleAcc('accLivello')"><span class="em">🎖</span>Livello e titolo <span class="conta" id="livelloConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="livelloBlocco"></div></div>
+      </div>
+
+      <!-- I TUOI INVITI (set 2026): il codice, il link da condividere e
+           due CONTI — quante persone, quanti punti, mai chi. Sta accanto
+           a «Livello e titolo» perche' e' la stessa moneta: gli XP da
+           inviti entrano nello stesso numero. Il campo a mano, per chi e'
+           arrivato senza il link, vive qui dentro e c'e' solo finche' la
+           sua finestra e' aperta. Nasce SPENTO: in DEMO e in vetrina non
+           c'e' un codice vero da mostrare, il patto del wallet. -->
+      <div class="acc" id="accInviti" style="display:none">
+        <button class="acc-h" onclick="toggleAcc('accInviti')"><span class="em">💌</span>I tuoi inviti <span class="conta" id="invitiConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="invitiBlocco"></div></div>
+      </div>
+
+      <div class="acc" id="accDistintivi">
+        <button class="acc-h" onclick="toggleAcc('accDistintivi')"><span class="em">🏅</span>Distintivi <span class="conta" id="distintiviConta"></span><span class="fr">▾</span></button>
+        <div class="acc-b"><div id="distintiviBlocco"></div></div>
+      </div>
+        </div>
+      </div>
+
+      <div class="grp" id="grpAspetto">
+        <button type="button" class="grp-h" onclick="toggleGrp('grpAspetto')"
+                aria-expanded="false"><span class="tit2">Avvisi e aspetto<small>Notifiche, tema e dimensione del testo</small></span><span class="fr">▾</span></button>
         <div class="grp-b">
       <div class="acc" id="accAvvisi">
         <button class="acc-h" onclick="toggleAcc('accAvvisi')"><span class="em">🔔</span>Avvisi<span class="fr">▾</span></button>
@@ -10875,56 +10912,81 @@ document.getElementById('cartello')?.remove();</script>
           <div id="fxRiga"></div>
         </div>
       </div>
-
-      <div class="acc" id="accLivello">
-        <button class="acc-h" onclick="toggleAcc('accLivello')"><span class="em">🎖</span>Livello e titolo <span class="conta" id="livelloConta"></span><span class="fr">▾</span></button>
-        <div class="acc-b"><div id="livelloBlocco"></div></div>
+        </div>
       </div>
 
-      <!-- I TUOI INVITI (set 2026): il codice, il link da condividere e
-           due CONTI — quante persone, quanti punti, mai chi. Sta accanto
-           a «Livello e titolo» perche' e' la stessa moneta: gli XP da
-           inviti entrano nello stesso numero. Il campo a mano, per chi e'
-           arrivato senza il link, vive qui dentro e c'e' solo finche' la
-           sua finestra e' aperta. Nasce SPENTO: in DEMO e in vetrina non
-           c'e' un codice vero da mostrare, il patto del wallet. -->
-      <div class="acc" id="accInviti" style="display:none">
-        <button class="acc-h" onclick="toggleAcc('accInviti')"><span class="em">💌</span>I tuoi inviti <span class="conta" id="invitiConta"></span><span class="fr">▾</span></button>
-        <div class="acc-b"><div id="invitiBlocco"></div></div>
+      <div class="grp" id="grpPrivacy">
+        <button type="button" class="grp-h" onclick="toggleGrp('grpPrivacy')"
+                aria-expanded="false"><span class="tit2">Privacy<small>Identità, i tuoi dati e sito Tor</small></span><span class="fr">▾</span></button>
+        <div class="grp-b">
+      <div class="acc" id="accIdentita">
+        <button class="acc-h" onclick="toggleAcc('accIdentita')"><span class="em">🆔</span>Identità<span class="fr">▾</span></button>
+        <div class="acc-b">
+          <!-- Niente piu' campo a mano, verifica con nota pubblica, ne'
+               invito NIP-85 separato (set 2026, decisione di Andrea):
+               davano un badge/una fiducia dichiarata senza mai firmare
+               davvero, e lasciavano pensare che bastasse. "Entra anche
+               con Nostr" qui sotto e' l'UNICA porta, e firma tutto -
+               badge, accesso, fiducia NIP-85 - nello stesso gesto. -->
+          <div id="identitaBlocco"></div>
+        </div>
       </div>
 
-      <div class="acc" id="accDistintivi">
-        <button class="acc-h" onclick="toggleAcc('accDistintivi')"><span class="em">🏅</span>Distintivi <span class="conta" id="distintiviConta"></span><span class="fr">▾</span></button>
-        <div class="acc-b"><div id="distintiviBlocco"></div></div>
+      <!-- «I tuoi dati»: era un bottone a tutta larghezza in fondo alla
+           pagina; dal set 2026 e' la voce-porta di «Privacy». -->
+      <div class="acc voce-porta" id="vocPrivacy">
+        <button type="button" class="acc-h" onclick="apriPrivacy()"><span class="em">🔐</span>I tuoi dati<span class="fr">›</span></button>
+      </div>
+
+      <!-- 🧅 IL SITO TOR. Il servizio nascosto ESISTE da prima di questo
+           cassetto — la sua chiave sta nel backup giornaliero — e non lo
+           sapeva nessuno: ONION_HOST non usciva mai verso il client,
+           quindi chi leggeva «Se ti colleghi da Tor» in «I tuoi dati»
+           scopriva che il .onion c'e' e non aveva modo di sapere QUALE.
+           E' lo stesso difetto gia' pagato coi reparti: ci si atterrava
+           bene, ma da dentro l'app quel link non si poteva PRENDERE.
+           QUI NON SI SPIEGA NIENTE, si porta il dato: la spiegazione
+           vive in «I tuoi dati» in tre paragrafi, e riscriverla qui
+           sarebbe la stessa prosa in due posti. Il cassetto porta
+           l'indirizzo, la copia e la porta verso quella sezione — il
+           pattern del recinto escrow, una riga e «Scopri di piu'».
+           Nasce SPENTO come i due sotto: senza indirizzo configurato
+           non deve lampeggiare prima di sparire. -->
+      <div class="acc" id="accTor" style="display:none">
+        <button class="acc-h" onclick="toggleAcc('accTor')"><span class="em">🧅</span>Sito Tor<span class="fr">▾</span></button>
+        <div class="acc-b"><div id="torBlocco"></div></div>
       </div>
         </div>
       </div>
 
       <div class="grp" id="grpAdmin">
         <button type="button" class="grp-h" onclick="toggleGrp('grpAdmin')"
-                aria-expanded="false">👑 Amministrazione<span class="fr">▾</span></button>
+                aria-expanded="false"><span class="tit2">Amministrazione<small>Moderazione, leve e registro</small></span><span class="fr">▾</span></button>
         <div class="grp-b">
       <div id="adminStats"></div>
         </div>
       </div>
-      <!-- La terza porta alla pagina del pagamento protetto (le altre
-           due sono il recinto del dettaglio e la riga di fiducia della
-           vetrina): qui la si cerca a mente fredda, non davanti a un
-           acquisto. Non e' un cassetto — non ha niente da aprire. -->
       <!-- La porta della classifica NON vive piu' qui (ago 2026,
            decisione di Andrea): e' il podio in testata, una porta
            sola. -->
-      <!-- «Tutorial»: il giro di benvenuto si rivede quando si vuole.
+      <!-- I DUE BOTTONI IN FONDO (set 2026): gli unici fuori dai
+           cassetti, affiancati e della stessa misura come la coppia
+           «Fai un'offerta» / «Acquista» della barra d'acquisto — basi
+           al 50%, la lezione gia' pagata li'. Se ne resta uno solo
+           (dentro Telegram «Esci» non c'e') tiene la SUA meta', al
+           centro: da solo a tutta larghezza tornerebbe il bottone
+           gigante che il cantiere ha tolto.
+           «Tutorial»: il giro di benvenuto si rivede quando si vuole.
            Nasce NASCOSTO e lo accende renderProfilo dove il tour puo'
            partire davvero — mai in DEMO ne' in VETRINA, dove
            hintAttivi() e' falsa: un bottone che porta a un muro e'
            peggio di un bottone che non c'e'. Rimette il SOLO tour, e
            i «Non ora» degli altri suggerimenti restano spenti. -->
-      <button class="btn ghost" id="profiloTutorial" style="display:none;margin-top:20px" onclick="riavviaTour()"
-        title="Rivedi il giro di benvenuto: le quattro tappe che raccontano il mercatino. I suggerimenti che hai già spento restano spenti.">👋 Tutorial</button>
-      <button class="btn ghost" style="margin-top:20px" onclick="apriSicurezza()">🔒 Come funziona il pagamento protetto</button>
-      <button class="btn ghost" style="margin-top:10px" onclick="apriPrivacy()">🔐 I tuoi dati</button>
-      <button class="btn ghost" id="profiloEsci" style="display:none;margin-top:26px" onclick="esciWeb()">🚪 Esci</button>
+      <div class="profilo-piede">
+        <button class="btn ghost" id="profiloTutorial" style="display:none" onclick="riavviaTour()"
+          title="Rivedi il giro di benvenuto: le quattro tappe che raccontano il mercatino. I suggerimenti che hai già spento restano spenti.">Tutorial</button>
+        <button class="btn ghost" id="profiloEsci" style="display:none" onclick="esciWeb()">Esci</button>
+      </div>
     </div>
   </div>
 
@@ -19811,7 +19873,14 @@ function apriCassettoProfilo(idAcc){
      sincrono, o lo scroll misura una pagina che non ha ancora
      quell'altezza. Con closest lo eredita anche il cassetto che
      qualcuno aggiungera' fra sei mesi, senza un elenco da ricordare. */
-  c?.closest('.grp')?.classList.add('open');
+  /* e UNO ALLA VOLTA anche da qui (set 2026): il suo si apre, gli
+     altri si chiudono — lo scroll qui sotto porta comunque al posto */
+  const g = c?.closest('.grp');
+  if (g) {
+    g.classList.add('open');
+    g.querySelector('.grp-h')?.setAttribute('aria-expanded', 'true');
+    chiudiAltriGruppi(g);
+  }
   if (c && !c.classList.contains('open')) c.classList.add('open');
   setTimeout(()=>c?.scrollIntoView({behavior: tourRidotto() ? 'auto' : 'smooth', block:'start'}), 80);
 }
@@ -20201,7 +20270,7 @@ function aggiornaPayHint(){
   box.innerHTML = (hintAttivi() && !walletNwcPaga() && !hintDismesso('nwc'))
     ? hintHTML('nwc',
         'Con un wallet collegato paghi in un tocco, senza copiare la invoice.',
-        'Collega', "apriCassettoProfilo('walletBlocco')", 'Non ora')
+        'Collega', "apriCassettoProfilo('accNwc')", 'Non ora')
     : '';
 }
 /* L'hint post-pubblicazione viaggia fino alla scheda dell'annuncio
@@ -24304,7 +24373,7 @@ function openDetail(id){
       const h = hintPubblicazione.id === 'lnaddr'
         ? hintHTML('lnaddr',
             'Imposta il tuo Lightning address: quando vendi, i sats ti arrivano da soli.',
-            'Imposta', "apriCassettoProfilo('walletBlocco')", 'Dopo')
+            'Imposta', "apriCassettoProfilo('accLnAddress')", 'Dopo')
         : hintPubblicazione.id === 'npubverifica'
         ? hintHTML('npubverifica',
             'La tua npub non è ancora verificata: il badge 🟣 sugli annunci arriva con la verifica.',
@@ -29063,8 +29132,12 @@ let lnAddrModifica = false;   // true = mostra il campo anche se l'indirizzo c'�
 function renderLnAddress(){
   const box = el('lnAddrBlocco');
   if (!box) return;
-  if (DEMO) { el('walletBlocco').style.display = 'none'; return; }
-  el('walletBlocco').style.display = '';
+  /* le tre voci di «Incassi e pagamenti» (erano un cassetto solo,
+     `walletBlocco`, fino al set 2026): spente insieme, e il gruppo si
+     spegne da solo (aggiornaGruppiProfilo) */
+  const vociIncassi = ['accLnAddress', 'accNwc', 'vocEsporta'];
+  vociIncassi.forEach(id => { if (el(id)) el(id).style.display = DEMO ? 'none' : ''; });
+  if (DEMO) return;
   if (myLnAddress && !lnAddrModifica) {
     box.innerHTML = `
       <div style="margin-top:12px;font-size:13px;font-weight:800;color:var(--trust)">
@@ -29238,11 +29311,31 @@ function toggleAcc(id){
    dove il pannello si rifa' con innerHTML. Fra una sessione e l'altra
    non si ricorda niente: si riparte da chiuso, che e' il default
    dichiarato. ---- */
+/* UNO ALLA VOLTA (set 2026, «Il profilo più elegante»): aprendo un
+   cassetto principale si chiude quello che era aperto, cosi' la pagina
+   resta la mappa corta e non un lenzuolo di cassetti spalancati. Il
+   prezzo della fisarmonica e' il salto — chiudendo un cassetto lungo
+   SOPRA, quello toccato scapperebbe verso l'alto da sotto il dito — e
+   si paga subito: si misura l'intestazione prima e dopo, e si scorre
+   della differenza. Le voci dentro (toggleAcc) restano indipendenti. */
+function chiudiAltriGruppi(tenuto){
+  document.querySelectorAll('#view-profilo .grp').forEach(g => {
+    if (g === tenuto || !g.classList.contains('open')) return;
+    g.classList.remove('open');
+    g.querySelector('.grp-h')?.setAttribute('aria-expanded', 'false');
+  });
+}
 function toggleGrp(id){
   haptic();
   const g = el(id); if (!g) return;
+  const h = g.querySelector('.grp-h');
+  const prima = h ? h.getBoundingClientRect().top : 0;
   const aperto = g.classList.toggle('open');
-  g.querySelector('.grp-h')?.setAttribute('aria-expanded', aperto ? 'true' : 'false');
+  h?.setAttribute('aria-expanded', aperto ? 'true' : 'false');
+  if (!aperto) return;
+  chiudiAltriGruppi(g);
+  const salto = h ? h.getBoundingClientRect().top - prima : 0;
+  if (salto) window.scrollBy(0, salto);
 }
 
 /* ---- UN TITOLO CHE SI APRE SUL VUOTO E' PEGGIO DI UN TITOLO CHE NON
@@ -29300,16 +29393,23 @@ function renderProfilo(){
         <div class="rep">${rep}</div>
       </div>
       ${tondi}
-    </div>
-    ${(myUsername||myNegozio)&&!DEMO&&!VETRINA?`<button class="btn ghost" style="margin-top:0" onclick="apriMioNegozio()">👁 Guarda il tuo negozio come lo vedono tutti</button>`:''}
-    ${(myNegozio)&&!DEMO&&!VETRINA?`<button class="btn ghost" onclick="apriWidget('negozio')">&lt;/&gt; Widget per il web</button>`:''}`;
+    </div>`;
+  /* Le due porte del negozio non sono piu' bottoni sotto il biglietto
+     da visita (set 2026): sono voci di «Negozio e spedizioni», con le
+     STESSE condizioni di prima. Si decidono qui, prima di
+     aggiornaGruppiProfilo che legge chi e' visibile. */
+  if (el('vocMioNegozio')) el('vocMioNegozio').style.display =
+    (myUsername||myNegozio)&&!DEMO&&!VETRINA ? '' : 'none';
+  if (el('vocWidgetNegozio')) el('vocWidgetNegozio').style.display =
+    (myNegozio)&&!DEMO&&!VETRINA ? '' : 'none';
   /* «Esci» dice cosa fa: con piu' account aperti esce da QUESTO e
      passa a chi resta, e chiamarlo «Esci» secco farebbe temere di
-     perderli tutti in un colpo. */
+     perderli tutti in un colpo. Senza icona dal set 2026: e' uno dei
+     due bottoni del piede, gemello di «Tutorial». */
   if (el('profiloEsci')) {
     el('profiloEsci').style.display = WEB ? '' : 'none';
     el('profiloEsci').textContent = accountAperti.length > 1
-      ? '🚪 Esci da questo account' : '🚪 Esci';
+      ? 'Esci da questo account' : 'Esci';
   }
   /* «Tutorial» c'e' dove il tour puo' partire davvero: hintAttivi()
      e' la stessa guardia che tourBenvenuto interroga per prima. */
@@ -29331,42 +29431,46 @@ function renderProfilo(){
 /* ---- «Completa il profilo (N di M)»: il promemoria consultabile.
    Niente dismiss: e' derivato dai dati veri e quando il profilo e'
    completo sparisce da solo — sparire E' il premio. ---- */
-let checklistAperta = false;
+/* DAL SET 2026 E' UN CASSETTO come gli altri («Il profilo più
+   elegante»): il guscio `grpChecklist` sta fisso nel markup e qui si
+   scrivono solo il sottotitolo e le voci — voci-porta, che aprono il
+   cassetto giusto. Aperto o chiuso lo dice la classe sul guscio, che un
+   ridisegno non tocca: la variabile di prima (e il ridisegno a ogni
+   tocco) non serve piu'. A profilo completo, o in DEMO e in vetrina, il
+   corpo resta vuoto e aggiornaGruppiProfilo spegne il cassetto. */
 let checklistPrimoSguardo = true;   // valutato una volta per pagina
 function renderChecklist(){
   const box = el('profiloChecklist');
   if (!box) return;
   if (DEMO || VETRINA) { box.innerHTML = ''; return; }
   const voci = [
-    {ok: !!myLnAddress, txt:'⚡ Lightning address: quando vendi, incassi da solo', acc:'walletBlocco'},
-    {ok: !!(myNpub && myNpubVerified), txt:'🟣 Npub verificata: il badge sui tuoi annunci', acc:'accIdentita'},
-    {ok: !!walletNwc(), txt:'⚡ Wallet collegato su questo dispositivo (Compra subito)', acc:'walletBlocco'},
+    {ok: !!myLnAddress, em:'⚡', txt:'Lightning address: quando vendi, incassi da solo', acc:'accLnAddress'},
+    {ok: !!(myNpub && myNpubVerified), em:'🟣', txt:'Npub verificata: il badge sui tuoi annunci', acc:'accIdentita'},
+    {ok: !!walletNwc(), em:'⚡', txt:'Wallet collegato su questo dispositivo (Compra subito)', acc:'accNwc'},
   ];
   if (myTgId != null && myTgId < 0)
-    voci.push({ok:false, txt:'✈️ Telegram collegato: gli avvisi in chat', acc:'accIdentita'});
+    voci.push({ok:false, em:'✈️', txt:'Telegram collegato: gli avvisi in chat', acc:'accIdentita'});
   const fatte = voci.filter(v=>v.ok).length;
   if (fatte === voci.length) { box.innerHTML = ''; return; }
   /* Alla PRIMA visita in assoluto del Profilo (per dispositivo) con
-     un profilo incompleto le voci si mostrano gia' aperte: l'utente
+     un profilo incompleto il cassetto si mostra gia' aperto: l'utente
      vede subito cosa manca senza dover toccare. Dalla seconda in poi
-     torna chiusa com'e' sempre stata; la logica delle voci non cambia. */
+     torna chiuso com'e' sempre stato; la logica delle voci non cambia. */
   if (checklistPrimoSguardo) {
     checklistPrimoSguardo = false;
     if (!hintDismesso('checklistvista')) {
-      checklistAperta = true;
+      const g = el('grpChecklist');
+      g?.classList.add('open');
+      g?.querySelector('.grp-h')?.setAttribute('aria-expanded', 'true');
       timbraVisto('checklistvista');
     }
   }
-  const righe = voci.filter(v=>!v.ok).map(v=>
-    `<div class="hintline" style="margin-top:6px;cursor:pointer"
-       onclick="apriCassettoProfilo('${v.acc}')"><span>${v.txt}</span>
-       <span class="hl-az"><a>›</a></span></div>`).join('');
-  box.innerHTML = `
-    <div class="hintline" style="cursor:pointer"
-      onclick="checklistAperta=!checklistAperta;renderChecklist()">
-      <b>Completa il profilo (${fatte} di ${voci.length})</b>
-      <span class="hl-az"><a>${checklistAperta?'▴':'▾'}</a></span></div>
-    ${checklistAperta ? righe : ''}`;
+  const conta = el('checklistConta');
+  if (conta) conta.textContent = `${fatte} di ${voci.length} fatti`;
+  box.innerHTML = voci.filter(v=>!v.ok).map(v=>`
+    <div class="acc voce-porta">
+      <button type="button" class="acc-h" onclick="apriCassettoProfilo('${v.acc}')"><span class="em">${v.em}</span>${v.txt}<span class="fr">›</span></button>
+    </div>`).join('');
 }
 
 /* ---- 🏅 I distintivi: guadagnati a colori con la data, mancanti in
@@ -39348,7 +39452,7 @@ async function trattamiDaNuovo(){
   go('esplora');                   // il tour vive in vetrina: ci si va
   modaleTest(tourBenvenuto);       // il cartello del rodaggio, poi il tour
   checklistPrimoSguardo = true;    // e la checklist si riapre da sola
-  checklistAperta = false;
+  el('grpChecklist')?.classList.remove('open');
   renderChecklist();
   toast('🧽 Fatto: per gli hint sei di nuovo un nuovo arrivato');
 }

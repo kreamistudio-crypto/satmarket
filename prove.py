@@ -43314,7 +43314,7 @@ def prove_numeri_negozio():
     _gi = mini.index('<div class="grp" id="grpNegozio">')
     _ac = mini.find('<div class="acc" id="accNumeriNegozio" style="display:none">')
     _sp = mini.index('id="accSpedizioniere"')
-    prova("il cassetto sta in «Impostazioni di negozio», per primo, spento",
+    prova("il cassetto sta in «Negozio e spedizioni», per primo, spento",
           True, _gi < _ac < _sp)
     prova("...col titolo chiesto", True,
           '<span class="em">📊</span>Il tuo negozio' in mini[_ac:_sp])
@@ -77669,8 +77669,16 @@ def prove_introduzioni_leggibili():
     riga = "font-size:12.5px;color:var(--{});font-weight:600;line-height:1.45"
     prova("nessuna riga d'introduzione e' rimasta in --muted", 0,
           mini.count(riga.format("muted")))
-    prova("...e sono tutte in --ink-soft (le 26 di ieri e le 2 di prima)",
-          True, mini.count(riga.format("ink-soft")) >= 28)
+    # 27 e non 28 dal set 2026 («Il profilo più elegante»): la riga
+    # dell'export («Il CSV dei tuoi affari conclusi…») e' diventata il
+    # sottotitolo della sua voce, `.tit2 small`, che e' --ink-soft anche
+    # lui — ed e' la riga qui sotto a dirlo.
+    prova("...e sono tutte in --ink-soft (le 26 di ieri e le 2 di prima, "
+          "meno l'export salito a sottotitolo)",
+          True, mini.count(riga.format("ink-soft")) >= 27)
+    _t2 = mini[mini.index("  .tit2 small{"):]
+    prova("...e il sottotitolo dei cassetti e' nell'inchiostro delle note",
+          True, "color:var(--ink-soft)" in _t2[:_t2.index("}")])
 
     # IL SECONDO GIRO (24 set 2026, richiesta di Andrea): la riga sopra
     # guardava UNO stile esatto, e fuori da lui restavano in --muted
@@ -85693,6 +85701,7 @@ def _banco_profilo(mini):
     pezzi = []
     for nome in ("function apriCassettoProfilo(idAcc){",
                  "function aggiornaGruppiProfilo(){",
+                 "function chiudiAltriGruppi(tenuto){",
                  "function toggleGrp(id){",
                  "function renderTor(){"):
         # pezzo_js si ferma PRIMA del terminatore: la graffa finale
@@ -85714,6 +85723,11 @@ function Nodo(cls, id){
 }
 Nodo.prototype.appendChild = function(n){ n.padre = this; this.figli.push(n); return n; };
 Nodo.prototype.setAttribute = function(k,v){ this.attr[k] = v; };
+// la fisarmonica misura l'intestazione prima e dopo (set 2026): il
+// banco le fa dire un salto finto, e conta di quanto si scorre
+let SALTO = 0, SCORSO = 0;
+Nodo.prototype.getBoundingClientRect = function(){ return {top: this.chiesto = (this.chiesto||0) + SALTO}; };
+const window = { scrollBy: (x, y)=>{ SCORSO += y; } };
 let COME = null;
 Nodo.prototype.scrollIntoView = function(o){ SCROLL++; COME = o && o.behavior; };
 Nodo.prototype.closest = function(sel){
@@ -85777,12 +85791,26 @@ apriCassettoProfilo('c2');
 out.cassetto = NODI['c2'].classList.contains('open');
 out.gruppo = NODI['g1'].classList.contains('open');
 out.scroll = SCROLL;
-// 2) toggleGrp apre il suo e non tocca gli altri
-NODI['g1'].classList.remove('open');
+// 1b) ...e chiude gli altri (uno alla volta, set 2026)
+NODI['g2'].classList.add('open');
+apriCassettoProfilo('c1');
+out.altroChiuso = NODI['g2'].classList.contains('open');
+out.ariaAltro = NODI['g2'].querySelector('.grp-h').attr['aria-expanded'];
+// 2) toggleGrp apre il suo e CHIUDE gli altri (uno alla volta)
+NODI['g1'].classList.add('open');
+SALTO = 40;
 toggleGrp('g2');
 out.g2 = NODI['g2'].classList.contains('open');
 out.g1 = NODI['g1'].classList.contains('open');
 out.aria = NODI['g2'].querySelector('.grp-h').attr['aria-expanded'];
+out.ariaG1 = NODI['g1'].querySelector('.grp-h').attr['aria-expanded'];
+out.scorso = SCORSO;
+// ...e richiuderlo non scorre e non apre nessun altro
+SCORSO = 0;
+toggleGrp('g2');
+out.richiuso = [NODI['g2'].classList.contains('open'),
+                NODI['g1'].classList.contains('open'), SCORSO];
+SALTO = 0;
 // 3) la sezione vuota sparisce, e la regia e' idempotente
 NODI['c1'].style.display = 'none';
 NODI['c2'].style.display = 'none';
@@ -85833,14 +85861,26 @@ setTimeout(()=>{ out.scroll = SCROLL; out.come = COME;
         # non si vede finche' non lo si prova.
         ("apriCassettoProfilo apre il cassetto E la sua sezione",
          [True, True], [o["cassetto"], o["gruppo"]]),
-        ("e lo scroll parte lo stesso", 1, o["scroll"]),
+        # DUE: il banco ora apre anche c1, per vedere che si chiude g2
+        ("e lo scroll parte lo stesso", 2, o["scroll"]),
         # la scorsa chiede al giudice degli effetti ridotti (set 2026):
         # morbida di serie, secca per chi li ha accesi
         ("...morbido di serie, secco a effetti ridotti",
          ["smooth", "auto"], [o["come"], o["comeRidotti"]]),
-        ("toggleGrp apre il suo e non tocca gli altri",
+        # UNO ALLA VOLTA (set 2026, «Il profilo più elegante»): la
+        # riga di prima diceva «non tocca gli altri», ed era la regola
+        # di allora — la fisarmonica la rovescia apposta.
+        ("apriCassettoProfilo chiude la sezione che era aperta",
+         [False, "false"], [o["altroChiuso"], o["ariaAltro"]]),
+        ("toggleGrp apre il suo e chiude gli altri",
          [True, False], [o["g2"], o["g1"]]),
-        ("e lo dice a voce", "true", o["aria"]),
+        ("e lo dice a voce, ai due", ["true", "false"], [o["aria"], o["ariaG1"]]),
+        # il prezzo della fisarmonica: l'intestazione toccata scappa
+        # verso l'alto se sopra si chiude un cassetto lungo, e si
+        # scorre della differenza misurata
+        ("l'intestazione toccata resta sotto il dito", 40, o["scorso"]),
+        ("richiudere non scorre e non apre nessun altro",
+         [False, False, 0], o["richiuso"]),
         # Un titolo che si apre sul vuoto e' peggio di un titolo che
         # non c'e': in DEMO succede a due sezioni su cinque.
         ("la sezione senza cassetti vivi sparisce", "none", o["vuotoSpento"]),
@@ -85916,7 +85956,11 @@ def prove_profilo_sezioni():
     prova("nessun cassetto del Profilo resta fuori da una sezione",
           [], orfani)
     prova("e ognuno compare una volta sola", len(ids), len(set(ids)))
-    prova("le sezioni sono sei", 6, vista.count('<div class="grp"'))
+    # NOVE dal set 2026 («Il profilo più elegante»): «Completa il
+    # profilo» diventa un cassetto, «Il tuo account» si divide in
+    # «Livello e inviti» e «Avvisi e aspetto», e «Incassi e pagamenti»
+    # sale da cassetto a sezione.
+    prova("le sezioni sono nove", 9, vista.count('<div class="grp"'))
     # LE SEZIONI NASCONO CHIUSE (decisione di Andrea): il Profilo si
     # apre sulla mappa intera, non su un cassetto gia' spalancato.
     prova("nessuna sezione nasce aperta", 0, vista.count('class="grp open"'))
@@ -85933,86 +85977,56 @@ def prove_profilo_sezioni():
     prova("...e si riaccende solo a caricamento riuscito", True,
           "el('grpAdmin').style.display = '';" in las)
 
-    # --- 2) LA FORMA RESTA DISTINTA, ed e' una TERZA e non una delle
-    # due che c'erano (ago 2026): un `.acc` dentro un `.acc-b` non
-    # esiste da nessuna parte nel client, e due livelli con la stessa
-    # veste sarebbero la trappola del doppio significato gia' pagata
-    # con «lampo», «attesa» e «nota».
-    # ⚠️ LE DUE ASSERZIONI QUI SOTTO HANNO CAMBIATO LATO: chiedevano
-    # che la sezione fosse un `.section-label` con la freccia in coda
-    # ai puntini — cioe' certificavano proprio il difetto arrivato dal
-    # campo, «i titoli non sembrano toccabili». La sezione non e' piu'
-    # un'etichetta, e tenersi quella classe vorrebbe dire
-    # sovrascriverne ogni proprieta'.
+    # --- 2) LA FORMA (set 2026, «Il profilo più elegante»). Le
+    # asserzioni di agosto certificavano la TERZA FORMA — testo nudo sul
+    # crema, 18px, la freccia in un cerchietto — ed e' esattamente la
+    # veste che Andrea ha chiesto di cambiare: tutto in cassetti
+    # rettangolari con titolo, sottotitolo e freccia. Cambiano lato, e
+    # resta la regola che le aveva scritte: DUE LIVELLI NON HANNO LA
+    # STESSA VESTE. Il cassetto e' la carta col sottotitolo; le voci
+    # dentro sono righe della carta, non carte nella carta.
     prova("la sezione non e' un'etichetta di servizio", True,
           'class="grp-h"' in vista
           and 'class="section-label grp-h"' not in vista)
     prova("e nemmeno un secondo cassetto", True,
           'class="grp acc"' not in vista)
     css = mini[:mini.index("</style>")]
-    # ⚠️ SI GUARDA DENTRO LA REGIONE DELLA REGOLA e mai tutto il CSS,
-    # ed e' la tortura ad averlo chiesto: `border:1.5px solid
-    # var(--field-line)` vive in DIECI punti del foglio e
-    # `border-radius:50%;background:var(--card)` in due, quindi le
-    # prime stesure passavano PER LA RAGIONE SBAGLIATA — certificavano
-    # che quelle stringhe esistono da qualche parte, non che siano
-    # nella regola della sezione. Due mutazioni sopravvivevano.
+    # si guarda DENTRO la regione della regola, mai tutto il CSS: la
+    # lezione della tortura d'agosto (le stringhe esistono in dieci
+    # posti del foglio)
+    carta = css[css.index("  .grp{"):css.index("  .grp-h{")]
     titolo = css[css.index("  .grp-h{"):css.index("  .grp-h .fr{")]
-    fr = css[css.index("  .grp-h .fr{"):css.index("  .grp.open .grp-h .fr")]
-    # LA MISURA: il livello SOPRA dev'essere piu' grande di quello
-    # sotto. Il cassetto sta a 15px, e prima del cantiere la sezione
-    # stava a 11 — cioe' il contrario.
-    prova("la sezione e' piu' GRANDE del cassetto (18 contro 15)", True,
-          "font-size:18px" in titolo and "font-size:15px" in css[
-              css.index("  .acc-h{"):css.index("  .acc-h .em")])
-    # IL COLORE: un comando non e' una nota di servizio.
+    voce = css[css.index("  .grp-b > .acc{"):css.index("  .grp-b > .acc::before{")]
+    filo = css[css.index("  .grp-b > .acc::before{"):css.index("  .grp-b > .acc > .acc-h{")]
+    riga = css[css.index("  .grp-b > .acc > .acc-h{"):]
+    riga = riga[:riga.index("}") + 1]
+    prova("la sezione e' una carta rettangolare, come i cassetti", True,
+          "background:var(--card)" in carta and "border-radius:16px" in carta
+          and "border:1px solid var(--line-soft)" in carta)
+    prova("...e le voci dentro NON sono carte nella carta", True,
+          "border:0" in voce and "background:none" in voce
+          and "border-radius:0" in voce and "margin:0" in voce)
+    prova("...ma righe separate da un filo col rientro", True,
+          "border-top:1px solid var(--line-soft)" in filo
+          and "left:16px" in filo)
+    # LA MISURA: il livello SOPRA resta piu' grande di quello sotto
+    _ct = int(re.search(r"font-size:(\d+)px", titolo).group(1))
+    _cr = float(re.search(r"font-size:([\d.]+)px", riga).group(1))
+    prova("il titolo della sezione e' piu' grande della voce", True,
+          _ct > _cr)
     prova("e parla l'inchiostro, non il grigio", True,
           "color:var(--ink)" in titolo and "var(--muted)" not in titolo)
-    # IL MAIUSCOLETTO CADE, e non e' cosmesi: e' il registro delle
-    # etichette di SERVIZIO in tutto il client, e finche' la sezione lo
-    # portava si leggeva come una nota invece che come un comando.
     prova("e il maiuscoletto delle etichette non torna", True,
           "text-transform" not in titolo and "letter-spacing" not in titolo)
-    # LA SEZIONE NON PRENDE LA CARTA, che e' la differenza piu' forte
-    # fra i due livelli — e la fascia velata a tutta larghezza fu
-    # scartata a schermo perche' indistinguibile dalla checklist.
-    prova("e non prende la carta del cassetto", True,
-          "background:none" in titolo and "var(--card)" not in titolo)
-    # ⚠️ E `font:inherit` VIENE PRIMA dei longhand, o la scorciatoia
-    # azzera corpo e peso e il titolo torna a 15px EREDITATI — la
-    # stringa `font-size:18px` resterebbe li' a dire il falso. E' la
-    # lezione gia' pagata da .demo-cta, ed e' l'ordine che un riordino
-    # sposta senza vederlo: la tortura ci e' passata attraverso finche'
-    # questa riga non e' esistita.
     prova("...e font:inherit sta PRIMA del corpo, o lo azzera", True,
-          -1 < titolo.find("font:inherit") < titolo.find("font-size:18px"))
-    # IL SEGNO DEL TOCCO: la freccia in un cerchietto di carta col
-    # contorno, che il cassetto ce l'ha NUDA. Misurato a schermo: senza
-    # il bordo il cerchietto non stacca dal crema della pagina.
-    prova("la freccia della sezione sta in un cerchietto", True,
-          "border-radius:50%" in fr and "background:var(--card)" in fr)
-    prova("...col contorno, o non stacca dal crema", True,
-          "border:1.5px solid var(--field-line)" in fr)
-    # ⚠️ IL TETTO E' 19px, MISURATO sulla pagina vera: a 20 il titolo
-    # piu' lungo («Impostazioni di negozio») va a capo a 320px e il
-    # bottone passa da 60 a 90. Qui non si misura il testo — ci vuole
-    # un browser — si inchioda il NUMERO, che e' l'unica cosa che la
-    # CI puo' dire: chi cresce il corpo oltre il tetto lo sente subito
-    # invece di scoprirlo da uno screenshot.
-    _c = int(re.search(r"font-size:(\d+)px", titolo).group(1))
-    prova("il corpo del titolo resta sotto il tetto misurato (19)", True,
-          15 < _c <= 19)
-    # IL GLIFO DENTRO IL CERCHIETTO: a 11px ne riempiva il 38% e non si
-    # leggeva (segnalato dal campo). Non cresce il CERCHIETTO — quello
-    # costerebbe due volte, in altezza della riga e nell'aria del testo
-    # — ma il glifo, che e' quel che si guarda.
-    prova("e il glifo dentro il cerchietto si vede (16, non 11)", True,
-          "font-size:16px" in fr)
-    # E IL CERCHIETTO RESTA 28: e' lui a dettare l'altezza della riga
-    # (align-items:center), quindi crescerlo alzerebbe ogni titolo.
-    prova("...mentre il cerchietto resta 28, o la riga cresce", True,
-          "width:28px;height:28px" in fr)
-    prova("mentre quella del cassetto resta nuda", True,
+          -1 < titolo.find("font:inherit") < titolo.find("font-size:"))
+    prova("il sottotitolo e' una nota: piu' piccolo, nell'inchiostro delle note",
+          True, ".tit2 small{" in css and "color:var(--ink-soft)" in
+          css[css.index(".tit2 small{"):css.index(".tit2 small{") + 120])
+    prova("la voce-porta non ruota: non ha niente da aprire", True,
+          "transform:none" in css[css.index("  .voce-porta .acc-h .fr{"):
+                                  css.index("  .voce-porta .acc-h .fr{") + 120])
+    prova("mentre la freccia del cassetto resta nuda", True,
           "border-radius" not in css[css.index("  .acc-h .fr{"):
                                      css.index("  .acc.open .acc-h .fr")])
     prova("il corpo della sezione si apre con la classe", True,
@@ -87723,6 +87737,205 @@ def prove_timbri_visti():
           {"poste": 0, "scritte": 0}, d["vetrina"])
     prova("cambiando identita' la memoria del conto di prima non vale",
           False, d["cambio"])
+
+
+def prove_profilo_elegante():
+    """IL PROFILO PIÙ ELEGANTE (set 2026, richiesta di Andrea).
+
+    La pagina «Il tuo profilo» era piena di bottoni a tutta larghezza e
+    di icone. Adesso: il titolo al centro, TUTTO dentro cassetti
+    rettangolari (titolo, sottotitolo, freccia, niente icona), i
+    bottoni di prima come voci dentro il cassetto giusto — le icone
+    solo li' —, e fuori soltanto «Tutorial» ed «Esci», affiancati.
+    La prova che vale di piu' e' il CENSIMENTO: ogni funzione che c'era
+    prima e' ancora raggiungibile, una volta sola, dal cassetto
+    deciso — un gesto rimasto fuori o sparito lo dice la CI, non un
+    utente che non trova piu' l'export."""
+    print("\n🫙 Il profilo più elegante")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    i0 = mini.index('<div class="view" id="view-profilo">')
+    i1 = mini.index("<!-- ============ LIGHTBOX", i0)
+    vista = mini[i0:i1]
+
+    # --- le campate dei contenitori, a STACK sui div (i </div> del
+    # markup sono tanti, e un conteggio secco direbbe il falso) ---
+    campate, pila = {}, []
+    for m in re.finditer(r'<div\b([^>]*)>|</div>', vista):
+        if m.group(0) == "</div>":
+            if pila:
+                chi, da = pila.pop()
+                if chi:
+                    campate[chi] = (da, m.end())
+            continue
+        at = m.group(1)
+        c = re.search(r'class="([^"]*)"', at)
+        i = re.search(r'id="([^"]*)"', at)
+        cls = c.group(1).split() if c else []
+        chi = ""
+        if "grp" in cls and i:
+            chi = i.group(1)
+        elif "profilo-piede" in cls:
+            chi = "piede"
+        pila.append((chi, m.start()))
+
+    def dentro(pos, chi):
+        a, b = campate.get(chi, (-1, -1))
+        return a < pos < b
+
+    # --- 1) L'ORDINE DEI CASSETTI, deciso con Andrea ---
+    ordine = re.findall(r'<div class="grp" id="([^"]+)"', vista)
+    prova("i cassetti principali, nell'ordine deciso",
+          ["grpChecklist", "grpCatalogo", "grpNegozio", "grpCompri",
+           "grpIncassi", "grpLivello", "grpAspetto", "grpPrivacy",
+           "grpAdmin"], ordine)
+    prova("...e nessuno nasce aperto", 0, len(re.findall(
+        r'<div class="grp[^"]*\bopen\b', vista)))
+
+    # --- 2) OGNI VOCE NEL SUO CASSETTO, una volta sola: i cassetti di
+    # prima (gli id non cambiano, tranne `walletBlocco` diviso in tre)
+    # e le porte che erano bottoni a tutta larghezza ---
+    CASSETTI = {
+        "grpCatalogo": ["accAnnunci", "accImport", "accPunto", "accDoppioni"],
+        "grpNegozio": ["accNumeriNegozio", "vocMioNegozio", "vocWidgetNegozio",
+                       "accSpedizioniere", "accSpedGratis", "accScontoPacco",
+                       "accCodici", "accBanner", "accSlugNegozio", "accFerie"],
+        "grpCompri": ["accPreferiti", "accRicerche", "accPuntiRitiro",
+                      "vocSicurezza"],
+        "grpIncassi": ["accLnAddress", "accNwc", "vocEsporta"],
+        "grpLivello": ["accLivello", "accInviti", "accDistintivi"],
+        "grpAspetto": ["accAvvisi", "accAspetto"],
+        "grpPrivacy": ["accIdentita", "vocPrivacy", "accTor"],
+    }
+    fuori = []
+    for g, voci in CASSETTI.items():
+        for v in voci:
+            ms = [m.start() for m in re.finditer(r'<div class="acc[^"]*" id="%s"' % v, vista)]
+            if len(ms) != 1 or not dentro(ms[0], g):
+                fuori.append((v, g, len(ms)))
+    prova("ogni voce sta, una volta sola, nel cassetto deciso", [], fuori)
+    tutte = re.findall(r'<div class="acc[^"]*" id="([^"]+)"', vista)
+    prova("...e non ci sono voci fuori censimento", sorted(sum(CASSETTI.values(), [])),
+          sorted(tutte))
+
+    # --- 3) OGNI FUNZIONE DI PRIMA E' RAGGIUNGIBILE, col suo gesto di
+    # sempre: la porta che era un bottone chiama la STESSA funzione ---
+    GESTI = [
+        ("apriMioNegozio()", "grpNegozio"), ("apriWidget('negozio')", "grpNegozio"),
+        ("apriSicurezza()", "grpCompri"), ("apriPrivacy()", "grpPrivacy"),
+        ("esportaDati()", "grpIncassi"), ("collegaWallet()", "grpIncassi"),
+        ("scaricaModelloImport()", "grpCatalogo"), ("importPrepara(this)", "grpCatalogo"),
+        ("setTema('auto')", "grpAspetto"), ("riavviaTour()", "piede"),
+        ("esciWeb()", "piede"),
+    ]
+    persi = []
+    for gesto, dove in GESTI:
+        ms = [m.start() for m in re.finditer(re.escape('onclick="' + gesto + '"'), vista)]
+        if len(ms) != 1 or not dentro(ms[0], dove):
+            persi.append((gesto, dove, len(ms)))
+    prova("ogni gesto di prima si raggiunge, una volta sola, dal posto deciso",
+          [], persi)
+
+    # --- 4) NIENTE BOTTONI GIGANTI FUORI DAI CASSETTI, tranne i due del
+    # piede. Il markup fisso, e la testata che renderProfilo scrive ---
+    sciolti = [m.start() for m in re.finditer(r'class="btn\b', vista)
+               if not any(dentro(m.start(), g) for g in ordine)
+               and not dentro(m.start(), "piede")]
+    prova("nessun bottone a tutta larghezza fuori dai cassetti", [], sciolti)
+    a, b = campate.get("piede", (0, 0))
+    piede = vista[a:b]
+    prova("in fondo solo «Tutorial» ed «Esci»", ["profiloTutorial", "profiloEsci"],
+          re.findall(r'<button class="btn ghost" id="([^"]+)"', piede))
+    prova("...ed e' davvero IN FONDO: dopo l'ultimo cassetto", True,
+          a > campate.get("grpAdmin", (0, 0))[1])
+    rp = pezzo_js(mini, "function renderProfilo(){", "\n}\n")
+    testata = rp[rp.index("box.innerHTML = `"):]
+    testata = testata[:testata.index("`;") + 2]
+    prova("la testata non scrive piu' bottoni", 0, testata.count('class="btn'))
+    css = mini[:mini.index("</style>")]
+    pp = css[css.index("  .profilo-piede .btn.ghost{"):]
+    pp = pp[:pp.index("}")]
+    # la coppia «Fai un'offerta» / «Acquista»: base al 50%, mai a 0
+    prova("i due del piede sono gemelli: base al 50%, e da soli non "
+          "crescono a tutta larghezza", True,
+          "flex:0 1 50%" in pp and "width:auto" in pp)
+    prova("...affiancati", True, ".profilo-piede{display:flex;" in css)
+
+    # --- 5) NIENTE ICONE SUI CASSETTI PRINCIPALI, le icone sulle voci ---
+    teste = re.findall(r'<button type="button" class="grp-h"[^>]*>(.*?)</button>',
+                       vista, re.S)
+    prova("ogni cassetto principale ha la sua intestazione", len(ordine), len(teste))
+    iconati = []
+    for t in teste:
+        testo = re.sub(r'<span class="fr">▾</span>', "", t)
+        testo = re.sub(r"<[^>]+>", "", testo)
+        if any(ord(ch) >= 0x2000 for ch in testo):
+            iconati.append(testo.strip())
+    prova("nessuna icona sui cassetti principali", [], iconati)
+    prova("...e ognuno ha il suo sottotitolo", len(ordine),
+          sum('<small' in t for t in teste))
+    voci_h = re.findall(r'<div class="acc[^"]*" id="[^"]+"[^>]*>\s*<button[^>]*class="acc-h"[^>]*>(.*?)</button>',
+                        vista, re.S)
+    prova("le voci dentro tengono l'icona", [], [v[:40] for v in voci_h
+                                                 if 'class="em' not in v])
+
+    # --- 6) I NOMI DECISI ---
+    inc = vista[campate["grpIncassi"][0]:campate["grpIncassi"][1]]
+    prova("il wallet collegato via Nostr si chiama «Wallet NWC (facoltativo)»",
+          True, "Wallet NWC (facoltativo)" in inc)
+    prova("...e il nome di prima non c'e' piu' da nessuna parte", 0,
+          mini.count("Wallet Lightning (facoltativo)"))
+    com = vista[campate["grpCompri"][0]:campate["grpCompri"][1]]
+    prova("«Come funziona il pagamento protetto» sta in «Quando compri»", True,
+          "Come funziona il pagamento protetto" in com)
+    pri = vista[campate["grpPrivacy"][0]:campate["grpPrivacy"][1]]
+    prova("«I tuoi dati» sta in «Privacy»", True, '</span>I tuoi dati<' in pri)
+    prova("il titolo «Il tuo profilo» sta in alto, al centro", True,
+          vista.find('<h2 class="profilo-tit">Il tuo profilo</h2>')
+          < vista.find('id="profiloTestata"')
+          and ".form h2.profilo-tit{text-align:center" in css)
+    prova("«Esci» senza icona, e dice ancora da quale account", True,
+          "? 'Esci da questo account' : 'Esci';" in rp)
+
+    # --- 7) I LINK DIRETTI: ogni apriCassettoProfilo('X') del client
+    # porta a una voce che esiste, dentro un cassetto ---
+    mete = sorted(set(re.findall(r"apriCassettoProfilo\('([A-Za-z]+)'\)", mini)))
+    rotti = [x for x in mete
+             if not re.search(r'<div class="acc[^"]*" id="%s"' % x, vista)]
+    prova("ogni link diretto a un cassetto porta a una voce che esiste", [], rotti)
+    prova("...e il vecchio `walletBlocco` non lo chiama piu' nessuno", 0,
+          mini.count("'walletBlocco'") + mini.count("el('walletBlocco')"))
+    prova("...mentre lnaddr e wallet aprono la voce giusta", True,
+          "apriCassettoProfilo('accLnAddress')" in mini
+          and "apriCassettoProfilo('accNwc')" in mini)
+
+    # --- 8) LA CHECKLIST E' UN CASSETTO, e fa gli stessi conti ---
+    rc = pezzo_js(mini, "function renderChecklist(){", "\n}\n")
+    prova("«Completa il profilo» scrive nel suo cassetto", True,
+          'class="grp-b" id="profiloChecklist"' in vista
+          and dentro(vista.index('id="profiloChecklist"'), "grpChecklist"))
+    prova("...con le voci-porta verso il cassetto giusto", True,
+          'class="acc voce-porta"' in rc and "apriCassettoProfilo('${v.acc}')" in rc)
+    prova("...il conto nel sottotitolo", True,
+          "`${fatte} di ${voci.length} fatti`" in rc)
+    prova("...e alla prima visita si apre da sola", True,
+          "g?.classList.add('open')" in rc and "timbraVisto('checklistvista')" in rc)
+    prova("...nascendo spento finche' non ha voci", True,
+          '<div class="grp" id="grpChecklist" style="display:none">' in vista)
+
+    # --- 9) GLI SPEGNIMENTI DI PRIMA RESTANO: il wallet in DEMO, le
+    # porte del negozio con le loro condizioni, l'admin ai moderatori ---
+    rl = pezzo_js(mini, "function renderLnAddress(){", "\n}\n")
+    prova("in DEMO le tre voci degli incassi si spengono (il patto del wallet)",
+          True, "['accLnAddress', 'accNwc', 'vocEsporta']" in rl
+          and "DEMO ? 'none' : ''" in rl)
+    prova("le porte del negozio tengono le condizioni dei bottoni di prima", True,
+          "(myUsername||myNegozio)&&!DEMO&&!VETRINA ? '' : 'none'" in rp
+          and "(myNegozio)&&!DEMO&&!VETRINA ? '' : 'none'" in rp)
+    prova("...e si decidono PRIMA che le sezioni leggano chi e' visibile", True,
+          rp.find("el('vocWidgetNegozio').style.display") < rp.find("\n  aggiornaGruppiProfilo();"))
+    las = pezzo_js(mini, "async function loadAdminStats(){", "\n}\n")
+    prova("l'amministrazione resta ai soli moderatori", True,
+          "if (!isAdmin || DEMO) {" in las)
 
 
 def prove_tutorial():
@@ -95128,8 +95341,10 @@ def prove_effetti_ridotti():
           "timbri del profilo", True,
           bool(_ado and _app and _ado.start() < _app.start()))
     i_asp = mini.index('id="accAspetto"')
+    # il confine era il cassetto dopo, «Livello e titolo»: dal set 2026
+    # «Aspetto» chiude «Avvisi e aspetto» e dopo viene «Privacy»
     prova("l'interruttore sta in «🌗 Aspetto»", True,
-          '<div id="fxRiga"></div>' in mini[i_asp:mini.index('id="accLivello"')])
+          '<div id="fxRiga"></div>' in mini[i_asp:mini.index('id="grpPrivacy"', i_asp)])
     i_tel = mini.index("<h3>Quello che resta sul tuo telefono</h3>")
     prova("«I tuoi dati» dice che la scelta sta nel profilo", True,
           "effetti ridotti" in mini[i_tel:mini.index("<h3>", i_tel + 10)])
@@ -100653,6 +100868,7 @@ def main():
               prove_bunker_muto,
               prove_login_qr,
               prove_profilo_sezioni,
+              prove_profilo_elegante,
               prove_badge_nostr,
               prove_reputazione_nostr,
               prove_nip89_handler,
