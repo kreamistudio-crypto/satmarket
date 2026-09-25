@@ -32889,3 +32889,138 @@ l'ombra ferma. A 320 la levetta del tema va a capo sotto «Recenti» e
 «Filtro»: era già così, non è del banner.
 **DA AVERE IL TELEFONO:** il bagliore su un OLED vero nei due temi, e
 il foglio in Telegram (iOS e Android).
+
+## Il profilo più elegante (25 set 2026)
+
+Richiesta di Andrea: la pagina «Il tuo profilo» era troppo piena di
+bottoni giganti e di icone. Il censimento di partenza: l'etichetta
+«IL TUO PROFILO», il biglietto da visita, DUE bottoni a tutta larghezza
+sotto («👁 Guarda il tuo negozio come lo vedono tutti», «</> Widget per
+il web»), le righe arancio di «Completa il profilo», sei sezioni con
+l'icona (📋 🏪 🫙 🔐 ⚙️ 👑) coi loro 24 cassetti, e QUATTRO bottoni a
+tutta larghezza in fondo (👋 Tutorial, 🔒 Come funziona il pagamento
+protetto, 🔐 I tuoi dati, 🚪 Esci).
+
+**COM'È ADESSO.** In alto e al centro il titolo «Il tuo profilo»; poi il
+biglietto da visita, che non è un cassetto; poi nove cassetti
+rettangolari con titolo, sottotitolo breve e freccia, SENZA icona:
+
+| Cassetto (sottotitolo) | Voci dentro, con l'icona |
+|---|---|
+| Completa il profilo («N di M fatti»), solo se incompleto | ⚡ Lightning address · 🟣 Npub verificata · ⚡ Wallet collegato · ✈️ Telegram |
+| Il tuo catalogo («Annunci, import e catalogo esterno») | 📋 I tuoi annunci · 📥 Importa in blocco · 🏪 Pacchi al tuo punto · 🔁 Doppioni su Nostr |
+| Negozio e spedizioni («Vetrina, spedizioni, sconti e ferie») | 📊 Il tuo negozio · 👁 Guarda il tuo negozio · </> Widget per il web · 📦 Come spedisci · 🚚 Spedizione gratis · 🎁 Sconto · 🎟 Codici · 🖼 Banner · 🔗 Link · 🌴 Ferie |
+| Quando compri («Preferiti, ricerche, ritiro e garanzia») | 🫙 Nel tuo barattolo · 🔎 Avvisi di ricerca · 📍 Punti di ritiro · 🔒 Come funziona il pagamento protetto |
+| Incassi e pagamenti («Lightning address, wallet ed export») | ⚡ Lightning address · 👛 Wallet NWC (facoltativo) · 📄 Esporta i tuoi dati |
+| Livello e inviti («Livello, titolo, inviti e distintivi») | 🎖 Livello e titolo · 💌 I tuoi inviti · 🏅 Distintivi |
+| Avvisi e aspetto («Notifiche, tema e dimensione del testo») | 🔔 Avvisi · 🌗 Aspetto |
+| Privacy («Identità, i tuoi dati e sito Tor») | 🆔 Identità · 🔐 I tuoi dati · 🧅 Sito Tor |
+| Amministrazione («Moderazione, leve e registro»), solo moderatori | il pannello di sempre |
+
+In fondo, gli unici fuori dai cassetti: «Tutorial» ed «Esci»,
+affiancati e della stessa misura come «Fai un'offerta» / «Acquista»
+(base al 50%, la lezione già pagata lì), senza icona; se ne resta uno
+solo — dentro Telegram «Esci» non c'è — tiene la sua metà, al centro,
+perché da solo a tutta larghezza sarebbe tornato il bottone gigante.
+
+**LE DECISIONI, coi perché.**
+- Spostamenti e nomi dati da Andrea: «Come funziona il pagamento
+  protetto» in Quando compri, «I tuoi dati» in Privacy, «Wallet
+  Lightning (facoltativo)» → «Wallet NWC (facoltativo)» (il Lightning
+  address accanto è Lightning anche lui: il nome deve dire il MODO).
+  Dentro la voce il campo si chiama «La stringa di connessione (NWC)»,
+  o voce e campo avrebbero detto due nomi diversi.
+- Il resto l'ho proposto io, tenendo insieme quel che si usa insieme:
+  «Il tuo account» diviso in «Livello e inviti» (la stessa moneta, gli
+  XP) e «Avvisi e aspetto»; «Incassi e pagamenti» salito da cassetto a
+  sezione, con le sue tre cose come voci; «Punti di ritiro» da Privacy
+  a Quando compri, dove si usa. ⚠️ Ad agosto stava in Privacy per una
+  ragione scritta (la pagina «I tuoi dati» nomina lui e il Lightning
+  address come strade per togliere un dato): la pagina li nomina per
+  NOME, e i nomi non sono cambiati — le sue due prove restano verdi.
+- UNO ALLA VOLTA, tutti chiusi all'apertura: aprendo un cassetto si
+  chiude l'altro (`chiudiAltriGruppi`, anche da `apriCassettoProfilo`),
+  così la pagina resta la mappa corta. Il prezzo della fisarmonica è il
+  salto — chiudendo un cassetto lungo SOPRA, quello toccato scappa
+  verso l'alto — e si paga in `toggleGrp`: si misura l'intestazione
+  prima e dopo e si scorre della differenza. Le voci dentro restano
+  indipendenti. Eccezione di sempre: alla prima visita «Completa il
+  profilo» si presenta aperto.
+- ROVESCIA LA «TERZA FORMA» D'AGOSTO, e lo fa sapendolo. Allora la
+  sezione fu apposta testo nudo sul crema per non vestire due livelli
+  uguali. La trappola resta chiusa in un altro modo: il cassetto è la
+  carta col SOTTOTITOLO, le voci dentro sono RIGHE della stessa carta
+  (niente bordo, fondo né raggio, un filo col rientro, l'icona in una
+  colonna fissa di 24px) — mai carte nella carta. E il dubbio della
+  sera d'agosto (la carta stacca dal fondo notturno solo 1,13) non
+  morde: la distinzione passa dal sottotitolo e dall'icona, non dal
+  contrasto.
+- «Completa il profilo» è un cassetto col guscio FISSO nel markup:
+  `renderChecklist` scrive solo sottotitolo e voci-porta, e aperto o
+  chiuso è la classe sul guscio. La variabile `checklistAperta` (e il
+  ridisegno a ogni tocco) non servono più; a profilo completo il corpo
+  vuoto lo spegne da solo.
+- `walletBlocco` è stato diviso in `accLnAddress`, `accNwc` e
+  `vocEsporta`: i due inviti che lo aprivano ora aprono la voce giusta
+  («Imposta» il Lightning address → `accLnAddress`, «Collega» il wallet
+  → `accNwc`), e così la checklist. Il testo della pagina privacy dice
+  «in «Incassi e pagamenti»» senza più l'icona, che i cassetti
+  principali non hanno.
+- Nessuna funzione ha cambiato comportamento: ogni porta chiama la
+  stessa funzione di prima, con le stesse condizioni (le due del
+  negozio le decide ancora `renderProfilo`, prima che
+  `aggiornaGruppiProfilo` legga chi è visibile), l'Amministrazione
+  resta ai soli moderatori, e gli altri id non si sono mossi.
+
+**LE STRADE SCARTATE.** Le voci come carte dentro la carta (due
+livelli con la stessa veste, la trappola d'agosto); il sottotitolo che
+va a capo — a 320 «Lightning address, wallet NWC ed export» faceva due
+righe, e il sottotitolo è diventato «Lightning address, wallet ed
+export»; l'emoji nuda del widget, che con «</>» di tre caratteri
+sfilacciava la colonna dei nomi (ora la classe `em-testo`, più
+piccola, nella colonna fissa).
+
+**PROVATO.** `prove_profilo_elegante` nuova (33): l'ordine dei nove
+cassetti, ogni voce una volta sola nel cassetto deciso e nessuna fuori
+censimento, ogni gesto di prima raggiungibile una volta sola dal posto
+deciso (le porte, l'export, il wallet, l'import, il tema, Tutorial ed
+Esci), nessun bottone a tutta larghezza fuori dai cassetti e la
+testata che non ne scrive più, i due del piede gemelli e in fondo,
+nessuna icona sulle intestazioni e un sottotitolo per ognuna, l'icona
+su ogni voce, i nomi decisi, ogni `apriCassettoProfilo` verso una voce
+che esiste, la checklist come cassetto, gli spegnimenti di prima.
+`prove_profilo_sezioni` emendata col perché: nove sezioni e non sei, e
+le asserzioni sulla forma — che certificavano la veste d'agosto —
+cambiano lato (carta rettangolare, voci senza carta, titolo più grande
+della voce, `font:inherit` prima del corpo); nel banco node la
+fisarmonica — il suo si apre, l'altro si chiude e lo dice a voce,
+l'intestazione resta sotto il dito (lo scorrimento del salto misurato),
+richiudere non scorre. Tortura su una copia: 7 mutazioni su 7 prese
+(icona sul cassetto, export sparito, fisarmonica tolta, bottone
+gigante di ritorno, piede a tutta larghezza, voce fuori dal suo
+cassetto, checklist verso `walletBlocco`).
+Suite intera severa senza config nel worktree ribasato su origin/main
+(892d063): 15.973 verdi e 0 rosse (sulla base di prima, 5d7dff3, al
+primo giro 3 rosse, tutte del cantiere: il
+sottotitolo in --muted a 12,5px, passato a --ink-soft, e due prove che
+contavano posizioni spostate — la riga dell'export salita a sottotitolo,
+e il confine di «Aspetto» — emendate col perché). Dopo l'ultimo rebase
+su b0b8794 (il banner delle commissioni del libro P2P, nessun file in
+comune col cantiere oltre ai verbali) girate le sezioni del cantiere,
+le due toccate da loro (prove_banner_fee_p2p, prove_p2p_libro) e quelle
+che leggono i documenti: tutte verdi. I collaudi non leggono il client
+e non sono stati rigirati.
+Dal vivo su una copia col server di collaudo, via Chrome headless e
+CDP, a 375 e 320 nei due temi: Venditore con «Negozio e spedizioni»
+aperto (chiaro 375), «Incassi e pagamenti» con la voce NWC aperta
+(scuro 320), tre cassetti aperti di fila con solo l'ultimo rimasto
+aperto (chiaro 320), Admin con l'Amministrazione aperta (scuro 375), e
+l'ingresso web con «Completa il profilo» aperto e il piede coi due
+bottoni a 167 px ciascuno (chiaro 375); nessuno scorrimento laterale.
+
+**DA GUARDARE SUL TELEFONO.** La fisarmonica dentro Telegram, dove lo
+scorrimento lo fa il WebView: aprendo un cassetto sotto uno lungo già
+aperto, l'intestazione toccata deve restare sotto il dito. Il piede
+dentro Telegram, dove c'è il solo «Tutorial» a metà larghezza. E se
+un venditore cerca il Lightning address sotto «Negozio» invece che in
+«Incassi e pagamenti».

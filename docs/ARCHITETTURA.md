@@ -23178,6 +23178,41 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   che da qui non si può fare: l'indirizzo vero sul dominio `.onion` col
   Tor Browser — che la fascia 🧅 e il cassetto dicano la stessa cosa, e
   che l'indirizzo copiato sia quello giusto.
+  IL PROFILO PIÙ ELEGANTE (set 2026, richiesta di Andrea) cambia la
+  veste delle sezioni qui sopra e ne rovescia la «terza forma»: il
+  titolo «Il tuo profilo» in alto e al centro (`h2.profilo-tit`), poi
+  il biglietto da visita, poi NOVE cassetti rettangolari — la carta di
+  `.acc`, con titolo, SOTTOTITOLO (`.tit2 small`) e freccia, SENZA
+  icona — e in fondo soli «Tutorial» ed «Esci», affiancati e gemelli
+  (`.profilo-piede`, base al 50%: da solo uno resta a metà, al
+  centro). L'ordine: Completa il profilo (solo se incompleto) · Il
+  tuo catalogo · Negozio e spedizioni · Quando compri · Incassi e
+  pagamenti · Livello e inviti · Avvisi e aspetto · Privacy ·
+  Amministrazione (solo moderatori).
+  LE VOCI DENTRO SONO RIGHE DELLA CARTA, non carte nella carta
+  (`.grp-b > .acc`: niente bordo, fondo né raggio, un filo col
+  rientro, l'icona in una colonna di 24px): è così che due livelli
+  restano distinti senza la veste nuda d'agosto. Le VOCI-PORTA
+  (`.acc.voce-porta`, freccia › che non ruota) sono i bottoni a tutta
+  larghezza di prima, con la stessa funzione e le stesse condizioni:
+  «Guarda il tuo negozio» e «Widget per il web» in Negozio,
+  «Come funziona il pagamento protetto» in Quando compri, «I tuoi
+  dati» in Privacy, «Esporta i tuoi dati» in Incassi.
+  `walletBlocco` NON ESISTE PIÙ: «Incassi e pagamenti» è salito da
+  cassetto a sezione, con tre voci — `accLnAddress`, `accNwc` («Wallet
+  NWC (facoltativo)», era «Wallet Lightning») e `vocEsporta` —, spente
+  insieme in DEMO da `renderLnAddress`. «Punti di ritiro» è passato da
+  Privacy a Quando compri, dove si usa; la pagina «I tuoi dati» li
+  nomina ancora per nome, e il nome non è cambiato.
+  «Completa il profilo» è un cassetto col guscio FISSO
+  (`grpChecklist`, nasce spento): `renderChecklist` scrive solo il
+  sottotitolo («N di M fatti») e le voci-porta, e l'aperto è la classe
+  sul guscio, che un ridisegno non tocca.
+  UNO ALLA VOLTA: `toggleGrp` e `apriCassettoProfilo` aprono il loro e
+  chiudono gli altri (`chiudiAltriGruppi`), e `toggleGrp` misura
+  l'intestazione prima e dopo e scorre della differenza, così quella
+  toccata resta sotto il dito. Le voci (`toggleAcc`) restano
+  indipendenti. Vedi CANTIERI, «Il profilo più elegante».
   PWA installabile (lug 2026, Fase 1 del percorso PWA→APK→Zapstore;
   percorso ormai completo: Fase 2 = icona adattiva, Fase 3 =
   «Distribuzione dell'APK», più sotto): `manifest.json` (id/
