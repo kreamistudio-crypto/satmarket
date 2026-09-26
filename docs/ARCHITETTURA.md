@@ -6882,7 +6882,16 @@
   le altre tappe e `chiudiTour` la spengono. Bianca, lunga 76 px,
   lampeggia sul posto solo nel blocco
   `prefers-reduced-motion: no-preference` del riflettore, e coi ridotti
-  resta piena e ferma.
+  resta piena e ferma. Il passo 7 la chiede a SINISTRA (`freccia:
+  'sinistra'`). IL DITO DELLA TAPPA: il velo passa il suo `pointerdown` a
+  `t.dito` (`ditoTour`); al passo 7 `ditoGiroP2P` lo prende solo se cade
+  sul + e lo da' al trascino di sempre (`trascinoGiuP2P`, che cattura il
+  dito sul +) con `soloGesto` — il tocco semplice non apre niente, la
+  tendina e il resto restano fermi. Lasciato in fondo, `lasciaSulLogoP2P`
+  chiama prima `chiudiGiroDalTrascinoP2P` (giro chiuso come con «Fine»,
+  lato «Vendi BTC» tenuto) e poi apre Barattozon con la morfosi; a meta'
+  il + torna su e il giro resta, col riflettore fermo sulla capsula
+  (`capsulaGiroFerma` finche' c'e' `p2p-binario`).
   Il verbale: CANTIERI, «Il libro subito», «Il tutorial su pagina
   sfocata, e «Invii» nel P2P» e «Il giro guidato del P2P».
   NEL P2P LA PROPRIA META' SI INVIA (26 set 2026): «Invia X € ·

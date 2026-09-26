@@ -51527,7 +51527,22 @@ def prove_giro_guidato_p2p():
     # LA FRECCETTA DEL TRASCINO (26 set 2026, ritocco di Andrea): la chiede
     # la sola tappa della tendina, vive dentro il velo, e pulsa solo
     # quando il movimento e' permesso — coi ridotti resta ferma e piena
-    prova("la freccetta la chiede la sola tappa della tendina", 1, giro.count("freccia: true"))
+    # EMENDATA (26 set 2026, terzo ritocco di Andrea): la freccia va a
+    # SINISTRA del +, e la tappa lo dice
+    prova("la freccetta la chiede la sola tappa della tendina, a sinistra", 1,
+          giro.count("freccia: 'sinistra'"))
+    # IL + SI TRASCINA DAVVERO AL PASSO 7 (26 set 2026, ritocco di Andrea):
+    # il velo passa il dito alla tappa che lo chiede, e il trascino di
+    # sempre, lasciato sul logo, chiude il giro prima della morfosi
+    prova("il velo passa il pointerdown alla tappa, e lo smonta alla chiusura", [True, True],
+          ["tv.addEventListener('pointerdown', ditoTour);" in pezzo_js(mini, "function avviaTour(tappe, dopo){", "\n}\n"),
+           "el('tour').removeEventListener('pointerdown', ditoTour);" in pezzo_js(mini, "function chiudiTour(){", "\n}\n")])
+    prova("...e il dito lo chiede la sola tappa della tendina", [1, 1],
+          # nel CODICE, non nei commenti («sotto il dito: nella prosa»)
+          [giro.count("dito: ditoGiroP2P"), len(re.findall(r"\bdito: [a-z]\w*P2P\b", mini))])
+    prova("il rilascio sul logo chiude il giro PRIMA di aprire il foglio", True,
+          0 < pezzo_js(mini, "function lasciaSulLogoP2P(){", "\n}\n").find("chiudiGiroDalTrascinoP2P()")
+          < pezzo_js(mini, "function lasciaSulLogoP2P(){", "\n}\n").find("apriBarattozonP2P()"))
     prova("...vive dentro il velo, decorativa, e nasce spenta", True,
           '<div id="tourFreccia" hidden aria-hidden="true"><svg ' in
           mini[mini.index('<div id="tour" role="dialog"'):mini.index('<div id="tourFumetto"')])
@@ -51586,6 +51601,20 @@ def prove_giro_guidato_p2p():
                     mini.index("/* ============ IL MOTORE DELLO SCAMBIO")]
     giudici = re.search(r"const LIVELLO_SCONTO_P2P = \d+;", mini).group(0) + "\n"
     giudici += re.search(r"const P2P_AFFARE_SUPER = \d+;", mini).group(0) + "\n"
+    # il trascino VERO del + sulla tendina: le sue costanti, il suo stato e
+    # le funzioni del gesto — il giro gli passa il dito, e si prova insieme
+    trascino = "".join(re.search(pat, mini).group(0) + "\n" for pat in (
+        r"const P2P_SOGLIA_TRASCINO = \d+;", r"const P2P_MORFO_MS = \d+;",
+        r"let p2pTrascino = null;", r"let p2pPiuGestoAt = -1e9;",
+        r"let p2pBinarioTimer = null;", r"let p2pDiscesaTimer = null;"))
+    for _f in ("function trascinoPuoiP2P(){", "function oltreSogliaP2P(dx, dy){",
+               "function corsaCursoreP2P(dy, max){", "function sopraTendinaP2P(d, max){",
+               "function salitaTondoP2P(tondo){", "function misuraGuidaP2P(){",
+               "function trascinoGiuP2P(e){", "function trascinoMuoveP2P(e){",
+               "function lasciaSulLogoP2P(){", "function guidaCursoreP2P(y, d, max){",
+               "function trascinoSuP2P(e){", "function trascinoFineP2P(apri){",
+               "function rientraCursoreP2P(){"):
+        trascino += pezzo_js(mini, _f, "\n}\n") + "\n}\n"
     for _f in ("function commissioneVivaP2P(){", "function commissioneListinoP2P(){",
                "function scontoFedeltaTestoP2P(punti){", "function mezzaCommissioneP2P(fee){",
                "function articoloPercentoP2P(testo){"):
@@ -51612,6 +51641,19 @@ const ELEM = {};
 const el = id => (ELEM[id] = ELEM[id] || fintoEl(id));
 const PIU = fintoEl('piu', rettangolo(160, 740, 54, 54));
 el('tourFreccia').hidden = true;
+/* il + della barra, come lo vuole il trascino: la sua misura, la capture
+   del dito, la variabile del blu */
+Object.assign(PIU, {offsetHeight: 54, catture: [], rilasci: [],
+  setPointerCapture(id){ this.catture.push(id); },
+  releasePointerCapture(id){ this.rilasci.push(id); }});
+PIU.style.setProperty = (k, v) => { PIU.style[k] = String(v); };
+PIU.style.removeProperty = k => { delete PIU.style[k]; };
+const tondoBarraP2P = () => PIU;
+const matchMedia = q => ({matches: q === '(max-width: 767px)'});
+function getComputedStyle(){ return {transform: 'none'}; }
+let FATTI = [];
+function toccaPiu(){ FATTI.push('piu'); }
+function apriBarattozonP2P(){ FATTI.push(tourInCorso ? 'barattozon col giro aperto' : 'barattozon'); }
 el('p2pLatoCompro').r = rettangolo(16, 55, 120, 46);
 el('p2pLatoVendo').r = rettangolo(240, 55, 120, 46);
 el('navBarattozon').r = rettangolo(160, 730, 54, 82);
@@ -51645,12 +51687,13 @@ function setLatoP2P(lato, senzaScossa){
   LATI.push([lato, !!senzaScossa]);
   if (lato === p2pLato) return;
   p2pLato = lato; renderP2P();
+  document.body.classList.toggle('p2p-vendo', lato === 'vendo');
 }
 let VISTA = 'view-p2p';
 const document = {
   querySelector: s => s === '.view.active' ? {id: VISTA} : null,
   querySelectorAll: s => s === '.p2p-esempio' ? CARTE.filter(c => c.esempio) : [],
-  documentElement: fintoEl('html'), ASCOLTI: [],
+  documentElement: fintoEl('html'), body: fintoEl('body'), ASCOLTI: [],
   addEventListener(t, f, c){ this.ASCOLTI.push([t, !!c]); },
   removeEventListener(t, f, c){ this.ASCOLTI = this.ASCOLTI.filter(a => !(a[0] === t && a[1] === !!c)); }};
 const window = {scrollTo(){}, addEventListener(){}, removeEventListener(){}};
@@ -51680,7 +51723,7 @@ const P2P_VESTE_METODI = {}, P2P_TABACCHINO = 'x';
 let p2pInfo = {fee: 0.03}, p2pSconto = null, p2pLeve = {mostro: 'm'};
 const p2pCoord = () => p2pLeve;
 global.fetch = () => new Promise(() => {});
-""" + giudici + "\n" + motore + "\n" + blocco_t + "\n" + giro + r"""
+""" + giudici + "\n" + motore + "\n" + blocco_t + "\n" + trascino + "\n" + giro + r"""
 const dorme = ms => new Promise(ok => setTimeout(ok, ms));
 const H = document.documentElement.classList;
 function azzera(){
@@ -51692,6 +51735,9 @@ function azzera(){
   LIBRO = {compro: [], vendo: []}; p2pLato = 'compro'; LATI = []; ESEMPI = [];
   renderP2P();
   PIU.offsetParent = {}; el('navBarattozon').offsetParent = {};
+  document.body.classList.remove('p2p-vendo', 'p2p-trascina', 'p2p-sopra', 'p2p-binario');
+  document.body.classList.add('nav-p2p');
+  p2pTrascino = null; FATTI = []; PIU.catture = []; PIU.style.transform = '';
 }
 /* le slide fino alla finale, e «Inizia» */
 function slideFinoInizia(){
@@ -51818,6 +51864,44 @@ const out = {};
   PIU.offsetParent = null; el('navBarattozon').offsetParent = null;
   rivediTourP2P(); slideFinoInizia();
   out.desktop = tuttiIPassi().map(p => p.bersaglio);
+  /* 12) IL + SI TRASCINA DAVVERO AL PASSO 7. Il centro del + e' (187, 767):
+         il velo gli passa il dito (ditoTour), e da li' — con la capture —
+         il gesto e' quello di sempre */
+  const D = (x, y) => ({pointerId: 7, pointerType: 'touch', button: 0, clientX: x, clientY: y});
+  const alPasso7 = () => {
+    azzera(); VISTI.giro_p2p = 1; RIDOTTI = true; PIU.offsetParent = {};
+    el('navBarattozon').offsetParent = {};
+    rivediTourP2P(); slideFinoInizia();
+    for (let i = 0; i < 6; i++) tourAvanti();
+  };
+  const qui = () => ({giro: tourInCorso, passo: tourTappa + 1, lato: p2pLato, fatti: FATTI.slice(),
+    gesto: !!p2pTrascino, piu: PIU.style.transform || '',
+    freccia: !el('tourFreccia').hidden, luce: el('tourLuce').style.top + '|' + el('tourLuce').style.height});
+  /* ...il TOCCO sul + non apre niente: nel giro vale il solo trascino */
+  alPasso7(); const luce7 = qui().luce;
+  ditoTour(D(187, 767)); trascinoSuP2P(D(187, 767));
+  out.trTocco = Object.assign(qui(), {presa: PIU.catture.slice()});
+  /* ...il dito FUORI dal + (sulla tendina, sulla pagina) resta fermo, e
+         al passo del + (il sesto) il velo non passa niente a nessuno */
+  alPasso7();
+  ditoTour(D(187, 805)); const tendinaFerma = !!p2pTrascino;
+  ditoTour(D(40, 300)); const paginaFerma = !!p2pTrascino;
+  tourTappa = 5; mostraTappa(); ditoTour(D(187, 767)); const sestoFermo = !!p2pTrascino;
+  out.trFuori = {tendina: tendinaFerma, pagina: paginaFerma, sesto: sestoFermo, fatti: FATTI.slice()};
+  /* ...A META': il + torna su, il giro resta al passo 7, il riflettore fermo */
+  alPasso7();
+  ditoTour(D(187, 767)); trascinoMuoveP2P(D(187, 787));
+  out.trMetaDurante = Object.assign(qui(), {luceFerma: qui().luce === luce7});
+  trascinoSuP2P(D(187, 787));
+  out.trMeta = Object.assign(qui(), {luceFerma: qui().luce === luce7});
+  /* ...IN FONDO: il giro si chiude (timbro gia' sul profilo), il lato resta
+         «Vendi BTC», via l'esempio e la freccia, e POI si apre Barattozon */
+  alPasso7(); TIMBRI = [];
+  ditoTour(D(187, 767)); trascinoMuoveP2P(D(187, 830));
+  const sopraFondo = document.body.classList.contains('p2p-sopra');
+  trascinoSuP2P(D(187, 830));
+  out.trFondo = Object.assign(qui(), {sopra: sopraFondo, esempi: CARTE.filter(c => c.esempio).length,
+    timbro: !!VISTI.giro_p2p, lati: LATI.slice(-1), ascolti: document.ASCOLTI.length});
   process.stdout.write(JSON.stringify(out));
   process.exit(0);
 })().catch(e => { process.stderr.write(String(e && e.stack || e)); process.exit(1); });
@@ -51853,8 +51937,8 @@ const out = {};
           v[6]["luce"])
     prova("...al lato «Vendi BTC» il giro passa da solo, senza scossa, e alla fine torna",
           [["vendo", True], ["compro", True]], o["lati"])
-    prova("LA FRECCETTA c'e' solo al passo 7, a destra della capsula e sotto la sua cima",
-          [None] * 6 + [["232px", "736px"]], [p["freccia"] for p in v])
+    prova("LA FRECCETTA c'e' solo al passo 7, a SINISTRA della capsula e sotto la sua cima",
+          [None] * 6 + [["118px", "736px"]], [p["freccia"] for p in v])
     prova("...«Avanti» e «Fine» la portano via, e «Salta» sul passo 7 pure",
           [True, False], [o["frecciaAccesa"], o["frecciaDopoSalta"]])
     prova("...e alla fine: via l'esempio, e il lato torna quello di partenza",
@@ -51893,6 +51977,26 @@ const out = {};
           [t["invioFuori"], t["spazioFuori"], t["invioDentro"], t["tab"]])
     prova("...ed Esc chiude il giro come «Salta»", {"giro": False, "lato": "compro", "esempi": 0, "ascolti": 0},
           o["esc"])
+    prova("IL + NEL GIRO: il tocco semplice non apre niente e non muove il giro",
+          [True, 7, [], False, [7]],
+          [o["trTocco"]["giro"], o["trTocco"]["passo"], o["trTocco"]["fatti"],
+           o["trTocco"]["gesto"], o["trTocco"]["presa"]])
+    prova("NESSUN ALTRO GESTO: il dito sulla tendina o sulla pagina, e al passo del + niente",
+          {"tendina": False, "pagina": False, "sesto": False, "fatti": []}, o["trFuori"])
+    prova("TRASCINO A META': il + scende col dito, il riflettore resta sulla capsula",
+          [True, True, True, 7], [o["trMetaDurante"]["gesto"], "translateY(" in o["trMetaDurante"]["piu"],
+                                  o["trMetaDurante"]["luceFerma"], o["trMetaDurante"]["passo"]])
+    prova("...lasciato, torna su, e il giro resta al passo 7 con la freccia",
+          {"giro": True, "passo": 7, "lato": "vendo", "fatti": [], "gesto": False, "piu": "",
+           "freccia": True, "luceFerma": True},
+          {k: o["trMeta"][k] for k in ("giro", "passo", "lato", "fatti", "gesto", "piu", "freccia", "luceFerma")})
+    prova("TRASCINO IN FONDO: il giro si chiude PRIMA, e si apre Barattozon",
+          [True, False, ["barattozon"]],
+          [o["trFondo"]["sopra"], o["trFondo"]["giro"], o["trFondo"]["fatti"]])
+    prova("...conta come finito: timbro sul profilo, lato «Vendi BTC» tenuto, via esempio e freccia",
+          [True, "vendo", 0, False, 0],
+          [o["trFondo"]["timbro"], o["trFondo"]["lato"], o["trFondo"]["esempi"],
+           o["trFondo"]["freccia"], o["trFondo"]["ascolti"]])
     prova("DA DESKTOP, senza barra, restano le quattro tappe della pagina",
           ["p2pLatoCompro", "esempio:compro", "p2pLatoVendo", "esempio:vendo"], o["desktop"])
 

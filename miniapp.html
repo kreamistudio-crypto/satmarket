@@ -20342,6 +20342,7 @@ function avviaTour(tappe, dopo){
   window.addEventListener('scroll', posizionaTour, {passive: true});
   tv.addEventListener('wheel', bloccaTourTocco, {passive: false});
   tv.addEventListener('touchmove', bloccaTourTocco, {passive: false});
+  tv.addEventListener('pointerdown', ditoTour);
   document.addEventListener('keydown', tastoTour, true);
   /* un bersaglio che finisce di muoversi (il + che sale cambiando lato)
      si riprende il riflettore addosso */
@@ -20352,6 +20353,14 @@ function avviaTour(tappe, dopo){
   return true;
 }
 function bloccaTourTocco(e){ e.preventDefault(); }
+/* IL DITO DELLA TAPPA (26 set 2026, col trascino del giro del P2P): il
+   velo prende ogni tocco, e una tappa puo' chiedere di vedere il suo
+   `pointerdown` — e' lei a decidere se quel dito e' suo (il + da
+   trascinare) o se resta fermo come tutti gli altri. */
+function ditoTour(e){
+  const t = tourTappe[tourTappa];
+  if (t && t.dito) t.dito(e);
+}
 function tastoTour(e){
   if (e.key === 'Escape') { navIndietro(); return; }
   /* NESSUN GESTO VERO SOTTO IL VELO (26 set 2026, col giro del P2P): il
@@ -20413,17 +20422,19 @@ function posizionaTour(){
   /* ...e il riflettore resta DENTRO lo schermo: un bersaglio attaccato
      al fondo non si porta il bordo oltre il vetro */
   luce.style.height = (Math.min(r.bottom + R, innerHeight - 3) - (r.top - R)) + 'px';
-  /* LA FRECCETTA, per la tappa che la chiede: accanto al riflettore, a
-     destra (a sinistra se di la' non c'e' posto), all'altezza della sua
-     cima — mai sopra il bersaglio. Le altre tappe la spengono, quindi
-     «Avanti» la porta via da se'. */
+  /* LA FRECCETTA, per la tappa che la chiede: accanto al riflettore, dal
+     lato che dice (`freccia: 'sinistra'`, o a destra), e dall'altro se
+     di la' non c'e' posto; all'altezza della sua cima — mai sopra il
+     bersaglio. Le altre tappe la spengono, quindi «Avanti» la porta via
+     da se'. */
   const fr = el('tourFreccia');
   if (fr) {
     fr.hidden = !t.freccia;
     if (t.freccia) {
       const fw = 24, spazio = R + 12;   // la misura del CSS
-      let fl = r.right + spazio;
-      if (fl + fw > innerWidth - 8) fl = r.left - spazio - fw;
+      const destra = r.right + spazio, sinistra = r.left - spazio - fw;
+      let fl = t.freccia === 'sinistra' ? sinistra : destra;
+      if (fl < 8 || fl + fw > innerWidth - 8) fl = fl === sinistra ? destra : sinistra;
       fr.style.left = fl + 'px';
       fr.style.top = (r.top + 6) + 'px';
     }
@@ -20449,6 +20460,7 @@ function chiudiTour(){
   window.removeEventListener('scroll', posizionaTour);
   el('tour').removeEventListener('wheel', bloccaTourTocco);
   el('tour').removeEventListener('touchmove', bloccaTourTocco);
+  el('tour').removeEventListener('pointerdown', ditoTour);
   document.removeEventListener('keydown', tastoTour, true);
   document.removeEventListener('transitionend', posizionaTour);
   const fr = el('tourFreccia'); if (fr) fr.hidden = true;
@@ -53325,6 +53337,9 @@ function trascinoMuoveP2P(e){
    morfosi non c'e' — effetti ridotti, o una guardia del foglio — il +
    torna a casa come sempre. */
 function lasciaSulLogoP2P(){
+  /* dal giro guidato il + portato fino in fondo chiude il giro PRIMA del
+     foglio: conta come finito (vedi IL GIRO GUIDATO DEL P2P) */
+  if (typeof chiudiGiroDalTrascinoP2P === 'function') chiudiGiroDalTrascinoP2P();
   document.body.classList.remove('p2p-trascina', 'p2p-sopra');
   apriBarattozonP2P();
   if (!document.body.classList.contains('capsula-via')) rientraCursoreP2P();
@@ -53378,9 +53393,10 @@ function trascinoSuP2P(e){
   if (!t || e.pointerId !== t.id) return;
   if (!t.attivo) {
     /* un TOCCO, anche un po' mosso: il + di sempre. L'orologio si segna
-       DOPO, o toccaPiu scarterebbe proprio questo */
+       DOPO, o toccaPiu scarterebbe proprio questo. Nel giro guidato
+       (`soloGesto`) il tocco non apre niente: li' vale il solo trascino */
     trascinoFineP2P(false);
-    if (trascinoPuoiP2P()) { toccaPiu(); p2pPiuGestoAt = performance.now(); }
+    if (!t.soloGesto && trascinoPuoiP2P()) { toccaPiu(); p2pPiuGestoAt = performance.now(); }
     return;
   }
   trascinoFineP2P(t.sopra && trascinoPuoiP2P());
@@ -57416,21 +57432,53 @@ const TAPPE_GIRO_P2P = [
     testo: `Qui ci sono gli annunci di chi vuole comprare i tuoi bitcoin.` },
   { trova: () => piuGiroP2P(), tondo: true,
     testo: `Pubblica il tuo annuncio di vendita e aspetta che qualcuno lo prenda.` },
-  /* la freccetta accanto al + invita al trascino (ritocco di Andrea) */
-  { trova: () => el('navBarattozon'), rett: capsulaGiroP2P, raggio: 33, freccia: true,
+  /* la freccetta a SINISTRA del + invita al trascino, e il + si trascina
+     DAVVERO: il velo gli passa il dito (ritocchi di Andrea) */
+  { trova: () => el('navBarattozon'), rett: capsulaGiroP2P, raggio: 33,
+    freccia: 'sinistra', dito: ditoGiroP2P,
     testo: `<b>Barattozon</b>: ti pagano in contanti l'ordine Amazon, tu dai i sats. Trascina il + giù.` },
 ];
 /* il tondo del + nella barra: e' lui che ha il colore del lato */
 function piuGiroP2P(){ return el('nav-vendi')?.querySelector('.ic') || null; }
 /* la tendina si illumina INSIEME al suo +: sono una capsula sola, e il
-   testo dice di trascinare l'uno sull'altra */
+   testo dice di trascinare l'uno sull'altra.
+   LA CAPSULA SI MISURA CON IL + A CASA: mentre il dito lo porta giu' (e
+   finche' non e' rientrato, `p2p-binario`) il riflettore resta sulla
+   capsula intera, non insegue il + — la misura di prima vale ancora. */
+let capsulaGiroFerma = null;
 function capsulaGiroP2P(b){
+  if (capsulaGiroFerma && document.body.classList.contains('p2p-binario')) return capsulaGiroFerma;
   const q = [b.getBoundingClientRect()];
   const p = piuGiroP2P();
   if (p) q.push(p.getBoundingClientRect());
   const top = Math.min(...q.map(x => x.top)), bottom = Math.max(...q.map(x => x.bottom));
   const left = Math.min(...q.map(x => x.left)), right = Math.max(...q.map(x => x.right));
-  return {top, bottom, left, right, width: right - left, height: bottom - top};
+  capsulaGiroFerma = {top, bottom, left, right, width: right - left, height: bottom - top};
+  return capsulaGiroFerma;
+}
+/* IL + SI TRASCINA DAVVERO AL PASSO 7 (26 set 2026, ritocco di Andrea): il
+   velo lascia passare il dito SOLO se cade sul + — il trascino di sempre
+   lo cattura (`trascinoGiuP2P` prende la capture sul +, e da li' move e
+   rilascio arrivano a lui). Tutto il resto resta fermo come nel giro: il
+   tocco sulla tendina, il resto della pagina, e il tocco semplice sul +
+   (`soloGesto`: nel giro vale il solo trascino). Lasciato a meta' il +
+   torna su e il giro resta qui; portato in fondo chiude il giro e apre
+   Barattozon con la morfosi di sempre (chiudiGiroDalTrascinoP2P). */
+function ditoGiroP2P(e){
+  const p = piuGiroP2P();
+  if (!p || p2pTrascino) return;
+  const q = p.getBoundingClientRect();
+  if (e.clientX < q.left || e.clientX > q.right || e.clientY < q.top || e.clientY > q.bottom) return;
+  trascinoGiuP2P(e);
+  if (p2pTrascino) p2pTrascino.soloGesto = true;
+}
+/* il + lasciato sul logo mentre il giro e' aperto: il giro si chiude come
+   con «Fine» (il timbro e' gia' sul profilo dalla comparsa) e il lato
+   RESTA «Vendi BTC» — il foglio che sta per aprirsi e' di quel lato */
+function chiudiGiroDalTrascinoP2P(){
+  if (!tourInCorso || giroP2PLato === null) return;
+  giroP2PLato = null;
+  chiudiTour();
 }
 /* La card da illuminare: la prima VERA del libro (anche la propria), e
    solo se non ce n'e' nessuna quella d'esempio del lato che si guarda.
@@ -57469,6 +57517,7 @@ function giroGuidatoP2P(chiesto){
   if (tourInCorso || tourP2PInCorso || testModaleInCorso) return;
   if (document.querySelector('.view.active')?.id !== 'view-p2p') return;
   giroP2PLato = p2pLato;
+  capsulaGiroFerma = null;
   if (p2pLato !== 'compro') setLatoP2P('compro', true);
   if (!avviaTour(TAPPE_GIRO_P2P, fineGiroP2P)) { fineGiroP2P(); return; }
   timbraVisto('giro_p2p');

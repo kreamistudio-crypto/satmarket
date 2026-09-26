@@ -34016,3 +34016,46 @@ densita' 3, relay morto: 320 e 375 px nei due temi, testo in due righe,
 freccetta visibile, animata, che non tocca riflettore ne' fumetto, via a
 fine giro; coi ridotti ferma e piena. Scatti approvati da Andrea.
 **DA AVERE:** l'occhio sul telefono.
+
+## Il passo 7 del giro guidato: freccia a sinistra e il + che si trascina (26 set 2026)
+
+Ritocco di Andrea a ddfca67. **1) LA FRECCIA VA A SINISTRA del +**
+(`freccia: 'sinistra'`; il motore la mette dall'altro lato solo se di
+la' non ci sta): bianca, 76 px, che lampeggia, dentro lo schermo, senza
+coprire il + ne' la tendina (misurato: finisce 18 px prima del +).
+**2) IL + SI TRASCINA DAVVERO durante il passo 7.** Il velo del giro
+prendeva ogni tocco; adesso una tappa puo' chiedere di vedere il suo
+`pointerdown` (`dito`, nel MOTORE: `ditoTour`), e al passo 7
+`ditoGiroP2P` lo prende SOLO se cade sul + e lo da' al trascino di
+sempre (`trascinoGiuP2P`, che cattura il dito sul +: da li' movimento e
+rilascio arrivano a lui come fuori dal giro). Il dito sulla tendina o
+sul resto della pagina resta fermo come prima, e il TOCCO semplice sul
++ non apre niente (`soloGesto`: nel giro vale il solo trascino). Portato
+in fondo, `lasciaSulLogoP2P` chiama PRIMA `chiudiGiroDalTrascinoP2P` —
+il giro si chiude come con «Fine» (il timbro `giro_p2p` e' gia' sul
+profilo dalla comparsa), il lato RESTA «Vendi BTC», via esempio e
+freccia — e poi apre Barattozon con la morfosi di sempre. Lasciato a
+meta', il + torna su come fuori dal giro e il giro resta al passo 7; il
+riflettore non insegue il + che scende (`capsulaGiroFerma`, finche' c'e'
+`p2p-binario`).
+**PROVATO.** `prove_giro_guidato_p2p` aggiornata: sentinelle (il velo
+passa e smonta il `pointerdown`, il dito lo chiede la sola tappa della
+tendina, il rilascio chiude il giro PRIMA del foglio, la freccia a
+sinistra) e nel banco node le funzioni VERE del trascino: tocco sul +
+che non apre niente, dito sulla tendina, sulla pagina e al passo del +
+fermo, trascino a meta' (il + scende, il riflettore resta, lasciato
+torna su e il giro resta), trascino in fondo (giro chiuso prima,
+Barattozon, timbro, lato «Vendi», via esempio e freccia). Tortura 9 su 9.
+Suite intera severa senza config nel worktree da origin/main (ddfca67):
+verde. Dal vivo col DITO — eventi touch veri via CDP
+(`Input.dispatchTouchEvent`, emulazione tocco Android), densita' 3,
+relay morto — a 320 e 375 px nei due temi e coi ridotti: freccia a
+sinistra; tocco su tendina, card e + senza effetto; a meta' il + scende
+col dito e torna su, giro al passo 7; in fondo giro chiuso, lato
+«Vendi», `p2pNuovoSheet` aperto con la morfosi (coi ridotti senza);
+nessun errore dell'app. Scatti approvati da Andrea.
+**DA AVERE: la prova nell'app Android col dito vero.** Da qui non si
+fa: nessun telefono ne' emulatore collegato (l'SDK di bubblewrap ha
+`adb` ma nessun dispositivo), e l'app punta a barattolo.store, quindi
+vede il codice nuovo solo dopo il deploy. La TWA e' Chrome: il percorso
+e' lo stesso degli eventi touch del banco, ma la prova vera e' di Andrea.
