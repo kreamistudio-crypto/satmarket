@@ -33972,3 +33972,47 @@ scorrimento laterale, nessun errore; «Salta» a meta', effetti ridotti,
 la messa a fuoco prima del giro. Scatti approvati da Andrea.
 **DA AVERE:** l'occhio sul telefono, e il giro con relay veri e una
 card vera che arriva a giro in corso.
+
+## Il passo 7 del giro guidato: il trascino e la freccetta (26 set 2026)
+
+Ritocco di Andrea a e016732. **1) IL TESTO dice anche «Trascina il +
+giù»**, tenendo «ordine Amazon»: «Barattozon: ti pagano in contanti
+l'ordine Amazon, tu dai i sats. Trascina il + giù.» La stesura d'esempio
+di Andrea («qualcuno paga in contanti il tuo ordine Amazon, tu dai i
+sats. Trascina il + giù.») andava su tre righe a 320 px; fra le otto
+misurate nel fumetto vero che stanno in due, questa ha il margine piu'
+largo (30 px sull'ultima riga a 320, 74 a 375) tenendo contanti, ordine
+Amazon, sats e trascino. **2) LA FRECCETTA**: accanto alla capsula, a
+destra e all'altezza della sua cima, fuori dal fumetto e senza coprire
+il + ne' la tendina; punta giu', BIANCA e lunga (76 px), e
+LAMPEGGIA ferma sul posto (1,1 s, da piena a quasi spenta), con un alone
+scuro che la stacca dalla barra — leggibile nei due temi. La prima
+stesura era arancio, corta (36 px) e pulsava scendendo: Andrea l'ha
+voluta bianca, piu' lunga (56, poi 76 px) e che lampeggia. E' un'opzione del MOTORE
+(`freccia` sulla tappa): la accende la sola tappa della tendina, le
+altre e `chiudiTour` la spengono. Coi ridotti niente animazione:
+piena, accesa e ferma.
+**LA LEZIONE, vista dal vivo e non dal banco:** al primo giro la
+freccetta era un `<svg id="tourFreccia" hidden>` e non compariva mai
+(0×0). `hidden` come proprieta' esiste solo sugli elementi HTML: su un
+svg `fr.hidden = false` scrive un campo inventato e l'attributo resta.
+Il banco node, coi suoi elementi di cartone, lo dava per acceso. Adesso
+e' un `<div>` attorno all'svg, e una sentinella tiene l'id fuori dall'svg.
+**PROVATO.** `prove_giro_guidato_p2p` aggiornata: il testo col trascino,
+la freccetta chiesta dalla sola tappa della tendina, dentro il velo e
+spenta alla nascita, bianca, lunga e che lampeggia sul posto, l'id su
+un elemento HTML, l'animazione solo nel
+blocco del movimento permesso, e nel banco accesa al solo passo 7, a
+destra della capsula, via con «Avanti», «Fine» e «Salta». EMENDATA col
+perche' la sentinella dell'anello del libro («il neutro e' un token, mai
+il bianco»): vietava `stroke:#fff` in TUTTO il file, e la freccia bianca
+la faceva cadere; ora guarda le sole regole `.p2p-anello` (un anello
+bianco messo apposta in una copia la fa ancora cadere). Tortura 7 su 7
+(al primo giro la sentinella dell'animazione guardava «qualche riga
+prima» e lasciava passare una regola spostata fuori: ora guarda il
+blocco preciso). Suite intera severa nel worktree da origin/main
+(e016732): 16.380 verdi e 0 rosse. Dal vivo, Chrome headless via CDP a
+densita' 3, relay morto: 320 e 375 px nei due temi, testo in due righe,
+freccetta visibile, animata, che non tocca riflettore ne' fumetto, via a
+fine giro; coi ridotti ferma e piena. Scatti approvati da Andrea.
+**DA AVERE:** l'occhio sul telefono.

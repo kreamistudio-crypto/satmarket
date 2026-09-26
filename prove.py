@@ -51522,7 +51522,38 @@ def prove_giro_guidato_p2p():
     prova("...e dicono le cose del giro, nell'ordine", [True] * 7,
           ["comprare" in testi[0], "venderti" in testi[1], "Pubblica" in testi[2],
            "vendere" in testi[3], "comprare i tuoi" in testi[4],
-           "vendita" in testi[5], "Barattozon" in testi[6] and "ordine Amazon" in testi[6]])
+           "vendita" in testi[5], "Barattozon" in testi[6] and "ordine Amazon" in testi[6]
+           and "Trascina il + giù" in testi[6]])
+    # LA FRECCETTA DEL TRASCINO (26 set 2026, ritocco di Andrea): la chiede
+    # la sola tappa della tendina, vive dentro il velo, e pulsa solo
+    # quando il movimento e' permesso — coi ridotti resta ferma e piena
+    prova("la freccetta la chiede la sola tappa della tendina", 1, giro.count("freccia: true"))
+    prova("...vive dentro il velo, decorativa, e nasce spenta", True,
+          '<div id="tourFreccia" hidden aria-hidden="true"><svg ' in
+          mini[mini.index('<div id="tour" role="dialog"'):mini.index('<div id="tourFumetto"')])
+    # il blocco del movimento e' QUELLO del riflettore: dall'apertura della
+    # media alla sua graffa, non «qualche riga prima» (la tortura ha
+    # passato una regola spostata appena fuori)
+    _i_luce = css.index("#tourLuce{transition:top .3s ease")
+    _i_mov = css.rindex("@media (prefers-reduced-motion: no-preference){", 0, _i_luce)
+    _mov = css[_i_mov:css.index("\n  }", _i_mov)]
+    # ...e l'id sta su un <div>: `hidden` come proprieta' su un <svg> non
+    # esiste, e la freccetta restava spenta (visto dal vivo, 0×0)
+    prova("...e l'interruttore `hidden` sta su un elemento HTML, non sull'svg", False,
+          bool(re.search(r"<svg[^>]*\bid=\"tourFreccia\"", mini)))
+    # SECONDA STESURA (26 set 2026, Andrea): bianca, lunga (76 px, la terza
+    # l'ha allungata ancora), e lampeggia ferma sul posto invece di scendere
+    prova("...bianca, lunga, e lampeggia sul posto (solo l'opacita' si muove)",
+          [True, True, False],
+          ["stroke:#fff" in pezzo_js(css, "#tourFreccia svg{", "}"),
+           'viewBox="0 0 24 76" width="24" height="76"' in mini
+           and "height:76px}" in pezzo_js(css, "#tourFreccia{position:fixed;", "}") + "}",
+           "transform" in pezzo_js(css, "@keyframes tourFrecciaLampeggia{", "}}")])
+    prova("...lampeggia solo col movimento permesso, e a riposo e' piena e accesa",
+          [True, False, False],
+          ["#tourFreccia{animation:tourFrecciaLampeggia" in _mov,
+           "animation" in pezzo_js(css, "#tourFreccia{position:fixed;", "}"),
+           "opacity" in pezzo_js(css, "#tourFreccia{position:fixed;", "}")])
     prova("il timbro del giro e' nel catalogo del server", True,
           '"giro_p2p")' in _SORGENTE)
 
@@ -51580,6 +51611,7 @@ function fintoEl(id, r){
 const ELEM = {};
 const el = id => (ELEM[id] = ELEM[id] || fintoEl(id));
 const PIU = fintoEl('piu', rettangolo(160, 740, 54, 54));
+el('tourFreccia').hidden = true;
 el('p2pLatoCompro').r = rettangolo(16, 55, 120, 46);
 el('p2pLatoVendo').r = rettangolo(240, 55, 120, 46);
 el('navBarattozon').r = rettangolo(160, 730, 54, 82);
@@ -51679,7 +51711,9 @@ function passo(){
           esempi: CARTE.filter(c => c.esempio).length,
           tondo: el('tourLuce').classList.contains('tondo'),
           salta: f.indexOf('class="tour-salta"') >= 0,
-          luce: [el('tourLuce').style.top, el('tourLuce').style.height]};
+          luce: [el('tourLuce').style.top, el('tourLuce').style.height],
+          freccia: el('tourFreccia').hidden ? null
+            : [el('tourFreccia').style.left, el('tourFreccia').style.top]};
 }
 function tuttiIPassi(){
   const passi = [];
@@ -51719,6 +51753,12 @@ const out = {};
   out.primaDelSalta = passo();
   navIndietro();                 /* il «Salta» del fumetto e' navIndietro() */
   out.salta = stato();
+  /* ...e «Salta» proprio sul passo della freccetta: se ne va con lui */
+  rivediTourP2P(); slideFinoInizia(); await dorme(A_FUOCO_TOUR_P2P_MS + 150);
+  for (let i = 0; i < 6; i++) tourAvanti();
+  out.frecciaAccesa = !el('tourFreccia').hidden;
+  navIndietro();
+  out.frecciaDopoSalta = !el('tourFreccia').hidden;
   /* 5) LIBRO PIENO: la card vera, mai l'esempio */
   azzera(); VISTI.giro_p2p = 1;
   LIBRO = {compro: ['c1', 'c2'], vendo: ['v1']}; renderP2P();
@@ -51813,6 +51853,10 @@ const out = {};
           v[6]["luce"])
     prova("...al lato «Vendi BTC» il giro passa da solo, senza scossa, e alla fine torna",
           [["vendo", True], ["compro", True]], o["lati"])
+    prova("LA FRECCETTA c'e' solo al passo 7, a destra della capsula e sotto la sua cima",
+          [None] * 6 + [["232px", "736px"]], [p["freccia"] for p in v])
+    prova("...«Avanti» e «Fine» la portano via, e «Salta» sul passo 7 pure",
+          [True, False], [o["frecciaAccesa"], o["frecciaDopoSalta"]])
     prova("...e alla fine: via l'esempio, e il lato torna quello di partenza",
           {"giro": False, "lato": "compro", "esempi": 0, "ascolti": 0}, o["vuotoDopo"])
     prova("LIBRO VUOTO: la card d'esempio del lato giusto, una per lato", [1, 1],
@@ -54369,9 +54413,14 @@ console.log(JSON.stringify(out));
     # si riconoscono al volo, una sfumatura continua solo confrontando
     # due card. E il neutro NON e' bianco: sulla card bianca non
     # esisterebbe — `--ink-soft` e' chiaro di sera e scuro di giorno.
+    # EMENDATA (26 set 2026, la freccetta bianca del giro guidato): il
+    # divieto guardava TUTTO il file, e la freccia del passo 7 e' bianca
+    # apposta — sul velo scuro, non su una card. Il divieto e' dell'ANELLO:
+    # si guarda nelle sue regole, dove il bianco sparirebbe sulla card.
+    _anello = " ".join(re.findall(r"\.p2p-anello[^{]*\{[^}]*\}", mini)).lower()
     prova("il neutro e' un token che gira col tema, mai il bianco",
           True, ".p2p-anello .resta{stroke:var(--ink-soft)}" in mini
-          and "stroke:#fff" not in mini.lower())
+          and "stroke:#fff" not in _anello and "p2p-anello" in _anello)
     prova("...e a tre giorni l'anello passa all'arancio di casa", True,
           ".p2p-anello.vicina .resta{stroke:var(--sats)}" in mini
           and "vicina" in out["svgVicina"]

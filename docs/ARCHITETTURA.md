@@ -6876,7 +6876,13 @@
   «Esempio», volto in `o.faccia`) che `cartaGiroP2P` rimette dopo ogni
   render e che `fineGiroP2P` toglie insieme al lato di partenza.
   Nessun gesto vero: il velo prende il dito, e `tastoTour` in cattura
-  ferma Invio e spazio fuori dal fumetto.
+  ferma Invio e spazio fuori dal fumetto. LA FRECCETTA DEL TRASCINO: una
+  tappa con `freccia` accende `#tourFreccia` (un <div> col suo svg, nel
+  velo) accanto al riflettore, a destra o a sinistra se non c'e' posto;
+  le altre tappe e `chiudiTour` la spengono. Bianca, lunga 76 px,
+  lampeggia sul posto solo nel blocco
+  `prefers-reduced-motion: no-preference` del riflettore, e coi ridotti
+  resta piena e ferma.
   Il verbale: CANTIERI, «Il libro subito», «Il tutorial su pagina
   sfocata, e «Invii» nel P2P» e «Il giro guidato del P2P».
   NEL P2P LA PROPRIA META' SI INVIA (26 set 2026): «Invia X € ·

@@ -7893,10 +7893,25 @@
   /* la prima comparsa non scivola dall'angolo: .subito spegne le
      transizioni per il primo posizionamento */
   #tour.subito #tourLuce,#tour.subito #tourFumetto{transition:none}
+  /* LA FRECCETTA DEL TRASCINO (26 set 2026, ritocco di Andrea al giro del
+     P2P): punta giu' accanto al + e LAMPEGGIA — si accende e si spegne,
+     ferma sul posto. BIANCA e LUNGA, 76 px (seconda e terza stesura di
+     Andrea: la prima era arancio, 36 px e pulsava scendendo; la seconda
+     bianca a 56, allungata ancora guardandola): il bianco
+     sul velo scuro si legge nei due temi, e l'alone scuro la stacca dalle
+     voci della barra che le stanno sotto. A riposo e' piena e accesa: e'
+     come resta con gli effetti ridotti. */
+  #tourFreccia{position:fixed;z-index:82;pointer-events:none;width:24px;height:76px}
+  #tourFreccia svg{display:block;fill:none;stroke:#fff;stroke-width:3.2;
+    stroke-linecap:round;stroke-linejoin:round;
+    filter:drop-shadow(0 0 2px rgba(15,12,6,.9))}
+  #tourFreccia[hidden]{display:none}
+  @keyframes tourFrecciaLampeggia{0%,100%{opacity:1}50%{opacity:.12}}
   @media (prefers-reduced-motion: no-preference){
     #tourLuce{transition:top .3s ease,left .3s ease,width .3s ease,
       height .3s ease,border-radius .3s ease}
     #tourFumetto{transition:top .3s ease,left .3s ease}
+    #tourFreccia{animation:tourFrecciaLampeggia 1.1s ease-in-out infinite}
   }
 
   /* ---------- tour del P2P: sei card, una scorsa (set 2026) ----------
@@ -11332,6 +11347,14 @@ document.getElementById('cartello')?.remove();</script>
   <!-- ============ TOUR DI BENVENUTO: velo + riflettore + fumetto ============ -->
   <div id="tour" role="dialog" aria-label="Tour di benvenuto">
     <div id="tourLuce"></div>
+    <!-- LA FRECCETTA DEL TRASCINO (26 set 2026): la accende la sola tappa
+         che la chiede (`freccia`), accanto al riflettore e fuori dal
+         fumetto. Decorativa: a dirlo a parole c'e' il testo.
+         ⚠️ UN <div> ATTORNO ALL'SVG, e non e' un vezzo: `hidden` come
+         PROPRIETA' esiste solo sugli elementi HTML — su un <svg>
+         `fr.hidden = false` scrive un campo inventato, l'attributo resta
+         e la freccetta non si vede mai (visto dal vivo, 0×0). -->
+    <div id="tourFreccia" hidden aria-hidden="true"><svg viewBox="0 0 24 76" width="24" height="76"><path d="M12 3v66M4 60l8 9 8-9"/></svg></div>
     <div id="tourFumetto" aria-live="polite"></div>
   </div>
 
@@ -20390,6 +20413,21 @@ function posizionaTour(){
   /* ...e il riflettore resta DENTRO lo schermo: un bersaglio attaccato
      al fondo non si porta il bordo oltre il vetro */
   luce.style.height = (Math.min(r.bottom + R, innerHeight - 3) - (r.top - R)) + 'px';
+  /* LA FRECCETTA, per la tappa che la chiede: accanto al riflettore, a
+     destra (a sinistra se di la' non c'e' posto), all'altezza della sua
+     cima — mai sopra il bersaglio. Le altre tappe la spengono, quindi
+     «Avanti» la porta via da se'. */
+  const fr = el('tourFreccia');
+  if (fr) {
+    fr.hidden = !t.freccia;
+    if (t.freccia) {
+      const fw = 24, spazio = R + 12;   // la misura del CSS
+      let fl = r.right + spazio;
+      if (fl + fw > innerWidth - 8) fl = r.left - spazio - fw;
+      fr.style.left = fl + 'px';
+      fr.style.top = (r.top + 6) + 'px';
+    }
+  }
   /* il fumetto: sotto il riflettore se c'e' posto, sopra altrimenti,
      e come ultima spiaggia in fondo allo schermo; sempre dentro i
      bordi, anche sugli schermi piccoli */
@@ -20413,6 +20451,7 @@ function chiudiTour(){
   el('tour').removeEventListener('touchmove', bloccaTourTocco);
   document.removeEventListener('keydown', tastoTour, true);
   document.removeEventListener('transitionend', posizionaTour);
+  const fr = el('tourFreccia'); if (fr) fr.hidden = true;
   bannerInstallaPwa();   // il banner installa riottiene la sua occasione
   const dopo = tourDopo;
   tourDopo = null;
@@ -57377,8 +57416,9 @@ const TAPPE_GIRO_P2P = [
     testo: `Qui ci sono gli annunci di chi vuole comprare i tuoi bitcoin.` },
   { trova: () => piuGiroP2P(), tondo: true,
     testo: `Pubblica il tuo annuncio di vendita e aspetta che qualcuno lo prenda.` },
-  { trova: () => el('navBarattozon'), rett: capsulaGiroP2P, raggio: 33,
-    testo: `Con <b>Barattozon</b> qualcuno paga in contanti il tuo ordine Amazon, tu gli dai i sats.` },
+  /* la freccetta accanto al + invita al trascino (ritocco di Andrea) */
+  { trova: () => el('navBarattozon'), rett: capsulaGiroP2P, raggio: 33, freccia: true,
+    testo: `<b>Barattozon</b>: ti pagano in contanti l'ordine Amazon, tu dai i sats. Trascina il + giù.` },
 ];
 /* il tondo del + nella barra: e' lui che ha il colore del lato */
 function piuGiroP2P(){ return el('nav-vendi')?.querySelector('.ic') || null; }
