@@ -71740,8 +71740,12 @@ def prove_banner_fee_p2p():
     prova("...e con la trasparenza dichiarata", True, bool(raw[20] & 0x10))
     larg = 1 + int.from_bytes(raw[24:27], "little")
     alt = 1 + int.from_bytes(raw[27:30], "little")
-    # a 375 la pagina e' larga 343 fra i suoi margini: il 3x sono 1029
-    prova("...largo abbastanza per un telefono a 3x", True, larg >= 3 * 343)
+    # il banner e' largo 5/6 della pagina (26 set 2026): a 430 la pagina
+    # e' 398 fra i margini, il banner ~332, il 3x sono 995. E il file e'
+    # fatto PER quella misura, dal PNG originale: il 1200 di prima (il 3x
+    # della pagina intera) vorrebbe dire che non e' stato rifatto
+    prova("...largo abbastanza per un telefono a 3x, e fatto per i 5/6",
+          True, 995 <= larg < 1200)
     try:
         from PIL import Image as _Im
         with _Im.open(FILE) as _im:
@@ -71814,11 +71818,12 @@ def prove_banner_fee_p2p():
     # --- 4) IL VESTITO E IL BAGLIORE ----------------------------------
     regola = re.search(r"\.p2p-fee-banner\{([^}]*)\}", css)
     regola = re.sub(r"\s+", "", regola.group(1)) if regola else ""
-    # PIU' PICCOLO DI UN TERZO (25 set 2026, ritocco di Andrea): due terzi
-    # della pagina, centrato; l'altezza la segue il file (height:auto)
-    prova("largo due terzi della pagina e centrato, uno stadio come la "
+    # PIU' PICCOLO DI UN TERZO (25 set 2026, ritocco di Andrea), poi PIU'
+    # GRANDE DI UN QUARTO (26 set): due terzi per 5/4, cinque sesti della
+    # pagina, centrato; l'altezza la segue il file (height:auto)
+    prova("largo cinque sesti della pagina e centrato, uno stadio come la "
           "capsula", True,
-          "width:calc(200%/3)" in regola and "margin:14pxauto16px" in regola
+          "width:calc(500%/6)" in regola and "margin:18pxauto16px" in regola
           and "border-radius:999px" in regola)
     prova("...l'immagine si adatta, con l'altezza che vuole il disegno",
           True, bool(re.search(r"\.p2p-fee-banner img\{[^}]*width:100%;"
@@ -71833,14 +71838,22 @@ def prove_banner_fee_p2p():
     kf = kf.group(1) if kf else ""
     prova("...con l'arancio di casa, nell'ombra che segue la forma", True,
           kf.count("box-shadow:") >= 2 and "rgba(255,138,0," in kf)
-    # ...e il bagliore rimpicciolito col banner: i numeri di prima (8 a
-    # riposo, 16 e 4 al picco) per due terzi
+    # ...e il bagliore in proporzione col banner: i numeri di b0b8794 (8
+    # a riposo, 16 e 4 al picco) per cinque sesti
     _bp = re.search(r"50%\{box-shadow:0 0 ([\d.]+)px ([\d.]+)px", kf)
     _br = re.search(r"0%,100%\{box-shadow:0 0 ([\d.]+)px", kf)
-    prova("...in proporzione al banner: due terzi di 8, 16 e 4", True,
+    prova("...in proporzione al banner: cinque sesti di 8, 16 e 4", True,
           bool(_bp and _br) and all(
-              abs(float(x) / y - 2 / 3) < 0.02 for x, y in
+              abs(float(x) / y - 5 / 6) < 0.02 for x, y in
               ((_br.group(1), 8), (_bp.group(1), 16), (_bp.group(2), 4))))
+    # ...e l'aria sopra basta all'alone del picco (sfocatura + espansione):
+    # sotto, il blocco attaccato ha il fondo dipinto e lo taglierebbe con
+    # un filo (26 set 2026: coi 14 di prima e l'alone a 5/6 c'era)
+    _mt = re.search(r"margin:(\d+)px", regola)
+    prova("...con l'aria sopra per tutto l'alone del picco, che il blocco "
+          "attaccato non lo tagli", True,
+          bool(_bp and _mt) and int(_mt.group(1))
+          >= float(_bp.group(1)) + float(_bp.group(2)))
     prova("...e da fermo resta un'ombra di riposo, la stessa del bordo "
           "dell'animazione", True,
           bool(re.search(r"0%,100%\{box-shadow:([^}]*)\}", kf))

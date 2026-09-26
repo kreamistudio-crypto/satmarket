@@ -27707,4 +27707,10 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   stesso giorno il banner e' largo DUE TERZI della pagina, centrato
   (`width:calc(200% / 3)`, `margin` auto; l'altezza la segue il file), e
   il bagliore ha i suoi numeri per due terzi (5,3 a riposo, 10,7/2,7 al
-  picco). «Ho capito» del foglio scende col `navIndietro`.
+  picco). «Ho capito» del foglio scende col `navIndietro`. Dal 26 set
+  2026 e' largo CINQUE SESTI (`width:calc(500% / 6)`, un quarto piu' dei
+  due terzi), bagliore per cinque sesti (6,7 a riposo, 13,3/3,3 al
+  picco), l'aria sopra a 18 perche' il fondo dipinto di `.p2p-sticky`
+  non tagli l'alone del picco (la prova lo confronta coi numeri del
+  keyframe), e il file e' 1000×259: il 3x della misura nuova su un
+  telefono da 400.

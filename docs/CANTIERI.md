@@ -33431,3 +33431,48 @@ eseguita da bash sugli ultimi undici commit di main, dà il messaggio
 qui sopra. Suite intera severa senza config nel worktree da origin/main
 (1c10a79): 16.170 verdi e 0 rosse.
 **DA GUARDARE:** il primo «🚀» vero su Telegram, al prossimo deploy.
+
+## Il banner delle commissioni un quarto piu' grande (26 set 2026)
+
+Ritocco di Andrea a d019748: il banner dei due terzi si ingrandisce di un
+quarto, in proporzione — due terzi per 5/4 fanno **CINQUE SESTI** della
+pagina (l'~83% della misura di b0b8794) —, sempre centrato
+(`width:calc(500% / 6)`, `margin` auto), e il **bagliore per cinque
+sesti**: 8→6,7 a riposo, 16/4→13,3/3,3 al picco. Tocco e foglio uguali.
+
+**IL FILE E' RIFATTO DALL'ORIGINALE**, non ingrandito da quello ridotto
+(che del resto non lo era: il ritocco dei due terzi aveva toccato solo il
+CSS, e il file era ancora il 1200 di b0b8794). Dal PNG di Andrea
+(`banner-fee-p2p.png`, 2752×1536): `crop` sul bbox dell'alpha
+(393,505,2443,1035, lo stesso di allora), `resize` a **1000×259**
+LANCZOS — il 3x del banner su un telefono da 400, cioe' 5/6 × 400 × 3 —,
+WebP qualita' 86, `method=6`, `alpha_quality=90`, info svuotata: 29 KB,
+soli VP8X/ALPH/VP8, stretto sulla capsula (alpha 0,0,1000,259).
+`width`/`height` del markup a 1000/259; la ricetta in PRODUZIONE dice
+1000 invece di 1200.
+
+**L'ARIA SOPRA SALE DA 14 A 18, ed e' la sola cosa non chiesta**: e'
+«l'aria dell'alone» (b0b8794 l'aveva alzata da 10 a 14 proprio perche'
+il fondo dipinto del blocco attaccato tagliava l'alone del picco con una
+riga netta). Misurato dal vivo a 320: con l'alone a cinque sesti e 14
+d'aria, sul filo del blocco il colore saltava di 10 livelli (19 con
+l'alone originale, 2 coi due terzi); a 17 ne restavano 4 a 375 (la coda
+della sfocatura va oltre i 16,6 di sfocatura + espansione); a 18 sono
+al massimo 2, come coi due terzi. Sotto resta 16.
+
+**PROVATO.** `prove_banner_fee_p2p` (51) emendata col perche': cinque
+sesti e centrato, il bagliore a 5/6 di 8, 16 e 4, il file largo almeno il
+3x del banner a 430 (995) e sotto il 1200 di prima (cioe' rifatto per la
+misura nuova), e una NUOVA: l'aria sopra almeno quanto sfocatura +
+espansione del picco, lette dal keyframe. Tortura 7 su 7 (larghezza
+vecchia, picco vecchio, riposo solo nel keyframe, il file 1200 di prima,
+un file non stretto, misure del markup, aria a 14). Suite intera severa
+senza config nel worktree da origin/main (80c87d6): 16.171 verdi e 0
+rosse. Dal vivo, Chrome headless via CDP a densita' 3 col server di
+collaudo di una copia (relay morto), a 320, 375 e 430 nei due temi: 42/42 — cinque sesti,
+centrato, proporzioni del file, nessuno scorrimento laterale, il file
+nuovo arrivato (1000×259, densita' ≥ 3), bagliore 13,3/3,3 al picco
+fermato a meta' (rientrando nel libro, che lo riavvia) e 6,7 a riposo,
+nessun filo sul fondo del blocco, il tocco che apre il foglio e «Ho
+capito» che lo chiude, nessun errore.
+**DA AVERE:** l'occhio sul telefono.

@@ -2037,11 +2037,22 @@
      file tiene le sue proporzioni (`height:auto`) —, e il bagliore coi
      suoi numeri per due terzi: 8→5,3 a riposo, 16/4→10,7/2,7 al picco.
      L'aria sopra e sotto resta quella di prima: e' dello spazio fra il
-     blocco e le card, non del banner. */
-  .p2p-fee-banner{display:block;width:calc(200% / 3);margin:14px auto 16px;padding:0;
+     blocco e le card, non del banner.
+     E POI PIU' GRANDE DI UN QUARTO (26 set 2026, ritocco di Andrea):
+     due terzi per 5/4 fanno CINQUE SESTI della pagina, sempre centrato,
+     e il bagliore per cinque sesti: 8→6,7 a riposo, 16/4→13,3/3,3 al
+     picco. Il file e' rifatto dal PNG originale per la misura nuova
+     (1000 di larghezza, il 3x di 5/6 di un telefono da 400), non
+     ingrandito da quello ridotto. E L'ARIA DELL'ALONE SALE CON LUI, da
+     14 a 18: al picco l'alone arriva a ~16,6px dal bordo (13,3 + 3,3)
+     piu' la coda della sfocatura, e con 14 il fondo dipinto del blocco
+     attaccato lo tagliava di nuovo con un filo (misurato a 320: 10
+     livelli di colore sul filo, contro i 2 dei due terzi e i 19
+     dell'originale; a 17 ne restavano 4 a 375). Sotto resta 16. */
+  .p2p-fee-banner{display:block;width:calc(500% / 6);margin:18px auto 16px;padding:0;
     border:0;border-radius:999px;background:none;cursor:pointer;
     -webkit-tap-highlight-color:transparent;
-    box-shadow:0 0 5.3px 0 rgba(255,138,0,.30);
+    box-shadow:0 0 6.7px 0 rgba(255,138,0,.30);
     animation:p2pFeeBagliore 1.2s ease-in-out 1}
   .p2p-fee-banner img{display:block;width:100%;height:auto}
   .p2p-fee-banner:focus-visible{outline:2px solid var(--orange);
@@ -2052,8 +2063,8 @@
   .p2p-fee-corpo{margin-bottom:14px}
   .p2p-fee-corpo p{margin:0 0 10px;font-size:14px;line-height:1.45}
   @keyframes p2pFeeBagliore{
-    0%,100%{box-shadow:0 0 5.3px 0 rgba(255,138,0,.30)}
-    50%{box-shadow:0 0 10.7px 2.7px rgba(255,138,0,.75)}}
+    0%,100%{box-shadow:0 0 6.7px 0 rgba(255,138,0,.30)}
+    50%{box-shadow:0 0 13.3px 3.3px rgba(255,138,0,.75)}}
   /* ⚠️ L'ARIA ATTORNO ALLA RIGA DI STRUMENTI, pareggiata (set 2026,
      richiesta di Andrea — e MISURATA, non dedotta): sotto la riga ce
      n'erano 13 — i 10 del suo margine piu' i 3 del fondo dipinto del
@@ -9556,7 +9567,7 @@ document.getElementById('cartello')?.remove();</script>
            regola universale la spegne e resta l'ombra ferma.
            Se il file non arriva il bottone se ne va: un bottone vuoto
            in cima al libro sarebbe un buco. -->
-      <button type="button" class="p2p-fee-banner" id="p2pFeeBanner" aria-haspopup="dialog" onclick="apriFeeP2P()"><img src="/assets/p2p-banner-fee.webp" width="1200" height="310" alt="Fee P2P: 2% barrato, in beta 1,5% per parte, pionieri o livello 5 meno 0,5%" onerror="this.parentNode.remove()"></button>
+      <button type="button" class="p2p-fee-banner" id="p2pFeeBanner" aria-haspopup="dialog" onclick="apriFeeP2P()"><img src="/assets/p2p-banner-fee.webp" width="1000" height="259"alt="Fee P2P: 2% barrato, in beta 1,5% per parte, pionieri o livello 5 meno 0,5%" onerror="this.parentNode.remove()"></button>
       <div id="p2pCorpo"></div>
       <!-- IL BOTTONE DEL PROFILO NON C'E' PIU' (set 2026, fase 6):
            l'identita' e' l'account, tutta sotto il cofano. Il
