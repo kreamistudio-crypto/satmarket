@@ -33476,3 +33476,47 @@ fermato a meta' (rientrando nel libro, che lo riavvia) e 6,7 a riposo,
 nessun filo sul fondo del blocco, il tocco che apre il foglio e «Ho
 capito» che lo chiude, nessun errore.
 **DA AVERE:** l'occhio sul telefono.
+
+## Il nostro barattolo nella seconda card del tour P2P (26 set 2026)
+
+Ritocco di Andrea: nella seconda card del tour del P2P («Chi vende
+blocca i sats prima che tu paghi...») il barattolo generico col
+lucchetto lascia il posto al NOSTRO, quello di
+`assets/barattolo-hero.png`. Il resto del tour non si tocca: testo,
+ordine, CSS, whitelist e catalogo restano quelli di prima, cambia solo
+`assets/tour-p2p/garanzia.webp` (stesso nome, quindi il `?v=` di
+`_timbra_asset_pagina` fa cadere le cache da solo).
+
+**LA TELA E' RIFATTA SUL FONDO DI PRIMA, non sostituita
+dall'immagine.** Il navy della tela vecchia e' piatto (#161C2A,
+letto sulla tela, non preso dal CSS): tela nuova 756×360 di quel navy,
+e sopra il barattolo. Del barattolo-hero esiste la sola versione PNG
+(480×480 con la trasparenza): si ritaglia sull'alpha (220×339) e si
+scala in alpha premoltiplicata, perche' ai bordi non resti una
+frangia chiara. WebP con perdita a qualita' 85, `method=6`, come le
+altre cinque: 14,8 KB (erano 9,2), il tour intero sale a ~86 KB.
+
+**STESSE MISURE E POSIZIONE DEL DISEGNO DI IERI.** Misurato sulla tela
+vecchia: il barattolo generico stava in x 265..490, y 25..329 (226×305,
+centrato su 377,5). Il nostro e' piu' stretto (0,65 contro 0,74),
+quindi comanda l'ALTEZZA: 198×305, in x 278..475, y 25..329 — alto
+uguale, centrato uguale, nessuno sbordo. A larghezza piena sarebbe
+stato alto 348 e sarebbe uscito dalla tela. Nessun alone aggiunto:
+quello caldo era del disegno vecchio, e non e' stato chiesto.
+
+**PROVATO.** `prove_tour_p2p` (54) con cinque sentinelle nuove sulla
+seconda tela: fuori dalla scatola di ieri resta il navy (scarto
+massimo 6, il rumore del WebP) ed e' proprio QUEL navy nella media
+(la sola soglia sul massimo lasciava passare #131B26, il navy di
+un'altra tela: l'ha preso la tortura); il disegno sta dentro la
+scatola e ne prende l'altezza; ed e' il NOSTRO barattolo alla resa —
+il 2,2% dei pixel oltre 24 dal barattolo composto a mano, contro l'87%
+della tela vecchia. Tortura 7 su 7 (la tela di ieri, fondo bianco,
+navy vicino, rimpicciolito, spostato che sborda, troppo alto,
+capovolto). Dal vivo, Chrome headless via CDP a densita' 3 col server
+di collaudo di una copia (relay morto), a 320 e 375 nei due temi:
+28/28 — seconda card a schermo col suo pallino, arrivata la tela nuova
+(756×360, byte uguali al file), immagine che copre la figura senza
+bande, navy sotto e attorno al barattolo nello scatto, testo
+invariato, nessun errore.
+**DA AVERE:** l'occhio sul telefono.

@@ -50695,6 +50695,72 @@ def prove_tour_p2p():
                 _storte.append(f"{_n} {_w}x{_h}")
         prova("le sei tele hanno la forma della scatola (21:10)",
               [], _storte)
+        # ⚠️ LA SECONDA TELA E' IL NOSTRO BARATTOLO (26 set 2026,
+        # ritocco di Andrea): al posto del barattolo generico col
+        # lucchetto c'e' `barattolo-hero.png`, posato SUL navy di prima
+        # (#161C2A, piatto) e alto quanto il disegno di ieri — la
+        # scatola x 265..490, y 25..329, misurata sulla tela vecchia.
+        # Tre modi di tornare storta in silenzio: il fondo che diventa
+        # quello dell'immagine invece del navy, il barattolo che sborda
+        # o rimpicciolisce, e il disegno che torna generico. Il terzo si
+        # giudica ALLA RESA e non al pixel esatto: il WebP con perdita
+        # sposta i bordi, quindi si contano i pixel che si scostano piu'
+        # di 24 dal barattolo composto a mano (oggi il 2%; la tela
+        # vecchia, contro lo stesso atteso, fa l'87%).
+        _pg = _os.path.join("assets", "tour-p2p", "garanzia.webp")
+        _ph = _os.path.join("assets", "barattolo-hero.png")
+        if _os.path.exists(_pg) and _os.path.exists(_ph):
+            from PIL import ImageChops as _Chops
+            NAVY, SCATOLA = (22, 28, 42), (265, 25, 491, 330)
+            _tela = _Img.open(_pg).convert("RGB")
+            _px = _tela.load()
+            def _dal_navy(c):
+                return max(abs(c[k] - NAVY[k]) for k in range(3))
+            # DUE MISURE DEL FONDO, e una da sola non basta: lo scarto
+            # massimo deve tollerare il rumore del WebP ai bordi dei
+            # blocchi (6 oggi), e con quella tolleranza passerebbe anche
+            # il navy di un'altra tela (#131B26 dista 4). La media no:
+            # su 200.000 pixel il rumore sparisce, e resta la tinta.
+            _fuori, _xs, _ys = 0, [], []
+            _somma, _quanti = [0, 0, 0], 0
+            for _y in range(_tela.height):
+                for _x in range(_tela.width):
+                    _c = _px[_x, _y]
+                    _d = _dal_navy(_c)
+                    if not (SCATOLA[0] <= _x < SCATOLA[2]
+                            and SCATOLA[1] <= _y < SCATOLA[3]):
+                        _fuori = max(_fuori, _d)
+                        _quanti += 1
+                        for _k in range(3):
+                            _somma[_k] += _c[_k]
+                    if _d > 40:
+                        _xs.append(_x); _ys.append(_y)
+            _media = [v / max(_quanti, 1) for v in _somma]
+            prova("la seconda tela tiene il navy di prima fuori dal "
+                  f"disegno (scarto {_fuori})", True, _fuori <= 8)
+            prova("...ed e' proprio QUEL navy, non uno vicino", True,
+                  all(abs(_media[k] - NAVY[k]) < 0.5 for k in range(3)))
+            prova("...e il barattolo sta nella scatola di ieri, senza "
+                  "sbordi", True, bool(_xs) and min(_xs) >= SCATOLA[0]
+                  and max(_xs) < SCATOLA[2] and min(_ys) >= SCATOLA[1]
+                  and max(_ys) < SCATOLA[3])
+            prova("...e ne prende tutta l'altezza (non rimpicciolisce)",
+                  True, bool(_ys) and min(_ys) <= 30 and max(_ys) >= 324)
+            _h = _Img.open(_ph).convert("RGBA")
+            _h = _h.crop(_h.getchannel("A").getbbox())
+            _lh = round(_h.width * 305 / _h.height)
+            _h = _h.convert("RGBa").resize(
+                (_lh, 305), _Img.LANCZOS).convert("RGBA")
+            _att = _Img.new("RGB", _tela.size, NAVY)
+            _att.paste(_h, (round(377.5 - _lh / 2), 25), _h)
+            _dd = list(_Chops.difference(
+                _tela.crop(SCATOLA), _att.crop(SCATOLA)).getdata())
+            _via = sum(1 for c in _dd if max(c) > 24) / len(_dd)
+            prova("...ed e' il NOSTRO barattolo, alla resa "
+                  f"({_via:.1%} dei pixel oltre 24)", True, _via < 0.10)
+        else:
+            salta("la seconda tela e' il nostro barattolo",
+                  "manca garanzia.webp o barattolo-hero.png")
     # IL TESTO STA IN MEZZO AL SUO SPAZIO: le card prendono tutte
     # l'altezza della piu' alta, e appoggiato in alto un testo di tre
     # righe lasciava un buco bianco sopra il piede.
