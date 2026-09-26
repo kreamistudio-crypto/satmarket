@@ -37,6 +37,17 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   del client (`📖 [p2p] libro: ...=N`): e' li' che si vede uno
   specchio che ha smesso di aggiornarsi, perche' non fallisce — torna
   zero, e zero si legge come «oggi non c'e' nessun ordine».
+- LE CARD P2P IN VETRINA (26 set 2026): la leva `P2P_IN_VETRINA` si
+  AGGIUNGE al config del VPS come le altre, e finche' manca o e'
+  `False` le card le vedono solo i moderatori e chi e' in
+  `P2P_PROVA_IDS`. **IL GIORNO DEL LANCIO** sono due righe nel
+  `config.py` del VPS, poi `sudo systemctl restart barattolo`:
+  `P2P_PROVA_IDS = []` (o la riga cancellata) e
+  `P2P_IN_VETRINA = True`. Tutt'e due: con qualcuno ancora nella fase
+  di prova le card restano di chi prova anche a leva accesa. Solo
+  `True` accende (una stringa «True» resta spenta, e all'avvio il
+  journal lo dice). Si verifica nel pannello «⚙️ Stato delle leve»,
+  riga «Card P2P in vetrina», e aprendo Esplora da un account qualunque.
 - LE NOTIFICHE PRECISE DEL P2P (16 set 2026) non hanno una leva loro:
   girano con `P2P_ATTIVO`, dentro lo stesso orologio del campanello,
   e leggono il libro dai relay del coordinator e poi dallo specchio.

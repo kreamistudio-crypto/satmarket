@@ -34228,3 +34228,95 @@ nella gabbia senza rete.
 riavvio, che deve dire «🫙 Pionieri: 101, coorte e distintivo
 combaciano» —
 `journalctl -u barattolo --since "10 min ago" | grep "Pionieri"`.
+
+Le card P2P in vetrina (26 set 2026, richiesta di Andrea). Al lancio
+pubblico del P2P (10 ottobre) ogni ordine vivo del libro compare anche
+nella vetrina del mercatino. Per ora le card si PREPARANO soltanto: tutto
+dietro una leva spenta, `P2P_IN_VETRINA = False`.
+**COME ERA PRIMA**, detto ad Andrea prima di scrivere codice: in vetrina
+di card P2P non ce n'erano. Col nome «P2P in vetrina» esistevano tre cose
+diverse: il post nel canale Telegram «Barattolo Vetrina»
+(`POST /api/p2p/canale`, «L'ordine P2P in vetrina», qui sopra), le due
+card-ingresso (la cella «Scambio» della striscia e la card P2P di «Da
+scoprire», che portano al libro e non mostrano ordini) e il libro stesso.
+**CHI LE VEDE lo decide il server**, un giudice solo,
+`_p2p_vetrina_per(tg_id)`, e viaggia nella busta di prima pagina come
+`p2p_vetrina` (una chiave sua: il dizionario `p2p` delle leve resta
+quello di sempre). Senza il P2P acceso sul server nessuno. A leva spenta
+i moderatori (`e_admin`, 999 in collaudo) e chi e' in `P2P_PROVA_IDS`,
+MAI l'utente normale ne' l'anonimo. A leva accesa tutti, anonimi
+compresi, ma SOLO a fase aperta: con qualcuno ancora in `P2P_PROVA_IDS`
+il P2P per gli altri non c'e', e una vetrina di ordini che il tocco non
+lascia prendere sarebbe una promessa smentita. Solo `True` accende: una
+stringa «True» o un 1 restano spenti e lo si dice all'avvio. Il
+pannello «⚙️ Stato delle leve» la mostra come «Card P2P in vetrina».
+**LA FONTE E' IL LIBRO**, non una copia: le card si leggono da
+`p2pLibro` — la copia del telefono o la fotografia del server
+all'ingresso, poi la lettura vera dai relay (al massimo una al minuto da
+qui) — e l'orecchio sui 38383, che per chi vede le card resta aperto
+anche in Esplora (`libroInAscoltoInEsploraP2P` in `go()`). Un ordine
+preso, annullato o scaduto esce dal libro e con lui dalla fila: l'evento
+vivo (`arrivaLibroP2P`) e la fotografia arrivata ridisegnano.
+**LA CARD** e' la `.card` del mercatino (stesse misure: 166×268 a
+375 px, 138 di larghezza a 320), con al posto della foto le due monete
+di `scambi-intestazione.webp` (gia' nel repo) su un fondo caldo fisso, e
+per Barattozon il marchio chiaro su blu notte. Sopra: la pastiglia
+«Vende BTC» (rossa #C2410C) o «Compra BTC» (verde #1B8B54) dal punto di
+vista di chi ha PUBBLICATO — la card del libro parla a chi legge, qui chi
+guarda non ha ancora scelto un lato —, il volto (foto, iniziale o «?»)
+nell'angolo del barattolino, e la cifra in euro nel cartellino di carta
+delle sorelle: intera senza decimali («50 €»), coi centesimi quando ci
+sono («23,47 €»), «20–150 €» con «scegli tu» sotto al posto dei sats.
+Sotto: il metodo per nome e il premio — il cartellino «Ottimo/Super
+affare» del libro, che da oggi e' una funzione sola (`affaroneP2P`) per
+tutt'e due le card, altrimenti il badge del premio.
+**DOVE: IN UNA FILA LORO**, «Scambi P2P», sopra la griglia, con «Vedi
+tutti →» che porta al libro; al massimo sei, dal piu' nuovo. Le due
+strade sono andate ad Andrea con uno scatto ciascuna: A mescolate
+(dentro la griglia, dopo il secondo annuncio e poi ogni cinque, colonna
+alterna) e B la fila. **Ha scelto B**: uno scambio non e' un oggetto, e
+mescolato alla griglia avrebbe fatto mentire il conto «N oggetti». La A
+e' stata tolta. La fila c'e' solo nella vetrina NUDA (`vetrinaNudaP2P`:
+Esplora su «Tutto», senza ricerca, filtri, ordinamento ne' barattolo) e
+non si riscrive se non cambia niente, o chi la scorre di lato
+perderebbe il segno a ogni pagina di annunci.
+**IL TOCCO** apre il dettaglio dell'ordine, lo stesso foglio del libro
+(`prendiOrdineP2P`, con le sue guardie). Chi il P2P non ce l'ha aperto —
+il moderatore fuori dalla fase di prova, chi guarda da fuori Telegram —
+legge il foglio breve «Lo scambio P2P» (`p2pCosaSheet`): cos'e', il
+deposito di garanzia, e «Per te non è ancora aperto» oppure il bottone
+per Telegram.
+**DUE RITOCCHI DI ANDREA sugli scatti**: le monete scendono (top 24%)
+cosi' la pastiglia non copre il ₿, e il cartellino dell'affare e' piu'
+grande — 12,5 px a 375; a 320 si ferma alla larghezza della riga (114 px
+utili), col `clamp`, che di piu' non ci sta.
+**PROVATO.** `prove_card_p2p_vetrina` (nuova, 44): il giudice del server
+su cinque scenari per moderatore, prova, normale e anonimo; il
+caricatore della leva con un config finto (solo `True` accende, la riga
+assente e' spenta); busta, pannello, config_esempio; nel client nessuna
+card dentro la griglia, la fila nascosta alla nascita, gli agganci
+all'ascolto, al libro vivo e alla fotografia; e un banco node sulle
+funzioni vere: le quattro card, Ottimo e Super solo sul verso
+favorevole, Barattozon, il testo di sconosciuti scappato, quali ordini
+(vivi, dal piu' nuovo, sei, fuori scaduti presi e lapidati), la vetrina
+nuda e i dodici casi in cui non lo e', la fila che non si riscrive, la
+leva spenta senza card, e i tocchi (aperto, sparito, chiuso, anonimo).
+Emendate col perche' quattro sentinelle che contavano i posti toccati
+(l'immagine delle monete, i colori del prezzo nel cartellino,
+`ordinaEffettivo()`, la riga dell'ascolto in `go()`). Tortura 16 su 16.
+Suite intera severa senza config nel worktree da origin/main (bc8679d):
+16.466 verdi e 0 rosse, e i 24 collaudi della CI nella gabbia verdi;
+ribasato su a940c22 (arrivati il banner a battiti e i pionieri, di
+un'altra sessione) di nuovo tutta: 16.490 verdi e 0 rosse, e i 25
+collaudi della CI (c'e' anche `collaudo_pionieri`) verdi. Dal vivo, Chrome headless
+via CDP a densita' 3, relay morto, leva spenta, ordini seminati nel
+libro della pagina: 111 in prova vede la fila e al tocco il dettaglio,
+999 la vede e al tocco il foglio breve, 222 non vede niente (e
+l'anonimo, dalla busta, nemmeno); card e fila a 320 e 375 px nei due
+temi, nessuno scorrimento laterale, nessun errore dell'app. Scatti
+approvati da Andrea.
+**IL GIORNO DEL LANCIO** (PRODUZIONE, «Le card P2P in vetrina»): nel
+config del VPS si svuota `P2P_PROVA_IDS` e si mette
+`P2P_IN_VETRINA = True`, poi riavvio.
+**DA AVERE:** l'occhio sul telefono, e il peso dei relay aperti da
+Esplora quando le card le vedranno tutti — oggi li apre solo chi prova.

@@ -6915,6 +6915,19 @@
   Il verbale: CANTIERI, «Il libro subito», «Il tutorial su pagina
   sfocata, e «Invii» nel P2P», «Il giro guidato del P2P» e «Il banner
   personale delle commissioni».
+  LE CARD P2P IN VETRINA (26 set 2026): una fila «Scambi P2P» sopra la
+  griglia di Esplora (`#p2pVetrinaSez`), con le card degli ordini vivi
+  del libro — la `.card` del mercatino, «Vende/Compra BTC» dal lato di
+  chi ha pubblicato, le monete o il marchio di Barattozon, l'euro nel
+  cartellino, il volto e il premio (`affaroneP2P`, lo stesso cartellino
+  della card del libro). Chi le vede lo decide il server
+  (`_p2p_vetrina_per`, chiave `p2p_vetrina` della busta): a leva
+  `P2P_IN_VETRINA` spenta moderatori e fase di prova, accesa tutti ma
+  solo a fase aperta. La fonte e' `p2pLibro` e l'orecchio sui 38383
+  resta aperto anche in Esplora per chi le vede; la fila c'e' solo
+  nella vetrina nuda (`vetrinaNudaP2P`) e non entra mai nella griglia.
+  Il tocco e' `prendiOrdineP2P`, o il foglio «Lo scambio P2P» per chi
+  il P2P non ce l'ha. Verbale: CANTIERI, «Le card P2P in vetrina».
   NEL P2P LA PROPRIA META' SI INVIA (26 set 2026): «Invia X € ·
   Ricevi ≈ X sats» (e «Invia ≈ X sats · Ricevi X €»), «Totale da
   inviare», «inviando» nelle card di «I miei scambi». «Pagare» resta
