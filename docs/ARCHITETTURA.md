@@ -9417,6 +9417,16 @@
   calcolo (`assegna_coorte`): la posizione in una fila non cambia mai
   più, e ricalcolarla sarebbe una scansione per chiamata a diecimila
   utenti. Backfill idempotente in `init_db` + `/api/me` per i nuovi.
+  LA FILA DEI PIONIERI È CHIUSA (26 set 2026): `COORTI_CHIUSE`
+  toglie «pioniere» alle coorti che si ASSEGNANO — i pionieri sono
+  quelli che l'avevano scritta quel giorno (101) — e il distintivo 🫙
+  non guarda più la posizione ma la coorte, che è il fatto unico da
+  cui leggono anche titolo 🌱 e sconti. La sola strada che porta la
+  coorte su un account è la fusione: se una delle due metà è
+  pioniera, lo è quella che resta (`esegui_fusione`), e la riga
+  cancellata non fa avanzare nessuno. A ogni avvio
+  `controlla_pionieri` scrive nel journal una riga col conto, e per
+  tg_id chi ha distintivo e coorte scollati; non ripara niente.
   LIVELLI a DUE CHIAVI (`LIVELLI`, `livello_utente(xp, affari)`), ed
   è la conseguenza diretta del niente-tetto: senza il secondo
   requisito una vendita da 4.000 € basterebbe a fare un maestro, e il

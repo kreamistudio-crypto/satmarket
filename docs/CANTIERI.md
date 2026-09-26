@@ -34168,3 +34168,63 @@ capsula identico fra prima e dopo in nove punti e appena fuori dal bordo
 delle grigie, la banda del bordo grigia, le spente R=G=B, l'accesa
 invariata; nessun errore dell'app. Scatti approvati da Andrea.
 **DA AVERE:** l'occhio sul telefono.
+
+## Coorte e distintivo Pioniere allineati, la fila chiusa (26 set 2026)
+
+Ritocco di Andrea. Il distintivo 🫙 Pioniere si ricalcolava a ogni
+giro sulla POSIZIONE (`posizione <= 100`), la coorte «pioniere» era
+congelata alla prima scrittura: una fusione Telegram↔Nostr cancella la
+riga Nostr, chi era dietro sale di un posto, e il 101° si prendeva il
+distintivo senza la coorte — quindi senza titolo 🌱 e senza sconto, che
+leggono la coorte. In più la fusione portava i distintivi e non la
+coorte. Sul VPS e' successo a due persone (955197830, 8851137040),
+allineate a mano da Andrea il 26 set: restano pionieri, e i pionieri
+sono 101.
+**LA CURA.** 1) La fila e' chiusa: `COORTI_CHIUSE = ("pioniere",)` e
+`coorte_da_posizione` salta le voci chiuse, quindi chi arriva senza
+coorte prende la prima APERTA (in testa alla fila: i primi giorni). La
+voce resta in `COORTI` perche' titolo, emoji e sconto la leggono. 2) Il
+criterio del distintivo e' `d["coorte"] == "pioniere"`, e
+`_dati_distintivi` non conta piu' la posizione (una scansione in meno a
+ogni giro). 3) In `esegui_fusione`, dopo la riga cancellata e prima
+della passata dei distintivi: se la meta' Nostr e' pioniera, la coorte
+passa all'account che resta; nessun altro avanza, perche' la fila e'
+chiusa. 4) `controlla_pionieri` a fine `init_db`, dopo la passata:
+una riga SEMPRE nel journal («🫙 Pionieri: N, coorte e distintivo
+combaciano»), oppure il conto degli storti e una riga per tg_id
+(distintivo si'/no, coorte; «utente sparito» per un distintivo senza
+anagrafe). Non ripara: un distintivo non si revoca e una coorte non si
+scrive a occhio.
+**LASCIATO COM'ERA, e da decidere a parte:** la descrizione «Tra i
+primi 100 iscritti» (sono 101); la fusione porta la sola coorte
+pioniere, non «la piu' vecchia delle due» in generale; il titolo
+indossato dalla meta' Nostr non migra; il campanello ai moderatori
+chiama ancora «nuovo pioniere» ogni iscritto.
+**PROVATO.** `prove_pionieri_congelati` (nuova, 16): il criterio vero
+eseguito sulla coorte, i dati senza posizione, la voce nel catalogo e
+chiusa, la fusione (testo e ordine), la chiamata in `init_db`, e
+`controlla_pionieri` eseguito su un database di cartone — tutto a posto,
+distintivo senza coorte, coorte senza distintivo, distintivo orfano, il
+journal riga per riga, niente riparato. `prove_coorti_titoli` EMENDATA
+col perche': il primo iscritto e il centesimo non sono piu' pionieri, e
+il pioniere dei titoli e' scritto a mano come sul VPS.
+`collaudo_pionieri.py` (nuovo, 24, entra in CI per nome) col server vero
+su un database usa-e-getta: il riavvio (riga del pregresso in testa alla
+fila → primi giorni e niente distintivo; cento distintivi ai cento di
+coorte; lo storto nominato e non riparato), la fusione con la meta'
+Nostr pioniera (coorte, distintivo, titolo, sconto P2P a leva accesa e
+sconto del mercatino; il 101° portato al CENTESIMO posto che al primo
+sguardo al Profilo e al riavvio dopo resta dei primi giorni, senza
+distintivo e senza sconto), e le altre tre fusioni (pionieri tutt'e due:
+99 e nessuno avanza nemmeno al 99° e al 100° posto; nessuno dei due;
+pioniera la sola meta' Telegram). Tortura 6 su 6 (distintivo di nuovo
+sulla posizione, fila riaperta, fusione senza coorte, controllo tolto,
+controllo muto, controllo che ripara): ognuna rossa nelle prove e nel
+collaudo.
+Suite intera severa senza config nel worktree da origin/main (bcfef2e):
+16.446 verdi e 0 rosse; i 25 collaudi della CI, questo compreso, verdi
+nella gabbia senza rete.
+**DA GUARDARE sul VPS, dopo il deploy:** la riga nel journal del
+riavvio, che deve dire «🫙 Pionieri: 101, coorte e distintivo
+combaciano» —
+`journalctl -u barattolo --since "10 min ago" | grep "Pionieri"`.

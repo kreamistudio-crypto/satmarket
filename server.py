@@ -2424,9 +2424,14 @@ DISTINTIVI = [
                      "una disputa",
          criterio=lambda d: d["vendite"] + d["acquisti"] >= 10
                             and d["dispute_perse"] == 0),
+    # SEGUE LA COORTE E NON PIU' LA POSIZIONE (26 set 2026): la
+    # posizione si ricalcolava a ogni giro e dopo una fusione — una riga
+    # cancellata davanti, tutti avanti di uno — il 101° prendeva questo
+    # distintivo senza la coorte, cioe' senza lo sconto. Adesso il fatto
+    # e' uno solo, la coorte congelata; vedi COORTI_CHIUSE.
     dict(id="pioniere", emoji="🫙", nome="Pioniere", fiducia=False,
          descrizione="Tra i primi 100 iscritti del Barattolo",
-         criterio=lambda d: d["posizione"] <= 100),
+         criterio=lambda d: d["coorte"] == "pioniere"),
     dict(id="primo_acquisto", emoji="⚡", nome="Primo acquisto",
          fiducia=False,
          descrizione="Il primo acquisto concluso col deposito di garanzia",
@@ -2511,12 +2516,9 @@ def _dati_distintivi(con, tg_id: int) -> dict | None:
         tg_id=tg_id,
         npub_verificata=u["npub_verificata"],
         npub_accesso=u["npub_accesso"],
-        # posizione d'iscrizione: registrato=0 (chi c'era prima della
-        # colonna) = i piu' vecchi di tutti; i nuovi arrivano sempre
-        # dopo, quindi la posizione di chi c'e' non peggiora mai
-        posizione=q("SELECT COUNT(*) FROM utenti WHERE registrato<? "
-                    "OR (registrato=? AND tg_id<=?)",
-                    u["registrato"], u["registrato"], tg_id),
+        # la coorte, scritta una volta da assegna_coorte e mai piu'
+        # ricalcolata: e' lei a dire chi e' pioniere, non la posizione
+        coorte=u["coorte"] or "",
         # `prova=0` ovunque si conti il COMMERCIO: gli ordini di
         # collaudo marcati da marca_prove.py non fanno curriculum
         vendite=q("SELECT COUNT(*) FROM ordini WHERE venditore_id=? "
@@ -2593,6 +2595,16 @@ COORTI = [(100, "pioniere", "🌱", "Pioniere",
            "Tra i primi 2.000 iscritti del Barattolo"),
           (10000, "bottegaio", "🏪", "Bottegaio",
            "Tra i primi 10.000 iscritti del Barattolo")]
+# LA FILA DEI PIONIERI E' CHIUSA (26 set 2026, decisione di Andrea): i
+# pionieri sono quelli che hanno oggi la coorte scritta — 101, con i
+# due allineati a mano sul VPS dopo le fusioni — e la lista non si
+# allarga piu'. assegna_coorte salta queste voci: chi arriva a una
+# coorte senza averla ancora prende la prima APERTA che la sua
+# posizione raggiunge. La voce resta in COORTI perche' titolo, emoji e
+# sconto la leggono ancora; a cambiare e' solo che nessuno la PRENDE.
+# L'unica strada che ne porta una su un account e' la fusione, che la
+# fa passare dalla meta' che muore a quella che resta (esegui_fusione).
+COORTI_CHIUSE = ("pioniere",)
 
 # I FONDATORI, per tg_id, dal config del VPS (vuoto nel codice: gli id
 # delle persone non stanno in repo). Non e' un traguardo che si
@@ -2605,8 +2617,12 @@ except ImportError:
 
 def coorte_da_posizione(posizione: int) -> str:
     """La coorte di chi si e' iscritto in quella posizione ('' = e'
-    arrivato oltre l'ultima soglia)."""
+    arrivato oltre l'ultima soglia). Le coorti chiuse non si danno piu'
+    a nessuno: il primo iscritto di un database nuovo e' dei primi
+    giorni."""
     for soglia, cid, _e, _n, _d in COORTI:
+        if cid in COORTI_CHIUSE:
+            continue
         if posizione <= soglia:
             return cid
     return ""
@@ -2621,8 +2637,8 @@ def assegna_coorte(con, tg_id: int) -> str:
                     (tg_id,)).fetchone()
     if not u or u["coorte"]:
         return u["coorte"] if u else ""
-    # Stessa posizione del distintivo Pioniere: registrato=0 (chi c'era
-    # prima della colonna) vale come i piu' vecchi di tutti
+    # La posizione d'iscrizione: registrato=0 (chi c'era prima della
+    # colonna) vale come i piu' vecchi di tutti
     pos = con.execute(
         "SELECT COUNT(*) FROM utenti WHERE registrato<? "
         "OR (registrato=? AND tg_id<=?)",
@@ -2631,6 +2647,44 @@ def assegna_coorte(con, tg_id: int) -> str:
     if c:
         con.execute("UPDATE utenti SET coorte=? WHERE tg_id=?", (c, tg_id))
     return c
+
+
+def controlla_pionieri(con) -> list:
+    """Il controllo del riavvio: chi ha il distintivo 🫙 Pioniere e una
+    coorte diversa, o la coorte senza il distintivo. Non ripara niente —
+    un distintivo non si revoca, e una coorte non si scrive a occhio —
+    dice e basta, nel journal, per tg_id.
+    Gira DOPO la passata dei distintivi: «coorte senza distintivo» la
+    passata l'ha gia' curata, quindi se esce qui qualcosa non va nel
+    giudice. Una riga SEMPRE, anche quando e' tutto a posto: un
+    controllo muto si legge come un controllo che non e' girato.
+    Ritorna le righe storte, (tg_id, coorte, distintivo) — coorte None
+    = il distintivo e' di un tg_id che in anagrafe non c'e' piu'."""
+    storti = [tuple(r) for r in con.execute(
+        "SELECT u.tg_id, u.coorte, b.tg_id IS NOT NULL FROM utenti u "
+        "LEFT JOIN badge_utente b ON b.tg_id=u.tg_id "
+        "AND b.badge_id='pioniere' "
+        "WHERE (u.coorte='pioniere') <> (b.tg_id IS NOT NULL) "
+        "UNION ALL SELECT b.tg_id, NULL, 1 FROM badge_utente b "
+        "WHERE b.badge_id='pioniere' AND NOT EXISTS "
+        "(SELECT 1 FROM utenti u WHERE u.tg_id=b.tg_id) ORDER BY 1")]
+    quanti = con.execute("SELECT COUNT(*) FROM utenti "
+                         "WHERE coorte='pioniere'").fetchone()[0]
+    if not storti:
+        print(f"🫙 Pionieri: {quanti}, coorte e distintivo combaciano",
+              flush=True)
+        return []
+    print(f"⚠️  Pionieri: {quanti} di coorte, {len(storti)} storti fra "
+          f"coorte e distintivo:", flush=True)
+    for tg_id, coorte, distintivo in storti:
+        if coorte is None:
+            print(f"   tg_id {tg_id}: distintivo sì, utente sparito",
+                  flush=True)
+        else:
+            print(f"   tg_id {tg_id}: distintivo "
+                  f"{'sì' if distintivo else 'no'}, coorte "
+                  f"'{coorte or ''}'", flush=True)
+    return storti
 
 
 # ------------------------- GLI XP (ago 2026) -------------------------
@@ -7812,6 +7866,9 @@ def init_db():
     # Le notifiche 🏅 spettano solo ai ganci dal vivo, mai a questa.
     for r in con.execute("SELECT tg_id FROM utenti").fetchall():
         controlla_distintivi(con, r["tg_id"])
+    # ...e poi il controllo dei pionieri, che guarda quel che la passata
+    # ha lasciato (26 set 2026): una riga nel journal a ogni avvio.
+    controlla_pionieri(con)
     con.commit()
     con.close()
 
@@ -14091,6 +14148,17 @@ def esegui_fusione(id_telegram: int, id_nostr: int):
             "WHERE tg_id=?",
             (n["npub"], n["npub_accesso"], n["ln_address"],
              n["vendite_ok"], n["acquisti_ok"], id_telegram))
+        # IL PIONIERE RESTA PIONIERE (26 set 2026): se la meta' che muore
+        # aveva la coorte, la prende quella che resta — e con lei lo
+        # sconto, il titolo e il distintivo, che la passata qui sotto
+        # scrive dalla coorte. Prima la coorte restava quella della
+        # riga Telegram e il distintivo migrava da solo: la persona si
+        # trovava il 🫙 senza lo sconto. E NESSUN ALTRO AVANZA: la fila
+        # e' chiusa (COORTI_CHIUSE), quindi la riga cancellata qui sopra
+        # non libera un posto per chi era dietro.
+        if n["coorte"] == "pioniere":
+            con.execute("UPDATE utenti SET coorte='pioniere' "
+                        "WHERE tg_id=?", (id_telegram,))
         # I due passati si pesano da soli: il ricalcolo sulle righe
         # appena migrate fa media e conteggio in un colpo.
         _ricalcola_rating(con, id_telegram)

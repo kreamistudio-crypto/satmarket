@@ -27752,9 +27752,16 @@ def prove_coorti_titoli():
     coorte = amb["coorte_da_posizione"]
     livello = amb["livello_utente"]
 
-    prova("il primo iscritto e' pioniere", "pioniere", coorte(1))
-    prova("il centesimo ancora pioniere", "pioniere", coorte(100))
+    # EMENDATE il 26 set 2026: la fila dei pionieri e' CHIUSA
+    # (COORTI_CHIUSE) — i pionieri sono quelli scritti oggi, e il primo
+    # iscritto di un database nuovo non lo diventa piu'. Prima qui si
+    # chiedeva «il primo iscritto e' pioniere» e «il centesimo ancora».
+    prova("la fila e' chiusa: il primo iscritto e' dei primi giorni",
+          "primi_giorni", coorte(1))
+    prova("...e il centesimo pure", "primi_giorni", coorte(100))
     prova("il 101esimo e' dei primi giorni", "primi_giorni", coorte(101))
+    prova("nessuna posizione da' piu' la coorte pioniere", [],
+          [p for p in range(1, 10002) if coorte(p) == "pioniere"])
     # Oltre l'ultima soglia NON c'e' coorte: e' un fatto, non un
     # premio da dare a tutti — se ce l'hanno tutti non dice niente
     prova("oltre l'ultima soglia nessuna coorte", "", coorte(10001))
@@ -27786,15 +27793,23 @@ def prove_coorti_titoli():
     """)
     amb["assegna_coorte"](con, 1)
     amb["assegna_coorte"](con, 5)
-    prova("il primo iscritto prende la coorte", "pioniere",
+    prova("il primo iscritto prende la coorte (la prima aperta)",
+          "primi_giorni",
           con.execute("SELECT coorte FROM utenti WHERE tg_id=1"
                       ).fetchone()["coorte"])
     # CONGELATA: arrivano mille utenti prima di lui e non cambia nulla
     for i in range(100, 1200):
         con.execute("INSERT INTO utenti(tg_id,registrato) VALUES(?,1)", (i,))
     amb["assegna_coorte"](con, 5)
-    prova("la coorte scritta non si ricalcola mai piu'", "pioniere",
+    prova("la coorte scritta non si ricalcola mai piu'", "primi_giorni",
           con.execute("SELECT coorte FROM utenti WHERE tg_id=5"
+                      ).fetchone()["coorte"])
+    # Il PIONIERE della lista congelata: la coorte ce l'ha gia' scritta,
+    # come sul VPS, e assegna_coorte non la tocca
+    con.execute("UPDATE utenti SET coorte='pioniere' WHERE tg_id=1")
+    amb["assegna_coorte"](con, 1)
+    prova("il pioniere della lista resta pioniere", "pioniere",
+          con.execute("SELECT coorte FROM utenti WHERE tg_id=1"
                       ).fetchone()["coorte"])
 
     t = amb["titoli_disponibili"](con, 1)
@@ -27847,6 +27862,113 @@ def prove_coorti_titoli():
              re.findall(r"\d+", html[i:html.index("]", i)])]
     prova("le soglie del client combaciano col server",
           [l[0] for l in amb["LIVELLI"]], front)
+
+
+# ====================================================================
+def prove_pionieri_congelati():
+    """Coorte e distintivo Pioniere allineati, lista congelata (26 set
+    2026). Il distintivo 🫙 si ricalcolava sulla POSIZIONE mentre la
+    coorte era congelata alla prima scrittura: dopo le fusioni
+    Telegram↔Nostr — una riga cancellata davanti, tutti avanti di uno —
+    due persone avevano il distintivo senza la coorte, cioe' senza lo
+    sconto. Adesso il fatto e' uno solo (la coorte), la fila e' chiusa,
+    la fusione porta la coorte dalla meta' che muore, e il riavvio dice
+    nel journal chi e' storto. Qui i pezzi su un database di cartone;
+    la fusione e il riavvio col server VERO stanno in
+    collaudo_pionieri.py."""
+    print("\n[pionieri congelati]")
+    import contextlib
+    import io
+    import sqlite3
+
+    # 1) IL DISTINTIVO SEGUE LA COORTE, eseguito: il criterio vero
+    i = _SORGENTE.index("DISTINTIVI = [")
+    amb = {}
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+    crit = next(d for d in amb["DISTINTIVI"]
+                if d["id"] == "pioniere")["criterio"]
+    prova("il distintivo va a chi ha la coorte pioniere", True,
+          crit({"coorte": "pioniere"}))
+    prova("...e a nessun altro, nemmeno a chi ha un'altra coorte",
+          [False, False], [crit({"coorte": "primi_giorni"}),
+                           crit({"coorte": ""})])
+    # la posizione non la guarda piu': dati SENZA la chiave, e il
+    # criterio risponde lo stesso (con la posizione sarebbe KeyError)
+    dd = codice(pezzo("_dati_distintivi"))
+    prova("i dati dei distintivi non contano piu' la posizione", False,
+          "posizione" in dd)
+    prova("...e portano la coorte scritta", True, 'coorte=u["coorte"]' in dd)
+
+    # 2) LA FILA E' CHIUSA: la voce resta nel catalogo (titolo, emoji,
+    # sconto la leggono) ma coorte_da_posizione la salta
+    j = _SORGENTE.index("COORTI = [")
+    amb2 = {}
+    exec(_SORGENTE[j:_SORGENTE.index("\n\n\n", j)], amb2)
+    exec(pezzo("coorte_da_posizione"), amb2)
+    prova("la voce pioniere resta nel catalogo delle coorti", True,
+          any(c[1] == "pioniere" for c in amb2["COORTI"]))
+    prova("...ed e' chiusa", ("pioniere",), amb2["COORTI_CHIUSE"])
+    prova("nessuna posizione la da' piu'", [],
+          [p for p in (1, 2, 50, 99, 100)
+           if amb2["coorte_da_posizione"](p) == "pioniere"])
+
+    # 3) LA FUSIONE PORTA LA COORTE, e dopo la riga cancellata: il testo
+    fus = codice(pezzo("esegui_fusione"))
+    porta = fus.find('if n["coorte"] == "pioniere":')
+    prova("la fusione guarda la coorte della meta' che muore", True,
+          porta > 0)
+    prova("...e la scrive sulla riga Telegram", True,
+          "UPDATE utenti SET coorte='pioniere' " in fus[porta:porta + 200])
+    prova("...DOPO la cancellazione e PRIMA della passata dei distintivi",
+          True, fus.index('DELETE FROM utenti WHERE tg_id=?') < porta
+          < fus.index("controlla_distintivi(con, id_telegram)"))
+
+    # 4) IL CONTROLLO AL RIAVVIO: gira in init_db dopo la passata
+    ini = codice(pezzo("init_db"))
+    passata = ini.find("controlla_distintivi(con, r[\"tg_id\"])")
+    prova("init_db chiama il controllo dei pionieri dopo la passata", True,
+          0 < passata < ini.find("controlla_pionieri(con)"))
+
+    exec(pezzo("controlla_pionieri"), amb2)
+    con = sqlite3.connect(":memory:")
+    con.executescript("""
+    CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, coorte TEXT DEFAULT '');
+    CREATE TABLE badge_utente(tg_id INTEGER, badge_id TEXT,
+      ottenuto_il INTEGER, PRIMARY KEY(tg_id,badge_id));
+    INSERT INTO utenti VALUES(1,'pioniere'),(2,'pioniere'),(3,'primi_giorni');
+    INSERT INTO badge_utente VALUES(1,'pioniere',0),(2,'pioniere',0),
+      (3,'nostrano',0);
+    """)
+
+    def giro():
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            storti = amb2["controlla_pionieri"](con)
+        return storti, out.getvalue()
+
+    storti, detto = giro()
+    prova("tutto a posto: niente storti", [], storti)
+    prova("...e lo DICE lo stesso, una riga col conto",
+          "🫙 Pionieri: 2, coorte e distintivo combaciano\n", detto)
+    # il 101° della fusione: distintivo senza coorte
+    con.execute("INSERT INTO badge_utente VALUES(3,'pioniere',0)")
+    # la coorte senza il distintivo
+    con.execute("INSERT INTO utenti VALUES(4,'pioniere')")
+    # il distintivo di un tg_id che in anagrafe non c'e' piu'
+    con.execute("INSERT INTO badge_utente VALUES(-9,'pioniere',0)")
+    storti, detto = giro()
+    prova("i tre storti, per tg_id", [(-9, None, 1), (3, "primi_giorni", 1),
+                                      (4, "pioniere", 0)], storti)
+    prova("...e il journal li nomina uno per uno",
+          ["⚠️  Pionieri: 3 di coorte, 3 storti fra coorte e distintivo:",
+           "   tg_id -9: distintivo sì, utente sparito",
+           "   tg_id 3: distintivo sì, coorte 'primi_giorni'",
+           "   tg_id 4: distintivo no, coorte 'pioniere'"],
+          detto.splitlines())
+    prova("il controllo non ripara niente: il distintivo resta",
+          1, con.execute("SELECT COUNT(*) FROM badge_utente WHERE tg_id=3 "
+                         "AND badge_id='pioniere'").fetchone()[0])
+    con.close()
 
 
 # ====================================================================
@@ -104132,6 +104254,7 @@ def main():
               prove_classifica_recensioni_tutte,
               prove_ferie, prove_stock_raccontato, prove_pausa,
               prove_xp, prove_inviti, prove_coorti_titoli,
+              prove_pionieri_congelati,
               prove_conto_acquisto,
               prove_zone_spedizione,
               prove_supplemento_spedizione,
