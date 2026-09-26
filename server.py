@@ -5049,7 +5049,14 @@ def init_db():
         -- della prima (vedi `p2p_avvisi`).
         sats INTEGER DEFAULT 0,
         metodi TEXT DEFAULT '',
-        tornati INTEGER DEFAULT 0
+        tornati INTEGER DEFAULT 0,
+        -- IL CAMBIO DI BARATTOZON (26 set 2026): euro per bitcoin con
+        -- cui chi ha pubblicato un ordine al tabacchino ha fatto i sats,
+        -- detto da lui all'intestazione e tenuto solo se sta a un soffio
+        -- dal nostro (`P2P_CAMBIO_PUB_SCARTO`). E' il metro con cui chi
+        -- guarda rilegge dai sats del libro il premio SCELTO, fermo,
+        -- invece di ricalcolarlo col mercato che si muove. 0 = non detto.
+        cambio_pub REAL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_p2p_ordini_tg ON p2p_ordini(tg_id);
     CREATE TABLE IF NOT EXISTS p2p_momenti(
@@ -6309,7 +6316,9 @@ def init_db():
                     # e il giro della riserva (patch 0007, 18 set 2026)
                     "sats INTEGER DEFAULT 0",
                     "metodi TEXT DEFAULT ''",
-                    "tornati INTEGER DEFAULT 0"):
+                    "tornati INTEGER DEFAULT 0",
+                    # il cambio di Barattozon (26 set 2026)
+                    "cambio_pub REAL DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE p2p_ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -40993,9 +41002,37 @@ def _riconcilia_parti_p2p(con, ordine: str, adesso: int) -> list:
     return righe
 
 
+# IL CAMBIO DI BARATTOZON SI CREDE SOLO A UN SOFFIO DAL NOSTRO (26 set
+# 2026): chi pubblica dice con quale cambio ha fatto i sats, e da quel
+# numero chi guarda rilegge il premio scelto. E' una DICHIARAZIONE, quindi
+# si confronta col cambio che il server stesso sta servendo: il client lo
+# ha letto dalla nostra busta, e fra la lettura e l'intestazione passano
+# minuti — il 2% li copre e lascia a chi volesse abbellire il premio al
+# massimo due punti. Fuori misura non si tiene, e la card ripiega sul
+# cambio di adesso: mai un premio creduto sulla parola.
+P2P_CAMBIO_PUB_SCARTO = 0.02
+
+
+def _cambio_pub_buono(cambi, ordine: str, cambio_server: float) -> float:
+    """Il cambio dichiarato per `ordine` in `cambi` (euro per bitcoin), se
+    e' un numero e sta entro `P2P_CAMBIO_PUB_SCARTO` da `cambio_server`;
+    altrimenti 0. PURA. Senza un cambio nostro (0: CoinGecko muto) non si
+    crede a nessuno: non c'e' niente con cui confrontare."""
+    if not isinstance(cambi, dict) or not (cambio_server > 0):
+        return 0.0
+    try:
+        c = float(cambi.get(ordine))
+    except (TypeError, ValueError):
+        return 0.0
+    if not (c > 0) or abs(c / cambio_server - 1) > P2P_CAMBIO_PUB_SCARTO:
+        return 0.0
+    return c
+
+
 def _registra_ordini_p2p(con, tg_id: int, ordini, adesso: int,
                          pubblicati: bool = False,
-                         presi: bool = False) -> dict:
+                         presi: bool = False,
+                         cambi=None, cambio_server: float = 0.0) -> dict:
     """Scrive «questo ordine e' di questo account». Idempotente (PK
     sull'id + INSERT OR IGNORE): il client li rimanda a ogni sessione.
     UN ORDINE GIA' DI UN ALTRO NON SI RUBA — l'OR IGNORE lo lascia a
@@ -41104,6 +41141,20 @@ def _registra_ordini_p2p(con, tg_id: int, ordini, adesso: int,
         if pubblicati:
             con.execute("UPDATE p2p_ordini SET maker=1 "
                         "WHERE ordine=? AND tg_id=?", (o, tg_id))
+            # il cambio di Barattozon (26 set 2026): solo sulla riga di
+            # chi l'ha pubblicato, e la PRIMA dichiarazione resta — i
+            # sats sono fissi, e il loro metro non si riscrive dopo
+            if isinstance(cambi, dict) and o in cambi:
+                c = _cambio_pub_buono(cambi, o, cambio_server)
+                if c:
+                    con.execute("UPDATE p2p_ordini SET cambio_pub=? "
+                                "WHERE ordine=? AND tg_id=? AND maker=1 "
+                                "AND (cambio_pub IS NULL OR cambio_pub <= 0)",
+                                (c, o, tg_id))
+                else:
+                    print(f"⚠️ P2P: il cambio di {o[:8]} non si tiene "
+                          f"({str(cambi.get(o))[:20]} contro {cambio_server}): "
+                          f"il premio si rilegge col cambio di adesso", flush=True)
     con.commit()
     if not presi:
         return {"registrati": scritti, "rifiutate": rifiutate} if rifiutate \
@@ -41167,6 +41218,21 @@ def _facce_ordini_p2p(con, ordini, adesso) -> dict:
             volto["giorni"] = max(0, (adesso - iscritto) // 86400)
         fuori[r["ordine"]] = volto
     return fuori
+
+
+def _cambi_pub_p2p(con, ordini) -> dict:
+    """Da una lista di id al cambio con cui chi li ha pubblicati ha
+    fatto i sats (26 set 2026, Barattozon): `{ordine: euro_per_btc}`,
+    solo quelli detti. NON E' UN VOLTO, ed e' la ragione per cui sta a
+    parte: e' il metro di un premio che sta gia' sulla card, quindi esce
+    anche a chi guarda senza sessione (la fotografia del libro), mentre
+    i volti no. Alza ValueError come la sorella, sulla lista storta."""
+    pulite = _ordini_puliti_p2p(ordini)
+    segni = ",".join("?" * len(pulite))
+    return {r["ordine"]: float(r["cambio_pub"])
+            for r in con.execute(
+                f"SELECT ordine, cambio_pub FROM p2p_ordini "
+                f"WHERE ordine IN ({segni}) AND cambio_pub > 0", pulite)}
 
 
 def _controparti_p2p(con, ordini, io: int, adesso) -> dict:
@@ -41313,7 +41379,10 @@ async def registra_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
                                      (d or {}).get("ordini"), int(time.time()),
                                      bool((d or {}).get("pubblicati")),
                                      bool((d or {}).get("presi"))
-                                     and _p2p_riconosciuto(con, user["id"]))
+                                     and _p2p_riconosciuto(con, user["id"]),
+                                     # il cambio di Barattozon (26 set 2026),
+                                     # confrontato col nostro dalla cache
+                                     (d or {}).get("cambi"), cambio_noto_ora())
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
@@ -41359,11 +41428,13 @@ async def facce_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
     try:
         facce = _facce_ordini_p2p(con, (d or {}).get("ordini"),
                                   int(time.time()))
+        # e il cambio di Barattozon, accanto ai volti (26 set 2026)
+        cambi = _cambi_pub_p2p(con, (d or {}).get("ordini"))
     except ValueError as e:
         raise HTTPException(400, str(e))
     finally:
         con.close()
-    return {"facce": facce}
+    return {"facce": facce, "cambi": cambi}
 
 
 @app.get("/api/p2p/libro")
@@ -41393,6 +41464,12 @@ def libro_fotografato_p2p(x_tg_init_data: str = Header(""),
     attivo = _p2p_leve()["attivo"]
     fuori = {"eventi": F["eventi"] if attivo else [],
              "quando": F["quando"] if attivo else 0}
+    # I CAMBI DI BARATTOZON ESCONO A TUTTI (26 set 2026, «il premio non
+    # si vede»): non sono un volto, sono il metro di un premio che sta
+    # gia' sulla card. Dalla memoria come i volti: li fotografa
+    # l'orologio (`_cambi_foto_p2p`), e qui non si apre niente.
+    if fuori["eventi"] and F.get("cambi"):
+        fuori["cambi"] = F["cambi"]
     if fuori["eventi"] and F.get("facce") and _ha_sessione_p2p(
             x_tg_init_data, barattolo_sessione):
         fuori["facce"] = F["facce"]
@@ -42496,9 +42573,29 @@ async def togli_sveglia_p2p(req: Request, x_tg_init_data: str = Header(""),
 # non va inseguito quando il coordinatore cambia il suo.
 MAX_EURO_P2P_CANALE = 100_000   # un argine, non il tetto degli ordini
 MAX_METODO_P2P_CANALE = 60      # il maxlength del campo nel foglio
+# il cursore del premio di Barattozon (26 set 2026): da −20 a +20, a
+# numeri interi — il gemello di `P2P_PREMIO_TAB_MAX` del client, e una
+# prova li tiene uguali
+P2P_PREMIO_CANALE_MAX = 20
 
 
-def _caption_canale_p2p(lato: str, euro: float, metodo: str, venditore: dict) -> str:
+def _premio_canale_p2p(lato: str, premio: int) -> str:
+    """Il premio di un ordine Barattozon come lo dice la card del libro
+    a chi GUARDA (26 set 2026): «10% più conveniente», «4% meno
+    conveniente», a zero «al prezzo di mercato». PURA.
+    IL GIUDICE E' QUELLO DEL CLIENT, `affareP2P`: la formula uniforme di
+    mostro (`sats -= premium/100 * sats`) fa che un premio positivo
+    assottigli sempre i sats, quindi conviene a chi legge solo se chi ha
+    pubblicato COMPRA sats. Chi pubblica «vendo» mette nel libro un
+    ordine `sell`, e chi lo legge dal canale e' chi compra."""
+    if not premio:
+        return "al prezzo di mercato"
+    affare = (lato == "compro") == (premio > 0)
+    return f"{abs(premio)}% {'più' if affare else 'meno'} conveniente"
+
+
+def _caption_canale_p2p(lato: str, euro: float, metodo: str, venditore: dict,
+                        premio=None) -> str:
     """La caption del post P2P nel canale «Barattolo Vetrina», gemella
     di `_caption_canale` ma per un ordine invece che per un annuncio
     (chiesto da Andrea, set 2026: il P2P deve vedersi in vetrina come
@@ -42519,6 +42616,12 @@ def _caption_canale_p2p(lato: str, euro: float, metodo: str, venditore: dict) ->
     verbo = "Compra" if lato == "compro" else "Vende"
     testo = f"🔁 <b>{verbo} BTC su Barattolo</b>"
     testo += f"\n💶 {_fmt_eur(euro)} €"
+    # IL PREMIO DI BARATTOZON (26 set 2026): a prezzo fisso non sta in
+    # nessun campo del libro, e chi legge il canale e' lo stesso che
+    # legge la card — le stesse parole. Per gli altri ordini `None`, e
+    # la caption resta quella di ieri.
+    if premio is not None:
+        testo += f"\n🏷️ {_premio_canale_p2p(lato, premio)}"
     testo += f"\n💳 {html.escape(metodo)}"
     testo += "\n🔒 Sats bloccati in un deposito di garanzia fino allo scambio"
     testo += f"\n\n<a href=\"{URL_PUBBLICO}\">🫙 Apri lo Scambio P2P su Barattolo</a>"
@@ -42572,6 +42675,16 @@ async def annuncia_ordine_p2p_canale(req: Request,
     # fila «Scambi P2P» di Esplora lo mostra al suo giro dopo (LA
     # FOTOGRAFIA SUBITO) — col canale acceso o spento
     _foto_subito_p2p()
+    # il premio di Barattozon (26 set 2026): solo sul tabacchino, e solo
+    # un INTERO della scala del cursore — «2.5», «10» fra virgolette o un
+    # booleano sono storti. Sugli altri metodi si ignora: il loro premio
+    # il post non l'ha mai detto.
+    premio = None
+    if _tabacchino_libro([metodo]) and d.get("premio") is not None:
+        premio = d.get("premio")
+        if (isinstance(premio, bool) or not isinstance(premio, int)
+                or abs(premio) > P2P_PREMIO_CANALE_MAX):
+            raise HTTPException(400, "Premio storto")
     postato = False
     if canale_id():
         try:
@@ -42588,7 +42701,7 @@ async def annuncia_ordine_p2p_canale(req: Request,
                 "venditore_npub_accesso": (riga["npub_accesso"] if riga else "") or "",
                 "venditore_negozio": (riga["negozio"] if riga else "") or "",
             }
-            caption = _caption_canale_p2p(lato, euro, metodo, venditore)
+            caption = _caption_canale_p2p(lato, euro, metodo, venditore, premio)
             postato = bool(await _manda_post_canale(canale_id(), caption, []))
         except Exception as e:
             print(f"⚠️ Post P2P nel canale saltato: {e}")
@@ -43889,7 +44002,7 @@ P2P_FOTO_MAX = 300                 # quante offerte si servono, al massimo
 P2P_FOTO_MAX_S = 60                # il tetto di una fotografia, relay compresi
 _CAMPI_EVENTO = ("id", "pubkey", "created_at", "kind", "tags", "content", "sig")
 _P2P_FOTO = {"ultimi": {}, "info": None, "quando": 0, "intera": 0,
-             "visto": 0, "eventi": [], "facce": {}, "via": {}}
+             "visto": 0, "eventi": [], "facce": {}, "cambi": {}, "via": {}}
 
 
 def libro_intero_da_relay(relay: str, mostro: str, since: int):
@@ -44017,6 +44130,8 @@ async def _fotografa_libro_p2p():
     # P2P» in vetrina): una query al minuto qui, invece di una per ogni
     # richiesta di Esplora. La rotta li serve dalla memoria.
     F["facce"] = _facce_foto_p2p(F["eventi"], adesso)
+    # ...e i cambi di Barattozon (26 set 2026), con la stessa ragione
+    F["cambi"] = _cambi_foto_p2p(F["eventi"])
     if intera:
         F["intera"] = adesso
 
@@ -44107,6 +44222,24 @@ def _facce_foto_p2p(eventi, adesso) -> dict:
     con = db()
     try:
         return _facce_ordini_p2p(con, ids, adesso)
+    except ValueError:
+        return {}
+    finally:
+        con.close()
+
+
+def _cambi_foto_p2p(eventi) -> dict:
+    """I cambi di Barattozon degli ordini della fotografia (26 set 2026),
+    calcolati UNA volta per giro dell'orologio come i volti: il giudice
+    e' `_cambi_pub_p2p`, sugli stessi id che la rotta serve."""
+    ids = [d for d in (_tag_evento_p2p(e, "d") for e in eventi or []
+                       if e.get("kind") == 38383)
+           if FORMA_ORDINE_P2P.fullmatch(d)][:MAX_ORDINI_P2P]
+    if not ids:
+        return {}
+    con = db()
+    try:
+        return _cambi_pub_p2p(con, ids)
     except ValueError:
         return {}
     finally:
@@ -45744,7 +45877,7 @@ def _tocca_a_me_p2p(stato: str, lato: str, recapito_detto: bool) -> bool:
 
 def _scambi_p2p(con, io, adesso: int) -> dict:
     """PURA sulla connessione: gli scambi di `io` come il server li sa —
-    `{ordine: {lato, mio, preso, euro, sats, metodi, stato, stato_libro,
+    `{ordine: {lato, mio, preso, euro, sats, metodi, cambio_pub, stato, stato_libro,
     creato, quando, giro, chiave_mia, chiave_peer, sats_ordine,
     sats_miei, payout_fallito, momenti}}`. Entrano gli ordini che `io`
     ha pubblicato (`p2p_ordini`) e quelli in cui mostrod lo nomina come
@@ -45766,8 +45899,8 @@ def _scambi_p2p(con, io, adesso: int) -> dict:
     fuori = {}
     for ordine in ids:
         o = con.execute(
-            "SELECT tg_id, lato, maker, stato, euro, sats, metodi, creato "
-            "FROM p2p_ordini WHERE ordine=?", (ordine,)).fetchone()
+            "SELECT tg_id, lato, maker, stato, euro, sats, metodi, creato, "
+            "cambio_pub FROM p2p_ordini WHERE ordine=?", (ordine,)).fetchone()
         s = con.execute(
             "SELECT compratore, venditore, preso_dal, giro, sats, sats_compratore, "
             "sats_venditore, chiave_compratore, chiave_venditore, aggiornato "
@@ -45811,6 +45944,9 @@ def _scambi_p2p(con, io, adesso: int) -> dict:
             "euro": _euro_numero_p2p(o["euro"] if o else ""),
             "sats": int(o["sats"] or 0) if o else 0,
             "metodi": _metodi_lista_p2p(o["metodi"] if o else ""),
+            # il cambio di Barattozon (26 set 2026): il premio scelto si
+            # rilegge anche sul dispositivo che la riga non l'ha scritta
+            "cambio_pub": float(o["cambio_pub"] or 0) if o else 0.0,
             "stato": q["stato"],
             "stato_libro": (o["stato"] if o else "") or "",
             "creato": int(o["creato"] or 0) if o else 0,

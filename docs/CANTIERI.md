@@ -34444,3 +34444,181 @@ websocket (lettura e ascolto) e tornando in Esplora si chiudono tutte e
 due, con la domanda alla fotografia partita subito; il tocco su una card
 apre il dettaglio con 0 websocket. Nessun errore dell'app.
 **DA AVERE:** la prova con due telefoni veri, e sapere se Caddy comprime.
+
+## Il premio di Barattozon non si vedeva (26 set 2026)
+
+IL DIFETTO (Andrea): pubblicato un ordine Barattozon con un premio —
+−10%, +5% —, la card nel libro, il dettaglio, la card in vetrina e «I
+miei scambi» dicevano sempre «al prezzo di mercato». Negli ordini P2P
+normali il premio si vedeva giusto. Il sospetto di Andrea: il premio
+«cotto» nei sats, e la card che legge il campo `premium`.
+
+**LA CAUSA ERA UN'ALTRA, ed e' la parte da tenere: la card aveva
+ragione.** Rileggeva gia' il premio dai sats contro il cambio
+(`premioImplicitoTabacchinoP2P`, dal 23 set). Erano i SATS a non averlo:
+la chiamata di `inviaNuovoOrdineP2P` passava ancora `sconto:
+campi.sconto`, la chiave dello sconto 0-15 del 22 set, che il premio del
+23 aveva rinominato in `premioTab` dentro `campiNuovoP2P` e dentro
+`ordineDaCampiP2P` ma non in QUESTA chiamata. Il costruttore non trovava
+`premioTab`, ripiegava su `premio` — il cursore del P2P NORMALE, che col
+tabacchino e' nascosto e quasi sempre a zero — e i sats partivano al
+cambio pieno. Il premio scelto stava nel riepilogo e sulla riga
+(`premioCotto`), mai sul filo; il libro rileggeva i sats e diceva il
+vero: «al prezzo di mercato». Peggio ancora quando il cursore normale
+era stato mosso prima di scegliere Barattozon: allora nei sats finiva
+QUEL numero, che nessuno aveva scelto per questo ordine. Il «Riprova»
+invece era giusto per caso: passa `premio: o.premioCotto`.
+PERCHE' NESSUNA PROVA L'HA VISTO: le prove del 23 set giravano
+`ordineDaCampiP2P` coi campi GIUSTI, e la chiamata vera non l'ha mai
+fatta girare nessuno. La prova nuova ritaglia la chiamata da
+`inviaNuovoOrdineP2P` e la esegue, col cursore normale mosso a +7
+apposta. **Un costruttore provato non prova chi lo chiama**, e fra i
+due passava un nome rinominato a meta'.
+
+**LA CURA DEL DIFETTO** e' una riga: `premioTab: campi.premioTab` al
+posto della chiave morta.
+
+**MA IL PREMIO MOSTRATO DOVEVA ANCHE SMETTERE DI BALLARE**, che era la
+seconda richiesta: rileggerlo col cambio di ADESSO dava un numero che si
+muoveva a ogni aggiornamento del cambio — un −10 scelto, col mercato
+salito del 5%, la card lo diceva −15. Le due strade proposte da Andrea,
+e la scelta:
+- UN TAG NOSTRO NELL'ORDINE: il 38383 lo scrive mostrod, non il client,
+  e l'unico campo pubblico che scriviamo noi e' il `pm`, gia' occupato
+  dall'importo coi centesimi e letto dagli altri client come nome del
+  metodo (la strada era gia' scartata il 23 set). E sarebbe una cifra
+  DICHIARATA: chi pubblica potrebbe scrivere −15 su sats a +5.
+- IL PREMIO RICALCOLATO DAI SATS COL CAMBIO DELLA PUBBLICAZIONE, con una
+  tolleranza: e' questa, resa ESATTA. Il cambio di quel momento non si
+  indovina dal `created_at` (lo storico dei prezzi e' uno al giorno), e
+  allora LO DICE CHI PUBBLICA: con quale cambio ha fatto i sats
+  (`cambioPub`, euro per bitcoin), sulla riga e all'intestazione
+  dell'ordine (`registraOrdiniP2P`, solo da `pubblicati`). Il SERVER lo
+  tiene solo se sta entro il 2% dal suo (`_cambio_pub_buono`,
+  `P2P_CAMBIO_PUB_SCARTO`), solo sul maker e solo la prima volta
+  (`p2p_ordini.cambio_pub`), e lo serve a chi guarda: accanto ai volti,
+  con la fotografia del libro — a TUTTI, anche senza sessione, perche'
+  non e' un volto ma il metro di un premio gia' sulla card; e dalla
+  MEMORIA, fotografato dall'orologio insieme ai volti
+  (`_cambi_foto_p2p`), perche' la rotta della fotografia regge tutta
+  Esplora e non apre il database (la regola di aeab620, arrivata a
+  meta' cantiere: la prima stesura una query ce l'aveva) — e
+  nell'archivio degli scambi. Nel client li prendono i volti, le due
+  letture della fotografia (il libro subito e la fila di Esplora) e
+  l'archivio. La tolleranza e' sul CAMBIO e non sul
+  premio: il premio si ricava sempre dai sats del libro, che sono i
+  fatti, e chi volesse abbellirlo ha al massimo due punti.
+  Rileggendo i sats col cambio con cui sono nati il premio torna
+  ESATTO — `satsTabacchinoP2P` percorsa all'indietro, e l'arrotondamento
+  dei sats vale meno di mezzo punto: la prova lo gira su tutti i 41
+  premi della scala, tre importi, tre cambi, col mercato mosso del 7%.
+
+IL GIUDICE E' UNO, `premioBarattozonP2P(o, pub, adesso)`: il cambio
+della pubblicazione se c'e'; se manca — gli ordini di altri client e i
+nostri nati prima di oggi — o se darebbe un premio fuori scala, il
+ripiego sul cambio di adesso, cioe' il comportamento di ieri. Lo
+chiamano `premioBzP2P` (con quel che la pagina sa: la riga, poi il
+server, poi il cambio vivo) e `premioCardP2P` (che per le card sceglie
+fra questo e il `premium` del filo). Da li' passano:
+- il BADGE del libro e della vetrina, che adesso dice «10% più
+  conveniente» come gli altri ordini, SENZA il segno — richiesta di
+  Andrea, «stesso badge dal punto di vista di chi guarda»; il segno del
+  23 set serviva perche' il numero era ricavato e ballava, e per chi
+  legge «−10% più conveniente» era un meno accanto a un piu';
+- il CARTELLINO «Ottimo/Super affare» (`affaroneP2P`), che per
+  Barattozon prima non c'era affatto: stesse soglie, stesso verso;
+- il CONTO del dettaglio e della pagina dello scambio: la percentuale
+  senza segno come negli altri ordini (la parola «Premio»/«Sconto» dice
+  il verso), il Controvalore SCORPORATO dai sats col premio scelto
+  (`scorporaPremioP2P`, come per la cifra detta dal coordinatore) invece
+  di rifatto col cambio di adesso — o il premio non ballerebbe e il
+  Controvalore si' —, e la riga RESTA anche a scambio preso: un premio
+  scelto e' un fatto dell'ordine, non si muove. Il ripiego sul cambio
+  vivo invece a cifra detta tace, com'era;
+- la card di «I MIEI SCAMBI» (`premioMioP2P`, via `comeLibroP2P` che
+  adesso porta id e cambio): «−10% meno conveniente per te» sul mio
+  ordine di vendita, e SOLO col cambio della pubblicazione — li' si
+  guardano anche scambi chiusi, e un ordine di prima di oggi resta muto
+  com'era;
+- il POST NEL CANALE: «🏷️ 10% più conveniente» fra l'euro e il metodo
+  (`_premio_canale_p2p`, lo stesso giudice dal lato di chi legge), solo
+  sul tabacchino e solo un intero della scala — la rotta rifiuta un
+  decimale, una stringa o un booleano. Gli altri ordini non lo dicono,
+  come prima.
+Il «RIPROVA» rifa' i sats al cambio di adesso (e' un ordine nuovo), e
+adesso la riga prende i sats e il cambio con cui ripartono: coi sats
+vecchi e il metro nuovo il premio si rileggerebbe storto.
+La pagina «Info P2P» diceva «il premio è ricavato… se il mercato si
+muove, quel numero si muove con lui»: adesso dice che e' il premio
+scelto, che non si muove, e che a cambiare col mercato e' quanto valgono
+in euro quei sats.
+
+**LA DOMANDA 4: PERCHE' BARATTOZON E' A SATS FISSI, E SE PUO' SMETTERE.**
+La ragione e' scritta il 22 set («Mostro 0.18.8 e gli importi con i
+centesimi») e non e' il PayCode in se': e' che **`fiat_amount` in Mostro
+e' un intero da cima a fondo** — `i64` in mostro-core, `integer` nel
+database, `i64.to_string()` nel tag `fa` — e l'importo di un ordine
+Amazon nasce coi centesimi. A prezzo di mercato il coordinatore farebbe i
+sats su 23 € invece che su 23,47: il 2% in meno di garanzia su
+quell'ordine, e fino al 9% su un PayCode da 5,50. Il premio non lo
+potrebbe correggere (e' un intero anche lui, e il premio e' la scelta di
+chi pubblica, non una toppa), e la patch «fiat_amount decimale» e' stata
+scartata quel giorno perche' vuole un fork di mostro-core e rompe le
+buste di ogni client altrui. Quindi NO, non si passa al comportamento
+degli ordini normali: resta a sats fissi, e l'ho lasciato.
+COSA COSTA, detto: nelle ore di vita del PayCode (al massimo 72) il
+premio VERO si allontana da quello scelto quanto si muove il BTC/EUR —
+i sats sono quelli, e valgono di piu' o di meno in euro. La card mostra
+il premio scelto, e i sats esatti accanto. Se un giorno un «Ottimo
+affare» rimasto in vetrina dopo un crollo sembrasse una promessa di
+troppo, la guardia e' due righe in `premioBarattozonP2P`: oltre N punti
+di distanza dal cambio di adesso si mostra il ricalcolo. Non l'ho messa:
+Andrea ha chiesto un numero che non balla.
+
+**LE STRADE SCARTATE.** Il tag nostro nel 38383 (lo scrive mostrod) e
+il premio nel `pm` (forma letta dagli altri client, e una dichiarazione
+non verificabile). Il cambio del giorno da `prezzo_storico` (una riga al
+giorno: sul mezzo punto non regge). Il cambio timbrato dal SERVER al
+momento dell'intestazione (fra la lettura del client e l'intestazione
+passano minuti, e il premio tornerebbe a volte storto di uno: il cambio
+del client, controllato, lo da' esatto). Il premio dichiarato invece del
+cambio (un numero in piu' da credere; col cambio il premio si ricava dai
+fatti). La guardia sul mercato mosso (vedi sopra). Il filtro del libro
+per premio: legge ancora il `premium` del filo, quindi un Barattozon a
+−10 passa per zero — non era fra i posti chiesti, ed e' detto in fondo.
+
+**PROVATO.** `prove_premio_barattozon` (nuova, 23): la chiamata vera
+della pubblicazione ritagliata ed eseguita (−10 nei sats, non il +7 del
+cursore normale ne' lo zero), il giro di andata e ritorno su 41 premi ×
+3 importi × 3 cambi, il giudice sui suoi bordi, libro, cartellino, «I
+miei scambi», il cambio che arriva dal server, e gli ORDINI NORMALI
+invariati (badge, cartellino, «per te» coi testi di prima); sul server il
+giudice del 2%, l'intestazione sul database vero (prima dichiarazione,
+solo maker, solo da `pubblicati`, fuori misura non tenuto), la colonna
+nel CREATE e nel giro dei database di ieri. EMENDATE col perche': il
+conto di Barattozon senza segno e coi casi nuovi (premio scelto a
+mercato mosso, che resta a cifra detta, dal server, metro storto), il
+badge della card senza segno e col premio scelto, «Info P2P», la card di
+«I miei scambi» con −10/+5/zero e lo scambio chiuso, la vetrina con
+Ottimo su Barattozon, la fotografia che porta i cambi a tutti,
+l'archivio degli scambi col cambio, il canale (caption, rotta, client),
+e le righe che cambiano forma (la chiamata della registrazione, due
+banchi di database scritti a mano che prendono la colonna). Tortura (al primo giro 22 su 23: la guardia «solo da `pubblicati`» sul server era
+coperta da quella del maker, e la prova adesso rilegge un ordine proprio
+dalla restore); dopo il ribasamento su aeab620 due in piu', sulla fotografia: 25 su 25. Suite intera severa senza config nel worktree da origin/main (495e489): 16.530 verdi e 0 rosse, e i 25 collaudi della CI verdi nella gabbia; ribasato su aeab620 (la fila di Esplora dalla fotografia senza relay, di un'altra sessione, che riscriveva la stessa rotta) di nuovo tutta: 16.571 verdi e 0 rosse, e i 25 collaudi di nuovo verdi.
+DAL VIVO, sull'app vera da una copia (collaudo, relay morto, cambio vero
+da CoinGecko): intestati quattro ordini con il cambio, il server ha
+tenuto i tre buoni e scartato quello fuori del 10%, e una seconda
+dichiarazione non ha riscritto la prima; poi il mercato spostato del 5%
+in pagina — il ricalcolo avrebbe detto −15, 0, −5 — e libro, dettaglio,
+vetrina, «I miei scambi» e la pagina di uno scambio concluso dicono −10,
++5, zero come scelti. Chrome headless via CDP a 375 px nei due temi,
+nessuno scorrimento laterale, nessun errore dell'app.
+**DA AVERE:** un ordine Barattozon vero pubblicato col premio, e la card
+vista dal telefono di un altro. Gli ordini Barattozon gia' nel libro
+prima del deploy sono a cambio pieno — il difetto — e la card li dice
+«al prezzo di mercato», che per loro e' il vero; escono da soli entro 72
+ore.
+**RESTA, da decidere:** il filtro del libro per premio sui Barattozon, e
+il premio nel post del canale anche per gli ordini normali, che oggi non
+lo dice.

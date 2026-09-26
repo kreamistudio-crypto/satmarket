@@ -10047,7 +10047,7 @@ document.getElementById('cartello')?.remove();</script>
       <ol class="sicu-passi">
         <li><b>Chi vende fa l'ordine su Amazon</b> scegliendo «paga in contanti nel punto vendita». Amazon gli manda una mail con tre cose: il <b>PayCode</b> (nove cifre, come 479-868-518), l'<b>importo</b> esatto coi centesimi e una <b>scadenza</b>, settantadue ore dal checkout. Vale fino a <b>novecentonovantanove euro</b> per ordine, senza minimo e senza commissione. <b>Non vale per Amazon Warehouse, contenuti digitali, oro, abbonamenti a Prime, buoni regalo e acquisti 1-Click</b>: se la mail di Amazon non offre il pagamento in contanti, l'ordine non è pagabile con Barattozon.</li>
         <li><b>Chi vende pubblica qui</b>, con Barattozon come unico metodo, e il foglio lo porta per mano in <b>quattro passi</b>: il PayCode, l'importo, la scadenza (con un selettore di data e ora, fra un'ora e settantadue ore) e il <b>premio</b>, con lo stesso cursore degli altri ordini, da meno venti a più venti per cento, a numeri interi. <b>Il segno decide il verso:</b> col premio positivo chi paga al tabacchino riceve meno sats del cambio pieno e la differenza resta a chi vende; col premio negativo ne riceve di più, e quella differenza la paga chi vende per la comodità. A zero passa il cambio pieno. <b>Premio più basso = più conveniente per chi paga = più probabile che qualcuno lo prenda in tempo.</b> Prima di pubblicare c'è il riepilogo. Il cambio si fissa lì, e l'ordine resta nel libro fino a <b>due ore prima</b> della scadenza del PayCode (mai oltre settantadue ore): poi esce da solo.</li>
-        <li><b>Nel libro quel premio si vede col segno</b>, sulla card e nel conto dell'ordine, accanto alle altre offerte. Qui però non è una cifra dichiarata: i sats sono fissi dalla pubblicazione, e il premio è <b>ricavato</b> confrontandoli col cambio del momento — se il mercato si muove, quel numero si muove con lui, e dice quanto conviene <i>adesso</i>.</li>
+        <li><b>Nel libro quel premio si vede come negli altri ordini</b>, sulla card e nel conto dell'ordine: «più conveniente» o «meno conveniente» per chi guarda, e dal dieci per cento il cartellino dell'affare. È <b>il premio scelto da chi vende</b>, e non si muove: i sats sono fissi dalla pubblicazione, e il premio si rilegge col cambio di quel momento. Se poi il mercato si muove, a cambiare è quanto valgono in euro quei sats, non il numero sulla card: i sats che ricevi sono quelli scritti, al satoshi.</li>
         <li><b>Chi compra prende l'ordine</b>, indica dove ricevere i sats, e chi vende li blocca in garanzia. A quel punto il PayCode, l'importo e la scadenza gli arrivano <b>qui dentro e cifrati</b>, in un riquadro col tempo che resta. Nel libro pubblico c'è solo l'importo: il PayCode non lo vede nessun altro, nemmeno Barattolo.</li>
         <li><b>Chi compra va a pagare</b> — in tabaccheria, al bar, in edicola o alla posta, dove si accettano i pagamenti Amazon in contanti, senza commissione —, dà il PayCode alla cassa, paga in contanti l'importo esatto e <b>tiene lo scontrino</b>: è la sua prova. Poi torna qui e tocca «Ho pagato al tabacchino».</li>
         <li><b>Chi vende controlla su Amazon</b> che l'ordine risulti saldato, e sceglie fra due bottoni: <b>«Risulta pagato: libera i sats»</b> oppure <b>«Non risulta pagato: apri una disputa»</b>. Ha <b>ventiquattro ore</b> a vista, e Barattolo glielo ricorda su Telegram dopo un'ora, sei ore e venti ore. <b>Non esiste una conferma automatica</b>: Amazon non parla con Barattolo, e i sats non si liberano da soli. Se chi vende non fa nulla, i sats restano in garanzia e chi ha pagato può aprire lui la disputa: decide un moderatore, e lo scontrino è quel che guarda.</li>
@@ -44958,25 +44958,33 @@ function affareP2P(o){
    Le quattro stesure e il perche' di quest'ultima stanno nella card
    del libro, dove il badge e' nato, e in CANTIERI («Il badge del
    premio, e le sue quattro stesure»). */
+/* il premio che una card del libro MOSTRA: quello del filo per gli
+   ordini a mercato; per Barattozon quello scelto da chi ha pubblicato
+   (`premioBzP2P`), perche' li' il premio e' COTTO nei sats e sul filo
+   vale zero; null per gli altri prezzi fissi — quel prezzo il mercato
+   non lo guarda — e quando non si sa. */
+function premioCardP2P(o){
+  if (!(o.sats > 0)) return o.premium || 0;
+  return tabacchinoP2P(o.metodi) ? premioBzP2P(o) : null;
+}
 function badgePremioP2P(o){
   /* ⚠️ BARATTOZON HA UN PREMIO ANCHE A PREZZO FISSO (23 set 2026,
-     decisione di Andrea): li' il premio e' COTTO nei sats e sul filo
-     vale zero, quindi il badge lo rilegge all'indietro dal cambio di
-     adesso e lo dice COL SEGNO — a prezzo fisso il segno e' l'unica
-     cosa che racconta da che parte pende. Gli altri ordini a prezzo
-     fisso restano muti: quel prezzo il mercato non lo guarda. A
-     cambio muto nessun badge, mai un numero inventato. */
-  const tab = o.sats > 0 && tabacchinoP2P(o.metodi);
-  if (o.sats > 0 && !tab) return '';
-  if (tab && !(cambioVivo && eurPerSat > 0 && o.euro > 0)) return '';
-  const p = tab ? premioImplicitoTabacchinoP2P(o.euro, o.sats, eurPerSat)
-                : (o.premium || 0);
-  const pr = tab ? Math.abs(p) : Math.abs(Math.round(p));
+     decisione di Andrea), e dal 26 set 2026 e' quello SCELTO e non
+     piu' il ricavato del momento: `premioCardP2P`. E si scrive COME
+     GLI ALTRI, «10% più conveniente» e non «−10% più conveniente»: il
+     segno serviva quando il numero era ricavato e ballava, e chi
+     guarda il libro vuole il verso detto in parole, uguale su ogni
+     card (richiesta di Andrea: stesso badge degli ordini normali, dal
+     punto di vista di chi guarda). A cambio muto e senza cambio della
+     pubblicazione nessun badge, mai un numero inventato. */
+  const p = premioCardP2P(o);
+  if (p === null) return '';
+  const pr = Math.abs(Math.round(p));
   if (!pr) return '<span class="p2p-badge">al prezzo di mercato</span>';
   const a = affareP2P({lato: o.lato, premium: p});
   return '<span class="p2p-badge"><b class="'
     + (a ? 'p2p-affare' : 'p2p-avviso') + '">'
-    + (tab ? esc(premioTestoTabP2P(p)) : pr + '%') + '</b> '
+    + pr + '%' + '</b> '
     + (a ? 'più' : 'meno') + ' conveniente</span>';
 }
 /* IL CARTELLINO DELL'AFFARE (dal 26 set 2026 in un posto solo: lo
@@ -44984,8 +44992,12 @@ function badgePremioP2P(o){
    verso favorevole a chi guarda, oltre le due soglie; il perche' intero
    sta nella card del libro, dove e' nato. */
 function affaroneP2P(o){
-  const pr = Math.abs(Math.round(o.premium || 0));
-  if (o.sats > 0 || !affareP2P(o) || pr < P2P_AFFARE_OTTIMO) return '';
+  /* Barattozon compreso (26 set 2026): il premio e' quello della card,
+     `premioCardP2P`, e il giudice e' lo stesso di tutti */
+  const p = premioCardP2P(o);
+  if (p === null) return '';
+  const pr = Math.abs(Math.round(p));
+  if (!affareP2P({lato: o.lato, premium: p}) || pr < P2P_AFFARE_OTTIMO) return '';
   return pr > P2P_AFFARE_SUPER
     ? '<span class="p2p-affarone super">⚡⚡ Super affare</span>'
     : '<span class="p2p-affarone">⚡ Ottimo affare</span>';
@@ -50435,17 +50447,18 @@ function contoDettP2P(o){
      `ricavato` = il Controvalore e il premio li abbiamo scorporati
      noi, quindi tornano a portare il ≈ */
   const esatto = fisso || detto > 0;
-  /* IL PREMIO DI BARATTOZON SI RILEGGE (23 set 2026): a prezzo fisso
-     sul filo `premium` e' zero — e' cotto nei sats — e il conto lo
-     ricava dai sats contro il cambio di ADESSO, che e' il numero su
-     cui sta decidendo chi legge. SOLO finche' l'ordine e' vivo nel
-     libro: appena il coordinatore dice la cifra (`satsDetti`) lo
+  /* IL PREMIO DI BARATTOZON SI RILEGGE (23 set 2026), E DAL 26 SET E'
+     QUELLO SCELTO: a prezzo fisso sul filo `premium` e' zero — e' cotto
+     nei sats — e il conto lo rilegge col cambio con cui quei sats sono
+     nati (`premioBzP2P`), quindi e' un numero FERMO, e resta anche a
+     scambio preso. Il ripiego sul cambio di ADESSO — gli ordini senza
+     un cambio della pubblicazione — vale SOLO finche' l'ordine e' vivo
+     nel libro: appena il coordinatore dice la cifra (`satsDetti`) lo
      scambio e' fatto, e un premio che continuasse a muoversi col
      mercato racconterebbe un affare gia' chiuso — la promessa di
      «Info P2P». Da qui in giu' il premio della riga e' `prem`. */
-  const premioTab = (fisso && detto <= 0 && tabacchinoP2P(o.metodi)
-                     && cambioVivo && eurPerSat > 0 && o.euro > 0)
-    ? premioImplicitoTabacchinoP2P(o.euro, o.sats, eurPerSat) : 0;
+  const premioTab = (fisso && tabacchinoP2P(o.metodi)
+                     && premioBzP2P(o, detto <= 0)) || 0;
   const prem = premioTab || Number(o.premium) || 0;
   const ricavato = (detto > 0 && !!Math.round(Number(o.premium) || 0)) || !!premioTab;
   const vivo = esatto || (cambioVivo && eurPerSat > 0);
@@ -50468,9 +50481,13 @@ function contoDettP2P(o){
                : (stimabile ? satsMercatoP2P({euro: e, premium: o.premium}) : 0);
     /* col premio di Barattozon il Controvalore torna a essere il
        MERCATO (i sats pieni per quegli euro) e il Subtotale resta la
-       cifra fissa: la differenza fra i due e' il premio, al satoshi */
-    const ctrl = detto > 0 ? scorporaPremioP2P(detto, o.premium)
-               : fisso ? (premioTab ? Math.round(e / eurPerSat) : o.sats)
+       cifra fissa: la differenza fra i due e' il premio, al satoshi.
+       ⚠️ IL MERCATO E' QUELLO DELLA PUBBLICAZIONE (26 set 2026): si
+       scorpora dai sats col premio scelto, come si fa con la cifra
+       detta dal coordinatore — col cambio di adesso il Controvalore
+       ballerebbe e il premio della riga accanto no. */
+    const ctrl = detto > 0 ? scorporaPremioP2P(detto, premioTab || o.premium)
+               : fisso ? (premioTab ? scorporaPremioP2P(o.sats, premioTab) : o.sats)
                : (stimabile ? Math.round(e / eurPerSat) : 0);
     const meta = (vivo && fee > 0) ? Math.round(merc * fee / 2) : 0;
     return {ctrl: ctrl, premio: Math.abs(ctrl - merc), merc: merc,
@@ -50624,17 +50641,16 @@ function contoDettP2P(o){
     : affare
       ? (prem > 0 ? 'Premio richiesto' : 'Sconto richiesto')
       : (prem > 0 ? 'Premio offerto' : 'Sconto offerto');
-  /* ⚠️ COL PREMIO DI BARATTOZON LA PERCENTUALE PORTA IL SEGNO
-     (23 set 2026, richiesta di Andrea), che negli altri ordini non
-     porta — li' il verso lo dice la PAROLA, «Premio» o «Sconto». Qui
-     il numero e' RICAVATO dai sats contro il mercato di adesso, e il
-     segno e' il modo piu' corto di dire da che parte pende: la parola
-     resta, e le due cose si confermano invece di contraddirsi. */
+  /* ⚠️ COL PREMIO DI BARATTOZON LA PERCENTUALE PORTAVA IL SEGNO
+     (23 set 2026, richiesta di Andrea), perche' il numero era RICAVATO
+     dal mercato di adesso e il segno diceva in un carattere da che
+     parte pendeva. Dal 26 set 2026 il numero e' quello SCELTO, e la
+     riga e' la stessa degli altri ordini: il verso lo dice la PAROLA,
+     «Premio» o «Sconto», come sulla card del libro. */
   const premio = ((!fisso && o.premium) || premioTab)
     ? r(nomePremio
         + ' <b class="' + (affare ? 'p2p-affare' : 'p2p-avviso') + '">'
-        + (premioTab ? esc(premioTestoTabP2P(premioTab))
-                     : Math.abs(Math.round(o.premium)) + '%') + '</b>',
+        + Math.abs(Math.round(prem)) + '%' + '</b>',
         cifra('premio', prem > 0 ? '−' : '+'), 'premio')
     : '';
   /* ⚠️ SOTTO IL CONTO NON C'E' PIU' NIENTE, e ci sono voluti due
@@ -51114,9 +51130,18 @@ async function riprovaPubblicazioneP2P(){
     await mostroRiascolta();
     const NT = window.NostrTools;
     const reput = !!(NT && NT.schnorr) && (o.indice | 0) > 0;
+    const ordine = ordineDaRigaP2P(o);
+    /* BARATTOZON RIFA' I SATS AL CAMBIO DI ADESSO (26 set 2026): e' un
+       ordine nuovo, e la riga prende i sats e il cambio con cui partono
+       — o il premio si rileggerebbe dai sats vecchi col metro nuovo */
+    if (o.tabacchino && ordine.amount > 0) {
+      o.sats = ordine.amount;
+      o.cambioPub = eurPerSat * 1e8;
+      scriviOrdineP2P(o);
+    }
     const msg = messaggioMostro('new-order', {
       requestId: nuovaRichiestaP2P(), indice: reput ? o.indice : null,
-      payload: {order: ordineDaRigaP2P(o)}
+      payload: {order: ordine}
     });
     await mostroChiama(tk.sk, msg, {mazzoSk: reput ? mz.sk : null, primoContatto: true});
     /* la chiave VIVA: alla risposta la riga ha gia' il nome definitivo */
@@ -52694,6 +52719,41 @@ function premioImplicitoTabacchinoP2P(euro, sats, cambio){
   const pieno = euro / cambio;
   const p = Math.round((1 - sats / pieno) * 100);
   return p === 0 ? 0 : p;
+}
+/* PURA: IL PREMIO DI UN ORDINE BARATTOZON DA MOSTRARE (26 set 2026, il
+   difetto «il premio non si vede»). null = non e' Barattozon, o non si
+   sa niente — e allora il badge tace, mai un numero inventato.
+   IL METRO E' IL CAMBIO DELLA PUBBLICAZIONE, e non quello di adesso:
+   `pub` (euro per BITCOIN) e' il cambio con cui chi ha pubblicato ha
+   fatto i sats, e rileggendoli con quello il premio torna ESATTO — e'
+   la stessa formula di `satsTabacchinoP2P` percorsa all'indietro, e
+   l'arrotondamento dei sats vale meno di mezzo punto. Quindi il numero
+   e' quello SCELTO, e non balla col mercato: il ricalcolo col cambio
+   vivo dava un premio che si muoveva a ogni aggiornamento della
+   pagina. E non e' una cifra dichiarata e basta: si ricava dai sats
+   del libro, che sono i fatti, e il cambio lo accetta il server solo
+   se sta a un soffio dal suo (`P2P_CAMBIO_PUB_SCARTO`).
+   Un metro che desse un premio fuori scala (un client che non e' il
+   nostro, una riga storta) non si crede, e si ripiega su `adesso`
+   (euro per SAT, 0 = no): il cambio vivo, il ricalcolo di prima, per
+   gli ordini che un cambio dichiarato non ce l'hanno — quelli di
+   altri client, e i nostri nati prima di oggi. */
+function premioBarattozonP2P(o, pub, adesso){
+  if (!o || !(o.sats > 0) || !(o.euro > 0) || !tabacchinoP2P(o.metodi)) return null;
+  if (pub > 0) {
+    const p = premioImplicitoTabacchinoP2P(o.euro, o.sats, pub / 1e8);
+    if (Math.abs(p) <= P2P_PREMIO_TAB_MAX) return p;
+  }
+  return adesso > 0 ? premioImplicitoTabacchinoP2P(o.euro, o.sats, adesso) : null;
+}
+/* ...e con quel che la pagina sa: il cambio sulla riga (i miei ordini),
+   poi quello detto dal server (gli ordini del libro), poi — se `vivo`
+   non e' falso — il cambio di adesso */
+function premioBzP2P(o, vivo){
+  if (!o) return null;
+  const pub = Number(o.cambioPub) || Number(p2pCambiPub[o.id]) || 0;
+  return premioBarattozonP2P(o, pub,
+    (vivo !== false && cambioVivo && eurPerSat > 0) ? eurPerSat : 0);
 }
 /* PURA: il passo del percorso in cui si sta (1 PayCode, 2 importo,
    3 scadenza, 4 premio), o 5 quando i quattro sono buoni: e' il
@@ -55196,7 +55256,17 @@ async function inviaNuovoOrdineP2P(confermato){
   const ordine = ordineDaCampiP2P(
     {euro: campi.euro, euroMax: campi.euroMax, sats: campi.sats,
      fisso: campi.fisso, metodi: metodi, premio: p2pNuovoPremio,
-     sconto: campi.sconto,
+     /* ⚠️ IL PREMIO DI BARATTOZON PASSA DA QUI (26 set 2026, il difetto
+        «il premio non si vede»): fino a oggi qui c'era `sconto:
+        campi.sconto`, la chiave dello sconto 0-15 del 22 set, che il
+        premio del 23 aveva rinominato in `premioTab` DENTRO i campi e
+        nel costruttore ma non in questa chiamata. Quindi il costruttore
+        non trovava `premioTab`, ripiegava su `premio` — il cursore del
+        P2P NORMALE, che col tabacchino e' nascosto — e i sats partivano
+        al cambio pieno: il premio scelto stava nel riepilogo e sulla
+        riga, mai sul filo. Il libro rileggeva i sats e diceva, giusto,
+        «al prezzo di mercato». */
+     premioTab: campi.premioTab,
      scade: campi.scade, adesso: campi.adesso, cambio: campi.cambio}, lato);
   /* i centesimi del tabacchino: sulla riga e nel canale sta l'esatto,
      sul filo l'intero (22 set 2026) */
@@ -55233,6 +55303,12 @@ async function inviaNuovoOrdineP2P(confermato){
     /* il premio intero e il PayCode normalizzato (23 set 2026):
        sulla riga vanno come li rilegge chi compra */
     ord.premioCotto = premioTabacchinoP2P(campi.premioTab).n;
+    /* E IL CAMBIO CON CUI QUEI SATS SONO NATI (26 set 2026), in euro
+       per bitcoin: e' il metro con cui il premio si RILEGGE uguale per
+       sempre (`premioBarattozonP2P`) — lo stesso numero che si
+       dichiara al server all'intestazione, perche' lo legga anche chi
+       guarda dal libro */
+    ord.cambioPub = campi.cambio * 1e8;
     const t = {ordine: payCodeP2P(campi.tab.ordine) || String(campi.tab.ordine || '').trim(),
                importo: centesimiTestoP2P(esattoTab),
                scade: campi.scade};
@@ -55293,7 +55369,10 @@ async function inviaNuovoOrdineP2P(confermato){
     /* Il canale e' un bonus e non un secondo giudice: l'ordine e' gia'
        partito davvero, quindi non si aspetta la risposta ne' si tocca
        lo schermo se va storta (stessa regola di Barattolo in vetrina). */
-    annunciaCanaleP2P(lato, euro, metodo);
+    /* col premio di Barattozon (26 set 2026): a prezzo fisso il post
+       non avrebbe altro modo di dirlo, e chi legge il canale e' lo
+       stesso che legge la card */
+    annunciaCanaleP2P(lato, euro, metodo, ord.tabacchino ? ord.premioCotto : null);
     /* LA SPUNTA: il coordinatore ha risposto, l'ordine e' nel libro.
        Si ridisegna PRIMA la pagina sotto, cosi' quando il velo scende
        dice gia' «Ordine pubblicato» anche lei. */
@@ -56595,10 +56674,14 @@ function comeLibroP2P(o){
      bisogno per riconoscere Barattozon, dove il premio non sta nel
      campo `premium` ma dentro i sats. Chi non li ha (le chiamate di
      comodo, `{lato, premium}`) resta com'era: lista vuota. */
+  /* E L'ID COL CAMBIO DELLA PUBBLICAZIONE (26 set 2026): il premio di
+     Barattozon si rilegge con quello (`premioBzP2P`) — dalla riga,
+     o, su un dispositivo che la riga l'ha adottata, dal server */
   return {lato: o.lato === 'compro' ? 'sell' : 'buy',
           euro: o.euro, euroMax: o.euroMax || 0,
           sats: o.sats || 0, premium: o.premium || 0,
-          metodi: o.metodi || []};
+          metodi: o.metodi || [],
+          id: o.id, cambioPub: o.cambioPub || 0};
 }
 /* PURA: i sats di uno scambio mio, in tre casi per ordine di VERITA'.
    Quel che ha detto il coordinatore vince su tutto (`satsNetti`: e'
@@ -56667,13 +56750,21 @@ function satsScambioP2P(o){
    card muta proprio sul caso piu' comune. A prezzo fisso niente, che
    quel prezzo il mercato non lo guarda. */
 function premioMioP2P(o){
-  if (o.sats > 0) return '';
-  if (!Math.round(o.premium || 0))
+  /* BARATTOZON HA IL SUO (26 set 2026): il premio scelto, riletto col
+     cambio della pubblicazione e MAI col cambio di adesso — qui si
+     guarda anche uno scambio chiuso, e il premio di un affare fatto non
+     si muove. Senza quel cambio (gli ordini nati prima di oggi) la card
+     tace, come ha sempre fatto a prezzo fisso. */
+  const p = o.sats > 0
+    ? (tabacchinoP2P(o.metodi) ? premioBzP2P(o, false) : null)
+    : (o.premium || 0);
+  if (p === null) return '';
+  if (!Math.round(p))
     return '<span class="p2p-badge">al prezzo di mercato</span>';
-  const a = affareP2P(o);
+  const a = affareP2P({lato: o.lato, premium: p});
   return '<span class="p2p-badge"><b class="'
     + (a ? 'p2p-affare' : 'p2p-avviso') + '">'
-    + premioTestoP2P(o.premium) + '</b> '
+    + premioTestoP2P(p) + '</b> '
     + (a ? 'più' : 'meno') + ' conveniente per te</span>';
 }
 /* ---- la riga di uno scambio nella lista ----
@@ -57534,10 +57625,14 @@ async function chiediFotoLibroP2P(){
   } catch(e) { return false; }
   const facce = (d && d.facce && typeof d.facce === 'object') ? d.facce : {};
   for (const id in facce) { p2pFacce[id] = facce[id]; p2pFacceChieste.add(id); }
+  /* i cambi di Barattozon escono a TUTTI, anche a chi guarda senza
+     sessione: non sono un volto, sono il metro di un premio che sta
+     gia' sulla card (26 set 2026) */
+  const cambi = prendiCambiPubP2P(d && d.cambi);
   const eventi = Array.isArray(d && d.eventi) ? d.eventi : [];
   const quando = (Number(d && d.quando) || 0) * 1000;
   if (p2pLibro || !eventi.length || !(quando > 0)
-      || Date.now() - quando > P2P_COPIA_MAX_MS) return Object.keys(facce).length > 0;
+      || Date.now() - quando > P2P_COPIA_MAX_MS) return Object.keys(facce).length > 0 || cambi;
   libroDaCopiaP2P(eventi, quando, 'server');
   /* i volti chiesti gia' qui: la domanda del render non ripartirebbe
      per un id che la fotografia ha gia' detto di non conoscere */
@@ -57951,6 +58046,9 @@ async function chiediFotoVetrinaP2P(){
   const d = await r.json();
   const facce = (d && d.facce && typeof d.facce === 'object') ? d.facce : {};
   for (const id in facce) { p2pFacce[id] = facce[id]; p2pFacceChieste.add(id); }
+  /* e i cambi di Barattozon, che la fotografia porta a tutti (26 set
+     2026): il premio scelto sulla card della fila, anche senza sessione */
+  prendiCambiPubP2P(d && d.cambi);
   const eventi = Array.isArray(d && d.eventi) ? d.eventi : [];
   const quando = (Number(d && d.quando) || 0) * 1000;
   /* leva spenta sul server, o una fotografia di piu' di un giorno: la
@@ -58064,6 +58162,23 @@ let p2pOrdiniRegistrati = new Set();   // gia' detti al server, in questa sessio
 let p2pFacce = {};                     // ordine -> {nome, avatar, media, voti}
 let p2pFacceChieste = new Set();       // gia' chiesti: mai due volte
 let p2pFacceGiro = null;               // la domanda in volo
+/* I CAMBI DI BARATTOZON (26 set 2026): ordine -> euro per bitcoin con
+   cui chi l'ha pubblicato ha fatto i sats. Arrivano dal server accanto
+   ai volti e con la fotografia del libro; il giudice che li usa e'
+   `premioBarattozonP2P`. */
+let p2pCambiPub = {};
+/* prende la mappa del server — testo di un altro, quindi solo id veri
+   e numeri positivi —; vero se ne e' entrato almeno uno nuovo */
+function prendiCambiPubP2P(m){
+  if (!m || typeof m !== 'object') return false;
+  let nuovi = false;
+  for (const id of Object.keys(m)) {
+    const c = Number(m[id]);
+    if (!idMostroVero(id) || !(c > 0) || !Number.isFinite(c)) continue;
+    if (p2pCambiPub[id] !== c) { p2pCambiPub[id] = c; nuovi = true; }
+  }
+  return nuovi;
+}
 async function registraOrdiniP2P(ids, pubblicati, presi){
   if (DEMO || VETRINA || !myTgId) return false;
   /* SOLO GLI ID VERI del coordinatore: i provvisori del client
@@ -58076,6 +58191,17 @@ async function registraOrdiniP2P(ids, pubblicati, presi){
     id && !provvisorioP2P(id) && (presi || !p2pOrdiniRegistrati.has(id)));
   if (!lista.length) return false;
   lista.forEach(id => p2pOrdiniRegistrati.add(id));
+  /* IL CAMBIO DI BARATTOZON (26 set 2026): chi ha appena pubblicato
+     dice con quale cambio ha fatto i sats — letto dalla SUA riga, mai
+     da un campo del libro —, e il server lo tiene per chi guarda:
+     e' il metro con cui il premio scelto si rilegge uguale per sempre
+     (`premioBarattozonP2P`). Solo da `pubblicati`: dalla restore gli
+     id sono anche di ordini presi. */
+  const cambi = {};
+  if (pubblicati) for (const id of lista) {
+    const riga = ordiniP2P()[id];
+    if (riga && riga.tabacchino && riga.cambioPub > 0) cambi[id] = riga.cambioPub;
+  }
   try {
     const r = await fetch(`${API_BASE}/p2p/ordini`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
@@ -58089,7 +58215,8 @@ async function registraOrdiniP2P(ids, pubblicati, presi){
                                io», dalla presa ACCETTATA dal coordinatore.
                                Il server lo annota solo a chi entra da
                                Telegram; per chi entra da Nostr lo ignora. */
-                            presi: !!presi})});
+                            presi: !!presi,
+                            cambi: cambi})});
     return r.ok;
   } catch(e){ return false; }
 }
@@ -58231,6 +58358,8 @@ async function chiediFacceP2P(ids){
       const facce = (d && d.facce) || {};
       let nuove = 0;
       for (const id in facce) { p2pFacce[id] = facce[id]; nuove++; }
+      /* e il cambio di Barattozon, che viaggia accanto ai volti */
+      if (prendiCambiPubP2P(d && d.cambi)) nuove++;
       return nuove > 0;
     } catch(e){ return false; }
     finally { p2pFacceGiro = null; }
@@ -58574,6 +58703,15 @@ async function chiediScambiServerP2P(){
         ? d.scambi : null;
       if (!lista) return false;
       p2pScambiServer = lista;
+      /* il cambio di Barattozon di ogni scambio (26 set 2026): su un
+         dispositivo che la riga non l'ha scritta, e' da qui che il
+         premio scelto si rilegge */
+      const cambi = {};
+      for (const id of Object.keys(lista)) {
+        const s = lista[id];
+        if (s && s.cambio_pub > 0) cambi[id] = s.cambio_pub;
+      }
+      prendiCambiPubP2P(cambi);
       diarioP2P('archivio: ' + Object.keys(lista).length + ' scambi dal server');
       return true;
     } catch(e) { return false; }
@@ -58667,12 +58805,17 @@ async function riallineaScambioP2P(id, motivo, leggero){
    Fail-open muta come le sorelle del mazzo: chi chiama (dal motore,
    dopo che l'ordine e' gia' partito davvero) non aspetta e non
    controlla l'esito. */
-async function annunciaCanaleP2P(lato, euro, metodo){
+async function annunciaCanaleP2P(lato, euro, metodo, premio){
   if (DEMO || VETRINA || !myTgId) return;
+  /* `premio` SOLO per Barattozon (26 set 2026): il premio scelto, che a
+     prezzo fisso non sta in nessun campo del libro; per gli altri
+     ordini la chiave non c'e' e il corpo resta quello di ieri */
+  const corpo = {lato: lato, euro: euro, metodo: metodo};
+  if (Number.isInteger(premio)) corpo.premio = premio;
   try {
     await fetch(`${API_BASE}/p2p/canale`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},
-      body: JSON.stringify({lato: lato, euro: euro, metodo: metodo})});
+      body: JSON.stringify(corpo)});
   } catch(e){}
 }
 

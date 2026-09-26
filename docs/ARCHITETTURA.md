@@ -25630,7 +25630,34 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   badge della card (`badgePremioP2P`, muto sugli altri prezzi fissi) e
   la riga del premio nel conto (`contoDettP2P`: Controvalore al
   mercato, premio, Subtotale alla cifra fissa), e a cifra detta dal
-  coordinatore la riga sparisce: da li' lo scambio e' fatto. Prima di pubblicare
+  coordinatore la riga sparisce: da li' lo scambio e' fatto.
+  ⚠️ DAL 26 SET 2026 IL PREMIO E' QUELLO SCELTO («il premio non si
+  vede»): il metro non e' piu' il cambio di adesso ma quello della
+  PUBBLICAZIONE (`cambioPub`, euro per bitcoin). Chi pubblica lo scrive
+  sulla riga e lo dichiara all'intestazione (`registraOrdiniP2P`, solo
+  da `pubblicati`); il server lo tiene in `p2p_ordini.cambio_pub` solo
+  se sta entro il 2% dal suo (`_cambio_pub_buono`,
+  `P2P_CAMBIO_PUB_SCARTO`), la prima volta e sul solo maker, e lo serve
+  accanto ai volti (`/api/p2p/facce`, giudice `_cambi_pub_p2p`), a
+  TUTTI con la fotografia del libro (`/api/p2p/libro`, dalla memoria:
+  li fotografa l'orologio con i volti, `_cambi_foto_p2p`, e la rotta
+  resta senza database) e nell'archivio degli scambi (`cambio_pub`).
+  Nel client li prendono i volti, le due letture della fotografia (il
+  libro subito e la fila di Esplora) e l'archivio. Nel client la cache e' `p2pCambiPub`
+  (`prendiCambiPubP2P`: solo id veri, solo numeri positivi); il
+  giudice e' UNO, `premioBarattozonP2P(o, pub, adesso)` — rilegge i
+  sats col cambio della pubblicazione, quindi torna il premio esatto
+  e non balla; senza cambio detto, o con un metro che darebbe un
+  premio fuori scala, ripiega sul cambio di adesso (gli ordini di
+  altri client e quelli nati prima). `premioBzP2P` lo chiama con quel
+  che la pagina sa, `premioCardP2P` sceglie per le card fra questo e il
+  `premium` del filo, e da li' passano il badge (SENZA segno, come
+  gli altri ordini), il cartellino dell'affare (`affaroneP2P`, anche
+  in vetrina), il conto (Controvalore scorporato dai sats col premio
+  scelto, e la riga resta anche a scambio preso) e la card di «I miei
+  scambi» (`premioMioP2P`, solo col cambio della pubblicazione). Il
+  post nel canale lo dice con le stesse parole (`_premio_canale_p2p`,
+  solo sul tabacchino). Prima di pubblicare
   il RIEPILOGO (`riepilogoTabacchinoP2P`, una `chiediConferma` col
   timbro `confermato`). LA VITA NEL LIBRO SEGUE IL PAYCODE e rovescia
   le 24 ore del 22 set: `expires_at` = scadenza meno DUE ORE, margine
