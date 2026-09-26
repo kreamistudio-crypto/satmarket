@@ -27496,7 +27496,12 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
    `FILE_TOUR_P2P`, 756x360 WebP (21:10, la forma della scatola nel
    client), 80 KB tutt'e sei — cartella sua
    e mai assets/categorie/, per la ragione di assets/scoprire/;
-   vedi CANTIERI, «Il tour di benvenuto del P2P»),
+   vedi CANTIERI, «Il tour di benvenuto del P2P»; dal 26 set 2026 la
+   stessa rotta serve anche le tre della slide finale personale,
+   `fine-pioniere`, `fine-livello5` e `fine-tutti`, con una tupla sua
+   `FILE_TOUR_P2P_FINE`: 480x480 WebP scontornate su trasparenza, 83
+   KB tutt'e tre — vedi CANTIERI, «La slide finale personale del tour
+   P2P»),
    `/assets/tappo.jpeg`, le rotte PWA (`/manifest.json`, `/sw.js`,
    `/offline.html`, `/assets/icona-192.png`, `/assets/icona-512.png`,
    `/assets/icona-192-maskable.png`, `/assets/icona-512-maskable.png`,

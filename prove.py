@@ -50639,8 +50639,11 @@ def prove_tour_p2p():
               "recapiti.webp", "reputazione.webp", "tabacchino.webp"]
     prova("...e ci sono tutte e sei, in ordine", ATTESI, nomi)
     _r = pezzo("asset_tour_p2p")
+    # (26 set 2026) la stessa rotta serve anche le tre della slide
+    # finale, che hanno la loro tupla: vedi prove_tour_p2p_finale
     prova("...e la rotta la interroga", True,
-          "if nome not in FILE_TOUR_P2P:" in _r)
+          "if nome not in FILE_TOUR_P2P and nome not in FILE_TOUR_P2P_FINE:"
+          in _r)
     prova("la rotta serve col 304 e la revalidazione", True,
           "_file_con_etag" in _r and '"public, no-cache"' in _r)
     # MAI un mount: la regola ferrea 3 vale anche per una cartella
@@ -50944,6 +50947,511 @@ def prove_tour_p2p():
     _riv = pezzo_js(mini, "function rivediTourP2P(){", "\n")
     prova("...e riaprire non rimette in gioco nessun timbro", False,
           "removeItem" in _riv)
+
+
+def prove_tour_p2p_finale():
+    """LA SLIDE FINALE PERSONALE DEL TOUR P2P (26 set 2026, ritocco di
+    Andrea): dopo le sei card un caricamento breve chiede al server se
+    chi guarda ha lo sconto, e la slide dice quella giusta — Pioniere,
+    livello 5, o per tutti. Piu' la SALITA: chi arriva al livello 5 la
+    ritrova da sola, una volta.
+
+    Il banco node fa GIRARE le funzioni vere del client (dal catalogo
+    del tour fino a `chiudiTourP2P`, piu' i giudici della fee di casa)
+    contro un DOM di cartone e una `fetch` finta, nei sei casi chiesti:
+    pioniere, livello 5, nessuno sconto, server che tace, apertura da
+    «Come funziona», salita una volta sola. I tempi del caricamento si
+    accorciano nel banco (1000 -> 40 ms, 3000 -> 160), e la sostituzione
+    si CONTROLLA: se il nome della costante cambiasse, il banco
+    aspetterebbe i tempi veri invece di mentire.
+
+    Quel che si sorveglia a parte, fuori dal banco: la rotta chiede allo
+    STESSO giudice del coordinatore, senza parametri; le tre figure sono
+    quadrate, uguali, scontornate e leggere; il movimento c'e' solo a
+    chi lo vuole; e nessun numero della fee e' scritto nel codice."""
+    print("\n[la slide finale del tour P2P]")
+    import os as _os
+    import json as _js, shutil, subprocess, tempfile
+    mini = open("miniapp.html", encoding="utf-8").read()
+    srv = open("server.py", encoding="utf-8").read()
+
+    # --- 1) LA ROTTA: lo stesso giudice del coordinatore --------------
+    _r = pezzo("mio_sconto_p2p")
+    prova("la rotta dello sconto di chi guarda esiste, in GET", True,
+          '@app.get("/api/p2p/mio-sconto")' in srv)
+    prova("...e chiede a `_sconto_p2p`, il giudice che risponde a mostrod",
+          True, '_sconto_p2p(con, user["id"])' in _r)
+    prova("...e il giudice di /api/p2p/sconto e' lo stesso", True,
+          "_sconto_p2p(con, r[0])" in pezzo("_sconti_per_chiavi_p2p"))
+    # NESSUN PARAMETRO: non si puo' chiedere di un altro, e non esiste
+    # nemmeno la sintassi per provarci (il patto di /api/p2p/chiavi)
+    _firma = _r[:_r.index(":\n")]
+    prova("...senza parametri: solo l'identita' di chi chiede", True,
+          _firma.count(":") == 2 and "x_tg_init_data" in _firma
+          and "barattolo_sessione" in _firma)
+    prova("...col gate della persona (409 = silenzio)", True,
+          'if not _p2p_per(user["id"])["attivo"]:' in _r
+          and "HTTPException(409" in _r)
+    prova("...e la risposta non si mette in cache", True,
+          '"Cache-Control": "no-store"' in _r)
+    prova("...e la connessione si chiude anche se il giudice esplode",
+          True, "finally:\n        con.close()" in _r)
+
+    # --- 2) LE TRE FIGURE ------------------------------------------------
+    _t = re.search(r"FILE_TOUR_P2P_FINE = \(([^)]*)\)", srv, re.S)
+    FINE = ["fine-pioniere.webp", "fine-livello5.webp", "fine-tutti.webp"]
+    prova("la whitelist della finale e' una tupla sua, di tre", FINE,
+          re.findall(r'"([^"]+)"', _t.group(1) if _t else ""))
+    prova("...e la rotta del tour la serve", True,
+          "if nome not in FILE_TOUR_P2P and nome not in FILE_TOUR_P2P_FINE:"
+          in pezzo("asset_tour_p2p"))
+    _fig = pezzo_js(mini, "const FIG_FINE_TOUR_P2P = {", "};")
+    prova("il client chiede le tre della whitelist, con URL letterali",
+          FINE, re.findall(r"/assets/tour-p2p/([a-z0-9-]+\.webp)", _fig))
+    prova("...ognuna al suo motivo", True,
+          "pioniere: '/assets/tour-p2p/fine-pioniere.webp'" in _fig
+          and "livello:  '/assets/tour-p2p/fine-livello5.webp'" in _fig
+          and "tutti:    '/assets/tour-p2p/fine-tutti.webp'" in _fig)
+    manca = [n for n in FINE
+             if not _os.path.exists(_os.path.join("assets", "tour-p2p", n))]
+    prova("i tre file esistono", [], manca)
+    try:
+        from PIL import Image as _Img
+    except ImportError:
+        salta("le tre figure sono quadrate e scontornate",
+              "Pillow non e' installata")
+    else:
+        _mis, _pesi, _angoli, _cuori, _bordi = set(), [], [], [], []
+        for _n in FINE:
+            _p = _os.path.join("assets", "tour-p2p", _n)
+            if not _os.path.exists(_p):
+                continue
+            _im = _Img.open(_p)
+            _mis.add((_im.size, _im.format))
+            _pesi.append(_os.path.getsize(_p) / 1024)
+            _a = _im.convert("RGBA").getchannel("A")
+            _w, _h = _im.size
+            _angoli.append(max(_a.getpixel(q) for q in
+                               ((2, 2), (_w - 3, 2), (2, _h - 3), (_w - 3, _h - 3))))
+            # IL VETRO DENTRO IL BARATTOLO RESTA DISEGNO: ha quasi il
+            # colore del fondo tolto, e uno scontorno per soglia lo
+            # avrebbe bucato. Si guarda un punto del vetro scuro, fra
+            # il bordo sinistro e il soggetto.
+            _cuori.append(_a.getpixel((round(_w * .33), round(_h * .72))))
+            # ...e il fondo tolto davvero: sulla fascia di sinistra,
+            # dove ci sono solo stelline, la meta' e piu' e' trasparente
+            _col = [_a.getpixel((x, y)) for x in range(0, round(_w * .12))
+                    for y in range(0, _h, 4)]
+            _bordi.append(sum(1 for v in _col if v == 0) / len(_col))
+        prova("le tre figure hanno la stessa misura, quadrata, in WebP",
+              [((480, 480), "WEBP")], sorted(_mis))
+        prova("...nitide a 3x sui 140 px della slide", True,
+              all(s[0][0] >= 420 for s in _mis))
+        prova(f"...leggere: meno di 40 KB l'una (ora "
+              f"{', '.join(f'{p:.0f}' for p in _pesi)})",
+              True, bool(_pesi) and max(_pesi) < 40)
+        prova("...col fondo tolto: angoli trasparenti", [0, 0, 0], _angoli)
+        prova("...e il fondo tolto per davvero, non solo negli angoli",
+              True, bool(_bordi) and min(_bordi) > 0.85)
+        prova("...e il vetro dentro il barattolo resta pieno", [255] * 3,
+              _cuori)
+
+    # --- 3) IL TIMBRO DELLA SALITA STA SUL PROFILO -------------------
+    _v = re.search(r"VISTI_NOTI = \(([^)]*)\)", srv, re.S)
+    prova("`p2p_lv5` e' nel catalogo dei timbri del server", True,
+          bool(_v) and '"p2p_lv5"' in _v.group(1))
+    prova("...e la slide del livello 5 lo timbra", True,
+          "if (motivo === 'livello') ricordaVisto('p2p_lv5', Date.now());"
+          in mini)
+
+    # --- 4) NESSUN NUMERO DELLA FEE E' SCRITTO A MANO ----------------
+    # si guarda il CODICE, non i commenti: quelli le frasi le citano
+    _tf = re.sub(r"//[^\n]*|/\*.*?\*/", "", pezzo_js(
+        mini, "function testoFineTourP2P(motivo, fee, listino, punti){",
+        "\n}\n"), flags=re.S)
+    prova("le parole della slide non scrivono cifre a mano", [],
+          re.findall(r"\d+(?:,\d+)?\s*%|dell'1|del 2|0,5", _tf))
+    prova("...il 5 del livello e' il gemello del server", True,
+          _tf.count("LIVELLO_SCONTO_P2P") == 2 and "livello 5" not in _tf)
+
+    # --- 5) IL MOVIMENTO SOLO A CHI LO VUOLE -------------------------
+    _i = mini.index("  .giro-fine{")
+    _css = mini[_i:mini.index("  @keyframes giroComparsa", _i)]
+    _mq = _css[_css.index("@media (prefers-reduced-motion: no-preference){"):]
+    prova("i pallini e la comparsa animano solo senza effetti ridotti",
+          True, "animation:giroAttesa" in _mq
+          and "animation:giroComparsa" in _mq
+          and _css.count("animation:") == 2)
+    prova("...e le due animazioni hanno i loro keyframes", True,
+          "@keyframes giroAttesa{" in mini
+          and "@keyframes giroComparsa{" in mini)
+    prova("la figura e' quadrata a 140 anche nel CSS", True,
+          ".giro-ill{display:block;width:140px;height:140px;" in mini)
+    prova("la cifra grande e' d'inchiostro, non d'arancio", True,
+          bool(re.search(r"\.giro-cifra b\{[^}]*color:var\(--ink\)", mini)))
+    prova("la finale sta nella scatola del tour, fra nastro e piede", True,
+          '<div class="giro-nastro" id="tourP2PNastro" aria-live="polite"></div>\n'
+          '      <div class="giro-fine" id="tourP2PFine" aria-live="polite"></div>\n'
+          '      <div class="giro-piede">' in mini.replace("\r\n", "\n"))
+
+    # --- 6) IL BANCO: le funzioni vere, sei casi ----------------------
+    _blocco = mini[mini.index("const TOUR_P2P_CHIAVE = "):
+                   mini.index("/* ============ IL MOTORE DELLO SCAMBIO")]
+    _corto = (_blocco.replace("const ATTESA_FINE_TOUR_P2P_MS = 1000;",
+                              "const ATTESA_FINE_TOUR_P2P_MS = 40;")
+                     .replace("const TETTO_FINE_TOUR_P2P_MS = 3000;",
+                              "const TETTO_FINE_TOUR_P2P_MS = 160;"))
+    prova("il banco accorcia i due tempi veri (1 s e 3 s)", 2,
+          sum(a != b for a, b in zip(_blocco.split("\n"), _corto.split("\n"))))
+    # i giudici della fee di casa, veri: le funzioni per intero piu' il
+    # gemello del livello (una costante, che si legge per forma)
+    _giudici = re.search(r"const LIVELLO_SCONTO_P2P = \d+;", mini).group(0) + "\n"
+    for _f in ("function commissioneVivaP2P(){",
+               "function commissioneListinoP2P(){",
+               "function scontoFedeltaTestoP2P(punti){",
+               "function mezzaCommissioneP2P(fee){",
+               "function articoloPercentoP2P(testo){"):
+        _giudici += pezzo_js(mini, _f, "\n}\n") + "\n}\n"
+    _prog = r"""
+const esc = s => String(s ?? '').replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function fintoEl(id){
+  const cl = new Set();
+  return {id, style: {}, innerHTML: '', textContent: '', offsetHeight: 300,
+    clientWidth: 340, scrollLeft: 0, children: [],
+    classList: {add: (...c) => c.forEach(x => cl.add(x)),
+                remove: (...c) => c.forEach(x => cl.delete(x)),
+                contains: c => cl.has(c),
+                toggle: (c, v) => (v ? cl.add(c) : cl.delete(c))},
+    scrollTo(o){ this.scrollLeft = o.left; },
+    addEventListener(){}, removeEventListener(){}};
+}
+const ELEM = {};
+const el = id => (ELEM[id] = ELEM[id] || fintoEl(id));
+const document = {querySelector: () => ({id: 'view-p2p'}),
+                  addEventListener(){}, removeEventListener(){}};
+const MEM = {};
+const localStorage = {getItem: k => (k in MEM ? MEM[k] : null),
+  setItem: (k, v) => { MEM[k] = String(v); }, removeItem: k => { delete MEM[k]; }};
+let vistiMem = {}, TIMBRI = [];
+function ricordaVisto(id, q){ vistiMem[id] = q; TIMBRI.push(id); }
+let myTgId = 111;
+const DEMO = false, VETRINA = false, API_BASE = '/api';
+function authHdr(){ return 'collaudo:' + myTgId + ':Compratore'; }
+function chiaveP2P(k){ return k + ':' + myTgId; }
+function haptic(){}
+function tourRidotto(){ return true; }
+let ANDATO = null;
+function go(v){ ANDATO = v; }
+function navIndietro(){ chiudiTourP2P(); }
+const tourInCorso = false, testModaleInCorso = false;
+const P2P_VESTE_METODI = {}, P2P_TABACCHINO = 'x';
+let p2pInfo = {fee: 0.03}, p2pSconto = null;
+let p2pLeve = {mostro: 'm', commissione: 4};
+const p2pCoord = () => p2pLeve;
+let RISPOSTA = null, DOMANDE = [];
+global.fetch = (url, opt) => {
+  DOMANDE.push({url, h: opt.headers['X-Tg-Init-Data']});
+  if (RISPOSTA === 'tace') return new Promise((ok, no) => {
+    opt.signal && opt.signal.addEventListener('abort', () => no(new Error('abort')));
+  });
+  if (RISPOSTA === 409) return Promise.resolve({ok: false, status: 409, json: async () => ({})});
+  return Promise.resolve({ok: true, json: async () => RISPOSTA});
+};
+""" + _giudici + "\n" + _corto + r"""
+const dorme = ms => new Promise(ok => setTimeout(ok, ms));
+function foto(){
+  const f = ELEM.tourP2PFine || {innerHTML: ''};
+  return {aperto: tourP2PInCorso, finale: el('tourP2P').classList.contains('finale'),
+          html: f.innerHTML, via: el('tourP2PVia').textContent,
+          spento: !!el('tourP2PVia').disabled,
+          salta: el('tourP2PSalta').style.visibility || '',
+          alta: f.style.minHeight || ''};
+}
+async function finoAllaFinale(){
+  for (let i = 0; i < TAPPE_TOUR_P2P.length; i++) avantiTourP2P();
+}
+function azzera(){
+  if (tourP2PInCorso) chiudiTourP2P();
+  for (const k in MEM) delete MEM[k];
+  vistiMem = {}; TIMBRI = []; DOMANDE = []; ANDATO = null;
+  p2pInfo = {fee: 0.03}; p2pLeve = {mostro: 'm', commissione: 4};
+  p2pSconto = {attivo: false, motivo: '', punti: 0.5};
+  myTgId = 111;
+}
+async function caso(risposta, prepara){
+  azzera();
+  if (prepara) prepara();
+  RISPOSTA = risposta;
+  const r = {};
+  apriTourP2PSePrimaVolta();
+  r.aperto = foto();
+  for (let i = 0; i < TAPPE_TOUR_P2P.length - 1; i++) avantiTourP2P();
+  r.sesta = foto();
+  avantiTourP2P();
+  r.subito = foto();
+  /* MENTRE SI CONTROLLA SI ASPETTA: il tocco su «Inizia» e l'Esc non
+     chiudono niente (onclick su un bottone spento non parte, ma la
+     guardia e' nella funzione: la chiama anche la tastiera) */
+  avantiTourP2P();
+  tastoTourP2P({key: 'Escape'});
+  r.dopoTocchi = foto();
+  await dorme(15);
+  r.presto = foto();          // la risposta c'e', ma il caricamento dura
+  await dorme(120);
+  r.dopo = foto();
+  await dorme(200);
+  r.tardi = foto();
+  r.timbri = TIMBRI.slice(); r.domande = DOMANDE.slice();
+  avantiTourP2P();            // «Inizia»
+  r.chiuso = foto(); r.andato = ANDATO;
+  return r;
+}
+(async () => {
+  const out = {};
+  const S = x => Object.assign({ok: true, punti: 0.5}, x);
+  out.pioniere = await caso(S({attivo: true, motivo: 'pioniere'}));
+  out.livello = await caso(S({attivo: true, motivo: 'livello'}));
+  out.nessuno = await caso(S({attivo: false, motivo: ''}));
+  out.tace = await caso('tace');
+  out.rifiuta = await caso(409);
+  // dopo la beta: la fee viva raggiunge il listino
+  out.dopoBeta = await caso(S({attivo: true, motivo: 'pioniere'}),
+                            () => { p2pInfo = {fee: 0.04}; });
+  out.dopoBetaTutti = await caso(S({attivo: false, motivo: ''}),
+                                 () => { p2pInfo = {fee: 0.04}; });
+  // altri numeri: la frase li segue, non li ricorda
+  out.altri = await caso(S({attivo: true, motivo: 'livello', punti: 0.25}),
+                         () => { p2pInfo = {fee: 0.02}; p2pLeve.commissione = 3; });
+  out.senzaFee = await caso(S({attivo: true, motivo: 'pioniere'}),
+                            () => { p2pInfo = null; });
+  out.levaSpenta = await caso(S({attivo: false, motivo: '', punti: 0}),
+                              () => { p2pSconto = {attivo: false, motivo: '', punti: 0}; });
+  out.anonimo = await caso(null, () => { myTgId = null; p2pSconto = null; });
+
+  // «COME FUNZIONA»: tour gia' visto, lo si riapre a mano
+  azzera(); vistiMem.tour_p2p = 1; RISPOSTA = S({attivo: true, motivo: 'pioniere'});
+  apriTourP2PSePrimaVolta();
+  const r = {daSolo: foto()};
+  rivediTourP2P(); r.aperto = foto();
+  await finoAllaFinale(); r.subito = foto();
+  await dorme(120); r.dopo = foto();
+  out.comeFunziona = r;
+
+  // LA SALITA AL LIVELLO 5: tour gia' visto, /me dice «livello»
+  azzera(); vistiMem.tour_p2p = 1; RISPOSTA = S({attivo: true, motivo: 'livello'});
+  p2pSconto = {attivo: true, motivo: 'livello', punti: 0.5};
+  const s = {};
+  apriTourP2PSePrimaVolta(); s.subito = foto();
+  s.timbroTour = MEM['barattolo_tour_p2p:111'] || null;
+  await dorme(120); s.dopo = foto(); s.timbri = TIMBRI.slice();
+  avantiTourP2P(); s.chiuso = foto();
+  apriTourP2PSePrimaVolta(); s.ancora = foto();
+  s.domande = DOMANDE.length;
+  out.salita = s;
+  // ...su un altro dispositivo: il timbro arriva col profilo
+  const altrove = vistiMem.p2p_lv5;
+  azzera(); vistiMem = {tour_p2p: 1, p2p_lv5: altrove};
+  p2pSconto = {attivo: true, motivo: 'livello', punti: 0.5};
+  apriTourP2PSePrimaVolta();
+  out.salitaAltrove = foto();
+  // il pioniere non ha salita, e nemmeno chi non ha sconto
+  azzera(); vistiMem.tour_p2p = 1;
+  p2pSconto = {attivo: true, motivo: 'pioniere', punti: 0.5};
+  apriTourP2PSePrimaVolta(); out.salitaPioniere = foto();
+  azzera(); vistiMem.tour_p2p = 1;
+  apriTourP2PSePrimaVolta(); out.salitaNessuno = foto();
+  // la salita col server che tace: si richiude senza timbrare
+  azzera(); vistiMem.tour_p2p = 1; RISPOSTA = 'tace';
+  p2pSconto = {attivo: true, motivo: 'livello', punti: 0.5};
+  apriTourP2PSePrimaVolta();
+  await dorme(250);
+  out.salitaTace = {f: foto(), timbri: TIMBRI.slice()};
+  // la salita a cui il server dice altro: niente cartello a sorpresa
+  azzera(); vistiMem.tour_p2p = 1; RISPOSTA = S({attivo: false, motivo: ''});
+  p2pSconto = {attivo: true, motivo: 'livello', punti: 0.5};
+  apriTourP2PSePrimaVolta();
+  await dorme(120);
+  out.salitaSmentita = {f: foto(), timbri: TIMBRI.slice()};
+  // il tour intero a un livello 5 timbra la slide: poi niente salita
+  azzera(); RISPOSTA = S({attivo: true, motivo: 'livello'});
+  p2pSconto = {attivo: true, motivo: 'livello', punti: 0.5};
+  apriTourP2PSePrimaVolta(); await finoAllaFinale(); await dorme(120);
+  avantiTourP2P();
+  apriTourP2PSePrimaVolta();
+  out.tourPoiSalita = {f: foto(), timbri: TIMBRI.slice()};
+  // LA RISPOSTA TARDIVA NON DIPINGE: chiuso e riaperto a meta'
+  azzera(); vistiMem.tour_p2p = 1; RISPOSTA = S({attivo: true, motivo: 'pioniere'});
+  rivediTourP2P(); await finoAllaFinale();
+  chiudiTourP2P(); rivediTourP2P();
+  await dorme(120);
+  out.tardiva = foto();
+  console.log(JSON.stringify(out));
+})();
+"""
+    node = shutil.which("node")
+    if not node:
+        salta("la slide finale del tour P2P, dal vivo nel banco", "serve node")
+        return
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as f:
+        f.write(_prog)
+    try:
+        _rr = subprocess.run([node, f.name], capture_output=True, text=True,
+                             encoding="utf-8", timeout=60)
+    finally:
+        os.unlink(f.name)
+    if _rr.returncode != 0:
+        prova("il banco della slide finale gira", "", _rr.stderr[:600])
+        return
+    o = _js.loads(_rr.stdout.strip())
+
+    def testo(h):
+        return re.sub(r"<[^>]+>", "|", h or "").replace("&#39;", "'")
+
+    # IL PERCORSO: sei card, poi il caricamento, poi la slide
+    p = o["pioniere"]
+    prova("il tour parte dalla prima card, non dalla finale", [True, False],
+          [p["aperto"]["aperto"], p["aperto"]["finale"]])
+    prova("sulla sesta il bottone dice ancora «Avanti», e «Salta» c'e'",
+          ["Avanti", ""], [p["sesta"]["via"], p["sesta"]["salta"]])
+    prova("...e «Avanti» dalla sesta porta al caricamento", True,
+          p["subito"]["finale"] and "Controllo il tuo account…" in p["subito"]["html"])
+    prova("...che prende la statura del nastro che lascia", "300px",
+          p["subito"]["alta"])
+    prova("...e sulla finale «Salta» si spegne e il bottone dice «Inizia»",
+          ["hidden", "Inizia"], [p["subito"]["salta"], p["subito"]["via"]])
+    prova("il caricamento dura anche se il server risponde subito", True,
+          "Controllo il tuo account…" in p["presto"]["html"])
+    # MENTRE SI CONTROLLA SI ASPETTA (26 set 2026, Andrea): chi guarda
+    # deve scoprire che sconto ha, non saltarlo con un tocco
+    prova("durante il caricamento «Inizia» e' spento", True,
+          p["subito"]["spento"])
+    prova("...e ne' il tocco ne' Esc chiudono il tour", [True, True, True],
+          [p["dopoTocchi"]["aperto"], p["dopoTocchi"]["finale"],
+           "Controllo il tuo account…" in p["dopoTocchi"]["html"]])
+    prova("...e alla risposta si riaccende", False, p["dopo"]["spento"])
+    prova("...anche quando il server tace: al tetto si riaccende", [True, False],
+          [o["tace"]["dopo"]["spento"], o["tace"]["tardi"]["spento"]])
+    prova("...e il tour chiuso non resta col bottone spento", False,
+          p["chiuso"]["spento"])
+    prova("...e chiede al server, UNA volta, a nome di chi guarda",
+          [{"url": "/api/p2p/mio-sconto", "h": "collaudo:111:Compratore"}],
+          p["domande"])
+
+    # PIONIERE
+    h = p["dopo"]["html"]
+    prova("pioniere: la piantina", True,
+          'src="/assets/tour-p2p/fine-pioniere.webp"' in h)
+    prova("...«🌱 Sei un Pioniere!»", True,
+          '<h3 class="giro-titolo">🌱 Sei un Pioniere!</h3>' in h)
+    prova("...la cifra grande e la vecchia barrata", True,
+          "<b>1%</b><s>1,5%</s>" in h)
+    prova("...e la frase", True,
+          "In beta la tua fee P2P è dell&#39;1% invece dell&#39;1,5%" in h)
+    prova("...e il pioniere non timbra la slide del livello 5", [],
+          [t for t in p["timbri"] if t == "p2p_lv5"])
+    prova("«Inizia» chiude e porta al libro (ci si e' gia')",
+          [False, False], [p["chiuso"]["aperto"], p["chiuso"]["finale"]])
+
+    # LIVELLO 5
+    lv = o["livello"]
+    h = lv["dopo"]["html"]
+    prova("livello 5: il fulmine", True,
+          'src="/assets/tour-p2p/fine-livello5.webp"' in h)
+    prova("...«Sei al livello 5!», la cifra e la stessa frase", True,
+          '<h3 class="giro-titolo">Sei al livello 5!</h3>' in h
+          and "<b>1%</b><s>1,5%</s>" in h
+          and "In beta la tua fee P2P è dell&#39;1% invece dell&#39;1,5%" in h)
+    prova("...e la slide vista si timbra sul profilo", True,
+          "p2p_lv5" in lv["timbri"])
+
+    # NESSUNO SCONTO
+    n = o["nessuno"]
+    h = n["dopo"]["html"]
+    prova("tutti gli altri: la BETA", True,
+          'src="/assets/tour-p2p/fine-tutti.webp"' in h)
+    prova("...«In beta la fee P2P è dell'1,5% per parte»", True,
+          '<h3 class="giro-titolo">In beta la fee P2P è dell&#39;1,5% per parte</h3>' in h)
+    prova("...e sotto «Dal livello 5 avrai uno sconto dello 0,5%»", True,
+          '<p class="giro-nota">Dal livello 5 avrai uno sconto dello 0,5%</p>' in h)
+    prova("...senza cifra barrata, e senza timbro", [False, []],
+          ["<s>" in h, [t for t in n["timbri"] if t == "p2p_lv5"]])
+
+    # IL SERVER CHE TACE: dopo il tetto, la versione per tutti, muta
+    t = o["tace"]
+    prova("server che tace: prima del tetto si aspetta ancora", True,
+          "Controllo il tuo account…" in t["dopo"]["html"])
+    prova("...e al tetto esce la slide per tutti", True,
+          "fine-tutti.webp" in t["tardi"]["html"]
+          and "In beta la fee P2P è dell&#39;1,5% per parte" in t["tardi"]["html"]
+          and "Dal livello 5 avrai uno sconto dello 0,5%" in t["tardi"]["html"])
+    prova("...senza una parola d'errore", [False, False],
+          [bool(re.search(r"errore|riprova|non risponde", t["tardi"]["html"], re.I)),
+           "Controllo" in t["tardi"]["html"]])
+    prova("un 409 del server vale come silenzio: la slide per tutti", True,
+          "fine-tutti.webp" in o["rifiuta"]["dopo"]["html"])
+
+    # LA BETA SPARISCE DA SOLA, E I NUMERI SI SEGUONO
+    prova("finita la beta: «La tua fee P2P è dell'1,5% invece del 2%»", True,
+          "La tua fee P2P è dell&#39;1,5% invece del 2%" in o["dopoBeta"]["dopo"]["html"]
+          and "<b>1,5%</b><s>2%</s>" in o["dopoBeta"]["dopo"]["html"]
+          and "beta" not in testo(o["dopoBeta"]["dopo"]["html"]).lower())
+    prova("...e per tutti «La fee P2P è del 2% per parte»", True,
+          "La fee P2P è del 2% per parte" in o["dopoBetaTutti"]["dopo"]["html"])
+    prova("altri numeri, altre frasi: fee 2%, listino 3, sconto 0,25", True,
+          "<b>0,75%</b><s>1%</s>" in o["altri"]["dopo"]["html"]
+          and "In beta la tua fee P2P è dello 0,75% invece dell&#39;1%"
+          in o["altri"]["dopo"]["html"])
+    prova("senza la fee del coordinatore nessuna cifra inventata", [False, True],
+          ["<b>" in o["senzaFee"]["dopo"]["html"],
+           "Hai uno sconto dello 0,5% sulla tua parte della fee P2P"
+           in o["senzaFee"]["dopo"]["html"]])
+    prova("a leva spenta niente promessa del livello 5", [True, False],
+          ["fine-tutti.webp" in o["levaSpenta"]["dopo"]["html"],
+           "Dal livello" in o["levaSpenta"]["dopo"]["html"]])
+    prova("chi non ha un conto va dritto alla slide per tutti, senza "
+          "«Controllo il tuo account»", [True, False, []],
+          ["fine-tutti.webp" in o["anonimo"]["subito"]["html"],
+           "Controllo" in o["anonimo"]["subito"]["html"],
+           o["anonimo"]["domande"]])
+
+    # «COME FUNZIONA»
+    c = o["comeFunziona"]
+    prova("tour gia' visto: entrando nel libro non riparte da solo", False,
+          c["daSolo"]["aperto"])
+    prova("«Come funziona» riapre il tour intero, dalla prima card",
+          [True, False], [c["aperto"]["aperto"], c["aperto"]["finale"]])
+    prova("...e finisce anche lui col caricamento e la slide personale",
+          [True, True], ["Controllo il tuo account…" in c["subito"]["html"],
+                         "🌱 Sei un Pioniere!" in c["dopo"]["html"]])
+
+    # LA SALITA AL LIVELLO 5, UNA VOLTA SOLA
+    s = o["salita"]
+    prova("salita: il libro apre DIRETTAMENTE la finale, col caricamento",
+          [True, True, True], [s["subito"]["aperto"], s["subito"]["finale"],
+                               "Controllo il tuo account…" in s["subito"]["html"]])
+    prova("...senza toccare il timbro del tour", None, s["timbroTour"])
+    prova("...poi la slide del livello 5, timbrata sul profilo", [True, ["p2p_lv5"]],
+          ["Sei al livello 5!" in s["dopo"]["html"], s["timbri"]])
+    prova("...«Inizia» la chiude, e al prossimo ingresso non ricompare",
+          [False, False], [s["chiuso"]["aperto"], s["ancora"]["aperto"]])
+    prova("...e non ha richiesto il server una seconda volta", 1, s["domande"])
+    prova("...ne' su un altro dispositivo, col timbro arrivato dal profilo",
+          False, o["salitaAltrove"]["aperto"])
+    prova("il pioniere non ha salita, e nemmeno chi non ha sconto",
+          [False, False], [o["salitaPioniere"]["aperto"],
+                           o["salitaNessuno"]["aperto"]])
+    prova("salita col server muto: si richiude senza timbrare, e ci si riprova",
+          [False, []], [o["salitaTace"]["f"]["aperto"], o["salitaTace"]["timbri"]])
+    prova("...e se il server non conferma il livello, niente cartello a sorpresa",
+          [False, []], [o["salitaSmentita"]["f"]["aperto"],
+                        o["salitaSmentita"]["timbri"]])
+    prova("chi vede il livello 5 nel tour intero non se lo ribecca come salita",
+          [False, True], [o["tourPoiSalita"]["f"]["aperto"],
+                          "p2p_lv5" in o["tourPoiSalita"]["timbri"]])
+    prova("una risposta tardiva non dipinge il tour riaperto", [True, False, ""],
+          [o["tardiva"]["aperto"], o["tardiva"]["finale"], o["tardiva"]["html"]])
 
 
 def prove_p2p_libro():
@@ -102121,7 +102629,7 @@ def main():
               prove_livello_accanto_al_titolo,
               prove_p2p_server,
         prove_p2p_libro,
-        prove_tour_p2p,
+        prove_tour_p2p, prove_tour_p2p_finale,
         prove_velo_p2p,
     prove_p2p_dettaglio,
     prove_nav_p2p,

@@ -7993,6 +7993,59 @@
      che sperando nell'ordine del foglio. */
   .giro-piede .btn{width:auto;flex:none;margin:0;margin-left:auto;
     padding:11px 22px;font-size:14px}
+  /* ══ LA SLIDE FINALE PERSONALE (26 set 2026, ritocco di Andrea) ══
+     Dopo le sei card il tour chiede al server se chi guarda ha lo
+     sconto della fee, e chiude con la slide giusta: il Pioniere, il
+     livello 5 o quella per tutti. Non e' una settima card del nastro,
+     ed e' voluto: il nastro si scorre col dito, e una slide che dipende
+     da una risposta del server non deve potersi raggiungere prima che
+     la risposta ci sia. Prende il POSTO del nastro dentro la stessa
+     scatola — stesso piede, stesso bottone, stessa statura (la
+     `min-height` la scrive `finaleTourP2P` misurando il nastro che
+     lascia), cosi' la card non salta di misura sotto il dito.
+     IL FONDO E' LA CARTA, non il navy delle sei: le tre illustrazioni
+     sono scontornate su trasparenza apposta, e il barattolo posa sul
+     crema di giorno e sul marrone di sera. «Salta» e i pallini, che
+     qui non hanno piu' niente da saltare ne' da contare, si spengono
+     senza sparire (`visibility`), e il piede non si sposta. */
+  .giro-fine{display:none;flex-direction:column;align-items:center;
+    justify-content:center;text-align:center;padding:14px 20px 14px}
+  #tourP2P.finale .giro-nastro{display:none}
+  #tourP2P.finale .giro-fine{display:flex}
+  #tourP2P.finale .giro-punti{visibility:hidden}
+  /* il caricamento: tre pallini come quelli del piede, che si
+     accendono uno dopo l'altro — la lingua del tour, non uno spinner */
+  .giro-attesa{display:flex;flex-direction:column;align-items:center;
+    gap:14px;margin:0;font-size:14px;font-weight:700;color:var(--ink-soft)}
+  .giro-attesa-punti{display:flex;gap:7px}
+  .giro-attesa-punti i{width:8px;height:8px;border-radius:50%;
+    background:var(--sats);opacity:.35}
+  .giro-ill{display:block;width:140px;height:140px;margin:0 auto 6px}
+  .giro-titolo{margin:0 0 2px;font-size:19px;font-weight:800;
+    line-height:1.3;color:var(--ink)}
+  /* LA CIFRA GRANDE E' IN INCHIOSTRO e non in arancio: il --sats sul
+     bianco fa 2,2:1, sotto il 3:1 che anche un testo grande vuole.
+     L'arancio resta del bottone e dei pallini. */
+  .giro-cifra{display:flex;align-items:baseline;justify-content:center;
+    gap:10px;margin:0 0 4px}
+  .giro-cifra b{font-size:42px;font-weight:800;line-height:1.05;
+    color:var(--ink)}
+  .giro-cifra s{font-size:21px;font-weight:700;color:var(--ink-soft)}
+  .giro-nota{margin:0;font-size:14px;font-weight:600;line-height:1.5;
+    color:var(--ink-soft)}
+  /* IL MOVIMENTO SOLO A CHI LO VUOLE: coi ridotti (il sistema, o
+     «🌗 Aspetto» — la regola universale di `html.fx-ridotti`) i
+     pallini restano fermi e il barattolo arriva di scatto */
+  @media (prefers-reduced-motion: no-preference){
+    .giro-attesa-punti i{animation:giroAttesa 1.05s ease-in-out infinite}
+    .giro-attesa-punti i:nth-child(2){animation-delay:.175s}
+    .giro-attesa-punti i:nth-child(3){animation-delay:.35s}
+    .giro-ill{animation:giroComparsa .45s cubic-bezier(.2,.8,.3,1) both}
+  }
+  @keyframes giroAttesa{0%,100%{opacity:.35;transform:scale(1)}
+    40%{opacity:1;transform:scale(1.3)}}
+  @keyframes giroComparsa{from{opacity:0;transform:scale(.9) translateY(6px)}
+    to{opacity:1;transform:none}}
   /* ⚠️ NIENTE `scroll-behavior:smooth` sul nastro, ed e' una regola
      di casa che vale per tutto il foglio: con lo scorrimento morbido
      la compensazione di `riapriOrdineFermo` diventerebbe
@@ -11230,6 +11283,7 @@ document.getElementById('cartello')?.remove();</script>
     <div class="giro-box">
       <button class="giro-salta" id="tourP2PSalta" onclick="chiudiTourP2P()">Salta</button>
       <div class="giro-nastro" id="tourP2PNastro" aria-live="polite"></div>
+      <div class="giro-fine" id="tourP2PFine" aria-live="polite"></div>
       <div class="giro-piede">
         <div class="giro-punti" id="tourP2PPunti"></div>
         <button class="btn orange" id="tourP2PVia" onclick="avantiTourP2P()">Avanti</button>
@@ -46773,6 +46827,168 @@ const TAPPE_TOUR_P2P = [
         + 'sbloccano verso di te.'},
 ];
 let tourP2PInCorso = false;
+/* ══ LA SLIDE FINALE PERSONALE (26 set 2026, ritocco di Andrea) ══
+   Dopo la sesta card «Avanti» non chiude: porta a un caricamento breve
+   («Controllo il tuo account…») che chiede DAVVERO al server se chi
+   guarda ha lo sconto della fee, e poi alla slide giusta — il Pioniere,
+   il livello 5 o quella per tutti. Vale al primo ingresso e da «Come
+   funziona», che passano tutt'e due da qui.
+   LA DOMANDA E' FRESCA e non la risposta di /api/me, ed e' il senso
+   del caricamento: /api/p2p/mio-sconto chiede a `_sconto_p2p`, lo
+   STESSO giudice che risponde al coordinatore alla presa in carico —
+   quindi la slide non puo' promettere uno sconto che mostrod poi non
+   fa, e un livello 5 preso dieci minuti fa c'e' gia'.
+   IL SERVER CHE TACE NON E' UN ERRORE: oltre `TETTO_FINE_TOUR_P2P_MS`
+   (o a un 409, o senza rete) esce la slide per tutti, che e' vera per
+   chiunque — nessun avviso, nessun «riprova».
+   IL CARICAMENTO DURA ALMENO `ATTESA_FINE_TOUR_P2P_MS`: una risposta
+   da 40 ms farebbe lampeggiare la scritta, che si leggerebbe come un
+   difetto. Chi non ha un conto (vetrina, anonimo) non ha niente da
+   controllare, e va dritto alla slide per tutti: dirgli «Controllo il
+   tuo account» sarebbe una bugia.
+   LE FIGURE SONO URL LETTERALI, il patto di `TAPPE_TOUR_P2P`: cosi'
+   `_timbra_asset_pagina` le timbra col ?v= del contenuto. */
+const FIG_FINE_TOUR_P2P = {
+  pioniere: '/assets/tour-p2p/fine-pioniere.webp',
+  livello:  '/assets/tour-p2p/fine-livello5.webp',
+  tutti:    '/assets/tour-p2p/fine-tutti.webp',
+};
+const ATTESA_FINE_TOUR_P2P_MS = 1000;
+const TETTO_FINE_TOUR_P2P_MS = 3000;
+/* aperto per la SOLA slide del livello 5 (la salita, vedi
+   `salitaLivelloP2P`) invece che per il tour intero */
+let tourP2PSolo = false;
+/* il gettone del giro: una risposta che arriva a tour gia' chiuso (o
+   chiuso e riaperto) non deve dipingere niente */
+let giroFineTourP2P = 0;
+/* LE PAROLE DELLA SLIDE, PURA: `motivo` e' quello del server ('pioniere',
+   'livello' o ''), `fee` la fee viva INTERA del coordinatore (0.03, o
+   null se il 38385 non e' arrivato), `listino` in punti percentuali sul
+   totale (P2P_COMMISSIONE_PERCENTO), `punti` lo sconto
+   (P2P_SCONTO_FEDELTA_PERCENTO). NESSUN NUMERO E' SCRITTO QUI: le
+   meta' passano da `mezzaCommissioneP2P`, gli articoli da
+   `articoloPercentoP2P`, lo sconto da `scontoFedeltaTestoP2P`, il 5 da
+   `LIVELLO_SCONTO_P2P` — gli stessi giudici della pagina «Informazioni».
+   LA BETA SPARISCE DA SOLA, col criterio di `testoFeeInfoP2P`: c'e'
+   finche' la fee viva sta sotto il listino. Senza fee letta non si
+   inventa una cifra: resta lo sconto detto come sconto. */
+function testoFineTourP2P(motivo, fee, listino, punti){
+  const f = (fee === null || fee === undefined) ? NaN : Number(fee);
+  const p = Number(punti) || 0, l = Number(listino) || 0;
+  const beta = Number.isFinite(f) && f > 0 && l > 0 && f * 100 < l;
+  const sconto = scontoFedeltaTestoP2P(p);     // «sconto dello 0,5%»
+  const di = x => articoloPercentoP2P(x) + x + '%';
+  if ((motivo === 'pioniere' || motivo === 'livello') && p > 0) {
+    const fig = FIG_FINE_TOUR_P2P[motivo];
+    const titolo = motivo === 'pioniere' ? '🌱 Sei un Pioniere!'
+      : 'Sei al livello ' + LIVELLO_SCONTO_P2P + '!';
+    if (!(f > 0))
+      return {fig, titolo, cifra: null,
+              nota: 'Hai uno ' + sconto + ' sulla tua parte della fee P2P'};
+    const piena = mezzaCommissioneP2P(f);
+    const mia = mezzaCommissioneP2P(Math.max(0, f - 2 * p / 100));
+    return {fig, titolo, cifra: {nuova: mia + '%', vecchia: piena + '%'},
+            nota: (beta ? 'In beta la tua fee P2P è ' : 'La tua fee P2P è ')
+              + di(mia) + ' invece ' + di(piena)};
+  }
+  const fig = FIG_FINE_TOUR_P2P.tutti;
+  const nota = p > 0
+    ? 'Dal livello ' + LIVELLO_SCONTO_P2P + ' avrai uno ' + sconto : '';
+  if (!Number.isFinite(f))
+    return {fig, titolo: 'La fee P2P la trovi nel conto dello scambio',
+            cifra: null, nota};
+  if (f <= 0)
+    return {fig, titolo: 'In questo momento lo scambio non ha commissione',
+            cifra: null, nota};
+  return {fig, cifra: null, nota,
+          titolo: (beta ? 'In beta la fee P2P è ' : 'La fee P2P è ')
+            + di(mezzaCommissioneP2P(f)) + ' per parte'};
+}
+/* la cifra grande e' un DISEGNO della frase qui sotto, che la dice
+   intera: ai lettori di schermo basta lei (`aria-hidden`) */
+function htmlFineTourP2P(t){
+  return `<img class="giro-ill" src="${t.fig}" width="140" height="140"`
+    + ` alt="" onerror="this.remove()">`
+    + '<h3 class="giro-titolo">' + esc(t.titolo) + '</h3>'
+    + (t.cifra ? '<p class="giro-cifra" aria-hidden="true"><b>'
+      + esc(t.cifra.nuova) + '</b><s>' + esc(t.cifra.vecchia) + '</s></p>' : '')
+    + (t.nota ? '<p class="giro-nota">' + esc(t.nota) + '</p>' : '');
+}
+/* la domanda al server, col suo tetto: null = non si sa (tace, 409,
+   niente rete, niente conto), e allora vale la slide per tutti */
+function chiediScontoTourP2P(){
+  if (DEMO || VETRINA || !API_BASE || !myTgId) return Promise.resolve(null);
+  const ctl = (typeof AbortController === 'function') ? new AbortController() : null;
+  const tetto = new Promise(ok => setTimeout(() => {
+    if (ctl) ctl.abort();
+    ok(null);
+  }, TETTO_FINE_TOUR_P2P_MS));
+  const domanda = fetch(`${API_BASE}/p2p/mio-sconto`, {cache: 'no-store',
+      headers: {'X-Tg-Init-Data': authHdr()},
+      signal: ctl ? ctl.signal : undefined})
+    .then(r => r.ok ? r.json() : null)
+    .then(j => (j && j.ok) ? j : null)
+    .catch(() => null);
+  return Promise.race([domanda, tetto]);
+}
+function finaleTourP2P(){
+  const giro = ++giroFineTourP2P;
+  const fine = el('tourP2PFine'), nastro = el('tourP2PNastro');
+  /* la card non cambia statura: prende l'altezza del nastro che lascia */
+  fine.style.minHeight = nastro.offsetHeight ? nastro.offsetHeight + 'px' : '';
+  el('tourP2P').classList.add('finale');
+  el('tourP2PSalta').style.visibility = 'hidden';
+  el('tourP2PVia').textContent = 'Inizia';
+  if (DEMO || VETRINA || !myTgId) { mostraFineTourP2P(null); return; }
+  fine.innerHTML = '<p class="giro-attesa" role="status">'
+    + '<span class="giro-attesa-punti" aria-hidden="true"><i></i><i></i><i></i></span>'
+    + 'Controllo il tuo account…</p>';
+  /* MENTRE SI CONTROLLA SI ASPETTA (26 set 2026, Andrea): «Inizia»
+     resta spento e Esc non chiude — chi guarda deve scoprire che
+     sconto ha, non saltarlo con un tocco distratto. L'attesa ha un
+     tetto (TETTO_FINE_TOUR_P2P_MS), quindi non si resta mai chiusi
+     dentro. Il gesto indietro del sistema resta libero: fermarlo
+     vorrebbe dire una cronologia gia' tornata sotto un tour ancora
+     aperto. */
+  el('tourP2PVia').disabled = true;
+  const inizio = Date.now();
+  chiediScontoTourP2P().then(sc => {
+    setTimeout(() => {
+      if (giro !== giroFineTourP2P || !tourP2PInCorso) return;
+      mostraFineTourP2P(sc);
+    }, Math.max(0, ATTESA_FINE_TOUR_P2P_MS - (Date.now() - inizio)));
+  });
+}
+function mostraFineTourP2P(sc){
+  const motivo = (sc && sc.attivo) ? String(sc.motivo || '') : '';
+  /* LA SALITA MOSTRA SOLO LA SUA SLIDE: se il server non conferma il
+     livello 5 (tace, o dice altro) non c'e' niente da festeggiare, e
+     il tour si richiude senza timbrare — ci si riprova al prossimo
+     ingresso. Una slide «per tutti» a chi e' entrato nel libro e basta
+     sarebbe un cartello a sorpresa. */
+  el('tourP2PVia').disabled = false;     // la risposta c'e': si puo' andare
+  if (tourP2PSolo && motivo !== 'livello') { chiudiTourP2P(); return; }
+  /* lo sconto dice il server; se tace, la leva la sa anche /api/me
+     (`punti` viaggia a tutti) e la riga «dal livello 5» resta vera */
+  const punti = sc ? sc.punti : (p2pSconto ? p2pSconto.punti : 0);
+  el('tourP2PFine').innerHTML = htmlFineTourP2P(testoFineTourP2P(
+    motivo, commissioneVivaP2P(), commissioneListinoP2P(), punti));
+  /* la slide del livello 5 vista UNA volta, sul profilo: vale su ogni
+     dispositivo, e la salita non la ripropone (`salitaLivelloP2P`) */
+  if (motivo === 'livello') ricordaVisto('p2p_lv5', Date.now());
+}
+/* LA SALITA AL LIVELLO 5 (26 set 2026): chi NON e' pioniere e arriva al
+   livello 5 dopo aver gia' visto il tour, al primo ingresso nel libro
+   trova la sola slide finale del livello 5 — col caricamento, che la
+   conferma al server. Una volta: il timbro `p2p_lv5` sta sul profilo.
+   Il sospetto lo da' /api/me (`p2p_sconto`, gia' in mano: nessuna
+   domanda in piu' a ogni ingresso), la conferma la slide.
+   ⚠️ CHI ERA GIA' AL LIVELLO 5 prima che la slide nascesse la vede una
+   volta anche lui: non l'ha mai vista, ed e' la stessa notizia. */
+function salitaLivelloP2P(){
+  return !!(myTgId && p2pSconto && p2pSconto.attivo
+            && p2pSconto.motivo === 'livello' && !vistiMem.p2p_lv5);
+}
 /* IL NOME DIVENTA IL MARCHIO, in UNA card sola. Si sostituisce DOPO
    `esc`, ed e' l'ordine che conta: prima si mette al sicuro il testo,
    poi si infila l'unico pezzo di markup che qui ci vuole stare.
@@ -46833,8 +47049,8 @@ function apriTourP2PSePrimaVolta(){
      scambi», e di la' il tour si aprirebbe sopra la pagina sbagliata —
      per giunta a chi il libro l'ha gia' attraversato. */
   if (document.querySelector('.view.active')?.id !== 'view-p2p') return;
-  if (tourP2PVisto()) return;
-  apriTourP2P();
+  if (!tourP2PVisto()) { apriTourP2P(); return; }
+  if (salitaLivelloP2P()) apriSalitaTourP2P();
 }
 /* «Come funziona»: lo stesso tour a richiesta, per tutti. Non rimette
    in gioco nessun timbro — riapre e basta, e alla chiusura il timbro
@@ -46845,7 +47061,17 @@ function apriTourP2P(){
   /* consumato alla COMPARSA, non alla fine: vedi il patto qui sopra */
   try { localStorage.setItem(chiaveTourP2P(), Date.now()); } catch(e){}
   ricordaVisto('tour_p2p', Date.now());   // ...e sul profilo: vedi tourP2PVisto
+  montaTourP2P(false);
+}
+/* la sola slide del livello 5: nessun timbro del tour si tocca — quello
+   della slide lo mette `mostraFineTourP2P` quando la slide c'e' davvero */
+function apriSalitaTourP2P(){
+  if (tourP2PInCorso) return;
+  montaTourP2P(true);
+}
+function montaTourP2P(solo){
   tourP2PInCorso = true;
+  tourP2PSolo = solo;
   const nastro = el('tourP2PNastro'), punti = el('tourP2PPunti');
   nastro.innerHTML = TAPPE_TOUR_P2P.map(t =>
     `<div class="giro-card"><div class="giro-fig">`
@@ -46857,11 +47083,16 @@ function apriTourP2P(){
     `<button type="button" class="giro-punto${i ? '' : ' on'}"`
     + ` onclick="vaiTappaTourP2P(${i})"`
     + ` aria-label="Vai al passo ${i + 1}"></button>`).join('');
+  const fine = el('tourP2PFine');
+  fine.innerHTML = '';
+  fine.style.minHeight = '';
+  el('tourP2P').classList.remove('finale');
   el('tourP2P').classList.add('open');
   nastro.scrollLeft = 0;              /* riaperto, si riparte dalla prima */
   nastro.addEventListener('scroll', scorriTourP2P, {passive: true});
   document.addEventListener('keydown', tastoTourP2P);
   aggiornaTourP2P();
+  if (solo) finaleTourP2P();
 }
 /* ⚠️ L'ASCOLTATORE PASSA UN ARGOMENTO, e va scartato (visto dal vivo:
    alla prima scorsa i pallini si spegnevano tutti e sei). `scroll`
@@ -46885,11 +47116,13 @@ function aggiornaTourP2P(i){
   if (i === undefined) i = tappaTourP2P();
   const punti = el('tourP2PPunti');
   [...punti.children].forEach((p, j) => p.classList.toggle('on', j === i));
-  const ultima = i === TAPPE_TOUR_P2P.length - 1;
-  el('tourP2PVia').textContent = ultima ? 'Inizia' : 'Avanti';
-  /* sull'ultima «Salta» e «Inizia» farebbero la stessa cosa, e due
-     bottoni per un gesto solo sono una domanda inutile */
-  el('tourP2PSalta').style.visibility = ultima ? 'hidden' : '';
+  /* DALLA SESTA SI VA AVANTI, non si comincia (26 set 2026): dopo c'e'
+     la slide finale, ed e' li' che il bottone dice «Inizia» e «Salta»
+     si spegne — sull'ultima «Salta» e «Inizia» farebbero la stessa
+     cosa, e due bottoni per un gesto solo sono una domanda inutile.
+     «Salta» sulla sesta salta anche la finale, come su ogni card. */
+  el('tourP2PVia').textContent = 'Avanti';
+  el('tourP2PSalta').style.visibility = '';
 }
 function vaiTappaTourP2P(i){
   haptic();
@@ -46904,16 +47137,22 @@ function vaiTappaTourP2P(i){
   aggiornaTourP2P(i);
 }
 function avantiTourP2P(){
+  if (el('tourP2PVia').disabled) return;   // si sta controllando l'account
   const i = tappaTourP2P();
-  if (i < TAPPE_TOUR_P2P.length - 1) { vaiTappaTourP2P(i + 1); return; }
+  const finale = el('tourP2P').classList.contains('finale');
+  if (!finale && i < TAPPE_TOUR_P2P.length - 1) { vaiTappaTourP2P(i + 1); return; }
   haptic();
+  if (!finale) { finaleTourP2P(); return; }
   chiudiTourP2P();
   /* «Inizia» PORTA AL LIBRO, e quasi sempre ci si e' gia': il ramo
      serve al giorno che il tour si aprira' da un'altra pagina. */
   if (document.querySelector('.view.active')?.id !== 'view-p2p') go('p2p');
 }
 function tastoTourP2P(e){
+  if (el('tourP2PVia').disabled) return;   // si sta controllando l'account
   if (e.key === 'Escape') { navIndietro(); return; }
+  /* sulla finale le frecce non hanno card da scorrere */
+  if (el('tourP2P').classList.contains('finale')) return;
   if (e.key === 'ArrowRight') vaiTappaTourP2P(tappaTourP2P() + 1);
   if (e.key === 'ArrowLeft')  vaiTappaTourP2P(tappaTourP2P() - 1);
 }
@@ -46923,7 +47162,11 @@ function chiudiTourP2P(){
      motore di navigazione scatta sul cambio di classe e chiede la pila
      a `navPila`, che questa variabile la legge */
   tourP2PInCorso = false;
+  tourP2PSolo = false;
+  el('tourP2PVia').disabled = false;
+  giroFineTourP2P++;      /* una risposta ancora in volo non dipinge piu' */
   el('tourP2P').classList.remove('open');
+  el('tourP2P').classList.remove('finale');
   el('tourP2PNastro').removeEventListener('scroll', scorriTourP2P);
   document.removeEventListener('keydown', tastoTourP2P);
 }

@@ -33520,3 +33520,99 @@ di collaudo di una copia (relay morto), a 320 e 375 nei due temi:
 bande, navy sotto e attorno al barattolo nello scatto, testo
 invariato, nessun errore.
 **DA AVERE:** l'occhio sul telefono.
+
+## La slide finale personale del tour P2P (26 set 2026)
+
+Ritocco di Andrea: dopo le sei card del tour P2P — sia al primo
+ingresso sia da «Come funziona» — un caricamento breve, «Controllo il
+tuo account…», e poi la slide di chi guarda: 🌱 Pioniere (la
+piantina), livello 5 (il fulmine), o tutti gli altri (BETA). Piu' la
+SALITA: chi non e' pioniere e arriva al livello 5 ritrova la sola slide
+del livello 5, una volta, al primo ingresso nel libro.
+
+**LA DOMANDA E' FRESCA, E IL GIUDICE E' QUELLO DI MOSTROD.** Rotta
+nuova `GET /api/p2p/mio-sconto`: niente parametri (si chiede solo di
+se', il patto di `/api/p2p/chiavi`), gate della persona, `no-store`,
+e la risposta viene da `_sconto_p2p` — lo stesso che per
+`/api/p2p/sconto` risponde al coordinatore alla presa. La slide non
+promette uno sconto che mostrod poi non fa. Il caricamento dura almeno
+1 s (una risposta da 40 ms farebbe lampeggiare la scritta); oltre 3 s,
+o a un 409, o senza rete, esce la slide per tutti, senza una parola
+d'errore. Chi non ha un conto (vetrina) va dritto alla slide per tutti:
+«Controllo il tuo account» sarebbe una bugia.
+
+**NESSUN NUMERO SCRITTO A MANO.** `testoFineTourP2P` (pura) passa dai
+giudici della pagina «Informazioni»: fee viva del 38385, listino
+P2P_COMMISSIONE_PERCENTO, sconto P2P_SCONTO_FEDELTA_PERCENTO,
+`LIVELLO_SCONTO_P2P`, `mezzaCommissioneP2P`, `articoloPercentoP2P`,
+`scontoFedeltaTestoP2P`. La beta c'e' finche' la fee viva sta sotto il
+listino (il criterio di `testoFeeInfoP2P`): dopo, «La tua fee P2P è
+dell'1,5% invece del 2%» e «La fee P2P è del 2% per parte». Senza 38385
+nessuna cifra; a leva spenta niente «Dal livello 5».
+
+**NON E' UNA SETTIMA CARD DEL NASTRO**, ed e' voluto: il nastro si
+scorre col dito, e una slide che dipende da una risposta del server non
+deve potersi raggiungere prima. Prende il posto del nastro nella stessa
+scatola (`#tourP2P.finale`), con la sua statura: dal vivo la scatola
+resta 366 px dal caricamento alla slide (a 320, 361→362). Dalla sesta
+card il bottone dice «Avanti» e «Salta» resta (salta anche la finale);
+sulla finale «Inizia» chiude come prima.
+
+**MENTRE SI CONTROLLA SI ASPETTA** (Andrea, visti gli scatti): durante
+«Controllo il tuo account…» «Inizia» e' spento e Esc non chiude — chi
+guarda deve scoprire che sconto ha, non saltarlo con un tocco. Il
+tetto dei 3 s fa si' che non si resti mai chiusi dentro. Il gesto
+indietro del SISTEMA resta libero, ed e' voluto: fermarlo vorrebbe dire
+una cronologia gia' tornata indietro sotto un tour ancora aperto.
+
+**LA SALITA.** Il sospetto lo da' `/api/me` (`p2p_sconto.motivo ===
+'livello'`, nessuna domanda in piu' a ogni ingresso), la conferma la
+slide. Il timbro `p2p_lv5` (nuovo in `VISTI_NOTI`) sta sul profilo, e
+vale su ogni dispositivo; lo mette la slide del livello 5 quando c'e'
+davvero, anche nel tour intero — chi l'ha vista li' non se la ribecca
+come salita. Se nella salita il server tace o non conferma il livello,
+il tour si richiude senza timbrare e ci si riprova al prossimo
+ingresso. ⚠️ Chi era GIA' al livello 5 prima di oggi la vede una volta
+anche lui: non l'ha mai vista.
+
+**LE ILLUSTRAZIONI.** Dai tre JPEG 2048×2048 col fondo marrone pieno di
+Andrea: floodfill dall'angolo (tolleranza 45) che si ferma contro il
+contorno del barattolo — cosi' il vetro scuro DENTRO, che ha quasi il
+colore del fondo, resta disegno —, rampa d'alpha sulla distanza dal
+fondo nei 3 px di bordo, colore de-moltiplicato (niente frangia
+marrone), ritaglio sul riquadro COMUNE alle tre e riduzione in alpha
+premoltiplicata. 480×480 WebP (140 px a schermo, nitide a 3×), 27-28
+KB l'una, in `assets/tour-p2p/fine-*.webp` con una tupla sua
+(`FILE_TOUR_P2P_FINE`) servita dalla stessa rotta: le sei sono strisce
+21:10 sul navy, queste quadrate su trasparenza, e le sentinelle delle
+sei non devono imparare eccezioni. Comparsa leggera (scala e
+dissolvenza, .45 s) e pallini del caricamento solo senza effetti
+ridotti. La cifra grande e' d'inchiostro: l'arancio sul bianco fa 2,2:1.
+
+**IL PUNTO 1 ERA GIA' FATTO**: il nostro barattolo nella seconda card
+e' b041c1c, della stessa mattina (voce qui sopra). Rifotografato e basta.
+
+**PROVATO.** `prove_tour_p2p_finale` (77): la rotta e il suo giudice, le
+tre figure (quadrate, uguali, angoli trasparenti, fondo tolto sulla
+fascia delle stelline, vetro pieno, sotto i 40 KB), nessuna cifra nel
+codice delle parole, movimento solo senza ridotti; e un banco node che
+fa girare le funzioni VERE del tour con un DOM di cartone e una fetch
+finta, tempi accorciati e controllati: pioniere, livello 5, nessuno
+sconto, server che tace (prima del tetto aspetta, al tetto la slide per
+tutti), 409, dopo la beta, altri numeri, senza fee, leva spenta,
+anonimo, «Come funziona», salita una volta sola (anche su un altro
+dispositivo), pioniere senza salita, salita col server muto o smentita,
+tour intero che timbra, risposta tardiva che non dipinge, bottone
+spento e Esc muto durante il caricamento (anche col server che tace,
+fino al tetto). Tortura 14 su 14. Emendata
+`prove_tour_p2p` (la rotta ora guarda due tuple). Dal vivo, Chrome
+headless via CDP a densita' 3, server di collaudo di una copia (relay
+morto, fee viva seminata a 0,03, listino 4, sconto 0,5), tre identita'
+vere dal database (111 pioniere, 222 livello 5, 999 senza): a 320 e 375
+nei due temi le tre slide con la figura giusta arrivata a 480 px,
+«Inizia» che chiude, nessuno scorrimento laterale, nessun errore; la
+salita di 222 apre la sola finale, timbra, e dopo un ricaricamento il
+timbro torna dal server e non ricompare; un tocco VERO su «Inizia»
+e un Esc durante il caricamento non chiudono niente, e dopo la
+risposta lo stesso tocco chiude.
+**DA AVERE:** l'occhio sul telefono, e un vero livello 5 che sale.

@@ -37521,9 +37521,12 @@ async def scegli_font_scala(req: Request,
 # sa soltanto salire. In due ci stanno senza toccare il giudice qui
 # sotto — salgono tutti e due, e il client guarda quale e' salito per
 # ultimo. Niente colonna e niente rotta in piu'.
+# `p2p_lv5` (26 set 2026) e' la slide finale del tour P2P per chi SALE
+# al livello 5: si vede una volta sola, e il «una volta» vale su ogni
+# dispositivo — che e' proprio il mestiere di questa colonna.
 VISTI_NOTI = ("tour", "tour_p2p", "cartello", "condcat", "checklistvista",
               "nwc", "lnaddr", "npubverifica", "nostrpub", "barraweb",
-              "duetocchi", "fx_ridotti", "fx_pieni")
+              "duetocchi", "fx_ridotti", "fx_pieni", "p2p_lv5")
 
 
 def _visti_leggi(grezzo) -> dict:
@@ -41770,6 +41773,33 @@ def conta_chiavi_p2p(x_tg_init_data: str = Header(""),
     esito = _conta_chiavi_p2p(con, user["id"])
     con.close()
     return {"ok": True, **esito}
+
+
+@app.get("/api/p2p/mio-sconto")
+def mio_sconto_p2p(x_tg_init_data: str = Header(""),
+                   barattolo_sessione: str = Cookie("")):
+    """LO SCONTO DI CHI GUARDA, chiesto ADESSO (26 set 2026): la slide
+    finale del tour P2P («Controllo il tuo account…») lo domanda qui
+    invece di fidarsi di quel che /api/me ha detto all'apertura — un
+    livello 5 raggiunto dieci minuti fa c'e' gia'.
+    IL GIUDICE E' `_sconto_p2p`, lo STESSO che per /api/p2p/sconto
+    risponde al coordinatore alla presa in carico: la slide non puo'
+    promettere uno sconto che mostrod poi non fa.
+    NESSUN PARAMETRO, il patto di /api/p2p/chiavi: si chiede solo di
+    se', e non esiste la sintassi per chiedere di un altro. Stesso gate
+    della persona (409 = silenzio: il client mostra la slide per tutti).
+    Il motivo si' e la pubkey no: qui chi chiede e' la persona stessa,
+    e «pioniere» o «livello» e' gia' scritto nel suo profilo."""
+    user = verifica_utente(x_tg_init_data, barattolo_sessione)
+    if not _p2p_per(user["id"])["attivo"]:
+        raise HTTPException(409, "Lo scambio P2P non e' attivo")
+    con = db()
+    try:
+        s = _sconto_p2p(con, user["id"])
+    finally:
+        con.close()
+    return JSONResponse({"ok": True, **s},
+                        headers={"Cache-Control": "no-store"})
 
 
 # ═══ «DOVE RICEVERE GLI EURO» E' UN PASSO DELLO SCAMBIO (18 set 2026,
@@ -60402,11 +60432,19 @@ def asset_scoprire(nome: str, if_none_match: str = Header("")):
 # (TAPPE_TOUR_P2P) e restano quelli.
 FILE_TOUR_P2P = ("scambio.webp", "garanzia.webp", "metodi.webp",
                  "recapiti.webp", "reputazione.webp", "tabacchino.webp")
+# LE TRE DELLA SLIDE FINALE (26 set 2026): stessa cartella e stessa
+# rotta, ma una tupla SUA, perche' sono un'altra famiglia — quadrate e
+# SCONTORNATE su trasparenza (posano sulla carta della card, che cambia
+# col tema), mentre le sei sono strisce 21:10 sul navy. Tenerle insieme
+# vorrebbe dire che ogni sentinella delle sei («21:10», «il navy»)
+# dovrebbe imparare un'eccezione.
+FILE_TOUR_P2P_FINE = ("fine-pioniere.webp", "fine-livello5.webp",
+                      "fine-tutti.webp")
 
 
 @app.get("/assets/tour-p2p/{nome}")
 def asset_tour_p2p(nome: str, if_none_match: str = Header("")):
-    if nome not in FILE_TOUR_P2P:
+    if nome not in FILE_TOUR_P2P and nome not in FILE_TOUR_P2P_FINE:
         raise HTTPException(404, "immagine non trovata")
     percorso = os.path.join("assets", "tour-p2p", nome)
     if not os.path.exists(percorso):
