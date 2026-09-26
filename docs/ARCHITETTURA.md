@@ -6893,17 +6893,23 @@
   il + torna su e il giro resta, col riflettore fermo sulla capsula
   (`capsulaGiroFerma` finche' c'e' `p2p-binario`).
   IL BANNER PERSONALE DELLE COMMISSIONI (26 set 2026): sopra
-  l'immagine del banner, dentro il bottone, quattro veli (le tre pillole
-  e l'etichetta BETA della terza), la barra rossa del 2% ridisegnata e
-  una luce, tutti in PERCENTUALE DEL FILE 1000×258 (una prova li
-  rimisura sui pixel). `fee-p3` lascia accesa la terza (pionieri e
-  livello 5), `fee-p2` la seconda (tutti gli altri), e la barra resta
-  accesa in tutti e due; senza classi e' tutto colorato. Chi e' chi lo
+  l'immagine del banner, dentro il bottone, quattro PEZZI (`.fee-pz`: la
+  stessa immagine ritagliata col contorno di ogni pillola, uno stadio
+  `clip-path: inset(… round 999px)` 2 px del file fuori dal bordo a meta'
+  sfumatura, e l'etichetta BETA della terza) e la barra rossa del 2%
+  ridisegnata, in PERCENTUALE DEL FILE 1000×258 (una prova li rimisura
+  sui pixel). Spento, il pezzo prende `filter: grayscale(1)
+  brightness(.78)` — mai un velo, mai un backdrop-filter —, quindi il
+  fondo della capsula resta quello del file. `fee-p3` lascia accesa la
+  terza (pionieri e livello 5), `fee-p2` la seconda (tutti gli altri), e
+  la barra resta accesa in tutti e due; senza classi e' tutto colorato. Chi e' chi lo
   dice `pillolaFeeP2P` da `p2pSconto` (/api/me, e la risposta fresca di
   /api/p2p/mio-sconto dalla slide finale): senza, colorato. L'animazione
-  (`animaBannerFeeP2P`, classe `fee-anima`, 1,5 s) parte da `fineGiroP2P`
+  (`animaBannerFeeP2P`, classe `fee-anima`, 1,5 s: le pillole che si
+  spegneranno battono da sinistra a destra e si fanno grigie, per ultima
+  batte quella accesa) parte da `fineGiroP2P`
   e timbra `banner_p2p`; da li' `bannerFeeFissoP2P` (a /me arrivato) lo
-  mette personale e fermo. Coi ridotti niente luce, subito lo stato
+  mette personale e fermo. Coi ridotti niente battiti, subito lo stato
   finale. L'alt dice il prezzo di chi guarda, con le cifre del disegno.
   Il blocco vive dopo il giro guidato: quello del libro non scrive cifre.
   Il verbale: CANTIERI, «Il libro subito», «Il tutorial su pagina

@@ -52039,75 +52039,105 @@ def prove_banner_fee_personale():
     blocco = mini[i_b:f_b]
 
     def regola(sel):
-        m = re.search(re.escape(sel) + r"\{([^}]*)\}", css)
+        # il selettore A INIZIO RIGA: in una regola comune (`.fee-pz,.fee-barra{`)
+        # il nome c'e' ma la regola e' un'altra
+        m = re.search(r"(?:^|\n)\s*" + re.escape(sel) + r"\{([^}]*)\}", css)
         return re.sub(r"\s+", "", m.group(1)) if m else ""
 
     def pc(r, k):
         m = re.search(k + r":(-?[\d.]+)%", r)
         return float(m.group(1)) if m else None
 
-    # --- 1) LE MISURE SONO QUELLE DEL FILE -------------------------------
+    # --- 1) I CONTORNI SONO QUELLI DEL FILE -----------------------------
+    # EMENDATA (26 set 2026, secondo giro, richiesta di Andrea): niente
+    # piu' veli scuri allargati — coprivano il fondo della capsula e lo
+    # facevano rossiccio. Ogni pillola ha un PEZZO della stessa immagine,
+    # ritagliato col contorno esatto (uno stadio) e fatto grigio col
+    # filtro: qui il contorno si RIMISURA sui pixel del file, al mezzo
+    # pixel, e il ritaglio del CSS sta 2 px fuori — la banda sfumata del
+    # bordo va nel grigio, o resta un filo del colore (visto dal vivo) —,
+    # entro un pixel.
+    FUORI = 2
+    def inset(sel):
+        m = re.search(re.escape(sel) + r"\{[^}]*clip-path:inset\(([^)]*)\)", css)
+        if not m:
+            return None
+        v = [float(x) for x in re.findall(r"(-?[\d.]+)%", m.group(1).split("round")[0])]
+        return v if len(v) == 4 else None
     try:
         from PIL import Image
     except ImportError:
-        salta("le pillole e la barra si rimisurano sul file", "PIL non c'e'")
+        salta("i contorni delle pillole si rimisurano sul file", "PIL non c'e'")
         Image = None
     if Image:
         im = Image.open(os.path.join("assets", "p2p-banner-fee.webp")).convert("RGBA")
         W, H = im.size
         px = im.load()
+        FONDO = (52, 32, 25)
 
-        def bbox(prova_px, x0=0, x1=None, y0=0, y1=None):
-            xs, ys = [], []
-            for y in range(y0, y1 or H):
-                for x in range(x0, x1 or W):
-                    if prova_px(px[x, y]):
-                        xs.append(x); ys.append(y)
-            return min(xs), max(xs), min(ys), max(ys)
-        arancio = bbox(lambda p: p[3] > 200 and p[0] > 215 and 95 < p[1] < 175 and p[2] < 90)
-        verde = bbox(lambda p: p[3] > 200 and p[1] > 110 and p[0] < 140 and p[2] < 120
-                     and p[1] - p[0] > 20)
-        # la prima pillola e' crema: a meta' altezza parte da sinistra, e
-        # sopra e sotto si misura fra le righe dove il testo non c'e'
-        crema = bbox(lambda p: p[3] > 200 and p[0] > 235 and p[1] > 205 and p[2] > 185
-                     and p[0] - p[2] < 70, 0, 330)
-        _cc = [y for y in range(H) if px[180, y][3] > 200 and px[180, y][0] > 235
-               and px[180, y][1] > 205 and px[180, y][2] > 185]
-        col_crema = (min(_cc), max(_cc))
-        tag = bbox(lambda p: p[3] > 200 and p[0] > 220 and p[1] > 200 and p[2] > 170,
-                   700, 900, 0, 30)
-        attese = {
-            # a destra la prima la copre il cerchietto con la freccia: il suo
-            # bordo e' dove comincia la seconda, meno il filo che le separa
-            ".p2p-fee-banner .fee-v1": (crema[0], col_crema[0], arancio[0] - 2, col_crema[1]),
-            ".p2p-fee-banner .fee-v2": (arancio[0], arancio[2], arancio[1], arancio[3]),
-            ".p2p-fee-banner .fee-v3": (verde[0], verde[2], verde[1], verde[3]),
-            ".p2p-fee-banner .fee-v3.fee-tag": (tag[0], tag[2], tag[1], tag[3]),
-        }
-        # IL VELO COPRE LA PILLOLA col suo bordo sfumato (visto dal vivo: a
-        # misura piena restava un filo di colore), con poco margine: al piu'
-        # 0,8 punti per lato in orizzontale e 2,5 in verticale
-        storte, veli = [], {}
-        for sel, (x0, y0, x1, y1) in attese.items():
-            r = regola(sel)
-            L, T, Wd, Hd = pc(r, "left"), pc(r, "top"), pc(r, "width"), pc(r, "height")
-            if None in (L, T, Wd, Hd):
-                storte.append((sel, "misure mancanti")); continue
-            veli[sel] = (L, L + Wd)
-            f0, f1 = x0 / W * 100, (x1 + 1) / W * 100
-            g0, g1 = y0 / H * 100, (y1 + 1) / H * 100
-            copre = L <= f0 + 0.01 and L + Wd >= f1 - 0.01 and T <= g0 + 0.01 and T + Hd >= g1 - 0.01
-            poco = f0 - L <= 0.8 and L + Wd - f1 <= 0.8 and g0 - T <= 2.5 and T + Hd - g1 <= 2.5
-            if not (copre and poco):
-                storte.append((sel, (L, T, Wd, Hd), tuple(round(v, 2) for v in (f0, g0, f1, g1))))
-        prova("i veli COPRONO le pillole del FILE, bordo compreso, con poco margine", [], storte)
-        # ...ma non entrano nella pillola accanto, che puo' essere quella accesa
-        a0, a1 = arancio[0] / W * 100, (arancio[1] + 1) / W * 100
-        v0 = verde[0] / W * 100
-        prova("...e un velo non entra mai nella pillola accesa accanto", [True, True, True],
-              [veli[".p2p-fee-banner .fee-v1"][1] <= a0 + 0.01,       # tutti: la 2 e' accesa
-               veli[".p2p-fee-banner .fee-v3"][0] >= a1 - 0.01,       # tutti: la 2 e' accesa
-               veli[".p2p-fee-banner .fee-v2"][1] <= v0 + 0.01])      # pionieri: la 3 e' accesa
+        def dd(a, b):
+            return math.sqrt(sum((a[i] - b[i]) ** 2 for i in range(3)))
+
+        def bordo(punti, pieno):
+            """dall'esterno verso l'interno: dove il pixel e' a meta' fra il
+            marrone della capsula e il pieno della pillola (si parte dal
+            marrone: prima c'e' il trasparente del file)"""
+            prima, visto = None, False
+            for c, (x, y) in punti:
+                p = px[x, y]
+                if not visto:
+                    visto = p[3] > 250 and dd(p, FONDO) < 30
+                    continue
+                t = dd(p, FONDO) / (dd(p, FONDO) + dd(p, pieno) + 1e-9)
+                if t >= 0.5:
+                    if prima is None:
+                        return c
+                    c0, t0 = prima
+                    return c0 + (0.5 - t0) / (t - t0) * (c - c0)
+                prima = (c, t)
+            return None
+
+        # le tre pillole: centro di scansione, colore pieno, e i due tratti
+        # di fondo scuro fra una pillola e l'altra da cui partire
+        PILL = {1: (180, (250, 227, 213), 0, 330), 2: (470, (244, 123, 25), 335, 625),
+                3: (870, (82, 145, 80), 630, 999)}
+        storti = []
+        for n, (cx, pieno, sx, dx) in PILL.items():
+            top = bordo([(y, (cx, y)) for y in range(0, 129)], pieno)
+            bot = bordo([(y, (cx, y)) for y in range(257, 129, -1)], pieno)
+            R, cy = (bot - top) / 2, (top + bot) / 2
+            estremi = []
+            for lato in (-1, 1):
+                stime = []
+                # i fianchi a meta' altezza li coprono i cerchietti con la
+                # freccia: si misura sopra e sotto, e si risale allo stadio
+                for dy in (-70, -60, 60, 70):
+                    y = int(round(cy + dy))
+                    xs = range(sx, cx) if lato < 0 else range(dx, cx, -1)
+                    e = bordo([(x, (x, y)) for x in xs], pieno)
+                    off = math.sqrt(max(R * R - (y - cy) ** 2, 0))
+                    stime.append(e + off - R if lato < 0 else e - off + R)
+                estremi.append(sum(stime) / len(stime))
+            v = inset(".p2p-fee-banner .fee-pz%d" % n)
+            dal_file = (top - FUORI, W - estremi[1] - FUORI, H - bot - FUORI,
+                        estremi[0] - FUORI)   # alto destra basso sinistra, in px
+            if not v or any(abs(v[k] / 100 * (H if k % 2 == 0 else W) - dal_file[k]) > 1.0
+                            for k in range(4)):
+                storti.append((n, v, tuple(round(x, 2) for x in dal_file)))
+        prova("ogni pezzo e' ritagliato col contorno della sua pillola, banda sfumata compresa "
+          "(2 px fuori, entro 1 px del file)",
+              [], storti)
+        # l'etichetta BETA della terza: fianchi e cima (il fondo sta dentro
+        # la pillola, che il pezzo della terza copre gia')
+        tagp = (252, 233, 215)
+        tl = bordo([(x, (x, 20)) for x in range(725, 796)], tagp)
+        tr = bordo([(x, (x, 20)) for x in range(870, 796, -1)], tagp)
+        tt = bordo([(y, (770, y)) for y in range(1, 20)], tagp)
+        vt = inset(".p2p-fee-banner .fee-pz3.fee-tag")
+        prova("...e l'etichetta BETA della terza col suo (fianchi e cima, 2 px fuori, entro 1 px)", True,
+              bool(vt) and abs(vt[0] / 100 * H - (tt - FUORI)) <= 1
+              and abs(W - vt[1] / 100 * W - (tr + FUORI)) <= 1
+              and abs(vt[3] / 100 * W - (tl - FUORI)) <= 1 and (H - vt[2] / 100 * H) > 26.4)
         # la barra rossa: asse, inclinazione, lunghezza e spessore
         pts = [(x, y) for y in range(60, 230) for x in range(80, 280)
                if px[x, y][3] > 200 and px[x, y][0] > 150 and px[x, y][1] < 90
@@ -52138,36 +52168,66 @@ def prove_banner_fee_personale():
     # --- 2) IL MARKUP: sopra l'immagine, dentro il bottone ---------------
     m = re.search(r'<button [^>]*id="p2pFeeBanner"[^>]*>(.*?)</button>', mini, re.S)
     dentro = m.group(1) if m else ""
-    ordine = [dentro.find(c) for c in ("<img ", 'class="fee-velo fee-v1"', 'class="fee-velo fee-v2"',
-                                       'class="fee-velo fee-v3"', 'class="fee-velo fee-v3 fee-tag"',
-                                       'class="fee-barra"', 'class="fee-luce"')]
-    prova("dentro il bottone: l'immagine, i quattro veli, la barra sopra i veli, la luce in cima",
+    ordine = [dentro.find(c) for c in ("<img ", 'class="fee-pz fee-pz1"', 'class="fee-pz fee-pz2"',
+                                       'class="fee-pz fee-pz3"', 'class="fee-pz fee-pz3 fee-tag"',
+                                       'class="fee-barra"')]
+    prova("dentro il bottone: l'immagine, i quattro pezzi, e la barra sopra i pezzi",
           True, -1 not in ordine and ordine == sorted(ordine))
-    prova("...tutti muti per chi legge con la voce (parla l'alt)", 6,
+    prova("...tutti muti per chi legge con la voce (parla l'alt)", 5,
           dentro.count('aria-hidden="true"'))
     prova("...e il bottone e' il riferimento delle coordinate", True,
           "position:relative" in regola(".p2p-fee-banner"))
+    prova("dei veli e della luce di ieri non resta niente", [0, 0, 0, 0],
+          [mini.count("fee-velo"), mini.count("fee-luce"), mini.count("p2pFeeLuce"),
+           mini.count("rgba(22,15,9,.62)")])
 
-    # --- 3) IL CSS: chi resta acceso, e la barra sempre -------------------
+    # --- 3) IL CSS: grigi col filtro, fondo intatto, barra sempre ---------
+    rpz = regola(".p2p-fee-banner .fee-pz")
+    prova("il pezzo e' la STESSA immagine, grande quanto il banner, senza un colore suo",
+          [True, True, False],
+          ["background:url(/assets/p2p-banner-fee.webp)00/100%100%no-repeat" in rpz,
+           "inset:0" in rpz, "rgba" in rpz])
+    prova("...e il grigio e' un FILTRO sul pezzo, non un backdrop-filter (i ridotti lo "
+          "spegnerebbero)", [True, 0],
+          ["filter:grayscale(1)brightness(.78)" in re.sub(r"\s+", "", css),
+           len(re.findall(r"fee-pz[^{]*\{[^}]*backdrop-filter", css))])
+    grigi = re.search(r"((?:\.p2p-fee-banner\.fee-p\d \.fee-pz\d,?\s*)+)\{\s*filter:grayscale", css)
+    gr = re.sub(r"\s+", "", grigi.group(1)) if grigi else ""
+    prova("pionieri e livello 5: grigie la prima e la seconda; tutti: la prima e la terza",
+          [True, True, True, True, False, False],
+          [".fee-p3.fee-pz1" in gr, ".fee-p3.fee-pz2" in gr, ".fee-p2.fee-pz1" in gr,
+           ".fee-p2.fee-pz3" in gr, ".fee-p3.fee-pz3" in gr, ".fee-p2.fee-pz2" in gr])
     accesi = re.search(r"((?:\.p2p-fee-banner\.fee-p\d \.fee-[\w]+,?\s*)+)\{opacity:1\}", css)
     acc = re.sub(r"\s+", "", accesi.group(1)) if accesi else ""
-    prova("pionieri e livello 5: velate la prima e la seconda; tutti: la prima e la terza",
-          [True, True, True, True],
-          [".fee-p3.fee-v1" in acc.replace(" ", ""), ".fee-p3.fee-v2" in acc.replace(" ", ""),
-           ".fee-p2.fee-v1" in acc.replace(" ", ""), ".fee-p2.fee-v3" in acc.replace(" ", "")])
     prova("LA BARRA ROSSA E' ACCESA in tutti e due gli stati personali", [True, True],
-          [".p2p-fee-banner.fee-p2.fee-barra" in acc.replace(" ", ""),
-           ".p2p-fee-banner.fee-p3.fee-barra" in acc.replace(" ", "")])
-    k2 = re.search(r"@keyframes p2pFeeLuce2\{(.*?)\}\}", css, re.S)
-    k3 = re.search(r"@keyframes p2pFeeLuce3\{(.*?)\}\}", css, re.S)
-    prova("la luce parte dalla prima pillola e si ferma sulla sua, in 1,5 s, una volta",
-          [True, True, True, True],
-          [bool(k2) and "left:2.95%" in k2.group(1) and "left:32.55%" in k2.group(1),
-           bool(k3) and "left:2.95%" in k3.group(1) and "left:64.85%" in k3.group(1),
-           "animation:p2pFeeLuce2 1.5s ease-in-out 1" in css,
-           "animation:p2pFeeLuce3 1.5s ease-in-out 1" in css])
-    prova("...e il JS la tiene alla stessa cifra", 1500,
-          int(re.search(r"const FEE_ANIMA_P2P_MS = (\d+);", mini).group(1)))
+          [".p2p-fee-banner.fee-p2.fee-barra" in acc, ".p2p-fee-banner.fee-p3.fee-barra" in acc])
+    # IL BATTITO (terzo ritocco di Andrea, al posto della luce): le grigie
+    # battono da sinistra a destra, poi quella di chi guarda
+    sc = re.sub(r"\s+", " ", css)
+
+    def partenza(sel):
+        m = re.search(re.escape(sel) + r"[^{]*\{animation:p2pFeeBattito ([\d.]+)s ease-in-out(?: ([\d.]+)s)? 1", sc)
+        return (float(m.group(1)), float(m.group(2) or 0)) if m else None
+    b1 = partenza(".p2p-fee-banner.fee-anima .fee-pz1")
+    b_p3_2 = partenza(".p2p-fee-banner.fee-anima.fee-p3 .fee-pz2")
+    b_p3_3 = partenza(".p2p-fee-banner.fee-anima.fee-p3 .fee-pz3")
+    prova("IL BATTITO dei pionieri: la prima, la seconda, poi la terza che resta accesa",
+          [(0.45, 0.0), (0.45, 0.5), (0.45, 1.0)], [b1, b_p3_2, b_p3_3])
+    prova("...e per tutti: la prima, la terza, poi la seconda (stesse regole, altra fila)",
+          True, ".p2p-fee-banner.fee-anima.fee-p3 .fee-pz2, .p2p-fee-banner.fee-anima.fee-p2 .fee-pz3{animation:p2pFeeBattito .45s ease-in-out .5s 1" in sc
+          and ".p2p-fee-banner.fee-anima.fee-p3 .fee-pz3, .p2p-fee-banner.fee-anima.fee-p2 .fee-pz2{animation:p2pFeeBattito .45s ease-in-out 1s 1" in sc)
+    prova("...ognuna si fa grigia appena finito il suo battito, e la barra rossa con la prima",
+          [True, True, True],
+          ["animation:p2pFeeBattito .45s ease-in-out 1; transition-delay:.45s}" in sc,
+           "ease-in-out .5s 1; transition-delay:.95s}" in sc,
+           ".p2p-fee-banner.fee-anima .fee-barra{transition:opacity 0s linear .45s}" in sc])
+    kb = re.search(r"@keyframes p2pFeeBattito\{(.*?)\}\}", css, re.S)
+    prova("...un leggero ingrandimento e ritorno", True,
+          bool(kb) and "transform:scale(1)" in kb.group(1) and "transform:scale(1.08)" in kb.group(1))
+    prova("...e tutto sta nell'animazione del JS (1,5 s): l'ultimo battito finisce a 1,45",
+          [1500, True],
+          [int(re.search(r"const FEE_ANIMA_P2P_MS = (\d+);", mini).group(1)),
+           bool(b_p3_3) and (b_p3_3[0] + b_p3_3[1]) * 1000 <= 1500])
 
     # --- 4) QUANDO: fine del giro, e /me per lo stato fisso ---------------
     prova("l'animazione parte da UN posto solo: la fine del giro guidato", [1, True],

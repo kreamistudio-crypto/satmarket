@@ -34124,3 +34124,47 @@ giro fino a «Fine» col dito, il banner fermato a 0 / 0,35 / 0,7 / 1,05 /
 per pioniere e tutti gli altri, e coi ridotti; nessuno scorrimento
 laterale, nessun errore dell'app. Scatti approvati da Andrea.
 **DA AVERE:** l'occhio sul telefono.
+
+## Il banner personale: pillole grigie e il battito (26 set 2026)
+
+Ritocchi di Andrea a bc8679d. **1) IL FONDO DELLA CAPSULA RESTA DEL
+FILE.** I veli scuri allargati coprivano anche il marrone attorno alle
+pillole e lo facevano rossiccio. Al loro posto, per ogni pillola, un
+PEZZO della stessa immagine (`.fee-pz`, grande quanto il banner)
+ritagliato col contorno della pillola: uno stadio, `clip-path:
+inset(… round 999px)`, misurato sui pixel del file al mezzo pixel (a
+meta' strada fra il marrone e il pieno; i fianchi sotto i cerchietti
+ricavati dallo stadio sopra e sotto) — pillole x 29,72-325,79 /
+322,75-628,00 / 623,98-970,54, y 26,4-230,4; etichetta BETA x
+747,72-844,71 da y 7,47, angoli ~10,5. **E 2 PX FUORI**, visto dal
+vivo da vicino: tagliando a meta' la banda sfumata del bordo (tre pixel)
+restava un filo arancio attorno alla seconda grigia e verde attorno
+alla terza; allargato di 2 la banda va nel grigio e il marrone pieno
+resta fuori. **2) GRIGIE, NON SBIADITE:** il pezzo spento prende `filter:
+grayscale(1) brightness(.78)` — scritte leggibili (1,5% bianco su grigio
+111, 2% nero su grigio 181) —, e la barra rossa ridisegnata resta sopra.
+Niente `backdrop-filter`: la regola degli effetti ridotti lo spegne.
+**3) IL BATTITO al posto della luce** (chiesto a lavoro in corso): le
+pillole che si spegneranno battono una alla volta da sinistra a destra
+(`scale(1.08)` e ritorno, 0,45 s, partenze a 0 / 0,5 / 1 s) e si fanno
+grigie appena finito il loro battito; per ultima batte quella di chi
+guarda, che resta accesa — pionieri 1, 2, 3; tutti 1, 3, 2 —, fine a
+1,45 s. La barra rossa arriva con la prima grigia: prima c'e' quella
+del pezzo che batte, e due barre sfalsate si vedrebbero. Coi ridotti
+niente battiti, subito lo stato finale. Stato fisso, timbro, `/me` e
+risposta fresca della slide finale non cambiano.
+**PROVATO.** `prove_banner_fee_personale` emendata: i ritagli
+rimisurati sul file (2 px fuori dal contorno a meta' sfumatura, entro 1
+px), il pezzo e' la stessa immagine senza colore suo, il grigio e' un
+filtro e non un velo ne' un backdrop, le grigie giuste nei due stati,
+l'ordine e i tempi dei battiti, e di veli e luce non resta niente; il
+banco node invariato. Tortura 14 su 14. Suite intera severa senza config
+nel worktree da origin/main (bc8679d): verde. Dal vivo via CDP a
+densita' 3, relay morto, leva dello sconto a 0,5 nel banco: giro fino a
+«Fine» col dito, banner fermato a meta' di ogni battito, stato finale e
+ingresso dopo, a 320 e 375 px nei due temi per pioniere e tutti gli
+altri, e coi ridotti; e un controllo SUI PIXEL: il marrone della
+capsula identico fra prima e dopo in nove punti e appena fuori dal bordo
+delle grigie, la banda del bordo grigia, le spente R=G=B, l'accesa
+invariata; nessun errore dell'app. Scatti approvati da Andrea.
+**DA AVERE:** l'occhio sul telefono.
