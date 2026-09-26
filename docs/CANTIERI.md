@@ -33633,3 +33633,129 @@ la beta e con altri numeri). Dal vivo, Chrome headless via CDP a
 densita' 3 su una copia col server di collaudo (relay morto), a 320 e
 375 nei due temi.
 **DA AVERE:** l'occhio sul telefono.
+
+## Il libro subito (26 set 2026)
+
+Ritocco di Andrea: entrando nel P2P compariva il caricamento
+(«Aspetta…») prima di vedere il libro. Adesso il libro compare subito,
+e i relay lavorano dietro le quinte.
+
+**COSA COSTAVA OGGI, e cosa aspettava.** `renderP2P` senza libro
+alzava il velo a tutto schermo dopo 180 ms e chiamava `caricaLibroP2P`:
+il bundle di Nostr (259 KB, `caricaNostrTools`), poi una websocket per
+OGNI relay — quelli del coordinatore e lo specchio —, la REQ e l'EOSE,
+con `Promise.allSettled`: si aspettava il piu' lento, fino a 8 s per
+aprire e 8 per rispondere (`P2P_LIBRO_MS`). Misurato dal vivo (Chrome
+headless, CPU 4×, relay di cartone su 127.0.0.1, tre giri, mediane):
+relay pronti (150 ms per aprire + 150 per rispondere) velo al 200° ms
+e prima card a **0,47 s**; relay lenti (1,5 + 1,5 s) a **3,16 s**; un
+relay che apre e tace **4,6 s** di velo e poi «Nessun ordine aperto»,
+FALSO; relay che non aprono **8,1 s** di velo e l'errore, nessuna card.
+
+**COSA COSTA ADESSO.** Con la copia sul telefono la prima card c'e' a
+**23 ms** dal tocco — lo stesso render — in tutti i casi, relay lenti,
+muti o appesi. Senza copia lo scheletro a 27 ms e la fotografia del
+server a **74 ms**; senza copia e senza fotografia (server appena
+ripartito coi relay giu') lo scheletro, e le card quando risponde il
+primo giro vero (~0,47 s coi relay pronti). Il libro vero arriva dietro
+nei tempi di prima (0,44 s / 3,1 s), senza velo: la riga «aggiorno…»
+se ne va, le card nuove respirano, lo scorrimento resta fermo. Coi
+relay muti la copia resta e a 4,6 s compare l'avviso («…potrebbe non
+essere aggiornato» e ↻ Riprova); appesi, a 8,1 s.
+
+**LE DUE FONTI.** Prima la COPIA del telefono (`barattolo_p2p_libro`,
+localStorage con try/catch): gli eventi GREZZI del libro mostrato
+all'ultima lettura vera piu' il 38385 (`grezziLibroP2P`, al massimo
+300), mai piu' vecchia di un giorno. Se manca, la FOTOGRAFIA del server:
+`GET /api/p2p/libro`, una domanda per sessione, dalla memoria e senza
+relay; aperta come il libro sui relay, i VOLTI solo a chi ha una
+sessione (la regola di `/api/p2p/facce`), no-store, vuota a leva spenta.
+La scrive l'orologio P2P nella sua passata intera, col suo tetto e il
+suo try (`_fotografa_libro_p2p`): a TUTTI i relay, eventi firmati dal
+coordinatore e ridotti ai sette campi. INCREMENTALE: tutto da capo una
+volta l'ora (16 giorni di 38383, la finestra del client), in mezzo solo
+dall'ultimo evento visto meno il margine di sempre — sedici giorni a
+tutti i relay ogni minuto sarebbero megabyte all'ora per niente. Per
+ogni `d` resta l'evento piu' nuovo QUALUNQUE stato, cosi' un relay
+indietro non fa risorgere un annullato; in vetrina i soli pending non
+scaduti. Le due fonti passano da `libroDaEventi`: nessuna seconda
+regola su cosa sia un'offerta.
+⚠️ LA STRADA NON PRESA: la fotografia come libro GIA' LETTO (ordini
+invece di eventi). Avrebbe voluto un secondo lettore sul server, e un
+giorno i due avrebbero detto due cose.
+
+**UNA COPIA NON E' LA PAROLA DEL COORDINATORE**, e porta il segno
+(`copia`: 'telefono' | 'server'). La lettura vera parte al primo render
+qualunque eta' abbia la copia; `offertaVivaP2P` su una copia dice no
+(fail-closed, come senza libro) e l'adozione non ricostruisce righe; un
+evento dall'ascolto non toglie il segno. I GESTI CHE PARLANO COL
+COORDINATORE ASPETTANO in silenzio (`aspettaLibroVeroP2P`): il bottone
+prende un anellino ed e' spento, nessun velo; «Compra/Vendi» nel
+dettaglio riparte a libro vero e riguarda l'ordine; `eseguiPresaP2P` ha
+la stessa cintura; se il libro tace, prendere si ferma col toast «Il
+libro degli ordini non risponde: riprova fra un momento», mentre
+PUBBLICARE va avanti (non ha bisogno del libro, e il coordinatore
+giudica da se').
+
+**ZERO EVENTI NON E' UNA RISPOSTA** (trovato dal giro dal vivo): un relay
+che apre e poi tace non arrivava mai al nostro tetto, perche' il bundle
+chiude la sottoscrizione da se' dopo 4,4 s come se fosse arrivato
+l'EOSE — oggi il libro diventava «Nessun ordine aperto», col libro
+subito avrebbe sostituito una copia buona col niente. Un relay che ha
+il coordinatore ha SEMPRE il suo 38385: chi non da' nemmeno quello, in
+`leggiLibroMostro`, vale come muto.
+
+**NIENTE SCHERMO CHE BLOCCA.** Il velo dell'ingresso e' uscito col suo
+`p2pAttesa`/`chiudiAttesaP2P`. Senza niente da mostrare, tre card
+finte e ferme (`scheletroLibroP2P`), anche al posto di «Nessun ordine
+aperto» quando una copia vuota aspetta i relay. La riga «aggiorno…» e'
+fissa sopra il + tondo della barra (118 px dal fondo: a 84 il + la
+copriva, visto nel primo scatto) e fuori dal flusso, quindi andando via
+non sposta niente. «Riprova» riabbassa anche il freno della rilettura.
+
+**IL TOUR SU FONDO PULITO.** Si apre all'ingresso, senza aspettare il
+libro (la ragione di prima era il velo); chi e' dentro aspetta /me, che
+porta i timbri, e /me lo richiama appena arriva. Il fondo e' pieno,
+`var(--bg)`: della pagina non si vede niente, solo la card — slide
+finale della fee compresa, che resta com'e' nel ritocco b25c94e
+dell'altra sessione (nessuna riga della slide tocca questo cantiere).
+**LO SVELAMENTO** nasce in un posto solo, `chiudiTourP2P`: la card se ne
+va e il fondo si ritira dall'alto verso il basso (`clip-path` da
+`inset(0)` a `inset(100% 0 0 0)`, 0,5 s, `SVELA_TOUR_P2P_MS`), senza
+prendere tocchi; con gli effetti ridotti la classe non si mette (e il
+CSS ha il ripiego gemellato in `html.fx-ridotti`). Negli ingressi
+normali niente svelamento.
+
+**PROVATO.** `prove_libro_subito` (55): la fotografia pura eseguita (il
+piu' nuovo per ordine, l'annullato che un relay indietro non fa
+risorgere, scaduti fuori, tetto e ordine), la rotta eseguita con un
+mondo di cartone (anonimo senza volti, con sessione i volti, leva
+spenta vuota, no-store, nessun relay ne' scrittura), le sentinelle di
+posto e di forma, e due banchi node sulle funzioni VERE: con e senza
+libro salvato, anonimo, fotografia vuota o vecchia, relay che arriva
+prima della fotografia, copia vecchia/rotta/memoria muta, RELAY LENTI
+(la copia resta, il bottone gira e torna, card nuove col respiro, copia
+salvata con i soli eventi giusti), RELAY CHE NON RISPONDONO (prendere si
+ferma, pubblicare no), copia vuota; e il tour: primo accesso (aspetta
+/me), «Salta» che svela e a fine corsa pulisce, ingresso normale senza
+svelamento, «Come funziona» che riapre e con «Inizia» svela, tour che
+riparte a svelamento in corsa, effetti ridotti, anonimo, «I miei
+scambi». Emendate col perche' `prove_tour_p2p` (l'innesco non aspetta
+piu' il libro), `prove_p2p_barattozon` (il velo non torna),
+`prove_p2p_libro` (la rilettura ridisegna ferma), `prove_nav_p2p` (lo
+scheletro), `prove_p2p_avvisi_libro` (tre try nell'orologio),
+`prove_effetti_ridotti` (il terzo ripiego fermo), e il banco di
+`prove_p2p_velo_pubblica` (il mondo nuovo di `inviaNuovoOrdineP2P`).
+Tortura 18 su 18. Suite intera severa nel worktree ribasato su
+b25c94e: 16.309 verdi e 0 rosse, e i 24 collaudi della CI verdi nella gabbia
+senza rete. Dal vivo con Chrome headless via CDP a densita' 3,
+375 px, nei due temi, due server di collaudo (prima = 351baeb, dopo =
+il cantiere) e un relay di CARTONE su 127.0.0.1 con una chiave di prova
+(mai il coordinatore vero): i tempi qui sopra, e gli scatti — copia con
+«aggiorno…», scheletro, bottone che gira e poi il toast senza nessuna
+presa partita, il + aperto senza libro, tour su fondo pieno, i
+fotogrammi dello svelamento, nessuno scorrimento laterale, nessun
+errore in pagina.
+**DA AVERE:** l'occhio sul telefono (lo svelamento e la riga
+«aggiorno…» sopra il +), e i tempi coi relay veri — qui erano di
+cartone per regola.

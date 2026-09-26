@@ -41220,6 +41220,40 @@ async def facce_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
     return {"facce": facce}
 
 
+@app.get("/api/p2p/libro")
+def libro_fotografato_p2p(x_tg_init_data: str = Header(""),
+                          barattolo_sessione: str = Cookie("")):
+    """L'ULTIMO LIBRO NOTO, dalla memoria (26 set 2026, «IL LIBRO
+    SUBITO»): la fotografia che l'orologio scrive ogni minuto — vedi
+    «LA FOTOGRAFIA DEL LIBRO». Nessun relay sotto, nessuna scrittura:
+    e' la rotta con cui il client riempie la pagina mentre la lettura
+    vera parte.
+    APERTA COME IL LIBRO: i 38383 li legge chiunque sui relay, e la
+    vetrina anonima il libro lo guarda gia'. I VOLTI no, per la regola
+    di `/api/p2p/facce`: escono solo a chi ha una sessione, e un
+    raccoglitore anonimo non incrocia niente coi nostri account.
+    Leva spenta = fotografia vuota, `quando` a zero: il client la tratta
+    come «non c'e'». no-store: e' una fotografia, e invecchia."""
+    F = _P2P_FOTO
+    attivo = _p2p_leve()["attivo"]
+    fuori = {"eventi": F["eventi"] if attivo else [],
+             "quando": F["quando"] if attivo else 0}
+    if fuori["eventi"] and utente_se_autenticato(x_tg_init_data,
+                                                 barattolo_sessione):
+        ids = [d for d in (_tag_evento_p2p(e, "d") for e in fuori["eventi"]
+                           if e.get("kind") == 38383)
+               if FORMA_ORDINE_P2P.fullmatch(d)][:MAX_ORDINI_P2P]
+        if ids:
+            con = db()
+            try:
+                fuori["facce"] = _facce_ordini_p2p(con, ids, int(time.time()))
+            except ValueError:
+                pass
+            finally:
+                con.close()
+    return JSONResponse(fuori, headers={"Cache-Control": "no-store"})
+
+
 @app.post("/api/p2p/controparte")
 async def controparte_p2p(req: Request, x_tg_init_data: str = Header(""),
                           barattolo_sessione: str = Cookie("")):
@@ -43379,6 +43413,16 @@ async def orologio_p2p():
             print(f"⚠️ Libro P2P: battito saltato "
                   f"({type(e).__name__}: {e})", flush=True)
         _P2P_BATTITO["vivo"] = time.time()
+        # LA FOTOGRAFIA DEL LIBRO (26 set 2026): nella passata intera, col
+        # suo tetto e il suo try — una fotografia che cade non tocca gli
+        # avvisi, che sono il mestiere dell'orologio
+        if not lampo and not solo_attese:
+            try:
+                await asyncio.wait_for(_fotografa_libro_p2p(), P2P_FOTO_MAX_S)
+            except Exception as e:
+                print(f"⚠️ Fotografia del libro P2P saltata "
+                      f"({type(e).__name__}: {e})", flush=True)
+            _P2P_BATTITO["vivo"] = time.time()
         try:
             await asyncio.wait_for(_giro_attese_p2p(), P2P_PASSATA_MAX_S)
         except asyncio.TimeoutError:
@@ -43632,6 +43676,158 @@ def info_libro_da_relay(relay: str, mostro: str):
         return fuori if fuori is not None else {}
     except Exception:
         return None
+
+
+# ═══ LA FOTOGRAFIA DEL LIBRO (26 set 2026, «IL LIBRO SUBITO») ═══
+# Entrando nel P2P il client aspettava TUTTI i relay prima di mostrare
+# una card. Adesso mostra subito l'ultimo libro noto: la copia che ha
+# sul telefono, o — la prima volta, o dopo un giorno — questa, che il
+# server tiene IN MEMORIA e serve da `/api/p2p/libro` senza toccare un
+# relay. La scrive l'orologio del P2P, nella stessa passata al minuto.
+# NON E' IL LIBRO DEL GIRO: quello chiede ai relay i soli NOSTRI ordini
+# (`#d`), questa tutto quel che il coordinatore ha in vetrina.
+# INCREMENTALE, perche' i sedici giorni di 38383 (la finestra del
+# client: un ordine non vive oltre `max_expiration_days`) sono qualche
+# centinaio di eventi per relay, e chiederli ogni minuto a tutti
+# sarebbero megabyte all'ora per niente: si legge tutto una volta
+# l'ora (e al primo giro), e in mezzo solo dall'ultimo evento visto
+# meno il margine di sempre (P2P_MARGINE_S). Per ogni `d` si tiene
+# l'evento PIU' NUOVO qualunque sia lo stato — un annullato tenuto e'
+# quel che impedisce a una copia vecchia di un relay indietro di far
+# risorgere l'ordine — e in vetrina esce solo chi e' `pending` e non
+# scaduto.
+# EVENTI GREZZI E FIRMATI: la firma si verifica qui come per ogni
+# lettore (`_firmato_dal_coordinatore`), e il client li passa dal suo
+# lettore del libro — nessuna seconda regola su cosa sia un'offerta.
+# Si tengono i soli sette campi di un evento: niente di quel che un
+# relay aggiunge di suo arriva a un telefono.
+P2P_FOTO_FINESTRA_S = 16 * 86400   # la finestra del client (P2P_LIBRO_FINESTRA_S)
+P2P_FOTO_INTERA_S = 3600           # ogni quanto si rilegge tutto da capo
+P2P_FOTO_MAX = 300                 # quante offerte si servono, al massimo
+P2P_FOTO_MAX_S = 60                # il tetto di una fotografia, relay compresi
+_CAMPI_EVENTO = ("id", "pubkey", "created_at", "kind", "tags", "content", "sig")
+_P2P_FOTO = {"ultimi": {}, "info": None, "quando": 0, "intera": 0,
+             "visto": 0, "eventi": []}
+
+
+def libro_intero_da_relay(relay: str, mostro: str, since: int):
+    """Chiede a UN relay il libro del coordinatore da `since` in poi (i
+    38383) e le sue impostazioni (il 38385 piu' recente). SINCRONA, va
+    nel pool del P2P come le sorelle. Torna gli eventi grezzi firmati da
+    lui, ridotti ai sette campi; None = relay muto — anche in collaudo
+    verso un relay che non e' di casa (`lettura_simulata`)."""
+    if not create_connection:
+        return None
+    if lettura_simulata(relay, "della fotografia del libro P2P (38383)"):
+        return None
+    try:
+        ws = create_connection(relay, timeout=5,
+                               sslopt={"cert_reqs": ssl.CERT_NONE})
+        ws.send(json.dumps(["REQ", "foto",
+                            {"kinds": [38383], "authors": [mostro],
+                             "since": int(since)},
+                            {"kinds": [38385], "authors": [mostro],
+                             "limit": 1}]))
+        inizio = time.time()
+        fuori = []
+        while time.time() - inizio < 8:
+            msg = json.loads(ws.recv())
+            if msg[0] == "EVENT" and msg[1] == "foto" and len(msg) > 2:
+                ev = msg[2]
+                if not isinstance(ev, dict) or ev.get("kind") not in (38383, 38385):
+                    continue
+                if not _firmato_dal_coordinatore(ev, mostro):
+                    print(f"⛔ Libro P2P: un evento da {relay} non e' firmato "
+                          "dal coordinatore: fuori dalla fotografia", flush=True)
+                    continue
+                fuori.append({k: ev[k] for k in _CAMPI_EVENTO})
+            elif msg[0] == "EOSE":
+                break
+        ws.close()
+        return fuori
+    except Exception:
+        return None
+
+
+def _tag_evento_p2p(ev: dict, nome: str) -> str:
+    for t in ev.get("tags") or []:
+        if isinstance(t, list) and len(t) > 1 and t[0] == nome:
+            return str(t[1])
+    return ""
+
+
+def _fondi_foto_p2p(ultimi: dict, info, eventi: list, adesso: int):
+    """PURA: porta degli eventi nuovi dentro quel che la fotografia sa
+    gia'. Per ogni `d` resta il 38383 piu' nuovo, qualunque stato; del
+    38385 il piu' recente. Chi e' uscito dalla finestra si dimentica.
+    Torna (ultimi, info), nuovi oggetti."""
+    ultimi = dict(ultimi or {})
+    for ev in eventi or []:
+        quando = int(ev.get("created_at") or 0)
+        if ev.get("kind") == 38385:
+            if info is None or quando > int(info.get("created_at") or 0):
+                info = ev
+            continue
+        d = _tag_evento_p2p(ev, "d")
+        if not d:
+            continue
+        g = ultimi.get(d)
+        if g is None or quando > int(g.get("created_at") or 0):
+            ultimi[d] = ev
+    soglia = adesso - P2P_FOTO_FINESTRA_S
+    ultimi = {d: e for d, e in ultimi.items()
+              if int(e.get("created_at") or 0) >= soglia}
+    return ultimi, info
+
+
+def _vetrina_foto_p2p(ultimi: dict, info, adesso: int) -> list:
+    """PURA: quel che la rotta serve — le offerte vive (`pending` e non
+    scadute: il tag `expires_at` e' la scadenza scritta dal
+    coordinatore), dalla piu' nuova, al massimo P2P_FOTO_MAX, e in coda
+    il 38385."""
+    vivi = []
+    for ev in (ultimi or {}).values():
+        if _tag_evento_p2p(ev, "s") != "pending":
+            continue
+        try:
+            scade = int(float(_tag_evento_p2p(ev, "expires_at") or 0))
+        except ValueError:
+            scade = 0
+        if scade and scade <= adesso:
+            continue
+        vivi.append(ev)
+    vivi.sort(key=lambda e: int(e.get("created_at") or 0), reverse=True)
+    return vivi[:P2P_FOTO_MAX] + ([info] if info else [])
+
+
+async def _fotografa_libro_p2p():
+    """Un giro della fotografia: a TUTTI i relay (quelli del
+    coordinatore e lo specchio, come il giro), e si unisce. Se nessuno
+    risponde la fotografia resta quella di prima, col suo `quando` —
+    il client la giudica per eta'."""
+    leve = _p2p_leve()
+    if not leve["attivo"] or not create_connection:
+        return
+    F = _P2P_FOTO
+    adesso = int(time.time())
+    intera = not F["intera"] or adesso - F["intera"] > P2P_FOTO_INTERA_S
+    since = (adesso - P2P_FOTO_FINESTRA_S if intera
+             else max(0, F["visto"] - P2P_MARGINE_S))
+    relays = list(leve["relay"]) + list(leve["specchio"])
+    risposte = await _chiedi_tutti_p2p(libro_intero_da_relay, relays,
+                                       leve["mostro"], since)
+    if not any(r is not None for _, r in risposte):
+        return
+    eventi = _unisci_p2p(risposte, lambda e: e["id"], {})
+    ultimi, info = _fondi_foto_p2p({} if intera else F["ultimi"],
+                                   None if intera else F["info"],
+                                   eventi, adesso)
+    visto = max([int(e.get("created_at") or 0) for e in ultimi.values()]
+                + [F["visto"] if not intera else 0])
+    F.update(ultimi=ultimi, info=info, quando=adesso, visto=visto,
+             eventi=_vetrina_foto_p2p(ultimi, info, adesso))
+    if intera:
+        F["intera"] = adesso
 
 
 def _avvisi_p2p_accesi(con, tg_id: int) -> bool:

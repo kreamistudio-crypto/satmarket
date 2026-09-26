@@ -50608,11 +50608,11 @@ def prove_tour_p2p():
        mancato, ma e' lo stesso difetto e si sorveglia uguale. E se
        `localStorage` tace il ripiego dev'essere «VISTO», o il tour
        tornerebbe a ogni ingresso proprio a chi non puo' spegnerlo.
-    2) L'INNESCO. Deve stare DOPO `chiudiAttesaP2P`, dentro il ramo
-       «il libro c'e'»: nel ramo dell'attesa il tour comparirebbe
-       sopra l'anello del caricamento, e chiudendolo si troverebbe lo
-       spinner — che e' esattamente quel che Andrea ha chiesto di non
-       fare.
+    2) L'INNESCO. Fino al 26 set 2026 doveva stare DOPO il velo del
+       caricamento, per non aprirsi sopra l'anello; col «LIBRO SUBITO»
+       il velo non c'e' piu' e il verso si rovescia: il tour si apre
+       all'ingresso, su un fondo pieno, PRIMA del ramo senza libro — e
+       chiudendolo si trova la pagina, mai uno spinner.
     3) LO STRATO. Il tour e' un livello del motore di navigazione: se
        `navPila` smettesse di nominarlo, l'indietro di Telegram
        passerebbe OLTRE il tour lasciandolo aperto sopra un'altra
@@ -50850,17 +50850,25 @@ def prove_tour_p2p():
     prova("«Trattami da nuovo» riarma anche il tour del P2P", True,
           "scordaTourP2P();" in _t2)
 
-    # --- 4) L'INNESCO ASPETTA IL LIBRO ------------------------------
+    # --- 4) L'INNESCO NON ASPETTA PIU' IL LIBRO ----------------------
+    # EMENDATA (26 set 2026, «IL LIBRO SUBITO», richiesta di Andrea): le
+    # due righe di ieri volevano l'innesco DOPO il velo e dopo il return
+    # del ramo dell'attesa. Il velo non c'e' piu', e il tour si apre
+    # all'ingresso con il libro che si prepara sotto: stesse due righe,
+    # verso rovesciato.
     _rp = pezzo_js(mini, "function renderP2P(){")
-    prova("l'innesco sta dopo che il velo si e' chiuso", True,
-          0 < _rp.find("chiudiAttesaP2P();")
-          < _rp.find("apriTourP2PSePrimaVolta();"))
-    # ...e sta nel ramo «il libro c'e'», cioe' DOPO il `return`
-    # dell'attesa: nel ramo di sopra comparirebbe sull'anello
-    prova("...e dopo il return del ramo dell'attesa", True,
-          0 < _rp.find(".finally(chiudiAttesaP2P);")
-          < _rp.find("apriTourP2PSePrimaVolta();"))
+    prova("l'innesco sta PRIMA del ramo senza libro: il tour non aspetta", True,
+          0 < _rp.find("apriTourP2PSePrimaVolta();")
+          < _rp.find("if (p2pLibro === null) {"))
+    prova("...e del velo dell'attesa non resta niente", [0, 0],
+          [_rp.count("attesaRitardata("), _rp.count("chiudiAttesaP2P")])
     _a = pezzo_js(mini, "function apriTourP2PSePrimaVolta(){", "\n}\n")
+    # ...ma chi e' dentro aspetta /me, che porta i timbri: aperto prima,
+    # il tour tornerebbe a chi l'ha visto su un altro dispositivo
+    prova("...e chi e' dentro aspetta /me, che lo richiama appena arriva", True,
+          "if (myTgId && !p2pLeve) return;" in _a
+          and "if (typeof apriTourP2PSePrimaVolta === 'function') apriTourP2PSePrimaVolta();"
+          in mini[mini.index("p2pSconto = me.p2p_sconto || null;"):][:600])
     prova("il tour non si apre sopra un altro strato", True,
           "if (tourP2PInCorso || tourInCorso || testModaleInCorso) return;" in _a)
     # LA SEZIONE E' IL LIBRO: renderP2P dipinge anche «I miei scambi»,
@@ -50947,6 +50955,495 @@ def prove_tour_p2p():
     _riv = pezzo_js(mini, "function rivediTourP2P(){", "\n")
     prova("...e riaprire non rimette in gioco nessun timbro", False,
           "removeItem" in _riv)
+
+
+def prove_libro_subito():
+    """IL LIBRO SUBITO (26 set 2026, richiesta di Andrea): entrando nel
+    P2P il libro compare SUBITO — la copia del telefono o la fotografia
+    del server — e i relay lavorano dietro le quinte. Nessun velo che
+    blocca, lo scheletro solo quando non c'e' niente, i gesti verso il
+    coordinatore che aspettano col bottone che gira, e il tour su un
+    fondo pieno che alla fine si ritira dall'alto verso il basso.
+
+    Il server si prova a PEZZI ESEGUITI (la fotografia e' pura, la rotta
+    gira con un mondo di cartone); il client con DUE banchi node sulle
+    funzioni VERE: il libro subito (copia, fotografia, relay lenti,
+    relay muti, gesti che aspettano) e il tour (primo accesso, «Come
+    funziona», svelamento solo dopo il tour e mai con gli effetti
+    ridotti). Le sentinelle di forma tengono il resto: dove vivono i
+    blocchi, la rotta senza relay, il velo che non torna."""
+    print("\n[il libro subito]")
+    import json as _js, shutil, subprocess, tempfile
+    mini = open("miniapp.html", encoding="utf-8").read()
+    srv = _SORGENTE
+    css = mini[mini.index("<style"):mini.index("</style>")]
+
+    # --- 1) LA FOTOGRAFIA DEL SERVER: pura, e si fa girare ---------------
+    amb = {"P2P_FOTO_FINESTRA_S": 16 * 86400, "P2P_FOTO_MAX": 3}
+    for nome in ("_tag_evento_p2p", "_fondi_foto_p2p", "_vetrina_foto_p2p"):
+        exec(pezzo(nome), amb)
+    ora = 2_000_000_000
+
+    def ev(d, s, quando, scade=0, kind=38383):
+        tags = [["d", d], ["s", s], ["k", "sell"], ["f", "EUR"]]
+        if scade:
+            tags.append(["expires_at", str(scade)])
+        return {"id": f"{d}-{s}-{quando}", "kind": kind, "created_at": quando,
+                "tags": tags, "pubkey": "m", "content": "", "sig": "x"}
+    info_v = {"id": "i1", "kind": 38385, "created_at": ora - 500, "tags": []}
+    info_n = {"id": "i2", "kind": 38385, "created_at": ora - 50, "tags": []}
+    ult, info = amb["_fondi_foto_p2p"]({}, None, [
+        ev("a", "pending", ora - 300), ev("a", "pending", ora - 100),
+        ev("b", "pending", ora - 200), ev("b", "canceled", ora - 150),
+        ev("c", "pending", ora - 90, scade=ora - 1),
+        ev("d", "pending", ora - 17 * 86400),
+        info_v, info_n, ev("", "pending", ora - 10)], ora)
+    prova("la fotografia tiene per ogni ordine l'evento PIU' NUOVO", [ora - 100, ora - 150],
+          [ult["a"]["created_at"], ult["b"]["created_at"]])
+    prova("...del 38385 il piu' recente, e fuori chi e' uscito dalla finestra o non ha `d`",
+          ["i2", False, False], [info["id"], "d" in ult, "" in ult])
+    # UN RELAY INDIETRO NON FA RISORGERE: il pending vecchio di `b`
+    # arriva DOPO l'annullato, in un giro incrementale
+    ult2, _i = amb["_fondi_foto_p2p"](ult, info, [ev("b", "pending", ora - 200)], ora)
+    prova("...e un pending vecchio arrivato dopo non fa risorgere l'annullato", "canceled",
+          [t[1] for t in ult2["b"]["tags"] if t[0] == "s"][0])
+    vetr = amb["_vetrina_foto_p2p"](ult, info, ora)
+    prova("in vetrina solo i vivi — pending e non scaduti — e il 38385 in coda",
+          ["a-pending-" + str(ora - 100), "i2"], [e["id"] for e in vetr])
+    molti = {str(i): ev(str(i), "pending", ora - i) for i in range(1, 7)}
+    prova("...dal piu' nuovo, al massimo P2P_FOTO_MAX", ["1", "2", "3"],
+          [e["tags"][0][1] for e in amb["_vetrina_foto_p2p"](molti, None, ora)])
+    # la LETTURA: firmata, ridotta ai sette campi, e in collaudo muta
+    _l = pezzo("libro_intero_da_relay")
+    prova("il lettore del libro intero verifica la firma, taglia i campi, e in collaudo tace",
+          [True, True, True], ["_firmato_dal_coordinatore(ev, mostro)" in _l,
+                               "{k: ev[k] for k in _CAMPI_EVENTO}" in _l,
+                               'lettura_simulata(relay, "della fotografia' in _l])
+    _f = pezzo("_fotografa_libro_p2p")
+    prova("...chiede a tutti i relay, e rilegge tutto solo una volta l'ora",
+          [True, True, True],
+          ["_chiedi_tutti_p2p(libro_intero_da_relay" in _f,
+           "P2P_FOTO_INTERA_S" in _f, "F[\"visto\"] - P2P_MARGINE_S" in _f])
+    prova("...e se nessuno risponde la fotografia resta quella di prima", True,
+          "if not any(r is not None for _, r in risposte):\n        return" in _f)
+    _o = pezzo("orologio_p2p")
+    prova("la fotografia gira nella passata intera dell'orologio, col suo tetto e il suo try",
+          True, "if not lampo and not solo_attese:" in _o
+          and "await asyncio.wait_for(_fotografa_libro_p2p(), P2P_FOTO_MAX_S)" in _o)
+
+    # --- 2) LA ROTTA: leggera, aperta, i volti solo con la sessione -------
+    _r = pezzo("libro_fotografato_p2p")
+    prova("la rotta c'e', in GET", True, '@app.get("/api/p2p/libro")' in srv)
+    prova("...e non tocca un relay ne' scrive", [0, 0, 0, 0],
+          [codice(_r).count(x) for x in ("create_connection", "_chiedi_", "INSERT", "UPDATE")])
+    class _Risp:
+        def __init__(self, contenuto, headers=None):
+            self.contenuto, self.headers = contenuto, headers or {}
+    class _Con:
+        def close(self):
+            pass
+    import re as _re
+    FOTO = {"eventi": [ev("abcdef12", "pending", ora), info_n], "quando": ora}
+    mondo = {"_P2P_FOTO": FOTO, "JSONResponse": _Risp, "Header": lambda d="": d,
+             "Cookie": lambda d="": d, "db": lambda: _Con(), "time": __import__("time"),
+             "FORMA_ORDINE_P2P": _re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
+             "MAX_ORDINI_P2P": 200, "_tag_evento_p2p": amb["_tag_evento_p2p"]}
+    chieste = []
+    mondo["_facce_ordini_p2p"] = lambda con, ids, adesso: (
+        chieste.append(list(ids)) or {i: {"nome": "Ada"} for i in ids})
+    exec(_r[_r.index("def "):], mondo)
+    def chiama(attivo, chi):
+        mondo["_p2p_leve"] = lambda: {"attivo": attivo}
+        mondo["utente_se_autenticato"] = lambda i, s: ({"id": 111} if chi else None)
+        return mondo["libro_fotografato_p2p"]("collaudo:111:A" if chi else "", "")
+    anon, dentro, spenta = chiama(True, False), chiama(True, True), chiama(False, True)
+    prova("all'anonimo la fotografia senza volti, e no-store", [2, False, "no-store"],
+          [len(anon.contenuto["eventi"]), "facce" in anon.contenuto,
+           anon.headers.get("Cache-Control")])
+    prova("...a chi ha una sessione anche i volti, chiesti per i soli ordini",
+          [{"abcdef12": {"nome": "Ada"}}, ["abcdef12"]],
+          [dentro.contenuto.get("facce"), chieste[-1]])
+    prova("...e a leva spenta una fotografia vuota, `quando` a zero", [[], 0],
+          [spenta.contenuto["eventi"], spenta.contenuto["quando"]])
+
+    # --- 3) IL CLIENT: dove vivono le cose, e il velo che non torna -------
+    i_bl = mini.index("/* ============ IL LIBRO SUBITO (26 set 2026")
+    f_bl = mini.index("/* ============ fine del libro subito ============ */")
+    blocco = mini[i_bl:f_bl]
+    prova("il blocco sta DOPO il motore e prima dei volti (li' la fetch e' di casa)", True,
+          mini.index("/* ============ fine del motore dello scambio") < i_bl
+          < mini.index("/* ============ I VOLTI SUL LIBRO"))
+    _rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
+    prova("renderP2P prende la copia prima del ramo senza libro", True,
+          0 < _rp.find("apriLibroSubitoP2P();") < _rp.find("if (p2pLibro === null) {"))
+    prova("...e la copia si rilegge subito, qualunque eta' abbia", True,
+          "(p2pLibro.copia || adesso - (p2pLibro.quando || 0) > P2P_LIBRO_FRESCO_MS)" in _rp)
+    prova("...e una copia vuota non dice «Nessun ordine aperto» mentre si legge", True,
+          "const vuotoInAttesa = !!p2pLibro.copia && !p2pErrore && !vivi.length" in _rp
+          and ": vuotoInAttesa ? scheletroLibroP2P()" in _rp)
+    prova("la riga «aggiorno…» e' fissa, fuori dal flusso, e se ne va a relay risposti",
+          [True, True], ["position:fixed" in pezzo_js(css, ".p2p-aggiorno{", "}"),
+                         "aggiorno.hidden = !!p2pErrore || !(p2pLibro === null || p2pLibro.copia);" in _rp])
+    prova("il libro vero diventa la copia della prossima visita", True,
+          "if (typeof dopoLibroVeroP2P === 'function') dopoLibroVeroP2P(eventi, prima);"
+          in pezzo_js(mini, "function caricaLibroP2P(forza){", "\n}\n"))
+    prova("una copia non giudica un'offerta viva e non adotta righe", [True, True],
+          ["if (p2pLibro.copia) return false;" in pezzo_js(mini, "function offertaVivaP2P(o){", "\n}\n"),
+           "(p2pLibro && !p2pLibro.copia && p2pLibro.ordini) || []"
+           in pezzo_js(mini, "function adottaOrdiniAltroveP2P(locali){", "\n}\n")])
+    _lm = pezzo_js(mini, "async function leggiLibroMostro(){", "\n}\n")
+    prova("un relay che da' ZERO eventi, nemmeno il 38385, non vale come risposta", True,
+          "if (e.status === 'fulfilled' && e.value.length) {" in _lm
+          and "} else if (e.status === 'fulfilled') {\n      fonti.push({url, n: 0, ok: false});" in _lm)
+    prova("...e l'ascolto non le toglie il segno", True,
+          "p2pLibro = Object.assign({}, p2pLibro, {ordini:" in pezzo_js(mini, "function arrivaLibroP2P(ev){", "\n}\n"))
+    prova("i gesti che parlano col coordinatore aspettano il libro vero", [True, True, True],
+          ["aspettaLibroVeroP2P(el('p2pDettVai'))" in pezzo_js(mini, "function confermaDettaglioP2P(){", "\n}\n"),
+           "!(await aspettaLibroVeroP2P(null))" in pezzo_js(mini, "async function eseguiPresaP2P(id, scelto, metodo){", "\n}\n"),
+           "await aspettaLibroVeroP2P(el('p2pNuovoInvia'), true);" in pezzo_js(mini, "async function inviaNuovoOrdineP2P(confermato){", "\n}\n")])
+    prova("il tour sta su un fondo pieno", True,
+          "background:var(--bg)}" in pezzo_js(css, "#tourP2P{", "}") + "}")
+    _cc = pezzo_js(mini, "function chiudiTourP2P(){", "\n}\n")
+    prova("lo svelamento nasce in UN posto solo, alla chiusura del tour, mai coi ridotti",
+          [1, True], [mini.count("classList.add('svela')"),
+                      "if (!tourRidotto()) {\n    el('tourP2P').classList.add('svela');" in _cc])
+    _d = _re.search(r"animation:tourP2PSvela \.(\d)s", css)
+    prova("...e dura mezzo secondo, la stessa cifra del CSS e del JS", [True, 500],
+          [bool(_d) and int(_d.group(1)) * 100 == 500,
+           int(_re.search(r"const SVELA_TOUR_P2P_MS = (\d+);", mini).group(1))])
+    prova("...dall'alto verso il basso: il fondo si ritira dal bordo di sopra", True,
+          "@keyframes tourP2PSvela{from{clip-path:inset(0 0 0 0)}to{clip-path:inset(100% 0 0 0)}}" in css)
+
+    node = shutil.which("node")
+    if not node:
+        salta("i due banchi del libro subito girano in node", "node non c'e'")
+        return
+
+    # --- 4) IL BANCO DEL LIBRO SUBITO: le funzioni vere --------------------
+    # Il lettore del libro (`libroDaEventi`) qui e' di cartone, e dichiarato:
+    # i suoi casi girano in prove_p2p_libro, e qui si prova la STRADA —
+    # quale fonte vince, quando, e cosa resta in mano a chi guarda.
+    pezzi = (mini[mini.index("function tagValore(ev, nome){"):
+                  mini.index("function tagValori(ev, nome){")]
+             + pezzo_js(mini, "function caricaLibroP2P(forza){", "\n}\n") + "\n}\n"
+             + blocco)
+    banco = r"""
+const MEM = {}; let MEMORIA_MUTA = false;
+const localStorage = {
+  getItem: k => { if (MEMORIA_MUTA) throw new Error('muta'); return k in MEM ? MEM[k] : null; },
+  setItem: (k, v) => { if (MEMORIA_MUTA) throw new Error('muta'); MEM[k] = String(v); }};
+const DEMO = false; let VETRINA = false, myTgId = 111; const API_BASE = '/api';
+function authHdr(){ return 'collaudo:111:A'; }
+let p2pInfo = null, p2pLibro = null, p2pErrore = '', p2pParziale = false,
+    p2pLettura = null, p2pGiro = 0, p2pFacce = {}, p2pFacceChieste = new Set(),
+    p2pCardNuove = {}, render = 0, toasts = [];
+function renderP2P(){ render++; }
+function toast(t){ toasts.push(t); }
+function lapidataP2P(){ return false; }
+const VISTE_NAV_P2P = new Set(['p2p']);
+function vistaAttivaP2P(){ return 'view-p2p'; }
+function ascoltaLibroP2P(){}
+/* il lettore di cartone: per ogni `d` il piu' nuovo, i pending sono
+   ordini (in ordine di id, per il confronto), il 38385 e' l'info */
+function libroDaEventi(eventi){
+  const ultimi = {}; let info = null;
+  for (const e of eventi) {
+    if (e.kind === 38385) { info = {quando: e.created_at}; continue; }
+    const d = tagValore(e, 'd');
+    if (!ultimi[d] || e.created_at > ultimi[d].created_at) ultimi[d] = e;
+  }
+  const ordini = Object.keys(ultimi).sort()
+    .filter(d => tagValore(ultimi[d], 's') === 'pending')
+    .map(d => ({id: d, creato: ultimi[d].created_at}));
+  return {ordini, info};
+}
+let RELAY = 'subito', LIBRO_RELAY = [];
+async function leggiLibroMostro(){
+  await new Promise(r => setTimeout(r, RELAY === 'lenti' ? 60 : 5));
+  if (RELAY === 'muti') throw new Error('nessuna risposta');
+  return {eventi: LIBRO_RELAY, completo: true};
+}
+let FOTO = null, DOMANDE = [];
+global.fetch = async (url, opt) => {
+  DOMANDE.push({url, h: (opt && opt.headers || {})['X-Tg-Init-Data'] || ''});
+  if (FOTO === 'muto') throw new Error('rete');
+  return {ok: true, json: async () => FOTO};
+};
+function bottone(){ return {innerHTML: 'Compra', disabled: false,
+  attr: {}, setAttribute(k, v){ this.attr[k] = v; }, removeAttribute(k){ delete this.attr[k]; }}; }
+const el = id => null;
+__PEZZI__
+const ora = Math.floor(Date.now() / 1000);
+const e38383 = (d, s, q) => ({id: d + s + q, kind: 38383, created_at: q, tags: [['d', d], ['s', s]]});
+const e38385 = q => ({id: 'info' + q, kind: 38385, created_at: q, tags: []});
+function azzera(){
+  for (const k in MEM) delete MEM[k];
+  MEMORIA_MUTA = false; VETRINA = false; myTgId = 111;
+  p2pInfo = null; p2pLibro = null; p2pErrore = ''; p2pLettura = null;
+  p2pFacce = {}; p2pFacceChieste = new Set(); p2pCardNuove = {};
+  p2pFotoChiesta = false; render = 0; toasts = []; FOTO = null; DOMANDE = [];
+  RELAY = 'subito'; LIBRO_RELAY = [];
+}
+function salvaCopia(eventi, eta){
+  MEM[P2P_COPIA_CHIAVE] = JSON.stringify({quando: Date.now() - (eta || 0), eventi});
+}
+const dorme = ms => new Promise(r => setTimeout(r, ms));
+const out = {};
+(async () => {
+  /* 1) CON IL LIBRO SALVATO: sincrono, niente domande al server */
+  azzera();
+  salvaCopia([e38383('aa', 'pending', ora - 50), e38385(ora - 60)], 30000);
+  out.salvato = {subito: apriLibroSubitoP2P(), copia: p2pLibro && p2pLibro.copia,
+                 ordini: p2pLibro && p2pLibro.ordini.map(o => o.id),
+                 info: !!p2pInfo, domande: DOMANDE.length};
+  /* 2) SENZA LIBRO SALVATO: la fotografia del server, coi volti */
+  azzera();
+  FOTO = {eventi: [e38383('bb', 'pending', ora - 20), e38385(ora - 30)], quando: ora - 40,
+          facce: {bb: {nome: 'Bea'}}};
+  const primo = apriLibroSubitoP2P();
+  const vuoto = p2pLibro === null;
+  apriLibroSubitoP2P();                       // un secondo render: nessuna seconda domanda
+  await dorme(10);
+  out.senza = {subito: primo, vuotoPrima: vuoto, copia: p2pLibro && p2pLibro.copia,
+               ordini: p2pLibro && p2pLibro.ordini.map(o => o.id), volto: p2pFacce.bb,
+               chiesto: p2pFacceChieste.has('bb'), domande: DOMANDE.map(d => d.url),
+               conSessione: DOMANDE[0] && DOMANDE[0].h, render};
+  /* ...l'anonimo la chiede senza sessione */
+  azzera(); myTgId = 0; FOTO = {eventi: [], quando: 0};
+  apriLibroSubitoP2P(); await dorme(10);
+  out.anonimo = {h: DOMANDE[0] && DOMANDE[0].h, libro: p2pLibro};
+  /* ...una fotografia vuota o vecchia di un giorno non fa un libro */
+  azzera(); FOTO = {eventi: [e38383('cc', 'pending', ora)], quando: ora - 90000};
+  apriLibroSubitoP2P(); await dorme(10);
+  out.fotoVecchia = p2pLibro;
+  /* ...e se il relay arriva prima della fotografia, la fotografia si butta */
+  azzera(); FOTO = {eventi: [e38383('dd', 'pending', ora)], quando: ora, facce: {dd: {nome: 'Dan'}}};
+  p2pLibro = {ordini: [{id: 'vero'}], quando: Date.now()};
+  await chiediFotoLibroP2P();
+  out.relayPrima = {ordini: p2pLibro.ordini.map(o => o.id), copia: !!p2pLibro.copia,
+                    volto: p2pFacce.dd};
+  /* 3) COPIA VECCHIA, ROTTA, MEMORIA MUTA: «non c'e'», mai un'eccezione */
+  azzera(); salvaCopia([e38383('ee', 'pending', ora)], 25 * 3600 * 1000);
+  out.copiaVecchia = leggiCopiaLibroP2P();
+  azzera(); MEM[P2P_COPIA_CHIAVE] = '{rotto';
+  out.copiaRotta = leggiCopiaLibroP2P();
+  azzera(); MEMORIA_MUTA = true; FOTO = {eventi: [], quando: 0};
+  let alzata = '';
+  try { out.muta = apriLibroSubitoP2P(); salvaCopiaLibroP2P([]); } catch(e) { alzata = String(e); }
+  out.mutaAlzata = alzata;
+  /* 4) RELAY LENTI: la copia resta in pagina, il gesto aspetta girando */
+  azzera();
+  salvaCopia([e38383('aa', 'pending', ora - 50), e38383('bb', 'pending', ora - 40)], 5000);
+  apriLibroSubitoP2P();
+  RELAY = 'lenti';
+  LIBRO_RELAY = [e38383('aa', 'pending', ora - 50), e38383('bb', 'canceled', ora - 10),
+                 e38383('bb', 'pending', ora - 40), e38383('nn', 'pending', ora - 5),
+                 e38385(ora - 60)];
+  const b = bottone();
+  const attesa = aspettaLibroVeroP2P(b);
+  await dorme(20);
+  out.lentiDurante = {copia: p2pLibro.copia, spento: b.disabled, gira: b.innerHTML.indexOf('p2p-btn-giro') >= 0,
+                      occupato: b.attr['aria-busy'] || ''};
+  const esito = await attesa;
+  const salvata = JSON.parse(MEM[P2P_COPIA_CHIAVE]);
+  out.lentiDopo = {esito, copia: !!p2pLibro.copia, ordini: p2pLibro.ordini.map(o => o.id),
+                   bottone: [b.innerHTML, b.disabled, 'aria-busy' in b.attr],
+                   nuove: Object.keys(p2pCardNuove).sort(),
+                   salvati: salvata.eventi.map(e => e.id.replace(/\d+$/, '')).sort(),
+                   toasts: toasts.length};
+  /* ...a libro vero in mano il gesto non aspetta niente */
+  const b2 = bottone();
+  out.giaVero = {esito: await aspettaLibroVeroP2P(b2), toccato: b2.innerHTML !== 'Compra'};
+  /* 5) RELAY CHE NON RISPONDONO: la copia resta, il prendere si ferma e
+        lo dice, il pubblicare va avanti */
+  azzera();
+  salvaCopia([e38383('aa', 'pending', ora - 50)], 5000);
+  apriLibroSubitoP2P(); RELAY = 'muti';
+  const b3 = bottone();
+  const prendere = await aspettaLibroVeroP2P(b3);
+  const pubblicare = await aspettaLibroVeroP2P(bottone(), true);
+  out.muti = {prendere, pubblicare, copia: p2pLibro && p2pLibro.copia, errore: p2pErrore,
+              toasts: toasts.slice(), bottone: [b3.innerHTML, b3.disabled]};
+  /* 6) UNA COPIA VUOTA: al libro vero nessuna card si veste «nuova» */
+  azzera(); salvaCopia([e38385(ora - 60)], 5000);
+  apriLibroSubitoP2P();
+  LIBRO_RELAY = [e38383('xx', 'pending', ora)];
+  await caricaLibroP2P();
+  out.copiaVuota = {nuove: Object.keys(p2pCardNuove), copia: !!p2pLibro.copia};
+  out.scheletro = scheletroLibroP2P();
+  process.stdout.write(JSON.stringify(out));
+})().catch(e => { process.stderr.write(String(e && e.stack || e)); process.exit(1); });
+"""
+    d = tempfile.mkdtemp()
+    try:
+        f = os.path.join(d, "subito.js")
+        with open(f, "w", encoding="utf-8") as fh:
+            fh.write(banco.replace("__PEZZI__", pezzi))
+        r = subprocess.run([node, f], capture_output=True, encoding="utf-8", timeout=60)
+        prova("il banco del libro subito gira in node", "", (r.stderr or "")[-700:])
+        o = _js.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else None
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    if o:
+        s = o["salvato"]
+        prova("CON IL LIBRO SALVATO: in pagina nello stesso render, col segno, senza domande",
+              [True, "telefono", ["aa"], True, 0],
+              [s["subito"], s["copia"], s["ordini"], s["info"], s["domande"]])
+        s = o["senza"]
+        prova("SENZA LIBRO SALVATO: niente in pagina subito (lo scheletro), una domanda sola al server",
+              [False, True, ["/api/p2p/libro"]], [s["subito"], s["vuotoPrima"], s["domande"]])
+        prova("...e la fotografia arriva col suo segno, i volti, e un ridisegno",
+              ["server", ["bb"], {"nome": "Bea"}, True, "collaudo:111:A", 1],
+              [s["copia"], s["ordini"], s["volto"], s["chiesto"], s["conSessione"], s["render"]])
+        prova("...l'anonimo la chiede senza sessione, e una fotografia vuota non fa un libro",
+              ["", None], [o["anonimo"]["h"], o["anonimo"]["libro"]])
+        prova("...ne' una vecchia di un giorno", None, o["fotoVecchia"])
+        prova("...e se un relay ha gia' risposto la fotografia si butta, i volti no",
+              [["vero"], False, {"nome": "Dan"}],
+              [o["relayPrima"]["ordini"], o["relayPrima"]["copia"], o["relayPrima"]["volto"]])
+        prova("una copia vecchia di un giorno, rotta, o una memoria muta valgono «non c'e'»",
+              [None, None, False, ""],
+              [o["copiaVecchia"], o["copiaRotta"], o["muta"], o["mutaAlzata"]])
+        s = o["lentiDurante"]
+        prova("RELAY LENTI: la copia resta in pagina e il bottone del gesto gira, spento",
+              ["telefono", True, True, "true"], [s["copia"], s["spento"], s["gira"], s["occupato"]])
+        s = o["lentiDopo"]
+        prova("...a risposta arrivata il libro e' quello vero, e il bottone torna com'era",
+              [True, False, ["aa", "nn"], ["Compra", False, False], 0],
+              [s["esito"], s["copia"], s["ordini"], s["bottone"], s["toasts"]])
+        prova("...la card che la copia non aveva si veste «nuova», le altre no", ["nn"], s["nuove"])
+        prova("...e la copia della prossima visita tiene i soli eventi del libro mostrato, piu' il 38385",
+              ["aapending", "info", "nnpending"], s["salvati"])
+        prova("...a libro vero gia' in mano il gesto non aspetta e non tocca il bottone",
+              [True, False], [o["giaVero"]["esito"], o["giaVero"]["toccato"]])
+        s = o["muti"]
+        prova("RELAY CHE NON RISPONDONO: la copia resta e l'errore si sa",
+              ["telefono", "nessuna risposta"], [s["copia"], s["errore"]])
+        prova("...prendere si ferma e lo dice con le parole di casa, pubblicare va avanti",
+              [False, True, ["Il libro degli ordini non risponde: riprova fra un momento"]],
+              [s["prendere"], s["pubblicare"], s["toasts"]])
+        prova("...e il bottone torna com'era anche qui", ["Compra", False], s["bottone"])
+        prova("una copia VUOTA: al libro vero nessuna card si veste «nuova»", [[], False],
+              [o["copiaVuota"]["nuove"], o["copiaVuota"]["copia"]])
+        prova("lo scheletro: tre card finte, mute per chi legge con la voce", [3, True],
+              [o["scheletro"].count('class="p2p-ord p2p-finta"'),
+               'aria-hidden="true"' in o["scheletro"]])
+
+    # --- 5) IL BANCO DEL TOUR: primo accesso, «Come funziona», svelamento --
+    blocco_t = mini[mini.index("const TOUR_P2P_CHIAVE = "):
+                    mini.index("/* ============ IL MOTORE DELLO SCAMBIO")]
+    giudici = re.search(r"const LIVELLO_SCONTO_P2P = \d+;", mini).group(0) + "\n"
+    for _f in ("function commissioneVivaP2P(){", "function commissioneListinoP2P(){",
+               "function scontoFedeltaTestoP2P(punti){", "function mezzaCommissioneP2P(fee){",
+               "function articoloPercentoP2P(testo){"):
+        giudici += pezzo_js(mini, _f, "\n}\n") + "\n}\n"
+    banco_t = r"""
+const esc = s => String(s ?? '');
+function fintoEl(id){
+  const cl = new Set();
+  return {id, style: {}, innerHTML: '', textContent: '', offsetHeight: 300,
+    clientWidth: 340, scrollLeft: 0, children: [], disabled: false,
+    classList: {add: (...c) => c.forEach(x => cl.add(x)),
+                remove: (...c) => c.forEach(x => cl.delete(x)),
+                contains: c => cl.has(c),
+                toggle: (c, v) => (v ? cl.add(c) : cl.delete(c))},
+    scrollTo(o){ this.scrollLeft = o.left; },
+    addEventListener(){}, removeEventListener(){}};
+}
+const ELEM = {};
+const el = id => (ELEM[id] = ELEM[id] || fintoEl(id));
+let VISTA = 'view-p2p';
+const document = {querySelector: () => ({id: VISTA}),
+                  addEventListener(){}, removeEventListener(){}};
+const MEM = {};
+const localStorage = {getItem: k => (k in MEM ? MEM[k] : null),
+  setItem: (k, v) => { MEM[k] = String(v); }, removeItem: k => { delete MEM[k]; }};
+let vistiMem = {};
+function ricordaVisto(id, q){ vistiMem[id] = q; }
+let myTgId = 111;
+const DEMO = false, VETRINA = false, API_BASE = '/api';
+function authHdr(){ return ''; }
+function chiaveP2P(k){ return k + ':' + myTgId; }
+function haptic(){}
+let RIDOTTI = false;
+function tourRidotto(){ return RIDOTTI; }
+function go(){}
+function navIndietro(){ chiudiTourP2P(); }
+const tourInCorso = false, testModaleInCorso = false;
+const P2P_VESTE_METODI = {}, P2P_TABACCHINO = 'x';
+let p2pInfo = {fee: 0.03}, p2pSconto = null, p2pLeve = null;
+const p2pCoord = () => p2pLeve;
+global.fetch = () => new Promise(() => {});
+""" + giudici + "\n" + blocco_t + r"""
+const dorme = ms => new Promise(ok => setTimeout(ok, ms));
+const t = () => ({aperto: tourP2PInCorso, svela: el('tourP2P').classList.contains('svela'),
+                  open: el('tourP2P').classList.contains('open')});
+function azzera(){
+  if (tourP2PInCorso) chiudiTourP2P();
+  clearTimeout(tourP2PSvelaTimer); el('tourP2P').classList.remove('svela');
+  for (const k in MEM) delete MEM[k];
+  vistiMem = {}; myTgId = 111; p2pLeve = {mostro: 'm'}; RIDOTTI = false; VISTA = 'view-p2p';
+}
+const out = {};
+(async () => {
+  /* PRIMO ACCESSO: /me non ancora arrivato -> aspetta; arrivato -> si apre */
+  azzera(); p2pLeve = null;
+  apriTourP2PSePrimaVolta(); out.primaDiMe = t();
+  p2pLeve = {mostro: 'm'};
+  apriTourP2PSePrimaVolta(); out.primoAccesso = t();
+  /* «Salta»: lo svelamento parte, e mezzo secondo dopo se n'e' andato */
+  chiudiTourP2P(); out.salta = t();
+  await dorme(SVELA_TOUR_P2P_MS - 150); out.aMeta = t();
+  await dorme(260); out.dopo = t();
+  /* INGRESSO NORMALE, tour gia' visto: niente tour, niente svelamento */
+  apriTourP2PSePrimaVolta(); out.normale = t();
+  /* «COME FUNZIONA»: si riapre anche a chi l'ha visto, e alla fine svela */
+  rivediTourP2P(); out.comeFunziona = t();
+  for (let i = 0; i < TAPPE_TOUR_P2P.length - 1; i++) avantiTourP2P();
+  avantiTourP2P();                     /* alla finale */
+  out.finale = el('tourP2P').classList.contains('finale');
+  el('tourP2PVia').disabled = false; avantiTourP2P();   /* «Inizia» */
+  out.inizia = t();
+  /* ...e un tour che riparte a svelamento in corsa torna pieno */
+  rivediTourP2P(); out.riaperto = t();
+  /* EFFETTI RIDOTTI: compare e basta */
+  azzera(); RIDOTTI = true; rivediTourP2P(); chiudiTourP2P(); out.ridotti = t();
+  /* chi e' anonimo (niente /me da aspettare) lo vede al primo accesso */
+  azzera(); myTgId = 0; p2pLeve = null; apriTourP2PSePrimaVolta(); out.anonimo = t();
+  /* e fuori dal libro non si apre da solo */
+  azzera(); VISTA = 'view-p2pmiei'; apriTourP2PSePrimaVolta(); out.miei = t();
+  process.stdout.write(JSON.stringify(out));
+  process.exit(0);
+})().catch(e => { process.stderr.write(String(e && e.stack || e)); process.exit(1); });
+"""
+    d = tempfile.mkdtemp()
+    try:
+        f = os.path.join(d, "tour.js")
+        with open(f, "w", encoding="utf-8") as fh:
+            fh.write(banco_t)
+        r = subprocess.run([node, f], capture_output=True, encoding="utf-8", timeout=60)
+        prova("il banco del tour su fondo pieno gira in node", "", (r.stderr or "")[-700:])
+        o = _js.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else None
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    if o:
+        chiuso = {"aperto": False, "svela": False, "open": False}
+        prova("TUTORIAL AL PRIMO ACCESSO: chi e' dentro aspetta /me, poi il tour si apre",
+              [chiuso, {"aperto": True, "svela": False, "open": True}],
+              [o["primaDiMe"], o["primoAccesso"]])
+        prova("SVELAMENTO SOLO DOPO IL TUTORIAL: «Salta» lo fa partire, e a fine corsa se ne va",
+              [{"aperto": False, "svela": True, "open": False}, True, chiuso],
+              [o["salta"], o["aMeta"]["svela"], o["dopo"]])
+        prova("...e un ingresso normale non apre il tour e non svela niente", chiuso, o["normale"])
+        prova("TUTORIAL DA «COME FUNZIONA»: si riapre anche a chi l'ha visto", True,
+              o["comeFunziona"]["aperto"])
+        prova("...e finito con «Inizia» svela anche lui", [True, True, False],
+              [o["finale"], o["inizia"]["svela"], o["inizia"]["aperto"]])
+        prova("...un tour che riparte a svelamento in corsa torna pieno",
+              {"aperto": True, "svela": False, "open": True}, o["riaperto"])
+        prova("con gli EFFETTI RIDOTTI la pagina compare e basta", chiuso, o["ridotti"])
+        prova("l'anonimo non ha /me da aspettare, e fuori dal libro il tour non parte da solo",
+              [True, False], [o["anonimo"]["aperto"], o["miei"]["aperto"]])
 
 
 def prove_tour_p2p_finale():
@@ -53587,9 +54084,14 @@ console.log(JSON.stringify(out));
     # il ramo stantio si guarda DA VICINO: rilegge diretto (mai via
     # ricaricaP2P, che azzererebbe il libro e farebbe il lampo di
     # «Leggo il libro…» sotto le dita di chi guarda)
-    _st = _rp2[_rp2.index("P2P_LIBRO_FRESCO_MS && !p2pLettura"):][:220]
+    # EMENDATA (26 set 2026, «IL LIBRO SUBITO»): la rilettura ridisegna
+    # FERMA — lo scorrimento tenuto, le card nuove col loro respiro —
+    # perche' da oggi rilegge anche la copia appena mostrata, e li' il
+    # libro sotto le dita cambia davvero. La finestra si allarga per
+    # questo: le righe fra il freno e il ridisegno sono tre in piu'.
+    _st = _rp2[_rp2.index("P2P_LIBRO_FRESCO_MS && !p2pLettura"):][:360]
     prova("...senza buttare quel che si vede", True,
-          "caricaLibroP2P().then(renderP2P" in _st
+          "caricaLibroP2P().then(" in _st and "ridisegnaLibroFermoP2P();" in _st
           and "p2pLibro = null" not in _st and "ricaricaP2P" not in _st)
     prova("...e «Riprova» del ramo rotto resta", True,
           'ricaricaP2P()">↻ Riprova' in _rp2)
@@ -55639,8 +56141,12 @@ def prove_nav_p2p():
     # l'attesa sta in tutt'e due; quando ha risposto di no, la striscia
     # si disegna lo stesso con le righe che il server sa — chi ha uno
     # scambio a meta' coi relay giu' deve poterlo vedere
+    # EMENDATA (26 set 2026, «IL LIBRO SUBITO»): nel LIBRO, senza niente
+    # da mostrare, al posto dell'attesa vuota (che il velo copriva) c'e'
+    # lo scheletro delle card; la striscia resta com'era
     prova("...e prima del libro l'attesa sta in TUTT'E DUE, salvo un libro che ha detto di no",
-          True, "box.innerHTML = attesa;" in rp
+          True, "box.innerHTML = attesa || (typeof scheletroLibroP2P === 'function'"
+                " ? scheletroLibroP2P() : '');" in rp
           and "if (mieiBox) mieiBox.innerHTML = (p2pErrore && scambiP2P()) || attesa;" in rp
           and "intestaScambiP2P(p2pErrore ? mieiRigheP2P() : null);" in rp)
     # IL LIBRO E' SOLO IL LIBRO: via la striscia e via il bottone —
@@ -66235,6 +66741,11 @@ function nomeProvvisorioP2P(i){ return 'provvisorio-' + i; }
 async function registraChiaviP2P(){} async function mostroRiascolta(){}
 function messaggioMostro(){ return {}; } function nuovaRichiestaP2P(){ return 7; }
 let canale = 0; function annunciaCanaleP2P(){ canale++; }
+/* il libro vero e' gia' in mano (26 set 2026, «IL LIBRO SUBITO»): su
+   una copia il bottone aspetterebbe la lettura, che qui non c'entra */
+let p2pLibro = {ordini: [], quando: Date.now()};
+const p2pAcceso = () => true;
+async function aspettaLibroVeroP2P(){ return true; }
 let MODO = 'ok', veloDuranteLaChiamata = null;
 async function mostroChiama(){
   /* il velo dev'essere SU mentre il coordinatore non ha ancora risposto */
@@ -66737,35 +67248,31 @@ def prove_p2p_barattozon():
     # ⚠️ NIENTE PAROLE DEL PROTOCOLLO a chi apre la sezione: il libro,
     # gli ordini e il coordinatore sono nomi nostri. Al loro posto il
     # velo di casa, lo stesso di tutta l'app.
+    # ⚠️ EMENDATA (26 set 2026, «IL LIBRO SUBITO», richiesta di Andrea):
+    # all'ingresso del P2P il velo di casa NON C'E' PIU'. Fino a ieri
+    # queste righe volevano «Aspetta…» sull'anello, chiuso su tre
+    # uscite e uno solo per render; adesso la pagina mostra subito
+    # l'ultimo libro noto (o lo scheletro), e le tre sorvegliano che il
+    # velo non torni — in renderP2P e in tutto il client.
     _rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
-    prova("il caricamento del P2P e' il velo di casa, con la parola di casa",
-          True, "attesaRitardata(null, 'Aspetta…', true)" in _rp)
+    prova("all'ingresso del P2P non c'e' nessun velo che blocca", [0, 0],
+          [_rp.count("attesaRitardata("), _rp.count("attesaP2P(")])
     prova("...e della scritta di prima non resta niente", 0,
           mini.count("Leggo il libro"))
-    # ⚠️ UN VELO A TUTTO SCHERMO CHE RESTA APERTO E' L'APP BLOCCATA, e
-    # da fuori non c'e' niente che lo tolga: si chiude sul libro
-    # arrivato, sull'errore, e comunque alla fine della lettura.
-    # le tre uscite sono DUE chiamate (l'errore e il libro arrivato) piu'
-    # il `finally`, che non e' una chiamata col nome ma la chiusura di
-    # ogni lettura, riuscita o no
-    prova("il velo si chiude su tutt'e tre le uscite", True,
-          _rp.count("chiudiAttesaP2P()") == 2
-          and ".finally(chiudiAttesaP2P)" in _rp)
-    # e il velo e' UNO: renderP2P passa di qui a ogni giro, e senza una
-    # variabile sola ne accenderebbe uno nuovo ogni volta
-    prova("...ed e' uno solo, non uno per render", True,
-          "if (!p2pAttesa) p2pAttesa = attesaRitardata" in _rp
-          and "let p2pAttesa = null;" in mini)
+    prova("...ne' della chiusura del velo dell'ingresso", [0, 0],
+          [mini.count("chiudiAttesaP2P"), mini.count("p2pAttesa ")])
     # ⚠️ L'ANELLO E' UN'OPZIONE DEL VELO DI CASA, non un secondo velo:
     # il barattolino resta il segno dell'app e vive dov'e' sempre
     # stato; qui serviva un giro piu' fine, e lo accende chi chiama.
     _an = pezzo_js(css, ".attesa-anello{", "}")
     prova("l'anello e' sottile e gira col keyframe che c'e' gia'", True,
           "border:2px solid" in _an and "animation:gira" in _an)
+    # EMENDATA (26 set 2026): l'ingresso del libro non lo chiama piu';
+    # l'opzione resta sul velo di casa, e l'anello resta dei gesti P2P
     prova("...e lo accende chi chiama l'attesa, sul velo di casa", True,
           "function attesaRitardata(btn, testo, anello){" in mini
           and "classList.toggle('anello', !!anello)" in mini
-          and "attesaRitardata(null, 'Aspetta…', true)" in _rp)
+          and "el('attesaOverlay').classList.add('anello');" in mini)
     prova("...e col moto ridotto sta fermo, come il resto", True,
           ".attesa-anello{animation:none}" in css.replace("\r\n", "").replace("  ", ""))
     # ⚠️ IL VELO NON HA PIU' LA SFOCATURA (dal campo: «lo sfondo e'
@@ -77362,8 +77869,11 @@ def prove_p2p_avvisi_libro():
     prova("l'orologio passa dal libro PRIMA delle attese", True,
           orologio.index("await asyncio.wait_for(_giro_libro_p2p(), P2P_PASSATA_MAX_S)")
           < orologio.index("await asyncio.wait_for(_giro_attese_p2p(), P2P_PASSATA_MAX_S)"))
+    # EMENDATA (26 set 2026, «IL LIBRO SUBITO»): i try sono TRE — la
+    # fotografia del libro gira nella stessa passata col suo, e una
+    # fotografia che cade non deve toccare gli avvisi
     prova("...e ognuno dei due ha il suo try (un battito storto non ferma l'altro)",
-          2, codice(orologio).count("except Exception as e:"))
+          3, codice(orologio).count("except Exception as e:"))
     prova("le righe mai viste si chiedono senza segnalibro", True,
           "for ids, da in ((nuovi, 0), (vecchi, since - P2P_MARGINE_S)):" in giro)
     prova("...e solo per due ore: un id che il libro non mostra smette di farsi cercare",
@@ -97108,8 +97618,11 @@ def prove_effetti_ridotti():
             if resto:
                 for uno in s.split(","):
                     ripieghi[uno] = ";".join(resto)
-    prova("i ripieghi fermi dei blocchi reduced-motion sono due",
-          [".btn.orange.in-evidenza", ".p2p-manca"], sorted(ripieghi))
+    # EMENDATA (26 set 2026, «IL LIBRO SUBITO»): il terzo e' lo
+    # svelamento dopo il tour del P2P, che col moto ridotto non corre —
+    # il fondo pieno se ne va e basta — e la classe lo gemella
+    prova("i ripieghi fermi dei blocchi reduced-motion sono tre",
+          ["#tourP2P.svela", ".btn.orange.in-evidenza", ".p2p-manca"], sorted(ripieghi))
     prova("...e la classe li gemella tutti, con le stesse dichiarazioni",
           [], [s for s, d in ripieghi.items()
                if "html.fx-ridotti %s{%s}" % (s, d) not in blocco])
@@ -102635,7 +103148,7 @@ def main():
               prove_livello_accanto_al_titolo,
               prove_p2p_server,
         prove_p2p_libro,
-        prove_tour_p2p, prove_tour_p2p_finale,
+        prove_tour_p2p, prove_tour_p2p_finale, prove_libro_subito,
         prove_velo_p2p,
     prove_p2p_dettaglio,
     prove_nav_p2p,

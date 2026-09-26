@@ -2828,6 +2828,30 @@
      di sempre da subito. */
   @keyframes p2pNuova{from{background:var(--sats-soft)}to{background:var(--card)}}
   .p2p-ord.p2p-nuova{animation:p2pNuova 1.5s ease-out}
+  /* IL LIBRO SUBITO (26 set 2026): lo scheletro delle card quando non
+     c'e' niente da mostrare — fermo, della misura di una card vera —,
+     la riga «aggiorno…» fissa sopra la barra, e l'anellino sul bottone
+     di un gesto che aspetta il libro vero. */
+  .p2p-ord.p2p-finta{min-height:96px;padding-top:18px}
+  .p2p-finta i{display:block;height:12px;border-radius:6px;
+    background:var(--line-soft);margin:0 0 12px}
+  .p2p-finta i:nth-child(1){width:46%;height:16px}
+  .p2p-finta i:nth-child(2){width:82%}
+  .p2p-finta i:nth-child(3){width:58%}
+  /* 118 e non meno: il + tondo della barra sporge ~98 px dal fondo, e
+     a 84 la riga gli finiva sotto (visto nel primo scatto) */
+  .p2p-aggiorno{position:fixed;left:50%;transform:translateX(-50%);
+    bottom:calc(118px + env(safe-area-inset-bottom));z-index:29;
+    pointer-events:none;font-size:12px;font-weight:700;color:var(--muted);
+    background:var(--card);border:1px solid var(--line-soft);
+    border-radius:999px;padding:4px 12px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+  .p2p-aggiorno[hidden]{display:none}
+  @media (min-width:768px){.p2p-aggiorno{bottom:24px}}
+  .p2p-btn-giro{display:inline-block;width:13px;height:13px;margin-right:8px;
+    vertical-align:-2px;border:2px solid currentColor;
+    border-right-color:transparent;border-radius:50%;
+    animation:gira .8s linear infinite}
+  @media (prefers-reduced-motion:reduce){.p2p-btn-giro{animation:none}}
   @media (prefers-reduced-motion:reduce){.p2p-ord.p2p-nuova{animation:none}}
   .p2p-tuo{background:rgba(255,138,0,.10);color:var(--orange);font-weight:700}
   /* ══ IL MARCHIO DEL METODO (16 set 2026) ══
@@ -7890,10 +7914,23 @@
      l'immagine copre la sua scatola e sotto non resta il bordo di
      un'altra tinta. E se una non arrivasse, quel che resta e' navy e
      non un buco bianco in mezzo alla card. */
+  /* ⚠️ IL FONDO E' PIENO (26 set 2026, richiesta di Andrea): dietro
+     la card del tour non si vede niente della pagina — solo il fondo
+     di casa e la card. Il libro intanto si prepara sotto, e alla
+     chiusura il fondo si ritira dall'alto verso il basso (`.svela`). */
   #tourP2P{position:fixed;inset:0;z-index:84;display:none;
     align-items:center;justify-content:center;padding:16px;
-    background:rgba(15,12,6,.62)}
+    background:var(--bg)}
   #tourP2P.open{display:flex}
+  /* LO SVELAMENTO: la card se ne va subito, il fondo si ritira in
+     mezzo secondo e non prende tocchi mentre lo fa. Con gli effetti
+     ridotti la classe non si mette nemmeno (chiudiTourP2P), e qui c'e'
+     la cintura: compare e basta. */
+  #tourP2P.svela{display:flex;pointer-events:none;
+    animation:tourP2PSvela .5s cubic-bezier(.25,.7,.35,1) forwards}
+  #tourP2P.svela .giro-box{visibility:hidden}
+  @keyframes tourP2PSvela{from{clip-path:inset(0 0 0 0)}to{clip-path:inset(100% 0 0 0)}}
+  @media (prefers-reduced-motion:reduce){#tourP2P.svela{display:none}}
   .giro-box{position:relative;width:100%;max-width:380px;
     max-height:calc(100dvh / var(--fs-zoom,1) - 32px);
     background:var(--card);border:1px solid var(--line);
@@ -8796,6 +8833,9 @@
   /* 2) gli aloni che battevano restano FERMI: gli stessi due ripieghi
         dei blocchi reduced-motion, dichiarazione per dichiarazione */
   html.fx-ridotti .p2p-manca{box-shadow:0 0 0 3px rgba(194,65,12,.55)}
+  /* 3) lo svelamento dopo il tour del P2P non corre: il fondo pieno se
+        ne va e la pagina c'e' (26 set 2026) — il gemello del suo blocco */
+  html.fx-ridotti #tourP2P.svela{display:none}
   html.fx-ridotti .btn.orange.in-evidenza{
     box-shadow:0 3px 0 var(--sats-deep),0 0 0 4px rgba(247,147,26,.35)}
 
@@ -9620,6 +9660,10 @@ document.getElementById('cartello')?.remove();</script>
            in cima al libro sarebbe un buco. -->
       <button type="button" class="p2p-fee-banner" id="p2pFeeBanner" aria-haspopup="dialog" onclick="apriFeeP2P()"><img src="/assets/p2p-banner-fee.webp" width="1000" height="259"alt="Fee P2P: 2% barrato, in beta 1,5% per parte, pionieri o livello 5 meno 0,5%" onerror="this.parentNode.remove()"></button>
       <div id="p2pCorpo"></div>
+      <!-- LA RIGA DISCRETA DEL LIBRO SUBITO (26 set 2026): finche' i
+           relay non hanno risposto, sopra la barra e fuori dal flusso
+           — andando via non sposta nessuna card. La accende renderP2P. -->
+      <div id="p2pAggiorno" class="p2p-aggiorno" role="status" hidden>aggiorno…</div>
       <!-- IL BOTTONE DEL PROFILO NON C'E' PIU' (set 2026, fase 6):
            l'identita' e' l'account, tutta sotto il cofano. Il
            foglietto ridotto (codice segreto + dimentica) si apre da
@@ -43432,17 +43476,11 @@ const P2P_LIBRO_FRESCO_MS = 60000; // oltre, il libro si rilegge da solo al pros
    motore: la usano tutt'e due, e il banco del motore la deve avere */
 let p2pLato = 'compro';            // 'compro' = k:sell (chi vende sats a me) | 'vendo' = k:buy
 let p2pLibro = null;               // {ordini:[...], quando} — null = mai letto
-/* IL VELO DELL'ATTESA, uno solo (16 set 2026): `attesaRitardata` torna
-   la sua chiusura, e finche' quella e' in mano il velo e' acceso. Una
-   sola variabile perche' renderP2P passa di qui a ogni giro: senza,
-   ogni render ne accenderebbe uno nuovo e la chiusura del primo non
-   spegnerebbe gli altri. */
-let p2pAttesa = null;
-function chiudiAttesaP2P(){
-  if (!p2pAttesa) return;
-  p2pAttesa();
-  p2pAttesa = null;
-}
+/* IL VELO DELL'ATTESA ALL'INGRESSO NON C'E' PIU' (26 set 2026, «IL
+   LIBRO SUBITO»): entrando si vede subito l'ultimo libro noto — la
+   copia del telefono o la fotografia del server — e i relay lavorano
+   dietro le quinte. Dal 16 set qui viveva la chiusura del velo a tutto
+   schermo; chi cerca il caricamento di prima lo trova in CANTIERI. */
 let p2pRiletto = 0;                // l'ultimo tentativo di rilettura: un giro caduto non martella
 let p2pInfo = null;                // le impostazioni del coordinator, dal 38385
 let p2pErrore = '';                // l'ultimo relay che non ha risposto, per dirlo
@@ -43799,9 +43837,22 @@ async function leggiLibroMostro(){
   let ultimo = null;
   esiti.forEach((e, i) => {
     const url = tutti[i];
-    if (e.status === 'fulfilled') {
+    /* ⚠️ ZERO EVENTI NON E' UNA RISPOSTA (26 set 2026, dal giro dal vivo
+       del «LIBRO SUBITO»): un relay che accetta la connessione e poi
+       tace non arriva mai al nostro tetto — il bundle chiude lui la
+       sottoscrizione dopo 4,4 s come se fosse arrivato l'EOSE, e il
+       libro diventava «Nessun ordine aperto» su un fatto mai detto. Un
+       relay che ha il coordinatore ha SEMPRE il suo 38385, anche a
+       libro vuoto: chi non da' nemmeno quello non ha risposto, e vale
+       come muto — cosi' una copia buona in pagina non viene sostituita
+       dal niente, e resta con l'avviso. */
+    if (e.status === 'fulfilled' && e.value.length) {
       fonti.push({url, n: e.value.length, ok: true});
       eventi = eventi.concat(e.value);
+    } else if (e.status === 'fulfilled') {
+      fonti.push({url, n: 0, ok: false});
+      ultimo = new Error('nessuna risposta da ' + url);
+      console.log('🔁 [p2p] relay che non risponde: ' + url + ' (zero eventi, nemmeno il 38385)');
     } else {
       fonti.push({url, n: 0, ok: false});
       ultimo = e.reason;
@@ -43891,12 +43942,17 @@ function caricaLibroP2P(forza){
       const libro = libroDaEventi(eventi);
       if (libro.info && (!p2pInfo || libro.info.quando >= p2pInfo.quando))
         p2pInfo = libro.info;
+      const prima = p2pLibro;
       p2pLibro = {
         ordini: libro.ordini.filter(o => !lapidataP2P(o.id)),
         quando: Date.now()
       };
       p2pErrore = '';
       p2pParziale = !completo;
+      /* IL LIBRO SUBITO (26 set 2026): il libro vero diventa la copia
+         della prossima visita, e se al suo posto c'era una copia le card
+         che lei non aveva si vestono «nuove» come quelle dell'ascolto */
+      if (typeof dopoLibroVeroP2P === 'function') dopoLibroVeroP2P(eventi, prima);
       /* col libro letto, se una vista del P2P e' aperta, l'orecchio
          sui 38383 si apre (24 set 2026): la leva puo' essere arrivata
          dopo il primo go() */
@@ -44968,33 +45024,39 @@ function renderP2P(){
   if (!box) return;
   el('p2pLatoCompro')?.classList.toggle('attiva', p2pLato === 'compro');
   el('p2pLatoVendo')?.classList.toggle('attiva', p2pLato === 'vendo');
+  /* IL TOUR NON ASPETTA PIU' IL LIBRO (26 set 2026, «IL LIBRO
+     SUBITO»): si apre all'ingresso, sopra un fondo pieno che della
+     pagina non lascia vedere niente, e il libro intanto si prepara
+     dietro. Fino a ieri stava dopo il velo del caricamento, per non
+     aprirsi sopra l'anello: il velo non c'e' piu', e con lui la
+     ragione di aspettare. */
+  apriTourP2PSePrimaVolta();
+  /* L'ULTIMO LIBRO NOTO, SUBITO (26 set 2026): senza un libro letto
+     si prende la copia del telefono — sincrona, quindi gia' in QUESTO
+     render — e in mancanza si chiede la fotografia del server, che
+     arriva col suo ridisegno. Vivono fuori dal libro (le loro
+     sentinelle vietano qui dentro la memoria del dispositivo e le
+     domande al server): da qui il typeof. */
+  if (p2pLibro === null && typeof apriLibroSubitoP2P === 'function') apriLibroSubitoP2P();
+  /* la riga discreta mentre i relay non hanno ancora risposto: e'
+     fissa sopra la barra, fuori dal flusso, cosi' andando via non
+     sposta niente */
+  const aggiorno = el('p2pAggiorno');
+  if (aggiorno) aggiorno.hidden = !!p2pErrore || !(p2pLibro === null || p2pLibro.copia);
   if (p2pLibro === null) {
-    /* IL CARICAMENTO E' QUELLO DI CASA (16 set 2026, richiesta di
-       Andrea): il barattolino che ondeggia con «Aspetta…», lo stesso
-       di tutto il resto dell'app. La riga di prima NOMINAVA il
-       protocollo a chi non deve conoscerlo — il libro, gli ordini, il
-       coordinatore sono parole nostre, e chi apre la sezione vuole
-       solo sapere che sta arrivando.
-       ⚠️ E QUI NON SI RIPETE QUEL CHE E' STATO TOLTO, nemmeno per
-       spiegarlo: una sentinella che conta la vecchia scritta la
-       troverebbe in questo commento e sarebbe rossa per la riga che
-       spiega perche' e' verde. E' la trappola gia' pagata tre volte.
-       ⚠️ E L'ATTESA SI CHIUDE SEMPRE, su tutt'e tre le uscite: col
-       libro arrivato (la riga dopo il blocco), con l'errore (qui
-       sotto) e comunque alla fine della lettura (`finally`). Un velo a
-       tutto schermo che resta aperto e' l'app bloccata, e non c'e'
-       niente che lo tolga da fuori.
-       La stessa attesa vale in tutt'e due i posti: anche la striscia
-       vuole il libro in mano (l'adozione ricostruisce solo cio' che il
-       libro sa descrivere), quindi prima del libro non c'e' niente di
-       onesto da mostrare nemmeno li'. */
+    /* NIENTE DA MOSTRARE: lo scheletro delle card, mai un velo che
+       blocca (26 set 2026). Ci si arriva solo senza copia sul telefono
+       e con la fotografia del server non ancora arrivata (o vuota): il
+       resto della pagina — tab, pillole, il + — resta vivo.
+       L'ERRORE resta com'era: il libro che ha risposto di no, senza
+       niente in mano, lo dice e offre il gesto. La striscia aspetta il
+       libro per la ragione di sempre (l'adozione ricostruisce solo
+       cio' che il libro sa descrivere). */
     const attesa = p2pErrore
       ? '<div class="hint">Il libro degli ordini non risponde (' + esc(p2pErrore) + ').'
         + '<button class="btn ghost" onclick="ricaricaP2P()">↻ Riprova</button></div>'
       : '';
-    if (p2pErrore) chiudiAttesaP2P();
-    else if (!p2pAttesa) p2pAttesa = attesaRitardata(null, 'Aspetta…', true);
-    box.innerHTML = attesa;
+    box.innerHTML = attesa || (typeof scheletroLibroP2P === 'function' ? scheletroLibroP2P() : '');
     /* I MIEI SCAMBI NON ASPETTANO UN LIBRO CHE NON RISPONDE (24 set
        2026, l'archivio del server): fin qui la striscia voleva il libro
        perche' solo il libro sapeva ricostruire una riga; adesso le
@@ -45016,15 +45078,9 @@ function renderP2P(){
        aspetta il libro per la stessa ragione — salvo che il libro
        abbia gia' detto di no: allora conta le righe che ci sono */
     intestaScambiP2P(p2pErrore ? mieiRigheP2P() : null);
-    if (!p2pErrore) caricaLibroP2P().then(renderP2P, renderP2P)
-      .finally(chiudiAttesaP2P);
+    if (!p2pErrore) caricaLibroP2P().then(renderP2P, renderP2P);
     return;
   }
-  /* il libro c'e': il velo se ne va, qualunque strada l'abbia acceso */
-  chiudiAttesaP2P();
-  /* ...e solo adesso il tour di benvenuto puo' aprirsi: mai sopra
-     l'anello dell'attesa (vedi `apriTourP2PSePrimaVolta`) */
-  apriTourP2PSePrimaVolta();
   /* IL LIBRO SI AGGIORNA DA SOLO (set 2026, fase 6): il bottone
      «Aggiorna il libro» non c'e' piu' — al posto del gesto, un libro
      piu' vecchio di P2P_LIBRO_FRESCO_MS si rilegge in sottofondo al
@@ -45035,11 +45091,20 @@ function renderP2P(){
      LA MARCATURA «e' mio» NON SI RIARMA QUI, ed e' voluto: e' una
      restore-session verso il coordinator (una alla volta per chiave,
      il vincolo della sonda) e resta a una per sessione. */
+  /* LA COPIA SI RILEGGE SUBITO (26 set 2026): un libro che viene dal
+     telefono o dal server non e' la parola del coordinatore, per
+     quanto fresco sia — la lettura vera parte al primo render, e
+     arrivando ridisegna FERMO (le card nuove col loro respiro, lo
+     scorrimento tenuto). Se cade, la copia resta e l'avviso lo dice. */
   const adesso = Date.now();
-  if (adesso - (p2pLibro.quando || 0) > P2P_LIBRO_FRESCO_MS
+  if ((p2pLibro.copia || adesso - (p2pLibro.quando || 0) > P2P_LIBRO_FRESCO_MS)
       && adesso - p2pRiletto > P2P_LIBRO_FRESCO_MS && !p2pLettura) {
     p2pRiletto = adesso;
-    caricaLibroP2P().then(renderP2P, () => {});
+    const copia = !!p2pLibro.copia;
+    caricaLibroP2P().then(() => {
+      if (typeof ridisegnaLibroFermoP2P === 'function') ridisegnaLibroFermoP2P();
+      else renderP2P();
+    }, copia ? renderP2P : () => {});
   }
   const k = P2P_LATO_K[p2pLato];
   /* il criterio lo dice la pillola «Ordina» (predefinito: la
@@ -45091,7 +45156,12 @@ function renderP2P(){
   const avvisi =
       (p2pParziale ? `<div class="hint">⚠️ Elenco parziale: risponde solo lo specchio `
         + `del libro, quindi qui puo' mancare qualcosa o restare un ordine gia' preso.</div>` : '')
-    + (p2pErrore ? `<div class="hint">${esc(p2pErrore)}</div>` : '');
+    + (p2pErrore ? `<div class="hint">${esc(p2pErrore)}${p2pLibro.copia
+        /* sulla COPIA l'errore dice anche cosa vuol dire per chi guarda,
+           e offre il gesto: senza, la lista resterebbe li' con l'aria
+           di essere vera */
+        ? ` — quel che vedi potrebbe non essere aggiornato.`
+          + `<button class="btn ghost" onclick="ricaricaP2P()">↻ Riprova</button>` : ''}</div>` : '');
   /* IL LIBRO E' SOLO IL LIBRO (set 2026, decisione di Andrea): la
      striscia e' andata nella sua vista e il «Pubblica» e' il + della
      nav — UN gesto solo, gia' vestito del colore del lato. */
@@ -45153,8 +45223,14 @@ function renderP2P(){
      misura e la frase non si sposta. Decorative (alt vuoto): a dire
      cosa succede e' la frase. Il vuoto DA FILTRO tiene il logo: li' il
      libro non e' vuoto, e' il filtro a non lasciar passare niente. */
+  /* UNA COPIA VUOTA NON E' UN LIBRO VUOTO (26 set 2026): finche' i
+     relay non hanno risposto, «Nessun ordine aperto» sarebbe detto su
+     una cosa non ancora chiesta — al suo posto lo scheletro. */
+  const vuotoInAttesa = !!p2pLibro.copia && !p2pErrore && !vivi.length
+    && typeof scheletroLibroP2P === 'function';
   box.innerHTML = avvisi
     + (mostrati.length ? mostrati.map(rigaOrdineP2P).join('')
+       : vuotoInAttesa ? scheletroLibroP2P()
        : `<div class="empty">${vivi.length
            ? '<img class="p2p-simbolo" src="/assets/p2p-logo-grande.webp" alt="" onerror="this.remove()">'
            : '<img class="scambi-img scambi-libro" src="/assets/scambi-intestazione.webp" width="682" height="459" alt="" onerror="this.remove()">'
@@ -45503,6 +45579,10 @@ function ricaricaP2P(){
   p2pErrore = '';
   p2pParziale = false;
   p2pLibro = null;
+  /* ...e il freno della rilettura (26 set 2026): con la copia che
+     torna subito in pagina, senza questa riga il gesto la mostrerebbe
+     e non la rileggerebbe fino al minuto dopo */
+  p2pRiletto = 0;
   /* anche la marcatura «e' mio» riprova col gesto — e RIARMA sempre
      (set 2026): la bandierina e' l'unico gate, quindi il gesto
      richiede pure dopo una risposta gia' avuta. Una fresca sostituisce
@@ -46400,6 +46480,9 @@ async function semeProfiloP2P(){
 function offertaVivaP2P(o){
   if (!o || o.stato !== 'pubblicato') return false;
   if (!p2pLibro || Date.now() - (p2pLibro.quando || 0) > P2P_LIBRO_FRESCO_MS) return false;
+  /* ...e nemmeno con una COPIA (26 set 2026): il telefono o il server
+     raccontano un libro di prima, non la parola del coordinatore */
+  if (p2pLibro.copia) return false;
   return ((p2pLibro && p2pLibro.ordini) || []).some(x => x && x.id === o.id);
 }
 function scambiApertiP2P(){
@@ -47038,16 +47121,21 @@ function scordaTourP2P(){
   } catch(e){}
   delete vistiMem.tour_p2p;      // la memoria dell'apertura, o non si riarma
 }
-/* L'ingresso automatico: UNA volta, e solo col libro gia' in mano.
-   Sta in `renderP2P` dopo `chiudiAttesaP2P` e non in `vaiP2P`, per due
-   ragioni diverse. La prima e' il velo: sopra l'anello del
-   caricamento il tour sarebbe un cartello davanti a una pagina che non
-   c'e' ancora, e chiudendolo si troverebbe l'attesa. La seconda e' la
+/* L'ingresso automatico: UNA volta, all'ingresso nel libro.
+   Fino al 26 set 2026 aspettava il libro, per non aprirsi sopra
+   l'anello del caricamento; col «LIBRO SUBITO» il velo non c'e' piu',
+   e il tour si apre subito su un fondo pieno mentre il libro si
+   prepara sotto. Sta in `renderP2P` e non in `vaiP2P` per la
    lezione di `renderInteresse`, gia' scritta due volte qui accanto:
    `vaiP2P` e' il solo ingresso dal TAB, mentre alla vista ci si torna
    col gesto indietro e dalla cronologia — che da li' non passano mai. */
 function apriTourP2PSePrimaVolta(){
   if (tourP2PInCorso || tourInCorso || testModaleInCorso) return;
+  /* CHI E' DENTRO ASPETTA /me (26 set 2026): il tour ormai si apre
+     all'ingresso, e prima di /me i timbri del profilo non ci sono —
+     chi l'ha visto su un altro dispositivo se lo ritroverebbe. /me lo
+     richiama appena arriva (vedi la riga accanto a `p2pSconto`). */
+  if (myTgId && !p2pLeve) return;
   /* LA SEZIONE E' IL LIBRO: `renderP2P` dipinge anche «I miei
      scambi», e di la' il tour si aprirebbe sopra la pagina sbagliata —
      per giunta a chi il libro l'ha gia' attraversato. */
@@ -47075,6 +47163,9 @@ function apriSalitaTourP2P(){
 function montaTourP2P(solo){
   tourP2PInCorso = true;
   tourP2PSolo = solo;
+  /* uno svelamento ancora in corsa si ferma: il tour torna pieno */
+  clearTimeout(tourP2PSvelaTimer);
+  el('tourP2P').classList.remove('svela');
   const nastro = el('tourP2PNastro'), punti = el('tourP2PPunti');
   nastro.innerHTML = TAPPE_TOUR_P2P.map(t =>
     `<div class="giro-card"><div class="giro-fig">`
@@ -47172,7 +47263,22 @@ function chiudiTourP2P(){
   el('tourP2P').classList.remove('finale');
   el('tourP2PNastro').removeEventListener('scroll', scorriTourP2P);
   document.removeEventListener('keydown', tastoTourP2P);
+  /* LO SVELAMENTO (26 set 2026, richiesta di Andrea): il fondo pieno
+     del tour non sparisce di colpo — la card se ne va e il fondo si
+     ritira dall'alto verso il basso, scoprendo la pagina in mezzo
+     secondo. Solo qui, alla fine di un tour: negli ingressi normali
+     la pagina c'e' e basta. Con gli effetti ridotti compare e basta. */
+  if (!tourRidotto()) {
+    el('tourP2P').classList.add('svela');
+    clearTimeout(tourP2PSvelaTimer);
+    tourP2PSvelaTimer = setTimeout(() => el('tourP2P').classList.remove('svela'),
+                                   SVELA_TOUR_P2P_MS + 60);
+  }
 }
+/* quanto dura lo svelamento: il CSS lo dice con la stessa cifra (la
+   prova le confronta), e il tempo toglie la classe un soffio dopo */
+const SVELA_TOUR_P2P_MS = 500;
+let tourP2PSvelaTimer = null;
 
 /* ============ IL MOTORE DELLO SCAMBIO (set 2026, tappa 4) ============
    Qui si PARLA col coordinatore: si prende un ordine del libro, si
@@ -47895,7 +48001,9 @@ function arrivaLibroP2P(ev){
   if (!p2pLibro) return false;   // la prima lettura e' in volo: porta anche questo
   const r = fondiLibroP2P(p2pLibro, ev);
   if (!r.cambiato) return false;
-  p2pLibro = {ordini: r.ordini.filter(o => !lapidataP2P(o.id)), quando: p2pLibro.quando};
+  /* il resto del libro resta com'e' — anche il segno della copia
+     (26 set 2026): un evento vivo non fa diventare vera una copia */
+  p2pLibro = Object.assign({}, p2pLibro, {ordini: r.ordini.filter(o => !lapidataP2P(o.id))});
   if (r.nuovo) { p2pCardNuove[r.nuovo] = Date.now(); voltoCardNuovaP2P(r.nuovo); }
   diarioP2P('libro in ascolto: ' + (r.nuovo ? 'nuovo ordine ' + r.nuovo : r.via ? 'via ' + r.via : 'aggiornato'));
   if (vistaAttivaP2P() === 'view-p2p') ridisegnaLibroFermoP2P();
@@ -50428,6 +50536,13 @@ function renderDettaglioP2P(){
    DEVIAZIONE, non una seconda strada) e da li' si rientra nella presa
    con la cifra in mano. */
 function confermaDettaglioP2P(){
+  /* SU UNA COPIA SI ASPETTA IL LIBRO VERO (26 set 2026): il bottone
+     gira, la pagina resta libera, e a libro arrivato si riparte da qui
+     — con l'ordine riguardato sul libro del coordinatore */
+  if (!p2pLibro || p2pLibro.copia) {
+    aspettaLibroVeroP2P(el('p2pDettVai')).then(ok => { if (ok) confermaDettaglioP2P(); });
+    return;
+  }
   const id = p2pDettOrdine;
   const o = rigaLibroP2P(id);
   if (!o) { toast('Quest\'ordine non c\'è più: aggiorna il libro'); return; }
@@ -50481,6 +50596,10 @@ async function eseguiPresaP2P(id, scelto, metodo){
      ordine: e' uno scambio con se stessi che congela l'ordine vero per
      tutta la finestra della presa in carico, e lo toglie dal libro a
      chi lo avrebbe preso davvero. */
+  /* ...e la stessa cintura per il libro (26 set 2026): da una COPIA non
+     si prende niente — si aspetta quello vero, e se non arriva ci si
+     ferma qui, prima di bruciare una chiave */
+  if ((!p2pLibro || p2pLibro.copia) && !(await aspettaLibroVeroP2P(null))) return;
   if (giroCadutoP2P(ordiniP2P()[id])) archiviaGiroCadutoP2P(id);
   if (ordiniP2P()[id]) {
     toast('Questo ordine è tuo: non puoi prenderlo');
@@ -54674,6 +54793,13 @@ function spiegaPremioP2P(){
   });
 }
 async function inviaNuovoOrdineP2P(confermato){
+  /* PUBBLICARE NON HA BISOGNO DEL LIBRO, ma delle impostazioni vive
+     del coordinatore (fee e tetti), che viaggiano con lui: su una copia
+     il bottone gira finche' la lettura vera non risponde (26 set 2026).
+     Se tace si va avanti lo stesso — il coordinatore giudica da se', e
+     fermare chi pubblica per un libro muto sarebbe un muro nuovo. */
+  if ((!p2pLibro || p2pLibro.copia) && p2pAcceso())
+    await aspettaLibroVeroP2P(el('p2pNuovoInvia'), true);
   const campi = campiNuovoP2P();
   const g = valeNuovoOrdineP2P(campi);
   if (!g.ok) { avvisaMancaP2P(g); return; }
@@ -56589,7 +56715,10 @@ function adottaOrdiniAltroveP2P(locali){
   if (!p2pMieiOrdini || !window.NostrTools) return 0;
   const mz = mazzoMostro();
   if (!mz) return 0;
-  const libro = (p2pLibro && p2pLibro.ordini) || [];
+  /* da una COPIA non si ricostruisce niente (26 set 2026): una riga
+     «pubblicato» scritta su un libro di prima resterebbe sbagliata
+     anche dopo — si aspetta il libro vero, che arriva al render dopo */
+  const libro = (p2pLibro && !p2pLibro.copia && p2pLibro.ordini) || [];
   const adesso = Math.floor(Date.now() / 1000);
   let nati = 0;
   for (const id in p2pMieiOrdini) {
@@ -56934,6 +57063,164 @@ function mieiRigheP2P(){
   return Object.keys(tutti).map(k => tutti[k]).filter(o => o && o.id);
 }
 /* ============ fine del motore dello scambio ============ */
+
+/* ============ IL LIBRO SUBITO (26 set 2026, richiesta di Andrea) ============
+   Entrando nel P2P si vedeva il velo «Aspetta…» finche' TUTTI i relay
+   non avevano risposto: il bundle di Nostr da caricare, poi una
+   websocket per relay, la REQ e l'EOSE — e si aspettava il piu' lento,
+   fino a otto secondi per aprire e otto per rispondere. Adesso il libro
+   compare subito, e la lettura vera lavora dietro.
+   DUE FONTI, IN QUEST'ORDINE: la COPIA salvata sul telefono all'ultima
+   lettura vera (sincrona: c'e' gia' nel primo render) e, se manca, la
+   FOTOGRAFIA che il server tiene in memoria (`/api/p2p/libro`, una
+   rotta leggera: nessun relay sotto, e i volti di chi ha pubblicato
+   per chi ha una sessione). Tutt'e due sono EVENTI GREZZI firmati dal
+   coordinatore e passano dallo stesso lettore del libro vero
+   (`libroDaEventi`): scadenze, valuta e doppioni si giudicano con le
+   regole di oggi, non con quelle del giorno in cui la copia e' nata.
+   UNA COPIA NON E' LA PAROLA DEL COORDINATORE, e porta il segno
+   (`copia`): la lettura vera parte subito, la riga «aggiorno…» resta
+   finche' non risponde, e i gesti che gli parlano — prendere,
+   pubblicare — ASPETTANO il libro vero col bottone che gira
+   (`aspettaLibroVeroP2P`), invece di bloccare la pagina. Per lo stesso
+   motivo una copia non giudica un'offerta viva e non adotta righe.
+   PIU' VECCHIA DI UN GIORNO non si mostra: sarebbe un elenco di
+   offerte prese da un pezzo. */
+const P2P_COPIA_CHIAVE = 'barattolo_p2p_libro';
+const P2P_COPIA_MAX_MS = 24 * 3600 * 1000;   // oltre, la copia non si mostra
+const P2P_COPIA_EVENTI = 300;                 // quanti eventi si tengono, al massimo
+let p2pFotoChiesta = false;      // la fotografia del server: una domanda per sessione
+/* PURA: dagli eventi di una lettura vera ai soli che servono a
+   ridisegnare quel libro — per ogni ordine mostrato l'evento che l'ha
+   fatto (stesso `d`, stesso `created_at`) e il 38385 piu' recente. */
+function grezziLibroP2P(eventi, libro){
+  const vivi = {};
+  ((libro && libro.ordini) || []).forEach(o => { vivi[o.id] = o.creato; });
+  const fuori = [];
+  let info = null;
+  for (const ev of eventi || []) {
+    if (!ev || typeof ev !== 'object') continue;
+    if (ev.kind === 38385) {
+      if (!info || (Number(ev.created_at) || 0) > (Number(info.created_at) || 0)) info = ev;
+      continue;
+    }
+    if (ev.kind !== 38383) continue;
+    const d = String(tagValore(ev, 'd') || '');
+    if (d in vivi && vivi[d] === (Number(ev.created_at) || 0)
+        && !fuori.some(x => tagValore(x, 'd') === d)) fuori.push(ev);
+  }
+  return fuori.slice(0, P2P_COPIA_EVENTI).concat(info ? [info] : []);
+}
+function salvaCopiaLibroP2P(eventi){
+  try {
+    localStorage.setItem(P2P_COPIA_CHIAVE,
+      JSON.stringify({quando: Date.now(), eventi: eventi}));
+  } catch(e) {}
+}
+/* la copia com'e' sul telefono, o null: memoria muta, rotta, vuota o
+   piu' vecchia di un giorno valgono uguale — «non c'e'» */
+function leggiCopiaLibroP2P(adesso){
+  let v = null;
+  try { v = JSON.parse(localStorage.getItem(P2P_COPIA_CHIAVE) || 'null'); }
+  catch(e) { return null; }
+  if (!v || typeof v !== 'object' || !Array.isArray(v.eventi)) return null;
+  const quando = Number(v.quando) || 0;
+  if (!(quando > 0) || (adesso || Date.now()) - quando > P2P_COPIA_MAX_MS) return null;
+  const eventi = v.eventi.filter(e => e && typeof e === 'object'
+    && (e.kind === 38383 || e.kind === 38385) && Array.isArray(e.tags));
+  return eventi.length ? {eventi: eventi.slice(0, P2P_COPIA_EVENTI + 1), quando} : null;
+}
+/* Da eventi grezzi di una copia al libro in pagina, col suo segno. Il
+   38385 della copia vale solo se non ce n'e' uno piu' fresco. */
+function libroDaCopiaP2P(eventi, quando, fonte){
+  const libro = libroDaEventi(eventi);
+  if (libro.info && !p2pInfo) p2pInfo = libro.info;
+  p2pLibro = {ordini: libro.ordini.filter(o => !lapidataP2P(o.id)),
+              quando: quando, copia: fonte};
+  return p2pLibro;
+}
+/* L'INGRESSO: la copia del telefono se c'e', altrimenti la fotografia
+   del server (in sottofondo, una volta per sessione). Torna vero se il
+   libro e' in pagina gia' adesso. */
+function apriLibroSubitoP2P(){
+  if (p2pLibro) return true;
+  if (typeof DEMO !== 'undefined' && DEMO) return false;
+  const c = leggiCopiaLibroP2P();
+  if (c) { libroDaCopiaP2P(c.eventi, c.quando, 'telefono'); return true; }
+  if (!p2pFotoChiesta) {
+    p2pFotoChiesta = true;
+    chiediFotoLibroP2P().then(ok => { if (ok) renderP2P(); }).catch(() => {});
+  }
+  return false;
+}
+/* La fotografia del server. Arriva quando arriva: se nel frattempo ha
+   risposto un relay la si butta (il libro vero vince sempre), e i
+   volti che porta entrano comunque nella cache di sempre. */
+async function chiediFotoLibroP2P(){
+  const h = {};
+  if (myTgId && !VETRINA) h['X-Tg-Init-Data'] = authHdr();
+  let d = null;
+  try {
+    const r = await fetch(`${API_BASE}/p2p/libro`, {headers: h, cache: 'no-store'});
+    if (!r.ok) return false;
+    d = await r.json();
+  } catch(e) { return false; }
+  const facce = (d && d.facce && typeof d.facce === 'object') ? d.facce : {};
+  for (const id in facce) { p2pFacce[id] = facce[id]; p2pFacceChieste.add(id); }
+  const eventi = Array.isArray(d && d.eventi) ? d.eventi : [];
+  const quando = (Number(d && d.quando) || 0) * 1000;
+  if (p2pLibro || !eventi.length || !(quando > 0)
+      || Date.now() - quando > P2P_COPIA_MAX_MS) return Object.keys(facce).length > 0;
+  libroDaCopiaP2P(eventi, quando, 'server');
+  /* i volti chiesti gia' qui: la domanda del render non ripartirebbe
+     per un id che la fotografia ha gia' detto di non conoscere */
+  p2pLibro.ordini.forEach(o => p2pFacceChieste.add(o.id));
+  return true;
+}
+/* Il libro vero e' arrivato (lo chiama `caricaLibroP2P`): diventa la
+   copia della prossima visita e, se in pagina c'era una copia con
+   delle card, quelle che lei non aveva si vestono «nuove». */
+function dopoLibroVeroP2P(eventi, prima){
+  salvaCopiaLibroP2P(grezziLibroP2P(eventi, p2pLibro));
+  if (!prima || !prima.copia || !(prima.ordini || []).length) return;
+  const cerano = new Set(prima.ordini.map(o => o.id));
+  const ora = Date.now();
+  p2pLibro.ordini.forEach(o => { if (!cerano.has(o.id)) p2pCardNuove[o.id] = ora; });
+}
+/* NIENTE DA MOSTRARE: tre card finte, ferme, della misura di quelle
+   vere. Nessuna animazione (non c'e' niente da far ondeggiare: la
+   riga «aggiorno…» dice gia' che sta arrivando). */
+function scheletroLibroP2P(){
+  const card = '<div class="p2p-ord p2p-finta"><i></i><i></i><i></i></div>';
+  return '<div class="p2p-scheletro" aria-hidden="true">' + card + card + card + '</div>';
+}
+/* L'INDICATORE SUL BOTTONE: un anellino davanti alla sua parola, e il
+   bottone spento finche' si aspetta. Nessun velo — la pagina resta
+   libera, che e' il punto. Torna la sua chiusura. */
+function bottoneAspettaP2P(btn){
+  if (!btn) return () => {};
+  const prima = btn.innerHTML, spento = btn.disabled;
+  btn.disabled = true;
+  btn.setAttribute('aria-busy', 'true');
+  btn.innerHTML = '<span class="p2p-btn-giro" aria-hidden="true"></span>' + prima;
+  return () => { btn.disabled = spento; btn.removeAttribute('aria-busy'); btn.innerHTML = prima; };
+}
+/* IL GESTO CHE PARLA COL COORDINATORE, SU UNA COPIA: aspetta in
+   silenzio la lettura vera (quella in volo, o una nuova) e torna vero
+   quando il libro in mano e' il suo. Se non risponde lo dice — salvo
+   chi puo' andare avanti lo stesso (`ancheSeTace`, il pubblicare). */
+async function aspettaLibroVeroP2P(btn, ancheSeTace){
+  if (p2pLibro && !p2pLibro.copia) return true;
+  const rip = bottoneAspettaP2P(btn);
+  let ok = false;
+  try { await caricaLibroP2P(); ok = !!(p2pLibro && !p2pLibro.copia); }
+  catch(e) { ok = false; }
+  finally { rip(); }
+  if (ok || ancheSeTace) return true;
+  toast('Il libro degli ordini non risponde: riprova fra un momento');
+  return false;
+}
+/* ============ fine del libro subito ============ */
 
 /* ============ I VOLTI SUL LIBRO (set 2026, decisione di Andrea) ====
    Le card mostrano chi ha pubblicato, con la faccia che quella persona
@@ -58507,6 +58794,10 @@ async function avvia(){
     /* ...e lo sconto fedelta' di CHI E' DENTRO (pioniere o livello 5):
        l'anonimo non ne ha, e la busta di vetrina non lo porta */
     p2pSconto = me.p2p_sconto || null;
+    /* il tour del P2P si apre all'ingresso, ma per chi e' dentro solo
+       a /me arrivato (i timbri li porta lui): se la sezione e' gia'
+       aperta, e' adesso (26 set 2026) */
+    if (typeof apriTourP2PSePrimaVolta === 'function') apriTourP2PSePrimaVolta();
     /* quali funzioni in arrivo ho gia' votato: accende il bottone
        giusto se la pagina e' gia' aperta (i due canali arrivano
        separati, e questo puo' atterrare per ultimo) */

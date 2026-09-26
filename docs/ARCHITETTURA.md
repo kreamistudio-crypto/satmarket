@@ -6826,6 +6826,34 @@
   server risponde; il volto arrivato ridisegna fermo. LO SPECCHIO RESTA FUORI, per l'invariante qui sopra: il coro e'
   la gamba viva; la rilettura dei 60 secondi legge anche lo specchio.
   Il verbale: CANTIERI, «Ritocchi al flusso P2P dalla prova vera».
+  IL LIBRO SUBITO (26 set 2026): entrando nel P2P non c'e' piu' il velo
+  «Aspetta…» — il libro compare dall'ultimo noto e la lettura vera
+  lavora dietro. Due fonti, in ordine: la COPIA sul telefono
+  (`barattolo_p2p_libro`, gli eventi grezzi del libro mostrato piu' il
+  38385, scritta da `dopoLibroVeroP2P` a ogni lettura vera, mai piu'
+  vecchia di un giorno) e, se manca, la FOTOGRAFIA del server
+  (`GET /api/p2p/libro`: aperta come il libro, volti solo con la
+  sessione, no-store, nessun relay sotto — la scrive l'orologio P2P
+  nella passata intera, `_fotografa_libro_p2p`, incrementale con una
+  rilettura intera l'ora, per ogni `d` l'evento piu' nuovo e in vetrina
+  i soli pending non scaduti). Tutt'e due passano da `libroDaEventi`.
+  Il libro in pagina porta il segno `copia` ('telefono' | 'server'):
+  la lettura vera parte subito, la riga «aggiorno…» (fissa sopra il +,
+  fuori dal flusso) resta finche' non risponde, e a risposta arrivata
+  il ridisegno e' FERMO con le card nuove vestite `p2p-nuova`. Una copia
+  non giudica un'offerta viva (`offertaVivaP2P`) e non adotta righe; i
+  gesti verso il coordinatore la aspettano (`aspettaLibroVeroP2P`: il
+  bottone gira, la pagina resta libera; prendere si ferma se il libro
+  tace, pubblicare va avanti). Niente da mostrare = tre card finte
+  (`scheletroLibroP2P`). E ZERO EVENTI NON E' UNA RISPOSTA: un relay che
+  non da' nemmeno il 38385 vale come muto (il bundle chiude la
+  sottoscrizione a 4,4 s come un EOSE, e il libro diventava vuoto). Il
+  blocco vive dopo il motore, dove la `fetch` e' di casa. IL TOUR si
+  apre all'ingresso (chi e' dentro aspetta /me) su un fondo pieno
+  (`background:var(--bg)`), e alla chiusura il fondo si ritira
+  dall'alto verso il basso in mezzo secondo (`.svela`,
+  `SVELA_TOUR_P2P_MS`); con gli effetti ridotti compare e basta.
+  Il verbale: CANTIERI, «Il libro subito».
   IL CORO DEI RELAY (16 set 2026, la gamba VIVA del P2P): la
   connessione con cui il client parla col coordinator — richieste,
   risposte, restore, recapiti, via di riserva — non e' piu' UN relay
