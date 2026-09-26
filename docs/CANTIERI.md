@@ -34380,3 +34380,67 @@ sui pixel la capsula ha il colore esatto della card (255,255,255 di
 giorno, 44,37,23 di sera), identico prima e dopo, e attorno alle spente
 c'e' solo lei; nessun errore dell'app. Scatti approvati da Andrea.
 **DA AVERE:** l'occhio sul telefono.
+La fila «Scambi P2P» senza relay, e la fotografia subito (26 set 2026,
+ritocco di Andrea a 7ee92f5/495e489). **IL DIFETTO DI DISEGNO:** per
+tenere vive le card in Esplora il client apriva l'ascolto dei 38383
+anche fuori dal P2P — dopo il lancio l'avrebbe fatto chiunque apra il
+mercatino. E dal vivo, pubblicando un ordine, la card non compariva
+finche' non si ricaricava la vetrina.
+**ADESSO LA FILA LEGGE LA FOTOGRAFIA DEL SERVER** (`/api/p2p/libro`, del
+«libro subito»): una GET all'apertura di Esplora e poi ogni 60 secondi,
+solo con Esplora davanti e la pagina visibile (`armaFotoVetrinaP2P`, un
+giro alla volta, che si ferma da solo); tornando su Esplora o sulla
+pagina la domanda parte SUBITO e salta la cache. Nessuna connessione ai
+relay da Esplora: l'ascolto dal vivo torna a esistere solo nelle viste
+del P2P, e la riga di `go()` e' quella di prima di 7ee92f5. Il tocco apre
+il dettaglio come dal libro: se `p2pLibro` manca o e' piu' vecchio della
+fotografia, la fotografia diventa il libro in pagina col segno della
+copia, e la presa aspetta il libro vero — se nel frattempo l'ordine e'
+stato preso, lo dice lei («Quest'ordine non c'è più»).
+**LA ROTTA REGGE TUTTA ESPLORA:** per richiesta non tocca ne' il
+database ne' i relay. I volti li calcola l'orologio con la fotografia
+(`_facce_foto_p2p`, una query al minuto invece di una per richiesta); chi
+guarda si riconosce dalla sola firma dell'initData — `_utente_da_initdata`,
+estratto da `verifica_utente` che lo chiama e poi scrive l'utente come
+prima — o dal cookie con cinque minuti di memoria (`_ha_sessione_p2p`).
+Cache `private, max-age=30` con `Vary: X-Tg-Init-Data, Cookie` (era
+no-store). I volti restano di chi ha una sessione. **Quanto pesa:** con
+20 ordini e il 38385 ~15,3 KB, ~18,5 KB coi volti; compressa ~4,5 KB (sono
+quasi tutti id, chiavi e firme esadecimali). Se Caddy comprima davvero sul
+VPS da qui non si vede: il suo config non sta nel repo.
+**LA FOTOGRAFIA SUBITO** (dal vivo di Andrea, a meta' giro): quando mostrod
+avvisa (0007) di un ordine PRESO, ANNULLATO o SCADUTO, l'ordine esce dalla
+fotografia all'istante, per parola di mostrod (`_foto_via_p2p`: resta fuori
+finche' un 38383 piu' nuovo non dice che e' tornato) e parte un giro
+incrementale; il TORNATO chiede il giro senza togliere. ⚠️ **LA 0007 NON
+ANNUNCIA GLI ORDINI NUOVI** — l'ordine nasce dal client —, quindi il
+segnale e' `/api/p2p/canale`, che ogni client di Barattolo chiama appena
+pubblica: rifa' la fotografia col canale acceso o spento. Gli ordini nati
+su un altro client di Mostro aspettano il giro del minuto. Il giro subito
+aspetta 3 s (il 38383 deve arrivare sui relay) ed e' uno alla volta: gli
+avvisi che arrivano mentre corre ne chiedono uno in piu', non uno ciascuno.
+**PROVATO.** `prove_card_p2p_vetrina` riscritta: la rotta senza database e
+senza relay, volti solo con la sessione, il cookie guardato una volta in
+cinque minuti; la fotografia subito (usciti, tornati, i passi che non
+toccano niente, P2P spento, solo sugli avvisi NUOVI, il canale dopo le
+guardie, sette richieste = due giri, senza loop non esplode); nel client
+nessun relay dal blocco della fila, una GET sola, l'ascolto solo nel P2P;
+e nel banco node il giro di un minuto con un orologio finto — prima domanda
+subito, il minuto dopo, un giro solo, pagina nascosta ferma, ritorno
+subito e senza cache, fuori da Esplora niente, e in tutto il banco nessuna
+chiamata a un relay. Emendate col perche' `prove_initdata` (il giudizio
+estratto), `prove_libro_subito` (cache e volti dalla memoria) e la riga
+dell'ascolto in `go()`. Tortura 27 su 27. Suite intera severa senza config
+nel worktree da origin/main (495e489): 16.520 verdi e 0 rosse; i 25 collaudi della
+CI verdi nella gabbia; ribasato su 4a522a5 (il banner, di un'altra sessione)
+di nuovo tutta: 16.528 verdi e 0 rosse, e i 25 collaudi verdi. **DAL VIVO**, Chrome headless via CDP a 375 px nei
+due temi, server del banco e un relay di cartone su 127.0.0.1 con una
+chiave di prova: 70 s in Esplora **0 websocket** e 2 domande alla
+fotografia; «un altro dispositivo» (222) pubblica un ordine — relay e
+`/api/p2p/canale` — e la card COMPARE dopo 49 s senza ricaricare; un
+evento 0007 `taken` e SPARISCE dopo 59 s (i tempi sono quelli del giro del
+minuto, il server era gia' aggiornato dopo 3 s); nel P2P si aprono 2
+websocket (lettura e ascolto) e tornando in Esplora si chiudono tutte e
+due, con la domanda alla fotografia partita subito; il tocco su una card
+apre il dettaglio con 0 websocket. Nessun errore dell'app.
+**DA AVERE:** la prova con due telefoni veri, e sapere se Caddy comprime.

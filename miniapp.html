@@ -14441,8 +14441,11 @@ function go(view){
   /* IL LIBRO IN ASCOLTO (24 set 2026): l'orecchio sui 38383 si apre
      entrando in una vista del P2P e si chiude uscendone — dalla VISTA,
      come nav-p2p, cosi' vale anche per indietro e cronologia */
-  if (VISTE_NAV_P2P.has(view) || libroInAscoltoInEsploraP2P(view)) { if (typeof ascoltaLibroP2P === 'function') ascoltaLibroP2P(); }
+  if (VISTE_NAV_P2P.has(view)) { if (typeof ascoltaLibroP2P === 'function') ascoltaLibroP2P(); }
   else if (typeof chiudiAscoltoLibroP2P === 'function') chiudiAscoltoLibroP2P();
+  /* ...e in Esplora la fila «Scambi P2P» riarma la sua fotografia: dai
+     relay non passa niente (26 set 2026, vedi LE CARD P2P IN VETRINA) */
+  if (view === 'esplora' && typeof armaFotoVetrinaP2P === 'function') armaFotoVetrinaP2P(true);
   /* la PRIMA apertura del libro in questa sessione saluta col dondolio
      del logo, poi dondola solo al cambio fra Compra e Vendi: tornando
      nel libro non piu' (scuotiLogoP2P toglie la classe a fine giro) */
@@ -48365,7 +48368,6 @@ function arrivaLibroP2P(ev){
   if (r.nuovo) { p2pCardNuove[r.nuovo] = Date.now(); voltoCardNuovaP2P(r.nuovo); }
   diarioP2P('libro in ascolto: ' + (r.nuovo ? 'nuovo ordine ' + r.nuovo : r.via ? 'via ' + r.via : 'aggiornato'));
   if (vistaAttivaP2P() === 'view-p2p') ridisegnaLibroFermoP2P();
-  if (vistaAttivaP2P() === 'view-esplora') renderVetrinaP2P();
   return true;
 }
 function cardNuovaP2P(id){
@@ -57514,7 +57516,7 @@ function apriLibroSubitoP2P(){
   if (c) { libroDaCopiaP2P(c.eventi, c.quando, 'telefono'); return true; }
   if (!p2pFotoChiesta) {
     p2pFotoChiesta = true;
-    chiediFotoLibroP2P().then(ok => { if (ok) { renderP2P(); renderVetrinaP2P(); } }).catch(() => {});
+    chiediFotoLibroP2P().then(ok => { if (ok) renderP2P(); }).catch(() => {});
   }
   return false;
 }
@@ -57813,13 +57815,18 @@ function animaBannerFeeP2P(){
    vedono solo i moderatori e la fase di prova: a dirlo e' il server,
    una chiave della busta di prima pagina (`p2p_vetrina`, giudice
    `_p2p_vetrina_per`), mai il client.
-   LA FONTE E' IL LIBRO, NON UNA COPIA SUA: le card si leggono da
-   `p2pLibro`, lo stesso oggetto che disegna la pagina del P2P — la
-   copia del telefono o la fotografia del server all'ingresso, poi la
-   lettura vera dai relay e l'orecchio sui 38383, che per chi vede le
-   card resta aperto anche in Esplora. Un ordine preso, annullato o
-   scaduto esce dal libro, e con lui dalla vetrina: non c'e' un secondo
-   elenco da tenere allineato.
+   ⚠️ LA FONTE E' LA FOTOGRAFIA DEL SERVER, NON I RELAY (26 set 2026,
+   ritocco di Andrea a 7ee92f5): la prima stesura leggeva `p2pLibro` e
+   teneva aperto l'orecchio sui 38383 anche in Esplora — dopo il lancio
+   lo avrebbe fatto CHIUNQUE apra il mercatino. Adesso la fila chiede
+   `/api/p2p/libro` (la fotografia che l'orologio del server rinfresca
+   ogni minuto, e che la rotta serve dalla memoria) all'apertura di
+   Esplora e poi ogni 60 secondi, SOLO a Esplora davanti e pagina
+   visibile; nessuna connessione ai relay da qui. Un ordine preso,
+   annullato o scaduto sparisce al giro dopo, cioe' entro un minuto.
+   L'ascolto dal vivo resta dentro le viste del P2P, come prima.
+   Gli eventi passano dallo stesso lettore del libro (`libroDaEventi`),
+   quindi scadenze, valuta e doppioni si giudicano con le sue regole.
    LA CARD HA LE MISURE DELLE SORELLE (la stessa `.card`, la stessa
    foto quadrata, lo stesso cartellino di carta a cavallo del bordo) e
    parla da chi ha PUBBLICATO: «Vende BTC» / «Compra BTC», mentre la
@@ -57836,9 +57843,13 @@ function animaBannerFeeP2P(){
    strada scartata (una card dopo il secondo annuncio e poi ogni cinque)
    sta in CANTIERI, «Le card P2P in vetrina». */
 const P2P_VETRINA_MAX = 6;          // quante card, al massimo
-const P2P_VETRINA_RILEGGI_MS = 60000;
+const P2P_VETRINA_FOTO_MS = 60000;  // ogni quanto la fila rinfresca la fotografia
 let p2pInVetrina = false;           // dalla busta di prima pagina
-let p2pVetrinaLetto = 0;            // l'ultima lettura vera chiesta da qui
+let p2pVetrinaFoto = null;          // {ordini, eventi, quando}: la fotografia della fila
+let p2pVetrinaChiesta = 0;          // quando e' partita l'ultima domanda
+let p2pVetrinaTimer = null;         // il prossimo giro, se c'e'
+let p2pVetrinaInVolo = false;
+let p2pVetrinaFresca = false;       // la prossima domanda salta la cache (ritorno in Esplora)
 let p2pVetrinaFirma = null;         // cosa c'e' in pagina: si ridisegna solo se cambia
 
 /* La vetrina e' quella nuda? */
@@ -57912,8 +57923,8 @@ function filaCardP2P(html){
 }
 function renderVetrinaP2P(){
   const qui = vetrinaNudaP2P();
-  if (qui) armaLibroVetrinaP2P();
-  const ordini = qui ? ordiniVetrinaP2P(p2pLibro) : [];
+  if (qui) armaFotoVetrinaP2P();
+  const ordini = qui ? ordiniVetrinaP2P(p2pVetrinaFoto) : [];
   const html = ordini.map(cardVetrinaP2P);
   /* SI RIDISEGNA SOLO SE CAMBIA QUALCOSA: riscrivere la fila la riporta
      all'inizio, e chi la sta scorrendo di lato perderebbe il segno a
@@ -57923,33 +57934,91 @@ function renderVetrinaP2P(){
   p2pVetrinaFirma = firma;
   filaCardP2P(html);
 }
-/* IL LIBRO PER LA VETRINA: all'ingresso la copia o la fotografia (le
-   porte del «libro subito»), poi la lettura vera — al massimo una al
-   minuto — e l'orecchio sui 38383, che da qui tiene le card vive. */
-function armaLibroVetrinaP2P(){
-  if (DEMO) return;
-  if (!p2pLibro && typeof apriLibroSubitoP2P === 'function') apriLibroSubitoP2P();
-  const ora = Date.now();
-  if (ora - p2pVetrinaLetto < P2P_VETRINA_RILEGGI_MS) return;
-  if (p2pLibro && !p2pLibro.copia && ora - (p2pLibro.quando || 0) < P2P_VETRINA_RILEGGI_MS) {
-    if (vistaAttivaP2P() === 'view-esplora') ascoltaLibroP2P();
-    return;
+/* LA FOTOGRAFIA PER LA FILA: una GET leggera, che il server serve dalla
+   memoria (cache privata di 30 s: un rientro in Esplora subito dopo non
+   la richiede nemmeno). I volti arrivano solo a chi ha una sessione, ed
+   entrano nella cache di sempre. Torna vero se la fila ha di che
+   ridisegnarsi. */
+async function chiediFotoVetrinaP2P(){
+  const h = {};
+  if (myTgId && !VETRINA) h['X-Tg-Init-Data'] = authHdr();
+  /* al ritorno in Esplora si salta la cache privata di 30 s: e' il
+     momento in cui chi guarda si aspetta la fila di adesso */
+  const fresca = p2pVetrinaFresca;
+  p2pVetrinaFresca = false;
+  const r = await fetch(`${API_BASE}/p2p/libro`, {headers: h, cache: fresca ? 'no-cache' : 'default'});
+  if (!r.ok) return false;
+  const d = await r.json();
+  const facce = (d && d.facce && typeof d.facce === 'object') ? d.facce : {};
+  for (const id in facce) { p2pFacce[id] = facce[id]; p2pFacceChieste.add(id); }
+  const eventi = Array.isArray(d && d.eventi) ? d.eventi : [];
+  const quando = (Number(d && d.quando) || 0) * 1000;
+  /* leva spenta sul server, o una fotografia di piu' di un giorno: la
+     fila resta vuota, mai un elenco di offerte prese da un pezzo */
+  if (!(quando > 0) || Date.now() - quando > P2P_COPIA_MAX_MS) {
+    p2pVetrinaFoto = {ordini: [], eventi: [], quando: 0};
+    return true;
   }
-  p2pVetrinaLetto = ora;
-  caricaLibroP2P().then(() => {
-    if (vistaAttivaP2P() === 'view-esplora') { ascoltaLibroP2P(); renderVetrinaP2P(); }
-  }).catch(() => {});
+  const libro = libroDaEventi(eventi);
+  if (libro.info && !p2pInfo) p2pInfo = libro.info;
+  p2pVetrinaFoto = {ordini: libro.ordini, eventi, quando};
+  return true;
 }
-/* l'orecchio del libro resta aperto in Esplora per chi vede le card */
-function libroInAscoltoInEsploraP2P(view){
-  return view === 'esplora' && p2pInVetrina && !DEMO;
+/* Esplora e' davanti e la pagina si vede: le due condizioni del giro */
+function vetrinaDavantiP2P(){
+  return vistaAttivaP2P() === 'view-esplora' && document.visibilityState !== 'hidden';
 }
+/* IL GIRO DI UN MINUTO: armarlo non fa niente se ce n'e' gia' uno o se
+   una domanda e' in volo; la prima domanda parte subito, le altre a un
+   minuto dall'ultima. Il giro si FERMA DA SOLO quando trova Esplora
+   dietro, la pagina nascosta o la vetrina non nuda — e lo riarmano il
+   ritorno in Esplora (go), la pagina che torna visibile e ogni disegno
+   della griglia.
+   `subito` (dal vivo di Andrea, 26 set 2026): TORNANDO in Esplora, o
+   sulla pagina, la domanda parte adesso e salta la cache — il minuto
+   vale per chi resta a guardare, non per chi arriva. Il server intanto
+   rifa' la fotografia appena mostrod gli dice che il libro e' cambiato
+   (LA FOTOGRAFIA SUBITO, in server.py). */
+function armaFotoVetrinaP2P(subito){
+  if (p2pVetrinaInVolo) return;
+  if (!p2pInVetrina || DEMO || !vetrinaDavantiP2P() || !vetrinaNudaP2P()) return;
+  if (subito && p2pVetrinaTimer) { clearTimeout(p2pVetrinaTimer); p2pVetrinaTimer = null; }
+  if (p2pVetrinaTimer) return;
+  if (subito) p2pVetrinaFresca = true;
+  const attesa = subito ? 0
+    : Math.max(0, P2P_VETRINA_FOTO_MS - (Date.now() - p2pVetrinaChiesta));
+  p2pVetrinaTimer = setTimeout(giroFotoVetrinaP2P, attesa);
+}
+function giroFotoVetrinaP2P(){
+  p2pVetrinaTimer = null;
+  if (!p2pInVetrina || DEMO || !vetrinaDavantiP2P() || !vetrinaNudaP2P()) return;
+  p2pVetrinaInVolo = true;
+  p2pVetrinaChiesta = Date.now();
+  chiediFotoVetrinaP2P().catch(() => false).then(() => {
+    p2pVetrinaInVolo = false;
+    renderVetrinaP2P();          // ridisegna se e' cambiato, e riarma il giro
+  });
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') armaFotoVetrinaP2P(true);
+});
 /* IL TOCCO: il dettaglio dell'ordine, lo stesso foglio del libro
    (prendiOrdineP2P: le sue guardie, il proprio ordine, la presa). Chi
    il P2P non ce l'ha ancora aperto — un moderatore fuori dalla fase di
    prova, chi guarda da fuori Telegram — legge prima cos'e'. */
 function apriCardP2P(id){
   if (DEMO || VETRINA || !myTgId || !p2pAcceso()) { apriCosaP2P(); return; }
+  /* IL DETTAGLIO LEGGE `p2pLibro`, che da Esplora puo' non esserci o
+     essere piu' vecchio della fotografia della fila: in quei casi la
+     fotografia diventa il libro in pagina, col segno della COPIA — cosi'
+     il dettaglio si apre subito, e la presa aspetta il libro vero dai
+     relay (`aspettaLibroVeroP2P`), che e' un gesto e non un'attesa di
+     Esplora. Se nel frattempo l'ordine e' stato preso, lo dice la presa
+     come dal libro: «Quest'ordine non c'è più». Un libro vero piu'
+     fresco della fotografia resta dov'e': quello e' piu' giusto. */
+  const f = p2pVetrinaFoto;
+  if (f && f.quando && (!p2pLibro || p2pLibro.copia || (p2pLibro.quando || 0) < f.quando))
+    libroDaCopiaP2P(f.eventi, f.quando, 'server');
   if (!rigaLibroP2P(id)) {
     toast('Quest\'ordine non c\'è più');
     renderVetrinaP2P();

@@ -8193,24 +8193,18 @@ MSG_ACCOUNT_ASSENTE = ("Questo account non è aperto su questo "
                        "dispositivo: rifai l'accesso")
 
 
-def verifica_utente(init_data: str, sessione: str = "") -> dict:
-    # --- browser col cookie di sessione (login web): niente initData.
-    #     Il fallback scatta SOLO a header vuoto: un initData presente
-    #     ma invalido resta 401, nessun "declassamento" possibile. ---
-    if not init_data:
-        user = utente_da_sessione(sessione)
-        if user:
-            return user
-        raise HTTPException(401, "Autenticazione Telegram non valida")
+def _utente_da_initdata(init_data: str) -> dict:
+    """L'initData GIUDICATO, senza scrivere niente (26 set 2026, con la
+    fila «Scambi P2P» in vetrina): la firma dice CHI, la freschezza
+    QUANDO, e torna l'utente — o alza il 401 di sempre. Era la prima
+    meta' di `verifica_utente`, che adesso la chiama e poi scrive
+    l'utente come prima; la fotografia del libro (`/api/p2p/libro`) la
+    chiama da sola per decidere se servire i volti, senza toccare il
+    database a ogni richiesta di Esplora."""
     # --- MODALITA' COLLAUDO: utenti finti per il test dal browser ---
     if MODALITA_COLLAUDO and init_data.startswith("collaudo:"):
         _, uid, nome = init_data.split(":", 2)
-        user = {"id": int(uid), "first_name": nome, "username": nome.lower()}
-        con = db()
-        _upsert_da_telegram(con, user["id"], nome, nome.lower())
-        con.commit()
-        con.close()
-        return user
+        return {"id": int(uid), "first_name": nome, "username": nome.lower()}
     # --- flusso normale: initData firmato da Telegram ---
     try:
         dati = dict(parse_qsl(init_data))
@@ -8230,12 +8224,34 @@ def verifica_utente(init_data: str, sessione: str = "") -> dict:
     #     FUORI dal try per due ragioni: qui dentro l'except si
     #     mangerebbe l'HTTPException e la riscriverebbe col messaggio
     #     generico, e una credenziale scaduta non deve scrivere sul
-    #     database — per questo sta anche PRIMA dell'INSERT. Fail-closed
+    #     database — per questo sta anche PRIMA dell'INSERT (che vive
+    #     in `verifica_utente`, dopo questa chiamata). Fail-closed
     #     per costruzione, come importo_invoice: auth_date assente o
     #     illeggibile vale 0, cioe' vecchio di un'era, cioe' rifiutato,
     #     senza un ramo apposta. ---
     if ORE_INITDATA and eta > ORE_INITDATA * 3600:
         raise HTTPException(401, MSG_INITDATA_SCADUTO)
+    return user
+
+
+def verifica_utente(init_data: str, sessione: str = "") -> dict:
+    # --- browser col cookie di sessione (login web): niente initData.
+    #     Il fallback scatta SOLO a header vuoto: un initData presente
+    #     ma invalido resta 401, nessun "declassamento" possibile. ---
+    if not init_data:
+        user = utente_da_sessione(sessione)
+        if user:
+            return user
+        raise HTTPException(401, "Autenticazione Telegram non valida")
+    # --- firma e freschezza: `_utente_da_initdata`, che non scrive ---
+    user = _utente_da_initdata(init_data)
+    # --- MODALITA' COLLAUDO: l'utente finto si scrive come sempre ---
+    if MODALITA_COLLAUDO and init_data.startswith("collaudo:"):
+        con = db()
+        _upsert_da_telegram(con, user["id"], user["first_name"], user["username"])
+        con.commit()
+        con.close()
+        return user
     try:
         con = db()
         _upsert_da_telegram(con, user["id"], user.get("first_name", ""),
@@ -41357,31 +41373,63 @@ def libro_fotografato_p2p(x_tg_init_data: str = Header(""),
     SUBITO»): la fotografia che l'orologio scrive ogni minuto — vedi
     «LA FOTOGRAFIA DEL LIBRO». Nessun relay sotto, nessuna scrittura:
     e' la rotta con cui il client riempie la pagina mentre la lettura
-    vera parte.
+    vera parte, e da cui la fila «Scambi P2P» di Esplora prende le sue
+    card, rinfrescandole ogni minuto.
+    REGGE TUTTA ESPLORA (26 set 2026): per richiesta non tocca ne' il
+    database ne' i relay. Gli eventi e i volti stanno in memoria (i
+    volti li calcola l'orologio con la fotografia, `_facce_foto_p2p`), e
+    chi guarda si riconosce dalla sola firma dell'initData
+    (`_utente_da_initdata`, che non scrive) o dal cookie con una memoria
+    di cinque minuti (`_ha_sessione_p2p`).
     APERTA COME IL LIBRO: i 38383 li legge chiunque sui relay, e la
     vetrina anonima il libro lo guarda gia'. I VOLTI no, per la regola
     di `/api/p2p/facce`: escono solo a chi ha una sessione, e un
     raccoglitore anonimo non incrocia niente coi nostri account.
     Leva spenta = fotografia vuota, `quando` a zero: il client la tratta
-    come «non c'e'». no-store: e' una fotografia, e invecchia."""
+    come «non c'e'». CACHE PRIVATA DI 30 SECONDI: la fotografia cambia
+    al piu' una volta al minuto; privata e con `Vary` perche' con la
+    sessione porta i volti, e un proxy non deve darli a un altro."""
     F = _P2P_FOTO
     attivo = _p2p_leve()["attivo"]
     fuori = {"eventi": F["eventi"] if attivo else [],
              "quando": F["quando"] if attivo else 0}
-    if fuori["eventi"] and utente_se_autenticato(x_tg_init_data,
-                                                 barattolo_sessione):
-        ids = [d for d in (_tag_evento_p2p(e, "d") for e in fuori["eventi"]
-                           if e.get("kind") == 38383)
-               if FORMA_ORDINE_P2P.fullmatch(d)][:MAX_ORDINI_P2P]
-        if ids:
-            con = db()
-            try:
-                fuori["facce"] = _facce_ordini_p2p(con, ids, int(time.time()))
-            except ValueError:
-                pass
-            finally:
-                con.close()
-    return JSONResponse(fuori, headers={"Cache-Control": "no-store"})
+    if fuori["eventi"] and F.get("facce") and _ha_sessione_p2p(
+            x_tg_init_data, barattolo_sessione):
+        fuori["facce"] = F["facce"]
+    return JSONResponse(fuori, headers={
+        "Cache-Control": "private, max-age=30",
+        "Vary": "X-Tg-Init-Data, Cookie"})
+
+
+# CHI GUARDA IL LIBRO HA UNA SESSIONE? Per il cookie del login web serve
+# il database (la tabella `sessioni`): la risposta si ricorda per cinque
+# minuti, cosi' Esplora che rinfresca ogni minuto non lo tocca a ogni
+# giro. Decide solo se servire i VOLTI, roba gia' pubblica nel mercatino:
+# una sessione chiusa da poco che li vede ancora qualche minuto non
+# apre niente. Il dizionario si svuota se cresce troppo.
+P2P_SESSIONI_VOLTI_S = 300
+_P2P_SESSIONI_VOLTI: dict = {}
+
+
+def _ha_sessione_p2p(init_data: str, sessione: str) -> bool:
+    if init_data:
+        try:
+            _utente_da_initdata(init_data)
+            return True
+        except Exception:
+            return False
+    if not sessione:
+        return False
+    th = hashlib.sha256(sessione.encode()).hexdigest()
+    adesso = time.time()
+    v = _P2P_SESSIONI_VOLTI.get(th)
+    if v and v[0] > adesso:
+        return v[1]
+    ok = utente_da_sessione(sessione) is not None
+    if len(_P2P_SESSIONI_VOLTI) >= 5000:
+        _P2P_SESSIONI_VOLTI.clear()
+    _P2P_SESSIONI_VOLTI[th] = (adesso + P2P_SESSIONI_VOLTI_S, ok)
+    return ok
 
 
 @app.post("/api/p2p/controparte")
@@ -42520,6 +42568,10 @@ async def annuncia_ordine_p2p_canale(req: Request,
     if _tabacchino_libro([metodo]) and not _importo_paycode_valido(euro):
         raise HTTPException(
             400, "Amazon accetta il pagamento in contanti fino a 999 € per ordine")
+    # un ordine nuovo nel libro: la fotografia si rifa' subito, cosi' la
+    # fila «Scambi P2P» di Esplora lo mostra al suo giro dopo (LA
+    # FOTOGRAFIA SUBITO) — col canale acceso o spento
+    _foto_subito_p2p()
     postato = False
     if canale_id():
         try:
@@ -43837,7 +43889,7 @@ P2P_FOTO_MAX = 300                 # quante offerte si servono, al massimo
 P2P_FOTO_MAX_S = 60                # il tetto di una fotografia, relay compresi
 _CAMPI_EVENTO = ("id", "pubkey", "created_at", "kind", "tags", "content", "sig")
 _P2P_FOTO = {"ultimi": {}, "info": None, "quando": 0, "intera": 0,
-             "visto": 0, "eventi": []}
+             "visto": 0, "eventi": [], "facce": {}, "via": {}}
 
 
 def libro_intero_da_relay(relay: str, mostro: str, since: int):
@@ -43954,10 +44006,111 @@ async def _fotografa_libro_p2p():
                                    eventi, adesso)
     visto = max([int(e.get("created_at") or 0) for e in ultimi.values()]
                 + [F["visto"] if not intera else 0])
-    F.update(ultimi=ultimi, info=info, quando=adesso, visto=visto,
-             eventi=_vetrina_foto_p2p(ultimi, info, adesso))
+    # GLI ORDINI USCITI PER PAROLA DI MOSTROD restano fuori anche se un
+    # relay non ha ancora il 38383 che lo dice (vedi LA FOTOGRAFIA
+    # SUBITO); passata la finestra del libro la loro lista si svuota
+    via = {d: q for d, q in (F.get("via") or {}).items()
+           if q >= adesso - P2P_FOTO_FINESTRA_S}
+    F.update(ultimi=ultimi, info=info, quando=adesso, visto=visto, via=via,
+             eventi=_senza_i_via_p2p(_vetrina_foto_p2p(ultimi, info, adesso), via))
+    # I VOLTI SI FOTOGRAFANO CON IL LIBRO (26 set 2026, la fila «Scambi
+    # P2P» in vetrina): una query al minuto qui, invece di una per ogni
+    # richiesta di Esplora. La rotta li serve dalla memoria.
+    F["facce"] = _facce_foto_p2p(F["eventi"], adesso)
     if intera:
         F["intera"] = adesso
+
+
+# ═══ LA FOTOGRAFIA SUBITO (26 set 2026, dal vivo di Andrea) ═══
+# Pubblicato un ordine, la card nella fila «Scambi P2P» di Esplora non
+# compariva finche' non si ricaricava la vetrina: la fotografia la
+# rifaceva solo l'orologio, una volta al minuto. Adesso si rifa' SUBITO
+# quando si sa che il libro e' cambiato:
+# • mostrod avvisa (eventi della patch 0007) di un ordine PRESO,
+#   ANNULLATO, SCADUTO o TORNATO nel libro — e i primi tre escono dalla
+#   fotografia all'istante, per parola di mostrod, senza aspettare che
+#   un relay abbia il 38383 nuovo (`_foto_via_p2p`);
+# • un client di Barattolo ha appena pubblicato (`/api/p2p/canale`):
+#   la 0007 degli ordini NUOVI non parla — l'ordine nasce dal client —
+#   e questo e' il solo segnale che il server ha. Gli ordini nati su un
+#   altro client di Mostro aspettano il giro del minuto.
+# Il giro subito aspetta un respiro (P2P_FOTO_SUBITO_S: il 38383 deve
+# arrivare sui relay) e poi fa una fotografia INCREMENTALE, quella di
+# sempre. Uno solo alla volta: gli avvisi che arrivano mentre corre
+# chiedono un giro in piu', non uno per ciascuno.
+P2P_FOTO_SUBITO_S = 3
+P2P_MOMENTI_FUORI_FOTO = ("preso", "annullato", "scaduto")
+_P2P_FOTO_SUBITO: dict = {"task": None, "ancora": False}
+
+
+def _senza_i_via_p2p(eventi, via) -> list:
+    """PURA: gli eventi della fotografia senza gli ordini che mostrod ha
+    detto usciti. Esce il 38383 NATO PRIMA della parola di mostrod; uno
+    piu' nuovo — l'ordine tornato nel libro — resta."""
+    via = via or {}
+    return [e for e in eventi or []
+            if not (e.get("kind") == 38383
+                    and int(e.get("created_at") or 0)
+                    <= via.get(_tag_evento_p2p(e, "d") or "", -1))]
+
+
+def _foto_via_p2p(F, ordine: str, quando: int) -> None:
+    """Toglie SUBITO un ordine dalla fotografia, per parola di mostrod."""
+    via = dict(F.get("via") or {})
+    via[ordine] = max(int(quando or 0), via.get(ordine, 0))
+    F["via"] = via
+    F["eventi"] = _senza_i_via_p2p(F.get("eventi"), via)
+
+
+def _foto_subito_p2p() -> None:
+    """Chiede un giro della fotografia adesso, non fra un minuto."""
+    S = _P2P_FOTO_SUBITO
+    if S["task"] is not None and not S["task"].done():
+        S["ancora"] = True
+        return
+
+    async def giro():
+        while True:
+            S["ancora"] = False
+            await asyncio.sleep(P2P_FOTO_SUBITO_S)
+            try:
+                await asyncio.wait_for(_fotografa_libro_p2p(), P2P_FOTO_MAX_S)
+            except Exception as e:
+                print(f"⚠️ Fotografia del libro, giro subito: {e}", flush=True)
+            if not S["ancora"]:
+                break
+    try:
+        S["task"] = asyncio.get_running_loop().create_task(giro())
+    except RuntimeError:
+        pass          # nessun loop in corsa: resta il giro del minuto
+
+
+def _foto_dopo_evento_p2p(ev: dict) -> None:
+    """Un avviso NUOVO di mostrod (0007) che cambia il libro."""
+    if not _p2p_leve()["attivo"]:
+        return
+    if ev.get("momento") in P2P_MOMENTI_FUORI_FOTO:
+        _foto_via_p2p(_P2P_FOTO, ev["ordine"], ev["ts"])
+    if ev.get("momento") in P2P_MOMENTI_FUORI_FOTO + ("tornato",):
+        _foto_subito_p2p()
+
+
+def _facce_foto_p2p(eventi, adesso) -> dict:
+    """I volti degli ordini della fotografia, calcolati UNA volta per
+    giro dell'orologio. Stessa lettura di `/api/p2p/facce` (il giudice
+    `_facce_ordini_p2p`), sugli stessi id che la rotta serve."""
+    ids = [d for d in (_tag_evento_p2p(e, "d") for e in eventi or []
+                       if e.get("kind") == 38383)
+           if FORMA_ORDINE_P2P.fullmatch(d)][:MAX_ORDINI_P2P]
+    if not ids:
+        return {}
+    con = db()
+    try:
+        return _facce_ordini_p2p(con, ids, adesso)
+    except ValueError:
+        return {}
+    finally:
+        con.close()
 
 
 def _avvisi_p2p_accesi(con, tg_id: int) -> bool:
@@ -45308,6 +45461,8 @@ async def evento_p2p(req: Request):
         t = asyncio.create_task(_manda_evento_p2p(ev, fatto))
         _TASK_EVENTI_P2P.add(t)
         t.add_done_callback(_TASK_EVENTI_P2P.discard)
+        # ...e la fotografia del libro si rifa' subito (LA FOTOGRAFIA SUBITO)
+        _foto_dopo_evento_p2p(ev)
     return JSONResponse({"ok": True, "nuovo": fatto is not None},
                         headers={"Cache-Control": "no-store"})
 

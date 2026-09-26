@@ -6930,9 +6930,15 @@
   della card del libro). Chi le vede lo decide il server
   (`_p2p_vetrina_per`, chiave `p2p_vetrina` della busta): a leva
   `P2P_IN_VETRINA` spenta moderatori e fase di prova, accesa tutti ma
-  solo a fase aperta. La fonte e' `p2pLibro` e l'orecchio sui 38383
-  resta aperto anche in Esplora per chi le vede; la fila c'e' solo
-  nella vetrina nuda (`vetrinaNudaP2P`) e non entra mai nella griglia.
+  solo a fase aperta. La fonte e' la FOTOGRAFIA del server
+  (`/api/p2p/libro`, dalla memoria, cache privata di 30 s), chiesta
+  all'apertura di Esplora e ogni 60 s solo a Esplora davanti e pagina
+  visibile (`armaFotoVetrinaP2P`), subito al ritorno: da Esplora nessun
+  relay, l'ascolto vive solo nel P2P. Il server la rifa' subito agli
+  avvisi 0007 di presa, annullo, scadenza e ritorno, e a
+  `/api/p2p/canale` per gli ordini nuovi di Barattolo (LA FOTOGRAFIA
+  SUBITO). La fila c'e' solo nella vetrina nuda (`vetrinaNudaP2P`) e
+  non entra mai nella griglia.
   Il tocco e' `prendiOrdineP2P`, o il foglio «Lo scambio P2P» per chi
   il P2P non ce l'ha. Verbale: CANTIERI, «Le card P2P in vetrina».
   NEL P2P LA PROPRIA META' SI INVIA (26 set 2026): «Invia X € ·
