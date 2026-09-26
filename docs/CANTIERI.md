@@ -33842,3 +33842,37 @@ effetti ridotti col fondo pieno, le card «Invii» nei due tab e «Totale
 da inviare» nel conto, nessuno scorrimento laterale, nessun errore
 dell'app.
 **DA AVERE:** l'occhio sul telefono.
+
+## «Invia», «Come vuoi ricevere» e la sfocatura a meta' (26 set 2026)
+
+Ritocchi di Andrea a 328bf97. **1) «INVII» DIVENTA «INVIA»** nei tre
+posti dove c'era: le due righe della card del libro («Invia 25,00 € ·
+Ricevi ≈ … sats», e dal lato opposto «Invia ≈ … sats · Ricevi 30,00 €»)
+e la riga del conto, che serve il dettaglio e la pagina dello scambio.
+Il resto dei testi di 328bf97 resta com'e' («Totale da inviare»,
+«Invierai circa», «Come vuoi inviare», «inviando» nelle card di «I miei
+scambi», che «Invii» non l'hanno mai avuto). ⚠️ «Invia» e' la forma che
+a settembre la prova della card teneva FUORI («la card descrive invece
+di ordinare»): torna per scelta di Andrea, e la prova rovesciata adesso
+tiene fuori «Invii». Il verbo resta uno nei due tab. E nel foglio
+Pubblica chi vende sats legge **«Come vuoi ricevere»** invece di «Come
+vuoi farti pagare» (anche col tabacchino: «Come vuoi ricevere — col
+tabacchino, uno solo»).
+**2) LA SFOCATURA A META'**: dietro il tour `filter:blur(12px)` invece di
+24 — si intravedono tab, banner e bordi delle card senza leggerne il
+testo. La messa a fuoco resta di 0,8 s, da 12px alla nitidezza (i sei
+istanti: 12 → 6,9 → 2,8 → 0,9 → 0,2 px → nitida). Misurata a CPU 4x:
+mediana 15,5-15,8 ms (60 fotogrammi al secondo), durata 0,75-0,78 s, i
+buchi solo oltre i 580 ms, a sfocatura sotto il pixel e allo
+smontaggio del livello.
+**PROVATO.** Emendate col perche' le prove della card, del conto, di
+`prove_p2p_invii`, del foglio Pubblica e della sfocatura in
+`prove_libro_subito`. Suite intera severa nel worktree da origin/main
+(328bf97): 16.334 verdi e 0 rosse, i 24 collaudi della CI verdi
+nella gabbia; tortura 5 su 5. Dal vivo, Chrome headless via CDP a densita' 3,
+375 px, due temi, relay di cartone su 127.0.0.1: tour e slide finale
+sulla pagina a 12px, i fotogrammi della messa a fuoco, «Invia» nelle
+card dei due tab e nel conto, «Come vuoi ricevere» nel foglio Pubblica
+dal tab «Vendi BTC», effetti ridotti col fondo pieno, nessuno
+scorrimento laterale, nessun errore dell'app.
+**DA AVERE:** l'occhio sul telefono.

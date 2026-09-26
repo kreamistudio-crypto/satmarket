@@ -7917,8 +7917,10 @@
   /* ⚠️ DIETRO IL TOUR LA PAGINA E' SFOCATA (26 set 2026, richiesta di
      Andrea, al posto del fondo pieno e dello svelamento di 23408a3):
      il tour non ha fondo, e finche' e' aperto la vista attiva e la
-     barra prendono un `filter:blur` cosi' forte che della pagina
-     restano solo colori e forme; la card sopra e' nitida. E' un filtro
+     barra prendono un `filter:blur` che lascia intravedere le card
+     senza farle leggere (12px: dal 26 set 2026 sera, a 24 della pagina
+     restavano solo colori e forme, e Andrea l'ha voluta a meta'); la
+     card sopra e' nitida. E' un filtro
      SULLA PAGINA e non un `backdrop-filter` sul velo: si disegna una
      volta e il compositore lo tiene, mentre il backdrop ricampiona
      tutto quel che sta sotto a ogni fotogramma — e sui telefoni e' il
@@ -7932,7 +7934,7 @@
     align-items:center;justify-content:center;padding:16px}
   #tourP2P.open{display:flex}
   html.p2p-sfocata #app > .view.active,
-  html.p2p-sfocata #app > nav{filter:blur(24px);will-change:filter}
+  html.p2p-sfocata #app > nav{filter:blur(12px);will-change:filter}
   html.p2p-a-fuoco #app > .view.active,
   html.p2p-a-fuoco #app > nav{will-change:filter;
     transition:filter .8s cubic-bezier(.3,.6,.35,1)}
@@ -44710,10 +44712,11 @@ function rigaOrdineP2P(o){
      compare il ≈. */
   const netto = nettoLatoP2P(o, o.sats > 0 ? o.sats : stima);
   /* LA CARD PARLA A CHI LEGGE (set 2026, ridisegno chiesto da Andrea):
-     in seconda persona, e l'EURO E' SEMPRE LA RIGA GRANDE — «Invii
+     in seconda persona, e l'EURO E' SEMPRE LA RIGA GRANDE — «Invia
      8,00 €» nel tab «Compra BTC» (ordini k=sell), «Ricevi 7,00 €» nel
      tab «Vendi BTC» (k=buy) — coi sats sempre sotto, «ricevi ≈ 11 828
-     sats» o «Invii ≈ 11 828 sats» («Paghi» fino al 26 set 2026). I due tab si leggono cosi' collo
+     sats» o «Invia ≈ 11 828 sats» («Paghi» e poi «Invii» fino al 26 set
+     2026: «Invia» e' la scelta di Andrea, la stessa parola dei due tab). I due tab si leggono cosi' collo
      stesso movimento dell'occhio: euro grande, sats piccoli, prezzo.
      (Il primo giro scambiava le righe col lato; Andrea l'ha
      rovesciato guardandolo: la coerenza fra i tab vale piu' del
@@ -44764,12 +44767,12 @@ function rigaOrdineP2P(o){
      a vendere ci arriva seconda: cambia l'ORDINE, mai la taglia —
      euro grande e sats piccoli in tutt'e due i tab. */
   const rigaEuro = '<span class="p2p-grande p2p-euro">'
-    + (paghiEuro ? 'Invii ' : 'Ricevi ') + eurTxt + '</span>';
+    + (paghiEuro ? 'Invia ' : 'Ricevi ') + eurTxt + '</span>';
   /* il verbo esce dalla tinta del lato e la cifra ci resta: vedi il
      CSS di `.p2p-sats .p2p-verbo` — in colore va quel che il colore
      distingue, cioe' i sats */
   const rigaSats = '<span class="p2p-piccola p2p-sats">'
-    + '<span class="p2p-verbo">' + (paghiEuro ? 'Ricevi ' : 'Invii ')
+    + '<span class="p2p-verbo">' + (paghiEuro ? 'Ricevi ' : 'Invia ')
     + '</span>' + sats + '</span>';
   /* LA RIGA DEL PREZZO E' MORTA CON LA CARD ESSENZIALE (10 set 2026,
      ritocco di Andrea): «al prezzo di mercato» non serviva a
@@ -50368,7 +50371,7 @@ function contoDettP2P(o){
        le due righe nello stesso foglio delle altre. Il riquadro le
        toglie dall'elenco. */
     + '<div class="ctrl-chiusa">'
-    + r(compro ? 'Ricevi' : 'Invii', cifra('netto'), 'tot sats')
+    + r(compro ? 'Ricevi' : 'Invia', cifra('netto'), 'tot sats')
     + r(compro ? 'Totale da inviare' : 'Ricevi', cifreEuro, 'tot euro')
     + '</div>'
     + '</div>';
@@ -53788,15 +53791,16 @@ function riquadroLimitiP2P(){
 }
 /* ---- IL NOME DEL CAMPO DEI METODI SEGUE IL VERSO (23 set 2026,
    ritocco di Andrea) ----
-   Chi vende sats riceve gli euro e legge «Come vuoi farti pagare»; chi
-   ne compra li paga e legge «Come vuoi pagare». «Metodi di pagamento»
+   Chi vende sats riceve gli euro e legge «Come vuoi ricevere»; chi
+   ne compra li invia e legge «Come vuoi inviare» (26 set 2026: erano
+   «farti pagare» e «pagare»). «Metodi di pagamento»
    non diceva da che parte viaggiano gli euro, e il foglio e' gia' tutto
    detto dal lato di chi scrive («la valuta con cui pagherai /
    riceverai»). UN POSTO SOLO per il nome: il riepilogo prima di
    pubblicare oggi il metodo non lo scrive, e il giorno che lo scrivera'
    chiama questa invece di battere una terza stesura. */
 function nomeMetodiP2P(lato){
-  return lato === 'compro' ? 'Come vuoi inviare' : 'Come vuoi farti pagare';
+  return lato === 'compro' ? 'Come vuoi inviare' : 'Come vuoi ricevere';
 }
 /* la riga che dice perche' l'importo si e' svuotato cambiando metodo
    (vedi `importoDopoMetodoP2P`): sotto il campo, nei due posti in cui

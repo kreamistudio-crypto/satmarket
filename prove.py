@@ -51108,7 +51108,9 @@ def prove_libro_subito():
           "background" in pezzo_js(css, "#tourP2P{", "}"))
     prova("la sfocatura e' un filtro SULLA pagina — vista attiva e barra —, mai un backdrop",
           [True, False],
-          ["html.p2p-sfocata #app > nav{filter:blur(24px);will-change:filter}" in css,
+          # 12px e non 24 (26 set 2026, sera, richiesta di Andrea): le card
+          # si intravedono senza leggersi — e non torna piu' forte di cosi'
+          ["html.p2p-sfocata #app > nav{filter:blur(12px);will-change:filter}" in css,
            "backdrop" in pezzo_js(css, "#tourP2P{", "}")])
     prova("...e con gli effetti ridotti niente sfocatura: il fondo pieno di casa", [True, True],
           ["html.fx-ridotti #tourP2P{background:var(--bg)}" in css,
@@ -51474,7 +51476,7 @@ def prove_p2p_invii():
     Le sentinelle guardano il CODICE (senza commenti) di ogni posto
     censito, e i due versi: quel che doveva cambiare e quel che doveva
     restare."""
-    print("\n[«Paghi» diventa «Invii» nel P2P]")
+    print("\n[«Paghi» diventa «Invia» nel P2P]")
     mini = open("miniapp.html", encoding="utf-8").read()
 
     def cod(firma):
@@ -51502,10 +51504,13 @@ def prove_p2p_invii():
         c = c.replace("(tab ? 'pagando ' : 'inviando ')", "")
         prova(f"{nome}: la propria meta' non si «paga» piu'", [],
               [v for v in vecchie if v in c])
-    prova("la card dice «Invii» sulle due righe", 2,
-          cod("function rigaOrdineP2P(o){").count("'Invii '"))
-    prova("il conto dice «Invii» e «Totale da inviare»", [True, True],
-          ["'Invii'" in cod("function contoDettP2P(o){"),
+    # EMENDATE (26 set 2026, sera): «Invii» e' diventato «Invia», scelta
+    # di Andrea; «Totale da inviare» e il resto dei testi restano
+    prova("la card dice «Invia» sulle due righe, e «Invii» non c'e' piu'", [2, 0],
+          [cod("function rigaOrdineP2P(o){").count("'Invia '"),
+           cod("function rigaOrdineP2P(o){").count("Invii")])
+    prova("il conto dice «Invia» e «Totale da inviare»", [True, True],
+          ["'Invia'" in cod("function contoDettP2P(o){"),
            "'Totale da inviare'" in cod("function contoDettP2P(o){")])
     prova("il metodo da scegliere segue il lato: inviare o ricevere gli euro", [True, True],
           ["(compro ? 'inviare' : 'ricevere') + ' gli euro.'" in cod("function renderDettaglioP2P(){"),
@@ -51537,8 +51542,10 @@ def prove_p2p_invii():
            "Paghi in contanti alla cassa del tabacchino" in mini,
            "Non si paga a parte" in mini,
            "t_vendo: 'Sats in pagamento'" in mini])
-    prova("...e «farti pagare» resta: e' la meta' dell'altra persona", 1,
-          mini.count("'Come vuoi farti pagare'"))
+    # ROVESCIATA (26 set 2026, sera, richiesta di Andrea): anche la meta'
+    # dell'altra persona si dice senza «pagare» — «Come vuoi ricevere»
+    prova("...e chi vende legge «Come vuoi ricevere», non piu' «farti pagare»", [1, 0],
+          [mini.count("'Come vuoi ricevere'"), mini.count("farti pagare'")])
     prova("...e il bot dice ancora «Paga la garanzia»", True,
           "Paga la garanzia: la richiesta è nell'app." in _SORGENTE)
     # --- NEL MERCATINO NON CAMBIA NIENTE ----------------------------
@@ -52403,10 +52410,14 @@ def prove_p2p_libro():
     # EMENDATA (26 set 2026, «PAGHI» DIVENTA «INVII», richiesta di
     # Andrea): la propria meta' di uno scambio si INVIA all'altra persona;
     # «pagare» resta alla garanzia, al PayCode e alla fee.
-    prova("la card parla in seconda persona, e descrive invece di ordinare",
+    # ⚠️ E LA SERA STESSA «INVII» DIVENTA «INVIA» (richiesta di Andrea): la
+    # forma che a settembre questa prova teneva fuori («la card descrive
+    # invece di ordinare») torna per scelta sua — «Invia 25,00 € · Ricevi
+    # ≈ … sats». Il verbo resta UNO nei due tab.
+    prova("la card parla in seconda persona, col verbo scelto da Andrea",
           True, "const paghiEuro = o.lato === 'sell';" in mini
-          and "(paghiEuro ? 'Invii ' : 'Ricevi ')" in mini
-          and "(paghiEuro ? 'Ricevi ' : 'Invii ')" in mini)
+          and "(paghiEuro ? 'Invia ' : 'Ricevi ')" in mini
+          and "(paghiEuro ? 'Ricevi ' : 'Invia ')" in mini)
     prova("...e le taglie restano fisse: euro grande, sats piccoli",
           True, '<span class="p2p-grande p2p-euro">' in mini
           and '<span class="p2p-piccola p2p-sats">' in mini)
@@ -53731,15 +53742,15 @@ console.log(JSON.stringify(out));
     # EMENDATA (26 set 2026, «PAGHI» DIVENTA «INVII», richiesta di
     # Andrea): la propria meta' di uno scambio si INVIA all'altra persona;
     # «pagare» resta alla garanzia, al PayCode e alla fee.
-    prova("nel tab Compra: invii euro grande, ricevi sats sotto", True,
-          '<span class="p2p-grande p2p-euro">Invii 8,00 €</span>'
+    prova("nel tab Compra: invia euro grande, ricevi sats sotto", True,
+          '<span class="p2p-grande p2p-euro">Invia 8,00 €</span>'
           in out["rigaCompra"]
           and '<span class="p2p-verbo">Ricevi </span>≈' in out["rigaCompra"])
-    prova("nel tab Vendi: invii sats prima, ricevi euro grande dopo",
-          True, '<span class="p2p-verbo">Invii </span>≈' in out["rigaVendi"]
+    prova("nel tab Vendi: invia sats prima, ricevi euro grande dopo",
+          True, '<span class="p2p-verbo">Invia </span>≈' in out["rigaVendi"]
           and '<span class="p2p-grande p2p-euro">Ricevi 8,00 €</span>'
           in out["rigaVendi"]
-          and out["rigaVendi"].index("Invii")
+          and out["rigaVendi"].index("Invia")
               < out["rigaVendi"].index("Ricevi"))
     # ⚠️ IN TINTA CI VA LA CIFRA, NON IL VERBO (set 2026, ritocco di
     # Andrea): dentro la card quel colore e' quello del LATO (verde a
@@ -53760,11 +53771,13 @@ console.log(JSON.stringify(out));
     # da quando la tinta e' della sola cifra): «p2p-sats">» adesso e'
     # seguito dallo span del verbo, non dalla parola
     prova("...e il verbo di chi da' e' uno solo nei due tab",
-          ("Invii", "Invii"),
+          ("Invia", "Invia"),
           (out["rigaCompra"].split('p2p-euro">')[1][:5],
            out["rigaVendi"].split('p2p-verbo">')[1][:5]))
-    prova("...e «Invia» non lo dice piu' nessuna delle due", [],
-          [k for k in ("rigaCompra", "rigaVendi") if "Invia" in out[k]])
+    # ROVESCIATA (26 set 2026, sera): «Invia» e' tornato per scelta di
+    # Andrea, quindi a non tornare e' il «Invii» del pomeriggio
+    prova("...e «Invii» non lo dice piu' nessuna delle due", [],
+          [k for k in ("rigaCompra", "rigaVendi") if "Invii" in out[k]])
     prova("...e nemmeno l'imperativo «Paga» di ieri", [],
           [k for k in ("rigaCompra", "rigaVendi")
            if re.search(r"Paga\b", out[k])])
@@ -53888,7 +53901,7 @@ console.log(JSON.stringify(out));
     prova("con la fee viva la card toglie la meta' a chi compra", True,
           "≈ 15206 sats" in out["cardNettaComm"])
     prova("...e la aggiunge a chi vende, che la blocca", True,
-          '<span class="p2p-verbo">Invii </span>≈ 98980 sats'
+          '<span class="p2p-verbo">Invia </span>≈ 98980 sats'
           in out["cardVendiComm"])
     prova("...e a prezzo fisso il netto porta il ≈", True,
           "≈ 79200 sats" in out["cardFissoComm"]
@@ -55096,7 +55109,7 @@ console.log(JSON.stringify(out));
           True, 'Premio al venditore <b class="p2p-affare">4%</b>'
           in o["contoVendi"]
           and '<span class="num meno">≈ −480 sats</span>' in o["contoVendi"]
-          and "Invii" in o["contoVendi"] and "≈ 11635 sats" in o["contoVendi"]
+          and "Invia" in o["contoVendi"] and "≈ 11635 sats" in o["contoVendi"]
           and "Totale da inviare" not in o["contoVendi"]
           and "Ricevi" in o["contoVendi"])
     # ...dove la commissione si AGGIUNGE (niente meno): la blocca lui
@@ -55230,8 +55243,8 @@ console.log(JSON.stringify(out));
     # AGGIUNGE a quel che si blocca, e in fondo si legge «Paghi»
     prova("chi vende blocca la sua meta' in piu': 7301 + 73 = 7374",
           [7301, 73, 7374], _somma(o["mioVendo"]))
-    prova("...e in fondo dice «Invii» invece di «Ricevi»", True,
-          ">Invii<" in o["mioVendo"] and "Totale da inviare" not in o["mioVendo"])
+    prova("...e in fondo dice «Invia» invece di «Ricevi»", True,
+          ">Invia<" in o["mioVendo"] and "Totale da inviare" not in o["mioVendo"])
     # ⚠️ UN INTERVALLO ANCORA APERTO NON SI FA FISSARE DA UNA CIFRA
     # SOLA: il coordinatore collassa i due capi insieme all'importo, e
     # finche' l'euro e' una fascia («20,00–100,00 €») un numero solo di
@@ -74845,7 +74858,7 @@ def prove_pubblica_metodo_prima():
     # --- 1) SUL TESTO: un nome solo, e niente troncamento muto --------
     _sc = pezzo_js(mini, "function scegliMetodoP2P(m){", "\n}\n")
     prova("il nome del campo dei metodi ha un posto solo, coi due versi", [1, 1],
-          [mini.count("'Come vuoi farti pagare'"), mini.count("'Come vuoi inviare'")])
+          [mini.count("'Come vuoi ricevere'"), mini.count("'Come vuoi inviare'")])
     prova("...e i due titoli di ieri non ci sono piu'", [False, False],
           ["'Metodi di pagamento — puoi sceglierne più di uno'" in mini,
            "'Metodo di pagamento — col tabacchino, uno solo'" in mini])
@@ -75048,14 +75061,15 @@ console.log(JSON.stringify(R));
            "Come vuoi inviare — puoi sceglierne più di uno",
            "Inserisci l'importo in EUR che vuoi inviare",
            "Tipo di prezzo", "Premio (%)", _LIM], out["compro"])
-    prova("chi vende sats: valuta, «Come vuoi farti pagare», poi l'importo",
+    # EMENDATA (26 set 2026, sera): «farti pagare» e' diventato «ricevere»
+    prova("chi vende sats: valuta, «Come vuoi ricevere», poi l'importo",
           ["Seleziona la valuta con cui riceverai",
-           "Come vuoi farti pagare — puoi sceglierne più di uno",
+           "Come vuoi ricevere — puoi sceglierne più di uno",
            "Inserisci l'importo in EUR che vuoi ricevere",
            "Tipo di prezzo", "Premio (%)", _LIM], out["vendo"])
     prova("...e con Barattozon i metodi stanno sopra il percorso, col nome di chi vende",
           ["Seleziona la valuta con cui riceverai",
-           "Come vuoi farti pagare — col tabacchino, uno solo",
+           "Come vuoi ricevere — col tabacchino, uno solo",
            "Il PayCode", "L'importo esatto, in EUR", "Quando scade il PayCode",
            "Il premio", _LIM], out["tab"])
     # sui nodi, con la tendina aperta: valuta, bottone dei metodi, le

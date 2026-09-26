@@ -6852,7 +6852,7 @@
   apre all'ingresso (chi e' dentro aspetta /me) SULLA PAGINA SFOCATA
   (dal 26 set 2026, al posto del fondo pieno e dello svelamento): il
   tour non ha fondo, e `sfocaPaginaTourP2P` mette `p2p-sfocata`
-  sull'<html>, che da' `filter:blur(24px)` alla vista attiva e alla
+  sull'<html>, che da' `filter:blur(12px)` alla vista attiva e alla
   barra — un filtro sulla pagina e non un backdrop; alla chiusura
   («Inizia», «Salta», indietro) la classe `p2p-a-fuoco` porta la
   transizione e la pagina torna a fuoco in 0,8 s
@@ -6860,8 +6860,8 @@
   fondo pieno, e la pagina c'e' nitida.
   Il verbale: CANTIERI, «Il libro subito» e «Il tutorial su pagina
   sfocata, e «Invii» nel P2P».
-  NEL P2P LA PROPRIA META' SI INVIA (26 set 2026): «Invii X € ·
-  Ricevi ≈ X sats» (e «Invii ≈ X sats · Ricevi X €»), «Totale da
+  NEL P2P LA PROPRIA META' SI INVIA (26 set 2026): «Invia X € ·
+  Ricevi ≈ X sats» (e «Invia ≈ X sats · Ricevi X €»), «Totale da
   inviare», «inviando» nelle card di «I miei scambi». «Pagare» resta
   alla garanzia, al PayCode, alla fee e ai sats «in pagamento»; nel
   mercatino non cambia niente (`prove_p2p_invii`).
