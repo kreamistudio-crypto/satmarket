@@ -1825,6 +1825,58 @@
     color:var(--ink);font-weight:800;font-size:10px;
     letter-spacing:.01em}
 
+  /* ---- LE CARD P2P IN VETRINA (26 set 2026) ----
+     La `.card` di sempre, con la foto al posto della foto: le due
+     monete (o il marchio di Barattozon) su un fondo che non segue il
+     tema — come una foto, e come tutto quel che ci sta sopra. La
+     pastiglia del lato e il volto stanno negli angoli del badge e del
+     barattolino; la cifra nel cartellino di carta delle sorelle. */
+  .card-p2p .p2p-vt-fondo{background:radial-gradient(120% 90% at 50% 38%,
+      #FFF3DC 0%,#F9D9A6 62%,#EDB86C 100%);position:relative}
+  /* le monete scendono un po' (ritocco di Andrea): la pastiglia del
+     lato non deve coprire il ₿ */
+  .card-p2p .ph .p2p-vt-monete{position:absolute;left:9%;top:24%;
+    width:82%;height:auto;object-fit:contain}
+  .card-p2p-bz .p2p-vt-fondo{background:radial-gradient(120% 90% at 50% 40%,
+      #22304A 0%,#131A26 70%)}
+  .card-p2p .ph .p2p-vt-marchio{position:absolute;left:12%;top:36%;
+    width:76%;height:auto;object-fit:contain}
+  /* colori FISSI, come il badge della lampo: stanno sulla «foto».
+     Bianco sul rosso 5,2:1 e sul verde 4,6:1 */
+  .p2p-vt-lato{position:absolute;top:8px;left:8px;z-index:2;
+    border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:800;
+    color:#fff;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+  .p2p-vt-lato.vende{background:#C2410C}
+  .p2p-vt-lato.compra{background:#1B8B54}
+  .p2p-vt-volto{position:absolute;top:7px;right:7px;z-index:2;
+    width:30px;height:30px;border-radius:50%;overflow:hidden;
+    border:2px solid #FFF8EA;background:#23282C;color:#FFF8EA;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Baloo 2',sans-serif;font-weight:800;font-size:13px;
+    line-height:1;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+  .p2p-vt-volto .av-foto{position:absolute;inset:0;width:100%;
+    height:100%;object-fit:cover}
+  /* l'euro nel cartellino: la cifra nell'inchiostro di casa della
+     carta, perche' qui non e' un prezzo in sats (l'arancio) */
+  .card-p2p .tag-price .price{color:#23282C;font-size:15px}
+  .card-p2p .p2p-vt-premio{justify-content:flex-start}
+  .card-p2p .p2p-vt-premio .p2p-badge{margin-top:0;font-size:11.5px}
+  /* il cartellino dell'affare piu' grande (ritocco di Andrea), fino a
+     riempire la riga: a 320 px la card e' larga 138 e dentro ne restano 114 */
+  .card-p2p .p2p-vt-premio .p2p-affarone{font-size:clamp(11px, 3.35vw, 12.5px);
+    line-height:1.25;padding:3px clamp(7px, 2.6vw, 10px) 4px;max-width:100%}
+  /* la fila, se vince lei: card larghe come quelle della griglia */
+  .p2p-vt-fila{display:flex;gap:12px;overflow-x:auto;
+    overscroll-behavior-x:contain;scrollbar-width:none;
+    padding:8px var(--pad) 4px}
+  .p2p-vt-fila::-webkit-scrollbar{display:none}
+  .p2p-vt-fila .card{flex:0 0 calc((100% - 12px) / 2)}
+  .p2p-vt-testa{display:flex;align-items:baseline;justify-content:space-between;
+    gap:8px;padding:16px var(--pad) 0}
+  .p2p-vt-tutti{background:none;border:0;padding:4px 0;cursor:pointer;
+    font:800 13px Nunito,sans-serif;color:var(--sats-text)}
+  .p2p-cosa-corpo p{margin:0 0 10px;font-size:14px;line-height:1.5}
+
   /* Etichetta di sezione con la linea puntinata che riempie fino al
      conteggio (quando c'e'): IN VETRINA ······· 42 oggetti */
   .section-label{
@@ -9365,6 +9417,16 @@ document.getElementById('cartello')?.remove();</script>
           onclick="scorriFila('scoprireStrip',1)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
       </div>
     </div>
+    <!-- GLI SCAMBI P2P IN FILA (26 set 2026): le card P2P in vetrina.
+         Nasce spenta: la accende renderVetrinaP2P solo con la leva del
+         server e nella vetrina nuda (vedi LE CARD P2P IN VETRINA). -->
+    <div id="p2pVetrinaSez" style="display:none">
+      <div class="p2p-vt-testa">
+        <div class="section-label riga-conta">Scambi P2P <span class="conta" id="p2pVetrinaConta"></span></div>
+        <button type="button" class="p2p-vt-tutti" onclick="vaiP2P()">Vedi tutti →</button>
+      </div>
+      <div class="p2p-vt-fila" id="p2pVetrinaFila"></div>
+    </div>
     <!-- Strumenti di navigazione: ordinamento discreto + filtro
          prezzo. Sono un'altra cosa dalla ricerca per parole, e si
          COMPONGONO con lei: chi cerca «bici» e poi stringe il prezzo
@@ -11830,6 +11892,21 @@ document.getElementById('cartello')?.remove();</script>
     <button type="button" class="btn orange" onclick="navIndietro()">Ho capito</button>
   </div>
 
+  <!-- COS'E' LO SCAMBIO P2P (26 set 2026): il foglio breve che apre una
+       card P2P della vetrina a chi il P2P non ce l'ha ancora aperto. La
+       riga che cambia la scrive apriCosaP2P col textContent. -->
+  <div class="sheet" id="p2pCosaSheet" role="dialog" aria-modal="true" aria-labelledby="p2pCosaTit">
+    <div class="grab"></div>
+    <h3 id="p2pCosaTit">Lo scambio P2P</h3>
+    <div class="p2p-cosa-corpo">
+      <p>Qui compri e vendi sats in euro direttamente con un'altra persona: chi compra manda gli euro (bonifico, Revolut, contanti…), chi vende manda i sats.</p>
+      <p>Finché gli euro non sono arrivati, i sats restano bloccati in un deposito di garanzia: chi vende non può riprenderseli a metà strada.</p>
+      <p id="p2pCosaAncora"></p>
+    </div>
+    <button type="button" class="btn orange" id="p2pCosaTg" style="display:none" onclick="apriTelegramDaCosaP2P()">Apri Barattolo su Telegram</button>
+    <button type="button" class="btn orange" id="p2pCosaOk" onclick="navIndietro()">Ho capito</button>
+  </div>
+
   <!-- COSA NON SI PUO' VENDERE (25 set 2026): il foglio breve del link
        accanto a «Pubblica annuncio». Il corpo lo scrive apriVietato
        COPIANDO lista e nota dalla pagina «Il pagamento protetto»
@@ -13857,6 +13934,8 @@ async function loadListings(anonimo){
      anonima): il calco di asta_abilitata — chiave assente = server di
      ieri = si resta al coming soon, un'assenza e non una bugia */
   if (j.p2p && typeof j.p2p === 'object') p2pLevaPubblica = j.p2p;
+  /* ...e le card P2P in vetrina (26 set 2026): le decide il server */
+  if (j.p2p_vetrina !== undefined) p2pInVetrina = j.p2p_vetrina === true;
   if (j.totale !== undefined) vetrinaTotale = j.totale;
   if (j.conteggi) conteggiServer = j.conteggi;
   if (j.regioni) regioniServer = j.regioni;
@@ -14335,7 +14414,7 @@ function go(view){
   /* IL LIBRO IN ASCOLTO (24 set 2026): l'orecchio sui 38383 si apre
      entrando in una vista del P2P e si chiude uscendone — dalla VISTA,
      come nav-p2p, cosi' vale anche per indietro e cronologia */
-  if (VISTE_NAV_P2P.has(view)) { if (typeof ascoltaLibroP2P === 'function') ascoltaLibroP2P(); }
+  if (VISTE_NAV_P2P.has(view) || libroInAscoltoInEsploraP2P(view)) { if (typeof ascoltaLibroP2P === 'function') ascoltaLibroP2P(); }
   else if (typeof chiudiAscoltoLibroP2P === 'function') chiudiAscoltoLibroP2P();
   /* la PRIMA apertura del libro in questa sessione saluta col dondolio
      del logo, poi dondola solo al cambio fra Compra e Vendi: tornando
@@ -17090,6 +17169,8 @@ function renderGrid(items){
   if (ba) ba.style.display =
     (!data.length && !DEMO && !VETRINA && !vistaBarattolo) ? '' : 'none';
   el('grid').innerHTML = data.map(cardHTML).join('');
+  /* le card P2P in vetrina: la fila si accende o si spegne con la vista */
+  renderVetrinaP2P();
   armaViste();
   /* La griglia non ha piu' contatori da aggiornare (il badge dice
      solo la percentuale), ma allo scadere va comunque ridisegnata o
@@ -26445,6 +26526,7 @@ function closeSheet(){
   el('p2pMieiFiltroSheet').classList.remove('open');
   el('p2pFeeSheet').classList.remove('open');
   el('vietatoSheet').classList.remove('open');
+  el('p2pCosaSheet').classList.remove('open');
   el('p2pVotoSheet').classList.remove('open');
   el('p2pHoldSheet').classList.remove('open');
   el('p2pIncassoSheet').classList.remove('open');
@@ -44867,6 +44949,17 @@ function badgePremioP2P(o){
     + (tab ? esc(premioTestoTabP2P(p)) : pr + '%') + '</b> '
     + (a ? 'più' : 'meno') + ' conveniente</span>';
 }
+/* IL CARTELLINO DELL'AFFARE (dal 26 set 2026 in un posto solo: lo
+   mostrano la card del libro e la card P2P della vetrina). Solo sul
+   verso favorevole a chi guarda, oltre le due soglie; il perche' intero
+   sta nella card del libro, dove e' nato. */
+function affaroneP2P(o){
+  const pr = Math.abs(Math.round(o.premium || 0));
+  if (o.sats > 0 || !affareP2P(o) || pr < P2P_AFFARE_OTTIMO) return '';
+  return pr > P2P_AFFARE_SUPER
+    ? '<span class="p2p-affarone super">⚡⚡ Super affare</span>'
+    : '<span class="p2p-affarone">⚡ Ottimo affare</span>';
+}
 
 /* LA CARD DI UN'OFFERTA, in tre blocchi: la cifra, come si paga, chi
    c'e' dall'altra parte. La cifra PRIMA e la persona ULTIMA — in un
@@ -45003,10 +45096,9 @@ function rigaOrdineP2P(o){
      stesse due che il foglio «Pubblica» potra' mostrare a chi pubblica
      il giorno che gli si voglia dire «con questo premio la tua offerta
      si accende». */
-  const affarone = (o.sats > 0 || !affare || pr < P2P_AFFARE_OTTIMO) ? ''
-    : pr > P2P_AFFARE_SUPER
-      ? '<span class="p2p-affarone super">⚡⚡ Super affare</span>'
-      : '<span class="p2p-affarone">⚡ Ottimo affare</span>';
+  /* dal 26 set 2026 il cartellino lo scrive `affaroneP2P`: lo mostra
+     anche la card P2P della vetrina, e una frase in due posti diverge */
+  const affarone = affaroneP2P(o);
   /* il metodo VESTITO (16 set 2026): il marchio per chi ce l'ha nel
      catalogo, il testo per tutti gli altri — vedi P2P_VESTE_METODI. Il
      `title` resta il testo, che e' quel che viaggia nel tag `pm`. */
@@ -48246,6 +48338,7 @@ function arrivaLibroP2P(ev){
   if (r.nuovo) { p2pCardNuove[r.nuovo] = Date.now(); voltoCardNuovaP2P(r.nuovo); }
   diarioP2P('libro in ascolto: ' + (r.nuovo ? 'nuovo ordine ' + r.nuovo : r.via ? 'via ' + r.via : 'aggiornato'));
   if (vistaAttivaP2P() === 'view-p2p') ridisegnaLibroFermoP2P();
+  if (vistaAttivaP2P() === 'view-esplora') renderVetrinaP2P();
   return true;
 }
 function cardNuovaP2P(id){
@@ -57394,7 +57487,7 @@ function apriLibroSubitoP2P(){
   if (c) { libroDaCopiaP2P(c.eventi, c.quando, 'telefono'); return true; }
   if (!p2pFotoChiesta) {
     p2pFotoChiesta = true;
-    chiediFotoLibroP2P().then(ok => { if (ok) renderP2P(); }).catch(() => {});
+    chiediFotoLibroP2P().then(ok => { if (ok) { renderP2P(); renderVetrinaP2P(); } }).catch(() => {});
   }
   return false;
 }
@@ -57685,6 +57778,178 @@ function animaBannerFeeP2P(){
   }, FEE_ANIMA_P2P_MS + 150);
 }
 /* ============ fine del banner personale ============ */
+
+/* ============ LE CARD P2P IN VETRINA (26 set 2026, richiesta di Andrea) ============
+   Al lancio pubblico del P2P ogni ordine vivo del libro compare anche
+   nella vetrina del mercatino, come una card fra le card. Fino ad
+   allora la leva del server (P2P_IN_VETRINA) e' SPENTA, e le card le
+   vedono solo i moderatori e la fase di prova: a dirlo e' il server,
+   una chiave della busta di prima pagina (`p2p_vetrina`, giudice
+   `_p2p_vetrina_per`), mai il client.
+   LA FONTE E' IL LIBRO, NON UNA COPIA SUA: le card si leggono da
+   `p2pLibro`, lo stesso oggetto che disegna la pagina del P2P — la
+   copia del telefono o la fotografia del server all'ingresso, poi la
+   lettura vera dai relay e l'orecchio sui 38383, che per chi vede le
+   card resta aperto anche in Esplora. Un ordine preso, annullato o
+   scaduto esce dal libro, e con lui dalla vetrina: non c'e' un secondo
+   elenco da tenere allineato.
+   LA CARD HA LE MISURE DELLE SORELLE (la stessa `.card`, la stessa
+   foto quadrata, lo stesso cartellino di carta a cavallo del bordo) e
+   parla da chi ha PUBBLICATO: «Vende BTC» / «Compra BTC», mentre la
+   card del libro parla a chi legge. Qui chi guarda non ha ancora
+   scelto un lato, e il lato che si legge e' quello dell'annuncio.
+   SI VEDONO SOLO NELLA VETRINA NUDA: Esplora su «Tutto», senza ricerca,
+   filtri, ordinamento ne' barattolo — un ordine P2P non ha una
+   categoria ne' un prezzo in sats da ordinare, e dentro un risultato
+   sarebbe un intruso. */
+/* ⚠️ IN UNA FILA LORO, «Scambi P2P», e non mescolate agli annunci
+   (decisione di Andrea sugli scatti delle due strade): uno scambio non
+   e' un oggetto, e dentro la griglia si sarebbe confuso con gli annunci
+   — e il conteggio «N oggetti» avrebbe smesso di dire il vero. La
+   strada scartata (una card dopo il secondo annuncio e poi ogni cinque)
+   sta in CANTIERI, «Le card P2P in vetrina». */
+const P2P_VETRINA_MAX = 6;          // quante card, al massimo
+const P2P_VETRINA_RILEGGI_MS = 60000;
+let p2pInVetrina = false;           // dalla busta di prima pagina
+let p2pVetrinaLetto = 0;            // l'ultima lettura vera chiesta da qui
+let p2pVetrinaFirma = null;         // cosa c'e' in pagina: si ridisegna solo se cambia
+
+/* La vetrina e' quella nuda? */
+function vetrinaNudaP2P(){
+  if (!p2pInVetrina || DEMO) return false;
+  if (ramoVetrina !== 'esplora' || activeCat !== 'Tutto') return false;
+  if (vistaBarattolo || barattoloOspite || ultimaRicercaAI) return false;
+  if (el('q') && el('q').value.trim()) return false;
+  if (filtroPrezzo || filtroSped || filtroRitiro || filtroDig || filtroLampo
+      || filtroSpedGratis || filtroSconto || filtroAsta || filtroCond || filtroReg) return false;
+  return !ordinaEffettivo();
+}
+/* PURA: gli ordini da mostrare, dal piu' nuovo. Le stesse regole del
+   libro (vivi, non scaduti, non lapidati): e' il libro, ristretto. */
+function ordiniVetrinaP2P(libro, adesso){
+  if (!libro || !Array.isArray(libro.ordini)) return [];
+  adesso = adesso || Math.floor(Date.now() / 1000);
+  return libro.ordini
+    .filter(o => o && o.id && o.stato === 'pending'
+                 && !(o.scade && o.scade <= adesso) && !lapidataP2P(o.id))
+    .sort((a, b) => (b.creato || 0) - (a.creato || 0))
+    .slice(0, P2P_VETRINA_MAX);
+}
+/* L'euro della card: intero senza decimali («50 €»), coi centesimi
+   quando ci sono (Barattozon: «23,47 €») — il cartellino e' stretto, e
+   «100,00–500,00 €» a 320 px non ci sta. */
+function euroCartaP2P(n){
+  return Number.isInteger(n) ? n.toLocaleString('it-IT') : fmtEur(n);
+}
+function cardVetrinaP2P(o){
+  const vende = o.lato === 'sell';
+  const tab = tabacchinoP2P(o.metodi);
+  const f = p2pFacce[o.id] || {};
+  /* lo sfondo: le due monete per tutti, il marchio per Barattozon (il
+     file chiaro: il fondo e' scuro in tutt'e due i temi) */
+  const fondo = tab
+    ? '<img class="p2p-vt-marchio" src="/assets/barattozon.webp" width="305" height="96" alt="" onerror="this.remove()">'
+    : '<img class="p2p-vt-monete" src="/assets/scambi-intestazione.webp" width="682" height="459" alt="" onerror="this.remove()">';
+  const euro = euroCartaP2P(o.euro) + (o.euroMax ? '–' + euroCartaP2P(o.euroMax) : '');
+  const sats = o.sats > 0 ? o.sats : satsMercatoP2P(o);
+  const sotto = o.euroMax ? 'scegli tu'
+    : sats > 0 ? '≈ ' + fmt(sats) + ' sats' : '';
+  const metodi = (o.metodi || []).map(m => esc(metodoBaseP2P(m))).join(', ');
+  const premio = affaroneP2P(o) || badgePremioP2P(o);
+  const lato = vende ? 'Vende BTC' : 'Compra BTC';
+  return `<div class="card card-p2p${tab ? ' card-p2p-bz' : ''}" data-p2p="${esc(o.id)}" role="button" tabindex="0"
+      aria-label="${esc(lato + ', ' + euro + ' euro' + (metodi ? ', ' + (o.metodi || []).map(metodoBaseP2P).join(', ') : ''))}"
+      onclick="apriCardP2P(this.dataset.p2p)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();apriCardP2P(this.dataset.p2p)}">
+      <div class="ph-wrap">
+        <div class="ph p2p-vt-fondo">${fondo}</div>
+        <span class="p2p-vt-lato ${vende ? 'vende' : 'compra'}">${lato}</span>
+        <span class="p2p-vt-volto">${avatarImg(f.avatar)}${esc((f.nome || '?')[0])}</span>
+        <div class="tag-price"><div class="price">${euro}<span class="unit eur">€</span></div>${sotto ? `<div class="price-sub">${sotto}</div>` : ''}</div>
+      </div>
+      <div class="info">
+        <div class="title">${metodi || 'Scambio P2P'}</div>
+        <div class="meta p2p-vt-premio">${premio}</div>
+      </div>
+    </div>`;
+}
+/* LA FILA: una striscia sua sopra la griglia, «Scambi P2P», con le card
+   larghe come quelle della griglia e «Vedi tutti» che porta al libro.
+   Senza card la sezione sparisce tutta, titolo compreso. */
+function filaCardP2P(html){
+  const sez = el('p2pVetrinaSez'), fila = el('p2pVetrinaFila');
+  if (!sez || !fila) return;
+  sez.style.display = html.length ? '' : 'none';
+  fila.innerHTML = html.join('');
+  const n = el('p2pVetrinaConta');
+  if (n) n.textContent = html.length ? String(html.length) : '';
+}
+function renderVetrinaP2P(){
+  const qui = vetrinaNudaP2P();
+  if (qui) armaLibroVetrinaP2P();
+  const ordini = qui ? ordiniVetrinaP2P(p2pLibro) : [];
+  const html = ordini.map(cardVetrinaP2P);
+  /* SI RIDISEGNA SOLO SE CAMBIA QUALCOSA: riscrivere la fila la riporta
+     all'inizio, e chi la sta scorrendo di lato perderebbe il segno a
+     ogni pagina di annunci che arriva */
+  const firma = html.join('');
+  if (firma === p2pVetrinaFirma) return;
+  p2pVetrinaFirma = firma;
+  filaCardP2P(html);
+}
+/* IL LIBRO PER LA VETRINA: all'ingresso la copia o la fotografia (le
+   porte del «libro subito»), poi la lettura vera — al massimo una al
+   minuto — e l'orecchio sui 38383, che da qui tiene le card vive. */
+function armaLibroVetrinaP2P(){
+  if (DEMO) return;
+  if (!p2pLibro && typeof apriLibroSubitoP2P === 'function') apriLibroSubitoP2P();
+  const ora = Date.now();
+  if (ora - p2pVetrinaLetto < P2P_VETRINA_RILEGGI_MS) return;
+  if (p2pLibro && !p2pLibro.copia && ora - (p2pLibro.quando || 0) < P2P_VETRINA_RILEGGI_MS) {
+    if (vistaAttivaP2P() === 'view-esplora') ascoltaLibroP2P();
+    return;
+  }
+  p2pVetrinaLetto = ora;
+  caricaLibroP2P().then(() => {
+    if (vistaAttivaP2P() === 'view-esplora') { ascoltaLibroP2P(); renderVetrinaP2P(); }
+  }).catch(() => {});
+}
+/* l'orecchio del libro resta aperto in Esplora per chi vede le card */
+function libroInAscoltoInEsploraP2P(view){
+  return view === 'esplora' && p2pInVetrina && !DEMO;
+}
+/* IL TOCCO: il dettaglio dell'ordine, lo stesso foglio del libro
+   (prendiOrdineP2P: le sue guardie, il proprio ordine, la presa). Chi
+   il P2P non ce l'ha ancora aperto — un moderatore fuori dalla fase di
+   prova, chi guarda da fuori Telegram — legge prima cos'e'. */
+function apriCardP2P(id){
+  if (DEMO || VETRINA || !myTgId || !p2pAcceso()) { apriCosaP2P(); return; }
+  if (!rigaLibroP2P(id)) {
+    toast('Quest\'ordine non c\'è più');
+    renderVetrinaP2P();
+    return;
+  }
+  prendiOrdineP2P(id);
+}
+function apriCosaP2P(){
+  haptic();
+  const fuori = DEMO || VETRINA || !myTgId;
+  const t = el('p2pCosaAncora');
+  if (t) t.textContent = fuori
+    ? 'Gli scambi si fanno dall\'app di Barattolo su Telegram.'
+    : 'Per te non è ancora aperto: arriva a breve.';
+  const b = el('p2pCosaTg');
+  if (b) b.style.display = (fuori && !DEMO) ? '' : 'none';
+  /* il bottone pieno e' uno solo: quello di Telegram quando c'e' */
+  const ok = el('p2pCosaOk');
+  if (ok) ok.className = 'btn ' + ((fuori && !DEMO) ? 'ghost' : 'orange');
+  el('sheetBg').classList.add('open');
+  el('p2pCosaSheet').classList.add('open');
+}
+function apriTelegramDaCosaP2P(){
+  closeSheet();
+  invitoTelegram(INVITO_ONION.p2p, 'p2p');
+}
+/* ============ fine delle card P2P in vetrina ============ */
 
 /* ============ I VOLTI SUL LIBRO (set 2026, decisione di Andrea) ====
    Le card mostrano chi ha pubblicato, con la faccia che quella persona

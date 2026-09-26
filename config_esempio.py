@@ -697,6 +697,13 @@ P2P_COMMISSIONE_PERCENTO = 2
 # cifra: il coordinatore non lo conosce e non lo applica. 0 =
 # spento, nessun tetto in euro.
 P2P_MAX_EURO = 0
+# LE CARD P2P IN VETRINA (26 set 2026): gli ordini vivi del libro
+# compaiono anche fra gli annunci del mercatino, come card.
+# SPENTA le vedono solo i moderatori e chi e' in P2P_PROVA_IDS, per
+# provarle. ACCESA le vedono tutti, ma solo con P2P_PROVA_IDS vuota:
+# il giorno del lancio si svuota la lista E si mette True qui.
+# Solo True accende: una stringa o un numero restano spenti.
+P2P_IN_VETRINA = False
 # LO SCONTO FEDELTA' SUL P2P (set 2026): punti percentuali IN MENO
 # sulla propria meta' per chi e' pioniere OPPURE ha il livello 5 (uno
 # sconto solo, non si sommano). ⚠️ Lo sconto vero lo applica il

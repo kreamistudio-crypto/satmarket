@@ -40245,7 +40245,10 @@ def prove_promesse_raggiungibili():
     # frase, un posto solo da tarare). Il numero e' il censimento — chi
     # ne aggiunge una lo sente, e il posto giusto per un colore nuovo
     # e' questa lista, non una regola sparsa altrove nel foglio.
-    prova("i colori del prezzo in card restano quattro", 4,
+    # LA QUINTA (26 set 2026) e' la card P2P della vetrina: li' il
+    # cartellino dice EURO e non un prezzo in sats, e prende
+    # l'inchiostro fisso della carta invece dell'arancio dei sats.
+    prova("i colori del prezzo in card restano cinque", 5,
           len(re.findall(r"\.tag-price[^{]*\.price\{color:", mini)))
 
     # ---- 5. «🚚 GRATIS» DICE IL FATTO, NON IL PERCHE' (decisione di
@@ -40679,7 +40682,9 @@ def prove_verde_e_filtri():
     # e non il valore del select (con un'occasione spuntata
     # l'ordine e' ereditato, e un campo spento mentre la vetrina
     # e' ordinata per scadenza direbbe che non sta facendo niente)
-    prova("...e lo chiedono in quattro", 5,
+    # ...e dal 26 set 2026 CINQUE: le card P2P in vetrina si mostrano
+    # solo sulla vetrina NON ordinata (vetrinaNudaP2P)
+    prova("...e lo chiedono in cinque", 6,
           mini.count("ordinaEffettivo()"))
     # LA SCELTA ESPLICITA VINCE: l'eredita' vale solo sul default
     prova("la scelta esplicita vince sull'eredita'", True,
@@ -52138,6 +52143,318 @@ const out = {};
            o["trFondo"]["freccia"], o["trFondo"]["ascolti"]])
     prova("DA DESKTOP, senza barra, restano le quattro tappe della pagina",
           ["p2pLatoCompro", "esempio:compro", "p2pLatoVendo", "esempio:vendo"], o["desktop"])
+
+
+def prove_card_p2p_vetrina():
+    """LE CARD P2P IN VETRINA (26 set 2026, richiesta di Andrea): gli
+    ordini vivi del libro in una fila «Scambi P2P» sopra la griglia del
+    mercatino. La leva del server (P2P_IN_VETRINA) nasce SPENTA: finche'
+    lo e', le card le vedono solo moderatori e fase di prova, e nessun
+    utente normale. Il giudice del server gira sui suoi casi, la card e
+    la fila girano in node sulle funzioni vere."""
+    print("\n[le card P2P in vetrina]")
+    import json as _js, shutil, subprocess, sys as _sys, tempfile, types
+    mini = open("miniapp.html", encoding="utf-8").read()
+    cfg = open("config_esempio.py", encoding="utf-8").read()
+
+    # --- 1) IL GIUDICE DEL SERVER: chi le vede ----------------------------
+    i = _SORGENTE.index("def _p2p_vetrina_per(tg_id) -> bool:")
+    giudice = _SORGENTE[i:_SORGENTE.index("\n\n\ndef ", i)]
+    ADMIN = 999
+
+    def vede(tg, attivo=True, leva=False, prova_ids=()):
+        amb = {"_p2p_leve": lambda: {"attivo": attivo},
+               "e_admin": lambda t: t == ADMIN,
+               "P2P_IN_VETRINA": leva, "P2P_PROVA_IDS": set(prova_ids)}
+        exec(giudice, amb)
+        return amb["_p2p_vetrina_per"](tg)
+    CHI = (111, 222, ADMIN, 0)       # in prova, normale, moderatore, anonimo
+    prova("LEVA SPENTA, fase di prova: le vedono chi prova e il moderatore, "
+          "MAI l'utente normale ne' l'anonimo", [True, False, True, False],
+          [vede(t, prova_ids=[111]) for t in CHI])
+    prova("...e a leva spenta con la fase aperta: solo il moderatore",
+          [False, False, True, False], [vede(t) for t in CHI])
+    prova("LEVA ACCESA con qualcuno ancora in prova: gli altri non le vedono "
+          "(il P2P per loro non c'e')", [True, False, True, False],
+          [vede(t, leva=True, prova_ids=[111]) for t in CHI])
+    prova("LEVA ACCESA a fase aperta: tutti, anonimi compresi",
+          [True, True, True, True], [vede(t, leva=True) for t in CHI])
+    prova("P2P spento sul server: nessuno, nemmeno a leva accesa",
+          [False, False, False, False],
+          [vede(t, attivo=False, leva=True, prova_ids=[111]) for t in CHI])
+
+    # SOLO True ACCENDE: il caricatore della leva, con un config finto
+    j = _SORGENTE.index("# LE CARD P2P IN VETRINA (26 set 2026, richiesta di Andrea): al lancio")
+    carica = _SORGENTE[j:_SORGENTE.index("    P2P_IN_VETRINA = False\n", j)
+                       + len("    P2P_IN_VETRINA = False\n")]
+    vecchio = _sys.modules.get("config")
+    letti = []
+    try:
+        for v in (True, False, "True", 1, None):
+            m = types.ModuleType("config")
+            m.P2P_IN_VETRINA = v
+            _sys.modules["config"] = m
+            amb = {"print": lambda *a, **k: None}
+            exec(carica, amb)
+            letti.append(amb["P2P_IN_VETRINA"])
+        _sys.modules["config"] = types.ModuleType("config")   # riga assente
+        amb = {}
+        exec(carica, amb)
+        letti.append(amb["P2P_IN_VETRINA"])
+    finally:
+        if vecchio is None:
+            _sys.modules.pop("config", None)
+        else:
+            _sys.modules["config"] = vecchio
+    prova("la leva accende SOLO con True: «True», 1 e None restano spenti, "
+          "e la riga assente e' spenta", [True, False, False, False, False, False],
+          letti)
+    prova("config_esempio la dichiara SPENTA", True,
+          "\nP2P_IN_VETRINA = False\n" in cfg.replace("\r\n", "\n"))
+    prova("la busta di prima pagina porta il giudizio, per chi guarda", True,
+          'risposta["p2p_vetrina"] = _p2p_vetrina_per(user["id"] if user else 0)'
+          in _SORGENTE)
+    prova("...in una chiave sua: il dizionario delle leve P2P resta quello di sempre",
+          False, "vetrina" in pezzo("_p2p_per"))
+    prova("il pannello delle leve la mostra", True,
+          '_leva("Card P2P in vetrina", "P2P_IN_VETRINA", P2P_IN_VETRINA,' in _SORGENTE)
+
+    # --- 2) IL CLIENT: dove sta, cosa legge ------------------------------
+    i_b = mini.index("/* ============ LE CARD P2P IN VETRINA (26 set 2026")
+    f_b = mini.index("/* ============ fine delle card P2P in vetrina ============ */")
+    blocco = mini[i_b:f_b]
+    prova("il client legge la leva dalla busta, e il vero e' SOLO true", True,
+          "if (j.p2p_vetrina !== undefined) p2pInVetrina = j.p2p_vetrina === true;" in mini)
+    prova("nasce spenta: prima della busta niente card", True,
+          "let p2pInVetrina = false;" in blocco)
+    prova("LA FILA E' LA STRADA SCELTA: nessuna card dentro la griglia degli annunci",
+          [False, False, False],
+          ["el('grid')" in blocco, "#grid" in blocco, "innestaCardP2P" in mini])
+    sez = re.search(r'<div id="p2pVetrinaSez"[^>]*>', mini)
+    prova("la sezione «Scambi P2P» nasce nascosta, sopra gli strumenti della griglia",
+          [True, True], [bool(sez) and 'style="display:none"' in sez.group(0),
+                         bool(sez) and sez.start() < mini.index('<div class="strumenti">')])
+    prova("la griglia disegnata ridisegna la fila (accesa o spenta con la vista)", True,
+          "renderVetrinaP2P();" in pezzo_js(mini, "function renderGrid(items){", "\n}\n"))
+    prova("l'orecchio del libro resta aperto in Esplora per chi vede le card", True,
+          "libroInAscoltoInEsploraP2P(view)" in pezzo_js(mini, "function go(view){", "\n}\n"))
+    prova("un evento vivo del libro e la fotografia del server ridisegnano la fila",
+          [True, True],
+          ["if (vistaAttivaP2P() === 'view-esplora') renderVetrinaP2P();"
+           in pezzo_js(mini, "function arrivaLibroP2P(ev){", "\n}\n"),
+           "renderP2P(); renderVetrinaP2P();" in pezzo_js(mini, "function apriLibroSubitoP2P(){", "\n}\n")])
+    prova("il foglio «Lo scambio P2P» c'e' e si chiude con gli altri", [True, True],
+          ['id="p2pCosaSheet"' in mini,
+           "el('p2pCosaSheet').classList.remove('open');" in pezzo_js(mini, "function closeSheet(){", "\n}\n")])
+    prova("il cartellino dell'affare e' UNO per libro e vetrina", [1, True],
+          [mini.count("function affaroneP2P("),
+           "const affarone = affaroneP2P(o);" in pezzo_js(mini, "function rigaOrdineP2P(o){", "\n}\n")])
+    prova("lo sfondo esiste nei due casi: le monete e il marchio di Barattozon",
+          [True, True], [os.path.exists(os.path.join("assets", "scambi-intestazione.webp")),
+                         os.path.exists(os.path.join("assets", "barattozon.webp"))])
+    css = mini[mini.index("<style"):mini.index("</style>")]
+    prova("la pastiglia sta sulla «foto»: colori FISSI, bianco su rosso e su verde",
+          [True, True], [".p2p-vt-lato.vende{background:#C2410C}" in css,
+                         ".p2p-vt-lato.compra{background:#1B8B54}" in css])
+
+    node = shutil.which("node")
+    if not node:
+        salta("il banco delle card P2P in vetrina gira in node", "node non c'e'")
+        return
+    banco = r"""
+const LOG = [];
+function fintoEl(id){ const cl = new Set(); let html = '', scritte = 0;
+  return {id, style: {}, textContent: '', value: '', className: '', dataset: {},
+    classList: {add: c => cl.add(c), remove: c => cl.delete(c), contains: c => cl.has(c)},
+    get innerHTML(){ return html; }, set innerHTML(v){ html = v; scritte++; },
+    get scritte(){ return scritte; }}; }
+const EL = {};
+const el = id => (EL[id] = EL[id] || fintoEl(id));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = n => n.toLocaleString('it-IT').replace(/\./g,' ');
+const fmtEur = e => e.toLocaleString('it-IT', {minimumFractionDigits:2, maximumFractionDigits:2});
+function avatarImg(n){ n = (n || '').replace(/[^A-Za-z0-9_.-]/g, ''); return n ? '<img class="av-foto" src="/foto/' + n + '">' : ''; }
+const P2P_AFFARE_OTTIMO = 10, P2P_AFFARE_SUPER = 15;
+const P2P_TABACCHINO = 'Contanti al tabacchino';
+const P2P_TABACCHINO_PM = /^Contanti al tabacchino(?:\s+(\d+\.\d{2}))?$/;
+function badgePremioP2P(o){ return '<span class="p2p-badge">BADGE</span>'; }
+let cambioVivo = true, eurPerSat = 0.00075;
+let DEMO = false, VETRINA = false, myTgId = 111, ACCESO = true;
+function p2pAcceso(){ return ACCESO; }
+let ramoVetrina = 'esplora', activeCat = 'Tutto', vistaBarattolo = false,
+    barattoloOspite = null, ultimaRicercaAI = false, ORDINE = '';
+let filtroPrezzo = null, filtroSped = false, filtroRitiro = false, filtroDig = false,
+    filtroLampo = false, filtroSpedGratis = false, filtroSconto = false,
+    filtroAsta = false, filtroCond = '', filtroReg = '';
+function ordinaEffettivo(){ return ORDINE; }
+let p2pLibro = null, p2pFacce = {}, LAPIDI = new Set();
+function lapidataP2P(id){ return LAPIDI.has(id); }
+function apriLibroSubitoP2P(){ LOG.push('libroSubito'); }
+function caricaLibroP2P(){ LOG.push('carica'); return Promise.resolve(); }
+function ascoltaLibroP2P(){ LOG.push('ascolta'); }
+function vistaAttivaP2P(){ return 'view-esplora'; }
+function rigaLibroP2P(id){ return ((p2pLibro && p2pLibro.ordini) || []).find(o => o.id === id) || null; }
+function prendiOrdineP2P(id){ LOG.push('presa:' + id); }
+function toast(t){ LOG.push('toast:' + t); }
+function haptic(){}
+function closeSheet(){ LOG.push('chiudi'); }
+function invitoTelegram(){ LOG.push('telegram'); }
+const INVITO_ONION = {p2p: ''};
+""" + pezzo_js(mini, "function metodoBaseP2P(m){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function tabacchinoP2P(metodi){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function satsMercatoP2P(o){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function affareP2P(o){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function affaroneP2P(o){", "\n}\n") + "\n}\n" \
+        + blocco + r"""
+const ADESSO = Math.floor(Date.now() / 1000);
+const O = (id, lato, euro, extra) => Object.assign({id, lato, euro, euroMax: 0, sats: 0,
+  premium: 0, metodi: ['Revolut'], stato: 'pending', scade: ADESSO + 86400, creato: ADESSO - 100}, extra || {});
+const out = {};
+/* LA CARD */
+p2pFacce = {v1: {nome: 'Luca', avatar: 'av_ab12_1.jpg'}, c1: {nome: 'giulia'}};
+out.vende = cardVetrinaP2P(O('v1', 'sell', 50));
+out.compra = cardVetrinaP2P(O('c1', 'buy', 80, {premium: 3, metodi: ['SEPA Instant']}));
+out.super = cardVetrinaP2P(O('s1', 'sell', 20, {euroMax: 150, premium: -16, metodi: ['Satispay']}));
+out.ottimo = cardVetrinaP2P(O('o1', 'buy', 30, {premium: 12}));
+out.contro = cardVetrinaP2P(O('x1', 'sell', 30, {premium: 16}));
+out.bz = cardVetrinaP2P(O('b1', 'sell', 23.47, {sats: 30000, metodi: ['Contanti al tabacchino 23.47']}));
+out.storta = cardVetrinaP2P(O('a"><script>', 'sell', 10, {metodi: ['<img src=x onerror=alert(1)>']}));
+cambioVivo = false; eurPerSat = 0;
+out.muto = cardVetrinaP2P(O('m1', 'sell', 10));
+cambioVivo = true; eurPerSat = 0.00075;
+/* QUALI ORDINI */
+LAPIDI = new Set(['lap']);
+const libro = {ordini: [
+  O('vecchio', 'sell', 5, {creato: ADESSO - 900}),
+  O('scaduto', 'sell', 5, {scade: ADESSO - 1}),
+  O('preso', 'sell', 5, {stato: 'in-progress'}),
+  O('lap', 'sell', 5),
+  O('nuovo', 'buy', 5, {creato: ADESSO - 10}),
+  ...[1,2,3,4,5,6].map(n => O('n' + n, 'sell', n, {creato: ADESSO - 500 + n}))]};
+out.ordini = ordiniVetrinaP2P(libro, ADESSO).map(o => o.id);
+out.vuoto = [ordiniVetrinaP2P(null).length, ordiniVetrinaP2P({}).length];
+/* LA VETRINA NUDA */
+const nuda = () => vetrinaNudaP2P();
+p2pInVetrina = true; out.nuda = nuda();
+const casi = {spenta: () => { p2pInVetrina = false; }, demo: () => { DEMO = true; },
+  reparto: () => { activeCat = 'Elettronica'; }, aste: () => { ramoVetrina = 'aste'; },
+  barattolo: () => { vistaBarattolo = true; }, ospite: () => { barattoloOspite = {}; },
+  lista: () => { ultimaRicercaAI = true; }, cerca: () => { el('q').value = 'bici'; },
+  prezzo: () => { filtroPrezzo = {min: 1}; }, regione: () => { filtroReg = 'Piemonte'; },
+  lampo: () => { filtroLampo = true; }, ordinata: () => { ORDINE = 'prezzo_su'; }};
+out.nonNuda = {};
+for (const k in casi) {
+  p2pInVetrina = true; DEMO = false; activeCat = 'Tutto'; ramoVetrina = 'esplora';
+  vistaBarattolo = false; barattoloOspite = null; ultimaRicercaAI = false; el('q').value = '';
+  filtroPrezzo = null; filtroReg = ''; filtroLampo = false; ORDINE = '';
+  casi[k](); out.nonNuda[k] = nuda();
+}
+p2pInVetrina = true; DEMO = false; activeCat = 'Tutto'; ramoVetrina = 'esplora';
+vistaBarattolo = false; barattoloOspite = null; ultimaRicercaAI = false; el('q').value = '';
+filtroPrezzo = null; filtroReg = ''; filtroLampo = false; ORDINE = '';
+/* LA FILA */
+p2pLibro = libro; LOG.length = 0;
+renderVetrinaP2P();
+out.fila = {display: el('p2pVetrinaSez').style.display, card: (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/g) || []).length,
+            conta: el('p2pVetrinaConta').textContent, log: LOG.slice()};
+const prima = el('p2pVetrinaFila').scritte;
+renderVetrinaP2P();
+out.stessaFila = el('p2pVetrinaFila').scritte - prima;
+libro.ordini = libro.ordini.filter(o => o.id !== 'nuovo');      // preso: esce dal libro
+renderVetrinaP2P();
+out.dopoPresa = [el('p2pVetrinaFila').innerHTML.includes('data-p2p="nuovo"'), el('p2pVetrinaFila').scritte - prima];
+p2pInVetrina = false;                                          // la leva non c'e'
+renderVetrinaP2P();
+out.spenta = {display: el('p2pVetrinaSez').style.display, html: el('p2pVetrinaFila').innerHTML};
+p2pInVetrina = true; renderVetrinaP2P();
+activeCat = 'Libri'; renderVetrinaP2P();
+out.inReparto = el('p2pVetrinaSez').style.display;
+activeCat = 'Tutto';
+/* IL TOCCO */
+LOG.length = 0; ACCESO = true; myTgId = 111; VETRINA = false;
+apriCardP2P('n1'); out.toccoAperto = LOG.slice();
+LOG.length = 0; apriCardP2P('sparito'); out.toccoSparito = LOG.slice();
+LOG.length = 0; ACCESO = false; apriCardP2P('n1');
+out.toccoChiuso = {log: LOG.slice(), foglio: el('p2pCosaSheet').classList.contains('open'),
+  tg: el('p2pCosaTg').style.display, ok: el('p2pCosaOk').className, riga: el('p2pCosaAncora').textContent};
+el('p2pCosaSheet').classList.remove('open');
+LOG.length = 0; ACCESO = true; myTgId = null; apriCardP2P('n1');
+out.toccoAnonimo = {log: LOG.slice(), foglio: el('p2pCosaSheet').classList.contains('open'),
+  tg: el('p2pCosaTg').style.display, ok: el('p2pCosaOk').className, riga: el('p2pCosaAncora').textContent};
+LOG.length = 0; apriTelegramDaCosaP2P(); out.telegram = LOG.slice();
+process.stdout.write(JSON.stringify(out));
+"""
+    d = tempfile.mkdtemp()
+    try:
+        f = os.path.join(d, "vetrina.js")
+        with open(f, "w", encoding="utf-8") as fh:
+            fh.write(banco)
+        r = subprocess.run([node, f], capture_output=True, encoding="utf-8", timeout=60)
+        prova("il banco delle card P2P in vetrina gira in node", "", (r.stderr or "")[-700:])
+        o = _js.loads(r.stdout) if r.stdout.strip() else None
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    if not o:
+        return
+
+    def c(k):
+        return o[k]
+    prova("chi VENDE: «Vende BTC» in rosso, le monete, i 50 € interi, il volto con la foto",
+          [True, True, True, True, True, False],
+          ['p2p-vt-lato vende">Vende BTC<' in c("vende"), "scambi-intestazione.webp" in c("vende"),
+           '<div class="price">50<span class="unit eur">€</span>' in c("vende"),
+           'src="/foto/av_ab12_1.jpg"' in c("vende"), ">L</span>" in c("vende"), "50,00" in c("vende")])
+    prova("chi COMPRA: «Compra BTC» in verde, l'iniziale senza foto, il metodo",
+          [True, True, True], ['p2p-vt-lato compra">Compra BTC<' in c("compra"),
+                               ">g</span>" in c("compra"), '<div class="title">SEPA Instant</div>' in c("compra")])
+    prova("l'INTERVALLO: «20–150 €» e «scegli tu» al posto dei sats", [True, True],
+          ["20–150<span" in c("super"), '<div class="price-sub">scegli tu</div>' in c("super")])
+    prova("il SUPER AFFARE e l'OTTIMO sul verso favorevole a chi guarda",
+          [True, True], ["⚡⚡ Super affare" in c("super"), "⚡ Ottimo affare" in c("ottimo")
+                         and "Super" not in c("ottimo")])
+    prova("...e sul verso sfavorevole nessun cartellino, parla il badge del premio",
+          [False, True], ["affare</span>" in c("contro"), "BADGE" in c("contro")])
+    prova("BARATTOZON: il suo fondo e il marchio, i centesimi, il metodo per nome",
+          [True, True, False, True, True],
+          ["card-p2p card-p2p-bz" in c("bz"), "barattozon.webp" in c("bz"),
+           "scambi-intestazione.webp" in c("bz"), "23,47<span" in c("bz"),
+           '<div class="title">Contanti al tabacchino</div>' in c("bz")])
+    prova("senza volto il tappo dice «?»; a cambio muto nessun numero inventato",
+          [True, False], [">?</span>" in c("bz"), "sats</div>" in c("muto")])
+    prova("il testo di sconosciuti passa scappato: id e metodo", [False, False, True],
+          ["<script>" in c("storta"), "<img src=x" in c("storta"),
+           "&lt;img src=x onerror=alert(1)&gt;" in c("storta")])
+    prova("QUALI ORDINI: i vivi, dal piu' nuovo, al massimo sei — fuori scaduti, "
+          "presi e lapidati", ["nuovo", "n6", "n5", "n4", "n3", "n2"], o["ordini"])
+    prova("...e un libro che non c'e' da' una fila vuota", [0, 0], o["vuoto"])
+    prova("LA VETRINA NUDA le mostra", True, o["nuda"])
+    prova("...e non le mostra con la leva spenta, in demo, in un reparto, nelle aste, "
+          "nel barattolo, con una ricerca, un filtro o un ordinamento",
+          {k: False for k in ("spenta", "demo", "reparto", "aste", "barattolo", "ospite",
+                              "lista", "cerca", "prezzo", "regione", "lampo", "ordinata")},
+          o["nonNuda"])
+    prova("LA FILA: accesa, sei card, il conto, e il libro chiesto e ascoltato",
+          {"display": "", "card": 6, "conta": "6", "log": ["carica"]},
+          {**o["fila"], "log": [x for x in o["fila"]["log"] if x != "libroSubito"]})
+    prova("...non si riscrive se non cambia niente (chi la scorre non perde il segno)",
+          0, o["stessaFila"])
+    prova("...e l'ordine preso esce subito, con una riscrittura sola", [False, 1], o["dopoPresa"])
+    prova("A LEVA SPENTA NESSUNA CARD: la sezione sparisce e la fila e' vuota",
+          {"display": "none", "html": ""}, o["spenta"])
+    prova("...e sparisce anche dentro un reparto", "none", o["inReparto"])
+    prova("IL TOCCO col P2P aperto: il dettaglio dell'ordine, come dal libro",
+          ["presa:n1"], o["toccoAperto"])
+    prova("...un ordine che non c'e' piu' lo dice, e non prende niente", True,
+          any(x.startswith("toast:") for x in o["toccoSparito"])
+          and not any(x.startswith("presa:") for x in o["toccoSparito"]))
+    prova("...col P2P chiuso (il moderatore fuori prova): il foglio breve, nessuna presa",
+          {"log": [], "foglio": True, "tg": "none", "ok": "btn orange",
+           "riga": "Per te non è ancora aperto: arriva a breve."}, o["toccoChiuso"])
+    prova("...da fuori Telegram: il foglio col bottone di Telegram in testa",
+          {"log": [], "foglio": True, "tg": "", "ok": "btn ghost",
+           "riga": "Gli scambi si fanno dall'app di Barattolo su Telegram."}, o["toccoAnonimo"])
+    prova("...e quel bottone chiude il foglio e invita in Telegram", ["chiudi", "telegram"],
+          o["telegram"])
 
 
 def prove_banner_fee_personale():
@@ -73712,7 +74029,8 @@ def prove_intestazione_scambi():
     firma = ("%s?v=%s" % (URL, _hl.sha1(raw).hexdigest()[:10])).encode()
     # ⚠️ I POSTI SONO QUATTRO dal 23 set 2026: le monete stanno anche
     # nel libro vuoto, al posto del logo P2P (ritocco di Andrea)
-    prova("i quattro posti che la mostrano escono timbrati col suo hash", 4,
+    # ...e CINQUE dal 26 set 2026: lo sfondo delle card P2P in vetrina
+    prova("i posti che la mostrano escono timbrati col suo hash", 5,
           timbrata.count(firma))
     # ⚠️ IL CONTENITORE ERA TROPPO GRANDE (22 set 2026, sera). Questa
     # riga diceva «la pagina non incorpora NESSUNA webp» e voleva dire
@@ -103647,7 +103965,9 @@ def prove_ritocchi_flusso_p2p():
           and "for (const u in p2pRelayVivi) { try { p2pRelayVivi[u].close(); } catch(e) {} }" in blocco)
     go = nudo(fn("function go(view){"))
     prova("...go() lo apre entrando in una vista del P2P e lo chiude uscendone, dalla VISTA", True,
-          "if (VISTE_NAV_P2P.has(view)) { if (typeof ascoltaLibroP2P === 'function') ascoltaLibroP2P(); }" in go
+          # (dal 26 set 2026 anche in Esplora per chi vede le card P2P
+          # in vetrina: la stessa riga, con la seconda domanda accanto)
+          "if (VISTE_NAV_P2P.has(view) || libroInAscoltoInEsploraP2P(view)) { if (typeof ascoltaLibroP2P === 'function') ascoltaLibroP2P(); }" in go
           and "else if (typeof chiudiAscoltoLibroP2P === 'function') chiudiAscoltoLibroP2P();" in go)
     prova("...e la prima lettura del libro lo apre anche lei, se la vista e' quella", True,
           "&& VISTE_NAV_P2P.has(vistaAttivaP2P().replace('view-', ''))) ascoltaLibroP2P();"
@@ -104326,6 +104646,7 @@ def main():
         prove_p2p_libro,
         prove_tour_p2p, prove_tour_p2p_finale, prove_libro_subito,
         prove_giro_guidato_p2p, prove_banner_fee_personale,
+        prove_card_p2p_vetrina,
         prove_p2p_invii,
         prove_velo_p2p,
     prove_p2p_dettaglio,

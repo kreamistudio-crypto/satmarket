@@ -19928,6 +19928,12 @@ async def lista_annunci(cat: str = "", q: str = "", limit: int = 0,
         # libro ordini si legge anche da anonimi in vetrina, dove
         # /api/me non esiste — il patto di `asta_abilitata`.
         risposta["p2p"] = _p2p_per(user["id"] if user else 0)
+        # ...e se questa persona vede le card P2P fra gli annunci (26 set
+        # 2026): una chiave a parte e non dentro `p2p`, che e' il
+        # dizionario delle leve e a fase aperta dev'essere quello di
+        # sempre. Viaggia qui perche' e' la busta di chi sta guardando
+        # la vetrina, anonimi compresi.
+        risposta["p2p_vetrina"] = _p2p_vetrina_per(user["id"] if user else 0)
     con.close()
     return risposta
 
@@ -25131,6 +25137,16 @@ def _leve_stato():
             # IL TETTO IN EURO DEGLI ORDINI (set 2026): la regola di
             # Barattolo, sopra il tetto in sats del coordinatore che
             # resta valido sotto. A giudicare e' il client, nel foglio.
+            # LE CARD P2P IN VETRINA (26 set 2026): la leva del lancio.
+            # Dice la costante e non chi le vede: a leva spenta le
+            # vedono comunque moderatori e fase di prova, ed e' scritto.
+            _leva("Card P2P in vetrina", "P2P_IN_VETRINA", P2P_IN_VETRINA,
+                  acceso="gli ordini vivi del libro compaiono fra gli "
+                         "annunci per tutti — ma solo con la fase di "
+                         "prova vuota: finché c'è qualcuno in "
+                         "P2P_PROVA_IDS le vede solo chi prova",
+                  spento="le card P2P in vetrina le vedono solo i "
+                         "moderatori e chi è nella fase di prova"),
             _leva("Tetto ordini P2P (€)", "P2P_MAX_EURO", P2P_MAX_EURO,
                   acceso="il foglio Pubblica rifiuta gli importi sopra "
                          "questa cifra; il tetto in sats del "
@@ -40269,6 +40285,23 @@ except (TypeError, ValueError):
     P2P_MAX_EURO = 0
     print("[p2p] P2P_MAX_EURO non e' un numero intero: il tetto in "
           "euro resta SPENTO")
+# LE CARD P2P IN VETRINA (26 set 2026, richiesta di Andrea): al lancio
+# pubblico del P2P ogni ordine vivo del libro compare anche nella
+# vetrina del mercatino, come una card fra le card. Fino ad allora la
+# leva e' SPENTA e le card le vedono solo i moderatori e chi e' nella
+# fase di prova (P2P_PROVA_IDS): servono a provarle, non a mostrarle.
+# A giudicare chi le vede e' `_p2p_vetrina_per`, un posto solo.
+# SOLO `True` ACCENDE, ed e' il verso giusto per una leva che mette
+# davanti a tutti uno scambio di denaro: una stringa «True» o un 1
+# scritti per sbaglio restano spenti, e lo si dice all'avvio.
+try:
+    from config import P2P_IN_VETRINA
+    if not isinstance(P2P_IN_VETRINA, bool):
+        print("[p2p] P2P_IN_VETRINA non e' True/False: le card P2P in "
+              "vetrina restano SPENTE")
+    P2P_IN_VETRINA = P2P_IN_VETRINA is True
+except ImportError:
+    P2P_IN_VETRINA = False
 # LO SCONTO FEDELTA' SUL P2P (set 2026, deciso con Alan): chi e'
 # PIONIERE oppure ha raggiunto il livello 5 paga mezzo punto in meno
 # sulla SUA meta' della commissione — 1% invece dell'1,5% della beta.
@@ -40508,6 +40541,30 @@ def _p2p_per(tg_id) -> dict:
     if leve["attivo"] and P2P_PROVA_IDS and tg_id not in P2P_PROVA_IDS:
         return {**leve, "attivo": False}
     return leve
+
+
+def _p2p_vetrina_per(tg_id) -> bool:
+    """Le CARD P2P IN VETRINA (26 set 2026): questa persona le vede?
+
+    TRE PORTE, e la prima le chiude tutte: senza il P2P acceso sul
+    server (`_p2p_leve`, il FATTO e non la costante) non c'e' nessun
+    ordine da mostrare, e nemmeno la fotografia del libro.
+    A LEVA SPENTA le vedono i MODERATORI e chi e' nella fase di prova:
+    sono i due gruppi che le devono provare prima del lancio. Il
+    moderatore puo' non avere il P2P aperto — le due leve sono separate
+    apposta, vedi P2P_PROVA_IDS — e allora il tocco gli spiega cos'e'
+    invece di aprire l'ordine.
+    A LEVA ACCESA le vedono tutti, anonimi compresi, MA SOLO A FASE
+    APERTA: con qualcuno ancora in P2P_PROVA_IDS il P2P per gli altri
+    non esiste, e una vetrina piena di ordini che nessuno puo' prendere
+    sarebbe una promessa che il tocco smentisce. Il giorno del lancio
+    si svuota la lista E si accende questa leva."""
+    if not _p2p_leve()["attivo"]:
+        return False
+    tg = int(tg_id or 0)
+    if tg and (e_admin(tg) or tg in P2P_PROVA_IDS):
+        return True
+    return bool(P2P_IN_VETRINA) and not P2P_PROVA_IDS
 
 
 def sconto_p2p_attivo() -> bool:
