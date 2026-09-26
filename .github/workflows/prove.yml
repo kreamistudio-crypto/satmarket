@@ -97,6 +97,7 @@ jobs:
              collaudo_numeri_negozio.py
              collaudo_letture_relay.py
              prepara_logo_consigliato.py
+             prepara_banner_fee.py
              collaudo_spedizione_standard.py
              collaudo_catalogo_esterno.py
              collaudo_nuova_fattura.py

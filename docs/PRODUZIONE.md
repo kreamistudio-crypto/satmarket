@@ -2089,6 +2089,14 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   955 → 1000), WebP qualità ~86,
   sotto i 50 KB, senza ICC/EXIF/XMP — la ricetta di Pillow sta nella
   voce di CANTIERI «Il banner delle commissioni nel libro P2P»;
+  1b) DAL 26 SET 2026 LA CAPSULA MARRONE SI TOGLIE DAL FILE: la disegna
+  il CSS col colore delle card del tema. Sul file ridotto a 1000 (col
+  suo marrone) `python prepara_banner_fee.py <ridotto> <uscita.webp>`:
+  misura pillole, etichetta e dischi delle frecce, ricostruisce i bordi
+  dalla forma (niente aloni) e lascia il resto trasparente; se il
+  disegno non e' quello atteso si FERMA. Poi `prove_banner_fee_personale`
+  rimisura i contorni sull'alfa e dice i ritagli (`clip-path`) da
+  riscrivere se le pillole si sono spostate;
   2) si SOSTITUISCE il file con lo STESSO NOME (la rotta
   `/assets/p2p-banner-fee.webp` e il markup non cambiano; il timbro
   `?v=` lo rifà `_timbra_asset_pagina`, quindi nessuna cache tiene il

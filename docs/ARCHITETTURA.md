@@ -6898,9 +6898,16 @@
   `clip-path: inset(… round 999px)` 2 px del file fuori dal bordo a meta'
   sfumatura, e l'etichetta BETA della terza) e la barra rossa del 2%
   ridisegnata, in PERCENTUALE DEL FILE 1000×258 (una prova li rimisura
-  sui pixel). Spento, il pezzo prende `filter: grayscale(1)
-  brightness(.78)` — mai un velo, mai un backdrop-filter —, quindi il
-  fondo della capsula resta quello del file. `fee-p3` lascia accesa la
+  sui pixel). LA CAPSULA E' DEL CSS (dal 26 set 2026, terzo giro): il
+  file non ha piu' il marrone (`prepara_banner_fee.py`), e dietro c'e'
+  il bottone stesso, `var(--card)` col filo `var(--line-soft)`; il pezzo
+  e' uno stadio pieno di `var(--card)` con dentro l'immagine (`<i>`),
+  cosi' ai bordi semitrasparenti non trapela l'<img> colorata. Spento,
+  l'`<i>` prende il filtro — `grayscale(1) brightness(.72)
+  contrast(.8)` la prima (scritte scure, alzate a grigio scuro),
+  `grayscale(1) brightness(.58) contrast(1.6)` la seconda e la terza
+  (scritte chiare, abbassate a grigio), AA verificato sui pixel del
+  file —, mai un velo, mai un backdrop-filter. `fee-p3` lascia accesa la
   terza (pionieri e livello 5), `fee-p2` la seconda (tutti gli altri), e
   la barra resta accesa in tutti e due; senza classi e' tutto colorato. Chi e' chi lo
   dice `pillolaFeeP2P` da `p2pSconto` (/api/me, e la risposta fresca di

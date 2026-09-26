@@ -52488,15 +52488,15 @@ def prove_banner_fee_personale():
         return float(m.group(1)) if m else None
 
     # --- 1) I CONTORNI SONO QUELLI DEL FILE -----------------------------
-    # EMENDATA (26 set 2026, secondo giro, richiesta di Andrea): niente
-    # piu' veli scuri allargati — coprivano il fondo della capsula e lo
-    # facevano rossiccio. Ogni pillola ha un PEZZO della stessa immagine,
-    # ritagliato col contorno esatto (uno stadio) e fatto grigio col
-    # filtro: qui il contorno si RIMISURA sui pixel del file, al mezzo
-    # pixel, e il ritaglio del CSS sta 2 px fuori — la banda sfumata del
-    # bordo va nel grigio, o resta un filo del colore (visto dal vivo) —,
-    # entro un pixel.
+    # EMENDATA (26 set 2026, secondo giro): niente veli scuri — ogni
+    # pillola ha un PEZZO della stessa immagine, ritagliato col contorno
+    # esatto (uno stadio) e fatto grigio col filtro.
+    # EMENDATA ANCORA (26 set 2026, terzo giro): il marrone della capsula
+    # non e' piu' nel file (`prepara_banner_fee.py`), quindi il contorno
+    # si misura sull'ALFA — dove la pillola copre meta' pixel —, e il
+    # ritaglio del CSS sta 2 px fuori, entro un pixel.
     FUORI = 2
+
     def inset(sel):
         m = re.search(re.escape(sel) + r"\{[^}]*clip-path:inset\(([^)]*)\)", css)
         if not m:
@@ -52506,72 +52506,88 @@ def prove_banner_fee_personale():
     try:
         from PIL import Image
     except ImportError:
-        salta("i contorni delle pillole si rimisurano sul file", "PIL non c'e'")
+        salta("il banner si rimisura sul file", "PIL non c'e'")
         Image = None
     if Image:
         im = Image.open(os.path.join("assets", "p2p-banner-fee.webp")).convert("RGBA")
         W, H = im.size
         px = im.load()
-        FONDO = (52, 32, 25)
+        FONDO = (52, 32, 25)     # il marrone della capsula di ieri
 
         def dd(a, b):
             return math.sqrt(sum((a[i] - b[i]) ** 2 for i in range(3)))
 
-        def bordo(punti, pieno):
-            """dall'esterno verso l'interno: dove il pixel e' a meta' fra il
-            marrone della capsula e il pieno della pillola (si parte dal
-            marrone: prima c'e' il trasparente del file)"""
-            prima, visto = None, False
+        def bordo(punti):
+            """dal trasparente verso l'interno: dove l'alfa passa meta'"""
+            prima = None
             for c, (x, y) in punti:
-                p = px[x, y]
-                if not visto:
-                    visto = p[3] > 250 and dd(p, FONDO) < 30
-                    continue
-                t = dd(p, FONDO) / (dd(p, FONDO) + dd(p, pieno) + 1e-9)
-                if t >= 0.5:
+                a = px[x, y][3]
+                if a >= 127.5:
                     if prima is None:
                         return c
-                    c0, t0 = prima
-                    return c0 + (0.5 - t0) / (t - t0) * (c - c0)
-                prima = (c, t)
+                    c0, a0 = prima
+                    return c0 + (127.5 - a0) / (a - a0) * (c - c0)
+                prima = (c, a)
             return None
 
-        # le tre pillole: centro di scansione, colore pieno, e i due tratti
-        # di fondo scuro fra una pillola e l'altra da cui partire
-        PILL = {1: (180, (250, 227, 213), 0, 330), 2: (470, (244, 123, 25), 335, 625),
-                3: (870, (82, 145, 80), 630, 999)}
-        storti = []
-        for n, (cx, pieno, sx, dx) in PILL.items():
-            top = bordo([(y, (cx, y)) for y in range(0, 129)], pieno)
-            bot = bordo([(y, (cx, y)) for y in range(257, 129, -1)], pieno)
+        # la capsula non c'e' piu': il fondo attorno e fra le pillole e'
+        # trasparente, e nessun pixel visibile e' del marrone di ieri
+        prova("NEL FILE NON C'E' PIU' LA CAPSULA: fondo e spazi fra le pillole trasparenti",
+              [0] * 7, [px[x, y][3] for x, y in ((15, 129), (475, 12), (475, 246), (313, 60),
+                                                 (626, 200), (985, 129), (500, 3))])
+        PILL = {1: (180, 0, 330), 2: (470, 335, 625), 3: (870, 630, 999)}
+        storti, aloni, stadi = [], [], []
+        for n, (cx, sx, dx) in PILL.items():
+            pieno = px[cx, 200][:3]
+            top = bordo([(y, (cx, y)) for y in range(0, 129)])
+            bot = bordo([(y, (cx, y)) for y in range(H - 1, 129, -1)])
             R, cy = (bot - top) / 2, (top + bot) / 2
             estremi = []
             for lato in (-1, 1):
                 stime = []
-                # i fianchi a meta' altezza li coprono i cerchietti con la
+                # i fianchi a meta' altezza li coprono i dischi con la
                 # freccia: si misura sopra e sotto, e si risale allo stadio
                 for dy in (-70, -60, 60, 70):
                     y = int(round(cy + dy))
                     xs = range(sx, cx) if lato < 0 else range(dx, cx, -1)
-                    e = bordo([(x, (x, y)) for x in xs], pieno)
+                    e = bordo([(x, (x, y)) for x in xs])
                     off = math.sqrt(max(R * R - (y - cy) ** 2, 0))
                     stime.append(e + off - R if lato < 0 else e - off + R)
+                    # SENZA ALONI: il primo pixel che si vede venendo da
+                    # fuori ha il colore della pillola, non un filo scuro
+                    for x in xs:
+                        if px[x, y][3] > 20:
+                            if dd(px[x, y], pieno) > 60:
+                                aloni.append((n, x, y, px[x, y]))
+                            break
                 estremi.append(sum(stime) / len(stime))
+            stadi.append((estremi[0], top, estremi[1], bot))
             v = inset(".p2p-fee-banner .fee-pz%d" % n)
             dal_file = (top - FUORI, W - estremi[1] - FUORI, H - bot - FUORI,
                         estremi[0] - FUORI)   # alto destra basso sinistra, in px
             if not v or any(abs(v[k] / 100 * (H if k % 2 == 0 else W) - dal_file[k]) > 1.0
                             for k in range(4)):
                 storti.append((n, v, tuple(round(x, 2) for x in dal_file)))
+        # e fuori dalle pillole nessun pixel visibile ha il marrone di ieri
+        # (dentro, il «2%» scuro ci somiglia: si guarda solo fuori)
+        def fuori_pillole(x, y):
+            for (x0, y0, x1, y1) in stadi:
+                r = (y1 - y0) / 2
+                qx = abs(x - (x0 + x1) / 2) - ((x1 - x0) / 2 - r)
+                qy = abs(y - (y0 + y1) / 2)
+                if math.hypot(max(qx, 0), max(qy, 0)) + min(max(qx, qy), 0) - r < 1.5:
+                    return False
+            return not (744 <= x <= 848 and y <= 44)       # l'etichetta BETA
+        marroni = sum(1 for y in range(H) for x in range(W)
+                      if px[x, y][3] > 60 and dd(px[x, y], FONDO) < 18 and fuori_pillole(x + .5, y + .5))
+        prova("NESSUN FILO DEL MARRONE di ieri fuori dalle pillole", 0, marroni)
+        prova("...i bordi delle pillole senza aloni: il primo pixel visibile e' del loro colore",
+              [], aloni)
         prova("ogni pezzo e' ritagliato col contorno della sua pillola, banda sfumata compresa "
-          "(2 px fuori, entro 1 px del file)",
-              [], storti)
-        # l'etichetta BETA della terza: fianchi e cima (il fondo sta dentro
-        # la pillola, che il pezzo della terza copre gia')
-        tagp = (252, 233, 215)
-        tl = bordo([(x, (x, 20)) for x in range(725, 796)], tagp)
-        tr = bordo([(x, (x, 20)) for x in range(870, 796, -1)], tagp)
-        tt = bordo([(y, (770, y)) for y in range(1, 20)], tagp)
+              "(2 px fuori, entro 1 px del file)", [], storti)
+        tl = bordo([(x, (x, 20)) for x in range(725, 796)])
+        tr = bordo([(x, (x, 20)) for x in range(870, 796, -1)])
+        tt = bordo([(y, (770, y)) for y in range(0, 20)])
         vt = inset(".p2p-fee-banner .fee-pz3.fee-tag")
         prova("...e l'etichetta BETA della terza col suo (fianchi e cima, 2 px fuori, entro 1 px)", True,
               bool(vt) and abs(vt[0] / 100 * H - (tt - FUORI)) <= 1
@@ -52604,6 +52620,70 @@ def prove_banner_fee_personale():
         prova("...rossa come il suo nucleo, e con le punte tonde", [True, True],
               ["background:#CA1B1C" in rb, "border-radius:999px" in rb])
 
+        # LE SPENTE: PIU' SCURE DI IERI, E LE SCRITTE AA. Il filtro si rifa'
+        # sui pixel del file coi conti del browser (grigio, poi luce, poi
+        # contrasto, in sRGB: dal vivo combaciano al grigio), e il rapporto
+        # e' quello WCAG. Le scritte piccole — «Fee P2P», «Pioniere o Lv.5»
+        # e «BETA» — vogliono 4,5:1; le cifre grandi 3:1.
+        def filtro(sel):
+            m = re.search(re.escape(sel) + r"[^{]*\{\s*filter:([^}]*)\}", css)
+            f = m.group(1) if m else ""
+            b = re.search(r"brightness\(([\d.]+)\)", f)
+            c = re.search(r"contrast\(([\d.]+)\)", f)
+            return ("grayscale(1)" in f, float(b.group(1)) if b else 1.0,
+                    float(c.group(1)) if c else 1.0)
+
+        def grigio(p, b, c):
+            v = (0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]) * b
+            return max(0.0, min(255.0, (v - 127.5) * c + 127.5))
+
+        def lum(v):
+            s_ = v / 255
+            return s_ / 12.92 if s_ <= 0.04045 else ((s_ + 0.055) / 1.055) ** 2.4
+
+        def rapporto(a, b):
+            la, lb = sorted((lum(a), lum(b)), reverse=True)
+            return (la + 0.05) / (lb + 0.05)
+
+        def estremo(box, chiaro):
+            x0, y0, x1, y1 = box
+            vals = [px[x, y] for y in range(y0, y1) for x in range(x0, x1) if px[x, y][3] == 255]
+            k = lambda p: 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]
+            return max(vals, key=k) if chiaro else min(vals, key=k)
+        f1 = filtro(".p2p-fee-banner.fee-p3 .fee-pz1>i")
+        f23 = filtro(".p2p-fee-banner.fee-p3 .fee-pz2>i")
+        # (fondo, scritta, filtro, soglia): la scritta e' il pixel piu'
+        # chiaro (o piu' scuro) del suo riquadro sul file
+        casi = {
+            "«Fee P2P» sulla prima": (px[180, 200], estremo((115, 60, 240, 88), False), f1, 4.5),
+            "«2%» sulla prima": (px[180, 200], estremo((110, 100, 250, 190), False), f1, 3.0),
+            "«1,5%» sulla seconda": (px[470, 200], estremo((375, 100, 580, 190), True), f23, 3.0),
+            "«BETA» sulla seconda": (estremo((436, 56, 522, 88), True), estremo((440, 62, 520, 84), False), f23, 4.5),
+            "«Pioniere o Lv.5» sulla terza": (px[870, 200], estremo((685, 62, 905, 88), True), f23, 4.5),
+            "«1%» sulla terza": (px[870, 200], estremo((735, 100, 860, 190), True), f23, 3.0),
+            "«BETA» dell'etichetta della terza": (px[796, 12], estremo((765, 14, 835, 40), False), f23, 4.5),
+        }
+        corti = {k: round(rapporto(grigio(a, v[1], v[2]), grigio(b, v[1], v[2])), 2)
+                 for k, (a, b, v, s_) in casi.items() if rapporto(grigio(a, v[1], v[2]),
+                                                              grigio(b, v[1], v[2])) < s_}
+        prova("LE SCRITTE DELLE SPENTE SONO AA (4,5:1 le piccole, 3:1 le cifre grandi)", {}, corti)
+        # SPENTE DAVVERO (26 set 2026, ritocco di Andrea): le scritte chiare
+        # della seconda e della terza non restano bianche (non oltre un grigio
+        # 175), e quelle scure della prima non restano nere (almeno 40)
+        tinte = {k: round(grigio(b, v[1], v[2])) for k, (a, b, v, s_) in casi.items()}
+        prova("...e sono GRIGIE: le chiare non oltre 175, le scure della prima non sotto 40",
+              [], [k for k, t_ in tinte.items()
+                   if (k in ("«1,5%» sulla seconda", "«Pioniere o Lv.5» sulla terza",
+                             "«1%» sulla terza") and t_ > 175)
+                   or (k == "«Fee P2P» sulla prima" and t_ < 40)])
+        # piu' scure di ieri: il filtro del giro prima era grayscale(1) brightness(.78)
+        prova("...e le spente sono piu' scure di ieri, tutte e tre", [True, True, True],
+              [grigio(px[180, 200], f1[1], f1[2]) < grigio(px[180, 200], .78, 1),
+               grigio(px[470, 200], f23[1], f23[2]) < grigio(px[470, 200], .78, 1),
+               grigio(px[870, 200], f23[1], f23[2]) < grigio(px[870, 200], .78, 1)])
+        prova("...e il grigio e' GRIGIO (tutte e tre col grayscale pieno)", [True, True],
+              [f1[0], f23[0]])
+
     # --- 2) IL MARKUP: sopra l'immagine, dentro il bottone ---------------
     m = re.search(r'<button [^>]*id="p2pFeeBanner"[^>]*>(.*?)</button>', mini, re.S)
     dentro = m.group(1) if m else ""
@@ -52612,36 +52692,43 @@ def prove_banner_fee_personale():
                                        'class="fee-barra"')]
     prova("dentro il bottone: l'immagine, i quattro pezzi, e la barra sopra i pezzi",
           True, -1 not in ordine and ordine == sorted(ordine))
+    prova("...ogni pezzo porta dentro la sua immagine (`<i>`)", 4,
+          dentro.count('aria-hidden="true"><i></i></span>'))
     prova("...tutti muti per chi legge con la voce (parla l'alt)", 5,
           dentro.count('aria-hidden="true"'))
-    prova("...e il bottone e' il riferimento delle coordinate", True,
-          "position:relative" in regola(".p2p-fee-banner"))
-    prova("dei veli e della luce di ieri non resta niente", [0, 0, 0, 0],
+    prova("dei veli e della luce di prima non resta niente", [0, 0, 0, 0],
           [mini.count("fee-velo"), mini.count("fee-luce"), mini.count("p2pFeeLuce"),
            mini.count("rgba(22,15,9,.62)")])
 
-    # --- 3) IL CSS: grigi col filtro, fondo intatto, barra sempre ---------
+    # --- 3) IL CSS: la capsula, i pezzi, i grigi, il battito --------------
+    rb_ = regola(".p2p-fee-banner")
+    prova("LA CAPSULA E' DEL CSS: il colore delle card del tema, il loro filo, uno stadio "
+          "grande quanto l'immagine", [True, True, True, True],
+          ["background:var(--card)" in rb_, "border:1pxsolidvar(--line-soft)" in rb_,
+           "border-radius:999px" in rb_, "position:relative" in rb_])
     rpz = regola(".p2p-fee-banner .fee-pz")
-    prova("il pezzo e' la STESSA immagine, grande quanto il banner, senza un colore suo",
-          [True, True, False],
-          ["background:url(/assets/p2p-banner-fee.webp)00/100%100%no-repeat" in rpz,
-           "inset:0" in rpz, "rgba" in rpz])
-    prova("...e il grigio e' un FILTRO sul pezzo, non un backdrop-filter (i ridotti lo "
-          "spegnerebbero)", [True, 0],
-          ["filter:grayscale(1)brightness(.78)" in re.sub(r"\s+", "", css),
+    rpi = regola(".p2p-fee-banner .fee-pz>i")
+    prova("il pezzo e' uno stadio PIENO del colore della capsula, con dentro la STESSA immagine",
+          [True, True, True],
+          ["background:var(--card)" in rpz and "inset:0" in rpz,
+           "background:url(/assets/p2p-banner-fee.webp)00/100%100%no-repeat" in rpi,
+           "inset:0" in rpi])
+    prova("...e il grigio e' un FILTRO sull'immagine del pezzo, non sul pezzo ne' un backdrop",
+          [True, 0, 0],
+          ["filter:grayscale(1)" in re.sub(r"\s+", "", css),
+           len(re.findall(r"\.fee-pz\d?\{[^}]*filter", css)),
            len(re.findall(r"fee-pz[^{]*\{[^}]*backdrop-filter", css))])
-    grigi = re.search(r"((?:\.p2p-fee-banner\.fee-p\d \.fee-pz\d,?\s*)+)\{\s*filter:grayscale", css)
-    gr = re.sub(r"\s+", "", grigi.group(1)) if grigi else ""
+    grigi = re.findall(r"((?:\.p2p-fee-banner\.fee-p\d \.fee-pz\d>i,?\s*)+)\{\s*filter:grayscale", css)
+    gr = re.sub(r"\s+", "", "".join(grigi))
     prova("pionieri e livello 5: grigie la prima e la seconda; tutti: la prima e la terza",
           [True, True, True, True, False, False],
-          [".fee-p3.fee-pz1" in gr, ".fee-p3.fee-pz2" in gr, ".fee-p2.fee-pz1" in gr,
-           ".fee-p2.fee-pz3" in gr, ".fee-p3.fee-pz3" in gr, ".fee-p2.fee-pz2" in gr])
+          [".fee-p3.fee-pz1>i" in gr, ".fee-p3.fee-pz2>i" in gr, ".fee-p2.fee-pz1>i" in gr,
+           ".fee-p2.fee-pz3>i" in gr, ".fee-p3.fee-pz3>i" in gr, ".fee-p2.fee-pz2>i" in gr])
     accesi = re.search(r"((?:\.p2p-fee-banner\.fee-p\d \.fee-[\w]+,?\s*)+)\{opacity:1\}", css)
     acc = re.sub(r"\s+", "", accesi.group(1)) if accesi else ""
     prova("LA BARRA ROSSA E' ACCESA in tutti e due gli stati personali", [True, True],
           [".p2p-fee-banner.fee-p2.fee-barra" in acc, ".p2p-fee-banner.fee-p3.fee-barra" in acc])
-    # IL BATTITO (terzo ritocco di Andrea, al posto della luce): le grigie
-    # battono da sinistra a destra, poi quella di chi guarda
+    # IL BATTITO: le grigie battono da sinistra a destra, poi quella di chi guarda
     sc = re.sub(r"\s+", " ", css)
 
     def partenza(sel):
@@ -52653,12 +52740,12 @@ def prove_banner_fee_personale():
     prova("IL BATTITO dei pionieri: la prima, la seconda, poi la terza che resta accesa",
           [(0.45, 0.0), (0.45, 0.5), (0.45, 1.0)], [b1, b_p3_2, b_p3_3])
     prova("...e per tutti: la prima, la terza, poi la seconda (stesse regole, altra fila)",
-          True, ".p2p-fee-banner.fee-anima.fee-p3 .fee-pz2, .p2p-fee-banner.fee-anima.fee-p2 .fee-pz3{animation:p2pFeeBattito .45s ease-in-out .5s 1" in sc
-          and ".p2p-fee-banner.fee-anima.fee-p3 .fee-pz3, .p2p-fee-banner.fee-anima.fee-p2 .fee-pz2{animation:p2pFeeBattito .45s ease-in-out 1s 1" in sc)
+          True, ".p2p-fee-banner.fee-anima.fee-p3 .fee-pz2, .p2p-fee-banner.fee-anima.fee-p2 .fee-pz3{animation:p2pFeeBattito .45s ease-in-out .5s 1}" in sc
+          and ".p2p-fee-banner.fee-anima.fee-p3 .fee-pz3, .p2p-fee-banner.fee-anima.fee-p2 .fee-pz2{animation:p2pFeeBattito .45s ease-in-out 1s 1}" in sc)
     prova("...ognuna si fa grigia appena finito il suo battito, e la barra rossa con la prima",
           [True, True, True],
-          ["animation:p2pFeeBattito .45s ease-in-out 1; transition-delay:.45s}" in sc,
-           "ease-in-out .5s 1; transition-delay:.95s}" in sc,
+          [".p2p-fee-banner.fee-anima .fee-pz1>i{transition-delay:.45s}" in sc,
+           ".p2p-fee-banner.fee-anima.fee-p3 .fee-pz2>i, .p2p-fee-banner.fee-anima.fee-p2 .fee-pz3>i{transition-delay:.95s}" in sc,
            ".p2p-fee-banner.fee-anima .fee-barra{transition:opacity 0s linear .45s}" in sc])
     kb = re.search(r"@keyframes p2pFeeBattito\{(.*?)\}\}", css, re.S)
     prova("...un leggero ingrandimento e ritorno", True,
@@ -74314,11 +74401,16 @@ def prove_banner_fee_p2p():
             _modo = _im.mode
             _bbox = _im.getchannel("A").getbbox()
         # STRETTO sulla capsula: il bagliore e' un'ombra del BOTTONE, e
-        # segue la capsula solo se il bottone e' largo quanto lei
-        prova("...ritagliato stretto sulla capsula (4px al massimo)",
+        # segue la capsula solo se il bottone e' largo quanto lei.
+        # EMENDATA (26 set 2026, la capsula nel CSS): il marrone non e'
+        # piu' nel file — la capsula E' il bottone —, e il file tiene la
+        # CORNICE della capsula di ieri con le pillole dentro ai margini di
+        # allora (~29 px ai lati, l'etichetta BETA a ~7 dall'alto, ~27 sotto):
+        # cosi' pillole, bottone e bagliore stanno dove stavano
+        prova("...con la cornice della capsula: le pillole dentro, ai margini di prima",
               ("RGBA", True),
-              (_modo, _bbox is not None and _bbox[0] <= 4 and _bbox[1] <= 4
-               and larg - _bbox[2] <= 4 and alt - _bbox[3] <= 4))
+              (_modo, _bbox is not None and 24 <= _bbox[0] <= 34 and 3 <= _bbox[1] <= 11
+               and 24 <= larg - _bbox[2] <= 34 and 20 <= alt - _bbox[3] <= 32))
     except ImportError:
         salta("il ritaglio del banner", "serve Pillow")
     prova("...e non sta in assets/categorie/", False,

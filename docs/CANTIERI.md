@@ -34320,3 +34320,63 @@ config del VPS si svuota `P2P_PROVA_IDS` e si mette
 `P2P_IN_VETRINA = True`, poi riavvio.
 **DA AVERE:** l'occhio sul telefono, e il peso dei relay aperti da
 Esplora quando le card le vedranno tutti — oggi li apre solo chi prova.
+
+## Il banner: la capsula del tema e le spente più scure (26 set 2026)
+
+Ritocchi di Andrea a bcfef2e. **1) IL MARRONE ERA ROSSICCIO GIA' NEL
+DISEGNO**, e adesso non c'e' piu': il file ha le sole pillole, le frecce
+e l'etichetta BETA su fondo trasparente, e la capsula la disegna il CSS
+— e' il bottone stesso, stadio grande quanto l'immagine (come la
+capsula di prima: il file tiene la sua cornice 1000×258), `var(--card)`
+col filo `var(--line-soft)` (il disegno aveva un contorno appena piu'
+chiaro del fondo). Il bagliore e' l'ombra dello stesso stadio: resta
+allineato, e i ritagli dei pezzi e la barra rossa pure, perche' le
+pillole non si sono mosse di un pixel.
+**TOGLIERE IL MARRONE NON BASTAVA**: attorno alle pillole il disegno ha un
+filo scuro-rossiccio di due o tre pixel, che su una card chiara
+diventava un alone. `prepara_banner_fee.py` (nella repo, per il
+prossimo disegno; ricetta in PRODUZIONE) RICOSTRUISCE i bordi dalla
+forma: misura pillole (stadi), etichetta (rettangolo tondo) e dischi
+delle frecce sul file, tiene i pixel dentro, dalla fascia del bordo
+prende copertura dalla forma e colore da due-tre pixel piu' dentro, e
+dove sotto un disco c'era il marrone lascia l'ombra del disco, nera e
+semitrasparente. Fuori, trasparente. WebP con alfa, 20 KB.
+**E IL PEZZO E' DIVENTATO UNO STADIO PIENO** (visto dal vivo): coi bordi
+semitrasparenti, un pezzo fatto della sola immagine lasciava trapelare
+ai bordi l'<img> colorata sotto (due strati a meta' alfa, un filo
+arancio sotto la seconda grigia). Adesso il pezzo e' `var(--card)` con
+dentro l'immagine (`<i>`), che prende il filtro: copre tutto quel che
+ritaglia, e l'anello fra bordo e ritaglio ha il colore della capsula.
+**2) LE SPENTE PIU' SCURE, E SPENTE ANCHE NELLE SCRITTE** (due giri
+di Andrea sugli scatti): il primo lasciava i numeri della seconda e
+della terza quasi bianchi (~240), e risaltavano; adesso numeri ed
+etichette sono GRIGI. Seconda e terza `grayscale(1) brightness(.58)
+contrast(1.6)`: fondi 56 e 45 (erano 111 e 103), scritte a ~157-160;
+«1,5%» 4,5:1 (cifre grandi, soglia 3), «Pioniere o Lv.5» 5,1:1, «1%»
+5,2:1. La prima ha scritte scure su un pieno chiaro, e il contrasto
+sotto 1 le alza dal nero a grigio scuro: `grayscale(1) brightness(.72)
+contrast(.8)`, fondo 160 (era 183), «Fee P2P» a 51, 4,8:1. La
+simulazione del filtro in sRGB combacia col browser al grigio (145 /
+145,3, 78 / 78,2, 63 / 61,9 nel giro di prova), e la prova rifa' i
+conti sul file: AA, e le scritte chiare non oltre un grigio 175.
+**PROVATO.** `prove_banner_fee_personale` emendata: nel file niente
+capsula (fondo e spazi trasparenti, nessun filo del marrone fuori dalle
+pillole, il primo pixel visibile di ogni bordo e' del colore della
+pillola), contorni misurati sull'alfa (ritagli 2 px fuori, entro 1 px),
+capsula nel CSS, pezzo pieno con l'immagine dentro e il filtro solo
+su di lei, AA delle scritte e spente piu' scure di ieri; in
+`prove_banner_fee_p2p` emendata col perche' la sentinella del ritaglio
+stretto (il file tiene la cornice della capsula, le pillole ai margini di
+prima). Tortura 9 su 9 (compreso il file di ieri col marrone), e 4 su 4
+sui grigi delle scritte. Lo
+script sta nella radice, quindi ha la sua riga nel compileall del
+workflow: un commit che tocca `.github/workflows/` puo' lasciare
+`pronto` indietro (PRODUZIONE, «DOPO UN COMMIT CHE TOCCA IL WORKFLOW»).
+Suite intera severa senza config nel worktree da origin/main
+(bcfef2e): 16.436 verdi e 0 rosse. Dal vivo via CDP a densita' 3, relay morto:
+giro fino a «Fine» col dito, battiti, stato finale e ingresso dopo, a
+320 e 375 px nei due temi per pioniere e tutti gli altri, e coi ridotti;
+sui pixel la capsula ha il colore esatto della card (255,255,255 di
+giorno, 44,37,23 di sera), identico prima e dopo, e attorno alle spente
+c'e' solo lei; nessun errore dell'app. Scatti approvati da Andrea.
+**DA AVERE:** l'occhio sul telefono.
