@@ -2833,6 +2833,13 @@
      la riga «aggiorno…» fissa sopra la barra, e l'anellino sul bottone
      di un gesto che aspetta il libro vero. */
   .p2p-ord.p2p-finta{min-height:96px;padding-top:18px}
+  /* LA CARD D'ESEMPIO DEL GIRO GUIDATO (26 set 2026): bordo tratteggiato
+     e l'etichetta «Esempio» a cavallo del bordo in alto, perche' non la
+     si scambi per un'offerta vera; il tocco non ce l'ha proprio */
+  .p2p-ord.p2p-esempio{border:1.5px dashed var(--sats);margin-top:18px;cursor:default}
+  .p2p-esempio-tag{position:absolute;top:-10px;left:12px;padding:2px 9px;
+    border-radius:999px;background:var(--sats);color:#fff;font-size:11px;
+    font-weight:800;letter-spacing:.04em;text-transform:uppercase;line-height:16px}
   .p2p-finta i{display:block;height:12px;border-radius:6px;
     background:var(--line-soft);margin:0 0 12px}
   .p2p-finta i:nth-child(1){width:46%;height:16px}
@@ -20262,6 +20269,10 @@ function apriCassettoProfilo(idAcc){
 let tourInCorso = false;   // finche' c'e' lui, il banner installa aspetta
 let tourTappe = [];        // le tappe col bersaglio presente, all'avvio
 let tourTappa = 0;
+/* quel che va fatto quando il giro finisce, per qualunque strada ci si
+   arrivi (Fine, Salta, Esc, gesto indietro): lo passa chi l'ha aperto.
+   Il benvenuto non ne ha; il giro del P2P rimette a posto la pagina. */
+let tourDopo = null;
 /* Ogni tappa: come trovare il bersaglio + il testo. Se il bersaglio
    manca (griglia vuota, in prima pagina solo annunci propri...) la
    tappa non entra proprio nel giro: il tour non si blocca mai. */
@@ -20283,13 +20294,23 @@ function tourBenvenuto(){
   /* la foto delle tappe vive: se non c'e' nulla da illuminare (vista
      sbagliata, vetrina vuota) non si consuma niente e si riprova
      alla visita dopo */
-  tourTappe = TAPPE_TOUR.filter(t => { const b = t.trova(); return b && b.offsetParent !== null; });
-  if (!tourTappe.length) return;
+  if (!avviaTour(TAPPE_TOUR)) return;
   /* consumato alla comparsa: anche ignorato, non torna (il patto
      one-shot del vecchio benvenuto). E il timbro sale sul profilo:
      vedi «I TIMBRI SOPRAVVIVONO AL DISPOSITIVO». */
   timbraVisto('tour');
+}
+/* IL MOTORE, per ogni giro (26 set 2026, col giro guidato del P2P): lo
+   stesso velo, lo stesso riflettore e lo stesso fumetto per qualunque
+   elenco di tappe. Tiene le tappe col bersaglio presente e risponde se
+   e' partito: senza niente da illuminare non parte, e chi l'ha chiamato
+   non consuma il suo timbro. Il `dopo` gira alla chiusura. */
+function avviaTour(tappe, dopo){
+  if (tourInCorso) return false;
+  tourTappe = tappe.filter(t => { const b = t.trova(); return b && b.offsetParent !== null; });
+  if (!tourTappe.length) return false;
   tourInCorso = true;
+  tourDopo = dopo || null;
   const ib = el('installBanner'); if (ib) ib.style.display = 'none';
   window.scrollTo(0, 0);          // le quattro tappe vivono tutte in alto
   const tv = el('tour');
@@ -20298,13 +20319,28 @@ function tourBenvenuto(){
   window.addEventListener('scroll', posizionaTour, {passive: true});
   tv.addEventListener('wheel', bloccaTourTocco, {passive: false});
   tv.addEventListener('touchmove', bloccaTourTocco, {passive: false});
-  document.addEventListener('keydown', tastoTour);
+  document.addEventListener('keydown', tastoTour, true);
+  /* un bersaglio che finisce di muoversi (il + che sale cambiando lato)
+     si riprende il riflettore addosso */
+  document.addEventListener('transitionend', posizionaTour);
   tourTappa = -1;
   tourAvanti();
   requestAnimationFrame(() => requestAnimationFrame(() => tv.classList.remove('subito')));
+  return true;
 }
 function bloccaTourTocco(e){ e.preventDefault(); }
-function tastoTour(e){ if (e.key === 'Escape') navIndietro(); }
+function tastoTour(e){
+  if (e.key === 'Escape') { navIndietro(); return; }
+  /* NESSUN GESTO VERO SOTTO IL VELO (26 set 2026, col giro del P2P): il
+     velo prende il dito, ma la tastiera va a chi ha il fuoco — un Invio
+     su una card o sul + partirebbe da sotto. Si ascolta in CATTURA, cosi'
+     arriva prima degli `onkeydown` della pagina; fuori dal fumetto Invio
+     e spazio non fanno niente, e Tab e frecce restano liberi. */
+  if ((e.key === 'Enter' || e.key === ' ') && !el('tour').contains(e.target)) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+}
 function tourAvanti(){
   tourTappa++;
   if (tourTappa >= tourTappe.length) { chiudiTour(); return; }
@@ -20312,6 +20348,9 @@ function tourAvanti(){
 }
 function mostraTappa(){
   const t = tourTappe[tourTappa];
+  /* la tappa puo' preparare la pagina prima di farsi trovare (il giro
+     del P2P passa da solo al tab «Vendi BTC») */
+  if (t && t.prima) t.prima();
   const b = t && t.trova();
   if (!b || b.offsetParent === null) { tourAvanti(); return; }  // sparito nel frattempo
   const ultima = tourTappa === tourTappe.length - 1;
@@ -20337,14 +20376,20 @@ function posizionaTour(){
   if (!tourInCorso) return;
   const t = tourTappe[tourTappa]; if (!t) return;
   const b = t.trova(); if (!b) return;
-  const r = b.getBoundingClientRect();
+  /* una tappa puo' illuminare piu' di un elemento (il + con la sua
+     tendina, nel giro del P2P): `rett` le da' il riquadro, `raggio`
+     la curva */
+  const r = t.rett ? t.rett(b) : b.getBoundingClientRect();
   const R = 6;   // il respiro attorno al bersaglio
   const luce = el('tourLuce');
   luce.classList.toggle('tondo', !!t.tondo);
+  luce.style.borderRadius = t.raggio ? t.raggio + 'px' : '';
   luce.style.top = (r.top - R) + 'px';
   luce.style.left = (r.left - R) + 'px';
   luce.style.width = (r.width + R * 2) + 'px';
-  luce.style.height = (r.height + R * 2) + 'px';
+  /* ...e il riflettore resta DENTRO lo schermo: un bersaglio attaccato
+     al fondo non si porta il bordo oltre il vetro */
+  luce.style.height = (Math.min(r.bottom + R, innerHeight - 3) - (r.top - R)) + 'px';
   /* il fumetto: sotto il riflettore se c'e' posto, sopra altrimenti,
      e come ultima spiaggia in fondo allo schermo; sempre dentro i
      bordi, anche sugli schermi piccoli */
@@ -20366,8 +20411,12 @@ function chiudiTour(){
   window.removeEventListener('scroll', posizionaTour);
   el('tour').removeEventListener('wheel', bloccaTourTocco);
   el('tour').removeEventListener('touchmove', bloccaTourTocco);
-  document.removeEventListener('keydown', tastoTour);
+  document.removeEventListener('keydown', tastoTour, true);
+  document.removeEventListener('transitionend', posizionaTour);
   bannerInstallaPwa();   // il banner installa riottiene la sua occasione
+  const dopo = tourDopo;
+  tourDopo = null;
+  if (dopo) dopo();
 }
 /* «Tutorial»: il tour di benvenuto si rivede quando si vuole, e per
    TUTTI — non solo per gli admin. Rimette in gioco il SOLO timbro
@@ -44205,7 +44254,8 @@ function anelloScadenzaP2P(o, adesso){
      c'e', iniziale se si sa il nome, «?» finche' non si sa niente.
      Il vuoto-oggetto tiene vive le stesse letture di sempre (avatar,
      nome, negozio) senza aprire un ramo per caso. */
-  const f = p2pFacce[o.id] || {};
+  /* la card d'esempio del giro guidato porta il suo volto con se' */
+  const f = o.faccia || p2pFacce[o.id] || {};
   /* IL VOLTO E' UNA PORTA (set 2026, richiesta di Andrea): toccarlo
      apre il NEGOZIO di chi ha pubblicato — la stessa pagina del
      mercatino — mentre il resto della card resta l'ordine. Lo
@@ -44856,7 +44906,7 @@ function rigaOrdineP2P(o){
      la riga non c'e'. La reputazione del coordinatore resta letta dal
      38383 e vive nel dettaglio dello scambio: repTestoP2P non e'
      morta, ha cambiato casa. */
-  const rep = stellineP2P(p2pFacce[o.id]);
+  const rep = stellineP2P(o.faccia || p2pFacce[o.id]);
   /* ⚠️ IL PROPRIO ORDINE SI DICE, e fin qui non lo diceva nessuno: la
      card era identica a quelle degli altri, quindi il proprio ordine
      sembrava un'occasione da prendere. Toccarlo non lo prendeva —
@@ -44871,6 +44921,17 @@ function rigaOrdineP2P(o){
   const mio = ordineMioP2P(o.id);
   /* l'id viaggia nel dataset e non dentro la stringa dell'onclick:
      e' testo di sconosciuti — il patto del filtro-alfabeto */
+  /* LA CARD D'ESEMPIO DEL GIRO GUIDATO (26 set 2026): e' questa stessa
+     card, ma senza id e senza tocco — non si prende — e con la sua
+     etichetta. `o.esempio` e' il lato del tab; vedi IL GIRO GUIDATO. */
+  if (o.esempio) return `<div class="p2p-ord p2p-esempio" data-lato="${esc(o.esempio)}">
+    <span class="p2p-esempio-tag">Esempio</span>
+    <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${anelloScadenzaP2P(o)}</div>
+    ${paghiEuro ? rigaSats : rigaEuro}
+    ${badge ? `<div class="p2p-badge-riga">${badge}${affarone}</div>` : ''}
+    ${paga}
+    ${rep ? '<div class="p2p-box p2p-rep">' + rep + '</div>' : ''}
+  </div>`;
   return `<div class="p2p-ord${mio ? ' p2p-mio' : ''}${typeof cardNuovaP2P === 'function' && cardNuovaP2P(o.id) ? ' p2p-nuova' : ''}" data-id="${esc(o.id)}" role="button" tabindex="0"
     onclick="prendiOrdineP2P(this.dataset.id)">
     <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${anelloScadenzaP2P(o)}</div>
@@ -46956,6 +47017,9 @@ const TETTO_FINE_TOUR_P2P_MS = 3000;
 /* aperto per la SOLA slide del livello 5 (la salita, vedi
    `salitaLivelloP2P`) invece che per il tour intero */
 let tourP2PSolo = false;
+/* aperto da «Come funziona»: alla fine il giro guidato riparte anche a
+   chi l'ha gia' visto (vedi IL GIRO GUIDATO DEL P2P) */
+let tourP2PChiesto = false;
 /* il gettone del giro: una risposta che arriva a tour gia' chiuso (o
    chiuso e riaperto) non deve dipingere niente */
 let giroFineTourP2P = 0;
@@ -47163,7 +47227,7 @@ function apriTourP2PSePrimaVolta(){
 /* «Come funziona»: lo stesso tour a richiesta, per tutti. Non rimette
    in gioco nessun timbro — riapre e basta, e alla chiusura il timbro
    resta quello che era (riscritto uguale da `apriTourP2P`). */
-function rivediTourP2P(){ haptic(); apriTourP2P(); }
+function rivediTourP2P(){ haptic(); apriTourP2P(); tourP2PChiesto = true; }
 function apriTourP2P(){
   if (tourP2PInCorso) return;
   /* consumato alla COMPARSA, non alla fine: vedi il patto qui sopra */
@@ -47180,6 +47244,7 @@ function apriSalitaTourP2P(){
 function montaTourP2P(solo){
   tourP2PInCorso = true;
   tourP2PSolo = solo;
+  tourP2PChiesto = false;
   /* la pagina dietro si sfoca (e una messa a fuoco in corsa si ferma) */
   sfocaPaginaTourP2P(true);
   const nastro = el('tourP2PNastro'), punti = el('tourP2PPunti');
@@ -47253,7 +47318,13 @@ function avantiTourP2P(){
   if (!finale && i < TAPPE_TOUR_P2P.length - 1) { vaiTappaTourP2P(i + 1); return; }
   haptic();
   if (!finale) { finaleTourP2P(); return; }
-  chiudiTourP2P();
+  /* IL GIRO SULLA PAGINA VERA (26 set 2026): dopo le slide intere — mai
+     dopo la sola slide del livello 5 — parte il giro guidato, a pagina
+     tornata a fuoco. Vive fuori da qui: da qui il typeof. */
+  const chiesto = tourP2PChiesto;
+  const giro = !tourP2PSolo && typeof giroGuidatoP2P === 'function'
+    ? () => giroGuidatoP2P(chiesto) : null;
+  chiudiTourP2P(giro);
   /* «Inizia» PORTA AL LIBRO, e quasi sempre ci si e' gia': il ramo
      serve al giorno che il tour si aprira' da un'altra pagina. */
   if (document.querySelector('.view.active')?.id !== 'view-p2p') go('p2p');
@@ -47266,7 +47337,9 @@ function tastoTourP2P(e){
   if (e.key === 'ArrowRight') vaiTappaTourP2P(tappaTourP2P() + 1);
   if (e.key === 'ArrowLeft')  vaiTappaTourP2P(tappaTourP2P() - 1);
 }
-function chiudiTourP2P(){
+/* `poi`: quel che parte a pagina tornata a fuoco (il giro guidato, da
+   «Inizia»); «Salta» e il gesto indietro non ne passano */
+function chiudiTourP2P(poi){
   if (!tourP2PInCorso) return;
   /* la bandierina si abbassa PRIMA della classe: l'osservatore del
      motore di navigazione scatta sul cambio di classe e chiede la pila
@@ -47283,17 +47356,20 @@ function chiudiTourP2P(){
      card se n'e' gia' andata, e la sfocatura si scioglie in 0,8 s.
      Solo qui, alla fine di un tour — «Inizia», «Salta» o il gesto
      indietro passano tutti da questa funzione. */
-  sfocaPaginaTourP2P(false);
+  sfocaPaginaTourP2P(false, typeof poi === 'function' ? poi : null);
 }
 /* LA SFOCATURA DIETRO IL TOUR, in un posto solo. Accesa: la classe
    sull'<html> (il CSS sfoca vista attiva e barra), mai con gli effetti
    ridotti. Spenta: la transizione entra INSIEME al valore che cambia
    — il browser la legge dallo stile nuovo — e se ne va a corsa
    finita; coi ridotti si spegne e basta. Quanto dura lo dice il CSS
-   con la stessa cifra (la prova le confronta). */
+   con la stessa cifra (la prova le confronta).
+   `poi` parte a corsa FINITA — subito se non c'e' corsa (ridotti, o
+   pagina gia' nitida) — e un tour riaperto in corsa lo cancella col
+   timer: e' cosi' che il giro guidato aspetta la messa a fuoco. */
 const A_FUOCO_TOUR_P2P_MS = 800;
 let tourP2PFuocoTimer = null;
-function sfocaPaginaTourP2P(accesa){
+function sfocaPaginaTourP2P(accesa, poi){
   const h = document.documentElement;
   clearTimeout(tourP2PFuocoTimer);
   if (accesa) {
@@ -47301,12 +47377,18 @@ function sfocaPaginaTourP2P(accesa){
     if (!tourRidotto()) h.classList.add('p2p-sfocata');
     return;
   }
-  if (!h.classList.contains('p2p-sfocata')) return;
-  if (tourRidotto()) { h.classList.remove('p2p-sfocata', 'p2p-a-fuoco'); return; }
+  if (!h.classList.contains('p2p-sfocata')) { if (poi) poi(); return; }
+  if (tourRidotto()) {
+    h.classList.remove('p2p-sfocata', 'p2p-a-fuoco');
+    if (poi) poi();
+    return;
+  }
   h.classList.add('p2p-a-fuoco');
   h.classList.remove('p2p-sfocata');
-  tourP2PFuocoTimer = setTimeout(() => h.classList.remove('p2p-a-fuoco'),
-                                 A_FUOCO_TOUR_P2P_MS + 60);
+  tourP2PFuocoTimer = setTimeout(() => {
+    h.classList.remove('p2p-a-fuoco');
+    if (poi) poi();
+  }, A_FUOCO_TOUR_P2P_MS + 60);
 }
 
 /* ============ IL MOTORE DELLO SCAMBIO (set 2026, tappa 4) ============
@@ -57252,6 +57334,114 @@ async function aspettaLibroVeroP2P(btn, ancheSeTace){
   return false;
 }
 /* ============ fine del libro subito ============ */
+
+/* ============ IL GIRO GUIDATO DEL P2P (26 set 2026, richiesta di Andrea) ============
+   Dopo le slide del tutorial, sulla pagina VERA: sette tappe col
+   riflettore — i due tab, una card del libro, il + di ogni lato e la
+   tendina di Barattozon — nello stile del giro di benvenuto del
+   mercatino. E' LO STESSO MOTORE e non una copia: `avviaTour` prende
+   l'elenco e il `dopo`, e il resto — velo, riflettore, fumetto,
+   «Avanti», «Salta», Esc, gesto indietro, effetti ridotti — e' suo.
+   QUANDO PARTE: a fine slide con «Inizia», mai dopo il loro «Salta» (che
+   salta il tutorial intero) e mai dopo la sola slide del livello 5; e
+   solo a pagina tornata a fuoco — `chiudiTourP2P` passa il giro a
+   `sfocaPaginaTourP2P`, che lo chiama a corsa finita. In automatico UNA
+   volta: il timbro `giro_p2p` sta sul profilo, quindi vale su ogni
+   dispositivo; da «Come funziona» si rivede sempre.
+   LA CARD E' VERA SE C'E', la prima del libro. Se il lato e' vuoto entra
+   una card d'ESEMPIO, disegnata dalla stessa `rigaOrdineP2P` con le
+   varianti da spiegare (Super affare, metodo, prezzo, reputazione) e
+   marcata «Esempio»: senza id e senza tocco non si prende, e alla fine
+   del giro se ne va.
+   NESSUN GESTO VERO: il velo prende ogni tocco e il motore spegne Invio
+   e spazio fuori dal fumetto. L'unico gesto che il giro fa da se' e'
+   passare al tab «Vendi BTC»; alla fine rimette il lato di partenza. */
+let giroP2PLato = null;    // il lato da rimettere alla fine; null = nessun giro
+/* I TESTI STANNO IN DUE RIGHE A 320 PX, ed e' la regola del giro:
+   misurati nel fumetto vero (a 320 il testo ha 264 px, due righe sono
+   ~84 caratteri). Tre stesure di Andrea ne facevano tre e quattro, e
+   sono state accorciate tenendo le sue parole; la prova le ricontrolla
+   col conto dei caratteri. */
+const TAPPE_GIRO_P2P = [
+  { trova: () => el('p2pLatoCompro'),
+    testo: `Vuoi <b>comprare</b> bitcoin? Parti da qui.` },
+  { trova: () => cartaGiroP2P(),
+    testo: `Qui trovi chi è disposto a venderti bitcoin. Tocca una card per vederla e prenderla.` },
+  { trova: () => piuGiroP2P(), tondo: true,
+    testo: `Non trovi l'affare giusto? Pubblica qui il tuo annuncio e aspetta chi lo prende.` },
+  /* il giro passa da solo al lato di chi vende: senza scossa, che e' la
+     risposta al dito sul tab */
+  { prima: () => setLatoP2P('vendo', true), trova: () => el('p2pLatoVendo'),
+    testo: `Vuoi <b>vendere</b> bitcoin? Da qui.` },
+  { trova: () => cartaGiroP2P(),
+    testo: `Qui ci sono gli annunci di chi vuole comprare i tuoi bitcoin.` },
+  { trova: () => piuGiroP2P(), tondo: true,
+    testo: `Pubblica il tuo annuncio di vendita e aspetta che qualcuno lo prenda.` },
+  { trova: () => el('navBarattozon'), rett: capsulaGiroP2P, raggio: 33,
+    testo: `Con <b>Barattozon</b> qualcuno paga in contanti il tuo ordine Amazon, tu gli dai i sats.` },
+];
+/* il tondo del + nella barra: e' lui che ha il colore del lato */
+function piuGiroP2P(){ return el('nav-vendi')?.querySelector('.ic') || null; }
+/* la tendina si illumina INSIEME al suo +: sono una capsula sola, e il
+   testo dice di trascinare l'uno sull'altra */
+function capsulaGiroP2P(b){
+  const q = [b.getBoundingClientRect()];
+  const p = piuGiroP2P();
+  if (p) q.push(p.getBoundingClientRect());
+  const top = Math.min(...q.map(x => x.top)), bottom = Math.max(...q.map(x => x.bottom));
+  const left = Math.min(...q.map(x => x.left)), right = Math.max(...q.map(x => x.right));
+  return {top, bottom, left, right, width: right - left, height: bottom - top};
+}
+/* La card da illuminare: la prima VERA del libro (anche la propria), e
+   solo se non ce n'e' nessuna quella d'esempio del lato che si guarda.
+   Si chiede a ogni riposizionamento, quindi si rimette da sola se un
+   render del libro l'ha portata via, e si toglie se nel frattempo e'
+   arrivata una card vera. */
+function cartaGiroP2P(){
+  const box = el('p2pCorpo');
+  if (!box) return null;
+  const vera = box.querySelector('.p2p-ord[data-id]');
+  const finta = box.querySelector('.p2p-esempio');
+  if (vera) { if (finta) finta.remove(); return vera; }
+  if (finta && finta.dataset.lato === p2pLato) return finta;
+  if (finta) finta.remove();
+  box.insertAdjacentHTML('afterbegin', cartaEsempioP2P(p2pLato));
+  return box.querySelector('.p2p-esempio');
+}
+/* L'ESEMPIO: nel tab «Compra BTC» c'e' chi VENDE (k=sell), in «Vendi
+   BTC» chi COMPRA (k=buy). Il premio sta oltre `P2P_AFFARE_SUPER` dal
+   verso favorevole a chi guarda, quindi la pastiglia e' «Super affare»
+   in tutt'e due; l'anello e' quasi pieno (sei giorni su sette), e le
+   stelle sono quelle di una persona con un po' di storia. */
+function cartaEsempioP2P(lato){
+  const adesso = Math.floor(Date.now() / 1000);
+  const premio = P2P_AFFARE_SUPER + 3;
+  return rigaOrdineP2P({id: '', esempio: lato, lato: lato === 'compro' ? 'sell' : 'buy',
+    euro: 50, euroMax: 0, sats: 0, premium: lato === 'compro' ? -premio : premio,
+    metodi: ['Revolut'], creato: adesso - 86400, scade: adesso + 6 * 86400,
+    faccia: {nome: 'Esempio', voti: 24, media: 4.9}});
+}
+/* Il giro, dalla fine delle slide: `chiesto` = aperte da «Come
+   funziona». Parte solo se la pagina e' ancora il libro e niente la
+   copre; il timbro si consuma alla COMPARSA, come quello del benvenuto. */
+function giroGuidatoP2P(chiesto){
+  if (!chiesto && hintDismesso('giro_p2p')) return;
+  if (tourInCorso || tourP2PInCorso || testModaleInCorso) return;
+  if (document.querySelector('.view.active')?.id !== 'view-p2p') return;
+  giroP2PLato = p2pLato;
+  if (p2pLato !== 'compro') setLatoP2P('compro', true);
+  if (!avviaTour(TAPPE_GIRO_P2P, fineGiroP2P)) { fineGiroP2P(); return; }
+  timbraVisto('giro_p2p');
+}
+/* la fine, qualunque strada la porti: via la card d'esempio, e il lato
+   torna quello di partenza */
+function fineGiroP2P(){
+  const lato = giroP2PLato;
+  giroP2PLato = null;
+  document.querySelectorAll('.p2p-esempio').forEach(n => n.remove());
+  if (lato && lato !== p2pLato) setLatoP2P(lato, true);
+}
+/* ============ fine del giro guidato del P2P ============ */
 
 /* ============ I VOLTI SUL LIBRO (set 2026, decisione di Andrea) ====
    Le card mostrano chi ha pubblicato, con la faccia che quella persona

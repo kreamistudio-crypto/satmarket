@@ -37524,9 +37524,11 @@ async def scegli_font_scala(req: Request,
 # `p2p_lv5` (26 set 2026) e' la slide finale del tour P2P per chi SALE
 # al livello 5: si vede una volta sola, e il «una volta» vale su ogni
 # dispositivo — che e' proprio il mestiere di questa colonna.
+# `giro_p2p` (26 set 2026) e' il giro guidato sulla pagina del P2P dopo
+# le slide: parte da solo una volta, e la volta vale su ogni dispositivo.
 VISTI_NOTI = ("tour", "tour_p2p", "cartello", "condcat", "checklistvista",
               "nwc", "lnaddr", "npubverifica", "nostrpub", "barraweb",
-              "duetocchi", "fx_ridotti", "fx_pieni", "p2p_lv5")
+              "duetocchi", "fx_ridotti", "fx_pieni", "p2p_lv5", "giro_p2p")
 
 
 def _visti_leggi(grezzo) -> dict:

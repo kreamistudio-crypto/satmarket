@@ -50889,7 +50889,7 @@ def prove_tour_p2p():
     # la bandierina si abbassa PRIMA della classe: l'osservatore
     # scatta sul cambio di classe e chiede la pila a navPila, che
     # questa variabile la legge
-    _c = pezzo_js(mini, "function chiudiTourP2P(){", "\n}\n")
+    _c = pezzo_js(mini, "function chiudiTourP2P(poi){", "\n}\n")
     prova("la bandierina cade prima della classe", True,
           0 < _c.find("tourP2PInCorso = false;")
           < _c.find("classList.remove('open')"))
@@ -51115,12 +51115,14 @@ def prove_libro_subito():
     prova("...e con gli effetti ridotti niente sfocatura: il fondo pieno di casa", [True, True],
           ["html.fx-ridotti #tourP2P{background:var(--bg)}" in css,
            "html.fx-ridotti.p2p-sfocata #app > nav{filter:none}" in css])
-    _cc = pezzo_js(mini, "function chiudiTourP2P(){", "\n}\n")
-    _sf = pezzo_js(mini, "function sfocaPaginaTourP2P(accesa){", "\n}\n")
+    _cc = pezzo_js(mini, "function chiudiTourP2P(poi){", "\n}\n")
+    _sf = pezzo_js(mini, "function sfocaPaginaTourP2P(accesa, poi){", "\n}\n")
     prova("sfocatura e messa a fuoco nascono in UN posto solo, e la chiusura del tour lo chiama",
           [1, 1, True, True],
           [mini.count(".classList.add('p2p-sfocata')"), mini.count(".classList.add('p2p-a-fuoco')"),
-           "sfocaPaginaTourP2P(false);" in _cc,
+           # EMENDATA (26 set 2026, il giro guidato del P2P): la chiusura
+           # passa anche il `poi`, che il giro aspetta a pagina a fuoco
+           "sfocaPaginaTourP2P(false, typeof poi === 'function' ? poi : null);" in _cc,
            "if (!tourRidotto()) h.classList.add('p2p-sfocata');" in _sf])
     _d = _re.search(r"transition:filter \.(\d)s", css)
     prova("...e la messa a fuoco dura 0,8 s, la stessa cifra del CSS e del JS", [True, 800],
@@ -51462,6 +51464,393 @@ const out = {};
               [o["ridottiAperto"], o["ridotti"]])
         prova("l'anonimo non ha /me da aspettare, e fuori dal libro il tour non parte da solo",
               [True, False], [o["anonimo"]["aperto"], o["miei"]["aperto"]])
+
+
+def prove_giro_guidato_p2p():
+    """IL GIRO GUIDATO DEL P2P (26 set 2026, richiesta di Andrea): dopo le
+    slide del tutorial, sulla pagina vera, sette tappe col riflettore —
+    «Compra BTC», una card, il + verde; poi da solo «Vendi BTC», una
+    card, il + rosso e la tendina di Barattozon. Stesso motore del giro
+    del mercatino (`avviaTour`), parte a pagina tornata a fuoco, una
+    volta sola (timbro `giro_p2p` sul profilo) e sempre da «Come
+    funziona»; la card e' vera se c'e', altrimenti una d'esempio che non
+    si prende e se ne va alla fine.
+
+    Le sentinelle tengono la forma (un motore, i testi in due righe, la
+    card d'esempio senza tocco); il banco node fa GIRARE il motore vero,
+    il tour del P2P vero e il blocco del giro su un DOM di cartone: giro
+    completo, «Salta» a meta', libro vuoto con l'esempio, libro pieno con
+    la card vera, rivisto da «Come funziona», una volta sola, effetti
+    ridotti, messa a fuoco interrotta, tastiera, desktop."""
+    print("\n[il giro guidato del P2P]")
+    import json as _js, shutil, subprocess, tempfile
+    mini = open("miniapp.html", encoding="utf-8").read()
+    css = mini[mini.index("<style"):mini.index("</style>")]
+    i_g = mini.index("/* ============ IL GIRO GUIDATO DEL P2P (26 set 2026")
+    f_g = mini.index("/* ============ fine del giro guidato del P2P ============ */")
+    giro = mini[i_g:f_g]
+
+    # --- 1) UN MOTORE SOLO ------------------------------------------------
+    prova("il riflettore e il fumetto sono uno solo nel markup", [1, 1],
+          [mini.count('id="tourLuce"'), mini.count('id="tourFumetto"')])
+    prova("il benvenuto e il giro del P2P partono dallo stesso motore",
+          [True, True],
+          ["if (!avviaTour(TAPPE_TOUR)) return;" in pezzo_js(mini, "function tourBenvenuto(){", "\n}\n"),
+           "avviaTour(TAPPE_GIRO_P2P, fineGiroP2P)" in giro])
+    prova("...e il giro non si fa un velo, un riflettore o un fumetto suoi", [0, 0, 0],
+          [giro.count("tourLuce"), giro.count("tourFumetto"), giro.count("addEventListener")])
+    prova("il giro sta fuori dal tour a slide, che lo chiama col typeof", [True, True],
+          [mini.index("/* ============ fine del libro subito") < i_g,
+           "typeof giroGuidatoP2P === 'function'" in pezzo_js(mini, "function avantiTourP2P(){", "\n}\n")])
+    _av = pezzo_js(mini, "function avantiTourP2P(){", "\n}\n")
+    prova("...solo da «Inizia» delle slide intere, mai dopo la sola slide del livello 5",
+          [True, True], ["const giro = !tourP2PSolo &&" in _av, "chiudiTourP2P(giro);" in _av])
+    prova("...e parte a pagina tornata a fuoco: il `poi` lo chiama la corsa finita", True,
+          "h.classList.remove('p2p-a-fuoco');\n    if (poi) poi();"
+          in pezzo_js(mini, "function sfocaPaginaTourP2P(accesa, poi){", "\n}\n").replace("\r", ""))
+    prova("il «Salta» delle slide non passa il giro", True,
+          'id="tourP2PSalta" onclick="chiudiTourP2P()"' in mini)
+
+    # --- 2) LE SETTE TAPPE, E I TESTI IN DUE RIGHE A 320 --------------------
+    testi = re.findall(r"testo: `([^`]*)`", giro)
+    prova("le tappe sono sette", 7, len(testi))
+    # misurati nel fumetto vero a 320 px (264 px di testo, Chrome, il
+    # corpo di casa): 84 caratteri stanno in due righe, 89 no — il tetto
+    # e' la misura, e un testo che cresce lo deve rimisurare
+    lunghi = [t for t in testi if len(re.sub(r"<[^>]+>", "", t)) > 84]
+    prova("ogni testo sta in due righe a 320 px (al massimo 84 caratteri)", [], lunghi)
+    prova("...e dicono le cose del giro, nell'ordine", [True] * 7,
+          ["comprare" in testi[0], "venderti" in testi[1], "Pubblica" in testi[2],
+           "vendere" in testi[3], "comprare i tuoi" in testi[4],
+           "vendita" in testi[5], "Barattozon" in testi[6] and "ordine Amazon" in testi[6]])
+    prova("il timbro del giro e' nel catalogo del server", True,
+          '"giro_p2p")' in _SORGENTE)
+
+    # --- 3) LA CARD D'ESEMPIO ---------------------------------------------
+    riga = pezzo_js(mini, "function rigaOrdineP2P(o){", "\n}\n")
+    _es = riga[riga.index("if (o.esempio) return"):riga.index("return `<div class=\"p2p-ord${mio")]
+    prova("la card d'esempio esce dalla stessa rigaOrdineP2P", True, "if (o.esempio) return" in riga)
+    prova("...senza id, senza tocco, senza ruolo di bottone", [0, 0, 0, 0],
+          [_es.count("data-id"), _es.count("onclick"), _es.count("role="), _es.count("tabindex")])
+    prova("...con l'etichetta «Esempio» e le righe vere (cifra, badge, metodo, stelle)",
+          [True] * 5, ['<span class="p2p-esempio-tag">Esempio</span>' in _es,
+                       "anelloScadenzaP2P(o)" in _es, "${affarone}" in _es,
+                       "${paga}" in _es, "p2p-rep" in _es])
+    prova("...e il volto e le stelle se li porta dietro, senza toccare quelli veri", [True, True],
+          ["const rep = stellineP2P(o.faccia || p2pFacce[o.id]);" in riga,
+           "const f = o.faccia || p2pFacce[o.id] || {};" in pezzo_js(mini, "function anelloScadenzaP2P(o, adesso){", "\n}\n")])
+    prova("...tratteggiata, e il tocco non ce l'ha", [True, True],
+          ["dashed" in pezzo_js(css, ".p2p-ord.p2p-esempio{", "}"),
+           "cursor:default" in pezzo_js(css, ".p2p-ord.p2p-esempio{", "}")])
+
+    node = shutil.which("node")
+    if not node:
+        salta("il banco del giro guidato gira in node", "node non c'e'")
+        return
+
+    # --- 4) IL BANCO: motore vero, tour P2P vero, giro vero ------------------
+    i_m = mini.index("let tourInCorso = false;")
+    motore = mini[i_m:mini.index("\n}\n", mini.index("function chiudiTour(){")) + 3]
+    blocco_t = mini[mini.index("const TOUR_P2P_CHIAVE = "):
+                    mini.index("/* ============ IL MOTORE DELLO SCAMBIO")]
+    giudici = re.search(r"const LIVELLO_SCONTO_P2P = \d+;", mini).group(0) + "\n"
+    giudici += re.search(r"const P2P_AFFARE_SUPER = \d+;", mini).group(0) + "\n"
+    for _f in ("function commissioneVivaP2P(){", "function commissioneListinoP2P(){",
+               "function scontoFedeltaTestoP2P(punti){", "function mezzaCommissioneP2P(fee){",
+               "function articoloPercentoP2P(testo){"):
+        giudici += pezzo_js(mini, _f, "\n}\n") + "\n}\n"
+    banco = r"""
+const esc = s => String(s ?? '');
+function rettangolo(x, y, w, h){ return {left: x, top: y, width: w, height: h, right: x + w, bottom: y + h}; }
+function fintoEl(id, r){
+  const cl = new Set(), ascolti = {};
+  return {id, style: {}, innerHTML: '', textContent: '', offsetHeight: 90, offsetWidth: 290,
+    clientWidth: 340, scrollLeft: 0, children: [], disabled: false, dataset: {},
+    offsetParent: {}, r: r || rettangolo(0, 0, 10, 10),
+    classList: {add: (...c) => c.forEach(x => cl.add(x)),
+                remove: (...c) => c.forEach(x => cl.delete(x)),
+                contains: c => cl.has(c),
+                toggle: (c, v) => (v ? cl.add(c) : cl.delete(c))},
+    getBoundingClientRect(){ return this.r; },
+    contains(n){ return n === this || (n && n.dentro === this.id); },
+    querySelector(s){ return s === '.ic' ? PIU : null; },
+    scrollTo(o){ this.scrollLeft = o.left; }, scrollIntoView(){},
+    addEventListener(t, f){ ascolti[t] = f; }, removeEventListener(t){ delete ascolti[t]; }};
+}
+const ELEM = {};
+const el = id => (ELEM[id] = ELEM[id] || fintoEl(id));
+const PIU = fintoEl('piu', rettangolo(160, 740, 54, 54));
+el('p2pLatoCompro').r = rettangolo(16, 55, 120, 46);
+el('p2pLatoVendo').r = rettangolo(240, 55, 120, 46);
+el('navBarattozon').r = rettangolo(160, 730, 54, 82);
+/* il corpo del libro: le card come oggetti, e i due selettori del giro */
+let CARTE = [];
+function carta(opz){
+  const c = fintoEl('carta', rettangolo(16, 270, 343, 180));
+  Object.assign(c, opz);
+  c.remove = () => { CARTE = CARTE.filter(x => x !== c); };
+  return c;
+}
+const corpo = el('p2pCorpo');
+corpo.querySelector = s => s === '.p2p-ord[data-id]' ? (CARTE.find(c => c.dataset.id) || null)
+  : s === '.p2p-esempio' ? (CARTE.find(c => c.esempio) || null) : null;
+corpo.insertAdjacentHTML = (dove, html) => {
+  const m = /class="p2p-ord p2p-esempio" data-lato="(\w+)"/.exec(html);
+  if (m) CARTE.unshift(carta({esempio: true, dataset: {lato: m[1]}}));
+};
+let ESEMPI = [];
+function rigaOrdineP2P(o){
+  ESEMPI.push(o);
+  return o.esempio ? '<div class="p2p-ord p2p-esempio" data-lato="' + o.esempio + '">' : '<div>';
+}
+/* il libro dei due lati, e il render che riscrive il corpo come quello vero */
+let LIBRO = {compro: [], vendo: []}, p2pLato = 'compro', LATI = [], RENDER = 0;
+function renderP2P(){
+  RENDER++;
+  CARTE = LIBRO[p2pLato].map(id => carta({dataset: {id}}));
+}
+function setLatoP2P(lato, senzaScossa){
+  LATI.push([lato, !!senzaScossa]);
+  if (lato === p2pLato) return;
+  p2pLato = lato; renderP2P();
+}
+let VISTA = 'view-p2p';
+const document = {
+  querySelector: s => s === '.view.active' ? {id: VISTA} : null,
+  querySelectorAll: s => s === '.p2p-esempio' ? CARTE.filter(c => c.esempio) : [],
+  documentElement: fintoEl('html'), ASCOLTI: [],
+  addEventListener(t, f, c){ this.ASCOLTI.push([t, !!c]); },
+  removeEventListener(t, f, c){ this.ASCOLTI = this.ASCOLTI.filter(a => !(a[0] === t && a[1] === !!c)); }};
+const window = {scrollTo(){}, addEventListener(){}, removeEventListener(){}};
+const innerHeight = 812, innerWidth = 375;
+function requestAnimationFrame(f){ f(); }
+const MEM = {};
+const localStorage = {getItem: k => (k in MEM ? MEM[k] : null),
+  setItem: (k, v) => { MEM[k] = String(v); }, removeItem: k => { delete MEM[k]; }};
+let vistiMem = {}, VISTI = {}, TIMBRI = [];
+function ricordaVisto(id, q){ vistiMem[id] = q; }
+function hintDismesso(id){ return !!VISTI[id]; }
+function timbraVisto(id){ VISTI[id] = Date.now(); TIMBRI.push(id); }
+function hintAttivi(){ return true; }
+function bannerInstallaPwa(){}
+let RIDOTTI = false;
+function effettiRidotti(){ return RIDOTTI; }
+/* il gesto indietro chiude lo strato di sopra, come la pila di navPila */
+function navIndietro(){ if (tourInCorso) chiudiTour(); else chiudiTourP2P(); }
+let myTgId = 111;
+const DEMO = false, VETRINA = false, API_BASE = '/api';
+function authHdr(){ return ''; }
+function chiaveP2P(k){ return k + ':' + myTgId; }
+function haptic(){}
+function go(){}
+const testModaleInCorso = false;
+const P2P_VESTE_METODI = {}, P2P_TABACCHINO = 'x';
+let p2pInfo = {fee: 0.03}, p2pSconto = null, p2pLeve = {mostro: 'm'};
+const p2pCoord = () => p2pLeve;
+global.fetch = () => new Promise(() => {});
+""" + giudici + "\n" + motore + "\n" + blocco_t + "\n" + giro + r"""
+const dorme = ms => new Promise(ok => setTimeout(ok, ms));
+const H = document.documentElement.classList;
+function azzera(){
+  if (tourInCorso) chiudiTour();
+  if (tourP2PInCorso) chiudiTourP2P();
+  clearTimeout(tourP2PFuocoTimer); H.remove('p2p-sfocata', 'p2p-a-fuoco');
+  for (const k in MEM) delete MEM[k];
+  vistiMem = {}; VISTI = {tour: 1}; TIMBRI = []; RIDOTTI = false; VISTA = 'view-p2p';
+  LIBRO = {compro: [], vendo: []}; p2pLato = 'compro'; LATI = []; ESEMPI = [];
+  renderP2P();
+  PIU.offsetParent = {}; el('navBarattozon').offsetParent = {};
+}
+/* le slide fino alla finale, e «Inizia» */
+function slideFinoInizia(){
+  for (let i = 0; i < TAPPE_TOUR_P2P.length; i++) avantiTourP2P();
+  el('tourP2PVia').disabled = false;
+  avantiTourP2P();
+}
+function bersaglio(){
+  const t = tourTappe[tourTappa], b = t && t.trova();
+  if (!b) return null;
+  return b === PIU ? '+' : b.esempio ? 'esempio:' + b.dataset.lato
+       : b.dataset.id ? 'carta:' + b.dataset.id : b.id;
+}
+function passo(){
+  const f = el('tourFumetto').innerHTML;
+  return {n: tourTappa + 1, di: tourTappe.length, bersaglio: bersaglio(), lato: p2pLato,
+          esempi: CARTE.filter(c => c.esempio).length,
+          tondo: el('tourLuce').classList.contains('tondo'),
+          salta: f.indexOf('class="tour-salta"') >= 0,
+          luce: [el('tourLuce').style.top, el('tourLuce').style.height]};
+}
+function tuttiIPassi(){
+  const passi = [];
+  while (tourInCorso) { passi.push(passo()); tourAvanti(); }
+  return passi;
+}
+const stato = () => ({giro: tourInCorso, lato: p2pLato, esempi: CARTE.filter(c => c.esempio).length,
+                      ascolti: document.ASCOLTI.length});
+const out = {};
+(async () => {
+  /* 1) GIRO COMPLETO, LIBRO VUOTO: dopo «Inizia», a pagina a fuoco */
+  azzera();
+  apriTourP2PSePrimaVolta();
+  slideFinoInizia();
+  out.subito = {giro: tourInCorso, fuoco: H.contains('p2p-a-fuoco'), timbri: TIMBRI.slice()};
+  await dorme(A_FUOCO_TOUR_P2P_MS - 200);
+  out.aMeta = {giro: tourInCorso, fuoco: H.contains('p2p-a-fuoco')};
+  await dorme(320);
+  out.partito = {giro: tourInCorso, fuoco: H.contains('p2p-a-fuoco'), timbri: TIMBRI.slice(),
+                 ascolti: document.ASCOLTI.slice()};
+  out.vuoto = tuttiIPassi();
+  out.vuotoDopo = stato();
+  out.lati = LATI.slice();
+  out.esempiFatti = ESEMPI.map(o => ({esempio: o.esempio, lato: o.lato, premio: o.premium,
+    metodi: o.metodi, voti: o.faccia && o.faccia.voti, id: o.id}));
+  /* 2) UNA VOLTA SOLA: il tour riaperto senza «Come funziona» non rifa' il giro */
+  apriTourP2P(); slideFinoInizia(); await dorme(A_FUOCO_TOUR_P2P_MS + 150);
+  out.unaVolta = stato();
+  /* ...e l'ingresso normale non apre niente */
+  apriTourP2PSePrimaVolta(); await dorme(10);
+  out.ingresso = {slide: tourP2PInCorso, giro: tourInCorso};
+  /* 3) DA «COME FUNZIONA» si rivede, timbro o no */
+  rivediTourP2P(); slideFinoInizia(); await dorme(A_FUOCO_TOUR_P2P_MS + 150);
+  out.rivisto = stato();
+  /* 4) «SALTA» A META': al quinto passo (lato vendo, esempio in pagina) */
+  for (let i = 0; i < 4; i++) tourAvanti();
+  out.primaDelSalta = passo();
+  navIndietro();                 /* il «Salta» del fumetto e' navIndietro() */
+  out.salta = stato();
+  /* 5) LIBRO PIENO: la card vera, mai l'esempio */
+  azzera(); VISTI.giro_p2p = 1;
+  LIBRO = {compro: ['c1', 'c2'], vendo: ['v1']}; renderP2P();
+  rivediTourP2P(); slideFinoInizia(); await dorme(A_FUOCO_TOUR_P2P_MS + 150);
+  out.pieno = tuttiIPassi();
+  out.pienoEsempi = ESEMPI.length;
+  /* 6) LA CARD SI RIMETTE DA SOLA: un render la porta via, e se arriva
+        una card vera l'esempio se ne va */
+  azzera(); VISTI.giro_p2p = 1;
+  rivediTourP2P(); slideFinoInizia(); await dorme(A_FUOCO_TOUR_P2P_MS + 150);
+  tourAvanti();
+  const primo = bersaglio();
+  renderP2P(); posizionaTour();
+  const dopoRender = bersaglio();
+  LIBRO.compro = ['arrivata']; CARTE.push(carta({dataset: {id: 'arrivata'}}));
+  posizionaTour();
+  out.cura = {primo, dopoRender, arrivata: bersaglio(), esempi: CARTE.filter(c => c.esempio).length};
+  chiudiTour();
+  /* 7) IL «SALTA» DELLE SLIDE salta anche il giro, e la sola slide del
+        livello 5 non lo apre */
+  azzera(); apriTourP2PSePrimaVolta();
+  el('tourP2PSalta'); chiudiTourP2P();      /* onclick="chiudiTourP2P()" */
+  await dorme(A_FUOCO_TOUR_P2P_MS + 150);
+  out.saltaSlide = {giro: tourInCorso, timbri: TIMBRI.slice()};
+  azzera(); VISTI.giro_p2p = 0; apriSalitaTourP2P();
+  el('tourP2PVia').disabled = false;
+  if (!el('tourP2P').classList.contains('finale')) finaleTourP2P();
+  el('tourP2PVia').disabled = false; avantiTourP2P();
+  await dorme(A_FUOCO_TOUR_P2P_MS + 150);
+  out.livello5 = {giro: tourInCorso, slide: tourP2PInCorso};
+  /* 8) EFFETTI RIDOTTI: niente corsa, il giro c'e' subito */
+  azzera(); RIDOTTI = true;
+  apriTourP2PSePrimaVolta(); slideFinoInizia();
+  out.ridotti = {giro: tourInCorso, sfocata: H.contains('p2p-sfocata'), fuoco: H.contains('p2p-a-fuoco')};
+  chiudiTour();
+  /* 9) LA MESSA A FUOCO INTERROTTA: un tour riaperto in corsa cancella il giro */
+  azzera(); apriTourP2PSePrimaVolta(); slideFinoInizia();
+  await dorme(200); rivediTourP2P();
+  await dorme(A_FUOCO_TOUR_P2P_MS + 150);
+  out.interrotta = {giro: tourInCorso, slide: tourP2PInCorso};
+  /* ...e se nel frattempo si e' andati via dal libro, niente giro */
+  azzera(); apriTourP2PSePrimaVolta(); slideFinoInizia(); VISTA = 'view-p2pmiei';
+  await dorme(A_FUOCO_TOUR_P2P_MS + 150);
+  out.andatoVia = {giro: tourInCorso, timbri: TIMBRI.slice()};
+  /* 10) NESSUN GESTO VERO: Invio e spazio fuori dal fumetto si fermano */
+  azzera(); VISTI.giro_p2p = 1; RIDOTTI = true;
+  rivediTourP2P(); slideFinoInizia();
+  const tasto = (key, dentro) => { const e = {key, target: {dentro}, fermo: 0, zitto: 0,
+    preventDefault(){ this.fermo++; }, stopPropagation(){ this.zitto++; }};
+    tastoTour(e); return [e.fermo, e.zitto]; };
+  out.tasti = {invioFuori: tasto('Enter', 'pagina'), spazioFuori: tasto(' ', 'pagina'),
+               invioDentro: tasto('Enter', 'tour'), tab: tasto('Tab', 'pagina')};
+  tasto('Escape', 'pagina');
+  out.esc = stato();
+  /* 11) DA DESKTOP la barra non c'e': restano le quattro tappe della pagina */
+  azzera(); VISTI.giro_p2p = 1; RIDOTTI = true;
+  PIU.offsetParent = null; el('navBarattozon').offsetParent = null;
+  rivediTourP2P(); slideFinoInizia();
+  out.desktop = tuttiIPassi().map(p => p.bersaglio);
+  process.stdout.write(JSON.stringify(out));
+  process.exit(0);
+})().catch(e => { process.stderr.write(String(e && e.stack || e)); process.exit(1); });
+"""
+    d = tempfile.mkdtemp()
+    try:
+        f = os.path.join(d, "giro.js")
+        with open(f, "w", encoding="utf-8") as fh:
+            fh.write(banco)
+        r = subprocess.run([node, f], capture_output=True, encoding="utf-8", timeout=60)
+        prova("il banco del giro guidato gira in node", "", (r.stderr or "")[-900:])
+        o = _js.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else None
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    if not o:
+        return
+    prova("DOPO «INIZIA» il giro aspetta la messa a fuoco", [False, True, False, True],
+          [o["subito"]["giro"], o["subito"]["fuoco"], o["aMeta"]["giro"], o["aMeta"]["fuoco"]])
+    prova("...e a pagina nitida parte, e consuma il suo timbro", [True, False, ["giro_p2p"]],
+          [o["partito"]["giro"], o["partito"]["fuoco"], o["partito"]["timbri"]])
+    prova("...la tastiera si ascolta in cattura, e il riflettore segue le corse",
+          [["keydown", True], ["transitionend", False]], o["partito"]["ascolti"])
+    v = o["vuoto"]
+    prova("GIRO COMPLETO: sette passi, su bersagli e lati giusti",
+          [["p2pLatoCompro", "compro"], ["esempio:compro", "compro"], ["+", "compro"],
+           ["p2pLatoVendo", "vendo"], ["esempio:vendo", "vendo"], ["+", "vendo"],
+           ["navBarattozon", "vendo"]],
+          [[p["bersaglio"], p["lato"]] for p in v])
+    prova("...«N di 7», «Salta» sempre in vista, e il cerchio tondo sul +",
+          [[7] * 7, [True] * 7, [False, False, True, False, False, True, False]],
+          [[p["di"] for p in v], [p["salta"] for p in v], [p["tondo"] for p in v]])
+    prova("...il riflettore abbraccia + e tendina, e non esce dal vetro", ["724px", "85px"],
+          v[6]["luce"])
+    prova("...al lato «Vendi BTC» il giro passa da solo, senza scossa, e alla fine torna",
+          [["vendo", True], ["compro", True]], o["lati"])
+    prova("...e alla fine: via l'esempio, e il lato torna quello di partenza",
+          {"giro": False, "lato": "compro", "esempi": 0, "ascolti": 0}, o["vuotoDopo"])
+    prova("LIBRO VUOTO: la card d'esempio del lato giusto, una per lato", [1, 1],
+          [p["esempi"] for p in v if p["bersaglio"].startswith("esempio")])
+    prova("...con Super affare dal verso buono, Revolut, stelle, e senza id",
+          [{"esempio": "compro", "lato": "sell", "premio": -18, "metodi": ["Revolut"], "voti": 24, "id": ""},
+           {"esempio": "vendo", "lato": "buy", "premio": 18, "metodi": ["Revolut"], "voti": 24, "id": ""}],
+          [o["esempiFatti"][0], [e for e in o["esempiFatti"] if e["esempio"] == "vendo"][0]])
+    prova("UNA VOLTA SOLA: le slide riaperte senza «Come funziona» non rifanno il giro",
+          [False, False, False], [o["unaVolta"]["giro"], o["ingresso"]["slide"], o["ingresso"]["giro"]])
+    prova("DA «COME FUNZIONA» il giro si rivede", True, o["rivisto"]["giro"])
+    prova("«SALTA» A META': chiude tutto, via l'esempio, lato di partenza",
+          [5, "vendo", {"giro": False, "lato": "compro", "esempi": 0, "ascolti": 0}],
+          [o["primaDelSalta"]["n"], o["primaDelSalta"]["lato"], o["salta"]])
+    prova("LIBRO PIENO: la card vera di ogni lato, e nessun esempio disegnato",
+          [["p2pLatoCompro", "carta:c1", "+", "p2pLatoVendo", "carta:v1", "+", "navBarattozon"], 0],
+          [[p["bersaglio"] for p in o["pieno"]], o["pienoEsempi"]])
+    prova("la card si rimette dopo un render, e lascia il posto a una vera che arriva",
+          ["esempio:compro", "esempio:compro", "carta:arrivata", 0],
+          [o["cura"]["primo"], o["cura"]["dopoRender"], o["cura"]["arrivata"], o["cura"]["esempi"]])
+    prova("il «Salta» delle slide salta anche il giro, e non lo timbra", [False, []],
+          [o["saltaSlide"]["giro"], o["saltaSlide"]["timbri"]])
+    prova("...e la sola slide del livello 5 non lo apre", [False, False],
+          [o["livello5"]["giro"], o["livello5"]["slide"]])
+    prova("EFFETTI RIDOTTI: nessuna sfocatura da aspettare, il giro c'e' subito",
+          {"giro": True, "sfocata": False, "fuoco": False}, o["ridotti"])
+    prova("un tour riaperto durante la messa a fuoco cancella il giro", [False, True],
+          [o["interrotta"]["giro"], o["interrotta"]["slide"]])
+    prova("...e chi e' andato via dal libro non se lo trova addosso, ne' timbrato",
+          [False, []], [o["andatoVia"]["giro"], o["andatoVia"]["timbri"]])
+    t = o["tasti"]
+    prova("NESSUN GESTO VERO: Invio e spazio fuori dal fumetto si fermano, dentro e Tab no",
+          [[1, 1], [1, 1], [0, 0], [0, 0]],
+          [t["invioFuori"], t["spazioFuori"], t["invioDentro"], t["tab"]])
+    prova("...ed Esc chiude il giro come «Salta»", {"giro": False, "lato": "compro", "esempi": 0, "ascolti": 0},
+          o["esc"])
+    prova("DA DESKTOP, senza barra, restano le quattro tappe della pagina",
+          ["p2pLatoCompro", "esempio:compro", "p2pLatoVendo", "esempio:vendo"], o["desktop"])
 
 
 def prove_p2p_invii():
@@ -97807,8 +98196,10 @@ def prove_effetti_ridotti():
            len(re.findall(r"<animate(?:Transform|Motion)?\b", mini))])
     # requestAnimationFrame non e' un effetto, ma e' da li' che ne nasce
     # uno a mano: si censisce CHI lo chiama, col suo perche'
-    #   tourBenvenuto, mostraTappa: attese di fotogramma (una classe che
+    #   avviaTour, mostraTappa: attese di fotogramma (una classe che
     #     si toglie dopo il paint), la corsa e' del CSS e la classe la spegne
+    #     (avviaTour e' il motore di ogni giro dal 26 set 2026: le due
+    #     attese stavano in tourBenvenuto, e le ha cedute a lui)
     #   barreCorri: il FLIP delle barre — idem, la transizione e' del CSS
     #   lbApplica: segue il DITO nel lightbox, non e' un'animazione
     #   passo: le monete di festaSats, che il giudice ferma alla porta
@@ -97823,7 +98214,7 @@ def prove_effetti_ridotti():
         nomi = re.findall(r"function\s+(\w+)\s*\(", js[:m.start()])
         chi[nomi[-1] if nomi else "?"] += 1
     prova("chi chiama requestAnimationFrame e' censito, col suo perche'",
-          {"togliGuscio": 2, "navArrivoSecco": 2, "tourBenvenuto": 2,
+          {"togliGuscio": 2, "navArrivoSecco": 2, "avviaTour": 2,
            "mostraTappa": 2, "barreCorri": 2, "lbApplica": 1, "passo": 2},
           dict(chi))
 
@@ -103294,6 +103685,7 @@ def main():
               prove_p2p_server,
         prove_p2p_libro,
         prove_tour_p2p, prove_tour_p2p_finale, prove_libro_subito,
+        prove_giro_guidato_p2p,
         prove_p2p_invii,
         prove_velo_p2p,
     prove_p2p_dettaglio,

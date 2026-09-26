@@ -33913,3 +33913,62 @@ ingresso normale mai sfocato, effetti ridotti col fondo pieno, nessuno
 scorrimento laterale, nessun errore dell'app. Scatti visti e approvati
 da Andrea prima del push.
 **DA AVERE:** l'occhio sul telefono.
+
+## Il giro guidato del P2P (26 set 2026)
+
+Richiesta di Andrea: dopo il tutorial a slide del P2P (slide finale
+della fee e messa a fuoco della pagina sfocata), un giro guidato sulla
+pagina VERA, nello stile del giro del mercatino. Sette tappe: «Compra
+BTC», una card del libro, il + verde; poi da solo «Vendi BTC», una card,
+il + rosso e la tendina di Barattozon (illuminata insieme al suo +, una
+capsula sola, a pillola).
+**LO STESSO MOTORE, NON UNA COPIA.** Il benvenuto aveva tutto dentro
+`tourBenvenuto`: ne e' uscito `avviaTour(tappe, dopo)`, e il benvenuto
+lo chiama con `TAPPE_TOUR` come prima (timbro `tour` consumato alla
+comparsa, identico). Tre aggiunte al motore, valide per ogni giro: la
+tappa puo' `prima` preparare la pagina, `rett`/`raggio` illuminano piu'
+elementi, e il riflettore non esce dal vetro; un `transitionend` lo
+riposiziona quando il bersaglio finisce di muoversi (il + che sale
+cambiando lato); `tastoTour` ascolta in cattura e ferma Invio e spazio
+fuori dal fumetto — il velo prendeva gia' il dito, la tastiera no.
+**QUANDO PARTE.** Da «Inizia» delle slide intere, a pagina tornata a
+fuoco: `chiudiTourP2P(poi)` → `sfocaPaginaTourP2P(false, poi)`, che lo
+chiama a corsa finita (misurato: ~1 s dopo «Inizia»; a 0,3 s la pagina
+e' ancora in messa a fuoco e il giro non c'e'). Coi ridotti subito. In
+automatico UNA volta, timbro `giro_p2p` sul profilo (nuovo in
+`VISTI_NOTI`); da «Come funziona» sempre (`tourP2PChiesto`).
+**SCELTE MIE, confermate da Andrea sugli scatti:** il «Salta» delle
+slide salta anche il giro (tutto il tutorial); la sola slide del
+livello 5 non lo apre; chi aveva gia' visto le slide prima di oggi non
+lo riceve in automatico (c'e' «Come funziona»); a fine giro, o a
+«Salta», il lato torna quello di partenza.
+**LA CARD D'ESEMPIO.** Col lato vuoto entra una card dalla STESSA
+`rigaOrdineP2P` (`o.esempio`): premio oltre `P2P_AFFARE_SUPER` dal verso
+buono (quindi «Super affare»), Revolut, prezzo, anello quasi pieno,
+4,9 stelle su 24 (volto in `o.faccia`, i veri non si toccano);
+tratteggiata, etichetta «Esempio», senza id ne' tocco. `cartaGiroP2P`
+la rimette se un render la porta via e la toglie se arriva una card
+vera; `fineGiroP2P` la toglie alla fine.
+**I TESTI IN DUE RIGHE A 320 PX**, misurati nel fumetto vero (264 px di
+testo: ~84 caratteri). Tre stesure di Andrea ne facevano tre e quattro:
+il 2 e il 3 accorciati tenendo le sue parole; il 7 e' «Con Barattozon
+qualcuno paga in contanti il tuo ordine Amazon, tu gli dai i sats.» —
+«ordine Amazon» voluto da Andrea; la variante con «Tocca qui» stava in
+due righe per 2 px, e su un altro telefono sarebbe andata a capo.
+**PROVATO.** `prove_giro_guidato_p2p` (nuova): sentinelle (un motore,
+sette tappe, testi entro 84 caratteri, esempio senza tocco) e un banco
+node col motore vero, il tour P2P vero e il blocco del giro — giro
+completo, «Salta» a meta', libro vuoto con l'esempio, libro pieno con
+la card vera, rivisto da «Come funziona», una volta sola, effetti
+ridotti, messa a fuoco interrotta, uscita dal libro, tastiera, desktop
+senza barra (quattro tappe). Emendate col perche' le ancore di
+`prove_tour_p2p` e `prove_libro_subito` (le firme col `poi`) e il
+censimento dei `requestAnimationFrame` (passati da `tourBenvenuto` ad
+`avviaTour`). Tortura 12 su 12. Suite intera severa senza config nel
+worktree da origin/main (6fefe1c): 16.374 verdi e 0 rosse. Dal vivo,
+Chrome headless via CDP a densita' 3, relay morto: 320 e 375 px, due
+temi, libro vuoto e pieno — sette passi, al massimo due righe, nessuno
+scorrimento laterale, nessun errore; «Salta» a meta', effetti ridotti,
+la messa a fuoco prima del giro. Scatti approvati da Andrea.
+**DA AVERE:** l'occhio sul telefono, e il giro con relay veri e una
+card vera che arriva a giro in corso.

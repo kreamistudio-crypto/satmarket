@@ -6858,8 +6858,27 @@
   transizione e la pagina torna a fuoco in 0,8 s
   (`A_FUOCO_TOUR_P2P_MS`). Con gli effetti ridotti niente sfocatura:
   fondo pieno, e la pagina c'e' nitida.
-  Il verbale: CANTIERI, «Il libro subito» e «Il tutorial su pagina
-  sfocata, e «Invii» nel P2P».
+  IL GIRO GUIDATO (26 set 2026): dopo «Inizia» delle slide intere — mai
+  dopo il loro «Salta», mai dopo la sola slide del livello 5 — sette
+  tappe col riflettore sulla pagina vera (`TAPPE_GIRO_P2P`: i due tab,
+  una card, il + di ogni lato, la capsula + e tendina di Barattozon).
+  E' LO STESSO MOTORE del benvenuto del mercatino: `avviaTour(tappe,
+  dopo)` tiene le tappe col bersaglio presente e risponde se e'
+  partito; una tappa puo' avere `prima` (il giro passa da solo a
+  «Vendi BTC»), `rett` e `raggio` (piu' elementi in un riflettore), e
+  il riflettore resta dentro lo schermo. Parte a pagina a fuoco:
+  `chiudiTourP2P(poi)` passa il giro a `sfocaPaginaTourP2P`, che lo
+  chiama a corsa finita (subito coi ridotti; un tour riaperto lo
+  cancella). In automatico una volta (timbro `giro_p2p` in
+  `VISTI_NOTI`), da «Come funziona» sempre (`tourP2PChiesto`). La card
+  e' la prima vera del libro, o una d'ESEMPIO dalla stessa
+  `rigaOrdineP2P` (`o.esempio`: senza id, senza tocco, etichetta
+  «Esempio», volto in `o.faccia`) che `cartaGiroP2P` rimette dopo ogni
+  render e che `fineGiroP2P` toglie insieme al lato di partenza.
+  Nessun gesto vero: il velo prende il dito, e `tastoTour` in cattura
+  ferma Invio e spazio fuori dal fumetto.
+  Il verbale: CANTIERI, «Il libro subito», «Il tutorial su pagina
+  sfocata, e «Invii» nel P2P» e «Il giro guidato del P2P».
   NEL P2P LA PROPRIA META' SI INVIA (26 set 2026): «Invia X € ·
   Ricevi ≈ X sats» (e «Invia ≈ X sats · Ricevi X €»), «Totale da
   inviare», «inviando» nelle card di «I miei scambi». «Pagare» resta
