@@ -30,6 +30,27 @@ e si cammina uno scambio intero guardandolo dai DUE lati a ogni passo:
   7. un annullato di due mesi fa resta fuori (lo storico e' di 30 giorni);
   8. la rotta non guarda la leva del P2P, e risponde `no-store`.
 
+E DAL 26 SET 2026 («Annulla» che dice non riuscito ma annulla, e
+l'ordine annullato che non compariva sotto «Annullati»), con gli eventi
+nella forma che la patch 0007 manda DAVVERO:
+
+  9. il mio ordine mai preso annullato col mio «Annulla» (`canceled`,
+     `pending`, la sola chiave di chi l'ha pubblicato), lo scaduto nel
+     libro (`expired`, `book`) e l'annullato che il server sa dal solo
+     libro: per chi l'ha pubblicato annullati, suoi, mai presi — per
+     gli altri niente;
+ 10. IL CLIENT VERO SULLA RISPOSTA VERA: le funzioni di miniapp.html,
+     girate in node sul JSON della rotta, fanno NASCERE quei tre sul
+     dispositivo che non li ha mai visti, annullati e sotto «Annullati»
+     (non nella lista di tutti i giorni), con la lapide e fuori dal
+     libro; e sul dispositivo che li aveva «pubblicati» la riga passa ad
+     annullata e la card esce dal libro;
+ 11. gli stati che l'attesa dei gesti rilegge quando la risposta di
+     mostrod tarda — euro inviati, annullo chiesto e proposto, annullato
+     d'accordo, liberati, disputa, e il ritiro di chi aveva preso (che la
+     0007 manda con TUTTE e due le chiavi) — sono quelli che la tabella
+     del client aspetta per quel gesto.
+
 NON TOCCA NIENTE DI VERO: il config e' di cartone (quello di
 `collaudo_pagamento_p2p`), niente Telegram, niente relay, niente
 coordinatore.
@@ -39,6 +60,7 @@ USO:  python collaudo_scambi_ovunque.py
 
 import asyncio
 import json
+import os
 import sys
 import time
 
@@ -49,6 +71,14 @@ TORNATO = "5a1e0000-bbbb-4a2b-9c3d-0000000000b1"
 MORTO = "5a1e0000-cccc-4a2b-9c3d-0000000000c1"
 VECCHIO = "5a1e0000-dddd-4a2b-9c3d-0000000000d1"
 VETRINA = "5a1e0000-eeee-4a2b-9c3d-0000000000e1"
+# 26 set 2026: l'annullo che rilegge e l'«Annullati» su ogni dispositivo
+RITIRO = "5a1e0000-ffff-4a2b-9c3d-0000000000f1"
+SCADUTO = "5a1e0000-ffff-4a2b-9c3d-0000000000f2"
+MORTO_NEL_LIBRO = "5a1e0000-ffff-4a2b-9c3d-0000000000f3"
+GESTI = "5a1e0000-ffff-4a2b-9c3d-0000000000f4"
+LIBERATO = "5a1e0000-ffff-4a2b-9c3d-0000000000f5"
+LASCIATO = "5a1e0000-ffff-4a2b-9c3d-0000000000f6"
+DISPUTA = "5a1e0000-ffff-4a2b-9c3d-0000000000f7"
 
 
 def semina_ordini():
@@ -83,8 +113,104 @@ def semina_ordini():
     con.execute("INSERT OR IGNORE INTO p2p_momenti(ordine,momento,quando,fonte,"
                 "giro,attore,dettaglio,arrivato) VALUES(?,'annullato',?,'mostro',1,'seller','',?)",
                 (VECCHIO, vecchio + 100, vecchio + 100))
+    # 26 set 2026: tre ordini in vetrina di chi vende, piu' uno che il
+    # libro sa gia' morto (l'evento della 0007 perso per strada), e tre
+    # da prendere per i gesti
+    for ordine, stato in ((RITIRO, "pending"), (SCADUTO, "pending"),
+                          (MORTO_NEL_LIBRO, "canceled"), (GESTI, "in-progress"),
+                          (LIBERATO, "in-progress"), (LASCIATO, "in-progress"),
+                          (DISPUTA, "in-progress")):
+        con.execute("INSERT OR REPLACE INTO p2p_ordini(ordine,tg_id,creato,stato,"
+                    "lato,maker,sats,euro,metodi) VALUES(?,?,?,?,'sell',1,"
+                    "0,'20,00 €','[\"Revolut\"]')",
+                    (ordine, banco.VENDE, adesso - 3000, stato))
     con.commit()
     con.close()
+
+
+def js(mini, firma, fine="\n}\n"):
+    """Un pezzo di miniapp.html, dalla firma alla fine data compresa."""
+    i = mini.index(firma)
+    return mini[i:mini.index(fine, i) + len(fine)]
+
+
+def client_sulla_risposta(risposta, locali, libro):
+    """IL CLIENT VERO SULLA RISPOSTA VERA: le funzioni di miniapp.html che
+    un dispositivo usa per l'archivio del server, girate in node sul JSON
+    della rotta. `locali` e' l'archivio del dispositivo prima, `libro` gli
+    id del libro in pagina. Torna, per ogni riga dopo l'adozione: stato,
+    ritirato, gruppo, se si vede a filtro spento, se sotto «Annullati»,
+    la lapide — e il libro dopo."""
+    import shutil
+    import subprocess
+    import tempfile
+    node = shutil.which("node")
+    if not node:
+        return {"ERRORE": "node non c'e'"}
+    mini = open(os.path.join(banco.QUI, "miniapp.html"), encoding="utf-8").read()
+    riga = lambda firma: mini[mini.index(firma):mini.index("\n", mini.index(firma))]
+    pezzi = "\n".join([
+        "const _box = {}; const localStorage = {getItem: k => (k in _box ? _box[k] : null),"
+        " setItem: (k, v) => { _box[k] = String(v); }};",
+        "const chiaveP2P = k => k; const window = {NostrTools: {}};",
+        "let archivio = {}; function ordiniP2P(){ return archivio; }"
+        " function scriviOrdineP2P(o){ archivio[o.id] = o; return o; }",
+        "let p2pMieiOrdini = null, p2pLibro = null, p2pScambiServer = null;",
+        "function diarioP2P(){}",
+        # un dispositivo che la chiave di QUESTI ordini non la sa: le
+        # righe nascono da guardare, ed e' il caso piu' stretto
+        "function mazzoMostro(){ return null; } function chiaveScambio(){ throw new Error('senza mazzo'); }",
+        "function azioniDisponibili(){ return ''; }",
+        riga("const P2P_FINALI = "), riga("const P2P_LIBRO_FINESTRA_S = "),
+        riga("const MOSTRO_LAPIDI_CHIAVE = "),
+        js(mini, "const STATI_P2P = {", "\n};\n"),
+        mini[mini.index("const P2P_DA_RESTORE = {"):
+             mini.index("\n}\n", mini.index("function riprendiDaRestoreP2P(o, statoMostro){")) + 3],
+        mini[mini.index("const P2P_INDICE_CERCA_MAX = "):
+             mini.index("\n}\n", mini.index("function adottaScambiServerP2P(locali){")) + 3],
+        mini[mini.index("function p2pRitirato(o){"):mini.index("\n}", mini.index("function p2pRitirato(o){")) + 2],
+        js(mini, "function lapidiP2P(){"), js(mini, "function lapideP2P(o){"),
+        js(mini, "function lapidataP2P(id){"), js(mini, "function archiviaRitiratoP2P(id){"),
+        js(mini, "function giroArchiviatoP2P(locali, id){"),
+        js(mini, "function gruppoScambioP2P(o){"), js(mini, "function passaStatoMieiP2P(o, f){"),
+    ])
+    prog = pezzi + """
+const dati = JSON.parse(require('fs').readFileSync(process.argv[2], 'utf-8'));
+archivio = dati.locali;
+p2pScambiServer = dati.risposta;
+p2pLibro = {ordini: dati.libro.map(id => ({id}))};
+adottaScambiServerP2P(archivio);
+const out = {righe: {}, libro: p2pLibro.ordini.map(x => x.id)};
+for (const id of Object.keys(archivio)) {
+  const o = archivio[id];
+  out.righe[id] = [o.stato, p2pRitirato(o), gruppoScambioP2P(o), passaStatoMieiP2P(o, []),
+                   passaStatoMieiP2P(o, ['morti']), lapidataP2P(id)];
+}
+process.stdout.write(JSON.stringify(out));
+"""
+    cart = tempfile.mkdtemp(prefix="annullati_")
+    try:
+        p = os.path.join(cart, "client.js")
+        d = os.path.join(cart, "dati.json")
+        open(p, "w", encoding="utf-8").write(prog)
+        open(d, "w", encoding="utf-8").write(json.dumps(
+            {"risposta": risposta, "locali": locali, "libro": libro}))
+        r = subprocess.run([node, p, d], capture_output=True, text=True,
+                           timeout=60, encoding="utf-8")
+    finally:
+        shutil.rmtree(cart, ignore_errors=True)
+    if r.returncode or not r.stdout.strip():
+        return {"ERRORE": (r.stderr or "")[-400:]}
+    return json.loads(r.stdout)
+
+
+def esiti_del_client():
+    """La tabella `ESITI_GESTO_P2P` di miniapp.html: gesto -> stati."""
+    import re
+    mini = open(os.path.join(banco.QUI, "miniapp.html"), encoding="utf-8").read()
+    t = js(mini, "const ESITI_GESTO_P2P = {", "\n};\n")
+    return {k: re.findall(r"'(\w+)'", v)
+            for k, v in re.findall(r"^  '?([\w-]+)'?: \{stati: \[([^\]]*)\]", t, re.M)}
 
 
 def scambi(chi):
@@ -208,6 +334,82 @@ def main():
     banco.SRV.P2P_ATTIVO = False
     prova("a leva spenta la rotta risponde lo stesso: chi ha uno scambio a meta' lo vede",
           "concluso", voce(V, ATTIVO, "stato")[0])
+    banco.SRV.P2P_ATTIVO = True
+
+    print("\n9) il mio ordine mai preso: annullato, scaduto, morto nel libro")
+    # la forma VERA: `cancel_pending_order_from_maker` manda `canceled`
+    # col dettaglio `pending`, l'attore e' chi l'ha pubblicato (la sua
+    # trade key e' il `seller` di un sell), e un ordine in vetrina ha
+    # solo quella chiave
+    banco.evento(RITIRO, "canceled", t + 300, "seller", "pending", buyer=None)
+    prova("«Annulla» su un mio ordine mai preso: annullato, mio, mai preso, con l'ora di mostrod",
+          ["annullato", True, False, t + 300], voce(V, RITIRO, "stato", "mio", "preso", "quando"))
+    banco.evento(SCADUTO, "expired", t + 310, "mostro", "book", buyer=None)
+    prova("...lo scaduto nel libro pure", ["annullato", True, False, t + 310],
+          voce(V, SCADUTO, "stato", "mio", "preso", "quando"))
+    prova("...e l'evento perso per strada: il server lo sa dal libro", ["annullato", True, False],
+          voce(V, MORTO_NEL_LIBRO, "stato", "mio", "preso"))
+    prova("chi compra e l'estraneo non vedono nessuno dei tre", [None, None, None, None, None, None],
+          [voce(C, o) for o in (RITIRO, SCADUTO, MORTO_NEL_LIBRO)]
+          + [voce(E, o) for o in (RITIRO, SCADUTO, MORTO_NEL_LIBRO)])
+
+    print("\n10) il client vero sulla risposta vera: «Annullati» su ogni dispositivo")
+    tre = (RITIRO, SCADUTO, MORTO_NEL_LIBRO)
+    risposta = {o: v for o, v in scambi(V)["scambi"].items() if o in tre}
+    nuovo = client_sulla_risposta(risposta, {}, list(tre) + [VETRINA])
+    SOTTO_ANNULLATI = ["annullato", True, "morti", False, True, True]
+    prova("il dispositivo che non li ha mai visti li fa NASCERE annullati, sotto «Annullati» e non "
+          "nella lista di tutti i giorni, con la lapide",
+          {o: SOTTO_ANNULLATI for o in tre}, nuovo.get("righe", nuovo))
+    prova("...e le loro card escono dal libro in pagina (resta quella viva)", [VETRINA],
+          nuovo.get("libro"))
+    # il dispositivo da cui erano stati pubblicati: la riga c'era, «pubblicato»
+    locali = {o: {"id": o, "lato": "vendo", "stato": "pubblicato", "mio": True, "indice": 0,
+                  "pubTrade": "", "creato": t} for o in tre}
+    risposta = {o: v for o, v in scambi(V)["scambi"].items() if o in tre}
+    vecchio = client_sulla_risposta(risposta, locali, list(tre) + [VETRINA])
+    prova("il dispositivo che li aveva «pubblicati»: la riga passa ad annullata e va sotto «Annullati»",
+          {o: SOTTO_ANNULLATI for o in tre}, vecchio.get("righe", vecchio))
+    prova("...e le card escono dal libro anche li'", [VETRINA], vecchio.get("libro"))
+
+    print("\n11) gli stati che l'attesa dei gesti rilegge")
+    esiti = esiti_del_client()
+    prova("la tabella del client c'e', coi sei gesti",
+          ["accetta", "chiedi", "dispute", "fiat-sent", "release", "ritira"], sorted(esiti))
+    fatto = lambda gesto, chi, ordine: (voce(chi, ordine, "stato") or [""])[0] in esiti.get(gesto, [])
+    banco.evento(GESTI, "taken", t + 400, "buyer", "take")
+    banco.evento(GESTI, "buyer-invoice-added", t + 410, "buyer", "hold-next")
+    banco.evento(GESTI, "hold-invoice-requested", t + 410, "mostro", "invoice")
+    banco.evento(GESTI, "hold-invoice-paid", t + 420, "seller")
+    banco.evento(GESTI, "fiat-sent", t + 430, "buyer")
+    prova("«ho inviato gli euro»: per chi compra il server dice un esito del gesto", True,
+          fatto("fiat-sent", C, GESTI))
+    banco.evento(GESTI, "cancel-requested", t + 440, "buyer")
+    prova("«chiedi di annullare»: a chi l'ha chiesto «annullo chiesto», un esito del gesto; "
+          "all'altro «annullo proposto»", [True, "annullo_proposto"],
+          [fatto("chiedi", C, GESTI), voce(V, GESTI, "stato")[0]])
+    banco.evento(GESTI, "canceled", t + 450, "seller", "cooperative")
+    prova("«accetta di annullare»: annullato per tutt'e due, esito dell'accetta e della richiesta",
+          [True, True], [fatto("accetta", V, GESTI), fatto("chiedi", C, GESTI)])
+    banco.evento(LIBERATO, "taken", t + 500, "buyer", "take")
+    banco.evento(LIBERATO, "hold-invoice-paid", t + 510, "seller")
+    banco.evento(LIBERATO, "fiat-sent", t + 520, "buyer")
+    banco.evento(LIBERATO, "released", t + 530, "seller", None,
+                 sats=7300, sats_buyer=7228, sats_seller=7372)
+    prova("«libera i sats»: per chi vende un esito del gesto", True, fatto("release", V, LIBERATO))
+    banco.evento(DISPUTA, "taken", t + 540, "buyer", "take")
+    banco.evento(DISPUTA, "hold-invoice-paid", t + 550, "seller")
+    banco.evento(DISPUTA, "dispute-opened", t + 560, "buyer")
+    prova("la disputa: un esito del gesto per chi l'ha aperta", True, fatto("dispute", C, DISPUTA))
+    # IL RITIRO DI CHI AVEVA PRESO, nella forma vera: la 0007 lo manda
+    # PRIMA di cancellare le sue chiavi (`cancel_order_by_taker_inner`),
+    # quindi l'evento porta TUTT'E DUE — il passo 5 qui sopra simula un
+    # evento senza la sua, che mostrod non manda
+    banco.evento(LASCIATO, "taken", t + 600, "buyer", "take")
+    banco.evento(LASCIATO, "canceled", t + 610, "buyer", "republished")
+    prova("chi aveva preso e ha chiesto di annullare lo vede annullato: il suo «chiedi» e' fatto",
+          ["annullato", True], [voce(C, LASCIATO, "stato")[0], fatto("chiedi", C, LASCIATO)])
+    prova("...e chi l'aveva pubblicato lo ritrova nel libro", "pubblicato", voce(V, LASCIATO, "stato")[0])
 
     print(f"\n{banco.PASSATE} ok, {banco.FALLITE} NO")
     return 1 if banco.FALLITE else 0

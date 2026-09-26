@@ -11039,6 +11039,20 @@
   pagata scrive `active` in `p2p_ordini.stato` (per il libro e' una
   presa, `STATI_LIBRO_PRESO`). Il verbale: CANTIERI, «Lo schermo segue
   lo stato di mostro».
+  LA RISPOSTA CHE TARDA NON E' UN NO (26 set 2026): i gesti con una
+  risposta del coordinatore — l'annullo nei suoi tre modi, gli euro
+  inviati, il rilascio, la disputa — aspettano da `attendiGestoP2P`
+  (fuori dal motore): ogni `P2P_TARDA_MS` il velo lo dice e si rilegge
+  leggero, e scaduta l'attesa si rilegge tutto (la restore solo dove sa
+  vedere il passo); «non riuscito» solo se lo stato riletto non e' fra
+  gli esiti del gesto (`ESITI_GESTO_P2P`). A un annullo
+  `order-already-canceled` e `not-found` sono un si'
+  (`annulloGiaFattoP2P`, applicato come il `canceled`). E OGNI ANNULLATO
+  STA SOTTO «ANNULLATI» per trenta giorni, anche il mio ordine mai preso
+  (rovescio del «ritirato = sparito»): `archiviaRitiratoP2P` lo toglie
+  dal libro in pagina e gli scrive la lapide ma la riga resta, la scopa
+  non ha piu' la soglia zero, l'archivio del server lo fa nascere. Il
+  verbale: CANTIERI, «"Annulla" dice non riuscito ma annulla».
   QUEL CHE È FATTO SI DICE AL PASSATO (22 set 2026, richiesta di
   Andrea): le card di «I miei scambi» CHIUSE non promettono più. Una
   conclusa porta la data della chiusura in alto a destra — piccola,

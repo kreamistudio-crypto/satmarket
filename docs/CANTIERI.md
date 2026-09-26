@@ -34622,3 +34622,130 @@ ore.
 **RESTA, da decidere:** il filtro del libro per premio sui Barattozon, e
 il premio nel post del canale anche per gli ordini normali, che oggi non
 lo dice.
+
+## «Annulla» dice non riuscito ma annulla, e l'«Annullati» vuoto (26 set 2026)
+
+Dal campo (Andrea): in un suo ordine pubblicato tocca «Annulla», il
+velo gira a lungo, poi «non riuscito» — e l'ordine era annullato davvero:
+il secondo «Annulla» riceve «già annullato». E l'ordine annullato così
+non compariva nemmeno sotto «Annullati» in «I miei scambi».
+
+**PERCHE' LA RISPOSTA TARDA, letto sui byte di mostrod 0.18.8.** Il
+coordinatore lavora gli eventi UNO alla volta (il ciclo di `run` in
+`src/app.rs` aspetta ogni gestore). L'annullo di un ordine in vetrina
+(`cancel_pending_order_from_maker`) PRIMA ripubblica il 38383 a
+`canceled` — `update_order_event`, cioe' un `send_event` che aspetta la
+conferma dei relay, via Tor — e POI mette in coda la risposta `canceled`
+con la stessa `request_id`; subito dopo parte l'evento della 0007 al
+nostro server. La coda la svuota un altro giro (`job_flush_messages_queue`,
+un messaggio ogni 250 ms), e ogni messaggio e' un altro `send_event` via
+Tor: a circuito freddo la sola stretta TLS ha misurato 10,6 s. Il
+telefono aspettava `P2P_ATTESA_MS` — 30 s da quando il messaggio parte,
+piu' i secondi della connessione prima — e poi l'annullo diceva «Non è
+riuscito: Nessuna risposta (30 s)» senza chiedere niente a nessuno (la
+fattura dal 25 set rileggeva, gli euro e il rilascio rileggevano DOPO
+aver detto di no). Se la risposta arrivava tardi la riga si muoveva da
+sola; se si perdeva restava «pubblicato» col bottone. Il secondo
+«Annulla» incontra il primo controllo di `cancel_action`: ordine gia'
+annullato → `order_already_canceled` (se l'ordine non c'e', `not_found`),
+e l'app lo mostrava come rifiuto, con la chiave grezza.
+
+**PERCHE' NON COMPARIVA SOTTO «ANNULLATI»: era una regola scritta.** «Il
+ritirato non si vede proprio più» (set 2026): ritirato = sparito, in
+quattro posti — il `canceled` del coordinatore (`togliRitiratoP2P` in
+`applicaMessaggioP2P`, che toglieva riga e cache e riportava ai miei
+scambi), la via di riserva del libro (`statoPubblicoOrdini`), la scopa
+(soglia zero) e l'archivio del server, che un mio ordine mai preso e
+annullato non lo faceva nascere. Lo scaduto nel libro ha la stessa forma,
+e spariva uguale. Il server invece lo sapeva e lo serviva.
+
+**LE CURE.**
+• `attendiGestoP2P(id, gesto, chiamata)`, fuori dal motore accanto al
+  riallineo: mentre si aspetta, ogni `P2P_TARDA_MS` (10 s) il velo dice
+  «La risposta tarda: controllo com'è andata…» e si chiede lo stato a chi
+  lo sa (`riallineaScambioP2P` leggero: archivio del server e libro
+  pubblico); se la riga e' arrivata dove il gesto la voleva, il gesto e'
+  riuscito subito. Scaduti i 30 s si rilegge un'ultima volta — la restore
+  solo dove sa vedere il passo — e «non riuscito» solo se il gesto non
+  risulta fatto, con la frase `P2P_NON_RISULTA`. Cosa vuol dire «fatto»
+  lo dice `ESITI_GESTO_P2P`, gesto per gesto: annullo (ritira, chiedi,
+  accetta), euro inviati, rilascio, disputa — per gli euro e il rilascio
+  anche i passi dopo, per «chiedi» anche l'annullato (prima della
+  garanzia mostrod annulla subito). La usano `inviaAnnulloP2P`,
+  `mossaOrdineP2P` e `inviaDisputaP2P`; il riallineo DOPO il no di
+  `mossaOrdineP2P` e' salito dentro l'attesa.
+• `annulloGiaFattoP2P`: `order-already-canceled` e `not-found` a un
+  annullo sono un si', applicati come il `canceled` del coordinatore
+  dalla porta di sempre; il no che la stessa risposta aveva scritto sulla
+  riga si cancella. `not-allowed-by-status` resta un no: a un ritiro vuol
+  dire che una presa ha vinto il compare-and-swap. `MOTIVI_CANTDO` ha le
+  due frasi.
+• Il ritiro dice «Ordine annullato ✓» (velo «Sto annullando l'ordine…»,
+  come il bottone); «chiedi» e «accetta» dicono «Scambio annullato ✓»
+  quando la riga, a gesto finito, e' annullata.
+• ROVESCIATO il «ritirato = sparito» (decisione di Andrea): ogni
+  annullato — da me, dall'altra parte, scaduto — sta sotto «Annullati»
+  per trenta giorni, su ogni dispositivo. Il rimotore e' diventato
+  `archiviaRitiratoP2P`: la riga resta, la card esce subito dal libro in
+  pagina (e dalla restore di sessione), la lapide resta per il relay
+  rimasto indietro. La scopa gli da' i trenta giorni di ogni finale;
+  l'archivio del server lo fa nascere dove non e' mai stato visto e lo
+  archivia quando muove una riga ad annullata; il `canceled` lo dice a
+  voce una volta sola (non all'eco) e la pagina aperta resta dov'e', con
+  «Ordine annullato — È uscito dal libro prima che qualcuno lo prendesse:
+  nessun sat si è mosso.» (`t_ritirato`, scelto da `statoTestoP2P`).
+Strade scartate: allungare l'attesa (sposta il no e fa aspettare di piu'
+chi ha gia' fatto); un «riuscito» ottimistico a messaggio partito (se non
+e' arrivato, la bugia costa piu' del ritardo: si chiede a chi lo sa); la
+restore per gli annulli (non elenca gli annullati e l'annullo chiesto
+resta `active`: trenta secondi per non sapere niente); rifare il foglio
+della fattura sul modello nuovo (curato il 25 set, resta com'e').
+
+**PROVATO.** `prove_annulla_riallinea` (45): sentinelle (fuori dal
+motore, i tre gesti, la tabella contro gli stati veri, le parole di casa)
+e due banchi node — i gesti contro un coordinatore di cartone (risposta
+in tempo, in ritardo, persa col server che sa, persa e riletta alla fine,
+persa e ferma, il no, il secondo annullo con le due parole e il
+`not-allowed-by-status` che resta no, «chiedi» e «accetta», euro,
+rilascio con la restore, disputa, gli stati oltre il passo scritti a
+mano, nessun rifiuto per aria) e il ritirato che resta (archivio, lapide,
+cache, frase, gruppo). Emendate col perche' le prove che dicevano
+«ritirato = sparito» e i testi vecchi (`prove_p2p_libro`,
+`prove_velo_p2p`, `prove_p2p_motore`, `prove_pallino_scambi` — l'archivio
+si scrive in quattro posti —, `prove_scambi_ovunque`, `prove_p2p_silenzi`,
+`prove_scambi_p2p_vecchi`, `prove_schermo_segue_mostro`,
+`prove_p2p_conto_dispositivo` — la chiave dell'archivio in cinque posti).
+Tortura su una copia: 20 guasti, 18 presi al primo giro; i due sfuggiti (la card che
+resta nel libro quando e' il server a muovere la riga — la prendeva gia'
+il collaudo — e gli euro senza «concluso» fra gli esiti) hanno avuto la
+loro rete, e sono 20 su 20. `collaudo_scambi_ovunque` esteso sul server
+vero con gli eventi nella forma che la 0007 manda: il ritiro, lo scaduto
+e l'evento perso (dal solo libro) annullati, miei, mai presi; il CLIENT
+VERO girato in node sulla risposta vera della rotta li fa nascere sotto
+«Annullati» su un dispositivo nuovo e li sposta li' su quello che li
+aveva pubblicati, fuori dal libro; e gli stati che l'attesa rilegge per
+ogni gesto (44 verdi). Suite intera severa senza config nel worktree
+ribasato su 40d2759: 16.618 verdi e 0 rosse; i 25 collaudi della CI
+verdi nella gabbia senza rete. Dal vivo su una copia col server di collaudo, un
+relay di cartone in loopback e un coordinatore di prova (il «cancel»
+parte davvero, la risposta no): ritiro con risposta persa e server
+avvisato → a 10,1 s «La risposta tarda», a 10,6 s «Ordine annullato ✓»,
+card fuori dal libro, sotto «Annullati»; secondo «Annulla» con
+`order_already_canceled` dal relay → «Ordine annullato ✓»; risposta vera
+a 15 s → vale lei; nessuna risposta da nessuna parte → a 30,6 s il «non
+riuscito» nuovo e l'ordine resta pubblicato; un'altra origine collo
+stesso account → i tre annullati nascono dal server sotto «Annullati»,
+con la chiave ritrovata.
+
+**RESTA DA GUARDARE.** Il telefono col coordinatore vero: quanto ci mette
+l'evento della 0007 ad arrivare al server via Tor (oltre i 10 s lo prende
+il secondo giro, a 20). Un ordine ritirato PRIMA di questo cantiere ha la
+riga gia' tolta e la lapide fino alla sua scadenza: se il server lo serve
+ancora dopo, rinasce sotto «Annullati» per i giorni che restano. Tre cose
+viste e non toccate: lo stepper della pagina di un annullato resta sul
+primo passo «in corso» (per ogni annullato, da prima); il giudice del
+ritirato guarda `satsNetti`, che un ordine a prezzo FISSO ha dalla
+nascita, quindi il suo ritiro va sotto «Annullati» ma senza lapide e con
+«Scambio annullato»; il passo 5 del collaudo del 24 set simula il ritiro
+di chi aveva preso senza la sua chiave, mentre la 0007 la manda (il passo
+11 nuovo usa la forma vera).

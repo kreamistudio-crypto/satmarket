@@ -54840,12 +54840,17 @@ def prove_p2p_libro():
     prova("...mentre le lapidi si applicano fuori dal lettore puro",
           True, "libro.ordini.filter(o => !lapidataP2P(o.id))"
           in pezzo_js(mini, "function caricaLibroP2P(forza){"))
-    # ...ED E' IL RIMOTORE A SCRIVERLE, solo per i MIEI da maker: un
-    # take andato a vuoto riporta nel libro l'ordine di un ALTRO,
-    # vivo, e lapidarlo sarebbe una bugia del libro.
-    prova("...e il rimotore scrive la lapide, solo per i MIEI", True,
-          "if (o.mio) lapideP2P(o);"
-          in pezzo_js(mini, "function togliRitiratoP2P(id){"))
+    # ...ED E' L'ARCHIVISTA A SCRIVERLE (fino al 26 set 2026 era «il
+    # rimotore»: il ritirato spariva, e adesso resta sotto «Annullati»),
+    # solo per i MIEI da maker: un take andato a vuoto riporta nel libro
+    # l'ordine di un ALTRO, vivo, e lapidarlo sarebbe una bugia del
+    # libro. «Solo i miei» lo dice il giudice, che vuole `mio` e nessuna
+    # presa: la lapide sta DOPO di lui.
+    prova("...e l'archivista scrive la lapide, solo per i MIEI", True,
+          "if (!p2pRitirato(o)) return false;\n  lapideP2P(o);"
+          in pezzo_js(mini, "function archiviaRitiratoP2P(id){")
+          and "&& !!o.mio && !o.preso;"
+          in pezzo_js(mini, "function p2pRitirato(o){", "\n}"))
     prova("...e chiede anche le impostazioni (38385)", True,
           "{kinds: [38385], authors: [c.mostro]}" in cod)
     prova("il relay si costruisce a mano, col timeout (la lezione del bunker)",
@@ -61828,8 +61833,12 @@ def prove_velo_p2p():
     # non per quel che dice. E' l'inciampo delle code dei testi del
     # tour, preso lo stesso giorno da un'altra parte.
     _tabl = _tab.replace("\\'", "'")
+    # EMENDATA (26 set 2026, «Annulla» che dice non riuscito ma annulla):
+    # il ritiro si dice «Ordine annullato ✓», come il bottone che lo fa
+    # («✕ Annulla l'ordine») e come ha chiesto Andrea — e il verbo del
+    # velo lo segue, che la regola della tabella e' proprio questa.
     for chiave, verbo, fatto in (
-            ("ritira", "Sto ritirando l'ordine…", "Ordine ritirato"),
+            ("ritira", "Sto annullando l'ordine…", "Ordine annullato ✓"),
             ("chiedi", "Chiedo di annullare…", "Richiesta di annullo inviata"),
             ("accetta", "Accetto di annullare…", "Annullo accettato")):
         prova(f"l'annullo «{chiave}» ha il suo verbo e il suo fatto", True,
@@ -62016,14 +62025,14 @@ def prove_velo_p2p():
     # i SEI giri del gesto (il dito ha le sue due letture qui sotto)
     _sei = {k: v for k, v in _out.items() if not k.startswith("dal dito")}
     prova("...e il verbo e' quello del gesto, sempre",
-          {k: ("Sto ritirando l'ordine…" if k.endswith("ritira")
+          {k: ("Sto annullando l'ordine…" if k.endswith("ritira")
                else "Sto liberando i sats…") for k in _sei},
           {k: v.get("detto") for k, v in _sei.items()})
     # LE TRE USCITE DICONO TRE COSE DIVERSE: la conferma, la ragione
     # del no, e — quando il messaggio non e' nemmeno partito — la
     # frase onesta di casa, che ha una cura diversa (si riprova).
     prova("la risposta buona conferma col fatto",
-          ["Ordine ritirato", "Sats liberati"],
+          ["Ordine annullato ✓", "Sats liberati"],
           [_out.get("risposta/ritira", {}).get("toast"),
            _out.get("risposta/release", {}).get("toast")])
     prova("il rifiuto scrive la ragione, non un errore qualunque",
@@ -62042,10 +62051,10 @@ def prove_velo_p2p():
           str(_out.get("dal dito/mentre aspetta", {}).get("velo", ""))
           .endswith("+anello"))
     prova("...col verbo del gesto, gia' da li'",
-          "Sto ritirando l'ordine…",
+          "Sto annullando l'ordine…",
           _out.get("dal dito/mentre aspetta", {}).get("detto"))
     prova("...e alla fine si chiude e conferma",
-          [False, "Ordine ritirato"],
+          [False, "Ordine annullato ✓"],
           [_out.get("dal dito/alla fine", {}).get("acceso"),
            _out.get("dal dito/alla fine", {}).get("toast")])
     prova("il messaggio mai partito ha la sua frase, e non nomina la rete",
@@ -63961,21 +63970,27 @@ function reset(){
     ? [ordine('canceled', r.dentro.request_id, idA)]
     : [];
   p2pOrdineAperto = idA;
-  await inviaAnnulloP2P();
+  /* col modo del bottone vero: su un ordine «pubblicato» il chiamante
+     passa 'ritira' (vedi `annullaScambioP2P`) */
+  await inviaAnnulloP2P('ritira');
   await pausa(60);
   const rc = ricevuti[ricevuti.length - 1] || {};
   out.ritiroFirmatoDallaSuaChiave = rc.tradePub === chiaveScambio(mzA.sk, 2).pub
     && rc.dentro && rc.dentro.action === 'cancel' && rc.dentro.id === idA;
   out.ritiroConProvaIdentita = rc.provaIdentita === true
     && rc.identitaPub === mzA.pub;
-  /* RITIRATO = SPARITO, subito e ovunque: niente riga, niente cache
-     (o l'adozione lo resusciterebbe), la pagina torna al libro e la
-     notizia si dice a voce */
-  out.ordineRitiratoSparito = !ordiniP2P()[idA]
+  /* ⚠️ EMENDATA (26 set 2026, decisione di Andrea: ogni annullato sta
+     sotto «Annullati» per trenta giorni). Era «ritirato = sparito»: niente
+     riga, niente cache, la pagina che tornava ai miei scambi. Adesso la
+     riga RESTA, annullata; le due cache si puliscono lo stesso — la card
+     deve uscire subito dal libro —; la pagina resta dov'e' e si
+     ridisegna; e la notizia si dice con la parola del bottone. */
+  out.ordineRitiratoArchiviato = !!ordiniP2P()[idA]
+    && ordiniP2P()[idA].stato === 'annullato'
     && !(p2pMieiOrdini && p2pMieiOrdini[idA])
     && !((p2pLibro && p2pLibro.ordini) || []).some(x => x.id === idA);
-  out.ritiroRiportaAlLibro = viste.indexOf('p2pmiei') >= 0;
-  out.ritiroDetto = toasts.some(t => String(t).indexOf('ritirato') >= 0);
+  out.ritiroResta = viste.indexOf('p2pmiei') < 0;
+  out.ritiroDetto = toasts.length > 0 && toasts[toasts.length - 1] === 'Ordine annullato ✓';
 
   /* ---- 11) IL CORO: un relay rotto, uno muto, uno buono ----------
      Il caso dal campo (16 set 2026): relay.mostro.network apre la
@@ -64487,9 +64502,9 @@ function reset(){
         "adozioneVera": "l'ordine della restore si adotta: riga vera, chiave vera",
         "ritiroFirmatoDallaSuaChiave": "...e il ritiro parte firmato con la chiave riderivata",
         "ritiroConProvaIdentita": "...con la prova d'identita' del profilo",
-        "ordineRitiratoSparito": "...e ritirato = sparito: riga e cache pulite",
-        "ritiroRiportaAlLibro": "...la pagina torna ai miei scambi",
-        "ritiroDetto": "...e la notizia si dice a voce",
+        "ordineRitiratoArchiviato": "...e il ritirato va sotto «Annullati»: la riga resta, le cache si puliscono",
+        "ritiroResta": "...la pagina resta dov'e' (non torna piu' ai miei scambi)",
+        "ritiroDetto": "...e la notizia si dice a voce: «Ordine annullato ✓»",
     }
     for k, nome in attesi.items():
         if isinstance(nome, tuple):
@@ -69578,9 +69593,13 @@ def prove_p2p_conto_dispositivo():
                       r"(?:MOSTRO_CHIAVE|MOSTRO_ORDINI_CHIAVE|MOSTRO_LAPIDI_CHIAVE|RECAPITI_CHIAVE)\)",
                       mini)
     prova("le quattro chiavi del P2P non si leggono mai nude", [], nude)
+    # EMENDATA (26 set 2026, «Annulla» che dice non riuscito ma annulla):
+    # l'archivio degli scambi passa da chiaveP2P in CINQUE posti e non piu'
+    # sei — il rimotore del ritirato e' diventato l'archivista, che la
+    # riga la lascia dov'e' (ogni annullato sta sotto «Annullati»)
     prova("...e passano tutte da chiaveP2P", True,
           mini.count("chiaveP2P(MOSTRO_CHIAVE)") == 3
-          and mini.count("chiaveP2P(MOSTRO_ORDINI_CHIAVE)") == 6
+          and mini.count("chiaveP2P(MOSTRO_ORDINI_CHIAVE)") == 5
           and mini.count("chiaveP2P(MOSTRO_LAPIDI_CHIAVE)") == 2
           and mini.count("chiaveP2P(RECAPITI_CHIAVE)") == 2)
     # la lista scritta per nome e le costanti tre blocchi piu' in la'
@@ -74000,11 +74019,13 @@ def prove_pallino_scambi():
     # silenzio), il gancio si guarda DENTRO ognuno dei cinque.
     GANCIO = ("if (typeof aggiornaPallinoScambiP2P === 'function') "
               "aggiornaPallinoScambiP2P();")
-    prova("l'archivio degli scambi si scrive in cinque posti", 5,
+    # EMENDATA (26 set 2026): QUATTRO e non piu' cinque — il rimotore del
+    # ritirato e' diventato l'archivista, che la riga la lascia dov'e'
+    # (ogni annullato sta sotto «Annullati»), e l'archivio non lo scrive.
+    prova("l'archivio degli scambi si scrive in quattro posti", 4,
           mini.count("localStorage.setItem(chiaveP2P(MOSTRO_ORDINI_CHIAVE)"))
     for firma in ("function rinominaOrdineP2P(o, nuovoId){",
                   "function scriviOrdineP2P(o){",
-                  "function togliRitiratoP2P(id){",
                   "function pulisciScambiP2P(){",
                   "function togliScambioP2P(id, ev){"):
         corpo = nudo(pezzo_js(mini, firma, "\n}\n"))
@@ -79539,10 +79560,16 @@ def prove_scambi_ovunque():
           True, 0 < sc.find("adottaOrdiniAltroveP2P(ordiniP2P());")
           < sc.find("adottaScambiServerP2P(ordiniP2P());") < sc.find("mieiRigheP2P()"))
     ad = pezzo_js(mini, "function adottaScambiServerP2P(locali){", "\n}\n")
-    prova("...mai su una lapide, mai un mio ritiro, mai senza stato", True,
+    # EMENDATA (26 set 2026, decisione di Andrea: ogni annullato sta
+    # sotto «Annullati» per trenta giorni, su OGNI dispositivo): il ritiro
+    # di un mio ordine mai preso NASCE — l'archivio del server e' l'unico
+    # posto da cui un dispositivo che non l'ha visto lo puo' sapere — e
+    # nascendo passa dall'archivista (la card esce dal libro, la lapide).
+    prova("...mai su una lapide, mai senza stato — e il mio ritiro nasce", True,
           "if (lapidataP2P(id)) continue;" in ad
-          and "if (s.mio && !s.preso && (stato === 'annullato' || stato === 'rifiutato')) continue;" in ad
-          and "if (!stato || !STATI_P2P[stato]) {" in ad)
+          and "if (s.mio && !s.preso" not in ad
+          and "if (!stato || !STATI_P2P[stato]) {" in ad
+          and "archiviaRitiratoP2P(o.id)" in ad)
     # EMENDATA (25 set 2026, «Lo schermo segue lo stato di mostro», caso
     # A): «in avanti» vale anche fra due stati dello STESSO gradino, se il
     # momento del server e' piu' fresco dell'ultima mossa vista qui — la
@@ -79719,11 +79746,18 @@ out.payoutFallitoTolto = !('payoutFallito' in ordiniFinti['ord-f']);
 // e) quel che NON nasce
 ordiniFinti = {}; lapidi = new Set(['ord-g']);
 p2pScambiServer = {'ord-g': S(),
-  'ord-h': S({mio: true, preso: false, stato: 'annullato'}),
   'ord-i': S({stato: ''}),
   'ord-j': S({stato: 'roba-nuova'})};
 n = adottaScambiServerP2P(ordiniFinti);
 out.nonNasce = n === 0 && Object.keys(ordiniFinti).length === 0;
+// e') ...e il MIO ritiro invece nasce (26 set 2026): annullato, ritirato,
+// sotto «Annullati» anche sul dispositivo che non l'ha mai visto
+ordiniFinti = {};
+p2pScambiServer = {'ord-h': S({mio: true, preso: false, stato: 'annullato',
+  sats_ordine: 0, sats_miei: 0, chiave_peer: ''})};  // mai preso: nessuna cifra dello scambio
+n = adottaScambiServerP2P(ordiniFinti);
+out.ritiroNasce = n === 1 && !!ordiniFinti['ord-h']
+  && ordiniFinti['ord-h'].stato === 'annullato' && p2pRitirato(ordiniFinti['ord-h']);
 out.nonNasceDetto = p2pDiario.some(r => r.includes('ord-i') && r.includes('non sa dire lo stato'));
 lapidi = new Set();
 // ...ma con la restore che parla, lo stato vuoto del server si traduce
@@ -79780,7 +79814,8 @@ console.log(JSON.stringify(out));
             ("finitaFerma", "...e una riga finita non si tocca"),
             ("payoutFallitoScritto", "il pagamento non passato arriva a chi vende"),
             ("payoutFallitoTolto", "...e se ne va con la fattura nuova"),
-            ("nonNasce", "non nasce: la lapide, il mio ritiro, lo stato vuoto, lo stato ignoto"),
+            ("nonNasce", "non nasce: la lapide, lo stato vuoto, lo stato ignoto"),
+            ("ritiroNasce", "...e il MIO ritiro nasce, annullato: sotto «Annullati» anche qui (26 set 2026)"),
             ("nonNasceDetto", "...e lo stato che manca si dice nel diario"),
             ("restoreTraduce", "...mentre con la restore che parla lo stato vuoto si traduce"),
             ("storicoNasce", "l'annullato di uno scambio preso nasce come storico, e non e' un ritiro"),
@@ -83988,7 +84023,7 @@ function provvisorioP2P(id){ return false; }
 function rinominaOrdineP2P(){}
 function intestaOrdiniP2P(){ return Promise.resolve(true); }
 function p2pRitirato(o){ return false; }
-function togliRitiratoP2P(){ return false; }
+function archiviaRitiratoP2P(){ return false; }
 function toast(m){ toasts.push(String(m)); }
 function haptic(){}
 function go(){}
@@ -94906,23 +94941,29 @@ def prove_scambi_p2p_vecchi():
     prova("la scopa passa dal giudice", True, "p2pTogliibile(o" in _sc)
     prova("...e non si ricopia l'elenco dei finali",
           False, "P2P_FINALI" in _sc)
-    # IL RITIRATO SPARISCE SUBITO E OVUNQUE (set 2026): il giudice e'
-    # uno (`p2pRitirato`) e lo chiamano i TRE posti dove l'annullato
-    # arriva o riposa — il kind 14, la via di riserva, e la scopa come
-    # rete. Il rimotore pulisce anche le due cache di sessione, o
-    # l'adozione resusciterebbe la riga appena tolta come «pubblicato».
-    prova("...e il ritirato ha il suo giudice anche nella scopa", True,
+    # IL RITIRATO SPARIVA SUBITO E OVUNQUE (set 2026) — ⚠️ ROVESCIATO IL
+    # 26 SET 2026 (decisione di Andrea, dal campo: l'ordine annullato
+    # col proprio «Annulla» non compariva nemmeno sotto «Annullati»).
+    # Ogni annullato sta sotto «Annullati» per trenta giorni: la scopa
+    # non ha piu' una soglia per il ritirato, e i due posti dove
+    # l'annullato ARRIVA — il kind 14 e la via di riserva — lo passano
+    # all'ARCHIVISTA, che pulisce le due cache di sessione (la card esce
+    # subito dal libro) e scrive la lapide, ma la riga la lascia.
+    prova("...e il ritirato NON ha piu' una soglia sua nella scopa", False,
           "p2pRitirato(o)" in _sc)
     _am = pezzo_js(mini, "function applicaMessaggioP2P(ord, dentro){", "\n}\n")
-    prova("il kind 14 che annulla passa dal rimotore e riporta ai miei",
-          True, "togliRitiratoP2P(nuovo.id)" in _am
-          and "go('p2pmiei')" in _am)
+    prova("il kind 14 che annulla passa dall'archivista, e la pagina resta dov'e'",
+          True, "archiviaRitiratoP2P(nuovo.id)" in _am
+          and "go('p2pmiei')" not in _am)
+    prova("...e la notizia si dice UNA volta, al passaggio e non all'eco",
+          True, "if (prima !== 'annullato' && archiviaRitiratoP2P(nuovo.id)) {" in _am)
     _spo = pezzo_js(mini, "async function statoPubblicoOrdini(ids){", "\n}\n")
     prova("...e la via di riserva pure, in silenzio", True,
-          "togliRitiratoP2P(o.id)" in _spo)
-    _rim = pezzo_js(mini, "function togliRitiratoP2P(id){", "\n}\n")
-    prova("il rimotore pulisce anche le cache, o l'adozione resuscita",
-          True, "p2pMieiOrdini[id]" in _rim and "p2pLibro.ordini" in _rim)
+          "archiviaRitiratoP2P(o.id)" in _spo)
+    _rim = pezzo_js(mini, "function archiviaRitiratoP2P(id){", "\n}\n")
+    prova("l'archivista pulisce le cache e NON toglie la riga",
+          True, "p2pMieiOrdini[id]" in _rim and "p2pLibro.ordini" in _rim
+          and "localStorage" not in _rim and "delete tutti" not in _rim)
 
     # E IL GIUDICE SI RICHIEDE DENTRO IL GESTO: l'id arriva dal DOM, e
     # il DOM non e' la verita' — la stessa ragione per cui sul server
@@ -95082,9 +95123,13 @@ def prove_scambi_p2p_vecchi():
         " rifiutato_stamattina: {id:'n', stato:'rifiutato',"
         "   creato: fa(24*60), aggiornato: fa(24*60), quando: fa(12)},"
         # il RITIRO e' di un mio ordine mai preso (24 set 2026): senza
-        # `mio` la riga sarebbe di chi ha preso, e quella e' storico
+        # `mio` la riga sarebbe di chi ha preso, e quella e' storico.
+        # Dal 26 set 2026 ha i trenta giorni di ogni annullato: quello di
+        # adesso resta, quello di un mese fa se ne va.
         " ritirato_appena: {id:'o', stato:'annullato', mio: true,"
         "   creato: fa(1), quando: fa(0)},"
+        " ritirato_di_un_mese: {id:'s', stato:'annullato', mio: true,"
+        "   creato: fa(24*40), quando: fa(24*31)},"
         # LE RECENSIONI (set 2026): finche' c'e' una recensione da
         # lasciare la riga non si tocca — e' la sua chiave che permette
         # di lasciarla. Quando il timbro c'e' (lasciata, o «un posto non
@@ -95141,16 +95186,23 @@ def prove_scambi_p2p_vecchi():
     # di un concluso — dalla lista escono da soli, che il filtro spento
     # nasconde gli annullati — e `annullato_di_un_mese` se ne va. Il
     # ritirato e' MIO (`mio: true`) e sparisce subito come sempre.
-    prova("la scopa toglie i vecchi, i ritirati e i rifiuti freddi",
+    # ⚠️ EMENDATA (26 set 2026, decisione di Andrea: ogni annullato sta
+    # sotto «Annullati» per trenta giorni): il ritirato NON sparisce
+    # piu' — `ritirato_appena` RESTA, e se ne va `ritirato_di_un_mese`,
+    # come l'annullato di uno scambio preso. I tolti restano sei.
+    prova("la scopa toglie i vecchi e i rifiuti freddi, e ogni annullato a un mese",
           {"tolti": 6,
            "resta": ["aperto_vecchio", "chiuso_stamattina_dal_coordinatore",
                      "fresco_finito", "notizia_vecchia",
                      "ricevuta_annullata", "rifiutato_stamattina",
+                     "ritirato_appena",
                      "sr_scaduto_ma_recente", "vecchio_finito",
                      "voto_dato", "voto_in_sospeso"]},
           _o2)
-    prova("il ritirato di ADESSO non arriva nemmeno al prossimo render",
-          False, "ritirato_appena" in (_o2.get("resta") or []))
+    prova("il ritirato di ADESSO resta, sotto «Annullati»",
+          True, "ritirato_appena" in (_o2.get("resta") or []))
+    prova("...e a un mese se ne va, come ogni annullato",
+          False, "ritirato_di_un_mese" in (_o2.get("resta") or []))
     prova("...mentre l'annullato di uno scambio preso resta, e' storico",
           True, "chiuso_stamattina_dal_coordinatore"
           in (_o2.get("resta") or []))
@@ -95166,8 +95218,9 @@ def prove_scambi_p2p_vecchi():
     # leggerebbe il timbro piu' VECCHIO e — col lampo — spazzerebbe un
     # rifiuto arrivato STAMATTINA: chi «pulisce» quel ripiego fa rossa
     # questa riga. (Il caso era un annullato quando l'annullato aveva
-    # una soglia; ora che il ritirato sparisce subito, a portare la
-    # catena e' il rifiutato — il mestiere e' lo stesso.)
+    # una soglia; quando il ritirato spariva subito, a portare la
+    # catena e' passato il rifiutato — il mestiere e' lo stesso. Dal 26
+    # set 2026 il ritirato ha di nuovo i suoi trenta giorni.)
     prova("...e un rifiuto di STAMATTINA resta, anche se l'ordine e' "
           "nato due mesi fa",
           True, "rifiutato_stamattina" in (_o2.get("resta") or []))
@@ -105230,9 +105283,13 @@ def prove_schermo_segue_mostro():
           and "riallineaScambioP2P(o.id, 'attesa')" in inc
           and "La fattura era già arrivata: scambio aggiornato" in inc)
     mo = nudo(fn("async function mossaOrdineP2P(id, azione, fatto, sto){"))
+    # EMENDATA (26 set 2026, «Annulla» che dice non riuscito ma annulla):
+    # il riallineo che partiva DOPO l'errore — quando il «non riuscito»
+    # era gia' stato detto — e' salito DENTRO l'attesa (`attendiGestoP2P`),
+    # che rilegge lo stato prima di dire di no. Il «gia' fatto» resta.
     prova("...e lo stesso per «ho inviato gli euro» e «libera i sats»", True,
           "if (typeof gestoGiaFattoP2P === 'function' && gestoGiaFattoP2P(e, id)) return;" in mo
-          and "riallineaScambioP2P(id, 'attesa')" in mo)
+          and "attendiGestoP2P(id, azione, chiamata)" in mo)
     ap = nudo(fn("function apriOrdineP2P(id){"))
     prova("...aprendo uno scambio vivo si riallinea, leggero, mai i finali ne' prima della presa", True,
           "riallineaScambioP2P(id, 'apertura', true)" in ap
@@ -105390,12 +105447,349 @@ process.stdout.write(JSON.stringify(out));
     prova("...ogni altro errore resta un errore", [False, False, False], o["altri"])
 
 
+def prove_annulla_riallinea():
+    """«ANNULLA» DICE NON RIUSCITO MA ANNULLA (26 set 2026, dal campo).
+    Andrea entra in un suo ordine pubblicato e tocca «Annulla»: il velo
+    gira a lungo, poi «non riuscito» — e l'ordine era annullato davvero;
+    il secondo «Annulla» riceve «già annullato». E l'ordine annullato non
+    compariva nemmeno sotto «Annullati».
+    PERCHE' (letto sui byte di mostrod 0.18.8): il coordinatore lavora un
+    messaggio alla volta, e sull'annullo PRIMA ripubblica il 38383 via Tor
+    e solo DOPO mette in coda la risposta, che un altro giro manda via Tor;
+    il telefono aspettava 30 s e diceva di no. Il server intanto lo sapeva
+    (patch 0007). E l'«Annullati» vuoto era una regola scritta apposta:
+    «ritirato = sparito», in quattro posti.
+    LE CURE: `attendiGestoP2P` (mentre si aspetta si chiede lo stato a chi
+    lo sa, e «non riuscito» solo se riletto lo stato il gesto non risulta
+    fatto) per l'annullo nei suoi tre modi, gli euro inviati, il rilascio
+    e la disputa; `annulloGiaFattoP2P` (il «gia' annullato» e il «non
+    c'e'» a un annullo sono un si'); e il ritirato che RESTA sotto
+    «Annullati» per trenta giorni, su ogni dispositivo
+    (`archiviaRitiratoP2P`, la nascita dall'archivio del server)."""
+    import json as _json, os as _os, re as _re, shutil as _sh
+    import subprocess as _sp, tempfile as _tf
+    print("\n[«Annulla» che dice non riuscito ma annulla, e l'Annullati]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    fn = lambda firma: pezzo_js(mini, firma, "\n}\n") + "\n}"
+    nudo = lambda js: _re.sub(r"/\*[\s\S]*?\*/", "", js)
+
+    # --- 1) LE SENTINELLE -------------------------------------------------
+    i_motore = mini.index("/* ============ IL MOTORE DELLO SCAMBIO")
+    i_fine_motore = mini.index("/* ============ fine del motore dello scambio ============ */")
+    i_fine_archivio = mini.index("/* ============ fine dell'archivio del server ============ */")
+    dove = {n: mini.index(n) for n in ("async function attendiGestoP2P(id, gesto, chiamata){",
+                                       "function annulloGiaFattoP2P(e, id){",
+                                       "const ESITI_GESTO_P2P = {")}
+    # FUORI DAL MOTORE, perche' il riallineo chiama il server: il motore
+    # ha la sua regola delle zero fetch, e questi la rispettano stando fuori
+    prova("l'attesa dei gesti e il «gia' annullato» vivono fuori dal motore, accanto al riallineo",
+          [True, True, True],
+          [i_fine_motore < v < i_fine_archivio for v in dove.values()])
+    for firma, gesto in (("async function inviaAnnulloP2P(modo){", "attendiGestoP2P(id, gesto, chiamata)"),
+                         ("async function mossaOrdineP2P(id, azione, fatto, sto){", "attendiGestoP2P(id, azione, chiamata)"),
+                         ("async function inviaDisputaP2P(){", "attendiGestoP2P(id, 'dispute', chiamata)")):
+        corpo = nudo(fn(firma))
+        prova(f"{firma[:firma.index('(')].split()[-1]} aspetta la risposta passando dall'attesa che rilegge",
+              True, "typeof attendiGestoP2P === 'function'" in corpo and gesto in corpo
+              and i_motore < mini.index(firma) < i_fine_motore)
+    ann = nudo(fn("async function inviaAnnulloP2P(modo){"))
+    prova("...e l'annullo tratta il «gia' annullato» come riuscito, PRIMA di dire di no", True,
+          0 < ann.find("annulloGiaFattoP2P(e, id)") < ann.find("toast('Non è riuscito: ' + agg.errore);"))
+    prova("...e la frase dice com'e' andata: annullato se la riga e' annullata", True,
+          "(ordiniP2P()[id] || {}).stato === 'annullato' ? voce.chiuso : voce.fatto" in ann)
+    tab = pezzo_js(mini, "const ANNULLI_P2P = {", "\n};").replace("\\'", "'")
+    prova("il ritiro dice «Ordine annullato ✓», la richiesta a scambio chiuso «Scambio annullato ✓»", True,
+          "fatto: 'Ordine annullato ✓'" in tab and tab.count("chiuso: 'Scambio annullato ✓'") == 2
+          and "chiuso: 'Ordine annullato ✓'" in tab)
+    motivi = pezzo_js(mini, "const MOTIVI_CANTDO = {", "\n};")
+    prova("i due «no» di mostro-core che a un annullo sono un si' hanno una frase anche altrove", True,
+          "'order-already-canceled':" in motivi and "'not-found':" in motivi)
+    prova("...e sono proprio quei due (not-allowed-by-status resta un no: qualcuno l'ha preso prima)",
+          "const P2P_GIA_ANNULLATO = ['order-already-canceled', 'not-found'];",
+          pezzo_js(mini, "const P2P_GIA_ANNULLATO = ", "\n"))
+    # I PASSI DI OGNI GESTO SONO STATI VERI: uno scritto male non sarebbe
+    # mai raggiunto, e l'attesa direbbe «non riuscito» su un gesto fatto
+    esiti = pezzo_js(mini, "const ESITI_GESTO_P2P = {", "\n};")
+    stati = pezzo_js(mini, "const STATI_P2P = {", "\n};")
+    chiavi_stati = set(_re.findall(r"^  (\w+): \{", stati, _re.M))
+    nomi_esiti = set(_re.findall(r"'(\w+)'", "".join(_re.findall(r"stati: \[([^\]]*)\]", esiti))))
+    prova("gli stati dell'attesa sono tutti stati veri della riga", [],
+          sorted(nomi_esiti - chiavi_stati))
+    prova("...i sei gesti con risposta ci sono tutti",
+          ["accetta", "chiedi", "dispute", "fiat-sent", "release", "ritira"],
+          sorted(_re.findall(r"^  '?([\w-]+)'?: \{stati", esiti, _re.M)))
+    prova("...e la restore si chiede solo dove sa vedere il passo (non gli annulli)",
+          {"ritira": "false", "chiedi": "false", "accetta": "false",
+           "fiat-sent": "true", "release": "true", "dispute": "true"},
+          {k: v for k, v in _re.findall(r"^  '?([\w-]+)'?: \{stati: \[[^\]]*\], restore: (\w+)\}", esiti, _re.M)})
+    tarda = int(_re.search(r"let P2P_TARDA_MS = (\d+);", mini).group(1))
+    attesa = int(_re.search(r"let P2P_ATTESA_MS = (\d+);", mini).group(1))
+    prova("si rilegge PRIMA che l'attesa della risposta finisca", True, 0 < tarda < attesa)
+    for const in ("P2P_TARDA_TESTO", "P2P_NON_RISULTA"):
+        frase = _re.search(r"const " + const + r" = '((?:[^'\\]|\\.)*)';", mini).group(1)
+        prova(f"{const}: le parole di casa (niente «relay» ne' «coordinatore»)", [False, False],
+              ["relay" in frase.lower(), "coordinatore" in frase.lower()])
+    # IL RITIRATO RESTA: nessuno dei posti dove l'annullato arriva lo toglie
+    prova("il ritirato non si toglie piu' da nessuna parte", [0, 0],
+          [mini.count("togliRitiratoP2P"), nudo(fn("function archiviaRitiratoP2P(id){")).count("localStorage")])
+    # (dalla tortura) quando e' il SERVER a muovere la riga ad annullata —
+    # il dispositivo che l'aveva «pubblicata» — la card deve uscire dal
+    # libro anche li': lo dice il collaudo sul server vero, e qui la riga
+    ads = nudo(fn("function adottaScambiServerP2P(locali){"))
+    prova("l'archivio del server che annulla una riga gia' qui la passa all'archivista", True,
+          "if (mosso && gia.stato === 'annullato' && typeof archiviaRitiratoP2P === 'function')\n"
+          "        archiviaRitiratoP2P(id);" in ads)
+    tst = nudo(fn("function statoTestoP2P(o){"))
+    prova("la pagina di un mio ordine mai preso dice «Ordine annullato»", True,
+          "p2pRitirato(o)" in tst and "t_ritirato: 'Ordine annullato'," in stati)
+
+    node = _sh.which("node")
+    if not node:
+        salta("i banchi node dell'annullo che rilegge", "node non c'e'")
+        return
+    cart = _tf.mkdtemp(prefix="annulla_")
+
+    # --- 2) IL BANCO DEI GESTI: il coordinatore di cartone e chi lo sa ----
+    blocco = lambda inizio, fine: mini[mini.index(inizio):mini.index(fine, mini.index(inizio)) + len(fine)]
+    b1 = "\n".join([
+        "let DEMO = false, VETRINA = false, myTgId = 111;",
+        "let archivio = {}; function ordiniP2P(){ return archivio; } function scriviOrdineP2P(o){ archivio[o.id] = o; return o; }",
+        "const toasts = []; function toast(t){ toasts.push(String(t)); }",
+        "const finti = {attesaTesto: {textContent: ''}}; function el(id){ return finti[id] || null; }",
+        "let veli = []; function attesaP2P(testo){ finti.attesaTesto.textContent = testo; veli.push('+'); return () => veli.push('-'); }",
+        "function haptic(){} function provvisorioP2P(){ return false; }",
+        "let p2pOrdineAperto = 'x'; let renderPag = 0; function renderOrdineP2P(){ renderPag++; }",
+        "const diario = []; function diarioP2P(r){ diario.push(r); }",
+        pezzo_js(mini, "const P2P_NON_PARTITO = ", "\n"),
+        # IL COORDINATORE DI CARTONE: risponde (e la risposta muove la riga,
+        # come fa il dispatcher vero), tace, o dice di no
+        "let copione = null; const chiamate = [];",
+        "function chiamataOrdineP2P(o, azione){ chiamate.push(azione); const c = copione;",
+        "  return new Promise((ok, no) => setTimeout(() => {",
+        "    if (c.esito === 'ok') { if (c.applica) archivio[o.id].stato = c.applica; ok({action: 'x'}); }",
+        "    else if (c.esito === 'silenzio') no(Object.assign(new Error('Nessuna risposta (30 s)'), {silenzio: true}));",
+        "    else no(Object.assign(new Error('La richiesta è stata rifiutata: ' + c.esito), {cantDo: true, motivo: c.esito}));",
+        "  }, c.dopo)); }",
+        # CHI LO SA: il riallineo di cartone — il server dice `serverDice`,
+        # e la restore (solo nel pieno) `restoreDice`
+        "let serverDice = '', restoreDice = '', riallinei = []; let p2pRiallineoInVolo = {};",
+        "async function riallineaScambioP2P(id, motivo, leggero){ riallinei.push(leggero ? 'leggero' : 'pieno');",
+        "  await new Promise(r => setTimeout(r, 5)); const o = archivio[id];",
+        "  if (o && serverDice) o.stato = serverDice; if (o && !leggero && restoreDice) o.stato = restoreDice; return true; }",
+        # la porta dei messaggi, di cartone: il suo `canceled`
+        "const applicati = [];",
+        "function applicaMessaggioP2P(ord, dentro){ applicati.push(dentro.action); const o = archivio[ord.id];",
+        "  if (dentro.action === 'canceled' && o) o.stato = 'annullato'; }",
+        fn("function ragioneGestoP2P(e){"),
+        fn("function gestoGiaFattoP2P(e, id){"),
+        blocco("const P2P_GIA_ANNULLATO = ", "\n}\n"),
+        blocco("const ESITI_GESTO_P2P = {", "\n}\n/* ============ fine dell'archivio"),
+        pezzo_js(mini, "const ANNULLI_P2P = {", "\n};") + "\n};",
+        fn("async function inviaAnnulloP2P(modo){"),
+        fn("async function mossaOrdineP2P(id, azione, fatto, sto){"),
+        fn("async function inviaDisputaP2P(){"),
+    ]).replace("/* ============ fine dell'archivio", "") + r"""
+const pausa = ms => new Promise(r => setTimeout(r, ms));
+function riga(stato, extra){ archivio = {x: Object.assign({id: 'x', lato: 'compro', stato, mio: true}, extra || {})}; }
+function giro(){ toasts.length = 0; riallinei.length = 0; applicati.length = 0; veli = []; serverDice = ''; restoreDice = ''; finti.attesaTesto.textContent = ''; }
+const foto = (t0) => ({toasts: toasts.slice(), riallinei: riallinei.slice(), stato: archivio.x.stato,
+  presto: Date.now() - t0 < 500, velo: veli.join(''), testo: finti.attesaTesto.textContent});
+(async () => {
+  const out = {};
+  // 1) la risposta arriva in tempo: nessuna domanda a nessuno
+  P2P_TARDA_MS = 100; giro(); riga('pubblicato'); copione = {dopo: 20, esito: 'ok', applica: 'annullato'};
+  let t0 = Date.now(); await inviaAnnulloP2P('ritira'); out.inTempo = foto(t0);
+  // 2) IN RITARDO: arriva dopo due giri di domande, e vale lei
+  giro(); riga('pubblicato'); copione = {dopo: 250, esito: 'ok', applica: 'annullato'};
+  t0 = Date.now(); await inviaAnnulloP2P('ritira'); out.inRitardo = foto(t0);
+  // 3) PERSA, ma il server lo sa: si dice riuscito al primo giro, senza
+  //    aspettare il silenzio (che qui arriva dopo 900 ms)
+  giro(); riga('pubblicato'); serverDice = 'annullato'; copione = {dopo: 900, esito: 'silenzio'};
+  t0 = Date.now(); await inviaAnnulloP2P('ritira'); out.persaServer = foto(t0);
+  await pausa(1000); out.persaServerDopo = toasts.slice();   // il silenzio in ritardo non parla
+  // 4) PERSA, e lo stato riletto alla fine dice fatto (nessun giro prima)
+  P2P_TARDA_MS = 400; giro(); riga('pubblicato'); copione = {dopo: 60, esito: 'silenzio'};
+  setTimeout(() => { serverDice = 'annullato'; }, 30);
+  t0 = Date.now(); await inviaAnnulloP2P('ritira'); out.persaRiletta = foto(t0);
+  // 5) PERSA, e niente si e' mosso: solo adesso «non riuscito»
+  giro(); riga('pubblicato'); copione = {dopo: 30, esito: 'silenzio'};
+  t0 = Date.now(); await inviaAnnulloP2P('ritira'); out.persaFerma = foto(t0); out.persaFermaErrore = archivio.x.errore;
+  // 6) IL NO RESTA UN NO, e arriva subito
+  P2P_TARDA_MS = 100; giro(); riga('pubblicato'); copione = {dopo: 20, esito: 'is-not-your-order'};
+  t0 = Date.now(); await inviaAnnulloP2P('ritira'); out.no = foto(t0);
+  // 7) IL SECONDO ANNULLA: «gia' annullato» e «non c'e'» sono un si'
+  for (const m of ['order-already-canceled', 'not-found']) {
+    giro(); riga('pubblicato', {cantDo: 'La richiesta è stata rifiutata: ' + m});
+    copione = {dopo: 20, esito: m};
+    await inviaAnnulloP2P('ritira');
+    out['secondo:' + m] = [toasts.slice(), applicati.slice(), archivio.x.stato, archivio.x.cantDo, archivio.x.errore];
+  }
+  // ...ma «non si puo' in questo momento» a un annullo e' un no (l'ha preso qualcuno)
+  giro(); riga('pubblicato'); copione = {dopo: 20, esito: 'not-allowed-by-status'};
+  await inviaAnnulloP2P('ritira');
+  out.nonPermesso = [toasts.slice(), applicati.slice(), archivio.x.stato];
+  // 8) CHIEDI DI ANNULLARE: prima della garanzia si annulla subito; da attivo e' una richiesta
+  P2P_TARDA_MS = 400; giro(); riga('attesa_mia_fattura', {mio: false}); serverDice = 'annullato';
+  copione = {dopo: 30, esito: 'silenzio'}; await inviaAnnulloP2P('chiedi'); out.chiediAnnullato = [toasts.slice(), riallinei.slice()];
+  giro(); riga('attivo'); serverDice = 'annullo_chiesto';
+  copione = {dopo: 30, esito: 'silenzio'}; await inviaAnnulloP2P('chiedi'); out.chiediRichiesta = toasts.slice();
+  giro(); riga('annullo_proposto'); copione = {dopo: 20, esito: 'ok', applica: 'annullato'};
+  await inviaAnnulloP2P('accetta'); out.accetta = toasts.slice();
+  // 9) GLI ALTRI GESTI: euro inviati, rilascio, disputa
+  P2P_TARDA_MS = 100; giro(); riga('attivo'); serverDice = 'euro_inviati'; copione = {dopo: 900, esito: 'silenzio'};
+  t0 = Date.now(); await mossaOrdineP2P('x', 'fiat-sent', 'Fatto ✅', 'Sto avvisando che hai pagato…'); out.euro = foto(t0);
+  P2P_TARDA_MS = 400; giro(); riga('euro_inviati', {lato: 'vendo'}); restoreDice = 'rilasciato';
+  copione = {dopo: 30, esito: 'silenzio'}; await mossaOrdineP2P('x', 'release', 'Sats liberati ✅', 'Sto liberando i sats…');
+  out.rilascioRestore = [toasts.slice(), riallinei.slice()];
+  giro(); riga('euro_inviati', {lato: 'vendo'}); copione = {dopo: 30, esito: 'silenzio'};
+  await mossaOrdineP2P('x', 'release', 'Sats liberati ✅', 'Sto liberando i sats…');
+  out.rilascioFermo = [toasts.slice(), riallinei.slice(), archivio.x.errore];
+  giro(); riga('attivo'); serverDice = 'in_disputa'; copione = {dopo: 30, esito: 'silenzio'};
+  await inviaDisputaP2P(); out.disputa = toasts.slice();
+  // (dalla tortura) OLTRE IL PASSO: lo scambio andato avanti vuol dire
+  // gesto fatto. Gli stati sono scritti qui A MANO, non letti dalla
+  // tabella: una tabella che ne perde uno qui fa rosso
+  out.oltre = {};
+  for (const [g, stati, detto, da] of [
+      ['fiat-sent', ['euro_inviati', 'rilasciato', 'pagamento_ritentato', 'fattura_nuova', 'concluso', 'annullato'], 'Fatto ✅', 'attivo'],
+      ['release', ['rilasciato', 'pagamento_ritentato', 'fattura_nuova', 'concluso', 'annullato'], 'Sats liberati ✅', 'euro_inviati']]) {
+    for (const st of stati) {
+      giro(); riga(da); serverDice = st; copione = {dopo: 30, esito: 'silenzio'};
+      await mossaOrdineP2P('x', g, detto, '…');
+      out.oltre[g + ':' + st] = toasts[0] === detto;
+    }
+  }
+  // il «gia' fatto» degli euro resta quello del 25 set
+  giro(); riga('attivo'); copione = {dopo: 20, esito: 'not-allowed-by-status'};
+  await mossaOrdineP2P('x', 'fiat-sent', 'Fatto ✅', 'Sto avvisando che hai pagato…');
+  await pausa(20); out.euroGiaFatto = toasts.slice();
+  await pausa(1000);
+  process.stdout.write(JSON.stringify(out));
+})();
+"""
+    p1 = _os.path.join(cart, "gesti.js")
+    open(p1, "w", encoding="utf-8").write(b1)
+    r1 = _sp.run([node, p1], capture_output=True, text=True, timeout=120, encoding="utf-8")
+    # ⚠️ ANCHE «NESSUN RIFIUTO PER ARIA» STA QUI: la risposta che perde la
+    # corsa rifiuta DOPO che il gesto e' chiuso, e un rifiuto non gestito
+    # fa morire node con lo stderr pieno — il banco lo direbbe
+    prova("il banco dei gesti gira, e nessun rifiuto resta per aria", "", (r1.stderr or "")[-600:])
+    if r1.returncode == 0 and r1.stdout.strip():
+        o = _json.loads(r1.stdout)
+        TARDA = "La risposta tarda: controllo com'è andata…"
+        prova("1) risposta in tempo: «Ordine annullato ✓», nessuna domanda a nessuno, velo chiuso",
+              [["Ordine annullato ✓"], [], "annullato", "+-", "Sto annullando l'ordine…"],
+              [o["inTempo"][k] for k in ("toasts", "riallinei", "stato", "velo", "testo")])
+        prova("2) risposta IN RITARDO: due domande leggere mentre si aspetta, il velo lo dice, e vale la risposta",
+              [["Ordine annullato ✓"], ["leggero", "leggero"], "annullato", "+-", TARDA],
+              [o["inRitardo"][k] for k in ("toasts", "riallinei", "stato", "velo", "testo")])
+        prova("3) risposta PERSA ma il server lo sa: riuscito al primo giro, senza aspettare il silenzio",
+              [["Ordine annullato ✓"], ["leggero"], "annullato", True, "+-"],
+              [o["persaServer"][k] for k in ("toasts", "riallinei", "stato", "presto", "velo")])
+        prova("...e il silenzio che arriva dopo non dice niente", ["Ordine annullato ✓"], o["persaServerDopo"])
+        prova("4) risposta PERSA, e lo stato riletto alla fine dice fatto: riuscito, senza la restore (non vede gli annulli)",
+              [["Ordine annullato ✓"], ["leggero"], "annullato"],
+              [o["persaRiletta"][k] for k in ("toasts", "riallinei", "stato")])
+        prova("5) risposta PERSA e niente mosso: solo adesso «non riuscito», e dice perche'",
+              [["Non è riuscito: Nessuna risposta, e dallo stato riletto il passo non risulta fatto"], ["leggero"], "pubblicato", "+-"],
+              [o["persaFerma"][k] for k in ("toasts", "riallinei", "stato", "velo")])
+        prova("...e l'errore resta scritto sulla riga", "Nessuna risposta, e dallo stato riletto il passo non risulta fatto",
+              o["persaFermaErrore"])
+        prova("6) il no resta un no: subito, e senza chiedere a nessuno",
+              [True, [], True],
+              [o["no"]["toasts"][0].startswith("Non è riuscito: La richiesta è stata rifiutata"),
+               o["no"]["riallinei"], o["no"]["presto"]])
+        for m in ("order-already-canceled", "not-found"):
+            prova(f"7) secondo «Annulla» con «{m}»: riuscito, passato dalla porta del «canceled», il no cancellato",
+                  [["Ordine annullato ✓"], ["canceled"], "annullato", "", ""], o["secondo:" + m])
+        prova("...ma «non si puo' in questo momento» a un annullo resta un no (l'ha preso qualcuno)",
+              [True, [], "pubblicato"],
+              [o["nonPermesso"][0][0].startswith("Non è riuscito:"), o["nonPermesso"][1], o["nonPermesso"][2]])
+        prova("8) «chiedi» prima della garanzia, risposta persa: il server dice annullato → «Scambio annullato ✓»",
+              [["Scambio annullato ✓"], ["leggero"]], o["chiediAnnullato"])
+        prova("...da attivo e' una richiesta: «Richiesta di annullo inviata»", ["Richiesta di annullo inviata"], o["chiediRichiesta"])
+        prova("...e chi accetta legge «Scambio annullato ✓»", ["Scambio annullato ✓"], o["accetta"])
+        prova("9) euro inviati, risposta persa, il server lo sa: «Fatto ✅» al primo giro",
+              [["Fatto ✅"], ["leggero"], "euro_inviati", True], [o["euro"][k] for k in ("toasts", "riallinei", "stato", "presto")])
+        prova("...rilascio, risposta persa: si chiede anche la restore, e se lo vede e' fatto",
+              [["Sats liberati ✅"], ["pieno"]], o["rilascioRestore"])
+        prova("...e se nessuno lo vede, «non riuscito» col suo perche'",
+              [["Nessuna risposta, e dallo stato riletto il passo non risulta fatto"], ["pieno"],
+               "Nessuna risposta, e dallo stato riletto il passo non risulta fatto"], o["rilascioFermo"])
+        prova("...la disputa pure", ["Disputa aperta"], o["disputa"])
+        prova("...e oltre il passo e' fatto (lo scambio e' andato avanti), ma un annullato no",
+              {"fiat-sent:euro_inviati": True, "fiat-sent:rilasciato": True,
+               "fiat-sent:pagamento_ritentato": True, "fiat-sent:fattura_nuova": True,
+               "fiat-sent:concluso": True, "fiat-sent:annullato": False,
+               "release:rilasciato": True, "release:pagamento_ritentato": True,
+               "release:fattura_nuova": True, "release:concluso": True, "release:annullato": False},
+              o["oltre"])
+        prova("...e il «gia' fatto» degli euro resta quello del 25 set", ["Questo passo è già fatto: aggiorno lo scambio ↻"],
+              o["euroGiaFatto"][:1])
+
+    # --- 3) IL BANCO DEL RITIRATO CHE RESTA --------------------------------
+    b2 = "\n".join([
+        "const _box = {}; const localStorage = {getItem: k => (k in _box ? _box[k] : null), setItem: (k, v) => { _box[k] = String(v); }};",
+        "const chiaveP2P = k => k;",
+        "let archivio = {}; function ordiniP2P(){ return archivio; }",
+        "let p2pMieiOrdini = null, p2pLibro = null;",
+        pezzo_js(mini, "const P2P_FINALI = ", "\n"),
+        pezzo_js(mini, "const P2P_LIBRO_FINESTRA_S = ", "\n"),
+        pezzo_js(mini, "const MOSTRO_LAPIDI_CHIAVE = ", "\n"),
+        pezzo_js(mini, "function p2pRitirato(o){", "\n}") + "\n}",
+        fn("function lapidiP2P(){"), fn("function lapideP2P(o){"), fn("function lapidataP2P(id){"),
+        fn("function archiviaRitiratoP2P(id){"),
+        pezzo_js(mini, "const STATI_P2P = {", "\n};") + "\n};",
+        pezzo_js(mini, "const P2P_GIRO_MORTO = {", "\n};") + "\n};",
+        "function aspettaRecapitoP2P(){ return false; } function nomeControparteP2P(o, d){ return d; } function percheFallitoP2P(){ return ''; }",
+        fn("function statoTestoP2P(o){"),
+        "function azioniDisponibili(){ return ''; }",
+        fn("function gruppoScambioP2P(o){"),
+        fn("function passaStatoMieiP2P(o, f){"),
+    ]) + r"""
+const out = {};
+const ADESSO = Math.floor(Date.now() / 1000);
+archivio = {rit: {id: 'rit', stato: 'annullato', mio: true, creato: ADESSO - 60},
+            preso: {id: 'preso', stato: 'annullato', mio: true, preso: true, creato: ADESSO - 60},
+            suo: {id: 'suo', stato: 'annullato', creato: ADESSO - 60}};
+p2pMieiOrdini = {rit: {stato: 'pending'}, preso: {stato: 'active'}};
+p2pLibro = {ordini: [{id: 'rit'}, {id: 'preso'}, {id: 'altro'}]};
+out.archivia = [archiviaRitiratoP2P('rit'), !!archivio.rit, archivio.rit.stato, lapidataP2P('rit'),
+                !!p2pMieiOrdini.rit, p2pLibro.ordini.map(x => x.id)];
+out.nonArchivia = [archiviaRitiratoP2P('preso'), archiviaRitiratoP2P('suo'), archiviaRitiratoP2P('nessuno'),
+                   lapidataP2P('preso'), lapidataP2P('suo'), !!p2pMieiOrdini.preso, p2pLibro.ordini.map(x => x.id)];
+out.idempotente = [archiviaRitiratoP2P('rit'), lapidataP2P('rit'), !!archivio.rit];
+out.testo = [statoTestoP2P(archivio.rit), statoTestoP2P(archivio.preso).t, statoTestoP2P(archivio.suo).t];
+out.gruppo = [gruppoScambioP2P(archivio.rit), passaStatoMieiP2P(archivio.rit, []), passaStatoMieiP2P(archivio.rit, ['morti']),
+              passaStatoMieiP2P(archivio.rit, ['libro'])];
+process.stdout.write(JSON.stringify(out));
+"""
+    p2 = _os.path.join(cart, "ritirato.js")
+    open(p2, "w", encoding="utf-8").write(b2)
+    r2 = _sp.run([node, p2], capture_output=True, text=True, timeout=60, encoding="utf-8")
+    _sh.rmtree(cart, ignore_errors=True)
+    prova("il banco del ritirato gira", "", (r2.stderr or "")[-500:])
+    if r2.returncode or not r2.stdout.strip():
+        return
+    o = _json.loads(r2.stdout)
+    prova("il ritirato si ARCHIVIA: la riga resta annullata, la lapide c'e', e le due cache (la card nel libro) no",
+          [True, True, "annullato", True, False, ["preso", "altro"]], o["archivia"])
+    prova("...solo il MIO mai preso: lo scambio preso e quello di un altro non si toccano",
+          [False, False, False, False, False, True, ["preso", "altro"]], o["nonArchivia"])
+    prova("...e rifarlo non cambia niente", [True, True, True], o["idempotente"])
+    prova("la sua pagina dice «Ordine annullato»; gli altri annullati restano «Scambio annullato»",
+          [{"t": "Ordine annullato", "d": "È uscito dal libro prima che qualcuno lo prendesse: nessun sat si è mosso."},
+           "Scambio annullato", "Scambio annullato"], o["testo"])
+    prova("...e sta sotto «Annullati»: fuori dalla lista di tutti i giorni, dentro la sua pillola",
+          ["morti", False, True, False], o["gruppo"])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_schermo_segue_mostro,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_schermo_segue_mostro, prove_annulla_riallinea,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,
