@@ -6852,7 +6852,7 @@
   apre all'ingresso (chi e' dentro aspetta /me) SULLA PAGINA SFOCATA
   (dal 26 set 2026, al posto del fondo pieno e dello svelamento): il
   tour non ha fondo, e `sfocaPaginaTourP2P` mette `p2p-sfocata`
-  sull'<html>, che da' `filter:blur(12px)` alla vista attiva e alla
+  sull'<html>, che da' `filter:blur(4px)` alla vista attiva e alla
   barra — un filtro sulla pagina e non un backdrop; alla chiusura
   («Inizia», «Salta», indietro) la classe `p2p-a-fuoco` porta la
   transizione e la pagina torna a fuoco in 0,8 s

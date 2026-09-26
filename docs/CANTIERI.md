@@ -33876,3 +33876,40 @@ card dei due tab e nel conto, «Come vuoi ricevere» nel foglio Pubblica
 dal tab «Vendi BTC», effetti ridotti col fondo pieno, nessuno
 scorrimento laterale, nessun errore dell'app.
 **DA AVERE:** l'occhio sul telefono.
+
+## La sfocatura a 4px e il banner nuovo delle commissioni (26 set 2026)
+
+Ritocchi di Andrea a dce84dc. **1) LA SFOCATURA DIETRO IL TUTORIAL
+parte da 4px** (era 12; 6 e' stato il passaggio di mezzo, visto negli
+scatti e alleggerito ancora di un terzo): si leggono le forme della
+pagina — tab, pulsanti, banner, card — e il testo si intuisce senza
+leggersi. La messa a fuoco resta di 0,8 s (4 → 2,3 → 0,9 → 0,3 → 0,06 px
+→ nitida); a CPU 4x mediana 15,5-15,9 ms, durata 0,75-0,78 s.
+**2) IL BANNER NUOVO**: `assets/p2p-banner-fee.webp` sostituito con lo
+STESSO NOME (la procedura di PRODUZIONE resta valida) dal PNG di Andrea
+1280×714 col fondo trasparente: ritaglio sull'alpha (955×246, bordi
+puliti: l'alpha passa da 0 a 255 in 2-3 px), ridimensionato a 1000×258
+in alpha premoltiplicata — il 3x di oggi, quindi un ingrandimento del
+~5% perche' il sorgente era piu' stretto —, WebP qualita' 86, method 6,
+solo VP8X/ALPH/VP8, 28 KB. Stessa larghezza (5/6 della pagina, 285,8 px
+su 343 a 375) e stessa centratura (44,6 px per lato); il bagliore e'
+l'ombra del bottone a raggio pieno e segue da sola la capsula nuova,
+che ha le stesse proporzioni (a riposo e al picco negli scatti).
+CAMBIATE LE CIFRE DEL DISEGNO, e con loro l'`alt`: la terza pillola non
+dice piu' lo sconto «Pionieri o Lv.5 −0,5%» ma la fee che si paga, in
+beta anche lei — «BETA · Pioniere o Lv.5 · 1%» —, quindi «Fee P2P: 2%
+barrato, in beta 1,5% per parte, in beta 1% per pionieri o livello 5»;
+`width`/`height` del markup a 1000/258.
+**PROVATO.** Emendate col perche' la sentinella della sfocatura in
+`prove_libro_subito` e quella dell'`alt` in `prove_banner_fee_p2p` (la
+terza cifra e' «in beta 1%», e «0,5%» non c'e' piu'). Tortura 3 su 3.
+Suite intera severa nel worktree da origin/main (dce84dc), sul codice a
+4px: 16.334 verdi e 0 rosse, e i 24 collaudi della CI verdi nella
+gabbia. Dal vivo, Chrome headless via CDP a densita' 3, 375 px, due
+temi, relay di cartone su 127.0.0.1: tutorial e slide finale sulla
+pagina a 4px, i fotogrammi della messa a fuoco, il banner nuovo nel
+libro (file vero caricato a 1000×258, riposo e picco del bagliore),
+ingresso normale mai sfocato, effetti ridotti col fondo pieno, nessuno
+scorrimento laterale, nessun errore dell'app. Scatti visti e approvati
+da Andrea prima del push.
+**DA AVERE:** l'occhio sul telefono.

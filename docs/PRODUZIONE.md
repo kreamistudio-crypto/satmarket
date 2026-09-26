@@ -2072,7 +2072,10 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   si cambia il DISEGNO, sul PC e non sul VPS, e parte col deploy:
   1) il PNG nuovo con lo sfondo trasparente → ritaglio stretto
   sull'alpha, largo 1000 (il 3x del banner, che è 5/6 della pagina di
-  un telefono da 400; fino al 26 set 2026 era 1200), WebP qualità ~86,
+  un telefono da 400; fino al 26 set 2026 era 1200 — e se il PNG
+  ritagliato è più stretto si INGRANDISCE fino a 1000, in alpha
+  premoltiplicata, com'è successo col disegno del 26 set 2026 sera,
+  955 → 1000), WebP qualità ~86,
   sotto i 50 KB, senza ICC/EXIF/XMP — la ricetta di Pillow sta nella
   voce di CANTIERI «Il banner delle commissioni nel libro P2P»;
   2) si SOSTITUISCE il file con lo STESSO NOME (la rotta

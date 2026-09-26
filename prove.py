@@ -51108,9 +51108,9 @@ def prove_libro_subito():
           "background" in pezzo_js(css, "#tourP2P{", "}"))
     prova("la sfocatura e' un filtro SULLA pagina — vista attiva e barra —, mai un backdrop",
           [True, False],
-          # 12px e non 24 (26 set 2026, sera, richiesta di Andrea): le card
-          # si intravedono senza leggersi — e non torna piu' forte di cosi'
-          ["html.p2p-sfocata #app > nav{filter:blur(12px);will-change:filter}" in css,
+          # 4px (26 set 2026, sera, richiesta di Andrea: 24, poi 12, poi 6,
+          # poi un terzo meno) — e non torna piu' forte di cosi'
+          ["html.p2p-sfocata #app > nav{filter:blur(4px);will-change:filter}" in css,
            "backdrop" in pezzo_js(css, "#tourP2P{", "}")])
     prova("...e con gli effetti ridotti niente sfocatura: il fondo pieno di casa", [True, True],
           ["html.fx-ridotti #tourP2P{background:var(--bg)}" in css,
@@ -73025,9 +73025,13 @@ def prove_banner_fee_p2p():
            else None))
     _alt = re.search(r'alt="([^"]*)"', img)
     _alt = _alt.group(1) if _alt else ""
+    # EMENDATA (26 set 2026, sera, il disegno nuovo di Andrea): la terza
+    # cifra non e' piu' lo sconto «−0,5%» ma la fee che si paga, «1%» —
+    # anche lei in beta — e l'alt dice quella
     prova("l'alt dice le tre cifre del disegno, per chi legge con la voce",
-          [True, True, True, True],
-          ["Fee P2P" in _alt, "2%" in _alt, "1,5%" in _alt, "0,5%" in _alt])
+          [True, True, True, True, False],
+          ["Fee P2P" in _alt, "2%" in _alt, "1,5%" in _alt, "in beta 1%" in _alt,
+           "0,5%" in _alt])
     prova("...e se il file non arriva il bottone se ne va (niente buco)",
           True, 'onerror="this.parentNode.remove()"' in img)
 
