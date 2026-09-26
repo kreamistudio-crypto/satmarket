@@ -51101,18 +51101,31 @@ def prove_libro_subito():
           ["aspettaLibroVeroP2P(el('p2pDettVai'))" in pezzo_js(mini, "function confermaDettaglioP2P(){", "\n}\n"),
            "!(await aspettaLibroVeroP2P(null))" in pezzo_js(mini, "async function eseguiPresaP2P(id, scelto, metodo){", "\n}\n"),
            "await aspettaLibroVeroP2P(el('p2pNuovoInvia'), true);" in pezzo_js(mini, "async function inviaNuovoOrdineP2P(confermato){", "\n}\n")])
-    prova("il tour sta su un fondo pieno", True,
-          "background:var(--bg)}" in pezzo_js(css, "#tourP2P{", "}") + "}")
+    # EMENDATE (26 set 2026, «IL TUTORIAL SU PAGINA SFOCATA», richiesta di
+    # Andrea): il fondo pieno e lo svelamento dall'alto sono usciti; dietro
+    # il tour la pagina si vede sfocata, e alla chiusura torna a fuoco.
+    prova("il tour non ha fondo: dietro si vede la pagina", False,
+          "background" in pezzo_js(css, "#tourP2P{", "}"))
+    prova("la sfocatura e' un filtro SULLA pagina — vista attiva e barra —, mai un backdrop",
+          [True, False],
+          ["html.p2p-sfocata #app > nav{filter:blur(24px);will-change:filter}" in css,
+           "backdrop" in pezzo_js(css, "#tourP2P{", "}")])
+    prova("...e con gli effetti ridotti niente sfocatura: il fondo pieno di casa", [True, True],
+          ["html.fx-ridotti #tourP2P{background:var(--bg)}" in css,
+           "html.fx-ridotti.p2p-sfocata #app > nav{filter:none}" in css])
     _cc = pezzo_js(mini, "function chiudiTourP2P(){", "\n}\n")
-    prova("lo svelamento nasce in UN posto solo, alla chiusura del tour, mai coi ridotti",
-          [1, True], [mini.count("classList.add('svela')"),
-                      "if (!tourRidotto()) {\n    el('tourP2P').classList.add('svela');" in _cc])
-    _d = _re.search(r"animation:tourP2PSvela \.(\d)s", css)
-    prova("...e dura mezzo secondo, la stessa cifra del CSS e del JS", [True, 500],
-          [bool(_d) and int(_d.group(1)) * 100 == 500,
-           int(_re.search(r"const SVELA_TOUR_P2P_MS = (\d+);", mini).group(1))])
-    prova("...dall'alto verso il basso: il fondo si ritira dal bordo di sopra", True,
-          "@keyframes tourP2PSvela{from{clip-path:inset(0 0 0 0)}to{clip-path:inset(100% 0 0 0)}}" in css)
+    _sf = pezzo_js(mini, "function sfocaPaginaTourP2P(accesa){", "\n}\n")
+    prova("sfocatura e messa a fuoco nascono in UN posto solo, e la chiusura del tour lo chiama",
+          [1, 1, True, True],
+          [mini.count(".classList.add('p2p-sfocata')"), mini.count(".classList.add('p2p-a-fuoco')"),
+           "sfocaPaginaTourP2P(false);" in _cc,
+           "if (!tourRidotto()) h.classList.add('p2p-sfocata');" in _sf])
+    _d = _re.search(r"transition:filter \.(\d)s", css)
+    prova("...e la messa a fuoco dura 0,8 s, la stessa cifra del CSS e del JS", [True, 800],
+          [bool(_d) and int(_d.group(1)) * 100 == 800,
+           int(_re.search(r"const A_FUOCO_TOUR_P2P_MS = (\d+);", mini).group(1))])
+    prova("...e dello svelamento di ieri non resta niente", [0, 0, 0],
+          [mini.count("'svela'"), mini.count("tourP2PSvela"), mini.count("SVELA_TOUR_P2P_MS")])
 
     node = shutil.which("node")
     if not node:
@@ -51353,7 +51366,7 @@ function fintoEl(id){
 const ELEM = {};
 const el = id => (ELEM[id] = ELEM[id] || fintoEl(id));
 let VISTA = 'view-p2p';
-const document = {querySelector: () => ({id: VISTA}),
+const document = {querySelector: () => ({id: VISTA}), documentElement: fintoEl('html'),
                   addEventListener(){}, removeEventListener(){}};
 const MEM = {};
 const localStorage = {getItem: k => (k in MEM ? MEM[k] : null),
@@ -51376,11 +51389,12 @@ const p2pCoord = () => p2pLeve;
 global.fetch = () => new Promise(() => {});
 """ + giudici + "\n" + blocco_t + r"""
 const dorme = ms => new Promise(ok => setTimeout(ok, ms));
-const t = () => ({aperto: tourP2PInCorso, svela: el('tourP2P').classList.contains('svela'),
-                  open: el('tourP2P').classList.contains('open')});
+const H = document.documentElement.classList;
+const t = () => ({aperto: tourP2PInCorso, open: el('tourP2P').classList.contains('open'),
+                  sfocata: H.contains('p2p-sfocata'), fuoco: H.contains('p2p-a-fuoco')});
 function azzera(){
   if (tourP2PInCorso) chiudiTourP2P();
-  clearTimeout(tourP2PSvelaTimer); el('tourP2P').classList.remove('svela');
+  clearTimeout(tourP2PFuocoTimer); H.remove('p2p-sfocata', 'p2p-a-fuoco');
   for (const k in MEM) delete MEM[k];
   vistiMem = {}; myTgId = 111; p2pLeve = {mostro: 'm'}; RIDOTTI = false; VISTA = 'view-p2p';
 }
@@ -51391,23 +51405,24 @@ const out = {};
   apriTourP2PSePrimaVolta(); out.primaDiMe = t();
   p2pLeve = {mostro: 'm'};
   apriTourP2PSePrimaVolta(); out.primoAccesso = t();
-  /* «Salta»: lo svelamento parte, e mezzo secondo dopo se n'e' andato */
+  /* «Salta»: la pagina torna a fuoco, e a corsa finita la classe se ne va */
   chiudiTourP2P(); out.salta = t();
-  await dorme(SVELA_TOUR_P2P_MS - 150); out.aMeta = t();
-  await dorme(260); out.dopo = t();
-  /* INGRESSO NORMALE, tour gia' visto: niente tour, niente svelamento */
+  await dorme(A_FUOCO_TOUR_P2P_MS - 300); out.aMeta = t();
+  await dorme(420); out.dopo = t();
+  /* INGRESSO NORMALE, tour gia' visto: niente tour, niente sfocatura */
   apriTourP2PSePrimaVolta(); out.normale = t();
-  /* «COME FUNZIONA»: si riapre anche a chi l'ha visto, e alla fine svela */
+  /* «COME FUNZIONA»: si riapre anche a chi l'ha visto, e alla fine rimette a fuoco */
   rivediTourP2P(); out.comeFunziona = t();
   for (let i = 0; i < TAPPE_TOUR_P2P.length - 1; i++) avantiTourP2P();
   avantiTourP2P();                     /* alla finale */
   out.finale = el('tourP2P').classList.contains('finale');
   el('tourP2PVia').disabled = false; avantiTourP2P();   /* «Inizia» */
   out.inizia = t();
-  /* ...e un tour che riparte a svelamento in corsa torna pieno */
+  /* ...e un tour che riparte a messa a fuoco in corsa torna sfocato */
   rivediTourP2P(); out.riaperto = t();
-  /* EFFETTI RIDOTTI: compare e basta */
-  azzera(); RIDOTTI = true; rivediTourP2P(); chiudiTourP2P(); out.ridotti = t();
+  /* EFFETTI RIDOTTI: niente sfocatura, e la pagina compare nitida */
+  azzera(); RIDOTTI = true; rivediTourP2P(); out.ridottiAperto = t();
+  chiudiTourP2P(); out.ridotti = t();
   /* chi e' anonimo (niente /me da aspettare) lo vede al primo accesso */
   azzera(); myTgId = 0; p2pLeve = null; apriTourP2PSePrimaVolta(); out.anonimo = t();
   /* e fuori dal libro non si apre da solo */
@@ -51422,28 +51437,119 @@ const out = {};
         with open(f, "w", encoding="utf-8") as fh:
             fh.write(banco_t)
         r = subprocess.run([node, f], capture_output=True, encoding="utf-8", timeout=60)
-        prova("il banco del tour su fondo pieno gira in node", "", (r.stderr or "")[-700:])
+        prova("il banco del tour su pagina sfocata gira in node", "", (r.stderr or "")[-700:])
         o = _js.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else None
     finally:
         shutil.rmtree(d, ignore_errors=True)
     if o:
-        chiuso = {"aperto": False, "svela": False, "open": False}
-        prova("TUTORIAL AL PRIMO ACCESSO: chi e' dentro aspetta /me, poi il tour si apre",
-              [chiuso, {"aperto": True, "svela": False, "open": True}],
-              [o["primaDiMe"], o["primoAccesso"]])
-        prova("SVELAMENTO SOLO DOPO IL TUTORIAL: «Salta» lo fa partire, e a fine corsa se ne va",
-              [{"aperto": False, "svela": True, "open": False}, True, chiuso],
-              [o["salta"], o["aMeta"]["svela"], o["dopo"]])
-        prova("...e un ingresso normale non apre il tour e non svela niente", chiuso, o["normale"])
-        prova("TUTORIAL DA «COME FUNZIONA»: si riapre anche a chi l'ha visto", True,
-              o["comeFunziona"]["aperto"])
-        prova("...e finito con «Inizia» svela anche lui", [True, True, False],
-              [o["finale"], o["inizia"]["svela"], o["inizia"]["aperto"]])
-        prova("...un tour che riparte a svelamento in corsa torna pieno",
-              {"aperto": True, "svela": False, "open": True}, o["riaperto"])
-        prova("con gli EFFETTI RIDOTTI la pagina compare e basta", chiuso, o["ridotti"])
+        chiuso = {"aperto": False, "open": False, "sfocata": False, "fuoco": False}
+        aperto = {"aperto": True, "open": True, "sfocata": True, "fuoco": False}
+        prova("TUTORIAL AL PRIMO ACCESSO: chi e' dentro aspetta /me, poi il tour si apre sulla pagina sfocata",
+              [chiuso, aperto], [o["primaDiMe"], o["primoAccesso"]])
+        prova("«Salta»: la card se ne va e la pagina torna a fuoco, e a corsa finita la classe se ne va",
+              [{"aperto": False, "open": False, "sfocata": False, "fuoco": True}, True, chiuso],
+              [o["salta"], o["aMeta"]["fuoco"], o["dopo"]])
+        prova("...e un ingresso normale non apre il tour e non sfoca niente", chiuso, o["normale"])
+        prova("TUTORIAL DA «COME FUNZIONA»: si riapre anche a chi l'ha visto, sfocato", aperto,
+              o["comeFunziona"])
+        prova("...e finito con «Inizia» rimette a fuoco anche lui", [True, True, False],
+              [o["finale"], o["inizia"]["fuoco"], o["inizia"]["aperto"]])
+        prova("...un tour che riparte a messa a fuoco in corsa torna sfocato", aperto, o["riaperto"])
+        prova("con gli EFFETTI RIDOTTI niente sfocatura, e alla chiusura la pagina c'e' nitida",
+              [{"aperto": True, "open": True, "sfocata": False, "fuoco": False}, chiuso],
+              [o["ridottiAperto"], o["ridotti"]])
         prova("l'anonimo non ha /me da aspettare, e fuori dal libro il tour non parte da solo",
               [True, False], [o["anonimo"]["aperto"], o["miei"]["aperto"]])
+
+
+def prove_p2p_invii():
+    """«PAGHI» DIVENTA «INVII» NEL P2P (26 set 2026, richiesta di Andrea):
+    la propria meta' di uno scambio non si PAGA a un negozio, si INVIA
+    all'altra persona — «Invii 25,00 € · Ricevi ≈ 33 000 sats», e dal
+    lato opposto «Invii ≈ 33 000 sats · Ricevi 25,00 €», «Totale da
+    inviare» nel conto. «Pagare» resta dove e' un pagamento davvero: la
+    richiesta della garanzia, il PayCode al tabacchino, la fee, i sats
+    «in pagamento» verso un wallet. «Compra/Vendi BTC» e «Stai comprando
+    / vendendo» non si toccano, e nel mercatino non cambia niente.
+    Le sentinelle guardano il CODICE (senza commenti) di ogni posto
+    censito, e i due versi: quel che doveva cambiare e quel che doveva
+    restare."""
+    print("\n[«Paghi» diventa «Invii» nel P2P]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    def cod(firma):
+        return re.sub(r"/\*[\s\S]*?\*/", "", pezzo_js(mini, firma, "\n}\n"))
+
+    posti = {
+        "la card del libro": "function rigaOrdineP2P(o){",
+        "il foglio «Quanto»": "function renderQuantoP2P(){",
+        "la stima del «Quanto»": "function quantoValeP2P(riga, valore){",
+        "il conto del dettaglio e della pagina": "function contoDettP2P(o){",
+        "il dettaglio dell'ordine": "function renderDettaglioP2P(){",
+        "la conferma del dettaglio": "function confermaDettaglioP2P(){",
+        "il nome dei metodi nel foglio Pubblica": "function nomeMetodiP2P(lato){",
+        "le card di «I miei scambi»": "function rigaScambioP2P(o){",
+    }
+    vecchie = ("'Paghi ", "'Paghi'", "Totale da pagare", "Pagherai", "vuoi pagare",
+               "'Come vuoi pagare'", "pagando '")
+    for nome, firma in posti.items():
+        try:
+            c = cod(firma)
+        except ValueError:
+            prova(f"{nome}: la funzione c'e'", True, False)
+            continue
+        # al tabacchino «pagando» resta: li' si paga davvero, alla cassa
+        c = c.replace("(tab ? 'pagando ' : 'inviando ')", "")
+        prova(f"{nome}: la propria meta' non si «paga» piu'", [],
+              [v for v in vecchie if v in c])
+    prova("la card dice «Invii» sulle due righe", 2,
+          cod("function rigaOrdineP2P(o){").count("'Invii '"))
+    prova("il conto dice «Invii» e «Totale da inviare»", [True, True],
+          ["'Invii'" in cod("function contoDettP2P(o){"),
+           "'Totale da inviare'" in cod("function contoDettP2P(o){")])
+    prova("il metodo da scegliere segue il lato: inviare o ricevere gli euro", [True, True],
+          ["(compro ? 'inviare' : 'ricevere') + ' gli euro.'" in cod("function renderDettaglioP2P(){"),
+           "(o.lato === 'sell' ? 'inviare' : 'ricevere') + ' gli euro'"
+           in cod("function confermaDettaglioP2P(){")])
+    prova("il foglio Pubblica: «Come vuoi inviare» e «la valuta con cui invierai»", [True, True],
+          ["'Come vuoi inviare'" in cod("function nomeMetodiP2P(lato){"),
+           "'Seleziona la valuta con cui ' + (compro ? 'invierai' : 'riceverai')" in mini])
+    prova("«I miei scambi»: «inviando», e al tabacchino resta «pagando»", True,
+          "(tab ? 'pagando ' : 'inviando ')" in cod("function rigaScambioP2P(o){"))
+    i = mini.index('id="view-p2pinfo"')
+    info = re.sub(r"<!--[\s\S]*?-->", "", mini[i:mini.index('id="view-p2pordine"', i)])
+    prova("Info P2P: le frasi sulla propria meta' dicono «inviare»", [True, True, True],
+          ["Scegli con quale metodo vuoi inviare gli euro (o riceverli)" in info,
+           "se dici di aver inviato gli euro e non l'hai fatto" in info,
+           "prima di inviare gli euro guarda che la pagina dica" in info])
+    prova("...e nessuna dice piu' «pagare» per la propria meta'", [],
+          [v for v in ("vuoi pagare (o essere pagato)", "dici di aver pagato e non hai pagato",
+                       "prima di pagare guarda") if v in info])
+    prova("la pagina dello scambio: «potrai inviare gli euro», «invia gli euro solo a…»",
+          [True, True],
+          ["da lì potrai inviare gli euro." in mini,
+           "ma invia gli euro solo a un recapito che ti ha dato LUI" in mini])
+
+    # --- I SENSI CHE RESTANO: pagamenti davvero ---------------------
+    prova("restano: la garanzia, il PayCode, la fee, i sats in pagamento", [True] * 5,
+          ["Paga la richiesta: i sats restano bloccati in garanzia" in mini,
+           "Ho pagato al tabacchino" in mini,
+           "Paghi in contanti alla cassa del tabacchino" in mini,
+           "Non si paga a parte" in mini,
+           "t_vendo: 'Sats in pagamento'" in mini])
+    prova("...e «farti pagare» resta: e' la meta' dell'altra persona", 1,
+          mini.count("'Come vuoi farti pagare'"))
+    prova("...e il bot dice ancora «Paga la garanzia»", True,
+          "Paga la garanzia: la richiesta è nell'app." in _SORGENTE)
+    # --- NEL MERCATINO NON CAMBIA NIENTE ----------------------------
+    prova("nel mercatino il conto dice ancora «Totale da pagare»", True,
+          "r('Totale da pagare', cifraCtrl(c.tot, c.circa, c.totEur), 'tot')" in mini)
+    prova("...e i due «Paghi … sats» del negozio restano", [True, True],
+          ["corpo: `Paghi ${fmt(prezzo)} sats e la porta si apre subito. `" in mini,
+           "corpo: `Paghi ${fmt(slugNegozioLeve.prezzo_sats)} sats e il tuo negozio `" in mini])
+    prova("...e «Compra BTC», «Vendi BTC», «Stai comprando» non si toccano", [True, True, True],
+          ['>Compra BTC</button>' in mini, '>Vendi BTC</button>' in mini,
+           "Stai comprando" in mini])
 
 
 def prove_tour_p2p_finale():
@@ -51625,7 +51731,7 @@ function fintoEl(id){
 }
 const ELEM = {};
 const el = id => (ELEM[id] = ELEM[id] || fintoEl(id));
-const document = {querySelector: () => ({id: 'view-p2p'}),
+const document = {querySelector: () => ({id: 'view-p2p'}), documentElement: fintoEl('html'),
                   addEventListener(){}, removeEventListener(){}};
 const MEM = {};
 const localStorage = {getItem: k => (k in MEM ? MEM[k] : null),
@@ -52294,10 +52400,13 @@ def prove_p2p_libro():
     # invece di ordinare. E «Ricevi» E' MAIUSCOLO dal 10 set 2026 (la
     # card essenziale): senza la terza riga del prezzo le due righe
     # non sono piu' una frase sola, e ognuna comincia da capo.
+    # EMENDATA (26 set 2026, «PAGHI» DIVENTA «INVII», richiesta di
+    # Andrea): la propria meta' di uno scambio si INVIA all'altra persona;
+    # «pagare» resta alla garanzia, al PayCode e alla fee.
     prova("la card parla in seconda persona, e descrive invece di ordinare",
           True, "const paghiEuro = o.lato === 'sell';" in mini
-          and "(paghiEuro ? 'Paghi ' : 'Ricevi ')" in mini
-          and "(paghiEuro ? 'Ricevi ' : 'Paghi ')" in mini)
+          and "(paghiEuro ? 'Invii ' : 'Ricevi ')" in mini
+          and "(paghiEuro ? 'Ricevi ' : 'Invii ')" in mini)
     prova("...e le taglie restano fisse: euro grande, sats piccoli",
           True, '<span class="p2p-grande p2p-euro">' in mini
           and '<span class="p2p-piccola p2p-sats">' in mini)
@@ -53619,15 +53728,18 @@ console.log(JSON.stringify(out));
     # ⚠️ E L'IMPERATIVO NON DEVE RIENTRARE DI SOPPIATTO: si guarda che la
     # parola vecchia non ricompaia da sola — in «Paghi» c'e' dentro
     # «Pagh» e non «Paga», quindi il confine di parola basta e morde.
-    prova("nel tab Compra: paghi euro grande, ricevi sats sotto", True,
-          '<span class="p2p-grande p2p-euro">Paghi 8,00 €</span>'
+    # EMENDATA (26 set 2026, «PAGHI» DIVENTA «INVII», richiesta di
+    # Andrea): la propria meta' di uno scambio si INVIA all'altra persona;
+    # «pagare» resta alla garanzia, al PayCode e alla fee.
+    prova("nel tab Compra: invii euro grande, ricevi sats sotto", True,
+          '<span class="p2p-grande p2p-euro">Invii 8,00 €</span>'
           in out["rigaCompra"]
           and '<span class="p2p-verbo">Ricevi </span>≈' in out["rigaCompra"])
-    prova("nel tab Vendi: paghi sats prima, ricevi euro grande dopo",
-          True, '<span class="p2p-verbo">Paghi </span>≈' in out["rigaVendi"]
+    prova("nel tab Vendi: invii sats prima, ricevi euro grande dopo",
+          True, '<span class="p2p-verbo">Invii </span>≈' in out["rigaVendi"]
           and '<span class="p2p-grande p2p-euro">Ricevi 8,00 €</span>'
           in out["rigaVendi"]
-          and out["rigaVendi"].index("Paghi")
+          and out["rigaVendi"].index("Invii")
               < out["rigaVendi"].index("Ricevi"))
     # ⚠️ IN TINTA CI VA LA CIFRA, NON IL VERBO (set 2026, ritocco di
     # Andrea): dentro la card quel colore e' quello del LATO (verde a
@@ -53648,7 +53760,7 @@ console.log(JSON.stringify(out));
     # da quando la tinta e' della sola cifra): «p2p-sats">» adesso e'
     # seguito dallo span del verbo, non dalla parola
     prova("...e il verbo di chi da' e' uno solo nei due tab",
-          ("Paghi", "Paghi"),
+          ("Invii", "Invii"),
           (out["rigaCompra"].split('p2p-euro">')[1][:5],
            out["rigaVendi"].split('p2p-verbo">')[1][:5]))
     prova("...e «Invia» non lo dice piu' nessuna delle due", [],
@@ -53776,7 +53888,7 @@ console.log(JSON.stringify(out));
     prova("con la fee viva la card toglie la meta' a chi compra", True,
           "≈ 15206 sats" in out["cardNettaComm"])
     prova("...e la aggiunge a chi vende, che la blocca", True,
-          '<span class="p2p-verbo">Paghi </span>≈ 98980 sats'
+          '<span class="p2p-verbo">Invii </span>≈ 98980 sats'
           in out["cardVendiComm"])
     prova("...e a prezzo fisso il netto porta il ≈", True,
           "≈ 79200 sats" in out["cardFissoComm"]
@@ -54649,7 +54761,7 @@ out.titoloCompra = el('p2pDettTit').textContent;
 out.pagina = el('p2pDettCorpo').innerHTML;
 /* col metodo non scelto il bottone e' SPENTO e la ragione si vede */
 out.bottoneSpento = out.pagina.indexOf('id="p2pDettVai" disabled') >= 0;
-out.dice = out.pagina.indexOf('Scegli con quale metodo vuoi pagare.') >= 0;
+out.dice = out.pagina.indexOf('Scegli con quale metodo vuoi inviare gli euro.') >= 0;
 /* ...e premerlo non prende niente */
 confermaDettaglioP2P();
 out.senzaMetodoNonPrende = prese.length === 0 && toasts.length === 1;
@@ -54898,7 +55010,7 @@ console.log(JSON.stringify(out));
           and ".conto-p2p .ctrl-riga.tot.sats .mono{color:var(--sats-text)}"
               not in mini)
     prova("...e l'ultima riga e' l'euro, in evidenza", True,
-          "Totale da pagare" in cm and "6,00 € 🇪🇺" in cm
+          "Totale da inviare" in cm and "6,00 € 🇪🇺" in cm
           and cm.count('ctrl-riga tot') == 2)
     prova("...e senza premio la sua riga non c'e'", False,
           "Premio al venditore" in cm)
@@ -54984,8 +55096,8 @@ console.log(JSON.stringify(out));
           True, 'Premio al venditore <b class="p2p-affare">4%</b>'
           in o["contoVendi"]
           and '<span class="num meno">≈ −480 sats</span>' in o["contoVendi"]
-          and "Paghi" in o["contoVendi"] and "≈ 11635 sats" in o["contoVendi"]
-          and "Totale da pagare" not in o["contoVendi"]
+          and "Invii" in o["contoVendi"] and "≈ 11635 sats" in o["contoVendi"]
+          and "Totale da inviare" not in o["contoVendi"]
           and "Ricevi" in o["contoVendi"])
     # ...dove la commissione si AGGIUNGE (niente meno): la blocca lui
     # ⚠️ A CHI VENDE LA META' SI AGGIUNGE, e adesso lo dice il SEGNO
@@ -55118,8 +55230,8 @@ console.log(JSON.stringify(out));
     # AGGIUNGE a quel che si blocca, e in fondo si legge «Paghi»
     prova("chi vende blocca la sua meta' in piu': 7301 + 73 = 7374",
           [7301, 73, 7374], _somma(o["mioVendo"]))
-    prova("...e in fondo dice «Paghi» invece di «Ricevi»", True,
-          ">Paghi<" in o["mioVendo"] and "Totale da pagare" not in o["mioVendo"])
+    prova("...e in fondo dice «Invii» invece di «Ricevi»", True,
+          ">Invii<" in o["mioVendo"] and "Totale da inviare" not in o["mioVendo"])
     # ⚠️ UN INTERVALLO ANCORA APERTO NON SI FA FISSARE DA UNA CIFRA
     # SOLA: il coordinatore collassa i due capi insieme all'importo, e
     # finche' l'euro e' una fascia («20,00–100,00 €») un numero solo di
@@ -55317,7 +55429,7 @@ console.log(JSON.stringify(out));
     # meta' commissione), e la vecchia riga sotto il titolo non c'e'
     # piu' — come la riga del prezzo, scesa anche lei nel conto.
     prova("...e la quantita' sta nel conto, al netto di tutto", True,
-          "≈ 11880 sats" in o["pagina"] and "Totale da pagare" in o["pagina"])
+          "≈ 11880 sats" in o["pagina"] and "Totale da inviare" in o["pagina"])
     prova("...e l'apertura dice solo il lato", False,
           "p2p-dett-prezzo" in o["pagina"] or "p2p-dett-sats" in o["pagina"])
     # LA RIGA DEL PREZZO DI IERI E' MORTA CON LA SUA RAGIONE: quel che
@@ -70553,10 +70665,14 @@ def prove_p2p_card_scambio():
     # PRIMA, ognuna con la sua classe, e il ternario le dispone. Se un
     # domani qualcuno rimettesse la classe sulla RIGA invece che sulla
     # moneta, il colore dei sats dipenderebbe dal lato.
-    prova("in testa va quel che si riceve, e sotto quel che si paga",
+    # EMENDATA (26 set 2026, «PAGHI» DIVENTA «INVII», richiesta di
+    # Andrea): la propria meta' di uno scambio si INVIA all'altra persona;
+    # «pagare» resta alla garanzia, al PayCode e alla fee.
+    prova("in testa va quel che si riceve, e sotto quel che si invia",
           True,
           "'<div class=\"p2p-scambio-lato\">Vuoi ricevere '" in rs
-          and "'<div class=\"p2p-scambio-euro\">pagando '" in rs
+          and "'<div class=\"p2p-scambio-euro\">inviando '" in rs
+          and "(tab ? 'pagando ' : 'inviando ')" in rs
           and "(ricevoSats ? cifraSats : cifraEuro)" in rs
           and "(ricevoSats ? cifraEuro : cifraSats)" in rs)
     prova("...e la classe sta sulla MONETA, non sulla riga", True,
@@ -71030,10 +71146,10 @@ console.log(JSON.stringify(out));
     prova("in testa va quel che si riceve: i sats a chi compra",
           [True, True],
           ['Vuoi ricevere <span class="p2p-sats">' in o["compro"],
-           'pagando <span class="p2p-euro">5,00 €</span>' in o["compro"]])
+           'inviando <span class="p2p-euro">5,00 €</span>' in o["compro"]])
     prova("...e gli euro a chi vende", [True, True],
           ['Vuoi ricevere <span class="p2p-euro">5,00 €</span>' in o["vendo"],
-           'pagando <span class="p2p-sats">' in o["vendo"]])
+           'inviando <span class="p2p-sats">' in o["vendo"]])
     # ...e le stesure vecchie non sono rimaste da nessuna parte
     prova("...e le frasi dei due giri prima se ne sono andate",
           [False, False, False, False],
@@ -71240,16 +71356,16 @@ console.log(JSON.stringify(out));
     # chiesto («coniugata come cosa fatta»).
     def _parole(h):
         return re.sub(r"\s+", " ", re.sub(r"<[^>]*>", " ", h)).strip()
-    prova("chi ha VENDUTO sats: «Hai ricevuto <euro> pagando <sats>»",
+    prova("chi ha VENDUTO sats: «Hai ricevuto <euro> inviando <sats>»",
           [True, True, False],
           ['Hai ricevuto <span class="p2p-euro">5,00 €</span>'
            in o["conclusoVendo"],
-           'pagando <span class="p2p-sats">' in o["conclusoVendo"],
+           'inviando <span class="p2p-sats">' in o["conclusoVendo"],
            "Vuoi ricevere" in o["conclusoVendo"]])
     prova("chi ha COMPRATO sats: le due cifre si scambiano di posto",
           [True, True],
           ['Hai ricevuto <span class="p2p-sats">' in o["conclusoCompro"],
-           'pagando <span class="p2p-euro">5,00 €</span>'
+           'inviando <span class="p2p-euro">5,00 €</span>'
            in o["conclusoCompro"]])
     # ⚠️ IL TABACCHINO E' L'UNICO METODO IN CUI LE DUE PARTI FANNO COSE
     # DIVERSE: chi paga il PayCode alla cassa, e chi si vede pagare la
@@ -74729,7 +74845,7 @@ def prove_pubblica_metodo_prima():
     # --- 1) SUL TESTO: un nome solo, e niente troncamento muto --------
     _sc = pezzo_js(mini, "function scegliMetodoP2P(m){", "\n}\n")
     prova("il nome del campo dei metodi ha un posto solo, coi due versi", [1, 1],
-          [mini.count("'Come vuoi farti pagare'"), mini.count("'Come vuoi pagare'")])
+          [mini.count("'Come vuoi farti pagare'"), mini.count("'Come vuoi inviare'")])
     prova("...e i due titoli di ieri non ci sono piu'", [False, False],
           ["'Metodi di pagamento — puoi sceglierne più di uno'" in mini,
            "'Metodo di pagamento — col tabacchino, uno solo'" in mini])
@@ -74924,9 +75040,12 @@ console.log(JSON.stringify(R));
     # i titoli delle scatole come si leggono dall'alto: la valuta, poi
     # COME si paga, poi QUANTO — e il nome del campo dice il verso
     _LIM = "Quanto si può, e quanto costa"
-    prova("chi compra sats: valuta, «Come vuoi pagare», poi l'importo",
-          ["Seleziona la valuta con cui pagherai",
-           "Come vuoi pagare — puoi sceglierne più di uno",
+    # EMENDATA (26 set 2026, «PAGHI» DIVENTA «INVII», richiesta di
+    # Andrea): la propria meta' di uno scambio si INVIA all'altra persona;
+    # «pagare» resta alla garanzia, al PayCode e alla fee.
+    prova("chi compra sats: valuta, «Come vuoi inviare», poi l'importo",
+          ["Seleziona la valuta con cui invierai",
+           "Come vuoi inviare — puoi sceglierne più di uno",
            "Inserisci l'importo in EUR che vuoi inviare",
            "Tipo di prezzo", "Premio (%)", _LIM], out["compro"])
     prova("chi vende sats: valuta, «Come vuoi farti pagare», poi l'importo",
@@ -97596,10 +97715,19 @@ def prove_effetti_ridotti():
           bool(_velo and _velo_fx
                and float(_velo_fx.group(1)) > float(_velo.group(1))))
     # le sfocature che NON sono backdrop: una sola, ferma, su un'icona
-    prova("l'unico `filter:blur` e' la luce dell'icona Nostr (1.2px, "
-          "fermo: non e' uno strato che si ricompone)", [".ico-nostr .lux"],
-          [s for s, c in regole
+    # EMENDATA (26 set 2026, il tutorial su pagina sfocata): la seconda e'
+    # la pagina dietro il tour del P2P — un filtro SULLA pagina, fermo
+    # mentre il tour e' aperto, e con gli effetti ridotti non c'e'
+    # (il suo `filter:none` e il fondo pieno stanno nel blocco)
+    prova("i `filter:blur` sono due: la luce dell'icona Nostr (1.2px, "
+          "fermo) e la pagina dietro il tour del P2P",
+          [".ico-nostr .lux",
+           "html.p2p-sfocata #app>.view.active,html.p2p-sfocata #app>nav"],
+          [" ".join(s.split()) for s, c in regole
            if re.search(r"(?<![a-z-])filter:[^;]*blur\(", c)])
+    prova("...e la classe spegne la seconda e rimette il fondo pieno", [True, True],
+          ["html.fx-ridotti.p2p-sfocata #app>nav{filter:none}" in blocco,
+           "html.fx-ridotti #tourP2P{background:var(--bg)}" in blocco])
 
     # --- 3) GLI ALONI CHE BATTEVANO RESTANO FERMI -------------------
     # I blocchi reduced-motion non fanno solo `none`: due danno un
@@ -97618,11 +97746,10 @@ def prove_effetti_ridotti():
             if resto:
                 for uno in s.split(","):
                     ripieghi[uno] = ";".join(resto)
-    # EMENDATA (26 set 2026, «IL LIBRO SUBITO»): il terzo e' lo
-    # svelamento dopo il tour del P2P, che col moto ridotto non corre —
-    # il fondo pieno se ne va e basta — e la classe lo gemella
-    prova("i ripieghi fermi dei blocchi reduced-motion sono tre",
-          ["#tourP2P.svela", ".btn.orange.in-evidenza", ".p2p-manca"], sorted(ripieghi))
+    # (26 set 2026: lo svelamento dopo il tour, che era il terzo, e'
+    # uscito con la pagina sfocata — si torna a due)
+    prova("i ripieghi fermi dei blocchi reduced-motion sono due",
+          [".btn.orange.in-evidenza", ".p2p-manca"], sorted(ripieghi))
     prova("...e la classe li gemella tutti, con le stesse dichiarazioni",
           [], [s for s, d in ripieghi.items()
                if "html.fx-ridotti %s{%s}" % (s, d) not in blocco])
@@ -103149,6 +103276,7 @@ def main():
               prove_p2p_server,
         prove_p2p_libro,
         prove_tour_p2p, prove_tour_p2p_finale, prove_libro_subito,
+        prove_p2p_invii,
         prove_velo_p2p,
     prove_p2p_dettaglio,
     prove_nav_p2p,

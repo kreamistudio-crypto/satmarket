@@ -33759,3 +33759,86 @@ errore in pagina.
 **DA AVERE:** l'occhio sul telefono (lo svelamento e la riga
 «aggiorno…» sopra il +), e i tempi coi relay veri — qui erano di
 cartone per regola.
+
+## Il tutorial su pagina sfocata, e «Invii» nel P2P (26 set 2026)
+
+Due ritocchi di Andrea.
+
+**1) IL TUTORIAL SU PAGINA SFOCATA** (al posto del fondo pieno e dello
+svelamento dall'alto di 23408a3). Il tour non ha piu' fondo: mentre e'
+aperto, la vista attiva e la barra prendono `filter:blur(24px)` (classe
+`p2p-sfocata` sull'<html>, un posto solo: `sfocaPaginaTourP2P`) e della
+pagina restano colori e forme; la card, slide finale compresa, e'
+nitida sopra. Alla chiusura — «Inizia», «Salta», il gesto indietro,
+tutti da `chiudiTourP2P` — la card se ne va e la classe `p2p-a-fuoco`
+porta la transizione: la pagina torna a fuoco in 0,8 s. Negli ingressi
+normali la classe non nasce mai. Con gli effetti ridotti niente
+sfocatura: il fondo pieno di casa, e alla chiusura la pagina c'e'
+nitida (la cintura in `html.fx-ridotti`). La riga «aggiorno…», fissa
+dentro la vista, sotto un filtro perderebbe il suo riferimento: finche'
+la pagina e' sfocata non si mostra.
+**IL MODO PIU' LEGGERO:** un filtro SULLA pagina, non un
+`backdrop-filter` su un velo — si disegna una volta e il compositore lo
+tiene. **MISURATO a CPU 4x** (Chrome headless, screencast): la messa a
+fuoco va a 60 fotogrammi al secondo, mediana 15,4-16 ms in tutt'e due
+i temi; i soli buchi (56-71 ms) cadono a 650 ms e a 850-900 ms, cioe'
+con la sfocatura gia' sotto 0,4 px e poi allo smontaggio del livello a
+corsa finita, quando a schermo non cambia piu' niente. La taratura
+sulla stessa pagina: una dissolvenza (quasi gratis) mediana 15,7 e
+massimo 30; la sfocatura 24→0 identica (15,6-15,9, massimo 30 dal
+secondo giro; 66 una volta sola, alla nascita del livello); il ripiego
+«velo scuro + sfocatura leggera» identico — quindi il ripiego non serve,
+e non c'e'.
+⚠️ E SI VEDE SOLO SU UN TELEFONO: headless disegna in software, un
+telefono ha la GPU. DA AVERE: l'occhio su un telefono lento.
+
+**2) «PAGHI» DIVENTA «INVII» NEL P2P**, dove la parola dice la propria
+meta' dello scambio. CAMBIATI: la card del libro («Invii 25,00 € ·
+Ricevi ≈ …», e dal lato opposto «Invii ≈ … sats · Ricevi 30,00 €»); il
+conto del dettaglio e della pagina dello scambio («Invii», «Totale da
+inviare»); il foglio «Quanto» («scegli tu quanto vuoi inviare»,
+«Invierai circa …»); il foglio Pubblica («Seleziona la valuta con cui
+invierai», «Come vuoi inviare»); le card di «I miei scambi» («Vuoi
+ricevere … inviando …», «Hai ricevuto … inviando …»); la pagina dello
+scambio («da lì potrai inviare gli euro», «invia gli euro solo a un
+recapito che ti ha dato LUI»); Info P2P («Scegli con quale metodo vuoi
+inviare gli euro (o riceverli)», «se dici di aver inviato gli euro e
+non l'hai fatto… E se li hai inviati…», «prima di inviare gli euro
+guarda…»). La frase del metodo da scegliere nel dettaglio seguiva il
+tab e non il lato — a VENDERE sats diceva «pagare» per una cosa che si
+riceve —: adesso «inviare» o «ricevere gli euro» secondo il lato.
+LASCIATI, perche' li' si paga davvero: la richiesta della garanzia
+(«Paga la richiesta», «garanzia da pagare», e il bot «Paga la
+garanzia»); il PayCode e tutto il percorso Barattozon («Paghi in
+contanti alla cassa del tabacchino», «Ho pagato al tabacchino»,
+«pagando … al tabacchino» nelle card, i solleciti del bot); la fee
+(«Non si paga a parte»); i sats «in pagamento» verso un wallet e le
+«richieste di pagamento»; i «metodi di pagamento» (sostantivo). E
+«Come vuoi farti pagare», che e' la meta' dell'altra persona. I
+messaggi del bot sugli scambi P2P non avevano un «paghi» della propria
+meta' (dicono gia' «inviare gli euro»): il server non cambia. Nel
+mercatino niente: «Totale da pagare» e i due «Paghi … sats» del negozio
+restano, e una prova li guarda.
+
+**PROVATO.** `prove_p2p_invii` (22, nuova): i posti censiti senza piu'
+«paghi/pagare» nel codice, le frasi nuove, i sensi lasciati ancora al
+loro posto, il mercatino e «Compra/Vendi BTC» intatti. Emendate col
+perche' `prove_libro_subito` (sentinelle e banco del tour: pagina
+sfocata al primo accesso e da «Come funziona», messa a fuoco con
+«Salta» e «Inizia» e classe tolta a corsa finita, tour che riparte a
+messa a fuoco in corsa, effetti ridotti senza sfocatura, ingresso
+normale senza), `prove_effetti_ridotti` (i due `filter:blur` e il
+gemello nella classe; i ripieghi tornano due), il banco di
+`prove_tour_p2p_finale` (l'<html> di cartone), e le prove dei testi di
+card, dettaglio, conto, «I miei scambi» e foglio Pubblica. Suite intera
+severa nel worktree da origin/main (23408a3): 16.334 verdi e 0 rosse, i 24 collaudi della CI verdi
+nella gabbia; tortura 14 su 14. Dal vivo,
+Chrome headless via CDP a densita' 3, 375 px, due temi, server di
+collaudo su una copia e relay di cartone su 127.0.0.1: la pagina
+irriconoscibile dietro il tour e dietro la slide finale, i sei istanti
+della messa a fuoco (24 → 13,7 → 5,7 → 1,9 → 0,4 px → nitida), dopo
+«Inizia» nessuna classe e nessun filtro, ingresso normale mai sfocato,
+effetti ridotti col fondo pieno, le card «Invii» nei due tab e «Totale
+da inviare» nel conto, nessuno scorrimento laterale, nessun errore
+dell'app.
+**DA AVERE:** l'occhio sul telefono.

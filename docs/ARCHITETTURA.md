@@ -6849,11 +6849,22 @@
   non da' nemmeno il 38385 vale come muto (il bundle chiude la
   sottoscrizione a 4,4 s come un EOSE, e il libro diventava vuoto). Il
   blocco vive dopo il motore, dove la `fetch` e' di casa. IL TOUR si
-  apre all'ingresso (chi e' dentro aspetta /me) su un fondo pieno
-  (`background:var(--bg)`), e alla chiusura il fondo si ritira
-  dall'alto verso il basso in mezzo secondo (`.svela`,
-  `SVELA_TOUR_P2P_MS`); con gli effetti ridotti compare e basta.
-  Il verbale: CANTIERI, «Il libro subito».
+  apre all'ingresso (chi e' dentro aspetta /me) SULLA PAGINA SFOCATA
+  (dal 26 set 2026, al posto del fondo pieno e dello svelamento): il
+  tour non ha fondo, e `sfocaPaginaTourP2P` mette `p2p-sfocata`
+  sull'<html>, che da' `filter:blur(24px)` alla vista attiva e alla
+  barra — un filtro sulla pagina e non un backdrop; alla chiusura
+  («Inizia», «Salta», indietro) la classe `p2p-a-fuoco` porta la
+  transizione e la pagina torna a fuoco in 0,8 s
+  (`A_FUOCO_TOUR_P2P_MS`). Con gli effetti ridotti niente sfocatura:
+  fondo pieno, e la pagina c'e' nitida.
+  Il verbale: CANTIERI, «Il libro subito» e «Il tutorial su pagina
+  sfocata, e «Invii» nel P2P».
+  NEL P2P LA PROPRIA META' SI INVIA (26 set 2026): «Invii X € ·
+  Ricevi ≈ X sats» (e «Invii ≈ X sats · Ricevi X €»), «Totale da
+  inviare», «inviando» nelle card di «I miei scambi». «Pagare» resta
+  alla garanzia, al PayCode, alla fee e ai sats «in pagamento»; nel
+  mercatino non cambia niente (`prove_p2p_invii`).
   IL CORO DEI RELAY (16 set 2026, la gamba VIVA del P2P): la
   connessione con cui il client parla col coordinator — richieste,
   risposte, restore, recapiti, via di riserva — non e' piu' UN relay

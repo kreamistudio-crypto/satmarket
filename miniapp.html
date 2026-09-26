@@ -7914,23 +7914,33 @@
      l'immagine copre la sua scatola e sotto non resta il bordo di
      un'altra tinta. E se una non arrivasse, quel che resta e' navy e
      non un buco bianco in mezzo alla card. */
-  /* ⚠️ IL FONDO E' PIENO (26 set 2026, richiesta di Andrea): dietro
-     la card del tour non si vede niente della pagina — solo il fondo
-     di casa e la card. Il libro intanto si prepara sotto, e alla
-     chiusura il fondo si ritira dall'alto verso il basso (`.svela`). */
+  /* ⚠️ DIETRO IL TOUR LA PAGINA E' SFOCATA (26 set 2026, richiesta di
+     Andrea, al posto del fondo pieno e dello svelamento di 23408a3):
+     il tour non ha fondo, e finche' e' aperto la vista attiva e la
+     barra prendono un `filter:blur` cosi' forte che della pagina
+     restano solo colori e forme; la card sopra e' nitida. E' un filtro
+     SULLA PAGINA e non un `backdrop-filter` sul velo: si disegna una
+     volta e il compositore lo tiene, mentre il backdrop ricampiona
+     tutto quel che sta sotto a ogni fotogramma — e sui telefoni e' il
+     piu' caro dei due.
+     ALLA CHIUSURA la pagina torna a fuoco in 0,8 s (`.p2p-a-fuoco`
+     porta la transizione, `chiudiTourP2P` toglie la sfocatura e poi
+     la transizione). Negli ingressi normali la classe non c'e' mai.
+     Con gli effetti ridotti la sfocatura non si mette: il tour torna
+     al fondo pieno, e alla chiusura la pagina c'e' nitida. */
   #tourP2P{position:fixed;inset:0;z-index:84;display:none;
-    align-items:center;justify-content:center;padding:16px;
-    background:var(--bg)}
+    align-items:center;justify-content:center;padding:16px}
   #tourP2P.open{display:flex}
-  /* LO SVELAMENTO: la card se ne va subito, il fondo si ritira in
-     mezzo secondo e non prende tocchi mentre lo fa. Con gli effetti
-     ridotti la classe non si mette nemmeno (chiudiTourP2P), e qui c'e'
-     la cintura: compare e basta. */
-  #tourP2P.svela{display:flex;pointer-events:none;
-    animation:tourP2PSvela .5s cubic-bezier(.25,.7,.35,1) forwards}
-  #tourP2P.svela .giro-box{visibility:hidden}
-  @keyframes tourP2PSvela{from{clip-path:inset(0 0 0 0)}to{clip-path:inset(100% 0 0 0)}}
-  @media (prefers-reduced-motion:reduce){#tourP2P.svela{display:none}}
+  html.p2p-sfocata #app > .view.active,
+  html.p2p-sfocata #app > nav{filter:blur(24px);will-change:filter}
+  html.p2p-a-fuoco #app > .view.active,
+  html.p2p-a-fuoco #app > nav{will-change:filter;
+    transition:filter .8s cubic-bezier(.3,.6,.35,1)}
+  /* la riga «aggiorno…» e' fissa DENTRO la vista: sotto un filtro il
+     suo riferimento diventa la vista, e si perderebbe in fondo alla
+     pagina — finche' la pagina e' sfocata non si mostra */
+  html.p2p-sfocata .p2p-aggiorno,
+  html.p2p-a-fuoco .p2p-aggiorno{visibility:hidden}
   .giro-box{position:relative;width:100%;max-width:380px;
     max-height:calc(100dvh / var(--fs-zoom,1) - 32px);
     background:var(--card);border:1px solid var(--line);
@@ -8833,9 +8843,11 @@
   /* 2) gli aloni che battevano restano FERMI: gli stessi due ripieghi
         dei blocchi reduced-motion, dichiarazione per dichiarazione */
   html.fx-ridotti .p2p-manca{box-shadow:0 0 0 3px rgba(194,65,12,.55)}
-  /* 3) lo svelamento dopo il tour del P2P non corre: il fondo pieno se
-        ne va e la pagina c'e' (26 set 2026) — il gemello del suo blocco */
-  html.fx-ridotti #tourP2P.svela{display:none}
+  /* 3) dietro il tour del P2P niente sfocatura (26 set 2026): il fondo
+        pieno di casa, e alla chiusura la pagina c'e' nitida */
+  html.fx-ridotti #tourP2P{background:var(--bg)}
+  html.fx-ridotti.p2p-sfocata #app > .view.active,
+  html.fx-ridotti.p2p-sfocata #app > nav{filter:none}
   html.fx-ridotti .btn.orange.in-evidenza{
     box-shadow:0 3px 0 var(--sats-deep),0 0 0 4px rgba(247,147,26,.35)}
 
@@ -9811,7 +9823,7 @@ document.getElementById('cartello')?.remove();</script>
       <h3>Come funziona, in cinque passi</h3>
       <ol class="sicu-passi">
         <li><b>Qualcuno pubblica un ordine.</b> Dice se compra o vende sats, per quanti euro e con quali metodi di pagamento. L'ordine finisce nel <b>libro degli ordini</b>, che vedono tutti.</li>
-        <li><b>Tu lo prendi.</b> Scegli con quale metodo vuoi pagare (o essere pagato) e l'ordine si riserva a te: da quel momento non lo può più prendere nessun altro.</li>
+        <li><b>Tu lo prendi.</b> Scegli con quale metodo vuoi inviare gli euro (o riceverli) e l'ordine si riserva a te: da quel momento non lo può più prendere nessun altro.</li>
         <li><b>Chi vende blocca i sats.</b> Paga una richiesta particolare, che <b>trattiene</b> i sats invece di consegnarli: escono dal suo wallet ma non arrivano a nessuno. Da qui in poi sono <b>in garanzia</b>.</li>
         <li><b>Chi compra manda gli euro.</b> Col metodo scelto, al recapito che l'altra persona gli lascia qui dentro: finché non arriva il bottone resta spento, e appena arriva ti avvisiamo. Poi lo dice qui.</li>
         <li><b>Chi vende libera i sats.</b> Controlla di aver ricevuto gli euro e li libera: arrivano all'indirizzo Lightning indicato da chi compra all'inizio.</li>
@@ -9840,7 +9852,7 @@ document.getElementById('cartello')?.remove();</script>
       <h3>Come si pagano gli euro</h3>
       <p>I metodi sono un elenco chiuso: <b><span data-p2pinfo="metodi"></span></b>. Chi pubblica sceglie quali accetta, chi prende ne sceglie uno.</p>
       <p><b>Gli euro non passano da Barattolo.</b> Viaggiano fra te e l'altra persona sul circuito che avete scelto, come se vi foste messi d'accordo per strada. Il recapito che serve — l'IBAN, il RevTag, il numero — ve lo scambiate <b>qui dentro e cifrato</b>: lo legge solo chi deve pagare.</p>
-      <p>Per questo la garanzia protegge <b>i sats e non gli euro</b>: se dici di aver pagato e non hai pagato, chi vende semplicemente non libera. E se hai pagato e non liberano, c'è la disputa.</p>
+      <p>Per questo la garanzia protegge <b>i sats e non gli euro</b>: se dici di aver inviato gli euro e non l'hai fatto, chi vende semplicemente non libera. E se li hai inviati e non liberano, c'è la disputa.</p>
 
       <h3 id="p2pinfo-tabacchino">Barattozon: il PayCode al tabacchino, passo per passo</h3>
       <p>È il metodo per chi non vuole passare da una banca o da un'app: chi <b>vende</b> sats fa un <b>ordine Amazon da pagare in contanti nel punto vendita</b> e chi <b>compra</b> lo paga alla cassa del tabacchino col <b>PayCode</b>. Il tabacchino incassa i contanti, l'ordine Amazon risulta pagato, e i sats si liberano. Nel libro il metodo si chiama ancora «Contanti al tabacchino»: è la parola che leggono anche le altre app.</p>
@@ -9874,7 +9886,7 @@ document.getElementById('cartello')?.remove();</script>
       <p>Ad app aperta la pagina dello scambio <b>si muove da sola</b>: la richiesta da pagare, il foglio dove indicare i sats e il passo dopo compaiono appena arrivano — via Tor ci vogliono di solito dieci-venti secondi. Ad app chiusa ti avvisiamo su Telegram o su Nostr, secondo le tue impostazioni.</p>
       <ul class="sicu-lista">
         <li><b>Un avviso per ogni passo che ti riguarda, e dice quale:</b> il tuo ordine è stato <b>preso</b>, c'è la <b>garanzia da pagare</b>, i sats <b>sono in garanzia</b> e tocca a te indicare dove riceverli, l'altra persona <b>ha indicato dove ricevere i sats</b>, <b>dice di aver inviato gli euro</b>, chiede di <b>annullare</b>, ha aperto una <b>disputa</b>, il pagamento dei sats <b>non è passato</b>. E alla fine: <b>concluso</b> (con quanto hai ricevuto o pagato, commissione compresa), <b>annullato</b>, <b>tornato nel libro</b> o <b>scaduto</b>.</li>
-        <li><b>«Ti ha indicato dove inviare gli euro: tocca a te»</b>, quando chi vende ti lascia il recapito. Il recapito <b>non è nell'avviso</b>: lo leggi qui dentro, cifrato — e prima di pagare guarda che la pagina dica <b>«Sats in garanzia»</b>.</li>
+        <li><b>«Ti ha indicato dove inviare gli euro: tocca a te»</b>, quando chi vende ti lascia il recapito. Il recapito <b>non è nell'avviso</b>: lo leggi qui dentro, cifrato — e prima di inviare gli euro guarda che la pagina dica <b>«Sats in garanzia»</b>.</li>
         <li><b>Niente</b>, per un gesto che hai <b>fatto tu</b>: l'hai già davanti. L'avviso va a chi deve fare il passo dopo, o deve saperlo.</li>
       </ul>
       <p><b>Da dove vengono.</b> A raccontarci i passi è il <b>coordinatore</b> — che facciamo girare noi — nel momento in cui succedono. Ci dice <b>quale ordine, quale passo, e fra quali due chiavi usa-e-getta</b>; degli importi ci dice solo quelli della <b>chiusura</b>. <b>Non ci manda</b> fatture, recapiti né messaggi: quelli restano cifrati fra voi due, e non li vediamo. Se un suo avviso si perde per strada, i passi pubblici — preso, concluso, annullato, scaduto — li leggiamo dal libro, e te li diciamo un minuto dopo.</p>
@@ -44698,10 +44710,10 @@ function rigaOrdineP2P(o){
      compare il ≈. */
   const netto = nettoLatoP2P(o, o.sats > 0 ? o.sats : stima);
   /* LA CARD PARLA A CHI LEGGE (set 2026, ridisegno chiesto da Andrea):
-     in seconda persona, e l'EURO E' SEMPRE LA RIGA GRANDE — «Paghi
+     in seconda persona, e l'EURO E' SEMPRE LA RIGA GRANDE — «Invii
      8,00 €» nel tab «Compra BTC» (ordini k=sell), «Ricevi 7,00 €» nel
      tab «Vendi BTC» (k=buy) — coi sats sempre sotto, «ricevi ≈ 11 828
-     sats» o «Paghi ≈ 11 828 sats». I due tab si leggono cosi' collo
+     sats» o «Invii ≈ 11 828 sats» («Paghi» fino al 26 set 2026). I due tab si leggono cosi' collo
      stesso movimento dell'occhio: euro grande, sats piccoli, prezzo.
      (Il primo giro scambiava le righe col lato; Andrea l'ha
      rovesciato guardandolo: la coerenza fra i tab vale piu' del
@@ -44744,17 +44756,20 @@ function rigaOrdineP2P(o){
      fattura, e quella li tiene in garanzia finche' l'euro non e'
      arrivato.
      E L'ORDINE DELLE RIGHE SEGUE IL GESTO: nel tab «Compra BTC» si
-     paga e poi si riceve, nel tab «Vendi BTC» si paga (in sats) e poi
-     si riceve. Quindi a comprare la riga grande (l'euro) sta in cima,
+     invia e poi si riceve, nel tab «Vendi BTC» si invia (in sats) e poi
+     si riceve. IL VERBO E' «INVII» (26 set 2026, richiesta di Andrea):
+     la propria meta' di uno scambio si manda all'altra persona, non si
+     paga a un negozio — «paghi» resta al mercatino, alla garanzia e al
+     PayCode, che sono pagamenti davvero. Quindi a comprare la riga grande (l'euro) sta in cima,
      a vendere ci arriva seconda: cambia l'ORDINE, mai la taglia —
      euro grande e sats piccoli in tutt'e due i tab. */
   const rigaEuro = '<span class="p2p-grande p2p-euro">'
-    + (paghiEuro ? 'Paghi ' : 'Ricevi ') + eurTxt + '</span>';
+    + (paghiEuro ? 'Invii ' : 'Ricevi ') + eurTxt + '</span>';
   /* il verbo esce dalla tinta del lato e la cifra ci resta: vedi il
      CSS di `.p2p-sats .p2p-verbo` — in colore va quel che il colore
      distingue, cioe' i sats */
   const rigaSats = '<span class="p2p-piccola p2p-sats">'
-    + '<span class="p2p-verbo">' + (paghiEuro ? 'Ricevi ' : 'Paghi ')
+    + '<span class="p2p-verbo">' + (paghiEuro ? 'Ricevi ' : 'Invii ')
     + '</span>' + sats + '</span>';
   /* LA RIGA DEL PREZZO E' MORTA CON LA CARD ESSENZIALE (10 set 2026,
      ritocco di Andrea): «al prezzo di mercato» non serviva a
@@ -47163,9 +47178,8 @@ function apriSalitaTourP2P(){
 function montaTourP2P(solo){
   tourP2PInCorso = true;
   tourP2PSolo = solo;
-  /* uno svelamento ancora in corsa si ferma: il tour torna pieno */
-  clearTimeout(tourP2PSvelaTimer);
-  el('tourP2P').classList.remove('svela');
+  /* la pagina dietro si sfoca (e una messa a fuoco in corsa si ferma) */
+  sfocaPaginaTourP2P(true);
   const nastro = el('tourP2PNastro'), punti = el('tourP2PPunti');
   nastro.innerHTML = TAPPE_TOUR_P2P.map(t =>
     `<div class="giro-card"><div class="giro-fig">`
@@ -47263,22 +47277,35 @@ function chiudiTourP2P(){
   el('tourP2P').classList.remove('finale');
   el('tourP2PNastro').removeEventListener('scroll', scorriTourP2P);
   document.removeEventListener('keydown', tastoTourP2P);
-  /* LO SVELAMENTO (26 set 2026, richiesta di Andrea): il fondo pieno
-     del tour non sparisce di colpo — la card se ne va e il fondo si
-     ritira dall'alto verso il basso, scoprendo la pagina in mezzo
-     secondo. Solo qui, alla fine di un tour: negli ingressi normali
-     la pagina c'e' e basta. Con gli effetti ridotti compare e basta. */
-  if (!tourRidotto()) {
-    el('tourP2P').classList.add('svela');
-    clearTimeout(tourP2PSvelaTimer);
-    tourP2PSvelaTimer = setTimeout(() => el('tourP2P').classList.remove('svela'),
-                                   SVELA_TOUR_P2P_MS + 60);
-  }
+  /* LA PAGINA TORNA A FUOCO (26 set 2026, richiesta di Andrea): la
+     card se n'e' gia' andata, e la sfocatura si scioglie in 0,8 s.
+     Solo qui, alla fine di un tour — «Inizia», «Salta» o il gesto
+     indietro passano tutti da questa funzione. */
+  sfocaPaginaTourP2P(false);
 }
-/* quanto dura lo svelamento: il CSS lo dice con la stessa cifra (la
-   prova le confronta), e il tempo toglie la classe un soffio dopo */
-const SVELA_TOUR_P2P_MS = 500;
-let tourP2PSvelaTimer = null;
+/* LA SFOCATURA DIETRO IL TOUR, in un posto solo. Accesa: la classe
+   sull'<html> (il CSS sfoca vista attiva e barra), mai con gli effetti
+   ridotti. Spenta: la transizione entra INSIEME al valore che cambia
+   — il browser la legge dallo stile nuovo — e se ne va a corsa
+   finita; coi ridotti si spegne e basta. Quanto dura lo dice il CSS
+   con la stessa cifra (la prova le confronta). */
+const A_FUOCO_TOUR_P2P_MS = 800;
+let tourP2PFuocoTimer = null;
+function sfocaPaginaTourP2P(accesa){
+  const h = document.documentElement;
+  clearTimeout(tourP2PFuocoTimer);
+  if (accesa) {
+    h.classList.remove('p2p-a-fuoco');
+    if (!tourRidotto()) h.classList.add('p2p-sfocata');
+    return;
+  }
+  if (!h.classList.contains('p2p-sfocata')) return;
+  if (tourRidotto()) { h.classList.remove('p2p-sfocata', 'p2p-a-fuoco'); return; }
+  h.classList.add('p2p-a-fuoco');
+  h.classList.remove('p2p-sfocata');
+  tourP2PFuocoTimer = setTimeout(() => h.classList.remove('p2p-a-fuoco'),
+                                 A_FUOCO_TOUR_P2P_MS + 60);
+}
 
 /* ============ IL MOTORE DELLO SCAMBIO (set 2026, tappa 4) ============
    Qui si PARLA col coordinatore: si prende un ordine del libro, si
@@ -49059,7 +49086,7 @@ const STATI_P2P = {
   rifiutato: {t: 'Ordine non preso', d: 'La richiesta non è stata accettata.',
               t_mio: 'Ordine non pubblicato', d_mio: 'La pubblicazione non è stata accettata.'},
   attesa_mia_fattura: {t: 'Dove vuoi i sats?', d: 'Indica il tuo indirizzo Lightning: è lì che arriveranno alla fine dello scambio.'},
-  attesa_hold_venditore: {t: 'Chi vende sta bloccando i sats', d: 'Appena sono al sicuro in garanzia te lo diciamo: da lì potrai pagare in euro.'},
+  attesa_hold_venditore: {t: 'Chi vende sta bloccando i sats', d: 'Appena sono al sicuro in garanzia te lo diciamo: da lì potrai inviare gli euro.'},
   attesa_fattura_compratore: {t: 'Chi compra sta indicando dove ricevere', d: 'Appena lo fa ti chiederemo di bloccare i sats.'},
   attesa_mia_hold: {t: 'Blocca i sats', d: 'Paga la richiesta: i sats restano bloccati in garanzia e non escono finché non li liberi tu.'},
   attivo: {t: 'Sats in garanzia', d_compro: 'I sats sono al sicuro in garanzia. Ora manda gli euro al recapito indicato da chi vende, poi dillo qui.',
@@ -49739,7 +49766,7 @@ function renderQuantoP2P(){
   box.innerHTML =
     '<div class="hint">Quest\'offerta va da <b>' + esc(fmtEur(riga.euro)) + ' \u20ac</b> a <b>' +
       esc(fmtEur(riga.euroMax)) + ' \u20ac</b>: scegli tu quanto ' +
-      (paghiEuro ? 'vuoi pagare' : 'vuoi ricevere') + '.</div>' +
+      (paghiEuro ? 'vuoi inviare' : 'vuoi ricevere') + '.</div>' +
     '<div class="field"><label for="p2pQuantoInp">Quanti euro</label>' +
     '<div class="campo-pre"><span class="pre">\u20ac</span>' +
     '<input id="p2pQuantoInp" type="text" inputmode="numeric" value="' +
@@ -49766,7 +49793,7 @@ function quantoValeP2P(riga, valore){
   const s = nettoLatoP2P(riga,
     satsMercatoP2P({euro: euro, premium: riga.premium || 0}));
   return {ok: true, euro: euro,
-    dillo: s ? ((riga.lato === 'sell' ? 'Riceverai circa ' : 'Pagherai circa ') + fmt(s) + ' sats.') : ''};
+    dillo: s ? ((riga.lato === 'sell' ? 'Riceverai circa ' : 'Invierai circa ') + fmt(s) + ' sats.') : ''};
 }
 function stimaQuantoP2P(){
   const riga = rigaLibroP2P(p2pQuantoOrdine);
@@ -50341,8 +50368,8 @@ function contoDettP2P(o){
        le due righe nello stesso foglio delle altre. Il riquadro le
        toglie dall'elenco. */
     + '<div class="ctrl-chiusa">'
-    + r(compro ? 'Ricevi' : 'Paghi', cifra('netto'), 'tot sats')
-    + r(compro ? 'Totale da pagare' : 'Ricevi', cifreEuro, 'tot euro')
+    + r(compro ? 'Ricevi' : 'Invii', cifra('netto'), 'tot sats')
+    + r(compro ? 'Totale da inviare' : 'Ricevi', cifreEuro, 'tot euro')
     + '</div>'
     + '</div>';
 }
@@ -50475,7 +50502,7 @@ function renderDettaglioP2P(){
      prima di `?:`, e leggerlo a occhio e' esattamente il modo in cui
      un domani qualcuno lo «sistema» al contrario. */
   const manca = (p2pDettMetodo || !(o.metodi && o.metodi.length > 1))
-    ? '' : 'Scegli con quale metodo vuoi pagare.';
+    ? '' : 'Scegli con quale metodo vuoi ' + (compro ? 'inviare' : 'ricevere') + ' gli euro.';
   /* IL CORPO COMINCIA DAL METODO, e sopra non c'e' piu' niente: il
      prezzo e la quantita' sono scesi nel conto scorporato (dove ogni
      cifra ha il suo nome) e il lato e' salito nel TITOLO. Quel che
@@ -50547,7 +50574,7 @@ function confermaDettaglioP2P(){
   const o = rigaLibroP2P(id);
   if (!o) { toast('Quest\'ordine non c\'è più: aggiorna il libro'); return; }
   if ((o.metodi || []).length > 1 && !p2pDettMetodo) {
-    toast('Scegli con quale metodo vuoi pagare');
+    toast('Scegli con quale metodo vuoi ' + (o.lato === 'sell' ? 'inviare' : 'ricevere') + ' gli euro');
     return;
   }
   haptic();
@@ -52031,7 +52058,7 @@ function recapitoAltroveP2P(){
   if (!o) return;
   chiediConferma({
     titolo: 'Hai già il recapito?',
-    corpo: 'Qui dentro non è arrivato. Se chi vende ti ha detto dove mandare gli euro per un\'altra strada, accendi il bottone — ma paga solo a un recapito che ti ha dato LUI, e solo perché questa pagina dice «Sats in garanzia».',
+    corpo: 'Qui dentro non è arrivato. Se chi vende ti ha detto dove mandare gli euro per un\'altra strada, accendi il bottone — ma invia gli euro solo a un recapito che ti ha dato LUI, e solo perché questa pagina dice «Sats in garanzia».',
     etichetta: 'Sì, ce l\'ho',
     poi: () => {
       const agg = ordiniP2P()[o.id];
@@ -53769,7 +53796,7 @@ function riquadroLimitiP2P(){
    pubblicare oggi il metodo non lo scrive, e il giorno che lo scrivera'
    chiama questa invece di battere una terza stesura. */
 function nomeMetodiP2P(lato){
-  return lato === 'compro' ? 'Come vuoi pagare' : 'Come vuoi farti pagare';
+  return lato === 'compro' ? 'Come vuoi inviare' : 'Come vuoi farti pagare';
 }
 /* la riga che dice perche' l'importo si e' svuotato cambiando metodo
    (vedi `importoDopoMetodoP2P`): sotto il campo, nei due posti in cui
@@ -53825,7 +53852,7 @@ function renderNuovoOrdineP2P(){
      e' gia' la strada giusta per la seconda. */
   const valuta = sezioneNuovoP2P({
     ico: 'valuta',
-    titolo: 'Seleziona la valuta con cui ' + (compro ? 'pagherai' : 'riceverai'),
+    titolo: 'Seleziona la valuta con cui ' + (compro ? 'invierai' : 'riceverai'),
     corpo: '<button type="button" class="p2p-tendina" id="p2pNuovoValutaBtn" ' +
       'aria-haspopup="dialog" onclick="apriValutaP2P()">' +
       '<span>' + val.bandiera + ' ' + esc(val.cod) + '</span>' +
@@ -56403,13 +56430,14 @@ function rigaScambioP2P(o){
       + ' tocca a te</span>' : '';
   /* ---- QUEL CHE E' FATTO SI DICE AL PASSATO (22 set 2026, richiesta
      di Andrea) ----
-     Le card VIVE restano come sono: li' «Vuoi ricevere … pagando …»
+     Le card VIVE restano come sono: li' «Vuoi ricevere … inviando …»
      racconta una cosa che deve ancora succedere, ed e' giusta. Su uno
      scambio CONCLUSO quella stessa frase e' una promessa su una cosa
      gia' finita, e chi riguarda i suoi scambi vecchi si chiede se manchi
      qualcosa.
      LE QUATTRO FRASI SONO DUE PIU' DUE: il verso normale — «Hai
-     ricevuto <quel che e' arrivato> pagando <quel che e' uscito>», e il
+     ricevuto <quel che e' arrivato> inviando <quel che e' uscito>» («pagando»
+     fino al 26 set 2026, e al tabacchino resta: li' si paga davvero), e il
      lato lo dice `ricevoSats` come nelle righe vive — e i due del
      tabacchino, che e' l'unico metodo in cui le due parti fanno cose
      DIVERSE: chi ha pagato il PayCode alla cassa aggiunge «al
@@ -56447,12 +56475,12 @@ function rigaScambioP2P(o){
             + '<div class="p2p-scambio-euro">per ' + cifraSats + '</div>'
           : '<div class="p2p-scambio-lato">Hai ricevuto '
             + (ricevoSats ? cifraSats : cifraEuro) + '</div>'
-            + '<div class="p2p-scambio-euro">pagando '
+            + '<div class="p2p-scambio-euro">' + (tab ? 'pagando ' : 'inviando ')
             + (ricevoSats ? cifraEuro : cifraSats)
             + (tab ? ' al tabacchino' : '') + '</div>')
       : '<div class="p2p-scambio-lato">Vuoi ricevere '
         + (ricevoSats ? cifraSats : cifraEuro) + '</div>'
-        + '<div class="p2p-scambio-euro">pagando '
+        + '<div class="p2p-scambio-euro">inviando '
         + (ricevoSats ? cifraEuro : cifraSats) + '</div>';
   /* ---- L'INSEGNA DI BARATTOZON SI SPEGNE COI FINALI (22 set 2026,
      richiesta di Andrea) ----
