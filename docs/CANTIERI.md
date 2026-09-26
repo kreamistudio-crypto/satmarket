@@ -33350,3 +33350,43 @@ terzi, centrato, bagliore al picco a 10,7/2,7 e un solo indietro dopo
 (10/10).
 **DA GUARDARE SUL TELEFONO:** il ritorno a occhio, e che tornando in
 Esplora da una vista qualunque la fila delle pillole non lampeggi piu'.
+
+## La home dice «utenti», non più «pionieri» (26 set 2026)
+
+Ritocco di Andrea. Nella home del mercatino, sotto «N oggetti», la riga
+«N pionieri» diventa **«N utenti»** («1 utente» al singolare).
+
+**IL NUMERO NON CAMBIA, ed era la domanda da fare prima della parola.**
+`conta_pionieri` è sempre stato `SELECT COUNT(*) FROM utenti`: TUTTI gli
+iscritti — Telegram e login Nostr, stessa tabella —, mai la coorte. I
+pionieri sono un'altra cosa: la coorte dei primi 100 (`assegna_coorte`,
+«Tra i primi 100 iscritti del Barattolo»). Quindi la scritta vecchia
+diceva il falso dal centounesimo iscritto in poi, e la nuova è quella
+giusta per il numero che c'è. (L'import Nostr aggiunge al più UNA riga,
+il `VENDITORE_ID` del config con `INSERT OR IGNORE`: di solito è già un
+iscritto.)
+
+**RESTANO I NOMI INTERNI**, come la vista «affari» rinominata «Ordini»:
+`#pionieriRiga`, `renderPionieri`, la variabile `pionieri`,
+`conta_pionieri` e soprattutto la chiave `pionieri` della busta di prima
+pagina, che rinominarla avrebbe spento la riga sui client in cache fino
+al ricarico. Cambiano i testi che la NOMINANO: la leva del pannello
+admin («Contatore degli utenti», spenta = «la riga «N utenti» non
+compare»), il commento di `config_esempio.py` e quelli del codice. La
+coorte e lo sconto «pionieri o livello 5» non si toccano: lì la parola
+è giusta.
+
+**PROVATO.** `prove_utenti_home` nuova (9): esegue la `conta_pionieri`
+vera su un database con 150 iscritti di cui 100 in coorte (più uno dal
+login Nostr, tg_id negativo) e vuole 150; fa girare in node il
+`renderPionieri` vero — «54 utenti», «1 utente», spenta a zero e in
+demo —; la parola vecchia non torna; la leva dice «N utenti». Tortura
+6 su 6 (conto ristretto alla coorte, parola vecchia, singolare rotto,
+riga accesa in demo, testo e nome della leva). Suite intera severa
+senza config nel worktree da origin/main (d019748): 16.129 verdi e 0
+rosse. Dal vivo,
+Chrome headless via CDP a 375 px (densità 3) nei due temi, sulla pagina
+del worktree con la riga accesa a mano: «1234 utenti» e «1 utente» su
+una riga, accanto a «8 oggetti» e ai controlli, nessuno scorrimento
+laterale (375 su 375).
+**DA GUARDARE SUL TELEFONO:** la riga col numero vero della produzione.

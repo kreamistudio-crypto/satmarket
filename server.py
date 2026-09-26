@@ -805,10 +805,11 @@ try:
 except ImportError:
     BANNER_TEST_LINK = ""
 
-# Il contatore dei «pionieri» in vetrina: quante persone sono gia'
-# entrate nel mercatino. Acceso di serie (in rodaggio il numero e' un
-# invito, non una statistica); un False nel config lo spegne quando
-# non servira' piu', senza cantieri.
+# Il contatore degli «utenti» in vetrina: quante persone sono gia'
+# entrate nel mercatino (fino al 26 set 2026 la riga diceva
+# «pionieri»). Acceso di serie (in rodaggio il numero e' un invito,
+# non una statistica); un False nel config lo spegne quando non
+# servira' piu', senza cantieri.
 try:
     from config import CONTATORE_UTENTI
 except ImportError:
@@ -19201,7 +19202,9 @@ def _pagina_finestra(con, campi, dove, par, limit, cursore,
 # --------------------- CONTATORE PIONIERI ---------------------------
 # Quante persone sono entrate nel mercatino: il numero che la vetrina
 # mostra sotto il conteggio degli oggetti. In fase di rodaggio si
-# chiamano «pionieri» — suona come un club, e lo sono. Cache breve: il
+# chiamavano «pionieri», ma il conto e' di TUTTI gli iscritti e i
+# pionieri sono i primi 100 (la coorte): dal 26 set 2026 la riga dice
+# «utenti», e il nome della funzione resta. Cache breve: il
 # numero cresce piano e la prima pagina della vetrina si chiede di
 # continuo (categorie, filtri, ogni riapertura dell'app).
 _pionieri_cache = {"quanti": 0, "quando": 0.0}
@@ -24968,9 +24971,9 @@ def _leve_stato():
                   bool(BANNER_TEST_LINK),
                   spento="il cartello non porta nessun bottone (e la fascia "
                          "non finge di essere toccabile)"),
-            _leva("Contatore dei pionieri", "CONTATORE_UTENTI",
+            _leva("Contatore degli utenti", "CONTATORE_UTENTI",
                   bool(CONTATORE_UTENTI),
-                  spento="la riga «N pionieri» non compare in vetrina"),
+                  spento="la riga «N utenti» non compare in vetrina"),
             _leva("«Pubblicato N giorni fa» fino a (giorni)",
                   "GIORNI_DATA_ANNUNCIO", GIORNI_DATA_ANNUNCIO,
                   spento="la data non si mostra mai nel dettaglio"),

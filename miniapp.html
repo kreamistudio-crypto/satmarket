@@ -9163,7 +9163,7 @@ document.getElementById('cartello')?.remove();</script>
          COMPONGONO con lei: chi cerca «bici» e poi stringe il prezzo
          resta dentro la sua ricerca.
          I conteggi vivono QUI, incolonnati accanto ai controlli: una
-         fascia sola tra le pillole e le foto. La riga dei pionieri
+         fascia sola tra le pillole e le foto. La riga degli utenti
          compare solo se il server manda il numero (interruttore spento
          nel config, demo o server vecchio = niente riga). -->
     <!-- Il barattolo condiviso di QUALCUN ALTRO, aperto dal suo link:
@@ -16902,11 +16902,17 @@ function renderGrid(items){
   vetrinaDisegnata();
 }
 
-/* «👥 54 pionieri»: la gente che è già entrata nel mercatino, sotto il
+/* «54 utenti»: la gente che è già entrata nel mercatino, sotto il
    conteggio degli oggetti. È un numero GLOBALE: non segue la categoria
    né la ricerca, quindi resta lì fermo mentre la griglia cambia.
    Niente in demo (i dati sono finti) e niente se il server non lo
-   manda — interruttore spento nel config o server di ieri. */
+   manda — interruttore spento nel config o server di ieri.
+   DICE «UTENTI» E NON PIÙ «PIONIERI» (26 set 2026, Andrea): il numero
+   è sempre stato il conto di TUTTI gli iscritti (COUNT(*) di utenti,
+   conta_pionieri nel server), mentre i pionieri sono una coorte — i
+   primi 100 — e la parola prometteva un club che dal centounesimo
+   iscritto non era più vero. Gli id e la chiave «pionieri» della busta
+   restano quelli: sono nomi interni, come la vista «affari». */
 function renderPionieri(){
   const r = el('pionieriRiga');
   if (!r) return;
@@ -16914,7 +16920,7 @@ function renderPionieri(){
   r.style.display = mostra ? '' : 'none';
   if (!mostra) return;
   r.innerHTML = `<span class="conta">${pionieri}</span> `
-    + `pionier${pionieri===1?'e':'i'}`;
+    + `utent${pionieri===1?'e':'i'}`;
 }
 
 /* «LO ASPETTO»: il like sulle pagine delle funzioni in arrivo (ago
@@ -16948,7 +16954,7 @@ function renderInteresse(){
     b.setAttribute('aria-pressed', mio ? 'true' : 'false');
     /* A ZERO NON SI SCRIVE UNO ZERO (decisione di Andrea): su una
        pagina che deve incuriosire, «0 persone» scoraggia proprio chi
-       arriva per primo. Il singolare esiste, come per i pionieri. */
+       arriva per primo. Il singolare esiste, come per gli utenti. */
     box.querySelector('.interesse-conta').textContent =
       !n ? 'Sii il primo' : n === 1 ? '1 lo aspetta' : `${fmt(n)} lo aspettano`;
   });

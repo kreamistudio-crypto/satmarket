@@ -17009,7 +17009,10 @@
   risposta era in volo prendeva un null — e quel giorno niente fascia
   e niente cartello, in silenzio. Un solo giro di rete per apertura,
   come sempre; cambia solo su COSA si aspetta.
-  Contatore dei pionieri (lug 2026): «830 oggetti» e «24 pionieri»
+  Contatore degli utenti (lug 2026, era «dei pionieri»: dal 26 set
+  2026 la riga dice «utenti», perché `conta_pionieri` conta TUTTI gli
+  iscritti e i pionieri sono la coorte dei primi 100; id e chiave
+  della busta restano `pionieri`): «830 oggetti» e «24 pionieri»
   sono un BLOCCO in colonna (`.conta-blocco`) DENTRO la riga di
   ordina+filtri, accanto ai controlli — il select è alto il triplo di
   una riga di testo, quindi la seconda riga non costa un pixel

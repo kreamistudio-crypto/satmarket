@@ -88176,6 +88176,96 @@ console.log(JSON.stringify(o));
 
 
 # ====================================================================
+def prove_utenti_home():
+    """LA RIGA «N UTENTI» DELLA HOME (26 set 2026, ritocco di Andrea).
+    Sotto «N annunci» la vetrina diceva «N pionieri»; adesso dice
+    «N utenti». La domanda che conta non e' la parola ma il NUMERO: i
+    pionieri sono una coorte — i primi 100 iscritti —, e se il conto
+    fosse stato il loro la scritta nuova direbbe il falso. Non lo e'
+    mai stato: conta_pionieri fa COUNT(*) su tutta la tabella utenti.
+    Questa prova lo tiene fermo ESEGUENDO la funzione vera su un
+    database con 150 iscritti di cui solo 100 in coorte, e fa girare in
+    node il render vero della riga: singolare, plurale, zero e demo."""
+    print("\n[la riga «N utenti» della home]")
+    import shutil
+    import sqlite3
+    import subprocess as _sp
+    import tempfile as _tf
+    import time as _time
+
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = _SORGENTE
+
+    # 1. IL NUMERO E' DI TUTTI GLI ISCRITTI, non della coorte. Si esegue
+    # la funzione vera: 100 pionieri, 49 senza coorte e un iscritto
+    # arrivato dal login Nostr (tg_id negativo, stessa tabella).
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.execute("CREATE TABLE utenti (tg_id INTEGER PRIMARY KEY, "
+                "coorte TEXT DEFAULT '', registrato INTEGER)")
+    for i in range(1, 150):
+        con.execute("INSERT INTO utenti VALUES (?, ?, ?)",
+                    (i, "pioniere" if i <= 100 else "", 1780000000 + i))
+    con.execute("INSERT INTO utenti VALUES (-42, '', 1780000999)")
+    amb = {"time": _time, "_pionieri_cache": {"quanti": 0, "quando": 0.0},
+           "CACHE_PIONIERI": 60}
+    exec(pezzo("conta_pionieri"), amb)
+    prova("il numero conta TUTTI gli iscritti, non i 100 pionieri", 150,
+          amb["conta_pionieri"](con))
+    prova("...e nella busta di prima pagina viaggia quel numero", True,
+          'risposta["pionieri"] = conta_pionieri(con)' in src)
+
+    # 2. LA PAROLA. Il render vero in node, con un elemento di cartone.
+    node = shutil.which("node")
+    if not node:
+        salta("la riga dice «N utenti»", "node non c'e'")
+    else:
+        js = pezzo_js(mini, "function renderPionieri", "\n}\n") + "\n}\n" + r"""
+let DEMO = false, pionieri = 0;
+const riga = {style: {display: 'none'}, innerHTML: ''};
+function el(id){ return id === 'pionieriRiga' ? riga : null; }
+function giro(n, demo){
+  DEMO = demo; pionieri = n;
+  riga.style.display = 'none'; riga.innerHTML = '';
+  renderPionieri();
+  return [riga.style.display, riga.innerHTML];
+}
+console.log(JSON.stringify({
+  molti: giro(54, false), uno: giro(1, false),
+  zero: giro(0, false), demo: giro(54, true),
+}));
+"""
+        with _tf.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                    encoding="utf-8") as fh:
+            fh.write(js)
+            percorso = fh.name
+        r = _sp.run([node, percorso], capture_output=True, text=True,
+                    encoding="utf-8", errors="replace")
+        os.unlink(percorso)
+        try:
+            out = json.loads(r.stdout.strip().splitlines()[-1])
+        except Exception:
+            out = {}
+        prova("54 iscritti: «54 utenti», col numero arancio davanti",
+              ["", '<span class="conta">54</span> utenti'], out.get("molti"))
+        prova("uno solo: «1 utente», al singolare",
+              ["", '<span class="conta">1</span> utente'], out.get("uno"))
+        prova("a zero la riga non c'e'", "none", (out.get("zero") or [""])[0])
+        prova("in demo la riga non c'e' (il numero sarebbe inventato)",
+              "none", (out.get("demo") or [""])[0])
+    corpo = pezzo_js(mini, "function renderPionieri", "\n}\n")
+    prova("la parola «pionieri» non torna nella riga", False,
+          "`pionier" in corpo or "pionier$" in corpo)
+
+    # 3. IL PANNELLO DELLE LEVE parla della stessa riga con la stessa
+    # parola: chi spegne la leva deve sapere cosa sparisce.
+    prova("la leva nel pannello admin dice «N utenti»", True,
+          '_leva("Contatore degli utenti", "CONTATORE_UTENTI",' in src
+          and 'spento="la riga «N utenti» non compare in vetrina"' in src)
+    prova("...e nessun testo nomina piu' la riga «N pionieri»", False,
+          "«N pionieri»" in src)
+
+
 def prove_config_esempio():
     """`config_esempio.py` E' IL FILE DA CUI SI COPIA (ago 2026, dal
     campo: le sei leve dei connettori erano cablate, funzionavano col
@@ -101869,6 +101959,7 @@ def main():
               prove_login_qr,
               prove_profilo_sezioni,
               prove_profilo_elegante,
+              prove_utenti_home,
               prove_badge_nostr,
               prove_reputazione_nostr,
               prove_nip89_handler,
