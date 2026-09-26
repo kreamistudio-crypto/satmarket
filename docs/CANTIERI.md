@@ -33390,3 +33390,44 @@ del worktree con la riga accesa a mano: «1234 utenti» e «1 utente» su
 una riga, accanto a «8 oggetti» e ai controlli, nessuno scorrimento
 laterale (375 su 375).
 **DA GUARDARE SUL TELEFONO:** la riga col numero vero della produzione.
+
+## L'avviso del deploy in breve (26 set 2026)
+
+Ritocco di Andrea. Il messaggio Telegram «🚀 Barattolo aggiornato» era
+lunghissimo: veniva da `git log --oneline | head -10`, e da noi il
+«titolo» di un commit è il messaggio INTERO — un paragrafo solo, prove e
+conti compresi —, quindi dieci commit erano dieci verbali. Adesso:
+
+    🚀 Barattolo aggiornato (1c10a79)
+    - La home dice «utenti», non più «pionieri»
+    - Il ritorno della morfosi nel mercatino, il lampo delle pillole…
+    …e altri 3
+
+**UNA RIGA PER COMMIT, SOLO IL TITOLO.** `novita_brevi` in `deploy.sh`
+(un heredoc Python, fail-open come `avvisa`: se git non risponde, niente
+righe e nessun errore) prende la prima riga di ogni messaggio e la
+taglia alla prima parentesi — la data, «Titolo (25 set 2026, …)» — o al
+primo punto, MAI dentro un «…»; poi, se è ancora lunga, a circa 70
+caratteri su uno spazio, coi puntini, senza chiudere su una parolina
+(«e il…») né dentro un «… lasciato aperto. Otto righe al massimo, poi
+«…e altri N» («…e un altro» se è uno). Esce già scappata per l'HTML di
+Telegram (prima lo faceva un `sed` nell'avviso). Lo sha in testa è a 7
+cifre, fra parentesi. **Gli altri avvisi** (rifiutato, fermo, annullato,
+giù) **non cambiano**, e `--dimmi` — che parla al terminale — tiene il
+suo `--oneline` intero.
+
+**PROVATO.** `prove_deploy`, blocco 7 (+41): il Python VERO dell'heredoc
+letto dal file e caricato (un'ancora sparita è una rossa, non
+un'esplosione); i titoli — data, punto, prima riga, parentesi e punto
+dentro «…» che non tagliano, vuoto, cinque lunghi veri o peggiori —;
+l'elenco con 8, 9 e 20 commit e l'HTML; DAL VIVO su un repo git
+usa-e-getta con undici commit (uno a più righe, uno lungo come i
+nostri) chiamato come lo chiama `deploy.sh` (`python3 - QUI LA`): otto
+righe, «…e altri 3», niente corpo né numeri delle prove, e con un
+intervallo che non esiste nessuna riga e nessun crash; le sentinelle
+sull'avviso — le novità solo nell'avviso di successo, gli altri
+cinque intatti. Tortura 12 su 12. La funzione vera, estratta ed
+eseguita da bash sugli ultimi undici commit di main, dà il messaggio
+qui sopra. Suite intera severa senza config nel worktree da origin/main
+(1c10a79): 16.170 verdi e 0 rosse.
+**DA GUARDARE:** il primo «🚀» vero su Telegram, al prossimo deploy.

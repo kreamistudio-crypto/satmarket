@@ -115,6 +115,80 @@ for chat in ADMIN_IDS:
 PY
 }
 
+# LE NOVITA' DEL DEPLOY, IN BREVE (26 set 2026): una riga per commit,
+# solo il titolo, al massimo otto righe e poi «…e altri N». Prima qui
+# c'era `git log --oneline | head -10`, e da noi il «titolo» di un
+# commit e' il messaggio INTERO — un paragrafo solo, prove comprese —
+# quindi l'avviso arrivava lungo come un verbale. Il titolo si taglia
+# alla prima parentesi (la data: «Titolo (25 set 2026, ...)») o al
+# primo punto, mai dentro un «...», e poi a circa 70 caratteri su uno
+# spazio. Esce gia' scappato per l'HTML di Telegram. Fail-open come
+# l'avviso: se git non risponde, le righe non ci sono e basta.
+novita_brevi() {
+  python3 - "$1" "$2" <<'PY' 2>/dev/null || true
+import html, subprocess, sys
+
+QUANTE = 8        # righe al massimo, poi «…e altri N»
+LARGHEZZA = 70    # caratteri del titolo, circa: si taglia su uno spazio
+PAROLINE = {"e", "o", "a", "di", "da", "in", "su", "con", "per", "tra", "fra",
+            "il", "lo", "la", "i", "gli", "le", "un", "una", "uno", "del",
+            "della", "dei", "delle", "nel", "nella", "al", "alla", "che"}
+
+def primo_taglio(riga):
+    """La prima parentesi o il primo punto FUORI dalle virgolette «»."""
+    dentro = 0
+    for i, c in enumerate(riga):
+        if c == "«":
+            dentro += 1
+        elif c == "»":
+            dentro = max(dentro - 1, 0)
+        elif i and not dentro and riga[i - 1] == " " and c == "(":
+            return i - 1
+        elif i and not dentro and c == " " and riga[i - 1] == ".":
+            return i - 1
+    return len(riga)
+
+def titolo(messaggio):
+    riga = (messaggio.strip().splitlines() or [""])[0].strip()
+    corto = riga[:primo_taglio(riga)].rstrip(" .,:;—-")
+    riga = corto or riga
+    if len(riga) > LARGHEZZA:
+        pezzo = riga[:LARGHEZZA]
+        if " " in pezzo[LARGHEZZA // 2:]:
+            pezzo = pezzo.rsplit(" ", 1)[0]
+        # e non si chiude dentro un «... lasciato aperto
+        if pezzo.count("«") > pezzo.count("»") and pezzo.rfind("«") > LARGHEZZA // 2:
+            pezzo = pezzo[:pezzo.rfind("«")].rstrip()
+        # e non si chiude su «e il…»: via le paroline rimaste in coda
+        parole = pezzo.split(" ")
+        while len(parole) > 3 and parole[-1].lower() in PAROLINE:
+            parole.pop()
+        pezzo = " ".join(parole)
+        riga = pezzo.rstrip(" .,:;—-") + "…"
+    return riga or "(senza titolo)"
+
+def novita(messaggi):
+    righe = ["- " + html.escape(titolo(m), quote=False)
+             for m in messaggi[:QUANTE]]
+    altri = len(messaggi) - QUANTE
+    if altri == 1:
+        righe.append("…e un altro")
+    elif altri > 1:
+        righe.append(f"…e altri {altri}")
+    return "\n".join(righe)
+
+if __name__ == "__main__":
+    uscita = subprocess.run(
+        ["git", "--no-pager", "log", "-z", "--format=%B",
+         f"{sys.argv[1]}..{sys.argv[2]}"],
+        capture_output=True, encoding="utf-8", errors="replace")
+    if uscita.returncode == 0:
+        messaggi = [m for m in uscita.stdout.split("\0") if m.strip()]
+        sys.stdout.reconfigure(encoding="utf-8")
+        print(novita(messaggi))
+PY
+}
+
 sta_bene() {
   # `--fail` o un 503 passerebbe per una risposta buona: la rotta
   # risponde 503 apposta quando il database non si apre, ed e' proprio
@@ -265,7 +339,7 @@ Non tiro niente finche' non lo so. Resta in produzione <code>${QUI:0:8}</code>."
     exit 0 ;;
 esac
 
-NOVITA="$(git --no-pager log --oneline "$QUI..$LA" 2>/dev/null | head -10)"
+NOVITA="$(novita_brevi "$QUI" "$LA")"
 dillo "🚀 aggiornamento: ${QUI:0:8} → ${LA:0:8}  ·  $MOTIVO  ·  $(firme_dette)"
 
 # IL DATABASE SI COPIA PRIMA, e si copia con l'API di sqlite invece che
@@ -318,8 +392,8 @@ systemctl restart "$SERVIZIO" || {
 if aspetta_che_stia_bene; then
   rm -f .deploy-bocciato .deploy-rifiutato
   dillo "✅ in produzione ${LA:0:8}"
-  avvisa "🚀 <b>Barattolo aggiornato</b> — <code>${LA:0:8}</code>
-$(echo "$NOVITA" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')"
+  avvisa "🚀 <b>Barattolo aggiornato</b> (<code>${LA:0:7}</code>)
+$NOVITA"
   exit 0
 fi
 

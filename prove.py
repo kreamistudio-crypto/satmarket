@@ -44795,6 +44795,169 @@ def prove_deploy():
     prova("...nel blocco [Service]", True,
           "Environment=HOME=/root" in corpo[corpo.index("[Service]"):])
 
+    # --- 7) L'AVVISO BREVE (26 set 2026) ----------------------------
+    # «🚀 Barattolo aggiornato» arrivava lungo come un verbale: era
+    # `git log --oneline`, e da noi il titolo di un commit e' il
+    # messaggio INTERO. Adesso una riga per commit, il solo titolo,
+    # otto righe al massimo e poi «…e altri N». Si prova il Python VERO
+    # dell'heredoc di `novita_brevi`, letto dal file e non ricopiato.
+    # l'avviso: le novita' brevi, e SOLO nell'avviso di successo
+    prova("le novita' vengono dalla funzione breve", True,
+          'NOVITA="$(novita_brevi "$QUI" "$LA")"' in sh)
+    # (il `--oneline` di `--dimmi` resta: e' il terminale, non Telegram)
+    prova("...non piu' dal log intero", False,
+          "| head -10" in sh or 'echo "$NOVITA"' in sh)
+    prova("l'avviso di successo e' titolo + righe", True,
+          'avvisa "🚀 <b>Barattolo aggiornato</b> (<code>${LA:0:7}</code>)'
+          '\n$NOVITA"' in sh)
+    prova("...e le novita' stanno solo li'", 1, sh.count("$NOVITA"))
+    # gli altri avvisi restano come sono
+    for gli_altri in ('avvisa "⛔ <b>Deploy rifiutato</b>',
+                      'avvisa "⏳ <b>Deploy fermo</b>',
+                      'avvisa "❌ <b>Deploy fermo</b>',
+                      'avvisa "↩️ <b>Deploy annullato</b>',
+                      "avvisa \"🆘 <b>Barattolo e' GIU'</b>"):
+        prova(f"resta: {gli_altri[8:34]}", True, gli_altri in sh)
+
+
+    grezzo = open("deploy.sh", encoding="utf-8").read().replace("\r\n", "\n")
+    i_nb = grezzo.find("\nnovita_brevi() {\n")
+    prova("c'e' la funzione delle novita' brevi", True, i_nb > -1)
+    testa = "<<'PY' 2>/dev/null || true\n"
+    prova("...fail-open come l'avviso", True,
+          grezzo.find(testa, i_nb) == grezzo.find("<<'PY'", i_nb) > -1)
+    codice_nb = grezzo[grezzo.find(testa, i_nb) + len(testa):
+                       grezzo.find("\nPY\n", i_nb) + 1]
+    # un'ancora sparita e' una ROSSA che si legge, non un'esplosione
+    nb = {"__name__": "prove_deploy"}
+    try:
+        exec(compile(codice_nb, "deploy.sh:novita_brevi", "exec"), nb)
+    except Exception:
+        codice_nb, nb = "", {}
+    prova("...e il suo Python si legge e si carica", True,
+          bool(codice_nb) and "titolo" in nb and "novita" in nb)
+    if "titolo" not in nb:
+        return
+    titolo, novita = nb["titolo"], nb["novita"]
+    larga = nb["LARGHEZZA"]
+    prova("otto righe al massimo, titoli di circa 70", (8, 70),
+          (nb["QUANTE"], larga))
+
+    # il titolo: la prima riga, fino alla parentesi della data o al
+    # primo punto — mai il corpo, mai i numeri delle prove
+    vero = ("Il codice di tracciamento cliccabile nei messaggi del bot "
+            "(25 set 2026, ritocco di Andrea). Nell'app il codice di un "
+            "pacco in viaggio apre @trackbot. Prove: prove_tracciamento "
+            "(39). Suite intera severa: 16.070 verdi e 0 rosse.")
+    prova("il titolo si ferma alla parentesi della data",
+          "Il codice di tracciamento cliccabile nei messaggi del bot",
+          titolo(vero))
+    prova("...o al primo punto", "Il tasto Esci e Tutorial più piccoli",
+          titolo("Il tasto Esci e Tutorial più piccoli. Misurati dal vivo "
+                 "via CDP: da 54 a 46px."))
+    prova("...e prende la prima riga sola", "Rilascio",
+          titolo("Rilascio\n\nCorpo lungo del rilascio.\nAltre righe."))
+    prova("una parentesi dentro «...» non taglia",
+          "Studio «Menu (beta) per i ristoranti»",
+          titolo("Studio «Menu (beta) per i ristoranti» (24 set 2026): "
+                 "solo il documento."))
+    prova("...e nemmeno un punto dentro «...»",
+          "Revert «I carrelli. Tolti» e il resto",
+          titolo("Revert «I carrelli. Tolti» e il resto. Corpo."))
+    prova("un titolo gia' corto resta intero", "Fix",
+          titolo("Fix"))
+    prova("un messaggio vuoto non lascia la riga vuota", "(senza titolo)",
+          titolo("   \n"))
+    # i lunghi: tagliati su uno spazio, coi puntini, senza chiudere su
+    # «e il…» ne' dentro un «... lasciato aperto
+    lunghi = [
+        "Il ritorno della morfosi nel mercatino, il lampo delle pillole e "
+        "il banner delle commissioni piu' piccolo (25 set 2026, tre "
+        "ritocchi di Andrea)",
+        "La quantita' apre ogni riga dei pezzi di un ordine: «2 × Pesto», "
+        "«1 × Sugo» e il totale in fondo",
+        "Il cambio sats ⇄ € che converte: dalla foto di un venditore, in "
+        "«📦 Spedizione» il costo si converte",
+        "Merge pull request #26 from kreamistudio-crypto/cantiere/"
+        "quantita-servizi-e-altre-cose-lunghissime",
+        "x" * 200,
+    ]
+    for m in lunghi:
+        tt = titolo(m)
+        coda = tt[:-1].split(" ")[-1].lower()
+        prova(f"lungo, tagliato coi puntini: {tt[:24]}…", True,
+              tt.endswith("…") and len(tt) <= larga + 1
+              and coda not in nb["PAROLINE"]
+              and tt[:-1] == tt[:-1].rstrip(" .,:;—-"))
+        meta = tt[larga // 2:]
+        prova(f"...e non resta dentro un «... aperto: {tt[:24]}…", False,
+              meta.count("«") > meta.count("»"))
+    prova("il taglio non cade su «e il…»",
+          "Il ritorno della morfosi nel mercatino, il lampo delle pillole…",
+          titolo(lunghi[0]))
+    prova("...e chiude il «...» invece di spezzarlo",
+          "La quantita' apre ogni riga dei pezzi di un ordine: «2 × Pesto»…",
+          titolo(lunghi[1]))
+
+    # l'elenco: una riga per commit, «- » davanti, scappato per l'HTML
+    # di Telegram (parse_mode HTML: un «<» nudo fa rifiutare l'avviso)
+    prova("una riga per commit, col trattino",
+          "- Uno\n- Due", novita(["Uno (26 set 2026). Corpo.", "Due"]))
+    prova("...scappata per l'HTML", "- Il &lt;b&gt; &amp; «ciao»",
+          novita(["Il <b> & «ciao»"]))
+    prova("otto commit: otto righe, nessuna coda",
+          8, len(novita([f"C{n}" for n in range(8)]).split("\n")))
+    nove = novita([f"C{n}" for n in range(9)]).split("\n")
+    prova("nove: otto righe e «…e un altro»", (9, "…e un altro"),
+          (len(nove), nove[-1]))
+    venti = novita([f"C{n}" for n in range(20)]).split("\n")
+    prova("venti: otto righe e «…e altri 12»",
+          (9, "- C0", "- C7", "…e altri 12"),
+          (len(venti), venti[0], venti[7], venti[-1]))
+    prova("nessun commit, nessuna riga", "", novita([]))
+
+    # DAL VIVO su un repo usa-e-getta: lo script vero, come lo chiama
+    # deploy.sh (`python3 - QUI LA`), con undici commit in mezzo —
+    # uno a piu' righe, uno col messaggio lungo come i nostri
+    import shutil as _sh_d, subprocess as _sp_d, tempfile as _tf_d
+    cartella = _tf_d.mkdtemp(prefix="novita-deploy-")
+    try:
+        def g(*a):
+            return _sp_d.run(
+                ["git", "-c", "user.name=prove", "-c", "user.email=p@p",
+                 "-c", "commit.gpgsign=false", *a], cwd=cartella,
+                capture_output=True, encoding="utf-8", errors="replace")
+        g("init", "-q")
+        g("commit", "--allow-empty", "-q", "-m", "La base")
+        qui = g("rev-parse", "HEAD").stdout.strip()
+        for n in range(9):
+            g("commit", "--allow-empty", "-q", "-m",
+              f"Commit {n} (26 set 2026). Prove: 16.073 verdi e 0 rosse.")
+        g("commit", "--allow-empty", "-q", "-m",
+          "Titolo su piu' righe\n\nIl corpo che non deve uscire.")
+        g("commit", "--allow-empty", "-q", "-m", vero)
+        la = g("rev-parse", "HEAD").stdout.strip()
+        uscita = _sp_d.run([sys.executable, "-", qui, la], input=codice_nb,
+                           cwd=cartella, capture_output=True,
+                           encoding="utf-8", errors="replace")
+        righe = uscita.stdout.rstrip("\n").split("\n")
+        prova("dal vivo: undici commit, otto righe e la coda",
+              ["- Il codice di tracciamento cliccabile nei messaggi del bot",
+               "- Titolo su piu' righe", "- Commit 8", "- Commit 7",
+               "- Commit 6", "- Commit 5", "- Commit 4", "- Commit 3",
+               "…e altri 3"], righe)
+        prova("...niente corpo, niente numeri delle prove", False,
+              any(p in uscita.stdout for p in
+                  ("corpo", "verdi", "Prove", "Nell'app")))
+        # git che non risponde (un intervallo che non esiste): niente
+        # righe, e niente eccezione
+        rotto = _sp_d.run([sys.executable, "-", "nonesiste", la],
+                          input=codice_nb, cwd=cartella, capture_output=True,
+                          encoding="utf-8", errors="replace")
+        prova("...e se git non risponde, nessuna riga e nessun crash",
+              (0, ""), (rotto.returncode, rotto.stdout))
+    finally:
+        _sh_d.rmtree(cartella, ignore_errors=True)
 
 def prove_giudice_deploy():
     """IL GIUDICE DELLA CI (set 2026, audit G2): `giudice_deploy.py`, la

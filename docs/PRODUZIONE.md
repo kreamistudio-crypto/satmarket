@@ -1654,7 +1654,9 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   testo libero); d) la CI è VERDE su di lui: `giudice_deploy.py` lo
   chiede alle Actions di GitHub (il giro nato da un push SU MAIN, coi
   lavori `prove` e `segreti` in `success`).
-  TRE ESITI. Si tira → «🚀». RIFIUTATO → journal, «⛔ Deploy rifiutato:
+  TRE ESITI. Si tira → «🚀 Barattolo aggiornato (sha)», con una riga
+  per commit arrivato — il solo titolo, otto righe al massimo e poi
+  «…e altri N» (`novita_brevi`, dal 26 set 2026). RIFIUTATO → journal, «⛔ Deploy rifiutato:
   <motivo>» ai moderatori UNA volta (timbro `.deploy-rifiutato`), e non
   si riprova da solo. ASPETTA (la CI gira, GitHub muto, token che non
   apre) → non tira, riprova al giro dopo, e dopo 10 minuti manda «⏳
