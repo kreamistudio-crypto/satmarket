@@ -51343,10 +51343,15 @@ async function caso(risposta, prepara){
     h = p["dopo"]["html"]
     prova("pioniere: la piantina", True,
           'src="/assets/tour-p2p/fine-pioniere.webp"' in h)
-    prova("...«🌱 Sei un Pioniere!»", True,
-          '<h3 class="giro-titolo">🌱 Sei un Pioniere!</h3>' in h)
-    prova("...la cifra grande e la vecchia barrata", True,
-          "<b>1%</b><s>1,5%</s>" in h)
+    # SENZA 🌱 E SENZA BARRATO (26 set 2026, ritocco di Andrea): la
+    # piantina e' gia' nel barattolo, e la cifra piena barrata la mostra
+    # il banner in cima al libro — qui resta solo quel che si paga
+    prova("...«Sei un Pioniere!», senza la piantina nel titolo", True,
+          '<h3 class="giro-titolo">Sei un Pioniere!</h3>' in h
+          and "🌱" not in h)
+    prova("...la cifra grande e' solo quella che si paga, niente barrato",
+          [True, False], ['<p class="giro-cifra" aria-hidden="true"><b>1%</b></p>' in h,
+                          "<s>" in h])
     prova("...e la frase", True,
           "In beta la tua fee P2P è dell&#39;1% invece dell&#39;1,5%" in h)
     prova("...e il pioniere non timbra la slide del livello 5", [],
@@ -51361,7 +51366,8 @@ async function caso(risposta, prepara){
           'src="/assets/tour-p2p/fine-livello5.webp"' in h)
     prova("...«Sei al livello 5!», la cifra e la stessa frase", True,
           '<h3 class="giro-titolo">Sei al livello 5!</h3>' in h
-          and "<b>1%</b><s>1,5%</s>" in h
+          and '<p class="giro-cifra" aria-hidden="true"><b>1%</b></p>' in h
+          and "<s>" not in h
           and "In beta la tua fee P2P è dell&#39;1% invece dell&#39;1,5%" in h)
     prova("...e la slide vista si timbra sul profilo", True,
           "p2p_lv5" in lv["timbri"])
@@ -51395,12 +51401,12 @@ async function caso(risposta, prepara){
     # LA BETA SPARISCE DA SOLA, E I NUMERI SI SEGUONO
     prova("finita la beta: «La tua fee P2P è dell'1,5% invece del 2%»", True,
           "La tua fee P2P è dell&#39;1,5% invece del 2%" in o["dopoBeta"]["dopo"]["html"]
-          and "<b>1,5%</b><s>2%</s>" in o["dopoBeta"]["dopo"]["html"]
+          and "<b>1,5%</b></p>" in o["dopoBeta"]["dopo"]["html"]
           and "beta" not in testo(o["dopoBeta"]["dopo"]["html"]).lower())
     prova("...e per tutti «La fee P2P è del 2% per parte»", True,
           "La fee P2P è del 2% per parte" in o["dopoBetaTutti"]["dopo"]["html"])
     prova("altri numeri, altre frasi: fee 2%, listino 3, sconto 0,25", True,
-          "<b>0,75%</b><s>1%</s>" in o["altri"]["dopo"]["html"]
+          "<b>0,75%</b></p>" in o["altri"]["dopo"]["html"]
           and "In beta la tua fee P2P è dello 0,75% invece dell&#39;1%"
           in o["altri"]["dopo"]["html"])
     prova("senza la fee del coordinatore nessuna cifra inventata", [False, True],
@@ -51424,7 +51430,7 @@ async function caso(risposta, prepara){
           [True, False], [c["aperto"]["aperto"], c["aperto"]["finale"]])
     prova("...e finisce anche lui col caricamento e la slide personale",
           [True, True], ["Controllo il tuo account…" in c["subito"]["html"],
-                         "🌱 Sei un Pioniere!" in c["dopo"]["html"]])
+                         "Sei un Pioniere!" in c["dopo"]["html"]])
 
     # LA SALITA AL LIVELLO 5, UNA VOLTA SOLA
     s = o["salita"]

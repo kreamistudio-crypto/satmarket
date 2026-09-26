@@ -33616,3 +33616,20 @@ timbro torna dal server e non ricompare; un tocco VERO su «Inizia»
 e un Esc durante il caricamento non chiudono niente, e dopo la
 risposta lo stesso tocco chiude.
 **DA AVERE:** l'occhio sul telefono, e un vero livello 5 che sale.
+
+## La slide finale del tour P2P, il ritocco (26 set 2026)
+
+Ritocco di Andrea a 351baeb. Nella slide del Pioniere il titolo perde
+la 🌱 — la piantina c'e' gia', dentro il barattolo della figura — e
+resta «Sei un Pioniere!». Nelle slide del Pioniere e del livello 5 la
+cifra grande resta SOLA: quella che si paga (1%), senza la piena
+barrata accanto, che la mostra gia' il banner delle commissioni in
+cima al libro. La frase sotto non cambia («In beta la tua fee P2P è
+dell'1% invece dell'1,5%»): e' lei a dire il confronto. Tolta anche la
+regola `.giro-cifra s`, rimasta senza nessuno da vestire.
+**PROVATO.** `prove_tour_p2p_finale` emendata col perche' (titolo
+senza piantina, cifra sola e nessun `<s>` nelle due slide, anche dopo
+la beta e con altri numeri). Dal vivo, Chrome headless via CDP a
+densita' 3 su una copia col server di collaudo (relay morto), a 320 e
+375 nei due temi.
+**DA AVERE:** l'occhio sul telefono.

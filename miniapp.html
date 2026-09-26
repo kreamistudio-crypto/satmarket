@@ -8026,11 +8026,9 @@
   /* LA CIFRA GRANDE E' IN INCHIOSTRO e non in arancio: il --sats sul
      bianco fa 2,2:1, sotto il 3:1 che anche un testo grande vuole.
      L'arancio resta del bottone e dei pallini. */
-  .giro-cifra{display:flex;align-items:baseline;justify-content:center;
-    gap:10px;margin:0 0 4px}
+  .giro-cifra{margin:0 0 4px;text-align:center}
   .giro-cifra b{font-size:42px;font-weight:800;line-height:1.05;
     color:var(--ink)}
-  .giro-cifra s{font-size:21px;font-weight:700;color:var(--ink-soft)}
   .giro-nota{margin:0;font-size:14px;font-weight:600;line-height:1.5;
     color:var(--ink-soft)}
   /* IL MOVIMENTO SOLO A CHI LO VUOLE: coi ridotti (il sistema, o
@@ -46880,14 +46878,19 @@ function testoFineTourP2P(motivo, fee, listino, punti){
   const di = x => articoloPercentoP2P(x) + x + '%';
   if ((motivo === 'pioniere' || motivo === 'livello') && p > 0) {
     const fig = FIG_FINE_TOUR_P2P[motivo];
-    const titolo = motivo === 'pioniere' ? '🌱 Sei un Pioniere!'
+    /* SENZA 🌱 NEL TITOLO (26 set 2026, ritocco di Andrea): la
+       piantina c'e' gia', dentro il barattolo della figura */
+    const titolo = motivo === 'pioniere' ? 'Sei un Pioniere!'
       : 'Sei al livello ' + LIVELLO_SCONTO_P2P + '!';
     if (!(f > 0))
       return {fig, titolo, cifra: null,
               nota: 'Hai uno ' + sconto + ' sulla tua parte della fee P2P'};
     const piena = mezzaCommissioneP2P(f);
     const mia = mezzaCommissioneP2P(Math.max(0, f - 2 * p / 100));
-    return {fig, titolo, cifra: {nuova: mia + '%', vecchia: piena + '%'},
+    /* LA CIFRA GRANDE E' SOLO QUELLA CHE SI PAGA (26 set 2026, ritocco
+       di Andrea): la piena barrata la mostra gia' il banner in cima al
+       libro, e qui la dice la frase sotto */
+    return {fig, titolo, cifra: mia + '%',
             nota: (beta ? 'In beta la tua fee P2P è ' : 'La tua fee P2P è ')
               + di(mia) + ' invece ' + di(piena)};
   }
@@ -46911,7 +46914,7 @@ function htmlFineTourP2P(t){
     + ` alt="" onerror="this.remove()">`
     + '<h3 class="giro-titolo">' + esc(t.titolo) + '</h3>'
     + (t.cifra ? '<p class="giro-cifra" aria-hidden="true"><b>'
-      + esc(t.cifra.nuova) + '</b><s>' + esc(t.cifra.vecchia) + '</s></p>' : '')
+      + esc(t.cifra) + '</b></p>' : '')
     + (t.nota ? '<p class="giro-nota">' + esc(t.nota) + '</p>' : '');
 }
 /* la domanda al server, col suo tetto: null = non si sa (tace, 409,
