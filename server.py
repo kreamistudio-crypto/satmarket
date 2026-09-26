@@ -37526,9 +37526,12 @@ async def scegli_font_scala(req: Request,
 # dispositivo — che e' proprio il mestiere di questa colonna.
 # `giro_p2p` (26 set 2026) e' il giro guidato sulla pagina del P2P dopo
 # le slide: parte da solo una volta, e la volta vale su ogni dispositivo.
+# `banner_p2p` (26 set 2026) e' la prima animazione del banner personale
+# delle commissioni: da li' il banner e' personale a ogni ingresso.
 VISTI_NOTI = ("tour", "tour_p2p", "cartello", "condcat", "checklistvista",
               "nwc", "lnaddr", "npubverifica", "nostrpub", "barraweb",
-              "duetocchi", "fx_ridotti", "fx_pieni", "p2p_lv5", "giro_p2p")
+              "duetocchi", "fx_ridotti", "fx_pieni", "p2p_lv5", "giro_p2p",
+              "banner_p2p")
 
 
 def _visti_leggi(grezzo) -> dict:

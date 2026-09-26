@@ -51569,8 +51569,11 @@ def prove_giro_guidato_p2p():
           ["#tourFreccia{animation:tourFrecciaLampeggia" in _mov,
            "animation" in pezzo_js(css, "#tourFreccia{position:fixed;", "}"),
            "opacity" in pezzo_js(css, "#tourFreccia{position:fixed;", "}")])
+    # EMENDATA (26 set 2026, il banner personale): `giro_p2p` non e' piu'
+    # l'ultimo del catalogo, quindi niente parentesi dopo di lui
+    _cat = re.search(r"VISTI_NOTI = \(([^)]*)\)", _SORGENTE, re.S)
     prova("il timbro del giro e' nel catalogo del server", True,
-          '"giro_p2p")' in _SORGENTE)
+          bool(_cat) and '"giro_p2p"' in _cat.group(1))
 
     # --- 3) LA CARD D'ESEMPIO ---------------------------------------------
     riga = pezzo_js(mini, "function rigaOrdineP2P(o){", "\n}\n")
@@ -51652,6 +51655,10 @@ const tondoBarraP2P = () => PIU;
 const matchMedia = q => ({matches: q === '(max-width: 767px)'});
 function getComputedStyle(){ return {transform: 'none'}; }
 let FATTI = [];
+/* il banner personale (IL BANNER PERSONALE): qui si conta quante volte
+   la fine del giro lo anima */
+let ANIME = 0;
+function animaBannerFeeP2P(){ ANIME++; }
 function toccaPiu(){ FATTI.push('piu'); }
 function apriBarattozonP2P(){ FATTI.push(tourInCorso ? 'barattozon col giro aperto' : 'barattozon'); }
 el('p2pLatoCompro').r = rettangolo(16, 55, 120, 46);
@@ -51783,6 +51790,7 @@ const out = {};
   out.vuoto = tuttiIPassi();
   out.vuotoDopo = stato();
   out.lati = LATI.slice();
+  out.animeDopoPrimo = ANIME;
   out.esempiFatti = ESEMPI.map(o => ({esempio: o.esempio, lato: o.lato, premio: o.premium,
     metodi: o.metodi, voti: o.faccia && o.faccia.voti, id: o.id}));
   /* 2) UNA VOLTA SOLA: il tour riaperto senza «Come funziona» non rifa' il giro */
@@ -51791,14 +51799,17 @@ const out = {};
   /* ...e l'ingresso normale non apre niente */
   apriTourP2PSePrimaVolta(); await dorme(10);
   out.ingresso = {slide: tourP2PInCorso, giro: tourInCorso};
+  out.animeIngressi = ANIME;
   /* 3) DA «COME FUNZIONA» si rivede, timbro o no */
   rivediTourP2P(); slideFinoInizia(); await dorme(A_FUOCO_TOUR_P2P_MS + 150);
   out.rivisto = stato();
+  out.animeRivisto = ANIME;
   /* 4) «SALTA» A META': al quinto passo (lato vendo, esempio in pagina) */
   for (let i = 0; i < 4; i++) tourAvanti();
   out.primaDelSalta = passo();
   navIndietro();                 /* il «Salta» del fumetto e' navIndietro() */
   out.salta = stato();
+  out.animeDopoSalta = ANIME;
   /* ...e «Salta» proprio sul passo della freccetta: se ne va con lui */
   rivediTourP2P(); slideFinoInizia(); await dorme(A_FUOCO_TOUR_P2P_MS + 150);
   for (let i = 0; i < 6; i++) tourAvanti();
@@ -51952,6 +51963,12 @@ const out = {};
     prova("UNA VOLTA SOLA: le slide riaperte senza «Come funziona» non rifanno il giro",
           [False, False, False], [o["unaVolta"]["giro"], o["ingresso"]["slide"], o["ingresso"]["giro"]])
     prova("DA «COME FUNZIONA» il giro si rivede", True, o["rivisto"]["giro"])
+    # IL BANNER PERSONALE (26 set 2026): la fine del giro lo anima — la
+    # prima volta e da «Come funziona» —, gli ingressi normali no
+    prova("IL BANNER si anima alla fine del primo giro, non negli ingressi normali",
+          [1, 1], [o["animeDopoPrimo"], o["animeIngressi"]])
+    prova("...e da «Come funziona» si anima di nuovo, a giro finito", [1, 2],
+          [o["animeRivisto"], o["animeDopoSalta"]])
     prova("«SALTA» A META': chiude tutto, via l'esempio, lato di partenza",
           [5, "vendo", {"giro": False, "lato": "compro", "esempi": 0, "ascolti": 0}],
           [o["primaDelSalta"]["n"], o["primaDelSalta"]["lato"], o["salta"]])
@@ -51999,6 +52016,293 @@ const out = {};
            o["trFondo"]["freccia"], o["trFondo"]["ascolti"]])
     prova("DA DESKTOP, senza barra, restano le quattro tappe della pagina",
           ["p2pLatoCompro", "esempio:compro", "p2pLatoVendo", "esempio:vendo"], o["desktop"])
+
+
+def prove_banner_fee_personale():
+    """IL BANNER PERSONALE DELLE COMMISSIONI (26 set 2026, richiesta di
+    Andrea): alla fine del giro guidato una luce scorre sulle tre pillole
+    del banner e vela quelle che non valgono per chi guarda — resta la
+    terza (1%) per pionieri e livello 5, la seconda (1,5%) per tutti gli
+    altri —, con la barra rossa del 2% sempre accesa; da li' ogni ingresso
+    trova il banner gia' personale, fermo. Senza /me (anonimo, server che
+    tace) il banner resta tutto colorato.
+
+    Le coordinate si RIMISURANO sul file (PIL) e si confrontano col CSS:
+    un disegno nuovo con le pillole altrove fa rosso qui, col numero
+    giusto. Il JS gira in node sulle funzioni vere."""
+    print("\n[il banner personale delle commissioni P2P]")
+    import json as _js, math, shutil, subprocess, tempfile
+    mini = open("miniapp.html", encoding="utf-8").read()
+    css = mini[mini.index("<style"):mini.index("</style>")]
+    i_b = mini.index("/* ============ IL BANNER PERSONALE DELLE COMMISSIONI (26 set 2026)")
+    f_b = mini.index("/* ============ fine del banner personale ============ */")
+    blocco = mini[i_b:f_b]
+
+    def regola(sel):
+        m = re.search(re.escape(sel) + r"\{([^}]*)\}", css)
+        return re.sub(r"\s+", "", m.group(1)) if m else ""
+
+    def pc(r, k):
+        m = re.search(k + r":(-?[\d.]+)%", r)
+        return float(m.group(1)) if m else None
+
+    # --- 1) LE MISURE SONO QUELLE DEL FILE -------------------------------
+    try:
+        from PIL import Image
+    except ImportError:
+        salta("le pillole e la barra si rimisurano sul file", "PIL non c'e'")
+        Image = None
+    if Image:
+        im = Image.open(os.path.join("assets", "p2p-banner-fee.webp")).convert("RGBA")
+        W, H = im.size
+        px = im.load()
+
+        def bbox(prova_px, x0=0, x1=None, y0=0, y1=None):
+            xs, ys = [], []
+            for y in range(y0, y1 or H):
+                for x in range(x0, x1 or W):
+                    if prova_px(px[x, y]):
+                        xs.append(x); ys.append(y)
+            return min(xs), max(xs), min(ys), max(ys)
+        arancio = bbox(lambda p: p[3] > 200 and p[0] > 215 and 95 < p[1] < 175 and p[2] < 90)
+        verde = bbox(lambda p: p[3] > 200 and p[1] > 110 and p[0] < 140 and p[2] < 120
+                     and p[1] - p[0] > 20)
+        # la prima pillola e' crema: a meta' altezza parte da sinistra, e
+        # sopra e sotto si misura fra le righe dove il testo non c'e'
+        crema = bbox(lambda p: p[3] > 200 and p[0] > 235 and p[1] > 205 and p[2] > 185
+                     and p[0] - p[2] < 70, 0, 330)
+        _cc = [y for y in range(H) if px[180, y][3] > 200 and px[180, y][0] > 235
+               and px[180, y][1] > 205 and px[180, y][2] > 185]
+        col_crema = (min(_cc), max(_cc))
+        tag = bbox(lambda p: p[3] > 200 and p[0] > 220 and p[1] > 200 and p[2] > 170,
+                   700, 900, 0, 30)
+        attese = {
+            # a destra la prima la copre il cerchietto con la freccia: il suo
+            # bordo e' dove comincia la seconda, meno il filo che le separa
+            ".p2p-fee-banner .fee-v1": (crema[0], col_crema[0], arancio[0] - 2, col_crema[1]),
+            ".p2p-fee-banner .fee-v2": (arancio[0], arancio[2], arancio[1], arancio[3]),
+            ".p2p-fee-banner .fee-v3": (verde[0], verde[2], verde[1], verde[3]),
+            ".p2p-fee-banner .fee-v3.fee-tag": (tag[0], tag[2], tag[1], tag[3]),
+        }
+        # IL VELO COPRE LA PILLOLA col suo bordo sfumato (visto dal vivo: a
+        # misura piena restava un filo di colore), con poco margine: al piu'
+        # 0,8 punti per lato in orizzontale e 2,5 in verticale
+        storte, veli = [], {}
+        for sel, (x0, y0, x1, y1) in attese.items():
+            r = regola(sel)
+            L, T, Wd, Hd = pc(r, "left"), pc(r, "top"), pc(r, "width"), pc(r, "height")
+            if None in (L, T, Wd, Hd):
+                storte.append((sel, "misure mancanti")); continue
+            veli[sel] = (L, L + Wd)
+            f0, f1 = x0 / W * 100, (x1 + 1) / W * 100
+            g0, g1 = y0 / H * 100, (y1 + 1) / H * 100
+            copre = L <= f0 + 0.01 and L + Wd >= f1 - 0.01 and T <= g0 + 0.01 and T + Hd >= g1 - 0.01
+            poco = f0 - L <= 0.8 and L + Wd - f1 <= 0.8 and g0 - T <= 2.5 and T + Hd - g1 <= 2.5
+            if not (copre and poco):
+                storte.append((sel, (L, T, Wd, Hd), tuple(round(v, 2) for v in (f0, g0, f1, g1))))
+        prova("i veli COPRONO le pillole del FILE, bordo compreso, con poco margine", [], storte)
+        # ...ma non entrano nella pillola accanto, che puo' essere quella accesa
+        a0, a1 = arancio[0] / W * 100, (arancio[1] + 1) / W * 100
+        v0 = verde[0] / W * 100
+        prova("...e un velo non entra mai nella pillola accesa accanto", [True, True, True],
+              [veli[".p2p-fee-banner .fee-v1"][1] <= a0 + 0.01,       # tutti: la 2 e' accesa
+               veli[".p2p-fee-banner .fee-v3"][0] >= a1 - 0.01,       # tutti: la 2 e' accesa
+               veli[".p2p-fee-banner .fee-v2"][1] <= v0 + 0.01])      # pionieri: la 3 e' accesa
+        # la barra rossa: asse, inclinazione, lunghezza e spessore
+        pts = [(x, y) for y in range(60, 230) for x in range(80, 280)
+               if px[x, y][3] > 200 and px[x, y][0] > 150 and px[x, y][1] < 90
+               and px[x, y][2] < 90 and px[x, y][0] - px[x, y][1] > 90]
+        n = len(pts)
+        mx = sum(p[0] for p in pts) / n; my = sum(p[1] for p in pts) / n
+        sxx = sum((p[0] - mx) ** 2 for p in pts) / n
+        syy = sum((p[1] - my) ** 2 for p in pts) / n
+        sxy = sum((p[0] - mx) * (p[1] - my) for p in pts) / n
+        ang = 0.5 * math.atan2(2 * sxy, sxx - syy)
+        ux, uy = math.cos(ang), math.sin(ang)
+        t = [(p[0] - mx) * ux + (p[1] - my) * uy for p in pts]
+        lung = max(t) - min(t)
+        rb = regola(".p2p-fee-banner .fee-barra")
+        rot = re.search(r"rotate\((-?[\d.]+)deg\)", rb)
+        cx = (pc(rb, "left") + pc(rb, "width") / 2) / 100 * W
+        cy = (pc(rb, "top") + pc(rb, "height") / 2) / 100 * H
+        prova("la barra rossa ridisegnata e' quella del FILE: centro, inclinazione, "
+              "lunghezza, spessore",
+              [True, True, True, True],
+              [abs(cx - mx) < 2 and abs(cy - my) < 2,
+               bool(rot) and abs(float(rot.group(1)) - math.degrees(ang)) < 1,
+               abs(pc(rb, "width") / 100 * W - lung) < 4,
+               5.5 <= pc(rb, "height") / 100 * H <= 8.5])
+        prova("...rossa come il suo nucleo, e con le punte tonde", [True, True],
+              ["background:#CA1B1C" in rb, "border-radius:999px" in rb])
+
+    # --- 2) IL MARKUP: sopra l'immagine, dentro il bottone ---------------
+    m = re.search(r'<button [^>]*id="p2pFeeBanner"[^>]*>(.*?)</button>', mini, re.S)
+    dentro = m.group(1) if m else ""
+    ordine = [dentro.find(c) for c in ("<img ", 'class="fee-velo fee-v1"', 'class="fee-velo fee-v2"',
+                                       'class="fee-velo fee-v3"', 'class="fee-velo fee-v3 fee-tag"',
+                                       'class="fee-barra"', 'class="fee-luce"')]
+    prova("dentro il bottone: l'immagine, i quattro veli, la barra sopra i veli, la luce in cima",
+          True, -1 not in ordine and ordine == sorted(ordine))
+    prova("...tutti muti per chi legge con la voce (parla l'alt)", 6,
+          dentro.count('aria-hidden="true"'))
+    prova("...e il bottone e' il riferimento delle coordinate", True,
+          "position:relative" in regola(".p2p-fee-banner"))
+
+    # --- 3) IL CSS: chi resta acceso, e la barra sempre -------------------
+    accesi = re.search(r"((?:\.p2p-fee-banner\.fee-p\d \.fee-[\w]+,?\s*)+)\{opacity:1\}", css)
+    acc = re.sub(r"\s+", "", accesi.group(1)) if accesi else ""
+    prova("pionieri e livello 5: velate la prima e la seconda; tutti: la prima e la terza",
+          [True, True, True, True],
+          [".fee-p3.fee-v1" in acc.replace(" ", ""), ".fee-p3.fee-v2" in acc.replace(" ", ""),
+           ".fee-p2.fee-v1" in acc.replace(" ", ""), ".fee-p2.fee-v3" in acc.replace(" ", "")])
+    prova("LA BARRA ROSSA E' ACCESA in tutti e due gli stati personali", [True, True],
+          [".p2p-fee-banner.fee-p2.fee-barra" in acc.replace(" ", ""),
+           ".p2p-fee-banner.fee-p3.fee-barra" in acc.replace(" ", "")])
+    k2 = re.search(r"@keyframes p2pFeeLuce2\{(.*?)\}\}", css, re.S)
+    k3 = re.search(r"@keyframes p2pFeeLuce3\{(.*?)\}\}", css, re.S)
+    prova("la luce parte dalla prima pillola e si ferma sulla sua, in 1,5 s, una volta",
+          [True, True, True, True],
+          [bool(k2) and "left:2.95%" in k2.group(1) and "left:32.55%" in k2.group(1),
+           bool(k3) and "left:2.95%" in k3.group(1) and "left:64.85%" in k3.group(1),
+           "animation:p2pFeeLuce2 1.5s ease-in-out 1" in css,
+           "animation:p2pFeeLuce3 1.5s ease-in-out 1" in css])
+    prova("...e il JS la tiene alla stessa cifra", 1500,
+          int(re.search(r"const FEE_ANIMA_P2P_MS = (\d+);", mini).group(1)))
+
+    # --- 4) QUANDO: fine del giro, e /me per lo stato fisso ---------------
+    prova("l'animazione parte da UN posto solo: la fine del giro guidato", [1, True],
+          [len(re.findall(r"\banimaBannerFeeP2P\(\);", re.sub(r"/\*[\s\S]*?\*/", "", mini))),
+           "if (typeof animaBannerFeeP2P === 'function') animaBannerFeeP2P();"
+           in pezzo_js(mini, "function fineGiroP2P(){", "\n}\n")])
+    prova("...e gli ingressi normali non la chiamano: il libro, il tab, il tour", [0, 0, 0],
+          [pezzo_js(mini, f, "\n}\n").count("animaBannerFeeP2P") for f in
+           ("function renderP2P(){", "function vaiP2P(){", "function apriTourP2PSePrimaVolta(){")])
+    # IL PIONIERE NUOVO (visto dal vivo): alla primissima apertura /me non
+    # sa ancora la coorte, e la risposta fresca della slide finale la
+    # corregge per tutta la visita — cosi' il banner si anima sul suo 1%
+    prova("la risposta fresca della slide finale diventa lo sconto della visita", True,
+          "if (sc && typeof sc.attivo === 'boolean') p2pSconto = sc;"
+          in pezzo_js(mini, "function mostraFineTourP2P(sc){", "\n}\n"))
+    prova("lo stato fisso si mette a /me arrivato, dopo lo sconto", True,
+          "p2pSconto = me.p2p_sconto || null;" in mini
+          and mini.index("bannerFeeFissoP2P();", mini.index("p2pSconto = me.p2p_sconto || null;"))
+          - mini.index("p2pSconto = me.p2p_sconto || null;") < 400)
+    prova("il timbro e' nel catalogo del server", True,
+          '"banner_p2p"' in re.search(r"VISTI_NOTI = \(([^)]*)\)", _SORGENTE, re.S).group(1))
+    prova("il blocco non si appoggia a cifre del coordinatore: le sole scritte sono "
+          "quelle del disegno, negli alt", [],
+          [c for c in ("0.01", "0.015", "0.03", "commissioneVivaP2P") if c in blocco])
+
+    node = shutil.which("node")
+    if not node:
+        salta("il banco del banner personale gira in node", "node non c'e'")
+        return
+    banco = r"""
+const LOG = [];
+function fintoCl(){ const s = new Set();
+  return {add: (...c) => c.forEach(x => { s.add(x); LOG.push('+' + x); }),
+          remove: (...c) => c.forEach(x => { s.delete(x); LOG.push('-' + x); }),
+          contains: c => s.has(c),
+          toggle: (c, v) => { if (v) { if (!s.has(c)) LOG.push('+' + c); s.add(c); }
+                              else { if (s.has(c)) LOG.push('-' + c); s.delete(c); } },
+          all: () => [...s].sort()}; }
+const IMG = {alt: 'Fee P2P: 2% barrato, in beta 1,5% per parte, in beta 1% per pionieri o livello 5', dataset: {}};
+const BANNER = {classList: fintoCl(), get offsetWidth(){ LOG.push('reflow'); return 1; },
+  querySelector: s => s === 'img' ? IMG : null};
+const el = id => id === 'p2pFeeBanner' ? BANNER : null;
+let myTgId = 111, p2pSconto = null, RIDOTTI = false, VISTI = {}, TIMBRI = [];
+function effettiRidotti(){ return RIDOTTI; }
+function hintDismesso(id){ return !!VISTI[id]; }
+function timbraVisto(id){ VISTI[id] = 1; TIMBRI.push(id); }
+""" + blocco + r"""
+const dorme = ms => new Promise(ok => setTimeout(ok, ms));
+const stato = () => ({classi: BANNER.classList.all(), alt: IMG.alt, timbri: TIMBRI.slice()});
+function azzera(sc, tg){
+  for (const c of BANNER.classList.all()) BANNER.classList.remove(c);
+  clearTimeout(feeAnimaP2PTimer); feeAnimaP2PTimer = null;
+  p2pSconto = sc; myTgId = tg === undefined ? 111 : tg; RIDOTTI = false; VISTI = {}; TIMBRI = [];
+  LOG.length = 0; vestiBannerFeeP2P(0);
+}
+const out = {};
+(async () => {
+  const PIONIERE = {attivo: true, motivo: 'pioniere', punti: 0.5};
+  const LIVELLO = {attivo: true, motivo: 'livello', punti: 0.5};
+  const NESSUNO = {attivo: false, motivo: '', punti: 0.5};
+  /* PRIMA DELLA PRIMA ANIMAZIONE: tutto colorato, anche per chi ha lo sconto */
+  azzera(PIONIERE); bannerFeeFissoP2P(); out.primaDelTimbro = stato();
+  /* L'ANIMAZIONE, pioniere: parte colorato, poi la classe del giro e la pillola */
+  azzera(PIONIERE); LOG.length = 0; animaBannerFeeP2P();
+  out.pioniereDurante = Object.assign(stato(), {log: LOG.slice()});
+  await dorme(FEE_ANIMA_P2P_MS + 250);
+  out.pioniereDopo = stato();
+  /* ...lo stato fisso all'ingresso dopo, senza animazione */
+  for (const c of BANNER.classList.all()) BANNER.classList.remove(c);
+  bannerFeeFissoP2P(); out.pioniereIngresso = stato();
+  azzera(LIVELLO); animaBannerFeeP2P(); await dorme(FEE_ANIMA_P2P_MS + 250);
+  out.livello = stato();
+  azzera(NESSUNO); animaBannerFeeP2P(); out.nessunoDurante = stato();
+  await dorme(FEE_ANIMA_P2P_MS + 250); out.nessuno = stato();
+  /* IL SERVER CHE TACE e L'ANONIMO: tutto colorato, niente timbro */
+  azzera(null); animaBannerFeeP2P(); out.tace = stato();
+  VISTI.banner_p2p = 1; bannerFeeFissoP2P(); out.taceFisso = stato();
+  azzera(PIONIERE, 0); animaBannerFeeP2P(); out.anonimo = stato();
+  /* EFFETTI RIDOTTI: nessuna corsa, subito lo stato finale */
+  azzera(PIONIERE); RIDOTTI = true; animaBannerFeeP2P(); out.ridotti = stato();
+  /* RIVISTO DA «COME FUNZIONA»: gia' personale, riparte COLORATO e rifa' la corsa */
+  azzera(NESSUNO); VISTI.banner_p2p = 1; bannerFeeFissoP2P(); LOG.length = 0;
+  animaBannerFeeP2P(); out.rivisto = {log: LOG.slice(), classi: BANNER.classList.all()};
+  /* ...e /me che arriva durante la corsa non la interrompe */
+  bannerFeeFissoP2P(); out.meInCorsa = BANNER.classList.all();
+  process.stdout.write(JSON.stringify(out));
+  process.exit(0);
+})().catch(e => { process.stderr.write(String(e && e.stack || e)); process.exit(1); });
+"""
+    d = tempfile.mkdtemp()
+    try:
+        f = os.path.join(d, "banner.js")
+        with open(f, "w", encoding="utf-8") as fh:
+            fh.write(banco)
+        r = subprocess.run([node, f], capture_output=True, encoding="utf-8", timeout=60)
+        prova("il banco del banner personale gira in node", "", (r.stderr or "")[-700:])
+        o = _js.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else None
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    if not o:
+        return
+    TUTTI = "Fee P2P: 2% barrato, in beta 1,5% per parte, in beta 1% per pionieri o livello 5"
+    ALT3 = "Fee P2P per te: 1% per parte, da pioniere o livello 5 (in beta, invece del 2%)"
+    ALT2 = "Fee P2P per te: 1,5% per parte (in beta, invece del 2%)"
+    prova("prima della prima animazione il banner e' tutto colorato, anche per il pioniere",
+          {"classi": [], "alt": TUTTI, "timbri": []}, o["primaDelTimbro"])
+    prova("PIONIERE: la corsa (fee-anima) con la terza accesa, l'alt dice l'1%, e il timbro",
+          {"classi": ["fee-anima", "fee-p3"], "alt": ALT3, "timbri": ["banner_p2p"]},
+          {k: o["pioniereDurante"][k] for k in ("classi", "alt", "timbri")})
+    lg = o["pioniereDurante"]["log"]
+    # (senza eccezioni: un evento che manca e' una rossa, non un banco che esplode)
+    _ia = lg.index("+fee-anima") if "+fee-anima" in lg else -1
+    _ir = lg.index("reflow", _ia) if _ia >= 0 and "reflow" in lg[_ia:] else -1
+    _ip = lg.index("+fee-p3") if "+fee-p3" in lg else -1
+    prova("...la corsa parte dal banner COLORATO: la classe del giro, un reflow, poi la pillola",
+          True, 0 <= _ia < _ir < _ip)
+    prova("...a corsa finita resta la terza, ferma", ["fee-p3"], o["pioniereDopo"]["classi"])
+    prova("...e all'ingresso dopo e' gia' personale, senza corsa", ["fee-p3"],
+          o["pioniereIngresso"]["classi"])
+    prova("LIVELLO 5: resta la terza (1%)", ["fee-p3"], o["livello"]["classi"])
+    prova("NESSUNO SCONTO: resta la seconda (1,5%), e l'alt lo dice",
+          [["fee-anima", "fee-p2"], ["fee-p2"], ALT2],
+          [o["nessunoDurante"]["classi"], o["nessuno"]["classi"], o["nessuno"]["alt"]])
+    prova("IL SERVER CHE TACE: tutto colorato, niente timbro, anche col timbro di prima",
+          [{"classi": [], "alt": TUTTI, "timbri": []}, []],
+          [o["tace"], o["taceFisso"]["classi"]])
+    prova("...e chi non e' entrato uguale", {"classi": [], "alt": TUTTI, "timbri": []}, o["anonimo"])
+    prova("EFFETTI RIDOTTI: niente corsa, subito lo stato finale", ["fee-p3"],
+          o["ridotti"]["classi"])
+    rv = o["rivisto"]["log"]
+    _pos = lambda x: rv.index(x) if x in rv else -1
+    prova("RIVISTO DA «COME FUNZIONA»: riparte colorato e rifa' la corsa", True,
+          0 <= _pos("-fee-p2") < _pos("+fee-anima") < _pos("+fee-p2"))
+    prova("...e /me che arriva a corsa in atto non la ferma", ["fee-anima", "fee-p2"],
+          o["meInCorsa"])
 
 
 def prove_p2p_invii():
@@ -103838,7 +104142,7 @@ def main():
               prove_p2p_server,
         prove_p2p_libro,
         prove_tour_p2p, prove_tour_p2p_finale, prove_libro_subito,
-        prove_giro_guidato_p2p,
+        prove_giro_guidato_p2p, prove_banner_fee_personale,
         prove_p2p_invii,
         prove_velo_p2p,
     prove_p2p_dettaglio,

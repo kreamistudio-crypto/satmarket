@@ -34059,3 +34059,68 @@ fa: nessun telefono ne' emulatore collegato (l'SDK di bubblewrap ha
 `adb` ma nessun dispositivo), e l'app punta a barattolo.store, quindi
 vede il codice nuovo solo dopo il deploy. La TWA e' Chrome: il percorso
 e' lo stesso degli eventi touch del banco, ma la prova vera e' di Andrea.
+
+## Il banner personale delle commissioni (26 set 2026)
+
+Richiesta di Andrea. Il banner del libro (un'immagine sola: 2% barrato,
+BETA 1,5%, BETA Pioniere o Lv.5 1%) diventa di chi guarda: resta accesa
+la sola pillola che vale per lui — la terza per pionieri e livello 5, la
+seconda per tutti gli altri — e le altre si velano, con la barra rossa
+del 2% sempre accesa.
+**L'IMMAGINE NON SI RIFA'.** Sopra, dentro il bottone, stanno quattro
+veli (le tre pillole e l'etichetta BETA che sporge dalla terza), la barra
+rossa ridisegnata e la luce, in PERCENTUALE DEL FILE 1000×258, misurati
+sui suoi pixel: pillole x 32-327 / 329-622 / 628-969, y 28-229 (27-230
+la terza), etichetta x 749-844 y 8-29; barra con centro (177,6; 145,6),
+−36,88°, lunga 175,8, spessa 7, rosso del nucleo #CA1B1C. Col velo sopra
+il rosso del disegno si scurirebbe: la barra ridisegnata coincide con
+quella del file, quindi accesa da subito non si vede finche' il velo non
+cala. **I VELI COPRONO ANCHE IL BORDO SFUMATO** (visto dal vivo, due
+giri): a misura piena restava un filo di colore attorno alle pillole
+velate; allargati di ~5 px del file in altezza restavano gli ANGOLI — il
+velo e' uno stadio col raggio della SUA altezza —, quindi ~5 px anche in
+larghezza, ma mai dentro la pillola accanto, che puo' essere quella
+accesa (la prima a destra non cresce).
+**L'ANIMAZIONE** parte a fine giro guidato (`fineGiroP2P`: la prima volta
+in automatico, e ogni volta da «Come funziona», qualunque strada chiuda
+il giro): il banner riparte colorato, la luce corre dal centro della
+prima pillola a quello della sua (1,5 s) e i veli calano al suo
+passaggio; quello a destra della sua pillola cala quando lei si ferma.
+Timbro `banner_p2p` sul profilo: da li' ogni ingresso trova il banner
+personale e fermo (`bannerFeeFissoP2P`, a /me arrivato). Il punto 4
+della richiesta (senza giro, a fine tutorial) non serve: il giro c'e'.
+**CHI E' CHI** lo dice `p2pSconto`, cioe' /api/me col giudice di
+/api/p2p/mio-sconto. Senza /me (anonimo, server che tace) resta tutto
+colorato. ⚠️ **IL PIONIERE NUOVO, visto dal vivo:** alla PRIMISSIMA
+apertura /me costruisce il profilo dalla riga letta PRIMA di
+`assegna_coorte`, quindi la coorte e' vuota e lo sconto «non attivo» fino
+alla visita dopo — l'animazione di un pioniere nuovo avrebbe acceso
+l'1,5%. La slide finale del tutorial chiede gia' al server fresco: la sua
+risposta ora diventa `p2pSconto` per la visita (`mostraFineTourP2P`).
+L'ordine dentro /me non l'ho toccato: vale anche per il conto dello
+scambio di quella prima visita, ed e' da decidere a parte.
+**IL RESTO NON CAMBIA:** il bagliore all'ingresso (sul bottone, e
+`fermaBaglioreFeeP2P` finisce solo le sue animazioni), il tocco, il
+foglio. Coi ridotti niente luce: subito lo stato finale (lo fa il JS, e
+la regola universale). L'alt dice il prezzo di chi guarda con le cifre
+del disegno («Fee P2P per te: 1% per parte, da pioniere o livello 5 (in
+beta, invece del 2%)» / «… 1,5% per parte …»). Il blocco JS vive dopo il
+giro guidato e non nel libro, la cui sentinella vieta cifre scritte.
+**PROVATO.** `prove_banner_fee_personale` (nuova): veli e barra rimisurati
+sul file con PIL (coprono le pillole col bordo, poco margine, mai dentro
+la pillola accesa; barra con centro, inclinazione, lunghezza e spessore
+del file), markup e CSS, un posto solo che anima, lo stato fisso a /me,
+e un banco node sulle funzioni vere: pioniere, livello 5, nessuno
+sconto, server che tace, anonimo, prima e dopo il timbro, effetti
+ridotti, rivisto da «Come funziona», /me in corsa. Nel banco del giro:
+animazione dopo il primo giro e dopo «Come funziona», nessuna negli
+ingressi normali. Emendate col perche' due sentinelle (il timbro del
+giro non e' piu' l'ultimo del catalogo). Tortura 14 su 14. Suite intera
+severa senza config nel worktree da origin/main (9cf7095): verde. Dal
+vivo, Chrome headless via CDP a densita' 3, relay morto, leva dello
+sconto a 0,5 nel config del banco, coorte di 111 pioniere o bottegaio:
+giro fino a «Fine» col dito, il banner fermato a 0 / 0,35 / 0,7 / 1,05 /
+1,5 s, lo stato finale e l'ingresso dopo, a 320 e 375 px nei due temi
+per pioniere e tutti gli altri, e coi ridotti; nessuno scorrimento
+laterale, nessun errore dell'app. Scatti approvati da Andrea.
+**DA AVERE:** l'occhio sul telefono.
