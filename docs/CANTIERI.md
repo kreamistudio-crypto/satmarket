@@ -34987,3 +34987,48 @@ giro: i due numeri della frase uscivano senza tinta (le regole stanno su
 `.ctrl-riga`), adesso verdi e rossi come le righe del conto.
 **DA AVERE:** il telefono con un Barattozon vero, e una presa vera col
 cambio timbrato dal server.
+La fila «Scambi P2P» piu' svelta, e la pillola di chi guarda (27 set
+2026, due ritocchi di Andrea a d357dcc). **1) PIU' SVELTA SUGLI ALTRI
+TELEFONI:** un ordine pubblicato da un telefono arrivava sugli altri con
+la home aperta dopo circa un minuto. Adesso la fila rilegge la fotografia
+ogni 15 s (solo con Esplora davanti e la pagina visibile), la cache HTTP
+della rotta scende a 10 s (piu' corta del giro), e il server la rifa'
+SENZA l'attesa fissa di 3 s: il giro parte subito, e se chi chiama dice
+quale ordine aspetta — il client manda il suo id a `/api/p2p/canale`,
+l'avviso 0007 del ritorno nel libro porta il suo — riprova dopo 1, 2 e 4
+s solo se la fotografia non lo porta ancora. Presa, annullo e scadenza
+non aspettano niente: escono gia' per parola di mostrod. **Misurato**
+(banco, relay di cartone su 127.0.0.1): la fotografia si aggiorna in
+33-55 ms dopo il canale e in 17-32 ms dopo uno 0007; una domanda alla
+rotta costa ~2 ms di mediana (p95 13-18 ms), dalla memoria, anonima o
+con la sessione. Fra due dispositivi — A pubblica col vero
+`annunciaCanaleP2P`, B guarda la home — la card compare su B dopo 4,0 /
+8,0 / 11,8 s secondo dove cade il suo giro, e una presa la toglie dopo
+15,1 s (un giro intero: l'avviso era arrivato subito dopo una domanda di
+B); B chiede la fotografia a passi di 15,0 s. Il ritardo e' quasi tutto
+il giro della fila, e il tetto e' 15 s.
+**2) LA PILLOLA DI CHI GUARDA** (rovescia la prima stesura, che diceva il
+lato di chi aveva pubblicato): come le schede del libro, la card dice
+cosa FA chi la tocca. Chi ha pubblicato vende → «Compra BTC», verde,
+«Invia X € · Ricevi ≈ sats»; chi ha pubblicato compra → «Vendi BTC»,
+rossa, «Ricevi X € · Invia ≈ sats»; Barattozon (chi pubblica vende sats)
+e' «Compra BTC». I sats sono al netto della propria meta' di commissione,
+col `nettoLatoP2P` del libro. IL MIO ORDINE: chi guarda e' chi l'ha
+pubblicato, quindi la stessa regola lo dice dal mio lato — il mio di
+vendita e' «Vendi BTC», ricevo gli euro e invio i sats — e resta
+riconoscibile dal mio volto (e da `card-p2p-mio`, «il tuo ordine» per chi
+legge con la voce). Il verbo sta nel cartellino in carattere di testo;
+a 320 px coi sei numeri la riga dei sats manda il verbo sopra e la cifra
+sotto, mai tagliata.
+**PROVATO.** `prove_card_p2p_vetrina` aggiornata (la pillola e i verbi
+per vendita, acquisto, Barattozon e il mio ordine, coi sats netti al
+satoshi; il giro a 15 s; il giro subito che parte senza attesa, riprova
+finche' l'ordine atteso arriva, si ferma dopo le riprove, e senza atteso
+e' uno; il canale che manda l'id, mai un nome provvisorio; il ritorno nel
+libro che aspetta il suo ordine); emendate col perche' la cache in
+`prove_libro_subito` e la firma di `annunciaCanaleP2P` in
+`prove_p2p_canale`. Tortura 16 su 16. Emendate anche `prove_p2p_velo_pubblica` (al suo banco serve `provvisorioP2P`) e la firma in `prove_p2p_paycode`. Suite intera severa senza config nel worktree ribasato su 25b2124 (la convenienza vera negli ordini a sats fissi, di un'altra sessione): 16.708 verdi e 0 rosse; i 25 collaudi della CI verdi nella gabbia. **DAL VIVO** con due
+dispositivi, CDP a 375 px nei due temi (i tempi qui sopra), e le card a
+320 px nei due temi senza scorrimento laterale; nessun errore dell'app.
+**DA AVERE:** i due telefoni veri, coi relay veri (il giro del server
+passa per i relay, fuori da 127.0.0.1 ci mette di piu').

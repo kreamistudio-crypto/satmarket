@@ -41475,9 +41475,11 @@ def libro_fotografato_p2p(x_tg_init_data: str = Header(""),
     di `/api/p2p/facce`: escono solo a chi ha una sessione, e un
     raccoglitore anonimo non incrocia niente coi nostri account.
     Leva spenta = fotografia vuota, `quando` a zero: il client la tratta
-    come «non c'e'». CACHE PRIVATA DI 30 SECONDI: la fotografia cambia
-    al piu' una volta al minuto; privata e con `Vary` perche' con la
-    sessione porta i volti, e un proxy non deve darli a un altro."""
+    come «non c'e'». CACHE PRIVATA DI 10 SECONDI (30 fino al 27 set
+    2026): la fila la rilegge ogni 15 s, e una cache piu' lunga del suo
+    giro le farebbe rileggere la copia di prima; privata e con `Vary`
+    perche' con la sessione porta i volti, e un proxy non deve darli a
+    un altro."""
     F = _P2P_FOTO
     attivo = _p2p_leve()["attivo"]
     fuori = {"eventi": F["eventi"] if attivo else [],
@@ -41492,7 +41494,7 @@ def libro_fotografato_p2p(x_tg_init_data: str = Header(""),
             x_tg_init_data, barattolo_sessione):
         fuori["facce"] = F["facce"]
     return JSONResponse(fuori, headers={
-        "Cache-Control": "private, max-age=30",
+        "Cache-Control": "private, max-age=10",
         "Vary": "X-Tg-Init-Data, Cookie"})
 
 
@@ -42691,8 +42693,12 @@ async def annuncia_ordine_p2p_canale(req: Request,
             400, "Amazon accetta il pagamento in contanti fino a 999 € per ordine")
     # un ordine nuovo nel libro: la fotografia si rifa' subito, cosi' la
     # fila «Scambi P2P» di Esplora lo mostra al suo giro dopo (LA
-    # FOTOGRAFIA SUBITO) — col canale acceso o spento
-    _foto_subito_p2p()
+    # FOTOGRAFIA SUBITO) — col canale acceso o spento. Il client manda
+    # l'id del suo ordine (27 set 2026): cosi' il server sa quale
+    # aspettare, e riprova solo se la prima lettura non lo porta. Un id
+    # storto o assente vale «nessuno»: il giro c'e' lo stesso.
+    ordine = str(d.get("ordine") or "")
+    _foto_subito_p2p(ordine if FORMA_ORDINE_P2P.fullmatch(ordine) else "")
     # il premio di Barattozon (26 set 2026): solo sul tabacchino, e solo
     # un INTERO della scala del cursore — «2.5», «10» fra virgolette o un
     # booleano sono storti. Sugli altri metodi si ignora: il loro premio
@@ -44175,13 +44181,20 @@ async def _fotografa_libro_p2p():
 #   la 0007 degli ordini NUOVI non parla — l'ordine nasce dal client —
 #   e questo e' il solo segnale che il server ha. Gli ordini nati su un
 #   altro client di Mostro aspettano il giro del minuto.
-# Il giro subito aspetta un respiro (P2P_FOTO_SUBITO_S: il 38383 deve
-# arrivare sui relay) e poi fa una fotografia INCREMENTALE, quella di
-# sempre. Uno solo alla volta: gli avvisi che arrivano mentre corre
-# chiedono un giro in piu', non uno per ciascuno.
-P2P_FOTO_SUBITO_S = 3
+# IL GIRO PARTE ADESSO (27 set 2026, ritocco di Andrea: prima aspettava
+# 3 s «perche' il 38383 arrivi sui relay», sempre). Il respiro serviva
+# solo quando l'ordine non c'e' ancora, quindi si paga solo allora: chi
+# chiama puo' dire QUALE ordine si aspetta (il client che pubblica manda
+# il suo id a /api/p2p/canale, l'avviso del ritorno nel libro porta il
+# suo), e se la fotografia non lo porta ancora si riprova dopo
+# P2P_FOTO_SUBITO_RIPROVE. Senza un ordine atteso (presa, annullo,
+# scadenza: quelli escono gia' per parola di mostrod) il giro e' uno.
+# E' una fotografia INCREMENTALE, quella di sempre. Uno solo alla volta:
+# gli avvisi che arrivano mentre corre chiedono un giro in piu', non uno
+# per ciascuno.
+P2P_FOTO_SUBITO_RIPROVE = (1, 2, 4)     # secondi, fra un giro e l'altro
 P2P_MOMENTI_FUORI_FOTO = ("preso", "annullato", "scaduto")
-_P2P_FOTO_SUBITO: dict = {"task": None, "ancora": False}
+_P2P_FOTO_SUBITO: dict = {"task": None, "ancora": False, "attesi": set()}
 
 
 def _senza_i_via_p2p(eventi, via) -> list:
@@ -44203,23 +44216,38 @@ def _foto_via_p2p(F, ordine: str, quando: int) -> None:
     F["eventi"] = _senza_i_via_p2p(F.get("eventi"), via)
 
 
-def _foto_subito_p2p() -> None:
-    """Chiede un giro della fotografia adesso, non fra un minuto."""
+def _foto_ha_ordine_p2p(ordine: str) -> bool:
+    """La fotografia porta gia' quest'ordine, vivo?"""
+    return any(e.get("kind") == 38383 and _tag_evento_p2p(e, "d") == ordine
+               for e in _P2P_FOTO.get("eventi") or [])
+
+
+def _foto_subito_p2p(atteso: str = "") -> None:
+    """Chiede un giro della fotografia ADESSO, non fra un minuto; con un
+    ordine `atteso`, riprova finche' la fotografia non lo porta."""
     S = _P2P_FOTO_SUBITO
+    if atteso:
+        S["attesi"].add(atteso)
     if S["task"] is not None and not S["task"].done():
         S["ancora"] = True
         return
 
     async def giro():
+        riprove = list(P2P_FOTO_SUBITO_RIPROVE)
         while True:
             S["ancora"] = False
-            await asyncio.sleep(P2P_FOTO_SUBITO_S)
             try:
                 await asyncio.wait_for(_fotografa_libro_p2p(), P2P_FOTO_MAX_S)
             except Exception as e:
                 print(f"⚠️ Fotografia del libro, giro subito: {e}", flush=True)
-            if not S["ancora"]:
-                break
+            S["attesi"] = {o for o in S["attesi"] if not _foto_ha_ordine_p2p(o)}
+            if S["ancora"]:
+                continue
+            if S["attesi"] and riprove:
+                await asyncio.sleep(riprove.pop(0))
+                continue
+            S["attesi"] = set()
+            break
     try:
         S["task"] = asyncio.get_running_loop().create_task(giro())
     except RuntimeError:
@@ -44232,8 +44260,10 @@ def _foto_dopo_evento_p2p(ev: dict) -> None:
         return
     if ev.get("momento") in P2P_MOMENTI_FUORI_FOTO:
         _foto_via_p2p(_P2P_FOTO, ev["ordine"], ev["ts"])
-    if ev.get("momento") in P2P_MOMENTI_FUORI_FOTO + ("tornato",):
+    if ev.get("momento") in P2P_MOMENTI_FUORI_FOTO:
         _foto_subito_p2p()
+    elif ev.get("momento") == "tornato":
+        _foto_subito_p2p(ev["ordine"])      # torna vivo: lo si aspetta
 
 
 def _facce_foto_p2p(eventi, adesso) -> dict:

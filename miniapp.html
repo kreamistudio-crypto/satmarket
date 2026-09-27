@@ -1846,7 +1846,7 @@
   .p2p-vt-lato{position:absolute;top:8px;left:8px;z-index:2;
     border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:800;
     color:#fff;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.25)}
-  .p2p-vt-lato.vende{background:#C2410C}
+  .p2p-vt-lato.vendi{background:#C2410C}
   .p2p-vt-lato.compra{background:#1B8B54}
   .p2p-vt-volto{position:absolute;top:7px;right:7px;z-index:2;
     width:30px;height:30px;border-radius:50%;overflow:hidden;
@@ -1859,6 +1859,16 @@
   /* l'euro nel cartellino: la cifra nell'inchiostro di casa della
      carta, perche' qui non e' un prezzo in sats (l'arancio) */
   .card-p2p .tag-price .price{color:#23282C;font-size:15px}
+  /* «Invia / Ricevi» di chi guarda (27 set 2026): la parola in carattere
+     di testo, piccola e nel grigio della carta; la cifra resta la stessa.
+     La riga dei sats va a capo SOLO se non ci sta (a 320 px, coi sei
+     numeri): il verbo sopra, la cifra sotto, mai tagliata */
+  .card-p2p .p2p-vt-verbo{font-family:Nunito,sans-serif;font-size:10.5px;
+    font-weight:800;color:#8A8271;margin-right:4px;letter-spacing:.01em}
+  .card-p2p .tag-price .price-sub{display:flex;flex-wrap:wrap;
+    align-items:baseline;column-gap:4px}
+  .card-p2p .tag-price .price-sub .p2p-vt-verbo{margin-right:0}
+  .card-p2p .p2p-vt-cifra{white-space:nowrap}
   .card-p2p .p2p-vt-premio{justify-content:flex-start}
   .card-p2p .p2p-vt-premio .p2p-badge{margin-top:0;font-size:11.5px}
   /* il cartellino dell'affare piu' grande (ritocco di Andrea), fino a
@@ -55563,7 +55573,8 @@ async function inviaNuovoOrdineP2P(confermato){
     /* col premio di Barattozon (26 set 2026): a prezzo fisso il post
        non avrebbe altro modo di dirlo, e chi legge il canale e' lo
        stesso che legge la card */
-    annunciaCanaleP2P(lato, euro, metodo, ord.tabacchino ? ord.premioCotto : null);
+    annunciaCanaleP2P(lato, euro, metodo, ord.tabacchino ? ord.premioCotto : null,
+                      provvisorioP2P(agg.id) ? '' : agg.id);
     /* LA SPUNTA: il coordinatore ha risposto, l'ordine e' nel libro.
        Si ridisegna PRIMA la pagina sotto, cosi' quando il velo scende
        dice gia' «Ordine pubblicato» anche lei. */
@@ -58256,10 +58267,10 @@ function animaBannerFeeP2P(){
    Gli eventi passano dallo stesso lettore del libro (`libroDaEventi`),
    quindi scadenze, valuta e doppioni si giudicano con le sue regole.
    LA CARD HA LE MISURE DELLE SORELLE (la stessa `.card`, la stessa
-   foto quadrata, lo stesso cartellino di carta a cavallo del bordo) e
-   parla da chi ha PUBBLICATO: «Vende BTC» / «Compra BTC», mentre la
-   card del libro parla a chi legge. Qui chi guarda non ha ancora
-   scelto un lato, e il lato che si legge e' quello dell'annuncio.
+   foto quadrata, lo stesso cartellino di carta a cavallo del bordo) e,
+   dal 27 set 2026, PARLA A CHI GUARDA come la card del libro: «Compra
+   BTC» su chi vende, «Vendi BTC» su chi compra (la prima stesura diceva
+   il lato di chi aveva pubblicato; vedi `cardVetrinaP2P`).
    SI VEDONO SOLO NELLA VETRINA NUDA: Esplora su «Tutto», senza ricerca,
    filtri, ordinamento ne' barattolo — un ordine P2P non ha una
    categoria ne' un prezzo in sats da ordinare, e dentro un risultato
@@ -58271,7 +58282,12 @@ function animaBannerFeeP2P(){
    strada scartata (una card dopo il secondo annuncio e poi ogni cinque)
    sta in CANTIERI, «Le card P2P in vetrina». */
 const P2P_VETRINA_MAX = 6;          // quante card, al massimo
-const P2P_VETRINA_FOTO_MS = 60000;  // ogni quanto la fila rinfresca la fotografia
+/* OGNI 15 SECONDI (27 set 2026, ritocco di Andrea: era un minuto, e un
+   ordine pubblicato da un altro telefono ci metteva fino a un minuto ad
+   arrivare). La domanda e' leggera — il server risponde dalla memoria,
+   senza database ne' relay — e parte solo con Esplora davanti e la pagina
+   visibile. La cache HTTP della rotta e' di 10 s, piu' corta del giro. */
+const P2P_VETRINA_FOTO_MS = 15000;  // ogni quanto la fila rinfresca la fotografia
 let p2pInVetrina = false;           // dalla busta di prima pagina
 let p2pVetrinaFoto = null;          // {ordini, eventi, quando}: la fotografia della fila
 let p2pVetrinaChiesta = 0;          // quando e' partita l'ultima domanda
@@ -58344,31 +58360,53 @@ function ordiniVetrinaP2P(libro, adesso, miei){
 function euroCartaP2P(n){
   return Number.isInteger(n) ? n.toLocaleString('it-IT') : fmtEur(n);
 }
+/* ⚠️ LA CARD PARLA A CHI GUARDA (27 set 2026, ritocco di Andrea che
+   ROVESCIA la prima stesura, dove la pillola diceva cosa fa chi ha
+   pubblicato): come le schede del libro, dice cosa FA chi la tocca.
+   Chi ha pubblicato VENDE (k=sell) → «Compra BTC», verde, «Invia X € ·
+   Ricevi ≈ sats»; chi ha pubblicato COMPRA (k=buy) → «Vendi BTC», rossa,
+   «Ricevi X € · Invia ≈ sats». Barattozon (chi pubblica vende sats) e'
+   quindi «Compra BTC». I sats sono al NETTO della propria meta' di
+   commissione, lo stesso `nettoLatoP2P` del libro.
+   IL MIO ORDINE: chi guarda E' chi l'ha pubblicato, quindi la stessa
+   regola lo dice dal mio lato — il mio ordine di vendita e' «Vendi BTC»
+   (ricevo gli euro) —, e resta riconoscibile dal mio volto, come oggi. */
 function cardVetrinaP2P(o){
-  const vende = o.lato === 'sell';
+  const mio = !!(o.mio || ordineMioP2P(o.id));
+  /* il lato visto come lo vede chi prende: il mio ordine si guarda da
+     dentro, cioe' al rovescio */
+  const io = mio ? (o.lato === 'sell' ? 'buy' : 'sell') : o.lato;
+  const compro = io === 'sell';            // chi guarda compra i sats
   const tab = tabacchinoP2P(o.metodi);
   /* il mio ordine porta il mio volto anche prima che il server lo sappia */
-  const f = p2pFacce[o.id] || ((o.mio || ordineMioP2P(o.id)) ? voltoMioP2P() : {});
+  const f = p2pFacce[o.id] || (mio ? voltoMioP2P() : {});
   /* lo sfondo: le due monete per tutti, il marchio per Barattozon (il
      file chiaro: il fondo e' scuro in tutt'e due i temi) */
   const fondo = tab
     ? '<img class="p2p-vt-marchio" src="/assets/barattozon.webp" width="305" height="96" alt="" onerror="this.remove()">'
     : '<img class="p2p-vt-monete" src="/assets/scambi-intestazione.webp" width="682" height="459" alt="" onerror="this.remove()">';
   const euro = euroCartaP2P(o.euro) + (o.euroMax ? '–' + euroCartaP2P(o.euroMax) : '');
-  const sats = o.sats > 0 ? o.sats : satsMercatoP2P(o);
-  const sotto = o.euroMax ? 'scegli tu'
-    : sats > 0 ? '≈ ' + fmt(sats) + ' sats' : '';
+  const lordo = o.sats > 0 ? o.sats : satsMercatoP2P(o);
+  const sats = nettoLatoP2P(Object.assign({}, o, {lato: io}), lordo);
+  const verboEuro = compro ? 'Invia' : 'Ricevi';
+  const verboSats = compro ? 'Ricevi' : 'Invia';
+  /* sull'intervallo la cifra la sceglie chi prende: niente sats */
+  const sotto = o.euroMax ? '<span class="p2p-vt-cifra">scegli tu</span>'
+    : sats > 0 ? '<span class="p2p-vt-verbo">' + verboSats + '</span><span class="p2p-vt-cifra">≈ '
+                 + fmt(sats) + ' sats</span>' : '';
   const metodi = (o.metodi || []).map(m => esc(metodoBaseP2P(m))).join(', ');
   const premio = affaroneP2P(o) || badgePremioP2P(o);
-  const lato = vende ? 'Vende BTC' : 'Compra BTC';
-  return `<div class="card card-p2p${tab ? ' card-p2p-bz' : ''}" data-p2p="${esc(o.id)}" role="button" tabindex="0"
-      aria-label="${esc(lato + ', ' + euro + ' euro' + (metodi ? ', ' + (o.metodi || []).map(metodoBaseP2P).join(', ') : ''))}"
+  const lato = compro ? 'Compra BTC' : 'Vendi BTC';
+  return `<div class="card card-p2p${tab ? ' card-p2p-bz' : ''}${mio ? ' card-p2p-mio' : ''}" data-p2p="${esc(o.id)}" role="button" tabindex="0"
+      aria-label="${esc(lato + ', ' + verboEuro.toLowerCase() + ' ' + euro + ' euro'
+                        + (metodi ? ', ' + (o.metodi || []).map(metodoBaseP2P).join(', ') : '')
+                        + (mio ? ', il tuo ordine' : ''))}"
       onclick="apriCardP2P(this.dataset.p2p)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();apriCardP2P(this.dataset.p2p)}">
       <div class="ph-wrap">
         <div class="ph p2p-vt-fondo">${fondo}</div>
-        <span class="p2p-vt-lato ${vende ? 'vende' : 'compra'}">${lato}</span>
+        <span class="p2p-vt-lato ${compro ? 'compra' : 'vendi'}">${lato}</span>
         <span class="p2p-vt-volto">${avatarImg(f.avatar)}${esc((f.nome || '?')[0])}</span>
-        <div class="tag-price"><div class="price">${euro}<span class="unit eur">€</span></div>${sotto ? `<div class="price-sub">${sotto}</div>` : ''}</div>
+        <div class="tag-price"><div class="price"><span class="p2p-vt-verbo">${verboEuro}</span>${euro}<span class="unit eur">€</span></div>${sotto ? `<div class="price-sub">${sotto}</div>` : ''}</div>
       </div>
       <div class="info">
         <div class="title">${metodi || 'Scambio P2P'}</div>
@@ -59364,13 +59402,16 @@ async function attendiGestoP2P(id, gesto, chiamata){
    Fail-open muta come le sorelle del mazzo: chi chiama (dal motore,
    dopo che l'ordine e' gia' partito davvero) non aspetta e non
    controlla l'esito. */
-async function annunciaCanaleP2P(lato, euro, metodo, premio){
+async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine){
   if (DEMO || VETRINA || !myTgId) return;
   /* `premio` SOLO per Barattozon (26 set 2026): il premio scelto, che a
      prezzo fisso non sta in nessun campo del libro; per gli altri
      ordini la chiave non c'e' e il corpo resta quello di ieri */
   const corpo = {lato: lato, euro: euro, metodo: metodo};
   if (Number.isInteger(premio)) corpo.premio = premio;
+  /* l'id del mio ordine (27 set 2026): il server rifa' la fotografia
+     subito e sa quale aspettare — riprova solo se non c'e' ancora */
+  if (ordine) corpo.ordine = String(ordine);
   try {
     await fetch(`${API_BASE}/p2p/canale`, {method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Tg-Init-Data': authHdr()},

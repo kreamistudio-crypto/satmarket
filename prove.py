@@ -51204,8 +51204,9 @@ def prove_libro_subito():
     anon, dentro, spenta = chiama(True, False), chiama(True, True), chiama(False, True)
     # NON PIU' no-store (26 set 2026, la fila «Scambi P2P» in vetrina):
     # una cache privata di 30 s, che la fotografia cambia al piu' al minuto
-    prova("all'anonimo la fotografia senza volti, con la cache privata di 30 s",
-          [2, False, "private, max-age=30"],
+    # ...10 s dal 27 set 2026: la fila «Scambi P2P» la rilegge ogni 15
+    prova("all'anonimo la fotografia senza volti, con la cache privata di 10 s",
+          [2, False, "private, max-age=10"],
           [len(anon.contenuto["eventi"]), "facce" in anon.contenuto,
            anon.headers.get("Cache-Control")])
     prova("...a chi ha una sessione anche i volti, dalla memoria: la rotta non li chiede",
@@ -52279,8 +52280,9 @@ def prove_card_p2p_vetrina():
           [], [s for s in ("db()", "utente_se_autenticato", "verifica_utente",
                            "_facce_ordini_p2p", "_chiedi_tutti_p2p", "create_connection")
                if s in corpo])
-    prova("...con una cache privata di 30 secondi, e Vary sulle due porte", True,
-          '"Cache-Control": "private, max-age=30"' in rot
+    # (10 s dal 27 set 2026: la fila rilegge ogni 15, la cache e' piu' corta)
+    prova("...con una cache privata di 10 secondi, e Vary sulle due porte", True,
+          '"Cache-Control": "private, max-age=10"' in rot
           and '"Vary": "X-Tg-Init-Data, Cookie"' in rot)
     prova("...e i volti li fotografa l'orologio, con il libro", True,
           'F["facce"] = _facce_foto_p2p(F["eventi"], adesso)' in pezzo("_fotografa_libro_p2p"))
@@ -52332,7 +52334,7 @@ def prove_card_p2p_vetrina():
     amb = {"_tag_evento_p2p": lambda e, n: next((t[1] for t in e.get("tags", [])
                                                 if t and t[0] == n), None),
            "asyncio": _aio, "print": lambda *a, **k: None}
-    i = _SORGENTE.index("P2P_FOTO_SUBITO_S = 3")
+    i = _SORGENTE.index("P2P_FOTO_SUBITO_RIPROVE = ")
     exec(_SORGENTE[i:_SORGENTE.index("def _facce_foto_p2p(", i)], amb)
     E = lambda d, q: {"kind": 38383, "created_at": q, "tags": [["d", d]]}
     info = {"kind": 38385, "created_at": 5, "tags": []}
@@ -52343,7 +52345,7 @@ def prove_card_p2p_vetrina():
           [amb["_tag_evento_p2p"](e, "d") for e in
            amb["_senza_i_via_p2p"](ev_foto, {"ordine-a": 200, "ordine-c": 200})])
     SUBITO = []
-    amb["_foto_subito_p2p"] = lambda: SUBITO.append(1)
+    amb["_foto_subito_p2p"] = lambda atteso="": SUBITO.append(atteso or "-")
     amb["_p2p_leve"] = lambda: {"attivo": True}
     F = {"eventi": list(ev_foto), "via": {}}
     amb["_P2P_FOTO"] = F
@@ -52352,8 +52354,8 @@ def prove_card_p2p_vetrina():
         amb["_foto_dopo_evento_p2p"]({"momento": momento, "ordine": ordine, "ts": 200})
     prova("un avviso di PRESA toglie l'ordine all'istante e chiede un giro; un passo "
           "qualsiasi non tocca niente; il TORNATO chiede il giro senza togliere",
-          [["ordine-b", "ordine-c", None], {"ordine-a": 200}, 2],
-          [[amb["_tag_evento_p2p"](e, "d") for e in F["eventi"]], F["via"], len(SUBITO)])
+          [["ordine-b", "ordine-c", None], {"ordine-a": 200}, ["-", "ordine-c"]],
+          [[amb["_tag_evento_p2p"](e, "d") for e in F["eventi"]], F["via"], list(SUBITO)])
     for momento in ("annullato", "scaduto"):
         amb["_foto_dopo_evento_p2p"]({"momento": momento, "ordine": "ordine-b", "ts": 300})
     prova("...e cosi' l'ANNULLATO e lo SCADUTO", [["ordine-c", None], 4],
@@ -52369,7 +52371,8 @@ def prove_card_p2p_vetrina():
     can = pezzo("annuncia_ordine_p2p_canale")
     prova("il client che ha appena pubblicato la rifa' anche lui, prima del canale e "
           "dopo le guardie", True,
-          can.index("raise HTTPException(\n            400, \"Amazon") < can.index("_foto_subito_p2p()")
+          can.index("raise HTTPException(\n            400, \"Amazon")
+          < can.index('_foto_subito_p2p(ordine if FORMA_ORDINE_P2P.fullmatch(ordine) else "")')
           < can.index("if canale_id():"))
     prova("la fotografia dell'orologio tiene fuori gli usciti, e la loro lista invecchia",
           True, "eventi=_senza_i_via_p2p(_vetrina_foto_p2p(ultimi, info, adesso), via))"
@@ -52381,7 +52384,8 @@ def prove_card_p2p_vetrina():
     amb2 = {"asyncio": _aio, "print": lambda *a, **k: None, "P2P_FOTO_MAX_S": 5,
             "_tag_evento_p2p": amb["_tag_evento_p2p"]}
     exec(_SORGENTE[i:_SORGENTE.index("def _facce_foto_p2p(", i)], amb2)
-    amb2["P2P_FOTO_SUBITO_S"] = 0
+    amb2["P2P_FOTO_SUBITO_RIPROVE"] = (0.01, 0.01, 0.01)
+    amb2["_P2P_FOTO"] = {"eventi": []}
 
     async def foto_finta():
         giri.append(1)
@@ -52401,6 +52405,53 @@ def prove_card_p2p_vetrina():
     amb2["_foto_subito_p2p"]()
     prova("...e senza un loop in corsa (una prova, un avvio) non esplode", None,
           amb2["_P2P_FOTO_SUBITO"]["task"])
+    # NESSUNA ATTESA FISSA (27 set 2026): il giro parte adesso, e con un
+    # ordine ATTESO riprova finche' la fotografia non lo porta
+    import time as _t
+    tempi = []
+
+    async def foto_misurata():
+        tempi.append(_t.monotonic())
+        if len(tempi) == 3:                       # al terzo giro il relay lo ha
+            amb2["_P2P_FOTO"]["eventi"] = [{"kind": 38383, "tags": [["d", "atteso-1"]]}]
+
+    amb2["_fotografa_libro_p2p"] = foto_misurata
+
+    async def attesa():
+        amb2["_P2P_FOTO"]["eventi"] = []
+        partito = _t.monotonic()
+        amb2["_foto_subito_p2p"]("atteso-1")
+        await amb2["_P2P_FOTO_SUBITO"]["task"]
+        return partito
+    partito = _aio.run(attesa())
+    prova("il giro parte SUBITO, senza i 3 s di ieri", True, tempi[0] - partito < 0.05)
+    prova("...e con l'ordine atteso riprova finche' la fotografia non lo porta, poi si ferma",
+          [3, set()], [len(tempi), amb2["_P2P_FOTO_SUBITO"]["attesi"]])
+    tempi.clear()
+    amb2["_P2P_FOTO"]["eventi"] = []
+    amb2["_fotografa_libro_p2p"] = foto_finta
+
+    async def mai():
+        giri.clear()
+        amb2["_foto_subito_p2p"]("mai-arrivato")
+        await amb2["_P2P_FOTO_SUBITO"]["task"]
+    _aio.run(mai())
+    prova("...un ordine che non arriva mai: un giro piu' le riprove, non all'infinito",
+          1 + 3, len(giri))
+    giri.clear()
+
+    async def uno():
+        amb2["_foto_subito_p2p"]()
+        await amb2["_P2P_FOTO_SUBITO"]["task"]
+    _aio.run(uno())
+    prova("...senza un ordine atteso il giro e' uno", 1, len(giri))
+    prova("il client manda l'id del suo ordine al canale, mai un nome provvisorio", True,
+          "annunciaCanaleP2P(lato, euro, metodo, ord.tabacchino ? ord.premioCotto : null,\n"
+          "                      provvisorioP2P(agg.id) ? '' : agg.id);" in mini)
+    prova("il ritorno nel libro aspetta il suo ordine, presa annullo e scadenza no", [True, True],
+          ['_foto_subito_p2p(ev["ordine"])' in pezzo("_foto_dopo_evento_p2p"),
+           "    if ev.get(\"momento\") in P2P_MOMENTI_FUORI_FOTO:\n        _foto_subito_p2p()\n"
+           in pezzo("_foto_dopo_evento_p2p")])
 
     # --- 2) IL CLIENT: dove sta, cosa legge ------------------------------
     i_b = mini.index("/* ============ LE CARD P2P IN VETRINA (26 set 2026")
@@ -52473,7 +52524,7 @@ def prove_card_p2p_vetrina():
                          os.path.exists(os.path.join("assets", "barattozon.webp"))])
     css = mini[mini.index("<style"):mini.index("</style>")]
     prova("la pastiglia sta sulla «foto»: colori FISSI, bianco su rosso e su verde",
-          [True, True], [".p2p-vt-lato.vende{background:#C2410C}" in css,
+          [True, True], [".p2p-vt-lato.vendi{background:#C2410C}" in css,
                          ".p2p-vt-lato.compra{background:#1B8B54}" in css])
 
     node = shutil.which("node")
@@ -52499,6 +52550,7 @@ const P2P_AFFARE_OTTIMO = 10, P2P_AFFARE_SUPER = 15;
 const P2P_TABACCHINO = 'Contanti al tabacchino';
 const P2P_TABACCHINO_PM = /^Contanti al tabacchino(?:\s+(\d+\.\d{2}))?$/;
 function badgePremioP2P(o){ return '<span class="p2p-badge">BADGE</span>'; }
+function feeMiaP2P(o){ return 0.03; }       // la fee viva: meta' a testa
 let cambioVivo = true, eurPerSat = 0.00075;
 /* il premio di Barattozon (26 set 2026): il cambio della pubblicazione */
 const P2P_PREMIO_TAB_MAX = 20;
@@ -52571,6 +52623,7 @@ const INVITO_ONION = {p2p: ''};
         + pezzo_js(mini, "function metroFissoP2P(o){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function premioCardP2P(o){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function affaroneP2P(o){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function nettoLatoP2P(o, sats){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function idMostroVero(id){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function prendiCambiPubP2P(m){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function tagValore(ev, nome){", "\n}\n") + "\n}\n" \
@@ -52586,6 +52639,7 @@ const out = {};
 /* LA CARD */
 p2pFacce = {v1: {nome: 'Luca', avatar: 'av_ab12_1.jpg'}, c1: {nome: 'giulia'}};
 out.vende = cardVetrinaP2P(O('v1', 'sell', 50));
+out.mio = cardVetrinaP2P(O('m9', 'sell', 40, {mio: true}));
 out.compra = cardVetrinaP2P(O('c1', 'buy', 80, {premium: 3, metodi: ['SEPA Instant']}));
 out.super = cardVetrinaP2P(O('s1', 'sell', 20, {euroMax: 150, premium: -16, metodi: ['Satispay']}));
 out.ottimo = cardVetrinaP2P(O('o1', 'buy', 30, {premium: 12}));
@@ -52656,7 +52710,7 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
               conta: el('p2pVetrinaConta').textContent, fetch: FETCH.length,
               url: FETCH[0] && FETCH[0].url, metodo: FETCH[0] && FETCH[0].metodo,
               auth: FETCH[0] && FETCH[0].h['X-Tg-Init-Data'], volto: p2pFacce.f7 && p2pFacce.f7.nome,
-              prossimo: TIMERS.map(t => t.ms > 59000 && t.ms <= 60000), primaCard: (el('p2pVetrinaFila').innerHTML.match(/data-p2p="([^"]+)"/) || [])[1]};
+              prossimo: TIMERS.map(t => t.ms > 14000 && t.ms <= 15000), primaCard: (el('p2pVetrinaFila').innerHTML.match(/data-p2p="([^"]+)"/) || [])[1]};
   const prima = el('p2pVetrinaFila').scritte;
   renderVetrinaP2P();
   out.doppioArmo = TIMERS.length;
@@ -52732,7 +52786,7 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
   RIGHE = {mio1: riga('mio1')};
   renderVetrinaP2P();
   out.mioSubito = {ids: ids(), volto: el('p2pVetrinaFila').innerHTML.includes('>I</span>'),
-                   vende: el('p2pVetrinaFila').innerHTML.includes('Vende BTC')};
+                   vende: el('p2pVetrinaFila').innerHTML.includes('Vendi BTC')};
   RIGHE = {'nuovo:3': riga('nuovo:3'), nc: riga('nc', {contattato: false}),
            vec: riga('vec', {creato: ADESSO - 700}), ann: riga('ann', {stato: 'annullato'}),
            lap: riga('lap'), alt: riga('alt', {mio: false}), pre: riga('pre', {stato: 'preso'})};
@@ -52804,16 +52858,37 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
 
     def c(k):
         return o[k]
-    prova("chi VENDE: «Vende BTC» in rosso, le monete, i 50 € interi, il volto con la foto",
-          [True, True, True, True, True, False],
-          ['p2p-vt-lato vende">Vende BTC<' in c("vende"), "scambi-intestazione.webp" in c("vende"),
-           '<div class="price">50<span class="unit eur">€</span>' in c("vende"),
+    # ⚠️ LA CARD PARLA A CHI GUARDA (27 set 2026, ritocco di Andrea che
+    # rovescia la prima stesura): chi ha pubblicato VENDE → «Compra BTC»
+    # verde, «Invia € · Ricevi sats»; chi ha pubblicato COMPRA → «Vendi BTC»
+    # rossa, «Ricevi € · Invia sats». I sats sono al netto della propria
+    # meta' di commissione (qui 3%: 1,5% a testa), lo stesso giudice del libro.
+    prova("chi ha pubblicato VENDE: a chi guarda «Compra BTC» in verde, «Invia 50 €», "
+          "«Ricevi» i sats al netto, le monete, il volto con la foto",
+          [True, True, True, True, True, True, False],
+          ['p2p-vt-lato compra">Compra BTC<' in c("vende"), "scambi-intestazione.webp" in c("vende"),
+           '<div class="price"><span class="p2p-vt-verbo">Invia</span>50<span class="unit eur">€</span>' in c("vende"),
+           '<span class="p2p-vt-verbo">Ricevi</span><span class="p2p-vt-cifra">≈ 65\u202f667 sats</span>' in c("vende"),
            'src="/foto/av_ab12_1.jpg"' in c("vende"), ">L</span>" in c("vende"), "50,00" in c("vende")])
-    prova("chi COMPRA: «Compra BTC» in verde, l'iniziale senza foto, il metodo",
-          [True, True, True], ['p2p-vt-lato compra">Compra BTC<' in c("compra"),
-                               ">g</span>" in c("compra"), '<div class="title">SEPA Instant</div>' in c("compra")])
-    prova("l'INTERVALLO: «20–150 €» e «scegli tu» al posto dei sats", [True, True],
-          ["20–150<span" in c("super"), '<div class="price-sub">scegli tu</div>' in c("super")])
+    prova("chi ha pubblicato COMPRA: a chi guarda «Vendi BTC» in rosso, «Ricevi 80 €», "
+          "«Invia» i sats al netto, l'iniziale senza foto, il metodo",
+          [True, True, True, True, True],
+          ['p2p-vt-lato vendi">Vendi BTC<' in c("compra"),
+           '<div class="price"><span class="p2p-vt-verbo">Ricevi</span>80<span' in c("compra"),
+           '<span class="p2p-vt-verbo">Invia</span><span class="p2p-vt-cifra">≈ 105\u202f019 sats</span>' in c("compra"),
+           ">g</span>" in c("compra"), '<div class="title">SEPA Instant</div>' in c("compra")])
+    prova("IL MIO ORDINE si guarda da dentro: il mio di vendita e' «Vendi BTC», ricevo gli "
+          "euro e invio i sats con la mia meta', e resta riconoscibile",
+          [True, True, True, True, True],
+          ['p2p-vt-lato vendi">Vendi BTC<' in c("mio"),
+           '<span class="p2p-vt-verbo">Ricevi</span>40<span' in c("mio"),
+           '<span class="p2p-vt-verbo">Invia</span><span class="p2p-vt-cifra">≈ 54\u202f133 sats</span>' in c("mio"),
+           "card-p2p-mio" in c("mio"), "il tuo ordine" in c("mio")])
+    prova("BARATTOZON (chi pubblica vende sats): a chi guarda «Compra BTC»", True,
+          'p2p-vt-lato compra">Compra BTC<' in c("bz"))
+    prova("l'INTERVALLO: «Invia 20–150 €» e «scegli tu» al posto dei sats", [True, True],
+          ['<span class="p2p-vt-verbo">Invia</span>20–150<span' in c("super"),
+           '<div class="price-sub"><span class="p2p-vt-cifra">scegli tu</span></div>' in c("super")])
     prova("il SUPER AFFARE e l'OTTIMO sul verso favorevole a chi guarda",
           [True, True], ["⚡⚡ Super affare" in c("super"), "⚡ Ottimo affare" in c("ottimo")
                          and "Super" not in c("ottimo")])
@@ -52830,7 +52905,7 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
           [True, False, True, True], ["⚡ Ottimo affare" in c("bzOttimo"), "affare</span>" in c("bzContro"),
                                       "BADGE" in c("bzContro"), "⚡⚡ Super affare" in c("fissoSuper")])
     prova("senza volto il tappo dice «?»; a cambio muto nessun numero inventato",
-          [True, False], [">?</span>" in c("bz"), "sats</div>" in c("muto")])
+          [True, False], [">?</span>" in c("bz"), "sats</span>" in c("muto")])
     prova("il testo di sconosciuti passa scappato: id e metodo", [False, False, True],
           ["<script>" in c("storta"), "<img src=x" in c("storta"),
            "&lt;img src=x onerror=alert(1)&gt;" in c("storta")])
@@ -52866,6 +52941,7 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
           [o["ritorno"], o["ritornoFetch"], o["dopoRitorno"]])
     prova("FUORI DA ESPLORA nessuna domanda e nessun giro", [6, 0], o["fuori"])
     prova("IN TUTTO IL BANCO LA FILA NON HA CHIAMATO NESSUN RELAY", [], o["relay"])
+    # (dal suo lato: il mio ordine di vendita, visto da me, e' «Vendi BTC»)
     prova("CHI PUBBLICA VEDE SUBITO LA SUA CARD, prima che la fotografia la porti: "
           "in testa, col suo volto, dal suo lato", {"ids": ["mio1", "h1"], "volto": True, "vende": True},
           o["mioSubito"])
@@ -68865,6 +68941,8 @@ function ricordaMazzo(){} async function cloudScrivi(){} function mazzoSerializz
 function mazzoMostro(){ return {}; } const CLOUD_MAZZO = 'x';
 function chiaveScambio(){ return {pub: 'ab'.repeat(32), sk: 'trade'}; }
 function nomeProvvisorioP2P(i){ return 'provvisorio-' + i; }
+/* (27 set 2026) il canale riceve l'id dell'ordine, mai un nome provvisorio */
+function provvisorioP2P(id){ return String(id || '').indexOf('provvisorio-') === 0; }
 async function registraChiaviP2P(){} async function mostroRiascolta(){}
 function messaggioMostro(){ return {}; } function nuovaRichiestaP2P(){ return 7; }
 let canale = 0; function annunciaCanaleP2P(){ canale++; }
@@ -69542,7 +69620,7 @@ def prove_p2p_canale():
 
     # --- 4) IL CLIENT: CHI CHIAMA, E CON COSA -------------------------
     mini = open("miniapp.html", encoding="utf-8").read()
-    ann = pezzo_js(mini, "async function annunciaCanaleP2P(lato, euro, metodo, premio){",
+    ann = pezzo_js(mini, "async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine){",
                    "\n}\n")
     # (26 set 2026) piu' il premio di Barattozon, e solo se e' un intero:
     # per gli altri ordini la chiave non c'e' e il corpo e' quello di ieri
@@ -69550,6 +69628,9 @@ def prove_p2p_canale():
           all(k not in ann for k in ("sk", "nsec", "trade"))
           and "const corpo = {lato: lato, euro: euro, metodo: metodo};" in ann
           and "if (Number.isInteger(premio)) corpo.premio = premio;" in ann
+          # (27 set 2026) e l'id del mio ordine, perche' il server sappia
+          # quale aspettare nella fotografia: e' gia' pubblico nel libro
+          and "if (ordine) corpo.ordine = String(ordine);" in ann
           and "body: JSON.stringify(corpo)" in ann)
     prova("sta fuori dal motore dello scambio", True,
           mini.index("async function annunciaCanaleP2P")
@@ -69558,7 +69639,8 @@ def prove_p2p_canale():
     prova("si chiama da dentro il motore, ma non c'e' scritto niente",
           True, "fetch(" not in invia)
     prova("...e SOLO dopo che l'ordine e' partito davvero, col premio del solo Barattozon", True,
-          invia.index("annunciaCanaleP2P(lato, euro, metodo, ord.tabacchino ? ord.premioCotto : null);")
+          # (27 set 2026: piu' l'id dell'ordine, mai un nome provvisorio)
+          invia.index("annunciaCanaleP2P(lato, euro, metodo, ord.tabacchino ? ord.premioCotto : null,")
           > invia.index("agg.contattato = true;"))
 
 
@@ -77363,7 +77445,8 @@ DOM = null;
           "/^Contanti al tabacchino(?:\\s+(\\d+\\.\\d{2}))?$/" in _riga("P2P_TABACCHINO_PM"))
     # (26 set 2026) la firma ha il premio di Barattozon in piu': un
     # intero, che dal libro si ricava comunque — non un dato Amazon
-    _can = pezzo_js(mini, "async function annunciaCanaleP2P(lato, euro, metodo, premio){", "\n}\n")
+    # (27 set 2026) e l'id dell'ordine, gia' pubblico nel libro
+    _can = pezzo_js(mini, "async function annunciaCanaleP2P(lato, euro, metodo, premio, ordine){", "\n}\n")
     prova("il canale riceve importo e metodo per nome: niente PayCode, niente scadenza", True,
           "PayCode" not in _can and "tab" not in re.sub(r"/\*[\s\S]*?\*/", "", _can).lower()
           .replace("tabacchino", "").replace("metabase", ""))

@@ -6924,15 +6924,17 @@
   personale delle commissioni».
   LE CARD P2P IN VETRINA (26 set 2026): una fila «Scambi P2P» sopra la
   griglia di Esplora (`#p2pVetrinaSez`), con le card degli ordini vivi
-  del libro — la `.card` del mercatino, «Vende/Compra BTC» dal lato di
-  chi ha pubblicato, le monete o il marchio di Barattozon, l'euro nel
+  del libro — la `.card` del mercatino, «Compra/Vendi BTC» dal lato di
+  CHI GUARDA (dal 27 set 2026: «Invia € · Ricevi sats» o il contrario,
+  netti; il mio ordine dal mio lato), le monete o il marchio di
+  Barattozon, l'euro nel
   cartellino, il volto e il premio (`affaroneP2P`, lo stesso cartellino
   della card del libro). Chi le vede lo decide il server
   (`_p2p_vetrina_per`, chiave `p2p_vetrina` della busta): a leva
   `P2P_IN_VETRINA` spenta moderatori e fase di prova, accesa tutti ma
   solo a fase aperta. La fonte e' la FOTOGRAFIA del server
-  (`/api/p2p/libro`, dalla memoria, cache privata di 30 s), chiesta
-  all'apertura di Esplora e ogni 60 s solo a Esplora davanti e pagina
+  (`/api/p2p/libro`, dalla memoria, cache privata di 10 s), chiesta
+  all'apertura di Esplora e ogni 15 s solo a Esplora davanti e pagina
   visibile (`armaFotoVetrinaP2P`), subito al ritorno: da Esplora nessun
   relay, l'ascolto vive solo nel P2P. Il server la rifa' subito agli
   avvisi 0007 di presa, annullo, scadenza e ritorno, e a

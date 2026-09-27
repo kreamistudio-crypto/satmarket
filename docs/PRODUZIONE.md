@@ -48,13 +48,14 @@ default del codice, e MODALITA_COLLAUDO col BOT_TOKEN vero fuori dal VPS
   `True` accende (una stringa «True» resta spenta, e all'avvio il
   journal lo dice). Si verifica nel pannello «⚙️ Stato delle leve»,
   riga «Card P2P in vetrina», e aprendo Esplora da un account qualunque.
-  La fila legge `/api/p2p/libro` ogni minuto (nessun relay dal
+  La fila legge `/api/p2p/libro` ogni 15 secondi (nessun relay dal
   telefono): se le card non si aggiornano, il primo posto e' la
   fotografia del server — `curl -s https://barattolo.store/api/p2p/libro
   | head -c 300` deve dire un `quando` recente — e poi il journal
-  dell'orologio P2P. Un ordine nuovo compare entro un minuto se nasce da
-  Barattolo (lo annuncia `/api/p2p/canale`), entro due se nasce da un
-  altro client di Mostro.
+  dell'orologio P2P. Un ordine nuovo compare entro 15 s se nasce da
+  Barattolo (lo annuncia `/api/p2p/canale`, e il server rifa' la
+  fotografia subito), entro un minuto e un quarto se nasce da un altro
+  client di Mostro (il giro dell'orologio piu' quello della fila).
 - LE NOTIFICHE PRECISE DEL P2P (16 set 2026) non hanno una leva loro:
   girano con `P2P_ATTIVO`, dentro lo stesso orologio del campanello,
   e leggono il libro dai relay del coordinator e poi dallo specchio.
