@@ -25690,7 +25690,27 @@ E L'ORDINE DELLA LISTA SEGUE LA DATA (decisione di Andrea, subito
   scelto, e la riga resta anche a scambio preso) e la card di «I miei
   scambi» (`premioMioP2P`, solo col cambio della pubblicazione). Il
   post nel canale lo dice con le stesse parole (`_premio_canale_p2p`,
-  solo sul tabacchino). Prima di pubblicare
+  solo sul tabacchino).
+  ⚠️ DAL 27 SET 2026 LE CARD DICONO LA CONVENIENZA VERA («la
+  convenienza vera negli ordini a sats fissi», ritocco di Andrea): per
+  OGNI ordine a sats fissi, Barattozon o no, `premioCardP2P` passa da
+  `convenienzaFissaP2P(o, metro)` — il premio-equivalente dei sats per
+  quegli euro, senza tetto, all'intero — e il metro lo sceglie
+  `metroFissoP2P`: il cambio di ADESSO finche' l'ordine e' da prendere,
+  quello DELLA PRESA dopo (`preso` = i miei sats detti, `satsMiei`;
+  `cambioPresa` in euro per bitcoin), 0 se preso senza quel cambio.
+  Il cambio della presa lo timbra il server in `p2p_scambi.cambio_presa`
+  quando mostrod racconta la presa (`_registra_evento_p2p(…, cambio)`,
+  una presa nuova lo riscrive) e lo serve nell'archivio, dove vince; il
+  telefono lo timbra da se' in `applicaMessaggioP2P` quando arrivano i
+  miei sats, solo su un messaggio fresco (`P2P_PRESA_FRESCA_S`). Badge,
+  cartellino, card di «I miei scambi» e conto (Controvalore al metro,
+  riga «Premio/Sconto» con la convenienza) la leggono tutti; in cima al
+  conto `rigaConvenienzaFissaP2P` mette i due numeri col segno e in
+  tinta — «Premio scelto · Al prezzo di adesso» a Barattozon
+  (`premioBzP2P`, ora solo il premio SCELTO), «Rispetto al mercato di
+  adesso» agli altri, «della presa» dopo. Gli ordini a mercato non
+  cambiano. Prima di pubblicare
   il RIEPILOGO (`riepilogoTabacchinoP2P`, una `chiediConferma` col
   timbro `confermato`). LA VITA NEL LIBRO SEGUE IL PAYCODE e rovescia
   le 24 ore del 22 set: `expires_at` = scadenza meno DUE ORE, margine

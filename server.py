@@ -5127,7 +5127,13 @@ def init_db():
         -- una vuota e' «un posto che in questo giro non c'e'».
         chiave_compratore TEXT DEFAULT '',
         chiave_venditore TEXT DEFAULT '',
-        aggiornato INTEGER DEFAULT 0
+        aggiornato INTEGER DEFAULT 0,
+        -- IL CAMBIO DELLA PRESA (27 set 2026): euro per bitcoin che il
+        -- server stava servendo quando mostrod ha raccontato la presa di
+        -- questo giro. A sats fissi la convenienza di uno scambio si
+        -- ferma li' (il client la rilegge dai sats e dagli euro con
+        -- questo metro); 0 = non si sa, e la convenienza tace.
+        cambio_presa REAL DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS p2p_avvisi(
         -- L'ANTI-DOPPIONE, ed e' UNO per tutte le strade (patch 0007):
@@ -6333,7 +6339,9 @@ def init_db():
     # le due trade key dette da mostrod (24 set 2026, «I miei scambi
     # su ogni dispositivo»): vedi lo schema di `p2p_scambi`
     for colonna in ("chiave_compratore TEXT DEFAULT ''",
-                    "chiave_venditore TEXT DEFAULT ''"):
+                    "chiave_venditore TEXT DEFAULT ''",
+                    # il cambio della presa (27 set 2026)
+                    "cambio_presa REAL DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE p2p_scambi ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -44984,7 +44992,7 @@ def _evento_p2p_pulito(d, adesso: int) -> dict:
     return ev
 
 
-def _registra_evento_p2p(con, ev: dict, adesso: int):
+def _registra_evento_p2p(con, ev: dict, adesso: int, cambio: float = 0.0):
     """LA CRONACA E LE PARTI. Pura sulla connessione. Torna None se
     l'evento e' GIA' ARRIVATO (il retry di mostrod porta lo stesso
     corpo, con la stessa ora: la chiave di `p2p_momenti` lo ferma), se
@@ -45061,6 +45069,15 @@ def _registra_evento_p2p(con, ev: dict, adesso: int):
             "chiave_venditore=excluded.chiave_venditore",
             (ev["ordine"], parti["compratore"], parti["venditore"], preso_dal,
              giro, adesso, ev["compratore_key"], ev["venditore_key"]))
+        # IL CAMBIO DELLA PRESA (27 set 2026): `cambio` e' quello che il
+        # server serve adesso (euro per bitcoin, 0 = non lo sa), e la
+        # presa e' questo istante — mostrod racconta entro un secondo.
+        # Ogni presa nuova lo riscrive, anche a zero: un giro ripreso
+        # non si porta il metro di quello prima. La chiamata col «preso»
+        # arrivato DOPO un fatto piu' recente non passa di qui.
+        if ev["momento"] == "preso":
+            con.execute("UPDATE p2p_scambi SET cambio_presa=? WHERE ordine=?",
+                        (cambio if cambio > 0 else 0, ev["ordine"]))
     # I DUE POSTI DEL LIBRO SI ALLINEANO A QUEL CHE HA DETTO (23 set
     # 2026, A1): la presa dichiarata dal telefono si conferma o cade, e
     # un'intestazione che mostrod smentisce si corregge. Il journal lo
@@ -45605,7 +45622,9 @@ async def evento_p2p(req: Request):
     con = db()
     try:
         ev = _evento_p2p_pulito(d, adesso)
-        fatto = _registra_evento_p2p(con, ev, adesso)
+        # col cambio di adesso, dalla cache: a una presa diventa il suo
+        # metro (27 set 2026)
+        fatto = _registra_evento_p2p(con, ev, adesso, cambio_noto_ora())
     except ValueError as e:
         print(f"⚠️ Evento P2P rifiutato: {e}", flush=True)
         raise HTTPException(400, str(e))
@@ -45916,7 +45935,7 @@ def _tocca_a_me_p2p(stato: str, lato: str, recapito_detto: bool) -> bool:
 def _scambi_p2p(con, io, adesso: int) -> dict:
     """PURA sulla connessione: gli scambi di `io` come il server li sa —
     `{ordine: {lato, mio, preso, euro, sats, metodi, cambio_pub, stato, stato_libro,
-    creato, quando, giro, chiave_mia, chiave_peer, sats_ordine,
+    creato, quando, giro, chiave_mia, chiave_peer, sats_ordine, cambio_presa,
     sats_miei, payout_fallito, momenti}}`. Entrano gli ordini che `io`
     ha pubblicato (`p2p_ordini`) e quelli in cui mostrod lo nomina come
     una delle due parti (`p2p_scambi`); il LATO e' quello detto da
@@ -45941,8 +45960,8 @@ def _scambi_p2p(con, io, adesso: int) -> dict:
             "cambio_pub, premio FROM p2p_ordini WHERE ordine=?", (ordine,)).fetchone()
         s = con.execute(
             "SELECT compratore, venditore, preso_dal, giro, sats, sats_compratore, "
-            "sats_venditore, chiave_compratore, chiave_venditore, aggiornato "
-            "FROM p2p_scambi WHERE ordine=?", (ordine,)).fetchone()
+            "sats_venditore, chiave_compratore, chiave_venditore, aggiornato, "
+            "cambio_presa FROM p2p_scambi WHERE ordine=?", (ordine,)).fetchone()
         compra = int(s["compratore"] or 0) if s else 0
         vende = int(s["venditore"] or 0) if s else 0
         libro = (o["lato"] if o else "") or ""
@@ -45996,6 +46015,9 @@ def _scambi_p2p(con, io, adesso: int) -> dict:
             "giro": int(s["giro"] or 0) if s else 0,
             "chiave_mia": chiavi[lato], "chiave_peer": chiavi[altro],
             "sats_ordine": int(s["sats"] or 0) if s else 0,
+            # il cambio della presa (27 set 2026): a sats fissi la
+            # convenienza dello scambio si ferma li'
+            "cambio_presa": float(s["cambio_presa"] or 0) if s else 0.0,
             "sats_miei": int((s["sats_compratore"] if lato == "compro"
                               else s["sats_venditore"]) or 0) if s else 0,
             "payout_fallito": bool(q["payout_fallito"]),

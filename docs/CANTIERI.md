@@ -34910,3 +34910,80 @@ restano arancio), l'intestazione «5 annullati · 1 tocca a te» e a filtro
 spento «1 scambio aperto · 1 tocca a te», il foglio «Sì, annulla /
 Indietro» e un altro foglio ancora con «Annulla»; nessuno scorrimento
 laterale, nessun errore dell'app.
+
+## La convenienza vera negli ordini a sats fissi (27 set 2026)
+
+IL RITOCCO (Andrea, su 40d2759): negli ordini a sats fissi — tutti i
+Barattozon, e gli ordini P2P normali a prezzo fisso — il vantaggio reale
+per chi prende cambia col prezzo del BTC, ma la card di Barattozon
+mostrava sempre il premio scelto alla pubblicazione, e un prezzo fisso
+non mostrava nessuna convenienza. Rovescia la scelta del giorno prima
+(«il premio scelto, che non balla»): quel numero adesso sta nel
+dettaglio, e la card dice il fatto di oggi.
+
+**COSA FA.** `convenienzaFissaP2P(o, metro)` e' il premio-equivalente
+dei sats fissi per quegli euro al metro dato, sulla scala e col verso di
+`premium`, **senza tetto** (anche 220%) e all'intero; `metroFissoP2P`
+sceglie il metro: il cambio di ADESSO (lo stesso degli ordini a mercato)
+finche' l'ordine e' da prendere, quello DELLA PRESA dopo, fermo; preso e
+senza quel cambio, niente — mai un numero inventato. `premioCardP2P` lo
+usa per OGNI prezzo fisso: badge e cartellino del libro e della vetrina,
+dal lato di chi guarda e nello stile degli ordini a mercato; la card di
+«I miei scambi» lo dice «per te». Nel dettaglio e nella pagina dello
+scambio il conto segue lo stesso metro (Controvalore al metro, la riga
+«Premio/Sconto» con la convenienza) e sopra c'e' la frase dei due numeri,
+`rigaConvenienzaFissaP2P`: «Premio scelto: −10% · Al prezzo di adesso:
+−32%» a Barattozon (il premio scelto da `premioBzP2P`, che adesso rilegge
+SOLO quello, col cambio della pubblicazione), «Rispetto al mercato di
+adesso: −220%» agli altri; dopo la presa «della presa». Qui i numeri
+portano il SEGNO — sono due, uno accanto all'altro, e si confrontano solo
+sulla stessa scala — e il verso per chi legge lo dice la tinta. Gli
+ordini a mercato restano come sono.
+**PRESO VUOL DIRE I MIEI SATS DETTI** (`satsMiei`), mai `satsNetti`: a
+un ordine fisso l'eco della pubblicazione lo scrive gia' nel libro, la
+lezione di 7251798. Per la stessa ragione il conto non guarda piu' la
+cifra detta (`satsDetti`) per decidere se la convenienza e' ferma: lo
+dice `preso`.
+
+**IL CAMBIO DELLA PRESA** lo timbra il SERVER quando mostrod racconta la
+presa (`p2p_scambi.cambio_presa`, colonna nuova col giro dei database di
+ieri; `_registra_evento_p2p` riceve il cambio che il server sta servendo,
+e una presa nuova lo riscrive, anche a zero se il cambio non c'e'),
+perche' e' l'unico posto che sa l'istante vero; lo serve l'archivio degli
+scambi, e nell'adozione vince. Il telefono lo timbra da se' quando
+arrivano i miei sats, ma solo su un messaggio fresco
+(`P2P_PRESA_FRESCA_S`, due minuti): uno applicato alla riapertura
+dell'app porterebbe il cambio di ore dopo.
+
+**LE STRADE SCARTATE.** Tenere il premio scelto sulla card con una
+guardia oltre N punti (l'avevo proposta il 26; Andrea vuole il numero
+vero). Un tetto alla convenienza come al cursore (e' un fatto del
+mercato, non una scelta). Il cambio della presa ricavato dallo storico
+dei prezzi (uno al giorno) o dai sats detti (per un fisso non dicono
+niente del mercato). Decidere «preso» da `satsNetti` o dalla cifra detta
+(l'eco della pubblicazione li scrive gia' nel libro).
+
+**PROVATO.** `prove_convenienza_vera` (nuova, 25): BTC fermo, salito e
+sceso del 20% per chi compra e per chi vende sats, Barattozon e prezzo
+fisso uguali; 220% e 98% senza tetto; l'intero; gli ordini a mercato
+invariati anche col bitcoin triplicato; a cambio muto i fissi tacciono;
+«per te» nel libro, ferma alla presa, muta senza il suo cambio, e
+`satsNetti` da solo che non vuol dire preso; la frase dei due numeri nei
+suoi cinque casi; il metro; e sul server il timbro sul database vero
+(alla presa, non sugli altri eventi, non sul retry, riscritto da una
+presa nuova e azzerato senza cambio), la colonna e l'archivio. EMENDATE
+col perche' le prove di ieri che dicevano il premio scelto sulla card
+(libro, vetrina, «I miei scambi», conto, «Info P2P») e quella che
+voleva muti i prezzi fissi. Tortura su una copia: 21 guasti di client e server, 21 presi. Suite intera severa senza config nel worktree da origin/main (7251798): 16.671 verdi e 0 rosse, i 25 collaudi della CI verdi nella gabbia; ribasato su ae125f5 (la fila dopo una pubblicazione e le card degli annullati, di altre sessioni) di nuovo tutta: 16.700 verdi e 0 rosse, e i 25 collaudi di nuovo verdi.
+DAL VIVO, sull'app da una copia (collaudo, relay morto, cambio vero) col
+BTC spostato del 20% in pagina: un Barattozon nato a −10 dice «32% più
+conveniente» e «Super affare», un fisso a 50 € «220%», l'ordine a mercato
+il suo −12; il dettaglio «Premio scelto: −10% · Al prezzo di adesso:
+−32%» e «Rispetto al mercato di adesso: −220%», la pagina di uno scambio
+concluso «della presa: −10%» fermo; Chrome headless via CDP a 320 e 375
+px nei due temi, nessuno scorrimento laterale, a 320 il «220%» sta nella
+card e il cartellino va a capo intero. Visto dal vivo e curato al primo
+giro: i due numeri della frase uscivano senza tinta (le regole stanno su
+`.ctrl-riga`), adesso verdi e rossi come le righe del conto.
+**DA AVERE:** il telefono con un Barattozon vero, e una presa vera col
+cambio timbrato dal server.

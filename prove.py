@@ -52566,7 +52566,9 @@ const INVITO_ONION = {p2p: ''};
         + pezzo_js(mini, "function affareP2P(o){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function premioImplicitoTabacchinoP2P(euro, sats, cambio){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function premioBarattozonP2P(o, pub, adesso){", "\n}\n") + "\n}\n" \
-        + pezzo_js(mini, "function premioBzP2P(o, vivo){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function premioBzP2P(o){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function convenienzaFissaP2P(o, metro){", "\n}\n") + "\n}\n" \
+        + pezzo_js(mini, "function metroFissoP2P(o){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function premioCardP2P(o){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function affaroneP2P(o){", "\n}\n") + "\n}\n" \
         + pezzo_js(mini, "function idMostroVero(id){", "\n}\n") + "\n}\n" \
@@ -52589,11 +52591,16 @@ out.super = cardVetrinaP2P(O('s1', 'sell', 20, {euroMax: 150, premium: -16, meto
 out.ottimo = cardVetrinaP2P(O('o1', 'buy', 30, {premium: 12}));
 out.contro = cardVetrinaP2P(O('x1', 'sell', 30, {premium: 16}));
 out.bz = cardVetrinaP2P(O('b1', 'sell', 23.47, {sats: 30000, metodi: ['Contanti al tabacchino 23.47']}));
-/* (26 set 2026) Barattozon col premio SCELTO: −12 a 90.000 €/BTC fa 29.207
-   sats; col cambio di adesso (0.00075) sarebbe un altro numero */
+/* (27 set 2026) a sats fissi la card dice la convenienza di ADESSO: al
+   cambio del banco (0.00075) 23,47 € fanno 31.293 sats pieni, quindi
+   35.048 sono un −12 e 27.538 un +12 — qualunque premio fosse stato
+   scelto (il cambio della pubblicazione qui dice 90.000 €/BTC e non
+   conta). E il prezzo fisso non Barattozon ha il suo cartellino: 30 €
+   per 46.400 sats sono un −16, Super. */
 p2pCambiPub = {b2: 90000, b3: 90000};
-out.bzOttimo = cardVetrinaP2P(O('b2', 'sell', 23.47, {sats: 29207, metodi: ['Contanti al tabacchino 23.47']}));
-out.bzContro = cardVetrinaP2P(O('b3', 'sell', 23.47, {sats: 22948, metodi: ['Contanti al tabacchino 23.47']}));
+out.bzOttimo = cardVetrinaP2P(O('b2', 'sell', 23.47, {sats: 35048, metodi: ['Contanti al tabacchino 23.47']}));
+out.bzContro = cardVetrinaP2P(O('b3', 'sell', 23.47, {sats: 27538, metodi: ['Contanti al tabacchino 23.47']}));
+out.fissoSuper = cardVetrinaP2P(O('fs', 'sell', 30, {sats: 46400, metodi: ['Revolut']}));
 out.storta = cardVetrinaP2P(O('a"><script>', 'sell', 10, {metodi: ['<img src=x onerror=alert(1)>']}));
 cambioVivo = false; eurPerSat = 0;
 out.muto = cardVetrinaP2P(O('m1', 'sell', 10));
@@ -52817,11 +52824,11 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
           ["card-p2p card-p2p-bz" in c("bz"), "barattozon.webp" in c("bz"),
            "scambi-intestazione.webp" in c("bz"), "23,47<span" in c("bz"),
            '<div class="title">Contanti al tabacchino</div>' in c("bz")])
-    # (26 set 2026, «il premio non si vede») il cartellino anche per
-    # Barattozon, col premio SCELTO riletto col cambio della pubblicazione
-    prova("BARATTOZON col premio scelto: −12 da «Ottimo affare», +12 niente cartellino",
-          [True, False, True], ["⚡ Ottimo affare" in c("bzOttimo"), "affare</span>" in c("bzContro"),
-                                "BADGE" in c("bzContro")])
+    # (27 set 2026, «la convenienza vera») il cartellino a sats fissi
+    # guarda la convenienza di ADESSO, per Barattozon e per ogni prezzo fisso
+    prova("SATS FISSI: −12 di adesso da «Ottimo affare», +12 niente, il fisso a −16 «Super»",
+          [True, False, True, True], ["⚡ Ottimo affare" in c("bzOttimo"), "affare</span>" in c("bzContro"),
+                                      "BADGE" in c("bzContro"), "⚡⚡ Super affare" in c("fissoSuper")])
     prova("senza volto il tappo dice «?»; a cambio muto nessun numero inventato",
           [True, False], [">?</span>" in c("bz"), "sats</div>" in c("muto")])
     prova("il testo di sconosciuti passa scappato: id e metodo", [False, False, True],
@@ -55123,7 +55130,9 @@ def prove_p2p_libro():
               # pubblicazione: il giudice puro, quello con la pagina, e
               # quello della card che li sceglie
               "function premioBarattozonP2P(o, pub, adesso){",
-              "function premioBzP2P(o, vivo){",
+              "function premioBzP2P(o){",
+              # (27 set 2026) la convenienza vera dei prezzi fissi
+              "function convenienzaFissaP2P(o, metro){", "function metroFissoP2P(o){",
               "function premioCardP2P(o){"):
         pezzi.append(pezzo_js(mini, f, "\n}\n") + "\n}")
     pezzi.append(re.search(r"const P2P_PREMIO_TAB_MAX = [^\n]*;", mini).group(0))
@@ -56424,8 +56433,12 @@ def prove_p2p_dettaglio():
         # vede» lo rilegge col cambio della PUBBLICAZIONE: il giudice
         # puro e quello che guarda la riga, il server e il cambio vivo
         "function premioBarattozonP2P(o, pub, adesso){",
-        "function premioBzP2P(o, vivo){",
+        "function premioBzP2P(o){",
+        # (27 set 2026) la convenienza vera dei prezzi fissi, e la sua riga
+        "function convenienzaFissaP2P(o, metro){", "function metroFissoP2P(o){",
         "function contoDettP2P(o){",
+        # (27 set 2026) la riga «Premio scelto · Al prezzo di adesso»
+        "function rigaConvenienzaFissaP2P(o, conv){",
         # ...e la traduzione del lato, che e' come il conto arriva
         # alla pagina di uno scambio PROPRIO
         "function comeLibroP2P(o){",
@@ -56567,31 +56580,35 @@ const TAB = ['Contanti al tabacchino 6.00'];
 out.contoTabPremio = contoDettP2P(ordine({sats: 11400, metodi: TAB}));
 out.contoTabSconto = contoDettP2P(ordine({sats: 12600, metodi: TAB}));
 out.contoTabPieno = contoDettP2P(ordine({sats: 12000, metodi: TAB}));
-/* ...ma a cifra DETTA dal coordinatore lo scambio e' fatto: niente
-   riga del premio, che si muoverebbe col mercato su un affare chiuso */
+/* ⚠️ (27 set 2026) la cifra DETTA non vuol dire PRESO: a un ordine fisso
+   l'eco della pubblicazione la scrive gia' nel libro (7251798), e il
+   conto resta sulla convenienza di adesso finche' chi chiama non dice
+   `preso` */
 out.contoTabDetto = contoDettP2P(Object.assign(
   ordine({sats: 11400, metodi: TAB}), {satsDetti: 11400}));
 /* e a cambio muto il premio non si inventa */
 cambioVivo = false;
 out.contoTabMuto = contoDettP2P(ordine({sats: 11400, metodi: TAB}));
 cambioVivo = true;
-/* ---- IL PREMIO SCELTO (26 set 2026, «il premio non si vede») ----
-   Col cambio della PUBBLICAZIONE (50.000 €/BTC = 0.0005 €/sat) il
-   premio torna quello scelto anche se il mercato e' andato a 0.00055:
-   col cambio di adesso 11400 sats sarebbero uno sconto del 4-5%. E
-   resta anche a cifra detta, perche' non si muove piu'. Dalla riga
-   (`cambioPub`, i miei) e dal server (`p2pCambiPub`, il libro). */
-eurPerSat = 0.00055;
-out.contoTabScelto = contoDettP2P(ordine({sats: 11400, metodi: TAB, cambioPub: 50000}));
-out.contoTabSceltoSconto = contoDettP2P(ordine({sats: 12600, metodi: TAB, cambioPub: 50000}));
-out.contoTabSceltoDetto = contoDettP2P(Object.assign(
-  ordine({sats: 11400, metodi: TAB, cambioPub: 50000}), {satsDetti: 11400}));
+/* ---- LA CONVENIENZA VERA (27 set 2026, ritocco di Andrea a 40d2759) ----
+   Il BTC e' salito del 20%: 0.0006 €/sat, e 6 € fanno 10.000 sats pieni.
+   Un Barattozon nato a +5 (11.400 sats a 50.000 €/BTC) adesso e' uno
+   SCONTO del 14% per chi prende: la riga del conto e il Controvalore
+   seguono il mercato, e sopra il conto la riga dice i due numeri.
+   Dopo la presa (`preso`, col suo cambio) tutto si ferma a quel momento;
+   preso e senza cambio della presa la convenienza tace. Il prezzo fisso
+   non Barattozon ha la sua riga, senza premio scelto. */
+eurPerSat = 0.0006;
+out.contoAdesso = contoDettP2P(ordine({sats: 11400, metodi: TAB, cambioPub: 50000}));
 p2pCambiPub = {'ord-srv': 50000};
-out.contoTabServer = contoDettP2P(ordine({id: 'ord-srv', sats: 11400, metodi: TAB}));
+out.contoServer = contoDettP2P(ordine({id: 'ord-srv', sats: 11400, metodi: TAB}));
 p2pCambiPub = {};
-/* ...e un metro che desse un premio fuori scala non si crede: vale il
-   cambio di adesso (un client altrui, una riga storta) */
-out.contoTabMetroStorto = contoDettP2P(ordine({sats: 11455, metodi: TAB, cambioPub: 200000}));
+out.contoPreso = contoDettP2P(Object.assign(ordine({sats: 11400, metodi: TAB, cambioPub: 50000}),
+  {satsDetti: 11400, preso: true, cambioPresa: 50000}));
+out.contoPresoSenza = contoDettP2P(Object.assign(ordine({sats: 11400, metodi: TAB, cambioPub: 50000}),
+  {satsDetti: 11400, preso: true}));
+out.contoFissoAdesso = contoDettP2P(ordine({sats: 11400, metodi: ['Revolut']}));
+out.contoMercatoIntatto = contoDettP2P(ordine({premium: 4}));
 eurPerSat = 0.0005;
 /* l'intervallo: ogni riga porta i due capi */
 out.contoRange = contoDettP2P(ordine({euro: 20, euroMax: 100}));
@@ -57079,40 +57096,49 @@ console.log(JSON.stringify(out));
     # ⚠️ QUANDO IL COORDINATORE HA DETTO LA CIFRA lo scambio e' fatto:
     # un premio che continuasse a muoversi col mercato racconterebbe un
     # affare chiuso, ed e' la promessa di «Info P2P»
-    # (26 set 2026) vale ancora per gli ordini SENZA cambio della
-    # pubblicazione, dove il premio sarebbe il ricalcolo col mercato
-    prova("...e a cifra detta dal coordinatore il premio ricalcolato non si rilegge piu'",
-          True, "Premio al venditore" not in o["contoTabDetto"]
-          and "Subtotale" not in o["contoTabDetto"])
+    # ⚠️ ROVESCIATA IL 27 SET 2026: a sats fissi la cifra DETTA non dice
+    # «preso» (l'eco della pubblicazione la scrive nel libro), e il conto
+    # resta sulla convenienza di adesso. A fermarlo e' `preso`, qui sotto
+    prova("...e la cifra detta senza `preso` resta sulla convenienza di adesso",
+          True, "Premio al venditore" in o["contoTabDetto"]
+          and "Subtotale" in o["contoTabDetto"])
     prova("...a cambio muto non si inventa nessun premio",
           True, "Premio al venditore" not in o["contoTabMuto"]
           and "Sconto del venditore" not in o["contoTabMuto"])
-    # --- IL PREMIO SCELTO (26 set 2026, «il premio non si vede») -------
-    # Col cambio della pubblicazione il premio e' quello scelto e NON
-    # BALLA: il mercato e' andato da 0.0005 a 0.00055 e la riga dice
-    # ancora +5%, col Controvalore scorporato dai sats (12000) e non
-    # rifatto col cambio di adesso (10909).
-    prova("col cambio della pubblicazione il premio e' quello scelto, anche a mercato mosso",
-          True, "Premio al venditore" in o["contoTabScelto"]
-          and 'p2p-avviso">5%<' in o["contoTabScelto"]
-          and "≈ 12000 sats" in o["contoTabScelto"]
-          and '<span class="num meno">≈ −600 sats</span>' in o["contoTabScelto"]
-          and ">11400 sats<" in o["contoTabScelto"]
-          and "10909" not in o["contoTabScelto"])
-    prova("...lo sconto scelto uguale, in verde",
-          True, "Sconto del venditore" in o["contoTabSceltoSconto"]
-          and 'p2p-affare">5%<' in o["contoTabSceltoSconto"]
-          and '<span class="num piu">≈ +600 sats</span>' in o["contoTabSceltoSconto"])
-    prova("...e a scambio preso RESTA: e' un fatto dell'ordine, non si muove col mercato",
-          True, "Premio al venditore" in o["contoTabSceltoDetto"]
-          and 'p2p-avviso">5%<' in o["contoTabSceltoDetto"]
-          and "Subtotale" in o["contoTabSceltoDetto"])
-    prova("...il cambio detto dal server vale come quello della riga",
-          True, 'p2p-avviso">5%<' in o["contoTabServer"]
-          and "Premio al venditore" in o["contoTabServer"])
-    prova("...e un metro che darebbe un premio fuori scala non si crede: vale il mercato di adesso",
-          True, "Sconto del venditore" in o["contoTabMetroStorto"]
-          and 'p2p-affare">5%<' in o["contoTabMetroStorto"])
+    # --- LA CONVENIENZA VERA (27 set 2026) -------------------------------
+    # BTC su del 20%: il Barattozon nato a +5 oggi e' uno sconto del 14%
+    # per chi prende — riga, Controvalore (10000 e non 12000) e la frase
+    # coi DUE numeri: il premio scelto e quello di adesso, col segno e in
+    # tinta dal lato di chi guarda (+5 rosso, −14 verde)
+    prova("Barattozon a mercato mosso: la riga dice il −14 di adesso, e la frase i due numeri",
+          True, "Sconto del venditore" in o["contoAdesso"]
+          and 'p2p-affare">14%<' in o["contoAdesso"]
+          and "≈ 10000 sats" in o["contoAdesso"]
+          and '<span class="num piu">≈ +1400 sats</span>' in o["contoAdesso"]
+          and ">11400 sats<" in o["contoAdesso"]
+          and '<div class="ctrl-conv">Premio scelto: <b class="p2p-avviso">+5%</b> · '
+              'Al prezzo di adesso: <b class="p2p-affare">−14%</b></div>' in o["contoAdesso"])
+    prova("...il premio scelto viene anche dal cambio detto dal server",
+          True, 'Premio scelto: <b class="p2p-avviso">+5%</b>' in o["contoServer"])
+    prova("...DOPO LA PRESA tutto si ferma al cambio di quel momento: +5, Controvalore 12000",
+          True, "Premio al venditore" in o["contoPreso"]
+          and 'p2p-avviso">5%<' in o["contoPreso"]
+          and "≈ 12000 sats" in o["contoPreso"]
+          and 'Al prezzo della presa: <b class="p2p-avviso">+5%</b>' in o["contoPreso"]
+          and "adesso" not in o["contoPreso"])
+    prova("...e preso senza il cambio della presa: niente riga, resta il solo premio scelto",
+          True, "Premio al venditore" not in o["contoPresoSenza"]
+          and "Sconto del venditore" not in o["contoPresoSenza"]
+          and '<div class="ctrl-conv">Premio scelto: <b class="p2p-avviso">+5%</b></div>'
+              in o["contoPresoSenza"])
+    prova("il prezzo fisso NON Barattozon: «Rispetto al mercato di adesso», senza premio scelto",
+          True, '<div class="ctrl-conv">Rispetto al mercato di adesso: '
+                '<b class="p2p-affare">−14%</b></div>' in o["contoFissoAdesso"]
+          and "Sconto del venditore" in o["contoFissoAdesso"]
+          and "Premio scelto" not in o["contoFissoAdesso"])
+    prova("...e l'ordine a MERCATO resta com'era: nessuna frase, il suo premio",
+          True, "ctrl-conv" not in o["contoMercatoIntatto"]
+          and 'p2p-avviso">4%<' in o["contoMercatoIntatto"])
     prova("un intervallo porta i due capi su ogni riga", True,
           "≈ 40000–200000 sats" in o["contoRange"]
           and "≈ 39600–198000 sats" in o["contoRange"]
@@ -72768,12 +72794,11 @@ def prove_p2p_card_scambio():
           mini.count("' conveniente</span>'"))
     # IL SEGNO LO SCRIVE `premioTestoP2P`, che gia' lo fa per i capi
     # del cursore del filtro: il «−» tipografico sta in un posto solo.
-    # (26 set 2026) su `p`, che per Barattozon e' il premio scelto
-    # riletto col cambio della pubblicazione e per gli altri `o.premium`
+    # (27 set 2026) su `p`, che a sats fissi e' la convenienza vera —
+    # adesso nel libro, ferma alla presa — e per gli altri `o.premium`
     prova("il segno del premio viene da premioTestoP2P", True,
           "premioTestoP2P(p)" in _mio
-          and "(tabacchinoP2P(o.metodi) ? premioBzP2P(o, false) : null)" in _mio
-          and ": (o.premium || 0);" in _mio)
+          and "const p = o.sats > 0 ? convenienzaFissaP2P(o, metroFissoP2P(o)) : (o.premium || 0);" in _mio)
     # ⚠️ LA CARD E IL CAPPELLO NON CONDIVIDONO PIU' NIENTE DI TESTO
     # (set 2026, due ritocchi di Andrea in fila). Il primo aveva
     # spezzato il verbo — «Vuoi comprare/vendere» nella lista, «Stai
@@ -72973,7 +72998,9 @@ def prove_p2p_card_scambio():
         # uno scambio proprio mostra col cambio della pubblicazione
         "function premioImplicitoTabacchinoP2P(euro, sats, cambio){",
         "function premioBarattozonP2P(o, pub, adesso){",
-        "function premioBzP2P(o, vivo){",
+        "function premioBzP2P(o){",
+        # (27 set 2026) la convenienza vera dei prezzi fissi, e la sua riga
+        "function convenienzaFissaP2P(o, metro){", "function metroFissoP2P(o){",
         "function vesteMetodoP2P(m){",
         "function marchioMetodoP2P(m, conTesto){",
         "function iconaMetodiP2P(metodi){",
@@ -73010,17 +73037,22 @@ const riga = (o) => Object.assign({
   id: 'ord-1', lato: 'compro', stato: 'pubblicato', euro: 5, euroMax: 0,
   sats: 0, satsNetti: 0, premium: 0, creato: 1000, metodi: ['SEPA']}, o);
 const out = {};
-/* IL PREMIO SCELTO DI BARATTOZON (26 set 2026): 23,47 € a 90.000 €/BTC
-   fanno 26.078 sats pieni; −10 = 28.686, +5 = 24.774. Il cambio di
-   adesso del banco (0.001) darebbe tutt'altro: vale quello della riga,
-   anche a scambio chiuso. Senza cambio della pubblicazione tace. */
+/* LA CONVENIENZA VERA SULLA MIA CARD (27 set 2026). Nel libro quella di
+   ADESSO: al cambio del banco (0.001) 23,47 € fanno 23.470 sats pieni,
+   quindi 28.686 sono un −22, 22.297 un +5, 23.470 lo zero — il premio
+   scelto alla pubblicazione (qui −10 a 90.000 €/BTC) non conta piu'.
+   Dopo la presa (i MIEI sats detti) quella di quel momento, ferma: col
+   cambio della presa a 90.000 €/BTC i 28.686 sats tornano il −10 anche
+   a scambio chiuso; preso e senza quel cambio, la card tace. */
 const BZ = ['Contanti al tabacchino 23.47'];
-out.bzMenoDieci = rigaScambioP2P(riga({lato: 'vendo', euro: 23.47, sats: 28686, metodi: BZ, cambioPub: 90000}));
-out.bzPiuCinque = rigaScambioP2P(riga({lato: 'vendo', euro: 23.47, sats: 24774, metodi: BZ, cambioPub: 90000}));
-out.bzZero = rigaScambioP2P(riga({lato: 'vendo', euro: 23.47, sats: 26078, metodi: BZ, cambioPub: 90000}));
+out.bzLibro = rigaScambioP2P(riga({lato: 'vendo', euro: 23.47, sats: 28686, metodi: BZ, cambioPub: 90000}));
+out.bzPiuCinque = rigaScambioP2P(riga({lato: 'vendo', euro: 23.47, sats: 22297, metodi: BZ}));
+out.bzZero = rigaScambioP2P(riga({lato: 'vendo', euro: 23.47, sats: 23470, metodi: BZ}));
+out.bzPreso = rigaScambioP2P(riga({lato: 'vendo', euro: 23.47, sats: 28686, metodi: BZ, cambioPub: 90000,
+                                   satsMiei: 29117, cambioPresa: 90000}));
 out.bzChiuso = rigaScambioP2P(riga({lato: 'vendo', euro: 23.47, sats: 28686, metodi: BZ, cambioPub: 90000,
-                                    stato: 'concluso'}));
-out.bzSenzaCambio = rigaScambioP2P(riga({lato: 'vendo', euro: 23.47, sats: 28686, metodi: BZ}));
+                                    satsMiei: 29117, cambioPresa: 90000, stato: 'concluso'}));
+out.bzSenzaCambio = rigaScambioP2P(riga({lato: 'vendo', euro: 23.47, sats: 28686, metodi: BZ, satsMiei: 29117}));
 out.compro = rigaScambioP2P(riga({}));
 out.vendo = rigaScambioP2P(riga({lato: 'vendo'}));
 /* IL SEGNO E' UN FATTO, LA TINTA UN GIUDIZIO: gli stessi quattro casi
@@ -73317,19 +73349,25 @@ console.log(JSON.stringify(out));
     prova("...e ogni card dice il giudizio, dichiarando per CHI",
           [True, True], o["perTe"])
     prova("a premio zero la frase c'e' lo stesso", True, o["zeroParla"])
-    prova("a prezzo fisso il premio non c'e' proprio", True,
-          "p2p-badge" not in o["fisso"]
-          and "al prezzo di mercato" not in o["fisso"])
-    # --- BARATTOZON NEI MIEI SCAMBI (26 set 2026, «il premio non si
-    # vede»): il premio SCELTO, riletto col cambio della pubblicazione —
-    # sul mio ordine di vendita un −10% e' uno sconto che PAGO io
-    prova("Barattozon: il premio scelto sulla mia card, −10, +5 e zero, col segno e «per te»",
+    # ⚠️ ROVESCIATA IL 27 SET 2026 («la convenienza vera»): fino a ieri
+    # «a prezzo fisso il premio non c'e' proprio — quel prezzo il mercato
+    # non lo guarda». Ma il vantaggio di chi prende si muove col bitcoin, e
+    # Andrea l'ha chiesto anche qui: 12.000 sats per 5 € a 0.001 sono il
+    # 140% sopra il mercato — senza tetto
+    prova("a prezzo fisso la convenienza vera, col segno, «per te» e senza tetto", True,
+          '<b class="p2p-affare">−140%</b> più conveniente per te' in o["fisso"])
+    # --- BARATTOZON NEI MIEI SCAMBI (27 set 2026): nel libro la
+    # convenienza di ADESSO, dopo la presa quella di quel momento, ferma.
+    # Sul mio ordine di vendita un «−» e' uno sconto che PAGO io
+    prova("Barattozon nel libro: la convenienza di adesso, −22 (non il −10 scelto), +5 e zero",
           [True, True, True],
-          ['<b class="p2p-avviso">−10%</b> meno conveniente per te' in o["bzMenoDieci"],
+          ['<b class="p2p-avviso">−22%</b> meno conveniente per te' in o["bzLibro"],
            '<b class="p2p-affare">+5%</b> più conveniente per te' in o["bzPiuCinque"],
            '<span class="p2p-badge">al prezzo di mercato</span>' in o["bzZero"]])
-    prova("...e resta a scambio chiuso, mentre senza cambio della pubblicazione tace",
-          [True, False], ['−10%</b>' in o["bzChiuso"], "p2p-badge" in o["bzSenzaCambio"]])
+    prova("...preso: quella della presa (−10), anche a scambio chiuso; senza il suo cambio tace",
+          [True, True, False],
+          ['<b class="p2p-avviso">−10%</b> meno conveniente per te' in o["bzPreso"],
+           '−10%</b>' in o["bzChiuso"], "p2p-badge" in o["bzSenzaCambio"]])
 
     # IL METODO: l'elenco finche' nessuno ha scelto, la scelta quando
     # c'e'. E fail-closed — un metodo fuori dall'elenco non e' una
@@ -76184,7 +76222,8 @@ def prove_premio_barattozon():
         "function metodoTabacchinoP2P(importo){", "function vitaLibroTabacchinoP2P(scade, adesso){",
         "function ordineDaCampiP2P(v, lato){",
         "function premioImplicitoTabacchinoP2P(euro, sats, cambio){",
-        "function premioBarattozonP2P(o, pub, adesso){", "function premioBzP2P(o, vivo){",
+        "function premioBarattozonP2P(o, pub, adesso){", "function premioBzP2P(o){",
+        "function convenienzaFissaP2P(o, metro){", "function metroFissoP2P(o){",
         "function premioCardP2P(o){", "function affareP2P(o){",
         "function badgePremioP2P(o){", "function affaroneP2P(o){",
         "function premioTestoP2P(n){", "function premioMioP2P(o){", "function comeLibroP2P(o){",
@@ -76232,8 +76271,11 @@ out.puro = [
   premioBarattozonP2P({sats: 44000, euro: 0, metodi: T}, 50000, 0.0005),      // euro ignoto
   premioBarattozonP2P(null, 50000, 0.0005)];
 /* 4) QUEL CHE SI VEDE: il libro, la vetrina e i miei scambi, con −10,
-   +5 e zero scelti a 50.000 €/BTC e il mercato andato a 0.00055 */
-eurPerSat = 0.00055;
+   +5 e zero scelti a 50.000 €/BTC. ⚠️ (27 set 2026) A MERCATO FERMO: da
+   «la convenienza vera» le card dicono la convenienza di ADESSO, che a
+   mercato fermo e' proprio il premio scelto; il mercato che si muove lo
+   prova `prove_convenienza_vera` */
+eurPerSat = 0.0005;
 const bz = (sats, extra) => Object.assign({id: 'x', lato: 'sell', euro: 20, sats, premium: 0,
                                            metodi: T, cambioPub: 50000}, extra || {});
 out.libro = [badgePremioP2P(bz(44000)), badgePremioP2P(bz(38000)), badgePremioP2P(bz(40000))];
@@ -76246,18 +76288,17 @@ out.miei = [premioMioP2P(mio(44000)), premioMioP2P(mio(42000)), premioMioP2P(mio
 /* dal server invece che dalla riga, per un id vero */
 const ID = '0b0e7c3e-1111-4222-8333-444455556666';
 out.nuovi = prendiCambiPubP2P({[ID]: 50000, 'storto': 50000, '__proto__': 9});
-out.server = badgePremioP2P({id: ID, lato: 'sell', euro: 20, sats: 44000, premium: 0, metodi: T});
-/* 5) GLI ORDINI NORMALI, invariati: gli stessi testi di prima */
+out.server = premioBzP2P({id: ID, lato: 'sell', euro: 20, sats: 44000, premium: 0, metodi: T});
+/* 5) GLI ORDINI A MERCATO, invariati: gli stessi testi di prima (i
+   prezzi fissi non Barattozon dal 27 set 2026 parlano anche loro, e
+   stanno in `prove_convenienza_vera`) */
 out.normali = [badgePremioP2P({lato: 'sell', euro: 20, sats: 0, premium: -4, metodi: ['SEPA']}),
                badgePremioP2P({lato: 'buy', euro: 20, sats: 0, premium: 4, metodi: ['SEPA']}),
                badgePremioP2P({lato: 'sell', euro: 20, sats: 0, premium: 0, metodi: ['SEPA']}),
-               badgePremioP2P({lato: 'sell', euro: 20, sats: 39000, premium: 0, metodi: ['SEPA']}),
                affaroneP2P({lato: 'sell', euro: 20, sats: 0, premium: -16, metodi: ['SEPA']}),
                affaroneP2P({lato: 'buy', euro: 20, sats: 0, premium: 12, metodi: ['SEPA']}),
                affaroneP2P({lato: 'sell', euro: 20, sats: 0, premium: 12, metodi: ['SEPA']}),
-               affaroneP2P({lato: 'sell', euro: 20, sats: 39000, premium: 0, metodi: ['SEPA']}),
-               premioMioP2P(comeLibroP2P({lato: 'vendo', euro: 20, sats: 0, premium: 3, metodi: ['SEPA']})),
-               premioMioP2P(comeLibroP2P({lato: 'vendo', euro: 20, sats: 12000, premium: 0, metodi: ['SEPA']}))];
+               premioMioP2P(comeLibroP2P({lato: 'vendo', euro: 20, sats: 0, premium: 3, metodi: ['SEPA']}))];
 process.stdout.write(JSON.stringify(out));
 """
     d = tempfile.mkdtemp()
@@ -76282,7 +76323,7 @@ process.stdout.write(JSON.stringify(out));
           [], o["giro"])
     prova("il giudice puro: detto, ripiego, niente, metro storto, altri metodi, a mercato, euro ignoto, null",
           [-10, -10, None, -10, None, None, None, None], o["puro"])
-    prova("il LIBRO dice il premio scelto come per gli altri ordini: −10, +5, zero",
+    prova("il LIBRO a mercato fermo dice il premio scelto come per gli altri ordini: −10, +5, zero",
           ['<span class="p2p-badge"><b class="p2p-affare">10%</b> più conveniente</span>',
            '<span class="p2p-badge"><b class="p2p-avviso">5%</b> meno conveniente</span>',
            '<span class="p2p-badge">al prezzo di mercato</span>'], o["libro"])
@@ -76295,17 +76336,230 @@ process.stdout.write(JSON.stringify(out));
           ['<span class="p2p-badge"><b class="p2p-avviso">−10%</b> meno conveniente per te</span>',
            '<span class="p2p-badge"><b class="p2p-avviso">−5%</b> meno conveniente per te</span>',
            '<span class="p2p-badge">al prezzo di mercato</span>'], o["miei"])
-    prova("dal server: entra solo l'id vero, e la card lo usa",
-          [True, '<span class="p2p-badge"><b class="p2p-affare">10%</b> più conveniente</span>'],
-          [o["nuovi"], o["server"]])
-    prova("GLI ORDINI NORMALI sono invariati: badge, cartellino e «per te» come prima",
+    # (27 set 2026) il premio SCELTO dal server lo legge il dettaglio
+    # (`rigaConvenienzaFissaP2P`), non piu' la card
+    prova("dal server: entra solo l'id vero, e il premio scelto si rilegge",
+          [True, -10], [o["nuovi"], o["server"]])
+    prova("GLI ORDINI A MERCATO sono invariati: badge, cartellino e «per te» come prima",
           ['<span class="p2p-badge"><b class="p2p-affare">4%</b> più conveniente</span>',
            '<span class="p2p-badge"><b class="p2p-affare">4%</b> più conveniente</span>',
-           '<span class="p2p-badge">al prezzo di mercato</span>', '',
+           '<span class="p2p-badge">al prezzo di mercato</span>',
            '<span class="p2p-affarone super">⚡⚡ Super affare</span>',
-           '<span class="p2p-affarone">⚡ Ottimo affare</span>', '', '',
-           '<span class="p2p-badge"><b class="p2p-affare">+3%</b> più conveniente per te</span>', ''],
+           '<span class="p2p-affarone">⚡ Ottimo affare</span>', '',
+           '<span class="p2p-badge"><b class="p2p-affare">+3%</b> più conveniente per te</span>'],
           o["normali"])
+
+
+def prove_convenienza_vera():
+    """LA CONVENIENZA VERA NEGLI ORDINI A SATS FISSI (27 set 2026, ritocco
+    di Andrea a 40d2759). I sats di un ordine a prezzo fisso — tutti i
+    Barattozon, e gli ordini P2P normali a prezzo fisso — sono fermi dalla
+    pubblicazione, e il bitcoin no: il vantaggio reale per chi prende si
+    muove col prezzo. Fino a ieri la card di Barattozon diceva il premio
+    SCELTO alla pubblicazione e gli altri prezzi fissi tacevano.
+
+    ADESSO: card del libro, card in vetrina e cartellino dicono la
+    convenienza di ADESSO, ricalcolata dai sats e dagli euro col cambio
+    degli ordini a mercato, dal lato di chi guarda (e «per te» a chi ha
+    pubblicato); il dettaglio e la pagina dello scambio mettono i due
+    numeri accanto («Premio scelto · Al prezzo di adesso», o «Rispetto al
+    mercato di adesso»); nessun tetto (anche 220%), arrotondato
+    all'intero; dopo la presa tutto si ferma al cambio di quel momento,
+    che il server timbra quando mostrod racconta la presa. Gli ordini a
+    mercato restano come sono."""
+    print("\n[la convenienza vera negli ordini a sats fissi]")
+    import json as _js
+    import shutil
+    import subprocess
+    import tempfile
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = _SORGENTE
+
+    # --- 1) DOVE PASSA, nel client ----------------------------------------
+    prova("la card sceglie la convenienza vera per OGNI prezzo fisso, e il premio del filo per gli altri",
+          True, "  if (!(o.sats > 0)) return o.premium || 0;\n"
+                "  return convenienzaFissaP2P(o, metroFissoP2P(o));"
+          in pezzo_js(mini, "function premioCardP2P(o){", "\n}\n"))
+    prova("...badge e cartellino passano da lei", [True, True],
+          ["const p = premioCardP2P(o);" in pezzo_js(mini, "function badgePremioP2P(o){", "\n}\n"),
+           "const p = premioCardP2P(o);" in pezzo_js(mini, "function affaroneP2P(o){", "\n}\n")])
+    _cl = pezzo_js(mini, "function comeLibroP2P(o){", "\n}\n")
+    prova("PRESO = i miei sats detti, mai `satsNetti` (l'eco della pubblicazione lo scrive a un fisso)",
+          True, "preso: o.satsMiei > 0, cambioPresa: o.cambioPresa || 0}" in _cl
+          and "satsNetti >" not in codice(_cl))
+    _cd = pezzo_js(mini, "function contoDettP2P(o){", "\n}\n")
+    prova("il conto: metro, convenienza, Controvalore al metro e la riga dei due numeri in cima",
+          True, "const metro = fisso ? metroFissoP2P(o) : 0;" in _cd
+          and "const convFissa = fisso ? convenienzaFissaP2P(o, metro) : null;" in _cd
+          and "const ctrl = (fisso && premioTab) ? Math.round(e / metro)" in _cd
+          and _cd.index("+ rigaConvenienzaFissaP2P(o, convFissa)") < _cd.index("+ r(etichettaCtrl, cifra('ctrl'))"))
+    _am = pezzo_js(mini, "function applicaMessaggioP2P(", "\n}\n")
+    prova("il telefono timbra il cambio della presa quando arrivano i MIEI sats, solo se il messaggio e' fresco",
+          True, "nuovo.cambioPresa = eurPerSat * 1e8;" in _am
+          and "!(ord.satsMiei > 0)" in _am and "<= P2P_PRESA_FRESCA_S)" in _am
+          and "const P2P_PRESA_FRESCA_S = 120;" in mini)
+    prova("...e quello del server vince nell'adozione, nei due cammini", [True, True],
+          ["if (Number(s.cambio_presa) > 0) o.cambioPresa = Number(s.cambio_presa);" in mini,
+           "if (Number(s.cambio_presa) > 0 && gia.cambioPresa !== Number(s.cambio_presa))" in mini])
+    prova("la riga dei due numeri non si spezza fra la parola e il numero", True,
+          ".conto-p2p .ctrl-conv b{font-weight:800;white-space:nowrap}" in mini)
+    # visto dal vivo al primo giro: le regole della tinta vivono su
+    # `.ctrl-riga` e sui badge, e la frase — che non e' una riga — usciva
+    # coi numeri bianchi
+    prova("...e i suoi numeri prendono la tinta del giudizio", [True, True],
+          [".conto-p2p .ctrl-conv .p2p-avviso{color:var(--danger)}" in mini,
+           ".conto-p2p .ctrl-conv .p2p-affare{color:var(--trust)}" in mini])
+    prova("«Info P2P» dice che la convenienza si muove col prezzo, senza limiti", True,
+          "la convenienza vera si muove col prezzo</b>, e il numero la segue, senza limiti" in mini)
+
+    # --- 2) IL SERVER: la colonna e il timbro all'evento di mostrod --------
+    prova("p2p_scambi ha il cambio della presa, nel CREATE e nel giro dei database di ieri",
+          [True, True], ["        cambio_presa REAL DEFAULT 0\n    );" in src,
+                         '"cambio_presa REAL DEFAULT 0"):' in src])
+    prova("...la rotta degli eventi gli passa il cambio di adesso, e l'archivio lo serve", [True, True],
+          ["fatto = _registra_evento_p2p(con, ev, adesso, cambio_noto_ora())" in src,
+           '"cambio_presa": float(s["cambio_presa"] or 0) if s else 0.0,' in pezzo("_scambi_p2p")])
+    con, amb = _banco_eventi_p2p()
+    ORD = "0f3a5c1e-7b2d-4c6a-9e11-aa00bb11cc98"
+    KA, KB = "c" * 64, "d" * 64
+    ORA = 1_790_000_000
+    pulisci, registra = amb["_evento_p2p_pulito"], amb["_registra_evento_p2p"]
+
+    def arriva(azione, attore, quando, cambio):
+        e = pulisci({"v": 1, "order": ORD, "action": azione, "ts": quando,
+                     "buyer": KA, "seller": KB, "actor": attore}, quando)
+        registra(con, e, quando, cambio)
+        r = con.execute("SELECT cambio_presa FROM p2p_scambi WHERE ordine=?", (ORD,)).fetchone()
+        return r[0] if r else None
+    visti = [arriva("taken", "buyer", ORA, 91000.0),
+             arriva("fiat-sent", "buyer", ORA + 100, 95000.0),
+             arriva("taken", "buyer", ORA, 99000.0),
+             arriva("taken", "buyer", ORA + 500, 92000.0),
+             arriva("taken", "buyer", ORA + 900, 0.0)]
+    prova("il cambio si timbra alla presa; un altro evento non lo sposta, il retry nemmeno; "
+          "una presa nuova lo riscrive, anche a zero (cambio ignoto)",
+          [91000.0, 91000.0, 91000.0, 92000.0, 0.0], visti)
+    con.close()
+
+    # --- 3) IL BANCO: le funzioni vere --------------------------------------
+    node = shutil.which("node")
+    if not node:
+        salta("il banco della convenienza vera gira in node", "node non c'e'")
+        return
+
+    def f(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}"
+
+    def costante(nome):
+        return re.search(r"const " + nome + r" = [^\n]*;", mini).group(0)
+    pezzi = [costante(n) for n in ("P2P_TABACCHINO", "P2P_TABACCHINO_PM", "P2P_PREMIO_TAB_MAX",
+                                   "P2P_AFFARE_OTTIMO", "P2P_AFFARE_SUPER")]
+    pezzi += [f(x) for x in (
+        "function metodoBaseP2P(m){", "function tabacchinoP2P(metodi){",
+        "function premioImplicitoTabacchinoP2P(euro, sats, cambio){",
+        "function premioBarattozonP2P(o, pub, adesso){", "function premioBzP2P(o){",
+        "function convenienzaFissaP2P(o, metro){", "function metroFissoP2P(o){",
+        "function premioCardP2P(o){", "function affareP2P(o){",
+        "function badgePremioP2P(o){", "function affaroneP2P(o){",
+        "function premioTestoP2P(n){", "function premioMioP2P(o){", "function comeLibroP2P(o){",
+        "function rigaConvenienzaFissaP2P(o, conv){")]
+    banco = "\n".join(pezzi) + r"""
+let cambioVivo = true, eurPerSat = 0.0005, p2pCambiPub = {};
+const T = ['Contanti al tabacchino 20.00'];
+const out = {};
+const nudo = h => String(h).replace(/<[^>]+>/g, '');
+/* 20 € per 40.000 sats: nato al mercato pieno a 0.0005 €/sat */
+const bz = (x) => Object.assign({id: 'b', lato: 'sell', euro: 20, sats: 40000, premium: 0, metodi: T}, x || {});
+const fx = (x) => Object.assign({id: 'f', lato: 'sell', euro: 20, sats: 40000, premium: 0, metodi: ['Revolut']}, x || {});
+const vedi = o => [nudo(badgePremioP2P(o)), nudo(affaroneP2P(o))];
+const a = (cambio, fn) => { eurPerSat = cambio; const r = fn(); eurPerSat = 0.0005; return r; };
+/* 1) IL BITCOIN FERMO, SALITO, SCESO — per chi compra sats (ordine sell)
+   e per chi li vende (ordine buy), Barattozon e prezzo fisso uguali */
+out.fermo = [vedi(bz()), vedi(fx())];
+out.salito = a(0.0006, () => [vedi(bz()), vedi(fx()), vedi(bz({lato: 'buy'}))]);
+out.sceso = a(0.0004, () => [vedi(bz()), vedi(fx()), vedi(bz({lato: 'buy'}))]);
+/* 2) SENZA TETTO, all'intero */
+out.oltre = a(0.0016, () => [vedi(bz()), vedi(fx())]);
+out.giu = a(0.00001, () => vedi(bz()));
+out.intero = a(0.00052, () => vedi(fx()));
+/* 3) GLI ORDINI A MERCATO restano come sono, qualunque sia il cambio */
+out.mercato = [vedi({lato: 'sell', euro: 20, sats: 0, premium: -12, metodi: ['SEPA']}),
+               a(0.0016, () => vedi({lato: 'sell', euro: 20, sats: 0, premium: -12, metodi: ['SEPA']})),
+               vedi({lato: 'buy', euro: 20, sats: 0, premium: 5, metodi: ['SEPA']})];
+/* 4) A CAMBIO MUTO nessun numero sui fissi; gli ordini a mercato parlano */
+cambioVivo = false;
+out.muto = [vedi(bz()), vedi({lato: 'buy', euro: 20, sats: 0, premium: 5, metodi: ['SEPA']})];
+cambioVivo = true;
+/* 5) PER CHI HA PUBBLICATO: la mia riga di vendita, tradotta col lato. Nel
+   libro la convenienza di adesso; dopo la presa (i MIEI sats detti) quella
+   del cambio della presa, ferma anche se il mercato e' salito; preso e
+   senza quel cambio, niente */
+const mio = x => comeLibroP2P(Object.assign({id: 'm', lato: 'vendo', euro: 20, sats: 40000, premium: 0, metodi: T}, x || {}));
+out.miei = a(0.0006, () => [nudo(premioMioP2P(mio())),
+                            nudo(premioMioP2P(mio({satsMiei: 40600, cambioPresa: 50000}))),
+                            nudo(premioMioP2P(mio({satsMiei: 40600}))),
+                            nudo(premioMioP2P(mio({satsNetti: 40000})))]);
+/* 6) LA RIGA DEI DUE NUMERI del dettaglio e della pagina */
+const conPub = bz({sats: 44000, cambioPub: 50000});      /* scelto −10 */
+out.riga = a(0.0006, () => [
+  rigaConvenienzaFissaP2P(conPub, convenienzaFissaP2P(conPub, metroFissoP2P(conPub))),
+  rigaConvenienzaFissaP2P(Object.assign({}, conPub, {preso: true, cambioPresa: 50000}),
+                          convenienzaFissaP2P(conPub, 0.0005)),
+  rigaConvenienzaFissaP2P(fx(), convenienzaFissaP2P(fx(), metroFissoP2P(fx()))),
+  rigaConvenienzaFissaP2P(bz({sats: 44000}), convenienzaFissaP2P(bz({sats: 44000}), 0.0006)),
+  rigaConvenienzaFissaP2P({lato: 'sell', euro: 20, sats: 0, premium: 5, metodi: ['SEPA']}, null),
+  rigaConvenienzaFissaP2P(fx(), null)]);
+/* 7) IL METRO */
+out.metro = [metroFissoP2P({}), metroFissoP2P({preso: true}), metroFissoP2P({preso: true, cambioPresa: 91000}),
+             (cambioVivo = false, metroFissoP2P({})), (cambioVivo = true, 0)];
+process.stdout.write(JSON.stringify(out));
+"""
+    d = tempfile.mkdtemp()
+    try:
+        fn = os.path.join(d, "convenienza.js")
+        with open(fn, "w", encoding="utf-8") as fh:
+            fh.write(banco)
+        r = subprocess.run([node, fn], capture_output=True, encoding="utf-8", timeout=60)
+        prova("il banco della convenienza vera gira in node", "", (r.stderr or "")[-700:])
+        o = _js.loads(r.stdout) if r.stdout.strip() else None
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    if not o:
+        return
+    prova("BTC FERMO: al prezzo di mercato, Barattozon e prezzo fisso uguali",
+          [["al prezzo di mercato", ""], ["al prezzo di mercato", ""]], o["fermo"])
+    prova("BTC SALITO del 20%: per chi compra sats il 20% in piu' (Super), per chi li vende il 20% in meno",
+          [["20% più conveniente", "⚡⚡ Super affare"], ["20% più conveniente", "⚡⚡ Super affare"],
+           ["20% meno conveniente", ""]], o["salito"])
+    prova("BTC SCESO del 20%: il contrario",
+          [["20% meno conveniente", ""], ["20% meno conveniente", ""],
+           ["20% più conveniente", "⚡⚡ Super affare"]], o["sceso"])
+    prova("NESSUN TETTO: 220% col bitcoin triplicato, 98% col bitcoin a picco",
+          [[["220% più conveniente", "⚡⚡ Super affare"], ["220% più conveniente", "⚡⚡ Super affare"]],
+           ["98% meno conveniente", ""]], [o["oltre"], o["giu"]])
+    prova("...arrotondato all'intero", ["4% più conveniente", ""], o["intero"])
+    prova("GLI ORDINI A MERCATO restano come sono, anche col bitcoin triplicato",
+          [["12% più conveniente", "⚡ Ottimo affare"], ["12% più conveniente", "⚡ Ottimo affare"],
+           ["5% più conveniente", ""]], o["mercato"])
+    prova("a cambio muto i fissi tacciono, gli ordini a mercato no",
+          [["", ""], ["5% più conveniente", ""]], o["muto"])
+    prova("A CHI HA PUBBLICATO: adesso −20 «per te»; preso, quello della presa (zero) anche col BTC salito; "
+          "preso senza il suo cambio niente; e `satsNetti` da solo non vuol dire preso",
+          ["−20% meno conveniente per te", "al prezzo di mercato", "",
+           "−20% meno conveniente per te"], o["miei"])
+    prova("LA RIGA DEI DUE NUMERI: Barattozon «Premio scelto · Al prezzo di adesso», dopo la presa «della presa»",
+          ['<div class="ctrl-conv">Premio scelto: <b class="p2p-affare">−10%</b> · '
+           'Al prezzo di adesso: <b class="p2p-affare">−32%</b></div>',
+           '<div class="ctrl-conv">Premio scelto: <b class="p2p-affare">−10%</b> · '
+           'Al prezzo della presa: <b class="p2p-affare">−10%</b></div>'], o["riga"][:2])
+    prova("...il prezzo fisso «Rispetto al mercato di adesso» (qui −20, in tinta per chi guarda)",
+          '<div class="ctrl-conv">Rispetto al mercato di adesso: <b class="p2p-affare">−20%</b></div>',
+          o["riga"][2])
+    prova("...Barattozon senza premio scelto noto dice solo quello di adesso; a mercato e senza numero niente",
+          ['<div class="ctrl-conv">Al prezzo di adesso: <b class="p2p-affare">−32%</b></div>', '', ''],
+          o["riga"][3:])
+    prova("IL METRO: adesso nel libro, preso senza cambio zero, preso col suo cambio quello, a cambio muto zero",
+          [0.0005, 0, 91000 / 1e8, 0, 0], o["metro"])
 
 
 def prove_p2p_paycode():
@@ -76386,7 +76640,8 @@ def prove_p2p_paycode():
             "function affareP2P(o){", "function comeLibroP2P(o){",
             "function bordoPremioP2P(frazione){", "function fasciaPremioP2P(premio, lato){",
             # (26 set 2026) il premio SCELTO, col cambio della pubblicazione
-            "function premioBarattozonP2P(o, pub, adesso){", "function premioBzP2P(o, vivo){",
+            "function premioBarattozonP2P(o, pub, adesso){", "function premioBzP2P(o){",
+        "function convenienzaFissaP2P(o, metro){", "function metroFissoP2P(o){",
             "function premioCardP2P(o){",
             "function badgePremioP2P(o){",
             "function premioTabP2P(){", "function premioTabModP2P(){",
@@ -76556,17 +76811,17 @@ DOM = null;
         "  badge: [badgePremioP2P({lato: 'sell', euro: 20, sats: 38800, metodi: [T], premium: 0}),\n"
         "          badgePremioP2P({lato: 'sell', euro: 20, sats: 41200, metodi: [T], premium: 0}),\n"
         "          badgePremioP2P({lato: 'sell', euro: 20, sats: 40000, metodi: [T], premium: 0}),\n"
-        "          badgePremioP2P({lato: 'sell', euro: 20, sats: 39000, metodi: ['Revolut'], premium: 0}),\n"
+        "          badgePremioP2P({lato: 'sell', euro: 20, sats: 38800, metodi: ['Revolut'], premium: 0}),\n"
         "          badgePremioP2P({lato: 'sell', euro: 20, sats: 0, metodi: ['Revolut'], premium: 4}),\n"
         "          (cambioVivo = false, badgePremioP2P({lato: 'sell', euro: 20, sats: 39000, metodi: [T], premium: 0}))],\n"
-        # (26 set 2026, «il premio non si vede») il premio SCELTO: col
-        # cambio della pubblicazione (50.000 €/BTC) 44.000 sats per 20 €
-        # sono un −10 anche se il mercato e' andato a 0.00055, dove il
-        # ricalcolo direbbe −21 — e l'ordine senza cambio detto lo dice
+        # (27 set 2026, «la convenienza vera») la card dice la
+        # convenienza di ADESSO: a 0.00055 €/sat 20 € fanno 36.364 sats
+        # pieni, e 44.000 sono un −21 anche se il premio scelto (col cambio
+        # della pubblicazione, 50.000 €/BTC) era −10; dal server uguale
         "  badgeScelto: (() => { cambioVivo = true; eurPerSat = 0.00055;\n"
         "    const B = o => badgePremioP2P(Object.assign({lato: 'sell', euro: 20, metodi: [T], premium: 0}, o));\n"
-        "    const r = [B({sats: 44000, cambioPub: 50000}), B({sats: 38000, cambioPub: 50000}),\n"
-        "               B({sats: 40000, cambioPub: 50000}),\n"
+        "    const r = [B({sats: 44000, cambioPub: 50000}), B({sats: 38200, cambioPub: 50000}),\n"
+        "               B({sats: 36364, cambioPub: 50000}),\n"
         "               (p2pCambiPub = {srv: 50000}, B({id: 'srv', sats: 44000})), B({id: 'altro', sats: 44000})];\n"
         "    p2pCambiPub = {}; eurPerSat = 0.0005; return r; })(),\n"
         "  cursore: (cambioVivo = true, CURSORI),\n"
@@ -76729,16 +76984,22 @@ DOM = null;
           ['<span class="p2p-badge"><b class="p2p-avviso">3%</b> meno conveniente</span>',
            '<span class="p2p-badge"><b class="p2p-affare">3%</b> più conveniente</span>',
            '<span class="p2p-badge">al prezzo di mercato</span>'], out["badge"][:3])
-    prova("il premio SCELTO col cambio della pubblicazione, a mercato mosso: −10, +5, zero, "
-          "dal server, e senza cambio detto il ricalcolo",
-          ['<span class="p2p-badge"><b class="p2p-affare">10%</b> più conveniente</span>',
-           '<span class="p2p-badge"><b class="p2p-avviso">5%</b> meno conveniente</span>',
+    # ⚠️ ROVESCIATA IL 27 SET 2026 («la convenienza vera»): il 26 la card
+    # diceva il premio SCELTO; adesso la convenienza di adesso, qualunque
+    # premio fosse stato scelto e da dovunque arrivi il suo cambio
+    prova("a mercato mosso la card dice la convenienza di ADESSO: −21, −5, zero, "
+          "e il cambio della pubblicazione non conta, dalla riga o dal server",
+          ['<span class="p2p-badge"><b class="p2p-affare">21%</b> più conveniente</span>',
+           '<span class="p2p-badge"><b class="p2p-affare">5%</b> più conveniente</span>',
            '<span class="p2p-badge">al prezzo di mercato</span>',
-           '<span class="p2p-badge"><b class="p2p-affare">10%</b> più conveniente</span>',
+           '<span class="p2p-badge"><b class="p2p-affare">21%</b> più conveniente</span>',
            '<span class="p2p-badge"><b class="p2p-affare">21%</b> più conveniente</span>'],
           out["badgeScelto"])
-    prova("...gli altri ordini a prezzo fisso restano muti, e quelli a mercato com'erano",
-          ["", '<span class="p2p-badge"><b class="p2p-avviso">4%</b> meno conveniente</span>'],
+    # ⚠️ ROVESCIATA IL 27 SET 2026: gli altri prezzi fissi NON sono piu'
+    # muti — dicono la loro convenienza vera, come Barattozon
+    prova("...gli altri ordini a prezzo fisso dicono la loro convenienza, e quelli a mercato com'erano",
+          ['<span class="p2p-badge"><b class="p2p-avviso">3%</b> meno conveniente</span>',
+           '<span class="p2p-badge"><b class="p2p-avviso">4%</b> meno conveniente</span>'],
           out["badge"][3:5])
     prova("...e a cambio muto nessun badge: mai un numero inventato", "", out["badge"][5])
     # --- IL CURSORE: le due lezioni del 18 set, gemelle ------------------
@@ -77038,9 +77299,10 @@ DOM = null;
           and "due ore prima" in _inf and "Ci sono due scadenze" in _inf
           and "Premio più basso = più conveniente per chi paga = più probabile che qualcuno lo prenda in tempo." in _inf
           and "Il segno decide il verso:" in _inf
-          # (26 set 2026) il premio nel libro e' quello SCELTO, e non si
-          # muove col mercato: la riga «ricavato» diceva il contrario
-          and "il premio scelto da chi vende</b>, e non si muove" in _inf
+          # (27 set 2026) la card dice quanto conviene ADESSO, e il
+          # dettaglio i due numeri; dopo la presa il conto si ferma
+          and "la convenienza vera si muove col prezzo" in _inf
+          and "<b>il premio scelto</b> da chi vende e quello <b>al prezzo di adesso</b>" in _inf
           and "<b>ricavato</b>" not in _inf
           and "Non risulta pagato: apri una disputa" in _inf)
     _cat = mini[mini.index("const TOUR_P2P = ["):] if "const TOUR_P2P = [" in mini else mini
@@ -77054,8 +77316,8 @@ DOM = null;
     prova("il dettaglio non ribatte il premio: lo dice il conto, nella sua riga", True,
           "premioImplicito" not in _nd and "💸" not in _nd
           and "apriInfoTabacchinoP2P()" in _nd
-          # (26 set 2026) il conto chiama il giudice del premio scelto
-          and "premioBzP2P(o, detto <= 0)"
+          # (27 set 2026) il conto chiama la convenienza vera, col metro
+          and "const convFissa = fisso ? convenienzaFissaP2P(o, metro) : null;"
           in pezzo_js(mini, "function contoDettP2P(o){", "\n}\n"))
     _per2 = pezzo_js(mini, "function percorsoTabacchinoP2P(val){", "\n}\n")
     # (23 set 2026, ritocco di Andrea) «Prime» da solo diceva poco: gli
@@ -79706,14 +79968,20 @@ def prove_scambi_ovunque():
     # la colonna del cambio di Barattozon (26 set 2026) come la aggiunge
     # init_db ai database di ieri: dopo le righe, che sono posizionali
     con.execute("ALTER TABLE p2p_ordini ADD COLUMN cambio_pub REAL DEFAULT 0")
+    # ...e il cambio della presa su p2p_scambi (27 set 2026)
+    con.execute("ALTER TABLE p2p_scambi ADD COLUMN cambio_presa REAL DEFAULT 0")
     # ...e quella del premio del libro (27 set 2026)
     con.execute("ALTER TABLE p2p_ordini ADD COLUMN premio REAL DEFAULT 0")
     con.execute("UPDATE p2p_ordini SET cambio_pub=91234.5 WHERE ordine='ord-vetrina-1'")
+    con.execute("UPDATE p2p_scambi SET cambio_presa=92345.5 WHERE ordine='ord-attivo-1'")
     scambi = amb["_scambi_p2p"]
     v = scambi(con, 111, ORA)
     prova("(26 set 2026) il cambio di Barattozon viaggia con lo scambio, 0 dove non e' detto",
           [91234.5, 0.0], [v.get("ord-vetrina-1", {}).get("cambio_pub"),
                            v.get("ord-attivo-1", {}).get("cambio_pub")])
+    prova("(27 set 2026) ...e il cambio della presa, 0 dove mostrod non l'ha raccontata",
+          [92345.5, 0.0], [v.get("ord-attivo-1", {}).get("cambio_presa"),
+                           v.get("ord-vetrina-1", {}).get("cambio_presa")])
     c = scambi(con, 222, ORA)
     prova("chi ha pubblicato vede i suoi, senza l'annullato di due mesi fa",
           ["ord-attivo-1", "ord-esterno-1", "ord-morto-ieri", "ord-vetrina-1"], sorted(v))
@@ -105042,6 +105310,8 @@ def prove_ritocchi_flusso_p2p():
         f"INSERT INTO p2p_momenti VALUES('ord-1','preso',{ORA - 300},'mostro',1,'buyer','');")
     # la colonna del cambio di Barattozon (26 set 2026), come init_db
     con.execute("ALTER TABLE p2p_ordini ADD COLUMN cambio_pub REAL DEFAULT 0")
+    # ...e il cambio della presa su p2p_scambi (27 set 2026)
+    con.execute("ALTER TABLE p2p_scambi ADD COLUMN cambio_presa REAL DEFAULT 0")
     # ...e quella del premio del libro (27 set 2026)
     con.execute("ALTER TABLE p2p_ordini ADD COLUMN premio REAL DEFAULT 0")
     quanti = amb["_quanti_tocca_p2p"]
@@ -106379,6 +106649,7 @@ def main():
     prove_p2p_barattozon,
     prove_p2p_paycode,
     prove_premio_barattozon,
+    prove_convenienza_vera,
     prove_pubblica_metodo_prima,
     prove_libro_vuoto_monete,
     prove_indietro_dal_libro,
