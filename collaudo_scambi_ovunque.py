@@ -49,7 +49,10 @@ nella forma che la patch 0007 manda DAVVERO:
      mostrod tarda — euro inviati, annullo chiesto e proposto, annullato
      d'accordo, liberati, disputa, e il ritiro di chi aveva preso (che la
      0007 manda con TUTTE e due le chiavi) — sono quelli che la tabella
-     del client aspetta per quel gesto.
+     del client aspetta per quel gesto;
+ 12. (27 set 2026) le cifre di un annullato — l'intervallo e il premio
+     che l'archivio porta — e il passo su cui si e' fermato, dal client
+     vero.
 
 NON TOCCA NIENTE DI VERO: il config e' di cartone (quello di
 `collaudo_pagamento_p2p`), niente Telegram, niente relay, niente
@@ -73,6 +76,8 @@ VECCHIO = "5a1e0000-dddd-4a2b-9c3d-0000000000d1"
 VETRINA = "5a1e0000-eeee-4a2b-9c3d-0000000000e1"
 # 26 set 2026: l'annullo che rilegge e l'«Annullati» su ogni dispositivo
 RITIRO = "5a1e0000-ffff-4a2b-9c3d-0000000000f1"
+# 27 set 2026: un intervallo col premio, annullato dopo la garanzia
+FORBICE = "5a1e0000-ffff-4a2b-9c3d-0000000000f8"
 SCADUTO = "5a1e0000-ffff-4a2b-9c3d-0000000000f2"
 MORTO_NEL_LIBRO = "5a1e0000-ffff-4a2b-9c3d-0000000000f3"
 GESTI = "5a1e0000-ffff-4a2b-9c3d-0000000000f4"
@@ -119,11 +124,14 @@ def semina_ordini():
     for ordine, stato in ((RITIRO, "pending"), (SCADUTO, "pending"),
                           (MORTO_NEL_LIBRO, "canceled"), (GESTI, "in-progress"),
                           (LIBERATO, "in-progress"), (LASCIATO, "in-progress"),
-                          (DISPUTA, "in-progress")):
+                          (DISPUTA, "in-progress"), (FORBICE, "in-progress")):
         con.execute("INSERT OR REPLACE INTO p2p_ordini(ordine,tg_id,creato,stato,"
                     "lato,maker,sats,euro,metodi) VALUES(?,?,?,?,'sell',1,"
                     "0,'20,00 €','[\"Revolut\"]')",
                     (ordine, banco.VENDE, adesso - 3000, stato))
+    # l'intervallo e il premio come li scrive il lettore del libro
+    con.execute("UPDATE p2p_ordini SET euro='da 20,00 a 100,00 €', premio=-2.5 "
+                "WHERE ordine=?", (FORBICE,))
     con.commit()
     con.close()
 
@@ -164,6 +172,9 @@ def client_sulla_risposta(risposta, locali, libro):
         riga("const P2P_FINALI = "), riga("const P2P_LIBRO_FINESTRA_S = "),
         riga("const MOSTRO_LAPIDI_CHIAVE = "),
         js(mini, "const STATI_P2P = {", "\n};\n"),
+        # (27 set 2026) la scala dei passi: dove si e' fermato un annullato
+        js(mini, "const P2P_PROGRESSO = {", "\n};\n"),
+        js(mini, "function fermoAnnulloP2P(o){"),
         mini[mini.index("const P2P_DA_RESTORE = {"):
              mini.index("\n}\n", mini.index("function riprendiDaRestoreP2P(o, statoMostro){")) + 3],
         mini[mini.index("const P2P_INDICE_CERCA_MAX = "):
@@ -185,6 +196,12 @@ for (const id of Object.keys(archivio)) {
   const o = archivio[id];
   out.righe[id] = [o.stato, p2pRitirato(o), gruppoScambioP2P(o), passaStatoMieiP2P(o, []),
                    passaStatoMieiP2P(o, ['morti']), lapidataP2P(id)];
+}
+/* (27 set 2026) le cifre e il passo su cui si e' fermato */
+out.cifre = {};
+for (const id of Object.keys(archivio)) {
+  const o = archivio[id];
+  out.cifre[id] = [o.euro, o.euroMax || 0, o.premium || 0, fermoAnnulloP2P(o)];
 }
 process.stdout.write(JSON.stringify(out));
 """
@@ -410,6 +427,20 @@ def main():
     prova("chi aveva preso e ha chiesto di annullare lo vede annullato: il suo «chiedi» e' fatto",
           ["annullato", True], [voce(C, LASCIATO, "stato")[0], fatto("chiedi", C, LASCIATO)])
     prova("...e chi l'aveva pubblicato lo ritrova nel libro", "pubblicato", voce(V, LASCIATO, "stato")[0])
+
+    print("\n12) le cifre di un annullato e dove si e' fermato (27 set 2026)")
+    banco.evento(FORBICE, "taken", t + 700, "buyer", "take")
+    banco.evento(FORBICE, "hold-invoice-paid", t + 710, "seller")
+    banco.evento(FORBICE, "cancel-requested", t + 720, "buyer")
+    banco.evento(FORBICE, "canceled", t + 730, "seller", "cooperative")
+    prova("l'archivio porta i due capi e il premio col segno",
+          ["annullato", 20.0, 100.0, -2.5], voce(V, FORBICE, "stato", "euro", "euro_max", "premium"))
+    prova("...e il ritiro dell'ordine in vetrina porta la sua cifra", [20.0, 0.0, 0.0],
+          voce(V, RITIRO, "euro", "euro_max", "premium"))
+    risposta = {o: v for o, v in scambi(V)["scambi"].items() if o in (FORBICE, RITIRO)}
+    nato = client_sulla_risposta(risposta, {}, [])
+    prova("il client vero: nasce con le cifre, e si e' fermato A GARANZIA (2) o NEL LIBRO (0)",
+          {FORBICE: [20, 100, -2.5, 2], RITIRO: [20, 0, 0, 0]}, nato.get("cifre", nato))
 
     print(f"\n{banco.PASSATE} ok, {banco.FALLITE} NO")
     return 1 if banco.FALLITE else 0

@@ -7487,6 +7487,10 @@
   .step b{font-size:13.5px;display:block}
   .step small{color:var(--muted);font-size:12px;font-weight:600}
   .step.todo{opacity:.45}
+  /* il passo su cui uno scambio si e' fermato (27 set 2026): la ✕ spenta
+     del badge «annullato», niente tratteggio che dica «si aspetta» */
+  .step.stop .dot{background:var(--card);border-color:var(--muted);color:var(--muted);font-size:10px;font-weight:900}
+  .step.stop .dot::after{content:'✕'}
   /* Il codice del tracciamento dentro il recinto si TOCCA e porta a
      @trackbot. NON il verde-link del vecchio «segui il pacco» (--trust
      sul fondo della fiducia rende 3,84: passa per un ornamento, non
@@ -47883,8 +47887,15 @@ const P2P_LAPIDE_TOLTO_S = 40 * 86400;
    pubblicato lo e' solo se nessuno l'aveva preso (`preso`, scritto
    dalla macchina a stati): il resto e' uno scambio abortito, che resta
    fra gli annullati. */
+/* ⚠️ I SATS CHE FANNO LA RICEVUTA SONO QUELLI DEL MIO LATO (27 set 2026):
+   il giudice guardava `satsNetti`, che un ordine a PREZZO FISSO ha dalla
+   nascita — l'eco del `new-order` porta l'importo — quindi il suo ritiro
+   non era un ritiro: niente lapide, e la pagina diceva «Scambio
+   annullato». `satsMiei` li scrivono solo le azioni che vengono DOPO la
+   presa (la fattura di chi compra, la hold di chi vende): quella e' la
+   traccia di uno scambio cominciato. */
 function p2pRitirato(o){
-  return !!o && o.stato === 'annullato' && !o.hold && !(o.satsNetti > 0)
+  return !!o && o.stato === 'annullato' && !o.hold && !(o.satsMiei > 0)
     && !!o.mio && !o.preso;
 }
 /* LE LAPIDI DEI RITIRATI (set 2026, dal campo: il morto che risorge).
@@ -49217,6 +49228,10 @@ function avanzaOrdineP2P(ordine, azione, payload){
     else if (P2P_GIRO_APERTO.indexOf(nuovo) >= 0 || nuovo === 'attivo') o.preso = true;
     /* una mossa vera del coordinatore chiude anche lo stato grezzo */
     delete o.statoGrezzo;
+    /* DOVE SI E' FERMATO (27 set 2026): il passo della pagina su cui
+       l'annullo e' caduto — lo legge `fermoAnnulloP2P` */
+    if ((nuovo === 'annullato' || nuovo === 'rifiutato') && typeof P2P_PROGRESSO !== 'undefined')
+      o.fermoA = P2P_PROGRESSO[o.stato] || 0;
     o.stato = nuovo;
     o.aggiornato = Math.floor(Date.now() / 1000);
     o.cantDo = '';
@@ -50494,7 +50509,12 @@ function contoDettP2P(o){
                      && premioBzP2P(o, detto <= 0)) || 0;
   const prem = premioTab || Number(o.premium) || 0;
   const ricavato = (detto > 0 && !!Math.round(Number(o.premium) || 0)) || !!premioTab;
-  const vivo = esatto || (cambioVivo && eurPerSat > 0);
+  /* ⚠️ UN EURO CHE NON SI SA NON E' ZERO (27 set 2026, dal campo: il
+     dettaglio di un annullato diceva «Invia 0 · Ricevi 0»). Senza la cifra
+     in euro la stima in sats non ha una base: si dice «—», come a cambio
+     muto. I sats FISSATI (o detti dal coordinatore) restano un fatto. */
+  const euroNoto = Number(o.euro) > 0;
+  const vivo = esatto || (euroNoto && cambioVivo && eurPerSat > 0);
   /* la fee di CHI LEGGE: con lo sconto fedelta' la sua meta' e' piu'
      piccola, e tutte le righe qui sotto la prendono da qui */
   const fee = feeMiaP2P(o);
@@ -50573,9 +50593,9 @@ function contoDettP2P(o){
      ripetuta tre volte. */
   const euriTesto = esc(fmtEur(o.euro))
     + (o.euroMax ? '–' + esc(fmtEur(o.euroMax)) : '');
-  const cifreEuro = num(euriTesto + ' ' + monetaP2P(o));
-  const etichettaCtrl = 'Controvalore di <b>' + euriTesto + ' '
-    + segnoMonetaP2P(o) + '</b>';
+  const cifreEuro = euroNoto ? num(euriTesto + ' ' + monetaP2P(o)) : num('—');
+  const etichettaCtrl = euroNoto ? 'Controvalore di <b>' + euriTesto + ' '
+    + segnoMonetaP2P(o) + '</b>' : 'Controvalore';
   /* la commissione: percentuale di chi legge + la sua cifra; «in
      promo» quando la fee viva sta sotto il listino di Barattolo —
      lo stesso cartello del conto del mercatino */
@@ -51651,6 +51671,18 @@ function renderOrdineP2P(){
   if (tabOrd) passi[2] = {t: 'PayCode pagato',
     d: o.lato === 'compro' ? 'Alla cassa del tabacchino, in contanti' : 'Chi compra l\'ha pagato alla cassa'};
   const prog = P2P_PROGRESSO[o.stato] === undefined ? 0 : P2P_PROGRESSO[o.stato];
+  /* ⚠️ UN ANNULLATO NON E' «IN CORSO» (27 set 2026, dal campo): lo
+     stepper restava sul primo passo col cerchio tratteggiato, cioe'
+     diceva «si aspetta» di uno scambio chiuso. Adesso il passo su cui
+     l'annullo e' caduto (`fermoAnnulloP2P`) prende il nome dello stato
+     — «Ordine annullato», «Scambio annullato», «Ordine non pubblicato» —
+     con la data, e la ✕ spenta al posto del cerchio; quelli prima sono
+     fatti, quelli dopo restano grigi. */
+  const fermo = (o.stato === 'annullato' || o.stato === 'rifiutato') ? fermoAnnulloP2P(o) : -1;
+  if (fermo >= 0) {
+    const quando = dataBreveP2P(chiusuraP2P(o));
+    passi[fermo] = {t: st.t, d: quando ? 'Il ' + quando : ''};
+  }
   const tog = p2pTogliibile(o);
   /* IL CONTO E' QUELLO DEL LIBRO, tradotto al verso di chi l'ordine
      ce l'ha (set 2026, richiesta di Andrea): stesse righe, stessi
@@ -51733,7 +51765,8 @@ function renderOrdineP2P(){
     anelloneTabacchinoP2P(o) +
     '<div class="p2p-passi"><div class="steps">' +
       passi.map((p, i) =>
-        '<div class="step ' + (i < prog ? 'done' : i === prog ? 'now' : 'todo') + '">' +
+        '<div class="step ' + (fermo >= 0 ? (i < fermo ? 'done' : i === fermo ? 'stop' : 'todo')
+                               : (i < prog ? 'done' : i === prog ? 'now' : 'todo')) + '">' +
         '<span class="dot"></span><b>' + esc(p.t) + '</b><small>'
         + esc(p.d) + '</small></div>'
       ).join('') +
@@ -55446,11 +55479,14 @@ function annullaScambioP2P(){
   haptic();
   const subito = P2P_ANNULLA_SUBITO.indexOf(o.stato) >= 0;
   chiediConferma({
-    titolo: subito ? 'Ritiri l\'ordine?' : 'Chiedi di annullare?',
+    titolo: subito ? 'Annulli l\'ordine?' : 'Chiedi di annullare?',
     corpo: subito
       ? 'L\'ordine esce dal libro. Nessuno ha ancora scambiato niente con te.'
       : 'Lo scambio si annulla solo se anche l\'altra persona è d\'accordo. Se lo è, i sats tornano a chi li ha bloccati.',
-    etichetta: subito ? 'Sì, ritira' : 'Sì, chiedilo',
+    /* «ANNULLA» COME IL BOTTONE (27 set 2026): «✕ Annulla l'ordine»,
+       «Sto annullando l'ordine…», «Ordine annullato ✓» — e il foglio in
+       mezzo diceva «ritira» */
+    etichetta: subito ? 'Sì, annulla' : 'Sì, chiedilo',
     /* la promessa si restituisce: vedi la nota in `euroInviatiP2P` */
     poi: () => inviaAnnulloP2P(subito ? 'ritira' : 'chiedi')
   });
@@ -56684,7 +56720,11 @@ const P2P_ORDINI_MIEI = ['recenti', 'fare', 'imp-giu', 'imp-su'];
 const P2P_ORDINE_MIEI_CASA = 'recenti';
 function ordinaMieiP2P(righe, criterio){
   const c = P2P_ORDINI_MIEI.indexOf(criterio) >= 0 ? criterio : P2P_ORDINE_MIEI_CASA;
-  const recente = (a, b) => (b.quando || b.creato || 0) - (a.quando || a.creato || 0);
+  /* ⚠️ «RECENTE» E' L'ULTIMO EVENTO (27 set 2026): lo stesso giudice
+     della data sulla card, `chiusuraP2P` — col solo `quando` un annullo
+     arrivato dal messaggio del coordinatore ripiegava sulla NASCITA, e
+     l'ordine appena annullato finiva in fondo */
+  const recente = (a, b) => chiusuraP2P(b) - chiusuraP2P(a);
   const peso = o => P2P_GRUPPI.findIndex(g => g.k === gruppoScambioP2P(o));
   const metro = c === 'fare' ? (a, b) => peso(a) - peso(b)
     : c === 'imp-giu' ? (a, b) => capoImportoP2P(b, true) - capoImportoP2P(a, true)
@@ -56855,8 +56895,28 @@ function premioMioP2P(o){
    questa domanda era gia' stata fatta. */
 function chiusuraP2P(o){
   if (!o) return 0;
-  return Math.floor(Number(o.ultimaMossa) || Number(o.aggiornato)
-                    || Number(o.creato) || 0);
+  /* ⚠️ L'ULTIMO EVENTO E' IL PIU' FRESCO FRA I DUE OROLOGI (27 set 2026,
+     dal campo: un ordine appena annullato finiva in FONDO a «Annullati»
+     e la card diceva la data della pubblicazione). `ultimaMossa` la
+     timbra il messaggio del coordinatore, `quando` la via del libro e
+     l'archivio del server — e un annullo saputo dal libro, o dal «gia'
+     annullato», lasciava `ultimaMossa` all'eco della pubblicazione. Il
+     piu' fresco dei due; poi l'aggiornamento, poi la nascita. E' anche
+     il metro di «Più recenti» (`ordinaMieiP2P`): la data sulla card e
+     il posto nella lista dicono la stessa cosa. */
+  return Math.floor(Math.max(Number(o.quando) || 0, Number(o.ultimaMossa) || 0)
+                    || Number(o.aggiornato) || Number(o.creato) || 0);
+}
+/* PURA: IL PASSO SU CUI UN ANNULLO E' CADUTO (27 set 2026), nella scala
+   di `P2P_PROGRESSO`: quello scritto sulla riga al momento del passaggio
+   (`fermoA`, dalla macchina a stati, dal libro o dall'archivio del
+   server) e, per le righe di prima, il ripiego — preso vuol dire che il
+   primo passo era fatto, senza promettere altro. */
+function fermoAnnulloP2P(o){
+  if (!o) return 0;
+  if (o.fermoA !== undefined && o.fermoA !== null)
+    return Math.max(0, Math.min(3, Number(o.fermoA) || 0));
+  return (o.giroMorto || o.preso) ? 1 : 0;
 }
 /* PURA: la data breve — giorno e mese, e l'ANNO solo se non e' questo
    (richiesta di Andrea: «anno solo se non è questo»). Un'altra data di
@@ -57112,6 +57172,7 @@ async function statoPubblicoOrdini(ids){
     const fine = (s === 'canceled' || s === 'expired') ? 'annullato'
                : s === 'success' ? 'concluso' : '';
     if (!fine) continue;
+    if (fine === 'annullato') o.fermoA = P2P_PROGRESSO[o.stato] || 0;
     o.stato = fine;
     o.quando = adesso;
     scriviOrdineP2P(o);
@@ -57391,12 +57452,14 @@ function rigaDaServerP2P(id, s, tk, stato, adesso){
     id: String(id), lato: lato,
     indice: tk ? (tk.indice | 0) : 0, pubTrade: tk ? tk.pub : '',
     mio: !!s.mio, stato: stato,
-    euro: Number(s.euro) || 0, euroMax: 0,
+    /* L'INTERVALLO E IL PREMIO (27 set 2026): l'archivio li porta, e
+       senza la card e il conto di un annullato dicevano «0» */
+    euro: Number(s.euro) || 0, euroMax: Math.max(0, Number(s.euro_max) || 0),
     sats: Math.max(0, Math.floor(Number(s.sats) || 0)),
     satsNetti: Math.max(0, Math.floor(Number(s.sats_ordine) || 0)),
     importoScelto: 0,
     metodi: Array.isArray(s.metodi) ? s.metodi.map(String) : [],
-    premium: 0,
+    premium: Number(s.premium) || 0,
     peer: (s.chiave_peer && s.chiave_peer !== (tk ? tk.pub : '')) ? String(s.chiave_peer) : '',
     hold: null, contattato: true, cantDo: '', errore: '', votabile: false,
     creato: Math.floor(Number(s.creato) || 0) || adesso,
@@ -57408,8 +57471,22 @@ function rigaDaServerP2P(id, s, tk, stato, adesso){
   if (Number(s.sats_miei) > 0) o.satsMiei = Math.floor(Number(s.sats_miei));
   if (s.preso) o.preso = true;
   if (!tk) o.soloVista = true;
+  if (stato === 'annullato' || stato === 'rifiutato') o.fermoA = fermoDaMomentiP2P(s.momenti);
   if (s.payout_fallito && lato === 'vendo' && stato === 'rilasciato') o.payoutFallito = true;
   return o;
+}
+/* PURA: DOVE SI E' FERMATO uno scambio annullato, dalla cronaca del
+   server (27 set 2026) — il passo della pagina, nella scala di
+   `P2P_PROGRESSO`: 3 se gli euro erano partiti, 2 a garanzia pagata, 1 se
+   qualcuno l'aveva preso, 0 se era ancora nel libro. Vale l'ultimo giro:
+   dopo un ritorno in vetrina i passi di prima non contano. */
+function fermoDaMomentiP2P(momenti){
+  const m = Array.isArray(momenti) ? momenti : [];
+  let da = 0;
+  for (let i = 0; i < m.length; i++) if (m[i] && m[i].m === 'tornato') da = i + 1;
+  const visti = m.slice(da).map(x => x && x.m);
+  return visti.indexOf('fiat') >= 0 ? 3 : visti.indexOf('garanzia_pagata') >= 0 ? 2
+    : visti.indexOf('preso') >= 0 ? 1 : 0;
 }
 /* la trade key di QUESTO ordine, se questo mazzo la sa derivare: prima
    l'indice della restore (della mia identita'), poi la chiave detta dal
@@ -57443,7 +57520,14 @@ function adottaScambiServerP2P(locali){
       if (!gia.peer && s.chiave_peer && s.chiave_peer !== gia.pubTrade) { gia.peer = String(s.chiave_peer); mosso = true; }
       if (!(gia.satsNetti > 0) && Number(s.sats_ordine) > 0) { gia.satsNetti = Math.floor(Number(s.sats_ordine)); mosso = true; }
       if (!(gia.satsMiei > 0) && Number(s.sats_miei) > 0) { gia.satsMiei = Math.floor(Number(s.sats_miei)); mosso = true; }
-      if (!(gia.euro > 0) && Number(s.euro) > 0) { gia.euro = Number(s.euro); mosso = true; }
+      /* la riga senza cifre prende quelle del server tutte insieme: la
+         cifra, il secondo capo e il premio sono lo stesso ordine */
+      if (!(gia.euro > 0) && Number(s.euro) > 0) {
+        gia.euro = Number(s.euro);
+        if (Number(s.euro_max) > 0) gia.euroMax = Number(s.euro_max);
+        if (!gia.premium && Number(s.premium)) gia.premium = Number(s.premium);
+        mosso = true;
+      }
       if (!(gia.metodi && gia.metodi.length) && Array.isArray(s.metodi) && s.metodi.length) { gia.metodi = s.metodi.map(String); mosso = true; }
       if (s.preso && !gia.preso) { gia.preso = true; mosso = true; }
       /* la riga solo da guardare si PROMUOVE appena la chiave si ritrova */
@@ -57467,6 +57551,10 @@ function adottaScambiServerP2P(locali){
           && (a > da || (a === da && s.stato !== gia.stato && q > (Number(gia.ultimaMossa) || 0)));
         if (avanti) {
           diarioP2P('archivio ' + String(id).slice(0, 8) + ': il server dice ' + s.stato + ', la riga e\' a ' + gia.stato + ' → ' + s.stato);
+          /* dove si e' fermato: il piu' avanti fra la riga e la
+             cronaca del server (27 set 2026) */
+          if (s.stato === 'annullato' || s.stato === 'rifiutato')
+            gia.fermoA = Math.max(P2P_PROGRESSO[gia.stato] || 0, fermoDaMomentiP2P(s.momenti));
           gia.stato = s.stato; gia.aggiornato = adesso;
           gia.cantDo = ''; gia.errore = ''; gia.nonPartito = false;
           delete gia.giroMorto; delete gia.statoGrezzo;
@@ -58852,7 +58940,14 @@ function annulloGiaFattoP2P(e, id){
   const o = ordiniP2P()[id];
   if (o) applicaMessaggioP2P(o, {action: 'canceled', quando: 0, payload: null});
   const agg = ordiniP2P()[id];
-  if (agg && (agg.cantDo || agg.errore)) { agg.cantDo = ''; agg.errore = ''; scriviOrdineP2P(agg); }
+  /* l'annullo e' un fatto di ADESSO: il `canceled` qui sopra non porta
+     un'ora, e senza la riga resterebbe datata all'eco della
+     pubblicazione (vedi `chiusuraP2P`) */
+  if (agg) {
+    agg.cantDo = ''; agg.errore = '';
+    if (agg.stato === 'annullato') agg.quando = Math.floor(Date.now() / 1000);
+    scriviOrdineP2P(agg);
+  }
   diarioP2P('annullo ' + String(id).slice(0, 8) + ': «' + e.motivo + '» = gia\' annullato, riuscito');
   return true;
 }

@@ -34749,3 +34749,73 @@ nascita, quindi il suo ritiro va sotto «Annullati» ma senza lapide e con
 «Scambio annullato»; il passo 5 del collaudo del 24 set simula il ritiro
 di chi aveva preso senza la sua chiave, mentre la 0007 la manda (il passo
 11 nuovo usa la forma vera).
+
+## Gli annullati: l'ordine, le cifre, lo stepper, il fisso, il foglio (27 set 2026)
+
+Cinque ritocchi di Andrea dopo d875b39.
+**1) L'ORDINE.** In «Annullati» l'ordine appena annullato stava in fondo:
+«Più recenti» guardava `quando || creato`, e un annullo arrivato dal
+messaggio del coordinatore `quando` non lo scrive (timbra `ultimaMossa`),
+quindi contava la nascita. Adesso il metro e' `chiusuraP2P`, la stessa
+data della card: il piu' fresco fra `quando` e `ultimaMossa`, poi
+l'aggiornamento, poi la nascita — cosi' anche la data «Annullato il …»
+di un annullo saputo dal libro non dice piu' quella della pubblicazione.
+Il «gia' annullato» si data adesso (`quando`).
+**2) LE CIFRE.** Il dettaglio diceva «Invia 0 · Ricevi 0»: l'archivio
+del server non portava il secondo capo di un intervallo («da 20,00 a
+100,00 €» diventava 0) ne' il premio, e il conto scriveva 0 per una cifra
+che non sapeva. Sul server: `_euri_numero_p2p` (i due capi),
+`p2p_ordini.premio` (colonna nuova, dal tag `premium` del libro, migrata
+da `init_db`), un 38383 senza `fa` che non cancella la cifra nota
+(`COALESCE`), e `/api/p2p/scambi` che serve `euro_max` e `premium`. Nel
+client la riga nata dal server li prende, quella che non aveva cifre li
+prende tutti insieme, e il conto scrive «—» dove l'euro non si sa (i sats
+fissati restano: sono un fatto).
+**3) LO STEPPER.** Il passo su cui l'annullo e' caduto prende il nome
+dello stato («Ordine annullato», «Scambio annullato», «Ordine non
+pubblicato») con la data e una ✕ spenta (`.step.stop`); quelli prima sono
+fatti, quelli dopo grigi, niente cerchio tratteggiato. Dove si e' fermato
+lo scrivono la macchina a stati, il libro e l'archivio (`fermoA`, dalla
+cronaca del server con `fermoDaMomentiP2P`); per le righe di prima vale
+il ripiego `fermoAnnulloP2P` (preso = primo passo fatto).
+**4) IL PREZZO FISSO.** Il giudice del ritirato guardava `satsNetti`, che
+l'eco della pubblicazione scrive a un ordine a prezzo fisso: adesso guarda
+`satsMiei`, che scrivono solo le azioni dopo la presa. Lapide e «Ordine
+annullato» anche per lui.
+**5) IL FOGLIO.** «Annulli l'ordine? / Sì, annulla», come il bottone.
+Strade scartate: un campo nuovo solo per l'ordinamento (due date per la
+stessa domanda si scollano); lo zero come «non so» (e' la bugia che ha
+aperto il giro); la cifra ricostruita dal libro in pagina (per un
+annullato il libro non c'e' piu').
+
+**PROVATO.** `prove_annullati_ritocchi` (23): sentinelle, il lettore del
+libro vero su un database vero (la cifra resta dopo un annullo senza
+`fa`, l'intervallo e il premio negativo), e un banco node con la macchina
+a stati vera (l'ordine di quattro annullati arrivati per strade diverse,
+la lista mista, dove si e' fermato da avanza, dai ripieghi e dalla
+cronaca, il prezzo fisso ritirato e quello preso). Il conto senza euro in
+`prove_p2p_dettaglio`. Emendate col perche' le sentinelle della chiusura,
+della colonna di Barattozon (non e' piu' l'ultima), il giudice del
+ritirato (`satsMiei`) e i banchi che ordinano la lista o leggono
+l'archivio (`chiusuraP2P`, `fermoDaMomentiP2P`, la colonna `premio`).
+`collaudo_scambi_ovunque` col passo 12: l'archivio vero porta i due capi
+e il premio col segno, e il client vero fa nascere l'annullato con le
+cifre e fermo a garanzia. Tortura su una copia: 14 guasti (client e
+server), 14 presi. Suite intera severa senza config nel worktree da origin/main
+(d875b39): 16.644 verdi e 0 rosse; i 25 collaudi della CI verdi nella
+gabbia senza rete. Dal vivo a 375 px coi due temi (server
+di collaudo, relay morto, eventi alla rotta vera): in «Annullati» quello
+appena annullato in cima, poi i due dal server, poi quello di ieri (quello
+di un mese l'ha tolto la scopa); lo scambio annullato a garanzia con
+«20,00–100,00 €», lo sconto e lo stepper fermo al terzo passo; quello
+senza cifra con «—» dappertutto; il prezzo fisso con «Ordine annullato»,
+30.000 sats e la lapide; il foglio «Annulli l'ordine? / Sì, annulla»;
+nessuno scorrimento laterale, nessun errore dell'app.
+
+**RESTA DA GUARDARE.** Il premio degli ordini chiusi PRIMA di oggi resta
+0 sul server (la colonna nasce vuota: il libro la riempie solo per gli
+ordini che rilegge). Nel foglio di conferma il bottone per chiudere si
+chiama anche lui «Annulla», sotto «Sì, annulla»: da decidere se
+chiamarlo diverso. L'intestazione di «I miei scambi» conta gli scambi
+aperti sulla lista filtrata (a «Annullati» dice «0 scambi aperti»), da
+prima.

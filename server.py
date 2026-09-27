@@ -5056,7 +5056,12 @@ def init_db():
         -- dal nostro (`P2P_CAMBIO_PUB_SCARTO`). E' il metro con cui chi
         -- guarda rilegge dai sats del libro il premio SCELTO, fermo,
         -- invece di ricalcolarlo col mercato che si muove. 0 = non detto.
-        cambio_pub REAL DEFAULT 0
+        cambio_pub REAL DEFAULT 0,
+        -- IL PREMIO DEL LIBRO (27 set 2026): il tag `premium` del 38383,
+        -- pubblico come la cifra. L'archivio degli scambi lo porta al
+        -- dispositivo che l'ordine non l'ha scritto: senza, la card e il
+        -- conto di un annullato dicevano «al prezzo di mercato».
+        premio REAL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_p2p_ordini_tg ON p2p_ordini(tg_id);
     CREATE TABLE IF NOT EXISTS p2p_momenti(
@@ -6318,7 +6323,9 @@ def init_db():
                     "metodi TEXT DEFAULT ''",
                     "tornati INTEGER DEFAULT 0",
                     # il cambio di Barattozon (26 set 2026)
-                    "cambio_pub REAL DEFAULT 0"):
+                    "cambio_pub REAL DEFAULT 0",
+                    # il premio del libro (27 set 2026)
+                    "premio REAL DEFAULT 0"):
         try:
             con.execute(f"ALTER TABLE p2p_ordini ADD COLUMN {colonna}")
         except sqlite3.OperationalError:
@@ -42978,11 +42985,19 @@ def _evento_libro_p2p(ev: dict):
         scade = max(0, int(float(tag.get("expires_at", ["0"])[0])))
     except (ValueError, OverflowError):
         scade = 0
+    # il premio (27 set 2026): percentuale col segno, storta = 0
+    try:
+        premio = float(tag.get("premium", ["0"])[0])
+    except (ValueError, OverflowError):
+        premio = 0.0
+    if premio != premio or abs(premio) > 100:
+        premio = 0.0
     return {"id": tag["d"][0], "stato": tag["s"][0],
             "lato": (tag.get("k") or [""])[0],
             "sats": sats, "euro": tag.get("fa") or [],
             "metodi": tag.get("pm") or [],
-            "quando": int(ev.get("created_at") or 0), "scade": scade}
+            "quando": int(ev.get("created_at") or 0), "scade": scade,
+            "premio": premio}
 
 
 _P2P_FIRMA_DETTO = {"manca": False}   # l'avviso di coincurve assente, una volta
@@ -44659,9 +44674,15 @@ def _avvisi_libro_p2p(con, eventi: list, adesso: int, fee, ore: int) -> list:
         # e' ancora del giro che chiude, e il contatore sale dopo.
         tornati = int(r["tornati"] or 0)
         torna = _passaggio_libro_p2p(prima, dopo, 1, scaduto) == "tornato"
+        # ⚠️ UNA CIFRA VUOTA NON CANCELLA QUELLA NOTA (27 set 2026): la
+        # cifra serve all'archivio degli scambi anche DOPO la chiusura (il
+        # dettaglio di un annullato diceva «Invia 0 · Ricevi 0»), e un
+        # 38383 che non la portasse — qualunque sia il motivo — la
+        # riscriverebbe vuota. Il premio viaggia con lei.
         con.execute(
             "UPDATE p2p_ordini SET stato=?, lato=?, maker=?, visto=?, "
-            "euro=?, preso_da=?, sats=?, metodi=?, tornati=? WHERE ordine=?",
+            "euro=COALESCE(NULLIF(?, ''), euro), preso_da=?, sats=?, metodi=?, "
+            "tornati=?, premio=? WHERE ordine=?",
             (dopo, ev.get("lato") or "", maker, int(ev.get("quando") or 0),
              # la cifra del libro, per l'avviso del recapito (18 set 2026);
              # coi centesimi del tabacchino, se il pm li porta (22 set)
@@ -44676,7 +44697,7 @@ def _avvisi_libro_p2p(con, eventi: list, adesso: int, fee, ore: int) -> list:
              int(ev.get("sats") or 0),
              json.dumps([str(m) for m in (ev.get("metodi") or [])][:12],
                         ensure_ascii=False),
-             tornati + (1 if torna else 0), ev["id"]))
+             tornati + (1 if torna else 0), float(ev.get("premio") or 0), ev["id"]))
         # ...e con lui la presa DICHIARATA e non ancora confermata (23
         # set 2026, A1): in vetrina non c'e' nessuno che abbia preso
         if dopo == "pending":
@@ -45770,6 +45791,20 @@ def _euro_numero_p2p(testo) -> float:
     return v if v > 0 else 0.0
 
 
+def _euri_numero_p2p(testo) -> tuple:
+    """PURA: la cifra del libro come `_euro_libro` la scrive, in due
+    numeri — `(euro, euro_max)` —: «10,00 €» e' (10.0, 0.0), un
+    intervallo ancora da scegliere «da 20,00 a 100,00 €» e' (20.0,
+    100.0). Fino al 27 set 2026 l'intervallo usciva 0, e il conto di un
+    annullato diceva «Invia 0 · Ricevi 0». Storta o vuota = (0.0, 0.0)."""
+    t = str(testo or "")
+    if t.strip().lower().startswith("da ") and " a " in t:
+        lo, _, hi = t.strip()[3:].partition(" a ")
+        a, b = _euro_numero_p2p(lo), _euro_numero_p2p(hi)
+        return (a, b) if a > 0 and b > a else (0.0, 0.0)
+    return (_euro_numero_p2p(t), 0.0)
+
+
 def _metodi_lista_p2p(testo) -> list:
     """PURA: i metodi come `p2p_ordini.metodi` li tiene (una lista JSON,
     o i nomi separati da virgola) in una lista di stringhe."""
@@ -45900,7 +45935,7 @@ def _scambi_p2p(con, io, adesso: int) -> dict:
     for ordine in ids:
         o = con.execute(
             "SELECT tg_id, lato, maker, stato, euro, sats, metodi, creato, "
-            "cambio_pub FROM p2p_ordini WHERE ordine=?", (ordine,)).fetchone()
+            "cambio_pub, premio FROM p2p_ordini WHERE ordine=?", (ordine,)).fetchone()
         s = con.execute(
             "SELECT compratore, venditore, preso_dal, giro, sats, sats_compratore, "
             "sats_venditore, chiave_compratore, chiave_venditore, aggiornato "
@@ -45939,9 +45974,13 @@ def _scambi_p2p(con, io, adesso: int) -> dict:
         chiavi = {"compro": (s["chiave_compratore"] if s else "") or "",
                   "vendo": (s["chiave_venditore"] if s else "") or ""}
         altro = "vendo" if lato == "compro" else "compro"
+        euri = _euri_numero_p2p(o["euro"] if o else "")
         fuori[ordine] = {
             "lato": lato, "mio": bool(mio), "preso": bool(q["preso"]),
-            "euro": _euro_numero_p2p(o["euro"] if o else ""),
+            # la cifra e il secondo capo dell'intervallo (27 set 2026)
+            "euro": euri[0], "euro_max": euri[1],
+            # il premio del libro, col segno (27 set 2026)
+            "premium": float(o["premio"] or 0) if o else 0.0,
             "sats": int(o["sats"] or 0) if o else 0,
             "metodi": _metodi_lista_p2p(o["metodi"] if o else ""),
             # il cambio di Barattozon (26 set 2026): il premio scelto si

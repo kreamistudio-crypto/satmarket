@@ -11053,6 +11053,14 @@
   dal libro in pagina e gli scrive la lapide ma la riga resta, la scopa
   non ha piu' la soglia zero, l'archivio del server lo fa nascere. Il
   verbale: CANTIERI, «"Annulla" dice non riuscito ma annulla».
+  GLI ANNULLATI (27 set 2026): «Più recenti» e la data della card sono
+  lo stesso giudice, `chiusuraP2P` (il piu' fresco fra `quando` e
+  `ultimaMossa`); l'archivio del server porta `euro_max` e `premium`
+  (`p2p_ordini.premio`, dal libro; un 38383 senza `fa` non cancella la
+  cifra), e il conto dice «—» per un euro che non si sa; lo stepper di un
+  annullato ferma sul passo `fermoAnnulloP2P` con la ✕ (`.step.stop`); il
+  ritirato si giudica sui `satsMiei`. Il verbale: CANTIERI, «Gli
+  annullati: l'ordine, le cifre, lo stepper».
   QUEL CHE È FATTO SI DICE AL PASSATO (22 set 2026, richiesta di
   Andrea): le card di «I miei scambi» CHIUSE non promettono più. Una
   conclusa porta la data della chiusura in alto a destra — piccola,

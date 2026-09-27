@@ -56478,6 +56478,9 @@ out.contoTabMetroStorto = contoDettP2P(ordine({sats: 11455, metodi: TAB, cambioP
 eurPerSat = 0.0005;
 /* l'intervallo: ogni riga porta i due capi */
 out.contoRange = contoDettP2P(ordine({euro: 20, euroMax: 100}));
+/* (27 set 2026) un annullato senza la cifra in euro: niente «0» */
+out.contoSenzaEuro = contoDettP2P(ordine({euro: 0}));
+out.contoSenzaEuroFisso = contoDettP2P(ordine({euro: 0, sats: 100000}));
 /* una valuta fuori dal catalogo porta la sigla e MAI una bandiera */
 out.contoAltra = contoDettP2P(ordine({fiat: 'USD'}));
 /* la fee viva sotto il listino e' una promo, e il conto la dice */
@@ -56997,6 +57000,14 @@ console.log(JSON.stringify(out));
           "≈ 40000–200000 sats" in o["contoRange"]
           and "≈ 39600–198000 sats" in o["contoRange"]
           and "20,00–100,00 € 🇪🇺" in o["contoRange"])
+    # (27 set 2026, dal campo: «Invia 0 · Ricevi 0» su un annullato) UN
+    # EURO CHE NON SI SA NON E' ZERO: niente «0,00 €» ne' «≈ 0 sats», e
+    # dove i sats sono fissati quelli restano, perche' sono un fatto
+    prova("senza la cifra in euro: trattini, mai uno zero inventato", [True, False, False, False],
+          ["—" in o["contoSenzaEuro"], "0,00" in o["contoSenzaEuro"],
+           "≈ 0 sats" in o["contoSenzaEuro"], "Controvalore di" in o["contoSenzaEuro"]])
+    prova("...e coi sats fissati quelli si vedono, l'euro no", [True, False],
+          ["100000 sats" in o["contoSenzaEuroFisso"], "0,00" in o["contoSenzaEuroFisso"]])
     # LA BANDIERINA STA DOVE E' VERA: una valuta fuori dal catalogo
     # porta la sua sigla, mai una bandiera inventata
     prova("...e una valuta sconosciuta porta la sigla, non una bandiera",
@@ -72046,6 +72057,9 @@ console.log(JSON.stringify(out));
                       # stesso
                       "function gruppoScambioP2P(o){",
                       "function passaStatoMieiP2P(o, f){",
+                      # (27 set 2026) «recente» e' l'ultimo evento, e lo
+                      # dice la chiusura: il metro della data sulla card
+                      "function chiusuraP2P(o){",
                       "function ordinaMieiP2P(righe, criterio){",
                       "function mieiMostratiP2P(righe){",
                       "function mieiRigheP2P(){",
@@ -72769,9 +72783,13 @@ def prove_p2p_card_scambio():
     # l'inchiostro che sulle card tinte passa l'AA.
     _ch = pezzo_js(mini, "function chiusuraP2P(o){", "\n}\n")
     _db = pezzo_js(mini, "function dataBreveP2P(ts){", "\n}\n")
-    prova("la chiusura ha una scala sola: mossa, aggiornamento, nascita",
-          True, "Number(o.ultimaMossa) || Number(o.aggiornato)" in _ch
-          and "|| Number(o.creato) || 0" in _ch)
+    # EMENDATA (27 set 2026, l'ordine degli annullati): la mossa e' il
+    # PIU' FRESCO fra `ultimaMossa` e `quando` — un annullo saputo dal libro
+    # o dal «gia' annullato» lasciava `ultimaMossa` all'eco della
+    # pubblicazione, e la card diceva quella data
+    prova("la chiusura ha una scala sola: l'ultimo evento, aggiornamento, nascita",
+          True, "Math.max(Number(o.quando) || 0, Number(o.ultimaMossa) || 0)" in _ch
+          and "|| Number(o.aggiornato) || Number(o.creato) || 0" in _ch)
     prova("...e i due giudici sono puri: niente DOM, niente orologi", [],
           [x for x in ("document", "el(", "localStorage", "setTimeout")
            if x in _ch or x in _db])
@@ -73781,6 +73799,8 @@ def prove_p2p_vista_miei():
         "function gruppoScambioP2P(o){",
         "function filtroAccesoMieiP2P(f){",
         "function passaStatoMieiP2P(o, f){",
+        # (27 set 2026) il metro di «Più recenti»
+        "function chiusuraP2P(o){",
         "function ordinaMieiP2P(righe, criterio){",
         "function mieiMostratiP2P(righe){")]
     banco = "\n".join(pezzi) + r"""
@@ -75918,9 +75938,11 @@ def prove_premio_barattozon():
            in pezzo_js(mini, "async function chiediFotoLibroP2P(){", "\n}\n"),
            "prendiCambiPubP2P(cambi);"
            in pezzo_js(mini, "async function chiediScambiServerP2P(){", "\n}\n")])
+    # EMENDATA (27 set 2026): la colonna del cambio non e' piu' l'ultima —
+    # dopo c'e' il premio del libro —, quindi si cerca senza la chiusura
     prova("sul server: la colonna nel CREATE e nel giro dei database di ieri", [True, True],
-          ["        cambio_pub REAL DEFAULT 0\n    );" in src,
-           '"cambio_pub REAL DEFAULT 0"):' in src])
+          ["        cambio_pub REAL DEFAULT 0,\n" in src,
+           '"cambio_pub REAL DEFAULT 0",' in src])
     prova("...la rotta la confronta col cambio NOSTRO, dalla cache", True,
           '(d or {}).get("cambi"), cambio_noto_ora())' in pezzo("registra_ordini_p2p"))
     prova("...i volti portano i cambi accanto, la fotografia li da' a TUTTI, l'archivio per scambio",
@@ -79387,7 +79409,7 @@ def prove_scambi_ovunque():
     for c in ("P2P_STORICO_GIORNI", "_PESO_MOMENTO_P2P"):
         i = _SORGENTE.index(c + " = ")
         exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
-    for f in ("_euro_numero_p2p", "_metodi_lista_p2p", "_stato_scambio_p2p",
+    for f in ("_euro_numero_p2p", "_euri_numero_p2p", "_metodi_lista_p2p", "_stato_scambio_p2p",
               "_parti_mostro_p2p", "_tocca_a_me_p2p", "_scambi_p2p"):
         exec(pezzo(f), amb)
     euro, metodi = amb["_euro_numero_p2p"], amb["_metodi_lista_p2p"]
@@ -79520,6 +79542,8 @@ def prove_scambi_ovunque():
     # la colonna del cambio di Barattozon (26 set 2026) come la aggiunge
     # init_db ai database di ieri: dopo le righe, che sono posizionali
     con.execute("ALTER TABLE p2p_ordini ADD COLUMN cambio_pub REAL DEFAULT 0")
+    # ...e quella del premio del libro (27 set 2026)
+    con.execute("ALTER TABLE p2p_ordini ADD COLUMN premio REAL DEFAULT 0")
     con.execute("UPDATE p2p_ordini SET cambio_pub=91234.5 WHERE ordine='ord-vetrina-1'")
     scambi = amb["_scambi_p2p"]
     v = scambi(con, 111, ORA)
@@ -79645,9 +79669,13 @@ def prove_scambi_ovunque():
                                           "P2P_FINALI", "P2P_INDICE_CERCA_MAX", "P2P_INDICE_CERCA_MIN",
                                           "P2P_GIRO_APERTO"))
              + "\n" + _cost("STATI_P2P", "\n};\n") + "\n"
+             # (27 set 2026) dove si e' fermato un annullato: la scala dei
+             # passi e il lettore della cronaca del server
+             + _cost("P2P_PROGRESSO", "\n};\n") + "\n"
              + "\n".join(pezzo_js(mini, f, "\n}\n") + "\n}"
                          for f in ("function statoDaRestoreP2P(o, statoMostro){",
                                    "function diarioP2P(riga){",
+                                   "function fermoDaMomentiP2P(momenti){",
                                    "function indiceDaChiaveP2P(mz, pub, max){",
                                    "function rigaDaServerP2P(id, s, tk, stato, adesso){",
                                    "function chiaveScambioDaServerP2P(mz, id, s){",
@@ -95026,7 +95054,11 @@ def prove_scambi_p2p_vecchi():
         "esito.sr_cieco = g({stato:'senza_risposta', creato: 0});\n"
         "esito.ritirato = p2pRitirato({stato:'annullato', mio: true});\n"
         "esito.ritiratoConHold = p2pRitirato({stato:'annullato', mio: true, hold:{bolt11:'x'}});\n"
-        "esito.ritiratoConSats = p2pRitirato({stato:'annullato', mio: true, satsNetti: 5});\n"
+        # EMENDATA (27 set 2026): i sats che fanno la ricevuta sono quelli
+        # del MIO lato (`satsMiei`, solo dopo la presa); `satsNetti` un
+        # ordine a prezzo FISSO ce l'ha dalla nascita, e non lo promuove
+        "esito.ritiratoConSats = p2pRitirato({stato:'annullato', mio: true, satsMiei: 5});\n"
+        "esito.ritiratoFisso = p2pRitirato({stato:'annullato', mio: true, satsNetti: 15000, sats: 15000});\n"
         "esito.ritiratoNonERifiutato = p2pRitirato({stato:'rifiutato', mio: true});\n"
         "esito.ritiratoNonEConcluso = p2pRitirato({stato:'concluso', mio: true});\n"
         # 24 set 2026: chi ha PRESO non ritira mai, e chi ha pubblicato
@@ -95075,6 +95107,8 @@ def prove_scambi_p2p_vecchi():
     # sats. La hold o i satsNetti lo promuovono a RICEVUTA, e gli
     # altri stati non c'entrano — il rifiutato porta un motivo da
     # leggere, il concluso il voto e l'export.
+    prova("...e un ordine a prezzo FISSO mai preso e' un ritiro come gli altri",
+          True, _out.get("ritiratoFisso"))
     prova("il ritirato e' l'annullato senza sats, e nessun altro",
           [True, False, False, False, False],
           [_out.get(k) for k in ("ritirato", "ritiratoConHold",
@@ -104792,7 +104826,7 @@ def prove_ritocchi_flusso_p2p():
     for c in ("P2P_STORICO_GIORNI", "_PESO_MOMENTO_P2P"):
         i = _SORGENTE.index(c + " = ")
         exec(_SORGENTE[i:_SORGENTE.index("\n\n", i)], amb)
-    for f in ("_euro_numero_p2p", "_metodi_lista_p2p", "_stato_scambio_p2p",
+    for f in ("_euro_numero_p2p", "_euri_numero_p2p", "_metodi_lista_p2p", "_stato_scambio_p2p",
               "_parti_mostro_p2p", "_tocca_a_me_p2p", "_scambi_p2p", "_quanti_tocca_p2p"):
         exec(pezzo(f), amb)
     tocca = amb["_tocca_a_me_p2p"]
@@ -104844,6 +104878,8 @@ def prove_ritocchi_flusso_p2p():
         f"INSERT INTO p2p_momenti VALUES('ord-1','preso',{ORA - 300},'mostro',1,'buyer','');")
     # la colonna del cambio di Barattozon (26 set 2026), come init_db
     con.execute("ALTER TABLE p2p_ordini ADD COLUMN cambio_pub REAL DEFAULT 0")
+    # ...e quella del premio del libro (27 set 2026)
+    con.execute("ALTER TABLE p2p_ordini ADD COLUMN premio REAL DEFAULT 0")
     quanti = amb["_quanti_tocca_p2p"]
 
     def passo(momento, q, attore, fonte="mostro", dettaglio=""):
@@ -105784,12 +105820,218 @@ process.stdout.write(JSON.stringify(out));
           ["morti", False, True, False], o["gruppo"])
 
 
+def prove_annullati_ritocchi():
+    """GLI ANNULLATI, I RITOCCHI (27 set 2026, dopo d875b39). Cinque cose
+    viste da Andrea: 1) in «Annullati» l'ordine appena annullato stava in
+    FONDO — «Più recenti» guardava `quando || creato`, e un annullo
+    arrivato dal messaggio del coordinatore `quando` non lo scrive, quindi
+    contava la nascita; 2) il dettaglio di un annullato diceva «Invia 0 ·
+    Ricevi 0» — l'archivio del server non portava l'intervallo ne' il
+    premio, e il conto scriveva 0 per una cifra che non sapeva; 3) lo
+    stepper restava sul primo passo «in corso»; 4) un ordine a prezzo
+    fisso annullato non era un ritiro per il giudice (guardava
+    `satsNetti`, che l'eco della pubblicazione gli scrive); 5) il foglio
+    diceva «Ritiri l'ordine? / Sì, ritira» sotto un bottone «Annulla»."""
+    import json as _json, os as _os, re as _re, shutil as _sh
+    import sqlite3
+    import subprocess as _sp, tempfile as _tf
+    print("\n[gli annullati: l'ordine, le cifre, lo stepper, il fisso, il foglio]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    src = open("server.py", encoding="utf-8").read()
+    fn = lambda firma: pezzo_js(mini, firma, "\n}\n") + "\n}"
+    nudo = lambda js: _re.sub(r"/\*[\s\S]*?\*/", "", js)
+
+    # --- le sentinelle ------------------------------------------------
+    prova("1) «Più recenti» ordina con la data della card", True,
+          "const recente = (a, b) => chiusuraP2P(b) - chiusuraP2P(a);"
+          in nudo(fn("function ordinaMieiP2P(righe, criterio){")))
+    prova("...e il «gia' annullato» si data adesso", True,
+          "if (agg.stato === 'annullato') agg.quando = Math.floor(Date.now() / 1000);"
+          in fn("function annulloGiaFattoP2P(e, id){"))
+    rend = nudo(fn("function renderOrdineP2P(){"))
+    prova("3) lo stepper di un annullato: il passo fermo prende il nome dello stato, niente «now»", True,
+          "const fermo = (o.stato === 'annullato' || o.stato === 'rifiutato') ? fermoAnnulloP2P(o) : -1;" in rend
+          and "passi[fermo] = {t: st.t, d: quando ? 'Il ' + quando : ''};" in rend
+          and "(fermo >= 0 ? (i < fermo ? 'done' : i === fermo ? 'stop' : 'todo')" in rend)
+    prova("...con la ✕ spenta nel CSS", True,
+          ".step.stop .dot::after{content:'✕'}" in mini
+          and ".step.stop .dot{background:var(--card);border-color:var(--muted);color:var(--muted)" in mini)
+    prova("...e la macchina a stati, il libro e l'archivio scrivono dove si e' fermato", [True, True, True, True],
+          ["o.fermoA = P2P_PROGRESSO[o.stato] || 0;" in fn("function avanzaOrdineP2P(ordine, azione, payload){"),
+           "if (fine === 'annullato') o.fermoA = P2P_PROGRESSO[o.stato] || 0;" in fn("async function statoPubblicoOrdini(ids){"),
+           "gia.fermoA = Math.max(P2P_PROGRESSO[gia.stato] || 0, fermoDaMomentiP2P(s.momenti));" in fn("function adottaScambiServerP2P(locali){"),
+           "o.fermoA = fermoDaMomentiP2P(s.momenti);" in fn("function rigaDaServerP2P(id, s, tk, stato, adesso){")])
+    ann = fn("function annullaScambioP2P(){")
+    prova("5) il foglio parla come il bottone: «Annulli l'ordine? / Sì, annulla»", [True, True, False, False],
+          ["'Annulli l\\'ordine?'" in ann, "'Sì, annulla'" in ann,
+           "Ritiri l" in ann, "'Sì, ritira'" in ann])
+    # --- il server: l'intervallo e il premio nell'archivio -----------
+    amb = {}
+    exec(pezzo("_euro_numero_p2p"), amb)
+    exec(pezzo("_euri_numero_p2p"), amb)
+    e2 = amb["_euri_numero_p2p"]
+    prova("2) sul server la cifra torna coi due capi: «10,00 €», «da 20,00 a 100,00 €», storta, rovescia, vuota",
+          [(10.0, 0.0), (20.0, 100.0), (0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
+          [e2("10,00 €"), e2("da 20,00 a 100,00 €"), e2("da venti a cento €"),
+           e2("da 100,00 a 20,00 €"), e2("")])
+    ev = pezzo("_evento_libro_p2p")
+    prova("...il lettore del libro porta il premio, e un premio storto vale zero", True,
+          '"premio": premio}' in ev and "if premio != premio or abs(premio) > 100:" in ev)
+    prova("...la colonna c'e' nel CREATE e nel giro dei database di ieri", [True, True],
+          ["        premio REAL DEFAULT 0\n    );" in src, '"premio REAL DEFAULT 0"):' in src])
+    prova("...un 38383 senza cifra non cancella quella nota, e il premio si scrive", True,
+          "euro=COALESCE(NULLIF(?, ''), euro)" in src and "tornati=?, premio=? WHERE ordine=?" in src)
+    sc = pezzo("_scambi_p2p")
+    prova("...e l'archivio li serve", True,
+          '"euro": euri[0], "euro_max": euri[1],' in sc
+          and '"premium": float(o["premio"] or 0) if o else 0.0,' in sc
+          and "cambio_pub, premio FROM p2p_ordini WHERE ordine=?" in sc)
+    # IL LETTORE VERO sul database vero: la cifra, l'intervallo e il premio
+    # entrano dal libro, e un 38383 senza `fa` non li cancella
+    detto = []
+    amb2 = _ambiente_libro_p2p(detto)
+    for f in _FUNZIONI_LIBRO_P2P:
+        exec(_senza_prosa(pezzo(f)), amb2)
+    for f in ("_euro_numero_p2p", "_euri_numero_p2p"):
+        exec(pezzo(f), amb2)
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    con.executescript(_schema_p2p_pieno(src))
+    con.execute("INSERT INTO utenti(tg_id, nome) VALUES(111, 'Anna')")
+    con.execute("INSERT INTO chiavi_p2p(pubkey, tg_id, creato) VALUES(?,111,0)", ("1" * 64,))
+    reg, giud, leggi = amb2["_registra_ordini_p2p"], amb2["_avvisi_libro_p2p"], amb2["_evento_libro_p2p"]
+
+    def grezzo(oid, st, quando, fa, premio):
+        tags = [["d", oid], ["k", "sell"], ["f", "EUR"], ["s", st], ["amt", "0"]]
+        if fa:
+            tags.append(["fa"] + list(fa))
+        tags += [["pm", "SEPA"], ["premium", premio], ["expires_at", "1999999999"],
+                 ["y", "mostro"], ["z", "order"]]
+        return {"created_at": quando, "content": "", "tags": tags}
+    reg(con, 111, ["ord-cifre-1", "ord-range-1"], 1000, True)
+    giud(con, [leggi(grezzo("ord-cifre-1", "pending", 1100, ["10"], "2")),
+               leggi(grezzo("ord-range-1", "pending", 1100, ["20", "100"], "-3"))], 1100, 0.03, 168)
+    giud(con, [leggi(grezzo("ord-cifre-1", "canceled", 1200, None, "2"))], 1200, 0.03, 168)
+    righe_l = {r["ordine"]: (r["stato"], r["euro"], r["premio"])
+               for r in con.execute("SELECT ordine, stato, euro, premio FROM p2p_ordini")}
+    prova("...il lettore del libro: la cifra resta dopo un annullo senza `fa`, e il premio c'e'",
+          ("canceled", "10,00 €", 2.0), righe_l.get("ord-cifre-1"))
+    prova("...e l'intervallo col premio negativo, che l'archivio rilegge in due capi",
+          [("pending", "da 20,00 a 100,00 €", -3.0), (20.0, 100.0)],
+          [righe_l.get("ord-range-1"), amb2["_euri_numero_p2p"](righe_l.get("ord-range-1", ("", "", 0))[1])])
+    con.close()
+    rd = fn("function rigaDaServerP2P(id, s, tk, stato, adesso){")
+    prova("...e il client li prende, alla nascita e sulla riga che non li aveva", [True, True, True],
+          ["euroMax: Math.max(0, Number(s.euro_max) || 0)" in rd, "premium: Number(s.premium) || 0," in rd,
+           "if (!gia.premium && Number(s.premium)) gia.premium = Number(s.premium);"
+           in fn("function adottaScambiServerP2P(locali){")])
+
+    node = _sh.which("node")
+    if not node:
+        salta("il banco node degli annullati", "node non c'e'")
+        return
+
+    def blocco(nome):
+        i = mini.index("const " + nome + " = {")
+        return mini[i:mini.index("\n};", i) + 3]
+    liste = "\n".join(_re.findall(r"^const P2P_[A-Z_]+ = \[[^\]]*\];", mini, _re.M))
+    banco = "\n".join([
+        blocco("AVANZA_P2P"), blocco("STATI_P2P"), blocco("MOTIVI_CANTDO"),
+        blocco("P2P_GIRO_MORTO"), blocco("P2P_PROGRESSO"), liste,
+        _re.search(r"const P2P_ORDINE_MIEI_CASA = [^\n]*;", mini).group(0),
+        fn("function chiaveCantDo(payload){"), fn("function motivoCantDo(payload){"),
+        fn("function importoBolt11(pr){"), fn("function leggiBolt11(pr){"),
+        "let p2pInfo = {fee: 0.02, scadenzaSec: 900};",
+        fn("function commissioneVivaP2P(){"), fn("function feeMiaP2P(o){"),
+        fn("function nettoLatoP2P(o, sats){"), fn("function scontoMancatoP2P(o, miei){"),
+        fn("function lordoDaMieiP2P(o, miei){"), fn("function recapitoEuroArrivatoP2P(o){"),
+        fn("function aspettaRecapitoP2P(o){"), fn("function nomeControparteP2P(o, ripiego){"),
+        "function percheFallitoP2P(){ return ''; }",
+        mini[mini.index("function p2pRitirato(o){"):mini.index("\n}", mini.index("function p2pRitirato(o){")) + 2],
+        fn("function statoTestoP2P(o){"), fn("function holdVivaP2P(o){"),
+        fn("function mossaDopoRilascioP2P(o, azione, ord){"),
+        fn("function avanzaOrdineP2P(ordine, azione, payload){"),
+        fn("function euroTabacchinoP2P(metodi){"),
+        _re.search(r"const P2P_TABACCHINO_PM = [^\n]*;", mini).group(0),
+        fn("function azioniDisponibili(o){"), fn("function gruppoScambioP2P(o){"),
+        fn("function chiusuraP2P(o){"), fn("function fermoAnnulloP2P(o){"),
+        fn("function fermoDaMomentiP2P(momenti){"), fn("function ordinaMieiP2P(righe, criterio){"),
+    ]) + r"""
+const out = {};
+const ORA = 1790000000;
+/* 1) L'ORDINE: quattro annullati — uno di un mese fa, uno di ieri, e due
+   di ADESSO nati una settimana fa: uno annullato dal messaggio del
+   coordinatore (ultimaMossa, niente quando), uno dal libro (quando nuovo,
+   ultimaMossa vecchia, l'eco della pubblicazione) */
+const righe = [
+  {id: 'mese', stato: 'annullato', creato: ORA - 40 * 86400, ultimaMossa: ORA - 30 * 86400},
+  {id: 'ieri', stato: 'annullato', creato: ORA - 3 * 86400, ultimaMossa: ORA - 86400},
+  {id: 'msg', stato: 'annullato', creato: ORA - 7 * 86400, ultimaMossa: ORA - 60, aggiornato: ORA - 59},
+  {id: 'libro', stato: 'annullato', creato: ORA - 7 * 86400, ultimaMossa: ORA - 7 * 86400, quando: ORA - 30}
+];
+out.ordine = ordinaMieiP2P(righe, 'recenti').map(o => o.id);
+out.date = righe.map(chiusuraP2P);
+/* il vivo e il chiuso nella stessa lista: l'ultimo passo, non la nascita */
+out.misto = ordinaMieiP2P([
+  {id: 'vecchioMaMosso', stato: 'attivo', creato: ORA - 5 * 86400, ultimaMossa: ORA - 10},
+  {id: 'nuovoFermo', stato: 'pubblicato', creato: ORA - 3600},
+  {id: 'annullatoOra', stato: 'annullato', creato: ORA - 9 * 86400, ultimaMossa: ORA - 5}
+], 'recenti').map(o => o.id);
+/* 3) DOVE SI E' FERMATO: dalla macchina a stati */
+const da = (stato, extra) => avanzaOrdineP2P(Object.assign({id: 'x', lato: 'vendo', mio: true, stato: stato,
+  cantDo: '', errore: '', metodi: []}, extra || {}), 'canceled', null);
+out.fermi = [da('pubblicato'), da('attesa_mia_hold', {preso: true}), da('attivo', {preso: true}),
+             da('euro_inviati', {preso: true})].map(o => [o.stato, o.fermoA, fermoAnnulloP2P(o)]);
+out.ripieghi = [fermoAnnulloP2P({stato: 'annullato'}), fermoAnnulloP2P({stato: 'annullato', preso: true}),
+                fermoAnnulloP2P({stato: 'annullato', giroMorto: 'hold'}), fermoAnnulloP2P({stato: 'annullato', fermoA: 9}),
+                fermoAnnulloP2P(null)];
+const M = (m) => ({m: m, q: 1, a: 'mostro', d: ''});
+out.momenti = [fermoDaMomentiP2P([]), fermoDaMomentiP2P([M('annullato')]),
+               fermoDaMomentiP2P([M('preso'), M('annullato')]),
+               fermoDaMomentiP2P([M('preso'), M('garanzia_pagata'), M('annullo_chiesto'), M('annullato')]),
+               fermoDaMomentiP2P([M('preso'), M('garanzia_pagata'), M('fiat'), M('annullato')]),
+               fermoDaMomentiP2P([M('preso'), M('tornato'), M('annullato')]), fermoDaMomentiP2P(null)];
+/* 4) IL PREZZO FISSO: l'eco della pubblicazione scrive satsNetti, e il
+   ritiro resta un ritiro — frase compresa */
+const fisso = avanzaOrdineP2P({id: 'f', lato: 'vendo', mio: true, stato: 'pubblicato', sats: 15000,
+  cantDo: '', errore: '', metodi: []}, 'new-order', {order: {amount: 15000}});
+const fissoAnnullato = avanzaOrdineP2P(fisso, 'canceled', null);
+out.fisso = [fisso.satsNetti, fissoAnnullato.stato, p2pRitirato(fissoAnnullato), statoTestoP2P(fissoAnnullato).t];
+const presoFisso = avanzaOrdineP2P(avanzaOrdineP2P(fisso, 'pay-invoice', {order: {amount: 15000}}), 'canceled', null);
+out.presoFisso = [p2pRitirato(presoFisso), statoTestoP2P(presoFisso).t];
+console.log(JSON.stringify(out));
+"""
+    cart = _tf.mkdtemp(prefix="annullati_")
+    p = _os.path.join(cart, "banco.js")
+    open(p, "w", encoding="utf-8").write(banco)
+    r = _sp.run([node, p], capture_output=True, text=True, timeout=60, encoding="utf-8")
+    _sh.rmtree(cart, ignore_errors=True)
+    prova("il banco degli annullati gira", "", (r.stderr or "")[-500:])
+    if r.returncode or not r.stdout.strip():
+        return
+    o = _json.loads(r.stdout)
+    prova("1) «Più recenti» sotto «Annullati»: i due di adesso in cima, qualunque strada abbia portato l'annullo",
+          ["libro", "msg", "ieri", "mese"], o["ordine"])
+    prova("...e la data della card e' la stessa del posto", [1790000000 - 30 * 86400, 1790000000 - 86400,
+          1790000000 - 60, 1790000000 - 30], o["date"])
+    prova("...e nella lista mista conta l'ultimo passo, non la nascita",
+          ["annullatoOra", "vecchioMaMosso", "nuovoFermo"], o["misto"])
+    prova("3) dove si e' fermato, dalla macchina a stati: nel libro, prima della garanzia, a garanzia, dopo gli euro",
+          [["annullato", 0, 0], ["annullato", 1, 1], ["annullato", 2, 2], ["annullato", 3, 3]], o["fermi"])
+    prova("...i ripieghi delle righe di prima: mai preso 0, preso o giro morto 1, e dentro la scala",
+          [0, 1, 1, 3, 0], o["ripieghi"])
+    prova("...e dalla cronaca del server, ultimo giro compreso", [0, 0, 1, 2, 3, 0, 0], o["momenti"])
+    prova("4) un ordine a prezzo FISSO mai preso: ritirato, con la sua frase", [15000, "annullato", True, "Ordine annullato"],
+          o["fisso"])
+    prova("...ma preso (la hold chiesta) resta uno scambio annullato", [False, "Scambio annullato"], o["presoFisso"])
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_schermo_segue_mostro, prove_annulla_riallinea,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullati_ritocchi,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,
