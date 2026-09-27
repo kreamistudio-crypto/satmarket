@@ -6938,7 +6938,12 @@
   avvisi 0007 di presa, annullo, scadenza e ritorno, e a
   `/api/p2p/canale` per gli ordini nuovi di Barattolo (LA FOTOGRAFIA
   SUBITO). La fila c'e' solo nella vetrina nuda (`vetrinaNudaP2P`) e
-  non entra mai nella griglia.
+  non entra mai nella griglia. I MIEI ordini appena pubblicati entrano
+  dall'archivio del dispositivo (`ordiniMieiFreschiP2P`, 10 minuti)
+  finche' la fotografia non li porta, e il ritorno in Esplora ridisegna
+  subito. Chi guarda puo' spegnerla («Scambi P2P nella home», in
+  Aspetto; timbri `p2p_home_via`/`p2p_home_su`): al suo posto la riga
+  `#p2pVetrinaVia` con «Mostra», e nessuna domanda al server.
   Il tocco e' `prendiOrdineP2P`, o il foglio «Lo scambio P2P» per chi
   il P2P non ce l'ha. Verbale: CANTIERI, «Le card P2P in vetrina».
   NEL P2P LA PROPRIA META' SI INVIA (26 set 2026): «Invia X € ·

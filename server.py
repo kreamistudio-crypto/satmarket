@@ -37647,7 +37647,10 @@ async def scegli_font_scala(req: Request,
 VISTI_NOTI = ("tour", "tour_p2p", "cartello", "condcat", "checklistvista",
               "nwc", "lnaddr", "npubverifica", "nostrpub", "barraweb",
               "duetocchi", "fx_ridotti", "fx_pieni", "p2p_lv5", "giro_p2p",
-              "banner_p2p")
+              "banner_p2p",
+              # «Scambi P2P nella home», 27 set 2026: spenta / riaccesa,
+              # vince il piu' recente — il patto di fx_ridotti / fx_pieni
+              "p2p_home_via", "p2p_home_su")
 
 
 def _visti_leggi(grezzo) -> dict:

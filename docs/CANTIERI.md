@@ -34819,3 +34819,49 @@ chiama anche lui «Annulla», sotto «Sì, annulla»: da decidere se
 chiamarlo diverso. L'intestazione di «I miei scambi» conta gli scambi
 aperti sulla lista filtrata (a «Annullati» dice «0 scambi aperti»), da
 prima.
+La fila «Scambi P2P» dopo una pubblicazione, e la scelta di chi guarda
+(27 set 2026, difetto e richiesta di Andrea a aeab620). **IL DIFETTO:**
+pubblicato un ordine e tornato alla home, la card non c'era; compariva
+solo rientrando nel P2P e riuscendo. **IL PERCHE', MISURATO sul banco col
+codice di prima:** non la cache e non un ritorno che non rinfresca — ogni
+strada (freccia, tasto e gesto di Telegram, gesto dell'app Android, tab
+Esplora) passa da `go('esplora')`, che la fotografia la chiede SUBITO e
+senza cache. Era una GARA: il server rifa' la fotografia 3 s dopo
+`/api/p2p/canale` e poi rilegge i relay, e chi torna prima riceve quella
+di prima; la card arrivava al giro dopo, 61,5 s dopo la pubblicazione.
+**LA CURA TOGLIE LA GARA invece di inseguirla:** i MIEI ordini ancora nel
+libro stanno gia' nell'archivio degli scambi del dispositivo, e la fila
+li unisce alla fotografia (`ordiniMieiFreschiP2P`) — solo i freschi (10
+minuti, poi decide la fotografia), col nome vero del coordinatore e
+confermati da lui (`contattato`), col mio volto, e un tocco apre il mio
+scambio. Quando la fotografia li porta resta una card sola. Tornando
+alla home la fila si ridisegna SUBITO coi fatti del dispositivo, mentre
+la fotografia parte senza cache; annullato, la riga cambia stato e la
+lapide lo toglie anche dalla fotografia vecchia.
+**LA SCELTA «SCAMBI P2P NELLA HOME»** (Profilo › Avvisi e aspetto ›
+Aspetto, sotto gli effetti ridotti, accesa di serie): spenta, al posto
+della fila la riga «Scambi P2P nascosti · Mostra», che la riaccende con un
+tocco, e nessuna domanda al server. Sono due timbri come gli effetti
+ridotti (`p2p_home_via`, `p2p_home_su`, vince il piu' recente): sul
+profilo, quindi su ogni dispositivo, e in memoria per chi non e' entrato.
+Interruttore e riga li vede solo chi la fila la vedrebbe.
+**PROVATO.** `prove_card_p2p_vetrina` estesa (la card mia subito e i
+sette casi che non contano, niente doppioni, il tocco sul mio, l'annullato
+che esce; la scelta spenta e riaccesa, spenta senza domande nemmeno
+tornando in Esplora o sulla pagina, spenta da un altro dispositivo col
+giro gia' armato che non chiede, chi non la vedrebbe, l'anonimo); emendata
+col perche' la sentinella di chi chiama `ordineMioP2P` (cinque posti).
+Tortura 20 su 20 (al primo giro una viva: le due guardie della fila
+spenta si coprivano a vicenda, e nessuna prova le guardava da sole).
+Suite intera severa senza config nel worktree ribasato su 7251798 (gli annullati, di un'altra sessione): 16.662 verdi e 0 rosse; i 25 collaudi della CI verdi nella gabbia. **DAL VIVO**, CDP a 375 px nei due temi, banco e relay di
+cartone su 127.0.0.1, id d'ordine nuovi a ogni giro: pubblicato e tornato
+con la freccia (dell'app, poi di Telegram), col tasto di Telegram, col
+tab Esplora e col gesto dell'app Android (CloseWatcher vero; il
+display-mode dell'app e' simulato, headless non lo emula) la card c'e'
+all'arrivo, dopo 0,7-1,5 s, ed e' la prima della fila; annullato e
+tornato sparisce, con la fotografia del server che l'aveva ancora; la
+scelta spenta dal Profilo col dito su un dispositivo, un secondo con lo
+stesso account apre gia' spento, «Mostra» la riaccende e il primo, riaperto,
+la vede. Nessun errore dell'app. Scatti approvati da Andrea.
+**DA AVERE:** il gesto vero sul telefono, e se su un dispositivo nuovo la
+fila compaia un attimo prima che /api/me porti la scelta (non misurato).

@@ -1876,6 +1876,11 @@
   .p2p-vt-tutti{background:none;border:0;padding:4px 0;cursor:pointer;
     font:800 13px Nunito,sans-serif;color:var(--sats-text)}
   .p2p-cosa-corpo p{margin:0 0 10px;font-size:14px;line-height:1.5}
+  /* la fila spenta: una riga piccola e discreta, col solo «Mostra» a colore */
+  .p2p-vt-via{padding:12px var(--pad) 0;font-size:12px;font-weight:700;
+    color:var(--muted);line-height:1.3}
+  .p2p-vt-via button{background:none;border:0;padding:6px 4px;margin:-6px 0;
+    font:inherit;font-weight:800;color:var(--sats-text);cursor:pointer}
 
   /* Etichetta di sezione con la linea puntinata che riempie fino al
      conteggio (quando c'e'): IN VETRINA ······· 42 oggetti */
@@ -9451,6 +9456,10 @@ document.getElementById('cartello')?.remove();</script>
     <!-- GLI SCAMBI P2P IN FILA (26 set 2026): le card P2P in vetrina.
          Nasce spenta: la accende renderVetrinaP2P solo con la leva del
          server e nella vetrina nuda (vedi LE CARD P2P IN VETRINA). -->
+    <!-- LA FILA SPENTA DA CHI GUARDA (27 set 2026): una riga sola, per
+         riaccenderla senza passare dal Profilo -->
+    <div id="p2pVetrinaVia" class="p2p-vt-via" style="display:none">Scambi P2P nascosti ·
+      <button type="button" onclick="setFilaP2P(true)">Mostra</button></div>
     <div id="p2pVetrinaSez" style="display:none">
       <div class="p2p-vt-testa">
         <div class="section-label riga-conta">Scambi P2P <span class="conta" id="p2pVetrinaConta"></span></div>
@@ -11412,6 +11421,9 @@ document.getElementById('cartello')?.remove();</script>
           <div id="fontPillole"
                style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"></div>
           <div id="fxRiga"></div>
+          <!-- «Scambi P2P nella home» (27 set 2026): la scrive
+               renderLevaFilaP2P, e solo per chi la fila la vedrebbe -->
+          <div id="filaP2PRiga"></div>
         </div>
       </div>
         </div>
@@ -14449,7 +14461,13 @@ function go(view){
   else if (typeof chiudiAscoltoLibroP2P === 'function') chiudiAscoltoLibroP2P();
   /* ...e in Esplora la fila «Scambi P2P» riarma la sua fotografia: dai
      relay non passa niente (26 set 2026, vedi LE CARD P2P IN VETRINA) */
-  if (view === 'esplora' && typeof armaFotoVetrinaP2P === 'function') armaFotoVetrinaP2P(true);
+  if (view === 'esplora' && typeof armaFotoVetrinaP2P === 'function') {
+    armaFotoVetrinaP2P(true);
+    /* ...e la fila si ridisegna ADESSO coi fatti di questo dispositivo:
+       il mio ordine appena pubblicato c'e', quello appena annullato no,
+       senza aspettare la risposta del server (27 set 2026) */
+    renderVetrinaP2P();
+  }
   /* la PRIMA apertura del libro in questa sessione saluta col dondolio
      del logo, poi dondola solo al cambio fra Compra e Vendi: tornando
      nel libro non piu' (scuotiLogoP2P toglie la classe a fine giro) */
@@ -58111,12 +58129,49 @@ function vetrinaNudaP2P(){
       || filtroSpedGratis || filtroSconto || filtroAsta || filtroCond || filtroReg) return false;
   return !ordinaEffettivo();
 }
-/* PURA: gli ordini da mostrare, dal piu' nuovo. Le stesse regole del
-   libro (vivi, non scaduti, non lapidati): e' il libro, ristretto. */
-function ordiniVetrinaP2P(libro, adesso){
-  if (!libro || !Array.isArray(libro.ordini)) return [];
+/* ⚠️ CHI PUBBLICA VEDE SUBITO LA SUA CARD (27 set 2026, dal vivo di
+   Andrea): pubblicato un ordine e tornato alla home, la card non c'era.
+   Il ritorno la fotografia la CHIEDEVA gia' (subito, senza cache): era
+   una GARA — il server la rifa' 3 s dopo `/api/p2p/canale` e poi
+   rilegge i relay, e chi torna prima riceve quella di prima; la card
+   arrivava al giro dopo, un minuto piu' tardi (misurato: 61,5 s).
+   LA CURA NON INSEGUE LA GARA, la toglie: i MIEI ordini ancora nel
+   libro li so gia' — stanno nell'archivio degli scambi di questo
+   dispositivo — e la fila li unisce alla fotografia finche' lei non li
+   porta. Solo i freschi (P2P_VETRINA_MIEI_S dalla nascita: poi decide la
+   fotografia), col NOME VERO del coordinatore (un provvisorio non si
+   tocca) e confermati da lui (`contattato`); annullato o preso, la riga
+   cambia stato ed esce da sola, e la lapide lo toglie anche dalla
+   fotografia vecchia. */
+const P2P_VETRINA_MIEI_S = 600;
+function ordiniMieiFreschiP2P(adesso){
   adesso = adesso || Math.floor(Date.now() / 1000);
-  return libro.ordini
+  let righe = {};
+  try { righe = ordiniP2P() || {}; } catch(e) { return []; }
+  const fuori = [];
+  for (const k in righe) {
+    const r = righe[k];
+    if (!r || !r.mio || !r.contattato || !r.id || provvisorioP2P(r.id)) continue;
+    if (r.stato !== 'pubblico' && r.stato !== 'pubblicato') continue;
+    if (!((Number(r.creato) || 0) >= adesso - P2P_VETRINA_MIEI_S)) continue;
+    fuori.push({id: String(r.id), lato: r.lato === 'compro' ? 'buy' : 'sell',
+                stato: 'pending', fiat: 'EUR', euro: Number(r.euro) || 0,
+                euroMax: Number(r.euroMax) || 0, sats: Number(r.sats) || 0,
+                premium: Number(r.premium) || 0,
+                metodi: Array.isArray(r.metodi) ? r.metodi.slice() : [],
+                scade: Number(r.scade) || 0, creato: Number(r.creato) || adesso, mio: true});
+  }
+  return fuori;
+}
+/* PURA: gli ordini da mostrare, dal piu' nuovo. Le stesse regole del
+   libro (vivi, non scaduti, non lapidati): e' il libro, ristretto — piu'
+   i miei appena nati che la fotografia non porta ancora (`miei`). */
+function ordiniVetrinaP2P(libro, adesso, miei){
+  adesso = adesso || Math.floor(Date.now() / 1000);
+  const base = (libro && Array.isArray(libro.ordini)) ? libro.ordini.slice() : [];
+  const ci = new Set(base.map(o => o && o.id));
+  for (const o of (miei || [])) if (o && o.id && !ci.has(o.id)) base.push(o);
+  return base
     .filter(o => o && o.id && o.stato === 'pending'
                  && !(o.scade && o.scade <= adesso) && !lapidataP2P(o.id))
     .sort((a, b) => (b.creato || 0) - (a.creato || 0))
@@ -58131,7 +58186,8 @@ function euroCartaP2P(n){
 function cardVetrinaP2P(o){
   const vende = o.lato === 'sell';
   const tab = tabacchinoP2P(o.metodi);
-  const f = p2pFacce[o.id] || {};
+  /* il mio ordine porta il mio volto anche prima che il server lo sappia */
+  const f = p2pFacce[o.id] || ((o.mio || ordineMioP2P(o.id)) ? voltoMioP2P() : {});
   /* lo sfondo: le due monete per tutti, il marchio per Barattozon (il
      file chiaro: il fondo e' scuro in tutt'e due i temi) */
   const fondo = tab
@@ -58172,8 +58228,15 @@ function filaCardP2P(html){
 }
 function renderVetrinaP2P(){
   const qui = vetrinaNudaP2P();
-  if (qui) armaFotoVetrinaP2P();
-  const ordini = qui ? ordiniVetrinaP2P(p2pVetrinaFoto) : [];
+  /* SPENTA DA CHI GUARDA: al posto della fila una riga sola per
+     riaccenderla, e nessuna domanda al server */
+  const via = qui && filaP2PNascosta();
+  const riga = el('p2pVetrinaVia');
+  if (riga) riga.style.display = via ? '' : 'none';
+  renderLevaFilaP2P();
+  const vede = qui && !via;
+  if (vede) armaFotoVetrinaP2P();
+  const ordini = vede ? ordiniVetrinaP2P(p2pVetrinaFoto, 0, ordiniMieiFreschiP2P()) : [];
   const html = ordini.map(cardVetrinaP2P);
   /* SI RIDISEGNA SOLO SE CAMBIA QUALCOSA: riscrivere la fila la riporta
      all'inizio, e chi la sta scorrendo di lato perderebbe il segno a
@@ -58233,7 +58296,8 @@ function vetrinaDavantiP2P(){
    (LA FOTOGRAFIA SUBITO, in server.py). */
 function armaFotoVetrinaP2P(subito){
   if (p2pVetrinaInVolo) return;
-  if (!p2pInVetrina || DEMO || !vetrinaDavantiP2P() || !vetrinaNudaP2P()) return;
+  if (!p2pInVetrina || DEMO || !vetrinaDavantiP2P() || !vetrinaNudaP2P()
+      || filaP2PNascosta()) return;
   if (subito && p2pVetrinaTimer) { clearTimeout(p2pVetrinaTimer); p2pVetrinaTimer = null; }
   if (p2pVetrinaTimer) return;
   if (subito) p2pVetrinaFresca = true;
@@ -58243,7 +58307,8 @@ function armaFotoVetrinaP2P(subito){
 }
 function giroFotoVetrinaP2P(){
   p2pVetrinaTimer = null;
-  if (!p2pInVetrina || DEMO || !vetrinaDavantiP2P() || !vetrinaNudaP2P()) return;
+  if (!p2pInVetrina || DEMO || !vetrinaDavantiP2P() || !vetrinaNudaP2P()
+      || filaP2PNascosta()) return;
   p2pVetrinaInVolo = true;
   p2pVetrinaChiesta = Date.now();
   chiediFotoVetrinaP2P().catch(() => false).then(() => {
@@ -58268,6 +58333,9 @@ function apriCardP2P(id){
      Esplora. Se nel frattempo l'ordine e' stato preso, lo dice la presa
      come dal libro: «Quest'ordine non c'è più». Un libro vero piu'
      fresco della fotografia resta dov'e': quello e' piu' giusto. */
+  /* il MIO ordine (anche appena nato, che la fotografia non porta
+     ancora) si apre come dal libro: la sua pagina di scambio */
+  if (ordiniP2P()[id]) { prendiOrdineP2P(id); return; }
   const f = p2pVetrinaFoto;
   if (f && f.quando && (!p2pLibro || p2pLibro.copia || (p2pLibro.quando || 0) < f.quando))
     libroDaCopiaP2P(f.eventi, f.quando, 'server');
@@ -58277,6 +58345,60 @@ function apriCardP2P(id){
     return;
   }
   prendiOrdineP2P(id);
+}
+/* ---- SCAMBI P2P NELLA HOME: LA SCELTA DI CHI GUARDA (27 set 2026,
+   richiesta di Andrea) ----
+   Un interruttore nel Profilo («Avvisi e aspetto» › Aspetto), acceso di
+   serie; spento, la fila non c'e' e al suo posto resta una riga piccola
+   «Scambi P2P nascosti · Mostra» che la riaccende con un tocco. Compaiono
+   tutt'e due SOLO a chi la fila la vedrebbe (`p2pInVetrina`).
+   LA SCELTA SONO DUE TIMBRI, come gli effetti ridotti: `p2p_home_via` e
+   `p2p_home_su`, e vince il piu' recente. Stanno sul profilo (/api/me/visti:
+   valgono su ogni dispositivo, e /api/me li riporta) e nella memoria del
+   dispositivo, che per chi non e' entrato e' l'unica. */
+function filaP2PNascosta(){
+  const h = hintLetti();
+  return (Number(h.p2p_home_via) || 0) > (Number(h.p2p_home_su) || 0);
+}
+function setFilaP2P(mostra){
+  haptic();
+  const h = hintLetti();
+  /* dopo l'altro, non «adesso»: con l'orologio indietro il timbro nuovo
+     nascerebbe piu' vecchio di quello che vuole battere */
+  const altro = Number(h[mostra ? 'p2p_home_via' : 'p2p_home_su']) || 0;
+  const quando = Math.max(Date.now(), altro + 1);
+  if (mostra) timbraVisto('p2p_home_su', quando);
+  else timbraVisto('p2p_home_via', quando);
+  if (!mostra && p2pVetrinaTimer) { clearTimeout(p2pVetrinaTimer); p2pVetrinaTimer = null; }
+  if (mostra) armaFotoVetrinaP2P(true);
+  renderVetrinaP2P();
+}
+function renderLevaFilaP2P(){
+  const box = el('filaP2PRiga');
+  if (!box) return;
+  let html = '';
+  if (p2pInVetrina && !DEMO) {
+    const su = !filaP2PNascosta();
+    const ovunque = !!myTgId && !VETRINA;
+    html = `
+  <div style="display:flex;align-items:center;gap:10px;margin-top:16px;padding-top:12px;border-top:1px solid var(--line)">
+    <div style="min-width:0;flex:1">
+      <div style="font-size:13.5px;font-weight:800">🔁 Scambi P2P nella home</div>
+      <div style="font-size:12px;color:var(--muted);font-weight:600;line-height:1.4">
+        La fila degli scambi di sats in euro, sopra gli annunci. Spenta,
+        al suo posto resta una riga per riaccenderla.
+        ${ovunque ? 'La scelta ti segue su <b style="color:var(--ink)">ogni dispositivo</b>.'
+                  : 'Vale su <b style="color:var(--ink)">questo dispositivo</b>.'}</div>
+    </div>
+    <button id="filaP2PLeva" onclick="setFilaP2P(${su ? 'false' : 'true'})"
+      role="switch" aria-checked="${su ? 'true' : 'false'}" aria-label="Scambi P2P nella home"
+      style="flex:none;font:inherit;font-size:12.5px;font-weight:800;border:1px solid ${su?'var(--sats)':'var(--line)'};background:${su?'var(--sats)':'transparent'};color:${su?'#fff':'var(--ink)'};border-radius:999px;padding:8px 14px;cursor:pointer">
+      ${su ? 'Attivo' : 'Spento'}</button>
+  </div>`;
+  }
+  if (box.dataset.firma === html) return;
+  box.dataset.firma = html;
+  box.innerHTML = html;
 }
 function apriCosaP2P(){
   haptic();
@@ -59932,6 +60054,7 @@ async function avvia(){
     adottaFont(me);   // la misura scelta sull'altro telefono
     adottaVisti(me);  // i timbri «una volta sola»: tour visto, «Non ora»
     applicaEffetti(); // ...e fra i timbri, gli effetti ridotti scelti altrove
+    if (typeof renderVetrinaP2P === 'function') renderVetrinaP2P();  // ...e la fila P2P
     mySpedizioniere = me.spedizioniere || '';
     spedizionieriCatalogo = me.spedizionieri || [];
     /* le SUE reti da una chiave nuova; un server di ieri non la manda

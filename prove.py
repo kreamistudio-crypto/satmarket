@@ -52432,11 +52432,29 @@ def prove_card_p2p_vetrina():
           [blocco.count("fetch("), "fetch(`${API_BASE}/p2p/libro`, {headers: h, cache:" in blocco,
            "method:" in blocco])
     go_js = pezzo_js(mini, "function go(view){", "\n}\n")
+    # (27 set 2026: e la fila si ridisegna SUBITO coi fatti del dispositivo,
+    # prima che la fotografia risponda — il mio appena pubblicato c'e')
+    _esp = go_js[go_js.find("if (view === 'esplora' && typeof armaFotoVetrinaP2P === 'function') {"):]
     prova("L'ASCOLTO DAL VIVO SOLO NEL P2P: go() lo apre nelle sue viste, e in Esplora "
-          "arma la fotografia", [True, True, False],
+          "arma la fotografia E ridisegna subito la fila", [True, True, True, False],
           ["  if (VISTE_NAV_P2P.has(view)) { if (typeof ascoltaLibroP2P === 'function') ascoltaLibroP2P(); }" in go_js,
-           "if (view === 'esplora' && typeof armaFotoVetrinaP2P === 'function') armaFotoVetrinaP2P(true);" in go_js,
+           _esp.startswith("if (view === 'esplora' && typeof armaFotoVetrinaP2P === 'function') {\n    armaFotoVetrinaP2P(true);"),
+           "    renderVetrinaP2P();\n  }" in _esp[:700],
            "libroInAscoltoInEsploraP2P" in mini])
+    prova("/api/me ridisegna la fila: la scelta fatta su un altro dispositivo arriva", True,
+          "if (typeof renderVetrinaP2P === 'function') renderVetrinaP2P();  // ...e la fila P2P" in mini)
+    prova("i due timbri della scelta sono nel catalogo del server", [True, True],
+          ['"p2p_home_via"' in re.search(r"VISTI_NOTI = \(([^)]*)\)", _SORGENTE, re.S).group(1),
+           '"p2p_home_su"' in re.search(r"VISTI_NOTI = \(([^)]*)\)", _SORGENTE, re.S).group(1)])
+    _via = re.search(r'<div id="p2pVetrinaVia"[^>]*>(.*?)</div>', mini, re.S)
+    prova("la riga «Scambi P2P nascosti · Mostra» nasce spenta, sopra la fila, e riaccende",
+          [True, True, True],
+          [bool(_via) and 'style="display:none"' in _via.group(0),
+           bool(_via) and mini.index('id="p2pVetrinaVia"') < mini.index('id="p2pVetrinaSez"'),
+           bool(_via) and 'onclick="setFilaP2P(true)">Mostra</button>' in _via.group(1)])
+    prova("l'interruttore vive in «Aspetto», sotto gli effetti ridotti", True,
+          0 < mini.index('<div id="fxRiga"></div>') < mini.index('<div id="filaP2PRiga"></div>')
+          < mini.index('id="grpPrivacy"'))
     prova("...e ne' un evento vivo del libro ne' la sua fotografia passano dalla fila",
           [False, False],
           ["renderVetrinaP2P" in pezzo_js(mini, "function arrivaLibroP2P(ev){", "\n}\n"),
@@ -52494,6 +52512,16 @@ let filtroPrezzo = null, filtroSped = false, filtroRitiro = false, filtroDig = f
     filtroAsta = false, filtroCond = '', filtroReg = '';
 function ordinaEffettivo(){ return ORDINE; }
 let p2pLibro = null, p2pFacce = {}, LAPIDI = new Set(), p2pInfo = null;
+/* l'archivio degli scambi di questo dispositivo, e i timbri del profilo */
+let RIGHE = {};
+function ordiniP2P(){ return RIGHE; }
+function provvisorioP2P(id){ return String(id || '').indexOf('nuovo:') === 0; }
+function ordineMioP2P(id){ return !!RIGHE[id]; }
+function voltoMioP2P(){ return {nome: 'Io', avatar: ''}; }
+let HINT = {};
+function hintLetti(){ return Object.assign({}, HINT); }
+const TIMBRATI = [];
+function timbraVisto(id, q){ HINT[id] = q || Date.now(); TIMBRATI.push(id); }
 const p2pFacceChieste = new Set();
 function lapidataP2P(id){ return LAPIDI.has(id); }
 /* I RELAY: se la fila ne chiama uno, il registro lo dice */
@@ -52685,6 +52713,71 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
   p2pInVetrina = true; activeCat = 'Libri'; renderVetrinaP2P();
   out.inReparto = [el('p2pVetrinaSez').style.display, TIMERS.length];
   activeCat = 'Tutto';
+  /* ---- CHI PUBBLICA VEDE SUBITO LA SUA CARD (27 set 2026) ---- */
+  VISTA = 'view-esplora'; ACCESO = true; myTgId = 111; VETRINA = false; p2pLibro = null;
+  FOTO = {eventi: [EV('h1', 'sell', 5, ADESSO - 50)], quando: ADESSO - 5};
+  TIMERS.length = 0; p2pVetrinaTimer = null; p2pVetrinaChiesta = 0; p2pVetrinaFirma = null;
+  renderVetrinaP2P(); await giro();            // la fotografia: il mio non c'e' ancora
+  const riga = (id, extra) => Object.assign({id, mio: true, contattato: true, stato: 'pubblico',
+    lato: 'vendo', euro: 40, euroMax: 0, sats: 0, premium: 0, metodi: ['Revolut'], scade: 0,
+    creato: ADESSO - 5}, extra || {});
+  const ids = () => [...el('p2pVetrinaFila').innerHTML.matchAll(/data-p2p="([^"]+)"/g)].map(m => m[1]);
+  RIGHE = {mio1: riga('mio1')};
+  renderVetrinaP2P();
+  out.mioSubito = {ids: ids(), volto: el('p2pVetrinaFila').innerHTML.includes('>I</span>'),
+                   vende: el('p2pVetrinaFila').innerHTML.includes('Vende BTC')};
+  RIGHE = {'nuovo:3': riga('nuovo:3'), nc: riga('nc', {contattato: false}),
+           vec: riga('vec', {creato: ADESSO - 700}), ann: riga('ann', {stato: 'annullato'}),
+           lap: riga('lap'), alt: riga('alt', {mio: false}), pre: riga('pre', {stato: 'preso'})};
+  LAPIDI = new Set(['lap']);
+  renderVetrinaP2P();
+  out.nonContano = ids();
+  RIGHE = {h1: riga('h1')};
+  renderVetrinaP2P();
+  out.senzaDoppioni = ids().filter(x => x === 'h1').length;
+  RIGHE = {mio1: riga('mio1')}; renderVetrinaP2P();
+  LOG.length = 0; apriCardP2P('mio1'); out.toccoMio = LOG.slice();
+  RIGHE.mio1.stato = 'annullato'; LAPIDI = new Set(['mio1']);
+  renderVetrinaP2P(); out.annullato = ids().includes('mio1');
+  LAPIDI = new Set(); RIGHE = {};
+  /* ---- LA SCELTA: SCAMBI P2P NELLA HOME ---- */
+  HINT = {}; TIMBRATI.length = 0;
+  TIMERS.length = 0; p2pVetrinaTimer = null; p2pVetrinaChiesta = Date.now(); FETCH.length = 0;
+  renderVetrinaP2P();
+  out.levaAccesa = el('filaP2PRiga').innerHTML.includes('aria-checked="true"')
+    && el('filaP2PRiga').innerHTML.includes('ogni dispositivo') && TIMERS.length === 1;
+  setFilaP2P(false);
+  out.spenta2 = {sez: el('p2pVetrinaSez').style.display, riga: el('p2pVetrinaVia').style.display,
+    giri: TIMERS.length, leva: el('filaP2PRiga').innerHTML.includes('aria-checked="false"'),
+    timbri: TIMBRATI.slice()};
+  await giro();
+  renderVetrinaP2P();
+  /* ...e neanche i due ritorni che la chiedono subito: la pagina che torna
+     visibile e il ritorno in Esplora (go) */
+  VIS.forEach(f => f());
+  armaFotoVetrinaP2P(true);
+  const armatiDaSpenta = TIMERS.length;
+  await giro();
+  out.spentaNonChiede = [FETCH.length, TIMERS.length, armatiDaSpenta];
+  setFilaP2P(true);                      // dal «Mostra» della home o dal Profilo: la stessa
+  out.riaccesa = {sez: el('p2pVetrinaSez').style.display, riga: el('p2pVetrinaVia').style.display,
+    giri: TIMERS.map(t => t.ms), timbri: TIMBRATI.slice()};
+  await giro();
+  out.riaccesaChiede = [FETCH.length, FETCH.length ? FETCH[FETCH.length - 1].cache : ''];
+  renderVetrinaP2P();                                // accesa: un giro armato fra un minuto
+  const giaChieste = FETCH.length;
+  HINT = {p2p_home_su: 1000, p2p_home_via: 2000};  // l'ha spenta un ALTRO dispositivo
+  renderVetrinaP2P();
+  out.altroDispositivo = [el('p2pVetrinaSez').style.display, el('p2pVetrinaVia').style.display];
+  await giro();                                      // il giro gia' armato non chiede
+  out.altroNonChiede = [FETCH.length - giaChieste, TIMERS.length];
+  HINT = {};
+  p2pInVetrina = false; renderVetrinaP2P();
+  out.nonLaVede = [el('filaP2PRiga').innerHTML, el('p2pVetrinaVia').style.display];
+  p2pInVetrina = true;
+  myTgId = null; renderVetrinaP2P();
+  out.anonimoLeva = el('filaP2PRiga').innerHTML.includes('questo dispositivo');
+  myTgId = 111;
   out.relay = LOG.filter(x => x.startsWith('RELAY')).concat(ALLOG.filter(x => x.startsWith('RELAY')));
   process.stdout.write(JSON.stringify(out));
 })().catch(e => { process.stderr.write(String(e && e.stack || e)); process.exit(1); });
@@ -52766,6 +52859,30 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
           [o["ritorno"], o["ritornoFetch"], o["dopoRitorno"]])
     prova("FUORI DA ESPLORA nessuna domanda e nessun giro", [6, 0], o["fuori"])
     prova("IN TUTTO IL BANCO LA FILA NON HA CHIAMATO NESSUN RELAY", [], o["relay"])
+    prova("CHI PUBBLICA VEDE SUBITO LA SUA CARD, prima che la fotografia la porti: "
+          "in testa, col suo volto, dal suo lato", {"ids": ["mio1", "h1"], "volto": True, "vende": True},
+          o["mioSubito"])
+    prova("...e non contano il nome provvisorio, il non confermato, il vecchio, l'annullato, "
+          "il preso, il lapidato, quello di un altro", ["h1"], o["nonContano"])
+    prova("...quando la fotografia lo porta resta UNA card", 1, o["senzaDoppioni"])
+    prova("...toccarla apre il mio scambio, non «non c'e' piu'»", ["presa:mio1"], o["toccoMio"])
+    prova("...e annullato esce subito, senza aspettare il server", False, o["annullato"])
+    prova("LA SCELTA: l'interruttore c'e', acceso, e vale su ogni dispositivo", True, o["levaAccesa"])
+    prova("...spento: via la fila, la riga «nascosti · Mostra», nessun giro, il timbro sul profilo",
+          {"sez": "none", "riga": "", "giri": 0, "leva": True, "timbri": ["p2p_home_via"]},
+          o["spenta2"])
+    prova("...e spento non chiede niente al server, nemmeno tornando in Esplora o sulla pagina "
+          "(nessun giro si arma)", [0, 0, 0], o["spentaNonChiede"])
+    prova("...riacceso (dalla home o dal Profilo): la fila torna e chiede SUBITO la fotografia",
+          {"sez": "", "riga": "none", "giri": [0], "timbri": ["p2p_home_via", "p2p_home_su"]},
+          o["riaccesa"])
+    prova("...senza cache", [1, "no-cache"], o["riaccesaChiede"])
+    prova("...spento su un ALTRO dispositivo (il timbro piu' nuovo arriva con /api/me): spento qui",
+          ["none", ""], o["altroDispositivo"])
+    prova("...e il giro che era gia' armato non chiede e non si riarma", [0, 0], o["altroNonChiede"])
+    prova("...chi la fila non la vedrebbe non vede ne' l'interruttore ne' la riga", ["", "none"],
+          o["nonLaVede"])
+    prova("...e per chi non e' entrato la scelta vale su questo dispositivo", True, o["anonimoLeva"])
     prova("L'ANONIMO chiede la fotografia senza initData", [1, False], o["anonimo"])
     prova("LEVA SPENTA SUL SERVER (fotografia vuota): la fila sparisce",
           {"display": "none", "card": 0}, o["serverSpento"])
@@ -71721,7 +71838,11 @@ def prove_p2p_server():
     # dall'ascolto (`voltoCardNuovaP2P`) chiede allo stesso giudice se
     # l'ordine e' mio, per mettere subito il mio volto — e deve dire la
     # stessa cosa della card che veste `p2p-mio`.
-    prova("...e lo chiamano la card, la porta, la cintura e il volto della card nuova", 4,
+    # ...E DAL 27 SET 2026 IN CINQUE: la card P2P della vetrina chiede
+    # allo stesso giudice se l'ordine e' mio, per metterci il mio volto
+    # prima che il server lo sappia (la fila dopo una pubblicazione)
+    prova("...e lo chiamano la card, la porta, la cintura, il volto della card nuova "
+          "e la card della vetrina", 5,
           solo_codice(mini).count("ordineMioP2P(") - 1)
     # --- 15c) LA CINTURA PRIMA DI FIRMARE (14 set 2026) ------------
     # Lo strato sotto all'avviso: OTTO posti derivano la trade key dal
