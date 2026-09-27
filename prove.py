@@ -73084,6 +73084,12 @@ out.conclusoTabScelto = rigaScambioP2P(riga({lato: 'compro', stato: 'concluso',
                                              metodoScelto: 'SEPA'}));
 out.annullatoData = rigaScambioP2P(riga({stato: 'annullato', ultimaMossa: ORA}));
 out.annullatoSenzaData = rigaScambioP2P(riga({stato: 'annullato', creato: 0}));
+/* (27 set 2026) le cifre di un annullato: senza euro, e a prezzo fisso */
+cambioVivo = false;
+out.annullatoSenzaEuro = rigaScambioP2P(riga({stato: 'annullato', ultimaMossa: ORA, euro: 0}));
+cambioVivo = true;
+out.annullatoFisso = rigaScambioP2P(riga({stato: 'annullato', ultimaMossa: ORA, lato: 'vendo',
+                                          euro: 20, sats: 30000}));
 out.rifiutato = rigaScambioP2P(riga({stato: 'rifiutato', ultimaMossa: ORA}));
 out.vivoResta = rigaScambioP2P(riga({lato: 'vendo', stato: 'attivo',
                                      ultimaMossa: ORA}));
@@ -73465,13 +73471,25 @@ console.log(JSON.stringify(out));
            "è stato pagato con" in _nudo_mini])
     prova("...e la coda segue la SCELTA di chi ha preso, non l'elenco",
           False, "al tabacchino" in _parole(o["conclusoTabScelto"]))
-    # GLI ANNULLATI NON PORTANO CIFRE: quell'importo non e' mai passato
-    # di mano, e scriverlo sembrerebbe un conto da fare.
-    prova("l'annullato dice solo quando, senza cifre", True,
+    # GLI ANNULLATI NON PORTAVANO CIFRE (22 set 2026) — ⚠️ ROVESCIATA IL
+    # 27 SET 2026, richiesta di Andrea: la card annullata porta le cifre
+    # che l'ordine aveva, «Invia … · Ricevi …» nel verso del lato, sotto
+    # «Annullato il …»; una cifra che non si sa e' «—»
+    prova("l'annullato dice quando, e poi le sue cifre", True,
           _parole(o["annullatoData"]).startswith("Annullato il ")
-          and "p2p-scambio-euro" not in o["annullatoData"]
-          and "p2p-sats" not in o["annullatoData"]
-          and "p2p-euro" not in o["annullatoData"])
+          and "Invia 5,00 € · Ricevi " in _parole(o["annullatoData"])
+          and "p2p-scambio-cifre" in o["annullatoData"])
+    prova("...e senza la cifra in euro si dice «—», mai «0,00 €»", [True, False],
+          ["Invia — · Ricevi —" in _parole(o["annullatoSenzaEuro"]),
+           "0,00" in o["annullatoSenzaEuro"]])
+    # chi vende INVIA i sats (fissati, piu' la sua meta' di fee: il ≈)
+    # e RICEVE l'euro
+    _pf = _parole(o["annullatoFisso"])
+    prova("...coi sats fissati nel verso di chi vende", True,
+          bool(re.search(r"Invia ≈? ?[0-9][0-9.  ]* sats · Ricevi 20,00 €", _pf)))
+    prova("...e la card annullata e' spenta, come il mai preso", [True, True, False],
+          ["p2p-scambio tinta tono-annullato spenta" in o["annullatoData"],
+           " spenta" in o["rifiutato"], " spenta" in o["vivoResta"]])
     prova("...e senza una data si ferma alla parola", True,
           _parole(o["annullatoSenzaData"]).startswith("Annullato ")
           and "Annullato il" not in o["annullatoSenzaData"])
@@ -74781,7 +74799,13 @@ def prove_intestazione_scambi():
         "function quantiToccaAMeP2P(righe){",
         "function contoScambiP2P(righe){",
         "function fraseContoScambiP2P(c){",
+        # (27 set 2026) col filtro acceso la riga dice cosa si guarda
+        "function filtroAccesoMieiP2P(f){",
+        "function passaStatoMieiP2P(o, f){",
+        "function fraseFiltroScambiP2P(righe, f){",
         "function intestaScambiP2P(righe){")]
+    pezzi_js.append(mini[mini.index("const P2P_NOMI_FILTRO = {"):
+                         mini.index("};", mini.index("const P2P_NOMI_FILTRO = {")) + 2])
     banco = "\n".join(pezzi_js) + r"""
 /* il cartone: le due scatole dell'intestazione */
 const scatola = () => {
@@ -74792,6 +74816,7 @@ const scatola = () => {
 let dom = {};
 const el = id => dom[id] || null;
 let p2pOrdineAperto = '', p2pHoldOrdine = '', p2pIncassoOrdine = '';
+let p2pMieiFiltro = [];
 function reset(){ dom = {p2pMieiIntesta: scatola(), p2pMieiConto: scatola()}; }
 const vista = () => ({vuota: dom.p2pMieiIntesta.classList.contains('vuota'),
                       conto: dom.p2pMieiConto.innerHTML});
@@ -74864,6 +74889,15 @@ const CASI = {
     return g;
   },
   soloFiniti: () => { intestaScambiP2P([R.fatto, R.morto]); return vista(); },
+  /* (27 set 2026) COL FILTRO ACCESO si dice cosa si guarda, e «tocca a
+     te» resta il conto di TUTTI */
+  filtrati: () => ['morti', 'fatti', 'libro', 'fare', 'fatti,morti'].map(f => {
+    p2pMieiFiltro = f.split(','); intestaScambiP2P(tutte());
+    const v = vista().conto; p2pMieiFiltro = []; return v;
+  }),
+  dueAnnullati: () => { p2pMieiFiltro = ['morti'];
+    intestaScambiP2P([R.morto, Object.assign({}, R.morto, {id: 'h2'}), R.libro]);
+    const v = vista().conto; p2pMieiFiltro = []; return v; },
   soloNelLibro: () => { intestaScambiP2P([R.libro]); return vista(); },
   /* i passaggi: vuoto -> uno mio -> il libro che si rilegge */
   passaggi: () => {
@@ -74977,6 +75011,13 @@ console.log(JSON.stringify(out));
     prova("dentro la riga ci sono solo cifre", "2 scambi aperti · " + SI % 1,
           o["soloCifre"])
     prova("senza le scatole non esplode", "intera", o["senzaScatole"])
+    # (27 set 2026, dal campo: «0 scambi aperti» sotto «Annullati» si
+    # leggeva come il conto della lista filtrata) COL FILTRO ACCESO la riga
+    # dice quanti ne mostra e di che gruppo, e «tocca a te» resta di TUTTI
+    prova("col filtro: annullati, conclusi, nel libro, solo «tocca a te», e due gruppi",
+          ["1 annullato · " + SI % 2, "1 concluso · " + SI % 2, "1 nel libro · " + SI % 2,
+           SI % 2, "2 scambi · " + SI % 2], o["filtrati"])
+    prova("...e al plurale, senza niente da fare", "2 annullati · 0 tocca a te", o["dueAnnullati"])
 
 
 def prove_banner_fee_p2p():
@@ -75558,8 +75599,10 @@ def prove_card_tinte_stato():
           [x for x in re.findall(r"'([^']*)'", tono)
            if x not in (" badge ", " tinta tono-", "")])
     riga = pezzo_js(mini, "function rigaScambioP2P(o){", "\n}\n")
+    # EMENDATA (27 set 2026): dopo il tono viene `spenta`, lo stesso
+    # grigio dentro ogni card annullata
     prova("la card lo indossa accanto alla classe di sempre", True,
-          """'<div class="p2p-ord p2p-scambio' + tonoCardP2P(o) + '"""
+          """'<div class="p2p-ord p2p-scambio' + tonoCardP2P(o) + (spenta ? ' spenta' : '')"""
           in riga)
     # IL COLORE NON E' L'UNICO SEGNO (richiesta di Andrea): la parola
     # dello stato resta nel riquadro, per chi i colori non li distingue
@@ -106147,12 +106190,47 @@ console.log(JSON.stringify(out));
     prova("...ma preso (la hold chiesta) resta uno scambio annullato", [False, "Scambio annullato"], o["presoFisso"])
 
 
+def prove_card_annullati():
+    """LE CARD DEGLI ANNULLATI (27 set 2026, ritocchi di Andrea a
+    7251798). Il velo grigio resta, uguale per tutti: dentro una card
+    spenta cifre e premio non si tingono piu' (l'arancio dei sats, il
+    verde o il rosso del premio facevano sembrare diversi due annullati);
+    le cifre dell'annullato e l'intestazione col filtro stanno nelle loro
+    sezioni (`prove_p2p_card_scambio`, `prove_intestazione_scambi`), e il
+    conto AA di `--ink-soft` su ogni tinta sta in `prove_card_tinte_stato`.
+    Qui: la regola della card spenta e il «Indietro» del foglio."""
+    print("\n[le card degli annullati: il velo uguale, e «Indietro»]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    nudo = re.sub(r"/\*[\s\S]*?\*/", "", mini)
+    riga = pezzo_js(mini, "function rigaScambioP2P(o){", "\n}\n")
+    prova("la card spenta: annullato e mai preso, nessun altro stato", True,
+          "const spenta = o.stato === 'annullato' || o.stato === 'rifiutato';" in riga)
+    regola = re.search(r"(\.p2p-scambio\.spenta [^{]*)\{color:var\(--ink-soft\)\}", nudo)
+    sel = [x.strip() for x in regola.group(1).split(",")] if regola else []
+    prova("...dentro, cifre e premio nel grigio della riga di servizio (AA: vedi le tinte)",
+          [".p2p-scambio.spenta .p2p-sats.p2p-sats", ".p2p-scambio.spenta .p2p-euro.p2p-euro",
+           ".p2p-scambio.spenta .p2p-badge .p2p-avviso", ".p2p-scambio.spenta .p2p-badge .p2p-affare"],
+          sel)
+    # ⚠️ IL PESO CONTA: la regola della tinta che schiarisce i sats pesa
+    # tre classi e quella del premio quattro — la card spenta ne pesa
+    # quattro e sta DOPO, o perderebbe in silenzio
+    prova("...e pesa quanto la tinta, e le sta dopo", True,
+          bool(regola) and nudo.index(".p2p-scambio.tinta .p2p-badge .p2p-avviso") < regola.start())
+    cc = pezzo_js(mini, "function chiediConferma(c){", "\n}\n")
+    prova("il foglio di conferma: il ripensamento ha un nome, di serie «Annulla»", True,
+          "el('confNo').textContent = c.indietro || 'Annulla';" in cc)
+    prova("...e chi chiede di annullare lo chiama «Indietro»", [True, True],
+          ["indietro: 'Indietro'," in pezzo_js(mini, "function annullaScambioP2P(){", "\n}\n"),
+           "indietro: 'Indietro'," in pezzo_js(mini, "function accettaAnnulloP2P(){", "\n}\n")])
+    prova("...solo loro: gli altri fogli restano come sono", 2, nudo.count("indietro: 'Indietro'"))
+
+
 def main():
     print("=" * 58)
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullati_ritocchi,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullati_ritocchi, prove_card_annullati,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,

@@ -2926,6 +2926,19 @@
   .p2p-scambio .p2p-badge,
   .p2p-scambio .p2p-scambio-euro{color:var(--ink-soft)}
   .p2p-scambio .p2p-badge .p2p-affare{color:var(--trust-text)}
+  /* ⚠️ LA CARD SPENTA E' UGUALE PER TUTTI (27 set 2026, richiesta di
+     Andrea): il velo grigio di un annullato resta, ma dentro le cifre e
+     il premio si tingevano ancora — l'arancio dei sats, il verde o il
+     rosso del premio —, e due annullati sembravano due cose diverse a
+     seconda del segno di un premio che non conta piu'. Dentro una card
+     spenta tutto l'inchiostro e' `--ink-soft`, lo stesso grigio della
+     riga di servizio: 6,6:1 sulla tinta piu' chiara, AA. I selettori
+     pesano QUANTO quelli della tinta (quattro classi) e stanno dopo, quindi
+     vincono senza `!important`. */
+  .p2p-scambio.spenta .p2p-sats.p2p-sats,
+  .p2p-scambio.spenta .p2p-euro.p2p-euro,
+  .p2p-scambio.spenta .p2p-badge .p2p-avviso,
+  .p2p-scambio.spenta .p2p-badge .p2p-affare{color:var(--ink-soft)}
   /* il puntino fra il premio e i sats e' MORTO col terzo ridisegno
      (set 2026): le due cifre non stanno piu' sulla stessa riga, e non
      c'e' piu' niente da separare — niente CSS orfano */
@@ -28331,6 +28344,10 @@ function chiediConferma(c){
      di sempre, che e' la guardia (vedi prove_onion) */
   if (c.vestito === 'bz') ok.insertAdjacentHTML('afterbegin', LOGO_BZ_HTML);
   el('confNo').style.display = c.avviso ? 'none' : '';
+  /* IL NOME DEL RIPENSAMENTO (27 set 2026): di serie «Annulla», e chi
+     chiede di ANNULLARE qualcosa lo chiama «Indietro» — sotto «Sì,
+     annulla» due «annulla» erano due strade con lo stesso nome */
+  el('confNo').textContent = c.indietro || 'Annulla';
   el('sheetBg').classList.add('open');
   el('confermaSheet').classList.add('open');
 }
@@ -55505,6 +55522,7 @@ function annullaScambioP2P(){
        «Sto annullando l'ordine…», «Ordine annullato ✓» — e il foglio in
        mezzo diceva «ritira» */
     etichetta: subito ? 'Sì, annulla' : 'Sì, chiedilo',
+    indietro: 'Indietro',
     /* la promessa si restituisce: vedi la nota in `euroInviatiP2P` */
     poi: () => inviaAnnulloP2P(subito ? 'ritira' : 'chiedi')
   });
@@ -55517,6 +55535,7 @@ function accettaAnnulloP2P(){
     titolo: 'Accetti di annullare?',
     corpo: 'Lo scambio si chiude e i sats tornano a chi li aveva bloccati. Nessuno perde niente.',
     etichetta: 'Sì, annulliamo',
+    indietro: 'Indietro',
     /* la promessa si restituisce: vedi la nota in `euroInviatiP2P` */
     poi: () => inviaAnnulloP2P('accetta')
   });
@@ -56694,7 +56713,32 @@ function intestaScambiP2P(righe){
   if (!testa || !conto) return;
   const ci = !!(righe && righe.length);
   testa.classList.toggle('vuota', !!righe && !ci);
-  conto.innerHTML = ci ? fraseContoScambiP2P(contoScambiP2P(righe)) : '';
+  const f = typeof p2pMieiFiltro !== 'undefined' ? p2pMieiFiltro : [];
+  conto.innerHTML = !ci ? ''
+    : filtroAccesoMieiP2P(f) ? fraseFiltroScambiP2P(righe, f)
+    : fraseContoScambiP2P(contoScambiP2P(righe));
+}
+/* ⚠️ COL FILTRO ACCESO SI DICE COSA SI GUARDA (27 set 2026, dal campo:
+   filtrando «Annullati» la riga diceva «0 scambi aperti» con un ordine
+   nel libro, e si leggeva come il conto della lista filtrata). Il conto
+   degli aperti guarda gia' TUTTI gli scambi, e conta i soli PRESI (22
+   set 2026: un ordine nel libro aspetta ancora qualcuno); letto sotto un
+   filtro pero' sembrava parlare della lista. Col filtro acceso la riga
+   dice QUANTI ne mostra e di che gruppo — «3 annullati» —, poi quanti
+   toccano a te fra TUTTI, che e' la cosa da non perdere mai di vista.
+   Due gruppi insieme si contano come «scambi»; «Tocca a te» da solo non
+   ripete due volte la stessa cifra. PURA. */
+const P2P_NOMI_FILTRO = {morti: ['annullato', 'annullati'], fatti: ['concluso', 'conclusi'],
+  libro: ['nel libro', 'nel libro'], corso: ['in corso', 'in corso']};
+function fraseFiltroScambiP2P(righe, f){
+  const tutte = righe || [];
+  const n = tutte.filter(o => passaStatoMieiP2P(o, f)).length;
+  const fare = quantiToccaAMeP2P(tutte);
+  const coda = fare + ' tocca a te';
+  const nomi = f.length === 1 ? P2P_NOMI_FILTRO[f[0]] : null;
+  if (f.length === 1 && f[0] === 'fare') return fare > 0 ? '<b>' + coda + '</b>' : coda;
+  const testa = n + ' ' + (nomi ? nomi[n === 1 ? 0 : 1] : (n === 1 ? 'scambio' : 'scambi'));
+  return testa + ' · ' + (fare > 0 ? '<b>' + coda + '</b>' : coda);
 }
 /* IL FILTRO SPENTO E' UN ARRAY VUOTO e non `null` come quello del
    libro, e la differenza ha un perche': la' il filtro e' un oggetto di
@@ -57030,9 +57074,21 @@ function rigaScambioP2P(o){
   const annullato = o.stato === 'annullato';
   const tab = tabacchinoP2P(metodi);
   const dataChiusa = (chiuso || annullato) ? dataBreveP2P(chiusuraP2P(o)) : '';
+  /* ⚠️ L'ANNULLATO PORTA LE SUE CIFRE (27 set 2026, richiesta di Andrea
+     che rovescia «gli annullati non portano cifre» del 22 set): sotto
+     «Annullato il …» la riga «Invia … · Ricevi …», nell'ordine del lato
+     — chi riceveva sats inviava euro —, con le cifre che l'ordine AVEVA
+     (quelle dette dal coordinatore, i sats fissati, o la stima col suo
+     ≈; l'intervallo coi due capi). Una cifra che non si sa e' «—», mai
+     «0 €» ne' la parola «sats» da sola: qui non c'e' una frase da tenere
+     in piedi, c'e' un conto da non inventare. */
+  const euA = Number(o.euro) > 0 ? cifraEuro : '<span class="p2p-euro">—</span>';
+  const saA = sats ? cifraSats : '<span class="p2p-sats">—</span>';
   const righe = annullato
     ? '<div class="p2p-scambio-lato">Annullato'
       + (dataChiusa ? ' il ' + esc(dataChiusa) : '') + '</div>'
+      + '<div class="p2p-scambio-euro p2p-scambio-cifre">Invia '
+      + (ricevoSats ? euA : saA) + ' · Ricevi ' + (ricevoSats ? saA : euA) + '</div>'
     : chiuso
       ? (tab && !ricevoSats
           ? '<div class="p2p-scambio-lato">Amazon pagato: '
@@ -57074,7 +57130,11 @@ function rigaScambioP2P(o){
     ? '<button class="order-x p2p-x" title="Togli" aria-label="Togli questo scambio" '
       + 'data-id="' + esc(o.id) + '" onclick="togliScambioP2P(this.dataset.id, event)">✕</button>'
     : '';
-  return '<div class="p2p-ord p2p-scambio' + tonoCardP2P(o) + '" role="button" tabindex="0" data-id="' + esc(o.id) + '" '
+  /* LA CARD SPENTA (27 set 2026): annullato o mai preso, lo stesso
+     grigio per tutti — vedi `.p2p-scambio.spenta` nel CSS */
+  const spenta = o.stato === 'annullato' || o.stato === 'rifiutato';
+  return '<div class="p2p-ord p2p-scambio' + tonoCardP2P(o) + (spenta ? ' spenta' : '')
+    + '" role="button" tabindex="0" data-id="' + esc(o.id) + '" '
     + 'onclick="apriOrdineP2P(this.dataset.id)">'
     /* LA DATA DI CHIUSURA STA NELL'ANGOLO (22 set 2026, richiesta di
        Andrea): piccola e discreta, e solo sulle card CONCLUSE — sugli

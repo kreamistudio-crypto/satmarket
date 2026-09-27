@@ -34865,3 +34865,48 @@ stesso account apre gia' spento, «Mostra» la riaccende e il primo, riaperto,
 la vede. Nessun errore dell'app. Scatti approvati da Andrea.
 **DA AVERE:** il gesto vero sul telefono, e se su un dispositivo nuovo la
 fila compaia un attimo prima che /api/me porti la scelta (non misurato).
+
+## Le card degli annullati: le cifre, il grigio uguale, «Indietro» (27 set 2026)
+
+Ritocchi di Andrea a 7251798.
+**1) IL VELO UGUALE.** La tinta grigia degli annullati resta; dentro
+pero' le cifre e il premio si tingevano ancora — l'arancio dei sats, il
+verde o il rosso del premio — e due annullati sembravano due cose
+diverse. La card annullata o mai presa porta `spenta`, e li' dentro sats,
+euro e premio sono `--ink-soft`, il grigio della riga di servizio (AA:
+il conto di `--ink-soft` su ogni tinta nei due temi sta gia' nella prova
+delle tinte). La regola pesa quattro classi, quanto la tinta, e le sta
+dopo.
+**2) LE CIFRE.** «Gli annullati non portano cifre» (22 set) e' ROVESCIATO:
+sotto «Annullato il …» c'e' «Invia … · Ricevi …» nel verso del lato,
+con le cifre che l'ordine aveva — dette dal coordinatore, fissate, o
+stimate col ≈ —, l'intervallo coi due capi, e «—» per una cifra che non
+si sa. Metodo e premio c'erano gia'.
+**3) «INDIETRO».** `chiediConferma` accetta `indietro`, il nome del
+ripensamento (di serie resta «Annulla», e si riscrive a ogni apertura
+del foglio condiviso); i fogli di chi annulla — ritirare, chiedere,
+accettare — lo chiamano «Indietro».
+**4) L'INTESTAZIONE.** Non contava la lista filtrata: conta TUTTI gli
+scambi, e solo quelli PRESI (22 set). Letto sotto «Annullati» pero'
+sembrava il conto del filtro. Col filtro acceso ora dice quanti ne
+mostra e di che gruppo — «5 annullati · 1 tocca a te» —, e «tocca a te»
+resta il conto di tutti (`fraseFiltroScambiP2P`).
+Strade scartate: contare nel «scambi aperti» anche gli ordini nel libro
+(rovescerebbe la scelta del 22 set; l'altra strada chiesta da Andrea,
+dire cosa si guarda, non rovescia niente); la tinta tolta agli annullati.
+
+**PROVATO.** `prove_card_annullati` (6, la regola spenta e «Indietro»);
+emendate col perche' la card che porta `spenta`, «l'annullato dice solo
+quando, senza cifre» (ora: quando e poi le cifre, «—» senza euro, il
+prezzo fisso nel verso di chi vende, spenta come il mai preso), e il
+banco dell'intestazione coi casi del filtro (annullati, conclusi, nel
+libro, solo «tocca a te», due gruppi, il plurale). Suite intera severa
+senza config nel worktree da origin/main (d357dcc): 16.673 verdi e 0
+rosse; i 25 collaudi della CI verdi nella gabbia. Dal vivo a 375 px
+nei due temi (server di collaudo, relay morto): cinque annullati con
+«Invia … · Ricevi …» — intervallo, prezzo fisso, «—» —, tutti dello stesso
+grigio dentro (il colore letto dal browser e' uno solo, le card vive
+restano arancio), l'intestazione «5 annullati · 1 tocca a te» e a filtro
+spento «1 scambio aperto · 1 tocca a te», il foglio «Sì, annulla /
+Indietro» e un altro foglio ancora con «Annulla»; nessuno scorrimento
+laterale, nessun errore dell'app.

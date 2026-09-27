@@ -11066,6 +11066,12 @@
   annullato ferma sul passo `fermoAnnulloP2P` con la ✕ (`.step.stop`); il
   ritirato si giudica sui `satsMiei`. Il verbale: CANTIERI, «Gli
   annullati: l'ordine, le cifre, lo stepper».
+  LE CARD DEGLI ANNULLATI (27 set 2026): portano «Invia … · Ricevi …»
+  sotto la data, e dentro sono `spenta` (cifre e premio `--ink-soft`);
+  col filtro acceso l'intestazione dice cosa mostra
+  (`fraseFiltroScambiP2P`); i fogli di chi annulla chiamano il
+  ripensamento «Indietro» (`chiediConferma`, `indietro`). Il verbale:
+  CANTIERI, «Le card degli annullati».
   QUEL CHE È FATTO SI DICE AL PASSATO (22 set 2026, richiesta di
   Andrea): le card di «I miei scambi» CHIUSE non promettono più. Una
   conclusa porta la data della chiusura in alto a destra — piccola,
