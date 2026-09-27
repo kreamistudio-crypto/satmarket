@@ -6926,7 +6926,7 @@
   griglia di Esplora (`#p2pVetrinaSez`), con le card degli ordini vivi
   del libro — la `.card` del mercatino, «Compra/Vendi BTC» dal lato di
   CHI GUARDA (dal 27 set 2026: «Invia € · Ricevi sats» o il contrario,
-  netti; il mio ordine dal mio lato), le monete o il marchio di
+  netti), le monete o il marchio di
   Barattozon, l'euro nel
   cartellino, il volto e il premio (`affaroneP2P`, lo stesso cartellino
   della card del libro). Chi le vede lo decide il server
@@ -6940,10 +6940,11 @@
   avvisi 0007 di presa, annullo, scadenza e ritorno, e a
   `/api/p2p/canale` per gli ordini nuovi di Barattolo (LA FOTOGRAFIA
   SUBITO). La fila c'e' solo nella vetrina nuda (`vetrinaNudaP2P`) e
-  non entra mai nella griglia. I MIEI ordini appena pubblicati entrano
-  dall'archivio del dispositivo (`ordiniMieiFreschiP2P`, 10 minuti)
-  finche' la fotografia non li porta, e il ritorno in Esplora ridisegna
-  subito. Chi guarda puo' spegnerla («Scambi P2P nella home», in
+  non entra mai nella griglia. Mostra solo quel che chi guarda puo'
+  prendere (dal 27 set 2026): fuori i MIEI ordini (`mioInVetrinaP2P`:
+  l'archivio del dispositivo, e `miei` che la rotta da' a chi ha la
+  sessione, dagli `autori` che l'orologio fotografa e che non escono mai
+  interi), e il taglio a sei dopo. Chi guarda puo' spegnerla («Scambi P2P nella home», in
   Aspetto; timbri `p2p_home_via`/`p2p_home_su`): al suo posto la riga
   `#p2pVetrinaVia` con «Mostra», e nessuna domanda al server.
   Il tocco e' `prendiOrdineP2P`, o il foglio «Lo scambio P2P» per chi

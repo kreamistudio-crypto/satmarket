@@ -58295,6 +58295,7 @@ let p2pVetrinaTimer = null;         // il prossimo giro, se c'e'
 let p2pVetrinaInVolo = false;
 let p2pVetrinaFresca = false;       // la prossima domanda salta la cache (ritorno in Esplora)
 let p2pVetrinaFirma = null;         // cosa c'e' in pagina: si ridisegna solo se cambia
+let p2pVetrinaMiei = new Set();     // gli ordini della fotografia pubblicati da me, per il server
 
 /* La vetrina e' quella nuda? */
 function vetrinaNudaP2P(){
@@ -58306,51 +58307,33 @@ function vetrinaNudaP2P(){
       || filtroSpedGratis || filtroSconto || filtroAsta || filtroCond || filtroReg) return false;
   return !ordinaEffettivo();
 }
-/* ⚠️ CHI PUBBLICA VEDE SUBITO LA SUA CARD (27 set 2026, dal vivo di
-   Andrea): pubblicato un ordine e tornato alla home, la card non c'era.
-   Il ritorno la fotografia la CHIEDEVA gia' (subito, senza cache): era
-   una GARA — il server la rifa' 3 s dopo `/api/p2p/canale` e poi
-   rilegge i relay, e chi torna prima riceve quella di prima; la card
-   arrivava al giro dopo, un minuto piu' tardi (misurato: 61,5 s).
-   LA CURA NON INSEGUE LA GARA, la toglie: i MIEI ordini ancora nel
-   libro li so gia' — stanno nell'archivio degli scambi di questo
-   dispositivo — e la fila li unisce alla fotografia finche' lei non li
-   porta. Solo i freschi (P2P_VETRINA_MIEI_S dalla nascita: poi decide la
-   fotografia), col NOME VERO del coordinatore (un provvisorio non si
-   tocca) e confermati da lui (`contattato`); annullato o preso, la riga
-   cambia stato ed esce da sola, e la lapide lo toglie anche dalla
-   fotografia vecchia. */
-const P2P_VETRINA_MIEI_S = 600;
-function ordiniMieiFreschiP2P(adesso){
-  adesso = adesso || Math.floor(Date.now() / 1000);
-  let righe = {};
-  try { righe = ordiniP2P() || {}; } catch(e) { return []; }
-  const fuori = [];
-  for (const k in righe) {
-    const r = righe[k];
-    if (!r || !r.mio || !r.contattato || !r.id || provvisorioP2P(r.id)) continue;
-    if (r.stato !== 'pubblico' && r.stato !== 'pubblicato') continue;
-    if (!((Number(r.creato) || 0) >= adesso - P2P_VETRINA_MIEI_S)) continue;
-    fuori.push({id: String(r.id), lato: r.lato === 'compro' ? 'buy' : 'sell',
-                stato: 'pending', fiat: 'EUR', euro: Number(r.euro) || 0,
-                euroMax: Number(r.euroMax) || 0, sats: Number(r.sats) || 0,
-                premium: Number(r.premium) || 0,
-                metodi: Array.isArray(r.metodi) ? r.metodi.slice() : [],
-                scade: Number(r.scade) || 0, creato: Number(r.creato) || adesso, mio: true});
-  }
-  return fuori;
+/* ⚠️ LA FILA MOSTRA SOLO QUEL CHE CHI GUARDA PUO' PRENDERE (27 set 2026,
+   ritocco di Andrea a 9f9b6a6, che ROVESCIA d357dcc): i miei ordini non
+   ci sono piu' — ne' quelli che la fotografia porta, ne' quelli che il
+   telefono ci univa dopo la pubblicazione (`ordiniMieiFreschiP2P`,
+   tolta con lei). La conferma di chi pubblica c'e' gia' al gesto, e il
+   mio ordine resta dove sta: nel libro P2P e in «I miei scambi».
+   MIO vuol dire due cose, e servono tutt'e due: quel che QUESTO
+   dispositivo sa (`ordineMioP2P`: l'archivio degli scambi e la lista del
+   coordinatore — anche un ordine che sto prendendo, che la fotografia
+   da' ancora vivo per un giro) e quel che dice il SERVER (`miei` della
+   fotografia, chi l'ha pubblicato: l'altro telefono dello stesso
+   account, che l'ordine non l'ha scritto da se'). Il taglio a
+   P2P_VETRINA_MAX viene DOPO: i posti sono tutti per gli altri, e una
+   fila di soli miei resta vuota e sparisce col suo titolo. */
+function mioInVetrinaP2P(id){
+  return p2pVetrinaMiei.has(id) || ordineMioP2P(id);
 }
 /* PURA: gli ordini da mostrare, dal piu' nuovo. Le stesse regole del
-   libro (vivi, non scaduti, non lapidati): e' il libro, ristretto — piu'
-   i miei appena nati che la fotografia non porta ancora (`miei`). */
-function ordiniVetrinaP2P(libro, adesso, miei){
+   libro (vivi, non scaduti, non lapidati): e' il libro, ristretto — e
+   senza quelli per cui `mio` dice di si'. */
+function ordiniVetrinaP2P(libro, adesso, mio){
   adesso = adesso || Math.floor(Date.now() / 1000);
-  const base = (libro && Array.isArray(libro.ordini)) ? libro.ordini.slice() : [];
-  const ci = new Set(base.map(o => o && o.id));
-  for (const o of (miei || [])) if (o && o.id && !ci.has(o.id)) base.push(o);
+  mio = mio || (() => false);
+  const base = (libro && Array.isArray(libro.ordini)) ? libro.ordini : [];
   return base
     .filter(o => o && o.id && o.stato === 'pending'
-                 && !(o.scade && o.scade <= adesso) && !lapidataP2P(o.id))
+                 && !(o.scade && o.scade <= adesso) && !lapidataP2P(o.id) && !mio(o.id))
     .sort((a, b) => (b.creato || 0) - (a.creato || 0))
     .slice(0, P2P_VETRINA_MAX);
 }
@@ -58368,18 +58351,12 @@ function euroCartaP2P(n){
    «Ricevi X € · Invia ≈ sats». Barattozon (chi pubblica vende sats) e'
    quindi «Compra BTC». I sats sono al NETTO della propria meta' di
    commissione, lo stesso `nettoLatoP2P` del libro.
-   IL MIO ORDINE: chi guarda E' chi l'ha pubblicato, quindi la stessa
-   regola lo dice dal mio lato — il mio ordine di vendita e' «Vendi BTC»
-   (ricevo gli euro) —, e resta riconoscibile dal mio volto, come oggi. */
+   I MIEI ORDINI in fila non ci sono (vedi `mioInVetrinaP2P`): la card e'
+   sempre di un altro, e chi guarda e' sempre chi prende. */
 function cardVetrinaP2P(o){
-  const mio = !!(o.mio || ordineMioP2P(o.id));
-  /* il lato visto come lo vede chi prende: il mio ordine si guarda da
-     dentro, cioe' al rovescio */
-  const io = mio ? (o.lato === 'sell' ? 'buy' : 'sell') : o.lato;
-  const compro = io === 'sell';            // chi guarda compra i sats
+  const compro = o.lato === 'sell';        // chi guarda compra i sats
   const tab = tabacchinoP2P(o.metodi);
-  /* il mio ordine porta il mio volto anche prima che il server lo sappia */
-  const f = p2pFacce[o.id] || (mio ? voltoMioP2P() : {});
+  const f = p2pFacce[o.id] || {};
   /* lo sfondo: le due monete per tutti, il marchio per Barattozon (il
      file chiaro: il fondo e' scuro in tutt'e due i temi) */
   const fondo = tab
@@ -58387,7 +58364,7 @@ function cardVetrinaP2P(o){
     : '<img class="p2p-vt-monete" src="/assets/scambi-intestazione.webp" width="682" height="459" alt="" onerror="this.remove()">';
   const euro = euroCartaP2P(o.euro) + (o.euroMax ? '–' + euroCartaP2P(o.euroMax) : '');
   const lordo = o.sats > 0 ? o.sats : satsMercatoP2P(o);
-  const sats = nettoLatoP2P(Object.assign({}, o, {lato: io}), lordo);
+  const sats = nettoLatoP2P(o, lordo);
   const verboEuro = compro ? 'Invia' : 'Ricevi';
   const verboSats = compro ? 'Ricevi' : 'Invia';
   /* sull'intervallo la cifra la sceglie chi prende: niente sats */
@@ -58397,10 +58374,9 @@ function cardVetrinaP2P(o){
   const metodi = (o.metodi || []).map(m => esc(metodoBaseP2P(m))).join(', ');
   const premio = affaroneP2P(o) || badgePremioP2P(o);
   const lato = compro ? 'Compra BTC' : 'Vendi BTC';
-  return `<div class="card card-p2p${tab ? ' card-p2p-bz' : ''}${mio ? ' card-p2p-mio' : ''}" data-p2p="${esc(o.id)}" role="button" tabindex="0"
+  return `<div class="card card-p2p${tab ? ' card-p2p-bz' : ''}" data-p2p="${esc(o.id)}" role="button" tabindex="0"
       aria-label="${esc(lato + ', ' + verboEuro.toLowerCase() + ' ' + euro + ' euro'
-                        + (metodi ? ', ' + (o.metodi || []).map(metodoBaseP2P).join(', ') : '')
-                        + (mio ? ', il tuo ordine' : ''))}"
+                        + (metodi ? ', ' + (o.metodi || []).map(metodoBaseP2P).join(', ') : ''))}"
       onclick="apriCardP2P(this.dataset.p2p)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();apriCardP2P(this.dataset.p2p)}">
       <div class="ph-wrap">
         <div class="ph p2p-vt-fondo">${fondo}</div>
@@ -58435,7 +58411,7 @@ function renderVetrinaP2P(){
   renderLevaFilaP2P();
   const vede = qui && !via;
   if (vede) armaFotoVetrinaP2P();
-  const ordini = vede ? ordiniVetrinaP2P(p2pVetrinaFoto, 0, ordiniMieiFreschiP2P()) : [];
+  const ordini = vede ? ordiniVetrinaP2P(p2pVetrinaFoto, 0, mioInVetrinaP2P) : [];
   const html = ordini.map(cardVetrinaP2P);
   /* SI RIDISEGNA SOLO SE CAMBIA QUALCOSA: riscrivere la fila la riporta
      all'inizio, e chi la sta scorrendo di lato perderebbe il segno a
@@ -58465,6 +58441,9 @@ async function chiediFotoVetrinaP2P(){
   /* e i cambi di Barattozon, che la fotografia porta a tutti (26 set
      2026): il premio scelto sulla card della fila, anche senza sessione */
   prendiCambiPubP2P(d && d.cambi);
+  /* i miei secondo il server (27 set 2026): ogni risposta prende il
+     posto della precedente, e senza sessione non ce ne sono */
+  p2pVetrinaMiei = new Set(Array.isArray(d && d.miei) ? d.miei.map(String) : []);
   const eventi = Array.isArray(d && d.eventi) ? d.eventi : [];
   const quando = (Number(d && d.quando) || 0) * 1000;
   /* leva spenta sul server, o una fotografia di piu' di un giorno: la
@@ -58532,9 +58511,6 @@ function apriCardP2P(id){
      Esplora. Se nel frattempo l'ordine e' stato preso, lo dice la presa
      come dal libro: «Quest'ordine non c'è più». Un libro vero piu'
      fresco della fotografia resta dov'e': quello e' piu' giusto. */
-  /* il MIO ordine (anche appena nato, che la fotografia non porta
-     ancora) si apre come dal libro: la sua pagina di scambio */
-  if (ordiniP2P()[id]) { prendiOrdineP2P(id); return; }
   const f = p2pVetrinaFoto;
   if (f && f.quando && (!p2pLibro || p2pLibro.copia || (p2pLibro.quando || 0) < f.quando))
     libroDaCopiaP2P(f.eventi, f.quando, 'server');

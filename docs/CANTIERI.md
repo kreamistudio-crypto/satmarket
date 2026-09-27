@@ -35032,3 +35032,47 @@ dispositivi, CDP a 375 px nei due temi (i tempi qui sopra), e le card a
 320 px nei due temi senza scorrimento laterale; nessun errore dell'app.
 **DA AVERE:** i due telefoni veri, coi relay veri (il giro del server
 passa per i relay, fuori da 127.0.0.1 ci mette di piu').
+
+La fila «Scambi P2P» senza i propri ordini (27 set 2026, ritocco di
+Andrea a 9f9b6a6, che ROVESCIA «chi pubblica vede subito la sua card» di
+d357dcc). **LA REGOLA:** nella home la fila mostra solo gli ordini che
+chi guarda PUO' PRENDERE. I miei non ci sono piu' — ne' quelli che la
+fotografia del server porta, ne' quelli che il telefono ci univa dopo la
+pubblicazione (`ordiniMieiFreschiP2P` e `P2P_VETRINA_MIEI_S` tolti).
+Nessun avviso in home dopo la pubblicazione: la conferma c'e' gia' al
+gesto (in home non ce n'era, e non ne nasce uno). Il mio ordine resta
+dove sta, nel libro P2P e in «I miei scambi». **MIO VUOL DIRE DUE COSE,
+e servono tutt'e due** (`mioInVetrinaP2P`): quel che QUESTO dispositivo
+sa (`ordineMioP2P` — l'archivio degli scambi e la lista del
+coordinatore, quindi anche un ordine che sto prendendo, che la
+fotografia da' vivo ancora per un giro) e quel che dice il SERVER: con
+la sessione `/api/p2p/libro` porta `miei`, gli id della fotografia che
+ho pubblicato io. Senza, l'altro telefono dello stesso account — che
+l'ordine non l'ha scritto — se lo sarebbe trovato in fila. Il server li
+sa gia' (`p2p_ordini`, la riga da cui escono i volti): l'orologio
+fotografa `autori` {ordine: tg_id} col libro, una query per giro, e la
+rotta ne da' a ciascuno SOLO la sua parte, dalla memoria — la mappa
+intera non esce mai. `_ha_sessione_p2p` diventa `_chi_guarda_p2p`, che
+torna il tg_id (0 = nessuno) con la stessa memoria di cinque minuti per
+il cookie. **IL TAGLIO A SEI VIENE DOPO:** i posti sono tutti per gli
+altri, e una fila di soli miei resta vuota e sparisce col titolo e il
+conto, col giro armato per quando arriva un altro. La card perde il
+ramo del «mio» (il lato rovesciato, `card-p2p-mio`, «il tuo ordine», il
+mio volto), e il tocco non ha piu' la scorciatoia verso il mio scambio.
+**PROVATO.** `prove_card_p2p_vetrina` (108): la rotta che da' a
+Telegram e al cookie i loro (anche dalla memoria) e niente a anonimo,
+initData storto e leva spenta, la mappa mai intera, il giudice degli
+autori sul database vero (mai `tg_id` 0, mai un id storto); nel banco
+node l'appena pubblicato che non entra e nessun avviso, la fotografia
+che lo porta e resta fuori, quello che sto prendendo, l'altro
+dispositivo dal `miei` del server e la risposta nuova che prende il
+posto della vecchia, la fila di soli miei vuota, sette degli altri piu'
+il mio: sei card degli altri. Emendate col perche' la memoria della
+fotografia in `prove_libro_subito` e il nome del giudice in
+`prove_p2p_campanello`. Tortura 14 su 14. Suite intera severa senza config nel worktree da origin/main (9f9b6a6): 16.716 verdi e 0 rosse; i 25 collaudi della CI verdi nella gabbia. **DAL VIVO**, CDP a
+375 px nei due temi, relay di cartone su 127.0.0.1: A pubblica (archivio,
+«questo e' mio» al server, canale), B la vede dopo 14,8 s con «Compra
+BTC»; su A non c'e' mai — subito, tornando in Esplora, dopo un giro
+intero —, e nemmeno su un secondo dispositivo di A con l'archivio vuoto
+(lo sa dal server); nessun avviso, nessuno scorrimento laterale, nessun
+errore dell'app. **DA AVERE:** i due telefoni veri.

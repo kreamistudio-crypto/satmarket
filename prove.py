@@ -51199,7 +51199,7 @@ def prove_libro_subito():
     exec(_r[_r.index("def "):], mondo)
     def chiama(attivo, chi):
         mondo["_p2p_leve"] = lambda: {"attivo": attivo}
-        mondo["_ha_sessione_p2p"] = lambda i, s: bool(chi)
+        mondo["_chi_guarda_p2p"] = lambda i, s: 111 if chi else 0
         return mondo["libro_fotografato_p2p"]("collaudo:111:A" if chi else "", "")
     anon, dentro, spenta = chiama(True, False), chiama(True, True), chiama(False, True)
     # NON PIU' no-store (26 set 2026, la fila «Scambi P2P» in vetrina):
@@ -51233,7 +51233,9 @@ def prove_libro_subito():
           'F["facce"] = _facce_foto_p2p(F["eventi"], adesso)\n'
           '    # ...e i cambi di Barattozon (26 set 2026), con la stessa ragione\n'
           '    F["cambi"] = _cambi_foto_p2p(F["eventi"])' in srv
-          and '"facce": {}, "cambi": {}, "via": {}}' in srv)
+          # (27 set 2026) dopo `via` c'e' la mappa degli autori: la memoria
+          # non si chiude piu' li'
+          and '"facce": {}, "cambi": {}, "via": {},\n             "autori": {}}' in srv)
 
     # --- 3) IL CLIENT: dove vivono le cose, e il velo che non torna -------
     i_bl = mini.index("/* ============ IL LIBRO SUBITO (26 set 2026")
@@ -52307,10 +52309,13 @@ def prove_card_p2p_vetrina():
            "_utente_da_initdata": initdata_finto,
            "utente_da_sessione": lambda s: SESS.append(s) or ({"id": 5} if s == "COOKIE-BUONO" else None),
            "_P2P_FOTO": {"eventi": [{"kind": 38383, "tags": [["d", "ordine-uno-1"]]}],
-                         "quando": 1000, "facce": {"ordine-uno-1": {"nome": "Luca"}}}}
+                         "quando": 1000, "facce": {"ordine-uno-1": {"nome": "Luca"}},
+                         # (27 set 2026) chi ha pubblicato cosa: 111 e' Telegram, 5 il cookie
+                         "autori": {"ordine-uno-1": 111, "ordine-due-2": 5,
+                                    "ordine-tre-3": 777, "ordine-qua-4": 111}}}
     ATTIVO = [True]
     i = _SORGENTE.index("P2P_SESSIONI_VOLTI_S = 300")
-    exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", _SORGENTE.index("def _ha_sessione_p2p", i))], amb)
+    exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", _SORGENTE.index("def _chi_guarda_p2p", i))], amb)
     exec(rot, amb)
     libro = amb["libro_fotografato_p2p"]
     anonimo, tg, storto = libro("", ""), libro("INIT-BUONO", ""), libro("INIT-STORTO", "")
@@ -52326,6 +52331,51 @@ def prove_card_p2p_vetrina():
           [len(anonimo["corpo"]["eventi"]), spenta["corpo"]])
     prova("...e IL DATABASE NON SI TOCCA: il cookie si guarda una volta in cinque minuti, "
           "non a ogni giro", [0, 1], [len(DB), len(SESS)])
+    # (27 set 2026, la fila senza i propri ordini) a chi ha una sessione
+    # i SUOI ordini della fotografia, per sapere cosa non mostrare anche
+    # sul dispositivo che non li ha scritti
+    prova("I SUOI ORDINI A CHI LI HA PUBBLICATI: a Telegram i suoi due, al cookie il suo "
+          "(anche dalla memoria), a nessuno quelli degli altri",
+          [["ordine-qua-4", "ordine-uno-1"], ["ordine-due-2"], ["ordine-due-2"]],
+          [tg["corpo"].get("miei"), web[0]["corpo"].get("miei"), web[2]["corpo"].get("miei")])
+    prova("...all'anonimo, a un initData storto e a leva spenta niente `miei`",
+          [False, False, False],
+          ["miei" in anonimo["corpo"], "miei" in storto["corpo"], "miei" in spenta["corpo"]])
+    prova("...e la mappa degli autori non esce MAI intera", [False, False],
+          ["autori" in tg["corpo"], "autori" in web[0]["corpo"]])
+    prova("...gli autori li fotografa l'orologio, col libro", True,
+          'F["autori"] = _autori_foto_p2p(F["eventi"])' in pezzo("_fotografa_libro_p2p"))
+    # il giudice degli autori sul database vero: le righe col tg_id, mai
+    # quelle a zero (un ordine preso di cui chi ha pubblicato non si e'
+    # ancora presentato), e mai un id storto
+    import sqlite3 as _sq
+    _dbd = tempfile.mkdtemp()
+    try:
+        _dbf = os.path.join(_dbd, "a.db")
+        _c = _sq.connect(_dbf)
+        _c.execute("CREATE TABLE p2p_ordini(ordine TEXT PRIMARY KEY, tg_id INTEGER NOT NULL)")
+        _c.executemany("INSERT INTO p2p_ordini VALUES(?,?)",
+                       [("aaaaaaaa-1", 111), ("bbbbbbbb-2", 0), ("cccccccc-3", 222),
+                        ("fuorifoto-4", 111)])
+        _c.commit()
+        _c.close()
+
+        def _db():
+            k = _sq.connect(_dbf)
+            k.row_factory = _sq.Row
+            return k
+        amb2 = {"db": _db, "FORMA_ORDINE_P2P": re.compile(r"^[0-9a-zA-Z-]{8,64}$"),
+                "MAX_ORDINI_P2P": 200,
+                "_tag_evento_p2p": lambda e, n: next((t[1] for t in e.get("tags", [])
+                                                      if t[0] == n), "")}
+        exec(pezzo("_autori_foto_p2p"), amb2)
+        _ev = [{"kind": 38383, "tags": [["d", d]]}
+               for d in ("aaaaaaaa-1", "bbbbbbbb-2", "cccccccc-3", "x';--")]
+        prova("il giudice degli autori: solo gli ordini della fotografia, solo col tg_id",
+              [{"aaaaaaaa-1": 111, "cccccccc-3": 222}, {}],
+              [amb2["_autori_foto_p2p"](_ev), amb2["_autori_foto_p2p"]([])])
+    finally:
+        shutil.rmtree(_dbd, ignore_errors=True)
 
     # --- 1c) LA FOTOGRAFIA SUBITO: gli avvisi di mostrod e il canale ----
     # (26 set 2026, dal vivo di Andrea: la card dell'ordine appena
@@ -52569,7 +52619,6 @@ let RIGHE = {};
 function ordiniP2P(){ return RIGHE; }
 function provvisorioP2P(id){ return String(id || '').indexOf('nuovo:') === 0; }
 function ordineMioP2P(id){ return !!RIGHE[id]; }
-function voltoMioP2P(){ return {nome: 'Io', avatar: ''}; }
 let HINT = {};
 function hintLetti(){ return Object.assign({}, HINT); }
 const TIMBRATI = [];
@@ -52639,7 +52688,6 @@ const out = {};
 /* LA CARD */
 p2pFacce = {v1: {nome: 'Luca', avatar: 'av_ab12_1.jpg'}, c1: {nome: 'giulia'}};
 out.vende = cardVetrinaP2P(O('v1', 'sell', 50));
-out.mio = cardVetrinaP2P(O('m9', 'sell', 40, {mio: true}));
 out.compra = cardVetrinaP2P(O('c1', 'buy', 80, {premium: 3, metodi: ['SEPA Instant']}));
 out.super = cardVetrinaP2P(O('s1', 'sell', 20, {euroMax: 150, premium: -16, metodi: ['Satispay']}));
 out.ottimo = cardVetrinaP2P(O('o1', 'buy', 30, {premium: 12}));
@@ -52669,6 +52717,8 @@ const libro = {ordini: [
   O('nuovo', 'buy', 5, {creato: ADESSO - 10}),
   ...[1,2,3,4,5,6].map(n => O('n' + n, 'sell', n, {creato: ADESSO - 500 + n}))]};
 out.ordini = ordiniVetrinaP2P(libro, ADESSO).map(o => o.id);
+/* (27 set 2026) i miei fuori, e il taglio a sei DOPO: il posto passa a un altro */
+out.senzaMio = ordiniVetrinaP2P(libro, ADESSO, id => id === 'nuovo').map(o => o.id);
 out.vuoto = [ordiniVetrinaP2P(null).length, ordiniVetrinaP2P({}).length];
 /* LA VETRINA NUDA */
 const nuda = () => vetrinaNudaP2P();
@@ -52774,33 +52824,57 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
   p2pInVetrina = true; activeCat = 'Libri'; renderVetrinaP2P();
   out.inReparto = [el('p2pVetrinaSez').style.display, TIMERS.length];
   activeCat = 'Tutto';
-  /* ---- CHI PUBBLICA VEDE SUBITO LA SUA CARD (27 set 2026) ---- */
+  /* ---- I MIEI ORDINI NON STANNO IN FILA (27 set 2026, ritocco di
+     Andrea che rovescia «chi pubblica vede subito la sua card») ---- */
   VISTA = 'view-esplora'; ACCESO = true; myTgId = 111; VETRINA = false; p2pLibro = null;
-  FOTO = {eventi: [EV('h1', 'sell', 5, ADESSO - 50)], quando: ADESSO - 5};
-  TIMERS.length = 0; p2pVetrinaTimer = null; p2pVetrinaChiesta = 0; p2pVetrinaFirma = null;
-  renderVetrinaP2P(); await giro();            // la fotografia: il mio non c'e' ancora
+  const ids = () => [...el('p2pVetrinaFila').innerHTML.matchAll(/data-p2p="([^"]+)"/g)].map(m => m[1]);
   const riga = (id, extra) => Object.assign({id, mio: true, contattato: true, stato: 'pubblico',
     lato: 'vendo', euro: 40, euroMax: 0, sats: 0, premium: 0, metodi: ['Revolut'], scade: 0,
     creato: ADESSO - 5}, extra || {});
-  const ids = () => [...el('p2pVetrinaFila').innerHTML.matchAll(/data-p2p="([^"]+)"/g)].map(m => m[1]);
+  const daCapo = () => { TIMERS.length = 0; p2pVetrinaTimer = null; p2pVetrinaChiesta = 0; p2pVetrinaFirma = null; };
+  /* appena pubblicato: nell'archivio c'e', nella fotografia ancora no — e
+     la fila non lo unisce piu' */
+  FOTO = {eventi: [EV('h1', 'sell', 5, ADESSO - 50)], quando: ADESSO - 5};
+  daCapo(); renderVetrinaP2P(); await giro();
+  LOG.length = 0;
   RIGHE = {mio1: riga('mio1')};
   renderVetrinaP2P();
-  out.mioSubito = {ids: ids(), volto: el('p2pVetrinaFila').innerHTML.includes('>I</span>'),
-                   vende: el('p2pVetrinaFila').innerHTML.includes('Vendi BTC')};
-  RIGHE = {'nuovo:3': riga('nuovo:3'), nc: riga('nc', {contattato: false}),
-           vec: riga('vec', {creato: ADESSO - 700}), ann: riga('ann', {stato: 'annullato'}),
-           lap: riga('lap'), alt: riga('alt', {mio: false}), pre: riga('pre', {stato: 'preso'})};
-  LAPIDI = new Set(['lap']);
-  renderVetrinaP2P();
-  out.nonContano = ids();
-  RIGHE = {h1: riga('h1')};
-  renderVetrinaP2P();
-  out.senzaDoppioni = ids().filter(x => x === 'h1').length;
-  RIGHE = {mio1: riga('mio1')}; renderVetrinaP2P();
-  LOG.length = 0; apriCardP2P('mio1'); out.toccoMio = LOG.slice();
-  RIGHE.mio1.stato = 'annullato'; LAPIDI = new Set(['mio1']);
-  renderVetrinaP2P(); out.annullato = ids().includes('mio1');
-  LAPIDI = new Set(); RIGHE = {};
+  out.appenaPubblicato = {ids: ids(), avvisi: LOG.filter(x => x.startsWith('toast:'))};
+  /* la fotografia lo porta: resta fuori, perche' e' nell'archivio */
+  FOTO = {eventi: [EV('mio1', 'sell', 40, ADESSO - 5), EV('h1', 'sell', 5, ADESSO - 50)], quando: ADESSO};
+  daCapo(); renderVetrinaP2P(); await giro();
+  out.dallaFotoArchivio = ids();
+  /* un ordine che sto PRENDENDO (la riga non e' mia come maker) e' fuori
+     anche lui: non lo posso prendere io */
+  RIGHE = {mio1: riga('mio1'), h1: riga('h1', {mio: false, stato: 'preso'})};
+  daCapo(); renderVetrinaP2P(); await giro();
+  out.stoPrendendo = ids();
+  /* L'ALTRO DISPOSITIVO: l'archivio e' vuoto, lo dice il server (`miei`) */
+  RIGHE = {};
+  FOTO = {eventi: [EV('altro1', 'buy', 9, ADESSO - 2), EV('h1', 'sell', 5, ADESSO - 50)],
+          quando: ADESSO, miei: ['altro1']};
+  daCapo(); renderVetrinaP2P(); await giro();
+  out.dalServer = ids();
+  /* ...e ogni risposta prende il posto della precedente (un altro account
+     sullo stesso telefono: l'ordine non e' piu' mio) */
+  delete FOTO.miei;
+  daCapo(); renderVetrinaP2P(); await giro();
+  out.rispostaNuova = ids();
+  /* SOLO MIEI: la fila si comporta come vuota, titolo e conto compresi */
+  FOTO = {eventi: [EV('m1', 'sell', 5, ADESSO - 3), EV('m2', 'buy', 6, ADESSO - 4)],
+          quando: ADESSO, miei: ['m2']};
+  RIGHE = {m1: riga('m1')};
+  daCapo(); renderVetrinaP2P(); await giro();
+  out.soloMiei = {display: el('p2pVetrinaSez').style.display, card: conta(),
+                  conta: el('p2pVetrinaConta').textContent, giri: TIMERS.length};
+  /* SETTE DEGLI ALTRI E IL MIO PIU' NUOVO: sei card, tutte degli altri */
+  FOTO = {eventi: [EV('mio9', 'sell', 5, ADESSO - 1)].concat(
+            [1,2,3,4,5,6,7].map(n => EV('a' + n, 'sell', n, ADESSO - 100 + n))),
+          quando: ADESSO, miei: ['mio9']};
+  RIGHE = {};
+  daCapo(); renderVetrinaP2P(); await giro();
+  out.seiAltri = ids();
+  RIGHE = {}; LAPIDI = new Set(); delete FOTO.miei;
   /* ---- LA SCELTA: SCAMBI P2P NELLA HOME ---- */
   HINT = {}; TIMBRATI.length = 0;
   TIMERS.length = 0; p2pVetrinaTimer = null; p2pVetrinaChiesta = Date.now(); FETCH.length = 0;
@@ -52877,13 +52951,11 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
            '<div class="price"><span class="p2p-vt-verbo">Ricevi</span>80<span' in c("compra"),
            '<span class="p2p-vt-verbo">Invia</span><span class="p2p-vt-cifra">≈ 105\u202f019 sats</span>' in c("compra"),
            ">g</span>" in c("compra"), '<div class="title">SEPA Instant</div>' in c("compra")])
-    prova("IL MIO ORDINE si guarda da dentro: il mio di vendita e' «Vendi BTC», ricevo gli "
-          "euro e invio i sats con la mia meta', e resta riconoscibile",
-          [True, True, True, True, True],
-          ['p2p-vt-lato vendi">Vendi BTC<' in c("mio"),
-           '<span class="p2p-vt-verbo">Ricevi</span>40<span' in c("mio"),
-           '<span class="p2p-vt-verbo">Invia</span><span class="p2p-vt-cifra">≈ 54\u202f133 sats</span>' in c("mio"),
-           "card-p2p-mio" in c("mio"), "il tuo ordine" in c("mio")])
+    # (27 set 2026) la card e' sempre di un altro: niente ramo del «mio»
+    prova("LA CARD NON HA PIU' UN RAMO «MIO»: ne' la classe, ne' «il tuo ordine», ne' il mio "
+          "volto, ne' l'unione dei miei appena nati", [],
+          [s for s in ("card-p2p-mio", "il tuo ordine", "voltoMioP2P(", "ordiniMieiFreschiP2P(",
+                       "P2P_VETRINA_MIEI_S =", "o.mio") if s in blocco])
     prova("BARATTOZON (chi pubblica vende sats): a chi guarda «Compra BTC»", True,
           'p2p-vt-lato compra">Compra BTC<' in c("bz"))
     prova("l'INTERVALLO: «Invia 20–150 €» e «scegli tu» al posto dei sats", [True, True],
@@ -52912,6 +52984,8 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
     prova("QUALI ORDINI: i vivi, dal piu' nuovo, al massimo sei — fuori scaduti, "
           "presi e lapidati", ["nuovo", "n6", "n5", "n4", "n3", "n2"], o["ordini"])
     prova("...e un libro che non c'e' da' una fila vuota", [0, 0], o["vuoto"])
+    prova("...i miei fuori, e il taglio a sei DOPO: il sesto posto passa a un altro",
+          ["n6", "n5", "n4", "n3", "n2", "n1"], o["senzaMio"])
     prova("LA VETRINA NUDA le mostra", True, o["nuda"])
     prova("...e non le mostra con la leva spenta, in demo, in un reparto, nelle aste, "
           "nel barattolo, con una ricerca, un filtro o un ordinamento",
@@ -52941,15 +53015,22 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
           [o["ritorno"], o["ritornoFetch"], o["dopoRitorno"]])
     prova("FUORI DA ESPLORA nessuna domanda e nessun giro", [6, 0], o["fuori"])
     prova("IN TUTTO IL BANCO LA FILA NON HA CHIAMATO NESSUN RELAY", [], o["relay"])
-    # (dal suo lato: il mio ordine di vendita, visto da me, e' «Vendi BTC»)
-    prova("CHI PUBBLICA VEDE SUBITO LA SUA CARD, prima che la fotografia la porti: "
-          "in testa, col suo volto, dal suo lato", {"ids": ["mio1", "h1"], "volto": True, "vende": True},
-          o["mioSubito"])
-    prova("...e non contano il nome provvisorio, il non confermato, il vecchio, l'annullato, "
-          "il preso, il lapidato, quello di un altro", ["h1"], o["nonContano"])
-    prova("...quando la fotografia lo porta resta UNA card", 1, o["senzaDoppioni"])
-    prova("...toccarla apre il mio scambio, non «non c'e' piu'»", ["presa:mio1"], o["toccoMio"])
-    prova("...e annullato esce subito, senza aspettare il server", False, o["annullato"])
+    # ⚠️ ROVESCIATA (27 set 2026, ritocco di Andrea a 9f9b6a6): era «chi
+    # pubblica vede subito la sua card». Adesso la fila mostra solo quel
+    # che chi guarda puo' prendere.
+    prova("I MIEI ORDINI NON STANNO IN FILA: appena pubblicato non entra, e nessun avviso",
+          {"ids": ["h1"], "avvisi": []}, o["appenaPubblicato"])
+    prova("...quando la fotografia lo porta resta fuori (l'archivio del dispositivo)",
+          ["h1"], o["dallaFotoArchivio"])
+    prova("...e fuori anche quello che sto prendendo", [], o["stoPrendendo"])
+    prova("...sull'ALTRO dispositivo lo dice il server (`miei`)", ["h1"], o["dalServer"])
+    prova("...e ogni risposta prende il posto della precedente", ["altro1", "h1"],
+          o["rispostaNuova"])
+    prova("SOLO MIEI: la fila si comporta come vuota — sparisce col titolo e il conto, "
+          "e il giro resta armato per quando arriva un altro",
+          {"display": "none", "card": 0, "conta": "", "giri": 1}, o["soloMiei"])
+    prova("SETTE DEGLI ALTRI E IL MIO PIU' NUOVO: sei card, tutte degli altri",
+          ["a7", "a6", "a5", "a4", "a3", "a2"], o["seiAltri"])
     prova("LA SCELTA: l'interruttore c'e', acceso, e vale su ogni dispositivo", True, o["levaAccesa"])
     prova("...spento: via la fila, la riga «nascosti · Mostra», nessun giro, il timbro sul profilo",
           {"sez": "none", "riga": "", "giri": 0, "leva": True, "timbri": ["p2p_home_via"]},
@@ -76235,7 +76316,7 @@ def prove_premio_barattozon():
            'if fuori["eventi"] and F.get("cambi"):\n        fuori["cambi"] = F["cambi"]'
            in pezzo("libro_fotografato_p2p")
            and pezzo("libro_fotografato_p2p").index('fuori["cambi"]')
-           < pezzo("libro_fotografato_p2p").index("_ha_sessione_p2p("),
+           < pezzo("libro_fotografato_p2p").index("_chi_guarda_p2p("),
            '"cambio_pub": float(o["cambio_pub"] or 0) if o else 0.0,' in pezzo("_scambi_p2p")])
 
     # --- 3) IL GIUDICE DEL CAMBIO E L'INTESTAZIONE, sul database vero ---

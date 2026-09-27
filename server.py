@@ -41469,11 +41469,17 @@ def libro_fotografato_p2p(x_tg_init_data: str = Header(""),
     volti li calcola l'orologio con la fotografia, `_facce_foto_p2p`), e
     chi guarda si riconosce dalla sola firma dell'initData
     (`_utente_da_initdata`, che non scrive) o dal cookie con una memoria
-    di cinque minuti (`_ha_sessione_p2p`).
+    di cinque minuti (`_chi_guarda_p2p`).
     APERTA COME IL LIBRO: i 38383 li legge chiunque sui relay, e la
     vetrina anonima il libro lo guarda gia'. I VOLTI no, per la regola
     di `/api/p2p/facce`: escono solo a chi ha una sessione, e un
     raccoglitore anonimo non incrocia niente coi nostri account.
+    I SUOI ORDINI A CHI LI HA PUBBLICATI (27 set 2026, ritocco di
+    Andrea alla fila): con la sessione arriva anche `miei`, gli id della
+    fotografia che ha pubblicato LUI — la fila di Esplora mostra solo
+    quel che chi guarda puo' prendere, e il dispositivo che l'ordine non
+    l'ha scritto da se' non avrebbe altro modo di riconoscerlo. Dalla
+    memoria (`autori`, fotografati dall'orologio), mai quelli degli altri.
     Leva spenta = fotografia vuota, `quando` a zero: il client la tratta
     come «non c'e'». CACHE PRIVATA DI 10 SECONDI (30 fino al 27 set
     2026): la fila la rilegge ogni 15 s, e una cache piu' lunga del suo
@@ -41490,43 +41496,49 @@ def libro_fotografato_p2p(x_tg_init_data: str = Header(""),
     # l'orologio (`_cambi_foto_p2p`), e qui non si apre niente.
     if fuori["eventi"] and F.get("cambi"):
         fuori["cambi"] = F["cambi"]
-    if fuori["eventi"] and F.get("facce") and _ha_sessione_p2p(
-            x_tg_init_data, barattolo_sessione):
+    chi = _chi_guarda_p2p(x_tg_init_data, barattolo_sessione) \
+        if fuori["eventi"] else 0
+    if chi and F.get("facce"):
         fuori["facce"] = F["facce"]
+    if chi:
+        fuori["miei"] = sorted(d for d, t in (F.get("autori") or {}).items()
+                               if t == chi)
     return JSONResponse(fuori, headers={
         "Cache-Control": "private, max-age=10",
         "Vary": "X-Tg-Init-Data, Cookie"})
 
 
-# CHI GUARDA IL LIBRO HA UNA SESSIONE? Per il cookie del login web serve
-# il database (la tabella `sessioni`): la risposta si ricorda per cinque
-# minuti, cosi' Esplora che rinfresca ogni minuto non lo tocca a ogni
-# giro. Decide solo se servire i VOLTI, roba gia' pubblica nel mercatino:
-# una sessione chiusa da poco che li vede ancora qualche minuto non
-# apre niente. Il dizionario si svuota se cresce troppo.
+# CHI GUARDA IL LIBRO? Per il cookie del login web serve il database
+# (la tabella `sessioni`): la risposta si ricorda per cinque minuti, cosi'
+# Esplora che rinfresca ogni 15 secondi non lo tocca a ogni giro. Decide
+# se servire i VOLTI, roba gia' pubblica nel mercatino, e — dal 27 set
+# 2026 — di QUALI ordini della fotografia chi guarda e' l'autore: una
+# sessione chiusa da poco che vede ancora qualche minuto i suoi non apre
+# niente. Torna il tg_id, 0 = nessuno. Il dizionario si svuota se cresce
+# troppo.
 P2P_SESSIONI_VOLTI_S = 300
 _P2P_SESSIONI_VOLTI: dict = {}
 
 
-def _ha_sessione_p2p(init_data: str, sessione: str) -> bool:
+def _chi_guarda_p2p(init_data: str, sessione: str) -> int:
     if init_data:
         try:
-            _utente_da_initdata(init_data)
-            return True
+            return int(_utente_da_initdata(init_data).get("id") or 0)
         except Exception:
-            return False
+            return 0
     if not sessione:
-        return False
+        return 0
     th = hashlib.sha256(sessione.encode()).hexdigest()
     adesso = time.time()
     v = _P2P_SESSIONI_VOLTI.get(th)
     if v and v[0] > adesso:
         return v[1]
-    ok = utente_da_sessione(sessione) is not None
+    u = utente_da_sessione(sessione)
+    chi = int(u.get("id") or 0) if u else 0
     if len(_P2P_SESSIONI_VOLTI) >= 5000:
         _P2P_SESSIONI_VOLTI.clear()
-    _P2P_SESSIONI_VOLTI[th] = (adesso + P2P_SESSIONI_VOLTI_S, ok)
-    return ok
+    _P2P_SESSIONI_VOLTI[th] = (adesso + P2P_SESSIONI_VOLTI_S, chi)
+    return chi
 
 
 @app.post("/api/p2p/controparte")
@@ -44034,7 +44046,8 @@ P2P_FOTO_MAX = 300                 # quante offerte si servono, al massimo
 P2P_FOTO_MAX_S = 60                # il tetto di una fotografia, relay compresi
 _CAMPI_EVENTO = ("id", "pubkey", "created_at", "kind", "tags", "content", "sig")
 _P2P_FOTO = {"ultimi": {}, "info": None, "quando": 0, "intera": 0,
-             "visto": 0, "eventi": [], "facce": {}, "cambi": {}, "via": {}}
+             "visto": 0, "eventi": [], "facce": {}, "cambi": {}, "via": {},
+             "autori": {}}
 
 
 def libro_intero_da_relay(relay: str, mostro: str, since: int):
@@ -44164,6 +44177,10 @@ async def _fotografa_libro_p2p():
     F["facce"] = _facce_foto_p2p(F["eventi"], adesso)
     # ...e i cambi di Barattozon (26 set 2026), con la stessa ragione
     F["cambi"] = _cambi_foto_p2p(F["eventi"])
+    # ...e CHI HA PUBBLICATO COSA (27 set 2026, la fila «Scambi P2P» senza
+    # i propri ordini): resta in memoria e non esce MAI intero — la rotta
+    # ne da' a ciascuno solo la sua parte (`miei`)
+    F["autori"] = _autori_foto_p2p(F["eventi"])
     if intera:
         F["intera"] = adesso
 
@@ -44280,6 +44297,28 @@ def _facce_foto_p2p(eventi, adesso) -> dict:
         return _facce_ordini_p2p(con, ids, adesso)
     except ValueError:
         return {}
+    finally:
+        con.close()
+
+
+def _autori_foto_p2p(eventi) -> dict:
+    """Chi ha pubblicato gli ordini della fotografia, {ordine: tg_id}
+    (27 set 2026): la stessa riga di `p2p_ordini` da cui escono i volti,
+    una query per giro dell'orologio. Serve SOLO a dire a chi guarda
+    quali ordini sono suoi, perche' la fila «Scambi P2P» di Esplora non
+    glieli mostri anche sugli altri dispositivi; nessuna rotta lo
+    serve intero."""
+    ids = [d for d in (_tag_evento_p2p(e, "d") for e in eventi or []
+                       if e.get("kind") == 38383)
+           if FORMA_ORDINE_P2P.fullmatch(d)][:MAX_ORDINI_P2P]
+    if not ids:
+        return {}
+    con = db()
+    try:
+        righe = con.execute(
+            f"SELECT ordine, tg_id FROM p2p_ordini WHERE ordine IN "
+            f"({','.join('?' * len(ids))}) AND tg_id > 0", ids).fetchall()
+        return {r["ordine"]: int(r["tg_id"]) for r in righe}
     finally:
         con.close()
 
