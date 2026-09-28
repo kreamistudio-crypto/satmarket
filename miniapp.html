@@ -43853,7 +43853,7 @@ let p2pLibro = null;               // {ordini:[...], quando} — null = mai lett
 let p2pRiletto = 0;                // l'ultimo tentativo di rilettura: un giro caduto non martella
 let p2pInfo = null;                // le impostazioni del coordinator, dal 38385
 let p2pErrore = '';                // l'ultimo relay che non ha risposto, per dirlo
-let p2pParziale = false;           // il libro e' arrivato solo dallo specchio
+let p2pParziale = false;           // lo specchio del libro non ha risposto: forse manca qualcosa
 let p2pLettura = null;             // la promessa in volo: due tocchi non fanno due REQ
 let p2pGiro = 0;                   // il patto di vetrinaGiro: la risposta di un giro vecchio si butta
 
@@ -44174,8 +44174,8 @@ async function leggiLibroMostro(){
   ];
   /* I DUE INSIEMI RESTANO DISTINTI QUI DENTRO: `vivi` sono i relay dove
      il coordinator ASCOLTA, `specchi` quelli che ne tengono solo una
-     copia. Serve sotto, per sapere se il libro e' completo o e' quel
-     che aveva lo specchio. */
+     copia. Serve sotto, per sapere se ha risposto lo specchio — che e'
+     quel che dice se il libro e' completo. */
   const vivi = c.relay;
   const specchi = Array.isArray(c.specchio) ? c.specchio : [];
   const tutti = vivi.concat(specchi);
@@ -44236,13 +44236,26 @@ async function leggiLibroMostro(){
   console.log('📖 [p2p] libro: '
     + fonti.map(f => f.url + '=' + (f.ok ? f.n : 'muto')).join('  '));
   if (!fonti.some(f => f.ok)) throw ultimo || new Error('nessun relay');
-  /* COMPLETO = ha risposto almeno un relay del coordinator. Se ha
-     parlato solo lo specchio, quel che si legge puo' essere vecchio —
-     un ordine gia' preso e' una SOSTITUZIONE, non una cancellazione,
-     quindi uno specchio indietro lo mostra ancora disponibile — e si
-     dice, invece di stampare «nessun ordine aperto». */
+  /* COMPLETO = HA RISPOSTO LO SPECCHIO (28 set 2026, rovesciato:
+     fino a ieri era «ha risposto almeno un relay del coordinator», e lo
+     specchio da solo valeva «elenco parziale»). Dal 17 set 2026 mostrod
+     scrive DIRETTAMENTE sullo specchio, che e' una macchina nostra, e il
+     router ci copia in piu' quel che trova sui pubblici: la sonda del
+     28 set lo ha visto dal lato di chi legge — per ogni ordine lo
+     specchio aveva la versione piu' fresca o la stessa dei pubblici, e
+     35 eventi su 103 che nessun pubblico aveva, l'ultimo ordine aperto
+     compreso. Quindi l'avviso gridava proprio quando il libro era il
+     piu' giusto: relay.mostro.network va in timeout spesso, e bastava.
+     Adesso si avvisa quando TACE lo specchio: allora il libro viene
+     dai soli pubblici, che possono essere indietro — un ordine gia'
+     preso e' una SOSTITUZIONE, non una cancellazione, quindi un relay
+     indietro lo mostra ancora libero — e si dice, invece di stampare
+     «nessun ordine aperto». Nessuno specchio configurato = il mondo
+     di prima dello specchio: chi ha risposto e' il coordinator, e
+     nessun avviso. */
   return {eventi, fonti,
-          completo: fonti.some((f, i) => f.ok && i < vivi.length)};
+          completo: !specchi.length
+                    || fonti.some((f, i) => f.ok && i >= vivi.length)};
 }
 
 /* IL LETTORE DEL LIBRO E' PURO (set 2026, il morto che risorge): da
@@ -45565,11 +45578,14 @@ function renderP2P(){
      raccontano com'e' andata la lettura di adesso — appesi in alto
      mangerebbero schermo per sempre a chi sta scorrendo le card.
      IL LIBRO PARZIALE SI DICHIARA: senza questa riga un elenco
-     arrivato dal solo specchio si legge come il libro vero, e un
-     ordine gia' preso sembra ancora libero. */
+     arrivato senza lo specchio si legge come il libro vero, e un
+     ordine gia' preso sembra ancora libero. Dal 28 set 2026 esce solo
+     quando lo specchio TACE (vedi `leggiLibroMostro`), e dice il fatto
+     con le parole di casa: niente «relay», niente «specchio». */
   const avvisi =
-      (p2pParziale ? `<div class="hint">⚠️ Elenco parziale: risponde solo lo specchio `
-        + `del libro, quindi qui puo' mancare qualcosa o restare un ordine gia' preso.</div>` : '')
+      (p2pParziale ? `<div class="hint">⚠️ L'elenco potrebbe essere incompleto: la nostra `
+        + `copia del libro degli ordini non risponde, quindi qui può mancare qualche ordine `
+        + `o restarne uno già preso.</div>` : '')
     + (p2pErrore ? `<div class="hint">${esc(p2pErrore)}${p2pLibro.copia
         /* sulla COPIA l'errore dice anche cosa vuol dire per chi guarda,
            e offre il gesto: senza, la lista resterebbe li' con l'aria

@@ -51096,6 +51096,133 @@ def prove_tour_p2p():
           "removeItem" in _riv)
 
 
+def prove_avviso_elenco_parziale():
+    """L'AVVISO «ELENCO PARZIALE» (28 set 2026, ritocco di Andrea): nel
+    libro ordini compariva spesso «Elenco parziale: risponde solo lo
+    specchio…», cioe' quando i relay pubblici erano lenti — e
+    relay.mostro.network va spesso in timeout. Ma dal 17 set 2026 mostrod
+    scrive DIRETTAMENTE sullo specchio, e la sonda del 28 set lo ha visto
+    dal lato di chi legge: per ogni ordine lo specchio aveva la versione
+    piu' fresca o la stessa dei pubblici, piu' 35 eventi su 103 che
+    nessun pubblico aveva. Quindi lo specchio che risponde vuol dire
+    libro completo, e l'avviso resta solo quando lo specchio TACE — e
+    allora dice che l'elenco potrebbe essere incompleto.
+
+    Il lettore VERO (`leggiLibroMostro`) gira in node con dei relay di
+    cartone, sui casi che contano; la frase si legge dal markup vero."""
+    print("\n[l'avviso dell'elenco parziale]")
+    import json as _js, shutil, subprocess, tempfile
+    mini = open("miniapp.html", encoding="utf-8").read()
+    _lm = pezzo_js(mini, "async function leggiLibroMostro(){", "\n}\n") + "\n}\n"
+    _rp = pezzo_js(mini, "function renderP2P(){", "\n}\n")
+    _cl = pezzo_js(mini, "function caricaLibroP2P(forza){", "\n}\n")
+
+    # --- 1) LA FRASE: dice il fatto, con le parole di casa ---------------
+    i = _rp.index("(p2pParziale ?")
+    frase = "".join(re.findall(r"`([^`]*)`", _rp[i:_rp.index(": '')", i)]))
+    prova("l'avviso dice che l'elenco POTREBBE essere incompleto", True,
+          "L'elenco potrebbe essere incompleto" in frase)
+    prova("...e perche': la nostra copia del libro non risponde", True,
+          "la nostra copia del libro degli ordini non risponde" in frase)
+    # a schermo le accentate VERE, come negli altri avvisi: la frase di
+    # ieri scriveva «puo'» e «gia'», che e' la grafia dei commenti
+    prova("...e cosa vuol dire, con le accentate vere", True,
+          "qui può mancare qualche ordine o restarne uno già preso" in frase)
+    prova("...con le parole di casa: niente relay, specchio, coordinatore o nostr",
+          [], [p for p in ("relay", "specchio", "coordinator", "nostr")
+               if re.search(r"\b" + p + r"\b", frase.lower())])
+    prova("la frase di ieri («risponde solo lo specchio») non c'e' piu'", 0,
+          mini.count("Elenco parziale: risponde solo lo specchio"))
+    prova("l'avviso lo accende ancora il lettore, dal suo `completo`", True,
+          "p2pParziale = !completo;" in _cl)
+
+    node = shutil.which("node")
+    if not node:
+        salta("il lettore del libro gira in node", "node non c'e'")
+        return
+
+    # --- 2) IL LETTORE VERO, coi relay di cartone ------------------------
+    # ok = 38385 + un ordine; vuoto = EOSE senza niente (vale muto: un
+    # relay col coordinatore ha SEMPRE il suo 38385); muto = non chiude
+    # mai (il timeout di relay.mostro.network); rotto = non apre.
+    banco = r"""
+const window = {};
+let MODI = {};
+class Relay {
+  constructor(url){ this.url = url; }
+  async connect(){ if (MODI[this.url] === 'rotto') throw new Error('non apre'); }
+  subscribe(filtri, h){
+    const modo = MODI[this.url], u = this.url;
+    setTimeout(() => {
+      if (modo === 'ok') {
+        h.onevent({kind: 38385, id: 'i' + u, created_at: 1, tags: []});
+        h.onevent({kind: 38383, id: 'o' + u, created_at: 2, tags: [['d', 'x'], ['s', 'pending']]});
+      }
+      if (modo !== 'muto') h.oneose();
+    }, 1);
+    return {close(){}};
+  }
+  close(){}
+}
+window.NostrTools = {Relay};
+function caricaNostrTools(){ return Promise.resolve(); }
+const P2P_LIBRO_MS = 150, P2P_LIBRO_FINESTRA_S = 16 * 86400;
+let LEVE = null;
+const p2pCoord = () => LEVE;
+const RIGHE = [];
+console.log = (...a) => RIGHE.push(a.join(' '));
+__LETTORE__
+async function leggi(relay, specchio, modi){
+  MODI = modi;
+  LEVE = {mostro: 'm', relay};
+  if (specchio !== undefined) LEVE.specchio = specchio;
+  try { const r = await leggiLibroMostro(); return {completo: r.completo, n: r.eventi.length}; }
+  catch(e) { return {alza: String(e && e.message || e)}; }
+}
+const P = ['wss://mostro.test', 'wss://damus.test'], S = ['wss://specchio.test'];
+const tutti = m => Object.fromEntries(P.concat(S).map(u => [u, m]));
+(async () => {
+  const out = {};
+  out.pubbliciMuti = await leggi(P, S, Object.assign(tutti('muto'), {'wss://specchio.test': 'ok'}));
+  out.unoMuto = await leggi(P, S, Object.assign(tutti('ok'), {'wss://mostro.test': 'muto'}));
+  out.tuttiOk = await leggi(P, S, tutti('ok'));
+  out.specchioRotto = await leggi(P, S, Object.assign(tutti('ok'), {'wss://specchio.test': 'rotto'}));
+  out.specchioMuto = await leggi(P, S, Object.assign(tutti('ok'), {'wss://specchio.test': 'muto'}));
+  out.specchioVuoto = await leggi(P, S, Object.assign(tutti('ok'), {'wss://specchio.test': 'vuoto'}));
+  out.senzaSpecchi = await leggi(P, [], Object.assign(tutti('ok'), {'wss://mostro.test': 'muto'}));
+  out.levaVecchia = await leggi(P, undefined, tutti('ok'));
+  out.tuttiRotti = await leggi(P, S, tutti('rotto'));
+  process.stdout.write('\n' + JSON.stringify(out));
+})().catch(e => { process.stderr.write(String(e && e.stack || e)); process.exit(1); });
+"""
+    d = tempfile.mkdtemp()
+    try:
+        f = os.path.join(d, "parziale.js")
+        with open(f, "w", encoding="utf-8") as fh:
+            fh.write(banco.replace("__LETTORE__", _lm))
+        r = subprocess.run([node, f], capture_output=True, encoding="utf-8", timeout=60)
+        prova("il banco del lettore del libro gira in node", "", (r.stderr or "")[-700:])
+        o = _js.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else None
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    if not o:
+        return
+    prova("SPECCHIO CHE RISPONDE e pubblici muti (il timeout di tutti i giorni): "
+          "completo, nessun avviso, e il libro e' quello dello specchio",
+          {"completo": True, "n": 2}, o["pubbliciMuti"])
+    prova("...e con un solo pubblico muto, lo stesso", True, o["unoMuto"]["completo"])
+    prova("...e con tutti che rispondono, completo e unito", {"completo": True, "n": 6},
+          o["tuttiOk"])
+    prova("SPECCHIO CHE NON RISPONDE: il libro arriva dai pubblici, e l'avviso si accende",
+          [{"completo": False, "n": 4}] * 3,
+          [o["specchioRotto"], o["specchioMuto"], o["specchioVuoto"]])
+    prova("...anche quando lo specchio da' zero eventi, nemmeno il 38385 (vale muto)",
+          False, o["specchioVuoto"]["completo"])
+    prova("NESSUNO SPECCHIO CONFIGURATO: il mondo di prima, nessun avviso", [True, True],
+          [o["senzaSpecchi"]["completo"], o["levaVecchia"]["completo"]])
+    prova("TUTTI MUTI: il lettore alza, come sempre (l'errore lo dice renderP2P)", True,
+          "alza" in o["tuttiRotti"])
+
 def prove_libro_subito():
     """IL LIBRO SUBITO (26 set 2026, richiesta di Andrea): entrando nel
     P2P il libro compare SUBITO — la copia del telefono o la fotografia
@@ -55199,8 +55326,12 @@ def prove_p2p_libro():
           "ordinaMieiP2P(" in pezzo_js(mini, "function mieiMostratiP2P(righe){", "\n}\n"))
     # gli AVVISI restano col libro: appesi in alto mangerebbero schermo
     # per sempre a chi scorre, e raccontano la lettura di adesso
+    # EMENDATA (28 set 2026, l'avviso dell'elenco parziale): la frase e'
+    # cambiata, e l'ancora con lei — cercare quella di ieri lasciava la
+    # prova verde su qualunque posto
     prova("...e gli avvisi del libro restano col libro", True,
-          "const avvisi =" in _rp and "Elenco parziale" not in _rp[:_rp.index("const avvisi =")])
+          "const avvisi =" in _rp and "potrebbe essere incompleto" in _rp
+          and "potrebbe essere incompleto" not in _rp[:_rp.index("const avvisi =")])
     # niente pillola finche' non c'e' un libro: un «0 offerte» appeso in
     # alto mentre si legge e' il numero vero di una cosa non chiesta
     prova("...e in attesa del libro la testata resta vuota", True,
@@ -72007,8 +72138,12 @@ def prove_p2p_server():
     # muto in testa torna a poter svuotare il libro.
     prova("il libro si legge a ventaglio e non a uno a uno", True,
           "Promise.allSettled" in libro)
-    prova("...e dice se e' COMPLETO o e' quel che aveva lo specchio",
-          True, "completo:" in libro)
+    # EMENDATA (28 set 2026, l'avviso dell'elenco parziale): COMPLETO
+    # vuol dire che ha risposto lo SPECCHIO — mostrod ci scrive
+    # direttamente — e non piu' un relay del coordinator. I casi girano
+    # in prove_avviso_elenco_parziale.
+    prova("...e dice se e' COMPLETO: ha risposto lo specchio",
+          True, "|| fonti.some((f, i) => f.ok && i >= vivi.length)" in libro)
 
     # --- 9) IL PROFILO CHE SI RICAVA DALL'ACCOUNT (set 2026) --------
     # L'ECCEZIONE DICHIARATA ALLA REGOLA FERREA 2, e la ragione per cui
@@ -107837,6 +107972,7 @@ def main():
               prove_p2p_server,
         prove_p2p_libro,
         prove_tour_p2p, prove_tour_p2p_finale, prove_libro_subito,
+        prove_avviso_elenco_parziale,
         prove_giro_guidato_p2p, prove_banner_fee_personale,
         prove_card_p2p_vetrina,
         prove_ritocchi_prova_alan,

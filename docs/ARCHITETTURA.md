@@ -6819,11 +6819,16 @@
   vuoto e una risposta piena si servono uguali, quindi con la lettura
   a uno a uno bastava un relay muto in testa per svuotare il libro. Si
   legge da tutti con `Promise.allSettled`, si unisce per `d`, e il
-  risultato dice anche se e' COMPLETO — cioe' se ha risposto almeno un
-  relay del coordinator. Se ha parlato solo lo specchio la pagina
-  scrive «elenco parziale»: un ordine gia' preso e' una SOSTITUZIONE e
-  non una cancellazione, quindi uno specchio indietro lo mostrerebbe
-  ancora libero.
+  risultato dice anche se e' COMPLETO — cioe', dal 28 set 2026, se ha
+  risposto lo SPECCHIO: mostrod ci scrive direttamente dal 17 set, e il
+  router ci copia in piu' i pubblici, quindi lo specchio che risponde e'
+  il libro intero anche coi relay pubblici muti (fino al 27 set valeva
+  il contrario: completo = un relay del coordinator, e lo specchio da
+  solo diceva «elenco parziale»). Se lo specchio TACE la pagina scrive
+  «L'elenco potrebbe essere incompleto»: il libro viene dai soli
+  pubblici, e un ordine gia' preso e' una SOSTITUZIONE e non una
+  cancellazione, quindi un relay indietro lo mostrerebbe ancora libero.
+  Senza specchi configurati, nessun avviso: il mondo di prima.
   E IL LIBRO RESTA IN ASCOLTO (24 set 2026): finche' una vista del P2P e'
   aperta, UN ascolto ai 38383 del coordinatore sul coro (`ascoltaP2P`,
   `since` dalla data del libro letto), aperto e chiuso da `go()` dalla

@@ -35364,3 +35364,61 @@ Alan no, e il suo tocco dal libro apre «nuovo:9»; la frase dice
 «quindi paghi l'1% di fee». Nessun errore dell'app, nessuno scorrimento
 laterale. **DA AVERE:** i due telefoni veri, e la riga di
 `p2p_ordini` dell'ordine di Alan sul VPS.
+
+## L'avviso «elenco parziale» solo quando tace lo specchio (28 set 2026)
+
+Ritocco chiesto da Andrea: nel libro ordini usciva spesso «⚠️ Elenco
+parziale: risponde solo lo specchio…», e usciva proprio quando i relay
+pubblici erano lenti — `relay.mostro.network` va spesso in timeout.
+Ma il criterio era del cantiere dello specchio (set 2026), quando lo
+specchio era un `strfry router` che copiava dai pubblici e poteva
+restare indietro. Dal 17 set («Mostro scrive sullo specchio») mostrod
+ci scrive DIRETTAMENTE, quindi il sospetto si era rovesciato.
+
+**VERIFICATO PRIMA DI TOCCARE, dal lato di chi legge.** Una sonda in
+sola lettura (una REQ per relay, niente firme, niente pubblicazioni)
+sui 38383/38385 del coordinatore degli ultimi 16 giorni: lo specchio
+ha risposto in 0,5 s con 102 ordini e il 38385; `relay.mostro.network`
+in timeout; `nos.lol` 502; `relay.damus.io` 79 ordini. Per OGNI ordine
+lo specchio aveva la versione piu' fresca o la stessa dei pubblici
+(zero ordini dove fosse indietro o assente — i 12 eventi di damus che
+lui non ha sono versioni SUPERATE degli stessi ordini: un evento
+addressable ne tiene una sola), e **35 eventi su 103 li aveva solo
+lui**, compreso l'ultimo ordine aperto (09:49 UTC): quelli il router
+non li puo' aver copiati, quindi la scrittura diretta c'e' davvero.
+
+**LA REGOLA NUOVA**, in `leggiLibroMostro`: COMPLETO = ha risposto lo
+specchio (`!specchi.length || fonti.some((f, i) => f.ok && i >=
+vivi.length)`). Specchio che risponde → nessun avviso, anche coi
+pubblici muti. Specchio che tace (non apre, timeout, o zero eventi —
+che vale muto dal «libro subito») → l'avviso, con le parole di casa e
+le accentate vere: «⚠️ L'elenco potrebbe essere incompleto: la nostra
+copia del libro degli ordini non risponde, quindi qui può mancare
+qualche ordine o restarne uno già preso.» Nessuno specchio
+configurato → il mondo di prima, nessun avviso. Tutti muti → l'errore
+di sempre, invariato.
+
+**STRADA SCARTATA: completo se risponde lo specchio OPPURE un
+pubblico.** Coi pubblici indietro (e `relay.mostro.network` lo e' stato
+per giorni) sarebbe tornato l'errore opposto: un libro dei soli
+pubblici presentato come intero.
+
+**PROVATO.** `prove_avviso_elenco_parziale` (15): il lettore VERO in
+node con relay di cartone — specchio che risponde coi pubblici muti,
+con uno solo muto, con tutti buoni; specchio rotto, in timeout e
+vuoto; nessuno specchio, leva senza la chiave; tutti muti — e la frase
+letta dal markup (parole di casa a parole intere: «nostra» contiene
+«nostr»). Emendate col perche' due sentinelle di `prove_p2p_libro` e
+`prove_p2p_server` che guardavano la frase e la regola di ieri.
+Tortura 7 su 7. DAL VIVO: server in collaudo da una copia, relay di
+cartone su 127.0.0.1 (uno che risponde, uno che accetta e tace per
+sempre, il morto sulla 9), a 375 px: specchio buono e pubblici muti →
+l'ordine c'e' e nessun avviso; specchio morto e un pubblico buono →
+l'avviso nuovo sopra la card; senza specchi → niente; tutti muti →
+l'errore di sempre. Nessun relay vero toccato dal banco.
+
+**DA GUARDARE**: se lo specchio restasse indietro in silenzio (router
+fermo E scrittura diretta caduta) l'avviso non lo direbbe — la difesa
+e' la riga `📖 [p2p] libro:` della console e il conto per relay nel
+journal, come prima. Il libro resta comunque l'UNIONE di tutti quelli
+che rispondono.
