@@ -13642,7 +13642,11 @@ def prove_foto_scarti():
             # etichettato image/jpeg e prima finiva SCRITTO sul disco.
             nomi, scarti = amb["salva_foto"](7, [uri(buona), uri(pdf)])
             prova("il PDF vestito da foto non si salva", 1, len(nomi))
-            prova("...e il motivo si dice", ["non è una foto"], scarti)
+            # dal 28 set 2026 il motivo dice anche QUALE foto (la
+            # posizione nella scelta): e' la frase che vede l'utente
+            prova("...e il motivo si dice, con la foto che riguarda",
+                  ["la foto 2 non è stata accettata: non è una foto"],
+                  scarti)
             prova("...e sul disco non ci finisce", ["a7_0.jpg", "a7_0_min.jpg"],
                   sorted(f for f in os.listdir(tmp) if f.startswith("a7_")))
 
@@ -13662,7 +13666,9 @@ def prove_foto_scarti():
                     ([uri(b"nemmeno per sogno", "heic")],
                      "foto HEIC: questo server non sa convertirla")):
                 nomi, scarti = amb["salva_foto"](8, foto)
-                prova(f"scarto detto: {atteso}", ([], [atteso]), (nomi, scarti))
+                prova(f"scarto detto: {atteso}", ([], [
+                    "la foto 1 non è stata accettata: " + atteso]),
+                    (nomi, scarti))
 
             # e il caso normale non inventa avvisi
             nomi, scarti = amb["salva_foto"](9, [uri(buona), uri(buona)])
@@ -13739,8 +13745,10 @@ def prove_foto_scarti():
     # silenzio dicono che QUESTO telefono non decodifica quel file, non
     # che il file sia rotto — quindi si chiede al server, che i byte li
     # ha uguali. La via d'uscita non e' piu' una frase: e' una strada.
-    prova("sentinella: ...e al timeout si chiede al server, non si molla",
-          True, "res(await fotoDalServer(file))" in corpo[:j])
+    # (28 set 2026) il ripiego ha DUE gradini — il decode in piccolo,
+    # poi il server — e il watchdog passa dalla stessa porta
+    prova("sentinella: ...e al timeout si ripiega, non si molla",
+          True, "res(await ripiegoFoto(file, 0, 0))" in corpo[:j])
     prova("sentinella: onload disarma il watchdog nel SUO ramo", True,
           "clearTimeout(watchdog)" in corpo[j:k])
     prova("sentinella: onerror pure — o la strada del server, che puo' "
@@ -13764,37 +13772,84 @@ def prove_foto_scarti():
     else:
         _pezzi = "".join(pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
             "function fotoDalServer(file){", "function jpegDalCanvas(img){",
+            "function telaPiatta(sorgente){", "function jpegVuoto(uri){",
+            "async function jpegDaBitmap(file, larg, alt){",
+            "async function ripiegoFoto(file, larg, alt){",
             "function ridimensiona(file){", "async function aggiungiFoto(files){"))
         _banco = """
-          // il banco: un telefono finto, con la tela e il server che
-          // si comportano come dice CASO
+          // il banco: un telefono finto, con la tela, il decode in
+          // piccolo e il server che si comportano come dice CASO
           let CASO = {};
           const _st = setTimeout;
-          // il watchdog e' a 30 secondi: qui si sveglia subito, o la
-          // prova aspetterebbe mezzo minuto per ogni caso
-          globalThis.setTimeout = (fn, ms, ...a) => _st(fn, ms >= 1000 ? 1 : ms, ...a);
+          // IL WATCHDOG (30 s) SI SVEGLIA SUBITO SOLO SUL DECODE MUTO. Il
+          // banco di prima lo accorciava sempre, e partiva PRIMA della
+          // risposta finta del decode: la foto «buona» entrava dal
+          // watchdog, cioe' dal server, e la strada dell'onload non la
+          // girava nessuno (scoperto il 28 set 2026, cantiere
+          // modifica-foto). Con decode che risponde resta lungo, e onload
+          // lo disarma. I tetti di jpegVuoto (8 s) e del decode in
+          // piccolo (20 s) restano DIETRO le risposte finte, come su un
+          // telefono vero.
+          globalThis.setTimeout = (fn, ms, ...a) =>
+            _st(fn, ms === 30000 && CASO.decode === 'muto' ? 1 : ms, ...a);
           let toasts = [], sellFoto = [], editandoNostr = false;
           const tg = {initData:'x'};
           let DEMO = false, VETRINA = false;
           const API_BASE = '/api';
+          const TELA_COLORI_MIN = 32, TELA_PIATTA_SD = 6;
+          const anteprimeMute = new Set();
           function authHdr(){ return ''; }
           function toast(t){ toasts.push(String(t)); }
           function renderFotoPreview(){}
           function haptic(){}
           globalThis.URL = {createObjectURL:()=>'blob:finto',
                             revokeObjectURL:()=>{}};
-          globalThis.document = {createElement:()=>({
-            getContext:()=>({drawImage(){}}),
-            toDataURL:()=>CASO.tela})};
+          // LA TELA: toDataURL consegna quel che dice CASO per la strada
+          // da cui arriva il disegno (l'<img> intero o il bitmap in
+          // piccolo), e il 16x16 di telaPiatta legge NERO dove il JPEG
+          // disegnato e' nero — o dappertutto, sul telefono che non sa
+          // disegnare niente (tuttoNero). Il 64x64 del conto dei colori ne
+          // da' 64 diversi; col RUMORE il 16x16 e' piatto (da lontano il
+          // fitto si fonde) ma i colori restano tanti: e' una foto vera
+          function tela(){
+            const c = {width:0, height:0, _src:null,
+              getContext(){ return {
+                drawImage(s){ c._src = s; },
+                getImageData(){
+                  const nero = CASO.tuttoNero || /NERO/.test((c._src && c._src._s) || '');
+                  const piatta = CASO.rumore && c.width === 16;
+                  const px = new Uint8ClampedArray(16 * 16 * 4);
+                  for (let q = 0; q < px.length; q++)
+                    px[q] = nero ? 0 : piatta ? 128 : (q * 37) % 256;
+                  return {data: px};
+                }}; },
+              toDataURL(){ return c._src && c._src._bitmap ? CASO.telaBitmap : CASO.tela; }};
+            return c;
+          }
+          globalThis.document = {createElement: tela};
           function Image(){}
           Object.defineProperty(Image.prototype, 'src', {
             set(v){ this._s = v; const io = this;
+              if (String(v).startsWith('data:')) {
+                // un JPEG gia' pronto che si ridisegna: si apre sempre
+                setTimeout(()=>{ io.naturalWidth = 1200; io.naturalHeight = 900;
+                                 io.onload(); }, 0);
+                return;
+              }
               if (CASO.decode === 'muto') return;   // ne' onload ne' onerror
               setTimeout(()=>{ if (CASO.decode === 'errore') { io.onerror(); }
                 else { io.naturalWidth = CASO.larg; io.naturalHeight = CASO.alt;
                        io.onload(); } }, 0); },
             get(){ return this._s; }});
           globalThis.Image = Image;
+          async function bitmapFinto(file, opz){
+            CASO.chiesteBitmap++; CASO.opz = opz;
+            if (CASO.bitmap === 'errore') throw new Error('no');
+            const bw = CASO.bw, bh = CASO.bh;
+            const w = opz.resizeWidth || Math.round(opz.resizeHeight * bw / bh);
+            const h = opz.resizeHeight || Math.round(opz.resizeWidth * bh / bw);
+            return {_bitmap: true, width: w, height: h, close(){}};
+          }
           function FileReader(){}
           FileReader.prototype.readAsDataURL = function(){
             const fr = this;
@@ -13803,41 +13858,80 @@ def prove_foto_scarti():
           };
           globalThis.FileReader = FileReader;
           globalThis.fetch = async ()=>{
+            CASO.chiamateServer++;
             if (CASO.server === 'rete') throw new Error('rete');
             return {ok: CASO.server === 'ok', json: async ()=>
               CASO.server === 'ok' ? {foto:'data:image/jpeg;base64,DALSERVER'}
                                    : {detail:'Non riesco a leggere questa foto'}};
           };
           const BUONA = 'data:image/jpeg;base64,' + 'Q'.repeat(200);
+          const NERA = 'data:image/jpeg;base64,NERO' + 'Q'.repeat(200);
+          const BITMAP = 'data:image/jpeg;base64,PICCOLA' + 'Q'.repeat(200);
+          const BITMAP_NERA = 'data:image/jpeg;base64,PICCOLANERO' + 'Q'.repeat(200);
         """ + _pezzi + """
-          async function giro(caso){
+          const DETTAGLI = {};
+          let NERE_ENTRATE = 0;
+          async function giro(caso, nome){
             CASO = Object.assign({decode:'ok', larg:4080, alt:3060,
-                                  tela:BUONA, server:'ok'}, caso);
+                                  tela:BUONA, server:'ok', bitmap:'no',
+                                  telaBitmap:BITMAP, bw:4080, bh:3060,
+                                  chiesteBitmap:0, chiamateServer:0}, caso);
+            globalThis.createImageBitmap = CASO.bitmap === 'no' ? undefined : bitmapFinto;
             DEMO = !!caso.demo; VETRINA = false;
-            toasts = []; sellFoto = [];
-            await aggiungiFoto([{name:'IMG_2032.jpg', type:'image/jpeg',
-                                 size: caso.peso || 3498244}]);
+            toasts = []; sellFoto = []; anteprimeMute.clear();
+            await aggiungiFoto([{name:'IMG_20260928_195315.jpg', type:'image/jpeg',
+                                 size: caso.peso || 3077281}]);
+            const f = sellFoto[0] || '';
+            NERE_ENTRATE += sellFoto.filter(x => /NERO/.test(x)).length;
+            DETTAGLI[nome] = {
+              fonte: f === BUONA ? 'tela' : f === BITMAP ? 'bitmap'
+                   : /DALSERVER/.test(f) ? 'server' : (f ? 'altro' : ''),
+              mute: anteprimeMute.size, bitmap: CASO.chiesteBitmap,
+              server: CASO.chiamateServer, opz: CASO.opz || null};
             return [sellFoto.length, toasts.length,
                     (toasts[0] || '').slice(0, 60)];
           }
           (async ()=>{
             const out = {};
-            out.buona = await giro({});
-            out.tela0 = await giro({larg:0, alt:0});
-            out.telaVuota = await giro({tela:'data:,'});
-            out.decodeNo = await giro({decode:'errore'});
-            out.muto = await giro({decode:'muto'});
-            out.serverNo = await giro({decode:'errore', server:'no'});
-            out.reteNo = await giro({decode:'errore', server:'rete'});
-            out.demo = await giro({decode:'errore', demo:true});
-            out.pesante = await giro({decode:'errore', peso: 20000000});
-            console.log(JSON.stringify(out));
+            out.buona = await giro({}, 'buona');
+            out.tela0 = await giro({larg:0, alt:0}, 'tela0');
+            out.telaVuota = await giro({tela:'data:,'}, 'telaVuota');
+            out.decodeNo = await giro({decode:'errore'}, 'decodeNo');
+            out.muto = await giro({decode:'muto'}, 'muto');
+            out.serverNo = await giro({decode:'errore', server:'no'}, 'serverNo');
+            out.reteNo = await giro({decode:'errore', server:'rete'}, 'reteNo');
+            out.demo = await giro({decode:'errore', demo:true}, 'demo');
+            out.pesante = await giro({decode:'errore', peso: 20000000}, 'pesante');
+            // --- LA TELA NERA (28 set 2026, il #461) ---
+            out.nera = await giro({tela:NERA, bitmap:'ok'}, 'nera');
+            out.neraVerticale = await giro({tela:NERA, bitmap:'ok', larg:3060,
+              alt:4080, bw:3060, bh:4080}, 'neraVerticale');
+            out.neraSenzaBitmap = await giro({tela:NERA}, 'neraSenzaBitmap');
+            out.neraBitmapNera = await giro({tela:NERA, bitmap:'ok',
+              telaBitmap:BITMAP_NERA}, 'neraBitmapNera');
+            out.neraBitmapErrore = await giro({tela:NERA, bitmap:'errore'},
+              'neraBitmapErrore');
+            out.versoStorto = await giro({tela:NERA, bitmap:'ok', larg:3060,
+              alt:4080, bw:4080, bh:3060}, 'versoStorto');
+            out.tuttoNero = await giro({tela:NERA, bitmap:'ok',
+              telaBitmap:BITMAP_NERA, tuttoNero:true}, 'tuttoNero');
+            out.grande = await giro({decode:'errore', peso: 20000000,
+              bitmap:'ok'}, 'grande');
+            out.piccola = await giro({tela:NERA, bitmap:'ok', larg:800,
+              alt:600, bw:800, bh:600}, 'piccola');
+            // --- L'ORDINE: prima il decode in piccolo, poi la tela ---
+            out.buonaBitmap = await giro({bitmap:'ok'}, 'buonaBitmap');
+            out.rumore = await giro({bitmap:'ok', rumore:true}, 'rumore');
+            out.bitmapNeraTelaBuona = await giro({bitmap:'ok',
+              telaBitmap:BITMAP_NERA}, 'bitmapNeraTelaBuona');
+            console.log(JSON.stringify({out, DETTAGLI, NERE_ENTRATE}));
           })();
         """
         _r = _sp5.run(["node", "-e", _banco], capture_output=True,
                       text=True, encoding="utf-8", timeout=60)
         try:
-            v = _json5.loads((_r.stdout or "").strip())
+            _tutto = _json5.loads((_r.stdout or "").strip())
+            v, _dett = _tutto["out"], _tutto["DETTAGLI"]
         except Exception:
             v = None
             prova("il banco del client gira", True,
@@ -13846,6 +13940,9 @@ def prove_foto_scarti():
             # 1) la strada normale: entra, e nessuno dice niente
             prova("la foto buona entra, e nessuno parla", [1, 0, ""],
                   v["buona"])
+            prova("...dalla tela, senza giri inutili", ("tela", 0, 0),
+                  (_dett["buona"]["fonte"], _dett["buona"]["bitmap"],
+                   _dett["buona"]["server"]))
             # 2) IL SILENZIO NUOVO, quello che ha aperto il cantiere:
             # onload parla ma i pixel non ci sono (naturalWidth 0), la
             # tela nasce 0x0 e toDataURL torna 'data:,' — una stringa
@@ -13875,7 +13972,70 @@ def prove_foto_scarti():
                   v["demo"][:2])
             prova("...e il troppo pesante dice il tetto", True,
                   v["pesante"][0] == 0 and "15MB" in v["pesante"][2])
-            # LA REGOLA, in una riga: in nessuno dei nove casi la foto
+            # 6) LA TELA NERA (28 set 2026, dal campo: il #461). La tela
+            # «riusciva» e consegnava un JPEG sano e NERO: le guardie
+            # sulla forma della stringa non potevano vederlo, la
+            # miniatura usciva nera e il server la scartava. Adesso si
+            # giudica il RISULTATO, e il nero prende un'altra strada.
+            prova("la tela nera non entra: la rifa' il decode in piccolo",
+                  ([1, 0, ""], "bitmap", 0),
+                  (v["nera"], _dett["nera"]["fonte"], _dett["nera"]["server"]))
+            prova("...chiedendo al decoder la misura finale sul lato lungo",
+                  {"resizeQuality": "high", "imageOrientation": "from-image", "resizeWidth": 1200},
+                  _dett["nera"]["opz"])
+            prova("...e in verticale sul lato lungo giusto",
+                  ("bitmap", {"resizeQuality": "high", "imageOrientation": "from-image", "resizeHeight": 1200}),
+                  (_dett["neraVerticale"]["fonte"], _dett["neraVerticale"]["opz"]))
+            # L'ORDINE (Redmi Note 12: WebView con poca memoria per la
+            # tela). Dove il decode in piccolo c'e', la foto passa di li'
+            # e il bitmap da 12 Mpx non nasce mai; se esce nero, si prova
+            # la tela intera, e solo dopo il server
+            prova("col decode in piccolo la foto buona passa di li' e basta",
+                  ([1, 0, ""], "bitmap", 1, 0),
+                  (v["buonaBitmap"], _dett["buonaBitmap"]["fonte"],
+                   _dett["buonaBitmap"]["bitmap"], _dett["buonaBitmap"]["server"]))
+            # IL GIUDICE E' GEMELLO DEL SERVER: pochi colori E piatta. Col
+            # solo «piatta» una foto di sabbia o di stoffa, fitta e
+            # uniforme da lontano, passava per nera (misurato dal vivo)
+            prova("una foto fitta e uniforme da lontano NON e' nera",
+                  ([1, 0, ""], "bitmap", 0),
+                  (v["rumore"], _dett["rumore"]["fonte"], _dett["rumore"]["server"]))
+            prova("il decode in piccolo nero: si prova la tela intera",
+                  ([1, 0, ""], "tela", 0),
+                  (v["bitmapNeraTelaBuona"], _dett["bitmapNeraTelaBuona"]["fonte"],
+                   _dett["bitmapNeraTelaBuona"]["server"]))
+            prova("una foto piccola non si ingrandisce",
+                  {"resizeQuality": "high", "imageOrientation": "from-image", "resizeWidth": 800},
+                  _dett["piccola"]["opz"])
+            for _c, _perche in (
+                    ("neraSenzaBitmap", "senza createImageBitmap"),
+                    ("neraBitmapNera", "col bitmap nero anche lui"),
+                    ("neraBitmapErrore", "col decode in piccolo che fallisce"),
+                    ("versoStorto", "col bitmap nel verso sbagliato (EXIF ignorato)")):
+                prova(f"tela nera {_perche}: la prende il server",
+                      ([1, 0, ""], "server"), (v[_c], _dett[_c]["fonte"]))
+            # 7) il telefono che non sa disegnare NIENTE: la foto del
+            # server e' buona e parte, ma la sua anteprima e' il riquadro
+            prova("il telefono che disegna tutto nero: la foto parte lo stesso",
+                  ([1, 0, ""], "server"), (v["tuttoNero"],
+                                           _dett["tuttoNero"]["fonte"]))
+            prova("...e in anteprima e' il riquadro, non una miniatura nera",
+                  1, _dett["tuttoNero"]["mute"])
+            prova("...solo li': le anteprime delle altre si vedono", 0,
+                  sum(d["mute"] for k, d in _dett.items() if k != "tuttoNero"))
+            # 8) LA FOTO GRANDE (oltre i 15MB del server): il decode
+            # dell'<img> fallisce, il server non la puo' prendere — il
+            # decode in piccolo prima, e il server non si chiama nemmeno
+            prova("la foto oltre i 15MB entra dal decode in piccolo",
+                  ([1, 0, ""], "bitmap", 0),
+                  (v["grande"], _dett["grande"]["fonte"], _dett["grande"]["server"]))
+            prova("...con le misure ignote chiede la larghezza di serie",
+                  {"resizeQuality": "high", "imageOrientation": "from-image", "resizeWidth": 1200},
+                  _dett["grande"]["opz"])
+            # LA REGOLA NUOVA: un JPEG nero non entra MAI fra le foto
+            prova("REGOLA: nessuna foto nera fra quelle da inviare", 0,
+                  _tutto["NERE_ENTRATE"])
+            # LA REGOLA, in una riga: in nessuno dei casi la foto
             # sparisce senza che qualcuno lo dica
             prova("REGOLA: o la foto entra, o qualcuno parla. Sempre.",
                   [], [k for k, r in v.items() if r[0] == 0 and r[1] == 0])
@@ -13884,8 +14044,10 @@ def prove_foto_scarti():
     # {motivo} — e a parlare e' il chiamante, in un posto solo. Finche'
     # e' cosi', un ramo nuovo che dimentica di dire il no non esiste.
     for f in ("function ridimensiona(", "function fotoDalServer(",
-              "function jpegDalCanvas("):
-        prova(f"sentinella: {f.split()[1][:-1]} non parla, risponde",
+              "function jpegDalCanvas(", "function telaPiatta(",
+              "function jpegVuoto(", "async function jpegDaBitmap(",
+              "async function ripiegoFoto("):
+        prova(f"sentinella: {f.split()[-1][:-1]} non parla, risponde",
               False, "toast(" in pezzo_js(mini, f, "\n}\n"))
     _agg = pezzo_js(mini, "async function aggiungiFoto(files){", "\n}\n")
     prova("sentinella: ...e chi la chiama dice SEMPRE il no", True,
@@ -13896,6 +14058,127 @@ def prove_foto_scarti():
     prova("sentinella: tutti e tre i chiamanti leggono l'esito",
           (3, 3), (mini.count("await ridimensiona("),
                    mini.count("esito = await ridimensiona(")))
+
+    # ---- LA MINIATURA NON E' MAI NERA, E L'AVVISO DICE QUALE FOTO ----
+    # (28 set 2026, cantiere modifica-foto: sul telefono del #461 le
+    # miniature uscivano nere e l'avviso diceva «2 foto su 2 non sono
+    # entrate» senza dire quali.) Il riquadro «Foto pronta, la sistemiamo
+    # noi» prende il posto dell'anteprima che il telefono non sa
+    # disegnare — segnata da aggiungiFoto o dall'onerror dell'<img> —
+    # e la foto resta fra quelle da inviare, col suo ✕.
+    if not _sh5.which("node"):
+        salta("le miniature mute e l'avviso, girati per davvero",
+              "node non installato")
+    else:
+        _pz = "".join(pezzo_js(mini, f, "\n}\n") + "\n}\n" for f in (
+            "function anteprimaMuta(i){", "function renderFotoPreview(){",
+            "function avvisoFoto(d, chieste){"))
+        _b = """
+          const anteprimeMute = new Set();
+          let sellFoto = [], editandoId = null, duplicaDaId = null,
+              fotoAttuali = [], editandoNostr = false;
+          const nodo = {innerHTML: ''};
+          function el(){ return nodo; }
+          function esc(s){ return s; }
+        """ + _pz + """
+          const BUONA = 'data:image/jpeg;base64,BUONA';
+          const MUTA = 'data:image/jpeg;base64,MUTA';
+          sellFoto = [BUONA, MUTA, 'caricando:1'];
+          anteprimeMute.add(MUTA);
+          anteprimeMute.add('data:image/jpeg;base64,VECCHIA');
+          renderFotoPreview();
+          const h1 = nodo.innerHTML;
+          anteprimaMuta(0);             // l'<img> della BUONA non si apre
+          const h2 = nodo.innerHTML;
+          anteprimaMuta(2);             // il chip d'attesa non si tocca
+          const conta = (h, r) => (h.match(r) || []).length;
+          console.log(JSON.stringify({
+            img1: conta(h1, /<img /g),
+            pronta1: conta(h1, /Foto pronta, la sistemiamo noi/g),
+            onerror: h1.includes('onerror="anteprimaMuta(0)"'),
+            potata: !anteprimeMute.has('data:image/jpeg;base64,VECCHIA'),
+            img2: conta(h2, /<img /g),
+            pronta2: conta(h2, /Foto pronta, la sistemiamo noi/g),
+            x2: conta(h2, /class="x"/g),
+            attesa: anteprimeMute.has('caricando:1'),
+            foto: sellFoto.length,
+            av1: avvisoFoto({foto_salvate: 1, foto_scarti:
+              ['la foto 2 non è stata accettata: immagine vuota']}, 2),
+            av2: avvisoFoto({foto_salvate: 1, foto_scarti:
+              ['foto ospitata altrove: ricaricala a mano']}, 2),
+            av3: avvisoFoto({foto_salvate: 2, foto_scarti: []}, 2)}));
+        """
+        _r = _sp5.run(["node", "-e", _b], capture_output=True, text=True,
+                      encoding="utf-8", timeout=60)
+        try:
+            m = _json5.loads((_r.stdout or "").strip())
+        except Exception:
+            m = None
+            prova("il banco delle miniature gira", True,
+                  f"node ha detto: {(_r.stderr or '')[:300]}")
+        if m:
+            prova("l'anteprima muta e' il riquadro, la buona una miniatura",
+                  (1, 1), (m["img1"], m["pronta1"]))
+            prova("...e l'<img> sa diventare riquadro se non si apre", True,
+                  m["onerror"])
+            prova("...cosa che fa davvero, senza perdere la foto",
+                  (0, 2, 2, 3), (m["img2"], m["pronta2"], m["x2"], m["foto"]))
+            prova("il chip d'attesa non diventa mai «pronta»", False,
+                  m["attesa"])
+            prova("le anteprime mute di foto tolte non restano appese", True,
+                  m["potata"])
+            prova("l'avviso dice QUALE foto, con la frase del server",
+                  " — ⚠️ la foto 2 non è stata accettata: immagine vuota",
+                  m["av1"])
+            prova("...e il motivo senza posizione tiene il conto",
+                  " — ⚠️ 1 foto su 2 non è entrata: foto ospitata altrove: "
+                  "ricaricala a mano", m["av2"])
+            prova("...e senza scarti non dice niente", "", m["av3"])
+
+    # i due numeri del giudice del client sono quelli del server: se uno
+    # dei due si ritocca, l'altro lo deve sapere
+    _num = lambda nome, src: re.search(nome + r"\s*=\s*(\d+)", src)
+    prova("sentinella: il giudice del client e' gemello del server",
+          (_num("FOTO_COLORI_MIN", _SORGENTE).group(1),
+           _num("FOTO_PIATTA_SD", _SORGENTE).group(1)),
+          (_num("TELA_COLORI_MIN", mini).group(1),
+           _num("TELA_PIATTA_SD", mini).group(1)))
+
+    # ---- IL SERVER: MAI UN ANNUNCIO SVUOTATO, MAI UNO NATO VUOTO ----
+    # Le domande vere le chiude collaudo_foto_scartate.py sulle rotte
+    # vere (tutte scartate = 400 e niente pubblicato, modifica che non
+    # si salva, lista vuota che non tocca, vecchie via solo DOPO). Qui
+    # le sentinelle sull'ORDINE, che un riordino innocente romperebbe
+    # senza che nessuna prova funzionale se ne accorga.
+    _mod = pezzo("modifica_annuncio")
+    prova("sentinella: in modifica le foto si salvano PRIMA dei campi",
+          True, _mod.index('salva_foto, annuncio_id, d["foto"]')
+          < _mod.index('"UPDATE annunci SET titolo=?, descrizione=?'))
+    prova("sentinella: ...e se nessuna entra, 400 prima di scrivere", True,
+          _mod.index("if not nomi_nuovi:")
+          < _mod.index('"UPDATE annunci SET titolo=?, descrizione=?'))
+    prova("sentinella: le vecchie si cancellano DOPO il database", True,
+          _mod.index('"UPDATE annunci SET foto=?')
+          < _mod.index("os.remove("))
+    prova("sentinella: la riga che svuotava l'annuncio non c'e' piu'",
+          False, 'json.dumps(nomi) if nomi else ""' in _mod)
+    prova("sentinella: una lista vuota non tocca le foto", True,
+          'isinstance(d.get("foto"), list) and d["foto"]' in _mod)
+    _pub = pezzo("pubblica")
+    prova("sentinella: tutte scartate = annuncio ritirato, prima di "
+          "annunciarlo al mondo", True,
+          _pub.index("SET stato='rimosso'") < _pub.index("accoda_promo(")
+          and _pub.index("SET stato='rimosso'")
+          < _pub.index("annuncio_su_nostr("))
+    prova("sentinella: ...con la cancellazione MORBIDA, mai una DELETE",
+          False, "DELETE FROM annunci" in codice(_pub))
+    _sf = pezzo("salva_foto")
+    prova("sentinella: ogni scarto di salva_foto dice QUALE foto", True,
+          codice(_sf).count("scarti.append(posto + ") == 8
+          and "scarti.append(\"" not in codice(_sf)
+          and "scarti.append(f\"" not in codice(_sf))
+    prova("sentinella: il collaudo delle rotte vere c'e'", True,
+          os.path.exists("collaudo_foto_scartate.py"))
 
 
 def prove_foto_vuota():
@@ -14025,8 +14308,9 @@ def prove_foto_vuota():
             nera = jpeg(Image.new("RGB", (704, 628), (0, 0, 0)))
             nomi, scarti = amb2["salva_foto"](77, [uri(buona), uri(nera)])
             prova("la foto vuota non si salva", 1, len(nomi))
-            prova("...col motivo che dice cosa fare",
-                  [amb2["MSG_FOTO_VUOTA"]], scarti)
+            prova("...col motivo che dice cosa fare (e quale foto)",
+                  ["la foto 2 non è stata accettata: "
+                   + amb2["MSG_FOTO_VUOTA"]], scarti)
             prova("...e sul disco non ci finisce",
                   ["a77_0.jpg", "a77_0_min.jpg"],
                   sorted(f for f in os.listdir(tmp) if f.startswith("a77_")))
@@ -14040,7 +14324,7 @@ def prove_foto_vuota():
     prova("sentinella: e scatta prima che il file tocchi il disco", True,
           corpo.index("_foto_vuota(raw)") < corpo.index("_salva_una_foto("))
     prova("sentinella: il motivo e' la costante, non una frase a mano",
-          True, "scarti.append(MSG_FOTO_VUOTA)" in corpo)
+          True, "scarti.append(posto + MSG_FOTO_VUOTA)" in corpo)
     giudice = pezzo("_foto_vuota")
     # il fail-open e' la meta' che protegge chi pubblica: senza Pillow
     # non si giudica nessuno

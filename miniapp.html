@@ -40373,6 +40373,11 @@ async function rimuoviModerazione(id){
 }
 
 let sellFoto = [];   // le foto scelte, gia' ridimensionate
+/* Le foto BUONE che questo telefono non sa disegnare (28 set 2026, la
+   tela nera): le ha preparate il server e partono come le altre, ma in
+   anteprima diventano il riquadro «Foto pronta, la sistemiamo noi» —
+   una miniatura nera direbbe «foto rotta» di una foto che non lo e'. */
+const anteprimeMute = new Set();
 let editandoId = null, editandoTitolo = '', fotoAttuali = [];
 /* IL DUPLICATO (ago 2026): il form si riempie come in modifica, ma
    l'annuncio che nasce e' NUOVO — quindi `editandoId` resta null e
@@ -41648,7 +41653,7 @@ function fotoDalServer(file){
           res({motivo: d.detail || `Non riesco a preparare «${file.name}»`});
           return;
         }
-        res({foto: d.foto});
+        res({foto: d.foto, dalServer: true});
       } catch(e){
         res({motivo:'Non sono riuscito a preparare la foto: riprova'});
       }
@@ -41694,6 +41699,119 @@ function jpegDalCanvas(img){
   } catch(e){ return ''; }
 }
 
+/* LA TELA NERA (28 set 2026, dal campo: l'annuncio #461, Android, Mini
+   App dentro Telegram, foto MediaTek da 4080x3060). Il canvas di quel
+   telefono «riusciva»: onload parlava, toDataURL tornava un JPEG lungo
+   e sano — tutto NERO. Le guardie di jpegDalCanvas guardano la FORMA
+   della stringa e non potevano vederlo: le miniature uscivano nere,
+   la foto partiva, e il server la scartava come «immagine vuota», che
+   e' il suo mestiere. Quindi il giudizio si sposta sul RISULTATO: il
+   JPEG si ridisegna e si misura col giudice del server, GEMELLO: vuota
+   = POCHISSIMI COLORI (al massimo FOTO_COLORI_MIN = 32, contati su un
+   64x64 campionato senza sfumare, cioe' su pixel veri) E PIATTA DA
+   LONTANO (FOTO_PIATTA_SD = 6 su un 16x16: la foto come la vede chi
+   sfoglia). Vuota = non si manda, si prende un'altra strada.
+   LA CONGIUNZIONE NON E' UN DI PIU' (misurato dal vivo il 28 set): col
+   solo «piatta da lontano» una foto vera di una superficie fitta —
+   sabbia, stoffa, un rumore — si fonde in un grigio uniforme e veniva
+   presa per nera; sotto i 15MB costava un giro dal server, sopra la
+   buttava. La tela nera ha UN colore solo, e la prende la prima
+   metà. */
+const TELA_COLORI_MIN = 32, TELA_PIATTA_SD = 6;
+function telaPiatta(sorgente){
+  try {
+    const cc = document.createElement('canvas');
+    cc.width = 64; cc.height = 64;
+    const cx = cc.getContext('2d');
+    cx.imageSmoothingEnabled = false;          // pixel veri, non medie
+    cx.drawImage(sorgente, 0, 0, 64, 64);
+    const campione = cx.getImageData(0, 0, 64, 64).data;
+    const colori = new Set();
+    for (let q = 0; q < campione.length && colori.size <= TELA_COLORI_MIN; q += 4)
+      colori.add((campione[q] << 16) | (campione[q + 1] << 8) | campione[q + 2]);
+    if (colori.size > TELA_COLORI_MIN) return false;
+    const c = document.createElement('canvas');
+    c.width = 16; c.height = 16;
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(sorgente, 0, 0, 16, 16);
+    const px = ctx.getImageData(0, 0, 16, 16).data;
+    const n = px.length / 4;
+    let peggiore = 0;
+    for (let k = 0; k < 3; k++){
+      let s = 0, s2 = 0;
+      for (let q = k; q < px.length; q += 4){ s += px[q]; s2 += px[q] * px[q]; }
+      const m = s / n;
+      peggiore = Math.max(peggiore, Math.sqrt(Math.max(0, s2 / n - m * m)));
+    }
+    return peggiore <= TELA_PIATTA_SD;
+  } catch(e){ return true; }   // non si sa misurare: si chiede a chi sa
+}
+
+/* Il JPEG, ridisegnato, mostra qualcosa? Vero = vuoto (o non si sa). Un
+   decode che non risponde vale «non so»: la strada dopo e' il server,
+   che non ha questo problema. */
+function jpegVuoto(uri){
+  return new Promise(res=>{
+    const img = new Image();
+    const basta = setTimeout(()=>res(true), 8000);
+    img.onload = ()=>{ clearTimeout(basta); res(telaPiatta(img)); };
+    img.onerror = ()=>{ clearTimeout(basta); res(true); };
+    img.src = uri;
+  });
+}
+
+/* IL DECODE IN PICCOLO (28 set 2026). createImageBitmap con
+   resizeWidth/resizeHeight chiede al decoder di consegnare GIA' la
+   misura finale: il bitmap da 12 Mpx — quello che la WebView di un
+   telefono non sa tenere in una tela — non nasce mai. Si passa UN lato
+   solo: l'altro lo calcola il browser dalle proporzioni vere, e se il
+   verso non combacia con quello dell'<img> (una WebView vecchia che qui
+   non applica l'EXIF) si lascia stare: meglio il server che una foto
+   sdraiata. larg/alt a zero = misure ignote (il decode dell'<img> e'
+   fallito o non ha risposto): si chiede la larghezza di serie, e
+   jpegDalCanvas riporta comunque il lato lungo a 1200. Il decode ha un
+   tetto di tempo suo: una Promise che non si risolve e' il silenzio
+   peggiore, e qui dentro si arriva proprio dai telefoni che tacciono. */
+async function jpegDaBitmap(file, larg, alt){
+  if (typeof createImageBitmap !== 'function') return '';
+  const MAX = 1200;
+  const k = (larg && alt) ? Math.min(1, MAX / Math.max(larg, alt)) : 0;
+  /* l'orientamento si CHIEDE, non si spera: un browser che non sa
+     applicare l'EXIF qui risponde di no (valore sconosciuto), e si passa
+     alla tela intera — mai una foto consegnata capovolta, che il
+     controllo del verso qui sotto non vedrebbe (180 gradi) */
+  const opz = {resizeQuality: 'high', imageOrientation: 'from-image'};
+  if (!k || larg >= alt) opz.resizeWidth = k ? Math.round(larg * k) : MAX;
+  else opz.resizeHeight = Math.round(alt * k);
+  let bmp = null, tetto = null;
+  try {
+    const decode = createImageBitmap(file, opz);
+    bmp = await Promise.race([decode, new Promise((_, no)=>{
+      tetto = setTimeout(()=>{ no(new Error('muto'));
+        decode.then(b=>{ try { b.close(); } catch(e){} }, ()=>{}); }, 20_000);
+    })]);
+    if (larg && alt && (bmp.width >= bmp.height) !== (larg >= alt)) return '';
+    return jpegDalCanvas(bmp);
+  } catch(e){ return ''; }
+  finally {
+    clearTimeout(tetto);
+    try { if (bmp && bmp.close) bmp.close(); } catch(e){}
+  }
+}
+
+/* IL RIPIEGO, IN DUE GRADINI, uguale per ogni strada che non arriva a
+   un JPEG vero — tela nera, tela muta, decode fallito, decode che non
+   risponde: prima il decode in piccolo QUI, poi i byte al server (la
+   strada del 14 set). L'ordine non e' un gusto: il primo non costa
+   rete e vale anche oltre i 15MB, dove il server non arriva. */
+async function ripiegoFoto(file, larg, alt){
+  const uri = await jpegDaBitmap(file, larg, alt);
+  if (uri && !(await jpegVuoto(uri))) return {foto: uri};
+  return await fotoDalServer(file);
+}
+
 function ridimensiona(file){
   /* Riduce la foto a max 1200px lato lungo, JPEG di qualita': questa
      e' l'UNICA compressione della filiera (il server salva il JPEG
@@ -41705,9 +41823,9 @@ function ridimensiona(file){
      promessa «nessuna foto sparisce in silenzio» una cosa di
      STRUTTURA invece che di memoria — prima ogni ramo doveva
      ricordarsi di parlare, e bastava uno che tacesse.
-     Ogni strada che non porta a un JPEG finisce nel ripiego del
-     server (vedi `fotoDalServer`): i byte sono gli stessi, ma di la'
-     c'e' Pillow e non la WebView di un telefono. */
+     Ogni strada che non porta a un JPEG VERO — anche uno nero —
+     finisce in `ripiegoFoto`: il decode in piccolo, poi il server,
+     che ha gli stessi byte, Pillow e non la WebView di un telefono. */
   return new Promise(res=>{
     const img = new Image();
     /* IL WATCHDOG DEL DECODE (ago 2026, dal campo: su un Android
@@ -41728,22 +41846,36 @@ function ridimensiona(file){
     const watchdog = setTimeout(async ()=>{
       decodeMuto = true;
       URL.revokeObjectURL(img.src);
-      res(await fotoDalServer(file));
+      res(await ripiegoFoto(file, 0, 0));
     }, 30_000);
     img.onload = async ()=>{
       if (decodeMuto) return;   // il watchdog ha gia' chiuso: niente lavoro postumo
       clearTimeout(watchdog);
-      const uri = jpegDalCanvas(img);
+      const larg = img.naturalWidth || img.width || 0;
+      const alt = img.naturalHeight || img.height || 0;
+      /* L'ORDINE DELLE STRADE (28 set 2026, il #461 su uno Xiaomi Redmi
+         Note 12: WebView di sistema con poca memoria per la tela). PRIMA
+         il decode in piccolo: il bitmap da 12 Mpx non nasce mai, ed e'
+         proprio quello che su questi telefoni esce nero — o fa chiudere
+         la WebView. L'onload dell'<img> costa poco: da' le misure senza
+         pretendere i pixel, che il browser decodifica solo per disegnare.
+         POI la tela intera, la strada di sempre, per chi il decode in
+         piccolo non ce l'ha o lo sbaglia. POI il server. Ogni JPEG si
+         giudica dal RISULTATO: uno nero — il caso del #461 — non passa. */
+      let uri = await jpegDaBitmap(file, larg, alt);
+      if (uri && await jpegVuoto(uri)) uri = '';
+      if (!uri) {
+        uri = jpegDalCanvas(img);
+        if (uri && await jpegVuoto(uri)) uri = '';
+      }
       URL.revokeObjectURL(img.src);
-      /* la tela ha risposto una cosa che non e' un JPEG: i byte veri
-         ce li ha ancora il file, e il server sa leggerli */
       res(uri ? {foto: uri} : await fotoDalServer(file));
     };
     img.onerror = async ()=>{
       if (decodeMuto) return;   // il watchdog ha gia' chiuso: niente doppia strada
       clearTimeout(watchdog);
       URL.revokeObjectURL(img.src);
-      res(await fotoDalServer(file));
+      res(await ripiegoFoto(file, 0, 0));
     };
     img.src = URL.createObjectURL(file);
   });
@@ -41794,6 +41926,13 @@ async function aggiungiFoto(files){
        E il `||` in coda copre anche il caso che nessuno ha previsto:
        un rifiuto senza motivo resta un rifiuto DETTO. */
     const esito = await ridimensiona(file) || {};
+    /* LA MINIATURA NON E' MAI NERA (28 set 2026): la foto preparata
+       dal server e' buona — l'ha convertita Pillow — ma un telefono
+       che non sa disegnare nella tela puo' non saperla nemmeno
+       mostrare. Allora parte lo stesso, e in anteprima e' il
+       riquadro «Foto pronta, la sistemiamo noi». */
+    if (esito.foto && esito.dalServer && await jpegVuoto(esito.foto))
+      anteprimeMute.add(esito.foto);
     const j = sellFoto.indexOf(segn);   // puo' essersi spostato (✕ su altre)
     if (j >= 0) {
       if (esito.foto) sellFoto[j] = esito.foto; else sellFoto.splice(j, 1);
@@ -41829,6 +41968,15 @@ async function fotoLasciate(ev){
   renderFotoPreview();
 }
 
+/* L'anteprima che non si apre nemmeno come <img>: stessa sorte della
+   foto che non si sa disegnare — il riquadro, mai il buco rotto. */
+function anteprimaMuta(i){
+  if (typeof sellFoto[i] === 'string' && !sellFoto[i].startsWith('caricando:')) {
+    anteprimeMute.add(sellFoto[i]);
+    renderFotoPreview();
+  }
+}
+
 function renderFotoPreview(){
   if ((editandoId || duplicaDaId) && !sellFoto.length && fotoAttuali.length){
     /* In modifica: si vedono le foto attuali; appena se ne scelgono
@@ -41858,10 +42006,12 @@ function renderFotoPreview(){
       <span style="font-size:17px">📷</span>
       <span style="font-size:9px;color:var(--muted);font-weight:700;text-align:center;line-height:1.2">${testo}</span>
     </div>`;
+  for (const f of anteprimeMute) if (!sellFoto.includes(f)) anteprimeMute.delete(f);
   el('photoPreview').innerHTML = sellFoto.map((f,i)=>`
     <div class="th">${f.startsWith('caricando:')
       ? chip('Carico la foto…', 'opacity:.55')
-      : `<img src="${f}" alt="">`}
+      : anteprimeMute.has(f) ? chip('Foto pronta, la sistemiamo noi')
+      : `<img src="${f}" alt="" onerror="anteprimaMuta(${i})">`}
       ${f.startsWith('caricando:') ? ''
         : `<span class="x" onclick="sellFoto.splice(${i},1);renderFotoPreview()">✕</span>`}
     </div>`).join('');
@@ -41877,9 +42027,14 @@ function avvisoFoto(d, chieste){
   if (!chieste || salvate === undefined) return '';   /* server di ieri */
   const perse = chieste - salvate;
   if (perse <= 0) return '';
-  const motivi = [...new Set(d.foto_scarti || [])].join(' · ');
+  /* dal 28 set 2026 ogni motivo e' gia' la frase intera, con la foto
+     che riguarda («la foto 2 non è stata accettata: …»): si mostra
+     com'e'. Il conto resta per i motivi senza posizione (il duplicato) */
+  const motivi = [...new Set(d.foto_scarti || [])];
+  if (motivi.length && motivi.every(m => /^la foto \d+ /.test(m)))
+    return ` — ⚠️ ${motivi.join(' · ')}`;
   return ` — ⚠️ ${perse} foto su ${chieste} non ${perse === 1
-    ? 'è entrata' : 'sono entrate'}${motivi ? ': ' + motivi : ''}`;
+    ? 'è entrata' : 'sono entrate'}${motivi.length ? ': ' + motivi.join(' · ') : ''}`;
 }
 
 async function publish(){

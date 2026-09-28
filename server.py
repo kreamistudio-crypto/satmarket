@@ -15871,18 +15871,25 @@ def salva_foto(annuncio_id: int, foto_lista: list,
     ogni scarto era un `continue` muto, l'annuncio nasceva con meno
     foto e nessuno lo diceva — chi pubblica se ne accorgeva aprendo la
     scheda. Nessuna foto sparisce in silenzio: o si carica, o l'utente
-    sa perche' no."""
+    sa perche' no.
+
+    E IL MOTIVO DICE QUALE FOTO (28 set 2026, cantiere modifica-foto):
+    «la foto 2 non è stata accettata: troppo grande». La posizione e'
+    quella della scelta, cioe' dell'anteprima che l'utente ha davanti,
+    e la frase e' gia' intera qui: il client la mostra com'e', senza
+    una regola gemella da tenere in pari."""
     nomi, scarti = [], []
     for i, f in enumerate((foto_lista or [])[:5]):     # max 5 foto
+        posto = f"la foto {i + 1} non è stata accettata: "
         m = re.match(r"data:image/(jpeg|jpg|png|webp|heic|heif);base64,(.+)",
                      f or "", re.S)
         if not m:
-            scarti.append("formato non riconosciuto")
+            scarti.append(posto + "formato non riconosciuto")
             continue
         try:
             raw = base64.b64decode(m.group(2))
         except Exception:
-            scarti.append("foto illeggibile")
+            scarti.append(posto + "foto illeggibile")
             continue
         # I JPEG del telefono pesano poco; agli originali da convertire
         # (mai ridimensionati dal browser: gli iPhone moderni superano
@@ -15890,17 +15897,17 @@ def salva_foto(annuncio_id: int, foto_lista: list,
         # riporta comunque a un JPEG da 1200px
         tetto = 15_000_000 if ImmaginePillow else 2_500_000
         if len(raw) > tetto:
-            scarti.append(f"troppo grande (oltre {tetto // 1_000_000}MB)")
+            scarti.append(posto + f"troppo grande (oltre {tetto // 1_000_000}MB)")
             continue
         if m.group(1) in ("heic", "heif"):
             if not (ImmaginePillow and pillow_heif):
                 print(f"⚠️ Foto HEIC saltata (annuncio #{annuncio_id}): "
                       f"servono i pacchetti pillow e pillow-heif")
-                scarti.append("foto HEIC: questo server non sa convertirla")
+                scarti.append(posto + "foto HEIC: questo server non sa convertirla")
                 continue
             raw = converti_in_jpeg(raw)
         elif not _e_immagine(raw):
-            scarti.append("non è una foto")
+            scarti.append(posto + "non è una foto")
             continue
         elif m.group(1) not in ("jpeg", "jpg") and ImmaginePillow:
             # PNG/WebP grezzi: gia' prima finivano in un file .jpg;
@@ -15917,7 +15924,7 @@ def salva_foto(annuncio_id: int, foto_lista: list,
         if raw:
             pulito = spoglia_metadati(raw) or converti_in_jpeg(raw)
             if pulito is None:
-                scarti.append("foto con dati nascosti che non riesco "
+                scarti.append(posto + "foto con dati nascosti che non riesco "
                               "a togliere")
                 continue
             raw = pulito
@@ -15926,13 +15933,13 @@ def salva_foto(annuncio_id: int, foto_lista: list,
         # rettangolo di un colore solo. Si dice subito, invece di
         # farlo scoprire dopo sei giorni a chi l'ha pubblicata.
         if _foto_vuota(raw):
-            scarti.append(MSG_FOTO_VUOTA)
+            scarti.append(posto + MSG_FOTO_VUOTA)
             continue
         nome = _salva_una_foto(annuncio_id, i, raw, versione)
         if nome:
             nomi.append(nome)
         else:
-            scarti.append("non riesco a leggere questa foto")
+            scarti.append(posto + "non riesco a leggere questa foto")
     return nomi, scarti
 
 
@@ -20281,11 +20288,41 @@ async def pubblica(req: Request, x_tg_init_data: str = Header(""),
     # sostituisce il set per intero, che e' la stessa regola della
     # modifica, e con le due strade insieme non si saprebbe quale
     # vince. Guardia di proprieta' dentro foto_da_copiare.
+    sorgenti = []
     if not (d.get("foto") or []):
         sorgenti = foto_da_copiare(user["id"], d.get("copia_foto_da"))
         if sorgenti:
             nomi, scarti_foto = await asyncio.to_thread(
                 copia_foto, annuncio_id, sorgenti)
+    # NESSUN ANNUNCIO NASCE SENZA FOTO SE LE FOTO C'ERANO (28 set 2026,
+    # cantiere modifica-foto). La riga e' gia' nel database — il nome
+    # dei file vuole l'id — ma niente e' ancora partito: Nostr, canali,
+    # avvisi di ricerca e moderatori vengono DOPO. Quindi si ritira con
+    # la cancellazione MORBIDA di casa (stato 'rimosso', come
+    # rimuovi_annuncio: nessuna DELETE, nessun riferimento che resta
+    # appeso) e l'utente riceve un no che dice perche', col form ancora
+    # pieno. Lo scudo anti-doppione guarda solo 'attivo' e 'revisione',
+    # quindi il secondo tentativo con altre foto passa. Chi non sceglie
+    # nessuna foto pubblica come sempre: qui non si decide che la foto
+    # e' obbligatoria, si decide che non si perde in silenzio.
+    if not nomi and ((d.get("foto") or []) or sorgenti):
+        con = db()
+        con.execute("UPDATE annunci SET stato='rimosso' WHERE id=?",
+                    (annuncio_id,))
+        con.commit()
+        con.close()
+        print(f"📷 Pubblicazione ritirata (annuncio #{annuncio_id}): "
+              f"nessuna foto accettata — " + "; ".join(scarti_foto),
+              flush=True)
+        raise HTTPException(
+            400, "Annuncio non pubblicato — "
+                 + "; ".join(scarti_foto or ["le foto non si leggono"])
+                 + ". Cambia le foto e riprova: quel che hai scritto è "
+                   "ancora qui.")
+    if scarti_foto:
+        print(f"📷 Pubblicazione dell'annuncio #{annuncio_id}: "
+              f"{len(nomi)} foto salvate, {len(scarti_foto)} scartate — "
+              + "; ".join(scarti_foto), flush=True)
     if nomi:
         con = db()
         con.execute("UPDATE annunci SET foto=? WHERE id=?",
@@ -21896,6 +21933,36 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
     in_revisione = bool(verdetto and verdetto[0] == "dubbio")
     motivo_dubbio = verdetto[1] if in_revisione else ""
 
+    # LE FOTO PRIMA DEI CAMPI (28 set 2026, cantiere modifica-foto).
+    # Una modifica le cui foto nuove vengono scartate TUTTE non si salva
+    # affatto: l'utente riceve il no col motivo di ognuna e resta nel
+    # foglio coi dati gia' scritti — meglio che trovarsi un annuncio
+    # cambiato a meta'. Per poterlo dire PRIMA di scrivere qualunque
+    # cosa, le foto si salvano qui: i nomi nuovi portano il timestamp e
+    # non toccano mai i file vecchi, quindi salvarle e' innocuo; le
+    # vecchie se ne vanno solo in fondo, a database scritto.
+    # Una lista VUOTA non tocca le foto: il client manda la chiave solo
+    # se ne ha scelte, e «toglile tutte» dal form non si puo' chiedere
+    # (prima una lista vuota svuotava l'annuncio e ne cancellava i file).
+    nomi_nuovi, scarti_foto = [], []
+    if isinstance(d.get("foto"), list) and d["foto"]:
+        # Nomi nuovi a ogni giro (il timestamp): cosi' il browser non
+        # puo' mostrare per sbaglio la foto vecchia dalla sua cache.
+        # E in un thread, come in pubblica(): la conversione HEIC non
+        # deve congelare il server.
+        nomi_nuovi, scarti_foto = await asyncio.to_thread(
+            salva_foto, annuncio_id, d["foto"],
+            versione=f"_{int(time.time())}")
+        if scarti_foto:
+            print(f"📷 Modifica dell'annuncio #{annuncio_id}: "
+                  f"{len(nomi_nuovi)} foto salvate, {len(scarti_foto)} "
+                  f"scartate — " + "; ".join(scarti_foto), flush=True)
+        if not nomi_nuovi:
+            raise HTTPException(
+                400, "Modifica non salvata — " + "; ".join(scarti_foto)
+                     + ". L'annuncio è com'era, foto comprese: cambia le "
+                       "foto nuove e riprova.")
+
     con = db()
     # valuta e prezzo_eur si scrivono SEMPRE entrambe: un annuncio che
     # torna in sats deve azzerare l'euro, o resterebbero residui.
@@ -21996,20 +22063,23 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
             f"riproponi sul listino nuovo."
             f"\n{URL_PUBBLICO}/annuncio/{annuncio_id}")
     conto_foto = {}
-    if isinstance(d.get("foto"), list):
-        # Nomi nuovi a ogni giro (il timestamp): cosi' il browser non
-        # puo' mostrare per sbaglio la foto vecchia dalla sua cache.
-        # E in un thread, come in pubblica(): la conversione HEIC non
-        # deve congelare il server.
-        nomi, scarti_foto = await asyncio.to_thread(
-            salva_foto, annuncio_id, d["foto"],
-            versione=f"_{int(time.time())}")
+    if nomi_nuovi:
+        nomi = nomi_nuovi
         # come in pubblica(): quante ne sono entrate lo dice la risposta
         conto_foto = {"foto_salvate": len(nomi), "foto_scarti": scarti_foto}
         try:
             vecchie = json.loads(a["foto"]) if a["foto"] else []
         except Exception:
             vecchie = []
+        con = db()
+        con.execute("UPDATE annunci SET foto=? WHERE id=?",
+                    (json.dumps(nomi), annuncio_id))
+        con.commit()
+        con.close()
+        # SOLO ADESSO le vecchie se ne vanno: le nuove sono sul disco E
+        # nel database. Prima si cancellavano in testa, e un guasto a
+        # meta' lasciava l'annuncio senza niente; adesso lascerebbe al
+        # massimo dei file in piu'.
         for v in vecchie:
             if v.startswith("http") or v in nomi:
                 continue
@@ -22019,11 +22089,6 @@ async def modifica_annuncio(annuncio_id: int, req: Request,
                     os.remove(os.path.join(FOTO_DIR, da_togliere))
                 except OSError:
                     pass
-        con = db()
-        con.execute("UPDATE annunci SET foto=? WHERE id=?",
-                    (json.dumps(nomi) if nomi else "", annuncio_id))
-        con.commit()
-        con.close()
     if in_revisione:
         # Fuori dalla vetrina in attesa dell'umano: sui relay l'evento
         # vecchio resta finche' non si decide (alla ✅ ripartira'

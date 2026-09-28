@@ -35545,3 +35545,75 @@ telefono e il coordinatore veri; il giro dal vivo non e' stato fatto.
 diagnosi») con la riga «chiave d66347c2: …» e l'annullo riuscito; se la
 restore e l'archivio non rispondono tutt'e due, la riga non si corregge
 e l'annullo dice la frase nuova — allora serve l'annullo da moderatore.
+
+## LA TELA NERA (28 set 2026, cantiere modifica-foto)
+
+**Dal campo**: l'annuncio **#461** («Lotto Demo Ps1…») nato senza foto.
+Il telefono (Xiaomi Redmi Note 12, Mini App dentro Telegram, WebView di
+sistema) mostrava le miniature NERE e diceva «2 foto su 2 non sono
+entrate: immagine vuota». Le foto (MediaTek, 4080×3060, 3 e 5 MB, EXIF
+normale) sono buone: il canvas di quel telefono consegnava un JPEG sano
+e tutto nero, il client lo mandava, il server lo scartava — ed era
+giusto — e l'annuncio si pubblicava lo stesso, vuoto. **Il #461 le foto
+non le ha mai avute**: si recupera solo ricaricandole.
+
+**IL PRIMO SOSPETTO ERA SBAGLIATO, e resta come controllo**: la modifica
+che cancella le vecchie. Nel codice c'era davvero — una modifica con
+foto nuove tutte scartate scriveva `foto=''` e toglieva i file vecchi,
+e lo faceva PRIMA di sapere se le nuove c'erano — ma al #461 non è
+successo. Curato lo stesso (punto 3).
+
+**LA CURA, tre pezzi.** 1) IL CLIENT GIUDICA IL RISULTATO: `jpegVuoto`
+ridisegna il JPEG e `telaPiatta` lo misura col giudice gemello di
+`_foto_vuota`. 2) L'ORDINE DELLE STRADE, scelto per le WebView con poca
+memoria per la tela: il decode in piccolo (`createImageBitmap` con la
+misura finale), poi la tela intera, poi il server; il ripiego vale anche
+oltre i 15MB. 3) IL SERVER: tutte scartate = niente pubblicazione (400,
+riga 'rimosso', form pieno) e niente modifica (le foto si salvano PRIMA
+dei campi); lista vuota che non tocca; vecchie via solo DOPO il
+database; ogni scarto dice QUALE foto; una riga «📷» nel journal. Le
+miniature: il riquadro «Foto pronta, la sistemiamo noi» dove il telefono
+non sa disegnare la foto buona.
+
+**MISURATO, non dedotto — e ha cambiato il disegno due volte.** Col solo
+«piatta da lontano» (la prima stesura) una foto di rumore da 19MB veniva
+presa per nera e buttata: la sabbia o la stoffa farebbero lo stesso. Il
+giudice è diventato la CONGIUNZIONE del server. E l'ordine era tela
+PRIMA e decode in piccolo DOPO: su un telefono che si chiude per la
+memoria il primo tentativo è proprio il gesto che lo uccide, quindi si è
+rovesciato. **SCARTATO**: la tela intermedia a passi — il sorgente da
+12 Mpx va disegnato comunque, ed è lui che esce nero; il decode in
+piccolo non lo fa nascere. Scartata anche la DELETE della riga al posto
+di 'rimosso': la casa cancella morbido.
+
+**PROVATO.** `prove_foto_scarti` allargata: il banco in node gira
+`ridimensiona` e `aggiungiFoto` VERE su 21 telefoni finti (tela nera,
+bitmap nero, senza `createImageBitmap`, verso sbagliato, tutto nero,
+foto grande, foto piccola, rumore…) con la REGOLA «nessuna foto nera fra
+quelle da inviare»; il riquadro e l'avviso in node; sentinelle
+sull'ordine del server e sui numeri gemelli. ⚠️ **E IL BANCO DI PRIMA
+MENTIVA**: accorciava il watchdog a 1 ms per tutti, e il watchdog
+partiva PRIMA della risposta finta del decode — la «foto buona» entrava
+dal server, e la strada dell'`onload` non l'aveva mai girata nessuno.
+Ora si accorcia solo sul decode muto. `collaudo_foto_scartate.py`
+(27 prove, rotte vere): pubblica tutta nera, secondo tentativo, una
+buona e una nera, senza foto, modifica che non si salva, lista vuota,
+senza chiave, una buona e una nera in modifica. Tortura 13 su 13. Dal
+vivo nel pane a 375 px con le DUE FOTO VERE dell'utente, una ruotata con
+EXIF 6 e una da 19MB, emulando cinque telefoni (normale, tela nera sopra
+8 Mpx, senza `createImageBitmap`, bitmap che ignora le misure, tutto
+nero): le foto dell'utente entrano sempre, dritte e mai nere, dalla
+strada giusta; col tutto nero dal server, col riquadro; la grande entra
+dal decode in piccolo e, dove non ce l'ha, dice il tetto dei 15MB.
+Pubblicato dal foglio l'annuncio col titolo del #461 e le sue foto; la
+pubblicazione e la modifica con foto nere dicono di no, col form pieno.
+**NON PROVATO**: il Redmi vero — il pane è Chromium desktop, e la tela
+nera è EMULATA; `createImageBitmap` con le opzioni dentro la WebView di
+quel telefono.
+`collaudo_foto_scartate` ENTRA NELLA CI (compileall e lista dei
+collaudi): la sentinella del compileall lo esige, e un collaudo fuori
+dalla CI invecchia. ⚠️ Il commit tocca il workflow, quindi `pronto`
+PUÒ restare indietro (PRODUZIONE, «DOPO UN COMMIT CHE TOCCA IL
+WORKFLOW»): si guarda dopo il push.
+**DA FARE**: far riprovare l'utente (il report dice come) e, se esce
+ancora nero, il journal: le righe «📷».

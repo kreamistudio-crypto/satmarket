@@ -6498,6 +6498,40 @@
   15MB) per sentirsi dire di no dal server — il conto giusto, perché
   quel caso è raro e chi lo produce lo sa, mentre la foto buona
   rifiutata capitava a chi non aveva sbagliato niente.
+  E LA TELA NERA (28 set 2026, dal campo: l'annuncio #461, uno Xiaomi
+  Redmi Note 12 nella Mini App). La tela di quel telefono «riusciva»:
+  `toDataURL` consegnava un JPEG sano e tutto NERO, che nessuna guardia
+  sulla forma poteva vedere — miniature nere, e il server che lo
+  scartava come «immagine vuota». Il giudizio adesso è sul RISULTATO:
+  `jpegVuoto` ridisegna il JPEG e `telaPiatta` lo misura col giudice
+  GEMELLO di `_foto_vuota` (pochi colori, `TELA_COLORI_MIN` = 32 su un
+  64x64 senza sfumare, E piatta da lontano, `TELA_PIATTA_SD` = 6 su un
+  16x16; una sentinella tiene i due numeri uguali a quelli del
+  server). L'ORDINE DELLE STRADE in `ridimensiona`: PRIMA il decode in
+  piccolo (`jpegDaBitmap`: `createImageBitmap` con un solo lato di
+  `resizeWidth`/`resizeHeight`, così il bitmap da 12 Mpx non nasce mai,
+  e `imageOrientation: 'from-image'` CHIESTO, così un browser che non
+  sa applicare l'EXIF dice di no invece di consegnare la foto
+  capovolta; più il controllo del verso contro l'`<img>`), POI la tela
+  intera di sempre, POI il server. Il decode fallito, muto o la tela
+  0x0 passano da `ripiegoFoto` (decode in piccolo, poi server), che
+  vale anche oltre i 15MB, dove il server non arriva. La foto buona
+  che il telefono non sa DISEGNARE (quella del server, sul telefono
+  che disegna tutto nero) parte lo stesso, e in anteprima è il
+  riquadro «Foto pronta, la sistemiamo noi» (`anteprimeMute`, anche
+  dall'`onerror` dell'`<img>`): mai una miniatura nera. E OGNI
+  SCARTO DI `salva_foto` DICE QUALE FOTO: «la foto 2 non è stata
+  accettata: …», già intera sul server, così il client non tiene una
+  regola gemella.
+  E IL SERVER NON LASCIA MAI UN ANNUNCIO SENZA LE FOTO CHE AVEVA:
+  pubblicare con foto scelte e tutte scartate = 400 col motivo di
+  ognuna, la riga ritirata con la cancellazione morbida ('rimosso',
+  prima che partano Nostr, canali e avvisi) e il form ancora pieno;
+  modificare con foto nuove tutte scartate = 400 e NIENTE scritto,
+  perché le foto si salvano PRIMA dei campi (nomi col timestamp, mai
+  sopra le vecchie); una lista vuota non tocca le foto; le vecchie si
+  cancellano dal disco solo DOPO che le nuove sono nel database.
+  Journal: una riga «📷» per ogni pubblicazione o modifica con scarti.
   E IL FENOMENO DIVENTA VISIBILE: `/api/foto/anteprima` scrive nel
   journal una riga per ogni conversione (formato, KB in ingresso e in
   uscita, e una riga anche sul rifiuto). Senza, un telefono che non
