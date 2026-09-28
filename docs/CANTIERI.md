@@ -35617,3 +35617,74 @@ PUÒ restare indietro (PRODUZIONE, «DOPO UN COMMIT CHE TOCCA IL
 WORKFLOW»): si guarda dopo il push.
 **DA FARE**: far riprovare l'utente (il report dice come) e, se esce
 ancora nero, il journal: le righe «📷».
+
+Le dispute P2P per i moderatori, primo pezzo: l'annullo insieme a
+disputa aperta (28 set 2026). **IL FATTO**: Alan apre una disputa di
+prova — «compra» 10 € in contanti, 13.603 sats (13.739 con la fee) in
+garanzia `ACCEPTED` dalle 19:30 UTC, disputa aperta da chi compra alle
+19:52, nessun solver, nessun euro girato; la hold scade al blocco
+969.744 (circa 117 ore). mostrod avvisa il server (`dispute-opened`), il
+server avvisa l'altra parte («i moderatori vi contatteranno»), e nessun
+moderatore riceve niente: non c'e' un pannello, e nessuna chiave fa da
+solver sul nodo. **LE DUE DECISIONI DI ANDREA**, prese prima del codice:
+1) la chiave del moderatore e' UNA PER MODERATORE E VIVE SOLO SUL SUO
+TELEFONO (solver aggiunto con `admin-add-solver` lanciato sul nodo, la
+nsec del nodo non esce mai da li'); scartate la nsec del nodo usata da
+fuori, la chiave solver sul VPS (calda sulla macchina esposta: chi buca
+il VPS o un account admin decide tutte le garanzie in disputa, e il
+server leggerebbe le chat) e la chiave solver sul nodo comandata dal VPS
+(stesso potere a chi buca il VPS, piu' pezzi). I controlli: sezione
+visibile ai soli moderatori, motivo e doppia conferma a registro PRIMA
+della firma, e l'allarme incrociato — una chiusura da moderatore che
+arriva dalla 0007 senza riga nel registro avvisa Andrea. Il limite
+dichiarato: chi ha la chiave puo' parlare a mostrod senza passare
+dall'app, e il controllo lo scopre, non lo ferma (per fermarlo servirebbe
+una patch che chieda il permesso al server: non adesso). 2) la disputa
+di prova si chiude con l'ANNULLO INSIEME, senza chiave da moderatore.
+**LETTO SUL SORGENTE** (upstream `v0.18.8`, via lettore che riassume; i
+byte del fork `-bar5` sul nodo non sono stati guardati): `cancel.rs`
+manda `Active | FiatSent | Dispute` all'annullo insieme, che cancella la
+hold e chiude la disputa come `SellerRefunded`; `release.rs` accetta il
+rilascio da `FiatSent` e da `Dispute`; il guardiano delle scadenze
+(`enforce_escrow_deadline_pass`) guarda solo `active` e `fiat-sent`,
+quindi una disputa che nessuno decide la chiude LND alla scadenza
+dell'HTLC, coi sats che tornano a chi vende e l'ordine che resta
+`dispute` nel database; `admin-add-solver` lo accetta solo dalla chiave
+del nodo (`npub` o `npub:read`), e un solver decide solo le dispute che
+ha preso lui. **SCARTATE per chiudere subito**: aspettare la scadenza
+(ordine sporco), `admin-cancel` con la nsec del nodo (e' la decisione 1
+presa di fretta), `lncli cancelinvoice` a mano (mostro e il libro
+restano storti: solo emergenza). **LA CURA**: in `in_disputa` il client
+offre «Chiedi di annullare» e, a chi riceve la proposta, «Accetta di
+annullare». LO STATO RESTA `in_disputa` e la richiesta e' una NOTA
+sulla riga (`annulloDisputa`: `chiesto` | `proposto`), non gli stati
+`annullo_chiesto`/`annullo_proposto`: per il coordinatore l'ordine e'
+ancora in disputa, la restore dice `dispute`, e nella ripresa la disputa
+sta sopra l'annullo — la prima rilettura si sarebbe portata via
+«Accetta» a chi doveva premerlo. La nota la scrive `avanzaOrdineP2P`
+(che resta autosufficiente), la porta l'archivio del server
+(`adottaScambiServerP2P`: a disputa aperta l'«annullo chiesto» del
+server non e' un passo indietro), la riconosce l'attesa dei gesti, e
+cade quando lo stato esce dalla disputa. Il foglio di conferma dice che
+la disputa si chiude, e a chi COMPRA aggiunge «Se hai già inviato gli
+euro non annullare: aspetta il moderatore». La lista
+`P2P_ANNULLA_INSIEME` non e' stata toccata. **NON FATTO, per perimetro**:
+il bottone «Libera i sats» a disputa aperta per chi vende (mostrod lo
+accetta): chiesto solo l'annullo. **PROVATO.** `prove_annullo_in_disputa`
+(29): sentinelle e il banco in node con la macchina a stati, i gesti, le
+frasi, «✋ Aspetta», l'attesa e la ripresa dalla restore veri.
+`collaudo_scambi_ovunque` col passo 14: server vero (disputa, poi
+`cancel-requested`, poi `canceled cooperative`) e client vero sulla
+risposta vera, dai due lati. Tortura 16 su 17 (la sopravvissuta e'
+equivalente: `cosa = ''` e `return null` sono lo stesso esito). Suite
+intera severa senza config nel worktree da origin/main (ec7a091): 16.954
+verdi e 0 rosse prima della sezione nuova. Dal vivo, server dalla copia
+col relay morto, riga seminata dalla porta vera: a 375 px i tre casi
+(disputa nuda, proposta, richiesta) hanno i bottoni e le frasi attesi, i
+due fogli le parole nuove, nessuno scorrimento laterale; letto dal DOM —
+lo scatto del pane non componeva, e non c'e'. **NON PROVATO**: il
+coordinatore vero e i due telefoni. **DA AVERE**: la chiusura della
+disputa di Alan coi due telefoni dopo il deploy, e sul nodo la riga
+della disputa (`disputes.status`) e la hold `CANCELED`. Il resto del
+cantiere (avviso ai moderatori, sezione «⚖️ Moderazione P2P», chat,
+procedura in PRODUZIONE) segue.
