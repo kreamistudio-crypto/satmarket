@@ -45247,7 +45247,10 @@ function rigaOrdineP2P(o){
      browser. Su un dispositivo dove quella lista non c'e', il proprio
      ordine resta indistinguibile: e' il limite dichiarato di questo
      mattone, e lo chiude la marcatura via coordinatore. */
-  const mio = ordineMioP2P(o.id);
+  /* ...E DAL 28 SET 2026 ANCHE QUEL CHE SA IL SERVER, o il nome
+     rimasto provvisorio: il giudice e' `ordineTuoP2P`, lo stesso della
+     fila della home e del tocco */
+  const mio = ordineTuoP2P(o.id, o);
   /* IL LATO DELLA CIFRA (28 set 2026): verde se chi legge riceve i
      sats, rosso se li invia — dall'ordine, mai dal tab (vedi il CSS di
      `.p2p-ord .p2p-sats`) */
@@ -48649,6 +48652,58 @@ function ordineMioP2P(id){
   const chiusi = typeof P2P_RESTORE_CHIUSI !== 'undefined' ? P2P_RESTORE_CHIUSI : [];
   return chiusi.indexOf(String(v.stato || '').trim().toLowerCase()) < 0;
 }
+/* ---- «È IL TUO ORDINE», UN GIUDICE SOLO (28 set 2026, dalla prova
+   di Alan) ----
+   Alan ha pubblicato un «compra BTC» e la card nella fila della home
+   aveva il «?» al posto del suo volto — e c'era, sul SUO telefono, come
+   un ordine da prendere: ha toccato «Vendi» credendo di dover
+   continuare. Un ordine non si prende da se', e chi l'ha pubblicato non
+   deve mai vederlo come prendibile.
+   MIO VUOL DIRE TRE COSE, dalla piu' certa alla meno:
+   • quel che sa QUESTO dispositivo (`ordineMioP2P`: l'archivio e la
+     lista del coordinatore);
+   • quel che dice il SERVER (`miei` della fotografia: chi l'ha
+     pubblicato da un altro dispositivo dello stesso account). Arriva
+     con la fila della home E col libro, da tutt'e due le domande;
+   • IL NOME CHE NON E' ARRIVATO (`provvisorioDelLibroP2P`): la risposta
+     del coordinatore alla pubblicazione si e' persa — il telefono ha
+     l'ordine sotto il nome provvisorio, il server non ha saputo niente
+     (ne' /p2p/ordini ne' il canale sono partiti), e nel libro c'e' un
+     ordine SENZA VOLTO uguale al mio. E' l'unico caso in cui il
+     telefono non puo' saperlo per certo, e allora lo sa per somiglianza.
+   Il libro non porta la chiave di chi pubblica (vedi la card del libro),
+   quindi il terzo e' il solo modo, ed e' stretto apposta: stesso lato,
+   stessa cifra, stesso premio, nato dopo il mio, e SOLO su un ordine di
+   cui nessuno sa l'autore — appena il server lo conosce, il volto
+   c'e' e la somiglianza non vale piu' (se era di un altro, torna
+   prendibile da solo). */
+function provvisorioDelLibroP2P(o){
+  if (!o || !o.id) return '';
+  const f = (typeof p2pFacce !== 'undefined' && p2pFacce[o.id]) || null;
+  if (f && f.nome) return '';
+  const tutti = ordiniP2P();
+  const kind = l => l === 'compro' ? 'buy' : l === 'vendo' ? 'sell' : l;
+  for (const k in tutti) {
+    const p = tutti[k];
+    if (!p || !p.mio || !provvisorioP2P(p.id)) continue;
+    if (P2P_FINALI.indexOf(p.stato) >= 0) continue;
+    if (kind(p.lato) !== o.lato) continue;
+    if (Math.round(Number(p.euro) || 0) !== Math.round(Number(o.euro) || 0)) continue;
+    if (Math.round(Number(p.euroMax) || 0) !== Math.round(Number(o.euroMax) || 0)) continue;
+    if (Math.round(Number(p.premium) || 0) !== Math.round(Number(o.premium) || 0)) continue;
+    const nato = Number(p.creato) || 0;
+    const quando = Number(o.creato) || 0;
+    if (!nato || !quando || quando < nato - 120 || quando - nato > P2P_ORIZZONTE_S) continue;
+    return p.id;
+  }
+  return '';
+}
+function ordineTuoP2P(id, o){
+  if (!id) return false;
+  if (ordineMioP2P(id)) return true;
+  if (typeof p2pVetrinaMiei !== 'undefined' && p2pVetrinaMiei.has(String(id))) return true;
+  return !!provvisorioDelLibroP2P(o || (typeof rigaLibroP2P === 'function' ? rigaLibroP2P(id) : null));
+}
 /* la riga del giro caduto si mette da parte SOTTO UN ALTRO NOME
    (`id~quando`), con `idVero` che ricorda l'ordine: resta in «I miei
    scambi» sotto «Annullati», libera la chiave vera per la presa nuova,
@@ -50776,11 +50831,20 @@ function contoDettP2P(o){
      domanda — il premio pende dalla mia parte? — e la traduzione del
      lato l'ha gia' fatta `comeLibroP2P`: quindi «richiesto» E'
      `affare`, senza una seconda tabella da tenere in pari. */
-  const nomePremio = !o.mio
-    ? (prem > 0 ? 'Premio al venditore' : 'Sconto del venditore')
-    : affare
-      ? (prem > 0 ? 'Premio richiesto' : 'Sconto richiesto')
-      : (prem > 0 ? 'Premio offerto' : 'Sconto offerto');
+  /* ⚠️ ROVESCIATO IL 28 SET 2026 (dalla prova di Alan, decisione di
+     Andrea): vendendo sats al suo «compra BTC» con −1% il conto diceva
+     «Sconto del venditore 1%» — ma il venditore era chi LEGGEVA. Un
+     primo giro diceva chi l'aveva scelto («Sconto chiesto da chi
+     compra»), e la tabella era ancora confusa. Adesso la riga dice il
+     SOLO EFFETTO per chi guarda, con la frase del badge delle card —
+     «X% più conveniente» / «X% meno conveniente», nient'altro — e sul
+     mio ordine torna il verbo di chi l'ha scelto, detto a me: «Premio
+     che hai richiesto», «Sconto che hai offerto» e i loro rovesci (il
+     «richiesto/offerto» qui sopra, in seconda persona). Il colore sta
+     sul numero, dal giudice di sempre (`affare`). Un giro intermedio
+     metteva sotto una nota col perche' («Chi compra chiede l'1% in meno
+     del mercato»): tolta, decisione di Andrea. `etichettaPremioP2P` e'
+     la frase, pura. */
   /* ⚠️ COL PREMIO DI BARATTOZON LA PERCENTUALE PORTAVA IL SEGNO
      (23 set 2026, richiesta di Andrea), perche' il numero era RICAVATO
      dal mercato di adesso e il segno diceva in un carattere da che
@@ -50788,9 +50852,7 @@ function contoDettP2P(o){
      riga e' la stessa degli altri ordini: il verso lo dice la PAROLA,
      «Premio» o «Sconto», come sulla card del libro. */
   const premio = ((!fisso && o.premium) || premioTab)
-    ? r(nomePremio
-        + ' <b class="' + (affare ? 'p2p-affare' : 'p2p-avviso') + '">'
-        + Math.abs(Math.round(prem)) + '%' + '</b>',
+    ? r(etichettaPremioP2P(o.mio, prem, affare),
         cifra('premio', prem > 0 ? '−' : '+'), 'premio')
     : '';
   /* ⚠️ SOTTO IL CONTO NON C'E' PIU' NIENTE, e ci sono voluti due
@@ -50866,6 +50928,21 @@ function contoDettP2P(o){
     + r(compro ? 'Totale da inviare' : 'Ricevi', cifreEuro, 'tot euro')
     + '</div>'
     + '</div>';
+}
+/* PURA: l'etichetta della riga del premio (28 set 2026, decisione di
+   Andrea). `mio` = chi legge l'ha pubblicato; `affare` = pende verso chi
+   legge (`affareP2P`, lo stesso giudice del badge). Per gli altri
+   l'effetto, con la frase del badge; per me quel che ho scelto: PREMIO o
+   SCONTO dal segno, RICHIESTO se pende verso di me e OFFERTO se pende
+   verso l'altro — il mio +2% da venditore l'ho richiesto, lo stesso +2%
+   da compratore l'ho offerto. Il colore sta sul numero, mai sulle
+   parole. */
+function etichettaPremioP2P(mio, prem, affare){
+  const num = '<b class="' + (affare ? 'p2p-affare' : 'p2p-avviso') + '">'
+    + Math.abs(Math.round(prem)) + '%</b>';
+  if (mio) return (prem > 0 ? 'Premio' : 'Sconto')
+    + (affare ? ' che hai richiesto ' : ' che hai offerto ') + num;
+  return num + (affare ? ' più' : ' meno') + ' conveniente';
 }
 /* LA RIGA DELLA CONVENIENZA A SATS FISSI (27 set 2026, richiesta di
    Andrea), in cima al conto del dettaglio e della pagina dello scambio:
@@ -50999,8 +51076,20 @@ function apriDettaglioP2P(id){
 function renderDettaglioP2P(){
   const box = el('p2pDettCorpo');
   if (!box) return;
-  const o = rigaLibroP2P(p2pDettOrdine);
-  if (!o) { box.innerHTML = '<div class="hint">Quest\'ordine non c\'è più.</div>'; return; }
+  const riga = rigaLibroP2P(p2pDettOrdine);
+  if (!riga) { box.innerHTML = '<div class="hint">Quest\'ordine non c\'è più.</div>'; return; }
+  /* IL MIO ORDINE SI GUARDA SOLTANTO, E DAL MIO LATO (28 set 2026, dalla
+     prova di Alan): la pagina lo chiede al giudice di tutti, qualunque
+     strada l'abbia aperta — anche il secondo dispositivo, dove l'ordine
+     lo sa solo il server. Al posto di «Compra/Vendi» dice di chi e', e
+     tutto il resto parla a chi l'ha pubblicato: il lato si gira come fa
+     `comeLibroP2P` per la pagina di uno scambio mio, e `mio` da' al
+     conto il nome di chi l'ha scelto («Sconto che hai richiesto 1%»).
+     Senza il giro, sul «compra BTC» di Alan la pagina diceva «Stai
+     vendendo sats» e parlava del suo sconto come di quello di un altro. */
+  const tuo = ordineTuoP2P(riga.id, riga);
+  const o = tuo ? Object.assign({}, riga, {lato: riga.lato === 'sell' ? 'buy' : 'sell', mio: true})
+    : riga;
   /* IL LATO LO DICE LA RIGA e non il tab, come su ogni card: il libro
      filtra per lato, quindi il risultato e' lo stesso — ma la pagina
      resta onesta anche aperta da un elenco non filtrato. */
@@ -51022,7 +51111,7 @@ function renderDettaglioP2P(){
      foglio Pubblica). Le parentesi non sono decorazione: `||` lega
      prima di `?:`, e leggerlo a occhio e' esattamente il modo in cui
      un domani qualcuno lo «sistema» al contrario. */
-  const manca = (p2pDettMetodo || !(o.metodi && o.metodi.length > 1))
+  const manca = (tuo || p2pDettMetodo || !(o.metodi && o.metodi.length > 1))
     ? '' : 'Scegli con quale metodo vuoi ' + (compro ? 'inviare' : 'ricevere') + ' gli euro.';
   /* IL CORPO COMINCIA DAL METODO, e sopra non c'e' piu' niente: il
      prezzo e la quantita' sono scesi nel conto scorporato (dove ogni
@@ -51030,11 +51119,12 @@ function renderDettaglioP2P(){
      resta e' l'ordine dei gesti — come pago, con chi ho a che fare,
      quanto tempo resta, quanto viene. */
   box.innerHTML =
+    (tuo ? '<div class="p2p-box p2p-tuo">È il tuo ordine: l\'hai pubblicato tu, e non si può prendere.</div>' : '') +
     metodiDettP2P(o) +
     notaTabacchinoDettP2P(o) +
     repRiquadroP2P(p2pFacce[o.id]) +
     anelloneP2P(o) +
-    avvisoPresaTabacchinoP2P(o) +
+    (tuo ? '' : avvisoPresaTabacchinoP2P(o)) +
     /* IL CONTO SCORPORATO sotto l'anello: il calco del foglio «Paga»
        del mercatino, righe nome/cifra e le due in evidenza. */
     contoDettP2P(o) +
@@ -51072,12 +51162,16 @@ function renderDettaglioP2P(){
       : '') +
     '<div class="hint" id="p2pDettManca" style="color:var(--danger);font-weight:800'
       + (manca ? '' : ';display:none') + '">' + esc(manca) + '</div>' +
-    '<div class="foglio-piede">' +
+    (tuo
+      ? '<div class="foglio-piede sola" id="p2pDettTuoPiede">' +
+          '<button type="button" class="btn ghost" onclick="navIndietro()">Indietro</button>' +
+        '</div>'
+      : '<div class="foglio-piede">' +
       '<button type="button" class="btn ghost" onclick="navIndietro()">Annulla</button>' +
       '<button type="button" class="btn orange" id="p2pDettVai"' +
         (manca ? ' disabled' : '') + ' onclick="confermaDettaglioP2P()">' +
         (compro ? 'Compra' : 'Vendi') + '</button>' +
-    '</div>';
+    '</div>');
 }
 /* IL «COMPRA» E' LA CONFERMA, e da qui in poi la strada e' quella di
    sempre: su un intervallo si passa dal foglio «Quanto» (una
@@ -51113,7 +51207,16 @@ function prendiOrdineP2P(id){
   /* la riga di una presa caduta si mette da parte e si prende da capo
      (25 set 2026): l'ordine nel libro e' di nuovo di nessuno */
   if (giroCadutoP2P(gia)) archiviaGiroCadutoP2P(id);
-  else if (gia) { apriOrdineP2P(id); return; }
+  else if (gia) {
+    if (gia.mio) toast('È il tuo ordine');
+    apriOrdineP2P(id);
+    return;
+  }
+  /* IL NOME CHE NON E' ARRIVATO (28 set 2026, dalla prova di Alan):
+     l'ordine del libro e' il mio rimasto col nome provvisorio — si apre
+     la SUA pagina, quella del mio ordine, invece di provare a prenderlo */
+  const prov = provvisorioDelLibroP2P(rigaLibroP2P(id));
+  if (prov) { toast('È il tuo ordine'); apriOrdineP2P(prov); return; }
   /* MIO MA NON IN LISTA: l'ordine e' di questo profilo, e qui non c'e'
      uno scambio da aprire — ma prenderlo no. ⚠️ E NON SI DICE DA DOVE
      E' NATO (set 2026, dal campo): l'assenza della riga locale non
@@ -51122,7 +51225,11 @@ function prendiOrdineP2P(id){
      un'altra scheda), e la frase vecchia era una bugia osservata. Si
      dice il fatto che regge in tutti i casi; ad aprirlo davvero sara'
      la ripresa delle fasi successive. */
-  if (ordineMioP2P(id)) { toast('Questo ordine è tuo: da questo dispositivo, per ora, si guarda soltanto'); return; }
+  /* ...E DAL 28 SET 2026 SI APRE LA SUA PAGINA, e dice «È il tuo
+     ordine» invece del bottone che lo prenderebbe (`renderDettaglioP2P`
+     lo chiede allo stesso giudice): anche quando a saperlo e' solo il
+     server, cioe' l'ordine pubblicato da un altro dispositivo */
+  if (ordineTuoP2P(id)) { toast('È il tuo ordine'); apriDettaglioP2P(id); return; }
   /* ⚠️ DA QUI IN POI NON SI CHIEDE PIU' NIENTE IN UN FOGLIETTO (set
      2026, ridisegno): si apre la PAGINA del dettaglio, e la conferma
      sono i suoi due bottoni in fondo. Le guardie restano QUI — sono
@@ -51150,11 +51257,11 @@ async function eseguiPresaP2P(id, scelto, metodo){
   if ((!p2pLibro || p2pLibro.copia) && !(await aspettaLibroVeroP2P(null))) return;
   if (giroCadutoP2P(ordiniP2P()[id])) archiviaGiroCadutoP2P(id);
   if (ordiniP2P()[id]) {
-    toast('Questo ordine è tuo: non puoi prenderlo');
+    toast('È il tuo ordine: non puoi prenderlo');
     apriOrdineP2P(id);
     return;
   }
-  if (ordineMioP2P(id)) { toast('Questo ordine è tuo: non puoi prenderlo'); return; }
+  if (ordineTuoP2P(id)) { toast('È il tuo ordine: non puoi prenderlo'); return; }
   const riga = ((p2pLibro && p2pLibro.ordini) || []).find(x => x.id === id);
   if (!riga) { toast('Quest\'ordine non c\'è più: aggiorna il libro'); return; }
   const adesso = Math.floor(Date.now() / 1000);
@@ -54343,10 +54450,18 @@ function rigaTettoFeeP2P(){
     const piena = mezzaCommissioneP2P(commissioneVivaP2P());
     /* «la fee P2P», lo stesso nome della riga del conto (25 set
        2026): era «la commissione di Barattolo» */
+    /* ⚠️ E IN FONDO LA CIFRA CHE SI PAGA (28 set 2026, ritocco di
+       Andrea dalla prova di Alan, che ROVESCIA qui il «mai la cifra
+       finale» del 25): «…e tu hai uno sconto dello 0,5%, quindi paghi
+       l'1% di fee». Il numero e' `q`, la meta' della fee MIA — la viva
+       di mostro meno lo sconto del config (`feeMiaP2P`) —, mai scritto a
+       mano: il giorno che la fee cambia sul nodo cambia con lei. Senza
+       sconto la frase resta com'era, che la cifra e' gia' quella. */
     pezzi.push(mia
       ? 'la fee P2P è ' + articoloPercentoP2P(piena)
         + piena + '% per parte, e tu hai uno '
         + scontoFedeltaTestoP2P(p2pSconto.punti)
+        + ', quindi paghi ' + articoloDetPercentoP2P(q) + q + '% di fee'
       : 'la fee P2P è ' + articoloPercentoP2P(q)
         + q + '% per parte');
   }
@@ -54401,6 +54516,14 @@ function articoloPercentoP2P(testo){
    LA SCATOLA CADE COL SILENZIO DEL COORDINATORE: senza il 38385 la
    riga dei numeri non nasce, e una scatola vuota col solo titolo
    direbbe che qualcosa manca. Niente riga, niente scatola. */
+/* L'ARTICOLO SENZA LA PREPOSIZIONE, dallo stesso giudice (28 set
+   2026): «paghi l'1%», «il 2%», «lo 0,5%». Si legge da
+   `articoloPercentoP2P` invece di ribattere la sua tabella: una
+   seconda lista di vocali un giorno direbbe «paghi il 1%». */
+function articoloDetPercentoP2P(testo){
+  const a = articoloPercentoP2P(testo);
+  return a === 'dello ' ? 'lo ' : a === 'del ' ? 'il ' : 'l\'';
+}
 function riquadroLimitiP2P(){
   const riga = rigaTettoFeeP2P();
   return riga ? sezioneNuovoP2P({
@@ -57994,6 +58117,10 @@ async function chiediFotoLibroP2P(){
      sessione: non sono un volto, sono il metro di un premio che sta
      gia' sulla card (26 set 2026) */
   const cambi = prendiCambiPubP2P(d && d.cambi);
+  /* ...e i miei secondo il server (28 set 2026): la stessa lista della
+     fila della home, che il libro prima ignorava — e cosi' un ordine
+     pubblicato da un altro dispositivo qui sembrava di un altro */
+  if (d && Array.isArray(d.miei)) p2pVetrinaMiei = new Set(d.miei.map(String));
   const eventi = Array.isArray(d && d.eventi) ? d.eventi : [];
   const quando = (Number(d && d.quando) || 0) * 1000;
   if (p2pLibro || !eventi.length || !(quando > 0)
@@ -58342,8 +58469,10 @@ function vetrinaNudaP2P(){
    account, che l'ordine non l'ha scritto da se'). Il taglio a
    P2P_VETRINA_MAX viene DOPO: i posti sono tutti per gli altri, e una
    fila di soli miei resta vuota e sparisce col suo titolo. */
-function mioInVetrinaP2P(id){
-  return p2pVetrinaMiei.has(id) || ordineMioP2P(id);
+function mioInVetrinaP2P(id, o){
+  /* i tre «mio» di `ordineTuoP2P` (28 set 2026): anche quello rimasto
+     col nome provvisorio, che si riconosce dall'ordine intero */
+  return ordineTuoP2P(id, o);
 }
 /* PURA: gli ordini da mostrare, dal piu' nuovo. Le stesse regole del
    libro (vivi, non scaduti, non lapidati): e' il libro, ristretto — e
@@ -58354,7 +58483,7 @@ function ordiniVetrinaP2P(libro, adesso, mio){
   const base = (libro && Array.isArray(libro.ordini)) ? libro.ordini : [];
   return base
     .filter(o => o && o.id && o.stato === 'pending'
-                 && !(o.scade && o.scade <= adesso) && !lapidataP2P(o.id) && !mio(o.id))
+                 && !(o.scade && o.scade <= adesso) && !lapidataP2P(o.id) && !mio(o.id, o))
     .sort((a, b) => (b.creato || 0) - (a.creato || 0))
     .slice(0, P2P_VETRINA_MAX);
 }

@@ -35271,3 +35271,96 @@ riconosceranno solo dal VPS o a mano); che `mostro.db` si apra in
 di 90 secondi. E la riga delle SETTE COSE APERTE sulla riconciliazione
 LND↔Mostro: questo cantiere ne fa la meta' dei pagamenti in USCITA, ora
 per ora; gli incassi restano di `orfani.py`.
+I ritocchi P2P dalla prova di Alan (28 set 2026, tre richieste di
+Andrea). **1) LA CIFRA CHE SI PAGA:** la frase del riquadro «Quanto si
+può, e quanto costa» finisce con «…e tu hai uno sconto dello 0,5%,
+quindi paghi l'1% di fee» — ROVESCIA per questa frase il «mai la cifra
+finale» del 25 set. Il numero e' la meta' della fee MIA (`feeMiaP2P`,
+la viva meno lo sconto), mai scritto; l'articolo («l'1%», «il 2%», «lo
+0,5%») lo da' `articoloDetPercentoP2P`, letto da `articoloPercentoP2P`
+e non ribattuto. Senza sconto la frase resta com'era.
+**2) «È IL TUO ORDINE».** Il «compra BTC» di Alan stava nella fila della
+home col «?» al posto del volto, e sul SUO telefono come un ordine da
+prendere: ha toccato «Vendi» per continuarlo. **IL PERCHE'**, due strade
+per lo stesso buco: l'autore lo scriveva solo `/api/p2p/ordini`, che il
+telefono manda da solo e senza aspettarlo — se non arriva, o arriva
+dopo il giro subito della fotografia, volto e `autori` mancano fino al
+giro del minuto; e se la risposta del coordinatore alla pubblicazione
+si perde, il telefono ha l'ordine sotto il nome provvisorio, non parte
+ne' `/p2p/ordini` ne' il canale, e nessuno sa di chi e'. Il journal
+del VPS non l'ho visto: quale delle due sia capitata ad Alan resta da
+leggere (`p2p_ordini` di quell'ordine). **LA CURA:** il server scrive
+chi ha pubblicato anche dal canale, PRIMA della fotografia
+(`_intesta_dal_canale_p2p`, lo stesso `_registra_ordini_p2p` con
+`pubblicati`: vince il primo, un mostrod che conosce un altro maker
+rifiuta, fail-open), e ogni intestazione — canale, `/p2p/ordini`, la
+restore di un altro dispositivo — rifa' dalla memoria volti, autori e
+cambi della fotografia (`_rinfresca_volti_foto_p2p`, solo se l'ordine e'
+fotografato). Il client ha UN giudice, `ordineTuoP2P`: l'archivio, i
+`miei` del server (ora li legge anche la fotografia del libro) e il
+nome rimasto provvisorio (`provvisorioDelLibroP2P`: stesso lato, cifra,
+intervallo e premio, nato dopo il mio e dentro l'orizzonte, SOLO su un
+ordine senza volto — appena il server sa l'autore la somiglianza non
+vale piu'). Lo chiedono la fila, la card del libro, il tocco, la
+cintura della presa e il dettaglio. Il tocco sul mio ordine dice «È il
+tuo ordine» e apre la SUA pagina (quella del mio scambio, o quella del
+nome provvisorio); se l'ordine lo sa solo il server, il dettaglio
+parla dal mio lato («Stai comprando sats», «Sconto che hai richiesto»), ha in
+cima il cartello «È il tuo ordine: l'hai pubblicato tu, e non si può
+prendere.» e il solo «Indietro». **SCARTATA:** adottare il provvisorio
+per somiglianza (rinominarlo col nome del libro): un ordine uguale di
+un altro diventerebbe mio, con la chiave sbagliata. **E UN BUCO
+RESTA, DICHIARATO:** risposta persa E secondo dispositivo con la
+restore fatta prima della pubblicazione — li' nessuno lo sa finche' la
+restore non riparte.
+**3) LA RIGA DEL PREMIO DICE L'EFFETTO PER CHI GUARDA:** vendendo sats al
+«compra BTC» di Alan a −1% il conto diceva «Sconto del venditore 1%», e
+il venditore era chi leggeva. Un primo giro diceva chi l'aveva scelto
+(«Sconto chiesto da chi compra»), e Andrea l'ha trovato ancora confuso:
+la decisione e' la frase del badge delle card, «X% più conveniente» /
+«X% meno conveniente», col colore sul numero (verde se e' un affare per
+chi guarda, rosso se ci perde), senza dire chi l'ha chiesto e senza
+nessuna riga sotto. Sul mio ordine, nel dettaglio e nel conto, quel che
+ho scelto: «Premio che hai richiesto X%» (vendo, +), «Sconto che hai
+offerto X%» (vendo, −), «Premio che hai offerto X%» (compro, +),
+«Sconto che hai richiesto X%» (compro, −) — richiesto se pende verso di
+me, offerto se pende verso l'altro. **DUE GIRI INTERMEDI SCARTATI**
+dopo averli visti: «Il tuo prezzo: X% sopra/sotto il mercato» sul mio,
+e sotto la riga degli altri una nota grigia col perche' («Chi compra
+chiede l'1% in meno del mercato», che a 320 px stava su una riga solo
+accorciata).
+`etichettaPremioP2P` (pura) e' la frase, il giudice del colore e' quello
+di sempre (`affareP2P`). La riga del confronto a prezzo fisso di
+Barattozon («Premio scelto · Al prezzo di adesso») resta com'era.
+**SCARTATE:** «Premio al venditore» (dice chi e' il venditore, non chi
+l'ha scelto) e «chiesto/offerto da chi vende/compra» (vero, ma da
+decifrare). **PROVATO.**
+`prove_ritocchi_prova_alan` (25): il canale che intesta prima della
+fotografia, sul database vero il volto subito e l'autore, chi arriva
+dopo non ruba, `/p2p/ordini` dopo il giro che porta il volto col
+rinfresco, niente database per ordini non fotografati, fail-open; in
+node il tocco sui sei casi (mio qui, dal server, dalla restore, col
+nome provvisorio, di un altro, che sto prendendo), la somiglianza su
+tredici, l'etichetta del premio nei quattro casi degli altri e nei
+quattro miei, e gli articoli. Emendate col perche'
+`prove_p2p_dettaglio` (nomi del conto, il dettaglio del mio ordine),
+`prove_card_p2p_vetrina` (il provvisorio fuori dalla fila),
+`prove_livello_accanto_al_titolo` (la frase), la sentinella dei
+chiamanti del giudice, la porta e la cintura di «lo schermo segue
+mostro». Tortura 17 su 17. Suite intera severa senza config nel
+worktree ribasato su origin/main (311f841): 16.860 verdi e 0 rosse; i
+25 collaudi della CI verdi nella gabbia. **DAL VIVO**,
+CDP a 375 px nei due temi, relay di cartone su 127.0.0.1 e server
+dalla copia: Alan pubblica e al server arriva SOLO il canale — Bea vede
+la card dopo 0,3-0,5 s col volto «A»; nella home di Alan non c'e'; sul
+suo secondo dispositivo (archivio vuoto) nemmeno, il libro dice «È il
+tuo ordine» e il tocco apre la sua pagina (lo scambio adottato dal
+server, o il dettaglio dal suo lato senza bottone, secondo chi arriva
+prima), e il dettaglio del suo ordine dice «Sconto che hai richiesto
+1%» in verde; Bea tocca e il conto dice «1% meno conveniente», col
+numero rosso e niente sotto;
+con la risposta persa Bea vede la card col «?» (nessuno sa l'autore) e
+Alan no, e il suo tocco dal libro apre «nuovo:9»; la frase dice
+«quindi paghi l'1% di fee». Nessun errore dell'app, nessuno scorrimento
+laterale. **DA AVERE:** i due telefoni veri, e la riga di
+`p2p_ordini` dell'ordine di Alan sul VPS.

@@ -41534,6 +41534,11 @@ async def registra_ordini_p2p(req: Request, x_tg_init_data: str = Header(""),
                                        or esito.get("confermate")
                                        or esito.get("in_attesa")):
         raise HTTPException(403, "Non risulti fra le due parti di questo scambio")
+    # I VOLTI DELLA FOTOGRAFIA SI RIFANNO SUBITO (28 set 2026, dalla prova
+    # di Alan): chi arriva dopo il giro della fotografia — questa rotta e
+    # il canale partono insieme e senza un ordine fra loro, e la restore
+    # di un altro dispositivo arriva quando arriva — non aspetta il minuto
+    _rinfresca_volti_foto_p2p((d or {}).get("ordini"))
     return {"ok": True, **esito}
 
 
@@ -42830,7 +42835,21 @@ async def annuncia_ordine_p2p_canale(req: Request,
     # aspettare, e riprova solo se la prima lettura non lo porta. Un id
     # storto o assente vale «nessuno»: il giro c'e' lo stesso.
     ordine = str(d.get("ordine") or "")
-    _foto_subito_p2p(ordine if FORMA_ORDINE_P2P.fullmatch(ordine) else "")
+    buono = bool(FORMA_ORDINE_P2P.fullmatch(ordine))
+    # ⚠️ E CHI L'HA PUBBLICATO SI SCRIVE QUI, PRIMA DELLA FOTOGRAFIA (28
+    # set 2026, dalla prova di Alan: un suo «compra BTC» stava nella fila
+    # della home col «?» al posto del volto, e sul suo telefono come un
+    # ordine da prendere). L'autore lo scriveva solo /api/p2p/ordini, che
+    # il telefono manda da solo e SENZA aspettarlo: se non arriva — o
+    # arriva dopo il giro subito — la fotografia nasce senza volto e
+    # senza `autori`, e la fila lo mostra anche a chi l'ha pubblicato
+    # fino al giro del minuto. Qui la sessione c'e' e l'id pure: e' la
+    # stessa dichiarazione («l'ho pubblicato io»), con lo stesso giudice
+    # e la stessa regola del primo che arriva, fatta nel solo momento
+    # in cui il server sa che l'ordine e' appena nato.
+    if buono:
+        _intesta_dal_canale_p2p(user["id"], ordine)
+    _foto_subito_p2p(ordine if buono else "")
     # il premio di Barattozon (26 set 2026): solo sul tabacchino, e solo
     # un INTERO della scala del cursore — «2.5», «10» fra virgolette o un
     # booleano sono storti. Sugli altri metodi si ignora: il loro premio
@@ -44441,6 +44460,56 @@ def _autori_foto_p2p(eventi) -> dict:
         return {r["ordine"]: int(r["tg_id"]) for r in righe}
     finally:
         con.close()
+
+
+def _rinfresca_volti_foto_p2p(ordini=None) -> bool:
+    """Rifa' dalla memoria i volti, gli autori e i cambi della
+    fotografia, SENZA rileggere i relay (28 set 2026, dalla prova di
+    Alan): li chiamano le due strade che scrivono chi ha pubblicato —
+    /api/p2p/ordini e il canale — perche' la fila «Scambi P2P» sappia
+    subito di chi e' un ordine gia' fotografato. Con `ordini` si rifa'
+    solo se almeno uno di quelli e' nella fotografia: il client rimanda
+    le sue liste a ogni sessione, e tre query per ordini che la
+    fotografia non porta sarebbero lavoro per niente. Torna vero se ha
+    rifatto."""
+    F = _P2P_FOTO
+    if not F.get("eventi"):
+        return False
+    if ordini is not None:
+        if not isinstance(ordini, list):
+            return False
+        if not any(isinstance(o, str) and _foto_ha_ordine_p2p(o)
+                   for o in ordini[:MAX_ORDINI_P2P]):
+            return False
+    try:
+        F["facce"] = _facce_foto_p2p(F["eventi"], int(time.time()))
+        F["cambi"] = _cambi_foto_p2p(F["eventi"])
+        F["autori"] = _autori_foto_p2p(F["eventi"])
+    except Exception as e:
+        print(f"⚠️ Fotografia del libro, volti non rifatti: {e}", flush=True)
+        return False
+    return True
+
+
+def _intesta_dal_canale_p2p(tg_id: int, ordine: str) -> None:
+    """«L'ho appena pubblicato io», detto dal canale (28 set 2026): la
+    stessa scrittura di /api/p2p/ordini con `pubblicati`, quindi lo
+    stesso giudice (`_registra_ordini_p2p`: il primo che arriva resta,
+    e un ordine di cui mostrod conosce un altro maker non si intesta).
+    Fail-open come il post del canale: un'intestazione saltata non deve
+    rompere il gesto, e /api/p2p/ordini resta l'altra strada."""
+    try:
+        con = db()
+        try:
+            _registra_ordini_p2p(con, int(tg_id), [ordine], int(time.time()),
+                                 pubblicati=True)
+        finally:
+            con.close()
+    except Exception as e:
+        print(f"⚠️ P2P: l'autore di {ordine[:8]} non si e' scritto dal canale: {e}",
+              flush=True)
+        return
+    _rinfresca_volti_foto_p2p([ordine])
 
 
 def _cambi_foto_p2p(eventi) -> dict:

@@ -6979,6 +6979,24 @@
   del libro) veste solo quel che parla del tab: logo, nav, il + e il
   foglio «Pubblica». Verbale: CANTIERI, «I colori del dettaglio aperto
   dalla vetrina».
+  «È IL TUO ORDINE», UN GIUDICE SOLO (28 set 2026): `ordineTuoP2P(id,
+  o)` e' mio se lo sa il dispositivo (`ordineMioP2P`), se lo dice il
+  server (`miei` della fotografia, che ora legge anche il libro) o se e'
+  il mio rimasto col nome provvisorio (`provvisorioDelLibroP2P`: stesso
+  lato, cifra e premio, nato dopo, SOLO su un ordine senza volto). Lo
+  chiedono la fila, la card del libro, il tocco (`prendiOrdineP2P`:
+  «È il tuo ordine» e la sua pagina), la cintura della presa e il
+  dettaglio, che sul mio ordine parla dal mio lato e non ha il bottone
+  per prenderlo. Sul server chi ha pubblicato si scrive anche da
+  `/api/p2p/canale`, PRIMA della fotografia (`_intesta_dal_canale_p2p`,
+  stesso giudice di `/api/p2p/ordini`), e ogni intestazione rifa' dalla
+  memoria volti, autori e cambi della fotografia
+  (`_rinfresca_volti_foto_p2p`). La riga del premio nel conto dice
+  l'effetto per chi guarda con la frase del badge («X% più/meno
+  conveniente», colore sul numero, niente sotto), e sul mio ordine quel
+  che ho scelto: «Premio/Sconto che hai richiesto» se pende verso di me,
+  «che hai offerto» se pende verso l'altro (`etichettaPremioP2P`). Verbale: CANTIERI,
+  «I ritocchi P2P dalla prova di Alan».
   IL CORO DEI RELAY (16 set 2026, la gamba VIVA del P2P): la
   connessione con cui il client parla col coordinator — richieste,
   risposte, restore, recapiti, via di riserva — non e' piu' UN relay

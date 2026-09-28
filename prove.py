@@ -52204,6 +52204,300 @@ const out = {};
           ["p2pLatoCompro", "esempio:compro", "p2pLatoVendo", "esempio:vendo"], o["desktop"])
 
 
+def prove_ritocchi_prova_alan():
+    """I RITOCCHI P2P DALLA PROVA DI ALAN (28 set 2026), tre cose.
+    1) La frase della fee dice in fondo la cifra che si paga — «…e tu
+    hai uno sconto dello 0,5%, quindi paghi l'1% di fee» —, letta e mai
+    scritta a mano; l'articolo esce dal giudice di sempre.
+    2) «È il tuo ordine»: Alan ha visto il suo «compra BTC» nella fila
+    della home, col «?» al posto del volto, e l'ha toccato per
+    continuarlo. Il server scrive chi ha pubblicato anche dal canale,
+    PRIMA della fotografia, e rifa' i volti della fotografia appena
+    qualcuno lo dichiara; il client ha UN giudice (`ordineTuoP2P`) per
+    la fila, il libro, il tocco, la cintura e il dettaglio — compreso
+    l'ordine rimasto col nome provvisorio, che il server non conosce.
+    3) Il nome del premio dice chi l'ha scelto e a favore di chi. Le
+    prove del conto intero stanno in `prove_p2p_dettaglio`; qui la
+    tabella."""
+    print("\n[i ritocchi P2P dalla prova di Alan]")
+    import json as _js
+    import shutil as _sh
+    import sqlite3 as _sq
+    import subprocess as _sp
+    import tempfile as _tf
+    import time as _time
+    mini = open("miniapp.html", encoding="utf-8").read()
+
+    # --- 1) IL SERVER: chi ha pubblicato si sa subito ---------------------
+    can = pezzo("annuncia_ordine_p2p_canale")
+    prova("il canale scrive chi ha pubblicato PRIMA di chiedere la fotografia, "
+          "e dopo le guardie", True,
+          can.index('raise HTTPException(\n            400, "Amazon')
+          < can.index('_intesta_dal_canale_p2p(user["id"], ordine)')
+          < can.index('_foto_subito_p2p(ordine if buono else "")'))
+    prova("...e solo con un id nella forma di mostro", True,
+          "buono = bool(FORMA_ORDINE_P2P.fullmatch(ordine))" in can
+          and "    if buono:\n        _intesta_dal_canale_p2p(" in can)
+    rot = pezzo("registra_ordini_p2p")
+    prova("/api/p2p/ordini rifa' i volti della fotografia prima di rispondere", True,
+          0 < rot.index('_rinfresca_volti_foto_p2p((d or {}).get("ordini"))')
+          < rot.index('return {"ok": True, **esito}'))
+
+    i_t = _SORGENTE.index("CREATE TABLE IF NOT EXISTS p2p_ordini(")
+    tabella = _SORGENTE[i_t:_SORGENTE.index("\n    );", i_t) + len("\n    );")]
+    cartella = _tf.mkdtemp()
+    try:
+        f_db = os.path.join(cartella, "p.db")
+        c = _sq.connect(f_db)
+        # la tabella VERA, da init_db; degli utenti le sole colonne del volto
+        c.executescript(tabella + """
+            CREATE TABLE utenti(tg_id INTEGER PRIMARY KEY, nome TEXT, rating REAL,
+              n_feedback INTEGER, negozio TEXT, username TEXT, registrato INTEGER,
+              avatar_scelta TEXT, avatar TEXT);
+            INSERT INTO utenti VALUES(111, 'Alan', 4.9, 7, 'alan', 'alan_tg', 0, '', 'av_alan.jpg');
+            INSERT INTO utenti VALUES(222, 'Bea', 0, 0, '', '', 0, 'nessuna', 'av_bea.jpg');
+        """)
+        c.commit()
+        c.close()
+        CHIAMATE = []
+
+        def _db():
+            CHIAMATE.append(1)
+            k = _sq.connect(f_db)
+            k.row_factory = _sq.Row
+            return k
+        STAMPE = []
+        amb = {"db": _db, "re": re, "time": _time, "sqlite3": _sq,
+               "print": lambda *a, **k: STAMPE.append(" ".join(map(str, a)))}
+        for riga in ("FORMA_ORDINE_P2P = ", "MAX_ORDINI_P2P = ", "P2P_CAMBIO_PUB_SCARTO = "):
+            i = _SORGENTE.index("\n" + riga) + 1
+            exec(_SORGENTE[i:_SORGENTE.index("\n", i)], amb)
+        for nome in ("_tag_evento_p2p", "_ordini_puliti_p2p", "_parti_mostro_p2p",
+                     "_cambio_pub_buono", "_registra_ordini_p2p", "_facce_ordini_p2p",
+                     "_cambi_pub_p2p", "_facce_foto_p2p", "_autori_foto_p2p",
+                     "_cambi_foto_p2p", "_foto_ha_ordine_p2p",
+                     "_rinfresca_volti_foto_p2p", "_intesta_dal_canale_p2p"):
+            exec(pezzo(nome), amb)
+        EV = lambda d: {"kind": 38383, "created_at": 1, "tags": [["d", d]]}
+        # la fotografia ha GIA' l'ordine appena pubblicato (il giro subito e'
+        # arrivato prima di /p2p/ordini), senza volto e senza autore: e' il
+        # caso di Alan
+        F = {"eventi": [EV("alan0001-buy"), EV("altro002-sell")],
+             "facce": {}, "cambi": {}, "autori": {}}
+        amb["_P2P_FOTO"] = F
+        amb["_intesta_dal_canale_p2p"](111, "alan0001-buy")
+        prova("APPENA PUBBLICATO, dal canale: il volto c'e' subito e l'ordine e' suo "
+              "(i `miei` della rotta escono da `autori`)",
+              [{"nome": "Alan", "avatar": "av_alan.jpg", "media": 4.9, "voti": 7,
+                "negozio": "alan"}, {"alan0001-buy": 111}],
+              [F["facce"].get("alan0001-buy"), F["autori"]])
+        k = _db()
+        r = k.execute("SELECT tg_id, maker FROM p2p_ordini WHERE ordine='alan0001-buy'").fetchone()
+        k.close()
+        prova("...ed e' la stessa scrittura di /p2p/ordini con «pubblicati»: autore e maker",
+              [111, 1], [r["tg_id"], r["maker"]])
+        amb["_intesta_dal_canale_p2p"](222, "alan0001-buy")
+        prova("...e chi lo dichiara dopo (l'id si legge dal libro pubblico) non se lo prende",
+              {"alan0001-buy": 111}, F["autori"])
+        # /p2p/ordini arriva DOPO il giro della fotografia: il suo rinfresco
+        # porta il volto subito, senza relay e senza aspettare il minuto
+        k = _db()
+        amb["_registra_ordini_p2p"](k, 222, ["altro002-sell"], 5, pubblicati=True)
+        k.close()
+        prima = "altro002-sell" in F["facce"]
+        rifatto = amb["_rinfresca_volti_foto_p2p"](["altro002-sell"])
+        prova("/p2p/ordini DOPO LA FOTOGRAFIA: prima niente volto, col rinfresco il "
+              "volto (senza la foto di chi l'ha tolta) e l'autore",
+              [False, True, "Bea", "", 222],
+              [prima, rifatto, F["facce"]["altro002-sell"]["nome"],
+               F["facce"]["altro002-sell"]["avatar"], F["autori"].get("altro002-sell")])
+        n = len(CHIAMATE)
+        prova("...ma per ordini che la fotografia non porta non tocca il database",
+              [False, False, False, 0],
+              [amb["_rinfresca_volti_foto_p2p"](["fuorifoto-99"]),
+               amb["_rinfresca_volti_foto_p2p"]("storto"),
+               amb["_rinfresca_volti_foto_p2p"]([]), len(CHIAMATE) - n])
+        amb["_P2P_FOTO"] = {"eventi": [], "facce": {}, "cambi": {}, "autori": {}}
+        prova("...e con la fotografia vuota nemmeno", [False, 0],
+              [amb["_rinfresca_volti_foto_p2p"](None), len(CHIAMATE) - n])
+        amb["_P2P_FOTO"] = F
+
+        def _giu():
+            raise _sq.OperationalError("database giu'")
+        amb["db"] = _giu
+        STAMPE.clear()
+        try:
+            amb["_intesta_dal_canale_p2p"](111, "alan0003-buy")
+            alzato = False
+        except Exception:
+            alzato = True
+        prova("FAIL-OPEN: col database giu' il canale non si ferma, e il journal lo dice",
+              [False, True], [alzato, any("non si e' scritto dal canale" in x for x in STAMPE)])
+    finally:
+        _sh.rmtree(cartella, ignore_errors=True)
+
+    # --- 2) IL CLIENT: un giudice, e dove lo chiedono ---------------------
+    def fn(firma):
+        return pezzo_js(mini, firma, "\n}\n") + "\n}\n"
+    prova("la card del libro, la fila, la cintura e il dettaglio chiedono al giudice unico",
+          [True, True, True, True, True],
+          ["const mio = ordineTuoP2P(o.id, o);" in fn("function rigaOrdineP2P(o){"),
+           "return ordineTuoP2P(id, o);" in fn("function mioInVetrinaP2P(id, o){"),
+           "!mio(o.id, o))" in fn("function ordiniVetrinaP2P(libro, adesso, mio){"),
+           "if (ordineTuoP2P(id)) { toast('È il tuo ordine: non puoi prenderlo'); return; }"
+           in fn("async function eseguiPresaP2P(id, scelto, metodo){"),
+           "const tuo = ordineTuoP2P(riga.id, riga);" in fn("function renderDettaglioP2P(){")])
+    prova("...e la fotografia del libro porta anche lei i miei secondo il server",
+          True, "if (d && Array.isArray(d.miei)) p2pVetrinaMiei = new Set(d.miei.map(String));"
+          in fn("async function chiediFotoLibroP2P(){"))
+
+    node = _sh.which("node")
+    if not node:
+        salta("il banco dei ritocchi dalla prova di Alan gira in node", "node non c'e'")
+        return
+    righe = []
+    for r0 in ("const P2P_FINALI = ", "const P2P_RESTORE_CHIUSI = ",
+               "const P2P_ORIZZONTE_S = ", "function provvisorioP2P(id){"):
+        i = mini.index(r0)
+        righe.append(mini[i:mini.index("\n", i)])
+    banco = "\n".join(righe) + "\n" + "".join(fn(x) for x in (
+        "function giroCadutoP2P(o){", "function ordineMioP2P(id){",
+        "function provvisorioDelLibroP2P(o){", "function ordineTuoP2P(id, o){",
+        "function prendiOrdineP2P(id){", "function affareP2P(o){",
+        "function etichettaPremioP2P(mio, prem, affare){",
+        "function articoloPercentoP2P(testo){", "function articoloDetPercentoP2P(testo){")) + r"""
+let DEMO = false, VETRINA = false, myTgId = 111;
+const INVITO_ONION = {p2p: ''};
+function invitoTelegram(){ LOG.push('telegram'); }
+function haptic(){}
+const LOG = [];
+function toast(t){ LOG.push('toast:' + t); }
+function apriOrdineP2P(id){ LOG.push('apri:' + id); }
+function apriDettaglioP2P(id){ LOG.push('dett:' + id); }
+function archiviaGiroCadutoP2P(id){ LOG.push('archivia:' + id); delete RIGHE[id]; }
+let RIGHE = {}, p2pMieiOrdini = {}, p2pVetrinaMiei = new Set(), p2pFacce = {}, p2pLibro = {ordini: []};
+function ordiniP2P(){ return RIGHE; }
+function rigaLibroP2P(id){ return p2pLibro.ordini.find(o => o.id === id) || null; }
+const ADESSO = Math.floor(Date.now() / 1000);
+const L = (id, extra) => Object.assign({id, lato: 'buy', stato: 'pending', euro: 25, euroMax: 0,
+  sats: 0, premium: -1, metodi: ['Revolut'], creato: ADESSO - 20}, extra || {});
+const prov = extra => Object.assign({id: 'nuovo:3', mio: true, lato: 'compro', stato: 'senza_risposta',
+  euro: 25, euroMax: 0, premium: -1, creato: ADESSO - 30}, extra || {});
+const tocco = id => { LOG.length = 0; prendiOrdineP2P(id); return LOG.slice(); };
+const out = {};
+/* IL TOCCO */
+p2pLibro = {ordini: [L('mio1'), L('srv1'), L('rest1'), L('alan1'), L('altro1'), L('presa1')]};
+RIGHE = {mio1: {id: 'mio1', mio: true, stato: 'pubblicato'}};
+out.mioQui = tocco('mio1');
+RIGHE = {};
+p2pVetrinaMiei = new Set(['srv1']);
+out.dalServer = tocco('srv1');
+p2pVetrinaMiei = new Set();
+p2pMieiOrdini = {rest1: {stato: 'pending'}};
+out.dallaRestore = tocco('rest1');
+p2pMieiOrdini = {};
+RIGHE = {'nuovo:3': prov()};
+out.provvisorio = tocco('alan1');
+p2pFacce = {altro1: {nome: 'Bob'}, alan1: {nome: 'Bob'}};
+out.altro = tocco('altro1');
+out.provvisorioConVolto = tocco('alan1');
+p2pFacce = {};
+RIGHE = {presa1: {id: 'presa1', mio: false, stato: 'preso'}};
+out.stoPrendendo = tocco('presa1');
+RIGHE = {};
+out.nessuno = tocco('altro1');
+/* LA SOMIGLIANZA, stretta apposta */
+const S = (riga, ordine) => { RIGHE = riga ? {[riga.id]: riga} : {}; return provvisorioDelLibroP2P(ordine); };
+out.somiglia = {
+  base: S(prov(), L('x')),
+  intervallo: S(prov({euro: 20, euroMax: 100}), L('x', {euro: 20, euroMax: 100})),
+  euro: S(prov(), L('x', {euro: 26})),
+  premio: S(prov(), L('x', {premium: 2})),
+  lato: S(prov(), L('x', {lato: 'sell'})),
+  natoPrima: S(prov(), L('x', {creato: ADESSO - 400})),
+  oltre: S(prov({creato: ADESSO - 169 * 3600}), L('x', {creato: ADESSO - 10})),
+  annullato: S(prov({stato: 'annullato'}), L('x')),
+  rifiutato: S(prov({stato: 'rifiutato'}), L('x')),
+  nomeVero: S(prov({id: 'vero123'}), L('x')),
+  nonMio: S(prov({mio: false}), L('x')),
+  vendo: S(prov({lato: 'vendo'}), L('x', {lato: 'sell'})),
+  niente: S(null, L('x')),
+};
+/* L'ETICHETTA DEL PREMIO: dal libro (chi prende) e sulla pagina del mio */
+const N = (mio, lato, prem) => etichettaPremioP2P(mio, prem, affareP2P({lato, premium: prem}));
+out.nomi = {
+  venditaPiu: N(false, 'sell', 2), venditaMeno: N(false, 'sell', -2),
+  acquistoPiu: N(false, 'buy', 2), acquistoMeno: N(false, 'buy', -2),
+  /* sulla pagina del mio il lato e' gia' tradotto (`comeLibroP2P`): il mio
+     «vendo» e' un `buy` per chi legge, il mio «compro» un `sell` */
+  mioVendoPiu: N(true, 'buy', 2), mioVendoMeno: N(true, 'buy', -2),
+  mioComproPiu: N(true, 'sell', 2), mioComproMeno: N(true, 'sell', -2),
+};
+out.articoli = ['0,5', '1', '1,5', '2', '3', '8', '11', '80', '0,75']
+  .map(q => articoloDetPercentoP2P(q) + q + '%');
+console.log(JSON.stringify(out));
+"""
+    cartella = _tf.mkdtemp()
+    try:
+        p = os.path.join(cartella, "banco.js")
+        open(p, "w", encoding="utf-8").write(banco)
+        r = _sp.run([node, p], capture_output=True, encoding="utf-8", timeout=90)
+    finally:
+        _sh.rmtree(cartella, ignore_errors=True)
+    if r.returncode != 0:
+        prova("il banco dei ritocchi dalla prova di Alan gira", "", (r.stderr or "")[-600:])
+        return
+    o = _js.loads(r.stdout.strip().splitlines()[-1])
+    prova("IL TOCCO SUL MIO ORDINE, su questo dispositivo: «È il tuo ordine» e la sua pagina",
+          ["toast:È il tuo ordine", "apri:mio1"], o["mioQui"])
+    prova("...pubblicato da un ALTRO dispositivo (lo dice il server): lo dice e apre il "
+          "dettaglio, che il bottone per prenderlo non ce l'ha",
+          ["toast:È il tuo ordine", "dett:srv1"], o["dalServer"])
+    prova("...e lo stesso se lo dice la lista del coordinatore",
+          ["toast:È il tuo ordine", "dett:rest1"], o["dallaRestore"])
+    prova("...rimasto col NOME PROVVISORIO (la risposta persa): apre la pagina del mio",
+          ["toast:È il tuo ordine", "apri:nuovo:3"], o["provvisorio"])
+    prova("L'ORDINE DI UN ALTRO si apre e basta, anche uguale al mio se ha un volto",
+          [["dett:altro1"], ["dett:alan1"], ["dett:altro1"]],
+          [o["altro"], o["provvisorioConVolto"], o["nessuno"]])
+    prova("...e quello che sto prendendo riapre il mio scambio, senza «È il tuo ordine»",
+          ["apri:presa1"], o["stoPrendendo"])
+    prova("LA SOMIGLIANZA E' STRETTA: stesso lato, cifra, intervallo e premio, nato dopo "
+          "il mio e dentro l'orizzonte, e solo un mio ordine vivo col nome provvisorio",
+          {"base": "nuovo:3", "intervallo": "nuovo:3", "euro": "", "premio": "",
+           "lato": "", "natoPrima": "", "oltre": "", "annullato": "", "rifiutato": "",
+           "nomeVero": "", "nonMio": "", "vendo": "nuovo:3", "niente": ""}, o["somiglia"])
+    # L'ETICHETTA DEL PREMIO (decisione di Andrea): per chi guarda il
+    # solo effetto, con la frase del badge, e il colore sul numero; mai
+    # chi l'ha scelto
+    A = '<b class="p2p-affare">2%</b>'
+    R = '<b class="p2p-avviso">2%</b>'
+    prova("IL PREMIO PER CHI GUARDA: l'effetto con la frase del badge, verde se e' un "
+          "affare e rosso se ci perde",
+          {"venditaPiu": R + " meno conveniente", "venditaMeno": A + " più conveniente",
+           "acquistoPiu": A + " più conveniente", "acquistoMeno": R + " meno conveniente"},
+          {k: v for k, v in o["nomi"].items() if not k.startswith("mio")})
+    prova("...e sul mio ordine quel che ho scelto io: richiesto se pende verso di me, "
+          "offerto se pende verso l'altro",
+          {"mioVendoPiu": "Premio che hai richiesto " + A,
+           "mioVendoMeno": "Sconto che hai offerto " + R,
+           "mioComproPiu": "Premio che hai offerto " + R,
+           "mioComproMeno": "Sconto che hai richiesto " + A},
+          {k: v for k, v in o["nomi"].items() if k.startswith("mio")})
+    prova("...e sotto la riga del premio nessuna nota", False,
+          "premio-perche" in mini or "function perchePremioP2P" in mini)
+    senza_commenti = re.sub(r"/\*[\s\S]*?\*/", "", mini)
+    prova("...e nel codice da nessuna parte chi l'ha scelto", False,
+          any(x in senza_commenti for x in ("chiesto da chi", "offerto da chi", "Premio al venditore",
+                                   "Sconto del venditore", "Premio richiesto")))
+    prova("«PAGHI L'1% DI FEE»: l'articolo segue il numero, dal giudice di sempre",
+          ["lo 0,5%", "l'1%", "l'1,5%", "il 2%", "il 3%", "l'8%", "l'11%", "l'80%",
+           "lo 0,75%"], o["articoli"])
+    prova("...e la frase lo chiede alla meta' MIA, mai a una cifra scritta", True,
+          "+ ', quindi paghi ' + articoloDetPercentoP2P(q) + q + '% di fee'"
+          in fn("function rigaTettoFeeP2P(){"))
+
+
 def prove_card_p2p_vetrina():
     """LE CARD P2P IN VETRINA (26 set 2026, richiesta di Andrea): gli
     ordini vivi del libro in una fila «Scambi P2P» sopra la griglia del
@@ -52427,7 +52721,7 @@ def prove_card_p2p_vetrina():
     prova("il client che ha appena pubblicato la rifa' anche lui, prima del canale e "
           "dopo le guardie", True,
           can.index("raise HTTPException(\n            400, \"Amazon")
-          < can.index('_foto_subito_p2p(ordine if FORMA_ORDINE_P2P.fullmatch(ordine) else "")')
+          < can.index('_foto_subito_p2p(ordine if buono else "")')
           < can.index("if canale_id():"))
     prova("la fotografia dell'orologio tiene fuori gli usciti, e la loro lista invecchia",
           True, "eventi=_senza_i_via_p2p(_vetrina_foto_p2p(ultimi, info, adesso), via))"
@@ -52624,6 +52918,11 @@ let RIGHE = {};
 function ordiniP2P(){ return RIGHE; }
 function provvisorioP2P(id){ return String(id || '').indexOf('nuovo:') === 0; }
 function ordineMioP2P(id){ return !!RIGHE[id]; }
+/* (28 set 2026) il giudice unico vero, con le sue due costanti */
+const P2P_FINALI = ['concluso', 'annullato', 'rifiutato'];
+const P2P_ORIZZONTE_S = 168 * 3600;
+""" + pezzo_js(mini, "function provvisorioDelLibroP2P(o){", "\n}\n") + "\n}\n" \
+    + pezzo_js(mini, "function ordineTuoP2P(id, o){", "\n}\n") + "\n}\n" + r"""
 let HINT = {};
 function hintLetti(){ return Object.assign({}, HINT); }
 const TIMBRATI = [];
@@ -52879,6 +53178,36 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
   RIGHE = {};
   daCapo(); renderVetrinaP2P(); await giro();
   out.seiAltri = ids();
+  /* ---- IL NOME CHE NON E' ARRIVATO (28 set 2026, dalla prova di Alan):
+     la risposta alla pubblicazione si e' persa, il mio ordine resta
+     «nuovo:3» nell'archivio e il server non sa chi l'ha pubblicato. Il
+     libro ha un ordine SENZA VOLTO uguale al mio: e' fuori. ---- */
+  RIGHE = {'nuovo:3': riga('nuovo:3', {lato: 'compro', euro: 25, premium: -1,
+                                       stato: 'senza_risposta', creato: ADESSO - 30})};
+  const EVp = (id, euro, q, premio) => {
+    const e = EV(id, 'buy', euro, q);
+    e.tags = e.tags.map(t => t[0] === 'premium' ? ['premium', String(premio)] : t);
+    return e;
+  };
+  FOTO = {eventi: [EVp('alan1', 25, ADESSO - 20, -1), EV('h1', 'sell', 5, ADESSO - 50)],
+          quando: ADESSO};
+  daCapo(); renderVetrinaP2P(); await giro();
+  out.provvisorio = ids();
+  /* ...con un volto e' di un altro, e torna */
+  p2pFacce['alan1'] = {nome: 'Bob'};
+  daCapo(); renderVetrinaP2P(); await giro();
+  out.provvisorioConVolto = ids();
+  delete p2pFacce['alan1'];
+  /* ...e cifra, premio o eta' diversi non sono il mio */
+  FOTO = {eventi: [EVp('alan2', 26, ADESSO - 20, -1), EVp('alan3', 25, ADESSO - 20, 2),
+                   EVp('alan4', 25, ADESSO - 400, -1)], quando: ADESSO};
+  daCapo(); renderVetrinaP2P(); await giro();
+  out.provvisorioDiversi = ids().sort();
+  /* ...e un mio annullato non somiglia a niente */
+  RIGHE['nuovo:3'].stato = 'annullato';
+  FOTO = {eventi: [EVp('alan1', 25, ADESSO - 20, -1)], quando: ADESSO};
+  daCapo(); renderVetrinaP2P(); await giro();
+  out.provvisorioAnnullato = ids();
   RIGHE = {}; LAPIDI = new Set(); delete FOTO.miei;
   /* ---- LA SCELTA: SCAMBI P2P NELLA HOME ---- */
   HINT = {}; TIMBRATI.length = 0;
@@ -53036,6 +53365,15 @@ const conta = () => (el('p2pVetrinaFila').innerHTML.match(/class="card card-p2p/
           {"display": "none", "card": 0, "conta": "", "giri": 1}, o["soloMiei"])
     prova("SETTE DEGLI ALTRI E IL MIO PIU' NUOVO: sei card, tutte degli altri",
           ["a7", "a6", "a5", "a4", "a3", "a2"], o["seiAltri"])
+    # (28 set 2026, dalla prova di Alan) la risposta alla pubblicazione
+    # persa: nessuno sa di chi e' l'ordine, e il telefono lo riconosce
+    prova("IL NOME CHE NON E' ARRIVATO: l'ordine senza volto uguale al mio rimasto "
+          "provvisorio sta fuori dalla fila", ["h1"], o["provvisorio"])
+    prova("...ma col volto di un altro torna (appena il server sa l'autore)",
+          ["alan1", "h1"], o["provvisorioConVolto"])
+    prova("...cifra, premio o nascita diversi non sono il mio, e un mio annullato "
+          "non somiglia a niente", [["alan2", "alan3", "alan4"], ["alan1"]],
+          [o["provvisorioDiversi"], o["provvisorioAnnullato"]])
     prova("LA SCELTA: l'interruttore c'e', acceso, e vale su ogni dispositivo", True, o["levaAccesa"])
     prova("...spento: via la fila, la riga «nascosti · Mostra», nessun giro, il timbro sul profilo",
           {"sez": "none", "riga": "", "giri": 0, "leva": True, "timbri": ["p2p_home_via"]},
@@ -56439,11 +56777,13 @@ def prove_p2p_dettaglio():
     # LE GUARDIE RESTANO NELLA PORTA, tutte: sono la ragione per cui la
     # pagina non si apre affatto su un ordine che non si puo' prendere —
     # meglio del bottone che, in fondo alla lettura, dice di no.
+    # (28 set 2026, dalla prova di Alan) la guardia del mio ordine e' il
+    # giudice unico, e invece di «si guarda soltanto» apre la sua pagina
     prova("...e le guardie della porta restano tutte", True,
           "if (DEMO)" in po and "if (VETRINA || !myTgId)" in po
           and "const gia = ordiniP2P()[id];" in po
-          and "if (ordineMioP2P(id))" in po
-          and "si guarda soltanto" in po)
+          and "if (ordineTuoP2P(id)) { toast('È il tuo ordine'); apriDettaglioP2P(id); return; }" in po
+          and "const prov = provvisorioDelLibroP2P(rigaLibroP2P(id));" in po)
     # LA DEVIAZIONE DELL'INTERVALLO HA CAMBIATO CASA: prima stava nella
     # porta — cioe' il foglio «Quanto» si apriva PRIMA che si fosse
     # visto l'ordine — e adesso sta nel bottone della pagina.
@@ -56626,6 +56966,11 @@ def prove_p2p_dettaglio():
         "function contoDettP2P(o){",
         # (27 set 2026) la riga «Premio scelto · Al prezzo di adesso»
         "function rigaConvenienzaFissaP2P(o, conv){",
+        # (28 set 2026) l'etichetta del premio: l'effetto per chi guarda,
+        # e sotto il perche'
+        "function etichettaPremioP2P(mio, prem, affare){",
+        "function articoloPercentoP2P(testo){",
+        "function articoloDetPercentoP2P(testo){",
         # ...e la traduzione del lato, che e' come il conto arriva
         # alla pagina di uno scambio PROPRIO
         "function comeLibroP2P(o){",
@@ -56730,6 +57075,10 @@ let chiusi = [], quanti = [], prese = [];
 function chiudiFoglioP2P(f){ chiusi.push(f); }
 function apriQuantoP2P(id){ quanti.push(id); }
 function eseguiPresaP2P(id, scelto, metodo){ prese.push([id, scelto, metodo]); }
+/* (28 set 2026) il giudice «e' tuo» e' uno stub coi suoi id: le sue
+   prove girano in `prove_ritocchi_prova_alan`, qui si guarda la pagina */
+const TUOI = new Set();
+function ordineTuoP2P(id){ return TUOI.has(id); }
 const ora = 2000000000;
 const G = 86400;
 const ordine = (o) => Object.assign({
@@ -56952,6 +57301,16 @@ prese = []; quanti = [];
 confermaDettaglioP2P();
 out.rangeDevia = [quanti.length, prese.length];
 
+/* ---- IL MIO ORDINE SI GUARDA SOLTANTO (28 set 2026, dalla prova di
+   Alan): la pagina lo chiede al giudice, e al posto di «Compra/Vendi»
+   dice di chi e' — anche con due metodi e nessuno scelto ---- */
+p2pLibro = {ordini: [ordine({id: 'ord-4', lato: 'buy', premium: -1, metodi: ['SEPA', 'Revolut']})]};
+TUOI.add('ord-4'); prese = []; quanti = [];
+apriDettaglioP2P('ord-4');
+out.paginaTua = el('p2pDettCorpo').innerHTML;
+out.titoloTuo = el('p2pDettTit').textContent;
+TUOI.clear();
+
 /* ---- il lettore del metodo scelto, coi due lati ---- */
 out.metodoMio = metodoSceltoP2P({metodi: ['SEPA', 'Revolut'],
                                  metodoScelto: 'Revolut'});
@@ -56978,6 +57337,23 @@ console.log(JSON.stringify(out));
 
     prova("il conto alla rovescia si legge, e i giorni solo se ci sono",
           ["00:00:59", "23:47:17", "6g 23:47:17", "00:00:00"], o["conto"])
+    # (28 set 2026, dalla prova di Alan) il mio ordine si guarda soltanto
+    pt = o["paginaTua"]
+    prova("IL MIO ORDINE: la pagina dice «È il tuo ordine», col conto e senza "
+          "il bottone che lo prenderebbe", [True, True, False, False, False, True],
+          ["È il tuo ordine: l'hai pubblicato tu, e non si può prendere." in pt,
+           "ctrl-conto" in pt, "p2pDettVai" in pt, "confermaDettaglioP2P" in pt,
+           "Scegli con quale metodo" in pt, ">Indietro</button>" in pt])
+    # ...e parla a chi l'ha pubblicato: Alan COMPRA a −1% (sul suo
+    # «compra BTC» diceva «Stai vendendo sats»), il suo prezzo, il
+    # cartello in testa, un bottone
+    prova("...e parla a chi l'ha pubblicato: il suo lato, il suo prezzo, il "
+          "cartello in cima e il bottone da solo",
+          ["Stai comprando sats", True, False, True, True],
+          [o["titoloTuo"], 'Sconto che hai richiesto <b class="p2p-affare">1%</b>' in pt,
+           "conveniente" in pt,
+           pt.index("È il tuo ordine") < pt.index("ctrl-conto"),
+           '<div class="foglio-piede sola" id="p2pDettTuoPiede">' in pt])
     # ⚠️ L'ULTIMA TACCA NON SI SPEGNE FINCHE' C'E' TEMPO: con
     # l'arrotondamento secco, sotto lo 0,83% l'anello sarebbe gia' vuoto
     # con l'ordine ancora vivo — e un anello vuoto dice «scaduto».
@@ -57206,7 +57582,7 @@ console.log(JSON.stringify(out));
           "Totale da inviare" in cm and "6,00 € 🇪🇺" in cm
           and cm.count('ctrl-riga tot') == 2)
     prova("...e senza premio la sua riga non c'e'", False,
-          "Premio al venditore" in cm)
+          "conveniente" in cm)
     # ⚠️ SOTTO IL CONTO NON C'E' PIU' NESSUNA SPIEGAZIONE (13 set
     # 2026, decisione di Andrea): la riga della commissione intera con
     # la sua spartizione ha seguito quella del prezzo di mercato, e
@@ -57244,7 +57620,7 @@ console.log(JSON.stringify(out));
     # Subtotale in mezzo a dire su cosa si calcola l'aliquota.
     prova("il premio viene PRIMA della fee, col subtotale in mezzo",
           True,
-          o["contoPremio"].index("Premio al venditore")
+          o["contoPremio"].index("meno conveniente")
           < o["contoPremio"].index("Subtotale")
           < o["contoPremio"].index("Fee P2P"))
     # ...e il conto SOMMA: 12000 − 480 = 11520, meno l'1% (115) = 11405
@@ -57262,7 +57638,7 @@ console.log(JSON.stringify(out));
     # «4%» verde accanto a un «−480» senza colore, e non e' un errore.
     prova("il premio porta la percentuale in tinta, e i sats il verso",
           True,
-          'Premio al venditore <b class="p2p-avviso">4%</b>'
+          '<b class="p2p-avviso">4%</b> meno conveniente'
           in o["contoPremio"]
           and '<span class="num meno">≈ −480 sats</span>' in o["contoPremio"]
           and "≈ 11405 sats" in o["contoPremio"])
@@ -57270,9 +57646,9 @@ console.log(JSON.stringify(out));
     # premio di meno», e' uno SCONTO — col nome giusto non serve
     # leggere il segno per capire di cosa si parla.
     prova("...e un premio negativo e' uno SCONTO, col suo nome", True,
-          'Sconto del venditore <b class="p2p-affare">2%</b>'
+          '<b class="p2p-affare">2%</b> più conveniente'
           in o["contoSconto"]
-          and "Premio al venditore" not in o["contoSconto"]
+          and "meno conveniente" not in o["contoSconto"]
           # ...e i suoi sats si AGGIUNGONO: lo dice il SEGNO, che
           # dal 12 set porta da solo quel che diceva la tinta. E il
           # conto SOMMA anche col verso rovesciato: 12000 − 122 + 240
@@ -57286,7 +57662,7 @@ console.log(JSON.stringify(out));
     # coerente — e dopo il ritocco del 12 set solo la prima e' in
     # tinta, che e' proprio la colonna del giudizio.
     prova("...e nel tab Vendi il conto si specchia",
-          True, 'Premio al venditore <b class="p2p-affare">4%</b>'
+          True, '<b class="p2p-affare">4%</b> più conveniente'
           in o["contoVendi"]
           and '<span class="num meno">≈ −480 sats</span>' in o["contoVendi"]
           and "Invia" in o["contoVendi"] and "≈ 11635 sats" in o["contoVendi"]
@@ -57312,7 +57688,7 @@ console.log(JSON.stringify(out));
     # serviva quando il numero era ricavato e ballava; adesso e' quello
     # scelto, e il verso lo dice la parola — «Premio» o «Sconto»
     prova("col premio di Barattozon il conto ha la sua riga, con la tinta e senza segno",
-          True, "Premio al venditore" in o["contoTabPremio"]
+          True, "meno conveniente" in o["contoTabPremio"]
           and 'p2p-avviso">5%<' in o["contoTabPremio"]
           and '<span class="num meno">≈ −600 sats</span>' in o["contoTabPremio"]
           and "Subtotale" in o["contoTabPremio"]
@@ -57321,14 +57697,13 @@ console.log(JSON.stringify(out));
     # ...e un premio NEGATIVO cambia nome alla voce, come sempre: e'
     # uno SCONTO, e quei sats si AGGIUNGONO al Controvalore
     prova("...e col premio negativo la voce e' uno sconto, in verde e col piu'",
-          True, "Sconto del venditore" in o["contoTabSconto"]
+          True, "più conveniente" in o["contoTabSconto"]
           and 'p2p-affare">5%<' in o["contoTabSconto"]
           and '<span class="num piu">≈ +600 sats</span>' in o["contoTabSconto"]
-          and "Premio al venditore" not in o["contoTabSconto"])
+          and "meno conveniente" not in o["contoTabSconto"])
     prova("...a premio zero la riga non c'e' (come su ogni ordine)",
           True, "Subtotale" not in o["contoTabPieno"]
-          and "Premio al venditore" not in o["contoTabPieno"]
-          and "Sconto del venditore" not in o["contoTabPieno"])
+          and "conveniente" not in o["contoTabPieno"])
     # ⚠️ QUANDO IL COORDINATORE HA DETTO LA CIFRA lo scambio e' fatto:
     # un premio che continuasse a muoversi col mercato racconterebbe un
     # affare chiuso, ed e' la promessa di «Info P2P»
@@ -57336,18 +57711,17 @@ console.log(JSON.stringify(out));
     # «preso» (l'eco della pubblicazione la scrive nel libro), e il conto
     # resta sulla convenienza di adesso. A fermarlo e' `preso`, qui sotto
     prova("...e la cifra detta senza `preso` resta sulla convenienza di adesso",
-          True, "Premio al venditore" in o["contoTabDetto"]
+          True, "meno conveniente" in o["contoTabDetto"]
           and "Subtotale" in o["contoTabDetto"])
     prova("...a cambio muto non si inventa nessun premio",
-          True, "Premio al venditore" not in o["contoTabMuto"]
-          and "Sconto del venditore" not in o["contoTabMuto"])
+          True, "conveniente" not in o["contoTabMuto"])
     # --- LA CONVENIENZA VERA (27 set 2026) -------------------------------
     # BTC su del 20%: il Barattozon nato a +5 oggi e' uno sconto del 14%
     # per chi prende — riga, Controvalore (10000 e non 12000) e la frase
     # coi DUE numeri: il premio scelto e quello di adesso, col segno e in
     # tinta dal lato di chi guarda (+5 rosso, −14 verde)
     prova("Barattozon a mercato mosso: la riga dice il −14 di adesso, e la frase i due numeri",
-          True, "Sconto del venditore" in o["contoAdesso"]
+          True, "più conveniente" in o["contoAdesso"]
           and 'p2p-affare">14%<' in o["contoAdesso"]
           and "≈ 10000 sats" in o["contoAdesso"]
           and '<span class="num piu">≈ +1400 sats</span>' in o["contoAdesso"]
@@ -57357,20 +57731,19 @@ console.log(JSON.stringify(out));
     prova("...il premio scelto viene anche dal cambio detto dal server",
           True, 'Premio scelto: <b class="p2p-avviso">+5%</b>' in o["contoServer"])
     prova("...DOPO LA PRESA tutto si ferma al cambio di quel momento: +5, Controvalore 12000",
-          True, "Premio al venditore" in o["contoPreso"]
+          True, "meno conveniente" in o["contoPreso"]
           and 'p2p-avviso">5%<' in o["contoPreso"]
           and "≈ 12000 sats" in o["contoPreso"]
           and 'Al prezzo della presa: <b class="p2p-avviso">+5%</b>' in o["contoPreso"]
           and "adesso" not in o["contoPreso"])
     prova("...e preso senza il cambio della presa: niente riga, resta il solo premio scelto",
-          True, "Premio al venditore" not in o["contoPresoSenza"]
-          and "Sconto del venditore" not in o["contoPresoSenza"]
+          True, "conveniente" not in o["contoPresoSenza"]
           and '<div class="ctrl-conv">Premio scelto: <b class="p2p-avviso">+5%</b></div>'
               in o["contoPresoSenza"])
     prova("il prezzo fisso NON Barattozon: «Rispetto al mercato di adesso», senza premio scelto",
           True, '<div class="ctrl-conv">Rispetto al mercato di adesso: '
                 '<b class="p2p-affare">−14%</b></div>' in o["contoFissoAdesso"]
-          and "Sconto del venditore" in o["contoFissoAdesso"]
+          and "più conveniente" in o["contoFissoAdesso"]
           and "Premio scelto" not in o["contoFissoAdesso"])
     prova("...e l'ordine a MERCATO resta com'era: nessuna frase, il suo premio",
           True, "ctrl-conv" not in o["contoMercatoIntatto"]
@@ -57506,17 +57879,21 @@ console.log(JSON.stringify(out));
     # lo stesso giudice del colore, che alla domanda «pende dalla mia
     # parte?» risponde gia'.
     prova("sul mio ordine di VENDITA il premio si CHIEDE", True,
-          "<span>Premio richiesto <b" in o["premioMioVendo"])
+          "<span>Premio che hai richiesto <b class=\"p2p-affare\">4%</b><" in o["premioMioVendo"])
     prova("...e lo sconto si OFFRE", True,
-          "<span>Sconto offerto <b" in o["scontoMioVendo"])
+          "<span>Sconto che hai offerto <b class=\"p2p-avviso\">2%</b><" in o["scontoMioVendo"])
     prova("sul mio ordine di ACQUISTO lo stesso segno si rovescia",
           [True, True],
-          ["<span>Premio offerto <b" in o["premioMioCompro"],
-           "<span>Sconto richiesto <b" in o["scontoMioCompro"]])
+          ["<span>Premio che hai offerto <b class=\"p2p-avviso\">4%</b><" in o["premioMioCompro"],
+           "<span>Sconto che hai richiesto <b class=\"p2p-affare\">2%</b><" in o["scontoMioCompro"]])
     # ...e il LIBRO non si tocca: la' chi legge non e' il proprietario
-    prova("...e dal libro il premio resta «al venditore»", [True, True],
-          ["Premio al venditore" in o["contoPremio"],
-           "Premio richiesto" not in o["contoPremio"]])
+    # (28 set 2026, dalla prova di Alan) dal libro la riga dice il solo
+    # effetto per chi guarda, con la frase del badge, e nient'altro sotto;
+    # «che hai richiesto/offerto» sta solo sul mio
+    prova("...e dal libro il premio dice l'effetto per chi guarda", [True, True, True],
+          ["meno conveniente" in o["contoPremio"],
+           "che hai" not in o["contoPremio"],
+           'conveniente</span><span class="mono">' in o["contoPremio"]])
 
     prova("senza volto il riquadro della reputazione non c'e' proprio",
           "", o["repSenza"])
@@ -67312,8 +67689,9 @@ def prove_p2p_pubblica():
     prova("...e l'annullo in evidenza e' lo stesso gesto, vestito d'arancio", True,
           "onclick=\"annullaScambioP2P()\"" in pezzo_js(mini, "const SECONDARI_EVIDENZA_P2P = {", "\n};")
           and "btn orange" in pezzo_js(mini, "const SECONDARI_EVIDENZA_P2P = {", "\n};"))
+    # (28 set 2026) ...tranne sul MIO ordine, che non si prende
     prova("il dettaglio avvisa alla presa, sopra il bottone", True,
-          "avvisoPresaTabacchinoP2P(o) +" in pezzo_js(mini, "function renderDettaglioP2P(){", "\n}\n"))
+          "(tuo ? '' : avvisoPresaTabacchinoP2P(o)) +" in pezzo_js(mini, "function renderDettaglioP2P(){", "\n}\n"))
     # LE PAROLE (fase 4): il dettaglio dice cos'e' e rimanda, e «Info
     # P2P» ha il passo per passo con i due momenti degli avvisi
     prova("...e dice cos'e' il tabacchino, col rimando a Info P2P", True,
@@ -72116,9 +72494,16 @@ def prove_p2p_server():
     # ...E DAL 27 SET 2026 IN CINQUE: la card P2P della vetrina chiede
     # allo stesso giudice se l'ordine e' mio, per metterci il mio volto
     # prima che il server lo sappia (la fila dopo una pubblicazione)
-    prova("...e lo chiamano la card, la porta, la cintura, il volto della card nuova "
-          "e la card della vetrina", 5,
+    # ...E DAL 28 SET 2026 (dalla prova di Alan) la card, la porta, la
+    # cintura e la fila chiedono al giudice UNICO `ordineTuoP2P`, che
+    # chiede a questo e ci aggiunge i `miei` del server e il nome rimasto
+    # provvisorio; a chiamare questo restano lui e il volto della card
+    # nuova. Il dettaglio chiede anche lui a `ordineTuoP2P`.
+    prova("...e lo chiamano il giudice unico e il volto della card nuova", 2,
           solo_codice(mini).count("ordineMioP2P(") - 1)
+    prova("...e il giudice unico lo chiamano la card, la porta, la cintura, il "
+          "dettaglio e la fila della home", 5,
+          solo_codice(mini).count("ordineTuoP2P(") - 1)
     # --- 15c) LA CINTURA PRIMA DI FIRMARE (14 set 2026) ------------
     # Lo strato sotto all'avviso: OTTO posti derivano la trade key dal
     # mazzo vivo dando per scontato che la riga sia sua, e UNO SOLO
@@ -72414,8 +72799,10 @@ console.log(JSON.stringify(out));
           and "gia.pubTrade = tk.pub;" in ad16)
     prova("...e il provvisorio si rinomina invece di raddoppiare", True,
           "rinominaOrdineP2P(" in ad16)
+    # (28 set 2026, dalla prova di Alan) onesto e utile: dice «È il tuo
+    # ordine» e apre la sua pagina, dove il bottone per prenderlo non c'e'
     prova("il tocco sul mio-ma-non-in-lista resta onesto", True,
-          "si guarda soltanto"
+          "if (ordineTuoP2P(id)) { toast('È il tuo ordine'); apriDettaglioP2P(id); return; }"
           in pezzo_js(mini, "function prendiOrdineP2P(", "\n}\n"))
     # IL BANCO: le due cure GIRANO, coi rami che contano. Le funzioni
     # vere piu' stub dichiarati — mostroConnetti ALZA apposta, cosi'
@@ -76796,6 +77183,7 @@ process.stdout.write(JSON.stringify(out));
           "preso senza il suo cambio niente; e `satsNetti` da solo non vuol dire preso",
           ["−20% meno conveniente per te", "al prezzo di mercato", "",
            "−20% meno conveniente per te"], o["miei"])
+    # (28 set 2026) «da chi vende»: il premio scelto dice chi l'ha scelto
     prova("LA RIGA DEI DUE NUMERI: Barattozon «Premio scelto · Al prezzo di adesso», dopo la presa «della presa»",
           ['<div class="ctrl-conv">Premio scelto: <b class="p2p-affare">−10%</b> · '
            'Al prezzo di adesso: <b class="p2p-affare">−32%</b></div>',
@@ -94920,7 +95308,8 @@ def prove_livello_accanto_al_titolo():
              pezzo_js(mini, "const titoloRiga = (", "'';") + "'';",
              pezzo_js(mini, "const LIVELLO_SCONTO_P2P = ", "\n"),
              pezzo_js(mini, "function rigaVantaggioLivello(", "\n}\n") + "\n}"]
-    for f in ("scontoFedeltaTestoP2P", "articoloPercentoP2P", "testoFeeInfoP2P",
+    for f in ("scontoFedeltaTestoP2P", "articoloPercentoP2P", "articoloDetPercentoP2P",
+              "testoFeeInfoP2P",
               "commissioneVivaP2P", "commissioneListinoP2P", "feeMiaP2P",
               "cartelloFeeP2P", "mezzaCommissioneP2P", "maxEuroP2P",
               "maxSatsTestoP2P", "rigaTettoFeeP2P"):
@@ -95030,9 +95419,12 @@ console.log(JSON.stringify(out));
     prova("il foglio Pubblica senza sconto: la meta' per parte",
           '<div class="hint">La fee P2P è dell\'1,5% per parte</div>',
           o["pieno"])
-    prova("...con lo sconto: la meta' piena e lo sconto, mai l'1% finale",
+    # ⚠️ ROVESCIATA IL 28 SET 2026 (ritocco di Andrea dalla prova di
+    # Alan): era «mai l'1% finale». In fondo adesso c'e' la cifra che si
+    # paga, letta — la fee viva meno lo sconto —, mai scritta a mano
+    prova("...con lo sconto: la meta' piena, lo sconto e in fondo quel che si paga",
           '<div class="hint">La fee P2P è dell\'1,5% per parte, '
-          'e tu hai uno sconto dello 0,5%</div>', o["scontato"])
+          'e tu hai uno sconto dello 0,5%, quindi paghi l\'1% di fee</div>', o["scontato"])
     prova("la pastiglia del conto dice il motivo: 🌱 Pioniere o Lv. 5",
           ["🌱 Pioniere", "Lv. 5"], [o["cartello"], o["cartelloLivello"]])
     prova("...e lo sconto mancato vince sul motivo", "sconto non verificato",
@@ -95061,9 +95453,10 @@ console.log(JSON.stringify(out));
           "dell'1% sulla propria parte.", fi["altriNumeri"])
     prova("...e gli articoli seguono il numero: «dell'8%», «dell'11%»", True,
           "è dell'8% in tutto" in fi["otto"] and "sarà dell'11% in tutto" in fi["otto"])
-    prova("la fee cambia sul nodo: la meta' si muove, lo sconto resta",
+    prova("la fee cambia sul nodo: la meta' si muove, lo sconto resta, e la cifra "
+          "che si paga segue da sola",
           '<div class="hint">La fee P2P è del 2% per parte, '
-          'e tu hai uno sconto dello 0,5%</div>', o["feeNuova"])
+          'e tu hai uno sconto dello 0,5%, quindi paghi l\'1,5% di fee</div>', o["feeNuova"])
 
 
 def _livelli_dal_sorgente():
@@ -106557,12 +106950,15 @@ def prove_schermo_segue_mostro():
     prova("...il giudice del giro caduto e' puro: finale e non pubblicato da me", True,
           "return !!o && P2P_FINALI.indexOf(o.stato) >= 0 && !o.mio;" in fn("function giroCadutoP2P(o){"))
     pr = nudo(fn("function prendiOrdineP2P(id){"))
+    # (28 set 2026) sul mio ordine l'apertura dice anche «È il tuo ordine»
     prova("...la porta del libro mette da parte il giro caduto e prende da capo", True,
-          "if (giroCadutoP2P(gia)) archiviaGiroCadutoP2P(id);\n  else if (gia) { apriOrdineP2P(id); return; }" in pr)
+          "if (giroCadutoP2P(gia)) archiviaGiroCadutoP2P(id);\n  else if (gia) {\n"
+          "    if (gia.mio) toast('È il tuo ordine');\n    apriOrdineP2P(id);\n"
+          "    return;\n  }" in pr)
     es = nudo(fn("async function eseguiPresaP2P(id, scelto, metodo){"))
     prova("...e la cintura della presa fa lo stesso, PRIMA della guardia «e' tuo»", True,
           0 < es.find("if (giroCadutoP2P(ordiniP2P()[id])) archiviaGiroCadutoP2P(id);")
-          < es.find("toast('Questo ordine è tuo: non puoi prenderlo');"))
+          < es.find("toast('È il tuo ordine: non puoi prenderlo');"))
     ad = nudo(fn("function adottaScambiServerP2P(locali){"))
     prova("...e l'archivio del server non fa rinascere il giro messo da parte", True,
           "if (typeof giroArchiviatoP2P === 'function' && giroArchiviatoP2P(locali, id)) continue;" in ad
@@ -107443,6 +107839,7 @@ def main():
         prove_tour_p2p, prove_tour_p2p_finale, prove_libro_subito,
         prove_giro_guidato_p2p, prove_banner_fee_personale,
         prove_card_p2p_vetrina,
+        prove_ritocchi_prova_alan,
         prove_p2p_invii,
         prove_velo_p2p,
     prove_p2p_dettaglio,
