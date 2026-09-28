@@ -11130,6 +11130,25 @@
   dal libro in pagina e gli scrive la lapide ma la riga resta, la scopa
   non ha piu' la soglia zero, l'archivio del server lo fa nascere. Il
   verbale: CANTIERI, «"Annulla" dice non riuscito ma annulla».
+  IL MIO ORDINE SI FIRMA CON LA CHIAVE DI CHI L'HA PUBBLICATO (28 set
+  2026): la trade key di un gesto si deriva da `riga.indice`, e una riga
+  scritta da una PRESA sotto l'id di un ordine mio porta l'indice della
+  presa. `riparaChiaveMakerP2P` (nel motore, sincrona, senza rete) la
+  rimette a posto: l'indice lo dice `indiceMakerP2P` — la restore
+  (`trade_index`, se l'ordine e' `pending`, o mio per il server o per la
+  riga) o l'archivio del server (`mio` + `chiave_mia`, cercata fra le
+  derivate) — e la riga di una presa torna la riga del mio ordine
+  (l'altro lato, lo stato di adesso, niente di `P2P_DELLA_PRESA`); se il
+  provvisorio `nuovo:N` dello stesso indice c'e' ancora, la riga vera e'
+  lui. La chiamano le due adozioni e `chiamataOrdineP2P` prima di
+  firmare (sulla riga di una presa passa solo l'annullo). La riparazione
+  del 14 set porta `indice` insieme a `pubTrade`: mai l'orecchio su una
+  chiave e la firma su un'altra. Un cant-do `is-not-your-order` passa da
+  `nonTuoOrdineP2P` (fuori dal motore): rilegge tutto, riprova UNA volta
+  se la chiave e' cambiata, altrimenti lo dice (`P2P_NON_TUO`). Sul
+  server `_scambi_p2p`, quando le due parti sono la stessa persona, da'
+  il lato di chi ha pubblicato. Il verbale: CANTIERI, «L'annullo firmato
+  con la chiave sbagliata».
   GLI ANNULLATI (27 set 2026): «Più recenti» e la data della card sono
   lo stesso giudice, `chiusuraP2P` (il piu' fresco fra `quando` e
   `ultimaMossa`); l'archivio del server porta `euro_max` e `premium`

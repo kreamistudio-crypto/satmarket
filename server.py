@@ -46223,7 +46223,14 @@ def _scambi_p2p(con, io, adesso: int) -> dict:
         compra = int(s["compratore"] or 0) if s else 0
         vende = int(s["venditore"] or 0) if s else 0
         libro = (o["lato"] if o else "") or ""
-        if io == compra:
+        if io == compra and io == vende:
+            # LE DUE PARTI SONO IO (28 set 2026, l'ordine d66347c2: il
+            # telefono non aveva riconosciuto il proprio ordine e l'ha
+            # preso): vale il lato di chi ha PUBBLICATO, perche' e' con
+            # quella chiave che l'ordine si governa — `chiave_mia` e'
+            # quella del lato, e con l'altro sarebbe la chiave della presa
+            lato = {"buy": "compro", "sell": "vendo"}.get(libro, "compro")
+        elif io == compra:
             lato = "compro"
         elif io == vende:
             lato = "vendo"

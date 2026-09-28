@@ -51634,6 +51634,17 @@ async function chiamataOrdineP2P(o, azione, payload){
      spedire un messaggio che verrebbe scartato in silenzio */
   if (!idMostroVero(o.id))
     throw new Error('Questo ordine non risulta ancora registrato: aspetta un momento la risposta');
+  /* ⚠️ IL MIO ORDINE SI FIRMA CON LA CHIAVE DI CHI L'HA PUBBLICATO (28
+     set 2026, l'ordine d66347c2): l'ultima occasione di raddrizzare la
+     riga e' adesso, prima che la chiave si derivi. Se la riga era quella
+     di una presa, l'unico gesto che ha ancora senso e' l'annullo: gli
+     altri parlavano di uno scambio che non c'e' piu'. */
+  if (typeof riparaChiaveMakerP2P === 'function') {
+    const riparata = riparaChiaveMakerP2P(o.id);
+    if (riparata) o = ordiniP2P()[o.id] || o;
+    if (riparata === 'presa' && azione !== 'cancel')
+      throw new Error('Questo è un tuo ordine, e lo scambio che stavi guardando non c\'è più: riapri la pagina');
+  }
   /* ⚠️ LA CINTURA DEL MAZZO (14 set 2026): questa e' la porta UNICA dei
      gesti verso il coordinatore, e qui sotto la trade key si deriva dal
      mazzo VIVO dando per scontato che l'ordine sia suo. Quando non lo
@@ -51653,8 +51664,13 @@ async function chiamataOrdineP2P(o, azione, payload){
     id: o.id,
     payload: payload || null
   });
-  return mostroChiama(tk.sk, msg, {mazzoSk: reput ? mz.sk : null,
-                                   primoContatto: !o.contattato});
+  const chiamata = mostroChiama(tk.sk, msg, {mazzoSk: reput ? mz.sk : null,
+                                             primoContatto: !o.contattato});
+  /* «NON E' TUO» NON E' LA FINE (28 set 2026): si rilegge lo stato e,
+     se la chiave giusta si trova, si riprova UNA volta — fuori dal
+     motore, perche' rileggere chiama il server (`nonTuoOrdineP2P`) */
+  return typeof nonTuoOrdineP2P === 'function'
+    ? chiamata.catch(e => nonTuoOrdineP2P(e, o, azione, payload, tk.pub)) : chiamata;
 }
 
 /* i gesti che stanno sotto, in ghost. Il rosso e' dell'uscita, come
@@ -57776,6 +57792,129 @@ function riprendiDaRestoreP2P(o, statoMostro){
   return r;
 }
 
+/* ═══ IL MIO ORDINE SI FIRMA CON LA CHIAVE DI CHI L'HA PUBBLICATO ════
+   (28 set 2026, dal campo: l'ordine d66347c2 di Alan, che non si
+   annullava piu'.)
+   IL FATTO: Alan pubblica un «compra» (la trade key dell'indice 2). Il
+   suo telefono non lo riconosce come suo — il «?» curato da cd264a9 — e
+   lo PRENDE, con la chiave dell'indice dopo. `eseguiPresaP2P` scrive la
+   riga sotto l'id VERO dell'ordine con l'indice della PRESA; la presa
+   cade, l'ordine torna nel libro, e la riga resta li'. Da quel momento
+   ogni gesto deriva la chiave da `riga.indice`: tre annulli firmati con
+   la chiave della presa caduta, tre «is_not_your_order».
+   PERCHE' NESSUNO L'HA FERMATO: la cintura del mazzo guarda l'IDENTITA'
+   della restore (ed e' la mia) e non l'indice; e la riparazione del 14
+   set raddrizzava `pubTrade` lasciando `indice` com'era — l'orecchio
+   sulla chiave di chi ha pubblicato, la firma con quella della presa.
+   Il «no», scritto ALLA chiave che aveva firmato, non arrivava nemmeno,
+   e il velo restava su «La risposta tarda…».
+   LA REGOLA: di un ordine MIO la chiave e' una, quella con cui l'ho
+   pubblicato. L'indice lo dice chi lo sa — la restore (`trade_index`:
+   un `pending` nella lista implica chi ha pubblicato, Q6 della sonda) o
+   l'archivio del server (`mio` + `chiave_mia`, cercata fra le derivate)
+   — e una presa, caduta o no, non lo sovrascrive.
+   `riparaChiaveMakerP2P` rimette a posto la riga e dice cos'ha fatto:
+   'chiave' (la riga era gia' del mio ordine, con indice o chiave
+   storti), 'presa' (era la riga di una presa del MIO ordine: diventa la
+   riga di chi l'ha pubblicato — l'altro lato, lo stato di adesso,
+   niente di quel che era della presa), '' (niente da fare, o non si sa:
+   fail-open, come la cintura).
+   Se il provvisorio `nuovo:N` dello stesso indice e' ancora qui — la
+   risposta alla pubblicazione si era persa — la riga vera e' LUI, e
+   prende il posto di quella della presa.
+   UNA RIGA FINITA NON SI TOCCA, e nemmeno un ordine che chi lo sa dice
+   finito: li' non c'e' piu' niente da firmare.
+   La chiamano le due adozioni (i telefoni che hanno gia' in memoria la
+   chiave sbagliata si correggono alla prossima apertura) e la porta dei
+   gesti, un attimo prima di firmare. SINCRONA E SENZA RETE. */
+function indiceMakerP2P(id, mz, o){
+  if (!id || !mz || !window.NostrTools) return 0;
+  const voce = p2pMieiOrdini && p2pMieiOrdini[id];
+  const s = (typeof p2pScambiServer !== 'undefined' && p2pScambiServer && p2pScambiServer[id]) || null;
+  const mioServer = !!(s && s.mio);
+  if (voce && (voce.indice | 0) > 0 && (!voce.identita || voce.identita === mz.pub)) {
+    const st = String(voce.stato || '').trim().toLowerCase();
+    if (st === 'pending' || mioServer || (o && o.mio)) return voce.indice | 0;
+  }
+  if (mioServer && s.chiave_mia)
+    return indiceDaChiaveP2P(mz, String(s.chiave_mia),
+                             Math.max(mz.indice | 0, P2P_INDICE_CERCA_MIN));
+  return 0;
+}
+/* quel che una riga porta SOLO perche' era una presa: non e' dell'ordine */
+const P2P_DELLA_PRESA = ['peer', 'hold', 'satsMiei', 'satsNetti', 'importoScelto',
+  'metodoScelto', 'preso', 'giroMorto', 'giroCaduto', 'statoGrezzo', 'fermoA',
+  'cambioPresa', 'ultimaMossa', 'quando', 'inRitardo', 'nonPartito', 'soloVista',
+  'campiMiei', 'campiLoro', 'euroInviatiAt', 'payoutFallito', 'votabile'];
+function riparaChiaveMakerP2P(id, locali){
+  const mz = mazzoMostro();
+  const tutti = locali || ordiniP2P();
+  const o = tutti[id];
+  if (!mz || !o) return '';
+  const indice = indiceMakerP2P(id, mz, o);
+  if (!(indice > 0)) return '';
+  let tk = null;
+  try { tk = chiaveScambio(mz.sk, indice); } catch(e) { return ''; }
+  const stessa = (o.indice | 0) === indice;
+  if (stessa && o.pubTrade === tk.pub && o.mio) return '';
+  if (P2P_FINALI.indexOf(o.stato) >= 0 && (o.mio || stessa)) return '';
+  const corto = String(id).slice(0, 8);
+  if (o.mio || stessa) {
+    diarioP2P('chiave ' + corto + ': la riga aveva l\'indice ' + (o.indice | 0)
+              + ', l\'ordine e\' mio con l\'indice ' + indice + ': raddrizzata');
+    o.indice = indice; o.pubTrade = tk.pub; o.mio = true;
+    delete o.soloVista;
+    scriviOrdineP2P(o);
+    return 'chiave';
+  }
+  /* LA RIGA DI UNA PRESA DEL MIO ORDINE: torna di chi l'ha pubblicato */
+  const voce = p2pMieiOrdini && p2pMieiOrdini[id];
+  const st = voce ? String(voce.stato || '').trim().toLowerCase() : '';
+  const s = (typeof p2pScambiServer !== 'undefined' && p2pScambiServer && p2pScambiServer[id]) || null;
+  const mioServer = !!(s && s.mio);
+  const libro = typeof rigaLibroP2P === 'function' ? rigaLibroP2P(id) : null;
+  const lato = libro ? (libro.lato === 'sell' ? 'vendo' : 'compro')
+    : (mioServer && (s.lato === 'vendo' || s.lato === 'compro')) ? s.lato
+    : o.daServer ? o.lato
+    : (o.lato === 'vendo' ? 'compro' : 'vendo');
+  const stato = st === 'pending' ? 'pubblicato'
+    : ((mioServer && s.stato) || statoDaRestoreP2P({lato: lato}, st) || '');
+  if (!stato || !STATI_P2P[stato] || P2P_FINALI.indexOf(stato) >= 0) return '';
+  const prov = Object.keys(tutti).find(k => provvisorioP2P(k) && tutti[k]
+    && tutti[k].mio && ((tutti[k].indice | 0) === indice));
+  diarioP2P('chiave ' + corto + ': la riga era di una presa (indice ' + (o.indice | 0)
+            + ', ' + o.stato + '), ma l\'ordine e\' mio (indice ' + indice
+            + '): torna di chi l\'ha pubblicato, a ' + stato
+            + (prov ? ', dalla riga ' + prov : ''));
+  if (prov) {
+    const vera = tutti[prov];
+    delete tutti[prov];
+    for (const k of Object.keys(o)) delete o[k];
+    Object.assign(o, vera);
+    rinominaOrdineP2P(o, id);
+    if (!(P2P_RIPRESA_PASSO[o.stato] > 0) || P2P_FINALI.indexOf(o.stato) >= 0) o.stato = stato;
+  } else {
+    for (const k of P2P_DELLA_PRESA) delete o[k];
+    o.peer = ''; o.hold = null; o.satsNetti = 0; o.importoScelto = 0; o.votabile = false;
+    o.lato = lato;
+    o.stato = stato;
+    const cifre = libro || (mioServer ? {euro: s.euro, euroMax: s.euro_max, sats: s.sats,
+                                          metodi: s.metodi, premium: s.premium} : null);
+    if (cifre && Number(cifre.euro) > 0) {
+      o.euro = Number(cifre.euro);
+      o.euroMax = Math.max(0, Number(cifre.euroMax) || 0);
+      o.sats = Math.max(0, Math.floor(Number(cifre.sats) || 0));
+      o.premium = Number(cifre.premium) || 0;
+      if (Array.isArray(cifre.metodi) && cifre.metodi.length) o.metodi = cifre.metodi.map(String);
+    }
+  }
+  o.indice = indice; o.pubTrade = tk.pub; o.mio = true;
+  o.contattato = true; o.cantDo = ''; o.errore = '';
+  o.aggiornato = Math.floor(Date.now() / 1000);
+  scriviOrdineP2P(o);
+  return 'presa';
+}
+
 /* ---- gli scambi riconosciuti dal coordinatore, senza riga locale --
    LA RIGA SI ADOTTA (set 2026, dal campo: «non posso piu' annullare»).
    Per un ordine PENDING la restore e il libro insieme dicono tutto
@@ -57834,6 +57973,10 @@ function adottaOrdiniAltroveP2P(locali){
     try { tk = chiaveScambio(mz.sk, indice); } catch(e) { continue; }
     const gia = locali[id];
     if (gia) {
+      /* PRIMA LA CHIAVE DI CHI HA PUBBLICATO (28 set 2026, l'ordine
+         d66347c2): la riga di una presa caduta sul MIO ordine torna la
+         riga del mio ordine, e da qui in giu' si ragiona su quella */
+      if (typeof riparaChiaveMakerP2P === 'function' && riparaChiaveMakerP2P(id, locali)) nati++;
       /* LA RIPRESA: lo stato del coordinatore muove la riga locale, UNA
          volta per fotografia (`ripresa` sulla voce, che vive in memoria
          e rinasce a ogni restore) — la lista resta la stessa per tutta
@@ -57875,6 +58018,10 @@ function adottaOrdiniAltroveP2P(locali){
          finita non si tocca, e una che combacia nemmeno. */
       if (gia.pubTrade === tk.pub || P2P_FINALI.indexOf(gia.stato) >= 0) continue;
       gia.pubTrade = tk.pub;
+      /* ...E L'INDICE CON LEI (28 set 2026): la chiave si DERIVA
+         dall'indice a ogni gesto, e raddrizzare la sola `pubTrade`
+         lasciava l'orecchio su una chiave e la firma su un'altra */
+      gia.indice = indice;
       scriviOrdineP2P(gia);
       nati++;
       continue;
@@ -58029,6 +58176,10 @@ function adottaScambiServerP2P(locali){
   for (const id in p2pScambiServer) {
     const s = p2pScambiServer[id];
     if (!s || typeof s !== 'object') continue;
+    /* prima la chiave di chi ha pubblicato (28 set 2026): vedi
+       `riparaChiaveMakerP2P` */
+    if (locali[id] && typeof riparaChiaveMakerP2P === 'function'
+        && riparaChiaveMakerP2P(id, locali)) nati++;
     const gia = locali[id];
     const tk = chiaveScambioDaServerP2P(mz, id, s);
     if (gia) {
@@ -58099,8 +58250,11 @@ function adottaScambiServerP2P(locali){
     /* LA NASCITA: mai su una lapide, mai un mio ritiro, mai senza stato */
     if (lapidataP2P(id)) continue;
     /* un giro caduto messo da parte non rinasce sotto il nome vero
-       (25 set 2026): sta gia' sotto «Annullati» col suo */
-    if (typeof giroArchiviatoP2P === 'function' && giroArchiviatoP2P(locali, id)) continue;
+       (25 set 2026): sta gia' sotto «Annullati» col suo.
+       ⚠️ TRANNE IL MIO ORDINE (28 set 2026): la presa caduta messa da
+       parte era sul MIO ordine, che nel libro e' vivo e va governato —
+       nasce, con la chiave di chi l'ha pubblicato */
+    if (typeof giroArchiviatoP2P === 'function' && giroArchiviatoP2P(locali, id) && !s.mio) continue;
     let stato = s.stato || '';
     if (!stato) {
       const voce = p2pMieiOrdini && p2pMieiOrdini[id];
@@ -59640,6 +59794,62 @@ async function riallineaScambioP2P(id, motivo, leggero){
     return dopo !== prima;
   })().finally(() => { delete p2pRiallineoInVolo[id]; });
   return p2pRiallineoInVolo[id];
+}
+/* ---- «NON E' TUO» DOPO UN GESTO (28 set 2026, l'ordine d66347c2) ----
+   Il coordinatore risponde `is_not_your_order` quando la chiave che ha
+   firmato non e' una delle parti di quell'ordine. Fin qui era un «no»
+   come gli altri — quando arrivava: Alan ha guardato tre volte «La
+   risposta tarda…» su un ordine suo.
+   ADESSO: si rilegge TUTTO (server, libro, restore: e' da li' che
+   arriva l'indice di chi ha pubblicato, e le adozioni raddrizzano la
+   riga), e se la chiave della riga e' CAMBIATA si riprova, UNA volta,
+   con quella. Se non e' cambiata — o il secondo tentativo prende lo
+   stesso «no» — si dice com'e' andata, con una frase che non lascia
+   nessuno ad aspettare. Un annullo che alla rilettura trova l'ordine
+   gia' annullato e' riuscito.
+   Si riprova solo il gesto che ha ancora senso: l'annullo sempre, gli
+   altri se la riga e' rimasta dallo stesso lato. */
+const P2P_NON_TUO = 'da questo profilo di scambio l\'ordine non risulta tuo, anche dopo aver riletto lo stato. Da qui non si può fare: scrivici, e lo sistemiamo noi';
+let p2pNonTuoInCorso = {};      // id -> true: il secondo tentativo e' in volo
+async function nonTuoOrdineP2P(e, o, azione, payload, usata){
+  if (!(e && e.cantDo && e.motivo === 'is-not-your-order')) throw e;
+  const id = o && o.id;
+  const chiaro = () => Object.assign(
+    new Error('La richiesta è stata rifiutata: ' + P2P_NON_TUO),
+    {cantDo: true, motivo: 'is-not-your-order', riletto: true});
+  if (!id || p2pNonTuoInCorso[id]) throw chiaro();
+  p2pNonTuoInCorso[id] = true;
+  const corto = String(id).slice(0, 8);
+  try {
+    diarioP2P('gesto ' + azione + ' ' + corto + ': «non e\' tuo» con la chiave '
+              + String(usata || '').slice(0, 8) + ', rileggo lo stato');
+    try { await (p2pRiallineoInVolo[id] || Promise.resolve()); } catch(x) {}
+    try { await riallineaScambioP2P(id, 'non-tuo', false); } catch(x) {}
+    try { riparaChiaveMakerP2P(id); } catch(x) {}
+    const riga = ordiniP2P()[id];
+    if (riga && azione === 'cancel' && riga.stato === 'annullato') {
+      diarioP2P('gesto ' + azione + ' ' + corto + ': riletto, l\'ordine e\' gia\' annullato');
+      return {action: 'canceled', riletto: true};
+    }
+    const mz = mazzoMostro();
+    let adesso = '';
+    try { if (riga && mz) adesso = chiaveScambio(mz.sk, riga.indice).pub; } catch(x) {}
+    const riprova = !!riga && !!adesso && adesso !== usata
+      && P2P_FINALI.indexOf(riga.stato) < 0
+      && (azione === 'cancel' || riga.lato === o.lato);
+    if (!riprova) {
+      diarioP2P('gesto ' + azione + ' ' + corto + ': riletto, la chiave '
+                + (adesso && adesso !== usata ? 'e\' cambiata ma il gesto non vale piu\''
+                                              : 'e\' la stessa') + ': non si riprova');
+      if (riga) { riga.cantDo = ''; scriviOrdineP2P(riga); }
+      throw chiaro();
+    }
+    riga.cantDo = ''; riga.errore = '';
+    scriviOrdineP2P(riga);
+    diarioP2P('gesto ' + azione + ' ' + corto + ': riprovo una volta con la chiave di chi ha pubblicato ('
+              + adesso.slice(0, 8) + ', indice ' + (riga.indice | 0) + ')');
+    return await chiamataOrdineP2P(riga, azione, payload);
+  } finally { delete p2pNonTuoInCorso[id]; }
 }
 /* ---- LA RISPOSTA CHE TARDA NON E' UN NO (26 set 2026, dal campo:
    «Annulla» caricava a lungo, poi diceva «non riuscito», e l'ordine era

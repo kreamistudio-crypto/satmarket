@@ -54,6 +54,18 @@ nella forma che la patch 0007 manda DAVVERO:
      che l'archivio porta — e il passo su cui si e' fermato, dal client
      vero.
 
+E DAL 28 SET 2026 (l'annullo firmato con la chiave sbagliata, l'ordine
+d66347c2 di Alan):
+
+ 13. chi PRENDE IL PROPRIO ORDINE — il telefono non l'aveva riconosciuto
+     — resta per il server chi l'ha PUBBLICATO: il lato e la `chiave_mia`
+     sono quelli della pubblicazione, durante la presa e dopo che e'
+     caduta, su un «compra» e su un «vendi»; e il CLIENT VERO, sulla
+     risposta vera e contro un coordinatore di cartone che a una chiave
+     non sua risponde «non e' tuo», raddrizza la riga della presa caduta
+     e annulla con la chiave giusta — al primo colpo se l'archivio e'
+     gia' arrivato, al secondo (uno solo) se arriva dopo il «no».
+
 NON TOCCA NIENTE DI VERO: il config e' di cartone (quello di
 `collaudo_pagamento_p2p`), niente Telegram, niente relay, niente
 coordinatore.
@@ -84,6 +96,12 @@ GESTI = "5a1e0000-ffff-4a2b-9c3d-0000000000f4"
 LIBERATO = "5a1e0000-ffff-4a2b-9c3d-0000000000f5"
 LASCIATO = "5a1e0000-ffff-4a2b-9c3d-0000000000f6"
 DISPUTA = "5a1e0000-ffff-4a2b-9c3d-0000000000f7"
+# 28 set 2026: l'ordine proprio preso da se' — un «compra» e un «vendi» —
+# e le seconde trade key delle stesse due persone (quelle della presa)
+MIO_COMPRA = "5a1e0000-ffff-4a2b-9c3d-0000000000f9"
+MIO_VENDI = "5a1e0000-ffff-4a2b-9c3d-0000000000fa"
+CHIAVE_COMPRA_2 = "c3" * 32
+CHIAVE_VENDE_2 = "d4" * 32
 
 
 def semina_ordini():
@@ -212,6 +230,112 @@ process.stdout.write(JSON.stringify(out));
         open(p, "w", encoding="utf-8").write(prog)
         open(d, "w", encoding="utf-8").write(json.dumps(
             {"risposta": risposta, "locali": locali, "libro": libro}))
+        r = subprocess.run([node, p, d], capture_output=True, text=True,
+                           timeout=60, encoding="utf-8")
+    finally:
+        shutil.rmtree(cart, ignore_errors=True)
+    if r.returncode or not r.stdout.strip():
+        return {"ERRORE": (r.stderr or "")[-400:]}
+    return json.loads(r.stdout)
+
+
+def client_che_annulla(risposta, ordine, locali, chiavi, maker, archivio_dopo):
+    """IL CLIENT VERO CONTRO UN COORDINATORE DI CARTONE (28 set 2026): le
+    adozioni, la porta dei gesti e il «non e' tuo» di miniapp.html, in
+    node. `chiavi` sono le trade key del profilo per indice (la
+    derivazione vera vuole il bundle: qui e' una tabella), `maker` la
+    chiave con cui l'ordine e' stato pubblicato — il coordinatore di
+    cartone a ogni altra risponde `is_not_your_order`. Con
+    `archivio_dopo` il telefono al momento del gesto non sa niente, e la
+    risposta del server gli arriva solo quando rilegge. Torna l'esito
+    dell'annullo, le chiavi che hanno firmato, la riga prima e dopo."""
+    import shutil
+    import subprocess
+    import tempfile
+    node = shutil.which("node")
+    if not node:
+        return {"ERRORE": "node non c'e'"}
+    mini = open(os.path.join(banco.QUI, "miniapp.html"), encoding="utf-8").read()
+    riga = lambda firma: mini[mini.index(firma):mini.index("\n", mini.index(firma))]
+    fino = lambda da, a: mini[mini.index(da):mini.index("\n}\n", mini.index(a)) + 3]
+    pezzi = "\n".join([
+        "const _box = {}; const localStorage = {getItem: k => (k in _box ? _box[k] : null),"
+        " setItem: (k, v) => { _box[k] = String(v); }};",
+        "const chiaveP2P = k => k; const MOSTRO_ORDINI_CHIAVE = 'o';"
+        " const window = {NostrTools: {schnorr: true}};",
+        "let p2pOrdineAperto = '', p2pHoldOrdine = '', p2pIncassoOrdine = '';",
+        "let p2pMieiOrdini = null, p2pLibro = {ordini: []}, p2pScambiServer = null;",
+        "const diario = []; function diarioP2P(r){ diario.push(r); }",
+        "function lapidataP2P(){ return false; } function rigaLibroP2P(){ return null; }",
+        "function idMostroVero(){ return true; } let rid = 0; function nuovaRichiestaP2P(){ return ++rid; }",
+        "function messaggioMostro(azione, opz){ return {azione: azione, id: opz.id}; }",
+        riga("const P2P_FINALI = "),
+        js(mini, "const STATI_P2P = {", "\n};\n"),
+        js(mini, "const P2P_PROGRESSO = {", "\n};\n"),
+        js(mini, "function ordiniP2P(){"),
+        fino("function nomeProvvisorioP2P(indice){", "function rinominaOrdineP2P(o, nuovoId){"),
+        js(mini, "function scriviOrdineP2P(o){"),
+        js(mini, "function giroArchiviatoP2P(locali, id){"),
+        js(mini, "function rigaDiQuestoMazzoP2P(o, m){"),
+        js(mini, "function ordineDiUnAltroMazzoP2P(o, m){"),
+        fino("const P2P_DA_RESTORE = {", "function riprendiDaRestoreP2P(o, statoMostro){"),
+        fino("function indiceMakerP2P(id, mz, o){", "function riparaChiaveMakerP2P(id, locali){"),
+        fino("const P2P_INDICE_CERCA_MAX = ", "function adottaScambiServerP2P(locali){"),
+        js(mini, "async function chiamataOrdineP2P(o, azione, payload){"),
+        fino("const P2P_NON_TUO = ", "async function nonTuoOrdineP2P("),
+    ])
+    prog = pezzi + """
+const dati = JSON.parse(require('fs').readFileSync(process.argv[2], 'utf-8'));
+const mazzo = {sk: 'S', pub: 'P', indice: dati.chiavi.length};
+function mazzoMostro(){ return mazzo; }
+function chiaveScambio(sk, i){
+  const pub = dati.chiavi[i - 1];
+  if (!pub) throw new Error('indice senza chiave');
+  return {sk: 'sk:' + pub, pub: pub, indice: i};
+}
+const firme = [];
+async function mostroChiama(skTrade, msg){
+  const pub = String(skTrade).replace('sk:', '');
+  firme.push(msg.azione + ':' + pub);
+  const ascolta = Object.values(ordiniP2P()).some(r => r.pubTrade === pub && P2P_FINALI.indexOf(r.stato) < 0);
+  if (pub !== dati.maker)
+    throw (ascolta ? Object.assign(new Error('La richiesta è stata rifiutata: questo ordine non è tuo'),
+                                   {cantDo: true, motivo: 'is-not-your-order'})
+                   : Object.assign(new Error('Nessuna risposta (30 s)'), {silenzio: true}));
+  const r = ordiniP2P()[msg.id]; r.stato = 'annullato'; scriviOrdineP2P(r);
+  return {action: 'canceled'};
+}
+let p2pRiallineoInVolo = {}; const riallinei = [];
+async function riallineaScambioP2P(id, motivo, leggero){
+  riallinei.push(motivo + (leggero ? ':leggero' : ':pieno'));
+  p2pScambiServer = dati.risposta;
+  adottaScambiServerP2P(ordiniP2P());
+  return true;
+}
+const foto = () => { const r = ordiniP2P()[dati.ordine];
+  return r ? [dati.chiavi.indexOf(r.pubTrade) + 1, r.indice, !!r.mio, r.lato, r.stato] : null; };
+(async () => {
+  _box.o = JSON.stringify(dati.locali);
+  const out = {prima: foto()};
+  if (!dati.archivio_dopo) {
+    p2pScambiServer = dati.risposta;
+    adottaScambiServerP2P(ordiniP2P());
+  }
+  out.adottata = foto();
+  try { const r = await chiamataOrdineP2P(ordiniP2P()[dati.ordine], 'cancel'); out.esito = 'ok:' + r.action; }
+  catch(e) { out.esito = 'no:' + e.message; }
+  out.firme = firme; out.riallinei = riallinei; out.dopo = foto();
+  process.stdout.write(JSON.stringify(out));
+})();
+"""
+    cart = tempfile.mkdtemp(prefix="chiave_maker_")
+    try:
+        p = os.path.join(cart, "client.js")
+        d = os.path.join(cart, "dati.json")
+        open(p, "w", encoding="utf-8").write(prog)
+        open(d, "w", encoding="utf-8").write(json.dumps(
+            {"risposta": risposta, "ordine": ordine, "locali": locali, "chiavi": chiavi,
+             "maker": maker, "archivio_dopo": bool(archivio_dopo)}))
         r = subprocess.run([node, p, d], capture_output=True, text=True,
                            timeout=60, encoding="utf-8")
     finally:
@@ -441,6 +565,64 @@ def main():
     nato = client_sulla_risposta(risposta, {}, [])
     prova("il client vero: nasce con le cifre, e si e' fermato A GARANZIA (2) o NEL LIBRO (0)",
           {FORBICE: [20, 100, -2.5, 2], RITIRO: [20, 0, 0, 0]}, nato.get("cifre", nato))
+
+    print("\n13) l'annullo con la chiave di chi ha pubblicato (28 set 2026)")
+    KC2, KV2 = CHIAVE_COMPRA_2, CHIAVE_VENDE_2
+    con = banco.con_db()
+    for chiave, tg in ((KC2, C), (KV2, V)):
+        con.execute("INSERT OR REPLACE INTO chiavi_p2p(pubkey, tg_id, creato) "
+                    "VALUES(?,?,?)", (chiave, tg, t))
+    for ordine, chi, lato in ((MIO_COMPRA, C, "buy"), (MIO_VENDI, V, "sell")):
+        con.execute("INSERT OR REPLACE INTO p2p_ordini(ordine,tg_id,creato,stato,"
+                    "lato,maker,sats,euro,metodi,premio) VALUES(?,?,?,'pending',?,1,"
+                    "0,'10,00 €','[\"Contanti\"]',-1)", (ordine, chi, t, lato))
+    con.commit()
+    con.close()
+    # il «compra» di chi compra, preso DA LUI come chi vende, con la sua
+    # seconda chiave: il caso di Alan
+    banco.evento(MIO_COMPRA, "taken", t + 800, "seller", "take", buyer=KC, seller=KC2)
+    prova("il mio «compra» preso da me: resto chi l'ha pubblicato, con la chiave della pubblicazione",
+          ["compro", True, KC, KC2], voce(C, MIO_COMPRA, "lato", "mio", "chiave_mia", "chiave_peer"))
+    banco.evento(MIO_COMPRA, "canceled", t + 810, "seller", "republished", buyer=KC, seller=KC2)
+    prova("...la presa cade: l'ordine e' di nuovo «pubblicato», mio, con la stessa chiave",
+          ["pubblicato", "compro", True, KC], voce(C, MIO_COMPRA, "stato", "lato", "mio", "chiave_mia"))
+    # il «vendi» di chi vende, preso DA LUI come chi compra: qui il lato
+    # di prima («compro», il primo controllato) dava la chiave della presa
+    banco.evento(MIO_VENDI, "taken", t + 820, "buyer", "take", buyer=KV2, seller=KV)
+    prova("il mio «vendi» preso da me: il lato e' quello di chi ha pubblicato, e la chiave pure",
+          ["vendo", True, KV, KV2], voce(V, MIO_VENDI, "lato", "mio", "chiave_mia", "chiave_peer"))
+    banco.evento(MIO_VENDI, "canceled", t + 830, "buyer", "republished", buyer=KV2, seller=KV)
+    prova("...e dopo la presa caduta pure",
+          ["pubblicato", "vendo", True, KV], voce(V, MIO_VENDI, "stato", "lato", "mio", "chiave_mia"))
+    # IL TELEFONO DI ALAN: la riga scritta dalla presa, sotto l'id vero,
+    # con l'indice della presa (2); la pubblicazione era l'indice 1
+    presa = lambda ordine, lato, chiave: {ordine: {
+        "id": ordine, "lato": lato, "indice": 2, "pubTrade": chiave, "stato": "attesa_mia_hold",
+        "euro": 10, "euroMax": 0, "sats": 15000, "satsNetti": 14900, "satsMiei": 15100,
+        "metodi": ["Contanti"], "premium": -1, "peer": "", "hold": {"bolt": "lnbc1"},
+        "contattato": True, "cantDo": "", "errore": "", "preso": True, "creato": t}}
+    for ordine, chi, lato_presa, lato_mio, k1, k2 in ((MIO_COMPRA, C, "vendo", "compro", KC, KC2),
+                                                      (MIO_VENDI, V, "compro", "vendo", KV, KV2)):
+        risposta = {o: v for o, v in scambi(chi)["scambi"].items() if o == ordine}
+        MIA = [1, 1, True, lato_mio, "pubblicato"]
+        r = client_che_annulla(risposta, ordine, presa(ordine, lato_presa, k2), [k1, k2], k1, False)
+        prova(f"il client vero ({lato_mio}): la riga della presa caduta torna di chi ha pubblicato…",
+              [[2, 2, False, lato_presa, "attesa_mia_hold"], MIA],
+              [r.get("prima", r), r.get("adottata")])
+        prova("...e l'annullo parte firmato con la chiave della pubblicazione: riuscito, al primo colpo",
+              ["ok:canceled", ["cancel:" + k1], [], "annullato"],
+              [r.get("esito"), r.get("firme"), r.get("riallinei"), (r.get("dopo") or [""] * 5)[4]])
+        r = client_che_annulla(risposta, ordine, presa(ordine, lato_presa, k2), [k1, k2], k1, True)
+        prova("...se l'archivio arriva solo dopo il «non e' tuo»: rilegge, riprova UNA volta con la chiave giusta, riesce",
+              ["ok:canceled", ["cancel:" + k2, "cancel:" + k1], ["non-tuo:pieno"], "annullato"],
+              [r.get("esito"), r.get("firme"), r.get("riallinei"), (r.get("dopo") or [""] * 5)[4]])
+    # il telefono con l'orecchio su una chiave e la firma sull'altra
+    storta = presa(MIO_COMPRA, "vendo", KC)
+    risposta = {o: v for o, v in scambi(C)["scambi"].items() if o == MIO_COMPRA}
+    r = client_che_annulla(risposta, MIO_COMPRA, storta, [KC, KC2], KC, False)
+    prova("il telefono con la chiave sbagliata gia' salvata si corregge da solo, e annulla",
+          [[1, 1, True, "compro", "pubblicato"], "ok:canceled", ["cancel:" + KC]],
+          [r.get("adottata", r), r.get("esito"), r.get("firme")])
 
     print(f"\n{banco.PASSATE} ok, {banco.FALLITE} NO")
     return 1 if banco.FALLITE else 0

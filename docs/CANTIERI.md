@@ -35500,3 +35500,48 @@ il conto di Bea dice «1% meno conveniente» in rosso e sotto «Premio
 richiesto dall'utente»; su una riga sola a 375 e a 320 px (la nota alta 18 px; misurata a 320 anche «Sconto offerto dall'utente»);
 sul proprio ordine di Alan «Sconto che hai richiesto 1%» e niente sotto.
 **DA AVERE:** il telefono.
+
+L'annullo firmato con la chiave sbagliata (28 set 2026, dal campo:
+l'ordine d66347c2 di Alan, «compra» 10 € in contanti). **IL FATTO**, dai
+log di mostrod: l'ordine e' pubblicato con la trade key dell'indice 2
+(6edbf143…); alle 09:40 UTC il telefono di Alan, che lo vedeva col «?» e
+non lo riconosceva come suo, lo PRENDE con un'altra chiave (a63096cd…);
+la presa cade e l'ordine torna `pending`; alle 13:18-13:20 tre annulli
+partono firmati con a63096cd…, tre `is_not_your_order`, e l'app resta su
+«La risposta tarda…». **PERCHE'**, letto sul codice: `eseguiPresaP2P`
+scrive la riga sotto l'id VERO dell'ordine con l'indice della presa, e
+ogni gesto deriva la chiave da `riga.indice`. Nessuno la correggeva: la
+cintura del mazzo guarda l'IDENTITA' della restore (la sua) e non
+l'indice; la riparazione del 14 set raddrizzava `pubTrade` e non
+`indice`, cioe' l'orecchio sulla chiave di chi ha pubblicato e la firma
+con quella della presa — il «no», scritto alla chiave che aveva firmato,
+non arrivava nemmeno. cd264a9 e 761af3f hanno curato il riconoscimento
+(il «?», «È il tuo ordine»), non la riga gia' scritta. **LA CURA**:
+`riparaChiaveMakerP2P` e `indiceMakerP2P` nel motore (vedi
+ARCHITETTURA, «IL MIO ORDINE SI FIRMA CON LA CHIAVE DI CHI L'HA
+PUBBLICATO»), chiamate dalle due adozioni — i telefoni con la chiave
+sbagliata si correggono alla prima apertura in cui restore o archivio
+rispondono — e dalla porta dei gesti; `nonTuoOrdineP2P` per il
+`is-not-your-order` (rilegge, riprova una volta, o lo dice); il mio
+ordine nasce dall'archivio anche con una presa caduta messa da parte;
+sul server il lato di chi ha pubblicato quando le due parti sono la
+stessa persona (su un «vendi» preso da se' `chiave_mia` era la chiave
+della presa). **SCARTATO**: mettere da parte la riga della presa e far
+rinascere l'ordine (due strade e la pagina aperta che cambia nome: la
+riga si converte sul posto); indovinare l'indice provando le chiavi
+contro il coordinatore; bloccare il gesto quando non si sa (la cintura
+resta fail-open). **PROVATO.** `prove_annullo_chiave_maker` (44):
+sentinelle e il banco in node con l'archivio vero, le adozioni, la porta
+e il «non e' tuo» veri contro un coordinatore di cartone — presa caduta
+viva e chiusa, annullo al primo colpo, `is-not-your-order` nei sei modi,
+il telefono con la chiave gia' sbagliata nei quattro modi, quel che non
+si tocca. Emendata col perche' la sentinella della nascita in
+`prove_schermo_segue_mostro`. `collaudo_scambi_ovunque` col passo 13:
+server vero (il «compra» e il «vendi» presi da se', durante e dopo) e
+client vero sulla risposta vera. Tortura 22 su 22 (due guardie morte
+tolte, una sopravvissuta presa con un caso in piu'). **NON PROVATO**: il
+telefono e il coordinatore veri; il giro dal vivo non e' stato fatto.
+**DA AVERE**: dal telefono di Alan, dopo il deploy, il diario («Copia
+diagnosi») con la riga «chiave d66347c2: …» e l'annullo riuscito; se la
+restore e l'archivio non rispondono tutt'e due, la riga non si corregge
+e l'annullo dice la frase nuova — allora serve l'annullo da moderatore.

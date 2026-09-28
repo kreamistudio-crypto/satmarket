@@ -107507,9 +107507,13 @@ def prove_schermo_segue_mostro():
           0 < es.find("if (giroCadutoP2P(ordiniP2P()[id])) archiviaGiroCadutoP2P(id);")
           < es.find("toast('È il tuo ordine: non puoi prenderlo');"))
     ad = nudo(fn("function adottaScambiServerP2P(locali){"))
-    prova("...e l'archivio del server non fa rinascere il giro messo da parte", True,
-          "if (typeof giroArchiviatoP2P === 'function' && giroArchiviatoP2P(locali, id)) continue;" in ad
-          and ad.index("if (lapidataP2P(id)) continue;") < ad.index("giroArchiviatoP2P(locali, id)) continue;"))
+    # EMENDATA (28 set 2026, l'annullo firmato con la chiave sbagliata): il
+    # giro messo da parte non rinasce — TRANNE sul mio ordine (`!s.mio`),
+    # che nel libro e' vivo e va governato con la chiave di chi l'ha
+    # pubblicato. Il caso gira in `prove_annullo_chiave_maker`.
+    prova("...e l'archivio del server non fa rinascere il giro messo da parte (se non e' il mio ordine)", True,
+          "if (typeof giroArchiviatoP2P === 'function' && giroArchiviatoP2P(locali, id) && !s.mio) continue;" in ad
+          and ad.index("if (lapidataP2P(id)) continue;") < ad.index("giroArchiviatoP2P(locali, id) && !s.mio) continue;"))
 
     # --- A) IL GIA' FATTO RILEGGE, L'APERTURA E IL RISVEGLIO RIALLINEANO --
     inc = nudo(fn("async function inviaIncassoP2P(){"))
@@ -108020,6 +108024,369 @@ process.stdout.write(JSON.stringify(out));
           ["morti", False, True, False], o["gruppo"])
 
 
+def prove_annullo_chiave_maker():
+    """L'ANNULLO FIRMATO CON LA CHIAVE SBAGLIATA (28 set 2026, dal campo:
+    l'ordine d66347c2 di Alan). Alan pubblica un «compra» con la trade key
+    dell'indice 2; il suo telefono non lo riconosce come suo e lo PRENDE,
+    con la chiave dell'indice 3. La presa cade, l'ordine torna nel libro,
+    e la riga locale — scritta dalla presa sotto l'id vero — resta con
+    l'indice 3: tre annulli firmati con la chiave della presa caduta, tre
+    `is_not_your_order`, e l'app ferma su «La risposta tarda…».
+    LE CURE: `riparaChiaveMakerP2P` (di un ordine MIO la chiave e' quella
+    con cui l'ho pubblicato, detta dalla restore o dall'archivio: la riga
+    di una presa torna la riga del mio ordine), chiamata dalle due
+    adozioni e dalla porta dei gesti; la riparazione del 14 set che porta
+    l'indice insieme alla chiave; `nonTuoOrdineP2P` (rilegge, riprova UNA
+    volta con la chiave giusta, o lo dice chiaro); sul server il lato di
+    chi ha pubblicato quando le due parti sono la stessa persona."""
+    import json as _json, os as _os, re as _re, shutil as _sh
+    import subprocess as _sp, tempfile as _tf
+    print("\n[l'annullo firmato con la chiave sbagliata]")
+    mini = open("miniapp.html", encoding="utf-8").read()
+    fn = lambda firma: pezzo_js(mini, firma, "\n}\n") + "\n}"
+    nudo = lambda js: _re.sub(r"/\*[\s\S]*?\*/", "", js)
+    blocco = lambda inizio, fine: mini[mini.index(inizio):mini.index(fine, mini.index(inizio)) + len(fine)]
+
+    # --- 1) LE SENTINELLE -------------------------------------------------
+    i_motore = mini.index("/* ============ IL MOTORE DELLO SCAMBIO")
+    i_fine_motore = mini.index("/* ============ fine del motore dello scambio ============ */")
+    i_fine_archivio = mini.index("/* ============ fine dell'archivio del server ============ */")
+    prova("il giudice della chiave e la riparazione vivono nel motore (niente rete)", [True, True],
+          [i_motore < mini.index(f) < i_fine_motore
+           for f in ("function indiceMakerP2P(id, mz, o){", "function riparaChiaveMakerP2P(id, locali){")])
+    rip = nudo(fn("function riparaChiaveMakerP2P(id, locali){")) + nudo(fn("function indiceMakerP2P(id, mz, o){"))
+    prova("...e non chiamano nessuno: ne' fetch ne' relay", [0, 0, 0],
+          [rip.count("fetch("), rip.count("mostroChiama"), rip.count("await ")])
+    prova("il «non e' tuo» vive fuori dal motore, accanto al riallineo", True,
+          i_fine_motore < mini.index("async function nonTuoOrdineP2P(e, o, azione, payload, usata){") < i_fine_archivio)
+    porta = nudo(fn("async function chiamataOrdineP2P(o, azione, payload){"))
+    prova("la porta dei gesti raddrizza la riga PRIMA della cintura e prima di derivare la chiave", True,
+          0 < porta.find("riparaChiaveMakerP2P(o.id)") < porta.find("ordineDiUnAltroMazzoP2P(o, mz)")
+          < porta.find("const tk = chiaveScambio(mz.sk, o.indice);"))
+    prova("...rilegge la riga raddrizzata, e sulla riga di una presa lascia passare solo l'annullo", True,
+          "if (riparata) o = ordiniP2P()[o.id] || o;" in porta
+          and "if (riparata === 'presa' && azione !== 'cancel')" in porta)
+    prova("...e il «non e' tuo» passa da chi rilegge, con la chiave che ha firmato", True,
+          "chiamata.catch(e => nonTuoOrdineP2P(e, o, azione, payload, tk.pub))" in porta
+          and "typeof nonTuoOrdineP2P === 'function'" in porta)
+    ado = nudo(fn("function adottaOrdiniAltroveP2P(locali){"))
+    prova("l'adozione dalla restore raddrizza la chiave PRIMA della ripresa (che guarda il lato)", True,
+          0 < ado.find("riparaChiaveMakerP2P(id, locali)") < ado.find("const ripreso = riprendiDaRestoreP2P(gia, st);"))
+    prova("...e la riparazione del 14 set porta l'indice insieme alla chiave", True,
+          "gia.pubTrade = tk.pub;\n      \n      gia.indice = indice;" in ado
+          or _re.search(r"gia\.pubTrade = tk\.pub;\s+gia\.indice = indice;", ado) is not None)
+    ads = nudo(fn("function adottaScambiServerP2P(locali){"))
+    prova("l'adozione dal server raddrizza la chiave prima di leggere la riga", True,
+          0 < ads.find("riparaChiaveMakerP2P(id, locali)") < ads.find("const gia = locali[id];"))
+    nt = nudo(fn("async function nonTuoOrdineP2P(e, o, azione, payload, usata){"))
+    prova("il «non e' tuo» rilegge TUTTO (anche la restore), dopo il giro gia' in volo", True,
+          0 < nt.find("await (p2pRiallineoInVolo[id] || Promise.resolve());")
+          < nt.find("await riallineaScambioP2P(id, 'non-tuo', false);")
+          < nt.find("return await chiamataOrdineP2P(riga, azione, payload);"))
+    prova("...e riprova una volta sola: il secondo tentativo in volo ferma il terzo", True,
+          "if (!id || p2pNonTuoInCorso[id]) throw chiaro();" in nt
+          and "finally { delete p2pNonTuoInCorso[id]; }" in nt)
+    frase = _re.search(r"const P2P_NON_TUO = '((?:[^'\\]|\\.)*)';", mini).group(1)
+    prova("la frase del «non e' tuo» ha le parole di casa (niente «relay», «coordinatore», «chiave»)",
+          [False, False, False],
+          [w in frase.lower() for w in ("relay", "coordinatore", "chiave")])
+    prova("...e dice cosa fare", True, "scrivici" in frase)
+    motore = nudo(mini[mini.index("const MOSTRO_ORDINI_CHIAVE"):i_fine_motore])
+    prova("il motore resta a zero fetch e zero corpo", [0, 0],
+          [motore.count("fetch("), motore.count("body:")])
+    sc = pezzo("_scambi_p2p")
+    prova("sul server, se le due parti sono la stessa persona vale il lato di chi ha pubblicato", True,
+          0 < sc.find("if io == compra and io == vende:") < sc.find("elif io == compra:")
+          and 'lato = {"buy": "compro", "sell": "vendo"}.get(libro, "compro")' in sc)
+
+    node = _sh.which("node")
+    if not node:
+        salta("il banco dell'annullo con la chiave di chi ha pubblicato", "node non c'e'")
+        return
+    cart = _tf.mkdtemp(prefix="chiave_maker_")
+
+    # --- 2) IL BANCO: l'archivio VERO (copie a ogni lettura, come il
+    #        localStorage), le adozioni, la porta e il «non e' tuo» veri;
+    #        di cartone il mazzo, la derivazione e il coordinatore ---------
+    b = "\n".join([
+        "const _box = {}; const localStorage = {getItem: k => (k in _box ? _box[k] : null),"
+        " setItem: (k, v) => { _box[k] = String(v); }};",
+        "const chiaveP2P = k => k; const MOSTRO_ORDINI_CHIAVE = 'o';",
+        "const window = {NostrTools: {schnorr: true}};",
+        "let DEMO = false, VETRINA = false, myTgId = 222;",
+        "let p2pOrdineAperto = '', p2pHoldOrdine = '', p2pIncassoOrdine = '';",
+        "let p2pMieiOrdini = null, p2pScambiServer = null, p2pLibro = null;",
+        "const diario = []; function diarioP2P(r){ diario.push(r); }",
+        "function lapidataP2P(){ return false; }",
+        "function rigaLibroP2P(id){ return ((p2pLibro && p2pLibro.ordini) || []).find(x => x.id === id) || null; }",
+        # il mazzo e la derivazione di cartone: la chiave dell'indice N e' «pub:N»
+        "let mazzo = {sk: 'S', pub: 'P', indice: 3}; function mazzoMostro(){ return mazzo; }",
+        "let derivate = 0;",
+        "function chiaveScambio(sk, i){ derivate++; return {sk: 'sk:' + i, pub: 'pub:' + i, indice: i}; }",
+        "function idMostroVero(){ return true; } let rid = 0; function nuovaRichiestaP2P(){ return ++rid; }",
+        "function messaggioMostro(azione, opz){ return {azione: azione, id: opz.id, indice: opz.indice}; }",
+        pezzo_js(mini, "const P2P_FINALI = ", "\n"),
+        pezzo_js(mini, "const STATI_P2P = {", "\n};") + "\n};",
+        pezzo_js(mini, "const P2P_PROGRESSO = {", "\n};") + "\n};",
+        blocco("function ordiniP2P(){", "\n}\n"),
+        blocco("function nomeProvvisorioP2P(indice){", "\n}\n"),      # fino a rinominaOrdineP2P
+        fn("function scriviOrdineP2P(o){"),
+        blocco("const P2P_RESTORE_CHIUSI = ", "\n}\n"),                # con giroCadutoP2P
+        fn("function giroArchiviatoP2P(locali, id){"),
+        fn("function rigaDiQuestoMazzoP2P(o, m){"),
+        fn("function ordineDiUnAltroMazzoP2P(o, m){"),
+        mini[mini.index("const P2P_DA_RESTORE = {"):
+             mini.index("\n}\n", mini.index("function riprendiDaRestoreP2P(o, statoMostro){")) + 3],
+        mini[mini.index("function indiceMakerP2P(id, mz, o){"):
+             mini.index("\n}\n", mini.index("function riparaChiaveMakerP2P(id, locali){")) + 3],
+        fn("function adottaOrdiniAltroveP2P(locali){"),
+        mini[mini.index("const P2P_INDICE_CERCA_MAX = "):
+             mini.index("\n}\n", mini.index("function adottaScambiServerP2P(locali){")) + 3],
+        fn("async function chiamataOrdineP2P(o, azione, payload){"),
+        mini[mini.index("const P2P_NON_TUO = "):
+             mini.index("\n}\n", mini.index("async function nonTuoOrdineP2P(")) + 3],
+    ]) + r"""
+/* IL COORDINATORE DI CARTONE: sa chi ha pubblicato ogni ordine, e a un
+   annullo firmato da un'altra chiave dice «non e' tuo». La risposta
+   ARRIVA solo se una riga viva ascolta sulla chiave che ha firmato: e'
+   il modo in cui sul telefono di Alan il «no» non e' mai arrivato. */
+const mostro = {ordini: {}, visti: []};
+async function mostroChiama(skTrade, msg){
+  const pub = String(skTrade).replace('sk:', 'pub:');
+  mostro.visti.push(msg.azione + ':' + pub);
+  await new Promise(r => setTimeout(r, 5));
+  const ascolta = Object.values(ordiniP2P()).some(r => r.pubTrade === pub && P2P_FINALI.indexOf(r.stato) < 0);
+  /* il «no» che arriva si scrive anche sulla riga, come fa la porta dei
+     messaggi vera (`applicaMessaggioP2P`) */
+  const no = m => {
+    const r = ordiniP2P()[msg.id];
+    if (ascolta && r) { r.cantDo = 'La richiesta è stata rifiutata: ' + m; scriviOrdineP2P(r); }
+    throw (ascolta
+      ? Object.assign(new Error('La richiesta è stata rifiutata: ' + m), {cantDo: true, motivo: m})
+      : Object.assign(new Error('Nessuna risposta (30 s)'), {silenzio: true})); };
+  const ord = mostro.ordini[msg.id];
+  if (!ord) no('not-found');
+  if (ord.maker !== pub && ord.taker !== pub) no('is-not-your-order');
+  if (msg.azione === 'cancel') {
+    ord.stato = 'canceled';
+    const r = ordiniP2P()[msg.id]; r.stato = 'annullato'; scriviOrdineP2P(r);
+    return {action: 'canceled'};
+  }
+  return {action: msg.azione};
+}
+/* CHI LO SA, di cartone: il riallineo pieno porta la restore e
+   l'archivio, e fa girare le adozioni VERE */
+let p2pRiallineoInVolo = {}; let restoreDice = null, serverDice = null; const riallinei = [];
+async function riallineaScambioP2P(id, motivo, leggero){
+  riallinei.push(motivo + (leggero ? ':leggero' : ':pieno'));
+  await new Promise(r => setTimeout(r, 5));
+  if (serverDice) p2pScambiServer = JSON.parse(JSON.stringify(serverDice));
+  adottaScambiServerP2P(ordiniP2P());
+  if (!leggero && restoreDice) p2pMieiOrdini = JSON.parse(JSON.stringify(restoreDice));
+  adottaOrdiniAltroveP2P(ordiniP2P());
+  return true;
+}
+const ORD = 'd66347c2-c1c4-40d4-bbce-3dc80ae4f83a';
+const LIBRO = {id: ORD, lato: 'buy', euro: 10, euroMax: 0, sats: 0, premium: -1, metodi: ['Contanti'], creato: 100};
+const PENDING = {[ORD]: {indice: 2, stato: 'pending', identita: 'P'}};
+function telefono(righe, opz){
+  const o = opz || {};
+  _box.o = JSON.stringify(righe); diario.length = 0; riallinei.length = 0; derivate = 0;
+  mostro.visti = []; mostro.ordini = {[ORD]: {maker: 'pub:2', stato: 'pending'}};
+  p2pMieiOrdini = o.restore === undefined ? null : JSON.parse(JSON.stringify(o.restore));
+  p2pScambiServer = o.server === undefined ? null : JSON.parse(JSON.stringify(o.server));
+  p2pLibro = {ordini: o.libro === undefined ? [Object.assign({}, LIBRO)] : o.libro};
+  restoreDice = o.restoreDice || null; serverDice = o.serverDice || null;
+  p2pOrdineAperto = o.aperto || '';
+}
+/* la riga che `eseguiPresaP2P` ha scritto: l'id VERO, l'indice della presa */
+const presa = (extra) => Object.assign({id: ORD, lato: 'vendo', indice: 3, pubTrade: 'pub:3',
+  stato: 'attesa_mia_hold', euro: 10, euroMax: 0, sats: 15000, satsNetti: 14900, satsMiei: 15100,
+  importoScelto: 0, metodoScelto: 'Contanti', metodi: ['Contanti'], premium: -1, peer: 'pub:2',
+  hold: {bolt: 'lnbc1'}, contattato: true, cantDo: '', errore: '', votabile: false,
+  preso: true, ultimaMossa: 1700000500, creato: 1700000000, aggiornato: 1700000500}, extra || {});
+const foto = (id) => { const r = ordiniP2P()[id || ORD]; return r ? [r.indice, r.pubTrade, !!r.mio, r.lato, r.stato] : null; };
+const esito = async (p) => { try { const r = await p; return 'ok:' + (r && r.action); } catch(e) { return 'no:' + String(e.message); } };
+(async () => {
+  const out = {};
+  // A) ORDINE PROPRIO CON PRESA CADUTA SULLA STESSA IDENTITA', riga viva
+  telefono({[ORD]: presa()}, {restore: PENDING});
+  out.A_prima = foto();
+  out.A_nati = adottaOrdiniAltroveP2P(ordiniP2P());
+  out.A = foto();
+  const a = ordiniP2P()[ORD];
+  out.A_pulita = [a.peer, a.hold, a.satsMiei === undefined, a.satsNetti, a.preso === undefined,
+                  a.ultimaMossa === undefined, a.metodoScelto === undefined, a.euro, a.premium, a.metodi];
+  out.A_diario = diario.filter(r => r.indexOf('chiave d66347c2') === 0).length;
+  out.A_seconda = [adottaOrdiniAltroveP2P(ordiniP2P()), foto()];
+  // ...presa caduta e gia' chiusa (il «canceled» era arrivato): stessa cura
+  telefono({[ORD]: presa({stato: 'annullato', hold: null})}, {restore: PENDING});
+  adottaOrdiniAltroveP2P(ordiniP2P());
+  out.A_chiusa = foto();
+  // B) L'ANNULLO CON LA CHIAVE GIUSTA
+  telefono({[ORD]: presa()}, {restore: PENDING});
+  adottaOrdiniAltroveP2P(ordiniP2P());
+  out.B = [await esito(chiamataOrdineP2P(ordiniP2P()[ORD], 'cancel')), mostro.visti.slice(), foto()[4], riallinei.slice()];
+  // ...e anche senza passare dall'adozione: la porta raddrizza prima di firmare
+  telefono({[ORD]: presa()}, {restore: PENDING});
+  out.B_porta = [await esito(chiamataOrdineP2P(ordiniP2P()[ORD], 'cancel')), mostro.visti.slice(), foto()];
+  // ...un altro gesto sulla riga di una presa non parte: non c'e' piu' lo scambio
+  telefono({[ORD]: presa({stato: 'attivo'})}, {restore: PENDING});
+  out.B_altro = [await esito(chiamataOrdineP2P(ordiniP2P()[ORD], 'fiat-sent')), mostro.visti.slice(), foto()];
+  // C) CANT-DO «IS_NOT_YOUR_ORDER»: il telefono non sa ancora niente
+  telefono({[ORD]: presa()}, {restoreDice: PENDING});
+  let t0 = Date.now();
+  out.C = [await esito(chiamataOrdineP2P(ordiniP2P()[ORD], 'cancel')), mostro.visti.slice(), foto(), riallinei.slice(),
+           Date.now() - t0 < 1000, (ordiniP2P()[ORD] || {}).cantDo || ''];
+  // ...sulla MIA riga con l'indice storto: stessa cura, e il «no» di prima non resta scritto
+  telefono({[ORD]: {id: ORD, lato: 'compro', indice: 5, pubTrade: 'pub:5', mio: true, stato: 'pubblicato', euro: 10}},
+           {restoreDice: PENDING});
+  out.C_mia = [await esito(chiamataOrdineP2P(ordiniP2P()[ORD], 'cancel')), mostro.visti.slice(), foto(),
+               (ordiniP2P()[ORD] || {}).cantDo || '', (ordiniP2P()[ORD] || {}).errore || ''];
+  // ...la chiave giusta la sa solo il server
+  telefono({[ORD]: presa()}, {serverDice: {[ORD]: {lato: 'compro', mio: true, stato: 'pubblicato', chiave_mia: 'pub:2',
+                                                  chiave_peer: '', euro: 10, euro_max: 0, sats: 0, premium: -1, metodi: ['Contanti']}},
+                              libro: []});
+  out.C_server = [await esito(chiamataOrdineP2P(ordiniP2P()[ORD], 'cancel')), mostro.visti.slice(), foto()];
+  // ...riletto, e nessuno sa niente: si dice chiaro, subito, con UN tentativo
+  telefono({[ORD]: presa()}, {});
+  t0 = Date.now();
+  out.C_niente = [await esito(chiamataOrdineP2P(ordiniP2P()[ORD], 'cancel')), mostro.visti.slice(), foto(), riallinei.slice(),
+                  Date.now() - t0 < 1000];
+  // ...riletto, la chiave cambia, ma anche la seconda prende «non e' tuo»: due tentativi, mai tre
+  telefono({[ORD]: presa()}, {restoreDice: PENDING});
+  mostro.ordini[ORD].maker = 'pub:9';
+  out.C_due = [await esito(chiamataOrdineP2P(ordiniP2P()[ORD], 'cancel')), mostro.visti.slice(), riallinei.length,
+               Object.keys(p2pNonTuoInCorso).length];
+  // ...riletto, e l'ordine risulta gia' annullato: l'annullo e' riuscito
+  telefono({[ORD]: presa()}, {serverDice: {[ORD]: {lato: 'vendo', mio: false, stato: 'annullato', chiave_mia: 'pub:3'}}, libro: []});
+  out.C_giaAnnullato = [await esito(chiamataOrdineP2P(ordiniP2P()[ORD], 'cancel')), mostro.visti.slice(), foto()[4]];
+  // ...un altro «no» resta un no, e non rilegge niente
+  telefono({[ORD]: presa()}, {restoreDice: PENDING});
+  mostro.ordini = {};
+  out.C_altroNo = [await esito(chiamataOrdineP2P(ordiniP2P()[ORD], 'cancel')), riallinei.slice()];
+  // D) IL TELEFONO CON LA CHIAVE SBAGLIATA GIA' SALVATA
+  // D1: l'orecchio su una chiave e la firma su un'altra (la riparazione del 14 set)
+  telefono({[ORD]: presa({pubTrade: 'pub:2'})}, {restore: PENDING});
+  adottaOrdiniAltroveP2P(ordiniP2P());
+  out.D1 = [foto(), await esito(chiamataOrdineP2P(ordiniP2P()[ORD], 'cancel')), mostro.visti.slice()];
+  // D2: la presa caduta gia' messa da parte, e il server sa che l'ordine e' mio
+  const daParte = presa({id: ORD + '~1700000500', idVero: ORD, giroCaduto: 1, stato: 'annullato', hold: null});
+  const SERVER_MIO = {[ORD]: {lato: 'compro', mio: true, stato: 'pubblicato', chiave_mia: 'pub:2', chiave_peer: '',
+                              euro: 10, euro_max: 0, sats: 0, premium: -1, metodi: ['Contanti'], creato: 100}};
+  telefono({[daParte.id]: daParte}, {server: SERVER_MIO, libro: []});
+  adottaScambiServerP2P(ordiniP2P());
+  out.D2 = [foto(), foto(daParte.id), Object.keys(ordiniP2P()).length];
+  // ...ma l'ordine di un ALTRO messo da parte non rinasce
+  telefono({[daParte.id]: daParte}, {server: {[ORD]: Object.assign({}, SERVER_MIO[ORD], {mio: false, lato: 'vendo', stato: 'annullato', chiave_mia: 'pub:3'})}, libro: []});
+  adottaScambiServerP2P(ordiniP2P());
+  out.D2_altrui = [foto(), Object.keys(ordiniP2P()).length];
+  // D3: la risposta alla pubblicazione persa — il provvisorio c'e' ancora, ed e' lui la riga vera
+  const prov = {id: 'nuovo:2', lato: 'compro', indice: 2, pubTrade: 'pub:2', mio: true, stato: 'senza_risposta',
+                euro: 10, euroMax: 0, sats: 0, premium: -1, metodi: ['Contanti'], tabacchino: 0, creato: 1699999000};
+  telefono({'nuovo:2': prov, [ORD]: presa()}, {restore: PENDING, aperto: 'nuovo:2'});
+  adottaOrdiniAltroveP2P(ordiniP2P());
+  out.D3 = [Object.keys(ordiniP2P()), foto(), ordiniP2P()[ORD].creato, ordiniP2P()[ORD].hold === undefined, p2pOrdineAperto];
+  // D4: a saperlo e' solo il server (la restore non ha risposto): l'indice si cerca fra le derivate
+  telefono({[ORD]: presa()}, {server: SERVER_MIO, libro: []});
+  adottaScambiServerP2P(ordiniP2P());
+  out.D4 = [foto(), ordiniP2P()[ORD].euro, ordiniP2P()[ORD].premium];
+  // E) QUEL CHE NON SI TOCCA
+  // l'ordine di un altro che ho preso io: la restore dice il MIO indice di presa
+  telefono({[ORD]: presa()}, {restore: {[ORD]: {indice: 3, stato: 'waiting-payment', identita: 'P'}}});
+  out.E_presaVera = [riparaChiaveMakerP2P(ORD), adottaOrdiniAltroveP2P(ordiniP2P()), foto()];
+  // la restore di un'altra identita'
+  telefono({[ORD]: presa()}, {restore: {[ORD]: {indice: 2, stato: 'pending', identita: 'ALTRA'}}});
+  out.E_altraIdentita = [riparaChiaveMakerP2P(ORD), adottaOrdiniAltroveP2P(ordiniP2P()), foto()];
+  // la riga giusta, e quella finita
+  const mia = {id: ORD, lato: 'compro', indice: 2, pubTrade: 'pub:2', mio: true, stato: 'pubblicato', euro: 10};
+  telefono({[ORD]: mia}, {restore: PENDING});
+  out.E_giusta = [riparaChiaveMakerP2P(ORD), foto(), diario.length];
+  telefono({[ORD]: Object.assign({}, mia, {indice: 5, pubTrade: 'pub:5', stato: 'annullato'})}, {restore: PENDING});
+  out.E_finita = [riparaChiaveMakerP2P(ORD), foto()];
+  // la MIA riga con l'indice storto si raddrizza senza cambiare altro
+  telefono({[ORD]: Object.assign({}, mia, {indice: 5, pubTrade: 'pub:5', stato: 'attivo', peer: 'pub:7'})},
+           {restore: {[ORD]: {indice: 2, stato: 'active', identita: 'P'}}});
+  out.E_miaStorta = [riparaChiaveMakerP2P(ORD), foto(), ordiniP2P()[ORD].peer];
+  // chi lo sa dice che l'ordine e' finito: niente da firmare, non si tocca
+  telefono({[ORD]: presa()}, {server: {[ORD]: Object.assign({}, SERVER_MIO[ORD], {stato: 'annullato'})}, libro: []});
+  out.E_ordineFinito = [riparaChiaveMakerP2P(ORD), foto()];
+  // senza mazzo, senza riga, su un provvisorio e su una riga messa da parte
+  telefono({[ORD]: presa(), 'nuovo:2': prov, [daParte.id]: daParte}, {restore: PENDING});
+  out.E_vuoti = [riparaChiaveMakerP2P('non-esiste'), riparaChiaveMakerP2P('nuovo:2'), riparaChiaveMakerP2P(daParte.id)];
+  mazzo = null; out.E_senzaMazzo = riparaChiaveMakerP2P(ORD); mazzo = {sk: 'S', pub: 'P', indice: 3};
+  // F) MAI PIU' L'ORECCHIO SU UNA CHIAVE E LA FIRMA SU UN'ALTRA: la riparazione del 14 set
+  telefono({[ORD]: presa({pubTrade: 'pub:SBAGLIATA'})}, {restore: {[ORD]: {indice: 4, stato: 'waiting-payment', identita: 'P'}}});
+  adottaOrdiniAltroveP2P(ordiniP2P());
+  out.F = foto();
+  process.stdout.write(JSON.stringify(out));
+})();
+"""
+    pj = _os.path.join(cart, "chiave.js")
+    open(pj, "w", encoding="utf-8").write(b)
+    r = _sp.run([node, pj], capture_output=True, text=True, timeout=120, encoding="utf-8")
+    _sh.rmtree(cart, ignore_errors=True)
+    prova("il banco della chiave gira, e nessun rifiuto resta per aria", "", (r.stderr or "")[-700:])
+    if r.returncode or not r.stdout.strip():
+        return
+    o = _json.loads(r.stdout)
+    ORD = "d66347c2-c1c4-40d4-bbce-3dc80ae4f83a"
+    MIA = [2, "pub:2", True, "compro", "pubblicato"]
+    PRESA = [3, "pub:3", False, "vendo", "attesa_mia_hold"]
+    NON_TUO = ("no:La richiesta è stata rifiutata: da questo profilo di scambio l'ordine non risulta tuo, "
+               "anche dopo aver riletto lo stato. Da qui non si può fare: scrivici, e lo sistemiamo noi")
+    prova("A) presa caduta sul mio ordine: la riga aveva la chiave della presa…", PRESA, o["A_prima"])
+    prova("...e alla prima adozione torna di chi l'ha pubblicato: indice 2, la sua chiave, mia, dall'altro lato, nel libro",
+          [1, MIA], [o["A_nati"], o["A"]])
+    prova("...senza niente di quel che era della presa (controparte, garanzia, importi, passi), con le cifre del libro",
+          ["", None, True, 0, True, True, True, 10, -1, ["Contanti"]], o["A_pulita"])
+    prova("...il diario lo scrive una volta, e rifarlo non cambia niente", [1, [0, MIA]],
+          [o["A_diario"], o["A_seconda"]])
+    prova("...anche se la presa caduta era gia' chiusa: l'ordine e' vivo, e torna governabile", MIA, o["A_chiusa"])
+    prova("B) l'annullo parte con la chiave di chi ha pubblicato, e riesce al primo colpo",
+          ["ok:canceled", ["cancel:pub:2"], "annullato", []], o["B"])
+    prova("...anche senza adozione: la porta raddrizza la riga prima di firmare",
+          ["ok:canceled", ["cancel:pub:2"], [2, "pub:2", True, "compro", "annullato"]], o["B_porta"])
+    prova("...e un altro gesto sulla riga di una presa non parte: lo dice, e la riga e' gia' quella giusta",
+          ["no:Questo è un tuo ordine, e lo scambio che stavi guardando non c'è più: riapri la pagina", [], MIA],
+          o["B_altro"])
+    prova("C) «non e' tuo»: rilegge tutto, riprova UNA volta con la chiave giusta e riesce — senza restare in attesa, e senza lasciare il no sulla riga",
+          ["ok:canceled", ["cancel:pub:3", "cancel:pub:2"], [2, "pub:2", True, "compro", "annullato"],
+           ["non-tuo:pieno"], True, ""], o["C"])
+    prova("...sulla MIA riga con l'indice storto pure, e il «no» del primo tentativo non resta scritto sulla riga",
+          ["ok:canceled", ["cancel:pub:5", "cancel:pub:2"], [2, "pub:2", True, "compro", "annullato"], "", ""],
+          o["C_mia"])
+    prova("...lo stesso quando la chiave giusta la sa solo il server",
+          ["ok:canceled", ["cancel:pub:3", "cancel:pub:2"], [2, "pub:2", True, "compro", "annullato"]], o["C_server"])
+    prova("...se riletto nessuno sa niente lo dice chiaro, subito, con un tentativo solo e la riga com'era",
+          [NON_TUO, ["cancel:pub:3"], PRESA, ["non-tuo:pieno"], True], o["C_niente"])
+    prova("...se anche la chiave nuova prende «non e' tuo»: due tentativi, mai tre, una rilettura, e niente resta in volo",
+          [NON_TUO, ["cancel:pub:3", "cancel:pub:2"], 1, 0], o["C_due"])
+    prova("...se riletto l'ordine e' gia' annullato, l'annullo e' riuscito",
+          ["ok:canceled", ["cancel:pub:3"], "annullato"], o["C_giaAnnullato"])
+    prova("...e un altro «no» resta un no: non rilegge niente",
+          ["no:La richiesta è stata rifiutata: not-found", []], o["C_altroNo"])
+    prova("D) il telefono con la chiave sbagliata gia' salvata (orecchio su una, firma sull'altra) si corregge da solo e annulla",
+          [MIA, "ok:canceled", ["cancel:pub:2"]], o["D1"])
+    prova("...la presa caduta gia' messa da parte: il MIO ordine nasce dall'archivio con la chiave giusta, e la riga da parte resta",
+          [MIA, [3, "pub:3", False, "vendo", "annullato"], 2], o["D2"])
+    prova("...ma quella sull'ordine di un altro non rinasce", [None, 1], o["D2_altrui"])
+    prova("...col provvisorio ancora qui (risposta alla pubblicazione persa) la riga vera e' lui: una riga sola, la sua nascita, la pagina aperta segue",
+          [[ORD], MIA, 1699999000, True, ORD], o["D3"])
+    prova("...e se lo sa solo il server, l'indice si trova fra le chiavi derivate", [MIA, 10, -1], o["D4"])
+    prova("E) l'ordine di un altro che ho preso io non si tocca", ["", 0, PRESA], o["E_presaVera"])
+    prova("...ne' quello che la restore di un'altra identita' dice suo", ["", 0, PRESA], o["E_altraIdentita"])
+    prova("...la riga giusta resta com'e', in silenzio", ["", MIA, 0], o["E_giusta"])
+    prova("...e una mia riga finita pure", ["", [5, "pub:5", True, "compro", "annullato"]], o["E_finita"])
+    prova("...la MIA riga con l'indice storto prende indice e chiave, e nient'altro",
+          ["chiave", [2, "pub:2", True, "compro", "attivo"], "pub:7"], o["E_miaStorta"])
+    prova("...se chi lo sa dice l'ordine finito non c'e' niente da firmare", ["", PRESA], o["E_ordineFinito"])
+    prova("...e senza riga, su un provvisorio, su una riga messa da parte o senza profilo non fa niente",
+          [["", "", ""], ""], [o["E_vuoti"], o["E_senzaMazzo"]])
+    prova("F) la riparazione del 14 set porta indice e chiave INSIEME: si firma con la chiave su cui si ascolta",
+          [4, "pub:4"], o["F"][:2])
+
+
 def prove_annullati_ritocchi():
     """GLI ANNULLATI, I RITOCCHI (27 set 2026, dopo d875b39). Cinque cose
     viste da Andrea: 1) in «Annullati» l'ordine appena annullato stava in
@@ -108266,7 +108633,7 @@ def main():
     print("  LE PROVE DI BARATTOLO")
     print("=" * 58)
     for f in (prove_filtro_italiano, prove_autocomplete_comuni,
-              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullati_ritocchi, prove_card_annullati,
+              prove_scambi_p2p_vecchi, prove_scambi_ovunque, prove_ritocchi_flusso_p2p, prove_volto_card_ascolto, prove_volto_unico, prove_schermo_segue_mostro, prove_annulla_riallinea, prove_annullo_chiave_maker, prove_annullati_ritocchi, prove_card_annullati,
               prove_testo_evento,
               prove_tag_commercio, prove_tag_client,
               prove_consegna_firmata,
