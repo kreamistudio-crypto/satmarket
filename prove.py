@@ -14199,6 +14199,113 @@ def prove_foto_metadati():
         prova("e la storta resta senza GPS, com'era gia'", {},
               _gps_dentro(amb["normalizza_foto_import"](storta.getvalue())))
 
+        # --- L'ORIENTAMENTO (set 2026, cantiere foto-senza-exif) --------
+        # Il tag Orientation e' l'unico metadato che dice come DISEGNARE
+        # la foto: il bisturi lo tagliava col resto, e una foto storta
+        # restava sdraiata per sempre — coi pixel IDENTICI, quindi
+        # nessuna delle prove qui sopra poteva accorgersene. Si misura
+        # come la vede un browser: exif_transpose, poi dov'e' il rosso.
+        from PIL import ImageDraw
+
+        def scena(larg, alt):
+            """Una foto VERTICALE con la banda rossa in ALTO."""
+            im = foto_finta(larg, alt)
+            ImageDraw.Draw(im).rectangle([0, 0, larg, alt // 8],
+                                         fill=(230, 10, 10))
+            return im
+
+        def verso(raw):
+            """(verticale?, rosso in alto?) come la disegna un browser."""
+            with Image.open(io.BytesIO(raw)) as im:
+                im = ImageOps.exif_transpose(im).convert("RGB")
+                larg, alt = im.size
+                r, g, b = im.getpixel((larg // 2, 2))
+                return (alt > larg, r > 150 and g < 90 and b < 90)
+
+        def salvata(raw, orientamento=None, fmt="JPEG"):
+            out = io.BytesIO()
+            extra = {}
+            if orientamento is not None:
+                extra["exif"] = _exif_con_gps(orientamento=orientamento)
+            raw.save(out, fmt, **extra) if fmt == "PNG" else \
+                raw.save(out, fmt, quality=90, **extra)
+            return out.getvalue()
+
+        # il telefono salva i pixel SDRAIATI e scrive «ruotala»: 6 vuol
+        # dire 90 gradi in senso orario per mostrarla
+        sdraiata = scena(80, 120).rotate(90, expand=True)
+        storta6 = salvata(sdraiata, 6)
+        prova("la storta di partenza, vista da un browser, e' dritta",
+              (True, True), verso(storta6))
+        prova("UNA FOTO STORTA NON SI SPOGLIA A BISTURI: «non lo so»",
+              None, spoglia(storta6))
+        # ...e la strada di salva_foto, che sul «non lo so» converte
+        rimessa = spoglia(storta6) or amb["converti_in_jpeg"](storta6)
+        prova("...la conversione la raddrizza: verticale, rosso in alto",
+              (True, True), verso(rimessa))
+        prova("...e i pixel sono girati DAVVERO, non solo dichiarati", 0,
+              len(dict(Image.open(io.BytesIO(rimessa)).getexif())))
+        prova("...e il GPS se n'e' andato lo stesso", {},
+              _gps_dentro(rimessa))
+        prova("tutti e sette gli orientamenti storti (2..8) vanno alla "
+              "conversione", [None] * 7,
+              [spoglia(salvata(sdraiata, o)) for o in range(2, 9)])
+        # LA FOTO SENZA EXIF E' DRITTA: e' il caso da cui e' partito il
+        # cantiere, e il bisturi non deve nemmeno sfiorarla
+        dritta = scena(80, 120)
+        nuda = salvata(dritta)
+        prova("una foto SENZA EXIF: orientamento normale, torna identica",
+              nuda, spoglia(nuda))
+        prova("...e resta dritta", (True, True), verso(spoglia(nuda)))
+        uno = salvata(dritta, 1)
+        prova("Orientation 1 col GPS: il bisturi va avanti, pixel intatti",
+              pixel(uno), pixel(spoglia(uno)))
+        # lo 0 e' quel che scrivono i programmi che «azzerano» i tag
+        # (Fossify Gallery, il caso dell'annuncio 354): fuori scala, cioe'
+        # normale — exif_transpose fa lo stesso, e un browser pure
+        zero = salvata(dritta, 0)
+        prova("Orientation 0 (EXIF azzerato): normale, pixel intatti",
+              pixel(zero), pixel(spoglia(zero)))
+        prova("...e resta dritta", (True, True), verso(spoglia(zero)))
+        prova("un valore fuori scala (9) e' normale anche lui", True,
+              spoglia(salvata(dritta, 9)) is not None)
+        # un EXIF ROTTO (spazzatura dopo «Exif\0\0»): Pillow lo legge
+        # vuoto, cioe' normale — e il bisturi lo toglie come ogni APP1
+        corpo = b"Exif\x00\x00" + b"\xde\xad\xbe\xef" * 20
+        rotto = (nuda[:2] + b"\xff\xe1" + (len(corpo) + 2).to_bytes(2, "big")
+                 + corpo + nuda[2:])
+        prova("un EXIF rotto: normale, spogliato, pixel intatti",
+              (True, False, pixel(nuda)),
+              (spoglia(rotto) is not None,
+               b"Exif\x00\x00" in (spoglia(rotto) or b"Exif\x00\x00"),
+               pixel(spoglia(rotto) or nuda)))
+        # il PNG storto: stessa regola, stesso ripiego
+        png6 = salvata(sdraiata, 6, "PNG")
+        prova("un PNG storto va alla conversione anche lui",
+              (None, (True, True)),
+              (spoglia(png6), verso(amb["converti_in_jpeg"](png6))))
+        # LA PORTA CHE LO FACEVA DAVVERO DALLA MINI APP: la busta di
+        # ritiro e la foto del contenuto digitale partono dal telefono
+        # GREZZE (readAsDataURL, niente canvas), e l'etichetta
+        # fotografata in verticale arrivava al compratore sdraiata
+        class _H(Exception):
+            def __init__(self, stato, detto=""):
+                super().__init__(detto)
+        amb["HTTPException"] = _H
+        amb["MAX_DOC_BUSTA"] = 15 * 1024 * 1024
+        i = _SORGENTE.index("FIRME_DOC_BUSTA = ")
+        exec(_SORGENTE[i:_SORGENTE.index("\n\n\n", i)], amb)
+        exec(pezzo("_documento_busta"), amb)
+        busta, tipo, est = amb["_documento_busta"](
+            "data:image/jpeg;base64," + base64.b64encode(storta6).decode())
+        prova("la busta con l'etichetta storta: arriva DRITTA, in JPEG",
+              ((True, True), "image/jpeg", "jpg", {}),
+              (verso(busta), tipo, est, _gps_dentro(busta)))
+        busta, tipo, _ = amb["_documento_busta"](
+            "data:image/jpeg;base64," + base64.b64encode(nuda).decode())
+        prova("...e quella senza EXIF passa com'era, byte per byte",
+              (nuda, "image/jpeg"), (busta, tipo))
+
     # --- SENTINELLE ---------------------------------------------------
     # le tre porte: se un riordino toglie la chiamata, la promessa cade
     # in silenzio e nessuna prova funzionale se ne accorge
