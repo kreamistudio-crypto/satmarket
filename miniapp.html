@@ -2658,8 +2658,15 @@
      di .p2p-sats (scambio, striscia) la cifra resta arancio, che li'
      il lato e' della riga e non del tab. DISCENDENTE e non figlio:
      dal set 2026 la cifra sta DENTRO la testa. */
+  /* ⚠️ IL LATO LO DICE L'ORDINE, NON IL TAB (28 set 2026, dal difetto
+     del dettaglio aperto dalla vetrina): la regola rossa leggeva
+     `body.p2p-vendo`, cioe' l'ultimo tab del libro guardato. Nel libro
+     il risultato era lo stesso — il libro filtra per lato — ma una card
+     fuori da un elenco filtrato avrebbe vestito il tab. Adesso la card
+     porta `lato-compro` / `lato-vendo` dal suo `o.lato`
+     (`rigaOrdineP2P`), lo stesso vocabolario del conto. */
   .p2p-ord .p2p-sats{color:var(--trust);transition:color .3s ease}
-  body.p2p-vendo .p2p-ord .p2p-sats{color:var(--danger)}
+  .p2p-ord.lato-vendo .p2p-sats{color:var(--danger)}
   @media (prefers-reduced-motion:reduce){
     .p2p-ord .p2p-sats{transition:none}
   }
@@ -2961,9 +2968,12 @@
      tab del LIBRO — rossi solo perche' l'ultima volta si e' guardato
      «Vendi BTC». Un rosso che non dice niente, nel posto dove il rosso
      e' l'allarme.
-     IL `body` IN TESTA NON E' DECORAZIONE: pareggia la specificita' di
-     `body.p2p-vendo .p2p-ord .p2p-sats` (tre classi piu' un elemento),
-     e questa riga sta DOPO, quindi vince.
+     IL `body` IN TESTA NON E' DECORAZIONE: era nato per pareggiare
+     `body.p2p-vendo .p2p-ord .p2p-sats` (tre classi piu' un elemento);
+     dal 28 set 2026 la regola rossa e' `.p2p-ord.lato-vendo .p2p-sats`
+     (tre classi), e l'elemento in piu' la batte comunque — la card di
+     uno scambio il lato non lo porta, ma se un giorno lo portasse
+     resterebbe arancio lo stesso.
      E `white-space:normal` perche' su un intervallo la cifra e' lunga
      («≈ 74 029–148 058 sats») e il `nowrap` di `.p2p-sats`
      allargherebbe la PAGINA invece di andare a capo. */
@@ -5667,21 +5677,25 @@
      verde e il rosso proprio perche' questa si vedesse. L'euro resta
      nell'inchiostro — due righe colorate in fondo tornerebbero a
      essere una macchia sola. */
-  .conto-p2p .ctrl-riga.tot.sats .mono{color:var(--trust)}
-  body.p2p-vendo .conto-p2p .ctrl-riga.tot.sats .mono{color:var(--danger)}
-  /* ⚠️ NELLA PAGINA DI UNO SCAMBIO PROPRIO IL LATO E' DELLA RIGA, NON
-     DEL TAB (24 set 2026, dalla prova vera: Andrea vende, e la riga
-     «Paghi X sats» del suo ordine appena pubblicato era VERDE). Le due
-     regole qui sopra leggono `body.p2p-vendo`, cioe' l'ultimo tab del
-     LIBRO guardato — che nella pagina di uno scambio non dice niente:
-     ci si arriva da «I miei scambi» col tab dov'era rimasto. Qui il
-     colore lo dice `o.lato`, scritto sulla scatola del conto da
-     renderOrdineP2P (`lato-compro` / `lato-vendo`): verde se i sats
-     ARRIVANO a chi legge, rosso se ESCONO — lo stesso significato
-     della barra e del libro. Sette classi contro sei piu' un elemento:
-     vince a prescindere dall'ordine nel foglio. */
-  .p2p-ord.lato-compro .conto-p2p .ctrl-riga.tot.sats .mono{color:var(--trust)}
-  .p2p-ord.lato-vendo .conto-p2p .ctrl-riga.tot.sats .mono{color:var(--danger)}
+  /* ⚠️ IL LATO E' DELL'ORDINE VISTO DA CHI LEGGE, MAI DEL TAB, e ci
+     sono voluti due giri. Il 24 set 2026 (dalla prova vera: Andrea
+     vende, e la riga «Paghi X sats» del suo ordine appena pubblicato
+     era VERDE) la pagina di uno scambio proprio aveva avuto la sua
+     classe, sulla scatola intorno al conto; ma la regola rossa di tutti
+     gli altri leggeva ancora `body.p2p-vendo`, cioe' l'ultimo tab del
+     LIBRO guardato. Il 28 set 2026 (dal campo: il dettaglio aperto
+     dalla fila «Scambi P2P» della home diceva «Ricevi X sats» ROSSO su
+     un «Compra BTC», e «Invia» verde su un «Vendi BTC») e' uscito il
+     resto: il dettaglio si apre anche da fuori dal libro, e il tab
+     rimasto non c'entra niente con l'ordine toccato.
+     LA CURA E' UNA SOLA per ogni strada — libro, vetrina, «I miei
+     scambi», link, notifica —: `contoDettP2P` scrive il lato sulla
+     scatola del conto (`lato-compro` se i sats ARRIVANO a chi legge,
+     `lato-vendo` se ESCONO — lo stesso significato della barra e del
+     libro), dal suo `o.lato` gia' tradotto per chi legge, e nessuna
+     regola del conto guarda piu' il body. */
+  .conto-p2p.lato-compro .ctrl-riga.tot.sats .mono{color:var(--trust)}
+  .conto-p2p.lato-vendo .ctrl-riga.tot.sats .mono{color:var(--danger)}
   .conto-p2p .ctrl-riga.tot.euro .mono{color:var(--ink)}
   .ctrl-riga.tot{font-weight:800;font-size:16.5px;padding:11px 0 10px}
   .ctrl-riga.tot .mono{color:var(--sats-text)}
@@ -45234,12 +45248,16 @@ function rigaOrdineP2P(o){
      ordine resta indistinguibile: e' il limite dichiarato di questo
      mattone, e lo chiude la marcatura via coordinatore. */
   const mio = ordineMioP2P(o.id);
+  /* IL LATO DELLA CIFRA (28 set 2026): verde se chi legge riceve i
+     sats, rosso se li invia — dall'ordine, mai dal tab (vedi il CSS di
+     `.p2p-ord .p2p-sats`) */
+  const lato = paghiEuro ? ' lato-compro' : ' lato-vendo';
   /* l'id viaggia nel dataset e non dentro la stringa dell'onclick:
      e' testo di sconosciuti — il patto del filtro-alfabeto */
   /* LA CARD D'ESEMPIO DEL GIRO GUIDATO (26 set 2026): e' questa stessa
      card, ma senza id e senza tocco — non si prende — e con la sua
      etichetta. `o.esempio` e' il lato del tab; vedi IL GIRO GUIDATO. */
-  if (o.esempio) return `<div class="p2p-ord p2p-esempio" data-lato="${esc(o.esempio)}">
+  if (o.esempio) return `<div class="p2p-ord p2p-esempio${lato}" data-lato="${esc(o.esempio)}">
     <span class="p2p-esempio-tag">Esempio</span>
     <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${anelloScadenzaP2P(o)}</div>
     ${paghiEuro ? rigaSats : rigaEuro}
@@ -45247,7 +45265,7 @@ function rigaOrdineP2P(o){
     ${paga}
     ${rep ? '<div class="p2p-box p2p-rep">' + rep + '</div>' : ''}
   </div>`;
-  return `<div class="p2p-ord${mio ? ' p2p-mio' : ''}${typeof cardNuovaP2P === 'function' && cardNuovaP2P(o.id) ? ' p2p-nuova' : ''}" data-id="${esc(o.id)}" role="button" tabindex="0"
+  return `<div class="p2p-ord${lato}${mio ? ' p2p-mio' : ''}${typeof cardNuovaP2P === 'function' && cardNuovaP2P(o.id) ? ' p2p-nuova' : ''}" data-id="${esc(o.id)}" role="button" tabindex="0"
     onclick="prendiOrdineP2P(this.dataset.id)">
     <div class="p2p-testa">${paghiEuro ? rigaEuro : rigaSats}${anelloScadenzaP2P(o)}</div>
     ${paghiEuro ? rigaSats : rigaEuro}
@@ -50796,7 +50814,10 @@ function contoDettP2P(o){
      sarebbe l'etichetta. Il conto del mercatino non ce l'ha e resta
      identico: la' le cifre sono corte e la regola di casa («a cedere
      e' l'etichetta») non fa danni. */
-  return '<div class="ctrl-conto conto-p2p">'
+  /* IL LATO SULLA SCATOLA (28 set 2026): e' il colore della riga dei
+     sats, verde se arrivano a chi legge e rosso se escono, deciso QUI
+     da `compro` e mai dal tab del libro (vedi il CSS di `.conto-p2p`) */
+  return '<div class="ctrl-conto conto-p2p ' + (compro ? 'lato-compro' : 'lato-vendo') + '">'
     + rigaConvenienzaFissaP2P(o, convFissa)
     + r(etichettaCtrl, cifra('ctrl'))
     + premio

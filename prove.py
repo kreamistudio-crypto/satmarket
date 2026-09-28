@@ -51758,7 +51758,8 @@ def prove_giro_guidato_p2p():
 
     # --- 3) LA CARD D'ESEMPIO ---------------------------------------------
     riga = pezzo_js(mini, "function rigaOrdineP2P(o){", "\n}\n")
-    _es = riga[riga.index("if (o.esempio) return"):riga.index("return `<div class=\"p2p-ord${mio")]
+    # (28 set 2026) la card porta il suo lato prima di tutto: `${lato}`
+    _es = riga[riga.index("if (o.esempio) return"):riga.index("return `<div class=\"p2p-ord${lato}${mio")]
     prova("la card d'esempio esce dalla stessa rigaOrdineP2P", True, "if (o.esempio) return" in riga)
     prova("...senza id, senza tocco, senza ruolo di bottone", [0, 0, 0, 0],
           [_es.count("data-id"), _es.count("onclick"), _es.count("role="), _es.count("tabindex")])
@@ -55816,11 +55817,36 @@ console.log(JSON.stringify(out));
     # l'inchiostro di casa, lo stesso della riga grande. Colorata
     # tutta, la riga si leggeva come un blocco unico e il colore
     # smetteva di indicare qualcosa.
+    # (28 set 2026) la tinta rossa la porta la card del lato, non il tab
     prova("...e in tinta c'e' la cifra, non il verbo", True,
           ".p2p-sats .p2p-verbo{color:var(--ink)}" in mini
           # e la tinta del LATO resta dov'era, sulla riga intera
           and ".p2p-ord .p2p-sats{color:var(--trust)" in mini
-          and "body.p2p-vendo .p2p-ord .p2p-sats{color:var(--danger)}" in mini)
+          and ".p2p-ord.lato-vendo .p2p-sats{color:var(--danger)}" in mini)
+    # ⚠️ LA CIFRA VESTE L'ORDINE, MAI IL TAB (28 set 2026, dal difetto del
+    # dettaglio aperto dalla vetrina): si chiede alla CASCATA, sul markup
+    # vero delle due card, col body di ciascun tab — il libro filtra per
+    # lato, ma una card fuori da un elenco filtrato non deve vestire il tab
+    _css_l = mini[mini.index("<style>"):mini.index("</style>")]
+    _reg_l, _ = _regole_css(_css_l[len("<style>"):])
+
+    def _tinta_card(markup, corpo):
+        cat = _catene_html(markup, lambda p: "p2p-sats" in p[-1]["classi"])
+        if len(cat) != 1:
+            return ("catene", len(cat))
+        v = _vince_css(_reg_l, [{"tag": "html", "attr": {}, "classi": set()},
+                                {"tag": "body", "attr": {}, "classi": set(corpo)}]
+                       + cat[0], ["color"]).get("color")
+        return v[0] if v else None
+    _TAB_L = ([], ["p2p-vendo"], ["nav-p2p"], ["nav-p2p", "p2p-vendo"])
+    prova("LA CIFRA DELLA CARD DEL LIBRO VESTE L'ORDINE: verde su un «Compra BTC» e "
+          "rossa su un «Vendi BTC», qualunque tab sia rimasto (lo dice la cascata)",
+          [["var(--trust)"] * 4, ["var(--danger)"] * 4],
+          [[_tinta_card(out["rigaCompra"], t) for t in _TAB_L],
+           [_tinta_card(out["rigaVendi"], t) for t in _TAB_L]])
+    prova("...e la card la porta scritta: lato-compro sul k=sell, lato-vendo sul k=buy",
+          [True, True], ['class="p2p-ord lato-compro' in out["rigaCompra"],
+                         'class="p2p-ord lato-vendo' in out["rigaVendi"]])
     # ...e i due tab dicono lo STESSO verbo a chi da', ognuno con la
     # sua moneta: e' tutto il ritocco, e una sentinella che guardasse
     # solo la parola nuova non direbbe questo.
@@ -56960,8 +56986,56 @@ console.log(JSON.stringify(out));
     # «Paga» del mercatino, e ogni riga e' la verita' di CHI LEGGE —
     # la meta' della commissione, o le righe non sommerebbero.
     cm = o["contoMercato"]
+    # (28 set 2026) ...e sulla scatola il LATO di chi legge: qui compra
     prova("il conto veste il vestito del mercatino", True,
-          '<div class="ctrl-conto conto-p2p">' in cm and 'ctrl-riga' in cm)
+          '<div class="ctrl-conto conto-p2p lato-compro">' in cm and 'ctrl-riga' in cm)
+    # ⚠️ IL COLORE DELLA RIGA DEI SATS E' DEL LATO DELL'ORDINE VISTO DA CHI
+    # LEGGE, MAI DEL TAB (28 set 2026, dal campo: aperto dalla fila «Scambi
+    # P2P» della home, un «Compra BTC» diceva «Ricevi X sats» ROSSO e un
+    # «Vendi BTC» «Invia» VERDE — il tab rimasto era l'altro). Si chiede
+    # alla CASCATA sul markup vero: la pagina del dettaglio (la stessa dal
+    # libro e dalla vetrina, cambia solo il tab rimasto) e la pagina di uno
+    # scambio proprio («I miei scambi», un link, una notifica), coi quattro
+    # body che il tab puo' lasciare.
+    _css_d = mini[mini.index("<style>"):mini.index("</style>")]
+    _reg_d, _ = _regole_css(_css_d[len("<style>"):])
+
+    def _nd(tag, id_=None, classi=()):
+        return {"tag": tag, "attr": {"id": id_} if id_ else {}, "classi": set(classi)}
+
+    def _tinta_sats(markup, corpo, sopra):
+        cat = _catene_html(markup, lambda p: "mono" in p[-1]["classi"] and len(p) > 1
+                           and {"tot", "sats"} <= p[-2]["classi"])
+        if len(cat) != 1:
+            return ("catene", len(cat))
+        v = _vince_css(_reg_d, [_nd("html"), _nd("body", classi=corpo)] + sopra + cat[0],
+                       ["color"]).get("color")
+        return v[0] if v else None
+    _TAB_D = ([], ["p2p-vendo"], ["nav-p2p"], ["nav-p2p", "p2p-vendo"])
+    _FOGLIO = [_nd("div", "p2pDettSheet", ("sheet", "pieno", "open")),
+               _nd("div", "p2pDettCorpo", ("foglio-corpo",))]
+    _PAGINA = [_nd("div", "p2pOrdineCorpo")]
+    # la scatola che renderOrdineP2P mette intorno al conto, dal sorgente
+    _scat = lambda lato, conto: '<div class="p2p-ord lato-' + lato + '">' + conto + '</div>'
+    prova("DAL DETTAGLIO (libro o vetrina, dopo il tab Compra e dopo il tab Vendi): "
+          "«Ricevi X sats» verde su un «Compra BTC», «Invia X sats» rosso su un "
+          "«Vendi BTC» (lo dice la cascata)",
+          [["var(--trust)"] * 4, ["var(--danger)"] * 4],
+          [[_tinta_sats(o["pagina"], t, _FOGLIO) for t in _TAB_D],
+           [_tinta_sats(o["paginaVendi"], t, _FOGLIO) for t in _TAB_D]])
+    prova("DA «I MIEI SCAMBI» (e da un link o una notifica, stessa pagina): verde "
+          "se compro, rosso se vendo, qualunque tab",
+          [["var(--trust)"] * 4, ["var(--danger)"] * 4],
+          [[_tinta_sats(_scat("compro", o["mioStima"]), t, _PAGINA) for t in _TAB_D],
+           [_tinta_sats(_scat("vendo", o["mioVendo"]), t, _PAGINA) for t in _TAB_D]])
+    prova("...il conto porta scritto il lato di chi legge, dal suo o.lato",
+          [True, True, True, True],
+          ['conto-p2p lato-compro"' in o["pagina"], 'conto-p2p lato-vendo"' in o["paginaVendi"],
+           'conto-p2p lato-compro"' in o["mioStima"], 'conto-p2p lato-vendo"' in o["mioVendo"]])
+    prova("...e NESSUNA regola del conto o delle card guarda piu' il tab del libro", [],
+          [r for r in re.findall(r"body\.p2p-vendo[^{}]*\{",
+                                 re.sub(r"/\*[\s\S]*?\*/", "", _css_d))
+           if "conto-p2p" in r or "p2p-ord" in r or "p2pDett" in r or "ctrl-" in r])
     # ══ IL CONTO DEL P2P CEDE DALLA DESTRA (11 set 2026, decisione di
     # Andrea) ══ e rovescia SOLO QUI la regola di casa «a cedere e'
     # l'etichetta coi puntini»: qui a destra ci sono un cartello, una
@@ -57115,10 +57189,11 @@ console.log(JSON.stringify(out));
           '<b class="p2p-avviso">1%</b>' in cm
           and ".ctrl-riga .p2p-avviso{color:var(--danger)}" in mini
           and ".ctrl-riga .p2p-affare{color:var(--trust)}" in mini)
+    # (28 set 2026) il lato sta sulla scatola del conto, mai sul body
     prova("...e l'unica riga accesa porta il colore del lato",
           True,
-          ".conto-p2p .ctrl-riga.tot.sats .mono{color:var(--trust)}" in mini
-          and "body.p2p-vendo .conto-p2p .ctrl-riga.tot.sats .mono"
+          ".conto-p2p.lato-compro .ctrl-riga.tot.sats .mono{color:var(--trust)}" in mini
+          and ".conto-p2p.lato-vendo .ctrl-riga.tot.sats .mono"
               "{color:var(--danger)}" in mini
           # ...e l'arancio «dei sats in astratto» e' uscito di qui
           and ".conto-p2p .ctrl-riga.tot.sats .mono{color:var(--sats-text)}"
@@ -57367,7 +57442,7 @@ console.log(JSON.stringify(out));
         return [int(n.replace(".", ""))
                 for n in re.findall(r"([\d.]+) sats", html)]
     prova("il conto dello scambio proprio e' quello del libro", True,
-          '<div class="ctrl-conto conto-p2p">' in o["mioStima"]
+          '<div class="ctrl-conto conto-p2p lato-compro">' in o["mioStima"]
           and "Fee P2P" in o["mioStima"] and "Ricevi" in o["mioStima"])
     # ⚠️ LA CIFRA DEL COORDINATORE E' UN FATTO E NON UNA STIMA: senza
     # `≈`, e la fee ci morde sopra. E' la promessa di «Info P2P» —
@@ -58258,7 +58333,8 @@ def prove_nav_p2p():
     prova("la cifra delle card del libro veste il lato, morbida", True,
           "color:var(--trust)" in _ps
           and "transition:color .3s ease" in _ps
-          and "body.p2p-vendo .p2p-ord .p2p-sats{color:var(--danger)}"
+          # (28 set 2026) il rosso lo porta la card del lato, non il tab
+          and ".p2p-ord.lato-vendo .p2p-sats{color:var(--danger)}"
           in mini)
     # ⚠️ QUESTA SENTINELLA HA CAMBIATO DUE VOLTE IN UN GIORNO, e la
     # storia vale piu' della riga. Contava DUE regole
@@ -58286,12 +58362,16 @@ def prove_nav_p2p():
     # terzo li ha rimessi, e con loro la riga di colore. Quel che
     # NON e' mai cambiato e' la domanda: la cifra dei propri scambi
     # non deve vestirsi del tab del libro.
+    # EMENDATA (28 set 2026): la regola rossa non legge piu' il tab ma il
+    # lato della card (`.p2p-ord.lato-vendo`), quindi le regole
+    # `.p2p-ord .p2p-sats{color` sono UNA, e il neutralizzatore degli
+    # scambi (tre classi e un elemento) batte anche la rossa nuova
     prova("...solo nel libro: le altre case restano arancio", True,
           "color:var(--sats-text)" in pezzo_js(mini, ".p2p-sats{", "}")
-          and mini.count(".p2p-ord .p2p-sats{color") == 2
+          and mini.count(".p2p-ord .p2p-sats{color") == 1
           and "body .p2p-ord.p2p-scambio .p2p-sats{color:var(--sats-text)"
               in mini
-          and mini.index("body.p2p-vendo .p2p-ord .p2p-sats{")
+          and mini.index(".p2p-ord.lato-vendo .p2p-sats{")
               < mini.index("body .p2p-ord.p2p-scambio .p2p-sats{"))
     prova("del PNG singolo di ieri non resta niente", 0,
           mini.count('/assets/p2p-logo.png'))
@@ -63323,7 +63403,9 @@ function reset(){
        conto porta la classe del LATO della riga — `lato-compro` o
        `lato-vendo` — perche' il colore della riga «Paghi X sats» non
        segua piu' l'ultimo tab del libro */
-    out.contoInCard = /<div class="p2p-ord lato-(compro|vendo)"><div class="ctrl-conto conto-p2p">/.test(h);
+    /* ...e dal 28 set 2026 il lato lo porta anche il conto, ed e' lo stesso */
+    out.contoInCard = /<div class="p2p-ord lato-compro"><div class="ctrl-conto conto-p2p lato-compro">/.test(h)
+      || /<div class="p2p-ord lato-vendo"><div class="ctrl-conto conto-p2p lato-vendo">/.test(h);
     out.contoSullaCifraVera = h.indexOf('7619 sats') >= 0
       && h.indexOf('7543 sats') >= 0 && h.indexOf('7468') < 0;
     /* ...e la testa a due colonne non c'e' piu': quel che diceva —
@@ -105339,12 +105421,15 @@ def prove_ritocchi_flusso_p2p():
     prova("1) il conto della pagina porta la classe del lato della RIGA", True,
           "'<div class=\"p2p-ord lato-' + (o.lato === 'vendo' ? 'vendo' : 'compro') + '\">' + conto + '</div>' +"
           in fn("function renderOrdineP2P(){"))
-    prova("...e il CSS la veste: verde a comprare, rosso a vendere, sopra il tab del libro", True,
-          ".p2p-ord.lato-compro .conto-p2p .ctrl-riga.tot.sats .mono{color:var(--trust)}" in css
-          and ".p2p-ord.lato-vendo .conto-p2p .ctrl-riga.tot.sats .mono{color:var(--danger)}" in css
-          and css.index("body.p2p-vendo .conto-p2p .ctrl-riga.tot.sats .mono{color:var(--danger)}")
-              < css.index(".p2p-ord.lato-vendo .conto-p2p"))
-    prova("...senza una terza regola sui sats delle card (la sentinella del libro conta due)", 2,
+    # EMENDATA (28 set 2026, i colori del dettaglio aperto dalla vetrina):
+    # il lato non lo porta piu' la scatola intorno ma il CONTO stesso, e la
+    # regola che leggeva il tab del libro non c'e' piu'
+    prova("...e il CSS la veste: verde a comprare, rosso a vendere, e il tab del libro "
+          "non c'entra", True,
+          ".conto-p2p.lato-compro .ctrl-riga.tot.sats .mono{color:var(--trust)}" in css
+          and ".conto-p2p.lato-vendo .ctrl-riga.tot.sats .mono{color:var(--danger)}" in css
+          and "body.p2p-vendo .conto-p2p" not in css)
+    prova("...senza una seconda regola sui sats delle card (la sentinella del libro conta una)", 1,
           mini.count(".p2p-ord .p2p-sats{color"))
 
     # --- 2) WALLET OF SATOSHI NON SI PROPONE -------------------------

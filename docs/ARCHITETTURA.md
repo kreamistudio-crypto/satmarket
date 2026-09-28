@@ -6954,6 +6954,15 @@
   inviare», «inviando» nelle card di «I miei scambi». «Pagare» resta
   alla garanzia, al PayCode, alla fee e ai sats «in pagamento»; nel
   mercatino non cambia niente (`prove_p2p_invii`).
+  IL COLORE DEL LATO E' DELL'ORDINE, MAI DEL TAB (28 set 2026): verde se
+  i sats arrivano a chi legge, rosso se escono. Lo porta scritto chi
+  mostra un ordine — il conto (`contoDettP2P`, `lato-compro` /
+  `lato-vendo` sulla sua scatola) e la card del libro (`rigaOrdineP2P`) —,
+  quindi il dettaglio ha gli stessi colori da ogni strada (libro,
+  vetrina, «I miei scambi», link, notifica). `body.p2p-vendo` (il tab
+  del libro) veste solo quel che parla del tab: logo, nav, il + e il
+  foglio «Pubblica». Verbale: CANTIERI, «I colori del dettaglio aperto
+  dalla vetrina».
   IL CORO DEI RELAY (16 set 2026, la gamba VIVA del P2P): la
   connessione con cui il client parla col coordinator — richieste,
   risposte, restore, recapiti, via di riserva — non e' piu' UN relay

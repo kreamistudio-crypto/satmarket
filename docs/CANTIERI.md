@@ -35076,3 +35076,47 @@ BTC»; su A non c'e' mai — subito, tornando in Esplora, dopo un giro
 intero —, e nemmeno su un secondo dispositivo di A con l'archivio vuoto
 (lo sa dal server); nessun avviso, nessuno scorrimento laterale, nessun
 errore dell'app. **DA AVERE:** i due telefoni veri.
+
+I colori del dettaglio aperto dalla vetrina (28 set 2026, difetto
+trovato da Andrea sul campo). **IL DIFETTO:** aperto dalla fila «Scambi
+P2P» della home, un ordine «Compra BTC» diceva «Ricevi X sats» ROSSO e
+un «Vendi BTC» «Invia X sats» VERDE; dal libro i colori erano giusti.
+**IL PERCHE'**, ed era il resto di 0f24bd4: la riga dei sats del conto
+(`contoDettP2P`) prendeva il rosso da `body.p2p-vendo`, cioe' dall'ultimo
+tab del libro guardato. Dal libro combaciava per caso — il libro filtra
+per lato —; dalla vetrina il tab rimasto era qualunque. 0f24bd4 aveva
+curato solo la pagina di uno scambio proprio, con la classe del lato
+sulla scatola INTORNO al conto; il dettaglio di un ordine altrui non ce
+l'aveva. **LA CURA E' UNA per ogni strada** — libro, vetrina, «I miei
+scambi», link, notifica —: il conto scrive il lato sulla propria scatola
+(`lato-compro` se i sats arrivano a chi legge, `lato-vendo` se escono,
+dal suo `o.lato` gia' tradotto per chi legge), e le due regole del conto
+leggono solo quella; `body.p2p-vendo .conto-p2p ...` e le due regole
+della scatola di 0f24bd4 sono uscite. **IL CENSIMENTO** di chi decideva
+un colore dal tab: oltre al conto, la cifra dei sats delle card del
+libro (`body.p2p-vendo .p2p-ord .p2p-sats`), giusta solo perche' il
+libro filtra — ora la card porta `lato-compro`/`lato-vendo` da
+`rigaOrdineP2P` e la regola rossa e' `.p2p-ord.lato-vendo .p2p-sats`
+(la card di uno scambio resta arancio, il suo neutralizzatore pesa un
+elemento in piu'). Restano sul tab, PER MESTIERE, le cose che parlano
+del tab stesso e non di un ordine: il logo del libro, la nav, il + e la
+sua morfosi, il bottone e il premio del foglio «Pubblica» (si pubblica
+dal lato del tab). Titolo, verbi, pillole del metodo e bottoni del
+dettaglio leggevano gia' l'ordine. **PROVATO.** Sul markup vero, la
+cascata (`_vince_css`) coi quattro body che il tab puo' lasciare: il
+dettaglio (libro e vetrina, dopo il tab Compra e dopo il tab Vendi)
+verde su «Compra BTC» e rosso su «Vendi BTC», la pagina di uno scambio
+proprio verde se compro e rosso se vendo, la cifra delle card del libro
+idem; nessuna regola del conto o delle card che nomini ancora il tab.
+Emendate col perche' le sentinelle che citavano le regole vecchie
+(`prove_p2p_libro`, `prove_p2p_dettaglio`, `prove_nav_p2p`,
+`prove_p2p_motore`, `prove_ritocchi_flusso_p2p`) e l'ancora della card
+d'esempio in `prove_giro_guidato_p2p`. Tortura 9 su 9. Suite intera severa senza config nel worktree da origin/main (3d5ce5a): 16.722 verdi e 0 rosse; i 25 collaudi della CI verdi nella gabbia.
+**DAL VIVO**, CDP a 375 px nei due temi, relay di cartone su 127.0.0.1:
+col colore calcolato dal browser, dalla vetrina dopo il tab Vendi e dopo
+il tab Compra «Ricevi» verde e «Invia» rosso, dal libro lo stesso (e la
+cifra della card), da «I miei scambi» col tab rimasto sull'altro lato
+lo stesso; e lo stesso giro sul client di prima rifa' il difetto
+(«Ricevi» rosso dopo il tab Vendi, «Invia» verde dopo il tab Compra).
+Nessun errore dell'app, nessuno scorrimento laterale. **DA AVERE:** il
+telefono.
