@@ -52512,7 +52512,7 @@ def prove_ritocchi_prova_alan():
         "function giroCadutoP2P(o){", "function ordineMioP2P(id){",
         "function provvisorioDelLibroP2P(o){", "function ordineTuoP2P(id, o){",
         "function prendiOrdineP2P(id){", "function affareP2P(o){",
-        "function etichettaPremioP2P(mio, prem, affare){",
+        "function etichettaPremioP2P(mio, prem, affare){", "function notaPremioP2P(mio, affare){",
         "function articoloPercentoP2P(testo){", "function articoloDetPercentoP2P(testo){")) + r"""
 let DEMO = false, VETRINA = false, myTgId = 111;
 const INVITO_ONION = {p2p: ''};
@@ -52581,6 +52581,8 @@ out.nomi = {
   mioVendoPiu: N(true, 'buy', 2), mioVendoMeno: N(true, 'buy', -2),
   mioComproPiu: N(true, 'sell', 2), mioComproMeno: N(true, 'sell', -2),
 };
+out.note = [notaPremioP2P(false, true), notaPremioP2P(false, false),
+            notaPremioP2P(true, true), notaPremioP2P(true, false)];
 out.articoli = ['0,5', '1', '1,5', '2', '3', '8', '11', '80', '0,75']
   .map(q => articoloDetPercentoP2P(q) + q + '%');
 console.log(JSON.stringify(out));
@@ -52632,12 +52634,19 @@ console.log(JSON.stringify(out));
            "mioComproPiu": "Premio che hai offerto " + R,
            "mioComproMeno": "Sconto che hai richiesto " + A},
           {k: v for k, v in o["nomi"].items() if k.startswith("mio")})
-    prova("...e sotto la riga del premio nessuna nota", False,
-          "premio-perche" in mini or "function perchePremioP2P" in mini)
+    # (28 set 2026, ritocco di Andrea a cd264a9) sotto la riga degli
+    # altri una nota: da dove viene, dallo stesso giudice del colore
+    prova("LA NOTA SOTTO IL PREMIO degli altri: sconto offerto se conviene, premio "
+          "richiesto se no; sul mio niente",
+          ["Sconto offerto dall'utente", "Premio richiesto dall'utente", "", ""], o["note"])
+    css = mini[mini.index("<style"):mini.index("</style>")]
+    prova("...su una riga sola, piccola e nell'inchiostro delle note", True,
+          ".conto-p2p .ctrl-riga .premio-nota{flex:0 0 100%;margin-top:-5px;\n"
+          "    font-size:12.5px;font-weight:600;color:var(--ink-soft);white-space:nowrap;" in css)
     senza_commenti = re.sub(r"/\*[\s\S]*?\*/", "", mini)
     prova("...e nel codice da nessuna parte chi l'ha scelto", False,
           any(x in senza_commenti for x in ("chiesto da chi", "offerto da chi", "Premio al venditore",
-                                   "Sconto del venditore", "Premio richiesto")))
+                                   "Sconto del venditore")))
     prova("«PAGHI L'1% DI FEE»: l'articolo segue il numero, dal giudice di sempre",
           ["lo 0,5%", "l'1%", "l'1,5%", "il 2%", "il 3%", "l'8%", "l'11%", "l'80%",
            "lo 0,75%"], o["articoli"])
@@ -57164,6 +57173,8 @@ def prove_p2p_dettaglio():
         # (28 set 2026) l'etichetta del premio: l'effetto per chi guarda,
         # e sotto il perche'
         "function etichettaPremioP2P(mio, prem, affare){",
+        "function notaPremioP2P(mio, affare){",
+        "function conNotaPremioP2P(riga, nota){",
         "function articoloPercentoP2P(testo){",
         "function articoloDetPercentoP2P(testo){",
         # ...e la traduzione del lato, che e' come il conto arriva
@@ -58094,6 +58105,14 @@ console.log(JSON.stringify(out));
           ["meno conveniente" in o["contoPremio"],
            "che hai" not in o["contoPremio"],
            'conveniente</span><span class="mono">' in o["contoPremio"]])
+    # (28 set 2026, ritocco di Andrea a cd264a9) ...e sotto, DENTRO la
+    # voce, la nota: premio richiesto se non conviene, sconto offerto se si'
+    prova("...e sotto, dentro la voce, la nota di da dove viene", [True, True, True, False],
+          ['<span class="premio-nota">Premio richiesto dall\'utente</span></div>' in o["contoPremio"],
+           '<span class="premio-nota">Sconto offerto dall\'utente</span></div>' in o["contoSconto"],
+           '<span class="premio-nota">Sconto offerto dall\'utente</span></div>' in o["contoVendi"],
+           any("premio-nota" in o[k] for k in ("premioMioVendo", "scontoMioVendo",
+                                                "premioMioCompro", "scontoMioCompro"))])
 
     prova("senza volto il riquadro della reputazione non c'e' proprio",
           "", o["repSenza"])

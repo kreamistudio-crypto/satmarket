@@ -5581,6 +5581,13 @@
      questa apertura NON tocca: «≈ −3453 sats» spezzato a meta'
      sarebbe un altro numero. */
   .conto-p2p .ctrl-riga .mono .num{white-space:nowrap}
+  /* la nota sotto il premio (28 set 2026): a tutta larghezza dentro la
+     voce, piccola e nell'inchiostro delle note (--ink-soft, la regola
+     delle note piccole), su UNA riga sola anche a 320 px — i puntini
+     sono solo la rete */
+  .conto-p2p .ctrl-riga .premio-nota{flex:0 0 100%;margin-top:-5px;
+    font-size:12.5px;font-weight:600;color:var(--ink-soft);white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
   /* la riga della convenienza a sats fissi (27 set 2026), in cima al
      conto: una frase, non una voce — corpo piccolo, inchiostro morbido,
      il filo del conto sotto. I due pezzi vanno a capo INTERI («Premio
@@ -51014,8 +51021,9 @@ function contoDettP2P(o){
      riga e' la stessa degli altri ordini: il verso lo dice la PAROLA,
      «Premio» o «Sconto», come sulla card del libro. */
   const premio = ((!fisso && o.premium) || premioTab)
-    ? r(etichettaPremioP2P(o.mio, prem, affare),
-        cifra('premio', prem > 0 ? '−' : '+'), 'premio')
+    ? conNotaPremioP2P(r(etichettaPremioP2P(o.mio, prem, affare),
+        cifra('premio', prem > 0 ? '−' : '+'), 'premio'),
+        notaPremioP2P(o.mio, affare))
     : '';
   /* ⚠️ SOTTO IL CONTO NON C'E' PIU' NIENTE, e ci sono voluti due
      giri (set 2026, decisione di Andrea). Qui stavano due frasi:
@@ -51099,6 +51107,24 @@ function contoDettP2P(o){
    verso l'altro — il mio +2% da venditore l'ho richiesto, lo stesso +2%
    da compratore l'ho offerto. Il colore sta sul numero, mai sulle
    parole. */
+/* LA NOTA SOTTO LA RIGA DEL PREMIO (28 set 2026, ritocco di Andrea a
+   cd264a9): sugli ordini degli altri, sotto «X% più/meno conveniente»,
+   una riga piccola dice da dove viene — «Sconto offerto dall'utente»
+   quando conviene a chi guarda, «Premio richiesto dall'utente» quando
+   no. La decide lo STESSO giudice del colore (`affare`), quindi nota e
+   tinta non si scollano. Sui propri ordini niente: «che hai richiesto /
+   offerto» dice gia' tutto. PURA. */
+function notaPremioP2P(mio, affare){
+  if (mio) return '';
+  return affare ? 'Sconto offerto dall\'utente' : 'Premio richiesto dall\'utente';
+}
+/* ...e la nota sta DENTRO la voce del conto, a tutta larghezza in coda
+   (la voce va gia' a capo, `flex-wrap`): il filo fra le voci resta dov'e' */
+function conNotaPremioP2P(riga, nota){
+  if (!nota) return riga;
+  return riga.slice(0, -'</div>'.length)
+    + '<span class="premio-nota">' + nota + '</span></div>';
+}
 function etichettaPremioP2P(mio, prem, affare){
   const num = '<b class="' + (affare ? 'p2p-affare' : 'p2p-avviso') + '">'
     + Math.abs(Math.round(prem)) + '%</b>';

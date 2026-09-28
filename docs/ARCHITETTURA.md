@@ -7017,7 +7017,9 @@
   memoria volti, autori e cambi della fotografia
   (`_rinfresca_volti_foto_p2p`). La riga del premio nel conto dice
   l'effetto per chi guarda con la frase del badge («X% più/meno
-  conveniente», colore sul numero, niente sotto), e sul mio ordine quel
+  conveniente», colore sul numero, e sotto la nota «Sconto offerto /
+  Premio richiesto dall'utente» dallo stesso giudice, `notaPremioP2P`),
+  e sul mio ordine, senza nota, quel
   che ho scelto: «Premio/Sconto che hai richiesto» se pende verso di me,
   «che hai offerto» se pende verso l'altro (`etichettaPremioP2P`). Verbale: CANTIERI,
   «I ritocchi P2P dalla prova di Alan».

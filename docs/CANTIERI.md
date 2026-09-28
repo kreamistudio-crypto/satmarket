@@ -35479,3 +35479,24 @@ codice non si ricava QUALE posto fosse (nessuno scriveva il «?» su un
 nome che il server manda: era sempre un volto non ancora arrivato o una
 pagina che ne aveva uno vuoto in mano), e adesso lo dice il segno: la
 sagoma e' un'attesa, il «?» un «non lo conosco» del server.
+
+La nota sotto il premio (28 set 2026, ritocco di Andrea a cd264a9). Nel
+conto P2P, sotto «X% più conveniente» / «X% meno conveniente» degli
+ordini degli ALTRI, una riga piccola dentro la stessa voce: «Sconto
+offerto dall'utente» quando conviene a chi guarda, «Premio richiesto
+dall'utente» quando no — decisa dallo stesso giudice del colore
+(`affare`), cosi' nota e tinta non si scollano (`notaPremioP2P`,
+`conNotaPremioP2P`). Sui propri ordini niente: «che hai richiesto /
+offerto» basta. In `--ink-soft` a 12,5px (la regola delle note piccole),
+`white-space:nowrap`, a tutta larghezza in coda alla voce. **PROVATO.**
+`prove_ritocchi_prova_alan` e `prove_p2p_dettaglio` emendate (le quattro
+note, la regola CSS, la nota dentro la voce del conto, niente sul mio);
+la sentinella «da nessuna parte chi l'ha scelto» non cerca piu' «Premio
+richiesto», che ora e' la nota. Tortura 5 su 5. Suite intera severa
+senza config nel worktree da origin/main (761af3f): 16.910 verdi e 0
+rosse; i 25 collaudi della CI verdi nella gabbia. **DAL VIVO**, CDP nei
+due temi, relay di cartone su 127.0.0.1: sul «compra BTC» di Alan a −1%
+il conto di Bea dice «1% meno conveniente» in rosso e sotto «Premio
+richiesto dall'utente»; su una riga sola a 375 e a 320 px (la nota alta 18 px; misurata a 320 anche «Sconto offerto dall'utente»);
+sul proprio ordine di Alan «Sconto che hai richiesto 1%» e niente sotto.
+**DA AVERE:** il telefono.
